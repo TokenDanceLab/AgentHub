@@ -19,7 +19,7 @@ export interface FileChangeGroupProps {
   className?: string | undefined;
 }
 
-export default function FileChangeGroup({
+export function FileChangeGroup({
   title,
   files,
   defaultExpanded = true,

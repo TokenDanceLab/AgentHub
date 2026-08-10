@@ -231,4 +231,147 @@ describe('PermissionModePicker', () => {
     const btn = screen.getByRole('button');
     expect(btn.getAttribute('aria-label')).toBe('Select permission mode');
   });
+
+  // ── Keyboard navigation ─────────────────────────────────
+
+  it('exposes aria-haspopup="menu" on the trigger', () => {
+    render(
+      <PermissionModePicker
+        value="default"
+        label="Permissions"
+        options={DEFAULT_OPTIONS}
+        onChange={vi.fn()}
+      />,
+    );
+    expect(screen.getByRole('button').getAttribute('aria-haspopup')).toBe('menu');
+  });
+
+  it('moves focus into the first option when the popover opens', async () => {
+    const user = userEvent.setup();
+    render(
+      <PermissionModePicker
+        value="default"
+        label="Permissions"
+        options={DEFAULT_OPTIONS}
+        onChange={vi.fn()}
+      />,
+    );
+    const trigger = screen.getByRole('button');
+    await user.click(trigger);
+    const optionButtons = screen.getAllByRole('button').slice(1);
+    expect(optionButtons.length).toBe(DEFAULT_OPTIONS.length);
+    expect(document.activeElement).toBe(optionButtons[0]!);
+  });
+
+  it('moves between options with ArrowDown and ArrowUp', async () => {
+    const user = userEvent.setup();
+    render(
+      <PermissionModePicker
+        value="default"
+        label="Permissions"
+        options={DEFAULT_OPTIONS}
+        onChange={vi.fn()}
+      />,
+    );
+    await user.click(screen.getByRole('button'));
+    const optionButtons = screen.getAllByRole('button').slice(1);
+    fireEvent.keyDown(optionButtons[0]!, { key: 'ArrowDown' });
+    expect(document.activeElement).toBe(optionButtons[1]!);
+    fireEvent.keyDown(optionButtons[1]!, { key: 'ArrowDown' });
+    expect(document.activeElement).toBe(optionButtons[2]!);
+    fireEvent.keyDown(optionButtons[2]!, { key: 'ArrowUp' });
+    expect(document.activeElement).toBe(optionButtons[1]!);
+  });
+
+  it('jumps to first option on Home and last on End', async () => {
+    const user = userEvent.setup();
+    render(
+      <PermissionModePicker
+        value="default"
+        label="Permissions"
+        options={DEFAULT_OPTIONS}
+        onChange={vi.fn()}
+      />,
+    );
+    await user.click(screen.getByRole('button'));
+    const optionButtons = screen.getAllByRole('button').slice(1);
+    fireEvent.keyDown(optionButtons[0]!, { key: 'End' });
+    expect(document.activeElement).toBe(optionButtons[optionButtons.length - 1]!);
+    fireEvent.keyDown(optionButtons[optionButtons.length - 1]!, { key: 'Home' });
+    expect(document.activeElement).toBe(optionButtons[0]!);
+  });
+
+  it('selects the highlighted option with Enter and closes', async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    render(
+      <PermissionModePicker
+        value="default"
+        label="Permissions"
+        options={DEFAULT_OPTIONS}
+        onChange={onChange}
+      />,
+    );
+    const trigger = screen.getByRole('button');
+    await user.click(trigger);
+    const optionButtons = screen.getAllByRole('button').slice(1);
+    fireEvent.keyDown(optionButtons[0]!, { key: 'ArrowDown' });
+    fireEvent.keyDown(optionButtons[1]!, { key: 'Enter' });
+    expect(onChange).toHaveBeenCalledWith('acceptEdits');
+    expect(trigger.getAttribute('aria-expanded')).toBe('false');
+  });
+
+  it('selects the highlighted option with Space and closes', async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    render(
+      <PermissionModePicker
+        value="default"
+        label="Permissions"
+        options={DEFAULT_OPTIONS}
+        onChange={onChange}
+      />,
+    );
+    const trigger = screen.getByRole('button');
+    await user.click(trigger);
+    const optionButtons = screen.getAllByRole('button').slice(1);
+    fireEvent.keyDown(optionButtons[0]!, { key: ' ' });
+    expect(onChange).toHaveBeenCalledWith('default');
+    expect(trigger.getAttribute('aria-expanded')).toBe('false');
+  });
+
+  it('restores focus to the trigger when closed with Escape', async () => {
+    const user = userEvent.setup();
+    render(
+      <PermissionModePicker
+        value="default"
+        label="Permissions"
+        options={DEFAULT_OPTIONS}
+        onChange={vi.fn()}
+      />,
+    );
+    const trigger = screen.getByRole('button');
+    await user.click(trigger);
+    expect(document.activeElement).not.toBe(trigger);
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(trigger.getAttribute('aria-expanded')).toBe('false');
+    expect(document.activeElement).toBe(trigger);
+  });
+
+  it('restores focus to the trigger after selecting an option', async () => {
+    const user = userEvent.setup();
+    render(
+      <PermissionModePicker
+        value="default"
+        label="Permissions"
+        options={DEFAULT_OPTIONS}
+        onChange={vi.fn()}
+      />,
+    );
+    const trigger = screen.getByRole('button');
+    await user.click(trigger);
+    await user.click(screen.getByText('Plan Mode'));
+    expect(trigger.getAttribute('aria-expanded')).toBe('false');
+    expect(document.activeElement).toBe(trigger);
+  });
 });

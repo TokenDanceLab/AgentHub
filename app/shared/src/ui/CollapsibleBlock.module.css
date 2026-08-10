@@ -1,6 +1,6 @@
 .block {
   border: 1px solid var(--border);
-  border-radius: var(--radius-lg, 0.5rem);
+  border-radius: var(--r-lg);
   overflow: hidden;
 }
 
@@ -57,7 +57,7 @@
   display: inline-flex;
   align-items: center;
   padding: 1px 7px;
-  border-radius: var(--radius-full, 999px);
+  border-radius: var(--r-full);
   font-size: var(--font-size-xs, 0.75rem);
   font-weight: 700;
   text-transform: uppercase;

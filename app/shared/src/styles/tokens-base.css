@@ -215,6 +215,18 @@
   --qr-cell: #f2f2f5;
   --qr-cell-on: #111827;
 
+  /* ── Team transcript accent palette (SubagentTranscript / SubagentStreamOverlay /
+     InlineDelegationCard). Raw hex literals previously lived inline in the
+     team-trio CSS modules; hoisting them here as named tokens lets themes
+     override them and removes the dead `var(--td-*, #hex)` fallbacks. */
+  --td-accent-blue:         #5b9bd5;
+  --td-accent-purple:       #a78bfa;
+  --td-accent-purple-muted: #c4b5fd;
+  --td-accent-amber:        #f59e0b;
+  --td-accent-amber-bg:    rgba(245, 158, 11, 0.1);
+  --td-hover-faint:        rgba(255, 255, 255, 0.03);
+  --td-hover-soft:         rgba(255, 255, 255, 0.04);
+
   /* ═══════════════════════════════════════════════════════════════════════
      v4 Role Colors
      ═══════════════════════════════════════════════════════════════════════ */

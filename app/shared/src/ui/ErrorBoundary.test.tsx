@@ -284,14 +284,14 @@ describe('ErrorBoundary extensions', () => {
 // ── Stack trace ────────────────────────────────────────
 
 describe('ErrorBoundary stack trace', () => {
-  it('shows stack trace by default', () => {
+  it('hides stack trace by default (showStack defaults to false)', () => {
     const error = new Error('With stack');
     render(
       <ErrorBoundary>
         <Thrower error={error} />
       </ErrorBoundary>,
     );
-    expect(screen.getByText('Stack Trace')).toBeDefined();
+    expect(screen.queryByText('Stack Trace')).toBeNull();
   });
 
   it('hides stack trace when showStack is false', () => {
@@ -308,7 +308,7 @@ describe('ErrorBoundary stack trace', () => {
     const error = new Error('No stack');
     error.stack = undefined;
     render(
-      <ErrorBoundary>
+      <ErrorBoundary showStack>
         <Thrower error={error} />
       </ErrorBoundary>,
     );
@@ -323,6 +323,15 @@ describe('ErrorBoundary stack trace', () => {
       </ErrorBoundary>,
     );
     expect(screen.getByText('Stack Trace')).toBeDefined();
+  });
+
+  it('offers a copy-details button by default', () => {
+    render(
+      <ErrorBoundary>
+        <Thrower error={new Error('boom')} />
+      </ErrorBoundary>,
+    );
+    expect(screen.getByText('Copy error details')).toBeDefined();
   });
 });
 

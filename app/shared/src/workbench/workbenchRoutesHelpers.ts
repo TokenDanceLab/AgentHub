@@ -84,6 +84,7 @@ export function buildDocsPageProps(
     onClosePreview: docsRoute.closeDocPreview,
     onDocClick: docsRoute.openDocPreview,
     rows: docsRoute.rows,
+    documentsLoading: docsRoute.documentsLoading,
   };
 
   assignDefined(props, 'onCreateDoc', docsRoute.documentsActions?.onCreateDoc);

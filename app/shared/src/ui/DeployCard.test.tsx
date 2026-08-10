@@ -1,5 +1,42 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
+
+// DeployCard uses useTranslation('chatview') + t('deploy.status.*') /
+// t('deploy.action.*'). Without a mock, react-i18next's default t returns
+// the raw key, so the Chinese-label assertions below fail. Mock the hook
+// with the same zh strings the chatview resources bundle ships.
+vi.mock('react-i18next', () => ({
+  useTranslation: () => {
+    const map: Record<string, string> = {
+      'deploy.status.pending': '待部署',
+      'deploy.status.ready': '就绪',
+      'deploy.status.building': '构建中',
+      'deploy.status.deploying': '部署中',
+      'deploy.status.deployed': '已就绪',
+      'deploy.status.failed': '部署失败',
+      'deploy.action.preview': '预览',
+      'deploy.action.open': '打开',
+      'deploy.action.deployToPublic': '部署到公网',
+    };
+    return {
+      t: (key: string, options?: string | Record<string, unknown>) => {
+        const base = map[key];
+        if (base === undefined) {
+          return typeof options === 'string' ? options : key;
+        }
+        if (options && typeof options === 'object') {
+          return base.replace(
+            /\{\{(\w+)\}\}/g,
+            (_m: string, name: string) => String(options[name] ?? ''),
+          );
+        }
+        return base;
+      },
+      i18n: { language: 'zh' },
+    };
+  },
+}));
+
 import DeployCard from './DeployCard';
 
 describe('DeployCard', () => {

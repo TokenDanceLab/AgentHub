@@ -10,7 +10,7 @@
   height: 100%;
   min-height: 0;
   border: 1px solid var(--border);
-  border-radius: var(--radius-md);
+  border-radius: var(--r-md);
   overflow: hidden;
   background: var(--card);
 }
@@ -82,7 +82,7 @@
   gap: 4px;
   padding: 3px 10px;
   border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
+  border-radius: var(--r-sm);
   background: transparent;
   color: var(--muted-foreground);
   font-size: var(--font-size-2xs);
@@ -184,7 +184,7 @@
 .fileTabBadge {
   font-size: var(--font-size-2xs);
   padding: 0 4px;
-  border-radius: var(--radius-xs);
+  border-radius: var(--r-xs);
   font-weight: var(--font-weight-semibold);
 }
 
@@ -365,12 +365,12 @@
    white-space: pre column alignment. */
 .wordAdded {
   background: color-mix(in oklch, var(--diff-added-border) 28%, transparent);
-  border-radius: 2px;
+  border-radius: var(--r-xs);
 }
 
 .wordRemoved {
   background: color-mix(in oklch, var(--diff-removed-border) 28%, transparent);
-  border-radius: 2px;
+  border-radius: var(--r-xs);
 }
 
 /* High Contrast (Windows HC) — report §4.5. Red/green are unreliable
@@ -424,7 +424,7 @@
   height: 20px;
   padding: 0;
   border: 1px solid transparent;
-  border-radius: var(--radius-xs);
+  border-radius: var(--r-xs);
   background: transparent;
   cursor: pointer;
   flex-shrink: 0;
@@ -499,7 +499,7 @@
   font-weight: var(--font-weight-semibold);
   font-family: var(--font-sans);
   padding: 0 5px;
-  border-radius: var(--radius-xs);
+  border-radius: var(--r-xs);
   line-height: 16px;
   pointer-events: none;
   user-select: none;

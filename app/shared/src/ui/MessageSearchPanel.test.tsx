@@ -100,7 +100,7 @@ describe('MessageSearchPanel', () => {
     await flushDebounce();
     const marks = screen.getAllByText('auth', { selector: 'mark' });
     expect(marks.length).toBeGreaterThanOrEqual(1);
-    expect(marks[0].tagName).toBe('MARK');
+    expect(marks[0]!.tagName).toBe('MARK');
   }, 15000);
 
   it('calls onJumpToMessage when clicking a result', async () => {
@@ -110,7 +110,7 @@ describe('MessageSearchPanel', () => {
     fireEvent.change(input, { target: { value: 'auth module' } });
     await flushDebounce();
     const results = screen.getAllByText(/auth module/);
-    fireEvent.click(results[0].closest('button')!);
+    fireEvent.click(results[0]!.closest('button')!);
     expect(onJump).toHaveBeenCalledWith(expect.any(String), expect.any(Number));
   });
 
@@ -200,5 +200,46 @@ describe('MessageSearchPanel', () => {
     expect(screen.queryByText(/auth module/)).toBeInTheDocument();
 
     vi.useRealTimers();
+  });
+
+  // ── Focus trap ─────────────────────────────────────────
+
+  it('moves focus into the search input when opened', () => {
+    const { rerender } = render(
+      <MessageSearchPanel {...defaultProps} open={false} />,
+    );
+    rerender(<MessageSearchPanel {...defaultProps} open={true} />);
+    const input = screen.getByPlaceholderText<HTMLInputElement>('Type to search...');
+    expect(document.activeElement).toBe(input);
+  });
+
+  it('traps Tab: wrapping from the last element back to the first', () => {
+    render(<MessageSearchPanel {...defaultProps} />);
+    const input = screen.getByPlaceholderText<HTMLInputElement>('Type to search...');
+    const closeBtn = screen.getByLabelText('Close search');
+    closeBtn.focus();
+    fireEvent.keyDown(closeBtn, { key: 'Tab' });
+    expect(document.activeElement).toBe(input);
+  });
+
+  it('traps Shift+Tab: wrapping from the first element to the last', () => {
+    render(<MessageSearchPanel {...defaultProps} />);
+    const input = screen.getByPlaceholderText<HTMLInputElement>('Type to search...');
+    const closeBtn = screen.getByLabelText('Close search');
+    input.focus();
+    fireEvent.keyDown(input, { key: 'Tab', shiftKey: true });
+    expect(document.activeElement).toBe(closeBtn);
+  });
+
+  it('cycles Tab through result buttons back to the input', async () => {
+    render(<MessageSearchPanel {...defaultProps} />);
+    const input = screen.getByPlaceholderText<HTMLInputElement>('Type to search...');
+    fireEvent.change(input, { target: { value: 'auth module' } });
+    await flushDebounce();
+    const resultButtons = screen.getAllByRole('button').filter((btn) => btn !== input);
+    const lastResult = resultButtons[resultButtons.length - 1]!;
+    lastResult.focus();
+    fireEvent.keyDown(lastResult, { key: 'Tab' });
+    expect(document.activeElement).toBe(input);
   });
 });

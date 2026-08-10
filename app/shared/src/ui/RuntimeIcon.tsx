@@ -250,7 +250,7 @@ function runtimeIconFallbackSvg(name: RuntimeIconFallback, iconSize: number): Re
     stroke: 'currentColor',
     strokeLinecap: 'round',
     strokeLinejoin: 'round',
-    strokeWidth: 1.8,
+    strokeWidth: 1.9,
     viewBox: '0 0 24 24',
     width: iconSize,
   } as const;

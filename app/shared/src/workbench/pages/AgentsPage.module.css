@@ -1133,7 +1133,7 @@
   border-top: 1px solid var(--glass-border-subtle, var(--bdr));
 }
 
-.agent-edit-actions .btn {
+.agent-edit-actions > button {
   flex: 1 1 0;
   padding: 0 var(--sp-10);
 }
@@ -1168,63 +1168,6 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-/* ── Buttons ── */
-
-.btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  height: 36px;
-  padding: 0 18px;
-  border-radius: var(--r-md);
-  font: 500 0.875rem var(--font-sans);
-  border: none;
-  cursor: pointer;
-  transition: background var(--dur-normal), color var(--dur-normal),
-    box-shadow var(--dur-normal);
-  white-space: nowrap;
-}
-
-.btn-p {
-  background: var(--primary);
-  color: var(--text-inv);
-}
-
-.btn-p:hover {
-  background: var(--primary-hover);
-  box-shadow: var(--e-1);
-}
-
-.btn-s {
-  background: var(--surface);
-  color: var(--text-1);
-  border: 1px solid var(--bdr-strong);
-}
-
-.btn-s:hover {
-  background: var(--surface-high);
-}
-
-.btn-d {
-  background: var(--danger);
-  color: white;
-}
-
-.btn-d:hover {
-  filter: brightness(0.92);
-}
-
-.btn:active {
-  box-shadow: none;
-}
-
-.btn[disabled] {
-  opacity: 0.45;
-  cursor: not-allowed;
-  filter: none;
-  transform: none;
 }
 
 /* ═══════════════════════════════════════════════════════════════════════

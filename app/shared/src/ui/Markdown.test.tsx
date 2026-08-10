@@ -3,6 +3,24 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+
+// CodeBlock (rendered by Markdown) is wired to react-i18next. Provide the
+// zh literals so the rendered copy/expand button text stays stable for the
+// assertions below (mirrors the RowItem.test.tsx mock pattern).
+vi.mock('react-i18next', () => ({
+  useTranslation: () => ({
+    t: (key: string) => {
+      const resources: Record<string, string> = {
+        'code.copy': '复制',
+        'code.copied': '已复制',
+        'code.expand': '展开',
+        'code.collapse': '收起',
+      };
+      return resources[key] ?? key;
+    },
+  }),
+}));
+
 import MarkdownContent from './Markdown';
 import styles from './Markdown.module.css';
 
@@ -112,6 +130,23 @@ describe('Markdown renderer regressions', () => {
   test('does not turn raw HTML into executable script', () => {
     const container = renderMarkdown('<script>alert(1)</script>');
     expect(container.querySelector('script')).toBeNull();
+  });
+
+  test('does not render an inline <img onerror> hidden inside emphasis as a real image', () => {
+    // react-markdown without rehype-raw treats raw HTML as literal text, so
+    // an adversarial `**<img src=x onerror=alert(1)>**` must NOT produce a
+    // real <img> element nor attach an onerror attribute anywhere.
+    const container = renderMarkdown('**<img src=x onerror=alert(1)>**');
+    expect(container.querySelector('img')).toBeNull();
+    expect(container.querySelector('strong')).not.toBeNull();
+    // No element in the rendered tree carries an onerror attribute.
+    expect(container.querySelector('[onerror]')).toBeNull();
+  });
+
+  test('treats a bare <img onerror> payload as text, not an element', () => {
+    const container = renderMarkdown('<img src=x onerror=alert(1)>');
+    expect(container.querySelector('img')).toBeNull();
+    expect(container.querySelector('[onerror]')).toBeNull();
   });
 
   test('returns no markup for empty content', () => {

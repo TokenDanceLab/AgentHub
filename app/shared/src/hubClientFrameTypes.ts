@@ -28,6 +28,7 @@ export interface HubDeviceKickedPayload {
 
 export interface HubAgentDispatchPayload {
   task_id: string;
+  delivery_id?: string;
   agent_instance_id: string;
   agent_type: string;
   custom_agent_id?: string;
@@ -36,10 +37,18 @@ export interface HubAgentDispatchPayload {
   session_id: string;
   trigger_message_id: string;
   trigger_user_id: string;
+  prompt: string;
   display_name: string;
   system_prompt?: string;
   model_params?: string;
   tool_whitelist?: string;
+  team_id?: string;
+  team_run_id?: string;
+  team_member_id?: string;
+  team_member_role?: string;
+  messages?: unknown[];
+  pinned_messages?: unknown[];
+  structured_output_schema?: unknown;
 }
 
 export interface HubAgentStreamPayload extends HubTaskStreamRequest {

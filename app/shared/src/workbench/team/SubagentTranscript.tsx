@@ -4,6 +4,8 @@
 // Empty state shows "等待 agent 启动…" when no events exist.
 
 import React, { type ReactNode, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
+import { CHATVIEW_I18N_NAMESPACE } from '../../chatview/i18n/resources';
 import type { TeamSubagentStreamEvent } from './SubagentStreamStore';
 import { Icon } from '../../ui/Icon';
 import styles from './SubagentTranscript.module.css';
@@ -13,19 +15,19 @@ import styles from './SubagentTranscript.module.css';
 type EventCategory = 'thinking' | 'tool_call' | 'text_delta' | 'result' | 'error' | 'cancel' | 'other';
 
 interface CategoryConfig {
-  label: string;
+  labelKey: string;
   icon: string;
   colorClass: string;
 }
 
 const CATEGORY_MAP: Record<EventCategory, CategoryConfig> = {
-  thinking:   { label: '思考',   icon: 'psychology',    colorClass: styles.transcriptThinking! },
-  tool_call:  { label: '工具调用', icon: 'build',         colorClass: styles.transcriptToolCall! },
-  text_delta: { label: '输出',   icon: 'edit_note',     colorClass: styles.transcriptTextDelta! },
-  result:     { label: '结果',   icon: 'check_circle',  colorClass: styles.transcriptResult! },
-  error:      { label: '错误',   icon: 'error',         colorClass: styles.transcriptError! },
-  cancel:     { label: '已取消', icon: 'cancel',        colorClass: styles.transcriptCancel! },
-  other:      { label: '事件',   icon: 'circle',        colorClass: styles.transcriptOther! },
+  thinking:   { labelKey: 'subagentStream.cat.thinking',   icon: 'psychology',    colorClass: styles.transcriptThinking! },
+  tool_call:  { labelKey: 'subagentStream.cat.toolCall',   icon: 'build',         colorClass: styles.transcriptToolCall! },
+  text_delta: { labelKey: 'subagentStream.cat.textDelta',  icon: 'edit_note',     colorClass: styles.transcriptTextDelta! },
+  result:     { labelKey: 'subagentStream.cat.result',     icon: 'check_circle',  colorClass: styles.transcriptResult! },
+  error:      { labelKey: 'subagentStream.cat.error',      icon: 'error',         colorClass: styles.transcriptError! },
+  cancel:     { labelKey: 'subagentStream.cat.cancel',     icon: 'cancel',        colorClass: styles.transcriptCancel! },
+  other:      { labelKey: 'subagentStream.cat.other',      icon: 'circle',        colorClass: styles.transcriptOther! },
 };
 
 function classifyEvent(eventType: string): EventCategory {
@@ -141,6 +143,7 @@ export function SubagentTranscript({
   events,
   showEmpty = true,
 }: SubagentTranscriptProps): React.ReactElement {
+  const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE);
   const entries = useMemo(() => buildEntries(events), [events]);
 
   // ── Empty state ──
@@ -153,14 +156,14 @@ export function SubagentTranscript({
           size={18}
           {...(styles.emptyIcon !== undefined ? { className: styles.emptyIcon } : {})}
         />
-        <span className={styles.emptyText}>等待 agent 启动…</span>
+        <span className={styles.emptyText}>{t('subagentStream.emptyWaiting')}</span>
       </div>
     );
   }
 
   // ── Rendered transcript ──
   return (
-    <div className={styles.transcript} role="log" aria-label="子会话事件流" aria-live="polite">
+    <div className={styles.transcript} role="log" aria-label={t('subagentStream.transcriptLabel')} aria-live="polite">
       {entries.map(({ event, category, config }) => (
         <div
           key={event.event_seq}
@@ -174,7 +177,7 @@ export function SubagentTranscript({
               size={16}
               {...(styles.entryIcon !== undefined ? { className: styles.entryIcon } : {})}
             />
-            <span className={styles.entryLabel}>{config.label}</span>
+            <span className={styles.entryLabel}>{t(config.labelKey)}</span>
             <span className={styles.entrySeq}>#{event.event_seq}</span>
           </div>
 

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
-import FileChangeGroup from './FileChangeGroup';
+import { FileChangeGroup } from './FileChangeGroup';
 import type { FileChangeItem } from './FileChangeGroup';
 
 const files: FileChangeItem[] = [

@@ -5,7 +5,7 @@
   min-height: 24px;
   padding: 4px 9px;
   border: 1px solid var(--border);
-  border-radius: var(--radius-full, 999px);
+  border-radius: var(--r-full);
   font-size: var(--font-size-xs, 0.75rem);
   font-weight: 700;
   white-space: nowrap;
@@ -13,11 +13,13 @@
 }
 
 .default { color: var(--foreground); background: var(--secondary); }
-.blue    { color: oklch(0.45 0.14 250); background: oklch(0.60 0.18 240 / 0.12); border-color: oklch(0.60 0.18 240 / 0.22); }
-.cyan    { color: oklch(0.45 0.08 210); background: oklch(0.60 0.10 210 / 0.12); border-color: oklch(0.60 0.10 210 / 0.22); }
-.purple  { color: oklch(0.45 0.18 295); background: oklch(0.55 0.22 300 / 0.12); border-color: oklch(0.55 0.22 300 / 0.22); }
-.green   { color: oklch(0.45 0.14 155); background: oklch(0.58 0.18 150 / 0.12); border-color: oklch(0.58 0.18 150 / 0.22); }
-.amber   { color: oklch(0.50 0.14 80);  background: oklch(0.70 0.18 85 / 0.14);  border-color: oklch(0.70 0.18 85 / 0.26); }
+/* Variant → token mapping (see Pill.tsx comment): blue=info, cyan=td-accent-blue,
+   purple=td-accent-purple, green=success, amber=warning/td-accent-amber. */
+.blue    { color: var(--info); background: var(--info-bg); border-color: color-mix(in srgb, var(--info) 22%, transparent); }
+.cyan    { color: var(--td-accent-blue); background: color-mix(in srgb, var(--td-accent-blue) 12%, transparent); border-color: color-mix(in srgb, var(--td-accent-blue) 22%, transparent); }
+.purple  { color: var(--td-accent-purple); background: color-mix(in srgb, var(--td-accent-purple) 12%, transparent); border-color: color-mix(in srgb, var(--td-accent-purple) 22%, transparent); }
+.green   { color: var(--success); background: var(--success-bg); border-color: color-mix(in srgb, var(--success) 22%, transparent); }
+.amber   { color: var(--td-accent-amber); background: var(--td-accent-amber-bg); border-color: color-mix(in srgb, var(--td-accent-amber) 26%, transparent); }
 
 /* ── Responsive ─────────────────── */
 

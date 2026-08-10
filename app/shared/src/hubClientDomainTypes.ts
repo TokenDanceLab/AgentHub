@@ -475,7 +475,8 @@ export interface HubListResponse<T> {
 
 export type HubExecutionTargetType =
   | 'local_edge'
-  | 'remote_edge'
+  | 'remote_ssh'
+  | 'tailscale'
   | 'cloud_edge'
   | 'hub_relay'
   | string;

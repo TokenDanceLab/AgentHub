@@ -13,8 +13,8 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { AlertCircle, RotateCcw, X } from 'lucide-react';
+import { Button } from './Button';
 import { Tooltip } from './Tooltip';
-import DOMPurify from 'dompurify';
 import type { Config as DOMPurifyConfig } from 'dompurify';
 import styles from './DocxPreview.module.css';
 
@@ -49,7 +49,7 @@ export const DocxPreview: React.FC<DocxPreviewProps> = ({
       'sup', 'sub',
       'span', 'div',
     ],
-    ALLOWED_ATTR: ['href', 'src', 'alt', 'title', 'width', 'height', 'colspan', 'rowspan', 'style'],
+    ALLOWED_ATTR: ['href', 'src', 'alt', 'title', 'width', 'height', 'colspan', 'rowspan'],
     ALLOW_DATA_ATTR: false,
   });
 
@@ -73,6 +73,8 @@ export const DocxPreview: React.FC<DocxPreviewProps> = ({
 
       const mammoth = await import('mammoth');
       const result = await mammoth.default.convertToHtml({ arrayBuffer });
+      // Load DOMPurify alongside mammoth so neither stays in the main chunk.
+      const { default: DOMPurify } = await import('dompurify');
       const sanitized: string = DOMPurify.sanitize(result.value, purifyConfig.current);
       setHtml(sanitized);
     } catch (err) {
@@ -97,14 +99,15 @@ export const DocxPreview: React.FC<DocxPreviewProps> = ({
         </div>
         {onClose && (
           <Tooltip label="关闭预览">
-            <button
-              className={styles.closeBtn}
+            <Button
+              variant="ghost"
+              size="sm"
               type="button"
               onClick={onClose}
               aria-label="关闭预览"
             >
               <X size={16} />
-            </button>
+            </Button>
           </Tooltip>
         )}
       </div>

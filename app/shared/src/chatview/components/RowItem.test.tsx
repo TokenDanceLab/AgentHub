@@ -259,7 +259,7 @@ describe('RowItem approval card (QW4)', () => {
     };
     const { container } = render(<RowItem item={item} />);
     expect(container.querySelector('.ap-approve')).not.toBeNull();
-    expect(container.querySelector('.ap-deny')).not.toBeNull();
+    expect(container.querySelector('.ap-reject')).not.toBeNull();
   });
 
   it('fires onApprove callback', () => {
@@ -280,7 +280,7 @@ describe('RowItem approval card (QW4)', () => {
       collapsible: true, open: true, apReason: 'test',
     };
     const { container } = render(<RowItem item={item} onReject={onReject} />);
-    fireEvent.click(container.querySelector('.ap-deny')!);
+    fireEvent.click(container.querySelector('.ap-reject')!);
     expect(onReject).toHaveBeenCalledWith('ap-reject');
   });
 
@@ -441,9 +441,9 @@ describe('RowItem approval card (T16)', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Fable UIUX gap #4: code-copy button Copy→Check feedback
+// Fable UIUX gap #4: code copy button Copy→Check feedback
 // ---------------------------------------------------------------------------
-describe('RowItem code-copy button (fable UIUX #4)', () => {
+describe('RowItem code copy button (fable UIUX #4)', () => {
   const codeItem = (overrides: Partial<RowItemType> = {}): RowItemType => ({
     id: 'code-1', type: 'tool', label: 'read', status: 'ok',
     collapsible: true, open: true,
@@ -453,7 +453,7 @@ describe('RowItem code-copy button (fable UIUX #4)', () => {
 
   it('renders the copy button in idle 复制 state', () => {
     const { container } = render(<RowItem item={codeItem()} />);
-    const btn = container.querySelector('.code-copy')!;
+    const btn = container.querySelector('button[aria-label="复制"]')!;
     expect(btn).not.toBeNull();
     expect(btn.textContent).toContain('复制');
     expect(btn.classList.contains('copied')).toBe(false);
@@ -462,7 +462,7 @@ describe('RowItem code-copy button (fable UIUX #4)', () => {
   it('flips to 已复制 on click via onCopy and back after 1500ms', () => {
     const onCopy = vi.fn();
     const { container } = render(<RowItem item={codeItem()} onCopy={onCopy} />);
-    const btn = container.querySelector('.code-copy')!;
+    const btn = container.querySelector('button[aria-label="复制"]')!;
     fireEvent.click(btn);
     // delegates to the app-level handler with the joined lines
     expect(onCopy).toHaveBeenCalledWith('code-1', 'const a = 1;\nconsole.log(a);');
@@ -484,7 +484,7 @@ describe('RowItem code-copy button (fable UIUX #4)', () => {
       configurable: true,
     });
     const { container } = render(<RowItem item={codeItem()} />);
-    const btn = container.querySelector('.code-copy')!;
+    const btn = container.querySelector('button[aria-label="复制"]')!;
     await act(async () => {
       fireEvent.click(btn);
     });
@@ -494,5 +494,95 @@ describe('RowItem code-copy button (fable UIUX #4)', () => {
       value: undefined,
       configurable: true,
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Wave10 a11y: keyboard equivalents — Enter/Space activate, Shift+F10/Menu
+// opens context menu, Escape collapses. Mirrors the ConversationSidebar pattern.
+// ---------------------------------------------------------------------------
+describe('RowItem keyboard equivalents (Wave10 a11y)', () => {
+  const toolItem = (overrides: Partial<RowItemType> = {}): RowItemType => ({
+    id: 'tool-kbd', type: 'tool', label: 'read', status: 'ok',
+    collapsible: true, open: true, content: 'tool body',
+    ...overrides,
+  });
+
+  it('Enter activates block select with the stable interaction id', () => {
+    const onBlockSelect = vi.fn();
+    const { container } = render(<RowItem item={toolItem()} onBlockSelect={onBlockSelect} />);
+    fireEvent.keyDown(container.querySelector('.row-item')!, { key: 'Enter' });
+    expect(onBlockSelect).toHaveBeenCalledTimes(1);
+    expect(onBlockSelect).toHaveBeenCalledWith('tool-kbd', false);
+  });
+
+  it('Space activates block select and prevents default scroll', () => {
+    const onBlockSelect = vi.fn();
+    const { container } = render(<RowItem item={toolItem()} onBlockSelect={onBlockSelect} />);
+    const row = container.querySelector('.row-item')!;
+    // Use a real KeyboardEvent with a spy so we can assert preventDefault ran
+    // (RTL's fireEvent.keyDown return value does not expose defaultPrevented
+    // reliably across jsdom versions).
+    const event = new KeyboardEvent('keydown', { key: ' ', bubbles: true, cancelable: true });
+    const preventDefaultSpy = vi.spyOn(event, 'preventDefault');
+    fireEvent(row, event);
+    expect(onBlockSelect).toHaveBeenCalledTimes(1);
+    expect(onBlockSelect).toHaveBeenCalledWith('tool-kbd', false);
+    expect(preventDefaultSpy).toHaveBeenCalled();
+  });
+
+  it('Shift+Enter passes shiftKey through to block select', () => {
+    const onBlockSelect = vi.fn();
+    const { container } = render(<RowItem item={toolItem()} onBlockSelect={onBlockSelect} />);
+    fireEvent.keyDown(container.querySelector('.row-item')!, { key: 'Enter', shiftKey: true });
+    expect(onBlockSelect).toHaveBeenCalledWith('tool-kbd', true);
+  });
+
+  it('Shift+F10 opens the context menu with a rect-derived payload', () => {
+    const onContextMenu = vi.fn();
+    const { container } = render(<RowItem item={toolItem()} onContextMenu={onContextMenu} />);
+    fireEvent.keyDown(container.querySelector('.row-item')!, { key: 'F10', shiftKey: true });
+    expect(onContextMenu).toHaveBeenCalledTimes(1);
+    const [blockId, payload] = onContextMenu.mock.calls[0]!;
+    expect(blockId).toBe('tool-kbd');
+    expect(typeof payload.preventDefault).toBe('function');
+    expect(payload.clientX).toBeGreaterThanOrEqual(0);
+    expect(payload.clientY).toBeGreaterThanOrEqual(0);
+  });
+
+  it('Menu (ContextMenu) key opens the context menu too', () => {
+    const onContextMenu = vi.fn();
+    const { container } = render(<RowItem item={toolItem()} onContextMenu={onContextMenu} />);
+    fireEvent.keyDown(container.querySelector('.row-item')!, { key: 'ContextMenu' });
+    expect(onContextMenu).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not throw when Shift+F10 pressed without an onContextMenu handler', () => {
+    const { container } = render(<RowItem item={toolItem()} />);
+    expect(() => {
+      fireEvent.keyDown(container.querySelector('.row-item')!, { key: 'F10', shiftKey: true });
+    }).not.toThrow();
+  });
+
+  it('Escape collapses an open collapsible row', () => {
+    const { container } = render(<RowItem item={toolItem()} />);
+    expect(container.querySelector('.row-bd')).not.toBeNull();
+    fireEvent.keyDown(container.querySelector('.row-item')!, { key: 'Escape' });
+    expect(container.querySelector('.row-bd')).toBeNull();
+  });
+
+  it('Escape is a no-op on a non-collapsible row', () => {
+    const { container } = render(<RowItem item={toolItem({ collapsible: false, open: false })} />);
+    expect(() => {
+      fireEvent.keyDown(container.querySelector('.row-item')!, { key: 'Escape' });
+    }).not.toThrow();
+    expect(container.querySelector('.row-item')).not.toBeNull();
+  });
+
+  it('Enter on the row does not double-fire when focus is on the inner header button', () => {
+    const onBlockSelect = vi.fn();
+    const { container } = render(<RowItem item={toolItem()} onBlockSelect={onBlockSelect} />);
+    fireEvent.keyDown(container.querySelector('.row-hd')!, { key: 'Enter' });
+    expect(onBlockSelect).not.toHaveBeenCalled();
   });
 });

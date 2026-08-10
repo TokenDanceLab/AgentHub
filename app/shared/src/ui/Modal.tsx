@@ -4,6 +4,7 @@ import { useEffect, useCallback, useRef, type ReactNode } from 'react';
 import { X, Maximize2, Minimize2 } from 'lucide-react';
 import { useFocusTrap } from './focusTrap';
 import { Tooltip } from './Tooltip';
+import { Button } from './Button';
 import styles from './Modal.module.css';
 
 export interface ModalProps {
@@ -20,7 +21,7 @@ export interface ModalProps {
   contentClassName?: string | undefined;
 }
 
-export default function Modal({
+export function Modal({
   open,
   onClose,
   title,
@@ -83,25 +84,27 @@ export default function Modal({
             {title != null && <span className={styles.title}>{title}</span>}
             {onToggleFullscreen != null && (
               <Tooltip label={fullscreen ? 'Exit fullscreen' : 'Fullscreen'}>
-              <button
-                className={styles.fullscreenBtn}
-                onClick={onToggleFullscreen}
-                aria-label={fullscreen ? 'Exit fullscreen' : 'Fullscreen'}
-                type="button"
-              >
-                {fullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
-              </button>
-            </Tooltip>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={onToggleFullscreen}
+                  aria-label={fullscreen ? 'Exit fullscreen' : 'Fullscreen'}
+                  type="button"
+                >
+                  {fullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
+                </Button>
+              </Tooltip>
             )}
             <Tooltip label="Close">
-              <button
-                className={styles.closeBtn}
+              <Button
+                variant="ghost"
+                size="sm"
                 onClick={onClose}
                 aria-label="Close"
                 type="button"
               >
                 <X size={16} />
-              </button>
+              </Button>
             </Tooltip>
           </div>
         )}
@@ -110,3 +113,5 @@ export default function Modal({
     </div>
   );
 }
+
+export default Modal;

@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useEffect, type KeyboardEvent } from 'react';
+import { useState, useRef, useCallback, useEffect, useId, type KeyboardEvent } from 'react';
 import { createPortal } from 'react-dom';
 import styles from './Select.module.css';
 
@@ -19,6 +19,13 @@ export function Select({ value, options, onChange, placeholder, className, ariaL
   const triggerRef = useRef<HTMLButtonElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const mountedRef = useRef(false);
+  const typeaheadRef = useRef<{ chars: string; timer: ReturnType<typeof setTimeout> | null }>({
+    chars: '',
+    timer: null,
+  });
+  const listboxId = useId();
+
+  const optionId = (idx: number) => `${listboxId}-option-${idx}`;
 
   const selectedLabel = options.find(([v]) => v === value)?.[1] ?? placeholder ?? '';
 
@@ -78,6 +85,14 @@ export function Select({ value, options, onChange, placeholder, className, ariaL
         e.preventDefault();
         setFocusIdx((i) => (i - 1 + options.length) % options.length);
         break;
+      case 'Home':
+        e.preventDefault();
+        if (open) setFocusIdx(0);
+        break;
+      case 'End':
+        e.preventDefault();
+        if (open) setFocusIdx(options.length - 1);
+        break;
       case 'Enter':
       case ' ':
         e.preventDefault();
@@ -91,6 +106,25 @@ export function Select({ value, options, onChange, placeholder, className, ariaL
       case 'Escape':
         e.preventDefault();
         close();
+        break;
+      default:
+        // Typeahead: consecutive printable characters jump to the first option
+        // whose label contains the accumulated string (resets after 500ms).
+        if (open && e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
+          e.preventDefault();
+          const typeahead = typeaheadRef.current;
+          if (typeahead.timer) clearTimeout(typeahead.timer);
+          typeahead.chars = (typeahead.chars + e.key).slice(-64);
+          typeahead.timer = setTimeout(() => {
+            typeahead.chars = '';
+            typeahead.timer = null;
+          }, 500);
+          const needle = typeahead.chars.toLowerCase();
+          const matchIdx = options.findIndex(([, label]) =>
+            label.toLowerCase().includes(needle),
+          );
+          if (matchIdx >= 0) setFocusIdx(matchIdx);
+        }
         break;
     }
   };
@@ -129,6 +163,8 @@ export function Select({ value, options, onChange, placeholder, className, ariaL
             ref={dropdownRef}
             className={`${styles.dropdown} ${position === 'up' ? styles.dropdownUp : ''}`}
             role="listbox"
+            id={listboxId}
+            aria-activedescendant={optionId(focusIdx)}
             onKeyDown={handleKey}
             style={
               triggerRef.current
@@ -148,7 +184,9 @@ export function Select({ value, options, onChange, placeholder, className, ariaL
             {options.map(([optValue, label], idx) => (
               <button
                 key={optValue}
+                id={optionId(idx)}
                 type="button"
+                tabIndex={-1}
                 className={`${styles.option} ${optValue === value ? styles.optionSelected : ''} ${idx === focusIdx ? styles.optionFocused : ''}`}
                 role="option"
                 aria-selected={optValue === value}

@@ -4,7 +4,7 @@
   height: 34px;
   place-items: center;
   flex-shrink: 0;
-  border-radius: 10px;
+  border-radius: var(--r-sm);
   color: var(--primary);
   font-family: var(--font-sans);
   font-weight: 900;
@@ -14,9 +14,9 @@
   border: 1px solid color-mix(in oklch, var(--primary) 28%, transparent);
 }
 
-.sm { width: 28px; height: 28px; font-size: 11px; border-radius: 8px; }
-.md { width: 34px; height: 34px; font-size: 14px; border-radius: 10px; }
-.lg { width: 42px; height: 42px; font-size: 16px; border-radius: 12px; }
+.sm { width: 28px; height: 28px; font-size: 11px; border-radius: var(--r-sm); }
+.md { width: 34px; height: 34px; font-size: 14px; border-radius: var(--r-sm); }
+.lg { width: 42px; height: 42px; font-size: 16px; border-radius: var(--r-md); }
 
 .brand {
   background: color-mix(in oklch, var(--brand) 14%, transparent);

@@ -1,6 +1,6 @@
 .card {
   border: 1px solid var(--border);
-  border-radius: var(--radius-md);
+  border-radius: var(--r-md);
   background: var(--card);
   margin: 6px 0;
   overflow: hidden;
@@ -52,14 +52,14 @@
   flex-shrink: 0;
 }
 
-.actionBtn {
+.iconAction {
   display: flex;
   align-items: center;
   justify-content: center;
   width: 26px;
   height: 26px;
   border: none;
-  border-radius: 6px;
+  border-radius: var(--r-xs);
   background: transparent;
   color: var(--muted-foreground);
   cursor: pointer;
@@ -67,35 +67,12 @@
   text-decoration: none;
 }
 
-.actionBtn:hover {
+.iconAction:hover {
   background: color-mix(in oklch, var(--foreground) 10%, transparent);
   color: var(--foreground);
 }
 
-.actionBtn:focus-visible {
-  outline: none;
-  box-shadow: var(--focus-ring);
-}
-
-.applyBtn {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 2px 8px;
-  border: 1px solid var(--primary);
-  border-radius: var(--radius-sm);
-  background: transparent;
-  color: var(--primary);
-  font-size: var(--font-size-xs);
-  cursor: pointer;
-  transition: background var(--duration-fast);
-}
-
-.applyBtn:hover {
-  background: color-mix(in oklch, var(--primary) 12%, transparent);
-}
-
-.applyBtn:focus-visible {
+.iconAction:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
@@ -109,7 +86,7 @@
   align-items: center;
   gap: 3px;
   padding: 2px 8px;
-  border-radius: var(--radius-sm);
+  border-radius: var(--r-sm);
   background: color-mix(in oklch, var(--success) 14%, transparent);
   color: var(--success);
   font-size: var(--font-size-xs);
@@ -126,6 +103,11 @@
   width: 100%;
   max-height: 360px;
   object-fit: contain;
+}
+
+.previewSkeleton {
+  min-height: 200px;
+  border-radius: var(--r-sm);
 }
 
 .previewFrame {

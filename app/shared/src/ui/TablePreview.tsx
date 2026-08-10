@@ -14,6 +14,7 @@
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { AlertCircle, ArrowUp, ArrowDown, ArrowUpDown, RotateCcw, X } from 'lucide-react';
+import { Button } from './Button';
 import styles from './TablePreview.module.css';
 import { Tooltip } from './Tooltip';
 
@@ -239,14 +240,15 @@ export const TablePreview: React.FC<TablePreviewProps> = ({
         </div>
         {onClose && (
           <Tooltip label="关闭预览">
-            <button
-              className={styles.closeBtn}
+            <Button
+              variant="ghost"
+              size="sm"
               type="button"
               onClick={onClose}
               aria-label="关闭预览"
             >
               <X size={16} />
-            </button>
+            </Button>
           </Tooltip>
         )}
       </div>

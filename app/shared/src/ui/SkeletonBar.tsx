@@ -16,9 +16,9 @@ export interface SkeletonBarProps {
   /** Gap between bars (CSS value). Default '0.5em'. */
   gap?: string;
   /** Additional className for the container. */
-  className?: string;
+  className?: string | undefined;
   /** Additional className for each bar line. */
-  lineClassName?: string;
+  lineClassName?: string | undefined;
 }
 
 

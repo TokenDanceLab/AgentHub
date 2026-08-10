@@ -21,6 +21,36 @@ import { Transcript } from '../../chatview/components/Transcript';
 vi.mock('virtua', () => ({
   Virtualizer: ({ children }: { children?: ReactNode }) => <>{children}</>,
 }));
+
+// InlineDelegationCard + SubagentTranscript resolve status labels via the
+// chatview i18n namespace. Mirror those keys here so the rendered zh status
+// copy is what the assertions expect.
+vi.mock('react-i18next', () => ({
+  useTranslation: () => ({
+    t: (key: string) => {
+      const translations: Record<string, string> = {
+        'inlineDelegation.ariaStack': '委派状态',
+        'inlineDelegation.emptyDetail': '暂无详细事件流',
+        'inlineDelegation.status.dispatching': '派单中…',
+        'inlineDelegation.status.streaming': '执行中…',
+        'inlineDelegation.status.done': '完成 ✓',
+        'inlineDelegation.status.failed': '失败 ✗',
+        'inlineDelegation.status.cancelled': '已取消',
+        'subagentStream.transcriptLabel': '子会话事件流',
+        'subagentStream.emptyWaiting': '等待 agent 启动…',
+        'subagentStream.cat.thinking': '思考',
+        'subagentStream.cat.toolCall': '工具调用',
+        'subagentStream.cat.textDelta': '输出',
+        'subagentStream.cat.result': '结果',
+        'subagentStream.cat.error': '错误',
+        'subagentStream.cat.cancel': '已取消',
+        'subagentStream.cat.other': '事件',
+      };
+      return translations[key] ?? key;
+    },
+    i18n: { language: 'zh' },
+  }),
+}));
 import type { TranscriptUserItem } from '../../chatview/transcript-item';
 
 function feedDispatch(overrides: Record<string, unknown> = {}): void {

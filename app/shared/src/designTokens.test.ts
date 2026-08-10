@@ -55,9 +55,15 @@ describe('designTokens', () => {
   it('looks up individual aliases without embedding app-specific copies', () => {
     expect(getGlassTokenAlias('--td-plum')).toMatchObject({
       intent: 'Active/focus accent',
-      desktopValue: '#5d68cc',
+      desktopValue: '#29ABE2',
       webAlias: '--brand',
       mobileAlias: '--td-plum',
+    });
+    expect(getGlassTokenAlias('--td-radius-control')).toMatchObject({
+      intent: 'Compact control radius',
+      desktopValue: '8px',
+      webAlias: '--r-sm',
+      mobileAlias: '--td-radius-control',
     });
     expect(getGlassTokenAlias('--td-glass-blur')).toMatchObject({
       intent: 'Frosted glass blur radius',

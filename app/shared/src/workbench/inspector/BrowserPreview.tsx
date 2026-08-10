@@ -4,7 +4,10 @@ import {
   type AgentHubTheme,
 } from '../../theme';
 import { DESIGN_NAV_GLYPH_STROKE_WIDTH, DesignNavIcon } from '../designIcons';
+import { Button } from '../../ui/Button';
 import { Tooltip } from '../../ui/Tooltip';
+import { useTranslation } from 'react-i18next';
+import { CHATVIEW_I18N_NAMESPACE } from '../../chatview/i18n/resources';
 import styles from './BrowserPreview.module.css';
 
 /* ═══════════════════════════════════════════════════════════════════════
@@ -114,6 +117,7 @@ export const BrowserPreview: React.FC<BrowserPreviewProps> = ({
   url,
   onClose,
 }) => {
+  const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE);
   const hostTheme = useHostAgentHubTheme();
   const themedBlank = isThemedBlankPreviewUrl(url);
   const addressLabel = themedBlank ? (url.trim() || 'about:blank') : url;
@@ -124,16 +128,16 @@ export const BrowserPreview: React.FC<BrowserPreviewProps> = ({
   return (
     <section
       className={styles.pane}
-      aria-label="内置浏览器预览"
+      aria-label={t('aria.browserPreview')}
     >
       {/* ── Toolbar ── */}
       <div className={styles.toolbar}>
         {/* Back */}
-        <Tooltip label="后退">
+        <Tooltip label={t('aria.goBack')}>
           <button
             className={styles.navBtn}
             type="button"
-            aria-label="后退"
+            aria-label={t('aria.goBack')}
             disabled
           >
             <DesignNavIcon name="back" size={15} strokeWidth={DESIGN_NAV_GLYPH_STROKE_WIDTH} />
@@ -141,11 +145,11 @@ export const BrowserPreview: React.FC<BrowserPreviewProps> = ({
         </Tooltip>
 
         {/* Forward */}
-        <Tooltip label="前进">
+        <Tooltip label={t('aria.goForward')}>
           <button
             className={styles.navBtn}
             type="button"
-            aria-label="前进"
+            aria-label={t('aria.goForward')}
             disabled
           >
             <DesignNavIcon name="forward" size={15} strokeWidth={DESIGN_NAV_GLYPH_STROKE_WIDTH} />
@@ -153,11 +157,11 @@ export const BrowserPreview: React.FC<BrowserPreviewProps> = ({
         </Tooltip>
 
         {/* Refresh */}
-        <Tooltip label="刷新">
+        <Tooltip label={t('aria.refresh')}>
           <button
             className={styles.navBtn}
             type="button"
-            aria-label="刷新"
+            aria-label={t('aria.refresh')}
           >
             <DesignNavIcon name="refresh" size={15} strokeWidth={DESIGN_NAV_GLYPH_STROKE_WIDTH} />
           </button>
@@ -172,15 +176,16 @@ export const BrowserPreview: React.FC<BrowserPreviewProps> = ({
         </div>
 
         {/* Close */}
-        <Tooltip label="关闭预览">
-          <button
-            className={styles.closeBtn}
+        <Tooltip label={t('aria.closePreview')}>
+          <Button
+            variant="ghost"
+            size="sm"
             type="button"
             onClick={onClose}
-            aria-label="关闭预览"
+            aria-label={t('aria.closePreview')}
           >
             <DesignNavIcon name="close" size={15} strokeWidth={DESIGN_NAV_GLYPH_STROKE_WIDTH} />
-          </button>
+          </Button>
         </Tooltip>
       </div>
 
@@ -189,14 +194,14 @@ export const BrowserPreview: React.FC<BrowserPreviewProps> = ({
         {themedBlank ? (
           <iframe
             className={`${styles.frame} ${styles.frameBlank}`}
-            title={`预览 ${addressLabel}`}
+            title={t('browserPreview.iframeTitle', { url: addressLabel })}
             srcDoc={blankSrcDoc}
             loading="lazy"
           />
         ) : (
           <iframe
             className={styles.frame}
-            title={`预览 ${url}`}
+            title={t('browserPreview.iframeTitle', { url })}
             src={url}
             loading="lazy"
           />
@@ -207,7 +212,7 @@ export const BrowserPreview: React.FC<BrowserPreviewProps> = ({
       <div className={styles.status}>
         <span className={styles.statusItem}>Desktop</span>
         <span className={styles.statusItem}>Local Vite</span>
-        <span className={styles.statusItem}>只读预览</span>
+        <span className={styles.statusItem}>{t('browserPreview.readOnly')}</span>
       </div>
     </section>
   );

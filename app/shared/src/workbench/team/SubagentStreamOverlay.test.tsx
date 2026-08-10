@@ -8,7 +8,9 @@ import {
 import { SubagentStreamOverlay } from './SubagentStreamOverlay';
 
 // Mock i18n: SubagentStreamOverlay + SubagentSessionDialog use the
-// sharedWorkbench namespace for dialog/open-button labels.
+// sharedWorkbench namespace for dialog/open-button labels. SubagentTranscript
+// (rendered inside the expanded overlay) uses the chatview namespace for its
+// category labels and empty hint, so those keys are mirrored here too.
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
     t: (key: string, options?: Record<string, unknown>) => {
@@ -16,6 +18,14 @@ vi.mock('react-i18next', () => ({
         'subagentStream.dialogTitle': '{{name}} · 子会话详情',
         'subagentStream.openSession': '打开完整会话',
         'subagentStream.transcriptLabel': '子会话事件流',
+        'subagentStream.emptyWaiting': '等待 agent 启动…',
+        'subagentStream.cat.thinking': '思考',
+        'subagentStream.cat.toolCall': '工具调用',
+        'subagentStream.cat.textDelta': '输出',
+        'subagentStream.cat.result': '结果',
+        'subagentStream.cat.error': '错误',
+        'subagentStream.cat.cancel': '已取消',
+        'subagentStream.cat.other': '事件',
       };
       const base = translations[key] ?? key;
       if (!options || typeof options !== 'object') return base;
