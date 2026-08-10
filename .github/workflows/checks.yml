@@ -48,7 +48,6 @@ jobs:
         run: go build ./...
 
       - name: Lint
-        continue-on-error: true
         uses: golangci/golangci-lint-action@v9
         with:
           working-directory: edge-server
@@ -91,7 +90,8 @@ jobs:
           exit $FAILED
 
       - name: Security scan (gosec)
-        continue-on-error: true  # Wave 10: advisory; gosec findings are pre-existing cognitive complexity
+        # Wave 10: advisory; gosec findings are pre-existing cognitive complexity
+        continue-on-error: true
         run: go run github.com/securego/gosec/v2/cmd/gosec@latest ./...
       - name: Vet
         run: go vet ./...
@@ -151,7 +151,8 @@ jobs:
       # until the debt is repaid to zero. Reads the same JSON report the Lint
       # step just produced (single source, no version drift).
       - name: Verify Hub lint fingerprint ratchet (#1573)
-        continue-on-error: true  # Wave 10: CI golangci-lint version produces different findings; re-baseline on CI
+        # Wave 10: CI golangci-lint version produces different findings; re-baseline on CI
+        continue-on-error: true
         working-directory: .
         run: python ./scripts/verify/verify-hub-lint-ratchet.py --LintJsonPath "${{ runner.temp }}/hub-lint-report.json"
 
@@ -184,7 +185,8 @@ jobs:
           fi
 
       - name: Security scan (gosec)
-        continue-on-error: true  # Wave 10: advisory matching go-edge
+        # Wave 10: advisory matching go-edge
+        continue-on-error: true
         run: go run github.com/securego/gosec/v2/cmd/gosec@latest ./...
 
       - name: Vet
