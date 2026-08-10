@@ -3,7 +3,7 @@ import type { WorkbenchConversation } from '../platform';
 import {
   ContextMenu,
   MultiSelectBar,
-  Toast,
+  DemoToast,
   type ContextMenuItem,
   type MultiSelectBarAction,
 } from './floating';
@@ -64,7 +64,7 @@ export function WorkbenchTranscriptOverlays({
           workspaceWidth={selectBarRect?.width}
         />
       )}
-      <Toast message={toastMessage} visible={toastVisible} />
+      <DemoToast message={toastMessage} visible={toastVisible} />
     </>
   );
 }

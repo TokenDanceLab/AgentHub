@@ -1,6 +1,9 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import type { ChatMessage } from '../types/chat';
 import type { TranscriptBlock } from '../transcript';
+import { useFocusTrap } from './focusTrap';
+import { X } from 'lucide-react';
+import { Button } from './Button';
 import styles from './MessageSearchPanel.module.css';
 
 const SEARCH_DEBOUNCE_MS = 300;
@@ -107,7 +110,7 @@ function toSearchableItems(messages?: ChatMessage[], transcriptBlocks?: Transcri
   return [];
 }
 
-export default function MessageSearchPanel({
+export function MessageSearchPanel({
   messages,
   transcriptBlocks,
   open,
@@ -123,6 +126,8 @@ export default function MessageSearchPanel({
   const [query, setQuery] = useState('');
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inputRef = useState<HTMLInputElement | null>(null);
+  const panelRef = useRef<HTMLDivElement | null>(null);
+  useFocusTrap(panelRef, open);
 
   const searchableItems = useMemo(
     () => toSearchableItems(messages, transcriptBlocks),
@@ -230,7 +235,12 @@ export default function MessageSearchPanel({
 
   return (
     <div className={styles.overlay} onClick={onClose}>
-      <div className={styles.panel} onClick={(e) => e.stopPropagation()} onKeyDown={handleKeyDown}>
+      <div
+        ref={panelRef}
+        className={styles.panel}
+        onClick={(e) => e.stopPropagation()}
+        onKeyDown={handleKeyDown}
+      >
         <div className={styles.searchBar}>
           <svg className={styles.searchIcon} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <circle cx="11" cy="11" r="8" />
@@ -245,12 +255,9 @@ export default function MessageSearchPanel({
             placeholder={searchPlaceholder}
             aria-label={searchLabel}
           />
-          <button className={styles.closeBtn} onClick={onClose} aria-label="Close search">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <line x1="18" y1="6" x2="6" y2="18" />
-              <line x1="6" y1="6" x2="18" y2="18" />
-            </svg>
-          </button>
+          <Button variant="ghost" size="sm" onClick={onClose} aria-label="Close search">
+            <X size={14} />
+          </Button>
         </div>
 
         <div className={styles.results}>
@@ -289,3 +296,13 @@ export default function MessageSearchPanel({
     </div>
   );
 }
+
+/*
+  Migration bridge (Wave 10): keep a default export so out-of-scope consumers
+  using `import MessageSearchPanel from './MessageSearchPanel'` keep compiling
+  — currently workbench/ConversationHost.tsx and ui/MessageSearchPanel.stories.tsx,
+  both outside this lane's editable file set. The primary export is now the named
+  `export function MessageSearchPanel` above. Remove this bridge once those
+  consumers migrate to named imports.
+*/
+export default MessageSearchPanel;

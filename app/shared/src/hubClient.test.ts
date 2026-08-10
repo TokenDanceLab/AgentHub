@@ -375,4 +375,59 @@ describe('hubClient helpers', () => {
     // Guard against accidental empty inventory during later edits.
     expect(Array.isArray(HUBCLIENT_SSOT_GAPS.desktopAndWebNotShared)).toBe(true);
   });
+
+  it('throws 401 immediately when no onRefreshToken is configured (current behavior)', async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({ code: 'auth_failed', message: 'Unauthorized' }, { status: 401 }),
+    );
+    const client = createHubClient({
+      baseUrl: 'http://hub.local',
+      getToken: () => 'expired-token',
+    });
+
+    await expect(client.me()).rejects.toMatchObject({ status: 401 });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('refreshes the token and retries once on 401 when onRefreshToken is provided', async () => {
+    const user = { id: 'u1', username: 'x', nickname: 'X' };
+    fetchMock
+      .mockResolvedValueOnce(
+        jsonResponse({ code: 'auth_failed', message: 'Unauthorized' }, { status: 401 }),
+      )
+      .mockResolvedValueOnce(jsonResponse({ code: 'OK', data: user }));
+    const onRefreshToken = vi.fn(async () => 'fresh-token');
+    const client = createHubClient({
+      baseUrl: 'http://hub.local',
+      getToken: () => 'stale-token',
+      onRefreshToken,
+    });
+
+    const result = await client.me();
+
+    expect(result).toMatchObject({ id: 'u1' });
+    expect(onRefreshToken).toHaveBeenCalledTimes(1);
+    // The retry must carry the refreshed bearer token.
+    const retryInit = fetchMock.mock.calls[1]?.[1];
+    expect((retryInit?.headers as Headers).get('Authorization')).toBe(
+      'Bearer fresh-token',
+    );
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not retry when onRefreshToken returns null', async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({ code: 'auth_failed', message: 'Unauthorized' }, { status: 401 }),
+    );
+    const onRefreshToken = vi.fn(async () => null);
+    const client = createHubClient({
+      baseUrl: 'http://hub.local',
+      getToken: () => 'expired-token',
+      onRefreshToken,
+    });
+
+    await expect(client.me()).rejects.toMatchObject({ status: 401 });
+    expect(onRefreshToken).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
 });

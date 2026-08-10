@@ -1,12 +1,12 @@
 import React from 'react';
 import styles from './Toast.module.css';
 
-export interface ToastProps {
+export interface DemoToastProps {
   message: string;
   visible: boolean;
 }
 
-export const Toast: React.FC<ToastProps> = ({ message, visible }) => {
+export const DemoToast: React.FC<DemoToastProps> = ({ message, visible }) => {
   return (
     // A11y (#10): role=status + aria-live=polite turns the toast into a
     // polite status live region — message swaps are announced to screen

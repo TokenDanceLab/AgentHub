@@ -304,13 +304,13 @@ describe('WebSocketTransport', () => {
       expect(instances.length).toBe(3);
     });
 
-    it('stays in disconnected after max retries exceeded', () => {
-      const t = createTransport({ maxRetries: 2, baseDelay: 1000 });
+    it('keeps retrying after max retries (no permanent give-up)', () => {
+      const t = createTransport({ maxRetries: 2, baseDelay: 1000, maxDelay: 30000 });
       t.connect();
       simulateOpen(lastWs());
 
       // Subscribe after connect to only track disconnect/reconnect cycle
-      const statuses: string[] = [];
+      const statuses: TransportStatus[] = [];
       t.on('status', (s: TransportStatus) => statuses.push(s));
 
       // Fail → retry 1
@@ -331,9 +331,11 @@ describe('WebSocketTransport', () => {
       // retry 2 fires
       lastWs().close();
 
-      // Now retries exhausted (retryCount=2, maxRetries=2) — should stay disconnected
-      vi.advanceTimersByTime(50000);
-      expect(t.getStatus()).toBe('disconnected');
+      // maxRetries exceeded — transport must NOT permanently give up.
+      // It continues retrying at the capped delay so transient outages self-heal.
+      const instancesBeforeContinuedRetry = instances.length;
+      vi.advanceTimersByTime(60000);
+      expect(instances.length).toBeGreaterThan(instancesBeforeContinuedRetry);
     });
   });
 
@@ -466,6 +468,67 @@ describe('WebSocketTransport', () => {
       createTransport();
       // WebSocket should NOT be created until connect() is called
       expect(instances).toHaveLength(0);
+    });
+  });
+
+  // ── Offline queue drop signaling (P1: no silent loss) ──
+
+  describe('offline queue drop signaling', () => {
+    it('emits a drop event (queue_full) when the cap forces an oldest-out drop', () => {
+      const t = createTransport({ offlineQueue: true });
+      const drops: Array<{ reason: string; count: number }> = [];
+      t.on('drop', (info) => drops.push(info));
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+      // Fill the queue exactly to the cap without tripping the cap.
+      for (let i = 0; i < 100; i++) {
+        t.send({ type: `msg-${i}` });
+      }
+      expect(drops).toHaveLength(0);
+
+      // One more send exceeds the cap → oldest dropped, drop event fired.
+      t.send({ type: 'overflow' });
+
+      expect(drops).toHaveLength(1);
+      expect(drops[0]).toEqual({ reason: 'queue_full', count: 1 });
+      expect(warnSpy).toHaveBeenCalled();
+      warnSpy.mockRestore();
+    });
+
+    it('emits a drop event (queue_expired) when the TTL clears a stale backlog', () => {
+      const t = createTransport({ offlineQueue: true });
+      const drops: Array<{ reason: string; count: number }> = [];
+      t.on('drop', (info) => drops.push(info));
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+      // Seed the queue (also stamps queueHeadAt = fake now).
+      t.send({ type: 'stale-1' });
+      t.send({ type: 'stale-2' });
+      expect(drops).toHaveLength(0);
+
+      // Advance past the 5-minute TTL, then send again → the whole stale
+      // backlog is dropped and a single queue_expired event is emitted.
+      vi.advanceTimersByTime(6 * 60 * 1000);
+      t.send({ type: 'fresh' });
+
+      expect(drops).toHaveLength(1);
+      expect(drops[0].reason).toBe('queue_expired');
+      expect(drops[0].count).toBe(2);
+      expect(warnSpy).toHaveBeenCalled();
+      warnSpy.mockRestore();
+    });
+
+    it('does not emit a drop event for an empty queue expiry', () => {
+      const t = createTransport({ offlineQueue: true });
+      const drops: Array<{ reason: string; count: number }> = [];
+      t.on('drop', (info) => drops.push(info));
+
+      // Advance past TTL with an EMPTY queue — send() should not fire a
+      // spurious queue_expired event (count would be 0).
+      vi.advanceTimersByTime(6 * 60 * 1000);
+      t.send({ type: 'first-after-long-offline' });
+
+      expect(drops).toHaveLength(0);
     });
   });
 });

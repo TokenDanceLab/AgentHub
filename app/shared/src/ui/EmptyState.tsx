@@ -1,5 +1,6 @@
 import { type ReactNode } from 'react';
 import { cx } from './cx';
+import { Button } from './Button';
 import styles from './EmptyState.module.css';
 
 export const EMPTY_STATE_KINDS = ['blank', 'search', 'filter', 'error', 'noPermission'] as const;
@@ -91,8 +92,9 @@ export function EmptyState({
           <p className={cx(styles.description, descriptionClassName)}>{description}</p>
         ) : null}
         {action ? (
-          <button
-            className={cx(styles.action, actionClassName)}
+          <Button
+            variant="primary"
+            className={actionClassName}
             type="button"
             aria-label={action.ariaLabel}
             onClick={action.onClick}
@@ -102,7 +104,7 @@ export function EmptyState({
             {action.shortcut ? (
               <kbd className={styles.shortcut}>{action.shortcut}</kbd>
             ) : null}
-          </button>
+          </Button>
         ) : null}
         {suggestions && suggestions.length > 0 ? (
           <div className={cx(styles.suggestions, suggestionsClassName)}>

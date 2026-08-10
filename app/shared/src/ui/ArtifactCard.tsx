@@ -1,5 +1,8 @@
+import { useState } from 'react';
 import { FileText, Globe, Image, Monitor, Download, ExternalLink, CheckCircle2 } from 'lucide-react';
 import { formatComposerAttachmentSize as formatSize } from '../composer/attachments';
+import { Button } from './Button';
+import { SkeletonBar } from './SkeletonBar';
 import styles from './ArtifactCard.module.css';
 import { PREVIEW_SANDBOX_REMOTE } from './previewSandbox';
 import { Tooltip } from './Tooltip';
@@ -22,7 +25,7 @@ const TYPE_ICON: Record<string, typeof FileText> = {
   iframe: Monitor,
 };
 
-export default function ArtifactCard({
+export function ArtifactCard({
   artifactId,
   artifactType,
   title,
@@ -35,6 +38,7 @@ export default function ArtifactCard({
   const Icon = TYPE_ICON[artifactType] ?? FileText;
   const sizeLabel = formatSize(size);
   const url = artifactUrl;
+  const [imageLoaded, setImageLoaded] = useState(false);
 
   return (
     <div className={styles.card} data-testid="artifact-card">
@@ -48,8 +52,9 @@ export default function ArtifactCard({
         <div className={styles.actions}>
           {canApplyDiff && !diffApplied && (
             <Tooltip label="Apply diff">
-              <button
-                className={styles.applyBtn}
+              <Button
+                variant="secondary"
+                size="sm"
                 onClick={() =>
                   window.dispatchEvent(
                     new CustomEvent('agenthub:apply-artifact-diff', { detail: { artifactId } }),
@@ -59,7 +64,7 @@ export default function ArtifactCard({
               >
                 <CheckCircle2 size={14} />
                 <span className={styles.applyLabel}>Apply</span>
-              </button>
+              </Button>
             </Tooltip>
           )}
           {diffApplied && (
@@ -71,7 +76,7 @@ export default function ArtifactCard({
           {url && (
             <Tooltip label="Open artifact">
               <a
-                className={styles.actionBtn}
+                className={styles.iconAction}
                 href={url}
                 target="_blank"
                 rel="noopener noreferrer"
@@ -84,7 +89,7 @@ export default function ArtifactCard({
           {url && (
             <Tooltip label="Download artifact">
               <a
-                className={styles.actionBtn}
+                className={styles.iconAction}
                 href={url}
                 download
                 aria-label="Download artifact"
@@ -98,12 +103,19 @@ export default function ArtifactCard({
       {previewUrl && (
         <div className={styles.preview}>
           {artifactType === 'image' ? (
-            <img
-              src={previewUrl}
-              alt={title}
-              className={styles.previewImage}
-              loading="lazy"
-            />
+            <>
+              {!imageLoaded && (
+                <SkeletonBar variant="block" className={styles.previewSkeleton} />
+              )}
+              <img
+                src={previewUrl}
+                alt={title}
+                className={styles.previewImage}
+                loading="lazy"
+                style={imageLoaded ? undefined : { display: 'none' }}
+                onLoad={() => setImageLoaded(true)}
+              />
+            </>
           ) : (
             <iframe
               src={previewUrl}
@@ -117,3 +129,5 @@ export default function ArtifactCard({
     </div>
   );
 }
+
+export default ArtifactCard;

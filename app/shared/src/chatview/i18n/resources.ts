@@ -116,6 +116,30 @@ export const chatviewResources = {
     'card.deploy.ready': '预览已就绪',
     'card.deploy.fail': '部署失败',
     'card.deploy.running': '正在部署',
+    'filePreview.modeSource': '源码',
+    'filePreview.modePreview': '预览',
+    'filePreview.readonly': '只读',
+    'filePreview.openWith': '打开方式',
+    'filePreview.backToOverview': '返回概览',
+    'filePreview.selectedTarget': '已选择 {{target}}',
+    'filePreview.ariaPane': '{{filename}} 只读预览',
+    'subagentStream.transcriptLabel': '子会话事件流',
+    'subagentStream.emptyWaiting': '等待 agent 启动…',
+    'subagentStream.cat.thinking': '思考',
+    'subagentStream.cat.toolCall': '工具调用',
+    'subagentStream.cat.textDelta': '输出',
+    'subagentStream.cat.result': '结果',
+    'subagentStream.cat.error': '错误',
+    'subagentStream.cat.cancel': '已取消',
+    'subagentStream.cat.other': '事件',
+    'inlineDelegation.detailHint': '点击展开子 Agent 详情',
+    'inlineDelegation.ariaStack': '子 Agent 委派状态',
+    'inlineDelegation.emptyDetail': '暂无详细事件流',
+    'inlineDelegation.status.dispatching': '派单中…',
+    'inlineDelegation.status.streaming': '执行中…',
+    'inlineDelegation.status.done': '完成 ✓',
+    'inlineDelegation.status.failed': '失败 ✗',
+    'inlineDelegation.status.cancelled': '已取消',
     'card.fail.retry': '重试',
     'card.expand': '展开',
     'card.collapse': '收起',
@@ -147,6 +171,16 @@ export const chatviewResources = {
     'sidebar.done': '全部完成',
 
     'code.copy': '复制',
+    'code.copied': '已复制',
+    'code.expand': '展开',
+    'code.collapse': '收起',
+
+    // ═══ Conversation sidebar empty state ═══
+    'sidebar.emptyTitle': '暂无会话',
+    'sidebar.emptyHint': '开始一个新会话以进行协作。',
+    'sidebar.emptySearchTitle': '无匹配结果',
+    'sidebar.emptySearchHint': '换个关键词试试，或清除搜索条件。',
+    'sidebar.clearSearch': '清除搜索',
 
     // ═══ Sim (legacy demo) ═══
     'sim.next': '下一步',
@@ -244,6 +278,19 @@ export const chatviewResources = {
     'action.stopRun': '停止运行',
     'action.removeAttachment': '移除 {name}',
 
+    // ═══ Deploy labels ═══
+    'deploy.status.pending': '待部署',
+    'deploy.status.ready': '就绪',
+    'deploy.status.building': '构建中',
+    'deploy.status.deploying': '部署中',
+    'deploy.status.deployed': '已就绪',
+    'deploy.status.failed': '部署失败',
+    'deploy.action.preview': '预览',
+    'deploy.action.open': '打开',
+    'deploy.action.deployToPublic': '部署到公网',
+    'browserPreview.iframeTitle': '预览 {{url}}',
+    'browserPreview.readOnly': '只读预览',
+
     // ═══ Mainchain labels ═══
     'mainchain.waitingTask': '等待 task/replay',
     'mainchain.waitingWorker': '等待 worker route',
@@ -284,6 +331,7 @@ export const chatviewResources = {
     'context.apps': '快捷应用',
     'context.delete': '删除',
     'context.edit': '编辑',
+    'context.cardActions': '卡片操作',
 
     // ═══ Conversation actions（#1508）═══
     'context.renameConversation': '重命名',
@@ -634,6 +682,30 @@ export const chatviewResources = {
     'card.deploy.ready': 'Preview Ready',
     'card.deploy.fail': 'Deploy failed',
     'card.deploy.running': 'Deploying...',
+    'filePreview.modeSource': 'Source',
+    'filePreview.modePreview': 'Preview',
+    'filePreview.readonly': 'Read-only',
+    'filePreview.openWith': 'Open with',
+    'filePreview.backToOverview': 'Back to overview',
+    'filePreview.selectedTarget': 'Selected {{target}}',
+    'filePreview.ariaPane': '{{filename}} read-only preview',
+    'subagentStream.transcriptLabel': 'Sub-session event stream',
+    'subagentStream.emptyWaiting': 'Waiting for agent to start…',
+    'subagentStream.cat.thinking': 'Thinking',
+    'subagentStream.cat.toolCall': 'Tool call',
+    'subagentStream.cat.textDelta': 'Output',
+    'subagentStream.cat.result': 'Result',
+    'subagentStream.cat.error': 'Error',
+    'subagentStream.cat.cancel': 'Cancelled',
+    'subagentStream.cat.other': 'Event',
+    'inlineDelegation.detailHint': 'Click to expand sub-agent details',
+    'inlineDelegation.ariaStack': 'Sub-agent delegation status',
+    'inlineDelegation.emptyDetail': 'No detailed event stream yet',
+    'inlineDelegation.status.dispatching': 'Dispatching…',
+    'inlineDelegation.status.streaming': 'Executing…',
+    'inlineDelegation.status.done': 'Done ✓',
+    'inlineDelegation.status.failed': 'Failed ✗',
+    'inlineDelegation.status.cancelled': 'Cancelled',
     'card.fail.retry': 'Retry',
     'card.expand': 'Expand',
     'card.collapse': 'Collapse',
@@ -665,6 +737,16 @@ export const chatviewResources = {
     'sidebar.done': 'All done',
 
     'code.copy': 'Copy',
+    'code.copied': 'Copied',
+    'code.expand': 'Expand',
+    'code.collapse': 'Collapse',
+
+    // ═══ Conversation sidebar empty state ═══
+    'sidebar.emptyTitle': 'No conversations',
+    'sidebar.emptyHint': 'Start a new conversation to begin.',
+    'sidebar.emptySearchTitle': 'No matching results',
+    'sidebar.emptySearchHint': 'Try a different search term, or clear the search.',
+    'sidebar.clearSearch': 'Clear search',
 
     // ═══ Sim (legacy demo) ═══
     'sim.next': 'Next',
@@ -762,6 +844,19 @@ export const chatviewResources = {
     'action.stopRun': 'Stop',
     'action.removeAttachment': 'Remove {name}',
 
+    // ═══ Deploy labels ═══
+    'deploy.status.pending': 'Pending',
+    'deploy.status.ready': 'Ready',
+    'deploy.status.building': 'Building',
+    'deploy.status.deploying': 'Deploying',
+    'deploy.status.deployed': 'Deployed',
+    'deploy.status.failed': 'Deploy failed',
+    'deploy.action.preview': 'Preview',
+    'deploy.action.open': 'Open',
+    'deploy.action.deployToPublic': 'Deploy to public',
+    'browserPreview.iframeTitle': 'Preview {{url}}',
+    'browserPreview.readOnly': 'Read-only preview',
+
     // ═══ Mainchain labels ═══
     'mainchain.waitingTask': 'Waiting task/replay',
     'mainchain.waitingWorker': 'Waiting worker route',
@@ -802,6 +897,7 @@ export const chatviewResources = {
     'context.apps': 'Quick apps',
     'context.delete': 'Delete',
     'context.edit': 'Edit',
+    'context.cardActions': 'Card actions',
 
     // ═══ Conversation actions (#1508) ═══
     'context.renameConversation': 'Rename',

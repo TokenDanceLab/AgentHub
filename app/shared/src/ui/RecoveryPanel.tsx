@@ -1,5 +1,6 @@
 import React, { type ReactNode } from 'react';
 import { cx } from './cx';
+import { Button } from './Button';
 import styles from './RecoveryPanel.module.css';
 
 export interface RecoveryPanelAction {
@@ -34,16 +35,19 @@ export interface RecoveryPanelProps {
 
 function RecoveryActionButton({
   action,
+  variant,
   baseClassName,
 }: {
   action: RecoveryPanelAction;
+  variant: 'primary' | 'secondary';
   baseClassName?: string;
 }) {
   const label = action.busy && action.busyLabel ? action.busyLabel : action.label;
 
   return (
-    <button
-      className={cx(styles.action, baseClassName, action.className)}
+    <Button
+      variant={variant}
+      className={cx(baseClassName, action.className)}
       type="button"
       disabled={action.disabled || action.busy}
       aria-busy={action.busy || undefined}
@@ -51,7 +55,7 @@ function RecoveryActionButton({
     >
       {action.icon}
       <span>{label}</span>
-    </button>
+    </Button>
   );
 }
 
@@ -87,11 +91,13 @@ export function RecoveryPanel({
       <div className={cx(styles.actions, actionsClassName)}>
         <RecoveryActionButton
           action={primaryAction}
+          variant="primary"
           {...(actionClassName ? { baseClassName: actionClassName } : {})}
         />
         {secondaryAction ? (
           <RecoveryActionButton
             action={secondaryAction}
+            variant="secondary"
             {...(actionClassName ? { baseClassName: actionClassName } : {})}
           />
         ) : null}

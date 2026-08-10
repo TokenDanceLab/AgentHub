@@ -64,56 +64,6 @@
   margin-bottom: 24px;
 }
 
-.btnPrimary {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 8px 20px;
-  border: none;
-  border-radius: var(--td-radius-control, 6px);
-  background: var(--primary);
-  color: var(--primary-foreground);
-  font-size: 14px;
-  font-weight: 500;
-  cursor: pointer;
-  font-family: var(--font-sans);
-  transition: opacity 0.15s ease;
-}
-
-.btnPrimary:hover {
-  opacity: 0.9;
-}
-
-.btnPrimary:focus-visible {
-  outline: 2px solid var(--td-focus);
-  outline-offset: 2px;
-}
-
-.btnSecondary {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 8px 20px;
-  border: 1px solid var(--td-line);
-  border-radius: var(--td-radius-control, 6px);
-  background: transparent;
-  color: var(--td-ink);
-  font-size: 14px;
-  font-weight: 500;
-  cursor: pointer;
-  font-family: var(--font-sans);
-  transition: background 0.15s ease;
-}
-
-.btnSecondary:hover {
-  background: var(--td-tint);
-}
-
-.btnSecondary:focus-visible {
-  outline: 2px solid var(--td-focus);
-  outline-offset: 2px;
-}
-
 .stackDetails {
   width: 100%;
   max-width: 560px;

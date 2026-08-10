@@ -1,6 +1,6 @@
 .card {
   border: 1px solid var(--border);
-  border-radius: var(--radius-xl, 0.75rem);
+  border-radius: var(--r-xl);
   background: var(--card);
   color: var(--card-foreground);
 }
@@ -10,7 +10,7 @@
   background: var(--glass-card-bg, var(--glass-panel));
   border-color: var(--glass-card-border, var(--glass-border));
   box-shadow: var(--glass-card-shadow, var(--glass-elev-2));
-  border-radius: var(--glass-card-radius, var(--radius-xl, 0.75rem));
+  border-radius: var(--glass-card-radius, var(--r-xl));
   backdrop-filter: var(--glass-backdrop-filter);
   -webkit-backdrop-filter: var(--glass-backdrop-filter);
   transition:

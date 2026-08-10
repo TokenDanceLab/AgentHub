@@ -5,17 +5,26 @@
 import { reportApiError } from './errors';
 
 export type TransportStatus = 'connecting' | 'connected' | 'disconnected' | 'reconnecting';
-export type TransportEvent = 'message' | 'status';
+export type TransportEvent = 'message' | 'status' | 'drop';
 export type TransportMessageHandler = (data: unknown) => void;
 export type TransportStatusHandler = (status: TransportStatus) => void;
-type TransportHandler = TransportMessageHandler | TransportStatusHandler;
+export type TransportDropReason = 'queue_full' | 'queue_expired';
+export interface TransportDropInfo {
+  reason: TransportDropReason;
+  count: number;
+}
+export type TransportDropHandler = (info: TransportDropInfo) => void;
+type TransportHandler = TransportMessageHandler | TransportStatusHandler | TransportDropHandler;
 
 export interface Transport {
   connect(url?: string): void;
   reconnect?(url?: string): void;
   send(data: unknown): void;
   close(): void;
-  on(event: TransportEvent, handler: TransportMessageHandler | TransportStatusHandler): () => void;
+  on(
+    event: TransportEvent,
+    handler: TransportMessageHandler | TransportStatusHandler | TransportDropHandler,
+  ): () => void;
   getStatus(): TransportStatus;
 }
 
@@ -34,6 +43,8 @@ export interface TransportOptions {
 }
 
 const QUEUE_STORAGE_KEY = 'agenthub:offline_queue';
+const MAX_QUEUE_SIZE = 100;
+const QUEUE_TTL_MS = 5 * 60 * 1000;
 
 export class WebSocketTransport implements Transport {
   private ws: WebSocket | null = null;
@@ -41,6 +52,7 @@ export class WebSocketTransport implements Transport {
   private retryCount = 0;
   private handlers = new Map<TransportEvent, Set<TransportHandler>>();
   private queue: unknown[] = [];
+  private queueHeadAt: number | null = null;
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private closed = false;
   private lastConnectUrl: string | null = null;
@@ -144,6 +156,34 @@ export class WebSocketTransport implements Transport {
     if (this.status === 'connected' && this.ws?.readyState === WebSocket.OPEN) {
       this.ws.send(JSON.stringify(data));
     } else if (this.useOfflineQueue) {
+      // TTL: if the head of the queue is older than QUEUE_TTL_MS, the whole
+      // backlog is stale (e.g. the user has been offline too long) — drop it
+      // rather than replaying outdated commands. Surface the loss via the
+      // 'drop' event so the UI can warn the user that some messages were not
+      // sent, instead of silently losing data.
+      if (this.queueHeadAt !== null && Date.now() - this.queueHeadAt > QUEUE_TTL_MS) {
+        const dropped = this.queue.length;
+        this.queue.length = 0;
+        this.queueHeadAt = null;
+        if (dropped > 0) {
+          console.warn(
+            `[WebSocketTransport] Offline queue expired (${dropped} stale message(s) dropped after >${QUEUE_TTL_MS}ms offline).`,
+          );
+          this.emit('drop', { reason: 'queue_expired', count: dropped });
+        }
+      }
+      // Bounded queue: drop oldest when over the size cap so a long outage
+      // does not exhaust memory or replay a huge backlog on reconnect.
+      if (this.queue.length >= MAX_QUEUE_SIZE) {
+        this.queue.shift();
+        console.warn(
+          `[WebSocketTransport] Offline queue full — dropped oldest message (cap ${MAX_QUEUE_SIZE}).`,
+        );
+        this.emit('drop', { reason: 'queue_full', count: 1 });
+      }
+      if (this.queueHeadAt === null) {
+        this.queueHeadAt = Date.now();
+      }
       this.queue.push(data);
       this.persistQueue();
     }
@@ -162,17 +202,21 @@ export class WebSocketTransport implements Transport {
       this.clearPersistedQueue();
     }
     this.queue.length = 0;
+    this.queueHeadAt = null;
   }
 
-  on(event: TransportEvent, handler: TransportMessageHandler | TransportStatusHandler): () => void {
+  on(
+    event: TransportEvent,
+    handler: TransportMessageHandler | TransportStatusHandler | TransportDropHandler,
+  ): () => void {
     let handlers = this.handlers.get(event);
     if (!handlers) {
       handlers = new Set<TransportHandler>();
       this.handlers.set(event, handlers);
     }
-    handlers.add(handler);
+    handlers.add(handler as TransportHandler);
     return () => {
-      this.handlers.get(event)?.delete(handler);
+      this.handlers.get(event)?.delete(handler as TransportHandler);
     };
   }
 
@@ -208,9 +252,12 @@ export class WebSocketTransport implements Transport {
     if (this.closed) return;
     if (this.reconnectTimer) return; // already scheduled
 
+    // P1: do not permanently give up after maxRetries. Warn and keep
+    // retrying at the capped delay so transient outages self-heal.
     if (this.retryCount >= this.maxRetries) {
-      this.setStatus('disconnected');
-      return;
+      console.warn(
+        `[WebSocketTransport] Max reconnect retries (${this.maxRetries}) reached — continuing at cap delay.`,
+      );
     }
 
     this.setStatus('reconnecting');
@@ -245,6 +292,7 @@ export class WebSocketTransport implements Transport {
     if (this.queue.length === 0) return;
     const queued = [...this.queue];
     this.queue.length = 0;
+    this.queueHeadAt = null;
     if (this.useOfflineQueue) {
       this.clearPersistedQueue();
     }

@@ -3,7 +3,7 @@ import { DesignNavIcon } from '../../designIcons';
 import { RuntimeBrandIcon } from '../../RuntimeBrandIcon';
 import { agentConfigToAgentSpecFixture } from '../../agentProfileCatalog';
 import { formatAgentHubAgentSpecV1 } from '../../../agentSpec';
-import { Select } from '../../../ui';
+import { Button, Select } from '../../../ui';
 import styles from '../AgentsPage.module.css';
 import { ConfigSummaryRow, formatList } from './shared';
 import {
@@ -291,29 +291,29 @@ export const AgentEditActions: React.FC<{
   onAgentDelete?: (() => void) | undefined;
 }> = ({ isBusy, isSaving, isDeleting, onAgentSave, onAgentDuplicate, onAgentDelete }) => (
   <div className={styles['agent-edit-actions']} aria-busy={isBusy ? 'true' : undefined}>
-    <button
-      className={`${styles.btn} ${styles['btn-p']}`}
+    <Button
+      variant="primary"
       type="button"
       disabled={isBusy}
       onClick={onAgentSave}
     >
       {isSaving ? '保存中' : '保存配置'}
-    </button>
-    <button
-      className={`${styles.btn} ${styles['btn-s']}`}
+    </Button>
+    <Button
+      variant="secondary"
       type="button"
       disabled={isBusy}
       onClick={onAgentDuplicate}
     >
       复制 Agent
-    </button>
-    <button
-      className={`${styles.btn} ${styles['btn-d']}`}
+    </Button>
+    <Button
+      variant="destructive"
       type="button"
       disabled={isBusy}
       onClick={onAgentDelete}
     >
       {isDeleting ? '删除中' : '删除'}
-    </button>
+    </Button>
   </div>
 );

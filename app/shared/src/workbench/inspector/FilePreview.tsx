@@ -1,8 +1,9 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { languageFromPath } from '../../ui/syntaxHighlight';
 import { DesignFileIcon, DesignNavIcon, DesignOpenWithIcon } from '../designIcons';
 import { CHATVIEW_I18N_NAMESPACE } from '../../chatview/i18n/resources';
+import { Button } from '../../ui/Button';
 import { Tooltip } from '../../ui/Tooltip';
 import {
   defaultPreviewMode,
@@ -66,6 +67,10 @@ export const FilePreview: React.FC<FilePreviewProps> = ({
   const [mode, setMode] = useState<FilePreviewMode>(defaultPreviewMode(filename));
   const [openMenuVisible, setOpenMenuVisible] = useState(false);
   const [lastOpenTarget, setLastOpenTarget] = useState<string | null>(null);
+  const [openWithActiveIndex, setOpenWithActiveIndex] = useState(0);
+  const openWithMenuRef = useRef<HTMLDivElement>(null);
+  const openWithTriggerRef = useRef<HTMLButtonElement>(null);
+  const openWithKeyboardRef = useRef(false);
   const codeLanguage = languageFromPath(filename);
   const lines = useMemo(() => content.split('\n'), [content]);
   const diffLines = useMemo(() => (diffContent ?? syntheticDiff(filename, content)).split('\n'), [content, diffContent, filename]);
@@ -73,10 +78,120 @@ export const FilePreview: React.FC<FilePreviewProps> = ({
   const canRenderMarkdown = isMarkdownFile(filename);
   const nativeMode = resolveNativeMode(filename);
 
+  // Roving tabindex for the mode tablist. The visible tabs depend on the
+  // file (nativeMode/markdown may be absent), so the tab array is rebuilt
+  // per-render and the active tab is the single tab stop. ArrowLeft/Right
+  // and Home/End move the stop; only keyboard-driven moves steal focus so
+  // mouse clicks don't disrupt where the user is. Mirrors GlobalRail.tsx.
+  const modeTabsListRef = useRef<HTMLDivElement>(null);
+  const tabsKeyboardRef = useRef(false);
+  const modeTabs = useMemo<{ mode: FilePreviewMode; label: string }[]>(() => {
+    const tabs: { mode: FilePreviewMode; label: string }[] = [];
+    if (nativeMode) tabs.push({ mode: nativeMode, label: nativeModeLabel(nativeMode) });
+    tabs.push({ mode: 'code', label: t('filePreview.modeSource') });
+    if (canRenderMarkdown) tabs.push({ mode: 'markdown', label: t('filePreview.modePreview') });
+    tabs.push({ mode: 'diff', label: 'Diff' });
+    return tabs;
+  }, [nativeMode, canRenderMarkdown, t]);
+
+  const [rovingTabIndex, setRovingTabIndex] = useState(() =>
+    Math.max(0, modeTabs.findIndex((tab) => tab.mode === mode)),
+  );
+
+  useEffect(() => {
+    const index = modeTabs.findIndex((tab) => tab.mode === mode);
+    if (index >= 0) setRovingTabIndex(index);
+  }, [mode, modeTabs]);
+
+  useEffect(() => {
+    if (!tabsKeyboardRef.current || !modeTabsListRef.current) return;
+    tabsKeyboardRef.current = false;
+    const tabs = modeTabsListRef.current.querySelectorAll<HTMLButtonElement>('[role="tab"]');
+    tabs[rovingTabIndex]?.focus();
+  }, [rovingTabIndex]);
+
+  function handleTabsKeyDown(event: React.KeyboardEvent<HTMLDivElement>): void {
+    if (modeTabs.length === 0) return;
+    let next = -1;
+    switch (event.key) {
+      case 'ArrowRight':
+        next = (rovingTabIndex + 1) % modeTabs.length;
+        break;
+      case 'ArrowLeft':
+        next = (rovingTabIndex - 1 + modeTabs.length) % modeTabs.length;
+        break;
+      case 'Home':
+        next = 0;
+        break;
+      case 'End':
+        next = modeTabs.length - 1;
+        break;
+      default:
+        return;
+    }
+    event.preventDefault();
+    tabsKeyboardRef.current = true;
+    setRovingTabIndex(next);
+    setMode(modeTabs[next]!.mode);
+  }
+
+  // Open-with menu: focus first item on open, rove with arrows, close on Esc,
+  // and restore focus to the trigger on close. Mirrors ContextMenu.tsx.
+  useEffect(() => {
+    if (!openMenuVisible) return;
+    setOpenWithActiveIndex(0);
+    openWithKeyboardRef.current = true;
+    const raf = requestAnimationFrame(() => {
+      const items = openWithMenuRef.current?.querySelectorAll<HTMLButtonElement>('[role="menuitem"]');
+      items?.[0]?.focus();
+    });
+    const handleKey = (event: KeyboardEvent) => {
+      const count = openWithItems.length;
+      if (count === 0) return;
+      let next = -1;
+      switch (event.key) {
+        case 'ArrowDown':
+          next = (openWithActiveIndex + 1) % count;
+          break;
+        case 'ArrowUp':
+          next = (openWithActiveIndex - 1 + count) % count;
+          break;
+        case 'Home':
+          next = 0;
+          break;
+        case 'End':
+          next = count - 1;
+          break;
+        case 'Escape':
+          event.preventDefault();
+          setOpenMenuVisible(false);
+          openWithTriggerRef.current?.focus();
+          return;
+        default:
+          return;
+      }
+      event.preventDefault();
+      openWithKeyboardRef.current = true;
+      setOpenWithActiveIndex(next);
+    };
+    document.addEventListener('keydown', handleKey);
+    return () => {
+      cancelAnimationFrame(raf);
+      document.removeEventListener('keydown', handleKey);
+    };
+  }, [openMenuVisible, openWithActiveIndex]);
+
+  useEffect(() => {
+    if (!openWithKeyboardRef.current || !openWithMenuRef.current) return;
+    openWithKeyboardRef.current = false;
+    const items = openWithMenuRef.current.querySelectorAll<HTMLButtonElement>('[role="menuitem"]');
+    items[openWithActiveIndex]?.focus();
+  }, [openWithActiveIndex]);
+
   return (
     <section
       className={styles.pane}
-      aria-label={`${filename} 只读预览`}
+      aria-label={t('filePreview.ariaPane', { filename })}
     >
       {/* ── Toolbar ── */}
       <div className={styles.toolbar}>
@@ -84,51 +199,31 @@ export const FilePreview: React.FC<FilePreviewProps> = ({
           <DesignFileIcon className={styles.fileIcon} name={filename} />
           <strong className={styles.fileTitleName} title={filename}>{filename}</strong>
         </div>
-        <div className={styles.modeTabs} role="tablist" aria-label={t('aria.filePreviewMode')}>
-          {nativeMode && (
+        <div
+          className={styles.modeTabs}
+          onKeyDown={handleTabsKeyDown}
+          ref={modeTabsListRef}
+          role="tablist"
+          aria-label={t('aria.filePreviewMode')}
+        >
+          {modeTabs.map((tab, index) => (
             <button
-              aria-selected={mode === nativeMode}
+              aria-selected={mode === tab.mode}
               className={styles.modeTab}
-              onClick={() => setMode(nativeMode)}
+              key={tab.mode}
+              onClick={() => setMode(tab.mode)}
               role="tab"
+              tabIndex={index === rovingTabIndex ? 0 : -1}
               type="button"
             >
-              {nativeModeLabel(nativeMode)}
+              {tab.label}
             </button>
-          )}
-          <button
-            aria-selected={mode === 'code'}
-            className={styles.modeTab}
-            onClick={() => setMode('code')}
-            role="tab"
-            type="button"
-          >
-            源码
-          </button>
-          {canRenderMarkdown && (
-            <button
-              aria-selected={mode === 'markdown'}
-              className={styles.modeTab}
-              onClick={() => setMode('markdown')}
-              role="tab"
-              type="button"
-            >
-              预览
-            </button>
-          )}
-          <button
-            aria-selected={mode === 'diff'}
-            className={styles.modeTab}
-            onClick={() => setMode('diff')}
-            role="tab"
-            type="button"
-          >
-            Diff
-          </button>
+          ))}
         </div>
         <div className={styles.openWithWrap}>
-          <Tooltip label="打开方式">
+          <Tooltip label={t('filePreview.openWith')}>
             <button
+              ref={openWithTriggerRef}
               aria-expanded={openMenuVisible}
               aria-haspopup="menu"
               aria-label={t('aria.openWith')}
@@ -140,15 +235,17 @@ export const FilePreview: React.FC<FilePreviewProps> = ({
             </button>
           </Tooltip>
           {openMenuVisible && (
-            <div className={styles.openWithMenu} role="menu" aria-label={t('aria.openWithMenu')}>
-              {openWithItems.map((item) => (
+            <div className={styles.openWithMenu} ref={openWithMenuRef} role="menu" aria-label={t('aria.openWithMenu')}>
+              {openWithItems.map((item, index) => (
                 <button
                   key={item.label}
                   role="menuitem"
+                  tabIndex={index === openWithActiveIndex ? 0 : -1}
                   type="button"
                   onClick={() => {
                     setLastOpenTarget(item.label);
                     setOpenMenuVisible(false);
+                    openWithTriggerRef.current?.focus();
                   }}
                 >
                   <span aria-hidden="true" className={styles.openWithIcon}>
@@ -164,15 +261,16 @@ export const FilePreview: React.FC<FilePreviewProps> = ({
             </div>
           )}
         </div>
-        <Tooltip label="返回概览">
-          <button
-            className={styles.closeBtn}
+        <Tooltip label={t('filePreview.backToOverview')}>
+          <Button
+            variant="ghost"
+            size="sm"
             type="button"
             onClick={onClose}
             aria-label={t('aria.backToOverview')}
           >
             <DesignNavIcon name="close" size={15} />
-          </button>
+          </Button>
         </Tooltip>
       </div>
 
@@ -180,9 +278,13 @@ export const FilePreview: React.FC<FilePreviewProps> = ({
       <div className={styles.meta}>
         <span className={styles.metaItem}>{owner}</span>
         <span className={styles.metaItem}>{langLabel}</span>
-        <span className={styles.metaItem}>只读</span>
+        <span className={styles.metaItem}>{t('filePreview.readonly')}</span>
         <span className={styles.metaItem}>{mode === 'diff' ? diffLines.length : lines.length} lines</span>
-        {lastOpenTarget && <span className={styles.metaItem}>已选择 {lastOpenTarget}</span>}
+        {lastOpenTarget && (
+          <span className={styles.metaItem}>
+            {t('filePreview.selectedTarget', { target: lastOpenTarget })}
+          </span>
+        )}
       </div>
 
       {mode === 'pdf' ? (

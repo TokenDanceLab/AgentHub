@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ProfilePopover, Toast } from './floating';
+import { ProfilePopover, DemoToast } from './floating';
 import { DesignNavIcon, type DesignNavIconName } from './designIcons';
 import { CHATVIEW_I18N_NAMESPACE } from '../chatview/i18n/resources';
 import { Tooltip } from '../ui/Tooltip';
@@ -261,7 +261,7 @@ export function GlobalRail({
         status={t('status.online')}
         variant="account"
       />
-      <Toast message={toastMessage} visible={toastVisible} />
+      <DemoToast message={toastMessage} visible={toastVisible} />
     </nav>
   );
 }

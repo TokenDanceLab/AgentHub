@@ -4,7 +4,7 @@
   grid-auto-columns: minmax(0, 1fr);
   gap: 4px;
   border: 1px solid var(--border);
-  border-radius: var(--radius-lg, 8px);
+  border-radius: var(--r-lg);
   padding: 4px;
   background: color-mix(in oklch, var(--card, white) 74%, transparent);
   color: var(--foreground);
@@ -18,7 +18,7 @@
   min-width: 0;
   min-height: 44px;
   border: 0;
-  border-radius: var(--radius-md, 6px);
+  border-radius: var(--r-md);
   padding: 0 10px;
   background: transparent;
   color: var(--muted-foreground);

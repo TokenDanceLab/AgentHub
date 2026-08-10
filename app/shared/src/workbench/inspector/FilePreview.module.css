@@ -247,41 +247,6 @@
 }
 
 
-/* ── Close button ── */
-.closeBtn {
-  grid-column: 4;
-  width: 26px;
-  height: 26px;
-  border: 0;
-  border-radius: var(--r-sm);
-  background: transparent;
-  color: var(--text-2);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  flex-shrink: 0;
-  transition: background var(--dur-normal) var(--ease),
-    color var(--dur-normal) var(--ease),
-    box-shadow var(--dur-normal) var(--ease);
-}
-
-.closeBtn:hover {
-  background: var(--surface-high);
-  color: var(--text-1);
-  box-shadow: none;
-}
-
-.closeBtn:focus-visible {
-  outline: none;
-  box-shadow: var(--focus-ring);
-}
-
-.closeBtn svg {
-  width: 15px;
-  height: 15px;
-}
-
 /* ── Meta bar (workspace, encoding, lines) ── */
 .meta {
   min-height: 22px;

@@ -1,6 +1,6 @@
 .group {
   border: 1px solid var(--border);
-  border-radius: var(--radius-md);
+  border-radius: var(--r-md);
   background: var(--card);
   margin: 6px 0;
   overflow: hidden;
@@ -119,7 +119,7 @@
   width: 30px;
   height: 30px;
   border: 1px solid transparent;
-  border-radius: var(--radius-sm);
+  border-radius: var(--r-sm);
   background: transparent;
   color: var(--muted-foreground);
   cursor: pointer;

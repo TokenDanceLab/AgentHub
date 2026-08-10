@@ -17,6 +17,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { AlertCircle, ChevronLeft, ChevronRight, RotateCcw, X } from 'lucide-react';
+import { Button } from './Button';
 import styles from './SlideshowPreview.module.css';
 import { Tooltip } from './Tooltip';
 
@@ -236,14 +237,15 @@ export const SlideshowPreview: React.FC<SlideshowPreviewProps> = ({
         </span>
         {onClose && (
           <Tooltip label="关闭预览">
-            <button
-              className={styles.closeBtn}
+            <Button
+              variant="ghost"
+              size="sm"
               type="button"
               onClick={onClose}
               aria-label="关闭预览"
             >
               <X size={16} />
-            </button>
+            </Button>
           </Tooltip>
         )}
       </div>

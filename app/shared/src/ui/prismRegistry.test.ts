@@ -20,7 +20,6 @@ import {
   highlightLineWithWordDiff,
   injectWordDiffIntoHast,
 } from './prismRegistry';
-
 // wordClassFor used across cases: added/removed get a class; context -> ''
 // (context stays as bare text so Prism color passes through unchanged).
 const cls = (t: WordDiffToken['type']): string =>
@@ -330,5 +329,32 @@ describe('injectWordDiffIntoHast (pure core)', () => {
     expect(span.tagName).toBe('span');
     expect(span.properties?.className).toEqual(['wordAdded']);
     expect(span.children?.[0]).toMatchObject({ type: 'text', value: 'abcde' });
+  });
+});
+
+// ── XSS hardening: escapeHtml must neutralize adversarial HTML payloads ─
+// `highlightLine` falls back to `escapeHtml` for unregistered/empty langs.
+// These tests pin that adversarial `<script>` / `<img onerror>` payloads are
+// escaped (no raw tags survive into the highlighted HTML string).
+describe('highlightLine XSS escaping', () => {
+  it('escapes a <script> payload in plain-text mode (no registered lang)', () => {
+    const html = highlightLine('<script>alert(1)</script>', '');
+    expect(html).not.toContain('<script>');
+    expect(html).toContain('&lt;script&gt;');
+  });
+
+  it('escapes an <img onerror> payload in plain-text mode', () => {
+    const html = highlightLine('<img src=x onerror=alert(1)>', '');
+    // No raw <img tag survives — the brackets are escaped so it cannot form
+    // a real element. (The literal word "onerror" remains as inert text,
+    // which is harmless without a real element to attach to.)
+    expect(html).not.toContain('<img');
+    expect(html).toContain('&lt;img');
+  });
+
+  it('preserves the visible text content of an escaped payload', () => {
+    const payload = '<script>alert(1)</script>';
+    const html = highlightLine(payload, '');
+    expect(textContent(html)).toBe(payload);
   });
 });

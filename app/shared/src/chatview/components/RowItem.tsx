@@ -12,6 +12,7 @@ import {
 import { CHATVIEW_I18N_NAMESPACE } from '../i18n/resources'
 import { cardLabelKey, toolKey, isToolResult } from '../design/labels'
 import MarkdownContent from '../../ui/Markdown'
+import { Button } from '../../ui/Button'
 import { RiskBadge } from '../../ui/RiskBadge'
 import type { RiskLevel } from '../../ui/RiskBadge'
 import { useCopiedFlag } from '../../ui/useCopiedFlag'
@@ -132,7 +133,7 @@ export const RowItem = memo(function RowItem({ item, onToggle, onApprove, onReje
   const [thinkDuration, setThinkDuration] = useState<number | undefined>(undefined)
   // T16: critical approval second-confirm — first click arms, second click fires.
   const [confirmingApprove, setConfirmingApprove] = useState(false)
-  // Fable UIUX #4: Copy→Check feedback for the code-copy button.
+  // Fable UIUX #4: Copy→Check feedback for the code copy button.
   const [copied, markCopied] = useCopiedFlag()
   const isOpen = item.type === 'route' ? true : open
 
@@ -233,34 +234,91 @@ export const RowItem = memo(function RowItem({ item, onToggle, onApprove, onReje
     }
   }
 
-  // T16: keyboard shortcuts on approval cards — A approve / R deny / Esc collapse.
-  // Letters are case-insensitive; modifier combos (Cmd+A, Ctrl+R) pass through so
-  // browser/OS shortcuts still work; ignored inside editable fields so typing
-  // isn't hijacked. Mirrors codeg keyboard-shortcuts normalization spirit.
-  const handleApprovalKey = (e: React.KeyboardEvent) => {
-    if (item.type !== 'approval' || item.status !== 'waiting') return
+  // T16 + Wave10 a11y: keyboard equivalents for block rows.
+  //   - Shift+F10 or Menu key → open context menu (mirrors ConversationSidebar).
+  //   - Enter/Space → activate: block-select when wired, else toggle the body.
+  //   - Escape → collapse an open collapsible row (approval cards also reset
+  //     the critical second-confirm).
+  //   - approval-waiting cards keep the A/R single-key shortcuts (case-insensitive,
+  //     modifier combos pass through, ignored inside editable fields so typing
+  //     isn't hijacked). Mirrors codeg keyboard-shortcuts normalization spirit.
+  const handleKeyDown = (e: React.KeyboardEvent) => {
     const target = e.target as HTMLElement | null
-    if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) return
-    if (e.metaKey || e.ctrlKey || e.altKey) return
-    const key = e.key
-    if (key === 'Escape') {
+
+    // Context-menu keyboard equivalent: Shift+F10 or the dedicated Menu key.
+    // Synthesize a MouseEvent-shaped payload from the focused anchor's rect so
+    // the parent's onContextMenu handler (which reads clientX/clientY) can
+    // position the floating menu without a real pointer event.
+    if (e.key === 'ContextMenu' || (e.shiftKey && e.key === 'F10')) {
+      if (!onContextMenu) return
       e.preventDefault()
-      setConfirmingApprove(false)
-      userToggledRef.current = true
-      setOpen(false)
-      onToggle?.(item.id)
+      e.stopPropagation()
+      const anchor = e.currentTarget as HTMLElement
+      const rect = anchor.getBoundingClientRect()
+      onContextMenu(interactionId, {
+        preventDefault() {},
+        stopPropagation() {},
+        currentTarget: anchor,
+        clientX: rect.left + Math.min(rect.width / 2, 24),
+        clientY: rect.top + Math.min(rect.height / 2, 24),
+      } as unknown as React.MouseEvent)
       return
     }
-    const lower = key.length === 1 ? key.toLowerCase() : key
-    if (lower === 'a') {
-      e.preventDefault()
-      handleApproveClick()
+
+    // Approval-waiting letter shortcuts (A/R) + Escape-to-collapse.
+    if (item.type === 'approval' && item.status === 'waiting') {
+      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) return
+      if (e.metaKey || e.ctrlKey || e.altKey) return
+      const key = e.key
+      if (key === 'Escape') {
+        e.preventDefault()
+        setConfirmingApprove(false)
+        userToggledRef.current = true
+        setOpen(false)
+        onToggle?.(item.id)
+        return
+      }
+      const lower = key.length === 1 ? key.toLowerCase() : key
+      if (lower === 'a') {
+        e.preventDefault()
+        handleApproveClick()
+        return
+      }
+      if (lower === 'r') {
+        e.preventDefault()
+        handleRejectClick()
+        return
+      }
+    }
+
+    // Universal Escape → collapse an open collapsible row (non-approval path;
+    // approval-waiting Escape returns above so its confirm state resets too).
+    if (e.key === 'Escape') {
+      if (item.collapsible && isOpen) {
+        e.preventDefault()
+        userToggledRef.current = true
+        setOpen(false)
+        onToggle?.(item.id)
+      }
       return
     }
-    if (lower === 'r') {
-      e.preventDefault()
-      handleRejectClick()
-      return
+
+    // Enter/Space → activate. Skip when focus is on an inner control (the
+    // header button, links, inputs) so its native activation isn't shadowed
+    // and we don't double-fire block-select on top of a button click.
+    if (e.key === 'Enter' || e.key === ' ') {
+      if (target && (target.tagName === 'BUTTON' || target.tagName === 'A' || target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) return
+      if (onBlockSelect) {
+        e.preventDefault()
+        onBlockSelect(interactionId, e.shiftKey)
+        return
+      }
+      if (item.collapsible && item.status !== 'running') {
+        e.preventDefault()
+        userToggledRef.current = true
+        setOpen(!isOpen)
+        onToggle?.(item.id)
+      }
     }
   }
 
@@ -269,7 +327,7 @@ export const RowItem = memo(function RowItem({ item, onToggle, onApprove, onReje
       className={cls}
       onContextMenu={onContextMenu ? handleContextMenu : undefined}
       onClick={onBlockSelect ? handleSelectClick : undefined}
-      onKeyDown={item.type === 'approval' && item.status === 'waiting' ? handleApprovalKey : undefined}
+      onKeyDown={handleKeyDown}
       data-block-id={interactionId}
       data-row-id={item.id}
       data-selectable-card={interactionId}
@@ -312,7 +370,7 @@ export const RowItem = memo(function RowItem({ item, onToggle, onApprove, onReje
             <div className="code-block">
               <div className="code-head">
                 <span className="code-head-left"><FileTypeIcon item={item} /><span>{item.codeLang || labelText}</span></span>
-                <button className={`code-copy${copied ? ' copied' : ''}`} aria-label={copied ? '已复制' : '复制'} onClick={handleCodeCopy}>{copied ? <><Check size={12} />已复制</> : <><Copy size={12} />复制</>}</button>
+                <Button variant="ghost" size="sm" className={copied ? 'copied' : undefined} aria-label={copied ? '已复制' : '复制'} onClick={handleCodeCopy}>{copied ? <><Check size={12} />已复制</> : <><Copy size={12} />复制</>}</Button>
               </div>
               <div className="code-lines">{item.codeLines.map((line, i) => (
                 <div key={i} className="code-line"><span className="code-num">{i + 1}</span><span className="code-text">{line}</span></div>
@@ -403,14 +461,16 @@ export const RowItem = memo(function RowItem({ item, onToggle, onApprove, onReje
                   {t(`card.approval.risk.${item.riskLevel}`)}
                 </RiskBadge>
               )}
-              <button
+              <Button
+                variant={item.riskLevel === 'critical' ? 'destructive' : 'primary'}
+                size="sm"
                 className={`ap-approve${item.riskLevel === 'critical' ? ' critical' : ''}${confirmingApprove ? ' confirming' : ''}`}
                 aria-label={confirmingApprove ? t('card.approval.confirmApprove') : t('card.approval.approve')}
                 onClick={handleApproveClick}
               >
                 {confirmingApprove ? t('card.approval.confirmApprove') : t('card.approval.approve')}
-              </button>
-              <button className="ap-deny" aria-label={t('card.approval.deny')} onClick={handleRejectClick}>{t('card.approval.deny')}</button>
+              </Button>
+              <Button variant="ghost" size="sm" className="ap-reject" aria-label={t('card.approval.deny')} onClick={handleRejectClick}>{t('card.approval.deny')}</Button>
               <span className="ap-kbd-hint">{t('card.approval.kbdHint')}</span>
             </div>
           )}
@@ -441,7 +501,7 @@ export const RowItem = memo(function RowItem({ item, onToggle, onApprove, onReje
           )}
         </div>
       )}
-      {item.status==='fail' && onRetry && <div className="retry-bar"><button className="retry-btn" aria-label={t('card.fail.retry')} onClick={() => onRetry(item.id)}>{t('card.fail.retry')}</button></div>}
+      {item.status==='fail' && onRetry && <div className="retry-bar"><Button variant="ghost" size="sm" className="fail-retry" aria-label={t('card.fail.retry')} onClick={() => onRetry(item.id)}>{t('card.fail.retry')}</Button></div>}
     </div>
   )
 })

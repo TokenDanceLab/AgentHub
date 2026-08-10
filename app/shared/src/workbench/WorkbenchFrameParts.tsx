@@ -23,6 +23,7 @@ import {
   useBuildChatConversationHostProps,
 } from './workbenchFramePartsHelpers';
 import { resolveComposerWorkDir } from './workbenchFrameHelpers';
+import { PageErrorBoundary } from '../ui/PageErrorBoundary';
 import styles from './AgentHubWorkbench.module.css';
 
 export {
@@ -101,7 +102,11 @@ export function WorkbenchRoutesFrame(
 export function ChatInspectorFrame(
   props: ChatInspectorFrameProps,
 ): React.ReactElement {
-  const inspector = <RightInspector {...buildChatInspectorProps(props)} />;
+  const inspector = (
+    <PageErrorBoundary>
+      <RightInspector {...buildChatInspectorProps(props)} />
+    </PageErrorBoundary>
+  );
   const localFiles = Boolean(props.platform.capabilities.localFiles);
   if (!localFiles) {
     return inspector;
