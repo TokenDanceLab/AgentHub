@@ -3,7 +3,7 @@ import { createElement, type ReactNode } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useHubStore } from '@/stores/hubStore';
-import { useToastStore } from '@/stores/toastStore';
+import { useToastStore } from '@shared/ui/toast';
 import { hubQueryKeys } from '@shared/stores/queryKeys';
 
 const tryAutoLoginMock = vi.hoisted(() => vi.fn());

@@ -10,6 +10,10 @@ import {
   type HubClient as SharedHubClient,
   type HubClientOptions as SharedHubClientOptions,
 } from '@shared/hubClient';
+import {
+  getCachedRefreshedAccessToken,
+  refreshWebHubAccessTokenOnce,
+} from '@/platform/webAuthTokenRefresh';
 
 export * from '@shared/hubClient';
 
@@ -20,9 +24,20 @@ export interface HubClientOptions extends SharedHubClientOptions {
 
 export function createHubClient(opts: HubClientOptions = {}): SharedHubClient {
   const baseUrl = (opts.baseUrl || HUB_URL).replace(/\/+$/, '');
+  const { getToken: userGetToken, ...restOpts } = opts;
   return createSharedHubClient({
-    ...opts,
+    ...restOpts,
     baseUrl,
+    // Wire the 401 auto-refresh hook the transport layer already supports.
+    // When a request returns 401, refreshHubAccessTokenOnce() exchanges the
+    // stored refresh token for a new access token and the transport retries
+    // once. Single-flight dedupes concurrent 401s to one refresh.
+    onRefreshToken: opts.onRefreshToken ?? refreshWebHubAccessTokenOnce,
+    // After a refresh, serve the cached fresh token so subsequent requests
+    // whose getToken() reads the stale auth singleton do not 401 again.
+    ...(userGetToken
+      ? { getToken: () => getCachedRefreshedAccessToken() ?? userGetToken() }
+      : {}),
   });
 }
 

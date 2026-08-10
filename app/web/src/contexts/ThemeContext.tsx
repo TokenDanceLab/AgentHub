@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, useCallback, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useMemo, useState, useCallback, type ReactNode } from 'react';
 import {
   applyAgentHubTheme,
   getStoredAgentHubThemeMode,
@@ -73,8 +73,13 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     }
   }, [themeMode, setThemeMode]);
 
+  const contextValue = useMemo<ThemeContextValue>(
+    () => ({ theme: resolvedTheme, themeMode, setThemeMode, toggleTheme }),
+    [resolvedTheme, themeMode, setThemeMode, toggleTheme],
+  );
+
   return (
-    <ThemeContext.Provider value={{ theme: resolvedTheme, themeMode, setThemeMode, toggleTheme }}>
+    <ThemeContext.Provider value={contextValue}>
       {children}
     </ThemeContext.Provider>
   );

@@ -7,13 +7,21 @@ import '@/i18n';
 import App from '@/App';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import { setToastHandler } from '@shared/errorReporting';
-import { useToastStore } from '@/stores/toastStore';
+import { useToastStore } from '@shared/ui/toast';
 
-// Bridge global error reporter to toast notifications
+// Bridge global error reporter to toast notifications. The reporter already
+// cleans technical strings out of `config.message` (see friendlyErrorMessage)
+// and surfaces a `traceId` when the caller provided one; we append it here
+// as secondary text so users can quote it to support without seeing the raw
+// server string, and forward the optional Retry action to the toast host.
 setToastHandler((config) => {
+  const message = config.traceId
+    ? `${config.title}: ${config.message} (trace: ${config.traceId})`
+    : (config.title ? `${config.title}: ${config.message}` : config.message);
   useToastStore.getState().showToast(
     config.severity as 'error' | 'warning' | 'info',
-    config.title ? `${config.title}: ${config.message}` : config.message,
+    message,
+    config.action ? { action: config.action } : undefined,
   );
 });
 
