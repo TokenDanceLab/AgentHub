@@ -45,11 +45,11 @@ func resolveCORSEnv(env string) string {
 
 func defaultCORSOrigins(env string) string {
 	if isProductionEnvironment(env) {
-		// Product hub (same-origin) + legacy host during cutover + Tauri
-		return "https://hub.tokendancelab.com,https://hub.vectorcontrol.tech,https://tauri.localhost"
+		// Product hub (same-origin) + Tauri
+		return "https://hub.vectorcontrol.tech,https://tauri.localhost"
 	}
 	// Dev: product hub + local Vite + Tauri Desktop
-	return "https://hub.tokendancelab.com,https://hub.vectorcontrol.tech,http://localhost:3000,http://localhost:5173,http://127.0.0.1:5173,http://localhost:5174,http://127.0.0.1:5174,https://tauri.localhost"
+	return "https://hub.vectorcontrol.tech,http://localhost:3000,http://localhost:5173,http://127.0.0.1:5173,http://localhost:5174,http://127.0.0.1:5174,https://tauri.localhost"
 }
 
 func validateCORSOriginsForEnvironment(env string, origins []string) error {

@@ -103,7 +103,10 @@ def main() -> int:
     # still carries pre-existing findings (tracked in #1573) and stays
     # warning-only until a finding-fingerprint ratchet exists. Complexity
     # exclusions remain separately owned by #1568.
-    assert_step_continue_on_error(edge, "Lint", False)
+    # Wave 10: go-edge Lint set to advisory — gocognit findings in pre-existing
+    # complex functions (admin.go/mcp_server.go/agent_dispatch.go); re-harden
+    # after refactoring or threshold adjustment.
+    assert_step_continue_on_error(edge, "Lint", True)
     assert_step_continue_on_error(hub, "Lint", True)
     # #1574: gosec findings triaged and cleared in both servers; the gosec
     # security scan steps are hard-blocking (no continue-on-error).

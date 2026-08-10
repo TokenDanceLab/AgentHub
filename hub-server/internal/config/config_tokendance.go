@@ -9,7 +9,7 @@ import (
 
 // TokenDanceIDConfig holds OIDC/OAuth2 configuration for TokenDance ID integration.
 type TokenDanceIDConfig struct {
-	// IssuerURL is the TokenDance ID issuer base URL (e.g. https://id.tokendancelab.com).
+	// IssuerURL is the TokenDance ID issuer base URL.
 	IssuerURL string `mapstructure:"issuer_url"`
 	// JWKSURI overrides the JWKS endpoint. Derived from issuer_url/oidc/jwks when empty.
 	JWKSURI string `mapstructure:"jwks_uri"`
@@ -22,9 +22,9 @@ type TokenDanceIDConfig struct {
 	// AllowedRedirectURIs lists additional browser/native callbacks accepted for one OIDC round trip.
 	AllowedRedirectURIs []string `mapstructure:"allowed_redirect_uris"`
 	// TokenURL overrides the OIDC token exchange endpoint. Derived from
-	// issuer_url/oidc/token when empty. Production points it at the DNS-only
-	// id-token.tokendancelab.com machine entry to bypass the public edge
-	// challenge (Bot Fight) that blocks non-JS clients (2026-08-08).
+	// issuer_url/oidc/token when empty. Production may override for a
+	// DNS-only machine entry to bypass public edge challenges that block
+	// non-JS clients.
 	// Env: AGENTHUB_TOKENDANCE_ID_TOKEN_URL.
 	TokenURL string `mapstructure:"token_url"`
 	// HTTPTimeout bounds the OIDC token-exchange and JWKS fetch requests
