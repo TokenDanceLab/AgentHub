@@ -29,42 +29,9 @@ import type { MobileAppFixture } from '@/types';
 
 // Re-export full shared SSOT for app imports (types + helpers).
 export * from '@agenthub/shared/hubClient';
-
-// ── Mobile-specific error types (preserved for test compatibility) ──
-
-export interface HubErrorDetails {
-  code: string;
-  message: string;
-  status?: number;
-  retryable: boolean;
-  cause?: unknown;
-}
-
-export class HubApiError extends Error {
-  code: string;
-  status: number;
-  retryable: boolean;
-
-  constructor(details: Omit<HubErrorDetails, 'cause'> & { status: number }) {
-    super(details.message);
-    this.name = 'HubApiError';
-    this.code = details.code;
-    this.status = details.status;
-    this.retryable = details.retryable;
-  }
-}
-
-export class HubNetworkError extends Error {
-  code = 'network_error';
-  retryable = true;
-  cause?: unknown;
-
-  constructor(message = 'Network request to AgentHub failed', cause?: unknown) {
-    super(message);
-    this.name = 'HubNetworkError';
-    this.cause = cause;
-  }
-}
+// Re-export the shared Hub error classes so mobile test/UI `instanceof`
+// checks resolve to one shared class identity (SSOT lives in shared errors.ts).
+export { HubApiError, HubNetworkError, type HubErrorDetails } from '@agenthub/shared/errors';
 
 // ── WebSocket event types (aligned with hub-server WS frames) ──
 // Includes legacy mobile-only types for UI layer backward compatibility.

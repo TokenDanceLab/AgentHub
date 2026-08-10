@@ -13,14 +13,22 @@ const runtimeFilePattern = /\.(?:ts|tsx|js|jsx|mjs)$/;
 const testFilePattern = /(?:\.test|\.spec)\.(?:ts|tsx|js|jsx|mjs)$/;
 const runtimeSecretAllowlist = new Set([
   'src/api/hubClient.ts',
+  // Mobile OIDC assembly legitimately reads/writes Hub access & refresh tokens
+  // (the Hub response shape uses access_token/refresh_token field names) and
+  // owns the SecureStore-backed Hub session storage. It performs no browser
+  // storage or document access — only expo-secure-store + shared Hub calls.
+  'src/session/mobileAuthSession.ts',
 ]);
 
 const allowedSharedImports = new Set([
   '@agenthub/shared/composer',
   '@agenthub/shared/designTokens',
+  '@agenthub/shared/errors',
   '@agenthub/shared/hubClient',
   '@agenthub/shared/hubEvents',
   '@agenthub/shared/i18n',
+  '@agenthub/shared/api/auth',
+  '@agenthub/shared/notificationIntents',
   '@agenthub/shared/platform',
   '@agenthub/shared/transcript',
   '@agenthub/shared/types',
