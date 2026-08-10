@@ -46,8 +46,7 @@ import {
 import { getHubClient } from '@/api/hubQueries';
 import type { AgentConfig, DocRow, SkillMarketItem, MCPMarketItem } from '@shared/workbench';
 import { getDemoRuntimeEvidence } from '@/demo/demoEvidence';
-import { useToastStore } from '@/stores/toastStore';
-import { ToastContainer } from '@/components/Toast';
+import { useToastStore, ToastContainer } from '@shared/ui/toast';
 import { useGlobalKeyboardShortcuts } from '@/hooks/useGlobalKeyboardShortcuts';
 
 export default function App() {
@@ -441,19 +440,35 @@ export function DesktopWorkbenchApp({ onLogout }: DesktopWorkbenchAppProps = {})
     }
   }, [createThread, workbench.conversations, workbench.isDemo]);
 
+  const agentProfilesStatus = useMemo(() => ({
+    loading: liveEdgeEnabled && (profileData?.items === undefined),
+    error: agentActionError,
+    actionError: agentActionError,
+    savingAgentId,
+    deletingAgentId,
+  }), [liveEdgeEnabled, profileData?.items, agentActionError, savingAgentId, deletingAgentId]);
+
+  const handleAgentsRetry = useCallback(() => {
+    setAgentActionError(undefined);
+  }, []);
+
+  const workbenchStatus = useMemo(() => ({
+    dataMode: workbench.dataMode,
+    targetState: workbench.edgeDemoData ? 'observed' : workbench.isDemo ? 'mock' : edgeOnline ? 'online' : 'offline',
+    targetLabel: workbench.edgeDemoData ? 'Local Edge observed (auto)' : workbench.isDemo ? 'Demo runtime' : 'Local Edge',
+    initialLoading: workbench.threadsLoading === true && workbench.conversations.length === 0,
+    ...((workbench.threadsError ?? workbench.itemsError) !== undefined
+      ? { loadError: (workbench.threadsError ?? workbench.itemsError) as string }
+      : {}),
+  }), [workbench.dataMode, workbench.edgeDemoData, workbench.isDemo, edgeOnline, workbench.threadsLoading, workbench.conversations.length, workbench.threadsError, workbench.itemsError]);
+
   return (
     <>
       {liveEdgeEnabled ? <DesktopHubTaskBridge /> : null}
       <AgentHubWorkbench
         activeConversationId={workbench.activeConversationId}
         agents={agents}
-        agentProfilesStatus={{
-          loading: liveEdgeEnabled && (profileData?.items === undefined),
-          error: agentActionError,
-          actionError: agentActionError,
-          savingAgentId,
-          deletingAgentId,
-        }}
+        agentProfilesStatus={agentProfilesStatus}
         contacts={workbench.contacts}
         contactsActions={workbench.contactsActions}
         documents={documents}
@@ -463,9 +478,7 @@ export function DesktopWorkbenchApp({ onLogout }: DesktopWorkbenchAppProps = {})
         onAgentCreate={handleAgentCreate}
         onAgentUpdate={handleAgentUpdate}
         onAgentDelete={handleAgentDelete}
-        onAgentsRetry={() => {
-          setAgentActionError(undefined);
-        }}
+        onAgentsRetry={handleAgentsRetry}
         onLogout={onLogout}
         onNavigateToConversation={handleNavigateToConversation}
         onEditMessage={
@@ -514,15 +527,7 @@ export function DesktopWorkbenchApp({ onLogout }: DesktopWorkbenchAppProps = {})
         skillMarketLoading={hubReady && skillMarketQuery.isFetching}
         mcpMarketItems={mcpMarketItems}
         mcpMarketLoading={hubReady && mcpMarketQuery.isFetching}
-        workbenchStatus={{
-          dataMode: workbench.dataMode,
-          targetState: workbench.edgeDemoData ? 'observed' : workbench.isDemo ? 'mock' : edgeOnline ? 'online' : 'offline',
-          targetLabel: workbench.edgeDemoData ? 'Local Edge observed (auto)' : workbench.isDemo ? 'Demo runtime' : 'Local Edge',
-          initialLoading: workbench.threadsLoading === true && workbench.conversations.length === 0,
-          ...((workbench.threadsError ?? workbench.itemsError) !== undefined
-            ? { loadError: (workbench.threadsError ?? workbench.itemsError) as string }
-            : {}),
-        }}
+        workbenchStatus={workbenchStatus}
       />
     </>
   );

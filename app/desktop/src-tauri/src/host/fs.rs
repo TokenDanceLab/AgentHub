@@ -121,6 +121,13 @@ fn workspace_roots_from_store_data(data: &WorkspaceStoreData) -> Vec<PathBuf> {
     roots
 }
 
+/// Test-only helper that applies the authorized workspace-root sync path.
+/// Narrowed to `#[cfg(test)]` so the non-test lib build does not carry an
+/// unused private function; production store sync uses
+/// `replace_workspace_roots_from_trusted_store` instead. The two security
+/// tests below exercise the "renderer store sync must not grant unknown
+/// roots" boundary, which is why this helper is retained.
+#[cfg(test)]
 fn replace_workspace_roots_from_store(
     access: &WorkspaceFileAccessState,
     data: &WorkspaceStoreData,
