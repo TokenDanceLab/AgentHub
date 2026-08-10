@@ -30,7 +30,7 @@ import { createWebWorkbenchProjectsPort } from '@/platform/webWorkbenchProjectsP
 import { useWebAuth } from '@/hooks/useWebAuth';
 import { getAccessToken, useAuth } from '@/hooks/useAuth';
 import { useHubStore } from '@/stores/hubStore';
-import { ToastContainer } from '@/components/Toast';
+import { ToastContainer } from '@shared/ui/toast';
 import styles from './App.module.css';
 
 export default function App() {
@@ -198,19 +198,31 @@ function WebWorkbenchRoot() {
     setShowAuthModal(true);
   }, [logout, sessionQueryClient, setShowAuthModal]);
 
+  const agentProfilesStatus = useMemo(() => ({
+    loading: realMode && agentList.isFetching,
+    error: agentLoadError,
+    actionError: agentActionError,
+    savingAgentId,
+    deletingAgentId,
+  }), [realMode, agentList.isFetching, agentLoadError, agentActionError, savingAgentId, deletingAgentId]);
+
+  const handleAgentsRetry = useCallback(() => {
+    setAgentActionError(undefined);
+    void agentList.refetch();
+  }, [agentList]);
+
+  const handleRegenerate = useCallback((blockId: string) => {
+    const messageId = blockId.replace(/^hub-message-/, '');
+    void createHubClient({ getToken: getAccessToken }).regenerateAgentTask(messageId).catch(() => {});
+  }, []);
+
   return (
     <>
       <AgentHubWorkbench
         activeConversationId={workbench.activeConversationId}
         agents={agents}
         composerExecutionTargets={workbench.composerExecutionTargets}
-        agentProfilesStatus={{
-          loading: realMode && agentList.isFetching,
-          error: agentLoadError,
-          actionError: agentActionError,
-          savingAgentId,
-          deletingAgentId,
-        }}
+        agentProfilesStatus={agentProfilesStatus}
         contacts={workbench.contacts}
         contactsActions={workbench.contactsActions}
         conversations={workbench.conversations}
@@ -222,20 +234,14 @@ function WebWorkbenchRoot() {
         onAgentCreate={handleAgentCreate}
         onAgentUpdate={handleAgentUpdate}
         onAgentDelete={handleAgentDelete}
-        onAgentsRetry={() => {
-          setAgentActionError(undefined);
-          void agentList.refetch();
-        }}
+        onAgentsRetry={handleAgentsRetry}
         onLogout={handleLogout}
         onProjectCreate={workbench.projectsActions ? handleProjectCreate : undefined}
         onProjectUpdate={workbench.projectsActions ? handleProjectUpdate : undefined}
         projectsPort={hubReady ? webProjectsPort : undefined}
         onApprovalDecision={workbench.onApprovalDecision}
         onNavigateToConversation={handleNavigateToConversation}
-        onRegenerate={(blockId) => {
-          const messageId = blockId.replace(/^hub-message-/, '');
-          void createHubClient({ getToken: getAccessToken }).regenerateAgentTask(messageId).catch(() => {});
-        }}
+        onRegenerate={handleRegenerate}
         isAgentRunning={workbench.isAgentRunning}
         onCancelRun={workbench.onCancelRun}
         onEditMessage={
