@@ -1,5 +1,7 @@
 # Dependency Graph — Post-Polish Residual
 
+> pending external archive — see docs/history.md
+
 ```mermaid
 flowchart TD
   subgraph P79[Phase 79 Docs Authority]

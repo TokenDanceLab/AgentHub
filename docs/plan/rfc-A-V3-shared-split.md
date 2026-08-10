@@ -1,5 +1,6 @@
 # RFC A-V3 — `@agenthub/shared` 拆 hub/edge 边界评估
 
+> SPEC completed — pending external archive
 > 状态: **已裁决 2026-08-03** — 驳回全量三分；quick-wins 已落地；软门禁硬化独立任务 #1525
 > 作者: senior-architect agent · 日期: 2026-07-30 · 更新: 2026-08-03（#1523 事实对齐）
 > 权威: `docs/progress/MASTER.md`；裁决由审核 leader 拍板

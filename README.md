@@ -7,10 +7,10 @@
 
   [English](README_EN.md) · [官网](https://hub.vectorcontrol.tech) · [文档](https://hub.vectorcontrol.tech/docs) · [API](api/)
 
-  ![version](https://img.shields.io/badge/version-0.5.0-blue?style=flat-square)
+  ![version](https://img.shields.io/badge/version-0.6.0-blue?style=flat-square)
   ![CI](https://img.shields.io/github/actions/workflow/status/TokenDanceLab/AgentHub/checks.yml?branch=master&style=flat-square&label=CI)
   ![release](https://img.shields.io/github/v/release/TokenDanceLab/AgentHub?style=flat-square)
-  ![go](https://img.shields.io/badge/go-1.25+-00ADD8?style=flat-square&logo=go)
+  ![go](https://img.shields.io/badge/go-1.26+-00ADD8?style=flat-square&logo=go)
   ![react](https://img.shields.io/badge/react-19-61DAFB?style=flat-square&logo=react)
   ![tauri](https://img.shields.io/badge/tauri-2-FFC131?style=flat-square&logo=tauri&logoColor=black)
   ![license](https://img.shields.io/badge/license-Apache--2.0-lightgrey?style=flat-square)
@@ -29,7 +29,7 @@ AgentHub 让你像在 IM 群聊里协作一样，把真人好友、Builder、Rev
 - **IM 形态协作** — 单聊、群聊、@Agent，在同一条任务流里完成
 - **多 Runtime 调度** — Claude Code、Codex、OpenCode 通过统一 Adapter 接入
 - **Diff / Preview / Approval** — 代码变更内联展示，审批流可控
-- **三端原生** — Tauri Desktop + Web + Expo React Native Mobile
+- **三端原生** — Tauri Desktop + Web + Expo React Native Mobile（Mobile 装配中，见 [CHANGELOG](CHANGELOG.md) Wave5/6）
 - **Hub-Edge 分布式** — 本地执行不依赖 Hub；Hub 提供多端同步、远程查看和审计
 
 ## 技术栈
@@ -53,6 +53,20 @@ AgentHub 让你像在 IM 群聊里协作一样，把真人好友、Builder、Rev
 | `edge-server` | 本地执行节点：CLI Adapter、SQLite、事件回放 |
 | `api` | OpenAPI 与 WebSocket 事件合同 |
 | `docs` | 架构、路线图、设计文档 |
+
+## 快速开始
+
+最小本地启动路径（5 步）。需要 Docker、Go 1.26+、Node 22+/corepack、pnpm 10+。
+
+```bash
+cp .env.example .env                        # 1. 复制开发环境变量（含默认 dev 密码）
+docker compose up -d postgres redis         # 2. 起基础设施（PG16 + Redis7，仅绑 127.0.0.1）
+cd hub-server && go run ./cmd/server-hub    # 3. 起 Hub Server（自动跑迁移，API 在 :8080）
+cd ../app && corepack pnpm install          # 4. 装前端依赖
+pnpm dev                                    # 5. 起 Desktop Vite（:5173）；web 用 pnpm dev:web
+```
+
+完整启动路径、OIDC 接入、Edge Server 调试见 [docs/developer-quickstart.md](docs/developer-quickstart.md)；生产部署与必填变量见 [docs/architecture/05-deployment.md](docs/architecture/05-deployment.md)。
 
 ## 开发
 

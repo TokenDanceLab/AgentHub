@@ -79,8 +79,7 @@ Stable behavior:
 - User messages are optimistic and must appear immediately after submit; refetch, replay, or runtime events must not make them flash away.
 - All sources are ordered by event time, then stable input order. User text, agent text, tool call/result, approval, subagent report, diff, artifact, deploy, context usage and preview stay in one linear transcript.
 - Adjacent agent blocks from the same author are grouped by shared chatview adapter. Tool result replaces its matching tool call when a call id or tool name matches.
-- Runtime diagnostics and mock/mode/debug labels are filtered before rendering as chat bubbles.
-- Markdown, code blocks and tables render inside shared bubble/card components, not as escaped plaintext.
+- Runtime diagnostics and mock/mode/debug labels are filtered before rendering as chat bubbles. Markdown, code blocks and tables render inside shared bubble/card components, not as escaped plaintext.
 - Auto-follow scrolls on first render, near-bottom updates, or a local user submit; user-initiated scrollback must not be forcibly overridden.
 
 ## Realtime And Cache Flow
@@ -134,7 +133,7 @@ Stubbed Hub, fixture, readiness-only and manifest-only outputs must set `real_te
 |---|---|
 | Transcript ordering/grouping/markdown | Shared Vitest over `app/shared/src/transcript/` and `app/shared/src/chatview/` |
 | Send visibility and auto-follow | Desktop/Web Playwright chat-flow specs; Mobile remains framework/boundary-only until a dedicated UI slice |
-| Layout cleanliness | Desktop/Web Visual QA gate at 16:9 `1440x810` light+dark via `visual-qa-shell.mjs` / `visual:qa:shell` ([scorecard](../archives/analysis/visual-qa-scorecard.md)); check overflow and final-message visibility |
+| Layout cleanliness | Desktop/Web Visual QA gate at 16:9 `1440x810` light+dark via `visual-qa-shell.mjs` / `visual:qa:shell` ([scorecard](../analysis/visual-qa-scorecard.md)); check overflow and final-message visibility |
 | Data boundary | `app/shared/src/testing/e2eDataModeContract.ts` plus surface-specific E2E assertions |
 | Packaged Desktop | Tauri package/sidecar/icon/installer evidence, not Vite-only |
 
@@ -142,6 +141,10 @@ Stubbed Hub, fixture, readiness-only and manifest-only outputs must set `real_te
 
 - [architecture.md](../architecture.md) — system overview and non-negotiable boundaries
 - [01-hub-server.md](01-hub-server.md) — Hub API and realtime ownership
-- [02-edge-server.md](02-edge-server.md) — Edge EventStore and local run ownership
-- [06-auth-identity.md](06-auth-identity.md) — TokenDance ID and Hub session flow
 - [../roadmap.md](../roadmap.md) — current priority and evidence boundaries
+
+## 前端 CI 易踩坑（站立规则）
+
+- `exactOptionalPropertyTypes`：禁 `...{ optional: maybeUndefined }`，defined 时赋值；async handler 传 `() => void` 用 `void fn()` 包装。`noUncheckedIndexedAccess`：CSS module / `Record<string,string>` 索引用 `styles.foo ?? ''`。
+- CSS helper 参数类型用 `Record<string,string>`，不要 `Pick<typeof styles,'a'|'b'>`（与 `CSSModuleClasses` 不兼容）。Nav 图标只用 `DesignNavIcon`（见 `DesignNavIconName`）；禁散落 nav glyph。
+- 11px (0.6875rem) 为 CJK 最小可读字号；badge/chip 用此值，正文标签 ≥12px。CI 统一 `changes` job（`dorny/paths-filter@v4`，Go-only 跳前端、CSS-only 跳 Go；`scripts/verify/verify-ci-gates.py` 校验）。

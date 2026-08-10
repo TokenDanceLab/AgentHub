@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"sync/atomic"
 )
@@ -86,8 +87,11 @@ type errorEnvelope struct {
 }
 
 // WriteError writes a standardized error response.
-// If err is *Error, uses its fields. Otherwise wraps as INTERNAL_ERROR.
-// Always generates and attaches a trace ID.
+// If err is *Error, uses its fields. Otherwise wraps as INTERNAL_ERROR with a
+// generic message — the original err text is logged (never sent to the
+// client) so internal details (filesystem paths, upstream error bodies, stack
+// hints) are not leaked through the API surface. Always generates and
+// attaches a trace ID so operators can correlate the log line to the response.
 func WriteError(w http.ResponseWriter, err error) {
 	var e *Error
 	if errors.As(err, &e) {
@@ -97,7 +101,12 @@ func WriteError(w http.ResponseWriter, err error) {
 		writeEnvelope(w, e.HTTPStatus, errorEnvelope{Error: e})
 		return
 	}
-	e = ErrInternal.WithMessage(err.Error()).WithTrace(NewTraceID())
+	traceID := NewTraceID()
+	slog.Error("unexpected internal error",
+		"traceId", traceID,
+		"error", err.Error(),
+	)
+	e = ErrInternal.WithTrace(traceID)
 	writeEnvelope(w, http.StatusInternalServerError, errorEnvelope{Error: e})
 }
 
@@ -111,7 +120,11 @@ func WriteErrorWithTrace(w http.ResponseWriter, err error, traceID string) {
 		writeEnvelope(w, e.HTTPStatus, errorEnvelope{Error: e})
 		return
 	}
-	e = ErrInternal.WithMessage(err.Error()).WithTrace(traceID)
+	slog.Error("unexpected internal error",
+		"traceId", traceID,
+		"error", err.Error(),
+	)
+	e = ErrInternal.WithTrace(traceID)
 	writeEnvelope(w, http.StatusInternalServerError, errorEnvelope{Error: e})
 }
 

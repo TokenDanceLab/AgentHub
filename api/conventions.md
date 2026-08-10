@@ -1,6 +1,6 @@
 # API Conventions
 
-最后更新：2026-07-29
+最后更新：2026-08-09
 
 本文定义 AgentHub REST API 和 WebSocket typed events 的通用规则。完整路径/schema 以 `api/openapi.yaml` 为准；事件合同入口见 `api/events.md`；错误码源头见 `pkg/errcode`、`edge-server/internal/errcode/` 和 `hub-server/internal/errcode/`。
 
@@ -64,6 +64,24 @@ GET /v1/threads?projectId=proj_1&pageSize=50&pageCursor=cursor_abc
 
 响应包含 `items` 和 `page.nextCursor` / `page.hasMore`。`pageSize` 默认 `50`，最大 `200`。不要把 offset pagination 作为主方式，避免消息流和事件流错位。
 
+### 三种列表响应形状
+
+实际 wire 形状因归属和资源而异，客户端必须按下列三种形状解析，不要假设统一 `{items, page}`：
+
+| 形状 | 归属 | 资源示例 | wire |
+|---|---|---|---|
+| 裸数组（Hub） | Hub | `sessions`、`threads`、`messages`、`teams`、`runs` | `{"code":"ok","data":[...]}` |
+| `{items, page:{hasMore:false}}`（Edge） | Edge | Edge 所有列表（runs、agents、plans、permission requests 等） | `{"items":[...],"page":{"hasMore":false}}` |
+| `{items, page:{nextCursor, hasMore}}`（Hub cursor） | Hub | `workspaces`、`agent_profiles`、`audit`、`skills`、`execution_targets`、`mcp_servers`、`market`、`provider_bindings` | `{"items":[...],"page":{"nextCursor":"...","hasMore":true}}` |
+
+形状选择依据：
+
+- **Hub 裸数组**用于"父资源内自然有界"的子集合（例如某 project 下的 threads、某 thread 下的 messages）。这些列表没有跨页游动的需求，Hub 直接以 `data` 数组返回，不裹 `items`/`page`。
+- **Edge 无 cursor**：Edge 当前列表均一次性返回，`page.hasMore` 恒为 `false` 且没有 `nextCursor` 字段。保留 `page` 对象是为了未来扩展时不破坏形状。
+- **Hub cursor** 用于跨项目、跨时间的全局列表（audit、workspaces、market 等），按 `pageCursor` 翻页，`page.nextCursor` 为空字符串或 `hasMore=false` 表示末页。
+
+客户端解析入口应按"先判 Hub envelope（`code==="ok"` 取 `data`），再按 `items`/`page` 解 Edge/Hub cursor 形状"的顺序处理。
+
 ## Errors
 
 REST 错误使用统一 envelope：
@@ -86,6 +104,26 @@ REST 错误使用统一 envelope：
 - 共享错误码定义在 `pkg/errcode/codes.go`；Edge/Hub 域码分别由各自 `internal/errcode/codes.go` 扩展。
 - Hub 成功 envelope 的 wire 值是 **小写** `ok`：`{"code":"ok","data":{...}}`（`hub-server/internal/errcode.OK.Code`，经 `handler.OK` 写出）。这不是 HTTP 状态文案，也不是 Edge 成功形状——Edge 成功响应返回裸 JSON 对象或数组。OpenAPI 中 Hub success 的 `code` enum 与此对齐为 `ok`；历史上部分文档/fixture 写过 `"OK"`。共享客户端对成功码大小写不敏感（`isHubSuccessCode`）仅作解析容错，**不是**双 wire 契约。统一 Hub/Edge 成功响应格式属于后续兼容性任务。
 - 前端解析入口是 `app/shared/src/errors.ts` 的 `parseError()`；Hub envelope 解包见 `app/shared/src/hubClientEnvelope.ts`。
+
+### HTTP 状态码与语义
+
+下表列出需要客户端特殊处理的 HTTP 状态码及对应 `code`。未列出的状态码按 envelope 内 `code` 处理。
+
+| HTTP | `code` | 语义与客户端行为 |
+|---|---|---|
+| 429 | `rate_limited` | 全局/按路径限流触发。响应头一定带 `Retry-After`（秒，整数），客户端必须遵守后再重试，不要立即退避风暴。WS 连接速率限制返回 `ws_rate_limited`（同样 429，无 `Retry-After`）。**注意**：限流 code 已规范化为 snake_case `rate_limited`；历史 fixture 里出现的 `RATE_LIMITED`/`too_many_requests` 不再是 production wire 值。 |
+| 410 | `session_dissolved` / `agent_task_cancelled` / `agent_task_timeout` | 资源曾存在但已进入终态，不可恢复。区别于 404 `not_found`：410 表示"曾经存在、现已终结"，客户端应停止重试并清理本地缓存/乐观状态，不要把它当瞬时错误重放。 |
+| 413 | `payload_too_large` / `attach_too_large` | 请求体超过配置上限。通用 `payload_too_large` 由共享 errcode 定义；Hub 附件域码 `attach_too_large` 用于上传场景。客户端应缩小体积后重试，不要原样重发。 |
+| 415 | `attach_type_not_allowed` | Hub 附件上传的文件类型不在允许清单。客户端应转换格式或换资源，不要重发同一文件。 |
+
+#### 限流与 Redis 故障
+
+限流中间件（`hub-server/internal/middleware/global_rate_limit.go`、`rate_limit.go`、`ws_rate_limit.go`）依赖 Redis。Redis 故障时的行为由配置决定：
+
+- **认证路径**（`/client/auth/*`）一律 fail-closed：返回 503 `rate_limit_unavailable`，绝不放行。
+- **非认证路径**：默认 fail-open，放行并写 warn 日志、置响应头 `X-Rate-Limit-Degraded: true`；若显式配置 `AGENTHUB_RATE_LIMIT_FAIL_OPEN=false`，则 fail-closed 返回 503 `rate_limit_unavailable`。
+
+客户端遇到 503 `rate_limit_unavailable` 时应区分：认证路径下不要无限重试（会一直 503）；非认证路径下若带 `X-Rate-Limit-Degraded` 表示限流已降级放行，可继续业务请求。
 
 ## Permissions
 

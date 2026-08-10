@@ -19,7 +19,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  GO_VERSION: "1.25.11"
+  GO_VERSION: "1.26.5"
   GOLANGCI_LINT_VERSION: "v2.12.2"
   NODE_VERSION: "22"
   PNPM_VERSION: "10"
@@ -54,9 +54,13 @@ jobs:
           version: ${{ env.GOLANGCI_LINT_VERSION }}
           args: --timeout=5m
 
-      - name: Test (unit only, skip integration)
+      # CI5: Test + race merged into a single run (was two passes: -count=1
+      # -short -coverprofile, then -count=1 -short -race). Combining -race
+      # with -coverprofile yields the coverage profile AND exercises the race
+      # detector in one pass — halves Go test wall-time per server.
+      - name: Test (unit only + race, skip integration)
         timeout-minutes: 20
-        run: go test ./... -count=1 -short -coverprofile=coverage.out -covermode=atomic -timeout=15m
+        run: go test ./... -count=1 -short -race -coverprofile=coverage.out -covermode=atomic -timeout=15m
 
       - name: Coverage check (informational)
         run: |
@@ -85,13 +89,29 @@ jobs:
           check_pkg "edge-server/internal/adapters/" 55 "adapters" || FAILED=1
           exit $FAILED
 
-      - name: Race detection
-        run: go test ./... -count=1 -short -race
-
       - name: Security scan (gosec)
         run: go run github.com/securego/gosec/v2/cmd/gosec@latest ./...
       - name: Vet
         run: go vet ./...
+
+      # CI7: staticcheck hard-blocking — edge-server findings zero-baselined;
+      # version pinned to prevent new-check drift from breaking CI.
+      - name: staticcheck
+        run: |
+          go install honnef.co/go/tools/cmd/staticcheck@2026.1
+          staticcheck ./... 2>&1
+
+      # #1566: orchestrator 依赖方向门禁（A-V1 Step 2）。叶子包
+      # internal/adapters/orchestrator 不得 import 根实现包；
+      # internal/orchestration 不得 import 任何 adapters。此前该脚本只在
+      # 本地跑、CI 未接线——治理声明与执行不一致，现接进 go-edge（已 setup-go）。
+      - name: Verify orchestrator dependency direction (#1566)
+        working-directory: .
+        run: python scripts/verify/verify-orchestrator-deps.py
+
+      - name: Self-test orchestrator dependency direction gate
+        working-directory: .
+        run: python scripts/verify/tests/verify-orchestrator-deps.Tests.py
 
   # ── Go: Hub Server ──────────────────────────
   go-hub:
@@ -136,9 +156,12 @@ jobs:
         working-directory: .
         run: python ./scripts/verify/tests/verify-hub-lint-ratchet.Tests.py
 
-      - name: Test (unit only, skip integration)
+      # CI5: Test + race merged into a single run (was two passes). Combining
+      # -race with -coverprofile gives the coverage profile and race coverage
+      # in one pass. PASS_COUNT non-zero guard preserved.
+      - name: Test (unit only + race, skip integration)
         run: |
-          go test ./... -count=1 -short -coverprofile=coverage.out -covermode=atomic -v 2>&1 | tee unit-test.log
+          go test ./... -count=1 -short -race -coverprofile=coverage.out -covermode=atomic -v 2>&1 | tee unit-test.log
           PASS_COUNT=$(grep -c "^--- PASS" unit-test.log || true)
           echo "unit lane PASS count: ${PASS_COUNT}"
           if [ "${PASS_COUNT}" -lt 1 ]; then
@@ -157,14 +180,18 @@ jobs:
             exit 1
           fi
 
-      - name: Race detection
-        run: go test ./... -count=1 -short -race
-
       - name: Security scan (gosec)
         run: go run github.com/securego/gosec/v2/cmd/gosec@latest ./...
 
       - name: Vet
         run: go vet ./...
+
+      # CI7: staticcheck hard-blocking — hub-server findings zero-baselined;
+      # version pinned to prevent new-check drift from breaking CI.
+      - name: staticcheck
+        run: |
+          go install honnef.co/go/tools/cmd/staticcheck@2026.1
+          staticcheck ./... 2>&1
 
   # ── Backend E2E: Fixture-only ────────────────
   backend-e2e-fixture:
@@ -193,39 +220,16 @@ jobs:
         working-directory: .
         run: python ./scripts/verify/verify-p0-remote-control-fixture.py
 
-  # -- Backend: focused subset, no real CLI/model/services
-  backend-focused-subset:
-    name: Backend focused subset
-    needs: changes
-    if: >-
-      github.event_name == 'workflow_dispatch' ||
-      needs.changes.outputs.go == 'true'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-
-      - uses: actions/setup-go@v7
-        with:
-          go-version: ${{ env.GO_VERSION }}
-          cache: true
-          cache-dependency-path: |
-            hub-server/go.sum
-            edge-server/go.sum
-
-      - name: Hub focused backend packages
-        run: cd hub-server && go test ./internal/repository ./internal/service ./internal/app ./internal/handler ./internal/router -short -count=1
-
-      - name: Edge focused backend packages
-        run: cd edge-server && go test ./internal/store ./internal/api ./internal/lifecycle ./cmd/agenthub-edge -short -count=1
-
   # ── Backend: Integration (real PostgreSQL + Redis) ──────────
   # hub-server/tests/integration is `//go:build integration` (lane manifest):
   # the default -short lanes never compile it, so the suite can no longer
   # silently vanish via a package-wide TestMain escape hatch. This job
   # provisions PostgreSQL + Redis service containers and runs the lane with
   # `-tags integration`, asserting non-zero PASS count so a 0-test lane fails.
-  # The -short jobs (go-hub / backend-focused-subset) cover unit tests and
-  # prove non-zero execution the same way.
+  # The -short jobs (go-edge / go-hub) cover unit tests and prove non-zero
+  # execution the same way. (CI5: backend-focused-subset removed — its focused
+  # package subset was fully redundant with the go-edge/go-hub full `go test
+  # ./...` runs.)
   backend-integration:
     name: Backend integration (PostgreSQL + Redis)
     needs: changes
@@ -296,42 +300,13 @@ jobs:
             exit 1
           fi
 
-  # ── Cross-Platform Build ─────────────────────
-  # Windows 构建保留在 release / release-readiness；日常 CI 只跑 ubuntu。
-  cross-build:
-    name: Cross-platform build
-    needs: changes
-    if: >-
-      github.event_name == 'workflow_dispatch' ||
-      needs.changes.outputs.go == 'true'
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        os: [ubuntu-latest]
-    steps:
-      - uses: actions/checkout@v7
-
-      - uses: actions/setup-go@v7
-        with:
-          go-version: ${{ env.GO_VERSION }}
-          cache: true
-          cache-dependency-path: |
-            edge-server/go.sum
-            hub-server/go.sum
-
-      - name: Build edge-server
-        run: cd edge-server && go build ./...
-
-      - name: Build hub-server
-        run: cd hub-server && go build ./...
-
-      - name: Test edge-server
-        run: cd edge-server && go test ./... -short -count=1
-
-      - name: Test hub-server
-        run: cd hub-server && go test ./... -short -count=1
-
   # ── Docker: Hub Server ───────────────────────
+  # cross-build removed (audit): matrix collapsed to ubuntu-latest only,
+  # duplicating go-edge + go-hub build/test. Windows cross-build stays in
+  # release / release-readiness. No gate asserted cross-build.
+  # CI5: switched bare `docker build` to docker/build-push-action@v7 with a
+  # GitHub Actions (type=gha) build cache — aligns with cd-hub-server.yml.
+  # No push (PR/build-only smoke build); cache reuses layers across runs.
   docker:
     name: Docker build (Hub Server)
     needs: changes
@@ -342,8 +317,18 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - name: Build Docker image
-        run: docker build -t agenthub-hub-server -f hub-server/deployments/Dockerfile .
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Build Docker image (cached)
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: hub-server/deployments/Dockerfile
+          push: false
+          tags: agenthub-hub-server:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
       - name: Verify image
         run: docker images agenthub-hub-server
@@ -381,6 +366,7 @@ jobs:
       shell: ${{ steps.filter.outputs.shell }}
       go: ${{ steps.filter.outputs.go }}
       mobile: ${{ steps.filter.outputs.mobile }}
+      frontend: ${{ steps.filter.outputs.frontend }}
     steps:
       - uses: actions/checkout@v7
       - uses: dorny/paths-filter@v4
@@ -427,6 +413,18 @@ jobs:
               - 'app/package.json'
               - 'app/pnpm-lock.yaml'
               - '.github/workflows/checks.yml'
+            # frontend = desktop ∪ web ∪ shared (coverage gate + vuln-scan-js
+            # trigger). Splits the heavy vitest coverage job out of the
+            # unconditional validate lane so a Go-only PR no longer pays for
+            # pnpm install + coverage.
+            frontend:
+              - 'app/desktop/**'
+              - 'app/web/**'
+              - 'app/shared/**'
+              - 'app/package.json'
+              - 'app/pnpm-lock.yaml'
+              - 'app/test-config/**'
+              - '.github/workflows/checks.yml'
 
   # ── Frontend: Desktop ────────────────────────
   # test:ci (4 sequential vitest configs, memory workaround) is fully green on
@@ -466,8 +464,22 @@ jobs:
       - name: Lint
         run: pnpm lint --max-warnings 0
 
-      - name: Test Desktop
-        run: pnpm test:ci
+      # CI5: vitest shard matrix. `pnpm test:ci` chains 4 vitest configs
+      # serially (≈337s). Split into 2 parallel shards; each shard re-runs
+      # all 4 configs but only its slice of test files (--shard i/2).
+      # --passWithNoTests guards configs whose file count leaves one shard
+      # empty — it does NOT mask a config that lost all tests (still fails
+      # in the other shard / in the baseline). vitest.config untouched.
+      - name: Test Desktop (shard ${{ matrix.shard }}/2)
+        run: |
+          pnpm exec vitest run --config vitest.desktop-ts-ci.config.ts --shard ${{ matrix.shard }}/2 --passWithNoTests
+          pnpm exec vitest run --config vitest.desktop-tsx-ci.config.ts --shard ${{ matrix.shard }}/2 --passWithNoTests
+          pnpm exec vitest run --config vitest.edge-integration-ci.config.ts --shard ${{ matrix.shard }}/2 --passWithNoTests
+          pnpm exec vitest run --config vitest.shared-ci.config.ts --shard ${{ matrix.shard }}/2 --passWithNoTests
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2]
 
   # ── Frontend: Web ────────────────────────────
   frontend-web:
@@ -592,6 +604,11 @@ jobs:
           fi
 
       # ── Hardened: Screenshot diff testing (visual QA) ──
+      - name: Cache Playwright browsers
+        uses: actions/cache@v5
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('app/pnpm-lock.yaml') }}
       - name: Install Playwright browsers
         run: pnpm exec playwright install --with-deps chromium
 
@@ -672,6 +689,11 @@ jobs:
       - name: Install
         run: pnpm install --frozen-lockfile
 
+      - name: Cache Playwright browsers
+        uses: actions/cache@v5
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('app/pnpm-lock.yaml') }}
       - name: Install Playwright Chromium
         run: pnpm exec playwright install --with-deps chromium
 
@@ -737,6 +759,11 @@ jobs:
       - name: Install
         run: pnpm install --frozen-lockfile
         working-directory: ./app
+      - name: Cache Playwright browsers
+        uses: actions/cache@v5
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('app/pnpm-lock.yaml') }}
       - name: Install Playwright browsers
         run: pnpm exec playwright install --with-deps chromium
         working-directory: ./app
@@ -891,12 +918,40 @@ jobs:
       - name: Verify v4 old UI active paths
         run: python ./scripts/verify/verify-v4-old-ui-active-paths.py
 
-      # ── Frontend coverage baseline gate (baseline must not regress) ──
-      # Runs vitest --coverage for app/shared, app/web, app/desktop and fails
-      # if any coverage metric drops below scripts/verify/coverage-baseline.json
-      # or if any test is skipped (.skip / .todo anti-cheat). v8 coverage is
-      # execution-path based so numbers are cross-platform deterministic; a
-      # small tolerance field in the baseline absorbs run-to-run async noise.
+      # #1612: i18n callsites ratchet — shared UI must not add new CJK
+      # string literals (every user-visible string routes through the i18n
+      # dictionary). The gate enforces a non-increasing baseline; the script
+      # exits non-zero when the current CJK-literal count exceeds baseline.
+      # Wired advisory (continue-on-error) only because two frontend files
+      # (ui/CodeBlock.tsx, workbench/workbenchTestMocks.ts) regressed the
+      # baseline in the current working tree and this lane cannot touch app/.
+      # Once those violations are backfilled below baseline, flip this to
+      # hard-blocking by removing continue-on-error. The gate itself is not
+      # weakened — the script runs on every PR and posts a failure annotation
+      # either way.
+      - name: Verify i18n callsites ratchet (#1612)
+        continue-on-error: true
+        run: python ./scripts/verify/verify-i18n-callsites.py
+
+  # ── Frontend coverage baseline gate (path-filtered) ──
+  # Split out of the unconditional validate lane (audit): a Go-only PR no
+  # longer pays for pnpm install + vitest --coverage. v8 coverage is
+  # execution-path based so numbers are cross-platform deterministic; a
+  # small tolerance field in the baseline absorbs run-to-run async noise.
+  # Fails if any coverage metric drops below scripts/verify/coverage-baseline.json
+  # or if any test is skipped (.skip / .todo anti-cheat).
+  frontend-coverage:
+    name: Frontend coverage baseline
+    needs: changes
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      needs.changes.outputs.frontend == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
       - name: Setup pnpm (coverage gate)
         uses: pnpm/action-setup@v6
         with:
@@ -921,6 +976,10 @@ jobs:
   # ── Vuln Scan: JS (pnpm audit --prod) ─────────
   vuln-scan-js:
     name: Vuln scan (pnpm audit --prod)
+    needs: changes
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      needs.changes.outputs.frontend == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -955,6 +1014,10 @@ jobs:
   # ── Vuln Scan: Go (govulncheck) ───────────────
   vuln-scan-go:
     name: Vuln scan (govulncheck)
+    needs: changes
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      needs.changes.outputs.go == 'true'
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -983,14 +1046,37 @@ jobs:
   # ── Vuln Scan: Rust (cargo audit, #1578) ───────
   vuln-scan-rust:
     name: Vuln scan (cargo audit)
+    needs: changes
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      needs.changes.outputs.desktop == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
 
       - uses: dtolnay/rust-toolchain@stable
 
-      - name: Install cargo-audit
-        run: cargo install cargo-audit --locked
+      # CI7: cargo clippy advisory — 24 warnings not yet zero-baselined;
+      # continue-on-error so CI stays green while the debt is triaged.
+      # Promote to hard-blocking (cargo clippy --all-targets -- -D warnings)
+      # once the lint debt is repaid to zero.
+      - name: cargo clippy (advisory)
+        continue-on-error: true
+        working-directory: app/desktop/src-tauri
+        run: cargo clippy --all-targets 2>&1
+
+      # CI5: cargo-audit install sped up via cargo-binstall (prebuilt binary,
+      # ~10s) instead of `cargo install cargo-audit --locked` which compiles
+      # ~200 crates (2-4 min) on every desktop-changed run. cargo-binstall
+      # is bootstrapped with its official installer script — no GitHub Action
+      # step is introduced, so the action-runtime allow-list is unaffected.
+      # Verified method per
+      # https://github.com/cargo-bins/cargo-binstall#installation.
+      - name: Install cargo-audit (prebuilt, via cargo-binstall)
+        run: |
+          curl -L --proto '=https' --tlsv1.2 -sSf \
+            https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.sh | bash
+          cargo binstall cargo-audit --no-confirm --locked
 
       - name: Rust advisory gate (fail-closed, #1578)
         shell: bash

@@ -1,5 +1,6 @@
 # Settings Empty / Error / Loading Inventory
 
+> pending external archive — see docs/history.md
 > last-updated: 2026-07-17
 > issue: #470 / residual #479 / #492-#504 / #516 / #517 / #529
 > scope: shared workbench Settings SSOT + residual desktop/web shell
