@@ -2,6 +2,7 @@ package lifecycle
 
 import (
 	"fmt"
+	"log/slog"
 
 	"github.com/agenthub/edge-server/internal/runnerctx"
 	"github.com/agenthub/edge-server/internal/store"
@@ -85,10 +86,11 @@ func itemEventScope(item store.Item) map[string]any {
 
 // persistenceErrorScopePayload builds scope and payload for run.persistence_error.
 func persistenceErrorScopePayload(runID string, err error) (scope, payload map[string]any) {
+	slog.Error("run persistence error", "runId", runID, "error", err)
 	scope = map[string]any{"runId": runID}
 	payload = map[string]any{
 		"runId": runID,
-		"error": err.Error(),
+		"error": "persistence error",
 	}
 	return scope, payload
 }
@@ -98,7 +100,8 @@ func subAgentErrorPayload(err error) map[string]any {
 	if err == nil {
 		return map[string]any{"error": ""}
 	}
-	return map[string]any{"error": err.Error()}
+	slog.Error("sub-agent error", "error", err)
+	return map[string]any{"error": "sub-agent execution failed"}
 }
 
 // subAgentResultQueuePayload builds the message-queue payload after sanitization.

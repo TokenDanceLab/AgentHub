@@ -2,7 +2,9 @@ package httpserver
 
 import (
 	"context"
+	"log/slog"
 	"net/http"
+	"runtime/debug"
 	"strings"
 	"time"
 
@@ -11,6 +13,7 @@ import (
 	"github.com/agenthub/edge-server/internal/jwtutil"
 	"github.com/agenthub/edge-server/internal/security"
 	sharederr "github.com/agenthub/pkg/errcode"
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 func corsMiddleware(next http.Handler, remoteMode bool, allowedOrigins []string) http.Handler {
@@ -118,4 +121,61 @@ func headerContainsToken(header http.Header, key, want string) bool {
 		}
 	}
 	return false
+}
+
+// recoveryHTTPHandler wraps an http.Handler with panic recovery. A panic in
+// any handler or middleware is recovered, logged via slog with the full
+// stack trace, and the client receives a 500 JSON error envelope instead of
+// a dropped connection / process crash. The optional panicCounter is
+// incremented on each recovery so operators can alert on a non-zero rate.
+//
+// This must be the OUTERMOST wrapper in the chain so panics in
+// corsMiddleware / localAuthMiddleware / restTimeoutMiddleware / route
+// handlers are all caught. net/http does not install a default recover for
+// connected-request handlers — without this wrapper a single handler panic
+// crashes the Edge process.
+func recoveryHTTPHandler(next http.Handler, panicCounter prometheus.Counter) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		defer func() {
+			if err := recover(); err != nil {
+				if isBrokenPipeEdge(err) {
+					return
+				}
+
+				if panicCounter != nil {
+					panicCounter.Inc()
+				}
+
+				stack := debug.Stack()
+
+				slog.ErrorContext(r.Context(), "panic recovered (edge http)",
+					"error", err,
+					"stack", string(stack),
+					"method", r.Method,
+					"path", r.URL.Path,
+				)
+
+				sharederr.WriteError(w, sharederr.ErrInternal)
+			}
+		}()
+		next.ServeHTTP(w, r)
+	})
+}
+
+// isBrokenPipeEdge reports whether the recovered value is a broken-pipe or
+// connection-reset error (client disconnect) that should not be logged as a
+// server error. Mirrors the Hub middleware.isBrokenPipe check.
+func isBrokenPipeEdge(err any) bool {
+	errMsg := ""
+	switch v := err.(type) {
+	case error:
+		errMsg = v.Error()
+	case string:
+		errMsg = v
+	default:
+		return false
+	}
+	lower := strings.ToLower(errMsg)
+	return strings.Contains(lower, "broken pipe") ||
+		strings.Contains(lower, "connection reset by peer")
 }

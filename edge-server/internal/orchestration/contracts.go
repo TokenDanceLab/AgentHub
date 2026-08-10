@@ -178,6 +178,15 @@ const (
 
 	// Tool allowlist enforcement events (Edge runtime)
 	BusEventToolRejected = "run.agent.tool_rejected"
+
+	// Sub-agent aggregation / dispatch outcome events (ResultAggregator,
+	// lifecycle/result_aggregator.go). The named constants centralize the
+	// literals currently published as raw strings in result_aggregator.go
+	// (Wave 2 adds them; Wave 3 will replace the raw publish call sites to
+	// reference these names). events.md / event_contract_test.go already
+	// treat these strings as the contract, so the values are frozen.
+	BusEventTaskDispatchFailed = "run.agent.task_dispatch_failed"
+	BusEventSubAgentsComplete  = "run.agent.sub_agents_complete"
 )
 
 // CtxBudgetKey is the context key for passing a *runnerctx.ContextBudget

@@ -55,6 +55,22 @@ go run ./edge-server/cmd/agenthub-edge --addr 127.0.0.1:3210 --runner-profile op
 | `--local-auth-token` / `AGENTHUB_EDGE_AUTH_TOKEN` | Optional local Edge API token |
 | `--hub-jwt-secret` / `AGENTHUB_HUB_JWT_SECRET` | Hub-issued Edge JWT verification secret |
 | `--edge-device-id` / `AGENTHUB_EDGE_DEVICE_ID` | Device binding for Hub JWT |
+| `--dev` / `AGENTHUB_DEV` | Dev mode：禁用自动本地 token，所有端点开放（仅本地开发） |
+| `--remote-mode` / `AGENTHUB_REMOTE_MODE` | 允许非 loopback bind + 远程 origin（需配 `--local-auth-token` 或 `--hub-jwt-secret`） |
+| `--allowed-origin` / `AGENTHUB_ALLOWED_ORIGINS` | remote-mode CORS 允许的 browser origin（可重复；env 用逗号分隔） |
+| `--event-log-path` / `AGENTHUB_EVENT_LOG_PATH` | append-only JSON-lines 事件日志路径（崩溃恢复/回放；空=不持久化） |
+| `--hub-url` / `AGENTHUB_HUB_URL` + `--hub-token` / `AGENTHUB_HUB_TOKEN` | Edge→Hub 直连回调上报地址 + JWT bearer 鉴权 |
+| `--hub-callback-timeout` / `AGENTHUB_HUB_CALLBACK_TIMEOUT` | 单次 Edge→Hub 回调超时（Go duration，默认 30s） |
+| `--hub-callback-retry-budget` / `AGENTHUB_HUB_CALLBACK_RETRY_BUDGET` | 回调总 wall-clock 重试预算（Go duration，默认 10s） |
+| `--hub-callback-max-attempts` / `AGENTHUB_HUB_CALLBACK_MAX_ATTEMPTS` | 单次回调总尝试数（默认 3） |
+| `AGENTHUB_MEMORY_LIMIT_MB` | Soft memory-limit（env-only，默认 512 MiB，0=禁用；防长跑堆膨胀） |
+| `--hub-mcp-sync-url` / `AGENTHUB_HUB_MCP_SYNC_URL` + `--hub-mcp-sync-interval` / `AGENTHUB_HUB_MCP_SYNC_INTERVAL` | 周期拉取 Hub MCP server 配置（URL 空=不同步；interval 默认 5m） |
+
+## Auto token and debug endpoint auth behavior
+
+非 dev 模式且未显式配 `--local-auth-token` 与 `--hub-jwt-secret` 时，Edge 启动自动生成随机 `aght_` 本地 token（32 字节），是浏览器与本地 runtime 之间的主防线：无 token 的进程无法调状态变更端点或订阅 `/v1/events`。`--dev`/`AGENTHUB_DEV=1` 关闭此保护（仅本地开发）。
+
+debug 端点（pprof、`/debug/config`、`/debug/state`）由 `debugAuthFunc` 分层鉴权（`server_auth.go`）：(1) Dev 模式 → nil（公开）；(2) 已配 `LocalAuthToken` → Bearer 校验；(3) 已配 `HubJWTSecret` 但无 `LocalAuthToken` → Hub-JWT 校验回退（复用 REST 路由同一 `jwtutil.ValidateHubToken` 信任链，防 operator 只配 HubJWTSecret 时 debug 端点裸奔）；(4) 均未配 → nil（等价 dev 开放）。TokenDance `td_` bearer 不被 debug 端点接受。
 
 ## Verification
 

@@ -21,18 +21,21 @@
 // API key passthrough: OPENAI_API_KEY / OPENAI_BASE_URL are filtered out of
 // the child env by the executor's sanitizer (env_sanitizer.go), so
 // BuildCommand injects them explicitly — the same passthrough pattern the
-// legacy CodexAdapter uses (codex.go BuildCommand).
+// legacy CodexAdapter uses (codex.go BuildCommand). The keys are read live
+// from the parent env on each BuildCommand call (not snapshotted at adapter
+// construction) so a key rotated after registration still flows to the spawn.
+//
+// This file is now a thin configuration shim over AcpAdapter: every behavior
+// (BuildCommand env passthrough, Metadata version pin, PreflightCheck
+// launcher-missing error, ParseStream via runACPSession, capabilities,
+// permission broker) is inherited from AcpAdapter via embedding + a single
+// AcpAdapterConfig. The earlier near-copy of the codex/claude/opencode ACP
+// wrappers has been collapsed into shared AcpAdapter logic (#1404 wave 2).
 package adapters
 
-import (
-	"fmt"
-	"os"
-	"runtime"
-)
-
-// codexACPAadapterID is the registry identifier of the official codex-acp
+// codexACPadapterID is the registry identifier of the official codex-acp
 // configuration.
-const codexACPAadapterID = "codex-acp"
+const codexACPadapterID = "codex-acp"
 
 // codexACPPackage is the official ACP adapter npm package.
 const codexACPPackage = "@agentclientprotocol/codex-acp"
@@ -41,94 +44,42 @@ const codexACPPackage = "@agentclientprotocol/codex-acp"
 // discipline: update on upgrades, keep the pin visible in metadata).
 const codexACPVersionPin = "1.1.7"
 
-// CodexACPAadapter runs the official codex-acp ACP agent binary.
+// CodexACPadapter runs the official codex-acp ACP agent binary.
 //
-// It embeds AcpAdapter (protocol handling, permission broker, capabilities)
-// and overrides only the command surface: BuildCommand injects the codex env
-// passthrough (OPENAI_API_KEY / OPENAI_BASE_URL), and Metadata() surfaces the
-// version pin. Everything else — ParseStream via runACPSession, NeedsStdin,
-// Available, SetPermissionBroker — is inherited.
-type CodexACPAadapter struct {
+// It embeds AcpAdapter and inherits the full AgentAdapter contract
+// (BuildCommand, Metadata, Capabilities, Available, PreflightCheck,
+// ParseStream, NeedsStdin, SetPermissionBroker) from it; this wrapper only
+// supplies the codex-acp configuration (binary, args, env keys, version pin,
+// preflight labels) via NewAcpAdapterConfig.
+type CodexACPadapter struct {
 	*AcpAdapter
-
-	// env carries the codex key/base-url passthrough injected in BuildCommand.
-	env []string
 }
 
-// NewCodexACPAadapter creates the codex-acp adapter configuration.
+// NewCodexACPadapter creates the codex-acp adapter configuration.
 //
 // npxPath is the launcher to spawn; when empty it defaults to "npx.cmd" on
 // Windows and "npx" elsewhere. The agent receives no run-time args beyond
 // `-y @agentclientprotocol/codex-acp`: ACP mode is implicit in the package,
 // and the prompt travels over stdio.
-func NewCodexACPAadapter(npxPath string) *CodexACPAadapter {
+func NewCodexACPadapter(npxPath string) *CodexACPadapter {
 	if npxPath == "" {
 		npxPath = defaultNpxPath()
 	}
-	inner := NewAcpAdapterWithID(
-		codexACPAadapterID,
-		npxPath,
-		[]string{"-y", codexACPPackage},
-		"Codex (ACP)",
-	)
-	return &CodexACPAadapter{
-		AcpAdapter: inner,
-		env:        codexEnvPassthrough(),
-	}
-}
-
-// defaultNpxPath returns the platform-appropriate npx launcher name.
-func defaultNpxPath() string {
-	if runtime.GOOS == "windows" {
-		return "npx.cmd"
-	}
-	return "npx"
-}
-
-// codexEnvPassthrough captures OPENAI_API_KEY / OPENAI_BASE_URL from the
-// parent environment so BuildCommand can inject them into the child (the env
-// sanitizer strips them from the inherited env).
-func codexEnvPassthrough() []string {
-	var env []string
-	if key := os.Getenv("OPENAI_API_KEY"); key != "" {
-		env = append(env, "OPENAI_API_KEY="+key)
-	}
-	if url := os.Getenv("OPENAI_BASE_URL"); url != "" {
-		env = append(env, "OPENAI_BASE_URL="+url)
-	}
-	return env
-}
-
-// Metadata returns the adapter identification with the pinned codex-acp
-// version surfaced for operations.
-func (a *CodexACPAadapter) Metadata() AdapterMetadata {
-	m := a.AcpAdapter.Metadata()
-	m.Version = "codex-acp " + codexACPVersionPin + " (npx)"
-	return m
-}
-
-// BuildCommand returns the npx launcher command with the static codex-acp
-// args, plus the codex env passthrough. The ACP prompt is NOT part of argv —
-// it travels over the stdio protocol (session/prompt).
-func (a *CodexACPAadapter) BuildCommand(ctx RunProcessContext) (cmdPath string, args []string, env []string, workDir string) {
-	cmdPath, args, _, workDir = a.AcpAdapter.BuildCommand(ctx)
-	return cmdPath, args, a.env, workDir
-}
-
-// PreflightCheck fails fast when the npx launcher is not resolvable, before
-// the executor spawns the process. (Authentication — OPENAI_API_KEY env or
-// Codex auth.json — is left to the codex-acp process itself, mirroring the
-// legacy codex CLI behavior.)
-func (a *CodexACPAadapter) PreflightCheck() error {
-	if !a.Available() {
-		return fmt.Errorf("codex-acp launcher %q not found on PATH (install Node.js/npx)", a.agentBinary)
-	}
-	return nil
+	return &CodexACPadapter{AcpAdapter: NewAcpAdapterConfig(AcpAdapterConfig{
+		ID:            codexACPadapterID,
+		Binary:        npxPath,
+		Args:          []string{"-y", codexACPPackage},
+		DisplayName:   "Codex (ACP)",
+		VersionLabel:  "codex-acp " + codexACPVersionPin + " (npx)",
+		EnvKeys:       []string{"OPENAI_API_KEY", "OPENAI_BASE_URL"},
+		LauncherLabel: "codex-acp",
+		InstallHint:   "install Node.js/npx",
+	})}
 }
 
 // compile-time guard: the wrapper satisfies the full AgentAdapter contract
 // (via the embedded AcpAdapter).
-var _ AgentAdapter = (*CodexACPAadapter)(nil)
+var _ AgentAdapter = (*CodexACPadapter)(nil)
 
 // TODO(#1404 真跑验证): an end-to-end run against the real `npx -y
 // @agentclientprotocol/codex-acp` process requires a Node.js/npx environment

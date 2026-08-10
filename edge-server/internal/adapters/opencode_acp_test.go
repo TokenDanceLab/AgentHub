@@ -139,7 +139,6 @@ func TestOpenCodeACPAdapterDefaultBinaryPath(t *testing.T) {
 func TestOpenCodeACPAdapterPreflightFailsFast(t *testing.T) {
 	a := &OpenCodeACPAdapter{
 		AcpAdapter: NewAcpAdapterWithID(opencodeACPAdapterID, "", nil, "OpenCode (ACP)"),
-		env:        nil,
 	}
 	if a.Available() {
 		t.Fatal("empty binary must not be available")

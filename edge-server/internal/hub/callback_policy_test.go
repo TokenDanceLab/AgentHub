@@ -122,7 +122,7 @@ func TestCallbackClient_StreamNotRetried(t *testing.T) {
 	defer srv.Close()
 
 	client := newTestCallbackClient(srv.URL, "test-token")
-	err := client.TaskStream(context.Background(), "task-001", "run-001", "chunk")
+	err := client.TaskStream(context.Background(), "task-001", "run-001", "", "chunk")
 	if err == nil {
 		t.Fatal("expected error for 5xx stream callback")
 	}

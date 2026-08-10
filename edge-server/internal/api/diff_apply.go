@@ -68,14 +68,15 @@ func (h *Handler) PostApplyRunDiff(w http.ResponseWriter, r *http.Request, runID
 		return
 	}
 	if err := h.validateWorkDirAllowed(req.WorkDir); err != nil {
-		writeJSON(w, http.StatusForbidden, errcode.ErrorBody(errcode.ErrWorkspaceNotAllowed.WithMessage(err.Error())))
+		slog.Error("workdir not allowed", "workDir", req.WorkDir, "error", err)
+		writeJSON(w, http.StatusForbidden, errcode.ErrorBody(errcode.ErrWorkspaceNotAllowed))
 		return
 	}
 
 	result, err := h.applySingleHunk(repository, runID, req)
 	if err != nil {
 		slog.Error("diff apply failed", "runId", runID, "filePath", req.FilePath, "hunkIndex", req.HunkIndex, "error", err)
-		writeJSON(w, http.StatusInternalServerError, errcode.ErrorBody(errcode.ErrInternal.WithMessage(err.Error())))
+		writeJSON(w, http.StatusInternalServerError, errcode.ErrorBody(errcode.ErrInternal))
 		return
 	}
 
@@ -111,7 +112,8 @@ func (h *Handler) PostApplyAllRunDiffs(w http.ResponseWriter, r *http.Request, r
 		return
 	}
 	if err := h.validateWorkDirAllowed(req.WorkDir); err != nil {
-		writeJSON(w, http.StatusForbidden, errcode.ErrorBody(errcode.ErrWorkspaceNotAllowed.WithMessage(err.Error())))
+		slog.Error("workdir not allowed", "workDir", req.WorkDir, "error", err)
+		writeJSON(w, http.StatusForbidden, errcode.ErrorBody(errcode.ErrWorkspaceNotAllowed))
 		return
 	}
 
@@ -129,7 +131,7 @@ func (h *Handler) PostApplyAllRunDiffs(w http.ResponseWriter, r *http.Request, r
 		})
 		if err != nil {
 			slog.Error("diff batch apply failed", "runId", runID, "filePath", decision.FilePath, "hunkIndex", decision.HunkIndex, "error", err)
-			writeJSON(w, http.StatusInternalServerError, errcode.ErrorBody(errcode.ErrInternal.WithMessagef("failed to apply %s hunk %d: %v", decision.FilePath, decision.HunkIndex, err)))
+			writeJSON(w, http.StatusInternalServerError, errcode.ErrorBody(errcode.ErrInternal))
 			return
 		}
 		results = append(results, result)

@@ -405,7 +405,7 @@ func TestHubE2E_CallbackFormat_HubCompatible(t *testing.T) {
 	}
 
 	// Test stream format
-	if err := client.TaskStream(ctx, taskID, runID, "Hello World"); err != nil {
+	if err := client.TaskStream(ctx, taskID, runID, "", "Hello World"); err != nil {
 		t.Fatalf("TaskStream: %v", err)
 	}
 	if c := mockHub.streamCount(); c != 1 {
