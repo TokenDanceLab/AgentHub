@@ -197,34 +197,6 @@
   white-space:nowrap;
 }
 
-.chatview-pinned-btn {
-  width:28px;
-  height:28px;
-  border:0;
-  border-radius:var(--r-xs);
-  background:transparent;
-  color:var(--text-2);
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  flex:0 0 auto;
-  cursor:pointer;
-  padding:0;
-  transition:background var(--dur, 160ms) var(--ease), color var(--dur, 160ms) var(--ease);
-}
-
-.chatview-pinned-btn:hover,
-.chatview-pinned-dismiss:hover {
-  background:var(--surface-high);
-  color:var(--text-1);
-}
-
-.chatview-pinned-btn svg {
-  width:16px;
-  height:16px;
-  display:block;
-}
-
 .chatview-pinned-meta {
   display:flex;
   align-items:center;

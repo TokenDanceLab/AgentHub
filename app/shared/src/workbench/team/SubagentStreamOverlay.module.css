@@ -32,42 +32,42 @@
   height: 24px;
   font-size: 0.6875rem;
   font-weight: 600;
-  color: var(--td-ink-muted, #a0a1aa);
-  background: var(--td-surface, rgba(37, 37, 45, 0.82));
-  border: 1px solid var(--td-line, rgba(255, 255, 255, 0.075));
-  border-radius: var(--td-radius-control, 8px);
-  backdrop-filter: blur(var(--td-glass-blur, 28px));
-  -webkit-backdrop-filter: blur(var(--td-glass-blur, 28px));
+  color: var(--td-ink-muted);
+  background: var(--td-surface);
+  border: 1px solid var(--td-line);
+  border-radius: var(--td-radius-control);
+  backdrop-filter: blur(var(--glass-blur-lg));
+  -webkit-backdrop-filter: blur(var(--glass-blur-lg));
   pointer-events: auto;
 }
 
 /* ── Chip (collapsed) ───────────────────────────────────────────────────── */
 
 .chip {
-  border: 1px solid var(--td-line, rgba(255, 255, 255, 0.075));
-  border-radius: var(--td-radius-control, 8px);
-  background: var(--td-surface, rgba(37, 37, 45, 0.82));
-  box-shadow: var(--td-glass-elev, 0 10px 28px rgba(15, 23, 42, 0.08));
-  backdrop-filter: blur(var(--td-glass-blur, 28px));
-  -webkit-backdrop-filter: blur(var(--td-glass-blur, 28px));
+  border: 1px solid var(--td-line);
+  border-radius: var(--td-radius-control);
+  background: var(--td-surface);
+  box-shadow: var(--glass-elev-2);
+  backdrop-filter: blur(var(--glass-blur-lg));
+  -webkit-backdrop-filter: blur(var(--glass-blur-lg));
   overflow: hidden;
   pointer-events: auto;
   font-family: var(--font-sans, 'Inter', system-ui, sans-serif);
-  color: var(--td-ink, #e3e4e6);
+  color: var(--td-ink);
   transition: border-color 0.2s ease;
 }
 
 .chipExpanded {
-  border-color: color-mix(in oklch, var(--td-plum, #5d68cc) 32%, var(--td-line, rgba(255, 255, 255, 0.075)));
+  border-color: color-mix(in oklch, var(--td-plum) 32%, var(--td-line));
 }
 
 /* ── Color borders ──────────────────────────────────────────────────────── */
 
-.colorBlue  { border-left: 3px solid #5b9bd5; }
-.colorPurple  { border-left: 3px solid #a78bfa; }
-.colorOrange { border-left: 3px solid #f59e0b; }
-.colorGreen  { border-left: 3px solid var(--td-moss, #69c967); }
-.colorRed    { border-left: 3px solid var(--td-danger, #ff7e78); }
+.colorBlue  { border-left: 3px solid var(--td-accent-blue); }
+.colorPurple  { border-left: 3px solid var(--td-accent-purple); }
+.colorOrange { border-left: 3px solid var(--td-accent-amber); }
+.colorGreen  { border-left: 3px solid var(--td-moss); }
+.colorRed    { border-left: 3px solid var(--td-danger); }
 
 /* ── Chip header button ─────────────────────────────────────────────────── */
 
@@ -94,12 +94,12 @@
 }
 
 .chipHeader:hover {
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--td-hover-soft);
 }
 
 .chipHeader:focus-visible {
   outline: none;
-  box-shadow: inset 0 0 0 2px var(--td-plum, #5d68cc);
+  box-shadow: inset 0 0 0 2px var(--td-plum);
 }
 
 /* ── Chip drill-down button (opens the full-session dialog) ─────────────── */
@@ -111,21 +111,21 @@
   height: 28px;
   margin-right: 6px;
   border: none;
-  border-radius: var(--td-radius-control, 8px);
+  border-radius: var(--td-radius-control);
   background: transparent;
-  color: var(--td-ink-muted, #a0a1aa);
+  color: var(--td-ink-muted);
   cursor: pointer;
   flex-shrink: 0;
 }
 
 .chipExpandBtn:hover {
-  background: rgba(255, 255, 255, 0.06);
-  color: var(--td-ink, #e3e4e6);
+  background: var(--glass-bg-hover);
+  color: var(--td-ink);
 }
 
 .chipExpandBtn:focus-visible {
   outline: none;
-  box-shadow: inset 0 0 0 2px var(--td-plum, #5d68cc);
+  box-shadow: inset 0 0 0 2px var(--td-plum);
 }
 
 /* ── Full-session drill-down dialog (#1406 follow-up) ───────────────────── */
@@ -149,8 +149,8 @@
   width: 24px;
   height: 24px;
   border-radius: 50%;
-  background: var(--td-plum, #5d68cc);
-  color: #fff;
+  background: var(--td-plum);
+  color: var(--on-primary);
   font-size: 0.625rem;
   font-weight: 700;
   text-transform: uppercase;
@@ -182,7 +182,7 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  color: var(--td-ink, #e3e4e6);
+  color: var(--td-ink);
 }
 
 .chipStatus {
@@ -194,7 +194,7 @@
 
 .chipPreview {
   font-size: 0.6875rem;
-  color: var(--td-ink-muted, #a0a1aa);
+  color: var(--td-ink-muted);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -205,7 +205,7 @@
 /* ── Events timeline ────────────────────────────────────────────────────── */
 
 .events {
-  border-top: 1px solid var(--td-line, rgba(255, 255, 255, 0.075));
+  border-top: 1px solid var(--td-line);
   max-height: 220px;
   overflow-y: auto;
   padding: 6px 10px;
@@ -226,13 +226,13 @@
 .eventIcon {
   flex-shrink: 0;
   margin-top: 1px;
-  color: var(--td-ink-muted, #a0a1aa);
+  color: var(--td-ink-muted);
   opacity: 0.7;
 }
 
 .eventType {
   font-weight: 600;
-  color: var(--td-ink-muted, #a0a1aa);
+  color: var(--td-ink-muted);
   white-space: nowrap;
   text-transform: lowercase;
   font-variant: small-caps;
@@ -244,7 +244,7 @@
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
-  color: var(--td-ink, #e3e4e6);
+  color: var(--td-ink);
 }
 
 .textDelta {
@@ -253,28 +253,28 @@
 }
 
 .toolCall {
-  color: var(--td-ink-muted, #a0a1aa);
+  color: var(--td-ink-muted);
 }
 
 .toolCall code {
   font-family: var(--font-mono, 'JetBrains Mono', monospace);
   font-size: 0.625rem;
-  color: #f59e0b;
-  background: rgba(245, 158, 11, 0.1);
+  color: var(--td-accent-amber);
+  background: var(--td-accent-amber-bg);
   padding: 1px 4px;
   border-radius: 3px;
 }
 
 .result {
-  color: var(--td-moss, #69c967);
+  color: var(--td-moss);
 }
 
 .error {
-  color: var(--td-danger, #ff7e78);
+  color: var(--td-danger);
 }
 
 .generic {
-  color: var(--td-ink-muted, #a0a1aa);
+  color: var(--td-ink-muted);
   font-size: 0.625rem;
 }
 

@@ -3,6 +3,16 @@ import styles from './Pill.module.css';
 
 type PillVariant = 'default' | 'blue' | 'cyan' | 'purple' | 'green' | 'amber';
 
+/**
+ * Variant → semantic mapping (color-name API kept for backward compat):
+ *   blue  → info (primary blue)
+ *   cyan  → td-accent-blue (light informational blue)
+ *   purple→ td-accent-purple
+ *   green → success
+ *   amber → warning / td-accent-amber
+ * Module CSS resolves each to theme tokens; do not add new color-name
+ * variants — prefer semantic tokens in new surfaces.
+ */
 interface PillProps {
   variant?: PillVariant;
   children: React.ReactNode;

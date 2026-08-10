@@ -4,7 +4,6 @@ import {
   agentResultBlock,
   agentTextBlock,
   artifactCreatedBlock,
-  childAgentBlock,
   compactBoundaryBlock,
   contextUsageBlock,
   fileChangeBlock,
@@ -18,9 +17,6 @@ import {
   runCancelledBlock,
   runFailedBlock,
   runFinishedBlock,
-  runStatusBlock,
-  runTextBlock,
-  subagentBlock,
   subtaskBlock,
   thinkingBlock,
   toolCallBlock,
@@ -57,7 +53,12 @@ export function normalizeEdgeEventsToTranscript(events: EventEnvelope[] | undefi
     const last = acc[acc.length - 1];
     if (!last) { acc.push(block); return acc; }
 
-    const sameRun = evidenceRunId(last) === evidenceRunId(block);
+    // Only merge when BOTH blocks carry a non-empty run evidence ref. Two
+    // blocks with no run evidence (e.g. legacy Hub events without edge_run_id)
+    // would otherwise both return '' from evidenceRunId, and '' === '' would
+    // wrongly collapse unrelated same-author text into one block.
+    const lastRunId = evidenceRunId(last);
+    const sameRun = Boolean(lastRunId) && lastRunId === evidenceRunId(block);
 
     // Merge consecutive text blocks with same author + run (streaming text_delta → single text block)
     if (
@@ -128,8 +129,9 @@ function evidenceRunId(block: TranscriptBlock): string {
 //
 // Members:
 // - run.queued / run.started / run.status.changed: run-level lifecycle state
-//   transitions (run.status.changed is also handled by the switch below, but is
-//   short-circuited here to null).
+//   transitions. The switch below no longer carries dedicated cases for these
+//   (they used to be unreachable dead code because this set short-circuits
+//   first); keeping them here silences the default-branch console.warn.
 // - run.agent.status_change: agent-level status indicator (e.g. the "compacting"
 //   state during auto-compaction); emitted by the Anthropic/OpenAI/NDJSON adapters.
 // - run.agent.context_warning: auto-compaction budget alert (emitted at ~85%
@@ -139,6 +141,21 @@ function evidenceRunId(block: TranscriptBlock): string {
 //   Consuming it for retry counting is a larger follow-up, deferred for now.
 // - run.agent.context_compaction: final auto-compaction marker emitted at
 //   compaction completion; status indicator, not content.
+//
+// TODO(Wave 3): The edge-server emits a long tail of structured events that the
+// transcript layer cannot yet project into dedicated block kinds. They are
+// listed here so the default-branch console.warn stays quiet until purpose-built
+// blocks are designed:
+//   - run.agent.sub_agents_complete: aggregated sub-agent results (no block kind)
+//   - run.agent.task_dispatched: orchestrator dispatch lifecycle (no block kind)
+//   - run.agent.hook_started / hook_progress / hook_response: hook chain telemetry
+//   - run.agent.plan_proposed / plan_approved / plan_rejected / plan_expired:
+//     plan approval gate signals (the Hub-level approval.* events are already
+//     projected via permissionRequestedBlock/permissionDecidedBlock)
+//   - run.agent.tool_rejected: allowlist enforcement signal
+//   - run.agent.session_init / session_state_changed / session_metrics:
+//     session lifecycle telemetry
+//   - run.agent.auth_status / rate_limit / cli_invocation_plan / tool_use_summary
 //
 // Explicitly skipping these silences the default-branch console.warn for known
 // system-level status events. Truly unknown event types still warn (see default).
@@ -150,18 +167,30 @@ const SKIPPED_EVENT_TYPES = new Set<string>([
   'run.agent.context_warning',
   'run.agent.api_retry',
   'run.agent.context_compaction',
+  // TODO(Wave 3): no dedicated transcript block kind yet — silenced, not dropped silently.
+  'run.agent.sub_agents_complete',
+  'run.agent.task_dispatched',
+  'run.agent.hook_started',
+  'run.agent.hook_progress',
+  'run.agent.hook_response',
+  'run.agent.plan_proposed',
+  'run.agent.plan_approved',
+  'run.agent.plan_rejected',
+  'run.agent.plan_expired',
+  'run.agent.tool_rejected',
+  'run.agent.session_init',
+  'run.agent.session_state_changed',
+  'run.agent.session_metrics',
+  'run.agent.auth_status',
+  'run.agent.rate_limit',
+  'run.agent.cli_invocation_plan',
+  'run.agent.tool_use_summary',
 ]);
 
 function normalizeEdgeEvent(event: EventEnvelope): TranscriptBlock | null {
   if (SKIPPED_EVENT_TYPES.has(event.type)) return null;
 
   switch (event.type) {
-    case 'run.queued':
-      return runTextBlock(event, 'queued', 'pending');
-    case 'run.started':
-      return runTextBlock(event, 'started', 'running');
-    case 'run.status.changed':
-      return runStatusBlock(event);
     case 'run.output':
       return outputTextBlock(event);
     case 'run.output.batch':
@@ -171,12 +200,17 @@ function normalizeEdgeEvent(event: EventEnvelope): TranscriptBlock | null {
       return agentTextBlock(event);
     case 'run.agent.thinking':
       return thinkingBlock(event);
-    case 'run.agent.subagent':
-      return subagentBlock(event);
+    // Legacy persisted Hub-runtime event_type still consumed by the
+    // chat-flow e2e contract (app/web/__e2e__); the edge-server itself emits
+    // run.agent.task_started / task_progress / task_notification instead, which
+    // are wired to the same subtaskBlock mapper below.
     case 'run.agent.subagent_task':
       return subtaskBlock(event);
-    case 'run.agent.child_agent':
-      return childAgentBlock(event);
+    case 'run.agent.task_started':
+    case 'run.agent.task_progress':
+    case 'run.agent.task_notification':
+    case 'run.agent.sub_agent_status':
+      return subtaskBlock(event);
     case 'run.agent.route_decision':
       return routeDecisionBlock(event);
     case 'run.agent.context_usage':
@@ -184,6 +218,7 @@ function normalizeEdgeEvent(event: EventEnvelope): TranscriptBlock | null {
     case 'run.agent.compact_boundary':
       return compactBoundaryBlock(event);
     case 'run.agent.tool_call':
+    case 'run.agent.mcp_tool_call':
       return toolCallBlock(event);
     case 'run.agent.tool_result':
       return toolResultBlock(event);

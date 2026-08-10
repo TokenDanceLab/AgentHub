@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { EventEnvelope } from '../events';
 import { normalizeEdgeEventsToTranscript } from './normalizeEdgeEvents';
 
@@ -223,14 +223,6 @@ describe('normalizeEdgeEventsToTranscript', () => {
         status: 'running',
         summary: '检查新增块是否进入 shared transcript。',
       }),
-      edgeEvent('evt-child', 3, 'run.agent.child_agent', {
-        runId: 'run-v4',
-        childId: 'browser-qa-v4',
-        title: 'Browser QA 截图验证',
-        agentName: 'Browser QA',
-        status: 'completed',
-        summary: '确认消息列能显示新增块。',
-      }),
       edgeEvent('evt-route', 4, 'run.agent.route_decision', {
         runId: 'run-v4',
         action: 'fanout',
@@ -267,15 +259,6 @@ describe('normalizeEdgeEventsToTranscript', () => {
         status: 'running',
         summary: '检查新增块是否进入 shared transcript。',
         runId: 'review-v4-blocks',
-      }),
-      expect.objectContaining({
-        kind: 'child_agent',
-        title: 'Browser QA 截图验证',
-        agent: 'Browser QA',
-        status: 'completed',
-        summary: '确认消息列能显示新增块。',
-        runId: 'browser-qa-v4',
-        parentRunId: 'run-v4',
       }),
       expect.objectContaining({
         kind: 'route_decision',
@@ -782,6 +765,148 @@ describe('normalizeEdgeEventsToTranscript edge cases', () => {
     expect(blocks).toHaveLength(1);
     expect(blocks[0]!.id).toBe('edge-event-evt-early'); // Earliest timestamp wins as base block ID
     expect((blocks[0]! as { text: string }).text).toBe('Should besortedlast.');
+  });
+
+  // ── 7. Newly-wired real edge-server events ────────────────────────────
+  // These event types are emitted by edge-server/internal/orchestration/contracts.go
+  // and were previously dropped by the default console.warn branch.
+
+  it('wires run.agent.mcp_tool_call to a tool_call block (MCP server tool activity)', () => {
+    // Emitted by edge-server/internal/adapters/codex_emit_tools.go alongside
+    // run.agent.tool_call; same payload shape (toolName, callId, input).
+    const blocks = normalizeEdgeEventsToTranscript([
+      edgeEvent('evt-mcp-tool', 1, 'run.agent.mcp_tool_call', {
+        runId: 'run-mcp',
+        callId: 'call-mcp-1',
+        toolName: 'mcp__filesystem__read',
+        status: 'running',
+      }),
+    ]);
+
+    expect(blocks).toHaveLength(1);
+    expect(blocks[0]!.kind).toBe('tool_call');
+    expect(blocks[0]!.id).toBe('edge-event-evt-mcp-tool');
+    const toolBlock = blocks[0]! as { toolName: string; callId: string };
+    expect(toolBlock.toolName).toBe('mcp__filesystem__read');
+    expect(toolBlock.callId).toBe('call-mcp-1');
+  });
+
+  it('wires run.agent.task_started to a subtask block using description as title', () => {
+    // Emitted by NDJSONStreamParser.emitTaskStarted (parser_ndjson_emit.go).
+    // Payload: { taskId, toolUseId, description, taskType } — no "title" field,
+    // so subtaskBlock falls back to description.
+    const blocks = normalizeEdgeEventsToTranscript([
+      edgeEvent('evt-task-started', 1, 'run.agent.task_started', {
+        runId: 'run-task',
+        taskId: 'task-001',
+        description: 'Analyze shared transcript blocks',
+        taskType: 'review',
+      }),
+    ]);
+
+    expect(blocks).toHaveLength(1);
+    expect(blocks[0]!.kind).toBe('subtask');
+    const subtaskBlock = blocks[0]! as { title: string; runId: string; status: string };
+    expect(subtaskBlock.title).toBe('Analyze shared transcript blocks');
+    expect(subtaskBlock.runId).toBe('task-001');
+    expect(subtaskBlock.status).toBe('running');
+  });
+
+  it('wires run.agent.task_progress to a subtask block', () => {
+    // Emitted by NDJSONStreamParser.emitTaskProgress. Payload may be the
+    // orchestrator variant { summary, completed, errored, running, waiting, total }
+    // or the parser variant { taskId, description, lastToolName, usage }.
+    const blocks = normalizeEdgeEventsToTranscript([
+      edgeEvent('evt-task-progress', 1, 'run.agent.task_progress', {
+        runId: 'run-task',
+        taskId: 'task-001',
+        description: 'Reviewing block alignment',
+        lastToolName: 'rg',
+      }),
+    ]);
+
+    expect(blocks).toHaveLength(1);
+    expect(blocks[0]!.kind).toBe('subtask');
+    expect((blocks[0]! as { title: string }).title).toBe('Reviewing block alignment');
+  });
+
+  it('wires run.agent.task_notification to a subtask block using summary as title', () => {
+    // Emitted by NDJSONStreamParser.emitTaskNotification.
+    // Payload: { taskId, status, summary, usage } — no title/description;
+    // subtaskBlock falls back to summary for the title.
+    const blocks = normalizeEdgeEventsToTranscript([
+      edgeEvent('evt-task-notification', 1, 'run.agent.task_notification', {
+        runId: 'run-task',
+        taskId: 'task-001',
+        status: 'completed',
+        summary: 'Review complete — 3 blocks verified',
+      }),
+    ]);
+
+    expect(blocks).toHaveLength(1);
+    expect(blocks[0]!.kind).toBe('subtask');
+    const subtaskBlock = blocks[0]! as { title: string; status: string; summary: string };
+    expect(subtaskBlock.title).toBe('Review complete — 3 blocks verified');
+    expect(subtaskBlock.status).toBe('completed');
+    expect(subtaskBlock.summary).toBe('Review complete — 3 blocks verified');
+  });
+
+  it('wires run.agent.sub_agent_status to a subtask block using agentName as worker', () => {
+    // Emitted by the orchestrator (subAgentStatusPayload) and ResultAggregator.
+    // Payload: { agentId, agentName, status, progress } — no title; subtaskBlock
+    // falls back to progress (or agentName) for the title.
+    const blocks = normalizeEdgeEventsToTranscript([
+      edgeEvent('evt-sub-status', 1, 'run.agent.sub_agent_status', {
+        runId: 'run-sub',
+        agentId: 'agent-builder',
+        agentName: 'Builder',
+        status: 'running',
+        progress: 'Building shared UI',
+      }),
+    ]);
+
+    expect(blocks).toHaveLength(1);
+    expect(blocks[0]!.kind).toBe('subtask');
+    const subtaskBlock = blocks[0]! as { title: string; worker: string; status: string; runId: string };
+    expect(subtaskBlock.title).toBe('Building shared UI');
+    expect(subtaskBlock.worker).toBe('Builder');
+    expect(subtaskBlock.status).toBe('running');
+    expect(subtaskBlock.runId).toBe('agent-builder');
+  });
+
+  it('silences SKIPPED long-tail events without console.warn (hook/plan/session/auth/rate_limit)', () => {
+    // These edge-server events have no dedicated transcript block kind yet.
+    // They are listed in SKIPPED_EVENT_TYPES so the default console.warn stays
+    // quiet. This test documents the contract: they produce no block and no warn.
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const longTailTypes = [
+      'run.agent.sub_agents_complete',
+      'run.agent.task_dispatched',
+      'run.agent.hook_started',
+      'run.agent.hook_progress',
+      'run.agent.hook_response',
+      'run.agent.plan_proposed',
+      'run.agent.plan_approved',
+      'run.agent.plan_rejected',
+      'run.agent.plan_expired',
+      'run.agent.tool_rejected',
+      'run.agent.session_init',
+      'run.agent.session_state_changed',
+      'run.agent.session_metrics',
+      'run.agent.auth_status',
+      'run.agent.rate_limit',
+      'run.agent.cli_invocation_plan',
+      'run.agent.tool_use_summary',
+    ];
+
+    for (const type of longTailTypes) {
+      const blocks = normalizeEdgeEventsToTranscript([
+        edgeEvent(`evt-${type}`, 1, type, { runId: 'run-skip' }),
+      ]);
+      expect(blocks).toEqual([]);
+    }
+    expect(warnSpy).not.toHaveBeenCalled();
+    warnSpy.mockRestore();
   });
 });
 

@@ -8,7 +8,7 @@ import { ForwardConversationPicker } from './ForwardConversationPicker';
 import { MultiSelectBar } from './MultiSelectBar';
 import { PersonPanel } from './PersonPanel';
 import { ProfilePopover } from './ProfilePopover';
-import { Toast } from './Toast';
+import { DemoToast } from './DemoToast';
 
 export {
   ContextMenu,
@@ -17,14 +17,14 @@ export {
   MultiSelectBar,
   PersonPanel,
   ProfilePopover,
-  Toast,
+  DemoToast,
 };
 
 export type { ContextMenuProps, ContextMenuItem } from './ContextMenu';
 export type { EmojiPickerProps } from './EmojiPicker';
 export type { ForwardConversationPickerProps } from './ForwardConversationPicker';
 export type { MultiSelectBarProps, MultiSelectBarAction } from './MultiSelectBar';
-export type { ToastProps } from './Toast';
+export type { DemoToastProps } from './DemoToast';
 
 // PersonPanel and ProfilePopover use inline prop types that are not exported.
 // Derive them via ComponentProps for consumers that need them.

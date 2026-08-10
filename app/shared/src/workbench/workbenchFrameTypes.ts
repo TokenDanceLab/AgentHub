@@ -26,102 +26,63 @@ import type { WorkbenchSessionChrome } from './useWorkbenchSessionChrome';
 import type { WorkbenchTranscriptChrome } from './useWorkbenchTranscriptChrome';
 import type { WorkbenchProfileChrome } from './useWorkbenchProfileChrome';
 import type { WorkbenchProjectsPort } from './workbenchProjectsPort';
+import type {
+  AgentHubWorkbenchModelCatalogItem,
+  AgentHubWorkbenchProjectsStatus,
+  AgentHubWorkbenchProps,
+  AgentHubWorkbenchStatus,
+} from './AgentHubWorkbenchTypes';
 
 /* ==========================================================================
    WorkbenchFrame prop contract -- residual extract from WorkbenchFrame
    (#637) + WorkbenchFrameParts prop contracts (#698). Pure types only.
+
+   WorkbenchFrameProps is the frame's view of AgentHubWorkbenchProps: it
+   omits the 9 conversation/message-action handlers that the frame does not
+   thread (the parent shell owns them) and re-adds its 8 frame-unique
+   fields (activePage/isChatPage/layout/session/transcriptChrome/profile/
+   setActivePage/children). The three shared-status shapes are aliased to
+   the AgentHubWorkbench* SSOT instead of being redefined, so the contract
+   stays a pure type intersection (Pick) and tsc stays green (#56-prop Step1).
    ========================================================================== */
 
-export interface WorkbenchFrameWorkbenchStatus {
-  dataMode?: string;
-  replayLabel?: string;
-  targetLabel?: string;
-  targetState?: string;
-  initialLoading?: boolean;
-  loadError?: string;
-}
+// Status/catalog shapes are aliases of the AgentHubWorkbench* SSOT — keeping
+// a single definition removes the triple-copy drift risk and lets consumers
+// reference either name interchangeably.
+export type WorkbenchFrameWorkbenchStatus = AgentHubWorkbenchStatus;
+export type WorkbenchFrameProjectsStatus = AgentHubWorkbenchProjectsStatus;
+export type WorkbenchFrameModelCatalogItem = AgentHubWorkbenchModelCatalogItem;
 
-export interface WorkbenchFrameProjectsStatus {
-  loading?: boolean | undefined;
-  error?: string | undefined;
-  actionError?: string | undefined;
-  saving?: boolean | undefined;
-}
-
-export interface WorkbenchFrameModelCatalogItem {
-  id: string;
-  label: string;
-  value: string;
-  provider?: string;
-  status: string;
-  description?: string;
-  default?: boolean;
-  tags?: string[];
-}
-
-export interface WorkbenchFrameProps {
-  platform: AgentHubPlatform;
+export interface WorkbenchFrameProps
+  extends Omit<
+    AgentHubWorkbenchProps,
+    | 'activeConversationId'
+    | 'onActiveConversationChange'
+    | 'onApprovalDecision'
+    | 'onRegenerate'
+    | 'onPinMessage'
+    | 'onUnpinMessage'
+    | 'onForwardMessage'
+    | 'onRecallMessage'
+    | 'onAddMessageReaction'
+  > {
+  // ── Frame-unique fields (not part of AgentHubWorkbenchProps) ──
   activePage: GlobalRailPage;
   isChatPage: boolean;
   layout: WorkbenchPanelLayout;
   session: WorkbenchSessionChrome;
   transcriptChrome: WorkbenchTranscriptChrome;
   profile: WorkbenchProfileChrome;
+  setActivePage: (page: GlobalRailPage) => void;
+  children?: React.ReactNode;
 
-  conversations: WorkbenchConversation[];
-  agents?: WorkbenchAgent[] | undefined;
-  composerExecutionTargets?: Array<{ id: string; label: string }> | undefined;
-  workbenchStatus?: WorkbenchFrameWorkbenchStatus | undefined;
-  agentProfilesStatus?: WorkbenchAgentProfilesStatus | undefined;
-  contacts?: WorkbenchContactsData | undefined;
-  projects?: ProjectInfo[] | undefined;
-  activeProjectId?: string | undefined;
-  projectsStatus?: WorkbenchFrameProjectsStatus | undefined;
-  onConversationPin?: ((conversationId: string, pinned: boolean) => void) | undefined;
-  onConversationArchive?: ((conversationId: string, archived: boolean) => void) | undefined;
-  onActiveProjectChange?: ((projectId: string) => void) | undefined;
-  onAgentCreate?: ((agent: AgentConfig) => Promise<void> | void) | undefined;
-  onAgentUpdate?: ((agent: AgentConfig) => Promise<void> | void) | undefined;
-  onAgentDelete?: ((agentId: string) => Promise<void> | void) | undefined;
-  onAgentsRetry?: (() => void) | undefined;
-  onLogout?: (() => void) | undefined;
-  onProjectCreate?: ((draft: ProjectDraft) => Promise<ProjectInfo | void> | ProjectInfo | void) | undefined;
-  onProjectUpdate?: ((
-    projectId: string,
-    draft: ProjectDraft,
-  ) => Promise<ProjectInfo | void> | ProjectInfo | void) | undefined;
-  projectsPort?: WorkbenchProjectsPort | undefined;
-  onNavigateToConversation?: ((target: { name: string; id: string; kind: 'dm' | 'group' }) => void) | undefined;
-  contactsActions?: WorkbenchContactsActions | undefined;
-  documents?: DocRow[] | undefined;
-  documentsActions?: WorkbenchDocumentsActions | undefined;
-  modelCatalog?: WorkbenchFrameModelCatalogItem[] | undefined;
-  ccSwitchStatus?: CCSwitchStatusInfo | undefined;
-  ccSwitchProviders?: CCSwitchProviderInfo[] | undefined;
-  runtimeEvidence?: RuntimeEvidenceSnapshot | undefined;
+  // ── Required-where-AWB-optional redeclarations ──
+  // AgentHubWorkbenchProps marks these optional so demo/legacy shells can
+  // omit them; the frame requires them because the chat chrome always
+  // renders the composer/mainchain from these flags.
   showComposerAgentPicker: boolean;
   showComposerStatus: boolean;
   showMainchainStatus: boolean;
-  transcript: TranscriptBlock[];
-  transcriptUnreadDivider?: import('../chatview').UnreadDividerDescriptor | undefined;
-  userDisplayName?: string | undefined;
-  userAvatarUrl?: string | undefined;
-  currentUserId?: string | undefined;
-  skillMarketItems?: SkillMarketItem[] | undefined;
-  skillMarketLoading?: boolean | undefined;
-  mcpMarketItems?: MCPMarketItem[] | undefined;
-  mcpMarketLoading?: boolean | undefined;
-  highlightedBlockId?: string | undefined;
-  onHighlightEnd?: (() => void) | undefined;
-  /** Whether an agent run is currently active (stop button morph, #1462 CF13). */
-  isAgentRunning?: boolean | undefined;
-  /** Cancel the active agent run (stop button handler). */
-  onCancelRun?: (() => void) | undefined;
-  /** Edit an already-sent message (#1462 CF16). Receives block id + new content. */
-  onEditMessage?: ((blockId: string, content: string) => Promise<void> | void) | undefined;
-  connectionStatus?: ConnectionStatusKind | undefined;
-  setActivePage: (page: GlobalRailPage) => void;
-  children?: React.ReactNode;
 }
 
 /* ==========================================================================

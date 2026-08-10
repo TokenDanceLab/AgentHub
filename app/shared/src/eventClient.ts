@@ -92,9 +92,20 @@ export class EventClient {
     this.ws.onmessage = (msg: MessageEvent<string>) => {
       try {
         const raw = JSON.parse(msg.data) as EventEnvelope;
-        if (typeof raw.seq === 'number' && raw.seq > this.lastSeq) {
-          this.lastSeq = raw.seq;
-          this.cursor = String(raw.seq);
+        if (typeof raw.seq === 'number') {
+          // system.gap events carry a synthetic seq (often 0) that must NOT
+          // pollute the replay cursor — doing so resets replay to seq=0 and
+          // triggers a full backfill storm on the next reconnect.
+          if (raw.type !== 'system.gap') {
+            // Idempotent dedup: after a reconnect the server replays from the
+            // cursor; events with seq <= lastSeq were already applied and must
+            // be dropped to avoid double-applying state changes.
+            if (raw.seq <= this.lastSeq) {
+              return;
+            }
+            this.lastSeq = raw.seq;
+            this.cursor = String(raw.seq);
+          }
         }
         const event = raw as AnyEvent;
         this.dispatch(event);

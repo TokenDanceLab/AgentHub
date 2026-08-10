@@ -371,10 +371,32 @@ export function ConversationSidebar({
       >
         {sortedConversations.length === 0 ? (
           <li className={styles.conversationEmpty}>
-            <span className={styles.conversationEmptyTitle}>No conversations</span>
-            <span className={styles.conversationEmptyHint}>
-              {searchQuery.trim() ? 'Try a different search term' : 'Start a new conversation to begin'}
-            </span>
+            {searchQuery.trim() ? (
+              <>
+                <span className={styles.conversationEmptyTitle}>
+                  {t('sidebar.emptySearchTitle')}
+                </span>
+                <span className={styles.conversationEmptyHint}>
+                  {t('sidebar.emptySearchHint')}
+                </span>
+                <button
+                  type="button"
+                  className={styles.conversationEmptyAction}
+                  onClick={() => setSearchQuery('')}
+                >
+                  {t('sidebar.clearSearch')}
+                </button>
+              </>
+            ) : (
+              <>
+                <span className={styles.conversationEmptyTitle}>
+                  {t('sidebar.emptyTitle')}
+                </span>
+                <span className={styles.conversationEmptyHint}>
+                  {t('sidebar.emptyHint')}
+                </span>
+              </>
+            )}
           </li>
         ) : (
           <Virtualizer ref={virtualizerRef} scrollRef={listRef} bufferSize={800}>

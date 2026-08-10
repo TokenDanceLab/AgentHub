@@ -58,11 +58,19 @@ export function subtaskBlock(event: EventEnvelope): TranscriptBlock | null {
   const taskRunId =
     stringField(event.payload.taskRunId) ??
     stringField(event.payload.taskId) ??
-    stringField(event.payload.id);
+    stringField(event.payload.id) ??
+    stringField(event.payload.agentId);
+  // Title fallbacks span the legacy subagent_task shape (title/task/name) and
+  // the real edge-server task_* / sub_agent_status payloads, which surface the
+  // human-readable label via description / summary / progress / agentName.
   const title =
     stringField(event.payload.title) ??
     stringField(event.payload.task) ??
-    stringField(event.payload.name);
+    stringField(event.payload.name) ??
+    stringField(event.payload.description) ??
+    stringField(event.payload.summary) ??
+    stringField(event.payload.progress) ??
+    stringField(event.payload.agentName);
   if (!title) return null;
   const worker =
     stringField(event.payload.worker) ??

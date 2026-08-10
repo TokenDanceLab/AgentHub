@@ -36,6 +36,7 @@ export function DocsPage({
   activeTab,
   onTabChange,
   rows,
+  documentsLoading,
   profiles,
   activePreview,
   onDocClick,
@@ -63,6 +64,7 @@ export function DocsPage({
         activeTab={activeTab}
         onTabChange={onTabChange}
         rows={rows}
+        documentsLoading={documentsLoading ?? false}
         profiles={profiles}
         activePreview={activePreview}
         onDocClick={onDocClick}

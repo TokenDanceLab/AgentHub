@@ -50,6 +50,9 @@ export interface DocsPageProps {
 
   /** Doc table rows */
   rows: DocRow[];
+  /** True while real-mode documents are still loading (undefined → skeleton).
+   *  Demo mode is never loading — mock rows render immediately. */
+  documentsLoading?: boolean;
   /** Agent/user profiles available for owner avatar resolution */
   profiles?: WorkbenchProfileSource[] | undefined;
   /** Currently selected document preview */

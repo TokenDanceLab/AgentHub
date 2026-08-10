@@ -25,6 +25,7 @@ import { UnifiedComposer } from './UnifiedComposer';
 import { WorkspaceHeader } from './WorkspaceHeader';
 import type { UnreadDividerDescriptor } from '../chatview';
 import MessageSearchPanel from '../ui/MessageSearchPanel';
+import { PageErrorBoundary } from '../ui/PageErrorBoundary';
 import { useComposerSubmitBehavior } from './workbenchPreferences';
 import styles from './AgentHubWorkbench.module.css';
 
@@ -340,13 +341,15 @@ export const ConversationHost = React.memo(function ConversationHost({
               {t('toast.pendingDispatchBadge', { count: pendingIntentsRef.current.length })}
             </div>
           )}
-          <UnifiedComposer composer={composer} dispatchComposer={dispatchComposer}
-            executionTargets={composerExecutionTargets} executionTargetId={selectedExecutionTargetId}
-            inputRef={composerInputRef} mentionableAgents={showComposerAgentPicker ? mentionableAgents : EMPTY_MENTIONS}
-            onExecutionTargetChange={onExecutionTargetChange} onPickLocalAttachments={platform.attachments?.pickFiles}
-            onSubmit={submitComposer} status={showComposerStatus ? workbenchStatus : undefined}
-            submitBehavior={composerSubmitBehavior} targetLabel={composerTargetLabel} uploadProgresses={uploadProgresses}
-            isRunning={isAgentRunning} onCancel={onCancelRun} onToast={onToast} />
+          <PageErrorBoundary>
+            <UnifiedComposer composer={composer} dispatchComposer={dispatchComposer}
+              executionTargets={composerExecutionTargets} executionTargetId={selectedExecutionTargetId}
+              inputRef={composerInputRef} mentionableAgents={showComposerAgentPicker ? mentionableAgents : EMPTY_MENTIONS}
+              onExecutionTargetChange={onExecutionTargetChange} onPickLocalAttachments={platform.attachments?.pickFiles}
+              onSubmit={submitComposer} status={showComposerStatus ? workbenchStatus : undefined}
+              submitBehavior={composerSubmitBehavior} targetLabel={composerTargetLabel} uploadProgresses={uploadProgresses}
+              isRunning={isAgentRunning} onCancel={onCancelRun} onToast={onToast} />
+          </PageErrorBoundary>
         </>
       )}
     </>

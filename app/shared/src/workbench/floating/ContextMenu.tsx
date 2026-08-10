@@ -1,4 +1,6 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import { CHATVIEW_I18N_NAMESPACE } from '../../chatview/i18n/resources';
 import { DesignNavIcon, type DesignNavIconName } from '../designIcons';
 import { FOCUSABLE, useFocusTrap } from '../../ui/focusTrap';
 import styles from './ContextMenu.module.css';
@@ -38,12 +40,14 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
   groups,
   items,
   isOpen,
-  subtitle = '卡片操作',
+  subtitle,
   title,
   x,
   y,
   onClose,
 }) => {
+  const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE);
+  const resolvedSubtitle = subtitle ?? t('context.cardActions');
   const menuRef = useRef<HTMLElement>(null);
   const [open, setOpen] = useState(false);
   const [pos, setPos] = useState<{ left: number; top: number }>({ left: x, top: y });
@@ -215,13 +219,13 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
         ref={menuRef}
         className={`${styles.menu}${open ? ` ${styles.open}` : ''}`}
         role="menu"
-        aria-label="卡片操作菜单"
+        aria-label={t('aria.contextMenu')}
         style={{ left: pos.left, top: pos.top }}
       >
         {title && (
           <div className={styles.title}>
             <span>{title}</span>
-            <small>{subtitle}</small>
+            <small>{resolvedSubtitle}</small>
           </div>
         )}
         {menuGroups.map((group, groupIndex) => (

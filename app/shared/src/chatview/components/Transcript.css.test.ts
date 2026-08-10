@@ -14,8 +14,6 @@ const pinnedClassNames = [
   'chatview-pinned-mark',
   'chatview-pinned-copy',
   'chatview-pinned-line',
-  'chatview-pinned-btn',
-  'chatview-pinned-dismiss',
   'chatview-pinned-meta',
   'chatview-pinned-time',
 ] as const;

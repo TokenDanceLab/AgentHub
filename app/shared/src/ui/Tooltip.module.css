@@ -19,7 +19,7 @@
   max-width: 220px;
   padding: 5px 8px 6px;
   border: 1px solid var(--glass-border, var(--border));
-  border-radius: var(--radius-sm, 8px);
+  border-radius: var(--r-sm);
   background: var(--glass-input-bg-hover, var(--card));
   backdrop-filter: blur(18px) saturate(1.12);
   -webkit-backdrop-filter: blur(18px) saturate(1.12);

@@ -61,7 +61,7 @@ export const DESKTOP_GLASS_TOKEN_ALIASES = [
   {
     alias: '--td-plum',
     intent: 'Active/focus accent',
-    desktopValue: '#5d68cc',
+    desktopValue: '#29ABE2',
     webAlias: '--brand',
     mobileAlias: '--td-plum',
   },
@@ -83,7 +83,7 @@ export const DESKTOP_GLASS_TOKEN_ALIASES = [
     alias: '--td-radius-control',
     intent: 'Compact control radius',
     desktopValue: '8px',
-    webAlias: '--radius-lg',
+    webAlias: '--r-sm',
     mobileAlias: '--td-radius-control',
   },
   {

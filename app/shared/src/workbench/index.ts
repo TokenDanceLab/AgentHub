@@ -194,7 +194,7 @@ export {
   MultiSelectBar,
   PersonPanel,
   ProfilePopover,
-  Toast,
+  DemoToast,
 } from './floating';
 export type {
   ContextMenuProps,
@@ -203,7 +203,7 @@ export type {
   MultiSelectBarAction,
   PersonPanelProps,
   ProfilePopoverProps,
-  ToastProps,
+  DemoToastProps,
 } from './floating';
 
 export * from './auxPanel';

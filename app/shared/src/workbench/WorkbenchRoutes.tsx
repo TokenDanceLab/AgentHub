@@ -5,6 +5,7 @@ import { WorkbenchDocsRouteView } from './WorkbenchDocsRouteView';
 import { WorkbenchProjectsRouteView } from './WorkbenchProjectsRouteView';
 import { WorkbenchSettingsRouteView } from './WorkbenchSettingsRouteView';
 import { WorkbenchTasksRouteView } from './WorkbenchTasksRouteView';
+import { PageErrorBoundary } from '../ui/PageErrorBoundary';
 import { useWorkbenchAgentsRoute } from './useWorkbenchAgentsRoute';
 import { useWorkbenchContactsRoute } from './useWorkbenchContactsRoute';
 import { useWorkbenchDocsRoute } from './useWorkbenchDocsRoute';
@@ -78,11 +79,13 @@ const WorkbenchTasksRouteGate = React.memo(function WorkbenchTasksRouteGate({
   });
   if (!active) return null;
   return (
-    <WorkbenchTasksRouteView
-      tasksRoute={tasksRoute}
-      realDataMode={realDataMode}
-      profiles={profiles}
-    />
+    <PageErrorBoundary>
+      <WorkbenchTasksRouteView
+        tasksRoute={tasksRoute}
+        realDataMode={realDataMode}
+        profiles={profiles}
+      />
+    </PageErrorBoundary>
   );
 });
 
@@ -124,7 +127,11 @@ const WorkbenchProjectsRouteGate = React.memo(function WorkbenchProjectsRouteGat
     realDataMode,
   });
   if (!active) return null;
-  return <WorkbenchProjectsRouteView projectsRoute={projectsRoute} profiles={profiles} />;
+  return (
+    <PageErrorBoundary>
+      <WorkbenchProjectsRouteView projectsRoute={projectsRoute} profiles={profiles} />
+    </PageErrorBoundary>
+  );
 });
 
 type WorkbenchDocsRouteGateProps = Pick<
@@ -132,6 +139,7 @@ type WorkbenchDocsRouteGateProps = Pick<
   'documents' | 'documentsActions'
 > & {
   active: boolean;
+  realDataMode: boolean;
   profiles: WorkbenchProfileSource[];
 };
 
@@ -140,13 +148,19 @@ const WorkbenchDocsRouteGate = React.memo(function WorkbenchDocsRouteGate({
   profiles,
   documents,
   documentsActions,
+  realDataMode,
 }: WorkbenchDocsRouteGateProps): React.ReactElement | null {
   const docsRoute = useWorkbenchDocsRoute({
     documents,
     documentsActions,
+    realDataMode,
   });
   if (!active) return null;
-  return <WorkbenchDocsRouteView docsRoute={docsRoute} profiles={profiles} />;
+  return (
+    <PageErrorBoundary onReset={docsRoute.closeDocPreview}>
+      <WorkbenchDocsRouteView docsRoute={docsRoute} profiles={profiles} />
+    </PageErrorBoundary>
+  );
 });
 
 export function WorkbenchRoutes({
@@ -290,6 +304,7 @@ export function WorkbenchRoutes({
         active={activePage === 'docs'}
         documents={documents}
         documentsActions={documentsActions}
+        realDataMode={realDataMode}
         profiles={profileSources}
       />
       {!isKnownPage && (

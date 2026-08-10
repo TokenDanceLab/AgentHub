@@ -1,8 +1,30 @@
 import React from 'react';
 import { render, screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { TeamSubagentStreamEvent } from './SubagentStreamStore';
 import { SubagentTranscript } from './SubagentTranscript';
+
+// SubagentTranscript resolves category labels + empty hint via the chatview
+// i18n namespace. Mirror those keys here so tests assert the rendered zh copy.
+vi.mock('react-i18next', () => ({
+  useTranslation: () => ({
+    t: (key: string) => {
+      const translations: Record<string, string> = {
+        'subagentStream.transcriptLabel': '子会话事件流',
+        'subagentStream.emptyWaiting': '等待 agent 启动…',
+        'subagentStream.cat.thinking': '思考',
+        'subagentStream.cat.toolCall': '工具调用',
+        'subagentStream.cat.textDelta': '输出',
+        'subagentStream.cat.result': '结果',
+        'subagentStream.cat.error': '错误',
+        'subagentStream.cat.cancel': '已取消',
+        'subagentStream.cat.other': '事件',
+      };
+      return translations[key] ?? key;
+    },
+    i18n: { language: 'zh' },
+  }),
+}));
 
 function makeEvent(overrides: Partial<TeamSubagentStreamEvent>): TeamSubagentStreamEvent {
   return {

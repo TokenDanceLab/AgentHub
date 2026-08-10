@@ -33,7 +33,6 @@
   --destructive: #EF4444;
   --destructive-foreground: #FFFFFF;
 
-  /* --border: platform-override */;
   --input: rgba(255, 255, 255, 0.052);
   --ring: rgba(59, 130, 246, 0.42);
 
@@ -46,7 +45,6 @@
 
   --color-success: #22C55E;
   --color-danger: #EF4444;
-  /* --color-border: platform-override */;
 
   --brand: #3B82F6;
   --skill: #A78BFA;
@@ -75,7 +73,6 @@
   --chat-user-bg: rgba(59, 130, 246, 0.08);
   --chat-code-bg: rgba(255, 255, 255, 0.055);
   --chat-thinking-bg: rgba(255, 255, 255, 0.02);
-  /* --chat-thinking-border: platform-override */;
 
   --input-panel-bg: #252536;
   --input-panel-border: rgba(0, 0, 0, 0.11);
@@ -91,6 +88,15 @@
   --diff-added-border: #22C55E;
   --diff-removed-bg: rgba(239, 68, 68, 0.10);
   --diff-removed-border: #EF4444;
+
+  /* v4 alias coverage — main tokens presets must override, not only legacy aliases */
+  --surface: var(--surface-raised);
+  --surface-dim: var(--surface-base);
+  --surface-high: var(--surface-raised-hover);
+  --text-1: var(--text-strong);
+  --text-2: var(--text-weaker);
+  --bdr: rgba(255, 255, 255, 0.06);
+  --primary-hover: #60A5FA;
 }
 
 /* Classic Blue — Light */
@@ -174,6 +180,15 @@
   --diff-added-border: #22C55E;
   --diff-removed-bg: rgba(239, 68, 68, 0.08);
   --diff-removed-border: #EF4444;
+
+  /* v4 alias coverage — main tokens presets must override, not only legacy aliases */
+  --surface: var(--surface-raised);
+  --surface-dim: var(--surface-base);
+  --surface-high: var(--surface-raised-hover);
+  --text-1: var(--text-strong);
+  --text-2: var(--text-weaker);
+  --bdr: var(--border);
+  --primary-hover: #1D4ED8;
 }
 
 /* ── Claude Warm ────────────────────────────────────────────────────────
@@ -203,7 +218,6 @@
   --destructive: #EF4444;
   --destructive-foreground: #FFFFFF;
 
-  /* --border: platform-override */;
   --input: rgba(255, 255, 255, 0.045);
   --ring: rgba(245, 158, 11, 0.42);
 
@@ -216,7 +230,6 @@
 
   --color-success: #84CC16;
   --color-danger: #EF4444;
-  /* --color-border: platform-override */;
 
   --brand: #F59E0B;
   --skill: #C084FC;
@@ -245,7 +258,6 @@
   --chat-user-bg: rgba(245, 158, 11, 0.07);
   --chat-code-bg: rgba(255, 255, 255, 0.05);
   --chat-thinking-bg: rgba(255, 255, 255, 0.015);
-  /* --chat-thinking-border: platform-override */;
 
   --input-panel-bg: #3D3028;
   --input-panel-border: rgba(0, 0, 0, 0.10);
@@ -261,6 +273,15 @@
   --diff-added-border: #84CC16;
   --diff-removed-bg: rgba(239, 68, 68, 0.10);
   --diff-removed-border: #EF4444;
+
+  /* v4 alias coverage — main tokens presets must override, not only legacy aliases */
+  --surface: var(--surface-raised);
+  --surface-dim: var(--surface-base);
+  --surface-high: var(--surface-raised-hover);
+  --text-1: var(--text-strong);
+  --text-2: var(--text-weaker);
+  --bdr: rgba(255, 255, 255, 0.06);
+  --primary-hover: #FBBF24;
 }
 
 /* Claude Warm — Light */
@@ -344,6 +365,15 @@
   --diff-added-border: #65A30D;
   --diff-removed-bg: rgba(239, 68, 68, 0.08);
   --diff-removed-border: #EF4444;
+
+  /* v4 alias coverage — main tokens presets must override, not only legacy aliases */
+  --surface: var(--surface-raised);
+  --surface-dim: var(--surface-base);
+  --surface-high: var(--surface-raised-hover);
+  --text-1: var(--text-strong);
+  --text-2: var(--text-weaker);
+  --bdr: var(--border);
+  --primary-hover: #B45309;
 }
 
 /* ── ChatGPT Minimal ────────────────────────────────────────────────────
@@ -386,7 +416,6 @@
 
   --color-success: #34D399;
   --color-danger: #EF4444;
-  /* --color-border: platform-override */;
 
   --brand: #10A37F;
   --skill: #A78BFA;
@@ -415,7 +444,6 @@
   --chat-user-bg: rgba(255, 255, 255, 0.045);
   --chat-code-bg: rgba(255, 255, 255, 0.05);
   --chat-thinking-bg: rgba(255, 255, 255, 0.015);
-  /* --chat-thinking-border: platform-override */;
 
   --input-panel-bg: #2D2D2D;
   --input-panel-border: rgba(0, 0, 0, 0.10);
@@ -431,6 +459,15 @@
   --diff-added-border: #34D399;
   --diff-removed-bg: rgba(239, 68, 68, 0.10);
   --diff-removed-border: #EF4444;
+
+  /* v4 alias coverage — main tokens presets must override, not only legacy aliases */
+  --surface: var(--surface-raised);
+  --surface-dim: var(--surface-base);
+  --surface-high: var(--surface-raised-hover);
+  --text-1: var(--text-strong);
+  --text-2: var(--text-weaker);
+  --bdr: rgba(255, 255, 255, 0.06);
+  --primary-hover: #2EC4A0;
 }
 
 /* ChatGPT Minimal — Light */
@@ -514,6 +551,15 @@
   --diff-added-border: #10A37F;
   --diff-removed-bg: rgba(239, 68, 68, 0.08);
   --diff-removed-border: #EF4444;
+
+  /* v4 alias coverage — main tokens presets must override, not only legacy aliases */
+  --surface: var(--surface-raised);
+  --surface-dim: var(--surface-base);
+  --surface-high: var(--surface-raised-hover);
+  --text-1: var(--text-strong);
+  --text-2: var(--text-weaker);
+  --bdr: var(--border);
+  --primary-hover: #0D8A6B;
 }
 
 /* ── DeepSeek Tech ──────────────────────────────────────────────────────
@@ -585,7 +631,6 @@
   --chat-user-bg: rgba(129, 140, 248, 0.08);
   --chat-code-bg: rgba(255, 255, 255, 0.05);
   --chat-thinking-bg: rgba(255, 255, 255, 0.02);
-  /* --chat-thinking-border: platform-override */;
 
   --input-panel-bg: #1E293B;
   --input-panel-border: rgba(0, 0, 0, 0.12);
@@ -601,6 +646,15 @@
   --diff-added-border: #4ADE80;
   --diff-removed-bg: rgba(239, 68, 68, 0.10);
   --diff-removed-border: #EF4444;
+
+  /* v4 alias coverage — main tokens presets must override, not only legacy aliases */
+  --surface: var(--surface-raised);
+  --surface-dim: var(--surface-base);
+  --surface-high: var(--surface-raised-hover);
+  --text-1: var(--text-strong);
+  --text-2: var(--text-weaker);
+  --bdr: rgba(255, 255, 255, 0.06);
+  --primary-hover: #A5B4FC;
 }
 
 /* DeepSeek Tech — Light */
@@ -684,6 +738,15 @@
   --diff-added-border: #22C55E;
   --diff-removed-bg: rgba(239, 68, 68, 0.08);
   --diff-removed-border: #EF4444;
+
+  /* v4 alias coverage — main tokens presets must override, not only legacy aliases */
+  --surface: var(--surface-raised);
+  --surface-dim: var(--surface-base);
+  --surface-high: var(--surface-raised-hover);
+  --text-1: var(--text-strong);
+  --text-2: var(--text-weaker);
+  --bdr: var(--border);
+  --primary-hover: #4F46E5;
 }
 
 /* ── One Dark Pro ───────────────────────────────────────────────────────
@@ -713,7 +776,6 @@
   --destructive: #E06C75;
   --destructive-foreground: #FFFFFF;
 
-  /* --border: platform-override */;
   --input: rgba(255, 255, 255, 0.05);
   --ring: rgba(97, 175, 239, 0.42);
 
@@ -726,7 +788,6 @@
 
   --color-success: #98C379;
   --color-danger: #E06C75;
-  /* --color-border: platform-override */;
 
   --brand: #61AFEF;
   --skill: #C678DD;
@@ -771,6 +832,15 @@
   --diff-added-border: #98C379;
   --diff-removed-bg: rgba(224, 108, 117, 0.10);
   --diff-removed-border: #E06C75;
+
+  /* v4 alias coverage — main tokens presets must override, not only legacy aliases */
+  --surface: var(--surface-raised);
+  --surface-dim: var(--surface-base);
+  --surface-high: var(--surface-raised-hover);
+  --text-1: var(--text-strong);
+  --text-2: var(--text-weaker);
+  --bdr: rgba(255, 255, 255, 0.06);
+  --primary-hover: #82C0F4;
 }
 
 /* One Dark Pro — Light */
@@ -854,6 +924,15 @@
   --diff-added-border: #98C379;
   --diff-removed-bg: rgba(224, 108, 117, 0.10);
   --diff-removed-border: #E06C75;
+
+  /* v4 alias coverage — main tokens presets must override, not only legacy aliases */
+  --surface: var(--surface-raised);
+  --surface-dim: var(--surface-base);
+  --surface-high: var(--surface-raised-hover);
+  --text-1: var(--text-strong);
+  --text-2: var(--text-weaker);
+  --bdr: var(--border);
+  --primary-hover: #4FA8E8;
 }
 
 /* ── Dracula ────────────────────────────────────────────────────────────
@@ -883,7 +962,6 @@
   --destructive: #FF5555;
   --destructive-foreground: #FFFFFF;
 
-  /* --border: platform-override */;
   --input: rgba(255, 255, 255, 0.05);
   --ring: rgba(189, 147, 249, 0.42);
 
@@ -896,7 +974,6 @@
 
   --color-success: #50FA7B;
   --color-danger: #FF5555;
-  /* --color-border: platform-override */;
 
   --brand: #BD93F9;
   --skill: #FF79C6;
@@ -925,7 +1002,6 @@
   --chat-user-bg: rgba(189, 147, 249, 0.07);
   --chat-code-bg: rgba(255, 255, 255, 0.05);
   --chat-thinking-bg: rgba(255, 255, 255, 0.015);
-  /* --chat-thinking-border: platform-override */;
 
   --input-panel-bg: #2C2E3A;
   --input-panel-border: rgba(0, 0, 0, 0.10);
@@ -941,6 +1017,15 @@
   --diff-added-border: #50FA7B;
   --diff-removed-bg: rgba(255, 85, 85, 0.10);
   --diff-removed-border: #FF5555;
+
+  /* v4 alias coverage — main tokens presets must override, not only legacy aliases */
+  --surface: var(--surface-raised);
+  --surface-dim: var(--surface-base);
+  --surface-high: var(--surface-raised-hover);
+  --text-1: var(--text-strong);
+  --text-2: var(--text-weaker);
+  --bdr: rgba(255, 255, 255, 0.06);
+  --primary-hover: #D0B3FB;
 }
 
 /* Dracula — Light */
@@ -1024,6 +1109,15 @@
   --diff-added-border: #50FA7B;
   --diff-removed-bg: rgba(255, 85, 85, 0.10);
   --diff-removed-border: #FF5555;
+
+  /* v4 alias coverage — main tokens presets must override, not only legacy aliases */
+  --surface: var(--surface-raised);
+  --surface-dim: var(--surface-base);
+  --surface-high: var(--surface-raised-hover);
+  --text-1: var(--text-strong);
+  --text-2: var(--text-weaker);
+  --bdr: var(--border);
+  --primary-hover: #A877F5;
 }
 
 /* ═══ Global focus fallback (a11y #8/#13) ═══════════════════════════════

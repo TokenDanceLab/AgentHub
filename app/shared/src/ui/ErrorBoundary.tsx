@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { getI18n } from 'react-i18next';
 import { globalErrorReporter } from '../errors';
+import { Button } from './Button';
 import styles from './ErrorBoundary.module.css';
 
 // ── Types ──────────────────────────────────────────────
@@ -16,8 +17,12 @@ interface Props {
   children: ReactNode;
   /** Platform-specific extensions: checked before base kinds */
   extensions?: ErrorBoundaryExtension[];
-  /** Show stack trace details (default true) */
+  /** Show stack trace details (default false — the stack is reachable via
+   *  the "Copy error details" button instead of being shown inline). */
   showStack?: boolean;
+  /** Invoked when the user retries (clears the boundary + lets the owning
+   *  route reset transient state so the same render error does not recur). */
+  onReset?: () => void;
 }
 
 interface State {
@@ -224,16 +229,36 @@ export default class ErrorBoundary extends Component<Props, State> {
 
   handleRetry = (): void => {
     this.setState({ hasError: false, error: null });
+    // Give the owning route a chance to clear transient state that may have
+    // caused the render error, so retry does not immediately re-throw.
+    this.props.onReset?.();
   };
 
   handleReload = (): void => {
     window.location.reload();
   };
 
+  handleCopyDetails = (): void => {
+    const { error } = this.state;
+    if (!error) return;
+    const payload = [
+      `ErrorBoundary report`,
+      `name: ${error.name}`,
+      `message: ${error.message}`,
+      `stack:`,
+      error.stack ?? '(no stack)',
+    ].join('\n');
+    try {
+      navigator.clipboard?.writeText(payload);
+    } catch {
+      // clipboard may be denied/unavailable — keep silent
+    }
+  };
+
   render(): ReactNode {
     if (this.state.hasError) {
       const { error } = this.state;
-      const { extensions, showStack = true } = this.props;
+      const { extensions, showStack = false } = this.props;
 
       const { config, onPrimary } = resolveError(
         error,
@@ -246,6 +271,7 @@ export default class ErrorBoundary extends Component<Props, State> {
       const description = t(config.descKey, config.descFallback);
       const primaryLabel = t(config.primaryLabelKey, config.primaryLabelFallback);
       const stackLabel = t('errorBoundary.stackTrace', 'Stack Trace');
+      const copyDetailsLabel = t('errorBoundary.copyDetails', 'Copy error details');
 
       return (
         <div className={styles.container} role="alert">
@@ -257,23 +283,33 @@ export default class ErrorBoundary extends Component<Props, State> {
           <p className={styles.description}>{description}</p>
 
           <div className={styles.actions}>
-            <button
+            <Button
               type="button"
+              variant="primary"
               onClick={onPrimary}
-              className={styles.btnPrimary}
             >
               {config.primaryIcon}
               {primaryLabel}
-            </button>
+            </Button>
 
             {!(error && isChunkLoadError(error)) && (
-              <button
+              <Button
                 type="button"
+                variant="secondary"
                 onClick={this.handleRetry}
-                className={styles.btnSecondary}
               >
                 {t('errorBoundary.retry', 'Retry')}
-              </button>
+              </Button>
+            )}
+
+            {error && (
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={this.handleCopyDetails}
+              >
+                {copyDetailsLabel}
+              </Button>
             )}
           </div>
 
