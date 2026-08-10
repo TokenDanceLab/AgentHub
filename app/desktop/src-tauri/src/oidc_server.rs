@@ -287,16 +287,198 @@ pub async fn stop_oidc_callback_server() -> Result<(), String> {
     Ok(())
 }
 
+/// Parsed components of a URL string, extracted without the `url` crate.
+#[derive(Debug)]
+struct ParsedProxyUrl {
+    scheme: String,
+    host: String,
+    port: Option<u16>,
+}
+
+/// Ports on 127.0.0.1 that `proxy_http_post` is permitted to reach.
+/// Local Edge runs on 3210; the OIDC callback server binds a random port
+/// but is never a proxy *target*, so it is deliberately absent here.
+const ALLOWED_LOOPBACK_PORTS: &[u16] = &[3210];
+
+/// HTTP request headers the proxy will forward. Anything else is dropped to
+/// prevent header injection / SSRF enrichment by a compromised webview.
+const ALLOWED_REQUEST_HEADERS: &[&str] = &[
+    "authorization",
+    "content-type",
+    "accept",
+    "accept-language",
+    "user-agent",
+    "x-request-id",
+    "x-trace-id",
+    "x-correlation-id",
+];
+
+/// Parse a URL into scheme/host/port without an external `url` dependency.
+/// Returns `Err` if the URL is structurally invalid (no scheme, no host).
+fn parse_proxy_url(raw: &str) -> Result<ParsedProxyUrl, String> {
+    let scheme_end = raw
+        .find("://")
+        .ok_or_else(|| format!("invalid URL: missing scheme separator in {raw:?}"))?;
+    let scheme = raw[..scheme_end].to_lowercase();
+    if scheme.is_empty() {
+        return Err(format!("invalid URL: empty scheme in {raw:?}"));
+    }
+
+    let rest = &raw[scheme_end + 3..];
+    // Host ends at the first '/', '?', '#', or ':' (port) — whichever comes first.
+    let host_end = rest
+        .find(|c: char| c == '/' || c == '?' || c == '#' || c == ':')
+        .unwrap_or(rest.len());
+    let host = rest[..host_end].trim_start_matches('[').trim_end_matches(']').to_lowercase();
+    if host.is_empty() {
+        return Err(format!("invalid URL: empty host in {raw:?}"));
+    }
+
+    let port = if host_end < rest.len() && rest.as_bytes()[host_end] == b':' {
+        let port_start = host_end + 1;
+        let port_str = &rest[port_start..rest_start_of_path(rest, port_start)];
+        port_str.parse::<u16>().ok()
+    } else {
+        None
+    };
+
+    Ok(ParsedProxyUrl { scheme, host, port })
+}
+
+/// Find the byte index where the path begins (first '/' or '?' or '#') at or
+/// after `start`, or the end of the string.
+fn rest_start_of_path(s: &str, start: usize) -> usize {
+    s[start..]
+        .find(|c: char| c == '/' || c == '?' || c == '#')
+        .map(|i| start + i)
+        .unwrap_or(s.len())
+}
+
+/// Returns `true` if `host` is a private, link-local, loopback, or
+/// metadata-endpoint IP that must never be reached via the proxy (SSRF guard).
+/// Loopback (127.0.0.1 / ::1) is handled separately because it is conditionally
+/// allowed on whitelisted ports.
+fn is_blocked_private_host(host: &str) -> bool {
+    // IPv4 dotted-quad checks.
+    let octets: Vec<&str> = host.split('.').collect();
+    if octets.len() == 4 && octets.iter().all(|o| o.parse::<u8>().is_ok()) {
+        let a: u8 = octets[0].parse().unwrap();
+        let b: u8 = octets[1].parse().unwrap();
+        return matches!(a, 10)                       // 10.0.0.0/8
+            || (a == 172 && (16..=31).contains(&b))  // 172.16.0.0/12
+            || (a == 192 && b == 168)                // 192.168.0.0/16
+            || (a == 169 && b == 254)                // 169.254.0.0/16 (link-local + cloud metadata)
+            || a == 0                                // 0.0.0.0/8
+            || (a == 127 && host != "127.0.0.1");    // 127.0.0.0/8 except the exact loopback addr
+    }
+    // IPv6 link-local / unique-local / loopback.
+    if host == "::1" {
+        return false; // loopback handled by caller
+    }
+    if host.starts_with("fc") || host.starts_with("fd") {
+        return true; // fc00::/7 unique-local
+    }
+    if host.starts_with("fe80") {
+        return true; // link-local
+    }
+    false
+}
+
+/// Validate a proxy target URL against the SSRF allowlist policy.
+///
+/// Rules:
+/// - Scheme must be `http` or `https` (no file://, ftp://, gopher://, etc.).
+/// - `https` is allowed to any public host, but private IP ranges are blocked.
+///   `https` to `127.0.0.1` is also blocked unless on an allowlisted port.
+/// - `http` is allowed ONLY to `127.0.0.1` on ports in [`ALLOWED_LOOPBACK_PORTS`].
+/// - `localhost` (non-IP) over http is rejected — callers must use 127.0.0.1
+///   or switch to https.
+fn validate_proxy_url(raw: &str) -> Result<ParsedProxyUrl, String> {
+    // Fast-path scheme check before full parse so that file:///etc/passwd
+    // (which has an empty host) is rejected for the right reason.
+    let scheme_end = raw
+        .find("://")
+        .ok_or_else(|| format!("invalid URL: missing scheme separator in {raw:?}"))?;
+    let scheme = raw[..scheme_end].to_lowercase();
+    if scheme != "http" && scheme != "https" {
+        return Err(format!(
+            "SSRF guard: scheme {scheme:?} is not allowed; use http (loopback only) or https"
+        ));
+    }
+
+    let parsed = parse_proxy_url(raw)?;
+    debug_assert_eq!(parsed.scheme, scheme);
+
+    match parsed.scheme.as_str() {
+        "https" => {
+            if is_blocked_private_host(&parsed.host) {
+                return Err(format!(
+                    "SSRF guard: https to private/link-local host {} is blocked",
+                    parsed.host
+                ));
+            }
+            // Block https to loopback unless on an allowlisted port. Reaching
+            // 127.0.0.1 over https to a random port is not a legitimate
+            // business endpoint and mirrors the SSRF exfiltration risk.
+            if parsed.host == "127.0.0.1" {
+                let port = parsed.port.ok_or_else(|| {
+                    "SSRF guard: https to 127.0.0.1 without an explicit port is blocked"
+                        .to_string()
+                })?;
+                if !ALLOWED_LOOPBACK_PORTS.contains(&port) {
+                    return Err(format!(
+                        "SSRF guard: https to 127.0.0.1 port {port} is not in the allowlist {ALLOWED_LOOPBACK_PORTS:?}"
+                    ));
+                }
+            }
+            Ok(parsed)
+        }
+        "http" => {
+            if parsed.host != "127.0.0.1" {
+                return Err(format!(
+                    "SSRF guard: http is only allowed to 127.0.0.1 (got host {}); use https for remote hosts",
+                    parsed.host
+                ));
+            }
+            let port = parsed.port.ok_or_else(|| {
+                "SSRF guard: http to 127.0.0.1 without an explicit port is blocked".to_string()
+            })?;
+            if !ALLOWED_LOOPBACK_PORTS.contains(&port) {
+                return Err(format!(
+                    "SSRF guard: http to 127.0.0.1 port {port} is not in the allowlist {ALLOWED_LOOPBACK_PORTS:?}"
+                ));
+            }
+            Ok(parsed)
+        }
+        // Unreachable: scheme already validated above.
+        other => Err(format!(
+            "SSRF guard: scheme {other:?} is not allowed; use http (loopback only) or https"
+        )),
+    }
+}
+
 /// Proxy an HTTP POST request through the Rust backend.
 /// This is needed because WebView2 `fetch()` does not respect `HTTP_PROXY`/`HTTPS_PROXY`
 /// environment variables (it uses Windows system proxy instead). The Rust `reqwest` client
 /// respects env vars, so requests that need a proxy must go through this command.
+///
+/// **SSRF guard**: the `url` is validated against an allowlist before any network
+/// request is made. See [`validate_proxy_url`] for the policy. Request headers are
+/// filtered through [`ALLOWED_REQUEST_HEADERS`] to prevent header injection.
 #[tauri::command]
 pub async fn proxy_http_post(
+    window: tauri::WebviewWindow,
     url: String,
     body: String,
     headers: Option<std::collections::HashMap<String, String>>,
 ) -> Result<ProxyHttpResponse, String> {
+    // Origin guard: reject invokes from non-trusted webview origins.
+    crate::commands::validate_command_origin(&window)?;
+    // Validate the URL before touching the network. This is the core SSRF
+    // mitigation: an arbitrary webview must not be able to POST to internal
+    // services, cloud metadata endpoints, or non-loopback private hosts.
+    let _validated = validate_proxy_url(&url)?;
+
     let client = reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(30))
         .build()
@@ -306,7 +488,12 @@ pub async fn proxy_http_post(
 
     if let Some(hdrs) = headers {
         for (k, v) in hdrs {
-            req = req.header(&k, &v);
+            let lower = k.to_lowercase();
+            if ALLOWED_REQUEST_HEADERS.iter().any(|h| *h == lower) {
+                req = req.header(&k, &v);
+            } else {
+                log::warn!("[proxy_http_post] dropping non-allowlisted header {k:?}");
+            }
         }
     }
 
@@ -438,5 +625,108 @@ mod tests {
             readiness.redirect_uri.as_deref(),
             Some("http://127.0.0.1:49152/callback")
         );
+    }
+
+    // ── SSRF guard: validate_proxy_url ───────────────────────────────
+
+    #[test]
+    fn proxy_url_allows_https_to_public_domain() {
+        let parsed = validate_proxy_url("https://api.vectorcontrol.tech/v1/chat").unwrap();
+        assert_eq!(parsed.scheme, "https");
+        assert_eq!(parsed.host, "api.vectorcontrol.tech");
+        assert!(parsed.port.is_none());
+    }
+
+    #[test]
+    fn proxy_url_allows_http_to_loopback_edge_port() {
+        let parsed = validate_proxy_url("http://127.0.0.1:3210/v1/health").unwrap();
+        assert_eq!(parsed.scheme, "http");
+        assert_eq!(parsed.host, "127.0.0.1");
+        assert_eq!(parsed.port, Some(3210));
+    }
+
+    #[test]
+    fn proxy_url_blocks_cloud_metadata_endpoint() {
+        // 169.254.169.254 is the classic cloud metadata IP — SSRF exfiltration.
+        let err = validate_proxy_url("http://169.254.169.254/latest/meta-data/").unwrap_err();
+        assert!(err.contains("SSRF guard"), "{err}");
+        assert!(err.contains("169.254.169.254"), "{err}");
+    }
+
+    #[test]
+    fn proxy_url_blocks_private_10_range() {
+        let err = validate_proxy_url("https://10.0.0.1/admin").unwrap_err();
+        assert!(err.contains("SSRF guard"), "{err}");
+    }
+
+    #[test]
+    fn proxy_url_blocks_private_192_168_range() {
+        let err = validate_proxy_url("https://192.168.1.1/admin").unwrap_err();
+        assert!(err.contains("SSRF guard"), "{err}");
+    }
+
+    #[test]
+    fn proxy_url_blocks_private_172_16_range() {
+        let err = validate_proxy_url("https://172.16.0.1/admin").unwrap_err();
+        assert!(err.contains("SSRF guard"), "{err}");
+    }
+
+    #[test]
+    fn proxy_url_blocks_loopback_non_allowlisted_port() {
+        let err = validate_proxy_url("http://127.0.0.1:8080/secret").unwrap_err();
+        assert!(err.contains("allowlist"), "{err}");
+        assert!(err.contains("8080"), "{err}");
+    }
+
+    #[test]
+    fn proxy_url_blocks_http_to_non_loopback_host() {
+        let err = validate_proxy_url("http://api.vectorcontrol.tech/v1/chat").unwrap_err();
+        assert!(err.contains("only allowed to 127.0.0.1"), "{err}");
+    }
+
+    #[test]
+    fn proxy_url_blocks_http_to_localhost() {
+        // `localhost` is not the exact IP 127.0.0.1 — rejected to avoid DNS rebinding.
+        let err = validate_proxy_url("http://localhost:3210/").unwrap_err();
+        assert!(err.contains("only allowed to 127.0.0.1"), "{err}");
+    }
+
+    #[test]
+    fn proxy_url_blocks_non_http_scheme() {
+        let err = validate_proxy_url("file:///etc/passwd").unwrap_err();
+        assert!(err.contains("scheme"), "{err}");
+        assert!(err.contains("file"), "{err}");
+    }
+
+    #[test]
+    fn proxy_url_blocks_zero_ip() {
+        let err = validate_proxy_url("https://0.0.0.0/").unwrap_err();
+        assert!(err.contains("SSRF guard"), "{err}");
+    }
+
+    #[test]
+    fn proxy_url_blocks_ipv6_unique_local() {
+        let err = validate_proxy_url("https://[fd00::1]/").unwrap_err();
+        assert!(err.contains("SSRF guard"), "{err}");
+    }
+
+    #[test]
+    fn proxy_url_blocks_https_to_loopback_non_edge_port() {
+        // Even over https, 127.0.0.1 without an allowlisted port is not a
+        // legitimate business endpoint — block it.
+        let err = validate_proxy_url("https://127.0.0.1:9999/").unwrap_err();
+        assert!(err.contains("SSRF guard"), "{err}");
+    }
+
+    #[test]
+    fn proxy_url_parses_port_from_url_with_path() {
+        let parsed = validate_proxy_url("http://127.0.0.1:3210/v1/health?detail=1").unwrap();
+        assert_eq!(parsed.port, Some(3210));
+    }
+
+    #[test]
+    fn proxy_url_rejects_missing_scheme() {
+        let err = validate_proxy_url("127.0.0.1:3210/").unwrap_err();
+        assert!(err.contains("missing scheme"), "{err}");
     }
 }

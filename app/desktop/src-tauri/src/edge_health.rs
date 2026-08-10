@@ -1,4 +1,4 @@
-use crate::edge_manager::SharedEdgeManager;
+use crate::edge_manager::{schedule_edge_restart, SharedEdgeManager};
 use std::time::Duration;
 use tauri::{AppHandle, Emitter};
 use tokio::time;
@@ -33,6 +33,24 @@ pub fn spawn_health_check(app: AppHandle, edge: SharedEdgeManager) {
 
             if health.online != was_online {
                 was_online = health.online;
+            }
+
+            // Reset the restart counter when the server is confirmed healthy
+            // so that a transient crash does not permanently consume the budget.
+            if health.online {
+                edge.lock().await.reset_restart_count();
+            }
+
+            // Zombie detection: child handle exists (is_running=true) but the
+            // health probe is offline. This means the sidecar/process is hung
+            // or was killed externally without a Terminated event. Clear the
+            // stale child handle and schedule an auto-restart.
+            if running && !health.online {
+                log::warn!("[edge-health] zombie detected: child present but health offline — scheduling restart");
+                let mut mgr = edge.lock().await;
+                mgr.clear_child();
+                drop(mgr);
+                schedule_edge_restart(app.clone());
             }
 
             // Always emit periodically to keep UI in sync

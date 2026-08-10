@@ -11,7 +11,7 @@ import { useThreadStore } from '@/stores/threadStore';
 import { useModelSettingsStore } from '@/stores/modelSettingsStore';
 import type { StartRunRequest, ThreadInfo } from '@shared/types';
 import type { ChatMessage } from '@shared/types/chat';
-import type { AddToastInput } from '@/stores/toastStore';
+import type { AddToastInput } from '@shared/ui/toast';
 import { readCustomInstructions } from '@/utils/customInstructions';
 import { findRetryPrompt } from '@/utils/messageActions';
 import { getActiveRunConflictId, isTurnInProgressConflict } from '@/utils/appUtils';

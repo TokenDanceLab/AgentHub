@@ -49,7 +49,6 @@ interface RunUIStore {
   loopCount: number;
   errorCount: number;
   abortController: AbortController | null;
-  fileReadCache: Map<string, { readCount: number; mtime: number }>;
   /** Latest token usage snapshot from context_usage events. */
   tokenStats: TokenStats | null;
 
@@ -66,6 +65,14 @@ interface RunUIStore {
 
 const sm = new RunStateMachine();
 
+// ── File-read dedup cache (command-style, OUT of zustand state) ─────────
+// Previously `fileReadCache` lived in reactive zustand state and every write
+// cloned the whole Map (`new Map(s.fileReadCache)`) — O(n) per stream event,
+// O(n²) over a long session. It is pure dedup metadata (no UI depends on its
+// value reactively), so hoisting it to a module-level Map mutated in place
+// removes the per-write copy entirely while preserving the same API.
+const fileReadCache = new Map<string, { readCount: number; mtime: number }>();
+
 export const useRunStore = create<RunUIStore>()(
   subscribeWithSelector((set, get) => ({
     isStreaming: false,
@@ -74,7 +81,6 @@ export const useRunStore = create<RunUIStore>()(
     loopCount: 0,
     errorCount: 0,
     abortController: null,
-    fileReadCache: new Map(),
     tokenStats: null,
 
     setRunState: (rs) => {
@@ -105,13 +111,10 @@ export const useRunStore = create<RunUIStore>()(
     setTokenStats: (stats) => set({ tokenStats: stats }),
 
     checkFileReadCache: (path, mtime) => {
-      const cached = get().fileReadCache.get(path);
+      const cached = fileReadCache.get(path);
       if (cached && cached.mtime === mtime) {
-        set((s) => {
-          const next = new Map(s.fileReadCache);
-          next.set(path, { readCount: cached.readCount + 1, mtime });
-          return { fileReadCache: next };
-        });
+        // In-place mutation — no Map clone, no reactive state churn.
+        cached.readCount += 1;
         return true;
       }
       return false;
@@ -121,6 +124,7 @@ export const useRunStore = create<RunUIStore>()(
       sm.reset();
       const ctrl = get().abortController;
       if (ctrl) ctrl.abort();
+      fileReadCache.clear();
       set({
         isStreaming: false,
         currentRunId: null,
@@ -128,7 +132,6 @@ export const useRunStore = create<RunUIStore>()(
         loopCount: 0,
         errorCount: 0,
         abortController: null,
-        fileReadCache: new Map(),
         tokenStats: null,
       });
     },

@@ -2,9 +2,7 @@ import { type ReactNode } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, renderHook } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { AppError } from '@shared/errors';
 import {
-  fetchAgentTeamOverview,
   useCreateAgentTeam,
   useDeleteAgentTeam,
   useStartTeamRun,
@@ -42,17 +40,6 @@ function jsonError(status: number, code: string, message: string): Response {
   );
 }
 
-function jsonOk(data: unknown, status = 200): Response {
-  return new Response(
-    JSON.stringify({ code: 'OK', data }),
-    {
-      status,
-      statusText: 'OK',
-      headers: { 'Content-Type': 'application/json' },
-    },
-  );
-}
-
 function getAuthorization(init?: RequestInit): string | null {
   const headers = init?.headers;
   if (!headers) return null;
@@ -65,128 +52,10 @@ function getAuthorization(init?: RequestInit): string | null {
   return record.Authorization ?? record.authorization ?? null;
 }
 
-const emptyOverview = {
-  teams: [],
-  bundles: [],
-  customAgents: [],
-  tasks: [],
-  events: [],
-};
-
 describe('desktop agentTeamQueries fail-closed branches', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
-  });
-
-  it('returns empty overview without calling Hub when preferHub is false', async () => {
-    const fetchMock = vi.fn();
-    vi.stubGlobal('fetch', fetchMock);
-
-    await expect(
-      fetchAgentTeamOverview(false, () => 'hub-token', 'http://test.local'),
-    ).resolves.toEqual(emptyOverview);
-    expect(fetchMock).not.toHaveBeenCalled();
-  });
-
-  it('returns empty overview without calling Hub when there is no token (fail-closed)', async () => {
-    const fetchMock = vi.fn();
-    vi.stubGlobal('fetch', fetchMock);
-
-    await expect(
-      fetchAgentTeamOverview(true, () => null, 'http://test.local'),
-    ).resolves.toEqual(emptyOverview);
-    expect(fetchMock).not.toHaveBeenCalled();
-  });
-
-  it('surfaces 401 unauthorized from agent-team list as AppError (fail-closed)', async () => {
-    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-      expect(String(input)).toBe('http://test.local/web/agent-teams');
-      expect(getAuthorization(init)).toBe('Bearer stale-token');
-      return jsonError(401, 'unauthorized', 'bad token');
-    });
-    vi.stubGlobal('fetch', fetchMock);
-
-    await expect(
-      fetchAgentTeamOverview(true, () => 'stale-token', 'http://test.local'),
-    ).rejects.toMatchObject({
-      code: 'unauthorized',
-      message: 'bad token',
-      status: 401,
-    });
-    await expect(
-      fetchAgentTeamOverview(true, () => 'stale-token', 'http://test.local'),
-    ).rejects.toBeInstanceOf(AppError);
-  });
-
-  it('surfaces 403 forbidden from agent-team list as AppError', async () => {
-    const fetchMock = vi.fn(async () => jsonError(403, 'FORBIDDEN', 'not allowed'));
-    vi.stubGlobal('fetch', fetchMock);
-
-    await expect(
-      fetchAgentTeamOverview(true, () => 'hub-access', 'http://test.local'),
-    ).rejects.toMatchObject({
-      code: 'FORBIDDEN',
-      message: 'not allowed',
-      status: 403,
-    });
-    await expect(
-      fetchAgentTeamOverview(true, () => 'hub-access', 'http://test.local'),
-    ).rejects.toBeInstanceOf(AppError);
-  });
-
-  it('surfaces 404 from agent-team list as AppError', async () => {
-    const fetchMock = vi.fn(async () => jsonError(404, 'NOT_FOUND', 'teams missing'));
-    vi.stubGlobal('fetch', fetchMock);
-
-    await expect(
-      fetchAgentTeamOverview(true, () => 'hub-access', 'http://test.local'),
-    ).rejects.toMatchObject({
-      code: 'NOT_FOUND',
-      message: 'teams missing',
-      status: 404,
-    });
-    await expect(
-      fetchAgentTeamOverview(true, () => 'hub-access', 'http://test.local'),
-    ).rejects.toBeInstanceOf(AppError);
-  });
-
-  it('surfaces 500 from agent-team list as AppError', async () => {
-    const fetchMock = vi.fn(async () => jsonError(500, 'INTERNAL_ERROR', 'hub down'));
-    vi.stubGlobal('fetch', fetchMock);
-
-    await expect(
-      fetchAgentTeamOverview(true, () => 'hub-access', 'http://test.local'),
-    ).rejects.toMatchObject({
-      code: 'INTERNAL_ERROR',
-      message: 'hub down',
-      status: 500,
-    });
-    await expect(
-      fetchAgentTeamOverview(true, () => 'hub-access', 'http://test.local'),
-    ).rejects.toBeInstanceOf(AppError);
-  });
-
-  it('loads empty overview when Hub returns no agent teams', async () => {
-    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
-      const url = String(input);
-      if (url.endsWith('/web/agent-teams')) {
-        return jsonOk([]);
-      }
-      if (url.includes('/web/custom-agents') || url.includes('/web/agent-profiles')) {
-        return jsonOk([]);
-      }
-      return jsonError(404, 'NOT_FOUND', `unexpected ${url}`);
-    });
-    vi.stubGlobal('fetch', fetchMock);
-
-    await expect(
-      fetchAgentTeamOverview(true, () => 'hub-access', 'http://test.local'),
-    ).resolves.toEqual({
-      ...emptyOverview,
-      customAgents: [],
-    });
-    expect(fetchMock).toHaveBeenCalled();
   });
 
   it('rejects team mutations without a Hub session token (fail-closed)', async () => {

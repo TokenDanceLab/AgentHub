@@ -21,6 +21,7 @@ import {
   type DesktopHubEventBridgeHandle,
 } from '@/stores/hubEventBridge';
 import { queryClient } from '@/api/queryClient';
+import { hubQueryKeys } from '@shared/stores/queryKeys';
 
 // ── Public types ─────────────────────────────────
 
@@ -114,8 +115,24 @@ export function useHubEventStream(
     const unsubStatus = handle.onStatus((wsStatus: TransportStatus) => {
       setStatus(wsStatus);
       // Wire Hub WS events to React Query cache + store updates on connect
-      if (wsStatus === 'connected' && !bridgeHandleRef.current) {
-        bridgeHandleRef.current = createDesktopHubEventBridge(handle, queryClient);
+      if (wsStatus === 'connected') {
+        // Backfill data missed while the socket was down: invalidate the
+        // message/thread/team caches so React Query refetches the current
+        // state from the Hub. Individual event handlers keep caches fresh
+        // thereafter, but a reconnect gap is closed by this bulk invalidate.
+        void queryClient
+          .invalidateQueries({ queryKey: hubQueryKeys.threads.root })
+          .catch(() => {
+            /* non-fatal */
+          });
+        void queryClient
+          .invalidateQueries({ queryKey: hubQueryKeys.agentTeams.root })
+          .catch(() => {
+            /* non-fatal */
+          });
+        if (!bridgeHandleRef.current) {
+          bridgeHandleRef.current = createDesktopHubEventBridge(handle, queryClient);
+        }
       } else if (wsStatus === 'disconnected') {
         bridgeHandleRef.current?.destroy();
         bridgeHandleRef.current = null;

@@ -31,7 +31,7 @@ export default function LoginForm({ onSuccess }: LoginFormProps) {
       setIdentityNotice(t('auth.tokenDanceCallbackPending'));
     } catch (err: unknown) {
       if (err instanceof OidcError) {
-        setServerError(t(`auth.error.oidc.${err.code}` as const, { detail: err.detail ?? '' }));
+        setServerError(t(`auth.error.oidc.${err.code}` as const, { detail: err.detail ?? '', defaultValue: 'Login failed' }));
       } else {
         const message = err instanceof Error ? err.message : '';
         setServerError(message || t('auth.error.tokenDanceUnavailable'));

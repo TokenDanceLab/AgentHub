@@ -75,7 +75,11 @@ fn refresh_token_entry() -> Result<Entry, String> {
 }
 
 #[tauri::command]
-pub async fn store_hub_refresh_token(token: String) -> Result<(), String> {
+pub async fn store_hub_refresh_token(
+    window: tauri::WebviewWindow,
+    token: String,
+) -> Result<(), String> {
+    crate::commands::validate_command_origin(&window)?;
     if token.trim().is_empty() {
         return Err("refresh token must not be empty".to_string());
     }
@@ -85,7 +89,10 @@ pub async fn store_hub_refresh_token(token: String) -> Result<(), String> {
 }
 
 #[tauri::command]
-pub async fn read_hub_refresh_token() -> Result<Option<String>, String> {
+pub async fn read_hub_refresh_token(
+    window: tauri::WebviewWindow,
+) -> Result<Option<String>, String> {
+    crate::commands::validate_command_origin(&window)?;
     match refresh_token_entry()?.get_password() {
         Ok(token) => Ok(Some(token)),
         Err(keyring_core::Error::NoEntry) => Ok(None),
@@ -94,7 +101,10 @@ pub async fn read_hub_refresh_token() -> Result<Option<String>, String> {
 }
 
 #[tauri::command]
-pub async fn clear_hub_refresh_token() -> Result<(), String> {
+pub async fn clear_hub_refresh_token(
+    window: tauri::WebviewWindow,
+) -> Result<(), String> {
+    crate::commands::validate_command_origin(&window)?;
     match refresh_token_entry()?.delete_credential() {
         Ok(()) | Err(keyring_core::Error::NoEntry) => Ok(()),
         Err(err) => Err(format!("credential store delete failed: {err}")),
@@ -110,7 +120,11 @@ fn access_token_entry() -> Result<Entry, String> {
 }
 
 #[tauri::command]
-pub async fn store_hub_access_token(token: String) -> Result<(), String> {
+pub async fn store_hub_access_token(
+    window: tauri::WebviewWindow,
+    token: String,
+) -> Result<(), String> {
+    crate::commands::validate_command_origin(&window)?;
     if token.trim().is_empty() {
         return Err("access token must not be empty".to_string());
     }
@@ -120,7 +134,10 @@ pub async fn store_hub_access_token(token: String) -> Result<(), String> {
 }
 
 #[tauri::command]
-pub async fn read_hub_access_token() -> Result<Option<String>, String> {
+pub async fn read_hub_access_token(
+    window: tauri::WebviewWindow,
+) -> Result<Option<String>, String> {
+    crate::commands::validate_command_origin(&window)?;
     match access_token_entry()?.get_password() {
         Ok(token) => Ok(Some(token)),
         Err(keyring_core::Error::NoEntry) => Ok(None),
@@ -129,7 +146,10 @@ pub async fn read_hub_access_token() -> Result<Option<String>, String> {
 }
 
 #[tauri::command]
-pub async fn clear_hub_access_token() -> Result<(), String> {
+pub async fn clear_hub_access_token(
+    window: tauri::WebviewWindow,
+) -> Result<(), String> {
+    crate::commands::validate_command_origin(&window)?;
     match access_token_entry()?.delete_credential() {
         Ok(()) | Err(keyring_core::Error::NoEntry) => Ok(()),
         Err(err) => Err(format!("credential store delete failed: {err}")),

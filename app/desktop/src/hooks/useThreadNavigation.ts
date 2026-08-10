@@ -4,7 +4,7 @@ import type { TFunction } from 'i18next';
 import { createThread } from '@/api/edgeClient';
 import type { ThreadInfo } from '@shared/types';
 import type { ChatMessage } from '@shared/types/chat';
-import type { AddToastInput } from '@/stores/toastStore';
+import type { AddToastInput } from '@shared/ui/toast';
 import { useSearchStore } from '@/stores/searchStore';
 import { buildForkDraft } from '@/utils/messageActions';
 import { focusComposer } from '@/utils/appUtils';
