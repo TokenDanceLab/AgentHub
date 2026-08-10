@@ -1,0 +1,16 @@
+-- 0066_agent_team_runs_token_usage.up.sql
+-- P1 budget guard fast path: add a maintained token_usage_total counter column
+-- to agent_team_runs so teamRunBudgetExceededDB can short-circuit the budget
+-- check in O(1) when the counter is non-NULL, instead of scanning every
+-- assignment + task + run event for the team run on every route decision
+-- (route_decision.go calls teamRunBudgetExceededDB inside the per-run row
+-- lock — the full event scan there is a hot-path regression under load).
+--
+-- The column is nullable so the migration is backward-compatible: existing
+-- runs keep NULL until the edge callback stream path increments them, and
+-- the guard falls back to the existing event-scan projection when the counter
+-- is NULL. A separate backfill command (skeleton in repository layer) can
+-- populate the column from the existing event projection for historical
+-- runs; until backfilled the guard takes max(column, projection) so a NULL
+-- or stale counter never under-reports usage.
+ALTER TABLE agent_team_runs ADD COLUMN token_usage_total BIGINT NULL;
