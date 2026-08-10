@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth, getAccessToken } from '@/hooks/useAuth';
 import { useHubStore } from '@/stores/hubStore';
-import { useToastStore } from '@/stores/toastStore';
+import { useToastStore } from '@shared/ui/toast';
 import { hubQueryKeys } from '@shared/stores/queryKeys';
 
 /**
