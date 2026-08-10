@@ -20,14 +20,23 @@
 // key depends on the provider config. The provider keys (OPENAI_API_KEY /
 // ANTHROPIC_API_KEY / OPENROUTER_API_KEY / GEMINI_API_KEY) are filtered out
 // of the child env by the executor's sanitizer (env_sanitizer.go), so
-// BuildCommand injects them explicitly — the same passthrough pattern the
-// legacy OpenCodeAdapter uses (opencode.go NewOpenCodeAdapter).
+// BuildCommand injects them explicitly. Keys are read live from the parent
+// env on each BuildCommand call via the shared AcpAdapter.BuildCommand +
+// acpEnvPassthrough (not snapshotted at construction), so a key rotated after
+// registration still flows to the spawned process.
+//
+// Wrapper shape: this adapter inherits BuildCommand, Metadata, Capabilities,
+// Available, ParseStream, NeedsStdin, and SetPermissionBroker from the
+// embedded AcpAdapter (#1404 wave 2 collapse). BuildCommand reads envKeys
+// live from the parent env on the embedded AcpAdapter (no per-wrapper env
+// field). The PreflightCheck override is retained because the read-only
+// TestOpenCodeACPAdapterPreflightFailsFast constructs a raw wrapper without
+// the inherited launcherLabel config and still expects the launcher-missing
+// failure; the override guarantees that behavior regardless of construction
+// path.
 package adapters
 
-import (
-	"fmt"
-	"os"
-)
+import "fmt"
 
 // opencodeACPAdapterID is the registry identifier of the native opencode ACP
 // configuration.
@@ -44,16 +53,12 @@ const opencodeACPDefaultBinary = "opencode"
 
 // OpenCodeACPAdapter runs the native `opencode acp` ACP agent.
 //
-// It embeds AcpAdapter (protocol handling, permission broker, capabilities)
-// and overrides only the command surface: BuildCommand spawns
-// `<binary> acp` with the OpenCode provider-key passthrough, and Metadata()
-// surfaces the version pin. Everything else — ParseStream via runACPSession,
-// NeedsStdin, Available, SetPermissionBroker — is inherited.
+// It embeds AcpAdapter and inherits BuildCommand/Metadata/Capabilities/
+// ParseStream/NeedsStdin/Available/SetPermissionBroker from it; this wrapper
+// only supplies the opencode-acp configuration via NewAcpAdapterConfig plus a
+// PreflightCheck override (see file doc for why the override is retained).
 type OpenCodeACPAdapter struct {
 	*AcpAdapter
-
-	// env carries the provider-key passthrough injected in BuildCommand.
-	env []string
 }
 
 // NewOpenCodeACPAdapter creates the opencode-acp adapter configuration.
@@ -66,56 +71,31 @@ func NewOpenCodeACPAdapter(binaryPath string) *OpenCodeACPAdapter {
 	if binaryPath == "" {
 		binaryPath = opencodeACPDefaultBinary
 	}
-	inner := NewAcpAdapterWithID(
-		opencodeACPAdapterID,
-		binaryPath,
-		[]string{"acp"},
-		"OpenCode (ACP)",
-	)
-	return &OpenCodeACPAdapter{
-		AcpAdapter: inner,
-		env:        opencodeEnvPassthrough(),
-	}
-}
-
-// opencodeEnvPassthrough captures the provider keys OpenCode can use from
-// the parent environment so BuildCommand can inject them into the child (the
-// env sanitizer strips them from the inherited env).
-func opencodeEnvPassthrough() []string {
-	var env []string
-	for _, key := range []string{
-		"OPENAI_API_KEY",
-		"ANTHROPIC_API_KEY",
-		"OPENROUTER_API_KEY",
-		"GEMINI_API_KEY",
-	} {
-		if val := os.Getenv(key); val != "" {
-			env = append(env, key+"="+val)
-		}
-	}
-	return env
-}
-
-// Metadata returns the adapter identification with the pinned opencode
-// version surfaced for operations.
-func (a *OpenCodeACPAdapter) Metadata() AdapterMetadata {
-	m := a.AcpAdapter.Metadata()
-	m.Version = "opencode-acp " + opencodeACPVersionPin + " (binary)"
-	return m
-}
-
-// BuildCommand returns the opencode binary command with the static ACP arg,
-// plus the provider-key passthrough. The ACP prompt is NOT part of argv — it
-// travels over the stdio protocol (session/prompt).
-func (a *OpenCodeACPAdapter) BuildCommand(ctx RunProcessContext) (cmdPath string, args []string, env []string, workDir string) {
-	cmdPath, args, _, workDir = a.AcpAdapter.BuildCommand(ctx)
-	return cmdPath, args, a.env, workDir
+	return &OpenCodeACPAdapter{AcpAdapter: NewAcpAdapterConfig(AcpAdapterConfig{
+		ID:           opencodeACPAdapterID,
+		Binary:       binaryPath,
+		Args:         []string{"acp"},
+		DisplayName:  "OpenCode (ACP)",
+		VersionLabel: "opencode-acp " + opencodeACPVersionPin + " (binary)",
+		EnvKeys: []string{
+			"OPENAI_API_KEY",
+			"ANTHROPIC_API_KEY",
+			"OPENROUTER_API_KEY",
+			"GEMINI_API_KEY",
+		},
+		LauncherLabel: "opencode-acp",
+		InstallHint:   "install opencode >= " + opencodeACPVersionPin,
+	})}
 }
 
 // PreflightCheck fails fast when the opencode binary is not resolvable,
-// before the executor spawns the process. (Authentication — provider API
-// keys or opencode auth login — is left to the opencode process itself,
-// mirroring the legacy opencode CLI behavior.)
+// before the executor spawns the process. Retained as an override (rather
+// than inherited from AcpAdapter.PreflightCheck) because the read-only
+// TestOpenCodeACPAdapterPreflightFailsFast constructs a raw wrapper without
+// the inherited launcherLabel config and still expects the launcher-missing
+// failure; this override guarantees that behavior regardless of how the
+// wrapper was constructed. Authentication — provider API keys or opencode
+// auth login — is left to the opencode process itself.
 func (a *OpenCodeACPAdapter) PreflightCheck() error {
 	if !a.Available() {
 		return fmt.Errorf("opencode-acp launcher %q not found on PATH (install opencode >= %s)", a.agentBinary, opencodeACPVersionPin)

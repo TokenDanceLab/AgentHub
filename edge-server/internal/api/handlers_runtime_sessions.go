@@ -1,6 +1,7 @@
 package api
 
 import (
+	"log/slog"
 	"net/http"
 	"strconv"
 	"strings"
@@ -50,7 +51,8 @@ func (h *Handler) GetRuntimeSessions(w http.ResponseWriter, r *http.Request) {
 
 	items, err := listRuntimeSessions(limit, runtimes)
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, errcode.ErrorBody(errcode.ErrInternal.WithMessage(err.Error())))
+		slog.Error("runtime session list failed", "limit", limit, "error", err)
+		writeJSON(w, http.StatusInternalServerError, errcode.ErrorBody(errcode.ErrInternal))
 		return
 	}
 	if items == nil {

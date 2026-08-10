@@ -151,7 +151,8 @@ func (h *Handler) GetMemory(w http.ResponseWriter, r *http.Request) {
 	agentID := r.URL.Query().Get("agentId")
 
 	if err := h.validateWorkDirAllowed(workDir); err != nil {
-		writeJSON(w, http.StatusForbidden, errcode.ErrorBody(errcode.ErrWorkspaceNotAllowed.WithMessage(err.Error())))
+		slog.Error("workdir not allowed", "workDir", workDir, "error", err)
+		writeJSON(w, http.StatusForbidden, errcode.ErrorBody(errcode.ErrWorkspaceNotAllowed))
 		return
 	}
 
@@ -183,7 +184,8 @@ func (h *Handler) PostMemory(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := h.validateWorkDirAllowed(req.WorkDir); err != nil {
-		writeJSON(w, http.StatusForbidden, errcode.ErrorBody(errcode.ErrWorkspaceNotAllowed.WithMessage(err.Error())))
+		slog.Error("workdir not allowed", "workDir", req.WorkDir, "error", err)
+		writeJSON(w, http.StatusForbidden, errcode.ErrorBody(errcode.ErrWorkspaceNotAllowed))
 		return
 	}
 	if req.ID == "" {
@@ -203,7 +205,8 @@ func (h *Handler) PostMemory(w http.ResponseWriter, r *http.Request) {
 		Overwrite: req.Overwrite,
 	})
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, errcode.ErrorBody(errcode.ErrInternal.WithMessage(err.Error())))
+		slog.Error("memory write failed", "workDir", req.WorkDir, "threadId", req.ThreadID, "error", err)
+		writeJSON(w, http.StatusInternalServerError, errcode.ErrorBody(errcode.ErrInternal))
 		return
 	}
 	writeSuccess(w, http.StatusCreated, entry)

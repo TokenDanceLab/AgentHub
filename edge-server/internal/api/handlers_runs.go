@@ -197,10 +197,12 @@ func (h *Handler) validateRunCreateState(repository store.Repository, req *runRe
 		if errors.Is(err, errcode.ErrWorkDirRequired) {
 			return http.StatusBadRequest, errcode.ErrorBody(errcode.ErrWorkDirRequired)
 		}
-		return http.StatusForbidden, errcode.ErrorBody(errcode.ErrWorkspaceNotAllowed.WithMessage(err.Error()))
+		slog.Error("run workdir validation failed", "workDir", req.WorkDir, "error", err)
+		return http.StatusForbidden, errcode.ErrorBody(errcode.ErrWorkspaceNotAllowed)
 	}
 	if err := validatePermissionMode(req.PermissionMode); err != nil {
-		return http.StatusBadRequest, errcode.ErrorBody(errcode.ErrInvalidPermissionMode.WithMessage(err.Error()))
+		slog.Error("invalid permission mode", "permissionMode", req.PermissionMode, "error", err)
+		return http.StatusBadRequest, errcode.ErrorBody(errcode.ErrInvalidPermissionMode)
 	}
 	if active, ok := activeRunForThread(repository.ListRuns(req.ThreadID)); ok {
 		return http.StatusConflict, activeRunExistsResponse(active)
@@ -319,11 +321,12 @@ func (h *Handler) startRunExecutor(run store.Run, req *runRequest, scope map[str
 		runCtx.MCPConfig = adapters.MergeConfigJSON(runCtx.MCPConfig, h.MCPConfigStore)
 	}
 	if err := h.Executor.Start(run, runCtx); err != nil {
+		slog.Error("run executor start failed", "runId", run.ID, "error", err)
 		if failed, ok := ensureStore(h).SetRunStatusIf(run.ID, "failed", "queued"); ok {
 			h.Bus.Publish("run.failed", scope, map[string]any{
 				"runId":  failed.ID,
 				"status": failed.Status,
-				"error":  err.Error(),
+				"error":  "run execution failed",
 			})
 		}
 		return err
@@ -421,10 +424,12 @@ func (h *Handler) PostRuns(w http.ResponseWriter, r *http.Request) {
 
 	if err := h.startRunExecutor(run, &req, scope); err != nil {
 		if errors.Is(err, lifecycle.ErrTooManyConcurrentRuns) {
-			writeJSON(w, http.StatusTooManyRequests, errcode.ErrorBody(errcode.ErrTooManyConcurrentRuns.WithMessage(err.Error())))
+			slog.Error("too many concurrent runs", "runId", runID, "error", err)
+			writeJSON(w, http.StatusTooManyRequests, errcode.ErrorBody(errcode.ErrTooManyConcurrentRuns))
 			return
 		}
-		writeJSON(w, http.StatusInternalServerError, errcode.ErrorBody(errcode.ErrExecutorStartFailed.WithMessagef("failed to start run executor: %v", err)))
+		slog.Error("run executor start failed", "runId", runID, "error", err)
+		writeJSON(w, http.StatusInternalServerError, errcode.ErrorBody(errcode.ErrExecutorStartFailed))
 		return
 	}
 	writeSuccess(w, http.StatusAccepted, acceptedResponse(runToResponse(run)))

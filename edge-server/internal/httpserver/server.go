@@ -32,6 +32,7 @@ import (
 	"github.com/agenthub/edge-server/internal/store"
 	debugpkg "github.com/agenthub/pkg/debug"
 	"github.com/agenthub/pkg/reqlog"
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 // HubUserIDFromContext extracts the Hub-authenticated user ID from context.
@@ -146,9 +147,20 @@ func Run(cfg Config) error {
 	mux.Handle("/mcp", mcpServer)
 	slog.Info("mcp server endpoint registered at /mcp")
 
+	// Wrap the whole middleware chain with panic recovery as the OUTERMOST
+	// layer so a panic in any handler or middleware is recovered instead of
+	// crashing the Edge process. net/http does not install a default recover
+	// for connected-request handlers. The counter feeds
+	// edge_http_panic_recoveries_total.
+	var panicCounter prometheus.Counter
+	if handler.Metrics != nil {
+		panicCounter = handler.Metrics.EdgeHTTPPanicRecoveries
+	}
+	chain := reqlog.AccessLog(corsMiddleware(restTimeoutMiddleware(localAuthMiddleware(mux, cfg.LocalAuthToken, cfg.HubJWTSecret, cfg.EdgeDeviceID), defaultRESTRequestTimeout), cfg.RemoteMode, cfg.AllowedOrigins))
+
 	srv := &http.Server{
 		Addr:    cfg.Addr,
-		Handler: reqlog.AccessLog(corsMiddleware(restTimeoutMiddleware(localAuthMiddleware(mux, cfg.LocalAuthToken, cfg.HubJWTSecret, cfg.EdgeDeviceID), defaultRESTRequestTimeout), cfg.RemoteMode, cfg.AllowedOrigins)),
+		Handler: recoveryHTTPHandler(chain, panicCounter),
 		// WriteTimeout=0: WebSocket connections are long-lived and manage their
 		// own deadlines. REST requests are guarded by restTimeoutMiddleware.
 		ReadTimeout:  15 * time.Second,
@@ -173,6 +185,14 @@ func Run(cfg Config) error {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
+
+	// Cancel in-flight agent runs BEFORE srv.Shutdown so child processes are
+	// terminated while we still have time budget. Without this, a Hub stop /
+	// SIGINT leaves spawned agent processes orphaned (notably on Windows,
+	// where CREATE_NEW_PROCESS_GROUP children are not killed by parent exit).
+	if pe, ok := handler.Executor.(*lifecycle.ProcessExecutor); ok && pe != nil {
+		pe.CancelAll(ctx)
+	}
 
 	if err := srv.Shutdown(ctx); err != nil {
 		return err
@@ -364,7 +384,14 @@ func newHandlerFromConfig(cfg Config) (*api.Handler, error) {
 
 	// Result aggregator collects sub-agent output and routes it back to the parent orchestrator.
 	resultAgg := lifecycle.NewResultAggregator(bus, agentReg)
-	_ = resultAgg.Start() // stop function; goroutine exits on process shutdown
+	resultAggStop := resultAgg.Start()
+	// Wire the aggregator's stop function into shutdown hooks so its goroutine
+	// exits cleanly instead of being orphaned on process exit (#988 shutdown gap).
+	cfg.ShutdownHooks = append(cfg.ShutdownHooks, func() {
+		if resultAggStop != nil {
+			resultAggStop()
+		}
+	})
 
 	// Per-run event counter: tracks event counts per run and debugs at
 	// completion time (see wireRunEventTracker).

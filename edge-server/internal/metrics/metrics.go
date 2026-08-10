@@ -7,6 +7,7 @@ import (
 	"net/http"
 
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/collectors"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
@@ -24,6 +25,31 @@ type EdgeMetrics struct {
 	EdgeEventBusDepth      prometheus.GaugeFunc
 	EdgeEventBusDropped    prometheus.CounterFunc
 
+	// EdgeEventPersistFailures counts events that exhausted all persist retry
+	// attempts in the event bus and were dropped (edge_event_persist_failures_total).
+	// Exposed as a CounterFunc so the events package owns the actual atomic
+	// counter and the metrics package stays a read-only view, mirroring the
+	// EdgeEventBusDropped wiring.
+	EdgeEventPersistFailures prometheus.CounterFunc
+
+	// EdgeEventLogTruncations counts event-log truncation attempts
+	// (edge_event_log_truncations_total). Backed by Bus.EventLogTruncations.
+	EdgeEventLogTruncations prometheus.CounterFunc
+	// EdgeEventLogTruncateFailures counts event-log truncation attempts that
+	// hit an error branch (edge_event_log_truncate_failures_total). Backed by
+	// Bus.EventLogTruncateFailures. Previously these failures were silent.
+	EdgeEventLogTruncateFailures prometheus.CounterFunc
+	// EdgeEventLogGaps counts replay/fanout gap events detected
+	// (edge_event_log_gaps_total): cursor predating the log or subscriber
+	// channel full. Backed by Bus.EventLogGaps.
+	EdgeEventLogGaps prometheus.CounterFunc
+
+	// EdgeHTTPPanicRecoveries counts panics recovered by the Edge HTTP
+	// recoveryHTTPHandler wrapping the mux. A non-zero rate signals a handler
+	// bug that would otherwise crash the process (the net/http server does
+	// not install a default recover for connected-request handlers).
+	EdgeHTTPPanicRecoveries prometheus.Counter
+
 	// Outbound is the unified outbound HTTP metrics contract (#1595):
 	// outbound_requests_total / outbound_request_duration_seconds with
 	// provider/purpose/category/status labels, shared with the Hub server.
@@ -39,6 +65,34 @@ func New(busDepthFn func() float64) *EdgeMetrics {
 
 // NewWithBusStats creates metrics with optional event bus callbacks.
 func NewWithBusStats(busDepthFn func() float64, busDroppedFn func() float64) *EdgeMetrics {
+	return newWithHooks(busDepthFn, busDroppedFn, nil, nil, nil, nil)
+}
+
+// NewWithPersistFailures creates metrics with optional event bus callbacks
+// plus a persist-failures callback that backs edge_event_persist_failures_total.
+// persistFailuresFn may be nil, in which case the metric is skipped (the events
+// package still counts internally and exposes the value via Bus.PersistFailures).
+func NewWithPersistFailures(busDepthFn, busDroppedFn, persistFailuresFn func() float64) *EdgeMetrics {
+	return newWithHooks(busDepthFn, busDroppedFn, persistFailuresFn, nil, nil, nil)
+}
+
+// NewWithEventLogStats creates metrics with optional event bus callbacks plus
+// event-log truncation/failure/gap callbacks that back
+// edge_event_log_truncations_total / edge_event_log_truncate_failures_total /
+// edge_event_log_gaps_total. Any nil callback skips the corresponding metric;
+// the events package still counts internally and exposes the values via
+// Bus.EventLogTruncations / EventLogTruncateFailures / EventLogGaps.
+func NewWithEventLogStats(
+	busDepthFn, busDroppedFn, persistFailuresFn func() float64,
+	truncationsFn, truncateFailuresFn, gapsFn func() float64,
+) *EdgeMetrics {
+	return newWithHooks(busDepthFn, busDroppedFn, persistFailuresFn, truncationsFn, truncateFailuresFn, gapsFn)
+}
+
+func newWithHooks(
+	busDepthFn, busDroppedFn, persistFailuresFn,
+	truncationsFn, truncateFailuresFn, gapsFn func() float64,
+) *EdgeMetrics {
 	reg := prometheus.NewRegistry()
 	factory := promauto.With(reg)
 
@@ -77,8 +131,49 @@ func NewWithBusStats(busDepthFn func() float64, busDroppedFn func() float64) *Ed
 		}, busDroppedFn)
 	}
 
+	if persistFailuresFn != nil {
+		m.EdgeEventPersistFailures = factory.NewCounterFunc(prometheus.CounterOpts{
+			Name: "edge_event_persist_failures_total",
+			Help: "Total number of event bus events dropped after exhausting all persist retry attempts.",
+		}, persistFailuresFn)
+	}
+
+	if truncationsFn != nil {
+		m.EdgeEventLogTruncations = factory.NewCounterFunc(prometheus.CounterOpts{
+			Name: "edge_event_log_truncations_total",
+			Help: "Total number of event log truncation attempts (log exceeded maxSize).",
+		}, truncationsFn)
+	}
+	if truncateFailuresFn != nil {
+		m.EdgeEventLogTruncateFailures = factory.NewCounterFunc(prometheus.CounterOpts{
+			Name: "edge_event_log_truncate_failures_total",
+			Help: "Total number of event log truncation attempts that hit an error branch (seek/read/truncate/rewrite failure).",
+		}, truncateFailuresFn)
+	}
+	if gapsFn != nil {
+		m.EdgeEventLogGaps = factory.NewCounterFunc(prometheus.CounterOpts{
+			Name: "edge_event_log_gaps_total",
+			Help: "Total number of event log replay/fanout gaps detected (cursor predating the log or subscriber channel full).",
+		}, gapsFn)
+	}
+
 	// Unified outbound metrics contract (#1595) on the isolated registry.
 	m.Outbound = outboundmetrics.NewRecorder(reg)
+
+	// edge_http_panic_recoveries_total: panics recovered by the Edge HTTP
+	// recoveryHTTPHandler. Mirrors the Hub http_panic_recoveries_total so
+	// operators can alert on either server with the same kind/threshold.
+	m.EdgeHTTPPanicRecoveries = factory.NewCounter(prometheus.CounterOpts{
+		Name: "edge_http_panic_recoveries_total",
+		Help: "Total number of Edge HTTP handler panics recovered by recoveryHTTPHandler.",
+	})
+
+	// Go runtime + process collectors on the isolated registry so the Edge
+	// /metrics endpoint exposes go_* and process_* alongside edge_* metrics.
+	// Previously only the Hub registered these on the default registry; the
+	// Edge served its isolated registry without them (#9 P2).
+	reg.MustRegister(collectors.NewGoCollector())
+	reg.MustRegister(collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}))
 
 	return m
 }

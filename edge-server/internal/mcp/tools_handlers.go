@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"strings"
 
 	"github.com/agenthub/edge-server/internal/adapters"
@@ -265,13 +266,14 @@ func (s *Server) toolStartRun(args json.RawMessage) (json.RawMessage, error) {
 	}
 
 	if err := s.executor.Start(run, runCtx); err != nil {
+		slog.Error("mcp run start failed", "runId", run.ID, "error", err)
 		// Mark run as failed
 		if failed, ok := s.store.SetRunStatusIf(run.ID, "failed", "queued"); ok {
 			if s.bus != nil {
 				s.bus.Publish("run.failed", scope, map[string]any{
 					"runId":  failed.ID,
 					"status": failed.Status,
-					"error":  err.Error(),
+					"error":  "run execution failed",
 				})
 			}
 		}

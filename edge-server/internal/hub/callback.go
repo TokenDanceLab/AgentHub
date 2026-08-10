@@ -24,15 +24,17 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"math/rand"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/agenthub/edge-server/internal/errcode"
 	"github.com/agenthub/pkg/outboundmetrics"
 	"github.com/agenthub/pkg/reqlog"
 
-	"github.com/agenthub/edge-server/internal/errcode"
+	"github.com/google/uuid"
 )
 
 // CallbackConfig is the explicit transport policy for the Edge→Hub callback
@@ -139,9 +141,15 @@ const (
 // callbackActionRetryable reports whether retrying a callback action is safe.
 // ack/done/fail are guarded by task-status transitions on the Hub side, so a
 // retried delivery either completes the transition or is rejected without
-// double-applying. stream chunks are content appends without a client_msg_id
-// in the payload — a retry could duplicate the chunk, so stream is
-// deliberately not retried (#1564).
+// double-applying. stream chunks carry a deterministic client_msg_id (UUIDv5
+// of runID+chunkIdx from fireHubStream, and UUIDv5 of runID+"reader:"+chunkIdx
+// from TaskStreamReader) so the Hub's #130 idempotent stream-to-message dedup
+// makes a retry safe to deliver; however stream is still deliberately not
+// retried (#1564) because the reader-driven path's per-call chunk index only
+// stays stable within a single reader pass — a retried whole-reader delivery
+// would re-emit the same client_msg_id sequence and the Hub would correctly
+// dedup, but the conservative choice is to keep stream non-retryable and let
+// the journal record the attempt for reconciliation.
 func callbackActionRetryable(action string) bool {
 	return action != "stream"
 }
@@ -274,25 +282,57 @@ func (c *CallbackClient) TaskAck(ctx context.Context, taskID string, runID strin
 	})
 }
 
-// TaskStream sends a streaming output chunk for an in-progress task.
-func (c *CallbackClient) TaskStream(ctx context.Context, taskID string, runID string, content string) error {
+// TaskStream sends a streaming output chunk for an in-progress task. The
+// clientMsgID is a deterministic UUIDv5 derived from (runID, chunkIdx) by
+// fireHubStream so the Hub can deduplicate replayed stream chunks (#130
+// idempotent stream-to-message). An empty clientMsgID is a no-op for dedup
+// (older callers that cannot derive one still work, they just lose replay
+// protection). The body carries client_msg_id alongside run_id and content.
+func (c *CallbackClient) TaskStream(ctx context.Context, taskID string, runID string, clientMsgID string, content string) error {
 	return c.callback(ctx, taskID, "stream", map[string]string{
-		"run_id":  runID,
-		"content": content,
+		"run_id":        runID,
+		"client_msg_id": clientMsgID,
+		"content":       content,
 	})
+}
+
+// readerStreamChunkClientMsgID derives a deterministic client_msg_id (UUIDv5)
+// for a reader-driven stream chunk. The name format runID + ":reader:" + idx
+// is deliberately distinct from the structured fireHubStream path
+// (runID + ":" + idx in lifecycle/process_executor_hub_callback.go) so a
+// reader-driven chunk and a structured chunk for the same run can never
+// collide on client_msg_id; the Hub's #130 idempotent stream-to-message dedup
+// therefore treats a re-delivered reader chunk as a duplicate of itself (same
+// runID + same reader chunkIdx ⇒ same UUIDv5) and skips it, instead of
+// accidentally deduping against an unrelated structured chunk. The idx is
+// scoped to a single TaskStreamReader pass: it starts at 1 for the first
+// non-empty chunk and increments for every subsequent non-empty chunk, so a
+// retry of the whole reader pass re-derives the same sequence and the Hub
+// dedups correctly.
+func readerStreamChunkClientMsgID(runID string, readerChunkIdx int64) string {
+	return uuid.NewSHA1(uuid.NameSpaceOID, []byte(runID+":reader:"+strconv.FormatInt(readerChunkIdx, 10))).String()
 }
 
 // TaskStreamReader sends streaming output from an io.Reader for an in-progress task.
 // It reads and sends chunks of the reader's content, each as a separate stream callback.
 // The reader is consumed fully; errors reading the reader are logged but do not fail the callback.
+// Each non-empty chunk carries a deterministic client_msg_id derived as
+// UUIDv5(runID + ":reader:" + readerChunkIdx) so a re-delivered chunk for the
+// same run + position produces the same id and the Hub's #130 idempotent
+// stream-to-message dedup can skip the duplicate. The readerChunkIdx is
+// per-call (single sequential pass through the reader), starting at 1; a whole
+// reader retry re-derives the same sequence so dedup is safe.
 func (c *CallbackClient) TaskStreamReader(ctx context.Context, taskID string, runID string, output io.Reader) error {
 	buf := make([]byte, 32*1024)
+	var readerChunkIdx int64
 	for {
 		n, err := output.Read(buf)
 		if n > 0 {
 			chunk := string(buf[:n])
-			if streamErr := c.TaskStream(ctx, taskID, runID, chunk); streamErr != nil {
-				slog.Warn("hub callback stream chunk failed", "taskId", taskID, "runId", runID, "error", streamErr)
+			readerChunkIdx++
+			clientMsgID := readerStreamChunkClientMsgID(runID, readerChunkIdx)
+			if streamErr := c.TaskStream(ctx, taskID, runID, clientMsgID, chunk); streamErr != nil {
+				slog.Warn("hub callback stream chunk failed", "taskId", taskID, "runId", runID, "readerChunkIdx", readerChunkIdx, "clientMsgId", clientMsgID, "error", streamErr)
 				// Continue despite errors — best-effort streaming
 			}
 		}
@@ -403,13 +443,35 @@ func (c *CallbackClient) callback(ctx context.Context, taskID string, action str
 
 // retryDelay computes the backoff for the given attempt, preferring a server
 // Retry-After delay when the server supplied one (bounded by the budget check
-// in the caller).
+// in the caller). When using the local exponential backoff, ±25% jitter is
+// applied so that a fleet of Edge instances retrying after a Hub-wide outage
+// do not thunder the Hub simultaneously on recovery.
 func (c *CallbackClient) retryDelay(attempt int, lastRetryAfter time.Duration) time.Duration {
 	backoff := c.cfg.RetryBaseDelay << uint(attempt-1) // 1s, 2s, 4s, ...
 	if lastRetryAfter > backoff {
 		return lastRetryAfter
 	}
-	return backoff
+	return applyCallbackJitter(backoff)
+}
+
+// callbackJitterFraction is the symmetric jitter fraction (±25%) applied to
+// callback backoff, matching the delivery outbox retry jitter envelope.
+const callbackJitterFraction = 0.25
+
+// applyCallbackJitter applies a symmetric ±25% jitter to delay. A zero/negative
+// delay is returned unchanged. #nosec G404 -- backoff jitter only; randomness
+// is not security-sensitive.
+func applyCallbackJitter(delay time.Duration) time.Duration {
+	if delay <= 0 {
+		return delay
+	}
+	jitter := int64(float64(delay) * callbackJitterFraction)
+	if jitter <= 0 {
+		return delay
+	}
+	// rand.Int63n(2*jitter+1) ∈ [0, 2*jitter]; shift to [-jitter, +jitter].
+	delta := rand.Int63n(2*jitter+1) - jitter
+	return delay + time.Duration(delta)
 }
 
 // doAttempt performs one callback POST and classifies the outcome. It returns

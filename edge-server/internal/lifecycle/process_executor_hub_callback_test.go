@@ -33,7 +33,7 @@ func (c *recordingHubCallback) TaskAck(_ context.Context, taskID string, runID s
 	return nil
 }
 
-func (c *recordingHubCallback) TaskStream(_ context.Context, _ string, _ string, content string) error {
+func (c *recordingHubCallback) TaskStream(_ context.Context, _ string, _ string, _ string, content string) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.streams = append(c.streams, content)
@@ -188,7 +188,7 @@ func (c *blockingHubCallback) TaskAck(context.Context, string, string) error {
 	return nil
 }
 
-func (c *blockingHubCallback) TaskStream(context.Context, string, string, string) error {
+func (c *blockingHubCallback) TaskStream(context.Context, string, string, string, string) error {
 	c.track()
 	defer c.untrack()
 	select {
