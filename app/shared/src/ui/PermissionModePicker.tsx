@@ -45,8 +45,27 @@ export function PermissionModePicker({
 }: PermissionModePickerProps) {
   const [open, setOpen] = useState(false);
   const [pos, setPos] = useState({ top: 0, left: 0, width: 0, up: false });
+  const [focusIdx, setFocusIdx] = useState(0);
+  const wasOpenRef = useRef(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
+
+  const focusOption = useCallback((idx: number) => {
+    const option = popoverRef.current?.querySelectorAll<HTMLButtonElement>('button')[idx];
+    option?.focus();
+  }, []);
+
+  // Move focus into the popover (first option) when it opens, and restore
+  // focus to the trigger when it closes.
+  useEffect(() => {
+    if (open) {
+      setFocusIdx(0);
+      focusOption(0);
+    } else if (wasOpenRef.current) {
+      triggerRef.current?.focus();
+    }
+    wasOpenRef.current = open;
+  }, [open, focusOption]);
 
   const updatePosition = useCallback(() => {
     const trigger = triggerRef.current;
@@ -98,10 +117,53 @@ export function PermissionModePicker({
   const cx = (...classes: Array<string | false | null | undefined>): string =>
     classes.filter(Boolean).join(' ');
 
+  const handlePopoverKeyDown = useCallback(
+    (event: React.KeyboardEvent) => {
+      switch (event.key) {
+        case 'ArrowDown':
+          event.preventDefault();
+          setFocusIdx((i) => {
+            const next = (i + 1) % options.length;
+            focusOption(next);
+            return next;
+          });
+          break;
+        case 'ArrowUp':
+          event.preventDefault();
+          setFocusIdx((i) => {
+            const next = (i - 1 + options.length) % options.length;
+            focusOption(next);
+            return next;
+          });
+          break;
+        case 'Home':
+          event.preventDefault();
+          setFocusIdx(0);
+          focusOption(0);
+          break;
+        case 'End':
+          event.preventDefault();
+          setFocusIdx(options.length - 1);
+          focusOption(options.length - 1);
+          break;
+        case 'Enter':
+        case ' ':
+          event.preventDefault();
+          if (options[focusIdx]) {
+            onChange(options[focusIdx].value);
+            setOpen(false);
+          }
+          break;
+      }
+    },
+    [focusIdx, options, onChange, focusOption],
+  );
+
   const popover = open && createPortal(
     <div
       ref={popoverRef}
       className={cx(styles.popover, pos.up ? styles.popoverUp : undefined, popoverClassName)}
+      onKeyDown={handlePopoverKeyDown}
       style={{
         position: 'fixed',
         zIndex: 9999,
@@ -144,6 +206,7 @@ export function PermissionModePicker({
         disabled={disabled}
         aria-label={ariaLabel}
         aria-expanded={open}
+        aria-haspopup="menu"
         onClick={() => open ? setOpen(false) : openPicker()}
       >
         <ShieldCheck size={14} />

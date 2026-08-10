@@ -1,97 +1,13 @@
-import React, { memo, useState, type HTMLAttributes } from 'react';
+import React, { memo, type HTMLAttributes } from 'react';
 import Markdown from 'react-markdown';
 import type { Components } from 'react-markdown';
 import remarkCjkFriendly from 'remark-cjk-friendly/parseOnly';
 import remarkGfm from 'remark-gfm';
 import remarkCjkAutolink from './cjkRemarkPlugin';
 import rehypeSlug from 'rehype-slug';
-import { PrismLight as SyntaxHighlighter } from 'react-syntax-highlighter';
-import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
-import { Check, Copy, Link2 } from 'lucide-react';
-import './prismRegistry'; // registers all languages on shared refractor instance
-import { useCopiedFlag } from './useCopiedFlag';
+import { Link2 } from 'lucide-react';
+import { CodeBlock } from './CodeBlock';
 import styles from './Markdown.module.css';
-
-/** Collapsed blocks are clipped to 400px height (see .codeBodyCollapsed in Markdown.module.css). */
-const CODE_COLLAPSE_LINE_THRESHOLD = 20;
-
-// ── CodeBlock component ───────────────────────────
-function CodeBlock({
-  className,
-  children,
-  ...rest
-}: {
-  className?: string | undefined;
-  children?: React.ReactNode;
-}) {
-  const match = /language-(\S+)/.exec(className ?? '');
-  const language = match ? match[1] : '';
-  const rawCode = String(children ?? '');
-
-  // CommonMark block code nodes end with a newline. Inline code spans do not,
-  // even when their source crosses a line or their rendered text wraps.
-  if (!language && !rawCode.endsWith('\n')) {
-    return (
-      <code className={styles.inlineCode} {...rest}>
-        {children}
-      </code>
-    );
-  }
-
-  const code = rawCode.replace(/\n$/, '');
-  const isLong = code.split('\n').length > CODE_COLLAPSE_LINE_THRESHOLD;
-  const [collapsed, setCollapsed] = useState(isLong);
-  const [copied, markCopied] = useCopiedFlag();
-
-  const handleCopy = () => {
-    if (!navigator.clipboard) return;
-    navigator.clipboard.writeText(code).then(markCopied).catch(() => {
-      /* clipboard may be denied — keep silent, no feedback flip */
-    });
-  };
-
-  return (
-    <div className={styles.codeBlockWrapper}>
-      <div className={styles.codeBlockHeader}>
-        {language && <span className={styles.codeLang}>{language}</span>}
-        <button
-          type="button"
-          className={`${styles.codeCopyBtn}${copied ? ' ' + styles.copied : ''}`}
-          onClick={handleCopy}
-          aria-label={copied ? '已复制' : '复制'}
-        >
-          {copied ? <Check size={12} /> : <Copy size={12} />}
-          {copied ? '已复制' : '复制'}
-        </button>
-      </div>
-      <div className={collapsed ? styles.codeBodyCollapsed : undefined}>
-        <SyntaxHighlighter
-          style={oneDark}
-          language={language || 'text'}
-          PreTag="div"
-          customStyle={{
-            margin: 0,
-            borderRadius: '0 0 4px 4px',
-            fontSize: 12,
-            lineHeight: 1.5,
-          }}
-          {...rest}
-        >
-          {code}
-        </SyntaxHighlighter>
-      </div>
-      {isLong && (
-        <button
-          type="button"
-          className={styles.codeToggle}
-          onClick={() => setCollapsed((c) => !c)}
-        >
-          {collapsed ? '展开' : '收起'}
-        </button>
-      )}
-    </div>
-  );
-}
 
 // ── Heading anchor links (#1506) ──────────────────
 // `rehype-slug` assigns each h1-h6 a stable `id` (GitHub-style slug; keeps

@@ -12,6 +12,8 @@
 // Pure consumer of existing WS frames — no protocol change.
 
 import React, { useCallback, useMemo, useState, useSyncExternalStore } from 'react';
+import { useTranslation } from 'react-i18next';
+import { CHATVIEW_I18N_NAMESPACE } from '../../chatview/i18n/resources';
 import {
   getMessageDelegationStore,
   type DelegationEntry,
@@ -25,7 +27,7 @@ import styles from './InlineDelegationCard.module.css';
 // ── Status presentation ─────────────────────────────────────────────────────
 
 interface StatusPresentation {
-  label: string;
+  labelKey: string;
   icon: string;
   colorClass: string;
 }
@@ -33,15 +35,15 @@ interface StatusPresentation {
 function statusPresentation(status: DelegationStatus): StatusPresentation {
   switch (status) {
     case 'dispatching':
-      return { label: '派单中…', icon: 'send', colorClass: styles.colorBlue! };
+      return { labelKey: 'inlineDelegation.status.dispatching', icon: 'send', colorClass: styles.colorBlue! };
     case 'streaming':
-      return { label: '执行中…', icon: 'bolt', colorClass: styles.colorPurple! };
+      return { labelKey: 'inlineDelegation.status.streaming', icon: 'bolt', colorClass: styles.colorPurple! };
     case 'done':
-      return { label: '完成 ✓', icon: 'check_circle', colorClass: styles.colorGreen! };
+      return { labelKey: 'inlineDelegation.status.done', icon: 'check_circle', colorClass: styles.colorGreen! };
     case 'failed':
-      return { label: '失败 ✗', icon: 'error', colorClass: styles.colorRed! };
+      return { labelKey: 'inlineDelegation.status.failed', icon: 'error', colorClass: styles.colorRed! };
     case 'cancelled':
-      return { label: '已取消', icon: 'cancel', colorClass: styles.colorGray! };
+      return { labelKey: 'inlineDelegation.status.cancelled', icon: 'cancel', colorClass: styles.colorGray! };
   }
 }
 
@@ -78,10 +80,12 @@ interface DelegationCardProps {
 }
 
 function DelegationCard({ entry }: DelegationCardProps): React.ReactElement {
+  const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE);
   const [expanded, setExpanded] = useState(false);
   const active = isActiveStatus(entry.status);
   const presentation = statusPresentation(entry.status);
   const avatarLetter = (entry.displayName[0] ?? '?').toUpperCase();
+  const statusLabel = t(presentation.labelKey);
 
   const toggle = useCallback(() => setExpanded((v) => !v), []);
 
@@ -103,7 +107,7 @@ function DelegationCard({ entry }: DelegationCardProps): React.ReactElement {
         className={styles.cardHeader}
         onClick={toggle}
         aria-expanded={expanded}
-        aria-label={`${entry.displayName}: ${presentation.label}`}
+        aria-label={`${entry.displayName}: ${statusLabel}`}
       >
         <span className={`${styles.avatar} ${active ? styles.avatarPulse : ''}`}>
           {avatarLetter}
@@ -116,7 +120,7 @@ function DelegationCard({ entry }: DelegationCardProps): React.ReactElement {
               size={14}
               {...(styles.statusIcon !== undefined ? { className: styles.statusIcon } : {})}
             />
-            {presentation.label}
+            {statusLabel}
           </span>
         </span>
         <Icon name={expanded ? 'expand_less' : 'expand_more'} size={16} />
@@ -133,7 +137,7 @@ function DelegationCard({ entry }: DelegationCardProps): React.ReactElement {
                 size={14}
                 {...(styles.detailHintIcon !== undefined ? { className: styles.detailHintIcon } : {})}
               />
-              <span>暂无详细事件流</span>
+              <span>{t('inlineDelegation.emptyDetail')}</span>
             </div>
           )}
         </div>
@@ -166,11 +170,12 @@ export interface InlineDelegationCardProps {
 export function InlineDelegationCard({
   messageId,
 }: InlineDelegationCardProps): React.ReactElement | null {
+  const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE);
   const entries = useDelegationsByMessage(messageId);
   if (entries.length === 0) return null;
 
   return (
-    <div className={styles.stack} role="region" aria-label="委派状态" aria-live="polite">
+    <div className={styles.stack} role="region" aria-label={t('inlineDelegation.ariaStack')} aria-live="polite">
       {entries.map((entry) => (
         <DelegationCard key={entry.taskId} entry={entry} />
       ))}

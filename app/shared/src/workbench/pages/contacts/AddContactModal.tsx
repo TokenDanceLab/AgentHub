@@ -1,6 +1,7 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { DesignNavIcon } from '../../designIcons';
 import { Select } from '../../../ui';
+import { useFocusTrap } from '../../../ui/focusTrap';
 import styles from '../ContactsPage.module.css';
 import { MODAL_TABS } from './shared';
 import type { ContactModalTab } from './types';
@@ -40,11 +41,13 @@ function QRPanel() {
 }
 
 function LinkPanel({ onCopy }: { onCopy?: (() => void) | undefined }) {
+  const linkInputId = React.useId();
   return (
     <div className={styles.linkPanel}>
-      <label className={styles.linkLabel}>邀请链接</label>
+      <label className={styles.linkLabel} htmlFor={linkInputId}>邀请链接</label>
       <div className={styles.linkCopyRow}>
         <input
+          id={linkInputId}
           className={styles.linkInput}
           readOnly
           value="https://agenthub.tokendance.local/invite/TD-2026"
@@ -87,6 +90,9 @@ function PhonePanel({
     onSend?.(countryCode, phone, note);
   }, [countryCode, phone, note, onSend]);
 
+  const phoneInputId = React.useId();
+  const noteInputId = React.useId();
+
   return (
     <form
       className={styles.phonePanel}
@@ -95,7 +101,7 @@ function PhonePanel({
         handleSend();
       }}
     >
-      <label className={styles.phoneLabel}>手机号</label>
+      <label className={styles.phoneLabel} htmlFor={phoneInputId}>手机号</label>
       <div className={styles.phoneRow}>
         <Select
           ariaLabel="区号"
@@ -105,14 +111,16 @@ function PhonePanel({
           onChange={setCountryCode}
         />
         <input
+          id={phoneInputId}
           className={styles.phoneInput}
           placeholder="输入手机号"
           value={phone}
           onChange={(e) => setPhone(e.target.value)}
         />
       </div>
-      <label className={styles.phoneLabel}>备注</label>
+      <label className={styles.phoneLabel} htmlFor={noteInputId}>备注</label>
       <input
+        id={noteInputId}
         className={styles.phoneInput}
         placeholder="例如：合作方 PM / 新同事"
         value={note}
@@ -137,6 +145,52 @@ export function AddContactModal({
   onSendPhoneInvite?: ((countryCode: string, phone: string, note: string) => void) | undefined;
 }) {
   const [activeTab, setActiveTab] = useState<ContactModalTab>('qr');
+  const modalRef = useRef<HTMLElement | null>(null);
+  useFocusTrap(modalRef, true);
+
+  // Move initial focus to the first input of the active panel (close button
+  // when the panel has none, e.g. the QR tab).
+  useEffect(() => {
+    const firstInput = modalRef.current?.querySelector('input');
+    const firstFocusable =
+      firstInput ?? modalRef.current?.querySelector<HTMLElement>('button');
+    firstFocusable?.focus();
+  }, []);
+
+  const handleDialogKeyDown = useCallback(
+    (event: React.KeyboardEvent) => {
+      if (event.key === 'Escape') onClose?.();
+    },
+    [onClose],
+  );
+
+  const handleTablistKeyDown = useCallback(
+    (event: React.KeyboardEvent) => {
+      const tabIndex = MODAL_TABS.findIndex((tab) => tab.id === activeTab);
+      let nextIndex: number | null = null;
+      switch (event.key) {
+        case 'ArrowRight':
+          nextIndex = (tabIndex + 1) % MODAL_TABS.length;
+          break;
+        case 'ArrowLeft':
+          nextIndex = (tabIndex - 1 + MODAL_TABS.length) % MODAL_TABS.length;
+          break;
+        case 'Home':
+          nextIndex = 0;
+          break;
+        case 'End':
+          nextIndex = MODAL_TABS.length - 1;
+          break;
+      }
+      if (nextIndex === null) return;
+      event.preventDefault();
+      const nextTab = MODAL_TABS[nextIndex]!;
+      setActiveTab(nextTab.id);
+      const tabButtons = modalRef.current?.querySelectorAll<HTMLButtonElement>('[role="tab"]');
+      tabButtons?.[nextIndex]?.focus();
+    },
+    [activeTab],
+  );
 
   const renderPanel = () => {
     switch (activeTab) {
@@ -161,10 +215,12 @@ export function AddContactModal({
       }}
     >
       <section
+        ref={modalRef}
         className={styles.modal}
         role="dialog"
         aria-modal="true"
         aria-labelledby="addContactTitle"
+        onKeyDown={handleDialogKeyDown}
       >
         <button
           type="button"
@@ -184,12 +240,13 @@ export function AddContactModal({
           </p>
         </div>
 
-        <div className={styles.modalTabs} role="tablist">
+        <div className={styles.modalTabs} role="tablist" onKeyDown={handleTablistKeyDown}>
           {MODAL_TABS.map((tab) => (
             <button
               key={tab.id}
               type="button"
               role="tab"
+              tabIndex={activeTab === tab.id ? 0 : -1}
               className={`${styles.modalTab} ${
                 activeTab === tab.id ? styles.modalTabActive : ''
               }`}

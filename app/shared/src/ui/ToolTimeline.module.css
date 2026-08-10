@@ -3,7 +3,7 @@
   margin: 2px 0 8px;
   padding: 8px 10px;
   border: 1px solid rgba(255, 255, 255, 0.075);
-  border-radius: 9px;
+  border-radius: var(--r-sm);
   background: rgba(255, 255, 255, 0.024);
   color: var(--foreground);
 }
@@ -60,7 +60,7 @@
   height: 22px;
   align-items: center;
   justify-content: center;
-  border-radius: 7px;
+  border-radius: var(--r-sm);
   background: rgba(255, 255, 255, 0.035);
 }
 
@@ -98,7 +98,7 @@
 .status {
   flex: 0 0 auto;
   padding: 2px 7px;
-  border-radius: 999px;
+  border-radius: var(--r-full);
   font-size: 11px;
   font-weight: 720;
   line-height: 1.35;

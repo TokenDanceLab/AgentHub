@@ -20,6 +20,7 @@ export type DocMainProps = Pick<
   | 'activeTab'
   | 'onTabChange'
   | 'rows'
+  | 'documentsLoading'
   | 'profiles'
   | 'activePreview'
   | 'onDocClick'
@@ -36,6 +37,7 @@ export function DocMain({
   activeTab,
   onTabChange,
   rows,
+  documentsLoading,
   profiles,
   activePreview,
   onDocClick,
@@ -124,6 +126,7 @@ export function DocMain({
 
       <DocTable
         rows={rows}
+        documentsLoading={documentsLoading ?? false}
         profiles={profiles}
         onDocClick={onDocClick}
         onDeleteDoc={onDeleteDoc}

@@ -58,7 +58,7 @@
 .popover {
   padding: 8px;
   border: 1px solid var(--glass-border-strong, var(--composer-panel-edge, var(--bdr-strong)));
-  border-radius: 12px;
+  border-radius: var(--r-md);
   background: var(--glass-panel-overlay, var(--composer-panel-bg, var(--glass-panel)));
   box-shadow: var(--glass-elev-3, var(--composer-panel-shadow));
   backdrop-filter: var(--glass-backdrop-filter);
@@ -95,7 +95,7 @@
   min-height: 36px;
   padding: 0 10px;
   border: 0;
-  border-radius: 9px;
+  border-radius: var(--r-sm);
   background: transparent;
   color: var(--composer-control-text, var(--muted-foreground));
   font: inherit;

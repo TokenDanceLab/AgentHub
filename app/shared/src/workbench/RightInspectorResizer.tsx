@@ -1,4 +1,6 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
+import { CHATVIEW_I18N_NAMESPACE } from '../chatview/i18n/resources';
 import styles from './AgentHubWorkbench.module.css';
 
 /* ═══════════════════════════════════════════════════════════════════════
@@ -23,9 +25,10 @@ export function RightInspectorResizer({
   onKeyDown,
   onPointerDown,
 }: RightInspectorResizerProps): React.ReactElement {
+  const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE);
   return (
     <div
-      aria-label="调整右侧栏宽度"
+      aria-label={t('aria.resizeInspector')}
       aria-orientation="vertical"
       aria-valuemax={maxWidth}
       aria-valuemin={minWidth}

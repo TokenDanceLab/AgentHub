@@ -5,6 +5,14 @@ export default defineConfig({
   ssr: {
     noExternal: true,
   },
+  resolve: {
+    // Match app/web + app/desktop: dedupe react/react-dom so the shared
+    // package (consumed by both renderers) doesn't end up with two copies
+    // of React in the test graph, which breaks hooks + zustand v5 stores
+    // (ui/toast/toastStore, chatview/typingPresence, transcript/pinMap,
+    // api/auth/ports all use zustand v5).
+    dedupe: ['react', 'react-dom'],
+  },
   test: {
     globals: true,
     environment: 'jsdom',
@@ -16,7 +24,9 @@ export default defineConfig({
     // Exclude stray git worktrees (e.g. .worktrees/refactor/*) and the
     // vendored reference/ repos so their test files — which resolve with a
     // different environment — aren't picked up and fail spuriously.
-    exclude: ['**/node_modules/**', '**/dist/**', '**/.worktrees/**', '**/reference/**'],
+    // Also exclude throwaway probe/ scratch tests under src/.tmp/ so ad-hoc
+    // debugging artifacts can never trip the suite even if recreated.
+    exclude: ['**/node_modules/**', '**/dist/**', '**/.worktrees/**', '**/reference/**', 'src/.tmp/**'],
     setupFiles: ['./src/__tests__/setup.ts'],
     coverage: createCoverage({
       thresholds: {

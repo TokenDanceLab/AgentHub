@@ -1,5 +1,6 @@
 // Shared UI primitives consumed across desktop/web/mobile-rn workbench surfaces.
-export { default as Modal } from './Modal';
+export { Modal } from './Modal';
+export type { ModalProps } from './Modal';
 export { DiffReviewPanel } from './DiffReviewPanel';
 export type { DiffReviewFile, DiffReviewLabels, DiffHunkDecision, DiffReviewPanelProps } from './DiffReviewPanel';
 export { Select } from './Select';
@@ -81,12 +82,12 @@ export {
 export type { RuntimeIconRegistry, RuntimeIconRegistryInput } from './runtimeIconRegistry';
 export { PermissionModePicker } from './PermissionModePicker';
 export type { PermissionModePickerProps, PermissionModeOption } from './PermissionModePicker';
-export { default as ArtifactCard } from './ArtifactCard';
+export { ArtifactCard } from './ArtifactCard';
 export type { ArtifactCardProps } from './ArtifactCard';
 export { PREVIEW_SANDBOX_REMOTE, PREVIEW_SANDBOX_SRCDOC } from './previewSandbox';
-export { default as DeployCard } from './DeployCard';
+export { DeployCard } from './DeployCard';
 export type { DeployCardProps } from './DeployCard';
-export { default as MessageSearchPanel } from './MessageSearchPanel';
+export { MessageSearchPanel } from './MessageSearchPanel';
 export { SlideshowPreview } from './SlideshowPreview';
 export type { SlideshowPreviewProps } from './SlideshowPreview';
 export { TablePreview } from './TablePreview';
@@ -106,3 +107,21 @@ export { Tooltip } from './Tooltip';
 export type { TooltipProps, TooltipSide } from './Tooltip';
 export { default as ErrorBoundary } from './ErrorBoundary';
 export type { ErrorConfig, ErrorBoundaryExtension } from './ErrorBoundary';
+
+// ── Wave 9 public barrel additions (previously exported only from file paths) ──
+export { Button } from './Button';
+export type { ButtonProps } from './Button';
+export { Avatar } from './Avatar';
+export { Pill } from './Pill';
+export { Card, CardHeader, CardContent, CardFooter } from './Card';
+export { CodeBlock } from './CodeBlock';
+export { CollapsibleBlock } from './CollapsibleBlock';
+export { FileChangeGroup } from './FileChangeGroup';
+export type { FileChangeGroupProps, FileChangeItem } from './FileChangeGroup';
+export { Icon } from './Icon';
+export { PageErrorBoundary } from './PageErrorBoundary';
+export type { PageErrorBoundaryProps } from './PageErrorBoundary';
+export { ProgressBar } from './ProgressBar';
+export { SkeletonBar } from './SkeletonBar';
+export type { SkeletonBarProps, SkeletonBarVariant } from './SkeletonBar';
+

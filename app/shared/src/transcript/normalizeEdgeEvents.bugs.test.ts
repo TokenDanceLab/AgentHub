@@ -287,37 +287,34 @@ describe('BUG: permissionDecidedBlock — event.id used as fallback requestId', 
   });
 });
 
-describe('BUG: subagentBlock — missing worker causes null return but the full event is discarded', () => {
-  it('BUG: subagent event with title but no worker is silently discarded', () => {
-    // Line 251: if (!title || !worker) return null;
-    // If title exists but worker is missing, the entire subagent event is dropped.
-    // This could lose important context — e.g., a title-only subagent event.
+describe('BUG: removed ghost subagent/child_agent branches now fall through to default', () => {
+  // The edge-server never emits run.agent.subagent or run.agent.child_agent
+  // (verified against edge-server/internal/orchestration/contracts.go — the
+  // real sub-agent lifecycle uses run.agent.task_started / task_progress /
+  // task_notification / sub_agent_status, all wired to subtaskBlock). These
+  // two ghost branches were removed; events with these types now hit the
+  // default console.warn and produce no block.
+  it('run.agent.subagent event is dropped via default branch (ghost type, no producer)', () => {
     const blocks = normalizeEdgeEventsToTranscript([
       edgeEvent('evt-sub-no-worker', 1, 'run.agent.subagent', {
         runId: 'run-test-7',
         taskId: 'task-abc',
         title: 'Important subagent task',
-        // No worker
       }),
     ]);
 
-    // BUG: Event is silently dropped — no block produced
     expect(blocks).toEqual([]);
   });
-});
 
-describe('BUG: childAgentBlock — missing agent causes silent drop', () => {
-  it('BUG: child_agent event with title but no agent name is silently discarded', () => {
+  it('run.agent.child_agent event is dropped via default branch (ghost type, no producer)', () => {
     const blocks = normalizeEdgeEventsToTranscript([
       edgeEvent('evt-child-no-agent', 1, 'run.agent.child_agent', {
         runId: 'run-test-8',
         childId: 'child-xyz',
         title: 'Parallel analysis task',
-        // No agent/agentName/worker/workerName
       }),
     ]);
 
-    // BUG: Event is silently dropped
     expect(blocks).toEqual([]);
   });
 });
@@ -663,5 +660,97 @@ describe('BUG: empty events array returns empty array', () => {
   it('handles empty array', () => {
     const blocks = normalizeEdgeEventsToTranscript([]);
     expect(blocks).toEqual([]);
+  });
+});
+
+// ── BUG: same-author text blocks with no run evidence must not merge ──────
+// Regression guard for the merge-vacuity bug: when two consecutive text
+// blocks from the same author both lack a run evidence ref, evidenceRunId
+// returns '' for both, and the old `'' === ''` check wrongly collapsed them
+// into a single block. The fix requires BOTH blocks to carry a non-empty run
+// evidence ref before merging.
+describe('BUG: text blocks without run evidence are not merged', () => {
+  it('keeps two same-author text blocks separate when neither has run evidence', () => {
+    const blocks = normalizeEdgeEventsToTranscript([
+      edgeEvent('evt-no-run-1', 1, 'run.agent.text_block', {
+        content: 'First standalone message.',
+      }),
+      edgeEvent('evt-no-run-2', 2, 'run.agent.text_block', {
+        content: 'Second standalone message.',
+      }),
+    ]);
+
+    expect(blocks).toHaveLength(2);
+    expect((blocks[0]! as { text: string }).text).toBe('First standalone message.');
+    expect((blocks[1]! as { text: string }).text).toBe('Second standalone message.');
+  });
+
+  it('still merges same-author text blocks when both share a run evidence ref', () => {
+    const blocks = normalizeEdgeEventsToTranscript([
+      edgeEvent('evt-run-1', 1, 'run.agent.text_delta', {
+        runId: 'run-shared',
+        content: 'Part A.',
+      }),
+      edgeEvent('evt-run-2', 2, 'run.agent.text_delta', {
+        runId: 'run-shared',
+        content: 'Part B.',
+      }),
+    ]);
+
+    expect(blocks).toHaveLength(1);
+    expect((blocks[0]! as { text: string }).text).toBe('Part A.Part B.');
+  });
+
+  it('does not merge when only the first block carries run evidence', () => {
+    const blocks = normalizeEdgeEventsToTranscript([
+      edgeEvent('evt-with-run', 1, 'run.agent.text_block', {
+        runId: 'run-lone',
+        content: 'Has run evidence.',
+      }),
+      edgeEvent('evt-without-run', 2, 'run.agent.text_block', {
+        content: 'No run evidence.',
+      }),
+    ]);
+
+    expect(blocks).toHaveLength(2);
+    expect((blocks[0]! as { text: string }).text).toBe('Has run evidence.');
+    expect((blocks[1]! as { text: string }).text).toBe('No run evidence.');
+  });
+});
+
+// ── BUG: missing event_seq must not collide with real seq=0 ───────────────
+// Hub-persisted events without event_seq previously defaulted to 0, making
+// them indistinguishable from a genuine seq=0 event and mis-ordering the
+// transcript. The fix uses a -1 sentinel so missing-seq events sort ahead of
+// real seq=0 events without colliding.
+describe('BUG: missing event_seq uses -1 sentinel, not 0', () => {
+  it('orders a no-seq Hub event ahead of a real seq=0 edge event at the same timestamp', () => {
+    // Two events with the same sentAt; the one with a real seq=0 should sort
+    // AFTER the one whose seq is missing (sentinel -1 sorts first).
+    const noSeqEvent: EventEnvelope = {
+      version: 'v1',
+      id: 'hub-no-seq',
+      seq: -1,
+      type: 'run.agent.text_block',
+      scope: { threadId: 'thread-live' },
+      sentAt: '2026-06-07T03:00:00Z',
+      payload: { content: 'Hub event without seq.' },
+    };
+    const realSeqZero: EventEnvelope = {
+      version: 'v1',
+      id: 'edge-seq-0',
+      seq: 0,
+      type: 'run.agent.text_block',
+      scope: { threadId: 'thread-live' },
+      sentAt: '2026-06-07T03:00:00Z',
+      payload: { content: 'Edge event with real seq 0.' },
+    };
+
+    // Feed in reverse order so sort is what places the no-seq event first.
+    const blocks = normalizeEdgeEventsToTranscript([realSeqZero, noSeqEvent]);
+
+    expect(blocks).toHaveLength(2);
+    expect((blocks[0]! as { text: string }).text).toBe('Hub event without seq.');
+    expect((blocks[1]! as { text: string }).text).toBe('Edge event with real seq 0.');
   });
 });

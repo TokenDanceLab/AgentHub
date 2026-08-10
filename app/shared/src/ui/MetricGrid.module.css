@@ -10,7 +10,7 @@
   min-width: 0;
   min-height: 64px;
   border: 1px solid var(--border);
-  border-radius: var(--radius-lg, 8px);
+  border-radius: var(--r-lg);
   padding: 9px 10px;
   background: color-mix(in oklch, var(--card, white) 74%, transparent);
   color: var(--foreground);

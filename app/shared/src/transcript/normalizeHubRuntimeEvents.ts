@@ -325,7 +325,11 @@ function hubRuntimeEventToEdgeEnvelope(event: HubRuntimeEventTranscriptInput): E
   return {
     version: 'v1',
     id: `hub-runtime-${event.id ?? eventIdentity(event)}`,
-    seq: event.event_seq ?? 0,
+    // Use -1 sentinel when event_seq is missing so these events sort ahead
+    // of real seq=0 events instead of colliding with them. Previously `?? 0`
+    // made a missing seq indistinguishable from a true seq=0, which could
+    // mis-order Hub-persisted events that never carried a sequence number.
+    seq: event.event_seq ?? -1,
     type: eventType,
     scope: {
       ...(runId ? { runId } : {}),

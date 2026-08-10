@@ -48,27 +48,6 @@
   font: 500 0.625rem/1.4 var(--font-sans);
 }
 
-.closeBtn {
-  width: 26px;
-  height: 26px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0;
-  border: 0;
-  border-radius: var(--r-sm);
-  background: transparent;
-  color: var(--text-2);
-  cursor: pointer;
-  flex-shrink: 0;
-  transition: background var(--dur-normal) var(--ease), color var(--dur-normal) var(--ease);
-}
-
-.closeBtn:hover {
-  background: var(--surface-high);
-  color: var(--text-1);
-}
-
 /* ── Sheet tabs ── */
 .sheetTabs {
   display: flex;

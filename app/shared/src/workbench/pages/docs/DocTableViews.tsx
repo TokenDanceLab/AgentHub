@@ -13,6 +13,7 @@ import {
   type WorkbenchProfileSource,
 } from '../../profileRegistry';
 import { EmptyState } from '../../../ui';
+import { SkeletonBar } from '../../../ui/SkeletonBar';
 import { Tooltip } from '../../../ui/Tooltip';
 import styles from '../DocsPage.module.css';
 import type { DocRow } from './types';
@@ -88,12 +89,14 @@ function DocTableRow({
 
 export function DocTable({
   rows,
+  documentsLoading,
   profiles,
   onDocClick,
   onDeleteDoc,
   onCreateDoc,
 }: {
   rows: DocRow[];
+  documentsLoading?: boolean;
   profiles?: WorkbenchProfileSource[] | undefined;
   onDocClick?: ((doc: DocRow) => void) | undefined;
   onDeleteDoc?: ((documentId: string) => Promise<unknown> | void) | undefined;
@@ -110,7 +113,32 @@ export function DocTable({
         <span>打开时间</span>
         <span />
       </div>
-      {rows.length === 0 ? (
+      {documentsLoading && rows.length === 0 ? (
+        // Loading state: real-mode documents still fetching (undefined).
+        // Show shimmering placeholder rows instead of the empty "暂无文档"
+        // copy so users do not mistake a load-in-progress for an empty list.
+        <div className="doc-table-skeleton" role="status" aria-label={t('docs.loading', '加载中…')}>
+          {Array.from({ length: 4 }, (_, index) => (
+            <div className={`${styles.docRow} doc-row`} key={`skeleton-${index}`} aria-hidden="true">
+              <span className={styles.docTitle}>
+                <span className={styles.docType}>
+                  <DesignNavIcon name="fileText" size={14} />
+                </span>
+                <SkeletonBar width="42%" height="1em" />
+              </span>
+              <span><SkeletonBar width="26%" height="1em" /></span>
+              <span className={styles.ownerPill} data-profile-kind="user">
+                <span className={styles.ownerAvatar} style={{ '--owner-avatar-color': 'var(--muted)' } as React.CSSProperties}>
+                  {' '}
+                </span>
+                <span><SkeletonBar width="3.6em" height="1em" /></span>
+              </span>
+              <span><SkeletonBar width="4.2em" height="1em" /></span>
+              <span className={styles.docMore} />
+            </div>
+          ))}
+        </div>
+      ) : rows.length === 0 ? (
         <EmptyState
           title={t('docs.empty.title')}
           description={t('docs.empty.description')}

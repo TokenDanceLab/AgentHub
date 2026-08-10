@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { GitCommitHorizontal, ChevronDown, RotateCcw, FileDiff } from 'lucide-react';
+import { Button } from './Button';
 import styles from './ArtifactVersionTimeline.module.css';
 
 export interface ArtifactVersion {
@@ -29,7 +30,11 @@ function formatTime(iso: string): string {
   } catch { return iso; }
 }
 
-export default function ArtifactVersionTimeline({
+/**
+ * @deprecated 此组件暂无消费方（不在 ui barrel，无应用消费点），待清理或接入。
+ *   Wave 10：默认导出已转 named export；保留组件以备未来接入或清理。
+ */
+export function ArtifactVersionTimeline({
   artifactId: _artifactId,
   artifactTitle,
   versions,
@@ -82,24 +87,26 @@ export default function ArtifactVersionTimeline({
               {expandedVersion === v.version && (
                 <div className={styles.actions}>
                   {v.version < latest && onCompare && (
-                    <button
-                      className={styles.actionBtn}
+                    <Button
+                      variant="secondary"
+                      size="sm"
                       onClick={() => onCompare(v.version, latest)}
                       type="button"
                     >
                       <FileDiff size={14} />
                       <span>Compare with current</span>
-                    </button>
+                    </Button>
                   )}
                   {onRevert && (
-                    <button
-                      className={`${styles.actionBtn} ${styles.actionBtnRevert}`}
+                    <Button
+                      variant="secondary"
+                      size="sm"
                       onClick={() => onRevert(v.version)}
                       type="button"
                     >
                       <RotateCcw size={14} />
                       <span>Revert to v{v.version}</span>
-                    </button>
+                    </Button>
                   )}
                 </div>
               )}

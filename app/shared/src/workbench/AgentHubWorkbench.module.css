@@ -696,6 +696,26 @@
   color: var(--text-3);
 }
 
+.conversationEmptyAction {
+  margin-top: var(--sp-xs);
+  padding: 4px 10px;
+  border: 1px solid var(--bdr-strong, transparent);
+  border-radius: var(--r-sm, 6px);
+  background: var(--surface-high, transparent);
+  color: var(--text-2);
+  font: 500 0.75rem var(--font-sans);
+  cursor: pointer;
+  transition: background 120ms ease, border-color 120ms ease;
+}
+
+.conversationEmptyAction:hover,
+.conversationEmptyAction:focus-visible {
+  background: var(--surface-highest, var(--surface-high, transparent));
+  border-color: var(--bdr-focus, var(--primary, currentColor));
+  color: var(--text-1);
+  outline: none;
+}
+
 .conversationActionBtn {
   display: flex;
   align-items: center;

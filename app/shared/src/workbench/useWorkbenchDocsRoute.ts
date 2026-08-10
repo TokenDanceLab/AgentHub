@@ -14,6 +14,10 @@ export interface WorkbenchDocumentsActions {
 export interface UseWorkbenchDocsRouteOptions {
   documents?: DocRow[] | undefined;
   documentsActions?: WorkbenchDocumentsActions | undefined;
+  /** True when the owning app is in real (non-demo) data mode. When real and
+   *  `documents` is undefined, the docs list is still loading — show a
+   *  skeleton instead of falling back to mock rows. */
+  realDataMode?: boolean | undefined;
 }
 
 export interface WorkbenchDocsRoute {
@@ -23,6 +27,8 @@ export interface WorkbenchDocsRoute {
   setDocsTab: (tab: DocsPane) => void;
   docsPreview: WorkbenchDocumentPreview | null;
   rows: DocRow[];
+  /** True while real-mode documents are loading (undefined input). */
+  documentsLoading: boolean;
   openDocPreview: (doc: DocRow) => void;
   closeDocPreview: () => void;
   documentsActions: WorkbenchDocumentsActions | undefined;
@@ -31,11 +37,15 @@ export interface WorkbenchDocsRoute {
 export function useWorkbenchDocsRoute({
   documents,
   documentsActions,
+  realDataMode,
 }: UseWorkbenchDocsRouteOptions): WorkbenchDocsRoute {
   const [docsNav, setDocsNav] = useState('home');
   const [docsTab, setDocsTab] = useState<DocsPane>('recent');
   const [docsPreview, setDocsPreview] = useState<WorkbenchDocumentPreview | null>(null);
-  const rows = documents ?? WORKBENCH_MOCK_DOC_ROWS;
+  // Real mode while the Hub list is still undefined = loading; demo mode
+  // (realDataMode false) keeps the mock-row fallback so demo content renders.
+  const documentsLoading = Boolean(realDataMode && documents === undefined);
+  const rows = documents ?? (documentsLoading ? [] : WORKBENCH_MOCK_DOC_ROWS);
 
   function openDocPreview(doc: DocRow): void {
     setDocsPreview(createDocPreview(doc));
@@ -52,6 +62,7 @@ export function useWorkbenchDocsRoute({
     setDocsTab,
     docsPreview,
     rows,
+    documentsLoading,
     openDocPreview,
     closeDocPreview,
     documentsActions,

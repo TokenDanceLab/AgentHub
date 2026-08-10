@@ -11,7 +11,7 @@
   user-select: none;
   /* glass card density */
   border: 1px solid var(--glass-border-strong, var(--border));
-  border-radius: var(--glass-card-radius, var(--radius-xl));
+  border-radius: var(--glass-card-radius, var(--r-xl));
   background: var(--glass-card-bg, var(--glass-panel));
   backdrop-filter: var(--glass-backdrop-filter);
   -webkit-backdrop-filter: var(--glass-backdrop-filter);
@@ -33,7 +33,7 @@
   width: 56px;
   height: 56px;
   border: 1px solid var(--glass-border-strong, var(--border));
-  border-radius: 16px;
+  border-radius: var(--r-lg);
   background:
     linear-gradient(
       135deg,
@@ -63,40 +63,7 @@
   line-height: 1.5;
 }
 
-/* ── CTA Action button with glass + glow ────────────────────────────── */
-.action {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--wb-gap-2xs, 7px);
-  min-height: 36px;
-  margin-top: var(--wb-gap-2xs, var(--space-xs, 0.25rem));
-  border: 1px solid var(--glass-border-strong, var(--bdr));
-  border-radius: var(--radius-lg, 8px);
-  padding: 0 var(--wb-gap-md, 16px);
-  background: var(--glass-bg-medium, var(--surface-low));
-  backdrop-filter: var(--glass-backdrop-filter);
-  -webkit-backdrop-filter: var(--glass-backdrop-filter);
-  box-shadow: var(--glass-elev-1);
-  color: var(--foreground);
-  font-family: var(--font-sans);
-  font-size: var(--font-size-sm, 0.875rem);
-  font-weight: 560;
-  cursor: pointer;
-}
-
-.action:hover {
-  border-color: var(--glass-border-heavy, var(--bdr-focus));
-  background: var(--glass-bg-strong, var(--surface-high));
-  box-shadow: var(--glass-elev-2), 0 0 16px color-mix(in oklch, var(--primary) 18%, transparent);
-}
-
-.action:focus-visible {
-  outline: none;
-  box-shadow: var(--focus-ring);
-}
-
-/* ── Shortcut kbd badge ─────────────────────────────────────────────── */
+/* ── Shortcut kbd badge (rendered inside the primary action Button) ── */
 .shortcut {
   display: inline-flex;
   align-items: center;
@@ -104,7 +71,7 @@
   min-height: 20px;
   padding: 0 6px;
   border: 1px solid var(--glass-border-subtle, var(--bdr));
-  border-radius: var(--radius-sm, 4px);
+  border-radius: var(--r-sm);
   background: var(--glass-bg-subtle, var(--surface-low));
   color: var(--muted-foreground);
   font-family: var(--font-sans);
@@ -113,20 +80,6 @@
   line-height: 1;
   white-space: nowrap;
   margin-inline-start: 2px;
-}
-
-@media (prefers-reduced-motion: no-preference) {
-  .action {
-    transition:
-      background-color var(--motion-hover),
-      border-color var(--motion-hover),
-      box-shadow var(--motion-hover),
-      transform var(--motion-press);
-  }
-
-  .action:active {
-    transform: scale(var(--glass-press-scale, 0.985));
-  }
 }
 
 .suggestions {
@@ -143,7 +96,7 @@
   gap: 6px;
   min-height: 32px;
   border: 1px solid var(--glass-border-subtle, var(--bdr));
-  border-radius: var(--radius-lg, 8px);
+  border-radius: var(--r-lg);
   padding: 0 12px;
   background: var(--glass-bg-subtle, var(--surface-low));
   backdrop-filter: var(--glass-backdrop-filter);
@@ -209,12 +162,6 @@
 
   .title {
     font-size: 20px;
-  }
-
-  .action {
-    min-height: var(--touch-target-min, 44px);
-    padding: 0 20px;
-    font-size: var(--font-size-base, 1rem);
   }
 
   .suggestions {

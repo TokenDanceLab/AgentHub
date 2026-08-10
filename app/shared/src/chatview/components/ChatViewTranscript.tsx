@@ -11,6 +11,8 @@ import { ExternalLink, Pin, X } from 'lucide-react'
 import { Transcript, type TranscriptHandle } from './Transcript'
 import { TypingIndicator } from './TypingIndicator'
 import { CHATVIEW_I18N_NAMESPACE } from '../i18n/resources'
+import { EmptyState } from '../../ui/EmptyState'
+import { Button } from '../../ui/Button'
 import { blocksToTranscriptItems, resolveCompactDividerIndices, resolveUnreadAnchorItemIndex, SEP, type TranscriptBlock } from '../adapter'
 import type { RowItem } from '../types'
 import type { UnreadDividerDescriptor } from '../types'
@@ -76,9 +78,14 @@ interface Props {
   unreadDivider?: UnreadDividerDescriptor | undefined
 }
 
-function EmptyState() {
+function EmptyTranscriptState() {
   const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE)
-  return <div className="chatview-empty">{t('transcript.empty')}</div>
+  return (
+    <EmptyState
+      title={t('transcript.empty')}
+      description={t('empty.generalBlank.desc')}
+    />
+  )
 }
 
 interface ErrorBoundaryProps { children: React.ReactNode }
@@ -275,7 +282,7 @@ export const ChatViewTranscript = memo(function ChatViewTranscript({ transcript,
         <div className="chatview-pinned-wrap">
           <div className="chatview-pinned-banner">
             <span className="chatview-pinned-mark" aria-hidden="true">
-              <Pin />
+              <Pin size={14} />
             </span>
             <div className="chatview-pinned-copy">
               <div className="chatview-pinned-line">
@@ -289,32 +296,34 @@ export const ChatViewTranscript = memo(function ChatViewTranscript({ transcript,
             </div>
 
             {pinnedAnnouncement.onCopy && (
-              <button
+              <Button
+                variant="ghost"
+                size="sm"
                 aria-label="打开置顶内容"
-                className="chatview-pinned-btn"
-                onClick={pinnedAnnouncement.onCopy}
                 title="打开置顶内容"
+                onClick={pinnedAnnouncement.onCopy}
                 type="button"
               >
-                <ExternalLink />
-              </button>
+                <ExternalLink size={14} />
+              </Button>
             )}
             {pinnedAnnouncement.onDismiss && (
-              <button
+              <Button
+                variant="ghost"
+                size="sm"
                 aria-label="关闭置顶"
-                className="chatview-pinned-btn chatview-pinned-dismiss"
-                onClick={pinnedAnnouncement.onDismiss}
                 title="关闭置顶"
+                onClick={pinnedAnnouncement.onDismiss}
                 type="button"
               >
-                <X />
-              </button>
+                <X size={14} />
+              </Button>
             )}
           </div>
         </div>
       )}
       {items.length === 0 ? (
-        <EmptyState />
+        <EmptyTranscriptState />
       ) : (
         <TranscriptErrorBoundary>
           <Transcript ref={transcriptRef} items={items} chatMode={chatMode} unreadDivider={resolvedUnreadDivider} compactDividers={resolvedCompactDividers} {...(sessionId !== undefined ? { sessionId } : {})} {...(onAgentClick ? { onAgentClick } : {})} {...(onBlockContextMenu ? { onBlockContextMenu } : {})} {...(onBlockSelect ? { onBlockSelect } : {})} {...(onBlockAction ? { onBlockAction } : {})} {...(onReviewFile ? { onReviewFile } : {})} {...(onDeploySubmit ? { onDeploySubmit } : {})} {...(selectedBlockIds ? { selectedBlockIds } : {})} {...(selectionMode !== undefined ? { selectionMode } : {})} {...(softHiddenBlockIds ? { softHiddenBlockIds } : {})} {...(actionedBlockIds ? { actionedBlockIds } : {})} {...(renderUserFooter ? { renderUserFooter } : {})} />

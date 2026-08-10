@@ -32,6 +32,10 @@
 }
 .row-hd:hover { background:var(--surface-high) }
 .row-hd:focus-visible { outline:none; box-shadow:var(--focus-ring) }
+/* ── Wave10 a11y: keyboard focus ring on the block row itself (the div is the
+   tab stop via tabIndex=0). Only matches keyboard focus, not inner-button
+   focus, so there's no double ring when the header button is focused. ── */
+.row-item:focus-visible { outline:none; box-shadow:var(--focus-ring) }
 .row-item.running > .row-hd,
 .row-item:not(.collapsible) > .row-hd { cursor:default; pointer-events:none }
 .row-item.running > .row-hd:hover,
@@ -135,17 +139,10 @@
 .think-duration { color:var(--text-3); font:var(--label-xs); font-weight:400; margin-left:var(--sp-xxs) }
 .ap-actions { display:flex; align-items:center; gap:var(--sp-sm); flex-wrap:wrap }
 .ap-actions.has-risk { padding-top:var(--sp-2) }
-.ap-actions button { height:28px; padding:0 var(--sp-14); border-radius:var(--r-sm); font:var(--label); cursor:pointer; border:none; transition:opacity var(--dur), box-shadow var(--dur) }
-.ap-actions button:hover { opacity:0.85 }
-.ap-actions button:focus-visible { outline:none; box-shadow:var(--focus-ring) }
-.ap-approve { background:var(--success); color:var(--on-primary) }
-.ap-deny { background:var(--surface); color:var(--danger); border:1px solid var(--danger-bg) }
-/* ── T16: risk badge + keyboard hint + critical second-confirm ── */
 .ap-kbd-hint { font:var(--label-xs); color:var(--text-3); margin-left:auto; user-select:none; opacity:0.85 }
-.ap-approve.critical { background:var(--danger); color:var(--on-primary, #fff) }
-.ap-approve.critical:hover { opacity:0.9 }
-.ap-approve.critical.confirming {
-  background:var(--danger); color:var(--on-primary, #fff);
+/* ── T16: critical second-confirm — armed state on the destructive Button
+   (danger outline + pulse ring, migrated from .ap-approve.critical.confirming) ── */
+.ap-actions .confirming {
   box-shadow:0 0 0 2px var(--surface), 0 0 0 4px var(--danger);
   animation:apConfirmPulse 1.2s ease-in-out infinite;
 }
@@ -153,12 +150,13 @@
   0%, 100% { box-shadow:0 0 0 2px var(--surface), 0 0 0 4px var(--danger) }
   50% { box-shadow:0 0 0 2px var(--surface), 0 0 0 6px var(--danger) }
 }
+/* ── Copy→Check feedback (Fable UIUX #4) ── */
+.code-head .copied { color:var(--success) }
+/* ── Fail retry (danger outline ghost) ── */
+.fail-retry { color:var(--danger); border-color:var(--danger) }
 
 /* ── Retry bar (card-level, visible even when collapsed) ────────── */
 .retry-bar { display:flex; padding:var(--sp-xs) var(--sp-10) var(--sp-xs) var(--sp-10); border-top:1px solid var(--danger-bg) }
-.retry-btn { height:28px; padding:0 var(--sp-14); border-radius:var(--r-sm); font:var(--label); cursor:pointer; border:1px solid var(--danger); background:var(--danger-bg); color:var(--danger); transition:opacity var(--dur) }
-.retry-btn:hover { opacity:0.85 }
-.retry-btn:focus-visible { outline:none; box-shadow:var(--focus-ring) }
 
 /* Route — dispatch indicator */
 .row-item.route { margin:var(--sp-xs) 0; animation:routeSlideIn var(--dur-slow) var(--ease) both }
@@ -216,12 +214,6 @@
 }
 .code-head-left { display:flex; align-items:center; gap:var(--sp-xxs) }
 
-.code-copy {
-  cursor:pointer; background:none; border:none; color:var(--text-3);
-  font:var(--label-xs); padding:var(--sp-2) var(--sp-xxs); border-radius:var(--r-xs);
-}
-.code-copy:hover { background:var(--surface-high); color:var(--text-1) }
-.code-copy:focus-visible { outline:none; box-shadow:var(--focus-ring) }
 .code-lines { padding:var(--sp-sm) 0; overflow-x:auto }
 .code-line { display:flex; padding:0 var(--sp-md); white-space:pre }
 .code-line:hover { background:var(--surface-low) }

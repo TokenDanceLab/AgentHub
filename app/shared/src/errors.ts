@@ -81,6 +81,45 @@ export async function parseError(response: Response): Promise<AppError> {
   );
 }
 
+// ── Mobile Hub error compatibility classes ──────────────────────────────────
+// SSOT for the mobile HubApiError/HubNetworkError shapes historically defined
+// locally in app/mobile-rn. Mobile re-exports these so test/UI `instanceof`
+// checks resolve to one shared class identity (#1338).
+
+export interface HubErrorDetails {
+  code: string;
+  message: string;
+  status?: number;
+  retryable: boolean;
+  cause?: unknown;
+}
+
+export class HubApiError extends Error {
+  code: string;
+  status: number;
+  retryable: boolean;
+
+  constructor(details: Omit<HubErrorDetails, 'cause'> & { status: number }) {
+    super(details.message);
+    this.name = 'HubApiError';
+    this.code = details.code;
+    this.status = details.status;
+    this.retryable = details.retryable;
+  }
+}
+
+export class HubNetworkError extends Error {
+  code = 'network_error';
+  retryable = true;
+  cause?: unknown;
+
+  constructor(message = 'Network request to AgentHub failed', cause?: unknown) {
+    super(message);
+    this.name = 'HubNetworkError';
+    this.cause = cause;
+  }
+}
+
 // ── ErrorReporter ──────────────────────────────
 
 export type ErrorCategory = 'network' | 'auth' | 'agent' | 'runtime' | 'unknown';

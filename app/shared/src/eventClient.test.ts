@@ -119,4 +119,93 @@ describe('EventClient', () => {
     expect(client.currentCursor).toBe('7');
     client.disconnect();
   });
+
+  it('does not let system.gap events pollute the replay cursor', () => {
+    const client = new EventClient({
+      baseUrl: 'http://127.0.0.1:3210',
+      reconnect: { baseDelay: 5, maxDelay: 5 },
+    });
+
+    client.connect();
+    const ws = MockWebSocket.instances[0];
+
+    // Establish the cursor at seq 42.
+    ws?.receive({
+      version: 'v1',
+      id: 'evt_real',
+      seq: 42,
+      type: 'run.output',
+      scope: {},
+      sentAt: '2026-05-24T10:00:00.000Z',
+      payload: {},
+    });
+    expect(client.currentCursor).toBe('42');
+
+    // A gap event arrives with a synthetic seq — must not move the cursor.
+    ws?.receive({
+      version: 'v1',
+      id: 'evt_gap',
+      seq: 0,
+      type: 'system.gap',
+      scope: {},
+      sentAt: '2026-05-24T10:00:01.000Z',
+      payload: { firstDroppedSeq: 43, lastDroppedSeq: 45, droppedCount: 3 },
+    });
+    expect(client.currentCursor).toBe('42');
+
+    client.disconnect();
+  });
+
+  it('drops replayed events with seq <= lastSeq (idempotent dedup)', () => {
+    const dispatched: Array<{ type: string; seq: number }> = [];
+    const client = new EventClient({
+      baseUrl: 'http://127.0.0.1:3210',
+      reconnect: { baseDelay: 5, maxDelay: 5 },
+    });
+    const unsub = client.on((event) => {
+      const env = event as { type: string; seq: number };
+      if (typeof env.seq === 'number') dispatched.push({ type: env.type, seq: env.seq });
+    });
+
+    client.connect();
+    const ws = MockWebSocket.instances[0];
+
+    ws?.receive({
+      version: 'v1',
+      id: 'evt_1',
+      seq: 10,
+      type: 'run.output',
+      scope: {},
+      sentAt: '2026-05-24T10:00:00.000Z',
+      payload: {},
+    });
+    // Replay of an already-seen seq — must be dropped, not re-dispatched.
+    ws?.receive({
+      version: 'v1',
+      id: 'evt_1_replay',
+      seq: 10,
+      type: 'run.output',
+      scope: {},
+      sentAt: '2026-05-24T10:00:01.000Z',
+      payload: {},
+    });
+    ws?.receive({
+      version: 'v1',
+      id: 'evt_2',
+      seq: 11,
+      type: 'run.finished',
+      scope: {},
+      sentAt: '2026-05-24T10:00:02.000Z',
+      payload: {},
+    });
+
+    expect(dispatched).toEqual([
+      { type: 'run.output', seq: 10 },
+      { type: 'run.finished', seq: 11 },
+    ]);
+    expect(client.currentCursor).toBe('11');
+
+    unsub();
+    client.disconnect();
+  });
 });

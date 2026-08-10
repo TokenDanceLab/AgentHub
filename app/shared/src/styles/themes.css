@@ -149,18 +149,47 @@ html[data-theme-sync='true'] *::after {
   --text-weaker: var(--text-2);
   --text-weakest: var(--text-3);
 
-  /* TokenDance cross-app aliases */
+  /* TokenDance cross-app aliases — Required Token Contract (design-system.md) */
   --td-canvas: var(--app-bg);
   --td-surface: var(--surface);
+  --td-tint: var(--primary-light);
+  --td-panel: var(--surface-high);
   --td-ink: var(--text-1);
   --td-ink-muted: var(--text-2);
   --td-line: var(--bdr);
   --td-plum: var(--primary);
   --td-moss: var(--success);
   --td-danger: var(--danger);
+  --td-warning: var(--warning);
   --td-focus: var(--bdr-focus);
   --td-radius-control: 8px;
   --td-radius-panel: 16px;
+  --td-space-1: var(--sp-xs);      /* 4px */
+  --td-space-2: var(--sp-sm);      /* 8px */
+  --td-space-3: var(--space-md);   /* 12px */
+  --td-space-4: var(--sp-md);      /* 16px */
+  --td-space-5: var(--sp-lg);      /* 24px */
+  --td-space-6: var(--sp-xl);      /* 32px */
+  --td-space-7: 2.5rem;            /* 40px */
+  --td-space-8: var(--space-3xl);  /* 48px */
+  --td-font: var(--font-sans);
+  --td-mono: var(--font-mono);
+  --td-text-1: var(--text-1);
+  --td-text-2: var(--text-2);
+  --td-text-3: var(--text-3);
+  --td-text-xs: var(--font-size-xs);
+  --td-text-sm: var(--font-size-sm);
+  --td-text-base: var(--font-size-base);
+  --td-text-lg: var(--font-size-lg);
+  --td-text-xl: var(--font-size-xl);
+  --td-leading-tight: var(--line-height-tight);
+  --td-leading-normal: var(--line-height-normal);
+  --td-leading-relaxed: var(--line-height-relaxed);
+  --td-shadow-sm: var(--e-1);
+  --td-shadow-md: var(--e-2);
+  --td-shadow-lg: var(--e-3);
+  --td-shadow-panel: var(--td-shadow-md);
+  --td-shadow-hairline: 0 0 0 1px var(--td-line);
 
   /* ── Chat surface tokens ────────────────────── */
   --chat-agent-bg: transparent;
@@ -218,6 +247,11 @@ html[data-theme-sync='true'] *::after {
   --elevated-card-shadow: var(--glass-elev-1);
   --elevated-card-shadow-strong: var(--glass-elev-2);
 
+  /* Team transcript hover/amber tints — dark theme uses faint white lifts. */
+  --td-hover-faint:    rgba(255, 255, 255, 0.02);
+  --td-hover-soft:     rgba(255, 255, 255, 0.04);
+  --td-accent-amber-bg: rgba(245, 158, 11, 0.1);
+
   /* ── Canvas ambient (dark) ───────────────────── */
   --canvas-ambient: radial-gradient(
     ellipse 780px 520px at 50% 42%,
@@ -262,15 +296,15 @@ html[data-theme-sync='true'] *::after {
   --primary-light: rgba(0,113,188,0.06);
   --primary-soft: rgba(0,113,188,0.11);
 
-  /* Status */
-  --success: #409467;
-  --success-bg: rgba(64,148,103,0.08);
-  --warning: #c0883a;
-  --warning-bg: rgba(192,136,58,0.08);
-  --danger: #d15252;
-  --danger-bg: rgba(209,82,82,0.06);
-  --info: #5e8dcc;
-  --info-bg: rgba(94,141,204,0.06);
+  /* Status — AA on light surface (#f8f9fb): each ≥4.5:1 (see #259). */
+  --success: #2d7a4f;
+  --success-bg: rgba(45,122,79,0.08);
+  --warning: #8a5a1a;
+  --warning-bg: rgba(138,90,26,0.08);
+  --danger: #b03c3c;
+  --danger-bg: rgba(176,60,60,0.06);
+  --info: #3d6a9e;
+  --info-bg: rgba(61,106,158,0.06);
 
   /* Ring / focus — bright blue rgba(41,171,226) cannot reach 3:1 on light
      bg (even solid = 2.49:1), so use the theme's deep primary #0071BC at
@@ -363,18 +397,47 @@ html[data-theme-sync='true'] *::after {
   --text-weaker: var(--text-2);
   --text-weakest: var(--text-3);
 
-  /* TokenDance cross-app aliases */
+  /* TokenDance cross-app aliases — Required Token Contract (design-system.md) */
   --td-canvas: var(--app-bg);
   --td-surface: var(--surface);
+  --td-tint: var(--primary-light);
+  --td-panel: var(--surface-high);
   --td-ink: var(--text-1);
   --td-ink-muted: var(--text-2);
   --td-line: var(--bdr);
   --td-plum: var(--primary);
   --td-moss: var(--success);
   --td-danger: var(--danger);
+  --td-warning: var(--warning);
   --td-focus: var(--bdr-focus);
   --td-radius-control: 8px;
   --td-radius-panel: 16px;
+  --td-space-1: var(--sp-xs);      /* 4px */
+  --td-space-2: var(--sp-sm);      /* 8px */
+  --td-space-3: var(--space-md);   /* 12px */
+  --td-space-4: var(--sp-md);      /* 16px */
+  --td-space-5: var(--sp-lg);      /* 24px */
+  --td-space-6: var(--sp-xl);      /* 32px */
+  --td-space-7: 2.5rem;            /* 40px */
+  --td-space-8: var(--space-3xl);  /* 48px */
+  --td-font: var(--font-sans);
+  --td-mono: var(--font-mono);
+  --td-text-1: var(--text-1);
+  --td-text-2: var(--text-2);
+  --td-text-3: var(--text-3);
+  --td-text-xs: var(--font-size-xs);
+  --td-text-sm: var(--font-size-sm);
+  --td-text-base: var(--font-size-base);
+  --td-text-lg: var(--font-size-lg);
+  --td-text-xl: var(--font-size-xl);
+  --td-leading-tight: var(--line-height-tight);
+  --td-leading-normal: var(--line-height-normal);
+  --td-leading-relaxed: var(--line-height-relaxed);
+  --td-shadow-sm: var(--e-1);
+  --td-shadow-md: var(--e-2);
+  --td-shadow-lg: var(--e-3);
+  --td-shadow-panel: var(--td-shadow-md);
+  --td-shadow-hairline: 0 0 0 1px var(--td-line);
 
   /* ── Chat surface tokens ────────────────────── */
   --chat-agent-bg: transparent;
@@ -457,6 +520,11 @@ html[data-theme-sync='true'] *::after {
   --elevated-card-border: var(--glass-card-border);
   --elevated-card-shadow: var(--glass-elev-1);
   --elevated-card-shadow-strong: var(--glass-elev-2);
+
+  /* Team transcript hover/amber tints — light theme uses faint black lifts. */
+  --td-hover-faint:    rgba(0, 0, 0, 0.015);
+  --td-hover-soft:     rgba(0, 0, 0, 0.04);
+  --td-accent-amber-bg: rgba(245, 158, 11, 0.1);
 
   /* ── Canvas ambient (light white frost) ──────── */
   --canvas-ambient: radial-gradient(
