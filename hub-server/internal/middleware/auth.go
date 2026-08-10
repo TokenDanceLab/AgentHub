@@ -324,7 +324,30 @@ func (m *AuthMiddleware) acceptAccessClaims(c *gin.Context, claims *jwtutil.Clai
 	}
 	blacklisted, err := m.deps.BlacklistChecker.IsAccessTokenBlacklisted(c.Request.Context(), claims.ID)
 	if err != nil {
-		// Checker already fail-opens on Redis errors; treat residual errors as open.
+		// The Redis-backed checker itself fail-opens on Redis errors and
+		// returns the residual error here. The default policy is fail-open
+		// (allow the request) to avoid locking users out during a Redis
+		// outage. Operators hardening production set
+		// AGENTHUB_AUTH_FAIL_CLOSED=true so a Redis outage cannot let a
+		// revoked (logged-out) access JWT back in: the request is rejected
+		// with 401 because revocation status could not be verified.
+		if config.AuthFailClosed() {
+			slog.Warn("access jti blacklist check error, fail-closed",
+				"jti", claims.ID, "user_id", claims.UserID, "error", err)
+			if metrics.JTIBlacklistCheckErrors != nil {
+				metrics.JTIBlacklistCheckErrors.Inc()
+			}
+			m.auditPermission(c, claims.UserID, "auth_validate", false, map[string]interface{}{
+				"reason": "jti_blacklist_check_failed_fail_closed",
+				"path":   c.FullPath(),
+			}, c.ClientIP())
+			if metrics.JWTVerificationFailures != nil {
+				metrics.JWTVerificationFailures.WithLabelValues("jti_blacklist_check_failed").Inc()
+			}
+			fail(c, errcode.AuthInvalidToken)
+			c.Abort()
+			return false
+		}
 		slog.Warn("access jti blacklist check error, fail-open", "jti", claims.ID, "error", err)
 		// G9: fail-open Redis error — security-relevant, must be visible in Grafana.
 		if metrics.JTIBlacklistCheckErrors != nil {

@@ -212,6 +212,24 @@ func (s *Service) HandleCallback(ctx context.Context, code, state, codeVerifier,
 		return nil, errcode.OIDCInvalidState
 	}
 
+	// Local PKCE verification (defense in depth): confirm the caller's
+	// code_verifier hashes to the code_challenge stored during authorize.
+	// TokenDance ID also checks this server-side, but a local check rejects a
+	// mismatched verifier before the network round-trip and makes the trust
+	// boundary explicit at the Hub. Only S256 is supported (enforced at
+	// authorize time); a missing/empty verifier is a client bug and fails closed.
+	if codeVerifier == "" {
+		return nil, errcode.OIDCInvalidState
+	}
+	if entry.CodeChallengeMethod != "S256" {
+		return nil, errcode.OIDCInvalidState
+	}
+	verifierDigest := sha256.Sum256([]byte(codeVerifier))
+	computedChallenge := base64.RawURLEncoding.EncodeToString(verifierDigest[:])
+	if !slices.Equal([]byte(computedChallenge), []byte(entry.CodeChallenge)) {
+		return nil, errcode.OIDCInvalidState
+	}
+
 	// 2. Exchange authorization code for tokens at TokenDance ID
 	slog.Debug("oidc.token.exchange.start", "redirect_uri", entry.RedirectURI, "code_len", len(code), "verifier_len", len(codeVerifier))
 	tokenResponse, err := s.exchangeCode(ctx, code, codeVerifier, entry.RedirectURI)

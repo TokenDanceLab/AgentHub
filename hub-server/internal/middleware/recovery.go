@@ -10,6 +10,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"github.com/agenthub/hub-server/internal/metrics"
 	sharederr "github.com/agenthub/pkg/errcode"
 )
 
@@ -23,6 +24,10 @@ import (
 //   - Returns a standard JSON error envelope: {"error": {"code": "...", "message": "...", "traceId": "..."}}.
 //   - Includes the request ID as traceId when available.
 //   - Suppresses stack-trace logging for broken-pipe errors (client disconnect).
+//   - Increments http_panic_recoveries_total so operators can alert on a
+//     non-zero panic rate (a handler bug that would otherwise crash the
+//     process when paired with the Timeout middleware's goroutine, which is
+//     recovered separately in timeout.go).
 func CustomRecovery() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		defer func() {
@@ -33,6 +38,10 @@ func CustomRecovery() gin.HandlerFunc {
 					// The connection is gone; nothing useful to write to the client.
 					c.Abort()
 					return
+				}
+
+				if metrics.HTTPPanicRecoveries != nil {
+					metrics.HTTPPanicRecoveries.Inc()
 				}
 
 				stack := debug.Stack()
@@ -68,6 +77,10 @@ func RecoveryHTTPHandler(next http.Handler) http.Handler {
 			if err := recover(); err != nil {
 				if isBrokenPipe(err) {
 					return
+				}
+
+				if metrics.HTTPPanicRecoveries != nil {
+					metrics.HTTPPanicRecoveries.Inc()
 				}
 
 				stack := debug.Stack()

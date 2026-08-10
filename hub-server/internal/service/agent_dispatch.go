@@ -12,6 +12,7 @@ import (
 	"github.com/agenthub/hub-server/internal/config"
 	"github.com/agenthub/hub-server/internal/jwtutil"
 	"github.com/agenthub/hub-server/internal/metrics"
+	"github.com/agenthub/hub-server/internal/middleware"
 	"github.com/agenthub/hub-server/internal/model"
 	"github.com/agenthub/hub-server/internal/repository"
 	"github.com/agenthub/hub-server/internal/service/dispatch"
@@ -21,6 +22,45 @@ import (
 // ── DTO aliases, ports, and wiring surface moved to agent_dispatch_ports.go (#1068).
 // ── AgentService facade moved to agent_dispatch_facade.go (#1068).
 // Core orchestration methods follow.
+
+// dispatchSemaphoreCapacity bounds concurrent dispatchTask goroutines launched
+// by TriggerAgentTask. It is intentionally generous so that normal load never
+// backs off, while a dispatch storm cannot exhaust goroutines/connections.
+const dispatchSemaphoreCapacity = 64
+
+// launchDispatchTask starts dispatchTask on a bounded goroutine. It performs a
+// non-blocking acquire on s.dispatchSem: when at capacity it does NOT spawn a
+// new goroutine and instead leaves the already-persisted queued task for the
+// TTL/redispatch path. This bounds live dispatchTask goroutines to the
+// semaphore capacity. The goroutine releases the slot before returning.
+func (s *DispatchService) launchDispatchTask(ctx context.Context, task *model.PendingAgentTask, ai *model.AgentInstance, prompt, modelParams, targetType string, customAgent *model.CustomAgent) {
+	if !dispatch.ServiceReceiverAvailable(s != nil) {
+		return
+	}
+	// Partial test constructions (e.g. &DispatchService{}) leave dispatchSem nil.
+	// Fall back to the historical unbounded launch so those paths keep working;
+	// only the production composition root wires a real semaphore.
+	if s.dispatchSem == nil {
+		middleware.SafeGo("dispatch.launch", func() {
+			s.dispatchTask(ctx, task, ai, prompt, modelParams, targetType, customAgent)
+		})
+		return
+	}
+	select {
+	case s.dispatchSem <- struct{}{}:
+	default:
+		// Semaphore full: back off. The task is already persisted as queued;
+		// the TTL sweeper / redispatch path will pick it up. Avoid spawning
+		// another goroutine that would only block on the semaphore.
+		slog.Warn(dispatch.DispatchLogSemaphoreFull,
+			"task_id", task.ID, "agent_instance_id", ai.ID, "capacity", dispatchSemaphoreCapacity)
+		return
+	}
+	middleware.SafeGo("dispatch.launch", func() {
+		defer func() { <-s.dispatchSem }()
+		s.dispatchTask(ctx, task, ai, prompt, modelParams, targetType, customAgent)
+	})
+}
 
 // dispatchToEdgeHTTP POSTs a task to local Edge /v1/runs. Returns Edge run ID on
 // success, or empty string when unreachable / rejected / decode fails.
@@ -85,7 +125,10 @@ func (s *DispatchService) TriggerAgentTask(ctx context.Context, userID, triggerM
 
 	// #100: Use context.WithoutCancel so the dispatch goroutine is not
 	// cancelled when the HTTP handler's request context is cancelled.
-	go s.dispatchTask(context.WithoutCancel(ctx), task, ai, dispatch.PromptFromMessage(msg), modelParams, targetType, customAgent)
+	// launchDispatchTask bounds concurrent dispatch goroutines via
+	// dispatchSem; on backoff the already-queued task is left for the
+	// TTL/redispatch path instead of spawning an unbounded goroutine.
+	s.launchDispatchTask(context.WithoutCancel(ctx), task, ai, dispatch.PromptFromMessage(msg), modelParams, targetType, customAgent)
 
 	return task, nil
 }

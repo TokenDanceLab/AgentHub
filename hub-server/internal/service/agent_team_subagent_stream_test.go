@@ -3,6 +3,8 @@ package service
 import (
 	"context"
 	"encoding/json"
+	"reflect"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -21,22 +23,18 @@ import (
 // HandleTaskStream + team-run ownership lookup need. Mirrors the schema in
 // agent_run_event_test.go plus agent_team_assignments / agent_team_tasks so
 // dbTeamRunLookup can resolve RunID → assignment/team_task/member.
+//
+// The DDL column types mirror the gorm `type:` tags declared in the production
+// model structs (hub-server/internal/model/*.go). The
+// TestSubagentStreamTestDB_DDLMatchesProductionModels drift test asserts they
+// stay in sync; when you change a model's gorm type tag, update the matching
+// DDL line here in the same commit.
 func newSubagentStreamTestDB(t *testing.T) *gorm.DB {
 	t.Helper()
 	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
 	require.NoError(t, err)
 	now := time.Now()
-	ddl := []string{
-		`CREATE TABLE sessions (id TEXT PRIMARY KEY, type TEXT NOT NULL, workspace_id TEXT, next_seq INTEGER NOT NULL DEFAULT 0, last_message_at DATETIME, dissolved BOOLEAN NOT NULL DEFAULT FALSE, created_at DATETIME)`,
-		`CREATE TABLE agent_instances (id TEXT PRIMARY KEY, agent_type TEXT NOT NULL, custom_agent_id TEXT, session_id TEXT NOT NULL, inviter_user_id TEXT NOT NULL, workspace_id TEXT, display_name TEXT NOT NULL, created_at DATETIME)`,
-		`CREATE TABLE pending_agent_tasks (id TEXT PRIMARY KEY, agent_instance_id TEXT NOT NULL, triggered_by_user_id TEXT NOT NULL, trigger_message_id TEXT NOT NULL, target_id TEXT, status TEXT NOT NULL, edge_run_id TEXT, edge_device_id TEXT, error_message TEXT, created_at DATETIME, dispatched_at DATETIME, finished_at DATETIME, expire_at DATETIME NOT NULL)`,
-		`CREATE TABLE messages (id TEXT PRIMARY KEY, session_id TEXT NOT NULL, seq_id INTEGER NOT NULL, client_msg_id TEXT NOT NULL, sender_type TEXT NOT NULL, sender_id TEXT NOT NULL, content_type TEXT NOT NULL, content TEXT NOT NULL, reply_to_message_id TEXT, recalled BOOLEAN NOT NULL DEFAULT FALSE, edited BOOLEAN NOT NULL DEFAULT FALSE, edited_at DATETIME, created_at DATETIME)`,
-		`CREATE UNIQUE INDEX idx_messages_session_client_msg ON messages (session_id, client_msg_id)`,
-		`CREATE TABLE agent_run_events (id TEXT PRIMARY KEY, task_id TEXT NOT NULL, edge_run_id TEXT, session_id TEXT NOT NULL, agent_instance_id TEXT NOT NULL, event_seq INTEGER NOT NULL, event_type TEXT NOT NULL, payload TEXT NOT NULL, created_at DATETIME)`,
-		`CREATE TABLE agent_team_runs (id TEXT PRIMARY KEY, team_id TEXT NOT NULL, session_id TEXT NOT NULL, trigger_user_id TEXT NOT NULL, trigger_message TEXT, target_id TEXT, mode TEXT NOT NULL DEFAULT 'supervisor', status TEXT NOT NULL, created_at DATETIME, updated_at DATETIME)`,
-		`CREATE TABLE agent_team_assignments (id TEXT PRIMARY KEY, team_run_id TEXT NOT NULL, from_member_id TEXT NOT NULL, to_member_id TEXT NOT NULL, type TEXT NOT NULL DEFAULT 'delegate', task_prompt TEXT NOT NULL, context TEXT DEFAULT '', status TEXT NOT NULL DEFAULT 'pending', run_id TEXT, result TEXT DEFAULT '', depth INTEGER NOT NULL DEFAULT 0, created_at DATETIME, updated_at DATETIME)`,
-		`CREATE TABLE agent_team_tasks (id TEXT PRIMARY KEY, team_run_id TEXT NOT NULL, assignment_id TEXT, assignee_member_id TEXT NOT NULL, parent_task_id TEXT, status TEXT NOT NULL DEFAULT 'pending', objective TEXT NOT NULL, input_refs TEXT NOT NULL DEFAULT '{}', run_id TEXT, attempt INTEGER NOT NULL DEFAULT 1, risk_level TEXT NOT NULL DEFAULT 'normal', created_at DATETIME, updated_at DATETIME)`,
-	}
+	ddl := subagentStreamTestDDL()
 	for _, stmt := range ddl {
 		require.NoError(t, db.Exec(stmt).Error)
 	}
@@ -44,6 +42,23 @@ func newSubagentStreamTestDB(t *testing.T) *gorm.DB {
 	require.NoError(t, db.Exec(`INSERT INTO agent_instances (id, agent_type, session_id, inviter_user_id, display_name, created_at) VALUES (?, ?, ?, ?, ?, ?)`, "agent-1", "codex", "sess-1", "user-1", "Codex", now).Error)
 	require.NoError(t, db.Exec(`INSERT INTO pending_agent_tasks (id, agent_instance_id, triggered_by_user_id, trigger_message_id, target_id, status, edge_run_id, edge_device_id, created_at, expire_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, "task-1", "agent-1", "user-1", "msg-1", "target-1", model.TaskStatusRunning, "run-1", "dev-1", now, now.Add(time.Hour)).Error)
 	return db
+}
+
+// subagentStreamTestDDL returns the hand-written DDL for the subagent stream
+// test schema. It is shared by newSubagentStreamTestDB and the drift test so
+// both stay anchored to the same source.
+func subagentStreamTestDDL() []string {
+	return []string{
+		`CREATE TABLE sessions (id uuid PRIMARY KEY, type varchar(16) NOT NULL, workspace_id uuid, next_seq INTEGER NOT NULL DEFAULT 0, last_message_at DATETIME, dissolved BOOLEAN NOT NULL DEFAULT FALSE, created_at DATETIME)`,
+		`CREATE TABLE agent_instances (id uuid PRIMARY KEY, agent_type varchar(64) NOT NULL, custom_agent_id uuid, session_id uuid NOT NULL, inviter_user_id uuid NOT NULL, workspace_id uuid, display_name varchar(64) NOT NULL, created_at DATETIME)`,
+		`CREATE TABLE pending_agent_tasks (id uuid PRIMARY KEY, agent_instance_id uuid NOT NULL, triggered_by_user_id uuid NOT NULL, trigger_message_id uuid NOT NULL, target_id uuid, status varchar(16) NOT NULL, edge_run_id varchar(128), edge_device_id uuid, error_message text, created_at DATETIME, dispatched_at DATETIME, finished_at DATETIME, expire_at DATETIME NOT NULL)`,
+		`CREATE TABLE messages (id uuid PRIMARY KEY, session_id uuid NOT NULL, seq_id INTEGER NOT NULL, client_msg_id uuid NOT NULL, sender_type varchar(16) NOT NULL, sender_id uuid NOT NULL, content_type varchar(32) NOT NULL, content jsonb NOT NULL, reply_to_message_id uuid, recalled BOOLEAN NOT NULL DEFAULT FALSE, edited BOOLEAN NOT NULL DEFAULT FALSE, edited_at DATETIME, created_at DATETIME)`,
+		`CREATE UNIQUE INDEX idx_messages_session_client_msg ON messages (session_id, client_msg_id)`,
+		`CREATE TABLE agent_run_events (id uuid PRIMARY KEY, task_id uuid NOT NULL, edge_run_id varchar(128), session_id uuid NOT NULL, agent_instance_id uuid NOT NULL, event_seq INTEGER NOT NULL, event_type varchar(96) NOT NULL, payload jsonb NOT NULL, created_at DATETIME)`,
+		`CREATE TABLE agent_team_runs (id uuid PRIMARY KEY, team_id uuid NOT NULL, session_id uuid NOT NULL, trigger_user_id uuid NOT NULL, trigger_message text, target_id uuid, mode varchar(20) NOT NULL DEFAULT 'supervisor', status varchar(20) NOT NULL DEFAULT 'queued', created_at DATETIME, updated_at DATETIME)`,
+		`CREATE TABLE agent_team_assignments (id uuid PRIMARY KEY, team_run_id uuid NOT NULL, from_member_id uuid NOT NULL, to_member_id uuid NOT NULL, type varchar(20) NOT NULL DEFAULT 'delegate', task_prompt text NOT NULL, context text DEFAULT '', status varchar(20) NOT NULL DEFAULT 'pending', run_id uuid, result text DEFAULT '', depth INTEGER NOT NULL DEFAULT 0, created_at DATETIME, updated_at DATETIME)`,
+		`CREATE TABLE agent_team_tasks (id uuid PRIMARY KEY, team_run_id uuid NOT NULL, assignment_id uuid, assignee_member_id uuid NOT NULL, parent_task_id uuid, status varchar(20) NOT NULL DEFAULT 'pending', objective text NOT NULL, input_refs jsonb NOT NULL DEFAULT '{}', run_id varchar(128), attempt INTEGER NOT NULL DEFAULT 1, risk_level varchar(20) NOT NULL DEFAULT 'normal', created_at DATETIME, updated_at DATETIME)`,
+	}
 }
 
 // seedSubagentTeamRun inserts a team run + a dispatched assignment + team task
@@ -296,5 +311,189 @@ func TestSubagentStreamLookup_IsInjectable(t *testing.T) {
 		require.Equal(t, "asg-9", p.AssignmentID)
 	case <-time.After(time.Second):
 		t.Fatal("injectable lookup should have produced an event")
+	}
+}
+
+// TestSubagentStreamTestDB_DDLMatchesProductionModels is a fixture drift
+// guard. It reflects over the production model structs (model/*.go), extracts
+// every field with an explicit gorm `type:` tag, and asserts the hand-written
+// DDL in subagentStreamTestDDL declares the same type for that column. This
+// catches drift such as target_id TEXT in the test DDL while the model says
+// `type:uuid`, which would mask type bugs that only surface against a real
+// Postgres schema. Columns without an explicit model `type:` tag (e.g.
+// created_at with only autoCreateTime) are skipped — gorm infers those and the
+// DDL's DATETIME is acceptable for sqlite.
+func TestSubagentStreamTestDB_DDLMatchesProductionModels(t *testing.T) {
+	expected := map[string]map[string]string{
+		"sessions":               gormTypeTags(reflect.TypeOf(model.Session{})),
+		"agent_instances":        gormTypeTags(reflect.TypeOf(model.AgentInstance{})),
+		"pending_agent_tasks":    gormTypeTags(reflect.TypeOf(model.PendingAgentTask{})),
+		"messages":               gormTypeTags(reflect.TypeOf(model.Message{})),
+		"agent_run_events":       gormTypeTags(reflect.TypeOf(model.AgentRunEvent{})),
+		"agent_team_runs":        gormTypeTags(reflect.TypeOf(model.AgentTeamRun{})),
+		"agent_team_assignments": gormTypeTags(reflect.TypeOf(model.AgentTeamAssignment{})),
+		"agent_team_tasks":       gormTypeTags(reflect.TypeOf(model.AgentTeamTask{})),
+	}
+
+	for _, stmt := range subagentStreamTestDDL() {
+		tableName, ddlCols, ok := parseCreateTableColumns(stmt)
+		if !ok {
+			continue // skip CREATE INDEX and other non-CREATE-TABLE statements
+		}
+		expCols, hasModel := expected[tableName]
+		require.True(t, hasModel, "DDL table %q has no model mapping in drift test", tableName)
+		for col, actualType := range ddlCols {
+			expType, hasExp := expCols[col]
+			if !hasExp {
+				continue // column has no explicit model type tag; skip
+			}
+			require.Equal(t, canonicalType(expType), canonicalType(actualType),
+			"table %q column %q: DDL type %q drifts from model gorm type %q — "+
+				"update subagentStreamTestDDL to match the model tag",
+			tableName, col, actualType, expType)
+		}
+	}
+}
+
+// gormTypeTags reflects over a struct and returns a map of column-name → gorm
+// `type:` tag value for every field that declares one. Column names respect an
+// explicit `column:` override; otherwise the Go field name is converted to
+// snake_case (matching gorm's default NamingStrategy).
+func gormTypeTags(structType reflect.Type) map[string]string {
+	out := make(map[string]string)
+	for i := 0; i < structType.NumField(); i++ {
+		field := structType.Field(i)
+		tag := field.Tag.Get("gorm")
+		if tag == "" {
+			continue
+		}
+		columnName := toSnakeCase(field.Name)
+		var typeValue string
+		for _, seg := range strings.Split(tag, ";") {
+			seg = strings.TrimSpace(seg)
+			switch {
+			case strings.HasPrefix(seg, "column:"):
+				columnName = strings.TrimPrefix(seg, "column:")
+			case strings.HasPrefix(seg, "type:"):
+				typeValue = strings.TrimPrefix(seg, "type:")
+			}
+		}
+		if typeValue == "" {
+			continue
+		}
+		out[strings.ToLower(columnName)] = typeValue
+	}
+	return out
+}
+
+// parseCreateTableColumns parses a `CREATE TABLE name (col type ..., ...)` DDL
+// statement into a column-name → declared-type map. Returns ok=false for
+// non-CREATE-TABLE statements (indexes, etc.) or malformed input.
+func parseCreateTableColumns(stmt string) (tableName string, cols map[string]string, ok bool) {
+	trimmed := strings.TrimSpace(stmt)
+	lowerHead := strings.ToLower(trimmed)
+	if !strings.HasPrefix(lowerHead, "create table ") {
+		return "", nil, false
+	}
+	open := strings.Index(trimmed, "(")
+	closeIdx := strings.LastIndex(trimmed, ")")
+	if open == -1 || closeIdx == -1 || closeIdx < open {
+		return "", nil, false
+	}
+	// "CREATE TABLE <name> (" — extract the table name token between the prefix
+	// and the opening paren.
+	headSegment := strings.TrimSpace(trimmed[len("create table"):open])
+	tableName = strings.TrimSpace(headSegment)
+	body := trimmed[open+1 : closeIdx]
+	cols = make(map[string]string)
+	for _, def := range strings.Split(body, ",") {
+		def = strings.TrimSpace(def)
+		if def == "" {
+			continue
+		}
+		tokens := strings.Fields(def)
+		if len(tokens) < 2 {
+			continue
+		}
+		name := tokens[0]
+		if isConstraintKeyword(name) {
+			continue
+		}
+		cols[strings.ToLower(name)] = strings.ToLower(tokens[1])
+	}
+	return tableName, cols, true
+}
+
+// isConstraintKeyword reports whether a DDL token is a SQL constraint keyword
+// (PRIMARY, NOT, DEFAULT, UNIQUE, FOREIGN, CONSTRAINT, CHECK, REFERENCES)
+// rather than a column name. Our DDL uses lowercase column names, so any
+// all-uppercase token inside a column-definition slot is a constraint keyword.
+func isConstraintKeyword(token string) bool {
+	switch strings.ToUpper(token) {
+	case "PRIMARY", "NOT", "NULL", "DEFAULT", "UNIQUE", "FOREIGN", "KEY",
+		"CONSTRAINT", "CHECK", "REFERENCES", "CREATE", "TABLE", "INDEX":
+		return true
+	}
+	return false
+}
+
+// toSnakeCase converts a CamelCase Go identifier to the snake_case form gorm
+// uses for default column names (e.g. AgentInstanceID → agent_instance_id,
+// ID → id, TriggeredByUserID → triggered_by_user_id).
+func toSnakeCase(name string) string {
+	var b strings.Builder
+	runes := []rune(name)
+	for i, r := range runes {
+		if !unicodeIsUpper(r) {
+			b.WriteRune(r)
+			continue
+		}
+		if i > 0 {
+			prev := runes[i-1]
+			if !unicodeIsUpper(prev) {
+				b.WriteRune('_')
+			} else if i+1 < len(runes) && !unicodeIsUpper(runes[i+1]) {
+				b.WriteRune('_')
+			}
+		}
+		b.WriteRune(unicodeToLower(r))
+	}
+	return b.String()
+}
+
+func unicodeIsUpper(r rune) bool { return r >= 'A' && r <= 'Z' }
+func unicodeToLower(r rune) rune {
+	if r >= 'A' && r <= 'Z' {
+		return r + ('a' - 'A')
+	}
+	return r
+}
+
+// canonicalType collapses dialect-specific type names into a semantic
+// category so the drift test treats sqlite and Postgres variants of the same
+// logical type as equivalent. For example, a model tag `type:timestamptz`
+// (Postgres) and the sqlite DDL `DATETIME` both map to "timestamp" because the
+// sqlite driver requires DATETIME to scan into time.Time. Conversely, `uuid`
+// vs `text` remain distinct so a real drift (TEXT where the model says uuid)
+// is still caught.
+func canonicalType(t string) string {
+	t = strings.ToLower(strings.TrimSpace(t))
+	switch {
+	case t == "uuid":
+		return "uuid"
+	case strings.HasPrefix(t, "varchar"):
+		return "varchar"
+	case t == "text":
+		return "text"
+	case t == "jsonb" || t == "json":
+		return "json"
+	case t == "timestamptz" || t == "datetime" || t == "timestamp" || strings.HasPrefix(t, "timestamp"):
+		return "timestamp"
+	case t == "boolean" || t == "bool":
+		return "boolean"
+	case strings.HasPrefix(t, "int"):
+		return "integer"
+	default:
+		return t
 	}
 }

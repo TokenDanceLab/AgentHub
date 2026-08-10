@@ -135,6 +135,15 @@ const RateLimitExpiryBuffer = 10 * time.Second
 // setting. Controlled by the AGENTHUB_RATE_LIMIT_FAIL_OPEN environment variable.
 const RateLimitFailOpenDefault = true
 
+// AuthFailClosedDefault controls the default behavior when the access-token
+// jti blacklist checker (Redis-backed) returns an error. When false (default),
+// the auth middleware fails open (allows the request through) to preserve the
+// historical behavior and avoid locking users out during a Redis outage. When
+// true (set via AGENTHUB_AUTH_FAIL_CLOSED=true), the middleware fails closed
+// and rejects the request so a Redis outage cannot let a revoked access JWT
+// (post-logout) back into the product APIs.
+const AuthFailClosedDefault = false
+
 // ── Messaging ────────────────────────────────────────────────────────────────
 
 // MessageRecallWindow is the non-owner recall window for messages.

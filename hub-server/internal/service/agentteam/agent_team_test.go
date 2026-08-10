@@ -639,7 +639,7 @@ func TestAgentTeamService_CompleteAssignmentPublishesEvent(t *testing.T) {
 	}
 	t.Cleanup(func() { eventBus.Close(context.Background()) })
 	events := make(chan bus.Event, 1)
-	eventBus.Subscribe("team.assignment.completed", func(ctx context.Context, event bus.Event) {
+	eventBus.Subscribe(bus.EventTypeTeamAssignmentDone, func(ctx context.Context, event bus.Event) {
 		events <- event
 	})
 	svc.SetBus(eventBus)
@@ -658,7 +658,7 @@ func TestAgentTeamService_CompleteAssignmentPublishesEvent(t *testing.T) {
 	require.NoError(t, svc.CompleteAssignment(context.Background(), "user-1", assignment.ID, "done text"))
 
 	event := readAgentTeamEvent(t, events)
-	assert.Equal(t, "team.assignment.completed", event.Type)
+	assert.Equal(t, bus.EventTypeTeamAssignmentDone, event.Type)
 	payload, ok := event.Payload.(map[string]interface{})
 	require.True(t, ok)
 	assert.Equal(t, run.ID, payload["team_run_id"])

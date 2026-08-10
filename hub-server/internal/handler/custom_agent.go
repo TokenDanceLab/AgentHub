@@ -1,12 +1,14 @@
 package handler
 
 import (
-	"errors"
 	"context"
+	"errors"
+	"log/slog"
 
 	"github.com/gin-gonic/gin"
 
 	"github.com/agenthub/hub-server/internal/errcode"
+	"github.com/agenthub/hub-server/internal/middleware"
 	"github.com/agenthub/hub-server/internal/model"
 )
 
@@ -50,7 +52,8 @@ func (h *CustomAgentHandler) Create(c *gin.Context) {
 		ToolWhitelist:  req.ToolWhitelist,
 		ModelParams:    req.ModelParams,
 	}).Validate(); err != nil {
-		FailWithMessage(c, errcode.ErrBadRequest, err.Error())
+		slog.Error("custom agent create validation failed", "request_id", middleware.GetRequestID(c), "user_id", userID, "error", err)
+		FailWithMessage(c, errcode.ErrBadRequest, "invalid agent configuration")
 		return
 	}
 	ca, err := h.service.CreateCustomAgent(c.Request.Context(), userID, req.Name, req.AvatarURL, req.AgentType, req.SystemPrompt, req.CapabilityTags, req.ToolWhitelist, req.ModelParams)
@@ -113,7 +116,8 @@ func (h *CustomAgentHandler) Update(c *gin.Context) {
 	}
 	// Pre-validate jsonb fields before DB update.
 	if err := ca.Validate(); err != nil {
-		FailWithMessage(c, errcode.ErrBadRequest, err.Error())
+		slog.Error("custom agent update validation failed", "request_id", middleware.GetRequestID(c), "user_id", userID, "agent_id", id, "error", err)
+		FailWithMessage(c, errcode.ErrBadRequest, "invalid agent configuration")
 		return
 	}
 	if err := h.service.UpdateCustomAgent(c.Request.Context(), userID, ca); err != nil {

@@ -29,11 +29,6 @@ func NewClient(rdb *redis.Client) *Client {
 	return &Client{rdb: rdb}
 }
 
-// isReady reports whether the underlying Redis connection is available.
-func (c *Client) isReady() bool {
-	return c != nil && c.rdb != nil
-}
-
 // GetRDB returns the underlying Redis client for advanced operations (e.g., rate limiting).
 // Returns nil if called on a nil *Client (defensive guard against wiring errors).
 func (c *Client) GetRDB() *redis.Client {

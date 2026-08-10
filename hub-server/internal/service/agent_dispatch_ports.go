@@ -95,6 +95,20 @@ type DispatchService struct {
 	edgeClient *http.Client
 	// jwtSecret signs run-start capability tokens; sourced from config.JWT.
 	jwtSecret string
+	// edgeBreaker guards dispatchToEdgeHTTP against a down Edge server. A nil
+	// breaker (partial test constructions) allows all traffic; NewDispatchService
+	// wires a real breaker so production fails fast after threshold consecutive
+	// edge failures instead of blocking the dispatch semaphore for 30s each.
+	edgeBreaker *edgeCircuitBreaker
+	// dispatchSem bounds concurrent dispatchTask goroutines launched from
+	// TriggerAgentTask. Without it every trigger spawns an unbounded goroutine
+	// that performs DB/HTTP/WS work; a dispatch storm could exhaust goroutines
+	// and connections. Capacity 64 matches a generous per-instance ceiling;
+	// when full the task stays persisted as queued and is picked up by the
+	// TTL/redispatch path instead of launching another goroutine. Direct
+	// test calls to dispatchTask bypass the semaphore (they already run on
+	// the test goroutine) so the pure dispatch path stays unchanged.
+	dispatchSem chan struct{}
 }
 
 // NewDispatchService constructs a DispatchService. bus/outbox/relay/mgr may be
@@ -114,6 +128,8 @@ func NewDispatchService(db *gorm.DB, bus dispatchBus, mgr dispatchWS, cacheClien
 		edgeCfg:     edgeCfg,
 		edgeClient:  edgeClient,
 		jwtSecret:   jwtSecret,
+		edgeBreaker: &edgeCircuitBreaker{},
+		dispatchSem: make(chan struct{}, dispatchSemaphoreCapacity),
 	}
 }
 

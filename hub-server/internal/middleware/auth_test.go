@@ -3,6 +3,7 @@ package middleware
 
 import (
 	"context"
+	"errors"
 	"sync/atomic"
 	"crypto/rand"
 	"crypto/rsa"
@@ -693,6 +694,70 @@ func TestWSAuthMiddlewareRejectsBlacklistedAccessJTI(t *testing.T) {
 	}, nil).WSHandler()(c)
 	if !c.IsAborted() {
 		t.Fatal("expected blacklisted access jti to be rejected on WS")
+	}
+	if w.Code != http.StatusUnauthorized {
+		t.Fatalf("status = %d, want 401", w.Code)
+	}
+}
+
+// erroringAccessBlacklist always returns an error, simulating a Redis outage
+// for the jti blacklist check path.
+type erroringAccessBlacklist struct{}
+
+func (erroringAccessBlacklist) IsAccessTokenBlacklisted(ctx context.Context, jti string) (bool, error) {
+	return false, errors.New("redis unavailable")
+}
+
+// TestAuthMiddlewareBlacklistCheckErrorFailsOpenByDefault verifies the
+// historical behavior: when AGENTHUB_AUTH_FAIL_CLOSED is not set (default
+// false), a Redis outage on the jti blacklist path allows the request
+// through (fail-open).
+func TestAuthMiddlewareBlacklistCheckErrorFailsOpenByDefault(t *testing.T) {
+	t.Setenv("AGENTHUB_AUTH_FAIL_CLOSED", "")
+	token := makeToken("user-fo", "desktop", "dev-fo")
+	c, w := ginRequest(http.MethodGet, "/client/auth/me", "Bearer "+token)
+	newTestAuthMW(testConfig(), AuthDependencies{
+		BlacklistChecker: erroringAccessBlacklist{},
+	}, nil).Handler()(c)
+	if c.IsAborted() {
+		t.Fatalf("default fail-open: expected request to be allowed, status=%d body=%s", w.Code, w.Body.String())
+	}
+	if got := c.GetString("user_id"); got != "user-fo" {
+		t.Fatalf("user_id = %q, want user-fo", got)
+	}
+}
+
+// TestAuthMiddlewareBlacklistCheckErrorFailsClosedWhenConfigured verifies the
+// Task 2 hardening: when AGENTHUB_AUTH_FAIL_CLOSED=true, a Redis outage on
+// the jti blacklist path rejects the request with 401 so a revoked
+// (logged-out) access JWT cannot slip back in during the outage.
+func TestAuthMiddlewareBlacklistCheckErrorFailsClosedWhenConfigured(t *testing.T) {
+	t.Setenv("AGENTHUB_AUTH_FAIL_CLOSED", "true")
+	token := makeToken("user-fc", "desktop", "dev-fc")
+	c, w := ginRequest(http.MethodGet, "/client/auth/me", "Bearer "+token)
+	newTestAuthMW(testConfig(), AuthDependencies{
+		BlacklistChecker: erroringAccessBlacklist{},
+	}, nil).Handler()(c)
+	if !c.IsAborted() {
+		t.Fatal("fail-closed: expected request to be rejected when blacklist check errors")
+	}
+	if w.Code != http.StatusUnauthorized {
+		t.Fatalf("status = %d, want 401", w.Code)
+	}
+}
+
+// TestWSAuthMiddlewareBlacklistCheckErrorFailsClosedWhenConfigured is the WS
+// upgrade counterpart: the fail-closed policy applies equally to WebSocket
+// upgrades so a Redis outage cannot let a revoked access JWT upgrade.
+func TestWSAuthMiddlewareBlacklistCheckErrorFailsClosedWhenConfigured(t *testing.T) {
+	t.Setenv("AGENTHUB_AUTH_FAIL_CLOSED", "true")
+	token := makeToken("user-ws-fc", "web", "dev-ws-fc")
+	c, w := ginRequest(http.MethodGet, "/client/ws", "Bearer "+token)
+	newTestAuthMW(testConfig(), AuthDependencies{
+		BlacklistChecker: erroringAccessBlacklist{},
+	}, nil).WSHandler()(c)
+	if !c.IsAborted() {
+		t.Fatal("fail-closed WS: expected upgrade to be rejected when blacklist check errors")
 	}
 	if w.Code != http.StatusUnauthorized {
 		t.Fatalf("status = %d, want 401", w.Code)

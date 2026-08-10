@@ -13,7 +13,6 @@ import (
 	"github.com/agenthub/hub-server/internal/bus"
 	"github.com/agenthub/hub-server/internal/model"
 	"github.com/agenthub/hub-server/internal/repository"
-	"github.com/agenthub/hub-server/internal/ws"
 )
 
 // BusEventTeamSubagentStream is the in-process bus event type that carries a
@@ -315,25 +314,28 @@ func (s *EdgeCallbackService) InvalidateTeamRunContext(taskID string) {
 }
 
 // teamCtxCache lazily allocates the LRU so tests that construct
-// EdgeCallbackService via struct literals still get caching.
+// EdgeCallbackService via struct literals still get caching. The allocation
+// is guarded by sync.Once so concurrent first-callers cannot both observe a
+// nil cache and double-allocate (a check-then-write data race).
 func (s *EdgeCallbackService) teamCtxCache() *teamRunContextCache {
-	if s.ctxCache == nil {
-		s.ctxCache = newTeamRunContextCache(1024)
-	}
+	s.ctxCacheOnce.Do(func() {
+		if s.ctxCache == nil {
+			s.ctxCache = newTeamRunContextCache(1024)
+		}
+	})
 	return s.ctxCache
 }
 
 // subagentLookup lazily allocates the DB-backed lookup so tests that construct
 // EdgeCallbackService via struct literals (no db wiring) still build, and so
-// the interface seam is available for substitution.
+// the interface seam is available for substitution. The allocation is guarded
+// by sync.Once for the same race-safety reason as teamCtxCache.
 func (s *EdgeCallbackService) subagentLookup() subagentStreamLookup {
-	if s.ctxLookup != nil {
-		return s.ctxLookup
-	}
-	if s.db == nil {
-		return nil
-	}
-	s.ctxLookup = &dbTeamRunLookup{db: s.db}
+	s.ctxLookupOnce.Do(func() {
+		if s.ctxLookup == nil && s.db != nil {
+			s.ctxLookup = &dbTeamRunLookup{db: s.db}
+		}
+	})
 	return s.ctxLookup
 }
 
@@ -342,7 +344,3 @@ func (s *EdgeCallbackService) subagentLookup() subagentStreamLookup {
 func (s *EdgeCallbackService) SetSubagentStreamLookup(lookup subagentStreamLookup) {
 	s.ctxLookup = lookup
 }
-
-// wsTeamSubagentStreamType is exported for tests that assert the bus→WS frame
-// type wiring without importing the ws package transitively.
-var wsTeamSubagentStreamType = ws.TypeTeamSubagentStream

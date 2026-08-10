@@ -4,12 +4,15 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"log/slog"
 	"net/http"
+	"runtime/debug"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/agenthub/hub-server/internal/errcode"
+	"github.com/agenthub/hub-server/internal/metrics"
 	"github.com/gin-gonic/gin"
 )
 
@@ -155,7 +158,40 @@ func Timeout(d time.Duration) gin.HandlerFunc {
 
 		done := make(chan struct{})
 		go func() {
+			// defer LIFO order: recover runs BEFORE close(done) so the parent
+			// (blocked on <-done) does not call flush() until the 500 has been
+			// written to the buffer. Without this recover, a handler panic in
+			// the goroutine would crash the process — CustomRecovery's
+			// defer-recover lives in the request goroutine, not this spawned
+			// one, so it cannot catch a panic that escapes the goroutine.
 			defer close(done)
+			defer func() {
+				if r := recover(); r != nil {
+					slog.ErrorContext(ctx, "handler panic recovered in timeout goroutine",
+						"panic", r,
+						"stack", string(debug.Stack()),
+						"method", c.Request.Method,
+						"path", c.Request.URL.Path,
+					)
+					if metrics.HTTPPanicRecoveries != nil {
+						metrics.HTTPPanicRecoveries.Inc()
+					}
+					// If the handler wrote nothing yet, synthesize a 500 so
+					// flush() delivers a proper error instead of an empty 200.
+					// When the handler already wrote partial output, leave the
+					// buffer as-is so flush() sends what was written.
+					tw.mu.Lock()
+					alreadyWritten := tw.wrote || tw.wroteHeader
+					tw.mu.Unlock()
+					if !alreadyWritten {
+						if tw.hdr.Get("Content-Type") == "" {
+							tw.hdr.Set("Content-Type", "application/json; charset=utf-8")
+						}
+						tw.WriteHeader(http.StatusInternalServerError)
+						_, _ = tw.Write([]byte(`{"error":{"code":"internal_error","message":"internal server error"}}`))
+					}
+				}
+			}()
 			// Check context before starting the handler chain.
 			// If the deadline passed between accepting the connection and
 			// entering this middleware, bail immediately.

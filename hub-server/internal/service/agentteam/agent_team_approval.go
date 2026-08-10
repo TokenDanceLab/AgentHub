@@ -8,6 +8,7 @@ import (
 	"github.com/agenthub/hub-server/internal/errcode"
 	"github.com/agenthub/hub-server/internal/model"
 	"github.com/agenthub/hub-server/internal/repository"
+	"github.com/agenthub/hub-server/internal/service/agentevent"
 	"gorm.io/gorm"
 )
 
@@ -281,21 +282,11 @@ func approvalMatchesID(approval model.TeamApprovalState, approvalID string) bool
 }
 
 func validApprovalDecision(decision string) bool {
-	switch decision {
-	case "allow", "deny":
-		return true
-	default:
-		return false
-	}
+	return agentevent.ValidApprovalDecision(decision)
 }
 
 func pendingApprovalStatus(status string) bool {
-	switch strings.ToLower(strings.TrimSpace(status)) {
-	case "", "pending", "requested", "awaiting":
-		return true
-	default:
-		return false
-	}
+	return agentevent.PendingApprovalStatus(status)
 }
 
 func applyApprovalDecision(approvals []model.TeamApprovalState, decision model.TeamApprovalDecision) {

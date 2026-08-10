@@ -9,6 +9,7 @@ import (
 	"github.com/agenthub/hub-server/internal/cache"
 	"github.com/agenthub/hub-server/internal/config"
 	"github.com/agenthub/hub-server/internal/errcode"
+	sharederr "github.com/agenthub/pkg/errcode"
 	"github.com/gin-gonic/gin"
 )
 
@@ -24,7 +25,7 @@ func GlobalRateLimit(cacheClient *cache.Client) gin.HandlerFunc {
 		if err != nil {
 			if isAuthPath(c) {
 				// Auth paths always fail closed.
-				fail(c, errcode.New("RATE_LIMIT_UNAVAILABLE", "rate limit service unavailable", http.StatusServiceUnavailable))
+				fail(c, errcode.New(sharederr.RateLimitUnavailable, "rate limit service unavailable", http.StatusServiceUnavailable))
 				c.Abort()
 				return
 			}
@@ -40,13 +41,13 @@ func GlobalRateLimit(cacheClient *cache.Client) gin.HandlerFunc {
 				return
 			}
 			// Fail closed for non-auth when explicitly configured.
-			fail(c, errcode.New("RATE_LIMIT_UNAVAILABLE", "rate limit service unavailable", http.StatusServiceUnavailable))
+			fail(c, errcode.New(sharederr.RateLimitUnavailable, "rate limit service unavailable", http.StatusServiceUnavailable))
 			c.Abort()
 			return
 		}
 		if exceeded {
 			c.Header("Retry-After", strconv.Itoa(config.GlobalRateLimitRetryAfterSeconds))
-			fail(c, errcode.New("RATE_LIMITED", "too many requests, please slow down", http.StatusTooManyRequests))
+			fail(c, errcode.New(sharederr.RateLimited, "too many requests, please slow down", http.StatusTooManyRequests))
 			c.Abort()
 			return
 		}

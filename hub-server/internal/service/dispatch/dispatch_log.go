@@ -25,4 +25,6 @@ const (
 	DispatchLogTargetBoundWSNotQueued       = "target-bound agent task websocket dispatch not queued; preserving pending task"
 
 	CapabilityMintFailedLog = "AH-SR-046 failed to issue capability token"
+
+	DispatchLogSemaphoreFull = "dispatch semaphore at capacity; task remains queued for ttl/redispatch"
 )

@@ -60,7 +60,7 @@ func (h *OIDCHandler) PostOIDCAuthorize(c *gin.Context) {
 	redirectURI := strings.TrimSpace(req.RedirectURI)
 	if err := validateRedirectURI(redirectURI, deviceType); err != nil {
 		slog.Error("oidc authorize redirect_uri validation failed", "request_id", middleware.GetRequestID(c), "redirect_uri", redirectURI, "error", err)
-		FailWithMessage(c, errcode.ErrBadRequest, err.Error())
+		FailWithMessage(c, errcode.ErrBadRequest, "redirect_uri is not allowed")
 		return
 	}
 	result, err := h.service.GenerateAuthorizationURL(c.Request.Context(),
@@ -139,7 +139,7 @@ func (h *OIDCHandler) handleCallback(c *gin.Context, code, state, codeVerifier, 
 	trimmedURI := strings.TrimSpace(redirectURI)
 	if err := validateRedirectURI(trimmedURI, dt); err != nil {
 		slog.Error("oidc callback redirect_uri validation failed", "request_id", middleware.GetRequestID(c), "redirect_uri", trimmedURI, "error", err)
-		FailWithMessage(c, errcode.ErrBadRequest, err.Error())
+		FailWithMessage(c, errcode.ErrBadRequest, "redirect_uri is not allowed")
 		return
 	}
 	result, err := h.service.HandleCallback(c.Request.Context(),
