@@ -7,10 +7,10 @@
 
   [中文](README.md) · [Website](https://hub.vectorcontrol.tech) · [Docs](https://hub.vectorcontrol.tech/docs) · [API](api/)
 
-  ![version](https://img.shields.io/badge/version-0.5.0-blue?style=flat-square)
+  ![version](https://img.shields.io/badge/version-0.6.0-blue?style=flat-square)
   ![CI](https://img.shields.io/github/actions/workflow/status/TokenDanceLab/AgentHub/checks.yml?branch=master&style=flat-square&label=CI)
   ![release](https://img.shields.io/github/v/release/TokenDanceLab/AgentHub?style=flat-square)
-  ![go](https://img.shields.io/badge/go-1.25+-00ADD8?style=flat-square&logo=go)
+  ![go](https://img.shields.io/badge/go-1.26+-00ADD8?style=flat-square&logo=go)
   ![react](https://img.shields.io/badge/react-19-61DAFB?style=flat-square&logo=react)
   ![tauri](https://img.shields.io/badge/tauri-2-FFC131?style=flat-square&logo=tauri&logoColor=black)
   ![license](https://img.shields.io/badge/license-Apache--2.0-lightgrey?style=flat-square)
@@ -29,7 +29,7 @@ AgentHub lets you collaborate with human teammates and AI agents in the same gro
 - **IM-native collaboration** — DMs, group chats, @agent mentions — all in one task stream
 - **Multi-runtime dispatch** — Claude Code, Codex, OpenCode through a unified adapter interface
 - **Diff / Preview / Approval** — inline code changes, review workflows
-- **Three native clients** — Tauri Desktop + Web + Expo React Native Mobile
+- **Three native clients** — Tauri Desktop + Web + Expo React Native Mobile (Mobile in assembly — see [CHANGELOG](CHANGELOG.md) Wave5/6)
 - **Hub-Edge distributed** — local execution works offline; Hub adds multi-device sync, remote viewing, and audit
 
 ## Tech Stack
@@ -53,6 +53,20 @@ AgentHub lets you collaborate with human teammates and AI agents in the same gro
 | `edge-server` | Local execution node: CLI adapters, SQLite, event replay |
 | `api` | OpenAPI and WebSocket event contracts |
 | `docs` | Architecture, roadmap, design docs |
+
+## Quick Start
+
+Minimal local bootstrap (5 steps). Requires Docker, Go 1.26+, Node 22+/corepack, pnpm 10+.
+
+```bash
+cp .env.example .env                        # 1. Copy dev env vars (includes dev defaults)
+docker compose up -d postgres redis         # 2. Start infra (PG16 + Redis7, 127.0.0.1 only)
+cd hub-server && go run ./cmd/server-hub    # 3. Start Hub Server (auto-migrates; API on :8080)
+cd ../app && corepack pnpm install          # 4. Install frontend deps
+pnpm dev                                    # 5. Start Desktop Vite (:5173); web uses pnpm dev:web
+```
+
+Full bootstrap, OIDC setup, and Edge Server debugging: [docs/developer-quickstart.md](docs/developer-quickstart.md). Production deployment and required vars: [docs/architecture/05-deployment.md](docs/architecture/05-deployment.md).
 
 ## Development
 

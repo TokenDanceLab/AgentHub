@@ -1,0 +1,429 @@
+# Design token usage audit (inventory)
+
+最后更新：2026-07-18
+Issue: #466 / #480 / #482 / #491 / #518 / #607 · closed hardcode: #879 / #910 / #1021
+Companion SSOT map: [../architecture/07-design-system-ssot.md](../../architecture/07-design-system-ssot.md)
+
+> Inventory only. Do not treat this file as token ownership — ownership is the architecture SSOT map.
+
+## 1. CSS load path
+
+```text
+app/desktop|web/src/main.tsx
+  -> styles/tokens.css   @import @shared/styles/tokens-base.css
+  -> styles/themes.css   @import @shared/styles/themes.css
+  -> styles/presets.css  @import @shared/styles/presets-base.css + surface border glue
+```
+
+## 2. Top hardcode offenders (sample counts)
+
+Counts ≈ matches of `#hex` / `rgba(...)` literals (module CSS). Snapshot for prioritization, not a CI gate.
+Re-audited 2026-07-18 (tip residual after #879 / #910 / #1021).
+
+| Rank | File | ~matches | Notes |
+|---:|---|---:|---|
+| 1 | `app/web/src/components/ModelDropdown.module.css` | **22** | dropdown chrome — open residual |
+| 2 | `app/shared/src/ui/EmptyState.module.css` | **13** | mostly glass-token fallbacks (`--glass-*` rgba); not semantic drift |
+| 3 | `app/shared/src/ui/PermissionModePicker.module.css` | **12** | non-semantic literals — deferred |
+| 4 | `app/web/src/components/IM/TeamEventTimeline.module.css` | **10** | IM timeline rgba chrome — open residual |
+| 5 | `app/web/src/components/AgentList.module.css` | **9** | list chrome — residual |
+| 6 | `app/web/src/components/IM/TeamApprovalPanel.module.css` | **8** | IM approval rgba — open residual |
+| 6 | `app/web/src/components/MentionPopover.module.css` | **8** | popover chrome — residual |
+| 8 | `app/shared/src/ui/Select.module.css` | **7** | shared select — residual |
+| — | `app/desktop/src/components/DesktopEntryGate.module.css` | **0** | **#879** closed hardcode map to SSOT |
+| — | `app/desktop/src/components/FileExplorer.module.css` | **0** | **#879** closed hardcode map to SSOT |
+| — | `app/web/src/components/WelcomeScreen.module.css` | **0** | **#482** glass/status → tokens |
+| — | `app/web/src/components/AuthPage.module.css` | **0** | **#482** auth glass → tokens |
+| — | ghost `var(--color-*)` product consumers | **0** product hits | **#910 / #1021**; `--color-*` legacy alias / preset-private only |
+| workbench | `app/shared/src/workbench/**/*.module.css` | few hex; spacing largely tokenized | **#480**: exact/compat spacing → `--sp-*`; odd micro-steps remain raw |
+| chatview | `app/shared/src/chatview/design/tokens.css` | full parallel table | **#491** / **#518** / **#607**: intentional density fork; hold |
+
+## 3. Theme fork evidence (pre-#466 → post)
+
+| Fork | Pre | Post #466 |
+|---|---|---|
+| ThemeContext dual providers | desktop with local preset list; web re-wrapping helpers | both thin wrappers; preset SSOT in `themePresets.ts` |
+| presets surface deltas | desktop opaque / web glass borders | unchanged legitimate glue |
+| chatview scoped tokens | parallel color/spacing tables | unchanged (deferred) |
+| `designTokens.ts` package export | not exported | still deferred |
+| Fallback hex drift | ApprovalCard `var(--danger, #d15252)` etc. | bare `var(--danger)` etc. |
+
+### Example drift (why bare vars matter)
+
+| Token | Light (`themes.css` :root) | Dark (`[data-theme=dark]`) | Stale fallback often used |
+|---|---|---|---|
+| `--danger` | `#d15252` | `#e87070` | `#d15252` / `#e53e3e` |
+| `--success` | `#409467` | `#69c967` | `#409467` |
+| `--primary` | `#0071BC` | `#29ABE2` | `#0071BC` |
+| `--warning` | `#c0883a` | `#d4aa4c` | `#c0883a` |
+
+## 4. Deferred / residual
+
+1. ~~Wholesale WelcomeScreen / AuthPage glass rewrite~~ → landed in **#482**
+2. Full chatview token merge (dark palette / radius / type) — **#491** / **#518** inventory; **#607** reconfirmed blocked
+3. ~~Workbench `px` → `--sp-*` pass~~ → landed in **#480** (odd steps deferred)
+4. Mobile RN color SSOT merge
+5. Shared React `ThemeProvider` with `enablePresets`
+6. Package export for `./designTokens` and/or `./styles/*`
+7. ~~DesktopEntryGate / FileExplorer hardcode~~ → landed in **#879**
+8. ~~Ghost `var(--color-*)` product consumers~~ → landed in **#910** / **#1021** (`--color-*` = legacy alias / preset-private only)
+9. **Open residual**: ModelDropdown + IM rgba chrome (see §2 ranks)
+10. ~~Stale semantic `var(--token, #hex|oklch)` fallbacks in shared UI~~ → **#607** safe cluster landed (see §7)
+
+## 4b. #482 Welcome/Auth glass migration notes
+
+### Visual parity intent
+
+- Keep web WelcomeScreen as the quiet Codex-style empty state (`launcher`/`brandMark` remain `display: none` / `contents`); token migration only rewires latent glass styles for future re-enable paths.
+- Keep web AuthPage glass card/sheet chrome (blur, elevated panel, soft borders) but source fills/borders/tints from shared `--glass-*` / `--elevated-card-*` tokens so light/dark theme SSOT wins.
+- Desktop Welcome/Auth already mostly tokenized; residual elevation rgba / light identity hex cleaned for the same token set.
+- No theme runtime rewrite (`theme.ts` / `themes.css` / `tokens-base.css` unchanged).
+
+### Residual / not rewritten
+
+- Exact blur amounts (`blur(24|28px)`) and saturate factors remain component-local (not tokenized; visual recipe, not color SSOT).
+- Web Auth submit remains glass-muted (web product choice); desktop Auth submit remains solid `var(--primary)` — intentional surface delta, not a fork of token values.
+- Desktop light identity button gradient still composes multiple glass tokens for specular highlight; acceptable residual complexity.
+- EntryGate / FileExplorer hardcode later closed in **#879**; remaining open residual is ModelDropdown + IM rgba chrome.
+
+## 4b. #480 Workbench spacing migration notes
+
+### Visual parity intent
+
+- Convert only spacing props (`padding*`, `margin*`, `gap`/`row-gap`/`column-gap`, pure positioned offsets) when **every** px atom in the declaration maps exactly.
+- Prefer v4 `--sp-*` (`2/4/6/8/10/14/16→md/24/32`). Use compat `--space-md` (12px) and `--space-3xl` (48px) only where no v4 name exists.
+- Do **not** snap odd micro-steps (3/5/7/9/18/20/22…) or invent new scale tokens in this pass.
+- Leave mixed multi-value decls, negatives, and `calc(...)` spacing raw; leave width/height/border/radius/font/size alone.
+- Stay on base tokens — do not use chatview-scoped `--sp-*` (chatview redefines `--sp-md`/`--sp-lg`).
+
+### Residual / not rewritten
+
+- Odd micro-steps and mixed recipes (e.g. `padding: 5px 10px`, `padding: 26px 12px 14px` in page-shared nav).
+- Local custom props such as `--composer-scroll-gap: 18px`.
+- Size/touch-target dimensions (rail 52px, avatars, icons).
+- Negative offsets (`-2px`, `-8px`, …).
+
+### Yield (this pass)
+
+- ~430 fully-mappable spacing decls / ~485 spacing atoms tokenized across shell, pages, floating, inspector.
+- Remaining raw spacing atoms are mostly unmapped odd steps and mixed multi-value recipes.
+
+## 5. How to re-audit
+
+```bash
+# rough hardcode density (module CSS)
+rg -c '#[0-9a-fA-F]{3,8}|rgba?\(' app/web/src/components app/desktop/src/components app/shared/src/ui --glob '*.module.css'
+
+# stale semantic fallbacks
+rg 'var\(--(danger|success|warning|primary),' app --glob '*.css'
+
+# ghost legacy --color-* product consumers (expect 0 outside presets/aliases)
+rg 'var\(--color-' app --glob '*.css'
+```
+
+## 6. Chatview token drift inventory (#491)
+
+Sources:
+
+- `app/shared/src/chatview/design/tokens.css` (scoped `.chatview` + `[data-theme="dark"] .chatview`)
+- `app/shared/src/styles/tokens-base.css`
+- `app/shared/src/styles/themes.css`
+- SSOT map: [07-design-system-ssot.md](../../architecture/07-design-system-ssot.md)
+
+### 6.1 Load path
+
+```text
+desktop|web main → tokens-base + themes
+ChatViewTranscript / chatview global.css → chatview/design/tokens.css  (.chatview scope wins)
+```
+
+Chatview keeps a **scoped parallel token table** for isolation / standalone import. Host apps load SSOT via `tokens-base.css` + `themes.css`, then chatview **re-overrides** the same names inside `.chatview`, so product chat does not inherit host spacing/radius/type and only partially tracks host colors.
+
+### 6.2 Usage density (chatview CSS)
+
+| Token | ~uses | Primary sites |
+|---|---:|---|
+| `--label-xs` | 12 | `RowItem.css`, `Transcript.css` |
+| `--label` | 12 | `RowItem.css`, `Transcript.css` |
+| `--sp-sm` | 17 | rows / transcript chrome |
+| `--sp-xs` | 12 | rows / transcript chrome |
+| `--r-xs` | 9 | cards, chips, code |
+| `--r-md` | 8 | cards, chips, code |
+| `--sp-md` | 5 | gap / code / row padding |
+| `--r-sm` | 5 | chips / buttons |
+| `--body` | 5 | body text |
+| `--sp-lg` / `--sp-xl` / `--r-lg` | 1 each | agent margin / empty pad / one radius |
+
+### 6.3 Spacing (`--sp-*`)
+
+| Token | Base (`tokens-base`) | Chatview | Match? |
+|---|---|---|---|
+| `--sp-2` | 2px | 2px | yes |
+| `--sp-xs` | 4px | 4px | yes |
+| `--sp-xxs` | 6px | 6px | yes |
+| `--sp-sm` | 8px | 8px | yes |
+| `--sp-10` | 10px | 10px | yes |
+| `--sp-14` | 14px | 14px | yes |
+| `--sp-16` | 16px | 16px | yes |
+| **`--sp-md`** | **16px** | **12px** (`var(--space-md, 12px)`) | **name collision; value = base compat** |
+| **`--sp-lg`** | **24px** | **20px** | **NO** |
+| **`--sp-xl`** | **32px** | **28px** | **NO** |
+
+Compat note (base only): `--space-md: 0.75rem` (**12px**) == chat density `--sp-md`. Chat density is the **compat 12px step**, not v4 `--sp-md`.
+
+If `--sp-md/lg/xl` were forced to base 16/24/32: row gaps, agent margins, empty padding, and code paddings all expand → **visual redesign of transcript density**, not a silent alias fix.
+
+### 6.4 Radius (`--r-*`)
+
+| Token | Base | Chatview | Δ |
+|---|---|---|---|
+| `--r-xs` | 6px | 3px | −3 |
+| `--r-sm` | 8px | 6px | −2 |
+| `--r-md` | 12px | 10px | −2 |
+| `--r-lg` | 16px | 14px | −2 |
+| `--r-full` | 9999px | 9999px | ok |
+| `--r-xl` / `--r-2xl` | base only | absent | n/a |
+
+High fan-out on cards/chips/code/buttons. Aligning to base rounds the whole chat surface.
+
+### 6.5 Typography
+
+| Token | Base | Chatview |
+|---|---|---|
+| `--font-sans` / `--font-mono` | same stacks | same |
+| `--body` | `400 0.875rem/1.5` (14px) | `400 0.8125rem/1.5` (**13px**) |
+| `--label` | `500 0.75rem/1.5` | same |
+| `--label-xs` | `600 0.625rem/1.5` (10px) | `600 0.6875rem/1.5` (**11px**) |
+| `--bubble-font` | — | chat-only `0.875rem` |
+| headlines / `--font-size-*` | base only | absent |
+
+Dense chat type is intentional (comments in `tokens.css`).
+
+### 6.6 Motion
+
+| Token | Base | Chatview |
+|---|---|---|
+| `--dur`, `--dur-slow`, `--dur-pulse`, `--dur-route`, `--dur-bar` | same | same |
+| `--ease` | same | same |
+| `--dur-fast/normal/medium/panel/...` | base only | absent |
+
+### 6.7 Colors — light
+
+Light surfaces/text/borders/primary in chatview **match** `themes.css` light (`#f7f6f9`, `#ffffff`, `#1a1a2e`, `rgba(0,0,0,0.055)`, primary `#0071BC`, etc.).
+
+Minor light `*-bg` opacity drift vs themes:
+
+| Token | themes light | chatview light |
+|---|---|---|
+| `--success-bg` | 0.08 | 0.06 |
+| `--warning-bg` | 0.08 | 0.06 |
+| `--info-bg` | 0.06 | 0.06 |
+| `--danger-bg` | 0.06 | 0.06 |
+
+Status/role/state hexes mostly match **tokens-base** light defaults.
+
+### 6.8 Colors — dark (**major fork**)
+
+| Token | themes dark | chatview dark |
+|---|---|---|
+| `--app-bg` | `#1a1a20` | `#121217` |
+| `--surface` | `#24242d` | `#1c1c24` |
+| `--surface-dim` | `#1e1e26` | `#16161d` |
+| `--surface-low` | `#282830` | `#1e1e28` |
+| `--surface-high` | `#2e2e38` | `#252532` |
+| `--surface-highest` | `#383844` | `#2d2d3a` |
+| `--text-1` | `#e3e4e6` | `#e8e8ed` |
+| `--text-2` | `#9a9aa4` | `#a0a0b0` |
+| `--text-3` | `#606068` | `#6a6a7a` |
+| `--bdr` | `rgba(255,255,255,0.06)` | `0.07` |
+| `--bdr-strong` | `0.10` | `0.12` |
+| **`--primary`** | **`#29ABE2`** | **`#3399dd`** |
+| `--success` | `#69c967` | `#4dab7a` |
+| `--warning` | `#d4aa4c` | `#d4a84a` |
+| `--danger` | `#e87070` | `#e06565` |
+| `--info` | `#6a93d4` | `#6e9de0` |
+| state/role/diff | follow themes | follow chatview palette |
+
+Highest product risk: chat sits in workbench under host `data-theme` but **does not use host dark SSOT**.
+
+### 6.9 Chat-only tokens (keep)
+
+`--bubble-font`, `--think-max-h`, `--avatar-size`, `--icon-size`, `--opacity-*`, `--guide-line`, `--shadow` (Transcript already prefers `var(--e-2, var(--shadow))`), chat-local role aliases already partially mirrored in base.
+
+### 6.10 Elevation / shadow
+
+| | Base | Chatview |
+|---|---|---|
+| elevation | `--e-0…--e-4` | — |
+| `--shadow` | — | light `0 2px 8px…` / dark `0 2px 12px…` |
+| themes | `--shadow-sm/md` | different recipe |
+
+### 6.11 Safe vs blocked aligns
+
+#### Blocked (do **not** do in #491)
+
+1. **`--sp-md/lg/xl` → base 16/24/32** — redesigns transcript density (5+ layout sites).
+2. **Radius scale → base 6/8/12/16** — rounds cards/chips/code (high fan-out).
+3. **`--body` / `--label-xs` → base type** — intentional dense type; high use of `--label-xs`.
+4. **Delete entire color table “to inherit host” without dark redesign** — dark surfaces + primary brand diverge; standalone path still imports only `chatview/design/tokens.css`.
+5. **Remove identical redeclares (fonts / micro-sp / dur) without host guarantee** — package API still says import scoped tokens for isolation; no package export of `./styles/*` yet.
+
+#### Landed in #491
+
+**Align 1 — spacing semantic link (safe, zero visual change)** in `chatview/design/tokens.css`:
+
+```css
+/* 12px = base compat --space-md, NOT v4 --sp-md (16px) */
+--sp-md: var(--space-md, 12px);
+```
+
+- Keeps 12px with or without host.
+- Documents SSOT relationship; unblocks later consumers that already use `--space-md`.
+- **Does not** retarget `--sp-lg` / `--sp-xl` (no base 20/28; inventing tokens out of scope).
+
+**Align 2b — color blocked with evidence (no value change)**
+Dark palette fork + light `success/warning-bg` opacity drift documented in §6.7–6.8. Full dark → `themes.css` merge deferred (high visual QA; separate issue). Light opacity inherit (2a) skipped for standalone fallback safety.
+
+### 6.12 Residual after #491 / #518
+
+| Area | Status after #491 | #518 residual decision |
+|---|---|---|
+| Spacing semantic | **partially linked**: chatview `--sp-md` → base `--space-md` (12px); `--sp-lg`/`--sp-xl` still dense 20/28 | keep; no further spacing alias (no base 20/28 step) |
+| Radius | still forked (tighter chat scale) | **document only** — see §6.14 |
+| Typography | still dense chat type | **document only** — see §6.14 |
+| Dark colors | still full palette fork (incl. primary `#3399dd` vs `#29ABE2`) | **document only** — see §6.14 |
+| Full merge / package `./styles/*` export | deferred | still deferred |
+
+### 6.13 Out of scope / later phases
+
+- Full chatview token merge / delete scoped table
+- Dark palette → `themes.css` (with visual QA under workbench host theme)
+- Radius + type density redesign (or intentional dual-scale product decision)
+- Package export of shared styles (`./styles/*`) so scoped redeclares can thin out safely
+- Workbench odd-px residual (already #480)
+
+### 6.14 #518 residual inventory — radius / type / dark
+
+Goal: micro inventory of the three forks left after #491. **No intentional visual redesign.** Optional zero-visual alias only if a host token already carries the **same computed value** under a different name (the `--sp-md` → `--space-md` pattern). None found for radius / type / dark.
+
+#### Radius residual
+
+| Token | Base (`tokens-base`) | Chatview | Δ | ~fan-out (chatview CSS) |
+|---|---|---|---:|---:|
+| `--r-xs` | 6px | 3px | −3 | ~9 (chips, code, badges, file acts) |
+| `--r-sm` | 8px | 6px | −2 | ~5 (buttons, code block shell, avatars) |
+| `--r-md` | 12px | 10px | −2 | ~8 (cards, card-stack, bubbles) |
+| `--r-lg` | 16px | 14px | −2 | 1 (user bubble) |
+| `--r-full` | 9999px | 9999px | 0 | 1 (progress / pill) |
+| `--r-xl` / `--r-2xl` | base only | absent | n/a | — |
+| `--radius-*` compat | aliases base `--r-*` | unused in chatview | n/a | — |
+
+Primary sites: `RowItem.css` (cards / chips / actions / code), `Transcript.css` (bubbles / badges / code).
+
+**Why not alias:** base has no 3 / 6 / 10 / 14 radius steps (compat `--radius-*` maps to the **looser** base scale). Pointing chatview `--r-*` at base `--r-*` or `--radius-*` rounds the whole transcript surface (+2–3px per corner) → redesign, not silent.
+
+#### Typography residual
+
+| Token | Base | Chatview | Match? | ~fan-out |
+|---|---|---|---|---:|
+| `--font-sans` / `--font-mono` | same stacks | same stacks | yes (literal redeclare) | many |
+| `--body` | 14px (`0.875rem`) | **13px** (`0.8125rem`) | **NO** | ~5 (+ empty / plan text) |
+| `--label` | 12px medium | same | yes (literal redeclare) | ~12 |
+| `--label-xs` | 10px (`0.625rem`) | **11px** (`0.6875rem`) | **NO** | ~12 |
+| `--bubble-font` | — | chat-only 14px | chat-only | bubble body |
+| raw `0.625/0.6875/0.8125rem` fonts | — | several hard sizes in `Transcript.css` / `RowItem.css` | bypass tokens | residual |
+
+**Why not alias:** no base token equals chat dense 13px body or 11px `--label-xs`. Aligning `--body` / `--label-xs` to base reflows labels + body density. Identical stacks (`--font-sans` / `--font-mono` / matching `--label`) stay as scoped redeclares because standalone import still only loads `chatview/design/tokens.css` (see blocked #491 #5).
+
+#### Dark palette residual (major)
+
+Chat sits under host `data-theme` in workbench but `[data-theme="dark"] .chatview` **re-overrides** the full surface/text/status table. Light mostly matches `themes.css`; dark does not.
+
+| Risk class | Examples (themes dark → chatview dark) | Product impact |
+|---|---|---|
+| Surfaces | `--app-bg` `#1a1a20`→`#121217`; `--surface` `#24242d`→`#1c1c24`; ladder dim/low/high/highest all darker | Chat panel reads as a separate sheet inside workbench |
+| Text | `--text-1/2/3` slight cool shift | readable but not host SSOT |
+| Borders | `--bdr` 0.06→0.07; `--bdr-strong` 0.10→0.12 | minor |
+| Brand / status | **`--primary` `#29ABE2`→`#3399dd`**; success/warning/danger/info all diverge | selection outline, user bubble fill, deploy links, agent avatars |
+| Role / state / diff | follow chatview status hexes | orchestrator + state chips diverge from host |
+
+Light residual only: `--success-bg` / `--warning-bg` opacity 0.08 (themes) vs 0.06 (chatview).
+
+**Why not alias / inherit host:** same custom-property names → no non-circular “different name, same value” link. Deleting the dark table to inherit host changes brand primary + every surface (redesign + standalone path loses colors). Light-only inherit (2a in #491) still skipped for standalone fallback safety.
+
+#### Safe vs blocked under #518
+
+| Candidate | Verdict |
+|---|---|
+| Radius → base / `--radius-*` | **blocked** (value Δ + high fan-out) |
+| `--body` / `--label-xs` → base type | **blocked** (density redesign) |
+| Dark table → `themes.css` inherit | **blocked** (visual redesign + standalone) |
+| Delete identical font/dur/micro-sp redeclares | **blocked** until package exports `./styles/*` and standalone load path includes host SSOT |
+| Extra spacing alias for `--sp-lg`/`--sp-xl` | **blocked** (no base 20/28) |
+| Zero-visual alias like #491 `--sp-md`→`--space-md` | **none remaining** for radius / type / dark |
+
+#### Landed in #518
+
+Docs + SSOT residual inventory only. `app/shared/src/chatview/design/tokens.css` **unchanged** this pass (no redesign; no unsafe alias).
+
+## 7. #607 residual inventory + safe fix cluster
+
+Goal: product-polish residual inventory update + one safe fix cluster (**no visual redesign**, no freestyle page rewrites of Agents/Contacts/Projects/Routes/Inspector).
+
+### 7.1 Residual status matrix (2026-07-18)
+
+| Area | Status | Action |
+|---|---|---|
+| Chatview spacing `--sp-md` | linked to base `--space-md` (12px) since #491 | **hold** — no further spacing alias |
+| Chatview `--sp-lg` / `--sp-xl` | dense 20/28 vs base 24/32 | **hold** (no base 20/28 step) |
+| Chatview radius / type / dark | intentional dense fork; documented §6.14 | **hold** — redesign / dual-scale decision needed |
+| Workbench odd-px residual | #480 left 3/5/7/9/18… raw | **hold** (snap would redesign) |
+| Stale semantic CSS fallbacks | residual after #466 ApprovalCard fix | **fixed** — §7.2 cluster (#607) |
+| EntryGate / FileExplorer hardcodes | **closed #879** (0 hex/rgba in module CSS) | — |
+| Ghost `var(--color-*)` product consumers | **closed #910 / #1021** | `--color-*` legacy alias / preset-private only |
+| ModelDropdown + IM rgba chrome | open residual (see §2 ranks) | dedicated hardcode pass |
+| EmptyState glass-token rgba fallbacks | glass SSOT present; fallbacks are defensive | **hold** (not semantic dark-mode drift) |
+| Package `./styles/*` export | still deferred | **hold** |
+
+### 7.2 Safe fix cluster landed — bare semantic tokens
+
+Same rule as #466 Fix B / SSOT §2.6: `var(--danger, #…)` and friends freeze **light** (or wrong-space oklch) values when the custom property is missing or when authors rely on the fallback path, which breaks dark/presets. Prefer bare `var(--token)`.
+
+| File | Before | After |
+|---|---|---|
+| `app/shared/src/ui/DeployCard.module.css` | `--success/--primary/--danger/--text-* /--surface-* /--bdr /--primary-hover` with light hex/rgba fallbacks (~17 literals) | bare theme tokens; hex/rgba count → **0** |
+| `app/shared/src/ui/CollapsibleBlock.module.css` | scheme borders used `var(--brand|success|warning|skill|destructive, oklch(...))` | bare semantic tokens |
+| `app/shared/src/ui/ProgressBar.module.css` | `--brand` / `--warning` oklch fallbacks | bare |
+| `app/shared/src/ui/Avatar.module.css` | `--brand` oklch fallback | bare |
+| `app/shared/src/ui/Button.module.css` | `--brand` oklch fallback on `.gradient` | bare (decorative oklch shadow left as non-token recipe) |
+| `app/shared/src/workbench/pages/DocsPage.module.css` | delete hover/confirm used `var(--danger, #e5484d)` (stale vs theme `#d15252` / dark `#e87070`) | bare `--danger` |
+| `app/desktop/src/components/FileSearchDialog.module.css` | `var(--primary, #5b9bd5)` (off-brand vs theme primary) | bare `--primary` |
+
+Evidence re-audit:
+
+```bash
+# semantic status/brand fallbacks — should be empty after #607
+rg 'var\(--(danger|success|warning|primary|info|brand|destructive|skill)\s*,' app --glob '*.css'
+
+# DeployCard hardcode density
+rg -c '#[0-9a-fA-F]{3,8}|rgba?\(' app/shared/src/ui/DeployCard.module.css
+```
+
+### 7.3 Explicit holds (with evidence)
+
+1. **Chatview dark / radius / type** — still blocked (see §6.14). No same-value host alias remains; full merge is redesign + standalone load-path work.
+2. **Open hex offenders (2026-07-18 ranks)** — ModelDropdown ~22, IM TeamEventTimeline ~10, TeamApprovalPanel ~8, plus shared EmptyState/PermissionModePicker glass/literal residuals. EntryGate/FileExplorer closed in #879.
+3. **Glass rgba fallbacks** in EmptyState etc. — defensive when `--glass-*` is absent; glass tokens are already SSOT; stripping changes standalone/story isolation, not dark-mode correctness.
+4. **Workbench page freestyle rewrites** — out of scope for #607 (Agents/Contacts/Projects/Routes/Inspector ownership lanes).
+
+### 7.4 Residual after #607 / #879 / #910 / #1021
+
+| Residual class | Open? | Next owner |
+|---|---|---|
+| Chatview full merge | yes | deliberate redesign issue |
+| ModelDropdown + IM rgba chrome | yes | future polish issues |
+| EntryGate / FileExplorer hardcode | **closed #879** | — |
+| Ghost `--color-*` product consumers | **closed #910 / #1021** | — |
+| Workbench odd-px normalize | yes | optional scale extension |
+| Shared UI semantic fallbacks | **closed** | — |
+| Package styles export | yes | packaging issue |

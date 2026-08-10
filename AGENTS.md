@@ -121,16 +121,11 @@ Mobile 主线是 Expo + React Native development build。旧 Tauri Mobile 不再
 - 通用组件在 `app/shared/src/ui/`，Desktop/Web 从 shared 导入，禁止复制本地 UI 副本。
 - CSS Modules + OKLCH tokens，避免硬编码颜色。
 - 用户消息、Agent 回复、工具/审批/产物卡片必须按时间线性展示；调试、mock、mode 信息不得进入主聊天流。
-- UI 改动用自动化 Playwright + Visual QA 证明行为和布局；Desktop/Web gate 视口为 `1440x810` light+dark，入口 `app/{desktop,web}/scripts/visual-qa-shell.mjs`（`visual:qa:shell`）。评分 SSOT：`docs/archives/analysis/visual-qa-scorecard.md`。`app/web/scripts/visual-qa.mjs` 为可选/遗留多场景电池，不是 merge gate。
+- UI 改动用自动化 Playwright + Visual QA 证明行为和布局；Desktop/Web gate 视口为 `1440x810` light+dark，入口 `app/{desktop,web}/scripts/visual-qa-shell.mjs`（`visual:qa:shell`）。评分 SSOT：`docs/analysis/visual-qa-scorecard.md`。`app/web/scripts/visual-qa.mjs` 为可选/遗留多场景电池，不是 merge gate。
+- 新 shared 组件必须带三件套：`<组件>.test.tsx` + `<组件>.stories.tsx` + 对照 `../docs/design/component-acceptance.md` 验收表逐项勾选；缺件不得合入。
+- 设计 token 改动（`app/shared/src/styles/`、`app/shared/src/designTokens.ts`）必须跑 `python scripts/verify/verify-design-token-ssot.py`，且 `app/shared/src/designTokens.test.ts`、`app/shared/src/styles/tokens-base.test.ts` 全绿后交付。
 
-前端 CI 易踩坑（站立规则）：
-
-- `exactOptionalPropertyTypes`：禁止 `...{ optional: maybeUndefined }`；只在 defined 时赋值；async handler 传给 `() => void` 时用 `void fn()` 包装。
-- `noUncheckedIndexedAccess`：CSS module / `Record<string, string>` 索引用 `styles.foo ?? ''`，不要假设必有 key。
-- CSS helper 参数类型用 `Record<string, string>`，不要 `Pick<typeof styles, 'a' | 'b'>`（与 `CSSModuleClasses` 不兼容）。
-- Nav 图标只用 `DesignNavIcon`（有效名称见 `DesignNavIconName` 类型）；禁止散落的 nav glyph 组件。
-- 11px (0.6875rem) 为 CJK 最小可读字号；badge/chip 用此值，正文标签 ≥12px。
-- CI 使用统一 `changes` job（`dorny/paths-filter@v4`）进行路径筛选：Go-only PR 跳过前端 CI，CSS-only PR 跳过 Go CI。`scripts/verify/verify-ci-gates.py` 校验 job 结构。
+前端 CI 易踩坑（exactOptionalPropertyTypes / noUncheckedIndexedAccess / CSS helper 类型 / DesignNavIcon / 11px CJK 下限 / changes job）见 `docs/architecture/04-frontend-data-flow.md` §前端 CI 易踩坑。
 
 ## 6. Git 和 worktree
 
@@ -155,11 +150,7 @@ git worktree add .worktrees/<topic> -b <type>/<topic> origin/master
 - 完成后运行验收、push、开 PR；合并后删除分支和 worktree。
 - 不在共享分支 force-push（amend 后 force-with-lease 除外）。
 
-防线（三层，防 master 直 push / 历史重写 / 非 squash 合入）：
-
-- **GitHub branch protection + repo 设置**（已配置，最强）：master 禁止 force push、禁止直接 push（必须 PR）、要求线性历史；**合并方式已锁死为 squash only**（merge commit / rebase merge 均已禁用，PR 按钮只剩一个选项）；要求 `validate`/`go-hub`/`go-edge` 通过；`enforce_admins: true` 管理员也不能绕过。strict 模式要求 PR 分支基于最新 master——并行 PR 偶尔需要 rebase 属正常预期，rebase 后 force-with-lease 推分支即可。
-- **本地 pre-push hook**（`scripts/git-hooks/pre-push`，clone 后跑 `bash scripts/git-hooks/install.sh` 启用）：往 master 直 push 本地提前拦截；feat/fix/docs/chore/* 分支放行；非 master 允许 force-with-lease；紧急绕过 `git push --no-verify`（GitHub 层仍兜底）。
-- **CI**：`scripts/verify/verify-commit-messages.sh` 在必跑 `validate` job 中 fail-closed 校验 Conventional Commits；`verify-ci-gates.py` 校验 job 结构。
+防线（三层，防 master 直 push / 历史重写 / 非 squash 合入）：(1) GitHub branch protection + repo 设置——master 禁 force/直 push、必须 PR、线性历史、squash only、要求 `validate`/`go-hub`/`go-edge`、`enforce_admins: true`；(2) 本地 pre-push hook（`scripts/git-hooks/pre-push`，`bash scripts/git-hooks/install.sh` 启用）——master 直 push 本地拦截，feat/fix/docs/chore/* 放行，`git push --no-verify` 紧急绕过；(3) CI——`scripts/verify/verify-commit-messages.sh` + `verify-ci-gates.py` 在 `validate` job fail-closed 校验 Conventional Commits 与 job 结构。详见 `scripts/git-hooks/` 与 `.github/workflows/checks.yml`。
 
 提交格式：
 
@@ -242,6 +233,7 @@ subagent 提示必须包含：目标、允许修改路径、禁改路径、必�
 | Mobile Hub-only 边界（不直连 Local Edge/runtime） | `scripts/verify/verify-mobile-hub-boundary.py` | checks.yml → validate |
 | hubClient thin-shell SSOT（客户端不分叉 REST 实现） | `scripts/verify/verify-hubclient-ssot.py` | checks.yml → validate |
 | Design token SSOT（CSS 硬编码颜色禁令） | `scripts/verify/verify-design-token-ssot.py` | checks.yml → validate |
+| shared UI i18n callsites ratchet（CJK 字面量不得新增，#1612） | `scripts/verify/verify-i18n-callsites.py` | checks.yml → validate |
 | 演示诚实：stub/fixture 不得冒充真实登录/API | `scripts/verify/verify-real-e2e-contract.py` | checks.yml → validate |
 | OpenAPI↔hub router 合同一致 | `scripts/verify/verify-openapi-contract.py` | checks.yml → validate |
 | shared 内不出现 Edge 客户端实现 | `scripts/verify/verify-shared-boundary.py` | checks.yml → validate |
@@ -255,7 +247,7 @@ subagent 提示必须包含：目标、允许修改路径、禁改路径、必�
 | shared edge 表面不被 web/mobile-rn import（A-V3 门禁） | `scripts/verify/verify-shared-edge-surface-isolation.py` | checks.yml → validate |
 | v4 旧 UI 组件/路由不得复活 | `scripts/verify/verify-v4-old-ui-active-paths.py` | checks.yml → validate |
 | Hub/Edge gosec SAST 告警清零（#1574，hard fail） | `scripts/verify/verify-gosec-gates.sh`（负向自测 `scripts/verify/tests/verify-gosec-gates.Tests.sh`）；go-edge/go-hub Security scan (gosec) step 直接 fail-closed | checks.yml → go-edge / go-hub |
-| OIDC 配置形状与边界（issuer/redirect/无 secret） | 旧 OIDC readiness 检查器已退役（2026-08-07，#1653：断言旧服务/测试名）；由 release gate（compose 模板 OIDC 字段断言）与 WSL 全栈 E2E（真实 OIDC 流）覆盖 | — |
+| OIDC 配置形状与边界（issuer/redirect/无 secret） | 旧 OIDC readiness 检查器已退役（2026-08-07，#1653：断言旧服务/测试名）；配置形状与证据等级见 `docs/architecture/05-deployment.md` 部署证据等级表（OIDC 行）；WSL 全栈 E2E 覆盖真实 OIDC 流 | — |
 | P0 remote-control fixture 就绪 | `scripts/verify/verify-p0-remote-control-fixture.py` | checks.yml → backend-e2e-fixture |
 | 后端 perf/leak 门禁（手动触发） | `scripts/verify/verify-backend-perf-leak-gates.py` | checks.yml → backend-perf-leak-gates |
 | 部署形状 SSOT：唯一 production compose、镜像名 SSOT、遗留清单关闭（#1527） | `scripts/verify/verify-deployment-shape.py`（负向自测 `scripts/verify/tests/verify-deployment-shape.Tests.py`） | cd-pr-check.yml → deployment-files |
@@ -267,36 +259,13 @@ subagent 提示必须包含：目标、允许修改路径、禁改路径、必�
 | UI Visual QA shell 行为证明（1440x810 light/dark） | `app/{desktop,web}/scripts/visual-qa-shell.mjs` | checks.yml → visual-qa-shell |
 | 真实登录/OIDC e2e 链路（需真实服务与凭据，`scripts/verify/verify-oidc-flow.py` 等 gate 保留在 `scripts/verify/`） | 无 | 无 |
 | 交互型 UI/UX 验收（Type/Motion/Empty 等跨组件行为） | 无 | 无 |
+| 配置组合安全（fail-closed 默认/env 全覆盖） | `hub-server/internal/config/config_validate.go`（校验入口）+ `hub-server/internal/config/constants.go`（`AuthFailClosedDefault`、`RateLimitFailOpenDefault`：auth 路径恒 fail-closed，非 auth 路径可 fail-open） | 无 |
+| edge debug 端点鉴权（Dev→nil / LocalAuthToken→Bearer / HubJWTSecret→hub-JWT 校验） | `edge-server/internal/httpserver/server_auth.go`（`debugAuthFunc` 分层鉴权，pprof/config/state 端点） | 无 |
+| 域 SSOT（CSP / Desktop 默认 URL / compose 回调域 三方一致） | `app/desktop/src-tauri/tauri.conf.json`（CSP + 默认 URL）；compose 回调域见 `deployments/production/.env.example`；专用 verifier 暂未建 | 无 |
 
 ## 10. 验证纪律
 
-所有变更至少运行：
-
-```powershell
-git diff --check
-git status --short --branch
-```
-
-文档或 API 变更追加：
-
-```powershell
-python scripts/verify/verify-doc-ssot.py
-python -c "import yaml, pathlib; yaml.safe_load(pathlib.Path('api/openapi.yaml').read_text(encoding='utf-8')); print('yaml ok')"
-```
-
-Go 变更按 touched service 跑：
-
-```powershell
-cd edge-server; go test ./... -short -count=1
-cd ../hub-server; go test ./... -short -count=1
-```
-
-前端变更按 touched app 跑：
-
-```powershell
-cd app/desktop; corepack pnpm test; corepack pnpm typecheck
-cd ../web; corepack.cmd pnpm typecheck; corepack.cmd pnpm exec vite build
-```
+所有变更的统一验证命令清单（diff/SSOT/yaml/Go/前端）见 `docs/developer-quickstart.md` §测试速查；文档/API 变更至少跑 `python scripts/verify/verify-doc-ssot.py` + openapi yaml parse。
 
 UI 工作流变更必须有行为断言，不只截图：共享 unit/contract + Desktop/Web Playwright + Visual QA，证据等级按 `real-e2e-acceptance` 标注。Vite renderer 不等于 packaged Desktop；stub/fixture/readiness-only 必须写 `real_tested=false`。
 
@@ -323,13 +292,25 @@ UI 工作流变更必须有行为断言，不只截图：共享 unit/contract + 
 
 ## 12. 发布流程
 
-唯一发布入口：本地打 tag → `git push origin <tag>` → `.github/workflows/release.yml` 触发构建并出 GitHub Release。旁路入口 cd-desktop.yml（手动触发）与 scripts/release/release.ps1（本地直传）已于 2026-08-02 删除，不再提供。
+唯一发布入口：本地打 tag → `git push origin <tag>` → `.github/workflows/release.yml` 触发构建并出 GitHub Release。旁路入口 cd-desktop.yml 与 scripts/release/release.ps1 已于 2026-08-02 删除。完整 tag SOP（前置校验、tag 格式正则、产物门控 variable、冻结开关）见 `docs/developer-quickstart.md` §发布 tag SOP。
 
-打 tag SOP：
+## 13. 依赖更新（Renovate）
 
-1. 前置：master 全绿；版本号与 `app/desktop/package.json`、`app/desktop/src-tauri/tauri.conf.json`、`app/desktop/src-tauri/Cargo.toml` 一致（校验见 `scripts/release/verify-release-gate.py`）。
-2. 打 tag：`git tag vX.Y.Z`（正式版）或 `git tag vX.Y.Z-rc.N`（候选版）；tag 指向的 commit 必须在 master 祖先链上，格式须匹配 `^v\d+\.\d+\.\d+(-rc\.\d+)?$`（release.yml 的 tag-guard job 双重守卫，任一不满足则 job 失败、不触发构建）。
-3. push：`git push origin <tag>` → release.yml 构建出包并发布。
-4. 发布产物：build-desktop（Windows NSIS + portable）恒定发布；build-desktop-macos（DMG）由仓库 variable `RELEASE_MACOS_ENABLED=true` 门控（macOS 低频使用，默认跳过，issue #1652；发布前可走 release-readiness 的 `run_macos_package_dry` 手动预检）；build-mobile（Android APK）由 `RELEASE_MOBILE_ENABLED=true` 门控。
+依赖更新由 `.github/renovate.json` 驱动，配置 SSOT 即该文件；本节只总结策略，不复制规则细节。
 
-冻结开关：`scripts/release/verify-release-gate.py` 末尾两条无条件 Blocker（signing/notarization 审批）是发布冻结开关，等管理员批准后再发布；不是常规门禁，不得按"永远红"误判为故障。
+| 策略 | 行为 |
+|---|---|
+| 启用 managers | `npm`、`gomod`、`cargo`、`dockerfile`、`github-actions`、`docker-compose` |
+| 调度 | 周一 09:00 后（Asia/Shanghai）；`prConcurrentLimit=10`、`prHourlyLimit=2` |
+| patch 更新 | 周一自动合并（`automerge: true`，squash），但 `ignoreTests: false` + `stabilityDays: 1`——必须等 `.github/workflows/checks.yml` 全绿且沉淀 1 天才合并，CI 红时 Renovate 不会自合。 |
+| minor 更新 | 周一汇总成一个 review PR，**不**自动合并，需人工审。 |
+| major 更更新 | 每个一个独立 PR，**不**自动合并，需人工审。 |
+| 排除的 major | `expo`/`expo-*`（mobile 生态 major 由 mobile 通道管）、`storybook`/`@storybook/*`（8→10 迁移延期）、`vite`（6→8 迁移面大）、`typescript`（5→7 迁移面大）。这些 major Renovate 不开 PR。 |
+
+纪律：
+
+- 不要在 AGENTS.md 或子文档复制 renovate.json 的具体 rule 值——改规则只改 `.github/renovate.json`，本表随之过期以配置为准。
+- patch auto-merge 的安全前提是 `checks.yml` 全绿。若 checks.yml 被禁用或跳过，Renovate 不会自动合并（`ignoreTests: false`），但也不应有人手动绕过 CI 合 patch。
+- Expo/Storybook/vite/TS 的 major 排除是"延期"，不是"永禁"。相关迁移由各自通道（mobile/design/build）推进，迁完再在 renovate.json 移除对应 `enabled: false` rule。
+- Renovate PR 一律带 `dependencies` label，便于过滤。
+

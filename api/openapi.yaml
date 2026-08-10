@@ -132,6 +132,14 @@ paths:
         - edgeLocalToken: []
       parameters:
         - $ref: "#/components/parameters/PageCursor"
+        - name: cursor
+          in: query
+          required: false
+          schema: { type: string }
+          description: >
+            Numeric event-sequence cursor for replay. Alias for `pageCursor`;
+            `cursor` takes precedence when both are present. The Edge handler
+            accepts either name for backwards compatibility.
       responses:
         "101":
           description: Switching Protocols.
@@ -352,7 +360,27 @@ paths:
         - $ref: "#/components/parameters/PageCursor"
       responses:
         "200":
-          $ref: "#/components/responses/List"
+          description: >
+            Thread list. Edge implementation returns {items, page:{hasMore:false}}
+            and never sends nextCursor (response_dto.go hardcodes hasMore:false).
+            The pageCursor/nextCursor parameters are accepted but ignored by Edge.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, page]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Resource"
+                  page:
+                    type: object
+                    required: [hasMore]
+                    properties:
+                      hasMore:
+                        type: boolean
+                        description: Always false on Edge (no cursor pagination).
     post:
       tags: [IMProject]
       operationId: createThread
@@ -1760,6 +1788,8 @@ paths:
         "200":
           $ref: "#/components/responses/Ok"
 
+        "500":
+          $ref: "#/components/responses/Error"
   /api/public/stats:
     get:
       tags: [HubSyncRelay]
@@ -1771,6 +1801,8 @@ paths:
         "200":
           description: Public stats.
 
+        "500":
+          $ref: "#/components/responses/Error"
   /client/auth/me:
     get:
       tags: [HubSyncRelay]
@@ -1783,6 +1815,16 @@ paths:
         "200":
           description: User profile.
 
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
   /client/contacts:
     get:
       tags: [HubSyncRelay]
@@ -1795,6 +1837,16 @@ paths:
         "200":
           $ref: "#/components/responses/List"
 
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
   /client/sessions:
     get:
       tags: [HubSyncRelay]
@@ -1805,7 +1857,17 @@ paths:
       security: [{ bearerAuth: [] }]
       responses:
         "200":
-          $ref: "#/components/responses/List"
+          description: Sessions list. Handler returns a bare JSON array (no {items,page} envelope); openapi aligned to implementation.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Resource"
+        "401":
+          $ref: "#/components/responses/Error"
+        "429":
+          $ref: "#/components/responses/Error"
     post:
       tags: [HubSyncRelay]
       operationId: hubCreateSession
@@ -1846,6 +1908,16 @@ paths:
         "200":
           description: Session created.
 
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
   /client/sessions/private:
     post:
       tags: [HubSyncRelay]
@@ -1864,6 +1936,16 @@ paths:
         "201":
           description: Session created.
 
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
   /client/sessions/group:
     post:
       tags: [HubSyncRelay]
@@ -1883,6 +1965,16 @@ paths:
         "201":
           description: Group created.
 
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
   /client/sessions/{id}/messages:
     get:
       tags: [HubSyncRelay]
@@ -1898,7 +1990,25 @@ paths:
           schema: { type: string }
       responses:
         "200":
-          $ref: "#/components/responses/List"
+          description: Messages list (bare array of Message). Handler returns []MessageResponse; openapi aligned to Message schema.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Message"
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "429":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
     post:
       tags: [HubSyncRelay]
       operationId: hubSendMessage
@@ -1921,6 +2031,16 @@ paths:
         "201":
           description: Message sent.
 
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
   /client/ws:
     get:
       tags: [HubSyncRelay]
@@ -2056,6 +2176,16 @@ paths:
                     items:
                       $ref: "#/components/schemas/AgentRunEvent"
 
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
   /web/agent-tasks/{id}/events/summary:
     x-agenthub-device-type: web
     get:
@@ -2083,6 +2213,16 @@ paths:
                   data:
                     $ref: "#/components/schemas/AgentRunEventSummary"
 
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
   /web/agent-tasks/{id}/summary:
     x-agenthub-device-type: web
     get:
@@ -2110,6 +2250,16 @@ paths:
                   data:
                     $ref: "#/components/schemas/AgentRunEventSummary"
 
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
   /web/agent-tasks/{id}/approvals:
     x-agenthub-device-type: web
     get:
@@ -2141,7 +2291,7 @@ paths:
         "404":
           $ref: "#/components/responses/Error"
 
-  /web/agent-tasks/{id}/approvals/{approvalId}/decide:
+  /web/agent-tasks/{id}/approvals/{approval_id}/decide:
     x-agenthub-device-type: web
     post:
       tags: [HubSyncRelay]
@@ -2156,7 +2306,7 @@ paths:
           in: path
           required: true
           schema: { type: string }
-        - name: approvalId
+        - name: approval_id
           in: path
           required: true
           schema: { type: string }
@@ -2240,6 +2390,12 @@ paths:
         "200":
           description: Task marked running.
 
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
   /edge/agent-tasks/{id}/stream:
     x-agenthub-device-type: desktop
     post:
@@ -2265,6 +2421,12 @@ paths:
         "200":
           description: Chunk recorded.
 
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
   /edge/agent-tasks/{id}/done:
     x-agenthub-device-type: desktop
     post:
@@ -2290,6 +2452,12 @@ paths:
         "200":
           description: Task marked done.
 
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
   /edge/agent-tasks/{id}/fail:
     x-agenthub-device-type: desktop
     post:
@@ -2315,6 +2483,12 @@ paths:
         "200":
           description: Task marked failed.
 
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
   # ═══════════════════════════════════════════════════════════
   # Hub Server — additional implemented routes
   # ═══════════════════════════════════════════════════════════
@@ -2416,7 +2590,7 @@ paths:
 
   # ── Contacts ──
 
-  /client/contacts/{userId}:
+  /client/contacts/{user_id}:
     delete:
       tags: [HubSyncRelay]
       operationId: hubRemoveContact
@@ -2430,7 +2604,17 @@ paths:
         "204":
           description: Removed.
 
-  /client/contacts/{userId}/block:
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
+  /client/contacts/{user_id}/block:
     post:
       tags: [HubSyncRelay]
       operationId: hubBlockContact
@@ -2444,7 +2628,17 @@ paths:
         "200":
           $ref: "#/components/responses/Ok"
 
-  /client/contacts/{userId}/unblock:
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
+  /client/contacts/{user_id}/unblock:
     post:
       tags: [HubSyncRelay]
       operationId: hubUnblockContact
@@ -2458,7 +2652,17 @@ paths:
         "200":
           $ref: "#/components/responses/Ok"
 
-  /client/contacts/{userId}/remark:
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
+  /client/contacts/{user_id}/remark:
     put:
       tags: [HubSyncRelay]
       operationId: hubUpdateRemark
@@ -2481,6 +2685,16 @@ paths:
         "200":
           $ref: "#/components/responses/Ok"
 
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
   # ── Friend Requests ──
 
   /client/friend-requests:
@@ -2559,7 +2773,17 @@ paths:
         "201":
           $ref: "#/components/responses/Created"
 
-  /client/sessions/{id}/members/{user_id}:
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
+  /client/sessions/{id}/members/{target_user_id}:
     delete:
       tags: [HubSyncRelay]
       operationId: hubRemoveSessionMember
@@ -2572,7 +2796,7 @@ paths:
           in: path
           required: true
           schema: { type: string }
-        - name: user_id
+        - name: target_user_id
           in: path
           required: true
           schema: { type: string }
@@ -2580,6 +2804,16 @@ paths:
         "204":
           description: Removed.
 
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
   /client/sessions/{id}/leave:
     post:
       tags: [HubSyncRelay]
@@ -2597,6 +2831,16 @@ paths:
         "200":
           $ref: "#/components/responses/Ok"
 
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
   # ── Session Management ──
 
   /client/sessions/{id}/dissolve:
@@ -2616,6 +2860,16 @@ paths:
         "200":
           $ref: "#/components/responses/Ok"
 
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
   /client/sessions/{id}/transfer-owner:
     post:
       tags: [HubSyncRelay]
@@ -2642,6 +2896,16 @@ paths:
         "200":
           $ref: "#/components/responses/Ok"
 
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
   /client/sessions/{id}/settings:
     put:
       tags: [HubSyncRelay]
@@ -2669,6 +2933,16 @@ paths:
         "200":
           $ref: "#/components/responses/Ok"
 
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
   /client/sessions/{id}/member-settings:
     patch:
       tags: [HubSyncRelay]
@@ -2723,6 +2997,16 @@ paths:
         "200":
           $ref: "#/components/responses/List"
 
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
   /client/messages/search:
     get:
       tags: [HubSyncRelay]
@@ -2740,6 +3024,16 @@ paths:
         "200":
           $ref: "#/components/responses/List"
 
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
   /client/sessions/{id}/messages/{msgId}:recall:
     post:
       tags: [HubSyncRelay]
@@ -2837,6 +3131,16 @@ paths:
         "200":
           $ref: "#/components/responses/List"
 
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
   /client/messages:forward:
     post:
       tags: [HubSyncRelay]
@@ -2887,6 +3191,16 @@ paths:
         "200":
           description: Attachment metadata if present; null if absent.
 
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
   /client/attachments:
     post:
       tags: [HubSyncRelay]
@@ -2908,6 +3222,18 @@ paths:
       responses:
         "201":
           $ref: "#/components/responses/Created"
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "413":
+          $ref: "#/components/responses/Error"
+        "415":
+          $ref: "#/components/responses/Error"
+        "429":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
 
   /client/attachments/{id}:
     get:
@@ -2955,6 +3281,16 @@ paths:
         "200":
           $ref: "#/components/responses/List"
 
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
   /client/notifications/{id}/read:
     post:
       tags: [HubSyncRelay]
@@ -2972,6 +3308,16 @@ paths:
         "200":
           $ref: "#/components/responses/Ok"
 
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
   /client/notifications/read-all:
     post:
       tags: [HubSyncRelay]
@@ -2984,6 +3330,16 @@ paths:
         "200":
           $ref: "#/components/responses/Ok"
 
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
   /client/settings:
     get:
       tags: [HubSyncRelay]
@@ -3097,6 +3453,16 @@ paths:
                           $ref: "#/components/schemas/AgentProfile"
                       page:
                         $ref: "#/components/schemas/PageInfo"
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
     post:
       tags: [HubSyncRelay]
       operationId: hubCreateAgentProfile
@@ -3114,6 +3480,16 @@ paths:
         "200":
           $ref: "#/components/responses/Ok"
 
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
   /web/custom-agents:
     x-agenthub-device-type: web
     get:
@@ -3126,6 +3502,16 @@ paths:
       responses:
         "200":
           $ref: "#/components/responses/List"
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
     post:
       tags: [HubSyncRelay]
       operationId: hubCreateCustomAgent
@@ -3158,6 +3544,16 @@ paths:
         "201":
           $ref: "#/components/responses/Created"
 
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
   /web/custom-agents/{id}:
     x-agenthub-device-type: web
     get:
@@ -3212,6 +3608,16 @@ paths:
       responses:
         "200":
           $ref: "#/components/responses/Ok"
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
     delete:
       tags: [HubSyncRelay]
       operationId: hubDeleteCustomAgent
@@ -3228,6 +3634,16 @@ paths:
         "204":
           description: Deleted.
 
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
   # ── Edge / Web ──
 
   /edge/devices/register:
@@ -3363,6 +3779,16 @@ paths:
         "200":
           $ref: "#/components/responses/Ok"
 
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
   /web/agent-tasks/{id}/regenerate:
     x-agenthub-device-type: web
     post:
@@ -3417,6 +3843,16 @@ paths:
         "200":
           description: New JWT token pair.
 
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
   /client/auth/logout:
     post:
       tags: [HubSyncRelay]
@@ -3429,6 +3865,16 @@ paths:
         "200":
           $ref: "#/components/responses/Ok"
 
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
   /client/auth/profile:
     put:
       tags: [HubSyncRelay]
@@ -3450,6 +3896,16 @@ paths:
         "200":
           $ref: "#/components/responses/Ok"
 
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
   # ── Contacts (routes from router.go not yet documented) ──
 
   /client/contacts/search:
@@ -3469,6 +3925,16 @@ paths:
         "200":
           $ref: "#/components/responses/List"
 
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
   /client/contacts/friend-requests:
     get:
       tags: [HubSyncRelay]
@@ -3480,6 +3946,16 @@ paths:
       responses:
         "200":
           $ref: "#/components/responses/List"
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
     post:
       tags: [HubSyncRelay]
       operationId: hubSendFriendRequest
@@ -3501,6 +3977,16 @@ paths:
         "201":
           $ref: "#/components/responses/Created"
 
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
   /client/contacts/friend-requests/{id}/accept:
     post:
       tags: [HubSyncRelay]
@@ -3518,6 +4004,16 @@ paths:
         "200":
           $ref: "#/components/responses/Ok"
 
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
   /client/contacts/friend-requests/{id}/reject:
     post:
       tags: [HubSyncRelay]
@@ -3535,6 +4031,16 @@ paths:
         "200":
           $ref: "#/components/responses/Ok"
 
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
   # ── Sessions (routes from router.go not yet documented) ──
 
   /client/sessions/{id}/info:
@@ -3564,6 +4070,16 @@ paths:
         "200":
           $ref: "#/components/responses/Ok"
 
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
   /client/sessions/{id}:
     delete:
       tags: [HubSyncRelay]
@@ -3581,6 +4097,16 @@ paths:
         "204":
           description: Deleted.
 
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
   /client/sessions/{id}/messages/sync:
     get:
       tags: [HubSyncRelay]
@@ -3606,6 +4132,16 @@ paths:
         "200":
           description: Incremental message batch.
 
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
   /client/sessions/{id}/read:
     post:
       tags: [HubSyncRelay]
@@ -3623,6 +4159,16 @@ paths:
         "200":
           $ref: "#/components/responses/Ok"
 
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
   /client/sessions/{id}/agents:
     post:
       tags: [HubSyncRelay]
@@ -3667,6 +4213,16 @@ paths:
                   data:
                     $ref: "#/components/schemas/AgentInstance"
 
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
   /client/sessions/search:
     get:
       tags: [HubSyncRelay]
@@ -3684,6 +4240,16 @@ paths:
         "200":
           $ref: "#/components/responses/List"
 
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
   # ── Messages (individual operations — code paths) ──
 
   /client/messages/{id}:
@@ -3691,7 +4257,7 @@ paths:
       tags: [HubSyncRelay]
       operationId: hubEditMessageDirect
       summary: Edit a message.
-      description: Sender-only edit for user messages within the Hub edit window.
+      description: Sender-only edit for user messages within the Hub edit window. Returns the edit acknowledgment (message_id + edited_at); not a full Message projection.
       x-agenthub-status: implemented
       x-agenthub-owner: Hub
       security: [{ bearerAuth: [] }]
@@ -3712,7 +4278,33 @@ paths:
                 content: { type: string }
       responses:
         "200":
-          $ref: "#/components/responses/Ok"
+          description: Edit acknowledgment.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message_id, edited_at]
+                properties:
+                  message_id:
+                    type: string
+                    format: uuid
+                  edited_at:
+                    type: string
+                    format: date-time
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "410":
+          $ref: "#/components/responses/Error"
+        "429":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
 
   /client/messages/{id}/recall:
     post:
@@ -3729,7 +4321,21 @@ paths:
           schema: { type: string }
       responses:
         "200":
-          $ref: "#/components/responses/Ok"
+          description: Message recalled (null data).
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "410":
+          $ref: "#/components/responses/Error"
+        "429":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
 
   /client/messages/{id}/pin:
     post:
@@ -3746,7 +4352,19 @@ paths:
           schema: { type: string }
       responses:
         "200":
-          $ref: "#/components/responses/Ok"
+          description: Message pinned (null data).
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "429":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
     delete:
       tags: [HubSyncRelay]
       operationId: hubUnpinMessageDirect
@@ -3761,7 +4379,19 @@ paths:
           schema: { type: string }
       responses:
         "200":
-          $ref: "#/components/responses/Ok"
+          description: Message unpinned (null data).
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "429":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
 
   /client/messages/{id}/reactions:
     get:
@@ -3796,6 +4426,18 @@ paths:
                     type: array
                     items:
                       $ref: "#/components/schemas/MessageReactionResponse"
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "429":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
     post:
       tags: [HubSyncRelay]
       operationId: hubAddMessageReactionDirect
@@ -3828,6 +4470,18 @@ paths:
                     enum: [ok]
                   data:
                     $ref: "#/components/schemas/MessageReactionResponse"
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "429":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
     delete:
       tags: [HubSyncRelay]
       operationId: hubRemoveMessageReactionDirect
@@ -3861,6 +4515,18 @@ paths:
                   data:
                     $ref: "#/components/schemas/MessageReactionResponse"
 
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "429":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
   /client/messages/{id}/forward:
     post:
       tags: [HubSyncRelay]
@@ -3887,6 +4553,16 @@ paths:
         "201":
           $ref: "#/components/responses/Created"
 
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
   # ── Execution Targets ──
 
   /web/execution-targets:
@@ -3901,6 +4577,16 @@ paths:
       responses:
         "200":
           $ref: "#/components/responses/List"
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
     post:
       tags: [HubSyncRelay]
       operationId: hubCreateExecutionTarget
@@ -3918,6 +4604,16 @@ paths:
         "201":
           $ref: "#/components/responses/Created"
 
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
   /web/execution-targets/{id}:
     x-agenthub-device-type: web
     get:
@@ -3935,6 +4631,16 @@ paths:
       responses:
         "200":
           $ref: "#/components/responses/Ok"
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
     patch:
       tags: [HubSyncRelay]
       operationId: hubUpdateExecutionTarget
@@ -3956,6 +4662,16 @@ paths:
       responses:
         "200":
           $ref: "#/components/responses/Ok"
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
     delete:
       tags: [HubSyncRelay]
       operationId: hubDeleteExecutionTarget
@@ -3972,6 +4688,16 @@ paths:
         "204":
           description: Deleted.
 
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
   /web/execution-targets/{id}/ping:
     x-agenthub-device-type: web
     post:
@@ -4015,6 +4741,16 @@ paths:
       responses:
         "200":
           $ref: "#/components/responses/List"
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
     post:
       tags: [HubSyncRelay]
       operationId: hubCreateProject
@@ -4086,7 +4822,7 @@ paths:
       tags: [HubSyncRelay]
       operationId: hubListProjectThreads
       summary: List Hub project group threads.
-      description: Returns owner-scoped Hub group sessions bound to the project workspace through sessions.workspace_id.
+      description: Returns owner-scoped Hub group sessions bound to the project workspace through sessions.workspace_id. Handler returns a bare JSON array (no {items,page} envelope); openapi aligned to implementation.
       x-agenthub-status: implemented
       x-agenthub-owner: Hub
       security: [{ bearerAuth: [] }]
@@ -4097,8 +4833,22 @@ paths:
           schema: { type: string, format: uuid }
       responses:
         "200":
-          $ref: "#/components/responses/List"
+          description: Project threads list (bare array).
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/WorkspaceThread"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
         "404":
+          $ref: "#/components/responses/Error"
+        "429":
+          $ref: "#/components/responses/Error"
+        "500":
           $ref: "#/components/responses/Error"
     post:
       tags: [HubSyncRelay]
@@ -4133,6 +4883,7 @@ paths:
       tags: [HubSyncRelay]
       operationId: hubListProjectThreadMessages
       summary: List messages in a Hub project group thread.
+      description: Handler returns a bare JSON array (no {items,page} envelope); openapi aligned to implementation.
       x-agenthub-status: implemented
       x-agenthub-owner: Hub
       security: [{ bearerAuth: [] }]
@@ -4151,8 +4902,22 @@ paths:
           schema: { type: integer, minimum: 1, maximum: 100 }
       responses:
         "200":
-          $ref: "#/components/responses/List"
+          description: Thread messages list (bare array).
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/WorkspaceThreadMessage"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
         "404":
+          $ref: "#/components/responses/Error"
+        "429":
+          $ref: "#/components/responses/Error"
+        "500":
           $ref: "#/components/responses/Error"
     post:
       tags: [HubSyncRelay]
@@ -4381,6 +5146,16 @@ paths:
         "200":
           $ref: "#/components/responses/List"
 
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
   # ── Relay Commands (web) ──
 
   /web/relay/commands:
@@ -4418,6 +5193,16 @@ paths:
         "200":
           $ref: "#/components/responses/Ok"
 
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
   /web/relay/commands/{id}:
     x-agenthub-device-type: web
     get:
@@ -4437,6 +5222,16 @@ paths:
         "200":
           $ref: "#/components/responses/Ok"
 
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
   /web/relay/commands/{id}/ack:
     x-agenthub-device-type: web
     post:
@@ -4456,6 +5251,16 @@ paths:
         "200":
           $ref: "#/components/responses/Ok"
 
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
   # ── Devices (web) ──
 
   /web/devices:
@@ -4471,6 +5276,16 @@ paths:
         "200":
           $ref: "#/components/responses/List"
 
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
   # ── Agent Teams (web) ──
 
   /web/agent-teams:
@@ -4498,16 +5313,39 @@ paths:
       responses:
         "200":
           $ref: "#/components/responses/Ok"
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
     get:
       tags: [HubSyncRelay]
       operationId: hubListAgentTeams
       summary: List agent teams owned by the current user.
+      description: Handler returns a bare JSON array (no {items,page} envelope); openapi aligned to implementation.
       x-agenthub-status: implemented
       x-agenthub-owner: Hub
       security: [{ bearerAuth: [] }]
       responses:
         "200":
-          $ref: "#/components/responses/List"
+          description: Agent teams list (bare array).
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AgentTeam"
+        "401":
+          $ref: "#/components/responses/Error"
+        "429":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
 
   /web/agent-teams/{id}:
     x-agenthub-device-type: web
@@ -4526,6 +5364,16 @@ paths:
       responses:
         "200":
           $ref: "#/components/responses/Ok"
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
     put:
       tags: [HubSyncRelay]
       operationId: hubUpdateAgentTeam
@@ -4548,6 +5396,16 @@ paths:
       responses:
         "200":
           $ref: "#/components/responses/Ok"
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
     delete:
       tags: [HubSyncRelay]
       operationId: hubDeleteAgentTeam
@@ -4559,6 +5417,16 @@ paths:
         "200":
           $ref: "#/components/responses/Ok"
 
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
   /web/agent-teams/{id}/members:
     x-agenthub-device-type: web
     parameters:
@@ -4592,6 +5460,16 @@ paths:
         "200":
           $ref: "#/components/responses/Ok"
 
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
   /web/agent-teams/{id}/members/{member_id}:
     x-agenthub-device-type: web
     parameters:
@@ -4614,6 +5492,16 @@ paths:
         "200":
           $ref: "#/components/responses/Ok"
 
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
   /web/agent-teams/{id}/runs:
     x-agenthub-device-type: web
     parameters:
@@ -4645,16 +5533,43 @@ paths:
       responses:
         "200":
           $ref: "#/components/responses/Ok"
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
     get:
       tags: [HubSyncRelay]
       operationId: hubListTeamRuns
       summary: List runs for a team.
+      description: Handler returns a bare JSON array (no {items,page} envelope); openapi aligned to implementation.
       x-agenthub-status: implemented
       x-agenthub-owner: Hub
       security: [{ bearerAuth: [] }]
       responses:
         "200":
-          $ref: "#/components/responses/List"
+          description: Team runs list (bare array).
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AgentTeamRun"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "429":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
 
   /web/agent-teams/{id}/runs/{run_id}:
     x-agenthub-device-type: web
@@ -4678,6 +5593,16 @@ paths:
         "200":
           $ref: "#/components/responses/Ok"
 
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
   /web/agent-teams/{id}/runs/{run_id}/state:
     x-agenthub-device-type: web
     parameters:
@@ -4700,6 +5625,16 @@ paths:
         "200":
           $ref: "#/components/responses/Ok"
 
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
   /web/agent-teams/{id}/runs/{run_id}/events:
     x-agenthub-device-type: web
     parameters:
@@ -4722,6 +5657,16 @@ paths:
         "200":
           $ref: "#/components/responses/List"
 
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
   /web/agent-teams/{id}/runs/{run_id}/tasks:
     x-agenthub-device-type: web
     parameters:
@@ -4744,6 +5689,16 @@ paths:
         "200":
           $ref: "#/components/responses/List"
 
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
   /web/agent-teams/{id}/runs/{run_id}/route-decisions:
     x-agenthub-device-type: web
     parameters:
@@ -4773,6 +5728,16 @@ paths:
         "200":
           $ref: "#/components/responses/Ok"
 
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
   /web/agent-teams/{id}/runs/{run_id}/approvals/{approval_id}/decide:
     x-agenthub-device-type: web
     parameters:
@@ -4806,6 +5771,16 @@ paths:
         "200":
           $ref: "#/components/responses/Ok"
 
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
   /web/agent-teams/{id}/runs/{run_id}/conflicts/{conflict_id}/resolve:
     x-agenthub-device-type: web
     parameters:
@@ -4839,6 +5814,16 @@ paths:
         "200":
           $ref: "#/components/responses/Ok"
 
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
   /web/agent-teams/{id}/runs/{run_id}/assignments:
     x-agenthub-device-type: web
     parameters:
@@ -4882,6 +5867,16 @@ paths:
       responses:
         "200":
           $ref: "#/components/responses/Ok"
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
     get:
       tags: [HubSyncRelay]
       operationId: hubListTeamAssignments
@@ -4893,6 +5888,16 @@ paths:
         "200":
           $ref: "#/components/responses/List"
 
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
   /web/agent-teams/{id}/runs/{run_id}/assignments/{assignment_id}/dispatch:
     x-agenthub-device-type: web
     parameters:
@@ -4919,6 +5924,16 @@ paths:
         "200":
           $ref: "#/components/responses/Ok"
 
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
   /web/agent-teams/{id}/runs/{run_id}/assignments/{assignment_id}/complete:
     x-agenthub-device-type: web
     parameters:
@@ -4955,6 +5970,16 @@ paths:
         "200":
           $ref: "#/components/responses/Ok"
 
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
   /web/agent-teams/{id}/runs/{run_id}/assignments/{assignment_id}/fail:
     x-agenthub-device-type: web
     parameters:
@@ -4991,6 +6016,16 @@ paths:
         "200":
           $ref: "#/components/responses/Ok"
 
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
   # ── Team run compete summary / human review gate ──
   # Mounted flat under /web/team-runs (not under /web/agent-teams/{id}/runs).
 
@@ -5484,6 +6519,16 @@ paths:
       responses:
         "200":
           $ref: "#/components/responses/Ok"
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
     delete:
       tags: [HubSyncRelay]
       operationId: hubDeleteAgentProfile
@@ -5495,6 +6540,16 @@ paths:
         "200":
           $ref: "#/components/responses/Ok"
 
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
   /web/agent-profiles/{id}/publish:
     x-agenthub-device-type: web
     post:
@@ -5514,6 +6569,16 @@ paths:
         "200":
           $ref: "#/components/responses/Ok"
 
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
   /web/agent-profiles/{id}/install:
     x-agenthub-device-type: web
     post:
@@ -5532,6 +6597,16 @@ paths:
         "200":
           $ref: "#/components/responses/Ok"
 
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
   # ── Skills ──
 
   /web/skills:
@@ -5549,6 +6624,16 @@ paths:
       responses:
         "200":
           $ref: "#/components/responses/List"
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
     post:
       tags: [HubSyncRelay]
       operationId: hubCreateSkill
@@ -5566,6 +6651,16 @@ paths:
         "201":
           $ref: "#/components/responses/Created"
 
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
   /web/skills/{id}:
     x-agenthub-device-type: web
     parameters:
@@ -5601,6 +6696,16 @@ paths:
       responses:
         "200":
           $ref: "#/components/responses/Ok"
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
     delete:
       tags: [HubSyncRelay]
       operationId: hubDeleteSkill
@@ -5612,6 +6717,16 @@ paths:
         "204":
           description: Deleted.
 
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
   /web/skills/{id}/publish:
     x-agenthub-device-type: web
     post:
@@ -5631,6 +6746,16 @@ paths:
         "200":
           $ref: "#/components/responses/Ok"
 
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
   /web/skills/{id}/unpublish:
     x-agenthub-device-type: web
     post:
@@ -5650,6 +6775,16 @@ paths:
         "200":
           $ref: "#/components/responses/Ok"
 
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
   # ── MCP Servers ──
 
   /web/mcp-servers:
@@ -5667,6 +6802,16 @@ paths:
       responses:
         "200":
           $ref: "#/components/responses/List"
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
     post:
       tags: [HubSyncRelay]
       operationId: hubCreateMCPServer
@@ -5684,6 +6829,16 @@ paths:
         "201":
           $ref: "#/components/responses/Created"
 
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
   /web/mcp-servers/{id}:
     x-agenthub-device-type: web
     parameters:
@@ -5719,6 +6874,16 @@ paths:
       responses:
         "200":
           $ref: "#/components/responses/Ok"
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
     delete:
       tags: [HubSyncRelay]
       operationId: hubDeleteMCPServer
@@ -5730,6 +6895,16 @@ paths:
         "204":
           description: Deleted.
 
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
   /web/mcp-servers/{id}/publish:
     x-agenthub-device-type: web
     post:
@@ -5749,6 +6924,16 @@ paths:
         "200":
           $ref: "#/components/responses/Ok"
 
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
   /web/mcp-servers/{id}/unpublish:
     x-agenthub-device-type: web
     post:
@@ -5768,6 +6953,16 @@ paths:
         "200":
           $ref: "#/components/responses/Ok"
 
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
   # ── Provider Bindings ──
 
   /web/provider-bindings:
@@ -5785,6 +6980,16 @@ paths:
       responses:
         "200":
           $ref: "#/components/responses/List"
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
     post:
       tags: [HubSyncRelay]
       operationId: hubCreateProviderBinding
@@ -5802,6 +7007,16 @@ paths:
         "201":
           $ref: "#/components/responses/Created"
 
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
   /web/provider-bindings/{id}:
     x-agenthub-device-type: web
     parameters:
@@ -5825,6 +7040,16 @@ paths:
       responses:
         "200":
           $ref: "#/components/responses/Ok"
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
     delete:
       tags: [HubSyncRelay]
       operationId: hubDeleteProviderBinding
@@ -5836,6 +7061,16 @@ paths:
         "204":
           description: Deleted.
 
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
   # ── Market ──
 
   /web/market/profiles:
@@ -5859,6 +7094,16 @@ paths:
         "200":
           $ref: "#/components/responses/List"
 
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
   /web/market/profiles/{id}:
     x-agenthub-device-type: web
     get:
@@ -5897,6 +7142,16 @@ paths:
         "200":
           $ref: "#/components/responses/Ok"
 
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
   /web/market/profiles/{id}/rate:
     x-agenthub-device-type: web
     post:
@@ -5927,6 +7182,16 @@ paths:
         "200":
           $ref: "#/components/responses/Ok"
 
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "500":
+          $ref: "#/components/responses/Error"
 components:
   securitySchemes:
     bearerAuth:
@@ -6502,6 +7767,10 @@ components:
         payload:
           type: object
           additionalProperties: true
+        seq_id:
+          type: integer
+          format: int64
+          description: Monotonic sequence ID for ordering and gap detection. Present on all non-auth frames.
     HubDevicePresencePayload:
       type: object
       required: [user_id]
@@ -7154,6 +8423,115 @@ components:
         content:
           type: string
           description: Raw text, or JSON text payload with optional metadata for im_kind, mentions and orchestrator_queue.
+    Attachment:
+      type: object
+      description: File attachment metadata (aligned to hub-server model.Attachment json tags).
+      required: [id, hash, size, mime_type, uploader_user_id, created_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        hash:
+          type: string
+          description: Content hash (sha256/sha512 hex digest).
+        size:
+          type: integer
+          format: int64
+          description: File size in bytes.
+        mime_type:
+          type: string
+        original_name:
+          type: string
+          description: Original filename if provided by uploader.
+        uploader_user_id:
+          type: string
+          format: uuid
+        metadata:
+          type: string
+          description: JSON object string with additional attachment metadata.
+        created_at:
+          type: string
+          format: date-time
+    MessageReplyToInfo:
+      type: object
+      description: Nested reply-target projection on Message (aligned to message.ReplyToInfo json tags).
+      required: [id, sender_id, content_type, content, recalled, created_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        sender_id:
+          type: string
+          format: uuid
+        content_type:
+          type: string
+        content:
+          type: string
+        recalled:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+    Message:
+      type: object
+      description: >
+        Hub session IM message API projection (aligned to model.Message +
+        message.MessageResponse json tags). Used by /client/sessions/{id}/messages
+        and /client/messages/{id} routes. The web-project projection
+        WorkspaceThreadMessage is a separate, smaller schema for /web/projects
+        thread routes.
+      required: [id, session_id, seq_id, client_msg_id, sender_type, sender_id, content_type, content, recalled, edited, created_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        session_id:
+          type: string
+          format: uuid
+        seq_id:
+          type: integer
+          format: int64
+        client_msg_id:
+          type: string
+          format: uuid
+        sender_type:
+          type: string
+          enum: [user, agent]
+        sender_id:
+          type: string
+          format: uuid
+        content_type:
+          type: string
+          enum: [text, code, diff, image, file, link_card, deploy_card]
+        content:
+          type: string
+          description: Normalized JSON string. Text messages are persisted as text-only JSON or text plus metadata JSON.
+        reply_to_message_id:
+          type: string
+          format: uuid
+          nullable: true
+          description: ID of the message this one replies to (absent when not a reply).
+        reply_to:
+          allOf:
+            - $ref: "#/components/schemas/MessageReplyToInfo"
+          nullable: true
+          description: Nested reply-target projection. Absent when not a reply or when the reply target has been deleted.
+        attachments:
+          type: array
+          items:
+            $ref: "#/components/schemas/Attachment"
+          description: File attachments associated with the message.
+        recalled:
+          type: boolean
+        edited:
+          type: boolean
+        edited_at:
+          type: string
+          format: date-time
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
     WorkspaceThreadMessage:
       type: object
       required: [id, project_id, thread_id, seq_id, client_msg_id, sender_type, sender_id, content_type, content, created_at]

@@ -1,6 +1,6 @@
 # AgentHub 开发快速上手
 
-最后更新：2026-07-18
+最后更新：2026-08-09
 
 本文档只保留新人启动本地开发环境需要的最短路径。规则、分支、E2E 证据等级和发布门禁以 `AGENTS.md` 与 `docs/progress/MASTER.md` 为准；总入口见 `docs/roadmap.md` 与 `.agents/skills/real-e2e-acceptance/SKILL.md`。
 
@@ -8,7 +8,7 @@
 
 | 工具 | 用途 |
 |---|---|
-| Go 1.25+ | Hub Server / Edge Server |
+| Go 1.26+ | Hub Server / Edge Server |
 | Node.js 20+ + corepack | pnpm workspace 和前端构建 |
 | PostgreSQL 16+ | Hub 数据库 |
 | Redis 7+ | Hub cache/session |
@@ -42,7 +42,8 @@ cp .env.example .env
 - `AGENTHUB_DB_HOST`, `AGENTHUB_DB_PORT`, `AGENTHUB_DB_USER`, `AGENTHUB_DB_PASSWORD`
 - `AGENTHUB_REDIS_HOST`, `AGENTHUB_REDIS_PORT`
 - `AGENTHUB_JWT_SECRET`（开发环境也使用足够长度的随机值，至少 32 字符）
-- TokenDance ID OIDC 仅在测试真实登录时配置：`AGENTHUB_TOKENDANCE_ID_ISSUER_URL`、`AGENTHUB_TOKENDANCE_ID_CLIENT_ID`、`AGENTHUB_TOKENDANCE_ID_CLIENT_SECRET`
+- TokenDance ID OIDC 仅在测试真实登录时配置：`AGENTHUB_TOKENDANCE_ID_ISSUER_URL`、`AGENTHUB_TOKENDANCE_ID_CLIENT_ID`、`AGENTHUB_TOKENDANCE_ID_CLIENT_SECRET`、`AGENTHUB_TOKENDANCE_ID_ALLOWED_REDIRECT_URIS`
+- 安全开关/前端入口：`AGENTHUB_AUTH_FAIL_CLOSED`（生产建议 `true`，见 [05-deployment.md](architecture/05-deployment.md) §安全配置）、`VITE_EDGE_URL`、`VITE_HUB_URL`（Desktop renderer 指向 Edge/Hub，见 `.env.example` §Desktop）
 
 本地依赖可以用 Docker Compose：
 
@@ -75,8 +76,6 @@ cd app
 corepack enable
 corepack pnpm install
 ```
-
-可选 Makefile 入口（从仓库根）：`make fe-install`、`make fe-dev`（desktop Vite `:5173`）。
 
 Web：
 
@@ -124,23 +123,15 @@ AGENTHUB_TOKENDANCE_ID_ISSUER_URL=http://127.0.0.1:3000
 后端：
 
 ```bash
-cd edge-server
-go test ./... -short -count=1
-
-cd ../hub-server
-go test ./... -short -count=1
+cd edge-server; go test ./... -short -count=1
+cd ../hub-server; go test ./... -short -count=1
 ```
 
 前端：
 
 ```bash
-cd app/desktop
-corepack pnpm test
-corepack pnpm typecheck
-
-cd ../web
-corepack.cmd pnpm typecheck
-corepack.cmd pnpm exec vite build
+cd app/desktop; corepack pnpm test; corepack pnpm typecheck
+cd ../web; corepack.cmd pnpm typecheck; corepack.cmd pnpm exec vite build
 ```
 
 文档/API：
@@ -161,6 +152,18 @@ E2E/Visual QA 只证明实际跑过的层级。使用 `.agents/skills/real-e2e-a
 |---|---|
 | Hub 连接数据库失败 | PostgreSQL 是否启动，`.env` 数据库变量是否匹配 |
 | Edge 3210 被占用 | 查找残留进程后重新启动 |
-| Web/desktop 显示 mock 数据 | 未登录或处于 Demo/Fixture 模式是预期行为 |
 | Hub WebSocket 连接失败 | 是否使用 Hub-issued session，CORS origin 是否允许当前前端端口 |
 | 只改前端是否需要 Rust | 不需要；只有 Tauri native 或 packaging 工作需要 Rust |
+| OIDC 登录报 `redirect_uri not allowed` | `AGENTHUB_TOKENDANCE_ID_REDIRECT_URI`/`ALLOWED_REDIRECT_URIS` 与 TDID 侧 `oauth_clients.redirect_uris` 不同步；重开登录、清浏览器 session 后重试，见 [05-deployment.md](architecture/05-deployment.md) §OIDC 回调契约 |
+| 接口 429/503 `rate_limited`/`rate_limit_unavailable` | Redis 故障或超配额；429 带 `Retry-After` 须遵守；503 多为 Redis 中断（认证路径恒 fail-closed），见 [conventions.md](../api/conventions.md) §Errors |
+| 启动报 JWT secret 弱被拒 | `change-me-production*`/`dev-secret-change-in-production*` 前缀被 blocklist 拒；换随机 ≥32 字符值 |
+
+## 发布 tag SOP
+
+唯一发布入口：本地打 tag → `git push origin <tag>` → `.github/workflows/release.yml` 触发构建并出 GitHub Release。旁路入口 cd-desktop.yml 与 `scripts/release/release.ps1` 已于 2026-08-02 删除。
+
+1. 前置：master 全绿；版本号与 `app/desktop/package.json`、`app/desktop/src-tauri/tauri.conf.json`、`app/desktop/src-tauri/Cargo.toml` 一致（校验见 `scripts/release/verify-release-gate.py`）。
+2. 打 tag：`git tag vX.Y.Z`（正式）或 `vX.Y.Z-rc.N`（候选）；commit 必须在 master 祖先链上，格式须匹配 `^v\d+\.\d+\.\d+(-rc\.\d+)?$`（release.yml tag-guard 双重守卫）；`git push origin <tag>` 后 release.yml 构建出包并发布。
+3. 产物门控：build-desktop（Windows NSIS + portable）恒定；build-desktop-macos（DMG）由 `RELEASE_MACOS_ENABLED=true` 门控（#1652，可走 `run_macos_package_dry` 预检）；build-mobile（Android APK）由 `RELEASE_MOBILE_ENABLED=true` 门控。
+
+冻结开关：`scripts/release/verify-release-gate.py` 末尾两条无条件 Blocker（signing/notarization 审批）是发布冻结开关，等管理员批准后再发布；不是常规门禁，不得按"永远红"误判为故障。

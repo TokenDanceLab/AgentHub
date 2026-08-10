@@ -57,7 +57,10 @@ services:
     environment:
       # hk3 本地 PostgreSQL 16（127.0.0.1:5433）。live 角色为 agenthub；
       # PG_PASSWORD 必填，其余默认值与 live 对齐（见 server projects/agenthub/STATE.md）。
-      AGENTHUB_DB_HOST: ${PG_HOST:-127.0.0.1:5433}
+      # NOTE: PG_HOST 默认值只写主机（不带端口）；端口走 PG_PORT（默认 5433）。
+      # 历史默认值 127.0.0.1:5433 会把端口塞进 host，DBConfig.DSN() 不拆分
+      # host:port，导致 DSN 拼成 host=127.0.0.1:5433 port=5433 连不上。
+      AGENTHUB_DB_HOST: ${PG_HOST:-127.0.0.1}
       AGENTHUB_DB_PORT: "${PG_PORT:-5433}"
       AGENTHUB_DB_USER: ${PG_USER:-agenthub}
       AGENTHUB_DB_PASSWORD: ${PG_PASSWORD:?请设置 PG_PASSWORD}
@@ -70,6 +73,14 @@ services:
       AGENTHUB_REDIS_DB: "0"
       AGENTHUB_REDIS_POOL_SIZE: "20"
       AGENTHUB_REDIS_MIN_IDLE_CONNS: "5"
+      # Security hardening (2026-08-10, CI7):
+      # - AUTH_FAIL_CLOSED=true: access-token jti blacklist check (Redis-backed)
+      #   fails CLOSED on Redis errors so a revoked (logged-out) access JWT
+      #   cannot slip back in during a Redis outage.
+      # - RATE_LIMIT_FAIL_OPEN=false: non-auth rate limiters also fail CLOSED
+      #   on Redis errors (auth paths always fail-closed regardless).
+      AGENTHUB_AUTH_FAIL_CLOSED: "true"
+      AGENTHUB_RATE_LIMIT_FAIL_OPEN: "false"
       # JWT
       AGENTHUB_JWT_SECRET: ${AGENTHUB_JWT_SECRET:?请设置 AGENTHUB_JWT_SECRET}
       AGENTHUB_JWT_ACCESS_TTL: ${AGENTHUB_JWT_ACCESS_TTL:-15m}

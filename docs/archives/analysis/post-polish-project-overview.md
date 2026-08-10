@@ -1,5 +1,6 @@
 # Post-Polish Project Overview
 
+> pending external archive — see docs/history.md
 > last-updated: 2026-07-21
 > program: post-visual-polish engineering residual — **delivered** (Phases 79–80 · #1340–#1342)
 > authority: does **not** replace `AGENTS.md` / `docs/architecture.md` / live `docs/progress/MASTER.md`

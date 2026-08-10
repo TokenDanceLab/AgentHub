@@ -1,5 +1,7 @@
 # Frontend Dedupe Plan (Strangler Cleanup)
 
+> pending external archive — see docs/history.md
+
 最后更新：2026-07-18
 范围：`app/desktop` / `app/web` / `app/shared`（mobile 仅边界相关）
 原则：只做小切片绞杀；不先大合并 orphan UI；先 SSOT 再删 fork。

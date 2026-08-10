@@ -22,7 +22,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  GO_VERSION: "1.25"
+  GO_VERSION: "1.26.5"
   REGISTRY: ghcr.io
   # Image SSOT: ghcr.io/tokendancelab/agenthub-hub-server (see docs/analysis/image-name-ssot.md / #426).
   # Do not reintroduce agenthub-hub as a second product image name.

@@ -276,8 +276,7 @@ def main() -> int:
     manifest = assert_artifact_manifest(REPO_ROOT, args.ArtifactsRoot)
 
     step("blocking external approval slices")
-    blocker("public release remains blocked until signing/notarization approval is explicit; this gate does not sign, notarize, staple, tag, push, or upload releases")
-    blocker("production updater publication remains blocked until signed latest.json and installer signature are produced and approved")
+    assert_signing_approval_gate()
 
     report_full_path = os.path.normpath(args.ReportPath if os.path.isabs(args.ReportPath) else os.path.join(REPO_ROOT, args.ReportPath))
     os.makedirs(os.path.dirname(report_full_path), exist_ok=True)
@@ -303,6 +302,33 @@ def main() -> int:
 
     print("Release gate READY.", flush=True)
     return 0
+
+
+def assert_signing_approval_gate() -> None:
+    """Lift the signing/notarization + updater freeze only when both:
+    (a) the repo variable RELEASE_SIGNING_APPROVED is set to "true"
+        (surfaced as an env var in CI; absent locally), and
+    (b) a signing-evidence file exists at the expected path.
+    Without either, the freeze stays in place (conservative default). The
+    block reason is recorded so the report explains why the gate is closed.
+    """
+    approved = os.environ.get("RELEASE_SIGNING_APPROVED", "").lower() == "true"
+    evidence_path = os.path.join(REPO_ROOT, "deployments", "production", "signing-manifest.sha256")
+    evidence_present = os.path.isfile(evidence_path)
+
+    if approved and evidence_present:
+        add_ready("signing/notarization freeze lifted: RELEASE_SIGNING_APPROVED=true and signing evidence present")
+        add_ready("production updater publication approved alongside signing freeze lift")
+        return
+
+    if not approved:
+        blocker("signing/notarization not approved: set repo variable RELEASE_SIGNING_APPROVED=true to lift the freeze")
+    elif not evidence_present:
+        blocker("signing/notarization approval set but signing evidence file is missing: deployments/production/signing-manifest.sha256")
+    # Updater publication is gated by the same freeze; mirror the reason so the
+    # report is explicit about both blocked slices.
+    if not (approved and evidence_present):
+        blocker("production updater publication remains blocked until signed latest.json and installer signature are produced and approved (signing freeze not lifted)")
 
 
 if __name__ == "__main__":

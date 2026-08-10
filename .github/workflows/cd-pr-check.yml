@@ -20,7 +20,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  GO_VERSION: "1.25"
+  GO_VERSION: "1.26.5"
 
 jobs:
   # ── Deployment file validation ─────────────────
@@ -153,19 +153,29 @@ jobs:
           echo "::endgroup::"
 
   # ── Docker build dry run ───────────────────────
+  # CI5: bare `docker build` → docker/build-push-action@v7 with type=gha
+  # cache (aligns with cd-hub-server.yml). load:true keeps the image in the
+  # local daemon so the subsequent Verify image contents step can `docker run`
+  # it. No push — this is a PR pre-flight build only.
   docker-build-dry:
     name: Docker build dry run
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
 
-      - name: Build Docker image (no push)
-        run: |
-          echo "::group::Docker build dry run"
-          docker build -t agenthub-hub:pr-check \
-            -f hub-server/deployments/Dockerfile .
-          echo "Docker image built successfully (not pushed)."
-          echo "::endgroup::"
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Build Docker image (no push, cached)
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: hub-server/deployments/Dockerfile
+          push: false
+          load: true
+          tags: agenthub-hub:pr-check
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
       - name: Verify image contents
         run: |

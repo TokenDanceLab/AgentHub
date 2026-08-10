@@ -1,5 +1,6 @@
 # RFC A-V1 — adapters/ 12.3k + lifecycle/ 7.6k 包拆分评估
 
+> SPEC completed — pending external archive
 > 状态: **已裁决 2026-08-03** — 采纳定向抽取；驳回 lifecycle 拆分与 adapters 全量叶子包化 · 执行入口 #1526（先合同解环，后移动文件）· **Step 2 已落地 2026-08-03（#1566）**
 > 作者: senior-architect agent · 日期: 2026-07-30 · 更新: 2026-08-03（#1523 事实对齐；#1566 Step 2 完成）
 > 权威: `docs/progress/MASTER.md`；裁决由审核 leader 拍板，实际移动文件仍需 AGENTS.md §5 审批（见 §9）

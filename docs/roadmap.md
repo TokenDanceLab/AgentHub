@@ -20,7 +20,7 @@
 | Program | Status | Pointer |
 |---|---|---|
 | Post-Polish Residual Hardening (Phases 79–80) | **closed** 2026-07-21 · #1340 #1341 #1342 | [plan/post-polish-task-breakdown.md](archives/plan/post-polish-task-breakdown.md) |
-| Visual polish (Phases 73–78) | closed 2026-07-20 · gate **89 Ship** | [analysis/visual-qa-scorecard.md](archives/analysis/visual-qa-scorecard.md) |
+| Visual polish (Phases 73–78) | closed 2026-07-20 · gate **89 Ship** | [analysis/visual-qa-scorecard.md](analysis/visual-qa-scorecard.md) |
 | Cleanup baseline (Phases 0–7) | closed 2026-07-16 / PR [#446](https://github.com/TokenDanceLab/AgentHub/pull/446) | [archives/cleanup-baseline/](archives/cleanup-baseline/) · historical `docs/plan/*` banners |
 
 ## 当前优先级
@@ -44,7 +44,7 @@
 | Backend performance/leak | 行为/微基准门禁已绿；不声明生产容量；**手动** `workflow_dispatch` job `Backend perf/leak gates` | [reference/backend-performance-gates.md](reference/backend-performance-gates.md) + `scripts/verify/verify-backend-perf-leak-gates.py` **PASS**（非 capacity） |
 | Mobile PR CI light | mobile-rn / shared hubClient 变更跑 typecheck+unit；重 suite 仍 dispatch | checks.yml `frontend-mobile-light` path-filter |
 | API contract hygiene | REST 以 `api/openapi.yaml` 为准，WS 以 `api/events.md` 为准 | OpenAPI parse + endpoint tests |
-| 发布链路治理（2026-08-07 起） | macOS 产物改 `RELEASE_MACOS_ENABLED` 门控 + `run_macos_package_dry` 预检（#1652）；生产 compose 模板与 live 对齐（本地 PG、canonical 回调，#1650/#1651）；cd-pr-check 加 compose config 干跑（#1655）；OIDC 配置门禁重写或退役（#1654） | verify-release-gate.py / verify-deployment-shape.py / cd-pr-check 全绿；issue #1650–#1658 逐个关闭 |
+| 发布链路治理（2026-08-07 起） | macOS 产物改 `RELEASE_MACOS_ENABLED` 门控 + `run_macos_package_dry` 预检（#1652）；生产 compose 模板与 live 对齐（本地 PG、canonical 回调，#1650/#1651）；cd-pr-check 加 compose config 干跑（#1655）；OIDC 配置门禁重写或退役（#1653/#1654 已完成） | verify-release-gate.py / verify-deployment-shape.py / cd-pr-check 全绿；issue #1650–#1658 逐个关闭 |
 
 ### P2
 
