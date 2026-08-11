@@ -599,7 +599,7 @@ describe('Desktop App v4 root', () => {
 
   // TODO: normalizeEdgeEvents rewrite (Wave 7) changed tool_call content rendering;
   // 'rg' toolName no longer appears as standalone text — investigate label/params flow.
-  it('merges live Edge events into the shared v4 transcript and evidence', () => {
+  it('merges live Edge events into the shared v4 transcript and evidence', async () => {
     window.localStorage.setItem(WORKBENCH_DATA_MODE_STORAGE_KEY, 'approved-real');
     mockedUseThreads.mockReturnValue({
       data: {
@@ -667,11 +667,11 @@ describe('Desktop App v4 root', () => {
     });
 
     expect(screen.getByRole('heading', { name: 'Live Edge 会话' })).toBeInTheDocument();
-    // Wave 7 normalizeEdgeEvents rewrite: tool_call toolName 'rg' and text block
-    // '持久化前的实时回答' no longer rendered as standalone text via mock t().
-    // The heading + evidence call verify the Live Edge section rendered correctly;
-    // deeper assertion restoration needs i18n mock that interpolates params.
-    expect(mockedUseRunEvidence).toHaveBeenLastCalledWith('run-live');
+    // Edge events flush asynchronously (rAF / 50ms batch timer), so the
+    // evidence fetch is asserted with waitFor rather than synchronously.
+    await waitFor(() => {
+      expect(mockedUseRunEvidence).toHaveBeenLastCalledWith('run-live');
+    });
 
     mockedUseThreadMessages.mockReturnValue({
       data: {
