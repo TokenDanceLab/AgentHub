@@ -4,13 +4,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log/slog"
 	"strings"
 	"time"
 
 	"github.com/agenthub/hub-server/internal/model"
-	"github.com/agenthub/hub-server/internal/repository"
-	"gorm.io/gorm"
 )
 
 // Pure route/decision/mapper helpers for agent team routing residual (#842).
@@ -111,48 +108,6 @@ func countMatchingRouteDecisionsInEvents(events []model.AgentTeamEvent, decision
 		return false
 	})
 	return count
-}
-
-// countMatchingRouteDecisions returns the number of prior accepted route
-// decisions for a run matching the given decision's action / next_worker /
-// instructions. Used by HandleRouteDecision's MaxRouteRepeats guardrail.
-// Delegates to countMatchingRouteDecisionsDB against the live service DB.
-func (s *AgentTeamService) countMatchingRouteDecisions(runID string, decision model.CoordinatorRouteDecision) (int, error) {
-	return s.countMatchingRouteDecisionsDB(s.db, runID, decision)
-}
-
-// countMatchingRouteDecisionsDB counts matching route decisions via SQL
-// aggregation (the #842 / N7 fix). It calls
-// repository.CountTeamRouteDecisionsByActionWorkerInstructions so only the
-// integer count crosses the wire — previously this loaded up to 10000 events
-// (ListTeamEventsByRun Limit 10000) and filtered in Go, which scanned the
-// whole event log on every route decision.
-//
-// The SQL path mirrors routeDecisionMatches normalization exactly: action is
-// case-insensitively trimmed, next_worker + instructions are case-sensitively
-// trimmed, and a missing JSON key (e.g. a finish decision with no
-// next_worker) is treated as the empty string to match Go's zero-value
-// unmarshal. The Go fallback (countMatchingRouteDecisionsInEvents over
-// ListTeamEventsByRun) is retained for SQLite unit tests that exercise the
-// guardrail without a real Postgres JSONB path, and as a correctness
-// cross-check during the transition.
-func (s *AgentTeamService) countMatchingRouteDecisionsDB(db *gorm.DB, runID string, decision model.CoordinatorRouteDecision) (int, error) {
-	count, err := repository.CountTeamRouteDecisionsByActionWorkerInstructions(
-		db, runID,
-		decision.Action, decision.NextWorker, decision.Instructions,
-	)
-	if err != nil {
-		// Dialect without JSON aggregation (or a malformed payload) → fall
-		// back to the in-memory scan so the guardrail never silently passes.
-		slog.Debug("route decision SQL count fallback to in-memory scan",
-			"run_id", runID, "error", err)
-		events, listErr := repository.ListTeamEventsByRun(db, runID)
-		if listErr != nil {
-			return 0, listErr
-		}
-		return countMatchingRouteDecisionsInEvents(events, decision), nil
-	}
-	return count, nil
 }
 
 // finishRouteOutcome maps a finish action to run status, event type, and payload.
