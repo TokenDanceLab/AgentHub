@@ -1,6 +1,5 @@
 // Desktop Hub client — thin surface over shared SSOT (#432 / T3.3).
-// - Method/DTO SSOT: @shared/hubClient
-// - Desktop-only glue: default HUB_URL + Tauri proxy fetch fallback
+// Method/DTO SSOT: @shared/hubClient; desktop-only glue: HUB_URL + Tauri proxy.
 // Do NOT add new Hub REST methods here; add them to app/shared/src/hubClient.ts first.
 
 import { HUB_URL } from '@/config';
@@ -26,7 +25,6 @@ export interface HubClientOptions extends SharedHubClientOptions {
   /** Defaults to desktop HUB_URL when omitted. */
   baseUrl?: string;
 }
-
 
 // Tauri proxy fallback ─────────────────────────────────────────────────
 
@@ -105,8 +103,6 @@ async function tauriProxyFallback(
   }
 }
 
-
-
 // ── Tauri proxy fetch fallback ──────────────────────────────────────────────
 
 /**
@@ -171,10 +167,10 @@ export function getCachedRefreshedAccessToken(): string | null {
 
 /**
  * Single-flight Hub access-token refresh. Reads the stored refresh token,
- * exchanges it via the public `/client/auth/refresh` endpoint, persists both
- * tokens to the Tauri credential store, and returns the new access token
- * (or null when there is no refresh token / the exchange fails). Concurrent
- * callers await the same in-flight promise.
+ * exchanges it via the public auth refresh endpoint, persists both tokens to
+ * the Tauri credential store, and returns the new access token (or null when
+ * there is no refresh token / the exchange fails). Concurrent callers await
+ * the same in-flight promise.
  */
 async function refreshHubAccessTokenOnce(): Promise<string | null> {
   if (refreshInFlight) return refreshInFlight;
@@ -271,7 +267,6 @@ export function createHubClient(opts: HubClientOptions = {}): SharedHubClient {
       client.updateExecutionTarget(id, toSharedTarget(data)),
   };
 }
-
 
 // ── Desktop compatibility type shims (historical shapes used by local UI) ──
 // Prefer Hub* / shared types for new code. These keep existing imports compiling
