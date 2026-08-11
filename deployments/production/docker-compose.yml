@@ -52,11 +52,11 @@ services:
       redis:
         condition: service_healthy
     environment:
-      # Local PostgreSQL 16 (127.0.0.1:5433). PG_PASSWORD required;
+      # Local PostgreSQL 16 (127.0.0.1:<port>). PG_PASSWORD required;
       # remaining defaults align with live (see private deploy repo).
       # NOTE: PG_HOST default is host-only (no port); port via PG_PORT (default 5433).
-      # Historical default 127.0.0.1:5433 would put port into host, DBConfig.DSN()
-      # does not split host:port, causing DSN host=127.0.0.1:5433 port=5433 failure.
+      # Historical default 127.0.0.1:<port> would put port into host, DBConfig.DSN()
+      # does not split host:port, causing DSN host=127.0.0.1:<port> port=5433 failure.
       AGENTHUB_DB_HOST: ${PG_HOST:-127.0.0.1}
       AGENTHUB_DB_PORT: "${PG_PORT:-5433}"
       AGENTHUB_DB_USER: ${PG_USER:-agenthub}
