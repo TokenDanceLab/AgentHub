@@ -10,7 +10,7 @@
 
 - **Live facts（权威）**：外部 server `projects/agenthub/STATE.md`（运维 SSOT）。本仓库不复制 host 标签、secret 或 IP。
 - **In-repo production shape**：`deployments/production/docker-compose.yml`（与 live compose 形状对齐的仓库模板）。
-- **构建输入目录**：`hub-server/deployments/` 仅保留镜像构建输入（Dockerfile、docker-entrypoint.sh、README.md），旧 prod/us1/hk2 compose 与 deploy 脚本已在 #1527 PR2 收口删除。
+- **构建输入目录**：`hub-server/deployments/` 仅保留镜像构建输入（Dockerfile、docker-entrypoint.sh、README.md），旧区域部署资产已在 #1527 PR2 收口删除。
 
 ## 仓库内资产（#1527 inventory）
 
@@ -24,10 +24,10 @@
 | `hub-server/deployments/README.md` | 构建输入目录说明 | 保留（#1527 PR2 精简） |
 | `hub-server/deployments/docker-compose.prod.yml` | 旧独立 PG+Redis 拓扑模板 | **已删除**（#1527 PR2 收口） |
 | `hub-server/deployments/docker-compose.us1.yml` | 区域（us1）旧模板 | **已删除**（#1527 PR2 收口） |
-| `hub-server/deployments/hk2/`（compose、deploy 脚本、nginx/env 模板） | 区域（hk2）旧部署资产 | **已删除**（#1527 PR2 收口） |
+| `hub-server/deployments/legacy/`（compose、deploy 脚本、nginx/env 模板） | 区域旧部署资产 | **已删除**（#1527 PR2 收口） |
 | `hub-server/deployments/Caddyfile` / `Caddyfile.prod` | 旧 reverse-proxy 模板 | **已删除**（#1527 PR2 收口） |
 | `hub-server/deployments/.env.production.example` | 旧生产 env 占位模板 | **已删除**（env 说明迁至 `deployments/production/.env.example`） |
-| `hub-server/deployments/deploy.sh` / `hk2/deploy-hk2.sh` / `deploy-web-hk2.sh` | 旧人工运维胶水脚本 | **已删除**（部署指引改指权威 compose，运维由 server SSOT 覆盖） |
+| `hub-server/deployments/deploy.sh` / `deploy-region.sh` | 旧人工运维胶水脚本 | **已删除**（部署指引改指权威 compose，运维由 server SSOT 覆盖） |
 | `scripts/verify/verify-deployment-shape.py` | 部署形状 SSOT 门禁 | CI 强制（#1527 PR1） |
 | `.github/workflows/cd-pr-check.yml` | PR 前置：compose 形状 + Dockerfile + 构建 dry run | 消费权威模板（#1527 PR1） |
 
@@ -111,7 +111,7 @@ Hub 侧 code 交换端点固定为 `POST /client/auth/oidc/callback`，桌面/We
 机器侧 code 交换（hub-server → TDID `/oidc/token`）与 JWKS 拉取（ID token 签名校验）走 DNS-only 的 `id-token.tokendancelab.com`：
 
 - 公网 `id.tokendancelab.com` 启用了 Bot Fight 挑战，会拦非 JS 客户端（hub-server 是服务端，拿不到 JS 挑战 cookie）。
-- `id-token.tokendancelab.com` 是 DNS-only 直连 hk1 的机器入口（LE 证书 + nginx → td-id `:9099`），仅供服务端使用，**不是**面向浏览器的地址。
+- `id-token.tokendancelab.com` 是 OIDC token 机器入口，仅供服务端使用，**不是**面向浏览器的地址。
 - 对应环境变量：`AGENTHUB_TOKENDANCE_ID_TOKEN_URL`、`AGENTHUB_TOKENDANCE_ID_JWKS_URI`（默认值已写进生产 compose 模板）。
 
 回调集合通过 `AGENTHUB_TOKENDANCE_ID_REDIRECT_URI`（单值，必须是集合成员之一）和 `AGENTHUB_TOKENDANCE_ID_ALLOWED_REDIRECT_URIS`（逗号分隔白名单）注入；前者是默认回跳，后者是一次性 OIDC 往返里额外接受的回跳。OIDC client 注册与 secret 由 TokenDance ID 管理，禁止写入仓库。

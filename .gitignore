@@ -100,7 +100,7 @@ Thumbs.db
 .env.*
 !.env.example
 !.env.production.example
-!.env.hk2.example
+!.env.production.example
 .envrc
 *.pem
 *.key
@@ -257,7 +257,7 @@ docs/GOAL.md
 .ops/
 
 # Sensitive deployment runbooks (host-specific, not for public repo)
-docs/deployment/hk2-*.md
+docs/deployment/region-*.md
 docs/deployment/*-deployment-runbook.md
 docs/deployment/*deployment*
 
