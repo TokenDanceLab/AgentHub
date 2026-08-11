@@ -142,7 +142,7 @@ git worktree add .worktrees/<topic> -b <type>/<topic> origin/master
 
 规则：
 
-- `master` 禁止直接 push；所有变更通过 PR squash merge。
+- `master` 禁止直接 push；所有变更通过 PR，合并仅用 **Squash and merge**（GitHub 已禁 merge/rebase commit）——一个 PR 一个主题，合入后 master 每主题仅一个 squash commit；禁止堆碎 commit、禁止用多次小 PR 凑历史。
 - 项目级 worktree 固定放 `.worktrees/`，一个 worktree 对应一个短分支和一个任务卡/PR。
 - 不按历史 handoff 或旧审计推断分支状态；用 `git status --short --branch`、`git worktree list`、GitHub issue/PR live 状态。
 - 完成后运行验收、push、开 PR；合并后删除分支和 worktree。
@@ -287,6 +287,8 @@ UI 工作流变更必须有行为断言，不只截图：共享 unit/contract + 
 发布平台策略（2026-08-11）：**Windows 是唯一桌面发布目标**（NSIS 安装包 + 便携 zip），macOS 桌面/公证不在范围内；Go 服务端二进制保留跨平台（Linux/Windows/darwin）；Android APK 走 `RELEASE_MOBILE_ENABLED` 门控（EAS）。代码签名：无商业证书时走 unsigned 策略（`RELEASE_UNSIGNED_OK=true`，SmartScreen 提示、updater 自签可用）；签名证书就绪后改用 `RELEASE_SIGNING_APPROVED=true` + 签名证据。
 
 Release 自动化的产物命名、双语 release notes（git-cliff 按 conventional commits 分类生成，配置见 `cliff.toml`）与 SHA256SUMS 校验和由 release.yml 维护，改动须过 `release-readiness.yml` 门禁。
+
+发布后按 `docs/developer-quickstart.md` §发布 tag SOP 步骤 5 核对产物（12 项 + 描述）；release job 失败按步骤 6 重发（移 tag → 删旧 release → 重推，softprops 不覆盖已存在 release）。
 
 ## 13. 依赖更新（Renovate）
 
