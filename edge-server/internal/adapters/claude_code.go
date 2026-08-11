@@ -1,7 +1,7 @@
 // DEPRECATED: the NDJSON stream-json parser (`claude -p --output-format
 // stream-json --verbose`) is superseded by the official claude-agent-acp ACP
 // adapter (claude_acp.go, registry id "claude-acp", third ACP migration
-// switch, per docs/analysis/agenthub-acp-go-migration.md §6). This adapter is
+// switch, per ACP Go migration §6). This adapter is
 // retained as a mature fallback and control: it keeps its full capability set
 // and its brokered approval chain (NewBrokeredPermissionHandler →
 // PermissionDecisionBroker), and claude_code_test.go remains the reference

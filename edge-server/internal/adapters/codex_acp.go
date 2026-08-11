@@ -1,5 +1,5 @@
 // Package adapters — codex-acp: the official Codex ACP adapter (first ACP
-// migration target, per docs/analysis/agenthub-acp-go-migration.md §6).
+// migration target, per ACP Go migration §6).
 //
 // The existing CodexAdapter (codex.go) is Phase 1 batch mode: it spawns the
 // codex CLI with `exec --json` and hand-parses JSONL output — no streaming

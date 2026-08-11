@@ -141,7 +141,6 @@ Stubbed Hub, fixture, readiness-only and manifest-only outputs must set `real_te
 
 - [architecture.md](../architecture.md) — system overview and non-negotiable boundaries
 - [01-hub-server.md](01-hub-server.md) — Hub API and realtime ownership
-- [../roadmap.md](../roadmap.md) — current priority and evidence boundaries
 
 ## 前端 CI 易踩坑（站立规则）
 

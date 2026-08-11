@@ -6,12 +6,11 @@
 
 1. 管理员的直接指令
 2. `AGENTS.md` - 项目规则、红线、工作流、skill 白名单、验证纪律
-3. `docs/progress/MASTER.md` - 当前 spec-driven 专项进度、Issue/PR、阻塞、验收证据
-4. `docs/roadmap.md` - 总进度、长期路线、模块级下一步
-5. `docs/architecture.md` + `docs/architecture/` - 架构、数据流、协议边界
-6. 其他专题文档、`docs/decisions.md`、reference、history
+3. GitHub issues/PR - 当前专项进度、Issue/PR、阻塞、验收证据
+4. `docs/architecture.md` + `docs/architecture/` - 架构、数据流、协议边界
+5. 其他专题文档、`docs/decisions.md`、reference、history
 
-不要在 roadmap、MASTER、治理报告或 skill 里复制本文件的规则。规则变更改这里；其他文档只链接或保留一句摘要。
+不要在治理报告或其他文档里复制本文件的规则。规则变更改这里；其他文档只链接或保留一句摘要。
 
 ## 0.5 根级目录地图
 
@@ -38,8 +37,8 @@
 ### 新 Agent 90 秒入口
 
 1. 先运行 `git status --short --branch`、`git log -5 --oneline`、`git worktree list`，确认真实分支、脏文件和并行 worktree；不要从旧 handoff 推断现场。
-2. 完整读本文件，再读 `docs/progress/MASTER.md` 的当前目标与 active track。仓库根目录不维护第二份进度文件。
-3. 只在任务需要时读 `docs/roadmap.md`、`docs/architecture.md` 和一个 owner 文档；不要先遍历整个 `docs/`。
+2. 完整读本文件，再读 GitHub issues/PR 的当前目标与 active track。仓库根目录不维护第二份进度文件。
+3. 只在任务需要时读 `docs/architecture.md` 和一个 owner 文档；不要先遍历整个 `docs/`。
 4. 查明对应 Issue/PR、允许修改路径、禁改路径和验收命令后再动代码。没有活跃任务且范围复杂时，先建立短 spec 再动手。
 5. 每完成一个切片立即运行最窄验证；宣称 merge-ready、真实 E2E、发布或生产就绪前，再运行对应完整 gate。
 
@@ -120,7 +119,7 @@ Mobile 主线是 Expo + React Native development build。旧 Tauri Mobile 不再
 - 通用组件在 `app/shared/src/ui/`，Desktop/Web 从 shared 导入，禁止复制本地 UI 副本。
 - CSS Modules + OKLCH tokens，避免硬编码颜色。
 - 用户消息、Agent 回复、工具/审批/产物卡片必须按时间线性展示；调试、mock、mode 信息不得进入主聊天流。
-- UI 改动用自动化 Playwright + Visual QA 证明行为和布局；Desktop/Web gate 视口为 `1440x810` light+dark，入口 `app/{desktop,web}/scripts/visual-qa-shell.mjs`（`visual:qa:shell`）。评分 SSOT：`docs/analysis/visual-qa-scorecard.md`。`app/web/scripts/visual-qa.mjs` 为可选/遗留多场景电池，不是 merge gate。
+- UI 改动用自动化 Playwright + Visual QA 证明行为和布局；Desktop/Web gate 视口为 `1440x810` light+dark，入口 `app/{desktop,web}/scripts/visual-qa-shell.mjs`（`visual:qa:shell`）。`app/web/scripts/visual-qa.mjs` 为可选/遗留多场景电池，不是 merge gate。
 - 新 shared 组件必须带三件套：`<组件>.test.tsx` + `<组件>.stories.tsx` + 对照 `../docs/design/component-acceptance.md` 验收表逐项勾选；缺件不得合入。
 - 设计 token 改动（`app/shared/src/styles/`、`app/shared/src/designTokens.ts`）必须跑 `python scripts/verify/verify-design-token-ssot.py`，且 `app/shared/src/designTokens.test.ts`、`app/shared/src/styles/tokens-base.test.ts` 全绿后交付。
 
@@ -172,19 +171,17 @@ subagent 提示必须包含：目标、允许修改路径、禁改路径、必�
 ## 8. 文档规则
 
 - 项目规则只写 `AGENTS.md`。
-- 当前 spec 进度只写 `docs/progress/MASTER.md`。
-- 总进度只写 `docs/roadmap.md`。
 - 架构概览写 `docs/architecture.md`；模块细节写 `docs/architecture/`。
 - 架构决策摘要写 `docs/decisions.md`；旧 ADR 正文只在 `docs/history.md` 指向的外部归档中追溯。
 - 模块当前 gate 写各模块 `README.md`；历史 handoff、设备证明和一次性验收记录归档，不作为当前事实入口。
 - 历史 longform、日期型审计、旧发布材料、过期设计、完成的 spec-driven 工件和过期项目 skill 放到 `docs/history.md` 指向的外部 TokenDance docs 归档。
-- 新历史 longform 不进源仓：走 `docs/history.md` 指向的外部 TokenDance docs 归档。当前执行中的 SPEC 使用 `docs/analysis/`、`docs/plan/`、`docs/progress/`。
+- 新历史 longform 不进源仓：走 `docs/history.md` 指向的外部 TokenDance docs 归档。
 - `scripts/` 根目录只保留分类目录：`scripts/verify/`、`scripts/dev/`、`scripts/release/`、`scripts/smoke/`、`scripts/e2e/` 和 `scripts/lib/`；不要新增根级脚本 wrapper。
 - 过时长期文档直接删除；需要保留审计轨迹时归档快照。
 - 避免巨石文档：主入口只保留职责、摘要、当前事实和链接；长表、历史日志、验收证据和专题设计移到 owner 子文档或 archive。
 - 文档不写个人本机绝对路径、私有服务器、生产 secret、token、日志或截图中的敏感信息。
-- 修改目录、协议、分工或稳定规则后，同步 README、roadmap、architecture、governance owner 文档和 verifier。
-- `.agenthub/memory/**` 是 gitignored 本机草稿，不是 SSOT；不得把 `project.md` 当进度或规则权威。权威仍是本文件、`docs/progress/MASTER.md` 与 GitHub issues（指针见 `docs/archives/analysis/local-memory-pointer.md`）。
+- 修改目录、协议、分工或稳定规则后，同步 README、architecture、governance owner 文档和 verifier。
+- `.agenthub/memory/**` 是 gitignored 本机草稿，不是 SSOT；不得把 `project.md` 当进度或规则权威。权威仍是本文件与 GitHub issues（指针见 `docs/archives/analysis/local-memory-pointer.md`）。
 
 ## 9. 安全和隐私
 
@@ -267,11 +264,11 @@ UI 工作流变更必须有行为断言，不只截图：共享 unit/contract + 
 
 大型复杂任务默认走 spec-driven-develop：
 
-1. 先读 active `docs/progress/MASTER.md`，GitHub mode 下同步 issue/milestone live 状态。
-2. SPEC 文档、任务分解、验收标准先行。
+1. 先读 GitHub issues/PR 的当前目标与 active track，确认 issue/milestone live 状态。
+2. SPEC 文档、任务分解、验收标准先行（以 GitHub issue 为载体）。
 3. 开发、测试、端到端验收其次。
-4. 完成后更新 MASTER、GitHub issue/PR、验收证据和归档计划。
-5. 专项完成后，把 `docs/analysis/`、本专项 `docs/plan/` 和 `docs/progress/` 外迁到 `docs/history.md` 指向的外部归档，并更新历史索引。
+4. 完成后更新 GitHub issue/PR、验收证据和归档计划。
+5. 专项完成后，把专项 SPEC 与证据外迁到 `docs/history.md` 指向的外部归档，并更新历史索引。
 
 短任务（单文件修复、typo、小改动）不需要完整 SPEC，但仍必须遵守本文件的范围、隐私和验证规则。
 

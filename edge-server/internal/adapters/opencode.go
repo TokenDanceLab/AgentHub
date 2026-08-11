@@ -24,7 +24,7 @@ import (
 // as the Phase 1/2 fallback/legacy path: `opencode run --format json`,
 // hand-rolled event parsing below, no ACP permission chain. Do not extend;
 // remove once opencode-acp is verified end-to-end (see
-// docs/analysis/agenthub-acp-go-migration.md §6).
+// ACP Go migration §6).
 //
 // Phase 1: opencode run "prompt" — batch mode, plain text output.
 // Phase 2: opencode run "prompt" --format json — structured JSON events.
