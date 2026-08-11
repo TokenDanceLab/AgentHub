@@ -12,7 +12,7 @@ Issue: #428 (T2.2)
 Operators/agents that still read `.agenthub/memory/project.md` should find only:
 
 - pointers to `AGENTS.md`, `docs/progress/MASTER.md`, GitHub `cleanup-baseline` issues
-- production pointer to server STATE (hk3 LIVE)
+- production pointer to server STATE (LIVE)
 - explicit **no SUPER phase / no competing backlog**
 
 ## Actions taken
