@@ -50,7 +50,7 @@ function LinkPanel({ onCopy }: { onCopy?: (() => void) | undefined }) {
           id={linkInputId}
           className={styles.linkInput}
           readOnly
-          value="https://agenthub.tokendance.local/invite/TD-2026"
+          value="https://hub.example.com/invite/TD-2026"
         />
         <button type="button" className={styles.linkCopyBtn} onClick={onCopy}>
           复制链接

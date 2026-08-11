@@ -135,7 +135,7 @@ def main() -> int:
                         help="跑完后保留 WSL 栈与源码（默认清理）")
     parser.add_argument("-EvidenceDir", "--EvidenceDir", default=".tmp/e2e-evidence",
                         help="证据输出目录（Windows 路径）")
-    parser.add_argument("-SrcRoot", "--SrcRoot", default="d:/Code/TokenDance",
+    parser.add_argument("-SrcRoot", "--SrcRoot", default="/workspace",
                         help="源码根目录（含 AgentHub 与 tokendance-id 两个仓）")
     args = parser.parse_args()
 

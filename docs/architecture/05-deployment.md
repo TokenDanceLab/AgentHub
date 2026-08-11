@@ -8,7 +8,7 @@
 
 ## Current production pointer
 
-- **Live facts（权威）**：外部 server `projects/agenthub/STATE.md`（运维 SSOT）。本仓库不复制 host 标签、secret 或 IP。
+- **Live facts（权威）**：私有部署仓 SSOT。本仓库不复制 host 标签、secret 或 IP。
 - **In-repo production shape**：`deployments/production/docker-compose.yml`（与 live compose 形状对齐的仓库模板）。
 - **构建输入目录**：`hub-server/deployments/` 仅保留镜像构建输入（Dockerfile、docker-entrypoint.sh、README.md），旧区域部署资产已在 #1527 PR2 收口删除。
 
@@ -128,7 +128,7 @@ Hub 侧 code 交换端点固定为 `POST /client/auth/oidc/callback`，桌面/We
 | 变量 | 必填 | 校验点 | 说明 |
 |---|---|---|---|
 | `PG_PASSWORD`（→ `AGENTHUB_DB_PASSWORD`） | 是 | entrypoint + `config.Validate` | DB 密码。entrypoint 缺失即 exit 1。 |
-| `PG_HOST`（→ `AGENTHUB_DB_HOST`） | 是（有默认 `127.0.0.1`） | `config.Validate`（`db.host is required`） | **只写主机，不带端口**。`DBConfig.DSN()` 不拆分 `host:port`，host 带端口会拼成 `host=127.0.0.1:5433 port=5433` 连不上。端口走 `PG_PORT`。 |
+| `PG_HOST`（→ `AGENTHUB_DB_HOST`） | 是（有默认 `127.0.0.1`） | `config.Validate`（`db.host is required`） | **只写主机，不带端口**。`DBConfig.DSN()` 不拆分 `host:port`，host 带端口会拼成 `host=127.0.0.1:<port> port=5433` 连不上。端口走 `PG_PORT`。 |
 | `PG_PORT`（→ `AGENTHUB_DB_PORT`） | 是（有默认 `5433`） | `config.Validate`（1–65535） | 端口独立于 host。 |
 | `AGENTHUB_JWT_SECRET` | 是 | entrypoint + `config.Validate`（≥32 字符，且不在弱密钥 blocklist） | JWT 签名密钥。`change-me-production*` / `dev-secret-change-in-production*` 前缀被 `weakSecretPrefixes` 拒绝，即使长度达标。 |
 | `AGENTHUB_TOKENDANCE_ID_CLIENT_ID` | 配置 OIDC 即必填 | `config.Validate`（client_id 设了则 issuer_url/client_secret/redirect_uri 都必填） | TDID OIDC client。留空=未启用 OIDC。 |
