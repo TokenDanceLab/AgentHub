@@ -84,7 +84,7 @@ class VerifyDeploymentShapeTests(unittest.TestCase):
 
     def test_second_production_compose_fails_closed(self):
         write_utf8(
-            os.path.join(self.fixture, "deployments", "production", "docker-compose.us2.yml"),
+            os.path.join(self.fixture, "deployments", "production", "docker-compose.production.yml"),
             """\
 services:
   hub-server:

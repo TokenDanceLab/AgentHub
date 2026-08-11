@@ -50,7 +50,7 @@ async function mockOIDCFlow(page: import('@playwright/test').Page, params: MockO
     }
 
     const body = route.request().postDataJSON();
-    const authUrl = new URL('https://id.tokendancelab.com/oidc/authorize');
+    const authUrl = new URL('https://id.example.com/oidc/authorize');
     authUrl.searchParams.set('response_type', 'code');
     authUrl.searchParams.set('client_id', 'c_test_client');
     authUrl.searchParams.set('redirect_uri', body.redirect_uri || buildWebRedirectUri());

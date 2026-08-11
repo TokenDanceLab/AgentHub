@@ -26,7 +26,7 @@ import {
 } from './agentProfileCatalog';
 
 export const WORKBENCH_MOCK_CONTACT_MEMBERS: ContactMember[] = [
-  { id: 'delicious', name: 'Delicious233', initials: 'D', tag: '当前用户', org: 'TokenDance', status: '在线' },
+  { id: 'delicious', name: 'demo-user', initials: 'D', tag: '当前用户', org: 'TokenDance', status: '在线' },
   { id: 'johnny', name: 'Johnny', initials: 'J', tag: '维护者', org: 'AgentHub Desktop', status: '刚刚活跃' },
   { id: 'trump', name: 'Trump', initials: 'T', tag: '协作者', org: '设计评审', status: '今天 10:18' },
 ];
@@ -104,10 +104,10 @@ export const WORKBENCH_MOCK_SERVICE_DESKS: ServiceDesk[] = [
 ];
 
 export const WORKBENCH_MOCK_DOC_ROWS: DocRow[] = [
-  { id: 'desktop-design-system', title: 'AgentHub Desktop 设计系统对齐清单', tag: '内部', location: '我的文档库', owner: 'Delicious233', time: '今天 14:52' },
+  { id: 'desktop-design-system', title: 'AgentHub Desktop 设计系统对齐清单', tag: '内部', location: '我的文档库', owner: 'demo-user', time: '今天 14:52' },
   { id: 'meeting-notes', title: '智能纪要：【AgentHub 设计评审】', tag: '共享', location: '与我共享', owner: 'Johnny', time: '今天 11:08' },
   { id: 'session-handoff', title: 'SESSION-HANDOFF-2026-06-05.md', location: '项目产物', owner: 'Codex', time: '昨天 22:40' },
-  { id: 'im-breakdown', title: 'AgentHub IM 交互拆解', tag: '内部', location: '我的文档库', owner: 'Delicious233', time: '6月4日 15:18' },
+  { id: 'im-breakdown', title: 'AgentHub IM 交互拆解', tag: '内部', location: '我的文档库', owner: 'demo-user', time: '6月4日 15:18' },
   { id: 'design-contract', title: 'TokenDance Design Contract v3', tag: '共享', location: '知识库', owner: 'Johnny', time: '6月3日 18:33' },
   { id: 'deep-research', title: 'AgentHub 开源项目深度研究', tag: '外部', location: '我的文档库', owner: 'Trump', time: '6月2日 19:42' },
 ];
@@ -123,7 +123,7 @@ export const WORKBENCH_MOCK_TASK_GROUPS: TaskGroup[] = [
         assignee: 'Builder',
         startTime: '今天 14:49',
         dueDate: '明天 18:00',
-        creator: 'Delicious233',
+        creator: 'demo-user',
         status: '进行中',
       },
       {
@@ -133,7 +133,7 @@ export const WORKBENCH_MOCK_TASK_GROUPS: TaskGroup[] = [
         assignee: 'Johnny',
         startTime: '今天 11:32',
         dueDate: '今天 22:00',
-        creator: 'Delicious233',
+        creator: 'demo-user',
         status: '待评审',
       },
       {
@@ -184,7 +184,7 @@ export const WORKBENCH_MOCK_PROJECTS: ProjectInfo[] = [
     status: '研究中',
     meta: '3 runs',
     themeColor: 'emerald',
-    members: ['Delicious233', 'Johnny', 'Trump', 'Builder', 'Researcher'],
+    members: ['demo-user', 'Johnny', 'Trump', 'Builder', 'Researcher'],
     announcement: '题材方向已收敛到二次元卡牌 Roguelite，下一步生成 prototype checklist。',
     runs: [
       { id: 'r1', name: '题材方向研究', status: 'running', owner: 'Researcher', meta: '35%' },
@@ -209,7 +209,7 @@ export const WORKBENCH_MOCK_PROJECTS: ProjectInfo[] = [
     status: '待归档确认',
     meta: '12 docs',
     themeColor: 'amber',
-    members: ['Delicious233', 'Johnny', 'Reviewer'],
+    members: ['demo-user', 'Johnny', 'Reviewer'],
     announcement: 'README、roadmap、handoff 已完成，Reviewer 正在做最终归档确认。',
     runs: [
       { id: 'r4', name: 'README 结构更新', status: 'completed', owner: 'Builder', meta: '12 files' },
@@ -332,7 +332,7 @@ export const WORKBENCH_MOCK_TASK_POOL: TaskItem[] = (() => {
       assignee: MOCK_TASK_ASSIGNEES[(i - 1) % MOCK_TASK_ASSIGNEES.length] ?? 'Builder',
       startTime: '刚刚',
       dueDate: i % 2 === 0 ? '今天 18:00' : '明天 18:00',
-      creator: 'Delicious233',
+      creator: 'demo-user',
       status: MOCK_TASK_STATUSES[(i - 1) % MOCK_TASK_STATUSES.length] ?? '未开始',
     });
   }

@@ -279,3 +279,5 @@ app/desktop/stats.html
 # Python bytecode caches (ps1→py migration batches)
 **/__pycache__/
 *.pyc
+
+*.local

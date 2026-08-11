@@ -1641,7 +1641,7 @@ func TestThreadPinsPersistPerThreadItem(t *testing.T) {
 	itemID := itemRaw["itemId"].(string)
 	drainEvents(t, ch, 2)
 
-	req = httptest.NewRequest(http.MethodPost, "/v1/threads/thread_local/pins", strings.NewReader(`{"itemId":"`+itemID+`","pinnedBy":" Delicious233 "}`))
+	req = httptest.NewRequest(http.MethodPost, "/v1/threads/thread_local/pins", strings.NewReader(`{"itemId":"`+itemID+`","pinnedBy":" demo-user "}`))
 	rec = httptest.NewRecorder()
 	mux.ServeHTTP(rec, req)
 	if rec.Code != http.StatusCreated {

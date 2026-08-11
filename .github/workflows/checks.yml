@@ -824,7 +824,7 @@ jobs:
         continue-on-error: true  # Wave 10: mock/test secrets trigger false positive; re-enable after allowlist
         run: |
           if [ "${{ github.event_name }}" = "pull_request" ]; then
-            if [ "${{ github.base_ref }}" = "master" ] && [ "${{ github.head_ref }}" = "dev/delicious233" ]; then
+            if [ "${{ github.base_ref }}" = "master" ] && [ "${{ github.head_ref }}" = "dev/demo-user" ]; then
               bash scripts/verify/check-secrets.sh --range HEAD^2^..HEAD^2
             else
               bash scripts/verify/check-secrets.sh --range "origin/${{ github.base_ref }}...HEAD"

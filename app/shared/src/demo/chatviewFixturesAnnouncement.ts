@@ -57,7 +57,7 @@ export const chatviewAnnouncementTranscript: TranscriptBlock[] = [
   {
     id: 'an3', kind: 'text', createdAt: '2026-06-16T10:00:00+08:00',
     author: S('admin-hub'),
-    text: 'SECURITY ADVISORY: A privilege escalation vulnerability (CVE-2026-49975) was patched in nginx 1.30.2. All AgentHub gateway nodes (hk2, us1, us2, sgp1) have been updated as of 2026-06-12. No exploitation detected. Full audit trail available in Fleet Hardening report. If you run self-hosted edge nodes, please update immediately.',
+    text: 'SECURITY ADVISORY: A privilege escalation vulnerability (CVE-2026-49975) was patched in nginx 1.30.2. All AgentHub gateway nodes (node-a, node-b, node-c, node-d) have been updated as of 2026-06-12. No exploitation detected. Full audit trail available in Fleet Hardening report. If you run self-hosted edge nodes, please update immediately.',
     displayTitle: 'Security Advisory',
     displayDetail: 'CVE-2026-49975 patched · All gateway nodes updated 2026-06-12',
     badgeLabel: 'Pinned',
