@@ -40,7 +40,7 @@ func TestMessageHandler_AddMessageReaction_Success(t *testing.T) {
 		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
 	}
 	var body struct {
-		Code string                          `json:"code"`
+		Code string                                  `json:"code"`
 		Data messagereaction.MessageReactionResponse `json:"data"`
 	}
 	if err := json.Unmarshal(w.Body.Bytes(), &body); err != nil {
@@ -136,7 +136,7 @@ func TestMessageHandler_ListMessageReactions_Success(t *testing.T) {
 		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
 	}
 	var body struct {
-		Code string                            `json:"code"`
+		Code string                                    `json:"code"`
 		Data []messagereaction.MessageReactionResponse `json:"data"`
 	}
 	if err := json.Unmarshal(w.Body.Bytes(), &body); err != nil {

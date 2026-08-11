@@ -381,7 +381,6 @@ func (m *mockAgentTeamService) GenerateCompeteSummary(ctx context.Context, userI
 	return m.competeSummary(ctx, userID, runID, req)
 }
 
-
 func (m *mockAgentTeamService) ReviewDagPlan(ctx context.Context, userID, runID string, decision model.HumanReviewDecision) (*model.HumanReviewState, error) {
 	if m.reviewDagPlan == nil {
 		return nil, nil

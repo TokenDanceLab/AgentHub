@@ -80,8 +80,8 @@ function envOrDev(key: string, devDefault: string): string {
   return devDefault;
 }
 
-export const HUB_URL = envOrDev('VITE_HUB_URL', 'https://hub.tokendancelab.com');
-export const HUB_WS_URL = envOrDev('VITE_HUB_WS_URL', 'wss://hub.tokendancelab.com/client/ws');
+export const HUB_URL = envOrDev('VITE_HUB_URL', 'https://hub.example.com');
+export const HUB_WS_URL = envOrDev('VITE_HUB_WS_URL', 'wss://hub.example.com/client/ws');
 export const TOKENDANCE_LOGIN_URL = import.meta.env.VITE_TOKENDANCE_LOGIN_URL || '';
 
 export const HEALTH_POLL_MS = 30_000;

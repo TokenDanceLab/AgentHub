@@ -238,8 +238,8 @@ services:
       TOKENDANCE_JWT_REFRESH_TTL: "24h"
       TOKENDANCE_DATABASE_DSN: "/app/data/id.db"
       TOKENDANCE_SECURITY_COOKIE_SECURE: "false"
-      # 默认 cookie domain 是 .tokendancelab.com（生产值）；e2e 必须覆盖，
-      # 否则 curl/浏览器对 127.0.0.1 保存 td_session 会被 domain 校验拒绝。
+      # Default cookie domain is production value; e2e must override,
+      # otherwise curl/browser saving td_session to 127.0.0.1 gets domain-rejected.
       TOKENDANCE_SECURITY_COOKIE_DOMAIN: "127.0.0.1"
       TOKENDANCE_FEATURES_REQUIRE_INVITE: "false"
       TOKENDANCE_SESSION_TTL: "24h"

@@ -62,7 +62,9 @@ func TestComputeLinkHash_Deterministic(t *testing.T) {
 }
 
 func TestComputeLinkHash_DifferentInputsProduceDifferentOutputs(t *testing.T) {
-	base := func() *AuditEvent { return &AuditEvent{ID: "event-1", UserID: "user-1", EventType: "login", Severity: "info", Summary: "s", PrevHash: "prev-hash"} }
+	base := func() *AuditEvent {
+		return &AuditEvent{ID: "event-1", UserID: "user-1", EventType: "login", Severity: "info", Summary: "s", PrevHash: "prev-hash"}
+	}
 	h1 := ComputeLinkHash(base())
 
 	diffID := base()
@@ -233,4 +235,3 @@ func TestVerifyChain_BrokenLink(t *testing.T) {
 		t.Fatalf("broken link should be detected at index 1, got %d", idx)
 	}
 }
-

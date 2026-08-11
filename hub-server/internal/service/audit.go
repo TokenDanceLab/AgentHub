@@ -79,7 +79,7 @@ type AuditService struct {
 	// bounded drain aborts at the shutdown deadline. atomic.Value because the
 	// retry loop reads it concurrently; the happens-before edge through
 	// close(done) covers writes, but Load is race-free regardless.
-	shutdownCtx atomic.Value // context.Context; nil until Shutdown
+	shutdownCtx  atomic.Value // context.Context; nil until Shutdown
 	shutdownOnce sync.Once
 }
 

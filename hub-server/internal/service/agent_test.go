@@ -11,8 +11,8 @@ import (
 	"time"
 
 	"github.com/DATA-DOG/go-sqlmock"
-	"github.com/agenthub/hub-server/internal/errcode"
 	"github.com/agenthub/hub-server/internal/bus"
+	"github.com/agenthub/hub-server/internal/errcode"
 	"github.com/agenthub/hub-server/internal/ws"
 	"github.com/glebarez/sqlite"
 	"github.com/stretchr/testify/assert"

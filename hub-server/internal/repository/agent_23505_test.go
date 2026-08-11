@@ -96,11 +96,11 @@ func TestCreateAgentRunEventWithNextSeqLimited_ConcurrentInsertsNoSpuriousError(
 			defer wg.Done()
 			<-start
 			evt := &model.AgentRunEvent{
-				TaskID:         taskID,
-				SessionID:      "sess-1",
+				TaskID:          taskID,
+				SessionID:       "sess-1",
 				AgentInstanceID: "ai-1",
-				EventType:      "stream",
-				Payload:        fmt.Sprintf("caller-%d", idx),
+				EventType:       "stream",
+				Payload:         fmt.Sprintf("caller-%d", idx),
 			}
 			errs <- CreateAgentRunEventWithNextSeqLimited(db, evt, 0)
 		}(i)

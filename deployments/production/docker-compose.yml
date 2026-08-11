@@ -1,9 +1,6 @@
 # ──────────────────────────────────────────────
-# AgentHub — 生产 Compose (hk3)
-# 独立于 AI 生产栈 (/opt/tokendance/compose.yml)
-# PG 为 hk3 本地 PostgreSQL 16（127.0.0.1:5433），Redis 本地轻量。
-# live 事实 SSOT：C:\Users\Ding\server\projects\agenthub\STATE.md
-# （Azure PG 已迁出并禁止恢复，勿改回云库形态）
+# AgentHub — Production Compose
+# PG/Redis local instances; live facts in private deploy repo.
 # ──────────────────────────────────────────────
 
 services:
@@ -55,11 +52,11 @@ services:
       redis:
         condition: service_healthy
     environment:
-      # hk3 本地 PostgreSQL 16（127.0.0.1:5433）。live 角色为 agenthub；
-      # PG_PASSWORD 必填，其余默认值与 live 对齐（见 server projects/agenthub/STATE.md）。
-      # NOTE: PG_HOST 默认值只写主机（不带端口）；端口走 PG_PORT（默认 5433）。
-      # 历史默认值 127.0.0.1:5433 会把端口塞进 host，DBConfig.DSN() 不拆分
-      # host:port，导致 DSN 拼成 host=127.0.0.1:5433 port=5433 连不上。
+      # Local PostgreSQL 16 (127.0.0.1:5433). PG_PASSWORD required;
+      # remaining defaults align with live (see private deploy repo).
+      # NOTE: PG_HOST default is host-only (no port); port via PG_PORT (default 5433).
+      # Historical default 127.0.0.1:5433 would put port into host, DBConfig.DSN()
+      # does not split host:port, causing DSN host=127.0.0.1:5433 port=5433 failure.
       AGENTHUB_DB_HOST: ${PG_HOST:-127.0.0.1}
       AGENTHUB_DB_PORT: "${PG_PORT:-5433}"
       AGENTHUB_DB_USER: ${PG_USER:-agenthub}
@@ -92,22 +89,20 @@ services:
       AGENTHUB_UPLOAD_DIR: /app/uploads
       AGENTHUB_UPLOAD_MAX_SIZE: "10485760"
       # TokenDance ID OIDC
-      AGENTHUB_TOKENDANCE_ID_ISSUER_URL: https://id.tokendancelab.com
+      AGENTHUB_TOKENDANCE_ID_ISSUER_URL: ${AGENTHUB_TOKENDANCE_ID_ISSUER_URL:-https://id.example.com}
       AGENTHUB_TOKENDANCE_ID_CLIENT_ID: ${AGENTHUB_TOKENDANCE_ID_CLIENT_ID:-}
       AGENTHUB_TOKENDANCE_ID_CLIENT_SECRET: ${AGENTHUB_TOKENDANCE_ID_CLIENT_SECRET:-}
-      # 回调契约（2026-08-08 live 实测对齐，issue #1651/#1656）：
-      # - /api/auth/callback → 首页 SPA 回调页（nginx /api/auth/ → :3001 静态站）
-      # - /workbench/auth/tokendance/callback → 工作台 app/web（BASE_URL=/workbench/）
-      # - http://127.0.0.1/callback → 桌面 Tauri loopback（RFC 8252 端口宽松匹配）
-      # TDID 侧 oauth_clients.redirect_uris 必须同步同一集合（server identity STATE.md）。
-      AGENTHUB_TOKENDANCE_ID_REDIRECT_URI: ${AGENTHUB_TOKENDANCE_ID_REDIRECT_URI:-https://hub.tokendancelab.com/api/auth/callback}
-      AGENTHUB_TOKENDANCE_ID_ALLOWED_REDIRECT_URIS: ${AGENTHUB_TOKENDANCE_ID_ALLOWED_REDIRECT_URIS:-https://hub.tokendancelab.com/api/auth/callback,https://hub.tokendancelab.com/workbench/auth/tokendance/callback,http://127.0.0.1/callback}
-      # 机器侧 code 交换端点（2026-08-08）：公网 id.tokendancelab.com 有 Bot Fight
-      # 挑战（拦非 JS 客户端）；id-token.tokendancelab.com 是 DNS-only 直连 hk1 的
-      # 机器入口（LE 证书 + nginx → td-id 9099），hub-server 服务端交换走这里。
-      AGENTHUB_TOKENDANCE_ID_TOKEN_URL: ${AGENTHUB_TOKENDANCE_ID_TOKEN_URL:-https://id-token.tokendancelab.com/oidc/token}
-      # 同理由：JWKS 拉取（ID token 签名校验）也走机器入口，避开公网挑战。
-      AGENTHUB_TOKENDANCE_ID_JWKS_URI: ${AGENTHUB_TOKENDANCE_ID_JWKS_URI:-https://id-token.tokendancelab.com/oidc/jwks}
+      # Callback contract (issue #1651/#1656):
+      # - /api/auth/callback → SPA callback (nginx /api/auth/ → :3001 static)
+      # - /workbench/auth/tokendance/callback → workbench app/web (BASE_URL=/workbench/)
+      # - http://127.0.0.1/callback → desktop Tauri loopback (RFC 8252 port-tolerant)
+      # TDID oauth_clients.redirect_uris must match this set.
+      AGENTHUB_TOKENDANCE_ID_REDIRECT_URI: ${AGENTHUB_TOKENDANCE_ID_REDIRECT_URI:-https://hub.vectorcontrol.tech/api/auth/callback}
+      AGENTHUB_TOKENDANCE_ID_ALLOWED_REDIRECT_URIS: ${AGENTHUB_TOKENDANCE_ID_ALLOWED_REDIRECT_URIS:-https://hub.vectorcontrol.tech/api/auth/callback,https://hub.vectorcontrol.tech/workbench/auth/tokendance/callback,http://127.0.0.1/callback}
+      # Machine-side code exchange endpoint: override TOKEN_URL/JWKS_URI for
+      # server-side OIDC if the public issuer blocks non-JS clients.
+      AGENTHUB_TOKENDANCE_ID_TOKEN_URL: ${AGENTHUB_TOKENDANCE_ID_TOKEN_URL:-}
+      AGENTHUB_TOKENDANCE_ID_JWKS_URI: ${AGENTHUB_TOKENDANCE_ID_JWKS_URI:-}
     ports:
       - "127.0.0.1:8090:8080"
       - "127.0.0.1:6060:6060"

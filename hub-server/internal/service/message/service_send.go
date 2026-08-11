@@ -11,13 +11,13 @@ import (
 	"golang.org/x/sync/errgroup"
 	"gorm.io/gorm"
 
+	"github.com/agenthub/hub-server/internal/bus"
 	"github.com/agenthub/hub-server/internal/config"
 	"github.com/agenthub/hub-server/internal/errcode"
 	"github.com/agenthub/hub-server/internal/model"
 	"github.com/agenthub/hub-server/internal/repository"
 	"github.com/agenthub/hub-server/internal/service/im"
 	"github.com/agenthub/hub-server/pkg/uuidv7"
-	"github.com/agenthub/hub-server/internal/bus"
 )
 
 // Residual pure-helper peel #1153: send/edit/recall/pin/forward write paths.

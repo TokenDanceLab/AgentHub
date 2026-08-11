@@ -22,8 +22,8 @@ type HealthHandler struct {
 	startTime   time.Time
 	version     string
 
-	mu            sync.RWMutex
-	migCache      migrationCache
+	mu       sync.RWMutex
+	migCache migrationCache
 }
 
 type migrationCache struct {

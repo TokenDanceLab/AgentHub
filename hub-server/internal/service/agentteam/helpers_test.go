@@ -32,4 +32,3 @@ func newMockDBAgent(t *testing.T) (*gorm.DB, sqlmock.Sqlmock, *sql.DB) {
 	require.NoError(t, err)
 	return gormDB, mock, sqlDB
 }
-
