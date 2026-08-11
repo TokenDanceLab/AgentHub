@@ -85,7 +85,7 @@ describe('Hub OIDC API contract (mocked)', () => {
   it('oidcAuthorize sends correct payload to Hub', async () => {
     const mockResponse = {
       state: 'hub-generated-state',
-      authorization_url: 'https://id.example.com/oidc/auth?response_type=code&client_id=hub&redirect_uri=http://localhost:8080/callback&code_challenge=abc&code_challenge_method=S256&state=hub-generated-state',
+      authorization_url: 'https://id.tokendancelab.com/oidc/auth?response_type=code&client_id=hub&redirect_uri=http://localhost:8080/callback&code_challenge=abc&code_challenge_method=S256&state=hub-generated-state',
     };
 
     const fetchMock = vi.fn().mockResolvedValue({
