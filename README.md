@@ -76,7 +76,6 @@ pnpm dev                                    # 5. 起 Desktop Vite（:5173）；w
 | [docs/architecture.md](docs/architecture.md) | 架构总览与模块索引 |
 | [docs/README.md](docs/README.md) | 文档导航 |
 | [AGENTS.md](AGENTS.md) | 项目规则 SSOT（分支、红线、证据等级） |
-| [docs/progress/MASTER.md](docs/progress/MASTER.md) | 当前程序进度 SSOT |
 
 ## 贡献
 

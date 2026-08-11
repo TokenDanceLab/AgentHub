@@ -5,5 +5,5 @@
 // dependencies so later RunEventService / EdgeCallbackService extracts can
 // reuse them without pulling orchestration code.
 //
-// See docs/analysis/hub-service-boundary-map.md (#468).
+// See #468.
 package agentevent

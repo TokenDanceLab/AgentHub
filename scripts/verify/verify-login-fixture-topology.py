@@ -114,7 +114,6 @@ def main() -> int:
     assert_contains("edge-server/internal/adapters/sdk_fixture_mapper_test.go", r"TestSDKFixtureMapperOpenAIGolden", "SDK fixture mapper OpenAI golden evidence remains fixture-only")
 
     step("Topology docs")
-    assert_contains("docs/roadmap.md", r"P0.*Web\s*->\s*Hub\s*->.*Desktop/Edge\s*->\s*Local Edge\s*->\s*CLI/SDK adapter", "roadmap records P0 remote-control auth/topology prerequisite")
     assert_contains("docs/governance/governance-execution.md", r"Login fixture topology gate", "governance records login fixture topology gate")
     assert_contains("docs/governance/governance-execution.md", r"Desktop receives Hub dispatch -> Local Edge starts CLI adapter", "governance keeps dispatch/CLI start outside this login slice")
     assert_contains("docs/governance/governance-execution.md", r"future real TokenDanceID/OIDC login remains approval-gated", "governance keeps real TokenDanceID/OIDC approval gate")

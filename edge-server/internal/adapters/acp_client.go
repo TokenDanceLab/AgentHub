@@ -7,7 +7,7 @@
 // `gemini --experimental-acp`) is spawned by ProcessExecutor via
 // AcpAdapter.BuildCommand; this file only talks JSON-RPC to it.
 //
-// Reference: docs/analysis/agenthub-acp-go-migration.md option C'.
+// Reference: ACP Go migration option C'.
 package adapters
 
 import (

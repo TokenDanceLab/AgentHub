@@ -5,7 +5,6 @@
   - real-e2e-acceptance skill 必须含全部 9 个证据等级（label + machine label）
   - AGENTS.md 必须指向 skill，不得另持一份证据等级矩阵
   - architecture.md 的 Visual QA 视口必须是 1440x810（禁陈旧 1440x920）
-  - roadmap 不得含旧 Mobile gate 措辞
   - smoke matrix 必须含 6 个 manifest 字段且 evidence_level 均在规范集合内
 
 失败语义与 ps1 对齐：异常 → 非零退出 + stderr 信息。
@@ -19,7 +18,6 @@ import sys
 SKILL_PATH = ".agents/skills/real-e2e-acceptance/SKILL.md"
 RULES_PATH = "AGENTS.md"
 ARCHITECTURE_PATH = "docs/architecture.md"
-ROADMAP_PATH = "docs/roadmap.md"
 SMOKE_MATRIX_PATH = "scripts/smoke/verify-e2e-smoke-matrix.py"
 
 # 与 ps1 的 [ordered] 字典一致（顺序即检查顺序）。
@@ -33,12 +31,6 @@ CANONICAL_LEVELS = [
     ("Backend/API", "backend-api"),
     ("Performance/leak", "performance-leak"),
     ("Packaged release", "packaged-release"),
-]
-
-STALE_ROADMAP_PATTERNS = [
-    "当前活跃 PR 的 Mobile required check 阻塞",
-    "Mobile required check 当前阻塞",
-    "Visual QA fixture/display-name 断言",
 ]
 
 REQUIRED_SMOKE_FIELDS = [
@@ -76,7 +68,6 @@ def main() -> int:
     skill_present = os.path.exists(SKILL_PATH)
     rules = read_text(RULES_PATH)
     architecture = read_text(ARCHITECTURE_PATH)
-    roadmap = read_text(ROADMAP_PATH)
     smoke_matrix = read_text(SMOKE_MATRIX_PATH)
 
     if skill_present:
@@ -98,10 +89,6 @@ def main() -> int:
         fail("architecture Visual QA still references stale 1440x920 viewport")
     if not re.search(r"1440x810", architecture, re.IGNORECASE):
         fail("architecture Visual QA must name the 16:9 1440x810 desktop viewport")
-
-    for pattern in STALE_ROADMAP_PATTERNS:
-        if re.search(re.escape(pattern), roadmap, re.IGNORECASE):
-            fail(f"roadmap contains stale Mobile gate wording: {pattern}")
 
     for required in REQUIRED_SMOKE_FIELDS:
         if not re.search(re.escape(required), smoke_matrix, re.IGNORECASE):

@@ -4,7 +4,7 @@
  *
  * CURRENT GATE MATRIX (Desktop half). Pair with:
  *   app/web/scripts/visual-qa-shell.mjs
- * Score SSOT: docs/analysis/visual-qa-scorecard.md
+ * Score SSOT: visual-qa-scorecard
  * Optional multi-scene battery (not gate): app/web/scripts/visual-qa.mjs
  *
  * Usage (from app/desktop):
@@ -132,7 +132,7 @@ async function main() {
     console.log(`wrote ${r.file}`);
   }
   console.log(`Desktop visual-qa shell capture done (${results.length} shots) → ${outDir}`);
-  console.log('Score with docs/analysis/visual-qa-scorecard.md');
+  console.log('Score with visual-qa-scorecard');
 }
 
 main().catch((err) => {

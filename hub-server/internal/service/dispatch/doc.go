@@ -21,5 +21,5 @@
 // soft-fail errors, #1000 running-not-retryable, #1009 atomic claim, and #1031
 // offline vs outbox dual-redelivery ownership.
 //
-// See docs/analysis/hub-service-boundary-map.md.
+// See hub-service-boundary-map analysis.
 package dispatch

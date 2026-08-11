@@ -78,7 +78,7 @@ Entry CSS load: desktop/web `main.tsx` imports surface `styles/{tokens,themes,pr
 
 | Acceptance | Evidence |
 |---|---|
-| Written SSOT map | this file + optional audit under `docs/analysis/` |
+| Written SSOT map | this file + optional audit artifacts |
 | ≥1 concrete dedupe | Fix A + Fix B above |
 | Surfaces still load shared CSS | desktop/web `styles/*.css` remain thin re-exports |
 

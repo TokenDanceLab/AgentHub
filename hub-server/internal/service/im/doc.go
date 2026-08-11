@@ -5,5 +5,5 @@
 // dependencies so later message/session/contact/attachment/reaction/workspace
 // package extracts can reuse them without pulling orchestration code.
 //
-// See docs/analysis/hub-service-boundary-map.md (#628, #639, #651).
+// See #628, #639, #651.
 package im

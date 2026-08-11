@@ -25,7 +25,7 @@ import (
 // kept as the Phase 1 fallback/legacy path: batch mode, hand-rolled JSONL
 // stdout parsing (codex_emit_*.go companions), no streaming. Do not extend;
 // remove once codex-acp is verified end-to-end (see
-// docs/analysis/agenthub-acp-go-migration.md §6).
+// ACP Go migration §6).
 //
 // Phase 1: codex exec "prompt" -- batch mode, JSONL output (simple, reliable).
 // Phase 2: codex app-server --listen stdio:// -- JSON-RPC full streaming.
