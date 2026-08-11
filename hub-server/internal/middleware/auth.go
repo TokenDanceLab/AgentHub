@@ -268,6 +268,7 @@ func setHubLocalClaims(c *gin.Context, claims *jwtutil.Claims) {
 //   - non-hub_local auth_source (e.g. TokenDance identity bearer)
 //   - non-empty purpose (edge-api / run-start / capability class)
 //   - edge / tokendance_bearer device_type (defense in depth)
+//
 // On rejection it audits, fails closed with 403, and aborts the request.
 // Returns true when the session is allowed to proceed.
 func (m *AuthMiddleware) enforceHubSession(c *gin.Context) bool {

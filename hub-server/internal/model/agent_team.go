@@ -97,14 +97,14 @@ const (
 
 // AgentTeamRun represents a single run of an AgentTeam.
 type AgentTeamRun struct {
-	ID             string    `gorm:"primaryKey;type:uuid" json:"id"`
-	TeamID         string    `gorm:"type:uuid;not null" json:"team_id"`
-	SessionID      string    `gorm:"type:uuid;not null" json:"session_id"`
-	TriggerUserID  string    `gorm:"type:uuid;not null" json:"trigger_user_id"`
-	TriggerMessage string    `gorm:"type:text" json:"trigger_message,omitempty"`
-	TargetID       *string   `gorm:"type:uuid" json:"target_id,omitempty"`
-	Mode           string    `gorm:"type:varchar(20);not null;default:supervisor" json:"mode"`
-	Status         string    `gorm:"type:varchar(20);not null;default:queued" json:"status"`
+	ID             string  `gorm:"primaryKey;type:uuid" json:"id"`
+	TeamID         string  `gorm:"type:uuid;not null" json:"team_id"`
+	SessionID      string  `gorm:"type:uuid;not null" json:"session_id"`
+	TriggerUserID  string  `gorm:"type:uuid;not null" json:"trigger_user_id"`
+	TriggerMessage string  `gorm:"type:text" json:"trigger_message,omitempty"`
+	TargetID       *string `gorm:"type:uuid" json:"target_id,omitempty"`
+	Mode           string  `gorm:"type:varchar(20);not null;default:supervisor" json:"mode"`
+	Status         string  `gorm:"type:varchar(20);not null;default:queued" json:"status"`
 	// TokenUsageTotal is a maintained counter of total tokens consumed by the
 	// run's agent run events, incremented by the edge stream callback when a
 	// stream event carries token usage. NULL until the first increment (or
@@ -120,8 +120,8 @@ type AgentTeamRun struct {
 	// working because CreateTeamRun never references the column. SELECT
 	// (First/Find) is unaffected by -> so the guard reads the live value.
 	TokenUsageTotal *int64    `gorm:"column:token_usage_total;->" json:"token_usage_total,omitempty"`
-	CreatedAt      time.Time `gorm:"autoCreateTime" json:"created_at"`
-	UpdatedAt      time.Time `gorm:"autoUpdateTime" json:"updated_at"`
+	CreatedAt       time.Time `gorm:"autoCreateTime" json:"created_at"`
+	UpdatedAt       time.Time `gorm:"autoUpdateTime" json:"updated_at"`
 }
 
 func (a *AgentTeamRun) BeforeCreate(tx *gorm.DB) error {

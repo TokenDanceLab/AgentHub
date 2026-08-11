@@ -8,10 +8,10 @@ import (
 
 // PublicStats is the response body for public stats queries.
 type PublicStats struct {
-	TotalUsers    int64  `json:"totalUsers"`
-	TotalAgents   int64  `json:"totalAgents"`
-	OnlineAgents  int64  `json:"onlineAgents"`
-	TotalMessages int64  `json:"totalMessages"`
+	TotalUsers    int64 `json:"totalUsers"`
+	TotalAgents   int64 `json:"totalAgents"`
+	OnlineAgents  int64 `json:"onlineAgents"`
+	TotalMessages int64 `json:"totalMessages"`
 }
 
 // PublicStatsService provides public-facing statistics without exposing raw DB access

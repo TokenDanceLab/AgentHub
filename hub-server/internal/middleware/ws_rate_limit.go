@@ -175,8 +175,8 @@ func WSIPRateLimitWithLimiter(l *wsIPLimiter) gin.HandlerFunc {
 // the WSMaxConnsPerUser limit. When the limit is exceeded the oldest connection
 // is kicked (by closing it) to make room for the new one.
 type WSUserConnLimiter struct {
-	mu    sync.Mutex
-	conns map[string][]string // user_id -> sorted list of conn IDs (oldest first)
+	mu     sync.Mutex
+	conns  map[string][]string // user_id -> sorted list of conn IDs (oldest first)
 	kickFn func(connID string)
 }
 

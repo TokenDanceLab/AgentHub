@@ -3,8 +3,8 @@
 package integration
 
 import (
-	"context"
 	"bytes"
+	"context"
 	"encoding/json"
 	"mime/multipart"
 	"net/http"

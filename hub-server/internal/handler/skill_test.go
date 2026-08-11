@@ -16,13 +16,13 @@ import (
 )
 
 type mockSkillService struct {
-	create      func(ctx context.Context, ownerID string, req *model.Skill) (*model.Skill, error)
-	get         func(ctx context.Context, id, ownerID string) (*model.Skill, error)
-	update      func(ctx context.Context, id, ownerID string, req *model.Skill) (*model.Skill, error)
-	delete      func(ctx context.Context, id, ownerID string) error
-	list        func(ctx context.Context, ownerID, q, skillType, cursor string, pageSize int) (*service.SkillListResult, error)
-	publish     func(ctx context.Context, id, ownerID string) error
-	unpublish   func(ctx context.Context, id, ownerID string) error
+	create       func(ctx context.Context, ownerID string, req *model.Skill) (*model.Skill, error)
+	get          func(ctx context.Context, id, ownerID string) (*model.Skill, error)
+	update       func(ctx context.Context, id, ownerID string, req *model.Skill) (*model.Skill, error)
+	delete       func(ctx context.Context, id, ownerID string) error
+	list         func(ctx context.Context, ownerID, q, skillType, cursor string, pageSize int) (*service.SkillListResult, error)
+	publish      func(ctx context.Context, id, ownerID string) error
+	unpublish    func(ctx context.Context, id, ownerID string) error
 	searchPublic func(ctx context.Context, q, skillType, cursor string, pageSize int) (*service.SkillListResult, error)
 }
 

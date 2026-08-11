@@ -3,10 +3,10 @@ package message
 import (
 	"context"
 
+	"github.com/agenthub/hub-server/internal/bus"
 	"github.com/agenthub/hub-server/internal/errcode"
 	"github.com/agenthub/hub-server/internal/model"
 	"github.com/agenthub/hub-server/internal/repository"
-	"github.com/agenthub/hub-server/internal/bus"
 )
 
 // Residual pure-helper peel #1153: history/search/pin-list/mark-read query paths.
