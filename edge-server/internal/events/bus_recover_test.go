@@ -200,17 +200,23 @@ func TestEventLogConcurrentAppendAndRead(t *testing.T) {
 	}()
 
 	// Reader goroutine
+	readerDone := make(chan struct{})
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
+		defer close(readerDone)
 		for i := 0; i < 50; i++ {
 			_, _ = log.ReadFrom(1)
-			time.Sleep(time.Millisecond)
 		}
 	}()
 
-	// Let them run briefly
-	time.Sleep(50 * time.Millisecond)
+	// Let the writer and reader run concurrently until the reader finishes
+	// its 50 passes, then stop the writer and drain both.
+	select {
+	case <-readerDone:
+	case <-time.After(5 * time.Second):
+		t.Fatal("reader did not finish concurrent append/read pass")
+	}
 	close(stop)
 	wg.Wait()
 }

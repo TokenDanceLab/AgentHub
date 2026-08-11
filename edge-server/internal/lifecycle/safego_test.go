@@ -59,23 +59,24 @@ func TestSafeGoRecoversPanic(t *testing.T) {
 	t.Parallel()
 
 	started := make(chan struct{})
+	panicReached := make(chan struct{})
 	safeGo("testPanic", func() {
+		// The deferred close fires during panic unwinding, right before
+		// safeGo's recover runs on the same goroutine stack — so observing it
+		// means the panic has left fn and recovery is about to complete.
+		defer close(panicReached)
 		close(started)
 		panic("induced panic for recovery test")
 	})
 
 	select {
-	case <-started:
-		// goroutine ran and panicked; reaching here means the process did not
-		// crash at the panic site (safeGo's defer/recover held).
+	case <-panicReached:
+		// goroutine panicked and the unwinding defer fired; reaching here
+		// means the process did not crash at the panic site (safeGo's
+		// defer/recover held) and recovery has completed.
 	case <-time.After(2 * time.Second):
-		t.Fatal("timed out waiting for safeGo goroutine to start")
+		t.Fatal("timed out waiting for safeGo goroutine panic recovery")
 	}
-
-	// Give the recovering defer a beat to run after the panic. The fact that
-	// this line executes at all is the survival assertion: an unrecovered
-	// goroutine panic would have terminated the test process already.
-	time.Sleep(50 * time.Millisecond)
 }
 
 // TestSafeGoRunsNormalFunc proves safeGo still invokes fn for the non-panicking
@@ -128,6 +129,10 @@ func TestFireHubCallbacksRecoverPanic(t *testing.T) {
 
 	// Wait until each panicking method has been entered (the goroutine reached
 	// the panic site). Four entries => four goroutines spawned and recovered.
+	// Each entered signal fires from inside the panicking method, right before
+	// panic unwinding runs safeGo's recover on the same goroutine stack — so
+	// once all four are observed, recovery is complete and no in-flight panic
+	// recovery can race the healthy callback handoff below.
 	deadline := time.After(3 * time.Second)
 	for i := 0; i < 4; i++ {
 		select {
@@ -136,10 +141,6 @@ func TestFireHubCallbacksRecoverPanic(t *testing.T) {
 			t.Fatalf("timed out waiting for panicking callback entry %d/4", i+1)
 		}
 	}
-
-	// Let the four recover defer calls finish so there is no in-flight panic
-	// recovery racing the healthy callback handoff.
-	time.Sleep(50 * time.Millisecond)
 
 	// Positive survival proof: swap in a healthy recording callback and fire a
 	// terminal callback. If the process had crashed during the panic phase we
