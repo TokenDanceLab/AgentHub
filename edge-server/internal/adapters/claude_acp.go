@@ -1,5 +1,5 @@
 // Package adapters — claude-acp: the official Claude Code ACP adapter (third
-// ACP migration target, per docs/analysis/agenthub-acp-go-migration.md §6).
+// ACP migration target, per ACP Go migration §6).
 //
 // The existing ClaudeCodeAdapter (claude_code.go) is a mature NDJSON
 // stream-json parser (claude -p --output-format stream-json --verbose) with

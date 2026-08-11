@@ -76,7 +76,6 @@ Full bootstrap, OIDC setup, and Edge Server debugging: [docs/developer-quickstar
 | [docs/architecture.md](docs/architecture.md) | Architecture overview and module index |
 | [docs/README.md](docs/README.md) | Docs navigation |
 | [AGENTS.md](AGENTS.md) | Project rules SSOT (branch, red lines, evidence grades) |
-| [docs/progress/MASTER.md](docs/progress/MASTER.md) | Live program progress SSOT |
 
 ## Contributing
 

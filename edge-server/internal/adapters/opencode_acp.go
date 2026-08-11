@@ -1,5 +1,5 @@
 // Package adapters — opencode-acp: the native OpenCode ACP adapter (second
-// ACP migration target, per docs/analysis/agenthub-acp-go-migration.md §6).
+// ACP migration target, per ACP Go migration §6).
 //
 // The existing OpenCodeAdapter (opencode.go) is Phase 1/2 batch mode: it
 // spawns the opencode CLI with `opencode run --format json` and hand-parses

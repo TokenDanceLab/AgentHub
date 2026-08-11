@@ -11,5 +11,5 @@
 //   - delivery_outbox_facade.go — status/TTL aliases, AgentService facades
 // Full model package move stays deferred (high-risk residual).
 //
-// See docs/analysis/hub-service-boundary-map.md (#744; prior pure extract #514; #801).
+// See #744 (prior pure extract #514; #801).
 package deliveryoutbox

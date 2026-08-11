@@ -81,8 +81,7 @@ type AcpAdapterConfig struct {
 // initialize handshake, creates a session, prompts, and streams updates —
 // all through the coder/acp-go-sdk client runtime (acp_client.go).
 //
-// Reference: #1404, docs/analysis/acp-spike-phase1.md,
-// docs/analysis/agenthub-acp-go-migration.md (option C').
+// Reference: #1404, ACP spike analysis, ACP Go migration (option C').
 type AcpAdapter struct {
 	// id is the registry identifier for this adapter instance. The generic
 	// NewAcpAdapter uses "acp"; concrete agent configs (e.g. codex-acp) use

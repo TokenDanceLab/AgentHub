@@ -9,8 +9,7 @@
 // generated from the official ACP schema by github.com/coder/acp-go-sdk
 // (v0.13.5) — no hand-rolled ACP structs are decoded here.
 //
-// Reference: docs/analysis/acp-spike-phase1.md §3 (Translation Mapping),
-// docs/analysis/agenthub-acp-go-migration.md (option C').
+// Reference: ACP spike analysis §3 (Translation Mapping), ACP Go migration (option C').
 package adapters
 
 import (

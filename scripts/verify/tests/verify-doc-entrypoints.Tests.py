@@ -69,11 +69,15 @@ class VerifyDocEntrypointsTests(unittest.TestCase):
         shutil.copyfile(os.path.join(REPO_ROOT, "AGENTS.md"), os.path.join(self.fixture, "AGENTS.md"))
         shutil.copyfile(os.path.join(REPO_ROOT, "README.md"), os.path.join(self.fixture, "README.md"))
 
-        # Mirror the caller's active analysis directory. A pre-commit caller
-        # may have removed stale files that still exist in fixture HEAD.
-        fixture_analysis = os.path.join(self.fixture, "docs", "analysis")
-        shutil.rmtree(fixture_analysis, ignore_errors=True)
-        shutil.copytree(os.path.join(REPO_ROOT, "docs", "analysis"), fixture_analysis)
+        # Mirror the caller's doc-slimming state: docs/analysis, docs/plan,
+        # docs/progress and docs/roadmap.md were removed on master but still
+        # exist in fixture HEAD — drop them so the verifier sees the same shape.
+        for rel in ("docs/analysis", "docs/plan", "docs/progress", "docs/roadmap.md"):
+            target = os.path.join(self.fixture, rel)
+            if os.path.isdir(target):
+                shutil.rmtree(target)
+            elif os.path.exists(target):
+                os.remove(target)
 
         if not os.path.isfile(os.path.join(REPO_ROOT, "PROGRESS.md")):
             stale_progress = os.path.join(self.fixture, "PROGRESS.md")

@@ -21,9 +21,9 @@
 |---|---|---|---|
 | TD-P0-HUB-01 | Hub OIDC 登录 | `hub-server/internal/handler/auth.go`、`hub-server/internal/jwtutil/tokendance.go`、`hub-server/internal/service/auth.go` | **代码已落地**：handler/service 覆盖 callback、非法 issuer/audience、`tokendance_sub` 映射、Hub access/refresh session、device proof。**部署证据队列**：发布分支证明、回调/客户端注册、刷新/登出冒烟（对齐 AH-SR-035） |
 | TD-P0-CLIENT-01 | Desktop/Web 登录 | `app/desktop/src/`、`app/web/src/`、`app/desktop/src-tauri/` | **代码已落地**：Desktop/Web tab-scoped `sessionStorage`；Web Hub-only 守卫；WS 接受 Hub-issued session、拒绝升级前 TokenDance bearer。**会话姿态**：AH-SR-037 **Accepted**（#438，非 Open）。**部署/客户端证据队列**：登录/登出截图、WS 认证冒烟、部署配置（对齐 AH-SR-036） |
-| TD-P0-FEISHU-01 | 飞书集成网关 | `hub-server/internal/`、`api/` | 目标：`/integrations/feishu/events`、`/integrations/feishu/card-actions`、`message_id` 幂等、`card.action.trigger` 3s 响应、无 3xx 重定向。**状态（2026-08-05）**：IM-bridge SPEC 已 merged（2026-07-27 立项）；实施按 `docs/plan/proposal-im-bridge.md` 推进 |
+| TD-P0-FEISHU-01 | 飞书集成网关 | `hub-server/internal/`、`api/` | 目标：`/integrations/feishu/events`、`/integrations/feishu/card-actions`、`message_id` 幂等、`card.action.trigger` 3s 响应、无 3xx 重定向。**状态（2026-08-05）**：IM-bridge SPEC 已 merged（2026-07-27 立项）；实施按 GitHub issue 推进 |
 | TD-P1-HUB-02 | Hub 授权 | `hub-server/internal/service/`、`hub-server/internal/middleware/` | 对 org/project/thread/run/profile/integration secrets 应用 resource/action 检查。**状态**：代码侧 owner fail-closed / capability 绑定已推进（见 AH-SR-045/046 Mitigated）；完整 membership 矩阵与 live 证据仍排队 |
-| TD-P0-DESIGN-01 | 视觉 QA | `app/desktop/screenshots/`、`app/web/screenshots/`、`app/mobile-rn/screenshots/` | Desktop/Web/Mobile 截图基线与 Visual QA 矩阵（gate 89 Ship，已收口）；公开产品站点属于产品发布事项，归 roadmap/发布流程，非本项范围 |
+| TD-P0-DESIGN-01 | 视觉 QA | `app/desktop/screenshots/`、`app/web/screenshots/`、`app/mobile-rn/screenshots/` | Desktop/Web/Mobile 截图基线与 Visual QA 矩阵（gate 89 Ship，已收口）；公开产品站点属于产品发布事项，归发布流程，非本项范围 |
 | TD-P0-I18N-01 | i18n 对等 | `app/desktop/src/i18n/locales/`、`app/web/src/i18n/locales/` | Desktop 扁平 `zh.json`/`en.json` 与 Web 命名空间目录对齐；Mobile 缺专用 i18n 文件 |
 | TD-P0-SEC-01 | 安全/风险 | `docs/governance/security-risk-register.md` | **SSOT 指针 only**：队列、状态与发布门禁以 register 为准（最后审查 **2026-08-05**）。本文件不复制长表；Critical/High Open\|rotate\|verification-required 阻断公开发布 |
 
@@ -60,7 +60,7 @@ D2b. Release dry build topology 是 topology/preflight only（拓扑/预检）�
 ## 同步清单
 
 - 当队列 ID 从未开始变为部分完成或已完成时，更新本文件。
-- 当主要功能或批次完成时，更新 `docs/roadmap.md`。
+
 - 当部署版本和 commit hash 变更时，更新 server workspace 的 AgentHub 运维状态文档；本仓库只保留无密证据指针。
 - 当新增发现、缓解措施或部署验证时，更新 `docs/governance/security-risk-register.md`。
 - 当 Hub session 或 token 规则变更时，更新 workspace 根 `../../../docs/identity/identity-auth.md` / `../../../docs/identity/authorization-model.md`。

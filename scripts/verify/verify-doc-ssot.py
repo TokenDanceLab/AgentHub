@@ -53,9 +53,7 @@ def is_active_doc(path: str) -> bool:
         return True
     if p in ("docs/README.md", "docs/history.md", "docs/decisions.md", "docs/reference/README.md", "docs/api-reference.md"):
         return True
-    if p == "docs/roadmap.md":
-        return True
-    if re.match(r"^docs/(analysis|plan|progress|governance)/.+\.md$", p):
+    if re.match(r"^docs/governance/.+\.md$", p):
         return True
     if re.match(r"^\.agents/skills/.+\.md$", p):
         return True
@@ -92,9 +90,9 @@ def check_root_entrypoints() -> None:
         ("CODEX.md", "tool-specific rules must not fork AGENTS.md"),
         ("GEMINI.md", "tool-specific rules must not fork AGENTS.md"),
         ("CURSOR.md", "tool-specific rules must not fork AGENTS.md"),
-        ("PROGRESS.md", "docs/progress/MASTER.md is the single current-progress surface"),
-        ("STATE.md", "current facts belong to AGENTS.md, MASTER.md, and owner docs"),
-        ("ROADMAP.md", "docs/roadmap.md is the canonical roadmap path"),
+        ("PROGRESS.md", "progress state lives on GitHub issues, not a repo file"),
+        ("STATE.md", "current facts live in AGENTS.md and owner docs, not a root STATE.md"),
+        ("ROADMAP.md", "roadmap state lives on GitHub issues, not a repo file"),
     ]
     for path, reason in forbidden:
         if exists(path):
@@ -143,7 +141,6 @@ def check_readme_entrypoints() -> None:
         "docs/developer-quickstart.md",
         "docs/architecture.md",
         "AGENTS.md",
-        "docs/progress/MASTER.md",
     ]
     for target in required:
         link_pattern = r"\[[^\]]+\]\(" + re.escape(target) + r"\)"
@@ -157,8 +154,6 @@ def check_required_markers() -> None:
     required = [
         ("AGENTS.md", "新 Agent 90 秒入口"),
         ("AGENTS.md", "项目总规则唯一入口"),
-        ("AGENTS.md", "docs/progress/MASTER.md"),
-        ("AGENTS.md", "docs/roadmap.md"),
         ("AGENTS.md", "避免巨石文档"),
         ("AGENTS.md", "项目规则只写 `AGENTS.md`"),
         ("docs/history.md", "archive commit"),
@@ -257,7 +252,6 @@ def check_max_lines() -> None:
         "docs/history.md": 80,
         "docs/decisions.md": 80,
         "docs/developer-quickstart.md": 170,
-        "docs/roadmap.md": 220,
         "docs/architecture.md": 170,
         "docs/architecture/04-frontend-data-flow.md": 150,
         "docs/api-reference.md": 80,

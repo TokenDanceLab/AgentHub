@@ -4,7 +4,7 @@
  * This is NOT the P74 merge gate. Current gate matrix (1440×810 light+dark):
  *   app/web/scripts/visual-qa-shell.mjs   →  pnpm --filter agenthub-web visual:qa:shell
  *   app/desktop/scripts/visual-qa-shell.mjs
- * Score SSOT: docs/analysis/visual-qa-scorecard.md (#1286)
+ * Score SSOT: visual-qa-scorecard (#1286)
  *
  * Scene names may still say 1440x920 for historical continuity of this battery only.
  * Do not treat those strings as the product gate viewport.

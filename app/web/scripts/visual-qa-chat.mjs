@@ -3,7 +3,7 @@
  * Viewport 1440x810 · themes light+dark · mock hub · Chat main path (not Agents)
  *
  * Optional density gate companion (does NOT replace visual:qa:shell merge gate).
- * Score notes: docs/analysis/visual-qa-scorecard.md §4 Chat path
+ * Score notes: visual-qa-scorecard §4 Chat path
  *
  * Usage (from app/web):
  *   node scripts/visual-qa-chat.mjs

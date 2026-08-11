@@ -100,12 +100,6 @@ def main() -> int:
     assert_not_contains("app/web/src/api/hubTokenStorage.ts", r"localStorage\.setItem", "Web storage helper does not write Hub tokens to localStorage")
 
     step("future real E2E gate")
-    assert_contains("docs/roadmap.md", "TokenDanceID/OIDC", "roadmap names the real OIDC login boundary")
-    assert_contains("docs/roadmap.md", "approval gate", "roadmap keeps real OIDC login approval-gated")
-    assert_contains("docs/roadmap.md", "OAuth client", "roadmap lists approved OAuth client as a prerequisite")
-    assert_contains("docs/roadmap.md", "test account", "roadmap lists disposable or pre-approved test account as a prerequisite")
-    assert_contains("docs/roadmap.md", "/client/auth/me", "roadmap lists auth-me proof in the evidence boundary")
-    assert_contains("docs/roadmap.md", r"client secret.*cookie.*authorization", "roadmap bans secret-bearing evidence from docs/logs/screenshots/commits/reports")
     assert_contains("docs/governance/governance-execution.md", r"Packaged Desktop OIDC readiness.*proposal-only gate", "governance keeps real packaged E2E proposal-only")
     assert_contains("docs/governance/governance-execution.md", r"Packaged real login dry readiness.*Hub/TokenDance ID.*secrets", "governance records no live TokenDance ID or browser action")
     assert_contains(".env.example", "AGENTHUB_TOKENDANCE_ID_CLIENT_SECRET", "example config names OIDC client secret without requiring a real value")

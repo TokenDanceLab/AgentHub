@@ -20,4 +20,4 @@
 | cc-switch 长文和旧技术参考 | [../history.md](../history.md) |
 | 早期竞品研究 | [../history.md](../history.md) |
 
-所有 reference 文档只提供背景，不覆盖 `AGENTS.md`、`docs/roadmap.md`、`docs/architecture.md` 或 `api/` 契约。
+所有 reference 文档只提供背景，不覆盖 `AGENTS.md`、`docs/architecture.md` 或 `api/` 契约。

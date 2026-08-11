@@ -106,6 +106,4 @@ Mobile shared workbench (viewer / limited control)
 ## 文档权威
 
 - 当前规则：[../AGENTS.md](../AGENTS.md)
-- 当前 SPEC 进度：`docs/progress/MASTER.md`（仅当文件存在时有效）
-- 总进度：[roadmap.md](roadmap.md)
 - 安全风险：[governance/security-risk-register.md](governance/security-risk-register.md)
