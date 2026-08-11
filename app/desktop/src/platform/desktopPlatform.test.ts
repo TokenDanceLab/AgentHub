@@ -89,7 +89,7 @@ describe('createDesktopPlatform', () => {
       }],
       attachments: [],
       approvalMode: 'workspace-write',
-      workDir: 'D:/Code/TokenDance/AgentHub',
+      workDir: '/workspace/AgentHub',
     });
 
     expect(submitRun).toHaveBeenCalledWith(expect.objectContaining({
@@ -98,7 +98,7 @@ describe('createDesktopPlatform', () => {
       projectId: 'project-edge',
       threadId: 'thread-edge',
       permissionMode: 'acceptEdits',
-      workDir: 'D:/Code/TokenDance/AgentHub',
+      workDir: '/workspace/AgentHub',
     }));
     expect(submitRun.mock.calls[0]?.[0]).not.toHaveProperty('provider');
   });

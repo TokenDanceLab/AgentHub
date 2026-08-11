@@ -230,7 +230,7 @@ describe('execution target queries', () => {
           device_id: 'desktop-current',
           name: 'Doris Windows Local Edge',
           target_type: 'local_edge',
-          workspace_allowlist: ['D:/Code/TokenDance/AgentHub'],
+          workspace_allowlist: ['/workspace/AgentHub'],
           trust_level: 'local',
           health_state: 'healthy',
           is_online: true,
@@ -241,7 +241,7 @@ describe('execution target queries', () => {
     );
 
     expect(target?.id).toBe('local-this-device');
-    expect(target?.workspace_allowlist).toEqual(['D:/Code/TokenDance/AgentHub']);
+    expect(target?.workspace_allowlist).toEqual(['/workspace/AgentHub']);
   });
 
   it('does not select a sole local edge target when the desktop device id is missing', () => {

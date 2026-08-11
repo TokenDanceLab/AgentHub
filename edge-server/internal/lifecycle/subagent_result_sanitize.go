@@ -18,7 +18,7 @@ var (
 	reStackTrace = regexp.MustCompile(`(?m)^\s*(?:\t+at\s.*|goroutine\s+\d+.*|\.\.\.[/\w.\-]+\.go:\d+(?:\s+.*)?)$`)
 
 	// reFilePath matches absolute file paths that reveal project directory
-	// structure, e.g. "D:/Code/TokenDance/..." or "/home/user/...".
+	// structure, e.g. "/home/user/project/..." or "C:/Users/me/project/...".
 	// The trailing character class includes backslash for Windows paths.
 	// Directory set includes common project roots: Code, Users, home, tmp,
 	// Projects, Work, Data, Documents, Desktop.

@@ -218,12 +218,12 @@ func TestSanitizeHubStreamText(t *testing.T) {
 	if got := sanitizeHubStreamText(""); got != "" {
 		t.Fatalf("empty -> %q", got)
 	}
-	pathy := "working in D:/Code/TokenDance/AgentHub/README.md"
+	pathy := "working in /workspace/AgentHub/README.md"
 	if got := sanitizeHubStreamText(pathy); got != pathy {
 		t.Fatalf("paths should remain: %q", got)
 	}
 	// Split literal so secret-guard does not treat the fixture as a live key.
-	leaky := "token sk-" + "abcdefghijklmnopqrstuvwxyz0123456789 and path D:/Code/TokenDance/x"
+	leaky := "token sk-" + "abcdefghijklmnopqrstuvwxyz0123456789 and path /workspace/x"
 	got := sanitizeHubStreamText(leaky)
 	if got == leaky {
 		t.Fatal("expected api key redaction")
@@ -231,7 +231,7 @@ func TestSanitizeHubStreamText(t *testing.T) {
 	if !strings.Contains(got, "[redacted:api-key]") {
 		t.Fatalf("missing redaction marker: %q", got)
 	}
-	if !strings.Contains(got, "D:/Code/TokenDance/x") {
+	if !strings.Contains(got, "/workspace/x") {
 		t.Fatalf("path should remain in hub stream: %q", got)
 	}
 }
