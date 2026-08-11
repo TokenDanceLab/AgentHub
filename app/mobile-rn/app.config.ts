@@ -70,7 +70,7 @@ const config = {
   ],
   extra: {
     hubBaseUrl: resolveDefaultHubBaseUrl(),
-    oidcIssuer: env?.EXPO_PUBLIC_TOKENDANCE_ID_ISSUER ?? 'https://id.example.invalid',
+    oidcIssuer: env?.EXPO_PUBLIC_TOKENDANCE_ID_ISSUER ?? 'https://id.example.com',
   },
 } as ExpoConfig;
 

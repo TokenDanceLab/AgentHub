@@ -17,19 +17,19 @@ import (
 const MaxOutputSchemaSize = 16 << 10 // 16 KB
 
 type CustomAgent struct {
-	ID             string     `gorm:"primaryKey;type:uuid" json:"id"`
-	OwnerUserID    string     `gorm:"type:uuid;not null" json:"owner_user_id"`
-	Name           string     `gorm:"type:varchar(64);not null" json:"name"`
-	AvatarURL      string     `gorm:"type:varchar(512)" json:"avatar_url,omitempty"`
-	AgentType      string     `gorm:"type:varchar(64);not null" json:"agent_type"`
-	SystemPrompt   string     `gorm:"type:text;not null" json:"system_prompt"`
-	CapabilityTags string     `gorm:"type:jsonb;default:'[]'" json:"capability_tags,omitempty"`
-	ToolWhitelist  string     `gorm:"type:jsonb;default:'[]'" json:"tool_whitelist,omitempty"`
-	ModelParams    string          `gorm:"type:jsonb;default:'{}'" json:"model_params,omitempty"`
+	ID             string           `gorm:"primaryKey;type:uuid" json:"id"`
+	OwnerUserID    string           `gorm:"type:uuid;not null" json:"owner_user_id"`
+	Name           string           `gorm:"type:varchar(64);not null" json:"name"`
+	AvatarURL      string           `gorm:"type:varchar(512)" json:"avatar_url,omitempty"`
+	AgentType      string           `gorm:"type:varchar(64);not null" json:"agent_type"`
+	SystemPrompt   string           `gorm:"type:text;not null" json:"system_prompt"`
+	CapabilityTags string           `gorm:"type:jsonb;default:'[]'" json:"capability_tags,omitempty"`
+	ToolWhitelist  string           `gorm:"type:jsonb;default:'[]'" json:"tool_whitelist,omitempty"`
+	ModelParams    string           `gorm:"type:jsonb;default:'{}'" json:"model_params,omitempty"`
 	OutputSchema   *json.RawMessage `gorm:"type:jsonb" json:"output_schema,omitempty"`
-	DeletedAt      *time.Time      `gorm:"type:timestamptz" json:"deleted_at,omitempty"`
-	CreatedAt      time.Time  `gorm:"autoCreateTime" json:"created_at"`
-	UpdatedAt      time.Time  `gorm:"autoUpdateTime" json:"updated_at"`
+	DeletedAt      *time.Time       `gorm:"type:timestamptz" json:"deleted_at,omitempty"`
+	CreatedAt      time.Time        `gorm:"autoCreateTime" json:"created_at"`
+	UpdatedAt      time.Time        `gorm:"autoUpdateTime" json:"updated_at"`
 }
 
 func (c *CustomAgent) BeforeCreate(tx *gorm.DB) error {

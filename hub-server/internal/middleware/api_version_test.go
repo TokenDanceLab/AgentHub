@@ -42,4 +42,3 @@ func TestAPIVersion_HeaderOnAllMethods(t *testing.T) {
 		})
 	}
 }
-

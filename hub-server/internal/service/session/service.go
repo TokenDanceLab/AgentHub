@@ -12,8 +12,8 @@ import (
 
 	"gorm.io/gorm"
 
-	"github.com/agenthub/hub-server/internal/cache"
 	"github.com/agenthub/hub-server/internal/bus"
+	"github.com/agenthub/hub-server/internal/cache"
 )
 
 // Bus publishes domain events from session lifecycle paths.

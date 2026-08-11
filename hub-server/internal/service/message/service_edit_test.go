@@ -8,10 +8,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/agenthub/hub-server/internal/errcode"
 	"github.com/agenthub/hub-server/internal/bus"
+	"github.com/agenthub/hub-server/internal/errcode"
 )
-
 
 func TestEditMessage_SuccessUpdatesContentAndPublishesEvent(t *testing.T) {
 	db := newMessageAttachmentTestDB(t)

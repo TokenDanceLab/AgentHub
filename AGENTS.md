@@ -313,4 +313,3 @@ UI 工作流变更必须有行为断言，不只截图：共享 unit/contract + 
 - patch auto-merge 的安全前提是 `checks.yml` 全绿。若 checks.yml 被禁用或跳过，Renovate 不会自动合并（`ignoreTests: false`），但也不应有人手动绕过 CI 合 patch。
 - Expo/Storybook/vite/TS 的 major 排除是"延期"，不是"永禁"。相关迁移由各自通道（mobile/design/build）推进，迁完再在 renovate.json 移除对应 `enabled: false` rule。
 - Renovate PR 一律带 `dependencies` label，便于过滤。
-

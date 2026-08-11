@@ -1,8 +1,8 @@
 package handler
 
 import (
-	"errors"
 	"context"
+	"errors"
 
 	"github.com/gin-gonic/gin"
 

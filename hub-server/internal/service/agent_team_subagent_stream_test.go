@@ -348,9 +348,9 @@ func TestSubagentStreamTestDB_DDLMatchesProductionModels(t *testing.T) {
 				continue // column has no explicit model type tag; skip
 			}
 			require.Equal(t, canonicalType(expType), canonicalType(actualType),
-			"table %q column %q: DDL type %q drifts from model gorm type %q — "+
-				"update subagentStreamTestDDL to match the model tag",
-			tableName, col, actualType, expType)
+				"table %q column %q: DDL type %q drifts from model gorm type %q — "+
+					"update subagentStreamTestDDL to match the model tag",
+				tableName, col, actualType, expType)
 		}
 	}
 }

@@ -3,15 +3,15 @@ package middleware
 
 import (
 	"context"
-	"errors"
-	"sync/atomic"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/sha256"
 	"encoding/base64"
+	"errors"
 	"math/big"
 	"net/http"
 	"net/http/httptest"
+	"sync/atomic"
 	"testing"
 	"time"
 

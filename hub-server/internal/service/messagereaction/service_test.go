@@ -11,8 +11,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"gorm.io/gorm"
 
-	"github.com/agenthub/hub-server/internal/errcode"
 	"github.com/agenthub/hub-server/internal/bus"
+	"github.com/agenthub/hub-server/internal/errcode"
 )
 
 // recordingReactionBus is a Bus test double that records Publish calls.

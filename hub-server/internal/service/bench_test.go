@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/agenthub/hub-server/internal/jwtutil"
 	"github.com/agenthub/hub-server/internal/bus"
+	"github.com/agenthub/hub-server/internal/jwtutil"
 )
 
 func BenchmarkEventBusPublish(b *testing.B) {

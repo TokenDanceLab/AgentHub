@@ -16,10 +16,9 @@ import (
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 
-	"github.com/agenthub/hub-server/internal/errcode"
 	"github.com/agenthub/hub-server/internal/bus"
+	"github.com/agenthub/hub-server/internal/errcode"
 )
-
 
 func newTestBus(t *testing.T) *bus.Bus {
 	t.Helper()
