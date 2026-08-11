@@ -276,6 +276,18 @@ UI 工作流变更必须有行为断言，不只截图：共享 unit/contract + 
 
 唯一发布入口：本地打 tag → `git push origin <tag>` → `.github/workflows/release.yml` 触发构建并出 GitHub Release。旁路入口 cd-desktop.yml 与 scripts/release/release.ps1 已于 2026-08-02 删除。完整 tag SOP（前置校验、tag 格式正则、产物门控 variable、冻结开关）见 `docs/developer-quickstart.md` §发布 tag SOP。
 
+版本号递增纪律（1.0 之前，0.x 阶段）：
+
+- **默认升 patch**：常规发布打 `v0.x.y+1`（如 0.6.0 → 0.6.1），保持小步快跑，避免版本号虚高。
+- **升 minor（v0.(x+1).0）需产品级理由**：新平台支持、破坏性 UI/API 变更、或对外公告的功能里程碑；日常功能/修复/重构一律 patch。
+- **RC 走 `vX.Y.Z-rc.N`**：正式发版前可迭代 rc，GitHub Release 自动标记 prerelease；RC 不覆盖稳定 tag。
+- **三端版本同步**：desktop（package.json + tauri.conf.json）版本必须与 tag 一致；web/mobile 版本落后 desktop 时在 release notes 中注明，不单独打三份 tag。
+- **禁止**：同一 minor 内反复 bump minor；tag 打后 24 小时内再打同 minor 的新 minor（patch 除外）；1.0 前打 `v1.x`。
+
+发布平台策略（2026-08-11）：**Windows 是唯一桌面发布目标**（NSIS 安装包 + 便携 zip），macOS 桌面/公证不在范围内；Go 服务端二进制保留跨平台（Linux/Windows/darwin）；Android APK 走 `RELEASE_MOBILE_ENABLED` 门控（EAS）。代码签名：无商业证书时走 unsigned 策略（`RELEASE_UNSIGNED_OK=true`，SmartScreen 提示、updater 自签可用）；签名证书就绪后改用 `RELEASE_SIGNING_APPROVED=true` + 签名证据。
+
+Release 自动化的产物命名、双语 release notes（git-cliff 按 conventional commits 分类生成，配置见 `cliff.toml`）与 SHA256SUMS 校验和由 release.yml 维护，改动须过 `release-readiness.yml` 门禁。
+
 ## 13. 依赖更新（Renovate）
 
 依赖更新由 `.github/renovate.json` 驱动，配置 SSOT 即该文件；本节只总结策略，不复制规则细节。

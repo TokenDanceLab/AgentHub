@@ -163,7 +163,8 @@ E2E/Visual QA 只证明实际跑过的层级。按 `scripts/verify/verify-real-e
 唯一发布入口：本地打 tag → `git push origin <tag>` → `.github/workflows/release.yml` 触发构建并出 GitHub Release。旁路入口 cd-desktop.yml 与 `scripts/release/release.ps1` 已于 2026-08-02 删除。
 
 1. 前置：master 全绿；版本号与 `app/desktop/package.json`、`app/desktop/src-tauri/tauri.conf.json`、`app/desktop/src-tauri/Cargo.toml` 一致（校验见 `scripts/release/verify-release-gate.py`）。
-2. 打 tag：`git tag vX.Y.Z`（正式）或 `vX.Y.Z-rc.N`（候选）；commit 必须在 master 祖先链上，格式须匹配 `^v\d+\.\d+\.\d+(-rc\.\d+)?$`（release.yml tag-guard 双重守卫）；`git push origin <tag>` 后 release.yml 构建出包并发布。
-3. 产物门控：build-desktop（Windows NSIS + portable）恒定；build-desktop-macos（DMG）由 `RELEASE_MACOS_ENABLED=true` 门控（#1652，可走 `run_macos_package_dry` 预检）；build-mobile（Android APK）由 `RELEASE_MOBILE_ENABLED=true` 门控。
+2. 版本选择（规则见 AGENTS.md §12）：常规发布默认升 patch；升 minor 需产品级理由；RC 走 `vX.Y.Z-rc.N`。
+3. 打 tag：`git tag vX.Y.Z`（正式）或 `vX.Y.Z-rc.N`（候选）；commit 必须在 master 祖先链上，格式须匹配 `^v\d+\.\d+\.\d+(-rc\.\d+)?$`（release.yml tag-guard 双重守卫）；`git push origin <tag>` 后 release.yml 构建出包并发布。
+4. 产物门控：build-desktop（Windows NSIS + portable）恒定；macOS 桌面已停用（2026-08-11，无 Apple 开发者账号/公证）；build-mobile（Android APK）由 `RELEASE_MOBILE_ENABLED=true` 门控。签名策略：无商业证书时设 `RELEASE_UNSIGNED_OK=true` 发布 unsigned Windows 包（SmartScreen 提示、updater 自签正常）；有证书后用 `RELEASE_SIGNING_APPROVED=true`。Release 内容：git-cliff 自动生成中英双语 changelog（`cliff.toml`，breaking 高亮）与 `SHA256SUMS`，标题 `AgentHub vX.Y.Z`。
 
 冻结开关：`scripts/release/verify-release-gate.py` 末尾两条无条件 Blocker（signing/notarization 审批）是发布冻结开关，等管理员批准后再发布；不是常规门禁，不得按"永远红"误判为故障。
