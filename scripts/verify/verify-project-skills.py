@@ -51,6 +51,9 @@ def main() -> int:
 
     skills_root = args.SkillsRoot
     if not os.path.isdir(skills_root):
+        if not os.path.isdir(os.path.dirname(skills_root)):
+            print("skills root absent (.agents removed) — whitelist gate trivially passes")
+            return 0
         fail(f"skills root not found: {skills_root}")
 
     actual = normalize_set(name for name in os.listdir(skills_root) if os.path.isdir(os.path.join(skills_root, name)))

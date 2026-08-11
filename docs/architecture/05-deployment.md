@@ -146,4 +146,4 @@ Hub 侧 code 交换端点固定为 `POST /client/auth/oidc/callback`，桌面/We
 - [02-edge-server.md](02-edge-server.md) — Edge Server 架构
 - [06-auth-identity.md](06-auth-identity.md) — TokenDance ID 和 Hub session
 - [../../AGENTS.md](../../AGENTS.md) — 执行 gate 和项目规则
-- [../../.agents/skills/real-e2e-acceptance/SKILL.md](../../.agents/skills/real-e2e-acceptance/SKILL.md) — 真实 E2E 证据等级
+- `scripts/verify/verify-real-e2e-contract.py` — 真实 E2E 证据等级（内嵌规范）

@@ -40,7 +40,7 @@
 1. 先运行 `git status --short --branch`、`git log -5 --oneline`、`git worktree list`，确认真实分支、脏文件和并行 worktree；不要从旧 handoff 推断现场。
 2. 完整读本文件，再读 `docs/progress/MASTER.md` 的当前目标与 active track。仓库根目录不维护第二份进度文件。
 3. 只在任务需要时读 `docs/roadmap.md`、`docs/architecture.md` 和一个 owner 文档；不要先遍历整个 `docs/`。
-4. 查明对应 Issue/PR、允许修改路径、禁改路径和验收命令后再动代码。没有活跃任务且范围复杂时，先按 `.agents/skills/dev-loop/SKILL.md` 建立短 spec。
+4. 查明对应 Issue/PR、允许修改路径、禁改路径和验收命令后再动代码。没有活跃任务且范围复杂时，先建立短 spec 再动手。
 5. 每完成一个切片立即运行最窄验证；宣称 merge-ready、真实 E2E、发布或生产就绪前，再运行对应完整 gate。
 
 **停止加载规则**：已经能回答“当前目标、事实 owner、允许改哪里、用什么验证”时就停止读文档；论证材料最多追加 1-3 篇精确 `docs/reference/**`，历史只通过 `docs/history.md` 定位。
@@ -98,7 +98,7 @@ Mobile 主线是 Expo + React Native development build。旧 Tauri Mobile 不再
 | 登录 | AgentHub 只接 TokenDance ID；第三方 provider、账号绑定、`oauth_bindings` 归 TokenDance ID | `../docs/identity/identity-auth.md` |
 | 授权 | TokenDance ID 只证明身份；Hub Server 用 Hub-local membership/resource/action 决定权限 | `../docs/identity/authorization-model.md` |
 | 安全风险 | Critical/High 且状态为 Open、rotate required 或 *verification required 时阻断公开发布；Accepted 须记 owner/日期/补偿控制（SSOT：`docs/governance/security-risk-register.md`） | `docs/governance/security-risk-register.md`, `../docs/security/security-risk.md` |
-| 演示诚实 | stub/demo/fixture/readiness-only 不得声称真实登录、真实模型/API 或 packaged Desktop | `docs/governance/threat-model.md`, `.agents/skills/real-e2e-acceptance/` |
+| 演示诚实 | stub/demo/fixture/readiness-only 不得声称真实登录、真实模型/API 或 packaged Desktop | `docs/governance/threat-model.md` |
 | Feishu/Lark | 飞书只做协作入口，不是第二登录系统；慢任务异步，卡片回调 3 秒内响应 | `../docs/identity/feishu-integration.md` |
 | i18n/公开包装 | zh/en 语义一致；不把第三方 provider 写成 AgentHub 直连登录 | `../docs/identity/i18n-packaging.md` |
 | Gateway | TokenDance API key 不是 TokenDance ID token，不得暴露给浏览器 UI 或公开日志 | `../docs/ecosystem/product-matrix.md` |
@@ -165,23 +165,9 @@ Agent 是协助者，不是仓库负责人。主 Agent 负责拆解、验收、�
 
 subagent 提示必须包含：目标、允许修改路径、禁改路径、必须阅读文档、必须运行检查、隐私红线。
 
-仓库只提交以下 active skill：
+仓库不再 vendored skill。真实 E2E 证据等级矩阵由 `scripts/verify/verify-real-e2e-contract.py` 内嵌规范维护；涉及真实 E2E、Playwright、Visual QA、approved-real、真实登录/运行、打包 Desktop、性能/泄漏、发布或 merge-ready 结论时，先对照该 gate 的证据等级。
 
-- `.agents/skills/dev-loop/`
-- `.agents/skills/test-coverage/`
-- `.agents/skills/pre-push/`
-- `.agents/skills/integration-test/`
-- `.agents/skills/adapter-dev/`
-- `.agents/skills/env-sandbox/`
-- `.agents/skills/real-e2e-acceptance/`
-
-白名单由 `scripts/verify/verify-project-skills.py` 校验。过期 skill 只保存在 `docs/history.md` 指向的外部归档，不能作为 active workflow 加载。
-
-使用规则：
-
-- 长程多步骤任务默认先按当前 SPEC；没有 active SPEC 且任务复杂时读 `.agents/skills/dev-loop/SKILL.md`。
-- 涉及真实 E2E、Playwright、Visual QA、approved-real、真实登录/运行、打包 Desktop、性能/泄漏、发布或 merge-ready 结论时，先读 `.agents/skills/real-e2e-acceptance/SKILL.md`。
-- 除白名单 skill 外，`.agents/`、`.codex/`、`.claude/` 的本机状态、缓存、会话记录和个人配置不得提交。
+`.codex/`、`.claude/` 的本机状态、缓存、会话记录和个人配置不得提交。
 
 ## 8. 文档规则
 
@@ -192,7 +178,7 @@ subagent 提示必须包含：目标、允许修改路径、禁改路径、必�
 - 架构决策摘要写 `docs/decisions.md`；旧 ADR 正文只在 `docs/history.md` 指向的外部归档中追溯。
 - 模块当前 gate 写各模块 `README.md`；历史 handoff、设备证明和一次性验收记录归档，不作为当前事实入口。
 - 历史 longform、日期型审计、旧发布材料、过期设计、完成的 spec-driven 工件和过期项目 skill 放到 `docs/history.md` 指向的外部 TokenDance docs 归档。
-- 新历史 longform 不进源仓：走 `docs/history.md` 指向的外部 TokenDance docs 归档。允许保留既有 `docs/archives/cleanup-baseline/` 快照；不要再新增平行 `docs/archives/*` 叙事目录。当前执行中的 SPEC 使用 `docs/analysis/`、`docs/plan/`、`docs/progress/`。
+- 新历史 longform 不进源仓：走 `docs/history.md` 指向的外部 TokenDance docs 归档。当前执行中的 SPEC 使用 `docs/analysis/`、`docs/plan/`、`docs/progress/`。
 - `scripts/` 根目录只保留分类目录：`scripts/verify/`、`scripts/dev/`、`scripts/release/`、`scripts/smoke/`、`scripts/e2e/` 和 `scripts/lib/`；不要新增根级脚本 wrapper。
 - 过时长期文档直接删除；需要保留审计轨迹时归档快照。
 - 避免巨石文档：主入口只保留职责、摘要、当前事实和链接；长表、历史日志、验收证据和专题设计移到 owner 子文档或 archive。
@@ -266,7 +252,7 @@ subagent 提示必须包含：目标、允许修改路径、禁改路径、必�
 
 所有变更的统一验证命令清单（diff/SSOT/yaml/Go/前端）见 `docs/developer-quickstart.md` §测试速查；文档/API 变更至少跑 `python scripts/verify/verify-doc-ssot.py` + openapi yaml parse。
 
-UI 工作流变更必须有行为断言，不只截图：共享 unit/contract + Desktop/Web Playwright + Visual QA，证据等级按 `real-e2e-acceptance` 标注。Vite renderer 不等于 packaged Desktop；stub/fixture/readiness-only 必须写 `real_tested=false`。
+UI 工作流变更必须有行为断言，不只截图：共享 unit/contract + Desktop/Web Playwright + Visual QA，证据等级按 `scripts/verify/verify-real-e2e-contract.py` 内嵌规范标注。Vite renderer 不等于 packaged Desktop；stub/fixture/readiness-only 必须写 `real_tested=false`。
 
 禁止无保护力测试：
 

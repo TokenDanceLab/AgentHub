@@ -142,7 +142,7 @@ Edge workbench 默认：`*.created`/`*.updated`/run 态 **UPSERT** + `seq` **水
 
 ## Fixture And Real-Evidence Boundary
 
-Adapter fixture 是 no-spend 合同：可证 parser/redaction/replay/transcript，不能证真实登录、CLI/模型执行、生产部署或 packaged Desktop。证据标签见 `.agents/skills/real-e2e-acceptance/SKILL.md`；stub 须 `real_tested=false`。
+Adapter fixture 是 no-spend 合同：可证 parser/redaction/replay/transcript，不能证真实登录、CLI/模型执行、生产部署或 packaged Desktop。证据标签由 `scripts/verify/verify-real-e2e-contract.py` 内嵌规范维护；stub 须 `real_tested=false`。
 
 ## Verification
 
