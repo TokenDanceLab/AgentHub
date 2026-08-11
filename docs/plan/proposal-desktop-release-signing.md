@@ -352,7 +352,7 @@ AgentHub 若做安装脚本，必须在脚本内置 **minisign 签名验证**（
 | 1.4 | **latest.json 产出强制化** | S | 1.3 | 把现有 if-present 收集改为 fail-if-missing；所有 platform job 产出 latest.json → publish 阶段聚合为多平台 latest.json（含 windows-x86_64 + darwin-aarch64 platform 签名） |
 | 1.5 | **验证 updater endpoint 200** | S | 1.4 | publish-release 完成后 `curl -I <updater_endpoint>` 断言 200，非 200 回退 draft（保留不发布） |
 | 1.6 | **NSIS installerHooks sidecar 清理** | S | 1.3 | 新增 `app/desktop/src-tauri/windows/installer-hooks.nsh`：升级前 `taskkill /F /T /IM agenthub-edge.exe`；`tauri.conf.json` 的 `windows.nsis.installerHooks` 指向该文件 |
-| 1.7 | **废弃 cd-desktop.yml 和 scripts/release/release.ps1** | S | 1.3 | cd-desktop.yml 添加注释 "DEPRECATED — use release.yml tag push instead"；release.ps1 不再维护（或简化为一键部署工具）；更新 AGENTS.md 和 .agents/skills/real-e2e-acceptance/SKILL.md 中的发布入口引用 |
+| 1.7 | **废弃 cd-desktop.yml 和 scripts/release/release.ps1** | S | 1.3 | cd-desktop.yml 添加注释 "DEPRECATED — use release.yml tag push instead"；release.ps1 不再维护（或简化为一键部署工具）；更新 AGENTS.md 中的发布入口引用 |
 
 **管理员物料**：无（全部用已有 secrets：`TAURI_SIGNING_PRIVATE_KEY`、`EXPO_TOKEN`）。
 

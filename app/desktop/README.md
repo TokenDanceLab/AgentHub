@@ -68,7 +68,7 @@ Invoke-RestMethod http://127.0.0.1:3210/v1/health
 Invoke-RestMethod http://127.0.0.1:3210/v1/agents
 ```
 
-Real E2E, Visual QA, observed-local, approved-real, and packaged-release evidence rules live in [../../.agents/skills/real-e2e-acceptance/SKILL.md](../../.agents/skills/real-e2e-acceptance/SKILL.md).
+Real E2E, Visual QA, observed-local, approved-real, and packaged-release evidence rules are enforced by `scripts/verify/verify-real-e2e-contract.py`.
 
 ## Links
 

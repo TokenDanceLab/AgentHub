@@ -65,7 +65,7 @@ Visual QA:
 corepack.cmd pnpm --filter agenthub-web visual:qa:shell
 ```
 
-Evidence from fixture/stub/visual runs must not claim real login, real model/API execution, packaged Desktop, or production behavior. Use [../../.agents/skills/real-e2e-acceptance/SKILL.md](../../.agents/skills/real-e2e-acceptance/SKILL.md) for evidence labels.
+Evidence from fixture/stub/visual runs must not claim real login, real model/API execution, packaged Desktop, or production behavior. Evidence labels are enforced by `scripts/verify/verify-real-e2e-contract.py`.
 
 ## Links
 

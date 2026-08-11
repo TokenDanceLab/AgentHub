@@ -39,7 +39,7 @@ Product-owned fields include:
 
 - 首轮 SDK 工作用 fixture mapper 和 golden tests，不跑 live SDK/model。
 - SDK event 只能映射到 AgentHub runtime events 和 evidence refs。
-- 任何 live SDK/model/API 执行必须走 `.agents/skills/real-e2e-acceptance/SKILL.md` 的 approved-real 证据边界。
+- 任何 live SDK/model/API 执行必须走 `scripts/verify/verify-real-e2e-contract.py` 的 approved-real 证据边界。
 - Web/Desktop/Tauri 不直接 import SDK、不保存 provider credential、不展示 provider-native session object。
 
 ## Review Checklist
