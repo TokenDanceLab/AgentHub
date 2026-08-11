@@ -6,7 +6,8 @@
 # The install table lives BEFORE the commit loop on purpose: Tera
 # whitespace control at the end of the loop body has dropped trailing
 # template content on the Linux binary, so static sections must precede
-# the {% for %} loop.
+# the {% for %} loop. Keep the rendered body well under GitHub's
+# 125,000-char release body limit (groups are sliced at 20 entries).
 
 [changelog]
 header = ""
@@ -16,14 +17,28 @@ body = """# AgentHub {{ version }}
 
 ---
 
-### 安装 / Installation
-| 平台 / Platform | 产物 / Artifact |
-| --- | --- |
-| Windows | `AgentHub_{{ version | trim_start_matches(pat="v") }}_x64-setup.exe`（安装版）· `AgentHub_{{ version | trim_start_matches(pat="v") }}_x64-portable.zip`（便携版） |
-| Android | `agenthub-mobile-{{ version | trim_start_matches(pat="v") }}-android.apk` |
-| 服务器 / Server | `agenthub-edge-{{ version | trim_start_matches(pat="v") }}-*` · `agenthub-hub-{{ version | trim_start_matches(pat="v") }}-*` |
+## 安装 / Installation
 
-所有产物的 SHA-256 校验和见 `SHA256SUMS`。Checksums for every artifact are published in `SHA256SUMS`.
+**Windows**：下载 `AgentHub_{{ version | trim_start_matches(pat="v") }}_x64-setup.exe`（NSIS 安装版，推荐）或 `AgentHub_{{ version | trim_start_matches(pat="v") }}_x64-portable.zip`（便携版，解压即用）。安装版自带应用内自动更新（updater 元数据 `latest.json` 已随本发布提供）。
+
+**服务器 / Server**：`agenthub-edge-{{ version | trim_start_matches(pat="v") }}-*`（本地执行运行时）与 `agenthub-hub-{{ version | trim_start_matches(pat="v") }}-*`（云端 Hub）按平台下载；macOS 用户可用 `darwin-*` 二进制自建。
+
+### 校验和 / Checksums
+
+所有产物 SHA-256 校验和见 `SHA256SUMS`，验证命令：
+
+```bash
+# Linux / macOS
+sha256sum -c SHA256SUMS
+# Windows (PowerShell)
+Get-FileHash AgentHub_{{ version | trim_start_matches(pat="v") }}_x64-setup.exe -Algorithm SHA256
+```
+
+### 帮助 / Support
+
+- 文档与架构：<https://github.com/TokenDanceLab/AgentHub/tree/master/docs>
+- 问题反馈：<https://github.com/TokenDanceLab/AgentHub/issues>
+- 变更历史：本文件下方按 Conventional Commits 分组，`BREAKING CHANGE` 置于顶部。
 
 ---
 
