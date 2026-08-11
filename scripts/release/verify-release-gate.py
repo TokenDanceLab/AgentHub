@@ -305,20 +305,39 @@ def main() -> int:
 
 
 def assert_signing_approval_gate() -> None:
-    """Lift the signing/notarization + updater freeze only when both:
-    (a) the repo variable RELEASE_SIGNING_APPROVED is set to "true"
-        (surfaced as an env var in CI; absent locally), and
-    (b) a signing-evidence file exists at the expected path.
-    Without either, the freeze stays in place (conservative default). The
-    block reason is recorded so the report explains why the gate is closed.
+    """Release signing policy. Three states, conservative by default:
+
+    - RELEASE_SIGNING_APPROVED=true + signing evidence file → full signed
+      release (Authenticode + notarization + signed updater metadata).
+    - RELEASE_UNSIGNED_OK=true → Windows unsigned release: the NSIS
+      installer and portable zip are published without a code-signing
+      certificate (SmartScreen shows a warning; users click "More info →
+      Run anyway"). The Tauri updater metadata stays self-signed via
+      TAURI_SIGNING_PRIVATE_KEY, so auto-update keeps working. macOS DMG /
+      notarization is out of scope entirely.
+    - neither → freeze (conservative default), recorded as a blocker.
+
+    Both approvals are explicit operator decisions surfaced via repo
+    variables; the unsigned path records a warning in the gate report so
+    the decision is auditable at release time.
     """
     approved = os.environ.get("RELEASE_SIGNING_APPROVED", "").lower() == "true"
+    unsigned_ok = os.environ.get("RELEASE_UNSIGNED_OK", "").lower() == "true"
     evidence_path = os.path.join(REPO_ROOT, "deployments", "production", "signing-manifest.sha256")
     evidence_present = os.path.isfile(evidence_path)
 
     if approved and evidence_present:
         add_ready("signing/notarization freeze lifted: RELEASE_SIGNING_APPROVED=true and signing evidence present")
         add_ready("production updater publication approved alongside signing freeze lift")
+        return
+
+    if unsigned_ok:
+        warn(
+            "unsigned release policy approved via RELEASE_UNSIGNED_OK=true: "
+            "Windows installer/portable publish without Authenticode signing "
+            "(SmartScreen warning expected); updater metadata is self-signed; "
+            "macOS DMG/notarization is out of scope"
+        )
         return
 
     if not approved:
