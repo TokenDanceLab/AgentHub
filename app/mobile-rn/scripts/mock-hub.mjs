@@ -368,7 +368,7 @@ function buildClientContacts() {
   return [
     {
       user_id: 'alice',
-      display_name: 'maintainer',
+      display_name: 'demo-user',
       remark: 'AgentHub workspace owner',
       status: 'online',
     },

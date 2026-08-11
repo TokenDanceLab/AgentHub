@@ -42,7 +42,7 @@ function collectLeaves(node, path, minSize) {
   return leaves;
 }
 
-const prefix = '<REPO_ROOT>/.worktrees/chatview-migration/app/';
+const prefix = 'REPO_ROOT/AgentHub/.worktrees/chatview-migration/app/';
 
 const leaves = collectLeaves(second, '', 5120);
 leaves.sort((a,b) => b.size - a.size);
