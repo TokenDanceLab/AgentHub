@@ -17,6 +17,9 @@ on:
         default: false
         type: boolean
 
+permissions:
+  contents: read
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
@@ -154,7 +157,7 @@ jobs:
   # and click "Approve" (or "Reject") before the pipeline continues.
   # ────────────────────────────────────────────────
   approve-production:
-    needs: deploy-staging
+    needs: [deploy-staging, docker-build-push]
     runs-on: ubuntu-latest
     environment:
       name: production
@@ -171,7 +174,7 @@ jobs:
 
   # ── Production 部署指引（人工 SSH 执行，本 workflow 不做真实部署）──
   deploy-production:
-    needs: approve-production
+    needs: [approve-production, docker-build-push]
     runs-on: ubuntu-latest
     environment:
       name: production
@@ -252,7 +255,7 @@ jobs:
 
   # ── 部署后人工验证指引（无真实 health 轮询，见 env 区声明）──
   health-check:
-    needs: deploy-production
+    needs: [deploy-production, docker-build-push]
     runs-on: ubuntu-latest
     if: always()
     steps:

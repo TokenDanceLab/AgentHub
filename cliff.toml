@@ -1,0 +1,58 @@
+# git-cliff changelog configuration (https://git-cliff.org)
+# Community-standard changelog generation for AgentHub releases.
+# Produces a bilingual (zh/en) release body from conventional commits;
+# invoked by .github/workflows/release.yml.
+#
+# The install table lives BEFORE the commit loop on purpose: Tera
+# whitespace control at the end of the loop body has dropped trailing
+# template content on the Linux binary, so static sections must precede
+# the {% for %} loop.
+
+[changelog]
+header = ""
+body = """# AgentHub {{ version }}
+
+发布版本 **{{ version }}** · Release **{{ version }}**.
+
+---
+
+### 安装 / Installation
+| 平台 / Platform | 产物 / Artifact |
+| --- | --- |
+| Windows | `AgentHub_{{ version | trim_start_matches(pat="v") }}_x64-setup.exe`（安装版）· `AgentHub_{{ version | trim_start_matches(pat="v") }}_x64-portable.zip`（便携版） |
+| Android | `agenthub-mobile-{{ version | trim_start_matches(pat="v") }}-android.apk` |
+| 服务器 / Server | `agenthub-edge-{{ version | trim_start_matches(pat="v") }}-*` · `agenthub-hub-{{ version | trim_start_matches(pat="v") }}-*` |
+
+所有产物的 SHA-256 校验和见 `SHA256SUMS`。Checksums for every artifact are published in `SHA256SUMS`.
+
+---
+
+{% for group, commits in commits | group_by(attribute="group") -%}
+## {{ group }}
+{%- for commit in commits %}
+- [{{ commit.message | split(pat="
+") | first }}](https://github.com/TokenDanceLab/AgentHub/commit/{{ commit.id }}) ({{ commit.id | truncate(length=7, end="") }})
+{%- endfor %}
+{% endfor -%}
+"""
+trim = true
+footer = ""
+
+[git]
+conventional_commits = true
+filter_unconventional = true
+commit_parsers = [
+  { body = ".*BREAKING CHANGE.*", group = "⚠️ Breaking Changes / 破坏性变更" },
+  { message = "^.*!:.*", group = "⚠️ Breaking Changes / 破坏性变更" },
+  { message = "^feat", group = "✨ Features / 新功能" },
+  { message = "^fix", group = "🐛 Bug Fixes / 问题修复" },
+  { message = "^perf", group = "⚡ Performance / 性能优化" },
+  { message = "^security", group = "🔒 Security / 安全加固" },
+  { message = "^docs", group = "📚 Documentation / 文档" },
+  { message = "^refactor", group = "🧹 Refactoring / 重构" },
+  { message = "^(test|ci)", group = "🧪 Tests & CI / 测试与 CI" },
+  { message = ".*", group = "📦 Other / 其他" },
+]
+protect_breaking_commits = false
+filter_commits = false
+sort_commits = "oldest"

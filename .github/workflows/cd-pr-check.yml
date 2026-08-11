@@ -10,10 +10,14 @@ on:
       - "hub-server/docker-compose*"
       - "hub-server/**.dockerignore"
       - ".github/workflows/cd-*.yml"
+
       - ".github/workflows/release.yml"
       - "hub-server/scripts/generate-secrets*"
       - "scripts/verify/verify-deployment-shape.py"
       - "scripts/verify/tests/verify-deployment-shape.Tests.py"
+
+permissions:
+  contents: read
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}

@@ -4,6 +4,9 @@ on:
   push:
     tags: ['v*']
 
+permissions:
+  contents: read
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
@@ -42,21 +45,20 @@ jobs:
           fi
           echo "tag ancestry ok: $GITHUB_REF_NAME is on master"
 
-  # ── Security Gate: release readiness (no Open High + signing freeze) ─
-  # Runs the release-gate verifier before any build. Hard-blocking (no
-  # continue-on-error): the risk register currently has no Open Critical/High,
-  # so the only remaining blocker is the signing/notarization freeze, which is
-  # lifted only via the repo variable RELEASE_SIGNING_APPROVED + signing
-  # evidence (see scripts/release/verify-release-gate.py). Until the operator
-  # lifts the freeze, tag pushes fail here instead of producing artifacts.
+  # ── Security Gate: release readiness (no Open High + signing policy) ─
+  # Hard-blocking (no continue-on-error): Open Critical/High risks block
+  # release. Signing policy (scripts/release/verify-release-gate.py):
+  #   - RELEASE_SIGNING_APPROVED=true + signing evidence → signed release
+  #   - RELEASE_UNSIGNED_OK=true → Windows unsigned release (SmartScreen
+  #     warning; updater still self-signed via TAURI_SIGNING_PRIVATE_KEY)
+  #   - neither → freeze (conservative default)
   security-gate:
     name: Security release gate
     needs: tag-guard
     runs-on: ubuntu-latest
     env:
-      # Repo variable lifts the signing freeze only when explicitly approved
-      # with matching signing evidence (see verify-release-gate.py).
       RELEASE_SIGNING_APPROVED: ${{ vars.RELEASE_SIGNING_APPROVED }}
+      RELEASE_UNSIGNED_OK: ${{ vars.RELEASE_UNSIGNED_OK }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -78,6 +80,13 @@ jobs:
         with:
           go-version: ${{ env.GO_VERSION }}
 
+      - name: Resolve release version
+        shell: bash
+        run: |
+          VER="${{ github.ref_name }}"
+          VER="${VER#v}"
+          echo "ver=${VER}" >> "$GITHUB_ENV"
+
       - name: Create dist directory
         run: mkdir -p dist
 
@@ -87,14 +96,14 @@ jobs:
           GOOS: linux
           GOARCH: amd64
           CGO_ENABLED: "0"
-        run: go build -ldflags="-s -w" -o ../dist/agenthub-edge-linux-amd64 ./cmd/agenthub-edge/
+        run: go build -ldflags="-s -w" -o ../dist/agenthub-edge-${ver}-linux-amd64 ./cmd/agenthub-edge/
 
       - name: Build Edge Server (Windows)
         working-directory: edge-server
         env:
           GOOS: windows
           GOARCH: amd64
-        run: go build -ldflags="-s -w" -o ../dist/agenthub-edge-windows-amd64.exe ./cmd/agenthub-edge/
+        run: go build -ldflags="-s -w" -o ../dist/agenthub-edge-${ver}-windows-amd64.exe ./cmd/agenthub-edge/
 
       - name: Build Hub Server (Linux)
         working-directory: hub-server
@@ -102,7 +111,7 @@ jobs:
           GOOS: linux
           GOARCH: amd64
           CGO_ENABLED: "0"
-        run: go build -ldflags="-s -w" -o ../dist/agenthub-hub-linux-amd64 ./cmd/server-hub/
+        run: go build -ldflags="-s -w" -o ../dist/agenthub-hub-${ver}-linux-amd64 ./cmd/server-hub/
 
       - name: Build Edge Server (macOS amd64)
         working-directory: edge-server
@@ -110,7 +119,7 @@ jobs:
           GOOS: darwin
           GOARCH: amd64
           CGO_ENABLED: "0"
-        run: go build -ldflags="-s -w" -o ../dist/agenthub-edge-darwin-amd64 ./cmd/agenthub-edge/
+        run: go build -ldflags="-s -w" -o ../dist/agenthub-edge-${ver}-darwin-amd64 ./cmd/agenthub-edge/
 
       - name: Build Edge Server (macOS arm64)
         working-directory: edge-server
@@ -118,7 +127,7 @@ jobs:
           GOOS: darwin
           GOARCH: arm64
           CGO_ENABLED: "0"
-        run: go build -ldflags="-s -w" -o ../dist/agenthub-edge-darwin-arm64 ./cmd/agenthub-edge/
+        run: go build -ldflags="-s -w" -o ../dist/agenthub-edge-${ver}-darwin-arm64 ./cmd/agenthub-edge/
 
       - name: Build Hub Server (macOS amd64)
         working-directory: hub-server
@@ -126,7 +135,7 @@ jobs:
           GOOS: darwin
           GOARCH: amd64
           CGO_ENABLED: "0"
-        run: go build -ldflags="-s -w" -o ../dist/agenthub-hub-darwin-amd64 ./cmd/server-hub/
+        run: go build -ldflags="-s -w" -o ../dist/agenthub-hub-${ver}-darwin-amd64 ./cmd/server-hub/
 
       - name: Build Hub Server (macOS arm64)
         working-directory: hub-server
@@ -134,7 +143,7 @@ jobs:
           GOOS: darwin
           GOARCH: arm64
           CGO_ENABLED: "0"
-        run: go build -ldflags="-s -w" -o ../dist/agenthub-hub-darwin-arm64 ./cmd/server-hub/
+        run: go build -ldflags="-s -w" -o ../dist/agenthub-hub-${ver}-darwin-arm64 ./cmd/server-hub/
 
       - name: Upload Go artifacts
         uses: actions/upload-artifact@v7
@@ -168,6 +177,15 @@ jobs:
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
 
+      - name: Cache Rust build artifacts
+        # Community-standard cargo cache (swatinem/rust-cache): caches the
+        # cargo registry + target/ between runs. Tauri dependency compilation
+        # is the slowest part of the desktop build — this cuts later builds
+        # from ~20min to a few minutes.
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: app/desktop/src-tauri
+
       - name: Download Go binaries for sidecar
         uses: actions/download-artifact@v8
         with:
@@ -177,8 +195,9 @@ jobs:
       - name: Prepare edge-server sidecar binary
         shell: pwsh
         run: |
+          $ver = "${{ github.ref_name }}" -replace '^v',''
           New-Item -ItemType Directory "app\desktop\src-tauri\binaries" -Force
-          Copy-Item "go-binaries\agenthub-edge-windows-amd64.exe" "app\desktop\src-tauri\binaries\agenthub-edge-x86_64-pc-windows-msvc.exe"
+          Copy-Item "go-binaries\agenthub-edge-${ver}-windows-amd64.exe" "app\desktop\src-tauri\binaries\agenthub-edge-x86_64-pc-windows-msvc.exe"
 
       - name: Build Tauri (NSIS)
         working-directory: app/desktop
@@ -215,7 +234,7 @@ jobs:
               $portableDir = "dist\AgentHub-portable"
               New-Item -ItemType Directory $portableDir -Force
               Copy-Item $exe.FullName "$portableDir\AgentHub.exe"
-              Copy-Item "go-binaries\agenthub-edge-windows-amd64.exe" "$portableDir\agenthub-edge.exe"
+              Copy-Item "go-binaries\agenthub-edge-${ver}-windows-amd64.exe" "$portableDir\agenthub-edge.exe"
               @"
           AgentHub ${{ github.ref_name }} — Portable Edition
 
@@ -225,6 +244,7 @@ jobs:
           Full documentation: https://github.com/TokenDanceLab/AgentHub
           "@ | Out-File "$portableDir\README.txt" -Encoding UTF8
               Compress-Archive -Path "$portableDir\*" -DestinationPath "dist\AgentHub_${ver}_x64-portable.zip" -Force
+              Remove-Item -Recurse -Force $portableDir
             } else {
               Write-Error "Neither Tauri zip nor release exe found"
               exit 1
@@ -235,73 +255,6 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: desktop-artifacts
-          path: dist/
-
-  # ── Tauri Desktop (macOS) ─────────────────────
-  # macOS 低频使用（决策 2026-08-07，issue #1652）：默认跳过，设置仓库
-  # variable RELEASE_MACOS_ENABLED=true 才参与发布；跳过时 release job
-  # 照常发布其余产物（对齐 build-mobile 门控模式）。
-  build-desktop-macos:
-    needs: build-go
-    if: ${{ vars.RELEASE_MACOS_ENABLED == 'true' }}
-    runs-on: macos-latest
-    env:
-      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-    steps:
-      - uses: actions/checkout@v7
-
-      - uses: pnpm/action-setup@v6
-        with:
-          version: ${{ env.PNPM_VERSION }}
-
-      - uses: actions/setup-node@v7
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: pnpm
-          cache-dependency-path: app/pnpm-lock.yaml
-
-      - name: Install dependencies
-        working-directory: app
-        run: pnpm install --frozen-lockfile
-
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Download Go binaries for sidecar
-        uses: actions/download-artifact@v8
-        with:
-          name: go-binaries
-          path: go-binaries
-
-      - name: Prepare edge-server sidecar binary
-        run: |
-          mkdir -p app/desktop/src-tauri/binaries
-          cp go-binaries/agenthub-edge-darwin-arm64 app/desktop/src-tauri/binaries/agenthub-edge-aarch64-apple-darwin
-
-      - name: Build Tauri (DMG)
-        working-directory: app/desktop
-        # bundle.targets 仅配了 nsis（Windows 专用），macOS 需用 CLI 覆盖为 dmg
-        run: pnpm tauri build --bundles dmg
-
-      - name: Create dist directory
-        run: mkdir -p dist
-
-      - name: Collect DMG
-        run: |
-          ver="${{ github.ref_name }}"
-          ver="${ver#v}"
-          dmg=$(find app/desktop/src-tauri/target/release/bundle/dmg -name "*.dmg" -type f | head -1)
-          if [ -z "$dmg" ]; then
-            echo "ERROR: No DMG found"
-            find app/desktop/src-tauri/target/release/bundle -type f 2>/dev/null || echo "bundle dir not found"
-            exit 1
-          fi
-          cp "$dmg" "dist/AgentHub_${ver}_aarch64.dmg"
-
-      - name: Upload macOS Desktop artifacts
-        uses: actions/upload-artifact@v7
-        with:
-          name: desktop-macos-artifacts
           path: dist/
 
   # ── Expo Android APK ─────────────────────────
@@ -337,6 +290,8 @@ jobs:
       - name: Build Android APK via EAS
         working-directory: app/mobile-rn
         run: |
+          VER="${{ github.ref_name }}"
+          VER="${VER#v}"
           eas build \
             --platform android \
             --profile preview \
@@ -365,7 +320,7 @@ jobs:
           fi
 
           echo "Downloading APK from $APK_URL"
-          curl -sSL -o ../../dist/agenthub-mobile.apk "$APK_URL"
+          curl -sSL -o "../../dist/agenthub-mobile-${VER}-android.apk" "$APK_URL"
           ls -lh ../../dist/
 
       - name: Upload Mobile artifacts
@@ -376,14 +331,20 @@ jobs:
 
   # ── GitHub Release ───────────────────────────
   release:
-    needs: [build-go, build-desktop, build-desktop-macos, build-mobile]
+    needs: [build-go, build-desktop, build-mobile]
     # build-mobile 未启用时（RELEASE_MOBILE_ENABLED != true）会 skipped，
     # needs 依赖被跳过会使下游默认跳过；显式放行 skipped、仍拦截 failure。
     if: ${{ !cancelled() && !contains(needs.*.result, 'failure') }}
     runs-on: ubuntu-latest
+    env:
+      RELEASE_UNSIGNED_OK: ${{ vars.RELEASE_UNSIGNED_OK }}
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
       - name: Download Go artifacts
         uses: actions/download-artifact@v8
         with:
@@ -394,15 +355,6 @@ jobs:
         uses: actions/download-artifact@v8
         with:
           name: desktop-artifacts
-          path: dist
-
-      - name: Download macOS Desktop artifacts
-        # macOS 门控（RELEASE_MACOS_ENABLED）未启用时无 desktop-macos-artifacts，
-        # 条件跳过避免下载失败（对齐 build-mobile 的 #1648 模式）
-        if: ${{ needs.build-desktop-macos.result == 'success' }}
-        uses: actions/download-artifact@v8
-        with:
-          name: desktop-macos-artifacts
           path: dist
 
       - name: Download Mobile artifacts
@@ -416,12 +368,51 @@ jobs:
       - name: List assets
         run: ls -la dist/
 
+      - name: Generate release notes with git-cliff
+        # Community-standard changelog generator (git-cliff, cliff.toml at repo
+        # root): groups conventional commits, flags breaking changes, renders
+        # the bilingual body. --latest emits only the current tag's section
+        # (the tag is detected from HEAD — do not pass --tag, it would blank
+        # the version variable in the template).
+        shell: bash
+        env:
+          RELEASE_UNSIGNED_OK: ${{ vars.RELEASE_UNSIGNED_OK }}
+        run: |
+          curl -sSL -o git-cliff.tar.gz \
+            https://github.com/orhun/git-cliff/releases/download/v2.13.1/git-cliff-2.13.1-x86_64-unknown-linux-gnu.tar.gz
+          tar -xzf git-cliff.tar.gz
+          GIT_CLIFF=$(find . -maxdepth 2 -type f -name git-cliff | head -1)
+          if [ -z "$GIT_CLIFF" ]; then
+            echo "::error::git-cliff binary not found after extraction"
+            exit 1
+          fi
+          "$GIT_CLIFF" --latest -o release-notes.md
+          if [ "$RELEASE_UNSIGNED_OK" = "true" ]; then
+            printf '%s\n' \
+              '> **Windows 未签名说明 / Unsigned notice**：安装包未做 Authenticode 签名，首次运行时 Windows SmartScreen 会提示“未知发布者”——点击“更多信息 → 仍要运行”即可。应用内自动更新正常（updater 元数据为自签）。' \
+              '> The installer is not code-signed; SmartScreen may warn on first run — click “More info → Run anyway”. In-app auto-update works (self-signed metadata).' \
+              >> release-notes.md
+          fi
+          echo "release notes tail (unsigned=${RELEASE_UNSIGNED_OK:-<unset>}):"
+          tail -n 4 release-notes.md
+
+      - name: Generate SHA256SUMS
+        shell: bash
+        run: |
+          cd dist
+          for f in *; do
+            [ "$f" = "SHA256SUMS" ] && continue
+            [ -d "$f" ] && continue
+            sha256sum "$f"
+          done > SHA256SUMS
+          cat SHA256SUMS
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ github.ref_name }}
-          name: ${{ github.ref_name }}
+          name: AgentHub ${{ github.ref_name }}
+          body_path: release-notes.md
           files: dist/*
           draft: false
           prerelease: ${{ contains(github.ref_name, '-') }}
-          generate_release_notes: true

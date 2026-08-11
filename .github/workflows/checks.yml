@@ -14,6 +14,9 @@ on:
     branches: [master]
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
@@ -808,6 +811,18 @@ jobs:
             git diff --check
           fi
 
+      - name: Check workflows with actionlint
+        # Community-standard GitHub Actions workflow linter (rhysd/actionlint):
+        # catches syntax errors, broken expressions, and unsafe shell patterns
+        # in every workflow on each push. Version pinned to the release asset
+        # (no curl|bash) for supply-chain hygiene.
+        shell: bash
+        run: |
+          curl -sSL -o actionlint.tar.gz \
+            https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionlint_1.7.12_linux_amd64.tar.gz
+          tar -xzf actionlint.tar.gz actionlint
+          ./actionlint -color -shellcheck=
+
       - name: Verify commit messages (PR only)
         if: github.event_name == 'pull_request'
         shell: bash
@@ -822,12 +837,16 @@ jobs:
 
       - name: Secret guard
         continue-on-error: true  # Wave 10: mock/test secrets trigger false positive; re-enable after allowlist
+        shell: bash
+        env:
+          BASE_REF: ${{ github.base_ref }}
+          HEAD_REF: ${{ github.head_ref }}
         run: |
           if [ "${{ github.event_name }}" = "pull_request" ]; then
-            if [ "${{ github.base_ref }}" = "master" ] && [ "${{ github.head_ref }}" = "dev/demo-user" ]; then
+            if [ "$BASE_REF" = "master" ] && [ "$HEAD_REF" = "dev/demo-user" ]; then
               bash scripts/verify/check-secrets.sh --range HEAD^2^..HEAD^2
             else
-              bash scripts/verify/check-secrets.sh --range "origin/${{ github.base_ref }}...HEAD"
+              bash scripts/verify/check-secrets.sh --range "origin/$BASE_REF...HEAD"
             fi
           elif git rev-parse --verify HEAD^ >/dev/null 2>&1; then
             bash scripts/verify/check-secrets.sh --range HEAD^..HEAD
