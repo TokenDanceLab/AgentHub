@@ -29,7 +29,7 @@ body = """# AgentHub {{ version }}
 
 {% for group, commits in commits | group_by(attribute="group") -%}
 ## {{ group }}
-{%- for commit in commits %}
+{%- for commit in commits | slice(end=20) %}
 - [{{ commit.message | split(pat="
 ") | first }}](https://github.com/TokenDanceLab/AgentHub/commit/{{ commit.id }}) ({{ commit.id | truncate(length=7, end="") }})
 {%- endfor %}
