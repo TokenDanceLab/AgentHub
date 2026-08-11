@@ -57,7 +57,7 @@ agent_team:
   max_team_run_budget_tokens: 200000
   max_team_run_budget_usage_pct: 95
 tokendance_id:
-  issuer_url: "https://id.tokendancelab.com"
+  issuer_url: "${AGENTHUB_TOKENDANCE_ID_ISSUER_URL:-https://id.example.com}"
   jwks_uri: ""
   client_id: ""
   client_secret: ""

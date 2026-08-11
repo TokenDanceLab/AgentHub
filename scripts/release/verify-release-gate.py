@@ -258,7 +258,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("-RepoRoot", "--RepoRoot", default=".", help="repository root")
     parser.add_argument("-BaseRef", "--BaseRef", default="origin/master", help="base (master) git ref")
-    parser.add_argument("-DevRef", "--DevRef", default="origin/dev/delicious233", help="dev git ref")
+    parser.add_argument("-DevRef", "--DevRef", default="origin/dev/demo-user", help="dev git ref")
     parser.add_argument("-ArtifactsRoot", "--ArtifactsRoot", default="", help="artifact root for the manifest gate")
     parser.add_argument("-ReportPath", "--ReportPath", default=".tmp/release-gate-report.json", help="release gate report output path")
     parser.add_argument("-AllowOpenHighRisks", "--AllowOpenHighRisks", action="store_true", help="report Open Critical/High risks without failing")

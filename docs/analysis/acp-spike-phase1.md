@@ -90,7 +90,7 @@ func (a *AcpAdapter) NeedsStdin() bool { return true } // required for permissio
 
 ## References
 
-- `D:\Code\Temp\codeg-research\protocol.md` — full ACP protocol analysis
-- `D:\Code\Temp\codeg-research\v0.22.1-DELTA.md` — competitive urgency
+- `TEMP_ROOT\codeg-research\protocol.md` — full ACP protocol analysis
+- `TEMP_ROOT\codeg-research\v0.22.1-DELTA.md` — competitive urgency
 - `edge-server/internal/adapters/adapter.go` — AgentAdapter interface
 - `edge-server/internal/adapters/registry.go` — adapter registration

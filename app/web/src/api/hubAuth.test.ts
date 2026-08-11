@@ -367,7 +367,7 @@ describe('web Hub auth token auto-login', () => {
         return new Response(
           JSON.stringify({
             state: 'server-state-1',
-            authorization_url: 'https://id.tokendancelab.com/authorize?state=server-state-1',
+            authorization_url: 'https://id.example.com/authorize?state=server-state-1',
           }),
           { status: 200, headers: { 'Content-Type': 'application/json' } }
         );
@@ -387,7 +387,7 @@ describe('web Hub auth token auto-login', () => {
 
       await vi.waitFor(() => {
         expect(assignSpy).toHaveBeenCalledWith(
-          'https://id.tokendancelab.com/authorize?state=server-state-1'
+          'https://id.example.com/authorize?state=server-state-1'
         );
       });
       const pending = JSON.parse(sessionStorage.getItem('agenthub_oidc_pkce_pending') ?? '{}');

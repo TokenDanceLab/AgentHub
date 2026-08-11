@@ -180,7 +180,7 @@ const composerInputLabel = /^(Composer input|aria\.composerInput)$/;
 const conversationSidebarLabel = /^(Conversation sidebar|aria\.conversationSidebar)$/;
 const workspaceLabel = /^(Workspace|aria\.workspace)$/;
 const workspaceTabsLabel = /^(Workspace tabs|aria\.workspaceTabs)$/;
-const railAvatarLabel = /^(Delicious233|user\.fallbackName)$/;
+const railAvatarLabel = /^(demo-user|user\.fallbackName)$/;
 const sendMessageLabel = /^(发送消息|Send message|profile\.sendMessage)$/;
 const overviewInspectorTabLabel = /^×(概览|Overview|inspector\.overview)$/;
 const browserInspectorTabLabel = /^×(浏览器|Browser|inspector\.browser)$/;
@@ -455,7 +455,7 @@ describe('Desktop App v4 root', () => {
   it('logs out the real Desktop session before returning to the login card', async () => {
     let authenticatedUser: { id: string; username: string } | null = {
       id: 'user-delicious233',
-      username: 'Delicious233',
+      username: 'demo-user',
     };
     const logout = vi.fn(async () => {
       authenticatedUser = null;
@@ -473,7 +473,7 @@ describe('Desktop App v4 root', () => {
     mockedUseCurrentUser.mockReturnValue({
       data: {
         userId: 'user-delicious233',
-        displayName: 'Delicious233',
+        displayName: 'demo-user',
         avatarUrl: '',
       },
     } as ReturnType<typeof useCurrentUser>);
@@ -495,7 +495,7 @@ describe('Desktop App v4 root', () => {
   });
 
   it('mounts the Hub task bridge on the Desktop active path when Hub auth and Local Edge are available', async () => {
-    mockAuthSession({ id: 'user-delicious233', username: 'Delicious233' } as ReturnType<typeof useAuth>['user']);
+    mockAuthSession({ id: 'user-delicious233', username: 'demo-user' } as ReturnType<typeof useAuth>['user']);
     window.localStorage.setItem(WORKBENCH_DATA_MODE_STORAGE_KEY, 'approved-real');
     renderWithProviders(<DesktopWorkbenchApp />);
 
@@ -520,7 +520,7 @@ describe('Desktop App v4 root', () => {
   });
 
   it('waits for Desktop device registration before accepting Hub dispatch frames', async () => {
-    mockAuthSession({ id: 'user-delicious233', username: 'Delicious233' } as ReturnType<typeof useAuth>['user']);
+    mockAuthSession({ id: 'user-delicious233', username: 'demo-user' } as ReturnType<typeof useAuth>['user']);
     window.localStorage.setItem(WORKBENCH_DATA_MODE_STORAGE_KEY, 'approved-real');
     mockedUseDeviceRegistration.mockReturnValue({
       deviceId: '00000000-0000-4000-8000-00000000d001',
