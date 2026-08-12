@@ -1,6 +1,6 @@
 # AgentHub 文档
 
-最后更新：2026-07-18
+最后更新：2026-08-11
 
 ## 快速入口
 
@@ -22,9 +22,7 @@ docs/
 ├── developer-quickstart.md            ← 新人入门
 ├── architecture.md                    ← 架构概览（→ architecture/ 模块详情）
 ├── architecture/                      ← 模块化架构文档
-├── plan/                              ← 现役 SPEC（历史 plan 见 archives/plan/）
-├── analysis/                          ← 当前 owner 分析/Accepted decision 输入；历史见 archives/
-├── archives/                          ← 已关闭程序快照（cleanup-baseline 等）与历史文档归档
+├── archives/                          ← 已关闭程序快照（analysis/plan/handoff）与历史文档归档
 ├── decisions.md                       ← 当前架构决策摘要
 ├── governance/                        ← 治理：执行映射、安全风险、威胁模型
 ├── history.md                         ← 历史归档索引（外部 TokenDance docs）
@@ -40,8 +38,8 @@ docs/
 | 模块架构 | [architecture/README.md](architecture/README.md) |
 | 当前架构决策摘要 | [decisions.md](decisions.md) |
 | 旧架构决策正文和背景 | [history.md](history.md) |
-| 现役 SPEC | [plan/](plan/)（历史 plan 见 [archives/plan/](archives/plan/)） |
-| 当前仓库布局裁决 | [analysis/root-layout.md](analysis/root-layout.md)；历史分析见 [archives/](archives/) 与 [history.md](history.md) |
+| 现役 SPEC | SPEC 完成后外迁；历史见 [archives/plan/](archives/plan/) 与 [history.md](history.md) |
+| 仓库布局裁决 | ADR-018 摘要见 [decisions.md](decisions.md)；历史分析见 [archives/](archives/) |
 | 项目规则和文档规则 | [../AGENTS.md](../AGENTS.md) |
 | WebSocket 事件合同 | [../api/events.md](../api/events.md) |
 | SDK Agent 策略 | [reference/sdk-agent-strategy.md](reference/sdk-agent-strategy.md) |

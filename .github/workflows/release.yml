@@ -175,7 +175,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@1.96.0
 
       - name: Cache Rust build artifacts
         # Community-standard cargo cache (swatinem/rust-cache): caches the

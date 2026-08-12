@@ -6,7 +6,8 @@
 - README 必需入口点链接 + 目标存在；
 - 约 35 个 (路径, 标记) 必须出现在对应文档；
 - 约 30 个禁止正则扫描活跃文档；
-- 行数上限表；AGENTS.md 反引号路径与 §9.5 映射表存在性；tests/ 不得镜像 scripts/ 脚本名。
+- 行数上限表；AGENTS.md 反引号路径与 §9.5 映射表存在性；tests/ 不得镜像 scripts/ 脚本名；
+- 活跃文档内部 markdown 相对链接目标存在性（DOC-BROKEN-LINK）。
 """
 
 import os
@@ -332,6 +333,45 @@ def check_agents_md_mapping_table() -> None:
     print(f"AGENTS.md mapping table check ok ({checked_scripts} script paths, {checked_ci_files} CI files)")
 
 
+def check_doc_internal_links() -> None:
+    """Verify markdown relative links inside active docs resolve to real files.
+
+    Broken links silently degrade navigation (e.g. docs/README.md used to point
+    at plan/ and analysis/ after those directories were archived). archives/ is
+    exempt — archived material may legitimately point at the external TokenDance
+    docs archive. http(s)://, mailto:, bare anchors and code spans are skipped.
+    """
+    entry_dirs = ["docs", "docs/architecture", "docs/governance", "docs/reference"]
+    active_files: list[str] = []
+    for d in entry_dirs:
+        d_abs = os.path.join(ROOT, d)
+        if os.path.isdir(d_abs):
+            for name in sorted(os.listdir(d_abs)):
+                if name.endswith(".md"):
+                    active_files.append(os.path.join(d, name))
+    link_re = re.compile(r"\[[^\]]+\]\(([^)]+)\)")
+    for doc_rel in active_files:
+        text = read_text(doc_rel)
+        doc_dir = os.path.dirname(doc_rel)
+        for target in link_re.findall(text):
+            target = target.strip()
+            if not target or target.startswith(("<", "#")):
+                continue
+            if re.match(r"^[a-z]+://", target) or target.startswith("mailto:"):
+                continue
+            path_part = target.split("#", 1)[0]
+            if not path_part:
+                continue
+            resolved = os.path.normpath(os.path.join(doc_dir, path_part))
+            # Only police targets inside the repo; out-of-repo links (../docs
+            # sibling repos) are not verifiable from this workspace.
+            resolved_abs = os.path.normpath(os.path.join(ROOT, resolved))
+            if not resolved_abs.startswith(ROOT.rstrip("/\\") + os.sep):
+                continue
+            if not os.path.exists(resolved_abs):
+                fail(f"{doc_rel} links to missing target: {target}", "DOC-BROKEN-LINK")
+
+
 def check_no_script_mirror() -> None:
     script_leaves = {normalize_path(f).rsplit("/", 1)[-1] for f in git_ls_files(["scripts/"])}
     test_leaves = [
@@ -355,6 +395,7 @@ def main() -> int:
     check_max_lines()
     check_agents_md_paths()
     check_agents_md_mapping_table()
+    check_doc_internal_links()
     check_no_script_mirror()
     print("doc SSOT ok")
     return 0
