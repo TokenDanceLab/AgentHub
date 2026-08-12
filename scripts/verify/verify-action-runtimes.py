@@ -36,8 +36,11 @@ ALLOWED_ACTIONS = {
     "docker/metadata-action": ["v6"],
     "docker/setup-buildx-action": ["v4"],
     "softprops/action-gh-release": ["v3"],
-    # composite actions have no JS runtime; @stable is a moving tag
-    "dtolnay/rust-toolchain": ["stable"],
+    # composite actions have no JS runtime; @stable is a moving tag.
+    # 1.96.0 is pinned in workflows (see release.yml) for reproducible builds.
+    "dtolnay/rust-toolchain": ["stable", "1.96.0"],
+    # v2 branch runs on node24 (verified 2026-08-12 via action.yml).
+    "swatinem/rust-cache": ["v2"],
 }
 
 USES_REFERENCE = re.compile(r"uses:\s*([^\s]+)")
