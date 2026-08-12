@@ -97,7 +97,7 @@ jobs:
       - name: Security scan (gosec)
         # Wave 10: advisory; gosec findings are pre-existing cognitive complexity
         continue-on-error: true
-        run: go run github.com/securego/gosec/v2/cmd/gosec@latest ./...
+        run: go run github.com/securego/gosec/v2/cmd/gosec@v2.28.0 ./...
       - name: Vet
         run: go vet ./...
 
@@ -192,7 +192,7 @@ jobs:
       - name: Security scan (gosec)
         # Wave 10: advisory matching go-edge
         continue-on-error: true
-        run: go run github.com/securego/gosec/v2/cmd/gosec@latest ./...
+        run: go run github.com/securego/gosec/v2/cmd/gosec@v2.28.0 ./...
 
       - name: Vet
         run: go vet ./...
@@ -1073,7 +1073,7 @@ jobs:
           # 事件流（NDJSON）经 verifier 按 summary 事件判定；解析失败/工具故障
           # 一律 fail-closed。旧实现把整段输出当单个 JSON 对象解析，
           # 解析失败后 exit 0 —— 假绿已修（#1534）。
-          go run golang.org/x/vuln/cmd/govulncheck@latest -json ./... 2>&1             | bash ../scripts/verify/verify-vulnerability-gates.sh govulncheck
+          go run golang.org/x/vuln/cmd/govulncheck@v1.6.0 -json ./... 2>&1             | bash ../scripts/verify/verify-vulnerability-gates.sh govulncheck
 
   # ── Vuln Scan: Rust (cargo audit, #1578) ───────
   vuln-scan-rust:
@@ -1086,7 +1086,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@1.96.0
 
       # CI7: cargo clippy advisory — 24 warnings not yet zero-baselined;
       # continue-on-error so CI stays green while the debt is triaged.

@@ -22,7 +22,7 @@
 | `app/` | 活 | 前端 monorepo（web/desktop/mobile-rn/shared） |
 | artifacts/ | 产物 | 本地构建输出（gitignored） |
 | dist/ | 产物 | 本地构建输出（gitignored，已清理） |
-| `docs/` | 活 | 知识库（architecture/progress/plan/analysis/governance/reference/archives） |
+| `docs/` | 活 | 知识库（architecture/governance/reference/archives） |
 | `edge-server/` | 活 | Go Edge 服务（local runtime、adapters、lifecycle） |
 | `hub-server/` | 活 | Go Hub 服务（REST/WS/OIDC/dispatch/agentteam） |
 | node_modules/ | 产物 | 依赖（gitignored） |
