@@ -1,4 +1,7 @@
-package api
+// Package permission tracks pending tool-permission requests for live agent
+// runs. The registry is consumed by the REST approval API and the MCP tool
+// layer without depending on either transport package.
+package permission
 
 import (
 	"strings"
@@ -45,6 +48,14 @@ func NewPermissionRegistry(ttl time.Duration) *PermissionRegistry {
 		ttl:     ttl,
 		now:     time.Now,
 	}
+}
+
+// NewPermissionRegistryWithClock is NewPermissionRegistry with an explicit
+// clock, used by deterministic expiry tests and future time-source injection.
+func NewPermissionRegistryWithClock(ttl time.Duration, now func() time.Time) *PermissionRegistry {
+	registry := NewPermissionRegistry(ttl)
+	registry.now = now
+	return registry
 }
 
 func (r *PermissionRegistry) Register(permission PendingPermission) bool {

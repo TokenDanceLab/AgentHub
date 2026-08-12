@@ -12,7 +12,7 @@ import (
 	"testing"
 
 	"github.com/agenthub/edge-server/internal/adapters"
-	"github.com/agenthub/edge-server/internal/api"
+	"github.com/agenthub/edge-server/internal/permission"
 	"github.com/agenthub/edge-server/internal/errcode"
 	"github.com/agenthub/edge-server/internal/events"
 	"github.com/agenthub/edge-server/internal/lifecycle"
@@ -30,7 +30,7 @@ func newTestServer(t *testing.T) (*Server, *store.Store) {
 	_, _ = s.CreateThread("thread_test", "proj_test", "Test Thread", "", "", "")
 
 	bus := events.NewBus(100)
-	permReg := api.NewPermissionRegistry(0)
+	permReg := permission.NewPermissionRegistry(0)
 
 	srv := NewServer(s, nil, bus, permReg)
 	srv.SetWorkspaceAllowlist([]string{t.TempDir()})
@@ -1099,7 +1099,7 @@ func TestApproveActionRequiresPermission(t *testing.T) {
 
 func TestToolApproveActionSuccessPublishesDecision(t *testing.T) {
 	srv, _ := newTestServer(t)
-	if !srv.permissionRegistry.Register(api.PendingPermission{
+	if !srv.permissionRegistry.Register(permission.PendingPermission{
 		ProjectID: "proj_test",
 		ThreadID:  "thread_test",
 		RunID:     "run_test",
