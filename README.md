@@ -7,7 +7,6 @@
 
   [English](README_EN.md) · [官网](https://hub.vectorcontrol.tech) · [文档](https://hub.vectorcontrol.tech/docs) · [API](api/)
 
-  ![version](https://img.shields.io/badge/version-0.6.0-blue?style=flat-square)
   ![CI](https://img.shields.io/github/actions/workflow/status/TokenDanceLab/AgentHub/checks.yml?branch=master&style=flat-square&label=CI)
   ![release](https://img.shields.io/github/v/release/TokenDanceLab/AgentHub?style=flat-square)
   ![go](https://img.shields.io/badge/go-1.26+-00ADD8?style=flat-square&logo=go)
