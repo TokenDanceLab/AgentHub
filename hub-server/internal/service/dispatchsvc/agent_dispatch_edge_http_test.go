@@ -1,4 +1,4 @@
-package service
+package dispatchsvc
 
 // #1549 contract tests for the Hub→Edge dispatch client: URL/token must come
 // from the injected config (composition root), never from process env, and

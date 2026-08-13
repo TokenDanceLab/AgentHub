@@ -5,6 +5,7 @@ import (
 
 	"github.com/agenthub/hub-server/internal/model"
 	"github.com/agenthub/hub-server/internal/service/dispatch"
+	"github.com/agenthub/hub-server/internal/service/dispatchsvc"
 )
 
 // ── AgentService facade (wiring/handler stability) ───────────────────────────
@@ -15,11 +16,11 @@ import (
 
 // dispatchService returns the composed DispatchService, lazily constructing one
 // from AgentService deps when tests use struct literals without NewAgentService.
-func (s *AgentService) dispatchService() *DispatchService {
+func (s *AgentService) dispatchService() *dispatchsvc.DispatchService {
 	if dispatch.ComposedDispatchReady(s.dispatch != nil) {
 		return s.dispatch
 	}
-	return NewDispatchService(s.db, s.bus, s.mgr, s.cacheClient, s.relay, s.deliveryOutboxService(), s.edgeCfg, s.edgeClient, s.jwtSecret)
+	return dispatchsvc.NewDispatchService(s.db, s.bus, wsManagerAdapter{manager: s.mgr}, s.cacheClient, relayServiceAdapter{relay: s.relay}, s.deliveryOutboxService(), s.edgeCfg, s.edgeClient, s.jwtSecret)
 }
 
 // TriggerAgentTask creates a pending task for an agent and dispatches it to the inviter's edge.

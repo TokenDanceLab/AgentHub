@@ -1,4 +1,4 @@
-package service
+package dispatchsvc
 
 import (
 	"context"
@@ -9,7 +9,6 @@ import (
 	"github.com/agenthub/hub-server/internal/model"
 	"github.com/agenthub/hub-server/internal/repository"
 	"github.com/agenthub/hub-server/internal/service/dispatch"
-	"github.com/agenthub/hub-server/internal/ws"
 )
 
 func (s *DispatchService) dispatchTargetBoundTask(ctx context.Context, cacheClient dispatchCache, task *model.PendingAgentTask, userID, deviceID string, payload []byte) bool {
@@ -40,7 +39,7 @@ func (s *DispatchService) dispatchTargetBoundTask(ctx context.Context, cacheClie
 		queueTargetTask(dispatch.TargetBoundReasonConnMismatch, nil)
 		return false
 	}
-	frame := ws.NewFrame(ws.TypeAgentDispatch, json.RawMessage(payload))
+	frame := FramePort{Type: frameTypeAgentDispatch, Payload: json.RawMessage(payload)}
 	if err := repository.UpdatePendingTaskDispatched(s.db, task.ID, deviceID); !dispatch.RepoUpdateSucceeded(err) {
 		slog.Error(dispatch.DispatchLogTargetBoundMarkFailed, "task_id", task.ID, "user_id", userID, "target_id", task.TargetID, "device_id", deviceID, "error", err)
 		return false

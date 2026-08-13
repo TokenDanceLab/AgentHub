@@ -80,18 +80,6 @@ func (r deliveryOutboxRecord) toEntry() DeliveryOutboxEntry {
 	return DeliveryOutboxEntry(r)
 }
 
-// redispatchTarget carries only the opaque fields Redispatcher / DispatchService
-// need to re-send a stored payload. It is not a GORM model and must not grow
-// journal columns — that keeps redispatch free of deliveryOutboxRecord.
-// Same-package unexported type so agent_dispatch.go can use it without ownership
-// transfer (#801 keeps redispatchTarget co-located; does not edit dispatch).
-type redispatchTarget struct {
-	TaskID       string
-	DeliveryID   string
-	Payload      string
-	EdgeDeviceID string
-}
-
 // ── DeliveryOutbox private repository helpers ──────────────────────────────
 
 // outboxModel is the GORM model handle for delivery_outbox mutations.
