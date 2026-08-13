@@ -22,6 +22,7 @@ import (
 	"github.com/agenthub/edge-server/internal/hub"
 	"github.com/agenthub/edge-server/internal/jwtutil"
 	"github.com/agenthub/edge-server/internal/lifecycle"
+	"github.com/agenthub/edge-server/internal/runcontrol"
 	"github.com/agenthub/edge-server/internal/runners"
 	"github.com/agenthub/edge-server/internal/store"
 	"github.com/golang-jwt/jwt/v5"
@@ -1181,8 +1182,8 @@ func TestPostRunsRejectsWorkDirWhenWorkspaceAllowlistEmpty(t *testing.T) {
 			if !ok {
 				t.Fatalf("error body = %#v, want error object", resp)
 			}
-			if errObj["code"] != errcode.ErrWorkspaceNotAllowed.Code {
-				t.Fatalf("error code = %#v, want %s", errObj["code"], errcode.ErrWorkspaceNotAllowed.Code)
+			if errObj["code"] != errcode.ErrWorkspaceAllowlistNotConfigured.Code {
+				t.Fatalf("error code = %#v, want %s", errObj["code"], errcode.ErrWorkspaceAllowlistNotConfigured.Code)
 			}
 			msg, ok := errObj["message"].(string)
 			if !ok || !strings.Contains(msg, "allowlist") {
@@ -1467,7 +1468,7 @@ func TestPostRunsCleansTerminalRunsBeforeCreatingNewRun(t *testing.T) {
 	h.Executor = executor
 	h.ensureDefaults()
 
-	for i := 0; i < defaultRunCleanupMaxTerminalRunsPerThread+1; i++ {
+	for i := 0; i < runcontrol.DefaultRunCleanupMaxTerminalRunsPerThread+1; i++ {
 		runID := fmt.Sprintf("run_terminal_%02d", i)
 		itemID := fmt.Sprintf("item_terminal_%02d", i)
 		run, err := h.Store.CreateRun(runID, "proj_local", "thread_local")
@@ -1505,7 +1506,7 @@ func TestPostRunsCleansTerminalRunsBeforeCreatingNewRun(t *testing.T) {
 	if len(executor.started) != 1 {
 		t.Fatalf("executor starts = %d, want 1", len(executor.started))
 	}
-	if got := h.Store.ListRuns("thread_local"); len(got) != defaultRunCleanupMaxTerminalRunsPerThread+1 {
+	if got := h.Store.ListRuns("thread_local"); len(got) != runcontrol.DefaultRunCleanupMaxTerminalRunsPerThread+1 {
 		t.Fatalf("thread run count = %d, want retained terminal runs plus new active run", len(got))
 	}
 }

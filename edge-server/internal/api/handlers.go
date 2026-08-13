@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/gorilla/websocket"
 
@@ -79,7 +78,6 @@ type Handler struct {
 	// Tests inject a temp dir so real foreign session stores are never scanned.
 	SessionHome string
 
-	runCreateMu               sync.Mutex
 	permissionRegistryMu      sync.Mutex
 	permissionObserverCancel  func()
 	permissionBrokerInstalled bool
@@ -101,9 +99,6 @@ var upgrader = websocket.Upgrader{
 }
 
 const (
-	defaultRunCleanupTerminalTTL              = 24 * time.Hour
-	defaultRunCleanupMaxTerminalRunsPerThread = 50
-
 	// CloseCodeEventGap is the WebSocket close code sent when the event bus
 	// detects dropped events for this subscriber. The client should reconnect
 	// with a known-good cursor to trigger a full resync.
@@ -124,7 +119,6 @@ func (h *Handler) denyRemoteHubSharedConfig(w http.ResponseWriter, r *http.Reque
 
 func (h *Handler) validateWorkDirAllowed(workDir string) error {
 	// Empty workDir is allowed for non-run endpoints (e.g. optional read paths).
-	// Run-start uses validateRunWorkDir, which rejects empty values (#854).
 	if workDir == "" {
 		return nil
 	}
@@ -141,16 +135,6 @@ func (h *Handler) validateWorkDirAllowed(workDir string) error {
 		return fmt.Errorf("workDir is outside the Edge workspace allowlist")
 	}
 	return err
-}
-
-// validateRunWorkDir enforces a non-empty workDir for adapter-backed run starts,
-// then applies the workspace allowlist check. Callers should pass the trimmed
-// workDir value and use the returned error for HTTP mapping.
-func (h *Handler) validateRunWorkDir(workDir string) error {
-	if strings.TrimSpace(workDir) == "" {
-		return errcode.ErrWorkDirRequired
-	}
-	return h.validateWorkDirAllowed(workDir)
 }
 
 func ensureStore(h *Handler) store.Repository {
