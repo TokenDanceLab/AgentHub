@@ -19,6 +19,7 @@ import (
 	"github.com/agenthub/hub-server/internal/model"
 	"github.com/agenthub/hub-server/internal/service/deliveryoutbox"
 	"github.com/agenthub/hub-server/internal/service/dispatch"
+	"github.com/agenthub/hub-server/internal/service/dispatchsvc"
 )
 
 // newOutboxDB creates an in-memory SQLite database with the delivery_outbox
@@ -694,13 +695,13 @@ func TestDispatchIncludesDeliveryID(t *testing.T) {
 		DisplayName:   "Claude",
 	}
 
-	svc.dispatchService().dispatchTask(context.Background(), task, agent, "test prompt", "", "", nil)
+	svc.dispatchService().DispatchTask(context.Background(), task, agent, "test prompt", "", "", nil)
 
 	snapshot := cache.snapshot()
 	require.Equal(t, "user-1", snapshot.pushedUser)
 	require.Len(t, snapshot.pushed, 1)
 
-	var payload dispatchPayload
+	var payload dispatch.Payload
 	require.NoError(t, json.Unmarshal([]byte(snapshot.pushed[0]), &payload))
 	require.NotEmpty(t, payload.DeliveryID, "dispatch payload should include delivery_id")
 
@@ -960,7 +961,7 @@ func TestOutbox_RetryLoopAdapterSoftFailDoesNotMarkSent(t *testing.T) {
 	seedRetryableTaskAndDelivery(t, db, "task-soft", "del-soft", payload, DeliveryStatusRetrying, 1, now)
 
 	cache := &failPushCache{pushErr: errors.New("redis unavailable")}
-	ds := NewDispatchService(db, nil, nil, cache, nil, nil, config.EdgeDispatchConfig{}, nil, "")
+	ds := dispatchsvc.NewDispatchService(db, nil, nil, cache, nil, nil, config.EdgeDispatchConfig{}, nil, "")
 	outbox := NewDeliveryOutbox(db, dispatchRedispatcher{d: ds})
 
 	outbox.retryDeliveries(ctx)
@@ -984,7 +985,7 @@ func TestOutbox_RetryLoopAdapterSuccessMarksSentAndBumpsUpdatedAt(t *testing.T) 
 	seedRetryableTaskAndDelivery(t, db, "task-ok", "del-ok", payload, DeliveryStatusSent, 0, old)
 
 	cache := &mockAgentCache{}
-	ds := NewDispatchService(db, nil, nil, cache, nil, nil, config.EdgeDispatchConfig{}, nil, "")
+	ds := dispatchsvc.NewDispatchService(db, nil, nil, cache, nil, nil, config.EdgeDispatchConfig{}, nil, "")
 	outbox := NewDeliveryOutbox(db, dispatchRedispatcher{d: ds})
 
 	before := time.Now().UTC()
@@ -1309,7 +1310,7 @@ func TestOutbox_RunningTaskNotRedispatched(t *testing.T) {
 
 	cache := &mockAgentCache{}
 	outbox := NewDeliveryOutbox(db, nil)
-	ds := NewDispatchService(db, nil, nil, cache, nil, outbox, config.EdgeDispatchConfig{}, nil, "")
+	ds := dispatchsvc.NewDispatchService(db, nil, nil, cache, nil, outbox, config.EdgeDispatchConfig{}, nil, "")
 	outbox.SetRedispatcher(dispatchRedispatcher{d: ds})
 
 	outbox.retryDeliveries(ctx)
@@ -1356,12 +1357,12 @@ func TestOutbox_OfflineDispatchDoesNotMarkSent(t *testing.T) {
 		ID: "agent-off", AgentType: "claude-code", SessionID: "sess-off",
 		InviterUserID: "user-1", DisplayName: "Claude",
 	}
-	svc.dispatchService().dispatchTask(context.Background(), task, agent, "test prompt", "", "", nil)
+	svc.dispatchService().DispatchTask(context.Background(), task, agent, "test prompt", "", "", nil)
 
 	snap := cache.snapshot()
 	require.Len(t, snap.pushed, 1)
 
-	var payload dispatchPayload
+	var payload dispatch.Payload
 	require.NoError(t, json.Unmarshal([]byte(snap.pushed[0]), &payload))
 	require.NotEmpty(t, payload.DeliveryID)
 

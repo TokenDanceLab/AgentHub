@@ -1,7 +1,8 @@
-package service
+package dispatchsvc
 
 import (
 	"context"
+	"encoding/json"
 	"log/slog"
 	"net/http"
 
@@ -11,7 +12,6 @@ import (
 	"github.com/agenthub/hub-server/internal/config"
 	"github.com/agenthub/hub-server/internal/metrics"
 	"github.com/agenthub/hub-server/internal/service/dispatch"
-	"github.com/agenthub/hub-server/internal/ws"
 )
 
 // dispatchPayload is a same-package alias for the pure dispatch.Payload DTO so
@@ -65,11 +65,50 @@ type dispatchCache interface {
 	PushPendingTargetTask(ctx context.Context, userID, targetID, deviceID, taskJSON string) error
 }
 
-// dispatchWS is the WebSocket connection lookup/push port used for device-bound
-// and inviter desktop dispatch. Implemented by *ws.Manager.
-type dispatchWS interface {
-	FindByConnID(connID string) *ws.Conn
-	PushToConn(connID string, frame ws.Frame) ws.DeliveryResult
+// ConnPort is the connection snapshot the dispatch flow needs: identity and
+// device binding only. The service-layer adapter maps *ws.Conn onto it so the
+// business layer never imports the transport package.
+type ConnPort struct {
+	ID         string
+	UserID     string
+	DeviceType string
+	DeviceID   string
+}
+
+// FramePort is the wire frame the dispatch flow pushes. The service-layer
+// adapter maps it onto ws.Frame; Type uses the same wire strings
+// (frameTypeAgentDispatch mirrors ws.TypeAgentDispatch).
+type FramePort struct {
+	Type    string
+	Payload json.RawMessage
+}
+
+// DeliveryResultPort reports the outcome of a PushToConn attempt. The adapter
+// maps ws.DeliveryResult onto it (Queued/Status/Err only; ConnDrops is
+// transport detail the dispatch flow does not consume).
+type DeliveryResultPort struct {
+	Queued bool
+	Status string
+	Err    error
+}
+
+// ManagerPort is the WebSocket connection lookup/push port used for
+// device-bound and inviter desktop dispatch. Implemented by the
+// wsManagerAdapter in the service package over *ws.Manager.
+type ManagerPort interface {
+	FindByConnID(connID string) *ConnPort
+	PushToConn(connID string, frame FramePort) DeliveryResultPort
+}
+
+// frameTypeAgentDispatch mirrors ws.TypeAgentDispatch; the adapter translates
+// between FramePort and the wire frame, so the string must stay in sync.
+const frameTypeAgentDispatch = "agent.dispatch"
+
+// RelayPort is the hub_relay command dispatch port. The service layer adapts
+// *RelayService (whose CreateCommand returns command metadata the dispatch
+// flow does not consume).
+type RelayPort interface {
+	CreateCommand(ctx context.Context, targetEdgeID, commandType string, payload json.RawMessage, createdBy string) error
 }
 
 // DispatchService owns agent task dispatch orchestration: trigger, payload build,
@@ -80,9 +119,9 @@ type dispatchWS interface {
 type DispatchService struct {
 	db          *gorm.DB
 	bus         dispatchBus
-	mgr         dispatchWS
+	mgr         ManagerPort
 	cacheClient dispatchCache
-	relay       relayDispatcher
+	relay       RelayPort
 	outbox      dispatchOutbox
 	// edgeCfg is the Hub→Edge dispatch client config (#1549). Read once at
 	// construction by the composition root; the request path never calls
@@ -117,7 +156,7 @@ type DispatchService struct {
 // service layer never reads process env (#1549). edgeClient must come from
 // the composition root (outboundhttp.NewClient); nil is tolerated for tests
 // that never hit the edge HTTP path (#1594).
-func NewDispatchService(db *gorm.DB, bus dispatchBus, mgr dispatchWS, cacheClient dispatchCache, relay relayDispatcher, outbox dispatchOutbox, edgeCfg config.EdgeDispatchConfig, edgeClient *http.Client, jwtSecret string) *DispatchService {
+func NewDispatchService(db *gorm.DB, bus dispatchBus, mgr ManagerPort, cacheClient dispatchCache, relay RelayPort, outbox dispatchOutbox, edgeCfg config.EdgeDispatchConfig, edgeClient *http.Client, jwtSecret string) *DispatchService {
 	return &DispatchService{
 		db:          db,
 		bus:         bus,
@@ -158,7 +197,7 @@ func (s *DispatchService) SetCache(cacheClient dispatchCache) {
 }
 
 // SetManager injects (or replaces) the WebSocket manager port.
-func (s *DispatchService) SetManager(mgr dispatchWS) {
+func (s *DispatchService) SetManager(mgr ManagerPort) {
 	if !dispatch.ServiceReceiverAvailable(s != nil) {
 		return
 	}
@@ -166,7 +205,7 @@ func (s *DispatchService) SetManager(mgr dispatchWS) {
 }
 
 // SetRelay injects (or replaces) the hub_relay command dispatcher port.
-func (s *DispatchService) SetRelay(relay relayDispatcher) {
+func (s *DispatchService) SetRelay(relay RelayPort) {
 	if !dispatch.ServiceReceiverAvailable(s != nil) {
 		return
 	}

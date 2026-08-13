@@ -185,12 +185,12 @@ func TestDispatchTaskIncludesPrompt(t *testing.T) {
 	// Point Edge dispatch at a dead port so it always falls back to Redis.
 	t.Setenv("AGENTHUB_EDGE_URL", "http://127.0.0.1:1")
 
-	svc.dispatchService().dispatchTask(context.Background(), task, agent, "Run the real runtime", `{"model":"claude-sonnet-4-6"}`, "", nil)
+	svc.dispatchService().DispatchTask(context.Background(), task, agent, "Run the real runtime", `{"model":"claude-sonnet-4-6"}`, "", nil)
 
 	snapshot := cache.snapshot()
 	require.Equal(t, "user-1", snapshot.pushedUser)
 	require.Len(t, snapshot.pushed, 1)
-	var payload dispatchPayload
+	var payload dispatch.Payload
 	require.NoError(t, json.Unmarshal([]byte(snapshot.pushed[0]), &payload))
 	require.Equal(t, "Run the real runtime", payload.Prompt)
 	require.Equal(t, "claude-code", payload.AgentType)
@@ -219,12 +219,12 @@ func TestDispatchTaskIncludesTargetID(t *testing.T) {
 		DisplayName:   "Codex",
 	}
 
-	svc.dispatchService().dispatchTask(context.Background(), task, agent, "Run the selected target", "", "", nil)
+	svc.dispatchService().DispatchTask(context.Background(), task, agent, "Run the selected target", "", "", nil)
 
 	snapshot := cache.snapshot()
 	require.Equal(t, "user-1", snapshot.pushedUser)
 	require.Len(t, snapshot.pushedTarget, 1)
-	var payload dispatchPayload
+	var payload dispatch.Payload
 	require.NoError(t, json.Unmarshal([]byte(snapshot.pushedTarget[0]), &payload))
 	require.Equal(t, "target-1", payload.TargetID)
 	require.Equal(t, "dev-1", payload.EdgeDeviceID)
@@ -307,11 +307,11 @@ func TestDispatchTaskIncludesTeamRunContext(t *testing.T) {
 		DisplayName:   "Supervisor",
 	}
 
-	svc.dispatchService().dispatchTask(context.Background(), task, agent, "Route this team run", "", "", nil)
+	svc.dispatchService().DispatchTask(context.Background(), task, agent, "Route this team run", "", "", nil)
 
 	snapshot := cache.snapshot()
 	require.Len(t, snapshot.pushed, 1)
-	var payload dispatchPayload
+	var payload dispatch.Payload
 	require.NoError(t, json.Unmarshal([]byte(snapshot.pushed[0]), &payload))
 	require.Equal(t, "team-1", payload.TeamID)
 	require.Equal(t, "run-team-1", payload.TeamRunID)
@@ -383,11 +383,11 @@ func TestDispatchTaskIncludesOutputSchema(t *testing.T) {
 	t.Setenv("AGENTHUB_EDGE_URL", "http://127.0.0.1:1")
 
 	// Dispatch WITH the CustomAgent (non-TeamRun scenario).
-	svc.dispatchService().dispatchTask(context.Background(), task, agent, "Give me a summary", "", "", customAgent)
+	svc.dispatchService().DispatchTask(context.Background(), task, agent, "Give me a summary", "", "", customAgent)
 
 	snapshot := cache.snapshot()
 	require.Len(t, snapshot.pushed, 1)
-	var payload dispatchPayload
+	var payload dispatch.Payload
 	require.NoError(t, json.Unmarshal([]byte(snapshot.pushed[0]), &payload))
 
 	// Verify OutputSchema is present in the dispatch payload.
@@ -503,11 +503,11 @@ func TestDispatchTaskIncludesOutputSchemaWithTeamRunContext(t *testing.T) {
 	t.Setenv("AGENTHUB_EDGE_URL", "http://127.0.0.1:1")
 
 	// Dispatch WITH the CustomAgent (TeamRun scenario — backward compatibility).
-	svc.dispatchService().dispatchTask(context.Background(), task, agent, "Route this team run", "", "", customAgent)
+	svc.dispatchService().DispatchTask(context.Background(), task, agent, "Route this team run", "", "", customAgent)
 
 	snapshot := cache.snapshot()
 	require.Len(t, snapshot.pushed, 1)
-	var payload dispatchPayload
+	var payload dispatch.Payload
 	require.NoError(t, json.Unmarshal([]byte(snapshot.pushed[0]), &payload))
 
 	// TeamRun context is preserved (backward compatibility).
@@ -546,11 +546,11 @@ func TestDispatchTaskWithoutCustomAgentOmitsOutputSchema(t *testing.T) {
 	}
 
 	t.Setenv("AGENTHUB_EDGE_URL", "http://127.0.0.1:1")
-	svc.dispatchService().dispatchTask(context.Background(), task, agent, "Run without custom agent", "", "", nil)
+	svc.dispatchService().DispatchTask(context.Background(), task, agent, "Run without custom agent", "", "", nil)
 
 	snapshot := cache.snapshot()
 	require.Len(t, snapshot.pushed, 1)
-	var payload dispatchPayload
+	var payload dispatch.Payload
 	require.NoError(t, json.Unmarshal([]byte(snapshot.pushed[0]), &payload))
 
 	// OutputSchema MUST be nil when no CustomAgent is associated.
@@ -581,7 +581,7 @@ func TestDispatchTaskWithTargetIDButNoDeviceFailsClosed(t *testing.T) {
 		DisplayName:   "Codex",
 	}
 
-	svc.dispatchService().dispatchTask(context.Background(), task, agent, "Run invalid target", "", "", nil)
+	svc.dispatchService().DispatchTask(context.Background(), task, agent, "Run invalid target", "", "", nil)
 
 	select {
 	case <-connA.Send:
@@ -615,7 +615,7 @@ func TestDispatchTaskDoesNotPushWhenDispatchedStateMissing(t *testing.T) {
 		DisplayName:   "Codex",
 	}
 
-	svc.dispatchService().dispatchTask(context.Background(), task, agent, "Run missing task", "", "", nil)
+	svc.dispatchService().DispatchTask(context.Background(), task, agent, "Run missing task", "", "", nil)
 
 	select {
 	case <-conn.Send:
@@ -649,7 +649,7 @@ func TestDispatchTaskDoesNotPushTerminalTask(t *testing.T) {
 		DisplayName:   "Codex",
 	}
 
-	svc.dispatchService().dispatchTask(context.Background(), task, agent, "Run cancelled task", "", "", nil)
+	svc.dispatchService().DispatchTask(context.Background(), task, agent, "Run cancelled task", "", "", nil)
 
 	select {
 	case <-conn.Send:
@@ -689,12 +689,12 @@ func TestDispatchTaskPreservesNonTargetTaskWhenDeliveryBufferFull(t *testing.T) 
 		DisplayName:   "Codex",
 	}
 
-	svc.dispatchService().dispatchTask(context.Background(), task, agent, "Run on online desktop", "", "", nil)
+	svc.dispatchService().DispatchTask(context.Background(), task, agent, "Run on online desktop", "", "", nil)
 
 	snapshot := cache.snapshot()
 	require.Equal(t, "user-1", snapshot.pushedUser)
 	require.Len(t, snapshot.pushed, 1)
-	var payload dispatchPayload
+	var payload dispatch.Payload
 	require.NoError(t, json.Unmarshal([]byte(snapshot.pushed[0]), &payload))
 	require.Equal(t, task.ID, payload.TaskID)
 }
@@ -734,13 +734,13 @@ func TestDispatchTaskRoutesTargetBoundTaskToBoundDevice(t *testing.T) {
 		DisplayName:   "Codex",
 	}
 
-	svc.dispatchService().dispatchTask(context.Background(), task, agent, "Run on B", "", "", nil)
+	svc.dispatchService().DispatchTask(context.Background(), task, agent, "Run on B", "", "", nil)
 
 	select {
 	case data := <-connB.Send:
 		var frame struct {
-			Type    string          `json:"type"`
-			Payload dispatchPayload `json:"payload"`
+			Type    string           `json:"type"`
+			Payload dispatch.Payload `json:"payload"`
 		}
 		require.NoError(t, json.Unmarshal(data, &frame))
 		require.Equal(t, ws.TypeAgentDispatch, frame.Type)
@@ -796,7 +796,7 @@ func TestDispatchTaskQueuesTargetBoundTaskWhenDeliveryBufferFull(t *testing.T) {
 		DisplayName:   "Codex",
 	}
 
-	svc.dispatchService().dispatchTask(context.Background(), task, agent, "Run on B", "", "", nil)
+	svc.dispatchService().DispatchTask(context.Background(), task, agent, "Run on B", "", "", nil)
 
 	snapshot := cache.snapshot()
 	require.Len(t, snapshot.pushedTarget, 1)
@@ -832,7 +832,7 @@ func TestDispatchTaskDoesNotPushTargetWhenDispatchedStateMissing(t *testing.T) {
 		DisplayName:   "Codex",
 	}
 
-	svc.dispatchService().dispatchTask(context.Background(), task, agent, "Run missing target task", "", "", nil)
+	svc.dispatchService().DispatchTask(context.Background(), task, agent, "Run missing target task", "", "", nil)
 
 	select {
 	case <-connB.Send:
@@ -872,7 +872,7 @@ func TestDispatchTaskDoesNotPushTerminalTargetTask(t *testing.T) {
 		DisplayName:   "Codex",
 	}
 
-	svc.dispatchService().dispatchTask(context.Background(), task, agent, "Run cancelled target", "", "", nil)
+	svc.dispatchService().DispatchTask(context.Background(), task, agent, "Run cancelled target", "", "", nil)
 
 	select {
 	case <-connB.Send:
@@ -908,7 +908,7 @@ func TestDispatchTaskQueuesTargetBoundTaskWhenBoundDeviceOffline(t *testing.T) {
 		DisplayName:   "Codex",
 	}
 
-	svc.dispatchService().dispatchTask(context.Background(), task, agent, "Run on offline B", "", "", nil)
+	svc.dispatchService().DispatchTask(context.Background(), task, agent, "Run on offline B", "", "", nil)
 
 	select {
 	case <-connA.Send:
@@ -1642,7 +1642,7 @@ func TestTriggerAgentTaskStoresAndDispatchesOwnedTarget(t *testing.T) {
 		return len(cache.snapshot().pushedTarget) == 1
 	}, time.Second, 10*time.Millisecond)
 	snapshot := cache.snapshot()
-	var payload dispatchPayload
+	var payload dispatch.Payload
 	require.NoError(t, json.Unmarshal([]byte(snapshot.pushedTarget[0]), &payload))
 	require.Equal(t, "target-local", payload.TargetID)
 	require.Equal(t, "dev-target", payload.EdgeDeviceID)
