@@ -18,6 +18,7 @@ import (
 	"github.com/agenthub/edge-server/internal/hub"
 	"github.com/agenthub/edge-server/internal/lifecycle"
 	"github.com/agenthub/edge-server/internal/metrics"
+	"github.com/agenthub/edge-server/internal/permission"
 	"github.com/agenthub/edge-server/internal/runners"
 	"github.com/agenthub/edge-server/internal/security"
 	"github.com/agenthub/edge-server/internal/skills"
@@ -54,7 +55,7 @@ type Handler struct {
 		DurableSnapshot(afterSeq uint64) ([]hub.DeliveryJournalEntry, error)
 	}
 
-	PermissionRegistry *PermissionRegistry
+	PermissionRegistry *permission.PermissionRegistry
 	PermissionBroker   *adapters.PermissionDecisionBroker
 
 	// PlanApprovalBroker manages pending orchestrator plans and connects
@@ -167,11 +168,11 @@ func ensurePreviewRunner(h *Handler, repository store.Repository) lifecycle.Prev
 	return h.PreviewRunner
 }
 
-func (h *Handler) ensurePermissionRegistry() *PermissionRegistry {
+func (h *Handler) ensurePermissionRegistry() *permission.PermissionRegistry {
 	h.permissionRegistryMu.Lock()
 	defer h.permissionRegistryMu.Unlock()
 	if h.PermissionRegistry == nil {
-		h.PermissionRegistry = NewPermissionRegistry(0)
+		h.PermissionRegistry = permission.NewPermissionRegistry(0)
 	}
 	if h.PermissionBroker == nil {
 		h.PermissionBroker = adapters.NewPermissionDecisionBroker()

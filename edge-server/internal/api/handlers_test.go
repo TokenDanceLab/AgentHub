@@ -22,6 +22,7 @@ import (
 	"github.com/agenthub/edge-server/internal/hub"
 	"github.com/agenthub/edge-server/internal/jwtutil"
 	"github.com/agenthub/edge-server/internal/lifecycle"
+	"github.com/agenthub/edge-server/internal/permission"
 	"github.com/agenthub/edge-server/internal/runcontrol"
 	"github.com/agenthub/edge-server/internal/runners"
 	"github.com/agenthub/edge-server/internal/store"
@@ -1986,7 +1987,7 @@ func TestPostPermissionDecideRejectsUnknownRequest(t *testing.T) {
 
 func TestPostPermissionDecideRejectsWrongRun(t *testing.T) {
 	h := newTestHandler()
-	h.ensurePermissionRegistry().Register(PendingPermission{
+	h.ensurePermissionRegistry().Register(permission.PendingPermission{
 		RunID:     "run_real",
 		RequestID: "req_1",
 	})
@@ -2006,7 +2007,7 @@ func TestPostPermissionDecideRejectsWrongRun(t *testing.T) {
 
 func TestPostPermissionDecideConsumesPendingRequestAndPublishesEvent(t *testing.T) {
 	h := newTestHandler()
-	h.ensurePermissionRegistry().Register(PendingPermission{
+	h.ensurePermissionRegistry().Register(permission.PendingPermission{
 		ProjectID: "proj_1",
 		ThreadID:  "thread_1",
 		RunID:     "run_1",
@@ -2166,7 +2167,7 @@ func TestRegisterRoutesInstallsPermissionBrokerOnClaudeAdapter(t *testing.T) {
 
 func TestPostPermissionDecideRejectsSecondDecision(t *testing.T) {
 	h := newTestHandler()
-	h.ensurePermissionRegistry().Register(PendingPermission{
+	h.ensurePermissionRegistry().Register(permission.PendingPermission{
 		RunID:     "run_1",
 		RequestID: "req_1",
 	})
@@ -2190,10 +2191,9 @@ func TestPostPermissionDecideRejectsSecondDecision(t *testing.T) {
 func TestPostPermissionDecideRejectsExpiredRequestWithoutPublishing(t *testing.T) {
 	h := newTestHandler()
 	now := time.Date(2026, 5, 29, 8, 0, 0, 0, time.UTC)
-	registry := NewPermissionRegistry(time.Minute)
-	registry.now = func() time.Time { return now }
+	registry := permission.NewPermissionRegistryWithClock(time.Minute, func() time.Time { return now })
 	h.PermissionRegistry = registry
-	h.PermissionRegistry.Register(PendingPermission{
+	h.PermissionRegistry.Register(permission.PendingPermission{
 		ProjectID: "proj_1",
 		ThreadID:  "thread_1",
 		RunID:     "run_1",
