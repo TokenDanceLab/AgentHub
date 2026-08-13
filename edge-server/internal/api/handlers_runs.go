@@ -12,6 +12,7 @@ import (
 	"github.com/agenthub/edge-server/internal/jwtutil"
 	"github.com/agenthub/edge-server/internal/lifecycle"
 	"github.com/agenthub/edge-server/internal/router"
+	"github.com/agenthub/edge-server/internal/runcontrol"
 	"github.com/agenthub/edge-server/internal/runnerctx"
 	"github.com/agenthub/edge-server/internal/store"
 )
@@ -181,43 +182,9 @@ func (h *Handler) validateCapabilityRequest(r *http.Request, req *runRequest) *e
 	return nil
 }
 
-// validateRunCreateState performs the pre-create validation under the
-// run-create mutex, in the historical PostRuns order. Returns an HTTP status
-// and a response body when the request is rejected (body != nil).
-func (h *Handler) validateRunCreateState(repository store.Repository, req *runRequest) (int, map[string]any) {
-	thread, ok := repository.GetThread(req.ThreadID)
-	if !ok || thread.ProjectID != req.ProjectID {
-		return http.StatusNotFound, errcode.ErrorBody(errcode.ErrNotFound.WithMessage("project or thread not found"))
-	}
-	if _, ok := repository.GetProject(req.ProjectID); !ok {
-		return http.StatusNotFound, errcode.ErrorBody(errcode.ErrNotFound.WithMessage("project or thread not found"))
-	}
-	req.WorkDir = strings.TrimSpace(req.WorkDir)
-	if err := h.validateRunWorkDir(req.WorkDir); err != nil {
-		if errors.Is(err, errcode.ErrWorkDirRequired) {
-			return http.StatusBadRequest, errcode.ErrorBody(errcode.ErrWorkDirRequired)
-		}
-		slog.Error("run workdir validation failed", "workDir", req.WorkDir, "error", err)
-		return http.StatusForbidden, errcode.ErrorBody(errcode.ErrWorkspaceNotAllowed)
-	}
-	if err := validatePermissionMode(req.PermissionMode); err != nil {
-		slog.Error("invalid permission mode", "permissionMode", req.PermissionMode, "error", err)
-		return http.StatusBadRequest, errcode.ErrorBody(errcode.ErrInvalidPermissionMode)
-	}
-	if active, ok := activeRunForThread(repository.ListRuns(req.ThreadID)); ok {
-		return http.StatusConflict, activeRunExistsResponse(active)
-	}
-	if h.Executor == nil {
-		return http.StatusServiceUnavailable, errcode.ErrorBody(errcode.ErrExecutorUnavailable.WithMessage("no Agent Runtime executor configured"))
-	}
-	// #175: Reject unknown agentId — do not fall back to default adapter.
-	if req.AgentID != "" && h.AdapterRegistry != nil {
-		if _, ok := h.AdapterRegistry.Get(req.AgentID); !ok {
-			return http.StatusBadRequest, errcode.ErrorBody(errcode.ErrInvalidAgentID.WithMessagef("unknown agent adapter: %q", req.AgentID))
-		}
-	}
-	return 0, nil
-}
+// validateRunCreateState previously performed pre-create validation here; the
+// shared run-creation core (internal/runcontrol.Create) now owns the entire
+// validation + creation + executor sequence for both REST and MCP.
 
 // publishRunPromptItem stores the run prompt as a user_message item and
 // publishes message.created / item.created events. Failure is non-fatal.
@@ -261,13 +228,10 @@ func publishRunQueuedItem(h *Handler, run store.Run) {
 	})
 }
 
-// startRunExecutor builds the run process context (skills, memory, MCP
-// config) and starts the executor. On start failure the run is marked failed
-// and a run.failed event is published; the error is returned for HTTP mapping.
-func (h *Handler) startRunExecutor(run store.Run, req *runRequest, scope map[string]any) error {
-	if h.Executor == nil {
-		return nil
-	}
+// buildRunContext builds the run process context (skills, memory, MCP
+// config) for the shared run-creation core. The executor start and the
+// failure state transition live in runcontrol.Create.
+func (h *Handler) buildRunContext(run store.Run, req *runRequest) lifecycle.RunProcessContext {
 	runCtx := lifecycle.RunProcessContext{
 		Run:                    run,
 		Prompt:                 req.Prompt,
@@ -320,18 +284,7 @@ func (h *Handler) startRunExecutor(run store.Run, req *runRequest, scope map[str
 	if h.MCPConfigStore != nil {
 		runCtx.MCPConfig = adapters.MergeConfigJSON(runCtx.MCPConfig, h.MCPConfigStore)
 	}
-	if err := h.Executor.Start(run, runCtx); err != nil {
-		slog.Error("run executor start failed", "runId", run.ID, "error", err)
-		if failed, ok := ensureStore(h).SetRunStatusIf(run.ID, "failed", "queued"); ok {
-			h.Bus.Publish("run.failed", scope, map[string]any{
-				"runId":  failed.ID,
-				"status": failed.Status,
-				"error":  "run execution failed",
-			})
-		}
-		return err
-	}
-	return nil
+	return runCtx
 }
 
 func (h *Handler) PostRuns(w http.ResponseWriter, r *http.Request) {
@@ -367,19 +320,16 @@ func (h *Handler) PostRuns(w http.ResponseWriter, r *http.Request) {
 	}
 
 	repository := ensureStore(h)
-	h.runCreateMu.Lock()
-	cleanupRuns(repository)
-	if status, body := h.validateRunCreateState(repository, &req); body != nil {
-		h.runCreateMu.Unlock()
-		writeJSON(w, status, body)
-		return
-	}
+
 	// Auto-detect continue: when the thread has prior assistant messages,
 	// set ContinueLast = true so adapters can resume the conversation.
+	// Each run creates a fresh CC conversation via --session-id.
 	if !req.Continue && threadHasAssistantHistory(repository, req.ThreadID) {
 		req.Continue = true
 	}
-	// Each run creates a fresh CC conversation via --session-id.
+	// WorkDir normalization previously happened inside validateRunCreateState;
+	// the shared core also trims, this keeps the context builder consistent.
+	req.WorkDir = strings.TrimSpace(req.WorkDir)
 
 	// Resolve adapter label for debug logging.
 	resolvedAdapterID := req.AgentID
@@ -392,44 +342,58 @@ func (h *Handler) PostRuns(w http.ResponseWriter, r *http.Request) {
 	}
 	slog.Debug("run.create", "agentId", req.AgentID, "threadId", req.ThreadID, "model", req.Model, "adapterResolved", resolvedAdapterID, "hasExecutor", h.Executor != nil)
 
-	runID := genID("run_")
-
 	// Classify prompt complexity for execution strategy selection.
 	// Complex tasks may benefit from orchestration/TeamRun; Simple tasks
 	// can dispatch directly to a single agent.
 	promptComplexity := router.ClassifyComplexity(req.Prompt)
-	slog.Debug("run.complexity", "runId", runID, "complexity", promptComplexity,
+	slog.Debug("run.complexity", "complexity", promptComplexity,
 		"promptLen", len(req.Prompt), "agentId", req.AgentID)
-	run, err := repository.CreateRun(runID, req.ProjectID, req.ThreadID)
-	h.runCreateMu.Unlock()
+
+	// The shared run-creation core (internal/runcontrol) owns validation,
+	// active-run guarding, run record creation, run.queued publication, and
+	// the executor start/failure state machine — REST and MCP share it. REST
+	// contributes the timeline policy and the adapter context builder.
+	run, err := runcontrol.Create(repository, h.Executor, h.Bus, runcontrol.CreateParams{
+		ProjectID:          req.ProjectID,
+		ThreadID:           req.ThreadID,
+		Prompt:             req.Prompt,
+		AgentID:            req.AgentID,
+		Model:              req.Model,
+		PermissionMode:     req.PermissionMode,
+		SessionID:          req.SessionID,
+		ContinueLast:       req.Continue,
+		WorkDir:            req.WorkDir,
+		WorkspaceAllowlist: h.WorkspaceAllowlist,
+		AgentExists: func(agentID string) bool {
+			if h.AdapterRegistry == nil {
+				return true // no registry in scope; skip the #175 check
+			}
+			_, ok := h.AdapterRegistry.Get(agentID)
+			return ok
+		},
+		Cleanup: true,
+		Timeline: func(run store.Run) {
+			publishRunPromptItem(h, run, req.Prompt)
+			publishRunQueuedItem(h, run)
+		},
+		BuildContext: func(run store.Run) lifecycle.RunProcessContext {
+			return h.buildRunContext(run, &req)
+		},
+	})
 	if err != nil {
-		if errors.Is(err, store.ErrNotFound) {
-			writeJSON(w, http.StatusNotFound, errcode.ErrorBody(errcode.ErrNotFound.WithMessage("project or thread not found")))
-		} else {
-			writeJSON(w, http.StatusInternalServerError, errcode.ErrorBody(errcode.ErrInternal.WithMessagef("failed to create run: %v", err)))
-		}
-		return
-	}
-	scope := map[string]any{
-		"projectId": run.ProjectID,
-		"threadId":  run.ThreadID,
-		"runId":     run.ID,
-	}
-
-	// Emit run.queued
-	h.Bus.Publish("run.queued", scope, run)
-	slog.Debug("run.queued", "runId", runID, "agentId", req.AgentID)
-	publishRunPromptItem(h, run, req.Prompt)
-	publishRunQueuedItem(h, run)
-
-	if err := h.startRunExecutor(run, &req, scope); err != nil {
-		if errors.Is(err, lifecycle.ErrTooManyConcurrentRuns) {
-			slog.Error("too many concurrent runs", "runId", runID, "error", err)
-			writeJSON(w, http.StatusTooManyRequests, errcode.ErrorBody(errcode.ErrTooManyConcurrentRuns))
+		if e, ok := err.(*errcode.Error); ok {
+			// Enrich the active-run conflict with the conflicting run,
+			// preserving the historical response body shape.
+			if errors.Is(err, errcode.ErrActiveRunExists) {
+				if active, found := runcontrol.ActiveRunForThread(repository.ListRuns(req.ThreadID)); found {
+					writeJSON(w, http.StatusConflict, activeRunExistsResponse(active))
+					return
+				}
+			}
+			writeJSON(w, e.HTTPStatus, errcode.ErrorBody(e))
 			return
 		}
-		slog.Error("run executor start failed", "runId", runID, "error", err)
-		writeJSON(w, http.StatusInternalServerError, errcode.ErrorBody(errcode.ErrExecutorStartFailed))
+		writeJSON(w, http.StatusInternalServerError, errcode.ErrorBody(errcode.ErrInternal.WithMessagef("%v", err)))
 		return
 	}
 	writeSuccess(w, http.StatusAccepted, acceptedResponse(runToResponse(run)))
