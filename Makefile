@@ -6,7 +6,7 @@
 #        make fe-lint     (frontend eslint + stylelint)
 #        make fe-build    (build all frontend packages)
 
-#        make release VER=v0.1.1  (build + upload release binaries)
+#        make release  (via git push tag -> release.yml, not built here)
 #        make help        (show this help)
 .PHONY: test test-all test-edge test-hub lint coverage sec release clean fmt \
         fe-install fe-dev fe-build fe-test fe-lint fe-typecheck help
@@ -37,7 +37,7 @@ help:
 	@echo "    fe-typecheck  tsc --noEmit (desktop + web)"
 	@echo ""
 	@echo "  Release:"
-	@echo "    release VER=v0.1.1   一键构建 + 上传"
+	@echo "    release              发布 = git push tag（触发 release.yml）"
 	@echo ""
 
 # ── Unit tests (no external deps) ────────────────────
