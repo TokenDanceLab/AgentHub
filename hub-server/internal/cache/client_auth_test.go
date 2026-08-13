@@ -17,10 +17,10 @@ func TestBlacklistRefreshToken_ThenCheck_Hit(t *testing.T) {
 	c, _ := testClient(t)
 	ctx := context.Background()
 
-	const tokenHash = "rt-hash-hit-1"
-	require.NoError(t, c.BlacklistRefreshToken(ctx, tokenHash, 5*time.Minute))
+	const blacklistKey = "rt-hash-hit-1"
+	require.NoError(t, c.BlacklistRefreshToken(ctx, blacklistKey, 5*time.Minute))
 
-	hit, err := c.IsRefreshTokenBlacklisted(ctx, tokenHash)
+	hit, err := c.IsRefreshTokenBlacklisted(ctx, blacklistKey)
 	require.NoError(t, err)
 	assert.True(t, hit, "blacklisted refresh token must be reported as blacklisted")
 }
@@ -43,13 +43,13 @@ func TestBlacklistRefreshToken_RevokeIsIdempotent(t *testing.T) {
 	c, _ := testClient(t)
 	ctx := context.Background()
 
-	const tokenHash = "rt-hash-idempotent"
+	const blacklistKey = "rt-hash-idempotent"
 	// First revocation.
-	require.NoError(t, c.BlacklistRefreshToken(ctx, tokenHash, 5*time.Minute))
+	require.NoError(t, c.BlacklistRefreshToken(ctx, blacklistKey, 5*time.Minute))
 	// Second revocation of the same hash must succeed (idempotent).
-	require.NoError(t, c.BlacklistRefreshToken(ctx, tokenHash, 5*time.Minute))
+	require.NoError(t, c.BlacklistRefreshToken(ctx, blacklistKey, 5*time.Minute))
 
-	hit, err := c.IsRefreshTokenBlacklisted(ctx, tokenHash)
+	hit, err := c.IsRefreshTokenBlacklisted(ctx, blacklistKey)
 	require.NoError(t, err)
 	assert.True(t, hit, "key must remain blacklisted after a repeat revoke")
 }
@@ -62,16 +62,16 @@ func TestBlacklistRefreshToken_RevokeExtendsTTL(t *testing.T) {
 	c, mr := testClient(t)
 	ctx := context.Background()
 
-	const tokenHash = "rt-hash-extend"
+	const blacklistKey = "rt-hash-extend"
 	// Initial revoke with a 2s TTL.
-	require.NoError(t, c.BlacklistRefreshToken(ctx, tokenHash, 2*time.Second))
+	require.NoError(t, c.BlacklistRefreshToken(ctx, blacklistKey, 2*time.Second))
 	// Fast-forward 1s, then revoke again — the second call must reset the TTL.
 	mr.FastForward(1 * time.Second)
-	require.NoError(t, c.BlacklistRefreshToken(ctx, tokenHash, 5*time.Second))
+	require.NoError(t, c.BlacklistRefreshToken(ctx, blacklistKey, 5*time.Second))
 	// Fast-forward 3s: original 2s TTL would have expired at t=2s, but the
 	// second revoke (at t=1s) reset it to 5s, so at t=4s the key must survive.
 	mr.FastForward(3 * time.Second)
-	hit, err := c.IsRefreshTokenBlacklisted(ctx, tokenHash)
+	hit, err := c.IsRefreshTokenBlacklisted(ctx, blacklistKey)
 	require.NoError(t, err)
 	assert.True(t, hit, "repeat revoke must extend the blacklist TTL past the original expiry")
 }
@@ -82,17 +82,17 @@ func TestBlacklistRefreshToken_Expires(t *testing.T) {
 	c, mr := testClient(t)
 	ctx := context.Background()
 
-	const tokenHash = "rt-hash-expire"
-	require.NoError(t, c.BlacklistRefreshToken(ctx, tokenHash, 1*time.Second))
+	const blacklistKey = "rt-hash-expire"
+	require.NoError(t, c.BlacklistRefreshToken(ctx, blacklistKey, 1*time.Second))
 
 	// Present immediately.
-	hit, err := c.IsRefreshTokenBlacklisted(ctx, tokenHash)
+	hit, err := c.IsRefreshTokenBlacklisted(ctx, blacklistKey)
 	require.NoError(t, err)
 	assert.True(t, hit)
 
 	// Fast-forward past the TTL.
 	mr.FastForward(1100 * time.Millisecond)
-	hit, err = c.IsRefreshTokenBlacklisted(ctx, tokenHash)
+	hit, err = c.IsRefreshTokenBlacklisted(ctx, blacklistKey)
 	require.NoError(t, err)
 	assert.False(t, hit, "blacklist entry must expire after its TTL")
 }

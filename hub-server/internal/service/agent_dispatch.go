@@ -12,9 +12,9 @@ import (
 	"github.com/agenthub/hub-server/internal/config"
 	"github.com/agenthub/hub-server/internal/jwtutil"
 	"github.com/agenthub/hub-server/internal/metrics"
-	"github.com/agenthub/hub-server/internal/middleware"
 	"github.com/agenthub/hub-server/internal/model"
 	"github.com/agenthub/hub-server/internal/repository"
+	"github.com/agenthub/hub-server/internal/safego"
 	"github.com/agenthub/hub-server/internal/service/dispatch"
 	"github.com/agenthub/hub-server/internal/ws"
 )
@@ -41,7 +41,7 @@ func (s *DispatchService) launchDispatchTask(ctx context.Context, task *model.Pe
 	// Fall back to the historical unbounded launch so those paths keep working;
 	// only the production composition root wires a real semaphore.
 	if s.dispatchSem == nil {
-		middleware.SafeGo("dispatch.launch", func() {
+		safego.SafeGo("dispatch.launch", func() {
 			s.dispatchTask(ctx, task, ai, prompt, modelParams, targetType, customAgent)
 		})
 		return
@@ -56,7 +56,7 @@ func (s *DispatchService) launchDispatchTask(ctx context.Context, task *model.Pe
 			"task_id", task.ID, "agent_instance_id", ai.ID, "capacity", dispatchSemaphoreCapacity)
 		return
 	}
-	middleware.SafeGo("dispatch.launch", func() {
+	safego.SafeGo("dispatch.launch", func() {
 		defer func() { <-s.dispatchSem }()
 		s.dispatchTask(ctx, task, ai, prompt, modelParams, targetType, customAgent)
 	})
