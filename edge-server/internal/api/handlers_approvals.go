@@ -7,6 +7,7 @@ import (
 
 	"github.com/agenthub/edge-server/internal/adapters"
 	"github.com/agenthub/edge-server/internal/errcode"
+	"github.com/agenthub/edge-server/internal/permission"
 )
 
 // Handler holds dependencies for HTTP and WebSocket handlers.
@@ -74,15 +75,15 @@ func (h *Handler) PostPermissionDecide(w http.ResponseWriter, r *http.Request) {
 	writeSuccess(w, http.StatusOK, map[string]any{"status": "ok"})
 }
 
-func pendingPermissionFromBroker(broker *adapters.PermissionDecisionBroker, runID, requestID, decision, reason string) (PendingPermission, bool) {
+func pendingPermissionFromBroker(broker *adapters.PermissionDecisionBroker, runID, requestID, decision, reason string) (permission.PendingPermission, bool) {
 	pending, ok := broker.Decide(runID, requestID, adapters.PermissionDecision{
 		Behavior: decision,
 		Message:  reason,
 	})
 	if !ok {
-		return PendingPermission{}, false
+		return permission.PendingPermission{}, false
 	}
-	return PendingPermission{
+	return permission.PendingPermission{
 		ProjectID: pending.ProjectID,
 		ThreadID:  pending.ThreadID,
 		RunID:     pending.RunID,
