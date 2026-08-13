@@ -13,6 +13,7 @@ import (
 
 	"github.com/agenthub/hub-server/internal/metrics"
 	"github.com/agenthub/hub-server/internal/middleware"
+	"github.com/agenthub/hub-server/internal/safego"
 	"github.com/agenthub/hub-server/internal/ws"
 )
 
@@ -103,7 +104,7 @@ func (h *WebSocketHandler) ServeWS(c *gin.Context) {
 	// seq_id=2 because auth.ok now consumes seq_id=1.
 	go h.writeLoop(conn)
 	h.manager.PushToConn(conn.ID, ws.NewFrame(ws.TypeAuthOK, nil))
-	middleware.SafeGo("ws.readLoop", func() {
+	safego.SafeGo("ws.readLoop", func() {
 		h.authenticatedReadLoop(conn)
 	})
 }

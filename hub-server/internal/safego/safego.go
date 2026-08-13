@@ -1,4 +1,7 @@
-package middleware
+// Package safego provides SafeGo, the panic-recovering goroutine
+// launcher used by handlers and services. It lives in its own leaf package
+// so the business layer never depends on the HTTP middleware package.
+package safego
 
 import (
 	"log/slog"
