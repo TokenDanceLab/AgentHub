@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/agenthub/hub-server/internal/metrics"
+	"github.com/agenthub/hub-server/internal/service/dispatchsvc"
 )
 
 // ── Retry loop orchestration ───────────────────────────────────────────────
@@ -93,11 +94,12 @@ func (o *DeliveryOutbox) retryDeliveries(ctx context.Context) {
 
 // ── Redispatcher adapter (implementation on DispatchService) ────────────────
 
-// dispatchRedispatcher adapts *DispatchService to the Redispatcher port without
-// exporting dispatchPayload or deliveryOutboxRecord to DeliveryOutbox.
-// Redispatch residual ownership moved in #573.
+// dispatchRedispatcher adapts *dispatchsvc.DispatchService to the Redispatcher
+// port without exporting dispatch payload types or the outbox row to
+// DeliveryOutbox. Redispatch residual ownership moved in #573; the dispatch
+// implementation moved to service/dispatchsvc.
 type dispatchRedispatcher struct {
-	d *DispatchService
+	d *dispatchsvc.DispatchService
 }
 
 func (a dispatchRedispatcher) RedispatchDelivery(ctx context.Context, taskID, deliveryID, payloadJSON, edgeDeviceID string) error {
@@ -107,12 +109,7 @@ func (a dispatchRedispatcher) RedispatchDelivery(ctx context.Context, taskID, de
 	// Propagate soft-fail errors so retryDeliveries does not MarkDeliverySent
 	// after a failed offline-queue / route attempt (#999). Dead-letter paths
 	// return nil (already terminal; MarkDeliverySent is a no-op).
-	return a.d.redispatchDelivery(ctx, redispatchTarget{
-		TaskID:       taskID,
-		DeliveryID:   deliveryID,
-		Payload:      payloadJSON,
-		EdgeDeviceID: edgeDeviceID,
-	})
+	return a.d.RedispatchDelivery(ctx, taskID, deliveryID, payloadJSON, edgeDeviceID)
 }
 
 // lazyDispatchRedispatcher resolves DispatchService only when a retry fires.

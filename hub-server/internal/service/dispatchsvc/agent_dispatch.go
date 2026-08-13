@@ -1,4 +1,4 @@
-package service
+package dispatchsvc
 
 import (
 	"context"
@@ -16,7 +16,6 @@ import (
 	"github.com/agenthub/hub-server/internal/repository"
 	"github.com/agenthub/hub-server/internal/safego"
 	"github.com/agenthub/hub-server/internal/service/dispatch"
-	"github.com/agenthub/hub-server/internal/ws"
 )
 
 // ── DTO aliases, ports, and wiring surface moved to agent_dispatch_ports.go (#1068).
@@ -42,7 +41,7 @@ func (s *DispatchService) launchDispatchTask(ctx context.Context, task *model.Pe
 	// only the production composition root wires a real semaphore.
 	if s.dispatchSem == nil {
 		safego.SafeGo("dispatch.launch", func() {
-			s.dispatchTask(ctx, task, ai, prompt, modelParams, targetType, customAgent)
+			s.DispatchTask(ctx, task, ai, prompt, modelParams, targetType, customAgent)
 		})
 		return
 	}
@@ -58,7 +57,7 @@ func (s *DispatchService) launchDispatchTask(ctx context.Context, task *model.Pe
 	}
 	safego.SafeGo("dispatch.launch", func() {
 		defer func() { <-s.dispatchSem }()
-		s.dispatchTask(ctx, task, ai, prompt, modelParams, targetType, customAgent)
+		s.DispatchTask(ctx, task, ai, prompt, modelParams, targetType, customAgent)
 	})
 }
 
@@ -167,7 +166,11 @@ func (s *DispatchService) validateDispatchTarget(ctx context.Context, userID, ta
 	return dispatch.NewTargetSnapshot(target.ID, target.TargetType, deviceID), nil
 }
 
-func (s *DispatchService) dispatchTask(ctx context.Context, task *model.PendingAgentTask, ai *model.AgentInstance, prompt, modelParams, targetType string, customAgent *model.CustomAgent) {
+// DispatchTask runs the full dispatch orchestration for an already-persisted
+// queued task: payload assembly, outbox record, route classification, and
+// delivery (HTTP / WS / offline / relay). Exported so the AgentService
+// facade and the service-level integration tests can drive it directly.
+func (s *DispatchService) DispatchTask(ctx context.Context, task *model.PendingAgentTask, ai *model.AgentInstance, prompt, modelParams, targetType string, customAgent *model.CustomAgent) {
 	// Pure payload assembly (#902/#1033/#1056); history loaders stay orchestration-side.
 	dp := dispatch.AssembleDispatchPayload(dispatch.AssembleInputCore(
 		task.ID, ai.ID, ai.AgentType, task.TargetID, task.EdgeDeviceID, ai.SessionID,
@@ -238,7 +241,7 @@ func (s *DispatchService) dispatchTask(ctx context.Context, task *model.PendingA
 				}
 				return
 			}
-			frame := ws.NewFrame(ws.TypeAgentDispatch, json.RawMessage(payload))
+			frame := FramePort{Type: frameTypeAgentDispatch, Payload: json.RawMessage(payload)}
 			if err := repository.UpdatePendingTaskDispatched(s.db, task.ID, conn.DeviceID); !dispatch.RepoUpdateSucceeded(err) {
 				slog.Error(dispatch.DispatchLogMarkAgentDispatched, "task_id", task.ID, "user_id", ai.InviterUserID, "device_id", conn.DeviceID, "error", err)
 				return
@@ -287,7 +290,7 @@ func (s *DispatchService) dispatchTask(ctx context.Context, task *model.PendingA
 
 	case dispatch.RouteHubRelay:
 		// hub_relay uses the relay service; failures fall back to offline target queue.
-		_, err := s.relay.CreateCommand(ctx, ai.InviterUserID, dispatch.AgentDispatchRelayCommand, json.RawMessage(payload), ai.InviterUserID)
+		err := s.relay.CreateCommand(ctx, ai.InviterUserID, dispatch.AgentDispatchRelayCommand, json.RawMessage(payload), ai.InviterUserID)
 		if !dispatch.HubRelayCreateSucceeded(err) {
 			slog.Error(dispatch.DispatchLogRelayCreateFailed, "task_id", task.ID, "user_id", ai.InviterUserID, "error", err)
 			if pushErr := cacheClient.PushPendingTargetTask(ctx, ai.InviterUserID, task.TargetID, task.EdgeDeviceID, string(payload)); !dispatch.OfflineQueuePushSucceeded(pushErr) {
@@ -345,6 +348,28 @@ func (s *DispatchService) issueRunStartCapability(dp *dispatchPayload) string {
 }
 
 // ── Redispatch residual (moved from AgentService in #573) ────────────────────
+
+// redispatchTarget carries only the opaque fields the redispatch path needs to
+// re-send a stored payload. It is not a GORM model and must not grow journal
+// columns — that keeps redispatch free of the outbox row type.
+type redispatchTarget struct {
+	TaskID       string
+	DeliveryID   string
+	Payload      string
+	EdgeDeviceID string
+}
+
+// RedispatchDelivery re-dispatches a stored delivery by payload fields. This
+// is the exported seam the service-layer outbox retry loop calls; it builds
+// the internal redispatchTarget so the outbox never touches dispatch internals.
+func (s *DispatchService) RedispatchDelivery(ctx context.Context, taskID, deliveryID, payloadJSON, edgeDeviceID string) error {
+	return s.redispatchDelivery(ctx, redispatchTarget{
+		TaskID:       taskID,
+		DeliveryID:   deliveryID,
+		Payload:      payloadJSON,
+		EdgeDeviceID: edgeDeviceID,
+	})
+}
 
 // redispatchDelivery re-dispatches a delivery by parsing the stored payload and
 // routing it to the target Edge device. Pure JSON prep is in dispatch; dead-letter
@@ -432,7 +457,7 @@ func (s *DispatchService) retryDispatchToTarget(ctx context.Context, task *pendi
 
 	switch dispatch.ClassifyRedeliveryRoute(preferDevice, connID, dispatch.ManagerPortAvailable(s.mgr != nil), routeErr, facts.ConnFound, facts.ConnUserMatch) {
 	case dispatch.RouteTargetBound:
-		result := s.mgr.PushToConn(connID, ws.NewFrame(ws.TypeAgentDispatch, json.RawMessage(newPayload)))
+		result := s.mgr.PushToConn(connID, FramePort{Type: frameTypeAgentDispatch, Payload: json.RawMessage(newPayload)})
 		if dispatch.RedeliveryWSPushSucceeded(result.Queued) {
 			slog.Info(dispatch.RedispatchLogWSSucceeded,
 				"delivery_id", rec.DeliveryID, "task_id", rec.TaskID, "device_id", task.EdgeDeviceID)
@@ -442,7 +467,7 @@ func (s *DispatchService) retryDispatchToTarget(ctx context.Context, task *pendi
 			"delivery_id", rec.DeliveryID, "task_id", rec.TaskID,
 			"delivery_status", result.Status, "error", result.Err)
 	case dispatch.RouteInviterDesktop:
-		result := s.mgr.PushToConn(connID, ws.NewFrame(ws.TypeAgentDispatch, json.RawMessage(newPayload)))
+		result := s.mgr.PushToConn(connID, FramePort{Type: frameTypeAgentDispatch, Payload: json.RawMessage(newPayload)})
 		if dispatch.RedeliveryWSPushSucceeded(result.Queued) {
 			slog.Info(dispatch.RedispatchLogWSFallbackSucceeded,
 				"delivery_id", rec.DeliveryID, "task_id", rec.TaskID)

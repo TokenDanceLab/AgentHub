@@ -109,12 +109,12 @@ func TestAuthMiddlewareInvalidToken(t *testing.T) {
 }
 
 func TestAuthMiddlewareRejectsTokenDanceTokenWithoutExpectedAudience(t *testing.T) {
-	token := "not-a-valid-local-token"
+	authHeaderValue := "not-a-valid-local-token"
 	cfg := testConfig()
 	cfg.TokenDanceID.IssuerURL = "https://id.example"
 	cfg.TokenDanceID.ClientID = ""
 
-	c, w := ginRequest(http.MethodGet, "/client/users/me", "Bearer "+token)
+	c, w := ginRequest(http.MethodGet, "/client/users/me", "Bearer "+authHeaderValue)
 	newTestAuthMW(cfg, AuthDependencies{}, nil).Handler()(c)
 
 	if !c.IsAborted() {
