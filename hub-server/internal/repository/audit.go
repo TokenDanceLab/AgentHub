@@ -45,7 +45,7 @@ func createAuditEventOnce(db *gorm.DB, event *model.AuditEvent) error {
 		// Advisory xact lock: serialize all chain writers (multi-instance
 		// safe). Not available on sqlite (unit tests) — the integration
 		// lane exercises the PostgreSQL path.
-		if tx.Dialector.Name() == "postgres" {
+		if tx.Name() == "postgres" {
 			if err := tx.Exec("SELECT pg_advisory_xact_lock(?)", auditChainAdvisoryLockKey).Error; err != nil {
 				return err
 			}

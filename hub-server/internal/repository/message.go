@@ -104,7 +104,7 @@ func PinMessageAtomic(db *gorm.DB, pin *model.MessagePin, maxPins int64) error {
 	return db.Transaction(func(tx *gorm.DB) error {
 		// Lock the session row to serialize concurrent pin operations.
 		// PostgreSQL uses FOR UPDATE; SQLite (tests) skips row locking.
-		if tx.Dialector.Name() == "postgres" {
+		if tx.Name() == "postgres" {
 			var sessionID string
 			if err := tx.Raw("SELECT id FROM sessions WHERE id = ? FOR UPDATE", pin.SessionID).Scan(&sessionID).Error; err != nil {
 				return err
@@ -172,7 +172,7 @@ func escapeILIKE(s string) string {
 }
 
 func messageSearchCondition(db *gorm.DB, tableAlias, q string) (string, []interface{}) {
-	if db.Dialector.Name() == "postgres" {
+	if db.Name() == "postgres" {
 		textExpr := postgresMessageTextExpression(tableAlias)
 		return "(to_tsvector('simple', COALESCE(" + textExpr + ", '')) @@ plainto_tsquery('simple', ?) OR " + textExpr + " ILIKE ? ESCAPE '\\')",
 			[]interface{}{q, "%" + escapeILIKE(q) + "%"}

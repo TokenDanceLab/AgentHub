@@ -236,7 +236,7 @@ func FindActivePendingTaskByAgentInstance(db *gorm.DB, agentInstanceID string) (
 // row-level FOR UPDATE lock; the SQLite fallback performs a no-op write so
 // integration tests exercise a real write lock. Mirrors LockTeamRunForUpdate (#1383).
 func LockAgentInstanceForUpdate(db *gorm.DB, agentInstanceID string) error {
-	if db.Dialector.Name() == "postgres" {
+	if db.Name() == "postgres" {
 		var id string
 		if err := db.Raw("SELECT id FROM agent_instances WHERE id = ? FOR UPDATE", agentInstanceID).Scan(&id).Error; err != nil {
 			return err
