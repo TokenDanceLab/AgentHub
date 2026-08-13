@@ -4,9 +4,13 @@
 
 ## [Unreleased]
 
+暂无未发布变更。
+
+## v0.6.1 (2026-08-12)
+
 ### 破坏性变更
 
-本节列出本轮 Unreleased 中需要客户端/运维同步变更的硬性兼容性破坏。每条都对应仓库内可定位的代码/配置点。
+本节列出本轮 v0.6.1 中需要客户端/运维同步变更的硬性兼容性破坏。每条都对应仓库内可定位的代码/配置点。
 
 - **`AuthFailClosed` 默认行为切换**：access-token jti 黑名单检查在 Redis 错误时不再 fail-open 放行。生产 compose 模板置 `AGENTHUB_AUTH_FAIL_CLOSED=true`（`hub-server/internal/config/constants.go` `AuthFailClosedDefault=false`，生产模板显式覆盖）。**影响**：Redis 中断期间已登出（吊销）的 access JWT 会被拒绝（401），不再"借故障复活"。dev 环境仍默认 fail-open。详见 [docs/architecture/05-deployment.md](docs/architecture/05-deployment.md) §安全配置。
 - **`RATE_LIMIT_FAIL_OPEN=false`（生产）**：非认证限流器在 Redis 错误时 fail-closed 返回 503 `rate_limit_unavailable`（`hub-server/internal/config/constants.go` `RateLimitFailOpenDefault=true`，生产模板显式覆盖为 `false`）。**影响**：Redis 中断时非认证路径不再"借故障放行"，客户端可能收到 503。认证路径（`/client/auth/*`）始终 fail-closed，与本开关无关。
@@ -28,7 +32,7 @@
 - 安全门禁四修（AH-SR-051）：迁移触发器双炸弹修复链、Go toolchain 升级、CI 门禁接线补齐、文档版本对齐。
 - 迁移 0061 `audit_rechain_trigger_fix`：0058 re-chain DO 块被 0040 BEFORE UPDATE 触发器拒绝（0040 先于 0058 应用），up/down 双向 deploy 炸弹；0061 用 `DISABLE/ENABLE TRIGGER USER` 外包重链，镜像 integration 测试的旁路方式，同事务自愈。
 - 迁移 0062 `agent_team_runs_indexes` + 0063 `agent_run_events_unique_seq`：team runs 查询路径与 run events 唯一 seq 修复。锁风险注记：两迁移非 `CONCURRENTLY`，在大表上建索引持 SHARE 锁阻塞写入，建议维护窗口低峰执行。
-- 迁移 0066 `agent_team_runs_counter_column`：计数器列 + backfill 通道（skeleton in repository layer），为 Wave5 计数器回填预留，旧查询路径不破坏。
+- 迁移 0066 `agent_team_runs_token_usage`：`token_usage_total` 计数器列 + backfill 通道（skeleton in repository layer），为 Wave5 计数器回填预留，旧查询路径不破坏。
 - 迁移 0064 `execution_target_invariants_not_valid`：0060 用 plain `ADD CONSTRAINT` 全表验证（脏历史库上首行违例即半装 deploy 炸弹）；0064 改为 `DROP → ADD ... NOT VALID → 逐约束违规计数 → 0 违规 VALIDATE`，legacy 行不重扫、新写立即被约束拦截，Wave5 backfill 留给计数器列通道。
 - 迁移 0065 `redundant_index_cleanup`：删除三个冗余二级索引——`idx_delivery_outbox_delivery_id`（与 `delivery_id UNIQUE` 重复）、`idx_agent_team_events_run_id`（0056 复合 UNIQUE 前缀）、`idx_notifications_user_id`（0013 复合前缀）。
 - 迁移 0058.down / 0016.down 回滚链修复：0058.down 补 `DISABLE/ENABLE TRIGGER USER` 外包（镜像 0061.up）；0016.down 在 `ADD CONSTRAINT fk` 前插 `INSERT INTO devices(id) VALUES(零UUID) ON CONFLICT DO NOTHING`，消除 FK 校验卡死。
@@ -45,7 +49,7 @@
 - 前端性能：useDesktopEdgeEvents 批处理；DocxPreview style 收敛；CSP 收紧。
 - mobile 装配（mobileAuth 通道）：push 通知、OIDC deep-link、SecureStore token 存储。
 - circuit breaker：出站调用熔断与半开探测。
-- budget（迁移 0066）：计数器列 + backfill 通道（skeleton in repository layer）。
+- budget（迁移 0066 `agent_team_runs_token_usage`）：`token_usage_total` 计数器列 + backfill 通道（skeleton in repository layer）。
 - client_msg_id：客户端消息幂等键落地。
 - event_log 持久化：事件日志 append-only JSON-lines 落库与回放。
 - auth.ok 首帧：WS 鉴权成功后立即下发 auth.ok 帧。
