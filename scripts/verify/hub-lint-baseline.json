@@ -14,8 +14,8 @@
     },
     {
       "linter": "gocognit",
-      "file": "internal/service/agent_dispatch.go",
-      "message": "cognitive complexity 98 of func `(*DispatchService).dispatchTask` is high (> 30)"
+      "file": "internal/service/dispatchsvc/agent_dispatch.go",
+      "message": "cognitive complexity 98 of func `(*DispatchService).DispatchTask` is high (> 30)"
     },
     {
       "linter": "gocognit",

@@ -14,6 +14,7 @@ import (
 	"github.com/agenthub/hub-server/internal/errcode"
 	"github.com/agenthub/hub-server/internal/model"
 	"github.com/agenthub/hub-server/internal/repository"
+	"github.com/agenthub/hub-server/internal/service/dispatchsvc"
 	"github.com/agenthub/hub-server/internal/ws"
 )
 
@@ -54,7 +55,7 @@ type AgentService struct {
 	// Constructed in NewAgentService; tests using struct literals fall back to
 	// a lazy facade via dispatchService(). DeliveryOutbox retries call into
 	// DispatchService through Redispatcher (dispatchPayload stays private).
-	dispatch *DispatchService
+	dispatch *dispatchsvc.DispatchService
 	// edgeCfg/jwtSecret are the Hub→Edge dispatch configuration (#1549),
 	// injected by the composition root and forwarded to DispatchService.
 	edgeCfg config.EdgeDispatchConfig
@@ -79,7 +80,7 @@ func NewAgentService(db *gorm.DB, bus *bus.Bus, mgr *ws.Manager, cacheClient *ca
 		s.deliveryOutbox, // DeliveryOutbox implements edgeCallbackOutbox via autoAckDeliveriesForTask
 	)
 	// Dispatch after outbox so RecordDelivery/MarkDeliverySent ports are ready.
-	s.dispatch = NewDispatchService(db, bus, mgr, s.cacheClient, relay, s.deliveryOutbox, edgeCfg, edgeClient, jwtSecret)
+	s.dispatch = dispatchsvc.NewDispatchService(db, bus, wsManagerAdapter{manager: mgr}, s.cacheClient, relayServiceAdapter{relay: relay}, s.deliveryOutbox, edgeCfg, edgeClient, jwtSecret)
 	s.deliveryOutbox.SetRedispatcher(dispatchRedispatcher{s.dispatch})
 	return s
 }

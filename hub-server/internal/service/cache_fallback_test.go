@@ -24,10 +24,4 @@ func TestResolveCacheUsesNoopForTypedNilClient(t *testing.T) {
 	require.ErrorIs(t, agent.PushPendingTask(ctx, "user-1", "{}"), cache.ErrCacheUnavailable)
 	_, err = agent.AllocateSeq(ctx, "session-1")
 	require.ErrorIs(t, err, cache.ErrCacheUnavailable)
-
-	dispatch := resolveDispatchCache(typedNil)
-	require.IsType(t, cache.NoOpCache{}, dispatch)
-	_, err = dispatch.GetRoute(ctx, "user-1", "desktop")
-	require.ErrorIs(t, err, cache.ErrCacheUnavailable)
-	require.ErrorIs(t, dispatch.PushPendingTask(ctx, "user-1", "{}"), cache.ErrCacheUnavailable)
 }
