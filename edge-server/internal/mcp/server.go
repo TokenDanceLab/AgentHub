@@ -36,9 +36,9 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/agenthub/edge-server/internal/api"
 	"github.com/agenthub/edge-server/internal/events"
 	"github.com/agenthub/edge-server/internal/lifecycle"
+	"github.com/agenthub/edge-server/internal/permission"
 	"github.com/agenthub/edge-server/internal/store"
 )
 
@@ -109,7 +109,7 @@ type Server struct {
 	store              store.Repository
 	executor           lifecycle.RunExecutor
 	bus                *events.Bus
-	permissionRegistry *api.PermissionRegistry
+	permissionRegistry *permission.PermissionRegistry
 	workspaceAllowlist []string
 
 	// authToken, if non-empty, is required as Bearer token on every MCP request.
@@ -124,7 +124,7 @@ func NewServer(
 	repository store.Repository,
 	executor lifecycle.RunExecutor,
 	bus *events.Bus,
-	permissionRegistry *api.PermissionRegistry,
+	permissionRegistry *permission.PermissionRegistry,
 ) *Server {
 	return &Server{
 		store:              repository,
