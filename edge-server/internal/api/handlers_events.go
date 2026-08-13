@@ -4,7 +4,6 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
-	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
@@ -248,15 +247,6 @@ func activeRunExistsResponse(run store.Run) map[string]any {
 	return body
 }
 
-func activeRunForThread(runs []store.Run) (store.Run, bool) {
-	for _, run := range runs {
-		if isActiveRunStatus(run.Status) {
-			return run, true
-		}
-	}
-	return store.Run{}, false
-}
-
 // threadHasAssistantHistory returns true when the thread contains at least one
 // message from the agent (role "agent"), indicating the adapter should resume
 // rather than start a fresh conversation.
@@ -267,44 +257,6 @@ func threadHasAssistantHistory(repo store.Repository, threadID string) bool {
 		}
 	}
 	return false
-}
-
-func isActiveRunStatus(status string) bool {
-	switch status {
-	case "queued", "started", "cancelling":
-		return true
-	default:
-		return false
-	}
-}
-
-// validatePermissionMode returns an error if mode is not a recognised
-// Claude Code --permission-mode value. An empty mode is allowed and means
-// "use the adapter default".
-func validatePermissionMode(mode string) error {
-	if mode == "" {
-		return nil
-	}
-	// SEC-02: Reject 'bypassPermissions' — it disables ALL security hooks at
-	// the CLI level, giving the agent unrestricted shell access regardless
-	// of SecurityHook settings. Only the whitelist modes are allowed.
-	switch mode {
-	case "default", "acceptEdits", "plan", "dontAsk":
-		return nil
-	default:
-		return fmt.Errorf("unknown permission mode %q: valid values are default, acceptEdits, plan, dontAsk", mode)
-	}
-}
-
-func cleanupRuns(repository store.Repository) store.RunCleanupResult {
-	cleaner, ok := repository.(store.RunCleaner)
-	if !ok {
-		return store.RunCleanupResult{}
-	}
-	return cleaner.CleanupRuns(store.RunCleanupOptions{
-		TerminalTTL:              defaultRunCleanupTerminalTTL,
-		MaxTerminalRunsPerThread: defaultRunCleanupMaxTerminalRunsPerThread,
-	})
 }
 
 // ---------------------------------------------------------------------------

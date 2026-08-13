@@ -5,15 +5,13 @@ package mcp
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
-	"log/slog"
 	"strings"
 
 	"github.com/agenthub/edge-server/internal/adapters"
 	"github.com/agenthub/edge-server/internal/errcode"
 	"github.com/agenthub/edge-server/internal/lifecycle"
-	"github.com/agenthub/edge-server/internal/security"
+	"github.com/agenthub/edge-server/internal/runcontrol"
 	"github.com/agenthub/edge-server/internal/store"
 )
 
@@ -142,47 +140,20 @@ func decodeStartRunArgs(args json.RawMessage) (startRunParams, error) {
 	return params, nil
 }
 
-// validateStartRunWorkDir requires a non-empty workDir for adapter runs
-// (#854), then applies the shared REST/MCP workspace allowlist policy
-// (AH-SR-006 / #998): EvalSymlinks + IsPathWithin via
-// security.ValidateWorkDirAgainstAllowlist. Returns the trimmed workDir.
-func validateStartRunWorkDir(workDir string, allowlist []string) (string, error) {
-	workDir = strings.TrimSpace(workDir)
-	if workDir == "" {
-		return "", errcode.ErrWorkDirRequired
-	}
-	if err := security.ValidateWorkDirAgainstAllowlist(workDir, allowlist); err != nil {
-		if errors.Is(err, security.ErrWorkspaceAllowlistEmpty) {
-			return "", errcode.ErrWorkspaceAllowlistNotConfigured
-		}
-		if errors.Is(err, security.ErrWorkspaceOutsideAllowlist) {
-			return "", errcode.ErrWorkspaceNotAllowed
-		}
-		return "", fmt.Errorf("invalid workDir: %w", err)
-	}
-	return workDir, nil
-}
-
-// errIfActiveRunExists returns an error when the thread already has an active
-// (queued or started) run.
-func errIfActiveRunExists(repo store.Repository, threadID string) error {
-	for _, r := range repo.ListRuns(threadID) {
-		if r.Status == "queued" || r.Status == "started" {
-			return fmt.Errorf("thread already has an active run: %s", r.ID)
-		}
-	}
-	return nil
-}
+// validateStartRunWorkDir and errIfActiveRunExists previously lived here; the
+// shared run-creation core (internal/runcontrol.Create) now owns workDir
+// validation and the active-run guard for both MCP and REST.
 
 // toolStartRun implements the agenthub_start_run tool.
 //
 // Requires non-empty workDir and validates it against the workspace allowlist
-// (AH-SR-006 / #854), mirroring REST validateRunWorkDir. Creates a run record,
-// publishes run.queued, creates a user message item, and starts the agent
-// executor.
+// (AH-SR-006 / #854). The validation, run creation, run.queued publication,
+// executor start, and failure state transition are shared with POST /v1/runs
+// through internal/runcontrol.Create — MCP only decodes its own argument
+// shape and provides its timeline/context policies.
 //
 // Returns an error if:
-//   - The thread already has an active run (queued or started)
+//   - The thread already has an active run (queued, started, or cancelling)
 //   - The project or thread is not found
 //   - workDir is missing/empty or outside the configured allowlist
 //   - Required fields (projectId, threadId, prompt, workDir) are missing
@@ -198,86 +169,57 @@ func (s *Server) toolStartRun(args json.RawMessage) (json.RawMessage, error) {
 	if err != nil {
 		return nil, err
 	}
-	workDir, err := validateStartRunWorkDir(params.WorkDir, s.workspaceAllowlist)
-	if err != nil {
-		return nil, err
-	}
-	params.WorkDir = workDir
+	params.WorkDir = strings.TrimSpace(params.WorkDir)
 
-	// Verify project and thread exist
-	thread, ok := s.store.GetThread(params.ThreadID)
-	if !ok || thread.ProjectID != params.ProjectID {
-		return nil, fmt.Errorf("thread not found: %s", params.ThreadID)
-	}
-	if _, ok := s.store.GetProject(params.ProjectID); !ok {
-		return nil, fmt.Errorf("project not found: %s", params.ProjectID)
-	}
-
-	// Check for active run
-	if err := errIfActiveRunExists(s.store, params.ThreadID); err != nil {
-		return nil, err
-	}
-
-	// Generate run ID and create the run
-	runID := generateID("run_")
-	run, err := s.store.CreateRun(runID, params.ProjectID, params.ThreadID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create run: %w", err)
-	}
-
-	// Publish run.queued event
-	scope := map[string]any{
-		"projectId": run.ProjectID,
-		"threadId":  run.ThreadID,
-		"runId":     run.ID,
-	}
-	if s.bus != nil {
-		s.bus.Publish("run.queued", scope, run)
-	}
-
-	// Create user message item
-	if _, err := s.store.CreateItem(store.Item{
-		ID:        generateID("item_"),
-		ProjectID: run.ProjectID,
-		ThreadID:  run.ThreadID,
-		RunID:     run.ID,
-		Type:      "user_message",
-		Role:      "user",
-		Status:    "created",
-		Content:   params.Prompt,
-	}); err == nil {
-		if s.bus != nil {
-			s.bus.Publish("message.created", scope, map[string]any{
+	run, err := runcontrol.Create(s.store, s.executor, s.bus, runcontrol.CreateParams{
+		ProjectID:          params.ProjectID,
+		ThreadID:           params.ThreadID,
+		Prompt:             params.Prompt,
+		AgentID:            params.AgentID,
+		Model:              params.Model,
+		WorkDir:            params.WorkDir,
+		WorkspaceAllowlist: s.workspaceAllowlist,
+		SessionID:          "mcp_" + params.ThreadID,
+		ContinueLast:       true,
+		Timeline: func(run store.Run) {
+			// MCP publishes a single user_message item (REST additionally
+			// publishes a queued marker item).
+			item, createErr := s.store.CreateItem(store.Item{
+				ID:        generateID("item_"),
+				ProjectID: run.ProjectID,
+				ThreadID:  run.ThreadID,
+				RunID:     run.ID,
+				Type:      "user_message",
+				Role:      "user",
+				Status:    "created",
+				Content:   params.Prompt,
+			})
+			if createErr != nil || s.bus == nil {
+				return
+			}
+			s.bus.Publish("message.created", map[string]any{
+				"projectId": item.ProjectID,
+				"threadId":  item.ThreadID,
+				"runId":     item.RunID,
+				"itemId":    item.ID,
+			}, map[string]any{
 				"content": params.Prompt,
 			})
-		}
-	}
-
-	// Start the executor
-	sessionID := "mcp_" + run.ThreadID
-	runCtx := lifecycle.RunProcessContext{
-		Run:          run,
-		Prompt:       params.Prompt,
-		AgentID:      params.AgentID,
-		Model:        params.Model,
-		SessionID:    sessionID,
-		ContinueLast: true,
-		WorkDir:      params.WorkDir,
-	}
-
-	if err := s.executor.Start(run, runCtx); err != nil {
-		slog.Error("mcp run start failed", "runId", run.ID, "error", err)
-		// Mark run as failed
-		if failed, ok := s.store.SetRunStatusIf(run.ID, "failed", "queued"); ok {
-			if s.bus != nil {
-				s.bus.Publish("run.failed", scope, map[string]any{
-					"runId":  failed.ID,
-					"status": failed.Status,
-					"error":  "run execution failed",
-				})
+		},
+		BuildContext: func(run store.Run) lifecycle.RunProcessContext {
+			return lifecycle.RunProcessContext{
+				Run:          run,
+				Prompt:       params.Prompt,
+				AgentID:      params.AgentID,
+				Model:        params.Model,
+				SessionID:    "mcp_" + run.ThreadID,
+				ContinueLast: true,
+				WorkDir:      params.WorkDir,
 			}
-		}
-		return nil, fmt.Errorf("failed to start run: %w", err)
+		},
+	})
+	if err != nil {
+		return nil, err
 	}
 
 	result := map[string]any{
