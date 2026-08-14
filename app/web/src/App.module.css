@@ -9,9 +9,9 @@
   height: 100vh;
   min-width: 0;
   overflow: hidden;
-  background: var(--app-bg, var(--background));
-  color: var(--foreground);
-  font-family: var(--font-sans);
+  background: var(--td-canvas, var(--td-canvas));
+  color: var(--td-ink);
+  font-family: var(--td-font);
 }
 
 .authOverlay {

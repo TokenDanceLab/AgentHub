@@ -7,10 +7,10 @@
   display: flex;
   flex-direction: column;
   height: 100vh;
-  background: var(--app-bg);
-  color: var(--foreground);
-  font-family: var(--font-sans);
-  font-size: var(--font-size-sm);
+  background: var(--td-canvas);
+  color: var(--td-ink);
+  font-family: var(--td-font);
+  font-size: var(--td-text-sm);
   overflow: hidden;
   -webkit-font-smoothing: antialiased;
 }
@@ -51,7 +51,7 @@
   align-items: center;
   justify-content: center;
   border: none;
-  color: var(--text-weaker);
+  color: var(--td-ink-muted);
   cursor: pointer;
   transition: background 0.15s ease, color 0.15s ease, transform 0.1s ease;
 }
@@ -68,7 +68,7 @@
 .railBtn:hover,
 .rightPanelCollapseBtn:hover {
   background: var(--glass-bg-medium);
-  color: var(--foreground);
+  color: var(--td-ink);
 }
 
 .mobileToolbarBtn:focus-visible,
@@ -82,7 +82,7 @@
   outline: 2px solid var(--ring);
   outline-offset: 2px;
   background: var(--glass-tint-plum);
-  color: var(--foreground);
+  color: var(--td-ink);
 }
 
 [data-theme='dark'] .mobileToolbarBtn:hover,
@@ -119,7 +119,7 @@
   backdrop-filter: blur(18px) saturate(1.12);
   -webkit-backdrop-filter: blur(18px) saturate(1.12);
   box-shadow: 0 10px 28px var(--glass-shadow-subtle);
-  color: var(--foreground);
+  color: var(--td-ink);
   font-size: 11px;
   font-weight: 560;
   line-height: 1.55;
@@ -198,7 +198,7 @@
   min-width: 0;
   flex: 1;
   overflow: hidden;
-  color: color-mix(in oklch, var(--foreground) 70%, var(--muted-foreground) 30%);
+  color: color-mix(in oklch, var(--td-ink) 70%, var(--td-ink-muted) 30%);
   font-size: 13px;
   font-weight: 460;
   line-height: 1.5;
@@ -293,13 +293,13 @@
   height: 7px;
   margin: 2px 0 4px;
   border-radius: 999px;
-  background: var(--muted-foreground);
+  background: var(--td-ink-muted);
   opacity: 0.55;
 }
 
 .railStatusDotActive {
-  background: var(--success);
-  box-shadow: 0 0 0 4px color-mix(in oklch, var(--success) 18%, transparent);
+  background: var(--td-moss);
+  box-shadow: 0 0 0 4px color-mix(in oklch, var(--td-moss) 18%, transparent);
   opacity: 1;
 }
 
@@ -361,7 +361,7 @@
   min-height: 1.5em;
   text-transform: uppercase;
   letter-spacing: 0;
-  color: var(--text-weaker);
+  color: var(--td-ink-muted);
 }
 
 .sidebarScroll {
@@ -373,7 +373,7 @@
 .sidebarEmpty {
   padding: 8px 12px;
   font-size: 11px;
-  color: var(--text-weaker);
+  color: var(--td-ink-muted);
   line-height: 1.4;
 }
 
@@ -388,11 +388,11 @@
   border: 1px solid var(--glass-border);
   border-radius: 9px;
   background: var(--glass-bg-subtle);
-  color: var(--text-weaker);
+  color: var(--td-ink-muted);
   cursor: pointer;
   font: inherit;
   text-align: left;
-  transition: background var(--duration-fast), color var(--duration-fast), border-color var(--duration-fast);
+  transition: background var(--td-dur-fast), color var(--td-dur-fast), border-color var(--td-dur-fast);
 }
 
 [data-theme='dark'] .sidebarSearch {
@@ -403,7 +403,7 @@
 .sidebarSearch:hover,
 .sidebarSearch:focus-visible {
   background: var(--glass-bg-light);
-  color: var(--foreground);
+  color: var(--td-ink);
   outline: none;
 }
 
@@ -458,14 +458,14 @@
   border: none;
   border-radius: 50%;
   background: transparent;
-  color: var(--text-weaker);
+  color: var(--td-ink-muted);
   cursor: pointer;
   transition: background 0.15s, color 0.15s;
 }
 
 .navIconBtn:hover {
   background: var(--glass-bg-light);
-  color: var(--foreground);
+  color: var(--td-ink);
 }
 
 [data-theme='dark'] .navIconBtn:hover {
@@ -525,7 +525,7 @@
   padding: 10px 16px;
   border-bottom: 1px solid var(--glass-border-subtle);
   flex-shrink: 0;
-  font-size: var(--font-size-sm);
+  font-size: var(--td-text-sm);
   font-weight: 430;
 }
 
@@ -546,8 +546,8 @@
 .workspaceThreadTitle {
   min-width: 0;
   overflow: hidden;
-  color: var(--muted-foreground);
-  font-size: var(--font-size-xs);
+  color: var(--td-ink-muted);
+  font-size: var(--td-text-xs);
   line-height: 1.55;
   min-height: 1.55em;
   padding: 1px 0 3px;
@@ -571,14 +571,14 @@
   border: none;
   border-radius: 50%;
   background: transparent;
-  color: var(--text-weaker);
+  color: var(--td-ink-muted);
   cursor: pointer;
   transition: background 0.15s, color 0.15s, transform 0.1s;
 }
 
 .workspaceHeaderBtn:hover {
   background: var(--glass-bg-light);
-  color: var(--foreground);
+  color: var(--td-ink);
 }
 
 .iconBadgeHostInline {
@@ -600,7 +600,7 @@
   padding: 0 4px;
   border: 1px solid var(--glass-input-bg-hover);
   border-radius: 999px;
-  background: var(--destructive);
+  background: var(--td-danger);
   color: var(--destructive-foreground);
   font-size: 9px;
   font-weight: 760;
@@ -625,8 +625,8 @@
   border-radius: 50%;
   flex-shrink: 0;
 }
-.workspaceHeaderDotOnline  { background: var(--success); }
-.workspaceHeaderDotOffline { background: var(--danger); }
+.workspaceHeaderDotOnline  { background: var(--td-moss); }
+.workspaceHeaderDotOffline { background: var(--td-danger); }
 
 /* ── Git branch badge ─────────────────────── */
 
@@ -636,12 +636,12 @@
   gap: 4px;
   margin-left: 2px;
   padding: 1px 7px;
-  border-radius: var(--radius-sm);
-  background: var(--card);
-  border: 1px solid var(--border);
+  border-radius: var(--td-radius-control);
+  background: var(--td-surface);
+  border: 1px solid var(--td-line);
   font-size: 11px;
   line-height: 1.5;
-  color: var(--muted-foreground);
+  color: var(--td-ink-muted);
   max-width: 320px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -650,20 +650,20 @@
 }
 
 .gitBranchIcon {
-  color: var(--success);
+  color: var(--td-moss);
   flex-shrink: 0;
 }
 
 .gitBranchName {
   font-weight: var(--font-weight-medium);
-  color: var(--foreground);
+  color: var(--td-ink);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .gitBranchDetached {
-  color: var(--muted-foreground);
+  color: var(--td-ink-muted);
   font-style: italic;
 }
 
@@ -671,7 +671,7 @@
   display: inline-flex;
   align-items: center;
   gap: 1px;
-  color: var(--warning);
+  color: var(--td-warning);
   font-size: 10px;
   font-weight: var(--font-weight-semibold);
 }
@@ -680,7 +680,7 @@
   display: inline-flex;
   align-items: center;
   gap: 1px;
-  color: var(--danger);
+  color: var(--td-danger);
   font-size: 10px;
   font-weight: var(--font-weight-semibold);
 }
@@ -693,8 +693,8 @@
   height: 16px;
   padding: 0 4px;
   border-radius: 999px;
-  background: var(--primary);
-  color: var(--primary-foreground);
+  background: var(--td-plum);
+  color: var(--td-ink-on-plum);
   font-size: 10px;
   font-weight: var(--font-weight-semibold);
   line-height: 1;
@@ -748,9 +748,9 @@
 .inspectorPanelBody {
   flex: 1;
   overflow-y: auto;
-  padding: var(--space-sm);
-  font-size: var(--font-size-xs);
-  color: var(--foreground);
+  padding: var(--td-space-2);
+  font-size: var(--td-text-xs);
+  color: var(--td-ink);
 }
 
 .inspectorPanelOpen {
@@ -771,7 +771,7 @@
   position: absolute;
   top: 48px;
   right: 16px;
-  z-index: var(--z-overlay);
+  z-index: var(--td-z-overlay);
   width: var(--right-panel-width, 360px);
   max-width: min(var(--right-panel-width, 360px), calc(100% - 32px));
   max-height: calc(100% - 64px);
@@ -846,42 +846,42 @@
   border: none;
   border-radius: 6px;
   background: transparent;
-  color: var(--text-weaker);
+  color: var(--td-ink-muted);
   font-size: 12px;
-  font-family: var(--font-sans);
+  font-family: var(--td-font);
   font-weight: 500;
   cursor: pointer;
   transition: all 0.15s ease;
 }
 
-.rightPanelTab:hover { color: var(--foreground); }
+.rightPanelTab:hover { color: var(--td-ink); }
 
 [data-theme='dark'] .rightPanelTab {
-  color: var(--text-weaker);
+  color: var(--td-ink-muted);
 }
 
 [data-theme='dark'] .rightPanelTab:hover {
-  color: var(--foreground);
+  color: var(--td-ink);
 }
 
 .rightPanelTabActive {
-  background: var(--card);
-  color: var(--foreground);
+  background: var(--td-surface);
+  color: var(--td-ink);
   box-shadow: 0 1px 4px var(--glass-shadow-subtle);
 }
 
 [data-theme='dark'] .rightPanelTabActive {
   background: var(--glass-bg-heavy);
-  color: var(--primary-foreground);
+  color: var(--td-ink-on-plum);
   box-shadow: 0 1px 3px var(--glass-shadow);
 }
 
 .rightPanelBody {
   flex: 1;
   overflow-y: auto;
-  padding: var(--space-sm);
-  font-size: var(--font-size-xs);
-  color: var(--foreground);
+  padding: var(--td-space-2);
+  font-size: var(--td-text-xs);
+  color: var(--td-ink);
 }
 
 /* ═══════════════════════════════════════════════
@@ -890,7 +890,7 @@
 
 .topBar {
   position: relative;
-  z-index: var(--z-sticky);
+  z-index: var(--td-z-nav);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -926,14 +926,14 @@
   border: none;
   border-radius: 6px;
   background: transparent;
-  color: var(--text-weaker);
+  color: var(--td-ink-muted);
   cursor: pointer;
   transition: background 0.15s ease, color 0.15s ease, transform 0.1s ease;
 }
 
 .topBarSidebarBtn:hover {
   background: var(--glass-bg-light);
-  color: var(--foreground);
+  color: var(--td-ink);
 }
 
 [data-theme='dark'] .topBarSidebarBtn:hover {
@@ -963,7 +963,7 @@
 
 .topBarNavBtnAccent {
   background: var(--glass-tint-plum);
-  color: var(--primary-foreground);
+  color: var(--td-ink-on-plum);
   box-shadow: 0 4px 12px var(--glass-tint-plum);
 }
 
@@ -988,7 +988,7 @@
   border: 0;
   border-radius: 11px;
   background: transparent;
-  color: color-mix(in oklch, var(--muted-foreground) 94%, var(--foreground) 6%);
+  color: color-mix(in oklch, var(--td-ink-muted) 94%, var(--td-ink) 6%);
   font: inherit;
   font-size: 12.5px;
   font-weight: 450;
@@ -1001,13 +1001,13 @@
 .appMenu .topMenuTrigger:hover,
 .appMenu .topMenuTriggerActive {
   background: var(--glass-bg-medium);
-  color: color-mix(in oklch, var(--foreground) 82%, var(--muted-foreground) 18%);
+  color: color-mix(in oklch, var(--td-ink) 82%, var(--td-ink-muted) 18%);
 }
 
 [data-theme='dark'] .appMenu .topMenuTrigger:hover,
 [data-theme='dark'] .appMenu .topMenuTriggerActive {
   background: var(--glass-bg-light);
-  color: color-mix(in oklch, var(--foreground) 78%, var(--muted-foreground) 22%);
+  color: color-mix(in oklch, var(--td-ink) 78%, var(--td-ink-muted) 22%);
 }
 
 .topMenuTrigger:focus-visible {
@@ -1017,7 +1017,7 @@
 
 .topMenuPanel {
   position: absolute;
-  z-index: var(--z-popover);
+  z-index: var(--td-z-popover);
   top: calc(100% + 4px);
   left: 0;
   display: grid;
@@ -1069,7 +1069,7 @@
   border: 0;
   border-radius: 0;
   background: transparent;
-  color: color-mix(in oklch, var(--foreground) 82%, var(--muted-foreground) 18%);
+  color: color-mix(in oklch, var(--td-ink) 82%, var(--td-ink-muted) 18%);
   cursor: pointer;
   font: inherit;
   font-size: 12.5px;
@@ -1094,7 +1094,7 @@
 }
 
 .topMenuItemDanger:not(:disabled) {
-  color: var(--destructive);
+  color: var(--td-danger);
 }
 
 .topMenuItemLabel {
@@ -1117,8 +1117,8 @@
   border: 0;
   border-radius: 0;
   background: transparent;
-  color: var(--muted-foreground);
-  font-family: var(--font-sans);
+  color: var(--td-ink-muted);
+  font-family: var(--td-font);
   font-size: 12px;
   font-weight: 430;
   line-height: 1.32;
@@ -1135,7 +1135,7 @@
   min-height: 22px;
   margin-left: 6px;
   padding: 1px 0 3px;
-  color: var(--text-weaker);
+  color: var(--td-ink-muted);
   font-size: 11px;
   line-height: 1.62;
 }
@@ -1145,15 +1145,15 @@
   height: 5px;
   border-radius: 50%;
 }
-.statusBadgeDotOnline  { background: var(--success); }
-.statusBadgeDotOffline { background: var(--danger); }
+.statusBadgeDotOnline  { background: var(--td-moss); }
+.statusBadgeDotOffline { background: var(--td-danger); }
 
 .topBarDim {
   display: inline-flex;
   align-items: center;
   min-height: 21px;
   padding: 1px 0 3px;
-  color: var(--text-weaker);
+  color: var(--td-ink-muted);
   font-size: 11px;
   line-height: 1.62;
 }
@@ -1167,14 +1167,14 @@
   border: none;
   border-radius: 50%;
   background: transparent;
-  color: var(--text-weaker);
+  color: var(--td-ink-muted);
   cursor: pointer;
   transition: background 0.15s, color 0.15s;
 }
 
 .topBarBtn:hover {
   background: var(--glass-bg-light);
-  color: var(--foreground);
+  color: var(--td-ink);
 }
 
 /* Window controls */
@@ -1190,7 +1190,7 @@
   height: 100%;
   border: none;
   background: transparent;
-  color: var(--text-weaker);
+  color: var(--td-ink-muted);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1199,8 +1199,8 @@
   transition: background 0.12s, color 0.12s;
 }
 
-.winBtn:hover { background: var(--glass-bg-light); color: var(--foreground); }
-.winBtnClose:hover { background: var(--destructive); color: var(--destructive-foreground); }
+.winBtn:hover { background: var(--glass-bg-light); color: var(--td-ink); }
+.winBtnClose:hover { background: var(--td-danger); color: var(--destructive-foreground); }
 
 /* ═══════════════════════════════════════════════
    Banner, overlay, modal, nav
@@ -1212,18 +1212,18 @@
   gap: 8px;
   padding: 6px 12px;
   background: var(--glass-bg-medium);
-  border-bottom: 1px solid var(--border);
-  color: var(--text-primary);
+  border-bottom: 1px solid var(--td-line);
+  color: var(--td-ink);
   font-size: 12px;
   flex-shrink: 0;
 }
 
 .bannerBtn {
   padding: 2px 10px;
-  border: 1px solid var(--border);
+  border: 1px solid var(--td-line);
   border-radius: 5px;
   background: transparent;
-  color: var(--text-primary);
+  color: var(--td-ink);
   cursor: pointer;
   font-size: 11px;
 }
@@ -1232,7 +1232,7 @@
 .modalOverlay {
   position: fixed;
   inset: 0;
-  z-index: var(--z-overlay);
+  z-index: var(--td-z-overlay);
   background: var(--glass-shadow);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
@@ -1265,7 +1265,7 @@
 }
 
 .sidebarBrand {
-  padding: var(--space-lg) var(--space-lg) var(--space-md);
+  padding: var(--td-space-4) var(--td-space-4) var(--td-space-3);
   flex-shrink: 0;
 }
 
@@ -1289,7 +1289,7 @@
 .overlay {
   position: fixed;
   inset: 0;
-  z-index: var(--z-overlay);
+  z-index: var(--td-z-overlay);
   background: var(--glass-shadow);
   opacity: 0;
   pointer-events: none;
@@ -1297,7 +1297,7 @@
 }
 .overlayActive { opacity: 1; pointer-events: auto; }
 
-.overlayPanel { position: fixed; z-index: var(--z-modal); }
+.overlayPanel { position: fixed; z-index: var(--td-z-modal); }
 
 .mobileNavPanel {
   display: flex;
@@ -1374,7 +1374,7 @@
 .topBarBtn,
 .winBtn,
 .topMenuItem kbd {
-  color: var(--text-weaker);
+  color: var(--td-ink-muted);
 }
 
 .iconTooltip,
@@ -1394,7 +1394,7 @@
 .topBarSidebarBtn:hover,
 .topBarBtn:hover,
 .winBtn:hover {
-  color: var(--text-primary);
+  color: var(--td-ink);
 }
 
 .workspaceHeader h2,
@@ -1413,13 +1413,13 @@
 
 .banner {
   background: var(--glass-bg-medium);
-  border-bottom-color: var(--border);
-  color: var(--text-primary);
+  border-bottom-color: var(--td-line);
+  color: var(--td-ink);
 }
 
 .bannerBtn {
-  border-color: var(--border);
-  color: var(--text-primary);
+  border-color: var(--td-line);
+  color: var(--td-ink);
 }
 
 .bannerBtn:hover:not(:disabled) {
