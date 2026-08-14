@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 	"sync"
@@ -1053,6 +1054,57 @@ func TestHandleTaskAck_AlreadyRunningIdempotent(t *testing.T) {
 	err := svc.HandleTaskAck(context.Background(), "user-1", "dev-1", taskID, "run-001")
 	assert.NoError(t, err)
 	assert.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestHandleTaskAck_OfflineQueuedUnboundDeviceClaim(t *testing.T) {
+	db, mock, sqlDB := newMockDBAgent(t)
+	defer sqlDB.Close()
+
+	svc := &AgentService{db: db}
+
+	taskID := "task-offline-unbound"
+	// #99 offline-replay task: queued, no edge device binding yet.
+	mock.ExpectQuery(sqlmTaskByID).
+		WithArgs(taskID, 1).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "agent_instance_id", "triggered_by_user_id", "status", "edge_device_id", "edge_run_id"}).
+			AddRow(taskID, "agent-1", "user-1", model.TaskStatusQueued, "", ""))
+
+	mock.ExpectQuery(sqlmAgentByID).
+		WithArgs("agent-1", 1).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "agent_type", "session_id", "inviter_user_id"}).
+			AddRow("agent-1", "claude", "sess-1", "user-1"))
+
+	mock.ExpectExec(sqlmUpdateTask).
+		WillReturnResult(sqlmock.NewResult(0, 1))
+
+	err := svc.HandleTaskAck(context.Background(), "user-1", "dev-1", taskID, "run-001")
+	assert.NoError(t, err)
+	assert.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestHandleTaskAck_OfflineQueuedUnboundRejectsWrongUser(t *testing.T) {
+	db, mock, sqlDB := newMockDBAgent(t)
+	defer sqlDB.Close()
+
+	svc := &AgentService{db: db}
+
+	taskID := "task-offline-wrong-user"
+	mock.ExpectQuery(sqlmTaskByID).
+		WithArgs(taskID, 1).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "agent_instance_id", "triggered_by_user_id", "status", "edge_device_id", "edge_run_id"}).
+			AddRow(taskID, "agent-1", "user-1", model.TaskStatusQueued, "", ""))
+
+	mock.ExpectQuery(sqlmAgentByID).
+		WithArgs("agent-1", 1).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "agent_type", "session_id", "inviter_user_id"}).
+			AddRow("agent-1", "claude", "sess-1", "user-1"))
+
+	err := svc.HandleTaskAck(context.Background(), "user-2", "dev-1", taskID, "run-001")
+	require.Error(t, err)
+	var taskErr *errcode.Error
+	require.True(t, errors.As(err, &taskErr))
+	require.Equal(t, errcode.AgentTaskNotFound.Code, taskErr.Code)
+	require.NoError(t, mock.ExpectationsWereMet())
 }
 
 func TestHandleTaskAck_EdgeRunIDBackfill(t *testing.T) {

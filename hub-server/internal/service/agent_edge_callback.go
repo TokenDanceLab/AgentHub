@@ -524,7 +524,10 @@ func (s *EdgeCallbackService) authorizeTaskEdgeCallback(task *model.PendingAgent
 	if ai.InviterUserID != edgeUserID {
 		return nil, errcode.AgentTaskNotFound
 	}
-	if task.EdgeDeviceID == "" || task.EdgeDeviceID != edgeDeviceID {
+	// Offline-queued tasks (#99) have no device binding until an edge acks
+	// them; the matching user's edge is allowed to claim an unbound task.
+	// Bound tasks must come from the bound device.
+	if task.EdgeDeviceID != "" && task.EdgeDeviceID != edgeDeviceID {
 		return nil, errcode.AgentTaskNotFound
 	}
 	if task.EdgeRunID != "" && task.EdgeRunID != edgeRunID {
