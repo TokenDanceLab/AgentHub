@@ -38,10 +38,10 @@ const NodeEl = memo(function NodeEl({n,x,y}:{n:DagNode;x:number;y:number}){
   const cy=y+NH/2
   return <g>
     <title>{n.agent} — {n.task}</title>
-    <rect x={x} y={y} width={NW} height={NH} rx={6} fill="var(--surface)" stroke="var(--bdr)" strokeWidth={1}/>
-    <circle cx={x+15} cy={cy} r={9} fill={roleColor[n.role]||'var(--text-2)'}/>
-    <text x={x+15} y={cy+3.5} textAnchor="middle" fill="white" fontFamily="var(--font-sans)" fontSize={8} fontWeight={700}>{roleInitial[n.role]||n.agent[0]}</text>
-    <text x={x+28} y={cy+3.5} fill="var(--text-1)" fontFamily="var(--font-sans)" fontSize={10} fontWeight={500}>@{n.agent}</text>
+    <rect x={x} y={y} width={NW} height={NH} rx={6} fill="var(--td-surface)" stroke="var(--td-line)" strokeWidth={1}/>
+    <circle cx={x+15} cy={cy} r={9} fill={roleColor[n.role]||'var(--td-ink-muted)'}/>
+    <text x={x+15} y={cy+3.5} textAnchor="middle" fill="white" fontFamily="var(--td-font)" fontSize={8} fontWeight={700}>{roleInitial[n.role]||n.agent[0]}</text>
+    <text x={x+28} y={cy+3.5} fill="var(--td-ink)" fontFamily="var(--td-font)" fontSize={10} fontWeight={500}>@{n.agent}</text>
     <circle cx={x+NW-12} cy={cy} r={3.5} fill={sc} className={n.status==='running'?'dag-pulse':''}/>
   </g>
 })
@@ -88,7 +88,7 @@ export const OrchestratorCard = memo(function OrchestratorCard({item}:{item:RowI
       {sw <= 0 ? <span className="orch-plan-text">No DAG</span> : <svg viewBox={`0 0 ${sw} ${sh}`} className="orch-dag" role="img" aria-label={item.label || 'Orchestrator DAG'}>
         <defs>
           <marker id={markerId} viewBox="0 0 10 7" refX={9} refY={3.5} markerWidth={5} markerHeight={4} orient="auto-start-reverse">
-            <polygon points="0 0, 10 3.5, 0 7" fill="var(--bdr-strong)"/>
+            <polygon points="0 0, 10 3.5, 0 7" fill="var(--td-line-strong)"/>
           </marker>
         </defs>
         {/* Edges — from each node to dependents in next layer */}
@@ -101,7 +101,7 @@ export const OrchestratorCard = memo(function OrchestratorCard({item}:{item:RowI
             const x2=P+sp.li*colW
             const y2=gy(sp.ri,allLayers[sp.li]!.length)+NH/2
             const mx=(x1+x2)/2
-            return <path key={`${depId}-${src.id}`} d={`M${x1},${y1} C${mx},${y1} ${mx},${y2} ${x2},${y2}`} fill="none" stroke="var(--bdr-strong)" strokeWidth={1.2} markerEnd={`url(#${markerId})`}/>
+            return <path key={`${depId}-${src.id}`} d={`M${x1},${y1} C${mx},${y1} ${mx},${y2} ${x2},${y2}`} fill="none" stroke="var(--td-line-strong)" strokeWidth={1.2} markerEnd={`url(#${markerId})`}/>
           })
         })}
         {/* Nodes */}
