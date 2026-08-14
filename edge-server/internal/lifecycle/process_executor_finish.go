@@ -13,6 +13,7 @@ func (e *ProcessExecutor) finish(runID string) {
 	e.mu.Lock()
 	_, hasCancelDone := e.cancelDone[runID]
 	_, hasRunOutput := e.runOutputs[runID]
+	_, isDeferred := e.pendingParentFinish[runID]
 	e.mu.Unlock()
 	plan := planFinishCleanup(e.agentRegistry != nil, hasCancelDone, hasRunOutput)
 	// Cascade: when a parent agent finishes, disconnect descendant registry
@@ -20,7 +21,13 @@ func (e *ProcessExecutor) finish(runID string) {
 	// ShutdownCascade accepts parent runID even when no agent is registered
 	// under that ID — children are keyed ParentID=parentRunID (#1001).
 	// Preserve #867 terminalFinish, #987 hubOutputs, #988 Cancel grace path.
-	if plan.Cascade {
+	//
+	// Orchestration deferral: a parent whose terminal finish is parked
+	// (pendingParentFinish) must NOT cascade-cancel its children — they are
+	// still running and will finalize the parent via FinalizeParentRun.
+	// Only cascade when the parent is finishing for real (normal terminal,
+	// cancel, or fault paths), never when its finish is deferred.
+	if plan.Cascade && !isDeferred {
 		// Pure filter keeps #1001 self/empty skip; Cancel side-effects stay here.
 		for _, childRunID := range filterCascadeCancelChildren(runID, e.agentRegistry.ShutdownCascade(runID)) {
 			e.Cancel(childRunID)
@@ -51,6 +58,52 @@ func (e *ProcessExecutor) finish(runID string) {
 		delete(e.runOutputs, runID)
 	}
 	e.mu.Unlock()
+}
+
+// hasActiveChildren reports whether the given run has at least one registered
+// sub-agent whose status is not terminal (still queued/running). Used to park
+// an orchestrator parent's terminal finish until its children complete.
+func (e *ProcessExecutor) hasActiveChildren(runID string) bool {
+	if e.agentRegistry == nil {
+		return false
+	}
+	for _, child := range e.agentRegistry.ListByParent(runID) {
+		if !isTerminalStatus(child.Status) {
+			return true
+		}
+	}
+	return false
+}
+
+// FinalizeParentRun completes the terminal finish of an orchestrator parent
+// run whose finish was deferred while its sub-agents were running. It is
+// invoked by the ResultAggregator when all children complete (or the collector
+// timeout fires a partial result). Idempotent: unknown/absent parents no-op.
+func (e *ProcessExecutor) FinalizeParentRun(parentRunID string) {
+	e.mu.Lock()
+	deferred, ok := e.pendingParentFinish[parentRunID]
+	if ok {
+		delete(e.pendingParentFinish, parentRunID)
+	}
+	e.mu.Unlock()
+	if !ok {
+		return
+	}
+
+	run := deferred.run
+	// Mirror the terminal publish from completeRunAttempt (the parent's own
+	// subprocess already exited; only the status transition and callbacks
+	// remain). The parent is not itself a sub-agent, so no sendSubAgentResult.
+	finished, published := e.store.SetRunStatusIf(run.ID, deferred.finalStatus, "started")
+	if planPublishStatus(published).Publish {
+		e.bus.Publish("run.finished", runScope(finished), RunResponse(finished))
+		e.fireHubDone(run.ID, RunResponse(finished))
+	}
+	e.checkPersistError(run.ID)
+	slog.Info("process: parent finalized after all sub-agents completed", "runId", run.ID, "finalStatus", deferred.finalStatus)
+	// finish() now runs the cascade and cleanup. Children are terminal at
+	// this point, so Cancel side-effects no-op on them (cancelPrecheck).
+	e.finish(run.ID)
 }
 
 // surfaceRunArtifacts performs auto-surface detection after a run completes.
