@@ -314,11 +314,13 @@ func terminalEndpointError(method string) error {
 // Prompt and workdir come from the RunProcessContext attached to ctx via
 // SDKAdapterContext (same pattern as the anthropic/openai SDK adapters).
 //
-// TODO(#1404 真跑验证): spawning the official adapter binary (`npx -y
-// @agentclientprotocol/codex-acp`, version-pinned per the migration report)
-// and a live end-to-end run require an environment with npx + agent keys —
-// left for environment verification. The SDK connection layer and typed
-// dispatch are exercised by acp_client_test.go with a mock JSON-RPC peer.
+// Verified on the DevSpace dev machine: live end-to-end runs against the
+// real claude-agent-acp 0.67.0 (and native opencode acp 1.18.18) — initialize
+// → session/new → session/prompt → streaming session/update → end_turn →
+// run finalized — plus the session/request_permission approval chain
+// (dangerous tool → broker → POST /v1/permissions/decide allow → tool
+// executed). The SDK connection layer and typed dispatch are also exercised
+// by acp_client_test.go with a mock JSON-RPC peer.
 func runACPSession(ctx context.Context, stdout io.Reader, stdin io.Writer, emitter EventEmitter, run store.Run, broker *PermissionDecisionBroker) error {
 	rc, ok := RunProcessContextFromContext(ctx)
 	if !ok || rc.Prompt == "" {
