@@ -391,6 +391,15 @@ func (s *EdgeCallbackService) HandleTaskDone(ctx context.Context, edgeUserID, ed
 		return err
 	}
 
+	// #1408: the stream path already projects runtime text as chat messages.
+	// When the session's latest agent message carries exactly the done-final
+	// text (a single-chunk stream followed by a done callback with the same
+	// content), skip inserting an identical duplicate so the chat does not
+	// render the final answer twice.
+	if shouldSkipDoneFinalInsert(s.db, ai.SessionID, task.AgentInstanceID, finalContent) {
+		finalContent = ""
+	}
+
 	// insert final message if content is provided
 	var msg *model.Message
 	if finalContent != "" {
@@ -544,6 +553,43 @@ func (s *EdgeCallbackService) authorizeTaskEdgeCallback(task *model.PendingAgent
 		return nil, errcode.ErrBadRequest
 	}
 	return ai, nil
+}
+
+// shouldSkipDoneFinalInsert reports whether HandleTaskDone should skip
+// inserting its final message because the session's latest agent message
+// already carries exactly the same text (stream projection landed it first).
+// The comparison is strict: sender must be the same agent instance and the
+// unwrapped plain text must match, so a partial stream (fragments) or an
+// interleaved user message never suppresses the authoritative final message.
+func shouldSkipDoneFinalInsert(db *gorm.DB, sessionID, senderID, finalContent string) bool {
+	if finalContent == "" {
+		return false
+	}
+	latest, err := repository.GetMessagesBySession(db, sessionID, 0, 1)
+	if err != nil || len(latest) == 0 {
+		return false
+	}
+	last := latest[0]
+	if last.SenderType != model.SenderTypeAgent || last.SenderID != senderID {
+		return false
+	}
+	return unwrapMessageContentText(last.Content) == finalContent
+}
+
+// unwrapMessageContentText extracts plain text from a messages.content jsonb
+// string. Stream-path messages are stored as {"content": "..."}; any other
+// shape (or a non-JSON value) is returned as-is.
+func unwrapMessageContentText(raw string) string {
+	var wrapper struct {
+		Content string `json:"content"`
+	}
+	if err := json.Unmarshal([]byte(raw), &wrapper); err != nil {
+		return raw
+	}
+	if wrapper.Content == "" {
+		return raw
+	}
+	return wrapper.Content
 }
 
 // ── AgentService facade (wiring/handler stability) ───────────────────────────

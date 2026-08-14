@@ -2,6 +2,7 @@ package lifecycle
 
 import (
 	"context"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -160,15 +161,16 @@ func TestHubOutputCollectorAllocatedOnBind(t *testing.T) {
 // blockingHubCallback holds every TaskStream until released, so tests can fill
 // callbackSem and prove stream paths do not block the caller.
 type blockingHubCallback struct {
-	mu        sync.Mutex
-	hold      chan struct{}
-	entered   chan struct{}
-	streams   int
-	acks      int
-	dones     int
-	fails     int
-	inFlight  int
-	maxFlight int
+	mu          sync.Mutex
+	hold        chan struct{}
+	entered     chan struct{}
+	streams     int
+	streamOrder []string
+	acks        int
+	dones       int
+	fails       int
+	inFlight    int
+	maxFlight   int
 }
 
 func newBlockingHubCallback(capacity int) *blockingHubCallback {
@@ -188,7 +190,7 @@ func (c *blockingHubCallback) TaskAck(context.Context, string, string) error {
 	return nil
 }
 
-func (c *blockingHubCallback) TaskStream(context.Context, string, string, string, string) error {
+func (c *blockingHubCallback) TaskStream(_ context.Context, _ string, _ string, _ string, content string) error {
 	c.track()
 	defer c.untrack()
 	select {
@@ -198,6 +200,7 @@ func (c *blockingHubCallback) TaskStream(context.Context, string, string, string
 	<-c.hold
 	c.mu.Lock()
 	c.streams++
+	c.streamOrder = append(c.streamOrder, content)
 	c.mu.Unlock()
 	return nil
 }
@@ -242,8 +245,10 @@ func (c *blockingHubCallback) releaseAll() {
 }
 
 // TestFireHubStreamNonBlockingWhenSemFull proves #1020: when callbackSem is full,
-// fireHubStream returns immediately (drops) instead of blocking the lifecycle path.
-// recordHubOutput remains independent of stream send success.
+// fireHubStream returns immediately instead of blocking the lifecycle path.
+// With the per-run ordered queue (#1409), chunks queue up and deliver in
+// emission order once pressure clears; recordHubOutput remains independent of
+// stream send success.
 func TestFireHubStreamNonBlockingWhenSemFull(t *testing.T) {
 	t.Parallel()
 
@@ -265,32 +270,30 @@ func TestFireHubStreamNonBlockingWhenSemFull(t *testing.T) {
 	executor.hubOutputs[runID] = newHubOutputCollector(hubCallbackFinalMaxBytes)
 	executor.mu.Unlock()
 
-	// Fill the semaphore with slow streams.
-	for i := 0; i < semCap; i++ {
-		executor.fireHubStream(runID, "held-stream")
-	}
+	// Queue streams while the first delivery blocks on the hold channel.
+	executor.fireHubStream(runID, "held-stream-1")
+	executor.fireHubStream(runID, "held-stream-2")
 
-	// Wait until both held callbacks have entered TaskStream.
+	// Wait until the first queued delivery has entered TaskStream.
 	deadline := time.After(2 * time.Second)
-	for i := 0; i < semCap; i++ {
-		select {
-		case <-cb.entered:
-		case <-deadline:
-			t.Fatal("timed out waiting for held stream callbacks to enter")
-		}
+	select {
+	case <-cb.entered:
+	case <-deadline:
+		t.Fatal("timed out waiting for the first held stream callback to enter")
 	}
 
-	// Saturated sem: further stream fire must not block the caller.
+	// Saturated delivery: further stream fire must not block the caller —
+	// chunks queue behind the held ones instead.
 	done := make(chan struct{})
 	go func() {
-		executor.fireHubStream(runID, "dropped-under-pressure")
+		executor.fireHubStream(runID, "queued-under-pressure")
 		close(done)
 	}()
 	select {
 	case <-done:
 		// non-blocking path succeeded
 	case <-time.After(500 * time.Millisecond):
-		t.Fatal("fireHubStream blocked on full callbackSem; expected non-blocking drop")
+		t.Fatal("fireHubStream blocked on full callbackSem; expected non-blocking queue")
 	}
 
 	// FinalContent collection is independent of stream send success (#987).
@@ -300,10 +303,37 @@ func TestFireHubStreamNonBlockingWhenSemFull(t *testing.T) {
 	}
 
 	cb.releaseAll()
+
+	// All three chunks must deliver in emission order (#1409).
+	deadline = time.After(2 * time.Second)
+	for {
+		cb.mu.Lock()
+		got := append([]string(nil), cb.streamOrder...)
+		cb.mu.Unlock()
+		if len(got) == 3 {
+			break
+		}
+		select {
+		case <-deadline:
+			t.Fatalf("timed out waiting for queued streams: got %v", got)
+		case <-time.After(20 * time.Millisecond):
+		}
+	}
+	cb.mu.Lock()
+	got := append([]string(nil), cb.streamOrder...)
+	cb.mu.Unlock()
+	want := []string{"held-stream-1", "held-stream-2", "queued-under-pressure"}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("streams = %v, want ordered %v", got, want)
+		}
+	}
 }
 
 // TestFireHubTerminalBoundedBySem proves #1020: terminal ack/done/fail callbacks
-// share callbackSem so concurrent Hub HTTP stays bounded.
+// share callbackSem so concurrent Hub HTTP stays bounded. Each done/fail fires
+// on its own run (a run has exactly one terminal callback in reality, and the
+// per-run queue closes on the first one), while acks stay run-agnostic.
 func TestFireHubTerminalBoundedBySem(t *testing.T) {
 	t.Parallel()
 
@@ -317,23 +347,30 @@ func TestFireHubTerminalBoundedBySem(t *testing.T) {
 	cb := newBlockingHubCallback(semCap)
 	executor.WithHubCallback(cb)
 
-	const runID = "run-terminal-bound"
-	const taskID = "task-terminal-bound"
-	executor.mu.Lock()
-	executor.hubTasks[runID] = taskID
-	executor.hubOutputs[runID] = newHubOutputCollector(hubCallbackFinalMaxBytes)
-	executor.mu.Unlock()
+	bindRun := func(runID string) {
+		executor.mu.Lock()
+		executor.hubTasks[runID] = "task-" + runID
+		executor.hubOutputs[runID] = newHubOutputCollector(hubCallbackFinalMaxBytes)
+		executor.mu.Unlock()
+	}
 
 	// Launch more terminal callbacks than the semaphore capacity.
 	const launches = 6
+	runCounter := 0
+	nextRun := func() string {
+		runID := "run-terminal-" + strconv.Itoa(runCounter)
+		runCounter++
+		bindRun(runID)
+		return runID
+	}
 	for i := 0; i < launches; i++ {
 		switch i % 3 {
 		case 0:
-			executor.fireHubAck(runID)
+			executor.fireHubAck(nextRun())
 		case 1:
-			executor.fireHubDone(runID, nil)
+			executor.fireHubDone(nextRun(), nil)
 		default:
-			executor.fireHubFail(runID, "boom")
+			executor.fireHubFail(nextRun(), "boom")
 		}
 	}
 
