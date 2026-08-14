@@ -1,6 +1,6 @@
 # AgentHub 组件验收标准（component-acceptance）
 
-最后更新：2026-08-13（自 TokenDanceLab/docs 迁入本仓库，本文件为 AgentHub 单仓 SSOT）
+最后更新：2026-08-14（自 TokenDanceLab/docs 迁入本仓库，本文件为 AgentHub 单仓 SSOT；#1672 迁移状态见 §1）
 
 本文是 AgentHub shared 组件的**验收标准 SSOT**：任何 `app/shared/src/ui/` 下的新组件（或对既有组件做可见行为改动）必须对照本文件的 5 维验收标准，并带 `.test.tsx` + `.stories.tsx` + 本文件验收表对照记录。它与跨产品设计契约（`tokendance-design` 仓库 [design-system.md](https://github.com/TokenDanceLab/tokendance-design/blob/master/docs/design/design-system.md) 管 token 收敛、[design-playbook.md](https://github.com/TokenDanceLab/tokendance-design/blob/master/docs/design/design-playbook.md) 管实现流程、[visual-qa-matrix.md](https://github.com/TokenDanceLab/tokendance-design/blob/master/docs/design/visual-qa-matrix.md) 管产品级截图证据）互补：本文管**单组件验收**，矩阵管**产品级视觉证据**。
 
@@ -30,7 +30,7 @@
 | 可选 | 玻璃/投影/圆角与 Design Contract 一致（control 8px / panel 16px 语义） |
 | 可选 | 提供 Storybook 截图或渲染证据路径 |
 
-> 迁移债务：历史 v4 词汇（`--surface/--text-*/--bdr/--primary-*`）仍在 `app/shared/src/designTokens.ts` 与 `chatview/design/tokens.css` 中存活。新组件不得把 v4 当作平行标准继续扩散；v4 → `--td-*` 的收敛以设计契约 SSOT 为准，收敛计划记入 debt（owner + 计划）。
+> 迁移状态（2026-08-14，issue #1672 M1–M7 闭环）：v4 → `--td-*` 组件级消费已清零——chatview/ui/workbench/web/desktop 消费面全部使用 `--td-*`，chatview 产品局部密度阶梯使用 `--chat-*` 前缀。`app/shared/src/styles/{tokens-base,themes}.css` 保留 v4 名作为**主题源值**（`--td-*` 桥接其上），新代码不要直接消费 v4 名。新组件一律直接使用 `--td-*`；确需产品局部组合的用 `--hub-*` 或组件前缀，禁止再造通用平行词汇。
 
 ### 2. 交互（Interaction）
 
@@ -77,7 +77,7 @@
 
 | 维度 | 必选项 | 状态 | 备注 |
 |---|---|---|---|
-| 视觉 | token 化配色（primary/secondary/danger + hover/disabled） | ✅ | `--primary`/`--primary-hover`/`--td-*` |
+| 视觉 | token 化配色（primary/secondary/danger + hover/disabled） | ✅ | `--td-plum`/`--td-plum-hover`/`--td-danger` 等 |
 | 视觉 | light/dark 对比度与 2x 边框 | ✅ | 随 Button.stories.tsx 巡检 |
 | 交互 | 异步禁用/进度、防重复提交 | ✅ | Button.test.tsx 有行为断言 |
 | 键盘 | Tab 聚焦、Enter/Space 触发 | ✅ | 原生 button 语义 |
@@ -89,7 +89,7 @@
 
 | 维度 | 必选项 | 状态 | 备注 |
 |---|---|---|---|
-| 视觉 | token 化面板（`--td-panel`/`--surface-high`）、scrim | ✅ | 需补 Storybook 证据 |
+| 视觉 | token 化面板（`--td-panel`/`--td-surface-3`）、scrim | ✅ | 需补 Storybook 证据 |
 | 交互 | 打开/关闭、提交/取消路径行为断言 | ✅ | Modal.test.tsx |
 | 键盘 | Esc 关闭、焦点移入/归还 | ✅ | 测试覆盖 |
 | 键盘 | Tab 循环（焦点困在对话框内） | ⚠️ | 需人工复核，见 debt 记录 |
