@@ -107,10 +107,9 @@ func (a *OpenCodeACPAdapter) PreflightCheck() error {
 // (via the embedded AcpAdapter).
 var _ AgentAdapter = (*OpenCodeACPAdapter)(nil)
 
-// TODO(#1404 真跑验证): an end-to-end run against the real `opencode acp` process
-// requires an opencode >= 1.18.5 binary on PATH with provider credentials
-// (API key or opencode auth login). Not present in this workspace —
-// verification is limited to the registry registration, command shape, and a
-// mock ACP peer (opencode_acp_test.go / acp_client_test.go). Before cutover:
-// verify on a machine with the opencode binary + keys, and confirm the
-// binary's `acp` subcommand speaks the pinned protocol version.
+// Verified: end-to-end runs against the real `opencode acp` process were
+// exercised on the DevSpace dev machine (opencode 1.18.18 installed via npm,
+// gateway provider configured in ~/.config/opencode/opencode.json →
+// initialize → session/new → session/prompt → streaming → end_turn → run
+// finalized). Provider credentials come from the opencode config file, not
+// the child env, so the sanitizer does not affect them.
