@@ -59,7 +59,7 @@ export const EmojiPicker: React.FC<EmojiPickerProps> = ({
   }, [activeIndex]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>): void => {
-    let next: number | null = null;
+    let next: number | null;
     switch (e.key) {
       case 'ArrowRight':
         next = (activeIndex + 1) % count;

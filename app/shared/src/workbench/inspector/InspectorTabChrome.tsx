@@ -124,7 +124,7 @@ export function InspectorMonitorHead({
 
     const current = enabledTabs.findIndex((tab) => tab.mode === activeMode);
     const from = current >= 0 ? current : 0;
-    let next = -1;
+    let next: number;
     switch (event.key) {
       case 'ArrowRight':
         next = (from + 1) % enabledTabs.length;

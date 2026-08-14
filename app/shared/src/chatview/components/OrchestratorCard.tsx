@@ -33,6 +33,9 @@ function buildLayers(nodes: DagNode[]): { layers: DagNode[][]; remaining: DagNod
 // ── Node dimensions (matching row-hd scale) ──
 const NW=108, NH=28, CG=48, RG=8, P=12
 
+/** Shared stable empty array for cards without orchestrator data. */
+const EMPTY_NODES: DagNode[] = []
+
 const NodeEl = memo(function NodeEl({n,x,y}:{n:DagNode;x:number;y:number}){
   const sc=n.status==='ok'?'var(--state-success)':n.status==='running'?'var(--state-running)':n.status==='fail'?'var(--state-failed)':'var(--state-waiting)'
   const cy=y+NH/2
@@ -50,13 +53,28 @@ const NodeEl = memo(function NodeEl({n,x,y}:{n:DagNode;x:number;y:number}){
  *  Nodes are topologically sorted into layers; edges connect dependencies.
  *  Detects and reports cycles when present. */
 export const OrchestratorCard = memo(function OrchestratorCard({item}:{item:RowItemType}){
-  const nodes: DagNode[]=item.orchAgents||[]
-  if (!nodes.length) return null
+  // Stable empty array so the useMemo dependencies do not change identity on
+  // every render when orchAgents is absent.
+  const nodes: DagNode[] = item.orchAgents ?? EMPTY_NODES
 
+  // Hooks run before the early return so the hook order stays stable when a
+  // card transitions between empty and populated states.
   const { layers, remaining } = useMemo(() => buildLayers(nodes), [nodes])
   const hasCycles = remaining.length > 0
   // If cycles exist, append a fallback layer so nodes are still visible
-  const allLayers = hasCycles ? [...layers, remaining] : layers
+  const allLayers = useMemo(
+    () => (hasCycles ? [...layers, remaining] : layers),
+    [hasCycles, layers, remaining],
+  )
+
+  // Build a lookup: node id → {layer index, row index}
+  const pos = useMemo(() => {
+    const m = new Map<string,{li:number;ri:number}>()
+    allLayers.forEach((layer,li)=>{layer.forEach((n,ri)=>{m.set(n.id,{li,ri})})})
+    return m
+  }, [allLayers])
+
+  if (!nodes.length) return null
 
   const markerId = `ah-${item.id.replace(/[^a-zA-Z0-9_-]/g, '_')}`
   const nLayers = allLayers.length
@@ -70,13 +88,6 @@ export const OrchestratorCard = memo(function OrchestratorCard({item}:{item:RowI
 
   // Y-position for a row within a column of height colH(rows)
   const gy = (i:number, rows:number)=>P+(colH(maxColRows)-colH(rows))/2+i*(NH+RG)
-
-  // Build a lookup: node id → {layer index, row index}
-  const pos = useMemo(() => {
-    const m = new Map<string,{li:number;ri:number}>()
-    allLayers.forEach((layer,li)=>{layer.forEach((n,ri)=>{m.set(n.id,{li,ri})})})
-    return m
-  }, [allLayers])
 
   return <div className="row-item route standalone open">
     <div className="row-hd">

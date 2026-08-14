@@ -3,7 +3,7 @@
  * Peel companion of chatviewFixtures (#1132). Pure only; zero behavior change.
  */
 
-import type { TranscriptBlock } from '../transcript/types'
+import type { EvidenceRefStatus, TranscriptBlock } from '../transcript/types'
 import { B, T, U } from './chatviewFixturesHelpers'
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -68,7 +68,7 @@ export const chatviewBuilderTranscript: TranscriptBlock[] = [
   { id: 'bto4', kind: 'tool_call', createdAt: T(9), author: B('builder'), toolName: 'Read', status: 'running' },
   { id: 'btr4', kind: 'tool_result', createdAt: T(10), author: B('builder'), toolName: 'Read', status: 'completed', summary: 'src/api/endpoints/tasks.ts · 95 lines · getTasks, getTaskById, createTask, updateTask, deleteTask — same structure' },
   { id: 'bto5', kind: 'tool_call', createdAt: T(11), author: B('builder'), toolName: 'Grep', status: 'running' },
-  { id: 'btr5', kind: 'tool_result', createdAt: T(12), author: B('builder'), toolName: 'Grep', status: 'completed', summary: 'src/api/ → "response\.json\|\.catch\|as Promise\|fetch(" · 53 matches · 8 endpoint files · identical error-handling pattern repeated everywhere' },
+  { id: 'btr5', kind: 'tool_result', createdAt: T(12), author: B('builder'), toolName: 'Grep', status: 'completed', summary: 'src/api/ → "response.json|.catch|as Promise|fetch(" · 53 matches · 8 endpoint files · identical error-handling pattern repeated everywhere' },
 
   /* ── Think 2: Analyze patterns, design types ── */
   {
@@ -334,7 +334,7 @@ export const chatviewBuilderTranscript: TranscriptBlock[] = [
   /* ── Approval → user approves → deploy ── */
   {
     id: 'bap1', kind: 'approval', createdAt: T(23), author: B('builder'),
-    title: 'Write 5 files (2 new, 3 modified)', status: 'waiting' as any,
+    title: 'Write 5 files (2 new, 3 modified)', status: 'waiting' as unknown as EvidenceRefStatus,
     reason: 'Builder requests creation of src/api/types.ts, src/api/create-client.ts and modification of 3 existing files. All type checks and lint pass. Confirmation required to proceed.',
   },
   { id: 'bu2', kind: 'text', createdAt: T(24), author: U('alice'), text: 'Looks good, approved. Go ahead and write the files.' },
@@ -430,7 +430,7 @@ export const chatviewBuilderTranscript: TranscriptBlock[] = [
   /* ── Second approval (waiting state, exercises onApprove/onReject) ── */
   {
     id: 'bap2', kind: 'approval', createdAt: T(35), author: B('builder'),
-    title: 'Migrate 31 call sites (non-breaking, incremental)', status: 'waiting' as any,
+    title: 'Migrate 31 call sites (non-breaking, incremental)', status: 'waiting' as unknown as EvidenceRefStatus,
     risk: 'low',
     reason: 'Non-breaking incremental migration. Each call site changes one import line. Legacy stubs remain active until all call sites are migrated. Rollback: revert the PR — old client.ts untouched throughout.',
   },

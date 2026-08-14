@@ -90,7 +90,7 @@ function extractFileUrl(content: string | undefined): string {
  *  because the shared package has no Local Edge; Desktop drives the Edge
  *  connection through its own wrappers.  InteractiveDiffPreview was already
  *  a known defect per verify-shared-boundary.py (audit-A P → PreviewPort). */
-let edgeBaseUrl = '';
+const edgeBaseUrl = '';
 
 async function postJson<T>(path: string, body: unknown): Promise<T> {
   if (!edgeBaseUrl) {
@@ -129,50 +129,60 @@ function InteractiveDiffPreview({
   file: PreviewFile;
   onClose: () => void;
 }): React.ReactElement {
-  if (!file.interactiveDiff) return (<></>);
-  const { runId, fileDiff, workDir } = file.interactiveDiff;
+  const interactiveDiff = file.interactiveDiff;
 
-  const reviewFiles: DiffReviewFile[] = useMemo(() => [{
-    filePath: fileDiff.filePath,
-    status: fileDiff.status === 'untracked' ? 'added' : fileDiff.status,
-    additions: fileDiff.additions,
-    deletions: fileDiff.deletions,
-    hunks: fileDiff.hunks as unknown as DiffReviewFile['hunks'],
-  }], [fileDiff]);
+  // Hooks run unconditionally so the hook order is stable if a file toggles
+  // between interactive and non-interactive diff states across renders.
+  const reviewFiles: DiffReviewFile[] = useMemo(() => {
+    if (!interactiveDiff) return [];
+    const { fileDiff } = interactiveDiff;
+    return [{
+      filePath: fileDiff.filePath,
+      status: fileDiff.status === 'untracked' ? 'added' : fileDiff.status,
+      additions: fileDiff.additions,
+      deletions: fileDiff.deletions,
+      hunks: fileDiff.hunks as unknown as DiffReviewFile['hunks'],
+    }];
+  }, [interactiveDiff]);
 
   const handleApplyHunk = useCallback(
     async (decision: DiffHunkDecision) => {
+      if (!interactiveDiff) return;
       try {
-        await applyRunDiff(runId, {
+        await applyRunDiff(interactiveDiff.runId, {
           file_path: decision.filePath,
           hunk_index: decision.hunkIndex,
           accepted: decision.accepted,
-          workDir,
+          workDir: interactiveDiff.workDir,
         });
       } catch (err) {
         console.error('RightInspector: applyRunDiff failed for hunk:', decision.filePath, decision.hunkIndex, err);
       }
     },
-    [runId, workDir],
+    [interactiveDiff],
   );
 
   const handleApplyAllHunks = useCallback(
     async (decisions: DiffHunkDecision[]) => {
+      if (!interactiveDiff) return;
       try {
-        await applyAllRunDiffs(runId, {
+        await applyAllRunDiffs(interactiveDiff.runId, {
           decisions: decisions.map((d) => ({
             file_path: d.filePath,
             hunk_index: d.hunkIndex,
             accepted: d.accepted,
           })),
-          workDir,
+          workDir: interactiveDiff.workDir,
         });
       } catch (err) {
         console.error('RightInspector: applyAllRunDiffs failed:', decisions.length, 'hunks,', err);
       }
     },
-    [runId, workDir],
+    [interactiveDiff],
   );
+
+  if (!interactiveDiff) return (<></>);
+  const { runId, fileDiff } = interactiveDiff;
 
   return (
     <div className={styles.filePreview}>

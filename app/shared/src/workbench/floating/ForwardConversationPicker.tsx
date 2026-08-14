@@ -75,7 +75,7 @@ export const ForwardConversationPicker: React.FC<ForwardConversationPickerProps>
     // Escape is owned by the submenu host (ContextMenu); do not swallow.
     if (e.key === 'Escape') return;
     if (count === 0) return;
-    let next: number | null = null;
+    let next: number | null;
     switch (e.key) {
       case 'ArrowDown':
         next = (activeIndex + 1) % count;

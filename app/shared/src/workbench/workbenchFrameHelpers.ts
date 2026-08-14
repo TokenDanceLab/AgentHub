@@ -111,7 +111,7 @@ export function toIdSet(ids: readonly string[]): Set<string> {
 export function createTranscriptBlockContextMenuHandler(
   transcript: readonly TranscriptBlock[],
   openBlockContextMenu: (block: TranscriptBlock, event: TranscriptContextMenuEvent) => void,
-): (blockId: string, event: { /* React.MouseEvent shape */ }) => void {
+): (blockId: string, event: unknown) => void {
   return (blockId, event) => {
     const block = transcript.find((b) => b.id === blockId);
     if (block) openBlockContextMenu(block, event as unknown as TranscriptContextMenuEvent);

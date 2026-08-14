@@ -66,7 +66,7 @@ export function isAllowedTechnicalId(value: string): boolean {
   const trimmed = value.trim();
   if (!trimmed) return false;
   // Model routes like "openai / gpt-5" or runtime ids like "claude-code".
-  return /^[A-Za-z0-9][A-Za-z0-9 ._/+\-]*$/.test(trimmed)
+  return /^[A-Za-z0-9][A-Za-z0-9 ._/+-]*$/.test(trimmed)
     && !findBannedProductEnMeta(trimmed).length
     && !findRuntimeModelStuffing(trimmed).length;
 }

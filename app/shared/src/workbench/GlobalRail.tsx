@@ -110,7 +110,7 @@ export function GlobalRail({
   }, [rovingIndex]);
 
   function handleRailKeyDown(event: React.KeyboardEvent<HTMLElement>): void {
-    let next = -1;
+    let next: number;
     switch (event.key) {
       case 'ArrowRight':
         next = (rovingIndex + 1) % pageIds.length;

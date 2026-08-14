@@ -49,15 +49,12 @@ import type {
   HubSendWorkspaceProjectThreadMessageRequest,
   HubWorkspaceProjectThreadMessage,
   HubMessage,
-  HubListResponse,
-  HubMCPServer,
 } from './hubClientDomainTypes';
 
 import * as hubPayload from './hubClientPayloadUtils';
 import {
   invokePathFormDataUpload,
   invokePathInitRequest,
-  invokePathsInitRequest,
 } from './hubClientRequestUtils';
 
 export interface HubClientExtendedApiDeps {
