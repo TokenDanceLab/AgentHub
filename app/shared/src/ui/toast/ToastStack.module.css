@@ -3,7 +3,7 @@
   position: fixed;
   top: 48px;
   right: 14px;
-  z-index: var(--z-toast);
+  z-index: var(--td-z-toast);
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -20,9 +20,9 @@
   padding: 9px 10px;
   border-radius: 12px;
   font-size: 12px;
-  line-height: var(--line-height-normal);
+  line-height: var(--td-leading-normal);
   cursor: default;
-  animation: toast-slide-in var(--duration-medium) var(--ease-out);
+  animation: toast-slide-in var(--duration-medium) var(--td-ease-out);
   box-shadow:
     0 16px 36px var(--glass-bg-heavy),
     0 4px 12px var(--glass-bg-medium),
@@ -30,12 +30,12 @@
   word-break: break-word;
   border: 1px solid var(--glass-border);
   background: var(--glass-input-bg-hover);
-  color: var(--foreground);
+  color: var(--td-ink);
   backdrop-filter: blur(28px) saturate(1.16);
   -webkit-backdrop-filter: blur(28px) saturate(1.16);
   transition:
-    opacity var(--duration-fast) var(--ease-out),
-    transform var(--duration-normal) var(--ease-in);
+    opacity var(--td-dur-fast) var(--td-ease-out),
+    transform var(--td-dur-normal) var(--ease-in);
 }
 
 [data-theme='dark'] .toast {
@@ -49,7 +49,7 @@
 }
 
 .toast.exiting {
-  animation: toast-slide-out var(--duration-normal) var(--ease-in) forwards;
+  animation: toast-slide-out var(--td-dur-normal) var(--ease-in) forwards;
   pointer-events: none;
 }
 
@@ -89,15 +89,15 @@
 }
 
 .success .icon {
-  color: var(--success);
+  color: var(--td-moss);
 }
 
 .error .icon {
-  color: var(--destructive);
+  color: var(--td-danger);
 }
 
 .warning .icon {
-  color: var(--warning);
+  color: var(--td-warning);
 }
 
 .info .icon {
@@ -113,25 +113,25 @@
 }
 
 .message {
-  line-height: var(--line-height-normal);
-  color: color-mix(in oklch, var(--foreground) 82%, transparent);
+  line-height: var(--td-leading-normal);
+  color: color-mix(in oklch, var(--td-ink) 82%, transparent);
 }
 
 .action {
   align-self: flex-start;
   display: inline-flex;
   align-items: center;
-  padding: 2px var(--space-sm);
-  border-radius: var(--radius-sm);
-  font-size: var(--font-size-xs);
+  padding: 2px var(--td-space-2);
+  border-radius: var(--td-radius-control);
+  font-size: var(--td-text-xs);
   font-weight: var(--font-weight-medium);
-  line-height: var(--line-height-tight);
+  line-height: var(--td-leading-tight);
   border: 1px solid currentColor;
   background: transparent;
   color: inherit;
   transition:
-    background var(--duration-fast) var(--ease-out),
-    opacity var(--duration-fast) var(--ease-out);
+    background var(--td-dur-fast) var(--td-ease-out),
+    opacity var(--td-dur-fast) var(--td-ease-out);
 }
 
 .action:hover {
@@ -151,21 +151,21 @@
   justify-content: center;
   width: 20px;
   height: 20px;
-  border-radius: var(--radius-sm);
+  border-radius: var(--td-radius-control);
   border: none;
   background: transparent;
-  color: var(--muted-foreground);
+  color: var(--td-ink-muted);
   margin-top: 1px;
   padding: 0;
   line-height: 1;
   cursor: pointer;
   transition:
-    background var(--duration-fast) var(--ease-out),
-    color var(--duration-fast) var(--ease-out);
+    background var(--td-dur-fast) var(--td-ease-out),
+    color var(--td-dur-fast) var(--td-ease-out);
 }
 
 .close:hover {
-  color: var(--foreground);
+  color: var(--td-ink);
   background: var(--hover-overlay);
 }
 

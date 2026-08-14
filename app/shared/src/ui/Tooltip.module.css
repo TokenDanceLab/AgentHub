@@ -18,13 +18,13 @@
   z-index: var(--z-tooltip, 600);
   max-width: 220px;
   padding: 5px 8px 6px;
-  border: 1px solid var(--glass-border, var(--border));
-  border-radius: var(--r-sm);
-  background: var(--glass-input-bg-hover, var(--card));
+  border: 1px solid var(--glass-border, var(--td-line));
+  border-radius: var(--td-radius-control);
+  background: var(--glass-input-bg-hover, var(--td-surface));
   backdrop-filter: blur(18px) saturate(1.12);
   -webkit-backdrop-filter: blur(18px) saturate(1.12);
   box-shadow: 0 10px 28px var(--glass-shadow-subtle, rgba(0, 0, 0, 0.34));
-  color: var(--foreground);
+  color: var(--td-ink);
   font-size: 11px;
   font-weight: 560;
   line-height: 1.55;
@@ -36,7 +36,7 @@
 
 [data-theme='dark'] .tooltip {
   border-color: transparent;
-  background: var(--glass-panel, var(--card));
+  background: var(--glass-panel, var(--td-surface));
   box-shadow: 0 14px 32px var(--glass-shadow, rgba(0, 0, 0, 0.52));
 }
 

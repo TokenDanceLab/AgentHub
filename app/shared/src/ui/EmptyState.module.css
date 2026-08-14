@@ -5,12 +5,12 @@
   justify-content: flex-start;
   max-width: 520px;
   margin: 0 auto;
-  padding: var(--wb-gap-3xl, 120px) var(--wb-gap-md, var(--space-md, 1rem)) var(--space-xl, 1.5rem);
-  color: var(--foreground);
+  padding: var(--wb-gap-3xl, 120px) var(--wb-gap-md, var(--td-space-3, 1rem)) var(--td-space-5, 1.5rem);
+  color: var(--td-ink);
   text-align: center;
   user-select: none;
   /* glass card density */
-  border: 1px solid var(--glass-border-strong, var(--border));
+  border: 1px solid var(--glass-border-strong, var(--td-line));
   border-radius: var(--glass-card-radius, var(--r-xl));
   background: var(--glass-card-bg, var(--glass-panel));
   backdrop-filter: var(--glass-backdrop-filter);
@@ -22,7 +22,7 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: var(--wb-gap-sm, var(--space-md, 0.75rem));
+  gap: var(--wb-gap-sm, var(--td-space-3, 0.75rem));
 }
 
 /* ── Icon with gradient background ─────────────────────────────────── */
@@ -32,8 +32,8 @@
   justify-content: center;
   width: 56px;
   height: 56px;
-  border: 1px solid var(--glass-border-strong, var(--border));
-  border-radius: var(--r-lg);
+  border: 1px solid var(--glass-border-strong, var(--td-line));
+  border-radius: var(--td-radius-panel);
   background:
     linear-gradient(
       135deg,
@@ -43,12 +43,12 @@
   backdrop-filter: var(--glass-backdrop-filter);
   -webkit-backdrop-filter: var(--glass-backdrop-filter);
   box-shadow: var(--glass-elev-1);
-  color: var(--muted-foreground);
+  color: var(--td-ink-muted);
 }
 
 .title {
   margin: 0;
-  color: var(--foreground);
+  color: var(--td-ink);
   font-size: 22px;
   font-weight: 520;
   letter-spacing: 0;
@@ -58,8 +58,8 @@
 .description {
   max-width: 420px;
   margin: 0;
-  color: var(--muted-foreground);
-  font-size: var(--font-size-sm, 0.875rem);
+  color: var(--td-ink-muted);
+  font-size: var(--td-text-sm, 0.875rem);
   line-height: 1.5;
 }
 
@@ -70,11 +70,11 @@
   justify-content: center;
   min-height: 20px;
   padding: 0 6px;
-  border: 1px solid var(--glass-border-subtle, var(--bdr));
-  border-radius: var(--r-sm);
-  background: var(--glass-bg-subtle, var(--surface-low));
-  color: var(--muted-foreground);
-  font-family: var(--font-sans);
+  border: 1px solid var(--glass-border-subtle, var(--td-line));
+  border-radius: var(--td-radius-control);
+  background: var(--glass-bg-subtle, var(--td-surface-2));
+  color: var(--td-ink-muted);
+  font-family: var(--td-font);
   font-size: var(--font-size-2xs, 0.625rem);
   font-weight: 500;
   line-height: 1;
@@ -87,7 +87,7 @@
   flex-wrap: wrap;
   justify-content: center;
   gap: var(--wb-gap-xs, 8px);
-  margin-top: var(--wb-gap-xs, var(--space-sm, 0.5rem));
+  margin-top: var(--wb-gap-xs, var(--td-space-2, 0.5rem));
 }
 
 .suggestionChip {
@@ -95,14 +95,14 @@
   align-items: center;
   gap: 6px;
   min-height: 32px;
-  border: 1px solid var(--glass-border-subtle, var(--bdr));
-  border-radius: var(--r-lg);
+  border: 1px solid var(--glass-border-subtle, var(--td-line));
+  border-radius: var(--td-radius-panel);
   padding: 0 12px;
-  background: var(--glass-bg-subtle, var(--surface-low));
+  background: var(--glass-bg-subtle, var(--td-surface-2));
   backdrop-filter: var(--glass-backdrop-filter);
   -webkit-backdrop-filter: var(--glass-backdrop-filter);
-  color: var(--foreground);
-  font-family: var(--font-sans);
+  color: var(--td-ink);
+  font-family: var(--td-font);
   font-size: 13px;
   cursor: pointer;
 }
@@ -125,8 +125,8 @@
 }
 
 .suggestionChip:hover {
-  border-color: var(--glass-border-strong, var(--bdr-focus));
-  background: var(--glass-bg-light, var(--surface-high));
+  border-color: var(--glass-border-strong, var(--td-focus));
+  background: var(--glass-bg-light, var(--td-surface-3));
 }
 
 .suggestionIcon {
@@ -139,7 +139,7 @@
 /* ── Entry animation (fadeInUp, 12px translateY, 60fps) ─────────────── */
 @media (prefers-reduced-motion: no-preference) {
   .container {
-    animation: emptyStateIn 0.32s var(--ease-out, cubic-bezier(0, 0, 0.2, 1));
+    animation: emptyStateIn 0.32s var(--td-ease-out, cubic-bezier(0, 0, 0.2, 1));
   }
 
   @keyframes emptyStateIn {
@@ -157,7 +157,7 @@
 @media (max-width: 767px) {
   .container {
     max-width: 100%;
-    padding: 80px var(--space-sm, 0.75rem) var(--space-lg, 1rem);
+    padding: 80px var(--td-space-2, 0.75rem) var(--td-space-4, 1rem);
   }
 
   .title {

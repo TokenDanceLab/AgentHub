@@ -12,7 +12,7 @@
 
 .eyebrow {
   margin: 0 0 2px;
-  color: var(--muted-foreground);
+  color: var(--td-ink-muted);
   font-size: 11px;
   font-weight: 700;
   line-height: 1.45;
@@ -22,7 +22,7 @@
 
 .title {
   margin: 0;
-  color: var(--foreground);
+  color: var(--td-ink);
   font-size: 16px;
   font-weight: 700;
   line-height: 1.45;

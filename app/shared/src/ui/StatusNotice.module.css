@@ -3,7 +3,7 @@
   align-items: center;
   gap: 6px;
   min-width: 0;
-  color: var(--muted-foreground);
+  color: var(--td-ink-muted);
   font-size: 12px;
   line-height: 1.45;
 }

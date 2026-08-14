@@ -17,21 +17,21 @@
   height: 30px;
   padding: 0 2px;
   border: 0;
-  border-radius: var(--r-sm);
+  border-radius: var(--td-radius-control);
   background: transparent;
-  color: var(--text-1);
-  font: 600 0.75rem var(--font-sans);
+  color: var(--td-ink);
+  font: 600 0.75rem var(--td-font);
   cursor: pointer;
   white-space: nowrap;
   transition:
-    background var(--dur-normal) var(--ease),
-    color var(--dur-normal) var(--ease),
-    box-shadow var(--dur-normal) var(--ease);
+    background var(--td-dur-normal) var(--td-ease),
+    color var(--td-dur-normal) var(--td-ease),
+    box-shadow var(--td-dur-normal) var(--td-ease);
   -webkit-font-smoothing: antialiased;
 }
 
 .trigger:hover {
-  background: color-mix(in srgb, var(--surface-high) 68%, transparent);
+  background: color-mix(in srgb, var(--td-surface-3) 68%, transparent);
 }
 
 .trigger:focus-visible {
@@ -51,7 +51,7 @@
 }
 
 .placeholder {
-  color: var(--text-3);
+  color: var(--td-ink-subtle);
   font-weight: 450;
   min-width: 0;
   overflow: hidden;
@@ -64,9 +64,9 @@
   opacity: 0.82;
   flex-shrink: 0;
   transition:
-    transform var(--dur-normal) var(--ease-panel),
-    color var(--dur-normal) var(--ease),
-    opacity var(--dur-normal) var(--ease);
+    transform var(--td-dur-normal) var(--ease-panel),
+    color var(--td-dur-normal) var(--td-ease),
+    opacity var(--td-dur-normal) var(--td-ease);
 }
 
 .chevronOpen {
@@ -81,14 +81,14 @@
   max-height: min(280px, calc(100vh - 32px));
   overflow-y: auto;
   padding: 7px;
-  border: 1px solid var(--glass-border, var(--bdr));
-  border-radius: var(--r-lg);
+  border: 1px solid var(--glass-border, var(--td-line));
+  border-radius: var(--td-radius-panel);
   background: var(--glass-panel-overlay, var(--glass-panel));
   box-shadow: var(--glass-elev-3);
   backdrop-filter: var(--glass-backdrop-filter);
   -webkit-backdrop-filter: var(--glass-backdrop-filter);
   animation: dropdownIn var(--dur-medium) var(--ease-panel);
-  font-family: var(--font-sans);
+  font-family: var(--td-font);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   scrollbar-width: thin;
@@ -134,22 +134,22 @@
   background: transparent;
   cursor: pointer;
   text-align: left;
-  font: 560 0.8125rem var(--font-sans);
-  color: var(--text-1);
+  font: 560 0.8125rem var(--td-font);
+  color: var(--td-ink);
   transition:
-    background var(--dur-normal) var(--ease),
-    color var(--dur-normal) var(--ease),
-    transform var(--dur-normal) var(--ease);
+    background var(--td-dur-normal) var(--td-ease),
+    color var(--td-dur-normal) var(--td-ease),
+    transform var(--td-dur-normal) var(--td-ease);
 }
 
 .option:hover,
 .optionFocused {
-  background: var(--surface-high);
+  background: var(--td-surface-3);
 }
 
 .optionSelected {
-  background: var(--primary-light);
-  color: var(--primary);
+  background: var(--td-tint);
+  color: var(--td-plum);
   font-weight: 650;
 }
 
@@ -172,7 +172,7 @@
 }
 
 [data-theme='dark'] .trigger:hover {
-  background: color-mix(in srgb, var(--surface-high) 70%, transparent);
+  background: color-mix(in srgb, var(--td-surface-3) 70%, transparent);
 }
 
 [data-theme='dark'] .trigger:focus-visible {
@@ -180,8 +180,8 @@
 }
 
 [data-theme='dark'] .dropdown {
-  background: color-mix(in srgb, var(--surface) 94%, transparent);
-  border-color: color-mix(in srgb, var(--bdr) 90%, transparent);
+  background: color-mix(in srgb, var(--td-surface) 94%, transparent);
+  border-color: color-mix(in srgb, var(--td-line) 90%, transparent);
   box-shadow:
     0 24px 68px -28px rgba(0, 0, 0, 0.72),
     0 12px 30px -18px rgba(0, 0, 0, 0.56),
@@ -190,7 +190,7 @@
 
 [data-theme='dark'] .option:hover,
 [data-theme='dark'] .optionFocused {
-  background: var(--surface-high);
+  background: var(--td-surface-3);
 }
 
 [data-theme='dark'] .chevron {

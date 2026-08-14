@@ -2,11 +2,11 @@
   display: grid;
   grid-template-columns: 38px minmax(0, 1fr);
   gap: 12px;
-  border: 1px solid var(--border);
+  border: 1px solid var(--td-line);
   border-radius: var(--r-xl);
   padding: 14px;
-  background: var(--card);
-  color: var(--foreground);
+  background: var(--td-surface);
+  color: var(--td-ink);
 }
 
 .icon {
@@ -15,10 +15,10 @@
   justify-content: center;
   width: 38px;
   height: 38px;
-  border: 1px solid var(--border);
-  border-radius: var(--r-lg);
-  background: color-mix(in oklch, var(--card, white) 70%, transparent);
-  color: var(--muted-foreground);
+  border: 1px solid var(--td-line);
+  border-radius: var(--td-radius-panel);
+  background: color-mix(in oklch, var(--td-surface, white) 70%, transparent);
+  color: var(--td-ink-muted);
 }
 
 .body {
@@ -29,7 +29,7 @@
 
 .eyebrow {
   margin: 0;
-  color: var(--muted-foreground);
+  color: var(--td-ink-muted);
   font-size: 11px;
   font-weight: 760;
   letter-spacing: 0;
@@ -39,7 +39,7 @@
 
 .title {
   margin: 0;
-  color: var(--foreground);
+  color: var(--td-ink);
   font-size: 16px;
   font-weight: 700;
   line-height: 1.45;
@@ -48,7 +48,7 @@
 .description,
 .meta {
   margin: 0;
-  color: var(--muted-foreground);
+  color: var(--td-ink-muted);
   font-size: 13px;
   line-height: 1.55;
 }
@@ -66,11 +66,11 @@
   justify-content: center;
   gap: 7px;
   min-height: 44px;
-  border: 1px solid var(--border);
+  border: 1px solid var(--td-line);
   border-radius: var(--r-md);
   padding: 0 13px;
-  background: var(--card);
-  color: var(--foreground);
+  background: var(--td-surface);
+  color: var(--td-ink);
   font: inherit;
   font-weight: 660;
   cursor: pointer;
