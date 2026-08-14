@@ -29,7 +29,9 @@
     "active": true,
     "createUpdaterArtifacts": true,
     "targets": [
-      "nsis"
+      "nsis",
+      "appimage",
+      "deb"
     ],
     "externalBin": [
       "binaries/agenthub-edge"

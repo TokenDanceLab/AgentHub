@@ -279,6 +279,100 @@ jobs:
           name: desktop-artifacts
           path: dist/
 
+  # ── Tauri Desktop (Linux) ────────────────────
+  # Linux 桌面端与 Windows 共用同一套前端 + src-tauri 源码；Cargo.toml 已含
+  # linux-keyutils-keyring-store。首版只出 AppImage + deb（GitHub Releases
+  # 手动更新）；AppImage auto-updater（full-update tar.gz 流）另记账债。
+  build-desktop-linux:
+    needs: build-go
+    runs-on: ubuntu-latest
+    env:
+      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install Tauri Linux system dependencies
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            build-essential \
+            curl \
+            wget \
+            file \
+            libxdo-dev \
+            libssl-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            patchelf
+
+      - uses: pnpm/action-setup@v6
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+          cache-dependency-path: app/pnpm-lock.yaml
+
+      - name: Install dependencies
+        working-directory: app
+        run: pnpm install --frozen-lockfile
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@1.96.0
+
+      - name: Cache Rust build artifacts
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: app/desktop/src-tauri
+
+      - name: Download Go binaries for sidecar
+        uses: actions/download-artifact@v8
+        with:
+          name: go-binaries
+          path: go-binaries
+
+      - name: Prepare edge-server sidecar binary
+        shell: bash
+        run: |
+          ver="${GITHUB_REF_NAME#v}"
+          mkdir -p app/desktop/src-tauri/binaries
+          cp "go-binaries/agenthub-edge-${ver}-linux-amd64" \
+             "app/desktop/src-tauri/binaries/agenthub-edge-x86_64-unknown-linux-gnu"
+          chmod +x "app/desktop/src-tauri/binaries/agenthub-edge-x86_64-unknown-linux-gnu"
+
+      - name: Build Tauri (AppImage + deb)
+        working-directory: app/desktop
+        run: pnpm tauri build
+
+      - name: Collect Linux bundles
+        shell: bash
+        run: |
+          ver="${GITHUB_REF_NAME#v}"
+          mkdir -p dist
+          appimage=$(find app/desktop/src-tauri/target/release/bundle/appimage -name "*.AppImage" -print -quit)
+          if [ -n "$appimage" ]; then
+            cp "$appimage" "dist/AgentHub_${ver}_x86_64.AppImage"
+          else
+            echo "::warning::AppImage 未生成"
+          fi
+          deb=$(find app/desktop/src-tauri/target/release/bundle/deb -name "*.deb" -print -quit)
+          if [ -n "$deb" ]; then
+            cp "$deb" "dist/AgentHub_${ver}_amd64.deb"
+          else
+            echo "::warning::deb 未生成"
+          fi
+          ls -la dist/
+
+      - name: Upload Linux Desktop artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: desktop-linux-artifacts
+          path: dist/
+
   # ── Expo Android APK ─────────────────────────
   # Mobile 处于深度重构期（AGENTS.md §2），且 EAS 需要 EXPO_TOKEN + EAS 账号；
   # 发布不硬依赖 APK。设置仓库 variable RELEASE_MOBILE_ENABLED=true 且配置
@@ -353,7 +447,7 @@ jobs:
 
   # ── GitHub Release ───────────────────────────
   release:
-    needs: [build-go, build-desktop, build-mobile]
+    needs: [build-go, build-desktop, build-desktop-linux, build-mobile]
     # build-mobile 未启用时（RELEASE_MOBILE_ENABLED != true）会 skipped，
     # needs 依赖被跳过会使下游默认跳过；显式放行 skipped、仍拦截 failure。
     if: ${{ !cancelled() && !contains(needs.*.result, 'failure') }}
@@ -377,6 +471,12 @@ jobs:
         uses: actions/download-artifact@v8
         with:
           name: desktop-artifacts
+          path: dist
+
+      - name: Download Desktop Linux artifacts
+        uses: actions/download-artifact@v8
+        with:
+          name: desktop-linux-artifacts
           path: dist
 
       - name: Download Mobile artifacts
