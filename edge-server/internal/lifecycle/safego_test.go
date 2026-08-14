@@ -100,7 +100,8 @@ func TestSafeGoRunsNormalFunc(t *testing.T) {
 // CallbackReporter. Each path routes through safeGo (P1: edge 裸 goroutine 无
 // recover), so the test process survives the four panics and a subsequent
 // healthy callback still fires — positive proof the executor is usable after
-// recovery.
+// recovery. Stream/done/fail use distinct runs because the per-run ordered
+// queue (#1409) closes on the first terminal job.
 func TestFireHubCallbacksRecoverPanic(t *testing.T) {
 	t.Parallel()
 
@@ -112,20 +113,28 @@ func TestFireHubCallbacksRecoverPanic(t *testing.T) {
 	panicker := newPanickingHubCallback()
 	executor.WithHubCallback(panicker)
 
-	const runID = "run-panic-recovery"
-	const taskID = "task-panic"
-	executor.mu.Lock()
-	executor.hubTasks[runID] = taskID
-	executor.hubOutputs[runID] = newHubOutputCollector(hubCallbackFinalMaxBytes)
-	executor.mu.Unlock()
+	bindRun := func(runID string) {
+		executor.mu.Lock()
+		executor.hubTasks[runID] = "task-" + runID
+		executor.hubOutputs[runID] = newHubOutputCollector(hubCallbackFinalMaxBytes)
+		executor.mu.Unlock()
+	}
+	const ackRun = "run-panic-ack"
+	const streamRun = "run-panic-stream"
+	const doneRun = "run-panic-done"
+	const failRun = "run-panic-fail"
+	bindRun(ackRun)
+	bindRun(streamRun)
+	bindRun(doneRun)
+	bindRun(failRun)
 
 	// Drive all four fireHub* paths. Each spawns a safeGo goroutine that enters
 	// the panicking callback method and then panics. Without recovery the test
 	// process would crash here.
-	executor.fireHubAck(runID)
-	executor.fireHubStream(runID, "panic-stream-content")
-	executor.fireHubDone(runID, nil)
-	executor.fireHubFail(runID, "boom")
+	executor.fireHubAck(ackRun)
+	executor.fireHubStream(streamRun, "panic-stream-content")
+	executor.fireHubDone(doneRun, nil)
+	executor.fireHubFail(failRun, "boom")
 
 	// Wait until each panicking method has been entered (the goroutine reached
 	// the panic site). Four entries => four goroutines spawned and recovered.
@@ -143,11 +152,13 @@ func TestFireHubCallbacksRecoverPanic(t *testing.T) {
 	}
 
 	// Positive survival proof: swap in a healthy recording callback and fire a
-	// terminal callback. If the process had crashed during the panic phase we
-	// would never observe TaskDone here.
+	// terminal callback on a fresh run. If the process had crashed during the
+	// panic phase we would never observe TaskDone here.
 	healthy := newRecordingHubCallback()
 	executor.WithHubCallback(healthy)
-	executor.fireHubDone(runID, nil)
+	const healthyRun = "run-panic-healthy"
+	bindRun(healthyRun)
+	executor.fireHubDone(healthyRun, nil)
 
 	select {
 	case <-healthy.doneSeen:

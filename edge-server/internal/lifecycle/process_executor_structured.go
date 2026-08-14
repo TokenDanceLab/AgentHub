@@ -18,6 +18,7 @@ func (e *ProcessExecutor) publishStructuredOutput(wg *sync.WaitGroup, run store.
 		scope,
 	)
 	emitter = newHubCallbackEmitter(e, run.ID, emitter)
+	hubEmitter := emitter
 	emitter = coalesceEmitter(emitter, newRuntimeEvidenceEmitter(e.store, run, emitter))
 	transcriptEmitter := newThreadTranscriptEmitter(e.store, run, emitter)
 	emitter = coalesceEmitter(emitter, transcriptEmitter)
@@ -50,6 +51,15 @@ func (e *ProcessExecutor) publishStructuredOutput(wg *sync.WaitGroup, run store.
 	emitter = adapters.NewSecureEmitter(ctx, emitter, hooks)
 
 	err := adapter.ParseStream(ctx, stdout, stdin, emitter, run)
+
+	// Drain the hub stream coalescer so a sub-threshold tail of text deltas
+	// is delivered before the run finalizes (the collector itself is fed
+	// per-event, so done-final is unaffected; this only matters for live
+	// chat projection). The assertion targets the hubCallbackEmitter captured
+	// before the outer wrappers, which do not implement FlushHubStream.
+	if flusher, ok := hubEmitter.(hubStreamFlusher); ok {
+		flusher.FlushHubStream()
+	}
 
 	// Close stdin after the turn so a long-running subprocess (the ACP agent,
 	// e.g. npx → claude-agent-acp → claude) sees EOF and exits. The ACP agent
