@@ -191,9 +191,10 @@ html[data-theme-sync='true'] *::after {
   --td-shadow-panel: var(--td-shadow-md);
   --td-shadow-hairline: 0 0 0 1px var(--td-line);
 
-  /* TokenDance contract — extended surface/ink/line/brand ramp (design-system.md §4.1) */
-  --td-surface-2: var(--surface-high);
-  --td-surface-3: var(--surface-highest);
+  /* TokenDance contract — extended surface/ink/line/brand ramp (design-system.md §4.1)
+     surface-2 = --surface-low（次级台阶），surface-3 = --surface-high（三级台阶） */
+  --td-surface-2: var(--surface-low);
+  --td-surface-3: var(--surface-high);
   --td-ink-subtle: var(--text-3);
   --td-ink-faint: var(--text-weakest);
   --td-line-strong: var(--bdr-strong);
@@ -453,9 +454,10 @@ html[data-theme-sync='true'] *::after {
   --td-shadow-panel: var(--td-shadow-md);
   --td-shadow-hairline: 0 0 0 1px var(--td-line);
 
-  /* TokenDance contract — extended surface/ink/line/brand ramp (design-system.md §4.1) */
-  --td-surface-2: var(--surface-high);
-  --td-surface-3: var(--surface-highest);
+  /* TokenDance contract — extended surface/ink/line/brand ramp (design-system.md §4.1)
+     surface-2 = --surface-low（次级台阶），surface-3 = --surface-high（三级台阶） */
+  --td-surface-2: var(--surface-low);
+  --td-surface-3: var(--surface-high);
   --td-ink-subtle: var(--text-3);
   --td-ink-faint: var(--text-weakest);
   --td-line-strong: var(--bdr-strong);

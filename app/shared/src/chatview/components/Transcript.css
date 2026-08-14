@@ -13,9 +13,9 @@
   width: 36px;
   height: 36px;
   border-radius: 50%;
-  border: 1px solid var(--bdr);
-  background: var(--surface);
-  color: var(--text-2);
+  border: 1px solid var(--td-line);
+  background: var(--td-surface);
+  color: var(--td-ink-muted);
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -27,8 +27,8 @@
 .scroll-to-bottom-btn:hover {
   opacity: 1;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.18);
-  color: var(--text-1);
-  border-color: var(--bdr-strong, var(--bdr));
+  color: var(--td-ink);
+  border-color: var(--td-line-strong, var(--td-line));
 }
 .scroll-to-bottom-btn:active {
   transform: scale(0.95);
@@ -37,8 +37,8 @@
 /* ── Date divider ─────────────────────────────────────────────────── */
 .date-divider {
   text-align: center;
-  font: 400 0.625rem var(--font-sans);
-  color: var(--text-3);
+  font: 400 0.625rem var(--td-font);
+  color: var(--td-ink-subtle);
   padding: var(--sp-sm) 0;
   align-self: center;
 }
@@ -50,22 +50,22 @@
   gap: var(--sp-sm);
   padding: var(--sp-sm) var(--sp-md, 16px);
   align-self: stretch;
-  color: var(--text-3);
+  color: var(--td-ink-subtle);
 }
 .unread-divider-line {
   flex: 1;
   height: 1px;
-  background: var(--bdr);
+  background: var(--td-line);
 }
 .unread-divider-label {
   display: inline-flex;
   align-items: baseline;
   gap: var(--sp-xs);
-  font: 400 0.625rem var(--font-sans);
+  font: 400 0.625rem var(--td-font);
   white-space: nowrap;
 }
 .unread-divider-read-through {
-  color: var(--text-2);
+  color: var(--td-ink-muted);
 }
 
 /* ── Compact divider (context compaction boundary, T21/CF23) ───────── */
@@ -75,23 +75,23 @@
   gap: var(--sp-sm);
   padding: var(--sp-sm) var(--sp-md, 16px);
   align-self: stretch;
-  color: var(--text-3);
+  color: var(--td-ink-subtle);
 }
 .compact-divider-line {
   flex: 1;
   height: 1px;
-  background: var(--bdr);
+  background: var(--td-line);
 }
 .compact-divider-label {
   display: inline-flex;
   align-items: baseline;
   gap: var(--sp-xs);
-  font: 400 0.625rem var(--font-sans);
+  font: 400 0.625rem var(--td-font);
   white-space: nowrap;
 }
 
 /* ── Empty state ──────────────────────────────────────────────────── */
-.chatview-empty { padding:var(--sp-xl); text-align:center; color:var(--text-3); font:var(--body) }
+.chatview-empty { padding:var(--sp-xl); text-align:center; color:var(--td-ink-subtle); font:var(--body) }
 
 /* ── Pinned announcement ──────────────────────────────────────────── */
 .chatview {
@@ -121,11 +121,11 @@
   background:transparent;
   pointer-events:none;
   transition:
-    left var(--dur-panel, var(--dur-medium, 260ms)) var(--ease-panel, var(--ease)),
-    width var(--dur-panel, var(--dur-medium, 260ms)) var(--ease-panel, var(--ease)),
-    max-width var(--dur-panel, var(--dur-medium, 260ms)) var(--ease-panel, var(--ease)),
-    transform var(--dur-medium, 260ms) var(--ease-panel, var(--ease)),
-    opacity var(--dur-medium, 260ms) var(--ease);
+    left var(--dur-panel, var(--dur-medium, 260ms)) var(--ease-panel, var(--td-ease)),
+    width var(--dur-panel, var(--dur-medium, 260ms)) var(--ease-panel, var(--td-ease)),
+    max-width var(--dur-panel, var(--dur-medium, 260ms)) var(--ease-panel, var(--td-ease)),
+    transform var(--dur-medium, 260ms) var(--ease-panel, var(--td-ease)),
+    opacity var(--dur-medium, 260ms) var(--td-ease);
 }
 
 .chatview-pinned-banner {
@@ -136,18 +136,18 @@
   align-items:center;
   gap:9px;
   padding:7px 9px 7px 11px;
-  border:1px solid var(--bdr);
+  border:1px solid var(--td-line);
   border-radius:var(--r-sm);
-  background:color-mix(in srgb, var(--surface) 96%, var(--surface-low) 4%);
-  color:var(--text-1);
+  background:color-mix(in srgb, var(--td-surface) 96%, var(--td-surface-2) 4%);
+  color:var(--td-ink);
   box-shadow:0 4px 14px rgba(18, 18, 32, 0.045);
   pointer-events:auto;
-  transition:border-color var(--dur, 160ms) var(--ease), box-shadow var(--dur-slow, 400ms) var(--ease);
+  transition:border-color var(--dur, 160ms) var(--td-ease), box-shadow var(--td-dur-slow, 400ms) var(--td-ease);
 }
 
 .chatview-pinned-banner:hover {
-  border-color:var(--bdr-strong);
-  box-shadow:var(--e-2, var(--shadow));
+  border-color:var(--td-line-strong);
+  box-shadow:var(--td-shadow-md, var(--td-shadow-sm));
 }
 
 .chatview-pinned-mark {
@@ -158,8 +158,8 @@
   align-items:center;
   justify-content:center;
   flex:0 0 auto;
-  background:var(--accent-orange, var(--warning));
-  color:var(--accent-orange-foreground, var(--on-primary));
+  background:var(--accent-orange, var(--td-warning));
+  color:var(--accent-orange-foreground, var(--td-ink-on-plum));
 }
 
 .chatview-pinned-mark svg {
@@ -181,8 +181,8 @@
   display:flex;
   align-items:baseline;
   gap:6px;
-  color:var(--text-1);
-  font:400 0.8125rem/1.25 var(--font-sans);
+  color:var(--td-ink);
+  font:400 0.8125rem/1.25 var(--td-font);
 }
 
 .chatview-pinned-line strong {
@@ -202,19 +202,19 @@
   align-items:center;
   gap:4px;
   min-width:0;
-  color:var(--text-3);
-  font:400 0.6875rem/1.2 var(--font-sans);
+  color:var(--td-ink-subtle);
+  font:400 0.6875rem/1.2 var(--td-font);
 }
 
 .chatview-pinned-meta a {
-  color:var(--primary);
+  color:var(--td-plum);
   text-decoration:none;
   cursor:pointer;
 }
 
 .chatview-pinned-time {
   margin-left:var(--sp-xs);
-  font-family:var(--font-mono);
+  font-family:var(--td-mono);
   font-weight:400;
 }
 
@@ -257,7 +257,7 @@
   display:flex;
   flex-direction:column;
   gap:2px;
-  color:var(--text-3);
+  color:var(--td-ink-subtle);
   font:var(--label-xs);
 }
 .message-display-meta[data-align='right'] {
@@ -277,7 +277,7 @@
   overflow:hidden;
   text-overflow:ellipsis;
   white-space:nowrap;
-  color:var(--text-2);
+  color:var(--td-ink-muted);
   font-weight:600;
 }
 .message-display-badge {
@@ -287,50 +287,50 @@
   min-height:18px;
   padding:1px 6px;
   border-radius:var(--r-xs);
-  border:1px solid var(--bdr);
-  background:var(--surface-high);
-  color:var(--text-2);
-  font:600 0.6875rem/1.2 var(--font-sans);
+  border:1px solid var(--td-line);
+  background:var(--td-surface-3);
+  color:var(--td-ink-muted);
+  font:600 0.6875rem/1.2 var(--td-font);
 }
 .message-display-badge[data-variant='thinking'] {
-  border-color:color-mix(in srgb, var(--primary) 28%, transparent);
-  background:color-mix(in srgb, var(--primary) 12%, transparent);
-  color:var(--primary);
+  border-color:color-mix(in srgb, var(--td-plum) 28%, transparent);
+  background:color-mix(in srgb, var(--td-plum) 12%, transparent);
+  color:var(--td-plum);
 }
 .message-display-badge[data-variant='success'] {
-  border-color:color-mix(in srgb, var(--success) 30%, transparent);
-  background:color-mix(in srgb, var(--success) 12%, transparent);
-  color:var(--success);
+  border-color:color-mix(in srgb, var(--td-moss) 30%, transparent);
+  background:color-mix(in srgb, var(--td-moss) 12%, transparent);
+  color:var(--td-moss);
 }
 .message-display-badge[data-variant='warning'] {
-  border-color:color-mix(in srgb, var(--warning) 32%, transparent);
-  background:color-mix(in srgb, var(--warning) 13%, transparent);
-  color:var(--warning);
+  border-color:color-mix(in srgb, var(--td-warning) 32%, transparent);
+  background:color-mix(in srgb, var(--td-warning) 13%, transparent);
+  color:var(--td-warning);
 }
 .message-display-badge[data-variant='danger'] {
-  border-color:color-mix(in srgb, var(--danger) 32%, transparent);
-  background:color-mix(in srgb, var(--danger) 12%, transparent);
-  color:var(--danger);
+  border-color:color-mix(in srgb, var(--td-danger) 32%, transparent);
+  background:color-mix(in srgb, var(--td-danger) 12%, transparent);
+  color:var(--td-danger);
 }
 .message-display-detail {
   max-width:100%;
   overflow:hidden;
   text-overflow:ellipsis;
   white-space:nowrap;
-  color:var(--text-3);
+  color:var(--td-ink-subtle);
 }
 
 /* ── Bubbles ─────────────────────────────────────────────────────────
    P76 density: tighter vertical padding, keep horizontal reading comfort. */
 .user-bubble {
-  background:var(--primary); color:var(--on-primary);
+  background:var(--td-plum); color:var(--td-ink-on-plum);
   border-radius:var(--r-lg); padding:var(--sp-xxs) var(--sp-sm);
   font:var(--bubble-font); line-height:1.55; word-break:break-word;
 }
 .agent-bubble {
-  background:var(--surface); border:1px solid var(--bdr);
+  background:var(--td-surface); border:1px solid var(--td-line);
   border-radius:var(--r-md); padding:var(--sp-xxs) var(--sp-sm);
-  font:var(--body); color:var(--text-1); line-height:1.5;
+  font:var(--body); color:var(--td-ink); line-height:1.5;
   max-width:100%;
   min-width:0;
 }
@@ -342,47 +342,47 @@
 .user-bubble > div > :last-child { margin-bottom:0 }
 .agent-bubble table,
 .user-bubble table { max-width:100% }
-.agent-bubble code { font:var(--label); background:var(--surface-high); padding:1px 5px; border-radius:var(--r-xs) }
+.agent-bubble code { font:var(--label); background:var(--td-surface-3); padding:1px 5px; border-radius:var(--r-xs) }
 .user-bubble a {
-  color:var(--on-primary);
-  text-decoration-color:color-mix(in srgb, var(--on-primary) 70%, transparent);
+  color:var(--td-ink-on-plum);
+  text-decoration-color:color-mix(in srgb, var(--td-ink-on-plum) 70%, transparent);
 }
 .user-bubble code {
   font:var(--label);
-  color:var(--on-primary);
-  background:color-mix(in srgb, var(--on-primary) 16%, transparent);
+  color:var(--td-ink-on-plum);
+  background:color-mix(in srgb, var(--td-ink-on-plum) 16%, transparent);
   padding:1px 5px;
   border-radius:var(--r-xs);
 }
 .user-bubble table {
-  border-color:color-mix(in srgb, var(--on-primary) 28%, transparent);
-  background:color-mix(in srgb, var(--on-primary) 7%, transparent);
+  border-color:color-mix(in srgb, var(--td-ink-on-plum) 28%, transparent);
+  background:color-mix(in srgb, var(--td-ink-on-plum) 7%, transparent);
 }
 .user-bubble th,
 .user-bubble td {
-  border-color:color-mix(in srgb, var(--on-primary) 24%, transparent);
+  border-color:color-mix(in srgb, var(--td-ink-on-plum) 24%, transparent);
 }
 .user-bubble th {
-  background:color-mix(in srgb, var(--on-primary) 12%, transparent);
+  background:color-mix(in srgb, var(--td-ink-on-plum) 12%, transparent);
 }
 .user-bubble tr:nth-child(even) td {
-  background:color-mix(in srgb, var(--on-primary) 6%, transparent);
+  background:color-mix(in srgb, var(--td-ink-on-plum) 6%, transparent);
 }
 
 /* ── Avatars ───────────────────────────────────────────────────────── */
 .ag-av {
   width:var(--avatar-size); height:var(--avatar-size); border-radius:50%;
   display:flex; align-items:center; justify-content:center;
-  font:600 0.75rem var(--font-sans); color:var(--on-primary); flex-shrink:0;
+  font:600 0.75rem var(--td-font); color:var(--td-ink-on-plum); flex-shrink:0;
 }
 .ag-av.builder{background:var(--role-builder)} .ag-av.reviewer{background:var(--role-reviewer)}
 .ag-av.deployer{background:var(--role-deployer)} .ag-av.researcher{background:var(--role-researcher)}
-.ag-av.orch{background:var(--role-orch)} .ag-av.shield{background:var(--warning)}
-.ag-av.agent{background:var(--info)} .ag-av.system{background:var(--text-3)}
-.ag-av.user-av{background:var(--primary)}
+.ag-av.orch{background:var(--role-orch)} .ag-av.shield{background:var(--td-warning)}
+.ag-av.agent{background:var(--info)} .ag-av.system{background:var(--td-ink-subtle)}
+.ag-av.user-av{background:var(--td-plum)}
 
-.ag-name { font:var(--label); color:var(--text-2) }
-.ag-time { font:var(--label-xs); font-family:var(--font-mono); font-weight:400; color:var(--text-3) }
+.ag-name { font:var(--label); color:var(--td-ink-muted) }
+.ag-time { font:var(--label-xs); font-family:var(--td-mono); font-weight:400; color:var(--td-ink-subtle) }
 
 .user-meta { display:flex; align-items:center; gap:var(--sp-sm); margin-bottom:var(--sp-2) }
 
