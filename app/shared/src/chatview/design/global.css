@@ -20,8 +20,8 @@
 
 body {
   font: var(--body);
-  color: var(--text-1);
-  background: var(--app-bg);
+  color: var(--td-ink);
+  background: var(--td-canvas);
   -webkit-font-smoothing: antialiased;
 }
 

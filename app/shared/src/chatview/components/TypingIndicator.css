@@ -7,8 +7,8 @@
   align-items: center;
   gap: 6px;
   padding: 6px 12px;
-  font: 400 0.75rem/1.4 var(--font-sans);
-  color: var(--text-3);
+  font: 400 0.75rem/1.4 var(--td-font);
+  color: var(--td-ink-subtle);
   animation: typingFadeIn 0.2s ease-out;
   flex-shrink: 0;
 }
@@ -23,7 +23,7 @@
   width: 5px;
   height: 5px;
   border-radius: 50%;
-  background: var(--text-3);
+  background: var(--td-ink-subtle);
   animation: typingBounce 1.4s ease-in-out infinite both;
 }
 
