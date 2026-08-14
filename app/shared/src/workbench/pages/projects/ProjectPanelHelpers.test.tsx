@@ -17,7 +17,6 @@ function agentProfile(name: string, overrides: Partial<WorkbenchProfileSource> =
   return {
     name,
     initials: name.slice(0, 2).toUpperCase(),
-    color: '#888',
     kind: 'agent',
     ...overrides,
   };
@@ -57,7 +56,7 @@ describe('ProjectMemberChip', () => {
     render(
       <ProjectMemberChip
         name="Alice"
-        profiles={[agentProfile('Alice', { label: 'Agent' })]}
+        profiles={[agentProfile('Alice')]}
       />,
     );
     expect(screen.getByText('Alice')).toBeInTheDocument();
@@ -89,7 +88,7 @@ describe('ProjectMemberChip', () => {
     const { container } = render(
       <ProjectMemberChip
         name="Diana"
-        profiles={[agentProfile('Diana', { label: 'Agent' })]}
+        profiles={[agentProfile('Diana')]}
       />,
     );
     const chip = container.firstElementChild;
@@ -107,9 +106,9 @@ describe('ProjectMemberChip', () => {
     expect(chip?.getAttribute('data-profile-kind')).toBe('user');
   });
 
-  it('matches a name in the profiles array and uses supplied color', () => {
+  it('matches a name in the profiles array and resolves user kind', () => {
     const profiles = [
-      agentProfile('Eve', { color: '#abc123', initials: 'EV', kind: 'user', label: 'User' }),
+      agentProfile('Eve', { initials: 'EV', kind: 'user' }),
     ];
     const { container } = render(<ProjectMemberChip name="Eve" profiles={profiles} />);
     const chip = container.firstElementChild;
