@@ -12,7 +12,11 @@ import (
 // process_executor_pure.go. Same package lifecycle; zero behavior change.
 
 // newSubAgentRunContext builds the isolated RunProcessContext for a dispatched
-// sub-agent. SessionID is always the child thread so context stays isolated.
+// sub-agent. SessionID is a fresh random UUID — the claude-code CLI validates
+// --session-id as a UUID and the gateway rejects hierarchical thread paths
+// like "parent/sub/run_x" ("Invalid session ID. Must be a valid UUID"). The
+// ThreadID stays hierarchical (stored on the run), so context isolation is
+// preserved without poisoning the CC session argument.
 func newSubAgentRunContext(run store.Run, task adapters.SubAgentTask, threadID string) RunProcessContext {
 	return RunProcessContext{
 		Run:       run,
@@ -20,7 +24,7 @@ func newSubAgentRunContext(run store.Run, task adapters.SubAgentTask, threadID s
 		AgentID:   task.AgentID,
 		Budget:    childBudget(task.Budget, task.Depth),
 		Model:     task.Model,
-		SessionID: threadID,
+		SessionID: newRandomSessionID(),
 	}
 }
 
