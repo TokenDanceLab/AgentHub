@@ -2,7 +2,7 @@
 
 > 子文档 | 主索引：[architecture.md](../architecture.md)
 >
-> 最后更新：2026-08-01
+> 最后更新：2026-08-14
 
 ## 概述
 
@@ -13,20 +13,20 @@ Edge Server 的 adapter 层负责将不同 Agent Runtime 的协议统一为内�
 | Adapter | 注册 ID | 文件 | 功能 |
 |---------|---------|------|------|
 | Claude Code (ACP) | `claude-acp` | `claude_acp.go` | 官方 `@agentclientprotocol/claude-agent-acp` 0.62.0 二进制 + `ANTHROPIC_API_KEY`，embed `AcpAdapter`（coder/acp-go-sdk） |
-| Codex (ACP) | `codex` | `codex_acp.go` | 官方 `codex-acp` 1.1.7 二进制 + `OPENAI_API_KEY`，embed `AcpAdapter` |
-| OpenCode (ACP) | `opencode` | `opencode_acp.go` | 原生 ACP 模式 `opencode acp` + 4 provider key passthrough，embed `AcpAdapter` |
-| Claude Code (legacy) | `claude-code` | `claude_code.go` ⚠️ DEPRECATED | 旧手写 stream-json parser，保留作 fallback；ACP 迁移后将移除 |
-| Codex (legacy) | — | `codex.go` ⚠️ DEPRECATED | 旧手写 parser，fallback |
-| OpenCode (legacy) | — | `opencode.go` ⚠️ DEPRECATED | 旧手写 parser，fallback |
+| Codex (ACP) | `codex-acp` | `codex_acp.go` | 官方 `codex-acp` 1.1.7 二进制 + `OPENAI_API_KEY`，embed `AcpAdapter` |
+| OpenCode (ACP) | `opencode-acp` | `opencode_acp.go` | 原生 ACP 模式 `opencode acp` + 4 provider key passthrough，embed `AcpAdapter` |
+| Claude Code (legacy) | `claude-code` | `claude_code.go` ⚠️ DEPRECATED | 旧手写 stream-json parser，仅保留作 orchestrator inner；Phase B 移除 |
+
+> `codex.go` / `opencode.go`（旧手写批处理 parser）已在 ACP 收敛（阶段 A）中删除，运行时统一走 ACP 层。
 
 ### ACP 迁移（2026-08，对标 codeg 官方 Wrapper）
 
-用户产品纠正：ACP 协议层**禁止手写 JSON-RPC loop**，必须用官方 Wrapper/适配层（对标 codeg）。三大家 CLI adapter 已接入官方 ACP 层（spike 状态，未切默认执行路径）：
+ACP 协议层**禁止手写 JSON-RPC loop**，必须用官方 Wrapper/适配层（对标 codeg）。三大家 CLI adapter 已接入官方 ACP 层，并成为**默认执行路径**（阶段 A 收敛完成）：
 
 - **协议边界**：100% 官方 adapter 二进制（claude-agent-acp / codex-acp / opencode 原生 ACP），Go runtime 用 `coder/acp-go-sdk` v0.13.5（Coder/Windsurf 厂维护，官方收录，从官方 schema 生成类型 + 自带 JSON-RPC 连接层）
-- **runtime 共享层**：`acp.go` `AcpAdapter`（SDK `acp.Client` 接口 9 方法自动分发）+ `acp_events.go`（typed 映射 `acp.SessionUpdate` → `run.agent.*`，修正 3 旧手写错误）+ `acp_client.go`（client skeleton）
-- **审批链**：`request_permission` → `Responder` → `PermissionDecisionBroker`（复用既有 broker，零新协议；3 CLI parser 迁移完成）
-- **诚实 TODO**：`AcpAdapter` 无注册点（spike，main.go flag 默认 off）；fs/terminal 帧设计待管理员 RFC；无超时；真跑验证需 ANTHROPIC_API_KEY/OPENAI_API_KEY + npx registry 网络。进度与剩余项见 GitHub issues（ACP migration 跟踪）。
+- **runtime 共享层**：`acp.go` `AcpAdapter`（SDK `acp.Client` 接口 9 方法自动分发）+ `acp_events.go`（typed 映射 `acp.SessionUpdate` → `run.agent.*`）+ `acp_client.go`（client skeleton）
+- **审批链**：`request_permission` → `Responder` → `PermissionDecisionBroker`（复用既有 broker，零新协议）
+- **默认注册**：`claude-acp` / `codex-acp` / `opencode-acp` 默认注册（空 launcher 回退平台原生 `npx`/`opencode`）；`--agent-default` 与 `--runner-profile` 默认 cutover 到 `*-acp`。真跑验证需 `ANTHROPIC_API_KEY`/`OPENAI_API_KEY` + npx registry 网络。进度与剩余项见 GitHub issues（ACP migration 跟踪）。
 
 ### CLI 执行模式
 
@@ -61,7 +61,7 @@ Edge Server 的 adapter 层负责将不同 Agent Runtime 的协议统一为内�
 
 - 仅在 `--claude-code-path` 非空时自动注册
 - 作为 `orchestrator` 角色的默认 adapter
-- 自动发现已注册的子 Agent（`claude-code`、`codex`、`opencode`、`anthropic-sdk`、`openai-sdk`），生成调度提示
+- 自动发现已注册的子 Agent（`claude-code`、`codex-acp`、`opencode-acp`、`anthropic-sdk`、`openai-sdk`），生成调度提示
 - 支持子 Agent spawn 重试（最多 3 次，指数退避）和并发调度（默认 10）
 
 ### Dispatch Interceptor 内部组件
@@ -114,7 +114,7 @@ type PreflightCheck interface {
 }
 ```
 
-Codex adapter 实现了 `PreflightCheck` 接口：预检 `OPENAI_API_KEY` 是否存在，缺失时返回描述性错误而非进程启动后失败。
+`PreflightCheck` 接口定义在 `adapter.go`。所有 adapter 均实现：预检 launcher 二进制 / API key 是否存在，缺失时返回描述性错误而非进程启动后失败（例如 `codex-acp` 预检 `npx` launcher，`claude-code` 预检 `OPENAI_API_KEY`）。
 
 ## 事件映射合同
 
@@ -146,7 +146,7 @@ Edge Server 支持通过 cc-switch 透明代理实现动态模型路由。当 cc
 
 - cc-switch 动态别名覆盖同 key 的静态别名（例如 cc-switch 将 `sonnet` 映射到 `deepseek-v4-pro` 时，静态 `claude-sonnet-4-6` 被替换）。
 - 未冲突的静态条目保留（不会被删除）。
-- 只消费 `appTypeToAgentID` 映射中已知的 app_type（claude → claude-code, codex → codex, opencode → opencode）。
+- 只消费 `appTypeToAgentID` 映射中已知的 app_type（`claude → claude-code`）。codex / opencode 已迁移到 ACP，模型解析在 ACP 进程内完成，不再走本表。
 
 ### 优雅降级
 

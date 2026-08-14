@@ -49,19 +49,6 @@ var ModelAliases = map[string]map[string]string{
 		"4.6": "claude-sonnet-4-6",
 		"4.5": "claude-haiku-4-5-20251001",
 	},
-	"codex": {
-		"gpt-5":       "gpt-5.3-codex",
-		"gpt-5-codex": "gpt-5.3-codex",
-		"gpt-5-mini":  "gpt-5.4-mini",
-		"gpt-5.5":     "gpt-5.5",
-		"o4":          "o4-mini",
-	},
-	"opencode": {
-		// OpenCode uses provider/model format — aliases resolve the model part.
-		"opus":   "newapi/deepseek-v4-pro",
-		"sonnet": "newapi/deepseek-v4-pro",
-		"haiku":  "newapi/deepseek-v4-pro",
-	},
 	"anthropic-sdk": {
 		"opus":   "claude-opus-4-7",
 		"sonnet": "claude-sonnet-4-6",
@@ -87,19 +74,6 @@ var ReasoningEfforts = map[string]map[string]string{
 		"high":   "high",
 		"max":    "max",
 	},
-	"codex": {
-		"low":    "minimal",
-		"medium": "low",
-		"high":   "high",
-		"max":    "xhigh",
-	},
-	"opencode": {
-		// OpenCode uses --variant flag rather than --reasoning-effort.
-		"low":    "minimal",
-		"medium": "",
-		"high":   "high",
-		"max":    "max",
-	},
 	"anthropic-sdk": {
 		"low":    "low",
 		"medium": "medium",
@@ -117,8 +91,6 @@ var ReasoningEfforts = map[string]map[string]string{
 // DefaultModels holds the default model per agent ID.
 var DefaultModels = map[string]string{
 	"claude-code":   "claude-sonnet-4-6",
-	"codex":         "gpt-5.5",
-	"opencode":      "newapi/deepseek-v4-pro",
 	"orchestrator":  "claude-sonnet-4-6",
 	"anthropic-sdk": "claude-sonnet-4-6",
 	"openai-sdk":    "gpt-5.5",
@@ -165,10 +137,11 @@ func ResolveModelWithDefault(agentID, model string) string {
 // appTypeToAgentID maps cc-switch app_type values to AgentHub adapter IDs.
 // Only app_types present in this map are consumed; unknown app_types in the
 // cc-switch database are silently skipped.
+//
+// codex / opencode 已迁移到 ACP（codex-acp / opencode-acp），其模型解析在
+// ACP 进程内完成，不走本表的 ModelAliases，因此不再在此消费 cc-switch 别名。
 var appTypeToAgentID = map[string]string{
-	"claude":   "claude-code",
-	"codex":    "codex",
-	"opencode": "opencode",
+	"claude": "claude-code",
 }
 
 // ConsumeCCSwitchModels reads model aliases from the cc-switch SQLite database at
@@ -177,9 +150,8 @@ var appTypeToAgentID = map[string]string{
 // # Merge semantics
 //
 // For each cc-switch provider whose app_type maps to a known AgentHub adapter
-// (claude → claude-code, codex → codex, opencode → opencode), the provider's
-// model aliases (parsed from settings_config env vars like ANTHROPIC_DEFAULT_SONNET_MODEL)
-// are written into ModelAliases[agentID]:
+// (claude → claude-code), the provider's model aliases (parsed from settings_config
+// env vars like ANTHROPIC_DEFAULT_SONNET_MODEL) are written into ModelAliases[agentID]:
 //
 //   - cc-switch entries override static entries on key match (e.g. if cc-switch
 //     says "sonnet" → "deepseek-v4-pro", that replaces the static "claude-sonnet-4-6").

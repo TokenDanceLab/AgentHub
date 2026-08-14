@@ -1,6 +1,6 @@
 # AgentHub Edge Server
 
-最后更新：2026-06-27
+最后更新：2026-08-14
 
 Edge Server 是靠近 workspace 和 Agent Runtime 的执行控制节点，可运行在 Desktop 内、本机后台、远程机器或 headless Cloud Edge。旧长版 README 见 [../docs/history.md](../docs/history.md)。
 
@@ -31,15 +31,15 @@ Mock/local health profile:
 go run ./edge-server/cmd/agenthub-edge --addr 127.0.0.1:3210 --runner-profile agenthub-runner-mock
 ```
 
-Runtime presets:
+Runtime presets（ACP 为默认 runtime，三个 `*-acp` 适配器默认注册，空 `--*-acp-path` 回退平台原生 `npx`/`opencode`）：
 
 ```powershell
-go run ./edge-server/cmd/agenthub-edge --addr 127.0.0.1:3210 --runner-profile claude-code
-go run ./edge-server/cmd/agenthub-edge --addr 127.0.0.1:3210 --runner-profile codex
-go run ./edge-server/cmd/agenthub-edge --addr 127.0.0.1:3210 --runner-profile opencode
+go run ./edge-server/cmd/agenthub-edge --addr 127.0.0.1:3210 --runner-profile claude-code   # → claude-acp
+go run ./edge-server/cmd/agenthub-edge --addr 127.0.0.1:3210 --runner-profile codex        # → codex-acp
+go run ./edge-server/cmd/agenthub-edge --addr 127.0.0.1:3210 --runner-profile opencode     # → opencode-acp
 ```
 
-`--runner-profile` selects the executor/runtime command preset. `--agent-default` selects the default adapter ID when a run does not specify an agent; it does not start a CLI by itself.
+`--runner-profile` 选择 executor/runtime 预设（现 cutover 到 ACP）。`--agent-default` 选择 run 未指定 agent 时的默认 adapter ID（`claude-acp`/`codex-acp`/`opencode-acp`/`claude-code`）。SDK 直连适配器（`anthropic-sdk`/`openai-sdk`，独立 HTTP 传输、不 spawn CLI）需 `--anthropic-sdk-path`/`--openai-sdk-path` 显式启用。
 
 ## Key Runtime Inputs
 
@@ -49,8 +49,14 @@ go run ./edge-server/cmd/agenthub-edge --addr 127.0.0.1:3210 --runner-profile op
 | `--store-backend` / `AGENTHUB_STORE_BACKEND` | `memory`, `file`, or `sqlite` |
 | `--store-db` / `AGENTHUB_STORE_DB` | SQLite path when backend is `sqlite` |
 | `--store-file` / `AGENTHUB_STORE_FILE` | Legacy JSON file store path |
-| `--agent-default` / `AGENTHUB_AGENT_DEFAULT` | Default Runtime adapter ID |
-| `--runner-profile` / `AGENTHUB_RUNNER_PROFILE` | Runtime preset |
+| `--agent-default` / `AGENTHUB_AGENT_DEFAULT` | Default Runtime adapter ID（`claude-acp`/`codex-acp`/`opencode-acp`/`claude-code`） |
+| `--runner-profile` / `AGENTHUB_RUNNER_PROFILE` | Runtime preset（`agenthub-runner-mock`/`claude-code`/`codex`/`opencode`，均 cutover 到 ACP） |
+| `--claude-acp-path` / `AGENTHUB_CLAUDE_ACP_PATH` | claude-agent-acp ACP launcher（空=平台原生 `npx`） |
+| `--codex-acp-path` / `AGENTHUB_CODEX_ACP_PATH` | codex-acp ACP launcher（空=平台原生 `npx`） |
+| `--opencode-acp-path` / `AGENTHUB_OPENCODE_ACP_PATH` | opencode-acp 二进制路径（空=`opencode`） |
+| `--claude-code-path` / `AGENTHUB_CLAUDE_CODE_PATH` | claude 二进制路径（orchestrator inner + legacy 回退） |
+| `--anthropic-sdk-path` / `AGENTHUB_ANTHROPIC_SDK_PATH` | 启用 anthropic-sdk 直连适配器（API key 或 `env`） |
+| `--openai-sdk-path` / `AGENTHUB_OPENAI_SDK_PATH` | 启用 openai-sdk 直连适配器（API key 或 `env`） |
 | `--workspace-allowlist` / `AGENTHUB_WORKSPACE_ALLOWLIST` | Allowed workspace roots for `/v1/runs` `workDir` |
 | `--local-auth-token` / `AGENTHUB_EDGE_AUTH_TOKEN` | Optional local Edge API token |
 | `--hub-jwt-secret` / `AGENTHUB_HUB_JWT_SECRET` | Hub-issued Edge JWT verification secret |

@@ -141,8 +141,8 @@ def resolve_agent_path(runtime_id: str, explicit_path: str) -> str | None:
         return resolve_path_executable(explicit_path)
     env_vars = {
         "claude-code": ("AGENTHUB_CLAUDE_CODE_PATH", "CLAUDE_PATH", "claude"),
-        "codex": ("AGENTHUB_CODEX_PATH", "CODEX_PATH", "codex"),
-        "opencode": ("AGENTHUB_OPENCODE_PATH", "OPENCODE_PATH", "opencode"),
+        "codex-acp": ("AGENTHUB_CODEX_ACP_PATH", "", "npx"),
+        "opencode-acp": ("AGENTHUB_OPENCODE_ACP_PATH", "", "opencode"),
     }
     var1, var2, command = env_vars[runtime_id]
     if os.environ.get(var1):
@@ -155,8 +155,8 @@ def resolve_agent_path(runtime_id: str, explicit_path: str) -> str | None:
 def get_agent_path_flag(runtime_id: str) -> str:
     return {
         "claude-code": "--claude-code-path",
-        "codex": "--codex-path",
-        "opencode": "--opencode-path",
+        "codex-acp": "--codex-acp-path",
+        "opencode-acp": "--opencode-acp-path",
     }[runtime_id]
 
 
@@ -425,7 +425,7 @@ def main() -> int:
     )
     parser.add_argument("--Help", action="store_true", help="show help and exit 0")
     parser.add_argument("--SkipBuild", action="store_true", help="skip building the Edge server binary")
-    parser.add_argument("--Runtime", default="claude-code", choices=["claude-code", "codex", "opencode"], help="runtime adapter to require")
+    parser.add_argument("--Runtime", default="claude-code", choices=["claude-code", "codex-acp", "opencode-acp"], help="runtime adapter to require")
     parser.add_argument("--CliPath", default="", help="explicit CLI path for the selected runtime")
     parser.add_argument("--RealCli", action="store_true", help="opt in to real CLI/model execution")
     parser.add_argument("--AllowMissingCli", action="store_true", help="if the selected CLI is missing, warn and skip with exit 0")

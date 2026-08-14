@@ -102,8 +102,8 @@ def resolve_path_executable(command_name: str) -> str | None:
 def resolve_agent_path(agent_id: str) -> str | None:
     env_vars = {
         "claude-code": ("AGENTHUB_CLAUDE_CODE_PATH", "CLAUDE_PATH", "claude"),
-        "codex": ("AGENTHUB_CODEX_PATH", "CODEX_PATH", "codex"),
-        "opencode": ("AGENTHUB_OPENCODE_PATH", "OPENCODE_PATH", "opencode"),
+        "codex-acp": ("AGENTHUB_CODEX_ACP_PATH", "", "npx"),
+        "opencode-acp": ("AGENTHUB_OPENCODE_ACP_PATH", "", "opencode"),
     }
     var1, var2, command = env_vars[agent_id]
     if os.environ.get(var1):
@@ -116,8 +116,8 @@ def resolve_agent_path(agent_id: str) -> str | None:
 def get_agent_path_flag(agent_id: str) -> str:
     return {
         "claude-code": "--claude-code-path",
-        "codex": "--codex-path",
-        "opencode": "--opencode-path",
+        "codex-acp": "--codex-acp-path",
+        "opencode-acp": "--opencode-acp-path",
     }[agent_id]
 
 
@@ -276,7 +276,7 @@ def main() -> int:
     normalize_stdout_lf()
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--SkipBuild", action="store_true", help="skip the Edge Server build")
-    parser.add_argument("--Agent", default="claude-code", choices=["claude-code", "codex", "opencode"], help="agent CLI to use")
+    parser.add_argument("--Agent", default="claude-code", choices=["claude-code", "codex-acp", "opencode-acp"], help="agent adapter to use")
     parser.add_argument("--Prompt", default="reply with just the word ok", help="prompt sent to the runtime")
     parser.add_argument("--RunTimeoutSec", type=int, default=60, help="run/event timeout")
     parser.add_argument("--EdgeAddr", default="127.0.0.1:3210", help="Edge address host:port")
@@ -319,7 +319,7 @@ def main() -> int:
         if not agent_path:
             fail_check(f"agent CLI not found for {args.Agent}")
             raise RuntimeError(
-                f"agent CLI not found for {args.Agent}; install it or set AGENTHUB_CLAUDE_CODE_PATH / AGENTHUB_CODEX_PATH / AGENTHUB_OPENCODE_PATH"
+                f"agent CLI not found for {args.Agent}; install it or set AGENTHUB_CLAUDE_CODE_PATH / AGENTHUB_CODEX_ACP_PATH / AGENTHUB_OPENCODE_ACP_PATH"
             )
         assert_true(True, f"agent CLI found: {agent_path}")
         test_strategy = f"live runtime ({args.Agent} via {agent_path})"
