@@ -3,9 +3,9 @@
   margin: 2px 0 8px;
   padding: 8px 10px;
   border: 1px solid rgba(255, 255, 255, 0.075);
-  border-radius: var(--r-sm);
+  border-radius: var(--td-radius-control);
   background: rgba(255, 255, 255, 0.024);
-  color: var(--foreground);
+  color: var(--td-ink);
 }
 
 [data-theme='light'] .root {
@@ -27,7 +27,7 @@
 }
 
 .headerLabel {
-  color: color-mix(in oklch, var(--foreground) 84%, var(--muted-foreground) 16%);
+  color: color-mix(in oklch, var(--td-ink) 84%, var(--td-ink-muted) 16%);
   font-size: 12px;
   font-weight: 720;
   line-height: 1.4;
@@ -35,7 +35,7 @@
 
 .headerCount {
   flex: 0 0 auto;
-  color: var(--text-weaker);
+  color: var(--td-ink-muted);
   font-size: 11px;
   line-height: 1.4;
 }
@@ -60,7 +60,7 @@
   height: 22px;
   align-items: center;
   justify-content: center;
-  border-radius: var(--r-sm);
+  border-radius: var(--td-radius-control);
   background: rgba(255, 255, 255, 0.035);
 }
 
@@ -75,7 +75,7 @@
 .entryText strong {
   min-width: 0;
   overflow: hidden;
-  color: color-mix(in oklch, var(--foreground) 91%, transparent);
+  color: color-mix(in oklch, var(--td-ink) 91%, transparent);
   font-size: 12px;
   font-weight: 660;
   line-height: 1.42;
@@ -87,8 +87,8 @@
   flex: 0 0 auto;
   max-width: 160px;
   overflow: hidden;
-  color: color-mix(in oklch, var(--foreground) 58%, var(--muted-foreground) 42%);
-  font-family: var(--font-mono);
+  color: color-mix(in oklch, var(--td-ink) 58%, var(--td-ink-muted) 42%);
+  font-family: var(--td-mono);
   font-size: 11px;
   line-height: 1.42;
   text-overflow: ellipsis;
@@ -105,21 +105,21 @@
 }
 
 .statusPending {
-  color: color-mix(in oklch, var(--muted-foreground) 82%, var(--foreground));
+  color: color-mix(in oklch, var(--td-ink-muted) 82%, var(--td-ink));
 }
 
 .statusRunning {
-  color: color-mix(in oklch, var(--warning) 72%, var(--foreground));
+  color: color-mix(in oklch, var(--td-warning) 72%, var(--td-ink));
 }
 
 .statusDraining {
-  color: color-mix(in oklch, var(--primary) 72%, var(--foreground));
+  color: color-mix(in oklch, var(--td-plum) 72%, var(--td-ink));
 }
 
 .statusCompleted {
-  color: color-mix(in oklch, var(--success) 72%, var(--foreground));
+  color: color-mix(in oklch, var(--td-moss) 72%, var(--td-ink));
 }
 
 .statusFailed {
-  color: color-mix(in oklch, var(--destructive) 78%, var(--foreground));
+  color: color-mix(in oklch, var(--td-danger) 78%, var(--td-ink));
 }

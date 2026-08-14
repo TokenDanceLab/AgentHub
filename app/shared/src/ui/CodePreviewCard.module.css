@@ -2,10 +2,10 @@
   display: grid;
   gap: 8px;
   min-width: 0;
-  border: 1px solid var(--td-line, var(--border));
+  border: 1px solid var(--td-line, var(--td-line));
   border-radius: var(--td-radius-control, 10px);
   padding: 10px;
-  background: color-mix(in oklch, var(--td-surface, var(--card)) 74%, transparent);
+  background: color-mix(in oklch, var(--td-surface, var(--td-surface)) 74%, transparent);
   box-shadow: var(--td-shadow-hairline, none);
 }
 
@@ -24,7 +24,7 @@
 .title {
   min-width: 0;
   overflow: hidden;
-  color: var(--td-ink, var(--foreground));
+  color: var(--td-ink, var(--td-ink));
   font-size: 12px;
   font-weight: 700;
   line-height: 1.35;
@@ -33,7 +33,7 @@
 }
 
 .meta {
-  color: var(--td-ink-muted, var(--muted-foreground));
+  color: var(--td-ink-muted, var(--td-ink-muted));
   font-size: 11px;
   font-weight: 700;
   line-height: 1.2;
@@ -53,8 +53,8 @@
   gap: 2px;
   min-width: 0;
   margin: 0;
-  color: var(--td-ink-muted, var(--muted-foreground));
-  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace);
+  color: var(--td-ink-muted, var(--td-ink-muted));
+  font-family: var(--td-mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace);
   font-size: 11px;
   line-height: 1.55;
   white-space: pre-wrap;
@@ -66,7 +66,7 @@
 }
 
 .more {
-  color: var(--td-ink, var(--foreground));
+  color: var(--td-ink, var(--td-ink));
   font-weight: 700;
 }
 

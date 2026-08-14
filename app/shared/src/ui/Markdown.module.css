@@ -39,10 +39,10 @@
   display: inline-flex;
   align-items: center;
   margin-right: 0.4em;
-  color: var(--text-3);
+  color: var(--td-ink-subtle);
   text-decoration: none;
   opacity: 0;
-  transition: opacity var(--dur-fast, 90ms) var(--ease, ease);
+  transition: opacity var(--td-dur-fast, 90ms) var(--td-ease, ease);
 }
 
 .root :is(h1, h2, h3, h4, h5, h6):hover .headingAnchor,
@@ -51,12 +51,12 @@
 }
 
 .headingAnchor:hover {
-  color: var(--primary);
+  color: var(--td-plum);
 }
 
 .headingAnchor:focus-visible {
   outline: none;
-  color: var(--primary);
+  color: var(--td-plum);
   border-radius: var(--r-xs, 4px);
   box-shadow: var(--focus-ring);
 }
@@ -105,12 +105,12 @@
 .root li.task-list-item > input[type='checkbox'] {
   flex: none;
   margin-top: 0.25em;
-  accent-color: var(--primary);
+  accent-color: var(--td-plum);
   cursor: default;
 }
 
 .root li.task-list-item > input[type='checkbox']:checked {
-  accent-color: var(--success);
+  accent-color: var(--td-moss);
 }
 
 .root li.task-list-item:has(> input[type='checkbox']:checked) {
@@ -127,7 +127,7 @@
 /* ── Links ──────────────────────────────────── */
 
 .root a {
-  color: var(--primary);
+  color: var(--td-plum);
   text-decoration: underline;
   text-underline-offset: 2px;
 }
@@ -155,7 +155,7 @@
 .root blockquote {
   margin: 0.5em 0;
   padding: 0.25em 0.75em;
-  border-left: 3px solid var(--bdr-strong);
+  border-left: 3px solid var(--td-line-strong);
   opacity: 0.85;
 }
 
@@ -166,12 +166,12 @@
 /* Nested quotes get a weaker border and reset opacity so the stack reads as
    distinct layers (instead of compounding 0.85^n into one flat blur). */
 .root blockquote blockquote {
-  border-left-color: var(--bdr);
+  border-left-color: var(--td-line);
   opacity: 1;
 }
 
 .root blockquote blockquote blockquote {
-  border-left-color: var(--bdr-strong);
+  border-left-color: var(--td-line-strong);
   opacity: 0.9;
 }
 
@@ -180,14 +180,14 @@
 .root hr {
   margin: 0.75em 0;
   border: none;
-  border-top: 1px solid var(--bdr);
+  border-top: 1px solid var(--td-line);
 }
 
 /* ── Images ─────────────────────────────────── */
 
 .root img {
   max-width: 100%;
-  border-radius: var(--r-sm);
+  border-radius: var(--td-radius-control);
 }
 
 /* ── Tables ─────────────────────────────────── */
@@ -200,7 +200,7 @@
   max-width: 100%;
   margin: 0.65em 0;
   overflow-x: auto;
-  border: 1px solid var(--bdr);
+  border: 1px solid var(--td-line);
   border-radius: var(--r-md);
   /* Transparent so zebra striping (tbody rows) paints through the rounded
      corners; the scroll container clips row backgrounds to the radius. */
@@ -212,8 +212,8 @@
 .root td {
   padding: 6px 10px;
   border: 0;
-  border-right: 1px solid var(--bdr);
-  border-bottom: 1px solid var(--bdr);
+  border-right: 1px solid var(--td-line);
+  border-bottom: 1px solid var(--td-line);
   text-align: left;
   white-space: nowrap;
 }
@@ -228,7 +228,7 @@
 }
 
 .root th {
-  background: var(--surface-high);
+  background: var(--td-surface-3);
   font-weight: 500;
   /* Sticky header: the table is the scroll container (overflow-x: auto), so
      the header stays visible while a long table scrolls vertically. */
@@ -244,7 +244,7 @@
 }
 
 .root tbody tr:nth-child(even) td {
-  background: var(--surface-low);
+  background: var(--td-surface-2);
 }
 
 /* ── Footnotes (GFM) ────────────────────────── */
@@ -252,16 +252,16 @@
 .root section.footnotes {
   margin-top: 1em;
   padding-top: 0.5em;
-  border-top: 1px solid var(--bdr);
+  border-top: 1px solid var(--td-line);
   font-size: 0.85em;
-  color: var(--text-2);
+  color: var(--td-ink-muted);
 }
 
 .root section.footnotes > h2 {
   margin: 0 0 0.25em;
   font-size: 0.95em;
   font-weight: 600;
-  color: var(--text-2);
+  color: var(--td-ink-muted);
 }
 
 .root section.footnotes ol {
@@ -270,7 +270,7 @@
 }
 
 .root section.footnotes a {
-  color: var(--text-3);
+  color: var(--td-ink-subtle);
 }
 
 /* ── Inline code ────────────────────────────── */
@@ -278,8 +278,8 @@
 .inlineCode {
   padding: 1px 5px;
   border-radius: var(--r-xs);
-  background: var(--surface-high);
-  font-family: var(--font-mono);
+  background: var(--td-surface-3);
+  font-family: var(--td-mono);
   font-size: 0.9em;
 
   /* Give every visually wrapped fragment its own background and rounded edge. */
@@ -291,7 +291,7 @@
 
 .codeBlockWrapper {
   margin: 0.5em 0;
-  border-radius: var(--r-sm);
+  border-radius: var(--td-radius-control);
   overflow: hidden;
   max-width: 100%;
 }
@@ -329,9 +329,9 @@
   display: block;
   padding: 3px 12px;
   font-size: 0.6875rem;
-  font-family: var(--font-mono);
+  font-family: var(--td-mono);
   text-transform: uppercase;
-  color: var(--text-2);
+  color: var(--td-ink-muted);
 }
 
 .codeCopyBtn {
@@ -344,14 +344,14 @@
   border-radius: var(--r-xs);
   background: none;
   font-size: 0.6875rem;
-  font-family: var(--font-sans);
-  color: var(--text-3);
+  font-family: var(--td-font);
+  color: var(--td-ink-subtle);
   cursor: pointer;
 }
 
 .codeCopyBtn:hover {
-  background: var(--surface-high);
-  color: var(--text-1);
+  background: var(--td-surface-3);
+  color: var(--td-ink);
 }
 
 .codeCopyBtn:focus-visible {
@@ -361,7 +361,7 @@
 
 /* Copy→Check feedback state (icon + label swap) */
 .codeCopyBtn.copied {
-  color: var(--success);
+  color: var(--td-moss);
 }
 
 /* ── Long-code collapse (fable UIUX #3) ─────────────────────────
@@ -392,17 +392,17 @@
   width: 100%;
   padding: 4px 0;
   border: none;
-  border-top: 1px solid var(--bdr);
+  border-top: 1px solid var(--td-line);
   background: var(--surface-dim);
-  color: var(--text-2);
+  color: var(--td-ink-muted);
   font-size: 0.6875rem;
-  font-family: var(--font-sans);
+  font-family: var(--td-font);
   cursor: pointer;
 }
 
 .codeToggle:hover {
-  background: var(--surface-high);
-  color: var(--text-1);
+  background: var(--td-surface-3);
+  color: var(--td-ink);
 }
 
 .codeToggle:focus-visible {

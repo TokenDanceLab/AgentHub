@@ -7,7 +7,7 @@
   gap: 5px;
   padding: 3px 10px;
   border-radius: var(--r-full, 999px);
-  font: 500 0.75rem var(--font-sans, -apple-system, BlinkMacSystemFont, 'Inter', 'PingFang SC', system-ui, sans-serif);
+  font: 500 0.75rem var(--td-font, -apple-system, BlinkMacSystemFont, 'Inter', 'PingFang SC', system-ui, sans-serif);
   white-space: nowrap;
   line-height: 1.4;
 }
@@ -24,21 +24,21 @@
 
 .low {
   background: var(--success-bg);
-  color: var(--success);
+  color: var(--td-moss);
 }
 
 .medium {
   background: var(--warning-bg);
-  color: var(--warning);
+  color: var(--td-warning);
 }
 
 .high {
   background: var(--danger-bg);
-  color: var(--danger);
+  color: var(--td-danger);
 }
 
 .critical {
   background: var(--danger-bg);
-  color: var(--danger);
-  border: 1px solid var(--danger);
+  color: var(--td-danger);
+  border: 1px solid var(--td-danger);
 }

@@ -1,8 +1,8 @@
 .card {
-  border: 1px solid var(--border);
+  border: 1px solid var(--td-line);
   border-radius: var(--r-xl);
-  background: var(--card);
-  color: var(--card-foreground);
+  background: var(--td-surface);
+  color: var(--td-ink);
 }
 
 /* Frosted glass recipe — values from design-token SSOT (#1197). */
@@ -30,8 +30,8 @@
 }
 
 .elevated {
-  background: var(--elevated-card-bg, var(--card));
-  border-color: var(--elevated-card-border, var(--border));
+  background: var(--elevated-card-bg, var(--td-surface));
+  border-color: var(--elevated-card-border, var(--td-line));
   box-shadow: var(--elevated-card-shadow, var(--glass-elev-1));
   transition:
     transform var(--motion-press, 90ms ease),
@@ -42,33 +42,33 @@
   transform: scale(var(--glass-press-scale, 0.985));
 }
 
-.compact { padding: var(--wb-gap-xs, var(--space-sm, 0.5rem)); }
+.compact { padding: var(--wb-gap-xs, var(--td-space-2, 0.5rem)); }
 .padNone { padding: 0; }
 
 /* default padding via .card */
 .card:not(.compact):not(.padNone) {
-  padding: var(--wb-gap-md, var(--space-lg, 1rem));
+  padding: var(--wb-gap-md, var(--td-space-4, 1rem));
 }
 
 .header {
-  padding-bottom: var(--wb-gap-sm, var(--space-md, 0.75rem));
-  border-bottom: 1px solid var(--border);
+  padding-bottom: var(--wb-gap-sm, var(--td-space-3, 0.75rem));
+  border-bottom: 1px solid var(--td-line);
 }
 
 .content {
-  padding-top: var(--wb-gap-sm, var(--space-md, 0.75rem));
+  padding-top: var(--wb-gap-sm, var(--td-space-3, 0.75rem));
 }
 
 .footer {
-  padding-top: var(--wb-gap-sm, var(--space-md, 0.75rem));
-  border-top: 1px solid var(--border);
+  padding-top: var(--wb-gap-sm, var(--td-space-3, 0.75rem));
+  border-top: 1px solid var(--td-line);
 }
 
 /* ── Responsive ─────────────────── */
 
 @media (max-width: 480px) {
   .card:not(.compact):not(.padNone) {
-    padding: var(--wb-gap-sm, var(--space-md, 0.75rem));
+    padding: var(--wb-gap-sm, var(--td-space-3, 0.75rem));
   }
 }
 

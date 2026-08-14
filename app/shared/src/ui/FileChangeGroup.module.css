@@ -1,7 +1,7 @@
 .group {
-  border: 1px solid var(--border);
+  border: 1px solid var(--td-line);
   border-radius: var(--r-md);
-  background: var(--card);
+  background: var(--td-surface);
   margin: 6px 0;
   overflow: hidden;
 }
@@ -14,10 +14,10 @@
   padding: 10px 14px;
   border: none;
   background: transparent;
-  color: var(--text-primary);
-  font-size: var(--font-size-sm);
+  color: var(--td-ink);
+  font-size: var(--td-text-sm);
   cursor: pointer;
-  transition: background var(--duration-fast);
+  transition: background var(--td-dur-fast);
 }
 
 .header:hover { background: var(--hover-overlay); }
@@ -26,7 +26,7 @@
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: var(--success);
+  background: var(--td-moss);
   flex-shrink: 0;
 }
 
@@ -40,22 +40,22 @@
 }
 
 .count {
-  font-size: var(--font-size-xs);
-  color: var(--text-weaker);
+  font-size: var(--td-text-xs);
+  color: var(--td-ink-muted);
   flex-shrink: 0;
 }
 
 .chevron {
-  transition: transform var(--duration-fast);
-  color: var(--muted-foreground);
+  transition: transform var(--td-dur-fast);
+  color: var(--td-ink-muted);
   flex-shrink: 0;
 }
 
 .chevronDown { transform: rotate(180deg); }
 
 .body {
-  border-top: 1px solid var(--border);
-  background: color-mix(in oklch, var(--background) 60%, var(--card));
+  border-top: 1px solid var(--td-line);
+  background: color-mix(in oklch, var(--td-canvas) 60%, var(--td-surface));
 }
 
 .fileRow {
@@ -65,8 +65,8 @@
   padding: 8px 14px;
   min-height: 44px;
   cursor: pointer;
-  transition: background var(--duration-fast);
-  border-bottom: 1px solid var(--border);
+  transition: background var(--td-dur-fast);
+  border-bottom: 1px solid var(--td-line);
   gap: 8px;
 }
 
@@ -81,19 +81,19 @@
   flex: 1;
 }
 
-.fileIcon { color: var(--muted-foreground); flex-shrink: 0; }
+.fileIcon { color: var(--td-ink-muted); flex-shrink: 0; }
 
 .fileName {
-  font-size: var(--font-size-sm);
-  font-family: var(--font-mono);
-  color: var(--text-primary);
+  font-size: var(--td-text-sm);
+  font-family: var(--td-mono);
+  color: var(--td-ink);
   font-weight: var(--font-weight-medium);
 }
 
 .filePath {
   font-size: 11px;
-  font-family: var(--font-mono);
-  color: var(--text-weaker);
+  font-family: var(--td-mono);
+  color: var(--td-ink-muted);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -104,13 +104,13 @@
   align-items: center;
   gap: 4px;
   flex-shrink: 0;
-  font-family: var(--font-mono);
-  font-size: var(--font-size-xs);
+  font-family: var(--td-mono);
+  font-size: var(--td-text-xs);
   font-variant-numeric: tabular-nums;
 }
 
-.additions { color: var(--success); font-weight: var(--font-weight-medium); }
-.deletions { color: var(--danger); font-weight: var(--font-weight-medium); }
+.additions { color: var(--td-moss); font-weight: var(--font-weight-medium); }
+.deletions { color: var(--td-danger); font-weight: var(--font-weight-medium); }
 
 .diffBtn {
   display: flex;
@@ -119,21 +119,21 @@
   width: 30px;
   height: 30px;
   border: 1px solid transparent;
-  border-radius: var(--r-sm);
+  border-radius: var(--td-radius-control);
   background: transparent;
-  color: var(--muted-foreground);
+  color: var(--td-ink-muted);
   cursor: pointer;
-  transition: background var(--duration-fast), color var(--duration-fast);
+  transition: background var(--td-dur-fast), color var(--td-dur-fast);
   margin-left: 4px;
 }
 
-.diffBtn:hover { background: var(--hover-overlay); color: var(--foreground); }
+.diffBtn:hover { background: var(--hover-overlay); color: var(--td-ink); }
 
 .previewHint {
-  color: var(--muted-foreground);
+  color: var(--td-ink-muted);
   flex-shrink: 0;
   opacity: 0;
-  transition: opacity var(--duration-fast);
+  transition: opacity var(--td-dur-fast);
 }
 
 /* Hover-reveal (mouse) + focus-within (keyboard a11y): the preview hint

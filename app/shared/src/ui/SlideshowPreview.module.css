@@ -7,7 +7,7 @@
   flex-direction: column;
   height: 100%;
   min-height: 0;
-  background: var(--surface);
+  background: var(--td-surface);
   overflow: hidden;
   animation: previewIn var(--dur-medium, 0.25s) var(--ease-spring, ease-out);
 }
@@ -19,8 +19,8 @@
   gap: 8px;
   min-height: 40px;
   padding: 6px 10px;
-  border-bottom: 1px solid var(--bdr);
-  background: var(--surface);
+  border-bottom: 1px solid var(--td-line);
+  background: var(--td-surface);
   flex-shrink: 0;
 }
 
@@ -33,8 +33,8 @@
 }
 
 .fileName {
-  font: 600 0.8125rem/1.2 var(--font-sans);
-  color: var(--text-1);
+  font: 600 0.8125rem/1.2 var(--td-font);
+  color: var(--td-ink);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -43,16 +43,16 @@
 .badge {
   flex-shrink: 0;
   padding: 1px 6px;
-  border-radius: var(--r-sm);
-  background: var(--primary-light);
-  color: var(--primary);
-  font: 500 0.625rem/1.4 var(--font-sans);
+  border-radius: var(--td-radius-control);
+  background: var(--td-tint);
+  color: var(--td-plum);
+  font: 500 0.625rem/1.4 var(--td-font);
 }
 
 .counter {
   flex-shrink: 0;
-  color: var(--text-3);
-  font: 500 0.6875rem var(--font-sans);
+  color: var(--td-ink-subtle);
+  font: 500 0.6875rem var(--td-font);
 }
 
 /* ── Slide area ── */
@@ -73,15 +73,15 @@
   padding: 0;
   border: 0;
   background: transparent;
-  color: var(--text-2);
+  color: var(--td-ink-muted);
   cursor: pointer;
   flex-shrink: 0;
-  transition: background var(--dur-normal) var(--ease), color var(--dur-normal) var(--ease);
+  transition: background var(--td-dur-normal) var(--td-ease), color var(--td-dur-normal) var(--td-ease);
 }
 
 .navBtn:hover:not(:disabled) {
-  background: var(--surface-high);
-  color: var(--text-1);
+  background: var(--td-surface-3);
+  color: var(--td-ink);
 }
 
 .navBtn:disabled {
@@ -96,7 +96,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--surface-low);
+  background: var(--td-surface-2);
   overflow: auto;
   padding: 16px;
 }
@@ -130,7 +130,7 @@
 
 .slideText {
   margin: 0;
-  color: var(--text-1);
+  color: var(--td-ink);
   font-size: 0.875rem;
   line-height: 1.5;
   word-break: break-word;
@@ -142,7 +142,7 @@
 }
 
 .slideEmpty {
-  color: var(--text-3);
+  color: var(--td-ink-subtle);
   font-style: italic;
   text-align: center;
 }
@@ -153,8 +153,8 @@
   align-items: center;
   gap: 6px;
   padding: 8px 10px;
-  border-top: 1px solid var(--bdr);
-  background: var(--surface-low);
+  border-top: 1px solid var(--td-line);
+  background: var(--td-surface-2);
   overflow-x: auto;
   flex-shrink: 0;
 }
@@ -167,23 +167,23 @@
   padding: 6px 8px;
   min-width: 64px;
   border: 2px solid transparent;
-  border-radius: var(--r-sm);
-  background: var(--surface);
-  color: var(--text-3);
+  border-radius: var(--td-radius-control);
+  background: var(--td-surface);
+  color: var(--td-ink-subtle);
   cursor: pointer;
   font-size: 0.625rem;
-  transition: border-color var(--dur-normal) var(--ease), background var(--dur-normal) var(--ease), color var(--dur-normal) var(--ease);
+  transition: border-color var(--td-dur-normal) var(--td-ease), background var(--td-dur-normal) var(--td-ease), color var(--td-dur-normal) var(--td-ease);
 }
 
 .thumbnail:hover {
-  border-color: var(--bdr-strong);
-  color: var(--text-1);
+  border-color: var(--td-line-strong);
+  color: var(--td-ink);
 }
 
 .thumbnailActive {
-  border-color: var(--primary);
-  color: var(--primary);
-  background: var(--primary-light);
+  border-color: var(--td-plum);
+  color: var(--td-plum);
+  background: var(--td-tint);
 }
 
 .thumbnailNumber {
@@ -206,18 +206,18 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: var(--space-sm);
-  color: var(--text-3);
-  font-size: var(--font-size-sm, 0.8125rem);
-  padding: var(--space-xl);
+  gap: var(--td-space-2);
+  color: var(--td-ink-subtle);
+  font-size: var(--td-text-sm, 0.8125rem);
+  padding: var(--td-space-5);
   min-height: 200px;
 }
 
 .spinner {
   width: 28px;
   height: 28px;
-  border: 3px solid var(--bdr);
-  border-top-color: var(--primary);
+  border: 3px solid var(--td-line);
+  border-top-color: var(--td-plum);
   border-radius: 50%;
   animation: previewSpin 0.7s linear infinite;
 }
@@ -233,16 +233,16 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: var(--space-sm);
-  color: var(--text-3);
-  font-size: var(--font-size-sm, 0.8125rem);
-  padding: var(--space-xl);
+  gap: var(--td-space-2);
+  color: var(--td-ink-subtle);
+  font-size: var(--td-text-sm, 0.8125rem);
+  padding: var(--td-space-5);
   min-height: 200px;
   text-align: center;
 }
 
 .errorIcon {
-  color: var(--danger);
+  color: var(--td-danger);
   opacity: 0.6;
 }
 
@@ -255,20 +255,20 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  margin-top: var(--space-xs);
+  margin-top: var(--td-space-1);
   padding: 6px 14px;
-  border: 1px solid var(--bdr);
-  border-radius: var(--r-sm);
+  border: 1px solid var(--td-line);
+  border-radius: var(--td-radius-control);
   background: transparent;
-  color: var(--text-2);
-  font-size: var(--font-size-xs, 0.6875rem);
+  color: var(--td-ink-muted);
+  font-size: var(--td-text-xs, 0.6875rem);
   cursor: pointer;
-  transition: background var(--dur-normal) var(--ease), color var(--dur-normal) var(--ease);
+  transition: background var(--td-dur-normal) var(--td-ease), color var(--td-dur-normal) var(--td-ease);
 }
 
 .retryBtn:hover {
-  background: var(--surface-high);
-  color: var(--text-1);
+  background: var(--td-surface-3);
+  color: var(--td-ink);
 }
 
 /* ── Entry animation ── */

@@ -13,9 +13,9 @@
   min-height: 32px;
   padding: 4px 8px;
   border: 0;
-  border-radius: var(--r-sm);
+  border-radius: var(--td-radius-control);
   background: transparent;
-  color: var(--muted-foreground);
+  color: var(--td-ink-muted);
   font: inherit;
   cursor: pointer;
 }
@@ -23,14 +23,14 @@
 @media (prefers-reduced-motion: no-preference) {
   .button {
     transition:
-      background var(--duration-fast, 0.16s),
-      color var(--duration-fast, 0.16s);
+      background var(--td-dur-fast, 0.16s),
+      color var(--td-dur-fast, 0.16s);
   }
 }
 
 .button:hover {
   background: var(--hover-overlay, var(--muted));
-  color: var(--foreground);
+  color: var(--td-ink);
 }
 
 .button:focus-visible {
@@ -44,7 +44,7 @@
 
 .button:disabled:hover {
   background: transparent;
-  color: var(--muted-foreground);
+  color: var(--td-ink-muted);
 }
 
 .leading {
@@ -62,7 +62,7 @@
 
 @media (prefers-reduced-motion: no-preference) {
   .chevron {
-    transition: transform var(--duration-fast, 0.16s) var(--ease-out, ease);
+    transition: transform var(--td-dur-fast, 0.16s) var(--td-ease-out, ease);
   }
 }
 
@@ -81,7 +81,7 @@
 .meta {
   margin-left: auto;
   min-width: max-content;
-  color: var(--muted-foreground);
+  color: var(--td-ink-muted);
   font-size: 11px;
   font-weight: 650;
   letter-spacing: 0;

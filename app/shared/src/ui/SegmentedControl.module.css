@@ -3,11 +3,11 @@
   grid-auto-flow: column;
   grid-auto-columns: minmax(0, 1fr);
   gap: 4px;
-  border: 1px solid var(--border);
-  border-radius: var(--r-lg);
+  border: 1px solid var(--td-line);
+  border-radius: var(--td-radius-panel);
   padding: 4px;
-  background: color-mix(in oklch, var(--card, white) 74%, transparent);
-  color: var(--foreground);
+  background: color-mix(in oklch, var(--td-surface, white) 74%, transparent);
+  color: var(--td-ink);
 }
 
 .option {
@@ -21,7 +21,7 @@
   border-radius: var(--r-md);
   padding: 0 10px;
   background: transparent;
-  color: var(--muted-foreground);
+  color: var(--td-ink-muted);
   font: inherit;
   font-size: 13px;
   font-weight: 650;
@@ -34,7 +34,7 @@
 }
 
 .option:hover:not(.optionActive) {
-  background: var(--surface-high);
+  background: var(--td-surface-3);
 }
 
 .option:focus-visible {
@@ -43,8 +43,8 @@
 }
 
 .optionActive {
-  background: color-mix(in oklch, var(--foreground) 8%, transparent);
-  color: var(--foreground);
+  background: color-mix(in oklch, var(--td-ink) 8%, transparent);
+  color: var(--td-ink);
 }
 
 .icon {

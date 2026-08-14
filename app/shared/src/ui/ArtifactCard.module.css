@@ -1,7 +1,7 @@
 .card {
-  border: 1px solid var(--border);
+  border: 1px solid var(--td-line);
   border-radius: var(--r-md);
-  background: var(--card);
+  background: var(--td-surface);
   margin: 6px 0;
   overflow: hidden;
 }
@@ -14,7 +14,7 @@
 }
 
 .icon {
-  color: var(--primary);
+  color: var(--td-plum);
   flex-shrink: 0;
   display: flex;
 }
@@ -23,14 +23,14 @@
   font-size: 10px;
   font-weight: 650;
   text-transform: uppercase;
-  color: var(--muted-foreground);
+  color: var(--td-ink-muted);
   flex-shrink: 0;
 }
 
 .title {
-  font-size: var(--font-size-sm);
+  font-size: var(--td-text-sm);
   font-weight: var(--font-weight-medium);
-  color: var(--text-primary);
+  color: var(--td-ink);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -40,7 +40,7 @@
 
 .size {
   font-size: 11px;
-  color: var(--text-weaker);
+  color: var(--td-ink-muted);
   flex-shrink: 0;
   font-variant-numeric: tabular-nums;
 }
@@ -61,15 +61,15 @@
   border: none;
   border-radius: var(--r-xs);
   background: transparent;
-  color: var(--muted-foreground);
+  color: var(--td-ink-muted);
   cursor: pointer;
-  transition: background var(--duration-fast), color var(--duration-fast);
+  transition: background var(--td-dur-fast), color var(--td-dur-fast);
   text-decoration: none;
 }
 
 .iconAction:hover {
-  background: color-mix(in oklch, var(--foreground) 10%, transparent);
-  color: var(--foreground);
+  background: color-mix(in oklch, var(--td-ink) 10%, transparent);
+  color: var(--td-ink);
 }
 
 .iconAction:focus-visible {
@@ -86,16 +86,16 @@
   align-items: center;
   gap: 3px;
   padding: 2px 8px;
-  border-radius: var(--r-sm);
-  background: color-mix(in oklch, var(--success) 14%, transparent);
-  color: var(--success);
-  font-size: var(--font-size-xs);
+  border-radius: var(--td-radius-control);
+  background: color-mix(in oklch, var(--td-moss) 14%, transparent);
+  color: var(--td-moss);
+  font-size: var(--td-text-xs);
   font-weight: var(--font-weight-medium);
 }
 
 .preview {
-  border-top: 1px solid var(--border);
-  background: color-mix(in oklch, var(--background) 60%, var(--card));
+  border-top: 1px solid var(--td-line);
+  background: color-mix(in oklch, var(--td-canvas) 60%, var(--td-surface));
 }
 
 .previewImage {
@@ -107,7 +107,7 @@
 
 .previewSkeleton {
   min-height: 200px;
-  border-radius: var(--r-sm);
+  border-radius: var(--td-radius-control);
 }
 
 .previewFrame {

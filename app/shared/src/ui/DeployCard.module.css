@@ -2,9 +2,9 @@
 /* Mirrors .deploy-card from the AgentHub Desktop demo. */
 
 .card {
-  background: var(--surface);
-  border: 1px solid var(--bdr);
-  border-radius: var(--r-lg, 12px);
+  background: var(--td-surface);
+  border: 1px solid var(--td-line);
+  border-radius: var(--td-radius-panel, 12px);
   padding: 14px 16px;
 }
 
@@ -23,7 +23,7 @@
   gap: 5px;
   padding: 3px 10px;
   border-radius: var(--r-full, 9999px);
-  font: 500 0.75rem var(--font-sans, -apple-system, BlinkMacSystemFont, 'Inter', system-ui, sans-serif);
+  font: 500 0.75rem var(--td-font, -apple-system, BlinkMacSystemFont, 'Inter', system-ui, sans-serif);
   white-space: nowrap;
 }
 
@@ -37,17 +37,17 @@
 
 .badgeSuccess {
   background: var(--success-bg);
-  color: var(--success);
+  color: var(--td-moss);
 }
 
 .badgePrimary {
   background: var(--primary-soft);
-  color: var(--primary);
+  color: var(--td-plum);
 }
 
 .badgeDanger {
   background: var(--danger-bg);
-  color: var(--danger);
+  color: var(--td-danger);
 }
 
 .spin {
@@ -60,8 +60,8 @@
 }
 
 .title {
-  font: 500 0.8125rem var(--font-sans, -apple-system, BlinkMacSystemFont, 'Inter', system-ui, sans-serif);
-  color: var(--text-1);
+  font: 500 0.8125rem var(--td-font, -apple-system, BlinkMacSystemFont, 'Inter', system-ui, sans-serif);
+  color: var(--td-ink);
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -76,13 +76,13 @@
   gap: 10px;
   padding: 10px 12px;
   border-radius: var(--r-md, 12px);
-  background: var(--surface-low);
-  border: 1px solid var(--bdr);
+  background: var(--td-surface-2);
+  border: 1px solid var(--td-line);
 }
 
 .url {
-  font: 400 0.6875rem var(--font-mono, 'SF Mono', 'Cascadia Code', 'JetBrains Mono', ui-monospace, monospace);
-  color: var(--primary);
+  font: 400 0.6875rem var(--td-mono, 'SF Mono', 'Cascadia Code', 'JetBrains Mono', ui-monospace, monospace);
+  color: var(--td-plum);
   flex: 1;
   min-width: 0;
   white-space: nowrap;
@@ -107,22 +107,22 @@
   height: 30px;
   padding: 0 12px;
   border: none;
-  border-radius: var(--r-sm, 8px);
-  font: 600 0.6875rem var(--font-sans, -apple-system, BlinkMacSystemFont, 'Inter', system-ui, sans-serif);
+  border-radius: var(--td-radius-control, 8px);
+  font: 600 0.6875rem var(--td-font, -apple-system, BlinkMacSystemFont, 'Inter', system-ui, sans-serif);
   cursor: pointer;
   white-space: nowrap;
-  transition: background var(--dur-normal, 140ms), color var(--dur-normal, 140ms), transform var(--dur-normal, 140ms), box-shadow var(--dur-normal, 140ms);
+  transition: background var(--td-dur-normal, 140ms), color var(--td-dur-normal, 140ms), transform var(--td-dur-normal, 140ms), box-shadow var(--td-dur-normal, 140ms);
   text-decoration: none;
 }
 
 .openBtn {
   background: transparent;
-  color: var(--text-2);
+  color: var(--td-ink-muted);
 }
 
 .openBtn:hover {
-  background: var(--surface-high);
-  color: var(--text-1);
+  background: var(--td-surface-3);
+  color: var(--td-ink);
 }
 
 .openBtn:focus-visible {
@@ -137,7 +137,7 @@
 /* ── Building/deploying placeholder ── */
 
 .skeleton {
-  border-radius: var(--r-sm);
+  border-radius: var(--td-radius-control);
 }
 
 @media (max-width: 767px) {

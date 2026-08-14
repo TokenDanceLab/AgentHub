@@ -7,17 +7,17 @@
   flex-direction: column;
   gap: 4px;
   padding: 8px 12px;
-  border: 1px solid var(--bdr);
+  border: 1px solid var(--td-line);
   border-radius: var(--r-md);
-  background: var(--surface);
+  background: var(--td-surface);
   transition:
-    border-color var(--dur-normal) var(--ease),
-    box-shadow var(--dur-normal) var(--ease);
+    border-color var(--td-dur-normal) var(--td-ease),
+    box-shadow var(--td-dur-normal) var(--td-ease);
 }
 
 .bar:hover {
-  border-color: var(--bdr-strong);
-  box-shadow: var(--e-1);
+  border-color: var(--td-line-strong);
+  box-shadow: var(--td-shadow-sm);
 }
 
 .agent {
@@ -25,8 +25,8 @@
   align-items: center;
   gap: 6px;
   min-height: 22px;
-  font: 400 0.75rem/1.4 var(--font-sans);
-  color: var(--text-2);
+  font: 400 0.75rem/1.4 var(--td-font);
+  color: var(--td-ink-muted);
 }
 
 .icon {
@@ -41,7 +41,7 @@
 
 .name {
   font-weight: 500;
-  color: var(--text-1);
+  color: var(--td-ink);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -50,21 +50,21 @@
 .status {
   margin-left: auto;
   font-size: 0.6875rem;
-  color: var(--text-3);
+  color: var(--td-ink-subtle);
   flex-shrink: 0;
 }
 
 .detail {
   margin-left: auto;
   font-size: 0.6875rem;
-  color: var(--text-3);
+  color: var(--td-ink-subtle);
   flex-shrink: 0;
 }
 
 /* ── Status variants ── */
 
 .statusStreaming {
-  color: var(--primary);
+  color: var(--td-plum);
 }
 
 .statusThinking {
@@ -72,11 +72,11 @@
 }
 
 .statusDone {
-  color: var(--success);
+  color: var(--td-moss);
 }
 
 .statusFailed {
-  color: var(--danger);
+  color: var(--td-danger);
 }
 
 /* ── Pulse animation for active agent icon ── */

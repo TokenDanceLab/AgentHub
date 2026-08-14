@@ -20,12 +20,12 @@
 
 .iconWrapNetwork {
   composes: iconWrap;
-  color: var(--warning);
+  color: var(--td-warning);
 }
 
 .iconWrapTimeout {
   composes: iconWrap;
-  color: var(--warning);
+  color: var(--td-warning);
 }
 
 .iconWrapCrash {

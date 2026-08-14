@@ -37,8 +37,8 @@ export const DagTree: React.FC<DagTreeProps> = ({ nodes, title }) => {
     <section style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
       {title && (
         <div style={{
-          font: '600 0.6875rem var(--font-sans)',
-          color: 'var(--text-3)',
+          font: '600 0.6875rem var(--td-font)',
+          color: 'var(--td-ink-subtle)',
           textTransform: 'uppercase',
           padding: '0 2px',
         }}>
@@ -67,10 +67,10 @@ function DagTreeNode({ node }: { node: DagNode }): React.ReactElement {
           alignItems: 'center',
           gap: 6,
           padding: '3px 6px',
-          borderRadius: 'var(--r-sm)',
+          borderRadius: 'var(--td-radius-control)',
           cursor: hasChildren ? 'pointer' : 'default',
-          font: '400 0.75rem var(--font-sans)',
-          color: node.status === 'failed' ? 'var(--danger)' : 'var(--text-2)',
+          font: '400 0.75rem var(--td-font)',
+          color: node.status === 'failed' ? 'var(--td-danger)' : 'var(--td-ink-muted)',
           background: 'transparent',
           border: 0,
           width: '100%',
@@ -85,7 +85,7 @@ function DagTreeNode({ node }: { node: DagNode }): React.ReactElement {
           {node.label}
         </span>
         {node.duration && (
-          <span style={{ marginLeft: 'auto', color: 'var(--text-3)', font: '500 0.6875rem var(--font-mono)', whiteSpace: 'nowrap' }}>
+          <span style={{ marginLeft: 'auto', color: 'var(--td-ink-subtle)', font: '500 0.6875rem var(--td-mono)', whiteSpace: 'nowrap' }}>
             {node.duration}
           </span>
         )}
@@ -114,12 +114,12 @@ function statusMarkStyle(status: DagNodeStatus): React.CSSProperties {
 
 function statusColor(status: DagNodeStatus): string {
   switch (status) {
-    case 'completed': return 'var(--success)';
+    case 'completed': return 'var(--td-moss)';
     case 'in_progress': return 'var(--state-thinking)';
-    case 'failed': return 'var(--danger)';
+    case 'failed': return 'var(--td-danger)';
     case 'pending':
     default:
-      return 'var(--text-3)';
+      return 'var(--td-ink-subtle)';
   }
 }
 

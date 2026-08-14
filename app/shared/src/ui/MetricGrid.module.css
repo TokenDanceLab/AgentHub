@@ -9,11 +9,11 @@
   gap: 2px;
   min-width: 0;
   min-height: 64px;
-  border: 1px solid var(--border);
-  border-radius: var(--r-lg);
+  border: 1px solid var(--td-line);
+  border-radius: var(--td-radius-panel);
   padding: 9px 10px;
-  background: color-mix(in oklch, var(--card, white) 74%, transparent);
-  color: var(--foreground);
+  background: color-mix(in oklch, var(--td-surface, white) 74%, transparent);
+  color: var(--td-ink);
   text-align: left;
 }
 
@@ -26,13 +26,13 @@
 .icon {
   display: inline-flex;
   align-items: center;
-  color: var(--muted-foreground);
+  color: var(--td-ink-muted);
 }
 
 .value {
   display: block;
   overflow: hidden;
-  color: var(--foreground);
+  color: var(--td-ink);
   font-size: 18px;
   font-weight: 760;
   line-height: 1.25;
@@ -42,7 +42,7 @@
 
 .label {
   overflow: hidden;
-  color: var(--muted-foreground);
+  color: var(--td-ink-muted);
   font-size: 12px;
   line-height: 1.45;
   text-overflow: ellipsis;

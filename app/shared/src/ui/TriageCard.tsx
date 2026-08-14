@@ -47,7 +47,7 @@ export function TriageCard({
     return (
       <div className={cx(styles.card, className)} role="alert">
         <span className={cx(styles.body, bodyClassName)}>
-          <span className={cx(styles.eyebrow, eyebrowClassName)} style={{ color: 'var(--destructive, #dc2626)' }}>
+          <span className={cx(styles.eyebrow, eyebrowClassName)} style={{ color: 'var(--td-danger, #dc2626)' }}>
             {typeof error === 'string' ? error : error}
           </span>
         </span>

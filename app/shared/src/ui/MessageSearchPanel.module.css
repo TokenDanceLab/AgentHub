@@ -9,8 +9,8 @@
   width: 100%;
   max-width: 560px;
   max-height: 420px;
-  background: var(--card);
-  border: 1px solid var(--border);
+  background: var(--td-surface);
+  border: 1px solid var(--td-line);
   border-radius: var(--r-md);
   box-shadow: 0 12px 40px var(--glass-shadow-subtle);
   display: flex;
@@ -35,13 +35,13 @@
   align-items: center;
   gap: 8px;
   padding: 10px 12px;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid var(--td-line);
   flex-shrink: 0;
 }
 
 .searchIcon {
   flex-shrink: 0;
-  color: var(--muted-foreground);
+  color: var(--td-ink-muted);
   opacity: 0.6;
 }
 
@@ -50,15 +50,15 @@
   min-width: 0;
   border: none;
   background: transparent;
-  color: var(--foreground);
+  color: var(--td-ink);
   font-size: 14px;
-  font-family: var(--font-sans);
+  font-family: var(--td-font);
   line-height: 1.5;
   outline: none;
 }
 
 .input::placeholder {
-  color: var(--text-weaker);
+  color: var(--td-ink-muted);
 }
 
 .results {
@@ -74,7 +74,7 @@
 .empty {
   padding: 32px 12px;
   text-align: center;
-  color: var(--text-weaker);
+  color: var(--td-ink-muted);
   font-size: 13px;
   line-height: 1.5;
 }
@@ -84,15 +84,15 @@
   width: 100%;
   padding: 8px 10px;
   border: none;
-  border-radius: var(--r-sm);
+  border-radius: var(--td-radius-control);
   background: transparent;
-  color: var(--foreground);
-  font-family: var(--font-sans);
+  color: var(--td-ink);
+  font-family: var(--td-font);
   font-size: 13px;
   line-height: 1.5;
   text-align: left;
   cursor: pointer;
-  transition: background 0.12s var(--ease-out);
+  transition: background 0.12s var(--td-ease-out);
 }
 
 .resultItem:hover {
@@ -100,13 +100,13 @@
 }
 
 .resultItemHighlight {
-  background: color-mix(in oklch, var(--primary) 10%, transparent);
+  background: color-mix(in oklch, var(--td-plum) 10%, transparent);
   animation: highlightPulse 0.4s ease-out;
 }
 
 @keyframes highlightPulse {
-  0% { background: color-mix(in oklch, var(--primary) 20%, transparent); }
-  100% { background: color-mix(in oklch, var(--primary) 2%, transparent); }
+  0% { background: color-mix(in oklch, var(--td-plum) 20%, transparent); }
+  100% { background: color-mix(in oklch, var(--td-plum) 2%, transparent); }
 }
 
 .resultMeta {
@@ -119,7 +119,7 @@
 .resultAgent {
   font-size: 11px;
   font-weight: 520;
-  color: var(--muted-foreground);
+  color: var(--td-ink-muted);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -128,12 +128,12 @@
 
 .resultTime {
   font-size: 11px;
-  color: var(--text-weaker);
+  color: var(--td-ink-muted);
   margin-left: auto;
 }
 
 .resultSnippet {
-  color: color-mix(in oklch, var(--foreground) 72%, var(--muted-foreground) 28%);
+  color: color-mix(in oklch, var(--td-ink) 72%, var(--td-ink-muted) 28%);
   font-size: 12.5px;
   line-height: 1.55;
   overflow: hidden;
@@ -144,8 +144,8 @@
 }
 
 .resultMark {
-  background: color-mix(in oklch, var(--warning) 34%, transparent);
-  color: var(--foreground);
+  background: color-mix(in oklch, var(--td-warning) 34%, transparent);
+  color: var(--td-ink);
   border-radius: var(--r-xs);
   padding: 0 1px;
 }
@@ -156,9 +156,9 @@
   justify-content: flex-end;
   gap: 4px;
   padding: 6px 10px;
-  border-top: 1px solid var(--border);
+  border-top: 1px solid var(--td-line);
   font-size: 11px;
-  color: var(--text-weaker);
+  color: var(--td-ink-muted);
   flex-shrink: 0;
 }
 
@@ -172,9 +172,9 @@
   border: 1px solid var(--glass-border-strong);
   border-radius: var(--r-xs);
   background: var(--glass-bg-subtle);
-  font-family: var(--font-sans);
+  font-family: var(--td-font);
   font-size: 10px;
   font-weight: 520;
-  color: var(--muted-foreground);
+  color: var(--td-ink-muted);
   line-height: 1;
 }
