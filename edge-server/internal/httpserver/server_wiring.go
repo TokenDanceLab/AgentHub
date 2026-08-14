@@ -40,7 +40,17 @@ func configureLocalRunner(reg *runners.Registry, execCfg lifecycle.ProcessExecut
 			Status:       "online",
 			Capabilities: []string{"process", "shell"},
 		})
+		return
 	}
+	// Mock executor fallback: no adapter and no runner command (the
+	// agenthub-runner-mock profile). Register a mock runner so the registry
+	// reflects the mock execution path instead of reporting "no runners".
+	reg.Upsert(runners.RunnerInfo{
+		ID:           "runner_local_1",
+		Name:         "Mock Runner (local)",
+		Status:       "online",
+		Capabilities: []string{"mock"},
+	})
 }
 
 func runnerCapabilitiesForAdapter(adapterID string, caps adapters.AgentCapabilities) []string {

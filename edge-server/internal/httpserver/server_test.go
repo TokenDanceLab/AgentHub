@@ -157,13 +157,18 @@ func TestCORSMiddlewareAllowsNoOrigin(t *testing.T) {
 	}
 }
 
-func TestNewHandlerFromConfigLeavesDefaultExecutorLazy(t *testing.T) {
+func TestNewHandlerFromConfigDefaultsToMockExecutor(t *testing.T) {
 	handler, err := newHandlerFromConfig(Config{})
 	if err != nil {
 		t.Fatalf("newHandlerFromConfig returned error: %v", err)
 	}
-	if handler.Executor != nil {
-		t.Fatalf("Executor = %T, want nil before handler defaulting", handler.Executor)
+	// No runner command and no agent default: the edge falls back to the mock
+	// executor so the run lifecycle stays usable (the agenthub-runner-mock
+	// profile contract). This replaced the old nil-executor behavior, which
+	// left the edge degraded (no executor, no runners) and every run failing
+	// with ErrExecutorUnavailable.
+	if _, ok := handler.Executor.(*lifecycle.MockExecutor); !ok {
+		t.Fatalf("Executor = %T, want *lifecycle.MockExecutor (mock fallback)", handler.Executor)
 	}
 	if handler.Bus == nil {
 		t.Fatal("Bus is nil")

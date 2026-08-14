@@ -67,7 +67,13 @@ type ClaudeACPAdapter struct {
 // Windows and "npx" elsewhere (shared defaultNpxPath). The agent receives no
 // run-time args beyond `-y @agentclientprotocol/claude-agent-acp`: ACP mode
 // is implicit in the package, and the prompt travels over stdio.
-func NewClaudeACPAdapter(npxPath string) *ClaudeACPAdapter {
+//
+// model is the default model injected as ANTHROPIC_MODEL when a run does not
+// specify one (sourced from --agent-model). Empty leaves model selection to
+// the agent's own settings.json. ANTHROPIC_AUTH_TOKEN / ANTHROPIC_BASE_URL
+// are also passed through so a cc-switch-style gateway (token + base URL)
+// authenticates the same way the legacy claude-code adapter does.
+func NewClaudeACPAdapter(npxPath, model string) *ClaudeACPAdapter {
 	if npxPath == "" {
 		npxPath = defaultNpxPath()
 	}
@@ -77,7 +83,9 @@ func NewClaudeACPAdapter(npxPath string) *ClaudeACPAdapter {
 		Args:          []string{"-y", claudeACPPackage},
 		DisplayName:   "Claude Code (ACP)",
 		VersionLabel:  "claude-acp " + claudeACPVersionPin + " (npx)",
-		EnvKeys:       []string{"ANTHROPIC_API_KEY"},
+		EnvKeys:       []string{"ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_BASE_URL"},
+		ModelEnvKey:   "ANTHROPIC_MODEL",
+		DefaultModel:  model,
 		LauncherLabel: "claude-acp",
 		InstallHint:   "install Node.js/npx",
 	})}

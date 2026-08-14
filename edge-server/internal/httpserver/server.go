@@ -262,13 +262,20 @@ func wireRunEventTracker(bus *events.Bus) {
 }
 
 // buildProcessExecutor wires the process executor, agent adapter, and the
-// Hub callback client (including the durable delivery journal). Returns nil
-// executor/hub client when neither a runner command nor an agent default is
-// configured.
+// Hub callback client (including the durable delivery journal). When neither
+// a runner command nor an agent default is configured it falls back to the
+// mock executor so the run lifecycle stays usable (the agenthub-runner-mock
+// profile).
 func buildProcessExecutor(cfg Config, bus *events.Bus, agentReg *agents.Registry, msgQueue *agents.Queue, resultAgg *lifecycle.ResultAggregator, edgeMetrics *metrics.EdgeMetrics) (lifecycle.RunExecutor, *hub.CallbackClient, error) {
 	hasAdapter := cfg.AdapterRegistry != nil && cfg.AgentDefault != ""
 	if cfg.ProcessExecutor.Command == "" && !hasAdapter {
-		return nil, nil, nil
+		// No runner command and no default agent adapter: fall back to the
+		// mock executor so the run lifecycle still works and the runner
+		// registry reflects a mock runner (the agenthub-runner-mock profile
+		// contract — "mock executor is the default when no runner command is
+		// specified"). Previously this returned a nil executor, leaving the
+		// edge degraded (no executor, no runners).
+		return lifecycle.NewMockExecutor(bus, cfg.Store), nil, nil
 	}
 	execCfg := cfg.ProcessExecutor
 	if execCfg.Command == "" && hasAdapter {
