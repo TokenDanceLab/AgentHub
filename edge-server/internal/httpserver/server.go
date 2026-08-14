@@ -408,6 +408,12 @@ func newHandlerFromConfig(cfg Config) (*api.Handler, error) {
 	if err != nil {
 		return nil, err
 	}
+	// Orchestration finalize bridge: an orchestrator parent whose terminal
+	// finish is parked (waiting on sub-agents) is finalized by the aggregator
+	// when all children complete or the collector timeout fires.
+	if processExecutor, ok := executor.(*lifecycle.ProcessExecutor); ok {
+		resultAgg.WithParentFinalizer(processExecutor.FinalizeParentRun)
+	}
 	configureLocalRunner(reg, cfg.ProcessExecutor, agentAdapterForRegistry(cfg.AdapterRegistry, cfg.AgentDefault), executor)
 
 	// Wire orchestrator adapter with runtime dependencies so it can spawn sub-agents.
