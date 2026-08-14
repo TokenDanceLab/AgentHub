@@ -26,7 +26,11 @@
      Base v4 scale: md/lg/xl = 16/24/32
      Matching micro steps inherit names only: 2/4/6/8/10/14/16
      --sp-md wires to base compat --space-md (12px), NOT v4 --sp-md (16px)
-     Row rhythm consumes --sp-md (12) not --sp-lg so more turns fit 1440×810. */
+     Row rhythm consumes --sp-md (12) not --sp-lg so more turns fit 1440×810.
+
+     #1672 豁免登记：此密度阶梯是 chatview 产品局部组合（值故意偏离
+     --td-space-* 契约刻度），保留 --sp-*/--r-*/--dur-* 局部名，
+     不迁移到 --td-*；未来可考虑改 --chat-* 前缀以消除"平行词汇"嫌疑。 */
   --sp-xs: 4px; --sp-sm: 8px;
   --sp-md: var(--space-md, 12px); /* 12px = base compat --space-md, not v4 --sp-md */
   --sp-lg: 16px; --sp-xl: 24px;
@@ -49,16 +53,17 @@
      light/dark track the design system.
      ─────────────────────────────────────────────────────────────────── */
 
-  /* Name aliases: chatview / tokens-base names → themes.css semantics */
-  --primary-bg: var(--primary-light);
-  --on-primary: var(--primary-foreground);
+  /* Name aliases: chatview / tokens-base names → themes.css semantics
+     (migrated to --td-* intents, #1672 M2a) */
+  --primary-bg: var(--td-tint);
+  --on-primary: var(--td-ink-on-plum);
 
   /* State: track theme status so dark/light follow themes.css.
      Role colors inherit tokens-base SSOT (--role-*) as theme-independent brand. */
   --state-running: var(--info);
-  --state-success: var(--success);
-  --state-failed: var(--danger);
-  --state-waiting: var(--warning);
+  --state-success: var(--td-moss);
+  --state-failed: var(--td-danger);
+  --state-waiting: var(--td-warning);
 
   /* ── Chatview-specific opacity tokens (animation keyframes) ───────── */
   --opacity-disabled: 0.4;  /* disabled state opacity */
@@ -66,8 +71,8 @@
   --opacity-dag-mid: 0.3;    /* dagPulse mid-keyframe */
 
   /* ── Chatview-specific visual tokens (guide lines, shadows) ───────── */
-  --guide-line: var(--bdr);
-  --shadow: var(--shadow-sm);
+  --guide-line: var(--td-line);
+  --shadow: var(--td-shadow-sm);
 }
 
 /* No [data-theme="dark"] .chatview palette block.
