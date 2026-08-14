@@ -98,28 +98,26 @@ def resolve_cli(runtime: str, cli_path: str) -> str:
         return ""
     if cli_path.strip():
         return resolve_executable(cli_path)
-    if runtime == "codex":
-        for env_name in ("AGENTHUB_CODEX_PATH", "CODEX_PATH"):
-            if os.environ.get(env_name):
-                return resolve_executable(os.environ[env_name])
-        return resolve_executable("codex")
+    if runtime == "codex-acp":
+        if os.environ.get("AGENTHUB_CODEX_ACP_PATH"):
+            return resolve_executable(os.environ["AGENTHUB_CODEX_ACP_PATH"])
+        return resolve_executable("npx")
     if runtime == "claude-code":
         if os.environ.get("AGENTHUB_CLAUDE_CODE_PATH"):
             return resolve_executable(os.environ["AGENTHUB_CLAUDE_CODE_PATH"])
         return resolve_executable("claude")
-    if runtime == "opencode":
-        for env_name in ("AGENTHUB_OPENCODE_PATH", "OPENCODE_PATH"):
-            if os.environ.get(env_name):
-                return resolve_executable(os.environ[env_name])
+    if runtime == "opencode-acp":
+        if os.environ.get("AGENTHUB_OPENCODE_ACP_PATH"):
+            return resolve_executable(os.environ["AGENTHUB_OPENCODE_ACP_PATH"])
         return resolve_executable("opencode")
     return ""
 
 
 def get_cli_path_flag(runtime: str) -> str:
     return {
-        "codex": "--codex-path",
+        "codex-acp": "--codex-acp-path",
         "claude-code": "--claude-code-path",
-        "opencode": "--opencode-path",
+        "opencode-acp": "--opencode-acp-path",
     }.get(runtime, "")
 
 
@@ -241,7 +239,7 @@ def main() -> int:
         pass
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--RepoRoot", "-RepoRoot", default=".")
-    parser.add_argument("--Runtime", "-Runtime", default="mock", choices=["codex", "claude-code", "opencode", "mock"])
+    parser.add_argument("--Runtime", "-Runtime", default="mock", choices=["codex-acp", "claude-code", "opencode-acp", "mock"])
     parser.add_argument("--CliPath", "-CliPath", default="")
     parser.add_argument("--Port", "-Port", type=int, default=3298)
     parser.add_argument("--TimeoutSec", "-TimeoutSec", type=int, default=30)

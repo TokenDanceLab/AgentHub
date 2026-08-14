@@ -22,7 +22,7 @@ import subprocess
 import sys
 import tempfile
 
-SUPPORTED_RUNTIME_IDS = ("codex", "claude-code", "opencode")
+SUPPORTED_RUNTIME_IDS = ("codex-acp", "claude-code", "opencode-acp")
 SECRET_LIKE_PATTERN = re.compile(
     r"(sk-[a-z0-9_-]{8,}|gh[pousr]_[a-z0-9_]{8,}|xox[baprs]-[a-z0-9-]+|AKIA[0-9A-Z]{12,}|"
     r"-----BEGIN [A-Z ]*PRIV(?:ATE) KEY-----|"
@@ -33,14 +33,14 @@ SECRET_LIKE_PATTERN = re.compile(
 
 RUNTIME_READINESS_DESCRIPTORS = [
     {
-        "RuntimeId": "codex",
-        "CommandName": "codex",
+        "RuntimeId": "codex-acp",
+        "CommandName": "npx",
         "VersionArgs": ["--version"],
         "HelpArgs": ["--help"],
-        "JsonMode": "codex exec --json",
+        "JsonMode": "codex-acp ACP over stdio",
         "PermissionBoundary": "operator-approved mode only; never infer approval from CLI defaults",
-        "DryPlan": "discover command, inspect --version/--help, record future codex exec --json command shape without prompt",
-        "EnvNames": ["AGENTHUB_CODEX_PATH", "OPENAI_API_KEY"],
+        "DryPlan": "discover npx launcher, inspect --version/--help, record future codex-acp ACP command shape without prompt",
+        "EnvNames": ["AGENTHUB_CODEX_ACP_PATH", "OPENAI_API_KEY"],
     },
     {
         "RuntimeId": "claude-code",
@@ -53,14 +53,14 @@ RUNTIME_READINESS_DESCRIPTORS = [
         "EnvNames": ["AGENTHUB_CLAUDE_CODE_PATH", "ANTHROPIC_API_KEY"],
     },
     {
-        "RuntimeId": "opencode",
+        "RuntimeId": "opencode-acp",
         "CommandName": "opencode",
         "VersionArgs": ["--version"],
         "HelpArgs": ["--help"],
-        "JsonMode": "opencode JSON event stream",
+        "JsonMode": "opencode acp over stdio",
         "PermissionBoundary": "default must not enable dangerously-skip-permissions; bypass requires explicit approval",
-        "DryPlan": "discover command, inspect --version/--help, record future opencode JSON command shape without prompt",
-        "EnvNames": ["AGENTHUB_OPENCODE_PATH"],
+        "DryPlan": "discover command, inspect --version/--help, record future opencode acp command shape without prompt",
+        "EnvNames": ["AGENTHUB_OPENCODE_ACP_PATH"],
     },
 ]
 

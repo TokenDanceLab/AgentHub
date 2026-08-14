@@ -241,11 +241,11 @@ func TestConsumeCCSwitchModels_RegistryIntegration(t *testing.T) {
 	if got := ResolveModelWithDefault("claude-code", ""); got != "claude-sonnet-4-6" {
 		t.Errorf("ResolveModelWithDefault(claude-code, \"\") = %q, want claude-sonnet-4-6", got)
 	}
-	if got := ResolveModelWithDefault("codex", ""); got != "gpt-5.5" {
-		t.Errorf("ResolveModelWithDefault(codex, \"\") = %q, want gpt-5.5", got)
+	if got := ResolveModelWithDefault("openai-sdk", ""); got != "gpt-5.5" {
+		t.Errorf("ResolveModelWithDefault(openai-sdk, \"\") = %q, want gpt-5.5", got)
 	}
-	if got := ResolveModelWithDefault("opencode", ""); got != "newapi/deepseek-v4-pro" {
-		t.Errorf("ResolveModelWithDefault(opencode, \"\") = %q, want newapi/deepseek-v4-pro", got)
+	if got := ResolveModelWithDefault("anthropic-sdk", ""); got != "claude-sonnet-4-6" {
+		t.Errorf("ResolveModelWithDefault(anthropic-sdk, \"\") = %q, want claude-sonnet-4-6", got)
 	}
 
 	// Step 5: Verify reasoning effort resolution.
