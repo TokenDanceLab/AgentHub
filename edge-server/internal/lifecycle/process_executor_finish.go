@@ -61,18 +61,37 @@ func (e *ProcessExecutor) finish(runID string) {
 }
 
 // hasActiveChildren reports whether the given run has at least one registered
-// sub-agent whose status is not terminal (still queued/running). Used to park
-// an orchestrator parent's terminal finish until its children complete.
+// sub-agent run that is not terminal yet. Used to park an orchestrator
+// parent's terminal finish until its children complete.
 func (e *ProcessExecutor) hasActiveChildren(runID string) bool {
 	if e.agentRegistry == nil {
 		return false
 	}
-	for _, child := range e.agentRegistry.ListByParent(runID) {
-		if !isTerminalStatus(child.Status) {
-			return true
+	count, allComplete := uniqueChildRunsAllComplete(e.agentRegistry.ListByParent(runID))
+	return count > 0 && !allComplete
+}
+
+// uniqueChildRunsAllComplete dedupes registry instances by RunID and reports
+// how many unique child runs exist and whether all of them are complete. A
+// run counts complete when ANY of its instances reached a terminal status:
+// the same run is registered twice (orchestrator dispatch placeholder +
+// executor run-backed instance), and the two status-update paths
+// (sendSubAgentResult vs aggregator handleRunComplete) may hit different
+// instances.
+func uniqueChildRunsAllComplete(children []agents.AgentInstance) (count int, allComplete bool) {
+	complete := make(map[string]bool)
+	for _, child := range children {
+		if child.RunID == "" {
+			continue
+		}
+		complete[child.RunID] = complete[child.RunID] || isTerminalStatus(child.Status)
+	}
+	for _, done := range complete {
+		if !done {
+			return len(complete), false
 		}
 	}
-	return false
+	return len(complete), len(complete) > 0
 }
 
 // FinalizeParentRun completes the terminal finish of an orchestrator parent
