@@ -65,7 +65,7 @@ func TestCodexACPadapterBuildCommand(t *testing.T) {
 	if cmdPath != wantPath {
 		t.Errorf("cmdPath = %q, want %q", cmdPath, wantPath)
 	}
-	wantArgs := []string{"-y", codexACPPackage}
+	wantArgs := []string{"-y", codexACPPackageSpec}
 	if len(args) != len(wantArgs) {
 		t.Fatalf("args = %v, want %v", args, wantArgs)
 	}
