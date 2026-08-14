@@ -80,7 +80,8 @@ func TestClaudeACPAdapterBuildCommand(t *testing.T) {
 	if cmdPath != wantPath {
 		t.Errorf("cmdPath = %q, want %q", cmdPath, wantPath)
 	}
-	wantArgs := []string{"-y", claudeACPPackage}
+	// The npm package must be version-pinned so `npx -y <pkg>` cannot drift.
+	wantArgs := []string{"-y", claudeACPPackageSpec}
 	if len(args) != len(wantArgs) {
 		t.Fatalf("args = %v, want %v", args, wantArgs)
 	}

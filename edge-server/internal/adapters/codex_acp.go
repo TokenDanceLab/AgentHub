@@ -40,9 +40,14 @@ const codexACPadapterID = "codex-acp"
 // codexACPPackage is the official ACP adapter npm package.
 const codexACPPackage = "@agentclientprotocol/codex-acp"
 
-// codexACPVersionPin is the version verified for the migration spike (bump
-// discipline: update on upgrades, keep the pin visible in metadata).
+// codexACPVersionPin is the npm version for the migration spike (bump
+// discipline: update on upgrades, keep the pin visible in metadata AND in
+// the npx package spec — an unpinned `npx -y <pkg>` silently drifts to
+// latest).
 const codexACPVersionPin = "1.1.7"
+
+// codexACPPackageSpec is the npx install spec with the version pin applied.
+const codexACPPackageSpec = codexACPPackage + "@" + codexACPVersionPin
 
 // CodexACPadapter runs the official codex-acp ACP agent binary.
 //
@@ -68,7 +73,7 @@ func NewCodexACPadapter(npxPath string) *CodexACPadapter {
 	return &CodexACPadapter{AcpAdapter: NewAcpAdapterConfig(AcpAdapterConfig{
 		ID:            codexACPadapterID,
 		Binary:        npxPath,
-		Args:          []string{"-y", codexACPPackage},
+		Args:          []string{"-y", codexACPPackageSpec},
 		DisplayName:   "Codex (ACP)",
 		VersionLabel:  "codex-acp " + codexACPVersionPin + " (npx)",
 		EnvKeys:       []string{"OPENAI_API_KEY", "OPENAI_BASE_URL"},
