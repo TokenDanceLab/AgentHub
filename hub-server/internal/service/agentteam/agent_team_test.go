@@ -219,12 +219,41 @@ func TestAgentTeamService_DeleteTeam(t *testing.T) {
 	mock.ExpectQuery(`SELECT * FROM "agent_teams"`).
 		WillReturnRows(rows)
 
-	// Delete
+	// No run history → deletable.
+	mock.ExpectQuery(`SELECT * FROM "agent_team_runs" WHERE team_id`).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "team_id", "session_id", "trigger_user_id", "trigger_message", "mode", "status", "created_at", "updated_at"}))
+
+	// Transaction: list members (none) + delete team.
+	mock.ExpectBegin()
+	mock.ExpectQuery(`SELECT * FROM "agent_team_members" WHERE team_id`).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "team_id", "agent_profile_id", "role", "position", "created_at"}))
 	mock.ExpectExec(`DELETE FROM "agent_teams"`).
 		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectCommit()
 
 	err := svc.DeleteTeam(context.Background(), "user-1", "team-1")
 	require.NoError(t, err)
+	assert.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestAgentTeamService_DeleteTeamWithRuns(t *testing.T) {
+	db, mock := newMockAgentTeamDB(t)
+	svc := NewAgentTeamService(db, nil, nil)
+
+	// Get team first
+	rows := sqlmock.NewRows([]string{"id", "owner_id", "name", "description", "avatar_url", "created_at", "updated_at"}).
+		AddRow("team-1", "user-1", "My Team", "", "", time.Now(), time.Now())
+	mock.ExpectQuery(`SELECT * FROM "agent_teams"`).
+		WillReturnRows(rows)
+
+	// One historical run → 409, no delete attempted.
+	mock.ExpectQuery(`SELECT * FROM "agent_team_runs" WHERE team_id`).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "team_id", "session_id", "trigger_user_id", "trigger_message", "mode", "status", "created_at", "updated_at"}).
+			AddRow("run-1", "team-1", "sess-1", "user-1", "go", "supervisor", "completed", time.Now(), time.Now()))
+
+	err := svc.DeleteTeam(context.Background(), "user-1", "team-1")
+	require.Error(t, err)
+	assert.ErrorIs(t, err, errcode.TeamHasRuns)
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
