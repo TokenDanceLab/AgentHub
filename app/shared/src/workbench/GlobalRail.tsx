@@ -248,7 +248,7 @@ export function GlobalRail({
         ]}
         anchorRef={avatarRef}
         avatar={userAvatarUrl ? '' : displayInitial}
-        avatarColor="var(--primary)"
+        avatarColor="var(--td-plum)"
         {...(userAvatarUrl ? { avatarUrl: userAvatarUrl } : {})}
         badge={t('user.currentBadge')}
         isOpen={profileOpen}

@@ -42,7 +42,7 @@ export function contactProfileActions(profile: ContactProfile): ContactProfileAc
 export function contactProfileAvatarColor(profile: ContactProfile): string {
   if (profile.kind === 'group') return 'var(--role-researcher)';
   if (profile.kind === 'service') return 'var(--role-deployer)';
-  return 'linear-gradient(135deg, var(--primary), var(--success))';
+  return 'linear-gradient(135deg, var(--td-plum), var(--td-moss))';
 }
 
 /** ProfilePopover variant — groups use the group chrome. */

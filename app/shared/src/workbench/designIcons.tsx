@@ -47,7 +47,7 @@ function fileSvg(type: DesignFileIconType): React.ReactElement {
         <svg {...common} fill="currentColor">
           <rect x="2.5" y="5" width="19" height="14" rx="1.6" />
           <path
-            fill="var(--surface)"
+            fill="var(--td-surface)"
             d="M5.2 15.5V8.6h2l1.75 2.2 1.75-2.2h2v6.9h-2v-4l-1.75 2.08L7.2 11.5v4h-2Zm10.7 0-2.5-3.05h1.65V8.6h1.9v3.85h1.65l-2.7 3.05Z"
           />
         </svg>
@@ -57,7 +57,7 @@ function fileSvg(type: DesignFileIconType): React.ReactElement {
         <svg {...common} fill="currentColor">
           <path d="M4 2h16l-1.45 16.25L12 22l-6.55-3.75L4 2Z" />
           <path
-            fill="var(--surface)"
+            fill="var(--td-surface)"
             d="M8.2 7h8l-.18 2H10.4l.13 1.55h5.35l-.42 4.75L12 17.3l-3.45-2-.22-2.48h2.05l.1 1.12L12 14.8l1.52-.86.13-1.45H8.15L7.8 7Z"
           />
         </svg>
@@ -67,7 +67,7 @@ function fileSvg(type: DesignFileIconType): React.ReactElement {
         <svg {...common} fill="currentColor">
           <path d="M4 2h16l-1.45 16.25L12 22l-6.55-3.75L4 2Z" />
           <path
-            fill="var(--surface)"
+            fill="var(--td-surface)"
             d="M8.05 7h7.9l-.18 2H10.2l.13 1.45h5.3l-.42 4.85L12 17.25l-3.2-1.95-.22-2.45h2.02l.1 1.1 1.3.78 1.32-.78.14-1.55H8.46L8.05 7Z"
           />
         </svg>
@@ -77,7 +77,7 @@ function fileSvg(type: DesignFileIconType): React.ReactElement {
         <svg {...common} fill="currentColor">
           <rect x="3" y="3" width="18" height="18" rx="2" />
           <path
-            fill="var(--surface)"
+            fill="var(--td-surface)"
             d="M8.3 16.1c.35.55.78.95 1.55.95.72 0 1.15-.36 1.15-1.75V8.2h1.95v7.15c0 2.05-1.2 3.25-3.02 3.25-1.62 0-2.56-.84-3.04-1.85l1.41-.65Zm5.8-.16c.52.85 1.2 1.18 2.05 1.18.86 0 1.4-.42 1.4-1 0-.7-.55-.95-1.5-1.36l-.52-.22c-1.48-.63-2.46-1.42-2.46-3.1 0-1.54 1.17-2.7 3-2.7 1.3 0 2.24.45 2.91 1.64l-1.38.88c-.35-.63-.72-.88-1.53-.88-.7 0-1.15.44-1.15.98 0 .68.42.95 1.38 1.37l.52.22c1.75.75 2.73 1.52 2.73 3.24 0 1.86-1.46 2.88-3.42 2.88-1.92 0-3.16-.92-3.76-2.12l1.73-1Z"
           />
         </svg>
@@ -88,7 +88,7 @@ function fileSvg(type: DesignFileIconType): React.ReactElement {
         <svg {...common} fill="currentColor">
           <rect x="3" y="3" width="18" height="18" rx="2" />
           <path
-            fill="var(--surface)"
+            fill="var(--td-surface)"
             d="M6.4 9.1h7.1v1.82h-2.55v7.18H8.96v-7.18H6.4V9.1Zm7.55 7.72c.48.76 1.1 1.05 1.86 1.05.78 0 1.26-.36 1.26-.9 0-.62-.5-.84-1.35-1.2l-.48-.2c-1.35-.58-2.23-1.28-2.23-2.78 0-1.4 1.06-2.46 2.72-2.46 1.2 0 2.04.42 2.66 1.48l-1.26.8c-.32-.56-.66-.78-1.4-.78-.64 0-1.04.4-1.04.9 0 .6.38.84 1.25 1.22l.48.2c1.58.68 2.47 1.36 2.47 2.92 0 1.68-1.32 2.6-3.1 2.6-1.72 0-2.84-.82-3.4-1.9l1.56-.95Z"
           />
         </svg>
@@ -139,7 +139,7 @@ function fileSvg(type: DesignFileIconType): React.ReactElement {
         <svg {...common} fill="currentColor">
           <rect x="3" y="3" width="18" height="18" rx="2" />
           <path
-            fill="var(--surface)"
+            fill="var(--td-surface)"
             d="M7 8.2h2.25l1.48 2.62 1.5-2.62h2.1l-2.45 4.04 2.68 4.56h-2.24l-1.68-2.98-1.72 2.98H6.8l2.72-4.48L7 8.2Zm8.2.05h2v8.5h-2v-8.5Z"
           />
         </svg>

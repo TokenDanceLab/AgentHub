@@ -32,7 +32,7 @@ describe('ProfilePopoverHelpers', () => {
   it('builds initials and avatar backgrounds', () => {
     expect(profileInitials(undefined, 'alice')).toBe('A');
     expect(profileInitials('ZD', 'alice')).toBe('ZD');
-    expect(profileAvatarBackground(undefined)).toBe('var(--primary)');
+    expect(profileAvatarBackground(undefined)).toBe('var(--td-plum)');
     expect(profileAvatarBackground('#123')).toBe('#123');
     expect(profileAvatarBackground('#123', {
       clearWhenImage: true,

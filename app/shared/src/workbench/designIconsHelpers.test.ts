@@ -25,7 +25,7 @@ describe('designIconsHelpers', () => {
   });
 
   it('keeps file icon colors aligned to tokendance-design/desktop', () => {
-    expect(getDesignFileIconColor('md')).toBe('var(--text-2)');
+    expect(getDesignFileIconColor('md')).toBe('var(--td-ink-muted)');
     expect(getDesignFileIconColor('css')).toBe('#1572b6');
     expect(getDesignFileIconColor('html')).toBe('#e34f26');
     expect(getDesignFileIconColor('js')).toBe('#f7df1e');
@@ -33,7 +33,7 @@ describe('designIconsHelpers', () => {
     expect(getDesignFileIconColor('sql')).toBe('var(--info, var(--state-running))');
     expect(getDesignFileIconColor('git')).toBe('#f05032');
     expect(getDesignFileIconColor('xlsx')).toBe('#217346');
-    expect(getDesignFileIconColor('file')).toBe('var(--text-3)');
+    expect(getDesignFileIconColor('file')).toBe('var(--td-ink-subtle)');
   });
 
   it('exposes a complete color map for every file icon type', () => {

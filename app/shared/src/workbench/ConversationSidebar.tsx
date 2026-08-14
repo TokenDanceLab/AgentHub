@@ -469,7 +469,7 @@ export function ConversationSidebar({
                       aria-label={`${conversation.title} 资料卡`}
                       className={`${styles.conversationAvatar} ${onAvatarClick ? styles.conversationAvatarClickable : ''}`}
                       style={{
-                        background: conversation.avatarUrl ? undefined : (conversation.avatarColor ?? 'var(--primary)'),
+                        background: conversation.avatarUrl ? undefined : (conversation.avatarColor ?? 'var(--td-plum)'),
                         color: conversation.avatarTextColor,
                       }}
                       tabIndex={onAvatarClick && isFocusedRow ? 0 : -1}

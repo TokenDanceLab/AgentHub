@@ -52,7 +52,7 @@
   -webkit-backdrop-filter: blur(var(--glass-blur-lg));
   overflow: hidden;
   pointer-events: auto;
-  font-family: var(--font-sans, 'Inter', system-ui, sans-serif);
+  font-family: var(--td-font, 'Inter', system-ui, sans-serif);
   color: var(--td-ink);
   transition: border-color 0.2s ease;
 }
@@ -150,7 +150,7 @@
   height: 24px;
   border-radius: 50%;
   background: var(--td-plum);
-  color: var(--on-primary);
+  color: var(--td-ink-on-plum);
   font-size: 0.625rem;
   font-weight: 700;
   text-transform: uppercase;
@@ -257,7 +257,7 @@
 }
 
 .toolCall code {
-  font-family: var(--font-mono, 'JetBrains Mono', monospace);
+  font-family: var(--td-mono, 'JetBrains Mono', monospace);
   font-size: 0.625rem;
   color: var(--td-accent-amber);
   background: var(--td-accent-amber-bg);

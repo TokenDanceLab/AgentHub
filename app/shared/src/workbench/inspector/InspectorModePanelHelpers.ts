@@ -149,9 +149,9 @@ export function isDeployInProgress(status: DeployStatus): boolean {
 }
 
 export function deployDotColor(status: DeployStatus): string {
-  if (isDeployReady(status)) return 'var(--success)';
-  if (isDeployFailed(status)) return 'var(--danger)';
-  return 'var(--primary)';
+  if (isDeployReady(status)) return 'var(--td-moss)';
+  if (isDeployFailed(status)) return 'var(--td-danger)';
+  return 'var(--td-plum)';
 }
 
 export function formatDeployUrlDisplay(url: string): string {

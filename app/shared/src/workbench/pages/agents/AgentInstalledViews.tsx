@@ -240,7 +240,7 @@ const AGENT_LIST_SKELETON_ROW: React.CSSProperties = {
   alignItems: 'center',
   gap: 'var(--sp-10)',
   minHeight: 66,
-  padding: 'var(--sp-sm) var(--sp-10)',
+  padding: 'var(--td-space-2) var(--sp-10)',
   pointerEvents: 'none',
 };
 

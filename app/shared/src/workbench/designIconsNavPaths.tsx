@@ -390,7 +390,7 @@ export function navIconPaths(name: DesignNavIconName): React.ReactNode {
           <path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Z" fill="currentColor" stroke="none" />
           <path
             d="m10.8 15.8-4-4 1.4-1.4 2.6 2.6 5.9-5.9 1.4 1.4-7.3 7.3Z"
-            fill="var(--surface)"
+            fill="var(--td-surface)"
             stroke="none"
           />
         </>

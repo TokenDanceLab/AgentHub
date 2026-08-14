@@ -292,11 +292,11 @@ export function ShortcutsPane(_props: SettingsPageProps): React.ReactElement {
                     gap: 4,
                     fontFamily: 'var(--mono, monospace)',
                     fontSize: '0.8125rem',
-                    color: hasConflict ? 'var(--danger, #e5484d)' : 'var(--text-2)',
+                    color: hasConflict ? 'var(--td-danger, #e5484d)' : 'var(--td-ink-muted)',
                     background: hasConflict ? 'var(--danger-bg, rgba(229,72,77,0.08))' : 'var(--bg-3)',
                     padding: '2px 8px',
                     borderRadius: 4,
-                    border: hasConflict ? '1px solid var(--danger, #e5484d)' : '1px solid var(--border)',
+                    border: hasConflict ? '1px solid var(--td-danger, #e5484d)' : '1px solid var(--td-line)',
                   }}
                 >
                   {formatKeys(shortcut.keys)}

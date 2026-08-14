@@ -34,7 +34,7 @@ describe('design icon registry', () => {
   });
 
   it('keeps file icon colors aligned to tokendance-design/desktop', () => {
-    expect(getDesignFileIconColor('md')).toBe('var(--text-2)');
+    expect(getDesignFileIconColor('md')).toBe('var(--td-ink-muted)');
     expect(getDesignFileIconColor('css')).toBe('#1572b6');
     expect(getDesignFileIconColor('html')).toBe('#e34f26');
     expect(getDesignFileIconColor('js')).toBe('#f7df1e');

@@ -11,25 +11,25 @@
   min-height: 0;
   display: flex;
   flex-direction: column;
-  border: 1px solid var(--glass-border, var(--bdr));
-  border-radius: var(--r-lg);
-  background: var(--glass-panel, var(--surface));
+  border: 1px solid var(--glass-border, var(--td-line));
+  border-radius: var(--td-radius-panel);
+  background: var(--glass-panel, var(--td-surface));
   overflow: hidden;
   box-shadow: var(--glass-elev-1);
   backdrop-filter: var(--glass-backdrop-filter);
   -webkit-backdrop-filter: var(--glass-backdrop-filter);
-  animation: editorIn var(--dur-medium) var(--ease);
+  animation: editorIn var(--dur-medium) var(--td-ease);
 }
 
 /* ── Toolbar (back / forward / refresh / address / close) ── */
 .toolbar {
   min-height: 46px;
-  padding: var(--sp-sm) var(--sp-10);
-  border-bottom: 1px solid var(--glass-border, var(--bdr));
+  padding: var(--td-space-2) var(--sp-10);
+  border-bottom: 1px solid var(--glass-border, var(--td-line));
   display: flex;
   align-items: center;
   gap: var(--sp-xxs);
-  background: var(--glass-bg-light, var(--surface));
+  background: var(--glass-bg-light, var(--td-surface));
 }
 
 /* ── Navigation buttons (back, forward, refresh) ── */
@@ -37,9 +37,9 @@
   width: 28px;
   height: 28px;
   border: 0;
-  border-radius: var(--r-sm);
+  border-radius: var(--td-radius-control);
   background: transparent;
-  color: var(--text-2);
+  color: var(--td-ink-muted);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -48,8 +48,8 @@
 }
 
 .navBtn:hover {
-  background: var(--surface-high);
-  color: var(--text-1);
+  background: var(--td-surface-3);
+  color: var(--td-ink);
 }
 
 .navBtn svg {
@@ -68,10 +68,10 @@
   min-width: 0;
   height: 30px;
   padding: 0 var(--sp-10);
-  border: 1px solid var(--glass-border, var(--bdr));
+  border: 1px solid var(--glass-border, var(--td-line));
   border-radius: var(--r-full);
-  background: var(--glass-input-bg, var(--surface-low));
-  color: var(--text-2);
+  background: var(--glass-input-bg, var(--td-surface-2));
+  color: var(--td-ink-muted);
   display: flex;
   align-items: center;
   gap: 7px;
@@ -81,7 +81,7 @@
   width: 15px;
   height: 15px;
   display: inline-flex;
-  color: var(--text-3);
+  color: var(--td-ink-subtle);
   flex: 0 0 auto;
 }
 
@@ -100,7 +100,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font: 500 0.75rem var(--font-mono);
+  font: 500 0.75rem var(--td-mono);
 }
 
 /* ── Iframe shell ── */
@@ -114,7 +114,7 @@
       var(--glass-tint-sky, transparent) 0%,
       transparent 68%
     ),
-    var(--glass-bg-subtle, var(--surface-low));
+    var(--glass-bg-subtle, var(--td-surface-2));
 }
 
 .frame {
@@ -126,8 +126,8 @@
      Real navigated pages still paint their own document canvas over this. */
   background: color-mix(
     in srgb,
-    var(--surface-high) 68%,
-    var(--glass-panel, var(--surface-low))
+    var(--td-surface-3) 68%,
+    var(--glass-panel, var(--td-surface-2))
   );
   color-scheme: inherit;
 }
@@ -142,14 +142,14 @@
 /* ── Status bar ── */
 .status {
   min-height: 30px;
-  padding: 0 var(--space-md);
-  border-top: 1px solid var(--glass-border, var(--bdr));
+  padding: 0 var(--td-space-3);
+  border-top: 1px solid var(--glass-border, var(--td-line));
   display: flex;
   align-items: center;
   gap: var(--sp-10);
-  color: var(--text-3);
-  background: var(--glass-bg-light, var(--surface-low));
-  font: 500 0.6875rem var(--font-sans);
+  color: var(--td-ink-subtle);
+  background: var(--glass-bg-light, var(--td-surface-2));
+  font: 500 0.6875rem var(--td-font);
 }
 
 .statusItem {
