@@ -9,7 +9,7 @@
   border-radius: 14px;
   background: var(--glass-panel-strong);
   box-shadow: 0 18px 48px var(--glass-shadow);
-  color: var(--foreground);
+  color: var(--td-ink);
   backdrop-filter: blur(28px) saturate(1.12);
   -webkit-backdrop-filter: blur(28px) saturate(1.12);
 }
@@ -23,7 +23,7 @@
   border: 1px solid var(--glass-border);
   border-radius: 8px;
   background: var(--glass-bg-light);
-  color: var(--muted-foreground);
+  color: var(--td-ink-muted);
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -33,7 +33,7 @@
 .closeBtn:hover {
   border-color: var(--glass-border-strong);
   background: var(--glass-bg-hover);
-  color: var(--foreground);
+  color: var(--td-ink);
 }
 
 .header {
@@ -59,7 +59,7 @@
 }
 .appName {
   margin: 0;
-  color: var(--foreground);
+  color: var(--td-ink);
   font-size: 18px;
   font-weight: 620;
   letter-spacing: 0;
@@ -67,7 +67,7 @@
 }
 .tagline {
   margin: 0;
-  color: var(--muted-foreground);
+  color: var(--td-ink-muted);
   font-size: 12px;
   line-height: 1.4;
 }
@@ -86,7 +86,7 @@
   border: none;
   border-radius: 6px;
   background: transparent;
-  color: var(--muted-foreground);
+  color: var(--td-ink-muted);
   font-size: 13px;
   font-weight: 500;
   cursor: pointer;
@@ -94,7 +94,7 @@
 }
 .tabActive {
   background: var(--glass-bg-medium);
-  color: var(--foreground);
+  color: var(--td-ink);
   box-shadow: 0 2px 6px var(--glass-shadow-subtle);
 }
 
@@ -114,7 +114,7 @@
 .label {
   font-size: 12px;
   font-weight: 500;
-  color: var(--muted-foreground);
+  color: var(--td-ink-muted);
 }
 
 /* ── Input — unified borderless style ─────── */
@@ -123,9 +123,9 @@
   border: 1px solid var(--glass-border);
   border-radius: 10px;
   background: var(--glass-bg-light);
-  color: var(--foreground);
+  color: var(--td-ink);
   font-size: 14px;
-  font-family: var(--font-sans);
+  font-family: var(--td-font);
   outline: none;
   transition: background 0.2s, box-shadow 0.2s;
   -webkit-font-smoothing: antialiased;
@@ -152,7 +152,7 @@
   right: 10px;
   border: none;
   background: transparent;
-  color: var(--muted-foreground);
+  color: var(--td-ink-muted);
   cursor: pointer;
   padding: 4px;
   display: flex;
@@ -161,7 +161,7 @@
 /* ── Error ────────────────────────────────── */
 .error {
   font-size: 11px;
-  color: var(--destructive);
+  color: var(--td-danger);
 }
 .errorBanner {
   min-height: 44px;
@@ -169,7 +169,7 @@
   border: 1px solid var(--glass-tint-danger);
   border-radius: 8px;
   background: var(--glass-tint-danger);
-  color: var(--foreground);
+  color: var(--td-ink);
   font-size: 12px;
   display: flex;
   align-items: center;
@@ -182,7 +182,7 @@
   border: 1px solid var(--glass-border);
   border-radius: 10px;
   background: var(--glass-bg-medium);
-  color: var(--foreground);
+  color: var(--td-ink);
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
@@ -199,7 +199,7 @@
   align-items: center;
   gap: 10px;
   margin: 2px 0;
-  color: var(--muted-foreground);
+  color: var(--td-ink-muted);
   font-size: 11px;
   font-weight: 500;
 }
@@ -218,7 +218,7 @@
   border-radius: 10px;
   background: var(--glass-bg-medium);
   box-shadow: none;
-  color: var(--foreground);
+  color: var(--td-ink);
   font-size: 14px;
   font-weight: 650;
   cursor: pointer;
@@ -251,7 +251,7 @@
 
 .identityHint {
   margin: -2px 0 0;
-  color: var(--muted-foreground);
+  color: var(--td-ink-muted);
   font-size: 11px;
   line-height: 1.45;
   text-align: center;
@@ -262,7 +262,7 @@
   border: 1px solid var(--glass-tint-plum);
   border-radius: 10px;
   background: var(--glass-tint-plum);
-  color: var(--foreground);
+  color: var(--td-ink);
   font-size: 12px;
   line-height: 1.45;
 }
@@ -280,7 +280,7 @@
 .switchButton {
   border: none;
   background: transparent;
-  color: var(--primary);
+  color: var(--td-plum);
   font-size: 12px;
   font-weight: 500;
   cursor: pointer;
@@ -291,8 +291,8 @@
 
 /* ── Success box ──────────────────────────── */
 .successBox { text-align: center; padding: 20px 0; }
-.successIcon { color: var(--success); margin-bottom: 8px; }
-.successText { font-size: 13px; color: var(--foreground); }
+.successIcon { color: var(--td-moss); margin-bottom: 8px; }
+.successText { font-size: 13px; color: var(--td-ink); }
 
 /* ── Advanced toggle ──────────────────────── */
 .advancedToggle {
@@ -303,14 +303,14 @@
   padding: 6px 0;
   border: none;
   background: transparent;
-  color: var(--muted-foreground);
+  color: var(--td-ink-muted);
   font-size: 12px;
   cursor: pointer;
   width: 100%;
   justify-content: center;
   transition: color 0.15s;
 }
-.advancedToggle:hover { color: var(--foreground); }
+.advancedToggle:hover { color: var(--td-ink); }
 
 .advancedToggleIcon {
   display: inline-flex;
@@ -326,9 +326,9 @@
   border: 1px solid var(--glass-border);
   border-radius: 8px;
   background: var(--glass-bg-light);
-  color: var(--foreground);
+  color: var(--td-ink);
   font-size: 13px;
-  font-family: var(--font-mono);
+  font-family: var(--td-mono);
   outline: none;
   box-sizing: border-box;
 }
@@ -341,7 +341,7 @@
   gap: 6px;
   margin-top: 6px;
   font-size: 11px;
-  color: var(--muted-foreground);
+  color: var(--td-ink-muted);
 }
 
 .hubStatusDot {
@@ -349,9 +349,9 @@
   border-radius: 50%;
   flex-shrink: 0;
 }
-.hubStatusDotConnected { background: var(--success); }
-.hubStatusDotDisconnected { background: var(--danger); }
-.hubStatusDotChecking { background: var(--warning); animation: pulse 1.5s infinite; }
+.hubStatusDotConnected { background: var(--td-moss); }
+.hubStatusDotDisconnected { background: var(--td-danger); }
+.hubStatusDotChecking { background: var(--td-warning); animation: pulse 1.5s infinite; }
 @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
 
 .hubStatusText { font-size: 11px; }
@@ -368,7 +368,7 @@
     border-bottom: 0;
     border-radius: 14px 14px 0 0;
     background: var(--glass-panel-overlay);
-    color: var(--foreground);
+    color: var(--td-ink);
     box-shadow: none;
     backdrop-filter: blur(28px) saturate(1.14);
     -webkit-backdrop-filter: blur(28px) saturate(1.14);
@@ -392,7 +392,7 @@
     border: 1px solid var(--glass-border);
     border-radius: 10px;
     background: var(--glass-bg-light);
-    color: var(--foreground);
+    color: var(--td-ink);
   }
 
   .header {
@@ -419,7 +419,7 @@
   .identityHint,
   .advancedToggle,
   .hubStatus {
-    color: var(--muted-foreground);
+    color: var(--td-ink-muted);
   }
 
   .body {
@@ -433,7 +433,7 @@
     min-height: 44px;
     border: 1px solid var(--glass-border);
     background: var(--glass-bg-light);
-    color: var(--foreground);
+    color: var(--td-ink);
     box-shadow: none;
   }
 
@@ -449,7 +449,7 @@
   .identityNotice {
     border-color: var(--glass-tint-plum);
     background: var(--glass-tint-plum);
-    color: var(--foreground);
+    color: var(--td-ink);
   }
 
   .errorBanner {

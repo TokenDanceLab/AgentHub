@@ -20,12 +20,12 @@
 
 .iconWrapNetwork {
   composes: iconWrap;
-  color: var(--warning);
+  color: var(--td-warning);
 }
 
 .iconWrapTimeout {
   composes: iconWrap;
-  color: var(--warning);
+  color: var(--td-warning);
 }
 
 .iconWrapUnknown {
@@ -66,12 +66,12 @@
   padding: 8px 20px;
   border: none;
   border-radius: var(--td-radius-control, 6px);
-  background: var(--primary);
-  color: var(--primary-foreground);
+  background: var(--td-plum);
+  color: var(--td-ink-on-plum);
   font-size: 14px;
   font-weight: 500;
   cursor: pointer;
-  font-family: var(--font-sans);
+  font-family: var(--td-font);
   transition: opacity 0.15s ease;
 }
 
@@ -96,7 +96,7 @@
   font-size: 14px;
   font-weight: 500;
   cursor: pointer;
-  font-family: var(--font-sans);
+  font-family: var(--td-font);
   transition: background 0.15s ease;
 }
 

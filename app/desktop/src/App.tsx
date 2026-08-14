@@ -429,7 +429,7 @@ export function DesktopWorkbenchApp({ onLogout }: DesktopWorkbenchAppProps = {})
         title: target.name,
         kind: target.kind === 'group' ? 'group' : 'direct',
         avatarLabel: target.name.slice(0, 1).toUpperCase(),
-        avatarColor: 'var(--primary)',
+        avatarColor: 'var(--td-plum)',
       };
       workbenchDemoRuntimeStore.addConversation(newConversation);
       setSelectedConversationId(target.id);
