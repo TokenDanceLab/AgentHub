@@ -158,7 +158,7 @@ func TestDeliveryMarkAndCapabilityGuards(t *testing.T) {
 	assert.True(t, ShouldReplayOfflinePayload("", "sent", true), "legacy empty delivery_id replays")
 	assert.True(t, ShouldReplayOfflinePayload("del-1", "pending", true))
 	assert.True(t, ShouldReplayOfflinePayload("del-1", "retrying", true))
-	assert.False(t, ShouldReplayOfflinePayload("del-1", "sent", true))
+	assert.True(t, ShouldReplayOfflinePayload("del-1", "sent", true), "alive sent rows must replay on reconnect")
 	assert.False(t, ShouldReplayOfflinePayload("del-1", "delivered", true))
 	assert.False(t, ShouldReplayOfflinePayload("del-1", "dead", true))
 	assert.True(t, ShouldReplayOfflinePayload("del-1", "sent", false), "lookup failure fails open")

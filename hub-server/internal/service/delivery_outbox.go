@@ -113,7 +113,17 @@ func (o *DeliveryOutbox) MarkDeliverySent(ctx context.Context, deliveryID string
 		return fmt.Errorf("mark delivery sent: %w", err)
 	}
 	if rows == 0 {
-		// Already sent or already acked — idempotent.
+		// Already sent: a fresh dispatch (offline replay push to a live
+		// desktop) restarts the ack-window so SentTimeout does not re-push a
+		// duplicate right after the desktop just received the frame.
+		_, bumpErr := o.updateOutboxByDeliveryID(ctx, deliveryID,
+			[]string{DeliveryStatusSent},
+			map[string]interface{}{
+				"updated_at": time.Now(),
+			})
+		if bumpErr != nil {
+			return fmt.Errorf("restart sent ack-window: %w", bumpErr)
+		}
 		return nil
 	}
 	slog.Debug("delivery marked sent", "delivery_id", deliveryID)
