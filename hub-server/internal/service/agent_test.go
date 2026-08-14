@@ -1088,7 +1088,7 @@ func TestHandleTaskAck_OfflineQueuedUnboundRejectsWrongUser(t *testing.T) {
 
 	svc := &AgentService{db: db}
 
-	taskID := "task-offline-wrong-user"
+	taskID := "taskx-offline-wrong-user"
 	mock.ExpectQuery(sqlmTaskByID).
 		WithArgs(taskID, 1).
 		WillReturnRows(sqlmock.NewRows([]string{"id", "agent_instance_id", "triggered_by_user_id", "status", "edge_device_id", "edge_run_id"}).
