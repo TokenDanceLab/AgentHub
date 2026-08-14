@@ -63,6 +63,17 @@ type AcpAdapterConfig struct {
 	// registration still flows to the spawned process.
 	EnvKeys []string
 
+	// ModelEnvKey is the environment variable used to pass the resolved
+	// model to the ACP agent process (e.g. "ANTHROPIC_MODEL" for claude-acp).
+	// The ACP protocol's session/new carries no model field, so the model
+	// must travel through the child env. Empty disables model injection.
+	ModelEnvKey string
+
+	// DefaultModel is the fallback model injected when the run request does
+	// not specify one (sourced from --agent-model). Empty leaves model
+	// selection to the agent's own config (settings.json / CLI defaults).
+	DefaultModel string
+
 	// LauncherLabel is the human-facing name used in the PreflightCheck
 	// error when the binary is unresolvable (e.g. "codex-acp launcher").
 	// Empty disables PreflightCheck (returns nil) for the generic
@@ -101,6 +112,11 @@ type AcpAdapter struct {
 	// envKeys are parent-env variables re-injected into the child env at
 	// BuildCommand time (see AcpAdapterConfig.EnvKeys).
 	envKeys []string
+
+	// modelEnvKey / defaultModel parameterize model injection into the child
+	// env at BuildCommand time (see AcpAdapterConfig.ModelEnvKey/DefaultModel).
+	modelEnvKey  string
+	defaultModel string
 
 	// launcherLabel / installHint parameterize PreflightCheck so concrete
 	// agent configs share one inherited method instead of overriding it.
@@ -146,6 +162,8 @@ func NewAcpAdapterConfig(cfg AcpAdapterConfig) *AcpAdapter {
 		agentBinary:   cfg.Binary,
 		agentArgs:     cfg.Args,
 		envKeys:       cfg.EnvKeys,
+		modelEnvKey:   cfg.ModelEnvKey,
+		defaultModel:  cfg.DefaultModel,
 		launcherLabel: cfg.LauncherLabel,
 		installHint:   cfg.InstallHint,
 		metadata: AdapterMetadata{
@@ -209,7 +227,21 @@ func (a *AcpAdapter) Capabilities() AgentCapabilities {
 // still flows to the spawned process. Returns a nil env slice when no keys
 // resolve, preserving the "no env" contract callers rely on.
 func (a *AcpAdapter) BuildCommand(ctx RunProcessContext) (cmdPath string, args []string, env []string, workDir string) {
-	return a.agentBinary, a.agentArgs, acpEnvPassthrough(a.envKeys), ctx.WorkDir
+	env = acpEnvPassthrough(a.envKeys)
+	if model := a.resolvedModel(ctx); a.modelEnvKey != "" && model != "" {
+		env = append(env, a.modelEnvKey+"="+model)
+	}
+	return a.agentBinary, a.agentArgs, env, ctx.WorkDir
+}
+
+// resolvedModel returns the model to inject into the child env: the run's
+// explicit model wins, then the adapter default (--agent-model). Empty means
+// the agent falls back to its own config (settings.json / CLI defaults).
+func (a *AcpAdapter) resolvedModel(ctx RunProcessContext) string {
+	if ctx.Model != "" {
+		return ctx.Model
+	}
+	return a.defaultModel
 }
 
 // NeedsStdin reports true — ACP requires a writable stdin for

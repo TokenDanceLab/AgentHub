@@ -110,7 +110,7 @@ func registerOpenCodeACPAdapter(reg *adapters.Registry, cfg config) {
 // legacy claude-code NDJSON parser stays registered as the orchestrator inner
 // and fallback (claude_code.go, marked DEPRECATED until Phase B).
 func registerClaudeACPAdapter(reg *adapters.Registry, cfg config) {
-	a := adapters.NewClaudeACPAdapter(cfg.ClaudeACPPath)
+	a := adapters.NewClaudeACPAdapter(cfg.ClaudeACPPath, cfg.AgentModel)
 	if err := reg.Register(a); err != nil {
 		slog.Warn("failed to register claude-acp adapter", "err", err)
 		return

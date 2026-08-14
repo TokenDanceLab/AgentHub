@@ -260,7 +260,7 @@ func TestAdapterMetadataIsNotEmpty(t *testing.T) {
 		metadata AdapterMetadata
 	}{
 		{"ClaudeCode", NewClaudeCodeAdapter("claude", "sonnet", "").Metadata()},
-		{"ClaudeACP", NewClaudeACPAdapter("").Metadata()},
+		{"ClaudeACP", NewClaudeACPAdapter("", "").Metadata()},
 		{"CodexACP", NewCodexACPadapter("").Metadata()},
 		{"OpenCodeACP", NewOpenCodeACPAdapter("").Metadata()},
 	}

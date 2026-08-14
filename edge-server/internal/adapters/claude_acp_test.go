@@ -19,7 +19,7 @@ import (
 )
 
 func TestClaudeACPAdapterMetadata(t *testing.T) {
-	a := NewClaudeACPAdapter("")
+	a := NewClaudeACPAdapter("", "")
 	if a.Metadata().ID != "claude-acp" {
 		t.Errorf("ID = %q, want claude-acp", a.Metadata().ID)
 	}
@@ -43,7 +43,7 @@ func TestClaudeACPAdapterMetadata(t *testing.T) {
 // legacy parser was already mature (approval chain wired), so the payoff is
 // protocol standardization + unified broker, not a capability upgrade.
 func TestClaudeACPAdapterCapabilities(t *testing.T) {
-	acp := NewClaudeACPAdapter("")
+	acp := NewClaudeACPAdapter("", "")
 	for _, field := range []struct {
 		name string
 		ok   bool
@@ -70,7 +70,7 @@ func TestClaudeACPAdapterCapabilities(t *testing.T) {
 }
 
 func TestClaudeACPAdapterBuildCommand(t *testing.T) {
-	a := NewClaudeACPAdapter("")
+	a := NewClaudeACPAdapter("", "")
 	cmdPath, args, env, workDir := a.BuildCommand(RunProcessContext{
 		Prompt:  "secret prompt that must NOT appear in argv",
 		WorkDir: `C:\work\proj`,
@@ -107,7 +107,7 @@ func TestClaudeACPAdapterBuildCommand(t *testing.T) {
 func TestClaudeACPAdapterBuildCommandEnvPassthrough(t *testing.T) {
 	t.Setenv("ANTHROPIC_API_KEY", "sk-ant-test-key")
 
-	a := NewClaudeACPAdapter("npx.cmd")
+	a := NewClaudeACPAdapter("npx.cmd", "")
 	cmdPath, _, env, _ := a.BuildCommand(RunProcessContext{Prompt: "p", WorkDir: `C:\w`})
 
 	if cmdPath != "npx.cmd" {
@@ -118,6 +118,23 @@ func TestClaudeACPAdapterBuildCommandEnvPassthrough(t *testing.T) {
 		if !strings.Contains(joined, want) {
 			t.Errorf("env missing %q: %v", want, env)
 		}
+	}
+}
+
+func TestClaudeACPAdapterBuildCommandInjectsModel(t *testing.T) {
+	// Default model (--agent-model) is injected as ANTHROPIC_MODEL when the
+	// run does not specify one — the ACP protocol's session/new has no model
+	// field, so the model must travel through the child env.
+	a := NewClaudeACPAdapter("", "deepseek-v4-pro")
+	_, _, env, _ := a.BuildCommand(RunProcessContext{Prompt: "p", WorkDir: `/w`})
+	if !strings.Contains(strings.Join(env, "\n"), "ANTHROPIC_MODEL=deepseek-v4-pro") {
+		t.Errorf("env missing ANTHROPIC_MODEL=deepseek-v4-pro: %v", env)
+	}
+
+	// Run-level model wins over the default.
+	_, _, env2, _ := a.BuildCommand(RunProcessContext{Prompt: "p", WorkDir: `/w`, Model: "claude-sonnet-4-6"})
+	if !strings.Contains(strings.Join(env2, "\n"), "ANTHROPIC_MODEL=claude-sonnet-4-6") {
+		t.Errorf("env missing run-level ANTHROPIC_MODEL override: %v", env2)
 	}
 }
 
@@ -148,7 +165,7 @@ func TestClaudeACPAdapterPreflightFailsFast(t *testing.T) {
 
 func TestClaudeACPAdapterRegistryRegistration(t *testing.T) {
 	reg := NewRegistry()
-	a := NewClaudeACPAdapter("")
+	a := NewClaudeACPAdapter("", "")
 
 	if err := reg.Register(a); err != nil {
 		t.Fatalf("Register: %v", err)
@@ -162,7 +179,7 @@ func TestClaudeACPAdapterRegistryRegistration(t *testing.T) {
 	}
 
 	// Duplicate registration must be rejected.
-	if err := reg.Register(NewClaudeACPAdapter("")); err == nil {
+	if err := reg.Register(NewClaudeACPAdapter("", "")); err == nil {
 		t.Error("duplicate claude-acp registration must be rejected")
 	}
 
@@ -191,7 +208,7 @@ func TestValidateCLIAdapterIDAcceptsClaudeACPAdapter(t *testing.T) {
 // run.agent.* events (the official-protocol path replacing the legacy NDJSON
 // parser).
 func TestClaudeACPAdapterParseStreamWithMockACPPeer(t *testing.T) {
-	adapter := NewClaudeACPAdapter("")
+	adapter := NewClaudeACPAdapter("", "")
 	emitter := &recordingEmitter{}
 	run := store.Run{ID: "run-claude-acp-1", ProjectID: "proj-claude-acp", ThreadID: "thread-claude-acp"}
 
