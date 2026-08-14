@@ -397,13 +397,23 @@ func (s *EdgeCallbackService) HandleTaskDone(ctx context.Context, edgeUserID, ed
 		if err := agentevent.ValidateAgentCallbackPayloadSize(finalContent); err != nil {
 			return err
 		}
+		// messages.content is jsonb — plain text must be wrapped exactly like
+		// the stream path does, or the insert fails with 22P02 (invalid json).
+		messageContent := finalContent
+		if !json.Valid([]byte(messageContent)) {
+			wrapped, marshalErr := json.Marshal(map[string]string{"content": finalContent})
+			if marshalErr != nil {
+				return marshalErr
+			}
+			messageContent = string(wrapped)
+		}
 		msg = &model.Message{
 			SessionID:   ai.SessionID,
 			SenderType:  model.SenderTypeAgent,
 			SenderID:    task.AgentInstanceID,
 			ClientMsgID: uuidv7.Must(),
 			ContentType: model.ContentTypeText,
-			Content:     finalContent,
+			Content:     messageContent,
 		}
 		if s.seq == nil {
 			return errcode.ErrInternal.WithMessage("edge callback sequence allocator not configured")
