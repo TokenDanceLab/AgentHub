@@ -13,22 +13,17 @@ import (
 	"testing"
 )
 
-// ── 常量：A-V1 RFC §6 / #1566 定义的 13 个已迁移文件 ──────────────────────────
+// ── 常量：A-V1 RFC §6 / #1566 定义的已迁移文件（编排去重后剩余 8 个源文件）───
 
 // orchestratorSourceFiles 是已从根 adapters 包迁移到当前叶子包
-// edge-server/internal/adapters/orchestrator/ 的 13 个 orchestrator_*.go
+// edge-server/internal/adapters/orchestrator/ 的 orchestrator_*.go
 // 源文件（不含 _test.go）。
 var orchestratorSourceFiles = []string{
 	"orchestrator.go",
-	"orchestrator_dag.go",
 	"orchestrator_dispatch_handle.go",
 	"orchestrator_dispatch_interceptor.go",
 	"orchestrator_dispatch_parse.go",
 	"orchestrator_dispatch_results.go",
-	"orchestrator_failure.go",
-	"orchestrator_failure_circuit.go",
-	"orchestrator_failure_classify.go",
-	"orchestrator_failure_recovery.go",
 	"orchestrator_ids.go",
 	"orchestrator_payloads.go",
 	"orchestrator_prompt.go",
@@ -36,10 +31,7 @@ var orchestratorSourceFiles = []string{
 
 // orchestratorTestFiles 是配套测试文件。
 var orchestratorTestFiles = []string{
-	"orchestrator_dag_robust_test.go",
-	"orchestrator_dag_test.go",
 	"orchestrator_e2e_test.go",
-	"orchestrator_failure_test.go",
 	"orchestrator_residual_test.go",
 }
 
