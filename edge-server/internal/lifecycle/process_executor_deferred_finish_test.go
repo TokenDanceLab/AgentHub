@@ -51,7 +51,8 @@ func TestHasActiveChildren(t *testing.T) {
 	}
 
 	if err := reg.Register(&agents.AgentInstance{
-		ID: "child-active", Name: "claude-code", AdapterID: "claude-code", ParentID: run.ID, Status: agents.StatusBusy,
+		ID: "child-active", Name: "claude-code", AdapterID: "claude-code", ParentID: run.ID,
+		RunID: "run_child_active", Status: agents.StatusBusy,
 	}); err != nil {
 		t.Fatalf("Register: %v", err)
 	}
@@ -60,7 +61,8 @@ func TestHasActiveChildren(t *testing.T) {
 	}
 
 	if err := reg.Register(&agents.AgentInstance{
-		ID: "child-done", Name: "codex-acp", AdapterID: "codex-acp", ParentID: run.ID, Status: agents.StatusCompleted,
+		ID: "child-done", Name: "codex-acp", AdapterID: "codex-acp", ParentID: run.ID,
+		RunID: "run_child_done", Status: agents.StatusCompleted,
 	}); err != nil {
 		t.Fatalf("Register: %v", err)
 	}
@@ -126,6 +128,43 @@ func TestNewSubAgentRunContextUsesFreshSessionUUID(t *testing.T) {
 	}
 	if !uuidLike(ctx.SessionID) {
 		t.Fatalf("SessionID = %q, want a UUID v4 form", ctx.SessionID)
+	}
+}
+
+// TestUniqueChildRunsAllCompleteDedupesDualInstances verifies that two
+// registry instances sharing a RunID (orchestrator placeholder + executor
+// run-backed) count as ONE child run, complete when ANY instance is terminal.
+func TestUniqueChildRunsAllCompleteDedupesDualInstances(t *testing.T) {
+	instances := func(aStatus, bStatus agents.Status) []agents.AgentInstance {
+		return []agents.AgentInstance{
+			{ID: "ph", Name: "claude-code", ParentID: "parent", RunID: "run_task_1", Status: aStatus},
+			{ID: "rb", Name: "claude-code", ParentID: "parent", RunID: "run_task_1", Status: bStatus},
+		}
+	}
+
+	// Both busy → 1 unique run, not complete.
+	count, all := uniqueChildRunsAllComplete(instances(agents.StatusBusy, agents.StatusBusy))
+	if count != 1 || all {
+		t.Fatalf("both busy: count=%d all=%v, want 1/false", count, all)
+	}
+	// Split status (one terminal) → the run is complete.
+	count, all = uniqueChildRunsAllComplete(instances(agents.StatusCompleted, agents.StatusBusy))
+	if count != 1 || !all {
+		t.Fatalf("split status: count=%d all=%v, want 1/true", count, all)
+	}
+	// Two distinct runs, one complete one busy → 2, not complete.
+	mixed := append(instances(agents.StatusCompleted, agents.StatusBusy),
+		agents.AgentInstance{ID: "rb2", Name: "codex-acp", ParentID: "parent", RunID: "run_task_2", Status: agents.StatusBusy})
+	count, all = uniqueChildRunsAllComplete(mixed)
+	if count != 2 || all {
+		t.Fatalf("mixed: count=%d all=%v, want 2/false", count, all)
+	}
+	// Placeholder without RunID is ignored.
+	noRun := append(instances(agents.StatusCompleted, agents.StatusBusy),
+		agents.AgentInstance{ID: "ph2", Name: "claude-code", ParentID: "parent", Status: agents.StatusIdle})
+	count, all = uniqueChildRunsAllComplete(noRun)
+	if count != 1 || !all {
+		t.Fatalf("placeholder ignored: count=%d all=%v, want 1/true", count, all)
 	}
 }
 

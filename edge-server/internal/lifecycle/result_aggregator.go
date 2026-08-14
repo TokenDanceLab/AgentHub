@@ -190,24 +190,11 @@ func (ra *ResultAggregator) handleRunComplete(evt events.EventEnvelope, status a
 // completed. If so, emits a run.agent.sub_agents_complete event with
 // aggregated results when a collector is configured.
 func (ra *ResultAggregator) checkAllChildrenComplete(parentID string) {
-	children := ra.registry.ListByParent(parentID)
-	// Only run-backed children count. The orchestrator registers a
-	// placeholder instance (no RunID) at dispatch time, then SpawnSubAgent
-	// registers the real run-backed instance — counting the placeholder
-	// would block the parent forever because the placeholder never reaches
-	// a terminal status.
-	allComplete := true
-	runBackedCount := 0
-	for _, child := range children {
-		if child.RunID == "" {
-			continue
-		}
-		runBackedCount++
-		if !isTerminalStatus(child.Status) {
-			allComplete = false
-			break
-		}
-	}
+	// Only run-backed child runs count, deduped by RunID: the same run is
+	// registered twice (orchestrator dispatch placeholder + executor
+	// run-backed instance), and counting either the placeholder alone or
+	// both would block the parent forever / double-count.
+	runBackedCount, allComplete := uniqueChildRunsAllComplete(ra.registry.ListByParent(parentID))
 	if allComplete && runBackedCount > 0 {
 		slog.Info("all sub-agents complete", "parentId", parentID, "childCount", runBackedCount)
 		ra.emitAggregatedResult(parentID, false)
