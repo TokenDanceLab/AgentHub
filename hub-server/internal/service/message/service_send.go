@@ -75,17 +75,21 @@ func (s *Service) SendMessage(ctx context.Context, sessionID, senderUserID strin
 		}
 	}
 
-	// Idempotency lookup only applies when the client supplied a dedupe key.
-	// Querying with an empty client_msg_id hits the UUID column with '' and
-	// Postgres rejects it (22P02), leaking a 500 on every plain send.
-	if req.ClientMsgID != "" {
-		existing, err := repository.GetMessageByClientMsgID(s.db, sessionID, req.ClientMsgID)
-		if err != nil {
-			return nil, err
-		}
-		if existing != nil {
-			return sendMessageResponseFromModel(existing), nil
-		}
+	// client_msg_id is a NOT NULL UUID column serving as the idempotency key.
+	// When the client does not supply one, generate it server-side — writing
+	// '' to the UUID column makes Postgres reject the insert (22P02), leaking
+	// a 500 on every plain send.
+	clientMsgID := req.ClientMsgID
+	if clientMsgID == "" {
+		clientMsgID = uuidv7.Must()
+	}
+
+	existing, err := repository.GetMessageByClientMsgID(s.db, sessionID, clientMsgID)
+	if err != nil {
+		return nil, err
+	}
+	if existing != nil {
+		return sendMessageResponseFromModel(existing), nil
 	}
 
 	for _, attachmentID := range attachmentIDs {
@@ -96,7 +100,7 @@ func (s *Service) SendMessage(ctx context.Context, sessionID, senderUserID strin
 
 	msg := &model.Message{
 		SessionID:    sessionID,
-		ClientMsgID:  req.ClientMsgID,
+		ClientMsgID:  clientMsgID,
 		SenderType:   model.SenderTypeUser,
 		SenderID:     senderUserID,
 		ContentType:  req.ContentType,
@@ -123,7 +127,7 @@ func (s *Service) SendMessage(ctx context.Context, sessionID, senderUserID strin
 	})
 	if err != nil {
 		if isDuplicateKeyError(err) {
-			existing, lookupErr := repository.GetMessageByClientMsgID(s.db, sessionID, req.ClientMsgID)
+			existing, lookupErr := repository.GetMessageByClientMsgID(s.db, sessionID, clientMsgID)
 			if lookupErr == nil && existing != nil {
 				return sendMessageResponseFromModel(existing), nil
 			}
