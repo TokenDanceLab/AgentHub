@@ -12,13 +12,14 @@
 // capability negotiation, and the Edge approval chain
 // (session/request_permission → PermissionDecisionBroker) come with it.
 //
-// Launch shape: `npx -y @agentclientprotocol/claude-agent-acp` (npx
-// distribution, version-pinned per the migration report). On Windows the
-// launcher must be npx.cmd — a bare "npx" command in PATH is resolved by
-// exec.Command only via PATHEXT expansion, and naming the .cmd explicitly
-// avoids ambiguity. The agent args are static (-y + package), so the .cmd %*
-// argument-forwarding quirk that corrupts multiline prompts does not apply
-// here: the user prompt travels over the ACP stdio protocol, never as argv.
+// Launch shape: `npx -y @agentclientprotocol/claude-agent-acp@0.67.0` (npx
+// distribution with the version pin applied via claudeACPPackageSpec). On
+// Windows the launcher must be npx.cmd — a bare "npx" command in PATH is
+// resolved by exec.Command only via PATHEXT expansion, and naming the .cmd
+// explicitly avoids ambiguity. The agent args are static (-y + pinned
+// package), so the .cmd %* argument-forwarding quirk that corrupts multiline
+// prompts does not apply here: the user prompt travels over the ACP stdio
+// protocol, never as argv.
 //
 // API key passthrough: ANTHROPIC_API_KEY is filtered out of the child env by
 // the executor's sanitizer (env_sanitizer.go), so BuildCommand injects it
@@ -47,9 +48,16 @@ const claudeACPAdapterID = "claude-acp"
 // claudeACPPackage is the official ACP adapter npm package.
 const claudeACPPackage = "@agentclientprotocol/claude-agent-acp"
 
-// claudeACPVersionPin is the version verified for the migration spike (bump
-// discipline: update on upgrades, keep the pin visible in metadata).
-const claudeACPVersionPin = "0.62.0"
+// claudeACPVersionPin is the npm version verified end-to-end on the DevSpace
+// dev machine (initialize handshake, session/new, session/prompt, end_turn,
+// model passthrough via ANTHROPIC_MODEL). Bump discipline: update on
+// upgrades, keep the pin visible in metadata AND in the npx package spec —
+// an unpinned `npx -y <pkg>` silently drifts to latest (previously 0.62.0
+// metadata vs 0.67.0 actually installed).
+const claudeACPVersionPin = "0.67.0"
+
+// claudeACPPackageSpec is the npx install spec with the version pin applied.
+const claudeACPPackageSpec = claudeACPPackage + "@" + claudeACPVersionPin
 
 // ClaudeACPAdapter runs the official claude-agent-acp ACP agent binary.
 //
@@ -65,8 +73,8 @@ type ClaudeACPAdapter struct {
 //
 // npxPath is the launcher to spawn; when empty it defaults to "npx.cmd" on
 // Windows and "npx" elsewhere (shared defaultNpxPath). The agent receives no
-// run-time args beyond `-y @agentclientprotocol/claude-agent-acp`: ACP mode
-// is implicit in the package, and the prompt travels over stdio.
+// run-time args beyond `-y` + the pinned package spec (claudeACPPackageSpec):
+// ACP mode is implicit in the package, and the prompt travels over stdio.
 //
 // model is the default model injected as ANTHROPIC_MODEL when a run does not
 // specify one (sourced from --agent-model). Empty leaves model selection to
@@ -80,7 +88,7 @@ func NewClaudeACPAdapter(npxPath, model string) *ClaudeACPAdapter {
 	return &ClaudeACPAdapter{AcpAdapter: NewAcpAdapterConfig(AcpAdapterConfig{
 		ID:            claudeACPAdapterID,
 		Binary:        npxPath,
-		Args:          []string{"-y", claudeACPPackage},
+		Args:          []string{"-y", claudeACPPackageSpec},
 		DisplayName:   "Claude Code (ACP)",
 		VersionLabel:  "claude-acp " + claudeACPVersionPin + " (npx)",
 		EnvKeys:       []string{"ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_BASE_URL"},
@@ -110,11 +118,8 @@ func (a *ClaudeACPAdapter) PreflightCheck() error {
 // (via the embedded AcpAdapter).
 var _ AgentAdapter = (*ClaudeACPAdapter)(nil)
 
-// TODO(#1404 真跑验证): an end-to-end run against the real `npx -y
-// @agentclientprotocol/claude-agent-acp` process requires a Node.js/npx
-// environment with Claude authentication (ANTHROPIC_API_KEY or Claude Code
-// login) and network access to the npm registry. Not present in this
-// workspace — verification is limited to the registry registration, command
-// shape, and a mock ACP peer (claude_acp_test.go / acp_client_test.go).
-// Before cutover: verify on a machine with npx + keys, and confirm the npm
-// mirror serves 0.62.0.
+// Verified: end-to-end runs against the real `npx -y
+// @agentclientprotocol/claude-agent-acp@0.67.0` process were exercised on the
+// DevSpace dev machine (initialize → session/new → session/prompt →
+// streaming updates → end_turn → run finalized; ANTHROPIC_MODEL passthrough
+// confirmed). The version pin must stay in sync with claudeACPVersionPin.
