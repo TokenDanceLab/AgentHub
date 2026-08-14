@@ -777,14 +777,14 @@ func TestNewHandlerFromConfigWithRegisteredAdapter(t *testing.T) {
 
 func TestNewHandlerFromConfigRegistersRuntimeRunner(t *testing.T) {
 	reg := adapters.NewRegistry()
-	a := adapters.NewCodexAdapter("codex", "")
+	a := adapters.NewCodexACPadapter("")
 	if err := reg.Register(a); err != nil {
 		t.Fatalf("Register: %v", err)
 	}
 
 	handler, err := newHandlerFromConfig(Config{
 		AdapterRegistry: reg,
-		AgentDefault:    "codex",
+		AgentDefault:    "codex-acp",
 	})
 	if err != nil {
 		t.Fatalf("newHandlerFromConfig returned error: %v", err)
@@ -793,13 +793,13 @@ func TestNewHandlerFromConfigRegistersRuntimeRunner(t *testing.T) {
 	if !ok {
 		t.Fatal("runner_local_1 should exist")
 	}
-	if runner.Name != "Codex Runner (local)" {
-		t.Fatalf("runner name = %q, want Codex Runner (local)", runner.Name)
+	if runner.Name != "Codex (ACP) Runner (local)" {
+		t.Fatalf("runner name = %q, want Codex (ACP) Runner (local)", runner.Name)
 	}
 	if hasString(runner.Capabilities, "mock") {
 		t.Fatalf("runner capabilities = %v, must not report mock for runtime adapter executor", runner.Capabilities)
 	}
-	for _, want := range []string{"codex", "tool_calls", "file_changes", "multi_turn"} {
+	for _, want := range []string{"codex-acp", "tool_calls", "file_changes", "multi_turn"} {
 		if !hasString(runner.Capabilities, want) {
 			t.Fatalf("runner capabilities = %v, missing %q", runner.Capabilities, want)
 		}
