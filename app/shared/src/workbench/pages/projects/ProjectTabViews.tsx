@@ -10,7 +10,6 @@
 import React from 'react';
 import {
   DesignFileIcon,
-  DesignNavIcon,
 } from '../../designIcons';
 import type { WorkbenchDocumentPreview } from '../../documentPreview';
 import type { WorkbenchProfileSource } from '../../profileRegistry';

@@ -1,4 +1,4 @@
-import type { AgentState, ToolPermission } from './types';
+import type { ToolPermission } from './types';
 
 /* ═══════════════════════════════════════════════════════════════════════
    AgentEditHelpers — pure residual slices from AgentEditPanel (#695).

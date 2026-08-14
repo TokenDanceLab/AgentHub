@@ -2,7 +2,6 @@ import React, { useEffect } from 'react';
 import styles from './ProjectsPage.module.css';
 import { applyFolderThemeColor } from '../../folderThemeColors';
 import {
-  DEFAULT_PROJECTS,
   ProjectMain,
   ProjectNav,
   useProjectEditor,

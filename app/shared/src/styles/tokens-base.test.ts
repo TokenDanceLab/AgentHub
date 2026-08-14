@@ -121,7 +121,7 @@ describe('shared root CSS tokens', () => {
     expect(darkBlock).toMatch(/--primary:\s*#29ABE2/);
     expect(lightBlock).toMatch(/--primary:\s*#0071BC/);
 
-    expect(radiusControl?.webAlias).toBe('--td-radius-control');
+    expect(radiusControl?.webAlias).toBe('--r-sm');
     expect(readCss(tokensPath)).toMatch(/--r-sm:\s*8px/);
     expect(darkBlock).toMatch(/--td-radius-control:\s*8px/);
     expect(lightBlock).toMatch(/--td-radius-control:\s*8px/);

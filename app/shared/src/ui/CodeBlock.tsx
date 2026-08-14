@@ -77,9 +77,18 @@ export function CodeBlock({
   className?: string | undefined;
   children?: React.ReactNode;
 }) {
+  // All hooks must run unconditionally: the inline branch below returns
+  // early, and a block→inline re-render would otherwise change the hook
+  // order ("Rendered fewer hooks than expected").
+  const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE);
+
   const match = /language-(\S+)/.exec(className ?? '');
   const language = match ? match[1] : '';
   const rawCode = String(children ?? '');
+  const code = rawCode.replace(/\n$/, '');
+  const isLong = code.split('\n').length > CODE_COLLAPSE_LINE_THRESHOLD;
+  const [collapsed, setCollapsed] = useState(isLong);
+  const [copied, markCopied] = useCopiedFlag();
 
   // CommonMark block code nodes end with a newline. Inline code spans do not,
   // even when their source crosses a line or their rendered text wraps.
@@ -90,12 +99,6 @@ export function CodeBlock({
       </code>
     );
   }
-
-  const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE);
-  const code = rawCode.replace(/\n$/, '');
-  const isLong = code.split('\n').length > CODE_COLLAPSE_LINE_THRESHOLD;
-  const [collapsed, setCollapsed] = useState(isLong);
-  const [copied, markCopied] = useCopiedFlag();
 
   const handleCopy = () => {
     if (!navigator.clipboard) return;

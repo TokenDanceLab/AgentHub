@@ -13,8 +13,6 @@ import { WorkbenchRoutes } from './WorkbenchRoutes';
 import {
   SidebarResizer,
   WorkbenchPageHost,
-  WorkspaceLoadErrorState,
-  WorkspaceLoadingState,
 } from './WorkbenchFrameChromeParts';
 import {
   buildChatInspectorProps,

@@ -111,7 +111,7 @@ export function Tooltip({
     const viewportWidth = window.innerWidth;
     const viewportHeight = window.innerHeight;
 
-    let shouldFlip = false;
+    let shouldFlip: boolean;
     if (side === 'bottom') {
       shouldFlip = hostRect.bottom + VERTICAL_GAP_PX + tooltipRect.height > viewportHeight;
     } else if (side === 'top') {

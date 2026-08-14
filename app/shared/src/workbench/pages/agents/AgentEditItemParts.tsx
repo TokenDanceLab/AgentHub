@@ -1,5 +1,4 @@
 import React from 'react';
-import { DesignNavIcon } from '../../designIcons';
 import { RuntimeBrandIcon } from '../../RuntimeBrandIcon';
 import { agentConfigToAgentSpecFixture } from '../../agentProfileCatalog';
 import { formatAgentHubAgentSpecV1 } from '../../../agentSpec';
@@ -12,12 +11,7 @@ import {
   stateClass,
 } from './AgentInstalledParts';
 import {
-  EDIT_ENGINE_OPTIONS,
-  EDIT_MODEL_OPTIONS,
-  EDIT_MODE_OPTIONS,
-  EDIT_STATE_OPTIONS,
   TOOL_PERMISSION_LABELS,
-  buildStatusNoticeClassName,
   defaultToolPermission,
   getEditFieldConfigs,
 } from './AgentEditHelpers';

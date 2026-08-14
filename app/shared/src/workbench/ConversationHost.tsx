@@ -268,7 +268,7 @@ export const ConversationHost = React.memo(function ConversationHost({
             const ref = await uploadPort.uploadAttachment(a.file);
             setUploadProgresses((prev) => ({ ...prev, [a.id]: { percent: 100, phase: 'done' } }));
             enrichedAttachments = enrichedAttachments.map((x) => x.id === a.id ? { ...x, attachmentRef: ref } : x);
-          } catch { setUploadProgresses((prev) => { const n = { ...prev }; delete n[a.id]; return n; }); }
+          } catch { setUploadProgresses((prev) => { const n = { ...prev }; Reflect.deleteProperty(n, a.id); return n; }); }
         }
       }
       const finalIntent = enrichedAttachments.length > 0 ? { ...intentWithLiveText, attachments: enrichedAttachments } : intentWithLiveText;

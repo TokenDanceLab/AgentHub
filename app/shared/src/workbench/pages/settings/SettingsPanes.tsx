@@ -247,17 +247,6 @@ function formatKeys(keys: string[]): string {
   return keys.join(' + ');
 }
 
-function hasConflictInGroup(group: KeyboardShortcutGroup): boolean {
-  const seen = new Map<string, string>();
-  for (const s of group.shortcuts) {
-    const key = s.keys.join('+');
-    const existing = seen.get(key);
-    if (existing !== undefined) return true;
-    seen.set(key, s.id);
-  }
-  return false;
-}
-
 function shortcutConflictId(group: KeyboardShortcutGroup, shortcutId: string): string | null {
   const shortcut = group.shortcuts.find((s) => s.id === shortcutId);
   if (!shortcut) return null;

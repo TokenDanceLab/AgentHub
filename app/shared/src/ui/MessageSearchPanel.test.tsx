@@ -125,9 +125,10 @@ describe('MessageSearchPanel', () => {
   it('closes when clicking overlay', () => {
     const onClose = vi.fn();
     render(<MessageSearchPanel {...defaultProps} onClose={onClose} />);
-    const overlay = screen.getByPlaceholderText('Type to search...')
-      .closest('[class*="panel"]')
-      ?.parentElement!;
+    const panel = screen.getByPlaceholderText('Type to search...')
+      .closest('[class*="panel"]');
+    const overlay = panel ? panel.parentElement : null;
+    if (!overlay) throw new Error('overlay element not found');
     fireEvent.click(overlay);
     expect(onClose).toHaveBeenCalled();
   });
