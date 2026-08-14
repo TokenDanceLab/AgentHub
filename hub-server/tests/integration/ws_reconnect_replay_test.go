@@ -192,25 +192,13 @@ func TestWSMultipleDevicesPerUser(t *testing.T) {
 	}
 }
 
-// TestWSHeartbeatKeepsConnection is intended to verify the manager's heartbeat
-// ping/pong mechanism detects a healthy connection.
+// TestWSHeartbeatKeepsConnection verifies the manager's heartbeat ping/pong
+// mechanism keeps a healthy connection alive.
 //
-// SKIPPED HONESTLY: the heartbeat ticker runs on config.WSHeartbeatInterval
-// (30s). A single heartbeat cycle therefore cannot be observed in a
-// reasonable unit/integration-test window without either:
-//  1. waiting 30s+ (unacceptable for CI), or
-//  2. refactoring Manager.StartHeartbeat to accept an injectable interval
-//     (a Manager logic change, out of scope for "pure test honesty").
-//
-// The previous version slept only 500ms and asserted the connection was still
-// registered — which is true regardless of whether the heartbeat ever fired,
-// so it verified nothing about the heartbeat ping/pong mechanism. Skipping
-// loudly here so CI does not report a fake green for heartbeat coverage.
-//
-// TODO: once Manager gains a test seam for the heartbeat interval (e.g.
-// StartHeartbeatWithInterval), rewrite this test to use a short interval and
-// assert that a healthy connection's missedPong stays 0 and that a stale
-// (unreachable) connection is closed+unregistered after WSMaxMissedPongs.
+// 历史：早期因心跳 ticker 固定 30s 无法在 CI 观察而诚实跳过；#1533 落地
+// StartHeartbeatWithInterval seam 后本测试改用 100ms interval 确定性验证。
+// 剩余半项（2026-08-14 #1658 defer）：stale（不可达）连接在
+// WSMaxMissedPongs 后被关闭+注销的断言尚未覆盖。
 func TestWSHeartbeatKeepsConnection(t *testing.T) {
 	manager := hubws.NewManager()
 	// 时钟注入 seam（#1533）：用 100ms interval 确定性验证心跳，不等真实 30s。
