@@ -98,7 +98,7 @@ export const demoConversationsBase: WorkbenchConversation[] = [
     model: '运行',
     avatarLabel: 'P',
     avatarColor: 'var(--surface-highest)',
-    avatarTextColor: 'var(--text-3)',
+    avatarTextColor: 'var(--td-ink-subtle)',
     members: ['maintainer', 'Builder', 'Reviewer', 'contributor-a', 'contributor-b'],
   },
   {
@@ -110,7 +110,7 @@ export const demoConversationsBase: WorkbenchConversation[] = [
     model: '运行',
     avatarLabel: 'W',
     avatarColor: 'var(--surface-highest)',
-    avatarTextColor: 'var(--text-3)',
+    avatarTextColor: 'var(--td-ink-subtle)',
   },
 ];
 

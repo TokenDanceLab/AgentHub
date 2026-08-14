@@ -132,7 +132,7 @@
   width: 100%;
   box-sizing: border-box;
 }
-.input::placeholder { color: var(--text-weakest); }
+.input::placeholder { color: var(--td-ink-faint); }
 .input:focus {
   background: var(--glass-bg-medium);
   box-shadow: 0 0 0 3px var(--glass-tint-plum);
