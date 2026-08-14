@@ -19,7 +19,7 @@
 }
 
 body {
-  font: var(--body);
+  font: var(--chat-body);
   color: var(--td-ink);
   background: var(--td-canvas);
   -webkit-font-smoothing: antialiased;

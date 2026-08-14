@@ -65,7 +65,7 @@ describe('ChatViewTranscript CSS contract', () => {
     for (const className of messageDisplayMetaClassNames) {
       expect(css, className).toMatch(new RegExp(`\\.${className}\\b`));
     }
-    expect(metaRule).toMatch(/\bfont\s*:\s*var\(--label-xs\)/);
+    expect(metaRule).toMatch(/\bfont\s*:\s*var\(--chat-label-xs\)/);
     expect(metaRule).not.toMatch(/\bbackground\s*:/);
     expect(detailRule).toMatch(/\btext-overflow\s*:\s*ellipsis/);
   });
@@ -74,11 +74,11 @@ describe('ChatViewTranscript CSS contract', () => {
     const rowRule = cssRule(css, '.grp-row');
     const contentRule = cssRule(css, '.grp-content');
 
-    expect(rowRule).toMatch(/margin-bottom\s*:\s*var\(--sp-md\)/);
-    expect(rowRule).toMatch(/gap\s*:\s*var\(--sp-sm\)/);
-    expect(contentRule).toMatch(/gap\s*:\s*var\(--sp-2\)/);
+    expect(rowRule).toMatch(/margin-bottom\s*:\s*var\(--chat-sp-md\)/);
+    expect(rowRule).toMatch(/gap\s*:\s*var\(--chat-sp-sm\)/);
+    expect(contentRule).toMatch(/gap\s*:\s*var\(--chat-sp-2\)/);
     /* Full-file match: cssRule hits first `.user-bubble` under `.grp-content >` (align only). */
-    expect(css).toMatch(/\.user-bubble\s*\{[^}]*padding\s*:\s*var\(--sp-xxs\)\s+var\(--sp-sm\)/);
-    expect(css).toMatch(/\.agent-bubble\s*\{[^}]*padding\s*:\s*var\(--sp-xxs\)\s+var\(--sp-sm\)/);
+    expect(css).toMatch(/\.user-bubble\s*\{[^}]*padding\s*:\s*var\(--chat-sp-xxs\)\s+var\(--chat-sp-sm\)/);
+    expect(css).toMatch(/\.agent-bubble\s*\{[^}]*padding\s*:\s*var\(--chat-sp-xxs\)\s+var\(--chat-sp-sm\)/);
   });
 });

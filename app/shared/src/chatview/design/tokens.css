@@ -7,42 +7,40 @@
 
    This file keeps only:
    - intentional chat density (typography / spacing / radius / sizing)
-   - chat-only name aliases that map onto shared semantic vars
-   - chat-only visual helpers (opacity keyframes, guide-line, shadow)
+   - chat-only state/opacity aliases that map onto shared semantic vars
    ══════════════════════════════════════════════════════════════════════ */
 
 .chatview {
   display:flex; flex-direction:column; height:100%; overflow:hidden;
   /* Font stacks match tokens-base; re-declared for standalone .chatview scope */
-  --font-sans: -apple-system, BlinkMacSystemFont, 'Inter', 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif;
-  --font-mono: 'SF Mono', 'Cascadia Code', 'JetBrains Mono', ui-monospace, monospace;
+  --chat-font-sans: -apple-system, BlinkMacSystemFont, 'Inter', 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif;
+  --chat-font-mono: 'SF Mono', 'Cascadia Code', 'JetBrains Mono', ui-monospace, monospace;
   /* ── Chatview-specific typography (differs from base tokens) ───────── */
-  --body: 400 0.8125rem/1.5 var(--font-sans);  /* smaller than base --body (0.875rem) */
-  --label: 500 0.75rem/1.5 var(--font-sans);
-  --label-xs: 600 0.6875rem/1.5 var(--font-sans);  /* larger than base --label-xs (0.625rem) */
-  --bubble-font: 400 0.875rem/1.5 var(--font-sans);  /* bubble message font, distinct from --body at 0.8125rem */
+  --chat-body: 400 0.8125rem/1.5 var(--chat-font-sans);  /* smaller than base --body (0.875rem) */
+  --chat-label: 500 0.75rem/1.5 var(--chat-font-sans);
+  --chat-label-xs: 600 0.6875rem/1.5 var(--chat-font-sans);  /* larger than base --label-xs (0.625rem) */
+  --chat-bubble-font: 400 0.875rem/1.5 var(--chat-font-sans);  /* bubble message font, distinct from --chat-body at 0.8125rem */
 
   /* Chat density scale (intentional P76): md/lg/xl = 12/16/24
      Base v4 scale: md/lg/xl = 16/24/32
      Matching micro steps inherit names only: 2/4/6/8/10/14/16
-     --sp-md wires to base compat --space-md (12px), NOT v4 --sp-md (16px)
-     Row rhythm consumes --sp-md (12) not --sp-lg so more turns fit 1440×810.
+     --chat-sp-md wires to base compat --space-md (12px), NOT v4 --sp-md (16px)
+     Row rhythm consumes --chat-sp-md (12) not --chat-sp-lg so more turns fit 1440×810.
 
-     #1672 豁免登记：此密度阶梯是 chatview 产品局部组合（值故意偏离
-     --td-space-* 契约刻度），保留 --sp-*/--r-*/--dur-* 局部名，
-     不迁移到 --td-*；未来可考虑改 --chat-* 前缀以消除"平行词汇"嫌疑。 */
-  --sp-xs: 4px; --sp-sm: 8px;
-  --sp-md: var(--space-md, 12px); /* 12px = base compat --space-md, not v4 --sp-md */
-  --sp-lg: 16px; --sp-xl: 24px;
-  --sp-xxs: 6px; --sp-2: 2px; --sp-10: 10px; --sp-14: 14px; --sp-16: 16px;
+     #1672 M7：密度阶梯使用 --chat-* 前缀（产品局部组合，值故意偏离
+     --td-space-*/--td-radius-* 契约刻度；前缀消除"平行词汇"外观）。 */
+  --chat-sp-xs: 4px; --chat-sp-sm: 8px;
+  --chat-sp-md: var(--space-md, 12px); /* 12px = base compat --space-md, not v4 --sp-md */
+  --chat-sp-lg: 16px; --chat-sp-xl: 24px;
+  --chat-sp-xxs: 6px; --chat-sp-2: 2px; --chat-sp-10: 10px; --chat-sp-14: 14px; --chat-sp-16: 16px;
   /* Optional density aliases (map onto chat scale / workbench map) */
-  --chat-row-gap: var(--sp-md);
-  --chat-bubble-pad-y: var(--sp-xxs);
-  --chat-bubble-pad-x: var(--sp-sm);
+  --chat-row-gap: var(--chat-sp-md);
+  --chat-bubble-pad-y: var(--chat-sp-xxs);
+  --chat-bubble-pad-x: var(--chat-sp-sm);
   /* Chat radius density (tighter than v4 base r-xs/sm/md/lg) */
-  --r-xs: 3px; --r-sm: 6px; --r-md: 10px; --r-lg: 14px; --r-full: 9999px;
-  --dur: 160ms; --dur-slow: 400ms; --dur-pulse: 1.2s; --dur-route: 1.5s; --dur-bar: 0.5s;
-  --ease: cubic-bezier(0.2, 0, 0, 1);
+  --chat-r-xs: 3px; --chat-r-sm: 6px; --chat-r-md: 10px; --chat-r-lg: 14px; --chat-r-full: 9999px;
+  --chat-dur: 160ms; --chat-dur-slow: 400ms; --chat-dur-pulse: 1.2s; --chat-dur-route: 1.5s; --chat-dur-bar: 0.5s;
+  --chat-ease: cubic-bezier(0.2, 0, 0, 1);
   /* ── Chatview-specific sizing tokens ─────────────────────────────── */
   --think-max-h: 240px; --avatar-size: 32px; --icon-size: 18px;
 
@@ -54,9 +52,8 @@
      ─────────────────────────────────────────────────────────────────── */
 
   /* Name aliases: chatview / tokens-base names → themes.css semantics
-     (migrated to --td-* intents, #1672 M2a) */
-  --primary-bg: var(--td-tint);
-  --on-primary: var(--td-ink-on-plum);
+     (migrated to --td-* intents, #1672 M2a；--primary-bg/--on-primary/
+     --guide-line/--shadow 已无消费者，M7 删除) */
 
   /* State: track theme status so dark/light follow themes.css.
      Role colors inherit tokens-base SSOT (--role-*) as theme-independent brand. */
@@ -69,10 +66,6 @@
   --opacity-disabled: 0.4;  /* disabled state opacity */
   --opacity-route-mid: 0.4;  /* routePulse mid-keyframe */
   --opacity-dag-mid: 0.3;    /* dagPulse mid-keyframe */
-
-  /* ── Chatview-specific visual tokens (guide lines, shadows) ───────── */
-  --guide-line: var(--td-line);
-  --shadow: var(--td-shadow-sm);
 }
 
 /* No [data-theme="dark"] .chatview palette block.
