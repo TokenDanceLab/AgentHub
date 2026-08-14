@@ -14,17 +14,7 @@ import "github.com/agenthub/edge-server/internal/orchestration"
 
 // ── Contract aliases (single SSOT: internal/orchestration) ─────────────────
 
-type TaskStatus = orchestration.TaskStatus
-
-const (
-	TaskPending   = orchestration.TaskPending
-	TaskRunning   = orchestration.TaskRunning
-	TaskCompleted = orchestration.TaskCompleted
-	TaskFailed    = orchestration.TaskFailed
-)
-
 type PlanTask = orchestration.PlanTask
-type ExecutionPlan = orchestration.ExecutionPlan
 type PlanApprovalConfig = orchestration.PlanApprovalConfig
 type PendingPlan = orchestration.PendingPlan
 type PlanDecision = orchestration.PlanDecision

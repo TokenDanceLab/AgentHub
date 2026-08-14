@@ -21,20 +21,6 @@ func (d *dispatchInterceptor) handleDispatch(evt dispatchEvent, scope map[string
 		}
 	}
 
-	// Check circuit breaker BEFORE registration and spawning.
-	// Without this gate, a tripped breaker stops retries of existing failures
-	// but does NOT prevent new dispatches to the same failing agent — the
-	// orchestrator keeps spawning sub-agents to a known-broken target, each
-	// one failing independently and consuming slots until per-parent cap.
-	if d.failureRecovery != nil {
-		if cbErr := d.failureRecovery.checkCircuitBreaker(evt.Agent); cbErr != nil {
-			d.inner.Emit(BusEventTaskNotification, scope, dispatchRejectedPayload(
-				evt.Agent, evt.Task, "circuit breaker open: "+cbErr.Error(), evt.SubtaskID,
-			))
-			return
-		}
-	}
-
 	agentID := genAgentID()
 	now := time.Now().UTC()
 

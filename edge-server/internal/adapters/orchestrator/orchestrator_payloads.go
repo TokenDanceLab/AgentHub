@@ -213,37 +213,6 @@ func formatResultSummary(payload map[string]any) string {
 	return s
 }
 
-// formatRetryInjectText builds the retry notification text with reflexion critique.
-func formatRetryInjectText(agentName, errMsg, retryDirective, critique string) string {
-	return fmt.Sprintf("[Sub-agent: %s] transient failure, retrying with analysis...\nError: %s\n%s\nCritique: %s", agentName, errMsg, retryDirective, critique)
-}
-
-// formatRetryDirective builds the T1-D03 retry context purification marker.
-func formatRetryDirective(failureErr error) string {
-	return fmt.Sprintf(
-		"[Previous attempt failed: %s. Use a DIFFERENT strategy. Do NOT repeat the same approach.]",
-		truncateError(failureErr, 200),
-	)
-}
-
-// formatSwitchInjectText builds switch-agent notification text.
-func formatSwitchInjectText(agentName, altID, errMsg string, hasAlt bool) string {
-	if hasAlt {
-		return fmt.Sprintf("[Sub-agent: %s] capability failure, switching to alternate agent %s...\nError: %s", agentName, altID, errMsg)
-	}
-	return fmt.Sprintf("[Sub-agent: %s] capability failure, no alternate agent available\nError: %s", agentName, errMsg)
-}
-
-// formatSkipInjectText builds skip-agent notification text.
-func formatSkipInjectText(agentName, errMsg string) string {
-	return fmt.Sprintf("[Sub-agent: %s] task skipped (unrecoverable)\nError: %s", agentName, errMsg)
-}
-
-// formatFailInjectText builds unrecoverable-failure notification text.
-func formatFailInjectText(agentName, errMsg, critique string) string {
-	return fmt.Sprintf("[Sub-agent: %s] unrecoverable failure\nError: %s\nCritique: %s", agentName, errMsg, critique)
-}
-
 // formatSubAgentResultInjectText builds success/error result injection text.
 func formatSubAgentResultInjectText(agentName string, isError bool, errMsg, resultSummary string) string {
 	if isError {

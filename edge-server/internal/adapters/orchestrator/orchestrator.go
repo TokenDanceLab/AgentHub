@@ -135,11 +135,6 @@ func (a *Adapter) ParseStream(ctx context.Context, stdout io.Reader, stdin io.Wr
 		if a.messageQueue != nil {
 			a.messageQueue.EnsureAgent(run.ID, 64)
 		}
-		// Build failure recovery manager if adapter registry is available.
-		var frm *FailureRecoveryManager
-		if a.adapterRegistry != nil && a.spawner != nil {
-			frm = NewFailureRecoveryManager(a.adapterRegistry, a.spawner)
-		}
 		effectiveEmitter = &dispatchInterceptor{
 			inner:           emitter,
 			registry:        a.agentRegistry,
@@ -154,7 +149,6 @@ func (a *Adapter) ParseStream(ctx context.Context, stdout io.Reader, stdin io.Wr
 			ctx:             ctx,
 			dispatched:      make(map[string]dispatchEvent),
 			planBroker:      a.planBroker,
-			failureRecovery: frm,
 		}
 		if budget, ok := ctx.Value(CtxBudgetKey).(*runnerctx.ContextBudget); ok {
 			effectiveEmitter.(*dispatchInterceptor).budget = budget
@@ -199,10 +193,6 @@ type dispatchInterceptor struct {
 	dispatchedMu       sync.Mutex
 	dispatchedCount    int                      // total sub-agents dispatched by this interceptor
 	dispatched         map[string]dispatchEvent // agentID -> original dispatch event for result injection
-
-	// Failure degradation: classifies sub-agent errors and drives recovery
-	// (retry / switch / skip / fail).
-	failureRecovery *FailureRecoveryManager
 
 	// textBuffer accumulates streamed text deltas to prevent dispatch JSON
 	// fragmentation across BusEventTextDelta events (ISSUE 3.2).
