@@ -122,7 +122,7 @@
   box-sizing: border-box;
 }
 
-.input::placeholder { color: var(--text-weakest); }
+.input::placeholder { color: var(--td-ink-faint); }
 
 .input:focus {
   background: var(--glass-bg-subtle);
@@ -148,7 +148,7 @@
   right: 10px;
   border: none;
   background: transparent;
-  color: var(--text-weakest);
+  color: var(--td-ink-faint);
   cursor: pointer;
   padding: 4px;
   display: flex;
@@ -518,7 +518,7 @@
   transition: border-color 0.15s, background 0.15s;
 }
 
-.devInput::placeholder { color: var(--text-weakest); }
+.devInput::placeholder { color: var(--td-ink-faint); }
 
 .devInput:focus {
   border-color: var(--glass-tint-plum);
