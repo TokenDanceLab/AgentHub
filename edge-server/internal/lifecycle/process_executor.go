@@ -47,7 +47,7 @@ type ProcessExecutor struct {
 	// Evidence gate configuration for post-run verification.
 	evidenceGateCfg EvidenceGateConfig
 
-	// Fault escalation configuration for 3-layer recovery on run failure.
+	// Fault auto-retry configuration for run failure recovery.
 	faultEscalationCfg FaultEscalationConfig
 
 	mu          sync.Mutex
