@@ -55,7 +55,7 @@ Web shared workbench
 | ProcessExecutor | `internal/lifecycle/process_executor.go` | 启动 agent CLI 子进程、管理 stdin/stdout pipe、超时与优雅关闭 |
 | DecisionLoop | `internal/lifecycle/decision_loop.go` | 包装 adapter 事件流，step 计数、maxSteps 强制、工具审批门控 |
 | EvidenceGate | `internal/lifecycle/evidence_gate.go` | 运行前/后证据验证门 |
-| FaultEscalation | `internal/lifecycle/fault_escalation.go` | 三层故障升级链：自动重试 → AI review → replan |
+| FaultEscalation | `internal/lifecycle/fault_escalation.go` | 故障自动重试链：失败后按 `MaxRetries` 自动重试，错误 review 与 replan 交由 agent in-context 自纠错 |
 | EnvSanitizer | `internal/lifecycle/env_sanitizer.go` | 运行环境变量脱敏 |
 
 ProcessExecutor 配置 `RunTimeout`（默认 30 分钟）、`ShutdownGracePeriod`（默认 10 秒），Unix 下先 SIGTERM 再 SIGKILL。

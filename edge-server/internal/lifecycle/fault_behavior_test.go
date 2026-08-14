@@ -8,8 +8,7 @@ import (
 // ── Behavioral tests for FaultEscalationConfigFromEnv ──────────────────────
 // These tests use os.Setenv to configure the process environment and verify
 // that FaultEscalationConfigFromEnv reads the correct values. They complement
-// the unit-level ShouldRetry/ShouldEscalateToReview/NextEscalationPhase
-// decision tests with real env-var-driven scenarios.
+// the unit-level ShouldRetry decision tests with real env-var-driven scenarios.
 
 func TestFaultEscalationConfigFromEnv_Behavior_DefaultsWhenEnvEmpty(t *testing.T) {
 	// No env vars set — returns DefaultFaultEscalationConfig.
@@ -314,152 +313,6 @@ func TestFaultEscalationConfig_Behavior_ShouldRetry_WhenMaxRetriesNegative(t *te
 	}
 }
 
-func TestFaultEscalationConfig_Behavior_ShouldEscalateToReview(t *testing.T) {
-	cfg := FaultEscalationConfig{
-		Enabled:    true,
-		MaxRetries: 2,
-	}
-
-	// Retry count < MaxRetries: not yet exhausted, no escalation to review.
-	if cfg.ShouldEscalateToReview(0) {
-		t.Error("ShouldEscalateToReview(0) with MaxRetries=2 should be false")
-	}
-	if cfg.ShouldEscalateToReview(1) {
-		t.Error("ShouldEscalateToReview(1) with MaxRetries=2 should be false")
-	}
-	// Retry count == MaxRetries: retries exhausted, escalate to review.
-	if !cfg.ShouldEscalateToReview(2) {
-		t.Error("ShouldEscalateToReview(2) with MaxRetries=2 should be true")
-	}
-	// Retry count > MaxRetries: already beyond retries, escalate to review.
-	if !cfg.ShouldEscalateToReview(3) {
-		t.Error("ShouldEscalateToReview(3) with MaxRetries=2 should be true")
-	}
-}
-
-func TestFaultEscalationConfig_Behavior_ShouldEscalateToReview_WhenDisabled(t *testing.T) {
-	cfg := FaultEscalationConfig{
-		Enabled:    false,
-		MaxRetries: 2,
-	}
-
-	if cfg.ShouldEscalateToReview(2) {
-		t.Error("ShouldEscalateToReview should be false when escalation is disabled")
-	}
-}
-
-func TestFaultEscalationConfig_Behavior_NextEscalationPhase_Disabled(t *testing.T) {
-	cfg := FaultEscalationConfig{
-		Enabled:    false,
-		MaxRetries: 3,
-	}
-
-	// Regardless of retry count or recoverability, phase is none.
-	if got := cfg.NextEscalationPhase(0, true); got != EscalationPhaseNone {
-		t.Errorf("NextEscalationPhase(0, true) disabled = %s, want none", got)
-	}
-	if got := cfg.NextEscalationPhase(5, false); got != EscalationPhaseNone {
-		t.Errorf("NextEscalationPhase(5, false) disabled = %s, want none", got)
-	}
-}
-
-func TestFaultEscalationConfig_Behavior_NextEscalationPhase_Retry(t *testing.T) {
-	cfg := FaultEscalationConfig{
-		Enabled:    true,
-		MaxRetries: 3,
-	}
-
-	// Retry count 0, 1, 2: still within retry window.
-	if got := cfg.NextEscalationPhase(0, true); got != EscalationPhaseRetry {
-		t.Errorf("NextEscalationPhase(0, true) = %s, want retry", got)
-	}
-	if got := cfg.NextEscalationPhase(2, false); got != EscalationPhaseRetry {
-		t.Errorf("NextEscalationPhase(2, false) = %s, want retry", got)
-	}
-}
-
-func TestFaultEscalationConfig_Behavior_NextEscalationPhase_Review(t *testing.T) {
-	cfg := FaultEscalationConfig{
-		Enabled:    true,
-		MaxRetries: 3,
-	}
-
-	// Retry count 3 (exhausted) + recoverable error → review phase.
-	if got := cfg.NextEscalationPhase(3, true); got != EscalationPhaseReview {
-		t.Errorf("NextEscalationPhase(3, true) = %s, want review", got)
-	}
-	if got := cfg.NextEscalationPhase(5, true); got != EscalationPhaseReview {
-		t.Errorf("NextEscalationPhase(5, true) = %s, want review", got)
-	}
-}
-
-func TestFaultEscalationConfig_Behavior_NextEscalationPhase_Replan(t *testing.T) {
-	cfg := FaultEscalationConfig{
-		Enabled:    true,
-		MaxRetries: 3,
-	}
-
-	// Retry count 3 (exhausted) + non-recoverable error → replan phase.
-	if got := cfg.NextEscalationPhase(3, false); got != EscalationPhaseReplan {
-		t.Errorf("NextEscalationPhase(3, false) = %s, want replan", got)
-	}
-	if got := cfg.NextEscalationPhase(5, false); got != EscalationPhaseReplan {
-		t.Errorf("NextEscalationPhase(5, false) = %s, want replan", got)
-	}
-}
-
-// Exhaust phase is a defensive fallback in NextEscalationPhase. With current
-// logic, ShouldRetry and ShouldEscalateToReview are complementary (one uses <
-// and the other >= on the same values), so Exhaust is unreachable. It exists
-// as a safety net in case the decision logic evolves.
-
-func TestFaultEscalationConfig_Behavior_NextEscalationPhase_FullProgression(t *testing.T) {
-	// Simulate a full fault escalation chain: retry → retry → review (recoverable)
-	cfg := FaultEscalationConfig{
-		Enabled:    true,
-		MaxRetries: 2,
-	}
-
-	// Retry count 0: still within retry window → retry
-	phase := cfg.NextEscalationPhase(0, false)
-	if phase != EscalationPhaseRetry {
-		t.Errorf("phase 0: got %s, want retry", phase)
-	}
-
-	// Retry count 1: still within retry window → retry
-	phase = cfg.NextEscalationPhase(1, false)
-	if phase != EscalationPhaseRetry {
-		t.Errorf("phase 1: got %s, want retry", phase)
-	}
-
-	// Retry count 2: retries exhausted. Recoverable → review.
-	phase = cfg.NextEscalationPhase(2, true)
-	if phase != EscalationPhaseReview {
-		t.Errorf("phase 2 (recoverable): got %s, want review", phase)
-	}
-
-	// Retry count 2: retries exhausted. Non-recoverable → replan.
-	phase = cfg.NextEscalationPhase(2, false)
-	if phase != EscalationPhaseReplan {
-		t.Errorf("phase 2 (non-recoverable): got %s, want replan", phase)
-	}
-}
-
-func TestFaultEscalationConfig_Behavior_StateDefaults(t *testing.T) {
-	// EscalationState zero values should be sensible.
-	var state EscalationState
-
-	if state.Phase != "" {
-		t.Errorf("zero EscalationState.Phase = %q, want empty", state.Phase)
-	}
-	if state.RetryCount != 0 {
-		t.Errorf("zero EscalationState.RetryCount = %d, want 0", state.RetryCount)
-	}
-	if state.MaxRetries != 0 {
-		t.Errorf("zero EscalationState.MaxRetries = %d, want 0", state.MaxRetries)
-	}
-}
-
 func TestFaultEscalationConfig_Behavior_DefaultConfigIsSensible(t *testing.T) {
 	cfg := DefaultFaultEscalationConfig()
 
@@ -482,39 +335,6 @@ func TestFaultEscalationConfig_Behavior_DefaultConfigIsSensible(t *testing.T) {
 	if cfg.ShouldRetry(1) {
 		t.Error("default config ShouldRetry(1) should be false (MaxRetries=1)")
 	}
-
-	// ShouldEscalateToReview should trigger after retries.
-	if !cfg.ShouldEscalateToReview(1) {
-		t.Error("default config ShouldEscalateToReview(1) should be true")
-	}
-
-	// NextEscalationPhase with default config.
-	if got := cfg.NextEscalationPhase(0, true); got != EscalationPhaseRetry {
-		t.Errorf("default NextEscalationPhase(0, true) = %s, want retry", got)
-	}
-	if got := cfg.NextEscalationPhase(1, true); got != EscalationPhaseReview {
-		t.Errorf("default NextEscalationPhase(1, true) = %s, want review", got)
-	}
-	if got := cfg.NextEscalationPhase(1, false); got != EscalationPhaseReplan {
-		t.Errorf("default NextEscalationPhase(1, false) = %s, want replan", got)
-	}
-}
-
-func TestEscalationPhase_Behavior_Constants(t *testing.T) {
-	// Verify all escalation phase constants have the expected string values.
-	phases := map[EscalationPhase]string{
-		EscalationPhaseNone:    "none",
-		EscalationPhaseRetry:   "retry",
-		EscalationPhaseReview:  "review",
-		EscalationPhaseReplan:  "replan",
-		EscalationPhaseExhaust: "exhausted",
-	}
-
-	for phase, want := range phases {
-		if string(phase) != want {
-			t.Errorf("EscalationPhase = %q, want %q", phase, want)
-		}
-	}
 }
 
 func TestFaultEscalationConfig_Behavior_EmptyStruct_IsSafe(t *testing.T) {
@@ -532,14 +352,8 @@ func TestFaultEscalationConfig_Behavior_EmptyStruct_IsSafe(t *testing.T) {
 		t.Errorf("zero-value FaultEscalationConfig should have EscalationTimeout=0, got %v", cfg.EscalationTimeout)
 	}
 
-	// All decision methods should return false / none / 0.
+	// All decision methods should return false / 0.
 	if cfg.ShouldRetry(0) {
 		t.Error("zero-value config ShouldRetry should be false")
-	}
-	if cfg.ShouldEscalateToReview(0) {
-		t.Error("zero-value config ShouldEscalateToReview should be false")
-	}
-	if got := cfg.NextEscalationPhase(0, true); got != EscalationPhaseNone {
-		t.Errorf("zero-value config NextEscalationPhase = %s, want none", got)
 	}
 }
