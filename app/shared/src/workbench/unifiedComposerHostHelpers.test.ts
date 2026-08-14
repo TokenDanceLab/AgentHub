@@ -147,7 +147,7 @@ describe('unifiedComposerHostHelpers', () => {
     expect(model.quote?.text).toBe('quoted');
     expect(model.mentions).toHaveLength(1);
     expect(model.mainchain?.mainchainTask).toBe('ready');
-    expect(model.attachment?.uploadProgresses?.a1.percent).toBe(10);
+    expect(model.attachment?.uploadProgresses?.a1?.percent).toBe(10);
     expect(model.agentOptions).toHaveLength(1);
     expect(model.targetPicker?.executionTargetId).toBe('t1');
     expect(model.statusItems).toContain('数据：真实数据');
