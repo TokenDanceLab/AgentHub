@@ -188,7 +188,7 @@ func TestAgentHubAgentSpecV1BuildsSDKFixtureStream(t *testing.T) {
 	if invocation.CLIInvocationPlan == nil {
 		t.Fatal("codex AgentSpec should compile to a redacted CLI invocation plan")
 	}
-	if invocation.CLIInvocationPlan.AdapterID != "codex" || invocation.CLIInvocationPlan.CommandName == "" || strings.ContainsAny(invocation.CLIInvocationPlan.CommandName, `\/`) {
+	if invocation.CLIInvocationPlan.AdapterID != "codex-acp" || invocation.CLIInvocationPlan.CommandName == "" || strings.ContainsAny(invocation.CLIInvocationPlan.CommandName, `\/`) {
 		t.Fatalf("CLI plan = %#v", invocation.CLIInvocationPlan)
 	}
 	if !invocation.CLIInvocationPlan.PromptRedacted || invocation.CLIInvocationPlan.Observed || invocation.CLIInvocationPlan.RealTested {

@@ -233,11 +233,11 @@ func runtimeInvocationFixtureStrategy(runtimeID string) string {
 func runtimeInvocationFixtureAdapter(runtimeID string, model string) AgentAdapter {
 	switch strings.ToLower(strings.TrimSpace(runtimeID)) {
 	case "codex":
-		return NewCodexAdapter("codex", model)
+		return NewCodexACPadapter("")
 	case "claude-code":
 		return NewClaudeCodeAdapter("claude", model, "")
 	case "opencode":
-		return NewOpenCodeAdapter("opencode")
+		return NewOpenCodeACPAdapter("")
 	default:
 		return nil
 	}

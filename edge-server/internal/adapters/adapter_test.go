@@ -28,34 +28,6 @@ func TestClaudeCodeAdapterMetadata(t *testing.T) {
 	}
 }
 
-func TestCodexAdapterMetadata(t *testing.T) {
-	a := NewCodexAdapter("codex", "gpt-5")
-	m := a.Metadata()
-	if m.ID != "codex" {
-		t.Fatalf("ID = %q, want codex", m.ID)
-	}
-	if m.Name != "Codex" {
-		t.Fatalf("Name = %q, want Codex", m.Name)
-	}
-	if m.Description == "" {
-		t.Fatal("Description should not be empty")
-	}
-}
-
-func TestOpenCodeAdapterMetadata(t *testing.T) {
-	a := NewOpenCodeAdapter("opencode")
-	m := a.Metadata()
-	if m.ID != "opencode" {
-		t.Fatalf("ID = %q, want opencode", m.ID)
-	}
-	if m.Name != "OpenCode" {
-		t.Fatalf("Name = %q, want OpenCode", m.Name)
-	}
-	if m.Description == "" {
-		t.Fatal("Description should not be empty")
-	}
-}
-
 // --- Adapter Capabilities tests ---
 
 func TestClaudeCodeAdapterCapabilities(t *testing.T) {
@@ -84,89 +56,12 @@ func TestClaudeCodeAdapterCapabilities(t *testing.T) {
 	}
 }
 
-func TestCodexAdapterCapabilities(t *testing.T) {
-	a := NewCodexAdapter("codex", "gpt-5")
-	c := a.Capabilities()
-	if c.Streaming { // Phase 1: batch only
-		t.Fatal("Streaming should be false for Phase 1")
-	}
-	if !c.ToolCalls {
-		t.Fatal("ToolCalls should be true")
-	}
-	if !c.FileChanges {
-		t.Fatal("FileChanges should be true")
-	}
-	if !c.MultiTurn {
-		t.Fatal("MultiTurn should be true")
-	}
-}
-
-func TestOpenCodeAdapterCapabilities(t *testing.T) {
-	a := NewOpenCodeAdapter("opencode")
-	c := a.Capabilities()
-	if !c.Streaming {
-		t.Fatal("Streaming should be true")
-	}
-	if !c.ToolCalls {
-		t.Fatal("ToolCalls should be true")
-	}
-	if !c.FileChanges {
-		t.Fatal("FileChanges should be true")
-	}
-	if !c.ThinkingVisible {
-		t.Fatal("ThinkingVisible should be true")
-	}
-	if !c.MultiTurn {
-		t.Fatal("MultiTurn should be true")
-	}
-}
-
 // --- NeedsStdin tests ---
 
 func TestClaudeCodeAdapterNeedsStdin(t *testing.T) {
 	a := NewClaudeCodeAdapter("claude", "sonnet", "")
 	if !a.NeedsStdin() {
 		t.Fatal("Claude Code should need stdin")
-	}
-}
-
-func TestCodexAdapterNeedsStdin(t *testing.T) {
-	a := NewCodexAdapter("codex", "gpt-5")
-	if a.NeedsStdin() {
-		t.Fatal("Codex should not need stdin")
-	}
-}
-
-func TestOpenCodeAdapterNeedsStdin(t *testing.T) {
-	a := NewOpenCodeAdapter("opencode")
-	if a.NeedsStdin() {
-		t.Fatal("OpenCode should not need stdin")
-	}
-}
-
-// --- sandboxForPermissionMode tests ---
-
-func TestSandboxForPermissionMode(t *testing.T) {
-	tests := []struct {
-		mode string
-		want string
-	}{
-		{"plan", "read-only"},
-		{"default", ""}, // Codex has no "default" sandbox — let it decide
-		{"acceptEdits", "workspace-write"},
-		{"dontAsk", "workspace-write"},
-		{"bypassPermissions", "danger-full-access"},
-		{"unknown", ""},
-		{"", ""},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.mode, func(t *testing.T) {
-			got := sandboxForPermissionMode(tt.mode)
-			if got != tt.want {
-				t.Fatalf("sandboxForPermissionMode(%q) = %q, want %q", tt.mode, got, tt.want)
-			}
-		})
 	}
 }
 
@@ -365,8 +260,9 @@ func TestAdapterMetadataIsNotEmpty(t *testing.T) {
 		metadata AdapterMetadata
 	}{
 		{"ClaudeCode", NewClaudeCodeAdapter("claude", "sonnet", "").Metadata()},
-		{"Codex", NewCodexAdapter("codex", "gpt-5").Metadata()},
-		{"OpenCode", NewOpenCodeAdapter("opencode").Metadata()},
+		{"ClaudeACP", NewClaudeACPAdapter("").Metadata()},
+		{"CodexACP", NewCodexACPadapter("").Metadata()},
+		{"OpenCodeACP", NewOpenCodeACPAdapter("").Metadata()},
 	}
 	for _, a := range adapters {
 		if a.metadata.ID == "" {
@@ -409,4 +305,13 @@ func TestClaudeBuildCommandOmitsAddDirWhenWorkDirEmpty(t *testing.T) {
 			}
 		}
 	}
+}
+
+func containsString(list []string, target string) bool {
+	for _, value := range list {
+		if value == target {
+			return true
+		}
+	}
+	return false
 }

@@ -55,10 +55,6 @@ func TestOpenCodeACPAdapterCapabilitiesUpgrade(t *testing.T) {
 			t.Errorf("opencode-acp Capabilities.%s = false, want true", field.name)
 		}
 	}
-	legacy := NewOpenCodeAdapter("opencode")
-	if legacy.Capabilities().PermissionHooks {
-		t.Error("legacy OpenCodeAdapter must keep PermissionHooks: false (batch parser, no ACP approval chain)")
-	}
 }
 
 func TestOpenCodeACPAdapterBuildCommand(t *testing.T) {
@@ -170,11 +166,6 @@ func TestOpenCodeACPAdapterRegistryRegistration(t *testing.T) {
 		t.Error("duplicate opencode-acp registration must be rejected")
 	}
 
-	// opencode-acp coexists with the legacy opencode adapter (fallback stays
-	// registered until the ACP path is verified end-to-end).
-	if err := reg.Register(NewOpenCodeAdapter("opencode")); err != nil {
-		t.Errorf("legacy opencode registration should coexist with opencode-acp: %v", err)
-	}
 	if !containsString(reg.ListIDs(), "opencode-acp") {
 		t.Errorf("ListIDs missing opencode-acp: %v", reg.ListIDs())
 	}
