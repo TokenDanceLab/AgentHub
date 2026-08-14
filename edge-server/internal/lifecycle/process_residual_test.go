@@ -428,8 +428,10 @@ func TestNewSubAgentRunContext(t *testing.T) {
 	if got.Run.ID != "run_c" || got.Prompt != "do work" || got.AgentID != "worker" || got.Model != "sonnet" {
 		t.Fatalf("fields %#v", got)
 	}
-	if got.SessionID != "th_c" {
-		t.Fatalf("session %q", got.SessionID)
+	// The CC session must be a fresh UUID, not the hierarchical thread path
+	// (claude-code rejects non-UUID --session-id values).
+	if got.SessionID == "th_c" || !uuidLike(got.SessionID) {
+		t.Fatalf("session %q, want a fresh UUID (not the thread path)", got.SessionID)
 	}
 	if got.Budget == nil || got.Budget == parentBudget {
 		t.Fatal("expected isolated child budget")
@@ -1998,8 +2000,12 @@ func TestResidualPlanPureHelpers1043(t *testing.T) {
 		},
 	}
 	ctx := buildSubAgentRunContext(run, task, "thread-child", "")
-	if ctx.Prompt != "do it" || ctx.AgentID != "agent-1" || ctx.SessionID != "thread-child" {
+	if ctx.Prompt != "do it" || ctx.AgentID != "agent-1" {
 		t.Fatalf("basic ctx %#v", ctx)
+	}
+	// Session is a fresh UUID, not the hierarchical thread path.
+	if ctx.SessionID == "thread-child" || !uuidLike(ctx.SessionID) {
+		t.Fatalf("basic ctx session %#v", ctx)
 	}
 	if ctx.AppendSystemPrompt == "" {
 		t.Fatal("expected sibling prompt")

@@ -1,13 +1,21 @@
 package lifecycle
 
 import (
+	"strings"
 	"testing"
 	"time"
 
+	"github.com/agenthub/edge-server/internal/adapters"
 	"github.com/agenthub/edge-server/internal/agents"
 	"github.com/agenthub/edge-server/internal/events"
 	"github.com/agenthub/edge-server/internal/store"
 )
+
+// uuidLike reports whether s looks like a UUID string (8-4-4-4-12 hex).
+func uuidLike(s string) bool {
+	parts := strings.Split(s, "-")
+	return len(parts) == 5 && len(parts[0]) == 8 && len(parts[1]) == 4 && len(parts[2]) == 4 && len(parts[3]) == 4 && len(parts[4]) == 12
+}
 
 // TestPlanParentWaitChildren covers the pure orchestration-deferral gate:
 // only a parent with a registry AND at least one active child defers.
@@ -104,6 +112,56 @@ func TestFinishSkipsCascadeForDeferredParent(t *testing.T) {
 	executor.finish(run.ID)
 	if inst, _ := reg.Get("child-busy"); inst.Status != agents.StatusDisconnected {
 		t.Fatalf("non-deferred finish must cascade-disconnect children: status = %s", inst.Status)
+	}
+}
+
+// TestNewSubAgentRunContextUsesFreshSessionUUID verifies the sub-agent's CC
+// session is a fresh UUID — the claude-code CLI rejects hierarchical thread
+// paths ("parent/sub/run_x") as session IDs.
+func TestNewSubAgentRunContextUsesFreshSessionUUID(t *testing.T) {
+	run := store.Run{ID: "run-sub", ProjectID: "proj", ThreadID: "thread/sub/run-sub"}
+	ctx := newSubAgentRunContext(run, adapters.SubAgentTask{AgentID: "claude-code", Prompt: "task"}, "thread/sub/run-sub")
+	if ctx.SessionID == run.ThreadID || ctx.SessionID == "thread/sub/run-sub" {
+		t.Fatalf("SessionID must not be the thread path: %q", ctx.SessionID)
+	}
+	if !uuidLike(ctx.SessionID) {
+		t.Fatalf("SessionID = %q, want a UUID v4 form", ctx.SessionID)
+	}
+}
+
+// TestCheckAllChildrenCompleteIgnoresPlaceholderInstances verifies the
+// aggregator only counts run-backed children (RunID set): the orchestrator's
+// dispatch-time placeholder instance must not block parent finalization.
+func TestCheckAllChildrenCompleteIgnoresPlaceholderInstances(t *testing.T) {
+	bus := events.NewBus(10)
+	reg := agents.NewRegistry()
+	ra := NewResultAggregator(bus, reg)
+
+	// Orchestrator placeholder (no RunID) — never reaches a terminal status.
+	if err := reg.Register(&agents.AgentInstance{
+		ID: "placeholder", Name: "claude-code", AdapterID: "claude-code", ParentID: "parent-run", Status: agents.StatusIdle,
+	}); err != nil {
+		t.Fatalf("Register placeholder: %v", err)
+	}
+	// Run-backed child — completed.
+	if err := reg.Register(&agents.AgentInstance{
+		ID: "run-backed", Name: "claude-code", AdapterID: "claude-code", ParentID: "parent-run",
+		RunID: "run-task-1", Status: agents.StatusCompleted,
+	}); err != nil {
+		t.Fatalf("Register run-backed: %v", err)
+	}
+
+	finalized := make(chan string, 1)
+	ra.WithParentFinalizer(func(parentRunID string) { finalized <- parentRunID })
+	ra.checkAllChildrenComplete("parent-run")
+
+	select {
+	case parentID := <-finalized:
+		if parentID != "parent-run" {
+			t.Fatalf("finalized parent = %q, want parent-run", parentID)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("finalizeParent not invoked despite run-backed children being complete")
 	}
 }
 
