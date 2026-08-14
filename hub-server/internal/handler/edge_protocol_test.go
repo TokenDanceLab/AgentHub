@@ -62,7 +62,7 @@ func TestEdgeHubProtocol_FullCallbackChain(t *testing.T) {
 			taskCreated = true
 			mu.Unlock()
 			return &model.PendingAgentTask{
-				ID:                "task-001",
+				ID:                "d0000000-0000-0000-0000-000000000001",
 				AgentInstanceID:   "agent-001",
 				TriggeredByUserID: userID,
 				TriggerMessageID:  triggerMessageID,
@@ -131,7 +131,7 @@ func TestEdgeHubProtocol_FullCallbackChain(t *testing.T) {
 		if err := json.Unmarshal(dataJSON, &taskData); err != nil {
 			t.Fatalf("failed to decode task data: %v", err)
 		}
-		if taskData["id"] != "task-001" {
+		if taskData["id"] != "d0000000-0000-0000-0000-000000000001" {
 			t.Fatalf("expected task id task-001, got %v", taskData["id"])
 		}
 		if taskData["status"] != model.TaskStatusDispatched {
@@ -144,7 +144,7 @@ func TestEdgeHubProtocol_FullCallbackChain(t *testing.T) {
 			"run_id": "run-edge-001",
 		}, "user_id", "u1")
 		// Edge routes have Gin params parsed via router; set Param manually
-		c.Params = []gin.Param{{Key: "id", Value: "task-001"}}
+		c.Params = []gin.Param{{Key: "id", Value: "d0000000-0000-0000-0000-000000000001"}}
 		agentHandler.TaskAck(c)
 
 		assertStatus(t, w, 200)
@@ -168,7 +168,7 @@ func TestEdgeHubProtocol_FullCallbackChain(t *testing.T) {
 			c, w := newGinCtx("POST", "/edge/agent-tasks/task-001/stream", map[string]string{
 				"content": chunk,
 			}, "user_id", "u1")
-			c.Params = []gin.Param{{Key: "id", Value: "task-001"}}
+			c.Params = []gin.Param{{Key: "id", Value: "d0000000-0000-0000-0000-000000000001"}}
 			agentHandler.TaskStream(c)
 
 			assertStatus(t, w, 200)
@@ -187,7 +187,7 @@ func TestEdgeHubProtocol_FullCallbackChain(t *testing.T) {
 		c, w := newGinCtx("POST", "/edge/agent-tasks/task-001/done", map[string]string{
 			"final_content": "All operations completed successfully.",
 		}, "user_id", "u1")
-		c.Params = []gin.Param{{Key: "id", Value: "task-001"}}
+		c.Params = []gin.Param{{Key: "id", Value: "d0000000-0000-0000-0000-000000000001"}}
 		agentHandler.TaskDone(c)
 
 		assertStatus(t, w, 200)
@@ -220,7 +220,7 @@ func TestEdgeHubProtocol_FullCallbackChain(t *testing.T) {
 		c, w := newGinCtx("POST", "/edge/agent-tasks/task-002/fail", map[string]string{
 			"error": "execution timeout after 60s",
 		}, "user_id", "u1")
-		c.Params = []gin.Param{{Key: "id", Value: "task-002"}}
+		c.Params = []gin.Param{{Key: "id", Value: "d0000000-0000-0000-0000-000000000002"}}
 		failHandler.TaskFail(c)
 
 		assertStatus(t, w, 200)
@@ -246,7 +246,7 @@ func TestAgentHandlerTaskStreamRejectsInvalidClientMsgID(t *testing.T) {
 		"content":       "hello",
 		"client_msg_id": "not-a-uuid",
 	}, "user_id", "u1", "device_id", "dev-1")
-	c.Params = []gin.Param{{Key: "id", Value: "task-001"}}
+	c.Params = []gin.Param{{Key: "id", Value: "d0000000-0000-0000-0000-000000000001"}}
 
 	agentHandler.TaskStream(c)
 
@@ -307,7 +307,7 @@ func TestEdgeHubProtocol_TaskLifecycleStateMachine(t *testing.T) {
 		triggerTaskFn: func(ctx context.Context, userID, triggerMessageID string) (*model.PendingAgentTask, error) {
 			recordState(model.TaskStatusDispatched)
 			return &model.PendingAgentTask{
-				ID:     "task-state-001",
+				ID:     "d0000000-0000-0000-0000-000000000011",
 				Status: model.TaskStatusDispatched,
 			}, nil
 		},
@@ -334,7 +334,7 @@ func TestEdgeHubProtocol_TaskLifecycleStateMachine(t *testing.T) {
 
 	// Ack
 	c, w = newGinCtx("POST", "/edge/agent-tasks/task-state-001/ack", nil, "user_id", "u1")
-	c.Params = []gin.Param{{Key: "id", Value: "task-state-001"}}
+	c.Params = []gin.Param{{Key: "id", Value: "d0000000-0000-0000-0000-000000000011"}}
 	h.TaskAck(c)
 	assertStatus(t, w, 200)
 
@@ -342,7 +342,7 @@ func TestEdgeHubProtocol_TaskLifecycleStateMachine(t *testing.T) {
 	c, w = newGinCtx("POST", "/edge/agent-tasks/task-state-001/done", map[string]string{
 		"final_content": "completed",
 	}, "user_id", "u1")
-	c.Params = []gin.Param{{Key: "id", Value: "task-state-001"}}
+	c.Params = []gin.Param{{Key: "id", Value: "d0000000-0000-0000-0000-000000000011"}}
 	h.TaskDone(c)
 	assertStatus(t, w, 200)
 
