@@ -32,7 +32,7 @@ export function PersonPanel({
   onAction,
 }: PersonPanelProps) {
   const initials = avatar || name.slice(0, 1).toUpperCase();
-  const avatarBg = avatarColor || 'var(--primary)';
+  const avatarBg = avatarColor || 'var(--td-plum)';
 
   return (
     <div className={styles.panel}>

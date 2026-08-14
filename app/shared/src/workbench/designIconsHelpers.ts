@@ -81,10 +81,10 @@ export function getDesignFileIconType(
 
 /** Color map aligned to tokendance-design/desktop file icons. */
 export const DESIGN_FILE_ICON_COLORS: Record<DesignFileIconType, string> = {
-  md: 'var(--text-2)',
-  markdown: 'var(--text-2)',
-  yml: 'var(--text-2)',
-  yaml: 'var(--text-2)',
+  md: 'var(--td-ink-muted)',
+  markdown: 'var(--td-ink-muted)',
+  yml: 'var(--td-ink-muted)',
+  yaml: 'var(--td-ink-muted)',
   css: '#1572b6',
   html: '#e34f26',
   js: '#f7df1e',
@@ -97,12 +97,12 @@ export const DESIGN_FILE_ICON_COLORS: Record<DesignFileIconType, string> = {
   git: '#f05032',
   xlsx: '#217346',
   csv: '#217346',
-  link: 'var(--primary)',
-  file: 'var(--text-3)',
+  link: 'var(--td-plum)',
+  file: 'var(--td-ink-subtle)',
 };
 
 export function getDesignFileIconColor(type: DesignFileIconType): string {
-  return DESIGN_FILE_ICON_COLORS[type] ?? 'var(--text-3)';
+  return DESIGN_FILE_ICON_COLORS[type] ?? 'var(--td-ink-subtle)';
 }
 
 export type DesignNavIconName =

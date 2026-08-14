@@ -171,7 +171,7 @@ function ProjectDetailSkeleton(): React.ReactElement {
     <div
       aria-hidden="true"
       data-testid="project-detail-skeleton"
-      style={{ display: 'grid', gap: 'var(--sp-10)', padding: 'var(--sp-lg) 0' }}
+      style={{ display: 'grid', gap: 'var(--sp-10)', padding: 'var(--td-space-5) 0' }}
     >
       <SkeletonBar width="38%" height="26px" />
       <SkeletonBar width="62%" height="12px" />

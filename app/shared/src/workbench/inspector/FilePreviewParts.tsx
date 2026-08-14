@@ -107,8 +107,8 @@ export function ImagePreview({ filename }: { filename: string }): React.ReactEle
         flexDirection: 'column',
         alignItems: 'center',
         gap: 12,
-        color: 'var(--text-3)',
-        font: '400 0.75rem var(--font-sans)',
+        color: 'var(--td-ink-subtle)',
+        font: '400 0.75rem var(--td-font)',
       }}>
         <DesignFileIcon className={styles.fileIcon} name={filename} />
         <span>图片预览: {filename}</span>

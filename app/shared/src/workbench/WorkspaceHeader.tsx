@@ -34,7 +34,7 @@ export function WorkspaceHeader({
         className={styles.workspaceAvatar}
         style={{
           background:
-            activeConversation?.avatarUrl ? undefined : (activeConversation?.avatarColor ?? 'var(--primary)'),
+            activeConversation?.avatarUrl ? undefined : (activeConversation?.avatarColor ?? 'var(--td-plum)'),
           color: activeConversation?.avatarTextColor,
         }}
       >

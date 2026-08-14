@@ -99,7 +99,7 @@ export function WorkbenchProfileOverlays({
           ]}
           anchorElement={activeGroupProfile.anchor}
           avatar={workbenchProfileInitials(activeGroupProfile.name)}
-          avatarColor="var(--primary)"
+          avatarColor="var(--td-plum)"
           badge={t('profile.groupChat')}
           isOpen
           meta={[

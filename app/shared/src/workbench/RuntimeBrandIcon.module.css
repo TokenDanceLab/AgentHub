@@ -3,8 +3,8 @@
 
   width: var(--runtime-brand-size);
   height: var(--runtime-brand-size);
-  border-radius: var(--r-sm);
-  color: var(--text-2);
+  border-radius: var(--td-radius-control);
+  color: var(--td-ink-muted);
   display: inline-flex;
   align-items: center;
   justify-content: center;

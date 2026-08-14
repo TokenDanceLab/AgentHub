@@ -3,7 +3,7 @@
 .panel {
   display: flex;
   flex-direction: column;
-  gap: var(--sp-md);
+  gap: var(--td-space-4);
 }
 
 /* ── Card ── */
@@ -12,39 +12,39 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 18px var(--sp-md) 20px;
-  border: 1px solid var(--bdr);
-  border-radius: var(--r-lg);
-  background: var(--surface);
-  transition: box-shadow var(--dur-medium) var(--ease),
-    border-color var(--dur-normal) var(--ease);
+  padding: 18px var(--td-space-4) 20px;
+  border: 1px solid var(--td-line);
+  border-radius: var(--td-radius-panel);
+  background: var(--td-surface);
+  transition: box-shadow var(--dur-medium) var(--td-ease),
+    border-color var(--td-dur-normal) var(--td-ease);
 }
 
 .card:hover {
-  border-color: var(--bdr-strong);
-  box-shadow: var(--e-1);
+  border-color: var(--td-line-strong);
+  box-shadow: var(--td-shadow-sm);
 }
 
 .avatar {
   width: 56px;
   height: 56px;
-  border-radius: var(--r-lg);
+  border-radius: var(--td-radius-panel);
   display: flex;
   align-items: center;
   justify-content: center;
   color: var(--text-inv);
-  font: 700 1.125rem var(--font-sans);
-  margin-bottom: var(--sp-md);
+  font: 700 1.125rem var(--td-font);
+  margin-bottom: var(--td-space-4);
 }
 
 .card h3 {
-  font: 600 1rem/1.2 var(--font-sans);
+  font: 600 1rem/1.2 var(--td-font);
 }
 
 .card p {
-  margin-top: var(--sp-xs);
-  color: var(--text-2);
-  font: 400 0.75rem var(--font-sans);
+  margin-top: var(--td-space-1);
+  color: var(--td-ink-muted);
+  font: 400 0.75rem var(--td-font);
 }
 
 .status {
@@ -55,8 +55,8 @@
   align-items: center;
   border-radius: var(--r-full);
   background: var(--success-bg);
-  color: var(--success);
-  font: 500 0.6875rem var(--font-sans);
+  color: var(--td-moss);
+  font: 500 0.6875rem var(--td-font);
 }
 
 /* ── Actions ── */
@@ -64,27 +64,27 @@
 .actions {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: var(--sp-sm);
+  gap: var(--td-space-2);
 }
 
 .actions button {
   height: 30px;
-  padding: 0 var(--sp-md);
-  border: 1px solid var(--bdr-strong);
-  border-radius: var(--r-sm);
-  background: var(--surface);
-  color: var(--text-2);
-  font: 500 0.75rem var(--font-sans);
+  padding: 0 var(--td-space-4);
+  border: 1px solid var(--td-line-strong);
+  border-radius: var(--td-radius-control);
+  background: var(--td-surface);
+  color: var(--td-ink-muted);
+  font: 500 0.75rem var(--td-font);
   cursor: pointer;
-  transition: background var(--dur-normal) var(--ease),
-    color var(--dur-normal) var(--ease),
-    box-shadow var(--dur-normal) var(--ease);
+  transition: background var(--td-dur-normal) var(--td-ease),
+    color var(--td-dur-normal) var(--td-ease),
+    box-shadow var(--td-dur-normal) var(--td-ease);
 }
 
 .actions button:hover {
-  background: var(--surface-low);
-  color: var(--text-1);
-  box-shadow: var(--e-1);
+  background: var(--td-surface-2);
+  color: var(--td-ink);
+  box-shadow: var(--td-shadow-sm);
 }
 
 .actions button:focus-visible {
@@ -102,10 +102,10 @@
 
 .projects span {
   min-height: 24px;
-  padding: 3px var(--sp-sm);
-  border: 1px solid var(--bdr);
+  padding: 3px var(--td-space-2);
+  border: 1px solid var(--td-line);
   border-radius: var(--r-full);
-  background: var(--surface);
-  color: var(--text-2);
-  font: 500 0.6875rem var(--font-sans);
+  background: var(--td-surface);
+  color: var(--td-ink-muted);
+  font: 500 0.6875rem var(--td-font);
 }
