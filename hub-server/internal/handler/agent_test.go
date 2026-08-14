@@ -14,6 +14,10 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// edgeTaskIDFixture is a valid UUID used for the /edge/agent-tasks/:id
+// callback tests — the handlers validate the path param as a UUID.
+const edgeTaskIDFixture = "c0000000-0000-0000-0000-000000000042"
+
 type mockAgentService struct {
 	addAgentToSession      func(ctx context.Context, userID, sessionID, agentType, customAgentID, displayName string) (*model.AgentInstance, error)
 	triggerAgentTask       func(ctx context.Context, userID, triggerMessageID, targetAgentInstanceID, targetAgentType, targetCustomAgentID, modelParams, targetID string) (*model.PendingAgentTask, error)
@@ -317,7 +321,7 @@ func TestAgentHandler_TaskAck(t *testing.T) {
 				called = true
 				assert.Equal(t, "edge-user-1", edgeUserID)
 				assert.Equal(t, "edge-device-1", edgeDeviceID)
-				assert.Equal(t, "task-1", taskID)
+				assert.Equal(t, edgeTaskIDFixture, taskID)
 				assert.Equal(t, "edge-run-1", edgeRunID)
 				return nil
 			},
@@ -332,7 +336,7 @@ func TestAgentHandler_TaskAck(t *testing.T) {
 		})
 
 		body := bytes.NewBufferString(`{"run_id":"run-1","edge_run_id":"edge-run-1"}`)
-		req := httptest.NewRequest(http.MethodPost, "/edge/agent-tasks/task-1/ack", body)
+		req := httptest.NewRequest(http.MethodPost, "/edge/agent-tasks/"+edgeTaskIDFixture+"/ack", body)
 		req.Header.Set("Content-Type", "application/json")
 		w := httptest.NewRecorder()
 		r.ServeHTTP(w, req)
@@ -358,7 +362,7 @@ func TestAgentHandler_TaskAck(t *testing.T) {
 			h.TaskAck(c)
 		})
 
-		req := httptest.NewRequest(http.MethodPost, "/edge/agent-tasks/task-1/ack", nil)
+		req := httptest.NewRequest(http.MethodPost, "/edge/agent-tasks/"+edgeTaskIDFixture+"/ack", nil)
 		w := httptest.NewRecorder()
 		r.ServeHTTP(w, req)
 
@@ -375,7 +379,7 @@ func TestAgentHandler_TaskStream(t *testing.T) {
 		svc := &mockAgentService{
 			handleTaskStream: func(ctx context.Context, edgeUserID, edgeDeviceID, taskID, edgeRunID string, stream model.AgentRunEventInput) error {
 				called = true
-				assert.Equal(t, "task-1", taskID)
+				assert.Equal(t, edgeTaskIDFixture, taskID)
 				assert.Equal(t, "edge-run-1", edgeRunID)
 				assert.Equal(t, "Hello", stream.Content)
 				return nil
@@ -391,7 +395,7 @@ func TestAgentHandler_TaskStream(t *testing.T) {
 		})
 
 		body := bytes.NewBufferString(`{"run_id":"run-1","edge_run_id":"edge-run-1","content":"Hello","event_type":"text"}`)
-		req := httptest.NewRequest(http.MethodPost, "/edge/agent-tasks/task-1/stream", body)
+		req := httptest.NewRequest(http.MethodPost, "/edge/agent-tasks/"+edgeTaskIDFixture+"/stream", body)
 		req.Header.Set("Content-Type", "application/json")
 		w := httptest.NewRecorder()
 		r.ServeHTTP(w, req)
@@ -412,7 +416,7 @@ func TestAgentHandler_TaskStream(t *testing.T) {
 		})
 
 		body := bytes.NewBufferString(`{"run_id":"run-1","event_type":"text"}`)
-		req := httptest.NewRequest(http.MethodPost, "/edge/agent-tasks/task-1/stream", body)
+		req := httptest.NewRequest(http.MethodPost, "/edge/agent-tasks/"+edgeTaskIDFixture+"/stream", body)
 		req.Header.Set("Content-Type", "application/json")
 		w := httptest.NewRecorder()
 		r.ServeHTTP(w, req)
@@ -646,7 +650,7 @@ func TestAgentHandler_TaskDone(t *testing.T) {
 		svc := &mockAgentService{
 			handleTaskDone: func(ctx context.Context, edgeUserID, edgeDeviceID, taskID, edgeRunID, finalContent string) error {
 				called = true
-				assert.Equal(t, "task-1", taskID)
+				assert.Equal(t, edgeTaskIDFixture, taskID)
 				assert.Equal(t, "edge-run-1", edgeRunID)
 				assert.Equal(t, "Final output", finalContent)
 				return nil
@@ -662,7 +666,7 @@ func TestAgentHandler_TaskDone(t *testing.T) {
 		})
 
 		body := bytes.NewBufferString(`{"run_id":"run-1","edge_run_id":"edge-run-1","final_content":"Final output"}`)
-		req := httptest.NewRequest(http.MethodPost, "/edge/agent-tasks/task-1/done", body)
+		req := httptest.NewRequest(http.MethodPost, "/edge/agent-tasks/"+edgeTaskIDFixture+"/done", body)
 		req.Header.Set("Content-Type", "application/json")
 		w := httptest.NewRecorder()
 		r.ServeHTTP(w, req)
@@ -683,7 +687,7 @@ func TestAgentHandler_TaskDone(t *testing.T) {
 		})
 
 		body := bytes.NewBufferString(`invalid json`)
-		req := httptest.NewRequest(http.MethodPost, "/edge/agent-tasks/task-1/done", body)
+		req := httptest.NewRequest(http.MethodPost, "/edge/agent-tasks/"+edgeTaskIDFixture+"/done", body)
 		req.Header.Set("Content-Type", "application/json")
 		w := httptest.NewRecorder()
 		r.ServeHTTP(w, req)
@@ -700,7 +704,7 @@ func TestAgentHandler_TaskFail(t *testing.T) {
 		svc := &mockAgentService{
 			handleTaskFail: func(ctx context.Context, edgeUserID, edgeDeviceID, taskID, edgeRunID, errMsg string) error {
 				called = true
-				assert.Equal(t, "task-1", taskID)
+				assert.Equal(t, edgeTaskIDFixture, taskID)
 				assert.Equal(t, "edge-run-1", edgeRunID)
 				assert.Equal(t, "timeout error", errMsg)
 				return nil
@@ -716,7 +720,7 @@ func TestAgentHandler_TaskFail(t *testing.T) {
 		})
 
 		body := bytes.NewBufferString(`{"run_id":"run-1","edge_run_id":"edge-run-1","error":"timeout error"}`)
-		req := httptest.NewRequest(http.MethodPost, "/edge/agent-tasks/task-1/fail", body)
+		req := httptest.NewRequest(http.MethodPost, "/edge/agent-tasks/"+edgeTaskIDFixture+"/fail", body)
 		req.Header.Set("Content-Type", "application/json")
 		w := httptest.NewRecorder()
 		r.ServeHTTP(w, req)
@@ -737,7 +741,7 @@ func TestAgentHandler_TaskFail(t *testing.T) {
 		})
 
 		body := bytes.NewBufferString(`{"run_id":"run-1"}`)
-		req := httptest.NewRequest(http.MethodPost, "/edge/agent-tasks/task-1/fail", body)
+		req := httptest.NewRequest(http.MethodPost, "/edge/agent-tasks/"+edgeTaskIDFixture+"/fail", body)
 		req.Header.Set("Content-Type", "application/json")
 		w := httptest.NewRecorder()
 		r.ServeHTTP(w, req)
