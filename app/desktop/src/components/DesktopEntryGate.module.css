@@ -5,7 +5,7 @@
   display: grid;
   place-items: center;
   padding: 32px;
-  background: var(--app-bg);
+  background: var(--td-canvas);
 }
 
 .card {
@@ -15,10 +15,10 @@
   gap: 22px;
   justify-items: center;
   padding: 30px;
-  border: 1px solid var(--bdr);
+  border: 1px solid var(--td-line);
   border-radius: var(--r-md);
-  background: var(--surface);
-  box-shadow: var(--e-2);
+  background: var(--td-surface);
+  box-shadow: var(--td-shadow-md);
 }
 
 .mark {
@@ -26,7 +26,7 @@
   height: 56px;
   border-radius: var(--r-md);
   display: block;
-  box-shadow: var(--e-1);
+  box-shadow: var(--td-shadow-sm);
 }
 
 .themeButton {
@@ -35,26 +35,26 @@
   right: 14px;
   width: 32px;
   height: 32px;
-  border: 1px solid var(--bdr);
+  border: 1px solid var(--td-line);
   border-radius: var(--r-full);
-  background: var(--surface-low);
-  color: var(--text-2);
+  background: var(--td-surface-2);
+  color: var(--td-ink-muted);
   display: inline-flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
   padding: 0;
   transition:
-    background var(--dur-fast) var(--ease),
-    border-color var(--dur-fast) var(--ease),
-    color var(--dur-fast) var(--ease),
-    box-shadow var(--dur-fast) var(--ease);
+    background var(--td-dur-fast) var(--td-ease),
+    border-color var(--td-dur-fast) var(--td-ease),
+    color var(--td-dur-fast) var(--td-ease),
+    box-shadow var(--td-dur-fast) var(--td-ease);
 }
 
 .themeButton:hover {
-  background: var(--primary-light);
+  background: var(--td-tint);
   border-color: transparent;
-  color: var(--primary);
+  color: var(--td-plum);
 }
 
 .themeButton:focus-visible {
@@ -64,8 +64,8 @@
 
 .card h1 {
   margin: 0;
-  color: var(--text-1);
-  font: 650 1.125rem/1.25 var(--font-sans);
+  color: var(--td-ink);
+  font: 650 1.125rem/1.25 var(--td-font);
   letter-spacing: 0;
 }
 
@@ -81,24 +81,24 @@
   min-height: 42px;
   border-radius: var(--r-md);
   padding: 0 14px;
-  font: 650 0.875rem/1 var(--font-sans);
+  font: 650 0.875rem/1 var(--td-font);
   cursor: pointer;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 9px;
   transition:
-    background var(--dur-fast) var(--ease),
-    border-color var(--dur-fast) var(--ease),
-    color var(--dur-fast) var(--ease),
-    box-shadow var(--dur-fast) var(--ease);
+    background var(--td-dur-fast) var(--td-ease),
+    border-color var(--td-dur-fast) var(--td-ease),
+    color var(--td-dur-fast) var(--td-ease),
+    box-shadow var(--td-dur-fast) var(--td-ease);
 }
 
 .primaryButton {
   border: 1px solid transparent;
-  background: var(--primary);
-  color: var(--on-primary);
-  box-shadow: var(--e-1);
+  background: var(--td-plum);
+  color: var(--td-ink-on-plum);
+  box-shadow: var(--td-shadow-sm);
 }
 
 .identityLogo {
@@ -109,32 +109,32 @@
 }
 
 .primaryButton:hover {
-  background: var(--primary-hover);
+  background: var(--td-plum-hover);
   border-color: transparent;
 }
 
 .secondaryButton {
-  border: 1px solid var(--bdr);
-  background: var(--surface-low);
-  color: var(--text-1);
+  border: 1px solid var(--td-line);
+  background: var(--td-surface-2);
+  color: var(--td-ink);
 }
 
 .secondaryButton:hover {
-  border-color: var(--primary);
-  color: var(--primary);
-  background: var(--primary-light);
+  border-color: var(--td-plum);
+  color: var(--td-plum);
+  background: var(--td-tint);
 }
 
 .edgeButton {
-  border: 1px solid color-mix(in oklch, var(--success) 24%, transparent);
+  border: 1px solid color-mix(in oklch, var(--td-moss) 24%, transparent);
   background: var(--success-bg);
-  color: var(--success);
-  box-shadow: var(--e-1);
+  color: var(--td-moss);
+  box-shadow: var(--td-shadow-sm);
 }
 
 .edgeButton:hover:not(:disabled) {
-  background: color-mix(in oklch, var(--success) 12%, var(--success-bg));
-  border-color: color-mix(in oklch, var(--success) 40%, transparent);
+  background: color-mix(in oklch, var(--td-moss) 12%, var(--success-bg));
+  border-color: color-mix(in oklch, var(--td-moss) 40%, transparent);
 }
 
 .edgeButton:disabled {
@@ -151,7 +151,7 @@
 
 .status {
   margin: -8px 0 0;
-  color: var(--text-3);
+  color: var(--td-ink-subtle);
   font: var(--caption);
   text-align: center;
 }
