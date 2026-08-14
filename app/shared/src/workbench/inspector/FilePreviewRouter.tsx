@@ -309,8 +309,8 @@ function NativeImagePreview({ filename }: { filename: string }): React.ReactElem
         flexDirection: 'column',
         alignItems: 'center',
         gap: 8,
-        color: 'var(--text-3)',
-        font: '400 0.75rem var(--font-sans)',
+        color: 'var(--td-ink-subtle)',
+        font: '400 0.75rem var(--td-font)',
       }}>
         <DesignFileIcon className={styles.fileIcon} name={filename} />
         <span>图片预览: {filename}</span>
@@ -327,11 +327,11 @@ function NativeTextPreview({ content }: { content: string }): React.ReactElement
       margin: 0,
       padding: 16,
       overflow: 'auto',
-      font: '400 0.8125rem/1.6 var(--font-mono)',
-      color: 'var(--text-2)',
+      font: '400 0.8125rem/1.6 var(--td-mono)',
+      color: 'var(--td-ink-muted)',
       whiteSpace: 'pre-wrap',
       wordBreak: 'break-word',
-      background: 'var(--surface)',
+      background: 'var(--td-surface)',
       minHeight: 0,
     }}>
       {content}

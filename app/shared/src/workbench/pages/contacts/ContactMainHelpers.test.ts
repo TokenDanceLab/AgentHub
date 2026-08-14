@@ -44,7 +44,7 @@ describe('ContactMainHelpers', () => {
     expect(contactProfileAvatarColor(makeProfile('group'))).toBe('var(--role-researcher)');
     expect(contactProfileAvatarColor(makeProfile('service'))).toBe('var(--role-deployer)');
     expect(contactProfileAvatarColor(makeProfile('member'))).toBe(
-      'linear-gradient(135deg, var(--primary), var(--success))',
+      'linear-gradient(135deg, var(--td-plum), var(--td-moss))',
     );
 
     expect(contactProfileVariant(makeProfile('group'))).toBe('group');

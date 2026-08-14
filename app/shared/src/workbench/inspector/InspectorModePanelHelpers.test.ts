@@ -155,9 +155,9 @@ describe('InspectorModePanelHelpers', () => {
     expect(isDeployInProgress('building')).toBe(true);
     expect(isDeployInProgress('deploying')).toBe(true);
     expect(isDeployInProgress('pending')).toBe(false);
-    expect(deployDotColor('deployed')).toBe('var(--success)');
-    expect(deployDotColor('failed')).toBe('var(--danger)');
-    expect(deployDotColor('pending')).toBe('var(--primary)');
+    expect(deployDotColor('deployed')).toBe('var(--td-moss)');
+    expect(deployDotColor('failed')).toBe('var(--td-danger)');
+    expect(deployDotColor('pending')).toBe('var(--td-plum)');
     expect(formatDeployUrlDisplay('https://example.com/app')).toBe('example.com/app');
     expect(formatDeployUrlDisplay('http://localhost:5173')).toBe('localhost:5173');
   });

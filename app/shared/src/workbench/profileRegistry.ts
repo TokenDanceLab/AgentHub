@@ -48,10 +48,10 @@ export function workbenchAgentColor(profile: Pick<WorkbenchProfileSource, 'id' |
   if (key.includes('researcher')) return 'var(--role-researcher)';
   if (key.includes('orchestrator')) return 'var(--role-orchestrator)';
   if (key.includes('deployer') || key.includes('release')) return 'var(--role-deployer)';
-  if (key.includes('security')) return 'var(--danger)';
+  if (key.includes('security')) return 'var(--td-danger)';
   if (key.includes('browser')) return 'var(--role-deployer)';
-  if (key.includes('data')) return 'var(--warning)';
-  return 'var(--primary)';
+  if (key.includes('data')) return 'var(--td-warning)';
+  return 'var(--td-plum)';
 }
 
 export function isWorkbenchAgentName(name: string, agents: WorkbenchProfileSource[] = []): boolean {

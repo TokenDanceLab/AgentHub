@@ -11,8 +11,8 @@
   display: flex;
   flex-direction: column;
   border: 1px solid var(--glass-border, transparent);
-  border-radius: var(--r-lg);
-  background: var(--glass-panel, var(--surface));
+  border-radius: var(--td-radius-panel);
+  background: var(--glass-panel, var(--td-surface));
   overflow: hidden;
   box-shadow: var(--glass-elev-1);
   backdrop-filter: var(--glass-backdrop-filter);
@@ -24,12 +24,12 @@
 .toolbar {
   min-height: 40px;
   padding: 6px 8px 5px 10px;
-  border-bottom: 1px solid var(--glass-border, var(--bdr));
+  border-bottom: 1px solid var(--glass-border, var(--td-line));
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto auto auto;
   align-items: center;
   gap: var(--sp-xxs);
-  background: var(--glass-bg-light, var(--surface));
+  background: var(--glass-bg-light, var(--td-surface));
 }
 
 /* ── File title block (icon + name + type) ── */
@@ -49,38 +49,38 @@
   align-items: center;
   gap: var(--sp-2);
   padding: var(--sp-2);
-  border-radius: var(--r-sm);
-  background: var(--surface-low);
-  border: 1px solid var(--bdr);
+  border-radius: var(--td-radius-control);
+  background: var(--td-surface-2);
+  border: 1px solid var(--td-line);
 }
 
 .modeTab {
   height: 22px;
   padding: 0 var(--sp-xxs);
   border: 0;
-  border-radius: calc(var(--r-sm) - 1px);
+  border-radius: calc(var(--td-radius-control) - 1px);
   background: transparent;
-  color: var(--text-2);
-  font: 500 0.6875rem/1 var(--font-sans);
+  color: var(--td-ink-muted);
+  font: 500 0.6875rem/1 var(--td-font);
   cursor: pointer;
   transition:
-    background var(--dur-normal) var(--ease),
-    color var(--dur-normal) var(--ease);
+    background var(--td-dur-normal) var(--td-ease),
+    color var(--td-dur-normal) var(--td-ease);
 }
 
 .modeTab:hover:not(:disabled) {
-  color: var(--text-1);
-  background: var(--surface-high);
+  color: var(--td-ink);
+  background: var(--td-surface-3);
 }
 
 .modeTab[aria-selected='true'] {
-  color: var(--primary);
-  background: var(--primary-light);
+  color: var(--td-plum);
+  background: var(--td-tint);
 }
 
 .modeTab:disabled {
   display: none;
-  color: var(--text-3);
+  color: var(--td-ink-subtle);
   cursor: not-allowed;
   opacity: 0.48;
 }
@@ -100,20 +100,20 @@
   justify-content: center;
   padding: 0;
   border: 0;
-  border-radius: var(--r-sm);
+  border-radius: var(--td-radius-control);
   background: transparent;
-  color: var(--text-2);
+  color: var(--td-ink-muted);
   cursor: pointer;
   transition:
-    background var(--dur-normal) var(--ease),
-    border-color var(--dur-normal) var(--ease),
-    color var(--dur-normal) var(--ease);
+    background var(--td-dur-normal) var(--td-ease),
+    border-color var(--td-dur-normal) var(--td-ease),
+    color var(--td-dur-normal) var(--td-ease);
 }
 
 .openWithBtn:hover,
 .openWithBtn[aria-expanded='true'] {
-  color: var(--text-1);
-  background: var(--surface-high);
+  color: var(--td-ink);
+  background: var(--td-surface-3);
 }
 
 .openWithMenu {
@@ -125,10 +125,10 @@
   max-height: 284px;
   overflow-y: auto;
   padding: var(--sp-xxs);
-  border: 1px solid var(--bdr);
+  border: 1px solid var(--td-line);
   border-radius: var(--r-md);
-  background: color-mix(in srgb, var(--surface) 94%, var(--surface-low) 6%);
-  box-shadow: var(--e-3);
+  background: color-mix(in srgb, var(--td-surface) 94%, var(--td-surface-2) 6%);
+  box-shadow: var(--td-shadow-lg);
   scrollbar-width: thin;
   scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
   opacity: 0;
@@ -139,32 +139,32 @@
 .openWithMenu button {
   width: 100%;
   min-height: 30px;
-  padding: 0 var(--sp-sm);
+  padding: 0 var(--td-space-2);
   border: 0;
-  border-radius: var(--r-sm);
+  border-radius: var(--td-radius-control);
   display: flex;
   align-items: center;
   gap: 9px;
   background: transparent;
-  color: var(--text-1);
+  color: var(--td-ink);
   text-align: left;
-  font: 500 0.8125rem var(--font-sans);
+  font: 500 0.8125rem var(--td-font);
   cursor: pointer;
   transition:
-    background var(--dur-normal) var(--ease),
-    color var(--dur-normal) var(--ease),
-    transform var(--dur-pop, var(--dur-medium)) var(--ease-press, var(--ease));
+    background var(--td-dur-normal) var(--td-ease),
+    color var(--td-dur-normal) var(--td-ease),
+    transform var(--dur-pop, var(--dur-medium)) var(--ease-press, var(--td-ease));
 }
 
 .openWithMenu button:hover {
-  background: var(--surface-high);
+  background: var(--td-surface-3);
   transform: translateX(1px);
 }
 
 .openWithIcon {
   width: 20px;
   height: 20px;
-  color: var(--text-3);
+  color: var(--td-ink-subtle);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -206,16 +206,16 @@
 }
 
 .vendorDefault {
-  color: var(--text-3);
+  color: var(--td-ink-subtle);
 }
 
 .vendorTerminal {
-  color: var(--text-1);
+  color: var(--td-ink);
 }
 
 .vendorFolder {
   fill: var(--warning-light);
-  stroke: var(--warning);
+  stroke: var(--td-warning);
 }
 
 .fileIcon {
@@ -226,7 +226,7 @@
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  color: var(--text-3);
+  color: var(--td-ink-subtle);
 }
 
 .fileIcon svg {
@@ -242,8 +242,8 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font: 600 0.8125rem/1.2 var(--font-sans);
-  color: var(--text-1);
+  font: 600 0.8125rem/1.2 var(--td-font);
+  color: var(--td-ink);
 }
 
 
@@ -251,13 +251,13 @@
 .meta {
   min-height: 22px;
   padding: 0 var(--sp-10);
-  border-bottom: 1px solid var(--glass-border, var(--bdr));
+  border-bottom: 1px solid var(--glass-border, var(--td-line));
   display: flex;
   align-items: center;
   gap: 7px;
-  color: var(--text-3);
-  background: var(--glass-bg-subtle, color-mix(in srgb, var(--surface-low) 62%, var(--surface) 38%));
-  font: 500 0.625rem var(--font-sans);
+  color: var(--td-ink-subtle);
+  background: var(--glass-bg-subtle, color-mix(in srgb, var(--td-surface-2) 62%, var(--td-surface) 38%));
+  font: 500 0.625rem var(--td-font);
   overflow: hidden;
 }
 
@@ -273,9 +273,9 @@
   content: '';
   width: 4px;
   height: 4px;
-  margin-right: var(--sp-sm);
+  margin-right: var(--td-space-2);
   border-radius: var(--r-full);
-  background: var(--bdr-strong);
+  background: var(--td-line-strong);
   display: inline-block;
   vertical-align: middle;
 }
@@ -286,9 +286,9 @@
   min-height: 0;
   margin: 0;
   overflow: auto;
-  background: color-mix(in srgb, var(--surface-low) 72%, var(--surface) 28%);
-  color: var(--text-1);
-  font: 400 0.6875rem/1.45 var(--font-mono);
+  background: color-mix(in srgb, var(--td-surface-2) 72%, var(--td-surface) 28%);
+  color: var(--td-ink);
+  font: 400 0.6875rem/1.45 var(--td-mono);
   tab-size: 2;
   scrollbar-width: thin;
   scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
@@ -302,7 +302,7 @@
 .codeInner {
   display: block;
   min-width: max-content;
-  padding: var(--sp-sm) 0;
+  padding: var(--td-space-2) 0;
 }
 
 /* ── Single code line (grid: line-number | content) ── */
@@ -313,17 +313,17 @@
 }
 
 .line:hover {
-  background: var(--primary-light);
+  background: var(--td-tint);
 }
 
 /* ── Line number ── */
 .lineNum {
-  padding-right: var(--sp-sm);
-  color: var(--text-3);
+  padding-right: var(--td-space-2);
+  color: var(--td-ink-subtle);
   text-align: right;
   font-style: normal;
   user-select: none;
-  border-right: 1px solid var(--bdr);
+  border-right: 1px solid var(--td-line);
 }
 
 /* ── Line content ── */
@@ -337,44 +337,44 @@
 .lineContent :global(.token.prolog),
 .lineContent :global(.token.doctype),
 .lineContent :global(.token.cdata) {
-  color: var(--text-3);
+  color: var(--td-ink-subtle);
 }
 
 .lineContent :global(.token.keyword),
 .lineContent :global(.token.atrule),
 .lineContent :global(.token.selector) {
-  color: var(--primary);
+  color: var(--td-plum);
 }
 
 .lineContent :global(.token.function),
 .lineContent :global(.token.class-name) {
-  color: color-mix(in srgb, var(--primary) 78%, var(--text-1) 22%);
+  color: color-mix(in srgb, var(--td-plum) 78%, var(--td-ink) 22%);
 }
 
 .lineContent :global(.token.string),
 .lineContent :global(.token.attr-value) {
-  color: var(--success);
+  color: var(--td-moss);
 }
 
 .lineContent :global(.token.number),
 .lineContent :global(.token.boolean),
 .lineContent :global(.token.constant) {
-  color: var(--warning);
+  color: var(--td-warning);
 }
 
 .lineContent :global(.token.operator),
 .lineContent :global(.token.punctuation) {
-  color: var(--text-2);
+  color: var(--td-ink-muted);
 }
 
 .diffAdd {
   background: var(--diff-add);
-  color: var(--success);
+  color: var(--td-moss);
 }
 
 .diffDel {
   background: var(--diff-del);
-  color: var(--danger);
+  color: var(--td-danger);
 }
 
 .markdownPreview {
@@ -382,8 +382,8 @@
   min-height: 0;
   overflow: auto;
   padding: 14px 18px 24px;
-  background: color-mix(in srgb, var(--surface-low) 72%, var(--surface) 28%);
-  color: var(--text-1);
+  background: color-mix(in srgb, var(--td-surface-2) 72%, var(--td-surface) 28%);
+  color: var(--td-ink);
   font: var(--body);
   line-height: 1.48;
   scrollbar-width: thin;
@@ -392,24 +392,24 @@
 
 .markdownPreview h1 {
   margin: 0 0 var(--sp-10);
-  color: var(--text-1);
-  font: 700 1.125rem/1.2 var(--font-sans);
+  color: var(--td-ink);
+  font: 700 1.125rem/1.2 var(--td-font);
 }
 
 .markdownPreview h2 {
   margin: 13px 0 6px;
-  color: var(--text-1);
-  font: 650 0.9375rem/1.35 var(--font-sans);
+  color: var(--td-ink);
+  font: 650 0.9375rem/1.35 var(--td-font);
 }
 
 .markdownPreview p {
   margin: 0 0 var(--sp-xxs);
-  color: var(--text-2);
+  color: var(--td-ink-muted);
 }
 
 .markdownListItem {
   position: relative;
-  padding-left: var(--sp-md);
+  padding-left: var(--td-space-4);
 }
 
 .markdownListItem::before {
@@ -420,7 +420,7 @@
   width: 4px;
   height: 4px;
   border-radius: 50%;
-  background: var(--text-3);
+  background: var(--td-ink-subtle);
 }
 
 .markdownGap {
@@ -466,7 +466,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: var(--sp-lg);
+  padding: var(--td-space-5);
   overflow: auto;
   min-height: 0;
 }
@@ -475,8 +475,8 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: var(--sp-sm);
-  color: var(--text-3);
-  font: 400 0.75rem var(--font-sans);
+  gap: var(--td-space-2);
+  color: var(--td-ink-subtle);
+  font: 400 0.75rem var(--td-font);
   text-align: center;
 }

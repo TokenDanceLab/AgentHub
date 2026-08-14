@@ -10,17 +10,17 @@
 .option {
   display: flex;
   align-items: center;
-  gap: var(--sp-sm);
+  gap: var(--td-space-2);
   padding: 6px 8px;
-  border-radius: var(--r-sm);
+  border-radius: var(--td-radius-control);
   cursor: pointer;
-  color: var(--text-1);
-  font: 500 0.8125rem / 1.4 var(--font-sans);
+  color: var(--td-ink);
+  font: 500 0.8125rem / 1.4 var(--td-font);
 }
 
 .option:hover,
 .option.active {
-  background: var(--surface-high);
+  background: var(--td-surface-3);
 }
 
 .option:focus-visible {
@@ -48,23 +48,23 @@
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: var(--sp-sm);
+  gap: var(--td-space-2);
   padding: var(--sp-2) var(--sp-xxs) var(--sp-xxs);
 }
 
 .cancel {
   border: 0;
-  border-radius: var(--r-sm);
+  border-radius: var(--td-radius-control);
   padding: 4px 10px;
   background: transparent;
-  color: var(--text-3);
-  font: 500 0.75rem var(--font-sans);
+  color: var(--td-ink-subtle);
+  font: 500 0.75rem var(--td-font);
   cursor: pointer;
 }
 
 .cancel:hover {
-  background: var(--surface-high);
-  color: var(--text-1);
+  background: var(--td-surface-3);
+  color: var(--td-ink);
 }
 
 .cancel:focus-visible,
@@ -75,11 +75,11 @@
 
 .confirm {
   border: 0;
-  border-radius: var(--r-sm);
+  border-radius: var(--td-radius-control);
   padding: 4px 12px;
   background: var(--accent);
   color: var(--accent-foreground);
-  font: 600 0.75rem var(--font-sans);
+  font: 600 0.75rem var(--td-font);
   cursor: pointer;
 }
 
@@ -94,8 +94,8 @@
 
 .empty {
   min-width: 200px;
-  padding: var(--sp-md) var(--sp-sm);
+  padding: var(--td-space-4) var(--td-space-2);
   text-align: center;
-  color: var(--text-3);
-  font: 500 0.75rem var(--font-sans);
+  color: var(--td-ink-subtle);
+  font: 500 0.75rem var(--td-font);
 }

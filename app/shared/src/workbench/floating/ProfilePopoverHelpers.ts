@@ -76,7 +76,7 @@ export function profileAvatarBackground(
   options?: { clearWhenImage?: boolean | undefined; avatarUrl?: string | undefined },
 ): string | undefined {
   if (options?.clearWhenImage && options.avatarUrl) return undefined;
-  return avatarColor || 'var(--primary)';
+  return avatarColor || 'var(--td-plum)';
 }
 
 /** Account head secondary line: "org · status" with safe separators. */

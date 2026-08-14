@@ -28,7 +28,7 @@
   backdrop-filter: blur(var(--glass-blur-lg));
   -webkit-backdrop-filter: blur(var(--glass-blur-lg));
   overflow: hidden;
-  font-family: var(--font-sans, 'Inter', system-ui, sans-serif);
+  font-family: var(--td-font, 'Inter', system-ui, sans-serif);
   color: var(--td-ink);
   transition: border-color 0.2s ease;
 }
@@ -76,7 +76,7 @@
   height: 24px;
   border-radius: 50%;
   background: var(--td-plum);
-  color: var(--on-primary);
+  color: var(--td-ink-on-plum);
   font-size: 0.625rem;
   font-weight: 700;
   text-transform: uppercase;
