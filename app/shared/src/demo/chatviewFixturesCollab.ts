@@ -3,7 +3,7 @@
  * Peel companion of chatviewFixtures (#1132). Pure only; zero behavior change.
  */
 
-import type { TranscriptBlock } from '../transcript/types'
+import type { EvidenceRefStatus, TranscriptBlock } from '../transcript/types'
 import { B, T, U } from './chatviewFixturesHelpers'
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -50,7 +50,7 @@ export const chatviewAgentCollabTranscript: TranscriptBlock[] = [
   { id: 'goto2', kind: 'tool_call', createdAt: T(4), author: O('orch'), toolName: 'Read', status: 'running' },
   { id: 'gotr2', kind: 'tool_result', createdAt: T(5), author: O('orch'), toolName: 'Read', status: 'completed', summary: 'src/auth/jwt.ts · 126 lines · verifyToken extracts { userId, role } from payload, attaches to ctx.state.auth' },
   { id: 'goto3', kind: 'tool_call', createdAt: T(6), author: O('orch'), toolName: 'Grep', status: 'running' },
-  { id: 'gotr3', kind: 'tool_result', createdAt: T(7), author: O('orch'), toolName: 'Grep', status: 'completed', summary: 'src/ → "router\.(get|post|put|patch|delete)" · 34 routes · 12 endpoint files · no role checks in any handler body' },
+  { id: 'gotr3', kind: 'tool_result', createdAt: T(7), author: O('orch'), toolName: 'Grep', status: 'completed', summary: 'src/ → "router.(get|post|put|patch|delete)" · 34 routes · 12 endpoint files · no role checks in any handler body' },
   { id: 'goto4', kind: 'tool_call', createdAt: T(7.2), author: O('orch'), toolName: 'Read', status: 'running' },
   { id: 'gotr4', kind: 'tool_result', createdAt: T(7.4), author: O('orch'), toolName: 'Read', status: 'completed', summary: 'src/router/index.ts · 67 lines · route tree with 34 endpoints grouped into 5 resource modules (users, projects, tasks, billing, admin)' },
 
@@ -284,7 +284,7 @@ export const chatviewAgentCollabTranscript: TranscriptBlock[] = [
   /* ── Approval block for the billing-reader follow-up ── */
   {
     id: 'gap1', kind: 'approval', createdAt: T(42), author: Q('qa'),
-    title: 'Add billing-reader role (1 file change, 5 lines)', status: 'waiting' as any,
+    title: 'Add billing-reader role (1 file change, 5 lines)', status: 'waiting' as unknown as EvidenceRefStatus,
     risk: 'low',
     reason: 'Single-file change: add `billing-reader` to Role enum in rbac-types.ts and add policy entries. No new middleware or logic changes. 0 risk of regression.',
     evidenceRefs: [

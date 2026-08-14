@@ -112,7 +112,7 @@ export const FilePreview: React.FC<FilePreviewProps> = ({
 
   function handleTabsKeyDown(event: React.KeyboardEvent<HTMLDivElement>): void {
     if (modeTabs.length === 0) return;
-    let next = -1;
+    let next: number;
     switch (event.key) {
       case 'ArrowRight':
         next = (rovingTabIndex + 1) % modeTabs.length;
@@ -148,7 +148,7 @@ export const FilePreview: React.FC<FilePreviewProps> = ({
     const handleKey = (event: KeyboardEvent) => {
       const count = openWithItems.length;
       if (count === 0) return;
-      let next = -1;
+      let next: number;
       switch (event.key) {
         case 'ArrowDown':
           next = (openWithActiveIndex + 1) % count;

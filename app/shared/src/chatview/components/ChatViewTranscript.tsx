@@ -173,7 +173,7 @@ const visuallyHiddenStyle: React.CSSProperties = {
  * Takes TranscriptBlock[] from the upstream data source and renders via ChatView component tree.
  * i18n resolved via react-i18next (chatview namespace), co-existing with the consumer's root provider.
  */
-export const ChatViewTranscript = memo(function ChatViewTranscript({ transcript, sessionId, chatMode = 'group', onAgentClick, onBlockContextMenu, onBlockSelect, onBlockAction, onReviewFile, onDeploySubmit, selectedBlockIds, selectionMode, softHiddenBlockIds, actionedBlockIds, highlightedBlockId, onHighlightEnd, pinnedAnnouncement, connectionStatus, typingUserNames, renderUserFooter, unreadDivider }: Props) {
+export const ChatViewTranscript = memo(function ChatViewTranscript({ transcript, sessionId, chatMode = 'group', onAgentClick, onBlockContextMenu, onBlockSelect, onBlockAction, onReviewFile, onDeploySubmit, selectedBlockIds, selectionMode, softHiddenBlockIds, actionedBlockIds, highlightedBlockId, onHighlightEnd, pinnedAnnouncement, typingUserNames, renderUserFooter, unreadDivider }: Props) {
   const items = useMemo(() => {
     try {
       return blocksToTranscriptItems(transcript)

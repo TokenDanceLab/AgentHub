@@ -148,7 +148,6 @@ export function parseUnifiedPatch(patch: string): ParsedPatch {
  * Handles unified patches, legacy before/after inputs, empty diffs, and malformed patches.
  */
 export function normalize(diff: ReviewDiff): ViewDiff {
-  const status = diff.status ? { status: diff.status } : {};
   if (diff.patch) {
     const parsed = parseUnifiedPatch(diff.patch);
     if (parsed.hunks.length > 0) {
@@ -313,20 +312,6 @@ export function isDiff(value: unknown): value is DiffInput {
   if (typeof d.deletions !== 'number') return false;
   if (d.status === undefined || d.status === null) return true;
   return d.status === 'added' || d.status === 'deleted' || d.status === 'modified';
-}
-
-function castDiff(d: Record<string, unknown>): DiffInput {
-  const result: DiffInput = {
-    file: d.file as string,
-    patch: d.patch as string,
-    additions: (d.additions as number) | 0,
-    deletions: (d.deletions as number) | 0,
-  };
-  const s = d.status as string | undefined;
-  if (s === 'added' || s === 'deleted' || s === 'modified') {
-    result.status = s;
-  }
-  return result;
 }
 
 /**

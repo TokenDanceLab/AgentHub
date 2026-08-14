@@ -16,7 +16,6 @@ import type {
   FailureTranscriptBlock,
   ChildAgentTranscriptBlock, SubtaskTranscriptBlock,
   PreviewTranscriptBlock,
-  CompactBoundaryTranscriptBlock,
 } from '../transcript/types'
 import type { RowItem } from './types'
 import {

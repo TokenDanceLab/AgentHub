@@ -28,7 +28,6 @@ import type {
   MemoryEntry,
   MemoryFrontmatter,
   AgentMemory,
-  MEMORY_FILES as MemoryFiles,
 } from './types';
 
 // ── Constants ────────────────────────────────────────────────────────────────

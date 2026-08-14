@@ -76,7 +76,6 @@ export function clampPopoverPosition(params: {
     popoverWidth,
     popoverHeight,
     viewportWidth,
-    viewportHeight,
   } = params;
   const margin = params.margin ?? 6;
   const fitsUp = caretTop - popoverHeight - margin >= 0;

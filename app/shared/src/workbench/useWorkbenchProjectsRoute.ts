@@ -81,7 +81,7 @@ export function useWorkbenchProjectsRoute({
   const portProjectsEnabled = Boolean(projectsPort) && !projects;
 
   // ── Pagination state (consumes the page cursor returned by the port) ──
-  const [pageCursor, setPageCursor] = useState<string | undefined>(undefined);
+  const [_pageCursor, setPageCursor] = useState<string | undefined>(undefined);
   const [hasMore, setHasMore] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [loadMoreError, setLoadMoreError] = useState<string | undefined>(undefined);

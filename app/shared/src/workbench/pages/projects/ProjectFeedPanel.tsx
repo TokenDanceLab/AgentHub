@@ -4,7 +4,6 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import React from 'react';
-import { DesignNavIcon } from '../../designIcons';
 import styles from '../ProjectsPage.module.css';
 import { ProjectSectionHead } from './ProjectPanelHelpers';
 import type { ProjectFeedItem } from './types';
