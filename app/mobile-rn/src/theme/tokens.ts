@@ -104,14 +104,24 @@ export interface AgentHubThemeTokens {
 export const agentHubMobileTokenAliases = {
   '--td-canvas': 'color.canvas',
   '--td-surface': 'color.surface',
+  '--td-surface-2': 'color.surfaceStrong',
+  '--td-surface-3': 'color.surfaceStrong', // RN 无第三台阶，取最强可用
   '--td-tint': 'color.tint',
   '--td-panel': 'color.panel',
   '--td-ink': 'color.ink',
   '--td-ink-50': 'color.inkMuted',
   '--td-ink-muted': 'color.inkMuted',
   '--td-ink-subtle': 'color.inkSubtle',
+  '--td-ink-faint': 'color.inkSubtle', // RN 无 faint 档，取最近可读级
   '--td-line': 'color.line',
+  '--td-line-strong': 'color.line', // RN 无 strong line，与 hairline 同源
+  '--td-line-hover': 'color.line',
   '--td-plum': 'color.accent',
+  '--td-plum-hover': 'color.accent', // RN 无 hover 概念，取 accent
+  '--td-sky': 'color.accent',
+  '--td-brand-soft': 'color.accentSoft',
+  '--td-brand-ring': 'color.focus',
+  '--td-ink-on-plum': 'color.onAccent',
   '--td-moss': 'color.moss',
   '--td-danger': 'color.danger',
   '--td-warning': 'color.warning',
@@ -134,6 +144,7 @@ export const agentHubMobileTokenAliases = {
   '--td-text-xs': 'type.xs',
   '--td-text-sm': 'type.sm',
   '--td-text-base': 'type.base',
+  '--td-text-md': 'type.lg', // RN 无 md 档，16px 最近 type.lg
   '--td-text-lg': 'type.lg',
   '--td-text-xl': 'type.xl',
   '--td-text-caption': 'type.role.caption',
