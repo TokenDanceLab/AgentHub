@@ -2,9 +2,9 @@
   display: inline-flex;
   align-items: center;
   min-height: 24px;
-  padding: var(--space-xs) var(--space-sm);
+  padding: var(--td-space-1) var(--td-space-2);
   border-radius: var(--radius-full);
-  font-size: var(--font-size-xs);
+  font-size: var(--td-text-xs);
   font-weight: var(--font-weight-normal);
   white-space: nowrap;
 }
@@ -12,15 +12,15 @@
 /* ── Status variants ─────────────────────────────────────────────────── */
 .online,
 .done {
-  color: var(--success);
-  background: color-mix(in oklch, var(--success) 12%, transparent);
-  border: 1px solid color-mix(in oklch, var(--success) 20%, transparent);
+  color: var(--td-moss);
+  background: color-mix(in oklch, var(--td-moss) 12%, transparent);
+  border: 1px solid color-mix(in oklch, var(--td-moss) 20%, transparent);
 }
 
 .offline {
-  color: var(--muted-foreground);
+  color: var(--td-ink-muted);
   background: var(--secondary);
-  border: 1px solid var(--border);
+  border: 1px solid var(--td-line);
 }
 
 .running,
@@ -31,14 +31,14 @@
 }
 
 .error {
-  color: var(--destructive);
-  background: color-mix(in oklch, var(--destructive) 12%, transparent);
-  border: 1px solid color-mix(in oklch, var(--destructive) 20%, transparent);
+  color: var(--td-danger);
+  background: color-mix(in oklch, var(--td-danger) 12%, transparent);
+  border: 1px solid color-mix(in oklch, var(--td-danger) 20%, transparent);
 }
 
 .pending,
 .review {
-  color: var(--warning);
-  background: color-mix(in oklch, var(--warning) 12%, transparent);
-  border: 1px solid color-mix(in oklch, var(--warning) 20%, transparent);
+  color: var(--td-warning);
+  background: color-mix(in oklch, var(--td-warning) 12%, transparent);
+  border: 1px solid color-mix(in oklch, var(--td-warning) 20%, transparent);
 }
