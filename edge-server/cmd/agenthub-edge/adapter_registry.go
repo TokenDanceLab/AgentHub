@@ -27,21 +27,21 @@ func applyRunnerProfile(cfg *config) error {
 			cfg.RunnerCommand = cfg.ClaudeCodePath
 		}
 		if cfg.AgentDefault == "" {
-			cfg.AgentDefault = "claude-code"
+			cfg.AgentDefault = "claude-acp"
 		}
 	case runnerProfileCodex:
 		if strings.TrimSpace(cfg.RunnerCommand) == "" {
-			cfg.RunnerCommand = cfg.CodexPath
+			cfg.RunnerCommand = cfg.ClaudeCodePath
 		}
 		if cfg.AgentDefault == "" {
-			cfg.AgentDefault = "codex"
+			cfg.AgentDefault = "codex-acp"
 		}
 	case runnerProfileOpenCode:
 		if strings.TrimSpace(cfg.RunnerCommand) == "" {
-			cfg.RunnerCommand = cfg.OpenCodePath
+			cfg.RunnerCommand = cfg.ClaudeCodePath
 		}
 		if cfg.AgentDefault == "" {
-			cfg.AgentDefault = "opencode"
+			cfg.AgentDefault = "opencode-acp"
 		}
 	default:
 		return fmt.Errorf("unknown --runner-profile %q; supported values: agenthub-runner-mock, claude-code, codex, opencode", cfg.RunnerProfile)
@@ -53,9 +53,7 @@ func buildAdapterRegistry(cfg config) *adapters.Registry {
 	reg := adapters.NewRegistry()
 
 	registerClaudeCodeAdapter(reg, cfg)
-	registerCodexAdapter(reg, cfg)
 	registerCodexACPAdapter(reg, cfg)
-	registerOpenCodeAdapter(reg, cfg)
 	registerOpenCodeACPAdapter(reg, cfg)
 	registerClaudeACPAdapter(reg, cfg)
 	registerManifestAdapters(reg, cfg)
@@ -82,27 +80,10 @@ func registerClaudeCodeAdapter(reg *adapters.Registry, cfg config) {
 	slog.Info("registered adapter", "id", a.Metadata().ID, "path", cfg.ClaudeCodePath)
 }
 
-// registerCodexAdapter registers the codex CLI adapter.
-func registerCodexAdapter(reg *adapters.Registry, cfg config) {
-	if cfg.CodexPath == "" {
-		return
-	}
-	a := adapters.NewCodexAdapter(cfg.CodexPath, cfg.AgentModel)
-	if err := reg.Register(a); err != nil {
-		slog.Warn("failed to register codex adapter", "err", err)
-		return
-	}
-	slog.Info("registered adapter", "id", a.Metadata().ID, "path", cfg.CodexPath)
-}
-
 // registerCodexACPAdapter registers the official codex-acp ACP adapter via
-// npx (ACP migration, first switch target; default off — enable with
-// --codex-acp-path npx.cmd). Cutover = point --agent-default (or per-run
-// agentId) at "codex-acp".
+// npx. ACP is the default codex runtime; an empty launcher falls back to the
+// platform-native npx (defaultNpxPath inside NewCodexACPadapter).
 func registerCodexACPAdapter(reg *adapters.Registry, cfg config) {
-	if cfg.CodexACPPath == "" {
-		return
-	}
 	a := adapters.NewCodexACPadapter(cfg.CodexACPPath)
 	if err := reg.Register(a); err != nil {
 		slog.Warn("failed to register codex-acp adapter", "err", err)
@@ -111,27 +92,10 @@ func registerCodexACPAdapter(reg *adapters.Registry, cfg config) {
 	slog.Info("registered adapter", "id", a.Metadata().ID, "launcher", cfg.CodexACPPath, "version", a.Metadata().Version, "available", a.Available())
 }
 
-// registerOpenCodeAdapter registers the opencode CLI adapter.
-func registerOpenCodeAdapter(reg *adapters.Registry, cfg config) {
-	if cfg.OpenCodePath == "" {
-		return
-	}
-	a := adapters.NewOpenCodeAdapter(cfg.OpenCodePath)
-	if err := reg.Register(a); err != nil {
-		slog.Warn("failed to register opencode adapter", "err", err)
-		return
-	}
-	slog.Info("registered adapter", "id", a.Metadata().ID, "path", cfg.OpenCodePath)
-}
-
 // registerOpenCodeACPAdapter registers the native `opencode acp` subcommand
-// adapter (ACP migration, second switch target; default off — enable with
-// --opencode-acp-path opencode). Cutover = point --agent-default (or per-run
-// agentId) at "opencode-acp".
+// adapter. ACP is the default opencode runtime; an empty path falls back to
+// the platform-native "opencode" binary.
 func registerOpenCodeACPAdapter(reg *adapters.Registry, cfg config) {
-	if cfg.OpencodeACPPath == "" {
-		return
-	}
 	a := adapters.NewOpenCodeACPAdapter(cfg.OpencodeACPPath)
 	if err := reg.Register(a); err != nil {
 		slog.Warn("failed to register opencode-acp adapter", "err", err)
@@ -141,13 +105,11 @@ func registerOpenCodeACPAdapter(reg *adapters.Registry, cfg config) {
 }
 
 // registerClaudeACPAdapter registers the official claude-agent-acp ACP adapter
-// via npx (ACP migration, third switch target; default off — enable with
-// --claude-acp-path npx.cmd). The legacy claude-code NDJSON parser stays
-// registered as a fallback and control (claude_code.go, marked DEPRECATED).
+// via npx. ACP is the default claude runtime; an empty launcher falls back to
+// the platform-native npx (defaultNpxPath inside NewClaudeACPAdapter). The
+// legacy claude-code NDJSON parser stays registered as the orchestrator inner
+// and fallback (claude_code.go, marked DEPRECATED until Phase B).
 func registerClaudeACPAdapter(reg *adapters.Registry, cfg config) {
-	if cfg.ClaudeACPPath == "" {
-		return
-	}
 	a := adapters.NewClaudeACPAdapter(cfg.ClaudeACPPath)
 	if err := reg.Register(a); err != nil {
 		slog.Warn("failed to register claude-acp adapter", "err", err)
@@ -222,8 +184,8 @@ func registerAdapter(reg *adapters.Registry, cfg config) {
 }
 
 func registeredChildAgentIDs(reg *adapters.Registry) []string {
-	ids := make([]string, 0, 3)
-	for _, id := range []string{"claude-code", "codex", "opencode", "anthropic-sdk", "openai-sdk"} {
+	ids := make([]string, 0, 5)
+	for _, id := range []string{"claude-code", "codex-acp", "opencode-acp", "anthropic-sdk", "openai-sdk"} {
 		if _, ok := reg.Get(id); ok {
 			ids = append(ids, id)
 		}

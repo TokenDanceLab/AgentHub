@@ -32,17 +32,12 @@ func TestCodexACPadapterMetadata(t *testing.T) {
 	}
 }
 
-// TestCodexACPadapterCapabilitiesUpgrade asserts the ACP switch payoff: the
-// new adapter streams (Streaming: true) where the legacy batch CodexAdapter
-// reports Streaming: false.
-func TestCodexACPadapterCapabilitiesUpgrade(t *testing.T) {
+// TestCodexACPadapterCapabilities asserts the ACP adapter's streaming and
+// tool capabilities (Streaming: true, the ACP switch payoff).
+func TestCodexACPadapterCapabilities(t *testing.T) {
 	acp := NewCodexACPadapter("")
 	if !acp.Capabilities().Streaming {
 		t.Error("codex-acp must advertise Streaming: true (ACP streaming over stdio)")
-	}
-	legacy := NewCodexAdapter("codex", "")
-	if legacy.Capabilities().Streaming {
-		t.Error("legacy CodexAdapter must keep Streaming: false (batch Phase 1 parser)")
 	}
 	for _, field := range []struct {
 		name string

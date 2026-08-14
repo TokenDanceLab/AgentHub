@@ -135,6 +135,14 @@ func (e *ParseStreamError) Error() string {
 // Unwrap returns the wrapped error for errors.Is/As support.
 func (e *ParseStreamError) Unwrap() error { return e.err }
 
+// PreflightAdapter is an optional interface that adapters can implement to
+// provide a pre-execution readiness check. The process executor calls this
+// before launching the subprocess and fails the run immediately with a
+// descriptive error if the check fails.
+type PreflightAdapter interface {
+	PreflightCheck() error
+}
+
 // _ is a compile-time assertion that the contract types stay importable
 // through this package for existing call sites (A-V1 Step 2, #1566).
 var _ = orchestration.AgentAdapter(nil)
