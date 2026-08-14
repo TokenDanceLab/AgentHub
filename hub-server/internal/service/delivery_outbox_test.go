@@ -195,6 +195,33 @@ func TestOutbox_MarkSentIdempotent(t *testing.T) {
 	assert.Equal(t, DeliveryStatusSent, status)
 }
 
+func TestOutbox_MarkSentOnAlreadySentRestartsAckWindow(t *testing.T) {
+	svc := newAgentServiceForOutbox(t)
+	ctx := context.Background()
+
+	deliveryID, err := svc.RecordDelivery(ctx, "task-sent-bump", `{}`, "")
+	require.NoError(t, err)
+	require.NoError(t, svc.MarkDeliverySent(ctx, deliveryID))
+
+	// Age the row so it would be eligible for the ack-window rescan.
+	oldTime := time.Now().Add(-2 * DeliverySentTimeout)
+	require.NoError(t, svc.db.WithContext(ctx).Exec(
+		`UPDATE delivery_outbox SET updated_at = ? WHERE delivery_id = ?`, oldTime, deliveryID,
+	).Error)
+
+	// A replay push to a live desktop re-marks sent → the ack window restarts.
+	require.NoError(t, svc.MarkDeliverySent(ctx, deliveryID))
+
+	status, err := svc.GetDeliveryStatus(ctx, deliveryID)
+	require.NoError(t, err)
+	assert.Equal(t, DeliveryStatusSent, status)
+
+	var rec deliveryOutboxRecord
+	require.NoError(t, svc.db.WithContext(ctx).Where("delivery_id = ?", deliveryID).First(&rec).Error)
+	assert.True(t, rec.UpdatedAt.After(oldTime), "ack window must restart after replay re-mark")
+	assert.Equal(t, 0, rec.AttemptCount)
+}
+
 // ==================== TestOutbox_AckNotFound ====================
 
 func TestOutbox_AckNotFound(t *testing.T) {
@@ -1427,7 +1454,7 @@ func TestOutbox_ShouldReplayOfflinePayloadCoordination(t *testing.T) {
 	// Pure ownership matrix for reconnect offline push vs outbox status (#1031).
 	assert.True(t, dispatch.ShouldReplayOfflinePayload("d1", DeliveryStatusPending, true))
 	assert.True(t, dispatch.ShouldReplayOfflinePayload("d1", DeliveryStatusRetrying, true))
-	assert.False(t, dispatch.ShouldReplayOfflinePayload("d1", DeliveryStatusSent, true))
+	assert.True(t, dispatch.ShouldReplayOfflinePayload("d1", DeliveryStatusSent, true), "alive sent rows must replay on reconnect")
 	assert.False(t, dispatch.ShouldReplayOfflinePayload("d1", DeliveryStatusDelivered, true))
 	assert.False(t, dispatch.ShouldReplayOfflinePayload("d1", DeliveryStatusDead, true))
 	assert.True(t, dispatch.ShouldReplayOfflinePayload("", DeliveryStatusSent, true))
