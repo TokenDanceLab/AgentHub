@@ -2,10 +2,10 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: var(--space-sm, 0.5rem);
+  gap: var(--td-space-2, 0.5rem);
   border: 1px solid transparent;
   border-radius: var(--r-md);
-  font-family: var(--font-sans);
+  font-family: var(--td-font);
   font-weight: var(--font-weight-medium, 500);
   cursor: pointer;
   white-space: nowrap;
@@ -34,15 +34,15 @@
 
 /* ── Sizes ─────────────────────── */
 
-.sm { height: 32px; padding: 0 10px; font-size: var(--font-size-xs, 0.75rem); border-radius: var(--r-sm); }
-.md { height: 36px; padding: 0 14px; font-size: var(--font-size-sm, 0.875rem); }
-.lg { height: 44px; padding: 0 20px; font-size: var(--font-size-base, 1rem); border-radius: var(--r-lg); }
+.sm { height: 32px; padding: 0 10px; font-size: var(--td-text-xs, 0.75rem); border-radius: var(--td-radius-control); }
+.md { height: 36px; padding: 0 14px; font-size: var(--td-text-sm, 0.875rem); }
+.lg { height: 44px; padding: 0 20px; font-size: var(--td-text-base, 1rem); border-radius: var(--td-radius-panel); }
 
 /* ── Variants ──────────────────── */
 
 .primary {
-  background: var(--primary);
-  color: var(--primary-foreground);
+  background: var(--td-plum);
+  color: var(--td-ink-on-plum);
 }
 .primary:hover:not(:disabled) {
   filter: brightness(1.1);
@@ -55,7 +55,7 @@
 .secondary {
   background: var(--secondary);
   color: var(--secondary-foreground);
-  border-color: var(--border);
+  border-color: var(--td-line);
 }
 .secondary:hover:not(:disabled) {
   background: var(--accent);
@@ -67,11 +67,11 @@
 
 .ghost {
   background: transparent;
-  color: var(--muted-foreground);
+  color: var(--td-ink-muted);
 }
 .ghost:hover:not(:disabled) {
   background: var(--secondary);
-  color: var(--foreground);
+  color: var(--td-ink);
 }
 .ghost:focus-visible:not(:disabled) {
   outline: none;
@@ -79,7 +79,7 @@
 }
 
 .destructive {
-  background: var(--destructive);
+  background: var(--td-danger);
   color: var(--destructive-foreground);
 }
 .destructive:hover:not(:disabled) {
@@ -91,9 +91,9 @@
 }
 
 .gradient {
-  color: var(--primary-foreground, #fff);
+  color: var(--td-ink-on-plum, #fff);
   font-weight: 700;
-  background: var(--brand);
+  background: var(--td-plum);
   box-shadow: 0 10px 22px oklch(0.55 0.16 255 / 0.24);
 }
 .gradient:hover:not(:disabled) {
@@ -125,7 +125,7 @@
   border-radius: var(--r-md);
   background: var(--secondary);
   color: var(--secondary-foreground);
-  border-color: var(--border);
+  border-color: var(--td-line);
 }
 .icon:hover:not(:disabled) {
   background: var(--accent);
@@ -137,13 +137,13 @@
   .sm {
     min-height: var(--touch-target-min, 44px);
     padding: 0 12px;
-    font-size: var(--font-size-sm, 0.875rem);
+    font-size: var(--td-text-sm, 0.875rem);
   }
 
   .md {
     min-height: var(--touch-target-min, 44px);
     padding: 0 16px;
-    font-size: var(--font-size-base, 1rem);
+    font-size: var(--td-text-base, 1rem);
   }
 
   .lg {

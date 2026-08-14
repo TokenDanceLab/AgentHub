@@ -5,7 +5,7 @@
 .overlay {
   position: fixed;
   inset: 0;
-  z-index: var(--z-modal, 1000);
+  z-index: var(--td-z-modal, 1000);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -25,8 +25,8 @@
   flex-direction: column;
   width: min(92vw, 1200px);
   max-height: 92vh;
-  border-radius: var(--r-lg);
-  background: var(--card);
+  border-radius: var(--td-radius-panel);
+  background: var(--td-surface);
   box-shadow: 0 24px 48px rgba(0, 0, 0, 0.35);
   overflow: hidden;
 }
@@ -48,17 +48,17 @@
 .header {
   display: flex;
   align-items: center;
-  gap: var(--space-sm);
-  padding: var(--space-sm) var(--space-md);
-  border-bottom: 1px solid var(--border);
+  gap: var(--td-space-2);
+  padding: var(--td-space-2) var(--td-space-3);
+  border-bottom: 1px solid var(--td-line);
   flex-shrink: 0;
 }
 
 .title {
   flex: 1;
-  font-size: var(--font-size-sm);
+  font-size: var(--td-text-sm);
   font-weight: var(--font-weight-semibold);
-  color: var(--foreground);
+  color: var(--td-ink);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

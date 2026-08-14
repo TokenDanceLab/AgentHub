@@ -8,7 +8,7 @@
    users still see the shape; only the pulse animation is motion-gated. */
 .line {
   display: block;
-  border-radius: var(--r-sm);
+  border-radius: var(--td-radius-control);
   background: oklch(0 0 0 / 0.08);
 }
 
