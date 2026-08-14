@@ -127,6 +127,13 @@
   --z-context-menu: 80;
   --z-demo-toast: 90;
 
+  /* TokenDance contract z-stacking (design-system.md §4.3) */
+  --td-z-nav:     var(--z-sticky);
+  --td-z-overlay: var(--z-overlay);
+  --td-z-popover: var(--z-popover);
+  --td-z-modal:   var(--z-modal);
+  --td-z-toast:   var(--z-toast);
+
   /* ── Focus Ring ──────────────────────────────────────────────────── */
   --ring-width:  2px;
   --ring-offset: 2px;
@@ -165,6 +172,13 @@
   --ease-in:         cubic-bezier(0.4, 0, 1, 1);
   --ease-standard:   var(--ease);
   --ease-emphasized: var(--ease-spring);
+
+  /* TokenDance contract motion aliases (design-system.md §4.3) */
+  --td-dur-fast:   var(--dur-fast);
+  --td-dur-normal: var(--dur-normal);
+  --td-dur-slow:   var(--dur-slow);
+  --td-ease:       var(--ease);
+  --td-ease-out:   var(--ease-out);
 
   /* ── Spinner ────────────────────────────────────────────────── */
   --spinner-speed: 0.8s;

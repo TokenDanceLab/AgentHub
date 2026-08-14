@@ -191,6 +191,20 @@ html[data-theme-sync='true'] *::after {
   --td-shadow-panel: var(--td-shadow-md);
   --td-shadow-hairline: 0 0 0 1px var(--td-line);
 
+  /* TokenDance contract — extended surface/ink/line/brand ramp (design-system.md §4.1) */
+  --td-surface-2: var(--surface-high);
+  --td-surface-3: var(--surface-highest);
+  --td-ink-subtle: var(--text-3);
+  --td-ink-faint: var(--text-weakest);
+  --td-line-strong: var(--bdr-strong);
+  --td-line-hover: var(--bdr-strong);   /* 暂无独立 hover-line 值，先与 strong 同源 */
+  --td-plum-hover: var(--primary-hover);
+  --td-sky: var(--primary-hover);       /* brand highlight；如需独立色相再拆 */
+  --td-brand-soft: var(--primary-soft);
+  --td-brand-ring: var(--ring);
+  --td-ink-on-plum: var(--primary-foreground);
+  --td-text-md: var(--font-size-base);
+
   /* ── Chat surface tokens ────────────────────── */
   --chat-agent-bg: transparent;
   --chat-user-bg: rgba(255,255,255,0.045);
@@ -438,6 +452,20 @@ html[data-theme-sync='true'] *::after {
   --td-shadow-lg: var(--e-3);
   --td-shadow-panel: var(--td-shadow-md);
   --td-shadow-hairline: 0 0 0 1px var(--td-line);
+
+  /* TokenDance contract — extended surface/ink/line/brand ramp (design-system.md §4.1) */
+  --td-surface-2: var(--surface-high);
+  --td-surface-3: var(--surface-highest);
+  --td-ink-subtle: var(--text-3);
+  --td-ink-faint: var(--text-weakest);
+  --td-line-strong: var(--bdr-strong);
+  --td-line-hover: var(--bdr-strong);   /* 暂无独立 hover-line 值，先与 strong 同源 */
+  --td-plum-hover: var(--primary-hover);
+  --td-sky: var(--primary-hover);       /* brand highlight；如需独立色相再拆 */
+  --td-brand-soft: var(--primary-soft);
+  --td-brand-ring: var(--ring);
+  --td-ink-on-plum: var(--primary-foreground);
+  --td-text-md: var(--font-size-base);
 
   /* ── Chat surface tokens ────────────────────── */
   --chat-agent-bg: transparent;
