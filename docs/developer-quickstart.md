@@ -162,7 +162,7 @@ E2E/Visual QA 只证明实际跑过的层级；PR 中写明证据等级（`fixtu
 
 唯一发布入口：本地打 tag → `git push origin <tag>` → release.yml 构建并出 GitHub Release。
 
-1. 前置：master 全绿；`app/desktop/package.json`、`src-tauri/tauri.conf.json`、`src-tauri/Cargo.toml` 版本一致（校验 `scripts/release/verify-release-gate.py`）。
+1. 前置：master 全绿；`app/desktop/package.json`、`src-tauri/tauri.conf.json`、`src-tauri/Cargo.toml` 版本一致（校验 `scripts/release/verify-release-gate.py`）。Linux 桌面构建可在发布前手动预检：`gh workflow run checks.yml` 跑 `desktop-linux-build`（`tauri build --no-bundle`，不产出安装包、不需签名密钥）。
 2. 版本选择（AGENTS.md §12）：默认升 patch；升 minor 需产品理由；RC 走 `vX.Y.Z-rc.N`。
 3. 打 tag：`git tag vX.Y.Z`；commit 须在 master 祖先链、格式 `^v\d+\.\d+\.\d+(-rc\.\d+)?$`（release.yml tag-guard 双重守卫）；`git push origin <tag>` 触发构建发布。
 4. 产物与签名：build-desktop（Windows NSIS + portable）恒定；build-desktop-linux（AppImage + deb，GitHub Releases 手动更新，AppImage auto-updater 另记账债）恒定；macOS 桌面已停用（2026-08-11）；build-mobile 由 `RELEASE_MOBILE_ENABLED=true` 门控；无商业证书时设 `RELEASE_UNSIGNED_OK=true`（SmartScreen 提示、updater 自签），有证书后用 `RELEASE_SIGNING_APPROVED=true`。git-cliff 生成中英双语 changelog（`cliff.toml`）+ `SHA256SUMS`，标题 `AgentHub vX.Y.Z`。冻结开关：`verify-release-gate.py` 末尾两条无条件 Blocker 是发布冻结开关，等管理员批准后再发布；不是故障。
