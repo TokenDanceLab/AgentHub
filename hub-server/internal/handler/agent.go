@@ -164,7 +164,10 @@ func (h *AgentHandler) TaskAck(c *gin.Context) {
 	} else {
 		slog.Warn("TaskAck received nil body", "task_id", c.Param("id"))
 	}
-	taskID := c.Param("id")
+	taskID, ok := taskIDParam(c)
+	if !ok {
+		return
+	}
 	edgeUserID := c.GetString("user_id")
 	edgeDeviceID := c.GetString("device_id")
 	if err := h.service.HandleTaskAck(c.Request.Context(), edgeUserID, edgeDeviceID, taskID, req.normalizedRunID()); err != nil {
@@ -208,7 +211,10 @@ func (h *AgentHandler) TaskStream(c *gin.Context) {
 		Fail(c, errcode.ErrBadRequest)
 		return
 	}
-	taskID := c.Param("id")
+	taskID, ok := taskIDParam(c)
+	if !ok {
+		return
+	}
 	edgeUserID := c.GetString("user_id")
 	edgeDeviceID := c.GetString("device_id")
 	stream := req.normalizedStream()
@@ -386,7 +392,10 @@ func (h *AgentHandler) TaskDone(c *gin.Context) {
 		Fail(c, errcode.ErrBadRequest)
 		return
 	}
-	taskID := c.Param("id")
+	taskID, ok := taskIDParam(c)
+	if !ok {
+		return
+	}
 	edgeUserID := c.GetString("user_id")
 	edgeDeviceID := c.GetString("device_id")
 	if err := h.service.HandleTaskDone(c.Request.Context(), edgeUserID, edgeDeviceID, taskID, req.normalizedRunID(), req.FinalContent); err != nil {
@@ -414,7 +423,10 @@ func (h *AgentHandler) TaskFail(c *gin.Context) {
 		Fail(c, errcode.ErrBadRequest)
 		return
 	}
-	taskID := c.Param("id")
+	taskID, ok := taskIDParam(c)
+	if !ok {
+		return
+	}
 	edgeUserID := c.GetString("user_id")
 	edgeDeviceID := c.GetString("device_id")
 	if err := h.service.HandleTaskFail(c.Request.Context(), edgeUserID, edgeDeviceID, taskID, req.normalizedRunID(), req.Error); err != nil {
