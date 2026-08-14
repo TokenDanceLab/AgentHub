@@ -62,6 +62,18 @@ type ProcessExecutor struct {
 	surfacers   map[string]*adapters.WorkdirSnapshot // runID to pre-run snapshot (for auto-surface detection)
 	cancelDone  map[string]chan struct{}             // runID to done channel for graceful shutdown goroutines
 	callbackSem chan struct{}                        // bounds concurrent hub callbacks (max 10); stream acquires non-blocking, terminal blocks
+
+	// pendingParentFinish holds parent runs whose terminal finish is deferred
+	// until all of their sub-agents complete (orchestration). Keyed by parent
+	// run ID; the ResultAggregator finalizes these via FinalizeParentRun.
+	pendingParentFinish map[string]deferredParentFinish
+}
+
+// deferredParentFinish is the terminal-finish snapshot for an orchestrator
+// parent run waiting on its sub-agents.
+type deferredParentFinish struct {
+	run         store.Run
+	finalStatus string
 }
 
 // NewProcessExecutor creates a ProcessExecutor that manages agent run lifecycles.

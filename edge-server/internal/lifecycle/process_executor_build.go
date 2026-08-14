@@ -267,6 +267,9 @@ func (e *ProcessExecutor) collectAndWaitOutput(
 //	*outcomeRetry      — a session-conflict retry is requested; caller continues the loop.
 //	*outcomeBreak      — the wait error is non-recoverable; caller breaks to fault escalation.
 //	*outcomeHandoff    — fault-escalation successor already launched; caller returns (terminalFinish=false).
+//	*outcomeDeferred   — an orchestrator parent with active sub-agents: the terminal
+//	                     publish is deferred to FinalizeParentRun (via ResultAggregator);
+//	                     the caller returns; finish() skips the cascade-cancel.
 type attemptOutcome int
 
 const (
@@ -274,6 +277,7 @@ const (
 	outcomeRetry
 	outcomeBreak
 	outcomeHandoff
+	outcomeDeferred
 )
 
 // completeRunAttempt runs Phase 3 of the attempt loop. ctx is the run context
@@ -371,6 +375,23 @@ func (e *ProcessExecutor) completeRunAttempt(
 		if evidencePlan.LogFailure {
 			slog.Warn("process: evidence gate verification failed", "runId", run.ID, "projectType", evidenceResult.ProjectType, "summary", evidenceResult.Summary)
 		}
+	}
+
+	// Orchestration deferral: an orchestrator parent whose sub-agents are
+	// still running must not terminal-finish yet — finish() would
+	// cascade-cancel the children (Codex AgentTree shutdown), aborting the
+	// multi-agent workflow right after dispatch. Park the terminal publish;
+	// the ResultAggregator finalizes the parent via FinalizeParentRun when
+	// the last child completes (or the collector timeout fires).
+	if planParentWaitChildren(e.agentRegistry != nil, e.hasActiveChildren(run.ID)).Defer {
+		e.mu.Lock()
+		if e.pendingParentFinish == nil {
+			e.pendingParentFinish = make(map[string]deferredParentFinish)
+		}
+		e.pendingParentFinish[run.ID] = deferredParentFinish{run: run, finalStatus: finalStatus}
+		e.mu.Unlock()
+		slog.Info("process: parent waiting for sub-agents before finish", "runId", run.ID)
+		return outcomeDeferred
 	}
 
 	finished, ok := e.store.SetRunStatusIf(run.ID, finalStatus, "started")

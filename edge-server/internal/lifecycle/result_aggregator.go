@@ -40,6 +40,11 @@ type ResultAggregator struct {
 	// emitter is a function that publishes events. It defaults to
 	// ra.bus.Publish but can be overridden in tests.
 	emitter func(evtType string, scope map[string]any, payload any)
+
+	// finalizeParent is invoked after all children of a parent complete, so
+	// an orchestrator parent whose terminal finish was parked
+	// (completeRunAttempt outcomeDeferred) can finalize. May be nil.
+	finalizeParent func(parentRunID string)
 }
 
 // NewResultAggregator creates a result aggregator that subscribes to the event
@@ -60,6 +65,15 @@ func NewResultAggregator(bus *events.Bus, registry *agents.Registry) *ResultAggr
 //     children exceed the configured timeout
 func (ra *ResultAggregator) WithCollector(c *SubAgentResultCollector) *ResultAggregator {
 	ra.collector = c
+	return ra
+}
+
+// WithParentFinalizer attaches the callback that finalizes an orchestrator
+// parent run whose terminal finish was parked while its sub-agents were
+// running. The callback fires when all children complete (and on the
+// collector timeout path that emits partial results).
+func (ra *ResultAggregator) WithParentFinalizer(f func(parentRunID string)) *ResultAggregator {
+	ra.finalizeParent = f
 	return ra
 }
 
@@ -187,6 +201,12 @@ func (ra *ResultAggregator) checkAllChildrenComplete(parentID string) {
 	if allComplete && len(children) > 0 {
 		slog.Info("all sub-agents complete", "parentId", parentID, "childCount", len(children))
 		ra.emitAggregatedResult(parentID, false)
+		// Finalize an orchestrator parent whose terminal finish was parked
+		// while its sub-agents were running (see completeRunAttempt
+		// outcomeDeferred). No-op for parents that finished normally.
+		if ra.finalizeParent != nil {
+			ra.finalizeParent(parentID)
+		}
 	}
 }
 
@@ -255,6 +275,11 @@ func (ra *ResultAggregator) checkTimeouts() {
 			continue
 		}
 		ra.emitAggregatedResult(parentID, true)
+		// A timed-out parent must still finalize: emit the partial result,
+		// then park-finish the parent so its cascade cancels the stragglers.
+		if ra.finalizeParent != nil {
+			ra.finalizeParent(parentID)
+		}
 	}
 }
 

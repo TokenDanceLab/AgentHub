@@ -112,6 +112,13 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 			// terminal finish.
 			terminalFinish = false
 			return
+		case outcomeDeferred:
+			// Orchestrator parent with active sub-agents: the terminal
+			// publish is parked and owned by FinalizeParentRun (invoked by
+			// the ResultAggregator). The deferred finish() still runs for
+			// map cleanup, but skips the cascade-cancel while the parent
+			// entry stays in pendingParentFinish.
+			return
 		}
 	}
 

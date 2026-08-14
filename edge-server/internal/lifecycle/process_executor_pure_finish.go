@@ -154,6 +154,20 @@ func planFinishCleanup(hasRegistry, hasCancelDone, hasRunOutput bool) finishClea
 	}
 }
 
+// parentWaitChildrenPlan is the pure orchestration-deferral gate for
+// completeRunAttempt: whether the parent's terminal finish must be parked
+// until its sub-agents complete.
+type parentWaitChildrenPlan struct {
+	Defer bool
+}
+
+// planParentWaitChildren decides whether an orchestrator parent run should
+// defer its terminal finish. Only parents with a registry AND at least one
+// active (non-terminal) child defer; plain runs finish immediately.
+func planParentWaitChildren(hasRegistry, hasActiveChildren bool) parentWaitChildrenPlan {
+	return parentWaitChildrenPlan{Defer: hasRegistry && hasActiveChildren}
+}
+
 // surfaceArtifactsPlan is the pure auto-surface gate for surfaceRunArtifacts.
 type surfaceArtifactsPlan struct {
 	Proceed       bool
