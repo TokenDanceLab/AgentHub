@@ -369,10 +369,12 @@ func runACPSession(ctx context.Context, stdout io.Reader, stdin io.Writer, emitt
 	// 3. session/prompt. During this call the SDK dispatches all inbound
 	// session/update notifications (→ SessionUpdate → run.agent.*) and
 	// blocking requests (→ handler TODOs, #1404) concurrently.
+	slog.Debug("acp: sending session/prompt", "run_id", run.ID, "session_id", sessResp.SessionId)
 	promptResp, err := conn.Prompt(ctx, acp.PromptRequest{
 		SessionId: sessResp.SessionId,
 		Prompt:    []acp.ContentBlock{acp.TextBlock(rc.Prompt)},
 	})
+	slog.Debug("acp: session/prompt returned", "run_id", run.ID, "stop_reason", promptResp.StopReason, "err", err)
 	if err != nil {
 		return NewNonRecoverableParseError(fmt.Errorf("acp: session/prompt failed: %w", err))
 	}

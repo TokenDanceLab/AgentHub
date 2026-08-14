@@ -50,6 +50,17 @@ func (e *ProcessExecutor) publishStructuredOutput(wg *sync.WaitGroup, run store.
 	emitter = adapters.NewSecureEmitter(ctx, emitter, hooks)
 
 	err := adapter.ParseStream(ctx, stdout, stdin, emitter, run)
+
+	// Close stdin after the turn so a long-running subprocess (the ACP agent,
+	// e.g. npx → claude-agent-acp → claude) sees EOF and exits. The ACP agent
+	// does not self-terminate after a single turn; without this close the
+	// executor's process-wait blocks on the still-open stderr pipe forever and
+	// the run never finalizes out of "started". Legacy one-shot CLI adapters
+	// (claude -p) have already exited by this point, so the close is a no-op.
+	if closer, ok := stdin.(io.Closer); ok {
+		_ = closer.Close()
+	}
+
 	parsePlan := planStructuredParsePost(err, transcriptEmitter != nil)
 	if parsePlan.RecordError {
 		slog.Error("structured output parse error", "runId", run.ID, "error", err)
