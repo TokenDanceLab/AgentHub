@@ -10,8 +10,8 @@ func TestResolveModelAlias(t *testing.T) {
 	}{
 		{"claude-code", "sonnet", "claude-sonnet-4-6"},
 		{"claude-code", "opus", "claude-opus-4-7"},
-		{"codex", "gpt-5", "gpt-5.3-codex"},
-		{"opencode", "sonnet", "newapi/deepseek-v4-pro"},
+		{"anthropic-sdk", "sonnet", "claude-sonnet-4-6"},
+		{"openai-sdk", "gpt-5", "gpt-5.5"},
 		// Passthrough for unknown model
 		{"claude-code", "custom-model", "custom-model"},
 		// Passthrough for unknown agent
@@ -36,10 +36,8 @@ func TestResolveReasoningEffort(t *testing.T) {
 		want    string
 	}{
 		{"claude-code", "high", "high"},
-		{"codex", "low", "minimal"},
-		{"codex", "max", "xhigh"},
-		{"opencode", "low", "minimal"},
-		{"opencode", "high", "high"},
+		{"anthropic-sdk", "max", "max"},
+		{"openai-sdk", "low", "low"},
 		// Passthrough for unknown effort
 		{"claude-code", "custom", "custom"},
 		// Unknown agent passthrough
@@ -70,15 +68,11 @@ func TestResolveModelWithDefault(t *testing.T) {
 		t.Errorf("got %q, want claude-sonnet-4-6 (default)", got)
 	}
 
-	// codex default
-	got = ResolveModelWithDefault("codex", "")
-	if got != "gpt-5.5" {
-		t.Errorf("got %q, want gpt-5.5 (default)", got)
+	// SDK defaults
+	if got := ResolveModelWithDefault("openai-sdk", ""); got != "gpt-5.5" {
+		t.Errorf("got %q, want gpt-5.5 (openai-sdk default)", got)
 	}
-
-	// opencode default
-	got = ResolveModelWithDefault("opencode", "")
-	if got != "newapi/deepseek-v4-pro" {
-		t.Errorf("got %q, want newapi/deepseek-v4-pro (opencode default)", got)
+	if got := ResolveModelWithDefault("anthropic-sdk", ""); got != "claude-sonnet-4-6" {
+		t.Errorf("got %q, want claude-sonnet-4-6 (anthropic-sdk default)", got)
 	}
 }
