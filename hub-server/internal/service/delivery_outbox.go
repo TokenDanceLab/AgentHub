@@ -90,6 +90,14 @@ func (o *DeliveryOutbox) RecordDelivery(ctx context.Context, taskID, payload, ed
 // to the Edge. Clears next_retry_at so the SentRetryCutoff ack-window governs
 // the next scan rather than the retry cadence (avoids duplicate Edge runs).
 // Already-sent/acked rows are a no-op (RowsAffected==0 tolerated).
+//
+// It also resets attempt_count to 0: a successful (re)dispatch proves the
+// payload is durably queued/sent, so the dead-letter budget counts only
+// CONSECUTIVE failed attempts. Without the reset, an offline-queued delivery
+// whose every redispatch succeeds still exhausts max_attempts and goes dead
+// within minutes — and the reconnect replay gate refuses to replay dead rows
+// (outbox "owns" redelivery), permanently stranding the queued task for any
+// desktop that reconnects later (#1031 offline replay contract).
 func (o *DeliveryOutbox) MarkDeliverySent(ctx context.Context, deliveryID string) error {
 	// Explicit updated_at: model uses autoUpdateTime:false so map Updates must
 	// bump it — SentRetryCutoff scans on updated_at for ack-window eligibility.
@@ -97,6 +105,7 @@ func (o *DeliveryOutbox) MarkDeliverySent(ctx context.Context, deliveryID string
 		[]string{DeliveryStatusPending, DeliveryStatusRetrying},
 		map[string]interface{}{
 			"status":        DeliveryStatusSent,
+			"attempt_count": 0,
 			"next_retry_at": nil,
 			"updated_at":    time.Now(),
 		})

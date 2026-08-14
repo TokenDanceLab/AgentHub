@@ -778,7 +778,9 @@ func TestOutbox_RetryLoopInvokesRedispatcher(t *testing.T) {
 	err = db.WithContext(ctx).Where("delivery_id = ?", "del-port").First(&rec).Error
 	require.NoError(t, err)
 	assert.Nil(t, rec.NextRetryAt)
-	assert.Equal(t, 1, rec.AttemptCount)
+	// Successful redispatch resets the attempt budget — the dead-letter
+	// counter counts consecutive FAILED attempts, not successful requeues.
+	assert.Equal(t, 0, rec.AttemptCount)
 
 	// Opaque redispatch port invoked with stored payload bytes.
 	require.Len(t, fake.calls, 1)
@@ -786,6 +788,55 @@ func TestOutbox_RetryLoopInvokesRedispatcher(t *testing.T) {
 	assert.Equal(t, "del-port", fake.calls[0].deliveryID)
 	assert.Equal(t, payload, fake.calls[0].payloadJSON)
 	assert.Equal(t, "dev-port", fake.calls[0].edgeDeviceID)
+}
+
+func TestOutbox_RetryLoopSuccessfulRedispatchDoesNotDeadLetter(t *testing.T) {
+	db := newOutboxDB(t)
+	ctx := context.Background()
+	fake := &fakeRedispatcher{}
+	outbox := NewDeliveryOutbox(db, fake)
+
+	now := time.Now()
+	rawDB, err := db.DB()
+	require.NoError(t, err)
+
+	// Seed a sent delivery past DeliverySentTimeout. This models an
+	// offline-queued task: every redispatch succeeds (the offline queue keeps
+	// accepting), and no edge has acked yet.
+	oldSentTime := now.Add(-DeliverySentTimeout - time.Second)
+	payload := `{"task_id":"task-live-queue","opaque":true}`
+	_, err = rawDB.Exec(
+		`INSERT INTO delivery_outbox (id, task_id, delivery_id, payload, status, attempt_count, max_attempts, edge_device_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		"live-sent", "task-live-queue", "del-live", payload, DeliveryStatusSent, 0, DefaultMaxDeliveryAttempts, "dev-live", oldSentTime, oldSentTime,
+	)
+	require.NoError(t, err)
+
+	// Drive far more retry cycles than the dead-letter budget (max 3).
+	// A successful redispatch proves the payload is still durably queued, so
+	// the delivery must stay alive — otherwise the reconnect replay gate
+	// refuses dead rows and a desktop reconnecting later misses the task.
+	for i := 0; i < 6; i++ {
+		outbox.retryDeliveries(ctx)
+		// Re-age updated_at so the sent row is eligible for the next scan
+		// (simulates the ack-window elapsing again).
+		_, err = rawDB.Exec(
+			`UPDATE delivery_outbox SET updated_at = ? WHERE delivery_id = ?`,
+			now.Add(-DeliverySentTimeout-time.Second), "del-live",
+		)
+		require.NoError(t, err)
+	}
+
+	status, err := outbox.GetDeliveryStatus(ctx, "del-live")
+	require.NoError(t, err)
+	assert.Equal(t, DeliveryStatusSent, status, "successful redispatch cycles must not dead-letter")
+
+	var rec deliveryOutboxRecord
+	err = db.WithContext(ctx).Where("delivery_id = ?", "del-live").First(&rec).Error
+	require.NoError(t, err)
+	// Each successful redispatch resets the failure budget.
+	assert.Equal(t, 0, rec.AttemptCount)
+
+	require.Len(t, fake.calls, 6)
 }
 
 func TestOutbox_RetryLoopRedispatchFailureStaysRetrying(t *testing.T) {
@@ -998,7 +1049,8 @@ func TestOutbox_RetryLoopAdapterSuccessMarksSentAndBumpsUpdatedAt(t *testing.T) 
 	var rec deliveryOutboxRecord
 	require.NoError(t, db.WithContext(ctx).Where("delivery_id = ?", "del-ok").First(&rec).Error)
 	assert.Nil(t, rec.NextRetryAt)
-	assert.Equal(t, 1, rec.AttemptCount)
+	// Successful redispatch resets the failure budget (see MarkDeliverySent).
+	assert.Equal(t, 0, rec.AttemptCount)
 	assert.True(t, !rec.UpdatedAt.Before(before), "updated_at should advance on success MarkDeliverySent")
 	assert.True(t, rec.UpdatedAt.After(old), "updated_at should be newer than pre-retry seed")
 
