@@ -63,6 +63,7 @@ var (
 	GroupAlreadyMember    = New("group_already_member", "user is already a member", http.StatusConflict)
 
 	TeamMemberAlready = New("team_member_already", "agent profile is already a member of this team", http.StatusConflict)
+	TeamHasRuns       = New("team_has_runs", "team has run history and cannot be deleted", http.StatusConflict)
 
 	UserNotFound      = New("user_not_found", "user not found", http.StatusNotFound)
 	UserUsernameTaken = New("user_username_taken", "username is already taken", http.StatusConflict)

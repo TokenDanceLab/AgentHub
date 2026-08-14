@@ -110,7 +110,32 @@ func (s *AgentTeamService) DeleteTeam(ctx context.Context, userID, teamID string
 	if team.OwnerID != userID {
 		return errcode.AgentNotFound
 	}
-	return repository.DeleteTeam(s.db, teamID)
+
+	// Teams with run history are non-deletable: hard-deleting would violate
+	// the agent_team_runs FK and destroy audit/history records. Surface a 409
+	// instead of leaking Postgres 23503 through the generic 500 fallback.
+	runs, err := repository.ListTeamRunsByTeam(s.db, teamID)
+	if err != nil {
+		return err
+	}
+	if len(runs) > 0 {
+		return errcode.TeamHasRuns
+	}
+
+	// Remove members first (member rows reference the team) inside a
+	// transaction so a member-delete failure cannot leave a half-deleted team.
+	return s.db.Transaction(func(tx *gorm.DB) error {
+		members, err := repository.ListTeamMembers(tx, teamID)
+		if err != nil {
+			return err
+		}
+		for _, member := range members {
+			if err := repository.RemoveTeamMember(tx, member.ID); err != nil {
+				return err
+			}
+		}
+		return repository.DeleteTeam(tx, teamID)
+	})
 }
 
 type TeamDetail = model.TeamDetail
