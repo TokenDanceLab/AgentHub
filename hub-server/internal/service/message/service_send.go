@@ -75,12 +75,17 @@ func (s *Service) SendMessage(ctx context.Context, sessionID, senderUserID strin
 		}
 	}
 
-	existing, err := repository.GetMessageByClientMsgID(s.db, sessionID, req.ClientMsgID)
-	if err != nil {
-		return nil, err
-	}
-	if existing != nil {
-		return sendMessageResponseFromModel(existing), nil
+	// Idempotency lookup only applies when the client supplied a dedupe key.
+	// Querying with an empty client_msg_id hits the UUID column with '' and
+	// Postgres rejects it (22P02), leaking a 500 on every plain send.
+	if req.ClientMsgID != "" {
+		existing, err := repository.GetMessageByClientMsgID(s.db, sessionID, req.ClientMsgID)
+		if err != nil {
+			return nil, err
+		}
+		if existing != nil {
+			return sendMessageResponseFromModel(existing), nil
+		}
 	}
 
 	for _, attachmentID := range attachmentIDs {
