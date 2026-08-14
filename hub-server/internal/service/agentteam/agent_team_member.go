@@ -47,6 +47,19 @@ func (s *AgentTeamService) AddTeamMember(ctx context.Context, userID, teamID, ag
 		Role:           role,
 		AgentProfileID: &agentProfileID,
 	}
+
+	// Duplicate membership must surface as a 409, not leak a Postgres
+	// unique-violation (23505) through the generic 500 fallback.
+	existingMembers, err := repository.ListTeamMembers(s.db, teamID)
+	if err != nil {
+		return err
+	}
+	for _, existing := range existingMembers {
+		if existing.AgentProfileID != nil && *existing.AgentProfileID == agentProfileID {
+			return errcode.TeamMemberAlready
+		}
+	}
+
 	return repository.AddTeamMember(s.db, member)
 }
 
