@@ -54,8 +54,10 @@ cmd_sync() {
     log "服务器 HEAD ($base) 不在本地，尝试全量 bundle…"
     git -C "$LOCAL_REPO" bundle create "$bundle_tmp" --all
   else
+    # 服务器只跟踪 master：bundle 打包本地 master ref（而不是当前分支），
+    # 保证 bundle 内含 master ref 可供 fetch master:refs/remotes/origin/master。
     # 无增量时 bundle create 以 "Refusing to create empty bundle" 退出 —— 属正常分支。
-    git -C "$LOCAL_REPO" bundle create "$bundle_tmp" "$base..HEAD" 2>/dev/null || true
+    git -C "$LOCAL_REPO" bundle create "$bundle_tmp" "$base..master" 2>/dev/null || true
   fi
   if [ ! -s "$bundle_tmp" ] || ! git -C "$LOCAL_REPO" bundle verify "$bundle_tmp" >/dev/null 2>&1; then
     log "无增量（服务器已是最新）"
