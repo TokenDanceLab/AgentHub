@@ -1,10 +1,10 @@
 /**
  * Hub client WebSocket frame payload and typed frame DTOs.
  * Extracted from hubClient.ts (#788) — pure types only; re-exported by hubClient.
- * Keep public names stable for web/desktop imports via @shared/hubClient.
+ * Keep public names stable for web/desktop imports via @shared/hub/hubClient.
  */
 
-import { HUB_EVENTS, type HubEventType } from './hubEvents';
+import { HUB_EVENTS, type HubEventType } from '../hubEvents';
 import type {
   HubAgentTaskStatus,
   HubMessage,

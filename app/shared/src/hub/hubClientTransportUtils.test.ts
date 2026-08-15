@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { AppError } from './errors';
+import { AppError } from '../errors';
 import {
   DEFAULT_HUB_TIMEOUT_MS,
   applyBearerAuth,

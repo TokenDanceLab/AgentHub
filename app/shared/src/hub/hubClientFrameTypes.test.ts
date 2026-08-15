@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { HUB_EVENTS } from './hubEvents';
+import { HUB_EVENTS } from '../hubEvents';
 import type {
   HubAgentCancelFrame,
   HubAgentCancelPayload,

@@ -1,7 +1,7 @@
 /**
  * Hub client team / profile / document / task-approval DTO surface.
  * Extracted from hubClient.ts (#767) — pure types only; re-exported by hubClient.
- * Keep public names stable for web/desktop imports via @shared/hubClient.
+ * Keep public names stable for web/desktop imports via @shared/hub/hubClient.
  */
 
 // ── T3.2 Team / profile / attachment types (ported from desktop∩web) ──

@@ -20,7 +20,7 @@ import type {
   HubNotification,
   HubSession,
   HubFriendEventPayload,
-} from '@shared/hubClient';
+} from '@shared/hub/hubClient';
 import { useTaskBridgeStore, type AgentTask } from '@/stores/taskBridgeStore';
 import { useConnectionStore } from '@/stores/connectionStore';
 import { useNotificationStore } from '@/stores/notificationStore';

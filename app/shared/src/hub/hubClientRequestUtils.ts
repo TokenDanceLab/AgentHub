@@ -4,7 +4,7 @@
  * Not re-exported from package index unless needed; keep names stable for hubClient import.
  */
 
-import { AppError } from './errors';
+import { AppError } from '../errors';
 import type {
   HubExecutionTarget,
   HubExecutionTargetListResponse,

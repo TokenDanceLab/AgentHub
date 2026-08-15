@@ -3,7 +3,7 @@
  * Peel companion of hubClientTransportUtils (#1102). Pure residual; zero behavior change.
  */
 
-import { reportApiError } from './errors';
+import { reportApiError } from '../errors';
 import { parseHubSuccessResponse } from './hubClientEnvelope';
 import { runRequestWithRouteFallback } from './hubClientRequestUtils';
 import {

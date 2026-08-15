@@ -3,7 +3,7 @@
  * Peel companion of hubClientTransportUtils (#1102). Pure only; zero behavior change.
  */
 
-import { AppError, reportApiError } from './errors';
+import { AppError, reportApiError } from '../errors';
 import {
   buildHubUrl,
   createAuthOnlyHeaders,

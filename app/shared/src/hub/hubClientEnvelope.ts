@@ -1,10 +1,10 @@
 /**
  * Hub response envelope / error runtime helpers.
  * Extracted from hubClient.ts (#799) — pure runtime only; re-exported by hubClient.
- * Keep public names stable for web/desktop imports via @shared/hubClient.
+ * Keep public names stable for web/desktop imports via @shared/hub/hubClient.
  */
 
-import { AppError, isErrorResponse } from './errors';
+import { AppError, isErrorResponse } from '../errors';
 import type { HubResponseEnvelope } from './hubClientDomainTypes';
 
 export class HubError extends AppError {

@@ -7,7 +7,7 @@
  * behavior and keep the historical `HubAuthState` / `HubAuth` surface.
  */
 
-import type { HubUserProfile } from '../../hubClient';
+import type { HubUserProfile } from '../../hub/hubClient';
 
 /** Which Hub auth method produced the current session. */
 export type HubTokenSource = 'tokendance' | 'hub' | null;

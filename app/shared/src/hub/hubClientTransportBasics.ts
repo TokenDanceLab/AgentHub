@@ -3,7 +3,7 @@
  * Peel companion of hubClientTransportUtils (#1102). Pure only; zero behavior change.
  */
 
-import { AppError } from './errors';
+import { AppError } from '../errors';
 
 export const DEFAULT_HUB_TIMEOUT_MS = 30_000;
 

@@ -1,7 +1,7 @@
 /**
  * Hub client public re-export barrel (types + envelope runtime + SSOT gaps).
  * Extracted from hubClient.ts (#810) so createHubClient stays the only executable surface
- * while @shared/hubClient import paths remain stable.
+ * while @shared/hub/hubClient import paths remain stable.
  */
 
 // ── Envelope / error runtime (extracted #799) ──

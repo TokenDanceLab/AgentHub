@@ -1,8 +1,8 @@
 // Mobile Hub client — thin surface over shared SSOT (#1338 / T80.2).
-// - Method/DTO SSOT: @agenthub/shared/hubClient
+// - Method/DTO SSOT: @agenthub/shared/hub/hubClient
 // - Mobile-only glue: async SecureStore token cache, fixture snapshot, legacy WS types,
 //   HubApiError/HubNetworkError (test/UI compatibility)
-// Do NOT add new Hub REST methods here; add them to app/shared/src/hubClient.ts first.
+// Do NOT add new Hub REST methods here; add them to app/shared/src/hub/hubClient.ts first.
 //
 // Inventory (T80.1 keep vs re-export):
 // | Surface | Decision |
@@ -21,14 +21,14 @@ import {
   type HubClient as SharedHubClient,
   type HubClientOptions,
   type HubSession,
-} from '@agenthub/shared/hubClient';
+} from '@agenthub/shared/hub/hubClient';
 import type { HubEventType } from '@agenthub/shared/hubEvents';
 
 import { mobileFixture } from '@/data/mobileFixtures';
 import type { MobileAppFixture } from '@/types';
 
 // Re-export full shared SSOT for app imports (types + helpers).
-export * from '@agenthub/shared/hubClient';
+export * from '@agenthub/shared/hub/hubClient';
 // Re-export the shared Hub error classes so mobile test/UI `instanceof`
 // checks resolve to one shared class identity (SSOT lives in shared errors.ts).
 export { HubApiError, HubNetworkError, type HubErrorDetails } from '@agenthub/shared/errors';

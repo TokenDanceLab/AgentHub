@@ -12,7 +12,7 @@ export default defineConfig({
       '@agenthub/shared/errors': path.resolve(__dirname, '..', 'shared', 'src', 'errors.ts'),
       '@agenthub/shared/api/auth': path.resolve(__dirname, '..', 'shared', 'src', 'api', 'auth', 'index.ts'),
       '@agenthub/shared/notificationIntents': path.resolve(__dirname, '..', 'shared', 'src', 'notificationIntents.ts'),
-      '@agenthub/shared/hubClient': path.resolve(__dirname, '..', 'shared', 'src', 'hubClient.ts'),
+      '@agenthub/shared/hub/hubClient': path.resolve(__dirname, '..', 'shared', 'src', 'hub', 'hubClient.ts'),
       '@agenthub/shared/hubEvents': path.resolve(__dirname, '..', 'shared', 'src', 'hubEvents.ts'),
       '@agenthub/shared/designTokens': path.resolve(__dirname, '..', 'shared', 'src', 'designTokens.ts'),
       '@agenthub/shared/transcript': path.resolve(__dirname, '..', 'shared', 'src', 'transcript', 'index.ts'),

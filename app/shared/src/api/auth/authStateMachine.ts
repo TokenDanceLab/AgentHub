@@ -13,7 +13,7 @@
  * ports (see ports.ts). The core performs no direct browser/Tauri access.
  */
 
-import type { HubClient } from '../../hubClient';
+import type { HubClient } from '../../hub/hubClient';
 import { computeCodeChallenge, generateCodeVerifier } from './pkce';
 import type { HubClientFactory, HubAuthPorts } from './ports';
 import { OidcError } from './types';
