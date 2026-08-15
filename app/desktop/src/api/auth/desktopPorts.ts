@@ -12,7 +12,7 @@
  * - authorization URL opens in the system browser (Tauri) or current window
  */
 
-import { getOrCreateDeviceId } from '@/api/deviceId';
+import { getOrCreateDeviceId } from '@shared/api/deviceId';
 import {
   clearStoredHubAccessToken,
   clearStoredHubRefreshToken,
