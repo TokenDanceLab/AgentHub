@@ -28,7 +28,7 @@
 | node_modules/ | 产物 | 依赖（gitignored） |
 | `pkg/` | 活 | Go 共享包（errcode 等） |
 | `reference/` | 参考 | 第三方源码只读副本（gitignored，INDEX.md 管理） |
-| `scripts/` | 活 | 验证/开发/发布脚本（verify/dev/release/smoke/lib/） |
+| `scripts/` | 活 | 验证/开发/发布脚本（verify/dev/e2e/git-hooks/lib/release/smoke/） |
 | `tests/` | 活 | 跨服务测试 |
 | tmp/ | 产物 | 本地临时文件（gitignored，已清理） |
 
@@ -176,7 +176,7 @@ subagent 提示必须包含：目标、允许修改路径、禁改路径、必�
 - 模块当前 gate 写各模块 `README.md`；历史 handoff、设备证明和一次性验收记录归档，不作为当前事实入口。
 - 历史 longform、日期型审计、旧发布材料、过期设计、完成的 spec-driven 工件和过期项目 skill 放到 `docs/history.md` 指向的外部 TokenDance docs 归档。
 - 新历史 longform 不进源仓：走 `docs/history.md` 指向的外部 TokenDance docs 归档。
-- `scripts/` 根目录只保留分类目录：`scripts/verify/`、`scripts/dev/`、`scripts/release/`、`scripts/smoke/`、`scripts/e2e/` 和 `scripts/lib/`；不要新增根级脚本 wrapper。
+- `scripts/` 根目录只保留分类目录：`scripts/verify/`、`scripts/dev/`、`scripts/e2e/`、`scripts/git-hooks/`、`scripts/lib/`、`scripts/release/` 和 `scripts/smoke/`；不要新增根级脚本 wrapper。
 - 过时长期文档直接删除；需要保留审计轨迹时归档快照。
 - 避免巨石文档：主入口只保留职责、摘要、当前事实和链接；长表、历史日志、验收证据和专题设计移到 owner 子文档或 archive。
 - 文档不写个人本机绝对路径、私有服务器、生产 secret、token、日志或截图中的敏感信息。
