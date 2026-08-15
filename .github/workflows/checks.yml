@@ -1226,12 +1226,21 @@ jobs:
   # Fails if any coverage metric drops below scripts/verify/coverage-baseline.json
   # or if any test is skipped (.skip / .todo anti-cheat).
   frontend-coverage:
-    name: Frontend coverage baseline
+    name: Frontend coverage baseline (${{ matrix.package }})
     needs: changes
     if: >-
       github.event_name == 'workflow_dispatch' ||
       needs.changes.outputs.frontend == 'true'
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      # CI5 wave2 (#1689): the gate ran all four packages serially in one job
+      # (~10min). Split into a per-package matrix; each leg runs only its own
+      # vitest --coverage (~1.5-4min) and fails with precise package scoping.
+      # The negative include-contract self-test (mobile vitest run) executes
+      # once, on the mobile leg.
+      matrix:
+        package: ['@agenthub/shared', 'agenthub-web', 'agenthub-desktop', 'agenthub-mobile-rn']
     steps:
       - uses: actions/checkout@v7
         with:
@@ -1253,11 +1262,13 @@ jobs:
       - name: Verify coverage baseline
         # 2026-08-15 收紧（原 Wave 10 advisory）：mobile re-baseline 后四包
         # 全绿（PR #1685 coverage 10m2s pass 验证），转 hard gate。
-        run: python ./scripts/verify/verify-coverage-baseline.py
+        run: python ./scripts/verify/verify-coverage-baseline.py --OnlyPackages "${{ matrix.package }}"
       # Negative self-test: an imported-by-nobody production file must be
       # counted as 0% and trip the uncovered ratchet (#1535). Cheap — mobile
-      # only (339 tests, node env).
+      # only (339 tests, node env). Runs once on the mobile leg instead of
+      # four times across the matrix.
       - name: Self-test coverage include contract (negative)
+        if: matrix.package == 'agenthub-mobile-rn'
         run: python ./scripts/verify/tests/coverage-include.Tests.py
 
   # ── Vuln Scan: JS (pnpm audit --prod) ─────────
