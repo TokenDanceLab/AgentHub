@@ -752,6 +752,10 @@ func (m *mockAgentRunControlCache) AllocateSeq(ctx context.Context, sessionID st
 	return 0, errors.New("not used")
 }
 
+func (m *mockAgentRunControlCache) SetSeq(ctx context.Context, sessionID string, seq int64) error {
+	return errors.New("not used")
+}
+
 func (m *mockAgentRunControlCache) PushPendingAgentControl(ctx context.Context, userID, deviceID, controlJSON string) error {
 	m.controls = append(m.controls, mockAgentRunControlCall{userID: userID, deviceID: deviceID, payload: controlJSON})
 	return nil

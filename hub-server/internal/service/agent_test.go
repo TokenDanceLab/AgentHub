@@ -114,6 +114,10 @@ func (m *mockAgentCache) AllocateSeq(ctx context.Context, sessionID string) (int
 	return 0, nil
 }
 
+func (m *mockAgentCache) SetSeq(ctx context.Context, sessionID string, seq int64) error {
+	return nil
+}
+
 const (
 	sqlmTaskByID   = `FROM "pending_agent_tasks" WHERE id =`
 	sqlmAgentByID  = `FROM "agent_instances" WHERE id =`
@@ -2118,4 +2122,78 @@ func TestHandleTaskDone_InsertsDistinctFinalMessage(t *testing.T) {
 	err := svc.HandleTaskDone(context.Background(), "user-1", "dev-1", taskID, "run-001", "FINAL ANSWER")
 	assert.NoError(t, err)
 	assert.NoError(t, mock.ExpectationsWereMet())
+}
+
+// ==================== #1411 seq continuity recovery ====================
+
+// seqRecoveryCache simulates a Redis cache whose session seq key was freshly
+// recreated: the first AllocateSeq returns 1 (fresh key INCR), SetSeq stores
+// the value, and the following AllocateSeq returns stored+1.
+type seqRecoveryCache struct {
+	seq int64
+}
+
+func (c *seqRecoveryCache) GetRoute(ctx context.Context, userID, deviceType string) (string, error) {
+	return "", errors.New("not used")
+}
+
+func (c *seqRecoveryCache) GetRouteForDevice(ctx context.Context, userID, deviceType, deviceID string) (string, error) {
+	return "", errors.New("not used")
+}
+
+func (c *seqRecoveryCache) PushPendingTask(ctx context.Context, userID, taskJSON string) error {
+	return nil
+}
+
+func (c *seqRecoveryCache) PushPendingTargetTask(ctx context.Context, userID, targetID, deviceID, taskJSON string) error {
+	return nil
+}
+
+func (c *seqRecoveryCache) AllocateSeq(ctx context.Context, sessionID string) (int64, error) {
+	if c.seq == 0 {
+		return 1, nil // fresh Redis key: INCR recreates at 1
+	}
+	c.seq++
+	return c.seq, nil
+}
+
+func (c *seqRecoveryCache) SetSeq(ctx context.Context, sessionID string, seq int64) error {
+	c.seq = seq
+	return nil
+}
+
+func TestAllocateSeqRecoversFreshRedisKeyFromDB(t *testing.T) {
+	db, mock, sqlDB := newMockDBAgent(t)
+	defer sqlDB.Close()
+
+	// Redis key freshly recreated (INCR returns 1) while sessions.next_seq
+	// already mirrors a higher value: allocation must recover continuity
+	// instead of returning a colliding seq.
+	mock.ExpectQuery(`SELECT next_seq FROM sessions`).
+		WillReturnRows(sqlmock.NewRows([]string{"next_seq"}).AddRow(7))
+
+	cache := &seqRecoveryCache{}
+	svc := &AgentService{db: db, cacheClient: cache}
+
+	seq, err := svc.allocateSeq(context.Background(), "sess-1")
+	require.NoError(t, err)
+	require.Equal(t, int64(8), seq)
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestAllocateSeqFreshRedisKeyWithoutDBMirrorKeepsOne(t *testing.T) {
+	db, mock, sqlDB := newMockDBAgent(t)
+	defer sqlDB.Close()
+
+	// Fresh key but the DB mirror is empty (new session): seq 1 is correct.
+	mock.ExpectQuery(`SELECT next_seq FROM sessions`).
+		WillReturnRows(sqlmock.NewRows([]string{"next_seq"}).AddRow(0))
+
+	cache := &seqRecoveryCache{}
+	svc := &AgentService{db: db, cacheClient: cache}
+
+	seq, err := svc.allocateSeq(context.Background(), "sess-1")
+	require.NoError(t, err)
+	require.Equal(t, int64(1), seq)
+	require.NoError(t, mock.ExpectationsWereMet())
 }
