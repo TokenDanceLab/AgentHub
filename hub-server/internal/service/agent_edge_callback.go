@@ -561,6 +561,9 @@ func (s *EdgeCallbackService) authorizeTaskEdgeCallback(task *model.PendingAgent
 // The comparison is strict: sender must be the same agent instance and the
 // unwrapped plain text must match, so a partial stream (fragments) or an
 // interleaved user message never suppresses the authoritative final message.
+// JSON-shaped content is compared canonically: Postgres jsonb re-serializes
+// stored JSON (key order + whitespace), so raw string equality would miss
+// duplicates for decision/structured outputs (#1414).
 func shouldSkipDoneFinalInsert(db *gorm.DB, sessionID, senderID, finalContent string) bool {
 	if finalContent == "" {
 		return false
@@ -573,7 +576,33 @@ func shouldSkipDoneFinalInsert(db *gorm.DB, sessionID, senderID, finalContent st
 	if last.SenderType != model.SenderTypeAgent || last.SenderID != senderID {
 		return false
 	}
-	return unwrapMessageContentText(last.Content) == finalContent
+	return canonicalContent(last.Content) == canonicalContent(finalContent)
+}
+
+// canonicalContent normalizes message content into a canonical compact form
+// so jsonb-stored values compare equal to the raw stream text they came from:
+// the projection wrapper {"content": X} is unwrapped first, then JSON-shaped
+// values are re-marshaled (stable whitespace/key order). Non-JSON values pass
+// through unchanged.
+func canonicalContent(raw string) string {
+	var wrapper struct {
+		Content string `json:"content"`
+	}
+	if err := json.Unmarshal([]byte(raw), &wrapper); err == nil && wrapper.Content != "" {
+		return canonicalContent(wrapper.Content)
+	}
+	if !json.Valid([]byte(raw)) {
+		return raw
+	}
+	var value any
+	if err := json.Unmarshal([]byte(raw), &value); err != nil {
+		return raw
+	}
+	canonical, err := json.Marshal(value)
+	if err != nil {
+		return raw
+	}
+	return string(canonical)
 }
 
 // unwrapMessageContentText extracts plain text from a messages.content jsonb
