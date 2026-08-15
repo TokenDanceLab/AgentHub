@@ -111,6 +111,7 @@ services:
       AGENTHUB_DB_USER: ${AGENTHUB_DB_USER:-agenthub}
       AGENTHUB_DB_PASSWORD: ${AGENTHUB_DB_PASSWORD:?请设置 AGENTHUB_DB_PASSWORD}
       AGENTHUB_DB_NAME: ${AGENTHUB_DB_NAME:-agenthub}
+      AGENTHUB_DB_SSLMODE: ${AGENTHUB_DB_SSLMODE:-disable}
       # Redis
       AGENTHUB_REDIS_HOST: redis
       AGENTHUB_REDIS_PORT: "6379"
@@ -118,6 +119,11 @@ services:
       AGENTHUB_REDIS_DB: "0"
       AGENTHUB_REDIS_POOL_SIZE: "100"
       AGENTHUB_REDIS_MIN_IDLE_CONNS: "10"
+      # 安全硬化（与 deployments/production 对齐，防开发/生产鉴权行为漂移）：
+      # AUTH_FAIL_CLOSED 让已撤销 access JWT 在 Redis 故障时无法回魂；
+      # RATE_LIMIT_FAIL_OPEN=false 让非鉴权限流在 Redis 故障时也 fail-closed。
+      AGENTHUB_AUTH_FAIL_CLOSED: ${AGENTHUB_AUTH_FAIL_CLOSED:-true}
+      AGENTHUB_RATE_LIMIT_FAIL_OPEN: ${AGENTHUB_RATE_LIMIT_FAIL_OPEN:-false}
       # JWT
       AGENTHUB_JWT_SECRET: ${AGENTHUB_JWT_SECRET:?请设置 AGENTHUB_JWT_SECRET（开发环境可设为 dev-secret-change-in-production-min-length-32）}
       AGENTHUB_JWT_ACCESS_TTL: ${AGENTHUB_JWT_ACCESS_TTL:-15m}

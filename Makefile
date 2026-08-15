@@ -8,7 +8,7 @@
 
 #        make release  (via git push tag -> release.yml, not built here)
 #        make help        (show this help)
-.PHONY: test test-all test-edge test-hub test-edge-e2e test-teamrun test-oidc test-hub-integration e2e-local lint coverage sec release clean fmt \
+.PHONY: test test-all test-edge test-edge-full test-hub test-hub-full test-edge-e2e test-teamrun test-oidc test-hub-integration e2e-local lint coverage sec bench ci release clean fmt \
         fe-install fe-dev fe-build fe-test fe-lint fe-typecheck help
 
 # ── Help ───────────────────────────────────────────
@@ -36,7 +36,7 @@ help:
 	@echo "  Frontend:"
 	@echo "    fe-install    pnpm install"
 	@echo "    fe-dev        pnpm dev (desktop :5173)"
-	@echo "    fe-build      pnpm -r build (全部包)"
+	@echo "    fe-build      build web + desktop（mobile 为 Expo，无产物构建）"
 	@echo "    fe-test       pnpm -r test"
 	@echo "    fe-lint       eslint + stylelint"
 	@echo "    fe-typecheck  tsc --noEmit (desktop + web)"
@@ -147,7 +147,8 @@ fe-dev:
 	cd app && pnpm dev
 
 fe-build:
-	cd app && pnpm -r build
+	# mobile-rn 是 Expo 开发构建（无产物 build script），只 build 有产物的 web/desktop
+	cd app && pnpm --filter agenthub-web --filter agenthub-desktop build
 
 fe-test:
 	cd app && pnpm -r test
