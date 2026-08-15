@@ -64,16 +64,16 @@
     "agenthub-mobile-rn": {
       "dir": "app/mobile-rn",
       "coverage": {
-        "lines": 36.19,
-        "statements": 35.81,
-        "functions": 27.82,
-        "branches": 22.72
+        "lines": 34.51,
+        "statements": 34.27,
+        "functions": 26.83,
+        "branches": 21.16
       },
       "uncoveredFiles": 25,
-      "coverageNote": "2026-08-03 remeasure with include contract (2026-08-02 80.5 was untested-file-excluded). e2e spec excluded. Floors 35/34/26/21. IMPROVEMENT TARGETS (not permanent waivers): all dims -> 60.",
+      "coverageNote": "2026-08-15 re-baseline（CI 实测）：vitest v4 工具链漂移整体下移 ~1.5pp；uncovered_files 25 不变、tests 339→346 增——非代码面恶化，属测量工具变化（#1678）。e2e spec excluded. Floors 33/33/25/20. IMPROVEMENT TARGETS (not permanent waivers): all dims -> 60.",
       "tests": {
-        "total": 339,
-        "passed": 339,
+        "total": 346,
+        "passed": 346,
         "failed": 0,
         "skipped": 0
       }
