@@ -29,7 +29,7 @@ help:
 	@echo "    lint          golangci-lint (edge + hub)"
 	@echo "    coverage      覆盖率报告 (HTML + func)"
 	@echo "    sec           gosec + govulncheck"
-	@echo "    bench         Benchmark (events + service)"
+	@echo "    bench         Benchmark (对齐 CI benchmark job: events+adapters / service+jwtutil)"
 	@echo "    ci            全量 CI: test + lint + sec"
 	@echo "    clean         清理测试缓存和覆盖率文件"
 	@echo ""
@@ -75,8 +75,9 @@ test-hub-integration:
 e2e-local: test-edge-e2e test-teamrun test-oidc
 
 # ── Full tests (requires Redis + PG) ─────────────────
+# test-all 含 integration lane（//go:build integration，需 PG + Redis service 容器）。
 
-test-all: test-edge-full test-hub-full
+test-all: test-edge-full test-hub-full test-hub-integration
 
 test-edge-full:
 	cd edge-server && go test ./... -count=1 -timeout 120s -race
@@ -85,10 +86,11 @@ test-hub-full:
 	cd hub-server && go test ./... -count=1 -timeout 120s
 
 # ── Benchmarks ───────────────────────────────────
+# 范围与 checks.yml 的 benchmark job 一致（edge events+adapters、hub service+jwtutil）。
 
 bench:
-	cd edge-server && go test -bench=. -benchmem ./internal/events/
-	cd hub-server && go test -bench=. -benchmem ./internal/service/
+	cd edge-server && go test -bench=. -benchmem ./internal/events/ ./internal/adapters/
+	cd hub-server && go test -bench=. -benchmem ./internal/service/ ./internal/jwtutil/
 
 # ── Lint ─────────────────────────────────────────
 
