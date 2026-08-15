@@ -171,8 +171,11 @@ class VerifyQualityDebtRatchetTests(unittest.TestCase):
         self.new_fixture()
         checks_path = os.path.join(self.fixture, ".github", "workflows", "checks.yml")
         text = read_utf8(checks_path)
-        text = re.sub(r"(?m)^      - name: Build\r?\n",
-                      "      - name: Build\n        continue-on-error: true\n",
+        # Anchor on the first Vet step (present in both go jobs, hard-fail,
+        # no baseline record) — the old Build anchor was removed from
+        # checks.yml in the #1689 speedup (go build merged into go test).
+        text = re.sub(r"(?m)^      - name: Vet\r?\n",
+                      "      - name: Vet\n        continue-on-error: true\n",
                       text, count=1)
         write_utf8(checks_path, text)
         self.assert_negative_code("QDR-SOFT-GATE-UNREGISTERED", "unregistered soft gate")
