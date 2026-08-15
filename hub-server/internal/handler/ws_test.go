@@ -3,11 +3,6 @@ package handler_test
 
 import (
 	"context"
-	"crypto/rand"
-	"crypto/rsa"
-	"crypto/sha256"
-	"encoding/base64"
-	"math/big"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -20,9 +15,9 @@ import (
 	"github.com/agenthub/hub-server/internal/jwtutil"
 	"github.com/agenthub/hub-server/internal/middleware"
 	hubws "github.com/agenthub/hub-server/internal/ws"
+	"github.com/agenthub/pkg/testkit/oidcfixture"
 	"github.com/coder/websocket"
 	"github.com/gin-gonic/gin"
-	"github.com/golang-jwt/jwt/v5"
 )
 
 // #nosec G101 -- 测试专用固定 JWT secret（非真实凭据）
@@ -371,35 +366,9 @@ func readFrame(t *testing.T, conn *websocket.Conn) *hubws.Frame {
 
 func makeTokenDanceWebSocketTokenWithJWKS(t *testing.T) (token, issuer, audience, jwks string) {
 	t.Helper()
-	priv, err := rsa.GenerateKey(rand.Reader, 2048)
-	if err != nil {
-		t.Fatalf("generate RSA key: %v", err)
-	}
-	kid := tokenDanceWebSocketKID(&priv.PublicKey)
-	n := base64.RawURLEncoding.EncodeToString(priv.PublicKey.N.Bytes())
-	e := base64.RawURLEncoding.EncodeToString(big.NewInt(int64(priv.PublicKey.E)).Bytes())
-	jwks = `{"keys":[{"kty":"RSA","use":"sig","alg":"RS256","kid":"` + kid + `","n":"` + n + `","e":"` + e + `"}]}`
-
-	now := time.Now()
+	key := oidcfixture.NewKey(t)
 	issuer = "https://id.example"
 	audience = "agenthub-client"
-	claims := jwt.RegisteredClaims{
-		Issuer:    issuer,
-		Subject:   "tokendance-user-ws",
-		Audience:  jwt.ClaimStrings{audience},
-		ExpiresAt: jwt.NewNumericDate(now.Add(time.Hour)),
-		IssuedAt:  jwt.NewNumericDate(now),
-	}
-	jwtToken := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
-	jwtToken.Header["kid"] = kid
-	signed, err := jwtToken.SignedString(priv)
-	if err != nil {
-		t.Fatalf("sign TokenDance token: %v", err)
-	}
-	return signed, issuer, audience, jwks
-}
-
-func tokenDanceWebSocketKID(pub *rsa.PublicKey) string {
-	hash := sha256.Sum256(pub.N.Bytes())
-	return base64.RawURLEncoding.EncodeToString(hash[:16])
+	token = oidcfixture.SignToken(t, key.Private, key.Kid, issuer, audience, "tokendance-user-ws", "", "")
+	return token, issuer, audience, key.JWKS
 }

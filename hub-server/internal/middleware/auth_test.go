@@ -3,12 +3,7 @@ package middleware
 
 import (
 	"context"
-	"crypto/rand"
-	"crypto/rsa"
-	"crypto/sha256"
-	"encoding/base64"
 	"errors"
-	"math/big"
 	"net/http"
 	"net/http/httptest"
 	"sync/atomic"
@@ -22,6 +17,7 @@ import (
 
 	"github.com/agenthub/hub-server/internal/config"
 	"github.com/agenthub/hub-server/internal/jwtutil"
+	"github.com/agenthub/pkg/testkit/oidcfixture"
 )
 
 func init() {
@@ -615,42 +611,11 @@ func TestWSAuthMiddlewareRejectsCapabilityToken(t *testing.T) {
 
 func makeTokenDanceMiddlewareToken(t *testing.T) (token, issuer, audience, jwks string) {
 	t.Helper()
-	priv, err := rsa.GenerateKey(rand.Reader, 2048)
-	if err != nil {
-		t.Fatalf("generate key: %v", err)
-	}
-	kid := tokenDanceMiddlewareKID(&priv.PublicKey)
-	n := base64.RawURLEncoding.EncodeToString(priv.PublicKey.N.Bytes())
-	e := base64.RawURLEncoding.EncodeToString(big.NewInt(int64(priv.PublicKey.E)).Bytes())
-	jwks = `{"keys":[{"kty":"RSA","use":"sig","alg":"RS256","kid":"` + kid + `","n":"` + n + `","e":"` + e + `"}]}`
-
+	key := oidcfixture.NewKey(t)
 	issuer = "https://id.example"
 	audience = "agenthub-client"
-	now := time.Now()
-	claims := jwtutil.TokenDanceClaims{
-		Email:         "user@example.com",
-		EmailVerified: true,
-		Name:          "Test User",
-		RegisteredClaims: jwt.RegisteredClaims{
-			Issuer:    issuer,
-			Subject:   "tokendance-user-1",
-			Audience:  jwt.ClaimStrings{audience},
-			ExpiresAt: jwt.NewNumericDate(now.Add(time.Hour)),
-			IssuedAt:  jwt.NewNumericDate(now),
-		},
-	}
-	signed := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
-	signed.Header["kid"] = kid
-	token, err = signed.SignedString(priv)
-	if err != nil {
-		t.Fatalf("sign token: %v", err)
-	}
-	return token, issuer, audience, jwks
-}
-
-func tokenDanceMiddlewareKID(pub *rsa.PublicKey) string {
-	hash := sha256.Sum256(pub.N.Bytes())
-	return base64.RawURLEncoding.EncodeToString(hash[:16])
+	token = oidcfixture.SignToken(t, key.Private, key.Kid, issuer, audience, "tokendance-user-1", "user@example.com", "Test User")
+	return token, issuer, audience, key.JWKS
 }
 
 type stubAccessBlacklist struct {
