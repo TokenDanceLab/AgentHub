@@ -20,6 +20,7 @@ import { describe, it, expect, beforeAll, afterAll, afterEach, vi } from 'vitest
 import { spawn, execSync } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import * as os from 'node:os';
 import type {
   AgentInfo,
   ListResponse,
@@ -38,6 +39,10 @@ const WS_URL = `ws://127.0.0.1:${TEST_PORT}/v1/events`;
 const EDGE_SERVER_DIR = path.resolve(__dirname, '..', '..', '..', '..', '..', 'edge-server');
 const BINARY_NAME = process.platform === 'win32' ? 'test-edge-server.exe' : 'test-edge-server';
 const BINARY_PATH = path.join(EDGE_SERVER_DIR, BINARY_NAME);
+
+// Workspace directory for adapter runs (#854 workDir is now required) and
+// the matching --workspace-allowlist root (#998); both point at a fresh temp dir.
+const WORK_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'agenthub-edge-real-'));
 
 // ═══════════════════════════════════════════════════════════════════
 // Module-level Go availability check (synchronous, fast)
@@ -121,7 +126,7 @@ describeReal('Real Edge Server E2E', () => {
     }
 
     // Start the server on the test port
-    serverProcess = spawn(BINARY_PATH, ['--addr', `127.0.0.1:${TEST_PORT}`, '--dev'], {
+    serverProcess = spawn(BINARY_PATH, ['--addr', `127.0.0.1:${TEST_PORT}`, '--dev', '--workspace-allowlist', WORK_DIR], {
       cwd: EDGE_SERVER_DIR,
       stdio: 'pipe',
     });
@@ -161,6 +166,13 @@ describeReal('Real Edge Server E2E', () => {
         // Best effort cleanup
       }
     }
+  });
+
+  beforeEach(async () => {
+    // The mock executor finishes a run in ~350ms; wait so the previous test's
+    // run reaches a terminal state and does not trip the per-thread
+    // active-run guard (409) when the next test creates a run on thread_local.
+    await new Promise((resolve) => setTimeout(resolve, 500));
   });
 
   afterEach(() => {
@@ -310,7 +322,7 @@ describeReal('Real Edge Server E2E', () => {
   // ═════════════════════════════════════════════════════════════════
 
   describe('POST /v1/runs', () => {
-    it('returns 503 executor_unavailable when no executor is configured', async () => {
+    it('returns 202 and creates a queued run (mock executor default)', async () => {
       requireServer();
       const res = await fetch(`${BASE_URL}/v1/runs`, {
         method: 'POST',
@@ -319,17 +331,22 @@ describeReal('Real Edge Server E2E', () => {
           projectId: 'proj_local',
           threadId: 'thread_local',
           prompt: 'Integration test prompt',
+          workDir: WORK_DIR,
         }),
       });
 
-      expect(res.status).toBe(503);
-
-      const body = await res.json();
-      expect(body.error.code).toBe('executor_unavailable');
-      expect(typeof body.error.message).toBe('string');
+      // The edge server now defaults to a mock executor (no runner command +
+      // no agent default), so run creation succeeds with 202 (queued run).
+      expect(res.status).toBe(202);
+      const data = unwrapEdgeResponse(await res.json()) as Record<string, unknown>;
+      expect(typeof data.runId).toBe('string');
+      expect((data.runId as string).length).toBeGreaterThan(0);
+      expect(data.status).toBe('queued');
+      expect(data.projectId).toBe('proj_local');
+      expect(data.threadId).toBe('thread_local');
     });
 
-    it('returns 503 even with minimal body', async () => {
+    it('returns 400 workdir_required with minimal body (workDir omitted)', async () => {
       requireServer();
       const res = await fetch(`${BASE_URL}/v1/runs`, {
         method: 'POST',
@@ -337,12 +354,12 @@ describeReal('Real Edge Server E2E', () => {
         body: JSON.stringify({ prompt: 'Minimal body' }),
       });
 
-      expect(res.status).toBe(503);
+      expect(res.status).toBe(400);
       const body = await res.json();
-      expect(body.error.code).toBe('executor_unavailable');
+      expect(body.error.code).toBe('workdir_required');
     });
 
-    it('returns 503 even with empty body', async () => {
+    it('returns 400 workdir_required with empty body', async () => {
       requireServer();
       const res = await fetch(`${BASE_URL}/v1/runs`, {
         method: 'POST',
@@ -350,9 +367,9 @@ describeReal('Real Edge Server E2E', () => {
         body: '',
       });
 
-      expect(res.status).toBe(503);
+      expect(res.status).toBe(400);
       const body = await res.json();
-      expect(body.error.code).toBe('executor_unavailable');
+      expect(body.error.code).toBe('workdir_required');
     });
 
     it('returns 400 for invalid JSON', async () => {
@@ -398,17 +415,22 @@ describeReal('Real Edge Server E2E', () => {
   });
 
   describe('GET /v1/runs/:id', () => {
-    it('returns run info for an existing run', async () => {
+    it('returns run info for a created run', async () => {
       requireServer();
-      // No executor — POST returns 503. Verify 503 response structure.
       const createRes = await fetch(`${BASE_URL}/v1/runs`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ projectId: 'proj_local', threadId: 'thread_local' }),
+        body: JSON.stringify({ projectId: 'proj_local', threadId: 'thread_local', workDir: WORK_DIR }),
       });
-      expect(createRes.status).toBe(503);
-      const errorBody = await createRes.json();
-      expect(errorBody.error.code).toBe('executor_unavailable');
+      expect(createRes.status).toBe(202);
+      const created = unwrapEdgeResponse(await createRes.json()) as Record<string, unknown>;
+      const runId = created.runId as string;
+
+      const res = await fetch(`${BASE_URL}/v1/runs/${runId}`);
+      expect(res.status).toBe(200);
+      const data = unwrapEdgeResponse(await res.json()) as Record<string, unknown>;
+      expect(data.runId).toBe(runId);
+      expect(['queued', 'started', 'finished']).toContain(data.status);
     });
 
     it('returns 404 for unknown run ID', async () => {
@@ -423,15 +445,23 @@ describeReal('Real Edge Server E2E', () => {
   });
 
   describe('POST /v1/runs/:id:cancel', () => {
-    it('cancels a queued run and returns 202', async () => {
+    it('cancels a created run', async () => {
       requireServer();
-      // No executor — POST /v1/runs returns 503.
       const createRes = await fetch(`${BASE_URL}/v1/runs`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ projectId: 'proj_local', threadId: 'thread_local' }),
+        body: JSON.stringify({ projectId: 'proj_local', threadId: 'thread_local', workDir: WORK_DIR }),
       });
-      expect(createRes.status).toBe(503);
+      expect(createRes.status).toBe(202);
+      const created = unwrapEdgeResponse(await createRes.json()) as Record<string, unknown>;
+      const runId = created.runId as string;
+
+      const cancelRes = await fetch(`${BASE_URL}/v1/runs/${runId}:cancel`, { method: 'POST' });
+      // 202 cancelling, or 200 if the mock run already reached a terminal state.
+      expect([200, 202]).toContain(cancelRes.status);
+      const body = unwrapEdgeResponse(await cancelRes.json()) as Record<string, unknown>;
+      expect(body.runId).toBe(runId);
+      expect(['cancelling', 'cancelled', 'finished']).toContain(body.status);
     });
 
     it('returns 404 for unknown run on cancel (#108)', async () => {
@@ -518,10 +548,8 @@ describeReal('Real Edge Server E2E', () => {
       }
     });
 
-    it('receives run.cancelled event when cancelling a run', async () => {
+    it('receives run lifecycle events for a created run', async () => {
       requireServer();
-      // No executor — POST /v1/runs returns 503, so we skip the cancel flow.
-      // Verify WS connection stability instead.
       const ws = new WebSocket(WS_URL);
       const events: EventEnvelope[] = [];
 
@@ -536,17 +564,24 @@ describeReal('Real Edge Server E2E', () => {
         ws.onerror = (err) => reject(new Error(`WebSocket error: ${JSON.stringify(err)}`));
       });
 
-      // Verify the executor_unavailable response on POST
+      // Create a run (mock executor) and expect the lifecycle to emit
+      // run.queued / run.started / run.output.batch / run.finished.
       const createRes = await fetch(`${BASE_URL}/v1/runs`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ projectId: 'proj_local', threadId: 'thread_local', prompt: 'Cancel test' }),
+        body: JSON.stringify({ projectId: 'proj_local', threadId: 'thread_local', prompt: 'Cancel test', workDir: WORK_DIR }),
       });
-      expect(createRes.status).toBe(503);
-      const body = await createRes.json();
-      expect(body.error.code).toBe('executor_unavailable');
+      expect(createRes.status).toBe(202);
 
-      await new Promise<void>((resolve) => setTimeout(resolve, 300));
+      // The mock executor finishes in ~350ms (5 output batches + status steps).
+      await new Promise<void>((resolve) => setTimeout(resolve, 1200));
+
+      const types = events.map((e) => e.type);
+      expect(types).toContain('run.queued');
+      expect(types).toContain('run.started');
+      expect(types).toContain('run.finished');
+      expect(types).toContain('run.output.batch');
+
       ws.close();
     });
 
@@ -699,30 +734,32 @@ describeReal('Real Edge Server E2E', () => {
       expect(typeof (body.page as Record<string, unknown>).hasMore).toBe('boolean');
     });
 
-    it('startRun returns executor_unavailable when no executor configured', async () => {
+    it('startRun returns 202 with a queued run', async () => {
       requireServer();
       const res = await fetch(`${BASE_URL}/v1/runs`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ projectId: 'proj_local', threadId: 'thread_local', prompt: 'Compat test' }),
+        body: JSON.stringify({ projectId: 'proj_local', threadId: 'thread_local', prompt: 'Compat test', workDir: WORK_DIR }),
       });
-      expect(res.status).toBe(503);
-      const body = await res.json();
-
-      expect(body).toHaveProperty('error');
-      expect(body.error).toHaveProperty('code');
-      expect(body.error).toHaveProperty('message');
-      expect(body.error.code).toBe('executor_unavailable');
+      expect(res.status).toBe(202);
+      const data = unwrapEdgeResponse(await res.json()) as Record<string, unknown>;
+      expect(data.status).toBe('queued');
+      expect(typeof data.runId).toBe('string');
     });
 
-    it('cancelRun returns 503 when no executor is configured', async () => {
+    it('cancelRun cancels a created run', async () => {
       requireServer();
       const createRes = await fetch(`${BASE_URL}/v1/runs`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt: 'Cancel compat test' }),
+        body: JSON.stringify({ prompt: 'Cancel compat test', workDir: WORK_DIR }),
       });
-      expect(createRes.status).toBe(503);
+      expect(createRes.status).toBe(202);
+      const created = unwrapEdgeResponse(await createRes.json()) as Record<string, unknown>;
+      const runId = created.runId as string;
+
+      const cancelRes = await fetch(`${BASE_URL}/v1/runs/${runId}:cancel`, { method: 'POST' });
+      expect([200, 202]).toContain(cancelRes.status);
     });
   });
 });

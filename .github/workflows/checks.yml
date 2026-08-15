@@ -747,6 +747,14 @@ jobs:
         working-directory: app
         run: pnpm install --frozen-lockfile
 
+      # Desktop↔Edge real E2E (#1678 P1-1): builds and runs the actual Go
+      # Edge server (mock executor default) and asserts REST + WebSocket
+      # contract + run lifecycle. Runs here because this job already has
+      # setup-go + pnpm install.
+      - name: Desktop↔Edge real E2E (Go edge server + REST/WS contract)
+        working-directory: app/desktop
+        run: pnpm exec vitest run --config vitest.edge-real-ci.config.ts --passWithNoTests
+
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@1.96.0
 
