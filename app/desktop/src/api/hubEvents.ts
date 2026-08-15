@@ -46,53 +46,12 @@ export const TYPE_TEAM_EVENT = E.TEAM_EVENT;
 export const TYPE_TEAM_ASSIGNMENT_DONE = E.TEAM_ASSIGNMENT_DONE;
 export const TYPE_TEAM_ASSIGNMENT_FAILED = E.TEAM_ASSIGNMENT_FAILED;
 
-/** All server-to-client event frame types (including auth responses). */
-export const SERVER_EVENT_TYPES = new Set([
-  TYPE_AUTH_OK,
-  TYPE_MESSAGE_NEW,
-  TYPE_MESSAGE_RECALL,
-  TYPE_MESSAGE_PIN,
-  TYPE_MESSAGE_UNPIN,
-  TYPE_MESSAGE_REACTION_ADDED,
-  TYPE_MESSAGE_REACTION_REMOVED,
-  TYPE_MESSAGE_READ,
-  TYPE_SESSION_CREATED,
-  TYPE_SESSION_DISSOLVED,
-  TYPE_SESSION_MEMBER_JOINED,
-  TYPE_SESSION_MEMBER_LEFT,
-  TYPE_SESSION_INFO_UPDATED,
-  TYPE_DEVICE_ONLINE,
-  TYPE_DEVICE_OFFLINE,
-  TYPE_DEVICE_KICKED,
-  TYPE_AGENT_DISPATCH,
-  TYPE_AGENT_STREAM,
-  TYPE_AGENT_DONE,
-  TYPE_AGENT_FAILED,
-  TYPE_AGENT_CANCEL,
-  TYPE_AGENT_CONTROL,
-  TYPE_NOTIFICATION_NEW,
-  TYPE_FRIEND_REQUEST,
-  TYPE_FRIEND_ACCEPTED,
-  TYPE_TEAM_RUN_STARTED,
-  TYPE_TEAM_EVENT,
-  TYPE_TEAM_ASSIGNMENT_DONE,
-  TYPE_TEAM_ASSIGNMENT_FAILED,
-]);
-
 // ── Wire types ───────────────────────────────────
 
 export interface HubFrame<T = unknown> {
   type: string;
   seq_id?: number;
   payload?: T;
-}
-
-export interface AuthPayload {
-  access_token: string;
-}
-
-export interface AuthFailPayload {
-  reason: string;
 }
 
 export interface HubMessage {
@@ -106,19 +65,6 @@ export interface HubMessage {
   reply_to_message_id?: string;
   recalled: boolean;
   created_at: string;
-}
-
-export interface HubSessionUpdate {
-  session_id: string;
-  name?: string;
-  avatar_url?: string;
-  announcement?: string;
-}
-
-export interface HubSessionMember {
-  session_id: string;
-  user_id: string;
-  role: string;
 }
 
 export interface HubDevicePresence {
@@ -141,17 +87,4 @@ export interface HubNotification {
   body: string;
   data?: Record<string, unknown>;
   created_at: string;
-}
-
-export interface HubFriendEvent {
-  user_id: string;
-  username: string;
-  nickname: string;
-  avatar_url?: string;
-}
-
-export interface HubReadReceipt {
-  session_id: string;
-  user_id: string;
-  last_read_seq: number;
 }
