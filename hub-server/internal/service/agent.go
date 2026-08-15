@@ -25,6 +25,7 @@ type agentCache interface {
 	PushPendingTask(ctx context.Context, userID, taskJSON string) error
 	PushPendingTargetTask(ctx context.Context, userID, targetID, deviceID, taskJSON string) error
 	AllocateSeq(ctx context.Context, sessionID string) (int64, error)
+	SetSeq(ctx context.Context, sessionID string, seq int64) error
 }
 
 // relayDispatcher is the subset of *RelayService methods used by AgentService.
@@ -151,6 +152,17 @@ func (s *AgentService) AddAgentToSession(ctx context.Context, userID, sessionID,
 func (s *AgentService) allocateSeq(ctx context.Context, sessionID string) (int64, error) {
 	seq, err := resolveAgentCache(s.cacheClient).AllocateSeq(ctx, sessionID)
 	if err == nil {
+		if seq == 1 {
+			// #1411: a fresh Redis key (restart / FLUSH / expiry) INCRs to 1,
+			// but messages allocated while Redis was down used the DB
+			// sequence — reusing 1 collides with the DB-persisted seq and the
+			// stream insert dies on idx_messages_session_seq (23505). Recover
+			// continuity from the DB mirror exactly like the message service
+			// (#1533) before returning.
+			if recovered, ok := s.recoverSeqFromDB(ctx, sessionID); ok {
+				return recovered, nil
+			}
+		}
 		return seq, nil
 	}
 	slog.Warn("redis seq allocation failed, falling back to DB", "session_id", sessionID, "error", err)
@@ -161,6 +173,26 @@ func (s *AgentService) allocateSeq(ctx context.Context, sessionID string) (int64
 		return txErr
 	})
 	return fallbackSeq, err
+}
+
+// recoverSeqFromDB restores the Redis seq key from the sessions.next_seq DB
+// mirror when the Redis key has been freshly recreated (INCR returned 1).
+// Mirrors the message service's #1533 recovery so both allocation paths
+// share the same continuity contract.
+func (s *AgentService) recoverSeqFromDB(ctx context.Context, sessionID string) (int64, bool) {
+	var dbSeq int64
+	if err := s.db.Raw("SELECT next_seq FROM sessions WHERE id = ?", sessionID).Scan(&dbSeq).Error; err != nil || dbSeq <= 0 {
+		return 0, false
+	}
+	cache := resolveAgentCache(s.cacheClient)
+	if err := cache.SetSeq(ctx, sessionID, dbSeq); err != nil {
+		return 0, false
+	}
+	recovered, err := cache.AllocateSeq(ctx, sessionID)
+	if err != nil {
+		return 0, false
+	}
+	return recovered, true
 }
 
 // ── Thin wrappers for repository calls needed by the app layer ──────────
