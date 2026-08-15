@@ -3,12 +3,15 @@ package hub
 import (
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/agenthub/edge-server/internal/testkit"
 )
 
 // makeTestJWT builds an unsigned JWT-shaped string with the given exp so the
@@ -106,16 +109,9 @@ func TestTokenProviderAutoRefreshRotatesBeforeExpiry(t *testing.T) {
 	p.StartAutoRefresh()
 	defer p.Stop()
 
-	deadline := time.Now().Add(10 * time.Second)
-	for time.Now().Before(deadline) {
-		if refreshCalls.Load() >= 1 {
-			break
-		}
-		time.Sleep(20 * time.Millisecond)
-	}
-	if refreshCalls.Load() == 0 {
-		t.Fatal("refresh never fired before expiry")
-	}
+	testkit.Eventually(t, 10*time.Second, func() bool {
+		return refreshCalls.Load() >= 1
+	}, "refresh fired before expiry", func() string { return fmt.Sprintf("refreshCalls=%d", refreshCalls.Load()) })
 
 	// The rotated token is the live one; LastError stays clean.
 	if p.AccessToken() == "" {
@@ -145,16 +141,9 @@ func TestTokenProviderRefreshFailureRetries(t *testing.T) {
 	p.StartAutoRefresh()
 	defer p.Stop()
 
-	deadline := time.Now().Add(5 * time.Second)
-	for time.Now().Before(deadline) {
-		if refreshCalls.Load() >= 1 {
-			break
-		}
-		time.Sleep(20 * time.Millisecond)
-	}
-	if refreshCalls.Load() == 0 {
-		t.Fatal("refresh never fired")
-	}
+	testkit.Eventually(t, 5*time.Second, func() bool {
+		return refreshCalls.Load() >= 1
+	}, "refresh fired", func() string { return fmt.Sprintf("refreshCalls=%d", refreshCalls.Load()) })
 	if err := p.LastError(); !strings.Contains(err, "refresh status 500") {
 		t.Fatalf("LastError = %q, want refresh status 500", err)
 	}
