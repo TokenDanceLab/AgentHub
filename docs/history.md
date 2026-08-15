@@ -1,6 +1,6 @@
 # AgentHub History
 
-最后更新：2026-06-28
+最后更新：2026-08-15
 
 本文件是 AgentHub 源仓的历史材料索引。历史 longform、日期型审计、旧发布材料、过期设计、参考调研、完成的 spec-driven 工件和过期项目 skill 不再保存在 AgentHub active source tree。
 
@@ -32,7 +32,7 @@
 
 ## Pending External Archive (in-repo, awaiting migration)
 
-以下文件已无活跃引用、本通道仅标注 `pending external archive — see docs/history.md`，未真外迁（外迁需管理员）。cleanup-baseline 冻结快照（`docs/archives/cleanup-baseline/`）受 §8 + roadmap + archives README 三重背书保留，不在此列。
+以下文件已无活跃引用、本通道仅标注 `pending external archive — see docs/history.md`，未真外迁（外迁需管理员）。
 
 | Path | Kind |
 |---|---|
@@ -45,6 +45,7 @@
 | `docs/archives/analysis/frontend-dedupe-plan.md` | strangler plan |
 | `docs/archives/plan/post-polish-milestones.md` | post-polish plan |
 | `docs/archives/plan/post-polish-dependency-graph.md` | post-polish plan |
+| `docs/archives/plan/post-polish-task-breakdown.md` | post-polish plan |
 | `docs/archives/handoff/2026-07-20-phase-74-75-handoff.md` | phase handoff |
 | `docs/archives/branch-hygiene.md` | branch cleanup record |
 

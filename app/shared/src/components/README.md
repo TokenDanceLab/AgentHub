@@ -58,7 +58,7 @@ export type { ComponentNameProps } from './ComponentName';
 ### Motion Classification: Informational vs Decorative
 
 Animations are classified into two tiers for `prefers-reduced-motion: reduce` behavior.
-Tier follows the [codeg principle](https://codeg/globals.css:1890-1894): maintainer opts into reduced-motion but expects **user-requested motion** to play normally.
+Tier follows a two-tier reduced-motion principle: maintainer opts into reduced-motion but expects **user-requested motion** to play normally.
 
 | Category | Behavior under `reduce` | Examples |
 |----------|------------------------|----------|
