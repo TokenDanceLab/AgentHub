@@ -2197,3 +2197,26 @@ func TestAllocateSeqFreshRedisKeyWithoutDBMirrorKeepsOne(t *testing.T) {
 	require.Equal(t, int64(1), seq)
 	require.NoError(t, mock.ExpectationsWereMet())
 }
+
+// #1414: jsonb re-serialization (whitespace/key order) must not defeat the
+// done-final dedup for JSON-shaped stream content.
+func TestShouldSkipDoneFinalInsert_JSONCanonicalMatch(t *testing.T) {
+	db, mock, sqlDB := newMockDBAgent(t)
+	defer sqlDB.Close()
+
+	mock.ExpectQuery(`FROM "messages"`).
+		WithArgs("sess-1", 1).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "session_id", "seq_id", "client_msg_id", "sender_type", "sender_id", "content_type", "content"}).
+			AddRow("msg-9", "sess-1", int64(9), "cmid-9", model.SenderTypeAgent, "agent-1", "text", `{"summary":"42","action":"finish"}`))
+
+	got := shouldSkipDoneFinalInsert(db, "sess-1", "agent-1", `{"action":"finish","summary":"42"}`)
+	assert.True(t, got)
+	assert.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestCanonicalContent(t *testing.T) {
+	assert.Equal(t, `{"action":"finish","summary":"42"}`, canonicalContent(`{"summary":"42",  "action": "finish"}`))
+	assert.Equal(t, "plain text", canonicalContent("plain text"))
+	// The projection wrapper {"content": X} unwraps to X.
+	assert.Equal(t, "x", canonicalContent(`{"content":"x"}`))
+}
