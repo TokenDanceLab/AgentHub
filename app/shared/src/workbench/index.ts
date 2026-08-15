@@ -24,7 +24,6 @@ export {
 } from './mainchain';
 export { MainchainStatusStrip } from './MainchainStatusStrip';
 export type { TranscriptContextMenuEvent, TranscriptPointerEvent } from './transcriptEventTypes';
-export * from './mockData';
 export {
   buildAgentCapabilityContractFromConfig,
   buildAgentCapabilitySummary,
