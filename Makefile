@@ -83,7 +83,7 @@ test-edge-full:
 	cd edge-server && go test ./... -count=1 -timeout 120s -race
 
 test-hub-full:
-	cd hub-server && go test ./... -count=1 -timeout 120s
+	cd hub-server && go test ./... -count=1 -timeout 120s -race
 
 # ── Benchmarks ───────────────────────────────────
 # 范围与 checks.yml 的 benchmark job 一致（edge events+adapters、hub service+jwtutil）。
