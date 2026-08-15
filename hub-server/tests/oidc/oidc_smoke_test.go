@@ -13,6 +13,7 @@ import (
 	"github.com/agenthub/hub-server/internal/jwtutil"
 	"github.com/agenthub/hub-server/internal/model"
 	"github.com/agenthub/hub-server/internal/service/oidc"
+	"github.com/agenthub/hub-server/internal/testkit"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -50,30 +51,8 @@ func (m *mockOIDCService) HandleCallback(_ context.Context, code, state, codeVer
 
 // ── Local helpers ────────────────────────────────────────────────────────────
 
-type apiResp struct {
-	Code    string          `json:"code"`
-	Message string          `json:"message"`
-	Data    json.RawMessage `json:"data"`
-	Error   *struct {
-		Code    string `json:"code"`
-		Message string `json:"message"`
-		TraceID string `json:"traceId"`
-	} `json:"error"`
-}
-
-func (r apiResp) GetCode() string {
-	if r.Error != nil {
-		return r.Error.Code
-	}
-	return r.Code
-}
-
-func (r apiResp) GetMsg() string {
-	if r.Error != nil {
-		return r.Error.Message
-	}
-	return r.Message
-}
+// apiResp is the shared Hub response envelope (internal/testkit.APIResponse).
+type apiResp = testkit.APIResponse
 
 func assertCode(t *testing.T, r apiResp, want string, ctx string) {
 	t.Helper()
