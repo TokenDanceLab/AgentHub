@@ -183,18 +183,20 @@ func TestEventLogConcurrentAppendAndRead(t *testing.T) {
 	var wg sync.WaitGroup
 	stop := make(chan struct{})
 
-	// Writer goroutine
+	// Writer goroutine — bounded: an unbounded writer makes the log grow
+	// without limit, so each reader pass (ReadFrom(1) replays the whole log)
+	// gets progressively slower and can trip the 5s deadline on slow CI IO.
+	// 2000 entries are plenty to exercise the append/read race.
+	const maxEntries = 2000
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		seq := int64(1)
-		for {
+		for seq := int64(1); seq <= maxEntries; seq++ {
 			select {
 			case <-stop:
 				return
 			default:
 				_ = log.Append(EventEnvelope{Version: "v1", ID: "evt", Seq: seq, Type: "test", SentAt: "now", Payload: "data"})
-				seq++
 			}
 		}
 	}()
