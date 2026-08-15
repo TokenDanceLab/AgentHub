@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"log/slog"
-	"sync"
 
 	"gorm.io/gorm"
 
@@ -12,6 +11,7 @@ import (
 	"github.com/agenthub/hub-server/internal/errcode"
 	"github.com/agenthub/hub-server/internal/model"
 	"github.com/agenthub/hub-server/internal/repository"
+	"github.com/agenthub/hub-server/internal/seqalloc"
 )
 
 // Residual pure-helper peel #1153: orchestration helpers (bus, seq, attachments).
@@ -26,62 +26,26 @@ func (s *Service) publish(ctx context.Context, event bus.Event) {
 	}
 }
 
-// seqLocks serializes seq allocation per session. Redis INCR is atomic, but
-// the DB mirror (SyncSessionSeq) and the DB fallback path (AllocateSeqID) both
-// touch sessions.next_seq; without serialization the two sources can interleave
-// and hand out duplicate seq values (#1533). Different sessions stay parallel.
-var seqLocks sync.Map // sessionID -> *sync.Mutex
-
-func seqLockFor(sessionID string) *sync.Mutex {
-	v, _ := seqLocks.LoadOrStore(sessionID, &sync.Mutex{})
-	return v.(*sync.Mutex)
+// allocateSeq allocates the next sequence number via the shared seqalloc
+// allocator (Redis INCR → DB mirror → DB fallback), then touches
+// last_message_at so the session appears in recent conversations (#154).
+func (s *Service) allocateSeq(ctx context.Context, sessionID string) (int64, error) {
+	seq, err := s.seqAllocator().Allocate(ctx, sessionID)
+	if err == nil {
+		if touchErr := repository.TouchSessionLastMessage(s.db, sessionID); touchErr != nil {
+			slog.Warn("failed to touch session last_message_at after seq alloc", "session_id", sessionID, "error", touchErr)
+		}
+	}
+	return seq, err
 }
 
-func (s *Service) allocateSeq(ctx context.Context, sessionID string) (int64, error) {
-	mu := seqLockFor(sessionID)
-	mu.Lock()
-	defer mu.Unlock()
-
-	seq, err := resolveCache(s.cacheClient).AllocateSeq(ctx, sessionID)
-	if err == nil {
-		// #154: Redis allocation does not update last_message_at, so touch it here
-		// to ensure the session appears in recent conversations.
-		if touchErr := repository.TouchSessionLastMessage(s.db, sessionID); touchErr != nil {
-			slog.Warn("failed to touch session last_message_at after redis seq alloc", "session_id", sessionID, "error", touchErr)
-		}
-		if seq == 1 {
-			// Redis key 刚重建（重启 / FLUSH / key 过期）：从 DB 持久镜像恢复，
-			// 防止 seq 回退或重复（seq continuity contract, #1533）。
-			var dbSeq int64
-			if dbErr := s.db.Raw("SELECT next_seq FROM sessions WHERE id = ?", sessionID).Scan(&dbSeq).Error; dbErr == nil && dbSeq > 0 {
-				if setErr := resolveCache(s.cacheClient).SetSeq(ctx, sessionID, dbSeq); setErr == nil {
-					if recovered, incrErr := resolveCache(s.cacheClient).AllocateSeq(ctx, sessionID); incrErr == nil {
-						seq = recovered
-					}
-				}
-			}
-		}
-		// 持久化镜像：Redis 是实时分配源，DB 只前推不回退，供恢复使用。
-		if syncErr := repository.SyncSessionSeq(s.db, sessionID, seq); syncErr != nil {
-			slog.Warn("failed to sync session seq mirror to db", "session_id", sessionID, "seq", seq, "error", syncErr)
-		}
-		return seq, nil
+// seqAllocator returns the configured allocator, lazily constructing one from
+// the cache port + DB for struct-literal tests that bypass NewService.
+func (s *Service) seqAllocator() *seqalloc.Allocator {
+	if s.seqAlloc != nil {
+		return s.seqAlloc
 	}
-	slog.Warn("redis seq allocation failed, falling back to DB", "session_id", sessionID, "error", err)
-	var fallbackSeq int64
-	err = s.db.Transaction(func(tx *gorm.DB) error {
-		var txErr error
-		fallbackSeq, txErr = repository.AllocateSeqID(tx, sessionID)
-		return txErr
-	})
-	if err == nil {
-		// 尽力把 DB 分配同步回 Redis，避免 Redis 恢复后 INCR 从旧值继续
-		// 而重复 fallback 已分配的 seq（失败可忽略——Redis 故障中）。
-		if setErr := resolveCache(s.cacheClient).SetSeq(ctx, sessionID, fallbackSeq); setErr != nil {
-			slog.Warn("failed to mirror fallback seq to redis", "session_id", sessionID, "seq", fallbackSeq, "error", setErr)
-		}
-	}
-	return fallbackSeq, err
+	return seqalloc.New(resolveCache(s.cacheClient), s.db)
 }
 
 func (s *Service) ensureAttachmentReferenceAllowed(userID, attachmentID string) error {
