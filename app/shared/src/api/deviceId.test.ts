@@ -3,7 +3,7 @@ import { DEVICE_ID_KEY, getOrCreateDeviceId } from './deviceId';
 
 const GENERATED_ID = '00000000-0000-0000-0000-00000000e101';
 
-describe('web device id storage', () => {
+describe('shared device id storage', () => {
   beforeEach(() => {
     localStorage.clear();
     vi.restoreAllMocks();
