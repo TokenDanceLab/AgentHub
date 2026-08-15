@@ -3,7 +3,6 @@ package service
 import (
 	"context"
 	"encoding/json"
-	"log/slog"
 	"net/http"
 
 	"gorm.io/gorm"
@@ -14,6 +13,7 @@ import (
 	"github.com/agenthub/hub-server/internal/errcode"
 	"github.com/agenthub/hub-server/internal/model"
 	"github.com/agenthub/hub-server/internal/repository"
+	"github.com/agenthub/hub-server/internal/seqalloc"
 	"github.com/agenthub/hub-server/internal/service/dispatchsvc"
 	"github.com/agenthub/hub-server/internal/ws"
 )
@@ -39,6 +39,10 @@ type AgentService struct {
 	mgr         *ws.Manager
 	cacheClient agentCache
 	relay       relayDispatcher
+	// seqAlloc owns message sequence allocation (Redis INCR → DB mirror →
+	// DB fallback). Set in NewAgentService; struct-literal tests fall back to
+	// a lazy allocator via seqAllocator().
+	seqAlloc *seqalloc.Allocator
 	// runEvents owns list/summary/approvals/artifacts orchestration.
 	// Constructed in NewAgentService; tests using struct literals fall back to
 	// a lazy facade via runEventService().
@@ -69,7 +73,7 @@ type AgentService struct {
 }
 
 func NewAgentService(db *gorm.DB, bus *bus.Bus, mgr *ws.Manager, cacheClient *cache.Client, relay relayDispatcher, edgeCfg config.EdgeDispatchConfig, edgeClient *http.Client, jwtSecret string) *AgentService {
-	s := &AgentService{db: db, bus: bus, mgr: mgr, cacheClient: resolveAgentCache(cacheClient), relay: relay, edgeCfg: edgeCfg, edgeClient: edgeClient, jwtSecret: jwtSecret}
+	s := &AgentService{db: db, bus: bus, mgr: mgr, cacheClient: resolveAgentCache(cacheClient), relay: relay, edgeCfg: edgeCfg, edgeClient: edgeClient, jwtSecret: jwtSecret, seqAlloc: seqalloc.New(cacheClient, db)}
 	s.runEvents = NewRunEventService(db, NewAgentControlService(cacheClient, mgr))
 	// Construct outbox first (nil redispatcher), then inject DispatchService
 	// adapter after dispatch exists (#573 — redispatch residual on DispatchService).
@@ -147,52 +151,19 @@ func (s *AgentService) AddAgentToSession(ctx context.Context, userID, sessionID,
 	return ai, nil
 }
 
-// allocateSeq returns the next message sequence number for a session.
-// It tries Redis INCR first and falls back to the DB row-level lock.
+// allocateSeq returns the next message sequence number for a session via the
+// shared seqalloc.Allocator (Redis INCR → DB mirror → DB fallback).
 func (s *AgentService) allocateSeq(ctx context.Context, sessionID string) (int64, error) {
-	seq, err := resolveAgentCache(s.cacheClient).AllocateSeq(ctx, sessionID)
-	if err == nil {
-		if seq == 1 {
-			// #1411: a fresh Redis key (restart / FLUSH / expiry) INCRs to 1,
-			// but messages allocated while Redis was down used the DB
-			// sequence — reusing 1 collides with the DB-persisted seq and the
-			// stream insert dies on idx_messages_session_seq (23505). Recover
-			// continuity from the DB mirror exactly like the message service
-			// (#1533) before returning.
-			if recovered, ok := s.recoverSeqFromDB(ctx, sessionID); ok {
-				return recovered, nil
-			}
-		}
-		return seq, nil
-	}
-	slog.Warn("redis seq allocation failed, falling back to DB", "session_id", sessionID, "error", err)
-	var fallbackSeq int64
-	err = s.db.Transaction(func(tx *gorm.DB) error {
-		var txErr error
-		fallbackSeq, txErr = repository.AllocateSeqID(tx, sessionID)
-		return txErr
-	})
-	return fallbackSeq, err
+	return s.seqAllocator().Allocate(ctx, sessionID)
 }
 
-// recoverSeqFromDB restores the Redis seq key from the sessions.next_seq DB
-// mirror when the Redis key has been freshly recreated (INCR returned 1).
-// Mirrors the message service's #1533 recovery so both allocation paths
-// share the same continuity contract.
-func (s *AgentService) recoverSeqFromDB(ctx context.Context, sessionID string) (int64, bool) {
-	var dbSeq int64
-	if err := s.db.Raw("SELECT next_seq FROM sessions WHERE id = ?", sessionID).Scan(&dbSeq).Error; err != nil || dbSeq <= 0 {
-		return 0, false
+// seqAllocator returns the configured allocator, lazily constructing one from
+// the cache port + DB for struct-literal tests that bypass NewAgentService.
+func (s *AgentService) seqAllocator() *seqalloc.Allocator {
+	if s.seqAlloc != nil {
+		return s.seqAlloc
 	}
-	cache := resolveAgentCache(s.cacheClient)
-	if err := cache.SetSeq(ctx, sessionID, dbSeq); err != nil {
-		return 0, false
-	}
-	recovered, err := cache.AllocateSeq(ctx, sessionID)
-	if err != nil {
-		return 0, false
-	}
-	return recovered, true
+	return seqalloc.New(resolveAgentCache(s.cacheClient), s.db)
 }
 
 // ── Thin wrappers for repository calls needed by the app layer ──────────

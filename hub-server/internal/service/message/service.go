@@ -13,6 +13,7 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/agenthub/hub-server/internal/bus"
+	"github.com/agenthub/hub-server/internal/seqalloc"
 )
 
 // Residual pure-helper peel #1153: Service struct, ports, and constructor glue.
@@ -43,13 +44,19 @@ type Service struct {
 	db          *gorm.DB
 	bus         Bus
 	cacheClient Cache
+	seqAlloc    *seqalloc.Allocator
 }
 
 // NewService constructs a message service.
 // bus may be nil for read-only/partial tests; write paths that publish no-op.
 // cacheClient may be nil and falls back to cache.NoOpCache (DB seq path).
 func NewService(db *gorm.DB, bus Bus, cacheClient Cache) *Service {
-	return &Service{db: db, bus: bus, cacheClient: resolveCache(cacheClient)}
+	return &Service{
+		db:          db,
+		bus:         bus,
+		cacheClient: resolveCache(cacheClient),
+		seqAlloc:    seqalloc.New(resolveCache(cacheClient), db),
+	}
 }
 
 // SetBus injects (or replaces) the event bus port.
@@ -66,4 +73,5 @@ func (s *Service) SetCache(cacheClient Cache) {
 		return
 	}
 	s.cacheClient = resolveCache(cacheClient)
+	s.seqAlloc = seqalloc.New(s.cacheClient, s.db)
 }
