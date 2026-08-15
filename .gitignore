@@ -27,7 +27,7 @@ output/
 *.tgz
 *.zip
 app/desktop/app/
-artifacts/
+/artifacts/
 
 # =============================================================================
 # Test & Coverage
@@ -282,3 +282,7 @@ app/desktop/stats.html
 *.pyc
 
 *.local
+
+# L3 真实测试证据（devserver.sh test 回传报告）；README.md 保留
+tests/artifacts/*
+!tests/artifacts/README.md
