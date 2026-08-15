@@ -28,7 +28,6 @@
     "./tree": "./src/tree.ts",
     "./diff": "./src/diff.ts",
     "./eventClient": "./src/eventClient.ts",
-    "./mock": "./src/mock.ts",
     "./stores/queryKeys": "./src/stores/queryKeys.ts",
     "./components": "./src/components/index.ts",
     "./ui": "./src/ui/index.ts",
