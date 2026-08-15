@@ -47,9 +47,6 @@ jobs:
           cache: true
           cache-dependency-path: edge-server/go.sum
 
-      - name: Build
-        run: go build ./...
-
       - name: Lint
         # Wave 10: advisory — gocognit findings in pre-existing complex functions
         continue-on-error: true
@@ -94,22 +91,32 @@ jobs:
           check_pkg "edge-server/internal/adapters/" 55 "adapters" || FAILED=1
           exit $FAILED
 
+      # CI7: staticcheck hard-blocking — edge-server findings zero-baselined;
+      # version pinned to prevent new-check drift from breaking CI.
+      # Binary cached across runs (gha cache keyed on pinned versions).
+      # Restore must precede both gosec and staticcheck steps.
+      - name: Cache static-analysis binaries (staticcheck + gosec)
+        id: sa-cache
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/go/bin/staticcheck
+            ~/go/bin/gosec
+          key: sa-tools-2026-08
+
       - name: Security scan (gosec)
         # Wave 10: advisory; gosec findings are pre-existing cognitive complexity
+        # Binary cached across runs (same pattern as staticcheck); go run
+        # re-downloads/recompiles gosec every job (~30s) without it.
         continue-on-error: true
-        run: go run github.com/securego/gosec/v2/cmd/gosec@v2.28.0 ./...
+        run: |
+          if [ ! -x ~/go/bin/gosec ]; then
+            go install github.com/securego/gosec/v2/cmd/gosec@v2.28.0
+          fi
+          ~/go/bin/gosec ./...
       - name: Vet
         run: go vet ./...
 
-      # CI7: staticcheck hard-blocking — edge-server findings zero-baselined;
-      # version pinned to prevent new-check drift from breaking CI.
-      # Binary cached across runs (gha cache keyed on pinned version).
-      - name: Cache staticcheck binary
-        id: staticcheck-cache
-        uses: actions/cache@v5
-        with:
-          path: ~/go/bin/staticcheck
-          key: staticcheck-2026.1
       - name: staticcheck
         run: |
           if [ ! -x ~/go/bin/staticcheck ]; then
@@ -147,9 +154,6 @@ jobs:
           go-version: ${{ env.GO_VERSION }}
           cache: true
           cache-dependency-path: hub-server/go.sum
-
-      - name: Build
-        run: go build ./...
 
       - name: Lint
         continue-on-error: true
@@ -198,23 +202,31 @@ jobs:
             exit 1
           fi
 
+      # CI7: staticcheck hard-blocking — hub-server findings zero-baselined;
+      # version pinned to prevent new-check drift from breaking CI.
+      # Binary cached across runs (gha cache keyed on pinned versions).
+      # Restore must precede both gosec and staticcheck steps.
+      - name: Cache static-analysis binaries (staticcheck + gosec)
+        id: sa-cache
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/go/bin/staticcheck
+            ~/go/bin/gosec
+          key: sa-tools-2026-08
+
       - name: Security scan (gosec)
-        # Wave 10: advisory matching go-edge
+        # Wave 10: advisory matching go-edge; binary cached same as staticcheck.
         continue-on-error: true
-        run: go run github.com/securego/gosec/v2/cmd/gosec@v2.28.0 ./...
+        run: |
+          if [ ! -x ~/go/bin/gosec ]; then
+            go install github.com/securego/gosec/v2/cmd/gosec@v2.28.0
+          fi
+          ~/go/bin/gosec ./...
 
       - name: Vet
         run: go vet ./...
 
-      # CI7: staticcheck hard-blocking — hub-server findings zero-baselined;
-      # version pinned to prevent new-check drift from breaking CI.
-      # Binary cached across runs (gha cache keyed on pinned version).
-      - name: Cache staticcheck binary
-        id: staticcheck-cache
-        uses: actions/cache@v5
-        with:
-          path: ~/go/bin/staticcheck
-          key: staticcheck-2026.1
       - name: staticcheck
         run: |
           if [ ! -x ~/go/bin/staticcheck ]; then
