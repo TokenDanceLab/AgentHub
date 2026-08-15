@@ -19,6 +19,11 @@ type SQLiteDeliveryJournal struct {
 	db     *sql.DB
 	mu     sync.Mutex
 	stopCh chan struct{}
+	// stopWG tracks the retention goroutine so Close() can wait for it to
+	// drain before closing the DB — otherwise the startup purge runs against
+	// a closed handle ("database is closed" noise) and tests leak a live
+	// goroutine holding the temp dir (TempDir RemoveAll: directory not empty).
+	stopWG sync.WaitGroup
 }
 
 // OpenSQLiteDeliveryJournal opens/creates journal DB at path.
@@ -142,7 +147,8 @@ func (j *SQLiteDeliveryJournal) HasSuccessful(taskID, runID, action string) (boo
 	return true, nil
 }
 
-// Close closes the DB and stops the background retention loop.
+// Close closes the DB and stops the background retention loop, waiting for
+// an in-flight purge to drain before the DB handle is released.
 func (j *SQLiteDeliveryJournal) Close() error {
 	if j == nil {
 		return nil
@@ -157,6 +163,7 @@ func (j *SQLiteDeliveryJournal) Close() error {
 			close(j.stopCh)
 		}
 	}
+	j.stopWG.Wait()
 	if j.db == nil {
 		return nil
 	}
@@ -171,7 +178,9 @@ func (j *SQLiteDeliveryJournal) startRetentionLoop() {
 		return
 	}
 	stop := j.stopCh
+	j.stopWG.Add(1)
 	go func() {
+		defer j.stopWG.Done()
 		ticker := time.NewTicker(JournalRetentionInterval)
 		defer ticker.Stop()
 		// Run once at startup so a long-downed Edge does not sit on a full
