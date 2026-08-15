@@ -1,239 +1,369 @@
-import type { EventEnvelope, AnyEvent } from './events';
+// Shared WebSocket event-stream client — the single core implementation
+// (#1682 P1). Platform renderers consume this through their own thin
+// wrappers (e.g. app/desktop/src/api/eventClient.ts) that inject
+// platform-specific defaults: resolved base URL, auth subprotocols, and any
+// legacy query-token fallback. Do not duplicate this implementation in
+// platform code.
+//
+// Responsibilities:
+//   - connection lifecycle (direct WebSocket, or injected Transport)
+//   - cursor-based replay with idempotent seq dedup — system.gap events
+//     never pollute the replay cursor
+//   - application-level ping/pong heartbeat with latency tracking
+//   - exponential backoff with jitter on reconnect
+
+import type { EventEnvelope } from './events';
 import { reportApiError } from './errors';
+import type { Transport, TransportStatus } from './transport';
 
-export type EventListener = (event: AnyEvent) => void;
-export type EventConnectionStatus =
-  | 'connecting'
-  | 'connected'
-  | 'disconnected'
-  | 'reconnecting'
-  | 'error';
-export type EventConnectionListener = (
-  status: EventConnectionStatus,
-  error?: string,
-) => void;
+export type EventHandler = (event: EventEnvelope) => void;
+export type StatusHandler = (status: TransportStatus) => void;
 
-export interface ReconnectOptions {
-  maxRetries: number;
-  baseDelay: number;
-  maxDelay: number;
-  backoffFactor: number;
+export interface StreamHandle {
+  /** Subscribe to incoming events. Returns an unsubscribe function. */
+  subscribe(handler: EventHandler): () => void;
+  /** Subscribe to connection status changes. Returns an unsubscribe function. */
+  onStatusChange(handler: StatusHandler): () => void;
+  /** Send a JSON message through the WebSocket (heartbeat pings are handled internally). */
+  send(data: Record<string, unknown>): void;
+  /** Latest measured round-trip latency in milliseconds, or null if not yet measured. */
+  getLatency(): number | null;
+  close(): void;
 }
 
-const defaultReconnect: ReconnectOptions = {
-  maxRetries: Infinity,
-  baseDelay: 1000,
-  maxDelay: 30000,
-  backoffFactor: 2,
-};
-
-export interface EventClientOptions {
+export interface EventStreamOptions {
+  /** Base WebSocket URL (ws:// or wss://). Defaults to the local Edge endpoint. */
   baseUrl?: string;
-  cursor?: string;
-  reconnect?: Partial<ReconnectOptions>;
+  /**
+   * Optional Transport instance for connection management. When provided the
+   * stream delegates connecting/reconnecting instead of owning a WebSocket.
+   */
+  transport?: Transport;
+  /**
+   * Optional WebSocket subprotocols, or a getter evaluated on each connect.
+   * Used to carry auth tokens via Sec-WebSocket-Protocol.
+   */
+  protocols?: string[] | (() => string[] | undefined);
+  /** Optional URL mutator applied just before connecting (legacy query-token auth). */
+  applyQueryToken?: (url: string) => string;
+  /** Give up reconnecting after this many consecutive failed attempts. Default 10. */
+  maxRetries?: number;
+  /** Initial reconnect delay in milliseconds. Default 1000. */
+  baseDelayMs?: number;
+  /** Cap for the exponential reconnect delay in milliseconds. Default 30000. */
+  maxDelayMs?: number;
+  /** Heartbeat ping interval in milliseconds. Default 10000. */
+  pingIntervalMs?: number;
+  /** Heartbeat pong timeout in milliseconds — the connection closes when exceeded. Default 5000. */
+  pongTimeoutMs?: number;
 }
 
-// ── EventClient ───────────────────────────────
+export const DEFAULT_EVENT_STREAM_URL = 'ws://127.0.0.1:3210/v1/events';
+const DEFAULT_MAX_RETRIES = 10;
+const DEFAULT_BASE_DELAY_MS = 1000;
+const DEFAULT_MAX_DELAY_MS = 30_000;
+const DEFAULT_PING_INTERVAL_MS = 10_000;
+const DEFAULT_PONG_TIMEOUT_MS = 5_000;
 
-export class EventClient {
-  private ws: WebSocket | null = null;
-  private listeners = new Set<EventListener>();
-  private connectionListeners = new Set<EventConnectionListener>();
-  private typeListeners = new Map<string, Set<EventListener>>();
-  private baseUrl: string;
-  private cursor: string | undefined;
-  private reconnect: ReconnectOptions;
-  private currentDelayMs: number;
-  private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
-  private destroyed = false;
-  private lastSeq = 0;
-  private retryCount = 0;
+function isWebSocketUrl(value: string): boolean {
+  return value.startsWith('ws://') || value.startsWith('wss://');
+}
 
-  constructor(opts: EventClientOptions = {}) {
-    this.baseUrl = (opts.baseUrl ?? 'http://127.0.0.1:3210').replace(
-      /\/+$/,
-      '',
-    );
-    this.cursor = opts.cursor;
-    this.reconnect = { ...defaultReconnect, ...opts.reconnect };
-    this.currentDelayMs = this.reconnect.baseDelay;
+function resolveProtocols(
+  protocols: EventStreamOptions['protocols'],
+): string[] | undefined {
+  if (!protocols) return undefined;
+  const value = typeof protocols === 'function' ? protocols() : protocols;
+  return value && value.length > 0 ? value : undefined;
+}
+
+export function createEventStream(
+  cursorOrUrl?: string,
+  opts: EventStreamOptions = {},
+): StreamHandle {
+  // The positional argument is either a full ws(s):// URL (used as the base
+  // URL) or a replay cursor. Explicit options win over the positional value.
+  const baseUrl =
+    opts.baseUrl ??
+    (cursorOrUrl && isWebSocketUrl(cursorOrUrl)
+      ? cursorOrUrl
+      : DEFAULT_EVENT_STREAM_URL);
+  const initialCursor =
+    cursorOrUrl && !isWebSocketUrl(cursorOrUrl) ? cursorOrUrl : undefined;
+
+  const maxRetries = opts.maxRetries ?? DEFAULT_MAX_RETRIES;
+  const baseDelayMs = opts.baseDelayMs ?? DEFAULT_BASE_DELAY_MS;
+  const maxDelayMs = opts.maxDelayMs ?? DEFAULT_MAX_DELAY_MS;
+  const pingIntervalMs = opts.pingIntervalMs ?? DEFAULT_PING_INTERVAL_MS;
+  const pongTimeoutMs = opts.pongTimeoutMs ?? DEFAULT_PONG_TIMEOUT_MS;
+
+  const providedTransport = opts.transport ?? null;
+  const applyQueryToken = opts.applyQueryToken;
+
+  let ws: WebSocket | null = null;
+  let reconnectDelayMs = baseDelayMs;
+  let retryCount = 0;
+  let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+
+  const handlers: EventHandler[] = [];
+  const statusHandlers: StatusHandler[] = [];
+  let closed = false;
+  let lastCursor: string | undefined = initialCursor;
+  let lastSeq = 0;
+
+  // Heartbeat state
+  let pingTimer: ReturnType<typeof setInterval> | null = null;
+  let pongTimer: ReturnType<typeof setTimeout> | null = null;
+  let latestLatencyMs: number | null = null;
+  let pingSendTime = 0;
+
+  // Transport-mode subscriptions
+  let unsubMessage: (() => void) | null = null;
+  let unsubStatus: (() => void) | null = null;
+
+  function notifyStatus(status: TransportStatus): void {
+    for (const handler of statusHandlers) handler(status);
   }
 
-  // ── Connection ─────────────────────────────
-
-  get wsUrl(): string {
-    const http = this.baseUrl;
-    const ws = http.replace(/^http/, 'ws');
-    const qs = this.cursor
-      ? `?cursor=${encodeURIComponent(this.cursor)}`
-      : '';
-    return `${ws}/v1/events${qs}`;
+  function clearHeartbeat(): void {
+    if (pingTimer) {
+      clearInterval(pingTimer);
+      pingTimer = null;
+    }
+    if (pongTimer) {
+      clearTimeout(pongTimer);
+      pongTimer = null;
+    }
   }
 
-  connect(): void {
-    if (this.destroyed) return;
-    if (
-      this.ws &&
-      (this.ws.readyState === WebSocket.OPEN ||
-        this.ws.readyState === WebSocket.CONNECTING)
-    ) {
+  function startHeartbeat(): void {
+    clearHeartbeat();
+    pingTimer = setInterval(() => {
+      if (providedTransport) {
+        if (providedTransport.getStatus() !== 'connected') return;
+        pingSendTime = Date.now();
+        providedTransport.send({ type: 'ping', ts: Date.now() });
+      } else {
+        if (!ws || ws.readyState !== WebSocket.OPEN) return;
+        pingSendTime = Date.now();
+        ws.send(JSON.stringify({ type: 'ping', ts: Date.now() }));
+      }
+      pongTimer = setTimeout(() => {
+        console.warn('[EventStream] WebSocket pong timeout — closing connection');
+        if (providedTransport) {
+          providedTransport.close();
+        } else if (ws) {
+          ws.close();
+        }
+      }, pongTimeoutMs);
+    }, pingIntervalMs);
+  }
+
+  function handleMessage(data: Record<string, unknown>): void {
+    // Any message proves the connection is alive — clear the pong timeout.
+    if (pongTimer) {
+      clearTimeout(pongTimer);
+      pongTimer = null;
+    }
+
+    // Application-level pong response — compute round-trip latency.
+    if (data.type === 'pong') {
+      if (pingSendTime > 0) {
+        latestLatencyMs = Math.round(Date.now() - pingSendTime);
+        pingSendTime = 0;
+      }
       return;
     }
 
-    this.dispatchConnection('connecting');
-    this.ws = new WebSocket(this.wsUrl);
+    const envelope = data as unknown as EventEnvelope;
+    // system.gap events carry a synthetic seq that must NOT pollute the
+    // replay cursor — doing so resets replay to seq 0 and triggers a full
+    // backfill storm on the next reconnect. Non-gap events with a numeric
+    // seq advance the cursor; replayed events (seq <= lastSeq) are dropped
+    // so reconnecting never double-applies state changes.
+    if (typeof envelope.seq === 'number' && envelope.type !== 'system.gap') {
+      if (envelope.seq <= lastSeq) return;
+      lastSeq = envelope.seq;
+      lastCursor = String(envelope.seq);
+    }
+    for (const handler of handlers) handler(envelope);
+  }
 
-    this.ws.onopen = () => {
-      this.currentDelayMs = this.reconnect.baseDelay;
-      this.retryCount = 0;
-      this.dispatchConnection('connected');
+  // ── Transport mode ──────────────────────────────────
+
+  function connectViaTransport(): void {
+    if (closed) return;
+    const transport = providedTransport;
+    if (!transport) return;
+
+    // Clean up previous subscriptions.
+    if (unsubMessage) {
+      unsubMessage();
+      unsubMessage = null;
+    }
+    if (unsubStatus) {
+      unsubStatus();
+      unsubStatus = null;
+    }
+
+    unsubStatus = transport.on('status', (status: TransportStatus) => {
+      if (status === 'connected') {
+        startHeartbeat();
+      } else {
+        clearHeartbeat();
+      }
+      notifyStatus(status);
+    });
+
+    unsubMessage = transport.on('message', (data: unknown) => {
+      if (typeof data === 'string') return; // raw string — ignore at event level
+      const record = data as Record<string, unknown>;
+      if (!record || typeof record !== 'object') return;
+      handleMessage(record);
+    });
+
+    transport.connect();
+  }
+
+  // ── Direct WebSocket mode ──────────────────────────
+
+  function connectDirect(): void {
+    if (closed) return;
+    const plainUrl = lastCursor
+      ? `${baseUrl}${baseUrl.includes('?') ? '&' : '?'}cursor=${encodeURIComponent(lastCursor)}`
+      : baseUrl;
+    // Query-token auth stays off by default; only the wrapper-provided
+    // mutator (legacy fallback) is applied here.
+    const url = applyQueryToken ? applyQueryToken(plainUrl) : plainUrl;
+    const protocols = resolveProtocols(opts.protocols);
+
+    ws = protocols ? new WebSocket(url, protocols) : new WebSocket(url);
+
+    ws.onopen = () => {
+      retryCount = 0;
+      reconnectDelayMs = baseDelayMs;
+      startHeartbeat();
+      notifyStatus('connected');
     };
 
-    this.ws.onmessage = (msg: MessageEvent<string>) => {
+    ws.onmessage = (event) => {
       try {
-        const raw = JSON.parse(msg.data) as EventEnvelope;
-        if (typeof raw.seq === 'number') {
-          // system.gap events carry a synthetic seq (often 0) that must NOT
-          // pollute the replay cursor — doing so resets replay to seq=0 and
-          // triggers a full backfill storm on the next reconnect.
-          if (raw.type !== 'system.gap') {
-            // Idempotent dedup: after a reconnect the server replays from the
-            // cursor; events with seq <= lastSeq were already applied and must
-            // be dropped to avoid double-applying state changes.
-            if (raw.seq <= this.lastSeq) {
-              return;
-            }
-            this.lastSeq = raw.seq;
-            this.cursor = String(raw.seq);
-          }
-        }
-        const event = raw as AnyEvent;
-        this.dispatch(event);
-      } catch (parseErr) {
-        console.error('[EventClient] Failed to parse WebSocket frame', parseErr);
+        const data = JSON.parse(event.data as string) as Record<string, unknown>;
+        handleMessage(data);
+      } catch (error) {
+        console.error('[EventStream] Dropping malformed WebSocket frame', error);
         reportApiError(
-          parseErr instanceof Error ? parseErr : new Error('Failed to parse WebSocket frame'),
-          { context: 'event_client_parse' },
+          error instanceof Error
+            ? error
+            : new Error('Malformed WebSocket frame'),
+          { context: 'event_stream_parse' },
         );
       }
     };
 
-    this.ws.onclose = () => {
-      this.ws = null;
-      this.dispatchConnection('disconnected');
-      if (!this.destroyed) {
-        this.scheduleReconnect();
-      }
+    ws.onclose = () => {
+      clearHeartbeat();
+      notifyStatus('disconnected');
+      if (!closed) scheduleReconnect();
     };
 
-    this.ws.onerror = () => {
-      console.error('[EventClient] WebSocket error — closing connection');
-      this.dispatchConnection('error', 'Edge event stream error');
-      this.ws?.close();
+    ws.onerror = () => {
+      // onclose fires after this, which triggers the reconnect.
+      console.error('[EventStream] WebSocket error — will reconnect via onclose');
     };
   }
 
-  disconnect(): void {
-    this.destroyed = true;
-    if (this.reconnectTimer !== null) {
-      clearTimeout(this.reconnectTimer);
-      this.reconnectTimer = null;
-    }
-    if (this.ws) {
-      this.ws.onclose = null;
-      this.ws.close();
-      this.ws = null;
-    }
-  }
-
-  // ── Event dispatch ─────────────────────────
-
-  on(listener: EventListener): () => void {
-    this.listeners.add(listener);
-    return () => this.listeners.delete(listener);
-  }
-
-  onConnection(listener: EventConnectionListener): () => void {
-    this.connectionListeners.add(listener);
-    return () => this.connectionListeners.delete(listener);
-  }
-
-  onType(type: string, listener: EventListener): () => void {
-    let set = this.typeListeners.get(type);
-    if (!set) {
-      set = new Set();
-      this.typeListeners.set(type, set);
-    }
-    set.add(listener);
-    return () => set?.delete(listener);
-  }
-
-  private dispatchConnection(status: EventConnectionStatus, error?: string): void {
-    for (const fn of this.connectionListeners) {
-      try {
-        fn(status, error);
-      } catch {
-        // Keep connection notifications isolated.
-      }
-    }
-  }
-
-  private dispatch(event: AnyEvent): void {
-    for (const fn of this.listeners) {
-      try {
-        fn(event);
-      } catch {
-        // Don't let one listener break others.
-      }
-    }
-    const typed = this.typeListeners.get(event.type);
-    if (typed) {
-      for (const fn of typed) {
-        try {
-          fn(event);
-        } catch {
-          // ignore
-        }
-      }
-    }
-  }
-
-  // ── Reconnection (exponential backoff) ─────
-
-  private scheduleReconnect(): void {
-    if (this.destroyed) return;
-    if (this.reconnect.maxRetries !== Infinity && this.retryCount >= this.reconnect.maxRetries) {
-      const msg = 'Max reconnect retries exceeded';
-      console.error(`[EventClient] ${msg} (${this.retryCount} attempts)`);
+  function scheduleReconnect(): void {
+    if (closed) return;
+    if (retryCount >= maxRetries) {
+      const msg = `Max retries (${maxRetries}) reached, giving up`;
+      console.error(`[EventStream] ${msg}`);
       reportApiError(new Error(msg), {
-        context: 'event_client_reconnect',
-        retryCount: this.retryCount,
-        baseUrl: this.baseUrl,
+        context: 'event_stream_reconnect',
+        retryCount,
+        baseUrl,
       });
-      this.dispatchConnection('disconnected', msg);
+      notifyStatus('disconnected');
       return;
     }
+    retryCount += 1;
 
-    this.retryCount += 1;
-    this.dispatchConnection('reconnecting', `Reconnecting (attempt ${this.retryCount})`);
+    // Exponential backoff with ±20% jitter to avoid a thundering herd.
+    const rawDelay = Math.min(reconnectDelayMs * 2, maxDelayMs);
+    const jitter = rawDelay * 0.2 * (Math.random() * 2 - 1);
+    const delay = Math.round(Math.max(0, rawDelay + jitter));
 
-    this.reconnectTimer = setTimeout(() => {
-      this.reconnectTimer = null;
-      this.connect();
-      this.currentDelayMs = Math.min(
-        this.currentDelayMs * this.reconnect.backoffFactor,
-        this.reconnect.maxDelay,
-      );
-    }, this.currentDelayMs);
+    reconnectTimer = setTimeout(() => {
+      reconnectTimer = null;
+      connectDirect();
+      reconnectDelayMs = rawDelay;
+    }, delay);
   }
 
-  // ── State ──────────────────────────────────
+  // ── Connect immediately (matches historical desktop semantics) ──
 
-  get connected(): boolean {
-    return this.ws?.readyState === WebSocket.OPEN;
+  if (providedTransport) {
+    connectViaTransport();
+  } else {
+    connectDirect();
   }
 
-  get currentCursor(): string | undefined {
-    return this.cursor;
-  }
+  // ── Return StreamHandle ─────────────────────────────
+
+  return {
+    subscribe(handler: EventHandler): () => void {
+      handlers.push(handler);
+      return () => {
+        const idx = handlers.indexOf(handler);
+        if (idx >= 0) handlers.splice(idx, 1);
+      };
+    },
+
+    onStatusChange(handler: StatusHandler): () => void {
+      statusHandlers.push(handler);
+      return () => {
+        const idx = statusHandlers.indexOf(handler);
+        if (idx >= 0) statusHandlers.splice(idx, 1);
+      };
+    },
+
+    getLatency(): number | null {
+      return latestLatencyMs;
+    },
+
+    close(): void {
+      closed = true;
+      retryCount = 0;
+      clearHeartbeat();
+      if (reconnectTimer) {
+        clearTimeout(reconnectTimer);
+        reconnectTimer = null;
+      }
+      if (unsubMessage) {
+        unsubMessage();
+        unsubMessage = null;
+      }
+      if (unsubStatus) {
+        unsubStatus();
+        unsubStatus = null;
+      }
+      if (providedTransport) {
+        providedTransport.close();
+      }
+      if (ws) {
+        ws.close();
+        ws = null;
+      }
+      handlers.length = 0;
+      statusHandlers.length = 0;
+    },
+
+    send(data: Record<string, unknown>): void {
+      if (providedTransport) {
+        providedTransport.send(data);
+      } else if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify(data));
+      }
+    },
+  };
 }
