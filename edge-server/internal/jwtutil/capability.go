@@ -1,91 +1,26 @@
 package jwtutil
 
 import (
-	"errors"
-	"strings"
-	"time"
-
-	"github.com/golang-jwt/jwt/v5"
+	sharedjwt "github.com/agenthub/pkg/jwtutil"
 )
 
-// CapabilityClaims carries the per-run authorization grant issued by Hub.
-// It binds a specific user/device to a target project for a limited-scope
-// operation (e.g., run-start).  Unlike HubClaims (which proves identity),
-// CapabilityClaims represents a delegated capability that must be presented
-// together with the identity JWT for dual-token verification.
-type CapabilityClaims struct {
-	UserID    string `json:"user_id"`
-	DeviceID  string `json:"device_id"`
-	ProjectID string `json:"project_id"`
-	Purpose   string `json:"purpose"` // e.g. "run-start" (action family)
-	// Optional fine-grained bindings (AH-SR-046). Empty means unbound / not enforced.
-	Action   string `json:"action,omitempty"`    // must equal purpose when set
-	TargetID string `json:"target_id,omitempty"` // execution target id
-	ThreadID string `json:"thread_id,omitempty"` // workspace/thread binding
-	jwt.RegisteredClaims
-}
-
-const (
-	capabilityExpectedIssuer   = "agenthub-hub"
-	capabilityExpectedAudience = "agenthub-edge"
-)
+// The capability-token contract (AH-SR-046) is owned by pkg/jwtutil — Hub
+// mints, Edge validates, one authoritative definition. This file re-exports
+// the shared symbols so edge callers keep their existing jwtutil.* imports.
+type CapabilityClaims = sharedjwt.CapabilityClaims
 
 var (
-	ErrCapabilityTokenExpired   = errors.New("capability token has expired")
-	ErrCapabilityTokenInvalid   = errors.New("capability token is invalid")
-	ErrCapabilityTokenEmpty     = errors.New("capability token is empty")
-	ErrCapabilitySecretEmpty    = errors.New("capability validation secret is empty")
-	ErrCapabilitySecretTooShort = errors.New("capability validation secret is too short")
-	errCapabilityAlgMismatch    = errors.New("capability token has invalid signing algorithm")
+	ErrCapabilityTokenExpired   = sharedjwt.ErrCapabilityTokenExpired
+	ErrCapabilityTokenInvalid   = sharedjwt.ErrCapabilityTokenInvalid
+	ErrCapabilityTokenEmpty     = sharedjwt.ErrCapabilityTokenEmpty
+	ErrCapabilitySecretEmpty    = sharedjwt.ErrCapabilitySecretEmpty
+	ErrCapabilitySecretTooShort = sharedjwt.ErrCapabilitySecretTooShort
 )
 
 // ValidateCapabilityToken validates a Hub-issued capability JWT against the
-// shared Hub JWT secret.  It returns the parsed claims on success.
-//
-// expectedDeviceID must match the device_id claim in the token.  This binds
-// the capability to the specific Edge device that Hub authorized.
+// shared Hub JWT secret. expectedDeviceID must match the device_id claim in
+// the token — this binds the capability to the specific Edge device that Hub
+// authorized.
 func ValidateCapabilityToken(tokenStr string, secret []byte, expectedDeviceID string) (*CapabilityClaims, error) {
-	if len(secret) == 0 {
-		return nil, ErrCapabilitySecretEmpty
-	}
-	if len(secret) < minSecretLen {
-		return nil, ErrCapabilitySecretTooShort
-	}
-	if strings.TrimSpace(tokenStr) == "" {
-		return nil, ErrCapabilityTokenEmpty
-	}
-	if strings.TrimSpace(expectedDeviceID) == "" {
-		return nil, ErrCapabilityTokenInvalid
-	}
-
-	token, err := jwt.ParseWithClaims(tokenStr, &CapabilityClaims{}, func(t *jwt.Token) (interface{}, error) {
-		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
-			return nil, errCapabilityAlgMismatch
-		}
-		return secret, nil
-	},
-		jwt.WithLeeway(30*time.Second),
-		jwt.WithValidMethods([]string{"HS256"}),
-		jwt.WithIssuer(capabilityExpectedIssuer),
-		jwt.WithAudience(capabilityExpectedAudience),
-	)
-	if err != nil {
-		if errors.Is(err, jwt.ErrTokenExpired) {
-			return nil, ErrCapabilityTokenExpired
-		}
-		return nil, ErrCapabilityTokenInvalid
-	}
-
-	claims, ok := token.Claims.(*CapabilityClaims)
-	if !ok || !token.Valid {
-		return nil, ErrCapabilityTokenInvalid
-	}
-	if claims.UserID == "" || claims.DeviceID == "" || claims.ProjectID == "" {
-		return nil, ErrCapabilityTokenInvalid
-	}
-	if claims.DeviceID != expectedDeviceID {
-		return nil, ErrCapabilityTokenInvalid
-	}
-
-	return claims, nil
+	return sharedjwt.ValidateCapabilityToken(tokenStr, secret, expectedDeviceID)
 }
