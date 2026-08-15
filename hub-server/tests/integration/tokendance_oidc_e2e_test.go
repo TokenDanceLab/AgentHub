@@ -4,13 +4,9 @@ package integration
 
 import (
 	"context"
-	"crypto/rand"
 	"crypto/rsa"
-	"crypto/sha256"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"math/big"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -31,6 +27,7 @@ import (
 	"github.com/agenthub/hub-server/internal/config"
 	"github.com/agenthub/hub-server/internal/jwtutil"
 	"github.com/agenthub/hub-server/internal/service/oidc"
+	"github.com/agenthub/pkg/testkit/oidcfixture"
 	"github.com/glebarez/sqlite"
 )
 
@@ -39,102 +36,18 @@ import (
 // It returns the server, the RSA private key (for signing tokens), and the host URL.
 func setupTokenDanceMockServer(t *testing.T) (*httptest.Server, *rsa.PrivateKey) {
 	t.Helper()
-
-	privKey, err := rsa.GenerateKey(rand.Reader, 2048)
-	require.NoError(t, err)
-
-	kid := computeKID(&privKey.PublicKey)
-	n := base64.RawURLEncoding.EncodeToString(privKey.PublicKey.N.Bytes())
-	e := base64.RawURLEncoding.EncodeToString(big.NewInt(int64(privKey.PublicKey.E)).Bytes())
-	jwksJSON := fmt.Sprintf(`{"keys":[{"kty":"RSA","use":"sig","alg":"RS256","kid":"%s","n":"%s","e":"%s"}]}`, kid, n, e)
-
-	mux := http.NewServeMux()
-
-	// /oidc/jwks — returns the public JWKS
-	mux.HandleFunc("GET /oidc/jwks", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		w.Write([]byte(jwksJSON))
-	})
-
-	// /oidc/authorize — returns authorization page
-	// (Hub doesn't call this directly; it generates URLs for the client to visit)
-	mux.HandleFunc("GET /oidc/authorize", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "text/html")
-		w.Write([]byte("<html><body>Mock TokenDance ID — Authorize</body></html>"))
-	})
-
-	// /oidc/token — exchanges authorization code for tokens
-	mux.HandleFunc("POST /oidc/token", func(w http.ResponseWriter, r *http.Request) {
-		if err := r.ParseForm(); err != nil {
-			w.WriteHeader(http.StatusBadRequest)
-			json.NewEncoder(w).Encode(map[string]string{"error": "invalid_request"})
-			return
-		}
-
-		grantType := r.FormValue("grant_type")
-		code := r.FormValue("code")
-		clientID := r.FormValue("client_id")
-		redirectURI := r.FormValue("redirect_uri")
-
-		// Validate required params
-		if grantType != "authorization_code" {
-			w.WriteHeader(http.StatusBadRequest)
-			json.NewEncoder(w).Encode(map[string]string{"error": "unsupported_grant_type"})
-			return
-		}
-		if code == "" || clientID == "" || redirectURI == "" {
-			w.WriteHeader(http.StatusBadRequest)
-			json.NewEncoder(w).Encode(map[string]string{"error": "invalid_request"})
-			return
-		}
-
-		// Sign an ID token
-		idToken := signMockIDToken(t, privKey, kid, clientID, "http://"+r.Host, "user-mock-"+code[:8])
-
-		resp := map[string]interface{}{
-			"access_token":  "mock-access-token-" + code[:8],
-			"token_type":    "Bearer",
-			"expires_in":    3600,
-			"id_token":      idToken,
-			"refresh_token": "mock-refresh-token-" + code[:8],
-			"scope":         "openid profile email",
-		}
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(resp)
-	})
-
-	server := httptest.NewServer(mux)
-	return server, privKey
+	provider := oidcfixture.NewServer(t)
+	return provider.Server, provider.Key.Private
 }
 
 // signMockIDToken signs a JWT ID token with the given RSA private key.
 func signMockIDToken(t *testing.T, privKey *rsa.PrivateKey, kid, aud, iss, sub string) string {
-	t.Helper()
-	now := time.Now()
-	claims := jwtutil.TokenDanceClaims{
-		Email:         sub + "@tokendance.test",
-		EmailVerified: true,
-		Name:          "Mock User " + sub,
-		RegisteredClaims: jwt.RegisteredClaims{
-			Issuer:    iss,
-			Subject:   sub,
-			Audience:  jwt.ClaimStrings{aud},
-			ExpiresAt: jwt.NewNumericDate(now.Add(time.Hour)),
-			IssuedAt:  jwt.NewNumericDate(now),
-		},
-	}
-	token := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
-	token.Header["kid"] = kid
-	signed, err := token.SignedString(privKey)
-	require.NoError(t, err)
-	return signed
+	return oidcfixture.SignToken(t, privKey, kid, iss, aud, sub, sub+"@tokendance.test", "Mock User "+sub)
 }
 
 // computeKID generates a deterministic key ID from an RSA public key.
 func computeKID(pub *rsa.PublicKey) string {
-	hash := sha256.Sum256(pub.N.Bytes())
-	return base64.RawURLEncoding.EncodeToString(hash[:16])
+	return oidcfixture.ComputeKID(pub)
 }
 
 func oidcE2EDeviceID(label string) string {
