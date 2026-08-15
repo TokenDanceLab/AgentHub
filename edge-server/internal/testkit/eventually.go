@@ -1,42 +1,25 @@
-// Package testkit provides shared deterministic-test helpers (#1550):
-// channel/condition waits with explicit deadlines instead of fixed sleeps or
-// unbounded polling.
+// Package testkit re-exports the shared deterministic-test helpers owned by
+// pkg/testkit (#1550). edge callers keep their existing testkit.* imports.
 package testkit
 
 import (
 	"testing"
 	"time"
-)
 
-// pollInterval is the default condition poll cadence.
-const pollInterval = 5 * time.Millisecond
+	pkgtestkit "github.com/agenthub/pkg/testkit"
+)
 
 // WaitFor blocks until done closes or timeout expires, failing the test on
 // timeout. Prefer this over time.Sleep when waiting for an event.
 func WaitFor(t *testing.T, timeout time.Duration, done <-chan struct{}, msg string) {
 	t.Helper()
-	select {
-	case <-done:
-	case <-time.After(timeout):
-		t.Fatalf("%s (timed out after %v)", msg, timeout)
-	}
+	pkgtestkit.WaitFor(t, timeout, done, msg)
 }
 
-// Eventually polls cond every pollInterval until it returns true or timeout
-// expires. On timeout the test fails with msg; dump (optional) is appended to
-// the failure message to show component state at the moment of failure.
+// Eventually polls cond every 5ms until it returns true or timeout expires.
+// On timeout the test fails with msg; dump (optional) is appended to the
+// failure message to show component state at the moment of failure.
 func Eventually(t *testing.T, timeout time.Duration, cond func() bool, msg string, dump func() string) {
 	t.Helper()
-	deadline := time.Now().Add(timeout)
-	for time.Now().Before(deadline) {
-		if cond() {
-			return
-		}
-		time.Sleep(pollInterval)
-	}
-	extra := ""
-	if dump != nil {
-		extra = "\n" + dump()
-	}
-	t.Fatalf("%s (timed out after %v)%s", msg, timeout, extra)
+	pkgtestkit.Eventually(t, timeout, cond, msg, dump)
 }
