@@ -284,9 +284,7 @@ UI 工作流变更必须有行为断言，不只截图：共享 unit/contract + 
 - **三端版本同步**：desktop（package.json + tauri.conf.json）版本必须与 tag 一致；web/mobile 版本落后 desktop 时在 release notes 中注明，不单独打三份 tag。
 - **禁止**：同一 minor 内反复 bump minor；tag 打后 24 小时内再打同 minor 的新 minor（patch 除外）；1.0 前打 `v1.x`。
 
-发布平台策略（2026-08-11）：**Windows 是唯一桌面发布目标**（NSIS 安装包 + 便携 zip），macOS 桌面/公证不在范围内；Go 服务端二进制保留跨平台（Linux/Windows/darwin）；Android APK 走 `RELEASE_MOBILE_ENABLED` 门控（EAS）。代码签名：无商业证书时走 unsigned 策略（`RELEASE_UNSIGNED_OK=true`，SmartScreen 提示、updater 自签可用）；签名证书就绪后改用 `RELEASE_SIGNING_APPROVED=true` + 签名证据。
-
-Release 自动化的产物命名、双语 release notes（git-cliff 按 conventional commits 分类生成，配置见 `cliff.toml`）与 SHA256SUMS 校验和由 release.yml 维护，改动须过 `release-readiness.yml` 门禁。
+平台策略（Windows 唯一桌面目标、macOS 停用、NSIS+portable、`RELEASE_MOBILE_ENABLED`/`RELEASE_UNSIGNED_OK`/`RELEASE_SIGNING_APPROVED` 门控）与产物命名/双语 release notes/SHA256SUMS 细节均在 `docs/developer-quickstart.md` §发布 tag SOP 步骤 4；release.yml 改动须过 `release-readiness.yml` 门禁。
 
 发布后按 `docs/developer-quickstart.md` §发布 tag SOP 步骤 5 核对产物（14 项 + 描述）；release job 失败按步骤 6 重发（移 tag → 删旧 release → 重推，softprops 不覆盖已存在 release）。
 

@@ -192,7 +192,7 @@ def check_required_markers() -> None:
 
 
 def check_forbidden_patterns() -> None:
-    allowed_claude_mentions = ["AGENTS.md", "docs/progress/MASTER.md"]
+    allowed_claude_mentions = ["AGENTS.md"]
     forbidden = [
         (r"AGENTS\.md\s*/\s*CLAUDE\.md", "legacy AGENTS/CLAUDE dual-rule wording"),
         (r"STATE\.md", "root STATE.md as an active project fact source"),
@@ -262,7 +262,6 @@ def check_max_lines() -> None:
         "docs/governance/security-risk-register.md": 180,
         "docs/governance/threat-model.md": 140,
         "docs/governance/governance-execution.md": 110,
-        "docs/progress/MASTER.md": 150,
     }
     for path, limit in limits.items():
         if exists(path) and line_count(path) > limit:

@@ -12,7 +12,7 @@
 | **功能设计** | [architecture.md](architecture.md) | [decisions.md](decisions.md) |
 | **历史追溯** | [history.md](history.md) · [archives/](archives/) | TokenDance docs 外部归档 |
 
-端口速记：Desktop/Tauri `5173`，Web `5174`，Mobile RN Expo `5177`，Hub `8080`，Edge `3210`。
+端口规则（Vite strict 端口）见 [../AGENTS.md](../AGENTS.md) §2；部署端口全景（含 PG/Redis/admin）见 [architecture/05-deployment.md](architecture/05-deployment.md)。
 
 ## 目录结构
 
