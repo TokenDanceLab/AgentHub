@@ -10,15 +10,14 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
+
+	sharedjwt "github.com/agenthub/pkg/jwtutil"
 )
 
-type Claims struct {
-	UserID     string `json:"user_id"`
-	DeviceType string `json:"device_type"`
-	DeviceID   string `json:"device_id"`
-	Purpose    string `json:"purpose,omitempty"`
-	jwt.RegisteredClaims
-}
+// Claims is the Hub-issued HS256 session token payload. Alias of the shared
+// pkg/jwtutil.HubSessionClaims single source (#1675 P1) — edge verifies the
+// same struct via its own alias, so the wire contract cannot drift.
+type Claims = sharedjwt.HubSessionClaims
 
 // newJTI returns a cryptographically random JWT ID (jti) for access-token
 // revocation. Opaque base64url; uniqueness is the only requirement.
