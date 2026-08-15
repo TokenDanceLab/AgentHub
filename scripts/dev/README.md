@@ -25,6 +25,14 @@
    `AGENTHUB_TOKENDANCE_ID_*`、`AGENTHUB_JWT_SECRET`）；缺键时 `start`
    会 fail-closed 并指出缺哪个键，值永不出服务器。
 
+4. 服务器出站受限，Go 需禁用 sumdb 校验，否则 `go test` 会因查
+   `sum.golang.org` 超时而失败（`go.work.sum`/`go.sum` 已提交校验和，
+   离线禁用 sumdb 安全）。一次性在服务器配置：
+
+   ```bash
+   go env -w GOSUMDB=off GONOSUMDB='*'
+   ```
+
 ### 证据纪律
 
 - `sync` 只在服务器工作树干净时允许快进；脏树先处理（避免证据跑在
