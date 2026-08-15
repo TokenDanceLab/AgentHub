@@ -13,8 +13,8 @@ import (
 
 	"github.com/agenthub/hub-server/internal/metrics"
 	"github.com/agenthub/hub-server/internal/middleware"
-	"github.com/agenthub/hub-server/internal/safego"
 	"github.com/agenthub/hub-server/internal/ws"
+	"github.com/agenthub/pkg/safego"
 )
 
 type WebSocketHandler struct {
