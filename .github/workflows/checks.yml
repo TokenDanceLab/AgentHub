@@ -114,15 +114,13 @@ jobs:
           key: sa-tools-2026-08
 
       - name: Security scan (gosec)
-        # Wave 10: advisory; pre-existing security findings not yet zero-baselined.
-        # Binary cached across runs (same pattern as staticcheck); go run
-        # re-downloads/recompiles gosec every job (~30s) without it.
-        continue-on-error: true
+        # #1574: hard fail (findings zero-baselined). Fail-closed wrapper
+        # verify-gosec-gates.sh rejects empty/unparseable output (no false green).
         run: |
           if [ ! -x ~/go/bin/gosec ]; then
             go install github.com/securego/gosec/v2/cmd/gosec@v2.28.0
           fi
-          ~/go/bin/gosec ./...
+          ~/go/bin/gosec -fmt=json ./... 2>/dev/null | ../scripts/verify/verify-gosec-gates.sh
       - name: Vet
         run: go vet ./...
 
@@ -279,13 +277,12 @@ jobs:
           key: sa-tools-2026-08
 
       - name: Security scan (gosec)
-        # Wave 10: advisory matching go-edge; binary cached same as staticcheck.
-        continue-on-error: true
+        # #1574: hard fail (findings zero-baselined), matching go-edge.
         run: |
           if [ ! -x ~/go/bin/gosec ]; then
             go install github.com/securego/gosec/v2/cmd/gosec@v2.28.0
           fi
-          ~/go/bin/gosec ./...
+          ~/go/bin/gosec -fmt=json ./... 2>/dev/null | ../scripts/verify/verify-gosec-gates.sh
 
       - name: Vet
         run: go vet ./...
