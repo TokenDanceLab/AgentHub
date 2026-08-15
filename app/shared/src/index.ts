@@ -369,17 +369,12 @@ export type {
   WorkbenchDemoSurface,
 } from './demo';
 
-export {
-  createMockPlatform,
-} from './platform';
 export type {
   AgentHubPlatform,
   AgentHubSurface,
   AttachmentPort,
   ConversationKind,
   ConversationPort,
-  MockPlatform,
-  MockPlatformSeed,
   RunPort,
   SurfaceCapabilities,
   WorkbenchAgent,

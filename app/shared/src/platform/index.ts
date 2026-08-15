@@ -1,11 +1,7 @@
 export {
-  createMockPlatform,
   createMockTerminalPort,
-  createMockWorkspaceFilesPort,
-  createMockWorkspaceGitPort,
 } from './createMockPlatform';
 export { resolveEvidencePreviewTarget } from './previewTargets';
-export type { MockPlatform, MockPlatformSeed, MockTerminalPort } from './createMockPlatform';
 export type {
   AgentHubPlatform,
   AgentHubSurface,
