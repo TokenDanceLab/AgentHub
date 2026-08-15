@@ -125,6 +125,25 @@ Mobile 主线是 Expo + React Native development build。旧 Tauri Mobile 不再
 
 前端 CI 易踩坑（exactOptionalPropertyTypes / noUncheckedIndexedAccess / CSS helper 类型 / DesignNavIcon / 11px CJK 下限 / changes job）见 `docs/architecture/04-frontend-data-flow.md` §前端 CI 易踩坑。
 
+## 5.5 测试分层（L0-L4）
+
+分层是执行入口的事实描述，不是可选约定；每层对应的 Makefile 目标与 CI job 必须一致。
+
+| 层 | 内容 | 入口 | CI job |
+|---|---|---|---|
+| L0 单元 | Go `-short`（零依赖）+ 前端 vitest | `make test` / `make fe-test` | `go-edge` / `go-hub` / `frontend-*`（checks.yml） |
+| L1 集成 | Go 集成（真实 PG16+Redis7，OIDC mock，`-tags integration`） | `make test-hub-integration`（先 `scripts/dev/dev-up.sh` 起容器） | `backend-integration`（service 容器） |
+| L2 回调 E2E | Edge→Hub 回调链路（进程内 mock hub / fixture smoke） | `make test-edge-e2e` / `make e2e-local` | `backend-edge-e2e` / `backend-e2e-fixture` |
+| L3 真实 E2E | Playwright 真实登录/聊天流（真实 ID+Hub+Edge 栈） | 远程 dev 服务器（`scripts/dev/`，见 #1681） | 仓库自认空白（`wsl-full-stack-e2e.sh` WSL 专属） |
+| L4 发布门禁 | 打包/安装器/真实证据 | `release-readiness.yml` | `release-readiness` |
+
+规则：
+
+- L0-L2 是 PR merge 门禁（squash 前必须绿）；L3 在远程 dev 服务器手动/脚本执行并落证据（`tests/artifacts/`，gitignore）；L4 是发布门禁。
+- 异步等待一律 `pkg/testkit` 的 `Eventually`/`WaitFor`，禁止裸 `time.Sleep` 轮询回调（docstring 明示 Prefer this over time.Sleep）。
+- 前端 coverage 契约由 `app/test-config/coverage.ts` factory 强制生产源码全量进分母，阈值在各 package `vitest.config.ts`（CI/本地同源，禁止两套阈值漂移）。
+- 证据等级（9 级，见 `scripts/verify/verify-real-e2e-contract.py`）与分层正交：L3 内按证据等级记录 real_tested 状态。
+
 ## 6. Git 和 worktree
 
 合并路径（2026-07 起简化）：
