@@ -1,6 +1,7 @@
 package lifecycle
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -8,6 +9,7 @@ import (
 	"github.com/agenthub/edge-server/internal/adapters"
 	"github.com/agenthub/edge-server/internal/events"
 	"github.com/agenthub/edge-server/internal/store"
+	"github.com/agenthub/edge-server/internal/testkit"
 )
 
 // newCoalesceTestEmitter builds a hubCallbackEmitter wired to a recording
@@ -36,19 +38,14 @@ func newCoalesceTestEmitter(t *testing.T, runID string) (*hubCallbackEmitter, *r
 
 func waitForStreams(t *testing.T, cb *recordingHubCallback, want int) {
 	t.Helper()
-	deadline := time.Now().Add(3 * time.Second)
-	for time.Now().Before(deadline) {
+	testkit.Eventually(t, 3*time.Second, func() bool {
 		cb.mu.Lock()
 		got := len(cb.streams)
 		cb.mu.Unlock()
-		if got >= want {
-			return
-		}
-		time.Sleep(5 * time.Millisecond)
-	}
-	cb.mu.Lock()
-	defer cb.mu.Unlock()
-	t.Fatalf("expected %d stream callbacks, got %d: %v", want, len(cb.streams), cb.streams)
+		return got >= want
+	}, fmt.Sprintf("stream callbacks >= %d", want), func() string {
+		return fmt.Sprintf("streams=%d", len(cb.streams))
+	})
 }
 
 func deltaEvent(text string) (string, map[string]any) {
