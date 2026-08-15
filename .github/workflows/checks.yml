@@ -120,7 +120,7 @@ jobs:
           if [ ! -x ~/go/bin/gosec ]; then
             go install github.com/securego/gosec/v2/cmd/gosec@v2.28.0
           fi
-          ~/go/bin/gosec -fmt=json ./... 2>/dev/null | ../scripts/verify/verify-gosec-gates.sh
+          ~/go/bin/gosec -fmt=json ./... 2>/dev/null | bash ../scripts/verify/verify-gosec-gates.sh
       - name: Vet
         run: go vet ./...
 
@@ -282,7 +282,7 @@ jobs:
           if [ ! -x ~/go/bin/gosec ]; then
             go install github.com/securego/gosec/v2/cmd/gosec@v2.28.0
           fi
-          ~/go/bin/gosec -fmt=json ./... 2>/dev/null | ../scripts/verify/verify-gosec-gates.sh
+          ~/go/bin/gosec -fmt=json ./... 2>/dev/null | bash ../scripts/verify/verify-gosec-gates.sh
 
       - name: Vet
         run: go vet ./...
