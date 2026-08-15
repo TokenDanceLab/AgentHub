@@ -91,15 +91,6 @@
       "review_by": "2026-10-01"
     },
     {
-      "location": "frontend-coverage: Verify coverage baseline",
-      "kind": "continue-on-error",
-      "reason": "new components/stories lowered measured coverage; re-baseline after tests catch up (#1577)",
-      "issue": 1573,
-      "owner": "frontend-owners",
-      "introduced_at": "2026-08-11",
-      "review_by": "2026-10-01"
-    },
-    {
       "location": "vuln-scan-rust: cargo clippy (advisory)",
       "kind": "continue-on-error",
       "reason": "24 clippy warnings not yet zero-baselined; advisory until debt repaid (#1578)",
