@@ -1,11 +1,11 @@
 package lifecycle
 
 import (
-	"crypto/rand"
 	"errors"
-	"fmt"
 	"os/exec"
 	"strings"
+
+	"github.com/google/uuid"
 )
 
 // isSessionConflictError returns true when the error message or the process
@@ -50,10 +50,5 @@ func isSessionConflictError(err error, stderrOutput string) bool {
 // newRandomSessionID generates a random UUID v4 string for retrying CC
 // sessions when the deterministic session ID conflicts with a stale process.
 func newRandomSessionID() string {
-	var uuid [16]byte
-	_, _ = rand.Read(uuid[:])
-	uuid[6] = (uuid[6] & 0x0f) | 0x40 // version 4
-	uuid[8] = (uuid[8] & 0x3f) | 0x80 // variant 2
-	return fmt.Sprintf("%x-%x-%x-%x-%x",
-		uuid[0:4], uuid[4:6], uuid[6:8], uuid[8:10], uuid[10:16])
+	return uuid.NewString()
 }
