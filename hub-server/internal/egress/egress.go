@@ -1,8 +1,8 @@
-// Package egress provides the canonical outbound HTTP transport for the Hub
-// (#1540). Before this package, outbound calls (e.g. execution-target health
-// pings) built their own http.Client and dialed user-supplied addresses
-// directly — no address classification, no DNS-rebinding defense, no redirect
-// policy. That is the SSRF hole this package closes.
+// Package egress provides the fail-closed outbound dial for user-controllable
+// target addresses (#1540). Before this package, execution-target health pings
+// built their own http.Client and dialed user-supplied addresses directly —
+// no address classification, no DNS-rebinding defense, no redirect policy.
+// That is the SSRF hole this package closes.
 //
 // Contract (fail-closed):
 //   - Default deny: loopback, unspecified, multicast, link-local, RFC1918,
@@ -16,8 +16,14 @@
 //   - HTTPS is the default scheme; plain HTTP requires explicit
 //     AllowPlainHTTP (trusted local policy).
 //
-// #1549 (outbound HTTP/config injection consolidation) must reuse this
-// transport as the single dial path instead of building new clients.
+// Trust boundary (#1549): egress guards user-controllable targets
+// (execution-target ping addresses). Admin-configured fixed endpoints — Edge
+// dispatch (AGENTHUB_EDGE_URL), OIDC issuer/JWKS — use
+// internal/outboundhttp.NewClient, whose trust boundary is the configuration
+// itself; both share the same principles (redirect refusal, bounded timeout,
+// body limit via outboundhttp.ReadLimited) and are wired at the composition
+// root. #1549's design is "a small number of purpose-specific clients", not a
+// single universal dial path.
 package egress
 
 import (
