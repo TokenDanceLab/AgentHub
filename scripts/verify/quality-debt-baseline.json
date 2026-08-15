@@ -19,27 +19,9 @@
       "review_by": "2026-10-01"
     },
     {
-      "location": "go-edge: Security scan (gosec)",
-      "kind": "continue-on-error",
-      "reason": "gosec @latest introduces rules tripping pre-existing code; advisory until findings triaged (#1574)",
-      "issue": 1573,
-      "owner": "edge-owners",
-      "introduced_at": "2026-08-11",
-      "review_by": "2026-10-01"
-    },
-    {
       "location": "go-hub: Verify Hub lint fingerprint ratchet (#1573)",
       "kind": "continue-on-error",
       "reason": "CI golangci-lint version produces findings differing from local baseline; re-baseline on CI before re-hardening (#1573)",
-      "issue": 1573,
-      "owner": "hub-owners",
-      "introduced_at": "2026-08-11",
-      "review_by": "2026-10-01"
-    },
-    {
-      "location": "go-hub: Security scan (gosec)",
-      "kind": "continue-on-error",
-      "reason": "gosec @latest advisory matching go-edge until findings triaged (#1574)",
       "issue": 1573,
       "owner": "hub-owners",
       "introduced_at": "2026-08-11",

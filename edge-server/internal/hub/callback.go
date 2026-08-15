@@ -428,8 +428,7 @@ func (c *CallbackClient) retryDelay(attempt int, lastRetryAfter time.Duration) t
 const callbackJitterFraction = 0.25
 
 // applyCallbackJitter applies a symmetric ±25% jitter to delay. A zero/negative
-// delay is returned unchanged. #nosec G404 -- backoff jitter only; randomness
-// is not security-sensitive.
+// delay is returned unchanged.
 func applyCallbackJitter(delay time.Duration) time.Duration {
 	if delay <= 0 {
 		return delay
@@ -439,6 +438,7 @@ func applyCallbackJitter(delay time.Duration) time.Duration {
 		return delay
 	}
 	// rand.Int63n(2*jitter+1) ∈ [0, 2*jitter]; shift to [-jitter, +jitter].
+	// #nosec G404 -- backoff jitter only; randomness is not security-sensitive.
 	delta := rand.Int63n(2*jitter+1) - jitter
 	return delay + time.Duration(delta)
 }
