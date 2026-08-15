@@ -36,6 +36,7 @@ coverage/
 playwright-report/
 test-results/
 test-results.json
+results.json
 tests/results/
 **/coverage.out
 **/coverage.html
