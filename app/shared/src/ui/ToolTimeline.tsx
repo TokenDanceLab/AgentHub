@@ -1,5 +1,5 @@
 import { CheckSquare, FileText, GitFork, Route, Wrench } from 'lucide-react';
-import { RuntimeBrandIcon } from '../workbench/RuntimeBrandIcon';
+import { RuntimeBrandIcon } from './RuntimeIcon';
 import styles from './ToolTimeline.module.css';
 
 // ── Minimal block shapes for the timeline ──────────────────────────
