@@ -190,6 +190,38 @@ func TestAuthMiddlewareSetsContextValues(t *testing.T) {
 	}
 }
 
+// TestAuthMiddlewareNilVerifierWithTokenDanceConfig is the regression for the
+// nil-receiver panic: integration tests (and any other caller) construct the
+// middleware with a nil tdVerifier while TokenDance ID IS configured — the
+// old guard checked only cfg and dereferenced nil inside the timeout
+// goroutine. With a nil verifier the RS256 path must be skipped and the
+// local HS256 token must still authenticate.
+func TestAuthMiddlewareNilVerifierWithTokenDanceConfig(t *testing.T) {
+	token := makeToken("user-nil-verifier", "desktop", "dev-nil-verifier")
+
+	cfg := testConfig()
+	cfg.TokenDanceID.IssuerURL = "https://id.example.invalid"
+	cfg.TokenDanceID.ClientID = "configured-client"
+
+	c, w := ginRequest(http.MethodGet, "/client/users/me", "Bearer "+token)
+	handler := newTestAuthMW(cfg, AuthDependencies{}, nil).Handler()
+	handler(c)
+	next := func(*gin.Context) {}
+	if !c.IsAborted() {
+		next(c)
+	}
+
+	if c.IsAborted() {
+		t.Fatalf("expected local HS256 fallback to authenticate, status=%d body=%s", w.Code, w.Body.String())
+	}
+	if got := c.GetString("user_id"); got != "user-nil-verifier" {
+		t.Fatalf("user_id = %q, want user-nil-verifier", got)
+	}
+	if got := c.GetString("auth_source"); got != "hub_local" {
+		t.Fatalf("auth_source = %q, want hub_local", got)
+	}
+}
+
 func TestAuthMiddlewareTokenDanceBearerDoesNotSatisfyDesktopDeviceCheck(t *testing.T) {
 	token, issuer, audience, jwks := makeTokenDanceMiddlewareToken(t)
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

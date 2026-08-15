@@ -16,6 +16,24 @@ import (
 	"github.com/agenthub/hub-server/internal/model"
 )
 
+// Edge 回调 handler 通过 taskIDParam 校验 :id 必须是 UUID（非 UUID 返回 400
+// 而非数据库 22P02 500，#f5d4f8969）。fixture task id 使用固定合法 UUID，
+// 保证断言可读且经过 normalize 后不变。
+const (
+	edgeTaskID001     = "00000000-0000-4000-8000-000000000001"
+	edgeTaskID002     = "00000000-0000-4000-8000-000000000002"
+	edgeTaskID003     = "00000000-0000-4000-8000-000000000003"
+	edgeTaskID004     = "00000000-0000-4000-8000-000000000004"
+	edgeTaskID005     = "00000000-0000-4000-8000-000000000005"
+	edgeTaskID006     = "00000000-0000-4000-8000-000000000006"
+	edgeTaskID007     = "00000000-0000-4000-8000-000000000007"
+	edgeTaskID008     = "00000000-0000-4000-8000-000000000008"
+	edgeTaskID009     = "00000000-0000-4000-8000-000000000009"
+	edgeTaskIDMissing = "00000000-0000-4000-8000-0000000000ff"
+	edgeTaskLifecycle = "00000000-0000-4000-8000-0000000000a1"
+	edgeTaskFail      = "00000000-0000-4000-8000-0000000000b1"
+)
+
 // ── Mock services ──────────────────────────────────────────────────────────
 
 // mockEdgeAgentService implements handler.AgentService for edge callback tests.
@@ -218,11 +236,11 @@ func TestEdgeAgentTaskAck(t *testing.T) {
 	}
 	h := handler.NewAgentHandler(svc)
 
-	c, w := newEdgeGinCtx("POST", "/edge/agent-tasks/task-001/ack", map[string]string{
+	c, w := newEdgeGinCtx("POST", "/edge/agent-tasks/"+edgeTaskID001+"/ack", map[string]string{
 		"run_id": "run-edge-001",
 	},
 		"user_id", "user-1", "device_type", "desktop", "device_id", "device-1")
-	c.Params = gin.Params{{Key: "id", Value: "task-001"}}
+	c.Params = gin.Params{{Key: "id", Value: edgeTaskID001}}
 	h.TaskAck(c)
 
 	if w.Code != 200 {
@@ -232,8 +250,8 @@ func TestEdgeAgentTaskAck(t *testing.T) {
 	if resp.GetCode() != errcode.OK.Code {
 		t.Fatalf("expected OK, got %s: %s", resp.Code, resp.Code)
 	}
-	if ackedTaskID != "task-001" {
-		t.Errorf("acked task ID = %q, want task-001", ackedTaskID)
+	if ackedTaskID != edgeTaskID001 {
+		t.Errorf("acked task ID = %q, want %s", ackedTaskID, edgeTaskID001)
 	}
 	if ackedEdgeUserID != "user-1" {
 		t.Errorf("acked edge user ID = %q, want user-1", ackedEdgeUserID)
@@ -254,9 +272,9 @@ func TestEdgeAgentTaskAckNotFound(t *testing.T) {
 	}
 	h := handler.NewAgentHandler(svc)
 
-	c, w := newEdgeGinCtx("POST", "/edge/agent-tasks/task-missing/ack", nil,
+	c, w := newEdgeGinCtx("POST", "/edge/agent-tasks/"+edgeTaskIDMissing+"/ack", nil,
 		"user_id", "user-1", "device_type", "desktop")
-	c.Params = gin.Params{{Key: "id", Value: "task-missing"}}
+	c.Params = gin.Params{{Key: "id", Value: edgeTaskIDMissing}}
 	h.TaskAck(c)
 
 	if w.Code != 404 {
@@ -290,11 +308,11 @@ func TestEdgeAgentTaskStream(t *testing.T) {
 	}
 	h := handler.NewAgentHandler(svc)
 
-	c, w := newEdgeGinCtx("POST", "/edge/agent-tasks/task-002/stream", map[string]any{
+	c, w := newEdgeGinCtx("POST", "/edge/agent-tasks/"+edgeTaskID002+"/stream", map[string]any{
 		"content": "Hello from Edge runner!",
 		"run_id":  "run-edge-002",
 	}, "user_id", "user-1", "device_type", "desktop", "device_id", "device-1")
-	c.Params = gin.Params{{Key: "id", Value: "task-002"}}
+	c.Params = gin.Params{{Key: "id", Value: edgeTaskID002}}
 	h.TaskStream(c)
 
 	if w.Code != 200 {
@@ -304,8 +322,8 @@ func TestEdgeAgentTaskStream(t *testing.T) {
 	if resp.GetCode() != errcode.OK.Code {
 		t.Fatalf("expected OK, got %s: %s", resp.Code, resp.Code)
 	}
-	if captured.taskID != "task-002" {
-		t.Errorf("taskID = %q, want task-002", captured.taskID)
+	if captured.taskID != edgeTaskID002 {
+		t.Errorf("taskID = %q, want %s", captured.taskID, edgeTaskID002)
 	}
 	if captured.edgeUserID != "user-1" {
 		t.Errorf("edgeUserID = %q, want user-1", captured.edgeUserID)
@@ -332,10 +350,10 @@ func TestEdgeAgentTaskStreamMultipleChunks(t *testing.T) {
 	h := handler.NewAgentHandler(svc)
 
 	for i, chunk := range []string{"chunk-1\n", "chunk-2\n", "chunk-3"} {
-		c, w := newEdgeGinCtx("POST", "/edge/agent-tasks/task-003/stream", map[string]any{
+		c, w := newEdgeGinCtx("POST", "/edge/agent-tasks/"+edgeTaskID003+"/stream", map[string]any{
 			"content": chunk,
 		}, "user_id", "user-1", "device_type", "desktop")
-		c.Params = gin.Params{{Key: "id", Value: "task-003"}}
+		c.Params = gin.Params{{Key: "id", Value: edgeTaskID003}}
 		h.TaskStream(c)
 
 		if w.Code != 200 {
@@ -356,9 +374,9 @@ func TestEdgeAgentTaskStreamBadRequest(t *testing.T) {
 	h := handler.NewAgentHandler(svc)
 
 	// Missing required "content" field.
-	c, w := newEdgeGinCtx("POST", "/edge/agent-tasks/task-004/stream", map[string]any{},
+	c, w := newEdgeGinCtx("POST", "/edge/agent-tasks/"+edgeTaskID004+"/stream", map[string]any{},
 		"user_id", "user-1", "device_type", "desktop")
-	c.Params = gin.Params{{Key: "id", Value: "task-004"}}
+	c.Params = gin.Params{{Key: "id", Value: edgeTaskID004}}
 	h.TaskStream(c)
 
 	if w.Code != 400 {
@@ -374,10 +392,10 @@ func TestEdgeAgentTaskStreamNotFound(t *testing.T) {
 	}
 	h := handler.NewAgentHandler(svc)
 
-	c, w := newEdgeGinCtx("POST", "/edge/agent-tasks/task-missing/stream", map[string]any{
+	c, w := newEdgeGinCtx("POST", "/edge/agent-tasks/"+edgeTaskIDMissing+"/stream", map[string]any{
 		"content": "some output",
 	}, "user_id", "user-1", "device_type", "desktop")
-	c.Params = gin.Params{{Key: "id", Value: "task-missing"}}
+	c.Params = gin.Params{{Key: "id", Value: edgeTaskIDMissing}}
 	h.TaskStream(c)
 
 	if w.Code != 404 {
@@ -407,11 +425,11 @@ func TestEdgeAgentTaskDone(t *testing.T) {
 	}
 	h := handler.NewAgentHandler(svc)
 
-	c, w := newEdgeGinCtx("POST", "/edge/agent-tasks/task-005/done", map[string]any{
+	c, w := newEdgeGinCtx("POST", "/edge/agent-tasks/"+edgeTaskID005+"/done", map[string]any{
 		"final_content": "Task completed successfully.",
 		"run_id":        "run-edge-005",
 	}, "user_id", "user-1", "device_type", "desktop", "device_id", "device-1")
-	c.Params = gin.Params{{Key: "id", Value: "task-005"}}
+	c.Params = gin.Params{{Key: "id", Value: edgeTaskID005}}
 	h.TaskDone(c)
 
 	if w.Code != 200 {
@@ -421,8 +439,8 @@ func TestEdgeAgentTaskDone(t *testing.T) {
 	if resp.GetCode() != errcode.OK.Code {
 		t.Fatalf("expected OK, got %s: %s", resp.Code, resp.Code)
 	}
-	if captured.taskID != "task-005" {
-		t.Errorf("taskID = %q, want task-005", captured.taskID)
+	if captured.taskID != edgeTaskID005 {
+		t.Errorf("taskID = %q, want %s", captured.taskID, edgeTaskID005)
 	}
 	if captured.edgeUserID != "user-1" {
 		t.Errorf("edgeUserID = %q, want user-1", captured.edgeUserID)
@@ -449,9 +467,9 @@ func TestEdgeAgentTaskDoneWithoutContent(t *testing.T) {
 	h := handler.NewAgentHandler(svc)
 
 	// final_content is optional — handler binds it as empty string if omitted.
-	c, w := newEdgeGinCtx("POST", "/edge/agent-tasks/task-006/done", map[string]any{},
+	c, w := newEdgeGinCtx("POST", "/edge/agent-tasks/"+edgeTaskID006+"/done", map[string]any{},
 		"user_id", "user-1", "device_type", "desktop")
-	c.Params = gin.Params{{Key: "id", Value: "task-006"}}
+	c.Params = gin.Params{{Key: "id", Value: edgeTaskID006}}
 	h.TaskDone(c)
 
 	if w.Code != 200 {
@@ -470,10 +488,10 @@ func TestEdgeAgentTaskDoneAlreadyFinished(t *testing.T) {
 	}
 	h := handler.NewAgentHandler(svc)
 
-	c, w := newEdgeGinCtx("POST", "/edge/agent-tasks/task-007/done", map[string]any{
+	c, w := newEdgeGinCtx("POST", "/edge/agent-tasks/"+edgeTaskID007+"/done", map[string]any{
 		"final_content": "done",
 	}, "user_id", "user-1", "device_type", "desktop")
-	c.Params = gin.Params{{Key: "id", Value: "task-007"}}
+	c.Params = gin.Params{{Key: "id", Value: edgeTaskID007}}
 	h.TaskDone(c)
 
 	if w.Code != 400 {
@@ -503,11 +521,11 @@ func TestEdgeAgentTaskFail(t *testing.T) {
 	}
 	h := handler.NewAgentHandler(svc)
 
-	c, w := newEdgeGinCtx("POST", "/edge/agent-tasks/task-008/fail", map[string]any{
+	c, w := newEdgeGinCtx("POST", "/edge/agent-tasks/"+edgeTaskID008+"/fail", map[string]any{
 		"error":  "runner process crashed: signal 11",
 		"run_id": "run-edge-008",
 	}, "user_id", "user-1", "device_type", "desktop", "device_id", "device-1")
-	c.Params = gin.Params{{Key: "id", Value: "task-008"}}
+	c.Params = gin.Params{{Key: "id", Value: edgeTaskID008}}
 	h.TaskFail(c)
 
 	if w.Code != 200 {
@@ -517,8 +535,8 @@ func TestEdgeAgentTaskFail(t *testing.T) {
 	if resp.GetCode() != errcode.OK.Code {
 		t.Fatalf("expected OK, got %s: %s", resp.Code, resp.Code)
 	}
-	if captured.taskID != "task-008" {
-		t.Errorf("taskID = %q, want task-008", captured.taskID)
+	if captured.taskID != edgeTaskID008 {
+		t.Errorf("taskID = %q, want %s", captured.taskID, edgeTaskID008)
 	}
 	if captured.edgeUserID != "user-1" {
 		t.Errorf("edgeUserID = %q, want user-1", captured.edgeUserID)
@@ -543,9 +561,9 @@ func TestEdgeAgentTaskFailBadRequest(t *testing.T) {
 	h := handler.NewAgentHandler(svc)
 
 	// Missing required "error" field.
-	c, w := newEdgeGinCtx("POST", "/edge/agent-tasks/task-009/fail", map[string]any{},
+	c, w := newEdgeGinCtx("POST", "/edge/agent-tasks/"+edgeTaskID009+"/fail", map[string]any{},
 		"user_id", "user-1", "device_type", "desktop")
-	c.Params = gin.Params{{Key: "id", Value: "task-009"}}
+	c.Params = gin.Params{{Key: "id", Value: edgeTaskID009}}
 	h.TaskFail(c)
 
 	if w.Code != 400 {
@@ -560,8 +578,8 @@ func TestEdgeAgentTaskFailBadRequest(t *testing.T) {
 func TestEdgeTaskLifecycle(t *testing.T) {
 	svc := &mockEdgeAgentService{
 		handleTaskAckFn: func(ctx context.Context, edgeUserID, edgeDeviceID, taskID, edgeRunID string) error {
-			if taskID != "lifecycle-task" {
-				t.Errorf("ack: taskID = %q, want lifecycle-task", taskID)
+			if taskID != edgeTaskLifecycle {
+				t.Errorf("ack: taskID = %q, want %s", taskID, edgeTaskLifecycle)
 			}
 			if edgeUserID != "user-1" {
 				t.Errorf("ack: edgeUserID = %q, want user-1", edgeUserID)
@@ -569,8 +587,8 @@ func TestEdgeTaskLifecycle(t *testing.T) {
 			return nil
 		},
 		handleTaskStreamFn: func(ctx context.Context, edgeUserID, edgeDeviceID, taskID, edgeRunID string, stream model.AgentRunEventInput) error {
-			if taskID != "lifecycle-task" {
-				t.Errorf("stream: taskID = %q, want lifecycle-task", taskID)
+			if taskID != edgeTaskLifecycle {
+				t.Errorf("stream: taskID = %q, want %s", taskID, edgeTaskLifecycle)
 			}
 			if edgeUserID != "user-1" {
 				t.Errorf("stream: edgeUserID = %q, want user-1", edgeUserID)
@@ -578,8 +596,8 @@ func TestEdgeTaskLifecycle(t *testing.T) {
 			return nil
 		},
 		handleTaskDoneFn: func(ctx context.Context, edgeUserID, edgeDeviceID, taskID, edgeRunID, finalContent string) error {
-			if taskID != "lifecycle-task" {
-				t.Errorf("done: taskID = %q, want lifecycle-task", taskID)
+			if taskID != edgeTaskLifecycle {
+				t.Errorf("done: taskID = %q, want %s", taskID, edgeTaskLifecycle)
 			}
 			if edgeUserID != "user-1" {
 				t.Errorf("done: edgeUserID = %q, want user-1", edgeUserID)
@@ -593,9 +611,9 @@ func TestEdgeTaskLifecycle(t *testing.T) {
 	h := handler.NewAgentHandler(svc)
 
 	// Step 1: Edge acknowledges receipt of the task.
-	c, w := newEdgeGinCtx("POST", "/edge/agent-tasks/lifecycle-task/ack", nil,
+	c, w := newEdgeGinCtx("POST", "/edge/agent-tasks/"+edgeTaskLifecycle+"/ack", nil,
 		"user_id", "user-1", "device_type", "desktop")
-	c.Params = gin.Params{{Key: "id", Value: "lifecycle-task"}}
+	c.Params = gin.Params{{Key: "id", Value: edgeTaskLifecycle}}
 	h.TaskAck(c)
 	if w.Code != 200 {
 		t.Fatalf("step 1 ack: expected 200, got %d", w.Code)
@@ -603,10 +621,10 @@ func TestEdgeTaskLifecycle(t *testing.T) {
 
 	// Step 2: Edge streams intermediate output.
 	for _, chunk := range []string{"output line 1\n", "output line 2\n"} {
-		c, w := newEdgeGinCtx("POST", "/edge/agent-tasks/lifecycle-task/stream", map[string]any{
+		c, w := newEdgeGinCtx("POST", "/edge/agent-tasks/"+edgeTaskLifecycle+"/stream", map[string]any{
 			"content": chunk,
 		}, "user_id", "user-1", "device_type", "desktop")
-		c.Params = gin.Params{{Key: "id", Value: "lifecycle-task"}}
+		c.Params = gin.Params{{Key: "id", Value: edgeTaskLifecycle}}
 		h.TaskStream(c)
 		if w.Code != 200 {
 			t.Fatalf("step 2 stream: expected 200, got %d", w.Code)
@@ -614,10 +632,10 @@ func TestEdgeTaskLifecycle(t *testing.T) {
 	}
 
 	// Step 3: Edge marks task as done with final content.
-	c, w = newEdgeGinCtx("POST", "/edge/agent-tasks/lifecycle-task/done", map[string]any{
+	c, w = newEdgeGinCtx("POST", "/edge/agent-tasks/"+edgeTaskLifecycle+"/done", map[string]any{
 		"final_content": "final result",
 	}, "user_id", "user-1", "device_type", "desktop")
-	c.Params = gin.Params{{Key: "id", Value: "lifecycle-task"}}
+	c.Params = gin.Params{{Key: "id", Value: edgeTaskLifecycle}}
 	h.TaskDone(c)
 	if w.Code != 200 {
 		t.Fatalf("step 3 done: expected 200, got %d", w.Code)
@@ -634,8 +652,8 @@ func TestEdgeTaskLifecycleFail(t *testing.T) {
 			return nil
 		},
 		handleTaskFailFn: func(ctx context.Context, edgeUserID, edgeDeviceID, taskID, edgeRunID, errMsg string) error {
-			if taskID != "fail-task" {
-				t.Errorf("fail: taskID = %q, want fail-task", taskID)
+			if taskID != edgeTaskFail {
+				t.Errorf("fail: taskID = %q, want %s", taskID, edgeTaskFail)
 			}
 			if edgeUserID != "user-1" {
 				t.Errorf("fail: edgeUserID = %q, want user-1", edgeUserID)
@@ -649,27 +667,27 @@ func TestEdgeTaskLifecycleFail(t *testing.T) {
 	h := handler.NewAgentHandler(svc)
 
 	// Ack + partial stream, then fail.
-	c, w := newEdgeGinCtx("POST", "/edge/agent-tasks/fail-task/ack", nil,
+	c, w := newEdgeGinCtx("POST", "/edge/agent-tasks/"+edgeTaskFail+"/ack", nil,
 		"user_id", "user-1", "device_type", "desktop")
-	c.Params = gin.Params{{Key: "id", Value: "fail-task"}}
+	c.Params = gin.Params{{Key: "id", Value: edgeTaskFail}}
 	h.TaskAck(c)
 	if w.Code != 200 {
 		t.Fatalf("ack: expected 200, got %d", w.Code)
 	}
 
-	c, w = newEdgeGinCtx("POST", "/edge/agent-tasks/fail-task/stream", map[string]any{
+	c, w = newEdgeGinCtx("POST", "/edge/agent-tasks/"+edgeTaskFail+"/stream", map[string]any{
 		"content": "partial output...",
 	}, "user_id", "user-1", "device_type", "desktop")
-	c.Params = gin.Params{{Key: "id", Value: "fail-task"}}
+	c.Params = gin.Params{{Key: "id", Value: edgeTaskFail}}
 	h.TaskStream(c)
 	if w.Code != 200 {
 		t.Fatalf("stream: expected 200, got %d", w.Code)
 	}
 
-	c, w = newEdgeGinCtx("POST", "/edge/agent-tasks/fail-task/fail", map[string]any{
+	c, w = newEdgeGinCtx("POST", "/edge/agent-tasks/"+edgeTaskFail+"/fail", map[string]any{
 		"error": "OOM killed",
 	}, "user_id", "user-1", "device_type", "desktop")
-	c.Params = gin.Params{{Key: "id", Value: "fail-task"}}
+	c.Params = gin.Params{{Key: "id", Value: edgeTaskFail}}
 	h.TaskFail(c)
 	if w.Code != 200 {
 		t.Fatalf("fail: expected 200, got %d", w.Code)

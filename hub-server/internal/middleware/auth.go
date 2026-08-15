@@ -219,7 +219,12 @@ func tokenFromWSSubprotocols(values []string) string {
 // Gin context values. Used by AuthMiddleware.
 func (m *AuthMiddleware) validateToken(c *gin.Context, tokenStr string) {
 	// Try TokenDance ID RS256 JWT first (if TokenDance ID is configured).
-	if m.cfg.TokenDanceID.IssuerURL != "" && m.cfg.TokenDanceID.ClientID != "" {
+	// tdVerifier must be non-nil as well: callers may construct the
+	// middleware with a nil verifier (NewAuthMiddleware documents it), and
+	// dereferencing nil here panics inside the timeout goroutine (recovered
+	// as a 500/403). The nil verifier means "RS256 path unavailable" —
+	// fall through to local HS256 instead.
+	if m.tdVerifier != nil && m.cfg.TokenDanceID.IssuerURL != "" && m.cfg.TokenDanceID.ClientID != "" {
 		if claims, err := m.tdVerifier.ParseJWT(tokenStr, m.cfg.TokenDanceID.IssuerURL, m.cfg.TokenDanceID.ClientID); err == nil {
 			c.Set("user_id", claims.Subject)
 			c.Set("device_type", "tokendance_bearer")
