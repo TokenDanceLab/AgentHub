@@ -1,6 +1,6 @@
 import type { QueryClient } from '@tanstack/react-query';
 import type { AttachmentRef, ComposerAttachment, ComposerIntent } from '@shared/composer';
-import type { HubContentType } from '@shared/hubClient';
+import type { HubContentType } from '@shared/hub/hubClient';
 import type { MessageResponse, SendMessageResponse } from '@/api/hubClient';
 
 export interface ComposerMessageContent {

@@ -24,7 +24,7 @@ const allowedSharedImports = new Set([
   '@agenthub/shared/composer',
   '@agenthub/shared/designTokens',
   '@agenthub/shared/errors',
-  '@agenthub/shared/hubClient',
+  '@agenthub/shared/hub/hubClient',
   '@agenthub/shared/hubEvents',
   '@agenthub/shared/i18n',
   '@agenthub/shared/api/auth',

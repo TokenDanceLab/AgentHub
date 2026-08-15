@@ -143,7 +143,7 @@ export {
   isHubResponseEnvelope,
   parseHubError,
   unwrapHubResponse,
-} from './hubClient';
+} from './hub/hubClient';
 export type {
   AddAgentToSessionRequest,
   AuthResponse,
@@ -243,7 +243,7 @@ export type {
   SessionMember,
   UpdateProfileRequest,
   UserProfile,
-} from './hubClient';
+} from './hub/hubClient';
 
 export { EventClient } from './eventClient';
 export type {

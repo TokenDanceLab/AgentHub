@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type {
   HubWorkspaceProject,
   HubWorkspaceProjectListResponse,
-} from '@shared/hubClient';
+} from '@shared/hub/hubClient';
 import { getHubClient } from '@/api/hubQueries';
 import { createDesktopWorkbenchProjectsPort } from './desktopWorkbenchProjectsPort';
 

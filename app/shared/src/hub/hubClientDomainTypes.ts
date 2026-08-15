@@ -1,7 +1,7 @@
 /**
  * Hub client core domain DTOs (auth, IM, workspace, task, execution, audit, relay).
  * Extracted from hubClient.ts (#777) — pure types only; re-exported by hubClient.
- * Keep public names stable for web/desktop imports via @shared/hubClient.
+ * Keep public names stable for web/desktop imports via @shared/hub/hubClient.
  */
 
 export interface HubResponseEnvelope<T = unknown> {
