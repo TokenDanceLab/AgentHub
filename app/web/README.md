@@ -23,7 +23,7 @@ Web UI -> Hub Server -> Edge relay / sync -> Edge Server -> Agent Runtime adapte
 |---|---|
 | App entry | `src/App.tsx` -> `src/layouts/WebLayout.tsx` |
 | Shell slots | `src/viewRegistryConfig.ts`, `src/views/viewRegistry.tsx` |
-| Hub client | `src/lib/hubClient.ts`, `src/api/` |
+| Hub client | `src/api/hubClient.ts`, `src/api/` |
 | i18n | `src/i18n/`, `src/i18n/README.md` |
 | Shared UI/workbench/chat | `../shared/src/ui/`, `../shared/src/workbench/`, `../shared/src/chatview/` |
 | Legacy route bridge | `src/router.tsx`, `src/pages/*` -> `App` |
