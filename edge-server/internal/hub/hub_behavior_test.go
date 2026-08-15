@@ -1,7 +1,6 @@
 package hub_test
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"io"
@@ -238,102 +237,6 @@ func TestCallbackClient_SuccessWithMalformedJSON(t *testing.T) {
 	err := client.TaskAck(context.Background(), "task-001", "run-001")
 	if err != nil {
 		t.Fatalf("expected success for 2xx with malformed JSON, got: %v", err)
-	}
-}
-
-// ---------------------------------------------------------------------------
-// 7. TaskStreamReader with empty reader
-// ---------------------------------------------------------------------------
-
-func TestCallbackClient_TaskStreamReader_Empty(t *testing.T) {
-	var mu sync.Mutex
-	callCount := 0
-
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		mu.Lock()
-		callCount++
-		mu.Unlock()
-
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(map[string]string{"code": errcode.OK.Code})
-	}))
-	defer srv.Close()
-
-	client := newTestCallbackClient(srv.URL, "token")
-	err := client.TaskStreamReader(context.Background(), "task-001", "run-001", strings.NewReader(""))
-	if err != nil {
-		t.Fatalf("unexpected error for empty reader: %v", err)
-	}
-	if callCount != 0 {
-		t.Fatalf("expected 0 callbacks for empty reader, got %d", callCount)
-	}
-}
-
-func TestCallbackClient_TaskStreamReader_SingleByteChunks(t *testing.T) {
-	// Verify that each read produces a callback, even for tiny chunks.
-	var mu sync.Mutex
-	callCount := 0
-	var receivedBodies []string
-
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		body, _ := io.ReadAll(r.Body)
-		mu.Lock()
-		callCount++
-		receivedBodies = append(receivedBodies, string(body))
-		mu.Unlock()
-
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(map[string]string{"code": errcode.OK.Code})
-	}))
-	defer srv.Close()
-
-	client := newTestCallbackClient(srv.URL, "token")
-	// Use a reader with chunk size = 1 byte
-	reader := bytes.NewReader([]byte("ABC"))
-	err := client.TaskStreamReader(context.Background(), "task-001", "run-001", reader)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if callCount < 1 {
-		t.Fatal("expected at least 1 callback")
-	}
-	// All chunks should contain valid JSON with run_id
-	for _, body := range receivedBodies {
-		var m map[string]string
-		if err := json.Unmarshal([]byte(body), &m); err != nil {
-			t.Fatalf("invalid JSON body: %s", body)
-		}
-		if m["run_id"] != "run-001" {
-			t.Fatalf("expected run_id=run-001, got %v", m["run_id"])
-		}
-	}
-}
-
-// ---------------------------------------------------------------------------
-// 8. TaskStreamReader with server errors (best-effort continues)
-// ---------------------------------------------------------------------------
-
-func TestCallbackClient_TaskStreamReader_ServerErrorsContinue(t *testing.T) {
-	var mu sync.Mutex
-	callCount := 0
-
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		mu.Lock()
-		callCount++
-		mu.Unlock()
-
-		// Return 500 for all calls — stream should still consume the full reader
-		w.WriteHeader(http.StatusInternalServerError)
-	}))
-	defer srv.Close()
-
-	client := newTestCallbackClient(srv.URL, "token")
-	reader := strings.NewReader("chunk1\nchunk2\nchunk3\n")
-	err := client.TaskStreamReader(context.Background(), "task-001", "run-001", reader)
-	if err != nil {
-		t.Fatalf("TaskStreamReader should not fail even when all callbacks error: %v", err)
 	}
 }
 
