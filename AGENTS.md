@@ -288,7 +288,7 @@ UI 工作流变更必须有行为断言，不只截图：共享 unit/contract + 
 
 Release 自动化的产物命名、双语 release notes（git-cliff 按 conventional commits 分类生成，配置见 `cliff.toml`）与 SHA256SUMS 校验和由 release.yml 维护，改动须过 `release-readiness.yml` 门禁。
 
-发布后按 `docs/developer-quickstart.md` §发布 tag SOP 步骤 5 核对产物（12 项 + 描述）；release job 失败按步骤 6 重发（移 tag → 删旧 release → 重推，softprops 不覆盖已存在 release）。
+发布后按 `docs/developer-quickstart.md` §发布 tag SOP 步骤 5 核对产物（14 项 + 描述）；release job 失败按步骤 6 重发（移 tag → 删旧 release → 重推，softprops 不覆盖已存在 release）。
 
 ## 13. 依赖更新（Renovate）
 
