@@ -245,12 +245,12 @@ export type {
   UserProfile,
 } from './hub/hubClient';
 
-export { EventClient } from './eventClient';
+export { createEventStream } from './eventClient';
 export type {
-  EventClientOptions,
-  EventConnectionListener,
-  EventConnectionStatus,
-  EventListener,
+  EventHandler,
+  EventStreamOptions,
+  StatusHandler,
+  StreamHandle,
 } from './eventClient';
 
 export {
