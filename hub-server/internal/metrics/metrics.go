@@ -7,7 +7,20 @@ import (
 	"github.com/prometheus/client_golang/prometheus/collectors"
 
 	"github.com/agenthub/pkg/outboundmetrics"
+	"github.com/agenthub/pkg/safego"
 )
+
+// init wires the shared panic-recovery launcher to the Hub's panic counter.
+// pkg/safego stays server-agnostic; the Hub attaches its observability hook
+// here so a recovered goroutine panic increments goroutine_panic_recoveries
+// for alerting (nil-guarded so builds that never call Register don't panic).
+func init() {
+	safego.SetPanicObserver(func(name string, panicValue any, stack string) {
+		if GoroutinePanicRecoveries != nil {
+			GoroutinePanicRecoveries.Inc()
+		}
+	})
+}
 
 var (
 	HTTPRequestsTotal                      *prometheus.CounterVec
