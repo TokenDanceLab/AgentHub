@@ -4,13 +4,11 @@ package oidc
 import (
 	"bytes"
 	"context"
-	"crypto/rand"
 	"crypto/rsa"
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
 	"log/slog"
-	"math/big"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -18,7 +16,6 @@ import (
 	"time"
 
 	"github.com/alicebob/miniredis/v2"
-	"github.com/golang-jwt/jwt/v5"
 	"github.com/redis/go-redis/v9"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -31,6 +28,7 @@ import (
 	"github.com/agenthub/hub-server/internal/jwtutil"
 	"github.com/agenthub/hub-server/internal/repository"
 	"github.com/agenthub/pkg/reqlog"
+	"github.com/agenthub/pkg/testkit/oidcfixture"
 	"github.com/glebarez/sqlite"
 )
 
@@ -385,40 +383,12 @@ func TestHandleCallback_TokenEndpointErrorDoesNotLogProviderRawBody(t *testing.T
 
 func oidcTestKey(t *testing.T) (*rsa.PrivateKey, string, string) {
 	t.Helper()
-	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
-	require.NoError(t, err)
-	kid := oidcTestKID(&privateKey.PublicKey)
-	n := base64.RawURLEncoding.EncodeToString(privateKey.N.Bytes())
-	e := base64.RawURLEncoding.EncodeToString(big.NewInt(int64(privateKey.E)).Bytes())
-	jwks := `{"keys":[{"kty":"RSA","use":"sig","alg":"RS256","kid":"` + kid + `","n":"` + n + `","e":"` + e + `"}]}`
-	return privateKey, jwks, kid
-}
-
-func oidcTestKID(pub *rsa.PublicKey) string {
-	hash := sha256.Sum256(pub.N.Bytes())
-	return base64.RawURLEncoding.EncodeToString(hash[:16])
+	key := oidcfixture.NewKey(t)
+	return key.Private, key.JWKS, key.Kid
 }
 
 func signOIDCTestIDToken(t *testing.T, privateKey *rsa.PrivateKey, kid, issuer, audience, subject string) string {
-	t.Helper()
-	now := time.Now()
-	claims := jwtutil.TokenDanceClaims{
-		Email:         "user@example.com",
-		EmailVerified: true,
-		Name:          "Test User",
-		RegisteredClaims: jwt.RegisteredClaims{
-			Issuer:    issuer,
-			Subject:   subject,
-			Audience:  jwt.ClaimStrings{audience},
-			ExpiresAt: jwt.NewNumericDate(now.Add(time.Hour)),
-			IssuedAt:  jwt.NewNumericDate(now),
-		},
-	}
-	token := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
-	token.Header["kid"] = kid
-	signed, err := token.SignedString(privateKey)
-	require.NoError(t, err)
-	return signed
+	return oidcfixture.SignToken(t, privateKey, kid, issuer, audience, subject, "user@example.com", "Test User")
 }
 
 // pkceS256Challenge computes the RFC 7636 S256 code_challenge for a given
