@@ -29,8 +29,12 @@ env:
 
 jobs:
   # ── Go: Edge Server ──────────────────────────
+  # CI5 wave2 (#1689): test execution lives in go-edge-test (2-shard matrix,
+  # each shard on its own 4-core runner). This job keeps lint / static
+  # analysis / coverage gates in one place and merges the shard coverage
+  # data with the native `go tool covdata` (no third-party merger).
   go-edge:
-    needs: changes
+    needs: [changes, go-edge-test]
     if: >-
       github.event_name == 'workflow_dispatch' ||
       needs.changes.outputs.go == 'true'
@@ -56,13 +60,16 @@ jobs:
           version: ${{ env.GOLANGCI_LINT_VERSION }}
           args: --timeout=5m
 
-      # CI5: Test + race merged into a single run (was two passes: -count=1
-      # -short -coverprofile, then -count=1 -short -race). Combining -race
-      # with -coverprofile yields the coverage profile AND exercises the race
-      # detector in one pass — halves Go test wall-time per server.
-      - name: Test (unit only + race, skip integration)
-        timeout-minutes: 20
-        run: go test ./... -count=1 -short -race -coverprofile=coverage.out -covermode=atomic -timeout=15m
+      - name: Download shard coverage data
+        uses: actions/download-artifact@v7
+        with:
+          pattern: go-edge-covdata-shard-*
+          path: edge-server/cov-shards
+
+      - name: Merge shard coverage (GOCOVERDIR covdata)
+        run: |
+          go tool covdata merge -i=cov-shards/go-edge-covdata-shard-1,cov-shards/go-edge-covdata-shard-2 -o=covdata-merged
+          go tool covdata textfmt -i=covdata-merged -o=coverage.out
 
       - name: Coverage check (informational)
         run: |
@@ -136,9 +143,52 @@ jobs:
         working-directory: .
         run: python scripts/verify/tests/verify-orchestrator-deps.Tests.py
 
+  # ── Go: Edge Server tests (shard×2) ──────────
+  # CI5 wave2 (#1689): the single-pass `go test ./... -race -coverprofile`
+  # (~116s wall) is split into a 2-shard matrix; each shard gets its own
+  # 4-core runner. Coverage uses GOCOVERDIR (native covdata) and is
+  # uploaded per shard; the go-edge job merges it with `go tool covdata
+  # merge` (no third-party tool). -coverpkg=./... keeps the full package
+  # set in every shard profile so the merged totals match a single pass.
+  go-edge-test:
+    needs: changes
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      needs.changes.outputs.go == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: edge-server
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2]
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+          cache-dependency-path: edge-server/go.sum
+
+      - name: Test (unit only + race, shard ${{ matrix.shard }}/2)
+        timeout-minutes: 15
+        env:
+          GOCOVERDIR: cov-shard
+        run: go test ./... -count=1 -short -race -shard=${{ matrix.shard }}/2 -coverpkg=./... -timeout=15m
+
+      - name: Upload shard coverage data
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: go-edge-covdata-shard-${{ matrix.shard }}
+          path: edge-server/cov-shard/
+          retention-days: 1
+
   # ── Go: Hub Server ──────────────────────────
   go-hub:
-    needs: changes
+    needs: [changes, go-hub-test]
     if: >-
       github.event_name == 'workflow_dispatch' ||
       needs.changes.outputs.go == 'true'
@@ -178,19 +228,19 @@ jobs:
         working-directory: .
         run: python ./scripts/verify/tests/verify-hub-lint-ratchet.Tests.py
 
-      # CI5: Test + race merged into a single run (was two passes). Combining
-      # -race with -coverprofile gives the coverage profile and race coverage
-      # in one pass. PASS_COUNT non-zero guard preserved.
-      - name: Test (unit only + race, skip integration)
+      # CI5 wave2 (#1689): test execution lives in go-hub-test (2-shard
+      # matrix). This job merges the shard coverage data with the native
+      # `go tool covdata` and keeps the overall >=40% gate hard-blocking.
+      - name: Download shard coverage data
+        uses: actions/download-artifact@v7
+        with:
+          pattern: go-hub-covdata-shard-*
+          path: hub-server/cov-shards
+
+      - name: Merge shard coverage (GOCOVERDIR covdata)
         run: |
-          go test ./... -count=1 -short -race -coverprofile=coverage.out -covermode=atomic -v 2>&1 | tee unit-test.log
-          PASS_COUNT=$(grep -c "^--- PASS" unit-test.log || true)
-          echo "unit lane PASS count: ${PASS_COUNT}"
-          if [ "${PASS_COUNT}" -lt 1 ]; then
-            echo "::error::unit lane executed 0 tests — hub-server/tests must not hide behind a package-wide -short exit"
-            tail -50 unit-test.log
-            exit 1
-          fi
+          go tool covdata merge -i=cov-shards/go-hub-covdata-shard-1,cov-shards/go-hub-covdata-shard-2 -o=covdata-merged
+          go tool covdata textfmt -i=covdata-merged -o=coverage.out
 
       - name: Coverage check (overall >= 40%)
         run: |
@@ -233,6 +283,55 @@ jobs:
             go install honnef.co/go/tools/cmd/staticcheck@2026.1
           fi
           staticcheck ./... 2>&1
+
+  # ── Go: Hub Server tests (shard×2) ───────────
+  # CI5 wave2 (#1689): same 2-shard split as go-edge-test. The non-zero
+  # PASS guard moves here per shard (each shard partitions test binaries,
+  # and hub-server has enough packages that every shard runs tests), so a
+  # package-wide -short escape hatch still trips a hard error.
+  go-hub-test:
+    needs: changes
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      needs.changes.outputs.go == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: hub-server
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2]
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+          cache-dependency-path: hub-server/go.sum
+
+      - name: Test (unit only + race, shard ${{ matrix.shard }}/2)
+        timeout-minutes: 15
+        env:
+          GOCOVERDIR: cov-shard
+        run: |
+          go test ./... -count=1 -short -race -shard=${{ matrix.shard }}/2 -coverpkg=./... -v 2>&1 | tee unit-test-shard.log
+          PASS_COUNT=$(grep -c "^--- PASS" unit-test-shard.log || true)
+          echo "unit lane PASS count (shard ${{ matrix.shard }}/2): ${PASS_COUNT}"
+          if [ "${PASS_COUNT}" -lt 1 ]; then
+            echo "::error::unit lane shard executed 0 tests — hub-server/tests must not hide behind a package-wide -short exit"
+            tail -50 unit-test-shard.log
+            exit 1
+          fi
+
+      - name: Upload shard coverage data
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: go-hub-covdata-shard-${{ matrix.shard }}
+          path: hub-server/cov-shard/
+          retention-days: 1
 
   # ── Backend E2E: Fixture-only ────────────────
   backend-e2e-fixture:
@@ -352,6 +451,12 @@ jobs:
       AGENTHUB_REDIS_PORT: "6379"
       AGENTHUB_JWT_SECRET: "ci-integration-jwt-secret-min-32-chars-ok!!"
       AGENTHUB_ENV: test
+      # phase1_7 的 OIDC authorize 测试走真实 router，需要非空 OIDC 配置；
+      # 占位值即可（GenerateAuthorizationURL 只组装 URL 不发起网络请求）。
+      AGENTHUB_TOKENDANCE_ID_ISSUER_URL: "https://id.example.invalid"
+      AGENTHUB_TOKENDANCE_ID_CLIENT_ID: "ci-integration-client"
+      AGENTHUB_TOKENDANCE_ID_CLIENT_SECRET: "ci-integration-secret-not-a-real-secret"
+      AGENTHUB_TOKENDANCE_ID_REDIRECT_URI: "http://127.0.0.1:8080/client/auth/oidc/callback"
     steps:
       - uses: actions/checkout@v7
 
