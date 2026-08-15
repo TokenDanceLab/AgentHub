@@ -184,6 +184,13 @@ func (l *EventLog) Append(evt EventEnvelope) error {
 				l.truncateLocked()
 			}
 		}
+		// Keep indexedSize in sync with the write so ReadFrom's external-change
+		// check does not perform a redundant full-file rescan for appends we
+		// made ourselves (the live index above is already correct). External
+		// writes that bypass Append still change the size and trigger a rebuild.
+		if fi, statErr := l.f.Stat(); statErr == nil {
+			l.indexedSize = fi.Size()
+		}
 	}
 	return err
 }
