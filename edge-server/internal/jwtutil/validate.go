@@ -6,18 +6,15 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
+
+	sharedjwt "github.com/agenthub/pkg/jwtutil"
 )
 
 // HubClaims carries the user identity extracted from a Hub-issued HS256 JWT.
-// It mirrors the Claims struct from hub-server/internal/jwtutil, consuming
-// only the fields that Edge needs for request authentication.
-type HubClaims struct {
-	UserID     string `json:"user_id"`
-	DeviceID   string `json:"device_id"`
-	DeviceType string `json:"device_type"`
-	Purpose    string `json:"purpose"`
-	jwt.RegisteredClaims
-}
+// Alias of the shared pkg/jwtutil.HubSessionClaims single source (#1675 P1) —
+// hub signs the same struct via its own alias, so the wire contract cannot
+// drift between signer and verifier.
+type HubClaims = sharedjwt.HubSessionClaims
 
 const (
 	// minSecretLen is the minimum length for an HMAC-SHA256 secret.
