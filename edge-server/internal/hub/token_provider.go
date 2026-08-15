@@ -16,9 +16,15 @@ import (
 // TokenProvider owns the Edge's Hub session bearer token and rotates it via
 // the Hub refresh endpoint before expiry (#1410). The Edge is a long-lived
 // process but Hub access tokens are short-lived (dev default 15m); without
-// rotation every callback starts 401ing once the token expires. The Desktop
-// (or any launcher) supplies an initial access token plus a refresh token via
-// --hub-token/--hub-refresh-token, and the provider keeps both fresh.
+// rotation every callback starts 401ing once the token expires.
+//
+// Single-owner rule: Hub refresh tokens rotate on use, so the token handed to
+// the Edge must NOT be the same refresh token the Desktop keeps for its own
+// session — whoever refreshes first invalidates the other's copy. Production
+// launchers should mint a dedicated Hub session for the Edge (same user,
+// separate device) and pass that pair via --hub-token/--hub-refresh-token;
+// a Desktop that owns its session instead pushes freshly minted pairs through
+// SetTokens when it refreshes.
 //
 // The provider is deliberately minimal and read-heavy: AccessToken() is called
 // on every outbound callback, so it must not block on network I/O. Rotation
