@@ -106,7 +106,7 @@ jobs:
       # Binary cached across runs (gha cache keyed on pinned version).
       - name: Cache staticcheck binary
         id: staticcheck-cache
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/go/bin/staticcheck
           key: staticcheck-2026.1
@@ -211,7 +211,7 @@ jobs:
       # Binary cached across runs (gha cache keyed on pinned version).
       - name: Cache staticcheck binary
         id: staticcheck-cache
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/go/bin/staticcheck
           key: staticcheck-2026.1
