@@ -17,6 +17,7 @@ import (
 	"github.com/agenthub/edge-server/internal/events"
 	"github.com/agenthub/edge-server/internal/lifecycle"
 	"github.com/agenthub/edge-server/internal/store"
+	"github.com/agenthub/pkg/safego"
 )
 
 // Handler holds dependencies for HTTP and WebSocket handlers.
@@ -103,7 +104,7 @@ func replayEventsToClient(conn *websocket.Conn, repo store.Repository, replay []
 // closes, refreshes the pong deadline, and forwards control frames to the
 // clientControl channel. It closes readDone when the connection dies.
 func startClientReadLoop(conn *websocket.Conn, done <-chan struct{}, readDone chan<- struct{}, clientControl chan<- map[string]any) {
-	safeGo("eventsClientRead", func() {
+	safego.SafeGo("eventsClientRead", func() {
 		defer close(readDone)
 		defer conn.Close()
 		_ = conn.SetReadDeadline(time.Now().Add(60 * time.Second))

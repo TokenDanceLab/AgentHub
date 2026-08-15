@@ -14,8 +14,8 @@ import (
 	"github.com/agenthub/hub-server/internal/metrics"
 	"github.com/agenthub/hub-server/internal/model"
 	"github.com/agenthub/hub-server/internal/repository"
-	"github.com/agenthub/hub-server/internal/safego"
 	"github.com/agenthub/hub-server/internal/service/dispatch"
+	"github.com/agenthub/pkg/safego"
 )
 
 // ── DTO aliases, ports, and wiring surface moved to agent_dispatch_ports.go (#1068).
