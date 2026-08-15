@@ -3,16 +3,15 @@
 // with the ProcessExecutor, create runs with hubTaskId, and verify that the
 // Edge server fires the correct callbacks back to the mock Hub.
 //
-// Tests guarded by testing.Short() are skipped in CI short mode because they
-// launch subprocesses. To run these tests locally:
+// Tests guarded by testing.Short() are skipped in the standard go test -short
+// lane because they launch subprocesses. To run these tests locally:
 //
 //	go test ./tests -count=1 -run "^TestHubE2E_" -v
 //
-// CI status: These tests are intentionally skipped in CI (go test -short).
-// They require subprocess execution (echo, exec.Command) which is not
-// available in a minimal CI sandbox. The TeamRun smoke test in
-// hub-server/tests/teamrun/ runs in CI since it uses in-memory SQLite
-// without subprocesses.
+// CI status: the backend-edge-e2e job (.github/workflows/checks.yml) runs
+// `go test ./tests/ -run '^TestHubE2E_'` WITHOUT -short, so the full suite
+// (including subprocess tests) executes in CI, with a non-zero PASS count
+// assertion.
 package tests
 
 import (
