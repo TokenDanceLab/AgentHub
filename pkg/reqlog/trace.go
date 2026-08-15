@@ -8,7 +8,6 @@ import (
 	"sync/atomic"
 )
 
-type traceIDKey struct{}
 type requestIDKey struct{}
 
 // RequestIDHeader is the header used to propagate the request id on inbound
