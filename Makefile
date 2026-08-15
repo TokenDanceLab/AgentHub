@@ -8,7 +8,7 @@
 
 #        make release  (via git push tag -> release.yml, not built here)
 #        make help        (show this help)
-.PHONY: test test-all test-edge test-hub lint coverage sec release clean fmt \
+.PHONY: test test-all test-edge test-hub test-edge-e2e lint coverage sec release clean fmt \
         fe-install fe-dev fe-build fe-test fe-lint fe-typecheck help
 
 # ── Help ───────────────────────────────────────────
@@ -20,6 +20,7 @@ help:
 	@echo "    test          单元测试 (edge + hub, -short)"
 	@echo "    test-all      完整测试 (需 Redis + PG)"
 	@echo "    test-edge     Edge Server 单元测试"
+	@echo "    test-edge-e2e Edge→Hub 回调冒烟 (零外部依赖, 进程内 mock hub)"
 	@echo "    test-hub      Hub Server 单元测试"
 	@echo "    lint          golangci-lint (edge + hub)"
 	@echo "    coverage      覆盖率报告 (HTML + func)"
@@ -46,6 +47,11 @@ test: test-edge test-hub
 
 test-edge:
 	cd edge-server && go test ./... -short -count=1 -timeout 60s
+
+# Edge→Hub 回调冒烟：mock hub + 进程内 edge，零外部依赖（不需 PG/Redis/真实 CLI）。
+# 覆盖 ack/stream/done/fail 直连回调链；-short 下这些用例会被跳过，故单独入口。
+test-edge-e2e:
+	cd edge-server && go test ./tests/ -count=1 -run "^TestHubE2E_" -timeout 120s
 
 test-hub:
 	cd hub-server && go test ./... -short -count=1 -timeout 60s
