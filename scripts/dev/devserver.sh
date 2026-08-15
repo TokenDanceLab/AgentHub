@@ -77,9 +77,16 @@ cmd_start() {
 set -euo pipefail
 REPO_ROOT="${AGENTHUB_DEVSERVER_ROOT:-/srv/agenthub-dev/AgentHub}"
 cd "$REPO_ROOT"
-export PATH=/usr/local/go/bin:$PATH
-# 环境适配（服务器本地开关；仓库无硬编码）
+# 服务器系统级环境（/etc/environment）不随非交互 SSH 会话加载；显式 source
+# 以取 GOPROXY 等镜像配置（仓库不硬编码任何镜像地址）。本地覆盖用 DEVSERVER_GOPROXY。
+if [ -z "${DEVSERVER_GOPROXY:-}" ] && [ -f /etc/environment ]; then
+  # shellcheck disable=SC1091
+  . /etc/environment 2>/dev/null || true
+  export GOPROXY="${GOPROXY:-}"
+fi
 [ -n "${DEVSERVER_GOPROXY:-}" ] && export GOPROXY="$DEVSERVER_GOPROXY"
+# PATH 必须在 source 之后补（/etc/environment 会整体覆盖 PATH）。
+export PATH=/usr/local/go/bin:$PATH
 
 # 依赖容器（幂等）
 docker compose up -d postgres redis
@@ -170,6 +177,14 @@ cmd_test() {
   ssh -o ConnectTimeout=30 "$REMOTE" bash -s >"$out_file" <<'REMOTE_SCRIPT'
 set -euo pipefail
 REPO_ROOT="${AGENTHUB_DEVSERVER_ROOT:-/srv/agenthub-dev/AgentHub}"
+# 服务器系统级环境（/etc/environment）不随非交互 SSH 会话加载；显式 source。
+if [ -z "${DEVSERVER_GOPROXY:-}" ] && [ -f /etc/environment ]; then
+  # shellcheck disable=SC1091
+  . /etc/environment 2>/dev/null || true
+  export GOPROXY="${GOPROXY:-}"
+fi
+[ -n "${DEVSERVER_GOPROXY:-}" ] && export GOPROXY="$DEVSERVER_GOPROXY"
+# PATH 必须在 source 之后补（/etc/environment 会整体覆盖 PATH）。
 export PATH=/usr/local/go/bin:$PATH
 cd "$REPO_ROOT"
 commit="$(git rev-parse --short HEAD)"
