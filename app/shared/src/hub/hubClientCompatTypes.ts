@@ -1,7 +1,7 @@
 /**
  * Hub client compatibility aliases (desktop/web historical names → Hub* types).
  * Extracted from hubClient.ts (#799) — pure types/const only; re-exported by hubClient.
- * Keep public names stable for web/desktop imports via @shared/hubClient.
+ * Keep public names stable for web/desktop imports via @shared/hub/hubClient.
  */
 
 import type {

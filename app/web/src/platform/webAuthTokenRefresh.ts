@@ -26,7 +26,7 @@ import {
   saveStoredHubRefreshToken,
 } from '@/api/hubTokenStorage';
 import { HUB_URL } from '@/config';
-import { createHubClient as createSharedHubClient } from '@shared/hubClient';
+import { createHubClient as createSharedHubClient } from '@shared/hub/hubClient';
 
 const REFRESH_CACHE_TTL_MS = 25_000;
 let refreshInFlight: Promise<string | null> | null = null;

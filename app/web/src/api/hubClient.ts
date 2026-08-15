@@ -1,7 +1,7 @@
 // Web Hub client — thin surface over shared SSOT (#433 / T3.4).
-// - Method/DTO SSOT: @shared/hubClient
+// - Method/DTO SSOT: @shared/hub/hubClient
 // - Web-only glue: default HUB_URL
-// Do NOT add new Hub REST methods here; add them to app/shared/src/hubClient.ts first.
+// Do NOT add new Hub REST methods here; add them to app/shared/src/hub/hubClient.ts first.
 // AH-SR-043: demo/fixture success paths belong in platform dataMode gates, not this client.
 
 import { HUB_URL } from '@/config';
@@ -9,13 +9,13 @@ import {
   createHubClient as createSharedHubClient,
   type HubClient as SharedHubClient,
   type HubClientOptions as SharedHubClientOptions,
-} from '@shared/hubClient';
+} from '@shared/hub/hubClient';
 import {
   getCachedRefreshedAccessToken,
   refreshWebHubAccessTokenOnce,
 } from '@/platform/webAuthTokenRefresh';
 
-export * from '@shared/hubClient';
+export * from '@shared/hub/hubClient';
 
 export interface HubClientOptions extends SharedHubClientOptions {
   /** Defaults to web HUB_URL when omitted. */

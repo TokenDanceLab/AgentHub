@@ -1,6 +1,6 @@
 // Desktop Hub client — thin surface over shared SSOT (#432 / T3.3).
-// Method/DTO SSOT: @shared/hubClient; desktop-only glue: HUB_URL + Tauri proxy.
-// Do NOT add new Hub REST methods here; add them to app/shared/src/hubClient.ts first.
+// Method/DTO SSOT: @shared/hub/hubClient; desktop-only glue: HUB_URL + Tauri proxy.
+// Do NOT add new Hub REST methods here; add them to app/shared/src/hub/hubClient.ts first.
 
 import { HUB_URL } from '@/config';
 import { AppError } from '@shared/errors';
@@ -11,7 +11,7 @@ import {
   type HubClient as SharedHubClient,
   type HubClientOptions as SharedHubClientOptions,
   type HubExecutionTargetRequest,
-} from '@shared/hubClient';
+} from '@shared/hub/hubClient';
 import {
   clearStoredHubRefreshToken,
   loadStoredHubRefreshToken,
@@ -20,7 +20,7 @@ import {
 } from './hubTokenStorage';
 
 // Re-export shared types/methods surface for existing desktop imports.
-export * from '@shared/hubClient';
+export * from '@shared/hub/hubClient';
 export interface HubClientOptions extends SharedHubClientOptions {
   /** Defaults to desktop HUB_URL when omitted. */
   baseUrl?: string;

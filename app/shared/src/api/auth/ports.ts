@@ -7,7 +7,7 @@
  * callback server), authorization URL opening, and device identity.
  */
 
-import type { HubClient, HubClientOptions } from '../../hubClient';
+import type { HubClient, HubClientOptions } from '../../hub/hubClient';
 import type {
   BrowserOIDCPending,
   HubTokenSource,

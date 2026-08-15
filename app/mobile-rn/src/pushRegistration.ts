@@ -3,7 +3,7 @@
 // Pipeline: request permission → get Expo push token → register device with
 // the Hub (device_id + capabilities). The push token itself is returned to
 // the caller so App.tsx can keep it for local notification handling; the Hub
-// registerDevice SSOT (app/shared/src/hubClientDomainTypes.ts) does not yet
+// registerDevice SSOT (app/shared/src/hub/hubClientDomainTypes.ts) does not yet
 // carry a push_token field, so delivering the token to the Hub for server-side
 // pushes is a Wave6 / shared-lane follow-up (see BLOCKED).
 //

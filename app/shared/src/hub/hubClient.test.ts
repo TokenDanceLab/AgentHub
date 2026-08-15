@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { HUB_EVENTS } from './hubEvents';
-import { AppError } from './errors';
+import { HUB_EVENTS } from '../hubEvents';
+import { AppError } from '../errors';
 import {
   createHubClient,
   HUBCLIENT_SSOT_GAPS,

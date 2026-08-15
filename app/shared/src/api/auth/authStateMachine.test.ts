@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-import type { HubClient } from '../../hubClient';
+import type { HubClient } from '../../hub/hubClient';
 import { createHubAuthCore } from './authStateMachine';
 import type { HubAuthPorts, HubClientFactory } from './ports';
 import {
