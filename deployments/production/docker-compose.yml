@@ -1,6 +1,9 @@
 # ──────────────────────────────────────────────
 # AgentHub — Production Compose
 # PG/Redis local instances; live facts in private deploy repo.
+#
+# 隔离纪律：container_name/网络名与根 docker-compose.yml 相同，
+# 两者同机同时 up 会冲突。同机并行部署必须用 -p 指定独立 project 名。
 # ──────────────────────────────────────────────
 
 services:
