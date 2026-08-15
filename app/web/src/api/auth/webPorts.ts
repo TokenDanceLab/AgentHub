@@ -9,7 +9,7 @@
  * - authorization URL opens in the current window (full-page redirect)
  */
 
-import { getOrCreateDeviceId } from '@/api/deviceId';
+import { getOrCreateDeviceId } from '@shared/api/deviceId';
 import {
   clearStoredHubAccessToken,
   clearStoredHubRefreshToken,

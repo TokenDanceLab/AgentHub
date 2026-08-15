@@ -1,7 +1,7 @@
 import { renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { HubClient } from '@/api/hubClient';
-import { DEVICE_ID_KEY } from '@/api/deviceId';
+import { DEVICE_ID_KEY } from '@shared/api/deviceId';
 import { useDeviceRegistration } from './useDeviceRegistration';
 
 describe('useDeviceRegistration', () => {
