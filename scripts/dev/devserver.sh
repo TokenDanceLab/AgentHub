@@ -11,6 +11,7 @@
 #   scripts/dev/devserver.sh stop     # 停止 hub/edge/web 进程（容器保留）
 #   scripts/dev/devserver.sh status   # 四服务健康 + git 状态
 #   scripts/dev/devserver.sh test     # 服务器跑 go test -short 并回传报告 JSON
+#   scripts/dev/devserver.sh integration  # integration lane：重建测试库 + 全量跑并回传报告
 #
 # 环境变量（均在本地配置，仓库不存任何地址/凭据）:
 #   AGENTHUB_DEVSERVER_SSH    ssh 目标（默认 agenthub-dev，须在 ~/.ssh/config 配置）
@@ -218,9 +219,85 @@ REMOTE_SCRIPT
   python3 -c "import json,sys; d=json.load(open('$out_file')); print(json.dumps(d, indent=2))" 2>/dev/null || cat "$out_file"
 }
 
+# Integration lane（对齐 CI backend-integration job）：
+# 每次在服务器 PG 上重建独立测试库 agenthub_test（DROP+CREATE），
+# 与 CI 的 ephemeral service 容器语义一致——共享 dev 库会被重复运行
+# 残留数据污染（tsetup_user/owner-scope 断言失败），因此 lane 必须
+# 在全新数据库上跑。凭据从服务器 .env 读取，不出仓库。
+cmd_integration() {
+  remote_check
+  local out_dir out_file
+  out_dir="${AGENTHUB_DEVSERVER_REPORT_DIR:-.tmp/devserver-reports}"
+  mkdir -p "$LOCAL_REPO/$out_dir"
+  out_file="$LOCAL_REPO/$out_dir/integration-$(date +%Y%m%d-%H%M%S).json"
+  log "服务器重建测试库 + 跑 integration lane（PG+Redis）…"
+  ssh -o ConnectTimeout=30 "$REMOTE" bash -s >"$out_file" <<'REMOTE_SCRIPT'
+set -euo pipefail
+REPO_ROOT="${AGENTHUB_DEVSERVER_ROOT:-/srv/agenthub-dev/AgentHub}"
+if [ -z "${DEVSERVER_GOPROXY:-}" ] && [ -f /etc/environment ]; then
+  # shellcheck disable=SC1091
+  . /etc/environment 2>/dev/null || true
+  export GOPROXY="${GOPROXY:-}"
+fi
+[ -n "${DEVSERVER_GOPROXY:-}" ] && export GOPROXY="$DEVSERVER_GOPROXY"
+export PATH=/usr/local/go/bin:$PATH
+cd "$REPO_ROOT"
+
+# 从服务器本地 .env 提取凭据/配置（值不出脚本、不回传明文）。
+for key in AGENTHUB_DB_USER AGENTHUB_DB_PASSWORD AGENTHUB_REDIS_HOST AGENTHUB_REDIS_PORT \
+           AGENTHUB_TOKENDANCE_ID_ISSUER_URL AGENTHUB_TOKENDANCE_ID_CLIENT_ID \
+           AGENTHUB_TOKENDANCE_ID_CLIENT_SECRET AGENTHUB_TOKENDANCE_ID_REDIRECT_URI; do
+  line="$(awk -F= -v k="$key" '$1==k {sub(/^[^=]*=/,""); print}' .env | tail -1)"
+  [ -n "$line" ] || { echo "[devserver] ERROR: .env 缺 $key"; exit 1; }
+  export "$key=$line"
+done
+# lane 专用库：每次 DROP+CREATE，保证与 CI 全新容器同语义。
+export AGENTHUB_DB_NAME=agenthub_test
+export AGENTHUB_DB_HOST=127.0.0.1
+export AGENTHUB_DB_PORT=5432
+export AGENTHUB_DB_SSLMODE=disable
+export AGENTHUB_JWT_SECRET="ci-integration-jwt-secret-min-32-chars-ok!!"
+export AGENTHUB_ENV=test
+
+docker exec -e PGPASSWORD="$AGENTHUB_DB_PASSWORD" agenthub-postgres \
+  psql -U "$AGENTHUB_DB_USER" -d postgres -c "DROP DATABASE IF EXISTS agenthub_test" >/dev/null
+docker exec -e PGPASSWORD="$AGENTHUB_DB_PASSWORD" agenthub-postgres \
+  psql -U "$AGENTHUB_DB_USER" -d postgres -c "CREATE DATABASE agenthub_test" >/dev/null
+
+commit="$(git rev-parse --short HEAD)"
+branch="$(git rev-parse --abbrev-ref HEAD)"
+start_ts="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+if (cd hub-server && go test -tags integration ./tests/integration/ -count=1 -timeout=20m >/tmp/devserver-integration.log 2>&1); then
+  result="pass"
+else
+  result="fail"
+fi
+end_ts="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+pass_count="$(grep -c '^--- PASS' /tmp/devserver-integration.log || true)"
+fail_count="$(grep -c '^--- FAIL' /tmp/devserver-integration.log || true)"
+cat <<JSON
+{
+  "schema": "devserver-integration-report.v1",
+  "server": "$(hostname)",
+  "arch": "$(uname -m)",
+  "branch": "$branch",
+  "commit": "$commit",
+  "startedAt": "$start_ts",
+  "finishedAt": "$end_ts",
+  "result": "$result",
+  "testsPassed": $pass_count,
+  "testsFailed": $fail_count,
+  "log": "/tmp/devserver-integration.log"
+}
+JSON
+REMOTE_SCRIPT
+  log "报告已回传: $out_file"
+  python3 -c "import json,sys; d=json.load(open('$out_file')); print(json.dumps(d, indent=2))" 2>/dev/null || cat "$out_file"
+}
+
 usage() {
   cat <<EOF
-用法: scripts/dev/devserver.sh <sync|start|stop|status|test>
+用法: scripts/dev/devserver.sh <sync|start|stop|status|test|integration>
 详见文件头注释。
 EOF
 }
@@ -231,5 +308,6 @@ case "${1:-}" in
   stop) cmd_stop ;;
   status) cmd_status ;;
   test) cmd_test ;;
+  integration) cmd_integration ;;
   *) usage; exit 2 ;;
 esac

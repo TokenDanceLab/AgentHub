@@ -2,7 +2,7 @@
 
 ## devserver.sh（远程 dev 服务器测试平台，L3 真实测试面）
 
-统一入口：`scripts/dev/devserver.sh <sync|start|stop|status|test>`。
+统一入口：`scripts/dev/devserver.sh <sync|start|stop|status|test|integration>`。
 
 远程服务器承载 L3 真实测试（全栈：TokenDanceID + hub + edge + web vite），
 本脚本从本地发起同步、启动、健康检查与测试报告回传。分层定义见
@@ -29,8 +29,18 @@
 
 - `sync` 只在服务器工作树干净时允许快进；脏树先处理（避免证据跑在
   未知代码上）。
-- `test` 回传 JSON 报告到本地 `.tmp/devserver-reports/`（gitignored），
-  报告含 commit/branch/arch/结果，可附 PR/issue 作为 L3 证据。
+- `test` / `integration` 回传 JSON 报告到本地 `.tmp/devserver-reports/`
+  （gitignored），报告含 commit/branch/arch/结果，可附 PR/issue 作为
+  L3 证据。
+
+### integration 命令与测试库隔离
+
+`integration` 对齐 CI `backend-integration` job（真实 PostgreSQL +
+Redis）：每次运行前在服务器 PG 上 DROP+CREATE 独立测试库
+`agenthub_test`，与 CI 的 ephemeral service 容器语义一致。共享 dev 库
+会被重复运行的残留数据污染（用户/session/owner-scope 断言失败），
+因此 lane 必须跑在全新数据库上；`integration` 把这条纪律固化在命令里，
+凭据仍从服务器 `.env` 提取、不出仓库。
 
 ## 其他脚本
 
