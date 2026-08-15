@@ -47,9 +47,6 @@ jobs:
           cache: true
           cache-dependency-path: edge-server/go.sum
 
-      - name: Build
-        run: go build ./...
-
       - name: Lint
         # Wave 10: advisory — gocognit findings in pre-existing complex functions
         continue-on-error: true
@@ -94,18 +91,37 @@ jobs:
           check_pkg "edge-server/internal/adapters/" 55 "adapters" || FAILED=1
           exit $FAILED
 
+      # CI7: staticcheck hard-blocking — edge-server findings zero-baselined;
+      # version pinned to prevent new-check drift from breaking CI.
+      # Binary cached across runs (gha cache keyed on pinned versions).
+      # Restore must precede both gosec and staticcheck steps.
+      - name: Cache static-analysis binaries (staticcheck + gosec)
+        id: sa-cache
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/go/bin/staticcheck
+            ~/go/bin/gosec
+          key: sa-tools-2026-08
+
       - name: Security scan (gosec)
         # Wave 10: advisory; gosec findings are pre-existing cognitive complexity
+        # Binary cached across runs (same pattern as staticcheck); go run
+        # re-downloads/recompiles gosec every job (~30s) without it.
         continue-on-error: true
-        run: go run github.com/securego/gosec/v2/cmd/gosec@v2.28.0 ./...
+        run: |
+          if [ ! -x ~/go/bin/gosec ]; then
+            go install github.com/securego/gosec/v2/cmd/gosec@v2.28.0
+          fi
+          ~/go/bin/gosec ./...
       - name: Vet
         run: go vet ./...
 
-      # CI7: staticcheck hard-blocking — edge-server findings zero-baselined;
-      # version pinned to prevent new-check drift from breaking CI.
       - name: staticcheck
         run: |
-          go install honnef.co/go/tools/cmd/staticcheck@2026.1
+          if [ ! -x ~/go/bin/staticcheck ]; then
+            go install honnef.co/go/tools/cmd/staticcheck@2026.1
+          fi
           staticcheck ./... 2>&1
 
       # #1566: orchestrator 依赖方向门禁（A-V1 Step 2）。叶子包
@@ -138,9 +154,6 @@ jobs:
           go-version: ${{ env.GO_VERSION }}
           cache: true
           cache-dependency-path: hub-server/go.sum
-
-      - name: Build
-        run: go build ./...
 
       - name: Lint
         continue-on-error: true
@@ -189,19 +202,36 @@ jobs:
             exit 1
           fi
 
+      # CI7: staticcheck hard-blocking — hub-server findings zero-baselined;
+      # version pinned to prevent new-check drift from breaking CI.
+      # Binary cached across runs (gha cache keyed on pinned versions).
+      # Restore must precede both gosec and staticcheck steps.
+      - name: Cache static-analysis binaries (staticcheck + gosec)
+        id: sa-cache
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/go/bin/staticcheck
+            ~/go/bin/gosec
+          key: sa-tools-2026-08
+
       - name: Security scan (gosec)
-        # Wave 10: advisory matching go-edge
+        # Wave 10: advisory matching go-edge; binary cached same as staticcheck.
         continue-on-error: true
-        run: go run github.com/securego/gosec/v2/cmd/gosec@v2.28.0 ./...
+        run: |
+          if [ ! -x ~/go/bin/gosec ]; then
+            go install github.com/securego/gosec/v2/cmd/gosec@v2.28.0
+          fi
+          ~/go/bin/gosec ./...
 
       - name: Vet
         run: go vet ./...
 
-      # CI7: staticcheck hard-blocking — hub-server findings zero-baselined;
-      # version pinned to prevent new-check drift from breaking CI.
       - name: staticcheck
         run: |
-          go install honnef.co/go/tools/cmd/staticcheck@2026.1
+          if [ ! -x ~/go/bin/staticcheck ]; then
+            go install honnef.co/go/tools/cmd/staticcheck@2026.1
+          fi
           staticcheck ./... 2>&1
 
   # ── Backend E2E: Fixture-only ────────────────
@@ -1098,7 +1128,8 @@ jobs:
         working-directory: app
         run: pnpm install --frozen-lockfile
       - name: Verify coverage baseline
-        continue-on-error: true  # Wave 10: new components/stories lowered coverage; re-baseline after tests catch up
+        # 2026-08-15 收紧（原 Wave 10 advisory）：mobile re-baseline 后四包
+        # 全绿（PR #1685 coverage 10m2s pass 验证），转 hard gate。
         run: python ./scripts/verify/verify-coverage-baseline.py
       # Negative self-test: an imported-by-nobody production file must be
       # counted as 0% and trip the uncovered ratchet (#1535). Cheap — mobile
