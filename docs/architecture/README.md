@@ -16,6 +16,7 @@
 | [06-auth-identity.md](06-auth-identity.md) | OIDC PKCE flow、JWT 签发、TokenDance ID 集成、设备注册 |
 | [07-design-system-ssot.md](07-design-system-ssot.md) | Design tokens / theme runtime / surface CSS ownership map |
 | [08-outbound-http.md](08-outbound-http.md) | 出站 HTTP policy 合同、client inventory、机器门禁（#1540/#1549/#1564） |
+| [09-dev-server-topology.md](09-dev-server-topology.md) | 远程 dev 服务器拓扑（L3 真实测试面）：端口矩阵、运行模型、身份链、重建步骤、证据纪律 |
 
 ## 约定
 
