@@ -5,6 +5,8 @@ package integration
 import (
 	"context"
 	"crypto/rsa"
+	"crypto/sha256"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -52,6 +54,16 @@ func computeKID(pub *rsa.PublicKey) string {
 
 func oidcE2EDeviceID(label string) string {
 	return uuid.NewSHA1(uuid.NameSpaceOID, []byte(label)).String()
+}
+
+// pkceChallenge derives the S256 code_challenge for a code_verifier, matching
+// the Hub-side PKCE defense-in-depth check in oidc.Service.HandleCallback
+// (sha256 -> base64url). Placeholder challenges fail callbacks with
+// oidc_invalid_state; e2e fixtures must derive real challenges.
+func pkceChallenge(t *testing.T, verifier string) string {
+	t.Helper()
+	digest := sha256.Sum256([]byte(verifier))
+	return base64.RawURLEncoding.EncodeToString(digest[:])
 }
 
 // setupE2EDB creates an in-memory SQLite database with tables needed for OIDC E2E tests.
@@ -160,7 +172,7 @@ func TestTokenDanceOIDC_E2E_GenerateAuthorizationURL(t *testing.T) {
 	ctx := context.Background()
 
 	result, err := svc.GenerateAuthorizationURL(ctx,
-		"e2e-challenge-base64url-encoded-test-data", "S256",
+		pkceChallenge(t, "e2e-url-generation-verifier-minimum-43-chars"), "S256",
 		"desktop", oidcE2EDeviceID("authorization-url"), "")
 	require.NoError(t, err)
 
@@ -178,7 +190,7 @@ func TestTokenDanceOIDC_E2E_GenerateAuthorizationURL(t *testing.T) {
 	assert.Equal(t, "http://127.0.0.1:54321/callback", q.Get("redirect_uri"))
 	assert.Equal(t, "openid profile email", q.Get("scope"))
 	assert.Equal(t, result.State, q.Get("state"))
-	assert.Equal(t, "e2e-challenge-base64url-encoded-test-data", q.Get("code_challenge"))
+	assert.Equal(t, pkceChallenge(t, "e2e-url-generation-verifier-minimum-43-chars"), q.Get("code_challenge"))
 	assert.Equal(t, "S256", q.Get("code_challenge_method"))
 }
 
@@ -192,7 +204,7 @@ func TestTokenDanceOIDC_E2E_FullFlow(t *testing.T) {
 	ctx := context.Background()
 
 	codeVerifier := "e2e-code-verifier-minimum-43-characters-for-s256"
-	codeChallenge := "e2e-code-challenge-s256-placeholder-value-set"
+	codeChallenge := pkceChallenge(t, codeVerifier)
 
 	// Step 1: Generate authorization URL
 	deviceID := oidcE2EDeviceID("full-flow")
@@ -244,7 +256,7 @@ func TestTokenDanceOIDC_E2E_StateConsumption(t *testing.T) {
 	ctx := context.Background()
 
 	verifier := "e2e-verifier-for-one-shot-test-min-43-chars"
-	challenge := "e2e-challenge-for-one-shot-test-value-here"
+	challenge := pkceChallenge(t, verifier)
 
 	// First: generate auth URL (stores state in Redis)
 	deviceID := oidcE2EDeviceID("state-consumption")
@@ -274,7 +286,7 @@ func TestTokenDanceOIDC_E2E_DeviceMismatch(t *testing.T) {
 	ctx := context.Background()
 
 	verifier := "e2e-verifier-for-device-mismatch-test-43chars"
-	challenge := "e2e-challenge-for-device-mismatch-test-ok"
+	challenge := pkceChallenge(t, verifier)
 
 	// Authorize with device X
 	authorizedDeviceID := oidcE2EDeviceID("device-alpha")
@@ -298,7 +310,7 @@ func TestTokenDanceOIDC_E2E_SubsequentLogin(t *testing.T) {
 	ctx := context.Background()
 
 	verifier := "e2e-second-login-code-verifier-43-chars-ok"
-	challenge := "e2e-second-login-code-challenge-value-yes"
+	challenge := pkceChallenge(t, verifier)
 
 	// First login
 	deviceID1 := oidcE2EDeviceID("subsequent-login-1")
@@ -317,8 +329,9 @@ func TestTokenDanceOIDC_E2E_SubsequentLogin(t *testing.T) {
 	_ = mockSrv
 	_ = privKey
 
-	// Second login with same code prefix → same sub from mock
-	auth2, err := svc.GenerateAuthorizationURL(ctx, challenge+"2", "S256", "desktop", deviceID2, "")
+	// Second login with same code prefix → same sub from mock.
+	// PKCE pair reuse is valid: challenge is derived from the same verifier.
+	auth2, err := svc.GenerateAuthorizationURL(ctx, challenge, "S256", "desktop", deviceID2, "")
 	require.NoError(t, err)
 
 	code2 := "same_user_001" // same prefix → mock returns same sub
@@ -336,7 +349,7 @@ func TestTokenDanceOIDC_E2E_BadTokenEndpoint(t *testing.T) {
 	ctx := context.Background()
 
 	verifier := "e2e-bad-token-endpoint-verifier-43-chars-xx"
-	challenge := "e2e-bad-token-endpoint-challenge-value-ab"
+	challenge := pkceChallenge(t, verifier)
 
 	authResult, err := svc.GenerateAuthorizationURL(ctx, challenge, "S256", "desktop", oidcE2EDeviceID("bad-token"), "")
 	require.NoError(t, err)
@@ -498,7 +511,7 @@ func TestTokenDanceOIDC_E2E_TokenEndpointErrors(t *testing.T) {
 	ctx := context.Background()
 
 	verifier := "e2e-token-error-test-verifier-43-chars-here"
-	challenge := "e2e-token-error-test-challenge-value-abc"
+	challenge := pkceChallenge(t, verifier)
 
 	// Generate auth URL (stores state in Redis)
 	deviceID := oidcE2EDeviceID("token-endpoint-error")
@@ -552,7 +565,7 @@ func TestTokenDanceOIDC_E2E_EmptyScopes(t *testing.T) {
 	_ = mockSrv
 
 	verifier := "e2e-scope-test-code-verifier-minimum-43-chars"
-	challenge := "e2e-scope-test-code-challenge-value-yep"
+	challenge := pkceChallenge(t, verifier)
 
 	deviceID := oidcE2EDeviceID("scope")
 	authResult, err := svc.GenerateAuthorizationURL(ctx, challenge, "S256", "desktop", deviceID, "")
@@ -578,7 +591,7 @@ func TestTokenDanceOIDC_E2E_RefreshTokenStorage(t *testing.T) {
 	ctx := context.Background()
 
 	verifier := "e2e-refresh-storage-verifier-43-chars-here-ok"
-	challenge := "e2e-refresh-storage-challenge-value-go"
+	challenge := pkceChallenge(t, verifier)
 
 	deviceID := oidcE2EDeviceID("refresh-storage")
 	authResult, err := svc.GenerateAuthorizationURL(ctx, challenge, "S256", "desktop", deviceID, "")
@@ -615,7 +628,7 @@ func TestTokenDanceOIDC_E2E_ConcurrentLogins(t *testing.T) {
 	for i := 0; i < numLogins; i++ {
 		go func(idx int) {
 			v := fmt.Sprintf("e2e-conc-%d-verifier-that-is-long-enough-ok", idx)
-			c := fmt.Sprintf("e2e-conc-%d-challenge-long-enough-value-yes", idx)
+			c := pkceChallenge(t, v)
 			deviceID := oidcE2EDeviceID(fmt.Sprintf("concurrent-%d", idx))
 			authR, err := svc.GenerateAuthorizationURL(ctx, c, "S256", "desktop", deviceID, "")
 			if err != nil {
@@ -658,9 +671,9 @@ func TestTokenDanceOIDC_E2E_LargePKCEValues(t *testing.T) {
 	svc, _, _, _, _ := setupE2EService(t)
 	ctx := context.Background()
 
-	// 128-char challenge and verifier (S256 limit is typically around 128 chars)
+	// 128-char verifier; its S256 challenge is the standard 43-char base64url hash.
 	verifier := strings.Repeat("v", 128)
-	challenge := strings.Repeat("c", 43) // S256 challenge is typically 43 chars
+	challenge := pkceChallenge(t, verifier)
 
 	deviceID := oidcE2EDeviceID("large-pkce")
 	authResult, err := svc.GenerateAuthorizationURL(ctx, challenge, "S256", "desktop", deviceID, "")
