@@ -27,12 +27,6 @@ func NewRequestID() string {
 	return fmt.Sprintf("req_%x-%x-%x-%x-%x", b[0:4], b[4:6], b[6:8], b[8:10], b[10:])
 }
 
-// NewTraceID generates a short, ordered trace ID for error responses.
-func NewTraceID() string {
-	n := atomic.AddUint64(&traceSeq, 1)
-	return fmt.Sprintf("trace_%06d", n)
-}
-
 // GetRequestID extracts the request ID from context.
 func GetRequestID(ctx context.Context) string {
 	if v, ok := ctx.Value(requestIDKey{}).(string); ok {

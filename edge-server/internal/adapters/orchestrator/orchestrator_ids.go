@@ -1,18 +1,13 @@
 package orchestrator
 
-import (
-	"crypto/rand"
-	"fmt"
-)
+import "github.com/agenthub/edge-server/internal/idgen"
 
 // genHexID generates a random 16-character hex string.
 func genHexID() string {
-	b := make([]byte, 8)
-	_, _ = rand.Read(b)
-	return fmt.Sprintf("%016x", b)
+	return idgen.Hex()
 }
 
 // genAgentID generates a random agent instance ID.
 func genAgentID() string {
-	return "agent_" + genHexID()
+	return idgen.New("agent_")
 }
