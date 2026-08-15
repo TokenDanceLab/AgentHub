@@ -168,6 +168,9 @@ func TestClaudeCodeIntegrationCancellation(t *testing.T) {
 }
 
 func TestClaudeCodeIntegrationWithStdinControl(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("claude CLI refuses --dangerously-skip-permissions under root/sudo; run the suite as a non-root user")
+	}
 	adapter := NewClaudeCodeAdapter(claudePath(t), "", "bypassPermissions")
 	ctx := context.Background()
 	run := store.Run{ID: "run_int_ctrl", ProjectID: "proj_int", ThreadID: "thread_int", Status: "started"}
