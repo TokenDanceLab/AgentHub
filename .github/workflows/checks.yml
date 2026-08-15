@@ -938,6 +938,14 @@ jobs:
           wait $MOCK_HUB_PID 2>/dev/null || true
           exit $E2E_EXIT_CODE
 
+      # #1678 P1-4: wire the 6 mobile-rn Playwright __e2e__ specs (auth/chat/
+      # settings/tasks/threads/workbench). The playwright.config.ts webServer
+      # block starts the mock hub + `expo start --web` itself, so this is a
+      # single command. Runs only on workflow_dispatch (S1 cost throttle).
+      - name: E2E (Playwright, mock hub + Expo web)
+        timeout-minutes: 25
+        run: pnpm --filter agenthub-mobile-rn test:e2e
+
       - name: Verify Mobile RN
         run: pnpm --filter agenthub-mobile-rn verify
       - name: Expo Doctor
