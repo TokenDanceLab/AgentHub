@@ -8,7 +8,7 @@
 
 #        make release  (via git push tag -> release.yml, not built here)
 #        make help        (show this help)
-.PHONY: test test-all test-edge test-hub test-edge-e2e lint coverage sec release clean fmt \
+.PHONY: test test-all test-edge test-hub test-edge-e2e test-teamrun test-oidc test-hub-integration e2e-local lint coverage sec release clean fmt \
         fe-install fe-dev fe-build fe-test fe-lint fe-typecheck help
 
 # ── Help ───────────────────────────────────────────
@@ -22,6 +22,10 @@ help:
 	@echo "    test-edge     Edge Server 单元测试"
 	@echo "    test-edge-e2e Edge→Hub 回调冒烟 (零外部依赖, 进程内 mock hub)"
 	@echo "    test-hub      Hub Server 单元测试"
+	@echo "    test-teamrun  团队编排 smoke (零外部依赖, in-memory sqlite)"
+	@echo "    test-oidc     OIDC/scenarios smoke (零外部依赖)"
+	@echo "    test-hub-integration  Hub 集成 lane (需 PG + Redis)"
+	@echo "    e2e-local     零依赖 E2E 组合: edge-e2e + teamrun + oidc"
 	@echo "    lint          golangci-lint (edge + hub)"
 	@echo "    coverage      覆盖率报告 (HTML + func)"
 	@echo "    sec           gosec + govulncheck"
@@ -55,6 +59,20 @@ test-edge-e2e:
 
 test-hub:
 	cd hub-server && go test ./... -short -count=1 -timeout 60s
+
+# 零外部依赖的 E2E smoke（in-memory sqlite，无 build tag，CI 直跑）。
+test-teamrun:
+	cd hub-server && go test ./tests/teamrun/ -count=1 -timeout 60s
+
+test-oidc:
+	cd hub-server && go test ./tests/oidc/ ./tests/scenarios/ -count=1 -timeout 60s
+
+# Hub 集成 lane（//go:build integration，需 PG + Redis service 容器）。
+test-hub-integration:
+	cd hub-server && go test -tags integration ./tests/integration/ -count=1 -timeout 300s
+
+# 零依赖 E2E 组合（无需 PG/Redis/真实 CLI）。
+e2e-local: test-edge-e2e test-teamrun test-oidc
 
 # ── Full tests (requires Redis + PG) ─────────────────
 
