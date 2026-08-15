@@ -83,6 +83,9 @@ def main() -> int:
     parser.add_argument("--BaselinePath", default=DEFAULT_BASELINE_PATH, help="path to coverage-baseline.json")
     parser.add_argument("--AppDir", default=DEFAULT_APP_DIR, help="workspace root (the app dir)")
     parser.add_argument("--KeepReports", action="store_true", help="do not delete generated coverage/ and test-results.json after parsing")
+    # --OnlyPackages: comma-separated baseline package keys to run (CI 4-package
+    # matrix splits the 10min gate into per-package parallel jobs). Default: all.
+    parser.add_argument("--OnlyPackages", default="", help="comma-separated package keys to run; empty = all")
     args = parser.parse_args()
 
     baseline_path = args.BaselinePath
@@ -94,6 +97,13 @@ def main() -> int:
         raise RuntimeError(f"app dir not found: {app_dir}")
 
     baseline = read_json(baseline_path)
+
+    only_packages = None
+    if args.OnlyPackages.strip():
+        only_packages = {name.strip() for name in args.OnlyPackages.split(",") if name.strip()}
+        unknown = only_packages - set(baseline["packages"].keys())
+        if unknown:
+            raise RuntimeError(f"--OnlyPackages contains unknown package keys: {sorted(unknown)}")
 
     # v8 coverage has a small run-to-run variance (a few async setup/teardown
     # paths execute non-deterministically). The baseline JSON declares a
@@ -107,6 +117,8 @@ def main() -> int:
 
     # Iterate packages in baseline order (JSON object order == ps1 property order).
     for pkg_filter, pkg in baseline["packages"].items():
+        if only_packages is not None and pkg_filter not in only_packages:
+            continue
         pkg_dir = pkg["dir"]
         config = pkg.get("config")
         abs_pkg_dir = os.path.join(REPO_ROOT, pkg_dir)
