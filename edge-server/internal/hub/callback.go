@@ -97,6 +97,7 @@ func (c CallbackConfig) withDefaults() CallbackConfig {
 type CallbackClient struct {
 	hubURL        string
 	authToken     string
+	tokenSource   func() string // live token override (edge auto-refresh); nil = static authToken
 	cfg           CallbackConfig
 	client        *http.Client
 	journal       *DeliveryJournal
@@ -104,6 +105,25 @@ type CallbackClient struct {
 	// outbound records every attempt against the unified outbound metrics
 	// contract (#1595); nil is a no-op.
 	outbound *outboundmetrics.Recorder
+}
+
+// SetTokenSource installs a live token provider. When set, every outbound
+// callback reads the bearer token from the source at send time instead of the
+// static authToken, so a rotated access token (edge auto-refresh) flows to the
+// next attempt without a client rebuild.
+func (c *CallbackClient) SetTokenSource(source func() string) {
+	c.tokenSource = source
+}
+
+// currentAuthToken resolves the bearer token for an outbound request: the live
+// token source wins, falling back to the static token.
+func (c *CallbackClient) currentAuthToken() string {
+	if c.tokenSource != nil {
+		if live := c.tokenSource(); live != "" {
+			return live
+		}
+	}
+	return c.authToken
 }
 
 // TaskResult carries the final result of a completed task.
@@ -484,8 +504,8 @@ func (c *CallbackClient) doAttempt(ctx context.Context, url string, payload []by
 		return false, true, 0, fmt.Errorf("hub callback request: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
-	if c.authToken != "" {
-		req.Header.Set("Authorization", "Bearer "+c.authToken)
+	if token := c.currentAuthToken(); token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
 	}
 	// Correlation contract (#1595): propagate the caller's request id so the
 	// Hub side can join callback logs to the originating Edge request.
