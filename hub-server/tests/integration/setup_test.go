@@ -40,6 +40,7 @@ import (
 	"github.com/agenthub/hub-server/internal/service/messagereaction"
 	"github.com/agenthub/hub-server/internal/service/oidc"
 	"github.com/agenthub/hub-server/internal/service/session"
+	"github.com/agenthub/hub-server/internal/testkit"
 	"github.com/agenthub/hub-server/internal/ws"
 )
 
@@ -356,32 +357,8 @@ func do(method, path string, body interface{}, token string) *http.Response {
 	return resp
 }
 
-type apiResp struct {
-	Code    string          `json:"code"`
-	Message string          `json:"message"`
-	Data    json.RawMessage `json:"data"`
-	Error   *struct {
-		Code    string `json:"code"`
-		Message string `json:"message"`
-		TraceID string `json:"traceId"`
-	} `json:"error"`
-}
-
-// GetCode returns the response code from either success or error envelope.
-func (r apiResp) GetCode() string {
-	if r.Error != nil {
-		return r.Error.Code
-	}
-	return r.Code
-}
-
-// GetMsg returns the message from either success or error envelope.
-func (r apiResp) GetMsg() string {
-	if r.Error != nil {
-		return r.Error.Message
-	}
-	return r.Message
-}
+// apiResp is the shared Hub response envelope (internal/testkit.APIResponse).
+type apiResp = testkit.APIResponse
 
 func parse(resp *http.Response) apiResp {
 	defer resp.Body.Close()

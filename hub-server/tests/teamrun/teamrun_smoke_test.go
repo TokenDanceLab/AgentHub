@@ -14,6 +14,7 @@ import (
 	"github.com/agenthub/hub-server/internal/handler"
 	"github.com/agenthub/hub-server/internal/model"
 	"github.com/agenthub/hub-server/internal/service/agentteam"
+	"github.com/agenthub/hub-server/internal/testkit"
 	"github.com/gin-gonic/gin"
 	"github.com/glebarez/sqlite"
 	"github.com/stretchr/testify/assert"
@@ -24,30 +25,8 @@ import (
 
 // ── Local apiResp to avoid dependency on tests package (which requires PostgreSQL) ──
 
-type apiResp struct {
-	Code    string          `json:"code"`
-	Message string          `json:"message"`
-	Data    json.RawMessage `json:"data"`
-	Error   *struct {
-		Code    string `json:"code"`
-		Message string `json:"message"`
-		TraceID string `json:"traceId"`
-	} `json:"error"`
-}
-
-func (r apiResp) GetCode() string {
-	if r.Error != nil {
-		return r.Error.Code
-	}
-	return r.Code
-}
-
-func (r apiResp) GetMsg() string {
-	if r.Error != nil {
-		return r.Error.Message
-	}
-	return r.Message
-}
+// apiResp is the shared Hub response envelope (internal/testkit.APIResponse).
+type apiResp = testkit.APIResponse
 
 func ptrStr(s string) *string { return &s }
 
