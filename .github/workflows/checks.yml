@@ -114,7 +114,7 @@ jobs:
           key: sa-tools-2026-08
 
       - name: Security scan (gosec)
-        # Wave 10: advisory; gosec findings are pre-existing cognitive complexity
+        # Wave 10: advisory; pre-existing security findings not yet zero-baselined.
         # Binary cached across runs (same pattern as staticcheck); go run
         # re-downloads/recompiles gosec every job (~30s) without it.
         continue-on-error: true

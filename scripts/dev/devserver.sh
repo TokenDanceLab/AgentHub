@@ -67,7 +67,7 @@ cmd_sync() {
   local size
   size=$(wc -c <"$bundle_tmp" | tr -d ' ')
   log "推送增量 bundle（$size bytes）…"
-  cat "$bundle_tmp" | ssh -o ConnectTimeout=15 "$REMOTE" "cat > /tmp/agenthub-sync.bundle"
+  ssh -o ConnectTimeout=15 "$REMOTE" "cat > /tmp/agenthub-sync.bundle" <"$bundle_tmp"
   ssh -o ConnectTimeout=30 "$REMOTE" "cd '$REPO_ROOT' && git fetch /tmp/agenthub-sync.bundle master:refs/remotes/origin/master && rm -f /tmp/agenthub-sync.bundle && git merge --ff-only origin/master && git log --oneline -1"
   log "sync 完成"
 }
@@ -122,10 +122,10 @@ nohup /tmp/agenthub-bin/server-hub >/tmp/hub.log 2>&1 & echo $! >/tmp/agenthub-h
 nohup /tmp/agenthub-bin/agenthub-edge >/tmp/edge.log 2>&1 & echo $! >/tmp/agenthub-edge.pid
 
 # 健康等待（wait_http 替换裸 sleep）
-wait_http() { # $1=url $2=name $3=超时秒
+wait_http() { # $1=url $2=name $3=迭代上限（每次 sleep 2s，总时长约 2×$3 秒）
   local i=0
   until curl -sf -m 2 "$1" >/dev/null 2>&1; do
-    i=$((i+1)); [ "$i" -ge "$3" ] && { echo "[devserver] TIMEOUT — $2 未在 $3s 内就绪"; return 1; }
+    i=$((i+1)); [ "$i" -ge "$3" ] && { echo "[devserver] TIMEOUT — $2 未在 ~$((2*$3))s 内就绪"; return 1; }
     sleep 2
   done
   echo "[devserver] $2 Ready"
