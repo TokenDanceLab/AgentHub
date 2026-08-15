@@ -131,10 +131,10 @@ Mobile 主线是 Expo + React Native development build。旧 Tauri Mobile 不再
 
 | 层 | 内容 | 入口 | CI job |
 |---|---|---|---|
-| L0 单元 | Go `-short`（零依赖）+ 前端 vitest | `make test` / `make fe-test` | `go-edge` / `go-hub` / `frontend-*`（checks.yml） |
+| L0 单元 | Go `-short`（零依赖）+ 前端 vitest | `make test` / `make fe-test` | `go-edge-test`/`go-hub-test`（2-shard 包轮转）+ `go-edge`/`go-hub`（lint/覆盖率门禁）+ `frontend-*`（checks.yml） |
 | L1 集成 | Go 集成（真实 PG16+Redis7，OIDC mock，`-tags integration`） | `make test-hub-integration`（先 `scripts/dev/dev-up.sh` 起容器） | `backend-integration`（service 容器） |
 | L2 回调 E2E | Edge→Hub 回调链路（进程内 mock hub / fixture smoke） | `make test-edge-e2e` / `make e2e-local` | `backend-edge-e2e` / `backend-e2e-fixture` |
-| L3 真实 E2E | Playwright 真实登录/聊天流（真实 ID+Hub+Edge 栈） | 远程 dev 服务器（`scripts/dev/`，见 #1681） | 仓库自认空白（`wsl-full-stack-e2e.sh` WSL 专属） |
+| L3 真实 E2E | Playwright 真实登录/聊天流（真实 ID+Hub+Edge 栈） | 远程 dev 服务器：`scripts/dev/devserver.sh test|integration`（见 #1681） | 仓库自认空白（`wsl-full-stack-e2e.sh` WSL 专属） |
 | L4 发布门禁 | 打包/安装器/真实证据 | `release-readiness.yml` | `release-readiness` |
 
 规则：
