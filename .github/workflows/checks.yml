@@ -231,6 +231,42 @@ jobs:
         working-directory: .
         run: python ./scripts/verify/verify-p0-remote-control-fixture.py
 
+  # ── Backend: Edge→Hub callback smoke (fixture-only) ──────────
+  # edge-server/tests TestHubE2E_ series spins up a mock Hub + in-process
+  # Edge ProcessExecutor and asserts ack/stream/done/fail direct-callback
+  # delivery. It is guarded by testing.Short(), so the go-edge -short lane
+  # skips it; this lane runs it explicitly with a non-zero PASS assertion
+  # (same pattern as backend-integration) so a 0-test lane fails.
+  backend-edge-e2e:
+    name: Backend Edge E2E (fixture-only)
+    needs: changes
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      needs.changes.outputs.go == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: edge-server
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+          cache-dependency-path: edge-server/go.sum
+
+      - name: Edge→Hub callback smoke
+        run: |
+          go test ./tests/ -count=1 -run '^TestHubE2E_' -v -timeout 120s 2>&1 | tee edge-e2e.log
+          PASS_COUNT=$(grep -c "^--- PASS" edge-e2e.log || true)
+          echo "edge e2e lane PASS count: ${PASS_COUNT}"
+          if [ "${PASS_COUNT}" -lt 1 ]; then
+            echo "::error::edge e2e lane executed 0 tests — lane must prove non-zero execution"
+            tail -50 edge-e2e.log
+            exit 1
+          fi
+
   # ── Backend: Integration (real PostgreSQL + Redis) ──────────
   # hub-server/tests/integration is `//go:build integration` (lane manifest):
   # the default -short lanes never compile it, so the suite can no longer
