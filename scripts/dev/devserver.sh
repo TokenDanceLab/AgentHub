@@ -273,7 +273,8 @@ else
   result="fail"
 fi
 end_ts="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-pass_count="$(grep -c '^--- PASS' /tmp/devserver-integration.log || true)"
+# 非 -v 模式无 "--- PASS" 行；用包级 ok 行计数，FAIL 行始终输出。
+packages_ok="$(grep -c '^ok ' /tmp/devserver-integration.log || true)"
 fail_count="$(grep -c '^--- FAIL' /tmp/devserver-integration.log || true)"
 cat <<JSON
 {
@@ -285,7 +286,7 @@ cat <<JSON
   "startedAt": "$start_ts",
   "finishedAt": "$end_ts",
   "result": "$result",
-  "testsPassed": $pass_count,
+  "packagesOk": $packages_ok,
   "testsFailed": $fail_count,
   "log": "/tmp/devserver-integration.log"
 }
