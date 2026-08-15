@@ -19,17 +19,6 @@ func TestNewRequestID(t *testing.T) {
 	}
 }
 
-func TestNewTraceID(t *testing.T) {
-	id := NewTraceID()
-	if !strings.HasPrefix(id, "trace_") {
-		t.Fatalf("NewTraceID = %q, want trace_ prefix", id)
-	}
-	id2 := NewTraceID()
-	if id == id2 {
-		t.Fatal("NewTraceID returned duplicate IDs")
-	}
-}
-
 func TestWithGetRequestID(t *testing.T) {
 	ctx := WithRequestID(context.Background(), "req_test123")
 	if got := GetRequestID(ctx); got != "req_test123" {

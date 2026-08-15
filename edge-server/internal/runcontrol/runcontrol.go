@@ -10,7 +10,6 @@
 package runcontrol
 
 import (
-	"crypto/rand"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -20,6 +19,7 @@ import (
 
 	"github.com/agenthub/edge-server/internal/errcode"
 	"github.com/agenthub/edge-server/internal/events"
+	"github.com/agenthub/edge-server/internal/idgen"
 	"github.com/agenthub/edge-server/internal/lifecycle"
 	"github.com/agenthub/edge-server/internal/security"
 	"github.com/agenthub/edge-server/internal/store"
@@ -255,10 +255,7 @@ func cleanupRuns(repository store.Repository) {
 	})
 }
 
-// generateRunID produces a run_ prefixed random identifier with the same
-// shape as the historical api.genID / mcp.generateID helpers.
+// generateRunID produces a run_ prefixed random identifier via idgen.
 func generateRunID() string {
-	b := make([]byte, 8)
-	_, _ = rand.Read(b)
-	return fmt.Sprintf("run_%016x", b)
+	return idgen.New("run_")
 }

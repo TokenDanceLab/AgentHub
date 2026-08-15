@@ -1,9 +1,7 @@
 package api
 
 import (
-	"crypto/rand"
 	"encoding/json"
-	"fmt"
 	"log/slog"
 	"net/http"
 	"sort"
@@ -12,6 +10,7 @@ import (
 	"time"
 
 	"github.com/agenthub/edge-server/internal/errcode"
+	"github.com/agenthub/edge-server/internal/idgen"
 	"github.com/agenthub/edge-server/internal/runners"
 )
 
@@ -69,9 +68,7 @@ func writeSuccess(w http.ResponseWriter, status int, data any) {
 // ---------------------------------------------------------------------------
 
 func genID(prefix string) string {
-	b := make([]byte, 8)
-	_, _ = rand.Read(b)
-	return fmt.Sprintf("%s%016x", prefix, b)
+	return idgen.New(prefix)
 }
 
 // storeReadinessCacheTTL bounds how long a cached store-readiness result is
