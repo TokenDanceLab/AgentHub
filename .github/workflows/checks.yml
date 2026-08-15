@@ -475,6 +475,9 @@ jobs:
       AGENTHUB_TOKENDANCE_ID_CLIENT_ID: "ci-integration-client"
       AGENTHUB_TOKENDANCE_ID_CLIENT_SECRET: "ci-integration-secret-not-a-real-secret"
       AGENTHUB_TOKENDANCE_ID_REDIRECT_URI: "http://127.0.0.1:8080/client/auth/oidc/callback"
+      # migration_audit_test.go 需要 admin URL（superuser）来 CREATE/DROP 独立测试库。
+      # agenthub:agenthub 是 CI PG 测试容器的 throwaway 凭据，127.0.0.1 是 runner loopback，非真实凭据。
+      AGENTHUB_PG_MIGRATION_TEST_ADMIN_URL: "postgres://agenthub:agenthub@127.0.0.1:5432/agenthub?sslmode=disable"  # leak-guard-allow:LG-F4C6A155
     steps:
       - uses: actions/checkout@v7
 
@@ -497,6 +500,18 @@ jobs:
           if [ "${PASS_COUNT}" -lt 1 ]; then
             echo "::error::integration lane executed 0 tests — lane must prove non-zero execution"
             tail -50 integration-test.log
+            exit 1
+          fi
+
+      - name: Migration-up coverage (real PostgreSQL)
+        working-directory: hub-server
+        run: |
+          go test ./internal/repository/ -run 'TestMigration0040' -count=1 -v -timeout=120s 2>&1 | tee migration-test.log
+          PASS_COUNT=$(grep -c "^--- PASS" migration-test.log || true)
+          echo "migration lane PASS count: ${PASS_COUNT}"
+          if [ "${PASS_COUNT}" -lt 1 ]; then
+            echo "::error::migration lane executed 0 tests — lane must prove non-zero execution"
+            tail -50 migration-test.log
             exit 1
           fi
 
