@@ -110,6 +110,7 @@ func main() {
 		EdgeDeviceID:       cfg.EdgeDeviceID,
 		HubURL:             cfg.HubURL,
 		HubToken:           cfg.HubToken,
+		HubRefreshToken:    cfg.HubRefreshToken,
 		HubCallbackTimeout: parseDurationOrDefault(cfg.HubCallbackTimeout, 0),
 		HubCallbackBudget:  parseDurationOrDefault(cfg.HubCallbackBudget, 0),
 		RemoteMode:         cfg.RemoteMode,

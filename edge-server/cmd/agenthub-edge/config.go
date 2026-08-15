@@ -36,6 +36,7 @@ type config struct {
 	// Hub callback configuration (Edge→Hub direct bridge)
 	HubURL                 string // Hub server base URL for Edge callback reporting
 	HubToken               string // JWT bearer token for authenticating with Hub
+	HubRefreshToken        string // Hub session refresh token; rotates --hub-token before expiry
 	HubCallbackTimeout     string // per-request timeout for Edge→Hub callbacks (default 30s)
 	HubCallbackBudget      string // total wall-clock retry budget for callbacks (default 10s)
 	HubCallbackMaxAttempts string // total attempts per callback (default 3)
@@ -157,6 +158,7 @@ func buildConfig(args []string) (config, error) {
 	fs.StringVar(&cfg.EdgeDeviceID, "edge-device-id", getEnv("AGENTHUB_EDGE_DEVICE_ID", ""), "local Edge device ID expected in Edge-scoped Hub JWTs; required with --hub-jwt-secret")
 	fs.StringVar(&cfg.HubURL, "hub-url", getEnv("AGENTHUB_HUB_URL", ""), "Hub server base URL for Edge→Hub direct callback reporting (e.g. https://hub.example.com)")
 	fs.StringVar(&cfg.HubToken, "hub-token", getEnv("AGENTHUB_HUB_TOKEN", ""), "JWT bearer token for authenticating callback requests to Hub")
+	fs.StringVar(&cfg.HubRefreshToken, "hub-refresh-token", getEnv("AGENTHUB_HUB_REFRESH_TOKEN", ""), "Hub session refresh token; when set the Edge rotates --hub-token before expiry via /client/auth/refresh")
 	fs.StringVar(&cfg.HubCallbackTimeout, "hub-callback-timeout", getEnv("AGENTHUB_HUB_CALLBACK_TIMEOUT", ""), "per-request timeout for Edge→Hub callbacks (Go duration, default 30s)")
 	fs.StringVar(&cfg.HubCallbackBudget, "hub-callback-retry-budget", getEnv("AGENTHUB_HUB_CALLBACK_RETRY_BUDGET", ""), "total wall-clock retry budget for Edge→Hub callbacks (Go duration, default 10s)")
 	fs.StringVar(&cfg.HubCallbackMaxAttempts, "hub-callback-max-attempts", getEnv("AGENTHUB_HUB_CALLBACK_MAX_ATTEMPTS", ""), "total attempts per Edge→Hub callback (default 3)")

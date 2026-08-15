@@ -53,6 +53,7 @@ type Config struct {
 	EdgeDeviceID           string                   // local Edge device ID expected in Edge-scoped Hub JWTs
 	HubURL                 string                   // Hub server base URL for Edge->Hub direct callbacks
 	HubToken               string                   // JWT bearer token for Hub callback authentication
+	HubRefreshToken        string                   // Hub session refresh token; enables token auto-rotation
 	HubCallbackTimeout     time.Duration            // per-request timeout for Edge→Hub callbacks; 0 = default (30s)
 	HubCallbackBudget      time.Duration            // total wall-clock retry budget for callbacks; 0 = default (10s)
 	HubCallbackMaxAttempts int                      // total attempts per callback; 0 = default (3)
@@ -319,6 +320,15 @@ func buildProcessExecutor(cfg Config, bus *events.Bus, agentReg *agents.Registry
 		// attempt on the Edge metrics registry.
 		hubClient = hubClient.WithMetrics(edgeMetrics.Outbound)
 		hubCallbackClient = hubClient
+		// Token auto-rotation (#1410): with a refresh token the provider
+		// rotates the bearer before expiry and every outbound callback reads
+		// the live token, so a long-lived Edge never starts 401ing.
+		if cfg.HubRefreshToken != "" {
+			tokenProvider := hub.NewTokenProvider(cfg.HubURL, cfg.HubToken, cfg.HubRefreshToken, edgehttp.NewClient(30*time.Second))
+			tokenProvider.StartAutoRefresh()
+			hubClient.SetTokenSource(tokenProvider.AccessToken)
+			slog.Info("hub token auto-rotation enabled", "hubURL", cfg.HubURL)
+		}
 		// Optional durable journal path: AGENTHUB_DELIVERY_JOURNAL_DB (AH-SR-049 / #445).
 		// Falls back to in-memory journal on open failure so callback path never blocks startup.
 		if journalPath := strings.TrimSpace(os.Getenv("AGENTHUB_DELIVERY_JOURNAL_DB")); journalPath != "" {
