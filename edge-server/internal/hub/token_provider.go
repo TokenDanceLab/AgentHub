@@ -38,6 +38,11 @@ type TokenProvider struct {
 
 	stop     chan struct{}
 	stopOnce sync.Once
+	// stopWG tracks the rotation goroutine so Stop() can wait for an
+	// in-flight refresh to drain before returning — otherwise tests and
+	// process shutdown leak live HTTP requests (httptest.Server.Close
+	// blocks on the still-active connection, observed on slow hosts).
+	stopWG   sync.WaitGroup
 	// lastErr mirrors the most recent rotation error for diagnostics.
 	lastErr string
 }
@@ -106,7 +111,9 @@ func (p *TokenProvider) StartAutoRefresh() {
 	if p == nil {
 		return
 	}
+	p.stopWG.Add(1)
 	go func() {
+		defer p.stopWG.Done()
 		delay := p.nextRefreshDelay()
 		for {
 			select {
@@ -123,7 +130,8 @@ func (p *TokenProvider) StartAutoRefresh() {
 	}()
 }
 
-// Stop terminates the rotation loop. Idempotent.
+// Stop terminates the rotation loop and waits for an in-flight refresh to
+// drain. Idempotent.
 func (p *TokenProvider) Stop() {
 	if p == nil {
 		return
@@ -131,6 +139,7 @@ func (p *TokenProvider) Stop() {
 	p.stopOnce.Do(func() {
 		close(p.stop)
 	})
+	p.stopWG.Wait()
 }
 
 // nextRefreshDelay computes the sleep until the next rotation from the current
