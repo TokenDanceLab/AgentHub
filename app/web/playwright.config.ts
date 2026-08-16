@@ -6,6 +6,9 @@ const webWorkspaceViewport = { width: 1440, height: 810 };
 
 export default defineConfig({
   testDir: './src/__e2e__',
+  // chat-real.spec.ts needs the live Hub+Edge stack and is driven by
+  // playwright.real.config.ts (pnpm test:e2e:real) instead (#1678).
+  testIgnore: ['**/chat-real.spec.ts'],
   timeout: 60_000,
   expect: { timeout: 10_000 },
   retries: 0,
