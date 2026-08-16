@@ -1124,8 +1124,8 @@ func TestConcurrentCheckRateLimit(t *testing.T) {
 	}
 	wg.Wait()
 
-	assert.Equal(t, int64(limit), allowed.Load(), "exactly limit (50) should be allowed (count up to limit)")
-	assert.Equal(t, int64(100-limit), blocked.Load(), "remaining should be blocked")
+	assert.Equal(t, limit, allowed.Load(), "exactly limit (50) should be allowed (count up to limit)")
+	assert.Equal(t, 100-limit, blocked.Load(), "remaining should be blocked")
 }
 
 // TestConcurrentGetOrLoad verifies that GetOrLoad with singleflight correctly
