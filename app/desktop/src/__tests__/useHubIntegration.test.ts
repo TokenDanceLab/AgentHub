@@ -115,7 +115,7 @@ vi.mock('@/stores/taskBridgeStore', () => {
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, act, waitFor } from '@testing-library/react';
 import { createServer, type IncomingMessage } from 'node:http';
-import type { HubWSHandle } from '@/api/hubWS';
+import type { HubWSHandle } from '@shared/hub/hubWS';
 import type { HubClient } from '@/api/hubClient';
 import { HUB_EVENTS } from '@shared/hubEvents';
 import { useHubIntegration } from '@/hooks/useHubIntegration';

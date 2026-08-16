@@ -3,7 +3,7 @@ import {
   getWorkbenchCatalogState,
   getWorkbenchDataMode,
   getWorkbenchSectionSource,
-  type WorkbenchDataMode,
+  type WorkbenchCatalogMode,
 } from './workbenchDataMode';
 import type { WorkbenchState } from './workbenchState';
 
@@ -27,7 +27,7 @@ function state(
 }
 
 describe('workbenchDataMode', () => {
-  it.each<[string, WorkbenchState, WorkbenchDataMode]>([
+  it.each<[string, WorkbenchState, WorkbenchCatalogMode]>([
     ['loading while Edge snapshot is pending', state({ connection: { status: 'loading' } }), 'loading'],
     [
       'live when connected with snapshot data',

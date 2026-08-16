@@ -5,7 +5,7 @@ import { getAgentActivityStore, getPinMapStore, type HubRuntimeEventTranscriptIn
 import { getMessageDelegationStore, getSubagentStreamStore } from '@shared/workbench';
 import { act, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { HubWSHandle, HubWSOptions } from '@/api/hubWS';
+import type { HubWSHandle, HubWSOptions } from '@shared/hub/hubWS';
 import type { TransportStatus } from '@/api/transport';
 import {
   AGENT_STREAM_LIVE_BATCH_WINDOW_MS,

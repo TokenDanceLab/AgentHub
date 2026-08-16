@@ -55,10 +55,10 @@ export type {
   AnyEvent,
 } from './events';
 
-export { parseError, isErrorResponse, AppError, globalErrorReporter, ErrorReporter, reportApiError } from './errors';
+export { parseError, isErrorResponse, AppError, globalErrorReporter, reportApiError } from './errors';
 export type { ErrorBody, ErrorCategory, ErrorReport } from './errors';
 
-export { useErrorReporter, setToastHandler } from './errorReporting';
+export { setToastHandler } from './errorReporting';
 export type { ErrorStats, ToastConfig, ToastSeverity } from './errorReporting';
 
 export { buildTree, flattenTree } from './tree';
@@ -101,13 +101,12 @@ export type {
   FolderThemeColorMeta,
 } from './folderThemeColors';
 
-export { normalizeDiffs, parseUnifiedDiff } from './diff';
+export { parseUnifiedDiff } from './diff';
 export type { DiffFile, DiffHunk, DiffLine } from './diff';
 
 export {
   normalize,
   text as diffText,
-  parseUnifiedPatch,
 } from './diff';
 export type {
   ViewDiff,
@@ -135,7 +134,7 @@ export type {
 export { HUB_EVENTS } from './hubEvents';
 export type { HubEventType } from './hubEvents';
 
-export { hubQueryKeys, edgeQueryKeys, isQueryKeyPrefix, rootPrefix } from './stores/queryKeys';
+export { hubQueryKeys, edgeQueryKeys } from './stores/queryKeys';
 
 export {
   createHubClient,
@@ -257,43 +256,39 @@ export {
   createWorkbenchState,
   initialWorkbenchState,
   workbenchReducer,
-} from './workbenchState';
+} from './workbench/workbenchState';
 export type {
   WorkbenchAction,
   WorkbenchConnectionStatus,
   WorkbenchSnapshot,
   WorkbenchState,
-} from './workbenchState';
+} from './workbench/workbenchState';
 export {
   getWorkbenchCatalogState,
   getWorkbenchDataMode,
   getWorkbenchSectionSource,
   workbenchDataModeLabels,
   workbenchDataModeTones,
-} from './workbenchDataMode';
+} from './workbench/workbenchDataMode';
 export type {
   WorkbenchCatalogState,
   WorkbenchCatalogTone,
-  WorkbenchDataMode,
+  WorkbenchCatalogMode,
   WorkbenchSectionSource,
   WorkbenchSectionSourceInput,
-} from './workbenchDataMode';
+} from './workbench/workbenchDataMode';
 
 export {
   SURFACE_METADATA,
   SURFACE_STATUS_METADATA,
   getSurfaceByDesktopSectionId,
-  getSurfaceByWebRoute,
   getSurfaceMetadata,
   getSurfaceStatusMetadata,
   getSurfacesByCategory,
   getSurfacesByPlatform,
-  surfaceMetadataById,
-  surfaceStatusById,
 } from './surfaceMetadata';
 
 export {
-  AGENTHUB_AGENT_SPEC_V1,
   buildAgentHubAgentSpecV1,
   formatAgentHubAgentSpecV1,
 } from './agentSpec';

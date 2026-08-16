@@ -15,7 +15,7 @@
 //   6. Handle errors gracefully (never crash Desktop)
 
 import { useEffect, useRef, useCallback } from 'react';
-import type { HubWSHandle } from '@/api/hubWS';
+import type { HubWSHandle } from '@shared/hub/hubWS';
 import type { CoordinatorRouteDecision, HubClient } from '@/api/hubClient';
 import { createEventStream, type StreamHandle } from '@/api/eventClient';
 import type { EventEnvelope } from '@shared/events';
