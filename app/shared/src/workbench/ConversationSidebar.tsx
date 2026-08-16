@@ -244,7 +244,9 @@ export function ConversationSidebar({
     setContextMenu({ conversation, x: rect.left + 16, y: rect.top });
   };
 
-  const handleRowContextMenu = (event: React.MouseEvent<HTMLButtonElement>, index: number) => {
+  // Attached to the row wrapper (selection button + action cluster are
+  // siblings), so right-clicking anywhere on a row still opens its menu.
+  const handleRowContextMenu = (event: React.MouseEvent<HTMLElement>, index: number) => {
     event.preventDefault();
     event.stopPropagation();
     openContextMenu(event.currentTarget, index);
@@ -447,128 +449,135 @@ export function ConversationSidebar({
                       />
                     </form>
                   ) : (
-                  <button
-                    aria-current={isActive ? 'true' : undefined}
-                    className={styles.conversationButton}
-                    data-agent-profile={conversation.kind === 'direct' ? conversation.title : undefined}
-                    data-pinned={isPinned ? 'true' : undefined}
-                    data-unread={conversation.unreadCount ? 'true' : undefined}
-                    onClick={() => {
-                      setFocusIndex(index);
-                      onSelectConversation?.(conversation.id);
-                    }}
-                    onContextMenu={(event) => handleRowContextMenu(event, index)}
-                    onKeyDown={(event) => handleRowKeyDown(event, index)}
-                    ref={(el) => {
-                      rowButtonRefs.current[index] = el;
-                    }}
-                    tabIndex={isFocusedRow ? 0 : -1}
-                    type="button"
-                  >
-                    <span
-                      aria-label={`${conversation.title} 资料卡`}
-                      className={`${styles.conversationAvatar} ${onAvatarClick ? styles.conversationAvatarClickable : ''}`}
-                      style={{
-                        background: conversation.avatarUrl ? undefined : (conversation.avatarColor ?? 'var(--td-plum)'),
-                        color: conversation.avatarTextColor,
+                    <div
+                      className={styles.conversationRow}
+                      data-active={isActive ? 'true' : undefined}
+                      onClick={() => {
+                        setFocusIndex(index);
+                        onSelectConversation?.(conversation.id);
                       }}
-                      tabIndex={onAvatarClick && isFocusedRow ? 0 : -1}
-                      onClick={(event) => {
-                        if (!onAvatarClick) return;
-                        event.stopPropagation();
-                        onAvatarClick(conversation, event.currentTarget);
-                      }}
-                      onKeyDown={(event) => {
-                        if (!onAvatarClick) return;
-                        if (event.key === 'Enter' || event.key === ' ') {
-                          event.preventDefault();
-                          event.stopPropagation();
-                          onAvatarClick(conversation, event.currentTarget);
-                        }
-                      }}
+                      onContextMenu={(event) => handleRowContextMenu(event, index)}
                     >
-                      {conversation.avatarUrl ? (
-                        <img alt="" className={styles.avatarImg} src={conversation.avatarUrl} />
-                      ) : (
-                        initial
-                      )}
-                      {isGroup && (
-                        <span className={styles.conversationAvatarBadge} aria-hidden="true">
-                          <DesignNavIcon name="users" size={10} />
+                      <button
+                        aria-current={isActive ? 'true' : undefined}
+                        className={styles.conversationButton}
+                        data-agent-profile={conversation.kind === 'direct' ? conversation.title : undefined}
+                        data-pinned={isPinned ? 'true' : undefined}
+                        data-unread={conversation.unreadCount ? 'true' : undefined}
+                        onKeyDown={(event) => handleRowKeyDown(event, index)}
+                        ref={(el) => {
+                          rowButtonRefs.current[index] = el;
+                        }}
+                        tabIndex={isFocusedRow ? 0 : -1}
+                        type="button"
+                      >
+                        <span
+                          aria-label={`${conversation.title} 资料卡`}
+                          className={`${styles.conversationAvatar} ${onAvatarClick ? styles.conversationAvatarClickable : ''}`}
+                          style={{
+                            background: conversation.avatarUrl ? undefined : (conversation.avatarColor ?? 'var(--td-plum)'),
+                            color: conversation.avatarTextColor,
+                          }}
+                          tabIndex={onAvatarClick && isFocusedRow ? 0 : -1}
+                          onClick={(event) => {
+                            if (!onAvatarClick) return;
+                            event.stopPropagation();
+                            onAvatarClick(conversation, event.currentTarget);
+                          }}
+                          onKeyDown={(event) => {
+                            if (!onAvatarClick) return;
+                            if (event.key === 'Enter' || event.key === ' ') {
+                              event.preventDefault();
+                              event.stopPropagation();
+                              onAvatarClick(conversation, event.currentTarget);
+                            }
+                          }}
+                        >
+                          {conversation.avatarUrl ? (
+                            <img alt="" className={styles.avatarImg} src={conversation.avatarUrl} />
+                          ) : (
+                            initial
+                          )}
+                          {isGroup && (
+                            <span className={styles.conversationAvatarBadge} aria-hidden="true">
+                              <DesignNavIcon name="users" size={10} />
+                            </span>
+                          )}
                         </span>
-                      )}
-                    </span>
-                    {isPinned && (
-                      <span className={styles.conversationPinIndicator} aria-label={t('aria.pinned')}>
-                        <DesignNavIcon name="pin" size={12} />
-                      </span>
-                    )}
-                    <span className={styles.conversationCopy}>
-                      <span className={styles.conversationTitle}>
-                        {isGroup && <DesignNavIcon name="users" size={12} className={styles.conversationKindIcon} />}
-                        {conversation.title}
-                      </span>
-                      {conversation.subtitle ? (
-                        <span className={styles.conversationSubtitle}>{conversation.subtitle}</span>
-                      ) : null}
-                    </span>
-                    {conversation.updatedLabel || conversation.unreadCount ? (
-                      <span className={styles.conversationMeta}>
-                        {conversation.updatedLabel ? (
-                          <span className={styles.conversationTime}>{conversation.updatedLabel}</span>
+                        {isPinned && (
+                          <span className={styles.conversationPinIndicator} aria-label={t('aria.pinned')}>
+                            <DesignNavIcon name="pin" size={12} />
+                          </span>
+                        )}
+                        <span className={styles.conversationCopy}>
+                          <span className={styles.conversationTitle}>
+                            {isGroup && <DesignNavIcon name="users" size={12} className={styles.conversationKindIcon} />}
+                            {conversation.title}
+                          </span>
+                          {conversation.subtitle ? (
+                            <span className={styles.conversationSubtitle}>{conversation.subtitle}</span>
+                          ) : null}
+                        </span>
+                        {conversation.updatedLabel || conversation.unreadCount ? (
+                          <span className={styles.conversationMeta}>
+                            {conversation.updatedLabel ? (
+                              <span className={styles.conversationTime}>{conversation.updatedLabel}</span>
+                            ) : null}
+                            {conversation.unreadCount ? (
+                              <span className={styles.unreadBadge}>{conversation.unreadCount}</span>
+                            ) : null}
+                          </span>
                         ) : null}
-                        {conversation.unreadCount ? (
-                          <span className={styles.unreadBadge}>{conversation.unreadCount}</span>
-                        ) : null}
+                      </button>
+                      {/* Row actions are a sibling of the selection button
+                          (#1715): no button may nest inside the row button. */}
+                      <span className={styles.conversationActions} onClick={(event) => event.stopPropagation()}>
+                        {onPinConversation && (
+                          <Tooltip label={isPinned ? '取消置顶' : '置顶'}>
+                            <button
+                              aria-label={isPinned ? '取消置顶' : '置顶'}
+                              className={styles.conversationActionBtn}
+                              data-active={isPinned ? 'true' : undefined}
+                              onClick={() => onPinConversation(conversation.id, !isPinned)}
+                              tabIndex={-1}
+                              type="button"
+                            >
+                              <DesignNavIcon name="pin" size={14} />
+                            </button>
+                          </Tooltip>
+                        )}
+                        {onArchiveConversation && !showArchived && (
+                          <Tooltip label="归档">
+                            <button
+                              aria-label={t('aria.archive')}
+                              className={styles.conversationActionBtn}
+                              onClick={() => {
+                                if (window.confirm('Archive this conversation?')) {
+                                  onArchiveConversation(conversation.id, true);
+                                }
+                              }}
+                              tabIndex={-1}
+                              type="button"
+                            >
+                              <DesignNavIcon name="archive" size={14} />
+                            </button>
+                          </Tooltip>
+                        )}
+                        {onArchiveConversation && showArchived && (
+                          <Tooltip label="取消归档">
+                            <button
+                              aria-label={t('aria.unarchive')}
+                              className={styles.conversationActionBtn}
+                              onClick={() => onArchiveConversation(conversation.id, false)}
+                              tabIndex={-1}
+                              type="button"
+                            >
+                              <DesignNavIcon name="inbox" size={14} />
+                            </button>
+                          </Tooltip>
+                        )}
                       </span>
-                    ) : null}
-                    <span className={styles.conversationActions} onClick={(e) => e.stopPropagation()}>
-                      {onPinConversation && (
-                        <Tooltip label={isPinned ? '取消置顶' : '置顶'}>
-                          <button
-                            aria-label={isPinned ? '取消置顶' : '置顶'}
-                            className={styles.conversationActionBtn}
-                            data-active={isPinned ? 'true' : undefined}
-                            onClick={() => onPinConversation(conversation.id, !isPinned)}
-                            tabIndex={-1}
-                            type="button"
-                          >
-                            <DesignNavIcon name="pin" size={14} />
-                          </button>
-                        </Tooltip>
-                      )}
-                      {onArchiveConversation && !showArchived && (
-                        <Tooltip label="归档">
-                          <button
-                            aria-label={t('aria.archive')}
-                            className={styles.conversationActionBtn}
-                            onClick={() => {
-                              if (window.confirm('Archive this conversation?')) {
-                                onArchiveConversation(conversation.id, true);
-                              }
-                            }}
-                            tabIndex={-1}
-                            type="button"
-                          >
-                            <DesignNavIcon name="archive" size={14} />
-                          </button>
-                        </Tooltip>
-                      )}
-                      {onArchiveConversation && showArchived && (
-                        <Tooltip label="取消归档">
-                          <button
-                            aria-label={t('aria.unarchive')}
-                            className={styles.conversationActionBtn}
-                            onClick={() => onArchiveConversation(conversation.id, false)}
-                            tabIndex={-1}
-                            type="button"
-                          >
-                            <DesignNavIcon name="inbox" size={14} />
-                          </button>
-                        </Tooltip>
-                      )}
-                    </span>
-                  </button>
+                    </div>
                   )}
                 </li>
               );
