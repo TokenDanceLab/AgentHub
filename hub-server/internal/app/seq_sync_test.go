@@ -4,7 +4,9 @@ import (
 	"context"
 	"testing"
 
+	"github.com/alicebob/miniredis/v2"
 	"github.com/glebarez/sqlite"
+	"github.com/redis/go-redis/v9"
 	"gorm.io/gorm"
 
 	"github.com/agenthub/hub-server/internal/cache"
@@ -64,4 +66,55 @@ func TestSyncLegacySeqsCancellable(t *testing.T) {
 	}
 	_ = n
 	_ = model.Session{} // keep model import
+}
+
+// TestSyncLegacySeqsOneTimeMarker proves the #1675 fix: the first run
+// performs the DB→Redis warm-up and sets the marker; every later startup
+// run no-ops instead of rescanning the sessions table.
+func TestSyncLegacySeqsOneTimeMarker(t *testing.T) {
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	if err != nil {
+		t.Fatalf("open sqlite: %v", err)
+	}
+	if err := db.Exec("CREATE TABLE sessions (id TEXT PRIMARY KEY, next_seq BIGINT NOT NULL DEFAULT 0, created_at DATETIME)").Error; err != nil {
+		t.Fatalf("create sessions: %v", err)
+	}
+	const sessionID = "00000000-0000-0000-0000-000000000001"
+	if err := db.Exec("INSERT INTO sessions (id, next_seq, created_at) VALUES (?, 7, datetime('now'))", sessionID).Error; err != nil {
+		t.Fatalf("insert session: %v", err)
+	}
+
+	mr, err := miniredis.Run()
+	if err != nil {
+		t.Fatalf("miniredis: %v", err)
+	}
+	t.Cleanup(mr.Close)
+	rdb := redis.NewClient(&redis.Options{Addr: mr.Addr()})
+	t.Cleanup(func() { rdb.Close() })
+
+	a := &App{
+		Config:      &config.Config{},
+		DB:          db,
+		CacheClient: cache.NewClient(rdb),
+		bg:          newBackgroundGroup(context.Background()),
+	}
+	ctx := context.Background()
+
+	// First run: warm-up happens, marker is set.
+	a.syncLegacySeqs(ctx)
+	if !mr.Exists("session:seq:" + sessionID) {
+		t.Fatal("first run did not warm up the session seq key")
+	}
+	if !mr.Exists(legacySeqSyncMarkerKey) {
+		t.Fatal("first run did not set the one-time marker")
+	}
+
+	// Simulate a later Redis loss of the seq key: the runtime self-healing
+	// path (seqalloc.recoverFromDB) covers it, the startup migration must
+	// NOT rescan — the marker makes it a one-time migration.
+	mr.Del("session:seq:" + sessionID)
+	a.syncLegacySeqs(ctx)
+	if mr.Exists("session:seq:" + sessionID) {
+		t.Fatal("second run re-synced sessions: one-time marker was not honored")
+	}
 }

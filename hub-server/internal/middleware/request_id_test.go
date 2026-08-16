@@ -3,6 +3,7 @@ package middleware
 import (
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/gin-gonic/gin"
@@ -43,8 +44,11 @@ func TestRequestID_GeneratedIDFormat(t *testing.T) {
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 
+	// The single backend request-ID generator (reqlog.NewRequestID) emits
+	// "req_" + a 36-char RFC 4122 UUIDv4 (#1675).
 	assert.NotEmpty(t, capturedID)
-	assert.Len(t, capturedID, 36, "generated ID should be UUID format")
+	assert.Len(t, capturedID, 40, "generated ID should be req_ + UUIDv4")
+	assert.True(t, strings.HasPrefix(capturedID, "req_"), "generated ID should carry the req_ prefix")
 }
 
 func TestRequestID_ConstantValues(t *testing.T) {

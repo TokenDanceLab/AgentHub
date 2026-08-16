@@ -7,7 +7,7 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/agenthub/hub-server/internal/service/deliveryoutbox"
-	"github.com/agenthub/hub-server/pkg/uuidv7"
+	"github.com/agenthub/hub-server/internal/uuidv7"
 )
 
 // ── Model (owned by DeliveryOutbox; not part of AgentService surface) ──────
