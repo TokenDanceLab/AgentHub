@@ -4,10 +4,15 @@
 门禁检查项：
 - 根入口点/过期路径/归档活动路径禁存在；
 - README 必需入口点链接 + 目标存在；
+- README zh/en 成熟度口径 parity（配对标记同现/同缺）；
 - 约 35 个 (路径, 标记) 必须出现在对应文档；
 - 约 30 个禁止正则扫描活跃文档；
-- 行数上限表；AGENTS.md 反引号路径与 §9.5 映射表存在性；tests/ 不得镜像 scripts/ 脚本名；
-- 活跃文档内部 markdown 相对链接目标存在性（DOC-BROKEN-LINK）。
+- 行数上限表（AGENTS.md 300 行预算）；AGENTS.md 反引号路径存在性；
+- 规则→机器验证映射 SSOT（docs/governance/verifier-map.md）存在性 + AGENTS owner 指针；
+- 活跃文档内部 markdown 相对链接目标存在性（DOC-BROKEN-LINK）；
+- standalone clone 可达性：活跃文档不得有解析出仓库的相对链接/路径（DOC-OUT-OF-REPO-LINK）；
+- tests/ 不得镜像 scripts/ 脚本名。
+
 """
 
 import os
@@ -40,7 +45,7 @@ def is_active_doc(path: str) -> bool:
     p = normalize_path(path)
     if re.match(r"^docs/(archive|archives|audit|release)/", p):
         return False
-    if p in ("AGENTS.md", "CONTRIBUTING.md", "reference/INDEX.md"):
+    if p in ("AGENTS.md", "CONTRIBUTING.md", "reference/INDEX.md", "README.md", "README_EN.md"):
         return True
     if p in ("api/README.md", "api/events.md", "api/conventions.md"):
         return True
@@ -234,7 +239,7 @@ def check_forbidden_patterns() -> None:
 
 def check_max_lines() -> None:
     limits = {
-        "AGENTS.md": 340,
+        "AGENTS.md": 300,
         "CHANGELOG.md": 90,
         "CONTRIBUTING.md": 90,
         "reference/INDEX.md": 80,
@@ -262,10 +267,14 @@ def check_max_lines() -> None:
         "docs/governance/security-risk-register.md": 180,
         "docs/governance/threat-model.md": 140,
         "docs/governance/governance-execution.md": 110,
+        "docs/governance/verifier-map.md": 120,
     }
     for path, limit in limits.items():
         if exists(path) and line_count(path) > limit:
-            fail(f"{path} has {line_count(path)} lines; active entry limit is {limit}. Move detail to owner docs or archive.")
+            fail(
+                f"{path} has {line_count(path)} lines; active entry limit is {limit}. Move detail to owner docs or archive.",
+                "DOC-MAX-LINES",
+            )
 
 
 def check_agents_md_paths() -> None:
@@ -274,7 +283,7 @@ def check_agents_md_paths() -> None:
     for match in re.finditer(r"`([^`]*)`", content):
         p = match.group(1).strip()
         if re.match(r"^\.\./", p):
-            continue
+            fail(f"AGENTS.md must not reference out-of-repo path: {p}", "DOC-OUT-OF-REPO-LINK")
         if re.match(r"^\.(agenthub|claude|codex)/", p):
             continue
         if re.match(r"^\.worktrees/", p):
@@ -304,13 +313,15 @@ def expand_brace_path(path: str) -> list:
 
 
 def check_agents_md_mapping_table() -> None:
-    content = read_text("AGENTS.md")
-    section = re.search(r"(?ms)^## 9\.5 .*?^## ", content)
-    if not section:
-        fail("AGENTS.md is missing the ## 9.5 rule-to-verifier mapping table section")
+    """Mapping SSOT moved to docs/governance/verifier-map.md (#1719).
+
+    The long table no longer lives in AGENTS.md §9.5; this check verifies the
+    script paths and CI files referenced by the new owner document.
+    """
+    content = read_text("docs/governance/verifier-map.md")
     checked_scripts = 0
     checked_ci_files = 0
-    for line in section.group(0).splitlines():
+    for line in content.splitlines():
         if not re.match(r"^\s*\|", line):
             continue
         cells = line.split("|")
@@ -321,15 +332,90 @@ def check_agents_md_mapping_table() -> None:
             ref = script_match.group(1).strip()
             for candidate in expand_brace_path(ref):
                 if not exists(candidate):
-                    fail(f"AGENTS.md mapping table references missing path: {candidate}")
+                    fail(f"verifier-map.md references missing path: {candidate}")
                 checked_scripts += 1
         ci_match = re.search(r"(?i)(checks\.yml|release-readiness\.yml|cd-[a-z-]+\.yml|release\.yml)", cells[3])
         if ci_match:
             ci_file = ci_match.group(1)
             if not exists(f".github/workflows/{ci_file}"):
-                fail(f"AGENTS.md mapping table references missing CI file: .github/workflows/{ci_file}")
+                fail(f"verifier-map.md references missing CI file: .github/workflows/{ci_file}")
             checked_ci_files += 1
-    print(f"AGENTS.md mapping table check ok ({checked_scripts} script paths, {checked_ci_files} CI files)")
+    print(f"verifier-map check ok ({checked_scripts} script paths, {checked_ci_files} CI files)")
+
+
+def check_verifier_map_owner() -> None:
+    if not exists("docs/governance/verifier-map.md"):
+        fail(
+            "docs/governance/verifier-map.md is missing; it is the SSOT for the rule-to-verifier mapping",
+            "DOC-VERIFIER-MAP-OWNER",
+        )
+    if "docs/governance/verifier-map.md" not in read_text("AGENTS.md"):
+        fail(
+            "AGENTS.md must point to docs/governance/verifier-map.md as the mapping SSOT owner",
+            "DOC-VERIFIER-MAP-OWNER",
+        )
+
+
+def check_readme_parity() -> None:
+    """README zh/en maturity parity: paired markers must co-exist or co-absent.
+
+    The two files are independently editable, so one-sided maturity edits (e.g.
+    zh claiming Mobile done while en still says in assembly) would go unnoticed.
+    Each pair below must appear in both READMEs or in neither.
+    """
+    pairs = [
+        ("Mobile 装配中", "Mobile in assembly"),
+        ("Desktop/Web 主线", "Desktop/Web are the mainline"),
+    ]
+    readme_zh = read_text("README.md")
+    readme_en = read_text("README_EN.md")
+    for zh_marker, en_marker in pairs:
+        zh_has = zh_marker in readme_zh
+        en_has = en_marker in readme_en
+        if zh_has != en_has:
+            fail(
+                f"README maturity parity broken: {zh_marker!r} (zh) vs {en_marker!r} (en) must appear in both or neither",
+                "DOC-README-PARITY",
+            )
+
+
+def check_out_of_repo_links() -> None:
+    """Standalone-clone reachability: active docs must not link outside the repo.
+
+    A fresh clone contains only this repository, so relative links or backtick
+    paths that resolve above the repo root (e.g. sibling workspace repos like
+    ../docs) are dead for every external reader. Public http(s):// URLs are the
+    only allowed out-of-repo references; archives/ is exempt.
+    """
+    files = [normalize_path(f) for f in git_ls_files() if is_active_doc(f) and exists(f)]
+    link_re = re.compile(r"\[[^\]]+\]\(([^)]+)\)")
+    backtick_re = re.compile(r"`([^`]*)`")
+    root_prefix = ROOT.rstrip("/\\") + os.sep
+    for rel in files:
+        text = read_text(rel)
+        text_no_code = re.sub(r"```[\s\S]*?```", "", text)
+        doc_dir = os.path.dirname(rel)
+        for target in link_re.findall(text):
+            target = target.strip()
+            if not target or target.startswith(("<", "#")):
+                continue
+            if re.match(r"^[a-z]+://", target) or target.startswith("mailto:"):
+                continue
+            path_part = target.split("#", 1)[0]
+            if not path_part:
+                continue
+            resolved_abs = os.path.normpath(os.path.join(ROOT, doc_dir, path_part))
+            if not resolved_abs.startswith(root_prefix):
+                fail(f"{rel} links outside the standalone repo: {target}", "DOC-OUT-OF-REPO-LINK")
+        for match in backtick_re.finditer(text_no_code):
+            path = match.group(1).strip()
+            if not path.startswith("../"):
+                continue
+            if re.search(r"[*?<>@\s]", path):
+                continue
+            resolved_abs = os.path.normpath(os.path.join(ROOT, doc_dir, path))
+            if not resolved_abs.startswith(root_prefix):
+                fail(f"{rel} references path outside the standalone repo: {path}", "DOC-OUT-OF-REPO-LINK")
 
 
 def check_doc_internal_links() -> None:
@@ -389,12 +475,15 @@ def main() -> int:
     check_stale_paths()
     check_dated_governance()
     check_readme_entrypoints()
+    check_readme_parity()
     check_required_markers()
     check_forbidden_patterns()
     check_max_lines()
-    check_agents_md_paths()
+    check_verifier_map_owner()
     check_agents_md_mapping_table()
+    check_agents_md_paths()
     check_doc_internal_links()
+    check_out_of_repo_links()
     check_no_script_mirror()
     print("doc SSOT ok")
     return 0

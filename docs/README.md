@@ -1,6 +1,6 @@
 # AgentHub 文档
 
-最后更新：2026-08-11
+最后更新：2026-08-16
 
 ## 快速入口
 
@@ -12,7 +12,7 @@
 | **功能设计** | [architecture.md](architecture.md) | [decisions.md](decisions.md) |
 | **历史追溯** | [history.md](history.md) · [archives/](archives/) | TokenDance docs 外部归档 |
 
-端口规则（Vite strict 端口）见 [../AGENTS.md](../AGENTS.md) §2；部署端口全景（含 PG/Redis/admin）见 [architecture/05-deployment.md](architecture/05-deployment.md)。
+端口全景（Vite strict 5173/5174/5177、Hub 8080、Edge 3210、PG/Redis/admin）见 [architecture/05-deployment.md](architecture/05-deployment.md) 默认端口表。
 
 ## 目录结构
 
@@ -45,6 +45,7 @@ docs/
 | SDK Agent 策略 | [reference/sdk-agent-strategy.md](reference/sdk-agent-strategy.md) |
 | 分支和 worktree 规则 | [../AGENTS.md](../AGENTS.md) |
 | 安全风险 | [governance/security-risk-register.md](governance/security-risk-register.md) |
+| 机器验证映射 | [governance/verifier-map.md](governance/verifier-map.md) |
 | 威胁模型 | [governance/threat-model.md](governance/threat-model.md) |
 | 后端性能/泄漏证据 | [reference/backend-performance-gates.md](reference/backend-performance-gates.md) |
 | 发布/截图历史清单 | [history.md](history.md) |

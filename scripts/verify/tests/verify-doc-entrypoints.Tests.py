@@ -5,8 +5,14 @@ All mutations happen in an isolated detached Git worktree. The caller worktree
 status is snapshotted before and after the suite.
 
 Targets scripts/verify/verify-doc-ssot.py (the ps1-era verifier was already
-migrated to python). The verifier is copied into the fixture worktree so its
-repo-root discovery resolves to the fixture, mirroring the original ps1 test.
+migrated to python). The verifier and all whitelist entry files are copied into
+the fixture worktree so its repo-root discovery resolves to the fixture,
+mirroring the original ps1 test. Negative behaviors proven here (#1719):
+
+- sibling escape link (DOC-OUT-OF-REPO-LINK)
+- README one-sided maturity change (DOC-README-PARITY)
+- AGENTS.md over the 300-line budget (DOC-MAX-LINES)
+- verifier-map owner pointer missing from AGENTS.md (DOC-VERIFIER-MAP-OWNER)
 """
 
 import hashlib
@@ -68,6 +74,17 @@ class VerifyDocEntrypointsTests(unittest.TestCase):
         shutil.copyfile(self.verifier, os.path.join(self.fixture, VERIFIER_REL))
         shutil.copyfile(os.path.join(REPO_ROOT, "AGENTS.md"), os.path.join(self.fixture, "AGENTS.md"))
         shutil.copyfile(os.path.join(REPO_ROOT, "README.md"), os.path.join(self.fixture, "README.md"))
+        shutil.copyfile(os.path.join(REPO_ROOT, "README_EN.md"), os.path.join(self.fixture, "README_EN.md"))
+        shutil.copyfile(
+            os.path.join(REPO_ROOT, "docs", "README.md"),
+            os.path.join(self.fixture, "docs", "README.md"),
+        )
+        shutil.copyfile(
+            os.path.join(REPO_ROOT, "docs", "governance", "governance-execution.md"),
+            os.path.join(self.fixture, "docs", "governance", "governance-execution.md"),
+        )
+        verifier_map_rel = os.path.join("docs", "governance", "verifier-map.md")
+        shutil.copyfile(os.path.join(REPO_ROOT, verifier_map_rel), os.path.join(self.fixture, verifier_map_rel))
 
         # Mirror the caller's doc-slimming state: docs/analysis, docs/plan,
         # docs/progress and docs/roadmap.md were removed on master but still
@@ -156,6 +173,70 @@ class VerifyDocEntrypointsTests(unittest.TestCase):
         after_hash = hashlib.sha256(restored_bytes).hexdigest()
         self.assertEqual(before_hash, after_hash, "README fixture bytes were not restored exactly")
 
+    def restore_bytes(self, path, original_bytes):
+        with open(path, "wb") as handle:
+            handle.write(original_bytes)
+
+    def assert_sibling_escape_link(self):
+        readme_path = os.path.join(self.fixture, "README.md")
+        with open(readme_path, "rb") as handle:
+            original_bytes = handle.read()
+        escape_line = "\n跨产品边界见 [sibling docs](../docs/identity/identity-auth.md)。\n"
+        try:
+            with open(readme_path, "a", encoding="utf-8", newline="\n") as handle:
+                handle.write(escape_line)
+            self.assert_failure_code("DOC-OUT-OF-REPO-LINK", "README with sibling escape link")
+        finally:
+            self.restore_bytes(readme_path, original_bytes)
+
+    def assert_readme_maturity_parity(self):
+        readme_path = os.path.join(self.fixture, "README.md")
+        with open(readme_path, "rb") as handle:
+            original_bytes = handle.read()
+        original_text = original_bytes.decode("utf-8")
+        if "Mobile 装配中" not in original_text:
+            self.fail("README fixture precondition missing zh maturity marker")
+        try:
+            mutated = original_text.replace("Mobile 装配中", "Mobile 已就绪", 1)
+            with open(readme_path, "w", encoding="utf-8", newline="\n") as handle:
+                handle.write(mutated)
+            self.assert_failure_code("DOC-README-PARITY", "README zh-only maturity change")
+        finally:
+            self.restore_bytes(readme_path, original_bytes)
+
+    def assert_agents_line_budget(self):
+        agents_path = os.path.join(self.fixture, "AGENTS.md")
+        with open(agents_path, "rb") as handle:
+            original_bytes = handle.read()
+        original_text = original_bytes.decode("utf-8")
+        current_lines = original_text.count("\n")
+        padding_lines = max(0, 320 - current_lines)
+        try:
+            with open(agents_path, "a", encoding="utf-8", newline="\n") as handle:
+                handle.write("# line-budget padding\n" * padding_lines)
+            self.assert_failure_code("DOC-MAX-LINES", "AGENTS.md over 300-line budget")
+        finally:
+            self.restore_bytes(agents_path, original_bytes)
+
+    def assert_verifier_map_owner(self):
+        agents_path = os.path.join(self.fixture, "AGENTS.md")
+        with open(agents_path, "rb") as handle:
+            original_bytes = handle.read()
+        original_text = original_bytes.decode("utf-8")
+        if "docs/governance/verifier-map.md" not in original_text:
+            self.fail("AGENTS fixture precondition missing verifier-map pointer")
+        try:
+            mutated = original_text.replace(
+                "`docs/governance/verifier-map.md`",
+                "`docs/governance/governance-execution.md`",
+                1,
+            )
+            with open(agents_path, "w", encoding="utf-8", newline="\n") as handle:
+                handle.write(mutated)
+            self.assert_failure_code("DOC-VERIFIER-MAP-OWNER", "AGENTS.md without verifier-map owner pointer")
+        finally:
+            self.restore_bytes(agents_path, original_bytes)
+
     def test_doc_entrypoint_behavior_suite(self):
         self.create_fixture()
         try:
@@ -166,6 +247,10 @@ class VerifyDocEntrypointsTests(unittest.TestCase):
             self.assert_forbidden_root_file("CODEX.md")
             self.assert_forbidden_stale_path("docs/analysis/project-overview.md")
             self.assert_readme_owner_link_required()
+            self.assert_sibling_escape_link()
+            self.assert_readme_maturity_parity()
+            self.assert_agents_line_budget()
+            self.assert_verifier_map_owner()
 
             exit_code, output = self.run_verifier()
             self.assertEqual(exit_code, 0, "verifier did not recover after fixture cleanup:\n%s" % output)
