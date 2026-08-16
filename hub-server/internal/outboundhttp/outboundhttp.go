@@ -4,6 +4,25 @@
 // process-global client. Policy: bounded timeout, redirects refused so
 // headers/payload are never replayed to another origin, default TLS
 // verification (no InsecureSkipVerify anywhere).
+//
+// Trust boundary (#1549): use outboundhttp only for dialing endpoints whose
+// address comes from administrator configuration, not from request data.
+// Concretely, all five production call sites are admin-configured endpoints:
+//
+//   - TokenDance ID OIDC token endpoint (service/oidc, token exchange —
+//     the POST body carries client_secret, so redirect refusal is the
+//     credential-replay defense)
+//   - TokenDance ID JWKS endpoint (service/oidc + jwtutil TokenDanceVerifier)
+//   - Hub→Edge dispatch URL, AGENTHUB_EDGE_URL (app/wiring, dispatchsvc)
+//   - TokenDance ID verifier HTTP client (app.App.tdVerifier)
+//
+// For user-controllable target addresses (execution-target ping URLs) the
+// correct dial path is internal/egress, which adds fail-closed address
+// classification (default deny for loopback/RFC1918/metadata, DNS-rebinding
+// re-check, admin allowlist). egress builds on this package's policy but is
+// a distinct trust boundary — do not "simplify" the two into one client.
+// There is deliberately no universal dial path (#1549): a small number of
+// purpose-specific clients, all wired at the composition root.
 package outboundhttp
 
 import (

@@ -11,6 +11,7 @@ import (
 
 	"github.com/agenthub/edge-server/internal/errcode"
 	"github.com/agenthub/edge-server/internal/idgen"
+	"github.com/agenthub/edge-server/internal/resputil"
 	"github.com/agenthub/edge-server/internal/runners"
 )
 
@@ -47,11 +48,7 @@ func (h *Handler) PatchSettings(w http.ResponseWriter, r *http.Request) {
 }
 
 func writeJSON(w http.ResponseWriter, status int, v any) {
-	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	w.WriteHeader(status)
-	if err := json.NewEncoder(w).Encode(v); err != nil {
-		slog.Error("failed to write json response", "error", err)
-	}
+	resputil.WriteJSON(w, status, v)
 }
 
 // writeSuccess writes a unified success envelope: {"code":"OK","data":...}

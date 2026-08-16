@@ -13,6 +13,8 @@ import (
 // The dispatch package defines wire-free ports (ManagerPort / RelayPort); the
 // service layer adapts the concrete ws.Manager and RelayService onto them so
 // the dispatch flow never imports transport or sibling-service types.
+// Full dispatch layering map (helpers / orchestration / adapters / facade):
+// see the dispatchsvc package doc.
 
 // wsManagerAdapter adapts *ws.Manager onto dispatchsvc.ManagerPort.
 type wsManagerAdapter struct {

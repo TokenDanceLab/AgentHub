@@ -18,7 +18,7 @@ import (
 	"github.com/agenthub/hub-server/internal/repository"
 	"github.com/agenthub/hub-server/internal/service/agentevent"
 	"github.com/agenthub/hub-server/internal/ws"
-	"github.com/agenthub/hub-server/pkg/uuidv7"
+	"github.com/agenthub/hub-server/internal/uuidv7"
 )
 
 // edgeCallbackBus publishes domain events from edge callback orchestration.
