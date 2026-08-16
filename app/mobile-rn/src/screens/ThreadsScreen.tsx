@@ -71,8 +71,8 @@ export function ThreadsScreen({
           <View style={{ paddingHorizontal: tokens.space.lg, paddingTop: tokens.space.md }}>
             <EmptyState
               icon="chat"
-              title={query.trim() ? t.noMessageResultsTitle : t.emptyQueueTitle}
-              description={query.trim() ? t.noMessageResultsDescription : t.emptyQueueDescription}
+              title={query.trim() ? t.noMessageResultsTitle : (fixture.account.hubSync === 'offline' ? t.previewOfflineTitle : t.emptyQueueTitle)}
+              description={query.trim() ? t.noMessageResultsDescription : (fixture.account.hubSync === 'offline' ? t.previewOfflineDescription : t.emptyQueueDescription)}
             />
           </View>
         ) : (
