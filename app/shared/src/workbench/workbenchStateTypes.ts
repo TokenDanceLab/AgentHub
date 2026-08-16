@@ -1,4 +1,4 @@
-import type { AnyEvent } from './events';
+import type { AnyEvent } from '../events';
 import type {
   Approval,
   Artifact,
@@ -10,7 +10,7 @@ import type {
   Runner,
   Thread,
   ThreadItem,
-} from './types';
+} from '../types';
 
 export type WorkbenchConnectionStatus =
   | 'idle'

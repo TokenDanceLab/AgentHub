@@ -1,5 +1,5 @@
-import type { AnyEvent } from './events';
-import type { RunLogs } from './types';
+import type { AnyEvent } from '../events';
+import type { RunLogs } from '../types';
 import {
   approvalKind,
   chunkText,

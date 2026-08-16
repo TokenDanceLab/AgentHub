@@ -5,7 +5,7 @@ import type {
   RunLogs,
   Thread,
   ThreadItem,
-} from './types';
+} from '../types';
 import type {
   WorkbenchSnapshot,
   WorkbenchSnapshotData,

@@ -1,6 +1,16 @@
 import type { WorkbenchState } from './workbenchState';
 
-export type WorkbenchDataMode =
+/**
+ * Catalog loading states derived from the WorkbenchState connection/snapshot.
+ *
+ * Not the data-source policy type: `WorkbenchDataMode` (auto/mock/fixture/
+ * observed/approved-real) lives in `../demo/dataMode` and governs which data
+ * source a platform may contact. This type only describes what the reducer
+ * catalog currently shows (loading/live/offline/mock/unavailable).
+ *
+ * @see WorkbenchDataMode in `../demo/dataMode`
+ */
+export type WorkbenchCatalogMode =
   | 'loading'
   | 'live'
   | 'offline-snapshot'
@@ -15,7 +25,7 @@ export type WorkbenchCatalogTone =
   | 'neutral';
 
 export interface WorkbenchCatalogState {
-  mode: WorkbenchDataMode;
+  mode: WorkbenchCatalogMode;
   label: string;
   tone: WorkbenchCatalogTone;
   message: string;
@@ -28,12 +38,12 @@ export interface WorkbenchSectionSource {
 }
 
 export interface WorkbenchSectionSourceInput {
-  mode: WorkbenchDataMode;
+  mode: WorkbenchCatalogMode;
   hasSectionSnapshot: boolean;
   hasLocalDryRun?: boolean;
 }
 
-export const workbenchDataModeLabels: Record<WorkbenchDataMode, string> = {
+export const workbenchDataModeLabels: Record<WorkbenchCatalogMode, string> = {
   loading: 'Loading catalog',
   live: 'Live',
   'offline-snapshot': 'Offline snapshot',
@@ -41,7 +51,7 @@ export const workbenchDataModeLabels: Record<WorkbenchDataMode, string> = {
   unavailable: 'Snapshot unavailable',
 };
 
-export const workbenchDataModeTones: Record<WorkbenchDataMode, WorkbenchCatalogTone> = {
+export const workbenchDataModeTones: Record<WorkbenchCatalogMode, WorkbenchCatalogTone> = {
   loading: 'cyan',
   live: 'green',
   'offline-snapshot': 'purple',
@@ -49,7 +59,7 @@ export const workbenchDataModeTones: Record<WorkbenchDataMode, WorkbenchCatalogT
   unavailable: 'neutral',
 };
 
-export function getWorkbenchDataMode(state: WorkbenchState): WorkbenchDataMode {
+export function getWorkbenchDataMode(state: WorkbenchState): WorkbenchCatalogMode {
   const hasSnapshot = hasWorkbenchSnapshotData(state);
 
   if (state.connection.status === 'loading') return 'loading';
@@ -111,7 +121,7 @@ function hasWorkbenchSnapshotData(state: WorkbenchState): boolean {
 }
 
 function getWorkbenchSnapshotSectionSource(
-  mode: WorkbenchDataMode,
+  mode: WorkbenchCatalogMode,
   hasSectionSnapshot: boolean,
 ): WorkbenchSectionSource {
   if (hasSectionSnapshot) {
@@ -134,7 +144,7 @@ function getWorkbenchSnapshotSectionSource(
 }
 
 function workbenchDataModeMessage(
-  mode: WorkbenchDataMode,
+  mode: WorkbenchCatalogMode,
   error?: string,
 ): string {
   switch (mode) {

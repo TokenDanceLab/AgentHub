@@ -3,7 +3,8 @@
 // typed convenience helpers for common Hub event categories.
 
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { createHubWS, type HubWSHandle } from '@/api/hubWS';
+import { createHubWS, type HubWSHandle } from '@shared/hub/hubWS';
+import { HUB_WS_URL } from '@/config';
 import type { TransportStatus } from '@/api/transport';
 import { HUB_EVENTS } from '@shared/hubEvents';
 import type { HubEventType } from '@shared/hubEvents';
@@ -107,7 +108,7 @@ export function useHubEventStream(
   useEffect(() => {
     const handle = createHubWS({
       getToken,
-      ...(url ? { url } : {}),
+      url: url ?? HUB_WS_URL,
     });
     handleRef.current = handle;
     queueMicrotask(() => setHubWS(handle));

@@ -1,3 +1,13 @@
+/**
+ * Data-source policy states that decide which data a platform may contact.
+ *
+ * Not the catalog loading type: `WorkbenchCatalogMode`
+ * (loading/live/offline-snapshot/mock/unavailable) lives in
+ * `../workbench/workbenchDataMode` and describes what the reducer catalog
+ * currently shows. Both types share no literal values; do not cross-assign.
+ *
+ * @see WorkbenchCatalogMode in `../workbench/workbenchDataMode`
+ */
 export type WorkbenchDataMode =
   | 'auto'
   | 'mock'
