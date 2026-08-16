@@ -1,5 +1,5 @@
 {
-  "_comment": "Hub golangci-lint finding fingerprint baseline (#1573). Regenerated 2026-08-10 with golangci-lint v2.12.2.",
+  "_comment": "Hub golangci-lint finding fingerprint baseline (#1573). Regenerated 2026-08-16 with golangci-lint v2.12.2.",
   "linter_version": "v2.12.2",
   "findings": [
     {
@@ -14,13 +14,8 @@
     },
     {
       "linter": "gocognit",
-      "file": "internal/service/dispatchsvc/agent_dispatch.go",
-      "message": "cognitive complexity 98 of func `(*DispatchService).DispatchTask` is high (> 30)"
-    },
-    {
-      "linter": "gocognit",
       "file": "internal/service/agent_edge_callback.go",
-      "message": "cognitive complexity 33 of func `(*EdgeCallbackService).HandleTaskDone` is high (> 30)"
+      "message": "cognitive complexity 39 of func `(*EdgeCallbackService).HandleTaskDone` is high (> 30)"
     },
     {
       "linter": "gocognit",
@@ -64,13 +59,18 @@
     },
     {
       "linter": "gocognit",
+      "file": "internal/service/dispatchsvc/agent_dispatch.go",
+      "message": "cognitive complexity 98 of func `(*DispatchService).DispatchTask` is high (> 30)"
+    },
+    {
+      "linter": "gocognit",
       "file": "internal/service/execution_target.go",
       "message": "cognitive complexity 36 of func `(*ExecutionTargetService).UpsertLocalEdgeForDesktopDevice` is high (> 30)"
     },
     {
       "linter": "gocognit",
       "file": "internal/service/message/service_send.go",
-      "message": "cognitive complexity 42 of func `(*Service).SendMessage` is high (> 30)"
+      "message": "cognitive complexity 43 of func `(*Service).SendMessage` is high (> 30)"
     },
     {
       "linter": "gocyclo",
@@ -86,241 +86,6 @@
       "linter": "gocyclo",
       "file": "internal/service/oidc/oidc.go",
       "message": "cyclomatic complexity 23 of func `(*Service).HandleCallback` is high (> 20)"
-    },
-    {
-      "linter": "gosec",
-      "file": "internal/service/deliveryoutbox/retry.go",
-      "message": "G404: Use of weak random number generator (math/rand or math/rand/v2 instead of crypto/rand)"
-    },
-    {
-      "linter": "ineffassign",
-      "file": "internal/service/dispatch/residual_test.go",
-      "message": "ineffectual assignment to mp"
-    },
-    {
-      "linter": "prealloc",
-      "file": "internal/service/delivery_outbox.go",
-      "message": "Consider preallocating records with capacity len(sentRecords) + len(retryingRecords)"
-    },
-    {
-      "linter": "revive",
-      "file": "internal/app/wiring.go",
-      "message": "indent-error-flow: if block ends with a return statement, so drop this else and outdent its block"
-    },
-    {
-      "linter": "revive",
-      "file": "internal/handler/message.go",
-      "message": "indent-error-flow: if block ends with a return statement, so drop this else and outdent its block (move short variable declaration to its own line if necessary)"
-    },
-    {
-      "linter": "revive",
-      "file": "internal/middleware/ws_rate_limit.go",
-      "message": "unexported-return: exported func NewWSIPRateLimiter returns unexported type *middleware.wsIPLimiter, which can be annoying to use"
-    },
-    {
-      "linter": "revive",
-      "file": "internal/repository/migrate.go",
-      "message": "blank-imports: a blank import should be only in a main or test package, or have a comment justifying it"
-    },
-    {
-      "linter": "revive",
-      "file": "internal/service/agentteam/agent_team.go",
-      "message": "exported: type name will be used as agentteam.AgentTeamGuardrails by other packages, and that stutters; consider calling this Guardrails"
-    },
-    {
-      "linter": "revive",
-      "file": "internal/service/agentteam/agent_team.go",
-      "message": "exported: type name will be used as agentteam.AgentTeamService by other packages, and that stutters; consider calling this Service"
-    },
-    {
-      "linter": "revive",
-      "file": "internal/service/contact/service.go",
-      "message": "exported: type name will be used as contact.ContactInfo by other packages, and that stutters; consider calling this Info"
-    },
-    {
-      "linter": "revive",
-      "file": "internal/service/image_meta.go",
-      "message": "blank-imports: a blank import should be only in a main or test package, or have a comment justifying it"
-    },
-    {
-      "linter": "revive",
-      "file": "internal/service/message/types.go",
-      "message": "exported: type name will be used as message.MessageResponse by other packages, and that stutters; consider calling this Response"
-    },
-    {
-      "linter": "revive",
-      "file": "internal/service/messagereaction/service.go",
-      "message": "exported: type name will be used as messagereaction.MessageReactionEventPayload by other packages, and that stutters; consider calling this EventPayload"
-    },
-    {
-      "linter": "revive",
-      "file": "internal/service/messagereaction/service.go",
-      "message": "exported: type name will be used as messagereaction.MessageReactionResponse by other packages, and that stutters; consider calling this Response"
-    },
-    {
-      "linter": "revive",
-      "file": "internal/service/session/dto.go",
-      "message": "exported: type name will be used as session.SessionListItem by other packages, and that stutters; consider calling this ListItem"
-    },
-    {
-      "linter": "revive",
-      "file": "internal/service/session/events.go",
-      "message": "exported: func name will be used as session.SessionDissolvedPayload by other packages, and that stutters; consider calling this DissolvedPayload"
-    },
-    {
-      "linter": "revive",
-      "file": "internal/service/session/events.go",
-      "message": "exported: func name will be used as session.SessionInfoUpdatedPayload by other packages, and that stutters; consider calling this InfoUpdatedPayload"
-    },
-    {
-      "linter": "revive",
-      "file": "internal/service/session/group_info.go",
-      "message": "exported: func name will be used as session.SessionMembersCacheKey by other packages, and that stutters; consider calling this MembersCacheKey"
-    },
-    {
-      "linter": "revive",
-      "file": "internal/service/session/group_info.go",
-      "message": "exported: func name will be used as session.SessionMetaCacheKey by other packages, and that stutters; consider calling this MetaCacheKey"
-    },
-    {
-      "linter": "revive",
-      "file": "internal/service/session/mappers.go",
-      "message": "exported: func name will be used as session.SessionListItemFromMeta by other packages, and that stutters; consider calling this ListItemFromMeta"
-    },
-    {
-      "linter": "revive",
-      "file": "internal/service/workspace/service.go",
-      "message": "exported: type name will be used as workspace.WorkspaceListResult by other packages, and that stutters; consider calling this ListResult"
-    },
-    {
-      "linter": "revive",
-      "file": "internal/service/workspace/service.go",
-      "message": "exported: type name will be used as workspace.WorkspaceThread by other packages, and that stutters; consider calling this Thread"
-    },
-    {
-      "linter": "revive",
-      "file": "internal/service/workspace/service.go",
-      "message": "exported: type name will be used as workspace.WorkspaceThreadMessage by other packages, and that stutters; consider calling this ThreadMessage"
-    },
-    {
-      "linter": "revive",
-      "file": "internal/service/workspace/service.go",
-      "message": "exported: type name will be used as workspace.WorkspaceUpdate by other packages, and that stutters; consider calling this Update"
-    },
-    {
-      "linter": "staticcheck",
-      "file": "internal/cache/client_pending.go",
-      "message": "S1016: should convert entry (type pendingTargetTaskOrderEntry) to PendingTargetTask instead of using struct literal"
-    },
-    {
-      "linter": "staticcheck",
-      "file": "internal/handler/ws_test.go",
-      "message": "QF1008: could remove embedded field \"PublicKey\" from selector"
-    },
-    {
-      "linter": "staticcheck",
-      "file": "internal/middleware/auth_test.go",
-      "message": "QF1008: could remove embedded field \"PublicKey\" from selector"
-    },
-    {
-      "linter": "staticcheck",
-      "file": "internal/repository/agent.go",
-      "message": "QF1008: could remove embedded field \"Dialector\" from selector"
-    },
-    {
-      "linter": "staticcheck",
-      "file": "internal/repository/agent_team.go",
-      "message": "QF1008: could remove embedded field \"Dialector\" from selector"
-    },
-    {
-      "linter": "staticcheck",
-      "file": "internal/service/agentteam/agent_team_compete.go",
-      "message": "QF1012: Use fmt.Fprintf(...) instead of WriteString(fmt.Sprintf(...))"
-    },
-    {
-      "linter": "staticcheck",
-      "file": "internal/service/delivery_outbox_model.go",
-      "message": "S1016: should convert r (type deliveryOutboxRecord) to DeliveryOutboxEntry instead of using struct literal"
-    },
-    {
-      "linter": "unconvert",
-      "file": "internal/cache/client_test.go",
-      "message": "unnecessary conversion"
-    },
-    {
-      "linter": "unused",
-      "file": "internal/cache/client.go",
-      "message": "func (*Client).isReady is unused"
-    },
-    {
-      "linter": "unused",
-      "file": "internal/handler/session_test.go",
-      "message": "func ptr is unused"
-    },
-    {
-      "linter": "unused",
-      "file": "internal/model/model_test.go",
-      "message": "func stringPtr is unused"
-    },
-    {
-      "linter": "unused",
-      "file": "internal/service/agent_run_event_test.go",
-      "message": "func (*mockTeamRouteHandler).HandleRouteDecision is unused"
-    },
-    {
-      "linter": "unused",
-      "file": "internal/service/agent_run_event_test.go",
-      "message": "type mockRouteCall is unused"
-    },
-    {
-      "linter": "unused",
-      "file": "internal/service/agent_run_event_test.go",
-      "message": "type mockTeamRouteHandler is unused"
-    },
-    {
-      "linter": "unused",
-      "file": "internal/service/agent_team_subagent_stream.go",
-      "message": "var wsTeamSubagentStreamType is unused"
-    },
-    {
-      "linter": "unused",
-      "file": "internal/service/agentteam/agent_team_guard.go",
-      "message": "func (*AgentTeamService).hasTimedOutActiveAssignment is unused"
-    },
-    {
-      "linter": "unused",
-      "file": "internal/service/agentteam/agent_team_guard.go",
-      "message": "func (*AgentTeamService).teamRunBudgetExceeded is unused"
-    },
-    {
-      "linter": "unused",
-      "file": "internal/service/agentteam/helpers_test.go",
-      "message": "func (*mockDBTeamService).AddAgentToSession is unused"
-    },
-    {
-      "linter": "unused",
-      "file": "internal/service/agentteam/helpers_test.go",
-      "message": "func (*mockDBTeamService).TriggerAgentTask is unused"
-    },
-    {
-      "linter": "unused",
-      "file": "internal/service/agentteam/helpers_test.go",
-      "message": "func (*mockTeamCache).AllocateSeq is unused"
-    },
-    {
-      "linter": "unused",
-      "file": "internal/service/agentteam/helpers_test.go",
-      "message": "func (*mockTeamCache).InitSeqIfAbsent is unused"
-    },
-    {
-      "linter": "unused",
-      "file": "internal/service/agentteam/helpers_test.go",
-      "message": "type mockDBTeamService is unused"
-    },
-    {
-      "linter": "unused",
-      "file": "internal/service/agentteam/helpers_test.go",
-      "message": "type mockTeamCache is unused"
     }
   ]
 }

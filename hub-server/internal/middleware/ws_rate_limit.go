@@ -67,6 +67,8 @@ func newWSIPRateLimiter() *wsIPLimiter {
 // NewWSIPRateLimiter is the exported constructor for tests and other isolated
 // callers. It returns a fresh limiter with its own cleanup goroutine; the
 // caller MUST call Stop() (e.g. via t.Cleanup) to release it.
+//
+//nolint:revive // intentional: test constructor returns the concrete type so tests can drive it directly.
 func NewWSIPRateLimiter() *wsIPLimiter {
 	return newWSIPRateLimiter()
 }

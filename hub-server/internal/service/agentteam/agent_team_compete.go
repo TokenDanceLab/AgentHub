@@ -31,9 +31,9 @@ type noOpCompeteAggregator struct{}
 func (noOpCompeteAggregator) CompareResults(_ context.Context, taskPrompt string, entries []model.CompeteSummaryEntry) (string, error) {
 	var b strings.Builder
 	b.WriteString("Comparison summary (no LLM configured):\n\n")
-	b.WriteString(fmt.Sprintf("Task: %s\n\n", taskPrompt))
+	fmt.Fprintf(&b, "Task: %s\n\n", taskPrompt)
 	for i, e := range entries {
-		b.WriteString(fmt.Sprintf("=== Agent %d (member %s) ===\n%s\n\n", i+1, e.MemberID, truncateResult(e.Result, 2000)))
+		fmt.Fprintf(&b, "=== Agent %d (member %s) ===\n%s\n\n", i+1, e.MemberID, truncateResult(e.Result, 2000))
 	}
 	return b.String(), nil
 }

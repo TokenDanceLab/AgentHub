@@ -3,6 +3,7 @@ package service
 import (
 	"encoding/json"
 	"image"
+	// Register decoders so image.DecodeConfig can sniff gif/jpeg/png formats.
 	_ "image/gif"
 	_ "image/jpeg"
 	_ "image/png"
