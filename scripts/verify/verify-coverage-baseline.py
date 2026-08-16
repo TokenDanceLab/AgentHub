@@ -20,6 +20,7 @@ cross-platform deterministic (Windows measure == ubuntu CI).
 """
 
 import argparse
+import datetime
 import json
 import os
 import shutil
@@ -50,6 +51,15 @@ def fmt_pct(package_total, metric) -> str:
     return dotnet_double((package_total.get(metric) or {}).get("pct"))
 
 
+def write_console(text: str) -> None:
+    """Write captured UTF-8 tool output without crashing locale-bound consoles."""
+    if not text:
+        return
+    encoding = sys.stdout.encoding or "utf-8"
+    safe = text.encode(encoding, errors="replace").decode(encoding, errors="replace")
+    sys.stdout.write(safe)
+
+
 def invoke_vitest_coverage(app_dir: str, pkg_filter: str, config: str) -> int:
     """Run vitest coverage for one package; mirrors the ps1 arg array exactly."""
     args = ["exec", "vitest", "run"]
@@ -65,17 +75,95 @@ def invoke_vitest_coverage(app_dir: str, pkg_filter: str, config: str) -> int:
         "--hookTimeout=120000",
     ]
     pnpm = shutil.which("pnpm") or "pnpm"
-    run = subprocess.run([pnpm, "--filter", pkg_filter, *args], cwd=app_dir, capture_output=True, text=True)
-    if run.stdout:
-        sys.stdout.write(run.stdout)
-    if run.stderr:
-        sys.stdout.write(run.stderr)
+    # Vitest writes UTF-8 (including ANSI/color diagnostics) even when Windows
+    # Python's locale encoding is GBK. Pin decoding explicitly so reader threads
+    # cannot crash and silently drop stdout/stderr on Windows test machines.
+    run = subprocess.run(
+        [pnpm, "--filter", pkg_filter, *args],
+        cwd=app_dir,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+    )
+    write_console(run.stdout)
+    write_console(run.stderr)
     return run.returncode
 
 
 def read_json(path: str):
     with open(path, encoding="utf-8-sig") as handle:
         return json.load(handle)
+
+
+def git_text(*args: str) -> str:
+    run = subprocess.run(["git", *args], cwd=REPO_ROOT, capture_output=True, text=True)
+    if run.returncode != 0:
+        detail = (run.stderr or run.stdout).strip()
+        raise RuntimeError(f"git {' '.join(args)} failed: {detail or f'exit {run.returncode}'}")
+    return run.stdout.strip()
+
+
+def validate_baseline_source(baseline: dict) -> None:
+    """Require masterSha to name a real commit that is an ancestor of HEAD."""
+    sha = str(baseline.get("masterSha") or "").strip()
+    short = str(baseline.get("masterShaShort") or "").strip()
+    if len(sha) != 40 or any(ch not in "0123456789abcdefABCDEF" for ch in sha):
+        raise RuntimeError("baseline masterSha must be a full 40-character git commit SHA")
+    git_text("cat-file", "-e", f"{sha}^{{commit}}")
+    ancestor = subprocess.run(["git", "merge-base", "--is-ancestor", sha, "HEAD"], cwd=REPO_ROOT)
+    if ancestor.returncode != 0:
+        raise RuntimeError(f"baseline masterSha {sha} is not an ancestor of HEAD")
+    if short and not sha.startswith(short):
+        raise RuntimeError(f"baseline masterShaShort {short!r} does not match masterSha")
+
+
+def validate_write_context(only_packages: set[str] | None) -> str:
+    """Return published master HEAD, refusing ambiguous or ephemeral baselines."""
+    if only_packages is not None:
+        raise RuntimeError("--WriteBaseline cannot be combined with --OnlyPackages; re-baseline must measure all packages")
+    if git_text("branch", "--show-current") != "master":
+        raise RuntimeError("--WriteBaseline must run from branch master so masterSha remains permanently reachable")
+    dirty = git_text("status", "--porcelain", "--untracked-files=no")
+    if dirty:
+        raise RuntimeError("--WriteBaseline requires a clean tracked working tree; commit/stash code changes first")
+    head = git_text("rev-parse", "HEAD")
+    origin_master = git_text("rev-parse", "origin/master")
+    if head != origin_master:
+        raise RuntimeError("--WriteBaseline requires local master == origin/master; sync the published master first")
+    return head
+
+
+def write_baseline(path: str, baseline: dict, measurements: dict[str, dict], source_sha: str) -> None:
+    """Persist fresh non-regressing measurements while preserving human notes/policy."""
+    for pkg_filter, measured in measurements.items():
+        pkg = baseline["packages"][pkg_filter]
+        for metric in METRICS:
+            old = float(pkg["coverage"][metric])
+            current = float(measured["coverage"][metric])
+            if current < old:
+                raise RuntimeError(
+                    f"--WriteBaseline refuses to lower {pkg_filter} {metric}: {current}% < {old}%; "
+                    "use an explicit reviewed baseline edit for intentional relaxations"
+                )
+        if int(measured["uncoveredFiles"]) > int(pkg.get("uncoveredFiles", measured["uncoveredFiles"])):
+            raise RuntimeError(
+                f"--WriteBaseline refuses to increase {pkg_filter} uncoveredFiles: "
+                f"{measured['uncoveredFiles']} > {pkg.get('uncoveredFiles')}"
+            )
+
+    for pkg_filter, measured in measurements.items():
+        pkg = baseline["packages"][pkg_filter]
+        pkg["coverage"] = measured["coverage"]
+        pkg["uncoveredFiles"] = measured["uncoveredFiles"]
+        pkg["tests"] = measured["tests"]
+
+    baseline["measuredAt"] = datetime.date.today().isoformat()
+    baseline["masterSha"] = source_sha
+    baseline["masterShaShort"] = source_sha[:9]
+    with open(path, "w", encoding="utf-8", newline="\n") as handle:
+        json.dump(baseline, handle, ensure_ascii=False, indent=2)
+        handle.write("\n")
 
 
 def main() -> int:
@@ -86,6 +174,14 @@ def main() -> int:
     # --OnlyPackages: comma-separated baseline package keys to run (CI 4-package
     # matrix splits the 10min gate into per-package parallel jobs). Default: all.
     parser.add_argument("--OnlyPackages", default="", help="comma-separated package keys to run; empty = all")
+    # Re-baseline is deliberately stricter than the ordinary gate: it must run
+    # all packages from a clean, published master so masterSha stays reachable
+    # after GitHub squash-merges feature branches. It never lowers a metric.
+    parser.add_argument(
+        "--WriteBaseline",
+        action="store_true",
+        help="re-measure all packages and write non-regressing measurements + published master HEAD to the baseline JSON",
+    )
     args = parser.parse_args()
 
     baseline_path = args.BaselinePath
@@ -97,6 +193,7 @@ def main() -> int:
         raise RuntimeError(f"app dir not found: {app_dir}")
 
     baseline = read_json(baseline_path)
+    validate_baseline_source(baseline)
 
     only_packages = None
     if args.OnlyPackages.strip():
@@ -104,6 +201,8 @@ def main() -> int:
         unknown = only_packages - set(baseline["packages"].keys())
         if unknown:
             raise RuntimeError(f"--OnlyPackages contains unknown package keys: {sorted(unknown)}")
+
+    write_source_sha = validate_write_context(only_packages) if args.WriteBaseline else ""
 
     # v8 coverage has a small run-to-run variance (a few async setup/teardown
     # paths execute non-deterministically). The baseline JSON declares a
@@ -114,6 +213,7 @@ def main() -> int:
 
     failures = []
     package_summaries = []
+    measurements: dict[str, dict] = {}
 
     # Iterate packages in baseline order (JSON object order == ps1 property order).
     for pkg_filter, pkg in baseline["packages"].items():
@@ -215,6 +315,16 @@ def main() -> int:
 
         # --- console summary line ----------------------------------------------
         if parsed_tests and parsed_coverage:
+            measurements[pkg_filter] = {
+                "coverage": {metric: float(totals[metric]["pct"]) for metric in METRICS},
+                "uncoveredFiles": uncovered_files,
+                "tests": {
+                    "total": num_total,
+                    "passed": num_passed,
+                    "failed": num_failed,
+                    "skipped": skipped_count,
+                },
+            }
             line = (
                 f"{pkg_filter:<22} tests={num_total} skipped={skipped_count} | "
                 f"lines={fmt_pct(totals, 'lines')}% stmt={fmt_pct(totals, 'statements')}% "
@@ -253,6 +363,14 @@ def main() -> int:
             print(f"  - {failure}")
         print("")
         raise RuntimeError(f"coverage baseline gate failed with {len(failures)} issue(s)")
+
+    if args.WriteBaseline:
+        if len(measurements) != len(baseline["packages"]):
+            raise RuntimeError(
+                f"--WriteBaseline measured {len(measurements)} packages, expected {len(baseline['packages'])}; refusing partial write"
+            )
+        write_baseline(baseline_path, baseline, measurements, write_source_sha)
+        print(f"coverage baseline updated from published master {write_source_sha[:9]} ({baseline_path})")
 
     print("")
     print("coverage baseline gate ok — no regression, zero skipped")
