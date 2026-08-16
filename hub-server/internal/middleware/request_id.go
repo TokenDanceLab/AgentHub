@@ -3,7 +3,6 @@ package middleware
 import (
 	"github.com/gin-gonic/gin"
 
-	"github.com/agenthub/hub-server/pkg/uuidv7"
 	"github.com/agenthub/pkg/reqlog"
 )
 
@@ -14,14 +13,15 @@ const RequestIDKey = "request_id"
 
 // RequestID is a Gin middleware that propagates or generates an X-Request-ID.
 // If the incoming request already carries an X-Request-ID header, it is
-// reused; otherwise a new UUIDv7 is generated. The ID is stored in the Gin
-// context under RequestIDKey, injected into Go context via reqlog, and echoed
-// back in the response header.
+// reused; otherwise a new request ID is generated via reqlog.NewRequestID
+// (the single backend request-ID generator, "req_" + UUIDv4 — #1675). The
+// ID is stored in the Gin context under RequestIDKey, injected into Go
+// context via reqlog, and echoed back in the response header.
 func RequestID() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		rid := c.GetHeader(requestIDHeader)
 		if rid == "" {
-			rid = uuidv7.Must()
+			rid = reqlog.NewRequestID()
 		}
 		c.Set(RequestIDKey, rid)
 		c.Header(requestIDHeader, rid)
