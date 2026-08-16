@@ -4,10 +4,6 @@ import { describe, expect, it, vi } from 'vitest';
 import type { AgentHubPlatform } from '../platform';
 import { WorkbenchFrame } from './WorkbenchFrame';
 
-vi.mock('react-i18next', () => ({
-  useTranslation: () => ({ t: (key: string) => key }),
-}));
-
 vi.mock('./GlobalRail', () => ({
   GlobalRail: () => <div data-testid="global-rail" />,
 }));

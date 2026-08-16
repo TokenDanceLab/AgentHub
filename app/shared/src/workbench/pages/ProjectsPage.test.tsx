@@ -1,35 +1,18 @@
 import React from 'react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, within } from '../../__tests__/setup';
 import { ProjectsPage } from './ProjectsPage';
 import { DEFAULT_PROJECTS } from './projects';
 import type { ProjectInfo, ProjectsPageProps } from './projects';
 
-vi.mock('react-i18next', () => ({
-  useTranslation: () => ({
-    t: (key: string) => {
-      const resources: Record<string, string> = {
-        'nav.projects': '项目',
-        'projects.newProject': '新建项目',
-        'projects.edit': '编辑项目',
-        'projects.loading': '正在加载项目…',
-        'projects.empty.title': '暂无项目',
-        'projects.empty.description': '创建第一个项目后开始协作',
-        'projects.empty.createFirst': '创建第一个项目',
-        'projects.nav.all': '全部',
-        'projects.nav.running': '进行中',
-        'projects.nav.completed': '已完成',
-        'projects.nav.archived': '归档',
-        'projects.tab.overview': '概览',
-        'projects.projectRuns': '运行',
-        'projects.tab.settings': '设置',
-        'inspector.artifacts': '产物',
-        'header.search': '搜索',
-      };
-      return resources[key] ?? key;
-    },
-  }),
-}));
+// Projects copy resolves via the sharedWorkbench namespace; opt into the zh
+// bundle of the shared test i18next instance (Issue #1717).
+import { useTestI18nLanguage } from '../../testing/i18n';
+
+beforeAll(async () => {
+  await useTestI18nLanguage('zh');
+});
+
 
 function baseProps(overrides: Partial<ProjectsPageProps> = {}): ProjectsPageProps {
   return {
@@ -59,7 +42,7 @@ describe('ProjectsPage empty state', () => {
     );
 
     const emptyState = screen.getByRole('region', { name: '暂无项目' });
-    expect(within(emptyState).getByText('创建第一个项目后开始协作')).toBeInTheDocument();
+    expect(within(emptyState).getByText('创建第一个项目以开始协作。')).toBeInTheDocument();
 
     fireEvent.click(within(emptyState).getByRole('button', { name: '创建第一个项目' }));
     expect(onNewProject).toHaveBeenCalledTimes(1);
@@ -111,7 +94,7 @@ describe('ProjectsPage detail tabs', () => {
     );
 
     expect(screen.getByText('项目公告')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: /运行/ }));
+    fireEvent.click(screen.getByRole('button', { name: '项目运行' }));
     expect(onTabChange).toHaveBeenCalledWith('runs');
   });
 });

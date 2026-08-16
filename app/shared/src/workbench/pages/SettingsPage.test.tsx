@@ -3,12 +3,6 @@ import { describe, expect, it, vi } from 'vitest';
 import { render, screen } from '../../__tests__/setup';
 import { SettingsPage, type SettingsPageProps } from './SettingsPage';
 
-vi.mock('react-i18next', () => ({
-  useTranslation: () => ({
-    t: (key: string) => key,
-  }),
-}));
-
 const BASE_PROPS: SettingsPageProps = {
   activePane: 'appearance',
   spaceTitle: 'AgentHub Desktop',

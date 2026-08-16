@@ -1,21 +1,15 @@
 import React from 'react';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, within } from '../../__tests__/setup';
 import { TasksPage } from './TasksPage';
 
-vi.mock('react-i18next', () => ({
-  useTranslation: () => ({
-    t: (key: string) => {
-      const resources: Record<string, string> = {
-        'tasks.newTask': '新建任务',
-        'tasks.empty.title': '暂无任务',
-        'tasks.empty.description': '创建任务分派给 Agent 队友',
-        'nav.tasks': '任务',
-      };
-      return resources[key] ?? key;
-    },
-  }),
-}));
+// Tasks copy resolves via the sharedWorkbench namespace; opt into the zh
+// bundle of the shared test i18next instance (Issue #1717).
+import { useTestI18nLanguage } from '../../testing/i18n';
+
+beforeAll(async () => {
+  await useTestI18nLanguage('zh');
+});
 
 const BASE_PROPS = {
   activePane: 'owned' as const,

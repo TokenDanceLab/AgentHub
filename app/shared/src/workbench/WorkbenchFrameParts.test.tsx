@@ -20,10 +20,6 @@ import {
 /** Last ConversationHost props seen by the mock (referential-stability gate). */
 const hostPropsLog = vi.hoisted(() => ({ last: null as Record<string, unknown> | null }));
 
-vi.mock('react-i18next', () => ({
-  useTranslation: () => ({ t: (k: string) => k }),
-}));
-
 vi.mock('./ConversationSidebar', () => ({
   ConversationSidebar: (props: Record<string, unknown>) => (
     <div data-testid="sidebar" data-active-id={props.activeConversationId as string} />

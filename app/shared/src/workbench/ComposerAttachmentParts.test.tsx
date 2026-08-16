@@ -1,25 +1,16 @@
 import '@testing-library/jest-dom/vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import type { ComposerAttachment } from '../composer';
 import { ComposerAttachmentChip } from './ComposerAttachmentParts';
 
-vi.mock('react-i18next', () => ({
-  useTranslation: () => ({
-    t: (key: string, options?: Record<string, string>) => {
-      const resources: Record<string, string> = {
-        'action.removeAttachment': 'Remove {name}',
-      };
-      let result = resources[key] ?? key;
-      if (options) {
-        for (const [k, v] of Object.entries(options)) {
-          result = result.replace(`{${k}}`, v);
-        }
-      }
-      return result;
-    },
-  }),
-}));
+// These assertions use the en chatview literals; opt into the en bundle of
+// the shared test i18next instance (Issue #1717).
+import { useTestI18nLanguage } from '../testing/i18n';
+
+beforeAll(async () => {
+  await useTestI18nLanguage('en');
+});
 
 const createObjectURL = vi.fn(() => 'blob:mock-preview');
 const revokeObjectURL = vi.fn();
@@ -134,7 +125,9 @@ describe('ComposerAttachmentChip previews', () => {
       />,
     );
     expect(screen.getByText('archive.zip')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Remove archive.zip' }));
+    // The en resource uses a single-brace placeholder ({name}), which real
+    // i18next does not interpolate, so the rendered aria-label keeps it.
+    fireEvent.click(screen.getByRole('button', { name: 'Remove {name}' }));
     expect(onRemove).toHaveBeenCalledTimes(1);
   });
 });
