@@ -90,8 +90,10 @@ func (a *App) initInfra(ctx context.Context) error {
 	log.Init(&a.Config.Server)
 	// Note: defer log.Sync() is in Run() so it fires at shutdown, not after initInfra.
 
-	// Legacy: sync existing session seq numbers to Redis (tracked in the
-	// background group — cancellable and awaited at shutdown, #1542)
+	// One-time legacy migration: sync existing session seq numbers to Redis.
+	// syncLegacySeqs sets a Redis marker on first success and no-ops on every
+	// later startup (#1675). Tracked in the background group — cancellable
+	// and awaited at shutdown (#1542).
 	a.bg.Go(func() error {
 		a.syncLegacySeqs(a.bg.Ctx())
 		return nil

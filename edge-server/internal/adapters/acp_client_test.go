@@ -15,6 +15,7 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"strings"
@@ -23,7 +24,65 @@ import (
 	"time"
 
 	"github.com/agenthub/edge-server/internal/store"
+	"github.com/coder/acp-go-sdk"
 )
+
+// TestUnwiredACPEndpointsFailClosed locks the STUB INVENTORY in acp_client.go:
+// every deliberately unwired ACP endpoint (#1404 fs/terminal frame design)
+// must answer with an error wrapping errACPEndpointNotWired — a JSON-RPC
+// error the agent can surface — and must never return a nil error (silent
+// hang from the agent's perspective) or a fabricated success response. When
+// #1404 wires an endpoint, remove it from this table and from the inventory.
+func TestUnwiredACPEndpointsFailClosed(t *testing.T) {
+	handler := newACPClientHandler(nil, store.Run{ID: "run_test"}, nil, context.Background())
+	ctx := context.Background()
+
+	stubs := []struct {
+		name string
+		call func() error
+	}{
+		{"fs/read_text_file", func() error {
+			_, err := handler.ReadTextFile(ctx, acp.ReadTextFileRequest{})
+			return err
+		}},
+		{"fs/write_text_file", func() error {
+			_, err := handler.WriteTextFile(ctx, acp.WriteTextFileRequest{})
+			return err
+		}},
+		{"terminal/create", func() error {
+			_, err := handler.CreateTerminal(ctx, acp.CreateTerminalRequest{})
+			return err
+		}},
+		{"terminal/kill", func() error {
+			_, err := handler.KillTerminal(ctx, acp.KillTerminalRequest{})
+			return err
+		}},
+		{"terminal/output", func() error {
+			_, err := handler.TerminalOutput(ctx, acp.TerminalOutputRequest{})
+			return err
+		}},
+		{"terminal/release", func() error {
+			_, err := handler.ReleaseTerminal(ctx, acp.ReleaseTerminalRequest{})
+			return err
+		}},
+		{"terminal/wait_for_exit", func() error {
+			_, err := handler.WaitForTerminalExit(ctx, acp.WaitForTerminalExitRequest{})
+			return err
+		}},
+	}
+
+	for _, stub := range stubs {
+		t.Run(stub.name, func(t *testing.T) {
+			err := stub.call()
+			if err == nil {
+				t.Fatalf("%s returned nil error — stub must fail closed, not hang", stub.name)
+			}
+			if !errors.Is(err, errACPEndpointNotWired) {
+				t.Fatalf("%s error = %v, want errACPEndpointNotWired", stub.name, err)
+			}
+		})
+	}
+}
 
 // fakeACPAgent simulates an ACP agent over two pipes. It reads client
 // requests from reqR (the client's stdin side) and writes responses and

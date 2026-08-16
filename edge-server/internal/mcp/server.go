@@ -32,13 +32,13 @@ package mcp
 import (
 	"encoding/json"
 	"io"
-	"log/slog"
 	"net/http"
 	"strings"
 
 	"github.com/agenthub/edge-server/internal/events"
 	"github.com/agenthub/edge-server/internal/lifecycle"
 	"github.com/agenthub/edge-server/internal/permission"
+	"github.com/agenthub/edge-server/internal/resputil"
 	"github.com/agenthub/edge-server/internal/store"
 )
 
@@ -365,15 +365,9 @@ func writeJSONRPCError(w http.ResponseWriter, id any, code int, message string) 
 	writeJSON(w, http.StatusOK, errorResponse(id, code, message))
 }
 
-// writeJSON writes a JSON response with the given HTTP status code.
-// Sets Content-Type: application/json and writes v as JSON.
-// If v is nil, only headers are written (empty body).
+// writeJSON writes a JSON response with the given HTTP status.
+// Delegates to the shared resputil writer (#1675): Content-Type
+// application/json; charset=utf-8, nil payloads write only headers.
 func writeJSON(w http.ResponseWriter, status int, v any) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	if v != nil {
-		if err := json.NewEncoder(w).Encode(v); err != nil {
-			slog.Error("mcp: failed to encode response", "error", err)
-		}
-	}
+	resputil.WriteJSON(w, status, v)
 }

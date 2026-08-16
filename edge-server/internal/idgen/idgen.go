@@ -6,6 +6,13 @@
 // simple copies silently ignored crypto/rand errors and would emit all-zero
 // IDs (collision) while the mcp copy carried a monotonic fallback. The
 // unified implementation keeps the fallback everywhere.
+//
+// Role in the backend ID scheme (#1675, canonical description in
+// hub-server/internal/uuidv7): edge IDs deliberately stay prefixed 16-hex
+// instead of UUIDs — edge rows live in a per-device local SQLite store and
+// are shown in local URLs/logs, where a short scannable ID beats UUID
+// shape; Hub entity rows are the UUIDv7 case. Do not "unify" this package
+// into UUIDv7.
 package idgen
 
 import (

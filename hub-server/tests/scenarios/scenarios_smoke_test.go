@@ -13,7 +13,7 @@ import (
 	"github.com/agenthub/hub-server/internal/model"
 	"github.com/agenthub/hub-server/internal/service"
 	"github.com/agenthub/hub-server/internal/testkit"
-	"github.com/agenthub/hub-server/pkg/uuidv7"
+	"github.com/agenthub/hub-server/internal/uuidv7"
 	"github.com/gin-gonic/gin"
 	"github.com/glebarez/sqlite"
 	"github.com/stretchr/testify/assert"

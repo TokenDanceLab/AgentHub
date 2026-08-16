@@ -9,6 +9,8 @@ import (
 
 	"golang.org/x/sync/errgroup"
 
+	"github.com/redis/go-redis/v9"
+
 	"github.com/agenthub/hub-server/internal/bus"
 	"github.com/agenthub/hub-server/internal/config"
 	"github.com/agenthub/hub-server/internal/model"
@@ -204,28 +206,86 @@ func (a *App) startWebSocketCleanup(ctx context.Context) {
 	a.mgr.StartHeartbeat(ctx)
 }
 
-// syncLegacySeqs copies existing session next_seq values from DB into Redis.
-// It observes ctx: cancelled at shutdown, the loop stops promptly.
+// legacySeqSyncMarkerKey marks the legacy session-seq warm-up as completed.
+// syncLegacySeqs is an explicit one-time migration (#1675): the first run
+// sets this marker in Redis, every later startup skips the DB scan. Delete
+// the key to force a re-run (e.g. after a Redis flush that lost seq keys).
+const legacySeqSyncMarkerKey = "migration:legacy-seq-sync:v1"
+
+// syncLegacySeqs copies existing session next_seq values from DB into Redis
+// once per deployment. It observes ctx (cancelled at shutdown) and is a
+// one-time migration, not a startup routine:
+//
+//   - If the marker key is already present, the migration completed on an
+//     earlier boot and this run returns immediately (no DB scan).
+//   - If the migration is cancelled or errors out partway, the marker is
+//     removed so the next startup retries the remaining work.
+//   - Sessions whose Redis seq key disappears later are covered by the
+//     runtime self-healing path (seqalloc.recoverFromDB), so this bulk
+//     warm-up is only the bootstrap for legacy data.
 func (a *App) syncLegacySeqs(ctx context.Context) {
-	var sessions []model.Session
-	if err := a.DB.Select("id, next_seq").Where("next_seq > 0").Order("created_at ASC").Limit(5000).Find(&sessions).Error; err != nil {
-		slog.Warn("failed to query sessions for seq sync", "error", err)
+	if ctx.Err() != nil {
 		return
 	}
-	if len(sessions) == 5000 {
-		slog.Warn("syncLegacySeqs: processed batch of 5000, more sessions may remain; run migration again if needed")
+	rdb := a.CacheClient.GetRDB()
+	if rdb == nil {
+		slog.Warn("legacy session seq sync skipped: redis client unavailable")
+		return
 	}
-	count := 0
-	for _, sess := range sessions {
+	claimed, err := rdb.SetNX(ctx, legacySeqSyncMarkerKey, time.Now().UTC().Format(time.RFC3339), 0).Result()
+	if err != nil {
+		slog.Warn("failed to check legacy seq sync marker", "error", err)
+		return
+	}
+	if !claimed {
+		slog.Debug("legacy session seq sync already completed; skipping")
+		return
+	}
+
+	const batchSize = 5000
+	total := 0
+	offset := 0
+	for {
 		if err := ctx.Err(); err != nil {
-			slog.Info("legacy session seq sync cancelled", "synced", count)
+			unsetLegacySeqSyncMarker(ctx, rdb)
+			slog.Info("legacy session seq sync cancelled", "synced", total)
 			return
 		}
-		if err := a.CacheClient.InitSeqIfAbsent(ctx, sess.ID, sess.NextSeq); err != nil {
-			slog.Warn("failed to init seq in redis", "session_id", sess.ID, "error", err)
-		} else {
-			count++
+		var sessions []model.Session
+		if err := a.DB.Select("id, next_seq").Where("next_seq > 0").Order("created_at ASC").Limit(batchSize).Offset(offset).Find(&sessions).Error; err != nil {
+			unsetLegacySeqSyncMarker(ctx, rdb)
+			slog.Warn("failed to query sessions for seq sync", "error", err)
+			return
 		}
+		if len(sessions) == 0 {
+			break
+		}
+		for _, sess := range sessions {
+			if err := ctx.Err(); err != nil {
+				unsetLegacySeqSyncMarker(ctx, rdb)
+				slog.Info("legacy session seq sync cancelled", "synced", total)
+				return
+			}
+			if err := a.CacheClient.InitSeqIfAbsent(ctx, sess.ID, sess.NextSeq); err != nil {
+				slog.Warn("failed to init seq in redis", "session_id", sess.ID, "error", err)
+			} else {
+				total++
+			}
+		}
+		if len(sessions) < batchSize {
+			break
+		}
+		offset += batchSize
 	}
-	slog.Info("legacy session seq sync completed", "total", len(sessions), "synced", count)
+	slog.Info("legacy session seq sync completed", "total", total)
+}
+
+// unsetLegacySeqSyncMarker removes the one-time marker so the next startup
+// retries the migration. Best effort: the marker is only removed when the
+// migration did not finish, and a leftover marker just skips a redundant
+// warm-up the runtime self-healing path covers anyway.
+func unsetLegacySeqSyncMarker(ctx context.Context, rdb *redis.Client) {
+	if err := rdb.Del(ctx, legacySeqSyncMarkerKey).Err(); err != nil {
+		slog.Warn("failed to clear legacy seq sync marker", "error", err)
+	}
 }

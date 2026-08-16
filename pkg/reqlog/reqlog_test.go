@@ -17,6 +17,26 @@ func TestNewRequestID(t *testing.T) {
 	if id == id2 {
 		t.Fatal("NewRequestID returned duplicate IDs")
 	}
+
+	// The body after the prefix must be a real RFC 4122 UUIDv4: 8-4-4-4-12
+	// hex layout, version nibble '4', variant in {8,9,a,b}.
+	body := strings.TrimPrefix(id, "req_")
+	parts := strings.Split(body, "-")
+	if len(parts) != 5 {
+		t.Fatalf("NewRequestID body %q is not 8-4-4-4-12", body)
+	}
+	for i, part := range parts {
+		wantLen := []int{8, 4, 4, 4, 12}[i]
+		if len(part) != wantLen {
+			t.Fatalf("NewRequestID body %q segment %d has length %d, want %d", body, i, len(part), wantLen)
+		}
+	}
+	if parts[2][0] != '4' {
+		t.Fatalf("NewRequestID body %q is not UUIDv4 (version nibble %q)", body, parts[2][0])
+	}
+	if !strings.Contains("89ab", string(parts[3][0])) {
+		t.Fatalf("NewRequestID body %q has invalid RFC 4122 variant nibble %q", body, parts[3][0])
+	}
 }
 
 func TestWithGetRequestID(t *testing.T) {

@@ -74,7 +74,13 @@ func New(code, message string, httpStatus int) *Error {
 
 var traceCounter atomic.Uint64
 
-// NewTraceID generates a unique, ordered trace ID.
+// NewTraceID generates a unique, ordered trace ID for correlating an error
+// response with its server-side log line. It is deliberately NOT a UUID:
+// a per-process monotonic counter ("trace_000123") is ordered, cheap, and
+// unambiguous in logs. UUID-shaped IDs belong to the other roles of the
+// backend ID scheme (see hub-server/internal/uuidv7: Hub entities = UUIDv7,
+// Edge entities = prefixed 16-hex, request correlation = UUIDv4 in
+// pkg/reqlog) — do not replace this counter with a UUID.
 func NewTraceID() string {
 	n := traceCounter.Add(1)
 	return fmt.Sprintf("trace_%06d", n)

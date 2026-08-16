@@ -12,7 +12,7 @@ import (
 	"github.com/agenthub/hub-server/internal/model"
 	"github.com/agenthub/hub-server/internal/repository"
 	"github.com/agenthub/hub-server/internal/service/im"
-	"github.com/agenthub/hub-server/pkg/uuidv7"
+	"github.com/agenthub/hub-server/internal/uuidv7"
 )
 
 // WorkspaceListResult holds paginated Hub project/workspace results.

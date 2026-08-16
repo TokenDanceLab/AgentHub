@@ -251,18 +251,34 @@ func firstPermissionOption(options []acp.PermissionOption, kinds ...acp.Permissi
 	return "", false
 }
 
-// ReadTextFile handles fs/read_text_file.
+// ── Unwired endpoint stubs (#1404) ────────────────────────────────────────
 //
-// TODO(#1404 帧设计): the Edge-side fs frame + allowlist enforcement (see
-// tool_allowlist_hook.go) is not designed for ACP yet; for the spike the
-// capability is advertised in initialize but the endpoint answers with an
-// error so the agent can surface it instead of hanging. (Permission-style
-// tool gates are handled via session/request_permission, which IS wired.)
+// STUB INVENTORY (single source of the "not wired" list — update both the
+// methods below and TestUnwiredACPEndpointsFailClosed when #1404 lands):
+//
+//	fs/read_text_file     → ReadTextFile        (fs frame design + allowlist)
+//	fs/write_text_file    → WriteTextFile       (fs frame design + allowlist)
+//	terminal/create       → CreateTerminal      (terminal frame design)
+//	terminal/kill         → KillTerminal        (terminal frame design)
+//	terminal/output       → TerminalOutput      (terminal frame design)
+//	terminal/release      → ReleaseTerminal     (terminal frame design)
+//	terminal/wait_for_exit → WaitForTerminalExit (terminal frame design)
+//
+// Wired endpoints (not stubs): session/update (SessionUpdate) and
+// session/request_permission (RequestPermission → Edge approval chain).
+//
+// Every stub fails closed with errACPEndpointNotWired — a JSON-RPC error the
+// agent can surface — never a silent hang, never a fake success. The
+// capabilities are still advertised in initialize (runACPSession) so the
+// agent can discover them; removing the advertisement is a #1404 follow-up,
+// not something a stub should silently do.
+//
+// ReadTextFile handles fs/read_text_file.
 func (h *acpClientHandler) ReadTextFile(ctx context.Context, params acp.ReadTextFileRequest) (acp.ReadTextFileResponse, error) {
 	return acp.ReadTextFileResponse{}, fsEndpointError("fs/read_text_file", params.Path)
 }
 
-// WriteTextFile handles fs/write_text_file. See ReadTextFile for the TODO.
+// WriteTextFile handles fs/write_text_file. Stub, see the STUB INVENTORY above.
 func (h *acpClientHandler) WriteTextFile(ctx context.Context, params acp.WriteTextFileRequest) (acp.WriteTextFileResponse, error) {
 	return acp.WriteTextFileResponse{}, fsEndpointError("fs/write_text_file", params.Path)
 }
@@ -272,22 +288,22 @@ func fsEndpointError(method, path string) error {
 		method, path, errACPEndpointNotWired)
 }
 
-// CreateTerminal handles terminal/create. See ReadTextFile for the TODO.
+// CreateTerminal handles terminal/create. Stub, see the STUB INVENTORY above.
 func (h *acpClientHandler) CreateTerminal(ctx context.Context, params acp.CreateTerminalRequest) (acp.CreateTerminalResponse, error) {
 	return acp.CreateTerminalResponse{}, terminalEndpointError("terminal/create")
 }
 
-// KillTerminal handles terminal/kill. See ReadTextFile for the TODO.
+// KillTerminal handles terminal/kill. Stub, see the STUB INVENTORY above.
 func (h *acpClientHandler) KillTerminal(ctx context.Context, params acp.KillTerminalRequest) (acp.KillTerminalResponse, error) {
 	return acp.KillTerminalResponse{}, terminalEndpointError("terminal/kill")
 }
 
-// TerminalOutput handles terminal/output. See ReadTextFile for the TODO.
+// TerminalOutput handles terminal/output. Stub, see the STUB INVENTORY above.
 func (h *acpClientHandler) TerminalOutput(ctx context.Context, params acp.TerminalOutputRequest) (acp.TerminalOutputResponse, error) {
 	return acp.TerminalOutputResponse{}, terminalEndpointError("terminal/output")
 }
 
-// ReleaseTerminal handles terminal/release. See ReadTextFile for the TODO.
+// ReleaseTerminal handles terminal/release. Stub, see the STUB INVENTORY above.
 func (h *acpClientHandler) ReleaseTerminal(ctx context.Context, params acp.ReleaseTerminalRequest) (acp.ReleaseTerminalResponse, error) {
 	return acp.ReleaseTerminalResponse{}, terminalEndpointError("terminal/release")
 }

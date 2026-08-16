@@ -9,7 +9,7 @@ import (
 	"github.com/agenthub/hub-server/internal/jwtutil"
 	"github.com/agenthub/hub-server/internal/model"
 	"github.com/agenthub/hub-server/internal/repository"
-	"github.com/agenthub/hub-server/pkg/uuidv7"
+	"github.com/agenthub/hub-server/internal/uuidv7"
 )
 
 const (

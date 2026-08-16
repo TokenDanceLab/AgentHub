@@ -10,7 +10,7 @@ import (
 
 	"gorm.io/gorm"
 
-	"github.com/agenthub/hub-server/pkg/uuidv7"
+	"github.com/agenthub/hub-server/internal/uuidv7"
 )
 
 // AuditEvent represents a recorded audit event.
