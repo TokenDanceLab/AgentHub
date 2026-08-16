@@ -226,6 +226,9 @@ screenshots/
 !app/mobile-rn/assets/
 !app/mobile-rn/assets/agenthub-*.png
 
+# Docs images referenced by README (must be tracked)
+!docs/images/desktop-workbench-preview.png
+
 # =============================================================================
 # Docs & Local Files
 # =============================================================================
