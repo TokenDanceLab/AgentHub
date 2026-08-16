@@ -1,19 +1,19 @@
 # AgentHub 治理执行
 
-最后更新：2026-08-05
+最后更新：2026-08-16
 
 本文件将 TokenDance 系统治理映射为 AgentHub 执行项。AgentHub 是多 Agent 协作平台；它是 TokenDance ID 的 relying party，拥有 Hub、Edge、Desktop、Web 和 Mobile 客户端。
 
 ## 根输入
 
-- `../../../docs/ecosystem/ecosystem-execution-queue.md`（TokenDance ID workspace）
-- `../../../docs/identity/identity-auth.md`（TokenDance ID workspace）
-- `../../../docs/identity/authorization-model.md`（TokenDance ID workspace）
-- `../../../docs/identity/feishu-integration.md`（TokenDance ID workspace）
-- `../../../docs/security/security-risk.md`（TokenDance ID workspace）
-- `../../../docs/identity/i18n-packaging.md`（TokenDance ID workspace）
-- `../../../docs/design/design-system.md`（TokenDance ID workspace）
-- `../../../docs/design/visual-qa-matrix.md`（TokenDance ID workspace）
+TokenDance 系统级治理文档位于私有 workspace（standalone clone 不可达，不写入公开 URL）。本仓不复制其内容；身份、授权、飞书、安全、i18n、设计的跨产品边界以 `../AGENTS.md` §4 生态边界 + 下列 in-repo owner 为准：
+
+- 身份与登录：`../architecture/06-auth-identity.md`（OIDC/PKCE、JWT 签发、设备注册）
+- 授权：`../AGENTS.md` §4（Hub-local membership/resource/action）
+- 安全风险：`security-risk-register.md`（SSOT，队列/状态/发布门禁以 register 为准）
+- 飞书：`../AGENTS.md` §4（协作入口，非第二登录系统）
+- i18n/公开包装：`../AGENTS.md` §4（zh/en 语义一致）
+- 设计：`../architecture/07-design-system-ssot.md` + `../component-acceptance.md`
 
 ## AgentHub 队列映射
 
@@ -63,5 +63,5 @@ D2b. Release dry build topology 是 topology/preflight only（拓扑/预检）�
 
 - 当部署版本和 commit hash 变更时，更新 server workspace 的 AgentHub 运维状态文档；本仓库只保留无密证据指针。
 - 当新增发现、缓解措施或部署验证时，更新 `docs/governance/security-risk-register.md`。
-- 当 Hub session 或 token 规则变更时，更新 workspace 根 `../../../docs/identity/identity-auth.md` / `../../../docs/identity/authorization-model.md`。
+- 当 Hub session 或 token 规则变更时，更新 `../architecture/06-auth-identity.md`、`../AGENTS.md` §4 边界摘要与 `security-risk-register.md` 相关风险行；TokenDance ID workspace 侧系统级文档由管理员在私有 workspace 同步，不在本仓维护。
 - 当 API 契约变更时，更新 `api/openapi.yaml` 和 `api/events.md`。

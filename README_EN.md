@@ -28,7 +28,7 @@ AgentHub lets you collaborate with human teammates and AI agents in the same gro
 - **IM-native collaboration** — DMs, group chats, @agent mentions — all in one task stream
 - **Multi-runtime dispatch** — Claude Code, Codex, OpenCode through a unified adapter interface
 - **Diff / Preview / Approval** — inline code changes, review workflows
-- **Three native clients** — Tauri Desktop + Web + Expo React Native Mobile (Mobile in assembly — see [CHANGELOG](CHANGELOG.md) Wave5/6)
+- **Three native clients** — Tauri Desktop + Web + Expo React Native Mobile (Desktop/Web are the mainline; Mobile in assembly)
 - **Hub-Edge distributed** — local execution works offline; Hub adds multi-device sync, remote viewing, and audit
 
 ## Tech Stack
