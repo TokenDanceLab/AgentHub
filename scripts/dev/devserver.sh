@@ -14,9 +14,9 @@
 #   scripts/dev/devserver.sh integration  # integration lane：重建测试库 + 全量跑并回传报告
 #
 # 环境变量（均在本地配置，仓库不存任何地址/凭据）:
-#   AGENTHUB_DEVSERVER_SSH    ssh 目标（默认 agenthub-dev，须在 ~/.ssh/config 配置）
-#   AGENTHUB_DEVSERVER_ROOT  服务器仓库路径（默认 /srv/agenthub-dev/AgentHub）
-#   AGENTHUB_DEVSERVER_APP   服务器 app 目录（默认 /srv/agenthub-dev/AgentHub/app）
+#   AGENTHUB_DEVSERVER_SSH      ssh 目标（必填；具体 alias/地址只放私有运维配置）
+#   AGENTHUB_DEVSERVER_SSH_BIN  ssh-compatible 可执行文件（默认 ssh；可注入受控 wrapper）
+#   AGENTHUB_DEVSERVER_ROOT     服务器仓库路径（默认 /srv/agenthub/AgentHub；可私有覆盖）
 #
 # 安全契约：
 #   - 仓库内零硬编码地址/凭据；secret 只存在于服务器本地 .env（gitignored）。
@@ -25,31 +25,49 @@
 # ───────────────────────────────────────────────────────────────
 set -euo pipefail
 
-REMOTE="${AGENTHUB_DEVSERVER_SSH:-agenthub-dev}"
-REPO_ROOT="${AGENTHUB_DEVSERVER_ROOT:-/srv/agenthub-dev/AgentHub}"
-APP_DIR="${AGENTHUB_DEVSERVER_APP:-/srv/agenthub-dev/AgentHub/app}"
+REMOTE="${AGENTHUB_DEVSERVER_SSH:-}"
+SSH_BIN="${AGENTHUB_DEVSERVER_SSH_BIN:-ssh}"
+REPO_ROOT="${AGENTHUB_DEVSERVER_ROOT:-/srv/agenthub/AgentHub}"
 LOCAL_REPO="$(cd "$(dirname "$0")/../.." && pwd)"
 
 log() { printf '[devserver] %s\n' "$*"; }
 die() { printf '[devserver] ERROR: %s\n' "$*" >&2; exit 1; }
+ssh_cmd() { "$SSH_BIN" "$@"; }
+require_remote_config() {
+  [ -n "$REMOTE" ] || die "AGENTHUB_DEVSERVER_SSH 未配置；具体远端 alias/地址必须留在私有运维配置"
+}
+remote_bash() {
+  local quoted_root
+  printf -v quoted_root '%q' "$REPO_ROOT"
+  ssh_cmd -o ConnectTimeout=30 "$REMOTE" "bash -s -- $quoted_root"
+}
+resolve_report_dir() {
+  local configured="${AGENTHUB_DEVSERVER_REPORT_DIR:-.tmp/devserver-reports}"
+  case "$configured" in
+    /*) printf '%s\n' "$configured" ;;
+    *) printf '%s/%s\n' "$LOCAL_REPO" "$configured" ;;
+  esac
+}
 
 # ssh 只读前置检查；失败给出可操作提示（不在仓库放任何地址）。
 remote_check() {
-  ssh -o ConnectTimeout=10 "$REMOTE" "echo ok" >/dev/null 2>&1 ||
-    die "无法连接 $REMOTE —— 请在本机 ~/.ssh/config 配置该 alias（见 scripts/dev/README.md）"
+  require_remote_config
+  ssh_cmd -o ConnectTimeout=10 "$REMOTE" "echo ok" >/dev/null 2>&1 ||
+    die "无法连接已配置的远端测试目标；请检查私有 SSH 配置（见 scripts/dev/README.md）"
 }
 
 cmd_sync() {
+  require_remote_config
   bundle_tmp="$(mktemp -t agenthub-sync.XXXXXX)"
   trap 'rm -f "${bundle_tmp:-}"' EXIT
   log "检查服务器工作树…"
   local dirty
-  dirty="$(ssh -o ConnectTimeout=10 "$REMOTE" "cd '$REPO_ROOT' && git status --porcelain" 2>/dev/null || true)"
+  dirty="$(ssh_cmd -o ConnectTimeout=10 "$REMOTE" "cd '$REPO_ROOT' && git status --porcelain" 2>/dev/null || true)"
   if [ -n "$dirty" ]; then
     die "服务器工作树不干净，禁止快进（证据纪律）。先在服务器处理：\n$dirty"
   fi
   local base
-  base="$(ssh -o ConnectTimeout=10 "$REMOTE" "cd '$REPO_ROOT' && git rev-parse HEAD" 2>/dev/null || true)"
+  base="$(ssh_cmd -o ConnectTimeout=10 "$REMOTE" "cd '$REPO_ROOT' && git rev-parse HEAD" 2>/dev/null || true)"
   [ -n "$base" ] || die "无法读取服务器 HEAD"
   if ! git -C "$LOCAL_REPO" cat-file -e "$base" 2>/dev/null; then
     log "服务器 HEAD ($base) 不在本地，尝试全量 bundle…"
@@ -67,16 +85,16 @@ cmd_sync() {
   local size
   size=$(wc -c <"$bundle_tmp" | tr -d ' ')
   log "推送增量 bundle（$size bytes）…"
-  ssh -o ConnectTimeout=15 "$REMOTE" "cat > /tmp/agenthub-sync.bundle" <"$bundle_tmp"
-  ssh -o ConnectTimeout=30 "$REMOTE" "cd '$REPO_ROOT' && git fetch /tmp/agenthub-sync.bundle master:refs/remotes/origin/master && rm -f /tmp/agenthub-sync.bundle && git merge --ff-only origin/master && git log --oneline -1"
+  ssh_cmd -o ConnectTimeout=15 "$REMOTE" "cat > /tmp/agenthub-sync.bundle" <"$bundle_tmp"
+  ssh_cmd -o ConnectTimeout=30 "$REMOTE" "cd '$REPO_ROOT' && git fetch /tmp/agenthub-sync.bundle master:refs/remotes/origin/master && rm -f /tmp/agenthub-sync.bundle && git merge --ff-only origin/master && git log --oneline -1"
   log "sync 完成"
 }
 
 cmd_start() {
   remote_check
-  ssh -o ConnectTimeout=30 "$REMOTE" bash -s <<'REMOTE_SCRIPT'
+  remote_bash <<'REMOTE_SCRIPT'
 set -euo pipefail
-REPO_ROOT="${AGENTHUB_DEVSERVER_ROOT:-/srv/agenthub-dev/AgentHub}"
+REPO_ROOT="${1:?missing remote repo root}"
 cd "$REPO_ROOT"
 # 服务器系统级环境（/etc/environment）不随非交互 SSH 会话加载；显式 source
 # 以取 GOPROXY 等镜像配置（仓库不硬编码任何镜像地址）。本地覆盖用 DEVSERVER_GOPROXY。
@@ -138,7 +156,7 @@ REMOTE_SCRIPT
 
 cmd_stop() {
   remote_check
-  ssh -o ConnectTimeout=30 "$REMOTE" bash -s <<'REMOTE_SCRIPT'
+  remote_bash <<'REMOTE_SCRIPT'
 set -euo pipefail
 for entry in hub:/tmp/agenthub-hub.pid edge:/tmp/agenthub-edge.pid; do
   name="${entry%%:*}"; pidfile="${entry##*:}"
@@ -153,9 +171,9 @@ REMOTE_SCRIPT
 
 cmd_status() {
   remote_check
-  ssh -o ConnectTimeout=30 "$REMOTE" bash -s <<'REMOTE_SCRIPT'
+  remote_bash <<'REMOTE_SCRIPT'
 set -euo pipefail
-REPO_ROOT="${AGENTHUB_DEVSERVER_ROOT:-/srv/agenthub-dev/AgentHub}"
+REPO_ROOT="${1:?missing remote repo root}"
 echo "== git =="
 git -C "$REPO_ROOT" status -sb | head -2
 echo "== services =="
@@ -171,13 +189,13 @@ REMOTE_SCRIPT
 cmd_test() {
   remote_check
   local out_dir out_file
-  out_dir="${AGENTHUB_DEVSERVER_REPORT_DIR:-.tmp/devserver-reports}"
-  mkdir -p "$LOCAL_REPO/$out_dir"
-  out_file="$LOCAL_REPO/$out_dir/report-$(date +%Y%m%d-%H%M%S).json"
+  out_dir="$(resolve_report_dir)"
+  mkdir -p "$out_dir"
+  out_file="$out_dir/report-$(date +%Y%m%d-%H%M%S).json"
   log "服务器跑 go test -short（hub+edge internal）…"
-  ssh -o ConnectTimeout=30 "$REMOTE" bash -s >"$out_file" <<'REMOTE_SCRIPT'
+  remote_bash >"$out_file" <<'REMOTE_SCRIPT'
 set -euo pipefail
-REPO_ROOT="${AGENTHUB_DEVSERVER_ROOT:-/srv/agenthub-dev/AgentHub}"
+REPO_ROOT="${1:?missing remote repo root}"
 # 服务器系统级环境（/etc/environment）不随非交互 SSH 会话加载；显式 source。
 if [ -z "${DEVSERVER_GOPROXY:-}" ] && [ -f /etc/environment ]; then
   # shellcheck disable=SC1091
@@ -202,7 +220,6 @@ failures="$(grep -c '^--- FAIL' /tmp/devserver-test.log || true)"
 cat <<JSON
 {
   "schema": "devserver-test-report.v1",
-  "server": "$(hostname)",
   "arch": "$(uname -m)",
   "branch": "$branch",
   "commit": "$commit",
@@ -227,13 +244,13 @@ REMOTE_SCRIPT
 cmd_integration() {
   remote_check
   local out_dir out_file
-  out_dir="${AGENTHUB_DEVSERVER_REPORT_DIR:-.tmp/devserver-reports}"
-  mkdir -p "$LOCAL_REPO/$out_dir"
-  out_file="$LOCAL_REPO/$out_dir/integration-$(date +%Y%m%d-%H%M%S).json"
+  out_dir="$(resolve_report_dir)"
+  mkdir -p "$out_dir"
+  out_file="$out_dir/integration-$(date +%Y%m%d-%H%M%S).json"
   log "服务器重建测试库 + 跑 integration lane（PG+Redis）…"
-  ssh -o ConnectTimeout=30 "$REMOTE" bash -s >"$out_file" <<'REMOTE_SCRIPT'
+  remote_bash >"$out_file" <<'REMOTE_SCRIPT'
 set -euo pipefail
-REPO_ROOT="${AGENTHUB_DEVSERVER_ROOT:-/srv/agenthub-dev/AgentHub}"
+REPO_ROOT="${1:?missing remote repo root}"
 if [ -z "${DEVSERVER_GOPROXY:-}" ] && [ -f /etc/environment ]; then
   # shellcheck disable=SC1091
   . /etc/environment 2>/dev/null || true
@@ -279,7 +296,6 @@ fail_count="$(grep -c '^--- FAIL' /tmp/devserver-integration.log || true)"
 cat <<JSON
 {
   "schema": "devserver-integration-report.v1",
-  "server": "$(hostname)",
   "arch": "$(uname -m)",
   "branch": "$branch",
   "commit": "$commit",
