@@ -1,10 +1,11 @@
-// Hub WebSocket client for AgentHub Web.
+// Shared Hub WebSocket client for AgentHub renderers (web + desktop).
 // Manages auth-frame handshake, typed event routing, and reconnection
-// via the Transport abstraction.
+// via the shared Transport abstraction. Platforms inject their configured
+// WS endpoint via HubWSOptions.url — there is no platform config import here.
 //
 // Protocol (matching hub-server/internal/router/router.go + ws/frame.go):
 //   1. WebSocket connects to ws://host/client/ws
-//      Auth is carried via Sec-WebSocket-Protocol (preferred browser path):
+//      Auth is carried via Sec-WebSocket-Protocol (preferred path):
 //        protocols: ["agenthub.bearer.v1", "<hub-jwt>"]
 //      Query ?access_token= is a legacy fallback only (mobile / older clients).
 //   2. Hub validates the Hub-issued token during HTTP upgrade (WSAuthMiddleware).
@@ -17,16 +18,15 @@
 // is re-executed automatically. Typed event subscriptions survive
 // across reconnects.
 
-import { HUB_WS_URL } from '@/config';
-import { WebSocketTransport, type Transport, type TransportStatus } from './transport';
-import type { HubEventType } from '@shared/hubEvents';
-import { HUB_EVENTS } from '@shared/hubEvents';
+import { WebSocketTransport, type Transport, type TransportStatus } from '../transport';
+import type { HubEventType } from '../hubEvents';
+import { HUB_EVENTS } from '../hubEvents';
 
 // ── Types ─────────────────────────────────────────
 
 export interface HubWSOptions {
   /** Hub WebSocket endpoint (e.g. ws://localhost:8080/client/ws). */
-  url?: string;
+  url: string;
   /** Returns the current JWT access token, or null if unauthenticated. */
   getToken: () => string | null;
   /** Optional Transport instance (injected for testing). */
@@ -35,7 +35,8 @@ export interface HubWSOptions {
   onAuthSuccess?: () => void;
   /**
    * When true, also append access_token to the WS URL (legacy fallback).
-   * Default false — browser path prefers Sec-WebSocket-Protocol only.
+   * Default false — preferred path carries the token via
+   * Sec-WebSocket-Protocol only.
    */
   useQueryTokenFallback?: boolean;
 }
@@ -97,7 +98,7 @@ export function withAccessToken(url: string, token: string | null): string {
 // ── Implementation ───────────────────────────────
 
 export function createHubWS(opts: HubWSOptions): HubWSHandle {
-  const baseUrl = opts.url ?? HUB_WS_URL;
+  const baseUrl = opts.url;
   const useQueryFallback = opts.useQueryTokenFallback === true;
 
   const connectURL = (): string => {
@@ -160,6 +161,15 @@ export function createHubWS(opts: HubWSOptions): HubWSHandle {
     // Drop application events before auth
     if (!authenticated) return;
 
+    // device.kicked: the Hub invalidated this device session (e.g. replaced).
+    // Stop auto-reconnect so we don't hammer the server with a dead token;
+    // the auth middleware clears the session and the UI prompts re-login.
+    if (frameType === HUB_EVENTS.DEVICE_KICKED) {
+      authenticated = false;
+      transport.close();
+      return;
+    }
+
     // Route to typed handlers
     const handlers = typedHandlers.get(frameType);
     if (handlers) {
@@ -198,11 +208,12 @@ export function createHubWS(opts: HubWSOptions): HubWSHandle {
     },
 
     on(type: HubEventType, handler: (payload: unknown) => void): () => void {
-      if (!typedHandlers.has(type)) {
-        typedHandlers.set(type, new Set());
+      let handlers = typedHandlers.get(type);
+      if (!handlers) {
+        handlers = new Set();
+        typedHandlers.set(type, handlers);
       }
-      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- just Set() above guarantees existence
-      typedHandlers.get(type)!.add(handler);
+      handlers.add(handler);
       return () => {
         typedHandlers.get(type)?.delete(handler);
       };
