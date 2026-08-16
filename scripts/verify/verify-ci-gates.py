@@ -210,6 +210,13 @@ def main() -> int:
         "validate must exercise coverage baseline metadata/write safety",
     )
     assert_step_continue_on_error(validate, "Self-test coverage baseline metadata/write safety", False)
+    devserver_contract_step = get_step_block(validate, "Verify remote devserver privacy/portability contract")
+    assert_contains(
+        devserver_contract_step,
+        r"scripts/verify/verify-devserver-contract\.py",
+        "validate must enforce the remote devserver privacy/portability contract",
+    )
+    assert_step_continue_on_error(validate, "Verify remote devserver privacy/portability contract", False)
 
     commit_message_step = get_step_block(validate, "Verify commit messages (PR only)")
     assert_contains(commit_message_step, r"scripts/verify/verify-commit-messages\.sh", "commit-message step must call the commit-message verifier")
