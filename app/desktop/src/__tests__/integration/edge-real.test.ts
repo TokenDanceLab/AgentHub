@@ -431,6 +431,8 @@ describeReal('Real Edge Server E2E', () => {
       const data = unwrapEdgeResponse(await res.json()) as Record<string, unknown>;
       expect(data.runId).toBe(runId);
       expect(['queued', 'started', 'finished']).toContain(data.status);
+      expect(data.projectId).toBe('proj_local');
+      expect(data.threadId).toBe('thread_local');
     });
 
     it('returns 404 for unknown run ID', async () => {
@@ -455,6 +457,8 @@ describeReal('Real Edge Server E2E', () => {
       expect(createRes.status).toBe(202);
       const created = unwrapEdgeResponse(await createRes.json()) as Record<string, unknown>;
       const runId = created.runId as string;
+      expect(created.projectId).toBe('proj_local');
+      expect(created.threadId).toBe('thread_local');
 
       const cancelRes = await fetch(`${BASE_URL}/v1/runs/${runId}:cancel`, { method: 'POST' });
       // 202 cancelling, or 200 if the mock run already reached a terminal state.
@@ -581,6 +585,13 @@ describeReal('Real Edge Server E2E', () => {
       expect(types).toContain('run.started');
       expect(types).toContain('run.finished');
       expect(types).toContain('run.output.batch');
+
+      // projectId/threadId posted to POST /v1/runs pass through to the
+      // run.queued event scope (and payload, serialized from the run record).
+      const queuedEvent = events.find((e) => e.type === 'run.queued');
+      expect(queuedEvent).toBeDefined();
+      expect(queuedEvent!.scope).toMatchObject({ projectId: 'proj_local', threadId: 'thread_local' });
+      expect(queuedEvent!.payload).toMatchObject({ projectId: 'proj_local', threadId: 'thread_local' });
 
       ws.close();
     });
@@ -752,11 +763,13 @@ describeReal('Real Edge Server E2E', () => {
       const createRes = await fetch(`${BASE_URL}/v1/runs`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt: 'Cancel compat test', workDir: WORK_DIR }),
+        body: JSON.stringify({ projectId: 'proj_local', threadId: 'thread_local', prompt: 'Cancel compat test', workDir: WORK_DIR }),
       });
       expect(createRes.status).toBe(202);
       const created = unwrapEdgeResponse(await createRes.json()) as Record<string, unknown>;
       const runId = created.runId as string;
+      expect(created.projectId).toBe('proj_local');
+      expect(created.threadId).toBe('thread_local');
 
       const cancelRes = await fetch(`${BASE_URL}/v1/runs/${runId}:cancel`, { method: 'POST' });
       expect([200, 202]).toContain(cancelRes.status);
