@@ -4,13 +4,21 @@
 // and mounts below a user message via the Transcript renderUserFooter slot.
 
 import { render, screen, fireEvent, act } from '@testing-library/react';
-import { describe, expect, it, beforeEach, vi } from 'vitest';
+import { beforeAll, describe, expect, it, beforeEach, vi } from 'vitest';
 import type { ReactNode } from 'react';
 import { HUB_EVENTS } from '../../hubEvents';
 import { getMessageDelegationStore } from './MessageDelegationStore';
 import { getSubagentStreamStore } from './SubagentStreamStore';
 import { InlineDelegationCard } from './InlineDelegationCard';
 import { Transcript } from '../../chatview/components/Transcript';
+
+// The delegation card + transcript labels resolve through the shared test
+// i18next instance; opt into the zh bundle for this suite (Issue #1717).
+import { useTestI18nLanguage } from '../../testing/i18n';
+
+beforeAll(async () => {
+  await useTestI18nLanguage('zh');
+});
 
 // jsdom has no layout engine, so virtua cannot measure the viewport/rows and
 // would mount zero rows — breaking content-level queries. These tests cover
@@ -23,34 +31,8 @@ vi.mock('virtua', () => ({
 }));
 
 // InlineDelegationCard + SubagentTranscript resolve status labels via the
-// chatview i18n namespace. Mirror those keys here so the rendered zh status
-// copy is what the assertions expect.
-vi.mock('react-i18next', () => ({
-  useTranslation: () => ({
-    t: (key: string) => {
-      const translations: Record<string, string> = {
-        'inlineDelegation.ariaStack': '委派状态',
-        'inlineDelegation.emptyDetail': '暂无详细事件流',
-        'inlineDelegation.status.dispatching': '派单中…',
-        'inlineDelegation.status.streaming': '执行中…',
-        'inlineDelegation.status.done': '完成 ✓',
-        'inlineDelegation.status.failed': '失败 ✗',
-        'inlineDelegation.status.cancelled': '已取消',
-        'subagentStream.transcriptLabel': '子会话事件流',
-        'subagentStream.emptyWaiting': '等待 agent 启动…',
-        'subagentStream.cat.thinking': '思考',
-        'subagentStream.cat.toolCall': '工具调用',
-        'subagentStream.cat.textDelta': '输出',
-        'subagentStream.cat.result': '结果',
-        'subagentStream.cat.error': '错误',
-        'subagentStream.cat.cancel': '已取消',
-        'subagentStream.cat.other': '事件',
-      };
-      return translations[key] ?? key;
-    },
-    i18n: { language: 'zh' },
-  }),
-}));
+// chatview i18n namespace; the registered test instance provides the real
+// zh copy.
 import type { TranscriptUserItem } from '../../chatview/transcript-item';
 
 function feedDispatch(overrides: Record<string, unknown> = {}): void {
@@ -239,7 +221,7 @@ describe('InlineDelegationCard', () => {
     // The delegation card is mounted inline below it, subscribed by message id.
     expect(screen.getByText('Planner')).toBeInTheDocument();
     expect(screen.getByText('派单中…')).toBeInTheDocument();
-    expect(screen.getByRole('region', { name: '委派状态' })).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: '子 Agent 委派状态' })).toBeInTheDocument();
   });
 
   it('renders no card below a user message that triggered no dispatch', () => {
@@ -252,6 +234,6 @@ describe('InlineDelegationCard', () => {
     );
 
     expect(screen.getByText('一条普通消息')).toBeInTheDocument();
-    expect(screen.queryByRole('region', { name: '委派状态' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: '子 Agent 委派状态' })).not.toBeInTheDocument();
   });
 });

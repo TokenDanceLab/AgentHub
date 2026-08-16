@@ -1,5 +1,5 @@
 import React from 'react';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, within } from '../../__tests__/setup';
 import {
   WORKBENCH_AGENT_MARKET_FIXTURES,
@@ -9,23 +9,15 @@ import {
 } from '../agentProfileCatalog';
 import { AgentsPage } from './AgentsPage';
 
-// AgentInstalledViews now resolves empty-state copy via i18n (agents.empty.*).
-// Other AgentsPage text is hardcoded in components, so a narrow t() mock
-// covering only the empty keys (fallback to the key itself) keeps the rest
-// of the suite unaffected.
-vi.mock('react-i18next', () => ({
-  useTranslation: () => ({
-    t: (key: string) => {
-      const resources: Record<string, string> = {
-        'agents.empty.title': '暂无已安装 Agent',
-        'agents.empty.description': '当前 Hub 账号还没有已安装配置。',
-        'agents.empty.add': '添加 Agent',
-      };
-      return resources[key] ?? key;
-    },
-  }),
-}));
+// AgentInstalledViews resolves empty-state copy via i18n (agents.empty.*);
+// the registered test instance provides the real sharedWorkbench zh strings
+// once this suite opts into zh (Issue #1717). Other AgentsPage text is
+// hardcoded in components.
+import { useTestI18nLanguage } from '../../testing/i18n';
 
+beforeAll(async () => {
+  await useTestI18nLanguage('zh');
+});
 vi.mock('@lobehub/icons', () => {
   const span = (props?: Record<string, unknown>) => React.createElement('span', props ?? {});
   return {

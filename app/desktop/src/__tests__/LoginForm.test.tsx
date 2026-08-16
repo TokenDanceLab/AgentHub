@@ -3,19 +3,6 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import LoginForm from '@/components/LoginForm';
 
-vi.mock('react-i18next', () => ({
-  useTranslation: () => ({
-    t: (key: string, vars?: Record<string, unknown>) => {
-      if (!vars) return key;
-      const varStr = Object.entries(vars)
-        .map(([k, v]) => `${k}=${v}`)
-        .join(', ');
-      return `${key}(${varStr})`;
-    },
-    i18n: { language: 'en' },
-  }),
-}));
-
 const mockLoginWithTokenDance = vi.fn();
 let mockUser: { id: string; username: string; nickname: string; avatar_url: string } | null = null;
 
