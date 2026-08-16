@@ -43,6 +43,26 @@ interface PreviewOptions {
 
 type TabletInspectorMode = 'overview' | 'files' | 'browser';
 
+type LocalPreviewPhase = 'loading' | 'live' | 'unavailable';
+
+/**
+ * What the preview renders while the local preview data plane is loading or
+ * unavailable. Deliberately NOT the rich default fixture: rendering fixture
+ * content while the mock Hub is unreachable would silently fake a green run.
+ */
+const previewDegradedFixture: MobileAppFixture = {
+  threads: [],
+  runs: [],
+  transcript: {},
+  account: {
+    tokenDanceId: 'recovering',
+    hubSession: 'missing',
+    notification: 'prompt',
+    hubSync: 'offline',
+    deviceLabel: 'Preview data unavailable',
+  },
+};
+
 function MobileAppContent({ preview }: { preview: PreviewOptions }): React.ReactElement {
   const fallbackFixture = useMemo(() => getMobileFixtureForScenario(preview.scenario), [preview.scenario]);
   const localPreviewEnabled = shouldUseLocalHubPreview(preview);
@@ -55,10 +75,16 @@ function MobileAppContent({ preview }: { preview: PreviewOptions }): React.React
     preview.runId ?? '',
     localPreviewBaseUrl ?? '',
   ].join('|');
-  const [localHubSnapshot, setLocalHubSnapshot] = useState<{ key: string; fixture: MobileAppFixture }>();
-  const fixture = localPreviewEnabled && localHubSnapshot?.key === localPreviewKey
-    ? localHubSnapshot.fixture
-    : fallbackFixture;
+  const [localPreviewPhase, setLocalPreviewPhase] = useState<LocalPreviewPhase>(
+    localPreviewEnabled ? 'loading' : 'live',
+  );
+  const [liveFixture, setLiveFixture] = useState<MobileAppFixture>();
+  const [snapshotReloadKey, setSnapshotReloadKey] = useState(0);
+  const fixture = !localPreviewEnabled
+    ? fallbackFixture
+    : localPreviewPhase === 'live' && liveFixture
+      ? liveFixture
+      : previewDegradedFixture;
   const { mode, setMode, tokens } = useAgentHubTheme();
   const { width } = useWindowDimensions();
   const useSplitPane = width >= 700;
@@ -90,23 +116,28 @@ function MobileAppContent({ preview }: { preview: PreviewOptions }): React.React
 
     const client = createHubClient({ baseUrl: localPreviewBaseUrl });
     const loadSnapshot = () => {
-      client.getMobileSnapshot().then((snapshot) => {
-        if (!cancelled && snapshot.threads.length > 0) {
-          setLocalHubSnapshot({ key: localPreviewKey, fixture: snapshot });
-          setSelectedThreadId((current) => (
-            snapshot.threads.some((thread) => thread.id === current)
-              ? current
-              : (snapshot.threads[0]?.id ?? '')
-          ));
-          setSelectedRunId((current) => (
-            snapshot.runs.some((run) => run.id === current)
-              ? current
-              : (snapshot.runs[0]?.id ?? '')
-          ));
+      client.getPreviewSnapshot().then((snapshot) => {
+        if (cancelled) {
+          return;
         }
+        setLiveFixture(snapshot);
+        setLocalPreviewPhase('live');
+        setSelectedThreadId((current) => (
+          snapshot.threads.some((thread) => thread.id === current)
+            ? current
+            : (snapshot.threads[0]?.id ?? '')
+        ));
+        setSelectedRunId((current) => (
+          snapshot.runs.some((run) => run.id === current)
+            ? current
+            : (snapshot.runs[0]?.id ?? '')
+        ));
       }).catch(() => {
         if (!cancelled) {
-          setLocalHubSnapshot(undefined);
+          // Fail loudly: never fall back to the rich fixture when the
+          // preview data plane is unreachable — that would fake a green run.
+          setLiveFixture(undefined);
+          setLocalPreviewPhase('unavailable');
         }
       });
     };
@@ -139,6 +170,7 @@ function MobileAppContent({ preview }: { preview: PreviewOptions }): React.React
     localPreviewBaseUrl,
     localPreviewEnabled,
     localPreviewKey,
+    snapshotReloadKey,
   ]);
 
   // Mount-once push registration: request permission, fetch the Expo push token,
@@ -370,6 +402,12 @@ function MobileAppContent({ preview }: { preview: PreviewOptions }): React.React
   } satisfies Record<MobileTab, React.ReactNode>;
   const useInlineTabRail = useSplitPane && (activeTab === 'chat' || activeTab === 'thread');
 
+  const retryPreviewSnapshot = () => {
+    setLiveFixture(undefined);
+    setLocalPreviewPhase('loading');
+    setSnapshotReloadKey((key) => key + 1);
+  };
+
   return (
     <>
       <StatusBar style={tokens.scheme === 'light' ? 'dark' : 'light'} />
@@ -381,9 +419,71 @@ function MobileAppContent({ preview }: { preview: PreviewOptions }): React.React
         tabRailPlacement={useInlineTabRail ? 'inlinePane' : 'bottom'}
         unreadThreads={counters.unreadThreads}
       >
+        {localPreviewEnabled && localPreviewPhase === 'unavailable' ? (
+          <PreviewUnavailableBanner onRetry={retryPreviewSnapshot} />
+        ) : null}
         {content[activeTab]}
       </AppShell>
     </>
+  );
+}
+
+function PreviewUnavailableBanner({ onRetry }: { onRetry: () => void }): React.ReactElement {
+  const { tokens } = useAgentHubTheme();
+  const t = useStrings();
+
+  return (
+    <View
+      style={{
+        minHeight: 48,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: tokens.space.sm,
+        borderBottomWidth: 1,
+        borderBottomColor: tokens.color.line,
+        backgroundColor: tokens.color.warningSoft,
+        paddingHorizontal: tokens.space.md,
+        paddingVertical: tokens.space.xs,
+      }}
+    >
+      <AgentHubIcon color={tokens.color.warning} name="shield" size={16} />
+      <View style={{ flex: 1, minWidth: 0 }}>
+        <Text
+          numberOfLines={1}
+          style={{
+            color: tokens.color.ink,
+            fontSize: tokens.type.xs,
+            fontWeight: tokens.type.weight.semibold,
+            lineHeight: tokens.type.lineHeight.xs,
+          }}
+        >
+          {t.previewUnavailableTitle}
+        </Text>
+        <Text
+          numberOfLines={2}
+          style={{ color: tokens.color.inkMuted, fontSize: tokens.type.xs, lineHeight: tokens.type.lineHeight.xs }}
+        >
+          {t.previewUnavailableDescription}
+        </Text>
+      </View>
+      <Pressable
+        accessibilityLabel={t.retry}
+        accessibilityRole="button"
+        hitSlop={8}
+        onPress={onRetry}
+        style={({ pressed }) => ({
+          minHeight: tokens.touch.minimum,
+          justifyContent: 'center',
+          borderRadius: tokens.radius.control,
+          backgroundColor: pressed ? tokens.color.tint : 'transparent',
+          paddingHorizontal: tokens.space.sm,
+        })}
+      >
+        <Text style={{ color: tokens.color.warning, fontSize: tokens.type.xs, fontWeight: tokens.type.weight.semibold, lineHeight: tokens.type.lineHeight.xs }}>
+          {t.retry}
+        </Text>
+      </Pressable>
+    </View>
   );
 }
 
