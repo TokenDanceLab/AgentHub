@@ -10,36 +10,29 @@
 
 ### 前置配置（全部本机，仓库不存任何地址/凭据）
 
-1. `~/.ssh/config` 增加 alias（主机名/用户按实际运维记录填写，不写入仓库）：
+1. 在私有运维配置中准备 SSH 目标，并通过 `AGENTHUB_DEVSERVER_SSH` 传入。
+   公开仓库不记录该目标的 alias、主机名、地址或登录用户。
 
-   ```
-   Host agenthub-dev
-       HostName <tailnet 主机名或地址>
-       User <登录用户>
-   ```
+2. 默认调用 PATH 中的 `ssh`。若运行环境需要受控 wrapper / 独立 ssh client，可把 `AGENTHUB_DEVSERVER_SSH_BIN` 设为一个 ssh-compatible 可执行文件路径；脚本不解析任意 shell 参数字符串。
 
-2. 服务器上仓库路径按需覆盖：`AGENTHUB_DEVSERVER_ROOT`（默认
-   `/srv/agenthub-dev/AgentHub`）。
+3. 服务器仓库路径可通过 `AGENTHUB_DEVSERVER_ROOT` 私有覆盖；公开默认值仅为
+   `/srv/agenthub/AgentHub`，不对应任何具体机器。
 
-3. 服务器本地 `.env` 必须包含启动所需全部键（`AGENTHUB_DB_*`、
+4. 服务器本地 `.env` 必须包含启动所需全部键（`AGENTHUB_DB_*`、
    `AGENTHUB_TOKENDANCE_ID_*`、`AGENTHUB_JWT_SECRET`）；缺键时 `start`
    会 fail-closed 并指出缺哪个键，值永不出服务器。
 
-4. 服务器出站受限，Go 需禁用 sumdb 校验，否则 `go test` 会因查
-   `sum.golang.org` 超时而失败（`go.work.sum`/`go.sum` 已提交校验和，
-   离线禁用 sumdb 安全）。一次性在服务器配置：
-
-   ```bash
-   go env -w GOSUMDB=off GONOSUMDB='*'
-   ```
+5. 若真实测试服务器出站受限，Go 依赖访问沿用该环境的服务器侧运维策略。
+   `devserver.sh` 会兼容既有 `/etc/environment` / `DEVSERVER_GOPROXY` 配置；
+   私有镜像地址、账号和凭据都不要写进仓库。
 
 ### 证据纪律
 
 - `sync` 只在服务器工作树干净时允许快进；脏树先处理（避免证据跑在
   未知代码上）。
 - `test` / `integration` 回传 JSON 报告到本地 `.tmp/devserver-reports/`
-  （gitignored），报告含 commit/branch/arch/结果，可附 PR/issue 作为
-  L3 证据。
+  （gitignored），报告只保留 commit/branch/arch/结果等可公开测试证据，
+  **不写远端 hostname / 地址 / SSH alias**；筛选后才可附 PR/issue。
 
 ### integration 命令与测试库隔离
 
