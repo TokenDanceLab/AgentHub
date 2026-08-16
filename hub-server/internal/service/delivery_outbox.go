@@ -197,8 +197,11 @@ func (o *DeliveryOutbox) ScanRetryableDeliveries(ctx context.Context) ([]Deliver
 		return nil, fmt.Errorf("scan retrying deliveries: %w", err)
 	}
 
-	records = append(records, sentRecords...)
-	records = append(records, retryingRecords...)
+	combined := make([]deliveryOutboxRecord, 0, len(records)+len(sentRecords)+len(retryingRecords))
+	combined = append(combined, records...)
+	combined = append(combined, sentRecords...)
+	combined = append(combined, retryingRecords...)
+	records = combined
 
 	entries := make([]DeliveryOutboxEntry, len(records))
 	for i, r := range records {

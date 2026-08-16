@@ -52,12 +52,12 @@ func (h *MessageHandler) SendMessage(c *gin.Context) {
 	}
 
 	if req.ClientMsgID != "" {
-		if normalized, ok := normalizeUUID(req.ClientMsgID); !ok {
+		normalized, ok := normalizeUUID(req.ClientMsgID)
+		if !ok {
 			Fail(c, errcode.ErrBadRequest)
 			return
-		} else {
-			req.ClientMsgID = normalized
 		}
+		req.ClientMsgID = normalized
 	}
 
 	result, err := h.service.SendMessage(c.Request.Context(), sessionID, userID, req)

@@ -6,6 +6,7 @@ import (
 	"net/url"
 
 	"github.com/golang-migrate/migrate/v4"
+	// Register golang-migrate postgres and file drivers.
 	_ "github.com/golang-migrate/migrate/v4/database/postgres"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 
