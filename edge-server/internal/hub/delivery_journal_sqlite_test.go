@@ -1,8 +1,11 @@
 package hub
 
 import (
+	"fmt"
 	"path/filepath"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/agenthub/edge-server/internal/edgehttp"
 )
@@ -60,6 +63,60 @@ func TestSQLiteDeliveryJournal_HasSuccessful(t *testing.T) {
 	ok, err = j.HasSuccessful("task-1", "run-1", "done")
 	if err != nil || ok {
 		t.Fatalf("different action should miss: ok=%v err=%v", ok, err)
+	}
+}
+
+func TestSQLiteDeliveryJournal_ConcurrentReadCleanupDoesNotBusy(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "journal.db")
+	j, err := OpenSQLiteDeliveryJournal(path)
+	if err != nil {
+		t.Fatalf("open: %v", err)
+	}
+	defer j.Close()
+
+	for i := 0; i < 8; i++ {
+		if _, err := j.Record(fmt.Sprintf("seed-%d", i), "run", "ack", true, "", 1); err != nil {
+			t.Fatalf("seed record: %v", err)
+		}
+	}
+
+	start := make(chan struct{})
+	errCh := make(chan error, 256)
+	var wg sync.WaitGroup
+	worker := func(fn func(int) error) {
+		defer wg.Done()
+		<-start
+		for i := 0; i < 50; i++ {
+			if err := fn(i); err != nil {
+				errCh <- err
+				return
+			}
+		}
+	}
+
+	wg.Add(4)
+	go worker(func(_ int) error {
+		_, err := j.Snapshot(0)
+		return err
+	})
+	go worker(func(i int) error {
+		_, err := j.HasSuccessful(fmt.Sprintf("seed-%d", i%8), "run", "ack")
+		return err
+	})
+	go worker(func(_ int) error {
+		_, err := j.CleanupOldJournal(time.Now().Add(-DefaultJournalRetention))
+		return err
+	})
+	go worker(func(i int) error {
+		_, err := j.Record(fmt.Sprintf("live-%d", i), "run", "stream", true, "", 1)
+		return err
+	})
+	close(start)
+	wg.Wait()
+	close(errCh)
+	for err := range errCh {
+		t.Fatalf("concurrent journal operation returned error: %v", err)
 	}
 }
 

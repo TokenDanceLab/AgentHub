@@ -101,6 +101,14 @@ func (j *SQLiteDeliveryJournal) Snapshot(afterSeq uint64) ([]DeliveryJournalEntr
 	if j == nil || j.db == nil {
 		return nil, fmt.Errorf("journal closed")
 	}
+	// SQLite permits many readers but only one writer. The retention loop runs
+	// a DELETE immediately after open, so an unguarded read here could race that
+	// writer on slower/ARM hosts and surface SQLITE_BUSY. Serialize every journal
+	// operation that touches this sql.DB with the same mutex used by Record and
+	// CleanupOldJournal; the journal is tiny and correctness matters more than
+	// parallel read throughput on the callback reconciliation path.
+	j.mu.Lock()
+	defer j.mu.Unlock()
 	rows, err := j.db.Query(
 		`SELECT seq, task_id, run_id, action, ok, COALESCE(error,''), attempts, recorded_at
 		 FROM delivery_journal WHERE seq > ? ORDER BY seq ASC`, afterSeq,
@@ -132,6 +140,8 @@ func (j *SQLiteDeliveryJournal) HasSuccessful(taskID, runID, action string) (boo
 	if j == nil || j.db == nil {
 		return false, fmt.Errorf("journal closed")
 	}
+	j.mu.Lock()
+	defer j.mu.Unlock()
 	row := j.db.QueryRow(
 		`SELECT 1 FROM delivery_journal WHERE task_id = ? AND action = ? AND ok = 1 AND (? = '' OR run_id = ?) LIMIT 1`,
 		taskID, action, runID, runID,
