@@ -31,7 +31,8 @@ import type { MobileAppFixture } from '@/types';
 export * from '@agenthub/shared/hub/hubClient';
 // Re-export the shared Hub error classes so mobile test/UI `instanceof`
 // checks resolve to one shared class identity (SSOT lives in shared errors.ts).
-export { HubApiError, HubNetworkError, type HubErrorDetails } from '@agenthub/shared/errors';
+import { HubApiError, HubNetworkError, type HubErrorDetails } from '@agenthub/shared/errors';
+export { HubApiError, HubNetworkError, type HubErrorDetails };
 
 // ── WebSocket event types (aligned with hub-server WS frames) ──
 // Includes legacy mobile-only types for UI layer backward compatibility.
@@ -99,6 +100,13 @@ export interface CreateHubClientOptions {
 export type HubClient = SharedHubClient & {
   readonly shared: SharedHubClient;
   getMobileSnapshot: () => Promise<MobileAppFixture>;
+  /**
+   * Preview-lane snapshot over the mock Hub's mobile snapshot producer
+   * (GET /v1/mobile/snapshot). Used by the Expo Web preview data plane
+   * (src/App.tsx). Fails loudly (HubNetworkError / HubApiError) instead of
+   * silently degrading, so the preview can surface an explicit offline state.
+   */
+  getPreviewSnapshot: () => Promise<MobileAppFixture>;
 };
 
 /** Methods that must not wait on SecureStore token resolution. */
@@ -119,12 +127,14 @@ function wrapSharedAsMobileClient(
     withAuth: <T>(fn: () => Promise<T>) => Promise<T>;
     clearToken: () => void;
     getMobileSnapshot: () => Promise<MobileAppFixture>;
+    getPreviewSnapshot: () => Promise<MobileAppFixture>;
   },
 ): HubClient {
   return new Proxy(shared as object, {
     get(target, prop, receiver) {
       if (prop === 'shared') return shared;
       if (prop === 'getMobileSnapshot') return glue.getMobileSnapshot;
+      if (prop === 'getPreviewSnapshot') return glue.getPreviewSnapshot;
 
       if (prop === 'logout') {
         return async () => {
@@ -161,6 +171,12 @@ export function createMockHubClient(delayMs = 80): HubClient {
     withAuth: async (fn) => fn(),
     clearToken: () => {},
     getMobileSnapshot: async () => {
+      await new Promise((resolve) => {
+        setTimeout(resolve, delayMs);
+      });
+      return mobileFixture;
+    },
+    getPreviewSnapshot: async () => {
       await new Promise((resolve) => {
         setTimeout(resolve, delayMs);
       });
@@ -262,7 +278,80 @@ export function createHubClient(options: CreateHubClientOptions): HubClient {
 
       return mapSessionsToMobileFixture(sessions, sessionsOk);
     },
+    getPreviewSnapshot: async () => {
+      const fetchImpl = options.fetchImpl ?? globalThis.fetch;
+      const snapshotUrl = `${options.baseUrl.replace(/\/+$/, '')}/v1/mobile/snapshot`;
+
+      let response: Response;
+      try {
+        response = await fetchImpl(snapshotUrl);
+      } catch (error) {
+        throw new HubNetworkError(
+          'Mobile preview snapshot request failed',
+          error instanceof Error ? error : new Error(String(error)),
+        );
+      }
+
+      if (!response.ok) {
+        throw new HubApiError({
+          code: 'snapshot_unavailable',
+          message: `Mobile preview snapshot endpoint returned HTTP ${response.status}`,
+          status: response.status,
+          retryable: true,
+        });
+      }
+
+      let body: unknown;
+      try {
+        body = await response.json();
+      } catch {
+        throw new HubApiError({
+          code: 'invalid_snapshot',
+          message: 'Mobile preview snapshot endpoint returned non-JSON content',
+          status: response.status,
+          retryable: true,
+        });
+      }
+
+      return parseMobileSnapshotBody(body);
+    },
   });
+}
+
+/**
+ * Shape-guards the mock Hub snapshot payload before it reaches the UI. The
+ * preview must never render unvalidated or partially valid data-plane output.
+ */
+function parseMobileSnapshotBody(body: unknown): MobileAppFixture {
+  if (typeof body !== 'object' || body === null) {
+    throw new HubApiError({
+      code: 'invalid_snapshot',
+      message: 'Mobile preview snapshot payload is not an object',
+      status: 200,
+      retryable: true,
+    });
+  }
+
+  const candidate = body as Record<string, unknown>;
+  if (
+    !Array.isArray(candidate.threads)
+    || !Array.isArray(candidate.runs)
+    || typeof candidate.transcript !== 'object'
+    || candidate.transcript === null
+    || Array.isArray(candidate.transcript)
+    || typeof candidate.account !== 'object'
+    || candidate.account === null
+    || typeof (candidate.account as Record<string, unknown>).deviceLabel !== 'string'
+  ) {
+    throw new HubApiError({
+      code: 'invalid_snapshot',
+      message: 'Mobile preview snapshot payload has an unexpected shape',
+      status: 200,
+      retryable: true,
+    });
+  }
+
+  return candidate as unknown as MobileAppFixture;
 }
 
 // ── WebSocket URL builder (aligned with hub-server /client/ws) ──
