@@ -1,6 +1,6 @@
 # AgentHub History
 
-最后更新：2026-08-15
+最后更新：2026-08-16
 
 本文件是 AgentHub 源仓的历史材料索引。历史 longform、日期型审计、旧发布材料、过期设计、参考调研、完成的 spec-driven 工件和过期项目 skill 不再保存在 AgentHub active source tree。
 
@@ -33,6 +33,8 @@
 ## Pending External Archive (in-repo, awaiting migration)
 
 以下文件已无活跃引用、本通道仅标注 `pending external archive — see docs/history.md`，未真外迁（外迁需管理员）。
+
+**外迁规则**：物理外迁由管理员执行（单次归档 PR：文件移入外部 TokenDanceLab/docs 归档，源仓删除正文），本表是源仓留存索引；外迁前不得重写或继续引用这些文件，新历史材料直接写入外部归档。
 
 | Path | Kind |
 |---|---|

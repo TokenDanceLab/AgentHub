@@ -1,6 +1,6 @@
 # AgentHub Hub Server
 
-最后更新：2026-06-27
+最后更新：2026-08-16
 
 Hub Server 是 AgentHub 的云端控制面：账号、IM、联系人/群聊、多端同步、设备路由、Edge 中继、Profile catalog 和审计。它不直接启动 Agent CLI；实际执行由 Edge Server 完成。
 

@@ -1,6 +1,6 @@
 # AgentHub 开发快速上手
 
-最后更新：2026-08-11
+最后更新：2026-08-16
 
 本文档只保留新人启动本地开发环境需要的最短路径。规则、分支、E2E 证据等级和发布门禁以 `AGENTS.md` 为准。
 
@@ -18,10 +18,8 @@
 ## 获取代码
 
 ```bash
-git clone https://github.com/TokenDanceLab/AgentHub.git
-cd AgentHub
-git checkout master
-git pull --ff-only
+git clone https://github.com/TokenDanceLab/AgentHub.git && cd AgentHub
+git checkout master && git pull --ff-only
 ```
 
 新工作优先用 `.worktrees/`：
@@ -55,32 +53,27 @@ docker compose up -d postgres redis
 Hub Server：
 
 ```bash
-cd hub-server
-go run ./cmd/server-hub
+cd hub-server && go run ./cmd/server-hub
 curl http://127.0.0.1:8080/health
 ```
 
 Edge Server：
 
 ```bash
-cd edge-server
-go run ./cmd/agenthub-edge
+cd edge-server && go run ./cmd/agenthub-edge
 curl http://127.0.0.1:3210/v1/health
 ```
 
 前端依赖在 monorepo 根装一次（推荐）：
 
 ```bash
-cd app
-corepack enable
-corepack pnpm install
+cd app && corepack enable && corepack pnpm install
 ```
 
 Web：
 
 ```bash
-cd app/web
-corepack pnpm dev
+cd app/web && corepack pnpm dev
 ```
 
 Web 监听 `127.0.0.1:5174`。
@@ -88,8 +81,7 @@ Web 监听 `127.0.0.1:5174`。
 Desktop renderer：
 
 ```bash
-cd app/desktop
-corepack pnpm dev
+cd app/desktop && corepack pnpm dev
 ```
 
 Desktop renderer 监听 `127.0.0.1:5173`。这只证明 Vite renderer，不证明 Tauri sidecar、sqlite、icon、installer 或 signing。
@@ -97,8 +89,7 @@ Desktop renderer 监听 `127.0.0.1:5173`。这只证明 Vite renderer，不证�
 完整 Tauri 开发模式：
 
 ```bash
-cd app/desktop
-corepack pnpm tauri dev
+cd app/desktop && corepack pnpm tauri dev
 ```
 
 Mobile RN 当前只保持 required gate 边界清楚；不要在 Desktop/Web 任务里顺手做 Mobile UI/native 深改。

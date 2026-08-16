@@ -1,5 +1,6 @@
 # Task Breakdown — Post-Polish Residual Hardening
 
+> pending external archive — see docs/history.md
 > last-updated: 2026-07-20
 > program: post-visual-polish residual (after gate 89)
 > tracking: GITHUB_FULL

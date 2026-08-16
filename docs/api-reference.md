@@ -1,6 +1,6 @@
 # AgentHub API Reference
 
-最后更新：2026-06-27
+最后更新：2026-08-16
 
 本文件只做 API 契约入口。旧 2041 行静态 API 参考见 [history.md](history.md)，避免它和 OpenAPI / WebSocket 契约漂移。
 
