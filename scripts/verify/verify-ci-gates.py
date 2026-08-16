@@ -91,6 +91,11 @@ def main() -> int:
     # ∪ shared). A Go-only PR no longer pays for pnpm install + vitest
     # --coverage. The gate contract moves with it.
     frontend_coverage = get_job_block(workflow, "frontend-coverage")
+    # #1720: design CSS syntax gate — token/theme/preset CSS is excluded from
+    # Stylelint (.stylelintignore), so a syntax-only fail-closed gate runs as a
+    # single path-filtered job. Normal scan and negative self-test are both
+    # hard-blocking; the job must never fall back to lint:css (920-rule debt).
+    design_css = get_job_block(workflow, "design-css")
 
     assert_contains(edge, r"Coverage check \(informational\)", "go-edge overall coverage must stay informational")
     assert_contains(edge, r"Coverage per-package minimums", "go-edge must keep per-package coverage minimums")
@@ -175,6 +180,7 @@ def main() -> int:
         ("frontend-mobile-light", mobile_light, "app/pnpm-lock.yaml"),
         ("e2e-smoke", e2e, "app/pnpm-lock.yaml"),
         ("visual-qa-shell", visual_shell, "app/pnpm-lock.yaml"),
+        ("design-css", design_css, "app/pnpm-lock.yaml"),
     ):
         # runtime major is governed by verify-action-runtimes.py (#1580); here
         # we only require the pnpm setup step to exist with the pnpm cache wired up
@@ -201,8 +207,26 @@ def main() -> int:
     # re-introduce the unconditional pnpm install + vitest cost on every PR.
     assert_not_contains(validate, r"Verify coverage baseline", "validate job must not carry the coverage gate (moved to frontend-coverage)")
 
+    # #1720: design-css fail-closed contract. Both steps hard-blocking; the
+    # verifier must be invoked via its own scripts (test:css-syntax), never
+    # via lint:css — that target carries the 920-rule historical debt which
+    # is out of scope for this gate. The changes job must expose the
+    # design_css filter so the gate stays path-filtered.
+    assert_contains(design_css, r"needs:\s+changes", "design-css must depend on unified changes job")
+    assert_contains(design_css, re.escape("needs.changes.outputs.design_css == 'true'"), "design-css must path-filter on design_css changes")
+    assert_contains(design_css, r"(?m)^\s+run: pnpm test:css-syntax\s*$", "design-css must run the design CSS syntax verifier")
+    assert_contains(design_css, r"(?m)^\s+run: pnpm test:css-syntax:self-test\s*$", "design-css must run the design CSS syntax negative self-test")
+    assert_not_contains(design_css, r"lint:css", "design-css must not fall back to lint:css (historical Stylelint rule debt)")
+    assert_step_continue_on_error(design_css, "Verify design CSS syntax", False)
+    assert_step_continue_on_error(design_css, "Self-test design CSS syntax gate (negative)", False)
+    assert_contains(changes, re.escape("design_css: ${{ steps.filter.outputs.design_css }}"), "changes job must expose the design_css output")
+    assert_contains(changes, r"(?m)^\s+design_css:\s*$", "changes job must define the design_css path filter")
+
     ci_policy_step = get_step_block(validate, "Verify CI gate policy")
     assert_contains(ci_policy_step, r"scripts/verify/verify-ci-gates\.py", "CI policy step must call scripts/verify/verify-ci-gates.py")
+    ci_policy_self_test_step = get_step_block(validate, "Self-test CI gate policy (workflow mutations)")
+    assert_contains(ci_policy_self_test_step, r"verify-ci-gates\.Tests\.py", "CI policy self-test step must call its workflow mutation test script")
+    assert_step_continue_on_error(validate, "Self-test CI gate policy (workflow mutations)", False)
     coverage_writer_selftest = get_step_block(validate, "Self-test coverage baseline metadata/write safety")
     assert_contains(
         coverage_writer_selftest,

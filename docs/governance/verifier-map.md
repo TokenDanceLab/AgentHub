@@ -11,7 +11,7 @@
 
 | 规则 | 验证脚本 | CI job |
 |---|---|---|
-| CI 路径筛选与 job 结构（统一 `changes` job） | `scripts/verify/verify-ci-gates.py` | checks.yml → validate |
+| CI 路径筛选与 job 结构（统一 `changes` job；design-css fail-closed 变异测试） | `scripts/verify/verify-ci-gates.py`（负向自测 `scripts/verify/tests/verify-ci-gates.Tests.py`） | checks.yml → validate |
 | action runtime 只允许 node24（防 Node-20 major 回退，#1580） | `scripts/verify/verify-action-runtimes.py`（负向自测 `scripts/verify/tests/verify-action-runtimes.Tests.py`） | checks.yml → validate |
 | Hub lint finding fingerprint ratchet（防新增/替换，#1573） | `scripts/verify/verify-hub-lint-ratchet.py`（负向自测 `scripts/verify/tests/verify-hub-lint-ratchet.Tests.py`，baseline `scripts/verify/hub-lint-baseline.json`） | checks.yml → go-hub |
 | skill 白名单只提交 active skill | `scripts/verify/verify-project-skills.py` | checks.yml → validate |
@@ -21,6 +21,7 @@
 | Mobile Hub-only 边界（不直连 Local Edge/runtime） | `scripts/verify/verify-mobile-hub-boundary.py` | checks.yml → validate |
 | hubClient thin-shell SSOT（客户端不分叉 REST 实现） | `scripts/verify/verify-hubclient-ssot.py` | checks.yml → validate |
 | Design token SSOT（CSS 硬编码颜色禁令） | `scripts/verify/verify-design-token-ssot.py` | checks.yml → validate |
+| 核心 token/theme/preset CSS 仅 parser 语法门禁（fail-closed；Stylelint 被 ignore 排除，规则债另立，#1720） | `app/scripts/verify-design-css-syntax.mjs`（内置 `--self-test` 负向自测） | checks.yml → design-css |
 | shared UI i18n callsites ratchet（CJK 字面量不得新增，#1612） | `scripts/verify/verify-i18n-callsites.py` | checks.yml → validate |
 | 演示诚实：stub/fixture 不得冒充真实登录/API | `scripts/verify/verify-real-e2e-contract.py` | checks.yml → validate |
 | OpenAPI↔hub router 合同一致 | `scripts/verify/verify-openapi-contract.py` | checks.yml → validate |

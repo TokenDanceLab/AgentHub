@@ -579,6 +579,7 @@ jobs:
       go: ${{ steps.filter.outputs.go }}
       mobile: ${{ steps.filter.outputs.mobile }}
       frontend: ${{ steps.filter.outputs.frontend }}
+      design_css: ${{ steps.filter.outputs.design_css }}
     steps:
       - uses: actions/checkout@v7
       - uses: dorny/paths-filter@v4
@@ -636,6 +637,17 @@ jobs:
               - 'app/package.json'
               - 'app/pnpm-lock.yaml'
               - 'app/test-config/**'
+              - '.github/workflows/checks.yml'
+            # design_css = token/theme/preset CSS syntax gate (#1720): the
+            # verifier scans tokens*/themes*/presets*.css anywhere under app/
+            # (10 required paths are the minimum, new matches join the scan).
+            design_css:
+              - 'app/**/tokens*.css'
+              - 'app/**/themes*.css'
+              - 'app/**/presets*.css'
+              - 'app/scripts/verify-design-css-syntax.mjs'
+              - 'app/package.json'
+              - 'app/pnpm-lock.yaml'
               - '.github/workflows/checks.yml'
 
   # ── Frontend: Desktop ────────────────────────
@@ -1139,6 +1151,9 @@ jobs:
       - name: Verify CI gate policy
         run: python ./scripts/verify/verify-ci-gates.py
 
+      - name: Self-test CI gate policy (workflow mutations)
+        run: python scripts/verify/tests/verify-ci-gates.Tests.py
+
       - name: Self-test coverage baseline metadata/write safety
         run: python scripts/verify/tests/coverage-baseline.Tests.py
 
@@ -1304,6 +1319,43 @@ jobs:
       - name: Self-test coverage include contract (negative)
         if: matrix.package == 'agenthub-mobile-rn'
         run: python ./scripts/verify/tests/coverage-include.Tests.py
+
+  # ── Design CSS syntax gate (fail-closed, #1720) ─
+  # 核心 token/theme/preset CSS 被 .stylelintignore 排除在 Stylelint 之外，
+  # 注释 `*/` 之类的语法错误因此假绿。本 job 只做 parser 语法检查
+  # （config: { rules: {} }），不碰约 920 条历史规则债。正向扫描与负向
+  # self-test 均为 hard-blocking（无 continue-on-error、无 || true）。
+  design-css:
+    name: Design CSS syntax (fail-closed)
+    needs: changes
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      needs.changes.outputs.design_css == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v6
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+          cache-dependency-path: app/pnpm-lock.yaml
+
+      - name: Install frontend deps
+        run: pnpm install --frozen-lockfile
+
+      - name: Verify design CSS syntax
+        run: pnpm test:css-syntax
+
+      - name: Self-test design CSS syntax gate (negative)
+        run: pnpm test:css-syntax:self-test
 
   # ── Vuln Scan: JS (pnpm audit --prod) ─────────
   vuln-scan-js:
