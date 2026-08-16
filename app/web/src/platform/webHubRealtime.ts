@@ -6,8 +6,9 @@ import { getPinMapStore } from '@shared/transcript';
 import { getAgentActivityStore } from '@shared/transcript/agentActivity';
 import { getMessageDelegationStore, getSubagentStreamStore } from '@shared/workbench';
 import { handleIncomingTyping } from '@shared/chatview/typingPresence';
-import { createHubWS, type HubWSHandle, type HubWSOptions } from '@/api/hubWS';
+import { createHubWS, type HubWSHandle, type HubWSOptions } from '@shared/hub/hubWS';
 import type { TransportStatus } from '@/api/transport';
+import { HUB_WS_URL } from '@/config';
 import { createHubClient } from '@/api/hubClient';
 import { trackEventSeq, replayMissedEvents } from '@/api/runEventReplay';
 import { useConnectionStore } from '@/stores/connectionStore';
@@ -134,6 +135,7 @@ export function useWebHubRealtime({
 
     const socket = createSocket({
       getToken,
+      url: HUB_WS_URL,
       onAuthSuccess: () => {
         // After (re)connect auth, attempt replay for the active task.
         if (replaying) return;

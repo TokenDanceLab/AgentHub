@@ -21,7 +21,7 @@ import {
   getAgentActivityStore,
   type HubRuntimeEventTranscriptInput,
 } from '@shared/transcript';
-import type { HubWSHandle, HubWSOptions } from '@/api/hubWS';
+import type { HubWSHandle, HubWSOptions } from '@shared/hub/hubWS';
 import { appendHubRuntimeEvent } from './webWorkbenchRuntimeEvents';
 import {
   AGENT_STREAM_LIVE_BATCH_WINDOW_MS,
