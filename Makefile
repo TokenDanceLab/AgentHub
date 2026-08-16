@@ -9,7 +9,7 @@
 #        make release  (via git push tag -> release.yml, not built here)
 #        make help        (show this help)
 .PHONY: test test-all test-edge test-edge-full test-hub test-hub-full test-edge-e2e test-teamrun test-oidc test-hub-integration e2e-local lint coverage sec bench ci release clean fmt \
-        fe-install fe-dev fe-build fe-test fe-lint fe-typecheck help
+        fe-install fe-dev fe-build fe-test fe-lint fe-typecheck fe-coverage-baseline help
 
 # ── Help ───────────────────────────────────────────
 
@@ -40,6 +40,7 @@ help:
 	@echo "    fe-test       pnpm -r test"
 	@echo "    fe-lint       eslint + stylelint"
 	@echo "    fe-typecheck  tsc --noEmit (desktop + web)"
+	@echo "    fe-coverage-baseline  在干净且已同步的 master 重测四包并仅上调 coverage baseline"
 	@echo ""
 	@echo "  Release:"
 	@echo "    release              发布 = git push tag（触发 release.yml）"
@@ -152,6 +153,11 @@ fe-build:
 
 fe-test:
 	cd app && pnpm -r test
+
+# 仅用于“提高/刷新”前端 coverage baseline：脚本会拒绝非 master、脏树、
+# 未同步 origin/master、partial package 或任何自动降基线，避免写入不可追溯 SHA。
+fe-coverage-baseline:
+	python scripts/verify/verify-coverage-baseline.py --WriteBaseline
 
 fe-lint:
 	cd app && pnpm -r lint
