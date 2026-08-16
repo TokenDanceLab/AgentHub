@@ -1075,16 +1075,14 @@ jobs:
       - name: Install Playwright browsers
         run: pnpm exec playwright install --with-deps chromium
         working-directory: ./app
-      - name: Build desktop
-        run: pnpm build
-        working-directory: ./app/desktop
       - name: Smoke test
-        # Only smoke.spec.ts runs in CI (static page checks).
-        # chat-real.spec.ts requires live Hub (port 8080) + Edge (port 3210)
-        # services which are not available in the CI sandbox.
+        # Only smoke.spec.ts runs in CI (static page checks against the web
+        # dev server on 5174). chat-real.spec.ts requires live Hub (port 8080)
+        # + Edge (port 3210) services which are not available in the CI
+        # sandbox.
         # Run chat-real.spec.ts locally with all services up:
-        #   pnpm exec playwright test --config e2e/playwright.config.ts --project=chromium chat-real.spec.ts
-        run: pnpm exec playwright test --config e2e/playwright.config.ts --project=chromium smoke.spec.ts
+        #   pnpm --filter agenthub-web exec playwright test --config playwright.real.config.ts --project=chromium chat-real.spec.ts
+        run: pnpm --filter agenthub-web exec playwright test --config playwright.config.ts --project=chromium smoke.spec.ts
         working-directory: ./app
 
   # ── Validation ───────────────────────────────

@@ -12,6 +12,10 @@
 
    Data: Import TranscriptBlock[] from your upstream and feed through
    blocksToTranscriptItems() to get TranscriptItem[] for rendering.
+
+   Typing presence & i18n resources: re-exported below — prefer the barrel
+   over deep imports of ./typingPresence or ./i18n/resources (deep imports
+   are retained for existing consumers).
    ══════════════════════════════════════════════════════════════════════ */
 
 // ── Components ────────────────────────────────────────────────────────
@@ -102,3 +106,28 @@ export type { TranscriptAgentItem as AgentTranscriptBlock } from './transcript-i
  * @deprecated Use {@link TranscriptUserItem} instead.
  */
 export type { TranscriptUserItem as UserTranscriptMsg } from './transcript-item'
+
+// ── Typing presence ────────────────────────────────────────────────────
+
+/**
+ * Ephemeral session-scoped typing indicator state fed by inbound Hub WS
+ * `typing` frames (auto-dismiss after 3s, plain observer pattern — no
+ * zustand dependency).
+ */
+export {
+  useTypingPresence,
+  handleIncomingTyping,
+  clearTyping,
+  subscribe,
+  getTypingUserIds,
+} from './typingPresence'
+
+// ── i18n resources ─────────────────────────────────────────────────────
+
+/**
+ * i18next resources for the 'chatview' namespace. Consumers must load
+ * `chatviewResources` under `CHATVIEW_I18N_NAMESPACE` into their
+ * I18nextProvider (see the header comment above).
+ */
+export { CHATVIEW_I18N_NAMESPACE, chatviewResources } from './i18n/resources'
+export type { TransKey, Locale } from './i18n/resources'

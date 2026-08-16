@@ -9,6 +9,12 @@ import { createElement, Fragment } from 'react';
 // NO_I18NEXT_INSTANCE warning is eliminated. No web locale namespaces are
 // loaded: no web suite asserts real translated copy for them.
 import { installTestI18n } from '@shared/testing/i18n';
+import {
+  antigravityColorIconMock,
+  lobehubIconsMock,
+  providerIconFeatureMock,
+} from '@shared/testing/lobehubIcons';
+import { installJsdomPolyfills } from '@shared/testing/jsdomPolyfills';
 
 installTestI18n();
 
@@ -20,37 +26,15 @@ vi.mock('virtua', () => ({
     createElement(Fragment, null, children as Parameters<typeof createElement>[2]),
 }));
 
-vi.mock('@lobehub/icons', () => ({
-  Alibaba: () => null,
-  AlibabaCloud: () => null,
-  Anthropic: () => null,
-  Aws: () => null,
-  Azure: () => null,
-  Bedrock: () => null,
-  ByteDance: () => null,
-  Claude: () => null,
-  ClaudeCode: () => null,
-  Codex: () => null,
-  Cohere: () => null,
-  DeepSeek: () => null,
-  Doubao: () => null,
-  Gemini: () => null,
-  GeminiCLI: () => null,
-  Google: () => null,
-  Meta: () => null,
-  Mistral: () => null,
-  ModelIcon: () => null,
-  Moonshot: () => null,
-  OpenCode: () => null,
-  OpenAI: () => null,
-  Perplexity: () => null,
-  ProviderIcon: () => null,
-  Qwen: () => null,
-  Volcengine: () => null,
-  Zhipu: () => null,
-}));
-
-vi.mock('@lobehub/icons/es/Antigravity/components/Color.js', () => ({ default: () => null }));
+// Single-source @lobehub/icons mocks (#1678): icon list + mocked deep paths
+// live in @shared/testing/lobehubIcons so web/desktop suites can no longer
+// drift apart.
+vi.mock('@lobehub/icons', () => lobehubIconsMock);
+vi.mock(
+  '@lobehub/icons/es/Antigravity/components/Color.js',
+  () => antigravityColorIconMock,
+);
+vi.mock('@lobehub/icons/es/features/ProviderIcon/index.js', () => providerIconFeatureMock);
 
 // Mock @lobehub/fluent-emoji (transitive peer dep of @lobehub/icons via @lobehub/ui)
 // to prevent vitest from processing its ESM directory import which Node.js cannot resolve.
@@ -69,15 +53,5 @@ vi.mock('@lobehub/fluent-emoji', () => ({
 // is a passthrough so transcript row content renders in integration tests
 // without the viewport measurement virtua can't perform in jsdom (the real
 // Virtualizer is exercised by shared Transcript.autoscroll/virtualization
-// tests). Mirrors shared + desktop setup.ts (RFC §6.4 / §8.2).
-if (typeof globalThis.ResizeObserver === 'undefined') {
-  class ResizeObserverStub {
-    observe(): void {}
-    unobserve(): void {}
-    disconnect(): void {}
-  }
-  globalThis.ResizeObserver = ResizeObserverStub as unknown as typeof ResizeObserver;
-}
-if (typeof Element !== 'undefined' && typeof Element.prototype.scrollIntoView === 'undefined') {
-  Element.prototype.scrollIntoView = function scrollIntoView(): void {};
-}
+// tests). Shared helper — see @shared/testing/jsdomPolyfills (#1678).
+installJsdomPolyfills();
