@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { ReactNode } from 'react';
@@ -209,5 +209,73 @@ describe('ConversationSidebar actions (#1508)', () => {
       expect(props.onDeleteConversation).not.toHaveBeenCalled();
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     });
+  });
+});
+
+describe('ConversationSidebar interaction structure (#1715)', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+  });
+
+  function conversationRows(): HTMLElement[] {
+    const listbox = screen.getByRole('listbox');
+    return within(listbox).getAllByRole('option');
+  }
+
+  it('keeps row selection and row actions as sibling surfaces (no button button)', () => {
+    renderSidebar({ onPinConversation: vi.fn(), onArchiveConversation: vi.fn() });
+    const rows = conversationRows();
+    expect(rows.length).toBeGreaterThan(0);
+    for (const row of rows) {
+      expect(row.querySelector('button button')).toBeNull();
+    }
+  });
+
+  it('pin action does not trigger row selection', async () => {
+    const user = userEvent.setup();
+    const { props } = renderSidebar({
+      onPinConversation: vi.fn(),
+      onSelectConversation: vi.fn(),
+    });
+    const firstRow = conversationRows()[0]!;
+    await user.click(within(firstRow).getByRole('button', { name: '置顶' }));
+    expect(props.onPinConversation).toHaveBeenCalledWith('c1', true);
+    expect(props.onSelectConversation).not.toHaveBeenCalled();
+  });
+
+  it('archive action does not trigger row selection', async () => {
+    const user = userEvent.setup();
+    vi.stubGlobal('confirm', vi.fn().mockReturnValue(true));
+    const { props } = renderSidebar({
+      onArchiveConversation: vi.fn(),
+      onSelectConversation: vi.fn(),
+    });
+    const firstRow = conversationRows()[0]!;
+    await user.click(within(firstRow).getByRole('button', { name: 'Archive' }));
+    expect(props.onArchiveConversation).toHaveBeenCalledWith('c1', true);
+    expect(props.onSelectConversation).not.toHaveBeenCalled();
+  });
+
+  it('clicking a row still selects the conversation', async () => {
+    const user = userEvent.setup();
+    const { props } = renderSidebar({ onSelectConversation: vi.fn() });
+    await user.click(screen.getByText('Second chat'));
+    expect(props.onSelectConversation).toHaveBeenCalledOnce();
+    expect(props.onSelectConversation).toHaveBeenCalledWith('c2');
+  });
+
+  it('preserves roving tabindex keyboard navigation across rows', async () => {
+    const user = userEvent.setup();
+    renderSidebar();
+    const rows = conversationRows();
+    const firstButton = within(rows[0]!).getByRole('button');
+    const secondButton = within(rows[1]!).getByRole('button');
+    expect(firstButton).toHaveAttribute('tabindex', '0');
+    expect(secondButton).toHaveAttribute('tabindex', '-1');
+    firstButton.focus();
+    await user.keyboard('{ArrowDown}');
+    expect(firstButton).toHaveAttribute('tabindex', '-1');
+    expect(secondButton).toHaveAttribute('tabindex', '0');
   });
 });

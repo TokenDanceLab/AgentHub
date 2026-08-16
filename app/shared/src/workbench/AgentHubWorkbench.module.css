@@ -347,7 +347,10 @@
   height: var(--wb-gap-2xs, 4px);
 }
 
-.conversationButton {
+/* Row wrapper (#1715): the option surface owns hover/active/current styling.
+   The selection button and the action cluster are siblings inside it, so a
+   conversation row can never contain a button inside a button. */
+.conversationRow {
   display: flex;
   gap: var(--wb-gap-xs, var(--sp-10));
   align-items: center;
@@ -355,39 +358,55 @@
   min-width: 0;
   min-height: 40px;
   padding: var(--wb-gap-2xs, 6px) var(--wb-gap-xs, 10px);
-  border: 0;
   border-radius: var(--r-md);
   background: transparent;
-  color: var(--td-ink);
-  text-align: left;
-  cursor: pointer;
   transition:
     background var(--motion-hover, var(--td-dur-normal) var(--td-ease)),
     transform var(--motion-press, var(--dur-pop) var(--ease-press)),
     box-shadow var(--motion-hover);
 }
 
-.conversationButton:focus-visible {
-  outline: none;
-  box-shadow: var(--focus-ring);
-}
-
-.conversationButton:hover {
+.conversationRow:hover {
   background: var(--glass-bg-light, var(--td-surface-3));
   transform: translateX(1px);
 }
 
-.conversationButton:active {
+.conversationRow:active {
   transform: translateX(0) scale(0.996);
 }
 
-.conversationButton[aria-current='true'] {
+.conversationRow[data-active='true'] {
   background: var(--glass-bg-active, var(--td-tint));
   box-shadow: inset 0 0 0 1px var(--glass-border-subtle, transparent);
 }
 
-.conversationButton[aria-current='true'] .conversationTitle {
+.conversationRow[data-active='true'] .conversationTitle {
   font-weight: 600;
+}
+
+/* The roving focus lives on the selection button, but the focus ring stays
+   on the whole row surface. */
+.conversationRow:has(.conversationButton:focus-visible) {
+  box-shadow: var(--focus-ring);
+}
+
+.conversationButton {
+  display: flex;
+  gap: var(--wb-gap-xs, var(--sp-10));
+  align-items: center;
+  align-self: stretch;
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--td-ink);
+  text-align: left;
+  cursor: pointer;
+}
+
+.conversationButton:focus-visible {
+  outline: none;
 }
 
 .conversationButton[data-unread='true'] .conversationTitle {
@@ -664,8 +683,8 @@
   transition: opacity var(--td-dur-normal) var(--td-ease);
 }
 
-.conversationButton:hover .conversationActions,
-.conversationButton:focus-within .conversationActions {
+.conversationRow:hover .conversationActions,
+.conversationRow:focus-within .conversationActions {
   opacity: 1;
 }
 
