@@ -1,6 +1,6 @@
 # SDK Agent Strategy
 
-最后更新：2026-06-27
+最后更新：2026-08-16
 
 本文档是轻量策略摘要。旧长版调研和 PoC backlog 见 [../history.md](../history.md)。
 

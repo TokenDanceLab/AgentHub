@@ -5,6 +5,8 @@
 | branch-hygiene | 分支混乱清理：删除 fork/* 48 个历史分支 + origin/dev/* 3 个早期 dev 分支，保留分支曾存在的痕迹；PR [#1501](https://github.com/TokenDanceLab/AgentHub/pull/1501) | 2026-08-02 | [branch-hygiene.md](./branch-hygiene.md) |
 | docs-hygiene | 历史 analysis/plan 收拢：post-polish 双轨、一次性 inventory、rescore 系列移入 archives | 2026-08-02 | [analysis/](./analysis/) · [plan/](./plan/) |
 | wiki-consolidation | wiki 孤儿知识面处置：14 个文件（pages/ 10 + 根 4）；module-hub 鉴权增量并入 01-hub-server、module-edge lifecycle/store 增量并入 02-edge-server，其余为重复/过时编译层归档；`wiki/` 目录移除 | 2026-08-02 | 详见 commit message（wiki/ 已删除，无独立归档目录） |
+| api-deprecations | `api/deprecations.md` 孤儿删除（#1677）：全仓零引用；命名迁移已完成（AGENTS.md §3 术语表即现状 SSOT），Migration Plan（Q3/Q4 2026 加 `/v1/runtimes`）与 ACP 收敛现实脱节（edge 实际走 ACP，无新双轨；`runner_offline` Go 已无） | 2026-08-15 | 已删除，见 commit 8ecad0517 |
+| e2e-test-fixtures | `app/e2e/test-fixtures.md` 孤儿删除（#1677）：旧 monorepo 快照（旧包名/旧命令），全仓零引用，与根 README 重复 | 2026-08-15 | 已删除，见 commit 8ecad0517 |
 
 ## 15-verifier disposition
 

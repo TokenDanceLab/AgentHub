@@ -1,6 +1,6 @@
 # AgentHub Desktop
 
-最后更新：2026-06-27
+最后更新：2026-08-16
 
 `app/desktop/` 是 AgentHub Tauri 桌面端入口，负责本地工作台、Hub 登录、多端 IM、设置、Agent/Profile 管理、Diff/Preview/Approval 和 Local Edge 可见状态。旧长版 README 见 [../../docs/history.md](../../docs/history.md)。
 
