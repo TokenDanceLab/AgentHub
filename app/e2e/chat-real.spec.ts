@@ -9,12 +9,13 @@ import { test, expect } from '@playwright/test';
  *   - Edge server running at http://127.0.0.1:3210
  *
  * Run:
- *   npx playwright test --config e2e/playwright.config.ts
+ *   pnpm test:e2e:real
+ *   (equivalently: npx playwright test --config playwright.real.config.ts)
  *
  * CI status: This spec is excluded from CI (e2e-smoke job only runs
- * smoke.spec.ts). These tests require live Hub + Edge servers which are not
- * available in the GitHub Actions sandbox. Run locally with all services up
- * before pushing production changes.
+ * smoke.spec.ts under playwright.config.ts). These tests require live Hub +
+ * Edge servers which are not available in the GitHub Actions sandbox. Run
+ * locally with all services up before pushing production changes.
  */
 
 test.describe('AgentHub real E2E', () => {
