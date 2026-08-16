@@ -449,15 +449,25 @@ class MockEdgeServer {
       return;
     }
     if (run.status === 'finished' || run.status === 'failed' || run.status === 'cancelled') {
-      this.sendJson(res, 202, { runId, status: run.status });
+      this.sendJson(res, 202, {
+        runId,
+        projectId: run.projectId,
+        threadId: run.threadId,
+        status: run.status,
+      });
       return;
     }
     run.status = 'cancelled';
     this.broadcast('run.cancelled',
       { projectId: run.projectId, threadId: run.threadId, runId },
-      { runId, status: 'cancelled' },
+      { runId, projectId: run.projectId, threadId: run.threadId, status: 'cancelled' },
     );
-    this.sendJson(res, 202, { runId, status: 'cancelled' });
+    this.sendJson(res, 202, {
+      runId,
+      projectId: run.projectId,
+      threadId: run.threadId,
+      status: 'cancelled',
+    });
   }
 
   // ── Helpers ──────────────────────────────────────────
@@ -610,6 +620,8 @@ describe('REST API contract', () => {
       expect(body.runId).toBe(created.runId);
       expect(body.status).toBeDefined();
       expect(typeof body.createdAt).toBe('string');
+      expect(body.projectId).toBe('p1');
+      expect(body.threadId).toBe('t1');
     });
 
     it('returns 404 for unknown run ID', async () => {
@@ -642,6 +654,8 @@ describe('REST API contract', () => {
       const body = await res.json();
       expect(body.runId).toBe(created.runId);
       expect(body.status).toBe('cancelled');
+      expect(body.projectId).toBe('p1');
+      expect(body.threadId).toBe('t1');
     });
 
     it('returns 202 with status for unknown run (matches handler.go)', async () => {
@@ -711,7 +725,7 @@ describe('WebSocket event stream', () => {
     await fetch(`${server.baseUrl}/v1/runs`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ prompt: 'test' }),
+      body: JSON.stringify({ projectId: 'proj_test', threadId: 'thread_test', prompt: 'test' }),
     });
 
     // Wait for async run lifecycle to complete
@@ -727,6 +741,13 @@ describe('WebSocket event stream', () => {
     expect(types).toContain('run.started');
     expect(types).toContain('run.output.batch');
     expect(types).toContain('run.finished');
+
+    // projectId/threadId sent in the create request pass through to the
+    // run.queued event scope and payload.
+    const queuedEvent = events.find((e) => e.type === 'run.queued');
+    expect(queuedEvent).toBeDefined();
+    expect(queuedEvent!.scope).toMatchObject({ projectId: 'proj_test', threadId: 'thread_test' });
+    expect(queuedEvent!.payload).toMatchObject({ projectId: 'proj_test', threadId: 'thread_test' });
   });
 
   it('verifies event envelope structure matches EventEnvelope type', async () => {
@@ -746,7 +767,7 @@ describe('WebSocket event stream', () => {
     await fetch(`${server.baseUrl}/v1/runs`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ prompt: 'test' }),
+      body: JSON.stringify({ projectId: 'proj_test', threadId: 'thread_test', prompt: 'test' }),
     });
 
     await new Promise<void>((resolve) => setTimeout(resolve, 300));
@@ -805,7 +826,7 @@ describe('WebSocket event stream', () => {
     const createRes = await fetch(`${server.baseUrl}/v1/runs`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ prompt: 'test' }),
+      body: JSON.stringify({ projectId: 'proj_test', threadId: 'thread_test', prompt: 'test' }),
     });
     const created = await createRes.json();
 
@@ -822,6 +843,12 @@ describe('WebSocket event stream', () => {
 
     const types = events.map((e) => e.type);
     expect(types).toContain('run.cancelled');
+
+    // projectId/threadId pass through to the run.cancelled event scope and payload.
+    const cancelledEvent = events.find((e) => e.type === 'run.cancelled');
+    expect(cancelledEvent).toBeDefined();
+    expect(cancelledEvent!.scope).toMatchObject({ projectId: 'proj_test', threadId: 'thread_test' });
+    expect(cancelledEvent!.payload).toMatchObject({ projectId: 'proj_test', threadId: 'thread_test' });
   });
 
   it('handles multiple WS clients receiving the same events', async () => {
@@ -844,7 +871,7 @@ describe('WebSocket event stream', () => {
     await fetch(`${server.baseUrl}/v1/runs`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ prompt: 'test' }),
+      body: JSON.stringify({ projectId: 'proj_test', threadId: 'thread_test', prompt: 'test' }),
     });
 
     await new Promise<void>((resolve) => setTimeout(resolve, 300));
@@ -945,6 +972,11 @@ describe('Desktop API client compatibility', () => {
     expect(body).toHaveProperty('threadId');
     expect(body).toHaveProperty('status');
     expect(body).toHaveProperty('createdAt');
+
+    // projectId/threadId posted to POST /v1/runs pass through to the
+    // created run response.
+    expect(body.projectId).toBe('p1');
+    expect(body.threadId).toBe('t1');
   });
 
   it('cancelRun response matches expected shape', async () => {
@@ -952,7 +984,7 @@ describe('Desktop API client compatibility', () => {
     const createRes = await fetch(`${server.baseUrl}/v1/runs`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ prompt: 'test' }),
+      body: JSON.stringify({ projectId: 'p1', threadId: 't1', prompt: 'test' }),
     });
     const created = await createRes.json();
 
@@ -964,5 +996,7 @@ describe('Desktop API client compatibility', () => {
     const body = await cancelRes.json();
     expect(body).toHaveProperty('runId');
     expect(body).toHaveProperty('status');
+    expect(body.projectId).toBe('p1');
+    expect(body.threadId).toBe('t1');
   });
 });
