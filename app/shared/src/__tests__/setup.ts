@@ -1,6 +1,18 @@
 import '@testing-library/jest-dom/vitest';
 import { beforeAll, vi } from 'vitest';
 
+// Shared test i18next instance (Issue #1717): real chatview + sharedWorkbench
+// resources, isolated per project via i18next.createInstance(). Registered
+// so every suite renders through the real `useTranslation` path without
+// per-file react-i18next mocks and without NO_I18NEXT_INSTANCE noise.
+// The default language is the helper's key-echo pseudo-language: suites
+// outside the #1717 frozen-file boundary (e.g. TypingIndicator) keep their
+// raw-key visible behavior, while frozen suites opt into zh/en per file via
+// useTestI18nLanguage().
+import { installTestI18n } from '../testing/i18n';
+
+installTestI18n();
+
 // Shared fetch mock for eventClient tests (apiClient.ts removed per RFC A-V3 §4.1).
 // Tests can reset/override this per-suite via vi.mocked(fetch).mockImplementation.
 globalThis.fetch = vi.fn();

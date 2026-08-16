@@ -4,18 +4,8 @@ import '@testing-library/jest-dom/vitest';
 import AuthPage from '@/components/AuthPage';
 import LoginForm from '@/components/LoginForm';
 
-vi.mock('react-i18next', () => ({
-  useTranslation: () => ({
-    t: (key: string, vars?: Record<string, unknown>) => {
-      if (!vars) return key;
-      const varStr = Object.entries(vars)
-        .map(([k, v]) => `${k}=${v}`)
-        .join(', ');
-      return `${key}(${varStr})`;
-    },
-    i18n: { language: 'en' },
-  }),
-}));
+// Raw-key visible copy is provided by the key-echo default language of the
+// web test i18next instance (Issue #1717) — no react-i18next mock here.
 
 const mockLoginWithTokenDance = vi.fn();
 let mockUser: { id: string; username: string; nickname: string; avatar_url: string } | null = null;

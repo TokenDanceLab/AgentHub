@@ -2,27 +2,19 @@ import { act, fireEvent, render } from '@testing-library/react';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
-
-// CodeBlock (rendered by Markdown) is wired to react-i18next. Provide the
-// zh literals so the rendered copy/expand button text stays stable for the
-// assertions below (mirrors the RowItem.test.tsx mock pattern).
-vi.mock('react-i18next', () => ({
-  useTranslation: () => ({
-    t: (key: string) => {
-      const resources: Record<string, string> = {
-        'code.copy': '复制',
-        'code.copied': '已复制',
-        'code.expand': '展开',
-        'code.collapse': '收起',
-      };
-      return resources[key] ?? key;
-    },
-  }),
-}));
+import { afterEach, beforeAll, beforeEach, describe, expect, test, vi } from 'vitest';
 
 import MarkdownContent from './Markdown';
 import styles from './Markdown.module.css';
+
+// CodeBlock (rendered by Markdown) resolves copy/expand labels via the
+// chatview namespace; opt into the zh bundle of the shared test i18next
+// instance (Issue #1717).
+import { useTestI18nLanguage } from '../testing/i18n';
+
+beforeAll(async () => {
+  await useTestI18nLanguage('zh');
+});
 
 // jsdom cannot compute stylesheet rules under vitest's default css:false
 // (module CSS exports class names only; the styles never reach the

@@ -9,12 +9,8 @@ import { hubQueryKeys } from '@shared/stores/queryKeys';
 const tryAutoLoginMock = vi.hoisted(() => vi.fn());
 const getAccessTokenMock = vi.hoisted(() => vi.fn());
 
-vi.mock('react-i18next', () => ({
-  useTranslation: () => ({
-    t: (key: string) => key,
-    i18n: { language: 'en' },
-  }),
-}));
+// Raw-key visible copy is provided by the key-echo default language of the
+// web test i18next instance (Issue #1717) — no react-i18next mock here.
 
 vi.mock('@/hooks/useAuth', () => ({
   useAuth: () => ({

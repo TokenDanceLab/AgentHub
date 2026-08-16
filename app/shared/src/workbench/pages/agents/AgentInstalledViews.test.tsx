@@ -6,24 +6,18 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import React from 'react';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { render, screen, within } from '../../../__tests__/setup';
 import { AgentInstalledView } from './AgentInstalledViews';
 import type { AgentConfig, AgentsPageProps } from './types';
 
-vi.mock('react-i18next', () => ({
-  useTranslation: () => ({
-    t: (key: string) => {
-      const resources: Record<string, string> = {
-        'agents.installed.title': 'Agent 管理',
-        'agents.empty.title': '暂无已安装 Agent',
-        'agents.empty.description': '当前 Hub 账号还没有已安装配置。',
-        'agents.empty.add': '添加 Agent',
-      };
-      return resources[key] ?? key;
-    },
-  }),
-}));
+// Empty-state copy resolves via the sharedWorkbench namespace; opt into the
+// zh bundle of the shared test i18next instance (Issue #1717).
+import { useTestI18nLanguage } from '../../../testing/i18n';
+
+beforeAll(async () => {
+  await useTestI18nLanguage('zh');
+});
 
 function baseProps(overrides: Partial<AgentsPageProps> = {}): AgentsPageProps {
   return {
