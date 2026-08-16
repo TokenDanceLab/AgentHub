@@ -203,6 +203,13 @@ def main() -> int:
 
     ci_policy_step = get_step_block(validate, "Verify CI gate policy")
     assert_contains(ci_policy_step, r"scripts/verify/verify-ci-gates\.py", "CI policy step must call scripts/verify/verify-ci-gates.py")
+    coverage_writer_selftest = get_step_block(validate, "Self-test coverage baseline metadata/write safety")
+    assert_contains(
+        coverage_writer_selftest,
+        r"scripts/verify/tests/coverage-baseline\.Tests\.py",
+        "validate must exercise coverage baseline metadata/write safety",
+    )
+    assert_step_continue_on_error(validate, "Self-test coverage baseline metadata/write safety", False)
 
     commit_message_step = get_step_block(validate, "Verify commit messages (PR only)")
     assert_contains(commit_message_step, r"scripts/verify/verify-commit-messages\.sh", "commit-message step must call the commit-message verifier")
