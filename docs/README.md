@@ -12,7 +12,7 @@
 | **功能设计** | [architecture.md](architecture.md) | [decisions.md](decisions.md) |
 | **历史追溯** | [history.md](history.md) · [archives/](archives/) | TokenDance docs 外部归档 |
 
-端口全景（Vite strict 5173/5174/5177、Hub 8080、Edge 3210、PG/Redis/admin）见 [architecture/05-deployment.md](architecture/05-deployment.md) 默认端口表。
+端口全景（默认端口表 SSOT）见 [architecture/05-deployment.md](architecture/05-deployment.md)。
 
 ## 目录结构
 
