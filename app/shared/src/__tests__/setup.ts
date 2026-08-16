@@ -10,6 +10,7 @@ import { beforeAll, vi } from 'vitest';
 // raw-key visible behavior, while frozen suites opt into zh/en per file via
 // useTestI18nLanguage().
 import { installTestI18n } from '../testing/i18n';
+import { installJsdomPolyfills } from '../testing/jsdomPolyfills';
 
 installTestI18n();
 
@@ -30,29 +31,9 @@ globalThis.fetch = vi.fn();
 // mock clientHeight/scrollTop/scrollHeight directly on `.transcript`
 // (orthogonal to RO). Mirrors codeg's test-setup.ts (frontend.md Q9).
 // (RFC §6.4 / §8.2)
+// Shared helper — see ./testing/jsdomPolyfills (#1678).
 // ──────────────────────────────────────────────────────────────
-if (typeof globalThis.ResizeObserver === 'undefined') {
-  class ResizeObserverStub {
-    observe(): void {}
-    unobserve(): void {}
-    disconnect(): void {}
-  }
-  globalThis.ResizeObserver = ResizeObserverStub as unknown as typeof ResizeObserver;
-}
-
-// jsdom's Element.scrollIntoView is not implemented and logs a noisy
-// "Not implemented" error. The Transcript highlight effect calls it on the
-// target row; stub it as a no-op so tests stay quiet and deterministic.
-if (typeof Element !== 'undefined' && typeof Element.prototype.scrollIntoView === 'undefined') {
-  Element.prototype.scrollIntoView = function scrollIntoView(): void {};
-}
-
-// jsdom's Element.scrollIntoView is not implemented and logs a noisy
-// "Not implemented" error. The Transcript highlight effect calls it on the
-// target row; stub it as a no-op so tests stay quiet and deterministic.
-if (typeof Element !== 'undefined' && typeof Element.prototype.scrollIntoView === 'undefined') {
-  Element.prototype.scrollIntoView = function scrollIntoView(): void {};
-}
+installJsdomPolyfills();
 
 // Re-export testing utilities so shared component tests import from one place.
 export { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
