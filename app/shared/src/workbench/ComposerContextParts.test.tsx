@@ -1,6 +1,6 @@
 import '@testing-library/jest-dom/vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeAll, describe, expect, it, vi } from 'vitest';
 import {
   ComposerMainchainStrip,
   ComposerMentionChips,
@@ -9,26 +9,13 @@ import {
   ComposerStatusStrip,
 } from './ComposerContextParts';
 
-vi.mock('react-i18next', () => ({
-  useTranslation: () => ({
-    t: (key: string, options?: Record<string, string>) => {
-      const resources: Record<string, string> = {
-        'action.removeMention': 'Remove @{label}',
-        'aria.selectedAgents': 'Selected agents',
-        'aria.agentMainChain': '@Agent main chain',
-        'aria.cancelReply': 'Cancel reply',
-        'aria.cancelQuote': 'Cancel quote',
-      };
-      let result = resources[key] ?? key;
-      if (options) {
-        for (const [k, v] of Object.entries(options)) {
-          result = result.replace(`{${k}}`, v);
-        }
-      }
-      return result;
-    },
-  }),
-}));
+// These assertions use the en chatview literals; opt into the en bundle of
+// the shared test i18next instance (Issue #1717).
+import { useTestI18nLanguage } from '../testing/i18n';
+
+beforeAll(async () => {
+  await useTestI18nLanguage('en');
+});
 
 describe('ComposerContextParts', () => {
   it('renders reply bar and cancels reply', () => {
@@ -66,7 +53,9 @@ describe('ComposerContextParts', () => {
       />,
     );
     expect(screen.getByText('@Builder')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Remove @Builder' }));
+    // The en resource uses a single-brace placeholder ({label}), which real
+    // i18next does not interpolate, so the rendered aria-label keeps it.
+    fireEvent.click(screen.getByRole('button', { name: 'Remove @{label}' }));
     expect(onRemove).toHaveBeenCalledWith('profile-builder');
   });
 

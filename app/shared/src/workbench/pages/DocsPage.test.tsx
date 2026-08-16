@@ -1,26 +1,15 @@
 import React from 'react';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, within } from '../../__tests__/setup';
 import { DocsPage } from './DocsPage';
 
-vi.mock('react-i18next', () => ({
-  useTranslation: () => ({
-    t: (key: string) => {
-      const resources: Record<string, string> = {
-        'docs.newDoc': '新建文档',
-        'docs.empty.title': '暂无文档',
-        'docs.empty.description': '创建或上传文档',
-        'docs.tab.recent': '最近访问',
-        'docs.tab.mine': '归我所有',
-        'docs.tab.shared': '与我共享',
-        'docs.tab.starred': '收藏',
-        'nav.docs': '云文档',
-        'header.search': '搜索',
-      };
-      return resources[key] ?? key;
-    },
-  }),
-}));
+// Docs copy resolves via the sharedWorkbench namespace; opt into the zh
+// bundle of the shared test i18next instance (Issue #1717).
+import { useTestI18nLanguage } from '../../testing/i18n';
+
+beforeAll(async () => {
+  await useTestI18nLanguage('zh');
+});
 
 const BASE_PROPS = {
   activeNav: 'home',

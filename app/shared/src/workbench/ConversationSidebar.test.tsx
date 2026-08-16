@@ -1,6 +1,6 @@
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import type { ReactNode } from 'react';
 import type { WorkbenchConversation } from '../platform';
 import { ConversationSidebar } from './ConversationSidebar';
@@ -10,35 +10,13 @@ import { ConversationSidebar } from './ConversationSidebar';
    jsdom has no layout engine, so virtua is mocked with a passthrough.
    ────────────────────────────────────────────────────────────────────── */
 
-vi.mock('react-i18next', () => ({
-  useTranslation: () => ({
-    t: (key: string, options?: Record<string, string>) => {
-      const resources: Record<string, string> = {
-        'aria.conversationSidebar': 'Conversation sidebar',
-        'aria.searchConversations': 'Search conversations',
-        'aria.renameConversation': 'Rename conversation',
-        'aria.sortConversations': 'Sort conversations',
-        'aria.pinned': 'Pinned',
-        'aria.archive': 'Archive',
-        'aria.unarchive': 'Unarchive',
-        'context.renameConversation': 'Rename',
-        'context.copyConversationLink': 'Copy link',
-        'context.deleteConversation': 'Delete',
-        'conversation.deleteTitle': 'Delete conversation',
-        'conversation.deleteBody': 'Delete conversation "{title}"? This cannot be undone.',
-        'conversation.deleteConfirm': 'Delete',
-        'conversation.cancel': 'Cancel',
-      };
-      let result = resources[key] ?? key;
-      if (options) {
-        for (const [k, v] of Object.entries(options)) {
-          result = result.replace(`{${k}}`, v);
-        }
-      }
-      return result;
-    },
-  }),
-}));
+// These assertions use the en chatview literals; opt into the en bundle of
+// the shared test i18next instance (Issue #1717).
+import { useTestI18nLanguage } from '../testing/i18n';
+
+beforeAll(async () => {
+  await useTestI18nLanguage('en');
+});
 
 vi.mock('virtua', () => ({
   Virtualizer: ({ children }: { children?: ReactNode }) => <>{children}</>,

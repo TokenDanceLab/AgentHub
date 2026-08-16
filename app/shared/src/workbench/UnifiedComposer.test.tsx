@@ -1,7 +1,7 @@
 import '@testing-library/jest-dom/vitest';
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import type { FormEvent } from 'react';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { clearDraft, loadDraft, saveDraft } from '../composer';
 import type { ComposerMention, ComposerState } from '../composer';
 import { UnifiedComposer } from './UnifiedComposer';
@@ -16,40 +16,13 @@ vi.mock('@lobehub/icons', () => ({
 }));
 vi.mock('@lobehub/icons/es/Antigravity/components/Color.js', () => ({ default: () => null }));
 
-vi.mock('react-i18next', () => ({
-  useTranslation: () => ({
-    t: (key: string, options?: Record<string, string>) => {
-      const resources: Record<string, string> = {
-        'action.removeMention': 'Remove @{label}',
-        'action.startAgentTask': 'Start agent task',
-        'action.stopRun': 'Stop',
-        'action.removeAttachment': 'Remove {name}',
-        'aria.composerInput': 'Composer input',
-        'aria.atAgent': '@Agent',
-        'aria.target': 'Desktop/Edge target',
-        'aria.attachments': 'Attachments',
-        'aria.selectedAgents': 'Selected agents',
-        'aria.agentMainChain': '@Agent main chain',
-        'aria.cancelReply': 'Cancel reply',
-        'aria.cancelQuote': 'Cancel quote',
-        'aria.cancelEdit': 'Cancel edit',
-        'aria.stopRun': 'Stop run',
-        'aria.addAttachment': 'Add attachment',
-        'profile.sendMessage': 'Send message',
-        'composer.editingMessage': 'Editing message',
-        'composer.mentionHint': 'Select someone to mention…',
-        'composer.mentionEmpty': 'No matching agents',
-      };
-      let result = resources[key] ?? key;
-      if (options) {
-        for (const [k, v] of Object.entries(options)) {
-          result = result.replace(`{${k}}`, v);
-        }
-      }
-      return result;
-    },
-  }),
-}));
+// Composer copy assertions use the en chatview literals; opt into the en
+// bundle of the shared test i18next instance (Issue #1717).
+import { useTestI18nLanguage } from '../testing/i18n';
+
+beforeAll(async () => {
+  await useTestI18nLanguage('en');
+});
 
 // requestIdleCallback polyfill for jsdom (used by draft persistence).
 beforeEach(() => {
@@ -103,7 +76,9 @@ describe('UnifiedComposer execution target selection', () => {
       type: 'addMention',
       mention: { id: 'profile-reviewer', label: 'Reviewer', runtimeId: 'codex' },
     });
-    expect(screen.getByRole('button', { name: 'Remove @Builder' })).toBeInTheDocument();
+    // The en resource uses a single-brace placeholder ({label}), which real
+    // i18next does not interpolate, so the rendered aria-label keeps it.
+    expect(screen.getByRole('button', { name: 'Remove @{label}' })).toBeInTheDocument();
   });
 
   it('locks mentioned real dispatch until a Desktop/Edge target is selected', () => {

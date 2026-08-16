@@ -168,10 +168,6 @@ vi.mock('@/demo/demoEvidence', () => ({
   getDemoRuntimeEvidence: vi.fn(),
 }));
 
-vi.mock('react-i18next', () => ({
-  useTranslation: () => ({ t: (key: string) => key, i18n: { language: 'en' } }),
-}));
-
 const eventHandlers: EventHandler[] = [];
 const createRunMutateAsync = vi.fn();
 const tryAutoLogin = vi.fn().mockResolvedValue(undefined);

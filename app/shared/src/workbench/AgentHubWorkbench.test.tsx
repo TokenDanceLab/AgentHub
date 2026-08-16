@@ -1,6 +1,6 @@
 import React from 'react';
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { WORKBENCH_DATA_MODE_STORAGE_KEY, projectGroupMessageLoopTranscript } from '../demo';
 import { createMockPlatform } from '../platform/createMockPlatform';
 import type { WorkbenchAgent } from '../platform/types';
@@ -8,6 +8,14 @@ import type { TranscriptBlock } from '../transcript/types';
 import { AgentHubWorkbench } from './AgentHubWorkbench';
 import { DESIGN_NAV_GLYPH_SIZE, DESIGN_NAV_GLYPH_STROKE_WIDTH } from './designIcons';
 import { MAX_PENDING_DISPATCH_RETRIES } from './composer/pendingIntents';
+
+// Workbench chrome + transcript copy resolve through the shared test
+// i18next instance; opt into the zh bundle for this suite (Issue #1717).
+import { useTestI18nLanguage } from '../testing/i18n';
+
+beforeAll(async () => {
+  await useTestI18nLanguage('zh');
+});
 
 // jsdom has no layout engine, so virtua cannot measure the viewport/rows and
 // would mount zero rows — breaking content-level queries on transcript cards.
@@ -18,451 +26,6 @@ import { MAX_PENDING_DISPATCH_RETRIES } from './composer/pendingIntents';
 // Transcript.virtualization.test.tsx (handle wiring).
 vi.mock('virtua', () => ({
   Virtualizer: ({ children }: { children?: React.ReactNode }) => <>{children}</>,
-}));
-
-/* Build translation maps inside vi.hoisted so they are available before
-   Vitest hoists the vi.mock factory.  Inline zh-CN from sharedWorkbench
-   and chatview namespaces to avoid importing modules inside vi.mock. */
-
-const { workbenchZhMap, chatviewZhMap } = vi.hoisted(() => {
-  function flatten(o: Record<string, unknown>, prefix = ''): Record<string, string> {
-    const m: Record<string, string> = {};
-    for (const [k, v] of Object.entries(o)) {
-      const next = prefix ? prefix + '.' + k : k;
-      if (typeof v === 'string') m[next] = v;
-      else if (v && typeof v === 'object') Object.assign(m, flatten(v as Record<string, unknown>, next));
-    }
-    return m;
-  }
-  const wb: Record<string, unknown> = {
-    nav: { chat:'对话', contacts:'通讯录', docs:'云文档', agents:'Agent', agentMarket:'Agent 市场', projects:'项目', runs:'任务', settings:'设置', search:'搜索' },
-    navLabel: { chat:'消息', docs:'云文档' },
-    composer: { placeholder:'发消息给 {{target}}', send:'发送消息', agentTarget:'Agent @{{agent}}' },
-    composerModes: { ask:'询问', plan:'规划', deploy:'部署' },
-    transcript: { dateTime:'{{date}} · {{time}}', timeline:'运行时间线', timelineItems:'{{count}} items', currentReasoning:'当前推理', reasoningSummary:'推理摘要', running:'运行中', pending:'待执行', completed:'完成', failed:'失败', readOnly:'只读' },
-    actions: { copy:'复制', copyLink:'复制消息链接', forward:'转发', addTask:'添加任务', exportDoc:'导出文档', delete:'删除' },
-    inspector: { overview:'概览', browser:'浏览器', files:'文件', collapsePanel:'收起右侧概览', expandPanel:'展开右侧概览', resize:'调整右侧栏宽度', closeTab:'关闭 {{label}}', tasks:'任务', resizeLabel:'调整右侧栏宽度', newWindow:'新建右侧窗口', restoreTab:'恢复 {{label}}', openFile:'打开文件 {{name}}', openDiff:'打开 diff {{name}}', openPreview:'打开预览 {{name}}', runEvidence:'运行证据', fileLabel:'文件', openArtifact:'打开产物 {{name}}', artifactMetadata:'产物 metadata {{name}}', noFileContent:'{{name}}\n\n暂无文件内容。', allClosed:'右侧窗口已关闭。使用 + 重新打开概览、浏览器或文件。', addMenu:'右侧窗口菜单', quickOpenFiles:'文件', quickOpenChat:'侧边聊天', quickOpenBrowser:'浏览器', quickOpenTerminal:'终端' },
-    sidebar: { resize:'调整最近频道宽度' },
-    settings: { dataMode:'数据模式' },
-    group: { agentProfile:'Agent 配置', sendMessage:'发送消息', copyLink:'复制链接' },
-    taskList: { myTasks:'我负责的', watching:'我关注的', board:'看板', list:'列表' },
-    header: { messages:'消息', docs:'云文档', collapseInspector:'收起概览', expandInspector:'展开概览' },
-    filePreview: { readOnlyPreview:'只读预览', source:'源码', diff:'Diff', openWith:'打开方式' },
-    browserPreview: { back:'后退', forward:'前进', refresh:'刷新', close:'关闭预览' },
-    'actions.backToOverview': '返回概览',
-    pinnedAnnouncement: { pin:'置顶', link:'链接' },
-    profilePopover: { sendMessage:'发送消息', editProfile:'编辑资料', copyLink:'复制链接' },
-    multiSelect: { copy:'复制', forward:'转发', delete:'删除', pin:'置顶', cancel:'取消', selected:'已选 {{count}} 条' },
-    contextMenu: { copy:'复制', forward:'转发', pin:'置顶', delete:'删除', select:'选择', reply:'回复' },
-    'settings.pane.appearance.title': '外观设置',
-    'settings.pane.localDev.title': '本地开发设置',
-    agents: { 'nav.installed':'已安装', 'nav.market':'Agent 市场', 'detail.tools':'工具权限', 'installed.search':'搜索已安装 Agent', 'installed.title':'Agent管理', 'market.title':'Agent 市场', 'market.search':'搜索 Agent', 'market.install':'安装', 'market.installed':'已安装', 'empty.title':'暂无已安装 Agent', 'empty.description':'当前 Hub 账号还没有已安装配置。', 'empty.add':'添加 Agent' },
-    contacts: { 'nav.internal':'组织内联系人', 'nav.external':'外部联系人', 'nav.newFriend':'新的联系人', 'search.placeholder':'搜索联系人' },
-    tasks: { 'nav.all':'全部任务', 'nav.assigned':'分配给我', 'nav.created':'我创建的', 'nav.watching':'我关注的', 'view.list':'列表', 'view.board':'看板', 'view.timeline':'时间线', 'newTask':'新建任务', 'status.pending':'待执行', 'status.active':'进行中', 'status.done':'已完成', 'status.failed':'失败', 'status.cancelled':'已取消' },
-    projects: { 'nav.all':'全部项目', 'nav.running':'运行中', 'nav.completed':'已完成', 'nav.archived':'已归档', 'tab.overview':'概览', 'tab.settings':'设置', 'tab.members':'成员', 'newProject':'新建项目', edit:'编辑项目', loading:'正在加载项目…', 'empty.title':'暂无项目', 'empty.description':'创建第一个项目以开始协作。', 'empty.createFirst':'创建第一个项目' },
-    docs: { 'tab.recent':'最近访问', 'tab.mine':'归我所有', 'tab.shared':'与我共享', 'tab.starred':'收藏', 'newDoc':'新建文档', 'search.placeholder':'搜索云文档' },
-    'settings.nav.appearance': '外观', 'settings.nav.appearanceDesc': '主题、语言和界面风格',
-    'settings.nav.notifications': '通知', 'settings.nav.notificationsDesc': '消息提醒和声音',
-    'settings.nav.agentDefaults': 'Agent 默认值', 'settings.nav.agentDefaultsDesc': '运行引擎、模型和审批策略',
-    'settings.nav.localDev': '本地开发', 'settings.nav.localDevDesc': 'Edge 连接、快捷键和调试选项',
-    'settings.nav.stateComponents': '状态组件', 'settings.nav.stateComponentsDesc': '预览 Agent 运行状态卡片',
-    'settings.moreButton.label': '设置更多',
-    'globalRail.settings.label': '设置', 'globalRail.settings.title': '设置',
-    'globalRail.toggleTheme.label': '切换主题', 'globalRail.toggleTheme.title': '切换主题',
-  };
-  return {
-    workbenchZhMap: flatten(wb),
-    chatviewZhMap: {
-'action.approved': '已批准',
-      'action.denied': '已拒绝',
-      'action.regenerating': '正在重新生成',
-      'action.removeAttachment': '移除 {name}',
-      'action.removeMention': '移除 @{label}',
-      'action.startAgentTask': '启动 Agent 任务',
-      'adapter.description.anthropicSdk': 'Anthropic Messages API via direct HTTP — 无需 CLI，直接调用 Claude API',
-      'adapter.description.claudeCode': 'Anthropic Claude Code CLI — 完整工具链，支持 Bash/Read/Write/Edit/Grep/Glob/Agent/Task',
-      'adapter.description.codex': 'OpenAI Codex CLI — 代码生成、审查、沙箱执行',
-      'adapter.description.openaiSdk': 'OpenAI Chat Completions API via direct HTTP — 无需 CLI，直接调用 GPT API',
-      'adapter.description.opencode': 'OpenCode CLI — 多 Provider、会话管理、ACP 协议',
-      'agent.state.configuring': '配置中',
-      'agent.state.ready': '可运行',
-      'agent.state.running': '运行中',
-      'agent.state.unavailable': '不可用',
-      'agent.state.waiting': '等待中',
-      'app.dm.desc': '你 ↔ Builder · 仅头像 · 所有卡片类型',
-      'app.dm.sim': '实时模拟 · 单聊',
-      'app.dm.simDesc': '动态演示：思考中 → 工具调用 → 文件变更 → Agent 回复',
-      'app.dm.title': '单聊模式',
-      'app.group.desc': '多人协作 · 头像+名字+时间 · 完整卡片类型 + 分派/审批',
-      'app.group.sim': '实时模拟 · 群聊',
-      'app.group.simDesc': '@Orchestrator 分派 → Builder 执行 → Reviewer 审查',
-      'app.group.title': '群聊模式',
-      'app.lang': '语言',
-      'app.theme': '主题',
-      'aria.addAttachment': 'Add attachment',
-      'aria.agentConfig': 'Agent 配置入口',
-      'aria.agentMainChain': '@Agent main chain',
-      'aria.agentSuggestions': 'Agent suggestions',
-      'aria.archive': '归档',
-      'aria.atAgent': '@Agent',
-      'aria.attachments': 'Attachments',
-      'aria.backToOverview': '返回概览',
-      'aria.browserPreview': '内置浏览器预览',
-      'aria.businessQr': '企业二维码',
-      'aria.cancelQuote': '取消引用',
-      'aria.cancelReply': '取消回复',
-      'aria.changedFiles': 'Changed files',
-      'aria.close': '关闭',
-      'aria.closePreview': '关闭预览',
-      'aria.collapseInspector': '收起右侧概览',
-      'aria.composerInput': 'Composer input',
-      'aria.confirmItems': '确认项',
-      'aria.contextMenu': '卡片操作菜单',
-      'aria.contextUsage': 'Context usage',
-      'aria.conversationSidebar': 'Conversation sidebar',
-      'aria.copyPath': '复制路径',
-      'aria.dataModeStatus': '数据模式状态',
-      'aria.desktopEntry': 'Desktop entry',
-      'aria.diffPreview': 'Diff 预览',
-      'aria.docSettings': '云文档设置',
-      'aria.editAssignee': '编辑负责人',
-      'aria.editDueTime': '编辑截止时间',
-      'aria.editProject': '编辑所属项目',
-      'aria.editStartTime': '编辑开始时间',
-      'aria.editTaskTitle': '编辑任务标题',
-      'aria.expandInspector': '展开右侧概览',
-      'aria.filePreviewMode': '文件预览模式',
-      'aria.globalRail': 'Global rail',
-      'aria.goBack': '后退',
-      'aria.goForward': '前进',
-      'aria.htmlPreview': 'HTML 预览',
-      'aria.inspectorMenu': '右侧窗口菜单',
-      'aria.inspectorTabs': '右侧工作区',
-      'aria.mainChainStatus': 'Demo main chain status',
-      'aria.markRead': 'Mark as read',
-      'aria.markdownPreview': 'Markdown 预览',
-      'aria.maximize': '最大化',
-      'aria.minimize': '最小化',
-      'aria.moreTags': '更多标签',
-      'aria.multiSelectBar': '多选操作',
-      'aria.navControls': 'Desktop navigation controls',
-      'aria.newChannel': '新建频道',
-      'aria.newInspectorTab': '新建右侧窗口',
-      'aria.newTask': '新任务',
-      'aria.notifications': 'Notifications',
-      'aria.onboarding': 'Onboarding progress',
-      'aria.open': '打开',
-      'aria.openWith': '打开方式',
-      'aria.openWithMenu': '打开方式菜单',
-      'aria.pinned': '已置顶',
-      'aria.preview': '预览',
-      'aria.previewArtifacts': 'Preview artifacts',
-      'aria.refresh': '刷新',
-      'aria.resizeInspector': '调整右侧栏宽度',
-      'aria.resizeSidebar': '调整最近频道宽度',
-      'aria.rightInspector': 'Right inspector',
-      'aria.runtimeEvidence': 'Runtime evidence state',
-      'aria.search': '搜索',
-      'aria.searchConversations': '搜索会话',
-      'aria.selectedAgents': 'Selected agents',
-      'aria.sessionSettings': '会话设置',
-      'aria.settings': '设置',
-      'aria.sortConversations': '排序方式',
-      'aria.settingsMore': '设置更多',
-      'aria.switchView': '切换视图',
-      'aria.target': 'Desktop/Edge target',
-      'aria.taskMoreActions': '任务更多操作',
-      'aria.taskMoreMenu': '任务更多操作菜单',
-      'aria.textPreview': '文本预览',
-      'aria.toggleSidebar': '切换左侧栏',
-      'aria.toggleTheme': '切换主题',
-      'aria.transcript': 'Transcript',
-      'aria.unarchive': '取消归档',
-      'aria.windowControls': 'Window controls',
-      'aria.workbenchPage': 'Workbench page',
-      'aria.workspace': 'Workspace',
-      'aria.workspaceTabs': 'Workspace tabs',
-      'bar.clear': '清空',
-      'bar.exit': '退出',
-      'bar.selectAll': '全选',
-      'browserPreview.iframeTitle': '预览 {{url}}',
-      'browserPreview.readOnly': '只读预览',
-      'card.approval.approve': '批准',
-      'card.approval.deny': '拒绝',
-      'card.approval.fail': '审批被拒绝',
-      'card.approval.ok': '权限检查通过',
-      'card.approval.title': '部署/写入审批',
-      'card.approval.waiting': '等待审批中...',
-      'card.attachment.fail': '附件加载失败',
-      'card.collapse': '收起',
-      'card.ctx.fail': '上下文耗尽',
-      'card.deploy.fail': '部署失败',
-      'card.deploy.ready': '预览已就绪',
-      'card.deploy.running': '正在部署',
-      'card.expand': '展开',
-      'card.fail.retry': '重试',
-      'context.cardActions': '卡片操作',
-      'filePreview.ariaPane': '{{filename}} 只读预览',
-      'filePreview.backToOverview': '返回概览',
-      'filePreview.modePreview': '预览',
-      'filePreview.modeSource': '源码',
-      'filePreview.openWith': '打开方式',
-      'filePreview.readonly': '只读',
-      'filePreview.selectedTarget': '已选择 {{target}}',
-      'inlineDelegation.ariaStack': '委派状态',
-      'inlineDelegation.emptyDetail': '暂无详细事件流',
-      'inlineDelegation.status.cancelled': '已取消',
-      'inlineDelegation.status.dispatching': '派单中…',
-      'inlineDelegation.status.done': '完成 ✓',
-      'inlineDelegation.status.failed': '失败 ✗',
-      'inlineDelegation.status.streaming': '执行中…',
-      'subagentStream.cat.cancel': '已取消',
-      'subagentStream.cat.error': '错误',
-      'subagentStream.cat.other': '事件',
-      'subagentStream.cat.result': '结果',
-      'subagentStream.cat.textDelta': '输出',
-      'subagentStream.cat.thinking': '思考',
-      'subagentStream.cat.toolCall': '工具调用',
-      'subagentStream.emptyWaiting': '等待 agent 启动…',
-      'subagentStream.transcriptLabel': '子会话事件流',
-      'card.file.create': '创建',
-      'card.file.create.running': '正在创建',
-      'card.file.delete': '删除',
-      'card.file.delete.running': '正在删除',
-      'card.file.fail': '文件操作失败',
-      'card.file.modify': '修改',
-      'card.file.modify.running': '正在修改',
-      'card.preview.fail': '预览失败',
-      'card.preview.ready': '预览就绪',
-      'card.preview.running': '正在生成预览...',
-      'card.route.dag': '拆解完成 · 并行 + 串行',
-      'card.route.fail': '分派失败',
-      'card.session.fail': '会话失败',
-      'card.session.prefix': '会话',
-      'card.sub.agent': '子 Agent',
-      'card.sub.agent.fail': '子 Agent 失败',
-      'card.sub.agent.ok': '子 Agent 完成',
-      'card.sub.agent.running': 'Agent · {name} 工作中',
-      'card.sub.agent.withName': '子 Agent · {name}',
-      'card.think.analyze': '分析',
-      'card.think.analyzeDone': '分析完成',
-      'card.think.done': '思考完成',
-      'card.think.fail': '思考失败',
-      'card.think.running': '正在思考',
-      'card.tool.audit': '审计',
-      'card.tool.audit.running': '正在审计',
-      'card.tool.check': '检查',
-      'card.tool.check.running': '正在检查',
-      'card.tool.eslint': 'eslint',
-      'card.tool.eslint.running': 'eslint --fix',
-      'card.tool.fail': '工具失败',
-      'card.tool.grep': '搜索',
-      'card.tool.grep.running': '正在搜索',
-      'card.tool.lint': '检查',
-      'card.tool.lint.running': '正在检查',
-      'card.tool.prettier': 'prettier',
-      'card.tool.prettier.running': 'prettier --write',
-      'card.tool.read': '阅读',
-      'card.tool.read.running': '正在阅读',
-      'card.tool.result': '工具结果',
-      'card.tool.result.running': '正在运行',
-      'card.tool.test': '测试',
-      'card.tool.test.running': '正在测试',
-      'card.tool.tsc': 'tsc --noEmit',
-      'card.tool.tsc.running': 'tsc --noEmit',
-      'card.tool.write': '写入',
-      'card.tool.write.running': '正在写入',
-      'chat.kind.friend': '好友',
-      'chat.kind.group': '群聊',
-      'chat.you': '你',
-      'code.copy': '复制',
-      'connection.connected': '已连接',
-      'connection.connecting': '正在连接 Edge 并加载数据...',
-      'connection.connectingBrief': '连接中',
-      'connection.disconnected': '已断开',
-      'context.addTask': '添加任务',
-      'context.apps': '快捷应用',
-      'context.copy': '复制',
-      'context.copyLink': '复制消息链接',
-      'context.createTopic': '创建话题',
-      'context.delete': '删除',
-      'context.exportDoc': '导出到文档',
-      'context.forward': '转发',
-      'context.multiSelect': '多选',
-      'context.pinMessage': '置顶消息',
-      'context.quote': '引用',
-      'context.react': '表情回复',
-      'context.regenerate': '重新生成',
-      'context.reply': '回复',
-      'context.translate': '翻译',
-      'doc.untitled': '未命名文档',
-      'error.agentProfile.create': 'Agent Profile 创建失败',
-      'error.agentProfile.delete': 'Agent Profile 删除失败',
-      'error.agentProfile.load': 'Agent Profile 加载失败',
-      'error.agentProfile.save': 'Agent Profile 保存失败',
-      'im.messageInput': 'Message input',
-      'im.send': 'Send message',
-      'inspector.diffPreview': 'Diff 预览',
-      'inspector.htmlPreview': 'HTML 预览',
-      'inspector.markdownPreview': 'Markdown 预览',
-      'label.agent': 'Agent',
-      'label.agentHub': 'AgentHub',
-      'label.contact': '联系人',
-      'mainchain.contextUsage': '上下文用量',
-      'mainchain.exportJson': '导出证据 JSON',
-      'mainchain.fail': '运行失败',
-      'mainchain.messageCard': '消息卡片',
-      'mainchain.noApprovalArtifact': '无 approval/artifact evidence',
-      'mainchain.noRuntimeEvidence': '暂无 transcript、runtime evidence 或 run session 可导出',
-      'mainchain.noTarget': '没有在线 Desktop/Edge target',
-      'mainchain.noTranscript': '暂无 transcript',
-      'mainchain.pickTarget': '待选择 Desktop/Edge target',
-      'mainchain.result': '运行结果',
-      'mainchain.selectedCard': '选中卡片',
-      'mainchain.thinking': '思考过程',
-      'mainchain.timeline': '运行时间线',
-      'mainchain.waitingEdgeEvidence': '等待 Edge evidence',
-      'mainchain.waitingEvidence': '等待证据',
-      'mainchain.waitingTask': '等待 task/replay',
-      'mainchain.waitingWorker': '等待 worker route',
-      'nav.chat': '对话',
-      'nav.contacts': '联系人',
-      'nav.docs': '云文档',
-      'nav.projects': '项目',
-      'nav.tasks': '任务',
-      'oidc.loginSuccess.body': '登录流程已完成。',
-      'oidc.loginSuccess.closeHint': '您可以关闭此页面并返回 AgentHub 桌面应用。',
-      'oidc.loginSuccess.heading': '登录成功',
-      'oidc.loginSuccess.title': 'AgentHub — 登录成功',
-      'oidc.missingParams.back': '返回 AgentHub',
-      'oidc.missingParams.body': '回调地址缺少 code 或 state 参数。请返回应用重新开始登录。',
-      'oidc.missingParams.heading': '缺少参数',
-      'oidc.missingParams.title': 'AgentHub — 缺少参数',
-      'profile.agentConfig': 'Agent 配置',
-      'profile.copyLink': '复制链接',
-      'profile.engine': '引擎',
-      'profile.groupChat': '群聊',
-      'profile.groupSession': '群聊会话',
-      'profile.groupType': '协作群',
-      'profile.identity': '身份',
-      'profile.members': '成员',
-      'profile.model': '模型',
-      'profile.org': '组织',
-      'profile.recentMessage': '最近消息',
-      'profile.role': '职责',
-      'profile.sendMessage': '发送消息',
-      'profile.skills': 'Skills',
-      'profile.state': '状态',
-      'profile.type': '类型',
-      'prompt.peerContext.conflict': '如果需要在共享文件上工作...',
-      'prompt.peerContext.header': '[同级 Agent 上下文]',
-      'prompt.peerContext.intro': '你正在与其他 Agent 并行工作。以下是你的同级 Agent 及其任务：',
-      'prompt.peerContext.modifySame': '如果两个 Agent 修改同一个文件...',
-      'prompt.peerContext.noModify': '不要修改其他 Agent 正在处理的文件',
-      'prompt.peerContext.note': '注意：',
-      'sidebar.allFiles': '所有文件',
-      'sidebar.cache': '缓存',
-      'sidebar.context': '上下文',
-      'sidebar.contextDetail': '上下文详情',
-      'sidebar.contextUse': '上下文使用',
-      'sidebar.cost': '费用',
-      'sidebar.done': '全部完成',
-      'sidebar.files': '文件',
-      'sidebar.input': '输入',
-      'sidebar.limit': '上限',
-      'sidebar.modelName': 'Claude Sonnet 4',
-      'sidebar.output': '输出',
-      'sidebar.overview': '概览',
-      'sidebar.tasks': '任务',
-      'sim.auto': '▶ 自动',
-      'sim.next': '下一步',
-      'sim.reset': '重置',
-      'sim.skip': '跳过',
-      'sim.start': '点击开始',
-      'sim.step': '步骤 {n} / {total}',
-      'sim.stop': '⏸ 停止',
-      'status.online': '在线',
-      'status.unconfigured': '未配置',
-      'toast.accountLogin': '已打开账号登录入口',
-      'toast.actionRecorded': '操作已记录',
-      'toast.agentConfigOpened': '已打开 {name} 配置',
-      'toast.appsOpened': '已打开快捷应用',
-      'toast.cardCopied': '已复制卡片内容',
-      'toast.contactLinkCopied': '已复制联系人链接',
-      'toast.deleteQueued': '已标记删除',
-      'toast.deployPreviewOpened': '已打开部署预览',
-      'toast.editProfile': '已打开资料编辑',
-      'toast.evidenceCopied': '已复制主链证据 JSON',
-      'toast.exportDraft': '已导出到云文档草稿',
-      'toast.forwardQueued': '已加入转发队列',
-      'toast.linkCopied': '已复制消息链接',
-      'toast.linkCopiedGeneric': '已复制链接',
-      'toast.loggedOut': '已退出登录',
-      'toast.multiCopy': '已复制 {count} 项',
-      'toast.multiDelete': '已删除 {count} 项',
-      'toast.multiExport': '已导出 {count} 项到文档草稿',
-      'toast.multiForward': '已准备转发 {count} 项',
-      'toast.multiProcessed': '已处理 {count} 项',
-      'toast.multiTaskDraft': '已为 {count} 项创建任务草稿',
-      'toast.noCardSelected': '还没有选择卡片',
-      'toast.noDmSession': '还没有 {name} 的私聊会话',
-      'toast.noEvidence': '暂无可导出的主链证据',
-      'toast.onlineStatus': '状态已保持在线',
-      'toast.pinUpdated': '已更新置顶',
-      'toast.pinnedOpened': '已打开置顶内容',
-      'toast.profileCard': '已打开个人名片',
-      'toast.qrLink': '已打开二维码与链接',
-      'toast.reactOpened': '已打开表情回复',
-      'toast.requestRunning': '已有正在运行的请求，请等待完成后再试。',
-      'toast.settingsOpened': '已打开设置',
-      'toast.taskDraft': '已添加到任务草稿',
-      'toast.topicDraft': '已创建话题草稿',
-      'toast.translateQueued': '已加入翻译队列',
-      'transcript.empty': '暂无消息',
-      'ui.applyDiff': 'Apply diff',
-      'ui.close': 'Close',
-      'ui.closeNotification': 'Close notification',
-      'ui.closeSearch': 'Close search',
-      'ui.downloadArtifact': 'Download artifact',
-      'ui.loading': 'Loading message',
-      'ui.openArtifact': 'Open artifact',
-      'user.currentBadge': '当前用户',
-      'user.editProfile': '编辑资料',
-      'user.fallbackName': '用户',
-      'user.loginMore': '登录更多账号',
-      'user.logout': '退出登录',
-      'user.myCard': '我的个人名片',
-      'user.myQr': '我的二维码与链接',
-      'user.settings': '设置',
-      'user.toggleTheme': '切换主题',
-    }
-  };
-});
-
-vi.mock('react-i18next', () => ({
-  useTranslation: () => ({
-    t: (key: string, options?: string | Record<string, unknown>) => {
-      const translations: Record<string, string> = {
-        ...workbenchZhMap,
-        ...chatviewZhMap,
-        'composer.placeholder': '发消息给 {{target}}',
-        'composer.send': '发送消息',
-        'nav.contacts': '联系人',
-        'toast.submitFailed': '提交失败，请重试',
-        'toast.dispatchRetryExhausted': '派单重试 {{max}} 次仍被拒绝，已放弃自动重试，请稍后手动重新触发该 Agent',
-        'toast.dispatchRetryFailed': '派单重试失败，请手动重新触发该 Agent',
-        'toast.pendingDispatchBadge': '待发送 {{count}} 条',
-      };
-      const base = translations[key];
-      if (base === undefined) return typeof options === 'string' ? options : key;
-      if (options && typeof options === 'object') {
-        return base.replace(/\{\{(\w+)\}\}/g, (_m: string, name: string) =>
-          String(options[name] ?? options[name.toLowerCase()] ?? '{{${name}}}'));
-      }
-      return base;
-    },
-    i18n: { language: 'zh' },
-  }),
 }));
 
 vi.mock('@lobehub/icons', () => {
@@ -1870,7 +1433,7 @@ describe('AgentHubWorkbench', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Agent' }));
 
-    const page = screen.getByRole('heading', { name: 'Agent管理' }).closest('main')!;
+    const page = screen.getByRole('heading', { name: 'Agent 管理' }).closest('main')!;
     expect(within(page).getAllByText('Hub Architect').length).toBeGreaterThan(0);
     expect(within(page).getAllByText('openai / gpt-5.5').length).toBeGreaterThan(0);
     expect(within(page).getByText('Architecture · Review')).toBeInTheDocument();
@@ -1901,7 +1464,7 @@ describe('AgentHubWorkbench', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Agent' }));
 
-    const page = screen.getByRole('heading', { name: 'Agent管理' }).closest('main')!;
+    const page = screen.getByRole('heading', { name: 'Agent 管理' }).closest('main')!;
     const emptyState = within(page).getByRole('region', { name: '暂无已安装 Agent' });
     expect(within(emptyState).getByText('当前 Hub 账号还没有已安装配置。')).toBeInTheDocument();
     expect(within(page).queryByText('Browser QA')).not.toBeInTheDocument();
@@ -1939,7 +1502,7 @@ describe('AgentHubWorkbench', () => {
 
     fireEvent.click(screen.getAllByRole('button', { name: '安装' })[0]!);
 
-    const page = screen.getByRole('heading', { name: 'Agent管理' }).closest('main')!;
+    const page = screen.getByRole('heading', { name: 'Agent 管理' }).closest('main')!;
     expect(within(page).getAllByText('目标：local_edge · fixture-local-edge').length).toBeGreaterThan(0);
     expect(within(page).getByDisplayValue('local_edge · fixture-local-edge')).toBeInTheDocument();
     expect(within(page).getByDisplayValue('ask-before-write')).toBeInTheDocument();
@@ -2017,7 +1580,7 @@ describe('AgentHubWorkbench', () => {
     );
 
     fireEvent.click(screen.getByRole('button', { name: 'Agent' }));
-    const page = screen.getByRole('heading', { name: 'Agent管理' }).closest('main')!;
+    const page = screen.getByRole('heading', { name: 'Agent 管理' }).closest('main')!;
 
     fireEvent.change(within(page).getByLabelText('名称'), {
       target: { value: 'Hub Architect Prime' },
@@ -3229,7 +2792,7 @@ describe('AgentHubWorkbench', () => {
       />,
     );
 
-    const skipLink = screen.getByRole('link', { name: 'a11y.skipToContent' });
+    const skipLink = screen.getByRole('link', { name: '跳到主要内容' });
     expect(skipLink).toHaveAttribute('href', '#main-content');
     expect(screen.getByRole('main', { name: 'Workspace' })).toHaveAttribute('id', 'main-content');
   });
@@ -3254,9 +2817,9 @@ describe('AgentHubWorkbench', () => {
 
     // '?' outside editable targets opens the help overlay.
     fireEvent.keyDown(document, { key: '?' });
-    const dialog = screen.getByRole('dialog', { name: 'shortcut.title' });
-    expect(within(dialog).getByText('shortcut.group.conversation')).toBeInTheDocument();
-    expect(within(dialog).getByText('shortcut.group.navigation')).toBeInTheDocument();
+    const dialog = screen.getByRole('dialog', { name: '键盘快捷键' });
+    expect(within(dialog).getByText('会话')).toBeInTheDocument();
+    expect(within(dialog).getByText('导航')).toBeInTheDocument();
     expect(within(dialog).getByText('Ctrl/⌘ + N')).toBeInTheDocument();
     expect(within(dialog).getByText('Enter')).toBeInTheDocument();
 
@@ -3602,7 +3165,7 @@ describe('pending dispatch queue (CF22)', () => {
     await waitFor(() => {
       expect(submit).toHaveBeenCalledTimes(1);
     });
-    expect(screen.getByText('待发送 1 条')).toBeInTheDocument();
+    expect(screen.getByText('待发送 {count} 条')).toBeInTheDocument();
 
     // The agent run ends → the queue flushes with a dispatch-only retry.
     // The message itself is never re-sent (submitComposerIntent stays at 1).
@@ -3625,7 +3188,7 @@ describe('pending dispatch queue (CF22)', () => {
     );
     expect(submit).toHaveBeenCalledTimes(1);
     await waitFor(() => {
-      expect(screen.queryByText('待发送 1 条')).not.toBeInTheDocument();
+      expect(screen.queryByText('待发送 {count} 条')).not.toBeInTheDocument();
     });
   });
 
@@ -3645,7 +3208,7 @@ describe('pending dispatch queue (CF22)', () => {
     await waitFor(() => {
       expect(submit).toHaveBeenCalledTimes(1);
     });
-    expect(screen.getByText('待发送 1 条')).toBeInTheDocument();
+    expect(screen.getByText('待发送 {count} 条')).toBeInTheDocument();
 
     // Run ends → retry 1 → still 409 → requeued; the delayed retry loop burns
     // the remaining budget (2 more attempts) and abandons with a toast.
@@ -3662,8 +3225,8 @@ describe('pending dispatch queue (CF22)', () => {
     await waitFor(() => {
       expect(redispatch).toHaveBeenCalledTimes(MAX_PENDING_DISPATCH_RETRIES);
     }, { timeout: 8000 });
-    expect(screen.queryByText('待发送 1 条')).not.toBeInTheDocument();
-    expect(screen.getByText('派单重试 3 次仍被拒绝，已放弃自动重试，请稍后手动重新触发该 Agent')).toBeInTheDocument();
+    expect(screen.queryByText('待发送 {count} 条')).not.toBeInTheDocument();
+    expect(screen.getByText('派单重试 {max} 次仍被拒绝，已放弃自动重试，请稍后手动重新触发该 Agent')).toBeInTheDocument();
     // Never re-sent the message during the retry loop.
     expect(submit).toHaveBeenCalledTimes(1);
   });

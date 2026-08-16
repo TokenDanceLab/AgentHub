@@ -1,5 +1,5 @@
 import { render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeAll, describe, expect, it, vi } from 'vitest';
 import type { ReactNode } from 'react';
 import type { TranscriptBlock } from '../adapter';
 
@@ -13,23 +13,13 @@ import type { TranscriptBlock } from '../adapter';
    once per row id.
    ────────────────────────────────────────────────────────────────────── */
 
-vi.mock('react-i18next', () => ({
-  useTranslation: () => ({
-    t: (key: string, options?: Record<string, string>) => {
-      const resources: Record<string, string> = {
-        'a11y.approvalArrived': 'Approval request received: {tool}',
-        'card.approval.title': 'Approval',
-      };
-      let result = resources[key] ?? key;
-      if (options) {
-        for (const [k, v] of Object.entries(options)) {
-          result = result.replace(`{${k}}`, v);
-        }
-      }
-      return result;
-    },
-  }),
-}));
+// These assertions use the en chatview literals; opt into the en bundle of
+// the shared test i18next instance (Issue #1717).
+import { useTestI18nLanguage } from '../../testing/i18n';
+
+beforeAll(async () => {
+  await useTestI18nLanguage('en');
+});
 
 vi.mock('virtua', () => ({
   // jsdom has no layout engine; a passthrough Virtualizer renders every child.

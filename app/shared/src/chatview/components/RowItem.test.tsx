@@ -1,69 +1,15 @@
 import '@testing-library/jest-dom/vitest';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
+import { beforeAll, describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 
-vi.mock('react-i18next', () => ({
-  useTranslation: () => ({
-    t: (key: string, options?: Record<string, string>) => {
-      const resources: Record<string, string> = {
-        'card.think.running': 'Thinking...',
-        'card.think.done': 'Thinking done',
-        'card.think.analyze': 'Analyzing',
-        'card.think.analyzeDone': 'Analysis done',
-        'card.think.fail': 'Thinking failed',
-        'card.think.thoughtFor': 'Thought for {duration}s',
-        'card.tool.read': 'Read',
-        'card.tool.read.running': 'Reading...',
-        'card.tool.grep': 'Search',
-        'card.tool.write': 'Write',
-        'card.tool.result': 'Tool result',
-        'card.tool.generic': '{name}',
-        'card.tool.generic.running': 'Running {name}...',
-        'card.tool.fail': 'Tool failed',
-        'card.file.create': 'Create',
-        'card.file.modify': 'Modify',
-        'card.file.delete': 'Delete',
-        'card.file.fail': 'File failed',
-        'card.sub.agent': 'Sub Agent',
-        'card.sub.agent.running': 'Agent · {name} working',
-        'card.sub.agent.fail': 'Sub Agent failed',
-        'card.sub.agent.ok': 'Sub Agent done',
-        'card.approval.title': 'Approval',
-        'card.approval.waiting': 'Awaiting approval...',
-        'card.approval.ok': 'Approval passed',
-        'card.approval.fail': 'Approval denied',
-        'card.approval.approve': 'Approve',
-        'card.approval.deny': 'Deny',
-        'card.collapse': 'Collapse',
-        'card.expand': 'Expand',
-        'card.fail.retry': 'Retry',
-        'code.copy': 'Copy',
-        'card.deploy.ready': 'Deploy',
-        'card.deploy.running': 'Deploying...',
-        'card.deploy.fail': 'Deploy failed',
-        'card.route.dag': 'Dispatch',
-        'card.preview.ready': 'Preview',
-        'card.preview.running': 'Preview loading',
-        'card.preview.fail': 'Preview failed',
-        'card.approval.confirmApprove': 'Confirm approve?',
-        'card.approval.risk.low': 'Low risk',
-        'card.approval.risk.medium': 'Medium risk',
-        'card.approval.risk.high': 'High risk',
-        'card.approval.risk.critical': 'Critical risk',
-        'card.approval.kbdHint': 'A Approve · R Deny · Esc Collapse',
-      };
-      let result = resources[key] ?? key;
-      if (options) {
-        for (const [k, v] of Object.entries(options)) {
-          result = result.replace(`{${k}}`, v);
-        }
-      }
-      return result;
-    },
-  }),
-}));
+// RowItem assertions use the en chatview literals. Point the shared test
+// i18next instance at the en bundle for this suite (Issue #1717).
+import { useTestI18nLanguage } from '../../testing/i18n';
 
-// Must import after the mock
+beforeAll(async () => {
+  await useTestI18nLanguage('en');
+});
+
 import { RowItem } from './RowItem';
 import type { RowItem as RowItemType } from '../types';
 

@@ -3,24 +3,18 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import React from 'react';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
 import { render, screen } from '../../../__tests__/setup';
 import { ProjectMain } from './ProjectMain';
 import type { ProjectMainProps } from './ProjectMain';
 
-vi.mock('react-i18next', () => ({
-  useTranslation: () => ({
-    t: (key: string) => {
-      const resources: Record<string, string> = {
-        'projects.empty.title': '暂无项目',
-        'projects.empty.description': '创建第一个项目后开始协作',
-        'projects.empty.createFirst': '创建第一个项目',
-        'projects.edit': '编辑项目',
-      };
-      return resources[key] ?? key;
-    },
-  }),
-}));
+// Empty-state copy resolves via the sharedWorkbench namespace; opt into the
+// zh bundle of the shared test i18next instance (Issue #1717).
+import { useTestI18nLanguage } from '../../../testing/i18n';
+
+beforeAll(async () => {
+  await useTestI18nLanguage('zh');
+});
 
 function baseProps(overrides: Partial<ProjectMainProps> = {}): ProjectMainProps {
   return {

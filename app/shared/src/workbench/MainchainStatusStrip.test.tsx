@@ -1,13 +1,10 @@
 import { render } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { MainchainStatusStrip } from './MainchainStatusStrip';
 import type { MainchainSummary } from './mainchain';
 
-vi.mock('react-i18next', () => ({
-  useTranslation: () => ({
-    t: (key: string) => key,
-  }),
-}));
+// Key-echo default of the shared test i18next instance keeps the original
+// identity-mock visible copy for this a11y suite (Issue #1717).
 
 const summary: MainchainSummary = {
   nodes: [{ id: 'n1', label: 'Agent A', detail: 'done', state: 'done' }],
