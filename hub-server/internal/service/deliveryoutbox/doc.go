@@ -9,6 +9,7 @@
 //   - delivery_outbox.go — ports, journal, retry loop, redispatch adapters
 //   - delivery_outbox_model.go — GORM record, Entry DTO, redispatchTarget, repo
 //   - delivery_outbox_facade.go — status/TTL aliases, AgentService facades
+//
 // Full model package move stays deferred (high-risk residual).
 //
 // See #744 (prior pure extract #514; #801).

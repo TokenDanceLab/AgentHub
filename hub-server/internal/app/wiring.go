@@ -123,10 +123,9 @@ func (a *App) initServices(ctx context.Context) error {
 		s3Store, err := attachment.NewS3StorageFromConfig(ctx, a.Config.S3)
 		if err != nil {
 			return fmt.Errorf("s3 attachment storage init failed: %w", err)
-		} else {
-			attachmentStorage = s3Store
-			slog.Info("S3 attachment storage configured", "bucket", a.Config.S3.Bucket, "endpoint", a.Config.S3.Endpoint)
 		}
+		attachmentStorage = s3Store
+		slog.Info("S3 attachment storage configured", "bucket", a.Config.S3.Bucket, "endpoint", a.Config.S3.Endpoint)
 	} else {
 		attachmentStorage = attachment.NewLocalStorage(a.Config.Upload.Dir)
 	}

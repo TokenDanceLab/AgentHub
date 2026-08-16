@@ -28,7 +28,10 @@ linters:
         - name: error-return
         - name: error-strings
         - name: error-naming
-        - name: exported
+        # `exported` (stutter) disabled deliberately: this repo's DTO names
+        # intentionally mirror the openapi.yaml schema names (e.g.
+        # message.MessageResponse, messagereaction.MessageReactionResponse),
+        # and the stutter rename would break that contract correspondence.
         - name: increment-decrement
         - name: var-naming
         - name: range
