@@ -227,3 +227,70 @@ describe('Mobile Hub client facade', () => {
     expect(networkError.retryable).toBe(true);
   });
 });
+
+describe('Mobile preview snapshot glue', () => {
+  const previewSnapshot = {
+    threads: [{ id: 't1', title: 'Preview Thread', subtitle: 's', initials: 'PT', unread: 1, participantKind: 'group', status: 'online', lastActivity: '14:00' }],
+    runs: [{ id: 'r1', threadId: 't1', title: 'Preview Run', status: 'approval_required', target: 'app/mobile-rn', updatedAt: '14:01', summary: 's', changedFiles: [] }],
+    transcript: { t1: [] },
+    account: {
+      tokenDanceId: 'signed_in',
+      hubSession: 'active',
+      notification: 'prompt',
+      hubSync: 'active',
+      deviceLabel: 'TokenDance mobile preview',
+    },
+  };
+
+  it('fetches the mock Hub mobile snapshot route and returns the parsed fixture', async () => {
+    const fetchImpl = vi.fn(async (url: string | Request | URL) => {
+      expect(String(url)).toBe('http://127.0.0.1:8088/v1/mobile/snapshot');
+      return new Response(JSON.stringify(previewSnapshot), { status: 200 });
+    });
+    const client = createHubClient({
+      baseUrl: 'http://127.0.0.1:8088',
+      fetchImpl,
+    });
+
+    const snapshot = await client.getPreviewSnapshot();
+
+    expect(snapshot.threads).toHaveLength(1);
+    expect(snapshot.runs[0]?.status).toBe('approval_required');
+    expect(snapshot.account.deviceLabel).toBe('TokenDance mobile preview');
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+
+  it('fails loudly with HubNetworkError when the snapshot route is unreachable', async () => {
+    const fetchImpl = vi.fn(async () => {
+      throw new TypeError('Network error');
+    });
+    const client = createHubClient({
+      baseUrl: 'http://127.0.0.1:8088',
+      fetchImpl,
+    });
+
+    await expect(client.getPreviewSnapshot()).rejects.toBeInstanceOf(HubNetworkError);
+  });
+
+  it('fails loudly with HubApiError when the snapshot route responds with an error status', async () => {
+    const fetchImpl = vi.fn(async () =>
+      new Response(JSON.stringify({ error: { code: 'not_found', message: 'missing' } }), { status: 404 }));
+    const client = createHubClient({
+      baseUrl: 'http://127.0.0.1:8088',
+      fetchImpl,
+    });
+
+    await expect(client.getPreviewSnapshot()).rejects.toMatchObject({ code: 'snapshot_unavailable', status: 404 });
+  });
+
+  it('rejects malformed snapshot payloads instead of rendering them', async () => {
+    const fetchImpl = vi.fn(async () =>
+      new Response(JSON.stringify({ threads: 'not-an-array' }), { status: 200 }));
+    const client = createHubClient({
+      baseUrl: 'http://127.0.0.1:8088',
+      fetchImpl,
+    });
+
+    await expect(client.getPreviewSnapshot()).rejects.toBeInstanceOf(HubApiError);
+  });
+});

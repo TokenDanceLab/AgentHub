@@ -18,6 +18,7 @@ interface AccountMenuItem {
   icon: AgentHubIconName;
   label: string;
   status?: string;
+  detail?: string;
   color: string;
   onPress?: () => void;
 }
@@ -83,7 +84,7 @@ export function AccountScreen({
           color: tokens.color.moss,
           onPress: nativeCapabilities.clearCache,
         },
-        { icon: 'file', label: t.devices, color: tokens.color.accent },
+        { icon: 'file', label: t.devices, detail: account.deviceLabel, color: tokens.color.accent },
         { icon: 'settings', label: t.settings, color: tokens.color.accent },
       ],
     },
@@ -100,10 +101,8 @@ export function AccountScreen({
     <View style={{ flex: 1, flexDirection: 'row', backgroundColor: tokens.color.scrim }}>
       {onClose ? (
         <Pressable
-          accessibilityLabel={t.closeAccountDrawer}
-          accessibilityRole="button"
           onPress={onClose}
-          style={StyleSheet.absoluteFill}
+          style={[StyleSheet.absoluteFill, { '--scrim': '1' } as Record<string, string>]}
         />
       ) : null}
       <AccountRail width={railWidth} />
@@ -219,6 +218,10 @@ function AccountRail({ width }: { width: number }): React.ReactElement {
         borderRightColor: tokens.color.line,
         paddingTop: tokens.space.lg,
         paddingHorizontal: tokens.space.xs,
+        // The rail has no interactive children; letting clicks fall through
+        // keeps the backdrop scrim the "tap outside closes drawer" target
+        // across the full viewport width.
+        pointerEvents: 'none',
       }}
     >
       <RailAccount iconLabel="TD" label="TokenDance" selected />
@@ -420,19 +423,28 @@ function AccountMenuSectionView({ section }: { section: AccountMenuSection }): R
             >
               <AgentHubIcon color={item.color} name={item.icon} size={22} />
             </View>
-            <Text
-              numberOfLines={1}
-              style={{
-                flex: 1,
-                color: tokens.color.ink,
-                fontSize: 16,
-                fontWeight: tokens.type.weight.medium,
-                lineHeight: 22,
-                includeFontPadding: false,
-              }}
-            >
-              {item.label}
-            </Text>
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Text
+                numberOfLines={1}
+                style={{
+                  color: tokens.color.ink,
+                  fontSize: 16,
+                  fontWeight: tokens.type.weight.medium,
+                  lineHeight: 22,
+                  includeFontPadding: false,
+                }}
+              >
+                {item.label}
+              </Text>
+              {item.detail ? (
+                <Text
+                  numberOfLines={1}
+                  style={{ color: tokens.color.inkSubtle, fontSize: 12, lineHeight: 16 }}
+                >
+                  {item.detail}
+                </Text>
+              ) : null}
+            </View>
             {item.status ? <AccountStatusBadge value={item.status} /> : null}
             <AgentHubIcon color={tokens.color.inkSubtle} name="chevronRight" size={18} />
           </MotionPressable>

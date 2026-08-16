@@ -19,6 +19,11 @@ export default defineConfig({
       name: 'chromium',
       use: {
         ...devices['Desktop Chrome'],
+        // Pin the locale so the suite is deterministic across hosts: the specs
+        // assert en/zh alternates, and a host-default locale (e.g. zh-CN on
+        // Windows) would flip aria-labels and silently break English-only
+        // locators like "Open account drawer".
+        locale: 'en-US',
         viewport: { width: 390, height: 844 },
         deviceScaleFactor: 3,
       },
