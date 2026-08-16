@@ -20,8 +20,7 @@
 |---|---|---|
 | `api/` | 活 | API 契约 SSOT（openapi.yaml/events.md/conventions.md） |
 | `app/` | 活 | 前端 monorepo（web/desktop/mobile-rn/shared） |
-| artifacts/ | 产物 | 本地构建输出（gitignored） |
-| dist/ | 产物 | 本地构建输出（gitignored，已清理） |
+| artifacts/ dist/ tmp/ | 产物 | 本地构建/临时输出（gitignored） |
 | `docs/` | 活 | 知识库（architecture/governance/reference/archives） |
 | `edge-server/` | 活 | Go Edge 服务（local runtime、adapters、lifecycle） |
 | `hub-server/` | 活 | Go Hub 服务（REST/WS/OIDC/dispatch/agentteam） |
@@ -30,7 +29,6 @@
 | `reference/` | 参考 | 第三方源码只读副本（gitignored，INDEX.md 管理） |
 | `scripts/` | 活 | 验证/开发/发布脚本（verify/dev/e2e/git-hooks/lib/release/smoke/） |
 | `tests/` | 活 | 跨服务测试 |
-| tmp/ | 产物 | 本地临时文件（gitignored，已清理） |
 
 ## 1. 首次入仓与渐进式加载
 
@@ -46,7 +44,7 @@
 
 人类同学的最短入口是 `README.md` → `docs/architecture.md` → `docs/developer-quickstart.md`。
 
-任务路由：接口改动读 `api/openapi.yaml`、`api/events.md`、`api/conventions.md`；UI/数据流读 `docs/architecture/04-frontend-data-flow.md`；登录、授权、Feishu/Lark、Gateway、安全、公开包装、i18n 或设计 token 同时读上级 `../AGENTS.md` 与对应 `../docs/` owner 文档。
+任务路由：接口改动读 `api/openapi.yaml`、`api/events.md`、`api/conventions.md`；UI/数据流读 `docs/architecture/04-frontend-data-flow.md`；身份、授权、飞书、Gateway、安全、公开包装、i18n、设计 token 的跨产品边界读下方 §4 生态边界（TokenDance 系统级 docs 在私有 workspace，公开仓不复制其内容）。
 
 ## 2. 项目分工和边界
 
@@ -59,15 +57,7 @@
 
 Mobile 主线是 Expo + React Native development build。旧 Tauri Mobile 不再恢复。当前 UI/UX 主线优先 Desktop/Web；Mobile 深度重构另开任务。
 
-固定端口：
-
-| 资源 | 端口 |
-|---|---:|
-| Desktop/Tauri Vite | 5173 strict |
-| Web Vite | 5174 strict |
-| Mobile RN Expo Web | 5177 |
-| Hub Server | 8080 |
-| Local Edge | 3210 |
+固定端口（Vite strict：Desktop 5173、Web 5174、Mobile Expo Web 5177；Hub API 8080、Local Edge 3210；含 PG/Redis/admin 的全景）见 `docs/architecture/05-deployment.md` 默认端口表。
 
 共享边界：
 
@@ -94,14 +84,14 @@ Mobile 主线是 Expo + React Native development build。旧 Tauri Mobile 不再
 
 | 主题 | 规则 | Owner 文档 |
 |---|---|---|
-| 登录 | AgentHub 只接 TokenDance ID；第三方 provider、账号绑定、`oauth_bindings` 归 TokenDance ID | `../docs/identity/identity-auth.md` |
-| 授权 | TokenDance ID 只证明身份；Hub Server 用 Hub-local membership/resource/action 决定权限 | `../docs/identity/authorization-model.md` |
-| 安全风险 | Critical/High 且状态为 Open、rotate required 或 *verification required 时阻断公开发布；Accepted 须记 owner/日期/补偿控制（SSOT：`docs/governance/security-risk-register.md`） | `docs/governance/security-risk-register.md`, `../docs/security/security-risk.md` |
+| 登录 | AgentHub 只接 TokenDance ID；第三方 provider、账号绑定、`oauth_bindings` 归 TokenDance ID | `docs/architecture/06-auth-identity.md` |
+| 授权 | TokenDance ID 只证明身份；Hub Server 用 Hub-local membership/resource/action 决定权限 | `docs/architecture/06-auth-identity.md`, `docs/governance/governance-execution.md` |
+| 安全风险 | Critical/High 且状态为 Open、rotate required 或 *verification required 时阻断公开发布；Accepted 须记 owner/日期/补偿控制（SSOT：`docs/governance/security-risk-register.md`） | `docs/governance/security-risk-register.md` |
 | 演示诚实 | stub/demo/fixture/readiness-only 不得声称真实登录、真实模型/API 或 packaged Desktop | `docs/governance/threat-model.md` |
-| Feishu/Lark | 飞书只做协作入口，不是第二登录系统；慢任务异步，卡片回调 3 秒内响应 | `../docs/identity/feishu-integration.md` |
-| i18n/公开包装 | zh/en 语义一致；不把第三方 provider 写成 AgentHub 直连登录 | `../docs/identity/i18n-packaging.md` |
-| Gateway | TokenDance API key 不是 TokenDance ID token，不得暴露给浏览器 UI 或公开日志 | `../docs/ecosystem/product-matrix.md` |
-| 设计 | dense command-center surface，真实工作流截图，不截空壳 | `../docs/design/design-playbook.md`, `../docs/design/visual-qa-matrix.md` |
+| Feishu/Lark | 飞书只做协作入口，不是第二登录系统；慢任务异步，卡片回调 3 秒内响应 | `docs/governance/governance-execution.md` |
+| i18n/公开包装 | zh/en 语义一致；不把第三方 provider 写成 AgentHub 直连登录 | `docs/governance/governance-execution.md` |
+| Gateway | TokenDance API key 不是 TokenDance ID token，不得暴露给浏览器 UI 或公开日志 | `docs/architecture/06-auth-identity.md` |
+| 设计 | dense command-center surface，真实工作流截图，不截空壳 | `docs/architecture/07-design-system-ssot.md`, `docs/component-acceptance.md` |
 
 ## 5. 技术主线
 
@@ -120,7 +110,7 @@ Mobile 主线是 Expo + React Native development build。旧 Tauri Mobile 不再
 - CSS Modules + OKLCH tokens，避免硬编码颜色。
 - 用户消息、Agent 回复、工具/审批/产物卡片必须按时间线性展示；调试、mock、mode 信息不得进入主聊天流。
 - UI 改动用自动化 Playwright + Visual QA 证明行为和布局；Desktop/Web gate 视口为 `1440x810` light+dark，入口 `app/{desktop,web}/scripts/visual-qa-shell.mjs`（`visual:qa:shell`）。`app/web/scripts/visual-qa.mjs` 为可选/遗留多场景电池，不是 merge gate。
-- 新 shared 组件必须带三件套：`<组件>.test.tsx` + `<组件>.stories.tsx` + 对照 `../docs/design/component-acceptance.md` 验收表逐项勾选；缺件不得合入。
+- 新 shared 组件必须带三件套：`<组件>.test.tsx` + `<组件>.stories.tsx` + 对照 `docs/component-acceptance.md` 验收表逐项勾选；缺件不得合入。
 - 设计 token 改动（`app/shared/src/styles/`、`app/shared/src/designTokens.ts`）必须跑 `python scripts/verify/verify-design-token-ssot.py`，且 `app/shared/src/designTokens.test.ts`、`app/shared/src/styles/tokens-base.test.ts` 全绿后交付。
 
 前端 CI 易踩坑（exactOptionalPropertyTypes / noUncheckedIndexedAccess / CSS helper 类型 / DesignNavIcon / 11px CJK 下限 / changes job）见 `docs/architecture/04-frontend-data-flow.md` §前端 CI 易踩坑。
@@ -193,14 +183,13 @@ subagent 提示必须包含：目标、允许修改路径、禁改路径、必�
 - 架构概览写 `docs/architecture.md`；模块细节写 `docs/architecture/`。
 - 架构决策摘要写 `docs/decisions.md`；旧 ADR 正文只在 `docs/history.md` 指向的外部归档中追溯。
 - 模块当前 gate 写各模块 `README.md`；历史 handoff、设备证明和一次性验收记录归档，不作为当前事实入口。
-- 历史 longform、日期型审计、旧发布材料、过期设计、完成的 spec-driven 工件和过期项目 skill 放到 `docs/history.md` 指向的外部 TokenDance docs 归档。
-- 新历史 longform 不进源仓：走 `docs/history.md` 指向的外部 TokenDance docs 归档。
-- `scripts/` 根目录只保留分类目录：`scripts/verify/`、`scripts/dev/`、`scripts/e2e/`、`scripts/git-hooks/`、`scripts/lib/`、`scripts/release/` 和 `scripts/smoke/`；不要新增根级脚本 wrapper。
-- 过时长期文档直接删除；需要保留审计轨迹时归档快照。
+- 历史 longform、日期型审计、旧发布材料和已完成 spec-driven 工件放到 `docs/history.md` 指向的外部归档；新历史 longform 不进源仓。
+- `scripts/` 根目录只保留分类目录（verify/dev/e2e/git-hooks/lib/release/smoke/）；不要新增根级脚本 wrapper。
+- 过时长期文档直接删除；需要保留审计轨迹时归档为只读快照，外迁规则见 `docs/history.md`。
 - 避免巨石文档：主入口只保留职责、摘要、当前事实和链接；长表、历史日志、验收证据和专题设计移到 owner 子文档或 archive。
 - 文档不写个人本机绝对路径、私有服务器、生产 secret、token、日志或截图中的敏感信息。
 - 修改目录、协议、分工或稳定规则后，同步 README、architecture、governance owner 文档和 verifier。
-- `.agenthub/memory/**` 是 gitignored 本机草稿，不是 SSOT；不得把 `project.md` 当进度或规则权威。权威仍是本文件与 GitHub issues（指针见 `docs/archives/analysis/local-memory-pointer.md`）。
+- `.agenthub/memory/**` 是 gitignored 本机 scratch，不是 SSOT；不得把 `project.md` 当进度或规则权威。进度与状态只写 GitHub Issue/PR；本仓库不维护本地 progress 文件，也不从已归档快照推断现场。
 
 ## 9. 安全和隐私
 
@@ -220,49 +209,11 @@ subagent 提示必须包含：目标、允许修改路径、禁改路径、必�
 
 ## 9.5 规则 → 机器验证映射
 
-下表列出有机器管的规则与其验证脚本、CI job。脚本路径与 CI 文件由 `verify-doc-ssot.py` 校验存在性；`无` 表示暂无机器验证，靠人工自觉，规则本身不因此失效。
+机器验证的完整映射（规则 → 验证脚本/负向自测 → CI job）在 `docs/governance/verifier-map.md`（SSOT，脚本与 CI 路径由 `verify-doc-ssot.py` 校验存在性）；本节不复制长表。
 
-| 规则 | 验证脚本 | CI job |
-|---|---|---|
-| CI 路径筛选与 job 结构（统一 `changes` job） | `scripts/verify/verify-ci-gates.py` | checks.yml → validate |
-| action runtime 只允许 node24（防 Node-20 major 回退，#1580） | `scripts/verify/verify-action-runtimes.py`（负向自测 `scripts/verify/tests/verify-action-runtimes.Tests.py`） | checks.yml → validate |
-| Hub lint finding fingerprint ratchet（防新增/替换，#1573） | `scripts/verify/verify-hub-lint-ratchet.py`（负向自测 `scripts/verify/tests/verify-hub-lint-ratchet.Tests.py`，baseline `scripts/verify/hub-lint-baseline.json`） | checks.yml → go-hub |
-| skill 白名单只提交 active skill | `scripts/verify/verify-project-skills.py` | checks.yml → validate |
-| 文档与 Agent 入口 SSOT：根级入口/路径/行数/标记/映射表保鲜 | `scripts/verify/verify-doc-ssot.py`（负向自测 `scripts/verify/tests/verify-doc-entrypoints.Tests.py`） | checks.yml → validate |
-| Web Hub-only 边界（不直连 Local Edge） | `scripts/verify/verify-web-hub-boundary.py` | checks.yml → validate |
-| Hub 纯包导入（不依赖框架包） | `scripts/verify/verify-hub-pure-packages.py` | checks.yml → validate |
-| Mobile Hub-only 边界（不直连 Local Edge/runtime） | `scripts/verify/verify-mobile-hub-boundary.py` | checks.yml → validate |
-| hubClient thin-shell SSOT（客户端不分叉 REST 实现） | `scripts/verify/verify-hubclient-ssot.py` | checks.yml → validate |
-| Design token SSOT（CSS 硬编码颜色禁令） | `scripts/verify/verify-design-token-ssot.py` | checks.yml → validate |
-| shared UI i18n callsites ratchet（CJK 字面量不得新增，#1612） | `scripts/verify/verify-i18n-callsites.py` | checks.yml → validate |
-| 演示诚实：stub/fixture 不得冒充真实登录/API | `scripts/verify/verify-real-e2e-contract.py` | checks.yml → validate |
-| OpenAPI↔hub router 合同一致 | `scripts/verify/verify-openapi-contract.py` | checks.yml → validate |
-| shared 内不出现 Edge 客户端实现 | `scripts/verify/verify-shared-boundary.py` | checks.yml → validate |
-| shared barrel 不泄漏 Edge 导出 | `scripts/verify/verify-shared-barrel.py` | checks.yml → validate |
-| Hub handler 不直连 repository | `scripts/verify/verify-hub-layering.py` | checks.yml → validate |
-| router 方法必须在 conventions.md 文档化 | `scripts/verify/verify-conventions.py` | checks.yml → validate |
-| 出站 client 卫生：service/jwtutil/edge-hub 范围内禁裸 client、禁 request-path env 读取、外部响应必须有 body limit、retry 必须有预算；allowlist 只缩且带 issue（#1549/#1564） | `scripts/verify/verify-outbound-client-hygiene.py`（负向自测 `scripts/verify/tests/verify-outbound-client-hygiene.Tests.py`） | checks.yml → validate |
-| shared REST contract 与 Hub router 一致 | `scripts/verify/verify-shared-rest-contract.py` | checks.yml → validate |
-| shared UI 依赖 hubClient 门禁 | `scripts/verify/verify-shared-ui-hubclient.py` | checks.yml → validate |
-| 前端覆盖率基线不回退 | `scripts/verify/verify-coverage-baseline.py` | checks.yml → validate |
-| shared edge 表面不被 web/mobile-rn import（A-V3 门禁） | `scripts/verify/verify-shared-edge-surface-isolation.py` | checks.yml → validate |
-| v4 旧 UI 组件/路由不得复活 | `scripts/verify/verify-v4-old-ui-active-paths.py` | checks.yml → validate |
-| Hub/Edge gosec SAST 告警清零（#1574：hard fail——Security scan (gosec) 已移除 continue-on-error，并经 `verify-gosec-gates.sh` fail-closed 校验） | `scripts/verify/verify-gosec-gates.sh`（负向自测 `scripts/verify/tests/verify-gosec-gates.Tests.sh`） | checks.yml → go-edge / go-hub |
-| OIDC 配置形状与边界（issuer/redirect/无 secret） | 旧 OIDC readiness 检查器已退役（2026-08-07，#1653：断言旧服务/测试名）；配置形状与证据等级见 `docs/architecture/05-deployment.md` 部署证据等级表（OIDC 行）；WSL 全栈 E2E 覆盖真实 OIDC 流 | — |
-| P0 remote-control fixture 就绪 | `scripts/verify/verify-p0-remote-control-fixture.py` | checks.yml → backend-e2e-fixture |
-| 后端 perf/leak 门禁（手动触发） | `scripts/verify/verify-backend-perf-leak-gates.py` | checks.yml → backend-perf-leak-gates |
-| 部署形状 SSOT：唯一 production compose、镜像名 SSOT、遗留清单关闭（#1527） | `scripts/verify/verify-deployment-shape.py`（负向自测 `scripts/verify/tests/verify-deployment-shape.Tests.py`） | cd-pr-check.yml → deployment-files |
-| Tauri packaged 行为与签名门禁 | `scripts/release/verify-tauri-package-readiness.py` | release-readiness.yml |
-| Tauri installer 冒烟 | `scripts/release/verify-tauri-installer-smoke.py` | release-readiness.yml |
-| Tauri dry 打包 | `scripts/release/verify-tauri-package-dry.py` | release-readiness.yml |
-| secrets/token 不落库 | `scripts/verify/check-secrets.sh` | checks.yml → validate |
-| 提交格式 `type(scope): 中文摘要`（PR 时） | `scripts/verify/verify-commit-messages.sh` | checks.yml → validate |
-| UI Visual QA shell 行为证明（1440x810 light/dark） | `app/{desktop,web}/scripts/visual-qa-shell.mjs` | checks.yml → visual-qa-shell |
-| 真实登录/OIDC e2e 链路（需真实服务与凭据，`scripts/verify/verify-oidc-flow.py` 等 gate 保留在 `scripts/verify/`） | 无 | 无 |
-| 交互型 UI/UX 验收（Type/Motion/Empty 等跨组件行为） | 无 | 无 |
-| 配置组合安全（fail-closed 默认/env 全覆盖） | `hub-server/internal/config/config_validate.go`（校验入口）+ `hub-server/internal/config/constants.go`（`AuthFailClosedDefault`、`RateLimitFailOpenDefault`：auth 路径恒 fail-closed，非 auth 路径可 fail-open） | 无 |
-| edge debug 端点鉴权（Dev→nil / LocalAuthToken→Bearer / HubJWTSecret→hub-JWT 校验） | `edge-server/internal/httpserver/server_auth.go`（`debugAuthFunc` 分层鉴权，pprof/config/state 端点） | 无 |
-| 域 SSOT（CSP / Desktop 默认 URL / compose 回调域 三方一致） | `app/desktop/src-tauri/tauri.conf.json`（CSP + 默认 URL）；compose 回调域见 `deployments/production/.env.example`；专用 verifier 暂未建 | 无 |
+- 何时读：给规则配新机器门禁、改 CI job、核对负向自测、或审计某条规则有没有机器管时。
+- 里面有什么：全表三列（规则/验证脚本/CI job）+ 维护规则；`无` 表示暂无机器验证，靠人工自觉，规则本身不因此失效。
+- 权威范围：映射只描述“有没有机器管”，规则本身的权威仍是本文件；两者冲突时以本文件为准，并更新映射表。
 
 ## 10. 验证纪律
 
@@ -293,36 +244,16 @@ UI 工作流变更必须有行为断言，不只截图：共享 unit/contract + 
 
 ## 12. 发布流程
 
-唯一发布入口：本地打 tag → `git push origin <tag>` → `.github/workflows/release.yml` 触发构建并出 GitHub Release。旁路入口 cd-desktop.yml 与 scripts/release/release.ps1 已于 2026-08-02 删除。完整 tag SOP（前置校验、tag 格式正则、产物门控 variable、冻结开关）见 `docs/developer-quickstart.md` §发布 tag SOP。
+唯一发布入口：本地打 tag → `git push origin <tag>` → `.github/workflows/release.yml` 触发构建并出 GitHub Release。tag SOP（前置校验、tag 格式、产物门控、冻结开关）见 `docs/developer-quickstart.md` §发布 tag SOP。
 
-版本号递增纪律（1.0 之前，0.x 阶段）：
+版本号递增纪律（1.0 之前，0.x 阶段）：默认升 patch（如 0.6.0 → 0.6.1）；升 minor（v0.(x+1).0）需产品级理由（新平台、破坏性变更或对外里程碑）；RC 走 `vX.Y.Z-rc.N`（prerelease，不覆盖稳定 tag）；三端版本同步（desktop 必须与 tag 一致，web/mobile 落后在 release notes 注明，不单独打 tag）。**禁止**：同一 minor 反复 bump、24 小时内重打同 minor（patch 除外）、1.0 前打 `v1.x`。
 
-- **默认升 patch**：常规发布打 `v0.x.y+1`（如 0.6.0 → 0.6.1），保持小步快跑，避免版本号虚高。
-- **升 minor（v0.(x+1).0）需产品级理由**：新平台支持、破坏性 UI/API 变更、或对外公告的功能里程碑；日常功能/修复/重构一律 patch。
-- **RC 走 `vX.Y.Z-rc.N`**：正式发版前可迭代 rc，GitHub Release 自动标记 prerelease；RC 不覆盖稳定 tag。
-- **三端版本同步**：desktop（package.json + tauri.conf.json）版本必须与 tag 一致；web/mobile 版本落后 desktop 时在 release notes 中注明，不单独打三份 tag。
-- **禁止**：同一 minor 内反复 bump minor；tag 打后 24 小时内再打同 minor 的新 minor（patch 除外）；1.0 前打 `v1.x`。
-
-平台策略（Windows 唯一桌面目标、macOS 停用、NSIS+portable、`RELEASE_MOBILE_ENABLED`/`RELEASE_UNSIGNED_OK`/`RELEASE_SIGNING_APPROVED` 门控）与产物命名/双语 release notes/SHA256SUMS 细节均在 `docs/developer-quickstart.md` §发布 tag SOP 步骤 4；release.yml 改动须过 `release-readiness.yml` 门禁。
-
-发布后按 `docs/developer-quickstart.md` §发布 tag SOP 步骤 5 核对产物（14 项 + 描述）；release job 失败按步骤 6 重发（移 tag → 删旧 release → 重推，softprops 不覆盖已存在 release）。
+平台策略（Windows 唯一桌面目标、NSIS+portable、`RELEASE_MOBILE_ENABLED`/`RELEASE_UNSIGNED_OK`/`RELEASE_SIGNING_APPROVED` 门控）与产物命名/双语 release notes 见 `docs/developer-quickstart.md` §发布 tag SOP 步骤 4；发布后产物核对见步骤 5，release job 失败按步骤 6 重发。
 
 ## 13. 依赖更新（Renovate）
 
-依赖更新由 `.github/renovate.json` 驱动，配置 SSOT 即该文件；本节只总结策略，不复制规则细节。
+配置 SSOT 是 `.github/renovate.json`，本节只总结策略，不复制规则细节。
 
-| 策略 | 行为 |
-|---|---|
-| 启用 managers | `npm`、`gomod`、`cargo`、`dockerfile`、`github-actions`、`docker-compose` |
-| 调度 | 周一 09:00 后（Asia/Shanghai）；`prConcurrentLimit=10`、`prHourlyLimit=2` |
-| patch 更新 | 周一自动合并（`automerge: true`，squash），但 `ignoreTests: false` + `stabilityDays: 1`——必须等 `.github/workflows/checks.yml` 全绿且沉淀 1 天才合并，CI 红时 Renovate 不会自合。 |
-| minor 更新 | 周一汇总成一个 review PR，**不**自动合并，需人工审。 |
-| major 更更新 | 每个一个独立 PR，**不**自动合并，需人工审。 |
-| 排除的 major | `expo`/`expo-*`（mobile 生态 major 由 mobile 通道管）、`storybook`/`@storybook/*`（8→10 迁移延期）、`vite`（6→8 迁移面大）、`typescript`（5→7 迁移面大）。这些 major Renovate 不开 PR。 |
-
-纪律：
-
-- 不要在 AGENTS.md 或子文档复制 renovate.json 的具体 rule 值——改规则只改 `.github/renovate.json`，本表随之过期以配置为准。
-- patch auto-merge 的安全前提是 `checks.yml` 全绿。若 checks.yml 被禁用或跳过，Renovate 不会自动合并（`ignoreTests: false`），但也不应有人手动绕过 CI 合 patch。
-- Expo/Storybook/vite/TS 的 major 排除是"延期"，不是"永禁"。相关迁移由各自通道（mobile/design/build）推进，迁完再在 renovate.json 移除对应 `enabled: false` rule。
-- Renovate PR 一律带 `dependencies` label，便于过滤。
+- patch：周一自动合并（squash），前提是 `.github/workflows/checks.yml` 全绿且沉淀 1 天；CI 红时 Renovate 不自合。
+- minor/major：汇总 review PR，不自动合并；`expo`/`expo-*`、`storybook`/`@storybook/*`、`vite`、`typescript` 的 major 不开 PR。
+- 改规则只改 `.github/renovate.json`，不在本文件或子文档复制 rule 值；上述 major 排除是“延期”不是“永禁”，迁移完成后由对应通道更新配置。Renovate PR 一律带 `dependencies` label。

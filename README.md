@@ -28,7 +28,7 @@ AgentHub 让你像在 IM 群聊里协作一样，把真人好友、Builder、Rev
 - **IM 形态协作** — 单聊、群聊、@Agent，在同一条任务流里完成
 - **多 Runtime 调度** — Claude Code、Codex、OpenCode 通过统一 Adapter 接入
 - **Diff / Preview / Approval** — 代码变更内联展示，审批流可控
-- **三端原生** — Tauri Desktop + Web + Expo React Native Mobile（Mobile 装配中，见 [CHANGELOG](CHANGELOG.md) Wave5/6）
+- **三端原生** — Tauri Desktop + Web + Expo React Native Mobile（Desktop/Web 主线，Mobile 装配中）
 - **Hub-Edge 分布式** — 本地执行不依赖 Hub；Hub 提供多端同步、远程查看和审计
 
 ## 技术栈
