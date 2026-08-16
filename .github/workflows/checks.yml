@@ -1139,6 +1139,9 @@ jobs:
       - name: Verify CI gate policy
         run: python ./scripts/verify/verify-ci-gates.py
 
+      - name: Self-test coverage baseline metadata/write safety
+        run: python scripts/verify/tests/coverage-baseline.Tests.py
+
       - name: Verify action runtime allow-list (no Node-20 actions)
         run: python ./scripts/verify/verify-action-runtimes.py
 
