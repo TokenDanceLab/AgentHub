@@ -22,6 +22,8 @@
     "test:e2e:desktop": "pnpm --filter agenthub-desktop test:e2e",
     "test:smoke:matrix": "python ../scripts/smoke/verify-e2e-smoke-matrix.py -RepoRoot ..",
     "lint:css": "stylelint \"**/*.css\" --ignore-path .stylelintignore",
+    "test:css-syntax": "node scripts/verify-design-css-syntax.mjs",
+    "test:css-syntax:self-test": "node scripts/verify-design-css-syntax.mjs --self-test",
     "test:e2e:geometry-smoke": "pnpm --filter agenthub-web test:e2e:geometry-smoke && pnpm --filter agenthub-desktop test:e2e:geometry-smoke"
   },
   "pnpm": {
