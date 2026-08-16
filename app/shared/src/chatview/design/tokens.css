@@ -28,7 +28,7 @@
      Row rhythm consumes --chat-sp-md (12) not --chat-sp-lg so more turns fit 1440×810.
 
      #1672 M7：密度阶梯使用 --chat-* 前缀（产品局部组合，值故意偏离
-     --td-space-*/--td-radius-* 契约刻度；前缀消除"平行词汇"外观）。 */
+     --td-space-* 与 --td-radius-* 契约刻度；前缀消除"平行词汇"外观）。 */
   --chat-sp-xs: 4px; --chat-sp-sm: 8px;
   --chat-sp-md: var(--space-md, 12px); /* 12px = base compat --space-md, not v4 --sp-md */
   --chat-sp-lg: 16px; --chat-sp-xl: 24px;
