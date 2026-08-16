@@ -211,7 +211,12 @@ describe('edgeClient', () => {
 
   describe('startRun', () => {
     it('posts and returns run info', async () => {
-      const mock = { runId: 'run_abc123', status: 'queued' };
+      const mock = {
+        runId: 'run_abc123',
+        projectId: 'proj_local',
+        threadId: 'thread_local',
+        status: 'queued',
+      };
       vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce({
         ok: true,
         json: () => Promise.resolve(mock),
@@ -220,13 +225,20 @@ describe('edgeClient', () => {
       const result = await startRun();
       expect(result.runId).toMatch(/^run_/);
       expect(result.status).toBe('queued');
+      expect(result.projectId).toBe('proj_local');
+      expect(result.threadId).toBe('thread_local');
     });
 
     it('sends Edge auth token when one is stored locally', async () => {
       localStorage.setItem('agenthub:edge_auth_token', 'local-edge-token');
       const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce({
         ok: true,
-        json: () => Promise.resolve({ runId: 'run_abc123', status: 'queued' }),
+        json: () => Promise.resolve({
+          runId: 'run_abc123',
+          projectId: 'proj_local',
+          threadId: 'thread_local',
+          status: 'queued',
+        }),
       } as Response);
 
       await startRun();
@@ -244,7 +256,12 @@ describe('edgeClient', () => {
     it('preserves OpenAPI run routing fields in the request body', async () => {
       const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce({
         ok: true,
-        json: () => Promise.resolve({ runId: 'run_abc123', status: 'queued' }),
+        json: () => Promise.resolve({
+          runId: 'run_abc123',
+          projectId: 'proj_local',
+          threadId: 'thread_local',
+          status: 'queued',
+        }),
       } as Response);
 
       await startRun({
@@ -274,14 +291,20 @@ describe('edgeClient', () => {
     it('preserves threadId in the request body', async () => {
       const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce({
         ok: true,
-        json: () => Promise.resolve({ runId: 'run_abc123', status: 'queued', threadId: 'thread-1' }),
+        json: () => Promise.resolve({
+          runId: 'run_abc123',
+          projectId: 'proj_local',
+          status: 'queued',
+          threadId: 'thread-1',
+        }),
       } as Response);
 
-      await startRun({
+      const result = await startRun({
         prompt: 'continue thread',
         threadId: 'thread-1',
       });
 
+      expect(result.threadId).toBe('thread-1');
       expect(fetchSpy).toHaveBeenCalledWith(
         expect.stringMatching(/\/v1\/runs$/),
         expect.objectContaining({
@@ -292,11 +315,35 @@ describe('edgeClient', () => {
         }),
       );
     });
+
+    it('returns raw data with exactly one drift warning when projectId/threadId are missing', async () => {
+      const driftPayload = { runId: 'run_drift', status: 'queued' };
+      vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve(driftPayload),
+      } as Response);
+      // The spy keeps the real console.warn running (no mockImplementation),
+      // so the drift warning is recorded but not swallowed.
+      const warnSpy = vi.spyOn(console, 'warn');
+
+      const result = await startRun();
+
+      // Schema-safe fallback contract: raw data survives an incomplete run
+      // response instead of crashing the UI.
+      expect(result).toEqual(driftPayload);
+      expect(warnSpy).toHaveBeenCalledTimes(1);
+      expect(warnSpy.mock.calls[0]?.[0]).toContain('[schema] startRun schema drift detected');
+    });
   });
 
   describe('cancelRun', () => {
     it('posts cancel and returns status', async () => {
-      const mock = { runId: 'run_abc123', status: 'cancelling' };
+      const mock = {
+        runId: 'run_abc123',
+        projectId: 'proj_local',
+        threadId: 'thread_local',
+        status: 'cancelling',
+      };
       vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce({
         ok: true,
         json: () => Promise.resolve(mock),
@@ -305,12 +352,19 @@ describe('edgeClient', () => {
       const result = await cancelRun('run_abc123');
       expect(result.runId).toBe('run_abc123');
       expect(result.status).toBe('cancelling');
+      expect(result.projectId).toBe('proj_local');
+      expect(result.threadId).toBe('thread_local');
     });
 
     it('URL-encodes the runId', async () => {
       const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce({
         ok: true,
-        json: () => Promise.resolve({ runId: 'run_x', status: 'cancelling' }),
+        json: () => Promise.resolve({
+          runId: 'run_x',
+          projectId: 'proj_local',
+          threadId: 'thread_local',
+          status: 'cancelling',
+        }),
       } as Response);
 
       await cancelRun('run_x');
