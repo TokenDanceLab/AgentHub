@@ -259,7 +259,17 @@ def check_max_lines() -> None:
         "docs/decisions.md": 80,
         "docs/developer-quickstart.md": 170,
         "docs/architecture.md": 170,
+        "docs/architecture/01-hub-server.md": 200,
+        "docs/architecture/02-edge-server.md": 200,
+        "docs/architecture/03-runtime-adapters.md": 200,
         "docs/architecture/04-frontend-data-flow.md": 150,
+        "docs/architecture/05-deployment.md": 200,
+        "docs/architecture/06-auth-identity.md": 200,
+        "docs/architecture/07-design-system-ssot.md": 150,
+        "docs/architecture/08-outbound-http.md": 150,
+        "docs/architecture/09-dev-server-topology.md": 80,
+        "docs/architecture/github-actions-ci-cd-policy.md": 120,
+        "docs/architecture/README.md": 40,
         "docs/api-reference.md": 80,
         "docs/reference/README.md": 80,
         "docs/reference/sdk-agent-strategy.md": 120,
@@ -434,6 +444,12 @@ def check_doc_internal_links() -> None:
             for name in sorted(os.listdir(d_abs)):
                 if name.endswith(".md"):
                     active_files.append(os.path.join(d, name))
+    # Also cover root-level and module README files that is_active_doc() tracks,
+    # so broken links in README.md / CONTRIBUTING.md / AGENTS.md markdown links
+    # are caught (previously only the 4 docs/ subdirectories were scanned).
+    for f in git_ls_files():
+        if is_active_doc(f) and exists(f) and f not in active_files:
+            active_files.append(f)
     link_re = re.compile(r"\[[^\]]+\]\(([^)]+)\)")
     for doc_rel in active_files:
         text = read_text(doc_rel)
