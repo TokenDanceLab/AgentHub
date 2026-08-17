@@ -101,7 +101,7 @@ export const DocxPreview: React.FC<DocxPreviewProps> = ({
           <span className={styles.badge}>DOCX</span>
         </div>
         {onClose && (
-          <Tooltip label="关闭预览">
+          <Tooltip label={t("aria.closePreview")}>
             <Button
               variant="ghost"
               size="sm"

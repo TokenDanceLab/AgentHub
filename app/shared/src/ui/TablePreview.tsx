@@ -242,7 +242,7 @@ export const TablePreview: React.FC<TablePreviewProps> = ({
           <span className={styles.badge}>{fileExt}</span>
         </div>
         {onClose && (
-          <Tooltip label="关闭预览">
+          <Tooltip label={t("aria.closePreview")}>
             <Button
               variant="ghost"
               size="sm"

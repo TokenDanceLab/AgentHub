@@ -239,7 +239,7 @@ export const SlideshowPreview: React.FC<SlideshowPreviewProps> = ({
           {totalSlides > 0 ? `${currentSlide + 1} / ${totalSlides}` : '—'}
         </span>
         {onClose && (
-          <Tooltip label="关闭预览">
+          <Tooltip label={t("aria.closePreview")}>
             <Button
               variant="ghost"
               size="sm"
@@ -276,7 +276,7 @@ export const SlideshowPreview: React.FC<SlideshowPreviewProps> = ({
       {/* ── Slide view ── */}
       {!loading && !error && currentSlideData && (
         <div className={styles.slideArea}>
-          <Tooltip label="上一张">
+          <Tooltip label={t("aria.previousImage")}>
             <button
               className={styles.navBtn}
               onClick={prevSlide}
@@ -306,7 +306,7 @@ export const SlideshowPreview: React.FC<SlideshowPreviewProps> = ({
             </div>
           </div>
 
-          <Tooltip label="下一张">
+          <Tooltip label={t("aria.nextImage")}>
             <button type="button"
               className={styles.navBtn}
               onClick={nextSlide}
