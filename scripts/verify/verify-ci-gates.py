@@ -132,6 +132,8 @@ def main() -> int:
     assert_contains(vuln_go, re.escape("verify-vulnerability-gates.sh govulncheck"), "vuln-scan-go must run the fail-closed govulncheck verifier")
     assert_contains(vuln_js, re.escape("verify-vulnerability-gates.sh pnpm-audit"), "vuln-scan-js must run the fail-closed pnpm audit verifier")
     assert_contains(validate, r"Self-test vulnerability gates", "validate must self-test the vulnerability gates")
+    assert_contains(validate, r"Self-test gosec gate", "validate must self-test the gosec fail-closed contract")
+    assert_contains(validate, r"Self-test secret guard", "validate must self-test the secret guard fail-closed contract")
 
     # Native Windows is a compatibility contract, not a duplicate release
     # pipeline: backend and frontend matrix legs must remain path-filtered and
