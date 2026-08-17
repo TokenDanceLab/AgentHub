@@ -266,7 +266,8 @@ func TestRateLimitFailClosed_AuthPath(t *testing.T) {
 	handler(c)
 
 	assert.True(t, c.IsAborted(), "auth path sliding window should fail-closed when Redis is down")
-	assert.Equal(t, http.StatusInternalServerError, w.Code)
+	assert.Equal(t, http.StatusServiceUnavailable, w.Code)
+	assert.Contains(t, w.Body.String(), "rate_limit_unavailable")
 }
 
 // redisDownClient creates a cache client whose underlying Redis server is shut
