@@ -300,7 +300,7 @@ export const ChatViewTranscript = memo(function ChatViewTranscript({ transcript,
                 variant="ghost"
                 size="sm"
                 aria-label={t("aria.openPinned")}
-                title="打开置顶内容"
+                title={t("aria.openPinned")}
                 onClick={pinnedAnnouncement.onCopy}
                 type="button"
               >
@@ -312,7 +312,7 @@ export const ChatViewTranscript = memo(function ChatViewTranscript({ transcript,
                 variant="ghost"
                 size="sm"
                 aria-label={t("aria.closePinned")}
-                title="关闭置顶"
+                title={t("aria.closePinned")}
                 onClick={pinnedAnnouncement.onDismiss}
                 type="button"
               >
