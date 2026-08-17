@@ -64,7 +64,7 @@ describe('SettingsPage load/error UX', () => {
       />,
     );
 
-    expect(screen.getByRole('alert', { name: '设置加载失败' })).toBeInTheDocument();
+    expect(screen.getByRole('alert', { name: 'settings.loadFailed' })).toBeInTheDocument();
     expect(screen.getByText('backend down')).toBeInTheDocument();
 
     screen.getByRole('button', { name: '重试加载' }).click();
