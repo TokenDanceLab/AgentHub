@@ -9,6 +9,8 @@ import { DateDivider } from './DateDivider'
 import { UnreadDivider } from './UnreadDivider'
 import { CompactDivider } from './CompactDivider'
 import { stableInteractionId } from './RowItem'
+import { useTranslation } from 'react-i18next'
+import { CHATVIEW_I18N_NAMESPACE } from '../i18n/resources'
 import './Transcript.css'
 
 const AUTO_FOLLOW_THRESHOLD_PX = 96
@@ -314,6 +316,7 @@ function buildBlockIndexMap(segments: TranscriptSegment[]): Map<string, number> 
 }
 
 const TranscriptImpl = forwardRef<TranscriptHandle, Props>(function Transcript({ items, sessionId, chatMode, onAgentClick, onBlockContextMenu, onBlockSelect, onBlockAction, onReviewFile, onDeploySubmit, selectedBlockIds, selectionMode, softHiddenBlockIds, actionedBlockIds, renderUserFooter, unreadDivider, compactDividers }: Props, ref) {
+  const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE)
   const segments = useMemo(() => partitionWithDates(items, unreadDivider, compactDividers), [items, unreadDivider, compactDividers])
   /**
    * Streaming throttle for the role=log live region (#11). While any row is
@@ -454,7 +457,7 @@ const TranscriptImpl = forwardRef<TranscriptHandle, Props>(function Transcript({
         <button
           className="scroll-to-bottom-btn"
           onClick={() => scrollToBottom(transcriptRef.current!)}
-          aria-label="回到底部"
+          aria-label={t("aria.scrollToBottom")}
           type="button"
         >
           <ArrowDown size={18} />

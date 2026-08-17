@@ -1,5 +1,11 @@
 import { fireEvent, render, waitFor } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeAll, describe, expect, it, vi } from 'vitest';
+import { useTestI18nLanguage } from '../../testing/i18n';
+
+beforeAll(async () => {
+  await useTestI18nLanguage('zh');
+});
+
 import { Transcript } from './Transcript';
 import type { TranscriptItem } from '../transcript-item';
 

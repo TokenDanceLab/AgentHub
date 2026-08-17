@@ -20,6 +20,8 @@ import { AlertCircle, ChevronLeft, ChevronRight, RotateCcw, X } from 'lucide-rea
 import { Button } from './Button';
 import styles from './SlideshowPreview.module.css';
 import { Tooltip } from './Tooltip';
+import { useTranslation } from 'react-i18next';
+import { CHATVIEW_I18N_NAMESPACE } from '../chatview/i18n/resources';
 
 export interface SlideshowPreviewProps {
   fileUrl: string;
@@ -148,6 +150,7 @@ export const SlideshowPreview: React.FC<SlideshowPreviewProps> = ({
   fileBlob,
   onClose,
 }) => {
+  const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE);
   const [slides, setSlides] = useState<SlideData[]>([]);
   const [currentSlide, setCurrentSlide] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -242,7 +245,7 @@ export const SlideshowPreview: React.FC<SlideshowPreviewProps> = ({
               size="sm"
               type="button"
               onClick={onClose}
-              aria-label="关闭预览"
+              aria-label={t("aria.closePreview")}
             >
               <X size={16} />
             </Button>
@@ -279,7 +282,7 @@ export const SlideshowPreview: React.FC<SlideshowPreviewProps> = ({
               onClick={prevSlide}
               disabled={currentSlide === 0}
               type="button"
-              aria-label="上一张"
+              aria-label={t("aria.previousImage")}
             >
               <ChevronLeft size={20} />
             </button>
@@ -309,7 +312,7 @@ export const SlideshowPreview: React.FC<SlideshowPreviewProps> = ({
               onClick={nextSlide}
               disabled={currentSlide >= totalSlides - 1}
               type="button"
-              aria-label="下一张"
+              aria-label={t("aria.nextImage")}
             >
               <ChevronRight size={20} />
             </button>

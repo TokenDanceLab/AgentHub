@@ -29,6 +29,7 @@ function DocTableRow({
   onDelete?: ((doc: DocRow) => void) | undefined;
   profiles?: WorkbenchProfileSource[] | undefined;
 }) {
+  const { t } = useTranslation(SHARED_WORKBENCH_I18N_NAMESPACE);
   const [confirming, setConfirming] = useState(false);
   const handleClick = useCallback(() => {
     onClick?.(doc);
@@ -75,7 +76,7 @@ function DocTableRow({
           </>
         ) : onDelete ? (
           <Tooltip label="删除文档">
-            <button type="button" className={styles.docDeleteBtn} onClick={handleDelete} aria-label="删除文档">
+            <button type="button" className={styles.docDeleteBtn} onClick={handleDelete} aria-label={t("aria.deleteDoc")}>
               <DesignNavIcon name="close" size={14} />
             </button>
           </Tooltip>

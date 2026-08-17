@@ -17,6 +17,8 @@ import { AlertCircle, ArrowUp, ArrowDown, ArrowUpDown, RotateCcw, X } from 'luci
 import { Button } from './Button';
 import styles from './TablePreview.module.css';
 import { Tooltip } from './Tooltip';
+import { useTranslation } from 'react-i18next';
+import { CHATVIEW_I18N_NAMESPACE } from '../chatview/i18n/resources';
 
 export interface TablePreviewProps {
   fileUrl: string;
@@ -71,6 +73,7 @@ export const TablePreview: React.FC<TablePreviewProps> = ({
   fileBlob,
   onClose,
 }) => {
+  const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE);
   const [headers, setHeaders] = useState<string[]>([]);
   const [rows, setRows] = useState<string[][]>([]);
   const [rawRows, setRawRows] = useState<string[][]>([]);
@@ -245,7 +248,7 @@ export const TablePreview: React.FC<TablePreviewProps> = ({
               size="sm"
               type="button"
               onClick={onClose}
-              aria-label="关闭预览"
+              aria-label={t("aria.closePreview")}
             >
               <X size={16} />
             </Button>
@@ -255,7 +258,7 @@ export const TablePreview: React.FC<TablePreviewProps> = ({
 
       {/* ── Sheet tabs ── */}
       {sheetNames.length > 1 && (
-        <div className={styles.sheetTabs} role="tablist" aria-label="工作表">
+        <div className={styles.sheetTabs} role="tablist" aria-label={t("aria.worksheet")}>
           {sheetNames.map((name) => (
             <button
               key={name}

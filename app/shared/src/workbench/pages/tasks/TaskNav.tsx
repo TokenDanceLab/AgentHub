@@ -40,7 +40,7 @@ export function TaskNav({
       <button
         type="button"
         className={`${styles.navMore} ${navMenuOpen ? styles.navMoreActive : ''}`}
-        aria-label="任务更多操作"
+        aria-label={t("aria.taskMoreActions")}
         aria-expanded={navMenuOpen}
         onClick={onNavMore}
       >

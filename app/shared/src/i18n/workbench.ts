@@ -269,6 +269,17 @@ export const sharedWorkbenchResources = {
       openSession: '打开完整会话',
       transcriptLabel: '子会话事件流',
     },
+    aria: {
+      deleteDoc: '删除文档',
+      themeColor: '主题色',
+      switchView: '切换视图',
+      taskMoreActions: '任务更多操作',
+      docSettings: '云文档设置',
+      moreTags: '更多标签',
+      rightWorkspace: '右侧工作区',
+      newRightWindow: '新建右侧窗口',
+      rightWindowMenu: '右侧窗口菜单',
+    },
   },
   en: {
     nav: {
@@ -535,6 +546,17 @@ export const sharedWorkbenchResources = {
       dialogTitle: '{{name}} · Sub-session details',
       openSession: 'Open full session',
       transcriptLabel: 'Sub-session event stream',
+    },
+    aria: {
+      deleteDoc: 'Delete document',
+      themeColor: 'Theme color',
+      switchView: 'Switch view',
+      taskMoreActions: 'More task actions',
+      docSettings: 'Document settings',
+      moreTags: 'More tags',
+      rightWorkspace: 'Right workspace',
+      newRightWindow: 'New right window',
+      rightWindowMenu: 'Right window menu',
     },
   },
 } as const;

@@ -120,6 +120,7 @@ export function ProjectEditor({
   onCancel: () => void;
   onSubmit: () => void;
 }): React.ReactElement {
+  const { t } = useTranslation(SHARED_WORKBENCH_I18N_NAMESPACE);
   const submitLabel = mode === 'create' ? '创建项目' : '保存项目';
   return (
     <form
@@ -149,7 +150,7 @@ export function ProjectEditor({
       </div>
       <fieldset className={styles.editorThemeColor}>
         <legend className={styles.editorThemeColorLegend}>主题色</legend>
-        <div className={styles.themeSwatchRow} role="radiogroup" aria-label="主题色">
+        <div className={styles.themeSwatchRow} role="radiogroup" aria-label={t("aria.themeColor")}>
           {FOLDER_THEME_COLORS.map((color) => {
             const meta = FOLDER_THEME_COLOR_META[color];
             const selected = draft.themeColor === color;
