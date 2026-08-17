@@ -598,12 +598,18 @@ func TestIsSensitiveEnvKeyPartialSuffixNotTriggered(t *testing.T) {
 	}
 }
 
-// envToMap converts a []string of KEY=VALUE pairs to a map.
+// envToMap converts a []string of KEY=VALUE pairs to a map that follows the
+// target operating system's environment-key semantics. Windows preserves the
+// original spelling of an existing key even when t.Setenv uses another case,
+// but environment lookups remain case-insensitive.
 func envToMap(env []string) map[string]string {
 	m := make(map[string]string, len(env))
 	for _, kv := range env {
 		key, val, ok := strings.Cut(kv, "=")
 		if ok {
+			if runtime.GOOS == "windows" {
+				key = strings.ToUpper(key)
+			}
 			m[key] = val
 		}
 	}

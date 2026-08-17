@@ -468,6 +468,7 @@ def main() -> int:
     REPO_ROOT = os.path.abspath(args.RepoRoot)
 
     step("Desktop version metadata")
+    workspace_package = read_json("app/package.json")
     package = read_json("app/desktop/package.json")
     tauri = read_json("app/desktop/src-tauri/tauri.conf.json")
     cargo_version = get_cargo_version("app/desktop/src-tauri/Cargo.toml")
@@ -480,6 +481,11 @@ def main() -> int:
     assert_true(tauri["productName"] == "AgentHub Desktop", "Desktop product name is stable")
     assert_release_tag_version_alignment(str(tauri["version"]))
 
+    package_manager = str(workspace_package.get("packageManager") or "")
+    assert_true(package_manager.startswith("pnpm@"), "frontend workspace pins pnpm through packageManager")
+    pnpm_version = package_manager.removeprefix("pnpm@")
+    assert_true(bool(re.fullmatch(r"\d+\.\d+\.\d+", pnpm_version)), "frontend workspace pins an explicit pnpm version")
+
     step("Windows package policy")
     assert_true(tauri["bundle"]["active"] is True, "Tauri bundle is active")
     assert_true(has_target(tauri["bundle"]["targets"], "nsis"), "Tauri bundle targets Windows NSIS")
@@ -489,9 +495,20 @@ def main() -> int:
 
     release_workflow_text = read_text(".github/workflows/release.yml")
     readiness_workflow_text = read_text(".github/workflows/release-readiness.yml")
+    checks_workflow_text = read_text(".github/workflows/checks.yml")
     governance_text = read_text("docs/governance/governance-execution.md")
     dry_gate_text = read_text("scripts/release/verify-tauri-package-dry.py")
     checker_text = read_file(os.path.abspath(__file__))
+    pnpm_version_pattern = rf'PNPM_VERSION:\s*"{re.escape(pnpm_version)}"'
+    for workflow_label, workflow_text in (
+        ("checks", checks_workflow_text),
+        ("release readiness", readiness_workflow_text),
+        ("release", release_workflow_text),
+    ):
+        assert_true(
+            re.search(pnpm_version_pattern, workflow_text, re.IGNORECASE),
+            f"{workflow_label} workflow uses workspace pnpm version {pnpm_version}",
+        )
     assert_true(re.search(r"agenthub-edge-x86_64-pc-windows-msvc\.exe", dry_gate_text, re.IGNORECASE), "release readiness dry gate prepares Windows sidecar agenthub-edge_x86_64-pc-windows-msvc.exe")
     assert_true(
         re.search(r"AgentHub_\$\{desktopVersion\}_x64-portable\.zip", dry_gate_text, re.IGNORECASE) or re.search(r"portable\.zip", dry_gate_text, re.IGNORECASE),
@@ -522,6 +539,10 @@ def main() -> int:
     step("Dry release policy")
     assert_true(re.search(r"workflow_dispatch", readiness_workflow_text, re.IGNORECASE), "release readiness workflow is manually runnable")
     assert_true(re.search(r"\.github/workflows/release\.yml", readiness_workflow_text, re.IGNORECASE), "release readiness workflow watches release.yml")
+    assert_true(
+        re.search(r"edge-server/internal/lifecycle/env_\*\.go", readiness_workflow_text, re.IGNORECASE),
+        "release readiness workflow watches the Windows environment inheritance contract",
+    )
     assert_true(re.search(r"app/desktop/src-tauri/Cargo\.lock", readiness_workflow_text, re.IGNORECASE), "release readiness workflow watches Cargo.lock")
     assert_true(not re.search(r"softprops/action-gh-release", readiness_workflow_text, re.IGNORECASE), "release readiness workflow does not create GitHub releases")
     assert_true(not re.search(r"gh release upload", readiness_workflow_text, re.IGNORECASE), "release readiness workflow does not upload release assets")
@@ -537,6 +558,12 @@ def main() -> int:
     installer_smoke_block = get_workflow_job_block(readiness_workflow_text, "windows-installer-smoke-preflight")
     assert_true(not re.search(r"pnpm\s+tauri\s+build", readiness_policy_block, re.IGNORECASE), "static readiness policy does not run full Tauri build")
     assert_true(not re.search(r"pnpm\s+tauri\s+build", installer_smoke_block, re.IGNORECASE), "installer smoke preflight does not run full Tauri build")
+    assert_true(
+        re.search(r"Verify Windows environment inheritance contract", installer_smoke_block, re.IGNORECASE)
+        and re.search(r"working-directory:\s*edge-server", installer_smoke_block, re.IGNORECASE)
+        and re.search(r"go test ./internal/lifecycle", installer_smoke_block, re.IGNORECASE),
+        "Windows installer smoke preflight runs the native environment inheritance contract",
+    )
     assert_workflow_command_explicit_opt_in(readiness_workflow_text, r"pnpm\s+tauri\s+build", "run_windows_package_dry", "windows-package-dry", "Full Tauri build")
 
     assert_generated_schema_clean()
