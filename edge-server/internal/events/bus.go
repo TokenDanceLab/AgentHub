@@ -96,6 +96,10 @@ type Bus struct {
 	stopCh    chan struct{}
 	jobs      chan observerJob
 	workersWg sync.WaitGroup
+
+	// closeOnce makes Close idempotent: a second call (e.g. from a shutdown
+	// hook + a defer in the same process) must not re-close stopCh and panic.
+	closeOnce sync.Once
 }
 
 // NewBus creates a new event bus with the given maximum history size.
@@ -431,13 +435,19 @@ func (b *Bus) DroppedCount() int64 {
 // Close shuts down the observer worker pool, closes the job channel, and
 // flushes and closes the underlying event log if one was configured via
 // WithEventLogPath. It is safe to call Close on a Bus that has no event log.
+//
+// Close is idempotent: a second call (e.g. from a shutdown hook plus a defer
+// in the same process) returns nil without re-closing stopCh and panicking.
 func (b *Bus) Close() error {
-	// Shut down the observer worker pool.
-	close(b.stopCh)
-	b.workersWg.Wait()
+	var eventLogErr error
+	b.closeOnce.Do(func() {
+		// Shut down the observer worker pool.
+		close(b.stopCh)
+		b.workersWg.Wait()
 
-	if b.eventLog != nil {
-		return b.eventLog.Close()
-	}
-	return nil
+		if b.eventLog != nil {
+			eventLogErr = b.eventLog.Close()
+		}
+	})
+	return eventLogErr
 }

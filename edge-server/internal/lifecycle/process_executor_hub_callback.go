@@ -249,6 +249,20 @@ func newHubCallbackQueueState(runID string) *hubCallbackQueueState {
 	}
 }
 
+// close idempotently closes the queue channel so the consumer goroutine (if
+// running) drains remaining jobs and exits. It is safe to call from finish()
+// when a panicked run skipped fireHubDone/fireHubFail and never enqueued a
+// terminal job — otherwise the queue entry and consumer would leak.
+func (s *hubCallbackQueueState) close() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.closed {
+		return
+	}
+	s.closed = true
+	close(s.ch)
+}
+
 // enqueueHubStreamJob appends a stream chunk to the run's FIFO without
 // blocking. Returns false when the queue is full (chunk dropped) or already
 // closed (terminal callback decided the run's delivery).
