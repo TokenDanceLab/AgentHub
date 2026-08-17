@@ -49,6 +49,7 @@ func TestDispatchTargetBound_RouteUnavailable_QueuesTargetTask(t *testing.T) {
 	assert.Contains(t, cache.pushed[0], userID, "push must include userID")
 	assert.Contains(t, cache.pushed[0], "target-desktop-1", "push must include targetID")
 	assert.Contains(t, cache.pushed[0], deviceID, "push must include deviceID")
+	assert.Contains(t, cache.pushed[0], string(payload), "push must include the original task JSON, not an altered copy")
 	assert.Equal(t, 0, ws.pushed, "must NOT push to WS conn (target is offline)")
 }
 
@@ -79,5 +80,6 @@ func TestDispatchTargetBound_ConnMismatch_QueuesTargetTask(t *testing.T) {
 	assert.False(t, delivered, "target-bound task with stale conn must not be delivered")
 	assert.Len(t, cache.pushed, 1, "must push to target queue exactly once")
 	assert.Contains(t, cache.pushed[0], "target-desktop-2", "push must include targetID")
+	assert.Contains(t, cache.pushed[0], string(payload), "push must include the original task JSON, not an altered copy")
 	assert.Equal(t, 0, ws.pushed, "must NOT push to WS conn (conn not found)")
 }
