@@ -2,7 +2,7 @@
 
 最后更新：2026-08-16
 
-本目录只保留仍会被当前实现或近期架构讨论引用的轻量参考。第三方项目调研、cc-switch 长文、旧设计系统报告和 Desktop 研究材料见 [../history.md](../history.md)。
+本目录只保留仍会被当前实现或架构 owner 文档引用的轻量参考。第三方项目调研、cc-switch 长文、旧设计系统报告和 Desktop 研究材料见 [../history.md](../history.md)。
 
 ## Active Reference
 

@@ -121,7 +121,7 @@ Mobile 主线是 Expo + React Native development build。旧 Tauri Mobile 不再
 
 | 层 | 内容 | 入口 | CI job |
 |---|---|---|---|
-| L0 单元 | Go `-short`（零依赖）+ 前端 vitest | `make test` / `make fe-test` | `go-edge-test`/`go-hub-test`（2-shard 包轮转）+ `go-edge`/`go-hub`（lint/覆盖率门禁）+ `frontend-*`（checks.yml） |
+| L0 单元 | Go `-short`（零依赖）+ 前端 vitest | `make test` / `make fe-test` | `go-edge-test`/`go-hub-test`（2-shard 包轮转）+ `go-edge`/`go-hub`（lint/覆盖率门禁）+ `frontend-*`（checks.yml）+ Windows 原生合同（`windows-go-test`/`windows-frontend-test` 执行矩阵 → `windows-go`/`windows-frontend` 稳定 required-check 聚合，见 `docs/architecture/github-actions-ci-cd-policy.md`） |
 | L1 集成 | Go 集成（真实 PG16+Redis7，OIDC mock，`-tags integration`） | `make test-hub-integration`（先 `scripts/dev/dev-up.sh` 起容器） | `backend-integration`（service 容器） |
 | L2 回调 E2E | Edge→Hub 回调链路（进程内 mock hub / fixture smoke） | `make test-edge-e2e` / `make e2e-local` | `backend-edge-e2e` / `backend-e2e-fixture` |
 | L3 真实 E2E | Playwright 真实登录/聊天流（真实 ID+Hub+Edge 栈） | 远程 dev 服务器：`scripts/dev/devserver.sh test|integration`（见 #1681） | 仓库自认空白（`wsl-full-stack-e2e.sh` WSL 专属） |
@@ -157,7 +157,7 @@ git worktree add .worktrees/<topic> -b <type>/<topic> origin/master
 - 完成后运行验收、push、开 PR；合并后删除分支和 worktree。
 - 不在共享分支 force-push（amend 后 force-with-lease 除外）。
 
-防线（三层，防 master 直 push / 历史重写 / 非 squash 合入）：(1) GitHub branch protection + repo 设置——master 禁 force/直 push、必须 PR、线性历史、squash only、要求 `validate`/`go-hub`/`go-edge`、`enforce_admins: true`；(2) 本地 pre-push hook（`scripts/git-hooks/pre-push`，`bash scripts/git-hooks/install.sh` 启用）——master 直 push 本地拦截，feat/fix/docs/chore/* 放行，`git push --no-verify` 紧急绕过；(3) CI——`scripts/verify/verify-commit-messages.sh` + `verify-ci-gates.py` 在 `validate` job fail-closed 校验 Conventional Commits 与 job 结构。详见 `scripts/git-hooks/` 与 `.github/workflows/checks.yml`。
+防线（三层，防 master 直 push / 历史重写 / 非 squash 合入）：(1) GitHub branch protection + repo 设置——master 禁 force/直 push、必须 PR、线性历史、squash only、要求 `validate`/`go-hub`/`go-edge`/`windows-go`/`windows-frontend`、`enforce_admins: true`；(2) 本地 pre-push hook（`scripts/git-hooks/pre-push`，`bash scripts/git-hooks/install.sh` 启用）——master 直 push 本地拦截，feat/fix/docs/chore/* 放行，`git push --no-verify` 紧急绕过；(3) CI——`scripts/verify/verify-commit-messages.sh` + `verify-ci-gates.py` 在 `validate` job fail-closed 校验 Conventional Commits 与 job 结构。详见 `scripts/git-hooks/` 与 `.github/workflows/checks.yml`。
 
 提交格式：
 
