@@ -56,6 +56,7 @@ make fe-typecheck
 make fe-test
 python scripts/verify/verify-ci-gates.py
 python scripts/verify/verify-doc-ssot.py
+python -c "import yaml, pathlib; yaml.safe_load(pathlib.Path('api/openapi.yaml').read_text(encoding='utf-8')); print('yaml ok')"
 git diff --check
 git status --short --branch
 ```
