@@ -161,7 +161,7 @@ export function InspectorMonitorHead({
         {visibleInspectorTabs.map((tab) => {
           const disabled = tab.mode === 'browser' && !browserPreviewEnabled;
           return (
-            <button
+            <button type="button"
               aria-selected={activeMode === tab.mode}
               className={styles.inspectorTab}
               data-inspector-tab={tab.mode}
@@ -175,7 +175,6 @@ export function InspectorMonitorHead({
               }}
               role="tab"
               tabIndex={activeMode === tab.mode ? 0 : -1}
-              type="button"
             >
               <TabMark char={tab.markChar} mode={tab.mode} onClose={onCloseTab} t={t}>
                 <DesignNavIcon

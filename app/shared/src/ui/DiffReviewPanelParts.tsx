@@ -40,7 +40,7 @@ export function DiffReviewFileTabs({
   return (
     <div className={cx(styles.fileTabs, fileTabsClassName)} role="tablist">
       {files.map((file, idx) => (
-        <button
+        <button type="button"
           key={file.filePath}
           className={cx(
             styles.fileTab,
@@ -98,7 +98,7 @@ export function DiffReviewToolbar({
         )}
       </div>
       <div className={styles.toolbarActions}>
-        <button
+        <button type="button"
           className={`${styles.toolbarBtn} ${styles.acceptAllBtn}`}
           onClick={onAcceptAll}
           aria-label={acceptAllLabel}
@@ -106,7 +106,7 @@ export function DiffReviewToolbar({
           <Check size={12} />
           <span>{acceptAllLabel}</span>
         </button>
-        <button
+        <button type="button"
           className={`${styles.toolbarBtn} ${styles.rejectAllBtn}`}
           onClick={onRejectAll}
           aria-label={rejectAllLabel}
@@ -252,7 +252,7 @@ export function DiffReviewSideColumn({
             {row.rowType !== 'context' && (
               <div className={styles.lineActions}>
                 <Tooltip label={acceptLineLabel}>
-                  <button
+                  <button type="button"
                     className={cx(
                       styles.lineActionBtn,
                       styles.lineAcceptBtn,
@@ -266,7 +266,7 @@ export function DiffReviewSideColumn({
                   </button>
                 </Tooltip>
                 <Tooltip label={rejectLineLabel}>
-                  <button
+                  <button type="button"
                     className={cx(
                       styles.lineActionBtn,
                       styles.lineRejectBtn,

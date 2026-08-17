@@ -454,11 +454,10 @@ const TranscriptImpl = forwardRef<TranscriptHandle, Props>(function Transcript({
       </Virtualizer>
       {/* Scroll-to-bottom button — appears when user has scrolled up */}
       {!nearBottom && (
-        <button
+        <button type="button"
           className="scroll-to-bottom-btn"
           onClick={() => scrollToBottom(transcriptRef.current!)}
           aria-label={t("aria.scrollToBottom")}
-          type="button"
         >
           <ArrowDown size={18} />
         </button>

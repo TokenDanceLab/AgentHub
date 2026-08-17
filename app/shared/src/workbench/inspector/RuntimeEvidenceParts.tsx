@@ -113,11 +113,10 @@ export function RuntimeEvidenceDiffSection({
     <RuntimeEvidenceSection channel="diff" count={count} sourceLabel={sourceLabel} title="Diff snapshot">
       {diffs.map((file) => (
         <li key={`diff-${file.filePath}`}>
-          <button
+          <button type="button"
             aria-label={`打开 diff ${file.filePath}`}
             className={styles.fileRow}
             onClick={() => onOpenDiff(file)}
-            type="button"
           >
             <DesignFileIcon className={styles.fileIcon} name={file.filePath} />
             <span className={styles.fileName}>{file.filePath}</span>
@@ -195,14 +194,13 @@ export function RuntimeEvidencePreviewsSection({
         const canOpen = Boolean(preview.url);
         return (
           <li key={preview.id}>
-            <button
+            <button type="button"
               aria-label={`打开预览 ${preview.id}`}
               className={styles.fileRow}
               disabled={!canOpen}
               onClick={() => {
                 if (preview.url) onOpenPreviewUrl(preview.url);
               }}
-              type="button"
             >
               <DesignFileIcon className={styles.fileIcon} name={preview.url ?? preview.id} type="link" />
               <span className={styles.fileName}>{preview.url ?? preview.id}</span>

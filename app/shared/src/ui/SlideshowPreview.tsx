@@ -307,11 +307,10 @@ export const SlideshowPreview: React.FC<SlideshowPreviewProps> = ({
           </div>
 
           <Tooltip label="下一张">
-            <button
+            <button type="button"
               className={styles.navBtn}
               onClick={nextSlide}
               disabled={currentSlide >= totalSlides - 1}
-              type="button"
               aria-label={t("aria.nextImage")}
             >
               <ChevronRight size={20} />
