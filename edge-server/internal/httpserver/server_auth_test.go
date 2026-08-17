@@ -6,7 +6,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/agenthub/edge-server/internal/jwtutil"
 	"github.com/golang-jwt/jwt/v5"
 )
 
@@ -148,11 +147,18 @@ func TestDebugAuthFunc_HubJWTFallbackRejectsWrongDeviceID(t *testing.T) {
 	}
 }
 
-func TestDebugAuthFunc_NoAuthConfiguredReturnsNil(t *testing.T) {
-	// Dev false, both secrets empty: equivalent to local dev open mode.
+func TestDebugAuthFunc_NoAuthConfiguredDeniesAll(t *testing.T) {
+	// Dev false, both secrets empty: deny-all so debug endpoints are not
+	// exposed without explicit auth configuration. Run() auto-generates a
+	// LocalAuthToken before calling debugAuthFunc, making this branch
+	// unreachable in production — but the gate itself must fail closed.
 	cfg := Config{}
-	if auth := debugAuthFunc(cfg); auth != nil {
-		t.Fatalf("expected nil auth when no auth configured, got non-nil")
+	auth := debugAuthFunc(cfg)
+	if auth == nil {
+		t.Fatal("expected non-nil deny-all auth when no auth configured, got nil")
 	}
-	_ = jwtutil.ErrTokenInvalid // keep jwtutil import meaningful if assertions evolve
+	req := httptest.NewRequest(http.MethodGet, "/debug/pprof/", nil)
+	if auth(req) {
+		t.Fatal("deny-all auth must reject all requests")
+	}
 }

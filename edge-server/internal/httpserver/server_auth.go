@@ -138,7 +138,7 @@ func debugAuthFunc(cfg Config) func(r *http.Request) bool {
 	if cfg.HubJWTSecret != "" {
 		return hubJWTDebugAuth(cfg.HubJWTSecret, cfg.EdgeDeviceID)
 	}
-	return nil
+	return func(r *http.Request) bool { return false }
 }
 
 // hubJWTDebugAuth returns an auth predicate that accepts a Bearer Hub JWT
