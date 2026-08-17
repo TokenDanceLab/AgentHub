@@ -544,7 +544,7 @@ export function ConversationSidebar({
                           </Tooltip>
                         )}
                         {onArchiveConversation && !showArchived && (
-                          <Tooltip label="归档">
+                          <Tooltip label={t("aria.archive")}>
                             <button type="button"
                               aria-label={t('aria.archive')}
                               className={styles.conversationActionBtn}
@@ -560,7 +560,7 @@ export function ConversationSidebar({
                           </Tooltip>
                         )}
                         {onArchiveConversation && showArchived && (
-                          <Tooltip label="取消归档">
+                          <Tooltip label={t("aria.unarchive")}>
                             <button type="button"
                               aria-label={t('aria.unarchive')}
                               className={styles.conversationActionBtn}
