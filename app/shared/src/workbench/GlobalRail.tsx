@@ -185,7 +185,7 @@ export function GlobalRail({
       </div>
 
       {topNavItems.map((item, index) => (
-        <button
+        <button type="button"
           aria-current={activePage === item.id ? 'page' : undefined}
           aria-label={navLabelMap[item.id] ?? item.label}
           className={styles.railButton}
@@ -194,7 +194,6 @@ export function GlobalRail({
           onClick={() => handleNavigate(item.id)}
           tabIndex={rovingIndex === index ? 0 : -1}
           title={navLabelMap[item.id] ?? item.label}
-          type="button"
         >
           <DesignNavIcon name={item.icon} size={18} />
         </button>
@@ -203,13 +202,12 @@ export function GlobalRail({
       <div className={styles.railSpacer} />
 
       <Tooltip label={t('user.settings')}>
-        <button
+        <button type="button"
           aria-label={t('aria.settings')}
           className={styles.railButton}
           data-rail-page="settings"
           onClick={() => handleNavigate('settings')}
           tabIndex={rovingIndex === pageIds.length - 1 ? 0 : -1}
-          type="button"
         >
           <DesignNavIcon name="railSettings" size={18} />
         </button>

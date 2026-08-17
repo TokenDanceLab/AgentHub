@@ -124,7 +124,7 @@ export function BrowserPanelFallback({
             const canOpen = canOpenEvidence(artifact, onOpenPreview, canOpenPreview);
             return (
               <li key={artifact.id}>
-                <button
+                <button type="button"
                   aria-label={`打开产物 ${artifact.label}`}
                   className={styles.browserArtifactButton}
                   disabled={!canOpen}
@@ -137,7 +137,6 @@ export function BrowserPanelFallback({
                       });
                     }
                   }}
-                  type="button"
                 >
                   <DesignFileIcon
                     className={styles.fileIcon}
@@ -182,11 +181,10 @@ export function FilesPanel({
       <ul aria-label="Changed files" className={styles.fileList}>
         {fallbackFiles.map((file) => (
           <li key={file.name}>
-            <button
+            <button type="button"
               aria-label={`打开文件 ${file.name}`}
               className={styles.fileRow}
               onClick={() => onFallbackFileClick?.(file)}
-              type="button"
             >
               <DesignFileIcon className={styles.fileIcon} name={file.name} type={file.type} />
               <span className={styles.fileName}>{file.name}</span>
@@ -214,7 +212,7 @@ export function FilesPanel({
         const canOpen = canOpenEvidence(file, onOpenPreview, canOpenPreview);
         return (
           <li key={file.id}>
-            <button
+            <button type="button"
               aria-label={`打开文件 ${file.label}`}
               className={styles.fileRow}
               disabled={!canOpen}
@@ -224,7 +222,6 @@ export function FilesPanel({
                   console.error('RightInspector: onOpenPreview file failed:', err);
                 });
               }}
-              type="button"
             >
               <DesignFileIcon className={styles.fileIcon} name={file.label} />
               <span className={styles.fileName}>{file.label}</span>

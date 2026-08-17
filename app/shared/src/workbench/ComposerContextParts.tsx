@@ -120,13 +120,12 @@ export function ComposerMentionChips({
   return (
     <div className={styles.composerMentions} aria-label={t('aria.selectedAgents')}>
       {mentions.map((mention) => (
-        <button
+        <button type="button"
           aria-label={t('action.removeMention', { label: mention.label })}
           className={styles.composerMentionChip}
           disabled={isSubmitting}
           key={mention.id}
           onClick={() => onRemove(mention.id)}
-          type="button"
         >
           {formatMentionChipLabel(mention)}
         </button>

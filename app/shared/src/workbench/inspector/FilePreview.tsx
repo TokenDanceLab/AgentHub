@@ -207,14 +207,13 @@ export const FilePreview: React.FC<FilePreviewProps> = ({
           aria-label={t('aria.filePreviewMode')}
         >
           {modeTabs.map((tab, index) => (
-            <button
+            <button type="button"
               aria-selected={mode === tab.mode}
               className={styles.modeTab}
               key={tab.mode}
               onClick={() => setMode(tab.mode)}
               role="tab"
               tabIndex={index === rovingTabIndex ? 0 : -1}
-              type="button"
             >
               {tab.label}
             </button>
@@ -222,14 +221,13 @@ export const FilePreview: React.FC<FilePreviewProps> = ({
         </div>
         <div className={styles.openWithWrap}>
           <Tooltip label={t('filePreview.openWith')}>
-            <button
+            <button type="button"
               ref={openWithTriggerRef}
               aria-expanded={openMenuVisible}
               aria-haspopup="menu"
               aria-label={t('aria.openWith')}
               className={styles.openWithBtn}
               onClick={() => setOpenMenuVisible((value) => !value)}
-              type="button"
             >
               <DesignNavIcon name="tools" size={14} />
             </button>

@@ -33,11 +33,10 @@ export function FileChangeGroup({
 
   return (
     <div className={`${styles.group} ${className ?? ''}`} data-testid="file-change-group">
-      <button
+      <button type="button"
         className={styles.header}
         onClick={() => setExpanded((v) => !v)}
         aria-expanded={expanded}
-        type="button"
       >
         <span className={styles.dot} />
         <span className={styles.title}>{title}</span>
@@ -74,14 +73,13 @@ export function FileChangeGroup({
                 )}
                 {onDiffClick && (
                   <Tooltip label="View diff">
-                    <button
+                    <button type="button"
                       className={styles.diffBtn}
                       onClick={(e) => {
                         e.stopPropagation();
                         onDiffClick(file);
                       }}
                       aria-label={`View diff for ${file.fileName}`}
-                      type="button"
                     >
                       <Eye size={14} />
                     </button>
