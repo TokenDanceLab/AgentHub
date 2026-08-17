@@ -625,7 +625,18 @@ func TestBusCloseShutsDownWorkers(t *testing.T) {
 	// After close, verify the bus is no longer operational.
 	// Worker pool is stopped; observers will not be processed.
 	// Note: Close() closes stopCh and waits for workers, then closes eventLog if any.
-	// It is NOT idempotent — calling Close() twice panics because stopCh is re-closed.
+	// Close() is idempotent via sync.Once — calling it twice is safe (see TestBusCloseIdempotent).
+}
+
+func TestBusCloseIdempotent(t *testing.T) {
+	b := NewBus(10)
+	if err := b.Close(); err != nil {
+		t.Fatalf("first Close: %v", err)
+	}
+	// A second Close must not panic on re-closing stopCh.
+	if err := b.Close(); err != nil {
+		t.Fatalf("second Close: %v", err)
+	}
 }
 
 // ---------------------------------------------------------------------------

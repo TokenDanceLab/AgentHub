@@ -106,12 +106,12 @@ func (ra *ResultAggregator) Start() (stop func()) {
 	ra.subID = subID
 
 	done := make(chan struct{})
-	go func() {
+	safeGo("resultAggregator", func() {
 		defer close(done)
 		for evt := range ch {
 			ra.handleEvent(evt)
 		}
-	}()
+	})
 
 	// Timeout fallback goroutine: periodically checks for parents whose
 	// children have exceeded the configured timeout. When found, emits
@@ -120,7 +120,7 @@ func (ra *ResultAggregator) Start() (stop func()) {
 	var timeoutDone chan struct{}
 	if ra.collector != nil {
 		timeoutDone = make(chan struct{})
-		go ra.runTimeoutCheck(timeoutDone)
+		safeGo("resultAggregatorTimeout", func() { ra.runTimeoutCheck(timeoutDone) })
 	}
 
 	return func() {

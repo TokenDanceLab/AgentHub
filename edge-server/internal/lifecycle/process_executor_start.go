@@ -20,7 +20,12 @@ func (e *ProcessExecutor) Start(run store.Run, runCtx RunProcessContext) error {
 	ctx, cancel := context.WithTimeout(context.Background(), e.runTimeout)
 	e.running[run.ID] = cancel
 
-	go e.run(ctx, run, bindRunProcessContext(runCtx, run))
+	// Spawn the run lifecycle goroutine through safeGo so a panic inside run()
+	// (adapter parse, emitter chain, output store) is recovered and logged
+	// instead of crashing the whole Edge process. run()'s deferred finish()
+	// still runs during panic unwinding before recover catches, so terminal
+	// state and package-level sync.Map hygiene are preserved.
+	safeGo("run", func() { e.run(ctx, run, bindRunProcessContext(runCtx, run)) })
 	return nil
 }
 
