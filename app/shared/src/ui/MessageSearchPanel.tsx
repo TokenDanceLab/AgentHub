@@ -268,11 +268,10 @@ export function MessageSearchPanel({
             <div className={styles.empty}>{noResultsLabel}</div>
           )}
           {results.map((result, idx) => (
-            <button
+            <button type="button"
               key={`${result.messageId}-${idx}`}
               className={`${styles.resultItem} ${highlightMessageId === result.messageId ? styles.resultItemHighlight : ''}`}
               onClick={() => handleResultClick(result)}
-              type="button"
             >
               <div className={styles.resultMeta}>
                 {result.agentName && (
