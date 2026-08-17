@@ -11,6 +11,26 @@ function resolvePath(source: unknown, path: string): unknown {
   ), source);
 }
 
+function hexToRgb(hex: string): [number, number, number] {
+  const normalized = hex.replace('#', '');
+  const r = parseInt(normalized.slice(0, 2), 16) / 255;
+  const g = parseInt(normalized.slice(2, 4), 16) / 255;
+  const b = parseInt(normalized.slice(4, 6), 16) / 255;
+  return [r, g, b];
+}
+
+function relativeLuminance(hex: string): number {
+  const [r, g, b] = hexToRgb(hex).map((c) => (c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4)));
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+
+function contrastRatio(foreground: string, background: string): number {
+  const l1 = relativeLuminance(foreground);
+  const l2 = relativeLuminance(background);
+  const [lighter, darker] = l1 > l2 ? [l1, l2] : [l2, l1];
+  return (lighter + 0.05) / (darker + 0.05);
+}
+
 describe('AgentHub mobile tokens', () => {
   it('keeps light mode as the default white-first mobile surface', () => {
     expect(getAgentHubTheme('light', true)).toBe(agentHubThemes.light);
@@ -124,5 +144,12 @@ describe('AgentHub mobile tokens', () => {
   it('resolves system mode from the current scheme', () => {
     expect(getAgentHubTheme('system', true).scheme).toBe('dark');
     expect(getAgentHubTheme('system', false).scheme).toBe('light');
+  });
+
+  it('keeps inkSubtle at or above WCAG AA contrast (4.5:1) on canvas for every theme', () => {
+    for (const theme of Object.values(agentHubThemes)) {
+      const ratio = contrastRatio(theme.color.inkSubtle, theme.color.canvas);
+      expect(ratio, `${theme.scheme} inkSubtle/canvas`).toBeGreaterThanOrEqual(4.5);
+    }
   });
 });
