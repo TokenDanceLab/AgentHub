@@ -374,7 +374,20 @@ func runACPSession(ctx context.Context, stdout io.Reader, stdin io.Writer, emitt
 			initResp.ProtocolVersion, acp.ProtocolVersionNumber))
 	}
 
-	// 2. session/new.
+	// 2. session/new. MCP server config from the run profile is not yet wired
+	// into the ACP session (frame design deferred, #1404). When a profile
+	// declares MCP servers, surface the gap as a visible status-change event
+	// + warning log so the user sees *why* MCP tools are unavailable instead
+	// of a silent absence.
+	if rc.MCPConfig != "" {
+		slog.Warn("acp: MCP config present but not wired into ACP session; MCP tools will be unavailable",
+			"run_id", run.ID, "reason", "acp_mcp_not_wired")
+		emitter.Emit(BusEventStatusChange, acpRunScope(run), map[string]any{
+			"status":  "degraded",
+			"reason":  "acp_mcp_not_wired",
+			"message": "MCP servers configured in this profile are not available in the ACP execution path",
+		})
+	}
 	sessResp, err := conn.NewSession(ctx, acp.NewSessionRequest{
 		Cwd:        rc.WorkDir,
 		McpServers: []acp.McpServer{}, // TODO(#1404): wire RunProcessContext.MCPConfig
