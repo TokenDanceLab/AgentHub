@@ -787,7 +787,7 @@ func TestValidateTokenDanceIDRejectsSeedSecret(t *testing.T) {
 		TokenDanceID: TokenDanceIDConfig{
 			IssuerURL:    "https://id.example",
 			ClientID:     "agenthub-client",
-			ClientSecret: "agenthub-dev-secret-change-me-padded-to-32!!",
+			ClientSecret: weakSecretPrefixes[len(weakSecretPrefixes)-1] + strings.Repeat("x", 32),
 			RedirectURI:  "http://127.0.0.1/callback",
 		},
 	}
