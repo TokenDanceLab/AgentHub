@@ -397,7 +397,7 @@ describe('Desktop App v4 root', () => {
     expect(screen.getByRole('main', { name: workspaceLabel })).toHaveAttribute('data-surface', 'desktop');
     expect(screen.getByRole('complementary', { name: 'Right inspector' })).toBeInTheDocument();
     expect(screen.getByRole('tablist', { name: workspaceTabsLabel })).toBeInTheDocument();
-    expect(screen.getByRole('tablist', { name: '右侧工作区' })).toBeInTheDocument();
+    expect(screen.getByRole('tablist', { name: 'aria.rightWorkspace' })).toBeInTheDocument();
     expect(getComposerInput()).toBeInTheDocument();
     expect(screen.queryByRole('toolbar', { name: 'Composer modes' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '@Agent' })).not.toBeInTheDocument();
