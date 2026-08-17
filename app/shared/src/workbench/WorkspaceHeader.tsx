@@ -95,7 +95,7 @@ export function WorkspaceHeader({
       </div>
 
       <div className={styles.workspaceActions}>
-        <Tooltip label="搜索">
+        <Tooltip label={t('aria.search')}>
           <button
             aria-label={t('aria.search')}
             className={styles.iconButton}
@@ -105,7 +105,7 @@ export function WorkspaceHeader({
             <DesignNavIcon name="search" />
           </button>
         </Tooltip>
-        <Tooltip label="新任务">
+        <Tooltip label={t('aria.newTask')}>
           <button
             aria-label={t('aria.newTask')}
             className={styles.iconButton}
@@ -114,7 +114,7 @@ export function WorkspaceHeader({
             <DesignNavIcon name="template" />
           </button>
         </Tooltip>
-        <Tooltip label="确认项">
+        <Tooltip label={t('aria.confirmItems')}>
           <button
             aria-label={t('aria.confirmItems')}
             className={styles.iconButton}
@@ -123,7 +123,7 @@ export function WorkspaceHeader({
             <DesignNavIcon name="check" />
           </button>
         </Tooltip>
-        <Tooltip label="会话设置">
+        <Tooltip label={t('aria.sessionSettings')}>
           <button
             aria-label={t('aria.sessionSettings')}
             className={styles.iconButton}
