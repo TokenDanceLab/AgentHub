@@ -8,6 +8,8 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import React from 'react';
+import { useTranslation } from 'react-i18next';
+import { SHARED_WORKBENCH_I18N_NAMESPACE } from '../../../i18n';
 import { DesignFileIcon } from '../../designIcons';
 import type { WorkbenchDocumentPreview } from '../../documentPreview';
 import { FilePreview } from '../../inspector';
@@ -35,9 +37,10 @@ export function MembersCard({
   members: string[];
   profiles?: WorkbenchProfileSource[] | undefined;
 }) {
+  const { t } = useTranslation(SHARED_WORKBENCH_I18N_NAMESPACE);
   return (
     <section className={`${styles.membersCard} project-members-card`} data-card-surface>
-      <ProjectSectionHead icon="users" title="成员" meta={`${members.length} people`} />
+      <ProjectSectionHead icon="users" title={t("projects.section.members")} meta={`${members.length} people`} />
       <div className={`${styles.memberChips} project-members`}>
         {members.map((name) => (
           <ProjectMemberChip key={name} name={name} profiles={profiles} />
@@ -79,9 +82,10 @@ export function RunsPanel({
   onRunClick?: ((run: ProjectRun) => void) | undefined;
   profiles?: WorkbenchProfileSource[] | undefined;
 }) {
+  const { t } = useTranslation(SHARED_WORKBENCH_I18N_NAMESPACE);
   return (
     <section className={`${styles.detailPanel} ${styles.runsPanel} project-detail-panel project-runs-panel`} data-card-surface>
-      <ProjectSectionHead icon="running" title="项目运行" meta={meta} />
+      <ProjectSectionHead icon="running" title={t("projects.section.projectRuns")} meta={meta} />
       {runs.map((run) => (
         <button
           key={run.id}
@@ -101,13 +105,14 @@ export function RunsPanel({
 }
 
 export function RunSummaryPanel({ project }: { project: ProjectInfo }) {
+  const { t } = useTranslation(SHARED_WORKBENCH_I18N_NAMESPACE);
   const running = runCount(project.runs, ['running', 'thinking']);
   const completed = runCount(project.runs, ['completed']);
   const waiting = runCount(project.runs, ['waiting']);
 
   return (
     <section className={`${styles.detailPanel} project-detail-panel`} data-card-surface>
-      <ProjectSectionHead icon="grid" title="运行摘要" meta={`${project.runs.length} total`} />
+      <ProjectSectionHead icon="grid" title={t("projects.section.runSummary")} meta={`${project.runs.length} total`} />
       <div className={styles.summaryRows}>
         <div className={styles.summaryRow}>
           <span className={`${styles.stateDot} ${styles.stateRunning}`} />
@@ -136,9 +141,10 @@ export function ArtifactsPanel({
   artifacts: ProjectArtifact[];
   onArtifactClick?: ((artifact: ProjectArtifact) => void) | undefined;
 }) {
+  const { t } = useTranslation(SHARED_WORKBENCH_I18N_NAMESPACE);
   return (
     <section className={`${styles.detailPanel} project-detail-panel`} data-card-surface>
-      <ProjectSectionHead icon="package" title="产物" meta={`${artifacts.length} files`} />
+      <ProjectSectionHead icon="package" title={t("projects.section.artifacts")} meta={`${artifacts.length} files`} />
       {artifacts.map((a) => (
         <button
           key={a.id}
@@ -156,9 +162,10 @@ export function ArtifactsPanel({
 }
 
 export function ArtifactIndexPanel({ artifacts }: { artifacts: ProjectArtifact[] }) {
+  const { t } = useTranslation(SHARED_WORKBENCH_I18N_NAMESPACE);
   return (
     <section className={`${styles.detailPanel} project-detail-panel`} data-card-surface>
-      <ProjectSectionHead icon="notes" title="产物索引" meta={`${artifacts.length} entries`} />
+      <ProjectSectionHead icon="notes" title={t("projects.section.artifactIndex")} meta={`${artifacts.length} entries`} />
       {artifacts.map((artifact, index) => (
         <div key={artifact.id} className={styles.metaRow}>
           <span>{String(index + 1).padStart(2, '0')}</span>
