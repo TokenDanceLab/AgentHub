@@ -1301,6 +1301,14 @@ jobs:
         shell: bash
         run: bash scripts/verify/tests/verify-vulnerability-gates.Tests.sh
 
+      - name: Self-test gosec gate (fail-closed contract)
+        shell: bash
+        run: bash scripts/verify/tests/verify-gosec-gates.Tests.sh
+
+      - name: Self-test secret guard (fail-closed contract)
+        shell: bash
+        run: bash scripts/verify/tests/check-secrets.Tests.sh
+
       - name: Verify Web Hub-only boundary
         run: python scripts/verify/verify-web-hub-boundary.py
 
