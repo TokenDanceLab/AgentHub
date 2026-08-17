@@ -2,6 +2,8 @@ import React from 'react';
 import { DesignNavIcon, type DesignNavIconName } from '../designIcons';
 import { Tooltip } from '../../ui/Tooltip';
 import styles from './MultiSelectBar.module.css';
+import { useTranslation } from 'react-i18next';
+import { CHATVIEW_I18N_NAMESPACE } from '../../chatview/i18n/resources';
 
 export interface MultiSelectBarAction {
   label: string;
@@ -26,6 +28,7 @@ export const MultiSelectBar: React.FC<MultiSelectBarProps> = ({
   workspaceLeft,
   workspaceWidth,
 }) => {
+  const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE);
   const style = {
     ...(workspaceLeft !== undefined ? { '--selectbar-left': `${Math.round(workspaceLeft)}px` } : {}),
     ...(workspaceWidth !== undefined ? { '--selectbar-width': `${Math.round(workspaceWidth)}px` } : {}),
@@ -36,7 +39,7 @@ export const MultiSelectBar: React.FC<MultiSelectBarProps> = ({
     <div
       className={styles.bar}
       role="toolbar"
-      aria-label="多选操作"
+      aria-label={t("aria.multiSelectBar")}
       style={style}
     >
       <div className={styles.count}>
