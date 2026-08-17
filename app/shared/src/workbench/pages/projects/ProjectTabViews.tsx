@@ -8,6 +8,8 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import React from 'react';
+import { useTranslation } from 'react-i18next';
+import { SHARED_WORKBENCH_I18N_NAMESPACE } from '../../../i18n';
 import {
   DesignFileIcon,
 } from '../../designIcons';
@@ -44,6 +46,7 @@ export function RunsTab({
   onRunClick?: ((projectId: string, run: ProjectRun) => void) | undefined;
   profiles?: WorkbenchProfileSource[] | undefined;
 }) {
+  const { t } = useTranslation(SHARED_WORKBENCH_I18N_NAMESPACE);
   return (
     <div className={styles.detailLayout}>
       <RunsPanel
@@ -54,7 +57,7 @@ export function RunsTab({
       />
       <RunSummaryPanel project={project} />
       <section className={`${styles.detailPanel} ${styles.feedPanel} project-detail-panel project-feed`} data-card-surface>
-        <ProjectSectionHead icon="notes" title="运行记录" meta="Recent" />
+        <ProjectSectionHead icon="notes" title={t("projects.section.runRecords")} meta="Recent" />
         {project.runs.map((run) => (
           <div key={run.id} className={styles.feedRow}>
             <time className={styles.feedTime}>{runStatusLabel(run.status)}</time>
@@ -79,6 +82,7 @@ export function ArtifactsTab({
   activePreview?: WorkbenchDocumentPreview | null | undefined;
   onClosePreview?: (() => void) | undefined;
 }) {
+  const { t } = useTranslation(SHARED_WORKBENCH_I18N_NAMESPACE);
   return (
     <div className={styles.detailLayout}>
       <ArtifactsPanel
@@ -87,7 +91,7 @@ export function ArtifactsTab({
       />
       <ArtifactIndexPanel artifacts={project.artifacts} />
       <section className={`${styles.detailPanel} ${styles.feedPanel} project-detail-panel project-feed`} data-card-surface>
-        <ProjectSectionHead icon="package" title="交付动态" meta={`${project.artifacts.length} files`} />
+        <ProjectSectionHead icon="package" title={t("projects.section.deliveryActivity")} meta={`${project.artifacts.length} files`} />
         {project.artifacts.map((artifact) => (
           <div key={artifact.id} className={styles.feedRow}>
             <time className={styles.feedTime}>{artifact.type}</time>
@@ -101,6 +105,7 @@ export function ArtifactsTab({
 }
 
 export function ArchiveTab({ project }: { project: ProjectInfo }) {
+  const { t } = useTranslation(SHARED_WORKBENCH_I18N_NAMESPACE);
   const completed = runCount(project.runs, ['completed']);
   const active = runCount(project.runs, ['running', 'thinking', 'waiting']);
   const archiveItems = [
@@ -112,7 +117,7 @@ export function ArchiveTab({ project }: { project: ProjectInfo }) {
   return (
     <div className={styles.detailLayout}>
       <section className={`${styles.detailPanel} project-detail-panel`} data-card-surface>
-        <ProjectSectionHead icon="archive" title="归档检查" meta={`${archiveItems.length} checks`} />
+        <ProjectSectionHead icon="archive" title={t("projects.section.archiveCheck")} meta={`${archiveItems.length} checks`} />
         {archiveItems.map((item) => (
           <div key={item.id} className={styles.archiveRow}>
             <span className={`${styles.stateDot} ${item.status === '可归档' || item.status === '已整理' ? styles.stateCompleted : styles.stateWaiting}`} />
@@ -123,7 +128,7 @@ export function ArchiveTab({ project }: { project: ProjectInfo }) {
         ))}
       </section>
       <section className={`${styles.detailPanel} project-detail-panel`} data-card-surface>
-        <ProjectSectionHead icon="package" title="归档包" meta="Draft" />
+        <ProjectSectionHead icon="package" title={t("projects.section.archivePackage")} meta="Draft" />
         <button type="button" className={`${styles.artifactRow} project-artifact`} data-card-surface>
           <DesignFileIcon className={styles.fileIcon} name={`${project.id}-handoff.md`} type="md" />
           <span className={styles.artifactName}>{project.id}-handoff.md</span>
@@ -145,6 +150,7 @@ export function SettingsTab({
   project: ProjectInfo;
   profiles?: WorkbenchProfileSource[] | undefined;
 }) {
+  const { t } = useTranslation(SHARED_WORKBENCH_I18N_NAMESPACE);
   const settings = [
     { label: '项目名称', value: project.name, meta: project.id },
     { label: '当前状态', value: project.status, meta: project.meta },
@@ -160,7 +166,7 @@ export function SettingsTab({
         onEdit={undefined}
       />
       <section className={`${styles.detailPanel} ${styles.settingsPanel} project-detail-panel`} data-card-surface>
-        <ProjectSectionHead icon="tools" title="项目设置" meta={`${settings.length} 项`} />
+        <ProjectSectionHead icon="tools" title={t("projects.section.projectSettings")} meta={`${settings.length} 项`} />
         {settings.map((item) => (
           <div key={item.label} className={styles.settingRow}>
             <div>
@@ -172,7 +178,7 @@ export function SettingsTab({
         ))}
       </section>
       <section className={`${styles.detailPanel} ${styles.settingsSidePanel} project-detail-panel`} data-card-surface>
-        <ProjectSectionHead icon="users" title="成员策略" meta={`${project.members.length} people`} />
+        <ProjectSectionHead icon="users" title={t("projects.section.memberPolicy")} meta={`${project.members.length} people`} />
         <ProjectMembers members={project.members} profiles={profiles} />
       </section>
     </div>

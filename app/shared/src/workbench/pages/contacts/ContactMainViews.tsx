@@ -1,4 +1,6 @@
 import React, { useCallback, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import { SHARED_WORKBENCH_I18N_NAMESPACE } from '../../../i18n';
 import {
   ContactGroupsPane,
   ContactListPage,
@@ -76,6 +78,7 @@ export function ContactMain({
   onAcceptRequest,
   onRejectRequest,
 }: ContactMainProps): React.ReactElement {
+  const { t } = useTranslation(SHARED_WORKBENCH_I18N_NAMESPACE);
   const resolvedPending = pendingContacts ?? [];
   const [activeProfile, setActiveProfile] = useState<ContactProfile | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
@@ -158,8 +161,8 @@ export function ContactMain({
       case 'external':
         return (
           <ContactListPage
-            title="外部联系人"
-            subtitle="客户、合作方和临时项目协作者，不进入 TokenDance 组织架构。"
+            title={t("contacts.section.external.title")}
+            subtitle={t("contacts.section.external.subtitle")}
             actionLabel="添加外部联系人"
             rows={externalContacts ?? []}
             sectionTitle="外部联系人"
@@ -196,8 +199,8 @@ export function ContactMain({
       case 'starred':
         return (
           <ContactListPage
-            title="星标联系人"
-            subtitle="常用联系人会固定在这里，便于快速发起对话和项目协作。"
+            title={t("contacts.section.starred.title")}
+            subtitle={t("contacts.section.starred.subtitle")}
             actionLabel="管理星标"
             rows={starredContacts ?? []}
             sectionTitle="TokenDance"
@@ -237,7 +240,7 @@ export function ContactMain({
       default:
         return (
           <ContactListPage
-            title="组织内联系人"
+            title={t("contacts.section.internal.title")}
             subtitle="TokenDance 成员和外部联系人统一从这里添加、确认和发起对话。"
             actionLabel="添加联系人"
             rows={members}

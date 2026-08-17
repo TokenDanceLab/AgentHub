@@ -14,11 +14,13 @@ import { PANE_META } from './types';
 import type { SettingsPageProps } from './types';
 import { useTranslation } from 'react-i18next';
 import { CHATVIEW_I18N_NAMESPACE } from '../../../chatview/i18n/resources';
+import { SHARED_WORKBENCH_I18N_NAMESPACE } from '../../../i18n';
 
 export type SettingsMainProps = SettingsPageProps;
 
 export function SettingsMain(props: SettingsMainProps): React.ReactElement {
   const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE);
+  const { t: tw } = useTranslation(SHARED_WORKBENCH_I18N_NAMESPACE);
   const {
     activePane,
     settingsLoading = false,
@@ -88,7 +90,7 @@ export function SettingsMain(props: SettingsMainProps): React.ReactElement {
             {...(styles.recoveryPanel ? { className: styles.recoveryPanel } : {})}
             icon={<DesignNavIcon name="error404" size={18} />}
             eyebrow="Settings recovery"
-            title="设置加载失败"
+            title={tw("settings.loadFailed")}
             description="无法从当前平台适配器读取已保存的设置。页面会暂时使用默认值，重试后可恢复远端偏好。"
             meta={settingsError}
             primaryAction={{
