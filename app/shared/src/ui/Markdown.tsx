@@ -8,6 +8,8 @@ import rehypeSlug from 'rehype-slug';
 import { Link2 } from 'lucide-react';
 import { CodeBlock } from './CodeBlock';
 import styles from './Markdown.module.css';
+import { useTranslation } from 'react-i18next';
+import { CHATVIEW_I18N_NAMESPACE } from '../chatview/i18n/resources';
 
 // ── Heading anchor links (#1506) ──────────────────
 // `rehype-slug` assigns each h1-h6 a stable `id` (GitHub-style slug; keeps
@@ -24,12 +26,13 @@ function HeadingWithAnchor({
   children,
   ...rest
 }: { tag: HeadingTag; id?: string | undefined; node?: unknown } & HTMLAttributes<HTMLHeadingElement>) {
+  const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE);
   const anchorId = id && id.length > 0 ? id : undefined;
   const Tag = tag;
   return (
     <Tag {...(anchorId ? { id: anchorId } : {})} {...rest}>
       {anchorId ? (
-        <a href={`#${anchorId}`} className={styles.headingAnchor} aria-label="跳转到标题">
+        <a href={`#${anchorId}`} className={styles.headingAnchor} aria-label={t('aria.jumpToHeading')}>
           <Link2 size={12} aria-hidden />
         </a>
       ) : null}

@@ -17,6 +17,8 @@ import { Button } from './Button';
 import { Tooltip } from './Tooltip';
 import type { Config as DOMPurifyConfig } from 'dompurify';
 import styles from './DocxPreview.module.css';
+import { useTranslation } from 'react-i18next';
+import { CHATVIEW_I18N_NAMESPACE } from '../chatview/i18n/resources';
 
 export interface DocxPreviewProps {
   fileUrl: string;
@@ -31,6 +33,7 @@ export const DocxPreview: React.FC<DocxPreviewProps> = ({
   fileBlob,
   onClose,
 }) => {
+  const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE);
   const [html, setHtml] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -104,7 +107,7 @@ export const DocxPreview: React.FC<DocxPreviewProps> = ({
               size="sm"
               type="button"
               onClick={onClose}
-              aria-label="关闭预览"
+              aria-label={t("aria.closePreview")}
             >
               <X size={16} />
             </Button>

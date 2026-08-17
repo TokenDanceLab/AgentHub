@@ -152,7 +152,7 @@ export function InspectorMonitorHead({
   return (
     <div className={styles.monitorHead}>
       <div
-        aria-label="右侧工作区"
+        aria-label={t("aria.rightWorkspace")}
         className={styles.inspectorTabs}
         onKeyDown={handleTablistKeyDown}
         ref={tablistRef}
@@ -194,7 +194,7 @@ export function InspectorMonitorHead({
         <Tooltip label="新建右侧窗口">
           <button
             type="button"
-            aria-label="新建右侧窗口"
+            aria-label={t("aria.newRightWindow")}
             aria-expanded={quickOpenVisible}
             aria-haspopup="menu"
             onClick={onToggleQuickOpen}
@@ -203,7 +203,7 @@ export function InspectorMonitorHead({
           </button>
         </Tooltip>
         {quickOpenVisible && (
-          <div className={styles.inspectorAddMenu} role="menu" aria-label="右侧窗口菜单">
+          <div className={styles.inspectorAddMenu} role="menu" aria-label={t("aria.rightWindowMenu")}>
             {quickOpenItems.map((item) => (
               <button
                 key={item.id}

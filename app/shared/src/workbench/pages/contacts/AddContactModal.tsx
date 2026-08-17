@@ -5,6 +5,8 @@ import { useFocusTrap } from '../../../ui/focusTrap';
 import styles from '../ContactsPage.module.css';
 import { MODAL_TABS } from './shared';
 import type { ContactModalTab } from './types';
+import { useTranslation } from 'react-i18next';
+import { CHATVIEW_I18N_NAMESPACE } from '../../../chatview/i18n/resources';
 
 /* ═══════════════════════════════════════════════════════════════════════
    Add-contact modal + invite panels.
@@ -13,6 +15,7 @@ import type { ContactModalTab } from './types';
    ═══════════════════════════════════════════════════════════════════════ */
 
 function QRPanel() {
+  const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE);
   // Generate a pseudo-QR pattern (purely decorative)
   const cells = Array.from({ length: 81 }, (_, i) =>
     (i * 7 + i) % 5 < 2,
@@ -21,7 +24,7 @@ function QRPanel() {
   return (
     <div className={styles.qrPanel}>
       <div className={styles.qrCard}>
-        <div className={styles.qrGrid} aria-label="企业二维码">
+        <div className={styles.qrGrid} aria-label={t("aria.businessQr")}>
           {cells.map((on, i) => (
             <span
               key={i}
@@ -146,6 +149,7 @@ export function AddContactModal({
 }) {
   const [activeTab, setActiveTab] = useState<ContactModalTab>('qr');
   const modalRef = useRef<HTMLElement | null>(null);
+  const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE);
   useFocusTrap(modalRef, true);
 
   // Move initial focus to the first input of the active panel (close button
@@ -226,7 +230,7 @@ export function AddContactModal({
           type="button"
           className={styles.modalClose}
           onClick={onClose}
-          aria-label="关闭"
+          aria-label={t("aria.close")}
         >
           <DesignNavIcon name="close" size={18} />
         </button>

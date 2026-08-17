@@ -150,7 +150,7 @@ export function TaskMain({
           <button
             type="button"
             className={`${styles.iconBtn} icon-action`}
-            aria-label="切换视图"
+            aria-label={t("aria.switchView")}
             onClick={() =>
               onViewModeChange(viewMode === 'list' ? 'board' : 'list')
             }

@@ -59,7 +59,7 @@ export function DocMain({
         <button
           type="button"
           className={`${styles.iconAction} icon-action`}
-          aria-label="云文档设置"
+          aria-label={t("aria.docSettings")}
           onClick={onSettings}
         >
           <DesignNavIcon name="settings" size={16} />
@@ -117,7 +117,7 @@ export function DocMain({
         <button
           type="button"
           className={styles.docTabPlus}
-          aria-label="更多标签"
+          aria-label={t("aria.moreTags")}
           onClick={onPlusTab}
         >
           <DesignNavIcon name="plus" size={15} />

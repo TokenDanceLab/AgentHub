@@ -23,6 +23,8 @@ import {
   statePanelKindClassName,
 } from './SettingsPaneHelpers';
 import type { SettingsPageProps, StatePanelKind } from './types';
+import { useTranslation } from 'react-i18next';
+import { CHATVIEW_I18N_NAMESPACE } from '../../../chatview/i18n/resources';
 
 /* ═══════════════════════════════════════════════════════════════════════
    SettingsPaneParts — presentational residual slices from SettingsPanes
@@ -39,11 +41,12 @@ export function DataModeStatus({
 }: {
   mode: string;
 }): React.ReactElement {
+  const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE);
   const detail = dataModeStatusDetail(mode);
   const label = dataModeStatusLabel(mode);
 
   return (
-    <section className={styles.modeStatus} aria-label="数据模式状态">
+    <section className={styles.modeStatus} aria-label={t("aria.dataModeStatus")}>
       <div className={styles.modeStatusHead}>
         <span>{label}</span>
         <span className={styles.modeStatusSpacer} aria-hidden="true" />

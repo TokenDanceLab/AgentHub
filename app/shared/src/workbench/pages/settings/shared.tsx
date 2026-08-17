@@ -12,6 +12,8 @@ import {
 } from '../../designIcons';
 import { getWorkbenchDataModeContract } from '../../../demo';
 import styles from '../SettingsPage.module.css';
+import { useTranslation } from 'react-i18next';
+import { CHATVIEW_I18N_NAMESPACE } from '../../../chatview/i18n/resources';
 
 /* ── Design icons ── */
 
@@ -177,13 +179,14 @@ interface SettingPathProps {
 }
 
 export function SettingPath({ value, onCopy }: SettingPathProps): React.ReactElement {
+  const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE);
   return (
     <div className={styles.path}>
       <code className={styles.pathCode}>{value}</code>
       <button
         className={styles.pathBtn}
         type="button"
-        aria-label="复制路径"
+        aria-label={t("aria.copyPath")}
         onClick={onCopy}
       >
         <DesignNavIcon name="copy" size={14} />
