@@ -191,7 +191,7 @@ export function InspectorMonitorHead({
         })}
       </div>
       <div className={styles.inspectorWindowActions}>
-        <Tooltip label="新建右侧窗口">
+        <Tooltip label={t("aria.newRightWindow")}>
           <button
             type="button"
             aria-label={t("aria.newRightWindow")}
