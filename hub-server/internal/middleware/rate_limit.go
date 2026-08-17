@@ -24,7 +24,7 @@ var rateLimitMemberID atomic.Int64
 // RateLimit returns a middleware that enforces a sliding-window rate limit
 // using Redis. limit is the maximum number of requests allowed within window.
 // When Redis is unavailable, auth paths always fail closed (reject the request
-// with 500). Non-auth paths respect AGENTHUB_RATE_LIMIT_FAIL_OPEN (default:
+// with 503 rate_limit_unavailable). Non-auth paths respect AGENTHUB_RATE_LIMIT_FAIL_OPEN (default:
 // fail-open with a warning log).
 func RateLimit(client *cache.Client, limit int, window time.Duration, keyFn func(c *gin.Context) string) gin.HandlerFunc {
 	return func(c *gin.Context) {
@@ -81,11 +81,14 @@ func RateLimit(client *cache.Client, limit int, window time.Duration, keyFn func
 	}
 }
 
-// handleRateLimitError handles Redis errors during rate limiting.
+// handleRateLimitError handles Redis errors during rate limiting. Auth paths
+// and explicitly fail-closed non-auth paths return 503 rate_limit_unavailable
+// (aligned with api/conventions.md §限流与 Redis 故障 and global_rate_limit.go);
+// the two middlewares must not drift on the wire shape for the same fault.
 func handleRateLimitError(c *gin.Context, key string, err error) {
 	if isAuthPath(c) {
-		// Auth paths always fail closed.
-		fail(c, errcode.ErrInternal)
+		// Auth paths always fail closed with 503 rate_limit_unavailable.
+		fail(c, errcode.New(sharederr.RateLimitUnavailable, "rate limit service unavailable", http.StatusServiceUnavailable))
 		c.Abort()
 		return
 	}
@@ -100,8 +103,8 @@ func handleRateLimitError(c *gin.Context, key string, err error) {
 		c.Next()
 		return
 	}
-	// Fail closed for non-auth when explicitly configured.
-	fail(c, errcode.ErrInternal)
+	// Fail closed for non-auth when explicitly configured: 503 rate_limit_unavailable.
+	fail(c, errcode.New(sharederr.RateLimitUnavailable, "rate limit service unavailable", http.StatusServiceUnavailable))
 	c.Abort()
 }
 

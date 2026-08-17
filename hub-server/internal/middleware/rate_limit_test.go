@@ -136,7 +136,8 @@ func TestFailHelper(t *testing.T) {
 }
 
 // TestRateLimitFailClosed_NonAuthWhenDisabled verifies that the sliding-window rate
-// limiter fails closed on non-auth paths when AGENTHUB_RATE_LIMIT_FAIL_OPEN=false.
+// limiter fails closed on non-auth paths when AGENTHUB_RATE_LIMIT_FAIL_OPEN=false,
+// returning 503 rate_limit_unavailable (aligned with api/conventions.md and global_rate_limit.go).
 func TestRateLimitFailClosed_NonAuthWhenDisabled(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	client := redisDownClient(t)
@@ -152,5 +153,28 @@ func TestRateLimitFailClosed_NonAuthWhenDisabled(t *testing.T) {
 	handler(c)
 
 	assert.True(t, c.IsAborted(), "non-auth sliding window should fail-closed when RATE_LIMIT_FAIL_OPEN=false")
-	assert.Equal(t, http.StatusInternalServerError, w.Code)
+	assert.Equal(t, http.StatusServiceUnavailable, w.Code)
+	assert.Contains(t, w.Body.String(), "rate_limit_unavailable")
+}
+
+// TestSlidingWindowRateLimitFailClosed_AuthPath verifies the sliding-window
+// limiter returns 503 rate_limit_unavailable on a distinct auth sub-path
+// (/client/auth/login) to complement TestRateLimitFailClosed_AuthPath which
+// tests /client/auth/refresh in global_rate_limit_test.go.
+func TestSlidingWindowRateLimitFailClosed_AuthPath(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	client := redisDownClient(t)
+
+	handler := RateLimit(client, 10, time.Minute, IPKey)
+
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest(http.MethodPost, "/client/auth/login", nil)
+	c.Request.RemoteAddr = "10.0.0.99:12345"
+
+	handler(c)
+
+	assert.True(t, c.IsAborted(), "auth sliding window should always fail-closed on Redis fault")
+	assert.Equal(t, http.StatusServiceUnavailable, w.Code)
+	assert.Contains(t, w.Body.String(), "rate_limit_unavailable")
 }
