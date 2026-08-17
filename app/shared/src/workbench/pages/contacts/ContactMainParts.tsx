@@ -209,11 +209,12 @@ export function ContactGroupsPane({
   onGroupClick?: ((group: ContactGroup) => void) | undefined;
   onAvatarClick?: ((group: ContactGroup, anchor: HTMLElement) => void) | undefined;
 }): React.ReactElement {
+  const { t } = useTranslation(SHARED_WORKBENCH_I18N_NAMESPACE);
   return (
     <main className={`${styles.main} workbench-main`}>
       <ContactMainHead
-        title="我的群组"
-        subtitle="项目群、评审群和协作群统一管理，按最新消息排序。"
+        title={t("contacts.section.myGroups.title")}
+        subtitle={t("contacts.section.myGroups.subtitle")}
         actionLabel="创建群组"
         onAction={onCreateGroup}
       />
@@ -241,11 +242,12 @@ export function ContactServicePane({
   onServiceClick?: ((desk: ServiceDesk) => void) | undefined;
   onAvatarClick?: ((desk: ServiceDesk, anchor: HTMLElement) => void) | undefined;
 }): React.ReactElement {
+  const { t } = useTranslation(SHARED_WORKBENCH_I18N_NAMESPACE);
   return (
     <main className={`${styles.main} workbench-main`}>
       <ContactMainHead
-        title="服务台"
-        subtitle="把账号、Agent 运行和云文档问题转给对应支持入口。"
+        title={t("contacts.section.helpDesk.title")}
+        subtitle={t("contacts.section.helpDesk.subtitle")}
         actionLabel="新建工单"
         onAction={onNewTicket}
       />

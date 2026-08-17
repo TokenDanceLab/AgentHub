@@ -6,6 +6,7 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { CHATVIEW_I18N_NAMESPACE } from '../../../chatview/i18n/resources';
+import { SHARED_WORKBENCH_I18N_NAMESPACE } from '../../../i18n';
 import {
   DataModeControl,
   SettingPath,
@@ -44,9 +45,10 @@ export {
    ═══════════════════════════════════════════════════════════════════════ */
 
 export function AppearancePane(props: SettingsPageProps): React.ReactElement {
+  const { t: tw } = useTranslation(SHARED_WORKBENCH_I18N_NAMESPACE);
   return (
     <>
-      <SettingsSection title="界面">
+      <SettingsSection title={tw("settings.section.interface")}>
         <SettingsRow label="主题" description="默认浅色；左下角主题按钮只负责快速切换当前预览。">
           <SettingSegment options={['跟随系统', '浅色', '深色']} active={props.theme} onChange={(v) => props.onChangeSetting('theme', v)} />
         </SettingsRow>
@@ -61,7 +63,7 @@ export function AppearancePane(props: SettingsPageProps): React.ReactElement {
         </SettingsRow>
       </SettingsSection>
 
-      <SettingsSection title="布局">
+      <SettingsSection title={tw("settings.section.layout")}>
         <SettingsRow label="右侧概览" description="新聊天默认显示，用户可从聊天头部收起。">
           <SettingSwitch active={props.inspectorVisible} onChange={(v) => props.onChangeSetting('inspectorVisible', v)} />
         </SettingsRow>
@@ -77,9 +79,10 @@ export function AppearancePane(props: SettingsPageProps): React.ReactElement {
 }
 
 export function NotifyPane(props: SettingsPageProps): React.ReactElement {
+  const { t: tw } = useTranslation(SHARED_WORKBENCH_I18N_NAMESPACE);
   return (
     <>
-      <SettingsSection title="运行提醒">
+      <SettingsSection title={tw("settings.section.runNotifications")}>
         <SettingsRow label="任务完成" description="Builder、Reviewer、Deployer 完成后在当前会话内提示。">
           <SettingSwitch active={props.taskCompleteNotify} onChange={(v) => props.onChangeSetting('taskCompleteNotify', v)} />
         </SettingsRow>
@@ -91,7 +94,7 @@ export function NotifyPane(props: SettingsPageProps): React.ReactElement {
         </SettingsRow>
       </SettingsSection>
 
-      <SettingsSection title="协作提醒">
+      <SettingsSection title={tw("settings.section.collaborationNotifications")}>
         <SettingsRow label="项目群消息" description="项目成员提及、公告更新和产物变更。">
           <SettingSegment options={['全部', '提及', '关闭']} active={props.projectGroupNotifyLevel} onChange={(v) => props.onChangeSetting('projectGroupNotifyLevel', v)} />
         </SettingsRow>
@@ -108,9 +111,10 @@ export function NotifyPane(props: SettingsPageProps): React.ReactElement {
 
 export function AgentDefaultsPane(props: SettingsPageProps): React.ReactElement {
   const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE);
+  const { t: tw } = useTranslation(SHARED_WORKBENCH_I18N_NAMESPACE);
   return (
     <>
-      <SettingsSection title="默认运行配置">
+      <SettingsSection title={tw("settings.section.defaultRunConfig")}>
         <SettingsRow label="默认模型" description="新 Agent 会话默认使用的模型徽标。">
           <SettingValue value={props.defaultModel} />
         </SettingsRow>
@@ -125,7 +129,7 @@ export function AgentDefaultsPane(props: SettingsPageProps): React.ReactElement 
         </SettingsRow>
       </SettingsSection>
 
-      <SettingsSection title="权限策略">
+      <SettingsSection title={tw("settings.section.permissionPolicy")}>
         {PERMISSION_ROWS.map(([tool, value, desc]) => (
           <SettingsRow key={tool} label={tool} description={desc} wide>
             <SettingSegment
@@ -140,7 +144,7 @@ export function AgentDefaultsPane(props: SettingsPageProps): React.ReactElement 
       {props.onOpenAgentConfig ? (
         <AgentConfigLink
           ariaLabel={t('aria.agentConfig')}
-          title="单个 Agent 配置"
+          title={tw("settings.section.singleAgentConfig")}
           description="为每个 Agent 单独配置运行器 (CC/Codex/OpenCode/SDK)、模型、System Prompt 和 MCP 绑定。"
           actionLabel="打开 Agent 配置"
           onOpen={props.onOpenAgentConfig}
@@ -151,9 +155,10 @@ export function AgentDefaultsPane(props: SettingsPageProps): React.ReactElement 
 }
 
 export function LocalDevPane(props: SettingsPageProps): React.ReactElement {
+  const { t: tw } = useTranslation(SHARED_WORKBENCH_I18N_NAMESPACE);
   return (
     <>
-      <SettingsSection title="本地预览">
+      <SettingsSection title={tw("settings.section.localPreview")}>
         <SettingsRow label="Vite 地址" description="用于实时预览 AgentHub Desktop design demo。">
           <SettingPath value={props.vitePreviewUrl} onCopy={() => props.onChangeSetting('copy_viteUrl', props.vitePreviewUrl)} />
         </SettingsRow>
@@ -176,7 +181,7 @@ export function LocalDevPane(props: SettingsPageProps): React.ReactElement {
 
       <DataModeStatus mode={props.dataMode} />
 
-      <SettingsSection title="调试">
+      <SettingsSection title={tw("settings.section.debug")}>
         <SettingsRow label="视觉 QA" description="需要时用浏览器截图检查桌面和窄宽布局。">
           <SettingValue value={props.visualQaMode} />
         </SettingsRow>
@@ -189,7 +194,7 @@ export function LocalDevPane(props: SettingsPageProps): React.ReactElement {
       </SettingsSection>
 
       {props.sessionImportVisible ? (
-        <SettingsSection title="本地会话导入">
+        <SettingsSection title={tw("settings.section.localSessionImport")}>
           <SettingsRow
             label="运行时会话"
             description="只读导入本机 Agent Runtime 会话摘要（导入/观察模式，不修改外部存储）。"
@@ -222,9 +227,10 @@ export function LocalDevPane(props: SettingsPageProps): React.ReactElement {
 }
 
 export function StatesPane(props: SettingsPageProps): React.ReactElement {
+  const { t: tw } = useTranslation(SHARED_WORKBENCH_I18N_NAMESPACE);
   return (
     <>
-      <SettingsSection title="状态策略">
+      <SettingsSection title={tw("settings.section.statePolicy")}>
         <SettingsRow label="空状态" description="说明当前为空，并提供一个明确下一步。">
           <SettingSwitch active={props.stateStrategies.empty} onChange={(v) => props.onChangeSetting('stateStrategy_empty', v)} />
         </SettingsRow>
