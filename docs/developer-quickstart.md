@@ -1,6 +1,6 @@
 # AgentHub 开发快速上手
 
-最后更新：2026-08-16
+最后更新：2026-08-17
 
 本文档只保留新人启动本地开发环境需要的最短路径。规则、分支、E2E 证据等级和发布门禁以 `AGENTS.md` 为准。
 
@@ -131,6 +131,8 @@ python scripts/verify/verify-real-e2e-contract.py
 python -c "import yaml, pathlib; yaml.safe_load(pathlib.Path('api/openapi.yaml').read_text(encoding='utf-8')); print('yaml ok')"
 git diff --check
 ```
+
+GitHub Actions 的 Ubuntu/Windows 分层、路径过滤、矩阵并行、缓存和免费额度策略见 [architecture/github-actions-ci-cd-policy.md](architecture/github-actions-ci-cd-policy.md)。普通 PR 会运行相关的 Windows 原生 Go/前端合同；Mobile full、Playwright、Visual QA、benchmark 和 Linux Tauri 预检通过 `workflow_dispatch` 按需运行。
 
 E2E/Visual QA 只证明实际跑过的层级；PR 中写明证据等级（`fixture-unit`/`playwright-ui`/`visual-qa`/`stubbed-hub`/`observed-local`/`approved-real`/`packaged-release`）。
 

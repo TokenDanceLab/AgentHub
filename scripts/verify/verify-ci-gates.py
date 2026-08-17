@@ -96,6 +96,10 @@ def main() -> int:
     # single path-filtered job. Normal scan and negative self-test are both
     # hard-blocking; the job must never fall back to lint:css (920-rule debt).
     design_css = get_job_block(workflow, "design-css")
+    windows_go_test = get_job_block(workflow, "windows-go-test")
+    windows_frontend_test = get_job_block(workflow, "windows-frontend-test")
+    windows_go = get_job_block(workflow, "windows-go")
+    windows_frontend = get_job_block(workflow, "windows-frontend")
 
     assert_contains(edge, r"Coverage check \(informational\)", "go-edge overall coverage must stay informational")
     assert_contains(edge, r"Coverage per-package minimums", "go-edge must keep per-package coverage minimums")
@@ -128,6 +132,26 @@ def main() -> int:
     assert_contains(vuln_go, re.escape("verify-vulnerability-gates.sh govulncheck"), "vuln-scan-go must run the fail-closed govulncheck verifier")
     assert_contains(vuln_js, re.escape("verify-vulnerability-gates.sh pnpm-audit"), "vuln-scan-js must run the fail-closed pnpm audit verifier")
     assert_contains(validate, r"Self-test vulnerability gates", "validate must self-test the vulnerability gates")
+
+    # Native Windows is a compatibility contract, not a duplicate release
+    # pipeline: backend and frontend matrix legs must remain path-filtered and
+    # hard-blocking while full Tauri packaging stays in release-readiness.
+    assert_contains(windows_go_test, r"needs:\s+changes", "windows-go-test must depend on the unified changes job")
+    assert_contains(windows_go_test, r"needs\.changes\.outputs\.go == 'true'", "windows-go-test must path-filter on Go changes")
+    assert_contains(windows_go_test, r"runs-on:\s+windows-latest", "windows-go-test must use a native Windows runner")
+    assert_contains(windows_go_test, r"module:\s*\[edge-server, hub-server\]", "windows-go-test must cover both Go modules")
+    assert_contains(windows_go_test, r"go test \./\.\.\. -short -count=1", "windows-go-test must execute the native short unit suite")
+    assert_contains(windows_frontend_test, r"needs:\s+changes", "windows-frontend-test must depend on the unified changes job")
+    assert_contains(windows_frontend_test, r"needs\.changes\.outputs\.frontend == 'true'", "windows-frontend-test must path-filter on frontend changes")
+    assert_contains(windows_frontend_test, r"runs-on:\s+windows-latest", "windows-frontend-test must use a native Windows runner")
+    assert_contains(windows_frontend_test, r"package:\s*\[agenthub-desktop, agenthub-web\]", "windows-frontend-test must cover Desktop and Web")
+    assert_contains(windows_frontend_test, r"pnpm --filter \$\{\{ matrix\.package \}\} typecheck", "windows-frontend-test must run package type checks")
+    assert_contains(windows_frontend_test, r"pnpm --filter \$\{\{ matrix\.package \}\} test", "windows-frontend-test must run package unit tests")
+    assert_contains(windows_frontend_test, r"pnpm --filter \$\{\{ matrix\.package \}\} build", "windows-frontend-test must run package production builds")
+    assert_contains(windows_go, r"needs:\s+\[changes, windows-go-test\]", "windows-go must aggregate the Windows Go matrix")
+    assert_contains(windows_go, r"if:\s+always\(\)", "windows-go must report a stable result when its matrix is skipped")
+    assert_contains(windows_frontend, r"needs:\s+\[changes, windows-frontend-test\]", "windows-frontend must aggregate the Windows frontend matrix")
+    assert_contains(windows_frontend, r"if:\s+always\(\)", "windows-frontend must report a stable result when its matrix is skipped")
 
     assert_contains(backend_fixture, r"working-directory:\s+hub-server", "backend-e2e-fixture must run from hub-server")
     assert_contains(backend_fixture, r"TeamRun fixture E2E", "backend-e2e-fixture must name the TeamRun fixture step")
@@ -181,6 +205,7 @@ def main() -> int:
         ("e2e-smoke", e2e, "app/pnpm-lock.yaml"),
         ("visual-qa-shell", visual_shell, "app/pnpm-lock.yaml"),
         ("design-css", design_css, "app/pnpm-lock.yaml"),
+        ("windows-frontend-test", windows_frontend_test, "app/pnpm-lock.yaml"),
     ):
         # runtime major is governed by verify-action-runtimes.py (#1580); here
         # we only require the pnpm setup step to exist with the pnpm cache wired up

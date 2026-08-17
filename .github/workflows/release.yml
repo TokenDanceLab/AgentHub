@@ -14,7 +14,7 @@ concurrency:
 env:
   GO_VERSION: "1.26.5"
   NODE_VERSION: "22"
-  PNPM_VERSION: "10"
+  PNPM_VERSION: "10.32.1"
 
 jobs:
   # ── Tag Guard: 发布入口守卫（格式 + master 祖先链）─────

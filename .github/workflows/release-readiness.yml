@@ -8,6 +8,8 @@ on:
     paths:
       - ".github/workflows/release.yml"
       - ".github/workflows/release-readiness.yml"
+      - "edge-server/internal/lifecycle/env_*.go"
+      - "app/package.json"
       - "app/desktop/package.json"
       - "app/desktop/src-tauri/Cargo.toml"
       - "app/desktop/src-tauri/Cargo.lock"
@@ -38,7 +40,7 @@ concurrency:
 env:
   GO_VERSION: "1.26.5"
   NODE_VERSION: "22"
-  PNPM_VERSION: "10"
+  PNPM_VERSION: "10.32.1"
 
 jobs:
   readiness-policy:
@@ -71,6 +73,10 @@ jobs:
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@1.96.0
+
+      - name: Verify Windows environment inheritance contract
+        working-directory: edge-server
+        run: go test ./internal/lifecycle -run '^(TestSanitizedEnv|TestEnvFilterAudit|TestEnvAllowlist|TestIsSensitiveEnvKey)' -count=1
 
       - name: Verify Windows installer smoke preflight
         run: python scripts/release/verify-tauri-installer-smoke.py -RepoRoot . -StrictToolchain
