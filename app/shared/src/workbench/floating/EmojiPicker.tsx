@@ -100,12 +100,11 @@ export const EmojiPicker: React.FC<EmojiPickerProps> = ({
       {rows.map((row, rowIndex) => (
         <div key={rowIndex} role="row" className={styles.row}>
           {row.map(({ emoji, index }) => (
-            <button
+            <button type="button"
               key={emoji}
               ref={(el) => {
                 cellRefs.current[index] = el;
               }}
-              type="button"
               role="gridcell"
               tabIndex={index === activeIndex ? 0 : -1}
               className={`${styles.cell}${index === activeIndex ? ` ${styles.active}` : ''}`}

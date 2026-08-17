@@ -348,11 +348,10 @@ export function ConversationSidebar({
         <option value="active">活跃</option>
       </select>
       {archivedCount > 0 && (
-        <button
+        <button type="button"
           className={styles.archiveFilterToggle}
           data-active={showArchived ? 'true' : undefined}
           onClick={() => setShowArchived((prev) => !prev)}
-          type="button"
         >
           <span className={styles.archiveFilterIcon} aria-hidden="true">
             <DesignNavIcon name="archive" size={14} />
@@ -458,7 +457,7 @@ export function ConversationSidebar({
                       }}
                       onContextMenu={(event) => handleRowContextMenu(event, index)}
                     >
-                      <button
+                      <button type="button"
                         aria-current={isActive ? 'true' : undefined}
                         className={styles.conversationButton}
                         data-agent-profile={conversation.kind === 'direct' ? conversation.title : undefined}
@@ -469,7 +468,6 @@ export function ConversationSidebar({
                           rowButtonRefs.current[index] = el;
                         }}
                         tabIndex={isFocusedRow ? 0 : -1}
-                        type="button"
                       >
                         <span
                           aria-label={`${conversation.title} 资料卡`}
@@ -534,13 +532,12 @@ export function ConversationSidebar({
                       <span className={styles.conversationActions} onClick={(event) => event.stopPropagation()}>
                         {onPinConversation && (
                           <Tooltip label={isPinned ? '取消置顶' : '置顶'}>
-                            <button
+                            <button type="button"
                               aria-label={isPinned ? '取消置顶' : '置顶'}
                               className={styles.conversationActionBtn}
                               data-active={isPinned ? 'true' : undefined}
                               onClick={() => onPinConversation(conversation.id, !isPinned)}
                               tabIndex={-1}
-                              type="button"
                             >
                               <DesignNavIcon name="pin" size={14} />
                             </button>
@@ -548,7 +545,7 @@ export function ConversationSidebar({
                         )}
                         {onArchiveConversation && !showArchived && (
                           <Tooltip label="归档">
-                            <button
+                            <button type="button"
                               aria-label={t('aria.archive')}
                               className={styles.conversationActionBtn}
                               onClick={() => {
@@ -557,7 +554,6 @@ export function ConversationSidebar({
                                 }
                               }}
                               tabIndex={-1}
-                              type="button"
                             >
                               <DesignNavIcon name="archive" size={14} />
                             </button>
@@ -565,12 +561,11 @@ export function ConversationSidebar({
                         )}
                         {onArchiveConversation && showArchived && (
                           <Tooltip label="取消归档">
-                            <button
+                            <button type="button"
                               aria-label={t('aria.unarchive')}
                               className={styles.conversationActionBtn}
                               onClick={() => onArchiveConversation(conversation.id, false)}
                               tabIndex={-1}
-                              type="button"
                             >
                               <DesignNavIcon name="inbox" size={14} />
                             </button>
@@ -605,21 +600,19 @@ export function ConversationSidebar({
             {t('conversation.deleteBody', { title: deleteTarget.title })}
           </p>
           <div className={styles.conversationDeleteActions}>
-            <button
+            <button type="button"
               className={styles.conversationDeleteCancel}
               onClick={() => setDeleteTarget(null)}
-              type="button"
             >
               {t('conversation.cancel')}
             </button>
-            <button
+            <button type="button"
               className={styles.conversationDeleteConfirm}
               onClick={() => {
                 const target = deleteTarget;
                 setDeleteTarget(null);
                 onDeleteConversation?.(target.id);
               }}
-              type="button"
             >
               {t('conversation.deleteConfirm')}
             </button>

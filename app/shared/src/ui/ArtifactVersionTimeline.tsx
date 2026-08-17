@@ -68,10 +68,9 @@ export function ArtifactVersionTimeline({
               {i < sorted.length - 1 && <div className={styles.connector} />}
             </div>
             <div className={styles.content}>
-              <button
+              <button type="button"
                 className={styles.versionHeader}
                 onClick={() => setExpandedVersion((prev) => prev === v.version ? null : v.version)}
-                type="button"
               >
                 <span className={styles.versionLabel}>v{v.version}</span>
                 {v.version === latest && <span className={styles.latestBadge}>current</span>}

@@ -35,7 +35,7 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(
       .filter(Boolean)
       .join(' ');
     return (
-      <button ref={ref} className={cls} {...props}>
+      <button type="button" ref={ref} className={cls} {...props}>
         {children}
       </button>
     );
