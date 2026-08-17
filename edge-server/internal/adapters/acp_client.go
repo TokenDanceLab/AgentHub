@@ -32,7 +32,7 @@ const acpSDKVersion = "v0.13.5"
 // a JSON-RPC error instead of a silent hang. session/request_permission no
 // longer goes through this sentinel — it is bridged to the Edge approval
 // chain via PermissionDecisionBroker.
-var errACPEndpointNotWired = errors.New("acp: endpoint not wired (TODO #1404: frame design)")
+var errACPEndpointNotWired = errors.New("acp: endpoint not wired (TODO #1743 (follow-up of #1404): frame design)")
 
 // acpClientHandler is the coder/acp-go-sdk client side. The SDK dispatches
 // inbound JSON-RPC to the acp.Client interface methods:
@@ -254,7 +254,7 @@ func firstPermissionOption(options []acp.PermissionOption, kinds ...acp.Permissi
 // ── Unwired endpoint stubs (#1404) ────────────────────────────────────────
 //
 // STUB INVENTORY (single source of the "not wired" list — update both the
-// methods below and TestUnwiredACPEndpointsFailClosed when #1404 lands):
+// methods below and TestUnwiredACPEndpointsFailClosed when #1743 lands):
 //
 //	fs/read_text_file     → ReadTextFile        (fs frame design + allowlist)
 //	fs/write_text_file    → WriteTextFile       (fs frame design + allowlist)
@@ -270,7 +270,7 @@ func firstPermissionOption(options []acp.PermissionOption, kinds ...acp.Permissi
 // Every stub fails closed with errACPEndpointNotWired — a JSON-RPC error the
 // agent can surface — never a silent hang, never a fake success. The
 // capabilities are still advertised in initialize (runACPSession) so the
-// agent can discover them; removing the advertisement is a #1404 follow-up,
+// agent can discover them; removing the advertisement is a #1743 follow-up,
 // not something a stub should silently do.
 //
 // ReadTextFile handles fs/read_text_file.
@@ -284,7 +284,7 @@ func (h *acpClientHandler) WriteTextFile(ctx context.Context, params acp.WriteTe
 }
 
 func fsEndpointError(method, path string) error {
-	return fmt.Errorf("acp: %s %q not wired (TODO #1404: Edge fs frame design + allowlist): %w",
+	return fmt.Errorf("acp: %s %q not wired (TODO #1743 (follow-up of #1404): Edge fs frame design + allowlist): %w",
 		method, path, errACPEndpointNotWired)
 }
 
@@ -314,7 +314,7 @@ func (h *acpClientHandler) WaitForTerminalExit(ctx context.Context, params acp.W
 }
 
 func terminalEndpointError(method string) error {
-	return fmt.Errorf("acp: %s not wired (TODO #1404: Edge terminal frame design): %w", method, errACPEndpointNotWired)
+	return fmt.Errorf("acp: %s not wired (TODO #1743 (follow-up of #1404): Edge terminal frame design): %w", method, errACPEndpointNotWired)
 }
 
 // runACPSession runs one ACP turn with the SDK client runtime: initialize
@@ -352,7 +352,7 @@ func runACPSession(ctx context.Context, stdout io.Reader, stdin io.Writer, emitt
 
 	// 1. initialize handshake. Capabilities: fs read/write + terminal are
 	// advertised; the endpoints answer with errors until the fs/terminal
-	// frame design lands (#1404; see handler TODO comments). Tool permission
+	// frame design lands (#1743; see handler TODO comments). Tool permission
 	// gates use session/request_permission, which is bridged to the Edge
 	// approval chain.
 	initResp, err := conn.Initialize(ctx, acp.InitializeRequest{
@@ -375,7 +375,7 @@ func runACPSession(ctx context.Context, stdout io.Reader, stdin io.Writer, emitt
 	}
 
 	// 2. session/new. MCP server config from the run profile is not yet wired
-	// into the ACP session (frame design deferred, #1404). When a profile
+	// into the ACP session (frame design deferred (#1743, follow-up of #1404)). When a profile
 	// declares MCP servers, surface the gap as a visible status-change event
 	// + warning log so the user sees *why* MCP tools are unavailable instead
 	// of a silent absence.
@@ -390,7 +390,7 @@ func runACPSession(ctx context.Context, stdout io.Reader, stdin io.Writer, emitt
 	}
 	sessResp, err := conn.NewSession(ctx, acp.NewSessionRequest{
 		Cwd:        rc.WorkDir,
-		McpServers: []acp.McpServer{}, // TODO(#1404): wire RunProcessContext.MCPConfig
+		McpServers: []acp.McpServer{}, // TODO(#1743): wire RunProcessContext.MCPConfig
 	})
 	if err != nil {
 		return NewNonRecoverableParseError(fmt.Errorf("acp: session/new failed: %w", err))
@@ -399,7 +399,7 @@ func runACPSession(ctx context.Context, stdout io.Reader, stdin io.Writer, emitt
 
 	// 3. session/prompt. During this call the SDK dispatches all inbound
 	// session/update notifications (→ SessionUpdate → run.agent.*) and
-	// blocking requests (→ handler TODOs, #1404) concurrently.
+	// blocking requests (→ handler #1743) concurrently.
 	slog.Debug("acp: sending session/prompt", "run_id", run.ID, "session_id", sessResp.SessionId)
 	promptResp, err := conn.Prompt(ctx, acp.PromptRequest{
 		SessionId: sessResp.SessionId,
