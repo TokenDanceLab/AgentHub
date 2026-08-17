@@ -75,7 +75,7 @@ function DocTableRow({
             <button type="button" className={styles.cancelDeleteBtn} onClick={handleCancelDelete}>取消</button>
           </>
         ) : onDelete ? (
-          <Tooltip label="删除文档">
+          <Tooltip label={t("aria.deleteDoc")}>
             <button type="button" className={styles.docDeleteBtn} onClick={handleDelete} aria-label={t("aria.deleteDoc")}>
               <DesignNavIcon name="close" size={14} />
             </button>
