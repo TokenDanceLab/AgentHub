@@ -1,7 +1,12 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeAll } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import { AddContactModal } from './AddContactModal';
+import { useTestI18nLanguage } from '../../../testing/i18n';
+
+beforeAll(async () => {
+  await useTestI18nLanguage('zh');
+});
 
 const TAB_LABELS = ['企业二维码', '企业链接', '企业邀请码', '手机号'];
 

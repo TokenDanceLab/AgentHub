@@ -12,6 +12,8 @@ import {
 } from '../../designIcons';
 import styles from '../TasksPage.module.css';
 import type { TasksPane, ViewMode } from './types';
+import { useTranslation } from 'react-i18next';
+import { CHATVIEW_I18N_NAMESPACE } from '../../../chatview/i18n/resources';
 
 // ── Nav definitions ──
 
@@ -85,10 +87,11 @@ export function StatCard({ label, value }: { label: string; value: number }) {
 }
 
 export function TaskNavMenu({ open }: { open: boolean }) {
+  const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE);
   if (!open) return null;
 
   return (
-    <div className={styles.navMenu} role="menu" aria-label="任务更多操作菜单">
+    <div className={styles.navMenu} role="menu" aria-label={t("aria.taskMoreMenu")}>
       <button type="button" role="menuitem">
         <DesignNavIcon name="fileText" size={14} />
         导入任务

@@ -370,7 +370,7 @@ export const RowItem = memo(function RowItem({ item, onToggle, onApprove, onReje
             <div className="code-block">
               <div className="code-head">
                 <span className="code-head-left"><FileTypeIcon item={item} /><span>{item.codeLang || labelText}</span></span>
-                <Button variant="ghost" size="sm" className={copied ? 'copied' : undefined} aria-label={copied ? '已复制' : '复制'} onClick={handleCodeCopy}>{copied ? <><Check size={12} />已复制</> : <><Copy size={12} />复制</>}</Button>
+                <Button variant="ghost" size="sm" className={copied ? 'copied' : undefined} aria-label={copied ? t('code.copied') : t('code.copy')} onClick={handleCodeCopy}>{copied ? <><Check size={12} />{t('code.copied')}</> : <><Copy size={12} />{t('code.copy')}</>}</Button>
               </div>
               <div className="code-lines">{item.codeLines.map((line, i) => (
                 <div key={i} className="code-line"><span className="code-num">{i + 1}</span><span className="code-text">{line}</span></div>

@@ -397,29 +397,29 @@ describe('RowItem code copy button (fable UIUX #4)', () => {
     ...overrides,
   });
 
-  it('renders the copy button in idle 复制 state', () => {
+  it('renders the copy button in idle Copy state', () => {
     const { container } = render(<RowItem item={codeItem()} />);
-    const btn = container.querySelector('button[aria-label="复制"]')!;
+    const btn = container.querySelector('button[aria-label="Copy"]')!;
     expect(btn).not.toBeNull();
-    expect(btn.textContent).toContain('复制');
+    expect(btn.textContent).toContain('Copy');
     expect(btn.classList.contains('copied')).toBe(false);
   });
 
-  it('flips to 已复制 on click via onCopy and back after 1500ms', () => {
+  it('flips to Copied on click via onCopy and back after 1500ms', () => {
     const onCopy = vi.fn();
     const { container } = render(<RowItem item={codeItem()} onCopy={onCopy} />);
-    const btn = container.querySelector('button[aria-label="复制"]')!;
+    const btn = container.querySelector('button[aria-label="Copy"]')!;
     fireEvent.click(btn);
     // delegates to the app-level handler with the joined lines
     expect(onCopy).toHaveBeenCalledWith('code-1', 'const a = 1;\nconsole.log(a);');
     // Copy→Check feedback
-    expect(btn.textContent).toContain('已复制');
+    expect(btn.textContent).toContain('Copied');
     expect(btn.classList.contains('copied')).toBe(true);
     // 1500ms later the flag resets
     act(() => {
       vi.advanceTimersByTime(1500);
     });
-    expect(btn.textContent).toContain('复制');
+    expect(btn.textContent).toContain('Copy');
     expect(btn.classList.contains('copied')).toBe(false);
   });
 
@@ -430,12 +430,12 @@ describe('RowItem code copy button (fable UIUX #4)', () => {
       configurable: true,
     });
     const { container } = render(<RowItem item={codeItem()} />);
-    const btn = container.querySelector('button[aria-label="复制"]')!;
+    const btn = container.querySelector('button[aria-label="Copy"]')!;
     await act(async () => {
       fireEvent.click(btn);
     });
     expect(writeText).toHaveBeenCalledWith('const a = 1;\nconsole.log(a);');
-    expect(btn.textContent).toContain('已复制');
+    expect(btn.textContent).toContain('Copied');
     Object.defineProperty(navigator, 'clipboard', {
       value: undefined,
       configurable: true,
