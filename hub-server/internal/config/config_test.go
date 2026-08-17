@@ -735,6 +735,72 @@ func TestValidateTokenDanceIDRequiresRedirectURI(t *testing.T) {
 	}
 }
 
+func TestValidateTokenDanceIDRejectsShortClientSecret(t *testing.T) {
+	cfg := &Config{
+		DB: DBConfig{
+			Host:            "localhost",
+			Port:            5432,
+			User:            "agenthub",
+			Name:            "agenthub",
+			MaxOpenConns:    2,
+			MaxIdleConns:    1,
+			ConnMaxLifetime: 30 * time.Minute,
+			ConnMaxIdleTime: 5 * time.Minute,
+		},
+		Redis: RedisConfig{Host: "localhost", Port: 6379},
+		JWT: JWTConfig{
+			Secret: "strong-agenthub-secret-padded-to-minimum-32-chars..",
+		},
+		TokenDanceID: TokenDanceIDConfig{
+			IssuerURL:    "https://id.example",
+			ClientID:     "agenthub-client",
+			ClientSecret: "short-but-present-secret",
+			RedirectURI:  "http://127.0.0.1/callback",
+		},
+	}
+
+	err := cfg.Validate()
+	if err == nil {
+		t.Fatal("expected short TokenDance ID client secret to be rejected")
+	}
+	if !strings.Contains(err.Error(), "tokendance_id.client_secret too short") {
+		t.Fatalf("Validate() error = %q, want tokendance_id.client_secret too short", err.Error())
+	}
+}
+
+func TestValidateTokenDanceIDRejectsSeedSecret(t *testing.T) {
+	cfg := &Config{
+		DB: DBConfig{
+			Host:            "localhost",
+			Port:            5432,
+			User:            "agenthub",
+			Name:            "agenthub",
+			MaxOpenConns:    2,
+			MaxIdleConns:    1,
+			ConnMaxLifetime: 30 * time.Minute,
+			ConnMaxIdleTime: 5 * time.Minute,
+		},
+		Redis: RedisConfig{Host: "localhost", Port: 6379},
+		JWT: JWTConfig{
+			Secret: "strong-agenthub-secret-padded-to-minimum-32-chars..",
+		},
+		TokenDanceID: TokenDanceIDConfig{
+			IssuerURL:    "https://id.example",
+			ClientID:     "agenthub-client",
+			ClientSecret: "agenthub-dev-secret-change-me-padded-to-32!!",
+			RedirectURI:  "http://127.0.0.1/callback",
+		},
+	}
+
+	err := cfg.Validate()
+	if err == nil {
+		t.Fatal("expected seed SQL TokenDance ID client secret to be rejected")
+	}
+	if !strings.Contains(err.Error(), "tokendance_id.client_secret must be a strong") {
+		t.Fatalf("Validate() error = %q, want tokendance_id.client_secret must be a strong", err.Error())
+	}
+}
+
 // --- DSN / Addr edge cases ---
 
 func TestDBConfigDSNZeroValues(t *testing.T) {

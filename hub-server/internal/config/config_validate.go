@@ -84,6 +84,7 @@ var knownHardcodedSecrets = []string{
 	"password",
 	"1234567890123456",
 	"aaaaaaaaaaaaaaaa",
+	"agenthub-dev-secret-change-me",
 }
 
 // weakSecretPrefixes blocks the publicly-documented placeholder families.
@@ -97,9 +98,12 @@ var knownHardcodedSecrets = []string{
 //     family (e.g. change-me-production-min-length-32-chars, 41 chars).
 //     Both PG_PASSWORD and JWT_SECRET in .env.example used this prefix; the
 //     JWT variant was long enough to pass the length gate before this entry.
+//   - "agenthub-dev-secret": the seed SQL OIDC client_secret family
+//     (agenthub-dev-secret-change-me and derivatives).
 var weakSecretPrefixes = []string{
 	"dev-secret-change-in-production",
 	"change-me-production",
+	"agenthub-dev-secret",
 }
 
 // isKnownWeakSecret reports whether the given secret is a hardcoded default
@@ -164,6 +168,17 @@ func (c *Config) validateTokenDanceID() error {
 		}
 		if c.TokenDanceID.RedirectURI == "" {
 			return fmt.Errorf("tokendance_id.redirect_uri is required when tokendance_id.client_id is set")
+		}
+		// OIDC client_secret must meet the same strength bar as JWT secrets:
+		// 32-char minimum and no known hardcoded/placeholder values. The
+		// seed SQL default (agenthub-dev-secret-change-me) and the
+		// .env.example documented placeholders must be rejected so an
+		// operator cannot accidentally run production with the seed value.
+		if len(c.TokenDanceID.ClientSecret) < 32 {
+			return fmt.Errorf("tokendance_id.client_secret too short: minimum 32 characters required (got %d)", len(c.TokenDanceID.ClientSecret))
+		}
+		if isKnownWeakSecret(c.TokenDanceID.ClientSecret) {
+			return errors.New("tokendance_id.client_secret must be a strong, non-default value; the seed SQL default and documented dev placeholders are rejected")
 		}
 	}
 	return nil
