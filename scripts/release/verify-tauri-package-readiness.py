@@ -484,6 +484,7 @@ def main() -> int:
     package_manager = str(workspace_package.get("packageManager") or "")
     assert_true(package_manager.startswith("pnpm@"), "frontend workspace pins pnpm through packageManager")
     pnpm_version = package_manager.removeprefix("pnpm@")
+    assert_true(bool(re.fullmatch(r"\d+\.\d+\.\d+", pnpm_version)), "frontend workspace pins an explicit pnpm version")
 
     step("Windows package policy")
     assert_true(tauri["bundle"]["active"] is True, "Tauri bundle is active")

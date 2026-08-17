@@ -150,8 +150,12 @@ def main() -> int:
     assert_contains(windows_frontend_test, r"pnpm --filter \$\{\{ matrix\.package \}\} build", "windows-frontend-test must run package production builds")
     assert_contains(windows_go, r"needs:\s+\[changes, windows-go-test\]", "windows-go must aggregate the Windows Go matrix")
     assert_contains(windows_go, r"if:\s+always\(\)", "windows-go must report a stable result when its matrix is skipped")
+    assert_contains(windows_go, re.escape("MATRIX_RESULT: ${{ needs.windows-go-test.result }}"), "windows-go must bind the Windows Go matrix result for fail-closed aggregation")
+    assert_contains(windows_go, re.escape('MATRIX_RESULT" != "success"'), "windows-go must fail when its Windows Go matrix did not succeed")
     assert_contains(windows_frontend, r"needs:\s+\[changes, windows-frontend-test\]", "windows-frontend must aggregate the Windows frontend matrix")
     assert_contains(windows_frontend, r"if:\s+always\(\)", "windows-frontend must report a stable result when its matrix is skipped")
+    assert_contains(windows_frontend, re.escape("MATRIX_RESULT: ${{ needs.windows-frontend-test.result }}"), "windows-frontend must bind the Windows frontend matrix result for fail-closed aggregation")
+    assert_contains(windows_frontend, re.escape('MATRIX_RESULT" != "success"'), "windows-frontend must fail when its Windows frontend matrix did not succeed")
 
     assert_contains(backend_fixture, r"working-directory:\s+hub-server", "backend-e2e-fixture must run from hub-server")
     assert_contains(backend_fixture, r"TeamRun fixture E2E", "backend-e2e-fixture must name the TeamRun fixture step")

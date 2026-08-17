@@ -41,8 +41,9 @@ AgentHub 使用 Ubuntu 和 Windows 原生 runner 验证不同类别的问题：
 
 ### Windows
 
-- `windows-go` 对 `edge-server` 和 `hub-server` 运行 `go test ./... -short`，验证 Windows 路径、进程、环境变量大小写和平台 API 行为。
-- `windows-frontend` 对 `agenthub-desktop` 和 `agenthub-web` 并行执行 typecheck、unit tests 和 production build。
+- `windows-go-test` 是执行矩阵：在 `windows-latest` 上对 `edge-server` 和 `hub-server` 运行 `go test ./... -short`，验证 Windows 路径、进程、环境变量大小写和平台 API 行为。
+- `windows-frontend-test` 是执行矩阵：在 `windows-latest` 上对 `agenthub-desktop` 和 `agenthub-web` 并行执行 typecheck、unit tests 和 production build。
+- `windows-go` 和 `windows-frontend` 是稳定 required-check 聚合 job：它们 `if: always()` 报告矩阵结果，分支保护只认这两个稳定名，不随矩阵基数变化。当路径过滤跳过执行矩阵时，聚合 job 退出 `success` 作为有意 no-op；该 success 只代表“未触发”，不提供测试执行证据。
 - Windows 原生合同不宣称 Tauri installer 可发布；installer 与 signing 仍由 release-readiness/release 的专门 job 负责。
 
 ## 开发者入口
@@ -56,6 +57,7 @@ make fe-test
 python scripts/verify/verify-ci-gates.py
 python scripts/verify/verify-doc-ssot.py
 git diff --check
+git status --short --branch
 ```
 
 Windows 原生合同可直接运行：

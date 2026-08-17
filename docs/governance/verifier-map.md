@@ -43,7 +43,7 @@
 | Tauri packaged 行为与签名门禁 | `scripts/release/verify-tauri-package-readiness.py` | release-readiness.yml |
 | pnpm 工具链版本与 `app/package.json#packageManager` 一致 | `scripts/release/verify-tauri-package-readiness.py` | checks.yml / release-readiness.yml / release.yml |
 | Tauri installer 冒烟 | `scripts/release/verify-tauri-installer-smoke.py` | release-readiness.yml |
-| Windows Agent Runtime 环境继承语义（代理变量透传、敏感变量过滤、环境键大小写） | `edge-server/internal/lifecycle/env_sanitizer_test.go` + `edge-server/internal/lifecycle/env_behavior_test.go`（workflow 结构由 `scripts/verify/verify-ci-gates.py` 与 `scripts/release/verify-tauri-package-readiness.py` 保鲜） | checks.yml → windows-go；release-readiness.yml → windows-installer-smoke-preflight |
+| Windows Agent Runtime 环境继承语义（代理变量透传、敏感变量过滤、环境键大小写） | `edge-server/internal/lifecycle/env_sanitizer_test.go` + `edge-server/internal/lifecycle/env_behavior_test.go`（workflow 结构由 `scripts/verify/verify-ci-gates.py` 与 `scripts/release/verify-tauri-package-readiness.py` 保鲜） | checks.yml → windows-go-test（`windows-go` 为稳定 required-check 聚合 job，不执行测试）；release-readiness.yml → windows-installer-smoke-preflight |
 | Tauri dry 打包 | `scripts/release/verify-tauri-package-dry.py` | release-readiness.yml |
 | secrets/token 不落库 | `scripts/verify/check-secrets.sh` | checks.yml → validate |
 | 提交格式 `type(scope): 中文摘要`（PR 时） | `scripts/verify/verify-commit-messages.sh` | checks.yml → validate |

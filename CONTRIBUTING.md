@@ -34,7 +34,7 @@ Common scopes: `client|edge|api|docs|desktop|web|hub|shared|ci`.
 - State evidence honestly: fixture, Playwright UI, Visual QA, stubbed Hub, observed-local, approved-real, backend/API, performance/leak, or packaged-release.
 - Do not claim real login, real model/API spend, packaged Desktop, signing, installer, release upload, or production deploy unless the matching approved gate ran.
 - Run the focused checks named by the touched files and include command evidence in the PR body.
-- Before requesting merge, confirm `git status --short --branch` is understood, generated artifacts are ignored, and no unrelated WIP is included.
+- Before requesting merge, run `git diff --check`, confirm `git status --short --branch` is understood, generated artifacts are ignored, and no unrelated WIP is included.
 
 ## License
 
