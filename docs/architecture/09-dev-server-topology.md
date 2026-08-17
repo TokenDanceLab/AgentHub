@@ -23,7 +23,7 @@
 |---|---|---|
 | PG/Redis | `docker compose up -d postgres redis`（根 compose，`restart: unless-stopped` 自愈） | 数据面，容器语义 |
 | hub/edge | go build 产物 + pidfile（`/tmp/agenthub-*.pid`）直跑 | 编译型前台进程，pidfile 让停止精确（go run 会 spawn 子进程，pidfile 记不住） |
-| ID/web | 服务器本地启动（一次性/手动） | 低频变更，尚未平台化（#1681 W5 待办） |
+| ID/web | 服务器本地启动（一次性/手动） | 低频变更，暂不平台化（#1681 设计已交付，未排期自动化） |
 
 ## 身份链（OIDC）
 
