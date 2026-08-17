@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Workflow text mutation tests for verify-ci-gates.py (#1720 design-css gate).
+"""Workflow text mutation tests for verify-ci-gates.py.
 
 Each case copies the real .github/workflows/checks.yml to a temp file, applies
 one surgical text mutation, and asserts the CI policy verifier exits non-zero:
@@ -9,6 +9,8 @@ one surgical text mutation, and asserts the CI policy verifier exits non-zero:
 3. delete the negative self-test step
 4. add continue-on-error to a hard-blocking step
 5. swap pnpm test:css-syntax* for pnpm lint:css
+6. delete the windows-go MATRIX_RESULT binding → aggregator no longer fail-closed
+7. delete the windows-frontend non-success failure branch → aggregator always green
 
 The unmutated copy must exit 0, proving the policy test only reddens on
 actual policy violations (fail-closed, no false green).
@@ -93,6 +95,28 @@ def swap_to_lint_css(text: str) -> str:
     ).replace("run: pnpm test:css-syntax\n", "run: pnpm lint:css\n")
 
 
+def delete_windows_go_matrix_binding(text: str) -> str:
+    pattern = re.compile(r'(?m)^\s*MATRIX_RESULT: \$\{\{ needs\.windows-go-test\.result \}\}\r?\n')
+    mutated, count = pattern.subn("", text)
+    if count != 1:
+        raise AssertionError(f"expected exactly one windows-go MATRIX_RESULT binding, removed {count}")
+    return mutated
+
+
+def delete_windows_frontend_failure_branch(text: str) -> str:
+    pattern = re.compile(r'(?ms)^\s*if \[ "\$MATRIX_RESULT" != "success" \]; then\r?\n.*?exit 1\r?\n\s*fi\r?\n')
+    # Target the windows-frontend aggregator block specifically.
+    frontend_block = re.compile(r"(?ms)^  windows-frontend:\r?\n(?P<body>.*?)(?=^  [A-Za-z0-9_-]+:\r?\n|\Z)")
+    match = frontend_block.search(text)
+    if not match:
+        raise AssertionError("windows-frontend aggregator block not found")
+    body = match.group("body")
+    mutated_body, count = pattern.subn("", body)
+    if count != 1:
+        raise AssertionError(f"expected exactly one windows-frontend failure branch, removed {count}")
+    return text[: match.start("body")] + mutated_body + text[match.end("body"):]
+
+
 class VerifyCiGatesMutationTests(unittest.TestCase):
     def assert_mutation_fails(self, mutated_text: str, case_name: str) -> None:
         exit_code, output = run_verifier(mutated_text)
@@ -120,6 +144,18 @@ class VerifyCiGatesMutationTests(unittest.TestCase):
 
     def test_swap_to_lint_css_fails(self):
         self.assert_mutation_fails(swap_to_lint_css(read_workflow()), "swapped to lint:css")
+
+    def test_delete_windows_go_matrix_binding_fails(self):
+        self.assert_mutation_fails(
+            delete_windows_go_matrix_binding(read_workflow()),
+            "deleted windows-go MATRIX_RESULT binding",
+        )
+
+    def test_delete_windows_frontend_failure_branch_fails(self):
+        self.assert_mutation_fails(
+            delete_windows_frontend_failure_branch(read_workflow()),
+            "deleted windows-frontend non-success failure branch",
+        )
 
 
 if __name__ == "__main__":
