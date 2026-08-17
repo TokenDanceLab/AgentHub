@@ -130,7 +130,7 @@ func (e *ProcessExecutor) buildAndStartProcess(
 		e.mu.Lock()
 		e.processes[run.ID] = cmd.Process
 		e.mu.Unlock()
-		go e.watchRunProcess(ctx, run.ID, cmd.Process, watchStop)
+		safeGo("watchRunProcess", func() { e.watchRunProcess(ctx, run.ID, cmd.Process, watchStop) })
 	}
 
 	// Eager-close stdin when adapter/decision-loop do not need the pipe.
@@ -228,7 +228,7 @@ func (e *ProcessExecutor) collectAndWaitOutput(
 	var wg sync.WaitGroup
 	outputLimiter := newRunOutputLimiter(e.maxRunOutputBytes)
 	wg.Add(1)
-	go e.publishOutput(&wg, run, outStore, outputLimiter, "stderr", proc.stderr)
+	safeGo("publishOutput.stderr", func() { e.publishOutput(&wg, run, outStore, outputLimiter, "stderr", proc.stderr) })
 
 	// Inject context budget for token tracking in stream parsers.
 	// Also inject RunProcessContext unconditionally — SDK adapters
@@ -238,11 +238,11 @@ func (e *ProcessExecutor) collectAndWaitOutput(
 
 	if proc.buildPlan.UseStructuredParser {
 		wg.Add(1)
-		go e.publishStructuredOutput(&wg, run, proc.stdout, proc.stdin, adapter, parserCtx, &parseErr)
+		safeGo("publishStructuredOutput", func() { e.publishStructuredOutput(&wg, run, proc.stdout, proc.stdin, adapter, parserCtx, &parseErr) })
 	} else {
 		// Raw capture: stdout goes to run.output.batch events
 		wg.Add(1)
-		go e.publishOutput(&wg, run, outStore, outputLimiter, "stdout", proc.stdout)
+		safeGo("publishOutput.stdout", func() { e.publishOutput(&wg, run, outStore, outputLimiter, "stdout", proc.stdout) })
 	}
 
 	// StdoutPipe/StderrPipe readers must finish before Wait closes the pipe
@@ -466,6 +466,6 @@ func (e *ProcessExecutor) handleFaultEscalation(
 	e.bus.Publish("run.fault_escalation.retry", runScope(*run),
 		faultEscalationRetryPayload(run.ID, newCount, e.faultEscalationCfg.MaxRetries))
 	slog.Warn("process: fault escalation auto-retry", "runId", run.ID, "retryCount", newCount, "maxRetries", e.faultEscalationCfg.MaxRetries)
-	go e.run(newCtx, *run, runCtx)
+	safeGo("run.faultEscalation", func() { e.run(newCtx, *run, runCtx) })
 	return true
 }

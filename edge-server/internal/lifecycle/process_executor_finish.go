@@ -58,6 +58,19 @@ func (e *ProcessExecutor) finish(runID string) {
 		delete(e.runOutputs, runID)
 	}
 	e.mu.Unlock()
+
+	// Clean up package-level hub callback state so a run that panicked and
+	// was recovered by safeGo (skipping fireHubDone/fireHubFail) does not
+	// leak hubCallbackQueues / hubStreamChunkSeq entries. The consumer
+	// goroutine's own defer also deletes; sync.Map.Delete is idempotent.
+	// Closing the queue channel unblocks a consumer stuck on range, letting
+	// it drain and exit cleanly.
+	if stateAny, ok := hubCallbackQueues.LoadAndDelete(runID); ok {
+		if state, ok := stateAny.(*hubCallbackQueueState); ok {
+			state.close()
+		}
+	}
+	hubStreamChunkSeq.Delete(runID)
 }
 
 // hasActiveChildren reports whether the given run has at least one registered

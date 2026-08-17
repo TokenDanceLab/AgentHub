@@ -47,7 +47,7 @@ func (e *ProcessExecutor) Cancel(runID string) CancelResult {
 		e.mu.Lock()
 		e.cancelDone[runID] = done
 		e.mu.Unlock()
-		go func() {
+		safeGo("cancelGrace", func() {
 			select {
 			case <-done:
 				return
@@ -68,7 +68,7 @@ func (e *ProcessExecutor) Cancel(runID string) CancelResult {
 			if _, err := proc.Wait(); planProcessWaitAfterKill(err).Log {
 				slog.Warn("process wait error after kill", "run_id", runID, "error", err)
 			}
-		}()
+		})
 	}
 
 	// Cancel the run context after the grace path is armed. This stops
