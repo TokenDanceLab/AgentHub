@@ -1,4 +1,4 @@
-import { Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { useState } from 'react';
 import type { TranscriptBlock } from '@agenthub/shared/transcript';
 
@@ -231,7 +231,10 @@ export function ChatScreen({
   const [evidenceSheetVisible, setEvidenceSheetVisible] = useState(false);
 
   return (
-    <View style={{ flex: 1, backgroundColor: tokens.color.panel }}>
+    <KeyboardAvoidingView
+      style={{ flex: 1, backgroundColor: tokens.color.panel }}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    >
       <ChatHeader activeRun={activeRun} showBack={showBack} onBack={onBack} thread={thread} {...(onToggleInspector ? { onToggleInspector } : {})} />
       <ChatTabs />
       <ScrollView
@@ -288,7 +291,7 @@ export function ChatScreen({
         visible={evidenceSheetVisible}
         onClose={() => setEvidenceSheetVisible(false)}
       />
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 function ChatHeader({
