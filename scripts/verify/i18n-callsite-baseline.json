@@ -1,31 +1,14 @@
 {
   "_comment": "Baseline of i18n callsite violations (source files with CJK string literals but no useTranslation import). The verify gate fails when the current count EXCEEDS this baseline; lower this number as more callsites are wired to useTranslation.",
   "scanRoot": "app/shared/src",
-  "totalViolations": 104,
-  "totalCjkLiteralLines": 930,
+  "totalViolations": 86,
+  "totalCjkLiteralLines": 763,
   "files": [
     {
       "path": "chatview/adapterMapBlock.ts",
       "cjkLiteralLines": 1,
       "samples": [
-        264
-      ]
-    },
-    {
-      "path": "chatview/components/CompactDivider.tsx",
-      "cjkLiteralLines": 4,
-      "samples": [
-        3,
-        23,
-        24,
-        25
-      ]
-    },
-    {
-      "path": "chatview/components/Transcript.tsx",
-      "cjkLiteralLines": 1,
-      "samples": [
-        457
+        263
       ]
     },
     {
@@ -67,9 +50,9 @@
       "path": "demo/dataMode.ts",
       "cjkLiteralLines": 3,
       "samples": [
-        139,
-        142,
-        157
+        149,
+        152,
+        167
       ]
     },
     {
@@ -94,25 +77,14 @@
       ]
     },
     {
-      "path": "demo/workbenchDemoData.ts",
-      "cjkLiteralLines": 12,
-      "samples": [
-        4,
-        5,
-        6,
-        7,
-        18
-      ]
-    },
-    {
       "path": "demo/workbenchDemoMessages.ts",
-      "cjkLiteralLines": 55,
+      "cjkLiteralLines": 8,
       "samples": [
-        16,
-        23,
-        24,
-        25,
-        26
+        19,
+        34,
+        50,
+        65,
+        83
       ]
     },
     {
@@ -176,53 +148,6 @@
         17,
         181,
         184
-      ]
-    },
-    {
-      "path": "ui/AgentStreamingBar.tsx",
-      "cjkLiteralLines": 6,
-      "samples": [
-        61,
-        91,
-        92,
-        93,
-        94
-      ]
-    },
-    {
-      "path": "ui/DocxPreview.tsx",
-      "cjkLiteralLines": 2,
-      "samples": [
-        100,
-        105
-      ]
-    },
-    {
-      "path": "ui/Markdown.tsx",
-      "cjkLiteralLines": 1,
-      "samples": [
-        32
-      ]
-    },
-    {
-      "path": "ui/SlideshowPreview.tsx",
-      "cjkLiteralLines": 7,
-      "samples": [
-        238,
-        243,
-        274,
-        280,
-        304
-      ]
-    },
-    {
-      "path": "ui/TablePreview.tsx",
-      "cjkLiteralLines": 4,
-      "samples": [
-        63,
-        241,
-        246,
-        256
       ]
     },
     {
@@ -350,14 +275,6 @@
       ]
     },
     {
-      "path": "workbench/floating/MultiSelectBar.tsx",
-      "cjkLiteralLines": 2,
-      "samples": [
-        33,
-        39
-      ]
-    },
-    {
       "path": "workbench/floating/ProfilePopoverHelpers.ts",
       "cjkLiteralLines": 2,
       "samples": [
@@ -389,11 +306,11 @@
       "path": "workbench/inspector/FilePreviewRouter.tsx",
       "cjkLiteralLines": 6,
       "samples": [
-        181,
-        210,
-        262,
-        276,
-        287
+        191,
+        220,
+        272,
+        286,
+        297
       ]
     },
     {
@@ -423,19 +340,15 @@
         89,
         121,
         128,
-        148,
-        186
+        147,
+        185
       ]
     },
     {
       "path": "workbench/inspector/InspectorTabChrome.tsx",
-      "cjkLiteralLines": 5,
+      "cjkLiteralLines": 1,
       "samples": [
-        155,
-        194,
-        197,
-        206,
-        232
+        231
       ]
     },
     {
@@ -462,8 +375,8 @@
       "cjkLiteralLines": 3,
       "samples": [
         117,
-        161,
-        199
+        160,
+        198
       ]
     },
     {
@@ -492,11 +405,11 @@
       "path": "workbench/pages/agents/AgentEditItemParts.tsx",
       "cjkLiteralLines": 21,
       "samples": [
-        52,
-        53,
-        106,
-        214,
-        246
+        46,
+        47,
+        100,
+        208,
+        240
       ]
     },
     {
@@ -593,33 +506,11 @@
       ]
     },
     {
-      "path": "workbench/pages/contacts/AddContactModal.tsx",
-      "cjkLiteralLines": 5,
-      "samples": [
-        23,
-        106,
-        115,
-        124,
-        180
-      ]
-    },
-    {
       "path": "workbench/pages/contacts/ContactMainHelpers.ts",
       "cjkLiteralLines": 2,
       "samples": [
         36,
         37
-      ]
-    },
-    {
-      "path": "workbench/pages/contacts/ContactMainViews.tsx",
-      "cjkLiteralLines": 21,
-      "samples": [
-        105,
-        107,
-        108,
-        109,
-        124
       ]
     },
     {
@@ -672,35 +563,6 @@
       ]
     },
     {
-      "path": "workbench/pages/projects/ProjectFeedPanel.tsx",
-      "cjkLiteralLines": 1,
-      "samples": [
-        15
-      ]
-    },
-    {
-      "path": "workbench/pages/projects/ProjectPanelParts.tsx",
-      "cjkLiteralLines": 5,
-      "samples": [
-        40,
-        84,
-        110,
-        141,
-        161
-      ]
-    },
-    {
-      "path": "workbench/pages/projects/ProjectTabViews.tsx",
-      "cjkLiteralLines": 15,
-      "samples": [
-        58,
-        91,
-        108,
-        109,
-        110
-      ]
-    },
-    {
       "path": "workbench/pages/projects/shared.tsx",
       "cjkLiteralLines": 10,
       "samples": [
@@ -723,17 +585,6 @@
       ]
     },
     {
-      "path": "workbench/pages/settings/SettingsMain.tsx",
-      "cjkLiteralLines": 6,
-      "samples": [
-        40,
-        88,
-        89,
-        92,
-        93
-      ]
-    },
-    {
       "path": "workbench/pages/settings/SettingsNav.tsx",
       "cjkLiteralLines": 4,
       "samples": [
@@ -752,24 +603,6 @@
         86,
         87,
         92
-      ]
-    },
-    {
-      "path": "workbench/pages/settings/SettingsPaneParts.tsx",
-      "cjkLiteralLines": 5,
-      "samples": [
-        46,
-        76,
-        77,
-        80,
-        83
-      ]
-    },
-    {
-      "path": "workbench/pages/settings/shared.tsx",
-      "cjkLiteralLines": 1,
-      "samples": [
-        186
       ]
     },
     {
@@ -799,17 +632,6 @@
       "cjkLiteralLines": 1,
       "samples": [
         80
-      ]
-    },
-    {
-      "path": "workbench/pages/tasks/shared.tsx",
-      "cjkLiteralLines": 18,
-      "samples": [
-        48,
-        49,
-        50,
-        54,
-        55
       ]
     },
     {
