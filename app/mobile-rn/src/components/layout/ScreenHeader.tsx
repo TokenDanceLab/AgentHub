@@ -71,7 +71,7 @@ export function ScreenHeader({
           {title}
         </Text>
         {description ? (
-          <Text numberOfLines={1} style={{ color: tokens.color.inkMuted, fontSize: tokens.type.sm, lineHeight: tokens.type.lineHeight.sm }}>
+          <Text numberOfLines={2} style={{ color: tokens.color.inkMuted, fontSize: tokens.type.sm, lineHeight: tokens.type.lineHeight.sm }}>
             {description}
           </Text>
         ) : null}
