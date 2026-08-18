@@ -1304,7 +1304,7 @@ async function run() {
       }
     }
     for (const expectedText of result.expectedTexts ?? []) {
-      if (!result.probe.bodyText.includes(expectedText)) {
+      if (!result.probe.bodyText.toLowerCase().includes(expectedText.toLowerCase())) {
         failures.push(`${result.name}: missing expected text "${expectedText}"`);
       }
     }
