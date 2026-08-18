@@ -39,6 +39,7 @@ import (
 	"github.com/agenthub/hub-server/internal/service/message"
 	"github.com/agenthub/hub-server/internal/service/messagereaction"
 	"github.com/agenthub/hub-server/internal/service/oidc"
+	"github.com/agenthub/hub-server/internal/service/publicstats"
 	"github.com/agenthub/hub-server/internal/service/session"
 	"github.com/agenthub/hub-server/internal/testkit"
 	"github.com/agenthub/hub-server/internal/ws"
@@ -144,7 +145,7 @@ func TestMain(m *testing.M) {
 	notificationService := service.NewNotificationService(db, mgr)
 	notificationHandler := handler.NewNotificationHandler(notificationService)
 	healthHandler := handler.NewHealthHandler(db, cacheClient, &cfg.DB, time.Now(), "test")
-	publicHandler := handler.NewPublicHandler(service.NewPublicStatsService(db), time.Now())
+	publicHandler := handler.NewPublicHandler(publicstats.NewPublicStatsService(db), time.Now())
 
 	// Phase 1-7 handlers
 	// config.yaml ships production-empty TokenDance ID values (client_id "",
