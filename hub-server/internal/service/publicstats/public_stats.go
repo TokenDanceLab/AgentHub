@@ -1,4 +1,4 @@
-package service
+package publicstats
 
 import (
 	"gorm.io/gorm"
