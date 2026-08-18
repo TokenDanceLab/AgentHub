@@ -5,6 +5,8 @@
    ══════════════════════════════════════════════════════════════════════ */
 
 import React, { memo } from 'react'
+import { useTranslation } from 'react-i18next'
+import { CHATVIEW_I18N_NAMESPACE } from '../i18n/resources'
 
 interface CompactDividerProps {
   /** Compaction trigger, e.g. "auto" or "manual". */
@@ -20,9 +22,10 @@ function formatPreTokens(n: number): string {
 
 /** Render a compact-boundary divider between transcript message groups. */
 export const CompactDivider = memo(function CompactDivider({ trigger, preTokens }: CompactDividerProps) {
-  const parts: string[] = ['上下文已压缩']
-  if (trigger === 'auto') parts.push('(自动)')
-  if (preTokens != null) parts.push(`${formatPreTokens(preTokens)} tokens 前`)
+  const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE)
+  const parts: string[] = [t('compactDivider.label')]
+  if (trigger === 'auto') parts.push(t('compactDivider.auto'))
+  if (preTokens != null) parts.push(t('compactDivider.tokensAgo', { tokens: formatPreTokens(preTokens) }))
 
   const label = parts.join(' ')
 

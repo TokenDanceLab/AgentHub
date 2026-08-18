@@ -1,8 +1,17 @@
 import React from 'react';
-import { describe, it, expect, afterEach } from 'vitest';
+import { describe, it, expect, afterEach, afterAll, beforeAll } from 'vitest';
 import { render } from '@testing-library/react';
 import { AgentStreamingBar } from './AgentStreamingBar';
 import { getAgentActivityStore } from '../transcript/agentActivity';
+import { useTestI18nLanguage, TEST_I18N_DEFAULT_LNG } from '../testing/i18n';
+
+beforeAll(async () => {
+  await useTestI18nLanguage('zh');
+});
+
+afterAll(async () => {
+  await useTestI18nLanguage(TEST_I18N_DEFAULT_LNG);
+});
 
 afterEach(() => {
   getAgentActivityStore().reset();
