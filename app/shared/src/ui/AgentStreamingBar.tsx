@@ -1,9 +1,11 @@
 import React, { useSyncExternalStore } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   getAgentActivityStore,
   type AgentActivitySnapshot,
   type AgentActivityStatus,
 } from '../transcript/agentActivity';
+import { CHATVIEW_I18N_NAMESPACE } from '../chatview/i18n/resources';
 import styles from './AgentStreamingBar.module.css';
 
 // ── Status icons ──────────────────────────────────────────────────────────
@@ -14,6 +16,14 @@ const STATUS_ICON: Record<AgentActivityStatus, string> = {
   streaming: '\u{2728}',
   done: '\u{2705}',
   failed: '\u{274C}',
+};
+
+const STATUS_LABEL_KEY: Record<AgentActivityStatus, string> = {
+  dispatching: 'agentStreaming.status.dispatching',
+  thinking: 'agentStreaming.status.thinking',
+  streaming: 'agentStreaming.status.streaming',
+  done: 'agentStreaming.status.done',
+  failed: 'agentStreaming.status.failed',
 };
 
 // ── Store binding ─────────────────────────────────────────────────────────
@@ -44,6 +54,7 @@ export interface AgentStreamingBarProps {
  * Hidden when no agents are active. Uses `useSyncExternalStore` for reactivity.
  */
 export function AgentStreamingBar({ className }: AgentStreamingBarProps): React.ReactElement | null {
+  const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE);
   const snapshot = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
 
   const agents = snapshot.activeAgents;
@@ -58,7 +69,7 @@ export function AgentStreamingBar({ className }: AgentStreamingBarProps): React.
   // No real progress percentage exists for agent runs, so surface the one
   // quantitative signal we do have: the number of tool calls.
   const totalToolCalls = agents.reduce((sum, a) => sum + (a.toolCalls ?? 0), 0);
-  const toolCallsLabel = totalToolCalls > 0 ? ` · ${totalToolCalls} 次工具调用` : '';
+  const toolCallsLabel = totalToolCalls > 0 ? ` · ${t('agentStreaming.toolCalls', { count: totalToolCalls })}` : '';
 
   return (
     <div className={`${styles.bar} ${className ?? ''}`} role="status" aria-live="polite">
@@ -67,14 +78,14 @@ export function AgentStreamingBar({ className }: AgentStreamingBarProps): React.
           <span className={`${styles.icon} ${isActive(agents[0]!.status) ? styles.iconPulse : ''}`} aria-hidden="true">{STATUS_ICON[agents[0]!.status]}</span>
           <span className={styles.name}>{agents[0]!.name}</span>
           <span className={`${styles.status} ${statusClassName(agents[0]!.status)}`}>
-            {statusLabel(agents[0]!.status)}
+            {t(STATUS_LABEL_KEY[agents[0]!.status])}
             {toolCallsLabel}
           </span>
         </div>
       ) : (
         <div className={styles.agent}>
           <span className={`${styles.icon} ${styles.iconPulse}`} aria-hidden="true">{'\u{1F916}'}</span>
-          <span className={styles.name}>{activeCount} 个 Agent 运行中{toolCallsLabel}</span>
+          <span className={styles.name}>{t('agentStreaming.multiAgent', { count: activeCount })}{toolCallsLabel}</span>
           <span className={styles.detail}>
             {agents.map((a) => STATUS_ICON[a.status]).join(' ')}
           </span>
@@ -85,16 +96,6 @@ export function AgentStreamingBar({ className }: AgentStreamingBarProps): React.
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────
-
-function statusLabel(status: AgentActivityStatus): string {
-  switch (status) {
-    case 'dispatching': return '调度中…';
-    case 'thinking': return '思考中…';
-    case 'streaming': return '输出中…';
-    case 'done': return '完成';
-    case 'failed': return '失败';
-  }
-}
 
 function statusClassName(status: AgentActivityStatus): string {
   switch (status) {

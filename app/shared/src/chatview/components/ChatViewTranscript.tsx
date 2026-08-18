@@ -290,7 +290,7 @@ export const ChatViewTranscript = memo(function ChatViewTranscript({ transcript,
                 <span>{pinnedAnnouncement.content}</span>
               </div>
               <div className="chatview-pinned-meta">
-                由 <a>{pinnedAnnouncement.author ?? '系统'}</a> 置顶
+                {t('pinnedAnnouncement.meta', { author: pinnedAnnouncement.author ?? t('pinnedAnnouncement.systemAuthor') })}
                 {pinnedAnnouncement.time && <span className="chatview-pinned-time">{pinnedAnnouncement.time}</span>}
               </div>
             </div>
