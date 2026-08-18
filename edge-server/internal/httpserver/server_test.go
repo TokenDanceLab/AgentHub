@@ -887,21 +887,29 @@ func TestNewHandlerFromConfigWiresTokenProviderStopHook(t *testing.T) {
 	// the mock-executor early return and actually reaches the HubURL wiring.
 	withoutRefresh, err := newHandlerFromConfig(Config{
 		AdapterRegistry: &adapters.Registry{},
-		AgentDefault:     "claude-code",
+		AgentDefault:    "claude-code",
 	})
 	if err != nil {
 		t.Fatalf("newHandlerFromConfig returned error: %v", err)
 	}
+	// Drain the result-aggregator stop hook during cleanup so the goroutine
+	// started by newHandlerFromConfig does not outlive this test.
+	t.Cleanup(func() {
+		for _, hook := range withoutRefresh.ShutdownHooks {
+			hook()
+		}
+	})
 	if len(withoutRefresh.ShutdownHooks) == 0 {
 		t.Fatalf("ShutdownHooks empty even without token provider; expected at least the result aggregator hook")
 	}
 	baseHookCount := len(withoutRefresh.ShutdownHooks)
 
 	// HubURL + refresh token: token provider starts and its Stop is appended.
-	// Use a localhost stub URL; we don't exercise the refresh round-trip here,
-	// only that newHandlerFromConfig wires the stop hook. StartAutoRefresh
-	// schedules the first refresh at exp-1m, so with a long-lived token no
-	// outbound call is made during the test.
+	// real_tested=false: this test validates local wiring only — no real Hub
+	// refresh round-trip is performed. Use a localhost stub URL; we only assert
+	// that newHandlerFromConfig wires the stop hook. StartAutoRefresh schedules
+	// the first refresh at exp-1m, so with a long-lived token no outbound call
+	// is made during the test.
 	const jwtAccess = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9." +
 		"eyJleHAiOjk5OTk5OTk5OTl9." + // far-future exp
 		"sig"
@@ -919,9 +927,10 @@ func TestNewHandlerFromConfigWiresTokenProviderStopHook(t *testing.T) {
 		t.Fatalf("ShutdownHooks = %d (base %d); want > base after token provider wired",
 			len(withRefresh.ShutdownHooks), baseHookCount)
 	}
-
 	// Drain hooks: the appended Stop must be safe to call (idempotent) and
-	// must not block even though StartAutoRefresh was just started.
+	// must not block even though StartAutoRefresh was just started. This also
+	// stops the rotation goroutine + result aggregator so neither leaks past
+	// this test.
 	for _, hook := range withRefresh.ShutdownHooks {
 		hook()
 	}
