@@ -129,6 +129,10 @@ describe('createSubagentStreamStore', () => {
 });
 
 describe('createSubagentStreamStore subscription', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it('notifies subscribers on push and supports unsubscribe', () => {
     const store = createSubagentStreamStore();
     let calls = 0;
@@ -145,7 +149,7 @@ describe('createSubagentStreamStore subscription', () => {
   });
 
   it('does not notify for a rejected push', () => {
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
     const store = createSubagentStreamStore();
     let calls = 0;
     store.subscribe(() => {
@@ -154,11 +158,10 @@ describe('createSubagentStreamStore subscription', () => {
 
     store.push(frame({ agent_task_id: '' }));
     expect(calls).toBe(0);
-    warnSpy.mockRestore();
   });
 
   it('isolates a throwing listener from the others', () => {
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
     const store = createSubagentStreamStore();
     let healthyCalls = 0;
     store.subscribe(() => {
@@ -170,7 +173,6 @@ describe('createSubagentStreamStore subscription', () => {
 
     expect(() => store.push(frame())).not.toThrow();
     expect(healthyCalls).toBe(1);
-    warnSpy.mockRestore();
   });
 
   it('reset clears state and notifies', () => {
