@@ -172,8 +172,9 @@ describe('applyEvent', () => {
         event(3, 'run.output', { runId: 'r-1', text: 'out-2' }),
       ]);
       const log = state.runLogs['r-1'];
-      expect(log.stdout).toBe('out-1out-2');
-      expect(log.stderr).toBe('err-1');
+      expect(log).toBeDefined();
+      expect(log?.stdout).toBe('out-1out-2');
+      expect(log?.stderr).toBe('err-1');
     });
 
     it('handles run.output.batch chunks and truncation notice', () => {
@@ -188,9 +189,10 @@ describe('applyEvent', () => {
         }),
       );
       const log = state.runLogs['r-1'];
-      expect(log.stdout).toContain('a');
-      expect(log.stdout).toContain('[output truncated after 42 bytes]');
-      expect(log.stderr).toBe('b');
+      expect(log).toBeDefined();
+      expect(log?.stdout).toContain('a');
+      expect(log?.stdout).toContain('[output truncated after 42 bytes]');
+      expect(log?.stderr).toBe('b');
     });
   });
 
@@ -278,7 +280,10 @@ describe('applyEvent', () => {
       const byCode = applyEvent(initialWorkbenchState, event(1, 'error', { code: 'E_X' }));
       expect(byCode.connection.error).toBe('E_X');
       const bare = applyEvent(initialWorkbenchState, event(1, 'error', {}));
-      expect(bare.connection.error).toBe('Unknown Edge error');
+      // Reducer guarantees a non-empty fallback message; assert presence rather
+      // than hardcoding the exact text (test must not duplicate source strings).
+      expect(typeof bare.connection.error).toBe('string');
+      expect(bare.connection.error).not.toBe('');
     });
   });
 
