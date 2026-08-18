@@ -200,7 +200,10 @@ func Run(cfg Config) error {
 	}
 
 	// Flush and close the event log so no events are lost on shutdown.
-	for _, hook := range cfg.ShutdownHooks {
+	// newHandlerFromConfig appends internal stops (result aggregator, token
+	// provider) to the same slice header that main.go pre-populated with
+	// mcpSyncer.Stop, so handler.ShutdownHooks is the single source of truth.
+	for _, hook := range handler.ShutdownHooks {
 		hook()
 	}
 	if err := handler.Bus.Close(); err != nil {
@@ -267,7 +270,7 @@ func wireRunEventTracker(bus *events.Bus) {
 // a runner command nor an agent default is configured it falls back to the
 // mock executor so the run lifecycle stays usable (the agenthub-runner-mock
 // profile).
-func buildProcessExecutor(cfg Config, bus *events.Bus, agentReg *agents.Registry, msgQueue *agents.Queue, resultAgg *lifecycle.ResultAggregator, edgeMetrics *metrics.EdgeMetrics) (lifecycle.RunExecutor, *hub.CallbackClient, error) {
+func buildProcessExecutor(cfg Config, bus *events.Bus, agentReg *agents.Registry, msgQueue *agents.Queue, resultAgg *lifecycle.ResultAggregator, edgeMetrics *metrics.EdgeMetrics) (lifecycle.RunExecutor, *hub.CallbackClient, func(), error) {
 	hasAdapter := cfg.AdapterRegistry != nil && cfg.AgentDefault != ""
 	if cfg.ProcessExecutor.Command == "" && !hasAdapter {
 		// No runner command and no default agent adapter: fall back to the
@@ -276,7 +279,7 @@ func buildProcessExecutor(cfg Config, bus *events.Bus, agentReg *agents.Registry
 		// contract — "mock executor is the default when no runner command is
 		// specified"). Previously this returned a nil executor, leaving the
 		// edge degraded (no executor, no runners).
-		return lifecycle.NewMockExecutor(bus, cfg.Store), nil, nil
+		return lifecycle.NewMockExecutor(bus, cfg.Store), nil, nil, nil
 	}
 	execCfg := cfg.ProcessExecutor
 	if execCfg.Command == "" && hasAdapter {
@@ -293,12 +296,15 @@ func buildProcessExecutor(cfg Config, bus *events.Bus, agentReg *agents.Registry
 	}
 	processExecutor, err := lifecycle.NewProcessExecutor(bus, cfg.Store, execCfg, agentAdapter, cfg.AdapterRegistry)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 	processExecutor.SetMetrics(edgeMetrics)
 	processExecutor.WithAgentRegistry(agentReg).WithMessageQueue(msgQueue).WithResultAggregator(resultAgg)
 
 	var hubCallbackClient *hub.CallbackClient
+	// tokenProviderStop stops the background rotation goroutine (buffered via
+	// the provider's stopWG) during graceful shutdown (#1410 completion).
+	var tokenProviderStop func()
 	// Wire Hub callback client for Edge-to-Hub direct bridge
 	if cfg.HubURL != "" {
 		// Transport policy assembled here at the composition root (#1564):
@@ -326,6 +332,7 @@ func buildProcessExecutor(cfg Config, bus *events.Bus, agentReg *agents.Registry
 		if cfg.HubRefreshToken != "" {
 			tokenProvider := hub.NewTokenProvider(cfg.HubURL, cfg.HubToken, cfg.HubRefreshToken, edgehttp.NewClient(30*time.Second))
 			tokenProvider.StartAutoRefresh()
+			tokenProviderStop = tokenProvider.Stop
 			hubClient.SetTokenSource(tokenProvider.AccessToken)
 			slog.Info("hub token auto-rotation enabled", "hubURL", cfg.HubURL)
 		}
@@ -341,7 +348,7 @@ func buildProcessExecutor(cfg Config, bus *events.Bus, agentReg *agents.Registry
 		processExecutor.WithHubCallback(hubClient)
 		slog.Info("edge-to-hub direct callback enabled", "hubURL", cfg.HubURL)
 	}
-	return processExecutor, hubCallbackClient, nil
+	return processExecutor, hubCallbackClient, tokenProviderStop, nil
 }
 
 // wireCCSwitch detects cc-switch and wires it into the handler for API
@@ -414,9 +421,17 @@ func newHandlerFromConfig(cfg Config) (*api.Handler, error) {
 	// completion time (see wireRunEventTracker).
 	wireRunEventTracker(bus)
 
-	executor, hubCallbackClient, err := buildProcessExecutor(cfg, bus, agentReg, msgQueue, resultAgg, edgeMetrics)
+	executor, hubCallbackClient, tokenProviderStop, err := buildProcessExecutor(cfg, bus, agentReg, msgQueue, resultAgg, edgeMetrics)
 	if err != nil {
 		return nil, err
+	}
+	// Wire the rotation goroutine's stop into shutdown hooks so a token refresh
+	// in flight drains cleanly instead of leaking live HTTP requests on exit
+	// (#1410 / #1688 graceful shutdown contract). cfg.ShutdownHooks is the
+	// same slice header caller-pre-populated (e.g. mcpSyncer.Stop) and the
+	// one Run() drains at shutdown.
+	if tokenProviderStop != nil {
+		cfg.ShutdownHooks = append(cfg.ShutdownHooks, tokenProviderStop)
 	}
 	// Orchestration finalize bridge: an orchestrator parent whose terminal
 	// finish is parked (waiting on sub-agents) is finalized by the aggregator
@@ -461,6 +476,7 @@ func newHandlerFromConfig(cfg Config) (*api.Handler, error) {
 		HubJWTSecret:       cfg.HubJWTSecret,
 		EdgeDeviceID:       cfg.EdgeDeviceID,
 		CallbackClient:     hubCallbackClient,
+		ShutdownHooks:      cfg.ShutdownHooks,
 	}
 
 	// Detect cc-switch and wire into handler for API endpoints and model

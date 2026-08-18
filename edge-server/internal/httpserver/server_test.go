@@ -876,6 +876,57 @@ func TestNewHandlerFromConfigEnsuresAllFields(t *testing.T) {
 	}
 }
 
+// TestNewHandlerFromConfigWiresTokenProviderStopHook proves the rotation
+// goroutine gets a shutdown hook when --hub-refresh-token is configured, and
+// that no hook is registered when auto-rotation is disabled (no refresh token
+// or no HubURL). Regression guard for the #1410 graceful-shutdown gap.
+func TestNewHandlerFromConfigWiresTokenProviderStopHook(t *testing.T) {
+	// No HubURL / no refresh token: no token provider, so no extra stop hook
+	// beyond the result aggregator's (#988). We use the adapter sentinel path
+	// (AdapterRegistry + AgentDefault) so buildProcessExecutor does not take
+	// the mock-executor early return and actually reaches the HubURL wiring.
+	withoutRefresh, err := newHandlerFromConfig(Config{
+		AdapterRegistry: &adapters.Registry{},
+		AgentDefault:     "claude-code",
+	})
+	if err != nil {
+		t.Fatalf("newHandlerFromConfig returned error: %v", err)
+	}
+	if len(withoutRefresh.ShutdownHooks) == 0 {
+		t.Fatalf("ShutdownHooks empty even without token provider; expected at least the result aggregator hook")
+	}
+	baseHookCount := len(withoutRefresh.ShutdownHooks)
+
+	// HubURL + refresh token: token provider starts and its Stop is appended.
+	// Use a localhost stub URL; we don't exercise the refresh round-trip here,
+	// only that newHandlerFromConfig wires the stop hook. StartAutoRefresh
+	// schedules the first refresh at exp-1m, so with a long-lived token no
+	// outbound call is made during the test.
+	const jwtAccess = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9." +
+		"eyJleHAiOjk5OTk5OTk5OTl9." + // far-future exp
+		"sig"
+	withRefresh, err := newHandlerFromConfig(Config{
+		AdapterRegistry: &adapters.Registry{},
+		AgentDefault:    "claude-code",
+		HubURL:          "http://127.0.0.1:0",
+		HubToken:        jwtAccess,
+		HubRefreshToken: "rt-dev",
+	})
+	if err != nil {
+		t.Fatalf("newHandlerFromConfig with refresh token returned error: %v", err)
+	}
+	if len(withRefresh.ShutdownHooks) <= baseHookCount {
+		t.Fatalf("ShutdownHooks = %d (base %d); want > base after token provider wired",
+			len(withRefresh.ShutdownHooks), baseHookCount)
+	}
+
+	// Drain hooks: the appended Stop must be safe to call (idempotent) and
+	// must not block even though StartAutoRefresh was just started.
+	for _, hook := range withRefresh.ShutdownHooks {
+		hook()
+	}
+}
+
 func TestNewHandlerFromConfigInvalidEnv(t *testing.T) {
 	_, err := newHandlerFromConfig(Config{
 		ProcessExecutor: lifecycle.ProcessExecutorConfig{
