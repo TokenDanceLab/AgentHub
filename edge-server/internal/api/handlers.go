@@ -79,6 +79,13 @@ type Handler struct {
 	// Tests inject a temp dir so real foreign session stores are never scanned.
 	SessionHome string
 
+	// ShutdownHooks are invoked in order during graceful shutdown (after HTTP
+	// Shutdown and before Bus.Close). newHandlerFromConfig appends internal
+	// stops (result aggregator, token provider) here; Run() drains the slice
+	// at shutdown. Tests read it to assert auto-rotation stop is registered
+	// when a HubRefreshToken is configured (#1410 graceful-shutdown contract).
+	ShutdownHooks []func()
+
 	permissionRegistryMu      sync.Mutex
 	permissionObserverCancel  func()
 	permissionBrokerInstalled bool
