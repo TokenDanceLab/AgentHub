@@ -1,4 +1,4 @@
-package adapters
+package sdk
 
 import (
 	"bufio"
@@ -8,10 +8,12 @@ import (
 	"io"
 	"log/slog"
 	"strings"
+
+	"github.com/agenthub/edge-server/internal/adapters"
 )
 
 // Residual pure-helper peel #1152: OpenAI SSE stream parse + event dispatch.
-// Same package adapters; ParseStream continues to call parseSSEStream.
+// Grouped into package sdk (#1760); ParseStream continues to call parseSSEStream.
 
 // openaiSSEState accumulates cross-chunk state while parsing an SSE stream.
 type openaiSSEState struct {
@@ -65,7 +67,7 @@ func (a *OpenAISDKAdapter) parseSSEStream(ctx context.Context, body io.Reader, e
 		if ctx.Err() != nil {
 			return ctx.Err()
 		}
-		return NewNonRecoverableParseError(fmt.Errorf("openai-sdk: SSE stream read error: %w", err))
+		return adapters.NewNonRecoverableParseError(fmt.Errorf("openai-sdk: SSE stream read error: %w", err))
 	}
 
 	emitOpenAIFinalEvents(emitter, scope, model, st)

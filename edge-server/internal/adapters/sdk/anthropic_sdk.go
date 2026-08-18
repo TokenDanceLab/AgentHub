@@ -1,4 +1,4 @@
-package adapters
+package sdk
 
 import (
 	"context"
@@ -10,11 +10,13 @@ import (
 	"strings"
 	"time"
 
+	"github.com/agenthub/edge-server/internal/adapters"
 	"github.com/agenthub/edge-server/internal/store"
 )
 
 // Residual pure-helper peel #1142: keep AnthropicSDKAdapter surface + ParseStream
-// orchestration; request/SSE/types moved to companion files.
+// orchestration; request/SSE/types moved to companion files. Grouped into
+// package sdk (#1760).
 
 const (
 	anthropicSDKAdapterID   = "anthropic-sdk"
@@ -176,13 +178,13 @@ func (a *AnthropicSDKAdapter) ParseStream(ctx context.Context, stdout io.Reader,
 
 	// Extract RunProcessContext from the context to get the prompt and model.
 	var runCtx RunProcessContext
-	if rc, ok := ctx.Value(CtxRunContext).(RunProcessContext); ok {
+	if rc, ok := ctx.Value(adapters.CtxRunContext).(RunProcessContext); ok {
 		runCtx = rc
 	}
 
 	model := a.model
 	if runCtx.Model != "" {
-		model = ResolveModel(anthropicSDKAdapterID, runCtx.Model)
+		model = adapters.ResolveModel(anthropicSDKAdapterID, runCtx.Model)
 		if model == "" {
 			model = runCtx.Model
 		}
@@ -253,7 +255,7 @@ func (a *AnthropicSDKAdapter) ParseStream(ctx context.Context, stdout io.Reader,
 
 	bodyBytes, err := json.Marshal(requestBody)
 	if err != nil {
-		return NewNonRecoverableParseError(fmt.Errorf("anthropic-sdk: failed to marshal request: %w", err))
+		return adapters.NewNonRecoverableParseError(fmt.Errorf("anthropic-sdk: failed to marshal request: %w", err))
 	}
 
 	// Emit session init
@@ -279,7 +281,7 @@ func (a *AnthropicSDKAdapter) ParseStream(ctx context.Context, stdout io.Reader,
 			"terminalReason": "error",
 			"provider":       "anthropic",
 		})
-		return NewNonRecoverableParseError(fmt.Errorf("%s", errMsg))
+		return adapters.NewNonRecoverableParseError(fmt.Errorf("%s", errMsg))
 	}
 
 	// Parse SSE stream
