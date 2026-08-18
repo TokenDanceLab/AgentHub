@@ -427,13 +427,13 @@ function getSurfaceConfig(
       title: t.settings,
       description: t.settingsDescription,
       panes: [
-        { label: t.workspaceSettings, value: 'workspace' },
+        { label: t.settingsTabWorkspace, value: 'workspace' },
         { label: t.appearanceSettings, value: 'appearance' },
         { label: t.notifications, value: 'notifications' },
-        { label: t.nativeDeviceCapabilities, value: 'device' },
+        { label: t.settingsTabDevice, value: 'device' },
         { label: t.agentDefaults, value: 'agent-defaults' },
         { label: t.localRuntimeState, value: 'runtime' },
-        { label: t.identityAndSession, value: 'identity' },
+        { label: t.settingsTabIdentity, value: 'identity' },
         { label: t.approvalPolicy, value: 'approval' },
       ],
       metrics: [
@@ -930,7 +930,7 @@ function SurfaceListRow({
           <Badge label={row.meta} size="micro" />
         </View>
         <Text
-          numberOfLines={1}
+          numberOfLines={2}
           style={{
             color: tokens.color.inkMuted,
             fontSize: tokens.type.xs,
@@ -998,7 +998,7 @@ function OverflowListRow({
           {row.title}
         </Text>
         <Text
-          numberOfLines={1}
+          numberOfLines={2}
           style={{
             color: tokens.color.inkMuted,
             fontSize: tokens.type.xs,
