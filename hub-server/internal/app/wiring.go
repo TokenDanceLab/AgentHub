@@ -22,6 +22,7 @@ import (
 	"github.com/agenthub/hub-server/internal/service"
 	"github.com/agenthub/hub-server/internal/service/agentteam"
 	"github.com/agenthub/hub-server/internal/service/attachment"
+	"github.com/agenthub/hub-server/internal/service/audit"
 	"github.com/agenthub/hub-server/internal/service/contact"
 	"github.com/agenthub/hub-server/internal/service/message"
 	"github.com/agenthub/hub-server/internal/service/messagereaction"
@@ -186,7 +187,7 @@ func (a *App) initServices(ctx context.Context) error {
 	a.WorkspaceHandler = handler.NewWorkspaceHandler(workspaceSvc)
 
 	// Audit service
-	auditSvc := service.NewAuditService(a.DB, &service.AuditServiceConfig{
+	auditSvc := audit.NewService(a.DB, &audit.Config{
 		AuditLogFile:    a.Config.Server.AuditLogFile,
 		RetryBufferSize: 1024,
 		// Lifecycle governs the async retry loop: on process shutdown the

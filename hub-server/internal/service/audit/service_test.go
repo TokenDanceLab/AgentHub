@@ -1,4 +1,4 @@
-package service
+package audit
 
 import (
 	"bytes"
@@ -15,14 +15,14 @@ import (
 	"github.com/agenthub/hub-server/internal/model"
 )
 
-func TestNewAuditServiceAllowsNilConfig(t *testing.T) {
+func TestNewServiceAllowsNilConfig(t *testing.T) {
 	// retryLoop/drain touch metrics.AuditQueueDepth directly; without
 	// Register the gauge is nil. Register is idempotent (sync.Once).
 	metrics.Register()
 
-	svc := NewAuditService(nil, nil)
+	svc := NewService(nil, nil)
 	if svc == nil {
-		t.Fatal("NewAuditService returned nil")
+		t.Fatal("NewService returned nil")
 	}
 	svc.Shutdown(context.Background())
 }
@@ -190,11 +190,11 @@ func TestAuditFileSinkClose(t *testing.T) {
 	}
 }
 
-// --- AuditServiceConfig / NewAuditService ---
+// --- Config / NewService ---
 
-func TestNewAuditServiceDefaultConfig(t *testing.T) {
+func TestNewServiceDefaultConfig(t *testing.T) {
 	metrics.Register()
-	svc := NewAuditService(nil, nil)
+	svc := NewService(nil, nil)
 	defer svc.Shutdown(context.Background())
 	if got := cap(svc.retryCh); got != 1024 {
 		t.Fatalf("default retryCh cap = %d, want 1024", got)
@@ -204,19 +204,19 @@ func TestNewAuditServiceDefaultConfig(t *testing.T) {
 	}
 }
 
-func TestNewAuditServiceCustomRetryBuffer(t *testing.T) {
+func TestNewServiceCustomRetryBuffer(t *testing.T) {
 	metrics.Register()
-	svc := NewAuditService(nil, &AuditServiceConfig{RetryBufferSize: 5})
+	svc := NewService(nil, &Config{RetryBufferSize: 5})
 	defer svc.Shutdown(context.Background())
 	if got := cap(svc.retryCh); got != 5 {
 		t.Fatalf("retryCh cap = %d, want 5", got)
 	}
 }
 
-func TestNewAuditServiceWithAuditLogFile(t *testing.T) {
+func TestNewServiceWithAuditLogFile(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "audit.jsonl")
 	metrics.Register()
-	svc := NewAuditService(nil, &AuditServiceConfig{AuditLogFile: path})
+	svc := NewService(nil, &Config{AuditLogFile: path})
 	defer svc.Shutdown(context.Background())
 	if svc.fileSink == nil {
 		t.Fatal("fileSink = nil, want non-nil when AuditLogFile is set")
@@ -226,12 +226,12 @@ func TestNewAuditServiceWithAuditLogFile(t *testing.T) {
 	}
 }
 
-func TestNewAuditServiceBadAuditLogFile(t *testing.T) {
+func TestNewServiceBadAuditLogFile(t *testing.T) {
 	// newAuditFileSink error must only disable the file sink (logged), not
 	// fail service construction.
 	path := filepath.Join(t.TempDir(), "no-such-dir", "audit.jsonl")
 	metrics.Register()
-	svc := NewAuditService(nil, &AuditServiceConfig{AuditLogFile: path})
+	svc := NewService(nil, &Config{AuditLogFile: path})
 	defer svc.Shutdown(context.Background())
 	if svc == nil {
 		t.Fatal("service must still be created when the file sink fails")
@@ -244,12 +244,12 @@ func TestNewAuditServiceBadAuditLogFile(t *testing.T) {
 // --- Record (queue-full drop) ---
 
 func TestAuditRecordQueueFullDrops(t *testing.T) {
-	// Construct directly with no retryLoop: NewAuditService would start
+	// Construct directly with no retryLoop: NewService would start
 	// retryLoop which drains the channel and calls persistWithRetry (needs a
 	// real *gorm.DB — would panic on nil). Keeping the queue unowned lets us
 	// observe the drop-on-full behavior in isolation; Record itself only
 	// does a non-blocking channel send.
-	svc := &AuditService{retryCh: make(chan *model.AuditEvent, 1)}
+	svc := &Service{retryCh: make(chan *model.AuditEvent, 1)}
 
 	svc.Record(context.Background(), "user-1", "test", "info", "first", nil, nil, nil, "127.0.0.1")
 	if got := len(svc.retryCh); got != 1 {
@@ -266,7 +266,7 @@ func TestAuditRecordQueueFullDrops(t *testing.T) {
 
 func TestAuditShutdownNoHang(t *testing.T) {
 	metrics.Register()
-	svc := NewAuditService(nil, nil)
+	svc := NewService(nil, nil)
 	done := make(chan struct{})
 	go func() {
 		svc.Shutdown(context.Background())
@@ -281,7 +281,7 @@ func TestAuditShutdownNoHang(t *testing.T) {
 
 func TestAuditRecordAfterShutdown(t *testing.T) {
 	metrics.Register()
-	svc := NewAuditService(nil, nil)
+	svc := NewService(nil, nil)
 	svc.Shutdown(context.Background())
 
 	// Shutdown only closes s.done; retryCh stays open, so Record still

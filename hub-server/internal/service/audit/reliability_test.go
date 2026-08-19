@@ -1,4 +1,4 @@
-package service
+package audit
 
 // #1543 — Audit async queue reliability. These tests pin the contract that
 // previously silent loss is now observable and shutdown is bounded:
@@ -26,9 +26,9 @@ func TestRecordQueueFullDropsCounted(t *testing.T) {
 	metrics.Register()
 	dropsBefore := testutil.ToFloat64(metrics.AuditQueueDrops)
 
-	// Constructed without NewAuditService: no retryLoop consumer, so the
+	// Constructed without NewService: no retryLoop consumer, so the
 	// buffered channel deterministically fills on the second Record.
-	svc := &AuditService{
+	svc := &Service{
 		retryCh:      make(chan *model.AuditEvent, 1),
 		retryBufSize: 1,
 		done:         make(chan struct{}),
@@ -52,7 +52,7 @@ func TestRecordQueueFullDropsCounted(t *testing.T) {
 // TestShutdownIdempotent verifies that calling Shutdown twice does not
 // panic and the second call is a no-op.
 func TestShutdownIdempotent(t *testing.T) {
-	svc := NewAuditService(nil, nil)
+	svc := NewService(nil, nil)
 	svc.Shutdown(context.Background())
 	svc.Shutdown(context.Background())
 	// Reaching here is the assertion: no close-of-closed-channel panic.
@@ -66,7 +66,7 @@ func TestShutdownBoundedByCancelledContext(t *testing.T) {
 	cancel()
 
 	start := time.Now()
-	svc := NewAuditService(nil, nil)
+	svc := NewService(nil, nil)
 	svc.Shutdown(ctx)
 	if elapsed := time.Since(start); elapsed > time.Second {
 		t.Fatalf("Shutdown with cancelled ctx took %v, want < 1s", elapsed)
@@ -80,7 +80,7 @@ func TestPersistWithRetryAbortsOnCancelledContext(t *testing.T) {
 	metrics.Register()
 	finalBefore := testutil.ToFloat64(metrics.AuditFinalFailures)
 
-	svc := &AuditService{fileSink: nil, lifecycle: context.Background()}
+	svc := &Service{fileSink: nil, lifecycle: context.Background()}
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 
@@ -104,7 +104,7 @@ func TestRetryLoopAbortsOnLifecycleCancellation(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	svc := NewAuditService(nil, &AuditServiceConfig{LifecycleContext: ctx})
+	svc := NewService(nil, &Config{LifecycleContext: ctx})
 
 	svc.Record(context.Background(), "u1", "test", "info", "late", nil, nil, nil, "")
 
