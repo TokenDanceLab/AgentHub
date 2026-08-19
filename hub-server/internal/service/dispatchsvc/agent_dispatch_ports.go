@@ -37,11 +37,10 @@ type pendingTaskSnapshot = dispatch.PendingTaskSnapshot
 // No OpenAPI/handler/frontend; no typed package move.
 //
 // Ports and nil-safe wrappers split into this file (#1068) to match
-// delivery_outbox.go / delivery_outbox_model.go pattern (#801).
+// the deliveryoutbox package split (#801 moved).
 
 // dispatchOutbox records, marks, and dead-letters delivery journal rows during
-// dispatch / redispatch. Implemented by *DeliveryOutbox (AgentService facades
-// also satisfy it for tests that pass *AgentService as outbox).
+// dispatch / redispatch. Implemented by *deliveryoutbox.Outbox.
 type dispatchOutbox interface {
 	RecordDelivery(ctx context.Context, taskID, payload, edgeDeviceID string) (string, error)
 	MarkDeliverySent(ctx context.Context, deliveryID string) error
@@ -113,7 +112,7 @@ type RelayPort interface {
 
 // DispatchService owns agent task dispatch orchestration: trigger, payload build,
 // edge HTTP / WS / offline routing, capability minting, history/pins loading, and
-// redispatch residual. DeliveryOutbox retries enter via Redispatcher; Payload DTO
+// redispatch residual. Outbox retries enter via Redispatcher; Payload DTO
 // lives in service/dispatch with a thin same-package alias. Same-package extract
 // (#563/#573/#617) + pure helpers (#732→#1056) — typed package move still deferred.
 type DispatchService struct {

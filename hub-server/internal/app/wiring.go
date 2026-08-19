@@ -23,6 +23,7 @@ import (
 	"github.com/agenthub/hub-server/internal/service/agentteam"
 	"github.com/agenthub/hub-server/internal/service/attachment"
 	"github.com/agenthub/hub-server/internal/service/contact"
+	"github.com/agenthub/hub-server/internal/service/deliveryoutbox"
 	"github.com/agenthub/hub-server/internal/service/message"
 	"github.com/agenthub/hub-server/internal/service/messagereaction"
 	"github.com/agenthub/hub-server/internal/service/oidc"
@@ -161,7 +162,11 @@ func (a *App) initServices(ctx context.Context) error {
 	// policy (bounded timeout, redirects refused). The service layer never
 	// constructs transport clients.
 	edgeDispatchClient := outboundhttp.NewClient(a.Config.Edge.Timeout)
-	a.AgentService = service.NewAgentService(a.DB, a.bus, a.mgr, a.CacheClient, a.RelayService, a.Config.Edge, edgeDispatchClient, a.Config.JWT.Secret)
+	// Delivery outbox (#801 moved): the composition root constructs the
+	// journal/retry-loop owner; AgentService consumes it via a local port.
+	// The DispatchService redispatch adapter is wired inside NewAgentService.
+	deliveryOutbox := deliveryoutbox.NewOutbox(a.DB, nil)
+	a.AgentService = service.NewAgentService(a.DB, a.bus, a.mgr, a.CacheClient, a.RelayService, a.Config.Edge, edgeDispatchClient, a.Config.JWT.Secret, deliveryOutbox)
 
 	// Agent Profile service
 	agentProfileSvc := service.NewAgentProfileService(a.DB)

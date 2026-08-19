@@ -11,7 +11,7 @@ import (
 // ── AgentService facade (wiring/handler stability) ───────────────────────────
 //
 // Thin delegating methods that forward AgentService API surface to the composed
-// DispatchService. Kept in a separate file to match delivery_outbox_facade.go
+// DispatchService. Kept in a separate file to match the outbox port file
 // pattern (#801). Orchestration stays in agent_dispatch.go.
 
 // dispatchService returns the composed DispatchService, lazily constructing one
@@ -20,7 +20,7 @@ func (s *AgentService) dispatchService() *dispatchsvc.DispatchService {
 	if dispatch.ComposedDispatchReady(s.dispatch != nil) {
 		return s.dispatch
 	}
-	return dispatchsvc.NewDispatchService(s.db, s.bus, wsManagerAdapter{manager: s.mgr}, s.cacheClient, relayServiceAdapter{relay: s.relay}, s.deliveryOutboxService(), s.edgeCfg, s.edgeClient, s.jwtSecret)
+	return dispatchsvc.NewDispatchService(s.db, s.bus, wsManagerAdapter{manager: s.mgr}, s.cacheClient, relayServiceAdapter{relay: s.relay}, s.deliveryOutbox, s.edgeCfg, s.edgeClient, s.jwtSecret)
 }
 
 // TriggerAgentTask creates a pending task for an agent and dispatches it to the inviter's edge.

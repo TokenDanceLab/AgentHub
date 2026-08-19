@@ -21,7 +21,8 @@
 //	service/agent_dispatch_facade.go
 //	                          package service: AgentService facade methods
 //	                          that delegate to DispatchService (kept
-//	                          separate to mirror delivery_outbox_facade.go)
+//	                          separate to mirror the outbox port split,
+//	                          agent_outbox.go)
 //
 // The two service-layer files exist because dispatchsvc is transport-free by
 // design: the ws/relay adaptation and the AgentService API surface must live

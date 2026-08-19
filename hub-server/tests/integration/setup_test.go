@@ -36,6 +36,7 @@ import (
 	"github.com/agenthub/hub-server/internal/service/agentteam"
 	"github.com/agenthub/hub-server/internal/service/attachment"
 	"github.com/agenthub/hub-server/internal/service/contact"
+	"github.com/agenthub/hub-server/internal/service/deliveryoutbox"
 	"github.com/agenthub/hub-server/internal/service/message"
 	"github.com/agenthub/hub-server/internal/service/messagereaction"
 	"github.com/agenthub/hub-server/internal/service/oidc"
@@ -136,7 +137,7 @@ func TestMain(m *testing.M) {
 		Service:   messageService,
 		reactions: messageReactionService,
 	})
-	agentService := service.NewAgentService(db, eventBus, mgr, cacheClient, nil, config.EdgeDispatchConfig{}, nil, "")
+	agentService := service.NewAgentService(db, eventBus, mgr, cacheClient, nil, config.EdgeDispatchConfig{}, nil, "", deliveryoutbox.NewOutbox(db, nil))
 	agentHandler := handler.NewAgentHandler(agentService)
 	customAgentHandler := handler.NewCustomAgentHandler(agentService)
 	attachmentService := attachment.NewService(db, cfg.Upload, attachment.NewLocalStorage(cfg.Upload.Dir))

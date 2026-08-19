@@ -1,4 +1,7 @@
-package service
+// Model ownership for the delivery_outbox journal: private GORM row, read
+// view, and repository helpers. Only Outbox journal/repository helpers may
+// construct or query outboxRecord; callers outside the package use Entry.
+package deliveryoutbox
 
 import (
 	"context"
@@ -6,23 +9,14 @@ import (
 
 	"gorm.io/gorm"
 
-	"github.com/agenthub/hub-server/internal/service/deliveryoutbox"
 	"github.com/agenthub/hub-server/internal/uuidv7"
 )
 
-// ── Model (owned by DeliveryOutbox; not part of AgentService surface) ──────
-//
-// Adjacent same-package residual split (#801): private GORM row, read view,
-// redispatch target, and repository helpers. Orchestration stays in
-// delivery_outbox.go; AgentService facades/aliases in delivery_outbox_facade.go.
-// Full model package move remains deferred (boundary map residual).
-
-// deliveryOutboxRecord is the private GORM row for delivery_outbox.
-// Only DeliveryOutbox journal/repository helpers may construct or query it.
-// Callers outside the outbox surface use DeliveryOutboxEntry (read view) or
-// redispatchTarget (opaque redispatch fields). Full model/repository package
-// move remains deferred; this residual seals ownership inside DeliveryOutbox.
-type deliveryOutboxRecord struct {
+// outboxRecord is the private GORM row for delivery_outbox.
+// Only Outbox journal/repository helpers may construct or query it.
+// Callers outside the outbox surface use Entry (read view) or
+// redispatchTarget (opaque redispatch fields).
+type outboxRecord struct {
 	ID           string     `gorm:"primaryKey;type:uuid"`
 	TaskID       string     `gorm:"type:uuid;not null;index:idx_delivery_outbox_task_id"`
 	DeliveryID   string     `gorm:"type:varchar(128);not null;uniqueIndex:idx_delivery_outbox_delivery_id"`
@@ -38,7 +32,7 @@ type deliveryOutboxRecord struct {
 	DeliveredAt  *time.Time `gorm:"type:timestamptz"`
 }
 
-func (r *deliveryOutboxRecord) BeforeCreate(tx *gorm.DB) error {
+func (r *outboxRecord) BeforeCreate(tx *gorm.DB) error {
 	id, err := uuidv7.New()
 	if err != nil {
 		return err
@@ -47,20 +41,20 @@ func (r *deliveryOutboxRecord) BeforeCreate(tx *gorm.DB) error {
 	return nil
 }
 
-func (r *deliveryOutboxRecord) BeforeUpdate(tx *gorm.DB) error {
+func (r *outboxRecord) BeforeUpdate(tx *gorm.DB) error {
 	r.UpdatedAt = time.Now()
 	return nil
 }
 
 // TableName overrides the default pluralized table name for GORM.
-func (deliveryOutboxRecord) TableName() string {
+func (outboxRecord) TableName() string {
 	return "delivery_outbox"
 }
 
-// DeliveryOutboxEntry is a read-only journal view for scan/test callers.
-// It intentionally carries no GORM tags so AgentService / tests do not couple
-// to the private persistence shape of deliveryOutboxRecord.
-type DeliveryOutboxEntry struct {
+// Entry is a read-only journal view for scan/test callers.
+// It intentionally carries no GORM tags so callers do not couple
+// to the private persistence shape of outboxRecord.
+type Entry struct {
 	ID           string
 	TaskID       string
 	DeliveryID   string
@@ -76,25 +70,25 @@ type DeliveryOutboxEntry struct {
 	DeliveredAt  *time.Time
 }
 
-func (r deliveryOutboxRecord) toEntry() DeliveryOutboxEntry {
-	return DeliveryOutboxEntry(r)
+func (r outboxRecord) toEntry() Entry {
+	return Entry(r)
 }
 
-// ── DeliveryOutbox private repository helpers ──────────────────────────────
+// ── Outbox private repository helpers ──────────────────────────────────────
 
 // outboxModel is the GORM model handle for delivery_outbox mutations.
-func outboxModel() *deliveryOutboxRecord { return &deliveryOutboxRecord{} }
+func outboxModel() *outboxRecord { return &outboxRecord{} }
 
 // findOutboxByDeliveryID loads one private row by delivery_id.
-func (o *DeliveryOutbox) findOutboxByDeliveryID(ctx context.Context, deliveryID string) (deliveryOutboxRecord, error) {
-	var rec deliveryOutboxRecord
+func (o *Outbox) findOutboxByDeliveryID(ctx context.Context, deliveryID string) (outboxRecord, error) {
+	var rec outboxRecord
 	err := o.db.WithContext(ctx).Where("delivery_id = ?", deliveryID).First(&rec).Error
 	return rec, err
 }
 
 // updateOutboxByDeliveryID applies column updates for rows matching delivery_id
 // and (optional) status filter. statusIn may be nil to skip status constraint.
-func (o *DeliveryOutbox) updateOutboxByDeliveryID(ctx context.Context, deliveryID string, statusIn []string, fields map[string]interface{}) (int64, error) {
+func (o *Outbox) updateOutboxByDeliveryID(ctx context.Context, deliveryID string, statusIn []string, fields map[string]interface{}) (int64, error) {
 	q := o.db.WithContext(ctx).Model(outboxModel()).Where("delivery_id = ?", deliveryID)
 	if len(statusIn) > 0 {
 		q = q.Where("status IN ?", statusIn)
@@ -107,10 +101,10 @@ func (o *DeliveryOutbox) updateOutboxByDeliveryID(ctx context.Context, deliveryI
 // delivery_id matches, status is still active, and attempt_count equals the
 // expected value observed by the caller. RowsAffected==1 means this worker owns
 // the redispatch; 0 means another worker already claimed (or row left active set).
-func (o *DeliveryOutbox) claimOutboxRetry(ctx context.Context, deliveryID string, expectedAttempt int, fields map[string]interface{}) (int64, error) {
+func (o *Outbox) claimOutboxRetry(ctx context.Context, deliveryID string, expectedAttempt int, fields map[string]interface{}) (int64, error) {
 	result := o.db.WithContext(ctx).Model(outboxModel()).
 		Where("delivery_id = ? AND status IN ? AND attempt_count = ?",
-			deliveryID, deliveryoutbox.ActiveStatuses(), expectedAttempt).
+			deliveryID, ActiveStatuses(), expectedAttempt).
 		Updates(fields)
 	return result.RowsAffected, result.Error
 }

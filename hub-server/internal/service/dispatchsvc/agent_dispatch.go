@@ -426,7 +426,7 @@ func (s *DispatchService) getPendingTaskForRedelivery(ctx context.Context, taskI
 // rec is a redispatchTarget (opaque payload fields only), not the GORM model.
 // Route classification is pure; WS/HTTP/offline side-effects stay here. Soft
 // offline-queue failures return an error so callers do not false-mark sent (#999).
-// Outbox MarkDeliverySent after success remains on DeliveryOutbox RedispatchDelivery.
+// Outbox MarkDeliverySent after success remains on Outbox RedispatchDelivery.
 func (s *DispatchService) retryDispatchToTarget(ctx context.Context, task *pendingTaskSnapshot, dp dispatchPayload, newPayload []byte, rec redispatchTarget) error {
 	minimalTask := dispatch.MinimalPendingTaskForHTTP(*task)
 	preferDevice := dispatch.RedeliveryPreferDeviceRoute(task.EdgeDeviceID)
@@ -493,6 +493,6 @@ func (s *DispatchService) retryDispatchToTarget(ctx context.Context, task *pendi
 
 // ── AgentService facade (wiring/handler stability) ───────────────────────────
 //
-// Moved to agent_dispatch_facade.go (#1068) to match delivery_outbox_facade.go
-// pattern (#801). Thin delegating methods: dispatchService, TriggerAgentTask,
+// Moved to agent_dispatch_facade.go (#1068) to match the outbox port split
+// (#801 moved). Thin delegating methods: dispatchService, TriggerAgentTask,
 // CancelTask, RegenerateAgentTask.

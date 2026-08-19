@@ -52,14 +52,14 @@ type AgentService struct {
 	// a lazy facade via edgeCallbackService().
 	edgeCallbacks *EdgeCallbackService
 	// deliveryOutbox owns journal + retry-loop orchestration.
-	// Constructed in NewAgentService; tests using struct literals fall back to
-	// a lazy facade via deliveryOutboxService(). Redispatch implementation lives
-	// on DispatchService and is injected via the Redispatcher port.
-	deliveryOutbox *DeliveryOutbox
+	// Constructed by the composition root (deliveryoutbox.NewOutbox) and
+	// injected through NewAgentService; the concrete type lives in the
+	// deliveryoutbox package and is consumed here via deliveryOutboxPort.
+	deliveryOutbox deliveryOutboxPort
 	// dispatch owns trigger/dispatch/cancel/regenerate + redispatch residual.
 	// Constructed in NewAgentService; tests using struct literals fall back to
-	// a lazy facade via dispatchService(). DeliveryOutbox retries call into
-	// DispatchService through Redispatcher (dispatchPayload stays private).
+	// a lazy facade via dispatchService(). Outbox retries call into
+	// DispatchService through the Redispatcher port (dispatchPayload stays private).
 	dispatch *dispatchsvc.DispatchService
 	// edgeCfg/jwtSecret are the Hub→Edge dispatch configuration (#1549),
 	// injected by the composition root and forwarded to DispatchService.
@@ -72,21 +72,23 @@ type AgentService struct {
 	jwtSecret  string
 }
 
-func NewAgentService(db *gorm.DB, bus *bus.Bus, mgr *ws.Manager, cacheClient *cache.Client, relay relayDispatcher, edgeCfg config.EdgeDispatchConfig, edgeClient *http.Client, jwtSecret string) *AgentService {
-	s := &AgentService{db: db, bus: bus, mgr: mgr, cacheClient: resolveAgentCache(cacheClient), relay: relay, edgeCfg: edgeCfg, edgeClient: edgeClient, jwtSecret: jwtSecret, seqAlloc: seqalloc.New(cacheClient, db)}
+func NewAgentService(db *gorm.DB, bus *bus.Bus, mgr *ws.Manager, cacheClient *cache.Client, relay relayDispatcher, edgeCfg config.EdgeDispatchConfig, edgeClient *http.Client, jwtSecret string, deliveryOutbox deliveryOutboxPort) *AgentService {
+	s := &AgentService{db: db, bus: bus, mgr: mgr, cacheClient: resolveAgentCache(cacheClient), relay: relay, edgeCfg: edgeCfg, edgeClient: edgeClient, jwtSecret: jwtSecret, seqAlloc: seqalloc.New(cacheClient, db), deliveryOutbox: deliveryOutbox}
 	s.runEvents = NewRunEventService(db, NewAgentControlService(cacheClient, mgr))
-	// Construct outbox first (nil redispatcher), then inject DispatchService
-	// adapter after dispatch exists (#573 — redispatch residual on DispatchService).
-	s.deliveryOutbox = NewDeliveryOutbox(db, nil)
+	// The composition root constructs the outbox (deliveryoutbox.NewOutbox)
+	// and injects it here; the DispatchService redispatch adapter is wired
+	// after dispatch exists (#573 — redispatch residual on DispatchService).
 	s.edgeCallbacks = NewEdgeCallbackService(
 		db,
 		bus,
 		seqAllocatorFunc(s.allocateSeq),
-		s.deliveryOutbox, // DeliveryOutbox implements edgeCallbackOutbox via autoAckDeliveriesForTask
+		s.deliveryOutbox, // Outbox implements edgeCallbackOutbox via AutoAckDeliveriesForTask
 	)
 	// Dispatch after outbox so RecordDelivery/MarkDeliverySent ports are ready.
 	s.dispatch = dispatchsvc.NewDispatchService(db, bus, wsManagerAdapter{manager: mgr}, s.cacheClient, relayServiceAdapter{relay: relay}, s.deliveryOutbox, edgeCfg, edgeClient, jwtSecret)
-	s.deliveryOutbox.SetRedispatcher(dispatchRedispatcher{s.dispatch})
+	if s.deliveryOutbox != nil {
+		s.deliveryOutbox.SetDispatchRedispatcher(s.dispatch)
+	}
 	return s
 }
 

@@ -1,16 +1,16 @@
-// Package deliveryoutbox holds pure delivery-outbox helpers for Hub AgentService.
+// Package deliveryoutbox owns the Hub→Edge delivery journal and retry-loop
+// orchestration plus the pure status / eligibility / backoff / string helpers
+// the orchestration uses.
 //
-// These helpers are intentionally free of DB / WS / cache / *AgentService
-// dependencies so DeliveryOutbox orchestration can reuse status, eligibility,
-// backoff, and string helpers without pulling journal/repository code.
+// The orchestration residual (#801 → moved here) closed the flat-service
+// split: outbox.go holds the Redispatcher port, Outbox type, and journal ops;
+// model.go holds the private GORM row, the Entry read view, and repository
+// helpers; retry.go holds the retry loop, redispatch adapters, backlog gauge,
+// and cleanup loop.
 //
-// Pure residual is closed (#514 backoff/truncate, #744 status/eligibility).
-// Flat service package keeps orchestration split across adjacent files (#801):
-//   - delivery_outbox.go — ports, journal, retry loop, redispatch adapters
-//   - delivery_outbox_model.go — GORM record, Entry DTO, redispatchTarget, repo
-//   - delivery_outbox_facade.go — status/TTL aliases, AgentService facades
+// The flat service package consumes *Outbox through a locally-defined port
+// (deliveryOutboxPort) so service never imports this package; the moved tests
+// here import the service package for cross-domain auto-ack coverage.
 //
-// Full model package move stays deferred (high-risk residual).
-//
-// See #744 (prior pure extract #514; #801).
+// See #514 (backoff/truncate), #744 (status/eligibility), #801 (split).
 package deliveryoutbox
