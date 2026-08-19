@@ -4,7 +4,7 @@ import (
 	"log/slog"
 
 	"github.com/agenthub/hub-server/internal/errcode"
-	"github.com/agenthub/hub-server/internal/service"
+	"github.com/agenthub/hub-server/internal/service/usersettings"
 	"github.com/gin-gonic/gin"
 )
 
@@ -77,4 +77,4 @@ func (h *UserSettingsHandler) PatchSettings(c *gin.Context) {
 }
 
 // Ensure UserSettingsService satisfies the interface at compile time.
-var _ UserSettingsService = (*service.UserSettingsService)(nil)
+var _ UserSettingsService = (*usersettings.Service)(nil)
