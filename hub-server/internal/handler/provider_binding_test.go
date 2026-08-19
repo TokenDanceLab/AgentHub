@@ -9,7 +9,7 @@ import (
 
 	"github.com/agenthub/hub-server/internal/errcode"
 	"github.com/agenthub/hub-server/internal/model"
-	"github.com/agenthub/hub-server/internal/service"
+	"github.com/agenthub/hub-server/internal/service/providerbinding"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -20,7 +20,7 @@ type mockProviderBindingService struct {
 	get    func(ctx context.Context, id, ownerID string) (*model.ProviderBinding, error)
 	update func(ctx context.Context, id, ownerID string, req *model.ProviderBinding) (*model.ProviderBinding, error)
 	delete func(ctx context.Context, id, ownerID string) error
-	list   func(ctx context.Context, ownerID, cursor string, pageSize int) (*service.PBListResult, error)
+	list   func(ctx context.Context, ownerID, cursor string, pageSize int) (*providerbinding.ListResult, error)
 }
 
 func (m *mockProviderBindingService) Create(ctx context.Context, ownerID string, req *model.ProviderBinding) (*model.ProviderBinding, error) {
@@ -51,9 +51,9 @@ func (m *mockProviderBindingService) Delete(ctx context.Context, id, ownerID str
 	return m.delete(ctx, id, ownerID)
 }
 
-func (m *mockProviderBindingService) List(ctx context.Context, ownerID, cursor string, pageSize int) (*service.PBListResult, error) {
+func (m *mockProviderBindingService) List(ctx context.Context, ownerID, cursor string, pageSize int) (*providerbinding.ListResult, error) {
 	if m.list == nil {
-		return &service.PBListResult{}, nil
+		return &providerbinding.ListResult{}, nil
 	}
 	return m.list(ctx, ownerID, cursor, pageSize)
 }
@@ -64,10 +64,10 @@ func TestProviderBindingHandler_List(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		called := false
 		svc := &mockProviderBindingService{
-			list: func(ctx context.Context, ownerID, cursor string, pageSize int) (*service.PBListResult, error) {
+			list: func(ctx context.Context, ownerID, cursor string, pageSize int) (*providerbinding.ListResult, error) {
 				called = true
 				assert.Equal(t, "user-1", ownerID)
-				return &service.PBListResult{
+				return &providerbinding.ListResult{
 					Items:   []model.ProviderBinding{{ID: "pb-1"}},
 					Cursor:  "next",
 					HasMore: true,
@@ -93,7 +93,7 @@ func TestProviderBindingHandler_List(t *testing.T) {
 
 	t.Run("service error", func(t *testing.T) {
 		svc := &mockProviderBindingService{
-			list: func(ctx context.Context, ownerID, cursor string, pageSize int) (*service.PBListResult, error) {
+			list: func(ctx context.Context, ownerID, cursor string, pageSize int) (*providerbinding.ListResult, error) {
 				return nil, errcode.ErrInternal
 			},
 		}

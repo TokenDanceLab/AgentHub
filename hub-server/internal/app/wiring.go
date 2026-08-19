@@ -29,6 +29,7 @@ import (
 	"github.com/agenthub/hub-server/internal/service/message"
 	"github.com/agenthub/hub-server/internal/service/messagereaction"
 	"github.com/agenthub/hub-server/internal/service/oidc"
+	"github.com/agenthub/hub-server/internal/service/providerbinding"
 	"github.com/agenthub/hub-server/internal/service/publicstats"
 	"github.com/agenthub/hub-server/internal/service/relay"
 	"github.com/agenthub/hub-server/internal/service/session"
@@ -184,7 +185,7 @@ func (a *App) initServices(ctx context.Context) error {
 	a.MarketHandler = handler.NewMarketHandler(agentProfileSvc)
 
 	// Provider Binding service
-	pbSvc := service.NewProviderBindingService(a.DB)
+	pbSvc := providerbinding.NewService(a.DB)
 	a.ProviderBindingHandler = handler.NewProviderBindingHandler(pbSvc)
 
 	// Workspace service (second IM typed-service package; DB-only, no bus/cache)

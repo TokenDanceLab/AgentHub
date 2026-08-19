@@ -10,16 +10,16 @@ import (
 	"github.com/agenthub/hub-server/internal/config"
 	"github.com/agenthub/hub-server/internal/errcode"
 	"github.com/agenthub/hub-server/internal/model"
-	"github.com/agenthub/hub-server/internal/service"
+	"github.com/agenthub/hub-server/internal/service/providerbinding"
 )
 
-// ProviderBindingService is the subset of *service.ProviderBindingService used by ProviderBindingHandler.
+// ProviderBindingService is the subset of *providerbinding.Service used by ProviderBindingHandler.
 type ProviderBindingService interface {
 	Create(ctx context.Context, ownerID string, req *model.ProviderBinding) (*model.ProviderBinding, error)
 	Get(ctx context.Context, id, ownerID string) (*model.ProviderBinding, error)
 	Update(ctx context.Context, id, ownerID string, req *model.ProviderBinding) (*model.ProviderBinding, error)
 	Delete(ctx context.Context, id, ownerID string) error
-	List(ctx context.Context, ownerID, cursor string, pageSize int) (*service.PBListResult, error)
+	List(ctx context.Context, ownerID, cursor string, pageSize int) (*providerbinding.ListResult, error)
 }
 
 type ProviderBindingHandler struct {
