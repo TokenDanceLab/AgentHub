@@ -9,12 +9,12 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"github.com/agenthub/hub-server/internal/errcode"
-	"github.com/agenthub/hub-server/internal/service"
+	"github.com/agenthub/hub-server/internal/service/audit"
 )
 
-// AuditService is the subset of *service.AuditService used by AuditHandler.
+// AuditService is the subset of *audit.Service used by AuditHandler.
 type AuditService interface {
-	Query(ctx context.Context, callerUserID string, isAdmin bool, eventType, severity string, since, until *time.Time, cursor string, pageSize int) (*service.AuditListResult, error)
+	Query(ctx context.Context, callerUserID string, isAdmin bool, eventType, severity string, since, until *time.Time, cursor string, pageSize int) (*audit.ListResult, error)
 }
 
 // AuditHandler handles HTTP endpoints for audit event queries.

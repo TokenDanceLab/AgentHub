@@ -35,6 +35,7 @@ import (
 	"github.com/agenthub/hub-server/internal/service"
 	"github.com/agenthub/hub-server/internal/service/agentteam"
 	"github.com/agenthub/hub-server/internal/service/attachment"
+	"github.com/agenthub/hub-server/internal/service/audit"
 	"github.com/agenthub/hub-server/internal/service/contact"
 	"github.com/agenthub/hub-server/internal/service/message"
 	"github.com/agenthub/hub-server/internal/service/messagereaction"
@@ -172,7 +173,7 @@ func TestMain(m *testing.M) {
 	pbHandler := handler.NewProviderBindingHandler(pbService)
 	targetService, _ := service.NewExecutionTargetService(db, egress.Config{AllowCIDRs: []string{"127.0.0.0/8"}, AllowPlainHTTP: true})
 	targetHandler := handler.NewExecutionTargetHandler(targetService)
-	auditService := service.NewAuditService(db, nil)
+	auditService := audit.NewService(db, nil)
 	auditHandler := handler.NewAuditHandler(auditService)
 	relayService := service.NewRelayService(cacheClient, mgr)
 	relayHandler := handler.NewRelayHandler(relayService)

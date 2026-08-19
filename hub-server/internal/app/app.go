@@ -19,6 +19,7 @@ import (
 	"github.com/agenthub/hub-server/internal/service"
 	"github.com/agenthub/hub-server/internal/service/agentteam"
 	"github.com/agenthub/hub-server/internal/service/attachment"
+	"github.com/agenthub/hub-server/internal/service/audit"
 	"github.com/agenthub/hub-server/internal/service/contact"
 	"github.com/agenthub/hub-server/internal/service/message"
 	"github.com/agenthub/hub-server/internal/service/messagereaction"
@@ -100,7 +101,7 @@ type App struct {
 	RelayHandler *handler.RelayHandler
 
 	// Audit
-	AuditService *service.AuditService
+	AuditService *audit.Service
 
 	// Settings
 	UserSettingsHandler *handler.UserSettingsHandler
@@ -141,7 +142,7 @@ func (a *App) tdVerifier() *jwtutil.TokenDanceVerifier {
 	})
 }
 
-// auditPermissionDecision adapts AuditService.RecordPermissionDecision for
+// auditPermissionDecision adapts audit.Service.RecordPermissionDecision for
 // the AuthMiddleware permission-audit callback (#1551). No-op when the audit
 // service is not yet constructed.
 func (a *App) auditPermissionDecision(ctx context.Context, userID string, decision string, allowed bool, details map[string]interface{}, clientIP string) {
