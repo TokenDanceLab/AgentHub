@@ -43,6 +43,7 @@ import (
 	"github.com/agenthub/hub-server/internal/service/oidc"
 	"github.com/agenthub/hub-server/internal/service/publicstats"
 	"github.com/agenthub/hub-server/internal/service/session"
+	"github.com/agenthub/hub-server/internal/service/skill"
 	"github.com/agenthub/hub-server/internal/testkit"
 	"github.com/agenthub/hub-server/internal/ws"
 )
@@ -165,7 +166,7 @@ func TestMain(m *testing.M) {
 	oidcHandler := handler.NewOIDCHandler(oidcService)
 	profileService := service.NewAgentProfileService(db)
 	agentProfileHandler := handler.NewAgentProfileHandler(profileService)
-	skillService := service.NewSkillService(db)
+	skillService := skill.NewService(db)
 	skillHandler := handler.NewSkillHandler(skillService)
 	mcpService := service.NewMCPService(db)
 	mcpHandler := handler.NewMCPServerHandler(mcpService)
