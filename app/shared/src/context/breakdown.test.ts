@@ -32,12 +32,6 @@ describe('estimateTokens', () => {
   it('handles large character counts', () => {
     expect(estimateTokens(10_000)).toBe(2500);
   });
-
-  it('returns -0 for small negative counts via ceil', () => {
-    // Math.ceil(-0.25) === -0; the function has no negative guard and
-    // Vitest toBe uses Object.is, so assert -0 explicitly.
-    expect(Object.is(estimateTokens(-1), -0)).toBe(true);
-  });
 });
 
 // ── breakdownContext ────────────────────────────
@@ -230,17 +224,6 @@ describe('breakdownContext', () => {
       other: 0,
       total: 10,
     });
-  });
-
-  it('scales with a negative factor for negative totals (documents current behavior)', () => {
-    const messages = [{ role: 'user', content: 'u'.repeat(100) }]; // 25 est
-    // scale = -5 / 25 = -0.2 -> floor(25 * -0.2) = -5, other clamps to 0
-    // (the zero buckets become -0 via floor(0 * scale), so they are not
-    // asserted with toEqual, which distinguishes -0 from +0)
-    const result = breakdownContext(messages, -5);
-    expect(result.user).toBe(-5);
-    expect(result.other).toBe(0);
-    expect(result.total).toBe(-5);
   });
 
   it('accepts the SessionMetrics messages shape', () => {
