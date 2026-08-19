@@ -1,4 +1,4 @@
-package adapters
+package sdk
 
 import (
 	"context"
@@ -10,11 +10,13 @@ import (
 	"strings"
 	"time"
 
+	"github.com/agenthub/edge-server/internal/adapters"
 	"github.com/agenthub/edge-server/internal/store"
 )
 
 // Residual pure-helper peel #1152: keep OpenAISDKAdapter surface + ParseStream
-// orchestration; request/SSE/types moved to companion files.
+// orchestration; request/SSE/types moved to companion files. Grouped into
+// package sdk (#1760).
 
 const (
 	openaiSDKAdapterID   = "openai-sdk"
@@ -169,13 +171,13 @@ func (a *OpenAISDKAdapter) ParseStream(ctx context.Context, stdout io.Reader, st
 
 	// Extract RunProcessContext from the context to get the prompt and model.
 	var runCtx RunProcessContext
-	if rc, ok := ctx.Value(CtxRunContext).(RunProcessContext); ok {
+	if rc, ok := ctx.Value(adapters.CtxRunContext).(RunProcessContext); ok {
 		runCtx = rc
 	}
 
 	model := a.model
 	if runCtx.Model != "" {
-		model = ResolveModel(openaiSDKAdapterID, runCtx.Model)
+		model = adapters.ResolveModel(openaiSDKAdapterID, runCtx.Model)
 		if model == "" {
 			model = runCtx.Model
 		}
@@ -196,7 +198,7 @@ func (a *OpenAISDKAdapter) ParseStream(ctx context.Context, stdout io.Reader, st
 	// Reasoning effort
 	if runCtx.ReasoningEffort != "" {
 		effort := runCtx.ReasoningEffort
-		if resolved := ResolveReasoningEffort(openaiSDKAdapterID, runCtx.ReasoningEffort); resolved != "" {
+		if resolved := adapters.ResolveReasoningEffort(openaiSDKAdapterID, runCtx.ReasoningEffort); resolved != "" {
 			effort = resolved
 		}
 		requestBody.ReasoningEffort = effort
@@ -212,7 +214,7 @@ func (a *OpenAISDKAdapter) ParseStream(ctx context.Context, stdout io.Reader, st
 
 	bodyBytes, err := json.Marshal(requestBody)
 	if err != nil {
-		return NewNonRecoverableParseError(fmt.Errorf("openai-sdk: failed to marshal request: %w", err))
+		return adapters.NewNonRecoverableParseError(fmt.Errorf("openai-sdk: failed to marshal request: %w", err))
 	}
 
 	// Emit session init
@@ -238,7 +240,7 @@ func (a *OpenAISDKAdapter) ParseStream(ctx context.Context, stdout io.Reader, st
 			"terminalReason": "error",
 			"provider":       "openai",
 		})
-		return NewNonRecoverableParseError(fmt.Errorf("%s", errMsg))
+		return adapters.NewNonRecoverableParseError(fmt.Errorf("%s", errMsg))
 	}
 
 	// Parse SSE stream

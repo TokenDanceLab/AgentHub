@@ -1,4 +1,4 @@
-package adapters
+package sdk
 
 import (
 	"context"
@@ -6,6 +6,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/agenthub/edge-server/internal/adapters"
 	"github.com/agenthub/edge-server/internal/runnerctx"
 	"github.com/agenthub/edge-server/internal/store"
 )
@@ -1003,7 +1004,7 @@ func TestOpenAISDK_E2E_ParseStream_HTTPError(t *testing.T) {
 		Prompt: "Hello",
 	}
 
-	ctx := SDKAdapterContext(context.Background(), runCtx)
+	ctx := adapters.SDKAdapterContext(context.Background(), runCtx)
 
 	err := adapter.ParseStream(ctx, nil, nil, emitter, run)
 	if err == nil {

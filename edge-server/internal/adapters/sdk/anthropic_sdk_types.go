@@ -1,7 +1,7 @@
-package adapters
+package sdk
 
 // Residual pure-helper peel #1142: Anthropic Messages API request/SSE types.
-// Same package adapters; public Adapter surface unchanged.
+// Grouped into package sdk (#1760); public Adapter surface unchanged.
 
 // --- Anthropic API types ---
 
