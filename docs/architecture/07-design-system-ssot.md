@@ -72,7 +72,7 @@ Entry CSS load: desktop/web `main.tsx` imports surface `styles/{tokens,themes,pr
 
 ### Fix B — kill stale status-token fallbacks
 
-- `app/desktop/src/components/ApprovalCard.module.css`: semantic colors and related status/text tokens use bare `var(--…)` so light/dark theme SSOT wins (previous light-only hex fallbacks e.g. `#d15252` / `#409467` / `#0071BC` diverged from dark theme values).
+- `app/desktop/src/components/ApprovalCard.module.css`（该路径已不存在：ApprovalCard 已迁入 shared 视觉体系，见 `app/shared/src/ui/RiskBadge.module.css`；Fix B 为 #466 历史记录）：semantic colors and related status/text tokens use bare `var(--…)` so light/dark theme SSOT wins (previous light-only hex fallbacks e.g. `#d15252` / `#409467` / `#0071BC` diverged from dark theme values).
 
 ## 6. Acceptance mapping
 

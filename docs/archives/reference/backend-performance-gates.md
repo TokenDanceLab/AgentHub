@@ -1,8 +1,10 @@
 # Backend Performance And Leak Gate Scope
 
+> 已归档 2026-08-19（Lane C 结构瘦身）— 判据 (a)：Gate Matrix 引用已重组的包结构与已改名的测试/benchmark（Hub EventBus 测试迁 `hub-server/internal/bus/`、`BenchmarkEventBus`→`BenchmarkEventBusPublish`、OIDC 行为测试迁 `internal/service/oidc/` 子包、Edge `BenchmarkBus`→`BenchmarkBusPublish*`）；判据 (c)：Gate Matrix/Current Scope 与机器门禁 `scripts/verify/verify-backend-perf-leak-gates.py` 重复且该脚本是 CI 唯一执行者（见 `docs/governance/verifier-map.md`）。归档索引见 [../README.md](../README.md)。
+
 最后更新：2026-06-27
 
-This file is the active owner for Hub/Edge backend performance and leak gate classification. The old multi-scenario planning catalog is indexed in [../history.md](../history.md).
+This file is the active owner for Hub/Edge backend performance and leak gate classification. The old multi-scenario planning catalog is indexed in [../../history.md](../../history.md).
 
 ## Evidence Classes
 
