@@ -1,4 +1,4 @@
-package service
+package document
 
 import (
 	"context"
@@ -15,18 +15,18 @@ import (
 	"github.com/agenthub/hub-server/internal/repository"
 )
 
-// DocumentService provides CRUD and artifact-projection document operations.
-type DocumentService struct {
+// Service provides CRUD and artifact-projection document operations.
+type Service struct {
 	db *gorm.DB
 }
 
-// NewDocumentService creates a new DocumentService.
-func NewDocumentService(db *gorm.DB) *DocumentService {
-	return &DocumentService{db: db}
+// NewService creates a new Service.
+func NewService(db *gorm.DB) *Service {
+	return &Service{db: db}
 }
 
 // CreateDocument creates a new user-owned document.
-func (s *DocumentService) CreateDocument(ctx context.Context, userID, title, docType, location string, tag *string, content *string) (*model.Document, error) {
+func (s *Service) CreateDocument(ctx context.Context, userID, title, docType, location string, tag *string, content *string) (*model.Document, error) {
 	title = strings.TrimSpace(title)
 	if title == "" {
 		return nil, errcode.ErrBadRequest.WithMessage("title is required")
@@ -57,7 +57,7 @@ func (s *DocumentService) CreateDocument(ctx context.Context, userID, title, doc
 }
 
 // GetDocument returns a single document by ID, checking ownership.
-func (s *DocumentService) GetDocument(ctx context.Context, userID, docID string) (*model.Document, error) {
+func (s *Service) GetDocument(ctx context.Context, userID, docID string) (*model.Document, error) {
 	doc, err := repository.GetDocumentByID(s.db, docID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -75,7 +75,7 @@ func (s *DocumentService) GetDocument(ctx context.Context, userID, docID string)
 }
 
 // UpdateDocument patches a document owned by the user.
-func (s *DocumentService) UpdateDocument(ctx context.Context, userID, docID string, title, docType *string, tag *string, content *string) (*model.Document, error) {
+func (s *Service) UpdateDocument(ctx context.Context, userID, docID string, title, docType *string, tag *string, content *string) (*model.Document, error) {
 	doc, err := s.GetDocument(ctx, userID, docID)
 	if err != nil {
 		return nil, err
@@ -108,7 +108,7 @@ func (s *DocumentService) UpdateDocument(ctx context.Context, userID, docID stri
 }
 
 // DeleteDocument soft-deletes a document owned by the user.
-func (s *DocumentService) DeleteDocument(ctx context.Context, userID, docID string) error {
+func (s *Service) DeleteDocument(ctx context.Context, userID, docID string) error {
 	doc, err := s.GetDocument(ctx, userID, docID)
 	if err != nil {
 		return err
@@ -121,7 +121,7 @@ func (s *DocumentService) DeleteDocument(ctx context.Context, userID, docID stri
 
 // ListDocuments returns a merged list of user-created documents and
 // artifact documents projected from agent run file_change events.
-func (s *DocumentService) ListDocuments(ctx context.Context, userID string, filter model.DocumentFilter) ([]model.DocumentListItem, error) {
+func (s *Service) ListDocuments(ctx context.Context, userID string, filter model.DocumentFilter) ([]model.DocumentListItem, error) {
 	// Clamp limit.
 	if filter.Limit <= 0 {
 		filter.Limit = 50
@@ -166,7 +166,7 @@ func (s *DocumentService) ListDocuments(ctx context.Context, userID string, filt
 
 // projectArtifactDocuments queries agent_run_events for file_change events
 // belonging to tasks triggered by this user, and maps them to DocumentListItem.
-func (s *DocumentService) projectArtifactDocuments(ctx context.Context, userID string, filter model.DocumentFilter) ([]model.DocumentListItem, error) {
+func (s *Service) projectArtifactDocuments(ctx context.Context, userID string, filter model.DocumentFilter) ([]model.DocumentListItem, error) {
 	var events []model.AgentRunEvent
 	q := s.db.Model(&model.AgentRunEvent{}).
 		Joins("JOIN pending_agent_tasks pat ON pat.id = agent_run_events.task_id").
