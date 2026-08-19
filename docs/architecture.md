@@ -98,7 +98,7 @@ Mobile shared workbench (viewer / limited control)
 |---|---|
 | API/协议 | OpenAPI YAML parse + affected handler/service tests |
 | Hub/Edge 逻辑 | focused Go tests; broad changes run `go test ./... -short -count=1` in touched service |
-| Backend performance/leak | [reference/backend-performance-gates.md](reference/backend-performance-gates.md) maps behavior gates, microbenchmarks, load smoke, and pprof/leak blockers |
+| Backend performance/leak | 机器门禁 `scripts/verify/verify-backend-perf-leak-gates.py` 执行行为门禁与短微基准；证据等级分类见 [archives/reference/backend-performance-gates.md](archives/reference/backend-performance-gates.md)（已归档 2026-08-19） |
 | Shared transcript/UI | shared unit/contract + Desktop/Web Playwright + Visual QA；Visual QA gate 89/100（已收口 2026-07-20）· 视口 16:9 `1440x810` light+dark via `visual-qa-shell.mjs` / `visual:qa:shell`（scorecard 已外迁，见 `docs/history.md`） |
 | Desktop packaged claim | Tauri package/sidecar/icon/installer evidence, not Vite-only |
 | Real login/model/API claim | approved-real evidence with explicit approval and no silent fallback |
