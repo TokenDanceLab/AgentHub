@@ -8,17 +8,17 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/agenthub/hub-server/internal/handler"
-	"github.com/agenthub/hub-server/internal/service"
+	"github.com/agenthub/hub-server/internal/service/relay"
 )
 
 func TestRelayHandlerCreateCommandAcceptsTargetIDAlias(t *testing.T) {
 	svc := &mockRelayService{
-		createFn: func(ctx context.Context, targetEdgeID, commandType string, payload json.RawMessage, createdBy string) (*service.RelayCommandData, error) {
+		createFn: func(ctx context.Context, targetEdgeID, commandType string, payload json.RawMessage, createdBy string) (*relay.CommandData, error) {
 			require.Equal(t, "edge-1", targetEdgeID)
 			require.Equal(t, "run.cancel", commandType)
 			require.JSONEq(t, `{"run_id":"run-1"}`, string(payload))
 			require.Equal(t, "user-1", createdBy)
-			return &service.RelayCommandData{
+			return &relay.CommandData{
 				ID:           "relay-1",
 				TargetEdgeID: targetEdgeID,
 				CommandType:  commandType,
@@ -81,12 +81,12 @@ func TestRelayHandlerCreateCommandRejectsMissingTargetOrPayload(t *testing.T) {
 
 type mockRelayService struct {
 	createCalled bool
-	createFn     func(ctx context.Context, targetEdgeID, commandType string, payload json.RawMessage, createdBy string) (*service.RelayCommandData, error)
-	getFn        func(ctx context.Context, id string, userID string) (*service.RelayCommandData, error)
+	createFn     func(ctx context.Context, targetEdgeID, commandType string, payload json.RawMessage, createdBy string) (*relay.CommandData, error)
+	getFn        func(ctx context.Context, id string, userID string) (*relay.CommandData, error)
 	ackFn        func(ctx context.Context, id string, userID string) error
 }
 
-func (m *mockRelayService) CreateCommand(ctx context.Context, targetEdgeID, commandType string, payload json.RawMessage, createdBy string) (*service.RelayCommandData, error) {
+func (m *mockRelayService) CreateCommand(ctx context.Context, targetEdgeID, commandType string, payload json.RawMessage, createdBy string) (*relay.CommandData, error) {
 	m.createCalled = true
 	if m.createFn != nil {
 		return m.createFn(ctx, targetEdgeID, commandType, payload, createdBy)
@@ -94,7 +94,7 @@ func (m *mockRelayService) CreateCommand(ctx context.Context, targetEdgeID, comm
 	return nil, nil
 }
 
-func (m *mockRelayService) GetCommand(ctx context.Context, id string, userID string) (*service.RelayCommandData, error) {
+func (m *mockRelayService) GetCommand(ctx context.Context, id string, userID string) (*relay.CommandData, error) {
 	if m.getFn != nil {
 		return m.getFn(ctx, id, userID)
 	}
