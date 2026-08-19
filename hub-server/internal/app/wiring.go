@@ -30,6 +30,7 @@ import (
 	"github.com/agenthub/hub-server/internal/service/messagereaction"
 	"github.com/agenthub/hub-server/internal/service/oidc"
 	"github.com/agenthub/hub-server/internal/service/publicstats"
+	"github.com/agenthub/hub-server/internal/service/relay"
 	"github.com/agenthub/hub-server/internal/service/session"
 	"github.com/agenthub/hub-server/internal/service/skill"
 	"github.com/agenthub/hub-server/internal/service/usersettings"
@@ -158,7 +159,7 @@ func (a *App) initServices(ctx context.Context) error {
 	a.ExecutionTargetHandler = handler.NewExecutionTargetHandler(targetSvc)
 
 	// Relay service (needed by AgentService).
-	a.RelayService = service.NewRelayService(a.CacheClient, a.mgr)
+	a.RelayService = relay.NewService(a.CacheClient, a.mgr)
 	a.RelayHandler = handler.NewRelayHandler(a.RelayService)
 
 	a.DeviceService = device.NewService(a.DB, targetSvc)

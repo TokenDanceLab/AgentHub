@@ -5,7 +5,7 @@
 // The package is transport-free: it depends on repository / cache / bus /
 // metrics / service/dispatch (pure helpers) only, and expresses its WS and
 // relay collaborators through local ports (ManagerPort / RelayPort) that the
-// service layer adapts from ws.Manager and RelayService. It must never import
+// service layer adapts from ws.Manager and relay.Service. It must never import
 // internal/ws or the sibling service implementations.
 //
 // Dispatch concern layering (deliberate split, not duplication):
@@ -16,7 +16,7 @@
 //	service/dispatchsvc       this package: orchestration + ports
 //	service/dispatch_adapters.go
 //	                          package service: adapts *ws.Manager and
-//	                          RelayService onto the dispatchsvc ports;
+//	                          relay.Service onto the dispatchsvc ports;
 //	                          transport types never leak below this layer
 //	service/agent_dispatch_facade.go
 //	                          package service: AgentService facade methods
