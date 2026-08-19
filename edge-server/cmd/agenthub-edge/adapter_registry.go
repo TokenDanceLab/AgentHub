@@ -7,6 +7,7 @@ import (
 
 	"github.com/agenthub/edge-server/internal/adapters"
 	"github.com/agenthub/edge-server/internal/adapters/orchestrator"
+	"github.com/agenthub/edge-server/internal/adapters/sdk"
 	"github.com/agenthub/edge-server/internal/edgehttp"
 )
 
@@ -146,7 +147,7 @@ func registerManifestAdapters(reg *adapters.Registry, cfg config) {
 func registerSDKAdapters(reg *adapters.Registry, cfg config) {
 	if cfg.AnthropicSDKPath != "" {
 		apiKey := resolveSDKAPIKey(cfg.AnthropicSDKPath, "ANTHROPIC_API_KEY")
-		a := adapters.NewAnthropicSDKAdapter(apiKey, cfg.AgentModel, edgehttp.NewClient(adapters.AnthropicHTTPTimeout))
+		a := sdk.NewAnthropicSDKAdapter(apiKey, cfg.AgentModel, edgehttp.NewClient(sdk.AnthropicHTTPTimeout))
 		if err := reg.Register(a); err != nil {
 			slog.Warn("failed to register anthropic-sdk adapter", "err", err)
 		} else {
@@ -155,7 +156,7 @@ func registerSDKAdapters(reg *adapters.Registry, cfg config) {
 	}
 	if cfg.OpenAISDKPath != "" {
 		apiKey := resolveSDKAPIKey(cfg.OpenAISDKPath, "OPENAI_API_KEY")
-		a := adapters.NewOpenAISDKAdapter(apiKey, cfg.AgentModel, edgehttp.NewClient(adapters.OpenAIHTTPTimeout))
+		a := sdk.NewOpenAISDKAdapter(apiKey, cfg.AgentModel, edgehttp.NewClient(sdk.OpenAIHTTPTimeout))
 		if err := reg.Register(a); err != nil {
 			slog.Warn("failed to register openai-sdk adapter", "err", err)
 		} else {
