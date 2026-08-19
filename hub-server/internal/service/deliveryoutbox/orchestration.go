@@ -1,22 +1,21 @@
-package service
+// Retry-loop and cleanup-loop orchestration. Both loops run on the Outbox
+// journal surface; redispatch goes through the Redispatcher port so this
+// package never imports dispatchsvc (pure-package gate).
+package deliveryoutbox
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
 	"time"
 
 	"github.com/agenthub/hub-server/internal/metrics"
-	"github.com/agenthub/hub-server/internal/service/dispatchsvc"
 )
-
-// ── Retry loop orchestration ───────────────────────────────────────────────
 
 // StartDeliveryRetryLoop starts a background goroutine that periodically scans
 // for retryable deliveries and re-dispatches them.
-func (o *DeliveryOutbox) StartDeliveryRetryLoop(ctx context.Context) {
+func (o *Outbox) StartDeliveryRetryLoop(ctx context.Context) {
 	go func() {
-		ticker := time.NewTicker(DeliveryRetryScanInterval)
+		ticker := time.NewTicker(RetryScanInterval)
 		defer ticker.Stop()
 		for {
 			select {
@@ -31,11 +30,9 @@ func (o *DeliveryOutbox) StartDeliveryRetryLoop(ctx context.Context) {
 
 // retryDeliveries scans for retryable deliveries and re-dispatches them via
 // the injected Redispatcher (opaque payload bytes — no dispatchPayload here).
-func (o *DeliveryOutbox) retryDeliveries(ctx context.Context) {
+func (o *Outbox) retryDeliveries(ctx context.Context) {
 	// Refresh the backlog gauge every tick so operators see the live
-	// pending/sent/retrying/dead population without a separate scrape. The
-	// refresh uses the same GROUP BY query shape as GetDeliveryStats so the
-	// cost is one indexed aggregation per scan interval, not a full table.
+	// pending/sent/retrying/dead population without a separate scrape.
 	o.refreshBacklogGauge(ctx)
 
 	records, err := o.ScanRetryableDeliveries(ctx)
@@ -92,75 +89,32 @@ func (o *DeliveryOutbox) retryDeliveries(ctx context.Context) {
 	}
 }
 
-// ── Redispatcher adapter (implementation on DispatchService) ────────────────
-
-// dispatchRedispatcher adapts *dispatchsvc.DispatchService to the Redispatcher
-// port without exporting dispatch payload types or the outbox row to
-// DeliveryOutbox. Redispatch residual ownership moved in #573; the dispatch
-// implementation moved to service/dispatchsvc.
-type dispatchRedispatcher struct {
-	d *dispatchsvc.DispatchService
-}
-
-func (a dispatchRedispatcher) RedispatchDelivery(ctx context.Context, taskID, deliveryID, payloadJSON, edgeDeviceID string) error {
-	if a.d == nil {
-		return fmt.Errorf("redispatch: nil dispatch service")
-	}
-	// Propagate soft-fail errors so retryDeliveries does not MarkDeliverySent
-	// after a failed offline-queue / route attempt (#999). Dead-letter paths
-	// return nil (already terminal; MarkDeliverySent is a no-op).
-	return a.d.RedispatchDelivery(ctx, taskID, deliveryID, payloadJSON, edgeDeviceID)
-}
-
-// lazyDispatchRedispatcher resolves DispatchService only when a retry fires.
-// Used by deliveryOutboxService() lazy construction so it does not call
-// dispatchService() during outbox construction (avoids init recursion with
-// dispatchService → deliveryOutboxService).
-type lazyDispatchRedispatcher struct {
-	s *AgentService
-}
-
-func (a lazyDispatchRedispatcher) RedispatchDelivery(ctx context.Context, taskID, deliveryID, payloadJSON, edgeDeviceID string) error {
-	if a.s == nil {
-		return fmt.Errorf("redispatch: nil agent service")
-	}
-	return dispatchRedispatcher{a.s.dispatchService()}.RedispatchDelivery(ctx, taskID, deliveryID, payloadJSON, edgeDeviceID)
-}
-
 // refreshBacklogGauge updates the delivery_outbox_backlog GaugeVec with the
 // current per-status row counts. Called once per retry tick. Failures are
 // logged but never abort the retry scan — the backlog gauge is best-effort
 // observability and must not shadow the retry/redispatch control flow.
-func (o *DeliveryOutbox) refreshBacklogGauge(ctx context.Context) {
-	if o == nil || o.db == nil || metrics.DeliveryOutboxBacklog == nil {
+func (o *Outbox) refreshBacklogGauge(ctx context.Context) {
+	if o == nil || o.store == nil || metrics.DeliveryOutboxBacklog == nil {
 		return
 	}
-	type statusCount struct {
-		Status string
-		Count  int64
-	}
-	var rows []statusCount
-	if err := o.db.WithContext(ctx).
-		Model(outboxModel()).
-		Select("status, COUNT(*) as count").
-		Group("status").
-		Scan(&rows).Error; err != nil {
+	rows, err := o.store.CountByStatus(ctx)
+	if err != nil {
 		slog.Debug("delivery outbox backlog gauge refresh failed", "error", err)
 		return
 	}
 	// Reset all labels to 0 first so a status that vanished (e.g. all rows
 	// cleaned up) does not leave a stale non-zero value pinned to the gauge.
 	for _, status := range []string{
-		DeliveryStatusPending,
-		DeliveryStatusSent,
-		DeliveryStatusRetrying,
-		DeliveryStatusDelivered,
-		DeliveryStatusDead,
+		StatusPending,
+		StatusSent,
+		StatusRetrying,
+		StatusDelivered,
+		StatusDead,
 	} {
 		metrics.DeliveryOutboxBacklog.WithLabelValues(status).Set(0)
 	}
-	for _, r := range rows {
-		metrics.DeliveryOutboxBacklog.WithLabelValues(r.Status).Set(float64(r.Count))
+	for status, count := range rows {
+		metrics.DeliveryOutboxBacklog.WithLabelValues(status).Set(float64(count))
 	}
 }
 
@@ -170,11 +124,11 @@ func (o *DeliveryOutbox) refreshBacklogGauge(ctx context.Context) {
 // CleanupOldDeliveries is only ever invoked from tests (#1212 outbox backlog
 // unbounded). Runs alongside StartDeliveryRetryLoop; both share the lifecycle
 // context so shutdown cancels both.
-func (o *DeliveryOutbox) StartDeliveryCleanupLoop(ctx context.Context) {
+func (o *Outbox) StartDeliveryCleanupLoop(ctx context.Context) {
 	go func() {
 		// 24h cadence: cleanup is a maintenance task, not a scan. The retention
-		// window (DeliveryOutboxRetention) is applied inside CleanupOldDeliveries.
-		ticker := time.NewTicker(DeliveryOutboxCleanupInterval)
+		// window (Retention) is applied inside CleanupOldDeliveries.
+		ticker := time.NewTicker(CleanupInterval)
 		defer ticker.Stop()
 		// Run once at startup so a long-downed Hub does not sit on a full
 		// outbox for a full interval before the first purge.
@@ -193,10 +147,10 @@ func (o *DeliveryOutbox) StartDeliveryCleanupLoop(ctx context.Context) {
 // runCleanupOnce runs a single cleanup pass and records the result. Errors
 // are logged and surfaced via the existing scan-failure counter family so
 // operators see a stuck cleanup loop in the same place as retry-scan failures.
-func (o *DeliveryOutbox) runCleanupOnce(ctx context.Context) {
-	removed, err := o.CleanupOldDeliveries(ctx, DeliveryOutboxRetention)
+func (o *Outbox) runCleanupOnce(ctx context.Context) {
+	removed, err := o.CleanupOldDeliveries(ctx, Retention)
 	if err != nil {
-		slog.Warn("delivery outbox cleanup failed", "error", err, "retention", DeliveryOutboxRetention)
+		slog.Warn("delivery outbox cleanup failed", "error", err, "retention", Retention)
 		if metrics.DeliveryOutboxScanFailures != nil {
 			metrics.DeliveryOutboxScanFailures.Inc()
 		}
@@ -205,7 +159,7 @@ func (o *DeliveryOutbox) runCleanupOnce(ctx context.Context) {
 	if removed > 0 {
 		slog.Info("delivery outbox cleanup purged rows",
 			"removed", removed,
-			"retention", DeliveryOutboxRetention,
+			"retention", Retention,
 		)
 	}
 }
