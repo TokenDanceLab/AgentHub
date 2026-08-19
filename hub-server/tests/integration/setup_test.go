@@ -37,6 +37,7 @@ import (
 	"github.com/agenthub/hub-server/internal/service/attachment"
 	"github.com/agenthub/hub-server/internal/service/audit"
 	"github.com/agenthub/hub-server/internal/service/contact"
+	"github.com/agenthub/hub-server/internal/service/device"
 	"github.com/agenthub/hub-server/internal/service/message"
 	"github.com/agenthub/hub-server/internal/service/messagereaction"
 	"github.com/agenthub/hub-server/internal/service/oidc"
@@ -126,7 +127,7 @@ func TestMain(m *testing.M) {
 	wsHandler := handler.NewWebSocketHandler(mgr, cfg.Server.Env)
 	authService := service.NewAuthService(db, cfg.JWT, cacheClient)
 	authHandler := handler.NewAuthHandler(authService)
-	deviceService := service.NewDeviceService(db, nil)
+	deviceService := device.NewService(db, nil)
 	deviceHandler := handler.NewDeviceHandler(deviceService)
 	contactService := contact.NewService(db, eventBus, cacheClient)
 	contactHandler := handler.NewContactHandler(contactService)

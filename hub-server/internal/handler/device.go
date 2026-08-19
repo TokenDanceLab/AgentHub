@@ -12,7 +12,7 @@ import (
 	"github.com/agenthub/hub-server/internal/model"
 )
 
-// DeviceService is the subset of *service.DeviceService used by DeviceHandler.
+// DeviceService is the subset of *device.Service used by DeviceHandler.
 type DeviceService interface {
 	Register(deviceID, userID, deviceType, appVersion string, capabilities []string) (*model.Device, error)
 	ListDevices(userID string) ([]model.Device, error)

@@ -21,6 +21,7 @@ import (
 	"github.com/agenthub/hub-server/internal/service/attachment"
 	"github.com/agenthub/hub-server/internal/service/audit"
 	"github.com/agenthub/hub-server/internal/service/contact"
+	"github.com/agenthub/hub-server/internal/service/device"
 	"github.com/agenthub/hub-server/internal/service/message"
 	"github.com/agenthub/hub-server/internal/service/messagereaction"
 	"github.com/agenthub/hub-server/internal/service/oidc"
@@ -62,7 +63,7 @@ type App struct {
 	AgentControlService    *service.AgentControlService
 	AttachmentService      *attachment.Service
 	NotificationService    *service.NotificationService
-	DeviceService          *service.DeviceService
+	DeviceService          *device.Service
 	DocumentService        *service.DocumentService
 
 	// OIDC (optional — only when TokenDance ID is configured)
