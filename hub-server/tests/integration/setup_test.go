@@ -42,6 +42,7 @@ import (
 	"github.com/agenthub/hub-server/internal/service/message"
 	"github.com/agenthub/hub-server/internal/service/messagereaction"
 	"github.com/agenthub/hub-server/internal/service/oidc"
+	"github.com/agenthub/hub-server/internal/service/providerbinding"
 	"github.com/agenthub/hub-server/internal/service/publicstats"
 	"github.com/agenthub/hub-server/internal/service/relay"
 	"github.com/agenthub/hub-server/internal/service/session"
@@ -173,7 +174,7 @@ func TestMain(m *testing.M) {
 	mcpService := mcpserver.NewService(db)
 	mcpHandler := handler.NewMCPServerHandler(mcpService)
 	marketHandler := handler.NewMarketHandler(profileService) // uses AgentProfileService
-	pbService := service.NewProviderBindingService(db)
+	pbService := providerbinding.NewService(db)
 	pbHandler := handler.NewProviderBindingHandler(pbService)
 	targetService, _ := service.NewExecutionTargetService(db, egress.Config{AllowCIDRs: []string{"127.0.0.0/8"}, AllowPlainHTTP: true})
 	targetHandler := handler.NewExecutionTargetHandler(targetService)
