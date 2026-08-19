@@ -1,4 +1,4 @@
-package service
+package device
 
 import (
 	"context"
@@ -28,7 +28,7 @@ func TestDeviceRegisterMapsOwnershipMismatchToBadRequest(t *testing.T) {
 	`).Error)
 	require.NoError(t, db.Exec(`CREATE INDEX idx_devices_user_type ON devices(user_id, device_type)`).Error)
 
-	svc := NewDeviceService(db, nil)
+	svc := NewService(db, nil)
 	deviceID := "44444444-4444-4444-8444-444444444444"
 
 	_, err = svc.Register(deviceID, "user-a", "desktop", "1.0.0", []string{"tasks"})
@@ -70,7 +70,7 @@ func TestDeviceRegisterUpsertsDesktopLocalEdgeTargetAfterSuccessfulRegister(t *t
 	require.NoError(t, db.Exec(`CREATE INDEX idx_devices_user_type ON devices(user_id, device_type)`).Error)
 
 	registrar := &recordingDesktopTargetRegistrar{}
-	svc := NewDeviceService(db, registrar)
+	svc := NewService(db, registrar)
 
 	deviceID := "55555555-5555-4555-8555-555555555555"
 	device, err := svc.Register(deviceID, "user-a", "desktop", "1.0.0", []string{"local_edge", "agent.dispatch"})
@@ -100,7 +100,7 @@ func TestDeviceRegisterDoesNotUpsertTargetAfterOwnershipMismatch(t *testing.T) {
 	require.NoError(t, db.Exec(`CREATE INDEX idx_devices_user_type ON devices(user_id, device_type)`).Error)
 
 	registrar := &recordingDesktopTargetRegistrar{}
-	svc := NewDeviceService(db, registrar)
+	svc := NewService(db, registrar)
 
 	deviceID := "66666666-6666-4666-8666-666666666666"
 	_, err = svc.Register(deviceID, "user-a", "desktop", "1.0.0", []string{"local_edge"})
