@@ -6,7 +6,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/agenthub/hub-server/internal/service"
+	"github.com/agenthub/hub-server/internal/service/publicstats"
 )
 
 // PublicStats is the response body for GET /api/public/stats.
@@ -20,13 +20,13 @@ type PublicStats struct {
 
 // PublicHandler serves unauthenticated public endpoints for the website.
 type PublicHandler struct {
-	statsSvc  *service.PublicStatsService
+	statsSvc  *publicstats.PublicStatsService
 	startTime time.Time
 }
 
 // NewPublicHandler creates a PublicHandler.
 // startTime should be the moment App.Run was called.
-func NewPublicHandler(statsSvc *service.PublicStatsService, startTime time.Time) *PublicHandler {
+func NewPublicHandler(statsSvc *publicstats.PublicStatsService, startTime time.Time) *PublicHandler {
 	return &PublicHandler{statsSvc: statsSvc, startTime: startTime}
 }
 
