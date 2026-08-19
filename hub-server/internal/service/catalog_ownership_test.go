@@ -10,6 +10,7 @@ import (
 
 	"github.com/agenthub/hub-server/internal/errcode"
 	"github.com/agenthub/hub-server/internal/model"
+	"github.com/agenthub/hub-server/internal/service/skill"
 )
 
 func newCatalogOwnershipTestDB(t *testing.T) *gorm.DB {
@@ -80,7 +81,7 @@ func TestSkillGetIsOwnerScoped(t *testing.T) {
 		RuntimeIDs:   "[]",
 		ConfigSchema: "{}",
 	}).Error)
-	svc := NewSkillService(db)
+	svc := skill.NewService(db)
 
 	skill, err := svc.Get(context.Background(), "skill-1", "owner-1")
 	require.NoError(t, err)

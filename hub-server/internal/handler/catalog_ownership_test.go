@@ -10,6 +10,7 @@ import (
 	"github.com/agenthub/hub-server/internal/handler"
 	"github.com/agenthub/hub-server/internal/model"
 	"github.com/agenthub/hub-server/internal/service"
+	"github.com/agenthub/hub-server/internal/service/skill"
 )
 
 func TestSkillHandlerGetSkillPassesCurrentUserToService(t *testing.T) {
@@ -75,7 +76,7 @@ func (m *mockSkillCatalogService) Delete(ctx context.Context, id, ownerID string
 	return nil
 }
 
-func (m *mockSkillCatalogService) List(ctx context.Context, ownerID, q, skillType, cursor string, pageSize int) (*service.SkillListResult, error) {
+func (m *mockSkillCatalogService) List(ctx context.Context, ownerID, q, skillType, cursor string, pageSize int) (*skill.ListResult, error) {
 	return nil, nil
 }
 
@@ -87,7 +88,7 @@ func (m *mockSkillCatalogService) Unpublish(ctx context.Context, id, ownerID str
 	return nil
 }
 
-func (m *mockSkillCatalogService) SearchPublic(ctx context.Context, q, skillType, cursor string, pageSize int) (*service.SkillListResult, error) {
+func (m *mockSkillCatalogService) SearchPublic(ctx context.Context, q, skillType, cursor string, pageSize int) (*skill.ListResult, error) {
 	return nil, nil
 }
 
