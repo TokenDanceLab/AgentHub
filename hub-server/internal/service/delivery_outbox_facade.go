@@ -63,17 +63,6 @@ const (
 	DeliveryOutboxCleanupInterval = deliveryoutbox.CleanupInterval
 )
 
-// computeNextRetryAt calculates the next retry time using exponential backoff.
-// Thin wrapper around pure deliveryoutbox helpers (clock fixed at call time).
-func computeNextRetryAt(attempt int) time.Time {
-	return deliveryoutbox.NextRetryAt(attempt, time.Now())
-}
-
-// truncateString is a thin alias kept for same-package tests.
-func truncateString(s string, maxLen int) string {
-	return deliveryoutbox.TruncateString(s, maxLen)
-}
-
 // ── Redispatcher adapters (implementation on DispatchService) ────────────────
 
 // dispatchRedispatcher adapts *dispatchsvc.DispatchService to the
