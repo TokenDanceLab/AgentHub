@@ -25,6 +25,7 @@ import (
 	"github.com/agenthub/hub-server/internal/service/audit"
 	"github.com/agenthub/hub-server/internal/service/contact"
 	"github.com/agenthub/hub-server/internal/service/device"
+	"github.com/agenthub/hub-server/internal/service/document"
 	"github.com/agenthub/hub-server/internal/service/mcpserver"
 	"github.com/agenthub/hub-server/internal/service/message"
 	"github.com/agenthub/hub-server/internal/service/messagereaction"
@@ -218,7 +219,7 @@ func (a *App) initServices(ctx context.Context) error {
 	a.AgentTeamService.SetHumanReviewEnabled(a.Config.AgentTeam.HumanReviewEnabled)
 	a.AgentTeamHandler = handler.NewAgentTeamHandler(a.AgentTeamService)
 	// Document service
-	a.DocumentService = service.NewDocumentService(a.DB)
+	a.DocumentService = document.NewService(a.DB)
 	a.DocumentHandler = handler.NewDocumentHandler(a.DocumentService)
 
 	// Settings service
