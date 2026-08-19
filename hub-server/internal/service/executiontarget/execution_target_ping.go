@@ -1,4 +1,4 @@
-package service
+package executiontarget
 
 import (
 	"context"
@@ -23,7 +23,7 @@ import (
 // when an execution target carries no explicit port.
 const defaultEdgePort = 3210
 
-func (s *ExecutionTargetService) Ping(ctx context.Context, id, ownerID string) error {
+func (s *Service) Ping(ctx context.Context, id, ownerID string) error {
 	t, err := repository.GetExecutionTargetByID(s.db, id)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -54,7 +54,7 @@ func (s *ExecutionTargetService) Ping(ctx context.Context, id, ownerID string) e
 // bound desktop device's live WS route (device-exact), and only a real route
 // produces online evidence. Unbound targets cannot be proven and stay
 // registered/unknown.
-func (s *ExecutionTargetService) pingLocalEdge(ctx context.Context, t *model.ExecutionTarget) error {
+func (s *Service) pingLocalEdge(ctx context.Context, t *model.ExecutionTarget) error {
 	if t.DeviceID == nil || strings.TrimSpace(*t.DeviceID) == "" {
 		_ = s.recordEvidence(ctx, t.ID, dispatch.EvidenceSourceProbe, dispatch.EvidenceStatusOffline, "missing_device_binding", "", "")
 		return errcode.TargetNotRoutable.WithMessage("local edge is not bound to a device")
@@ -77,7 +77,7 @@ func (s *ExecutionTargetService) pingLocalEdge(ctx context.Context, t *model.Exe
 // pingRemote probes a remote_ssh / tailscale / cloud_edge target over HTTP
 // through the fail-closed egress transport (#1540) and records probe
 // evidence (protocol-independent: observed target id + failure category).
-func (s *ExecutionTargetService) pingRemote(ctx context.Context, t *model.ExecutionTarget) error {
+func (s *Service) pingRemote(ctx context.Context, t *model.ExecutionTarget) error {
 	if t.Host == "" {
 		_ = s.recordEvidence(ctx, t.ID, dispatch.EvidenceSourceProbe, dispatch.EvidenceStatusOffline, "no_host", "", "")
 		return errcode.TargetNotRoutable.WithMessage("execution target has no host configured")
@@ -93,7 +93,7 @@ func (s *ExecutionTargetService) pingRemote(ctx context.Context, t *model.Execut
 // pingHubRelay proves an exact device route for a hub_relay target (#1544).
 // The owner having any WebSocket connection is no longer sufficient — the
 // bound device itself must have a live route (user + device identity).
-func (s *ExecutionTargetService) pingHubRelay(ctx context.Context, t *model.ExecutionTarget) error {
+func (s *Service) pingHubRelay(ctx context.Context, t *model.ExecutionTarget) error {
 	if s.cache == nil {
 		_ = s.recordEvidence(ctx, t.ID, dispatch.EvidenceSourceRelayRoute, dispatch.EvidenceStatusUnknown, "route_proof_unavailable", "", "")
 		return errcode.TargetNotRoutable.WithMessage("execution target health proof is not available")
@@ -121,7 +121,7 @@ func (s *ExecutionTargetService) pingHubRelay(ctx context.Context, t *model.Exec
 // Every health state change funnels through here; the readable health fields
 // are projections only. Persistence failure is logged (the probe itself
 // succeeded — the caller's error, if any, is the probe verdict, not this).
-func (s *ExecutionTargetService) recordEvidence(ctx context.Context, targetID, source, status, failureCategory, observedTargetID, routeKey string) error {
+func (s *Service) recordEvidence(ctx context.Context, targetID, source, status, failureCategory, observedTargetID, routeKey string) error {
 	now := time.Now()
 	expires := now.Add(dispatch.DesktopTargetStaleAfter)
 	ev := &model.ExecutionTargetEvidence{
@@ -147,7 +147,7 @@ func (s *ExecutionTargetService) recordEvidence(ctx context.Context, targetID, s
 // administrator allowlist covers the address. No credential is attached —
 // AuthCredential is not persisted (no secret source), and hub-initiated
 // pings must not carry secrets to arbitrary targets.
-func (s *ExecutionTargetService) pingEdgeServer(ctx context.Context, addr string, t *model.ExecutionTarget) error {
+func (s *Service) pingEdgeServer(ctx context.Context, addr string, t *model.ExecutionTarget) error {
 	// Scheme comes from the egress policy: https default, plain http only
 	// with explicit egress.allow_plain_http (trusted local policy).
 	url := s.egress.Scheme() + "://" + addr + "/v1/health"

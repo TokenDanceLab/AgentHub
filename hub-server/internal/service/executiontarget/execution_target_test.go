@@ -1,4 +1,4 @@
-package service
+package executiontarget
 
 import (
 	"context"
@@ -37,9 +37,9 @@ func assertLatestEvidence(t *testing.T, db *gorm.DB, targetID string, wantSource
 // newExecutionTargetSvc builds the service with a test-only egress policy:
 // loopback + plain http allowed (httptest servers listen on 127.0.0.1).
 // Tests of the default-deny behavior pass an explicit config instead.
-func newExecutionTargetSvc(t *testing.T, db *gorm.DB) *ExecutionTargetService {
+func newExecutionTargetSvc(t *testing.T, db *gorm.DB) *Service {
 	t.Helper()
-	svc, err := NewExecutionTargetService(db, egress.Config{
+	svc, err := NewService(db, egress.Config{
 		AllowCIDRs:     []string{"127.0.0.0/8"},
 		AllowPlainHTTP: true,
 	})
@@ -259,7 +259,7 @@ func TestExecutionTargetPingRefusedWithoutEgressAllowlist(t *testing.T) {
 		Metadata:           "{}",
 	}).Error)
 
-	svc, err := NewExecutionTargetService(db, egress.Config{}) // default-deny
+	svc, err := NewService(db, egress.Config{}) // default-deny
 	require.NoError(t, err)
 
 	err = svc.Ping(context.Background(), "target-cloud", "owner-1")
