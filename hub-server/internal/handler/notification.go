@@ -12,7 +12,7 @@ import (
 	"github.com/agenthub/hub-server/internal/model"
 )
 
-// NotificationService is the subset of *service.NotificationService used by NotificationHandler.
+// NotificationService is the subset of *notification.Service used by NotificationHandler.
 type NotificationService interface {
 	ListNotifications(ctx context.Context, userID string, unreadOnly bool, limit, offset int) ([]model.Notification, error)
 	MarkRead(ctx context.Context, userID, notifID string) error

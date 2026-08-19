@@ -29,6 +29,7 @@ import (
 	"github.com/agenthub/hub-server/internal/service/mcpserver"
 	"github.com/agenthub/hub-server/internal/service/message"
 	"github.com/agenthub/hub-server/internal/service/messagereaction"
+	"github.com/agenthub/hub-server/internal/service/notification"
 	"github.com/agenthub/hub-server/internal/service/oidc"
 	"github.com/agenthub/hub-server/internal/service/providerbinding"
 	"github.com/agenthub/hub-server/internal/service/publicstats"
@@ -125,7 +126,7 @@ func (a *App) initInfra(ctx context.Context) error {
 func (a *App) initServices(ctx context.Context) error {
 	// Service layer
 	a.AuthService = service.NewAuthService(a.DB, a.Config.JWT, a.CacheClient)
-	a.NotificationService = service.NewNotificationService(a.DB, a.mgr)
+	a.NotificationService = notification.NewService(a.DB, a.mgr)
 	// Attachment storage: S3 when configured, otherwise local filesystem.
 	var attachmentStorage attachment.ObjectStorage
 	if a.Config.S3.IsConfigured() {
