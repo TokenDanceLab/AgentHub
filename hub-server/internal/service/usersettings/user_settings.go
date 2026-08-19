@@ -1,4 +1,4 @@
-package service
+package usersettings
 
 import (
 	"fmt"
@@ -8,18 +8,18 @@ import (
 	"github.com/agenthub/hub-server/internal/repository"
 )
 
-// UserSettingsService provides business logic for user settings.
-type UserSettingsService struct {
+// Service provides business logic for user settings.
+type Service struct {
 	repo *repository.UserSettingsRepository
 }
 
-// NewUserSettingsService creates a new service instance.
-func NewUserSettingsService(repo *repository.UserSettingsRepository) *UserSettingsService {
-	return &UserSettingsService{repo: repo}
+// NewService creates a new service instance.
+func NewService(repo *repository.UserSettingsRepository) *Service {
+	return &Service{repo: repo}
 }
 
 // GetSettings returns all settings for a user as a map.
-func (s *UserSettingsService) GetSettings(userID string) (map[string]string, error) {
+func (s *Service) GetSettings(userID string) (map[string]string, error) {
 	settings, err := s.repo.GetSettings(userID)
 	if err != nil {
 		return nil, fmt.Errorf("get user settings: %w", err)
@@ -32,7 +32,7 @@ func (s *UserSettingsService) GetSettings(userID string) (map[string]string, err
 }
 
 // UpsertSettings validates and upserts settings for a user.
-func (s *UserSettingsService) UpsertSettings(userID string, values map[string]string) (map[string]string, error) {
+func (s *Service) UpsertSettings(userID string, values map[string]string) (map[string]string, error) {
 	// Validate keys and values
 	cleaned := make(map[string]string, len(values))
 	for key, value := range values {
