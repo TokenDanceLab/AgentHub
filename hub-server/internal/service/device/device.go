@@ -1,4 +1,4 @@
-package service
+package device
 
 import (
 	"context"
@@ -13,9 +13,9 @@ import (
 	"github.com/agenthub/hub-server/internal/repository"
 )
 
-// DeviceService encapsulates device business logic, keeping DB access
+// Service encapsulates device business logic, keeping DB access
 // out of the HTTP handler layer.
-type DeviceService struct {
+type Service struct {
 	db                     *gorm.DB
 	desktopTargetRegistrar desktopTargetRegistrar
 }
@@ -24,15 +24,15 @@ type desktopTargetRegistrar interface {
 	UpsertLocalEdgeForDesktopDevice(ctx context.Context, device *model.Device) (*model.ExecutionTarget, error)
 }
 
-// NewDeviceService creates a new DeviceService backed by the given database.
-func NewDeviceService(db *gorm.DB, registrar desktopTargetRegistrar) *DeviceService {
-	return &DeviceService{db: db, desktopTargetRegistrar: registrar}
+// NewService creates a new Service backed by the given database.
+func NewService(db *gorm.DB, registrar desktopTargetRegistrar) *Service {
+	return &Service{db: db, desktopTargetRegistrar: registrar}
 }
 
 // Register creates or updates a device record for the given user and returns it.
 // The handler layer should not construct model.Device directly — all DB logic
 // lives here.
-func (s *DeviceService) Register(deviceID, userID, deviceType, appVersion string, capabilities []string) (*model.Device, error) {
+func (s *Service) Register(deviceID, userID, deviceType, appVersion string, capabilities []string) (*model.Device, error) {
 	capsBytes, _ := json.Marshal(capabilities)
 
 	device := &model.Device{
@@ -61,24 +61,24 @@ func (s *DeviceService) Register(deviceID, userID, deviceType, appVersion string
 }
 
 // Get returns a single device by its ID.
-func (s *DeviceService) Get(deviceID string) (*model.Device, error) {
+func (s *Service) Get(deviceID string) (*model.Device, error) {
 	return repository.GetDeviceByID(s.db, deviceID)
 }
 
 // List returns all devices belonging to the given user, ordered by most
 // recently active first.
-func (s *DeviceService) List(userID string) ([]model.Device, error) {
+func (s *Service) List(userID string) ([]model.Device, error) {
 	return repository.ListDevicesByUser(s.db, userID)
 }
 
 // ListDevices is an alias for List to match the handler interface.
-func (s *DeviceService) ListDevices(userID string) ([]model.Device, error) {
+func (s *Service) ListDevices(userID string) ([]model.Device, error) {
 	return s.List(userID)
 }
 
 // Update refreshes a device’s last-active timestamp, app version, and
 // capabilities.  Only fields that are provided should change.
-func (s *DeviceService) Update(deviceID, appVersion string, capabilities []string) error {
+func (s *Service) Update(deviceID, appVersion string, capabilities []string) error {
 	updates := map[string]interface{}{
 		"last_active_at": time.Now(),
 	}
@@ -93,6 +93,6 @@ func (s *DeviceService) Update(deviceID, appVersion string, capabilities []strin
 }
 
 // Unregister removes a device record by ID.
-func (s *DeviceService) Unregister(deviceID string) error {
+func (s *Service) Unregister(deviceID string) error {
 	return repository.DeleteDevice(s.db, deviceID)
 }

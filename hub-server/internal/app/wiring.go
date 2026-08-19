@@ -24,6 +24,7 @@ import (
 	"github.com/agenthub/hub-server/internal/service/attachment"
 	"github.com/agenthub/hub-server/internal/service/audit"
 	"github.com/agenthub/hub-server/internal/service/contact"
+	"github.com/agenthub/hub-server/internal/service/device"
 	"github.com/agenthub/hub-server/internal/service/message"
 	"github.com/agenthub/hub-server/internal/service/messagereaction"
 	"github.com/agenthub/hub-server/internal/service/oidc"
@@ -138,7 +139,7 @@ func (a *App) initServices(ctx context.Context) error {
 	a.MessageReactionService = messagereaction.NewService(a.DB, a.bus)
 	a.AgentControlService = service.NewAgentControlService(a.CacheClient, a.mgr)
 
-	// Execution Target service (needed by DeviceService).
+	// Execution Target service (needed by the device service).
 	// Egress policy (#1540): default-deny; the administrator must explicitly
 	// allowlist target ranges for hub-initiated pings.
 	targetSvc, err := service.NewExecutionTargetService(a.DB, egress.Config{
@@ -157,7 +158,7 @@ func (a *App) initServices(ctx context.Context) error {
 	a.RelayService = service.NewRelayService(a.CacheClient, a.mgr)
 	a.RelayHandler = handler.NewRelayHandler(a.RelayService)
 
-	a.DeviceService = service.NewDeviceService(a.DB, targetSvc)
+	a.DeviceService = device.NewService(a.DB, targetSvc)
 	// Shared Hub→Edge dispatch client (#1594): built once at the composition
 	// root from the injected edge config with the sanctioned outboundhttp
 	// policy (bounded timeout, redirects refused). The service layer never
