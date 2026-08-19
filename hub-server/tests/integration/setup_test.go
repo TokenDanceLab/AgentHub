@@ -41,6 +41,7 @@ import (
 	"github.com/agenthub/hub-server/internal/service/mcpserver"
 	"github.com/agenthub/hub-server/internal/service/message"
 	"github.com/agenthub/hub-server/internal/service/messagereaction"
+	"github.com/agenthub/hub-server/internal/service/notification"
 	"github.com/agenthub/hub-server/internal/service/oidc"
 	"github.com/agenthub/hub-server/internal/service/providerbinding"
 	"github.com/agenthub/hub-server/internal/service/publicstats"
@@ -148,7 +149,7 @@ func TestMain(m *testing.M) {
 	customAgentHandler := handler.NewCustomAgentHandler(agentService)
 	attachmentService := attachment.NewService(db, cfg.Upload, attachment.NewLocalStorage(cfg.Upload.Dir))
 	attachmentHandler := handler.NewAttachmentHandler(attachmentService)
-	notificationService := service.NewNotificationService(db, mgr)
+	notificationService := notification.NewService(db, mgr)
 	notificationHandler := handler.NewNotificationHandler(notificationService)
 	healthHandler := handler.NewHealthHandler(db, cacheClient, &cfg.DB, time.Now(), "test")
 	publicHandler := handler.NewPublicHandler(publicstats.NewPublicStatsService(db), time.Now())
