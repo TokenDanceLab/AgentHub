@@ -34,7 +34,7 @@ cd hub-server
 go test ./... -short -count=1
 ```
 
-涉及性能、goroutine、EventBus、outbox、scheduler、Redis TTL 或历史内存泄漏路径时，不要只跑功能测试；按 [../docs/reference/backend-performance-gates.md](../docs/reference/backend-performance-gates.md) 选择 behavior gate、microbenchmark、load smoke 或 pprof/leak 证据。
+涉及性能、goroutine、EventBus、outbox、scheduler、Redis TTL 或历史内存泄漏路径时，不要只跑功能测试；按 [../docs/archives/reference/backend-performance-gates.md](../docs/archives/reference/backend-performance-gates.md)（已归档：门禁矩阵由 scripts/verify/verify-backend-perf-leak-gates.py 执行）选择 behavior gate、microbenchmark、load smoke 或 pprof/leak 证据。
 
 ## Source Map
 

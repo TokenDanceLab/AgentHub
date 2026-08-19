@@ -89,7 +89,7 @@ python ./scripts/verify/verify-backend-perf-leak-gates.py --Benchtime 100ms
 
 `client-smoke.py` uses the current Edge runtime architecture and no longer builds the deleted standalone `runner/` directory.
 
-Performance/leak claims follow [../docs/reference/backend-performance-gates.md](../docs/reference/backend-performance-gates.md); Edge lifecycle/store/adapters behavior tests and microbenchmarks are not production capacity proof.
+Performance/leak claims follow [../docs/archives/reference/backend-performance-gates.md](../docs/archives/reference/backend-performance-gates.md) (archived; gates enforced by scripts/verify/verify-backend-perf-leak-gates.py); Edge lifecycle/store/adapters behavior tests and microbenchmarks are not production capacity proof.
 
 ## Links
 
