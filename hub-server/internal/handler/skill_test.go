@@ -9,7 +9,7 @@ import (
 
 	"github.com/agenthub/hub-server/internal/errcode"
 	"github.com/agenthub/hub-server/internal/model"
-	"github.com/agenthub/hub-server/internal/service"
+	"github.com/agenthub/hub-server/internal/service/skill"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -20,10 +20,10 @@ type mockSkillService struct {
 	get          func(ctx context.Context, id, ownerID string) (*model.Skill, error)
 	update       func(ctx context.Context, id, ownerID string, req *model.Skill) (*model.Skill, error)
 	delete       func(ctx context.Context, id, ownerID string) error
-	list         func(ctx context.Context, ownerID, q, skillType, cursor string, pageSize int) (*service.SkillListResult, error)
+	list         func(ctx context.Context, ownerID, q, skillType, cursor string, pageSize int) (*skill.ListResult, error)
 	publish      func(ctx context.Context, id, ownerID string) error
 	unpublish    func(ctx context.Context, id, ownerID string) error
-	searchPublic func(ctx context.Context, q, skillType, cursor string, pageSize int) (*service.SkillListResult, error)
+	searchPublic func(ctx context.Context, q, skillType, cursor string, pageSize int) (*skill.ListResult, error)
 }
 
 func (m *mockSkillService) Create(ctx context.Context, ownerID string, req *model.Skill) (*model.Skill, error) {
@@ -54,9 +54,9 @@ func (m *mockSkillService) Delete(ctx context.Context, id, ownerID string) error
 	return m.delete(ctx, id, ownerID)
 }
 
-func (m *mockSkillService) List(ctx context.Context, ownerID, q, skillType, cursor string, pageSize int) (*service.SkillListResult, error) {
+func (m *mockSkillService) List(ctx context.Context, ownerID, q, skillType, cursor string, pageSize int) (*skill.ListResult, error) {
 	if m.list == nil {
-		return &service.SkillListResult{}, nil
+		return &skill.ListResult{}, nil
 	}
 	return m.list(ctx, ownerID, q, skillType, cursor, pageSize)
 }
@@ -75,9 +75,9 @@ func (m *mockSkillService) Unpublish(ctx context.Context, id, ownerID string) er
 	return m.unpublish(ctx, id, ownerID)
 }
 
-func (m *mockSkillService) SearchPublic(ctx context.Context, q, skillType, cursor string, pageSize int) (*service.SkillListResult, error) {
+func (m *mockSkillService) SearchPublic(ctx context.Context, q, skillType, cursor string, pageSize int) (*skill.ListResult, error) {
 	if m.searchPublic == nil {
-		return &service.SkillListResult{}, nil
+		return &skill.ListResult{}, nil
 	}
 	return m.searchPublic(ctx, q, skillType, cursor, pageSize)
 }
@@ -215,10 +215,10 @@ func TestSkillHandler_ListSkills(t *testing.T) {
 
 	called := false
 	svc := &mockSkillService{
-		list: func(ctx context.Context, ownerID, q, skillType, cursor string, pageSize int) (*service.SkillListResult, error) {
+		list: func(ctx context.Context, ownerID, q, skillType, cursor string, pageSize int) (*skill.ListResult, error) {
 			called = true
 			assert.Equal(t, "user-1", ownerID)
-			return &service.SkillListResult{
+			return &skill.ListResult{
 				Items:   []model.Skill{{ID: "skill-1"}},
 				Cursor:  "next",
 				HasMore: true,
@@ -248,17 +248,17 @@ func TestSkillHandler_ListSkills_Public(t *testing.T) {
 	searchPublicCalled := false
 	listCalled := false
 	svc := &mockSkillService{
-		searchPublic: func(ctx context.Context, q, skillType, cursor string, pageSize int) (*service.SkillListResult, error) {
+		searchPublic: func(ctx context.Context, q, skillType, cursor string, pageSize int) (*skill.ListResult, error) {
 			searchPublicCalled = true
 			assert.Equal(t, "agent_skill", skillType)
-			return &service.SkillListResult{
+			return &skill.ListResult{
 				Items:   []model.Skill{{ID: "public-skill-1", Name: "Public Skill"}},
 				HasMore: false,
 			}, nil
 		},
-		list: func(ctx context.Context, ownerID, q, skillType, cursor string, pageSize int) (*service.SkillListResult, error) {
+		list: func(ctx context.Context, ownerID, q, skillType, cursor string, pageSize int) (*skill.ListResult, error) {
 			listCalled = true
-			return &service.SkillListResult{}, nil
+			return &skill.ListResult{}, nil
 		},
 	}
 	h := NewSkillHandler(svc)

@@ -30,6 +30,7 @@ import (
 	"github.com/agenthub/hub-server/internal/service/oidc"
 	"github.com/agenthub/hub-server/internal/service/publicstats"
 	"github.com/agenthub/hub-server/internal/service/session"
+	"github.com/agenthub/hub-server/internal/service/skill"
 	"github.com/agenthub/hub-server/internal/service/usersettings"
 	"github.com/agenthub/hub-server/internal/service/workspace"
 )
@@ -172,7 +173,7 @@ func (a *App) initServices(ctx context.Context) error {
 	a.AgentProfileHandler = handler.NewAgentProfileHandler(agentProfileSvc)
 
 	// Skill + MCP Server services
-	skillSvc := service.NewSkillService(a.DB)
+	skillSvc := skill.NewService(a.DB)
 	a.SkillHandler = handler.NewSkillHandler(skillSvc)
 	mcpSvc := service.NewMCPService(a.DB)
 	a.MCPServerHandler = handler.NewMCPServerHandler(mcpSvc)

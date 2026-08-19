@@ -1,4 +1,4 @@
-package service
+package skill
 
 import (
 	"context"
@@ -11,17 +11,18 @@ import (
 	"github.com/agenthub/hub-server/internal/repository"
 )
 
-// SkillService handles CRUD for user-managed skills.
-type SkillService struct {
+// Service handles CRUD for user-managed skills.
+type Service struct {
 	db *gorm.DB
 }
 
-func NewSkillService(db *gorm.DB) *SkillService {
-	return &SkillService{db: db}
+// NewService creates a new Service.
+func NewService(db *gorm.DB) *Service {
+	return &Service{db: db}
 }
 
-// SkillListResult holds paginated skill results.
-type SkillListResult struct {
+// ListResult holds paginated skill results.
+type ListResult struct {
 	Items   []model.Skill `json:"items"`
 	HasMore bool          `json:"has_more"`
 	Cursor  string        `json:"next_cursor,omitempty"`
@@ -29,7 +30,7 @@ type SkillListResult struct {
 
 // ── CRUD ──
 
-func (s *SkillService) Create(ctx context.Context, ownerID string, req *model.Skill) (*model.Skill, error) {
+func (s *Service) Create(ctx context.Context, ownerID string, req *model.Skill) (*model.Skill, error) {
 	if req.Name == "" {
 		return nil, errcode.ErrBadRequest
 	}
@@ -54,7 +55,7 @@ func (s *SkillService) Create(ctx context.Context, ownerID string, req *model.Sk
 	return req, nil
 }
 
-func (s *SkillService) Get(ctx context.Context, id, ownerID string) (*model.Skill, error) {
+func (s *Service) Get(ctx context.Context, id, ownerID string) (*model.Skill, error) {
 	sk, err := repository.GetSkillByID(s.db, id)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -68,7 +69,7 @@ func (s *SkillService) Get(ctx context.Context, id, ownerID string) (*model.Skil
 	return sk, nil
 }
 
-func (s *SkillService) Update(ctx context.Context, id, ownerID string, req *model.Skill) (*model.Skill, error) {
+func (s *Service) Update(ctx context.Context, id, ownerID string, req *model.Skill) (*model.Skill, error) {
 	sk, err := repository.GetSkillByID(s.db, id)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -112,7 +113,7 @@ func (s *SkillService) Update(ctx context.Context, id, ownerID string, req *mode
 	return sk, nil
 }
 
-func (s *SkillService) Delete(ctx context.Context, id, ownerID string) error {
+func (s *Service) Delete(ctx context.Context, id, ownerID string) error {
 	sk, err := repository.GetSkillByID(s.db, id)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -126,7 +127,7 @@ func (s *SkillService) Delete(ctx context.Context, id, ownerID string) error {
 	return repository.SoftDeleteSkill(s.db, id, ownerID)
 }
 
-func (s *SkillService) List(ctx context.Context, ownerID, q, skillType, cursor string, pageSize int) (*SkillListResult, error) {
+func (s *Service) List(ctx context.Context, ownerID, q, skillType, cursor string, pageSize int) (*ListResult, error) {
 	skills, hasMore, err := repository.ListSkills(s.db, ownerID, q, skillType, cursor, pageSize)
 	if err != nil {
 		return nil, err
@@ -135,12 +136,12 @@ func (s *SkillService) List(ctx context.Context, ownerID, q, skillType, cursor s
 	if hasMore && len(skills) > 0 {
 		nextCursor = skills[len(skills)-1].ID
 	}
-	return &SkillListResult{Items: skills, HasMore: hasMore, Cursor: nextCursor}, nil
+	return &ListResult{Items: skills, HasMore: hasMore, Cursor: nextCursor}, nil
 }
 
 // ── Market ──
 
-func (s *SkillService) Publish(ctx context.Context, id, ownerID string) error {
+func (s *Service) Publish(ctx context.Context, id, ownerID string) error {
 	sk, err := repository.GetSkillByID(s.db, id)
 	if err != nil {
 		return errcode.UserNotFound
@@ -152,7 +153,7 @@ func (s *SkillService) Publish(ctx context.Context, id, ownerID string) error {
 	return repository.UpdateSkill(s.db, sk)
 }
 
-func (s *SkillService) Unpublish(ctx context.Context, id, ownerID string) error {
+func (s *Service) Unpublish(ctx context.Context, id, ownerID string) error {
 	sk, err := repository.GetSkillByID(s.db, id)
 	if err != nil {
 		return errcode.UserNotFound
@@ -164,7 +165,7 @@ func (s *SkillService) Unpublish(ctx context.Context, id, ownerID string) error 
 	return repository.UpdateSkill(s.db, sk)
 }
 
-func (s *SkillService) SearchPublic(ctx context.Context, q, skillType, cursor string, pageSize int) (*SkillListResult, error) {
+func (s *Service) SearchPublic(ctx context.Context, q, skillType, cursor string, pageSize int) (*ListResult, error) {
 	skills, hasMore, err := repository.ListPublicSkills(s.db, q, skillType, cursor, pageSize)
 	if err != nil {
 		return nil, err
@@ -173,5 +174,5 @@ func (s *SkillService) SearchPublic(ctx context.Context, q, skillType, cursor st
 	if hasMore && len(skills) > 0 {
 		nextCursor = skills[len(skills)-1].ID
 	}
-	return &SkillListResult{Items: skills, HasMore: hasMore, Cursor: nextCursor}, nil
+	return &ListResult{Items: skills, HasMore: hasMore, Cursor: nextCursor}, nil
 }
