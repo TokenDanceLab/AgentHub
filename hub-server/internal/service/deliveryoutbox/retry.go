@@ -36,6 +36,16 @@ const (
 	// thundering herd when many deliveries become eligible simultaneously
 	// after a Hub outage recovery.
 	RetryJitterFraction = 0.25
+
+	// Retention is how long a delivered or dead-letter outbox row is kept
+	// before CleanupOldDeliveries purges it. 7 days balances operator audit
+	// window against unbounded table growth.
+	Retention = 7 * 24 * time.Hour
+
+	// CleanupInterval is how often the background cleanup loop fires. 24h
+	// keeps the purge off the hot path; the retention window (not the
+	// cadence) governs how old a row must be to qualify.
+	CleanupInterval = 24 * time.Hour
 )
 
 // NextRetryDelay calculates the exponential backoff delay for a retry attempt
