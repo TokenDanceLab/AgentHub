@@ -38,6 +38,7 @@ import (
 	"github.com/agenthub/hub-server/internal/service/audit"
 	"github.com/agenthub/hub-server/internal/service/contact"
 	"github.com/agenthub/hub-server/internal/service/device"
+	"github.com/agenthub/hub-server/internal/service/mcpserver"
 	"github.com/agenthub/hub-server/internal/service/message"
 	"github.com/agenthub/hub-server/internal/service/messagereaction"
 	"github.com/agenthub/hub-server/internal/service/oidc"
@@ -168,7 +169,7 @@ func TestMain(m *testing.M) {
 	agentProfileHandler := handler.NewAgentProfileHandler(profileService)
 	skillService := skill.NewService(db)
 	skillHandler := handler.NewSkillHandler(skillService)
-	mcpService := service.NewMCPService(db)
+	mcpService := mcpserver.NewService(db)
 	mcpHandler := handler.NewMCPServerHandler(mcpService)
 	marketHandler := handler.NewMarketHandler(profileService) // uses AgentProfileService
 	pbService := service.NewProviderBindingService(db)

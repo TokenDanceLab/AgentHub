@@ -10,6 +10,7 @@ import (
 
 	"github.com/agenthub/hub-server/internal/errcode"
 	"github.com/agenthub/hub-server/internal/model"
+	"github.com/agenthub/hub-server/internal/service/mcpserver"
 	"github.com/agenthub/hub-server/internal/service/skill"
 )
 
@@ -103,7 +104,7 @@ func TestMCPServerGetIsOwnerScoped(t *testing.T) {
 		AuthConfig: "{}",
 		ToolSchema: "{}",
 	}).Error)
-	svc := NewMCPService(db)
+	svc := mcpserver.NewService(db)
 
 	server, err := svc.Get(context.Background(), "mcp-1", "owner-1")
 	require.NoError(t, err)
