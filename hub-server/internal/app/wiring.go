@@ -26,6 +26,7 @@ import (
 	"github.com/agenthub/hub-server/internal/service/message"
 	"github.com/agenthub/hub-server/internal/service/messagereaction"
 	"github.com/agenthub/hub-server/internal/service/oidc"
+	"github.com/agenthub/hub-server/internal/service/publicstats"
 	"github.com/agenthub/hub-server/internal/service/session"
 	"github.com/agenthub/hub-server/internal/service/workspace"
 )
@@ -244,7 +245,7 @@ func (a *App) initHandlers(_ context.Context) error {
 	a.AttachmentHandler = handler.NewAttachmentHandler(a.AttachmentService)
 	a.NotificationHandler = handler.NewNotificationHandler(a.NotificationService)
 	a.HealthHandler = handler.NewHealthHandler(a.DB, a.CacheClient, &a.Config.DB, a.startTime, a.Version)
-	pubStatsSvc := service.NewPublicStatsService(a.DB)
+	pubStatsSvc := publicstats.NewPublicStatsService(a.DB)
 	a.PublicHandler = handler.NewPublicHandler(pubStatsSvc, a.startTime)
 
 	return nil
