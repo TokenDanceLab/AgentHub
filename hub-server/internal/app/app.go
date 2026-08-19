@@ -25,6 +25,7 @@ import (
 	"github.com/agenthub/hub-server/internal/service/document"
 	"github.com/agenthub/hub-server/internal/service/message"
 	"github.com/agenthub/hub-server/internal/service/messagereaction"
+	"github.com/agenthub/hub-server/internal/service/notification"
 	"github.com/agenthub/hub-server/internal/service/oidc"
 	"github.com/agenthub/hub-server/internal/service/relay"
 	"github.com/agenthub/hub-server/internal/service/session"
@@ -64,7 +65,7 @@ type App struct {
 	AgentService           *service.AgentService
 	AgentControlService    *service.AgentControlService
 	AttachmentService      *attachment.Service
-	NotificationService    *service.NotificationService
+	NotificationService    *notification.Service
 	DeviceService          *device.Service
 	DocumentService        *document.Service
 
