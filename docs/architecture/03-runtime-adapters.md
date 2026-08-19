@@ -62,7 +62,7 @@ ACP 协议层**禁止手写 JSON-RPC loop**，必须用官方 Wrapper/适配层�
 - 仅在 `--claude-code-path` 非空时自动注册
 - 作为 `orchestrator` 角色的默认 adapter
 - 自动发现已注册的子 Agent（`claude-code`、`codex-acp`、`opencode-acp`、`anthropic-sdk`、`openai-sdk`），生成调度提示
-- 支持子 Agent spawn 重试（最多 3 次，指数退避）和并发调度（默认 10）
+- 支持子 Agent 并发调度（默认 10）；子 Agent 失败恢复由 lifecycle `FaultEscalation` 统一承担（自动重试 + in-context 自纠错，见 [02-edge-server.md](02-edge-server.md) §Run Lifecycle）
 
 ### Dispatch Interceptor 内部组件
 
@@ -70,11 +70,11 @@ Orchestrator 的 `ParseStream` 在 Claude Code 输出流上包装了 `dispatchIn
 
 | 子层 | 位置 | 职责 |
 |------|------|------|
-| **Rule Engine** (T2-A08) | `orchestrator.go` `applyRuleEngine` / `ruleEnginePreprocess` | 文本级和事件级的确定性预处理：完成信号检测（done/finish/completed 关键词匹配）、审批决策关键词短路（yes/no/approve/reject 跳过 JSON 解析）、单 finish dispatch 跳过优化、同 Agent 批量 dispatch 自动转顺序执行 |
+| **Rule Engine** (T2-A08) | `orchestrator_dispatch_interceptor.go` `applyRuleEngine` / `ruleEnginePreprocess` | 文本级和事件级的确定性预处理：完成信号检测（done/finish/completed 关键词匹配）、审批决策关键词短路（yes/no/approve/reject 跳过 JSON 解析）、单 finish dispatch 跳过优化、同 Agent 批量 dispatch 自动转顺序执行 |
 | **Plan Approval Gate** (P0 #3) | `plan_approval.go` `PlanApprovalBroker` | 在 dispatch 前暂停，发出 `plan.proposed` 事件并等待用户审批；支持超时自动批准（默认 60s） |
-| **Fan-Out Pool** | `orchestrator.go` `fanOutDispatches` / `fanOutSequential` | 信号量限制并发（默认 10），注入兄弟 Agent 上下文避免 workspace 文件冲突；同 Agent 批量自动降级为顺序执行 |
-| **Result Listener** | `orchestrator.go` `runResultListener` / `handleSubAgentResult` | 通过消息队列接收子 Agent 结果/错误，注入回 orchestrator 文本流，触发进度汇总 |
-| **Failure Recovery** | `orchestrator_failure.go` `FailureRecoveryManager` | 错误分类（transient/capability/cancel 三分类 + 模式匹配）、恢复决策（retry 指数退避/switch agent/skip/fail）、per-agentName 断路器（Closed/Open/Half-Open 三态）、Reflexion 批判生成用于学习性重试 |
+| **Fan-Out Pool** | `orchestrator_dispatch_interceptor.go` `fanOutDispatches` / `fanOutSequential` | 信号量限制并发（默认 10），注入兄弟 Agent 上下文避免 workspace 文件冲突；同 Agent 批量自动降级为顺序执行 |
+| **Result Listener** | `orchestrator_dispatch_results.go` `runResultListener` / `handleSubAgentResult` | 通过消息队列接收子 Agent 结果/错误，注入回 orchestrator 文本流，触发进度汇总 |
+| **Failure Recovery** | lifecycle `FaultEscalation`（`internal/lifecycle/fault_escalation.go`） | 已收敛（#4ddde5b，2026-08-14）：删除 `orchestrator_failure.go`/`FailureRecoveryManager`/断路器三态/Reflexion，失败恢复改为纯自动重试（`MaxRetries` 默认 1，`AGENTHUB_MAX_RETRIES` 可调）+ 错误 review/replan 由 agent in-context 自纠错 |
 
 **Rule Engine 规则说明**（按评估顺序）：
 
@@ -83,15 +83,9 @@ Orchestrator 的 `ParseStream` 在 Claude Code 输出流上包装了 `dispatchIn
 3. **单 finish dispatch 跳过**：当 orchestrator 发出仅含完成语义描述的单个 dispatch 时，跳过 fanOut 直接发出进度汇总。
 4. **同 Agent 顺序执行**：当所有 dispatch 都指向同一 Agent 时，自动从并发 fanOut 降级为顺序执行，避免单个 adapter 的实例内竞争。
 
-**Failure Recovery 决策矩阵**：
+**Failure Recovery 现状**（旧决策矩阵已随 #4ddde5b 删除）：
 
-| 分类 | 策略 | 断路器行为 |
-|------|------|-----------|
-| `transient`（超时/限流/网络） | 指数退避重试（1s 起，±25% jitter，最大 30s），最多 3 次 | 不触发 |
-| `capability`（工具缺失/权限/不可用） | 切换到可用替代 Agent；无替代时 fail | 不触发 |
-| `cancel`（无效输入/深度超限/取消） | skip + 通知父 orchestrator | 不触发 |
-| 断路器 Open | 直接 skip，不分类 | 30s cooldown 后允许一次 Half-Open 探测 |
-| 累计重试超 `MaxRetryDepth`(3) | 强制 fail | 记录断路器失败 |
+> 旧 `FailureRecoveryManager` 的三分类（transient/capability/cancel）+ 断路器（Closed/Open/Half-Open）决策矩阵已于 2026-08-14 删除，不再维护。当前失败处理为 lifecycle `FaultEscalation` 纯自动重试（`MaxRetries` 默认 1）+ agent in-context 自纠错，见上表 Failure Recovery 行。
 
 ## Runtime Manifest / Fixture（测试/开发辅助，不计入生产 adapter 数）
 
