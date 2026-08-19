@@ -25,6 +25,7 @@ import (
 	"github.com/agenthub/hub-server/internal/service/audit"
 	"github.com/agenthub/hub-server/internal/service/contact"
 	"github.com/agenthub/hub-server/internal/service/device"
+	"github.com/agenthub/hub-server/internal/service/mcpserver"
 	"github.com/agenthub/hub-server/internal/service/message"
 	"github.com/agenthub/hub-server/internal/service/messagereaction"
 	"github.com/agenthub/hub-server/internal/service/oidc"
@@ -175,7 +176,7 @@ func (a *App) initServices(ctx context.Context) error {
 	// Skill + MCP Server services
 	skillSvc := skill.NewService(a.DB)
 	a.SkillHandler = handler.NewSkillHandler(skillSvc)
-	mcpSvc := service.NewMCPService(a.DB)
+	mcpSvc := mcpserver.NewService(a.DB)
 	a.MCPServerHandler = handler.NewMCPServerHandler(mcpSvc)
 
 	// Market handler (reuses AgentProfileService)

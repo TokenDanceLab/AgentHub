@@ -9,7 +9,7 @@ import (
 
 	"github.com/agenthub/hub-server/internal/handler"
 	"github.com/agenthub/hub-server/internal/model"
-	"github.com/agenthub/hub-server/internal/service"
+	"github.com/agenthub/hub-server/internal/service/mcpserver"
 	"github.com/agenthub/hub-server/internal/service/skill"
 )
 
@@ -117,7 +117,7 @@ func (m *mockMCPCatalogService) Delete(ctx context.Context, id, ownerID string) 
 	return nil
 }
 
-func (m *mockMCPCatalogService) List(ctx context.Context, ownerID, q, transport, cursor string, pageSize int) (*service.MCPListResult, error) {
+func (m *mockMCPCatalogService) List(ctx context.Context, ownerID, q, transport, cursor string, pageSize int) (*mcpserver.ListResult, error) {
 	return nil, nil
 }
 
@@ -129,6 +129,6 @@ func (m *mockMCPCatalogService) Unpublish(ctx context.Context, id, ownerID strin
 	return nil
 }
 
-func (m *mockMCPCatalogService) SearchPublic(ctx context.Context, q, transport, cursor string, pageSize int) (*service.MCPListResult, error) {
+func (m *mockMCPCatalogService) SearchPublic(ctx context.Context, q, transport, cursor string, pageSize int) (*mcpserver.ListResult, error) {
 	return nil, nil
 }
