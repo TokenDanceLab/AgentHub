@@ -11,7 +11,7 @@ import (
 	"github.com/agenthub/hub-server/internal/egress"
 	"github.com/agenthub/hub-server/internal/handler"
 	"github.com/agenthub/hub-server/internal/model"
-	"github.com/agenthub/hub-server/internal/service"
+	"github.com/agenthub/hub-server/internal/service/executiontarget"
 	"github.com/agenthub/hub-server/internal/testkit"
 	"github.com/agenthub/hub-server/internal/uuidv7"
 	"github.com/gin-gonic/gin"
@@ -326,7 +326,7 @@ func TestScenarioDispatch_CreateTargetViaAPI(t *testing.T) {
 
 	gin.SetMode(gin.TestMode)
 
-	targetSvc, svcErr := service.NewExecutionTargetService(db, egress.Config{})
+	targetSvc, svcErr := executiontarget.NewService(db, egress.Config{})
 	require.NoError(t, svcErr)
 	targetHandler := handler.NewExecutionTargetHandler(targetSvc)
 
@@ -390,7 +390,7 @@ func TestScenarioDispatch_InvalidTargetTypeViaAPI(t *testing.T) {
 
 	gin.SetMode(gin.TestMode)
 
-	targetSvc, svcErr := service.NewExecutionTargetService(db, egress.Config{})
+	targetSvc, svcErr := executiontarget.NewService(db, egress.Config{})
 	require.NoError(t, svcErr)
 	targetHandler := handler.NewExecutionTargetHandler(targetSvc)
 
@@ -442,7 +442,7 @@ func TestScenarioDispatch_TargetListByType(t *testing.T) {
 
 	gin.SetMode(gin.TestMode)
 
-	targetSvc, svcErr := service.NewExecutionTargetService(db, egress.Config{})
+	targetSvc, svcErr := executiontarget.NewService(db, egress.Config{})
 	require.NoError(t, svcErr)
 	targetHandler := handler.NewExecutionTargetHandler(targetSvc)
 
@@ -516,7 +516,7 @@ func TestScenarioDispatch_PingAllTargetTypes(t *testing.T) {
 	db := scenarioTestDB(t)
 	userID, deviceID, _ := scenarioTestFixtures(t, db)
 
-	targetSvc, svcErr := service.NewExecutionTargetService(db, egress.Config{})
+	targetSvc, svcErr := executiontarget.NewService(db, egress.Config{})
 	require.NoError(t, svcErr)
 
 	for _, targetType := range []string{"local_edge", "remote_ssh", "hub_relay", "tailscale", "cloud_edge"} {

@@ -12,7 +12,7 @@ import (
 
 	"github.com/agenthub/hub-server/internal/handler"
 	"github.com/agenthub/hub-server/internal/model"
-	"github.com/agenthub/hub-server/internal/service"
+	"github.com/agenthub/hub-server/internal/service/executiontarget"
 )
 
 type mockExecutionTargetService struct {
@@ -23,7 +23,7 @@ type mockExecutionTargetService struct {
 	updatePatch *model.ExecutionTargetPatch
 
 	get  func(ctx context.Context, id, ownerID string) (*model.ExecutionTarget, error)
-	list func(ctx context.Context, ownerID, targetType, cursor string, pageSize int) (*service.TargetListResult, error)
+	list func(ctx context.Context, ownerID, targetType, cursor string, pageSize int) (*executiontarget.ListResult, error)
 }
 
 func (m *mockExecutionTargetService) Create(ctx context.Context, ownerID string, req *model.ExecutionTarget) (*model.ExecutionTarget, error) {
@@ -53,11 +53,11 @@ func (m *mockExecutionTargetService) Delete(ctx context.Context, id, ownerID str
 	return nil
 }
 
-func (m *mockExecutionTargetService) List(ctx context.Context, ownerID, targetType, cursor string, pageSize int) (*service.TargetListResult, error) {
+func (m *mockExecutionTargetService) List(ctx context.Context, ownerID, targetType, cursor string, pageSize int) (*executiontarget.ListResult, error) {
 	if m.list != nil {
 		return m.list(ctx, ownerID, targetType, cursor, pageSize)
 	}
-	return &service.TargetListResult{}, nil
+	return &executiontarget.ListResult{}, nil
 }
 
 func (m *mockExecutionTargetService) Ping(ctx context.Context, id, ownerID string) error {
@@ -150,8 +150,8 @@ func TestExecutionTargetHandlerListReturnsOnlyAuthMethodStrategy(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	secret := "edge-secret-token-should-not-leak"
 	svc := &mockExecutionTargetService{
-		list: func(ctx context.Context, ownerID, targetType, cursor string, pageSize int) (*service.TargetListResult, error) {
-			return &service.TargetListResult{
+		list: func(ctx context.Context, ownerID, targetType, cursor string, pageSize int) (*executiontarget.ListResult, error) {
+			return &executiontarget.ListResult{
 				Items: []model.ExecutionTarget{
 					{
 						ID:                 "target-1",

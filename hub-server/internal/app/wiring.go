@@ -26,6 +26,7 @@ import (
 	"github.com/agenthub/hub-server/internal/service/contact"
 	"github.com/agenthub/hub-server/internal/service/device"
 	"github.com/agenthub/hub-server/internal/service/document"
+	"github.com/agenthub/hub-server/internal/service/executiontarget"
 	"github.com/agenthub/hub-server/internal/service/mcpserver"
 	"github.com/agenthub/hub-server/internal/service/message"
 	"github.com/agenthub/hub-server/internal/service/messagereaction"
@@ -149,7 +150,7 @@ func (a *App) initServices(ctx context.Context) error {
 	// Execution Target service (needed by the device service).
 	// Egress policy (#1540): default-deny; the administrator must explicitly
 	// allowlist target ranges for hub-initiated pings.
-	targetSvc, err := service.NewExecutionTargetService(a.DB, egress.Config{
+	targetSvc, err := executiontarget.NewService(a.DB, egress.Config{
 		AllowCIDRs:     a.Config.Egress.AllowCIDRs,
 		AllowHostnames: a.Config.Egress.AllowHostnames,
 		AllowPlainHTTP: a.Config.Egress.AllowPlainHTTP,
