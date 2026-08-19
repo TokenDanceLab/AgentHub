@@ -30,6 +30,7 @@ import (
 	"github.com/agenthub/hub-server/internal/service/oidc"
 	"github.com/agenthub/hub-server/internal/service/publicstats"
 	"github.com/agenthub/hub-server/internal/service/session"
+	"github.com/agenthub/hub-server/internal/service/usersettings"
 	"github.com/agenthub/hub-server/internal/service/workspace"
 )
 
@@ -218,7 +219,7 @@ func (a *App) initServices(ctx context.Context) error {
 
 	// Settings service
 	settingsRepo := repository.NewUserSettingsRepository(a.DB)
-	settingsSvc := service.NewUserSettingsService(settingsRepo)
+	settingsSvc := usersettings.NewService(settingsRepo)
 	a.UserSettingsHandler = handler.NewUserSettingsHandler(settingsSvc)
 
 	// OIDC Service (optional — only when TokenDance ID client is configured)
