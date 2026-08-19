@@ -1,4 +1,3 @@
-// real_tested=true
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { AppError } from '../errors';
 import {

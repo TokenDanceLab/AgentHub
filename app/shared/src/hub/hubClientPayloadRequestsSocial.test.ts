@@ -1,4 +1,3 @@
-// real_tested=true
 import { describe, it, expect } from 'vitest';
 import {
   buildAcceptFriendRequest,
