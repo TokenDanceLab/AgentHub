@@ -1,4 +1,4 @@
-package adapters
+package sdk
 
 import (
 	"bytes"
@@ -10,11 +10,12 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/agenthub/edge-server/internal/adapters"
 	"github.com/agenthub/edge-server/internal/runnerctx"
 )
 
 // Residual pure-helper peel #1142: Anthropic SDK HTTP request + message build helpers.
-// Same package adapters; doRequestWithRetry / buildMessages called from ParseStream.
+// Grouped into package sdk (#1760); doRequestWithRetry / buildMessages called from ParseStream.
 
 // doRequestWithRetry makes the HTTP request with automatic retry for transient
 // failures (429 rate limit, 500/502/503/504 server errors). Auth errors (401/403)
@@ -50,7 +51,7 @@ func (a *AnthropicSDKAdapter) doRequestWithRetry(ctx context.Context, body []byt
 
 		req, err := http.NewRequestWithContext(ctx, http.MethodPost, a.baseURL+"/v1/messages", bytes.NewReader(body))
 		if err != nil {
-			return nil, NewNonRecoverableParseError(fmt.Errorf("anthropic-sdk: failed to create request: %w", err))
+			return nil, adapters.NewNonRecoverableParseError(fmt.Errorf("anthropic-sdk: failed to create request: %w", err))
 		}
 		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("x-api-key", a.apiKey)
@@ -90,7 +91,7 @@ func (a *AnthropicSDKAdapter) doRequestWithRetry(ctx context.Context, body []byt
 		"terminalReason": "error",
 		"provider":       "anthropic",
 	})
-	return nil, NewNonRecoverableParseError(fmt.Errorf("anthropic-sdk: request failed after %d retries: %w", anthropicMaxRetries, lastErr))
+	return nil, adapters.NewNonRecoverableParseError(fmt.Errorf("anthropic-sdk: request failed after %d retries: %w", anthropicMaxRetries, lastErr))
 }
 
 // buildMessages converts the RunProcessContext into Anthropic message format.

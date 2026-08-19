@@ -1,4 +1,4 @@
-package adapters
+package sdk
 
 import (
 	"bytes"
@@ -11,11 +11,12 @@ import (
 	"strings"
 	"time"
 
+	"github.com/agenthub/edge-server/internal/adapters"
 	"github.com/agenthub/edge-server/internal/runnerctx"
 )
 
 // Residual pure-helper peel #1152: OpenAI SDK HTTP request + message build helpers.
-// Same package adapters; doRequestWithRetry / buildMessages called from ParseStream.
+// Grouped into package sdk (#1760); doRequestWithRetry / buildMessages called from ParseStream.
 
 // doRequestWithRetry makes the HTTP request with automatic retry for transient
 // failures (429 rate limit, 500/502/503/504 server errors). Auth errors (401/403)
@@ -62,7 +63,7 @@ func (a *OpenAISDKAdapter) doRequestWithRetry(ctx context.Context, body []byte, 
 
 		req, err := http.NewRequestWithContext(ctx, http.MethodPost, a.baseURL+"/v1/chat/completions", bytes.NewReader(body))
 		if err != nil {
-			return nil, NewNonRecoverableParseError(fmt.Errorf("openai-sdk: failed to create request: %w", err))
+			return nil, adapters.NewNonRecoverableParseError(fmt.Errorf("openai-sdk: failed to create request: %w", err))
 		}
 		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("Authorization", "Bearer "+a.apiKey)
@@ -101,7 +102,7 @@ func (a *OpenAISDKAdapter) doRequestWithRetry(ctx context.Context, body []byte, 
 		"terminalReason": "error",
 		"provider":       "openai",
 	})
-	return nil, NewNonRecoverableParseError(fmt.Errorf("openai-sdk: request failed after %d retries: %w", openaiMaxRetries, lastErr))
+	return nil, adapters.NewNonRecoverableParseError(fmt.Errorf("openai-sdk: request failed after %d retries: %w", openaiMaxRetries, lastErr))
 }
 
 // buildMessages converts the RunProcessContext into OpenAI message format.
