@@ -38,6 +38,7 @@ import (
 	"github.com/agenthub/hub-server/internal/service/audit"
 	"github.com/agenthub/hub-server/internal/service/contact"
 	"github.com/agenthub/hub-server/internal/service/device"
+	"github.com/agenthub/hub-server/internal/service/executiontarget"
 	"github.com/agenthub/hub-server/internal/service/mcpserver"
 	"github.com/agenthub/hub-server/internal/service/message"
 	"github.com/agenthub/hub-server/internal/service/messagereaction"
@@ -177,7 +178,7 @@ func TestMain(m *testing.M) {
 	marketHandler := handler.NewMarketHandler(profileService) // uses AgentProfileService
 	pbService := providerbinding.NewService(db)
 	pbHandler := handler.NewProviderBindingHandler(pbService)
-	targetService, _ := service.NewExecutionTargetService(db, egress.Config{AllowCIDRs: []string{"127.0.0.0/8"}, AllowPlainHTTP: true})
+	targetService, _ := executiontarget.NewService(db, egress.Config{AllowCIDRs: []string{"127.0.0.0/8"}, AllowPlainHTTP: true})
 	targetHandler := handler.NewExecutionTargetHandler(targetService)
 	auditService := audit.NewService(db, nil)
 	auditHandler := handler.NewAuditHandler(auditService)

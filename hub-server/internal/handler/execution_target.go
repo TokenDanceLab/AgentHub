@@ -16,16 +16,16 @@ import (
 	"github.com/agenthub/hub-server/internal/errcode"
 	"github.com/agenthub/hub-server/internal/middleware"
 	"github.com/agenthub/hub-server/internal/model"
-	"github.com/agenthub/hub-server/internal/service"
+	"github.com/agenthub/hub-server/internal/service/executiontarget"
 )
 
-// ExecutionTargetService is the subset of *service.ExecutionTargetService used by ExecutionTargetHandler.
+// ExecutionTargetService is the subset of *executiontarget.Service used by ExecutionTargetHandler.
 type ExecutionTargetService interface {
 	Create(ctx context.Context, ownerID string, req *model.ExecutionTarget) (*model.ExecutionTarget, error)
 	Get(ctx context.Context, id, ownerID string) (*model.ExecutionTarget, error)
 	Update(ctx context.Context, id, ownerID string, patch *model.ExecutionTargetPatch) (*model.ExecutionTarget, error)
 	Delete(ctx context.Context, id, ownerID string) error
-	List(ctx context.Context, ownerID, targetType, cursor string, pageSize int) (*service.TargetListResult, error)
+	List(ctx context.Context, ownerID, targetType, cursor string, pageSize int) (*executiontarget.ListResult, error)
 	Ping(ctx context.Context, id, ownerID string) error
 }
 

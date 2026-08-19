@@ -1,4 +1,4 @@
-package service
+package executiontarget
 
 import (
 	"context"
@@ -19,44 +19,44 @@ import (
 	"github.com/agenthub/hub-server/internal/service/dispatch"
 )
 
-// ExecutionTargetService handles CRUD for execution targets.
-type ExecutionTargetService struct {
+// Service handles CRUD for execution targets.
+type Service struct {
 	db     *gorm.DB
-	cache  ExecutionTargetCache
+	cache  Cache
 	egress *egress.Client
 }
 
-// ExecutionTargetCache is the subset of *cache.Client methods used by
-// ExecutionTargetService. Route proofs are device-exact (#1544): owner-level
+// Cache is the subset of *cache.Client methods used by
+// Service. Route proofs are device-exact (#1544): owner-level
 // presence is no longer accepted for hub_relay / local_edge health.
-type ExecutionTargetCache interface {
+type Cache interface {
 	GetRouteForDevice(ctx context.Context, userID, deviceType, deviceID string) (string, error)
 }
 
-// TargetListResult holds paginated execution target results.
-type TargetListResult struct {
+// ListResult holds paginated execution target results.
+type ListResult struct {
 	Items   []model.ExecutionTarget `json:"items"`
 	HasMore bool                    `json:"has_more"`
 	Cursor  string                  `json:"next_cursor,omitempty"`
 }
 
-// NewExecutionTargetService wires the fail-closed egress policy (#1540):
+// NewService wires the fail-closed egress policy (#1540):
 // outbound pings use the canonical egress transport and refuse restricted
 // networks unless the administrator allowlisted them.
-func NewExecutionTargetService(db *gorm.DB, egressCfg egress.Config) (*ExecutionTargetService, error) {
+func NewService(db *gorm.DB, egressCfg egress.Config) (*Service, error) {
 	c, err := egress.New(egressCfg)
 	if err != nil {
 		return nil, fmt.Errorf("execution target service: %w", err)
 	}
-	return &ExecutionTargetService{db: db, egress: c}, nil
+	return &Service{db: db, egress: c}, nil
 }
 
 // SetCache injects an optional cache client for hub_relay health checks.
-func (s *ExecutionTargetService) SetCache(cache ExecutionTargetCache) {
+func (s *Service) SetCache(cache Cache) {
 	s.cache = cache
 }
 
-func (s *ExecutionTargetService) Create(ctx context.Context, ownerID string, req *model.ExecutionTarget) (*model.ExecutionTarget, error) {
+func (s *Service) Create(ctx context.Context, ownerID string, req *model.ExecutionTarget) (*model.ExecutionTarget, error) {
 	if req.Name == "" {
 		return nil, errcode.ErrBadRequest
 	}
@@ -98,7 +98,7 @@ func (s *ExecutionTargetService) Create(ctx context.Context, ownerID string, req
 	return req, nil
 }
 
-func (s *ExecutionTargetService) UpsertLocalEdgeForDesktopDevice(ctx context.Context, device *model.Device) (*model.ExecutionTarget, error) {
+func (s *Service) UpsertLocalEdgeForDesktopDevice(ctx context.Context, device *model.Device) (*model.ExecutionTarget, error) {
 	if device == nil || strings.TrimSpace(device.ID) == "" || strings.TrimSpace(device.UserID) == "" || device.DeviceType != "desktop" {
 		return nil, errcode.ErrBadRequest
 	}
@@ -176,7 +176,7 @@ func (s *ExecutionTargetService) UpsertLocalEdgeForDesktopDevice(ctx context.Con
 
 // recordRegistrationEvidence persists the desktop check-in evidence for a
 // local_edge target (#1544).
-func (s *ExecutionTargetService) recordRegistrationEvidence(ctx context.Context, target *model.ExecutionTarget, device *model.Device, now time.Time) {
+func (s *Service) recordRegistrationEvidence(ctx context.Context, target *model.ExecutionTarget, device *model.Device, now time.Time) {
 	expires := now.Add(dispatch.DesktopTargetStaleAfter)
 	ev := &model.ExecutionTargetEvidence{
 		TargetID:   target.ID,
@@ -287,7 +287,7 @@ func requireDeviceBelongsToOwner(ctx context.Context, db *gorm.DB, ownerID, devi
 	return nil
 }
 
-func (s *ExecutionTargetService) Get(ctx context.Context, id, ownerID string) (*model.ExecutionTarget, error) {
+func (s *Service) Get(ctx context.Context, id, ownerID string) (*model.ExecutionTarget, error) {
 	t, err := repository.GetExecutionTargetByID(s.db, id)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -308,7 +308,7 @@ func (s *ExecutionTargetService) Get(ctx context.Context, id, ownerID string) (*
 
 // loadEvidence fetches the latest health evidence for a target; a missing
 // row yields nil evidence (no evidence recorded yet).
-func (s *ExecutionTargetService) loadEvidence(ctx context.Context, targetID string) (*model.ExecutionTargetEvidence, error) {
+func (s *Service) loadEvidence(ctx context.Context, targetID string) (*model.ExecutionTargetEvidence, error) {
 	ev, err := repository.GetExecutionTargetEvidence(s.db.WithContext(ctx), targetID)
 	if err != nil {
 		if repository.IsEvidenceNotFound(err) {
@@ -325,7 +325,7 @@ func (s *ExecutionTargetService) loadEvidence(ctx context.Context, targetID stri
 // system-managed — neither can be patched. Port reset to 0 and device_id
 // unbind (null) are now expressible, which the old "non-zero means provided"
 // convention made impossible.
-func (s *ExecutionTargetService) Update(ctx context.Context, id, ownerID string, patch *model.ExecutionTargetPatch) (*model.ExecutionTarget, error) {
+func (s *Service) Update(ctx context.Context, id, ownerID string, patch *model.ExecutionTargetPatch) (*model.ExecutionTarget, error) {
 	t, err := repository.GetExecutionTargetByID(s.db, id)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -515,7 +515,7 @@ func normalizeExecutionTargetDefaults(t *model.ExecutionTarget) {
 	}
 }
 
-func (s *ExecutionTargetService) Delete(ctx context.Context, id, ownerID string) error {
+func (s *Service) Delete(ctx context.Context, id, ownerID string) error {
 	t, err := repository.GetExecutionTargetByID(s.db, id)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -529,7 +529,7 @@ func (s *ExecutionTargetService) Delete(ctx context.Context, id, ownerID string)
 	return repository.SoftDeleteExecutionTarget(s.db, id, ownerID)
 }
 
-func (s *ExecutionTargetService) List(ctx context.Context, ownerID, targetType, cursor string, pageSize int) (*TargetListResult, error) {
+func (s *Service) List(ctx context.Context, ownerID, targetType, cursor string, pageSize int) (*ListResult, error) {
 	targets, hasMore, err := repository.ListExecutionTargets(s.db, ownerID, targetType, cursor, pageSize)
 	if err != nil {
 		return nil, err
@@ -555,7 +555,7 @@ func (s *ExecutionTargetService) List(ctx context.Context, ownerID, targetType, 
 	if hasMore && len(targets) > 0 {
 		nextCursor = targets[len(targets)-1].ID
 	}
-	return &TargetListResult{Items: targets, HasMore: hasMore, Cursor: nextCursor}, nil
+	return &ListResult{Items: targets, HasMore: hasMore, Cursor: nextCursor}, nil
 }
 
 // applyExecutionTargetHealthProjection overwrites the readable health fields
