@@ -11,7 +11,7 @@ import (
 // ── dispatchsvc transport adapters ─────────────────────────────────────────
 //
 // The dispatch package defines wire-free ports (ManagerPort / RelayPort); the
-// service layer adapts the concrete ws.Manager and RelayService onto them so
+// service layer adapts the concrete ws.Manager and relay.Service onto them so
 // the dispatch flow never imports transport or sibling-service types.
 // Full dispatch layering map (helpers / orchestration / adapters / facade):
 // see the dispatchsvc package doc.
@@ -43,7 +43,7 @@ func (a wsManagerAdapter) PushToConn(connID string, frame dispatchsvc.FramePort)
 	}
 }
 
-// relayServiceAdapter adapts relayDispatcher (RelayService subset) onto
+// relayServiceAdapter adapts relayDispatcher (relay.Service subset) onto
 // dispatchsvc.RelayPort. The dispatch flow discards the created command's
 // metadata, so the adapter drops it.
 type relayServiceAdapter struct {

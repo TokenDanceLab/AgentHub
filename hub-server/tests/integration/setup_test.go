@@ -43,6 +43,7 @@ import (
 	"github.com/agenthub/hub-server/internal/service/messagereaction"
 	"github.com/agenthub/hub-server/internal/service/oidc"
 	"github.com/agenthub/hub-server/internal/service/publicstats"
+	"github.com/agenthub/hub-server/internal/service/relay"
 	"github.com/agenthub/hub-server/internal/service/session"
 	"github.com/agenthub/hub-server/internal/service/skill"
 	"github.com/agenthub/hub-server/internal/testkit"
@@ -178,7 +179,7 @@ func TestMain(m *testing.M) {
 	targetHandler := handler.NewExecutionTargetHandler(targetService)
 	auditService := audit.NewService(db, nil)
 	auditHandler := handler.NewAuditHandler(auditService)
-	relayService := service.NewRelayService(cacheClient, mgr)
+	relayService := relay.NewService(cacheClient, mgr)
 	relayHandler := handler.NewRelayHandler(relayService)
 	agentTeamService := agentteam.NewAgentTeamService(db, agentService, cacheClient)
 	agentTeamHandler := handler.NewAgentTeamHandler(agentTeamService)

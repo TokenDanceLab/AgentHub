@@ -105,7 +105,7 @@ type ManagerPort interface {
 const frameTypeAgentDispatch = "agent.dispatch"
 
 // RelayPort is the hub_relay command dispatch port. The service layer adapts
-// *RelayService (whose CreateCommand returns command metadata the dispatch
+// *relay.Service (whose CreateCommand returns command metadata the dispatch
 // flow does not consume).
 type RelayPort interface {
 	CreateCommand(ctx context.Context, targetEdgeID, commandType string, payload json.RawMessage, createdBy string) error

@@ -9,13 +9,13 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"github.com/agenthub/hub-server/internal/errcode"
-	"github.com/agenthub/hub-server/internal/service"
+	"github.com/agenthub/hub-server/internal/service/relay"
 )
 
-// RelayService is the subset of *service.RelayService used by RelayHandler.
+// RelayService is the subset of *relay.Service used by RelayHandler.
 type RelayService interface {
-	CreateCommand(ctx context.Context, targetEdgeID, commandType string, payload json.RawMessage, createdBy string) (*service.RelayCommandData, error)
-	GetCommand(ctx context.Context, id string, userID string) (*service.RelayCommandData, error)
+	CreateCommand(ctx context.Context, targetEdgeID, commandType string, payload json.RawMessage, createdBy string) (*relay.CommandData, error)
+	GetCommand(ctx context.Context, id string, userID string) (*relay.CommandData, error)
 	AckCommand(ctx context.Context, id string, userID string) error
 }
 
