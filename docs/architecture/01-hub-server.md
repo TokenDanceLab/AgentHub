@@ -94,7 +94,7 @@ Remote/cloud execution claims require relay/provisioning/device proof/workspace 
 | REST contract | OpenAPI YAML parse + affected handler tests |
 | WS event behavior | Hub WS tests + `api/events.md` sync |
 | Auth/session | OIDC/session tests（配置形状门禁已退役 #1653，真实流验证非 CI 静态门禁见 §9.5） |
-| Performance/leak path | [../reference/backend-performance-gates.md](../reference/backend-performance-gates.md) plus behavior test for the same path |
+| Performance/leak path | 机器门禁 `scripts/verify/verify-backend-perf-leak-gates.py` plus behavior test for the same path（旧证据分类见 [../archives/reference/backend-performance-gates.md](../archives/reference/backend-performance-gates.md)，已归档） |
 
 ## Related
 

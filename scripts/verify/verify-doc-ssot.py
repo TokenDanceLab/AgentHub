@@ -55,8 +55,6 @@ def is_active_doc(path: str) -> bool:
         return True
     if p in ("app/web/README.md", "app/desktop/README.md", "app/mobile-rn/README.md"):
         return True
-    if p == "docs/reference/backend-performance-gates.md":
-        return True
     if p in ("docs/README.md", "docs/history.md", "docs/decisions.md", "docs/reference/README.md", "docs/api-reference.md"):
         return True
     if re.match(r"^docs/governance/.+\.md$", p):
@@ -176,9 +174,6 @@ def check_required_markers() -> None:
         ("hub-server/README.md", "Source Map"),
         ("hub-server/deployments/README.md", "Live host"),
         ("hub-server/tests/README.md", "Integration Tests"),
-        ("docs/reference/backend-performance-gates.md", "Current Scope"),
-        ("docs/reference/backend-performance-gates.md", "Gate Matrix"),
-        ("docs/reference/backend-performance-gates.md", "Do Not Claim"),
         ("reference/INDEX.md", "docs/reference/README.md"),
         ("CONTRIBUTING.md", "旧详细贡献指南见"),
         ("docs/governance/governance-execution.md", "D2b. Release dry build topology"),
@@ -188,7 +183,7 @@ def check_required_markers() -> None:
         ("scripts/release/verify-tauri-package-readiness.py", "assert_no_macos_unsigned_dry_release_actions"),
         ("scripts/release/verify-tauri-package-dry.py", "windows-desktop-package-dry"),
         ("docs/architecture/04-frontend-data-flow.md", "Source Owner Map"),
-        ("hub-server/README.md", "docs/reference/backend-performance-gates.md"),
+        ("hub-server/README.md", "docs/archives/reference/backend-performance-gates.md"),
         ("edge-server/README.md", "verify-backend-perf-leak-gates.py"),
     ]
     for path, marker in required:
@@ -253,7 +248,6 @@ def check_max_lines() -> None:
         "hub-server/README.md": 120,
         "hub-server/deployments/README.md": 100,
         "hub-server/tests/README.md": 70,
-        "docs/reference/backend-performance-gates.md": 115,
         "docs/README.md": 120,
         "docs/history.md": 80,
         "docs/decisions.md": 80,

@@ -47,5 +47,5 @@ docs/
 | 安全风险 | [governance/security-risk-register.md](governance/security-risk-register.md) |
 | 机器验证映射 | [governance/verifier-map.md](governance/verifier-map.md) |
 | 威胁模型 | [governance/threat-model.md](governance/threat-model.md) |
-| 后端性能/泄漏证据 | [reference/backend-performance-gates.md](reference/backend-performance-gates.md) |
+| 后端性能/泄漏证据 | 机器门禁 `scripts/verify/verify-backend-perf-leak-gates.py`；旧证据分类 [archives/reference/backend-performance-gates.md](archives/reference/backend-performance-gates.md)（已归档） |
 | 发布/截图历史清单 | [history.md](history.md) |
