@@ -1,4 +1,4 @@
-package service
+package audit
 
 // DB-backed audit service tests on SQLite. The repository layer explicitly
 // supports this lane (advisory xact lock is postgres-only, see
@@ -52,7 +52,7 @@ func newAuditTestDB(t *testing.T) *gorm.DB {
 	return db
 }
 
-func newAuditTestService(t *testing.T, db *gorm.DB, config *AuditServiceConfig) *AuditService {
+func newAuditTestService(t *testing.T, db *gorm.DB, config *Config) *Service {
 	t.Helper()
 
 	// audit.go's retryLoop/drain touch metrics.AuditQueueDepth directly;
@@ -60,7 +60,7 @@ func newAuditTestService(t *testing.T, db *gorm.DB, config *AuditServiceConfig) 
 	metrics.Register()
 
 	if config == nil {
-		config = &AuditServiceConfig{}
+		config = &Config{}
 	}
 	if config.LifecycleContext == nil {
 		config.LifecycleContext = context.Background()
@@ -69,7 +69,7 @@ func newAuditTestService(t *testing.T, db *gorm.DB, config *AuditServiceConfig) 
 		config.RetryBufferSize = 16
 	}
 
-	svc := NewAuditService(db, config)
+	svc := NewService(db, config)
 	t.Cleanup(func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 		defer cancel()
@@ -87,7 +87,7 @@ func countAuditEvents(t *testing.T, db *gorm.DB) int64 {
 
 // --- persistWithRetry ---
 
-func TestAuditServicePersistWithRetryWritesEvent(t *testing.T) {
+func TestServicePersistWithRetryWritesEvent(t *testing.T) {
 	db := newAuditTestDB(t)
 	svc := newAuditTestService(t, db, nil)
 
@@ -107,7 +107,7 @@ func TestAuditServicePersistWithRetryWritesEvent(t *testing.T) {
 	require.NotEmpty(t, stored.ID, "event ID is assigned by the DB default")
 }
 
-func TestAuditServicePersistWithRetryAbortsOnCancel(t *testing.T) {
+func TestServicePersistWithRetryAbortsOnCancel(t *testing.T) {
 	db := newAuditTestDB(t)
 	svc := newAuditTestService(t, db, nil)
 
@@ -121,10 +121,10 @@ func TestAuditServicePersistWithRetryAbortsOnCancel(t *testing.T) {
 
 // --- RecordSync ---
 
-func TestAuditServiceRecordSyncPersistsAndWritesFileSink(t *testing.T) {
+func TestServiceRecordSyncPersistsAndWritesFileSink(t *testing.T) {
 	db := newAuditTestDB(t)
 	logPath := filepath.Join(t.TempDir(), "audit.jsonl")
-	svc := newAuditTestService(t, db, &AuditServiceConfig{AuditLogFile: logPath})
+	svc := newAuditTestService(t, db, &Config{AuditLogFile: logPath})
 
 	err := svc.RecordSync(context.Background(), "00000000-0000-0000-0000-000000000002", "test.sync", "info", "sync event", nil, nil, nil, "127.0.0.1")
 	require.NoError(t, err)
@@ -135,7 +135,7 @@ func TestAuditServiceRecordSyncPersistsAndWritesFileSink(t *testing.T) {
 	require.Contains(t, string(data), "sync event", "file sink receives the JSONL entry")
 }
 
-func TestAuditServiceRecordSyncReturnsPersistenceError(t *testing.T) {
+func TestServiceRecordSyncReturnsPersistenceError(t *testing.T) {
 	// No table: repository.CreateAuditEvent must fail and RecordSync must surface it.
 	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
 	require.NoError(t, err)
@@ -147,7 +147,7 @@ func TestAuditServiceRecordSyncReturnsPersistenceError(t *testing.T) {
 
 // --- Record (async queue) ---
 
-func TestAuditServiceRecordAsyncPersistsViaRetryLoop(t *testing.T) {
+func TestServiceRecordAsyncPersistsViaRetryLoop(t *testing.T) {
 	db := newAuditTestDB(t)
 	svc := newAuditTestService(t, db, nil)
 
@@ -162,7 +162,7 @@ func TestAuditServiceRecordAsyncPersistsViaRetryLoop(t *testing.T) {
 
 // --- Query ---
 
-func TestAuditServiceQueryNonAdminFiltersCaller(t *testing.T) {
+func TestServiceQueryNonAdminFiltersCaller(t *testing.T) {
 	db := newAuditTestDB(t)
 	svc := newAuditTestService(t, db, nil)
 
@@ -185,7 +185,7 @@ func TestAuditServiceQueryNonAdminFiltersCaller(t *testing.T) {
 	require.Len(t, admin.Items, 6)
 }
 
-func TestAuditServiceQueryPaginationAndCursor(t *testing.T) {
+func TestServiceQueryPaginationAndCursor(t *testing.T) {
 	db := newAuditTestDB(t)
 	svc := newAuditTestService(t, db, nil)
 
@@ -212,7 +212,7 @@ func TestAuditServiceQueryPaginationAndCursor(t *testing.T) {
 
 // --- VerifyChain ---
 
-func TestAuditServiceVerifyChainValidAndTampered(t *testing.T) {
+func TestServiceVerifyChainValidAndTampered(t *testing.T) {
 	db := newAuditTestDB(t)
 	svc := newAuditTestService(t, db, nil)
 
@@ -239,7 +239,7 @@ func TestAuditServiceVerifyChainValidAndTampered(t *testing.T) {
 
 // --- RecordPermissionDecision ---
 
-func TestAuditServiceRecordPermissionDecisionDenyIsWarn(t *testing.T) {
+func TestServiceRecordPermissionDecisionDenyIsWarn(t *testing.T) {
 	db := newAuditTestDB(t)
 	svc := newAuditTestService(t, db, nil)
 
@@ -256,7 +256,7 @@ func TestAuditServiceRecordPermissionDecisionDenyIsWarn(t *testing.T) {
 	require.Equal(t, false, details["allowed"])
 }
 
-func TestAuditServiceRecordPermissionDecisionAllowIsInfo(t *testing.T) {
+func TestServiceRecordPermissionDecisionAllowIsInfo(t *testing.T) {
 	db := newAuditTestDB(t)
 	svc := newAuditTestService(t, db, nil)
 
