@@ -2,9 +2,11 @@ package service
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/agenthub/hub-server/internal/service/deliveryoutbox"
+	"github.com/agenthub/hub-server/internal/service/dispatchsvc"
 )
 
 // ── Outbox status constants (aliases to pure deliveryoutbox package) ────────
@@ -53,28 +55,62 @@ const (
 	// DeliveryOutboxRetention is how long a delivered or dead-letter outbox
 	// row is kept before CleanupOldDeliveries purges it. 7 days balances
 	// operator audit window against unbounded table growth.
-	DeliveryOutboxRetention = 7 * 24 * time.Hour
+	DeliveryOutboxRetention = deliveryoutbox.Retention
 
 	// DeliveryOutboxCleanupInterval is how often the background cleanup loop
 	// fires. 24h keeps the purge off the hot path; the retention window
 	// (not the cadence) governs how old a row must be to qualify.
-	DeliveryOutboxCleanupInterval = 24 * time.Hour
+	DeliveryOutboxCleanupInterval = deliveryoutbox.CleanupInterval
 )
 
-// computeNextRetryAt calculates the next retry time using exponential backoff.
-// Thin wrapper around pure deliveryoutbox helpers (clock fixed at call time).
-func computeNextRetryAt(attempt int) time.Time {
-	return deliveryoutbox.NextRetryAt(attempt, time.Now())
+// ── Redispatcher adapters (implementation on DispatchService) ────────────────
+
+// dispatchRedispatcher adapts *dispatchsvc.DispatchService to the
+// deliveryoutbox.Redispatcher port without exporting dispatch payload types
+// or the outbox row to the outbox. Redispatch residual ownership moved in
+// #573; the dispatch implementation moved to service/dispatchsvc.
+type dispatchRedispatcher struct {
+	d *dispatchsvc.DispatchService
 }
 
-// truncateString is a thin alias kept for same-package tests.
-func truncateString(s string, maxLen int) string {
-	return deliveryoutbox.TruncateString(s, maxLen)
+func (a dispatchRedispatcher) RedispatchDelivery(ctx context.Context, taskID, deliveryID, payloadJSON, edgeDeviceID string) error {
+	if a.d == nil {
+		return fmt.Errorf("redispatch: nil dispatch service")
+	}
+	// Propagate soft-fail errors so retryDeliveries does not MarkDeliverySent
+	// after a failed offline-queue / route attempt (#999). Dead-letter paths
+	// return nil (already terminal; MarkDeliverySent is a no-op).
+	return a.d.RedispatchDelivery(ctx, taskID, deliveryID, payloadJSON, edgeDeviceID)
 }
+
+// lazyDispatchRedispatcher resolves DispatchService only when a retry fires.
+// Used by deliveryOutboxService() lazy construction so it does not call
+// dispatchService() during outbox construction (avoids init recursion with
+// dispatchService → deliveryOutboxService).
+type lazyDispatchRedispatcher struct {
+	s *AgentService
+}
+
+func (a lazyDispatchRedispatcher) RedispatchDelivery(ctx context.Context, taskID, deliveryID, payloadJSON, edgeDeviceID string) error {
+	if a.s == nil {
+		return fmt.Errorf("redispatch: nil agent service")
+	}
+	return dispatchRedispatcher{a.s.dispatchService()}.RedispatchDelivery(ctx, taskID, deliveryID, payloadJSON, edgeDeviceID)
+}
+
+// ── Outbox type aliases (thin views over the pure deliveryoutbox package) ──
+
+// DeliveryOutbox aliases the pure orchestration type; construction now goes
+// through deliveryoutbox.NewOutbox with the gorm-backed DeliveryOutboxStore
+// (delivery_outbox_store.go).
+type DeliveryOutbox = deliveryoutbox.Outbox
+
+// DeliveryOutboxEntry aliases the pure read view (no GORM tags).
+type DeliveryOutboxEntry = deliveryoutbox.Entry
 
 // ── AgentService facade (wiring/handler stability) ───────────────────────────
 
-// deliveryOutboxService returns the composed DeliveryOutbox, lazily constructing
+// deliveryOutboxService returns the composed Outbox, lazily constructing
 // one from AgentService deps when tests use struct literals without NewAgentService.
 // Lazy path uses lazyDispatchRedispatcher so construction does not recurse into
 // dispatchService(); redispatch still lands on DispatchService at call time.
@@ -82,7 +118,7 @@ func (s *AgentService) deliveryOutboxService() *DeliveryOutbox {
 	if s.deliveryOutbox != nil {
 		return s.deliveryOutbox
 	}
-	return NewDeliveryOutbox(s.db, lazyDispatchRedispatcher{s})
+	return deliveryoutbox.NewOutbox(NewDeliveryOutboxStore(s.db), lazyDispatchRedispatcher{s})
 }
 
 // RecordDelivery inserts a delivery_outbox entry in status=pending before

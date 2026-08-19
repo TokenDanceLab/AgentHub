@@ -14,6 +14,7 @@ import (
 	"github.com/agenthub/hub-server/internal/model"
 	"github.com/agenthub/hub-server/internal/repository"
 	"github.com/agenthub/hub-server/internal/seqalloc"
+	"github.com/agenthub/hub-server/internal/service/deliveryoutbox"
 	"github.com/agenthub/hub-server/internal/service/dispatchsvc"
 	"github.com/agenthub/hub-server/internal/service/relay"
 	"github.com/agenthub/hub-server/internal/ws"
@@ -78,7 +79,7 @@ func NewAgentService(db *gorm.DB, bus *bus.Bus, mgr *ws.Manager, cacheClient *ca
 	s.runEvents = NewRunEventService(db, NewAgentControlService(cacheClient, mgr))
 	// Construct outbox first (nil redispatcher), then inject DispatchService
 	// adapter after dispatch exists (#573 — redispatch residual on DispatchService).
-	s.deliveryOutbox = NewDeliveryOutbox(db, nil)
+	s.deliveryOutbox = deliveryoutbox.NewOutbox(NewDeliveryOutboxStore(db), nil)
 	s.edgeCallbacks = NewEdgeCallbackService(
 		db,
 		bus,

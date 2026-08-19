@@ -34,9 +34,9 @@ type edgeCallbackSeq interface {
 }
 
 // edgeCallbackOutbox auto-acks delivery journal rows when Edge proves receipt
-// (ack, first authorized stream, or done). Implemented solely by *DeliveryOutbox.
+// (ack, first authorized stream, or done). Implemented solely by *deliveryoutbox.Outbox.
 type edgeCallbackOutbox interface {
-	autoAckDeliveriesForTask(ctx context.Context, taskID string)
+	AutoAckDeliveriesForTask(ctx context.Context, taskID string)
 }
 
 // seqAllocatorFunc adapts a function to edgeCallbackSeq.
@@ -164,7 +164,7 @@ func (s *EdgeCallbackService) autoAck(ctx context.Context, taskID string) {
 	if s.outbox == nil {
 		return
 	}
-	s.outbox.autoAckDeliveriesForTask(ctx, taskID)
+	s.outbox.AutoAckDeliveriesForTask(ctx, taskID)
 }
 
 // HandleTaskStream records a typed runtime event and keeps the existing
