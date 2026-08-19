@@ -116,8 +116,6 @@ const STORED_ATTACHMENT: AttachmentRef = {
 beforeEach(() => {
   FakeXMLHttpRequest.instances = [];
   vi.stubGlobal('XMLHttpRequest', FakeXMLHttpRequest);
-  // setup.ts installs a shared `fetch = vi.fn()`; clear any state between tests.
-  vi.mocked(fetch).mockReset();
 });
 
 afterEach(() => {
