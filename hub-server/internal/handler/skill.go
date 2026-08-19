@@ -10,19 +10,19 @@ import (
 	"github.com/agenthub/hub-server/internal/config"
 	"github.com/agenthub/hub-server/internal/errcode"
 	"github.com/agenthub/hub-server/internal/model"
-	"github.com/agenthub/hub-server/internal/service"
+	"github.com/agenthub/hub-server/internal/service/skill"
 )
 
-// SkillService is the subset of *service.SkillService used by SkillHandler.
+// SkillService is the subset of *skill.Service used by SkillHandler.
 type SkillService interface {
 	Create(ctx context.Context, ownerID string, req *model.Skill) (*model.Skill, error)
 	Get(ctx context.Context, id, ownerID string) (*model.Skill, error)
 	Update(ctx context.Context, id, ownerID string, req *model.Skill) (*model.Skill, error)
 	Delete(ctx context.Context, id, ownerID string) error
-	List(ctx context.Context, ownerID, q, skillType, cursor string, pageSize int) (*service.SkillListResult, error)
+	List(ctx context.Context, ownerID, q, skillType, cursor string, pageSize int) (*skill.ListResult, error)
 	Publish(ctx context.Context, id, ownerID string) error
 	Unpublish(ctx context.Context, id, ownerID string) error
-	SearchPublic(ctx context.Context, q, skillType, cursor string, pageSize int) (*service.SkillListResult, error)
+	SearchPublic(ctx context.Context, q, skillType, cursor string, pageSize int) (*skill.ListResult, error)
 }
 
 type SkillHandler struct {
