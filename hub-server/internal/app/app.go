@@ -25,6 +25,7 @@ import (
 	"github.com/agenthub/hub-server/internal/service/message"
 	"github.com/agenthub/hub-server/internal/service/messagereaction"
 	"github.com/agenthub/hub-server/internal/service/oidc"
+	"github.com/agenthub/hub-server/internal/service/relay"
 	"github.com/agenthub/hub-server/internal/service/session"
 	"github.com/agenthub/hub-server/internal/ws"
 )
@@ -98,7 +99,7 @@ type App struct {
 	AgentTeamService *agentteam.AgentTeamService
 
 	// Relay
-	RelayService *service.RelayService
+	RelayService *relay.Service
 	RelayHandler *handler.RelayHandler
 
 	// Audit

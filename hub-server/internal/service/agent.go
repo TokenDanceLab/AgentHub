@@ -15,6 +15,7 @@ import (
 	"github.com/agenthub/hub-server/internal/repository"
 	"github.com/agenthub/hub-server/internal/seqalloc"
 	"github.com/agenthub/hub-server/internal/service/dispatchsvc"
+	"github.com/agenthub/hub-server/internal/service/relay"
 	"github.com/agenthub/hub-server/internal/ws"
 )
 
@@ -28,9 +29,9 @@ type agentCache interface {
 	SetSeq(ctx context.Context, sessionID string, seq int64) error
 }
 
-// relayDispatcher is the subset of *RelayService methods used by AgentService.
+// relayDispatcher is the subset of *relay.Service methods used by AgentService.
 type relayDispatcher interface {
-	CreateCommand(ctx context.Context, targetEdgeID, commandType string, payload json.RawMessage, createdBy string) (*RelayCommandData, error)
+	CreateCommand(ctx context.Context, targetEdgeID, commandType string, payload json.RawMessage, createdBy string) (*relay.CommandData, error)
 }
 
 type AgentService struct {
