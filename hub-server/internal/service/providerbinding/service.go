@@ -1,4 +1,4 @@
-package service
+package providerbinding
 
 import (
 	"context"
@@ -11,17 +11,17 @@ import (
 	"github.com/agenthub/hub-server/internal/repository"
 )
 
-// ProviderBindingService handles CRUD for provider bindings.
-type ProviderBindingService struct {
+// Service handles CRUD for provider bindings.
+type Service struct {
 	db *gorm.DB
 }
 
-func NewProviderBindingService(db *gorm.DB) *ProviderBindingService {
-	return &ProviderBindingService{db: db}
+func NewService(db *gorm.DB) *Service {
+	return &Service{db: db}
 }
 
-// PBListResult holds paginated provider binding results.
-type PBListResult struct {
+// ListResult holds paginated provider binding results.
+type ListResult struct {
 	Items   []model.ProviderBinding `json:"items"`
 	HasMore bool                    `json:"has_more"`
 	Cursor  string                  `json:"next_cursor,omitempty"`
@@ -29,7 +29,7 @@ type PBListResult struct {
 
 // ── CRUD ──
 
-func (s *ProviderBindingService) Create(ctx context.Context, ownerID string, req *model.ProviderBinding) (*model.ProviderBinding, error) {
+func (s *Service) Create(ctx context.Context, ownerID string, req *model.ProviderBinding) (*model.ProviderBinding, error) {
 	if req.Provider == "" {
 		return nil, errcode.ErrBadRequest
 	}
@@ -45,7 +45,7 @@ func (s *ProviderBindingService) Create(ctx context.Context, ownerID string, req
 	return req, nil
 }
 
-func (s *ProviderBindingService) Get(ctx context.Context, id, ownerID string) (*model.ProviderBinding, error) {
+func (s *Service) Get(ctx context.Context, id, ownerID string) (*model.ProviderBinding, error) {
 	pb, err := repository.GetProviderBindingByID(s.db, id)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -59,7 +59,7 @@ func (s *ProviderBindingService) Get(ctx context.Context, id, ownerID string) (*
 	return pb, nil
 }
 
-func (s *ProviderBindingService) Update(ctx context.Context, id, ownerID string, req *model.ProviderBinding) (*model.ProviderBinding, error) {
+func (s *Service) Update(ctx context.Context, id, ownerID string, req *model.ProviderBinding) (*model.ProviderBinding, error) {
 	pb, err := repository.GetProviderBindingByID(s.db, id)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -100,7 +100,7 @@ func (s *ProviderBindingService) Update(ctx context.Context, id, ownerID string,
 	return pb, nil
 }
 
-func (s *ProviderBindingService) Delete(ctx context.Context, id, ownerID string) error {
+func (s *Service) Delete(ctx context.Context, id, ownerID string) error {
 	pb, err := repository.GetProviderBindingByID(s.db, id)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -114,7 +114,7 @@ func (s *ProviderBindingService) Delete(ctx context.Context, id, ownerID string)
 	return repository.DeleteProviderBinding(s.db, id, ownerID)
 }
 
-func (s *ProviderBindingService) List(ctx context.Context, ownerID, cursor string, pageSize int) (*PBListResult, error) {
+func (s *Service) List(ctx context.Context, ownerID, cursor string, pageSize int) (*ListResult, error) {
 	bindings, hasMore, err := repository.ListProviderBindings(s.db, ownerID, cursor, pageSize)
 	if err != nil {
 		return nil, err
@@ -123,5 +123,5 @@ func (s *ProviderBindingService) List(ctx context.Context, ownerID, cursor strin
 	if hasMore && len(bindings) > 0 {
 		nextCursor = bindings[len(bindings)-1].ID
 	}
-	return &PBListResult{Items: bindings, HasMore: hasMore, Cursor: nextCursor}, nil
+	return &ListResult{Items: bindings, HasMore: hasMore, Cursor: nextCursor}, nil
 }

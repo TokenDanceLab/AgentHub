@@ -11,6 +11,7 @@ import (
 	"github.com/agenthub/hub-server/internal/errcode"
 	"github.com/agenthub/hub-server/internal/model"
 	"github.com/agenthub/hub-server/internal/service/mcpserver"
+	"github.com/agenthub/hub-server/internal/service/providerbinding"
 	"github.com/agenthub/hub-server/internal/service/skill"
 )
 
@@ -122,7 +123,7 @@ func TestProviderBindingGetIsOwnerScoped(t *testing.T) {
 		Provider: "openai",
 		Metadata: "{}",
 	}).Error)
-	svc := NewProviderBindingService(db)
+	svc := providerbinding.NewService(db)
 
 	binding, err := svc.Get(context.Background(), "binding-1", "owner-1")
 	require.NoError(t, err)
