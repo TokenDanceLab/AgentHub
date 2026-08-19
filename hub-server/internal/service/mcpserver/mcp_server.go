@@ -1,4 +1,4 @@
-package service
+package mcpserver
 
 import (
 	"context"
@@ -12,25 +12,25 @@ import (
 	"github.com/agenthub/hub-server/internal/repository"
 )
 
-// MCPService handles CRUD for MCP server registry entries.
-type MCPService struct {
+// Service handles CRUD for MCP server registry entries.
+type Service struct {
 	db *gorm.DB
 }
 
-// MCPListResult wraps paginated MCP server list responses.
-type MCPListResult struct {
+// ListResult wraps paginated MCP server list responses.
+type ListResult struct {
 	Items   []model.MCPServer `json:"items"`
 	HasMore bool              `json:"has_more"`
 	Cursor  string            `json:"next_cursor,omitempty"`
 }
 
-// NewMCPService creates a new MCP server service.
-func NewMCPService(db *gorm.DB) *MCPService {
-	return &MCPService{db: db}
+// NewService creates a new MCP server service.
+func NewService(db *gorm.DB) *Service {
+	return &Service{db: db}
 }
 
 // Create adds a new MCP server owned by the given user.
-func (s *MCPService) Create(ctx context.Context, ownerID string, m *model.MCPServer) (*model.MCPServer, error) {
+func (s *Service) Create(ctx context.Context, ownerID string, m *model.MCPServer) (*model.MCPServer, error) {
 	if m.Name == "" || m.Transport == "" {
 		return nil, errcode.ErrBadRequest.WithMessage("name and transport are required")
 	}
@@ -56,7 +56,7 @@ func (s *MCPService) Create(ctx context.Context, ownerID string, m *model.MCPSer
 }
 
 // Get retrieves a single MCP server by ID; owner must match.
-func (s *MCPService) Get(ctx context.Context, id, ownerID string) (*model.MCPServer, error) {
+func (s *Service) Get(ctx context.Context, id, ownerID string) (*model.MCPServer, error) {
 	m, err := repository.GetMCPServerByID(s.db, id)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -71,7 +71,7 @@ func (s *MCPService) Get(ctx context.Context, id, ownerID string) (*model.MCPSer
 }
 
 // Update modifies an MCP server; owner must match.
-func (s *MCPService) Update(ctx context.Context, id, ownerID string, m *model.MCPServer) (*model.MCPServer, error) {
+func (s *Service) Update(ctx context.Context, id, ownerID string, m *model.MCPServer) (*model.MCPServer, error) {
 	existing, err := repository.GetMCPServerByID(s.db, id)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -108,7 +108,7 @@ func (s *MCPService) Update(ctx context.Context, id, ownerID string, m *model.MC
 }
 
 // Delete soft-deletes an MCP server; owner must match.
-func (s *MCPService) Delete(ctx context.Context, id, ownerID string) error {
+func (s *Service) Delete(ctx context.Context, id, ownerID string) error {
 	m, err := repository.GetMCPServerByID(s.db, id)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -123,7 +123,7 @@ func (s *MCPService) Delete(ctx context.Context, id, ownerID string) error {
 }
 
 // List returns paginated MCP servers for an owner.
-func (s *MCPService) List(ctx context.Context, ownerID, q, transport, cursor string, pageSize int) (*MCPListResult, error) {
+func (s *Service) List(ctx context.Context, ownerID, q, transport, cursor string, pageSize int) (*ListResult, error) {
 	servers, hasMore, err := repository.ListMCPServers(s.db, ownerID, q, transport, cursor, pageSize)
 	if err != nil {
 		return nil, err
@@ -132,11 +132,11 @@ func (s *MCPService) List(ctx context.Context, ownerID, q, transport, cursor str
 	if hasMore && len(servers) > 0 {
 		nextCursor = servers[len(servers)-1].ID
 	}
-	return &MCPListResult{Items: servers, HasMore: hasMore, Cursor: nextCursor}, nil
+	return &ListResult{Items: servers, HasMore: hasMore, Cursor: nextCursor}, nil
 }
 
 // Publish marks an MCP server as public.
-func (s *MCPService) Publish(ctx context.Context, id, ownerID string) error {
+func (s *Service) Publish(ctx context.Context, id, ownerID string) error {
 	m, err := repository.GetMCPServerByID(s.db, id)
 	if err != nil {
 		return errcode.UserNotFound
@@ -149,7 +149,7 @@ func (s *MCPService) Publish(ctx context.Context, id, ownerID string) error {
 }
 
 // Unpublish marks an MCP server as private.
-func (s *MCPService) Unpublish(ctx context.Context, id, ownerID string) error {
+func (s *Service) Unpublish(ctx context.Context, id, ownerID string) error {
 	m, err := repository.GetMCPServerByID(s.db, id)
 	if err != nil {
 		return errcode.UserNotFound
@@ -162,7 +162,7 @@ func (s *MCPService) Unpublish(ctx context.Context, id, ownerID string) error {
 }
 
 // SearchPublic searches published MCP servers.
-func (s *MCPService) SearchPublic(ctx context.Context, q, transport, cursor string, pageSize int) (*MCPListResult, error) {
+func (s *Service) SearchPublic(ctx context.Context, q, transport, cursor string, pageSize int) (*ListResult, error) {
 	servers, hasMore, err := repository.ListPublicMCPServers(s.db, q, transport, cursor, pageSize)
 	if err != nil {
 		return nil, err
@@ -171,5 +171,5 @@ func (s *MCPService) SearchPublic(ctx context.Context, q, transport, cursor stri
 	if hasMore && len(servers) > 0 {
 		nextCursor = fmt.Sprintf("%d", servers[len(servers)-1].InstallCount)
 	}
-	return &MCPListResult{Items: servers, HasMore: hasMore, Cursor: nextCursor}, nil
+	return &ListResult{Items: servers, HasMore: hasMore, Cursor: nextCursor}, nil
 }

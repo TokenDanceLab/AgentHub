@@ -10,19 +10,19 @@ import (
 	"github.com/agenthub/hub-server/internal/config"
 	"github.com/agenthub/hub-server/internal/errcode"
 	"github.com/agenthub/hub-server/internal/model"
-	"github.com/agenthub/hub-server/internal/service"
+	"github.com/agenthub/hub-server/internal/service/mcpserver"
 )
 
-// MCPService is the subset of *service.MCPService used by MCPServerHandler.
+// MCPService is the subset of *mcpserver.Service used by MCPServerHandler.
 type MCPService interface {
 	Create(ctx context.Context, ownerID string, req *model.MCPServer) (*model.MCPServer, error)
 	Get(ctx context.Context, id, ownerID string) (*model.MCPServer, error)
 	Update(ctx context.Context, id, ownerID string, req *model.MCPServer) (*model.MCPServer, error)
 	Delete(ctx context.Context, id, ownerID string) error
-	List(ctx context.Context, ownerID, q, transport, cursor string, pageSize int) (*service.MCPListResult, error)
+	List(ctx context.Context, ownerID, q, transport, cursor string, pageSize int) (*mcpserver.ListResult, error)
 	Publish(ctx context.Context, id, ownerID string) error
 	Unpublish(ctx context.Context, id, ownerID string) error
-	SearchPublic(ctx context.Context, q, transport, cursor string, pageSize int) (*service.MCPListResult, error)
+	SearchPublic(ctx context.Context, q, transport, cursor string, pageSize int) (*mcpserver.ListResult, error)
 }
 
 type MCPServerHandler struct {

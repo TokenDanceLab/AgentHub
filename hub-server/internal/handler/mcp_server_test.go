@@ -9,7 +9,7 @@ import (
 
 	"github.com/agenthub/hub-server/internal/errcode"
 	"github.com/agenthub/hub-server/internal/model"
-	"github.com/agenthub/hub-server/internal/service"
+	"github.com/agenthub/hub-server/internal/service/mcpserver"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -20,10 +20,10 @@ type mockMCPService struct {
 	get          func(ctx context.Context, id, ownerID string) (*model.MCPServer, error)
 	update       func(ctx context.Context, id, ownerID string, req *model.MCPServer) (*model.MCPServer, error)
 	delete       func(ctx context.Context, id, ownerID string) error
-	list         func(ctx context.Context, ownerID, q, transport, cursor string, pageSize int) (*service.MCPListResult, error)
+	list         func(ctx context.Context, ownerID, q, transport, cursor string, pageSize int) (*mcpserver.ListResult, error)
 	publish      func(ctx context.Context, id, ownerID string) error
 	unpublish    func(ctx context.Context, id, ownerID string) error
-	searchPublic func(ctx context.Context, q, transport, cursor string, pageSize int) (*service.MCPListResult, error)
+	searchPublic func(ctx context.Context, q, transport, cursor string, pageSize int) (*mcpserver.ListResult, error)
 }
 
 func (m *mockMCPService) Create(ctx context.Context, ownerID string, req *model.MCPServer) (*model.MCPServer, error) {
@@ -54,9 +54,9 @@ func (m *mockMCPService) Delete(ctx context.Context, id, ownerID string) error {
 	return m.delete(ctx, id, ownerID)
 }
 
-func (m *mockMCPService) List(ctx context.Context, ownerID, q, transport, cursor string, pageSize int) (*service.MCPListResult, error) {
+func (m *mockMCPService) List(ctx context.Context, ownerID, q, transport, cursor string, pageSize int) (*mcpserver.ListResult, error) {
 	if m.list == nil {
-		return &service.MCPListResult{}, nil
+		return &mcpserver.ListResult{}, nil
 	}
 	return m.list(ctx, ownerID, q, transport, cursor, pageSize)
 }
@@ -75,9 +75,9 @@ func (m *mockMCPService) Unpublish(ctx context.Context, id, ownerID string) erro
 	return m.unpublish(ctx, id, ownerID)
 }
 
-func (m *mockMCPService) SearchPublic(ctx context.Context, q, transport, cursor string, pageSize int) (*service.MCPListResult, error) {
+func (m *mockMCPService) SearchPublic(ctx context.Context, q, transport, cursor string, pageSize int) (*mcpserver.ListResult, error) {
 	if m.searchPublic == nil {
-		return &service.MCPListResult{}, nil
+		return &mcpserver.ListResult{}, nil
 	}
 	return m.searchPublic(ctx, q, transport, cursor, pageSize)
 }
@@ -215,10 +215,10 @@ func TestMCPServerHandler_ListMCPServers(t *testing.T) {
 
 	called := false
 	svc := &mockMCPService{
-		list: func(ctx context.Context, ownerID, q, transport, cursor string, pageSize int) (*service.MCPListResult, error) {
+		list: func(ctx context.Context, ownerID, q, transport, cursor string, pageSize int) (*mcpserver.ListResult, error) {
 			called = true
 			assert.Equal(t, "user-1", ownerID)
-			return &service.MCPListResult{
+			return &mcpserver.ListResult{
 				Items:   []model.MCPServer{{ID: "mcp-1"}},
 				Cursor:  "next",
 				HasMore: true,
