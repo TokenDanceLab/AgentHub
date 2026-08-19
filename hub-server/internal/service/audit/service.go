@@ -1,4 +1,4 @@
-package service
+package audit
 
 import (
 	"context"
@@ -60,8 +60,8 @@ func (s *auditFileSink) close() error {
 	return s.file.Close()
 }
 
-// AuditService provides audit event recording and querying.
-type AuditService struct {
+// Service provides audit event recording and querying.
+type Service struct {
 	db       *gorm.DB
 	fileSink *auditFileSink
 
@@ -73,7 +73,7 @@ type AuditService struct {
 
 	// lifecycle is the process-lifetime context for the retry loop; retry
 	// backoff and persistence abort when it is cancelled. Defaults to
-	// context.Background when AuditServiceConfig.LifecycleContext is nil.
+	// context.Background when Config.LifecycleContext is nil.
 	lifecycle context.Context
 	// shutdownCtx is set by Shutdown (before close(done)) so the retry loop's
 	// bounded drain aborts at the shutdown deadline. atomic.Value because the
@@ -83,8 +83,8 @@ type AuditService struct {
 	shutdownOnce sync.Once
 }
 
-// AuditServiceConfig holds optional configuration for the AuditService.
-type AuditServiceConfig struct {
+// Config holds optional configuration for the Service.
+type Config struct {
 	// AuditLogFile is the path to the JSONL audit log file.
 	// When empty, file-based logging is disabled.
 	AuditLogFile string
@@ -96,10 +96,10 @@ type AuditServiceConfig struct {
 	LifecycleContext context.Context
 }
 
-// NewAuditService creates a new AuditService.
-func NewAuditService(db *gorm.DB, cfg *AuditServiceConfig) *AuditService {
+// NewService creates a new Service.
+func NewService(db *gorm.DB, cfg *Config) *Service {
 	if cfg == nil {
-		cfg = &AuditServiceConfig{}
+		cfg = &Config{}
 	}
 
 	bufSize := 1024
@@ -117,7 +117,7 @@ func NewAuditService(db *gorm.DB, cfg *AuditServiceConfig) *AuditService {
 		slog.Error("audit: failed to open audit log file, file sink disabled", "path", cfg.AuditLogFile, "error", err)
 	}
 
-	svc := &AuditService{
+	svc := &Service{
 		db:           db,
 		fileSink:     fileSink,
 		retryCh:      make(chan *model.AuditEvent, bufSize),
@@ -137,7 +137,7 @@ func NewAuditService(db *gorm.DB, cfg *AuditServiceConfig) *AuditService {
 // retryLoop processes the retry queue with exponential backoff.
 // On Shutdown it drains remaining events until the shutdown deadline
 // (bounded), then abandons the rest (counted via AuditQueueDepth).
-func (s *AuditService) retryLoop() {
+func (s *Service) retryLoop() {
 	defer s.wg.Done()
 	for {
 		select {
@@ -153,7 +153,7 @@ func (s *AuditService) retryLoop() {
 
 // persistCtx returns the context governing persistence: the shutdown
 // deadline once Shutdown has been called, otherwise the lifecycle context.
-func (s *AuditService) persistCtx() context.Context {
+func (s *Service) persistCtx() context.Context {
 	if v := s.shutdownCtx.Load(); v != nil {
 		if ctx, ok := v.(context.Context); ok && ctx != nil {
 			return ctx
@@ -164,7 +164,7 @@ func (s *AuditService) persistCtx() context.Context {
 
 // drain processes queued events until the queue is empty or the shutdown
 // deadline expires (whichever comes first).
-func (s *AuditService) drain() {
+func (s *Service) drain() {
 	shutdownCtx := s.persistCtx()
 	for {
 		select {
@@ -185,7 +185,7 @@ func (s *AuditService) drain() {
 // using exponential backoff (100ms, 200ms, 400ms). The backoff sleep is
 // cancellable via ctx, so a shutdown or lifecycle cancellation aborts the
 // retry early instead of sleeping on a dead process.
-func (s *AuditService) persistWithRetry(ctx context.Context, event *model.AuditEvent) {
+func (s *Service) persistWithRetry(ctx context.Context, event *model.AuditEvent) {
 	const maxRetries = 3
 	backoff := 100 * time.Millisecond
 
@@ -230,7 +230,7 @@ func (s *AuditService) persistWithRetry(ctx context.Context, event *model.AuditE
 // It is idempotent (subsequent calls no-op). The retry loop drains the
 // queue but aborts at ctx's deadline, so shutdown is bounded even when the
 // queue is full and persistence is slow.
-func (s *AuditService) Shutdown(ctx context.Context) {
+func (s *Service) Shutdown(ctx context.Context) {
 	s.shutdownOnce.Do(func() {
 		s.shutdownCtx.Store(ctx)
 		close(s.done)
@@ -253,8 +253,8 @@ func (s *AuditService) Shutdown(ctx context.Context) {
 	})
 }
 
-// AuditListResult holds a page of audit event results.
-type AuditListResult struct {
+// ListResult holds a page of audit event results.
+type ListResult struct {
 	Items   []model.AuditEvent `json:"items"`
 	HasMore bool               `json:"has_more"`
 	Cursor  string             `json:"next_cursor,omitempty"`
@@ -268,7 +268,7 @@ type AuditListResult struct {
 // loss is unacceptable (security-critical decisions) must use RecordSync
 // instead. Reliability levels: Record = at-most-once, RecordSync = at-least-
 // once (waits for persistence).
-func (s *AuditService) Record(ctx context.Context, userID, eventType, severity, summary string, details map[string]interface{}, profileID, targetID *string, clientIP string) {
+func (s *Service) Record(ctx context.Context, userID, eventType, severity, summary string, details map[string]interface{}, profileID, targetID *string, clientIP string) {
 	detailsJSON := "{}"
 	if details != nil {
 		if b, err := json.Marshal(details); err == nil {
@@ -299,7 +299,7 @@ func (s *AuditService) Record(ctx context.Context, userID, eventType, severity, 
 
 // RecordSync records an audit event synchronously and waits for persistence.
 // Use this for security-critical events where event loss is unacceptable.
-func (s *AuditService) RecordSync(ctx context.Context, userID, eventType, severity, summary string, details map[string]interface{}, profileID, targetID *string, clientIP string) error {
+func (s *Service) RecordSync(ctx context.Context, userID, eventType, severity, summary string, details map[string]interface{}, profileID, targetID *string, clientIP string) error {
 	detailsJSON := "{}"
 	if details != nil {
 		if b, err := json.Marshal(details); err == nil {
@@ -335,7 +335,7 @@ func (s *AuditService) RecordSync(ctx context.Context, userID, eventType, severi
 
 // Query returns paginated audit events. If callerUserID is non-empty and
 // isAdmin is false, only events belonging to callerUserID are returned.
-func (s *AuditService) Query(ctx context.Context, callerUserID string, isAdmin bool, eventType, severity string, since, until *time.Time, cursor string, pageSize int) (*AuditListResult, error) {
+func (s *Service) Query(ctx context.Context, callerUserID string, isAdmin bool, eventType, severity string, since, until *time.Time, cursor string, pageSize int) (*ListResult, error) {
 	filterUserID := ""
 	if !isAdmin {
 		filterUserID = callerUserID
@@ -351,12 +351,12 @@ func (s *AuditService) Query(ctx context.Context, callerUserID string, isAdmin b
 		nextCursor = events[len(events)-1].ID
 	}
 
-	return &AuditListResult{Items: events, HasMore: hasMore, Cursor: nextCursor}, nil
+	return &ListResult{Items: events, HasMore: hasMore, Cursor: nextCursor}, nil
 }
 
 // VerifyChain verifies the hash-chain integrity of the most recent audit events.
 // Returns the index of the first invalid link, or -1 if the chain is valid.
-func (s *AuditService) VerifyChain(limit int) (int, error) {
+func (s *Service) VerifyChain(limit int) (int, error) {
 	return repository.VerifyAuditChain(s.db, limit)
 }
 
@@ -364,7 +364,7 @@ func (s *AuditService) VerifyChain(limit int) (int, error) {
 // middleware.AuditPermissionFn. It records a permission decision (allow/deny)
 // as a security-critical audit event using synchronous persistence to ensure
 // the event is never lost.
-func (s *AuditService) RecordPermissionDecision(ctx context.Context, userID string, decision string, allowed bool, details map[string]interface{}, clientIP string) {
+func (s *Service) RecordPermissionDecision(ctx context.Context, userID string, decision string, allowed bool, details map[string]interface{}, clientIP string) {
 	severity := "info"
 	summary := "permission_granted"
 	if !allowed {

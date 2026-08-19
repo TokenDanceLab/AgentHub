@@ -10,13 +10,13 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/agenthub/hub-server/internal/service"
+	"github.com/agenthub/hub-server/internal/service/audit"
 )
 
 type mockAuditService struct{}
 
-func (m *mockAuditService) Query(ctx context.Context, callerUserID string, isAdmin bool, eventType, severity string, since, until *time.Time, cursor string, pageSize int) (*service.AuditListResult, error) {
-	return &service.AuditListResult{Items: nil, HasMore: false}, nil
+func (m *mockAuditService) Query(ctx context.Context, callerUserID string, isAdmin bool, eventType, severity string, since, until *time.Time, cursor string, pageSize int) (*audit.ListResult, error) {
+	return &audit.ListResult{Items: nil, HasMore: false}, nil
 }
 
 func TestAuditHandler_ListAuditEvents(t *testing.T) {
