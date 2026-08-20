@@ -10,7 +10,7 @@
 // (v0.13.5) — no hand-rolled ACP structs are decoded here.
 //
 // Reference: ACP spike analysis §3 (Translation Mapping), ACP Go migration (option C').
-package adapters
+package acp
 
 import (
 	"encoding/json"

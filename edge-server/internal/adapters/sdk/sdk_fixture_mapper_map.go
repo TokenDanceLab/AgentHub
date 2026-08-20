@@ -1,4 +1,6 @@
-package adapters
+package sdk
+
+import "github.com/agenthub/edge-server/internal/adapters"
 
 // Residual pure-helper peel #1122: mapSDKFixtureEvent type switch body.
 
@@ -15,12 +17,12 @@ func mapSDKFixtureEvent(event SDKFixtureEvent, provider string, scope map[string
 	case "invocation_plan", "cli_invocation_plan":
 		return oneSDKMappedEvent(BusEventCLIInvocationPlan, scope, commonSDKPayload(event, provider, map[string]any{
 			"adapterId":           event.AdapterID,
-			"commandName":         commandNameOnly(event.CommandName),
+			"commandName":         adapters.CommandNameOnly(event.CommandName),
 			"argFlags":            event.ArgFlags,
 			"configKeys":          event.ConfigKeys,
 			"positionalArgCount":  event.PositionalArgCount,
-			"envNames":            envNamesOnly(event.EnvNames),
-			"workDir":             invocationPathNameOnly(event.WorkDir),
+			"envNames":            adapters.EnvNamesOnly(event.EnvNames),
+			"workDir":             adapters.InvocationPathNameOnly(event.WorkDir),
 			"promptRedacted":      event.PromptRedacted,
 			"observed":            false,
 			"realTested":          false,

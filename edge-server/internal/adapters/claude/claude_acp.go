@@ -38,15 +38,14 @@
 // failure; the override guarantees that behavior regardless of construction
 // path.
 //
-// #1760 claude 增量：随 claude 家族归组到子包 claude，共享 ACP 机制
-// （AcpAdapter/NewAcpAdapterConfig/DefaultNpxPath）仍在根包，经
-// adapters.Xxx 限定引用。
+// #1760 acp 增量：共享 ACP 机制随 acp 家族归组到子包 adapters/acp
+// （AcpAdapter/NewAcpAdapterConfig/DefaultNpxPath），经 acp.Xxx 限定引用。
 package claude
 
 import (
 	"fmt"
 
-	"github.com/agenthub/edge-server/internal/adapters"
+	"github.com/agenthub/edge-server/internal/adapters/acp"
 )
 
 // claudeACPAdapterID is the registry identifier of the official claude-agent-acp
@@ -74,13 +73,13 @@ const claudeACPPackageSpec = claudeACPPackage + "@" + claudeACPVersionPin
 // only supplies the claude-acp configuration via NewAcpAdapterConfig plus a
 // PreflightCheck override (see file doc for why the override is retained).
 type ClaudeACPAdapter struct {
-	*adapters.AcpAdapter
+	*acp.AcpAdapter
 }
 
 // NewClaudeACPAdapter creates the claude-agent-acp adapter configuration.
 //
 // npxPath is the launcher to spawn; when empty it defaults to "npx.cmd" on
-// Windows and "npx" elsewhere (shared adapters.DefaultNpxPath). The agent
+// Windows and "npx" elsewhere (shared acp.DefaultNpxPath). The agent
 // receives no run-time args beyond `-y` + the pinned package spec
 // (claudeACPPackageSpec): ACP mode is implicit in the package, and the
 // prompt travels over stdio.
@@ -92,9 +91,9 @@ type ClaudeACPAdapter struct {
 // authenticates the same way the legacy claude-code adapter does.
 func NewClaudeACPAdapter(npxPath, model string) *ClaudeACPAdapter {
 	if npxPath == "" {
-		npxPath = adapters.DefaultNpxPath()
+		npxPath = acp.DefaultNpxPath()
 	}
-	return &ClaudeACPAdapter{AcpAdapter: adapters.NewAcpAdapterConfig(adapters.AcpAdapterConfig{
+	return &ClaudeACPAdapter{AcpAdapter: acp.NewAcpAdapterConfig(acp.AcpAdapterConfig{
 		ID:            claudeACPAdapterID,
 		Binary:        npxPath,
 		Args:          []string{"-y", claudeACPPackageSpec},

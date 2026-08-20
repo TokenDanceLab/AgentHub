@@ -6,7 +6,7 @@
 // hand-parses the JSON event stream — a 500+ line custom parser, no ACP
 // permission chain. This adapter replaces that hop with OpenCode's native ACP
 // subcommand (`opencode acp`, v1.18.5+), consumed by the shared
-// coder/acp-go-sdk client runtime (root acp_client.go): streaming updates,
+// coder/acp-go-sdk client runtime (adapters/acp acp_client.go): streaming updates,
 // capability negotiation, and the Edge approval chain
 // (session/request_permission → PermissionDecisionBroker) come with it.
 //
@@ -40,6 +40,7 @@ import (
 	"fmt"
 
 	"github.com/agenthub/edge-server/internal/adapters"
+	"github.com/agenthub/edge-server/internal/adapters/acp"
 )
 
 // opencodeACPAdapterID is the registry identifier of the native opencode ACP
@@ -62,7 +63,7 @@ const opencodeACPDefaultBinary = "opencode"
 // only supplies the opencode-acp configuration via NewAcpAdapterConfig plus a
 // PreflightCheck override (see file doc for why the override is retained).
 type OpenCodeACPAdapter struct {
-	*adapters.AcpAdapter
+	*acp.AcpAdapter
 }
 
 // NewOpenCodeACPAdapter creates the opencode-acp adapter configuration.
@@ -75,7 +76,7 @@ func NewOpenCodeACPAdapter(binaryPath string) *OpenCodeACPAdapter {
 	if binaryPath == "" {
 		binaryPath = opencodeACPDefaultBinary
 	}
-	return &OpenCodeACPAdapter{AcpAdapter: adapters.NewAcpAdapterConfig(adapters.AcpAdapterConfig{
+	return &OpenCodeACPAdapter{AcpAdapter: acp.NewAcpAdapterConfig(acp.AcpAdapterConfig{
 		ID:           opencodeACPAdapterID,
 		Binary:       binaryPath,
 		Args:         []string{"acp"},

@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"github.com/agenthub/edge-server/internal/adapters"
+	"github.com/agenthub/edge-server/internal/adapters/acp"
 	"github.com/agenthub/edge-server/internal/store"
 )
 
@@ -295,7 +296,7 @@ func TestOpenCodeACPAdapterDefaultBinaryPath(t *testing.T) {
 
 func TestOpenCodeACPAdapterPreflightFailsFast(t *testing.T) {
 	a := &OpenCodeACPAdapter{
-		AcpAdapter: adapters.NewAcpAdapterWithID(opencodeACPAdapterID, "", nil, "OpenCode (ACP)"),
+		AcpAdapter: acp.NewAcpAdapterWithID(opencodeACPAdapterID, "", nil, "OpenCode (ACP)"),
 	}
 	if a.Available() {
 		t.Fatal("empty binary must not be available")
@@ -375,7 +376,7 @@ func TestOpenCodeACPAdapterParseStreamWithMockACPPeer(t *testing.T) {
 	}
 
 	// The fake agent records a request method only AFTER writing its response
-	// (root acp_client_test.go fakeACPAgent.run: write-then-record), so the
+	// (acp/acp_client_test.go fakeACPAgent.run: write-then-record), so the
 	// client can finish ParseStream before the peer goroutine records
 	// session/prompt. Poll briefly instead of asserting immediately — the
 	// record must arrive, just not synchronously with the client's last read.

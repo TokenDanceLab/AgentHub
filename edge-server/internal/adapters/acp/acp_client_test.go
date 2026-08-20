@@ -9,7 +9,7 @@
 //
 // Real-adapter end-to-end run (`npx -y @agentclientprotocol/codex-acp`) is a
 // TODO for environment verification (see runACPSession).
-package adapters
+package acp
 
 import (
 	"bufio"
@@ -23,6 +23,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/agenthub/edge-server/internal/adapters"
 	"github.com/agenthub/edge-server/internal/store"
 	"github.com/coder/acp-go-sdk"
 )
@@ -187,7 +188,7 @@ func emitterAll(r *recordingEmitter) []recordedEvent {
 
 // testACPContext builds a ParseStream-style ctx carrying RunProcessContext.
 func testACPContext(prompt, workDir string) context.Context {
-	return SDKAdapterContext(context.Background(), RunProcessContext{
+	return adapters.SDKAdapterContext(context.Background(), RunProcessContext{
 		Prompt:  prompt,
 		WorkDir: workDir,
 	})
@@ -370,7 +371,7 @@ func permissionRequestLine(id int, sessionID, optionsJSON, toolCallJSON string) 
 func TestRunACPSession_PermissionBrokerBlocksThenAllows(t *testing.T) {
 	emitter := &recordingEmitter{}
 	run := store.Run{ID: "run-acp-broker-allow", ProjectID: "proj-acp", ThreadID: "thread-acp"}
-	broker := NewPermissionDecisionBroker()
+	broker := adapters.NewPermissionDecisionBroker()
 
 	clientToAgentR, clientToAgentW := io.Pipe()
 	agentToClientR, agentToClientW := io.Pipe()
@@ -395,7 +396,7 @@ func TestRunACPSession_PermissionBrokerBlocksThenAllows(t *testing.T) {
 	// broker request id, and the agent must NOT have received a response yet.
 	permEvt := waitForEvent(t, emitter, BusEventPermissionRequested, 5*time.Second)
 	requestID := permEvt.payload.(map[string]any)["requestId"].(string)
-	waitForBrokerPending(t, broker, permissionDecisionKey{runID: run.ID, requestID: requestID}, 5*time.Second)
+	waitForBrokerPending(t, broker, run.ID, requestID, 5*time.Second)
 	select {
 	case resp := <-agent.responses:
 		t.Fatalf("agent got a response while the permission was still pending: %s", resp)
@@ -403,7 +404,7 @@ func TestRunACPSession_PermissionBrokerBlocksThenAllows(t *testing.T) {
 	}
 
 	// Desktop decides allow → broker resolves the parked request.
-	pending, ok := broker.Decide(run.ID, requestID, PermissionDecision{Behavior: "allow", DecisionClass: "user_approved"})
+	pending, ok := broker.Decide(run.ID, requestID, adapters.PermissionDecision{Behavior: "allow", DecisionClass: "user_approved"})
 	if !ok {
 		t.Fatal("broker did not find the pending ACP permission request")
 	}
@@ -428,7 +429,7 @@ func TestRunACPSession_PermissionBrokerBlocksThenAllows(t *testing.T) {
 	}
 
 	// A second Decide must miss (entry consumed).
-	if _, ok := broker.Decide(run.ID, requestID, PermissionDecision{Behavior: "allow"}); ok {
+	if _, ok := broker.Decide(run.ID, requestID, adapters.PermissionDecision{Behavior: "allow"}); ok {
 		t.Error("broker still holds the resolved permission request")
 	}
 
@@ -444,7 +445,7 @@ func TestRunACPSession_PermissionBrokerBlocksThenAllows(t *testing.T) {
 func TestRunACPSession_PermissionBrokerDenyMapsToRejectOption(t *testing.T) {
 	emitter := &recordingEmitter{}
 	run := store.Run{ID: "run-acp-broker-deny", ProjectID: "proj-acp", ThreadID: "thread-acp"}
-	broker := NewPermissionDecisionBroker()
+	broker := adapters.NewPermissionDecisionBroker()
 
 	clientToAgentR, clientToAgentW := io.Pipe()
 	agentToClientR, agentToClientW := io.Pipe()
@@ -468,7 +469,7 @@ func TestRunACPSession_PermissionBrokerDenyMapsToRejectOption(t *testing.T) {
 	permEvt := waitForEvent(t, emitter, BusEventPermissionRequested, 5*time.Second)
 	requestID := permEvt.payload.(map[string]any)["requestId"].(string)
 
-	if _, ok := broker.Decide(run.ID, requestID, PermissionDecision{Behavior: "deny", Message: "blocked by test"}); !ok {
+	if _, ok := broker.Decide(run.ID, requestID, adapters.PermissionDecision{Behavior: "deny", Message: "blocked by test"}); !ok {
 		t.Fatal("broker did not find the pending ACP permission request")
 	}
 
@@ -496,7 +497,7 @@ func TestRunACPSession_PermissionBrokerDenyMapsToRejectOption(t *testing.T) {
 func TestRunACPSession_PermissionBrokerDenyWithoutRejectOption(t *testing.T) {
 	emitter := &recordingEmitter{}
 	run := store.Run{ID: "run-acp-broker-deny-norej", ProjectID: "proj-acp", ThreadID: "thread-acp"}
-	broker := NewPermissionDecisionBroker()
+	broker := adapters.NewPermissionDecisionBroker()
 
 	clientToAgentR, clientToAgentW := io.Pipe()
 	agentToClientR, agentToClientW := io.Pipe()
@@ -520,7 +521,7 @@ func TestRunACPSession_PermissionBrokerDenyWithoutRejectOption(t *testing.T) {
 	permEvt := waitForEvent(t, emitter, BusEventPermissionRequested, 5*time.Second)
 	requestID := permEvt.payload.(map[string]any)["requestId"].(string)
 
-	if _, ok := broker.Decide(run.ID, requestID, PermissionDecision{Behavior: "deny", Message: "blocked by test"}); !ok {
+	if _, ok := broker.Decide(run.ID, requestID, adapters.PermissionDecision{Behavior: "deny", Message: "blocked by test"}); !ok {
 		t.Fatal("broker did not find the pending ACP permission request")
 	}
 
@@ -543,7 +544,7 @@ func TestRunACPSession_PermissionBrokerDenyWithoutRejectOption(t *testing.T) {
 func TestRunACPSession_PermissionBrokerDisconnectRecyclesParked(t *testing.T) {
 	emitter := &recordingEmitter{}
 	run := store.Run{ID: "run-acp-broker-disconnect", ProjectID: "proj-acp", ThreadID: "thread-acp"}
-	broker := NewPermissionDecisionBroker()
+	broker := adapters.NewPermissionDecisionBroker()
 
 	clientToAgentR, clientToAgentW := io.Pipe()
 	agentToClientR, agentToClientW := io.Pipe()
@@ -566,14 +567,14 @@ func TestRunACPSession_PermissionBrokerDisconnectRecyclesParked(t *testing.T) {
 
 	permEvt := waitForEvent(t, emitter, BusEventPermissionRequested, 5*time.Second)
 	requestID := permEvt.payload.(map[string]any)["requestId"].(string)
-	key := permissionDecisionKey{runID: run.ID, requestID: requestID}
-	waitForBrokerPending(t, broker, key, 5*time.Second)
+
+	waitForBrokerPending(t, broker, run.ID, requestID, 5*time.Second)
 
 	// Agent process exit: close its stdout side → SDK receive loop EOF →
 	// connection ctx cancelled → waiter recycles the parked entry.
 	agentToClientW.Close()
 
-	waitForBrokerMiss(t, broker, permissionDecisionKey{runID: run.ID, requestID: requestID}, 5*time.Second)
+	waitForBrokerMiss(t, broker, run.ID, requestID, 5*time.Second)
 }
 
 // TestRunACPSession_PermissionBrokerCancelRequestRecyclesParked: a
@@ -583,7 +584,7 @@ func TestRunACPSession_PermissionBrokerDisconnectRecyclesParked(t *testing.T) {
 func TestRunACPSession_PermissionBrokerCancelRequestRecyclesParked(t *testing.T) {
 	emitter := &recordingEmitter{}
 	run := store.Run{ID: "run-acp-broker-cancel", ProjectID: "proj-acp", ThreadID: "thread-acp"}
-	broker := NewPermissionDecisionBroker()
+	broker := adapters.NewPermissionDecisionBroker()
 
 	clientToAgentR, clientToAgentW := io.Pipe()
 	agentToClientR, agentToClientW := io.Pipe()
@@ -627,7 +628,7 @@ func TestRunACPSession_PermissionBrokerCancelRequestRecyclesParked(t *testing.T)
 	}
 
 	// And the parked entry is recycled.
-	waitForBrokerMiss(t, broker, permissionDecisionKey{runID: run.ID, requestID: requestID}, 5*time.Second)
+	waitForBrokerMiss(t, broker, run.ID, requestID, 5*time.Second)
 }
 
 // TestRunACPSession_PermissionBrokerRunCancelRecyclesParked: run teardown
@@ -636,7 +637,7 @@ func TestRunACPSession_PermissionBrokerCancelRequestRecyclesParked(t *testing.T)
 func TestRunACPSession_PermissionBrokerRunCancelRecyclesParked(t *testing.T) {
 	emitter := &recordingEmitter{}
 	run := store.Run{ID: "run-acp-broker-runcancel", ProjectID: "proj-acp", ThreadID: "thread-acp"}
-	broker := NewPermissionDecisionBroker()
+	broker := adapters.NewPermissionDecisionBroker()
 
 	clientToAgentR, clientToAgentW := io.Pipe()
 	agentToClientR, agentToClientW := io.Pipe()
@@ -662,12 +663,12 @@ func TestRunACPSession_PermissionBrokerRunCancelRecyclesParked(t *testing.T) {
 
 	permEvt := waitForEvent(t, emitter, BusEventPermissionRequested, 5*time.Second)
 	requestID := permEvt.payload.(map[string]any)["requestId"].(string)
-	key := permissionDecisionKey{runID: run.ID, requestID: requestID}
-	waitForBrokerPending(t, broker, key, 5*time.Second)
+
+	waitForBrokerPending(t, broker, run.ID, requestID, 5*time.Second)
 
 	cancelRun()
 
-	waitForBrokerMiss(t, broker, permissionDecisionKey{runID: run.ID, requestID: requestID}, 5*time.Second)
+	waitForBrokerMiss(t, broker, run.ID, requestID, 5*time.Second)
 }
 
 // waitForEvent polls the recording emitter until an event of the given type
@@ -687,38 +688,33 @@ func waitForEvent(t *testing.T, r *recordingEmitter, eventType string, timeout t
 
 // waitForBrokerPending polls until the broker holds the given key (the
 // handler registers the request before emitting permission_requested, so the
-// requestId from the event is authoritative).
-func waitForBrokerPending(t *testing.T, b *PermissionDecisionBroker, key permissionDecisionKey, timeout time.Duration) {
+// requestId from the event is authoritative). Read-only via the broker's
+// exported PendingPermission peek (never resolves the parked entry).
+func waitForBrokerPending(t *testing.T, b *adapters.PermissionDecisionBroker, runID, requestID string, timeout time.Duration) {
 	t.Helper()
 	deadline := time.Now().Add(timeout)
 	for time.Now().Before(deadline) {
-		b.mu.Lock()
-		_, ok := b.pending[key]
-		b.mu.Unlock()
-		if ok {
+		if b.PendingPermission(runID, requestID) {
 			return
 		}
 		time.Sleep(5 * time.Millisecond)
 	}
-	t.Fatalf("broker never registered pending key %+v", key)
+	t.Fatalf("broker never registered pending key %s/%s", runID, requestID)
 }
 
 // waitForBrokerMiss polls until the broker no longer holds the key, i.e. the
 // parked entry was recycled. Read-only: it never consumes the entry (a
 // Decide probe would resolve the parked request and poison the test).
-func waitForBrokerMiss(t *testing.T, b *PermissionDecisionBroker, key permissionDecisionKey, timeout time.Duration) {
+func waitForBrokerMiss(t *testing.T, b *adapters.PermissionDecisionBroker, runID, requestID string, timeout time.Duration) {
 	t.Helper()
 	deadline := time.Now().Add(timeout)
 	for time.Now().Before(deadline) {
-		b.mu.Lock()
-		_, ok := b.pending[key]
-		b.mu.Unlock()
-		if !ok {
+		if !b.PendingPermission(runID, requestID) {
 			return
 		}
 		time.Sleep(5 * time.Millisecond)
 	}
-	t.Fatalf("broker entry %+v was never recycled", key)
+	t.Fatalf("broker entry %s/%s was never recycled", runID, requestID)
 }
 
 func TestRunACPSession_RequiresPromptAndWorkDir(t *testing.T) {
@@ -728,19 +724,19 @@ func TestRunACPSession_RequiresPromptAndWorkDir(t *testing.T) {
 	// No RunProcessContext attached → non-recoverable error.
 	err := runACPSession(context.Background(), strings.NewReader(""), io.Discard, emitter, run, nil)
 	if err == nil || !isNonRecoverable(err) {
-		t.Fatalf("missing RunProcessContext: got %v, want non-recoverable ParseStreamError", err)
+		t.Fatalf("missing RunProcessContext: got %v, want non-recoverable adapters.ParseStreamError", err)
 	}
 
 	// Empty workdir → non-recoverable error.
 	err = runACPSession(testACPContext("prompt", ""), strings.NewReader(""), io.Discard, emitter, run, nil)
 	if err == nil || !isNonRecoverable(err) {
-		t.Fatalf("empty workdir: got %v, want non-recoverable ParseStreamError", err)
+		t.Fatalf("empty workdir: got %v, want non-recoverable adapters.ParseStreamError", err)
 	}
 }
 
-// isNonRecoverable reports whether err wraps a non-recoverable ParseStreamError.
+// isNonRecoverable reports whether err wraps a non-recoverable adapters.ParseStreamError.
 func isNonRecoverable(err error) bool {
-	ps, ok := err.(*ParseStreamError)
+	ps, ok := err.(*adapters.ParseStreamError)
 	return ok && !ps.Recoverable()
 }
 
@@ -763,4 +759,52 @@ func TestAcpBinaryAvailable(t *testing.T) {
 	if acpBinaryAvailable("  ", missing) {
 		t.Error("blank binary must be unavailable")
 	}
+}
+
+// TestAcpAdapterMetadataIsNotEmpty verifies the experimental ACP adapter has
+// non-empty metadata（#1760 acp 增量：随 acp 家族从根包
+// TestAdapterMetadataIsNotEmpty 迁入，逻辑未改）。
+func TestAcpAdapterMetadataIsNotEmpty(t *testing.T) {
+	metadata := NewAcpAdapter("acp", nil, "ACP experimental").Metadata()
+	if metadata.ID == "" {
+		t.Fatal("ACP adapter ID is empty")
+	}
+	if metadata.Name == "" {
+		t.Fatal("ACP adapter Name is empty")
+	}
+	if metadata.Description == "" {
+		t.Fatal("ACP adapter Description is empty")
+	}
+}
+
+// recordingEmitter / recordedEvent 是根包 event_emitter_test.go 测试桩的
+// 本地副本（#1760 acp 增量）：acp 家族归组后根包 _test 符号不可跨包引用，
+// 与 claude 包测试内置测试桩副本的既有模式一致。
+type recordingEmitter struct {
+	mu     sync.Mutex
+	events []recordedEvent
+}
+
+type recordedEvent struct {
+	eventType string
+	scope     map[string]any
+	payload   any
+}
+
+func (r *recordingEmitter) Emit(eventType string, scope map[string]any, payload any) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.events = append(r.events, recordedEvent{eventType, scope, payload})
+}
+
+func (r *recordingEmitter) eventsByType(eventType string) []recordedEvent {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	var result []recordedEvent
+	for _, e := range r.events {
+		if e.eventType == eventType {
+			result = append(result, e)
+		}
+	}
+	return result
 }

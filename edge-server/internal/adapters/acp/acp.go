@@ -10,7 +10,7 @@
 //
 // Once validated with a real ACP agent binary, the "experimental" tag
 // will be removed and this adapter will join the production registry.
-package adapters
+package acp
 
 import (
 	"context"
@@ -21,6 +21,7 @@ import (
 	"runtime"
 	"strings"
 
+	"github.com/agenthub/edge-server/internal/adapters"
 	"github.com/agenthub/edge-server/internal/store"
 )
 
@@ -126,7 +127,7 @@ type AcpAdapter struct {
 	// permissionBroker bridges session/request_permission to the Edge
 	// approval chain. nil = auto-approve fallback (see
 	// acpClientHandler.RequestPermission).
-	permissionBroker *PermissionDecisionBroker
+	permissionBroker *adapters.PermissionDecisionBroker
 }
 
 // NewAcpAdapter creates an experimental ACP adapter for the given agent binary.
@@ -190,12 +191,12 @@ func newAcpAdapter(id, agentBinary string, agentArgs []string, displayName strin
 	}
 }
 
-// SetPermissionBroker installs the shared PermissionDecisionBroker that
+// SetPermissionBroker installs the shared adapters.PermissionDecisionBroker that
 // session/request_permission requests are bridged to (mirrors
 // ClaudeCodeAdapter.SetPermissionBroker; the API layer's
 // installPermissionBrokerLocked calls this automatically once the adapter is
 // registered).
-func (a *AcpAdapter) SetPermissionBroker(broker *PermissionDecisionBroker) {
+func (a *AcpAdapter) SetPermissionBroker(broker *adapters.PermissionDecisionBroker) {
 	a.permissionBroker = broker
 }
 
