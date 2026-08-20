@@ -37,9 +37,17 @@
 // inherited launcherLabel config and still expects the launcher-missing
 // failure; the override guarantees that behavior regardless of construction
 // path.
-package adapters
+//
+// #1760 claude 增量：随 claude 家族归组到子包 claude，共享 ACP 机制
+// （AcpAdapter/NewAcpAdapterConfig/DefaultNpxPath）仍在根包，经
+// adapters.Xxx 限定引用。
+package claude
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/agenthub/edge-server/internal/adapters"
+)
 
 // claudeACPAdapterID is the registry identifier of the official claude-agent-acp
 // configuration.
@@ -66,15 +74,16 @@ const claudeACPPackageSpec = claudeACPPackage + "@" + claudeACPVersionPin
 // only supplies the claude-acp configuration via NewAcpAdapterConfig plus a
 // PreflightCheck override (see file doc for why the override is retained).
 type ClaudeACPAdapter struct {
-	*AcpAdapter
+	*adapters.AcpAdapter
 }
 
 // NewClaudeACPAdapter creates the claude-agent-acp adapter configuration.
 //
 // npxPath is the launcher to spawn; when empty it defaults to "npx.cmd" on
-// Windows and "npx" elsewhere (shared defaultNpxPath). The agent receives no
-// run-time args beyond `-y` + the pinned package spec (claudeACPPackageSpec):
-// ACP mode is implicit in the package, and the prompt travels over stdio.
+// Windows and "npx" elsewhere (shared adapters.DefaultNpxPath). The agent
+// receives no run-time args beyond `-y` + the pinned package spec
+// (claudeACPPackageSpec): ACP mode is implicit in the package, and the
+// prompt travels over stdio.
 //
 // model is the default model injected as ANTHROPIC_MODEL when a run does not
 // specify one (sourced from --agent-model). Empty leaves model selection to
@@ -83,9 +92,9 @@ type ClaudeACPAdapter struct {
 // authenticates the same way the legacy claude-code adapter does.
 func NewClaudeACPAdapter(npxPath, model string) *ClaudeACPAdapter {
 	if npxPath == "" {
-		npxPath = defaultNpxPath()
+		npxPath = adapters.DefaultNpxPath()
 	}
-	return &ClaudeACPAdapter{AcpAdapter: NewAcpAdapterConfig(AcpAdapterConfig{
+	return &ClaudeACPAdapter{AcpAdapter: adapters.NewAcpAdapterConfig(adapters.AcpAdapterConfig{
 		ID:            claudeACPAdapterID,
 		Binary:        npxPath,
 		Args:          []string{"-y", claudeACPPackageSpec},
@@ -109,7 +118,7 @@ func NewClaudeACPAdapter(npxPath, model string) *ClaudeACPAdapter {
 // Code login — is left to the claude-agent-acp process itself.
 func (a *ClaudeACPAdapter) PreflightCheck() error {
 	if !a.Available() {
-		return fmt.Errorf("claude-acp launcher %q not found on PATH (install Node.js/npx)", a.agentBinary)
+		return fmt.Errorf("claude-acp launcher %q not found on PATH (install Node.js/npx)", a.AgentBinary())
 	}
 	return nil
 }

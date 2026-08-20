@@ -1,4 +1,4 @@
-package adapters
+package claude
 
 import (
 	"context"
@@ -6,11 +6,48 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/agenthub/edge-server/internal/runnerctx"
 	"github.com/agenthub/edge-server/internal/store"
 )
+
+// mockEmitter captures emitted events for test verification. 源自根包
+// parser_ndjson_test.go，随 claude 家族下沉（#1760 claude 增量）；根包测试
+// 符号不可跨包引用，改动需两侧同步。
+type mockEmitter struct {
+	mu     sync.Mutex
+	events []emittedEvent
+}
+
+type emittedEvent struct {
+	Type    string
+	Scope   map[string]any
+	Payload map[string]any
+}
+
+func (m *mockEmitter) Emit(eventType string, scope map[string]any, payload any) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	p, _ := payload.(map[string]any)
+	if p == nil {
+		p = map[string]any{}
+	}
+	m.events = append(m.events, emittedEvent{Type: eventType, Scope: scope, Payload: p})
+}
+
+func (m *mockEmitter) eventsOfType(typ string) []emittedEvent {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	var result []emittedEvent
+	for _, e := range m.events {
+		if e.Type == typ {
+			result = append(result, e)
+		}
+	}
+	return result
+}
 
 func claudePath(t *testing.T) string {
 	t.Helper()

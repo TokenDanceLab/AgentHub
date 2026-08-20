@@ -778,43 +778,9 @@ func TestSDKFixtureMapperRedactsTopLevelRefsAndPreservesSanitizedTerminalReason(
 	}
 }
 
-func TestCLIInvocationPlanRedactsPromptEnvAndPaths(t *testing.T) {
-	adapter := NewClaudeCodeAdapter("C:\\Tools\\Claude\\claude.exe", "claude-sonnet-fixture", "default")
-	plan := BuildCLIInvocationPlan(adapter, RunProcessContext{
-		Prompt:         "SECRET_PROMPT_SHOULD_NOT_APPEAR",
-		AgentID:        "claude-code",
-		Model:          "sonnet",
-		PermissionMode: "plan",
-		WorkDir:        "C:\\Users\\Ding\\private\\workspace",
-	})
-
-	if plan.AdapterID != "claude-code" {
-		t.Fatalf("AdapterID = %q, want claude-code", plan.AdapterID)
-	}
-	if plan.CommandName != "claude.exe" {
-		t.Fatalf("CommandName = %q, want basename only", plan.CommandName)
-	}
-	if plan.WorkDir != "workspace" {
-		t.Fatalf("WorkDir = %q, want basename-only redaction", plan.WorkDir)
-	}
-	if !plan.PromptRedacted {
-		t.Fatal("PromptRedacted = false, want true")
-	}
-	if plan.Observed || plan.RealTested {
-		t.Fatalf("fixture invocation plan observed/realTested = %v/%v, want false/false", plan.Observed, plan.RealTested)
-	}
-	encoded := marshalSDKFixtureGolden(t, []SDKMappedEvent{{
-		Type:    "test",
-		Scope:   map[string]any{},
-		Payload: plan.Payload(),
-	}})
-	if strings.Contains(encoded, "SECRET_PROMPT_SHOULD_NOT_APPEAR") || strings.Contains(encoded, "C:\\Users\\Ding") {
-		t.Fatalf("invocation plan leaked prompt or absolute path:\n%s", encoded)
-	}
-	if !strings.Contains(encoded, `"--permission-mode"`) || !strings.Contains(encoded, `"--model"`) {
-		t.Fatalf("invocation plan did not retain safe arg flags:\n%s", encoded)
-	}
-}
+// TestCLIInvocationPlanRedactsPromptEnvAndPaths 已随 claude 家族迁往
+// adapters/claude（#1760 claude 增量）：它以 claude-code 适配器为投影主体，
+// 根包测试不得 import adapters/claude（claude → adapters 单向依赖）。
 
 func assertSDKFixtureGolden(t *testing.T, name string) {
 	t.Helper()
