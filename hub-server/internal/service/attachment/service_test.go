@@ -16,8 +16,8 @@ import (
 	"github.com/agenthub/hub-server/internal/config"
 	"github.com/agenthub/hub-server/internal/errcode"
 	"github.com/agenthub/hub-server/internal/model"
-	"github.com/agenthub/hub-server/internal/service"
 	"github.com/agenthub/hub-server/internal/service/attachment"
+	"github.com/agenthub/hub-server/internal/service/im"
 )
 
 func TestLocalStorage_PutAndGet(t *testing.T) {
@@ -94,7 +94,7 @@ func TestLocalStorage_AvoidsDoubleUploadsPrefixWhenBaseDirIsUploads(t *testing.T
 	store := attachment.NewLocalStorage(uploadDir)
 
 	hash := "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-	key := service.PathFromHash(hash)
+	key := im.PathFromHash(hash)
 	if key == "" {
 		t.Fatal("PathFromHash should return a non-empty key for a valid hash")
 	}
@@ -164,7 +164,7 @@ func TestSaveAttachment_StorageInjection(t *testing.T) {
 	_ = store
 
 	hash := "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-	key := service.PathFromHash(hash)
+	key := im.PathFromHash(hash)
 	if key == "" {
 		t.Fatal("PathFromHash should return a non-empty key for a valid hash")
 	}
@@ -229,8 +229,8 @@ func TestAttachmentService_SetStoragePort(t *testing.T) {
 	if !store.called {
 		t.Fatal("storage PresignURL should be called after SetStorage")
 	}
-	if store.key != service.PathFromHash(hash) {
-		t.Fatalf("presign key = %q, want %q", store.key, service.PathFromHash(hash))
+	if store.key != im.PathFromHash(hash) {
+		t.Fatalf("presign key = %q, want %q", store.key, im.PathFromHash(hash))
 	}
 }
 
@@ -380,8 +380,8 @@ func TestAttachmentServicePresignBlobURLUsesStorageKeyAndSafeResponseHeaders(t *
 	if url != store.url {
 		t.Fatalf("PresignBlobURL() = %q, want %q", url, store.url)
 	}
-	if store.key != service.PathFromHash(hash) {
-		t.Fatalf("presign key = %q, want %q", store.key, service.PathFromHash(hash))
+	if store.key != im.PathFromHash(hash) {
+		t.Fatalf("presign key = %q, want %q", store.key, im.PathFromHash(hash))
 	}
 	if store.contentType != "text/plain" {
 		t.Fatalf("presign content type = %q, want text/plain", store.contentType)
