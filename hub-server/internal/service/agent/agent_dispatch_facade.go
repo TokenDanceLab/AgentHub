@@ -1,4 +1,4 @@
-package service
+package agent
 
 import (
 	"context"
@@ -8,15 +8,15 @@ import (
 	"github.com/agenthub/hub-server/internal/service/dispatchsvc"
 )
 
-// ── AgentService facade (wiring/handler stability) ───────────────────────────
+// ── Service facade (wiring/handler stability) ───────────────────────────
 //
-// Thin delegating methods that forward AgentService API surface to the composed
+// Thin delegating methods that forward Service API surface to the composed
 // DispatchService. Kept in a separate file to match delivery_outbox_facade.go
 // pattern (#801). Orchestration stays in agent_dispatch.go.
 
 // dispatchService returns the composed DispatchService, lazily constructing one
-// from AgentService deps when tests use struct literals without NewAgentService.
-func (s *AgentService) dispatchService() *dispatchsvc.DispatchService {
+// from Service deps when tests use struct literals without NewService.
+func (s *Service) dispatchService() *dispatchsvc.DispatchService {
 	if dispatch.ComposedDispatchReady(s.dispatch != nil) {
 		return s.dispatch
 	}
@@ -24,16 +24,16 @@ func (s *AgentService) dispatchService() *dispatchsvc.DispatchService {
 }
 
 // TriggerAgentTask creates a pending task for an agent and dispatches it to the inviter's edge.
-func (s *AgentService) TriggerAgentTask(ctx context.Context, userID, triggerMessageID, targetAgentInstanceID, targetAgentType, targetCustomAgentID, modelParams, targetID string) (*model.PendingAgentTask, error) {
+func (s *Service) TriggerAgentTask(ctx context.Context, userID, triggerMessageID, targetAgentInstanceID, targetAgentType, targetCustomAgentID, modelParams, targetID string) (*model.PendingAgentTask, error) {
 	return s.dispatchService().TriggerAgentTask(ctx, userID, triggerMessageID, targetAgentInstanceID, targetAgentType, targetCustomAgentID, modelParams, targetID)
 }
 
 // CancelTask cancels a pending task by its ID.
-func (s *AgentService) CancelTask(ctx context.Context, userID, taskID string) error {
+func (s *Service) CancelTask(ctx context.Context, userID, taskID string) error {
 	return s.dispatchService().CancelTask(ctx, userID, taskID)
 }
 
 // RegenerateAgentTask creates a new task using the same prompt as an existing task.
-func (s *AgentService) RegenerateAgentTask(ctx context.Context, userID, taskID string) (*model.PendingAgentTask, error) {
+func (s *Service) RegenerateAgentTask(ctx context.Context, userID, taskID string) (*model.PendingAgentTask, error) {
 	return s.dispatchService().RegenerateAgentTask(ctx, userID, taskID)
 }

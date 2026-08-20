@@ -16,7 +16,7 @@ import (
 	"github.com/agenthub/hub-server/internal/model"
 )
 
-// AgentService is the subset of *service.AgentService used by AgentHandler.
+// AgentService is the subset of *agent.Service used by AgentHandler.
 type AgentService interface {
 	AddAgentToSession(ctx context.Context, userID, sessionID, agentType, customAgentID, displayName string) (*model.AgentInstance, error)
 	TriggerAgentTask(ctx context.Context, userID, triggerMessageID, targetAgentInstanceID, targetAgentType, targetCustomAgentID, modelParams, targetID string) (*model.PendingAgentTask, error)

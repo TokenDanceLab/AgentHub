@@ -1,4 +1,4 @@
-package service
+package agent
 
 import (
 	"context"
@@ -9,7 +9,7 @@ import (
 	"github.com/agenthub/hub-server/internal/cache"
 )
 
-func TestResolveCacheUsesNoopForTypedNilClient(t *testing.T) {
+func TestResolveAgentCacheUsesNoopForTypedNilClient(t *testing.T) {
 	ctx := context.Background()
 	var typedNil *cache.Client
 

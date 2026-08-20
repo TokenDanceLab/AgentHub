@@ -19,7 +19,7 @@ import (
 	"github.com/agenthub/hub-server/internal/log"
 	"github.com/agenthub/hub-server/internal/outboundhttp"
 	"github.com/agenthub/hub-server/internal/repository"
-	"github.com/agenthub/hub-server/internal/service"
+	"github.com/agenthub/hub-server/internal/service/agent"
 	"github.com/agenthub/hub-server/internal/service/agentcontrol"
 	"github.com/agenthub/hub-server/internal/service/agentprofile"
 	"github.com/agenthub/hub-server/internal/service/agentteam"
@@ -175,7 +175,7 @@ func (a *App) initServices(ctx context.Context) error {
 	// policy (bounded timeout, redirects refused). The service layer never
 	// constructs transport clients.
 	edgeDispatchClient := outboundhttp.NewClient(a.Config.Edge.Timeout)
-	a.AgentService = service.NewAgentService(a.DB, a.bus, a.mgr, a.CacheClient, a.RelayService, a.Config.Edge, edgeDispatchClient, a.Config.JWT.Secret)
+	a.AgentService = agent.NewService(a.DB, a.bus, a.mgr, a.CacheClient, a.RelayService, a.Config.Edge, edgeDispatchClient, a.Config.JWT.Secret)
 
 	// Agent Profile service
 	agentProfileSvc := agentprofile.NewService(a.DB)

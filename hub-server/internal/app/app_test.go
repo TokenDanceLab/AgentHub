@@ -21,7 +21,7 @@ import (
 	"github.com/agenthub/hub-server/internal/config"
 	"github.com/agenthub/hub-server/internal/metrics"
 	"github.com/agenthub/hub-server/internal/model"
-	"github.com/agenthub/hub-server/internal/service"
+	"github.com/agenthub/hub-server/internal/service/agent"
 	"github.com/agenthub/hub-server/internal/service/messagereaction"
 	"github.com/agenthub/hub-server/internal/service/session"
 	"github.com/agenthub/hub-server/internal/ws"
@@ -805,7 +805,7 @@ func TestOnRouteSetReplaysTargetQueueOnlyForConnectedDevice(t *testing.T) {
 		CacheClient:  cacheClient,
 		mgr:          mgr,
 		bg:           newBackgroundGroup(context.Background()),
-		AgentService: service.NewAgentService(db, nil, mgr, cacheClient, nil, config.EdgeDispatchConfig{}, nil, ""),
+		AgentService: agent.NewService(db, nil, mgr, cacheClient, nil, config.EdgeDispatchConfig{}, nil, ""),
 	}
 	require.NoError(t, cacheClient.PushPendingTargetTask(context.Background(), "user-1", "target-dev-b", "dev-b", `{"task_id":"task-dev-b","target_id":"target-dev-b"}`))
 
@@ -875,7 +875,7 @@ func TestOnRouteSetKeepsPendingTargetQueueWhenDeliveryBufferFull(t *testing.T) {
 		CacheClient:  cacheClient,
 		mgr:          mgr,
 		bg:           newBackgroundGroup(context.Background()),
-		AgentService: service.NewAgentService(db, nil, mgr, cacheClient, nil, config.EdgeDispatchConfig{}, nil, ""),
+		AgentService: agent.NewService(db, nil, mgr, cacheClient, nil, config.EdgeDispatchConfig{}, nil, ""),
 	}
 	const payload = `{"task_id":"task-dev-b-full","target_id":"target-dev-b"}`
 	require.NoError(t, cacheClient.PushPendingTargetTask(context.Background(), "user-1", "target-dev-b", "dev-b", payload))
@@ -923,7 +923,7 @@ func TestOnRouteSetDoesNotReplayTargetQueueWhenDispatchStateMissing(t *testing.T
 		CacheClient:  cacheClient,
 		mgr:          mgr,
 		bg:           newBackgroundGroup(context.Background()),
-		AgentService: service.NewAgentService(db, nil, mgr, cacheClient, nil, config.EdgeDispatchConfig{}, nil, ""),
+		AgentService: agent.NewService(db, nil, mgr, cacheClient, nil, config.EdgeDispatchConfig{}, nil, ""),
 	}
 	require.NoError(t, cacheClient.PushPendingTargetTask(context.Background(), "user-1", "target-dev-b", "dev-b", `{"task_id":"missing-task","target_id":"target-dev-b"}`))
 
@@ -985,7 +985,7 @@ func TestPublishExpiredTaskTimeoutSkipsStaleTerminalTask(t *testing.T) {
 		DB:           db,
 		bus:          b,
 		bg:           newBackgroundGroup(context.Background()),
-		AgentService: service.NewAgentService(db, b, nil, nil, nil, config.EdgeDispatchConfig{}, nil, ""),
+		AgentService: agent.NewService(db, b, nil, nil, nil, config.EdgeDispatchConfig{}, nil, ""),
 	}
 	staleScannedTask := model.PendingAgentTask{
 		ID:              "task-timeout-race",

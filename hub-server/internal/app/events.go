@@ -11,7 +11,7 @@ import (
 	"github.com/agenthub/hub-server/internal/handler"
 	"github.com/agenthub/hub-server/internal/metrics"
 	"github.com/agenthub/hub-server/internal/model"
-	"github.com/agenthub/hub-server/internal/service"
+	"github.com/agenthub/hub-server/internal/service/agent"
 	"github.com/agenthub/hub-server/internal/service/dispatch"
 	"github.com/agenthub/hub-server/internal/service/messagereaction"
 	"github.com/agenthub/hub-server/internal/ws"
@@ -276,7 +276,7 @@ func (a *App) subscribeAgentEvents() {
 	// why a ws.Type* constant is not added here (OpenAPI parity gate owns the
 	// ws constant + openapi enum + hubEvents.ts sync across lanes).
 	a.bus.Subscribe(bus.EventTypeAgentRouteDecision, func(ctx context.Context, event bus.Event) {
-		payload, ok := event.Payload.(service.RouteDecisionPayload)
+		payload, ok := event.Payload.(agent.RouteDecisionPayload)
 		if !ok {
 			return
 		}
