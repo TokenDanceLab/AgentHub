@@ -1,9 +1,9 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import type { ChatMessage } from '../types/chat';
 import type { TranscriptBlock } from '../transcript';
-import { useFocusTrap } from './focusTrap';
+import { useFocusTrap } from '../ui/focusTrap';
 import { X } from 'lucide-react';
-import { Button } from './Button';
+import { Button } from '../ui/Button';
 import styles from './MessageSearchPanel.module.css';
 
 const SEARCH_DEBOUNCE_MS = 300;
@@ -299,7 +299,7 @@ export function MessageSearchPanel({
 /*
   Migration bridge (Wave 10): keep a default export so out-of-scope consumers
   using `import MessageSearchPanel from './MessageSearchPanel'` keep compiling
-  — currently workbench/ConversationHost.tsx and ui/MessageSearchPanel.stories.tsx,
+  — currently workbench/ConversationHost.tsx and workbench/MessageSearchPanel.stories.tsx,
   both outside this lane's editable file set. The primary export is now the named
   `export function MessageSearchPanel` above. Remove this bridge once those
   consumers migrate to named imports.
