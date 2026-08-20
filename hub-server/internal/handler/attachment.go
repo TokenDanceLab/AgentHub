@@ -17,6 +17,7 @@ import (
 	"github.com/agenthub/hub-server/internal/errcode"
 	"github.com/agenthub/hub-server/internal/model"
 	"github.com/agenthub/hub-server/internal/service"
+	"github.com/agenthub/hub-server/internal/service/im"
 )
 
 // AttachmentService is the subset of *attachment.Service used by AttachmentHandler.
@@ -52,7 +53,7 @@ func (h *AttachmentHandler) Probe(c *gin.Context) {
 		Fail(c, errcode.ErrBadRequest)
 		return
 	}
-	if !service.IsValidAttachmentHash(req.Hash) {
+	if !im.IsValidAttachmentHash(req.Hash) {
 		Fail(c, errcode.ErrBadRequest)
 		return
 	}
@@ -79,7 +80,7 @@ func (h *AttachmentHandler) Upload(c *gin.Context) {
 	userID := c.GetString("user_id")
 
 	hash := c.PostForm("hash")
-	if !service.IsValidAttachmentHash(hash) {
+	if !im.IsValidAttachmentHash(hash) {
 		Fail(c, errcode.ErrBadRequest)
 		return
 	}
@@ -178,7 +179,7 @@ func (h *AttachmentHandler) Download(c *gin.Context) {
 		Fail(c, errcode.AttachNotFound)
 		return
 	}
-	if !service.IsValidAttachmentHash(a.Hash) {
+	if !im.IsValidAttachmentHash(a.Hash) {
 		Fail(c, errcode.AttachNotFound)
 		return
 	}
