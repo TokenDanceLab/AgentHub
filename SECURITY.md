@@ -4,8 +4,8 @@
 
 请**不要**在公开 issue 中报告 Critical/High 级安全问题。
 
-- 首选：GitHub Security Advisory（本仓库 Security 标签页 → Report a vulnerability，若未启用请使用以下邮箱渠道）
-- 或通过组织内部安全渠道联系维护者
+- 首选：GitHub Security Advisory（本仓库 Security 标签页 → Report a vulnerability）。
+- 若该入口不可用：创建 issue 并**只写 "security report" 占位**（不含任何细节），在 body 中@维护者；我们会在 48 小时内确认收到，并通过私密渠道索要细节。
 
 报告请包含：影响范围、复现步骤（最小化）、可能的修复建议。我们会在 48 小时内确认收到，并定期同步处理进展。
 

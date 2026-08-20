@@ -24,10 +24,12 @@ Hub Server（`hub-server/`）是 AgentHub 的云端控制面：TokenDance ID rel
 | App assembly | `hub-server/cmd/server-hub/main.go`, `hub-server/internal/app/` |
 | Route registry | `hub-server/internal/router/router.go` |
 | HTTP layer | `hub-server/internal/handler/` |
+| Auth middleware | `hub-server/internal/middleware/` |
 | Business logic | `hub-server/internal/service/`（按领域分子包，见下） |
 | Persistence | `hub-server/internal/repository/`, `hub-server/internal/model/` |
 | WebSocket frames | `hub-server/internal/ws/frame.go` |
-| Event fanout | `hub-server/internal/app/events.go` |
+| Event fanout / bus | `hub-server/internal/app/events.go`, `hub-server/internal/bus/` |
+| Cache / sequence | `hub-server/internal/cache/`, `hub-server/internal/seqalloc/` |
 | Config | `hub-server/internal/config/`, `hub-server/configs/`, `.env.example` |
 | Migrations | `hub-server/migrations/` |
 
@@ -44,7 +46,7 @@ Hub Server（`hub-server/`）是 AgentHub 的云端控制面：TokenDance ID rel
 | 资源 / 目录 | `attachment`, `document`, `skill`, `mcpserver`, `providerbinding`, `publicstats`, `usersettings`, `workspace` |
 | 审计 | `audit` |
 
-纯包门禁：`deliveryoutbox`（及 `dispatch`/`im`/`agentevent`）在 `scripts/verify/verify-hub-pure-packages.py` 的 PURE_DIRS 中，禁止 import gorm/cache/ws/service 树；其持久化经 `Store` 接口由 service 包的 gorm 实现注入。残留平铺文件仅 `delivery_outbox_facade.go`/`delivery_outbox_store.go`/`image_meta.go`。
+纯包门禁：`deliveryoutbox`（及 `dispatch`/`im`/`agentevent`）在 `scripts/verify/verify-hub-pure-packages.py` 的 PURE_DIRS 中，禁止 import gorm/cache/ws/service 树；其持久化经 `Store` 接口由 service 包的 gorm 实现注入（PURE_FILES 另含 `agentteam/route_helpers.go`）。残留平铺文件（非测试）仅 `delivery_outbox_facade.go`/`delivery_outbox_store.go`/`image_meta.go`，另有 `bench_test.go`/`catalog_ownership_test.go`/`image_meta_test.go` 三个测试文件。`agent` 子包目前仍经 `service.DeliveryOutbox`/`NewDeliveryOutboxStore` 依赖平铺根包 facade（`agent/agent.go`），平铺根包非无依赖残留；后续建议将 facade 迁入子包或改窄接口注入。
 
 ## Contract Map
 
