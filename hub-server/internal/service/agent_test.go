@@ -1568,7 +1568,7 @@ func TestTimeoutExpiredTaskDoesNotOverwriteTerminalRace(t *testing.T) {
 // ==================== B5: #116 reject agent tasks for dissolved sessions ====================
 
 func TestTriggerAgentTask_RejectsDissolvedSession(t *testing.T) {
-	db, mock, sqlDB := newMockDB(t)
+	db, mock, sqlDB := newMockDBAgent(t)
 	defer sqlDB.Close()
 
 	triggerMsgID := "trigger-msg-dissolved"
@@ -1596,7 +1596,7 @@ func TestTriggerAgentTask_RejectsDissolvedSession(t *testing.T) {
 // as an error to the caller instead of being misread as "not a member"
 // (previously `active, _ :=` collapsed DB faults into SessionNotMember).
 func TestTriggerAgentTask_MemberActiveLookupErrorSurfaces(t *testing.T) {
-	db, mock, sqlDB := newMockDB(t)
+	db, mock, sqlDB := newMockDBAgent(t)
 	defer sqlDB.Close()
 
 	triggerMsgID := "trigger-msg-member-err"
