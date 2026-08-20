@@ -76,6 +76,22 @@ pnpm dev                                    # 5. 起 Desktop Vite（:5173）；w
 | [docs/README.md](docs/README.md) | 文档导航 |
 | [AGENTS.md](AGENTS.md) | 项目规则 SSOT（分支、红线、证据等级） |
 
+## 仓库内容边界
+
+本仓库是 **public** 的，只包含：
+
+- 全部源代码、API 契约（`api/`）、工程门禁脚本（`scripts/verify/`）
+- 面向用户与贡献者的公开文档（`docs/` 中不含内部运营/安全材料）
+- 安全策略摘要（`SECURITY.md`，含发布门禁风险状态表）
+
+**不在本仓库**（属 TokenDance 私有文档中枢 `TokenDanceLab/docs`，private）：
+
+- 内部治理执行映射（TokenDance 队列、飞书集成、发布审批切片）
+- 安全风险登记表正文与威胁模型（本仓只保留无细节的发布门禁状态）
+- 私有部署拓扑、运维证据与路由
+
+公开文档不包含真实服务器地址、生产 secret、token、日志或个人路径（见 `AGENTS.md` §9）。治理公开区说明见 [docs/governance/README.md](docs/governance/README.md)。
+
 ## 贡献
 
 欢迎提交 Issue 和 Pull Request。详情见 [CONTRIBUTING.md](CONTRIBUTING.md)。
