@@ -24,8 +24,8 @@ import type { MainchainSummary } from './mainchain';
 import { UnifiedComposer } from './UnifiedComposer';
 import { WorkspaceHeader } from './WorkspaceHeader';
 import type { UnreadDividerDescriptor } from '../chatview';
-import MessageSearchPanel from '../ui/MessageSearchPanel';
-import { PageErrorBoundary } from '../ui/PageErrorBoundary';
+import MessageSearchPanel from './MessageSearchPanel';
+import { PageErrorBoundary } from './PageErrorBoundary';
 import { useComposerSubmitBehavior } from './workbenchPreferences';
 import styles from './AgentHubWorkbench.module.css';
 
