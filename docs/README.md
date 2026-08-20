@@ -1,6 +1,6 @@
 # AgentHub 文档
 
-最后更新：2026-08-16
+最后更新：2026-08-20
 
 ## 快速入口
 
@@ -38,12 +38,14 @@ docs/
 | 模块架构 | [architecture/README.md](architecture/README.md) |
 | 当前架构决策摘要 | [decisions.md](decisions.md) |
 | 旧架构决策正文和背景 | [history.md](history.md) |
-| 现役 SPEC | SPEC 完成后外迁；历史见 [archives/plan/](archives/plan/) 与 [history.md](history.md) |
-| 仓库布局裁决 | ADR-018 摘要见 [decisions.md](decisions.md)；历史分析见 [archives/](archives/) |
+| 现役 SPEC | SPEC 完成后外迁；历史见 [history.md](history.md) |
+| 仓库布局裁决 | ADR-018 摘要见 [decisions.md](decisions.md)；历史分析见 [history.md](history.md) |
 | 项目规则和文档规则 | [../AGENTS.md](../AGENTS.md) |
 | WebSocket 事件合同 | [../api/events.md](../api/events.md) |
-| SDK Agent 策略 | [reference/sdk-agent-strategy.md](reference/sdk-agent-strategy.md) |
+| SDK Agent 策略 | [reference/README.md](reference/README.md)（含 [sdk-agent-strategy.md](reference/sdk-agent-strategy.md)、[agent-protocol-compat.md](reference/agent-protocol-compat.md)） |
+| 组件验收标准 | [component-acceptance.md](component-acceptance.md) |
 | 分支和 worktree 规则 | [../AGENTS.md](../AGENTS.md) |
+| 治理执行（飞书/i18n/公开包装） | [governance/governance-execution.md](governance/governance-execution.md) |
 | 安全风险 | [governance/security-risk-register.md](governance/security-risk-register.md) |
 | 机器验证映射 | [governance/verifier-map.md](governance/verifier-map.md) |
 | 威胁模型 | [governance/threat-model.md](governance/threat-model.md) |

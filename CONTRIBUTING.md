@@ -28,6 +28,21 @@ Allowed types (SSOT in AGENTS.md): `feat|fix|docs|refactor|chore|test|perf|ci|re
 
 Common scopes: `client|edge|api|docs|desktop|web|hub|shared|ci`.
 
+## Build / Test / Lint
+
+完整命令速查见 [docs/developer-quickstart.md](docs/developer-quickstart.md) §测试速查（SSOT）。常用入口：
+
+```bash
+make test          # Go 单元测试（L0，-short）+ 前端 vitest
+make fe-test       # 前端 vitest
+cd hub-server && go test ./... -short -count=1   # Hub 单元
+cd edge-server && go test ./... -short -count=1  # Edge 单元
+make test-hub-integration                         # L1 集成（先 scripts/dev/dev-up.sh 起 PG/Redis）
+python scripts/verify/verify-doc-ssot.py          # 文档/规则一致性门禁
+```
+
+改动文件对应的最窄 gate 优先；宣称 merge-ready 前跑对应完整 gate（分层与 CI job 映射见 [AGENTS.md](AGENTS.md) §5.5）。
+
 ## Pull Requests
 
 - Keep PRs scoped to one issue or one coherent change.
@@ -35,6 +50,7 @@ Common scopes: `client|edge|api|docs|desktop|web|hub|shared|ci`.
 - Do not claim real login, real model/API spend, packaged Desktop, signing, installer, release upload, or production deploy unless the matching approved gate ran.
 - Run the focused checks named by the touched files and include command evidence in the PR body.
 - Before requesting merge, run `git diff --check`, confirm `git status --short --branch` is understood, generated artifacts are ignored, and no unrelated WIP is included.
+- 行为准则见 [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)；发现安全漏洞请按 [SECURITY.md](SECURITY.md) 的私密渠道报告，不要公开 issue。
 
 ## License
 

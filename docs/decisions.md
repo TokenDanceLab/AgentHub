@@ -1,6 +1,6 @@
 # AgentHub Decisions
 
-最后更新：2026-08-09
+最后更新：2026-08-20
 
 本文件是当前架构决策摘要。旧 ADR 全文已外迁到 `docs/history.md` 指向的 TokenDance docs archive；旧正文只作追溯，不覆盖 `AGENTS.md`、`docs/architecture.md`、`docs/architecture/`、`api/` 或当前源码事实。
 
@@ -17,6 +17,7 @@
 | ADR-009 | Accepted, historical | SettingsPage 拆分为 section/primitives/lazy lanes 的方向有效；是否已完成以当前 Desktop/Web settings 代码为准，不作为新 backlog。 | Frontend settings | 历史有效 |
 | ADR-010 | Accepted | Edge 暴露 MCP-compatible capability 时以 Edge auth、tool schema、transport 和当前 endpoint 代码为准；不要为每个外部工具做专用协议。 | Edge MCP | 是 |
 | ADR-011 | Accepted | 前端保持 pnpm workspace / shared package 架构；Desktop/Web/Mobile 共享类型和 UI contract，平台能力留在各平台 adapter。 | Frontend platform | 是 |
+| ADR-012 | — 未单独成档 | 历史审计未找到 ADR-012 记录（git log 与归档索引均无）。编号跳过，不补记；后续新决策从 ADR-024 续号。 | — | — |
 | ADR-013 | Accepted, historical | Hub app 启动入口应保持职责拆分：wiring、events、background、admin、router 等边界清楚；当前文件布局以源码为准。 | Hub server | 是 |
 | ADR-014 | Accepted, partially realized | Agent team service 应按 CRUD、member、run、compete、routing、events 等领域拆分；当前落地情况以 `hub-server/internal/service/` 为准。 | Hub service | 部分有效 |
 | ADR-015 | Accepted | 避免服务间循环依赖；优先窄接口、构造函数显式依赖和事件中介，不用 setter 注入掩盖循环。 | Hub architecture | 是 |
@@ -30,6 +31,7 @@
 | ADR-021 | Accepted 2026-08-09 | 安全门禁四修（AH-SR-051）：迁移触发器双炸弹修复链、Go toolchain 1.26.5（stdlib vuln GO-2026-5037/5038/5039）、i18n callsites ratchet 接线、文档版本对齐。 | Security / CI | 是 |
 | ADR-022 | Accepted 2026-08-09 | 迁移触发器修复原则：已发布迁移不可变（不改 0040/0058.up/0060.up/0016.up），新建后续迁移（0061/0064）以 `DISABLE/ENABLE TRIGGER USER` 或 `NOT VALID` 方式旁路 0040 append-only 触发器；down 链同样补外包。legacy 行 backfill 留给计数器列通道，不在此轮。 | Hub migrations | 是 |
 | ADR-023 | Accepted 2026-08-09 | Tauri 安全加固：sidecar 重启策略、command 门控（最小权限 capability）、SSRF 防护（出站 URL allowlist + 私网拦截）。正文见 Tauri 通道交付。 | Desktop / Security | 是 |
+| ADR-024 | Accepted 2026-08-20；landed #1760/#1761（2026-08-19~20 全量落地） | service/adapters 领域子包化收官：#1761 hub `internal/service/` 平铺大包按领域拆 28 子包（Identity/Agent/IM/执行/资源/审计六族，`handler -> service -> repository` 单向依赖不变，纯包 `dispatch/deliveryoutbox/im/agentevent` 经 `verify-hub-pure-packages.py` 门禁禁止 import gorm/cache/ws/service 树，持久化经 `Store` 接口注入）；#1760 edge `internal/adapters/` 按 Agent 家族拆 `claude/codex/opencode/orchestrator/sdk/testdata` 叶子子包（orchestrator 为唯一纯叶子，`verify-orchestrator-deps.py` + `TestLeafDoesNotImportRootAdapters` 机器门禁，composition root 装配，根包保留共享 ACP 运行时）。新增领域逻辑放入对应子包，不再回平铺包。 | Hub / Edge architecture | 是 |
 
 ## Archive
 
