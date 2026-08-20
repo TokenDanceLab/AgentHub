@@ -1,5 +1,5 @@
 // real_tested=true
-import { renderHook } from '@testing-library/react';
+import { act, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { friendlyErrorMessage, setToastHandler, useErrorReporter, type ToastConfig } from './errorReporting';
 import { globalErrorReporter, HubNetworkError } from './errors';
@@ -86,16 +86,80 @@ describe('toast delivery contract', () => {
   });
 });
 
-describe('useErrorReporter (known production bug)', () => {
+describe('useErrorReporter snapshot stability (#1795)', () => {
   afterEach(() => {
     globalErrorReporter.clear();
   });
 
-  it('crashes on mount: unstable getSnapshot loops useSyncExternalStore', () => {
-    // getSnapshot() builds a fresh { total, byCategory, latest } object per
-    // call, so React's snapshot-consistency check re-renders forever and
-    // aborts with "Maximum update depth exceeded". Pinned so the fix
-    // (memoizing getSnapshot) turns this test into a regression alert.
-    expect(() => renderHook(() => useErrorReporter())).toThrow('Maximum update depth exceeded');
+  it('returns the same snapshot reference across renders without store updates', () => {
+    // getSnapshot must be Object.is-stable between store changes, otherwise
+    // React's useSyncExternalStore consistency check re-renders forever and
+    // aborts with "Maximum update depth exceeded" (#1795). The hook returns
+    // the snapshot object itself, so reference equality pins that contract.
+    const { result, rerender } = renderHook(() => useErrorReporter());
+    const firstSnapshot = result.current.stats;
+
+    rerender();
+    expect(result.current.stats).toBe(firstSnapshot);
+
+    rerender();
+    expect(result.current.stats).toBe(firstSnapshot);
+  });
+
+  it('returns a fresh snapshot with correct content after a store update', () => {
+    const { result, rerender } = renderHook(() => useErrorReporter());
+    const beforeUpdate = result.current.stats;
+    expect(beforeUpdate.total).toBe(0);
+    expect(beforeUpdate.latest).toBeNull();
+
+    act(() => {
+      globalErrorReporter.report(new HubNetworkError());
+    });
+
+    const afterUpdate = result.current.stats;
+    expect(afterUpdate).not.toBe(beforeUpdate);
+    expect(afterUpdate.total).toBe(1);
+    expect(afterUpdate.byCategory.network).toBe(1);
+    expect(afterUpdate.latest?.message).toBe(new HubNetworkError().message);
+
+    // Once the update settles the snapshot must be stable again; a fresh
+    // object per render would re-trigger the update loop.
+    rerender();
+    expect(result.current.stats).toBe(afterUpdate);
+  });
+
+  it('resets to an empty snapshot after clearErrors', () => {
+    const { result, rerender } = renderHook(() => useErrorReporter());
+    act(() => {
+      globalErrorReporter.report(new HubNetworkError());
+    });
+    expect(result.current.stats.total).toBe(1);
+
+    act(() => {
+      result.current.clearErrors();
+    });
+    rerender();
+
+    expect(result.current.stats.total).toBe(0);
+    expect(result.current.stats.latest).toBeNull();
+    expect(result.current.stats.byCategory).toEqual({});
+  });
+
+  it('clear notifies change-channel subscribers even without a new report', () => {
+    const { result, rerender } = renderHook(() => useErrorReporter());
+    act(() => {
+      globalErrorReporter.report(new HubNetworkError());
+    });
+    expect(result.current.stats.total).toBe(1);
+
+    // Direct store clear (no hook in the middle) must still re-render
+    // consumers: the change channel fires on clear, not only on report.
+    act(() => {
+      globalErrorReporter.clear();
+    });
+    rerender();
+
+    expect(result.current.stats.total).toBe(0);
+    expect(result.current.stats.latest).toBeNull();
   });
 });
