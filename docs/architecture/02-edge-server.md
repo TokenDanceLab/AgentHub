@@ -2,7 +2,7 @@
 
 > 子文档 | 主索引：[architecture.md](../architecture.md)
 >
-> 最后更新：2026-07-18
+> 最后更新：2026-08-20
 
 ## 职责
 
@@ -75,10 +75,25 @@ ProcessExecutor 配置 `RunTimeout`（默认 30 分钟）、`ShutdownGracePeriod
 | Event bus/replay | `internal/events/` |
 | Store | `internal/store/` |
 | Run lifecycle | `internal/lifecycle/` |
-| Runtime adapters | `internal/adapters/` |
+| Runtime adapters | `internal/adapters/`（按家族分子包，见下） |
 | Agent registry/queue | `internal/agents/` |
 | Runners compat summary | `internal/runners/` — compat summary only; `/v1/runners` is not a new business Agent model |
 | Metrics/run context | `internal/metrics/`, `internal/runnerctx/` |
+
+## Adapter 家族子包（#1760）
+
+`internal/adapters/` 已从平铺大包拆分为按 Agent 家族归组的子包。每个家族子包是叶子包，只依赖根包与中立合同包（`internal/orchestration`），根包不 import 子包；注册由组合根（`cmd/agenthub-edge`、`internal/httpserver`）完成，根包仅保留字符串适配器 ID。共享机制（`AcpAdapter`、NDJSON parser、权限处理链、MCP 临时配置、registry）留在根包。
+
+| 家族 | 子包 | 内容 |
+|---|---|---|
+| Claude | `internal/adapters/claude/` | legacy `ClaudeCodeAdapter`（`claude-code`，DEPRECATED）+ 官方 ACP `ClaudeACPAdapter`（`claude-acp`） |
+| Codex | `internal/adapters/codex/` | ACP `CodexACPAdapter`（`codex-acp`） |
+| OpenCode | `internal/adapters/opencode/` | 原生 ACP `OpenCodeACPAdapter`（`opencode-acp`） |
+| Orchestrator | `internal/adapters/orchestrator/` | 群聊编排 `OrchestratorAdapter`（`orchestrator`）+ dispatch interceptor 各子层 |
+| SDK | `internal/adapters/sdk/` | HTTP `AnthropicSDKAdapter`（`anthropic-sdk`）、`OpenAISDKAdapter`（`openai-sdk`） |
+| Test fixtures | `internal/adapters/testdata/` | 测试共享 fixtures（`sdk_fixture_mapper` 等） |
+
+纯包门禁：`orchestrator` 叶子包经 `scripts/verify/verify-orchestrator-deps.py` 机器门禁，禁止 import 根 `internal/adapters` 实现；`TestLeafDoesNotImportRootAdapters` 保证依赖方向单向。共享 ACP 运行时（`acp.go` `AcpAdapter`）与各家族子包共置于根包平铺区（残留平铺文件含 `acp*.go`/`parser_ndjson*.go`/`registry.go` 等）。
 
 ## 与 Hub 的通信
 

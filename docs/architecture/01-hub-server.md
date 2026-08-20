@@ -2,7 +2,7 @@
 
 > 子文档 | 主索引：[architecture.md](../architecture.md)
 >
-> 最后更新：2026-08-02
+> 最后更新：2026-08-20
 
 Hub Server（`hub-server/`）是 AgentHub 的云端控制面：TokenDance ID relying party、Hub session、IM、AgentTeam、同步、中继、审计和远程控制面。它不启动本机 Agent Runtime；执行仍由 Edge Server 和 adapter 负责。
 
@@ -24,12 +24,27 @@ Hub Server（`hub-server/`）是 AgentHub 的云端控制面：TokenDance ID rel
 | App assembly | `hub-server/cmd/server-hub/main.go`, `hub-server/internal/app/` |
 | Route registry | `hub-server/internal/router/router.go` |
 | HTTP layer | `hub-server/internal/handler/` |
-| Business logic | `hub-server/internal/service/` |
+| Business logic | `hub-server/internal/service/`（按领域分子包，见下） |
 | Persistence | `hub-server/internal/repository/`, `hub-server/internal/model/` |
 | WebSocket frames | `hub-server/internal/ws/frame.go` |
 | Event fanout | `hub-server/internal/app/events.go` |
 | Config | `hub-server/internal/config/`, `hub-server/configs/`, `.env.example` |
 | Migrations | `hub-server/migrations/` |
+
+## Service 领域子包（#1761）
+
+`internal/service/` 已从平铺大包拆分为按领域归组的子包，`handler -> service -> repository` 单向依赖不变；每个子包内 `Service`/`NewService` 命名，`handler` 侧保留窄接口。新增领域逻辑放入对应子包，不再回平铺包。
+
+| 领域族 | 子包 |
+|---|---|
+| Identity | `auth`, `oidc` |
+| Agent | `agent`, `agentcontrol`, `agentevent`, `agentprofile`, `agentteam` |
+| IM / 会话 | `contact`, `session`, `message`, `messagereaction`, `notification`, `im` |
+| 执行 / 调度 | `dispatch`, `dispatchsvc`, `executiontarget`, `device`, `relay`, `deliveryoutbox` |
+| 资源 / 目录 | `attachment`, `document`, `skill`, `mcpserver`, `providerbinding`, `publicstats`, `usersettings`, `workspace` |
+| 审计 | `audit` |
+
+纯包门禁：`deliveryoutbox`（及 `dispatch`/`im`/`agentevent`）在 `scripts/verify/verify-hub-pure-packages.py` 的 PURE_DIRS 中，禁止 import gorm/cache/ws/service 树；其持久化经 `Store` 接口由 service 包的 gorm 实现注入。残留平铺文件仅 `delivery_outbox_facade.go`/`delivery_outbox_store.go`/`image_meta.go`。
 
 ## Contract Map
 
