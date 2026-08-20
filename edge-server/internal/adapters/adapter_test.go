@@ -192,16 +192,15 @@ func TestBuildSiblingContextPromptEdgeCases(t *testing.T) {
 
 // TestAdapterMetadataIsNotEmpty verifies all built-in adapters have non-empty metadata.
 // OrchestratorAdapter 已迁移到叶子包，其 Metadata 校验见叶子包
-// orchestrator_adapter_test.go（#1566）。Claude 家族（claude-code/claude-acp）
-// 已归组到子包 adapters/claude，其 Metadata 校验见
-// claude/claude_code_test.go（#1760 claude 增量）。
+// orchestrator_adapter_test.go（#1566）。Claude 家族已归组到 adapters/claude
+// （校验见 claude/claude_code_test.go），codex/opencode 家族已归组到
+// adapters/codex、adapters/opencode（校验见各自子包测试，#1760 各增量）。
 func TestAdapterMetadataIsNotEmpty(t *testing.T) {
 	adapters := []struct {
 		name     string
 		metadata AdapterMetadata
 	}{
-		{"CodexACP", NewCodexACPadapter("").Metadata()},
-		{"OpenCodeACP", NewOpenCodeACPAdapter("").Metadata()},
+		{"ACP", NewAcpAdapter("acp", nil, "ACP experimental").Metadata()},
 	}
 	for _, a := range adapters {
 		if a.metadata.ID == "" {

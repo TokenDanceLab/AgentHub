@@ -258,8 +258,8 @@ func (a *AcpAdapter) Available() bool {
 }
 
 // AgentBinary returns the configured ACP agent binary path/name. Exported so
-// wrapper packages (adapters/claude) can surface it in their own
-// PreflightCheck messages (#1760 claude 增量).
+// wrapper packages (adapters/claude, adapters/codex, adapters/opencode) can
+// surface it in their own PreflightCheck messages (#1760 各增量).
 func (a *AcpAdapter) AgentBinary() string {
 	return a.agentBinary
 }
@@ -294,7 +294,7 @@ func acpBinaryAvailable(binary string, lookPath func(string) (string, error)) bo
 
 // DefaultNpxPath returns the platform-appropriate npx launcher name. Shared
 // by the codex-acp and claude-acp configs (both spawn npx); exported for the
-// claude 子包（#1760 claude 增量，claude → adapters 单向依赖）。
+// claude/codex/opencode 子包（#1760 各增量，子包 → adapters 单向依赖）。
 func DefaultNpxPath() string {
 	if runtime.GOOS == "windows" {
 		return "npx.cmd"

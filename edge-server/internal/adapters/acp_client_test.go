@@ -743,3 +743,24 @@ func isNonRecoverable(err error) bool {
 	ps, ok := err.(*ParseStreamError)
 	return ok && !ps.Recoverable()
 }
+
+// TestAcpBinaryAvailable 校验根包私有助手 acpBinaryAvailable 的解析规则
+// （随 codex 家族下沉时留在根包，测试根包基础设施，#1760 codex/opencode
+// 增量）。
+func TestAcpBinaryAvailable(t *testing.T) {
+	found := func(string) (string, error) { return "npx.cmd", nil }
+	missing := func(string) (string, error) { return "", errors.New("executable file not found") }
+
+	if !acpBinaryAvailable("npx.cmd", found) {
+		t.Error("resolvable binary should be available")
+	}
+	if acpBinaryAvailable("npx.cmd", missing) {
+		t.Error("unresolvable binary must be unavailable")
+	}
+	if acpBinaryAvailable("", found) {
+		t.Error("empty binary must be unavailable")
+	}
+	if acpBinaryAvailable("  ", missing) {
+		t.Error("blank binary must be unavailable")
+	}
+}

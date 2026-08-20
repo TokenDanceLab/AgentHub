@@ -1,23 +1,160 @@
-// Package adapters — codex-acp adapter tests.
+// Package codex — codex-acp adapter tests.
 //
 // These tests verify the codex-acp registry registration, command shape, and
-// the full ParseStream path against a mock ACP peer over real io.Pipe wire
-// (reusing the fakeACPAgent from acp_client_test.go). No real `npx
-// @agentclientprotocol/codex-acp` process is spawned — that requires a
-// Node.js/npx environment with Codex auth + registry network access, which is
-// a TODO for environment verification (see codex_acp.go).
-package adapters
+// the full ParseStream path against a mock ACP peer over real io.Pipe wire.
+// No real `npx @agentclientprotocol/codex-acp` process is spawned — that
+// requires a Node.js/npx environment with Codex auth + registry network
+// access, which is a TODO for environment verification (see codex_acp.go).
+package codex
 
 import (
+	"bufio"
 	"context"
-	"errors"
+	"encoding/json"
+	"fmt"
 	"io"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
+	"github.com/agenthub/edge-server/internal/adapters"
 	"github.com/agenthub/edge-server/internal/store"
 )
+
+// ── 测试桩：自根包测试文件随 codex 家族下沉的副本（#1760 codex/opencode
+// 增量）──
+// fakeACPAgent / sessionUpdateLine / recordingEmitter / emitterAll /
+// containsString 与根包 acp_client_test.go、event_emitter_test.go、
+// adapter_test.go 中的同名声明的行为保持一致，改动需两侧同步。
+
+// fakeACPAgent simulates an ACP agent over two pipes. It reads client
+// requests from reqR (the client's stdin side) and writes responses and
+// notifications to respW (the client's stdout side). The wire format is real
+// line-delimited JSON-RPC 2.0, so the test exercises the SDK's framing,
+// parsing, and dispatch for real.
+type fakeACPAgent struct {
+	mu      sync.Mutex
+	methods []string // client→agent request methods, in order
+
+	// responses carries every JSON-RPC response line the agent receives.
+	// Buffered so the agent goroutine never blocks on it.
+	responses chan string
+}
+
+func newFakeACPAgent() *fakeACPAgent {
+	return &fakeACPAgent{responses: make(chan string, 8)}
+}
+
+func (f *fakeACPAgent) recordMethod(m string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.methods = append(f.methods, m)
+}
+
+func (f *fakeACPAgent) gotMethods() []string {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return append([]string(nil), f.methods...)
+}
+
+// run answers requests until reqR hits EOF. notifications (JSON-RPC lines)
+// are injected after a session/prompt request, before its response.
+func (f *fakeACPAgent) run(t *testing.T, reqR io.Reader, respW io.Writer, notifications [][]byte) {
+	t.Helper()
+	scanner := bufio.NewScanner(reqR)
+	for scanner.Scan() {
+		var msg struct {
+			ID     json.RawMessage `json:"id"`
+			Method string          `json:"method"`
+		}
+		if err := json.Unmarshal(scanner.Bytes(), &msg); err != nil {
+			t.Errorf("fake agent: unparseable client line: %v", err)
+			return
+		}
+
+		// Record the request BEFORE answering it: the client returns as
+		// soon as it reads our response, so recording afterwards races
+		// with the test's gotMethods() assertion and can drop the last
+		// method (observed flaky on session/prompt).
+		f.recordMethod(msg.Method)
+
+		switch msg.Method {
+		case "":
+			// JSON-RPC response (e.g. to a session/request_permission request).
+			f.responses <- string(scanner.Bytes())
+
+		case "initialize":
+			f.write(t, respW, f.result(msg.ID, `{"protocolVersion":1,"agentCapabilities":{},"authMethods":[]}`))
+
+		case "session/new":
+			f.write(t, respW, f.result(msg.ID, `{"sessionId":"sess-mock-1"}`))
+
+		case "session/prompt":
+			for _, n := range notifications {
+				f.write(t, respW, n)
+			}
+			f.write(t, respW, f.result(msg.ID, `{"stopReason":"end_turn"}`))
+
+		default:
+			// session/request_permission and anything else: no result —
+			// the response (possibly an error) is written by the SDK.
+		}
+	}
+}
+
+func (f *fakeACPAgent) result(id json.RawMessage, result string) []byte {
+	return []byte(fmt.Sprintf(`{"jsonrpc":"2.0","id":%s,"result":%s}`, id, result))
+}
+
+func (f *fakeACPAgent) write(t *testing.T, w io.Writer, b []byte) {
+	t.Helper()
+	if _, err := w.Write(append(append([]byte(nil), b...), '\n')); err != nil {
+		t.Errorf("fake agent: write: %v", err)
+	}
+}
+
+// sessionUpdateLine builds a wire-format session/update notification.
+// The update JSON must carry the official "sessionUpdate" discriminator.
+func sessionUpdateLine(sessionID, update string) []byte {
+	return []byte(fmt.Sprintf(
+		`{"jsonrpc":"2.0","method":"session/update","params":{"sessionId":%q,"update":%s}}`,
+		sessionID, update))
+}
+
+// emitterAll returns a copy of every event recorded by a recordingEmitter.
+func emitterAll(r *recordingEmitter) []recordedEvent {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return append([]recordedEvent(nil), r.events...)
+}
+
+// recordingEmitter is a mock EventEmitter that records all emitted events.
+type recordingEmitter struct {
+	mu     sync.Mutex
+	events []recordedEvent
+}
+
+type recordedEvent struct {
+	eventType string
+	scope     map[string]any
+	payload   any
+}
+
+func (r *recordingEmitter) Emit(eventType string, scope map[string]any, payload any) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.events = append(r.events, recordedEvent{eventType, scope, payload})
+}
+
+func containsString(list []string, target string) bool {
+	for _, value := range list {
+		if value == target {
+			return true
+		}
+	}
+	return false
+}
 
 func TestCodexACPadapterMetadata(t *testing.T) {
 	a := NewCodexACPadapter("")
@@ -29,6 +166,29 @@ func TestCodexACPadapterMetadata(t *testing.T) {
 	}
 	if !strings.Contains(a.Metadata().Version, codexACPVersionPin) {
 		t.Errorf("Version = %q, want pinned codex-acp %s visible", a.Metadata().Version, codexACPVersionPin)
+	}
+}
+
+// TestCodexAdapterMetadataIsNotEmpty 校验 codex 家族内置适配器均有非空
+// metadata（根包 TestAdapterMetadataIsNotEmpty 的 codex 行随家族迁入，
+// #1760 codex/opencode 增量）。
+func TestCodexAdapterMetadataIsNotEmpty(t *testing.T) {
+	adapters := []struct {
+		name     string
+		metadata AdapterMetadata
+	}{
+		{"CodexACP", NewCodexACPadapter("").Metadata()},
+	}
+	for _, a := range adapters {
+		if a.metadata.ID == "" {
+			t.Fatalf("%s adapter ID is empty", a.name)
+		}
+		if a.metadata.Name == "" {
+			t.Fatalf("%s adapter Name is empty", a.name)
+		}
+		if a.metadata.Description == "" {
+			t.Fatalf("%s adapter Description is empty", a.name)
+		}
 	}
 }
 
@@ -61,7 +221,7 @@ func TestCodexACPadapterBuildCommand(t *testing.T) {
 		WorkDir: `C:\work\proj`,
 	})
 
-	wantPath := DefaultNpxPath()
+	wantPath := adapters.DefaultNpxPath()
 	if cmdPath != wantPath {
 		t.Errorf("cmdPath = %q, want %q", cmdPath, wantPath)
 	}
@@ -108,27 +268,9 @@ func TestCodexACPadapterBuildCommandEnvPassthrough(t *testing.T) {
 }
 
 func TestCodexACPadapterDefaultNpxPath(t *testing.T) {
-	got := DefaultNpxPath()
+	got := adapters.DefaultNpxPath()
 	if got != "npx.cmd" && got != "npx" {
 		t.Fatalf("DefaultNpxPath = %q, want platform npx launcher", got)
-	}
-}
-
-func TestAcpBinaryAvailable(t *testing.T) {
-	found := func(string) (string, error) { return "npx.cmd", nil }
-	missing := func(string) (string, error) { return "", errors.New("executable file not found") }
-
-	if !acpBinaryAvailable("npx.cmd", found) {
-		t.Error("resolvable binary should be available")
-	}
-	if acpBinaryAvailable("npx.cmd", missing) {
-		t.Error("unresolvable binary must be unavailable")
-	}
-	if acpBinaryAvailable("", found) {
-		t.Error("empty binary must be unavailable")
-	}
-	if acpBinaryAvailable("  ", missing) {
-		t.Error("blank binary must be unavailable")
 	}
 }
 
@@ -136,7 +278,7 @@ func TestAcpBinaryAvailable(t *testing.T) {
 // fails before spawn.
 func TestCodexACPadapterPreflightFailsFast(t *testing.T) {
 	a := &CodexACPadapter{
-		AcpAdapter: NewAcpAdapterConfig(AcpAdapterConfig{
+		AcpAdapter: adapters.NewAcpAdapterConfig(adapters.AcpAdapterConfig{
 			ID:            codexACPadapterID,
 			Binary:        "",
 			DisplayName:   "Codex (ACP)",
@@ -157,7 +299,7 @@ func TestCodexACPadapterPreflightFailsFast(t *testing.T) {
 }
 
 func TestCodexACPadapterRegistryRegistration(t *testing.T) {
-	reg := NewRegistry()
+	reg := adapters.NewRegistry()
 	a := NewCodexACPadapter("")
 
 	if err := reg.Register(a); err != nil {
@@ -181,7 +323,7 @@ func TestCodexACPadapterRegistryRegistration(t *testing.T) {
 	if _, ok := reg.Get("acp"); ok {
 		t.Error("generic acp adapter unexpectedly registered")
 	}
-	if err := reg.Register(NewAcpAdapter("fake-agent", nil, "Fake")); err != nil {
+	if err := reg.Register(adapters.NewAcpAdapter("fake-agent", nil, "Fake")); err != nil {
 		t.Errorf("generic acp registration should coexist with codex-acp: %v", err)
 	}
 	if !containsString(reg.ListIDs(), "codex-acp") {
@@ -190,7 +332,7 @@ func TestCodexACPadapterRegistryRegistration(t *testing.T) {
 }
 
 func TestValidateCLIAdapterIDAcceptsCodexACPadapter(t *testing.T) {
-	if err := ValidateCLIAdapterID("codex-acp"); err != nil {
+	if err := adapters.ValidateCLIAdapterID("codex-acp"); err != nil {
 		t.Fatalf("ValidateCLIAdapterID(codex-acp) = %v, want nil", err)
 	}
 }
@@ -221,7 +363,7 @@ func TestCodexACPadapterParseStreamWithMockACPPeer(t *testing.T) {
 	agent := newFakeACPAgent()
 	go agent.run(t, clientToAgentR, agentToClientW, notifications)
 
-	ctx := SDKAdapterContext(context.Background(), RunProcessContext{
+	ctx := adapters.SDKAdapterContext(context.Background(), RunProcessContext{
 		Prompt:  "hello codex",
 		WorkDir: `C:\work`,
 	})
@@ -231,10 +373,10 @@ func TestCodexACPadapterParseStreamWithMockACPPeer(t *testing.T) {
 	}
 
 	// The fake agent records a request method only AFTER writing its response
-	// (acp_client_test.go fakeACPAgent.run: write-then-record), so the client
-	// can finish ParseStream before the peer goroutine records session/prompt.
-	// Poll briefly instead of asserting immediately — the record must arrive,
-	// just not synchronously with the client's last read.
+	// (root acp_client_test.go fakeACPAgent.run: write-then-record), so the
+	// client can finish ParseStream before the peer goroutine records
+	// session/prompt. Poll briefly instead of asserting immediately — the
+	// record must arrive, just not synchronously with the client's last read.
 	deadline := time.Now().Add(2 * time.Second)
 	for {
 		if got := strings.Join(agent.gotMethods(), ","); got == "initialize,session/new,session/prompt" {
