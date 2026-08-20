@@ -1,4 +1,4 @@
-package service
+package agent
 
 import (
 	"context"
@@ -12,7 +12,7 @@ import (
 )
 
 // CreateCustomAgent creates a new custom agent owned by the given user.
-func (s *AgentService) CreateCustomAgent(ctx context.Context, ownerID, name, avatarURL, agentType, systemPrompt, capabilityTags, toolWhitelist, modelParams string) (*model.CustomAgent, error) {
+func (s *Service) CreateCustomAgent(ctx context.Context, ownerID, name, avatarURL, agentType, systemPrompt, capabilityTags, toolWhitelist, modelParams string) (*model.CustomAgent, error) {
 	ca := &model.CustomAgent{
 		OwnerUserID:    ownerID,
 		Name:           name,
@@ -30,7 +30,7 @@ func (s *AgentService) CreateCustomAgent(ctx context.Context, ownerID, name, ava
 }
 
 // GetCustomAgent returns a custom agent by ID, verifying ownership.
-func (s *AgentService) GetCustomAgent(ctx context.Context, ownerID, id string) (*model.CustomAgent, error) {
+func (s *Service) GetCustomAgent(ctx context.Context, ownerID, id string) (*model.CustomAgent, error) {
 	ca, err := repository.GetCustomAgentByID(s.db, id)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -45,12 +45,12 @@ func (s *AgentService) GetCustomAgent(ctx context.Context, ownerID, id string) (
 }
 
 // ListCustomAgents returns all custom agents owned by the given user.
-func (s *AgentService) ListCustomAgents(ctx context.Context, ownerID string) ([]model.CustomAgent, error) {
+func (s *Service) ListCustomAgents(ctx context.Context, ownerID string) ([]model.CustomAgent, error) {
 	return repository.ListCustomAgentsByOwner(s.db, ownerID)
 }
 
 // UpdateCustomAgent updates an existing custom agent, verifying ownership.
-func (s *AgentService) UpdateCustomAgent(ctx context.Context, ownerID string, ca *model.CustomAgent) error {
+func (s *Service) UpdateCustomAgent(ctx context.Context, ownerID string, ca *model.CustomAgent) error {
 	existing, err := repository.GetCustomAgentByID(s.db, ca.ID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -76,7 +76,7 @@ func (s *AgentService) UpdateCustomAgent(ctx context.Context, ownerID string, ca
 }
 
 // DeleteCustomAgent soft-deletes a custom agent, verifying ownership.
-func (s *AgentService) DeleteCustomAgent(ctx context.Context, ownerID, id string) error {
+func (s *Service) DeleteCustomAgent(ctx context.Context, ownerID, id string) error {
 	ca, err := repository.GetCustomAgentByID(s.db, id)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {

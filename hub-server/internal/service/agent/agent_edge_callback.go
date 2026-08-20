@@ -1,4 +1,4 @@
-package service
+package agent
 
 import (
 	"context"
@@ -28,7 +28,7 @@ type edgeCallbackBus interface {
 }
 
 // edgeCallbackSeq allocates message sequence IDs for stream/done projections.
-// Implemented by AgentService.allocateSeq via seqAllocatorFunc.
+// Implemented by Service.allocateSeq via seqAllocatorFunc.
 type edgeCallbackSeq interface {
 	allocateSeq(ctx context.Context, sessionID string) (int64, error)
 }
@@ -621,11 +621,11 @@ func unwrapMessageContentText(raw string) string {
 	return wrapper.Content
 }
 
-// ── AgentService facade (wiring/handler stability) ───────────────────────────
+// ── Service facade (wiring/handler stability) ───────────────────────────
 
 // edgeCallbackService returns the composed EdgeCallbackService, lazily constructing
-// one from AgentService deps when tests use struct literals without NewAgentService.
-func (s *AgentService) edgeCallbackService() *EdgeCallbackService {
+// one from Service deps when tests use struct literals without NewService.
+func (s *Service) edgeCallbackService() *EdgeCallbackService {
 	if s.edgeCallbacks != nil {
 		return s.edgeCallbacks
 	}
@@ -639,21 +639,21 @@ func (s *AgentService) edgeCallbackService() *EdgeCallbackService {
 }
 
 // HandleTaskAck marks a task as running and optionally records the Edge run id.
-func (s *AgentService) HandleTaskAck(ctx context.Context, edgeUserID, edgeDeviceID, taskID, edgeRunID string) error {
+func (s *Service) HandleTaskAck(ctx context.Context, edgeUserID, edgeDeviceID, taskID, edgeRunID string) error {
 	return s.edgeCallbackService().HandleTaskAck(ctx, edgeUserID, edgeDeviceID, taskID, edgeRunID)
 }
 
 // HandleTaskStream records a typed runtime event and projects message.new for chat.
-func (s *AgentService) HandleTaskStream(ctx context.Context, edgeUserID, edgeDeviceID, taskID, edgeRunID string, stream model.AgentRunEventInput) error {
+func (s *Service) HandleTaskStream(ctx context.Context, edgeUserID, edgeDeviceID, taskID, edgeRunID string, stream model.AgentRunEventInput) error {
 	return s.edgeCallbackService().HandleTaskStream(ctx, edgeUserID, edgeDeviceID, taskID, edgeRunID, stream)
 }
 
 // HandleTaskDone marks a task as done and inserts the final content as a message.
-func (s *AgentService) HandleTaskDone(ctx context.Context, edgeUserID, edgeDeviceID, taskID, edgeRunID, finalContent string) error {
+func (s *Service) HandleTaskDone(ctx context.Context, edgeUserID, edgeDeviceID, taskID, edgeRunID, finalContent string) error {
 	return s.edgeCallbackService().HandleTaskDone(ctx, edgeUserID, edgeDeviceID, taskID, edgeRunID, finalContent)
 }
 
 // HandleTaskFail marks a task as failed.
-func (s *AgentService) HandleTaskFail(ctx context.Context, edgeUserID, edgeDeviceID, taskID, edgeRunID, errMsg string) error {
+func (s *Service) HandleTaskFail(ctx context.Context, edgeUserID, edgeDeviceID, taskID, edgeRunID, errMsg string) error {
 	return s.edgeCallbackService().HandleTaskFail(ctx, edgeUserID, edgeDeviceID, taskID, edgeRunID, errMsg)
 }

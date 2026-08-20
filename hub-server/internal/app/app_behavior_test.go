@@ -17,7 +17,7 @@ import (
 	"github.com/agenthub/hub-server/internal/cache"
 	"github.com/agenthub/hub-server/internal/config"
 	"github.com/agenthub/hub-server/internal/model"
-	"github.com/agenthub/hub-server/internal/service"
+	"github.com/agenthub/hub-server/internal/service/agent"
 	"github.com/agenthub/hub-server/internal/ws"
 )
 
@@ -310,7 +310,7 @@ func TestEventDispatch_AgentDoneSkipsNotificationWhenNoTask(t *testing.T) {
 	cc := newBehaviorCache(t)
 	b := newBehaviorBus(t)
 
-	agentSvc := service.NewAgentService(db, nil, mgr, cc, nil, config.EdgeDispatchConfig{}, nil, "")
+	agentSvc := agent.NewService(db, nil, mgr, cc, nil, config.EdgeDispatchConfig{}, nil, "")
 	a := &App{
 		mgr:          mgr,
 		bus:          b,
