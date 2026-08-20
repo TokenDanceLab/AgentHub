@@ -1,4 +1,4 @@
-package service
+package agent
 
 import (
 	"context"
@@ -200,11 +200,11 @@ func (s *RunEventService) taskRunEventsForOwner(userID, taskID string) (*model.P
 	return task, events, nil
 }
 
-// ── AgentService facade (wiring/handler stability) ───────────────────────────
+// ── Service facade (wiring/handler stability) ───────────────────────────
 
 // runEventService returns the composed RunEventService, lazily constructing one
-// from AgentService deps when tests use struct literals without NewAgentService.
-func (s *AgentService) runEventService() *RunEventService {
+// from Service deps when tests use struct literals without NewService.
+func (s *Service) runEventService() *RunEventService {
 	if s.runEvents != nil {
 		return s.runEvents
 	}
@@ -216,23 +216,23 @@ func (s *AgentService) runEventService() *RunEventService {
 }
 
 // ListTaskRunEvents returns run events for a pending task, filtered and paginated.
-func (s *AgentService) ListTaskRunEvents(ctx context.Context, userID, taskID string, filter model.AgentRunEventFilter) ([]model.AgentRunEvent, error) {
+func (s *Service) ListTaskRunEvents(ctx context.Context, userID, taskID string, filter model.AgentRunEventFilter) ([]model.AgentRunEvent, error) {
 	return s.runEventService().ListTaskRunEvents(ctx, userID, taskID, filter)
 }
 
 // GetTaskRunEventSummary returns a rollup summary for a task's run events.
-func (s *AgentService) GetTaskRunEventSummary(ctx context.Context, userID, taskID string) (*model.AgentRunEventSummary, error) {
+func (s *Service) GetTaskRunEventSummary(ctx context.Context, userID, taskID string) (*model.AgentRunEventSummary, error) {
 	return s.runEventService().GetTaskRunEventSummary(ctx, userID, taskID)
 }
 
-func (s *AgentService) ListTaskApprovals(ctx context.Context, userID, taskID string) (*model.AgentTaskApprovalList, error) {
+func (s *Service) ListTaskApprovals(ctx context.Context, userID, taskID string) (*model.AgentTaskApprovalList, error) {
 	return s.runEventService().ListTaskApprovals(ctx, userID, taskID)
 }
 
-func (s *AgentService) DecideTaskApproval(ctx context.Context, userID, taskID, approvalID string, decision model.TeamApprovalDecision) (*model.AgentTaskApproval, error) {
+func (s *Service) DecideTaskApproval(ctx context.Context, userID, taskID, approvalID string, decision model.TeamApprovalDecision) (*model.AgentTaskApproval, error) {
 	return s.runEventService().DecideTaskApproval(ctx, userID, taskID, approvalID, decision)
 }
 
-func (s *AgentService) ListTaskArtifacts(ctx context.Context, userID, taskID string) (*model.AgentTaskArtifactList, error) {
+func (s *Service) ListTaskArtifacts(ctx context.Context, userID, taskID string) (*model.AgentTaskArtifactList, error) {
 	return s.runEventService().ListTaskArtifacts(ctx, userID, taskID)
 }

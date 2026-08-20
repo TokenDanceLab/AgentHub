@@ -1,4 +1,4 @@
-package service
+package agent
 
 import (
 	"context"
@@ -143,7 +143,7 @@ func TestAddAgentToSessionReturnsCreatedInstance(t *testing.T) {
 		LastReadSeq: 0,
 	}).Error)
 
-	svc := &AgentService{db: db}
+	svc := &Service{db: db}
 	agent, err := svc.AddAgentToSession(context.Background(), userID, session.ID, "claude-code", "", "Hub Builder")
 
 	require.NoError(t, err)
@@ -173,7 +173,7 @@ func TestDispatchTaskIncludesPrompt(t *testing.T) {
 	defer sqlDB.Close()
 
 	cache := &mockAgentCache{}
-	svc := &AgentService{db: db, cacheClient: cache}
+	svc := &Service{db: db, cacheClient: cache}
 	task := &model.PendingAgentTask{
 		ID:                "task-1",
 		TriggeredByUserID: "user-1",
@@ -208,7 +208,7 @@ func TestDispatchTaskIncludesTargetID(t *testing.T) {
 	defer sqlDB.Close()
 
 	cache := &mockAgentCache{}
-	svc := &AgentService{db: db, cacheClient: cache}
+	svc := &Service{db: db, cacheClient: cache}
 	task := &model.PendingAgentTask{
 		ID:                "task-1",
 		TriggeredByUserID: "user-1",
@@ -297,7 +297,7 @@ func TestDispatchTaskIncludesTeamRunContext(t *testing.T) {
 
 	profileID := "profile-supervisor"
 	cache := &mockAgentCache{}
-	svc := &AgentService{db: db, cacheClient: cache}
+	svc := &Service{db: db, cacheClient: cache}
 	task := &model.PendingAgentTask{
 		ID:                "task-1",
 		TriggeredByUserID: "user-1",
@@ -368,7 +368,7 @@ func TestDispatchTaskIncludesOutputSchema(t *testing.T) {
 	}
 
 	cache := &mockAgentCache{}
-	svc := &AgentService{db: db, cacheClient: cache}
+	svc := &Service{db: db, cacheClient: cache}
 	task := &model.PendingAgentTask{
 		ID:                "task-output-schema",
 		TriggeredByUserID: "user-1",
@@ -488,7 +488,7 @@ func TestDispatchTaskIncludesOutputSchemaWithTeamRunContext(t *testing.T) {
 	}
 
 	cache := &mockAgentCache{}
-	svc := &AgentService{db: db, cacheClient: cache}
+	svc := &Service{db: db, cacheClient: cache}
 	task := &model.PendingAgentTask{
 		ID:                "task-teamrun-outputschema",
 		TriggeredByUserID: "user-1",
@@ -535,7 +535,7 @@ func TestDispatchTaskWithoutCustomAgentOmitsOutputSchema(t *testing.T) {
 	defer sqlDB.Close()
 
 	cache := &mockAgentCache{}
-	svc := &AgentService{db: db, cacheClient: cache}
+	svc := &Service{db: db, cacheClient: cache}
 	task := &model.PendingAgentTask{
 		ID:                "task-no-ca",
 		TriggeredByUserID: "user-1",
@@ -571,7 +571,7 @@ func TestDispatchTaskWithTargetIDButNoDeviceFailsClosed(t *testing.T) {
 	mgr.SetAuth(connA.ID, "user-1", "desktop", "dev-a")
 
 	cache := &mockAgentCache{routeID: connA.ID}
-	svc := &AgentService{db: db, mgr: mgr, cacheClient: cache}
+	svc := &Service{db: db, mgr: mgr, cacheClient: cache}
 	task := &model.PendingAgentTask{
 		ID:                "task-target-no-device",
 		TriggeredByUserID: "user-1",
@@ -606,7 +606,7 @@ func TestDispatchTaskDoesNotPushWhenDispatchedStateMissing(t *testing.T) {
 	mgr.SetAuth(conn.ID, "user-1", "desktop", "dev-a")
 
 	cache := &mockAgentCache{routeID: conn.ID}
-	svc := &AgentService{db: db, mgr: mgr, cacheClient: cache}
+	svc := &Service{db: db, mgr: mgr, cacheClient: cache}
 	task := &model.PendingAgentTask{
 		ID:                "missing-dispatch-task",
 		TriggeredByUserID: "user-1",
@@ -640,7 +640,7 @@ func TestDispatchTaskDoesNotPushTerminalTask(t *testing.T) {
 	mgr.SetAuth(conn.ID, "user-1", "desktop", "dev-a")
 
 	cache := &mockAgentCache{routeID: conn.ID}
-	svc := &AgentService{db: db, mgr: mgr, cacheClient: cache}
+	svc := &Service{db: db, mgr: mgr, cacheClient: cache}
 	task := &model.PendingAgentTask{
 		ID:                "task-cancelled-dispatch",
 		TriggeredByUserID: "user-1",
@@ -680,7 +680,7 @@ func TestDispatchTaskPreservesNonTargetTaskWhenDeliveryBufferFull(t *testing.T) 
 	}
 
 	cache := &mockAgentCache{routeID: conn.ID}
-	svc := &AgentService{db: db, mgr: mgr, cacheClient: cache}
+	svc := &Service{db: db, mgr: mgr, cacheClient: cache}
 	task := &model.PendingAgentTask{
 		ID:                "task-dispatch-full",
 		TriggeredByUserID: "user-1",
@@ -723,7 +723,7 @@ func TestDispatchTaskRoutesTargetBoundTaskToBoundDevice(t *testing.T) {
 			"user-1|desktop|dev-b": connB.ID,
 		},
 	}
-	svc := &AgentService{db: db, mgr: mgr, cacheClient: cache}
+	svc := &Service{db: db, mgr: mgr, cacheClient: cache}
 	task := &model.PendingAgentTask{
 		ID:                "task-target",
 		TriggeredByUserID: "user-1",
@@ -785,7 +785,7 @@ func TestDispatchTaskQueuesTargetBoundTaskWhenDeliveryBufferFull(t *testing.T) {
 			"user-1|desktop|dev-b": connB.ID,
 		},
 	}
-	svc := &AgentService{db: db, mgr: mgr, cacheClient: cache}
+	svc := &Service{db: db, mgr: mgr, cacheClient: cache}
 	task := &model.PendingAgentTask{
 		ID:                "task-target-full",
 		TriggeredByUserID: "user-1",
@@ -821,7 +821,7 @@ func TestDispatchTaskDoesNotPushTargetWhenDispatchedStateMissing(t *testing.T) {
 			"user-1|desktop|dev-b": connB.ID,
 		},
 	}
-	svc := &AgentService{db: db, mgr: mgr, cacheClient: cache}
+	svc := &Service{db: db, mgr: mgr, cacheClient: cache}
 	task := &model.PendingAgentTask{
 		ID:                "missing-target-dispatch-task",
 		TriggeredByUserID: "user-1",
@@ -861,7 +861,7 @@ func TestDispatchTaskDoesNotPushTerminalTargetTask(t *testing.T) {
 			"user-1|desktop|dev-b": connB.ID,
 		},
 	}
-	svc := &AgentService{db: db, mgr: mgr, cacheClient: cache}
+	svc := &Service{db: db, mgr: mgr, cacheClient: cache}
 	task := &model.PendingAgentTask{
 		ID:                "task-cancelled-target",
 		TriggeredByUserID: "user-1",
@@ -897,7 +897,7 @@ func TestDispatchTaskQueuesTargetBoundTaskWhenBoundDeviceOffline(t *testing.T) {
 	mgr.SetAuth(connA.ID, "user-1", "desktop", "dev-a")
 
 	cache := &mockAgentCache{routeID: connA.ID}
-	svc := &AgentService{db: db, mgr: mgr, cacheClient: cache}
+	svc := &Service{db: db, mgr: mgr, cacheClient: cache}
 	task := &model.PendingAgentTask{
 		ID:                "task-target-offline",
 		TriggeredByUserID: "user-1",
@@ -971,7 +971,7 @@ func TestCancelTask_AtomicFailClosed(t *testing.T) {
 	defer sqlDB.Close()
 
 	b := newTestBus(t)
-	svc := &AgentService{db: db, bus: b}
+	svc := &Service{db: db, bus: b}
 
 	taskID := "task-cancel-atomic"
 	mock.ExpectQuery(sqlmTaskByID).
@@ -997,7 +997,7 @@ func TestCancelTask_AlreadyTerminal(t *testing.T) {
 	defer sqlDB.Close()
 
 	b := newTestBus(t)
-	svc := &AgentService{db: db, bus: b}
+	svc := &Service{db: db, bus: b}
 
 	taskID := "task-done"
 	mock.ExpectQuery(sqlmTaskByID).
@@ -1016,7 +1016,7 @@ func TestHandleTaskAck_DispatchedToRunningAtomic(t *testing.T) {
 	db, mock, sqlDB := newMockDBAgent(t)
 	defer sqlDB.Close()
 
-	svc := &AgentService{db: db}
+	svc := &Service{db: db}
 
 	taskID := "task-ack"
 	mock.ExpectQuery(sqlmTaskByID).
@@ -1041,7 +1041,7 @@ func TestHandleTaskAck_AlreadyRunningIdempotent(t *testing.T) {
 	db, mock, sqlDB := newMockDBAgent(t)
 	defer sqlDB.Close()
 
-	svc := &AgentService{db: db}
+	svc := &Service{db: db}
 
 	taskID := "task-already-running"
 	mock.ExpectQuery(sqlmTaskByID).
@@ -1064,7 +1064,7 @@ func TestHandleTaskAck_OfflineQueuedUnboundDeviceClaim(t *testing.T) {
 	db, mock, sqlDB := newMockDBAgent(t)
 	defer sqlDB.Close()
 
-	svc := &AgentService{db: db}
+	svc := &Service{db: db}
 
 	taskID := "task-offline-unbound"
 	// #99 offline-replay task: queued, no edge device binding yet.
@@ -1090,7 +1090,7 @@ func TestHandleTaskAck_OfflineQueuedUnboundRejectsWrongUser(t *testing.T) {
 	db, mock, sqlDB := newMockDBAgent(t)
 	defer sqlDB.Close()
 
-	svc := &AgentService{db: db}
+	svc := &Service{db: db}
 
 	taskID := "taskx-offline-wrong-user"
 	mock.ExpectQuery(sqlmTaskByID).
@@ -1115,7 +1115,7 @@ func TestHandleTaskAck_EdgeRunIDBackfill(t *testing.T) {
 	db, mock, sqlDB := newMockDBAgent(t)
 	defer sqlDB.Close()
 
-	svc := &AgentService{db: db}
+	svc := &Service{db: db}
 
 	taskID := "task-backfill"
 	mock.ExpectQuery(sqlmTaskByID).
@@ -1140,7 +1140,7 @@ func TestHandleTaskAck_EdgeRunIDBackfillConflictAcceptsSameRunID(t *testing.T) {
 	db, mock, sqlDB := newMockDBAgent(t)
 	defer sqlDB.Close()
 
-	svc := &AgentService{db: db}
+	svc := &Service{db: db}
 
 	taskID := "task-backfill-same-conflict"
 	mock.ExpectQuery(sqlmTaskByID).
@@ -1170,7 +1170,7 @@ func TestHandleTaskAck_EdgeRunIDBackfillConflictRejectsMismatch(t *testing.T) {
 	db, mock, sqlDB := newMockDBAgent(t)
 	defer sqlDB.Close()
 
-	svc := &AgentService{db: db}
+	svc := &Service{db: db}
 
 	taskID := "task-backfill-mismatch-conflict"
 	mock.ExpectQuery(sqlmTaskByID).
@@ -1200,7 +1200,7 @@ func TestHandleTaskAckRejectsOversizedEdgeRunID(t *testing.T) {
 	db, mock, sqlDB := newMockDBAgent(t)
 	defer sqlDB.Close()
 
-	svc := &AgentService{db: db}
+	svc := &Service{db: db}
 
 	err := svc.HandleTaskAck(context.Background(), "user-1", "dev-1", "task-ack", strings.Repeat("x", 129))
 	require.ErrorIs(t, err, errcode.ErrBadRequest)
@@ -1216,7 +1216,7 @@ func TestHandleTaskStream_DispatchedTransitionConflictDoesNotPersist(t *testing.
 	b.Subscribe(ws.TypeAgentStream, func(ctx context.Context, event bus.Event) {
 		streamEvents <- event
 	})
-	svc := &AgentService{db: db, bus: b, cacheClient: &mockAgentCache{}}
+	svc := &Service{db: db, bus: b, cacheClient: &mockAgentCache{}}
 
 	taskID := "task-stream-conflict"
 	mock.ExpectQuery(sqlmTaskByID).
@@ -1256,7 +1256,7 @@ func TestHandleTaskDone_AtomicTransition(t *testing.T) {
 	defer sqlDB.Close()
 
 	b := newTestBus(t)
-	svc := &AgentService{db: db, bus: b}
+	svc := &Service{db: db, bus: b}
 
 	taskID := "task-done-atomic"
 	mock.ExpectQuery(sqlmTaskByID).
@@ -1288,7 +1288,7 @@ func TestHandleTaskDone_AtomicConflictDoesNotPublish(t *testing.T) {
 	b.Subscribe("agent.done", func(ctx context.Context, event bus.Event) {
 		doneEvents <- event
 	})
-	svc := &AgentService{db: db, bus: b}
+	svc := &Service{db: db, bus: b}
 
 	taskID := "task-done-conflict"
 	mock.ExpectQuery(sqlmTaskByID).
@@ -1323,7 +1323,7 @@ func TestHandleTaskFail_AtomicTransition(t *testing.T) {
 	defer sqlDB.Close()
 
 	b := newTestBus(t)
-	svc := &AgentService{db: db, bus: b}
+	svc := &Service{db: db, bus: b}
 
 	taskID := "task-fail-atomic"
 	mock.ExpectQuery(sqlmTaskByID).
@@ -1353,7 +1353,7 @@ func TestHandleTaskFail_AtomicConflictDoesNotPublish(t *testing.T) {
 	b.Subscribe("agent.failed", func(ctx context.Context, event bus.Event) {
 		failedEvents <- event
 	})
-	svc := &AgentService{db: db, bus: b}
+	svc := &Service{db: db, bus: b}
 
 	taskID := "task-fail-conflict"
 	mock.ExpectQuery(sqlmTaskByID).
@@ -1383,7 +1383,7 @@ func TestHandleTaskFail_AlreadyTerminal(t *testing.T) {
 	db, mock, sqlDB := newMockDBAgent(t)
 	defer sqlDB.Close()
 
-	svc := &AgentService{db: db}
+	svc := &Service{db: db}
 
 	taskID := "task-already-done"
 	mock.ExpectQuery(sqlmTaskByID).
@@ -1402,7 +1402,7 @@ func TestHandleTaskDone_RejectsQueuedTask(t *testing.T) {
 	db, mock, sqlDB := newMockDBAgent(t)
 	defer sqlDB.Close()
 
-	svc := &AgentService{db: db}
+	svc := &Service{db: db}
 
 	taskID := "task-queued"
 	mock.ExpectQuery(sqlmTaskByID).
@@ -1419,7 +1419,7 @@ func TestHandleTaskFail_RejectsQueuedTask(t *testing.T) {
 	db, mock, sqlDB := newMockDBAgent(t)
 	defer sqlDB.Close()
 
-	svc := &AgentService{db: db}
+	svc := &Service{db: db}
 
 	taskID := "task-queued-fail"
 	mock.ExpectQuery(sqlmTaskByID).
@@ -1437,7 +1437,7 @@ func TestHandleTaskDone_AcceptsDispatchedTask(t *testing.T) {
 	defer sqlDB.Close()
 
 	b := newTestBus(t)
-	svc := &AgentService{db: db, bus: b}
+	svc := &Service{db: db, bus: b}
 
 	taskID := "task-dispatched-done"
 	mock.ExpectQuery(sqlmTaskByID).
@@ -1466,7 +1466,7 @@ func TestHandleTaskAck_QueuedToRunning(t *testing.T) {
 	db, mock, sqlDB := newMockDBAgent(t)
 	defer sqlDB.Close()
 
-	svc := &AgentService{db: db}
+	svc := &Service{db: db}
 
 	taskID := "task-queued-ack"
 	mock.ExpectQuery(sqlmTaskByID).
@@ -1500,7 +1500,7 @@ func TestHandleTaskAck_QueuedOfflineReplayTransitionsToRunning(t *testing.T) {
 		ExpireAt:          time.Now().Add(time.Hour),
 	}
 	require.NoError(t, db.Create(task).Error)
-	svc := &AgentService{db: db}
+	svc := &Service{db: db}
 
 	err := svc.HandleTaskAck(context.Background(), "user-1", "dev-1", task.ID, "run-queued")
 
@@ -1524,7 +1524,7 @@ func TestTimeoutExpiredTaskMarksScannedStatus(t *testing.T) {
 		ExpireAt:          time.Now().Add(-time.Hour),
 	}
 	require.NoError(t, db.Create(task).Error)
-	svc := &AgentService{db: db}
+	svc := &Service{db: db}
 
 	timedOut, err := svc.TimeoutExpiredTask(task.ID, model.TaskStatusRunning)
 
@@ -1553,7 +1553,7 @@ func TestTimeoutExpiredTaskDoesNotOverwriteTerminalRace(t *testing.T) {
 	require.NoError(t, db.Model(&model.PendingAgentTask{}).
 		Where("id = ?", task.ID).
 		Updates(map[string]interface{}{"status": model.TaskStatusDone, "finished_at": &finishedAt}).Error)
-	svc := &AgentService{db: db}
+	svc := &Service{db: db}
 
 	timedOut, err := svc.TimeoutExpiredTask(task.ID, model.TaskStatusRunning)
 
@@ -1585,7 +1585,7 @@ func TestTriggerAgentTask_RejectsDissolvedSession(t *testing.T) {
 		WillReturnRows(sqlmock.NewRows([]string{"id", "type", "dissolved", "owner_user_id"}).
 			AddRow("session-dissolved", "group", true, "owner-1"))
 
-	svc := &AgentService{db: db}
+	svc := &Service{db: db}
 	_, err := svc.TriggerAgentTask(context.Background(), "user-1", triggerMsgID, "", "", "", "", "")
 	require.ErrorIs(t, err, errcode.SessionDissolved)
 	require.NoError(t, mock.ExpectationsWereMet())
@@ -1625,7 +1625,7 @@ func TestTriggerAgentTask_MemberActiveLookupErrorSurfaces(t *testing.T) {
 		WithArgs("session-live", "user", "user-1").
 		WillReturnError(memberCheckErr)
 
-	svc := &AgentService{db: db}
+	svc := &Service{db: db}
 	_, err := svc.TriggerAgentTask(context.Background(), "user-1", triggerMsgID, "", "", "", "", "")
 	require.ErrorIs(t, err, memberCheckErr)
 	require.NotErrorIs(t, err, errcode.SessionNotMember)
@@ -1635,7 +1635,7 @@ func TestTriggerAgentTask_MemberActiveLookupErrorSurfaces(t *testing.T) {
 
 func TestTriggerAgentTaskRejectsTargetOwnedByAnotherUser(t *testing.T) {
 	db := newAgentTaskTargetContractDB(t)
-	svc := &AgentService{db: db, cacheClient: &mockAgentCache{}}
+	svc := &Service{db: db, cacheClient: &mockAgentCache{}}
 
 	_, err := svc.TriggerAgentTask(context.Background(), "user-1", "msg-1", "", "codex", "", "", "target-other")
 
@@ -1649,7 +1649,7 @@ func TestTriggerAgentTaskRejectsTargetWithoutBoundDevice(t *testing.T) {
 	db := newAgentTaskTargetContractDB(t)
 	require.NoError(t, db.Exec(`INSERT INTO execution_targets (id, owner_id, name, target_type, workspace_allowlist, trust_level, health_state, is_online, last_seen_at, capabilities, metadata) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		"target-no-device", "user-1", "Local workstation", "local_edge", `["/workspace"]`, "local", "online", true, time.Now(), "{}", "{}").Error)
-	svc := &AgentService{db: db, cacheClient: &mockAgentCache{}}
+	svc := &Service{db: db, cacheClient: &mockAgentCache{}}
 
 	_, err := svc.TriggerAgentTask(context.Background(), "user-1", "msg-1", "", "codex", "", "", "target-no-device")
 
@@ -1665,7 +1665,7 @@ func TestTriggerAgentTaskRejectsNonLocalEdgeTarget(t *testing.T) {
 		"dev-remote", "user-1", "desktop", "0.1.0", "[]", "2030-01-01T00:00:00Z", "2030-01-01T00:00:00Z").Error)
 	require.NoError(t, db.Exec(`INSERT INTO execution_targets (id, owner_id, device_id, name, target_type, workspace_allowlist, trust_level, health_state, is_online, last_seen_at, capabilities, metadata) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		"target-remote", "user-1", "dev-remote", "Remote SSH target", "remote_ssh", `["/workspace"]`, "remote", "online", true, time.Now(), "{}", "{}").Error)
-	svc := &AgentService{db: db, cacheClient: &mockAgentCache{}}
+	svc := &Service{db: db, cacheClient: &mockAgentCache{}}
 
 	_, err := svc.TriggerAgentTask(context.Background(), "user-1", "msg-1", "", "codex", "", "", "target-remote")
 
@@ -1683,7 +1683,7 @@ func TestTriggerAgentTaskStoresAndDispatchesOwnedTarget(t *testing.T) {
 		"target-local", "user-1", "dev-target", "Local workstation", "local_edge", `["/workspace"]`, "local", "online", true, time.Now(), "{}", "{}").Error)
 	seedEvidenceForTarget(t, db, "target-local", "online", -time.Minute, dispatch.DesktopTargetStaleAfter)
 	cache := &mockAgentCache{}
-	svc := &AgentService{db: db, cacheClient: cache}
+	svc := &Service{db: db, cacheClient: cache}
 
 	task, err := svc.TriggerAgentTask(context.Background(), "user-1", "msg-1", "", "codex", "", "", "target-local")
 
@@ -1712,7 +1712,7 @@ func TestTriggerAgentTaskPrebindsOwnedTargetDevice(t *testing.T) {
 		"target-local-device", "user-1", "dev-local", "Local workstation", "local_edge", `["/workspace"]`, "local", "online", true, time.Now(), "{}", "{}").Error)
 	seedEvidenceForTarget(t, db, "target-local-device", "online", -time.Minute, dispatch.DesktopTargetStaleAfter)
 	cache := &mockAgentCache{}
-	svc := &AgentService{db: db, cacheClient: cache}
+	svc := &Service{db: db, cacheClient: cache}
 
 	task, err := svc.TriggerAgentTask(context.Background(), "user-1", "msg-1", "", "codex", "", "", "target-local-device")
 
@@ -1732,7 +1732,7 @@ func TestTriggerAgentTaskRejectsStaleTargetHealth(t *testing.T) {
 		"target-stale", "user-1", "dev-stale", "Stale workstation", "local_edge", `["/workspace"]`, "local", "online", true, time.Now().Add(-dispatch.DesktopTargetStaleAfter-time.Second), "{}", "{}").Error)
 	// 证据窗口已过期 → 投影 stale → 调度拒绝。
 	seedEvidenceForTarget(t, db, "target-stale", "online", -3*time.Minute, -time.Minute)
-	svc := &AgentService{db: db, cacheClient: &mockAgentCache{}}
+	svc := &Service{db: db, cacheClient: &mockAgentCache{}}
 
 	_, err := svc.TriggerAgentTask(context.Background(), "user-1", "msg-1", "", "codex", "", "", "target-stale")
 
@@ -1750,7 +1750,7 @@ func TestTriggerAgentTaskRejectsMismatchTargetHealth(t *testing.T) {
 		"target-mismatch", "user-1", "dev-mismatch", "Mismatched workstation", "local_edge", `["/workspace"]`, "local", "mismatch", false, time.Now(), "{}", "{}").Error)
 	// observed identity mismatch 证据 → 投影 mismatch → 调度拒绝。
 	seedEvidenceForTarget(t, db, "target-mismatch", "mismatch", -time.Minute, dispatch.DesktopTargetStaleAfter)
-	svc := &AgentService{db: db, cacheClient: &mockAgentCache{}}
+	svc := &Service{db: db, cacheClient: &mockAgentCache{}}
 
 	_, err := svc.TriggerAgentTask(context.Background(), "user-1", "msg-1", "", "codex", "", "", "target-mismatch")
 
@@ -1899,7 +1899,7 @@ func newAgentTaskTargetContractDB(t *testing.T) *gorm.DB {
 func TestTriggerAgentTaskTurnInProgressRejectsActiveTask(t *testing.T) {
 	db := newAgentTaskTargetContractDB(t)
 	cache := &mockAgentCache{}
-	svc := &AgentService{db: db, cacheClient: cache}
+	svc := &Service{db: db, cacheClient: cache}
 
 	// Pre-seed an active queued task so the gate fires without spawning a
 	// dispatch goroutine for the first task.
@@ -1928,7 +1928,7 @@ func TestTriggerAgentTaskTurnInProgressDifferentAgentInstanceNotBlocked(t *testi
 	require.NoError(t, db.Exec(`INSERT INTO agent_instances (id, agent_type, session_id, inviter_user_id, display_name) VALUES (?, ?, ?, ?, ?)`,
 		"agent-2", "claude-code", "sess-1", "user-1", "Claude").Error)
 	cache := &mockAgentCache{}
-	svc := &AgentService{db: db, cacheClient: cache}
+	svc := &Service{db: db, cacheClient: cache}
 
 	activeTask := &model.PendingAgentTask{
 		AgentInstanceID:   "agent-1",
@@ -1955,7 +1955,7 @@ func TestTriggerAgentTaskTurnInProgressDifferentAgentInstanceNotBlocked(t *testi
 func TestTriggerAgentTaskTurnInProgressTerminalTaskDoesNotBlock(t *testing.T) {
 	db := newAgentTaskTargetContractDB(t)
 	cache := &mockAgentCache{}
-	svc := &AgentService{db: db, cacheClient: cache}
+	svc := &Service{db: db, cacheClient: cache}
 
 	doneTask := &model.PendingAgentTask{
 		AgentInstanceID:   "agent-1",
@@ -2051,7 +2051,7 @@ func TestHandleTaskDone_SkipsDuplicateFinalMessage(t *testing.T) {
 	defer sqlDB.Close()
 
 	b := newTestBus(t)
-	svc := &AgentService{db: db, bus: b}
+	svc := &Service{db: db, bus: b}
 
 	taskID := "task-done-dedup"
 	mock.ExpectQuery(sqlmTaskByID).
@@ -2086,7 +2086,7 @@ func TestHandleTaskDone_InsertsDistinctFinalMessage(t *testing.T) {
 	defer sqlDB.Close()
 
 	b := newTestBus(t)
-	svc := &AgentService{db: db, bus: b}
+	svc := &Service{db: db, bus: b}
 
 	taskID := "task-done-distinct"
 	mock.ExpectQuery(sqlmTaskByID).
@@ -2173,7 +2173,7 @@ func TestAllocateSeqRecoversFreshRedisKeyFromDB(t *testing.T) {
 		WillReturnRows(sqlmock.NewRows([]string{"next_seq"}).AddRow(7))
 
 	cache := &seqRecoveryCache{}
-	svc := &AgentService{db: db, cacheClient: cache}
+	svc := &Service{db: db, cacheClient: cache}
 
 	seq, err := svc.allocateSeq(context.Background(), "sess-1")
 	require.NoError(t, err)
@@ -2190,7 +2190,7 @@ func TestAllocateSeqFreshRedisKeyWithoutDBMirrorKeepsOne(t *testing.T) {
 		WillReturnRows(sqlmock.NewRows([]string{"next_seq"}).AddRow(0))
 
 	cache := &seqRecoveryCache{}
-	svc := &AgentService{db: db, cacheClient: cache}
+	svc := &Service{db: db, cacheClient: cache}
 
 	seq, err := svc.allocateSeq(context.Background(), "sess-1")
 	require.NoError(t, err)

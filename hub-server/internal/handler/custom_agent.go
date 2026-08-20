@@ -12,7 +12,7 @@ import (
 	"github.com/agenthub/hub-server/internal/model"
 )
 
-// CustomAgentService is the subset of *service.AgentService used by CustomAgentHandler.
+// CustomAgentService is the subset of *agent.Service used by CustomAgentHandler.
 type CustomAgentService interface {
 	CreateCustomAgent(ctx context.Context, ownerID, name, avatarURL, agentType, systemPrompt, capabilityTags, toolWhitelist, modelParams string) (*model.CustomAgent, error)
 	ListCustomAgents(ctx context.Context, ownerID string) ([]model.CustomAgent, error)

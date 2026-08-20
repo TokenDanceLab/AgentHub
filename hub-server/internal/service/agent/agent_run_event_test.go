@@ -1,4 +1,4 @@
-package service
+package agent
 
 import (
 	"context"
@@ -149,7 +149,7 @@ func TestHandleTaskStreamPersistsTypedRunEventAndProjection(t *testing.T) {
 		}
 	})
 
-	svc := &AgentService{db: db, bus: b, cacheClient: &mockAgentCache{}}
+	svc := &Service{db: db, bus: b, cacheClient: &mockAgentCache{}}
 	payload := json.RawMessage(`{"type":"run.agent.tool_call","callId":"call-1","toolName":"read_file"}`)
 	err := svc.HandleTaskStream(context.Background(), "user-1", "dev-1", "task-1", "run-1", model.AgentRunEventInput{
 		EventType:   "run.agent.tool_call",
@@ -188,7 +188,7 @@ func TestHandleTaskStreamAutoParsesRunningTeamRunRouteDecision(t *testing.T) {
 			decisions <- payload
 		}
 	})
-	svc := &AgentService{db: db, bus: b, cacheClient: &mockAgentCache{}}
+	svc := &Service{db: db, bus: b, cacheClient: &mockAgentCache{}}
 
 	err := svc.HandleTaskStream(context.Background(), "user-1", "dev-1", "task-1", "run-1", model.AgentRunEventInput{
 		Payload: json.RawMessage(`{"action":"delegate","next_worker":"member-2","instructions":"Implement the route","reasoning":"needs backend"}`),
@@ -255,7 +255,7 @@ func TestHandleTaskStreamSkipsInvalidRouteDecisionPayloads(t *testing.T) {
 					decisions <- payload
 				}
 			})
-			svc := &AgentService{db: db, bus: b, cacheClient: &mockAgentCache{}}
+			svc := &Service{db: db, bus: b, cacheClient: &mockAgentCache{}}
 
 			err := svc.HandleTaskStream(context.Background(), "user-1", "dev-1", "task-1", "run-1", model.AgentRunEventInput{
 				Payload: tt.payload,
@@ -285,7 +285,7 @@ func TestHandleTaskStreamRouteDecisionHandlerErrorDoesNotFailStream(t *testing.T
 		// Simulate a handler that would error — but on the b, errors only log.
 		_ = event
 	})
-	svc := &AgentService{db: db, bus: b, cacheClient: &mockAgentCache{}}
+	svc := &Service{db: db, bus: b, cacheClient: &mockAgentCache{}}
 
 	err := svc.HandleTaskStream(context.Background(), "user-1", "dev-1", "task-1", "run-1", model.AgentRunEventInput{
 		Payload: json.RawMessage(`{"action":"delegate","next_worker":"member-2","instructions":"Implement the route"}`),
@@ -297,7 +297,7 @@ func TestHandleTaskStreamRouteDecisionHandlerErrorDoesNotFailStream(t *testing.T
 
 func TestHandleTaskStreamRejectsOversizedInferredEventType(t *testing.T) {
 	db := newAgentRunEventTestDB(t)
-	svc := &AgentService{db: db, bus: newTestBus(t), cacheClient: &mockAgentCache{}}
+	svc := &Service{db: db, bus: newTestBus(t), cacheClient: &mockAgentCache{}}
 	tooLongEventType := "run.agent." + strings.Repeat("x", 96)
 	payload := json.RawMessage(`{"type":"` + tooLongEventType + `","content":"oversized event type"}`)
 
@@ -313,7 +313,7 @@ func TestHandleTaskStreamRejectsOversizedInferredEventType(t *testing.T) {
 
 func TestHandleTaskStreamRejectsOversizedPayload(t *testing.T) {
 	db := newAgentRunEventTestDB(t)
-	svc := &AgentService{db: db, bus: newTestBus(t), cacheClient: &mockAgentCache{}}
+	svc := &Service{db: db, bus: newTestBus(t), cacheClient: &mockAgentCache{}}
 	payload := json.RawMessage(`{"type":"run.output.batch","content":"` + strings.Repeat("x", model.RunEventPayloadMaxBytes) + `"}`)
 
 	err := svc.HandleTaskStream(context.Background(), "user-1", "dev-1", "task-1", "run-1", model.AgentRunEventInput{
@@ -332,7 +332,7 @@ func TestHandleTaskStreamRejectsOversizedPayload(t *testing.T) {
 
 func TestHandleTaskStreamRejectsOversizedProjectedContent(t *testing.T) {
 	db := newAgentRunEventTestDB(t)
-	svc := &AgentService{db: db, bus: newTestBus(t), cacheClient: &mockAgentCache{}}
+	svc := &Service{db: db, bus: newTestBus(t), cacheClient: &mockAgentCache{}}
 
 	err := svc.HandleTaskStream(context.Background(), "user-1", "dev-1", "task-1", "run-1", model.AgentRunEventInput{
 		Payload: json.RawMessage(`{"type":"run.agent.tool_call","toolName":"read_file"}`),
@@ -351,7 +351,7 @@ func TestHandleTaskStreamRejectsOversizedProjectedContent(t *testing.T) {
 
 func TestHandleTaskStreamRejectsOversizedEdgeRunID(t *testing.T) {
 	db := newAgentRunEventTestDB(t)
-	svc := &AgentService{db: db, bus: newTestBus(t), cacheClient: &mockAgentCache{}}
+	svc := &Service{db: db, bus: newTestBus(t), cacheClient: &mockAgentCache{}}
 
 	err := svc.HandleTaskStream(context.Background(), "user-1", "dev-1", "task-1", strings.Repeat("x", 129), model.AgentRunEventInput{
 		Payload: json.RawMessage(`{"type":"run.output.batch","content":"hello"}`),
@@ -369,7 +369,7 @@ func TestHandleTaskStreamRejectsOversizedEdgeRunID(t *testing.T) {
 
 func TestHandleTaskStreamRejectsRunEventWhenTaskEventCapReached(t *testing.T) {
 	db := newAgentRunEventTestDB(t)
-	svc := &AgentService{db: db, bus: newTestBus(t), cacheClient: &mockAgentCache{}}
+	svc := &Service{db: db, bus: newTestBus(t), cacheClient: &mockAgentCache{}}
 	maxRunEventsPerTask := config.MaxRunEventsPerTask
 
 	events := make([]model.AgentRunEvent, 0, maxRunEventsPerTask)
@@ -403,7 +403,7 @@ func TestHandleTaskStreamRejectsRunEventWhenTaskEventCapReached(t *testing.T) {
 
 func TestHandleTaskDoneRejectsOversizedFinalContent(t *testing.T) {
 	db := newAgentRunEventTestDB(t)
-	svc := &AgentService{db: db, bus: newTestBus(t), cacheClient: &mockAgentCache{}}
+	svc := &Service{db: db, bus: newTestBus(t), cacheClient: &mockAgentCache{}}
 
 	err := svc.HandleTaskDone(context.Background(), "user-1", "dev-1", "task-1", "run-1", strings.Repeat("x", model.RunEventPayloadMaxBytes+1))
 	require.ErrorIs(t, err, errcode.ErrBadRequest)
@@ -419,7 +419,7 @@ func TestHandleTaskDoneRejectsOversizedFinalContent(t *testing.T) {
 
 func TestHandleTaskDoneRejectsOversizedEdgeRunID(t *testing.T) {
 	db := newAgentRunEventTestDB(t)
-	svc := &AgentService{db: db, bus: newTestBus(t), cacheClient: &mockAgentCache{}}
+	svc := &Service{db: db, bus: newTestBus(t), cacheClient: &mockAgentCache{}}
 
 	err := svc.HandleTaskDone(context.Background(), "user-1", "dev-1", "task-1", strings.Repeat("x", 129), "final")
 	require.ErrorIs(t, err, errcode.ErrBadRequest)
@@ -435,7 +435,7 @@ func TestHandleTaskDoneRejectsOversizedEdgeRunID(t *testing.T) {
 
 func TestHandleTaskFailRejectsOversizedError(t *testing.T) {
 	db := newAgentRunEventTestDB(t)
-	svc := &AgentService{db: db, bus: newTestBus(t), cacheClient: &mockAgentCache{}}
+	svc := &Service{db: db, bus: newTestBus(t), cacheClient: &mockAgentCache{}}
 
 	err := svc.HandleTaskFail(context.Background(), "user-1", "dev-1", "task-1", "run-1", strings.Repeat("x", model.RunEventPayloadMaxBytes+1))
 	require.ErrorIs(t, err, errcode.ErrBadRequest)
@@ -448,7 +448,7 @@ func TestHandleTaskFailRejectsOversizedError(t *testing.T) {
 
 func TestHandleTaskFailRejectsOversizedEdgeRunID(t *testing.T) {
 	db := newAgentRunEventTestDB(t)
-	svc := &AgentService{db: db, bus: newTestBus(t), cacheClient: &mockAgentCache{}}
+	svc := &Service{db: db, bus: newTestBus(t), cacheClient: &mockAgentCache{}}
 
 	err := svc.HandleTaskFail(context.Background(), "user-1", "dev-1", "task-1", strings.Repeat("x", 129), "model error")
 	require.ErrorIs(t, err, errcode.ErrBadRequest)
@@ -471,7 +471,7 @@ func TestListTaskRunEventsIsOwnerScoped(t *testing.T) {
 		Payload:         `{"content":"hello"}`,
 	}).Error)
 
-	svc := &AgentService{db: db}
+	svc := &Service{db: db}
 	events, err := svc.ListTaskRunEvents(context.Background(), "user-1", "task-1", model.AgentRunEventFilter{})
 	require.NoError(t, err)
 	require.Len(t, events, 1)
@@ -493,7 +493,7 @@ func TestListTaskRunEventsSupportsFilters(t *testing.T) {
 		require.NoError(t, db.Create(&event).Error)
 	}
 
-	svc := &AgentService{db: db}
+	svc := &Service{db: db}
 	toolEvents, err := svc.ListTaskRunEvents(context.Background(), "user-1", "task-1", model.AgentRunEventFilter{
 		EventType: "run.agent.tool_call",
 		AfterSeq:  1,
@@ -531,7 +531,7 @@ func TestGetTaskRunEventSummaryAggregatesRuntimeHistory(t *testing.T) {
 		require.NoError(t, db.Create(&event).Error)
 	}
 
-	svc := &AgentService{db: db}
+	svc := &Service{db: db}
 	summary, err := svc.GetTaskRunEventSummary(context.Background(), "user-1", "task-1")
 	require.NoError(t, err)
 	require.Equal(t, "task-1", summary.TaskID)
@@ -563,7 +563,7 @@ func TestListTaskApprovalsProjectsPendingAndDecidedRuntimeEvents(t *testing.T) {
 		require.NoError(t, db.Create(&event).Error)
 	}
 
-	svc := &AgentService{db: db}
+	svc := &Service{db: db}
 	result, err := svc.ListTaskApprovals(context.Background(), "user-1", "task-1")
 	require.NoError(t, err)
 	require.Equal(t, "task-1", result.TaskID)
@@ -601,7 +601,7 @@ func TestDecideTaskApprovalRoundTripsExactTargetDeviceAndCorrelation(t *testing.
 	}).Error)
 
 	controlCache := &mockAgentRunControlCache{}
-	svc := &AgentService{db: db, cacheClient: controlCache}
+	svc := &Service{db: db, cacheClient: controlCache}
 	listed, err := svc.ListTaskApprovals(context.Background(), "user-1", "task-1")
 	require.NoError(t, err)
 	require.Len(t, listed.Pending, 1)
@@ -664,7 +664,7 @@ func TestDecideTaskApprovalRejectsInvalidState(t *testing.T) {
 			if tt.event != nil {
 				require.NoError(t, db.Create(tt.event).Error)
 			}
-			svc := &AgentService{db: db, cacheClient: &mockAgentRunControlCache{}}
+			svc := &Service{db: db, cacheClient: &mockAgentRunControlCache{}}
 			_, err := svc.DecideTaskApproval(context.Background(), "user-1", "task-1", tt.approvalID, model.TeamApprovalDecision{Decision: tt.decision})
 			require.ErrorIs(t, err, tt.wantErr)
 		})
@@ -682,7 +682,7 @@ func TestListTaskArtifactsProjectsFileChangeAndArtifactCreated(t *testing.T) {
 		require.NoError(t, db.Create(&event).Error)
 	}
 
-	svc := &AgentService{db: db}
+	svc := &Service{db: db}
 	result, err := svc.ListTaskArtifacts(context.Background(), "user-1", "task-1")
 	require.NoError(t, err)
 	require.Equal(t, "task-1", result.TaskID)

@@ -1,4 +1,4 @@
-package service
+package agent
 
 import (
 	"context"
@@ -220,7 +220,7 @@ func TestHandleTaskStream_PublishesBothAgentStreamAndTeamSubagentStream(t *testi
 		}
 	})
 
-	svc := &AgentService{db: db, bus: b, cacheClient: &mockAgentCache{}}
+	svc := &Service{db: db, bus: b, cacheClient: &mockAgentCache{}}
 	err := svc.HandleTaskStream(context.Background(), "user-1", "dev-1", "task-1", "run-1", model.AgentRunEventInput{
 		EventType:   "run.agent.tool_call",
 		Payload:     json.RawMessage(`{"toolName":"read_file"}`),
@@ -259,7 +259,7 @@ func TestHandleTaskStream_NonTeamRun_PublishesOnlyAgentStream(t *testing.T) {
 		teamGot.Store(true)
 	})
 
-	svc := &AgentService{db: db, bus: b, cacheClient: &mockAgentCache{}}
+	svc := &Service{db: db, bus: b, cacheClient: &mockAgentCache{}}
 	err := svc.HandleTaskStream(context.Background(), "user-1", "dev-1", "task-1", "run-1", model.AgentRunEventInput{
 		EventType:   "run.agent.tool_call",
 		Payload:     json.RawMessage(`{"toolName":"read_file"}`),
