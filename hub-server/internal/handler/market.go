@@ -10,12 +10,12 @@ import (
 	"github.com/agenthub/hub-server/internal/config"
 	"github.com/agenthub/hub-server/internal/errcode"
 	"github.com/agenthub/hub-server/internal/model"
-	"github.com/agenthub/hub-server/internal/service"
+	"github.com/agenthub/hub-server/internal/service/agentprofile"
 )
 
-// MarketService is the subset of *service.AgentProfileService used by MarketHandler.
+// MarketService is the subset of *agentprofile.Service used by MarketHandler.
 type MarketService interface {
-	SearchMarket(ctx context.Context, runtimeID, q, sortBy, cursor string, pageSize int) (*service.ListResult, error)
+	SearchMarket(ctx context.Context, runtimeID, q, sortBy, cursor string, pageSize int) (*agentprofile.ListResult, error)
 	GetPublic(ctx context.Context, id string) (*model.AgentProfile, error)
 	Install(ctx context.Context, id, installerID string) (*model.AgentProfile, error)
 	Rate(ctx context.Context, profileID, raterID string, score int) (float64, int, error)
