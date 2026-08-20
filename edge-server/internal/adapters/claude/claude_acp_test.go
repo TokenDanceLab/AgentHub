@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/agenthub/edge-server/internal/adapters"
+	"github.com/agenthub/edge-server/internal/adapters/acp"
 	"github.com/agenthub/edge-server/internal/store"
 )
 
@@ -217,7 +218,7 @@ func TestClaudeACPAdapterBuildCommand(t *testing.T) {
 		WorkDir: `C:\work\proj`,
 	})
 
-	wantPath := adapters.DefaultNpxPath()
+	wantPath := acp.DefaultNpxPath()
 	if cmdPath != wantPath {
 		t.Errorf("cmdPath = %q, want %q", cmdPath, wantPath)
 	}
@@ -293,7 +294,7 @@ func TestClaudeACPAdapterVersionPin(t *testing.T) {
 // fails before spawn.
 func TestClaudeACPAdapterPreflightFailsFast(t *testing.T) {
 	a := &ClaudeACPAdapter{
-		AcpAdapter: adapters.NewAcpAdapterWithID(claudeACPAdapterID, "", nil, "Claude Code (ACP)"),
+		AcpAdapter: acp.NewAcpAdapterWithID(claudeACPAdapterID, "", nil, "Claude Code (ACP)"),
 	}
 	if a.Available() {
 		t.Fatal("empty binary must not be available")
@@ -330,7 +331,7 @@ func TestClaudeACPAdapterRegistryRegistration(t *testing.T) {
 	if _, ok := reg.Get("acp"); ok {
 		t.Error("generic acp adapter unexpectedly registered")
 	}
-	if err := reg.Register(adapters.NewAcpAdapter("fake-agent", nil, "Fake")); err != nil {
+	if err := reg.Register(acp.NewAcpAdapter("fake-agent", nil, "Fake")); err != nil {
 		t.Errorf("generic acp registration should coexist with claude-acp: %v", err)
 	}
 	if !containsString(reg.ListIDs(), "claude-acp") {

@@ -60,7 +60,7 @@ func BuildCLIInvocationPlan(adapter AgentAdapter, ctx RunProcessContext) CLIInvo
 func BuildCLIInvocationPlanFromCommand(adapter AgentAdapter, ctx RunProcessContext, cmdPath string, args []string, env []string, workDir string) CLIInvocationPlan {
 	if adapter == nil {
 		return CLIInvocationPlan{
-			CommandName:             commandNameOnly(cmdPath),
+			CommandName:             CommandNameOnly(cmdPath),
 			RealTestedReason:        "no adapter",
 			ExecutionMode:           "fixture",
 			NoSpendDefault:          true,
@@ -72,14 +72,20 @@ func BuildCLIInvocationPlanFromCommand(adapter AgentAdapter, ctx RunProcessConte
 		}
 	}
 	flags, configKeys, positionalCount := summarizeCLIInvocationArgs(args)
+	// firstNonEmpty 随 sdk_fixture_mapper 家族迁入 adapters/sdk（#1760
+	// mapper 增量）；此处仅剩单个调用点，行为等价地内联（取首个非空白值）。
+	projectedWorkDir := workDir
+	if strings.TrimSpace(projectedWorkDir) == "" {
+		projectedWorkDir = ctx.WorkDir
+	}
 	return CLIInvocationPlan{
 		AdapterID:               adapter.Metadata().ID,
-		CommandName:             commandNameOnly(cmdPath),
+		CommandName:             CommandNameOnly(cmdPath),
 		ArgFlags:                flags,
 		ConfigKeys:              configKeys,
 		PositionalArgCount:      positionalCount,
-		EnvNames:                envNamesOnly(env),
-		WorkDir:                 invocationPathNameOnly(firstNonEmpty(workDir, ctx.WorkDir)),
+		EnvNames:                EnvNamesOnly(env),
+		WorkDir:                 InvocationPathNameOnly(projectedWorkDir),
 		PromptRedacted:          strings.TrimSpace(ctx.Prompt) != "",
 		Observed:                false,
 		RealTested:              false,
@@ -166,7 +172,10 @@ func summarizeCLIInvocationArgs(args []string) ([]string, []string, int) {
 	return flags, configKeys, positionalCount
 }
 
-func envNamesOnly(env []string) []string {
+// EnvNamesOnly extracts the variable names from "KEY=VALUE" entries, deduped
+// and order-preserved. Exported so the sdk subpackage can reuse the SSOT
+// path-name/plan helpers from the root package (#1760 mapper 增量).
+func EnvNamesOnly(env []string) []string {
 	names := make([]string, 0, len(env))
 	for _, kv := range env {
 		name, _, _ := strings.Cut(kv, "=")
@@ -179,7 +188,9 @@ func envNamesOnly(env []string) []string {
 	return names
 }
 
-func commandNameOnly(value string) string {
+// CommandNameOnly returns the basename of a command path (backslashes
+// normalized). Exported for the sdk subpackage (#1760 mapper 增量).
+func CommandNameOnly(value string) string {
 	cleaned := strings.TrimSpace(strings.ReplaceAll(value, "\\", "/"))
 	if cleaned == "" {
 		return ""
@@ -187,7 +198,10 @@ func commandNameOnly(value string) string {
 	return path.Base(cleaned)
 }
 
-func invocationPathNameOnly(value string) string {
+// InvocationPathNameOnly reduces a workspace path to its basename when
+// absolute, otherwise strips "./" prefixes (plan redaction). Exported for
+// the sdk subpackage (#1760 mapper 增量).
+func InvocationPathNameOnly(value string) string {
 	cleaned := strings.TrimSpace(strings.ReplaceAll(value, "\\", "/"))
 	if cleaned == "" {
 		return ""

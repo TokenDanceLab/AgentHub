@@ -9,7 +9,7 @@
 // 见 acp_events.go。参考：ACP spike 分析 §3（翻译映射）
 //
 //	api/events.md §3.3（live-streaming 事件表）
-package adapters
+package acp
 
 import (
 	"strings"

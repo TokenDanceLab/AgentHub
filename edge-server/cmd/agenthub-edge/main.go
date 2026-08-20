@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"github.com/agenthub/edge-server/internal/adapters/sdk"
 	"log/slog"
 	"os"
 	"runtime/debug"
@@ -150,5 +151,5 @@ func main() {
 }
 
 func runtimeManifestFixtureReplayRequested(args []string) bool {
-	return len(args) == 1 && args[0] == adapters.RuntimeManifestFixtureReplayFlag
+	return len(args) == 1 && args[0] == sdk.RuntimeManifestFixtureReplayFlag
 }
