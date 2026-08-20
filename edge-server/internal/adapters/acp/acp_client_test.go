@@ -32,10 +32,15 @@ import (
 // every deliberately unwired ACP endpoint (#1404 fs/terminal frame design)
 // must answer with an error wrapping errACPEndpointNotWired — a JSON-RPC
 // error the agent can surface — and must never return a nil error (silent
-// hang from the agent's perspective) or a fabricated success response. When
-// #1404 wires an endpoint, remove it from this table and from the inventory.
+// hang from the agent's perspective) or a fabricated success response.
+//
+// This table exercises the frame-gate rejection branch (#1743 item 1): with
+// no workspace configured, every path is rejected by the allowlist and
+// every terminal frame is malformed (empty requests) — both gate errors
+// still wrap errACPEndpointNotWired (unwiredFrameError). When #1743 item 3
+// wires an endpoint, remove it from this table and from the inventory.
 func TestUnwiredACPEndpointsFailClosed(t *testing.T) {
-	handler := newACPClientHandler(nil, store.Run{ID: "run_test"}, nil, context.Background())
+	handler := newACPClientHandler(nil, store.Run{ID: "run_test"}, nil, context.Background(), "")
 	ctx := context.Background()
 
 	stubs := []struct {
@@ -84,6 +89,251 @@ func TestUnwiredACPEndpointsFailClosed(t *testing.T) {
 		})
 	}
 }
+
+// TestUnwiredACPEndpointsFailClosedInsideWorkspace covers the second
+// fail-closed branch: requests whose frames pass the allowlist gate still
+// end in errACPEndpointNotWired because no execution is wired behind the
+// gate yet (#1743 item 3 pending). Together with
+// TestUnwiredACPEndpointsFailClosed this locks both answers an unwired
+// stub can give.
+func TestUnwiredACPEndpointsFailClosedInsideWorkspace(t *testing.T) {
+	handler := newACPClientHandler(nil, store.Run{ID: "run_test"}, nil, context.Background(), "/workspace")
+	ctx := context.Background()
+
+	inWorkspacePath := "/workspace/src/main.go"
+	inWorkspaceCwd := "/workspace/scripts"
+
+	stubs := []struct {
+		name string
+		call func() error
+	}{
+		{"fs/read_text_file", func() error {
+			_, err := handler.ReadTextFile(ctx, acp.ReadTextFileRequest{Path: inWorkspacePath})
+			return err
+		}},
+		{"fs/write_text_file", func() error {
+			_, err := handler.WriteTextFile(ctx, acp.WriteTextFileRequest{Path: inWorkspacePath, Content: "data"})
+			return err
+		}},
+		{"terminal/create", func() error {
+			_, err := handler.CreateTerminal(ctx, acp.CreateTerminalRequest{Command: "go", Cwd: &inWorkspaceCwd})
+			return err
+		}},
+		{"terminal/kill", func() error {
+			_, err := handler.KillTerminal(ctx, acp.KillTerminalRequest{TerminalId: "term-1"})
+			return err
+		}},
+		{"terminal/output", func() error {
+			_, err := handler.TerminalOutput(ctx, acp.TerminalOutputRequest{TerminalId: "term-1"})
+			return err
+		}},
+		{"terminal/release", func() error {
+			_, err := handler.ReleaseTerminal(ctx, acp.ReleaseTerminalRequest{TerminalId: "term-1"})
+			return err
+		}},
+		{"terminal/wait_for_exit", func() error {
+			_, err := handler.WaitForTerminalExit(ctx, acp.WaitForTerminalExitRequest{TerminalId: "term-1"})
+			return err
+		}},
+	}
+
+	for _, stub := range stubs {
+		t.Run(stub.name, func(t *testing.T) {
+			err := stub.call()
+			if err == nil {
+				t.Fatalf("%s returned nil error — stub must fail closed, not hang", stub.name)
+			}
+			if !errors.Is(err, errACPEndpointNotWired) {
+				t.Fatalf("%s error = %v, want errACPEndpointNotWired", stub.name, err)
+			}
+			// The frame passed the gate, so no gate sentinel may leak in.
+			if errors.Is(err, errACPPathOutsideWorkspace) || errors.Is(err, errACPMalformedFrame) {
+				t.Fatalf("%s error = %v, wraps a gate sentinel despite an in-workspace frame", stub.name, err)
+			}
+		})
+	}
+}
+
+// TestFsTerminalStubsEnforceAllowlistGate drives the stubs with a
+// configured workspace: paths outside the workspace and malformed frames
+// are rejected at the gate with the gate sentinel observable, and the
+// answer still wraps errACPEndpointNotWired (nothing executes for unwired
+// endpoints, whichever branch fails).
+func TestFsTerminalStubsEnforceAllowlistGate(t *testing.T) {
+	handler := newACPClientHandler(nil, store.Run{ID: "run_gate"}, nil, context.Background(), "/workspace")
+	ctx := context.Background()
+
+	outsideCwd := "/tmp"
+	rejections := []struct {
+		name         string
+		call         func() error
+		gateSentinel error
+	}{
+		{"fs/read_text_file outside workspace", func() error {
+			_, err := handler.ReadTextFile(ctx, acp.ReadTextFileRequest{Path: "/etc/passwd"})
+			return err
+		}, errACPPathOutsideWorkspace},
+		{"fs/write_text_file traversal escape", func() error {
+			_, err := handler.WriteTextFile(ctx, acp.WriteTextFileRequest{Path: "/workspace/../secret.txt", Content: "x"})
+			return err
+		}, errACPPathOutsideWorkspace},
+		{"terminal/create cwd outside workspace", func() error {
+			_, err := handler.CreateTerminal(ctx, acp.CreateTerminalRequest{Command: "sh", Cwd: &outsideCwd})
+			return err
+		}, errACPPathOutsideWorkspace},
+		{"terminal/create without command", func() error {
+			_, err := handler.CreateTerminal(ctx, acp.CreateTerminalRequest{})
+			return err
+		}, errACPMalformedFrame},
+		{"terminal/kill without terminalId", func() error {
+			_, err := handler.KillTerminal(ctx, acp.KillTerminalRequest{})
+			return err
+		}, errACPMalformedFrame},
+	}
+
+	for _, rejection := range rejections {
+		t.Run(rejection.name, func(t *testing.T) {
+			err := rejection.call()
+			if err == nil {
+				t.Fatalf("%s returned nil error — gate rejection must fail closed", rejection.name)
+			}
+			if !errors.Is(err, rejection.gateSentinel) {
+				t.Errorf("%s error = %v, want wrapping %v", rejection.name, err, rejection.gateSentinel)
+			}
+			if !errors.Is(err, errACPEndpointNotWired) {
+				t.Errorf("%s error = %v, must keep wrapping errACPEndpointNotWired (STUB INVENTORY contract)", rejection.name, err)
+			}
+		})
+	}
+}
+
+// TestWorkspaceAllowlistValidatePath locks the fail-closed containment
+// rules of the frame gate (#1743 item 1): only paths resolving inside the
+// workspace root pass; traversal, outside paths, relative paths, empty
+// inputs, and adjacent-prefix directories all reject with
+// errACPPathOutsideWorkspace.
+func TestWorkspaceAllowlistValidatePath(t *testing.T) {
+	cases := []struct {
+		name    string
+		root    string
+		path    string
+		allowed bool
+	}{
+		{"nested file", "/workspace", "/workspace/src/main.go", true},
+		{"root itself", "/workspace", "/workspace", true},
+		{"root with trailing slash", "/workspace/", "/workspace/file.txt", true},
+		{"windows backslashes", `C:\work`, `C:\work\file.txt`, true},
+		{"windows drive letter case", `C:\work`, `c:/work/file.txt`, true},
+		{"traversal escapes root", "/workspace", "/workspace/../etc/passwd", false},
+		{"outside absolute path", "/workspace", "/etc/passwd", false},
+		{"adjacent prefix directory", "/workspace", "/workspace-evil/file.txt", false},
+		{"relative path", "/workspace", "src/main.go", false},
+		{"empty path", "/workspace", "", false},
+		{"whitespace-only path", "/workspace", "   ", false},
+		{"empty root rejects everything", "", "/workspace/file.txt", false},
+		{"windows traversal", `C:\work`, `C:\work\..\secret.txt`, false},
+		{"different windows drive", `C:\work`, `D:\work\file.txt`, false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			allowlist := newWorkspaceAllowlist(tc.root)
+			err := allowlist.validatePath(tc.path)
+			if tc.allowed {
+				if err != nil {
+					t.Fatalf("validatePath(%q) under root %q = %v, want allowed", tc.path, tc.root, err)
+				}
+			} else {
+				if err == nil {
+					t.Fatalf("validatePath(%q) under root %q = nil, want rejection", tc.path, tc.root)
+				}
+				if !errors.Is(err, errACPPathOutsideWorkspace) {
+					t.Fatalf("validatePath(%q) error = %v, want wrapping errACPPathOutsideWorkspace", tc.path, err)
+				}
+			}
+			if got := allowlist.AllowsPath(tc.path); got != tc.allowed {
+				t.Errorf("AllowsPath(%q) = %v, want %v", tc.path, got, tc.allowed)
+			}
+		})
+	}
+
+	// An absent allowlist (no workspace at all) rejects too — fail-closed.
+	var absentAllowlist *workspaceAllowlist
+	if err := absentAllowlist.validatePath("/workspace/file.txt"); !errors.Is(err, errACPPathOutsideWorkspace) {
+		t.Errorf("nil allowlist validatePath = %v, want wrapping errACPPathOutsideWorkspace", err)
+	}
+}
+
+// TestFsTerminalFramesCarryNormalizedFields locks the frame side of the
+// design: frames that pass the gate carry normalized fields a future
+// executor must use (never the raw request path), with schema optionals
+// passed through.
+func TestFsTerminalFramesCarryNormalizedFields(t *testing.T) {
+	allowlist := newWorkspaceAllowlist(`C:\work`)
+
+	readFrame, err := buildReadTextFileFrame(allowlist, acp.ReadTextFileRequest{Path: `c:\work\src\main.go`})
+	if err != nil {
+		t.Fatalf("buildReadTextFileFrame: %v", err)
+	}
+	if readFrame.Method != acpMethodReadTextFile || readFrame.Path != "C:/work/src/main.go" {
+		t.Errorf("read frame = %+v, want method %s path C:/work/src/main.go", readFrame, acpMethodReadTextFile)
+	}
+
+	line, limit := 3, 25
+	windowFrame, err := buildReadTextFileFrame(allowlist, acp.ReadTextFileRequest{Path: `C:\work\notes.md`, Line: &line, Limit: &limit})
+	if err != nil {
+		t.Fatalf("buildReadTextFileFrame(window): %v", err)
+	}
+	if windowFrame.Line != &line || windowFrame.Limit != &limit {
+		t.Errorf("read window frame = %+v, want Line/Limit passthrough", windowFrame)
+	}
+
+	writeFrame, err := buildWriteTextFileFrame(allowlist, acp.WriteTextFileRequest{Path: `C:\work\out.txt`, Content: "data"})
+	if err != nil {
+		t.Fatalf("buildWriteTextFileFrame: %v", err)
+	}
+	if writeFrame.Method != acpMethodWriteTextFile || writeFrame.Path != "C:/work/out.txt" || writeFrame.Content != "data" {
+		t.Errorf("write frame = %+v, want normalized path and content passthrough", writeFrame)
+	}
+
+	createFrame, err := buildCreateTerminalFrame(allowlist, acp.CreateTerminalRequest{
+		Command: "go",
+		Args:    []string{"test", "./..."},
+		Cwd:     stringPointer(`c:\work\scripts`),
+		Env:     []acp.EnvVariable{{Name: "GOFLAGS", Value: "-short"}, {Name: "GOFLAGS", Value: "-v"}},
+	})
+	if err != nil {
+		t.Fatalf("buildCreateTerminalFrame: %v", err)
+	}
+	if createFrame.Cwd != "C:/work/scripts" {
+		t.Errorf("create frame cwd = %q, want normalized C:/work/scripts", createFrame.Cwd)
+	}
+	if len(createFrame.Args) != 2 || createFrame.Args[0] != "test" {
+		t.Errorf("create frame args = %v, want [test ./...]", createFrame.Args)
+	}
+	// Later env entries win (process-env semantics).
+	if createFrame.Env["GOFLAGS"] != "-v" {
+		t.Errorf("create frame env GOFLAGS = %q, want -v (last entry wins)", createFrame.Env["GOFLAGS"])
+	}
+
+	defaultCwdFrame, err := buildCreateTerminalFrame(allowlist, acp.CreateTerminalRequest{Command: "go"})
+	if err != nil {
+		t.Fatalf("buildCreateTerminalFrame(no cwd): %v", err)
+	}
+	if defaultCwdFrame.Cwd != "" {
+		t.Errorf("create frame cwd = %q, want empty (defaults to the session workdir at execution time)", defaultCwdFrame.Cwd)
+	}
+
+	killFrame, err := buildTerminalIDFrame(acpMethodKillTerminal, "term-1")
+	if err != nil {
+		t.Fatalf("buildTerminalIDFrame: %v", err)
+	}
+	if killFrame.Method != acpMethodKillTerminal || killFrame.TerminalID != "term-1" {
+		t.Errorf("terminal id frame = %+v, want method %s id term-1", killFrame, acpMethodKillTerminal)
+	}
+}
+
+// stringPointer returns a pointer to s for building optional SDK fields.
+func stringPointer(s string) *string { return &s }
 
 // fakeACPAgent simulates an ACP agent over two pipes. It reads client
 // requests from reqR (the client's stdin side) and writes responses and
