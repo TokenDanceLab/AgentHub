@@ -10,7 +10,7 @@ Edge Server 的 adapter 层负责将不同 Agent Runtime 的协议统一为内�
 
 `internal/adapters/` 已按 Agent 家族归组为叶子子包（[#1760]，见 [02-edge-server.md](02-edge-server.md) §Adapter 家族子包）：`claude/`、`codex/`、`opencode/`、`orchestrator/`、`sdk/`；共享机制（`AcpAdapter`、NDJSON parser、registry）留在根包。下表文件列给出子包内路径（未标注的仍在根包平铺区）。
 
-[#1760]: https://github.com/AgentHub-AI/AgentHub/issues/1760
+[#1760]: https://github.com/TokenDanceLab/AgentHub/issues/1760
 
 ## CLI Adapters
 
@@ -112,7 +112,7 @@ type PreflightCheck interface {
 }
 ```
 
-`PreflightCheck` 接口定义在 `adapter.go`。所有 adapter 均实现：预检 launcher 二进制 / API key 是否存在，缺失时返回描述性错误而非进程启动后失败（例如 `codex-acp` 预检 `npx` launcher，`claude-code` 预检 `OPENAI_API_KEY`）。
+`PreflightCheck` 接口定义在 `adapter.go`。所有 adapter 均实现：预检 launcher 二进制 / API key 是否存在，缺失时返回描述性错误而非进程启动后失败（例如 `codex-acp` 预检 `npx` launcher，`claude-code` 预检 `ANTHROPIC_API_KEY`）。
 
 ## 事件映射合同
 
