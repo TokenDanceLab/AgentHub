@@ -1,5 +1,5 @@
 import { type ReactNode } from 'react';
-import ErrorBoundary, { type ErrorBoundaryExtension } from './ErrorBoundary';
+import ErrorBoundary, { type ErrorBoundaryExtension } from '../ui/ErrorBoundary';
 
 /**
  * Page-level error boundary for workbench route gates.
@@ -9,7 +9,7 @@ import ErrorBoundary, { type ErrorBoundaryExtension } from './ErrorBoundary';
  * can clear transient state when the user retries — preventing the same render
  * error from immediately re-throwing after the boundary clears.
  *
- * Wraps each memoized route gate in {@link ../workbench/WorkbenchRoutes} so a
+ * Wraps each memoized route gate in {@link WorkbenchRoutes} so a
  * render crash in tasks/projects/docs stays isolated to that page instead of
  * tearing down the whole workbench shell.
  */

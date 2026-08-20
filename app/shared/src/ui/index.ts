@@ -1,4 +1,4 @@
-// Shared UI primitives consumed across desktop/web/mobile-rn workbench surfaces.
+// Shared UI primitives consumed across desktop/web/mobile-rn product surfaces.
 export { Modal } from './Modal';
 export type { ModalProps } from './Modal';
 export { DiffReviewPanel } from './DiffReviewPanel';
@@ -87,7 +87,6 @@ export type { ArtifactCardProps } from './ArtifactCard';
 export { PREVIEW_SANDBOX_REMOTE, PREVIEW_SANDBOX_SRCDOC } from './previewSandbox';
 export { DeployCard } from './DeployCard';
 export type { DeployCardProps } from './DeployCard';
-export { MessageSearchPanel } from './MessageSearchPanel';
 export { SlideshowPreview } from './SlideshowPreview';
 export type { SlideshowPreviewProps } from './SlideshowPreview';
 export { TablePreview } from './TablePreview';
@@ -119,8 +118,6 @@ export { CollapsibleBlock } from './CollapsibleBlock';
 export { FileChangeGroup } from './FileChangeGroup';
 export type { FileChangeGroupProps, FileChangeItem } from './FileChangeGroup';
 export { Icon } from './Icon';
-export { PageErrorBoundary } from './PageErrorBoundary';
-export type { PageErrorBoundaryProps } from './PageErrorBoundary';
 export { ProgressBar } from './ProgressBar';
 export { SkeletonBar } from './SkeletonBar';
 export type { SkeletonBarProps, SkeletonBarVariant } from './SkeletonBar';

@@ -21,7 +21,7 @@ import {
   useBuildChatConversationHostProps,
 } from './workbenchFramePartsHelpers';
 import { resolveComposerWorkDir } from './workbenchFrameHelpers';
-import { PageErrorBoundary } from '../ui/PageErrorBoundary';
+import { PageErrorBoundary } from './PageErrorBoundary';
 import styles from './AgentHubWorkbench.module.css';
 
 export {
