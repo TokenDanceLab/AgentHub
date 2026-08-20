@@ -2,20 +2,24 @@
 
 > 子文档 | 主索引：[architecture.md](../architecture.md)
 >
-> 最后更新：2026-08-14
+> 最后更新：2026-08-20
 
 ## 概述
 
 Edge Server 的 adapter 层负责将不同 Agent Runtime 的协议统一为内部 `RunEvent` 流。所有 adapter 实现统一的 Go interface，Edge 不关心底层 Agent 的具体协议差异。
 
+`internal/adapters/` 已按 Agent 家族归组为叶子子包（[#1760]，见 [02-edge-server.md](02-edge-server.md) §Adapter 家族子包）：`claude/`、`codex/`、`opencode/`、`orchestrator/`、`sdk/`；共享机制（`AcpAdapter`、NDJSON parser、registry）留在根包。下表文件列给出子包内路径（未标注的仍在根包平铺区）。
+
+[#1760]: https://github.com/AgentHub-AI/AgentHub/issues/1760
+
 ## CLI Adapters
 
 | Adapter | 注册 ID | 文件 | 功能 |
 |---------|---------|------|------|
-| Claude Code (ACP) | `claude-acp` | `claude_acp.go` | 官方 `@agentclientprotocol/claude-agent-acp` 0.62.0 二进制 + `ANTHROPIC_API_KEY`，embed `AcpAdapter`（coder/acp-go-sdk） |
-| Codex (ACP) | `codex-acp` | `codex_acp.go` | 官方 `codex-acp` 1.1.7 二进制 + `OPENAI_API_KEY`，embed `AcpAdapter` |
-| OpenCode (ACP) | `opencode-acp` | `opencode_acp.go` | 原生 ACP 模式 `opencode acp` + 4 provider key passthrough，embed `AcpAdapter` |
-| Claude Code (legacy) | `claude-code` | `claude_code.go` ⚠️ DEPRECATED | 旧手写 stream-json parser，仅保留作 orchestrator inner；Phase B 移除 |
+| Claude Code (ACP) | `claude-acp` | `claude/claude_acp.go` | 官方 `@agentclientprotocol/claude-agent-acp` 0.62.0 二进制 + `ANTHROPIC_API_KEY`，embed `AcpAdapter`（coder/acp-go-sdk） |
+| Codex (ACP) | `codex-acp` | `codex/codex_acp.go` | 官方 `codex-acp` 1.1.7 二进制 + `OPENAI_API_KEY`，embed `AcpAdapter` |
+| OpenCode (ACP) | `opencode-acp` | `opencode/opencode_acp.go` | 原生 ACP 模式 `opencode acp` + 4 provider key passthrough，embed `AcpAdapter` |
+| Claude Code (legacy) | `claude-code` | `claude/claude_code.go` ⚠️ DEPRECATED | 旧手写 stream-json parser，仅保留作 orchestrator inner；Phase B 移除 |
 
 > `codex.go` / `opencode.go`（旧手写批处理 parser）已在 ACP 收敛（阶段 A）中删除，运行时统一走 ACP 层。
 
@@ -41,8 +45,8 @@ ACP 协议层**禁止手写 JSON-RPC loop**，必须用官方 Wrapper/适配层�
 
 | Adapter | 注册 ID | 文件 | 调用方式 |
 |---------|---------|------|---------|
-| `AnthropicSDKAdapter` | `anthropic-sdk` | `anthropic_sdk.go` | HTTP direct call Anthropic Messages API + SSE streaming |
-| `OpenAISDKAdapter` | `openai-sdk` | `openai_sdk.go` | HTTP direct call OpenAI Chat Completions API + SSE streaming |
+| `AnthropicSDKAdapter` | `anthropic-sdk` | `sdk/anthropic_sdk.go` | HTTP direct call Anthropic Messages API + SSE streaming |
+| `OpenAISDKAdapter` | `openai-sdk` | `sdk/openai_sdk.go` | HTTP direct call OpenAI Chat Completions API + SSE streaming |
 
 ### 特征
 
@@ -57,7 +61,7 @@ ACP 协议层**禁止手写 JSON-RPC loop**，必须用官方 Wrapper/适配层�
 
 | Adapter | 注册 ID | 文件 | 功能 |
 |---------|---------|------|------|
-| `OrchestratorAdapter` | `orchestrator` | `orchestrator.go` | 群聊编排：包装 Claude Code + 系统提示，分解任务并分发给子 Agent |
+| `OrchestratorAdapter` | `orchestrator` | `orchestrator/orchestrator.go` | 群聊编排：包装 Claude Code + 系统提示，分解任务并分发给子 Agent |
 
 - 仅在 `--claude-code-path` 非空时自动注册
 - 作为 `orchestrator` 角色的默认 adapter
@@ -70,10 +74,10 @@ Orchestrator 的 `ParseStream` 在 Claude Code 输出流上包装了 `dispatchIn
 
 | 子层 | 位置 | 职责 |
 |------|------|------|
-| **Rule Engine** (T2-A08) | `orchestrator_dispatch_interceptor.go` `applyRuleEngine` / `ruleEnginePreprocess` | 文本级和事件级的确定性预处理：完成信号检测（done/finish/completed 关键词匹配）、审批决策关键词短路（yes/no/approve/reject 跳过 JSON 解析）、单 finish dispatch 跳过优化、同 Agent 批量 dispatch 自动转顺序执行 |
-| **Plan Approval Gate** (P0 #3) | `plan_approval.go` `PlanApprovalBroker` | 在 dispatch 前暂停，发出 `plan.proposed` 事件并等待用户审批；支持超时自动批准（默认 60s） |
-| **Fan-Out Pool** | `orchestrator_dispatch_interceptor.go` `fanOutDispatches` / `fanOutSequential` | 信号量限制并发（默认 10），注入兄弟 Agent 上下文避免 workspace 文件冲突；同 Agent 批量自动降级为顺序执行 |
-| **Result Listener** | `orchestrator_dispatch_results.go` `runResultListener` / `handleSubAgentResult` | 通过消息队列接收子 Agent 结果/错误，注入回 orchestrator 文本流，触发进度汇总 |
+| **Rule Engine** (T2-A08) | `orchestrator/orchestrator_dispatch_interceptor.go` `applyRuleEngine` / `ruleEnginePreprocess` | 文本级和事件级的确定性预处理：完成信号检测（done/finish/completed 关键词匹配）、审批决策关键词短路（yes/no/approve/reject 跳过 JSON 解析）、单 finish dispatch 跳过优化、同 Agent 批量 dispatch 自动转顺序执行 |
+| **Plan Approval Gate** (P0 #3) | `orchestrator/plan_approval.go` `PlanApprovalBroker` | 在 dispatch 前暂停，发出 `plan.proposed` 事件并等待用户审批；支持超时自动批准（默认 60s） |
+| **Fan-Out Pool** | `orchestrator/orchestrator_dispatch_interceptor.go` `fanOutDispatches` / `fanOutSequential` | 信号量限制并发（默认 10），注入兄弟 Agent 上下文避免 workspace 文件冲突；同 Agent 批量自动降级为顺序执行 |
+| **Result Listener** | `orchestrator/orchestrator_dispatch_results.go` `runResultListener` / `handleSubAgentResult` | 通过消息队列接收子 Agent 结果/错误，注入回 orchestrator 文本流，触发进度汇总 |
 | **Failure Recovery** | lifecycle `FaultEscalation`（`internal/lifecycle/fault_escalation.go`） | 已收敛（#4ddde5b，2026-08-14）：删除 `orchestrator_failure.go`/`FailureRecoveryManager`/断路器三态/Reflexion，失败恢复改为纯自动重试（`MaxRetries` 默认 1，`AGENTHUB_MAX_RETRIES` 可调）+ 错误 review/replan 由 agent in-context 自纠错 |
 
 **Rule Engine 规则说明**（按评估顺序）：
