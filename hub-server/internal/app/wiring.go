@@ -20,6 +20,8 @@ import (
 	"github.com/agenthub/hub-server/internal/outboundhttp"
 	"github.com/agenthub/hub-server/internal/repository"
 	"github.com/agenthub/hub-server/internal/service"
+	"github.com/agenthub/hub-server/internal/service/agentcontrol"
+	"github.com/agenthub/hub-server/internal/service/agentprofile"
 	"github.com/agenthub/hub-server/internal/service/agentteam"
 	"github.com/agenthub/hub-server/internal/service/attachment"
 	"github.com/agenthub/hub-server/internal/service/audit"
@@ -145,7 +147,7 @@ func (a *App) initServices(ctx context.Context) error {
 	a.SessionService = session.NewService(a.DB, a.CacheClient, a.bus)
 	a.MessageService = message.NewService(a.DB, a.bus, a.CacheClient)
 	a.MessageReactionService = messagereaction.NewService(a.DB, a.bus)
-	a.AgentControlService = service.NewAgentControlService(a.CacheClient, a.mgr)
+	a.AgentControlService = agentcontrol.NewService(a.CacheClient, a.mgr)
 
 	// Execution Target service (needed by the device service).
 	// Egress policy (#1540): default-deny; the administrator must explicitly
@@ -175,7 +177,7 @@ func (a *App) initServices(ctx context.Context) error {
 	a.AgentService = service.NewAgentService(a.DB, a.bus, a.mgr, a.CacheClient, a.RelayService, a.Config.Edge, edgeDispatchClient, a.Config.JWT.Secret)
 
 	// Agent Profile service
-	agentProfileSvc := service.NewAgentProfileService(a.DB)
+	agentProfileSvc := agentprofile.NewService(a.DB)
 	a.AgentProfileHandler = handler.NewAgentProfileHandler(agentProfileSvc)
 
 	// Skill + MCP Server services
@@ -184,7 +186,7 @@ func (a *App) initServices(ctx context.Context) error {
 	mcpSvc := mcpserver.NewService(a.DB)
 	a.MCPServerHandler = handler.NewMCPServerHandler(mcpSvc)
 
-	// Market handler (reuses AgentProfileService)
+	// Market handler (reuses agentprofile.Service)
 	a.MarketHandler = handler.NewMarketHandler(agentProfileSvc)
 
 	// Provider Binding service

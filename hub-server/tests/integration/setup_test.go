@@ -33,6 +33,7 @@ import (
 	"github.com/agenthub/hub-server/internal/repository"
 	"github.com/agenthub/hub-server/internal/router"
 	"github.com/agenthub/hub-server/internal/service"
+	"github.com/agenthub/hub-server/internal/service/agentprofile"
 	"github.com/agenthub/hub-server/internal/service/agentteam"
 	"github.com/agenthub/hub-server/internal/service/attachment"
 	"github.com/agenthub/hub-server/internal/service/audit"
@@ -169,13 +170,13 @@ func TestMain(m *testing.M) {
 
 	oidcService := oidc.NewService(db, cfg.TokenDanceID, cfg.JWT, cacheClient)
 	oidcHandler := handler.NewOIDCHandler(oidcService)
-	profileService := service.NewAgentProfileService(db)
+	profileService := agentprofile.NewService(db)
 	agentProfileHandler := handler.NewAgentProfileHandler(profileService)
 	skillService := skill.NewService(db)
 	skillHandler := handler.NewSkillHandler(skillService)
 	mcpService := mcpserver.NewService(db)
 	mcpHandler := handler.NewMCPServerHandler(mcpService)
-	marketHandler := handler.NewMarketHandler(profileService) // uses AgentProfileService
+	marketHandler := handler.NewMarketHandler(profileService) // reuses agentprofile.Service
 	pbService := providerbinding.NewService(db)
 	pbHandler := handler.NewProviderBindingHandler(pbService)
 	targetService, _ := executiontarget.NewService(db, egress.Config{AllowCIDRs: []string{"127.0.0.0/8"}, AllowPlainHTTP: true})

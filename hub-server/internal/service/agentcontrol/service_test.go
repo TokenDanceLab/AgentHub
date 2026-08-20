@@ -1,4 +1,4 @@
-package service
+package agentcontrol
 
 import (
 	"context"
@@ -28,7 +28,7 @@ func TestAgentControlServiceDeliversToExactDesktopDevice(t *testing.T) {
 	mgr.SetAuth(conn.ID, "user-1", "desktop", "dev-b")
 	require.NoError(t, cacheClient.SetRoute(ctx, "user-1", "desktop:dev-b", conn.ID))
 
-	svc := NewAgentControlService(cacheClient, mgr)
+	svc := NewService(cacheClient, mgr)
 	require.NoError(t, svc.DeliverToDesktopDevice(ctx, "user-1", "dev-b", model.AgentControlPayload{
 		Kind:       model.AgentControlKindPermissionDecide,
 		ApprovalID: "approval-b",
@@ -76,7 +76,7 @@ func TestAgentControlServiceQueuesWhenExactDeviceRouteMissing(t *testing.T) {
 	mgr.SetAuth(connA.ID, "user-1", "desktop", "dev-a")
 	require.NoError(t, cacheClient.SetRoute(ctx, "user-1", "desktop:dev-a", connA.ID))
 
-	svc := NewAgentControlService(cacheClient, mgr)
+	svc := NewService(cacheClient, mgr)
 	require.NoError(t, svc.DeliverToDesktopDevice(ctx, "user-1", "dev-b", model.AgentControlPayload{
 		Kind:       model.AgentControlKindPermissionDecide,
 		ApprovalID: "approval-b",
@@ -115,7 +115,7 @@ func TestAgentControlServiceQueuesWhenExactDeviceDeliveryBufferFull(t *testing.T
 		conn.Send <- []byte("already queued")
 	}
 
-	svc := NewAgentControlService(cacheClient, mgr)
+	svc := NewService(cacheClient, mgr)
 	require.NoError(t, svc.DeliverToDesktopDevice(ctx, "user-1", "dev-b", model.AgentControlPayload{
 		Kind:       model.AgentControlKindPermissionDecide,
 		ApprovalID: "approval-b",
@@ -139,7 +139,7 @@ func TestAgentControlServiceQueuesDuplicateOfflineControlOnce(t *testing.T) {
 	t.Cleanup(mr.Close)
 	cacheClient := cache.NewClient(redis.NewClient(&redis.Options{Addr: mr.Addr()}))
 
-	svc := NewAgentControlService(cacheClient, ws.NewManager())
+	svc := NewService(cacheClient, ws.NewManager())
 	payload := model.AgentControlPayload{
 		Kind:       model.AgentControlKindPermissionDecide,
 		ApprovalID: "approval-dedupe",
