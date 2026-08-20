@@ -269,10 +269,13 @@ func firstPermissionOption(options []acp.PermissionOption, kinds ...acp.Permissi
 // session/request_permission (RequestPermission → Edge approval chain).
 //
 // Every stub fails closed with errACPEndpointNotWired — a JSON-RPC error the
-// agent can surface — never a silent hang, never a fake success. The
-// capabilities are still advertised in initialize (runACPSession) so the
-// agent can discover them; removing the advertisement is a #1743 follow-up,
-// not something a stub should silently do.
+// agent can surface — never a silent hang, never a fake success.
+//
+// #1743 removed the fs/terminal capability advertisement from initialize
+// (runACPSession): advertising a capability whose endpoints can only answer
+// with errors would invite the agent to depend on a broken surface. The
+// stubs stay fail-closed as the last line of defense until the fs/terminal
+// frame design (+ workspace allowlist) actually wires them.
 //
 // ReadTextFile handles fs/read_text_file.
 func (h *acpClientHandler) ReadTextFile(ctx context.Context, params acp.ReadTextFileRequest) (acp.ReadTextFileResponse, error) {
@@ -351,17 +354,15 @@ func runACPSession(ctx context.Context, stdout io.Reader, stdin io.Writer, emitt
 	conn := acp.NewClientSideConnection(handler, stdin, stdout)
 	conn.SetLogger(slog.With("component", "acp-sdk", "sdk", acpSDKVersion, "run_id", run.ID))
 
-	// 1. initialize handshake. Capabilities: fs read/write + terminal are
-	// advertised; the endpoints answer with errors until the fs/terminal
-	// frame design lands (#1743; see handler TODO comments). Tool permission
-	// gates use session/request_permission, which is bridged to the Edge
-	// approval chain.
+	// 1. initialize handshake. No fs/terminal client capabilities are
+	// advertised: the client-side endpoints are still unwired fail-closed
+	// stubs (#1743, follow-up of #1404), and advertising a capability whose
+	// endpoints can only answer with errors would invite the agent to depend
+	// on a broken surface. Tool permission gates use
+	// session/request_permission, which is bridged to the Edge approval
+	// chain.
 	initResp, err := conn.Initialize(ctx, acp.InitializeRequest{
 		ProtocolVersion: acp.ProtocolVersionNumber,
-		ClientCapabilities: acp.ClientCapabilities{
-			Fs:       acp.FileSystemCapabilities{ReadTextFile: true, WriteTextFile: true},
-			Terminal: true,
-		},
 		ClientInfo: &acp.Implementation{
 			Name:    "agenthub-edge",
 			Version: "acp-spike",
@@ -375,14 +376,16 @@ func runACPSession(ctx context.Context, stdout io.Reader, stdin io.Writer, emitt
 			initResp.ProtocolVersion, acp.ProtocolVersionNumber))
 	}
 
-	// 2. session/new. MCP server config from the run profile is not yet wired
-	// into the ACP session (frame design deferred (#1743, follow-up of #1404)). When a profile
-	// declares MCP servers, surface the gap as a visible status-change event
-	// + warning log so the user sees *why* MCP tools are unavailable instead
-	// of a silent absence.
-	if rc.MCPConfig != "" {
-		slog.Warn("acp: MCP config present but not wired into ACP session; MCP tools will be unavailable",
-			"run_id", run.ID, "reason", "acp_mcp_not_wired")
+	// 2. session/new. The run profile's MCP config (rc.MCPConfig) is parsed
+	// into ACP McpServer entries and wired into the session (#1743). A parse
+	// failure keeps the #1740 visible degradation event (reason
+	// acp_mcp_not_wired) so the user still sees *why* MCP tools are
+	// unavailable instead of a silent absence; a successful parse passes the
+	// servers through and emits no degradation.
+	mcpServers, mcpParseErr := parseACPMcpServers(rc.MCPConfig)
+	if mcpParseErr != nil {
+		slog.Warn("acp: MCP config could not be wired into ACP session; MCP tools will be unavailable",
+			"run_id", run.ID, "reason", "acp_mcp_not_wired", "error", mcpParseErr)
 		emitter.Emit(BusEventStatusChange, acpRunScope(run), map[string]any{
 			"status":  "degraded",
 			"reason":  "acp_mcp_not_wired",
@@ -391,7 +394,7 @@ func runACPSession(ctx context.Context, stdout io.Reader, stdin io.Writer, emitt
 	}
 	sessResp, err := conn.NewSession(ctx, acp.NewSessionRequest{
 		Cwd:        rc.WorkDir,
-		McpServers: []acp.McpServer{}, // TODO(#1743): wire RunProcessContext.MCPConfig
+		McpServers: mcpServers,
 	})
 	if err != nil {
 		return adapters.NewNonRecoverableParseError(fmt.Errorf("acp: session/new failed: %w", err))
