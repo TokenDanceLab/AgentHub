@@ -1,13 +1,14 @@
-// Package adapters — codex-acp: the official Codex ACP adapter (first ACP
+// Package codex — codex-acp: the official Codex ACP adapter (first ACP
 // migration target, per ACP Go migration §6).
 //
-// The existing CodexAdapter (codex.go) is Phase 1 batch mode: it spawns the
-// codex CLI with `exec --json` and hand-parses JSONL output — no streaming
-// (Streaming: false), no ACP permission chain. This adapter replaces that hop
-// with the official ACP adapter binary `@agentclientprotocol/codex-acp`,
-// which speaks the Agent Client Protocol (JSON-RPC 2.0) over stdio and is
-// consumed by the shared coder/acp-go-sdk client runtime (acp_client.go):
-// streaming updates, capability negotiation, and the Edge approval chain
+// The existing CodexAdapter (codex.go, root package) is Phase 1 batch mode:
+// it spawns the codex CLI with `exec --json` and hand-parses JSONL output —
+// no streaming (Streaming: false), no ACP permission chain. This adapter
+// replaces that hop with the official ACP adapter binary
+// `@agentclientprotocol/codex-acp`, which speaks the Agent Client Protocol
+// (JSON-RPC 2.0) over stdio and is consumed by the shared coder/acp-go-sdk
+// client runtime (root acp_client.go): streaming updates, capability
+// negotiation, and the Edge approval chain
 // (session/request_permission → PermissionDecisionBroker) come with it.
 //
 // Launch shape: `npx -y @agentclientprotocol/codex-acp` (npx distribution,
@@ -25,13 +26,15 @@
 // from the parent env on each BuildCommand call (not snapshotted at adapter
 // construction) so a key rotated after registration still flows to the spawn.
 //
-// This file is now a thin configuration shim over AcpAdapter: every behavior
-// (BuildCommand env passthrough, Metadata version pin, PreflightCheck
+// This file is now a thin configuration shim over the root AcpAdapter: every
+// behavior (BuildCommand env passthrough, Metadata version pin, PreflightCheck
 // launcher-missing error, ParseStream via runACPSession, capabilities,
 // permission broker) is inherited from AcpAdapter via embedding + a single
 // AcpAdapterConfig. The earlier near-copy of the codex/claude/opencode ACP
 // wrappers has been collapsed into shared AcpAdapter logic (#1404 wave 2).
-package adapters
+package codex
+
+import "github.com/agenthub/edge-server/internal/adapters"
 
 // codexACPadapterID is the registry identifier of the official codex-acp
 // configuration.
@@ -57,20 +60,20 @@ const codexACPPackageSpec = codexACPPackage + "@" + codexACPVersionPin
 // supplies the codex-acp configuration (binary, args, env keys, version pin,
 // preflight labels) via NewAcpAdapterConfig.
 type CodexACPadapter struct {
-	*AcpAdapter
+	*adapters.AcpAdapter
 }
 
 // NewCodexACPadapter creates the codex-acp adapter configuration.
 //
 // npxPath is the launcher to spawn; when empty it defaults to "npx.cmd" on
-// Windows and "npx" elsewhere. The agent receives no run-time args beyond
-// `-y @agentclientprotocol/codex-acp`: ACP mode is implicit in the package,
-// and the prompt travels over stdio.
+// Windows and "npx" elsewhere (shared adapters.DefaultNpxPath). The agent
+// receives no run-time args beyond `-y @agentclientprotocol/codex-acp`: ACP
+// mode is implicit in the package, and the prompt travels over stdio.
 func NewCodexACPadapter(npxPath string) *CodexACPadapter {
 	if npxPath == "" {
-		npxPath = DefaultNpxPath()
+		npxPath = adapters.DefaultNpxPath()
 	}
-	return &CodexACPadapter{AcpAdapter: NewAcpAdapterConfig(AcpAdapterConfig{
+	return &CodexACPadapter{AcpAdapter: adapters.NewAcpAdapterConfig(adapters.AcpAdapterConfig{
 		ID:            codexACPadapterID,
 		Binary:        npxPath,
 		Args:          []string{"-y", codexACPPackageSpec},
@@ -84,12 +87,12 @@ func NewCodexACPadapter(npxPath string) *CodexACPadapter {
 
 // compile-time guard: the wrapper satisfies the full AgentAdapter contract
 // (via the embedded AcpAdapter).
-var _ AgentAdapter = (*CodexACPadapter)(nil)
+var _ adapters.AgentAdapter = (*CodexACPadapter)(nil)
 
 // TODO(#1404 真跑验证): an end-to-end run against the real `npx -y
 // @agentclientprotocol/codex-acp` process requires a Node.js/npx environment
 // with Codex authentication (OPENAI_API_KEY or ChatGPT login) and network
 // access to the npm registry. Not present in this workspace — verification is
 // limited to the registry registration, command shape, and a mock ACP peer
-// (codex_acp_test.go / acp_client_test.go). Before cutover: verify on a
+// (codex_acp_test.go / root acp_client_test.go). Before cutover: verify on a
 // machine with npx + keys, and confirm the npm mirror serves 1.1.7.
