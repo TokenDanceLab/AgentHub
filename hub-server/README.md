@@ -60,7 +60,7 @@ go test ./... -short -count=1
 | Hub 架构 | `docs/architecture/01-hub-server.md` |
 | Auth / TokenDance ID | `docs/architecture/06-auth-identity.md` |
 | Deployment boundary | `docs/architecture/05-deployment.md` |
-| Security risks | `docs/governance/security-risk-register.md` |
+| Security risks | `SECURITY.md`（摘要；SSOT 在 TokenDance 私有治理文档） |
 
 ## Auth Boundary
 

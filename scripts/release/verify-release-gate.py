@@ -172,9 +172,9 @@ def assert_rc_tag_policy(version: str) -> None:
 
 
 def get_open_high_risks(repo_root: str) -> list:
-    risk_path = os.path.join(repo_root, "docs", "governance", "security-risk-register.md")
+    risk_path = os.path.join(repo_root, "SECURITY.md")
     if not os.path.isfile(risk_path):
-        blocker("security risk register is missing")
+        blocker("security policy is missing")
         return []
 
     pattern = re.compile(r"^\|\s*(?P<id>AH-SR-\d+)\s*\|\s*(?P<severity>Critical|High)\s*\|\s*Open\s*\|\s*(?P<risk>[^|]+)\|", re.IGNORECASE)
