@@ -157,3 +157,29 @@ func TestAgentControlServiceQueuesDuplicateOfflineControlOnce(t *testing.T) {
 	require.Len(t, queued, 1)
 	require.JSONEq(t, `{"kind":"permission.decide","edge_device_id":"dev-b","approval_id":"approval-dedupe","edge_control":{"runId":"edge-run-dedupe","requestId":"approval-dedupe","decision":"allow"}}`, queued[0])
 }
+
+func TestNewServiceFallsBackToNoOpCacheForTypedNilClient(t *testing.T) {
+	ctx := context.Background()
+	// A nil *cache.Client wrapped in the CachePort interface is a typed-nil:
+	// the interface value is non-nil while the underlying pointer is nil.
+	// NewService must fall back to NoOpCache so delivery degrades to queuing
+	// instead of panicking on a nil receiver.
+	var typedNilClient *cache.Client
+	var port CachePort = typedNilClient
+
+	svc := NewService(port, nil)
+	require.NotNil(t, svc.cacheClient)
+
+	err := svc.DeliverToDesktopDevice(ctx, "user-1", "dev-b", model.AgentControlPayload{
+		Kind:       model.AgentControlKindPermissionDecide,
+		ApprovalID: "approval-typed-nil",
+		EdgeControl: &model.TeamApprovalEdgeControl{
+			RunID:     "edge-run-typed-nil",
+			RequestID: "approval-typed-nil",
+			Decision:  "allow",
+		},
+	})
+	// NoOpCache degrades delivery to a "cache unavailable" error instead of
+	// panicking on a typed-nil receiver — that is the regression guard here.
+	require.Error(t, err)
+}

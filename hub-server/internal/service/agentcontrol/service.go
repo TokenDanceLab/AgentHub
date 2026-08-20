@@ -34,10 +34,7 @@ func NewService(cacheClient CachePort, mgr *ws.Manager) *Service {
 }
 
 func resolveAgentControlCache(c CachePort) CachePort {
-	if c == nil {
-		return cache.NoOpCache{}
-	}
-	return c
+	return cache.ResolveCache[CachePort](c, cache.NoOpCache{})
 }
 
 func (s *Service) DeliverToDesktopDevice(ctx context.Context, userID, deviceID string, payload model.AgentControlPayload) error {
