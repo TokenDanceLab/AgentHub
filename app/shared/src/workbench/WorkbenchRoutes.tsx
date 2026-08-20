@@ -5,7 +5,7 @@ import { WorkbenchDocsRouteView } from './WorkbenchDocsRouteView';
 import { WorkbenchProjectsRouteView } from './WorkbenchProjectsRouteView';
 import { WorkbenchSettingsRouteView } from './WorkbenchSettingsRouteView';
 import { WorkbenchTasksRouteView } from './WorkbenchTasksRouteView';
-import { PageErrorBoundary } from '../ui/PageErrorBoundary';
+import { PageErrorBoundary } from './PageErrorBoundary';
 import { useWorkbenchAgentsRoute } from './useWorkbenchAgentsRoute';
 import { useWorkbenchContactsRoute } from './useWorkbenchContactsRoute';
 import { useWorkbenchDocsRoute } from './useWorkbenchDocsRoute';

@@ -1,9 +1,9 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import type { ChatMessage } from '../types/chat';
 import type { TranscriptBlock } from '../transcript';
-import { useFocusTrap } from './focusTrap';
-import { X } from 'lucide-react';
-import { Button } from './Button';
+import { useFocusTrap } from '../ui/focusTrap';
+import { Button } from '../ui/Button';
+import { DesignNavIcon } from './designIcons';
 import styles from './MessageSearchPanel.module.css';
 
 const SEARCH_DEBOUNCE_MS = 300;
@@ -242,10 +242,11 @@ export function MessageSearchPanel({
         onKeyDown={handleKeyDown}
       >
         <div className={styles.searchBar}>
-          <svg className={styles.searchIcon} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="11" cy="11" r="8" />
-            <line x1="21" y1="21" x2="16.65" y2="16.65" />
-          </svg>
+          <DesignNavIcon
+            className={styles.searchIcon}
+            name="search"
+            strokeWidth={2}
+          />
           <input
             ref={setInputRef}
             className={styles.input}
@@ -256,7 +257,7 @@ export function MessageSearchPanel({
             aria-label={searchLabel}
           />
           <Button variant="ghost" size="sm" onClick={onClose} aria-label="Close search">
-            <X size={14} />
+            <DesignNavIcon name="close" size={14} strokeWidth={2} />
           </Button>
         </div>
 
@@ -299,7 +300,7 @@ export function MessageSearchPanel({
 /*
   Migration bridge (Wave 10): keep a default export so out-of-scope consumers
   using `import MessageSearchPanel from './MessageSearchPanel'` keep compiling
-  — currently workbench/ConversationHost.tsx and ui/MessageSearchPanel.stories.tsx,
+  — currently workbench/ConversationHost.tsx and workbench/MessageSearchPanel.stories.tsx,
   both outside this lane's editable file set. The primary export is now the named
   `export function MessageSearchPanel` above. Remove this bridge once those
   consumers migrate to named imports.
