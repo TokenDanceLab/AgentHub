@@ -94,25 +94,39 @@ type fakeACPAgent struct {
 	mu      sync.Mutex
 	methods []string // client→agent request methods, in order
 
+	// params carries the raw params JSON of every client→agent request,
+	// keyed by method (initialize / session/new / session/prompt) — the
+	// #1743 tests assert the initialize capabilities and the session/new
+	// mcpServers shapes.
+	params map[string][]string
+
 	// responses carries every JSON-RPC response line the agent receives.
 	// Buffered so the agent goroutine never blocks on it.
 	responses chan string
 }
 
 func newFakeACPAgent() *fakeACPAgent {
-	return &fakeACPAgent{responses: make(chan string, 8)}
+	return &fakeACPAgent{params: make(map[string][]string), responses: make(chan string, 8)}
 }
 
-func (f *fakeACPAgent) recordMethod(m string) {
+func (f *fakeACPAgent) recordRequest(method string, params json.RawMessage) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	f.methods = append(f.methods, m)
+	f.methods = append(f.methods, method)
+	f.params[method] = append(f.params[method], string(params))
 }
 
 func (f *fakeACPAgent) gotMethods() []string {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	return append([]string(nil), f.methods...)
+}
+
+// gotParams returns the raw params JSON lines recorded for method.
+func (f *fakeACPAgent) gotParams(method string) []string {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return append([]string(nil), f.params[method]...)
 }
 
 // run answers requests until reqR hits EOF. notifications (JSON-RPC lines)
@@ -124,6 +138,7 @@ func (f *fakeACPAgent) run(t *testing.T, reqR io.Reader, respW io.Writer, notifi
 		var msg struct {
 			ID     json.RawMessage `json:"id"`
 			Method string          `json:"method"`
+			Params json.RawMessage `json:"params"`
 		}
 		if err := json.Unmarshal(scanner.Bytes(), &msg); err != nil {
 			t.Errorf("fake agent: unparseable client line: %v", err)
@@ -134,7 +149,7 @@ func (f *fakeACPAgent) run(t *testing.T, reqR io.Reader, respW io.Writer, notifi
 		// soon as it reads our response, so recording afterwards races
 		// with the test's gotMethods() assertion and can drop the last
 		// method (observed flaky on session/prompt).
-		f.recordMethod(msg.Method)
+		f.recordRequest(msg.Method, msg.Params)
 
 		switch msg.Method {
 		case "":
@@ -191,6 +206,16 @@ func testACPContext(prompt, workDir string) context.Context {
 	return adapters.SDKAdapterContext(context.Background(), RunProcessContext{
 		Prompt:  prompt,
 		WorkDir: workDir,
+	})
+}
+
+// testACPContextWithMCP is testACPContext plus the run-profile MCP config
+// string (--mcp-config style).
+func testACPContextWithMCP(prompt, workDir, mcpConfig string) context.Context {
+	return adapters.SDKAdapterContext(context.Background(), RunProcessContext{
+		Prompt:    prompt,
+		WorkDir:   workDir,
+		MCPConfig: mcpConfig,
 	})
 }
 
@@ -265,6 +290,169 @@ func TestRunACPSession_MockAgentStreamsTypedUpdates(t *testing.T) {
 				t.Errorf("event[%d] scope[%s] = %v, want %v", i, k, got[i].scope[k], v)
 			}
 		}
+	}
+}
+
+// TestRunACPSession_InitializeAdvertisesNoFsOrTerminal locks the #1743
+// capability shrink: fs read/write and terminal are no longer advertised
+// during initialize because the client-side endpoints are unwired
+// fail-closed stubs — an agent must not be invited to depend on a surface
+// whose endpoints can only answer with errors.
+func TestRunACPSession_InitializeAdvertisesNoFsOrTerminal(t *testing.T) {
+	emitter := &recordingEmitter{}
+	run := store.Run{ID: "run-acp-cap", ProjectID: "proj-acp", ThreadID: "thread-acp"}
+
+	clientToAgentR, clientToAgentW := io.Pipe()
+	agentToClientR, agentToClientW := io.Pipe()
+	t.Cleanup(func() {
+		clientToAgentR.Close()
+		agentToClientW.Close()
+	})
+
+	agent := newFakeACPAgent()
+	go agent.run(t, clientToAgentR, agentToClientW, nil)
+
+	err := runACPSession(testACPContext("hello agent", `C:\work`), agentToClientR, clientToAgentW, emitter, run, nil)
+	if err != nil {
+		t.Fatalf("runACPSession: %v", err)
+	}
+
+	params := agent.gotParams("initialize")
+	if len(params) != 1 {
+		t.Fatalf("initialize params = %v, want exactly one initialize request", params)
+	}
+	var init struct {
+		ClientCapabilities struct {
+			Fs       map[string]bool `json:"fs"`
+			Terminal *bool           `json:"terminal"`
+		} `json:"clientCapabilities"`
+	}
+	if err := json.Unmarshal([]byte(params[0]), &init); err != nil {
+		t.Fatalf("initialize params not JSON: %v (%s)", err, params[0])
+	}
+	if init.ClientCapabilities.Fs["readTextFile"] || init.ClientCapabilities.Fs["writeTextFile"] {
+		t.Errorf("fs capability advertised: %+v, want absent/false (#1743)", init.ClientCapabilities.Fs)
+	}
+	if init.ClientCapabilities.Terminal != nil && *init.ClientCapabilities.Terminal {
+		t.Errorf("terminal capability advertised: %+v, want absent/false (#1743)", init.ClientCapabilities.Terminal)
+	}
+}
+
+// TestRunACPSession_WiresMCPConfigIntoSessionNew locks the #1743 MCP wiring:
+// a valid run-profile MCP config is parsed and passed as session/new
+// mcpServers entries, and no degraded status-change event is emitted on the
+// successful parse path.
+func TestRunACPSession_WiresMCPConfigIntoSessionNew(t *testing.T) {
+	emitter := &recordingEmitter{}
+	run := store.Run{ID: "run-acp-mcp", ProjectID: "proj-acp", ThreadID: "thread-acp"}
+
+	clientToAgentR, clientToAgentW := io.Pipe()
+	agentToClientR, agentToClientW := io.Pipe()
+	t.Cleanup(func() {
+		clientToAgentR.Close()
+		agentToClientW.Close()
+	})
+
+	agent := newFakeACPAgent()
+	go agent.run(t, clientToAgentR, agentToClientW, nil)
+
+	mcpConfig := `{"mcpServers":{"fs":{"name":"filesystem","command":"node",` +
+		`"args":["server.js"],"env":{"NODE_ENV":"test"}}}}`
+	err := runACPSession(testACPContextWithMCP("hello agent", `C:\work`, mcpConfig),
+		agentToClientR, clientToAgentW, emitter, run, nil)
+	if err != nil {
+		t.Fatalf("runACPSession: %v", err)
+	}
+
+	params := agent.gotParams("session/new")
+	if len(params) != 1 {
+		t.Fatalf("session/new params = %v, want exactly one request", params)
+	}
+	var sess struct {
+		McpServers []struct {
+			Type    string   `json:"type"`
+			Name    string   `json:"name"`
+			Command string   `json:"command"`
+			Args    []string `json:"args"`
+			Env     []struct {
+				Name  string `json:"name"`
+				Value string `json:"value"`
+			} `json:"env"`
+		} `json:"mcpServers"`
+	}
+	if err := json.Unmarshal([]byte(params[0]), &sess); err != nil {
+		t.Fatalf("session/new params not JSON: %v (%s)", err, params[0])
+	}
+	if len(sess.McpServers) != 1 {
+		t.Fatalf("session/new mcpServers = %+v, want 1 entry", sess.McpServers)
+	}
+	got := sess.McpServers[0]
+	// The SDK's McpServer.MarshalJSON emits the "type" discriminator only for
+	// the http/sse/acp union variants; stdio is the implicit default and
+	// carries no type field.
+	if got.Type != "" {
+		t.Errorf("mcpServers[0].type = %q, want empty (stdio is the implicit default)", got.Type)
+	}
+	if got.Name != "filesystem" || got.Command != "node" {
+		t.Errorf("mcpServers[0] = %+v, want name=filesystem command=node", got)
+	}
+	if len(got.Args) != 1 || got.Args[0] != "server.js" {
+		t.Errorf("mcpServers[0].args = %v, want [server.js]", got.Args)
+	}
+	if len(got.Env) != 1 || got.Env[0].Name != "NODE_ENV" || got.Env[0].Value != "test" {
+		t.Errorf("mcpServers[0].env = %+v, want [{NODE_ENV test}]", got.Env)
+	}
+
+	// #1740 degradation must not fire on the successful wiring path.
+	if evs := emitter.eventsByType(BusEventStatusChange); len(evs) > 0 {
+		t.Errorf("status_change events emitted on successful MCP wiring: %+v", evs)
+	}
+}
+
+// TestRunACPSession_InvalidMCPConfigKeepsDegradedEvent locks the #1740
+// baseline: when the MCP config JSON cannot be parsed, the run still
+// completes with an empty mcpServers list and the visible degraded
+// status-change event (reason acp_mcp_not_wired) is emitted.
+func TestRunACPSession_InvalidMCPConfigKeepsDegradedEvent(t *testing.T) {
+	emitter := &recordingEmitter{}
+	run := store.Run{ID: "run-acp-mcp-bad", ProjectID: "proj-acp", ThreadID: "thread-acp"}
+
+	clientToAgentR, clientToAgentW := io.Pipe()
+	agentToClientR, agentToClientW := io.Pipe()
+	t.Cleanup(func() {
+		clientToAgentR.Close()
+		agentToClientW.Close()
+	})
+
+	agent := newFakeACPAgent()
+	go agent.run(t, clientToAgentR, agentToClientW, nil)
+
+	err := runACPSession(testACPContextWithMCP("hello agent", `C:\work`, `{"mcpServers": `),
+		agentToClientR, clientToAgentW, emitter, run, nil)
+	if err != nil {
+		t.Fatalf("runACPSession: %v", err)
+	}
+
+	// session/new still proceeds with an empty (non-nil) mcpServers list.
+	params := agent.gotParams("session/new")
+	if len(params) != 1 {
+		t.Fatalf("session/new params = %v, want exactly one request", params)
+	}
+	if !strings.Contains(params[0], `"mcpServers":[]`) {
+		t.Errorf("session/new params = %s, want empty mcpServers array", params[0])
+	}
+
+	// The #1740 degraded event must still fire on the parse-failure path.
+	evs := emitter.eventsByType(BusEventStatusChange)
+	if len(evs) == 0 {
+		t.Fatal("missing status_change event for unparseable MCP config")
+	}
+	payload, ok := evs[0].payload.(map[string]any)
+	if !ok {
+		t.Fatalf("status_change payload = %#v, want map", evs[0].payload)
+	}
+	if payload["status"] != "degraded" || payload["reason"] != "acp_mcp_not_wired" {
+		t.Errorf("status_change payload = %+v, want status=degraded reason=acp_mcp_not_wired", payload)
 	}
 }
 
