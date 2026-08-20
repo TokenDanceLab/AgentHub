@@ -107,8 +107,32 @@ function getRetryLabel(): string {
   return 'Retry';
 }
 
+/** Aggregates the reporter's recent errors into the stats snapshot consumed
+ *  by useErrorReporter. Kept as a standalone function so getSnapshot can
+ *  cache its result instead of allocating a fresh object per call (#1795). */
+function computeErrorStats(): ErrorStats {
+  const recent = globalErrorReporter.getRecent(50);
+  const byCategory: Record<string, number> = {};
+  for (const r of recent) {
+    byCategory[r.category] = (byCategory[r.category] ?? 0) + r.count;
+  }
+  return {
+    total: recent.reduce((sum, r) => sum + r.count, 0),
+    byCategory,
+    latest: recent[0] ?? null,
+  };
+}
+
 export function useErrorReporter() {
   const subscribed = useRef(false);
+
+  // useSyncExternalStore requires getSnapshot to return an Object.is-stable
+  // reference between store changes; returning a fresh object per call makes
+  // React's snapshot-consistency check re-render forever and abort with
+  // "Maximum update depth exceeded" (#1795). The cache is invalidated on
+  // store updates so the reference only changes when the underlying data
+  // does.
+  const cachedSnapshot = useRef<ErrorStats | null>(null);
 
   if (!subscribed.current) {
     subscribed.current = true;
@@ -116,21 +140,24 @@ export function useErrorReporter() {
   }
 
   const subscribe = useCallback(
-    (onStoreChange: () => void) => globalErrorReporter.subscribe(() => onStoreChange()),
+    (onStoreChange: () => void) =>
+      // Subscribe to the change channel (fires on report and on clear) so
+      // clearErrors also re-renders consumers instead of leaving a stale
+      // snapshot on screen.
+      globalErrorReporter.subscribeChange(() => {
+        // Invalidate before notifying so React's next getSnapshot call
+        // recomputes against the updated store.
+        cachedSnapshot.current = null;
+        onStoreChange();
+      }),
     [],
   );
 
   const getSnapshot = useCallback((): ErrorStats => {
-    const recent = globalErrorReporter.getRecent(50);
-    const byCategory: Record<string, number> = {};
-    for (const r of recent) {
-      byCategory[r.category] = (byCategory[r.category] ?? 0) + r.count;
+    if (cachedSnapshot.current === null) {
+      cachedSnapshot.current = computeErrorStats();
     }
-    return {
-      total: recent.reduce((sum, r) => sum + r.count, 0),
-      byCategory,
-      latest: recent[0] ?? null,
-    };
+    return cachedSnapshot.current;
   }, []);
 
   const stats = useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
@@ -141,7 +168,11 @@ export function useErrorReporter() {
     [],
   );
 
-  const clearErrors = useCallback(() => globalErrorReporter.clear(), []);
+  const clearErrors = useCallback(() => {
+    // clear() fires the change channel, which invalidates the snapshot cache
+    // through the subscribe callback above.
+    globalErrorReporter.clear();
+  }, []);
 
   return { stats, reportError, clearErrors };
 }
