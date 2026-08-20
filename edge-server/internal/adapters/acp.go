@@ -257,6 +257,13 @@ func (a *AcpAdapter) Available() bool {
 	return acpBinaryAvailable(a.agentBinary, exec.LookPath)
 }
 
+// AgentBinary returns the configured ACP agent binary path/name. Exported so
+// wrapper packages (adapters/claude) can surface it in their own
+// PreflightCheck messages (#1760 claude 增量).
+func (a *AcpAdapter) AgentBinary() string {
+	return a.agentBinary
+}
+
 // PreflightCheck fails fast when the agent binary is not resolvable, before
 // the executor spawns the process. The error message is parameterized by
 // LauncherLabel/InstallHint so concrete agent configs (codex-acp,
@@ -285,10 +292,10 @@ func acpBinaryAvailable(binary string, lookPath func(string) (string, error)) bo
 	return err == nil
 }
 
-// defaultNpxPath returns the platform-appropriate npx launcher name. Shared
-// by the codex-acp and claude-acp configs (both spawn npx); moved here from
-// codex_acp.go so claude_acp.go no longer borrows a sibling's helper.
-func defaultNpxPath() string {
+// DefaultNpxPath returns the platform-appropriate npx launcher name. Shared
+// by the codex-acp and claude-acp configs (both spawn npx); exported for the
+// claude 子包（#1760 claude 增量，claude → adapters 单向依赖）。
+func DefaultNpxPath() string {
 	if runtime.GOOS == "windows" {
 		return "npx.cmd"
 	}
