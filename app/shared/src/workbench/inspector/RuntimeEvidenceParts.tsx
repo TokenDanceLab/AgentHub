@@ -90,8 +90,8 @@ export function ArtifactWorkspaceProjection({
       <span>Topic: {topic}</span>
       <span>Version: {version}</span>
       <span>Preview: {previewStatus}</span>
-      <span>Download: metadata only</span>
-      <span>Export: evidence bundle ready</span>
+      <span>Download: unavailable — Hub/Edge expose no artifact content endpoint (metadata only)</span>
+      <span>Export: unavailable — this panel has no export action (review-only evidence)</span>
       <span>Evidence: {evidenceSourceLabel ?? 'None'}</span>
       <span>Diff projection: {diffLabel}</span>
     </div>

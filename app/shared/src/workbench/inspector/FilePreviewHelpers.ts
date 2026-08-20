@@ -1,3 +1,4 @@
+import type { PreviewPort } from '../../platform';
 import { highlightLine } from '../../ui/syntaxHighlight';
 import type { DesignOpenWithIconName } from '../designIcons';
 import styles from './FilePreview.module.css';
@@ -121,4 +122,29 @@ export function openWithIconClass(name: DesignOpenWithIconName): string {
     default:
       return styles.brandIconSvg ?? '';
   }
+}
+
+/**
+ * Resolve an evidence content reference (from `PreviewFile.content`) into a
+ * displayable URL for native previews (PDF iframe / image).
+ *
+ * - Empty/non-URL references (fallback prose such as `# path` metadata) yield
+ *   `undefined` so the renderer shows an honest capability notice instead of
+ *   an empty frame.
+ * - Absolute http(s) URLs are used unchanged on every surface.
+ * - Host-relative API paths (`/v1/runs/…/content`) require a `PreviewPort`
+ *   that owns the host: Desktop resolves them against the Local Edge base
+ *   URL, Web returns `undefined` (no Local Edge access, Hub-only boundary).
+ */
+export function resolvePreviewContentUrl(
+  contentRef: string | undefined,
+  previewPort: PreviewPort | undefined,
+): string | undefined {
+  const trimmed = contentRef?.trim() ?? '';
+  if (!trimmed) return undefined;
+  if (/^https?:\/\//i.test(trimmed)) return trimmed;
+  if (trimmed.startsWith('/')) {
+    return previewPort?.resolveContentUrl?.(trimmed);
+  }
+  return undefined;
 }

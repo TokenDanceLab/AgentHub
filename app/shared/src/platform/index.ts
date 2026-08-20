@@ -5,6 +5,8 @@ export { resolveEvidencePreviewTarget } from './previewTargets';
 export type {
   AgentHubPlatform,
   AgentHubSurface,
+  ApplyAllRunDiffsInput,
+  ApplyRunDiffInput,
   AttachmentPort,
   ConversationKind,
   ConversationPort,
@@ -14,6 +16,7 @@ export type {
   LocalCliRuntimeId,
   PreviewPort,
   RedispatchTaskResult,
+  RunDiffHunkDecision,
   RunPort,
   RuntimeSessionSummary,
   SurfaceCapabilities,

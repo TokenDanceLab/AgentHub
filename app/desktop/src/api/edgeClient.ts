@@ -27,6 +27,8 @@ import {
   AgentInfoSchema,
   RunInfoSchema,
   RunDiffSchema,
+  ApplyRunDiffResponseSchema,
+  ApplyAllRunDiffsResponseSchema,
   ArtifactSchema,
   PreviewSchema,
   ThreadInfoSchema,
@@ -305,6 +307,65 @@ export async function fetchRunDiff(runId: string): Promise<RunDiff> {
   });
   if (!res.ok) throw await parseError(res);
   return safeParse<RunDiff>(RunDiffSchema, unwrapEdgeResponse(await res.json()), 'runDiff');
+}
+
+export interface ApplyRunDiffRequest {
+  filePath: string;
+  hunkIndex: number;
+  accepted: boolean;
+  workDir: string;
+}
+
+export interface ApplyRunDiffResponse {
+  runId: string;
+  filePath: string;
+  hunkIndex: number;
+  accepted: boolean;
+  applied: boolean;
+}
+
+export interface ApplyAllRunDiffsRequest {
+  decisions: Array<Pick<ApplyRunDiffRequest, 'filePath' | 'hunkIndex' | 'accepted'>>;
+  workDir: string;
+}
+
+export interface ApplyAllRunDiffsResponse {
+  runId: string;
+  applied: number;
+}
+
+/** Write one hunk accept/reject decision back into the run workdir. */
+export async function applyRunDiff(runId: string, request: ApplyRunDiffRequest): Promise<ApplyRunDiffResponse> {
+  const res = await edgeFetch(`${BASE}/v1/runs/${encodeURIComponent(runId)}/apply`, {
+    method: 'POST',
+    ...edgeDevRequestInit({}, { 'Content-Type': 'application/json' }),
+    body: JSON.stringify({
+      file_path: request.filePath,
+      hunk_index: request.hunkIndex,
+      accepted: request.accepted,
+      workDir: request.workDir,
+    }),
+  });
+  if (!res.ok) throw await parseError(res);
+  return safeParse<ApplyRunDiffResponse>(ApplyRunDiffResponseSchema, unwrapEdgeResponse(await res.json()), 'applyRunDiff');
+}
+
+/** Batch variant of applyRunDiff for accept-all / reject-all decisions. */
+export async function applyAllRunDiffs(runId: string, request: ApplyAllRunDiffsRequest): Promise<ApplyAllRunDiffsResponse> {
+  const res = await edgeFetch(`${BASE}/v1/runs/${encodeURIComponent(runId)}/apply-all`, {
+    method: 'POST',
+    ...edgeDevRequestInit({}, { 'Content-Type': 'application/json' }),
+    body: JSON.stringify({
+      decisions: request.decisions.map((decision) => ({
+        file_path: decision.filePath,
+        hunk_index: decision.hunkIndex,
+        accepted: decision.accepted,
+      })),
+      workDir: request.workDir,
+    }),
+  });
+  if (!res.ok) throw await parseError(res);
+  return safeParse<ApplyAllRunDiffsResponse>(ApplyAllRunDiffsResponseSchema, unwrapEdgeResponse(await res.json()), 'applyAllRunDiffs');
 }
 
 export async function fetchArtifacts(): Promise<ListResponse<Artifact>> {

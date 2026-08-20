@@ -173,6 +173,21 @@ export const RunDiffSchema = z.object({
   files: z.array(RunDiffFileSchema),
 });
 
+// POST /v1/runs/{runId}/apply — single hunk decision write-back.
+export const ApplyRunDiffResponseSchema = z.object({
+  runId: z.string(),
+  filePath: z.string(),
+  hunkIndex: z.number(),
+  accepted: z.boolean(),
+  applied: z.boolean(),
+});
+
+// POST /v1/runs/{runId}/apply-all — batch hunk decision write-back.
+export const ApplyAllRunDiffsResponseSchema = z.object({
+  runId: z.string(),
+  applied: z.number(),
+});
+
 export const ArtifactSchema = z.object({
   id: z.string(),
   runId: z.string(),

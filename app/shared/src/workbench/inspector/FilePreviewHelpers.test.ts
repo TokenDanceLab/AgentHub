@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import type { PreviewPort } from '../../platform';
 import {
   defaultPreviewMode,
   diffLineClass,
@@ -13,6 +14,7 @@ import {
   openWithIconClass,
   openWithItems,
   resolveNativeMode,
+  resolvePreviewContentUrl,
   syntheticDiff,
 } from './FilePreviewHelpers';
 import styles from './FilePreview.module.css';
@@ -78,5 +80,41 @@ describe('FilePreviewHelpers', () => {
     expect(openWithIconClass('terminal')).toContain(styles.vendorTerminal ?? 'vendorTerminal');
     expect(openWithIconClass('folder')).toContain(styles.vendorFolder ?? 'vendorFolder');
     expect(openWithIconClass('vscode')).toBeTruthy();
+  });
+});
+
+describe('resolvePreviewContentUrl (#1817)', () => {
+  it('returns undefined for empty or prose fallback content', () => {
+    expect(resolvePreviewContentUrl(undefined, undefined)).toBeUndefined();
+    expect(resolvePreviewContentUrl('', undefined)).toBeUndefined();
+    expect(resolvePreviewContentUrl('# reports/runtime.patch', undefined)).toBeUndefined();
+    expect(resolvePreviewContentUrl('Read-only runtime diff evidence.', undefined)).toBeUndefined();
+  });
+
+  it('passes absolute http(s) URLs through without a port', () => {
+    expect(resolvePreviewContentUrl('http://127.0.0.1:4173/preview', undefined))
+      .toBe('http://127.0.0.1:4173/preview');
+    expect(resolvePreviewContentUrl('https://preview.example.com/app', undefined))
+      .toBe('https://preview.example.com/app');
+  });
+
+  it('delegates host-relative API paths to the port resolver', () => {
+    const resolveContentUrl = vi.fn((ref: string) => `http://127.0.0.1:3210${ref}`);
+    const port: PreviewPort = {
+      openEvidence: vi.fn(),
+      resolveContentUrl,
+    };
+    expect(resolvePreviewContentUrl('/v1/runs/run-1/artifacts/artifact-1/content', port))
+      .toBe('http://127.0.0.1:3210/v1/runs/run-1/artifacts/artifact-1/content');
+    expect(resolveContentUrl).toHaveBeenCalledWith('/v1/runs/run-1/artifacts/artifact-1/content');
+  });
+
+  it('yields undefined for host-relative paths when the port cannot resolve them (web boundary)', () => {
+    const port: PreviewPort = {
+      openEvidence: vi.fn(),
+      resolveContentUrl: () => undefined,
+    };
+    expect(resolvePreviewContentUrl('/v1/runs/run-1/previews/preview-1/content', port)).toBeUndefined();
+    expect(resolvePreviewContentUrl('/v1/runs/run-1/artifacts/artifact-1/content', undefined)).toBeUndefined();
   });
 });

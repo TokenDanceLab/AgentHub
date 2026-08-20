@@ -107,8 +107,8 @@ describe('AgentHubWorkbench', () => {
     expect(screen.getByText('Topic: thread-1')).toBeInTheDocument();
     expect(screen.getByText('Version: run-edge-1')).toBeInTheDocument();
     expect(screen.getByText('Preview: ready')).toBeInTheDocument();
-    expect(screen.getByText('Download: metadata only')).toBeInTheDocument();
-    expect(screen.getByText('Export: evidence bundle ready')).toBeInTheDocument();
+    expect(screen.getByText('Download: unavailable — Hub/Edge expose no artifact content endpoint (metadata only)')).toBeInTheDocument();
+    expect(screen.getByText('Export: unavailable — this panel has no export action (review-only evidence)')).toBeInTheDocument();
     expect(screen.getByText('Evidence: Edge')).toBeInTheDocument();
     expect(screen.getByText('Diff projection: 1 file')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '查看产物 reports/runtime.patch' })).not.toBeInTheDocument();

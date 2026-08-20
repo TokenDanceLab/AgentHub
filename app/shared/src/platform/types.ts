@@ -107,9 +107,56 @@ export interface AttachmentPort {
   uploadAttachment(file: File): Promise<AttachmentRef>;
 }
 
+/**
+ * A single hunk accept/reject decision from the interactive diff reviewer.
+ * Mirrors the Edge apply request body field-by-field (file_path / hunk_index /
+ * accepted) so host adapters can forward it without re-mapping.
+ */
+export interface RunDiffHunkDecision {
+  filePath: string;
+  hunkIndex: number;
+  accepted: boolean;
+}
+
+/** Input for `PreviewPort.applyRunDiff` — one hunk decision plus run/workdir context. */
+export interface ApplyRunDiffInput {
+  runId: string;
+  /** Run working directory the hunk is written back into (Edge validates it). */
+  workDir: string;
+  decision: RunDiffHunkDecision;
+}
+
+/** Input for `PreviewPort.applyAllRunDiffs` — batch decisions plus run/workdir context. */
+export interface ApplyAllRunDiffsInput {
+  runId: string;
+  workDir: string;
+  decisions: RunDiffHunkDecision[];
+}
+
 export interface PreviewPort {
   canOpenEvidence?(evidence: EvidenceRef): boolean;
   openEvidence(evidence: EvidenceRef): Promise<void>;
+  /**
+   * Write one interactive-diff hunk decision back into the run workdir
+   * (Edge POST /v1/runs/{runId}/apply). Only surfaces with a Local Edge
+   * implement this (Desktop); Web omits it and the inspector degrades to an
+   * explicit read-only review notice instead of silently dropping the click.
+   */
+  applyRunDiff?(input: ApplyRunDiffInput): Promise<void>;
+  /**
+   * Batch variant of `applyRunDiff` for accept-all / reject-all
+   * (Edge POST /v1/runs/{runId}/apply-all). Same surface contract.
+   */
+  applyAllRunDiffs?(input: ApplyAllRunDiffsInput): Promise<void>;
+  /**
+   * Resolve an evidence content reference into a displayable URL.
+   * Absolute http(s) URLs are typically returned unchanged; host-relative
+   * API paths (e.g. `/v1/runs/…/content`) become absolute host URLs on
+   * surfaces that own the host (Desktop → Local Edge). Return `undefined`
+   * when the surface cannot serve the content so the UI can render an
+   * honest capability notice instead of a broken frame.
+   */
+  resolveContentUrl?(contentRef: string): string | undefined;
 }
 
 export type LocalCliRuntimeId = 'codex' | 'claude-code' | 'opencode';
