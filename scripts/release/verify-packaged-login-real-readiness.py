@@ -100,8 +100,8 @@ def main() -> int:
     assert_not_contains("app/web/src/api/hubTokenStorage.ts", r"localStorage\.setItem", "Web storage helper does not write Hub tokens to localStorage")
 
     step("future real E2E gate")
-    assert_contains("docs/governance/governance-execution.md", r"Packaged Desktop OIDC readiness.*proposal-only gate", "governance keeps real packaged E2E proposal-only")
-    assert_contains("docs/governance/governance-execution.md", r"Packaged real login dry readiness.*Hub/TokenDance ID.*secrets", "governance records no live TokenDance ID or browser action")
+    assert_contains("docs/governance/README.md", r"Packaged Desktop OIDC readiness.*proposal-only gate", "governance keeps real packaged E2E proposal-only")
+    assert_contains("docs/governance/README.md", r"Packaged real login dry readiness.*Hub/TokenDance ID.*secrets", "governance records no live TokenDance ID or browser action")
     assert_contains(".env.example", "AGENTHUB_TOKENDANCE_ID_CLIENT_SECRET", "example config names OIDC client secret without requiring a real value")
     assert_contains(".env.example", "AGENTHUB_TOKENDANCE_ID_ALLOWED_REDIRECT_URIS", "example config names allowed redirect URI boundary")
 

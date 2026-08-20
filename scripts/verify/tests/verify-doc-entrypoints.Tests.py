@@ -80,8 +80,8 @@ class VerifyDocEntrypointsTests(unittest.TestCase):
             os.path.join(self.fixture, "docs", "README.md"),
         )
         shutil.copyfile(
-            os.path.join(REPO_ROOT, "docs", "governance", "governance-execution.md"),
-            os.path.join(self.fixture, "docs", "governance", "governance-execution.md"),
+            os.path.join(REPO_ROOT, "docs", "governance", "README.md"),
+            os.path.join(self.fixture, "docs", "governance", "README.md"),
         )
         verifier_map_rel = os.path.join("docs", "governance", "verifier-map.md")
         shutil.copyfile(os.path.join(REPO_ROOT, verifier_map_rel), os.path.join(self.fixture, verifier_map_rel))

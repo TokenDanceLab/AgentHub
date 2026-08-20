@@ -57,7 +57,7 @@ Hub Server（`hub-server/`）是 AgentHub 的云端控制面：TokenDance ID rel
 | API conventions | `api/conventions.md` |
 | Auth/identity | [06-auth-identity.md](06-auth-identity.md) |
 | Deployment boundary | [05-deployment.md](05-deployment.md) |
-| Security risk status | [../governance/security-risk-register.md](../governance/security-risk-register.md) |
+| Security risk status | [../../SECURITY.md](../../SECURITY.md)（SSOT 在 TokenDance 私有治理文档） |
 
 ## Auth 中间件链与路由分组
 

@@ -110,4 +110,4 @@ Mobile shared workbench (viewer / limited control)
 ## 文档权威
 
 - 当前规则：[../AGENTS.md](../AGENTS.md)
-- 安全风险：[governance/security-risk-register.md](governance/security-risk-register.md)
+- 安全风险摘要：[../SECURITY.md](../SECURITY.md)（SSOT 在 TokenDance 私有治理文档）

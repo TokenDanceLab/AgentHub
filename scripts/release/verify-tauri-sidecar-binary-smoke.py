@@ -93,7 +93,7 @@ def test_package_readiness_prerequisites() -> bool:
         "app/desktop/package.json",
         "app/desktop/src-tauri/Cargo.toml",
         "app/desktop/src-tauri/Cargo.lock",
-        "docs/governance/governance-execution.md",
+        "docs/governance/README.md",
     ]
 
     for relative in required:

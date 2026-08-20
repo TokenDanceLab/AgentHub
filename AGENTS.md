@@ -85,11 +85,11 @@ Mobile 主线是 Expo + React Native development build。旧 Tauri Mobile 不再
 | 主题 | 规则 | Owner 文档 |
 |---|---|---|
 | 登录 | AgentHub 只接 TokenDance ID；第三方 provider、账号绑定、`oauth_bindings` 归 TokenDance ID | `docs/architecture/06-auth-identity.md` |
-| 授权 | TokenDance ID 只证明身份；Hub Server 用 Hub-local membership/resource/action 决定权限 | `docs/architecture/06-auth-identity.md`, `docs/governance/governance-execution.md` |
-| 安全风险 | Critical/High 且状态为 Open、rotate required 或 *verification required 时阻断公开发布；Accepted 须记 owner/日期/补偿控制（SSOT：`docs/governance/security-risk-register.md`） | `docs/governance/security-risk-register.md` |
-| 演示诚实 | stub/demo/fixture/readiness-only 不得声称真实登录、真实模型/API 或 packaged Desktop | `docs/governance/threat-model.md` |
-| Feishu/Lark | 飞书只做协作入口，不是第二登录系统；慢任务异步，卡片回调 3 秒内响应 | `docs/governance/governance-execution.md` |
-| i18n/公开包装 | zh/en 语义一致；不把第三方 provider 写成 AgentHub 直连登录 | `docs/governance/governance-execution.md` |
+| 授权 | TokenDance ID 只证明身份；Hub Server 用 Hub-local membership/resource/action 决定权限 | `docs/architecture/06-auth-identity.md` |
+| 安全风险 | Critical/High 且状态为 Open、rotate required 或 *verification required 时阻断公开发布；Accepted 须记 owner/日期/补偿控制（SSOT 在 TokenDance 私有治理文档 governance/agenthub/security-risk-register.md，本仓摘要见 `SECURITY.md`） | `SECURITY.md` |
+| 演示诚实 | stub/demo/fixture/readiness-only 不得声称真实登录、真实模型/API 或 packaged Desktop（威胁模型正文在 TokenDance 私有治理文档） | `docs/governance/README.md` |
+| Feishu/Lark | 飞书只做协作入口，不是第二登录系统；慢任务异步，卡片回调 3 秒内响应（治理执行正文在 TokenDance 私有治理文档） | `docs/governance/README.md` |
+| i18n/公开包装 | zh/en 语义一致；不把第三方 provider 写成 AgentHub 直连登录 | `docs/governance/README.md` |
 | Gateway | TokenDance API key 不是 TokenDance ID token，不得暴露给浏览器 UI 或公开日志 | `docs/architecture/06-auth-identity.md` |
 | 设计 | dense command-center surface，真实工作流截图，不截空壳 | `docs/architecture/07-design-system-ssot.md`, `docs/component-acceptance.md` |
 
@@ -203,7 +203,7 @@ subagent 提示必须包含：目标、允许修改路径、禁改路径、必�
 发布红线：
 
 - stub/demo/fixture 不得冒充真实登录、真实模型/API 或 packaged Desktop。
-- Critical/High 且 Open、rotate required 或 *verification required 阻断公开发布；Accepted 与当前队列以 `docs/governance/security-risk-register.md` 为准。
+- Critical/High 且 Open、rotate required 或 *verification required 阻断公开发布；Accepted 与当前队列以 `SECURITY.md`（本仓摘要）与 TokenDance 私有治理文档 security-risk-register（SSOT）为准。
 
 需要示例配置时只提交 `.env.example`，值用占位符。新增本地生成目录、缓存、数据库、日志或私钥目录前，先更新 `.gitignore`。
 
