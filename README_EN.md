@@ -76,6 +76,22 @@ Full bootstrap, OIDC setup, and Edge Server debugging: [docs/developer-quickstar
 | [docs/README.md](docs/README.md) | Docs navigation |
 | [AGENTS.md](AGENTS.md) | Project rules SSOT (branch, red lines, evidence grades) |
 
+## Repository Content Boundary
+
+This repository is **public** and contains only:
+
+- All source code, API contracts (`api/`), and engineering gate scripts (`scripts/verify/`)
+- Public documentation for users and contributors (`docs/` contains no internal operations or security material)
+- Security policy summary (`SECURITY.md`, including the release-gate risk status table)
+
+**Not in this repository** (lives in the TokenDance private docs hub `TokenDanceLab/docs`, private):
+
+- Internal governance execution mapping (TokenDance queues, Feishu integration, release approval slices)
+- Security risk register details and threat model (this repo keeps only the detail-free release-gate status)
+- Private deployment topology, ops evidence, and routing
+
+Public docs contain no real server addresses, production secrets, tokens, logs, or personal paths (see `AGENTS.md` §9). Governance public-area notes: [docs/governance/README.md](docs/governance/README.md).
+
 ## Contributing
 
 Issues and pull requests are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md).
