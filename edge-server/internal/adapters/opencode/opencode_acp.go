@@ -1,14 +1,14 @@
-// Package adapters — opencode-acp: the native OpenCode ACP adapter (second
+// Package opencode — opencode-acp: the native OpenCode ACP adapter (second
 // ACP migration target, per ACP Go migration §6).
 //
-// The existing OpenCodeAdapter (opencode.go) is Phase 1/2 batch mode: it
-// spawns the opencode CLI with `opencode run --format json` and hand-parses
-// the JSON event stream — a 500+ line custom parser, no ACP permission chain.
-// This adapter replaces that hop with OpenCode's native ACP subcommand
-// (`opencode acp`, v1.18.5+), consumed by the shared coder/acp-go-sdk client
-// runtime (acp_client.go): streaming updates, capability negotiation, and the
-// Edge approval chain (session/request_permission → PermissionDecisionBroker)
-// come with it.
+// The existing OpenCodeAdapter (opencode.go, root package) is Phase 1/2 batch
+// mode: it spawns the opencode CLI with `opencode run --format json` and
+// hand-parses the JSON event stream — a 500+ line custom parser, no ACP
+// permission chain. This adapter replaces that hop with OpenCode's native ACP
+// subcommand (`opencode acp`, v1.18.5+), consumed by the shared
+// coder/acp-go-sdk client runtime (root acp_client.go): streaming updates,
+// capability negotiation, and the Edge approval chain
+// (session/request_permission → PermissionDecisionBroker) come with it.
 //
 // Launch shape: `opencode acp` — native CLI subcommand on the opencode binary
 // (GitHub releases distribution). Unlike codex-acp there is NO npx wrapper:
@@ -34,9 +34,13 @@
 // the inherited launcherLabel config and still expects the launcher-missing
 // failure; the override guarantees that behavior regardless of construction
 // path.
-package adapters
+package opencode
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/agenthub/edge-server/internal/adapters"
+)
 
 // opencodeACPAdapterID is the registry identifier of the native opencode ACP
 // configuration.
@@ -58,7 +62,7 @@ const opencodeACPDefaultBinary = "opencode"
 // only supplies the opencode-acp configuration via NewAcpAdapterConfig plus a
 // PreflightCheck override (see file doc for why the override is retained).
 type OpenCodeACPAdapter struct {
-	*AcpAdapter
+	*adapters.AcpAdapter
 }
 
 // NewOpenCodeACPAdapter creates the opencode-acp adapter configuration.
@@ -71,7 +75,7 @@ func NewOpenCodeACPAdapter(binaryPath string) *OpenCodeACPAdapter {
 	if binaryPath == "" {
 		binaryPath = opencodeACPDefaultBinary
 	}
-	return &OpenCodeACPAdapter{AcpAdapter: NewAcpAdapterConfig(AcpAdapterConfig{
+	return &OpenCodeACPAdapter{AcpAdapter: adapters.NewAcpAdapterConfig(adapters.AcpAdapterConfig{
 		ID:           opencodeACPAdapterID,
 		Binary:       binaryPath,
 		Args:         []string{"acp"},
@@ -98,14 +102,14 @@ func NewOpenCodeACPAdapter(binaryPath string) *OpenCodeACPAdapter {
 // auth login — is left to the opencode process itself.
 func (a *OpenCodeACPAdapter) PreflightCheck() error {
 	if !a.Available() {
-		return fmt.Errorf("opencode-acp launcher %q not found on PATH (install opencode >= %s)", a.agentBinary, opencodeACPVersionPin)
+		return fmt.Errorf("opencode-acp launcher %q not found on PATH (install opencode >= %s)", a.AgentBinary(), opencodeACPVersionPin)
 	}
 	return nil
 }
 
 // compile-time guard: the wrapper satisfies the full AgentAdapter contract
 // (via the embedded AcpAdapter).
-var _ AgentAdapter = (*OpenCodeACPAdapter)(nil)
+var _ adapters.AgentAdapter = (*OpenCodeACPAdapter)(nil)
 
 // Verified: end-to-end runs against the real `opencode acp` process were
 // exercised on the DevSpace dev machine (opencode 1.18.18 installed via npm,

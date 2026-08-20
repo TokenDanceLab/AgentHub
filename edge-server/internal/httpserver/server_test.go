@@ -14,6 +14,7 @@ import (
 
 	"github.com/agenthub/edge-server/internal/adapters"
 	"github.com/agenthub/edge-server/internal/adapters/claude"
+	"github.com/agenthub/edge-server/internal/adapters/codex"
 	"github.com/agenthub/edge-server/internal/api"
 	"github.com/agenthub/edge-server/internal/edgeidentity"
 	"github.com/agenthub/edge-server/internal/events"
@@ -783,7 +784,7 @@ func TestNewHandlerFromConfigWithRegisteredAdapter(t *testing.T) {
 
 func TestNewHandlerFromConfigRegistersRuntimeRunner(t *testing.T) {
 	reg := adapters.NewRegistry()
-	a := adapters.NewCodexACPadapter("")
+	a := codex.NewCodexACPadapter("")
 	if err := reg.Register(a); err != nil {
 		t.Fatalf("Register: %v", err)
 	}
