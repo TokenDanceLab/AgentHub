@@ -28,8 +28,8 @@ import (
 	"github.com/agenthub/hub-server/internal/config"
 	"github.com/agenthub/hub-server/internal/handler"
 	"github.com/agenthub/hub-server/internal/model"
-	"github.com/agenthub/hub-server/internal/service"
 	"github.com/agenthub/hub-server/internal/service/attachment"
+	"github.com/agenthub/hub-server/internal/service/im"
 )
 
 type mockAttachmentService struct {
@@ -98,7 +98,7 @@ func (m *mockAttachmentService) BlobLocalPath(hash string) string {
 	if m.remoteStorage {
 		return ""
 	}
-	relPath := service.PathFromHash(hash)
+	relPath := im.PathFromHash(hash)
 	if relPath == "" {
 		return ""
 	}
@@ -195,7 +195,7 @@ func TestAttachmentUploadHashMismatchDoesNotModifyExistingBlob(t *testing.T) {
 	uploadContent := []byte("different upload content")
 	sum := sha256.Sum256(content)
 	hash := hex.EncodeToString(sum[:])
-	relPath := service.PathFromHash(hash)
+	relPath := im.PathFromHash(hash)
 	if err := os.MkdirAll(relPath, 0755); err != nil {
 		t.Fatalf("MkdirAll returned error: %v", err)
 	}
@@ -475,7 +475,7 @@ func TestAttachmentUploadUsesConfiguredLocalStorageDir(t *testing.T) {
 	if w.Code != http.StatusOK {
 		t.Fatalf("expected status 200, got %d: %s", w.Code, w.Body.String())
 	}
-	storedPath := filepath.Join(uploadDir, service.PathFromHash(hash))
+	storedPath := filepath.Join(uploadDir, im.PathFromHash(hash))
 	got, err := os.ReadFile(storedPath)
 	if err != nil {
 		t.Fatalf("configured upload blob should be readable at %s: %v", storedPath, err)
@@ -507,7 +507,7 @@ func TestAttachmentDownloadFormatsUnsafeFilenameSafely(t *testing.T) {
 	content := []byte("download body")
 	sum := sha256.Sum256(content)
 	hash := hex.EncodeToString(sum[:])
-	relPath := service.PathFromHash(hash)
+	relPath := im.PathFromHash(hash)
 	if err := os.MkdirAll(relPath, 0755); err != nil {
 		t.Fatalf("MkdirAll returned error: %v", err)
 	}
