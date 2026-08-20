@@ -7,7 +7,7 @@
 | 角色 | 先读 | 然后 |
 |------|------|------|
 | **新开发者** | [developer-quickstart.md](developer-quickstart.md) | [architecture.md](architecture.md) |
-| **评审/产品** | [architecture.md](architecture.md) | [decisions.md](decisions.md) → [governance/threat-model.md](governance/threat-model.md) |
+| **评审/产品** | [architecture.md](architecture.md) | [decisions.md](decisions.md) → [governance/README.md](governance/README.md) |
 | **贡献者** | [../CONTRIBUTING.md](../CONTRIBUTING.md) | [developer-quickstart.md](developer-quickstart.md) · [../AGENTS.md](../AGENTS.md) |
 | **功能设计** | [architecture.md](architecture.md) | [decisions.md](decisions.md) |
 | **历史追溯** | [history.md](history.md) · [archives/](archives/) | TokenDance docs 外部归档 |
@@ -24,7 +24,7 @@ docs/
 ├── architecture/                      ← 模块化架构文档
 ├── archives/                          ← 已关闭程序快照（analysis/plan/handoff）与历史文档归档
 ├── decisions.md                       ← 当前架构决策摘要
-├── governance/                        ← 治理：执行映射、安全风险、威胁模型
+├── governance/                        ← 治理：机器验证映射 + 指针（内部治理正文在私有 docs）
 ├── history.md                         ← 历史归档索引（外部 TokenDance docs）
 ├── images/                            ← 截图与图片资源
 └── reference/                         ← 轻量技术参考
@@ -45,9 +45,8 @@ docs/
 | SDK Agent 策略 | [reference/README.md](reference/README.md)（含 [sdk-agent-strategy.md](reference/sdk-agent-strategy.md)、[agent-protocol-compat.md](reference/agent-protocol-compat.md)） |
 | 组件验收标准 | [component-acceptance.md](component-acceptance.md) |
 | 分支和 worktree 规则 | [../AGENTS.md](../AGENTS.md) |
-| 治理执行（飞书/i18n/公开包装） | [governance/governance-execution.md](governance/governance-execution.md) |
-| 安全风险 | [governance/security-risk-register.md](governance/security-risk-register.md) |
+| 治理（公开区：验证映射 + 指针） | [governance/README.md](governance/README.md) |
+| 安全风险摘要 | [../SECURITY.md](../SECURITY.md)（SSOT 在 TokenDance 私有治理文档） |
 | 机器验证映射 | [governance/verifier-map.md](governance/verifier-map.md) |
-| 威胁模型 | [governance/threat-model.md](governance/threat-model.md) |
 | 后端性能/泄漏证据 | 机器门禁 `scripts/verify/verify-backend-perf-leak-gates.py`；旧证据分类 [archives/reference/backend-performance-gates.md](archives/reference/backend-performance-gates.md)（已归档） |
 | 发布/截图历史清单 | [history.md](history.md) |

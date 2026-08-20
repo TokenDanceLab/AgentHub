@@ -176,8 +176,8 @@ def check_required_markers() -> None:
         ("hub-server/tests/README.md", "Integration Tests"),
         ("reference/INDEX.md", "docs/reference/README.md"),
         ("CONTRIBUTING.md", "旧详细贡献指南见"),
-        ("docs/governance/governance-execution.md", "D2b. Release dry build topology"),
-        ("docs/governance/governance-execution.md", "later approval slice"),
+        ("docs/governance/README.md", "Login fixture topology gate"),
+        ("docs/governance/README.md", "已迁移至私有文档中枢"),
         ("docs/architecture/05-deployment.md", "Desktop packaged 行为正确"),
         ("scripts/release/verify-tauri-package-readiness.py", "assert_workflow_command_explicit_opt_in"),
         ("scripts/release/verify-tauri-package-readiness.py", "assert_no_macos_unsigned_dry_release_actions"),
@@ -268,9 +268,6 @@ def check_max_lines() -> None:
         "docs/reference/README.md": 80,
         "docs/reference/sdk-agent-strategy.md": 120,
         "docs/reference/agent-protocol-compat.md": 100,
-        "docs/governance/security-risk-register.md": 180,
-        "docs/governance/threat-model.md": 140,
-        "docs/governance/governance-execution.md": 110,
         "docs/governance/verifier-map.md": 120,
     }
     for path, limit in limits.items():

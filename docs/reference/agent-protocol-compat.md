@@ -34,4 +34,4 @@ AgentHub 不是 Agent Protocol 的 drop-in implementation。两者概念层相�
 - REST SSOT：`api/openapi.yaml`
 - WebSocket SSOT：`api/events.md`
 - 架构入口：`docs/architecture.md`
-- 安全/授权风险：`docs/governance/security-risk-register.md`
+- 安全/授权风险：`SECURITY.md`（SSOT 在 TokenDance 私有治理文档）
