@@ -159,6 +159,7 @@ function dedupKey(error: Error | AppError, category: ErrorCategory): string {
 export class ErrorReporter {
   private errors: Map<string, ErrorReport> = new Map();
   private listeners: Set<(report: ErrorReport) => void> = new Set();
+  private changeListeners: Set<() => void> = new Set();
   private throttleTimers: Map<string, ReturnType<typeof setTimeout>> = new Map();
   private throttleMs = 1000;
 
@@ -213,11 +214,26 @@ export class ErrorReporter {
     for (const fn of this.listeners) {
       try { fn(report); } catch { /* isolate */ }
     }
+    this.notifyChanged();
+  }
+
+  private notifyChanged(): void {
+    for (const fn of this.changeListeners) {
+      try { fn(); } catch { /* isolate */ }
+    }
   }
 
   subscribe(listener: (report: ErrorReport) => void): () => void {
     this.listeners.add(listener);
     return () => this.listeners.delete(listener);
+  }
+
+  /** Change channel: fires on report and on clear, without a report payload.
+   *  For useSyncExternalStore subscriptions that only need to know the store
+   *  mutated (e.g. useErrorReporter's snapshot invalidation). */
+  subscribeChange(listener: () => void): () => void {
+    this.changeListeners.add(listener);
+    return () => this.changeListeners.delete(listener);
   }
 
   getRecent(limit = 20): ErrorReport[] {
@@ -230,6 +246,7 @@ export class ErrorReporter {
     this.errors.clear();
     for (const timer of this.throttleTimers.values()) clearTimeout(timer);
     this.throttleTimers.clear();
+    this.notifyChanged();
   }
 }
 
