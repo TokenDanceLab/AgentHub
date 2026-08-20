@@ -1,6 +1,6 @@
 # AgentHub History
 
-最后更新：2026-08-16
+最后更新：2026-08-20
 
 本文件是 AgentHub 源仓的历史材料索引。历史 longform、日期型审计、旧发布材料、过期设计、参考调研、完成的 spec-driven 工件和过期项目 skill 不再保存在 AgentHub active source tree。
 
@@ -44,6 +44,7 @@
 | `docs/archives/analysis/post-polish-risk-assessment.md` | post-polish risk |
 | `docs/archives/analysis/settings-empty-error-inventory.md` | settings inventory |
 | `docs/archives/analysis/settings-sectionid-residual-inventory.md` | settings inventory |
+| `docs/archives/analysis/local-memory-pointer.md` | local memory pointer |
 | `docs/archives/analysis/frontend-dedupe-plan.md` | strangler plan |
 | `docs/archives/plan/post-polish-milestones.md` | post-polish plan |
 | `docs/archives/plan/post-polish-dependency-graph.md` | post-polish plan |
