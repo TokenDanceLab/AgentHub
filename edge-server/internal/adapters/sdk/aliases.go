@@ -14,16 +14,24 @@ type EventEmitter = orchestration.EventEmitter
 type AdapterMetadata = orchestration.AdapterMetadata
 type AgentCapabilities = orchestration.AgentCapabilities
 type RunProcessContext = orchestration.RunProcessContext
+type AgentAdapter = orchestration.AgentAdapter
 
 // ── Bus event type strings（与 orchestration 完全一致，防双 SSOT）────────────
 const (
-	BusEventAPIRetry     = orchestration.BusEventAPIRetry
-	BusEventContextUsage = orchestration.BusEventContextUsage
-	BusEventResult       = orchestration.BusEventResult
-	BusEventSessionInit  = orchestration.BusEventSessionInit
-	BusEventStatusChange = orchestration.BusEventStatusChange
-	BusEventTextBlock    = orchestration.BusEventTextBlock
-	BusEventTextDelta    = orchestration.BusEventTextDelta
-	BusEventThinking     = orchestration.BusEventThinking
-	BusEventToolCall     = orchestration.BusEventToolCall
+	BusEventAPIRetry            = orchestration.BusEventAPIRetry
+	BusEventCLIInvocationPlan   = orchestration.BusEventCLIInvocationPlan
+	BusEventContextUsage        = orchestration.BusEventContextUsage
+	BusEventFileChange          = orchestration.BusEventFileChange
+	BusEventPermissionRequested = orchestration.BusEventPermissionRequested
+	BusEventResult              = orchestration.BusEventResult
+	BusEventRouteDecision       = orchestration.BusEventRouteDecision
+	BusEventSessionInit         = orchestration.BusEventSessionInit
+	BusEventSessionStateChanged = orchestration.BusEventSessionStateChanged
+	BusEventStatusChange        = orchestration.BusEventStatusChange
+	BusEventTaskProgress        = orchestration.BusEventTaskProgress
+	BusEventTextBlock           = orchestration.BusEventTextBlock
+	BusEventTextDelta           = orchestration.BusEventTextDelta
+	BusEventThinking            = orchestration.BusEventThinking
+	BusEventToolCall            = orchestration.BusEventToolCall
+	BusEventToolResult          = orchestration.BusEventToolResult
 )

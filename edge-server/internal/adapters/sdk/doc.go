@@ -15,12 +15,15 @@
 //	aliases.go 引入，模式对齐 adapters/orchestrator 叶子包）
 //	cmd/agenthub-edge（组合根）→ internal/adapters/sdk
 //
-// 根 internal/adapters 不 import 本子包：根包对 SDK 适配器的唯一残留引用
-// 是 registry.go 中的字符串适配器 ID（"anthropic-sdk" / "openai-sdk"），
-// 注册由组合根完成，因此方向天然单向。
+// 根 internal/adapters 不 import 本子包：根包对 SDK 适配器与 SDK fixture
+// 机制的残留引用仅剩 registry.go 中的字符串适配器 ID（"anthropic-sdk" /
+// "openai-sdk"），注册由组合根完成，因此方向天然单向。
 //
-// 仍留在根包、暂未归组的 sdk_fixture_mapper*.go 与根包存在双向耦合
-// （mapper 使用根包 BusEvent* 常量；根包 agentspec_fixture.go 构造
-// SDKFixture* 类型并调用其它适配器构造函数），强行下沉会形成 import
-// cycle，留待后续增量解耦。
+// #1760 mapper 增量：sdk_fixture_mapper 家族（sdk_fixture_mapper*.go）及其
+// 耦合的根包消费方一并归组本包——agentspec_fixture.go（AgentHubAgentSpec
+// fixture 的 SDK 投影，含 RegisterClaudeCodeAdapterProvider 等反向注入钩子）
+// 与 runtime_manifest.go（fixture 型 runtime manifest 适配器，ParseStream
+// 回放 SDK fixture 流）。#1770 记录的 mapper↔根包双向耦合由此解耦：mapper
+// 的 BusEvent* 常量经 aliases.go 派生自 orchestration，根包不再构造
+// SDKFixture* 类型，依赖方向恢复单向（sdk → adapters）。
 package sdk

@@ -1,4 +1,4 @@
-package adapters
+package acp
 
 import (
 	"testing"

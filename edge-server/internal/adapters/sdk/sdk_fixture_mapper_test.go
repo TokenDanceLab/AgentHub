@@ -1,4 +1,4 @@
-package adapters
+package sdk
 
 import (
 	"encoding/json"
@@ -871,4 +871,16 @@ func firstMappedPayloadOfType(t *testing.T, mapped []SDKMappedEvent, eventType s
 	}
 	t.Fatalf("missing mapped event type=%s callId=%s in %#v", eventType, callID, mapped)
 	return nil
+}
+
+// containsString 是根包 adapter_test.go 测试桩的本地副本（#1760 mapper
+// 增量）：mapper 家族归组后根包 _test 符号不可跨包引用，与 claude/acp
+// 包测试内置测试桩副本的既有模式一致。
+func containsString(list []string, target string) bool {
+	for _, value := range list {
+		if value == target {
+			return true
+		}
+	}
+	return false
 }

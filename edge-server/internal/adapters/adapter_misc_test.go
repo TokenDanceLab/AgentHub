@@ -183,7 +183,7 @@ func TestParseStreamErrorRecoverable(t *testing.T) {
 
 // --- hooks.go: ClassifyToolRisk unknown tool ---
 
-// --- control_protocol.go: normalizePermissionDecision ---
+// --- control_protocol.go: NormalizePermissionDecision ---
 
 func TestNormalizePermissionDecision(t *testing.T) {
 	cases := []struct {
@@ -237,7 +237,7 @@ func TestNormalizePermissionDecision(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			result := normalizePermissionDecision(tc.input)
+			result := NormalizePermissionDecision(tc.input)
 			if result.Behavior != tc.wantBehavior {
 				t.Errorf("Behavior = %q, want %q", result.Behavior, tc.wantBehavior)
 			}
@@ -266,9 +266,9 @@ func TestCommandNameOnly(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.input, func(t *testing.T) {
-			got := commandNameOnly(tc.input)
+			got := CommandNameOnly(tc.input)
 			if got != tc.want {
-				t.Errorf("commandNameOnly(%q) = %q, want %q", tc.input, got, tc.want)
+				t.Errorf("CommandNameOnly(%q) = %q, want %q", tc.input, got, tc.want)
 			}
 		})
 	}
@@ -294,9 +294,9 @@ func TestInvocationPathNameOnly(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.input, func(t *testing.T) {
-			got := invocationPathNameOnly(tc.input)
+			got := InvocationPathNameOnly(tc.input)
 			if got != tc.want {
-				t.Errorf("invocationPathNameOnly(%q) = %q, want %q", tc.input, got, tc.want)
+				t.Errorf("InvocationPathNameOnly(%q) = %q, want %q", tc.input, got, tc.want)
 			}
 		})
 	}
@@ -345,7 +345,7 @@ func TestEnvNamesOnly(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			got := envNamesOnly(tc.env)
+			got := EnvNamesOnly(tc.env)
 			if len(got) != len(tc.want) {
 				t.Fatalf("len = %d, want %d: %v", len(got), len(tc.want), got)
 			}

@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"github.com/agenthub/edge-server/internal/adapters"
+	"github.com/agenthub/edge-server/internal/adapters/acp"
 	"github.com/agenthub/edge-server/internal/store"
 )
 
@@ -221,7 +222,7 @@ func TestCodexACPadapterBuildCommand(t *testing.T) {
 		WorkDir: `C:\work\proj`,
 	})
 
-	wantPath := adapters.DefaultNpxPath()
+	wantPath := acp.DefaultNpxPath()
 	if cmdPath != wantPath {
 		t.Errorf("cmdPath = %q, want %q", cmdPath, wantPath)
 	}
@@ -268,7 +269,7 @@ func TestCodexACPadapterBuildCommandEnvPassthrough(t *testing.T) {
 }
 
 func TestCodexACPadapterDefaultNpxPath(t *testing.T) {
-	got := adapters.DefaultNpxPath()
+	got := acp.DefaultNpxPath()
 	if got != "npx.cmd" && got != "npx" {
 		t.Fatalf("DefaultNpxPath = %q, want platform npx launcher", got)
 	}
@@ -278,7 +279,7 @@ func TestCodexACPadapterDefaultNpxPath(t *testing.T) {
 // fails before spawn.
 func TestCodexACPadapterPreflightFailsFast(t *testing.T) {
 	a := &CodexACPadapter{
-		AcpAdapter: adapters.NewAcpAdapterConfig(adapters.AcpAdapterConfig{
+		AcpAdapter: acp.NewAcpAdapterConfig(acp.AcpAdapterConfig{
 			ID:            codexACPadapterID,
 			Binary:        "",
 			DisplayName:   "Codex (ACP)",
@@ -323,7 +324,7 @@ func TestCodexACPadapterRegistryRegistration(t *testing.T) {
 	if _, ok := reg.Get("acp"); ok {
 		t.Error("generic acp adapter unexpectedly registered")
 	}
-	if err := reg.Register(adapters.NewAcpAdapter("fake-agent", nil, "Fake")); err != nil {
+	if err := reg.Register(acp.NewAcpAdapter("fake-agent", nil, "Fake")); err != nil {
 		t.Errorf("generic acp registration should coexist with codex-acp: %v", err)
 	}
 	if !containsString(reg.ListIDs(), "codex-acp") {
@@ -373,7 +374,7 @@ func TestCodexACPadapterParseStreamWithMockACPPeer(t *testing.T) {
 	}
 
 	// The fake agent records a request method only AFTER writing its response
-	// (root acp_client_test.go fakeACPAgent.run: write-then-record), so the
+	// (acp/acp_client_test.go fakeACPAgent.run: write-then-record), so the
 	// client can finish ParseStream before the peer goroutine records
 	// session/prompt. Poll briefly instead of asserting immediately — the
 	// record must arrive, just not synchronously with the client's last read.

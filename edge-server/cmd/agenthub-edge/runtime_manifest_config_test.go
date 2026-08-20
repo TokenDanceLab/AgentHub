@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/agenthub/edge-server/internal/adapters"
+	"github.com/agenthub/edge-server/internal/adapters/sdk"
 )
 
 func TestBuildConfigAcceptsRuntimeManifestFlag(t *testing.T) {
@@ -23,10 +23,10 @@ func TestBuildConfigAcceptsRuntimeManifestFlag(t *testing.T) {
 }
 
 func TestRuntimeManifestFixtureReplayRequested(t *testing.T) {
-	if !runtimeManifestFixtureReplayRequested([]string{adapters.RuntimeManifestFixtureReplayFlag}) {
+	if !runtimeManifestFixtureReplayRequested([]string{sdk.RuntimeManifestFixtureReplayFlag}) {
 		t.Fatal("fixture replay flag should request harmless replay mode")
 	}
-	if runtimeManifestFixtureReplayRequested([]string{adapters.RuntimeManifestFixtureReplayFlag, "--extra"}) {
+	if runtimeManifestFixtureReplayRequested([]string{sdk.RuntimeManifestFixtureReplayFlag, "--extra"}) {
 		t.Fatal("fixture replay mode should only accept the exact replay flag")
 	}
 	if runtimeManifestFixtureReplayRequested([]string{"--runtime-manifest", "runtime.json"}) {
@@ -38,9 +38,9 @@ func TestBuildAdapterRegistryRegistersRuntimeManifest(t *testing.T) {
 	dir := t.TempDir()
 	success := true
 	fixturePath := filepath.Join(dir, "fixture.json")
-	fixture := adapters.SDKFixtureStream{
+	fixture := sdk.SDKFixtureStream{
 		Provider: "custom-runtime-fixture",
-		Events: []adapters.SDKFixtureEvent{
+		Events: []sdk.SDKFixtureEvent{
 			{ID: "evt_result", Type: "terminal_result", Success: &success, Summary: "fixture complete"},
 		},
 	}
@@ -54,7 +54,7 @@ func TestBuildAdapterRegistryRegistersRuntimeManifest(t *testing.T) {
 
 	manifestPath := filepath.Join(dir, "runtime.json")
 	manifest := map[string]any{
-		"schema":  adapters.RuntimeManifestV1Schema,
+		"schema":  sdk.RuntimeManifestV1Schema,
 		"id":      "custom-fixture",
 		"name":    "Custom Fixture",
 		"kind":    "custom",

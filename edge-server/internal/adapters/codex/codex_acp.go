@@ -7,7 +7,7 @@
 // replaces that hop with the official ACP adapter binary
 // `@agentclientprotocol/codex-acp`, which speaks the Agent Client Protocol
 // (JSON-RPC 2.0) over stdio and is consumed by the shared coder/acp-go-sdk
-// client runtime (root acp_client.go): streaming updates, capability
+// client runtime (adapters/acp acp_client.go): streaming updates, capability
 // negotiation, and the Edge approval chain
 // (session/request_permission → PermissionDecisionBroker) come with it.
 //
@@ -26,15 +26,19 @@
 // from the parent env on each BuildCommand call (not snapshotted at adapter
 // construction) so a key rotated after registration still flows to the spawn.
 //
-// This file is now a thin configuration shim over the root AcpAdapter: every
-// behavior (BuildCommand env passthrough, Metadata version pin, PreflightCheck
-// launcher-missing error, ParseStream via runACPSession, capabilities,
-// permission broker) is inherited from AcpAdapter via embedding + a single
-// AcpAdapterConfig. The earlier near-copy of the codex/claude/opencode ACP
-// wrappers has been collapsed into shared AcpAdapter logic (#1404 wave 2).
+// This file is now a thin configuration shim over the acp subpackage
+// AcpAdapter: every behavior (BuildCommand env passthrough, Metadata version
+// pin, PreflightCheck launcher-missing error, ParseStream via runACPSession,
+// capabilities, permission broker) is inherited from AcpAdapter via embedding
+// + a single AcpAdapterConfig. The earlier near-copy of the codex/claude/
+// opencode ACP wrappers has been collapsed into shared AcpAdapter logic
+// (#1404 wave 2).
 package codex
 
-import "github.com/agenthub/edge-server/internal/adapters"
+import (
+	"github.com/agenthub/edge-server/internal/adapters"
+	"github.com/agenthub/edge-server/internal/adapters/acp"
+)
 
 // codexACPadapterID is the registry identifier of the official codex-acp
 // configuration.
@@ -60,20 +64,20 @@ const codexACPPackageSpec = codexACPPackage + "@" + codexACPVersionPin
 // supplies the codex-acp configuration (binary, args, env keys, version pin,
 // preflight labels) via NewAcpAdapterConfig.
 type CodexACPadapter struct {
-	*adapters.AcpAdapter
+	*acp.AcpAdapter
 }
 
 // NewCodexACPadapter creates the codex-acp adapter configuration.
 //
 // npxPath is the launcher to spawn; when empty it defaults to "npx.cmd" on
-// Windows and "npx" elsewhere (shared adapters.DefaultNpxPath). The agent
+// Windows and "npx" elsewhere (shared acp.DefaultNpxPath). The agent
 // receives no run-time args beyond `-y @agentclientprotocol/codex-acp`: ACP
 // mode is implicit in the package, and the prompt travels over stdio.
 func NewCodexACPadapter(npxPath string) *CodexACPadapter {
 	if npxPath == "" {
-		npxPath = adapters.DefaultNpxPath()
+		npxPath = acp.DefaultNpxPath()
 	}
-	return &CodexACPadapter{AcpAdapter: adapters.NewAcpAdapterConfig(adapters.AcpAdapterConfig{
+	return &CodexACPadapter{AcpAdapter: acp.NewAcpAdapterConfig(acp.AcpAdapterConfig{
 		ID:            codexACPadapterID,
 		Binary:        npxPath,
 		Args:          []string{"-y", codexACPPackageSpec},
@@ -94,5 +98,5 @@ var _ adapters.AgentAdapter = (*CodexACPadapter)(nil)
 // with Codex authentication (OPENAI_API_KEY or ChatGPT login) and network
 // access to the npm registry. Not present in this workspace — verification is
 // limited to the registry registration, command shape, and a mock ACP peer
-// (codex_acp_test.go / root acp_client_test.go). Before cutover: verify on a
+// (codex_acp_test.go / acp/acp_client_test.go). Before cutover: verify on a
 // machine with npx + keys, and confirm the npm mirror serves 1.1.7.

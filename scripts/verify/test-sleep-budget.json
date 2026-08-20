@@ -1,6 +1,6 @@
 {
  "_comment": "Per-file time.Sleep budget baseline (#1565). Extends the #1550 count ratchet (scripts/verify/test-sleep-baseline.json) with value budgets: count, total_ms (sum of all resolved sleeps), max_ms (largest single sleep) and the exact per-sleep values, so a 20ms sleep cannot silently become 20s and the lane wall-clock cannot grow unapproved. Any count/value increase requires -UpdateBaseline (tracked approval). kinds: poll_deadline (interval inside a deadline-guarded loop), negative_window (assert 'did not happen'), simulated_slow (handler/mock/loader slow behavior), real_protocol (real heartbeat/debounce/subprocess time), grace_window (async callback/drain grace). owner/review required per file.",
- "edge-server/internal/adapters/acp_client_test.go": {
+ "edge-server/internal/adapters/acp/acp_client_test.go": {
   "count": 3,
   "total_ms": 15,
   "max_ms": 5,

@@ -185,7 +185,7 @@ func (h *DefaultPermissionHandler) handleCanUseTool(ctx context.Context, stdin i
 	default:
 		decision = PermissionDecision{Behavior: "allow"}
 	}
-	decision = normalizePermissionDecision(decision)
+	decision = NormalizePermissionDecision(decision)
 
 	resp := ControlMessage{
 		Type:      "control_response",
@@ -311,7 +311,7 @@ func (b *PermissionDecisionBroker) Begin(scope PermissionScope, req PermissionRe
 	return func(ctx context.Context) PermissionDecision {
 		select {
 		case decision := <-waiter.decision:
-			return normalizePermissionDecision(decision)
+			return NormalizePermissionDecision(decision)
 		case <-ctx.Done():
 			b.mu.Lock()
 			delete(b.pending, key)
@@ -345,11 +345,15 @@ func (b *PermissionDecisionBroker) Decide(runID, requestID string, decision Perm
 	if !ok {
 		return PendingPermissionRequest{}, false
 	}
-	waiter.decision <- normalizePermissionDecision(decision)
+	waiter.decision <- NormalizePermissionDecision(decision)
 	return waiter.pending, true
 }
 
-func normalizePermissionDecision(decision PermissionDecision) PermissionDecision {
+// NormalizePermissionDecision trims and validates a decision's behavior:
+// only "allow"/"deny" survive; anything else (including empty) becomes a
+// deny with a reason message. Exported so the acp subpackage can normalize
+// broker decisions through the same SSOT path (#1760 acp 增量).
+func NormalizePermissionDecision(decision PermissionDecision) PermissionDecision {
 	decision.Behavior = strings.TrimSpace(decision.Behavior)
 	switch decision.Behavior {
 	case "allow", "deny":
@@ -361,6 +365,25 @@ func normalizePermissionDecision(decision PermissionDecision) PermissionDecision
 		decision.Behavior = "deny"
 		return decision
 	}
+}
+
+// PendingPermission reports whether a permission request is currently parked
+// for the given run/request pair. Read-only: it never resolves or recycles
+// the parked entry. Exported so the acp subpackage can assert broker
+// lifecycle (register/recycle on cancel) without white-box access (#1760
+// acp 增量).
+func (b *PermissionDecisionBroker) PendingPermission(runID, requestID string) bool {
+	if b == nil {
+		return false
+	}
+	key := permissionDecisionKey{
+		runID:     strings.TrimSpace(runID),
+		requestID: strings.TrimSpace(requestID),
+	}
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	_, ok := b.pending[key]
+	return ok
 }
 
 // WriteInterrupt sends an interrupt control_request to the CLI via stdin.

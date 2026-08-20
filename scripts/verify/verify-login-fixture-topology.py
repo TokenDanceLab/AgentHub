@@ -110,8 +110,8 @@ def main() -> int:
     assert_contains("scripts/release/verify-packaged-login-real-readiness.py", r"No live Hub, TokenDance ID, browser, secret, or CLI/model calls were made", "packaged real-readiness gate is dry")
     assert_contains("scripts/verify/verify-web-hub-boundary.py", r"Web Hub-only boundary", "Web Hub-only boundary gate exists")
     assert_contains("scripts/release/verify-tauri-package-readiness.py", r"macOS unsigned dry policy boundary", "macOS unsigned dry policy gate remains present")
-    assert_contains("edge-server/internal/adapters/sdk_fixture_mapper_test.go", r"TestSDKFixtureMapperClaudeGolden", "SDK fixture mapper Claude golden evidence remains fixture-only")
-    assert_contains("edge-server/internal/adapters/sdk_fixture_mapper_test.go", r"TestSDKFixtureMapperOpenAIGolden", "SDK fixture mapper OpenAI golden evidence remains fixture-only")
+    assert_contains("edge-server/internal/adapters/sdk/sdk_fixture_mapper_test.go", r"TestSDKFixtureMapperClaudeGolden", "SDK fixture mapper Claude golden evidence remains fixture-only")
+    assert_contains("edge-server/internal/adapters/sdk/sdk_fixture_mapper_test.go", r"TestSDKFixtureMapperOpenAIGolden", "SDK fixture mapper OpenAI golden evidence remains fixture-only")
 
     step("Topology docs")
     assert_contains("docs/governance/governance-execution.md", r"Login fixture topology gate", "governance records login fixture topology gate")
