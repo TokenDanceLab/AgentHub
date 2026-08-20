@@ -12,11 +12,12 @@ import (
 	"github.com/agenthub/hub-server/internal/errcode"
 	"github.com/agenthub/hub-server/internal/model"
 	"github.com/agenthub/hub-server/internal/repository"
+	"github.com/agenthub/hub-server/internal/service/agentcontrol"
 	"github.com/agenthub/hub-server/internal/service/agentevent"
 )
 
 // runEventControl delivers Hub control commands to the exact Desktop/Edge device
-// that owns a local Edge run. Implemented by *AgentControlService.
+// that owns a local Edge run. Implemented by *agentcontrol.Service.
 type runEventControl interface {
 	DeliverToDesktopDevice(ctx context.Context, userID, deviceID string, payload model.AgentControlPayload) error
 }
@@ -208,8 +209,8 @@ func (s *AgentService) runEventService() *RunEventService {
 		return s.runEvents
 	}
 	var control runEventControl
-	if controlCache, ok := s.cacheClient.(agentControlCache); ok {
-		control = &AgentControlService{cacheClient: controlCache, mgr: s.mgr}
+	if controlCache, ok := s.cacheClient.(agentcontrol.CachePort); ok {
+		control = agentcontrol.NewService(controlCache, s.mgr)
 	}
 	return NewRunEventService(s.db, control)
 }

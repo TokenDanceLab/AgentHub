@@ -12,16 +12,16 @@ import (
 	"github.com/agenthub/hub-server/internal/config"
 	"github.com/agenthub/hub-server/internal/errcode"
 	"github.com/agenthub/hub-server/internal/model"
-	"github.com/agenthub/hub-server/internal/service"
+	"github.com/agenthub/hub-server/internal/service/agentprofile"
 )
 
-// AgentProfileService is the subset of *service.AgentProfileService used by AgentProfileHandler.
+// AgentProfileService is the subset of *agentprofile.Service used by AgentProfileHandler.
 type AgentProfileService interface {
 	Create(ctx context.Context, ownerID string, req *model.AgentProfile) (*model.AgentProfile, error)
 	Get(ctx context.Context, id, ownerID string) (*model.AgentProfile, error)
 	Update(ctx context.Context, id, ownerID string, updates map[string]interface{}) (*model.AgentProfile, error)
 	Delete(ctx context.Context, id, ownerID string) error
-	List(ctx context.Context, ownerID, runtimeID, q, cursor string, pageSize int) (*service.ListResult, error)
+	List(ctx context.Context, ownerID, runtimeID, q, cursor string, pageSize int) (*agentprofile.ListResult, error)
 	Publish(ctx context.Context, id, ownerID string) error
 	Unpublish(ctx context.Context, id, ownerID string) error
 	Install(ctx context.Context, id, installerID string) (*model.AgentProfile, error)

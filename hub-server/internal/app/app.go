@@ -17,6 +17,7 @@ import (
 	"github.com/agenthub/hub-server/internal/jwtutil"
 	"github.com/agenthub/hub-server/internal/outboundhttp"
 	"github.com/agenthub/hub-server/internal/service"
+	"github.com/agenthub/hub-server/internal/service/agentcontrol"
 	"github.com/agenthub/hub-server/internal/service/agentteam"
 	"github.com/agenthub/hub-server/internal/service/attachment"
 	"github.com/agenthub/hub-server/internal/service/audit"
@@ -63,7 +64,7 @@ type App struct {
 	MessageService         *message.Service
 	MessageReactionService *messagereaction.Service
 	AgentService           *service.AgentService
-	AgentControlService    *service.AgentControlService
+	AgentControlService    *agentcontrol.Service
 	AttachmentService      *attachment.Service
 	NotificationService    *notification.Service
 	DeviceService          *device.Service

@@ -9,22 +9,22 @@ import (
 
 	"github.com/agenthub/hub-server/internal/errcode"
 	"github.com/agenthub/hub-server/internal/model"
-	"github.com/agenthub/hub-server/internal/service"
+	"github.com/agenthub/hub-server/internal/service/agentprofile"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 type mockMarketService struct {
-	searchMarket func(ctx context.Context, runtimeID, q, sortBy, cursor string, pageSize int) (*service.ListResult, error)
+	searchMarket func(ctx context.Context, runtimeID, q, sortBy, cursor string, pageSize int) (*agentprofile.ListResult, error)
 	getPublic    func(ctx context.Context, id string) (*model.AgentProfile, error)
 	install      func(ctx context.Context, id, installerID string) (*model.AgentProfile, error)
 	rate         func(ctx context.Context, profileID, raterID string, score int) (float64, int, error)
 }
 
-func (m *mockMarketService) SearchMarket(ctx context.Context, runtimeID, q, sortBy, cursor string, pageSize int) (*service.ListResult, error) {
+func (m *mockMarketService) SearchMarket(ctx context.Context, runtimeID, q, sortBy, cursor string, pageSize int) (*agentprofile.ListResult, error) {
 	if m.searchMarket == nil {
-		return &service.ListResult{}, nil
+		return &agentprofile.ListResult{}, nil
 	}
 	return m.searchMarket(ctx, runtimeID, q, sortBy, cursor, pageSize)
 }
@@ -56,12 +56,12 @@ func TestMarketHandler_SearchMarketProfiles(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		called := false
 		svc := &mockMarketService{
-			searchMarket: func(ctx context.Context, runtimeID, q, sortBy, cursor string, pageSize int) (*service.ListResult, error) {
+			searchMarket: func(ctx context.Context, runtimeID, q, sortBy, cursor string, pageSize int) (*agentprofile.ListResult, error) {
 				called = true
 				assert.Equal(t, "runtime-1", runtimeID)
 				assert.Equal(t, "assistant", q)
 				assert.Equal(t, "recent", sortBy)
-				return &service.ListResult{
+				return &agentprofile.ListResult{
 					Items:   []model.AgentProfile{{ID: "profile-1"}},
 					Cursor:  "next-cursor",
 					HasMore: true,
@@ -87,7 +87,7 @@ func TestMarketHandler_SearchMarketProfiles(t *testing.T) {
 
 	t.Run("service error", func(t *testing.T) {
 		svc := &mockMarketService{
-			searchMarket: func(ctx context.Context, runtimeID, q, sortBy, cursor string, pageSize int) (*service.ListResult, error) {
+			searchMarket: func(ctx context.Context, runtimeID, q, sortBy, cursor string, pageSize int) (*agentprofile.ListResult, error) {
 				return nil, errcode.ErrInternal
 			},
 		}

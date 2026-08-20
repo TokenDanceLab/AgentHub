@@ -1,4 +1,4 @@
-package service
+package agentcontrol
 
 import (
 	"context"
@@ -12,33 +12,32 @@ import (
 	"github.com/agenthub/hub-server/internal/ws"
 )
 
-type agentControlCache interface {
+// CachePort is the subset of *cache.Client used for routing and queuing
+// Hub control commands to desktop/edge devices.
+type CachePort interface {
 	GetRouteForDevice(ctx context.Context, userID, deviceType, deviceID string) (string, error)
 	PushPendingAgentControl(ctx context.Context, userID, deviceID, controlJSON string) error
 }
 
-// AgentControlService delivers Hub control commands to the exact Desktop/Edge
+// Service delivers Hub control commands to the exact Desktop/Edge
 // device that owns the local Edge run.
-type AgentControlService struct {
-	cacheClient agentControlCache
+type Service struct {
+	cacheClient CachePort
 	mgr         *ws.Manager
 }
 
-func NewAgentControlService(cacheClient *cache.Client, mgr *ws.Manager) *AgentControlService {
-	return &AgentControlService{
+func NewService(cacheClient CachePort, mgr *ws.Manager) *Service {
+	return &Service{
 		cacheClient: resolveAgentControlCache(cacheClient),
 		mgr:         mgr,
 	}
 }
 
-func resolveAgentControlCache(c *cache.Client) agentControlCache {
-	if c == nil {
-		return cache.NoOpCache{}
-	}
-	return c
+func resolveAgentControlCache(c CachePort) CachePort {
+	return cache.ResolveCache[CachePort](c, cache.NoOpCache{})
 }
 
-func (s *AgentControlService) DeliverToDesktopDevice(ctx context.Context, userID, deviceID string, payload model.AgentControlPayload) error {
+func (s *Service) DeliverToDesktopDevice(ctx context.Context, userID, deviceID string, payload model.AgentControlPayload) error {
 	userID = strings.TrimSpace(userID)
 	deviceID = strings.TrimSpace(deviceID)
 	if userID == "" || deviceID == "" || strings.TrimSpace(payload.Kind) == "" {
