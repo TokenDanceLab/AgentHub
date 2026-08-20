@@ -214,18 +214,23 @@ jobs:
           cache-dependency-path: hub-server/go.sum
 
       - name: Lint
-        continue-on-error: true
+        # #1657: hard gate — lint failures now block merges. The 17
+        # pre-existing complexity findings remain baseline-registered in the
+        # #1573 fingerprint ratchet, so only-new-issues keeps those from
+        # failing this step until the debt is repaid; once the baseline is
+        # empty this knob can be dropped for a full-report hard fail.
         uses: golangci/golangci-lint-action@v9
         with:
           working-directory: hub-server
           version: ${{ env.GOLANGCI_LINT_VERSION }}
           args: --timeout=5m --output.json.path=${{ runner.temp }}/hub-lint-report.json
+          only-new-issues: true
 
       # #1573: finding fingerprint ratchet — any finding NOT in the baseline
       # (new linter, new rule, escalated severity, replacement with same count)
-      # hard-fails this job even though the raw Lint step above stays advisory
-      # until the debt is repaid to zero. Reads the same JSON report the Lint
-      # step just produced (single source, no version drift).
+      # hard-fails this job even though pre-existing baseline findings stay
+      # advisory until the debt is repaid to zero. Reads the same JSON report
+      # the Lint step just produced (single source, no version drift).
       - name: Verify Hub lint fingerprint ratchet (#1573)
         # Wave 10: CI golangci-lint version produces different findings; re-baseline on CI
         continue-on-error: true
