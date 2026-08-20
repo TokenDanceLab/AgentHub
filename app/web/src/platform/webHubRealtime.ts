@@ -1,21 +1,41 @@
 import { useEffect, useRef } from 'react';
 import { type QueryClient, useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { HUB_EVENTS } from '@shared/hubEvents';
 import { hubRuntimeEventFromPayload, type HubRuntimeEventTranscriptInput } from '@shared/transcript';
 import { getPinMapStore } from '@shared/transcript';
 import { getAgentActivityStore } from '@shared/transcript/agentActivity';
 import { getMessageDelegationStore, getSubagentStreamStore } from '@shared/workbench';
 import { handleIncomingTyping } from '@shared/chatview/typingPresence';
-import { createHubWS, type HubWSHandle, type HubWSOptions } from '@shared/hub/hubWS';
-import type { TransportStatus } from '@/api/transport';
+import { buildWSAuthProtocols, createHubWS, type HubWSHandle, type HubWSOptions } from '@shared/hub/hubWS';
+import { WebSocketTransport, type Transport, type TransportStatus } from '@/api/transport';
 import { HUB_WS_URL } from '@/config';
 import { createHubClient } from '@/api/hubClient';
 import { trackEventSeq, replayMissedEvents } from '@/api/runEventReplay';
+import { isDeviceKickedFrame, respondToDeviceKick } from '@/platform/webDeviceKicked';
 import { useConnectionStore } from '@/stores/connectionStore';
 import { getAccessToken } from '@/hooks/useAuth';
 
 type HubPayload = Record<string, unknown>;
 type CreateHubWS = (opts: HubWSOptions) => HubWSHandle;
+
+/**
+ * Transport factory for the Hub socket. The hook observes the transport
+ * directly for device.kicked frames (#1816), which the shared hubWS handle
+ * swallows before app-level handlers.
+ */
+export type CreateWebRealtimeTransport = (options: {
+  url: string;
+  getToken: () => string | null;
+}) => Transport;
+
+/** Mirrors the transport the shared hubWS builds when none is injected. */
+const createDefaultWebRealtimeTransport: CreateWebRealtimeTransport = ({ url, getToken }) =>
+  new WebSocketTransport({
+    url,
+    protocols: () => buildWSAuthProtocols(getToken()),
+    maxRetries: 10,
+  });
 
 const SESSION_EVENTS = new Set<string>([
   HUB_EVENTS.SESSION_CREATED,
@@ -74,6 +94,11 @@ export interface WebHubRealtimeOptions {
   /** Callback invoked with replayed events after a WS reconnect gap fill. */
   onReplayEvents?: (events: HubRuntimeEventTranscriptInput[], taskId: string) => void;
   createSocket?: CreateHubWS;
+  /**
+   * Transport factory handed to the socket. The hook subscribes to it
+   * directly for device.kicked frames before the socket is created (#1816).
+   */
+  createTransport?: CreateWebRealtimeTransport;
   getToken?: () => string | null;
   /** Test/benchmark override; production uses one display-frame window. */
   liveBatchWindowMs?: number;
@@ -86,14 +111,17 @@ export function useWebHubRealtime({
   onRuntimeEvent,
   onReplayEvents,
   createSocket = createHubWS,
+  createTransport = createDefaultWebRealtimeTransport,
   getToken = getAccessToken,
   liveBatchWindowMs = AGENT_STREAM_LIVE_BATCH_WINDOW_MS,
 }: WebHubRealtimeOptions): void {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const runtimeSessionIdRef = useRef(runtimeSessionId);
   const runtimeTaskIdRef = useRef(runtimeTaskId);
   const onRuntimeEventRef = useRef(onRuntimeEvent);
   const onReplayEventsRef = useRef(onReplayEvents);
+  const translateRef = useRef(t);
   const liveBatcherRef = useRef<WebWorkbenchLiveEventBatcher | null>(null);
 
   useEffect(() => {
@@ -109,7 +137,10 @@ export function useWebHubRealtime({
     runtimeTaskIdRef.current = runtimeTaskId;
     onRuntimeEventRef.current = onRuntimeEvent;
     onReplayEventsRef.current = onReplayEvents;
-  }, [onRuntimeEvent, onReplayEvents, runtimeSessionId, runtimeTaskId]);
+    // Keep the socket effect independent of language switches: the kicked
+    // feedback reads the current translator through this ref.
+    translateRef.current = t;
+  }, [onRuntimeEvent, onReplayEvents, runtimeSessionId, runtimeTaskId, t]);
 
   useEffect(() => {
     if (!enabled) return undefined;
@@ -133,9 +164,20 @@ export function useWebHubRealtime({
     }, liveBatchWindowMs);
     liveBatcherRef.current = liveBatcher;
 
+    // Build the transport before the socket so the kicked-frame observer is
+    // registered first: the shared hubWS closes the transport while handling
+    // device.kicked, which clears remaining listeners mid-emit (#1816).
+    const transport = createTransport({ url: HUB_WS_URL, getToken });
+    const unsubscribeDeviceKicked = transport.on('message', (raw: unknown) => {
+      if (isDeviceKickedFrame(raw)) {
+        respondToDeviceKick(translateRef.current);
+      }
+    });
+
     const socket = createSocket({
       getToken,
       url: HUB_WS_URL,
+      transport,
       onAuthSuccess: () => {
         // After (re)connect auth, attempt replay for the active task.
         if (replaying) return;
@@ -241,6 +283,19 @@ export function useWebHubRealtime({
       }
     });
     const unsubscribeStatus = socket.onStatus((status: TransportStatus) => {
+      // Mirror transport status into the connection store so the shell can
+      // show live connection/reconnection state (#1816).
+      const connection = useConnectionStore.getState();
+      if (status === 'connected') {
+        connection.setConnected(true);
+        connection.setReconnecting(false);
+      } else if (status === 'reconnecting') {
+        connection.setConnected(false);
+        connection.setReconnecting(true);
+      } else {
+        connection.setConnected(false);
+        connection.setReconnecting(false);
+      }
       if (status === 'disconnected') {
         liveBatcher.flush();
       }
@@ -250,14 +305,19 @@ export function useWebHubRealtime({
     return () => {
       unsubscribe();
       unsubscribeStatus();
+      unsubscribeDeviceKicked();
       liveBatcher.dispose();
       if (liveBatcherRef.current === liveBatcher) {
         liveBatcherRef.current = null;
       }
       invalidation.dispose();
       socket.close();
+      // The socket is gone — never leave a stale "connected" flag behind.
+      const connection = useConnectionStore.getState();
+      connection.setConnected(false);
+      connection.setReconnecting(false);
     };
-  }, [createSocket, enabled, getToken, liveBatchWindowMs, queryClient]);
+  }, [createSocket, createTransport, enabled, getToken, liveBatchWindowMs, queryClient]);
 }
 
 export function dispatchHubRuntimeEvent(
