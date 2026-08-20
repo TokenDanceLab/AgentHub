@@ -32,7 +32,7 @@ func TestAuth(t *testing.T) {
 	})
 
 	t.Run("Logout", func(t *testing.T) {
-		// AuthService.Logout is documented idempotent for manually-issued JWTs
+		// auth.Service.Logout is documented idempotent for manually-issued JWTs
 		// without a stored refresh token — exactly what register() mints.
 		u := register(t, "ta05", "pass1234", "A5")
 		mustOK(t, parse(postAuth("/client/auth/logout", u.Token, nil)), "logout")
