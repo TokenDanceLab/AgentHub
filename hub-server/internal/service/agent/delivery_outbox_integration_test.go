@@ -1,6 +1,6 @@
-package service
+package agent
 
-// Cross-domain outbox tests: AgentService / dispatchsvc composition over the
+// Cross-domain outbox tests: Service / dispatchsvc composition over the
 // gorm-backed DeliveryOutboxStore. Pure journal + retry-loop behavior is
 // covered in internal/service/deliveryoutbox/outbox_test.go; this file keeps
 // the tests that need gorm seeding (agent instances, tasks, sessions) and the
@@ -19,6 +19,7 @@ import (
 
 	"github.com/agenthub/hub-server/internal/config"
 	"github.com/agenthub/hub-server/internal/model"
+	"github.com/agenthub/hub-server/internal/service"
 	"github.com/agenthub/hub-server/internal/service/deliveryoutbox"
 	"github.com/agenthub/hub-server/internal/service/dispatch"
 	"github.com/agenthub/hub-server/internal/service/dispatchsvc"
@@ -118,7 +119,7 @@ func newOutboxDB(t *testing.T) *gorm.DB {
 
 func TestOutbox_AutoAckOnTaskAck(t *testing.T) {
 	db := newOutboxDB(t)
-	svc := &AgentService{db: db}
+	svc := &Service{db: db}
 	ctx := context.Background()
 
 	// Setup: create agent instance, pending task, and delivery outbox entry.
@@ -142,14 +143,14 @@ func TestOutbox_AutoAckOnTaskAck(t *testing.T) {
 	// Verify delivery is now delivered.
 	status, err := svc.GetDeliveryStatus(ctx, deliveryID)
 	require.NoError(t, err)
-	assert.Equal(t, DeliveryStatusDelivered, status)
+	assert.Equal(t, deliveryoutbox.StatusDelivered, status)
 }
 
 // ==================== TestOutbox_IntegrationRetry ====================
 
 func TestOutbox_IntegrationRetry(t *testing.T) {
 	db := newOutboxDB(t)
-	svc := &AgentService{db: db, cacheClient: &mockAgentCache{}}
+	svc := &Service{db: db, cacheClient: &mockAgentCache{}}
 	ctx := context.Background()
 
 	// Setup minimal task context.
@@ -168,9 +169,9 @@ func TestOutbox_IntegrationRetry(t *testing.T) {
 	require.NoError(t, err)
 	_ = svc.MarkDeliverySent(ctx, deliveryID)
 
-	// Manually set updated_at to be older than DeliverySentTimeout to make it scannable.
+	// Manually set updated_at to be older than deliveryoutbox.SentTimeout to make it scannable.
 	err = db.Exec(`UPDATE delivery_outbox SET updated_at = ? WHERE delivery_id = ?`,
-		now.Add(-DeliverySentTimeout-time.Second), deliveryID).Error
+		now.Add(-deliveryoutbox.SentTimeout-time.Second), deliveryID).Error
 	require.NoError(t, err)
 
 	// Scan should find this delivery.
@@ -187,7 +188,7 @@ func TestOutbox_IntegrationRetry(t *testing.T) {
 	// Verify retry state.
 	status, err := svc.GetDeliveryStatus(ctx, deliveryID)
 	require.NoError(t, err)
-	assert.Equal(t, DeliveryStatusRetrying, status)
+	assert.Equal(t, deliveryoutbox.StatusRetrying, status)
 
 	// Now simulate ack arriving after retry.
 	err = svc.AckDelivery(ctx, deliveryID)
@@ -195,14 +196,14 @@ func TestOutbox_IntegrationRetry(t *testing.T) {
 
 	status, err = svc.GetDeliveryStatus(ctx, deliveryID)
 	require.NoError(t, err)
-	assert.Equal(t, DeliveryStatusDelivered, status)
+	assert.Equal(t, deliveryoutbox.StatusDelivered, status)
 }
 
 // ==================== TestOutbox_HandleTaskAckWithMultipleDeliveries ====================
 
 func TestOutbox_HandleTaskAckWithMultipleDeliveries(t *testing.T) {
 	db := newOutboxDB(t)
-	svc := &AgentService{db: db}
+	svc := &Service{db: db}
 	ctx := context.Background()
 
 	now := time.Now()
@@ -234,7 +235,7 @@ func TestOutbox_HandleTaskAckWithMultipleDeliveries(t *testing.T) {
 	for _, del := range []string{del1, del2} {
 		status, err := svc.GetDeliveryStatus(ctx, del)
 		require.NoError(t, err)
-		assert.Equal(t, DeliveryStatusDelivered, status, "delivery %s should be delivered", del)
+		assert.Equal(t, deliveryoutbox.StatusDelivered, status, "delivery %s should be delivered", del)
 	}
 }
 
@@ -252,7 +253,7 @@ func TestDispatchIncludesDeliveryID(t *testing.T) {
 		"member-did", "sess-did", model.MemberTypeUser, "user-1", model.MemberRoleMember).Error)
 
 	cache := &mockAgentCache{}
-	svc := &AgentService{db: db, cacheClient: cache}
+	svc := &Service{db: db, cacheClient: cache}
 	t.Setenv("AGENTHUB_EDGE_URL", "http://127.0.0.1:1")
 
 	task := &model.PendingAgentTask{
@@ -283,15 +284,20 @@ func TestDispatchIncludesDeliveryID(t *testing.T) {
 	require.NoError(t, json.Unmarshal([]byte(snapshot.pushed[0]), &payload))
 	require.NotEmpty(t, payload.DeliveryID, "dispatch payload should include delivery_id")
 
-	// Verify the outbox record was created.
-	var rec deliveryOutboxRecord
-	err := svc.db.Where("delivery_id = ?", payload.DeliveryID).First(&rec).Error
+	// Verify the outbox record was created. deliveryOutboxRecord is owned by
+	// the flat service package, so this test reads the row through a local view.
+	var rec struct {
+		DeliveryID string
+		TaskID     string
+		Status     string
+	}
+	err := svc.db.Table("delivery_outbox").Where("delivery_id = ?", payload.DeliveryID).First(&rec).Error
 	require.NoError(t, err)
 	assert.Equal(t, payload.DeliveryID, rec.DeliveryID)
 	assert.Equal(t, task.ID, rec.TaskID)
 	// Offline-only dispatch leaves outbox pending (#1031) so reconnect + outbox
 	// redispatch do not dual-fire the same delivery_id.
-	assert.Equal(t, DeliveryStatusPending, rec.Status,
+	assert.Equal(t, deliveryoutbox.StatusPending, rec.Status,
 		"offline queue acceptance must not MarkDeliverySent (#1031)")
 }
 
@@ -319,7 +325,7 @@ func ensureOutboxStreamTables(t *testing.T, db *gorm.DB) {
 func TestOutbox_AutoAckOnTaskStream(t *testing.T) {
 	db := newOutboxDB(t)
 	ensureOutboxStreamTables(t, db)
-	svc := &AgentService{db: db, bus: newTestBus(t), cacheClient: &mockAgentCache{}}
+	svc := &Service{db: db, bus: newTestBus(t), cacheClient: &mockAgentCache{}}
 	ctx := context.Background()
 
 	now := time.Now()
@@ -342,7 +348,7 @@ func TestOutbox_AutoAckOnTaskStream(t *testing.T) {
 
 	status, err := svc.GetDeliveryStatus(ctx, deliveryID)
 	require.NoError(t, err)
-	assert.Equal(t, DeliveryStatusDelivered, status, "first authorized stream must auto-ack outbox")
+	assert.Equal(t, deliveryoutbox.StatusDelivered, status, "first authorized stream must auto-ack outbox")
 
 	var task model.PendingAgentTask
 	require.NoError(t, db.Where("id = ?", "task-stream-ack").First(&task).Error)
@@ -351,7 +357,7 @@ func TestOutbox_AutoAckOnTaskStream(t *testing.T) {
 
 func TestOutbox_AutoAckOnTaskDone(t *testing.T) {
 	db := newOutboxDB(t)
-	svc := &AgentService{db: db, bus: newTestBus(t), cacheClient: &mockAgentCache{}}
+	svc := &Service{db: db, bus: newTestBus(t), cacheClient: &mockAgentCache{}}
 	ctx := context.Background()
 
 	now := time.Now()
@@ -372,7 +378,7 @@ func TestOutbox_AutoAckOnTaskDone(t *testing.T) {
 
 	status, err := svc.GetDeliveryStatus(ctx, deliveryID)
 	require.NoError(t, err)
-	assert.Equal(t, DeliveryStatusDelivered, status, "done must auto-ack outbox when stream/ack were skipped")
+	assert.Equal(t, deliveryoutbox.StatusDelivered, status, "done must auto-ack outbox when stream/ack were skipped")
 }
 
 func TestOutbox_RunningTaskNotRedispatched(t *testing.T) {
@@ -392,12 +398,12 @@ func TestOutbox_RunningTaskNotRedispatched(t *testing.T) {
 	pastRetry := now.Add(-time.Second)
 	_, err = rawDB.Exec(
 		`INSERT INTO delivery_outbox (id, task_id, delivery_id, payload, status, attempt_count, max_attempts, next_retry_at, edge_device_id, last_error, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		"id-del-running", "task-running", "del-running", payload, DeliveryStatusRetrying, 1, DefaultMaxDeliveryAttempts, pastRetry, "dev-1", "prior", now, now,
+		"id-del-running", "task-running", "del-running", payload, deliveryoutbox.StatusRetrying, 1, deliveryoutbox.DefaultMaxAttempts, pastRetry, "dev-1", "prior", now, now,
 	)
 	require.NoError(t, err)
 
 	cache := &mockAgentCache{}
-	outbox := deliveryoutbox.NewOutbox(NewDeliveryOutboxStore(db), nil)
+	outbox := deliveryoutbox.NewOutbox(service.NewDeliveryOutboxStore(db), nil)
 	ds := dispatchsvc.NewDispatchService(db, nil, nil, cache, nil, outbox, config.EdgeDispatchConfig{}, nil, "")
 	outbox.SetRedispatcher(dispatchRedispatcher{d: ds})
 
@@ -405,10 +411,12 @@ func TestOutbox_RunningTaskNotRedispatched(t *testing.T) {
 
 	status, err := outbox.GetDeliveryStatus(ctx, "del-running")
 	require.NoError(t, err)
-	assert.Equal(t, DeliveryStatusDead, status, "running task deliveries must not be redispatched (#1000)")
+	assert.Equal(t, deliveryoutbox.StatusDead, status, "running task deliveries must not be redispatched (#1000)")
 
-	var rec deliveryOutboxRecord
-	require.NoError(t, db.WithContext(ctx).Where("delivery_id = ?", "del-running").First(&rec).Error)
+	var rec struct {
+		LastError string
+	}
+	require.NoError(t, db.WithContext(ctx).Table("delivery_outbox").Where("delivery_id = ?", "del-running").First(&rec).Error)
 	assert.Contains(t, rec.LastError, "running")
 
 	snap := cache.snapshot()
@@ -419,7 +427,7 @@ func TestOutbox_RunningTaskNotRedispatched(t *testing.T) {
 // exported Outbox surface. retryDeliveries is unexported in the pure package
 // (its loop is covered by outbox_test.go over a fake store); this helper keeps
 // the service-side integration path on the real gorm store + dispatch adapter.
-func driveDeliveryRetryCycle(ctx context.Context, outbox *DeliveryOutbox, redispatcher deliveryoutbox.Redispatcher) {
+func driveDeliveryRetryCycle(ctx context.Context, outbox *service.DeliveryOutbox, redispatcher deliveryoutbox.Redispatcher) {
 	records, err := outbox.ScanRetryableDeliveries(ctx)
 	if err != nil {
 		return
@@ -453,7 +461,7 @@ func TestOutbox_OfflineDispatchDoesNotMarkSent(t *testing.T) {
 		"member-off", "sess-off", model.MemberTypeUser, "user-1", model.MemberRoleMember).Error)
 
 	cache := &mockAgentCache{}
-	svc := &AgentService{db: db, cacheClient: cache}
+	svc := &Service{db: db, cacheClient: cache}
 	t.Setenv("AGENTHUB_EDGE_URL", "http://127.0.0.1:1")
 
 	task := &model.PendingAgentTask{
@@ -480,16 +488,16 @@ func TestOutbox_OfflineDispatchDoesNotMarkSent(t *testing.T) {
 
 	status, err := svc.GetDeliveryStatus(context.Background(), payload.DeliveryID)
 	require.NoError(t, err)
-	assert.Equal(t, DeliveryStatusPending, status, "must not mark sent solely because offline accepted")
+	assert.Equal(t, deliveryoutbox.StatusPending, status, "must not mark sent solely because offline accepted")
 }
 
 func TestOutbox_ShouldReplayOfflinePayloadCoordination(t *testing.T) {
 	// Pure ownership matrix for reconnect offline push vs outbox status (#1031).
-	assert.True(t, dispatch.ShouldReplayOfflinePayload("d1", DeliveryStatusPending, true))
-	assert.True(t, dispatch.ShouldReplayOfflinePayload("d1", DeliveryStatusRetrying, true))
-	assert.True(t, dispatch.ShouldReplayOfflinePayload("d1", DeliveryStatusSent, true), "alive sent rows must replay on reconnect")
-	assert.False(t, dispatch.ShouldReplayOfflinePayload("d1", DeliveryStatusDelivered, true))
-	assert.False(t, dispatch.ShouldReplayOfflinePayload("d1", DeliveryStatusDead, true))
-	assert.True(t, dispatch.ShouldReplayOfflinePayload("", DeliveryStatusSent, true))
-	assert.True(t, dispatch.ShouldReplayOfflinePayload("d1", DeliveryStatusSent, false))
+	assert.True(t, dispatch.ShouldReplayOfflinePayload("d1", deliveryoutbox.StatusPending, true))
+	assert.True(t, dispatch.ShouldReplayOfflinePayload("d1", deliveryoutbox.StatusRetrying, true))
+	assert.True(t, dispatch.ShouldReplayOfflinePayload("d1", deliveryoutbox.StatusSent, true), "alive sent rows must replay on reconnect")
+	assert.False(t, dispatch.ShouldReplayOfflinePayload("d1", deliveryoutbox.StatusDelivered, true))
+	assert.False(t, dispatch.ShouldReplayOfflinePayload("d1", deliveryoutbox.StatusDead, true))
+	assert.True(t, dispatch.ShouldReplayOfflinePayload("", deliveryoutbox.StatusSent, true))
+	assert.True(t, dispatch.ShouldReplayOfflinePayload("d1", deliveryoutbox.StatusSent, false))
 }

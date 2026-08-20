@@ -1,4 +1,4 @@
-package service
+package agent
 
 import (
 	"context"
@@ -196,7 +196,7 @@ func TestTriggerAgentTask_SuccessAndTurnInProgressGate(t *testing.T) {
 	userID, _, agentInstanceID, triggerMessageID := seedTriggerFixture(t, db)
 
 	cache := &mockAgentCache{}
-	svc := &AgentService{db: db, cacheClient: cache}
+	svc := &Service{db: db, cacheClient: cache}
 	// Dead Edge URL so the dispatch goroutine's HTTP attempt fails fast and
 	// falls through to the mock cache offline queue without a status
 	// transition — this keeps the first task queued so the second trigger
@@ -255,7 +255,7 @@ func TestTriggerAgentTask_ErrorPaths(t *testing.T) {
 		require.NoError(t, db.Model(&model.Session{}).
 			Where("id = ?", sessionID).Update("dissolved", true).Error)
 
-		svc := &AgentService{db: db, cacheClient: &mockAgentCache{}}
+		svc := &Service{db: db, cacheClient: &mockAgentCache{}}
 		task, err := svc.TriggerAgentTask(context.Background(), userID, triggerMessageID, agentInstanceID, "", "", "", "")
 
 		require.ErrorIs(t, err, errcode.SessionDissolved)
@@ -271,7 +271,7 @@ func TestTriggerAgentTask_ErrorPaths(t *testing.T) {
 		db := newTriggerAgentTaskDB(t)
 		userID, _, triggerMessageID := seedSessionUserMessage(t, db)
 
-		svc := &AgentService{db: db, cacheClient: &mockAgentCache{}}
+		svc := &Service{db: db, cacheClient: &mockAgentCache{}}
 		task, err := svc.TriggerAgentTask(context.Background(), userID, triggerMessageID, "", "", "", "", "")
 
 		require.ErrorIs(t, err, errcode.AgentNotFound)
@@ -292,7 +292,7 @@ func TestTriggerAgentTask_ErrorPaths(t *testing.T) {
 			Where("session_id = ? AND member_type = ? AND member_id = ?", sessionID, model.MemberTypeUser, userID).
 			Update("left_at", "2030-01-01T00:00:00Z").Error)
 
-		svc := &AgentService{db: db, cacheClient: &mockAgentCache{}}
+		svc := &Service{db: db, cacheClient: &mockAgentCache{}}
 		task, err := svc.TriggerAgentTask(context.Background(), userID, triggerMessageID, agentInstanceID, "", "", "", "")
 
 		require.ErrorIs(t, err, errcode.SessionNotMember)
@@ -308,7 +308,7 @@ func TestTriggerAgentTask_ErrorPaths(t *testing.T) {
 		db := newTriggerAgentTaskDB(t)
 		userID, _, agentInstanceID, _ := seedTriggerFixture(t, db)
 
-		svc := &AgentService{db: db, cacheClient: &mockAgentCache{}}
+		svc := &Service{db: db, cacheClient: &mockAgentCache{}}
 		task, err := svc.TriggerAgentTask(context.Background(), userID, "nonexistent-trigger-message-id", agentInstanceID, "", "", "", "")
 
 		require.ErrorIs(t, err, errcode.MsgNotFound)
