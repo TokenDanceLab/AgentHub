@@ -21,6 +21,7 @@ import (
 	"github.com/agenthub/hub-server/internal/service/agentteam"
 	"github.com/agenthub/hub-server/internal/service/attachment"
 	"github.com/agenthub/hub-server/internal/service/audit"
+	"github.com/agenthub/hub-server/internal/service/auth"
 	"github.com/agenthub/hub-server/internal/service/contact"
 	"github.com/agenthub/hub-server/internal/service/device"
 	"github.com/agenthub/hub-server/internal/service/document"
@@ -58,7 +59,7 @@ type App struct {
 	Version string
 
 	// Service layer
-	AuthService            *service.AuthService
+	AuthService            *auth.Service
 	ContactService         *contact.Service
 	SessionService         *session.Service
 	MessageService         *message.Service

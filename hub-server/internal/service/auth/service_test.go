@@ -1,4 +1,4 @@
-package service
+package auth
 
 import (
 	"context"
@@ -78,7 +78,7 @@ func TestRefreshToken_Invalid(t *testing.T) {
 		WithArgs(sqlmock.AnyArg(), 1).
 		WillReturnError(gorm.ErrRecordNotFound)
 
-	svc := NewAuthService(db, jwtCfg(), nil)
+	svc := NewService(db, jwtCfg(), nil)
 	_, err := svc.RefreshToken(context.Background(), "invalid-refresh-token")
 	assert.Error(t, err)
 	assert.NoError(t, mock.ExpectationsWereMet())
@@ -93,7 +93,7 @@ func TestRefreshToken_Revoked(t *testing.T) {
 		WillReturnRows(sqlmock.NewRows([]string{"id", "user_id", "device_type", "device_id", "token_hash", "revoked", "expires_at"}).
 			AddRow("rt-1", "user-uuid", "desktop", "dev-1", "hash", true, time.Now().Add(24*time.Hour)))
 
-	svc := NewAuthService(db, jwtCfg(), nil)
+	svc := NewService(db, jwtCfg(), nil)
 	_, err := svc.RefreshToken(context.Background(), "any-refresh-token")
 	assert.Error(t, err)
 	assert.NoError(t, mock.ExpectationsWereMet())
@@ -122,7 +122,7 @@ func TestRefreshToken_Success(t *testing.T) {
 	mock.ExpectExec(sqlInsertRT).
 		WillReturnResult(sqlmock.NewResult(2, 1))
 
-	svc := NewAuthService(db, jwtCfg(), nil)
+	svc := NewService(db, jwtCfg(), nil)
 	resp, err := svc.RefreshToken(context.Background(), "valid-refresh-token")
 	require.NoError(t, err)
 	assert.NotEmpty(t, resp.AccessToken)
@@ -154,7 +154,7 @@ func TestRefreshToken_RotatesWithCache(t *testing.T) {
 	mock.ExpectExec(sqlInsertRT).
 		WillReturnResult(sqlmock.NewResult(2, 1))
 
-	svc := NewAuthService(db, jwtCfg(), testCacheClient(t))
+	svc := NewService(db, jwtCfg(), testCacheClient(t))
 	resp, err := svc.RefreshToken(context.Background(), "some-refresh-token")
 	require.NoError(t, err)
 	assert.NotEmpty(t, resp.AccessToken)
@@ -180,7 +180,7 @@ func TestRefreshToken_RejectsBlacklistedTokenHash(t *testing.T) {
 	// that blacklisted faster than DB commit).
 	require.NoError(t, cacheClient.BlacklistRefreshToken(context.Background(), "hash-abc", time.Hour))
 
-	svc := NewAuthService(db, jwtCfg(), cacheClient)
+	svc := NewService(db, jwtCfg(), cacheClient)
 	_, err := svc.RefreshToken(context.Background(), "any-token-producing-hash-abc")
 	assert.Error(t, err)
 	assert.NoError(t, mock.ExpectationsWereMet())
@@ -203,7 +203,7 @@ func TestRefreshToken_RejectsBlacklistedUserDevice(t *testing.T) {
 	// wrote to Redis but hasn't finished DB commit yet).
 	require.NoError(t, cacheClient.BlacklistRefreshToken(context.Background(), "user-uuid:dev-1", time.Hour))
 
-	svc := NewAuthService(db, jwtCfg(), cacheClient)
+	svc := NewService(db, jwtCfg(), cacheClient)
 	_, err := svc.RefreshToken(context.Background(), "any-token-for-user-uuid-dev-1")
 	assert.Error(t, err)
 	assert.NoError(t, mock.ExpectationsWereMet())
@@ -225,7 +225,7 @@ func TestRefreshToken_RejectsBlacklistedUserDeviceType(t *testing.T) {
 	// Pre-set the scoped blacklist key.
 	require.NoError(t, cacheClient.BlacklistRefreshToken(context.Background(), "user-uuid:dev-1:desktop", time.Hour))
 
-	svc := NewAuthService(db, jwtCfg(), cacheClient)
+	svc := NewService(db, jwtCfg(), cacheClient)
 	_, err := svc.RefreshToken(context.Background(), "any-token-for-user-uuid-dev-1-desktop")
 	assert.Error(t, err)
 	assert.NoError(t, mock.ExpectationsWereMet())
@@ -241,7 +241,7 @@ func TestLogout(t *testing.T) {
 		WithArgs(true, "user-uuid", "dev-1").
 		WillReturnResult(sqlmock.NewResult(0, 1))
 
-	svc := NewAuthService(db, jwtCfg(), nil)
+	svc := NewService(db, jwtCfg(), nil)
 	err := svc.Logout(context.Background(), "user-uuid", "dev-1", "", "")
 	assert.NoError(t, err)
 	assert.NoError(t, mock.ExpectationsWereMet())
@@ -257,7 +257,7 @@ func TestLogout_BlacklistsInRedis(t *testing.T) {
 		WillReturnResult(sqlmock.NewResult(0, 1))
 
 	cacheClient := testCacheClient(t)
-	svc := NewAuthService(db, jwtCfg(), cacheClient)
+	svc := NewService(db, jwtCfg(), cacheClient)
 	err := svc.Logout(context.Background(), "user-uuid", "dev-1", "desktop", "")
 	require.NoError(t, err)
 	assert.NoError(t, mock.ExpectationsWereMet())
@@ -280,7 +280,7 @@ func TestLogout_WithDeviceType(t *testing.T) {
 		WillReturnResult(sqlmock.NewResult(0, 1))
 
 	cacheClient := testCacheClient(t)
-	svc := NewAuthService(db, jwtCfg(), cacheClient)
+	svc := NewService(db, jwtCfg(), cacheClient)
 	err := svc.Logout(context.Background(), "user-uuid", "dev-1", "desktop", "")
 	require.NoError(t, err)
 	assert.NoError(t, mock.ExpectationsWereMet())
@@ -302,7 +302,7 @@ func TestLogout_WithoutDeviceType(t *testing.T) {
 		WillReturnResult(sqlmock.NewResult(0, 1))
 
 	cacheClient := testCacheClient(t)
-	svc := NewAuthService(db, jwtCfg(), cacheClient)
+	svc := NewService(db, jwtCfg(), cacheClient)
 	err := svc.Logout(context.Background(), "user-uuid", "dev-1", "", "")
 	require.NoError(t, err)
 	assert.NoError(t, mock.ExpectationsWereMet())
@@ -325,7 +325,7 @@ func TestLogout_BlacklistsAccessJTI(t *testing.T) {
 		WillReturnResult(sqlmock.NewResult(0, 1))
 
 	cacheClient := testCacheClient(t)
-	svc := NewAuthService(db, jwtCfg(), cacheClient)
+	svc := NewService(db, jwtCfg(), cacheClient)
 	err := svc.Logout(context.Background(), "user-uuid", "dev-1", "desktop", "access-jti-abc")
 	require.NoError(t, err)
 	assert.NoError(t, mock.ExpectationsWereMet())
@@ -351,7 +351,7 @@ func TestGetMe_NotFound(t *testing.T) {
 		WithArgs("nonexistent", 1).
 		WillReturnError(gorm.ErrRecordNotFound)
 
-	svc := NewAuthService(db, jwtCfg(), nil)
+	svc := NewService(db, jwtCfg(), nil)
 	_, err := svc.GetMe(context.Background(), "nonexistent")
 	assert.Error(t, err)
 	assert.NoError(t, mock.ExpectationsWereMet())
@@ -366,7 +366,7 @@ func TestGetMe_Success(t *testing.T) {
 		WillReturnRows(sqlmock.NewRows([]string{"id", "username", "password_hash", "nickname", "avatar_url"}).
 			AddRow("user-uuid", "testuser", "hashed", "Test User", "https://example.com/avatar.png"))
 
-	svc := NewAuthService(db, jwtCfg(), nil)
+	svc := NewService(db, jwtCfg(), nil)
 	user, err := svc.GetMe(context.Background(), "user-uuid")
 	require.NoError(t, err)
 	assert.Equal(t, "testuser", user.Username)
@@ -389,7 +389,7 @@ func TestUpdateProfile_Success(t *testing.T) {
 	mock.ExpectExec(sqlUpdateUser).
 		WillReturnResult(sqlmock.NewResult(0, 1))
 
-	svc := NewAuthService(db, jwtCfg(), testCacheClient(t))
+	svc := NewService(db, jwtCfg(), testCacheClient(t))
 	user, err := svc.UpdateProfile(context.Background(), "user-uuid", "New Name", "https://img.com/a.png")
 	require.NoError(t, err)
 	assert.Equal(t, "New Name", user.Nickname)
@@ -408,7 +408,7 @@ func TestUpdateProfile_NilCacheDoesNotPanic(t *testing.T) {
 	mock.ExpectExec(sqlUpdateUser).
 		WillReturnResult(sqlmock.NewResult(0, 1))
 
-	svc := NewAuthService(db, jwtCfg(), nil)
+	svc := NewService(db, jwtCfg(), nil)
 	user, err := svc.UpdateProfile(context.Background(), "user-uuid", "New Name", "https://img.com/a.png")
 	require.NoError(t, err)
 	assert.Equal(t, "New Name", user.Nickname)

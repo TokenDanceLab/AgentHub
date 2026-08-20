@@ -8,13 +8,13 @@ import (
 	"github.com/agenthub/hub-server/internal/errcode"
 	"github.com/agenthub/hub-server/internal/middleware"
 	"github.com/agenthub/hub-server/internal/model"
-	"github.com/agenthub/hub-server/internal/service"
+	"github.com/agenthub/hub-server/internal/service/auth"
 	"github.com/gin-gonic/gin"
 )
 
-// AuthService is the subset of *service.AuthService used by AuthHandler.
+// AuthService is the subset of *auth.Service used by AuthHandler.
 type AuthService interface {
-	RefreshToken(ctx context.Context, rawRefreshToken string) (*service.LoginResponse, error)
+	RefreshToken(ctx context.Context, rawRefreshToken string) (*auth.LoginResponse, error)
 	Logout(ctx context.Context, userID, deviceID, deviceType, accessJTI string) error
 	GetMe(ctx context.Context, userID string) (*model.User, error)
 	UpdateProfile(ctx context.Context, userID, nickname, avatarURL string) (*model.User, error)

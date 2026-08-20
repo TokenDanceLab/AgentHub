@@ -25,6 +25,7 @@ import (
 	"github.com/agenthub/hub-server/internal/service/agentteam"
 	"github.com/agenthub/hub-server/internal/service/attachment"
 	"github.com/agenthub/hub-server/internal/service/audit"
+	"github.com/agenthub/hub-server/internal/service/auth"
 	"github.com/agenthub/hub-server/internal/service/contact"
 	"github.com/agenthub/hub-server/internal/service/device"
 	"github.com/agenthub/hub-server/internal/service/document"
@@ -128,7 +129,7 @@ func (a *App) initInfra(ctx context.Context) error {
 // initServices constructs all service-layer components and their inline handlers.
 func (a *App) initServices(ctx context.Context) error {
 	// Service layer
-	a.AuthService = service.NewAuthService(a.DB, a.Config.JWT, a.CacheClient)
+	a.AuthService = auth.NewService(a.DB, a.Config.JWT, a.CacheClient)
 	a.NotificationService = notification.NewService(a.DB, a.mgr)
 	// Attachment storage: S3 when configured, otherwise local filesystem.
 	var attachmentStorage attachment.ObjectStorage
