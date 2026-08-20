@@ -13,7 +13,7 @@
    { "ms": 5, "kind": "poll_deadline" }
   ]
  },
- "edge-server/internal/adapters/claude_acp_test.go": {
+ "edge-server/internal/adapters/claude/claude_acp_test.go": {
   "count": 1,
   "total_ms": 5,
   "max_ms": 5,

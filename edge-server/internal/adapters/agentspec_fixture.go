@@ -230,17 +230,39 @@ func runtimeInvocationFixtureStrategy(runtimeID string) string {
 	}
 }
 
+// runtimeInvocationFixtureAdapter returns the concrete CLI adapter used for a
+// redacted invocation-plan projection, or nil when the runtime has no
+// cli-json fixture adapter. The claude-code branch is injected by package
+// claude via RegisterClaudeCodeAdapterProvider（#1760 claude 增量）：根包不得
+// import adapters/claude（claude → adapters 单向依赖），故经此钩子反向注入。
 func runtimeInvocationFixtureAdapter(runtimeID string, model string) AgentAdapter {
 	switch strings.ToLower(strings.TrimSpace(runtimeID)) {
 	case "codex":
 		return NewCodexACPadapter("")
 	case "claude-code":
-		return NewClaudeCodeAdapter("claude", model, "")
+		if claudeCodeAdapterProvider != nil {
+			return claudeCodeAdapterProvider(model)
+		}
+		return nil
 	case "opencode":
 		return NewOpenCodeACPAdapter("")
 	default:
 		return nil
 	}
+}
+
+// claudeCodeAdapterProvider is registered by package claude at init time
+// (fixture_provider.go). Non-nil only in binaries/tests that link the claude
+// subpackage; root-package unit tests do not link it, and no root test
+// exercises the "claude-code" fixture branch.
+var claudeCodeAdapterProvider func(model string) AgentAdapter
+
+// RegisterClaudeCodeAdapterProvider installs the claude-code constructor for
+// AgentHubAgentSpec fixture projection. Called once from package claude's
+// init; exported so the claude subpackage can inject without the root
+// package importing it (import cycle avoidance, #1760).
+func RegisterClaudeCodeAdapterProvider(provider func(model string) AgentAdapter) {
+	claudeCodeAdapterProvider = provider
 }
 
 func runtimeInvocationFixtureParserContract(strategy string) []string {

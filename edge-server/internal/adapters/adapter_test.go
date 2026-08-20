@@ -12,59 +12,6 @@ import (
 	"github.com/agenthub/edge-server/internal/store"
 )
 
-// --- Adapter Metadata tests ---
-
-func TestClaudeCodeAdapterMetadata(t *testing.T) {
-	a := NewClaudeCodeAdapter("claude", "sonnet", "")
-	m := a.Metadata()
-	if m.ID != "claude-code" {
-		t.Fatalf("ID = %q, want claude-code", m.ID)
-	}
-	if m.Name != "Claude Code" {
-		t.Fatalf("Name = %q, want Claude Code", m.Name)
-	}
-	if m.Description == "" {
-		t.Fatal("Description should not be empty")
-	}
-}
-
-// --- Adapter Capabilities tests ---
-
-func TestClaudeCodeAdapterCapabilities(t *testing.T) {
-	a := NewClaudeCodeAdapter("claude", "sonnet", "")
-	c := a.Capabilities()
-	if !c.Streaming {
-		t.Fatal("Streaming should be true")
-	}
-	if !c.ToolCalls {
-		t.Fatal("ToolCalls should be true")
-	}
-	if !c.FileChanges {
-		t.Fatal("FileChanges should be true")
-	}
-	if !c.PermissionHooks {
-		t.Fatal("PermissionHooks should be true")
-	}
-	if !c.ThinkingVisible {
-		t.Fatal("ThinkingVisible should be true")
-	}
-	if !c.MultiTurn {
-		t.Fatal("MultiTurn should be true")
-	}
-	if !c.MCPIntegration {
-		t.Fatal("MCPIntegration should be true")
-	}
-}
-
-// --- NeedsStdin tests ---
-
-func TestClaudeCodeAdapterNeedsStdin(t *testing.T) {
-	a := NewClaudeCodeAdapter("claude", "sonnet", "")
-	if !a.NeedsStdin() {
-		t.Fatal("Claude Code should need stdin")
-	}
-}
-
 // --- NDJSON parser option tests ---
 
 func TestNDJSONParserWithControlHandler(t *testing.T) {
@@ -192,14 +139,6 @@ func TestUnavailableAdapterReportsFalse(t *testing.T) {
 	}
 }
 
-func TestAvailableAdapterReportsTrue(t *testing.T) {
-	a := NewClaudeCodeAdapter("claude", "sonnet", "")
-	// Claude adapter checks binary existence; on a dev machine without
-	// Claude CLI, Available() may return false. We just verify it does not
-	// panic.
-	_ = a.Available()
-}
-
 // TestParseStreamErrorRecoverableFlag verifies the semantic contract of
 // recoverable vs non-recoverable parse errors.
 func TestParseStreamErrorRecoverableFlag(t *testing.T) {
@@ -253,14 +192,14 @@ func TestBuildSiblingContextPromptEdgeCases(t *testing.T) {
 
 // TestAdapterMetadataIsNotEmpty verifies all built-in adapters have non-empty metadata.
 // OrchestratorAdapter 已迁移到叶子包，其 Metadata 校验见叶子包
-// orchestrator_adapter_test.go（#1566）。
+// orchestrator_adapter_test.go（#1566）。Claude 家族（claude-code/claude-acp）
+// 已归组到子包 adapters/claude，其 Metadata 校验见
+// claude/claude_code_test.go（#1760 claude 增量）。
 func TestAdapterMetadataIsNotEmpty(t *testing.T) {
 	adapters := []struct {
 		name     string
 		metadata AdapterMetadata
 	}{
-		{"ClaudeCode", NewClaudeCodeAdapter("claude", "sonnet", "").Metadata()},
-		{"ClaudeACP", NewClaudeACPAdapter("", "").Metadata()},
 		{"CodexACP", NewCodexACPadapter("").Metadata()},
 		{"OpenCodeACP", NewOpenCodeACPAdapter("").Metadata()},
 	}
@@ -285,25 +224,6 @@ func TestDefaultWorkDirDoesNotReturnHome(t *testing.T) {
 	}
 	if err == nil && home != "" && got == home {
 		t.Fatalf("DefaultWorkDir must not return user home %q", home)
-	}
-}
-
-func TestClaudeBuildCommandOmitsAddDirWhenWorkDirEmpty(t *testing.T) {
-	adapter := NewClaudeCodeAdapter("claude", "sonnet", "")
-	_, args, _, workDir := adapter.BuildCommand(RunProcessContext{Prompt: "hello"})
-	if workDir != "" {
-		t.Fatalf("workDir = %q, want empty", workDir)
-	}
-	for i, a := range args {
-		if a == "--add-dir" {
-			// On Windows an --add-dir for TempDir may still be present; ensure it is not home.
-			if i+1 < len(args) {
-				home, err := os.UserHomeDir()
-				if err == nil && home != "" && args[i+1] == home {
-					t.Fatalf("--add-dir should not grant home: %q", args[i+1])
-				}
-			}
-		}
 	}
 }
 

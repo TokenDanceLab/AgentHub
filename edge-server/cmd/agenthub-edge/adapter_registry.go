@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/agenthub/edge-server/internal/adapters"
+	"github.com/agenthub/edge-server/internal/adapters/claude"
 	"github.com/agenthub/edge-server/internal/adapters/orchestrator"
 	"github.com/agenthub/edge-server/internal/adapters/sdk"
 	"github.com/agenthub/edge-server/internal/edgehttp"
@@ -73,7 +74,7 @@ func registerClaudeCodeAdapter(reg *adapters.Registry, cfg config) {
 	if cfg.ClaudeCodePath == "" {
 		return
 	}
-	a := adapters.NewClaudeCodeAdapter(cfg.ClaudeCodePath, cfg.AgentModel, "")
+	a := claude.NewClaudeCodeAdapter(cfg.ClaudeCodePath, cfg.AgentModel, "")
 	if err := reg.Register(a); err != nil {
 		slog.Warn("failed to register claude-code adapter", "err", err)
 		return
@@ -83,7 +84,7 @@ func registerClaudeCodeAdapter(reg *adapters.Registry, cfg config) {
 
 // registerCodexACPAdapter registers the official codex-acp ACP adapter via
 // npx. ACP is the default codex runtime; an empty launcher falls back to the
-// platform-native npx (defaultNpxPath inside NewCodexACPadapter).
+// platform-native npx (DefaultNpxPath inside NewCodexACPadapter).
 func registerCodexACPAdapter(reg *adapters.Registry, cfg config) {
 	a := adapters.NewCodexACPadapter(cfg.CodexACPPath)
 	if err := reg.Register(a); err != nil {
@@ -107,11 +108,11 @@ func registerOpenCodeACPAdapter(reg *adapters.Registry, cfg config) {
 
 // registerClaudeACPAdapter registers the official claude-agent-acp ACP adapter
 // via npx. ACP is the default claude runtime; an empty launcher falls back to
-// the platform-native npx (defaultNpxPath inside NewClaudeACPAdapter). The
-// legacy claude-code NDJSON parser stays registered as the orchestrator inner
-// and fallback (claude_code.go, marked DEPRECATED until Phase B).
+// the platform-native npx (adapters.DefaultNpxPath inside NewClaudeACPAdapter).
+// The legacy claude-code NDJSON parser stays registered as the orchestrator
+// inner and fallback (claude_code.go, marked DEPRECATED until Phase B).
 func registerClaudeACPAdapter(reg *adapters.Registry, cfg config) {
-	a := adapters.NewClaudeACPAdapter(cfg.ClaudeACPPath, cfg.AgentModel)
+	a := claude.NewClaudeACPAdapter(cfg.ClaudeACPPath, cfg.AgentModel)
 	if err := reg.Register(a); err != nil {
 		slog.Warn("failed to register claude-acp adapter", "err", err)
 		return
@@ -174,7 +175,7 @@ func registerAdapter(reg *adapters.Registry, cfg config) {
 		return
 	}
 	childAgents := registeredChildAgentIDs(reg)
-	inner := adapters.NewClaudeCodeAdapter(cfg.ClaudeCodePath, cfg.AgentModel, "")
+	inner := claude.NewClaudeCodeAdapter(cfg.ClaudeCodePath, cfg.AgentModel, "")
 	a := orchestrator.NewOrchestratorAdapter(inner, orchestrator.DefaultOrchestratorPrompt(childAgents))
 	if err := reg.Register(a); err != nil {
 		slog.Warn("failed to register orchestrator adapter", "err", err)

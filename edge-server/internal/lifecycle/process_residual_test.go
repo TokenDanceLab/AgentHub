@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/agenthub/edge-server/internal/adapters"
+	"github.com/agenthub/edge-server/internal/adapters/claude"
 	"github.com/agenthub/edge-server/internal/agents"
 	"github.com/agenthub/edge-server/internal/events"
 	"github.com/agenthub/edge-server/internal/hub"
@@ -476,7 +477,7 @@ func TestNeedsAdapterStdinAndMetricsLabel(t *testing.T) {
 	if got := resolveAdapterMetricsLabel(nil); got != "none" {
 		t.Fatalf("nil label %q", got)
 	}
-	ad := adapters.NewClaudeCodeAdapter("claude", "sonnet", "")
+	ad := claude.NewClaudeCodeAdapter("claude", "sonnet", "")
 	if got := resolveAdapterMetricsLabel(ad); got == "" || got == "none" {
 		t.Fatalf("adapter label %q", got)
 	}
@@ -736,7 +737,7 @@ func TestPreflightAndEmitterHelpers(t *testing.T) {
 	if _, ok := asPreflightAdapter(nil); ok {
 		t.Fatal("nil adapter")
 	}
-	ad := adapters.NewClaudeCodeAdapter("claude", "sonnet", "")
+	ad := claude.NewClaudeCodeAdapter("claude", "sonnet", "")
 	// Claude adapter may or may not implement PreflightAdapter; just ensure no panic.
 	_, _ = asPreflightAdapter(ad)
 

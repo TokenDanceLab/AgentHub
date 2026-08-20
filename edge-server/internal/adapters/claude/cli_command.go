@@ -1,4 +1,4 @@
-package adapters
+package claude
 
 import (
 	"os"
@@ -7,7 +7,7 @@ import (
 )
 
 // resolveNodeCLICommand handles Windows .cmd shim bypass for npm-installed
-// Node.js CLIs (Claude Code, Codex, OpenCode).
+// Node.js CLIs (Claude Code).
 //
 // On Windows, npm installs a .cmd shim that forwards args via %*, which corrupts
 // multiline prompts when launched via os/exec. This function resolves the underlying
@@ -15,7 +15,7 @@ import (
 // as real argv values.
 //
 // Parameters:
-//   - binaryPath: the CLI name or path (e.g. "claude", "codex", "opencode")
+//   - binaryPath: the CLI name or path (e.g. "claude")
 //   - entrypoint: relative path from the .cmd shim directory to the JS entrypoint
 //     (e.g. "node_modules/@anthropic-ai/claude-code/cli.js")
 //   - lookPath: typically exec.LookPath, injected for testability

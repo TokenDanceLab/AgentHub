@@ -1,22 +1,163 @@
-// Package adapters — claude-acp adapter tests.
+// Package claude — claude-acp adapter tests.
 //
 // These tests verify the claude-acp registry registration, command shape, and
 // the full ParseStream path against a mock ACP peer over real io.Pipe wire
-// (reusing the fakeACPAgent from acp_client_test.go). No real `npx
+// (reusing the fakeACPAgent harness, copied here from root
+// acp_client_test.go — 根包测试符号不可跨包引用). No real `npx
 // @agentclientprotocol/claude-agent-acp` process is spawned — that requires a
 // Node.js/npx environment with Claude auth + registry network access, which is
 // a TODO for environment verification (see claude_acp.go).
-package adapters
+package claude
 
 import (
+	"bufio"
 	"context"
+	"encoding/json"
+	"fmt"
 	"io"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
+	"github.com/agenthub/edge-server/internal/adapters"
 	"github.com/agenthub/edge-server/internal/store"
 )
+
+// ── 测试桩：自根包测试文件随 claude 家族下沉的副本（#1760 claude 增量） ──
+// fakeACPAgent / sessionUpdateLine / recordingEmitter / emitterAll /
+// containsString 与根包 acp_client_test.go、event_emitter_test.go、
+// adapter_test.go 中的同名声明的行为保持一致，改动需两侧同步。
+
+// fakeACPAgent simulates an ACP agent over two pipes. It reads client
+// requests from reqR (the client's stdin side) and writes responses and
+// notifications to respW (the client's stdout side). The wire format is real
+// line-delimited JSON-RPC 2.0, so the test exercises the SDK's framing,
+// parsing, and dispatch for real.
+type fakeACPAgent struct {
+	mu      sync.Mutex
+	methods []string // client→agent request methods, in order
+
+	// responses carries every JSON-RPC response line the agent receives.
+	// Buffered so the agent goroutine never blocks on it.
+	responses chan string
+}
+
+func newFakeACPAgent() *fakeACPAgent {
+	return &fakeACPAgent{responses: make(chan string, 8)}
+}
+
+func (f *fakeACPAgent) recordMethod(m string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.methods = append(f.methods, m)
+}
+
+func (f *fakeACPAgent) gotMethods() []string {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return append([]string(nil), f.methods...)
+}
+
+// run answers requests until reqR hits EOF. notifications (JSON-RPC lines)
+// are injected after a session/prompt request, before its response.
+func (f *fakeACPAgent) run(t *testing.T, reqR io.Reader, respW io.Writer, notifications [][]byte) {
+	t.Helper()
+	scanner := bufio.NewScanner(reqR)
+	for scanner.Scan() {
+		var msg struct {
+			ID     json.RawMessage `json:"id"`
+			Method string          `json:"method"`
+		}
+		if err := json.Unmarshal(scanner.Bytes(), &msg); err != nil {
+			t.Errorf("fake agent: unparseable client line: %v", err)
+			return
+		}
+
+		// Record the request BEFORE answering it: the client returns as
+		// soon as it reads our response, so recording afterwards races
+		// with the test's gotMethods() assertion and can drop the last
+		// method (observed flaky on session/prompt).
+		f.recordMethod(msg.Method)
+
+		switch msg.Method {
+		case "":
+			// JSON-RPC response (e.g. to a session/request_permission request).
+			f.responses <- string(scanner.Bytes())
+
+		case "initialize":
+			f.write(t, respW, f.result(msg.ID, `{"protocolVersion":1,"agentCapabilities":{},"authMethods":[]}`))
+
+		case "session/new":
+			f.write(t, respW, f.result(msg.ID, `{"sessionId":"sess-mock-1"}`))
+
+		case "session/prompt":
+			for _, n := range notifications {
+				f.write(t, respW, n)
+			}
+			f.write(t, respW, f.result(msg.ID, `{"stopReason":"end_turn"}`))
+
+		default:
+			// session/request_permission and anything else: no result —
+			// the response (possibly an error) is written by the SDK.
+		}
+	}
+}
+
+func (f *fakeACPAgent) result(id json.RawMessage, result string) []byte {
+	return []byte(fmt.Sprintf(`{"jsonrpc":"2.0","id":%s,"result":%s}`, id, result))
+}
+
+func (f *fakeACPAgent) write(t *testing.T, w io.Writer, b []byte) {
+	t.Helper()
+	if _, err := w.Write(append(append([]byte(nil), b...), '\n')); err != nil {
+		t.Errorf("fake agent: write: %v", err)
+	}
+}
+
+// sessionUpdateLine builds a wire-format session/update notification.
+// The update JSON must carry the official "sessionUpdate" discriminator.
+func sessionUpdateLine(sessionID, update string) []byte {
+	return []byte(fmt.Sprintf(
+		`{"jsonrpc":"2.0","method":"session/update","params":{"sessionId":%q,"update":%s}}`,
+		sessionID, update))
+}
+
+// recordingEmitter is a mock EventEmitter that records all emitted events.
+type recordingEmitter struct {
+	mu     sync.Mutex
+	events []recordedEvent
+}
+
+type recordedEvent struct {
+	eventType string
+	scope     map[string]any
+	payload   any
+}
+
+func (r *recordingEmitter) Emit(eventType string, scope map[string]any, payload any) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.events = append(r.events, recordedEvent{eventType, scope, payload})
+}
+
+// emitterAll returns a copy of every event recorded by a recordingEmitter.
+func emitterAll(r *recordingEmitter) []recordedEvent {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return append([]recordedEvent(nil), r.events...)
+}
+
+func containsString(list []string, target string) bool {
+	for _, value := range list {
+		if value == target {
+			return true
+		}
+	}
+	return false
+}
+
+// ── claude-acp adapter tests ────────────────────────────────────────────────
 
 func TestClaudeACPAdapterMetadata(t *testing.T) {
 	a := NewClaudeACPAdapter("", "")
@@ -76,7 +217,7 @@ func TestClaudeACPAdapterBuildCommand(t *testing.T) {
 		WorkDir: `C:\work\proj`,
 	})
 
-	wantPath := defaultNpxPath()
+	wantPath := adapters.DefaultNpxPath()
 	if cmdPath != wantPath {
 		t.Errorf("cmdPath = %q, want %q", cmdPath, wantPath)
 	}
@@ -152,7 +293,7 @@ func TestClaudeACPAdapterVersionPin(t *testing.T) {
 // fails before spawn.
 func TestClaudeACPAdapterPreflightFailsFast(t *testing.T) {
 	a := &ClaudeACPAdapter{
-		AcpAdapter: NewAcpAdapterWithID(claudeACPAdapterID, "", nil, "Claude Code (ACP)"),
+		AcpAdapter: adapters.NewAcpAdapterWithID(claudeACPAdapterID, "", nil, "Claude Code (ACP)"),
 	}
 	if a.Available() {
 		t.Fatal("empty binary must not be available")
@@ -165,7 +306,7 @@ func TestClaudeACPAdapterPreflightFailsFast(t *testing.T) {
 }
 
 func TestClaudeACPAdapterRegistryRegistration(t *testing.T) {
-	reg := NewRegistry()
+	reg := adapters.NewRegistry()
 	a := NewClaudeACPAdapter("", "")
 
 	if err := reg.Register(a); err != nil {
@@ -189,7 +330,7 @@ func TestClaudeACPAdapterRegistryRegistration(t *testing.T) {
 	if _, ok := reg.Get("acp"); ok {
 		t.Error("generic acp adapter unexpectedly registered")
 	}
-	if err := reg.Register(NewAcpAdapter("fake-agent", nil, "Fake")); err != nil {
+	if err := reg.Register(adapters.NewAcpAdapter("fake-agent", nil, "Fake")); err != nil {
 		t.Errorf("generic acp registration should coexist with claude-acp: %v", err)
 	}
 	if !containsString(reg.ListIDs(), "claude-acp") {
@@ -198,7 +339,7 @@ func TestClaudeACPAdapterRegistryRegistration(t *testing.T) {
 }
 
 func TestValidateCLIAdapterIDAcceptsClaudeACPAdapter(t *testing.T) {
-	if err := ValidateCLIAdapterID("claude-acp"); err != nil {
+	if err := adapters.ValidateCLIAdapterID("claude-acp"); err != nil {
 		t.Fatalf("ValidateCLIAdapterID(claude-acp) = %v, want nil", err)
 	}
 }
@@ -230,7 +371,7 @@ func TestClaudeACPAdapterParseStreamWithMockACPPeer(t *testing.T) {
 	agent := newFakeACPAgent()
 	go agent.run(t, clientToAgentR, agentToClientW, notifications)
 
-	ctx := SDKAdapterContext(context.Background(), RunProcessContext{
+	ctx := adapters.SDKAdapterContext(context.Background(), RunProcessContext{
 		Prompt:  "hello claude",
 		WorkDir: `C:\work`,
 	})
@@ -274,5 +415,45 @@ func TestClaudeACPAdapterParseStreamWithMockACPPeer(t *testing.T) {
 	}
 	if got[2].payload.(map[string]any)["stop_reason"] != "end_turn" {
 		t.Errorf("result stop_reason = %v, want end_turn", got[2].payload)
+	}
+}
+
+// TestCLIInvocationPlanRedactsPromptEnvAndPaths 自根包 sdk_fixture_mapper_test.go
+// 随 claude 家族迁入（#1760 claude 增量）：以 claude-code 适配器为投影主体
+// 校验 BuildCLIInvocationPlan 的脱敏契约，逻辑未改。
+func TestCLIInvocationPlanRedactsPromptEnvAndPaths(t *testing.T) {
+	adapter := NewClaudeCodeAdapter("C:\\Tools\\Claude\\claude.exe", "claude-sonnet-fixture", "default")
+	plan := adapters.BuildCLIInvocationPlan(adapter, RunProcessContext{
+		Prompt:         "SECRET_PROMPT_SHOULD_NOT_APPEAR",
+		AgentID:        "claude-code",
+		Model:          "sonnet",
+		PermissionMode: "plan",
+		WorkDir:        "C:\\Users\\Ding\\private\\workspace",
+	})
+
+	if plan.AdapterID != "claude-code" {
+		t.Fatalf("AdapterID = %q, want claude-code", plan.AdapterID)
+	}
+	if plan.CommandName != "claude.exe" {
+		t.Fatalf("CommandName = %q, want basename only", plan.CommandName)
+	}
+	if plan.WorkDir != "workspace" {
+		t.Fatalf("WorkDir = %q, want basename-only redaction", plan.WorkDir)
+	}
+	if !plan.PromptRedacted {
+		t.Fatal("PromptRedacted = false, want true")
+	}
+	if plan.Observed || plan.RealTested {
+		t.Fatalf("fixture invocation plan observed/realTested = %v/%v, want false/false", plan.Observed, plan.RealTested)
+	}
+	encoded, err := json.MarshalIndent(plan.Payload(), "", "  ")
+	if err != nil {
+		t.Fatalf("marshal invocation plan payload: %v", err)
+	}
+	if strings.Contains(string(encoded), "SECRET_PROMPT_SHOULD_NOT_APPEAR") || strings.Contains(string(encoded), "C:\\Users\\Ding") {
+		t.Fatalf("invocation plan leaked prompt or absolute path:\n%s", encoded)
+	}
+	if !strings.Contains(string(encoded), `"--permission-mode"`) || !strings.Contains(string(encoded), `"--model"`) {
+		t.Fatalf("invocation plan did not retain safe arg flags:\n%s", encoded)
 	}
 }

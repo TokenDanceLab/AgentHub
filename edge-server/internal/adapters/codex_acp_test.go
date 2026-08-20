@@ -61,7 +61,7 @@ func TestCodexACPadapterBuildCommand(t *testing.T) {
 		WorkDir: `C:\work\proj`,
 	})
 
-	wantPath := defaultNpxPath()
+	wantPath := DefaultNpxPath()
 	if cmdPath != wantPath {
 		t.Errorf("cmdPath = %q, want %q", cmdPath, wantPath)
 	}
@@ -108,9 +108,9 @@ func TestCodexACPadapterBuildCommandEnvPassthrough(t *testing.T) {
 }
 
 func TestCodexACPadapterDefaultNpxPath(t *testing.T) {
-	got := defaultNpxPath()
+	got := DefaultNpxPath()
 	if got != "npx.cmd" && got != "npx" {
-		t.Fatalf("defaultNpxPath = %q, want platform npx launcher", got)
+		t.Fatalf("DefaultNpxPath = %q, want platform npx launcher", got)
 	}
 }
 
