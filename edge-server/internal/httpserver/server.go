@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/agenthub/edge-server/internal/adapters"
+	"github.com/agenthub/edge-server/internal/adapters/claude"
 	"github.com/agenthub/edge-server/internal/adapters/orchestrator"
 	"github.com/agenthub/edge-server/internal/agents"
 	"github.com/agenthub/edge-server/internal/api"
@@ -377,7 +378,7 @@ func wireCCSwitch(cfg Config, h *api.Handler) {
 	if cfg.AdapterRegistry != nil && ccReader != nil {
 		if a, ok := cfg.AdapterRegistry.Get("claude-code"); ok {
 			if claudeAdapter, ok := a.(interface {
-				SetCCSwitchResolver(adapters.CCSwitchModelResolver)
+				SetCCSwitchResolver(claude.SwitchModelResolver)
 			}); ok {
 				claudeAdapter.SetCCSwitchResolver(ccReader)
 				slog.Debug("cc-switch model resolver wired into claude-code adapter")

@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/agenthub/edge-server/internal/adapters"
+	"github.com/agenthub/edge-server/internal/adapters/claude"
 	"github.com/agenthub/edge-server/internal/agents"
 	"github.com/agenthub/edge-server/internal/edgeidentity"
 	"github.com/agenthub/edge-server/internal/errcode"
@@ -2113,8 +2114,8 @@ func TestPostPermissionDecideUnblocksWaitingPermissionRequest(t *testing.T) {
 func TestRegisterRoutesInstallsPermissionBrokerOnClaudeAdapter(t *testing.T) {
 	h := newTestHandler()
 	adapterRegistry := adapters.NewRegistry()
-	claude := adapters.NewClaudeCodeAdapter("claude", "", "")
-	if err := adapterRegistry.Register(claude); err != nil {
+	claudeAdapter := claude.NewClaudeCodeAdapter("claude", "", "")
+	if err := adapterRegistry.Register(claudeAdapter); err != nil {
 		t.Fatalf("register adapter: %v", err)
 	}
 	h.AdapterRegistry = adapterRegistry
@@ -2136,7 +2137,7 @@ func TestRegisterRoutesInstallsPermissionBrokerOnClaudeAdapter(t *testing.T) {
 	run := store.Run{ID: "run_1", ProjectID: "proj_1", ThreadID: "thread_1", Status: "started"}
 
 	go func() {
-		done <- claude.ParseStream(context.Background(), strings.NewReader(string(msg)+"\n"), &stdin, adapters.NewBusEventEmitter(h.Bus), run)
+		done <- claudeAdapter.ParseStream(context.Background(), strings.NewReader(string(msg)+"\n"), &stdin, adapters.NewBusEventEmitter(h.Bus), run)
 	}()
 
 	select {

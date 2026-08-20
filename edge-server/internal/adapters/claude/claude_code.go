@@ -8,7 +8,11 @@
 // for the legacy parser contract. New feature work must target claude-acp;
 // removal is deferred until claude-acp passes environment verification (see
 // claude_acp.go TODO 真跑验证). Logic intentionally unchanged.
-package adapters
+//
+// #1760 claude 增量：本文件随 claude 家族归组到子包 claude；仍依赖根包
+// internal/adapters 的共享助手（ResolveModel / 权限处理链 / NDJSON parser 等，
+// 方向与 sdk 子包一致：claude → adapters 单向）。
+package claude
 
 import (
 	"context"
@@ -22,14 +26,15 @@ import (
 	"runtime"
 	"strings"
 
+	"github.com/agenthub/edge-server/internal/adapters"
 	"github.com/agenthub/edge-server/internal/runnerctx"
 	"github.com/agenthub/edge-server/internal/store"
 )
 
-// CCSwitchModelResolver resolves model aliases through the cc-switch database.
+// SwitchModelResolver resolves model aliases through the cc-switch database.
 // When non-nil, the adapter will attempt to resolve model names dynamically
 // through cc-switch before falling back to the static alias table.
-type CCSwitchModelResolver interface {
+type SwitchModelResolver interface {
 	ResolveModelAlias(alias, appType string) (string, bool)
 }
 
@@ -48,12 +53,12 @@ type ClaudeCodeAdapter struct {
 	permissionMode   string   // default permission mode (fallback when runCtx.PermissionMode is empty)
 	maxTurns         int
 	available        bool // #177: true if the CLI binary exists and is executable
-	permissionBroker *PermissionDecisionBroker
+	permissionBroker *adapters.PermissionDecisionBroker
 
 	// ccSwitchResolver dynamically resolves model aliases through the cc-switch
 	// database. When non-nil and cc-switch routing is active, this takes
 	// precedence over the static ModelAliases table for model resolution.
-	ccSwitchResolver CCSwitchModelResolver
+	ccSwitchResolver SwitchModelResolver
 }
 
 // NewClaudeCodeAdapter creates a Claude Code adapter.
@@ -98,7 +103,7 @@ func (a *ClaudeCodeAdapter) Capabilities() AgentCapabilities {
 	}
 }
 
-func (a *ClaudeCodeAdapter) SetPermissionBroker(broker *PermissionDecisionBroker) {
+func (a *ClaudeCodeAdapter) SetPermissionBroker(broker *adapters.PermissionDecisionBroker) {
 	a.permissionBroker = broker
 }
 
@@ -106,7 +111,7 @@ func (a *ClaudeCodeAdapter) SetPermissionBroker(broker *PermissionDecisionBroker
 // database. When set, the adapter will resolve model aliases via cc-switch first
 // (reflecting the actual transparent proxy mapping), falling back to the static
 // ModelAliases table only when cc-switch cannot resolve the alias.
-func (a *ClaudeCodeAdapter) SetCCSwitchResolver(resolver CCSwitchModelResolver) {
+func (a *ClaudeCodeAdapter) SetCCSwitchResolver(resolver SwitchModelResolver) {
 	a.ccSwitchResolver = resolver
 }
 
@@ -123,7 +128,7 @@ func (a *ClaudeCodeAdapter) resolveModelForAdapter(model string) string {
 		}
 	}
 	// Fall back to static alias table.
-	return ResolveModel("claude-code", model)
+	return adapters.ResolveModel("claude-code", model)
 }
 
 // ccSwitchManaged returns true when the user's Claude Code is managed by
@@ -210,7 +215,7 @@ func (a *ClaudeCodeAdapter) BuildCommand(ctx RunProcessContext) (string, []strin
 	// a file path (as --mcp-config expects) rather than inline JSON, which
 	// could exceed OS argument length limits.
 	if ctx.MCPConfig != "" {
-		if mcpPath, err := WriteMCPConfigTempFile(ctx.MCPConfig); err != nil {
+		if mcpPath, err := adapters.WriteMCPConfigTempFile(ctx.MCPConfig); err != nil {
 			slog.Warn("mcp: failed to write temp config file, passing inline",
 				"error", err)
 			args = append(args, "--mcp-config", ctx.MCPConfig)
@@ -298,7 +303,7 @@ func (a *ClaudeCodeAdapter) appendModelAndPermissionArgs(args []string, ctx RunP
 
 	// Reasoning effort (--effort)
 	if ctx.ReasoningEffort != "" {
-		effort := ResolveReasoningEffort("claude-code", ctx.ReasoningEffort)
+		effort := adapters.ResolveReasoningEffort("claude-code", ctx.ReasoningEffort)
 		args = append(args, "--effort", effort)
 	}
 
@@ -412,16 +417,16 @@ func buildClaudeAuthEnv() []string {
 }
 
 func (a *ClaudeCodeAdapter) ParseStream(ctx context.Context, stdout io.Reader, stdin io.Writer, emitter EventEmitter, run store.Run) error {
-	parser := NewNDJSONStreamParser(emitter, run)
+	parser := adapters.NewNDJSONStreamParser(emitter, run)
 	if stdin != nil {
 		if a.permissionBroker != nil {
-			parser.WithControlHandler(NewBrokeredPermissionHandler(emitter, a.permissionBroker, PermissionScope{
+			parser.WithControlHandler(adapters.NewBrokeredPermissionHandler(emitter, a.permissionBroker, adapters.PermissionScope{
 				ProjectID: run.ProjectID,
 				ThreadID:  run.ThreadID,
 				RunID:     run.ID,
 			}), stdin)
 		} else {
-			parser.WithControlHandler(NewEventEmittingPermissionHandler(emitter), stdin)
+			parser.WithControlHandler(adapters.NewEventEmittingPermissionHandler(emitter), stdin)
 		}
 	}
 	// Security hooks are now installed at the ProcessExecutor level via

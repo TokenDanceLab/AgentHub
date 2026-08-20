@@ -68,7 +68,7 @@ type CodexACPadapter struct {
 // and the prompt travels over stdio.
 func NewCodexACPadapter(npxPath string) *CodexACPadapter {
 	if npxPath == "" {
-		npxPath = defaultNpxPath()
+		npxPath = DefaultNpxPath()
 	}
 	return &CodexACPadapter{AcpAdapter: NewAcpAdapterConfig(AcpAdapterConfig{
 		ID:            codexACPadapterID,

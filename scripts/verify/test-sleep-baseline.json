@@ -1,6 +1,6 @@
 {
  "edge-server/internal/adapters/acp_client_test.go": 3,
- "edge-server/internal/adapters/claude_acp_test.go": 1,
+ "edge-server/internal/adapters/claude/claude_acp_test.go": 1,
  "edge-server/internal/adapters/cli_json_readiness_test.go": 1,
  "edge-server/internal/adapters/codex_acp_test.go": 1,
  "edge-server/internal/adapters/opencode_acp_test.go": 1,

@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/agenthub/edge-server/internal/adapters"
+	"github.com/agenthub/edge-server/internal/adapters/claude"
 	"github.com/agenthub/edge-server/internal/api"
 	"github.com/agenthub/edge-server/internal/edgeidentity"
 	"github.com/agenthub/edge-server/internal/events"
@@ -760,7 +761,7 @@ func TestNewHandlerFromConfigWithAdapterSentinelPath(t *testing.T) {
 
 func TestNewHandlerFromConfigWithRegisteredAdapter(t *testing.T) {
 	reg := adapters.NewRegistry()
-	a := adapters.NewClaudeCodeAdapter("claude", "sonnet", "")
+	a := claude.NewClaudeCodeAdapter("claude", "sonnet", "")
 	if err := reg.Register(a); err != nil {
 		t.Fatalf("Register: %v", err)
 	}
@@ -838,7 +839,7 @@ func TestNewHandlerFromConfigRegistersProcessRunner(t *testing.T) {
 func TestNewHandlerFromConfigAdapterNotFound(t *testing.T) {
 	reg := adapters.NewRegistry()
 	// Register something different from AgentDefault
-	a := adapters.NewClaudeCodeAdapter("claude", "sonnet", "")
+	a := claude.NewClaudeCodeAdapter("claude", "sonnet", "")
 	if err := reg.Register(a); err != nil {
 		t.Fatalf("Register: %v", err)
 	}
