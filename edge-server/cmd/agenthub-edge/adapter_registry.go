@@ -7,6 +7,8 @@ import (
 
 	"github.com/agenthub/edge-server/internal/adapters"
 	"github.com/agenthub/edge-server/internal/adapters/claude"
+	"github.com/agenthub/edge-server/internal/adapters/codex"
+	"github.com/agenthub/edge-server/internal/adapters/opencode"
 	"github.com/agenthub/edge-server/internal/adapters/orchestrator"
 	"github.com/agenthub/edge-server/internal/adapters/sdk"
 	"github.com/agenthub/edge-server/internal/edgehttp"
@@ -84,9 +86,9 @@ func registerClaudeCodeAdapter(reg *adapters.Registry, cfg config) {
 
 // registerCodexACPAdapter registers the official codex-acp ACP adapter via
 // npx. ACP is the default codex runtime; an empty launcher falls back to the
-// platform-native npx (DefaultNpxPath inside NewCodexACPadapter).
+// platform-native npx (codex.DefaultNpxPath inside NewCodexACPadapter).
 func registerCodexACPAdapter(reg *adapters.Registry, cfg config) {
-	a := adapters.NewCodexACPadapter(cfg.CodexACPPath)
+	a := codex.NewCodexACPadapter(cfg.CodexACPPath)
 	if err := reg.Register(a); err != nil {
 		slog.Warn("failed to register codex-acp adapter", "err", err)
 		return
@@ -98,7 +100,7 @@ func registerCodexACPAdapter(reg *adapters.Registry, cfg config) {
 // adapter. ACP is the default opencode runtime; an empty path falls back to
 // the platform-native "opencode" binary.
 func registerOpenCodeACPAdapter(reg *adapters.Registry, cfg config) {
-	a := adapters.NewOpenCodeACPAdapter(cfg.OpencodeACPPath)
+	a := opencode.NewOpenCodeACPAdapter(cfg.OpencodeACPPath)
 	if err := reg.Register(a); err != nil {
 		slog.Warn("failed to register opencode-acp adapter", "err", err)
 		return
