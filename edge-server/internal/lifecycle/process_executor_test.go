@@ -1,6 +1,7 @@
 package lifecycle
 
 import (
+	"github.com/agenthub/edge-server/internal/adapters/sdk"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -237,7 +238,7 @@ func (a *fixtureSDKStreamAdapter) ParseStream(ctx context.Context, stdout io.Rea
 	if err != nil {
 		return err
 	}
-	stream, err := adapters.DecodeSDKFixtureStream(data)
+	stream, err := sdk.DecodeSDKFixtureStream(data)
 	if err != nil {
 		return adapters.NewRecoverableParseError(err)
 	}
@@ -246,7 +247,7 @@ func (a *fixtureSDKStreamAdapter) ParseStream(ctx context.Context, stdout io.Rea
 		"threadId":  run.ThreadID,
 		"runId":     run.ID,
 	}
-	for _, mapped := range adapters.MapSDKFixtureStream(stream, scope) {
+	for _, mapped := range sdk.MapSDKFixtureStream(stream, scope) {
 		emitter.Emit(mapped.Type, mapped.Scope, mapped.Payload)
 	}
 	return nil
@@ -1867,9 +1868,9 @@ func TestProcessExecutorHelper(t *testing.T) {
 		}
 	case "sdk-fixture-json":
 		success := true
-		stream := adapters.SDKFixtureStream{
+		stream := sdk.SDKFixtureStream{
 			Provider: "opencode-agent-sdk-fixture",
-			Events: []adapters.SDKFixtureEvent{
+			Events: []sdk.SDKFixtureEvent{
 				{
 					ID:             "fixture_session_1",
 					Type:           "sidecar_session_ready",
@@ -1914,9 +1915,9 @@ func TestProcessExecutorHelper(t *testing.T) {
 		fmt.Fprintln(os.Stdout, string(data))
 	case "sdk-fixture-runner-contract-json":
 		success := true
-		stream := adapters.SDKFixtureStream{
+		stream := sdk.SDKFixtureStream{
 			Provider: "agenthub-runner-process-fixture",
-			Events: []adapters.SDKFixtureEvent{
+			Events: []sdk.SDKFixtureEvent{
 				{
 					ID:             "runner_session_1",
 					Type:           "sidecar_session_ready",
@@ -2002,9 +2003,9 @@ func TestProcessExecutorHelper(t *testing.T) {
 		fmt.Fprintln(os.Stdout, `{"provider":"agenthub-runner-process-fixture","events":[`)
 		fmt.Fprintln(os.Stdout, `not-json`)
 	case "sdk-fixture-error-json":
-		stream := adapters.SDKFixtureStream{
+		stream := sdk.SDKFixtureStream{
 			Provider: "agenthub-runner-process-fixture",
-			Events: []adapters.SDKFixtureEvent{
+			Events: []sdk.SDKFixtureEvent{
 				{
 					ID:        "error_permission_1",
 					Type:      "permission.asked",

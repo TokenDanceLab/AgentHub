@@ -8,7 +8,7 @@
 // AcpAdapter.BuildCommand; this file only talks JSON-RPC to it.
 //
 // Reference: ACP Go migration option C'.
-package adapters
+package acp
 
 import (
 	"context"
@@ -19,6 +19,7 @@ import (
 	"strings"
 	"sync/atomic"
 
+	"github.com/agenthub/edge-server/internal/adapters"
 	"github.com/agenthub/edge-server/internal/store"
 	"github.com/coder/acp-go-sdk"
 )
@@ -31,7 +32,7 @@ const acpSDKVersion = "v0.13.5"
 // deliberately leaves unwired (fs/terminal frame design): the agent receives
 // a JSON-RPC error instead of a silent hang. session/request_permission no
 // longer goes through this sentinel — it is bridged to the Edge approval
-// chain via PermissionDecisionBroker.
+// chain via adapters.PermissionDecisionBroker.
 var errACPEndpointNotWired = errors.New("acp: endpoint not wired (TODO #1743 (follow-up of #1404): frame design)")
 
 // acpClientHandler is the coder/acp-go-sdk client side. The SDK dispatches
@@ -58,10 +59,10 @@ type acpClientHandler struct {
 	sessionID atomic.Pointer[acp.SessionId]
 
 	// broker bridges session/request_permission to the Edge approval chain
-	// (PermissionDecisionBroker → POST /v1/permissions/decide, see
+	// (adapters.PermissionDecisionBroker → POST /v1/permissions/decide, see
 	// control_protocol.go). nil = auto-approve fallback, mirroring
 	// DefaultPermissionHandler when no decider/broker is configured.
-	broker *PermissionDecisionBroker
+	broker *adapters.PermissionDecisionBroker
 
 	// runCtx is the ParseStream context for this turn; it is cancelled when
 	// the run is torn down. Waiters select on it so parked permission
@@ -78,7 +79,7 @@ type acpClientHandler struct {
 // (the SDK dispatch calls these methods directly).
 var _ acp.Client = (*acpClientHandler)(nil)
 
-func newACPClientHandler(emitter EventEmitter, run store.Run, broker *PermissionDecisionBroker, runCtx context.Context) *acpClientHandler {
+func newACPClientHandler(emitter EventEmitter, run store.Run, broker *adapters.PermissionDecisionBroker, runCtx context.Context) *acpClientHandler {
 	return &acpClientHandler{emitter: emitter, run: run, broker: broker, runCtx: runCtx}
 }
 
@@ -96,7 +97,7 @@ func (h *acpClientHandler) SessionUpdate(ctx context.Context, params acp.Session
 // agent pauses until the client responds.
 //
 // Approval chain: the request is registered with the shared
-// PermissionDecisionBroker (keyed by runID + generated requestID), a
+// adapters.PermissionDecisionBroker (keyed by runID + generated requestID), a
 // run.agent.permission_requested event is emitted upstream so Desktop can
 // render the approval UI, and the handler blocks until either
 //   - POST /v1/permissions/decide resolves the broker entry (allow/deny), or
@@ -124,15 +125,15 @@ func (h *acpClientHandler) RequestPermission(ctx context.Context, params acp.Req
 
 	// 1. Register with the broker before emitting, so /v1/permissions/decide
 	// can resolve the request as soon as Desktop sees the event.
-	var waitForBrokerDecision func(context.Context) PermissionDecision
+	var waitForBrokerDecision func(context.Context) adapters.PermissionDecision
 	registerFailed := false
 	if h.broker != nil {
 		var ok bool
-		waitForBrokerDecision, ok = h.broker.Begin(PermissionScope{
+		waitForBrokerDecision, ok = h.broker.Begin(adapters.PermissionScope{
 			ProjectID: h.run.ProjectID,
 			ThreadID:  h.run.ThreadID,
 			RunID:     h.run.ID,
-		}, PermissionRequest{
+		}, adapters.PermissionRequest{
 			RequestID: requestID,
 			ToolName:  toolName,
 			ToolUseID: toolUseID,
@@ -148,27 +149,27 @@ func (h *acpClientHandler) RequestPermission(ctx context.Context, params acp.Req
 		"toolName":  toolName,
 		"toolUseId": toolUseID,
 		"input":     params.ToolCall.RawInput,
-		"riskLevel": string(ClassifyToolRisk(toolName)),
+		"riskLevel": string(adapters.ClassifyToolRisk(toolName)),
 	})
 
 	// 3. Wait for the decision: broker blocks until Desktop responds (the
 	// broker waiter returns a safe deny on cancellation and recycles the
 	// parked entry); without a broker, fall back to auto-approve.
-	var decision PermissionDecision
+	var decision adapters.PermissionDecision
 	switch {
 	case waitForBrokerDecision != nil:
 		waitCtx, stop := h.permissionWaitCtx(ctx)
 		decision = waitForBrokerDecision(waitCtx)
 		stop() // unregister the runCtx hook once the wait completes
 	case registerFailed:
-		decision = PermissionDecision{
+		decision = adapters.PermissionDecision{
 			Behavior: "deny",
 			Message:  "permission request could not be registered for approval",
 		}
 	default:
-		decision = PermissionDecision{Behavior: "allow"}
+		decision = adapters.PermissionDecision{Behavior: "allow"}
 	}
-	decision = normalizePermissionDecision(decision)
+	decision = adapters.NormalizePermissionDecision(decision)
 
 	// 4. Emit permission_decided for observability (mirrors
 	// DefaultPermissionHandler.handleCanUseTool).
@@ -221,7 +222,7 @@ func acpPermissionToolName(params acp.RequestPermissionRequest) string {
 //	deny  → the first reject_* option the agent offered, else 'cancelled'
 //	        (there is no bare deny outcome in ACP — without a reject option,
 //	        'cancelled' is the closest denial signal)
-func acpOutcomeForDecision(decision PermissionDecision, options []acp.PermissionOption) acp.RequestPermissionOutcome {
+func acpOutcomeForDecision(decision adapters.PermissionDecision, options []acp.PermissionOption) acp.RequestPermissionOutcome {
 	if decision.Behavior == "allow" {
 		if id, ok := firstPermissionOption(options, acp.PermissionOptionKindAllowOnce, acp.PermissionOptionKindAllowAlways); ok {
 			return acp.NewRequestPermissionOutcomeSelected(id)
@@ -323,7 +324,7 @@ func terminalEndpointError(method string) error {
 // connection is torn down by the SDK when the peer (agent process) closes
 // stdout or ctx is cancelled.
 //
-// broker, when non-nil, is the shared PermissionDecisionBroker that
+// broker, when non-nil, is the shared adapters.PermissionDecisionBroker that
 // session/request_permission is bridged to (see RequestPermission); nil
 // falls back to auto-approve.
 //
@@ -337,13 +338,13 @@ func terminalEndpointError(method string) error {
 // (dangerous tool → broker → POST /v1/permissions/decide allow → tool
 // executed). The SDK connection layer and typed dispatch are also exercised
 // by acp_client_test.go with a mock JSON-RPC peer.
-func runACPSession(ctx context.Context, stdout io.Reader, stdin io.Writer, emitter EventEmitter, run store.Run, broker *PermissionDecisionBroker) error {
-	rc, ok := RunProcessContextFromContext(ctx)
+func runACPSession(ctx context.Context, stdout io.Reader, stdin io.Writer, emitter EventEmitter, run store.Run, broker *adapters.PermissionDecisionBroker) error {
+	rc, ok := adapters.RunProcessContextFromContext(ctx)
 	if !ok || rc.Prompt == "" {
-		return NewNonRecoverableParseError(fmt.Errorf("acp: RunProcessContext with prompt required in ctx (use SDKAdapterContext)"))
+		return adapters.NewNonRecoverableParseError(fmt.Errorf("acp: RunProcessContext with prompt required in ctx (use SDKAdapterContext)"))
 	}
 	if rc.WorkDir == "" {
-		return NewNonRecoverableParseError(fmt.Errorf("acp: workdir required for session/new (got %q)", rc.WorkDir))
+		return adapters.NewNonRecoverableParseError(fmt.Errorf("acp: workdir required for session/new (got %q)", rc.WorkDir))
 	}
 
 	handler := newACPClientHandler(emitter, run, broker, ctx)
@@ -367,10 +368,10 @@ func runACPSession(ctx context.Context, stdout io.Reader, stdin io.Writer, emitt
 		},
 	})
 	if err != nil {
-		return NewNonRecoverableParseError(fmt.Errorf("acp: initialize failed: %w", err))
+		return adapters.NewNonRecoverableParseError(fmt.Errorf("acp: initialize failed: %w", err))
 	}
 	if initResp.ProtocolVersion != acp.ProtocolVersionNumber {
-		return NewNonRecoverableParseError(fmt.Errorf("acp: protocol version mismatch: agent %d, client %d",
+		return adapters.NewNonRecoverableParseError(fmt.Errorf("acp: protocol version mismatch: agent %d, client %d",
 			initResp.ProtocolVersion, acp.ProtocolVersionNumber))
 	}
 
@@ -393,7 +394,7 @@ func runACPSession(ctx context.Context, stdout io.Reader, stdin io.Writer, emitt
 		McpServers: []acp.McpServer{}, // TODO(#1743): wire RunProcessContext.MCPConfig
 	})
 	if err != nil {
-		return NewNonRecoverableParseError(fmt.Errorf("acp: session/new failed: %w", err))
+		return adapters.NewNonRecoverableParseError(fmt.Errorf("acp: session/new failed: %w", err))
 	}
 	handler.sessionID.Store(&sessResp.SessionId)
 
@@ -407,7 +408,7 @@ func runACPSession(ctx context.Context, stdout io.Reader, stdin io.Writer, emitt
 	})
 	slog.Debug("acp: session/prompt returned", "run_id", run.ID, "stop_reason", promptResp.StopReason, "err", err)
 	if err != nil {
-		return NewNonRecoverableParseError(fmt.Errorf("acp: session/prompt failed: %w", err))
+		return adapters.NewNonRecoverableParseError(fmt.Errorf("acp: session/prompt failed: %w", err))
 	}
 
 	// 4. Prompt response (StopReason) → run.agent.result.

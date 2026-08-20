@@ -1,8 +1,10 @@
-package adapters
+package sdk
 
 import (
 	"fmt"
 	"strings"
+
+	"github.com/agenthub/edge-server/internal/adapters"
 )
 
 const agentHubAgentSpecV1Schema = "agenthub.agent_spec.v1"
@@ -60,7 +62,7 @@ type RuntimeInvocationFixtureV1 struct {
 	RawSDKObjectPolicy  string                            `json:"raw_sdk_object_policy"`
 	Context             RuntimeInvocationContextFixtureV1 `json:"context"`
 	ParserContract      []string                          `json:"parser_contract"`
-	CLIInvocationPlan   *CLIInvocationPlan                `json:"cli_invocation_plan,omitempty"`
+	CLIInvocationPlan   *adapters.CLIInvocationPlan       `json:"cli_invocation_plan,omitempty"`
 	ApprovalEvidenceRef string                            `json:"approval_evidence_ref,omitempty"`
 }
 
@@ -199,7 +201,7 @@ func CompileAgentSpecV1ToRuntimeInvocationFixture(spec AgentHubAgentSpecV1) (Run
 			AllowedTools:    invocation.Context.AllowedTools,
 			WorkDir:         firstAgentSpecMapString(spec.TargetPreference, "workspace"),
 		}
-		plan := BuildCLIInvocationPlan(adapter, ctx)
+		plan := adapters.BuildCLIInvocationPlan(adapter, ctx)
 		invocation.CLIInvocationPlan = &plan
 	}
 	return invocation, nil

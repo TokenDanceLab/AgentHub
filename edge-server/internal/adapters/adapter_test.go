@@ -190,30 +190,9 @@ func TestBuildSiblingContextPromptEdgeCases(t *testing.T) {
 	}
 }
 
-// TestAdapterMetadataIsNotEmpty verifies all built-in adapters have non-empty metadata.
-// OrchestratorAdapter 已迁移到叶子包，其 Metadata 校验见叶子包
-// orchestrator_adapter_test.go（#1566）。Claude 家族已归组到 adapters/claude
-// （校验见 claude/claude_code_test.go），codex/opencode 家族已归组到
-// adapters/codex、adapters/opencode（校验见各自子包测试，#1760 各增量）。
-func TestAdapterMetadataIsNotEmpty(t *testing.T) {
-	adapters := []struct {
-		name     string
-		metadata AdapterMetadata
-	}{
-		{"ACP", NewAcpAdapter("acp", nil, "ACP experimental").Metadata()},
-	}
-	for _, a := range adapters {
-		if a.metadata.ID == "" {
-			t.Fatalf("%s adapter ID is empty", a.name)
-		}
-		if a.metadata.Name == "" {
-			t.Fatalf("%s adapter Name is empty", a.name)
-		}
-		if a.metadata.Description == "" {
-			t.Fatalf("%s adapter Description is empty", a.name)
-		}
-	}
-}
+// TestAdapterMetadataIsNotEmpty 已随各家族归组迁移：
+// claude/codex/opencode 行随家族迁至各自子包测试，ACP 行随 acp 家族迁至
+// adapters/acp（TestAcpAdapterMetadataIsNotEmpty，#1760 acp 增量）。
 
 func TestDefaultWorkDirDoesNotReturnHome(t *testing.T) {
 	home, err := os.UserHomeDir()
@@ -224,13 +203,4 @@ func TestDefaultWorkDirDoesNotReturnHome(t *testing.T) {
 	if err == nil && home != "" && got == home {
 		t.Fatalf("DefaultWorkDir must not return user home %q", home)
 	}
-}
-
-func containsString(list []string, target string) bool {
-	for _, value := range list {
-		if value == target {
-			return true
-		}
-	}
-	return false
 }

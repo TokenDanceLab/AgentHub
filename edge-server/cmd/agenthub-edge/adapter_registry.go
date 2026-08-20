@@ -86,7 +86,7 @@ func registerClaudeCodeAdapter(reg *adapters.Registry, cfg config) {
 
 // registerCodexACPAdapter registers the official codex-acp ACP adapter via
 // npx. ACP is the default codex runtime; an empty launcher falls back to the
-// platform-native npx (codex.DefaultNpxPath inside NewCodexACPadapter).
+// platform-native npx (acp.DefaultNpxPath inside NewCodexACPadapter).
 func registerCodexACPAdapter(reg *adapters.Registry, cfg config) {
 	a := codex.NewCodexACPadapter(cfg.CodexACPPath)
 	if err := reg.Register(a); err != nil {
@@ -110,7 +110,7 @@ func registerOpenCodeACPAdapter(reg *adapters.Registry, cfg config) {
 
 // registerClaudeACPAdapter registers the official claude-agent-acp ACP adapter
 // via npx. ACP is the default claude runtime; an empty launcher falls back to
-// the platform-native npx (adapters.DefaultNpxPath inside NewClaudeACPAdapter).
+// the platform-native npx (acp.DefaultNpxPath inside NewClaudeACPAdapter).
 // The legacy claude-code NDJSON parser stays registered as the orchestrator
 // inner and fallback (claude_code.go, marked DEPRECATED until Phase B).
 func registerClaudeACPAdapter(reg *adapters.Registry, cfg config) {
@@ -125,12 +125,12 @@ func registerClaudeACPAdapter(reg *adapters.Registry, cfg config) {
 // registerManifestAdapters registers fixture-only custom runtime manifests.
 func registerManifestAdapters(reg *adapters.Registry, cfg config) {
 	for _, manifestPath := range cfg.RuntimeManifests {
-		manifest, err := adapters.LoadRuntimeManifestFile(manifestPath)
+		manifest, err := sdk.LoadRuntimeManifestFile(manifestPath)
 		if err != nil {
 			slog.Warn("failed to load runtime manifest", "path", manifestPath, "err", err)
 			continue
 		}
-		a := adapters.NewRuntimeManifestAdapter(manifest)
+		a := sdk.NewRuntimeManifestAdapter(manifest)
 		if err := reg.Register(a); err != nil {
 			slog.Warn("failed to register runtime manifest adapter", "id", manifest.ID, "path", manifestPath, "err", err)
 			continue

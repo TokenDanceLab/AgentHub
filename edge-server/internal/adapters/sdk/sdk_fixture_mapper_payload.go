@@ -1,6 +1,10 @@
-package adapters
+package sdk
 
-import "strings"
+import (
+	"strings"
+
+	"github.com/agenthub/edge-server/internal/adapters"
+)
 
 // Residual pure-helper peel #1122: payload/scope helpers for SDK fixture mapping.
 
@@ -165,7 +169,7 @@ func sdkFixtureCapabilitiesPayload(capabilities SDKFixtureCapabilities) map[stri
 		payload["noSpendDefault"] = true
 	}
 	if len(capabilities.Transports) > 0 {
-		payload["transports"] = envNamesOnly(capabilities.Transports)
+		payload["transports"] = adapters.EnvNamesOnly(capabilities.Transports)
 	}
 	return payload
 }

@@ -1,10 +1,11 @@
-package adapters
+package sdk
 
 import (
 	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/agenthub/edge-server/internal/adapters"
 	"io"
 	"os"
 	"path/filepath"
@@ -145,7 +146,7 @@ func (a *RuntimeManifestAdapter) BuildCommand(ctx RunProcessContext) (string, []
 		cmdPath, args := runtimeManifestFixtureReplayCommand()
 		return cmdPath, args, nil, workDir
 	}
-	return a.manifest.Command, redactedRuntimeManifestArgs(a.manifest.Args), envNamesOnly(a.manifest.EnvNames), workDir
+	return a.manifest.Command, redactedRuntimeManifestArgs(a.manifest.Args), adapters.EnvNamesOnly(a.manifest.EnvNames), workDir
 }
 
 func (a *RuntimeManifestAdapter) ParseStream(ctx context.Context, stdout io.Reader, _ io.Writer, emitter EventEmitter, run store.Run) error {
@@ -155,7 +156,7 @@ func (a *RuntimeManifestAdapter) ParseStream(ctx context.Context, stdout io.Read
 		"runId":     run.ID,
 	}
 	cmdPath, args, env, workDir := a.BuildCommand(RunProcessContext{})
-	plan := BuildCLIInvocationPlanFromCommand(a, RunProcessContext{}, cmdPath, args, env, workDir)
+	plan := adapters.BuildCLIInvocationPlanFromCommand(a, RunProcessContext{}, cmdPath, args, env, workDir)
 	emitter.Emit(BusEventCLIInvocationPlan, scope, plan.Payload())
 
 	var data []byte
