@@ -12,20 +12,20 @@ import (
 	"github.com/agenthub/hub-server/internal/errcode"
 	"github.com/agenthub/hub-server/internal/handler"
 	"github.com/agenthub/hub-server/internal/model"
-	"github.com/agenthub/hub-server/internal/service"
+	"github.com/agenthub/hub-server/internal/service/auth"
 )
 
 const testDeviceID = "11111111-1111-4111-8111-111111111111"
 
 // mockAuthService implements handler.AuthService.
 type mockAuthService struct {
-	refreshTokenFn  func(ctx context.Context, rawRefreshToken string) (*service.LoginResponse, error)
+	refreshTokenFn  func(ctx context.Context, rawRefreshToken string) (*auth.LoginResponse, error)
 	logoutFn        func(ctx context.Context, userID, deviceID, deviceType, accessJTI string) error
 	getMeFn         func(ctx context.Context, userID string) (*model.User, error)
 	updateProfileFn func(ctx context.Context, userID, nickname, avatarURL string) (*model.User, error)
 }
 
-func (m *mockAuthService) RefreshToken(ctx context.Context, rawRefreshToken string) (*service.LoginResponse, error) {
+func (m *mockAuthService) RefreshToken(ctx context.Context, rawRefreshToken string) (*auth.LoginResponse, error) {
 	return m.refreshTokenFn(ctx, rawRefreshToken)
 }
 func (m *mockAuthService) Logout(ctx context.Context, userID, deviceID, deviceType, accessJTI string) error {
@@ -92,8 +92,8 @@ func parseResponse[T any](t *testing.T, w *httptest.ResponseRecorder) handler.Re
 
 func TestAuthHandler_Refresh_Success(t *testing.T) {
 	svc := &mockAuthService{
-		refreshTokenFn: func(ctx context.Context, rawRefreshToken string) (*service.LoginResponse, error) {
-			return &service.LoginResponse{AccessToken: "new-access", RefreshToken: "new-refresh", ExpiresIn: 3600}, nil
+		refreshTokenFn: func(ctx context.Context, rawRefreshToken string) (*auth.LoginResponse, error) {
+			return &auth.LoginResponse{AccessToken: "new-access", RefreshToken: "new-refresh", ExpiresIn: 3600}, nil
 		},
 	}
 	h := handler.NewAuthHandler(svc)
@@ -110,7 +110,7 @@ func TestAuthHandler_Refresh_Success(t *testing.T) {
 
 func TestAuthHandler_Refresh_Invalid(t *testing.T) {
 	svc := &mockAuthService{
-		refreshTokenFn: func(ctx context.Context, rawRefreshToken string) (*service.LoginResponse, error) {
+		refreshTokenFn: func(ctx context.Context, rawRefreshToken string) (*auth.LoginResponse, error) {
 			return nil, errcode.AuthRefreshInvalid
 		},
 	}
@@ -127,7 +127,7 @@ func TestAuthHandler_Refresh_Invalid(t *testing.T) {
 }
 
 func TestAuthHandler_Refresh_BadRequest(t *testing.T) {
-	svc := &mockAuthService{refreshTokenFn: func(ctx context.Context, rawRefreshToken string) (*service.LoginResponse, error) {
+	svc := &mockAuthService{refreshTokenFn: func(ctx context.Context, rawRefreshToken string) (*auth.LoginResponse, error) {
 		return nil, errcode.ErrInternal
 	}}
 	h := handler.NewAuthHandler(svc)

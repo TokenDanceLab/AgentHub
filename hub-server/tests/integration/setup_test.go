@@ -37,6 +37,7 @@ import (
 	"github.com/agenthub/hub-server/internal/service/agentteam"
 	"github.com/agenthub/hub-server/internal/service/attachment"
 	"github.com/agenthub/hub-server/internal/service/audit"
+	"github.com/agenthub/hub-server/internal/service/auth"
 	"github.com/agenthub/hub-server/internal/service/contact"
 	"github.com/agenthub/hub-server/internal/service/device"
 	"github.com/agenthub/hub-server/internal/service/executiontarget"
@@ -132,7 +133,7 @@ func TestMain(m *testing.M) {
 	}
 	eventBus = b
 	wsHandler := handler.NewWebSocketHandler(mgr, cfg.Server.Env)
-	authService := service.NewAuthService(db, cfg.JWT, cacheClient)
+	authService := auth.NewService(db, cfg.JWT, cacheClient)
 	authHandler := handler.NewAuthHandler(authService)
 	deviceService := device.NewService(db, nil)
 	deviceHandler := handler.NewDeviceHandler(deviceService)

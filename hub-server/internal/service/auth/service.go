@@ -1,4 +1,4 @@
-package service
+package auth
 
 import (
 	"context"
@@ -18,7 +18,7 @@ import (
 	"github.com/agenthub/hub-server/internal/repository"
 )
 
-// authCache is the subset of *cache.Client methods used by AuthService.
+// authCache is the subset of *cache.Client methods used by Service.
 type authCache interface {
 	Invalidate(ctx context.Context, keys ...string) error
 	BlacklistRefreshToken(ctx context.Context, tokenHash string, ttl time.Duration) error
@@ -34,19 +34,19 @@ type LoginResponse struct {
 	ExpiresIn    int64  `json:"expires_in"`
 }
 
-type AuthService struct {
+type Service struct {
 	db          *gorm.DB
 	jwtCfg      config.JWTConfig
 	cacheClient authCache
 }
 
-func NewAuthService(db *gorm.DB, jwtCfg config.JWTConfig, cacheClient *cache.Client) *AuthService {
-	return &AuthService{db: db, jwtCfg: jwtCfg, cacheClient: resolveAuthCache(cacheClient)}
+func NewService(db *gorm.DB, jwtCfg config.JWTConfig, cacheClient *cache.Client) *Service {
+	return &Service{db: db, jwtCfg: jwtCfg, cacheClient: resolveAuthCache(cacheClient)}
 }
 
 // RefreshToken validates a refresh token, issues a new access token,
 // and rotates the refresh token (#134: old one is revoked, new one is issued).
-func (s *AuthService) RefreshToken(ctx context.Context, rawRefreshToken string) (*LoginResponse, error) {
+func (s *Service) RefreshToken(ctx context.Context, rawRefreshToken string) (*LoginResponse, error) {
 	tokenHash := jwtutil.HashRefreshToken(rawRefreshToken)
 	rt, err := repository.FindRefreshTokenByHash(s.db, tokenHash)
 	if err != nil {
@@ -125,7 +125,7 @@ func (s *AuthService) RefreshToken(ctx context.Context, rawRefreshToken string) 
 // If deviceType is non-empty, the Redis blacklist is scoped by device_type (#149).
 // When accessJTI is non-empty, the access token jti is also blacklisted until
 // AccessTTL elapses so middleware rejects the token immediately (#888).
-func (s *AuthService) Logout(ctx context.Context, userID, deviceID, deviceType, accessJTI string) error {
+func (s *Service) Logout(ctx context.Context, userID, deviceID, deviceType, accessJTI string) error {
 	// Write to Redis blacklist so token validation can check without hitting DB (#66).
 	// BlacklistRefreshToken prepends "rt_blacklist:" internally, so we only pass the
 	// logical key suffix here.
@@ -154,7 +154,7 @@ func (s *AuthService) Logout(ctx context.Context, userID, deviceID, deviceType, 
 	return repository.RevokeRefreshTokensByUserDevice(s.db, userID, deviceID)
 }
 
-func (s *AuthService) GetMe(ctx context.Context, userID string) (*model.User, error) {
+func (s *Service) GetMe(ctx context.Context, userID string) (*model.User, error) {
 	user, err := repository.GetUserByID(s.db, userID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -165,7 +165,7 @@ func (s *AuthService) GetMe(ctx context.Context, userID string) (*model.User, er
 	return user, nil
 }
 
-func (s *AuthService) UpdateProfile(ctx context.Context, userID, nickname, avatarURL string) (*model.User, error) {
+func (s *Service) UpdateProfile(ctx context.Context, userID, nickname, avatarURL string) (*model.User, error) {
 	user, err := repository.GetUserByID(s.db, userID)
 	if err != nil {
 		return nil, err
