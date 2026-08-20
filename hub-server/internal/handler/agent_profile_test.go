@@ -11,7 +11,7 @@ import (
 	"github.com/agenthub/hub-server/internal/errcode"
 	"github.com/agenthub/hub-server/internal/handler"
 	"github.com/agenthub/hub-server/internal/model"
-	"github.com/agenthub/hub-server/internal/service"
+	"github.com/agenthub/hub-server/internal/service/agentprofile"
 )
 
 // ── Existing tests ──────────────────────────────────────────────────────────
@@ -156,9 +156,9 @@ func TestAgentProfileHandlerCreateProfileBadRequest(t *testing.T) {
 
 func TestAgentProfileHandlerListProfilesSuccess(t *testing.T) {
 	svc := &mockAgentProfileService{
-		listFn: func(ctx context.Context, ownerID, runtimeID, q, cursor string, pageSize int) (*service.ListResult, error) {
+		listFn: func(ctx context.Context, ownerID, runtimeID, q, cursor string, pageSize int) (*agentprofile.ListResult, error) {
 			require.Equal(t, "user-1", ownerID)
-			return &service.ListResult{Items: nil, Cursor: "", HasMore: false}, nil
+			return &agentprofile.ListResult{Items: nil, Cursor: "", HasMore: false}, nil
 		},
 	}
 	h := handler.NewAgentProfileHandler(svc)
@@ -359,7 +359,7 @@ type mockAgentProfileService struct {
 	createFn    func(ctx context.Context, ownerID string, req *model.AgentProfile) (*model.AgentProfile, error)
 	updateFn    func(ctx context.Context, id, ownerID string, updates map[string]interface{}) (*model.AgentProfile, error)
 	deleteFn    func(ctx context.Context, id, ownerID string) error
-	listFn      func(ctx context.Context, ownerID, runtimeID, q, cursor string, pageSize int) (*service.ListResult, error)
+	listFn      func(ctx context.Context, ownerID, runtimeID, q, cursor string, pageSize int) (*agentprofile.ListResult, error)
 	publishFn   func(ctx context.Context, id, ownerID string) error
 	installFn   func(ctx context.Context, id, installerID string) (*model.AgentProfile, error)
 }
@@ -404,7 +404,7 @@ func (m *mockAgentProfileService) Delete(ctx context.Context, id, ownerID string
 	return nil
 }
 
-func (m *mockAgentProfileService) List(ctx context.Context, ownerID, runtimeID, q, cursor string, pageSize int) (*service.ListResult, error) {
+func (m *mockAgentProfileService) List(ctx context.Context, ownerID, runtimeID, q, cursor string, pageSize int) (*agentprofile.ListResult, error) {
 	m.listCalled = true
 	if m.listFn != nil {
 		return m.listFn(ctx, ownerID, runtimeID, q, cursor, pageSize)
@@ -432,7 +432,7 @@ func (m *mockAgentProfileService) Install(ctx context.Context, id, installerID s
 	return nil, nil
 }
 
-func (m *mockAgentProfileService) SearchMarket(ctx context.Context, runtimeID, q, sortBy, cursor string, pageSize int) (*service.ListResult, error) {
+func (m *mockAgentProfileService) SearchMarket(ctx context.Context, runtimeID, q, sortBy, cursor string, pageSize int) (*agentprofile.ListResult, error) {
 	return nil, nil
 }
 

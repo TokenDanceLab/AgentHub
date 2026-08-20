@@ -1,4 +1,4 @@
-package service
+package agentprofile
 
 import (
 	"context"
@@ -69,7 +69,7 @@ func seedAgentProfile(t *testing.T, db *gorm.DB, id, ownerID string, public bool
 func TestAgentProfileGetIsOwnerScoped(t *testing.T) {
 	db := newAgentProfileTestDB(t)
 	seedAgentProfile(t, db, "profile-1", "owner-1", false)
-	svc := NewAgentProfileService(db)
+	svc := NewService(db)
 
 	profile, err := svc.Get(context.Background(), "profile-1", "owner-1")
 	require.NoError(t, err)
@@ -83,7 +83,7 @@ func TestAgentProfileGetPublicOnlyReturnsPublishedProfiles(t *testing.T) {
 	db := newAgentProfileTestDB(t)
 	seedAgentProfile(t, db, "public-profile", "owner-1", true)
 	seedAgentProfile(t, db, "private-profile", "owner-1", false)
-	svc := NewAgentProfileService(db)
+	svc := NewService(db)
 
 	profile, err := svc.GetPublic(context.Background(), "public-profile")
 	require.NoError(t, err)
@@ -96,7 +96,7 @@ func TestAgentProfileGetPublicOnlyReturnsPublishedProfiles(t *testing.T) {
 func TestAgentProfileUpdateNormalizesJSONLikeFields(t *testing.T) {
 	db := newAgentProfileTestDB(t)
 	seedAgentProfile(t, db, "profile-1", "owner-1", false)
-	svc := NewAgentProfileService(db)
+	svc := NewService(db)
 
 	profile, err := svc.Update(context.Background(), "profile-1", "owner-1", map[string]interface{}{
 		"name":                      "Updated profile",
@@ -149,7 +149,7 @@ func TestAgentProfileUpdateRejectsInvalidFieldTypesWithoutPanic(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			db := newAgentProfileTestDB(t)
 			seedAgentProfile(t, db, "profile-1", "owner-1", false)
-			svc := NewAgentProfileService(db)
+			svc := NewService(db)
 
 			var err error
 			require.NotPanics(t, func() {

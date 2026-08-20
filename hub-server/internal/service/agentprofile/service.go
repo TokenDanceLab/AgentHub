@@ -1,4 +1,4 @@
-package service
+package agentprofile
 
 import (
 	"context"
@@ -14,13 +14,13 @@ import (
 	"github.com/agenthub/hub-server/internal/repository"
 )
 
-// AgentProfileService handles CRUD for user-managed agent profiles.
-type AgentProfileService struct {
+// Service handles CRUD for user-managed agent profiles.
+type Service struct {
 	db *gorm.DB
 }
 
-func NewAgentProfileService(db *gorm.DB) *AgentProfileService {
-	return &AgentProfileService{db: db}
+func NewService(db *gorm.DB) *Service {
+	return &Service{db: db}
 }
 
 // CreateResult holds the created profile and pagination info for list endpoints.
@@ -36,7 +36,7 @@ type ListResult struct {
 
 // ── CRUD ──
 
-func (s *AgentProfileService) Create(ctx context.Context, ownerID string, req *model.AgentProfile) (*model.AgentProfile, error) {
+func (s *Service) Create(ctx context.Context, ownerID string, req *model.AgentProfile) (*model.AgentProfile, error) {
 	if req.Name == "" || req.RuntimeID == "" {
 		return nil, errcode.ErrBadRequest
 	}
@@ -61,7 +61,7 @@ func (s *AgentProfileService) Create(ctx context.Context, ownerID string, req *m
 	return req, nil
 }
 
-func (s *AgentProfileService) Get(ctx context.Context, id, ownerID string) (*model.AgentProfile, error) {
+func (s *Service) Get(ctx context.Context, id, ownerID string) (*model.AgentProfile, error) {
 	p, err := repository.GetAgentProfileByID(s.db, id)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -75,7 +75,7 @@ func (s *AgentProfileService) Get(ctx context.Context, id, ownerID string) (*mod
 	return p, nil
 }
 
-func (s *AgentProfileService) GetPublic(ctx context.Context, id string) (*model.AgentProfile, error) {
+func (s *Service) GetPublic(ctx context.Context, id string) (*model.AgentProfile, error) {
 	p, err := repository.GetAgentProfileByID(s.db, id)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -89,7 +89,7 @@ func (s *AgentProfileService) GetPublic(ctx context.Context, id string) (*model.
 	return p, nil
 }
 
-func (s *AgentProfileService) Update(ctx context.Context, id, ownerID string, updates map[string]interface{}) (*model.AgentProfile, error) {
+func (s *Service) Update(ctx context.Context, id, ownerID string, updates map[string]interface{}) (*model.AgentProfile, error) {
 	p, err := repository.GetAgentProfileByID(s.db, id)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -217,7 +217,7 @@ func (s *AgentProfileService) Update(ctx context.Context, id, ownerID string, up
 	return p, nil
 }
 
-func (s *AgentProfileService) Delete(ctx context.Context, id, ownerID string) error {
+func (s *Service) Delete(ctx context.Context, id, ownerID string) error {
 	p, err := repository.GetAgentProfileByID(s.db, id)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -231,7 +231,7 @@ func (s *AgentProfileService) Delete(ctx context.Context, id, ownerID string) er
 	return repository.SoftDeleteAgentProfile(s.db, id, ownerID)
 }
 
-func (s *AgentProfileService) List(ctx context.Context, ownerID, runtimeID, q, cursor string, pageSize int) (*ListResult, error) {
+func (s *Service) List(ctx context.Context, ownerID, runtimeID, q, cursor string, pageSize int) (*ListResult, error) {
 	profiles, hasMore, err := repository.ListAgentProfiles(s.db, ownerID, runtimeID, q, cursor, pageSize)
 	if err != nil {
 		return nil, err
@@ -245,7 +245,7 @@ func (s *AgentProfileService) List(ctx context.Context, ownerID, runtimeID, q, c
 
 // ── Market ──
 
-func (s *AgentProfileService) Publish(ctx context.Context, id, ownerID string) error {
+func (s *Service) Publish(ctx context.Context, id, ownerID string) error {
 	p, err := repository.GetAgentProfileByID(s.db, id)
 	if err != nil {
 		return errcode.UserNotFound
@@ -257,7 +257,7 @@ func (s *AgentProfileService) Publish(ctx context.Context, id, ownerID string) e
 	return repository.UpdateAgentProfile(s.db, p)
 }
 
-func (s *AgentProfileService) Unpublish(ctx context.Context, id, ownerID string) error {
+func (s *Service) Unpublish(ctx context.Context, id, ownerID string) error {
 	p, err := repository.GetAgentProfileByID(s.db, id)
 	if err != nil {
 		return errcode.UserNotFound
@@ -269,7 +269,7 @@ func (s *AgentProfileService) Unpublish(ctx context.Context, id, ownerID string)
 	return repository.UpdateAgentProfile(s.db, p)
 }
 
-func (s *AgentProfileService) Install(ctx context.Context, id, installerID string) (*model.AgentProfile, error) {
+func (s *Service) Install(ctx context.Context, id, installerID string) (*model.AgentProfile, error) {
 	src, err := repository.GetAgentProfileByID(s.db, id)
 	if err != nil {
 		return nil, errcode.UserNotFound
@@ -295,7 +295,7 @@ func (s *AgentProfileService) Install(ctx context.Context, id, installerID strin
 }
 
 // SearchMarket searches public profiles.
-func (s *AgentProfileService) SearchMarket(ctx context.Context, runtimeID, q, sortBy, cursor string, pageSize int) (*ListResult, error) {
+func (s *Service) SearchMarket(ctx context.Context, runtimeID, q, sortBy, cursor string, pageSize int) (*ListResult, error) {
 	profiles, hasMore, err := repository.ListPublicProfiles(s.db, runtimeID, q, sortBy, cursor, pageSize)
 	if err != nil {
 		return nil, err
@@ -312,7 +312,7 @@ func (s *AgentProfileService) SearchMarket(ctx context.Context, runtimeID, q, so
 }
 
 // Rate updates a profile's rating with simple averaging.
-func (s *AgentProfileService) Rate(ctx context.Context, profileID, raterID string, score int) (float64, int, error) {
+func (s *Service) Rate(ctx context.Context, profileID, raterID string, score int) (float64, int, error) {
 	if score < 1 || score > 5 {
 		return 0, 0, errcode.ErrBadRequest.WithMessage("score must be between 1 and 5")
 	}
