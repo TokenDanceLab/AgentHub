@@ -116,7 +116,14 @@ def main() -> int:
     # complex functions (admin.go/mcp_server.go/agent_dispatch.go); re-harden
     # after refactoring or threshold adjustment.
     assert_step_continue_on_error(edge, "Lint", True)
-    assert_step_continue_on_error(hub, "Lint", True)
+    # #1657: go-hub Lint converted from soft gate to hard-blocking. The 17
+    # pre-existing complexity findings stay tolerated through the action's
+    # only-new-issues mode until the #1573 baseline debt is repaid; the step
+    # must keep the pinned golangci-lint action (no placeholder commands).
+    assert_step_continue_on_error(hub, "Lint", False)
+    hub_lint_step = get_step_block(hub, "Lint")
+    assert_contains(hub_lint_step, r"golangci/golangci-lint-action@v9", "go-hub Lint must keep the pinned golangci-lint action (no placeholder commands)")
+    assert_contains(hub_lint_step, r"only-new-issues:\s*true", "go-hub Lint must restrict hard failures to new findings while baseline debt remains")
     # #1574: gosec findings triaged and cleared in both servers; the gosec
     # security scan steps are hard-blocking (no continue-on-error) and run
     # through the fail-closed verify-gosec-gates.sh wrapper.
