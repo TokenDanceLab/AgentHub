@@ -1,5 +1,5 @@
 {
-  "_comment": "Hub golangci-lint finding fingerprint baseline (#1573). Regenerated 2026-08-16 with golangci-lint v2.12.2.",
+  "_comment": "Hub golangci-lint finding fingerprint baseline (#1573). Regenerated 2026-08-20 with golangci-lint v2.12.2.",
   "linter_version": "v2.12.2",
   "findings": [
     {
@@ -14,23 +14,23 @@
     },
     {
       "linter": "gocognit",
-      "file": "internal/service/agent_edge_callback.go",
+      "file": "internal/service/agent/agent_edge_callback.go",
       "message": "cognitive complexity 39 of func `(*EdgeCallbackService).HandleTaskDone` is high (> 30)"
     },
     {
       "linter": "gocognit",
-      "file": "internal/service/agent_edge_callback.go",
+      "file": "internal/service/agent/agent_edge_callback.go",
       "message": "cognitive complexity 43 of func `(*EdgeCallbackService).HandleTaskStream` is high (> 30)"
-    },
-    {
-      "linter": "gocognit",
-      "file": "internal/service/agent_profile.go",
-      "message": "cognitive complexity 51 of func `(*AgentProfileService).Update` is high (> 30)"
     },
     {
       "linter": "gocognit",
       "file": "internal/service/agentevent/project.go",
       "message": "cognitive complexity 52 of func `ProjectTaskApprovals` is high (> 30)"
+    },
+    {
+      "linter": "gocognit",
+      "file": "internal/service/agentprofile/service.go",
+      "message": "cognitive complexity 51 of func `(*Service).Update` is high (> 30)"
     },
     {
       "linter": "gocognit",
@@ -64,8 +64,8 @@
     },
     {
       "linter": "gocognit",
-      "file": "internal/service/execution_target.go",
-      "message": "cognitive complexity 36 of func `(*ExecutionTargetService).UpsertLocalEdgeForDesktopDevice` is high (> 30)"
+      "file": "internal/service/executiontarget/execution_target.go",
+      "message": "cognitive complexity 36 of func `(*Service).UpsertLocalEdgeForDesktopDevice` is high (> 30)"
     },
     {
       "linter": "gocognit",

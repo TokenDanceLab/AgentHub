@@ -1,15 +1,6 @@
 {
   "soft_gates": [
     {
-      "location": "go-hub: Lint",
-      "kind": "continue-on-error",
-      "reason": "pre-existing Hub lint findings keep this step advisory; #1573（closed 2026-08-04）的 finding-fingerprint ratchet 与硬放行转换未完成，转换仍需认领；#1568（closed）complexity exclusions 已偿清",
-      "issue": 1573,
-      "owner": "hub-owners",
-      "introduced_at": "2026-05-24",
-      "review_by": "2026-10-01"
-    },
-    {
       "location": "go-edge: Lint",
       "kind": "continue-on-error",
       "reason": "Wave 10: gofmt fixed; gocognit findings in pre-existing complex functions (admin.go/mcp_server.go/agent_dispatch.go) keep lint advisory until refactor (#1568)",
