@@ -349,6 +349,16 @@
   color: var(--td-plum);
 }
 
+/* Read-only value display (no handler) — plain text, not a button (#1818). */
+.valueStatic {
+  max-width: 240px;
+  color: var(--td-ink-muted);
+  font: 500 0.875rem var(--td-font);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* ── Segmented control ── */
 .segment {
   min-height: 32px;
@@ -428,6 +438,48 @@
 
 .switchOn .switchThumb {
   transform: translateX(18px);
+}
+
+/* ── Disabled (coming-soon) controls (#1818) ── */
+.segmentDisabled,
+.switchDisabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.segmentDisabled .segmentBtn,
+.switchDisabled {
+  cursor: not-allowed;
+}
+
+.segmentDisabled .segmentBtn:hover {
+  color: var(--td-ink-muted);
+}
+
+.switchDisabled:hover {
+  box-shadow: none;
+}
+
+/* Inline "coming soon" marker shown next to a disabled setting (#1818). */
+.comingSoonNote {
+  display: inline-block;
+  margin-left: var(--sp-2);
+  padding: 1px 6px;
+  border: 1px solid var(--td-line);
+  border-radius: var(--r-xs, 4px);
+  background: var(--td-surface-2);
+  color: var(--td-ink-subtle);
+  font: 500 0.6875rem var(--td-font);
+  font-style: normal;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
+/* Honest note under the state preview grid (#1818). */
+.statePreviewNote {
+  margin: 0 0 var(--td-space-3, 12px);
+  color: var(--td-ink-subtle);
+  font: 400 0.75rem/1.45 var(--td-font);
 }
 
 /* ── Path display ── */

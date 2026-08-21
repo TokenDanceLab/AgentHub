@@ -186,7 +186,8 @@ export interface TranscriptChromeControllerDeps {
   onApprovalDecision?: ((decision: ApprovalDecisionAction) => Promise<void> | void) | undefined;
   /**
    * Hub session id for REST message actions (#1383). Absent on Desktop/demo
-   * shells — pin/unpin/react then keep the placeholder toast behavior.
+   * shells — the react/pin/unpin/recall menu entries are omitted there and
+   * their planners return no effects (#1818).
    */
   sessionId?: string | null | undefined;
   onPinMessage?: ((messageId: string, sessionId: string) => Promise<void> | void) | undefined;
@@ -450,6 +451,9 @@ export function createTranscriptChromeController(
       t,
       onAction: runContextAction,
       onEnterSelection: enterSelection,
+      // Hub REST message entries (react/pin/unpin/recall) render only with
+      // a session; Desktop/demo shells get an honest, shorter menu (#1818).
+      hubMessageActions: Boolean(deps.sessionId),
       ...(conversations !== undefined ? { conversations } : {}),
     }),
     multiSelectActions: () => buildTranscriptMultiSelectActions({

@@ -28,6 +28,7 @@ export { TaskSelectionStrip };
 export function TaskTable({
   groups,
   emptyStateLabel,
+  comingSoonEmptyState = false,
   onTaskClick,
   onAddRow,
   selectedTaskId,
@@ -41,6 +42,8 @@ export function TaskTable({
 }: {
   groups: TaskGroup[];
   emptyStateLabel?: string | undefined;
+  /** Real data mode without a task backend (#1818): coming-soon empty state. */
+  comingSoonEmptyState?: boolean | undefined;
   onTaskClick?: ((task: TaskItem) => void) | undefined;
   onAddRow?: (() => void) | undefined;
   selectedTaskId?: string | null | undefined;
@@ -72,7 +75,11 @@ export function TaskTable({
       />
 
       {totalTasks === 0 && (
-        <TaskTableEmptyState emptyStateLabel={emptyStateLabel} onAddRow={onAddRow} />
+        <TaskTableEmptyState
+          comingSoon={comingSoonEmptyState}
+          emptyStateLabel={emptyStateLabel}
+          onAddRow={onAddRow}
+        />
       )}
 
       {/* Fallback: if no groups, show single group with all tasks */}

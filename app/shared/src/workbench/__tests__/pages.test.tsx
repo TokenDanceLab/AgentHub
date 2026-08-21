@@ -134,15 +134,13 @@ describe('AgentHubWorkbench', () => {
     const dialog = screen.getByRole('dialog', { name: '用户 账号菜单' });
     expect(dialog).toBeInTheDocument();
     expect(dialog).toHaveTextContent('TokenDance');
-    expect(within(dialog).getByRole('button', { name: '编辑资料' })).toBeInTheDocument();
-    expect(within(dialog).getByRole('button', { name: '复制链接' })).toBeInTheDocument();
-    expect(within(dialog).getByRole('button', { name: '我的个人名片' })).toBeInTheDocument();
-    expect(within(dialog).getByRole('button', { name: '我的二维码与链接' })).toBeInTheDocument();
-    expect(within(dialog).getByRole('button', { name: '登录更多账号' })).toBeInTheDocument();
+    // Decorative account items (edit profile / card / QR / add account) were
+    // removed with their fake toasts; logout is the only real action (#1818).
+    expect(within(dialog).queryByRole('button', { name: '编辑资料' })).not.toBeInTheDocument();
+    expect(within(dialog).queryByRole('button', { name: '我的个人名片' })).not.toBeInTheDocument();
+    expect(within(dialog).queryByRole('button', { name: '我的二维码与链接' })).not.toBeInTheDocument();
+    expect(within(dialog).queryByRole('button', { name: '登录更多账号' })).not.toBeInTheDocument();
     expect(within(dialog).getByRole('button', { name: '退出登录' })).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole('button', { name: '复制链接' }));
-    expect(screen.getByText('已复制链接')).toBeInTheDocument();
 
     fireEvent.keyDown(document, { key: 'Escape' });
     expect(screen.queryByRole('dialog', { name: '用户 账号菜单' })).not.toBeInTheDocument();

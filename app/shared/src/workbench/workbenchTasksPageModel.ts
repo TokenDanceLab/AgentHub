@@ -5,7 +5,11 @@ export interface TasksPageDerivedModel {
   activeFilterCount: number;
   crossProjectCount: number;
   dueTodayCount: number;
-  emptyStateLabel: string | undefined;
+  /**
+   * Real data mode has no task backend yet (#1818): the page renders an
+   * honest "coming soon" empty state instead of replay/mock task rows.
+   */
+  tasksComingSoon: boolean;
   fieldConfigActive: boolean;
   fieldConfigLabel: string;
   groupActive: boolean;
@@ -70,7 +74,7 @@ export function buildTasksPageDerivedModel(input: {
     activeFilterCount: taskFilterActive ? 1 : 0,
     crossProjectCount: countCrossProjectTasks(visibleTasks),
     dueTodayCount: countDueTodayTasks(visibleTasks),
-    emptyStateLabel: realDataMode ? 'Hub tasks are not loaded in this replay.' : undefined,
+    tasksComingSoon: realDataMode && visibleTasks.length === 0,
     fieldConfigActive: !taskShowCreator,
     fieldConfigLabel: buildTaskFieldConfigLabel(taskShowCreator),
     groupActive: taskGroupMode !== 'custom' || taskViewMode !== 'list',

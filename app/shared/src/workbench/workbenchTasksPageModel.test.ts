@@ -77,7 +77,8 @@ describe('workbenchTasksPageModel', () => {
       activeFilterCount: 1,
       crossProjectCount: 2,
       dueTodayCount: 2,
-      emptyStateLabel: 'Hub tasks are not loaded in this replay.',
+      // Real mode with visible tasks (parent-provided) is not "coming soon".
+      tasksComingSoon: false,
       fieldConfigActive: true,
       fieldConfigLabel: '字段配置 5/6',
       groupActive: true,
@@ -86,6 +87,19 @@ describe('workbenchTasksPageModel', () => {
       sortActive: true,
       sortLabel: '排序：截止时间',
     });
+
+    // Real mode without any tasks renders the honest coming-soon empty
+    // state (#1818).
+    const realEmpty = buildTasksPageDerivedModel({
+      realDataMode: true,
+      taskFilterActive: false,
+      taskGroupMode: 'custom',
+      taskShowCreator: true,
+      taskSortMode: 'custom',
+      taskViewMode: 'list',
+      visibleTasks: [],
+    });
+    expect(realEmpty.tasksComingSoon).toBe(true);
 
     const demo = buildTasksPageDerivedModel({
       realDataMode: false,
@@ -96,7 +110,7 @@ describe('workbenchTasksPageModel', () => {
       taskViewMode: 'list',
       visibleTasks: [],
     });
-    expect(demo.emptyStateLabel).toBeUndefined();
+    expect(demo.tasksComingSoon).toBe(false);
     expect(demo.activeFilterCount).toBe(0);
     expect(demo.groupActive).toBe(false);
     expect(demo.sortActive).toBe(false);

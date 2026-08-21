@@ -14,6 +14,7 @@ import { getWorkbenchDataModeContract } from '../../../demo';
 import styles from '../SettingsPage.module.css';
 import { useTranslation } from 'react-i18next';
 import { CHATVIEW_I18N_NAMESPACE } from '../../../chatview/i18n/resources';
+import { SHARED_WORKBENCH_I18N_NAMESPACE } from '../../../i18n';
 
 /* ── Design icons ── */
 
@@ -75,14 +76,26 @@ interface SettingsRowProps {
   children: React.ReactNode;
   /** Use a wider control area (for permission segments). */
   wide?: boolean;
+  /**
+   * Marks a row whose control is not wired to a real capability yet
+   * (#1818): renders an explicit "coming soon" note so a disabled control
+   * is never read as a working one.
+   */
+  comingSoon?: boolean;
 }
 
-export function SettingsRow({ label, description, children, wide = false }: SettingsRowProps): React.ReactElement {
+export function SettingsRow({ label, description, children, wide = false, comingSoon = false }: SettingsRowProps): React.ReactElement {
+  const { t: tw } = useTranslation(SHARED_WORKBENCH_I18N_NAMESPACE);
   return (
     <div className={`${styles.row} settings-row`} data-card-surface>
       <div>
         <strong className={styles.rowLabel}>{label}</strong>
-        <span className={styles.rowDesc}>{description}</span>
+        <span className={styles.rowDesc}>
+          {description}
+          {comingSoon && (
+            <em className={styles.comingSoonNote}>{tw('settings.comingSoon')}</em>
+          )}
+        </span>
       </div>
       <div className={`${styles.control}${wide ? ` ${styles.controlWide}` : ''}`}>
         {children}
@@ -97,16 +110,25 @@ interface SettingSegmentProps {
   options: string[];
   active: string;
   onChange: (value: string) => void;
+  /**
+   * Disabled segments keep their current value visible but ignore clicks —
+   * used for preferences that have no effect yet (#1818).
+   */
+  disabled?: boolean;
 }
 
-export function SettingSegment({ options, active, onChange }: SettingSegmentProps): React.ReactElement {
+export function SettingSegment({ options, active, onChange, disabled = false }: SettingSegmentProps): React.ReactElement {
   return (
-    <div className={styles.segment}>
+    <div
+      aria-disabled={disabled || undefined}
+      className={`${styles.segment}${disabled ? ` ${styles.segmentDisabled}` : ''}`}
+    >
       {options.map((option) => (
         <button
           key={option}
           aria-pressed={option === active}
           className={`${styles.segmentBtn}${option === active ? ` ${styles.segmentBtnActive}` : ''}`}
+          disabled={disabled}
           type="button"
           onClick={() => onChange(option)}
         >
@@ -140,15 +162,22 @@ export function DataModeControl({ active, onChange }: DataModeControlProps): Rea
 interface SettingSwitchProps {
   active: boolean;
   onChange: (active: boolean) => void;
+  /**
+   * Disabled switches keep their current state visible but ignore clicks —
+   * used for preferences that have no effect yet (#1818).
+   */
+  disabled?: boolean;
 }
 
-export function SettingSwitch({ active, onChange }: SettingSwitchProps): React.ReactElement {
+export function SettingSwitch({ active, onChange, disabled = false }: SettingSwitchProps): React.ReactElement {
   return (
     <button
-      className={`${styles.switch}${active ? ` ${styles.switchOn}` : ''}`}
-      type="button"
-      role="switch"
       aria-checked={active}
+      aria-disabled={disabled || undefined}
+      className={`${styles.switch}${active ? ` ${styles.switchOn}` : ''}${disabled ? ` ${styles.switchDisabled}` : ''}`}
+      disabled={disabled}
+      role="switch"
+      type="button"
       onClick={() => onChange(!active)}
     >
       <span className={styles.switchThumb} />
@@ -164,6 +193,11 @@ interface SettingValueProps {
 }
 
 export function SettingValue({ value, onClick }: SettingValueProps): React.ReactElement {
+  // Read-only values render as plain text; a button without a handler would
+  // be a clickable-but-dead control (#1818).
+  if (!onClick) {
+    return <span className={styles.valueStatic}>{value}</span>;
+  }
   return (
     <button className={styles.value} type="button" onClick={onClick}>
       {value}

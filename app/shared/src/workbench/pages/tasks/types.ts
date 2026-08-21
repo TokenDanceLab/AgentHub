@@ -65,6 +65,16 @@ export interface TasksPageProps {
   groups: TaskGroup[];
   /** Status line to show when no tasks are available from the active data source. */
   emptyStateLabel?: string | undefined;
+  /**
+   * Real data mode without a task backend (#1818): the empty state explains
+   * that the task list is coming soon instead of implying tasks were loaded.
+   */
+  comingSoonEmptyState?: boolean | undefined;
+  /**
+   * Marks mock/demo task data with an explicit badge so demo rows are never
+   * mistaken for real workspace tasks (#1818).
+   */
+  demoDataActive?: boolean | undefined;
   /** Agent/user profiles available for assignee and creator avatar resolution */
   profiles?: WorkbenchProfileSource[] | undefined;
   /** Selected task details, rendered as a compact in-page action strip */

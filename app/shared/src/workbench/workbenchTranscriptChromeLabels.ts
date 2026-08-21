@@ -76,9 +76,9 @@ export function blockTitle(
     case 'route_decision':
       return block.targetAgent || block.action;
     case 'context_usage':
-      return block.modelLabel || '上下文用量';
+      return block.modelLabel || t('mainchain.contextUsage');
     default:
-      return '消息卡片';
+      return t('mainchain.messageCard');
   }
 }
 
@@ -98,16 +98,11 @@ export function cardActionLabel(
 ): string {
   const labels: Record<string, string> = {
     copy: t('toast.cardCopied'),
-    react: t('toast.reactOpened'),
+    react: t('toast.reactionAdded'),
     reply: `${t('context.reply')} ${title}`,
     forward: t('toast.forwardQueued'),
-    topic: t('toast.topicDraft'),
     pin: t('toast.pinUpdated'),
     link: t('toast.linkCopied'),
-    translate: t('toast.translateQueued'),
-    task: t('toast.taskDraft'),
-    export: t('toast.exportDraft'),
-    apps: t('toast.appsOpened'),
     delete: t('toast.deleteQueued'),
     edit: t('toast.editStarted'),
   };
@@ -121,9 +116,6 @@ export function multiActionLabel(
 ): string {
   const labels: Record<string, string> = {
     copy: t('toast.multiCopy', { count }),
-    forward: t('toast.multiForward', { count }),
-    task: t('toast.multiTaskDraft', { count }),
-    export: t('toast.multiExport', { count }),
     delete: t('toast.multiDelete', { count }),
   };
   return labels[action] ?? t('toast.multiProcessed', { count });
