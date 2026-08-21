@@ -167,6 +167,15 @@ export const RowItem = memo(function RowItem({ item, onToggle, onApprove, onReje
     }
   }, [item.status, item.type, item.collapsible])
 
+  // Waiting approval cards: auto-expand so the approve/deny actions are
+  // visible without hunting inside the collapsed body (#1821). Once the user
+  // manually toggles, respect their choice.
+  useEffect(() => {
+    if (item.type !== 'approval' || item.status !== 'waiting') return
+    if (!item.collapsible || userToggledRef.current) return
+    setOpen(true)
+  }, [item.type, item.status, item.collapsible])
+
   // T16: reset critical second-confirm whenever the approval card's status or
   // identity changes (decided → idle, or a new request replaces this card).
   useEffect(() => {
@@ -496,7 +505,18 @@ export const RowItem = memo(function RowItem({ item, onToggle, onApprove, onReje
           {item.sessionTags && <div className="sess-meta">{item.sessionTags.map((t,i) => <span key={i}>{t}</span>)}</div>}
           {item.children && item.children.length > 0 && (
             <div className="row-children">
-              {item.children.map((child) => <RowItem key={child.id} item={child} />)}
+              {item.children.map((child) => (
+                // #1821: nested cards (run_step_group recursion) must receive
+                // the approval + toggle callbacks or their buttons are dead.
+                // Conditional spread keeps exactOptionalPropertyTypes happy.
+                <RowItem
+                  key={child.id}
+                  item={child}
+                  {...(onToggle ? { onToggle } : {})}
+                  {...(onApprove ? { onApprove } : {})}
+                  {...(onReject ? { onReject } : {})}
+                />
+              ))}
             </div>
           )}
         </div>

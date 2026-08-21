@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { browserFilesToComposerAttachments, clearDraft, loadDraft, saveDraft } from '@shared/composer';
 import type { ComposerMention } from '@shared/composer';
@@ -88,6 +88,7 @@ export function UnifiedComposer({
   submitBehavior,
   targetLabel,
   uploadProgresses,
+  onRetryAttachmentUpload,
   isRunning,
   onCancel,
   onToast,
@@ -124,6 +125,24 @@ export function UnifiedComposer({
     (id: string) => onExecutionTargetChange?.(id),
     [onExecutionTargetChange],
   );
+
+  /**
+   * Uploads currently in flight, for the progress line shown while the
+   * composer is submitting (the attachment chips are cleared optimistically,
+   * so the bar would otherwise vanish mid-upload, #1821).
+   */
+  const inFlightUploadSummaries = useMemo(() => {
+    if (!uploadProgresses) return [];
+    return Object.entries(uploadProgresses).flatMap(([attachmentId, progress]) => {
+      if (progress.phase !== 'hashing' && progress.phase !== 'uploading') return [];
+      const attachment = composer.attachments.find((a) => a.id === attachmentId);
+      return [{
+        attachmentId,
+        name: attachment?.name ?? attachmentId,
+        percent: progress.percent,
+      }];
+    });
+  }, [uploadProgresses, composer.attachments]);
 
   useEffect(() => {
     if (!shouldClearExecutionTarget(executionTargets, runtime.executionTargetId)) return;
@@ -180,6 +199,14 @@ export function UnifiedComposer({
     const cid = composer.conversationId;
     if (!cid) return;
 
+    // Conversation switch with a draft still pending its idle-callback flush:
+    // persist it for the OLD conversation before touching the new one, so
+    // switching never drops un-saved draft content (#1821).
+    const pending = pendingDraftRef.current;
+    if (pending && pending.conversationId !== cid) {
+      flushDraft();
+    }
+
     // ══ Phase 1: Load draft (first time per conversationId) ══
     if (draftLoadedRef.current !== cid) {
       draftLoadedRef.current = cid;
@@ -187,9 +214,12 @@ export function UnifiedComposer({
       if (composer.text === '' && composer.mentions.length === 0) {
         const draft = loadDraft(cid);
         if (draft) {
-          // Restore text and mentions — dispatches trigger a re-render.
+          // Restore text + mentions, validating mentions against the current
+          // roster so stale agent ids never become ghost chips (#1821).
+          const rosterIds = new Set(runtime.mentionableAgents.map((m) => m.id));
+          const validMentions = draft.mentions.filter((m) => rosterIds.has(m.id));
           dispatchComposer({ type: 'setText', text: draft.text });
-          for (const m of draft.mentions) {
+          for (const m of validMentions) {
             dispatchComposer({ type: 'addMention', mention: m });
           }
           return; // Don't save/clear this cycle — let the re-render handle it.
@@ -199,6 +229,10 @@ export function UnifiedComposer({
 
     // ══ Phase 2: Save / Clear draft ══
     if (composer.text === '' && composer.mentions.length === 0) {
+      // Flush any draft still pending for the PREVIOUS conversation first:
+      // switching conversations within the idle-callback window used to drop
+      // the old draft silently (#1821).
+      flushDraft();
       // Empty state after user interaction or submit → clear draft.
       clearDraft(cid);
       if (ricIdRef.current !== null) {
@@ -221,7 +255,7 @@ export function UnifiedComposer({
       typeof window.requestIdleCallback === 'function'
         ? window.requestIdleCallback(flushDraft, { timeout: 500 })
         : window.setTimeout(flushDraft, 200);
-  }, [composer.text, composer.mentions, composer.conversationId, dispatchComposer]);
+  }, [composer.text, composer.mentions, composer.conversationId, dispatchComposer, runtime.mentionableAgents]);
 
   // Force-flush pending draft when the page is hidden; flush on unmount.
   useEffect(() => {
@@ -544,7 +578,21 @@ export function UnifiedComposer({
           isSubmitting={view.isSubmitting}
           onRemove={handleRemoveAttachment}
           uploadProgresses={chromeModel.attachment.uploadProgresses}
+          {...(onRetryAttachmentUpload ? { onRetryUpload: onRetryAttachmentUpload } : {})}
         />
+      )}
+      {view.isSubmitting && inFlightUploadSummaries.length > 0 && (
+        <div className={styles.composerStatus} role="status">
+          {inFlightUploadSummaries.map((summary) => (
+            <span key={summary.attachmentId}>
+              {t('composer.uploadingAttachment', {
+                name: summary.name,
+                percent: String(summary.percent),
+                defaultValue: `上传中 ${summary.name} ${summary.percent}%`,
+              })}
+            </span>
+          ))}
+        </div>
       )}
       <div className={styles.composerRow}>
         {dragOver && <div className={styles.composerDragOverlay} />}

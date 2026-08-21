@@ -56,6 +56,11 @@ export interface ChatViewBridgeProps {
   connectionStatus?: ConnectionStatusKind | undefined;
   /** Set of conversation IDs whose pinned announcements have been dismissed. */
   dismissedPinnedIds: Set<string>;
+  /**
+   * Called when the user dismisses the pinned banner (#1821). The host keeps
+   * the dismissed set so the banner stays hidden until the pin changes.
+   */
+  onDismissPinned?: ((conversationId: string) => void) | undefined;
   /** Called to show a toast (used for pinned announcement copy feedback). */
   onToast?: ((message: string) => void) | undefined;
   /**
@@ -94,6 +99,7 @@ export const ChatViewBridge = React.memo(function ChatViewBridge({
   onHighlightEnd,
   connectionStatus,
   dismissedPinnedIds,
+  onDismissPinned,
   onToast,
   unreadDivider,
 }: ChatViewBridgeProps): React.ReactElement {
@@ -112,9 +118,12 @@ export const ChatViewBridge = React.memo(function ChatViewBridge({
       author: activeConversation.pinnedAnnouncement.author,
       time: activeConversation.pinnedAnnouncement.time,
       onCopy: onToast ? () => onToast(t('toast.pinnedOpened')) : undefined,
-      onDismiss: undefined,
+      // #1821: wire the real dismissal path so the close button works.
+      onDismiss: onDismissPinned
+        ? () => onDismissPinned(activeConversation.id)
+        : undefined,
     };
-  }, [activeConversation, dismissedPinnedIds, onToast]);
+  }, [activeConversation, dismissedPinnedIds, onDismissPinned, onToast]);
 
   // #1406 Phase 3: mount the inline delegation card below each user message.
   const renderUserFooter = useCallback(

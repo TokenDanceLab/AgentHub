@@ -154,7 +154,9 @@ describe('Web app root', () => {
     expect(screen.queryByRole('button', { name: '切换左侧栏' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '后退' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '前进' })).not.toBeInTheDocument();
-    expect(screen.getByRole('tablist', { name: workspaceTabsLabel })).toBeInTheDocument();
+    // #1821: the legacy workspace tab row (消息/云文档/新建频道) was dead
+    // chrome (no onClick) and has been removed from WorkspaceHeader.
+    expect(screen.queryByRole('tablist', { name: workspaceTabsLabel })).not.toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Agent 协作群' })).toBeInTheDocument();
     expect(getComposerInput()).toBeInTheDocument();
     // showComposerAgentPicker / showMainchainStatus={false} prop gating, on the real shell.

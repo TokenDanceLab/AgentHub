@@ -61,7 +61,12 @@ export function resolveHubContacts(
   contacts: HubContactLike[] | undefined,
   hubReady: boolean,
   dataMode: WorkbenchDataMode,
+  loadError?: string | undefined,
 ): WorkbenchContactsData | undefined {
+  // #1821: a failed request must not collapse into an empty contact list.
+  // Returning undefined lets the page show its error state; the shell passes
+  // the request error through the optional `loadError` argument.
+  if (loadError) return undefined;
   if (!hubReady) {
     return isWorkbenchFixtureDataMode(dataMode) ? undefined : hubEmptyContacts;
   }
@@ -134,7 +139,11 @@ export function resolveHubProjects<TProject extends HubWorkspaceProjectLike>(
   hubReady: boolean,
   dataMode: WorkbenchDataMode,
   mapFn: (project: TProject) => ProjectInfo,
+  loadError?: string | undefined,
 ): ProjectInfo[] | undefined {
+  // #1821: a failed request must not collapse into an empty list; undefined
+  // lets the page show its error state.
+  if (loadError) return undefined;
   if (!hubReady) {
     return isWorkbenchFixtureDataMode(dataMode) ? undefined : [];
   }
@@ -148,8 +157,9 @@ export function resolveHubProjectsDefault(
   projects: HubWorkspaceProjectLike[] | undefined,
   hubReady: boolean,
   dataMode: WorkbenchDataMode,
+  loadError?: string | undefined,
 ): ProjectInfo[] | undefined {
-  return resolveHubProjects(projects, hubReady, dataMode, workspaceProjectToProjectInfo);
+  return resolveHubProjects(projects, hubReady, dataMode, workspaceProjectToProjectInfo, loadError);
 }
 
 // ── Document mapping ────────────────────────────────────────────────
@@ -202,7 +212,11 @@ export function resolveHubDocuments(
   documents: HubDocumentLike[] | undefined,
   hubReady: boolean,
   dataMode: WorkbenchDataMode,
+  loadError?: string | undefined,
 ): DocRow[] | undefined {
+  // #1821: a failed request must not collapse into an empty list; undefined
+  // lets the page show its error state.
+  if (loadError) return undefined;
   if (!hubReady) {
     return isWorkbenchFixtureDataMode(dataMode) ? undefined : [];
   }

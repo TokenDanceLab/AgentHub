@@ -224,13 +224,14 @@ describe('ConversationSidebar interaction structure (#1715)', () => {
 
   it('archive action does not trigger row selection', async () => {
     const user = userEvent.setup();
-    vi.stubGlobal('confirm', vi.fn().mockReturnValue(true));
     const { props } = renderSidebar({
       onArchiveConversation: vi.fn(),
       onSelectConversation: vi.fn(),
     });
     const firstRow = conversationRows()[0]!;
     await user.click(within(firstRow).getByRole('button', { name: 'Archive' }));
+    // #1821: archive confirms in a Modal (no more native window.confirm).
+    await user.click(screen.getByRole('button', { name: '归档' }));
     expect(props.onArchiveConversation).toHaveBeenCalledWith('c1', true);
     expect(props.onSelectConversation).not.toHaveBeenCalled();
   });

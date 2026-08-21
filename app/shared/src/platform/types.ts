@@ -4,6 +4,7 @@ import type {
   ComposerIntent,
   ComposerSubmitResult,
 } from '../composer/types';
+import type { AttachmentUploadProgress } from '../composer/upload';
 import type { EvidenceRef } from '../transcript';
 import type { AgentActivitySnapshot } from '../transcript/agentActivity';
 
@@ -110,6 +111,15 @@ export interface AttachmentPort {
   pickFiles(): Promise<ComposerAttachment[]>;
   /** Upload a file to the Hub attachment store. Returns the server-side attachment ref. */
   uploadAttachment(file: File): Promise<AttachmentRef>;
+  /**
+   * Progress-capable upload (#1821). Optional — surfaces that implement it
+   * can report real incremental progress (e.g. the shared XHR path in
+   * composer/upload.ts). ConversationHost prefers this variant when present.
+   */
+  uploadAttachmentWithProgress?(
+    file: File,
+    onProgress: (progress: AttachmentUploadProgress) => void,
+  ): Promise<AttachmentRef>;
 }
 
 /**

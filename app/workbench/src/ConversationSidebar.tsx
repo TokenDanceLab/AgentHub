@@ -110,6 +110,14 @@ export function ConversationSidebar({
   const [renamingId, setRenamingId] = useState<string | null>(null);
   /** Conversation awaiting delete confirmation in the dialog. */
   const [deleteTarget, setDeleteTarget] = useState<WorkbenchConversation | null>(null);
+  /** Conversation awaiting archive confirmation in the dialog (#1821). */
+  const [archiveTarget, setArchiveTarget] = useState<WorkbenchConversation | null>(null);
+  /**
+   * Set when Escape cancels an inline rename. Blur fires after the input is
+   * removed in some browsers — the flag keeps that late blur from committing
+   * a cancelled rename (#1821).
+   */
+  const cancelRenameRef = useRef(false);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -294,7 +302,10 @@ export function ConversationSidebar({
       items.push({
         icon: 'edit',
         label: t('context.renameConversation'),
-        onClick: () => setRenamingId(conversation.id),
+        onClick: () => {
+          cancelRenameRef.current = false;
+          setRenamingId(conversation.id);
+        },
       });
     }
     if (onCopyConversationLink) {
@@ -430,17 +441,27 @@ export function ConversationSidebar({
                         autoFocus
                         className={styles.conversationRenameInput}
                         defaultValue={conversation.title}
-                        onBlur={() => setRenamingId(null)}
+                        // #1821: blur commits the typed value instead of
+                        // discarding it silently (Enter blurs → single commit
+                        // path; Escape cancels via cancelRenameRef).
+                        onBlur={(event) => {
+                          if (cancelRenameRef.current) {
+                            cancelRenameRef.current = false;
+                            return;
+                          }
+                          handleRenameSubmit(conversation, event.currentTarget.value);
+                        }}
                         onFocus={(event) => event.currentTarget.select()}
                         onKeyDown={(event) => {
                           if (event.key === 'Enter') {
                             event.preventDefault();
-                            handleRenameSubmit(conversation, event.currentTarget.value);
+                            event.currentTarget.blur();
                             return;
                           }
                           if (event.key === 'Escape') {
                             event.preventDefault();
                             event.stopPropagation();
+                            cancelRenameRef.current = true;
                             setRenamingId(null);
                           }
                         }}
@@ -548,11 +569,7 @@ export function ConversationSidebar({
                             <button type="button"
                               aria-label={t('aria.archive')}
                               className={styles.conversationActionBtn}
-                              onClick={() => {
-                                if (window.confirm('Archive this conversation?')) {
-                                  onArchiveConversation(conversation.id, true);
-                                }
-                              }}
+                              onClick={() => setArchiveTarget(conversation)}
                               tabIndex={-1}
                             >
                               <DesignNavIcon name="archive" size={14} />
@@ -615,6 +632,39 @@ export function ConversationSidebar({
               }}
             >
               {t('conversation.deleteConfirm')}
+            </button>
+          </div>
+        </Modal>
+      )}
+      {archiveTarget && (
+        <Modal
+          contentClassName={styles.conversationDeleteContent}
+          onClose={() => setArchiveTarget(null)}
+          open
+          title={t('conversation.archiveTitle', { defaultValue: '归档会话' })}
+        >
+          <p className={styles.conversationDeleteText}>
+            {t('conversation.archiveBody', {
+              title: archiveTarget.title,
+              defaultValue: '确定要归档会话“{{title}}”吗？归档后可随时恢复。',
+            })}
+          </p>
+          <div className={styles.conversationDeleteActions}>
+            <button type="button"
+              className={styles.conversationDeleteCancel}
+              onClick={() => setArchiveTarget(null)}
+            >
+              {t('conversation.cancel')}
+            </button>
+            <button type="button"
+              className={styles.conversationDeleteConfirm}
+              onClick={() => {
+                const target = archiveTarget;
+                setArchiveTarget(null);
+                onArchiveConversation?.(target.id, true);
+              }}
+            >
+              {t('conversation.archiveConfirm', { defaultValue: '归档' })}
             </button>
           </div>
         </Modal>
