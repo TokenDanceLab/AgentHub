@@ -2,6 +2,7 @@
 // 参考: OpCode agentStore caching + Kanna connection tracking
 import { create } from 'zustand';
 import { subscribeWithSelector } from 'zustand/middleware';
+import type { ConnectionStatusKind } from '@shared/workbench';
 import type { HealthResponse } from '@shared/types';
 
 /** Recovery state for stream recovery after WebSocket reconnection. */
@@ -63,3 +64,16 @@ export const useConnectionStore = create<ConnectionState>()(
     setRecoveryError: (e) => set({ recoveryError: e }),
   })),
 );
+
+/**
+ * Maps the raw WebSocket flags to the workbench connection indicator kind
+ * (#1816): connected → live; reconnecting → connecting (a recovery attempt
+ * is in flight); anything else → disconnected.
+ */
+export function deriveWorkbenchConnectionStatus(
+  state: Pick<ConnectionState, 'isConnected' | 'reconnecting'>,
+): ConnectionStatusKind {
+  if (state.isConnected) return 'connected';
+  if (state.reconnecting) return 'connecting';
+  return 'disconnected';
+}

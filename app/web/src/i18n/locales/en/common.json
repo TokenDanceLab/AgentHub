@@ -151,7 +151,10 @@
   "auth.error.oidc.timeout": "Login timed out — no callback received within 5 minutes.",
   "auth.error.oidc.tokenExchangeFailed": "Token exchange failed: {{detail}}",
   "auth.error.oidc.startFailed": "Failed to start OIDC login: {{detail}}",
+  "auth.error.oidc.default": "TokenDance ID sign-in failed. Please try again.",
   "webChat.signInRequired": "Sign in is required to use web chat",
+  "webChat.deviceKicked": "This device session was signed out by the Hub (it may have been replaced by another login). Please sign in again.",
+  "webChat.deviceKicked.signIn": "Sign in",
 
   "diff.empty.title": "No changes to display",
   "diff.empty.description": "Diff output will appear here after the run reports changed files.",
