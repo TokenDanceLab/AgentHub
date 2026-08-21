@@ -299,6 +299,7 @@ export function buildChatInspectorProps(
 
   assignIfDefined(inspectorProps, 'canOpenPreview', platform.preview?.canOpenEvidence);
   assignIfDefined(inspectorProps, 'onOpenPreview', platform.preview?.openEvidence);
+  assignIfDefined(inspectorProps, 'previewPort', platform.preview);
   assignIfDefined(inspectorProps, 'reviewFileRequest', reviewFileRequest);
   assignIfDefined(inspectorProps, 'runtimeEvidence', runtimeEvidence);
   assignIfDefined(inspectorProps, 'workDir', resolveComposerWorkDir(composer.workDir));

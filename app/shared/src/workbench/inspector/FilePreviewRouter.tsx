@@ -1,14 +1,20 @@
-import React, { useCallback, useMemo } from 'react';
-import { parseError } from '../../errors';
+import React, { useCallback, useMemo, useState } from 'react';
+import type { PreviewPort, RuntimeEvidenceContentRef } from '../../platform';
 import type { FileDiff } from '../../types/chat';
-import { DiffReviewPanel, type DiffHunkDecision, type DiffReviewFile } from '../../ui/DiffReviewPanel';
+import {
+  DiffReviewPanel,
+  type DiffHunkDecision,
+  type DiffReviewFile,
+} from '../../ui/DiffReviewPanel';
 import { DocxPreview } from '../../ui/DocxPreview';
 import { SlideshowPreview } from '../../ui/SlideshowPreview';
 import { TablePreview } from '../../ui/TablePreview';
 import { PREVIEW_SANDBOX_SRCDOC } from '../../ui/previewSandbox';
+import { useToastStore } from '../../ui/toast/toastStore';
 import { DesignFileIcon } from '../designIcons';
 import styles from '../AgentHubWorkbench.module.css';
 import { FilePreview } from './FilePreview';
+import { resolvePreviewContentUrl } from './FilePreviewHelpers';
 import type { FileItem } from './OverviewPanel';
 
 /* ═══════════════════════════════════════════════════════════════════════
@@ -16,33 +22,58 @@ import type { FileItem } from './OverviewPanel';
    code viewer based on the filename extension.
 
    Routing table:
-     interactiveDiff       -> InteractiveDiffPreview (accept/reject write-back)
+     interactiveDiff       -> InteractiveDiffPreview (accept/reject write-back
+                              via PreviewPort; read-only notice on surfaces
+                              without a Local Edge)
      .pptx                 -> SlideshowPreview
      .ppt                  -> SlideshowPreview (legacy kind)
      .xlsx / .xls / .csv   -> TablePreview
      .docx                 -> DocxPreview
-     .pdf                  -> browser-native PDF iframe
+     .pdf                  -> browser-native PDF iframe (needs a resolvable
+                              content URL; honest notice otherwise)
      .html / .htm          -> sandboxed HTML iframe (srcDoc)
-     .png/.jpg/...         -> image placeholder (URL-loaded later)
+     .png/.jpg/...         -> image via evidence content URL (honest notice
+                              when no resolvable URL exists)
      .txt / .log           -> plain <pre>
      everything else       -> FilePreview (code / diff / markdown)
+
+   Interactive diff apply and content-URL resolution go through the platform
+   `PreviewPort` (#1817): the shared package owns no Local Edge, so the
+   renderer never hardcodes an Edge base URL. Desktop implements the port
+   against Edge REST; Web omits apply (Hub-only boundary) and the router
+   degrades to explicit read-only feedback instead of silent console errors.
    ═══════════════════════════════════════════════════════════════════════ */
 
 export type PreviewFile = FileItem & {
   content?: string | undefined;
   diffContent?: string | undefined;
   owner?: string | undefined;
+  /**
+   * Structured ref to host-owned runtime-evidence content (artifact file or
+   * preview). Resolved via `PreviewPort.resolveRuntimeEvidenceContent`;
+   * shared code never constructs host REST paths itself (#1817).
+   */
+  contentRef?: RuntimeEvidenceContentRef | undefined;
   /** When present, this is an interactive diff from a run — enables accept/reject with Edge apply. */
-  interactiveDiff?: {
-    runId: string;
-    fileDiff: FileDiff;
-    workDir: string;
-  } | undefined;
+  interactiveDiff?:
+    | {
+        runId: string;
+        fileDiff: FileDiff;
+        workDir: string;
+      }
+    | undefined;
 };
 
 export interface FilePreviewRouterProps {
   file: PreviewFile;
   onClose: () => void;
+  /**
+   * Platform preview port for capabilities the shared package cannot own:
+   * diff hunk write-back (Edge apply) and evidence content-URL resolution.
+   * Optional so fixture/demo shells keep rendering; absent capabilities
+   * degrade to explicit user-facing notices.
+   */
+  previewPort?: PreviewPort | undefined;
 }
 
 type FilePreviewKind =
@@ -74,8 +105,8 @@ function detectFilePreviewKind(fileName: string): FilePreviewKind {
 }
 
 /** Extract a fetchable URL from a PreviewFile's content field.
- *  runtimeEvidenceOverviewFiles puts real Edge API paths (e.g. /v1/runs/…/content)
- *  or full preview URLs into `content`; fallback text starts with `#` or prose. */
+ *  Overview mappers put full preview URLs into `content`; structured
+ *  runtime-evidence refs are carried by `contentRef` instead (#1817). */
 function extractFileUrl(content: string | undefined): string {
   if (!content) return '';
   // Real URLs start with '/' (relative API path) or 'http'
@@ -85,103 +116,104 @@ function extractFileUrl(content: string | undefined): string {
   return '';
 }
 
-/** Replaces the now-deleted shared Edge REST client apply fns (RFC A-V3 §4.1 —
- *  zero external consumers, stored in shared/src as dead surface).  edgeBaseUrl is unconfigured here
- *  because the shared package has no Local Edge; Desktop drives the Edge
- *  connection through its own wrappers.  InteractiveDiffPreview was already
- *  a known defect per verify-shared-boundary.py (audit-A P → PreviewPort). */
-const edgeBaseUrl = '';
-
-async function postJson<T>(path: string, body: unknown): Promise<T> {
-  if (!edgeBaseUrl) {
-    throw new Error('Edge base URL not configured — route through PreviewPort instead');
-  }
-  const res = await fetch(`${edgeBaseUrl}${path}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  });
-  if (!res.ok) {
-    throw await parseError(res);
-  }
-  return res.json() as Promise<T>;
+function describeError(err: unknown): string {
+  if (err instanceof Error) return err.message;
+  return String(err);
 }
 
-async function applyRunDiff(
-  runId: string,
-  body: { file_path: string; hunk_index: number; accepted: boolean; workDir: string },
-): Promise<{ code: string; data: unknown }> {
-  return postJson(`/v1/runs/${encodeURIComponent(runId)}/apply`, body);
-}
+const APPLY_UNSUPPORTED_NOTE =
+  '当前端不支持将 diff 写回工作区（仅桌面本地 Edge 支持），当前为只读评审。';
 
-async function applyAllRunDiffs(
-  runId: string,
-  body: { decisions: Array<{ file_path: string; hunk_index: number; accepted: boolean }>; workDir: string },
-): Promise<{ code: string; data: unknown }> {
-  return postJson(`/v1/runs/${encodeURIComponent(runId)}/apply-all`, body);
-}
-
-/** Interactive diff preview with hunk accept/reject that writes back to the workdir via Edge API. */
+/** Interactive diff preview with hunk accept/reject that writes back to the workdir via the platform PreviewPort. */
 function InteractiveDiffPreview({
   file,
   onClose,
+  previewPort,
 }: {
   file: PreviewFile;
   onClose: () => void;
+  previewPort?: PreviewPort | undefined;
 }): React.ReactElement {
   const interactiveDiff = file.interactiveDiff;
+  const showToast = useToastStore((state) => state.showToast);
+  const applySupported = Boolean(previewPort?.applyRunDiff && previewPort?.applyAllRunDiffs);
 
   // Hooks run unconditionally so the hook order is stable if a file toggles
   // between interactive and non-interactive diff states across renders.
   const reviewFiles: DiffReviewFile[] = useMemo(() => {
     if (!interactiveDiff) return [];
     const { fileDiff } = interactiveDiff;
-    return [{
-      filePath: fileDiff.filePath,
-      status: fileDiff.status === 'untracked' ? 'added' : fileDiff.status,
-      additions: fileDiff.additions,
-      deletions: fileDiff.deletions,
-      hunks: fileDiff.hunks as unknown as DiffReviewFile['hunks'],
-    }];
+    return [
+      {
+        filePath: fileDiff.filePath,
+        status: fileDiff.status === 'untracked' ? 'added' : fileDiff.status,
+        additions: fileDiff.additions,
+        deletions: fileDiff.deletions,
+        hunks: fileDiff.hunks as unknown as DiffReviewFile['hunks'],
+      },
+    ];
   }, [interactiveDiff]);
 
   const handleApplyHunk = useCallback(
     async (decision: DiffHunkDecision) => {
       if (!interactiveDiff) return;
+      if (!previewPort?.applyRunDiff) {
+        showToast('warning', APPLY_UNSUPPORTED_NOTE);
+        return;
+      }
       try {
-        await applyRunDiff(interactiveDiff.runId, {
-          file_path: decision.filePath,
-          hunk_index: decision.hunkIndex,
-          accepted: decision.accepted,
+        await previewPort.applyRunDiff({
+          runId: interactiveDiff.runId,
           workDir: interactiveDiff.workDir,
+          decision: {
+            filePath: decision.filePath,
+            hunkIndex: decision.hunkIndex,
+            accepted: decision.accepted,
+          },
         });
+        showToast(
+          'success',
+          decision.accepted
+            ? `已应用 hunk：${decision.filePath} #${decision.hunkIndex + 1}`
+            : `已拒绝 hunk：${decision.filePath} #${decision.hunkIndex + 1}`
+        );
       } catch (err) {
-        console.error('RightInspector: applyRunDiff failed for hunk:', decision.filePath, decision.hunkIndex, err);
+        showToast('error', `Diff 应用失败：${describeError(err)}`);
       }
     },
-    [interactiveDiff],
+    [interactiveDiff, previewPort, showToast]
   );
 
   const handleApplyAllHunks = useCallback(
     async (decisions: DiffHunkDecision[]) => {
       if (!interactiveDiff) return;
+      if (!previewPort?.applyAllRunDiffs) {
+        showToast('warning', APPLY_UNSUPPORTED_NOTE);
+        return;
+      }
       try {
-        await applyAllRunDiffs(interactiveDiff.runId, {
-          decisions: decisions.map((d) => ({
-            file_path: d.filePath,
-            hunk_index: d.hunkIndex,
-            accepted: d.accepted,
-          })),
+        await previewPort.applyAllRunDiffs({
+          runId: interactiveDiff.runId,
           workDir: interactiveDiff.workDir,
+          decisions: decisions.map((item) => ({
+            filePath: item.filePath,
+            hunkIndex: item.hunkIndex,
+            accepted: item.accepted,
+          })),
         });
+        const acceptedCount = decisions.filter((item) => item.accepted).length;
+        showToast(
+          'success',
+          `已批量处理 ${decisions.length} 个 hunk（应用 ${acceptedCount}，拒绝 ${decisions.length - acceptedCount}）`
+        );
       } catch (err) {
-        console.error('RightInspector: applyAllRunDiffs failed:', decisions.length, 'hunks,', err);
+        showToast('error', `Diff 批量应用失败：${describeError(err)}`);
       }
     },
-    [interactiveDiff],
+    [interactiveDiff, previewPort, showToast]
   );
 
-  if (!interactiveDiff) return (<></>);
+  if (!interactiveDiff) return <></>;
   const { runId, fileDiff } = interactiveDiff;
 
   return (
@@ -192,6 +224,20 @@ function InteractiveDiffPreview({
         </button>
         <span className={styles.filePreviewTitle}>{fileDiff.filePath}</span>
       </div>
+      {!applySupported && (
+        <div
+          role="note"
+          style={{
+            padding: '8px 12px',
+            font: '400 0.75rem/1.5 var(--td-font)',
+            color: 'var(--td-ink-muted)',
+            background: 'var(--td-surface)',
+            borderBottom: '1px solid var(--td-border-hairline)',
+          }}
+        >
+          {APPLY_UNSUPPORTED_NOTE}
+        </div>
+      )}
       <DiffReviewPanel
         files={reviewFiles}
         runId={runId}
@@ -205,60 +251,45 @@ function InteractiveDiffPreview({
 export function FilePreviewRouter({
   file,
   onClose,
+  previewPort,
 }: FilePreviewRouterProps): React.ReactElement {
   // Interactive diff review with accept/reject write-back
   if (file.interactiveDiff) {
-    return (
-      <InteractiveDiffPreview
-        file={file}
-        onClose={onClose}
-      />
-    );
+    return <InteractiveDiffPreview file={file} onClose={onClose} previewPort={previewPort} />;
   }
 
   const kind = detectFilePreviewKind(file.name);
   const content = file.content ?? `${file.name}\n\n暂无文件内容。`;
-  const fileUrl = extractFileUrl(file.content);
+  // Structured runtime-evidence refs resolve through the host port; plain
+  // content refs keep the generic string resolution path (#1817).
+  const contentUrl = file.contentRef
+    ? previewPort?.resolveRuntimeEvidenceContent?.(file.contentRef)
+    : resolvePreviewContentUrl(file.content, previewPort);
+  // Office viewers accept any direct URL in `content`, and fall back to the
+  // port-resolved URL (Desktop) instead of a broken host-relative fetch.
+  const fileUrl = extractFileUrl(file.content) || contentUrl || '';
 
   switch (kind) {
     case 'pptx':
     case 'pptx-legacy':
-      return (
-        <SlideshowPreview
-          fileName={file.name}
-          fileUrl={fileUrl}
-          onClose={onClose}
-        />
-      );
+      return <SlideshowPreview fileName={file.name} fileUrl={fileUrl} onClose={onClose} />;
 
     case 'xlsx':
     case 'xls':
     case 'csv':
-      return (
-        <TablePreview
-          fileName={file.name}
-          fileUrl={fileUrl}
-          onClose={onClose}
-        />
-      );
+      return <TablePreview fileName={file.name} fileUrl={fileUrl} onClose={onClose} />;
 
     case 'docx':
-      return (
-        <DocxPreview
-          fileName={file.name}
-          fileUrl={fileUrl}
-          onClose={onClose}
-        />
-      );
+      return <DocxPreview fileName={file.name} fileUrl={fileUrl} onClose={onClose} />;
 
     case 'pdf':
-      return <NativePdfPreview filename={file.name} />;
+      return <NativePdfPreview contentUrl={contentUrl} filename={file.name} />;
 
     case 'html':
       return <NativeHtmlPreview content={content} />;
 
     case 'image':
-      return <NativeImagePreview filename={file.name} />;
+      return <NativeImagePreview contentUrl={contentUrl} filename={file.name} />;
 
     case 'text':
       return <NativeTextPreview content={content} />;
@@ -279,11 +310,67 @@ export function FilePreviewRouter({
 
 /* ═══ Native File Previews (zero extra libraries) ═══ */
 
-function NativePdfPreview({ filename }: { filename: string }): React.ReactElement {
+function NativePreviewFallback({
+  detail,
+  filename,
+  title,
+}: {
+  detail: string;
+  filename: string;
+  title: string;
+}): React.ReactElement {
+  return (
+    <div
+      style={{
+        flex: 1,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 24,
+        overflow: 'auto',
+        minHeight: 0,
+      }}
+    >
+      <div
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: 8,
+          color: 'var(--td-ink-subtle)',
+          font: '400 0.75rem var(--td-font)',
+          textAlign: 'center',
+        }}
+      >
+        <DesignFileIcon className={styles.fileIcon} name={filename} />
+        <span>{title}</span>
+        <span style={{ fontSize: '0.6875rem' }}>{detail}</span>
+      </div>
+    </div>
+  );
+}
+
+function NativePdfPreview({
+  contentUrl,
+  filename,
+}: {
+  contentUrl?: string | undefined;
+  filename: string;
+}): React.ReactElement {
+  if (!contentUrl) {
+    return (
+      <NativePreviewFallback
+        detail="未提供可访问的 PDF 内容地址（当前端无可用内容端点），无法渲染预览。"
+        filename={filename}
+        title={`PDF 预览: ${filename}`}
+      />
+    );
+  }
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
       <iframe
         title={`PDF 预览 ${filename}`}
+        src={contentUrl}
         style={{ flex: 1, border: 0, minHeight: 0 }}
         role="document"
       />
@@ -303,47 +390,73 @@ function NativeHtmlPreview({ content }: { content: string }): React.ReactElement
   );
 }
 
-function NativeImagePreview({ filename }: { filename: string }): React.ReactElement {
+function NativeImagePreview({
+  contentUrl,
+  filename,
+}: {
+  contentUrl?: string | undefined;
+  filename: string;
+}): React.ReactElement {
+  const [loadFailed, setLoadFailed] = useState(false);
+
+  if (!contentUrl) {
+    return (
+      <NativePreviewFallback
+        detail="未提供可访问的图片内容地址（当前端无可用内容端点），无法渲染预览。"
+        filename={filename}
+        title={`图片预览: ${filename}`}
+      />
+    );
+  }
+
+  if (loadFailed) {
+    return (
+      <NativePreviewFallback
+        detail="图片内容地址存在，但加载失败（可能已失效或当前端无访问权限）。"
+        filename={filename}
+        title={`图片预览: ${filename}`}
+      />
+    );
+  }
+
   return (
-    <div style={{
-      flex: 1,
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      padding: 24,
-      overflow: 'auto',
-      minHeight: 0,
-    }}>
-      <div style={{
+    <div
+      style={{
+        flex: 1,
         display: 'flex',
-        flexDirection: 'column',
         alignItems: 'center',
-        gap: 8,
-        color: 'var(--td-ink-subtle)',
-        font: '400 0.75rem var(--td-font)',
-      }}>
-        <DesignFileIcon className={styles.fileIcon} name={filename} />
-        <span>图片预览: {filename}</span>
-        <span style={{ fontSize: '0.6875rem' }}>图片内容将通过文件 URL 加载</span>
-      </div>
+        justifyContent: 'center',
+        padding: 24,
+        overflow: 'auto',
+        minHeight: 0,
+      }}
+    >
+      <img
+        src={contentUrl}
+        alt={filename}
+        onError={() => setLoadFailed(true)}
+        style={{ maxWidth: '100%', height: 'auto', objectFit: 'contain' }}
+      />
     </div>
   );
 }
 
 function NativeTextPreview({ content }: { content: string }): React.ReactElement {
   return (
-    <pre style={{
-      flex: 1,
-      margin: 0,
-      padding: 16,
-      overflow: 'auto',
-      font: '400 0.8125rem/1.6 var(--td-mono)',
-      color: 'var(--td-ink-muted)',
-      whiteSpace: 'pre-wrap',
-      wordBreak: 'break-word',
-      background: 'var(--td-surface)',
-      minHeight: 0,
-    }}>
+    <pre
+      style={{
+        flex: 1,
+        margin: 0,
+        padding: 16,
+        overflow: 'auto',
+        font: '400 0.8125rem/1.6 var(--td-mono)',
+        color: 'var(--td-ink-muted)',
+        whiteSpace: 'pre-wrap',
+        wordBreak: 'break-word',
+        background: 'var(--td-surface)',
+        minHeight: 0,
+      }}
+    >
       {content}
     </pre>
   );

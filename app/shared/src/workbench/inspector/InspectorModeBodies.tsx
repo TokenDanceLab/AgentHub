@@ -1,6 +1,7 @@
 import React from 'react';
 import type { EvidenceRef, ContextUsageTranscriptBlock } from '../../transcript';
 import type { RuntimeEvidenceSnapshot } from '../../inspector';
+import type { PreviewPort } from '../../platform';
 import type { FileDiff } from '../../types/chat';
 import { AgentStreamingBar } from '../../ui/AgentStreamingBar';
 import type { DagNode } from '../../ui/DagTree';
@@ -119,6 +120,8 @@ export interface FilesModeBodyProps {
   files: EvidenceRef[];
   overviewFiles: PreviewFile[];
   previewFile: PreviewFile | null;
+  /** Platform preview port forwarded to FilePreviewRouter (#1817). */
+  previewPort?: PreviewPort | undefined;
   runtimeEvidence?: RuntimeEvidenceSnapshot | undefined;
   onClose: () => void;
   onFallbackFileClick: (file: FileItem) => void;
@@ -132,6 +135,7 @@ export function FilesModeBody({
   files,
   overviewFiles,
   previewFile,
+  previewPort,
   runtimeEvidence,
   onClose,
   onFallbackFileClick,
@@ -144,6 +148,7 @@ export function FilesModeBody({
       <FilePreviewRouter
         file={previewFile}
         onClose={onClose}
+        previewPort={previewPort}
       />
     );
   }

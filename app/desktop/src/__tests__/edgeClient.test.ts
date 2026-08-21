@@ -15,6 +15,8 @@ import {
   fetchRunDiff,
   fetchArtifacts,
   fetchPreviews,
+  applyRunDiff,
+  applyAllRunDiffs,
 } from '../api/edgeClient';
 import { createDesktopPlatform } from '../platform/desktopPlatform';
 import { mapEdgeAgentsToWorkbenchAgents } from '../platform/edgeCapabilityMapper';
@@ -707,6 +709,94 @@ describe('edgeClient', () => {
         expect.stringMatching(/\/v1\/threads\/thread_abc:archive$/),
         expect.objectContaining({ method: 'POST' }),
       );
+    });
+  });
+
+  describe('diff apply write-back (#1817)', () => {
+    it('posts a single hunk decision to Edge /v1/runs/{runId}/apply with snake_case fields', async () => {
+      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({
+          code: 'OK',
+          data: {
+            runId: 'run_abc123',
+            filePath: 'src/app.ts',
+            hunkIndex: 2,
+            accepted: true,
+            applied: true,
+          },
+        }),
+      } as Response);
+
+      const result = await applyRunDiff('run_abc123', {
+        filePath: 'src/app.ts',
+        hunkIndex: 2,
+        accepted: true,
+        workDir: '/work/project',
+      });
+
+      expect(result.applied).toBe(true);
+      expect(fetchSpy).toHaveBeenCalledWith(
+        expect.stringMatching(/\/v1\/runs\/run_abc123\/apply$/),
+        expect.objectContaining({
+          method: 'POST',
+          body: JSON.stringify({
+            file_path: 'src/app.ts',
+            hunk_index: 2,
+            accepted: true,
+            workDir: '/work/project',
+          }),
+        }),
+      );
+    });
+
+    it('posts batch decisions to Edge /v1/runs/{runId}/apply-all', async () => {
+      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({
+          code: 'OK',
+          data: { runId: 'run_abc123', applied: 2 },
+        }),
+      } as Response);
+
+      const result = await applyAllRunDiffs('run_abc123', {
+        decisions: [
+          { filePath: 'src/app.ts', hunkIndex: 0, accepted: true },
+          { filePath: 'src/app.ts', hunkIndex: 1, accepted: false },
+        ],
+        workDir: '/work/project',
+      });
+
+      expect(result.applied).toBe(2);
+      expect(fetchSpy).toHaveBeenCalledWith(
+        expect.stringMatching(/\/v1\/runs\/run_abc123\/apply-all$/),
+        expect.objectContaining({
+          method: 'POST',
+          body: JSON.stringify({
+            decisions: [
+              { file_path: 'src/app.ts', hunk_index: 0, accepted: true },
+              { file_path: 'src/app.ts', hunk_index: 1, accepted: false },
+            ],
+            workDir: '/work/project',
+          }),
+        }),
+      );
+    });
+
+    it('surfaces Edge apply failures as errors for the UI toast path', async () => {
+      vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce({
+        ok: false,
+        status: 403,
+        statusText: 'Forbidden',
+        json: () => Promise.resolve({ error: { code: 'workspace_not_allowed', message: 'workdir not allowed' } }),
+      } as Response);
+
+      await expect(applyRunDiff('run_abc123', {
+        filePath: 'src/app.ts',
+        hunkIndex: 0,
+        accepted: true,
+        workDir: '/forbidden',
+      })).rejects.toThrow('workdir not allowed');
     });
   });
 });

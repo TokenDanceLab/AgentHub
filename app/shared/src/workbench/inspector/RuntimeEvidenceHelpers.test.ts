@@ -76,14 +76,18 @@ describe('RuntimeEvidenceHelpers', () => {
       { label: '等待 Hub replay evidence', status: 'todo' },
     ]);
 
-    const tasks = runtimeEvidenceOverviewTasks(emptyEvidence({
-      runId: 'run-1',
-      artifacts: [sampleArtifact()],
-      diffs: [sampleDiff()],
-      previews: [samplePreview({
-        url: 'https://example.test/preview',
-      })],
-    }));
+    const tasks = runtimeEvidenceOverviewTasks(
+      emptyEvidence({
+        runId: 'run-1',
+        artifacts: [sampleArtifact()],
+        diffs: [sampleDiff()],
+        previews: [
+          samplePreview({
+            url: 'https://example.test/preview',
+          }),
+        ],
+      })
+    );
 
     expect(tasks).toEqual([
       { label: '跟随 run-1', status: 'active' },
@@ -94,24 +98,30 @@ describe('RuntimeEvidenceHelpers', () => {
   });
 
   it('maps overview files for artifacts, diffs, and previews', () => {
-    const files = runtimeEvidenceOverviewFiles(emptyEvidence({
-      runId: 'run-9',
-      artifacts: [sampleArtifact({
-        id: 'art-1',
-        path: 'dist/app.js',
-        kind: 'bundle',
+    const files = runtimeEvidenceOverviewFiles(
+      emptyEvidence({
         runId: 'run-9',
-        threadId: 'thread-1',
-        createdAt: '2026-07-02T00:00:00Z',
-      })],
-      diffs: [sampleDiff({ filePath: 'src/x.ts' })],
-      previews: [samplePreview({
-        id: 'prev-1',
-        status: 'starting',
-        runId: 'run-9',
-        createdAt: '2026-07-02T00:00:00Z',
-      })],
-    }));
+        artifacts: [
+          sampleArtifact({
+            id: 'art-1',
+            path: 'dist/app.js',
+            kind: 'bundle',
+            runId: 'run-9',
+            threadId: 'thread-1',
+            createdAt: '2026-07-02T00:00:00Z',
+          }),
+        ],
+        diffs: [sampleDiff({ filePath: 'src/x.ts' })],
+        previews: [
+          samplePreview({
+            id: 'prev-1',
+            status: 'starting',
+            runId: 'run-9',
+            createdAt: '2026-07-02T00:00:00Z',
+          }),
+        ],
+      })
+    );
 
     expect(files).toHaveLength(3);
     expect(files[0]).toMatchObject({
@@ -119,35 +129,66 @@ describe('RuntimeEvidenceHelpers', () => {
       type: 'bundle',
       isPrimary: true,
       owner: 'Hub replay',
-      content: '/v1/runs/run-9/artifacts/art-1/content',
+      contentRef: { kind: 'artifact', runId: 'run-9', id: 'art-1' },
     });
+    expect(files[0]?.content).toContain('# dist/app.js');
     expect(files[1]?.name).toBe('src/x.ts');
     expect(files[1]?.type).toBe('diff');
     expect(files[1]?.diffContent).toContain('diff --git a/src/x.ts b/src/x.ts');
     expect(files[2]).toMatchObject({
       name: 'prev-1',
       type: 'preview',
-      content: '/v1/runs/run-9/previews/prev-1/content',
+      contentRef: { kind: 'preview', runId: 'run-9', id: 'prev-1' },
     });
   });
 
+  it('keeps displayable preview URLs in content and skips the endpoint ref', () => {
+    const files = runtimeEvidenceOverviewFiles(
+      emptyEvidence({
+        runId: 'run-9',
+        previews: [
+          samplePreview({
+            id: 'prev-3',
+            status: 'ready',
+            runId: 'run-9',
+            url: 'https://preview.example.test/app',
+            createdAt: '2026-07-02T00:00:00Z',
+          }),
+        ],
+      })
+    );
+
+    expect(files[0]).toMatchObject({
+      name: 'https://preview.example.test/app',
+      type: 'preview',
+      content: 'https://preview.example.test/app',
+    });
+    expect(files[0]?.contentRef).toBeUndefined();
+  });
+
   it('falls back to markdown metadata when artifact/preview content URLs are unavailable', () => {
-    const files = runtimeEvidenceOverviewFiles(emptyEvidence({
-      artifacts: [sampleArtifact({
-        id: 'art-2',
-        path: 'notes.md',
-        kind: 'markdown',
-        runId: '',
-        threadId: 't-2',
-        createdAt: '2026-07-03T00:00:00Z',
-      })],
-      previews: [samplePreview({
-        id: 'prev-2',
-        status: 'stopped',
-        runId: '',
-        createdAt: '2026-07-03T00:00:00Z',
-      })],
-    }));
+    const files = runtimeEvidenceOverviewFiles(
+      emptyEvidence({
+        artifacts: [
+          sampleArtifact({
+            id: 'art-2',
+            path: 'notes.md',
+            kind: 'markdown',
+            runId: '',
+            threadId: 't-2',
+            createdAt: '2026-07-03T00:00:00Z',
+          }),
+        ],
+        previews: [
+          samplePreview({
+            id: 'prev-2',
+            status: 'stopped',
+            runId: '',
+            createdAt: '2026-07-03T00:00:00Z',
+          }),
+        ],
+      })
+    );
 
     expect(files[0]?.content).toContain('# notes.md');
     expect(files[0]?.content).toContain('- Thread: t-2');
@@ -157,7 +198,9 @@ describe('RuntimeEvidenceHelpers', () => {
 
   it('builds overview kicker labels from run id', () => {
     expect(runtimeEvidenceOverviewKicker(emptyEvidence())).toBe('Hub replay');
-    expect(runtimeEvidenceOverviewKicker(emptyEvidence({ runId: 'run-42' }))).toBe('Hub replay / run-42');
+    expect(runtimeEvidenceOverviewKicker(emptyEvidence({ runId: 'run-42' }))).toBe(
+      'Hub replay / run-42'
+    );
   });
 
   it('serializes file diffs with git-style prefixes', () => {
@@ -196,17 +239,23 @@ describe('RuntimeEvidenceHelpers', () => {
     expect(artifactWorkspaceDiffLabel(3)).toBe('3 files');
     expect(artifactWorkspaceTopic(sampleArtifact({ threadId: 'topic-1' }))).toBe('topic-1');
     expect(artifactWorkspaceTopic(sampleArtifact({ threadId: '' }))).toBe('unknown');
-    expect(artifactWorkspaceVersion(sampleArtifact({ runId: 'artifact-run' }), 'fallback-run')).toBe('artifact-run');
-    expect(artifactWorkspaceVersion(sampleArtifact({ runId: '' }), 'fallback-run')).toBe('fallback-run');
+    expect(
+      artifactWorkspaceVersion(sampleArtifact({ runId: 'artifact-run' }), 'fallback-run')
+    ).toBe('artifact-run');
+    expect(artifactWorkspaceVersion(sampleArtifact({ runId: '' }), 'fallback-run')).toBe(
+      'fallback-run'
+    );
     expect(artifactWorkspaceVersion(sampleArtifact({ runId: '' }), undefined)).toBe('unknown');
 
     expect(artifactWorkspacePreviewStatus([])).toBe('none');
-    expect(artifactWorkspacePreviewStatus([
-      samplePreview({ id: 'p1', status: 'starting' }),
-      samplePreview({ id: 'p2', status: 'ready' }),
-    ])).toBe('ready');
-    expect(artifactWorkspacePreviewStatus([
-      samplePreview({ id: 'p1', status: 'starting' }),
-    ])).toBe('starting');
+    expect(
+      artifactWorkspacePreviewStatus([
+        samplePreview({ id: 'p1', status: 'starting' }),
+        samplePreview({ id: 'p2', status: 'ready' }),
+      ])
+    ).toBe('ready');
+    expect(artifactWorkspacePreviewStatus([samplePreview({ id: 'p1', status: 'starting' })])).toBe(
+      'starting'
+    );
   });
 });
