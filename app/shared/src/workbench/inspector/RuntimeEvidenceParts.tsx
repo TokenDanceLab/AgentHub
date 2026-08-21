@@ -1,10 +1,7 @@
 import React from 'react';
 import type { RuntimeEvidenceChannel, RuntimeEvidenceSnapshot } from '../../inspector';
 import type { FileDiff } from '../../types/chat';
-import {
-  DesignFileIcon,
-  DesignNavIcon,
-} from '../designIcons';
+import { DesignFileIcon, DesignNavIcon } from '../designIcons';
 import styles from '../AgentHubWorkbench.module.css';
 import {
   artifactWorkspaceDiffLabel,
@@ -90,7 +87,9 @@ export function ArtifactWorkspaceProjection({
       <span>Topic: {topic}</span>
       <span>Version: {version}</span>
       <span>Preview: {previewStatus}</span>
-      <span>Download: unavailable — Hub/Edge expose no artifact content endpoint (metadata only)</span>
+      <span>
+        Download: unavailable — no download action; preview resolves artifact content via host port
+      </span>
       <span>Export: unavailable — this panel has no export action (review-only evidence)</span>
       <span>Evidence: {evidenceSourceLabel ?? 'None'}</span>
       <span>Diff projection: {diffLabel}</span>
@@ -110,10 +109,16 @@ export function RuntimeEvidenceDiffSection({
   sourceLabel?: string | undefined;
 }): React.ReactElement {
   return (
-    <RuntimeEvidenceSection channel="diff" count={count} sourceLabel={sourceLabel} title="Diff snapshot">
+    <RuntimeEvidenceSection
+      channel="diff"
+      count={count}
+      sourceLabel={sourceLabel}
+      title="Diff snapshot"
+    >
       {diffs.map((file) => (
         <li key={`diff-${file.filePath}`}>
-          <button type="button"
+          <button
+            type="button"
             aria-label={`打开 diff ${file.filePath}`}
             className={styles.fileRow}
             onClick={() => onOpenDiff(file)}
@@ -122,12 +127,18 @@ export function RuntimeEvidenceDiffSection({
             <span className={styles.fileName}>{file.filePath}</span>
             <span className={styles.fileMeta}>{diffMeta(file)}</span>
             {file.editId && <span className={styles.fileMeta}>edit {file.editId}</span>}
-            {file.reviewStatus && <span className={styles.fileMeta}>review {file.reviewStatus}</span>}
+            {file.reviewStatus && (
+              <span className={styles.fileMeta}>review {file.reviewStatus}</span>
+            )}
             {file.canApply !== undefined && (
-              <span className={styles.fileMeta}>apply {file.canApply ? 'available' : 'unavailable'}</span>
+              <span className={styles.fileMeta}>
+                apply {file.canApply ? 'available' : 'unavailable'}
+              </span>
             )}
             {file.canRevert !== undefined && (
-              <span className={styles.fileMeta}>revert {file.canRevert ? 'available' : 'unavailable'}</span>
+              <span className={styles.fileMeta}>
+                revert {file.canRevert ? 'available' : 'unavailable'}
+              </span>
             )}
           </button>
         </li>
@@ -153,7 +164,12 @@ export function RuntimeEvidenceArtifactsSection({
 }): React.ReactElement {
   const previewStatus = artifactWorkspacePreviewStatus(previews);
   return (
-    <RuntimeEvidenceSection channel="artifacts" count={count} sourceLabel={sourceLabel} title="Artifacts">
+    <RuntimeEvidenceSection
+      channel="artifacts"
+      count={count}
+      sourceLabel={sourceLabel}
+      title="Artifacts"
+    >
       {artifacts.map((artifact) => (
         <li key={artifact.id}>
           <div
@@ -189,12 +205,18 @@ export function RuntimeEvidencePreviewsSection({
   sourceLabel?: string | undefined;
 }): React.ReactElement {
   return (
-    <RuntimeEvidenceSection channel="previews" count={count} sourceLabel={sourceLabel} title="Previews">
+    <RuntimeEvidenceSection
+      channel="previews"
+      count={count}
+      sourceLabel={sourceLabel}
+      title="Previews"
+    >
       {previews.map((preview) => {
         const canOpen = Boolean(preview.url);
         return (
           <li key={preview.id}>
-            <button type="button"
+            <button
+              type="button"
               aria-label={`打开预览 ${preview.id}`}
               className={styles.fileRow}
               disabled={!canOpen}
@@ -202,7 +224,11 @@ export function RuntimeEvidencePreviewsSection({
                 if (preview.url) onOpenPreviewUrl(preview.url);
               }}
             >
-              <DesignFileIcon className={styles.fileIcon} name={preview.url ?? preview.id} type="link" />
+              <DesignFileIcon
+                className={styles.fileIcon}
+                name={preview.url ?? preview.id}
+                type="link"
+              />
               <span className={styles.fileName}>{preview.url ?? preview.id}</span>
               <span className={styles.fileMeta}>{preview.status}</span>
             </button>
