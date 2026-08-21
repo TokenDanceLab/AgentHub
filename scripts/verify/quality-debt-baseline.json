@@ -10,12 +10,12 @@
       "review_by": "2026-10-01"
     },
     {
-      "location": "go-hub: Verify Hub lint fingerprint ratchet (#1573)",
+      "location": "go-hub: Lint",
       "kind": "continue-on-error",
-      "reason": "CI golangci-lint version produces findings differing from local baseline; re-baseline on CI before re-hardening (#1573)",
+      "reason": "lint 硬门禁已移到 fingerprint ratchet step（#1573）；Lint step 因 golangci-lint-action 退出码不读 baseline 且 >300 文件 PR 全量回退，保持 report-only (#1657/#1832)",
       "issue": 1573,
       "owner": "hub-owners",
-      "introduced_at": "2026-08-11",
+      "introduced_at": "2026-08-21",
       "review_by": "2026-10-01"
     },
     {
