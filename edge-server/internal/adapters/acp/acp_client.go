@@ -28,11 +28,15 @@ import (
 // against (bump discipline: update on SDK upgrades).
 const acpSDKVersion = "v0.13.5"
 
-// errACPEndpointNotWired is returned by client handler methods that the spike
-// deliberately leaves unwired (fs/terminal frame design): the agent receives
-// a JSON-RPC error instead of a silent hang. session/request_permission no
-// longer goes through this sentinel — it is bridged to the Edge approval
-// chain via adapters.PermissionDecisionBroker.
+// errACPEndpointNotWired is returned by client handler methods that the
+// spike deliberately leaves unwired (fs/terminal execution — the frame
+// design + workspace allowlist gate already lives in acp_frames.go): the
+// agent receives a JSON-RPC error instead of a silent hang. Frame-gate
+// rejections wrap it too (unwiredFrameError), so the STUB INVENTORY
+// contract — every answer an unwired endpoint can give is observable as
+// not-wired — holds on both branches. session/request_permission no longer
+// goes through this sentinel — it is bridged to the Edge approval chain
+// via adapters.PermissionDecisionBroker.
 var errACPEndpointNotWired = errors.New("acp: endpoint not wired (TODO #1743 (follow-up of #1404): frame design)")
 
 // acpClientHandler is the coder/acp-go-sdk client side. The SDK dispatches
@@ -71,6 +75,14 @@ type acpClientHandler struct {
 	// or $/cancel_request).
 	runCtx context.Context
 
+	// allowlist is the workspace path gate for fs/terminal frames
+	// (acp_frames.go, #1743 item 1): built from the session workdir in
+	// runACPSession. Every fs/terminal stub runs its inbound request
+	// through the frame builders, so a path outside the workspace is
+	// rejected before the not-wired answer. An empty root rejects every
+	// path (fail-closed).
+	allowlist *workspaceAllowlist
+
 	// permSeq generates unique per-run broker request ids.
 	permSeq atomic.Uint64
 }
@@ -79,8 +91,14 @@ type acpClientHandler struct {
 // (the SDK dispatch calls these methods directly).
 var _ acp.Client = (*acpClientHandler)(nil)
 
-func newACPClientHandler(emitter EventEmitter, run store.Run, broker *adapters.PermissionDecisionBroker, runCtx context.Context) *acpClientHandler {
-	return &acpClientHandler{emitter: emitter, run: run, broker: broker, runCtx: runCtx}
+func newACPClientHandler(emitter EventEmitter, run store.Run, broker *adapters.PermissionDecisionBroker, runCtx context.Context, workspaceRoot string) *acpClientHandler {
+	return &acpClientHandler{
+		emitter:   emitter,
+		run:       run,
+		broker:    broker,
+		runCtx:    runCtx,
+		allowlist: newWorkspaceAllowlist(workspaceRoot),
+	}
 }
 
 // SessionUpdate handles the agent's session/update notification: typed
@@ -255,15 +273,16 @@ func firstPermissionOption(options []acp.PermissionOption, kinds ...acp.Permissi
 // ── Unwired endpoint stubs (#1404) ────────────────────────────────────────
 //
 // STUB INVENTORY (single source of the "not wired" list — update both the
-// methods below and TestUnwiredACPEndpointsFailClosed when #1743 lands):
+// methods below and TestUnwiredACPEndpointsFailClosed when an endpoint is
+// wired):
 //
-//	fs/read_text_file     → ReadTextFile        (fs frame design + allowlist)
-//	fs/write_text_file    → WriteTextFile       (fs frame design + allowlist)
-//	terminal/create       → CreateTerminal      (terminal frame design)
-//	terminal/kill         → KillTerminal        (terminal frame design)
-//	terminal/output       → TerminalOutput      (terminal frame design)
-//	terminal/release      → ReleaseTerminal     (terminal frame design)
-//	terminal/wait_for_exit → WaitForTerminalExit (terminal frame design)
+//	fs/read_text_file      → ReadTextFile        (execution not wired)
+//	fs/write_text_file     → WriteTextFile       (execution not wired)
+//	terminal/create        → CreateTerminal      (execution not wired)
+//	terminal/kill          → KillTerminal        (execution not wired)
+//	terminal/output        → TerminalOutput      (execution not wired)
+//	terminal/release       → ReleaseTerminal     (execution not wired)
+//	terminal/wait_for_exit → WaitForTerminalExit (execution not wired)
 //
 // Wired endpoints (not stubs): session/update (SessionUpdate) and
 // session/request_permission (RequestPermission → Edge approval chain).
@@ -271,54 +290,106 @@ func firstPermissionOption(options []acp.PermissionOption, kinds ...acp.Permissi
 // Every stub fails closed with errACPEndpointNotWired — a JSON-RPC error the
 // agent can surface — never a silent hang, never a fake success.
 //
-// #1743 removed the fs/terminal capability advertisement from initialize
-// (runACPSession): advertising a capability whose endpoints can only answer
-// with errors would invite the agent to depend on a broken surface. The
-// stubs stay fail-closed as the last line of defense until the fs/terminal
-// frame design (+ workspace allowlist) actually wires them.
+// #1743 item 1 landed the two preconditions for wiring (acp_frames.go):
+//   - capabilities shrink: initialize no longer advertises fs/terminal
+//     (runACPSession) — advertising a capability whose endpoints can only
+//     answer with errors would invite the agent to depend on a broken
+//     surface;
+//   - frame design + workspace allowlist: every stub builds its edge-side
+//     frame through the allowlist gate before answering, so a path outside
+//     the session workspace is rejected even before the not-wired error
+//     (gate rejections still wrap errACPEndpointNotWired).
+//
+// What remains is real execution behind the gate (#1743 item 3, real-run
+// verification, requires approval) — until then the stubs stay fail-closed
+// as the last line of defense.
 //
 // ReadTextFile handles fs/read_text_file.
 func (h *acpClientHandler) ReadTextFile(ctx context.Context, params acp.ReadTextFileRequest) (acp.ReadTextFileResponse, error) {
-	return acp.ReadTextFileResponse{}, fsEndpointError("fs/read_text_file", params.Path)
+	frame, err := buildReadTextFileFrame(h.allowlist, params)
+	if err != nil {
+		return acp.ReadTextFileResponse{}, unwiredFrameError(err)
+	}
+	return acp.ReadTextFileResponse{}, fsEndpointError(frame.Method, frame.Path)
 }
 
 // WriteTextFile handles fs/write_text_file. Stub, see the STUB INVENTORY above.
 func (h *acpClientHandler) WriteTextFile(ctx context.Context, params acp.WriteTextFileRequest) (acp.WriteTextFileResponse, error) {
-	return acp.WriteTextFileResponse{}, fsEndpointError("fs/write_text_file", params.Path)
+	frame, err := buildWriteTextFileFrame(h.allowlist, params)
+	if err != nil {
+		return acp.WriteTextFileResponse{}, unwiredFrameError(err)
+	}
+	return acp.WriteTextFileResponse{}, fsEndpointError(frame.Method, frame.Path)
 }
 
-func fsEndpointError(method, path string) error {
-	return fmt.Errorf("acp: %s %q not wired (TODO #1743 (follow-up of #1404): Edge fs frame design + allowlist): %w",
-		method, path, errACPEndpointNotWired)
+// fsEndpointError is the fail-closed answer for an fs frame that passed the
+// workspace allowlist gate: the frame is valid but nothing executes it yet.
+func fsEndpointError(method, normalizedPath string) error {
+	return fmt.Errorf("acp: %s %q passed the workspace allowlist but execution is not wired (TODO #1743 item 3: real-run verification): %w",
+		method, normalizedPath, errACPEndpointNotWired)
 }
 
-// CreateTerminal handles terminal/create. Stub, see the STUB INVENTORY above.
+// unwiredFrameError is the fail-closed answer when the frame gate rejects a
+// request (path outside the workspace, malformed frame): the gate rejection
+// stays observable via errACPPathOutsideWorkspace / errACPMalformedFrame,
+// and the STUB INVENTORY contract holds because the error also wraps
+// errACPEndpointNotWired — nothing is executed for these endpoints.
+func unwiredFrameError(gateErr error) error {
+	return fmt.Errorf("acp: frame rejected before execution: %w (endpoint unwired: %w)", gateErr, errACPEndpointNotWired)
+}
+
+// CreateTerminal handles terminal/create. Stub, see the STUB INVENTORY
+// above; an explicit cwd passes the workspace allowlist gate first.
 func (h *acpClientHandler) CreateTerminal(ctx context.Context, params acp.CreateTerminalRequest) (acp.CreateTerminalResponse, error) {
-	return acp.CreateTerminalResponse{}, terminalEndpointError("terminal/create")
+	frame, err := buildCreateTerminalFrame(h.allowlist, params)
+	if err != nil {
+		return acp.CreateTerminalResponse{}, unwiredFrameError(err)
+	}
+	return acp.CreateTerminalResponse{}, terminalEndpointError(frame.Method)
 }
 
 // KillTerminal handles terminal/kill. Stub, see the STUB INVENTORY above.
 func (h *acpClientHandler) KillTerminal(ctx context.Context, params acp.KillTerminalRequest) (acp.KillTerminalResponse, error) {
-	return acp.KillTerminalResponse{}, terminalEndpointError("terminal/kill")
+	frame, err := buildTerminalIDFrame(acpMethodKillTerminal, params.TerminalId)
+	if err != nil {
+		return acp.KillTerminalResponse{}, unwiredFrameError(err)
+	}
+	return acp.KillTerminalResponse{}, terminalEndpointError(frame.Method)
 }
 
 // TerminalOutput handles terminal/output. Stub, see the STUB INVENTORY above.
 func (h *acpClientHandler) TerminalOutput(ctx context.Context, params acp.TerminalOutputRequest) (acp.TerminalOutputResponse, error) {
-	return acp.TerminalOutputResponse{}, terminalEndpointError("terminal/output")
+	frame, err := buildTerminalIDFrame(acpMethodTerminalOutput, params.TerminalId)
+	if err != nil {
+		return acp.TerminalOutputResponse{}, unwiredFrameError(err)
+	}
+	return acp.TerminalOutputResponse{}, terminalEndpointError(frame.Method)
 }
 
 // ReleaseTerminal handles terminal/release. Stub, see the STUB INVENTORY above.
 func (h *acpClientHandler) ReleaseTerminal(ctx context.Context, params acp.ReleaseTerminalRequest) (acp.ReleaseTerminalResponse, error) {
-	return acp.ReleaseTerminalResponse{}, terminalEndpointError("terminal/release")
+	frame, err := buildTerminalIDFrame(acpMethodReleaseTerminal, params.TerminalId)
+	if err != nil {
+		return acp.ReleaseTerminalResponse{}, unwiredFrameError(err)
+	}
+	return acp.ReleaseTerminalResponse{}, terminalEndpointError(frame.Method)
 }
 
-// WaitForTerminalExit handles terminal/wait_for_exit. See ReadTextFile for the TODO.
+// WaitForTerminalExit handles terminal/wait_for_exit. Stub, see the STUB
+// INVENTORY above.
 func (h *acpClientHandler) WaitForTerminalExit(ctx context.Context, params acp.WaitForTerminalExitRequest) (acp.WaitForTerminalExitResponse, error) {
-	return acp.WaitForTerminalExitResponse{}, terminalEndpointError("terminal/wait_for_exit")
+	frame, err := buildTerminalIDFrame(acpMethodWaitTerminalExit, params.TerminalId)
+	if err != nil {
+		return acp.WaitForTerminalExitResponse{}, unwiredFrameError(err)
+	}
+	return acp.WaitForTerminalExitResponse{}, terminalEndpointError(frame.Method)
 }
 
+// terminalEndpointError is the fail-closed answer for a terminal frame that
+// passed the frame gate: the frame is valid but nothing executes it yet.
 func terminalEndpointError(method string) error {
-	return fmt.Errorf("acp: %s not wired (TODO #1743 (follow-up of #1404): Edge terminal frame design): %w", method, errACPEndpointNotWired)
+	return fmt.Errorf("acp: %s frame accepted but execution is not wired (TODO #1743 item 3: real-run verification): %w",
+		method, errACPEndpointNotWired)
 }
 
 // runACPSession runs one ACP turn with the SDK client runtime: initialize
@@ -350,7 +421,7 @@ func runACPSession(ctx context.Context, stdout io.Reader, stdin io.Writer, emitt
 		return adapters.NewNonRecoverableParseError(fmt.Errorf("acp: workdir required for session/new (got %q)", rc.WorkDir))
 	}
 
-	handler := newACPClientHandler(emitter, run, broker, ctx)
+	handler := newACPClientHandler(emitter, run, broker, ctx, rc.WorkDir)
 	conn := acp.NewClientSideConnection(handler, stdin, stdout)
 	conn.SetLogger(slog.With("component", "acp-sdk", "sdk", acpSDKVersion, "run_id", run.ID))
 
