@@ -161,6 +161,10 @@ export function RightInspector({
       aria-label="Right inspector"
       className={styles.inspector}
       data-preview={inspectorDataPreviewAttr(activeMode)}
+      /* #1823: `aria-hidden` must never wrap focusable content. `inert`
+         removes the collapsed inspector's tabs / resizer / preview controls
+         from the focus order (CSS adds the visibility gate). */
+      inert={collapsed}
     >
       <RightInspectorResizer
         collapsed={collapsed}
