@@ -26,6 +26,23 @@
         "skipped": 0
       }
     },
+    "@agenthub/workbench": {
+      "dir": "app/workbench",
+      "coverage": {
+        "lines": 83.67,
+        "statements": 82.28,
+        "functions": 81.66,
+        "branches": 75.61
+      },
+      "uncoveredFiles": 7,
+      "coverageNote": "2026-08-21 首次入基线（#1759 第二阶段 workbench 独立成 @agenthub/workbench 第 6 包；拆包时 vitest.config floors 59/52/52/59 即按本次实测设定，低于 60 的维度是提升目标非永久豁免）。uncovered 7 文件：MessageSearchPanel.stories.tsx / WorkbenchDocsRouteView.tsx / index.ts / auxPanel/AuxPanel.tsx / floating/PersonPanel.tsx / pages/projects/ProjectMembers.tsx / pages/projects/ProjectTabViews.tsx。",
+      "tests": {
+        "total": 1020,
+        "passed": 1020,
+        "failed": 0,
+        "skipped": 0
+      }
+    },
     "agenthub-web": {
       "dir": "app/web",
       "coverage": {
