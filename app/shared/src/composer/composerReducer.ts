@@ -1,4 +1,9 @@
-import type { ComposerAction, ComposerIntent, ComposerState } from './types';
+import type {
+  ComposerAction,
+  ComposerDraftSnapshot,
+  ComposerIntent,
+  ComposerState,
+} from './types';
 
 export function createInitialComposerState(conversationId: string): ComposerState {
   return {
@@ -32,6 +37,15 @@ export function composerReducer(
       return {
         ...state,
         text: action.text,
+        submitState: state.submitState === 'error' ? 'idle' : state.submitState,
+      };
+    case 'prependText':
+      // Insert ahead of any existing draft instead of replacing it (#1821).
+      // The caller's text carries its own trailing separator, so concat is
+      // safe for both empty and non-empty drafts.
+      return {
+        ...state,
+        text: state.text ? `${action.text}${state.text}` : action.text,
         submitState: state.submitState === 'error' ? 'idle' : state.submitState,
       };
     case 'setMode':
@@ -96,6 +110,26 @@ export function composerReducer(
         ...state,
         attachments: state.attachments.filter((attachment) => attachment.id !== action.attachmentId),
       };
+    case 'setAttachmentRef':
+      return {
+        ...state,
+        attachments: state.attachments.map((attachment) => (
+          attachment.id === action.attachmentId
+            ? { ...attachment, attachmentRef: action.attachmentRef }
+            : attachment
+        )),
+      };
+    case 'restoreDraft':
+      // Put a failed send's content back (#1821). submitState is left to the
+      // caller so it can distinguish "restored, retry available" from "idle".
+      return {
+        ...state,
+        text: action.draft.text,
+        mentions: [...action.draft.mentions],
+        attachments: [...action.draft.attachments],
+        replyTo: action.draft.replyTo,
+        quote: action.draft.quote,
+      };
     case 'resetAfterSubmit':
       return {
         ...state,
@@ -114,6 +148,23 @@ export function composerReducer(
 
 export function canSubmitComposer(state: ComposerState): boolean {
   return state.text.trim().length > 0 || state.attachments.length > 0;
+}
+
+/**
+ * Snapshot the user-authored composer content before an optimistic clear, so a
+ * failed send can restore it via the `restoreDraft` action (#1821).
+ */
+export function captureComposerDraft(
+  state: ComposerState,
+  overrides?: { text?: string },
+): ComposerDraftSnapshot {
+  return {
+    text: overrides?.text ?? state.text,
+    mentions: [...state.mentions],
+    attachments: [...state.attachments],
+    replyTo: state.replyTo,
+    quote: state.quote,
+  };
 }
 
 export function buildComposerIntent(state: ComposerState): ComposerIntent {

@@ -365,7 +365,7 @@ describe('useWorkbenchTranscriptChrome', () => {
     expect(result.current.softHiddenBlockIds).toEqual(['b1']);
   });
 
-  it('routes approve/deny decisions for permission requests', () => {
+  it('routes approve/deny decisions for permission requests', async () => {
     const onApprovalDecision = vi.fn();
     const { result } = renderTranscriptChrome({
       transcript: [
@@ -378,7 +378,9 @@ describe('useWorkbenchTranscriptChrome', () => {
       onApprovalDecision,
     });
 
-    act(() => {
+    // #1821: the success toast fires only after the decision request
+    // resolves; flush the microtask chain before asserting the message.
+    await act(async () => {
       result.current.handleTranscriptBlockAction('approve', 'perm-1');
     });
     expect(onApprovalDecision).toHaveBeenCalledWith({
@@ -390,7 +392,7 @@ describe('useWorkbenchTranscriptChrome', () => {
     });
     expect(result.current.toastMessage).toBe('action.approved');
 
-    act(() => {
+    await act(async () => {
       result.current.handleTranscriptBlockAction('deny', 'perm-1');
     });
     expect(onApprovalDecision).toHaveBeenLastCalledWith({

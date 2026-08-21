@@ -360,9 +360,11 @@ describe('workbenchTranscriptChromeHelpers', () => {
           approvalId: 'req-1',
           decision: 'allow',
         },
+        // #1821: success toast is deferred until the decision request resolves.
+        successMessage: 'action.approved',
+        failureMessage: 'toast.approvalFailed',
       },
       { type: 'pulse', blockId: 'p1' },
-      { type: 'toast', message: 'action.approved' },
     ]);
 
     const retry = planTranscriptBlockAction({

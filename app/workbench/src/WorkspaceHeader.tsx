@@ -60,40 +60,12 @@ export function WorkspaceHeader({
             <span className={styles.workspaceModel}>{activeConversation?.model}</span>
           ) : null}
         </div>
-
-        <div aria-label={t('aria.workspaceTabs')} className={styles.workspaceTabs} role="tablist">
-          <button
-            aria-selected="true"
-            className={styles.workspaceTab}
-            data-workspace-tab="messages"
-            role="tab"
-            type="button"
-          >
-            <DesignNavIcon name="chat" />
-            消息
-          </button>
-          <button
-            aria-selected="false"
-            className={styles.workspaceTab}
-            data-workspace-tab="docs"
-            role="tab"
-            type="button"
-          >
-            <DesignNavIcon name="fileText" />
-            云文档
-          </button>
-          <button
-            aria-label={t('aria.newChannel')}
-            className={`${styles.workspaceTab} ${styles.workspaceTabIconOnly}`}
-            data-workspace-tab="new-channel"
-            role="tab"
-            type="button"
-          >
-            <DesignNavIcon name="plus" />
-          </button>
-        </div>
       </div>
 
+      {/* #1821: the tab row (消息/云文档/新建频道) and the 新任务/确认项/会话设置
+          buttons had no onClick — nothing to navigate to or open. Removed
+          instead of leaving dead chrome; shells that gain those capabilities
+          should wire callbacks when re-adding them. */}
       <div className={styles.workspaceActions}>
         <Tooltip label={t('aria.search')}>
           <button
@@ -103,33 +75,6 @@ export function WorkspaceHeader({
             type="button"
           >
             <DesignNavIcon name="search" />
-          </button>
-        </Tooltip>
-        <Tooltip label={t('aria.newTask')}>
-          <button
-            aria-label={t('aria.newTask')}
-            className={styles.iconButton}
-            type="button"
-          >
-            <DesignNavIcon name="template" />
-          </button>
-        </Tooltip>
-        <Tooltip label={t('aria.confirmItems')}>
-          <button
-            aria-label={t('aria.confirmItems')}
-            className={styles.iconButton}
-            type="button"
-          >
-            <DesignNavIcon name="check" />
-          </button>
-        </Tooltip>
-        <Tooltip label={t('aria.sessionSettings')}>
-          <button
-            aria-label={t('aria.sessionSettings')}
-            className={styles.iconButton}
-            type="button"
-          >
-            <DesignNavIcon name="settings" />
           </button>
         </Tooltip>
         <Tooltip label={inspectorCollapsed ? '展开右侧概览' : '收起右侧概览'}>

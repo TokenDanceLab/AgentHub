@@ -70,6 +70,54 @@ describe('RowItem think card (QW6)', () => {
 });
 
 // ---------------------------------------------------------------------------
+// #1821: waiting-approval auto-expand + nested callback plumbing
+// ---------------------------------------------------------------------------
+describe('RowItem approval cards (#1821)', () => {
+  const waitingApproval = (overrides: Partial<RowItemType> = {}): RowItemType => ({
+    id: 'approval-1',
+    type: 'approval',
+    label: 'approval',
+    status: 'waiting',
+    collapsible: true,
+    apReason: JSON.stringify({ command: 'rm -rf dist', cwd: '/repo' }),
+    ...overrides,
+  });
+
+  it('auto-expands a waiting approval card so the A/R actions are visible', () => {
+    const { container } = render(<RowItem item={waitingApproval()} />);
+    expect(container.querySelector('.row-item')!.className).toContain('open');
+    expect(screen.getByRole('button', { name: 'Approve' })).toBeInTheDocument();
+  });
+
+  it('respects a manual collapse of a waiting approval card (no re-expand)', () => {
+    const { container, rerender } = render(<RowItem item={waitingApproval()} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Collapse' }));
+    rerender(<RowItem item={waitingApproval({ id: 'approval-1' })} />);
+    expect(container.querySelector('.row-item')!.className).not.toContain('open');
+  });
+
+  it('passes approve/reject/toggle callbacks into nested children', () => {
+    const onApprove = vi.fn();
+    const onReject = vi.fn();
+    const onToggle = vi.fn();
+    const parent: RowItemType = {
+      id: 'group-1', type: 'sub', label: 'run_step_group', status: 'ok',
+      collapsible: true, open: true,
+      children: [waitingApproval({ id: 'child-approval' })],
+    };
+    render(
+      <RowItem item={parent} onApprove={onApprove} onReject={onReject} onToggle={onToggle} />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Approve' }));
+    expect(onApprove).toHaveBeenCalledWith('child-approval');
+    fireEvent.click(screen.getByRole('button', { name: 'Deny' }));
+    expect(onReject).toHaveBeenCalledWith('child-approval');
+    fireEvent.click(screen.getAllByRole('button', { name: 'Collapse' })[1]!);
+    expect(onToggle).toHaveBeenCalledWith('child-approval');
+  });
+});
+
+// ---------------------------------------------------------------------------
 // QW4: Approval card six-type rendering
 // ---------------------------------------------------------------------------
 describe('RowItem approval card (QW4)', () => {

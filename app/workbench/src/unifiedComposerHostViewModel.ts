@@ -55,6 +55,11 @@ export interface UnifiedComposerProps {
     targetState?: string | undefined;
   } | undefined;
   uploadProgresses?: Record<string, AttachmentUploadState>;
+  /**
+   * Retry an attachment whose upload failed (#1821). Wired by the host; the
+   * failed chip renders a retry button only when this is present.
+   */
+  onRetryAttachmentUpload?: ((attachmentId: string) => void) | undefined;
   onSubmit(event: FormEvent<HTMLFormElement>): void;
   inputRef?: Ref<HTMLTextAreaElement>;
   targetLabel?: string | undefined;

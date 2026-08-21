@@ -218,6 +218,23 @@ export function createMockPlatform(seed: MockPlatformSeed = {}): MockPlatform {
                 mime_type: file.type || 'application/octet-stream',
               };
             },
+            async uploadAttachmentWithProgress(
+              file: File,
+              onProgress: (progress: { percent: number; phase: 'hashing' | 'uploading' | 'done' }) => void,
+            ): Promise<AttachmentRef> {
+              onProgress({ percent: 10, phase: 'hashing' });
+              await new Promise((resolve) => setTimeout(resolve, 10));
+              onProgress({ percent: 45, phase: 'uploading' });
+              await new Promise((resolve) => setTimeout(resolve, 10));
+              onProgress({ percent: 90, phase: 'uploading' });
+              return {
+                id: `mock-attachment-${file.name}`,
+                name: file.name,
+                original_name: file.name,
+                size: file.size,
+                mime_type: file.type || 'application/octet-stream',
+              };
+            },
           },
         }
       : {}),
