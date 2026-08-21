@@ -13,6 +13,8 @@ one surgical text mutation, and asserts the CI policy verifier exits non-zero:
 7. delete the windows-frontend non-success failure branch → aggregator always green
 8. restore the go-hub job-level path filter → required check skip-able again
 9. delete the go-hub no-Go-changes fallback step → job has no success path when filtered
+10. remove the changes.result=='success' guard from both Go fallbacks → changes failure reports green again
+11. delete the go-hub changes-failure fail-closed step → required check false-green again
 
 The unmutated copy must exit 0, proving the policy test only reddens on
 actual policy violations (fail-closed, no false green).
@@ -147,7 +149,7 @@ GO_HUB_FALLBACK_TEXT = (
     "      # filter deselects this job (skipped jobs never satisfy branch\n"
     "      # protection and permanently block frontend-only PRs).\n"
     "      - name: Report no-Go-changes skip (required check)\n"
-    "        if: ${{ !cancelled() && github.event_name != 'workflow_dispatch' && needs.changes.outputs.go != 'true' }}\n"
+    "        if: ${{ !cancelled() && github.event_name != 'workflow_dispatch' && needs.changes.result == 'success' && needs.changes.outputs.go != 'true' }}\n"
     "        run: |\n"
     '          echo "skipped: no Go changes; reporting success for required check go-hub"\n'
     "          exit 0\n"
@@ -160,6 +162,36 @@ def delete_go_hub_fallback_step(text: str) -> str:
     if GO_HUB_FALLBACK_TEXT not in body:
         raise AssertionError("go-hub fallback step text not found")
     return text[:start] + body.replace(GO_HUB_FALLBACK_TEXT, "", 1) + text[end:]
+
+
+def remove_go_fallback_changes_success_guard(text: str) -> str:
+    """删除 go-edge/go-hub fallback 的 changes.result=='success' 守卫，模拟 changes
+    失败时 fallback 仍报成功（false green 防回退）。"""
+    pattern = re.compile(r"needs\.changes\.result == 'success' && ")
+    mutated, count = pattern.subn("", text)
+    if count != 2:
+        raise AssertionError(f"expected exactly two fallback changes-result guards, removed {count}")
+    return mutated
+
+
+GO_HUB_CHANGES_FAIL_STEP_TEXT = (
+    "      # Fail-closed: when the path filter itself fails, the Go verdict is\n"
+    "      # unknown. Report failure instead of letting the skip fallback mask\n"
+    "      # the skipped real gates as green.\n"
+    "      - name: Fail when Go path filter failed\n"
+    "        if: ${{ !cancelled() && github.event_name != 'workflow_dispatch' && needs.changes.result != 'success' }}\n"
+    "        run: |\n"
+    '          echo "::error::changes job result: ${{ needs.changes.result }}; cannot decide Go gates for go-hub"\n'
+    "          exit 1\n"
+)
+
+
+def delete_go_hub_changes_fail_step(text: str) -> str:
+    """删除 go-hub changes 失败 fail-closed 步骤，模拟 required check 重新可 false green（防回退）。"""
+    start, end, body = get_go_hub_body(text)
+    if GO_HUB_CHANGES_FAIL_STEP_TEXT not in body:
+        raise AssertionError("go-hub changes-fail step text not found")
+    return text[:start] + body.replace(GO_HUB_CHANGES_FAIL_STEP_TEXT, "", 1) + text[end:]
 
 
 class VerifyCiGatesMutationTests(unittest.TestCase):
@@ -214,6 +246,20 @@ class VerifyCiGatesMutationTests(unittest.TestCase):
         self.assert_mutation_fails(
             delete_go_hub_fallback_step(read_workflow()),
             "deleted go-hub no-Go-changes fallback step",
+        )
+
+    def test_remove_go_fallback_changes_success_guard_fails(self):
+        """fallback 失去 changes.result=='success' 守卫时，校验器必须非零退出（false green 防回退）。"""
+        self.assert_mutation_fails(
+            remove_go_fallback_changes_success_guard(read_workflow()),
+            "removed fallback changes-result success guard",
+        )
+
+    def test_delete_go_hub_changes_fail_step_fails(self):
+        """go-hub changes 失败 fail-closed 步骤被删除时，校验器必须非零退出（防回退断言）。"""
+        self.assert_mutation_fails(
+            delete_go_hub_changes_fail_step(read_workflow()),
+            "deleted go-hub changes-failure fail-closed step",
         )
 
 

@@ -112,7 +112,8 @@ def main() -> int:
     # go-edge / go-hub 恒报 report：两者是 required checks，GitHub 不把
     # skipped 视为 required check 通过，纯前端 PR 会被永久 BLOCK。
     # 策略：job 级 if 恒真（!cancelled()），真实门禁步骤带 go 条件（省成本），
-    # 末尾 fallback step 在无 Go 变更时输出 skipped 并 exit 0。
+    # 末尾 fallback step 在无 Go 变更时输出 skipped 并 exit 0；changes 失败时
+    # 由 fail-closed step（result != 'success'）exit 1，杜绝 false green。
     for job_name, job_body in (("go-edge", edge), ("go-hub", hub)):
         assert_contains(
             job_body,
@@ -125,9 +126,13 @@ def main() -> int:
             f"{job_name} real gates must stay step-level path-filtered",
         )
         fallback_step = get_step_block(job_body, "Report no-Go-changes skip (required check)")
+        assert_contains(fallback_step, r"needs\.changes\.result == 'success'", f"{job_name} fallback must require the changes job to succeed")
         assert_contains(fallback_step, r"needs\.changes\.outputs\.go != 'true'", f"{job_name} fallback must only run when the Go filter is off")
         assert_contains(fallback_step, r"reporting success for required check", f"{job_name} fallback must report success for the required check")
         assert_contains(fallback_step, r"exit 0", f"{job_name} fallback must exit 0")
+        fail_step = get_step_block(job_body, "Fail when Go path filter failed")
+        assert_contains(fail_step, r"needs\.changes\.result != 'success'", f"{job_name} must fail closed when the changes job fails")
+        assert_contains(fail_step, r"exit 1", f"{job_name} changes-failure step must exit 1")
 
     # #1536: Edge lint is at 0 issues and hardened to hard-blocking; Hub lint
     # still carries pre-existing findings (tracked in #1573) and stays

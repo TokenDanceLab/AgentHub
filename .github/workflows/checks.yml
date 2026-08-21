@@ -160,10 +160,19 @@ jobs:
       # filter deselects this job (skipped jobs never satisfy branch
       # protection and permanently block frontend-only PRs).
       - name: Report no-Go-changes skip (required check)
-        if: ${{ !cancelled() && github.event_name != 'workflow_dispatch' && needs.changes.outputs.go != 'true' }}
+        if: ${{ !cancelled() && github.event_name != 'workflow_dispatch' && needs.changes.result == 'success' && needs.changes.outputs.go != 'true' }}
         run: |
           echo "skipped: no Go changes; reporting success for required check go-edge"
           exit 0
+
+      # Fail-closed: when the path filter itself fails, the Go verdict is
+      # unknown. Report failure instead of letting the skip fallback mask
+      # the skipped real gates as green.
+      - name: Fail when Go path filter failed
+        if: ${{ !cancelled() && github.event_name != 'workflow_dispatch' && needs.changes.result != 'success' }}
+        run: |
+          echo "::error::changes job result: ${{ needs.changes.result }}; cannot decide Go gates for go-edge"
+          exit 1
 
   # ── Go: Edge Server tests (shard×2) ──────────
   # CI5 wave2 (#1689): the single-pass `go test ./... -race -coverprofile`
@@ -340,10 +349,19 @@ jobs:
       # filter deselects this job (skipped jobs never satisfy branch
       # protection and permanently block frontend-only PRs).
       - name: Report no-Go-changes skip (required check)
-        if: ${{ !cancelled() && github.event_name != 'workflow_dispatch' && needs.changes.outputs.go != 'true' }}
+        if: ${{ !cancelled() && github.event_name != 'workflow_dispatch' && needs.changes.result == 'success' && needs.changes.outputs.go != 'true' }}
         run: |
           echo "skipped: no Go changes; reporting success for required check go-hub"
           exit 0
+
+      # Fail-closed: when the path filter itself fails, the Go verdict is
+      # unknown. Report failure instead of letting the skip fallback mask
+      # the skipped real gates as green.
+      - name: Fail when Go path filter failed
+        if: ${{ !cancelled() && github.event_name != 'workflow_dispatch' && needs.changes.result != 'success' }}
+        run: |
+          echo "::error::changes job result: ${{ needs.changes.result }}; cannot decide Go gates for go-hub"
+          exit 1
 
   # ── Go: Hub Server tests (shard×2) ───────────
   # CI5 wave2 (#1689): same 2-shard package split as go-edge-test
