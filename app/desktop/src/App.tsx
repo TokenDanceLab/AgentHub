@@ -23,7 +23,9 @@ import { useDecideTeamApproval } from '@/api/agentTeamQueries';
 import { useDocumentList, useCreateDocument, hubDocToDocRow } from '@/api/documentQueries';
 import { useModelCatalog, useCCSwitchStatus, useCCSwitchProviders } from '@/api/modelCatalogQueries';
 import { useRunEvidence } from '@/api/runEvidenceQueries';
-import { useCreateRun } from '@/api/runQueries';
+import { useCreateRun, useCancelRun, useRuns, useDecideEdgePermission, findActiveEdgeRun } from '@/api/runQueries';
+import { resolveEdgePermissionRunId } from '@/platform/edgeApprovalRouting';
+import { useConnectionStore } from '@/stores/connectionStore';
 import { useCreateThread, useCurrentUser, useThreads } from '@/api/threadQueries';
 import { DesktopChrome } from '@/components/DesktopChrome';
 import { DesktopEntryGate } from '@/components/DesktopEntryGate';
@@ -44,7 +46,7 @@ import {
   hubAgentProfileToWorkbenchAgent,
 } from '@/api/agentProfileQueries';
 import { getHubClient } from '@/api/hubQueries';
-import type { AgentConfig, DocRow, SkillMarketItem, MCPMarketItem } from '@shared/workbench';
+import type { AgentConfig, ConnectionStatusKind, DocRow, SkillMarketItem, MCPMarketItem } from '@shared/workbench';
 import { getDemoRuntimeEvidence } from '@/demo/demoEvidence';
 import { useToastStore, ToastContainer } from '@shared/ui/toast';
 import { useGlobalKeyboardShortcuts } from '@/hooks/useGlobalKeyboardShortcuts';
@@ -155,9 +157,16 @@ export function DesktopWorkbenchApp({ onLogout }: DesktopWorkbenchAppProps = {})
   const [savingAgentId, setSavingAgentId] = useState<string | undefined>();
   const [deletingAgentId, setDeletingAgentId] = useState<string | undefined>();
   const createRun = useCreateRun();
+  const cancelRun = useCancelRun();
+  const decideEdgePermission = useDecideEdgePermission();
   const createThread = useCreateThread();
   const decideTeamApproval = useDecideTeamApproval();
   const { data: threadsData } = useThreads(undefined, { enabled: liveEdgeEnabled });
+  // Edge run lifecycle for the active thread — the authoritative source for
+  // the running state (composer stop button) and the cancel target (#1816 W1).
+  const runsQuery = useRuns(undefined, workbench.activeThreadId, {
+    enabled: liveEdgeEnabled && Boolean(workbench.activeThreadId),
+  });
   const { data: currentUser } = useCurrentUser(edgeOnline);
   const { data: documentListData } = useDocumentList(undefined, { enabled: liveEdgeEnabled });
   const createDocumentMutation = useCreateDocument();
@@ -407,15 +416,91 @@ export function DesktopWorkbenchApp({ onLogout }: DesktopWorkbenchAppProps = {})
     if (thread) setSelectedConversationId(thread.threadId);
   }, [threadsData?.items, workbench.isDemo]);
 
-  const handleApprovalDecision = useCallback(async (action: ApprovalDecisionAction) => {
-    if (!action.teamId || !action.teamRunId) return;
-    await decideTeamApproval.mutateAsync({
-      teamId: action.teamId,
-      runId: action.teamRunId,
-      approvalId: action.approvalId,
-      decision: { decision: action.decision },
+  // Still-active Edge run in the current thread, from the run lifecycle query.
+  const activeEdgeRun = useMemo(
+    () => findActiveEdgeRun(runsQuery.data?.items),
+    [runsQuery.data?.items],
+  );
+
+  // An agent run is "active" while the Edge run list still holds a
+  // non-terminal run for the thread, or the SSE-fed agent activity shows
+  // dispatching/thinking/streaming (mirrors the web isAgentRunning contract,
+  // #1462 CF13 stop-button morph).
+  const isAgentRunning = useMemo(() => {
+    if (!liveEdgeEnabled) return false;
+    if (activeEdgeRun) return true;
+    return (workbench.agentActivity?.activeAgents ?? []).some(
+      (agent) =>
+        agent.status === 'dispatching' ||
+        agent.status === 'thinking' ||
+        agent.status === 'streaming',
+    );
+  }, [liveEdgeEnabled, activeEdgeRun, workbench.agentActivity]);
+
+  const handleCancelRun = useCallback(() => {
+    // Prefer the authoritative run list; fall back to the run id carried by
+    // the current transcript when the list has not caught up yet.
+    const runId = activeEdgeRun?.runId ?? activeRunId;
+    if (!runId) return;
+    void cancelRun.mutateAsync(runId).catch((error: unknown) => {
+      showToast(
+        'error',
+        error instanceof Error && error.message ? error.message : tIm('toast.error'),
+      );
     });
-  }, [decideTeamApproval]);
+  }, [activeEdgeRun, activeRunId, cancelRun, showToast, tIm]);
+
+  const handleApprovalDecision = useCallback(async (action: ApprovalDecisionAction) => {
+    if (action.teamId && action.teamRunId) {
+      await decideTeamApproval.mutateAsync({
+        teamId: action.teamId,
+        runId: action.teamRunId,
+        approvalId: action.approvalId,
+        decision: { decision: action.decision },
+      });
+      return;
+    }
+    // Hub-owned approvals (team or agent-task) without a complete team
+    // context have no local route — never mis-send them to the Local Edge.
+    // Note: a local Edge permission block can carry teamRunId alone (the
+    // mapper derives it from payload.runId), so teamRunId by itself must not
+    // block the Local Edge route below.
+    if (action.teamId || action.agentTaskId) return;
+    // Local Edge run permission (#1816 W1): the card's requestId doubles as
+    // the Edge permission requestId; the owning runId comes from the
+    // permission_request block's run evidence, falling back to the active
+    // run of the current transcript.
+    if (!liveEdgeEnabled) return;
+    const runId = resolveEdgePermissionRunId(workbench.transcript, action.approvalId) ?? activeRunId;
+    if (!runId) return;
+    await decideEdgePermission.mutateAsync({
+      runId,
+      requestId: action.approvalId,
+      decision: action.decision,
+    });
+  }, [decideTeamApproval, decideEdgePermission, liveEdgeEnabled, workbench.transcript, activeRunId]);
+
+  // Real desktop connection state for the workbench rail dot (#1816 W1):
+  // Local Edge is the primary execution link, so Edge-down means
+  // disconnected; while the Hub WS transport is still establishing we show
+  // connecting. Demo mode has no real link and hides the dot.
+  const hubWsStatus = useConnectionStore((state) => state.connectionStatus);
+  const connectionStatus = useMemo<ConnectionStatusKind | undefined>(() => {
+    if (workbench.isDemo) return undefined;
+    if (!edgeOnline) return 'disconnected';
+    if (hubWsStatus === 'connecting' || hubWsStatus === 'reconnecting') return 'connecting';
+    return 'connected';
+  }, [workbench.isDemo, edgeOnline, hubWsStatus]);
+
+  // Device kicked by the Hub (#1816 W1): hubEventBridge surfaces the toast
+  // and flags the store; the shell reacts by returning to the login entry
+  // with the regular logout cleanup.
+  const kickedReason = useConnectionStore((state) => state.kickedReason);
+  useEffect(() => {
+    if (!kickedReason) return;
+    useConnectionStore.getState().clearKicked();
+    onLogout?.();
+  }, [kickedReason, onLogout]);
 
   const handleNavigateToConversation = useCallback((target: { name: string; id: string; kind: 'dm' | 'group' }) => {
     if (workbench.isDemo) {
@@ -495,6 +580,9 @@ export function DesktopWorkbenchApp({ onLogout }: DesktopWorkbenchAppProps = {})
         onProjectUpdate={workbench.projectsActions?.update}
         projectsPort={hubReady ? desktopProjectsPort : undefined}
         onApprovalDecision={handleApprovalDecision}
+        isAgentRunning={isAgentRunning}
+        onCancelRun={liveEdgeEnabled ? handleCancelRun : undefined}
+        connectionStatus={connectionStatus}
         activeProjectId={workbench.activeProjectId}
         onActiveProjectChange={handleActiveProjectChange}
           modelCatalog={modelCatalog?.items}

@@ -11,6 +11,8 @@ import type { QueryClient } from '@tanstack/react-query';
 import { HUB_EVENTS, type HubEventType } from '@shared/hubEvents';
 import { hubQueryKeys } from '@shared/stores/queryKeys';
 import { getPinMapStore } from '@shared/transcript';
+import { useToastStore } from '@shared/ui/toast';
+import { getI18n } from 'react-i18next';
 import type {
   HubAgentDispatchPayload,
   HubAgentDonePayload,
@@ -312,8 +314,24 @@ function onDeviceOffline(qc: QueryClient, _payload: unknown) {
   invalidateAllWithPrefix(qc, hubQueryKeys.executionTargets.root);
 }
 
-function onDeviceKicked(_qc: QueryClient, _payload: unknown) {
-  // Device kicked — auth middleware clears the session
+function onDeviceKicked(qc: QueryClient, payload: unknown) {
+  // Hub pushes device.kicked only to the connection being replaced
+  // (events.go onRouteSet → oldConnID), so receiving it here always means
+  // THIS session lost to a login elsewhere: surface feedback and hand the
+  // shell back to the login entry via the connection store.
+  const data = payload as { reason?: unknown };
+  const reason = str(data?.reason) || 'logged_in_elsewhere';
+  getConnection().markKicked(reason);
+
+  const fallbackMessage = 'Signed out: this device session was replaced by a new login.';
+  const translate = getI18n()?.t?.bind(getI18n());
+  const translated = translate?.('auth.deviceKickedToast', { defaultValue: fallbackMessage });
+  const message = typeof translated === 'string' && translated.trim() ? translated : fallbackMessage;
+  useToastStore.getState().showToast('warning', message);
+
+  // Hub-owned caches belong to the kicked session; drop them so no stale
+  // private data survives into the next login on this device.
+  invalidateAllWithPrefix(qc, ['hub']);
 }
 
 // ── Team run events ────────────────────────────────────────────
