@@ -255,5 +255,5 @@ UI 工作流变更必须有行为断言，不只截图：共享 unit/contract + 
 配置 SSOT 是 `.github/renovate.json`，本节只总结策略，不复制规则细节。
 
 - patch：周一自动合并（squash），前提是 `.github/workflows/checks.yml` 全绿且沉淀 1 天；CI 红时 Renovate 不自合。
-- minor/major：汇总 review PR，不自动合并；`expo`/`expo-*`、`storybook`/`@storybook/*`、`vite`、`typescript` 的 major 不开 PR。
+- minor：汇总周度 review PR；major：逐个独立 PR 评审；均不自动合并；`expo`/`expo-*`、`storybook`/`@storybook/*`、`vite`、`typescript` 的 major 不开 PR。
 - 改规则只改 `.github/renovate.json`，不在本文件或子文档复制 rule 值；上述 major 排除是“延期”不是“永禁”，迁移完成后由对应通道更新配置。Renovate PR 一律带 `dependencies` label。

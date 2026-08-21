@@ -85,11 +85,11 @@
 | a11y | 可访问名称、focus ring | ✅ | 图标按钮强制 aria-label |
 | 响应式 | 无横向滚动、长文案适配、尺寸稳定 | ✅ | 固定高度按钮 |
 
-### Modal（`app/shared/src/ui/Modal.tsx`，有测试、缺 stories）
+### Modal（`app/shared/src/ui/Modal.tsx`，三件套齐全）
 
 | 维度 | 必选项 | 状态 | 备注 |
 |---|---|---|---|
-| 视觉 | token 化面板（`--td-panel`/`--td-surface-3`）、scrim | ✅ | 需补 Storybook 证据 |
+| 视觉 | token 化面板（`--td-panel`/`--td-surface-3`）、scrim | ✅ | 随 Modal.stories.tsx 巡检 |
 | 交互 | 打开/关闭、提交/取消路径行为断言 | ✅ | Modal.test.tsx |
 | 键盘 | Esc 关闭、焦点移入/归还 | ✅ | 测试覆盖 |
 | 键盘 | Tab 循环（焦点困在对话框内） | ⚠️ | 需人工复核，见 debt 记录 |
@@ -97,11 +97,11 @@
 | a11y | 焦点环与对比度 | ✅ | |
 | 响应式 | 窄宽下可用、无横向滚动 | ✅ | 宽度上限 + 内滚 |
 
-### ToastStack（`app/shared/src/ui/toast/ToastStack.tsx`，有测试、缺 stories）
+### ToastStack（`app/shared/src/ui/toast/ToastStack.tsx`，三件套齐全）
 
 | 维度 | 必选项 | 状态 | 备注 |
 |---|---|---|---|
-| 视觉 | token 化状态色（success/warning/danger）、堆叠间距 | ✅ | 需补 Storybook 证据 |
+| 视觉 | token 化状态色（success/warning/danger）、堆叠间距 | ✅ | 随 ToastStack.stories.tsx 巡检 |
 | 交互 | 入列/出列/自动消失/手动关闭行为断言 | ✅ | Toast.test.tsx + toastStore.test.ts |
 | 键盘 | 关闭按钮可聚焦 | ✅ | |
 | a11y | `role="status"`/`role="alert"` 按消息重要性区分 | ✅ | |
