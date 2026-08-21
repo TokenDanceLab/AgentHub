@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { DesignNavIcon } from '@shared/workbench';
+import { DesignNavIcon } from '@agenthub/workbench';
 import { useAuth } from '@/hooks/useAuth';
 import { OidcError } from '@/api/hubAuth';
 import agentHubLogo from '@/assets/agenthub-product-icon-rounded.svg';

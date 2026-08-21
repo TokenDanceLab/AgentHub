@@ -11,11 +11,13 @@ WORKDIR /app
 # Install dependencies first (cache layer)
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY shared/package.json ./shared/package.json
+COPY workbench/package.json ./workbench/package.json
 COPY web/package.json ./web/package.json
 RUN pnpm install --frozen-lockfile
 
 # Copy source and build (vite only — tsc runs in CI)
 COPY shared ./shared
+COPY workbench ./workbench
 COPY web ./web
 RUN pnpm --filter agenthub-web exec vite build
 

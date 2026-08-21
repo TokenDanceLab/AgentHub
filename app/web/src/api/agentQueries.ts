@@ -5,7 +5,7 @@ import { getAccessToken } from '@/hooks/useAuth';
 import { useHubStore } from '@/stores/hubStore';
 import { hubQueryKeys } from '@shared/stores/queryKeys';
 import type { AgentCapabilities, AgentInfo, ListResponse } from '@shared/types';
-import type { AgentConfig } from '@shared/workbench';
+import type { AgentConfig } from '@agenthub/workbench';
 
 const hubClient = createHubClient({ getToken: getAccessToken });
 

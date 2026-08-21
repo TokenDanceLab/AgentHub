@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """verify-i18n-callsites.py — guard against regressing hardcoded CJK literals.
 
-Scans app/shared/src for source files that still embed CJK string literals
-(Zh/Hans) but do NOT import `useTranslation`. Each such file is a "callsite
+Scans app/shared/src and app/workbench/src (#1759) for source files that
+still embed CJK string literals (Zh/Hans) but do NOT import `useTranslation`.
+Each such file is a "callsite
 violation": a component/module that renders user-visible Chinese without
 going through react-i18next, so it cannot be localized to English.
 
@@ -34,7 +35,12 @@ from pathlib import Path
 
 # Repository root is two levels up from this script (scripts/verify -> repo).
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
-SCAN_ROOT = REPO_ROOT / "app" / "shared" / "src"
+# #1759：workbench 独立成包后，CJK 字面量 ratchet 同时覆盖 shared 与
+# workbench 两棵源码树（相对路径带包名前缀，避免重名文件互相遮蔽）。
+SCAN_ROOTS = (
+    ("shared", REPO_ROOT / "app" / "shared" / "src"),
+    ("workbench", REPO_ROOT / "app" / "workbench" / "src"),
+)
 BASELINE_FILE = REPO_ROOT / "scripts" / "verify" / "i18n-callsite-baseline.json"
 
 # A CJK Unified Ideograph range covers Zh/Hans/Hant, Hiragana, Katakana, and
@@ -73,15 +79,17 @@ USE_TRANSLATION_IMPORT_PATTERN = re.compile(
 
 # Files that are the i18n dictionaries themselves, plus test/setup files.
 # These are the legitimate homes for CJK literals and must never be flagged.
+# Paths are prefixed with the scan-root package name (shared/workbench).
 DICTIONARY_PATHS = {
-    "chatview/i18n/resources.ts",
-    "i18n/workbench.ts",
-    "i18n/index.ts",
+    "shared/chatview/i18n/resources.ts",
+    "shared/i18n/workbench.ts",
+    "shared/i18n/index.ts",
 }
 TEST_SUFFIXES = (".test.ts", ".test.tsx", ".spec.ts", ".spec.tsx")
 SETUP_FILES = {
-    "__tests__/setup.ts",
-    "__tests__/setup.tsx",
+    "shared/__tests__/setup.ts",
+    "shared/__tests__/setup.tsx",
+    "workbench/__tests__/setup.ts",
     # Test scaffolding: zh map fixtures + lobehub mock payloads. Not shipped
     # UI strings; safe to exclude from the i18n callsite gate.
     "workbench/workbenchTestMocks.ts",
@@ -129,38 +137,41 @@ def scan_cjk_literal_lines(text: str) -> list[int]:
 
 
 def collect_violations() -> list[Violation]:
-    """Walk SCAN_ROOT and return all callsite violations, sorted by path."""
-    if not SCAN_ROOT.is_dir():
-        return []
-
+    """Walk all scan roots and return callsite violations, sorted by path."""
     violations: list[Violation] = []
-    for source_path in sorted(SCAN_ROOT.rglob("*")):
-        if not source_path.is_file():
-            continue
-        if source_path.suffix not in {".ts", ".tsx"}:
-            continue
-        relative = source_path.relative_to(SCAN_ROOT).as_posix()
-        if is_dictionary_file(relative):
+
+    for package_name, scan_root in SCAN_ROOTS:
+        if not scan_root.is_dir():
             continue
 
-        text = source_path.read_text(encoding="utf-8", errors="replace")
-        cjk_lines = scan_cjk_literal_lines(text)
-        if not cjk_lines:
-            continue
-        if file_has_use_translation(text):
-            # The file imports useTranslation, so its CJK literals are presumed
-            # to be t() keys/values or comments — not hardcoded UI strings.
-            # This is a heuristic; the baseline absorbs edge cases.
-            continue
+        for source_path in sorted(scan_root.rglob("*")):
+            if not source_path.is_file():
+                continue
+            if source_path.suffix not in {".ts", ".tsx"}:
+                continue
+            relative = f"{package_name}/{source_path.relative_to(scan_root).as_posix()}"
+            if is_dictionary_file(relative):
+                continue
 
-        sample = tuple(cjk_lines[:5])
-        violations.append(
-            Violation(
-                relative_path=relative,
-                cjk_line_count=len(cjk_lines),
-                sample_lines=sample,
+            text = source_path.read_text(encoding="utf-8", errors="replace")
+            cjk_lines = scan_cjk_literal_lines(text)
+            if not cjk_lines:
+                continue
+            if file_has_use_translation(text):
+                # The file imports useTranslation, so its CJK literals are
+                # presumed to be t() keys/values or comments — not hardcoded
+                # UI strings. This is a heuristic; the baseline absorbs edge
+                # cases.
+                continue
+
+            sample = tuple(cjk_lines[:5])
+            violations.append(
+                Violation(
+                    relative_path=relative,
+                    cjk_line_count=len(cjk_lines),
+                    sample_lines=sample,
+                )
             )
-        )
 
     violations.sort(key=lambda violation: violation.relative_path)
     return violations
@@ -184,7 +195,7 @@ def write_baseline(violations: list[Violation]) -> None:
             "fails when the current count EXCEEDS this baseline; lower this "
             "number as more callsites are wired to useTranslation."
         ),
-        "scanRoot": "app/shared/src",
+        "scanRoot": "app/shared/src + app/workbench/src",
         "totalViolations": len(violations),
         "totalCjkLiteralLines": sum(v.cjk_line_count for v in violations),
         "files": [v.to_dict() for v in violations],
@@ -224,7 +235,8 @@ def main(argv: list[str] | None = None) -> int:
     baseline_count = int(baseline.get("totalViolations", -1))
     baseline_lines = int(baseline.get("totalCjkLiteralLines", -1))
 
-    print(f"[i18n-callsites] scan root : {SCAN_ROOT.relative_to(REPO_ROOT)}")
+    print("[i18n-callsites] scan roots: "
+          + ", ".join(str(scan_root.relative_to(REPO_ROOT)) for _, scan_root in SCAN_ROOTS))
     print(f"[i18n-callsites] baseline  : {baseline_count} files / "
           f"{baseline_lines} CJK literal lines")
     print(f"[i18n-callsites] current   : {current_count} files / "

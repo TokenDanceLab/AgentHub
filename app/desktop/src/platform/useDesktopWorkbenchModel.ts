@@ -16,15 +16,15 @@ import { getAgentActivityStore, type AgentActivitySnapshot } from '@shared/trans
 import { computeTranscriptUnreadMarker, type TranscriptUnreadMarker } from '@/components/IM/transcriptUnreadMarker';
 import type { WorkbenchAgent, WorkbenchConversation } from '@shared/platform';
 import type { ThreadInfo, ThreadItemInfo, ThreadPinInfo } from '@shared/types';
-import type { ProjectDraft, ProjectInfo } from '@shared/workbench';
-import type { WorkbenchContactsData } from '@shared/workbench';
-import type { WorkbenchContactsActions } from '@shared/workbench/WorkbenchRoutes';
+import type { ProjectDraft, ProjectInfo } from '@agenthub/workbench';
+import type { WorkbenchContactsData } from '@agenthub/workbench';
+import type { WorkbenchContactsActions } from '@agenthub/workbench/WorkbenchRoutes';
 import {
   resolveHubContacts,
   resolveHubProjects,
   hubSessionToConversation,
   type HubContactLike,
-} from '@shared/workbench/hubDataMapping';
+} from '@agenthub/workbench/hubDataMapping';
 import { useThreadMessages, useThreadPins, useThreads } from '@/api/threadQueries';
 import { useHubSessions, useHubMessages, useHubPinnedMessages, useHubSendMessage, useHubRecallMessage, useHubEditMessage, useHubPinMessage, useHubUnpinMessage, useHubMarkRead } from '@/api/sessionQueries';
 import {

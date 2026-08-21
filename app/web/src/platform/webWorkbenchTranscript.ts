@@ -1,4 +1,4 @@
-import type { RuntimeEvidenceSnapshot } from '@shared/workbench';
+import type { RuntimeEvidenceSnapshot } from '@agenthub/workbench';
 import {
   WORKBENCH_DEMO_FALLBACK_CONVERSATION_ID,
   isWorkbenchRealDataMode,

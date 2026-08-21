@@ -15,19 +15,24 @@ export default defineConfig({
         test: { name: 'shared', sequence: { groupOrder: 1 } },
       },
       {
+        extends: 'workbench/vitest.config.ts',
+        root: projectRoot('workbench'),
+        test: { name: 'workbench', sequence: { groupOrder: 2 } },
+      },
+      {
         extends: 'desktop/vitest.desktop-ci.config.ts',
         root: projectRoot('desktop'),
-        test: { name: 'desktop', sequence: { groupOrder: 2 } },
+        test: { name: 'desktop', sequence: { groupOrder: 3 } },
       },
       {
         extends: 'web/vitest.config.ts',
         root: projectRoot('web'),
-        test: { name: 'web', sequence: { groupOrder: 3 } },
+        test: { name: 'web', sequence: { groupOrder: 4 } },
       },
       {
         extends: 'mobile-rn/vitest.config.ts',
         root: projectRoot('mobile-rn'),
-        test: { name: 'mobile-rn', sequence: { groupOrder: 4 } },
+        test: { name: 'mobile-rn', sequence: { groupOrder: 5 } },
       },
     ],
   },
