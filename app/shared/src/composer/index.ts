@@ -16,6 +16,7 @@ export {
 export {
   buildComposerIntent,
   canSubmitComposer,
+  captureComposerDraft,
   composerReducer,
   createInitialComposerState,
 } from './composerReducer';

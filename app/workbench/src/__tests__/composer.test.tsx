@@ -60,6 +60,88 @@ describe('AgentHubWorkbench', () => {
     });
   });
 
+  it('restores the draft and retries when an attachment upload fails (#1821)', async () => {
+    const uploadAttachment = vi.fn()
+      .mockRejectedValueOnce(new Error('upload exploded'))
+      .mockResolvedValueOnce({
+        id: 'att-1',
+        name: 'notes.md',
+        original_name: 'notes.md',
+        size: 5,
+        mime_type: 'text/markdown',
+      });
+    const platform = createMockPlatform({
+      surface: 'web',
+      conversations: [{ id: 'team', title: 'Agent 协作群', kind: 'group' }],
+    });
+    platform.attachments = {
+      pickFiles: async () => [{
+        id: 'att-browser-1',
+        name: 'notes.md',
+        source: 'browser' as const,
+        size: 5,
+        mime: 'text/markdown',
+        file: new File(['abc'], 'notes.md', { type: 'text/markdown' }),
+      }],
+      uploadAttachment,
+    };
+
+    render(
+      <AgentHubWorkbench
+        agents={agents}
+        platform={platform}
+        conversations={platform.seed.conversations}
+        activeConversationId="team"
+        transcript={[]}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Add attachment' }));
+    expect(await screen.findByText('notes.md')).toBeInTheDocument();
+    fireEvent.change(screen.getByRole('textbox', { name: 'Composer input' }), {
+      target: { value: '附带笔记' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: '发送消息' }));
+
+    // The failed upload surfaces the error, sends nothing, and restores the
+    // user's draft (text + attachment) instead of silently dropping it.
+    await waitFor(() => {
+      expect(screen.getByText('上传失败')).toBeInTheDocument();
+    });
+    expect(screen.getByRole('textbox', { name: 'Composer input' })).toHaveValue('附带笔记');
+    expect(screen.getByText('notes.md')).toBeInTheDocument();
+    expect(platform.submittedIntents).toHaveLength(0);
+
+    // The failed chip offers a retry; it re-uploads in place and the resubmit
+    // then ships the intent with the attachment ref.
+    fireEvent.click(screen.getByRole('button', { name: '重试上传 notes.md' }));
+    await waitFor(() => {
+      expect(screen.queryByText('上传失败')).not.toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByRole('button', { name: '发送消息' }));
+    await waitFor(() => {
+      expect(platform.submittedIntents).toHaveLength(1);
+    });
+    expect(uploadAttachment).toHaveBeenCalledTimes(2);
+    expect(platform.submittedIntents[0]).toEqual(
+      expect.objectContaining({
+        text: '附带笔记',
+        attachments: [
+          expect.objectContaining({
+            name: 'notes.md',
+            attachmentRef: {
+              id: 'att-1',
+              name: 'notes.md',
+              original_name: 'notes.md',
+              size: 5,
+              mime_type: 'text/markdown',
+            },
+          }),
+        ],
+      }),
+    );
+  });
+
   it('submits @Agent main-chain intents with an explicit execution target', async () => {
     const platform = createMockPlatform({
       surface: 'web',

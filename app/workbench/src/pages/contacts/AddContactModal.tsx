@@ -20,6 +20,13 @@ function QRPanel() {
   const cells = Array.from({ length: 81 }, (_, i) =>
     (i * 7 + i) % 5 < 2,
   );
+  // #1821: the QR "valid until" date used to be a hardcoded literal that went
+  // stale; derive it from today + 30 days instead.
+  const expireLabel = React.useMemo(() => {
+    const date = new Date();
+    date.setDate(date.getDate() + 30);
+    return `有效期至 ${date.getFullYear()}年${date.getMonth() + 1}月${date.getDate()}日`;
+  }, []);
 
   return (
     <div className={styles.qrPanel}>
@@ -38,7 +45,7 @@ function QRPanel() {
       <p className={styles.qrCopy}>
         对方扫码后可申请加入企业，管理员确认后出现在组织内联系人。
       </p>
-      <span className={styles.qrExpire}>有效期至 2026年7月18日</span>
+      <span className={styles.qrExpire}>{expireLabel}</span>
     </div>
   );
 }

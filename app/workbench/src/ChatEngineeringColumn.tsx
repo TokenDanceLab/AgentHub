@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import type {
   AgentHubPlatform,
+  RuntimeSessionSummary,
   WorkspaceFileEntry,
   WorkspaceGitChange,
   WorkspaceGitCommit,
@@ -51,6 +52,10 @@ export function ChatEngineeringColumn({
   const [files, setFiles] = useState<WorkspaceFileEntry[]>([]);
   const [changes, setChanges] = useState<WorkspaceGitChange[]>([]);
   const [commits, setCommits] = useState<WorkspaceGitCommit[]>([]);
+  // #1821: the 会话 tab used to be a static placeholder. Wire it to the real
+  // host runtime-session list when the port exists; otherwise show an honest
+  // empty state instead of fake content.
+  const [runtimeSessions, setRuntimeSessions] = useState<RuntimeSessionSummary[]>([]);
 
   useEffect(() => {
     if (effective !== activeTab) setActiveTab(effective);
@@ -82,6 +87,23 @@ export function ChatEngineeringColumn({
     };
   }, [platform, workDir, hasWorkspace]);
 
+  // #1821: 会话 tab — real host runtime sessions (Desktop port) or an honest
+  // empty state; no more static placeholder.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const next = (await platform?.host?.listRuntimeSessions?.()) ?? [];
+        if (!cancelled) setRuntimeSessions(next);
+      } catch {
+        if (!cancelled) setRuntimeSessions([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [platform]);
+
   return (
     <div
       className={[shellStyles.engineeringColumn, styles.column].filter(Boolean).join(' ')}
@@ -98,7 +120,18 @@ export function ChatEngineeringColumn({
         >
           {{
             session_details: (
-              <div className={styles.placeholder}>会话详情与运行摘要（本地工程循环）</div>
+              <ul className={styles.list} data-testid="aux-session-details">
+                {runtimeSessions.length === 0 ? (
+                  <li className={styles.placeholder}>暂无本地运行会话</li>
+                ) : (
+                  runtimeSessions.map((session) => (
+                    <li key={session.id} className={styles.listItem}>
+                      <span className={styles.kind}>{session.runtime}</span>
+                      {session.title ?? session.path ?? session.id}
+                    </li>
+                  ))
+                )}
+              </ul>
             ),
             file_tree: (
               <ul className={styles.list} data-testid="aux-file-tree">

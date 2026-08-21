@@ -69,6 +69,21 @@ export interface QuoteContext {
   messageId?: string;
 }
 
+/**
+ * Composer content captured right before a submit attempt (#1821).
+ *
+ * A send clears the composer optimistically; when the request then fails the
+ * snapshot is dispatched back so the user's text, mentions, attachments and
+ * reply/quote context are never silently dropped.
+ */
+export interface ComposerDraftSnapshot {
+  text: string;
+  mentions: ComposerMention[];
+  attachments: ComposerAttachment[];
+  replyTo: ReplyToContext | null;
+  quote: QuoteContext | null;
+}
+
 export interface ComposerState {
   conversationId: string;
   text: string;
@@ -120,6 +135,11 @@ export interface ComposerSubmitResult {
 export type ComposerAction =
   | { type: 'setConversationId'; conversationId: string }
   | { type: 'setText'; text: string }
+  /**
+   * Insert text at the start of the existing draft without discarding it
+   * (e.g. quote-reply prepends the quoted block, #1821).
+   */
+  | { type: 'prependText'; text: string }
   | { type: 'setMode'; mode: ComposerMode }
   | { type: 'addMention'; mention: ComposerMention }
   | { type: 'removeMention'; mentionId: string }
@@ -131,4 +151,8 @@ export type ComposerAction =
   | { type: 'setReplyTo'; replyTo: ReplyToContext | null }
   | { type: 'setQuote'; quote: QuoteContext | null }
   | { type: 'setEditingMessage'; messageId: string | null }
+  /** Attach the Hub upload result to an already-listed attachment (#1821). */
+  | { type: 'setAttachmentRef'; attachmentId: string; attachmentRef: AttachmentRef }
+  /** Put a captured draft back after a failed submit (#1821). */
+  | { type: 'restoreDraft'; draft: ComposerDraftSnapshot }
   | { type: 'resetAfterSubmit' };

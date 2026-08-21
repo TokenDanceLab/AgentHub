@@ -3,6 +3,8 @@ import { formatComposerAttachmentSize } from '@shared/composer';
 import {
   type AttachmentUploadState,
   type ComposerExecutionTarget,
+  isAttachmentUploadFailed,
+  isAttachmentUploadInFlight,
   isAttachmentUploading,
   isImageAttachment,
 } from './unifiedComposerHelpers';
@@ -71,6 +73,8 @@ export interface ComposerAttachmentChipViewModel {
   previewKind: ComposerAttachmentPreviewKind | undefined;
   sizeLabel: string | undefined;
   isUploading: boolean;
+  isUploadInFlight: boolean;
+  isUploadFailed: boolean;
   uploadPercent: number;
 }
 
@@ -105,6 +109,8 @@ export function buildAttachmentChipViewModel(params: {
     ? formatComposerAttachmentSize(attachment.size)
     : undefined;
   const isUploading = isAttachmentUploading(uploadProgress, attachment);
+  const isUploadInFlight = isAttachmentUploadInFlight(uploadProgress);
+  const isUploadFailed = isAttachmentUploadFailed(uploadProgress);
   const uploadPercent = uploadProgress?.percent ?? 0;
 
   return {
@@ -113,6 +119,8 @@ export function buildAttachmentChipViewModel(params: {
     previewKind,
     sizeLabel,
     isUploading,
+    isUploadInFlight,
+    isUploadFailed,
     uploadPercent,
   };
 }

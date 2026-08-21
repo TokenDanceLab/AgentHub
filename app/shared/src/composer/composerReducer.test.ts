@@ -67,6 +67,67 @@ describe('composerReducer', () => {
     );
   });
 
+  it('prepends quote text into the existing draft instead of replacing it (#1821)', () => {
+    const empty = createInitialComposerState('team');
+    const quotedEmpty = composerReducer(empty, { type: 'prependText', text: '> 引用\n\n' });
+    expect(quotedEmpty.text).toBe('> 引用\n\n');
+
+    const withDraft = composerReducer(
+      { ...quotedEmpty, text: '> 引用\n\n正在写的草稿' },
+      { type: 'prependText', text: '> 第二条引用\n\n' },
+    );
+    expect(withDraft.text).toBe('> 第二条引用\n\n> 引用\n\n正在写的草稿');
+  });
+
+  it('restores a captured draft after a failed submit (#1821)', () => {
+    let state = createInitialComposerState('team');
+    state = composerReducer(state, { type: 'setText', text: '附带内容的草稿' });
+    state = composerReducer(state, {
+      type: 'addMention',
+      mention: { id: 'builder', label: 'Builder' },
+    });
+    state = composerReducer(state, {
+      type: 'addAttachment',
+      attachment: { id: 'a1', name: 'notes.md', source: 'browser' },
+    });
+    state = composerReducer(state, {
+      type: 'setReplyTo',
+      replyTo: { messageId: 'm1', author: 'You', preview: 'preview' },
+    });
+    const snapshot = {
+      text: state.text,
+      mentions: [...state.mentions],
+      attachments: [...state.attachments],
+      replyTo: state.replyTo,
+      quote: null,
+    };
+
+    // Optimistic clear (what a submit does), then restore on failure.
+    const cleared = composerReducer(state, { type: 'resetAfterSubmit' });
+    expect(cleared.text).toBe('');
+    expect(cleared.attachments).toEqual([]);
+
+    const restored = composerReducer(cleared, { type: 'restoreDraft', draft: snapshot });
+    expect(restored.text).toBe('附带内容的草稿');
+    expect(restored.mentions.map((m) => m.id)).toEqual(['builder']);
+    expect(restored.attachments.map((a) => a.id)).toEqual(['a1']);
+    expect(restored.replyTo?.messageId).toBe('m1');
+  });
+
+  it('writes upload refs back into attachments and keeps them across restore (#1821)', () => {
+    let state = createInitialComposerState('team');
+    state = composerReducer(state, {
+      type: 'addAttachment',
+      attachment: { id: 'a1', name: 'notes.md', source: 'browser', file: new File(['x'], 'notes.md') },
+    });
+    state = composerReducer(state, {
+      type: 'setAttachmentRef',
+      attachmentId: 'a1',
+      attachmentRef: { id: 'att-1', name: 'notes.md', size: 1, mime_type: 'text/markdown' },
+    });
+    expect(state.attachments[0]?.attachmentRef?.id).toBe('att-1');
+  });
+
   it('resets text and transient submit state after successful submit', () => {
     let state = composerReducer(createInitialComposerState('team'), { type: 'setText', text: 'ship' });
     state = composerReducer(state, { type: 'addMention', mention: { id: 'builder', label: 'Builder' } });

@@ -11,7 +11,20 @@ import type { ComposerSubmitBehavior } from './workbenchPreferences';
 
 export interface AttachmentUploadState {
   percent: number;
-  phase: 'hashing' | 'uploading' | 'done';
+  phase: 'hashing' | 'uploading' | 'done' | 'failed';
+}
+
+/** True while the upload is in flight (chip shows the progress bar). */
+export function isAttachmentUploadInFlight(uploadProgress: AttachmentUploadState | undefined): boolean {
+  return Boolean(
+    uploadProgress &&
+      (uploadProgress.phase === 'hashing' || uploadProgress.phase === 'uploading'),
+  );
+}
+
+/** True when the upload failed and the chip should offer retry. */
+export function isAttachmentUploadFailed(uploadProgress: AttachmentUploadState | undefined): boolean {
+  return uploadProgress?.phase === 'failed';
 }
 
 export interface ComposerExecutionTarget {

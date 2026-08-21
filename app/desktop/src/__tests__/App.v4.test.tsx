@@ -430,7 +430,9 @@ describe('Desktop App v4 root', () => {
     expect(screen.getByRole('complementary', { name: conversationSidebarLabel })).toBeInTheDocument();
     expect(screen.getByRole('main', { name: workspaceLabel })).toHaveAttribute('data-surface', 'desktop');
     expect(screen.getByRole('complementary', { name: 'Right inspector' })).toBeInTheDocument();
-    expect(screen.getByRole('tablist', { name: workspaceTabsLabel })).toBeInTheDocument();
+    // #1821: the legacy workspace tab row was dead chrome and was removed
+    // from WorkspaceHeader (both surfaces).
+    expect(screen.queryByRole('tablist', { name: workspaceTabsLabel })).not.toBeInTheDocument();
     expect(screen.getByRole('tablist', { name: 'aria.rightWorkspace' })).toBeInTheDocument();
     expect(getComposerInput()).toBeInTheDocument();
     expect(screen.queryByRole('toolbar', { name: 'Composer modes' })).not.toBeInTheDocument();
