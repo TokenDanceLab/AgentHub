@@ -137,14 +137,18 @@ def main() -> int:
     # complex functions (admin.go/mcp_server.go/agent_dispatch.go); re-harden
     # after refactoring or threshold adjustment.
     assert_step_continue_on_error(edge, "Lint", True)
-    # #1657: go-hub Lint converted from soft gate to hard-blocking. The 17
-    # pre-existing complexity findings stay tolerated through the action's
-    # only-new-issues mode until the #1573 baseline debt is repaid; the step
-    # must keep the pinned golangci-lint action (no placeholder commands).
-    assert_step_continue_on_error(hub, "Lint", False)
+    # #1657/#1832: go-hub Lint is report-only (advisory) — the action's raw
+    # exit code cannot consult the #1573 baseline, and >300-file PR diffs
+    # fall back to a full-repo lint that would hard-fail debt-clean large
+    # PRs. The hard gate lives in the fingerprint ratchet step below, which
+    # exempts baseline-registered findings in both patch and full-lint mode.
+    # The step must keep the pinned golangci-lint action (no placeholder
+    # commands) and only-new-issues so small PRs keep a new-findings report.
+    assert_step_continue_on_error(hub, "Lint", True)
     hub_lint_step = get_step_block(hub, "Lint")
     assert_contains(hub_lint_step, r"golangci/golangci-lint-action@v9", "go-hub Lint must keep the pinned golangci-lint action (no placeholder commands)")
-    assert_contains(hub_lint_step, r"only-new-issues:\s*true", "go-hub Lint must restrict hard failures to new findings while baseline debt remains")
+    assert_contains(hub_lint_step, r"only-new-issues:\s*true", "go-hub Lint must keep only-new-issues so patch-mode reports stay scoped to new findings")
+    assert_step_continue_on_error(hub, "Verify Hub lint fingerprint ratchet (#1573)", False)
     # #1574: gosec findings triaged and cleared in both servers; the gosec
     # security scan steps are hard-blocking (no continue-on-error) and run
     # through the fail-closed verify-gosec-gates.sh wrapper.
