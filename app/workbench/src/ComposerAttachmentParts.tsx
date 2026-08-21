@@ -27,11 +27,13 @@ export function ComposerAttachmentBar({
   isSubmitting,
   uploadProgresses,
   onRemove,
+  onRetryUpload,
 }: {
   attachments: ComposerAttachment[];
   isSubmitting: boolean;
   uploadProgresses: Record<string, AttachmentUploadState> | undefined;
   onRemove: (attachmentId: string) => void;
+  onRetryUpload?: ((attachmentId: string) => void) | undefined;
 }): React.ReactElement {
   const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE);
   return (
@@ -47,6 +49,7 @@ export function ComposerAttachmentBar({
             isSubmitting={isSubmitting}
             key={attachment.id}
             onRemove={() => onRemove(attachment.id)}
+            {...(onRetryUpload ? { onRetryUpload: () => onRetryUpload(attachment.id) } : {})}
             {...(progress ? { uploadProgress: progress } : {})}
           />
         );
@@ -59,11 +62,13 @@ export function ComposerAttachmentChip({
   attachment,
   isSubmitting,
   onRemove,
+  onRetryUpload,
   uploadProgress,
 }: {
   attachment: ComposerAttachment;
   isSubmitting: boolean;
   onRemove: () => void;
+  onRetryUpload?: (() => void) | undefined;
   uploadProgress?: AttachmentUploadState;
 }): React.ReactElement {
   const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE);
@@ -72,6 +77,8 @@ export function ComposerAttachmentChip({
     previewKind,
     sizeLabel,
     isUploading,
+    isUploadInFlight,
+    isUploadFailed,
     uploadPercent,
   } = buildAttachmentChipViewModel({
     attachment,
@@ -106,7 +113,8 @@ export function ComposerAttachmentChip({
   return (
     <div
       className={styles.attachmentChip}
-      {...(isUploading ? { 'data-uploading': 'true' } : {})}
+      {...(isUploadInFlight ? { 'data-uploading': 'true' } : {})}
+      {...(isUploadFailed ? { 'data-upload-failed': 'true' } : {})}
       style={imageUrl ? { height: 34, maxWidth: 280, paddingLeft: 4 } : undefined}
     >
       {imageUrl ? (
@@ -133,7 +141,16 @@ export function ComposerAttachmentChip({
       {sizeLabel && (
         <span className={styles.attachmentChipSize}>{sizeLabel}</span>
       )}
-      {isUploading ? (
+      {isUploadFailed && (
+        <span
+          className={styles.attachmentChipSize}
+          role="status"
+          style={{ color: 'var(--td-warning)', fontWeight: 600 }}
+        >
+          {t('composer.attachmentUploadFailed', { defaultValue: '上传失败' })}
+        </span>
+      )}
+      {isUploadInFlight ? (
         <span className={styles.attachmentUploadBar}>
           <span className={styles.attachmentUploadFill} style={{ width: `${uploadPercent}%` }} />
         </span>
@@ -146,6 +163,26 @@ export function ComposerAttachmentChip({
           type="button"
         >
           &times;
+        </button>
+      )}
+      {isUploadFailed && onRetryUpload && (
+        <button
+          aria-label={t('action.retryAttachmentUpload', { name: attachment.name, defaultValue: `重试上传 ${attachment.name}` })}
+          onClick={onRetryUpload}
+          style={{
+            flexShrink: 0,
+            border: '1px solid var(--td-line)',
+            borderRadius: 'var(--td-radius-control)',
+            background: 'var(--td-surface-2)',
+            color: 'var(--td-ink)',
+            cursor: 'pointer',
+            fontSize: 12,
+            lineHeight: '20px',
+            padding: '0 8px',
+          }}
+          type="button"
+        >
+          {t('action.retryAttachmentUpload', { name: attachment.name, defaultValue: '重试' })}
         </button>
       )}
     </div>

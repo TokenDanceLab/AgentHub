@@ -42,9 +42,10 @@ describe('AgentHubWorkbench', () => {
     expect(screen.getByRole('complementary', { name: 'Conversation sidebar' })).toBeInTheDocument();
     expect(screen.getByRole('main', { name: 'Workspace' })).toHaveAttribute('data-surface', 'desktop');
     expect(screen.getByRole('complementary', { name: 'Right inspector' })).toBeInTheDocument();
-    expect(screen.getByRole('tablist', { name: 'Workspace tabs' })).toBeInTheDocument();
-    expect(screen.getByRole('tab', { name: '消息' })).toHaveAttribute('aria-selected', 'true');
-    expect(screen.getByRole('tab', { name: '云文档' })).toBeInTheDocument();
+    /* #1821: the workspace header tab row (消息/云文档/新建频道) was dead chrome —
+       no shell callback could switch views — and was removed. */
+    expect(screen.queryByRole('tablist', { name: 'Workspace tabs' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('tab', { name: '云文档' })).not.toBeInTheDocument();
     /* P76: default primary card is overview only. */
     const inspectorTablist = screen.getByRole('tablist', { name: '右侧工作区' });
     expect(within(inspectorTablist).getByRole('tab', { name: /概览/ })).toHaveAttribute('aria-selected', 'true');

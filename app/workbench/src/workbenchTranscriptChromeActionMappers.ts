@@ -11,7 +11,6 @@ import {
   buildQuoteComposerText,
   cardActionLabel,
   cardLinkForBlock,
-  multiActionLabel,
   resolveBlockTitleById,
   resolveQuoteText,
   type TranscriptChromeTranslate,
@@ -35,7 +34,14 @@ export type TranscriptChromeSideEffect =
     focusComposer?: true;
   }
   | { type: 'regenerate'; blockId: string }
-  | { type: 'approval'; decision: ApprovalDecisionAction }
+  | {
+    type: 'approval';
+    decision: ApprovalDecisionAction;
+    /** Shown only after the decision request resolves successfully (#1821). */
+    successMessage: string;
+    /** Shown when the decision request rejects (#1821). */
+    failureMessage: string;
+  }
   | { type: 'pulse'; blockId: string }
   | { type: 'toast'; message: string }
   | { type: 'exitSelection' }
@@ -134,7 +140,9 @@ export function planContextAction(options: {
     effects.push({
       type: 'composer',
       actions: [
-        { type: 'setText', text: buildQuoteComposerText(quoteText) },
+        // #1821: insert the quote ahead of the existing draft instead of
+        // replacing it (prependText, not setText).
+        { type: 'prependText', text: buildQuoteComposerText(quoteText) },
         {
           type: 'setQuote',
           quote: {
@@ -239,10 +247,15 @@ export function planContextAction(options: {
     return effects;
   }
 
-  effects.push(
-    { type: 'pulse', blockId },
-    { type: 'toast', message: cardActionLabel(reactAction ? 'react' : action, title, t) },
-  );
+  // Known actions with real effects get a confirmation toast; unknown or
+  // unwired actions plan nothing — a generic "已记录" toast would claim an
+  // effect that never runs (#1818, #1821).
+  if (action === 'copy' || action === 'link' || action === 'delete') {
+    effects.push(
+      { type: 'pulse', blockId },
+      { type: 'toast', message: cardActionLabel(action, title, t) },
+    );
+  }
   return effects;
 }
 
@@ -261,13 +274,17 @@ export function planTranscriptBlockAction(options: {
 
   if (action === 'approve' || action === 'deny') {
     if (block.kind === 'permission_request') {
+      // #1821: the success toast must not fire before the request resolves —
+      // the decision is awaited in applyTranscriptChromeSideEffects and only
+      // then reports success (or the failure message on rejection).
       effects.push(
-        { type: 'approval', decision: buildPermissionApprovalDecision(block, action) },
-        { type: 'pulse', blockId },
         {
-          type: 'toast',
-          message: action === 'approve' ? t('action.approved') : t('action.denied'),
+          type: 'approval',
+          decision: buildPermissionApprovalDecision(block, action),
+          successMessage: action === 'approve' ? t('action.approved') : t('action.denied'),
+          failureMessage: t('toast.approvalFailed', { defaultValue: '审批失败，请重试' }),
         },
+        { type: 'pulse', blockId },
       );
     }
   }
@@ -315,14 +332,17 @@ export function planMultiAction(options: {
         .map((blockId) => resolveBlockTitleById(transcript, blockId, t))
         .join('\n'),
     });
+    // Success toast only rides real effects; unknown multi-actions plan
+    // nothing instead of a fake "已处理 N 项" success (#1818, #1821).
+    effects.push({ type: 'toast', message: t('toast.multiCopy', { count }) });
   }
   if (action === 'delete') {
     effects.push(
       { type: 'softHide', blockIds: selectedBlockIds },
       { type: 'exitSelection' },
+      { type: 'toast', message: t('toast.multiDelete', { count }) },
     );
   }
-  effects.push({ type: 'toast', message: multiActionLabel(action, count, t) });
   return effects;
 }
 
@@ -393,9 +413,22 @@ export function applyTranscriptChromeSideEffects(
       case 'regenerate':
         handlers.onRegenerate?.(effect.blockId);
         break;
-      case 'approval':
-        handlers.onApprovalDecision?.(effect.decision);
+      case 'approval': {
+        // #1821: wait for the decision request instead of fire-and-forget —
+        // the success toast only fires after it resolves; a rejection shows
+        // the failure message so a failed approval is never silent.
+        const handler = handlers.onApprovalDecision;
+        if (!handler) break;
+        void Promise.resolve(handler(effect.decision)).then(
+          () => handlers.showWorkbenchToast(effect.successMessage),
+          (err: unknown) => {
+            handlers.showWorkbenchToast(
+              err instanceof Error ? err.message : effect.failureMessage,
+            );
+          },
+        );
         break;
+      }
       case 'pulse':
         handlers.pulseBlock(effect.blockId);
         break;

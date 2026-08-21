@@ -3,7 +3,12 @@ import { useTranslation } from 'react-i18next';
 import type { TranscriptBlock, TextTranscriptBlock } from '@shared/transcript';
 import { isSidebarOnlyTranscriptBlock, orderTranscriptBlocks } from '@shared/transcript';
 import type { ComposerIntent, ComposerMention } from '@shared/composer';
-import { buildComposerIntent, composerReducer, createInitialComposerState } from '@shared/composer';
+import {
+  buildComposerIntent,
+  captureComposerDraft,
+  composerReducer,
+  createInitialComposerState,
+} from '@shared/composer';
 import {
   enqueuePendingIntent,
   MAX_PENDING_DISPATCH_RETRIES,
@@ -115,6 +120,34 @@ export const ConversationHost = React.memo(function ConversationHost({
   const isSubmittingRef = useRef(false);
   const composerSubmitBehavior = useComposerSubmitBehavior();
 
+  // ── Pinned banner dismissal (#1821) ───────────────────────────────────
+  // The shell owns the initial dismissed set; the host adds local dismissals
+  // and keeps them even if the shell re-renders with the old set.
+  const [dismissedPinnedLocal, setDismissedPinnedLocal] = useState<Set<string>>(
+    () => new Set(dismissedPinnedIds),
+  );
+  useEffect(() => {
+    setDismissedPinnedLocal((current) => {
+      let changed = false;
+      const next = new Set(current);
+      for (const id of dismissedPinnedIds) {
+        if (!next.has(id)) {
+          next.add(id);
+          changed = true;
+        }
+      }
+      return changed ? next : current;
+    });
+  }, [dismissedPinnedIds]);
+  const handleDismissPinned = useCallback((conversationId: string): void => {
+    setDismissedPinnedLocal((current) => {
+      if (current.has(conversationId)) return current;
+      const next = new Set(current);
+      next.add(conversationId);
+      return next;
+    });
+  }, []);
+
   // ── Pending dispatch queue (CF22) ──────────────────────────────────────
   // Queue is ref-authoritative (mutations are synchronous read-modify-write,
   // never split across an await) with a version tick to trigger re-renders.
@@ -147,10 +180,11 @@ export const ConversationHost = React.memo(function ConversationHost({
     const head = peekPendingIntent(pendingIntentsRef.current);
     if (!head) return;
     // The message lives in its original conversation — never dispatch a
-    // queued intent after the user has switched away (drop silently; same
-    // as the pre-queue behavior of losing the dispatch opportunity).
+    // queued intent after the user has switched away. Surface the drop so it
+    // is not silent (#1821).
     if (head.intent.conversationId !== currentConversationId) {
       mutatePendingIntents((current) => removePendingIntent(current, head));
+      onToast(t('toast.pendingDispatchDroppedOnSwitch', { defaultValue: '已切换会话，待派单任务已取消' }));
       return;
     }
     flushInFlightRef.current = true;
@@ -236,6 +270,12 @@ export const ConversationHost = React.memo(function ConversationHost({
     }
 
     let optimisticId: string | undefined;
+    // Snapshot the user's draft before the optimistic clear: when the submit
+    // fails the content is restored so nothing is silently dropped (#1821).
+    const draftSnapshot = captureComposerDraft(composer, { text: liveText.trim() });
+    // Tracks upload refs written so far — the catch restores the draft with
+    // them so a retry only re-uploads what actually failed.
+    let enrichedAttachments = composer.attachments;
     try {
       const intent = buildComposerIntent(composer);
       const intentWithLiveText = { ...intent, text: liveText.trim(), conversationId: capturedConversationId };
@@ -258,17 +298,31 @@ export const ConversationHost = React.memo(function ConversationHost({
       dispatchComposer({ type: 'resetAfterSubmit' });
       dispatchComposer({ type: 'setSubmitState', submitState: 'submitting' });
       setUploadProgresses({});
-      let enrichedAttachments = capturedAttachments;
-      if (pendingAttachments.length > 0 && platform.attachments?.uploadAttachment) {
+      if (pendingAttachments.length > 0 && platform.attachments) {
         const uploadPort = platform.attachments;
+        const uploadWithProgress = uploadPort.uploadAttachmentWithProgress ?? undefined;
         for (const a of pendingAttachments) {
           if (!a.file) continue;
           try {
             setUploadProgresses((prev) => ({ ...prev, [a.id]: { percent: 5, phase: 'hashing' } }));
-            const ref = await uploadPort.uploadAttachment(a.file);
+            const ref = uploadWithProgress
+              ? await uploadWithProgress(a.file, (progress) => {
+                  setUploadProgresses((prev) => ({
+                    ...prev,
+                    [a.id]: { percent: progress.percent, phase: progress.phase },
+                  }));
+                })
+              : await uploadPort.uploadAttachment(a.file);
             setUploadProgresses((prev) => ({ ...prev, [a.id]: { percent: 100, phase: 'done' } }));
             enrichedAttachments = enrichedAttachments.map((x) => x.id === a.id ? { ...x, attachmentRef: ref } : x);
-          } catch { setUploadProgresses((prev) => { const n = { ...prev }; Reflect.deleteProperty(n, a.id); return n; }); }
+            // Keep the composer state in sync so a restored draft keeps the refs.
+            dispatchComposer({ type: 'setAttachmentRef', attachmentId: a.id, attachmentRef: ref });
+          } catch {
+            // Upload failed: mark the chip failed and abort the send — shipping
+            // the message without the file would silently lose it (#1821).
+            setUploadProgresses((prev) => ({ ...prev, [a.id]: { percent: 100, phase: 'failed' } }));
+            throw new Error(`附件「${a.name}」上传失败，请重试或移除后发送`);
+          }
         }
       }
       const finalIntent = enrichedAttachments.length > 0 ? { ...intentWithLiveText, attachments: enrichedAttachments } : intentWithLiveText;
@@ -303,12 +357,52 @@ export const ConversationHost = React.memo(function ConversationHost({
       if (optimisticId) {
         setPendingUserBlocks((current) => current.filter((pending) => pending.id !== optimisticId));
       }
+      // Restore the user's draft (failed attachments keep their refs so a
+      // retry only re-uploads what actually failed) and keep the failed
+      // progress entries so the chips show the failure + retry state.
+      dispatchComposer({
+        type: 'restoreDraft',
+        draft: {
+          ...draftSnapshot,
+          attachments: draftSnapshot.attachments.map((attachment) => {
+            const ref = enrichedAttachments.find((enriched) => enriched.id === attachment.id)?.attachmentRef;
+            return ref ? { ...attachment, attachmentRef: ref } : attachment;
+          }),
+        },
+      });
       dispatchComposer({ type: 'setSubmitState', submitState: 'error' });
-      setUploadProgresses({});
       onToast(err instanceof Error ? err.message : t('toast.submitFailed'));
     } finally { isSubmittingRef.current = false; }
   }, [composer, currentConversationId, platform, selectedExecutionTargetId, isAgentRunning,
     onToast, dispatchComposer, t, transcript, onEditMessage, mutatePendingIntents, flushPendingIntents]);
+
+  /**
+   * Retry a failed attachment upload from its chip (#1821). The attachment
+   * keeps its transient `file` after the failed submit, so the retry can
+   * re-upload in place and write the ref back into the composer.
+   */
+  const retryAttachmentUpload = useCallback(async (attachmentId: string): Promise<void> => {
+    const uploadPort = platform.attachments;
+    const attachment = composer.attachments.find((a) => a.id === attachmentId);
+    if (!uploadPort || !attachment?.file) return;
+    const uploadWithProgress = uploadPort.uploadAttachmentWithProgress ?? undefined;
+    setUploadProgresses((prev) => ({ ...prev, [attachmentId]: { percent: 5, phase: 'hashing' } }));
+    try {
+      const ref = uploadWithProgress
+        ? await uploadWithProgress(attachment.file, (progress) => {
+            setUploadProgresses((prev) => ({
+              ...prev,
+              [attachmentId]: { percent: progress.percent, phase: progress.phase },
+            }));
+          })
+        : await uploadPort.uploadAttachment(attachment.file);
+      setUploadProgresses((prev) => ({ ...prev, [attachmentId]: { percent: 100, phase: 'done' } }));
+      dispatchComposer({ type: 'setAttachmentRef', attachmentId, attachmentRef: ref });
+    } catch {
+      setUploadProgresses((prev) => ({ ...prev, [attachmentId]: { percent: 100, phase: 'failed' } }));
+      onToast(`附件「${attachment.name}」上传失败，请重试`);
+    }
+  }, [composer.attachments, platform, dispatchComposer, onToast]);
 
   const handleSearchJump = useCallback((id: string) => { onSearchOpenChange(false); setSearchHighlightId(id); }, [onSearchOpenChange]);
   const handleSearchHighlightEnd = useCallback(() => { setSearchHighlightId(null); onHighlightEnd?.(); }, [onHighlightEnd]);
@@ -328,7 +422,8 @@ export const ConversationHost = React.memo(function ConversationHost({
           selectedBlockIds={selectedBlockIds} selectionMode={selectionMode}
           softHiddenBlockIds={softHiddenBlockIds} actionedBlockIds={actionedBlockIds}
           highlightedBlockId={resolvedHighlight} onHighlightEnd={handleSearchHighlightEnd}
-          connectionStatus={connectionStatus} dismissedPinnedIds={dismissedPinnedIds} onToast={onToast} />
+          connectionStatus={connectionStatus} dismissedPinnedIds={dismissedPinnedLocal}
+          onDismissPinned={handleDismissPinned} onToast={onToast} />
       </div>
       <MessageSearchPanel open={searchOpen} onClose={() => onSearchOpenChange(false)}
         onJumpToMessage={handleSearchJump} highlightMessageId={searchHighlightId}
@@ -339,6 +434,29 @@ export const ConversationHost = React.memo(function ConversationHost({
           {pendingIntentsRef.current.length > 0 && (
             <div className={styles.pendingIntentBadge} role="status">
               {t('toast.pendingDispatchBadge', { count: pendingIntentsRef.current.length })}
+              <button
+                aria-label={t('toast.pendingDispatchCancel', { defaultValue: '取消待派单任务' })}
+                onClick={() => {
+                  mutatePendingIntents(() => []);
+                  onToast(t('toast.pendingDispatchCancelled', { defaultValue: '已取消待派单任务' }));
+                }}
+                style={{
+                  marginLeft: 8,
+                  border: 'none',
+                  background: 'transparent',
+                  color: 'inherit',
+                  cursor: 'pointer',
+                  fontSize: 12,
+                  lineHeight: '20px',
+                  padding: 0,
+                  // The badge itself is pointer-events:none (CSS); the cancel
+                  // button opts back in so the click actually lands.
+                  pointerEvents: 'auto',
+                }}
+                type="button"
+              >
+                {t('toast.pendingDispatchCancelAction', { defaultValue: '取消' })}
+              </button>
             </div>
           )}
           <PageErrorBoundary>
@@ -348,7 +466,8 @@ export const ConversationHost = React.memo(function ConversationHost({
               onExecutionTargetChange={onExecutionTargetChange} onPickLocalAttachments={platform.attachments?.pickFiles}
               onSubmit={submitComposer} status={showComposerStatus ? workbenchStatus : undefined}
               submitBehavior={composerSubmitBehavior} targetLabel={composerTargetLabel} uploadProgresses={uploadProgresses}
-              isRunning={isAgentRunning} onCancel={onCancelRun} onToast={onToast} />
+              isRunning={isAgentRunning} onCancel={onCancelRun} onToast={onToast}
+              onRetryAttachmentUpload={retryAttachmentUpload} />
           </PageErrorBoundary>
         </>
       )}

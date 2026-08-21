@@ -137,6 +137,58 @@ describe('workbenchTranscriptChromeActionMappers', () => {
     expect(handlers.exitSelection).toHaveBeenCalledOnce();
   });
 
+  it('awaits approval decisions before success and reports failures (#1821)', async () => {
+    const baseHandlers = {
+      copyText: vi.fn(),
+      softHideBlocks: vi.fn(),
+      dispatchComposer: vi.fn(),
+      focusComposer: vi.fn(),
+      pulseBlock: vi.fn(),
+      showWorkbenchToast: vi.fn(),
+      exitSelection: vi.fn(),
+    };
+
+    // Resolve-controlled decision: no toast before the request settles.
+    let resolveDecision: (() => void) | undefined;
+    const slowDecision = vi.fn(() => new Promise<void>((resolve) => {
+      resolveDecision = () => resolve();
+    }));
+    applyTranscriptChromeSideEffects([
+      {
+        type: 'approval',
+        decision: { approvalId: 'req-1', decision: 'allow' },
+        successMessage: 'approved-ok',
+        failureMessage: 'approval-failed',
+      },
+    ], {
+      ...baseHandlers,
+      onApprovalDecision: slowDecision,
+    });
+    expect(slowDecision).toHaveBeenCalledWith({ approvalId: 'req-1', decision: 'allow' });
+    expect(baseHandlers.showWorkbenchToast).not.toHaveBeenCalled();
+    resolveDecision?.();
+    await vi.waitFor(() => {
+      expect(baseHandlers.showWorkbenchToast).toHaveBeenCalledWith('approved-ok');
+    });
+
+    // Rejecting decision: the failure message (or the error text) is shown.
+    const rejectingDecision = vi.fn().mockRejectedValue(new Error('network down'));
+    applyTranscriptChromeSideEffects([
+      {
+        type: 'approval',
+        decision: { approvalId: 'req-2', decision: 'deny' },
+        successMessage: 'denied-ok',
+        failureMessage: 'approval-failed',
+      },
+    ], {
+      ...baseHandlers,
+      onApprovalDecision: rejectingDecision,
+    });
+    await vi.waitFor(() => {
+      expect(baseHandlers.showWorkbenchToast).toHaveBeenCalledWith('network down');
+    });
+  });
+
   it('copies an openable http(s) link instead of the dead agenthub:// scheme (#1504)', () => {
     const transcript = [textBlock({ id: 'b1' })];
 
