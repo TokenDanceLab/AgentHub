@@ -18,10 +18,10 @@ export async function openWebEvidencePreview(evidence: EvidenceRef): Promise<voi
  * PreviewPort.resolveContentUrl for Web (#1817) — explicit capability boundary.
  * Web is Hub-only (root AGENTS §2): it never reaches a Local Edge or raw
  * runtime. Absolute http(s) evidence URLs (e.g. a runtime preview server
- * surfaced through Hub replay) render as-is, but host-relative Edge API paths
- * (`/v1/runs/…/content`) have no Web endpoint, so they resolve to `undefined`
- * and the inspector renders an honest "no content source" notice instead of
- * a broken frame against the Hub origin.
+ * surfaced through Hub replay) render as-is, but host-relative Edge content
+ * paths have no Web endpoint, so they resolve to `undefined` and the
+ * inspector renders an honest "no content source" notice instead of a
+ * broken frame against the Hub origin.
  */
 export function resolveWebEvidenceContentUrl(contentRef: string): string | undefined {
   const trimmed = contentRef.trim();
