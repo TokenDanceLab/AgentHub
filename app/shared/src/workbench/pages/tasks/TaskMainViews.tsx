@@ -23,6 +23,8 @@ export type TaskMainProps = Pick<
   | 'onViewModeChange'
   | 'groups'
   | 'emptyStateLabel'
+  | 'comingSoonEmptyState'
+  | 'demoDataActive'
   | 'profiles'
   | 'selectedTask'
   | 'taskActionLabel'
@@ -67,6 +69,8 @@ export function TaskMain({
   onViewModeChange,
   groups,
   emptyStateLabel,
+  comingSoonEmptyState = false,
+  demoDataActive = false,
   profiles,
   selectedTask,
   taskActionLabel,
@@ -138,15 +142,26 @@ export function TaskMain({
       {/* Head */}
       <div className={`${styles.head} workbench-head`}>
         <div>
-          <h1 className={styles.headTitle}>{title}</h1>
+          <div className={styles.headTitleRow}>
+            <h1 className={styles.headTitle}>{title}</h1>
+            {demoDataActive && (
+              <span className={styles.demoBadge} data-demo-badge>
+                {t('tasks.demoBadge')}
+              </span>
+            )}
+          </div>
           <p className={styles.headSubcopy}>
             跨项目任务中心；项目页只展示当前项目内任务和运行。
           </p>
         </div>
         <div className={styles.headActions}>
-          <button type="button" className={`${styles.createBtn} btn btn-p`} onClick={onCreateTask}>
-            {t('tasks.newTask')}
-          </button>
+          {/* Without a create handler (real data mode, no task backend yet)
+              the button is omitted instead of rendering a dead control (#1818). */}
+          {onCreateTask && (
+            <button type="button" className={`${styles.createBtn} btn btn-p`} onClick={onCreateTask}>
+              {t('tasks.newTask')}
+            </button>
+          )}
           <button
             type="button"
             className={`${styles.iconBtn} icon-action`}
@@ -187,14 +202,16 @@ export function TaskMain({
 
       {/* Toolbar */}
       <div className={`${styles.toolbar} task-toolbar`}>
-        <button
-          type="button"
-          className={styles.toolbarBtn}
-          onClick={onCreateTask}
-        >
-          <DesignNavIcon name="plus" size={15} />
-          {t('tasks.newTask')}
-        </button>
+        {onCreateTask && (
+          <button
+            type="button"
+            className={styles.toolbarBtn}
+            onClick={onCreateTask}
+          >
+            <DesignNavIcon name="plus" size={15} />
+            {t('tasks.newTask')}
+          </button>
+        )}
         <button
           type="button"
           className={`${styles.toolbarBtn} ${
@@ -250,6 +267,7 @@ export function TaskMain({
 
       {/* Task table */}
       <TaskTable
+        comingSoonEmptyState={comingSoonEmptyState}
         emptyStateLabel={emptyStateLabel}
         groups={groups}
         editingDraft={editingDraft}

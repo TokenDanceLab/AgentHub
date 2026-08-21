@@ -148,13 +148,14 @@ export function GlobalRail({
   }
 
   function handleProfileAction(action: string): void {
+    // Logout is the only real account action left in the popover; the
+    // decorative edit-profile/card/QR/add-account items were removed
+    // together with their fake success toasts (#1818).
     if (action === t('user.logout')) {
       setProfileOpen(false);
       onLogout?.();
       showToast(t('toast.loggedOut'));
-      return;
     }
-    showToast(profileActionLabel(action, t));
   }
 
   function handleAvatarKeyDown(event: React.KeyboardEvent<HTMLDivElement>): void {
@@ -234,15 +235,7 @@ export function GlobalRail({
 
       <ProfilePopover
         accountMenu={[
-          { label: t('user.myCard') },
-          { label: t('user.myQr') },
-          { label: t('user.loginMore') },
-          { divider: true },
           { label: t('user.logout'), style: 'danger' },
-        ]}
-        actions={[
-          { label: t('user.editProfile') },
-          { label: t('profile.copyLink') },
         ]}
         anchorRef={avatarRef}
         avatar={userAvatarUrl ? '' : displayInitial}
@@ -252,9 +245,7 @@ export function GlobalRail({
         isOpen={profileOpen}
         name={displayName}
         onAccountMenu={handleProfileAction}
-        onAction={handleProfileAction}
         onClose={() => setProfileOpen(false)}
-        onStatusToggle={() => showToast(t('toast.onlineStatus'))}
         org="TokenDance"
         status={t('status.online')}
         variant="account"
@@ -262,25 +253,6 @@ export function GlobalRail({
       <DemoToast message={toastMessage} visible={toastVisible} />
     </nav>
   );
-}
-
-function profileActionLabel(action: string, t: (key: string) => string): string {
-  switch (action) {
-    case '编辑资料':
-      return t('toast.editProfile');
-    case '复制链接':
-      return t('toast.linkCopiedGeneric');
-    case '我的个人名片':
-      return t('toast.profileCard');
-    case '我的二维码与链接':
-      return t('toast.qrLink');
-    case '登录更多账号':
-      return t('toast.accountLogin');
-    case '设置':
-      return t('toast.settingsOpened');
-    default:
-      return action;
-  }
 }
 
 function connectionStatusLabel(status: ConnectionStatusKind, t: (key: string) => string): string {

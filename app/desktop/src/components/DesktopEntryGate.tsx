@@ -64,16 +64,16 @@ export function DesktopEntryGate({ onLoginSuccess, onContinueDemo, onConnectEdge
     <main aria-label="Desktop entry" className={styles.entry}>
       <section aria-labelledby="desktop-entry-title" className={styles.card}>
         <button
-          aria-label="切换主题"
+          aria-label={t('desktopEntry.toggleTheme', { defaultValue: '切换主题' })}
           className={styles.themeButton}
           onClick={onToggleTheme}
-          title="切换主题"
+          title={t('desktopEntry.toggleTheme', { defaultValue: '切换主题' })}
           type="button"
         >
           <DesignNavIcon name="sun" size={16} />
         </button>
         <img alt="AgentHub" className={styles.mark} src={agentHubLogo} />
-        <h1 id="desktop-entry-title">登录 AgentHub</h1>
+        <h1 id="desktop-entry-title">{t('desktopEntry.title', { defaultValue: '登录 AgentHub' })}</h1>
         <div className={styles.actions}>
           <button
             className={styles.primaryButton}
@@ -88,28 +88,40 @@ export function DesktopEntryGate({ onLoginSuccess, onContinueDemo, onConnectEdge
               data-testid="tokendance-id-logo"
               src={tokenDanceLogo}
             />
-            <span>{loginPending ? '正在跳转 TokenDance ID…' : '使用 TokenDance ID 继续'}</span>
+            <span>
+              {loginPending
+                ? t('desktopEntry.redirecting', { defaultValue: '正在跳转 TokenDance ID…' })
+                : t('desktopEntry.continueWithTokenDance', { defaultValue: '使用 TokenDance ID 继续' })}
+            </span>
           </button>
           <button
             className={`${styles.secondaryButton} ${styles.edgeButton}`}
             disabled={!edgeOnline}
             onClick={onConnectEdge}
-            title={edgeOnline ? '连接本地 Edge Server，读取真实数据' : 'Local Edge 未运行'}
+            title={edgeOnline
+              ? t('desktopEntry.edgeOnlineHint', { defaultValue: '连接本地 Edge Server，读取真实数据' })
+              : t('desktopEntry.edgeOffline', { defaultValue: 'Local Edge 未运行' })}
             type="button"
           >
             <DesignNavIcon name="laptop" size={16} />
-            <span>{edgeOnline ? '连接 Local Edge' : 'Local Edge 未运行'}</span>
+            <span>
+              {edgeOnline
+                ? t('desktopEntry.connectEdge', { defaultValue: '连接 Local Edge' })
+                : t('desktopEntry.edgeOffline', { defaultValue: 'Local Edge 未运行' })}
+            </span>
           </button>
           <button
             className={styles.secondaryButton}
             onClick={onContinueDemo}
             type="button"
           >
-            使用 Demo 模式继续
+            {t('desktopEntry.continueDemo', { defaultValue: '使用 Demo 模式继续' })}
           </button>
         </div>
         {loginPending ? (
-          <p className={styles.status} role="status">正在等待 TokenDance ID 登录…</p>
+          <p className={styles.status} role="status">
+            {t('desktopEntry.waitingForLogin', { defaultValue: '正在等待 TokenDance ID 登录…' })}
+          </p>
         ) : null}
         {loginError ? (
           <p className={styles.status} role="alert" style={{ color: 'var(--error, #e53e3e)' }}>{loginError}</p>

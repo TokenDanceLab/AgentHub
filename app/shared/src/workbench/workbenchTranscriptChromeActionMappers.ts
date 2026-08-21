@@ -165,14 +165,20 @@ export function planContextAction(options: {
       { type: 'softHide', blockIds: [block.id] },
       { type: 'regenerate', blockId },
       { type: 'pulse', blockId },
-      { type: 'toast', message: cardActionLabel(action, title, t) },
+      { type: 'toast', message: t('action.regenerating') },
     );
     return effects;
   }
 
-  // Hub REST message actions (#1383). With a session id these replace the
-  // placeholder toast; without one (Desktop/demo) the old toast stays.
+  // Hub REST message actions (#1383) require a session id. Without one
+  // (Desktop/demo shells) the menu no longer offers them, and any stray
+  // direct call plans nothing — a fake success toast would claim an effect
+  // that never runs (#1818).
   const reactAction = isReactEmojiAction(action);
+  const hubMessageAction = action === 'pin' || action === 'unpin' || reactAction;
+  if (hubMessageAction && !sessionId) {
+    return [];
+  }
   if ((action === 'pin' || action === 'unpin' || reactAction) && sessionId) {
     if (action === 'pin') {
       effects.push(
@@ -200,6 +206,11 @@ export function planContextAction(options: {
     return effects;
   }
   if (action === 'recall') {
+    // Recall is a Hub REST action; without a session id there is nothing to
+    // run, so plan nothing instead of a fake "recalled" toast (#1818).
+    if (!sessionId) {
+      return [];
+    }
     effects.push(
       { type: 'recall', messageId: blockId },
       { type: 'pulse', blockId },
@@ -422,11 +433,18 @@ export interface BuildTranscriptContextMenuGroupsOptions {
   onAction: (action: string, blockId: string) => void;
   onEnterSelection: (blockId: string) => void;
   /**
-   * Forward target candidates (#1385). When provided, the forward menu item
-   * gets a target-conversation picker submenu; absent (Desktop/demo shells)
-   * keeps the old plain-forward placeholder toast.
+   * Forward target candidates (#1385). The forward menu item only renders
+   * when a conversation list is available — the picker submenu is the only
+   * real forward path, so shells without candidates get no forward entry
+   * instead of a fake success toast (#1818).
    */
   conversations?: WorkbenchConversation[] | undefined;
+  /**
+   * Hub REST message actions are available (#1383). Desktop/demo shells
+   * have no session, so react/pin/unpin/recall entries are omitted there
+   * instead of planning placeholder toasts (#1818).
+   */
+  hubMessageActions?: boolean | undefined;
 }
 
 export function buildTranscriptContextMenuGroups({
@@ -436,6 +454,7 @@ export function buildTranscriptContextMenuGroups({
   onAction,
   onEnterSelection,
   conversations,
+  hubMessageActions = false,
 }: BuildTranscriptContextMenuGroupsOptions): Array<Array<ContextMenuItem>> {
   const block = transcript.find((item) => item.id === blockId);
   const isAgentText = block?.kind === 'text' && block.author.role === 'agent';
@@ -449,37 +468,39 @@ export function buildTranscriptContextMenuGroups({
   return [
     [
       { label: t('context.copy'), icon: 'fileText', shortcut: 'Ctrl C', onClick: () => onAction('copy', blockId) },
-      {
-        label: t('context.react'),
-        icon: 'star',
-        chevron: true,
-        // Plain click path (default 👍) is kept for direct callers; the menu
-        // click/Enter opens the picker submenu instead (#1384).
-        onClick: () => onAction('react', blockId),
-        submenu: (close) => createElement(EmojiPicker, {
-          ariaLabel: t('aria.emojiPicker'),
-          autoFocus: true,
-          onSelect: (emoji: string) => {
-            // The chosen emoji rides the action string (`react:<emoji>`);
-            // planContextAction decodes it back into the react effect.
-            onAction(`react:${emoji}`, blockId);
-            close();
-          },
-        }),
-      },
+      // Emoji reactions are a Hub REST action; without a session the entry
+      // is omitted (#1818).
+      ...(hubMessageActions
+        ? [{
+            label: t('context.react'),
+            icon: 'star' as const,
+            chevron: true,
+            // Plain click path (default 👍) is kept for direct callers; the menu
+            // click/Enter opens the picker submenu instead (#1384).
+            onClick: () => onAction('react', blockId),
+            submenu: (close: () => void) => createElement(EmojiPicker, {
+              ariaLabel: t('aria.emojiPicker'),
+              autoFocus: true,
+              onSelect: (emoji: string) => {
+                // The chosen emoji rides the action string (`react:<emoji>`);
+                // planContextAction decodes it back into the react effect.
+                onAction(`react:${emoji}`, blockId);
+                close();
+              },
+            }),
+          }]
+        : []),
       { label: t('context.reply'), icon: 'notes', onClick: () => onAction('reply', blockId) },
       ...(isTextBlock ? [{ label: t('context.quote'), icon: 'copy' as const, onClick: () => onAction('quote', blockId) }] : []),
       ...(isUserText ? [{ label: t('context.edit'), icon: 'edit' as const, onClick: () => onAction('edit', blockId) }] : []),
-      {
-        label: t('context.forward'),
-        icon: 'external',
-        // #1385: with a conversation list the item opens the target picker
-        // submenu (chevron); without one it stays a plain action that keeps
-        // the placeholder toast.
-        chevron: conversations !== undefined,
-        onClick: () => onAction('forward', blockId),
-        ...(conversations !== undefined
-          ? {
+      // Forward only renders with the target picker submenu (#1385); without
+      // a conversation list there is no real forward path, so no entry (#1818).
+      ...(conversations !== undefined
+        ? [{
+            label: t('context.forward'),
+            icon: 'external' as const,
+            chevron: true,
+            onClick: () => onAction('forward', blockId),
             submenu: (close: () => void) => createElement(ForwardConversationPicker, {
               conversations,
               ariaLabel: t('aria.forwardPicker'),
@@ -493,36 +514,32 @@ export function buildTranscriptContextMenuGroups({
                 close();
               },
               onCancel: close,
-            })
-          }
-          : {}),
-      },
+            }),
+          }]
+        : []),
     ],
     [
-      { label: t('context.createTopic'), icon: 'groups', onClick: () => onAction('topic', blockId) },
       { label: t('context.multiSelect'), icon: 'grid', shortcut: 'Shift', onClick: () => onEnterSelection(blockId) },
       // #1449: the pin entry toggles — pinned blocks show the unpin action
       // (`context.unpin` i18n + effect + toast + pulse). `block.pinned` is
       // written by the adapter from message-level pin state, which the
       // pinMap store provides (getPinMapStore → withPinnedState merged in
-      // web/desktop workbench model, see pinMap.ts).
-      {
-        label: block?.pinned ? t('context.unpin') : t('context.pinMessage'),
-        icon: 'bell',
-        onClick: () => onAction(block?.pinned ? 'unpin' : 'pin', blockId),
-      },
+      // web/desktop workbench model, see pinMap.ts). Hub-only (#1818).
+      ...(hubMessageActions
+        ? [{
+            label: block?.pinned ? t('context.unpin') : t('context.pinMessage'),
+            icon: 'bell' as const,
+            onClick: () => onAction(block?.pinned ? 'unpin' : 'pin', blockId),
+          }]
+        : []),
       { label: t('context.copyLink'), icon: 'external', onClick: () => onAction('link', blockId) },
-      { label: t('context.translate'), icon: 'library', onClick: () => onAction('translate', blockId) },
     ],
     [
       ...(isAgentText ? [{ label: t('context.regenerate'), icon: 'refresh' as const, onClick: () => onAction('regenerate', blockId) }] : []),
-      { label: t('context.addTask'), icon: 'running', onClick: () => onAction('task', blockId) },
-      { label: t('context.exportDoc'), icon: 'download', onClick: () => onAction('export', blockId) },
-      { label: t('context.apps'), icon: 'tools', chevron: true, onClick: () => onAction('apps', blockId) },
       // Recall (#1383) only makes sense for the user's own messages — the
       // Hub REST planner already supports it; the menu entry was missing.
-      // Danger-styled like delete.
-      ...(isUserMessage
+      // Danger-styled like delete. Hub-only (#1818).
+      ...(isUserMessage && hubMessageActions
         ? [{ label: t('context.recall'), icon: 'back' as const, danger: true, onClick: () => onAction('recall', blockId) }]
         : []),
       { label: t('context.delete'), icon: 'archive', danger: true, onClick: () => onAction('delete', blockId) },
@@ -545,6 +562,9 @@ export function buildTranscriptMultiSelectActions({
   onMultiAction,
   onExit,
 }: BuildTranscriptMultiSelectActionsOptions): Array<MultiSelectBarAction> {
+  // Only actions with real effects stay: copy (clipboard) and delete
+  // (soft-hide). Forward/task/export multi-actions had no backing effects —
+  // they only toasted — and were removed (#1818).
   return [
     {
       label: t('bar.selectAll'),
@@ -557,9 +577,6 @@ export function buildTranscriptMultiSelectActions({
       onClick: onClear,
     },
     { label: t('context.copy'), icon: 'fileText', onClick: () => onMultiAction('copy') },
-    { label: t('context.forward'), icon: 'external', onClick: () => onMultiAction('forward') },
-    { label: t('context.addTask'), icon: 'running', onClick: () => onMultiAction('task') },
-    { label: t('context.exportDoc'), icon: 'download', onClick: () => onMultiAction('export') },
     { label: t('context.delete'), icon: 'archive', danger: true, onClick: () => onMultiAction('delete') },
     {
       label: t('bar.exit'),

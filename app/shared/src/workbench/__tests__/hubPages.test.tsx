@@ -488,9 +488,11 @@ describe('AgentHubWorkbench', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '任务' }));
     const tasksPage = screen.getByRole('region', { name: 'Workbench page' });
-    const tasksEmpty = within(tasksPage).getByRole('region', { name: /tasks\.empty\.title|暂无任务|No tasks/i });
+    // Real mode without a task backend shows the honest coming-soon empty
+    // state instead of mock task rows (#1818).
+    const tasksEmpty = within(tasksPage).getByRole('region', { name: /任务列表即将接入|Task list is coming soon/i });
     expect(tasksEmpty).toBeInTheDocument();
-    expect(within(tasksPage).getByText('Hub tasks are not loaded in this replay.')).toBeInTheDocument();
+    expect(within(tasksPage).getByText('真实任务数据源尚未接入，当前没有可展示的任务。')).toBeInTheDocument();
     expect(within(tasksPage).queryByRole('button', { name: /B0 SQLite 迁移方案/ })).not.toBeInTheDocument();
     expect(within(tasksPage).queryByRole('button', { name: /Agent 市场卡片完善/ })).not.toBeInTheDocument();
   });

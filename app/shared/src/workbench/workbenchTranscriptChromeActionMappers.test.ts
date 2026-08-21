@@ -220,6 +220,7 @@ describe('workbenchTranscriptChromeActionMappers', () => {
       t,
       onAction,
       onEnterSelection: vi.fn(),
+      hubMessageActions: true,
     });
     const recallItem = userMenu.flat().find((i) => i.label === 'context.recall');
     expect(recallItem).toBeDefined();
@@ -233,8 +234,24 @@ describe('workbenchTranscriptChromeActionMappers', () => {
       t,
       onAction: vi.fn(),
       onEnterSelection: vi.fn(),
+      hubMessageActions: true,
     });
     expect(agentMenu.flat().map((i) => i.label)).not.toContain('context.recall');
+  });
+
+  it('omits recall/pin/react menu entries without Hub message actions (#1818)', () => {
+    const userBlock = textBlock({ id: 'u', author: { id: 'u', role: 'human', name: 'You' } });
+    const menu = buildTranscriptContextMenuGroups({
+      blockId: 'u',
+      transcript: [userBlock],
+      t,
+      onAction: vi.fn(),
+      onEnterSelection: vi.fn(),
+    });
+    const labels = menu.flat().map((i) => i.label);
+    expect(labels).not.toContain('context.recall');
+    expect(labels).not.toContain('context.pinMessage');
+    expect(labels).not.toContain('context.react');
   });
 
   it('toggles the pin menu item between pin and unpin off block.pinned (#1449)', () => {
@@ -249,6 +266,7 @@ describe('workbenchTranscriptChromeActionMappers', () => {
       t,
       onAction: vi.fn(),
       onEnterSelection: vi.fn(),
+      hubMessageActions: true,
     });
     expect(userMenu.flat().map((i) => i.label)).toContain('context.pinMessage');
     const agentMenu = buildTranscriptContextMenuGroups({
@@ -257,6 +275,7 @@ describe('workbenchTranscriptChromeActionMappers', () => {
       t,
       onAction: vi.fn(),
       onEnterSelection: vi.fn(),
+      hubMessageActions: true,
     });
     expect(agentMenu.flat().map((i) => i.label)).toContain('context.pinMessage');
     const pinOnAction = vi.fn();
@@ -266,6 +285,7 @@ describe('workbenchTranscriptChromeActionMappers', () => {
       t,
       onAction: pinOnAction,
       onEnterSelection: vi.fn(),
+      hubMessageActions: true,
     });
     pinCapture.flat().find((i) => i.label === 'context.pinMessage')?.onClick?.();
     expect(pinOnAction).toHaveBeenCalledWith('pin', 'u');
@@ -277,6 +297,7 @@ describe('workbenchTranscriptChromeActionMappers', () => {
       t,
       onAction: vi.fn(),
       onEnterSelection: vi.fn(),
+      hubMessageActions: true,
     });
     const labels = pinnedMenu.flat().map((i) => i.label);
     expect(labels).toContain('context.unpin');
@@ -288,6 +309,7 @@ describe('workbenchTranscriptChromeActionMappers', () => {
       t,
       onAction: unpinOnAction,
       onEnterSelection: vi.fn(),
+      hubMessageActions: true,
     });
     unpinCapture.flat().find((i) => i.label === 'context.unpin')?.onClick?.();
     expect(unpinOnAction).toHaveBeenCalledWith('unpin', 'p');
@@ -304,7 +326,7 @@ describe('workbenchTranscriptChromeActionMappers', () => {
     const unpin = planContextAction({ action: 'unpin', blockId: 'b1', transcript, t, sessionId: 'sess-1' });
     expect(unpin).toContainEqual({ type: 'unpin', messageId: 'b1', sessionId: 'sess-1' });
 
-    const recall = planContextAction({ action: 'recall', blockId: 'b1', transcript, t });
+    const recall = planContextAction({ action: 'recall', blockId: 'b1', transcript, t, sessionId: 'sess-1' });
     expect(recall).toContainEqual({ type: 'recall', messageId: 'b1' });
 
     const react = planContextAction({ action: 'react', blockId: 'b1', transcript, t, sessionId: 'sess-1' });
@@ -324,11 +346,10 @@ describe('workbenchTranscriptChromeActionMappers', () => {
     expect(picked).toContainEqual({ type: 'react', messageId: 'b1', sessionId: 'sess-1', emoji: '🔥' });
     expect(picked.find((e) => e.type === 'toast')?.message).toBe('toast.reactionAdded');
 
-    // Without a session id (Desktop/demo) the picker action keeps the
-    // placeholder toast under the plain react label.
+    // Without a session id (Desktop/demo) the picker action plans nothing —
+    // no fake success toast for an effect that cannot run (#1818).
     const demo = planContextAction({ action: 'react:🎉', blockId: 'b1', transcript, t });
-    expect(demo.some((e) => e.type === 'react')).toBe(false);
-    expect(demo.find((e) => e.type === 'toast')?.message).toBe('toast.reactOpened');
+    expect(demo).toEqual([]);
   });
 
   it('wires the react menu item to an emoji picker submenu that plans the chosen emoji', () => {
@@ -339,6 +360,7 @@ describe('workbenchTranscriptChromeActionMappers', () => {
       t,
       onAction,
       onEnterSelection: vi.fn(),
+      hubMessageActions: true,
     });
     const reactItem = groups[0]?.find((item) => item.label === 'context.react');
     expect(reactItem?.chevron).toBe(true);
@@ -352,12 +374,17 @@ describe('workbenchTranscriptChromeActionMappers', () => {
     expect(close).toHaveBeenCalledOnce();
   });
 
-  it('keeps the placeholder toast for pin/react without a session id (Desktop/demo)', () => {
-    const transcript = [textBlock({ id: 'b1' })];
+  it('plans nothing for pin/recall without a session id instead of a fake toast (#1818)', () => {
+    const transcript = [
+      textBlock({ id: 'b1' }),
+      textBlock({ id: 'u1', author: { id: 'u', role: 'human', name: 'You' } }),
+    ];
     const pin = planContextAction({ action: 'pin', blockId: 'b1', transcript, t });
-    expect(pin.some((e) => e.type === 'pin')).toBe(false);
-    expect(pin.some((e) => e.type === 'pulse')).toBe(true);
-    expect(pin.some((e) => e.type === 'toast')).toBe(true);
+    expect(pin).toEqual([]);
+    const react = planContextAction({ action: 'react', blockId: 'b1', transcript, t });
+    expect(react).toEqual([]);
+    const recall = planContextAction({ action: 'recall', blockId: 'u1', transcript, t });
+    expect(recall).toEqual([]);
   });
 
   it('keeps the forward placeholder toast for the plain forward action (direct callers)', () => {
@@ -426,7 +453,7 @@ describe('workbenchTranscriptChromeActionMappers', () => {
     expect(close).toHaveBeenCalledOnce();
   });
 
-  it('keeps the plain forward menu item when no conversations are wired (#1385)', () => {
+  it('omits the forward menu item when no conversations are wired (#1385, #1818)', () => {
     const onAction = vi.fn();
     const groups = buildTranscriptContextMenuGroups({
       blockId: 'b1',
@@ -435,11 +462,11 @@ describe('workbenchTranscriptChromeActionMappers', () => {
       onAction,
       onEnterSelection: vi.fn(),
     });
+    // A plain forward without a target picker only ever produced a
+    // placeholder toast, so shells without conversations get no entry.
     const forwardItem = groups[0]?.find((item) => item.label === 'context.forward');
-    expect(forwardItem?.chevron).toBe(false);
-    expect(forwardItem?.submenu).toBeUndefined();
-    forwardItem?.onClick?.();
-    expect(onAction).toHaveBeenCalledWith('forward', 'b1');
+    expect(forwardItem).toBeUndefined();
+    expect(onAction).not.toHaveBeenCalled();
   });
 
   it('shows the empty picker state when the conversation list is empty (#1385)', () => {
