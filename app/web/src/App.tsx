@@ -30,6 +30,7 @@ import { createWebWorkbenchProjectsPort } from '@/platform/webWorkbenchProjectsP
 import { useWebAuth } from '@/hooks/useWebAuth';
 import { getAccessToken, useAuth } from '@/hooks/useAuth';
 import { useHubStore } from '@/stores/hubStore';
+import { deriveWorkbenchConnectionStatus, useConnectionStore } from '@/stores/connectionStore';
 import { ToastContainer } from '@shared/ui/toast';
 import styles from './App.module.css';
 
@@ -58,6 +59,14 @@ function WebWorkbenchRoot() {
   const sessionQueryClient = useQueryClient();
   const showAuthModal = useHubStore((state) => state.showAuthModal);
   const setShowAuthModal = useHubStore((state) => state.setShowAuthModal);
+  // Live Hub WS state mirrored by useWebHubRealtime (#1816); surfaced as the
+  // workbench connection indicator.
+  const wsConnected = useConnectionStore((state) => state.isConnected);
+  const wsReconnecting = useConnectionStore((state) => state.reconnecting);
+  const connectionStatus = deriveWorkbenchConnectionStatus({
+    isConnected: wsConnected,
+    reconnecting: wsReconnecting,
+  });
   const dataModeOverride = useSyncExternalStore(
     subscribeWorkbenchDataModeOverride,
     getWorkbenchDataModeOverrideSnapshot,
@@ -222,6 +231,7 @@ function WebWorkbenchRoot() {
         activeConversationId={workbench.activeConversationId}
         agents={agents}
         composerExecutionTargets={workbench.composerExecutionTargets}
+        connectionStatus={realMode ? connectionStatus : undefined}
         agentProfilesStatus={agentProfilesStatus}
         contacts={workbench.contacts}
         contactsActions={workbench.contactsActions}

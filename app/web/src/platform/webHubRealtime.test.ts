@@ -3,10 +3,14 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { HUB_EVENTS } from '@shared/hubEvents';
 import { getAgentActivityStore, getPinMapStore, type HubRuntimeEventTranscriptInput } from '@shared/transcript';
 import { getMessageDelegationStore, getSubagentStreamStore } from '@shared/workbench';
-import { act, renderHook } from '@testing-library/react';
+import { act, renderHook, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { HubWSHandle, HubWSOptions } from '@shared/hub/hubWS';
+import { createHubWS, type HubWSHandle, type HubWSOptions } from '@shared/hub/hubWS';
+import { type Transport } from '@/api/transport';
 import type { TransportStatus } from '@/api/transport';
+import { useConnectionStore } from '@/stores/connectionStore';
+import { useHubStore } from '@/stores/hubStore';
+import { useToastStore } from '@shared/ui/toast';
 import {
   AGENT_STREAM_LIVE_BATCH_WINDOW_MS,
   AGENT_STREAM_INVALIDATE_WINDOW_MS,
@@ -730,5 +734,164 @@ describe('agent.dispatch → MessageDelegationStore (#1406 Phase 3)', () => {
 
     harness.unmount();
     harness.clear();
+  });
+});
+
+describe('connection status visibility (#1816)', () => {
+  beforeEach(() => {
+    useConnectionStore.setState({ isConnected: false, reconnecting: false });
+  });
+
+  afterEach(() => {
+    useConnectionStore.setState({ isConnected: false, reconnecting: false });
+  });
+
+  it('mirrors WS transport status into the connection store', () => {
+    const harness = mountRealtimeHarness();
+    expect(useConnectionStore.getState().isConnected).toBe(false);
+    expect(useConnectionStore.getState().reconnecting).toBe(false);
+
+    harness.setStatus('connected');
+    expect(useConnectionStore.getState().isConnected).toBe(true);
+    expect(useConnectionStore.getState().reconnecting).toBe(false);
+
+    harness.setStatus('reconnecting');
+    expect(useConnectionStore.getState().isConnected).toBe(false);
+    expect(useConnectionStore.getState().reconnecting).toBe(true);
+
+    harness.setStatus('connected');
+    expect(useConnectionStore.getState().isConnected).toBe(true);
+    expect(useConnectionStore.getState().reconnecting).toBe(false);
+
+    harness.setStatus('disconnected');
+    expect(useConnectionStore.getState().isConnected).toBe(false);
+    expect(useConnectionStore.getState().reconnecting).toBe(false);
+
+    harness.unmount();
+  });
+
+  it('never leaves a stale connected flag after the realtime socket is torn down', () => {
+    const harness = mountRealtimeHarness();
+    harness.setStatus('connected');
+    expect(useConnectionStore.getState().isConnected).toBe(true);
+
+    harness.unmount();
+    expect(useConnectionStore.getState().isConnected).toBe(false);
+    expect(useConnectionStore.getState().reconnecting).toBe(false);
+  });
+});
+
+/**
+ * Fake Transport that records message handlers so tests can deliver raw
+ * frames. The real shared createHubWS is used on top of it, so these tests
+ * exercise the production swallow behavior of device.kicked frames.
+ */
+function createFakeSocketTransport() {
+  const messageHandlers = new Set<(data: unknown) => void>();
+  const closeSpy = vi.fn();
+  const transport: Transport = {
+    connect: vi.fn(),
+    send: vi.fn(),
+    close: () => {
+      closeSpy();
+      messageHandlers.clear();
+    },
+    on: (event, handler) => {
+      if (event !== 'message') return () => undefined;
+      const messageHandler = handler as (data: unknown) => void;
+      messageHandlers.add(messageHandler);
+      return () => {
+        messageHandlers.delete(messageHandler);
+      };
+    },
+    getStatus: () => 'connected',
+  };
+  return {
+    transport,
+    closeSpy,
+    deliver: (frame: unknown) => {
+      for (const handler of [...messageHandlers]) handler(frame);
+    },
+  };
+}
+
+describe('device.kicked feedback (#1816)', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    sessionStorage.clear();
+    useHubStore.getState().clear();
+    useToastStore.setState({ toasts: [] });
+  });
+
+  function mountKickedHarness() {
+    const fake = createFakeSocketTransport();
+    const queryClient = new QueryClient();
+    const wrapper = ({ children }: { children: ReactNode }) =>
+      createElement(QueryClientProvider, { client: queryClient }, children);
+    const hook = renderHook(() => {
+      useWebHubRealtime({
+        enabled: true,
+        runtimeSessionId: 'hub-session-1',
+        runtimeTaskId: 'task-1',
+        onRuntimeEvent: () => undefined,
+        // Real shared socket: swallows kicked frames before app handlers.
+        createSocket: createHubWS,
+        createTransport: () => fake.transport,
+        getToken: () => 'fixture-token',
+      });
+    }, { wrapper });
+    return { ...fake, unmount: () => act(() => hook.unmount()) };
+  }
+
+  it('shows user-visible feedback, resets the session, and guides re-login when the Hub kicks this device', async () => {
+    sessionStorage.setItem('agenthub_hub_token', 'live-access');
+    sessionStorage.setItem('agenthub_hub_refresh_token', 'live-refresh');
+    useHubStore.getState().setAuthenticated(true, 'user-1', 'alice');
+    const harness = mountKickedHarness();
+
+    act(() => {
+      harness.deliver({ type: HUB_EVENTS.AUTH_OK, payload: null });
+    });
+    expect(useHubStore.getState().authenticated).toBe(true);
+
+    act(() => {
+      harness.deliver({ type: HUB_EVENTS.DEVICE_KICKED, payload: { reason: 'replaced' } });
+    });
+
+    // The shared hubWS closed the socket after the kicked frame…
+    expect(harness.closeSpy).toHaveBeenCalled();
+    // …and the transport-level observer surfaced user-visible feedback.
+    const toasts = useToastStore.getState().toasts;
+    expect(toasts).toHaveLength(1);
+    expect(toasts[0]).toEqual(
+      expect.objectContaining({ type: 'warning' }),
+    );
+    expect(String(toasts[0]?.message)).toMatch(/webChat\.deviceKicked/);
+    expect(toasts[0]?.action?.label).toMatch(/webChat\.deviceKicked\.signIn/);
+
+    await waitFor(() => {
+      expect(useHubStore.getState().authenticated).toBe(false);
+      expect(useHubStore.getState().showAuthModal).toBe(true);
+    });
+    expect(sessionStorage.getItem('agenthub_hub_token')).toBeNull();
+    expect(sessionStorage.getItem('agenthub_hub_refresh_token')).toBeNull();
+
+    harness.unmount();
+  });
+
+  it('does not react to non-kicked device frames', () => {
+    useHubStore.getState().setAuthenticated(true, 'user-1', 'alice');
+    const harness = mountKickedHarness();
+
+    act(() => {
+      harness.deliver({ type: HUB_EVENTS.AUTH_OK, payload: null });
+      harness.deliver({ type: HUB_EVENTS.DEVICE_ONLINE, payload: { device_id: 'desktop-1' } });
+    });
+
+    expect(useToastStore.getState().toasts).toHaveLength(0);
+    expect(useHubStore.getState().authenticated).toBe(true);
+    expect(useHubStore.getState().showAuthModal).toBe(false);
+
+    harness.unmount();
   });
 });

@@ -151,7 +151,10 @@
   "auth.error.oidc.timeout": "登录超时——5 分钟内未收到回调。",
   "auth.error.oidc.tokenExchangeFailed": "Token 交换失败: {{detail}}",
   "auth.error.oidc.startFailed": "无法启动 OIDC 登录: {{detail}}",
+  "auth.error.oidc.default": "TokenDance ID 登录失败，请重试。",
   "webChat.signInRequired": "使用网页聊天需要先登录",
+  "webChat.deviceKicked": "本设备会话已被 Hub 注销（可能在其他登录中被替换），请重新登录。",
+  "webChat.deviceKicked.signIn": "重新登录",
 
   "diff.empty.title": "暂无变更可显示",
   "diff.empty.description": "运行报告变更文件后，Diff 输出会显示在这里。",
