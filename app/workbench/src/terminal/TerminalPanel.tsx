@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import type {
   TerminalPort,
   TerminalSession,
@@ -226,6 +226,53 @@ export const TerminalPanel: React.FC<TerminalPanelProps> = ({
     [activeSessionId, busy, isControlled, sessions, setActive, terminal],
   );
 
+  // ── Roving tabindex (#1823) ──────────────────────────────────────────
+  // One Tab stop for the whole strip; Arrow/Home/End move focus between tab
+  // buttons without changing the selected session (activation stays on
+  // click/Enter like standard APG tabs).
+  const tabsRef = useRef<HTMLDivElement>(null);
+  const tabsId = useId();
+  // #1835 review: the roving Tab stop is tracked separately from the
+  // selected session. Arrow navigation moves focus without changing the
+  // selection; a re-render derived only from activeSessionId would reset
+  // tabIndex=-1 on the newly focused tab and drop the roving stop.
+  const [rovingTabId, setRovingTabId] = useState<TerminalSessionId | null>(null);
+
+  const handleTabsKeyDown = useCallback((event: React.KeyboardEvent<HTMLDivElement>) => {
+    const tabButtons = tabsRef.current
+      ? Array.from(tabsRef.current.querySelectorAll<HTMLButtonElement>('[role="tab"]'))
+      : [];
+    if (tabButtons.length === 0) return;
+    const activeIndex = tabButtons.findIndex((button) => button === document.activeElement);
+    // Focus on a non-tab stop (e.g. the close button) is not part of the
+    // roving strip — arrow keys should not hijack it (#1835 review).
+    if (activeIndex < 0) return;
+    let nextIndex: number | null = null;
+    switch (event.key) {
+      case 'ArrowRight':
+        nextIndex = (activeIndex + 1) % tabButtons.length;
+        break;
+      case 'ArrowLeft':
+        nextIndex = (activeIndex - 1 + tabButtons.length) % tabButtons.length;
+        break;
+      case 'Home':
+        nextIndex = 0;
+        break;
+      case 'End':
+        nextIndex = tabButtons.length - 1;
+        break;
+      default:
+        return;
+    }
+    event.preventDefault();
+    const target = tabButtons[nextIndex];
+    target?.focus();
+    // Keep the roving stop on the focused tab (tabIndex=0 must not remain
+    // on the previously selected tab when focus moved away from it).
+    const targetSessionId = target?.dataset.sessionId ?? null;
+    setRovingTabId(targetSessionId as TerminalSessionId | null);
+  }, []);
+
   if (!isLocalTerminalEnabled(localTerminal)) {
     return null;
   }
@@ -240,40 +287,61 @@ export const TerminalPanel: React.FC<TerminalPanelProps> = ({
       data-local-terminal="enabled"
     >
       <div className={styles.toolbar}>
-        <div className={styles.tabs} role="tablist" aria-label={labels.ariaLabel}>
+        <div
+          className={styles.tabs}
+          role="tablist"
+          aria-label={labels.ariaLabel}
+          onKeyDown={handleTabsKeyDown}
+          ref={tabsRef}
+        >
           {sessions.map((session) => {
             const selected = session.id === activeSessionId;
+            /* Roving tabindex (#1823/#1835 review): one Tab stop for the
+               strip, owned by the roving tab — which falls back to the
+               selected session (or the first tab when nothing is selected).
+               Arrow navigation updates the roving stop without changing the
+               selection. */
+            const isTabStop =
+              session.id === (rovingTabId ?? activeSessionId ?? sessions[0]?.id ?? null);
             return (
-              <button
-                key={session.id}
-                type="button"
-                role="tab"
-                aria-selected={selected}
-                className={selected ? styles.tabActive : styles.tab}
-                data-session-id={session.id}
-                data-session-status={session.status}
-                onClick={() => setActive(session.id)}
-              >
-                <span className={styles.tabTitle}>{session.title}</span>
-                <span className={styles.tabStatus}>
-                  {sessionStatusLabel(session.status, labels)}
-                </span>
+              /* role="presentation" wrapper: the tablist keeps `tab` children
+                 while the close control is a real sibling button. Nesting a
+                 button (or role="button") inside the tab button was invalid
+                 HTML and left the close action keyboard-unreachable. */
+              <div className={styles.tabGroup} key={session.id} role="presentation">
+                <button
+                  type="button"
+                  role="tab"
+                  id={`${tabsId}-tab-${session.id}`}
+                  aria-controls={`${tabsId}-panel`}
+                  aria-selected={selected}
+                  className={selected ? styles.tabActive : styles.tab}
+                  data-session-id={session.id}
+                  data-session-status={session.status}
+                  tabIndex={isTabStop ? 0 : -1}
+                  onClick={() => setActive(session.id)}
+                >
+                  <span className={styles.tabTitle}>{session.title}</span>
+                  <span className={styles.tabStatus}>
+                    {sessionStatusLabel(session.status, labels)}
+                  </span>
+                </button>
                 <Tooltip label={labels.closeSession}>
-                  <span
+                  <button
+                    type="button"
                     className={styles.tabClose}
-                    role="button"
-                    tabIndex={-1}
                     aria-label={`${labels.closeSession}: ${session.title}`}
+                    data-session-close={session.id}
+                    tabIndex={isTabStop ? 0 : -1}
                     onClick={(event) => {
-                      event.preventDefault();
                       event.stopPropagation();
                       void handleCloseSession(session.id);
                     }}
                   >
                     ×
-                  </span>
+                  </button>
                 </Tooltip>
-              </button>
+              </div>
             );
           })}
         </div>
@@ -308,7 +376,13 @@ export const TerminalPanel: React.FC<TerminalPanelProps> = ({
         ) : null}
       </div>
 
-      <div className={styles.body} data-terminal-body>
+      <div
+        className={styles.body}
+        data-terminal-body
+        id={`${tabsId}-panel`}
+        role="tabpanel"
+        {...(activeSession ? { 'aria-labelledby': `${tabsId}-tab-${activeSession.id}` } : {})}
+      >
         {sessions.length === 0 || !activeSession ? (
           <div className={styles.empty} data-terminal-empty>
             <span className={styles.emptyIcon} aria-hidden="true">

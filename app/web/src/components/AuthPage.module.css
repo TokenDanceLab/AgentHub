@@ -133,9 +133,12 @@
   box-sizing: border-box;
 }
 .input::placeholder { color: var(--td-ink-faint); }
-.input:focus {
+/* #1823: the old ring was --glass-tint-plum (4% alpha) — effectively
+   invisible. --focus-ring is the design-system focus token (≥3:1). */
+.input:focus-visible {
   background: var(--glass-bg-medium);
-  box-shadow: 0 0 0 3px var(--glass-tint-plum);
+  border-color: var(--td-focus);
+  box-shadow: var(--focus-ring);
 }
 .input:disabled { opacity: 0.5; }
 .inputError { box-shadow: 0 0 0 1px var(--glass-tint-danger); }
@@ -235,7 +238,7 @@
 }
 .identityButton:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 3px var(--glass-tint-plum);
+  box-shadow: var(--focus-ring);
 }
 .identityButton:disabled {
   opacity: 0.5;
@@ -333,7 +336,7 @@
   box-sizing: border-box;
 }
 .hubInput:focus {
-  box-shadow: 0 0 0 3px var(--glass-tint-plum);
+  box-shadow: var(--focus-ring);
 }
 .hubStatus {
   display: flex;

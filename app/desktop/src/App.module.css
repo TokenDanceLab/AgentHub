@@ -953,12 +953,30 @@
 }
 
 .topBarNavBtn {
+  position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   width: 22px;
   height: 22px;
   border-radius: 7px;
+}
+
+/* #1823: the 22×22 visual box is below the 32px minimum pointer target.
+   ::before grows the hit area without changing the dense top-bar layout. */
+.topBarNavBtn::before {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 32px;
+  height: 32px;
+  transform: translate(-50%, -50%);
+  content: '';
+}
+
+.topBarNavBtn:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
 }
 
 .topBarNavBtnAccent {

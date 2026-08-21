@@ -525,7 +525,10 @@ html[data-theme-sync='true'] *::after {
   --glass-shadow: rgba(15, 23, 42, 0.11);
   --glass-shadow-subtle: rgba(15, 23, 42, 0.07);
 
-  --glass-text-muted: rgba(15, 23, 42, 0.45);
+  /* #1823: 0.45 alpha over the white frost canvas measured ≈2.9:1 — below the
+     3:1 non-text floor and far below the 4.5:1 muted-text bar. 0.62 lands at
+     ≈5:1 while keeping the muted hierarchy. */
+  --glass-text-muted: rgba(15, 23, 42, 0.62);
   --glass-text-disabled: rgba(15, 23, 42, 0.25);
 
   --glass-input-bg: rgba(255, 255, 255, 0.76);

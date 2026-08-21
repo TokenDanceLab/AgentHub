@@ -59,7 +59,16 @@ export function ChatSidebarFrame({
   });
 
   return (
-    <div className={styles.sidebarFrame}>
+    <div
+      aria-hidden={sidebarCollapsed}
+      className={styles.sidebarFrame}
+      data-sidebar-frame
+      /* #1823: collapsing only clipped the column, so the search box, sort
+         select and conversation buttons stayed in the Tab order. `inert`
+         removes the whole subtree from focus + AT, matching the CSS
+         visibility gate on .sidebarFrame. */
+      inert={sidebarCollapsed}
+    >
       <ConversationSidebar {...sidebarProps} />
       <SidebarResizer
         beginSidebarResize={beginSidebarResize}
@@ -117,6 +126,7 @@ export function ChatInspectorFrame(
       hasWorkspace={hasWorkspace}
       localFiles={localFiles}
       platform={props.platform}
+      inspectorCollapsed={props.inspectorCollapsed}
       {...(workDir ? { workDir } : {})}
     />
   );

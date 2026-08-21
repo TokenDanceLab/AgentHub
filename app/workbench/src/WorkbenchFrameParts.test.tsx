@@ -22,7 +22,11 @@ const hostPropsLog = vi.hoisted(() => ({ last: null as Record<string, unknown> |
 
 vi.mock('./ConversationSidebar', () => ({
   ConversationSidebar: (props: Record<string, unknown>) => (
-    <div data-testid="sidebar" data-active-id={props.activeConversationId as string} />
+    <div data-testid="sidebar" data-active-id={props.activeConversationId as string}>
+      {/* #1835 review: a focusable descendant so the collapsed-sidebar test
+          can prove `inert` (not just aria-hidden) blocks Tab focus. */}
+      <input aria-label="aria.searchConversations" data-testid="sidebar-search" />
+    </div>
   ),
 }));
 
@@ -221,7 +225,7 @@ describe('WorkbenchFrameParts', () => {
       expect(screen.getByRole('separator')).toBeTruthy();
     });
 
-    it('sets resizer tabIndex to -1 when sidebar is collapsed', () => {
+    it('removes the resizer from the accessibility tree when the sidebar is collapsed', () => {
       render(
         <ChatSidebarFrame
           conversations={[]}
@@ -234,7 +238,34 @@ describe('WorkbenchFrameParts', () => {
           beginSidebarResize={vi.fn()}
         />,
       );
-      expect(screen.getByRole('separator').getAttribute('tabindex')).toBe('-1');
+      // #1823: `inert` on the collapsed frame removes the whole subtree —
+      // resizer included — from the a11y tree (stronger than tabindex=-1).
+      expect(screen.queryByRole('separator')).not.toBeInTheDocument();
+      expect(screen.getByRole('separator', { hidden: true })).toBeInTheDocument();
+      // #1835 review: a focusable descendant (the sidebar search input) must
+      // also be unreachable — being inside the inert subtree is what blocks
+      // Tab focus, not just the aria-hidden flag.
+      const searchInput = screen.getByTestId('sidebar-search');
+      expect(searchInput.closest('[inert]')).not.toBeNull();
+      expect(screen.queryByRole('textbox', { name: 'aria.searchConversations' })).not.toBeInTheDocument();
+    });
+
+    it('keeps the sidebar search input focusable when expanded', () => {
+      render(
+        <ChatSidebarFrame
+          conversations={[]}
+          currentConversationId="c1"
+          onSelectConversation={vi.fn()}
+          onAvatarClick={vi.fn()}
+          sidebarWidth={260}
+          sidebarCollapsed={false}
+          resizeSidebarBy={vi.fn()}
+          beginSidebarResize={vi.fn()}
+        />,
+      );
+      const searchInput = screen.getByTestId('sidebar-search');
+      expect(searchInput.closest('[inert]')).toBeNull();
+      expect(screen.getByRole('textbox', { name: 'aria.searchConversations' })).toBeInTheDocument();
     });
   });
 
