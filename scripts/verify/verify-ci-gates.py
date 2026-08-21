@@ -62,6 +62,7 @@ def assert_step_continue_on_error(job_block: str, step_name: str, expected: bool
 
 
 def main() -> int:
+    """解析 checks.yml 并断言全部 CI 门禁政策；违例即抛错退出 1（fail-closed，防回退）。"""
     parser = argparse.ArgumentParser(description="CI gate policy verifier")
     parser.add_argument("--WorkflowPath", default=".github/workflows/checks.yml")
     args = parser.parse_args()
@@ -108,6 +109,31 @@ def main() -> int:
     assert_contains(edge, re.escape('check_pkg "edge-server/internal/adapters/" 55 "adapters"'), "go-edge must keep adapters package coverage minimum")
     assert_contains(hub, r"THRESHOLD=40", "go-hub coverage threshold must be 40%")
 
+    # go-edge / go-hub 恒报 report：两者是 required checks，GitHub 不把
+    # skipped 视为 required check 通过，纯前端 PR 会被永久 BLOCK。
+    # 策略：job 级 if 恒真（!cancelled()），真实门禁步骤带 go 条件（省成本），
+    # 末尾 fallback step 在无 Go 变更时输出 skipped 并 exit 0；changes 失败时
+    # 由 fail-closed step（result != 'success'）exit 1，杜绝 false green。
+    for job_name, job_body in (("go-edge", edge), ("go-hub", hub)):
+        assert_contains(
+            job_body,
+            r"(?m)^\s+if:\s+\$\{\{\s*!cancelled\(\)\s*\}\}\s*$",
+            f"{job_name} must always report a result (job-level if must not path-filter)",
+        )
+        assert_contains(
+            job_body,
+            r"if:\s+github\.event_name == 'workflow_dispatch' \|\| needs\.changes\.outputs\.go == 'true'",
+            f"{job_name} real gates must stay step-level path-filtered",
+        )
+        fallback_step = get_step_block(job_body, "Report no-Go-changes skip (required check)")
+        assert_contains(fallback_step, r"needs\.changes\.result == 'success'", f"{job_name} fallback must require the changes job to succeed")
+        assert_contains(fallback_step, r"needs\.changes\.outputs\.go != 'true'", f"{job_name} fallback must only run when the Go filter is off")
+        assert_contains(fallback_step, r"reporting success for required check", f"{job_name} fallback must report success for the required check")
+        assert_contains(fallback_step, r"exit 0", f"{job_name} fallback must exit 0")
+        fail_step = get_step_block(job_body, "Fail when Go path filter failed")
+        assert_contains(fail_step, r"needs\.changes\.result != 'success'", f"{job_name} must fail closed when the changes job fails")
+        assert_contains(fail_step, r"exit 1", f"{job_name} changes-failure step must exit 1")
+
     # #1536: Edge lint is at 0 issues and hardened to hard-blocking; Hub lint
     # still carries pre-existing findings (tracked in #1573) and stays
     # warning-only until a finding-fingerprint ratchet exists. Complexity
@@ -116,14 +142,18 @@ def main() -> int:
     # complex functions (admin.go/mcp_server.go/agent_dispatch.go); re-harden
     # after refactoring or threshold adjustment.
     assert_step_continue_on_error(edge, "Lint", True)
-    # #1657: go-hub Lint converted from soft gate to hard-blocking. The 17
-    # pre-existing complexity findings stay tolerated through the action's
-    # only-new-issues mode until the #1573 baseline debt is repaid; the step
-    # must keep the pinned golangci-lint action (no placeholder commands).
-    assert_step_continue_on_error(hub, "Lint", False)
+    # #1657/#1832: go-hub Lint is report-only (advisory) — the action's raw
+    # exit code cannot consult the #1573 baseline, and >300-file PR diffs
+    # fall back to a full-repo lint that would hard-fail debt-clean large
+    # PRs. The hard gate lives in the fingerprint ratchet step below, which
+    # exempts baseline-registered findings in both patch and full-lint mode.
+    # The step must keep the pinned golangci-lint action (no placeholder
+    # commands) and only-new-issues so small PRs keep a new-findings report.
+    assert_step_continue_on_error(hub, "Lint", True)
     hub_lint_step = get_step_block(hub, "Lint")
     assert_contains(hub_lint_step, r"golangci/golangci-lint-action@v9", "go-hub Lint must keep the pinned golangci-lint action (no placeholder commands)")
-    assert_contains(hub_lint_step, r"only-new-issues:\s*true", "go-hub Lint must restrict hard failures to new findings while baseline debt remains")
+    assert_contains(hub_lint_step, r"only-new-issues:\s*true", "go-hub Lint must keep only-new-issues so patch-mode reports stay scoped to new findings")
+    assert_step_continue_on_error(hub, "Verify Hub lint fingerprint ratchet (#1573)", False)
     # #1574: gosec findings triaged and cleared in both servers; the gosec
     # security scan steps are hard-blocking (no continue-on-error) and run
     # through the fail-closed verify-gosec-gates.sh wrapper.

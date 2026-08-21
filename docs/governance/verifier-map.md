@@ -11,9 +11,9 @@
 
 | 规则 | 验证脚本 | CI job |
 |---|---|---|
-| CI 路径筛选与 job 结构（统一 `changes` job；design-css fail-closed 变异测试） | `scripts/verify/verify-ci-gates.py`（负向自测 `scripts/verify/tests/verify-ci-gates.Tests.py`） | checks.yml → validate |
+| CI 路径筛选与 job 结构（统一 `changes` job；design-css fail-closed 变异测试；go-edge/go-hub 恒报 report 防 required check 跳过阻塞） | `scripts/verify/verify-ci-gates.py`（负向自测 `scripts/verify/tests/verify-ci-gates.Tests.py`） | checks.yml → validate |
 | action runtime 只允许 node24（防 Node-20 major 回退，#1580） | `scripts/verify/verify-action-runtimes.py`（负向自测 `scripts/verify/tests/verify-action-runtimes.Tests.py`） | checks.yml → validate |
-| Hub lint finding fingerprint ratchet（防新增/替换，#1573） | `scripts/verify/verify-hub-lint-ratchet.py`（负向自测 `scripts/verify/tests/verify-hub-lint-ratchet.Tests.py`，baseline `scripts/verify/hub-lint-baseline.json`） | checks.yml → go-hub |
+| Hub lint finding fingerprint ratchet（防新增/替换，#1573；go-hub 硬门禁，全量 lint 回退模式对 baseline 存量豁免） | `scripts/verify/verify-hub-lint-ratchet.py`（负向自测 `scripts/verify/tests/verify-hub-lint-ratchet.Tests.py`，baseline `scripts/verify/hub-lint-baseline.json`） | checks.yml → go-hub |
 | skill 白名单只提交 active skill | `scripts/verify/verify-project-skills.py` | checks.yml → validate |
 | 文档与 Agent 入口 SSOT：根级入口/路径/行数/标记/映射表保鲜 | `scripts/verify/verify-doc-ssot.py`（负向自测 `scripts/verify/tests/verify-doc-entrypoints.Tests.py`） | checks.yml → validate |
 | Web Hub-only 边界（不直连 Local Edge） | `scripts/verify/verify-web-hub-boundary.py` | checks.yml → validate |
