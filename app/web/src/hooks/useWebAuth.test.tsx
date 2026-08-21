@@ -170,3 +170,66 @@ describe('useWebAuth', () => {
     expect(useToastStore.getState().toasts).toHaveLength(0);
   });
 });
+
+describe('useWebAuth OIDC callback errors (#1816)', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    sessionStorage.clear();
+    useHubStore.getState().clear();
+    useToastStore.setState({ toasts: [] });
+    tryAutoLoginMock.mockReset();
+    getAccessTokenMock.mockReset();
+    getAccessTokenMock.mockReturnValue(null);
+  });
+
+  it('surfaces OidcError from the callback path as an error toast and reopens the auth modal', async () => {
+    const { OidcError } = await import('@/api/hubAuth');
+    tryAutoLoginMock.mockRejectedValueOnce(
+      new OidcError('stateMismatch', 'OIDC state mismatch', 'bad state'),
+    );
+    const { wrapper } = createWrapper();
+    const { useWebAuth } = await import('./useWebAuth');
+
+    const { result } = renderHook(() => useWebAuth(), { wrapper });
+    await waitFor(() => expect(result.current.authReady).toBe(true));
+
+    const toasts = useToastStore.getState().toasts;
+    expect(toasts).toHaveLength(1);
+    expect(toasts[0]).toEqual(
+      expect.objectContaining({ type: 'error' }),
+    );
+    // Key-echo test i18n: the message carries the OIDC error key (or the
+    // default fallback key), never an empty string.
+    expect(String(toasts[0]?.message)).toMatch(/auth\.error\.oidc\./);
+    expect(useHubStore.getState().showAuthModal).toBe(true);
+  });
+
+  it('maps tokenExchangeFailed with detail through the oidc i18n key', async () => {
+    const { OidcError } = await import('@/api/hubAuth');
+    tryAutoLoginMock.mockRejectedValueOnce(
+      new OidcError('tokenExchangeFailed', 'Token exchange failed: boom', 'boom'),
+    );
+    const { wrapper } = createWrapper();
+    const { useWebAuth } = await import('./useWebAuth');
+
+    const { result } = renderHook(() => useWebAuth(), { wrapper });
+    await waitFor(() => expect(result.current.authReady).toBe(true));
+
+    const toasts = useToastStore.getState().toasts;
+    expect(toasts).toHaveLength(1);
+    expect(String(toasts[0]?.message)).toMatch(/auth\.error\.oidc\./);
+    expect(useHubStore.getState().showAuthModal).toBe(true);
+  });
+
+  it('keeps non-OIDC auto-login rejections silent (no toast, no modal)', async () => {
+    tryAutoLoginMock.mockRejectedValueOnce(new Error('network down'));
+    const { wrapper } = createWrapper();
+    const { useWebAuth } = await import('./useWebAuth');
+
+    const { result } = renderHook(() => useWebAuth(), { wrapper });
+    await waitFor(() => expect(result.current.authReady).toBe(true));
+
+    expect(useToastStore.getState().toasts).toHaveLength(0);
+    expect(useHubStore.getState().showAuthModal).toBe(false);
+  });
+});
