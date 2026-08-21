@@ -148,8 +148,11 @@ GO_HUB_FALLBACK_TEXT = (
     "      # Fallback: keep the required check reported even when the Go path\n"
     "      # filter deselects this job (skipped jobs never satisfy branch\n"
     "      # protection and permanently block frontend-only PRs).\n"
+    "      # The job default cwd (hub-server) does not exist when checkout was\n"
+    "      # deselected; anchor the fallback at the repo root.\n"
     "      - name: Report no-Go-changes skip (required check)\n"
     "        if: ${{ !cancelled() && github.event_name != 'workflow_dispatch' && needs.changes.result == 'success' && needs.changes.outputs.go != 'true' }}\n"
+    "        working-directory: .\n"
     "        run: |\n"
     '          echo "skipped: no Go changes; reporting success for required check go-hub"\n'
     "          exit 0\n"
@@ -180,6 +183,7 @@ GO_HUB_CHANGES_FAIL_STEP_TEXT = (
     "      # the skipped real gates as green.\n"
     "      - name: Fail when Go path filter failed\n"
     "        if: ${{ !cancelled() && github.event_name != 'workflow_dispatch' && needs.changes.result != 'success' }}\n"
+    "        working-directory: .\n"
     "        run: |\n"
     '          echo "::error::changes job result: ${{ needs.changes.result }}; cannot decide Go gates for go-hub"\n'
     "          exit 1\n"
