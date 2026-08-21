@@ -120,6 +120,7 @@ def delete_windows_frontend_failure_branch(text: str) -> str:
 
 
 def get_go_hub_body(text: str) -> tuple:
+    """提取 go-hub job 块边界与正文，供恒报回归用例在块内做定点修改。"""
     go_hub_block = re.compile(r"(?ms)^  go-hub:\r?\n(?P<body>.*?)(?=^  [A-Za-z0-9_-]+:\r?\n)")
     match = go_hub_block.search(text)
     if not match:
@@ -128,6 +129,7 @@ def get_go_hub_body(text: str) -> tuple:
 
 
 def restore_go_hub_job_path_filter(text: str) -> str:
+    """把 go-hub 的恒报 if 还原成路径筛选，模拟 required check 重新可被跳过（防回退）。"""
     start, end, body = get_go_hub_body(text)
     always_if = "    if: ${{ !cancelled() }}"
     if always_if not in body:
@@ -153,6 +155,7 @@ GO_HUB_FALLBACK_TEXT = (
 
 
 def delete_go_hub_fallback_step(text: str) -> str:
+    """删除 go-hub 无 Go 变更时的 fallback 报成功步骤，模拟 required check 失去成功出口（防回退）。"""
     start, end, body = get_go_hub_body(text)
     if GO_HUB_FALLBACK_TEXT not in body:
         raise AssertionError("go-hub fallback step text not found")
@@ -200,12 +203,14 @@ class VerifyCiGatesMutationTests(unittest.TestCase):
         )
 
     def test_restore_go_hub_job_path_filter_fails(self):
+        """go-hub 恒报 if 被还原为路径筛选时，CI 政策校验器必须非零退出（防回退断言）。"""
         self.assert_mutation_fails(
             restore_go_hub_job_path_filter(read_workflow()),
             "restored go-hub job-level path filter",
         )
 
     def test_delete_go_hub_fallback_step_fails(self):
+        """go-hub fallback 步骤被删除时，CI 政策校验器必须非零退出（防回退断言）。"""
         self.assert_mutation_fails(
             delete_go_hub_fallback_step(read_workflow()),
             "deleted go-hub no-Go-changes fallback step",

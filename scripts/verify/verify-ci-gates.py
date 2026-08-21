@@ -62,6 +62,7 @@ def assert_step_continue_on_error(job_block: str, step_name: str, expected: bool
 
 
 def main() -> int:
+    """解析 checks.yml 并断言全部 CI 门禁政策；违例即抛错退出 1（fail-closed，防回退）。"""
     parser = argparse.ArgumentParser(description="CI gate policy verifier")
     parser.add_argument("--WorkflowPath", default=".github/workflows/checks.yml")
     args = parser.parse_args()
