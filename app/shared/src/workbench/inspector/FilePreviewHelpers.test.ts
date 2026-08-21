@@ -92,10 +92,12 @@ describe('resolvePreviewContentUrl (#1817)', () => {
   });
 
   it('passes absolute http(s) URLs through without a port', () => {
-    expect(resolvePreviewContentUrl('http://127.0.0.1:4173/preview', undefined))
-      .toBe('http://127.0.0.1:4173/preview');
-    expect(resolvePreviewContentUrl('https://preview.example.com/app', undefined))
-      .toBe('https://preview.example.com/app');
+    expect(resolvePreviewContentUrl('http://127.0.0.1:4173/preview', undefined)).toBe(
+      'http://127.0.0.1:4173/preview'
+    );
+    expect(resolvePreviewContentUrl('https://preview.example.com/app', undefined)).toBe(
+      'https://preview.example.com/app'
+    );
   });
 
   it('delegates host-relative API paths to the port resolver', () => {
@@ -104,9 +106,12 @@ describe('resolvePreviewContentUrl (#1817)', () => {
       openEvidence: vi.fn(),
       resolveContentUrl,
     };
-    expect(resolvePreviewContentUrl('/v1/runs/run-1/artifacts/artifact-1/content', port))
-      .toBe('http://127.0.0.1:3210/v1/runs/run-1/artifacts/artifact-1/content');
-    expect(resolveContentUrl).toHaveBeenCalledWith('/v1/runs/run-1/artifacts/artifact-1/content');
+    expect(resolvePreviewContentUrl('/host-content/run-1/artifacts/artifact-1/content', port)).toBe(
+      'http://127.0.0.1:3210/host-content/run-1/artifacts/artifact-1/content'
+    );
+    expect(resolveContentUrl).toHaveBeenCalledWith(
+      '/host-content/run-1/artifacts/artifact-1/content'
+    );
   });
 
   it('yields undefined for host-relative paths when the port cannot resolve them (web boundary)', () => {
@@ -114,7 +119,11 @@ describe('resolvePreviewContentUrl (#1817)', () => {
       openEvidence: vi.fn(),
       resolveContentUrl: () => undefined,
     };
-    expect(resolvePreviewContentUrl('/v1/runs/run-1/previews/preview-1/content', port)).toBeUndefined();
-    expect(resolvePreviewContentUrl('/v1/runs/run-1/artifacts/artifact-1/content', undefined)).toBeUndefined();
+    expect(
+      resolvePreviewContentUrl('/host-content/run-1/previews/preview-1/content', port)
+    ).toBeUndefined();
+    expect(
+      resolvePreviewContentUrl('/host-content/run-1/artifacts/artifact-1/content', undefined)
+    ).toBeUndefined();
   });
 });

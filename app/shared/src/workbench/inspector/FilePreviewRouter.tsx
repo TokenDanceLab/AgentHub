@@ -1,7 +1,11 @@
 import React, { useCallback, useMemo, useState } from 'react';
-import type { PreviewPort } from '../../platform';
+import type { PreviewPort, RuntimeEvidenceContentRef } from '../../platform';
 import type { FileDiff } from '../../types/chat';
-import { DiffReviewPanel, type DiffHunkDecision, type DiffReviewFile } from '../../ui/DiffReviewPanel';
+import {
+  DiffReviewPanel,
+  type DiffHunkDecision,
+  type DiffReviewFile,
+} from '../../ui/DiffReviewPanel';
 import { DocxPreview } from '../../ui/DocxPreview';
 import { SlideshowPreview } from '../../ui/SlideshowPreview';
 import { TablePreview } from '../../ui/TablePreview';
@@ -44,12 +48,20 @@ export type PreviewFile = FileItem & {
   content?: string | undefined;
   diffContent?: string | undefined;
   owner?: string | undefined;
+  /**
+   * Structured ref to host-owned runtime-evidence content (artifact file or
+   * preview). Resolved via `PreviewPort.resolveRuntimeEvidenceContent`;
+   * shared code never constructs host REST paths itself (#1817).
+   */
+  contentRef?: RuntimeEvidenceContentRef | undefined;
   /** When present, this is an interactive diff from a run — enables accept/reject with Edge apply. */
-  interactiveDiff?: {
-    runId: string;
-    fileDiff: FileDiff;
-    workDir: string;
-  } | undefined;
+  interactiveDiff?:
+    | {
+        runId: string;
+        fileDiff: FileDiff;
+        workDir: string;
+      }
+    | undefined;
 };
 
 export interface FilePreviewRouterProps {
@@ -93,8 +105,8 @@ function detectFilePreviewKind(fileName: string): FilePreviewKind {
 }
 
 /** Extract a fetchable URL from a PreviewFile's content field.
- *  runtimeEvidenceOverviewFiles puts real Edge API paths (e.g. /v1/runs/…/content)
- *  or full preview URLs into `content`; fallback text starts with `#` or prose. */
+ *  Overview mappers put full preview URLs into `content`; structured
+ *  runtime-evidence refs are carried by `contentRef` instead (#1817). */
 function extractFileUrl(content: string | undefined): string {
   if (!content) return '';
   // Real URLs start with '/' (relative API path) or 'http'
@@ -109,7 +121,8 @@ function describeError(err: unknown): string {
   return String(err);
 }
 
-const APPLY_UNSUPPORTED_NOTE = '当前端不支持将 diff 写回工作区（仅桌面本地 Edge 支持），当前为只读评审。';
+const APPLY_UNSUPPORTED_NOTE =
+  '当前端不支持将 diff 写回工作区（仅桌面本地 Edge 支持），当前为只读评审。';
 
 /** Interactive diff preview with hunk accept/reject that writes back to the workdir via the platform PreviewPort. */
 function InteractiveDiffPreview({
@@ -130,13 +143,15 @@ function InteractiveDiffPreview({
   const reviewFiles: DiffReviewFile[] = useMemo(() => {
     if (!interactiveDiff) return [];
     const { fileDiff } = interactiveDiff;
-    return [{
-      filePath: fileDiff.filePath,
-      status: fileDiff.status === 'untracked' ? 'added' : fileDiff.status,
-      additions: fileDiff.additions,
-      deletions: fileDiff.deletions,
-      hunks: fileDiff.hunks as unknown as DiffReviewFile['hunks'],
-    }];
+    return [
+      {
+        filePath: fileDiff.filePath,
+        status: fileDiff.status === 'untracked' ? 'added' : fileDiff.status,
+        additions: fileDiff.additions,
+        deletions: fileDiff.deletions,
+        hunks: fileDiff.hunks as unknown as DiffReviewFile['hunks'],
+      },
+    ];
   }, [interactiveDiff]);
 
   const handleApplyHunk = useCallback(
@@ -160,13 +175,13 @@ function InteractiveDiffPreview({
           'success',
           decision.accepted
             ? `已应用 hunk：${decision.filePath} #${decision.hunkIndex + 1}`
-            : `已拒绝 hunk：${decision.filePath} #${decision.hunkIndex + 1}`,
+            : `已拒绝 hunk：${decision.filePath} #${decision.hunkIndex + 1}`
         );
       } catch (err) {
         showToast('error', `Diff 应用失败：${describeError(err)}`);
       }
     },
-    [interactiveDiff, previewPort, showToast],
+    [interactiveDiff, previewPort, showToast]
   );
 
   const handleApplyAllHunks = useCallback(
@@ -189,16 +204,16 @@ function InteractiveDiffPreview({
         const acceptedCount = decisions.filter((item) => item.accepted).length;
         showToast(
           'success',
-          `已批量处理 ${decisions.length} 个 hunk（应用 ${acceptedCount}，拒绝 ${decisions.length - acceptedCount}）`,
+          `已批量处理 ${decisions.length} 个 hunk（应用 ${acceptedCount}，拒绝 ${decisions.length - acceptedCount}）`
         );
       } catch (err) {
         showToast('error', `Diff 批量应用失败：${describeError(err)}`);
       }
     },
-    [interactiveDiff, previewPort, showToast],
+    [interactiveDiff, previewPort, showToast]
   );
 
-  if (!interactiveDiff) return (<></>);
+  if (!interactiveDiff) return <></>;
   const { runId, fileDiff } = interactiveDiff;
 
   return (
@@ -240,50 +255,32 @@ export function FilePreviewRouter({
 }: FilePreviewRouterProps): React.ReactElement {
   // Interactive diff review with accept/reject write-back
   if (file.interactiveDiff) {
-    return (
-      <InteractiveDiffPreview
-        file={file}
-        onClose={onClose}
-        previewPort={previewPort}
-      />
-    );
+    return <InteractiveDiffPreview file={file} onClose={onClose} previewPort={previewPort} />;
   }
 
   const kind = detectFilePreviewKind(file.name);
   const content = file.content ?? `${file.name}\n\n暂无文件内容。`;
-  const fileUrl = extractFileUrl(file.content);
-  const contentUrl = resolvePreviewContentUrl(file.content, previewPort);
+  // Structured runtime-evidence refs resolve through the host port; plain
+  // content refs keep the generic string resolution path (#1817).
+  const contentUrl = file.contentRef
+    ? previewPort?.resolveRuntimeEvidenceContent?.(file.contentRef)
+    : resolvePreviewContentUrl(file.content, previewPort);
+  // Office viewers accept any direct URL in `content`, and fall back to the
+  // port-resolved URL (Desktop) instead of a broken host-relative fetch.
+  const fileUrl = extractFileUrl(file.content) || contentUrl || '';
 
   switch (kind) {
     case 'pptx':
     case 'pptx-legacy':
-      return (
-        <SlideshowPreview
-          fileName={file.name}
-          fileUrl={fileUrl}
-          onClose={onClose}
-        />
-      );
+      return <SlideshowPreview fileName={file.name} fileUrl={fileUrl} onClose={onClose} />;
 
     case 'xlsx':
     case 'xls':
     case 'csv':
-      return (
-        <TablePreview
-          fileName={file.name}
-          fileUrl={fileUrl}
-          onClose={onClose}
-        />
-      );
+      return <TablePreview fileName={file.name} fileUrl={fileUrl} onClose={onClose} />;
 
     case 'docx':
-      return (
-        <DocxPreview
-          fileName={file.name}
-          fileUrl={fileUrl}
-          onClose={onClose}
-        />
-      );
+      return <DocxPreview fileName={file.name} fileUrl={fileUrl} onClose={onClose} />;
 
     case 'pdf':
       return <NativePdfPreview contentUrl={contentUrl} filename={file.name} />;
@@ -323,24 +320,28 @@ function NativePreviewFallback({
   title: string;
 }): React.ReactElement {
   return (
-    <div style={{
-      flex: 1,
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      padding: 24,
-      overflow: 'auto',
-      minHeight: 0,
-    }}>
-      <div style={{
+    <div
+      style={{
+        flex: 1,
         display: 'flex',
-        flexDirection: 'column',
         alignItems: 'center',
-        gap: 8,
-        color: 'var(--td-ink-subtle)',
-        font: '400 0.75rem var(--td-font)',
-        textAlign: 'center',
-      }}>
+        justifyContent: 'center',
+        padding: 24,
+        overflow: 'auto',
+        minHeight: 0,
+      }}
+    >
+      <div
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: 8,
+          color: 'var(--td-ink-subtle)',
+          font: '400 0.75rem var(--td-font)',
+          textAlign: 'center',
+        }}
+      >
         <DesignFileIcon className={styles.fileIcon} name={filename} />
         <span>{title}</span>
         <span style={{ fontSize: '0.6875rem' }}>{detail}</span>
@@ -419,15 +420,17 @@ function NativeImagePreview({
   }
 
   return (
-    <div style={{
-      flex: 1,
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      padding: 24,
-      overflow: 'auto',
-      minHeight: 0,
-    }}>
+    <div
+      style={{
+        flex: 1,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 24,
+        overflow: 'auto',
+        minHeight: 0,
+      }}
+    >
       <img
         src={contentUrl}
         alt={filename}
@@ -440,18 +443,20 @@ function NativeImagePreview({
 
 function NativeTextPreview({ content }: { content: string }): React.ReactElement {
   return (
-    <pre style={{
-      flex: 1,
-      margin: 0,
-      padding: 16,
-      overflow: 'auto',
-      font: '400 0.8125rem/1.6 var(--td-mono)',
-      color: 'var(--td-ink-muted)',
-      whiteSpace: 'pre-wrap',
-      wordBreak: 'break-word',
-      background: 'var(--td-surface)',
-      minHeight: 0,
-    }}>
+    <pre
+      style={{
+        flex: 1,
+        margin: 0,
+        padding: 16,
+        overflow: 'auto',
+        font: '400 0.8125rem/1.6 var(--td-mono)',
+        color: 'var(--td-ink-muted)',
+        whiteSpace: 'pre-wrap',
+        wordBreak: 'break-word',
+        background: 'var(--td-surface)',
+        minHeight: 0,
+      }}
+    >
       {content}
     </pre>
   );

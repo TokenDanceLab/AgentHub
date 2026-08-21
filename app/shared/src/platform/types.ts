@@ -1,4 +1,9 @@
-import type { AttachmentRef, ComposerAttachment, ComposerIntent, ComposerSubmitResult } from '../composer/types';
+import type {
+  AttachmentRef,
+  ComposerAttachment,
+  ComposerIntent,
+  ComposerSubmitResult,
+} from '../composer/types';
 import type { EvidenceRef } from '../transcript';
 import type { AgentActivitySnapshot } from '../transcript/agentActivity';
 
@@ -133,30 +138,49 @@ export interface ApplyAllRunDiffsInput {
   decisions: RunDiffHunkDecision[];
 }
 
+/**
+ * Neutral reference to one runtime-evidence content item (artifact file or
+ * preview). Shared code owns this shape only — the host adapter maps it to
+ * its own content endpoint. No host REST paths live in shared.
+ */
+export interface RuntimeEvidenceContentRef {
+  kind: 'artifact' | 'preview';
+  runId: string;
+  /** Artifact id or preview id. */
+  id: string;
+}
+
 export interface PreviewPort {
   canOpenEvidence?(evidence: EvidenceRef): boolean;
   openEvidence(evidence: EvidenceRef): Promise<void>;
   /**
-   * Write one interactive-diff hunk decision back into the run workdir
-   * (Edge POST /v1/runs/{runId}/apply). Only surfaces with a Local Edge
-   * implement this (Desktop); Web omits it and the inspector degrades to an
-   * explicit read-only review notice instead of silently dropping the click.
+   * Write one interactive-diff hunk decision back into the run workdir.
+   * Only surfaces with a Local Edge implement this (Desktop); Web omits it
+   * and the inspector degrades to an explicit read-only review notice
+   * instead of silently dropping the click.
    */
   applyRunDiff?(input: ApplyRunDiffInput): Promise<void>;
   /**
-   * Batch variant of `applyRunDiff` for accept-all / reject-all
-   * (Edge POST /v1/runs/{runId}/apply-all). Same surface contract.
+   * Batch variant of `applyRunDiff` for accept-all / reject-all.
+   * Same surface contract.
    */
   applyAllRunDiffs?(input: ApplyAllRunDiffsInput): Promise<void>;
   /**
    * Resolve an evidence content reference into a displayable URL.
    * Absolute http(s) URLs are typically returned unchanged; host-relative
-   * API paths (e.g. `/v1/runs/…/content`) become absolute host URLs on
-   * surfaces that own the host (Desktop → Local Edge). Return `undefined`
-   * when the surface cannot serve the content so the UI can render an
-   * honest capability notice instead of a broken frame.
+   * API paths become absolute host URLs on surfaces that own the host
+   * (Desktop → Local Edge). Return `undefined` when the surface cannot
+   * serve the content so the UI can render an honest capability notice
+   * instead of a broken frame.
    */
   resolveContentUrl?(contentRef: string): string | undefined;
+  /**
+   * Resolve a structured runtime-evidence content ref (artifact/preview
+   * from a Hub replay) into a displayable URL. Host adapters own the
+   * endpoint mapping; surfaces without the backing runtime (Web) omit it
+   * and the inspector renders a capability notice.
+   */
+  resolveRuntimeEvidenceContent?(ref: RuntimeEvidenceContentRef): string | undefined;
 }
 
 export type LocalCliRuntimeId = 'codex' | 'claude-code' | 'opencode';
@@ -191,7 +215,7 @@ export type RuntimeSessionSummary = {
 export interface HostDiagnosticsPort {
   localCliDiscovery?(): Promise<LocalCliDiscoveryManifest>;
   /**
-   * Optional host-owned list of local runtime sessions (Edge GET /v1/runtime-sessions).
+   * Optional host-owned list of local runtime sessions.
    * Desktop only; Web must omit. Renderer never opens foreign session stores.
    */
   listRuntimeSessions?(limit?: number): Promise<RuntimeSessionSummary[]>;
@@ -215,7 +239,11 @@ export interface MessageActionsPort {
   unpinMessage(messageId: string, sessionId: string): Promise<void>;
   forwardMessage(messageId: string, targetSessionIds: string[]): Promise<void>;
   recallMessage(messageId: string): Promise<void>;
-  addMessageReaction(messageId: string, sessionId: string, reaction: { emoji: string }): Promise<void>;
+  addMessageReaction(
+    messageId: string,
+    sessionId: string,
+    reaction: { emoji: string }
+  ): Promise<void>;
 }
 
 /** Stable id for a host-owned terminal session (not a renderer process handle). */

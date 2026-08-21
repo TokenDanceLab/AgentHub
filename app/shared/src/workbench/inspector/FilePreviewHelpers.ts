@@ -103,7 +103,13 @@ export function diffLineClass(line: string, css: typeof styles): string {
 }
 
 export function highlightDiffLine(line: string, language: string): string {
-  if (!line || line.startsWith('diff ') || line.startsWith('@@') || line.startsWith('---') || line.startsWith('+++')) {
+  if (
+    !line ||
+    line.startsWith('diff ') ||
+    line.startsWith('@@') ||
+    line.startsWith('---') ||
+    line.startsWith('+++')
+  ) {
     return highlightLine(line, '');
   }
   const marker = line[0] === '+' || line[0] === '-' || line[0] === ' ' ? line[0] : '';
@@ -132,13 +138,15 @@ export function openWithIconClass(name: DesignOpenWithIconName): string {
  *   `undefined` so the renderer shows an honest capability notice instead of
  *   an empty frame.
  * - Absolute http(s) URLs are used unchanged on every surface.
- * - Host-relative API paths (`/v1/runs/…/content`) require a `PreviewPort`
- *   that owns the host: Desktop resolves them against the Local Edge base
- *   URL, Web returns `undefined` (no Local Edge access, Hub-only boundary).
+ * - Host-relative API paths require a `PreviewPort` that owns the host:
+ *   Desktop resolves them against the Local Edge base URL, Web returns
+ *   `undefined` (no Local Edge access, Hub-only boundary).
+ * - Structured runtime-evidence refs (`PreviewFile.contentRef`) are resolved
+ *   separately via `PreviewPort.resolveRuntimeEvidenceContent` (#1817).
  */
 export function resolvePreviewContentUrl(
   contentRef: string | undefined,
-  previewPort: PreviewPort | undefined,
+  previewPort: PreviewPort | undefined
 ): string | undefined {
   const trimmed = contentRef?.trim() ?? '';
   if (!trimmed) return undefined;

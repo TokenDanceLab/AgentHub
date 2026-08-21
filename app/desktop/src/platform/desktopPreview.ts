@@ -1,5 +1,6 @@
 import { open } from '@tauri-apps/plugin-shell';
 import { resolveEvidencePreviewTarget } from '@shared/platform';
+import type { RuntimeEvidenceContentRef } from '@shared/platform';
 import type { EvidenceRef } from '@shared/transcript';
 import { getEdgeBaseUrl } from '@/config';
 
@@ -33,4 +34,19 @@ export function resolveDesktopEvidenceContentUrl(contentRef: string): string | u
     return `${edgeBase}${trimmed}`;
   }
   return undefined;
+}
+
+/**
+ * PreviewPort.resolveRuntimeEvidenceContent for Desktop (#1817).
+ * Desktop owns the Local Edge connection, so it maps the shared structured
+ * ref onto the Edge run content endpoint. This is the only place where the
+ * Edge content path shape lives — shared code only carries the neutral ref.
+ */
+export function resolveDesktopRuntimeEvidenceContent(
+  ref: RuntimeEvidenceContentRef,
+): string | undefined {
+  const edgeBase = getEdgeBaseUrl().replace(/\/+$/, '');
+  if (!edgeBase) return undefined;
+  const collection = ref.kind === 'artifact' ? 'artifacts' : 'previews';
+  return `${edgeBase}/v1/runs/${ref.runId}/${collection}/${ref.id}/content`;
 }

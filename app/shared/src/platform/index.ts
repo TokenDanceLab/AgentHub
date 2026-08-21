@@ -1,6 +1,4 @@
-export {
-  createMockTerminalPort,
-} from './createMockPlatform';
+export { createMockTerminalPort } from './createMockPlatform';
 export { resolveEvidencePreviewTarget } from './previewTargets';
 export type {
   AgentHubPlatform,
@@ -18,6 +16,7 @@ export type {
   RedispatchTaskResult,
   RunDiffHunkDecision,
   RunPort,
+  RuntimeEvidenceContentRef,
   RuntimeSessionSummary,
   SurfaceCapabilities,
   TerminalPort,
