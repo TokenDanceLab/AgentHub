@@ -357,6 +357,8 @@ def main() -> int:
     assert_step_continue_on_error(validate, "Verify OpenAPI↔hub router contract", False)
     assert_contains(validate, r"Verify Shared Edge-free boundary", "validate job must run the Shared Edge-free boundary verifier")
     assert_contains(validate, r"scripts/verify/verify-shared-boundary.py", "validate job must call scripts/verify/verify-shared-boundary.ps1")
+    assert_contains(validate, r"scripts/verify/verify-frontend-package-boundary.py", "validate job must call the frontend package boundary verifier (#1759)")
+    assert_step_continue_on_error(validate, "Verify frontend package boundary (workbench -> shared only, #1759)", False)
     assert_step_continue_on_error(validate, "Verify Shared Edge-free boundary", False)
     assert_contains(validate, r"Verify Shared barrel Edge-export ban", "validate job must run the Shared barrel Edge-export ban verifier")
     assert_contains(validate, r"scripts/verify/verify-shared-barrel.py", "validate job must call scripts/verify/verify-shared-barrel.ps1")
@@ -399,7 +401,7 @@ def main() -> int:
     assert_not_contains(backend_perf, r"load-test", "backend-perf-leak-gates must not claim load/capacity smoke")
 
     assert_contains(changes, r"dorny/paths-filter@", "changes job must use dorny/paths-filter (major governed by #1580 runtime gate)")
-    assert_contains(changes, re.escape("app/shared/src/workbench/**"), "changes job must watch workbench paths")
+    assert_contains(changes, re.escape("app/workbench/**"), "changes job must watch workbench package paths (#1759)")
     assert_contains(changes, re.escape("app/shared/src/styles/**"), "changes job must watch shared styles")
     assert_contains(changes, re.escape("app/web/scripts/visual-qa*"), "changes job must watch web visual-qa scripts")
     assert_contains(changes, re.escape("app/desktop/scripts/visual-qa*"), "changes job must watch desktop visual-qa scripts")

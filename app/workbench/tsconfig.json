@@ -1,0 +1,32 @@
+{
+  "compilerOptions": {
+    "target": "ES2021",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "jsx": "react-jsx",
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": false,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    "lib": ["ES2021", "DOM"],
+    "baseUrl": ".",
+    "paths": {
+      "@shared/*": ["../shared/src/*"],
+      "@shared": ["../shared/src/index.ts"]
+    }
+  },
+  "include": ["src"],
+  "exclude": [
+    "src/__tests__",
+    "src/**/*.test.ts",
+    "src/**/*.test.tsx",
+    "src/**/*.spec.ts",
+    "src/**/*.spec.tsx",
+    "src/**/*.stories.tsx",
+    "src/**/*.stories.ts"
+  ]
+}

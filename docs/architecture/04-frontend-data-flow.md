@@ -13,13 +13,13 @@
 ```text
 Desktop/Web/Mobile app shell
   -> platform adapter
-  -> app/shared workbench + chatview
+  -> @agenthub/workbench shell + app/shared chatview
   -> transcript normalizer + renderer
 ```
 
 规则：
 
-- `app/shared/` 拥有 workbench、transcript、composer、inspector 和 chatview 组件合同。
+- `app/workbench/`（`@agenthub/workbench`）拥有端级 workbench shell；`app/shared/` 拥有 transcript、composer、inspector 和 chatview 组件合同。依赖方向固定为 workbench → shared 单向（#1759）。
 - Desktop/Web/Mobile 只提供 platform adapter、认证、查询、runtime bridge 和壳层能力。
 - Shared UI 不直接调用 Tauri invoke、Hub client 或 Edge client。
 - Desktop renderer 不直接执行 CLI；本地执行走 Tauri host typed API、Local Edge 和 Edge adapter。
@@ -49,7 +49,7 @@ UI 可以根据 `capabilities` 隐藏或禁用动作，但不能 fork 另一套�
 
 | 责任 | Owner |
 |---|---|
-| Workbench shell / rail / inspector / routes | `app/shared/src/workbench/` |
+| Workbench shell / rail / inspector / routes | `app/workbench/src/` |
 | Chat transcript renderer | `app/shared/src/chatview/` |
 | Transcript block types, ordering, Hub/Edge normalization, evidence | `app/shared/src/transcript/` |
 | Data mode compatibility contract | `app/shared/src/demo/dataMode.ts`, `app/shared/src/testing/e2eDataModeContract.ts` |

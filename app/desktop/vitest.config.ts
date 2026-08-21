@@ -21,7 +21,7 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'jsdom',
-    include: ['src/**/*.test.ts', 'src/**/*.test.tsx', '../shared/src/**/*.test.ts', '../shared/src/**/*.test.tsx'],
+    include: ['src/**/*.test.ts', 'src/**/*.test.tsx', '../shared/src/**/*.test.ts', '../shared/src/**/*.test.tsx', '../workbench/src/**/*.test.ts', '../workbench/src/**/*.test.tsx'],
     setupFiles: ['./src/__tests__/setup.ts'],
     execArgv: ['--max-old-space-size=8192'],
     maxWorkers: 4,

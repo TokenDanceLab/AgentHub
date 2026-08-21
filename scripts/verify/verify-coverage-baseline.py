@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """Frontend coverage baseline gate (baseline must not regress) — ps1 迁移。
 
-Runs vitest --coverage for the four frontend packages (@agenthub/shared,
-agenthub-web, agenthub-desktop, agenthub-mobile-rn), parses the json-summary
-coverage report and the json test-results report, then asserts:
+Runs vitest --coverage for the five frontend packages (@agenthub/shared,
+@agenthub/workbench, agenthub-web, agenthub-desktop, agenthub-mobile-rn),
+parses the json-summary coverage report and the json test-results report,
+then asserts:
   1. Every coverage metric (lines/branches/functions/statements) is >= the
      value recorded in scripts/verify/coverage-baseline.json (no regression).
   2. Every coverage.include file with statements but 0% lines is an
@@ -171,7 +172,7 @@ def main() -> int:
     parser.add_argument("--BaselinePath", default=DEFAULT_BASELINE_PATH, help="path to coverage-baseline.json")
     parser.add_argument("--AppDir", default=DEFAULT_APP_DIR, help="workspace root (the app dir)")
     parser.add_argument("--KeepReports", action="store_true", help="do not delete generated coverage/ and test-results.json after parsing")
-    # --OnlyPackages: comma-separated baseline package keys to run (CI 4-package
+    # --OnlyPackages: comma-separated baseline package keys to run (CI 5-package
     # matrix splits the 10min gate into per-package parallel jobs). Default: all.
     parser.add_argument("--OnlyPackages", default="", help="comma-separated package keys to run; empty = all")
     # Re-baseline is deliberately stricter than the ordinary gate: it must run

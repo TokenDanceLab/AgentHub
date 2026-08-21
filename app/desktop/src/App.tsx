@@ -13,7 +13,7 @@ import {
 import { CHATVIEW_I18N_NAMESPACE } from '@shared/chatview/i18n/resources';
 import type { UnreadDividerDescriptor } from '@shared/chatview';
 import { toggleAppliedAgentHubTheme } from '@shared/theme';
-import { AgentHubWorkbench } from '@shared/workbench';
+import { AgentHubWorkbench } from '@agenthub/workbench';
 import { resolveCurrentTranscriptRunId } from '@shared/transcript';
 import { getAgentActivityStore } from '@shared/transcript/agentActivity';
 import type { ApprovalDecisionAction } from '@shared/transcript';
@@ -46,7 +46,7 @@ import {
   hubAgentProfileToWorkbenchAgent,
 } from '@/api/agentProfileQueries';
 import { getHubClient } from '@/api/hubQueries';
-import type { AgentConfig, ConnectionStatusKind, DocRow, SkillMarketItem, MCPMarketItem } from '@shared/workbench';
+import type { AgentConfig, ConnectionStatusKind, DocRow, SkillMarketItem, MCPMarketItem } from '@agenthub/workbench';
 import { getDemoRuntimeEvidence } from '@/demo/demoEvidence';
 import { useToastStore, ToastContainer } from '@shared/ui/toast';
 import { useGlobalKeyboardShortcuts } from '@/hooks/useGlobalKeyboardShortcuts';

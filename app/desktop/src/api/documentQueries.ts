@@ -4,7 +4,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { createHubClient, type HubDocumentListItem } from '@/api/hubClient';
 import { getAccessToken } from '@/hooks/useAuth';
-import type { DocRow } from '@shared/workbench/pages';
+import type { DocRow } from '@agenthub/workbench/pages';
 
 // Lazy singleton — avoids creating the client on module load when Hub is not needed.
 let _hubClient: ReturnType<typeof createHubClient> | null = null;

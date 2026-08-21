@@ -5,7 +5,7 @@ import { HUB_EVENTS } from '@shared/hubEvents';
 import { hubRuntimeEventFromPayload, type HubRuntimeEventTranscriptInput } from '@shared/transcript';
 import { getPinMapStore } from '@shared/transcript';
 import { getAgentActivityStore } from '@shared/transcript/agentActivity';
-import { getMessageDelegationStore, getSubagentStreamStore } from '@shared/workbench';
+import { getMessageDelegationStore, getSubagentStreamStore } from '@agenthub/workbench';
 import { handleIncomingTyping } from '@shared/chatview/typingPresence';
 import { buildWSAuthProtocols, createHubWS, type HubWSHandle, type HubWSOptions } from '@shared/hub/hubWS';
 import { WebSocketTransport, type Transport, type TransportStatus } from '@/api/transport';

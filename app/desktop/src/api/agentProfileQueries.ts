@@ -1,6 +1,6 @@
 // React Query hooks for Edge Agent Profiles — CRUD operations.
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { AgentConfig } from '@shared/workbench';
+import type { AgentConfig } from '@agenthub/workbench';
 import {
   fetchAgentProfiles,
   createAgentProfile,

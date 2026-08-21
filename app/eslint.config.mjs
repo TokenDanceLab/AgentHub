@@ -31,6 +31,27 @@ export default tseslint.config(
     },
   },
 
+  // 依赖方向门禁（#1759）：shared 是跨端原语层，永远不得 import workbench
+  // 包（workbench → shared 单向）。相对路径越界由
+  // scripts/verify/verify-frontend-package-boundary.py 兜底。
+  {
+    files: ["shared/**/*.{ts,tsx,js,jsx,mjs}"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              group: ["@agenthub/workbench", "@agenthub/workbench/*", "@workbench", "@workbench/*"],
+              message:
+                "shared must never import workbench — dependency direction is workbench -> shared only (#1759).",
+            },
+          ],
+        },
+      ],
+    },
+  },
+
   // React Hooks rules — only for UI packages
   {
     files: ["desktop/**/*.{tsx,jsx}", "web/**/*.{tsx,jsx}", "mobile-rn/**/*.{tsx,jsx}"],

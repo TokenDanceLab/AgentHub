@@ -56,7 +56,7 @@ export const lobehubIconsMock = {
 
 /**
  * Mock for the deep Antigravity color-icon module (imported by
- * `shared/src/workbench/designIcons.tsx`). The real module chain pulls in
+ * `workbench/src/designIcons.tsx`). The real module chain pulls in
  * assets Node cannot process in a jsdom test run.
  */
 export const antigravityColorIconMock = { default: NullLobehubIcon };

@@ -17,7 +17,8 @@
 | `@shared/context/*` | `src/context/` | 上下文用量和 token breakdown 工具 |
 | `@shared/ui` | `src/ui/` | Desktop/Web 共用 UI 组件、测试和 Storybook story |
 | `@shared/chatview` | `src/chatview/` | ChatView 消息卡片渲染系统：adapter、TranscriptItem、RowItem 状态机、i18n、CSS tokens |
-| `@shared/workbench` | `src/workbench/` | v4 共享工作台 shell、状态管理、platform adapter 接口 |
+
+端级 workbench shell 已于 #1759 独立为第 6 个包 `@agenthub/workbench`（`app/workbench/`），依赖方向固定为 workbench → shared 单向；shared 不再包含也不再 re-export workbench。
 
 ## 使用
 

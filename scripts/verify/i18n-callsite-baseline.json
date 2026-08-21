@@ -1,18 +1,18 @@
 {
   "_comment": "Baseline of i18n callsite violations (source files with CJK string literals but no useTranslation import). The verify gate fails when the current count EXCEEDS this baseline; lower this number as more callsites are wired to useTranslation.",
-  "scanRoot": "app/shared/src",
-  "totalViolations": 86,
-  "totalCjkLiteralLines": 763,
+  "scanRoot": "app/shared/src + app/workbench/src",
+  "totalViolations": 88,
+  "totalCjkLiteralLines": 779,
   "files": [
     {
-      "path": "chatview/adapterMapBlock.ts",
+      "path": "shared/chatview/adapterMapBlock.ts",
       "cjkLiteralLines": 1,
       "samples": [
         263
       ]
     },
     {
-      "path": "chatview/components/UnreadDivider.tsx",
+      "path": "shared/chatview/components/UnreadDivider.tsx",
       "cjkLiteralLines": 2,
       "samples": [
         3,
@@ -20,7 +20,7 @@
       ]
     },
     {
-      "path": "chatview/design/labels.ts",
+      "path": "shared/chatview/design/labels.ts",
       "cjkLiteralLines": 10,
       "samples": [
         164,
@@ -31,7 +31,7 @@
       ]
     },
     {
-      "path": "chatview/types.ts",
+      "path": "shared/chatview/types.ts",
       "cjkLiteralLines": 2,
       "samples": [
         72,
@@ -39,7 +39,7 @@
       ]
     },
     {
-      "path": "composer/types.ts",
+      "path": "shared/composer/types.ts",
       "cjkLiteralLines": 2,
       "samples": [
         15,
@@ -47,7 +47,7 @@
       ]
     },
     {
-      "path": "demo/dataMode.ts",
+      "path": "shared/demo/dataMode.ts",
       "cjkLiteralLines": 3,
       "samples": [
         149,
@@ -56,7 +56,7 @@
       ]
     },
     {
-      "path": "demo/teamrunDemo.ts",
+      "path": "shared/demo/teamrunDemo.ts",
       "cjkLiteralLines": 4,
       "samples": [
         163,
@@ -66,7 +66,7 @@
       ]
     },
     {
-      "path": "demo/workbenchDemoAgents.ts",
+      "path": "shared/demo/workbenchDemoAgents.ts",
       "cjkLiteralLines": 19,
       "samples": [
         19,
@@ -77,7 +77,7 @@
       ]
     },
     {
-      "path": "demo/workbenchDemoMessages.ts",
+      "path": "shared/demo/workbenchDemoMessages.ts",
       "cjkLiteralLines": 8,
       "samples": [
         19,
@@ -88,7 +88,7 @@
       ]
     },
     {
-      "path": "demo/workbenchDemoStore.ts",
+      "path": "shared/demo/workbenchDemoStore.ts",
       "cjkLiteralLines": 5,
       "samples": [
         137,
@@ -99,14 +99,14 @@
       ]
     },
     {
-      "path": "demo/workbenchDemoTypes.ts",
+      "path": "shared/demo/workbenchDemoTypes.ts",
       "cjkLiteralLines": 1,
       "samples": [
         39
       ]
     },
     {
-      "path": "inspector/inspectorEvidence.ts",
+      "path": "shared/inspector/inspectorEvidence.ts",
       "cjkLiteralLines": 10,
       "samples": [
         270,
@@ -117,7 +117,7 @@
       ]
     },
     {
-      "path": "transcript/edgeEventEvidence.ts",
+      "path": "shared/transcript/edgeEventEvidence.ts",
       "cjkLiteralLines": 4,
       "samples": [
         183,
@@ -127,7 +127,7 @@
       ]
     },
     {
-      "path": "transcript/normalizeHubMessages.ts",
+      "path": "shared/transcript/normalizeHubMessages.ts",
       "cjkLiteralLines": 2,
       "samples": [
         64,
@@ -135,14 +135,14 @@
       ]
     },
     {
-      "path": "transcript/normalizeThreadItems.ts",
+      "path": "shared/transcript/normalizeThreadItems.ts",
       "cjkLiteralLines": 1,
       "samples": [
         101
       ]
     },
     {
-      "path": "transcript/pinMap.ts",
+      "path": "shared/transcript/pinMap.ts",
       "cjkLiteralLines": 3,
       "samples": [
         17,
@@ -151,7 +151,7 @@
       ]
     },
     {
-      "path": "ui/cjkRemarkPlugin.ts",
+      "path": "shared/ui/cjkRemarkPlugin.ts",
       "cjkLiteralLines": 12,
       "samples": [
         29,
@@ -162,7 +162,7 @@
       ]
     },
     {
-      "path": "ui/useCopiedFlag.ts",
+      "path": "shared/ui/useCopiedFlag.ts",
       "cjkLiteralLines": 1,
       "samples": [
         17
@@ -196,6 +196,15 @@
         39,
         41,
         60
+      ]
+    },
+    {
+      "path": "workbench/__tests__/helpers.tsx",
+      "cjkLiteralLines": 3,
+      "samples": [
+        110,
+        111,
+        112
       ]
     },
     {
@@ -827,6 +836,17 @@
         30,
         31,
         32
+      ]
+    },
+    {
+      "path": "workbench/workbenchTestFixtures.ts",
+      "cjkLiteralLines": 13,
+      "samples": [
+        14,
+        22,
+        34,
+        67,
+        76
       ]
     },
     {
