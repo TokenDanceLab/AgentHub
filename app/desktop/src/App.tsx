@@ -460,9 +460,12 @@ export function DesktopWorkbenchApp({ onLogout }: DesktopWorkbenchAppProps = {})
       });
       return;
     }
-    // Hub-owned approvals (team/agent task) without a complete team context
-    // have no local route — never mis-send them to the Local Edge.
-    if (action.teamId || action.teamRunId || action.agentTaskId) return;
+    // Hub-owned approvals (team or agent-task) without a complete team
+    // context have no local route — never mis-send them to the Local Edge.
+    // Note: a local Edge permission block can carry teamRunId alone (the
+    // mapper derives it from payload.runId), so teamRunId by itself must not
+    // block the Local Edge route below.
+    if (action.teamId || action.agentTaskId) return;
     // Local Edge run permission (#1816 W1): the card's requestId doubles as
     // the Edge permission requestId; the owning runId comes from the
     // permission_request block's run evidence, falling back to the active

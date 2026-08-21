@@ -15,6 +15,7 @@ import { useCreateRun, useCancelRun, useRuns, useDecideEdgePermission } from '@/
 import { useCreateThread, useCurrentUser, useThreadMessages, useThreadPins, useThreads } from '@/api/threadQueries';
 import type { EventHandler, StatusHandler, StreamHandle } from '@/api/eventClient';
 import { queryClient } from '@/api/queryClient';
+import { getAgentActivityStore } from '@shared/transcript/agentActivity';
 import { getAccessToken, useAuth } from '@/hooks/useAuth';
 import { useDeviceRegistration } from '@/hooks/useDeviceRegistration';
 import { useHealth } from '@/hooks/useHealth';
@@ -256,6 +257,10 @@ describe('Desktop App v4 root', () => {
     vi.clearAllMocks();
     testQueryClient.clear();
     window.localStorage.clear();
+    // The agent activity store is a process-level singleton fed by Edge
+    // events; clear it so a previous test's streaming agents cannot leak
+    // into the composer running/stop-button state of the next test.
+    getAgentActivityStore().reset();
     Object.defineProperty(window, '__TAURI_INTERNALS__', {
       value: {},
       configurable: true,
@@ -855,6 +860,13 @@ describe('Desktop App v4 root', () => {
         },
       });
     });
+
+    // The waiting approval card arrives collapsed (same as the web shell);
+    // expand it (aria-label `card.expand`) to reveal the approve/deny actions.
+    const approvalCard = await screen.findByRole('button', {
+      name: /^(card\.expand|展开|Expand)$/,
+    });
+    fireEvent.click(approvalCard);
 
     const approveButton = await screen.findByRole('button', {
       name: /^(批准|Approve|card\.approval\.approve)$/,
