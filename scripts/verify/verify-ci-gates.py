@@ -108,6 +108,26 @@ def main() -> int:
     assert_contains(edge, re.escape('check_pkg "edge-server/internal/adapters/" 55 "adapters"'), "go-edge must keep adapters package coverage minimum")
     assert_contains(hub, r"THRESHOLD=40", "go-hub coverage threshold must be 40%")
 
+    # go-edge / go-hub 恒报 report：两者是 required checks，GitHub 不把
+    # skipped 视为 required check 通过，纯前端 PR 会被永久 BLOCK。
+    # 策略：job 级 if 恒真（!cancelled()），真实门禁步骤带 go 条件（省成本），
+    # 末尾 fallback step 在无 Go 变更时输出 skipped 并 exit 0。
+    for job_name, job_body in (("go-edge", edge), ("go-hub", hub)):
+        assert_contains(
+            job_body,
+            r"(?m)^\s+if:\s+\$\{\{\s*!cancelled\(\)\s*\}\}\s*$",
+            f"{job_name} must always report a result (job-level if must not path-filter)",
+        )
+        assert_contains(
+            job_body,
+            r"if:\s+github\.event_name == 'workflow_dispatch' \|\| needs\.changes\.outputs\.go == 'true'",
+            f"{job_name} real gates must stay step-level path-filtered",
+        )
+        fallback_step = get_step_block(job_body, "Report no-Go-changes skip (required check)")
+        assert_contains(fallback_step, r"needs\.changes\.outputs\.go != 'true'", f"{job_name} fallback must only run when the Go filter is off")
+        assert_contains(fallback_step, r"reporting success for required check", f"{job_name} fallback must report success for the required check")
+        assert_contains(fallback_step, r"exit 0", f"{job_name} fallback must exit 0")
+
     # #1536: Edge lint is at 0 issues and hardened to hard-blocking; Hub lint
     # still carries pre-existing findings (tracked in #1573) and stays
     # warning-only until a finding-fingerprint ratchet exists. Complexity

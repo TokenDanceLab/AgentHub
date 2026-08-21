@@ -11,6 +11,8 @@ one surgical text mutation, and asserts the CI policy verifier exits non-zero:
 5. swap pnpm test:css-syntax* for pnpm lint:css
 6. delete the windows-go MATRIX_RESULT binding → aggregator no longer fail-closed
 7. delete the windows-frontend non-success failure branch → aggregator always green
+8. restore the go-hub job-level path filter → required check skip-able again
+9. delete the go-hub no-Go-changes fallback step → job has no success path when filtered
 
 The unmutated copy must exit 0, proving the policy test only reddens on
 actual policy violations (fail-closed, no false green).
@@ -117,6 +119,46 @@ def delete_windows_frontend_failure_branch(text: str) -> str:
     return text[: match.start("body")] + mutated_body + text[match.end("body"):]
 
 
+def get_go_hub_body(text: str) -> tuple:
+    go_hub_block = re.compile(r"(?ms)^  go-hub:\r?\n(?P<body>.*?)(?=^  [A-Za-z0-9_-]+:\r?\n)")
+    match = go_hub_block.search(text)
+    if not match:
+        raise AssertionError("go-hub job block not found")
+    return match.start("body"), match.end("body"), match.group("body")
+
+
+def restore_go_hub_job_path_filter(text: str) -> str:
+    start, end, body = get_go_hub_body(text)
+    always_if = "    if: ${{ !cancelled() }}"
+    if always_if not in body:
+        raise AssertionError("go-hub job-level always-report if not found")
+    path_filter_if = (
+        "    if: >-\n"
+        "      github.event_name == 'workflow_dispatch' ||\n"
+        "      needs.changes.outputs.go == 'true'"
+    )
+    return text[:start] + body.replace(always_if, path_filter_if, 1) + text[end:]
+
+
+GO_HUB_FALLBACK_TEXT = (
+    "      # Fallback: keep the required check reported even when the Go path\n"
+    "      # filter deselects this job (skipped jobs never satisfy branch\n"
+    "      # protection and permanently block frontend-only PRs).\n"
+    "      - name: Report no-Go-changes skip (required check)\n"
+    "        if: ${{ !cancelled() && github.event_name != 'workflow_dispatch' && needs.changes.outputs.go != 'true' }}\n"
+    "        run: |\n"
+    '          echo "skipped: no Go changes; reporting success for required check go-hub"\n'
+    "          exit 0\n"
+)
+
+
+def delete_go_hub_fallback_step(text: str) -> str:
+    start, end, body = get_go_hub_body(text)
+    if GO_HUB_FALLBACK_TEXT not in body:
+        raise AssertionError("go-hub fallback step text not found")
+    return text[:start] + body.replace(GO_HUB_FALLBACK_TEXT, "", 1) + text[end:]
+
+
 class VerifyCiGatesMutationTests(unittest.TestCase):
     def assert_mutation_fails(self, mutated_text: str, case_name: str) -> None:
         exit_code, output = run_verifier(mutated_text)
@@ -155,6 +197,18 @@ class VerifyCiGatesMutationTests(unittest.TestCase):
         self.assert_mutation_fails(
             delete_windows_frontend_failure_branch(read_workflow()),
             "deleted windows-frontend non-success failure branch",
+        )
+
+    def test_restore_go_hub_job_path_filter_fails(self):
+        self.assert_mutation_fails(
+            restore_go_hub_job_path_filter(read_workflow()),
+            "restored go-hub job-level path filter",
+        )
+
+    def test_delete_go_hub_fallback_step_fails(self):
+        self.assert_mutation_fails(
+            delete_go_hub_fallback_step(read_workflow()),
+            "deleted go-hub no-Go-changes fallback step",
         )
 
 

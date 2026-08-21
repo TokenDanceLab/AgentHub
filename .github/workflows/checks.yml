@@ -35,23 +35,26 @@ jobs:
   # profiles with scripts/verify/merge-coverprofiles.py (repo-local).
   go-edge:
     needs: [changes, go-edge-test]
-    if: >-
-      github.event_name == 'workflow_dispatch' ||
-      needs.changes.outputs.go == 'true'
+    # Required check: always report a result so a path-filtered skip cannot
+    # block branch protection. Real gates below run only for Go changes.
+    if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: edge-server
     steps:
-      - uses: actions/checkout@v7
+      - if: github.event_name == 'workflow_dispatch' || needs.changes.outputs.go == 'true'
+        uses: actions/checkout@v7
 
-      - uses: actions/setup-go@v7
+      - if: github.event_name == 'workflow_dispatch' || needs.changes.outputs.go == 'true'
+        uses: actions/setup-go@v7
         with:
           go-version: ${{ env.GO_VERSION }}
           cache: true
           cache-dependency-path: edge-server/go.sum
 
       - name: Lint
+        if: github.event_name == 'workflow_dispatch' || needs.changes.outputs.go == 'true'
         # Wave 10: advisory — gocognit findings in pre-existing complex functions
         continue-on-error: true
         uses: golangci/golangci-lint-action@v9
@@ -61,12 +64,14 @@ jobs:
           args: --timeout=5m
 
       - name: Download shard coverage data
+        if: github.event_name == 'workflow_dispatch' || needs.changes.outputs.go == 'true'
         uses: actions/download-artifact@v7
         with:
           pattern: go-edge-coverage-shard-*
           path: edge-server/cov-shards
 
       - name: Merge shard coverage (coverprofile text)
+        if: github.event_name == 'workflow_dispatch' || needs.changes.outputs.go == 'true'
         run: |
           python ../scripts/verify/merge-coverprofiles.py \
             cov-shards/go-edge-coverage-shard-1/shard-1.out \
@@ -74,12 +79,14 @@ jobs:
             -o coverage.out
 
       - name: Coverage check (informational)
+        if: github.event_name == 'workflow_dispatch' || needs.changes.outputs.go == 'true'
         run: |
           COVERAGE=$(go tool cover -func=coverage.out | grep total | awk '{print $3}' | sed 's/%//')
           echo "Overall coverage: ${COVERAGE}%"
           echo "::notice::edge-server overall coverage: ${COVERAGE}%"
 
       - name: Coverage per-package minimums
+        if: github.event_name == 'workflow_dispatch' || needs.changes.outputs.go == 'true'
         run: |
           echo "=== Per-package coverage minimums ==="
           check_pkg() {
@@ -106,6 +113,7 @@ jobs:
       # Restore must precede both gosec and staticcheck steps.
       - name: Cache static-analysis binaries (staticcheck + gosec)
         id: sa-cache
+        if: github.event_name == 'workflow_dispatch' || needs.changes.outputs.go == 'true'
         uses: actions/cache@v5
         with:
           path: |
@@ -114,6 +122,7 @@ jobs:
           key: sa-tools-2026-08
 
       - name: Security scan (gosec)
+        if: github.event_name == 'workflow_dispatch' || needs.changes.outputs.go == 'true'
         # #1574: hard fail (findings zero-baselined). Fail-closed wrapper
         # verify-gosec-gates.sh rejects empty/unparseable output (no false green).
         run: |
@@ -122,9 +131,11 @@ jobs:
           fi
           ~/go/bin/gosec -fmt=json ./... 2>/dev/null | bash ../scripts/verify/verify-gosec-gates.sh
       - name: Vet
+        if: github.event_name == 'workflow_dispatch' || needs.changes.outputs.go == 'true'
         run: go vet ./...
 
       - name: staticcheck
+        if: github.event_name == 'workflow_dispatch' || needs.changes.outputs.go == 'true'
         run: |
           if [ ! -x ~/go/bin/staticcheck ]; then
             go install honnef.co/go/tools/cmd/staticcheck@2026.1
@@ -136,12 +147,23 @@ jobs:
       # internal/orchestration 不得 import 任何 adapters。此前该脚本只在
       # 本地跑、CI 未接线——治理声明与执行不一致，现接进 go-edge（已 setup-go）。
       - name: Verify orchestrator dependency direction (#1566)
+        if: github.event_name == 'workflow_dispatch' || needs.changes.outputs.go == 'true'
         working-directory: .
         run: python scripts/verify/verify-orchestrator-deps.py
 
       - name: Self-test orchestrator dependency direction gate
+        if: github.event_name == 'workflow_dispatch' || needs.changes.outputs.go == 'true'
         working-directory: .
         run: python scripts/verify/tests/verify-orchestrator-deps.Tests.py
+
+      # Fallback: keep the required check reported even when the Go path
+      # filter deselects this job (skipped jobs never satisfy branch
+      # protection and permanently block frontend-only PRs).
+      - name: Report no-Go-changes skip (required check)
+        if: ${{ !cancelled() && github.event_name != 'workflow_dispatch' && needs.changes.outputs.go != 'true' }}
+        run: |
+          echo "skipped: no Go changes; reporting success for required check go-edge"
+          exit 0
 
   # ── Go: Edge Server tests (shard×2) ──────────
   # CI5 wave2 (#1689): the single-pass `go test ./... -race -coverprofile`
@@ -197,23 +219,26 @@ jobs:
   # ── Go: Hub Server ──────────────────────────
   go-hub:
     needs: [changes, go-hub-test]
-    if: >-
-      github.event_name == 'workflow_dispatch' ||
-      needs.changes.outputs.go == 'true'
+    # Required check: always report a result so a path-filtered skip cannot
+    # block branch protection. Real gates below run only for Go changes.
+    if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: hub-server
     steps:
-      - uses: actions/checkout@v7
+      - if: github.event_name == 'workflow_dispatch' || needs.changes.outputs.go == 'true'
+        uses: actions/checkout@v7
 
-      - uses: actions/setup-go@v7
+      - if: github.event_name == 'workflow_dispatch' || needs.changes.outputs.go == 'true'
+        uses: actions/setup-go@v7
         with:
           go-version: ${{ env.GO_VERSION }}
           cache: true
           cache-dependency-path: hub-server/go.sum
 
       - name: Lint
+        if: github.event_name == 'workflow_dispatch' || needs.changes.outputs.go == 'true'
         # #1657: hard gate — lint failures now block merges. The 17
         # pre-existing complexity findings remain baseline-registered in the
         # #1573 fingerprint ratchet, so only-new-issues keeps those from
@@ -232,12 +257,14 @@ jobs:
       # advisory until the debt is repaid to zero. Reads the same JSON report
       # the Lint step just produced (single source, no version drift).
       - name: Verify Hub lint fingerprint ratchet (#1573)
+        if: github.event_name == 'workflow_dispatch' || needs.changes.outputs.go == 'true'
         # Wave 10: CI golangci-lint version produces different findings; re-baseline on CI
         continue-on-error: true
         working-directory: .
         run: python ./scripts/verify/verify-hub-lint-ratchet.py --LintJsonPath "${{ runner.temp }}/hub-lint-report.json"
 
       - name: Self-test Hub lint fingerprint ratchet
+        if: github.event_name == 'workflow_dispatch' || needs.changes.outputs.go == 'true'
         working-directory: .
         run: python ./scripts/verify/tests/verify-hub-lint-ratchet.Tests.py
 
@@ -246,12 +273,14 @@ jobs:
       # scripts/verify/merge-coverprofiles.py and keeps the overall >=40%
       # gate hard-blocking.
       - name: Download shard coverage data
+        if: github.event_name == 'workflow_dispatch' || needs.changes.outputs.go == 'true'
         uses: actions/download-artifact@v7
         with:
           pattern: go-hub-coverage-shard-*
           path: hub-server/cov-shards
 
       - name: Merge shard coverage (coverprofile text)
+        if: github.event_name == 'workflow_dispatch' || needs.changes.outputs.go == 'true'
         run: |
           python ../scripts/verify/merge-coverprofiles.py \
             cov-shards/go-hub-coverage-shard-1/shard-1.out \
@@ -259,6 +288,7 @@ jobs:
             -o coverage.out
 
       - name: Coverage check (overall >= 40%)
+        if: github.event_name == 'workflow_dispatch' || needs.changes.outputs.go == 'true'
         run: |
           COVERAGE=$(go tool cover -func=coverage.out | grep total | awk '{print $3}' | sed 's/%//')
           THRESHOLD=40
@@ -274,6 +304,7 @@ jobs:
       # Restore must precede both gosec and staticcheck steps.
       - name: Cache static-analysis binaries (staticcheck + gosec)
         id: sa-cache
+        if: github.event_name == 'workflow_dispatch' || needs.changes.outputs.go == 'true'
         uses: actions/cache@v5
         with:
           path: |
@@ -282,6 +313,7 @@ jobs:
           key: sa-tools-2026-08
 
       - name: Security scan (gosec)
+        if: github.event_name == 'workflow_dispatch' || needs.changes.outputs.go == 'true'
         # #1574: hard fail (findings zero-baselined), matching go-edge.
         run: |
           if [ ! -x ~/go/bin/gosec ]; then
@@ -290,14 +322,25 @@ jobs:
           ~/go/bin/gosec -fmt=json ./... 2>/dev/null | bash ../scripts/verify/verify-gosec-gates.sh
 
       - name: Vet
+        if: github.event_name == 'workflow_dispatch' || needs.changes.outputs.go == 'true'
         run: go vet ./...
 
       - name: staticcheck
+        if: github.event_name == 'workflow_dispatch' || needs.changes.outputs.go == 'true'
         run: |
           if [ ! -x ~/go/bin/staticcheck ]; then
             go install honnef.co/go/tools/cmd/staticcheck@2026.1
           fi
           staticcheck ./... 2>&1
+
+      # Fallback: keep the required check reported even when the Go path
+      # filter deselects this job (skipped jobs never satisfy branch
+      # protection and permanently block frontend-only PRs).
+      - name: Report no-Go-changes skip (required check)
+        if: ${{ !cancelled() && github.event_name != 'workflow_dispatch' && needs.changes.outputs.go != 'true' }}
+        run: |
+          echo "skipped: no Go changes; reporting success for required check go-hub"
+          exit 0
 
   # ── Go: Hub Server tests (shard×2) ───────────
   # CI5 wave2 (#1689): same 2-shard package split as go-edge-test
