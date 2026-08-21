@@ -21,6 +21,10 @@ export type ChatEngineeringColumnProps = {
   localFiles: boolean;
   platform?: AgentHubPlatform | undefined;
   workDir?: string | undefined;
+  /** #1823: when the inspector column is collapsed, the whole column —
+   * including the AuxPanel tab strip below the inspector — leaves the
+   * keyboard/AT order. */
+  inspectorCollapsed?: boolean | undefined;
 };
 
 const LABELS: Record<AuxPanelTab, string> = {
@@ -42,6 +46,7 @@ export function ChatEngineeringColumn({
   localFiles,
   platform,
   workDir,
+  inspectorCollapsed,
 }: ChatEngineeringColumnProps): React.ReactElement {
   const available = useMemo(
     () => resolveAvailableAuxTabs({ hasWorkspace, localFiles }),
@@ -108,6 +113,7 @@ export function ChatEngineeringColumn({
     <div
       className={[shellStyles.engineeringColumn, styles.column].filter(Boolean).join(' ')}
       data-testid="chat-engineering-column"
+      {...(inspectorCollapsed ? { inert: true } : {})}
     >
       <div className={styles.inspectorSlot}>{inspector}</div>
       <div className={styles.auxSlot}>

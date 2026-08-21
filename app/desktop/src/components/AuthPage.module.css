@@ -126,7 +126,7 @@
 
 .input:focus {
   background: var(--glass-bg-subtle);
-  box-shadow: 0 0 0 3px var(--glass-tint-plum);
+  box-shadow: var(--focus-ring);
 }
 
 .input:disabled { opacity: 0.5; }
@@ -245,9 +245,12 @@
   box-shadow: 0 12px 32px var(--glass-tint-sky);
 }
 
+/* #1823: the previous rings used 4% alpha glass tints (invisible). The
+   design-system --focus-ring token carries the visible ≥3:1 ring; the glow
+   layers stay for the surface treatment. */
 .identityButton:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 3px var(--glass-tint-sky), 0 12px 32px var(--glass-tint-sky);
+  box-shadow: var(--focus-ring), 0 12px 32px var(--glass-tint-sky);
 }
 
 [data-theme='light'] .identityButton:hover {
@@ -259,7 +262,7 @@
 [data-theme='light'] .identityButton:focus-visible {
   box-shadow:
     inset 0 1px 0 var(--glass-input-bg-hover),
-    0 0 0 3px var(--glass-tint-sky),
+    var(--focus-ring),
     0 12px 32px var(--glass-tint-sky);
 }
 
@@ -275,9 +278,12 @@
   color: var(--td-ink);
 }
 
-[data-theme='dark'] .identityButton:hover,
-[data-theme='dark'] .identityButton:focus-visible {
+[data-theme='dark'] .identityButton:hover {
   box-shadow: 0 12px 32px var(--glass-shadow);
+}
+
+[data-theme='dark'] .identityButton:focus-visible {
+  box-shadow: var(--focus-ring), 0 12px 32px var(--glass-shadow);
 }
 
 .identityIcon {
@@ -389,7 +395,7 @@
 }
 
 .hubInput:focus {
-  box-shadow: 0 0 0 3px var(--glass-tint-plum);
+  box-shadow: var(--focus-ring);
 }
 
 .hubStatus {
@@ -521,6 +527,7 @@
 .devInput::placeholder { color: var(--td-ink-faint); }
 
 .devInput:focus {
-  border-color: var(--glass-tint-plum);
+  border-color: var(--td-focus);
+  box-shadow: var(--focus-ring);
   background: var(--glass-bg-subtle);
 }

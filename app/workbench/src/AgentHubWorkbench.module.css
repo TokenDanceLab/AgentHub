@@ -187,20 +187,38 @@
   backdrop-filter: var(--glass-backdrop-filter);
   -webkit-backdrop-filter: var(--glass-backdrop-filter);
   clip-path: inset(0 0 0 0);
+  /* visibility flips back immediately on expand so the reveal animation runs. */
+  visibility: visible;
   transition:
     width var(--sidebar-motion-duration) var(--sidebar-motion-ease),
     clip-path var(--sidebar-motion-duration) var(--sidebar-motion-ease),
     border-color var(--sidebar-motion-duration) var(--sidebar-motion-ease),
     background var(--td-dur-normal) var(--td-ease),
-    box-shadow var(--td-dur-normal) var(--td-ease);
+    box-shadow var(--td-dur-normal) var(--td-ease),
+    visibility 0s linear 0s;
   will-change: width, clip-path;
 }
 
+/*
+ * #1823: clipping alone left the search box / sort / conversation buttons in
+ * the Tab order after collapse (focus leak into a 0px column). `visibility:
+ * hidden` takes the whole subtree out of the focus order; the delay keeps it
+ * painted until the collapse animation finishes. `inert` on the host element
+ * (WorkbenchFrameParts) is the scripted counterpart for AT semantics.
+ */
 .shell[data-sidebar-collapsed='true'] .sidebarFrame {
   width: 0;
   border-right-color: transparent;
   clip-path: inset(0 100% 0 0);
   pointer-events: none;
+  visibility: hidden;
+  transition:
+    width var(--sidebar-motion-duration) var(--sidebar-motion-ease),
+    clip-path var(--sidebar-motion-duration) var(--sidebar-motion-ease),
+    border-color var(--sidebar-motion-duration) var(--sidebar-motion-ease),
+    background var(--td-dur-normal) var(--td-ease),
+    box-shadow var(--td-dur-normal) var(--td-ease),
+    visibility 0s linear var(--sidebar-motion-duration);
 }
 
 .shell[data-sidebar-resizing='true'] .sidebarFrame {
@@ -1879,13 +1897,15 @@
   backdrop-filter: var(--glass-backdrop-filter);
   -webkit-backdrop-filter: var(--glass-backdrop-filter);
   clip-path: inset(0 0 0 0);
+  visibility: visible;
   transition:
     width var(--inspector-motion-duration) var(--inspector-motion-ease),
     flex-basis var(--inspector-motion-duration) var(--inspector-motion-ease),
     clip-path var(--inspector-motion-duration) var(--inspector-motion-ease),
     border-color var(--inspector-motion-duration) var(--inspector-motion-ease),
     background var(--td-dur-normal) var(--td-ease),
-    box-shadow var(--td-dur-normal) var(--td-ease);
+    box-shadow var(--td-dur-normal) var(--td-ease),
+    visibility 0s linear 0s;
   will-change: width, flex-basis, clip-path;
 }
 
@@ -1909,13 +1929,15 @@
   backdrop-filter: var(--glass-backdrop-filter);
   -webkit-backdrop-filter: var(--glass-backdrop-filter);
   clip-path: inset(0 0 0 0);
+  visibility: visible;
   transition:
     width var(--inspector-motion-duration) var(--inspector-motion-ease),
     flex-basis var(--inspector-motion-duration) var(--inspector-motion-ease),
     clip-path var(--inspector-motion-duration) var(--inspector-motion-ease),
     border-color var(--inspector-motion-duration) var(--inspector-motion-ease),
     background var(--td-dur-normal) var(--td-ease),
-    box-shadow var(--td-dur-normal) var(--td-ease);
+    box-shadow var(--td-dur-normal) var(--td-ease),
+    visibility 0s linear 0s;
   will-change: width, flex-basis, clip-path;
 }
 
@@ -1927,6 +1949,12 @@
   border-left: none;
 }
 
+/*
+ * #1823: the collapsed inspector still carries `aria-hidden`, so it must not
+ * keep focusable descendants (tabs, resizer, preview controls) reachable by
+ * Tab. `visibility: hidden` removes the subtree from the focus order once the
+ * collapse animation has finished; RightInspector sets `inert` in parallel.
+ */
 .shell[data-inspector-collapsed='true'] .inspector,
 .shell[data-inspector-collapsed='true'] .engineeringColumn {
   width: 0;
@@ -1934,6 +1962,15 @@
   border-left-color: transparent;
   clip-path: inset(0 0 0 100%);
   pointer-events: none;
+  visibility: hidden;
+  transition:
+    width var(--inspector-motion-duration) var(--inspector-motion-ease),
+    flex-basis var(--inspector-motion-duration) var(--inspector-motion-ease),
+    clip-path var(--inspector-motion-duration) var(--inspector-motion-ease),
+    border-color var(--inspector-motion-duration) var(--inspector-motion-ease),
+    background var(--td-dur-normal) var(--td-ease),
+    box-shadow var(--td-dur-normal) var(--td-ease),
+    visibility 0s linear var(--inspector-motion-duration);
 }
 
 .shell[data-inspector-resizing='true'] .inspector,
@@ -3261,5 +3298,71 @@
     min-height: 0 !important;
     overflow: visible !important;
     padding: 0 !important;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   A11y remediation (#1823) — visible focus rings, ≥32px hit areas, and
+   reduced-motion gating for the panel-collapse choreography.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+.workspaceTab:focus-visible,
+.inspectorTab:focus-visible,
+.inspectorWindowActions button:focus-visible,
+.inspectorAddMenu button:focus-visible,
+.conversationActionBtn:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+  color: var(--td-ink);
+}
+
+/* Small chrome controls keep their 26–28px visual box (dense command-center
+   density is Lane D's contract) but grow an invisible ≥32px pointer/touch
+   target via ::before, which does not participate in layout. */
+.workspaceTab,
+.conversationActionBtn {
+  position: relative;
+}
+
+.workspaceTab::before,
+.conversationActionBtn::before {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  min-width: 32px;
+  min-height: 32px;
+  width: 100%;
+  height: 100%;
+  transform: translate(-50%, -50%);
+  content: '';
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* The 360ms grid-template-columns + clip-path + translateX collapse
+     choreography becomes an instant state change. */
+  .shell {
+    --inspector-motion-duration: 0ms;
+    --sidebar-motion-duration: 0ms;
+  }
+
+  .shell,
+  .sidebarFrame,
+  .sidebar,
+  .inspector,
+  .engineeringColumn,
+  .monitorHead,
+  .inspectorPanel {
+    transition-duration: 0ms;
+    transition-delay: 0ms;
+  }
+
+  .inspectorAddMenu {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+
+  .connectionDot[data-status='connecting'] {
+    animation: none;
   }
 }
