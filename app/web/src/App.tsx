@@ -1,9 +1,9 @@
 import { QueryClientProvider, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useMemo, useState, useSyncExternalStore } from 'react';
 import { useTranslation } from 'react-i18next';
-import { AgentHubWorkbench } from '@shared/workbench';
+import { AgentHubWorkbench } from '@agenthub/workbench';
 import { CHATVIEW_I18N_NAMESPACE } from '@shared/chatview/i18n/resources';
-import type { AgentConfig, ProjectDraft, ProjectInfo, SkillMarketItem, MCPMarketItem } from '@shared/workbench';
+import type { AgentConfig, ProjectDraft, ProjectInfo, SkillMarketItem, MCPMarketItem } from '@agenthub/workbench';
 import {
   allowsWorkbenchDemoRuntimeMutation,
   getWorkbenchDataModeContract,

@@ -41,14 +41,12 @@ export default defineConfig({
       //   events.ts — 事件名常量（无逻辑）
       //   mock.ts — 测试 mock 工具（不参与被测逻辑）
       //   errors.ts — 错误类型定义
-      //   workbench/workbenchProjectsPort.ts — 纯类型契约（#1546），零运行时语句
       exclude: [
         'src/index.ts',
         'src/types.ts',
         'src/events.ts',
         'src/mock.ts',
         'src/errors.ts',
-        'src/workbench/workbenchProjectsPort.ts',
       ],
     }),
   },

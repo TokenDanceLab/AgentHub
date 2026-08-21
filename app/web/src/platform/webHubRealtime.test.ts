@@ -2,7 +2,7 @@ import { createElement, type ReactNode } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { HUB_EVENTS } from '@shared/hubEvents';
 import { getAgentActivityStore, getPinMapStore, type HubRuntimeEventTranscriptInput } from '@shared/transcript';
-import { getMessageDelegationStore, getSubagentStreamStore } from '@shared/workbench';
+import { getMessageDelegationStore, getSubagentStreamStore } from '@agenthub/workbench';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createHubWS, type HubWSHandle, type HubWSOptions } from '@shared/hub/hubWS';

@@ -16,6 +16,7 @@ python scripts/verify/verify-design-token-ssot.py   # 设计 token 门禁（改 
 ## 前端边界（速查，权威在根 AGENTS §2/§5）
 
 - 通用 UI 只在 `shared/src/ui/`；Desktop/Web/Mobile 从 shared 导入，禁止复制本地副本。
+- 端级 workbench shell 只在 `workbench/src/`（`@agenthub/workbench`，#1759 独立成包）；web/desktop 从 `@agenthub/workbench` 导入，mobile-rn 不依赖。依赖方向 workbench → shared 单向，shared 禁止 import workbench（eslint + `scripts/verify/verify-frontend-package-boundary.py` 双重门禁）。
 - `app/shared/src/hub/hubClient.ts` 是 Hub REST/WS 唯一 SSOT；各平台 `api/hubClient.ts` 只做 thin shell，禁止分叉 REST 实现。
 - Desktop 原生能力只在 `app/desktop/src-tauri/`；Web/Mobile 是 Hub-only，不直连 Local Edge。
 - CSS Modules + OKLCH tokens，避免硬编码颜色。

@@ -2,7 +2,7 @@
 // 参考: OpCode agentStore caching + Kanna connection tracking
 import { create } from 'zustand';
 import { subscribeWithSelector } from 'zustand/middleware';
-import type { ConnectionStatusKind } from '@shared/workbench';
+import type { ConnectionStatusKind } from '@agenthub/workbench';
 import type { HealthResponse } from '@shared/types';
 
 /** Recovery state for stream recovery after WebSocket reconnection. */

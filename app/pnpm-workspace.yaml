@@ -1,5 +1,6 @@
 packages:
   - "shared"
+  - "workbench"
   - "desktop"
   - "web"
   - "mobile-rn"

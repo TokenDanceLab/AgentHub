@@ -37,7 +37,8 @@ Mobile shared workbench (viewer / limited control)
 
 | 层 | 目录 | 职责 |
 |---|---|---|
-| Shared UI | `app/shared/` | workbench、transcript、composer、inspector、platform contracts |
+| Shared UI | `app/shared/` | transcript、composer、inspector、platform contracts、design token |
+| Workbench | `app/workbench/` | 端级工作台 shell（`@agenthub/workbench`，依赖方向 workbench → shared 单向，#1759） |
 | Desktop | `app/desktop/` | Tauri shell、Desktop adapter、Local Edge、本机能力 |
 | Web | `app/web/` | Hub session、Web adapter、远程审批和查看 |
 | Mobile | `app/mobile-rn/` | RN shell、Mobile adapter、Hub viewer surface |

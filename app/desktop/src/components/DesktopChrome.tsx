@@ -1,11 +1,11 @@
 import type { ReactNode } from 'react';
 import { getCurrentWindow } from '@tauri-apps/api/window';
-import { DesignNavIcon } from '@shared/workbench/designIcons';
+import { DesignNavIcon } from '@agenthub/workbench/designIcons';
 import {
   DESKTOP_NAVIGATE_BACK_EVENT,
   DESKTOP_NAVIGATE_FORWARD_EVENT,
   DESKTOP_TOGGLE_SIDEBAR_EVENT,
-} from '@shared/workbench/desktopChromeEvents';
+} from '@agenthub/workbench/desktopChromeEvents';
 import styles from './DesktopChrome.module.css';
 
 type WindowCommand = 'minimize' | 'toggleMaximize' | 'close';

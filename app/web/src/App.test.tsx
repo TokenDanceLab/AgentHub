@@ -7,11 +7,11 @@ import { queryClient } from '@/api/queryClient';
 import { useHubStore } from '@/stores/hubStore';
 
 /**
- * These tests render the REAL shared v4 workbench (`@shared/workbench`).
+ * These tests render the REAL shared v4 workbench (`@agenthub/workbench`).
  * Only the data/network layer below App is mocked — Hub queries, the web
  * workbench projection hook, web auth, and the auth modal.
  *
- * Previously this file replaced `@shared/workbench` with a ~50-line hand-written
+ * Previously this file replaced `@agenthub/workbench` with a ~50-line hand-written
  * stub and then asserted against the DOM that stub itself rendered, which made
  * every assertion vacuously true against the real shell. Keep the mock surface
  * at the data layer; do not stub the workbench.

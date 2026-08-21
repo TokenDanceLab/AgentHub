@@ -18,7 +18,7 @@ Issue: #466 (P9.1 SSOT map) · residual hardcode closed via #879 / #910 / #1021 
 | **Theme preset runtime SSOT** | `app/shared/src/themePresets.ts` (re-exported from `theme.ts`) | preset list, meta, storage key, `data-theme-preset` apply |
 | **Cross-platform alias registry** | `app/shared/src/designTokens.ts` | `--td-*` ↔ web/mobile alias map + surface rules (**TS registry, not CSS values**) |
 | **UI primitives** | `app/shared/src/ui/**` | Shared components + module CSS |
-| **Workbench shell** | `app/shared/src/workbench/**` | Product shell CSS/TS |
+| **Workbench shell** | `app/workbench/src/**` | Product shell CSS/TS（#1759 独立为 `@agenthub/workbench`） |
 | **Chatview scoped fork** | `app/shared/src/chatview/design/tokens.css` | Re-declares surfaces/text/status under `.chatview` (intentional isolation; value-drift risk) |
 | **Desktop re-exports** | `app/desktop/src/styles/{tokens,themes,presets}.css` | Thin `@import` of shared (+ desktop border overrides in presets) |
 | **Web re-exports** | `app/web/src/styles/{tokens,themes,presets}.css` | Thin `@import` of shared (+ web glass border overrides) |
