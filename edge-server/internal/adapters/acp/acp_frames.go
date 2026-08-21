@@ -102,7 +102,7 @@ func (a *workspaceAllowlist) validatePath(rawPath string) error {
 	if !normalizedPathIsAbsolute(normalized) {
 		return fmt.Errorf("%w: relative path %q (ACP requires absolute paths)", errACPPathOutsideWorkspace, rawPath)
 	}
-	if normalized != a.workspaceRoot && !strings.HasPrefix(normalized, a.workspaceRoot+"/") {
+	if !pathInsideWorkspace(normalized, a.workspaceRoot) {
 		return fmt.Errorf("%w: %q does not resolve under workspace %q", errACPPathOutsideWorkspace, rawPath, a.workspaceRoot)
 	}
 	return nil
@@ -114,17 +114,27 @@ func (a *workspaceAllowlist) validatePath(rawPath string) error {
 // a leading drive letter is upper-cased so containment matches the case
 // insensitivity of Windows roots ("c:/work" ≡ "C:/work"). Pure string
 // handling — no filesystem access.
+//
+// Whitespace-only input is rejected (""), but every character of a
+// non-empty path is preserved: trimming would rewrite a legitimate
+// trailing-space workdir ("/work ") into "/work" and let the gate accept
+// paths outside the real root.
 func normalizeWorkspacePath(rawPath string) string {
-	trimmed := strings.TrimSpace(rawPath)
-	if trimmed == "" {
+	if strings.TrimSpace(rawPath) == "" {
 		return ""
 	}
-	slashed := strings.ReplaceAll(trimmed, "\\", "/")
+	slashed := strings.ReplaceAll(rawPath, "\\", "/")
 	cleaned := path.Clean(slashed)
 	if len(cleaned) >= 2 && cleaned[1] == ':' {
 		drive := cleaned[0]
 		if 'a' <= drive && drive <= 'z' {
 			cleaned = strings.ToUpper(string(drive)) + cleaned[1:]
+		}
+		// path.Clean drops the trailing separator of drive roots
+		// ("C:/" → "C:"); restore it so drive roots stay canonical
+		// filesystem roots for the containment check.
+		if len(cleaned) == 2 && strings.HasSuffix(slashed, "/") {
+			cleaned += "/"
 		}
 	}
 	return cleaned
@@ -133,10 +143,38 @@ func normalizeWorkspacePath(rawPath string) string {
 // normalizedPathIsAbsolute reports whether a normalized path is absolute:
 // POSIX ("/...") or Windows drive-rooted ("X:/...").
 func normalizedPathIsAbsolute(normalized string) bool {
-	if strings.HasPrefix(normalized, "/") {
+	return strings.HasPrefix(normalized, "/") || isWindowsDrivePath(normalized)
+}
+
+// isWindowsDrivePath reports whether a normalized path is Windows
+// drive-rooted ("X:/...").
+func isWindowsDrivePath(normalized string) bool {
+	return len(normalized) >= 3 && normalized[1] == ':' && normalized[2] == '/'
+}
+
+// pathInsideWorkspace reports whether candidate is the root itself or a
+// descendant of it, using component-boundary containment so adjacent
+// prefixes ("/work" vs "/work-evil") never match. Filesystem roots
+// ("/", "C:/") act as boundaries without appending a duplicate separator,
+// and Windows drive paths compare case-insensitively (NTFS/FAT semantics)
+// while keeping the boundary check. Pure string handling — no filesystem
+// access.
+func pathInsideWorkspace(candidate, root string) bool {
+	if isWindowsDrivePath(candidate) && isWindowsDrivePath(root) {
+		boundary := root
+		if !strings.HasSuffix(boundary, "/") {
+			boundary += "/"
+		}
+		return strings.EqualFold(candidate, root) ||
+			strings.HasPrefix(strings.ToLower(candidate), strings.ToLower(boundary))
+	}
+	if candidate == root {
 		return true
 	}
-	return len(normalized) >= 3 && normalized[1] == ':' && normalized[2] == '/'
+	if strings.HasSuffix(root, "/") {
+		return strings.HasPrefix(candidate, root)
+	}
+	return strings.HasPrefix(candidate, root+"/")
 }
 
 // acpFsFrame is the edge-side frame for the fs/* endpoints: the validated
