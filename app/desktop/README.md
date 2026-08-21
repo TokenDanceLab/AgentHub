@@ -25,7 +25,7 @@ Desktop UI -> Local Edge Server -> Agent Runtime adapter -> Claude Code / Codex 
 | Views and slots | `src/views/` |
 | State/hooks | `src/stores/`, `src/hooks/` |
 | Tauri host | `src-tauri/` |
-| Shared UI/workbench/chat | `../shared/src/ui/`, `../shared/src/workbench/`, `../shared/src/chatview/` |
+| Shared UI/workbench/chat | `../shared/src/ui/`, `../workbench/src/`, `../shared/src/chatview/` |
 
 ## Local Preview
 

@@ -26,6 +26,7 @@
 | 演示诚实：stub/fixture 不得冒充真实登录/API | `scripts/verify/verify-real-e2e-contract.py` | checks.yml → validate |
 | OpenAPI↔hub router 合同一致 | `scripts/verify/verify-openapi-contract.py` | checks.yml → validate |
 | shared 内不出现 Edge 客户端实现 | `scripts/verify/verify-shared-boundary.py` | checks.yml → validate |
+| 前端包依赖方向：shared 不得 import workbench，workbench 只依赖 shared（#1759） | `scripts/verify/verify-frontend-package-boundary.py`（负向自测 `scripts/verify/tests/verify-frontend-package-boundary.Tests.py`）+ app/eslint.config.mjs `no-restricted-imports` | checks.yml → validate |
 | shared barrel 不泄漏 Edge 导出 | `scripts/verify/verify-shared-barrel.py` | checks.yml → validate |
 | Hub handler 不直连 repository | `scripts/verify/verify-hub-layering.py` | checks.yml → validate |
 | router 方法必须在 conventions.md 文档化 | `scripts/verify/verify-conventions.py` | checks.yml → validate |

@@ -790,17 +790,19 @@ jobs:
             desktop:
               - 'app/desktop/**'
               - 'app/shared/**'
+              - 'app/workbench/**'
               - 'app/package.json'
               - 'app/pnpm-lock.yaml'
               - '.github/workflows/checks.yml'
             web:
               - 'app/web/**'
               - 'app/shared/**'
+              - 'app/workbench/**'
               - 'app/package.json'
               - 'app/pnpm-lock.yaml'
               - '.github/workflows/checks.yml'
             shell:
-              - 'app/shared/src/workbench/**'
+              - 'app/workbench/**'
               - 'app/shared/src/styles/**'
               - 'app/shared/src/theme*.ts'
               - 'app/shared/src/themePresets.*'
@@ -827,14 +829,15 @@ jobs:
               - 'app/package.json'
               - 'app/pnpm-lock.yaml'
               - '.github/workflows/checks.yml'
-            # frontend = desktop ∪ web ∪ shared (coverage gate + vuln-scan-js
-            # trigger). Splits the heavy vitest coverage job out of the
-            # unconditional validate lane so a Go-only PR no longer pays for
-            # pnpm install + coverage.
+            # frontend = desktop ∪ web ∪ shared ∪ workbench (coverage gate +
+            # vuln-scan-js trigger). Splits the heavy vitest coverage job out
+            # of the unconditional validate lane so a Go-only PR no longer
+            # pays for pnpm install + coverage.
             frontend:
               - 'app/desktop/**'
               - 'app/web/**'
               - 'app/shared/**'
+              - 'app/workbench/**'
               - 'app/package.json'
               - 'app/pnpm-lock.yaml'
               - 'app/test-config/**'
@@ -1420,6 +1423,12 @@ jobs:
       - name: Verify Shared Edge-free boundary
         run: python ./scripts/verify/verify-shared-boundary.py
 
+      - name: Verify frontend package boundary (workbench -> shared only, #1759)
+        run: python ./scripts/verify/verify-frontend-package-boundary.py
+
+      - name: Self-test frontend package boundary gate (negative)
+        run: python scripts/verify/tests/verify-frontend-package-boundary.Tests.py
+
       - name: Verify Shared barrel Edge-export ban
         run: python ./scripts/verify/verify-shared-barrel.py
 
@@ -1496,7 +1505,7 @@ jobs:
       # The negative include-contract self-test (mobile vitest run) executes
       # once, on the mobile leg.
       matrix:
-        package: ['@agenthub/shared', 'agenthub-web', 'agenthub-desktop', 'agenthub-mobile-rn']
+        package: ['@agenthub/shared', '@agenthub/workbench', 'agenthub-web', 'agenthub-desktop', 'agenthub-mobile-rn']
     steps:
       - uses: actions/checkout@v7
         with:

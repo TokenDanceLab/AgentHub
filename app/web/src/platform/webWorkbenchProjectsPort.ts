@@ -1,8 +1,8 @@
 import type {
   WorkbenchProjectsPage,
   WorkbenchProjectsPort,
-} from '@shared/workbench';
-import { workspaceProjectToProjectInfo } from '@shared/workbench/hubDataMapping';
+} from '@agenthub/workbench';
+import { workspaceProjectToProjectInfo } from '@agenthub/workbench/hubDataMapping';
 import { createHubClient } from '@/api/hubClient';
 import { getAccessToken } from '@/hooks/useAuth';
 import { projectDraftToHubRequest } from './webWorkbenchProjects';

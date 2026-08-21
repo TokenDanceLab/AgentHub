@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { CHATVIEW_I18N_NAMESPACE } from '@shared/chatview/i18n/resources';
-import type { ProjectDraft } from '@shared/workbench';
+import type { ProjectDraft } from '@agenthub/workbench';
 import {
   getWorkbenchDataModeContract,
   getWorkbenchDataModeOverrideSnapshot,
@@ -12,7 +12,7 @@ import {
 import {
   resolveHubContacts,
   type HubContactLike,
-} from '@shared/workbench/hubDataMapping';
+} from '@agenthub/workbench/hubDataMapping';
 import {
   getAgentActivityStore,
   getPinMapStore,
@@ -712,6 +712,6 @@ export {
   type WebExecutionTargetStatus,
   type WebExecutionTargetStatusState,
 } from './webWorkbenchExecutionTargets';
-export { hubEmptyContacts as webHubEmptyContacts } from '@shared/workbench/hubDataMapping';
-export { contactInfoToMember } from '@shared/workbench/hubDataMapping';
-export { resolveHubContacts as resolveWebWorkbenchContacts } from '@shared/workbench/hubDataMapping';
+export { hubEmptyContacts as webHubEmptyContacts } from '@agenthub/workbench/hubDataMapping';
+export { contactInfoToMember } from '@agenthub/workbench/hubDataMapping';
+export { resolveHubContacts as resolveWebWorkbenchContacts } from '@agenthub/workbench/hubDataMapping';

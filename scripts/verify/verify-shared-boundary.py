@@ -21,9 +21,10 @@ for _ in range(4):
 else:
     raise RuntimeError("cannot locate AgentHub repository root")
 
-# 三端共同消费的 shared 子树，必须保持 Edge-free
+# 三端共同消费的 shared/workbench 子树，必须保持 Edge-free
+# （#1759 第二阶段起 workbench 独立为 app/workbench 包）
 SCAN_DIRS = [
-    "app/shared/src/workbench",
+    "app/workbench/src",
     "app/shared/src/chatview",
     "app/shared/src/ui",
 ]
@@ -119,7 +120,7 @@ def main() -> int:
                     defect_notes += 1
                     print(f"  KNOWN DEFECT  {label} in {rel}:{index + 1} — {reason}")
                 else:
-                    tree = re.sub(r"^app/shared/src/", "", rel, flags=re.IGNORECASE)
+                    tree = re.sub(r"^app/(?:shared|workbench)/src/", "", rel, flags=re.IGNORECASE)
                     tree = re.sub(r"/.*$", "", tree, flags=re.IGNORECASE)
                     fail_line(f"{label} found in {rel}:{index + 1} — Edge client must not leak into shared {tree}")
 

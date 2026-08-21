@@ -253,32 +253,6 @@ export type {
 } from './eventClient';
 
 export {
-  createWorkbenchState,
-  initialWorkbenchState,
-  workbenchReducer,
-} from './workbench/workbenchState';
-export type {
-  WorkbenchAction,
-  WorkbenchConnectionStatus,
-  WorkbenchSnapshot,
-  WorkbenchState,
-} from './workbench/workbenchState';
-export {
-  getWorkbenchCatalogState,
-  getWorkbenchDataMode,
-  getWorkbenchSectionSource,
-  workbenchDataModeLabels,
-  workbenchDataModeTones,
-} from './workbench/workbenchDataMode';
-export type {
-  WorkbenchCatalogState,
-  WorkbenchCatalogTone,
-  WorkbenchCatalogMode,
-  WorkbenchSectionSource,
-  WorkbenchSectionSourceInput,
-} from './workbench/workbenchDataMode';
-
-export {
   SURFACE_METADATA,
   SURFACE_STATUS_METADATA,
   getSurfaceByDesktopSectionId,
@@ -403,20 +377,3 @@ export type {
   TranscriptAuthorRole,
   TranscriptBlock,
 } from './transcript';
-
-export {
-  AgentHubWorkbench,
-  ConversationSidebar,
-  GlobalRail,
-  RightInspector,
-  UnifiedComposer,
-  WorkspaceHeader,
-  agentConfigToAgentSpecFixture,
-} from './workbench';
-export type {
-  AgentHubWorkbenchProps,
-  ConversationSidebarProps,
-  RightInspectorProps,
-  UnifiedComposerProps,
-  WorkspaceHeaderProps,
-} from './workbench';

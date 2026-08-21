@@ -36,6 +36,7 @@
   },
   "dependencies": {
     "@agenthub/shared": "workspace:*",
+    "@agenthub/workbench": "workspace:*",
     "@lobehub/icons": "^5.10.0",
     "@tanstack/react-query": "^5.101.4",
     "@tauri-apps/api": "^2.11.1",

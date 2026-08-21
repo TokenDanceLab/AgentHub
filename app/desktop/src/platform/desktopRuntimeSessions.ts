@@ -1,4 +1,4 @@
-import type { RuntimeSessionImportItem } from '@shared/workbench';
+import type { RuntimeSessionImportItem } from '@agenthub/workbench';
 
 /**
  * Desktop host: Edge GET /v1/runtime-sessions via typed fetch.

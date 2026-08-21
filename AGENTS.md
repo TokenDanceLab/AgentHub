@@ -19,7 +19,7 @@
 | 目录 | 分类 | 职责 |
 |---|---|---|
 | `api/` | 活 | API 契约 SSOT（openapi.yaml/events.md/conventions.md） |
-| `app/` | 活 | 前端 monorepo（web/desktop/mobile-rn/shared） |
+| `app/` | 活 | 前端 monorepo（web/desktop/mobile-rn/shared/workbench） |
 | artifacts/ dist/ tmp/ | 产物 | 本地构建/临时输出（gitignored） |
 | `docs/` | 活 | 知识库（architecture/governance/reference/archives） |
 | `edge-server/` | 活 | Go Edge 服务（local runtime、adapters、lifecycle） |
@@ -62,7 +62,7 @@ Mobile 主线是 Expo + React Native development build。旧 Tauri Mobile 不再
 共享边界：
 
 - API 契约写在 `api/`。
-- 通用 UI、transcript、composer、inspector、platform contract 放 `app/shared/`。
+- 通用 UI、transcript、composer、inspector、platform contract 放 `app/shared/`；端级 workbench shell 放 `app/workbench/`（`@agenthub/workbench`，依赖方向 workbench → shared 单向，#1759）。
 - Hub REST/WS 方法与 DTO 的 SSOT 是 `app/shared/src/hub/hubClient.ts`（及拆出的 payload/extended 模块）。Desktop/Web/Mobile 的 `app/{desktop,web,mobile-rn}/src/api/hubClient.ts` 只能是 thin shell（平台默认 baseUrl、Tauri proxy、SecureStore token、fixture snapshot、WS URL 等胶水）；禁止在客户端再分叉 REST 实现。
 - Desktop 只能把 Tauri/Rust native 能力放在 `app/desktop/src-tauri/`。
 - Web 只能通过 Hub/Web adapter 访问远端能力，不能直连 Local Edge 或 runtime。

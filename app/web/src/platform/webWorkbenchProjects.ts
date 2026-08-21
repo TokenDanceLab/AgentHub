@@ -1,4 +1,4 @@
-import type { ProjectDraft, ProjectInfo } from '@shared/workbench';
+import type { ProjectDraft, ProjectInfo } from '@agenthub/workbench';
 import type { WorkbenchDataMode } from '@shared/demo';
 import {
   getWorkbenchDataModeContract,

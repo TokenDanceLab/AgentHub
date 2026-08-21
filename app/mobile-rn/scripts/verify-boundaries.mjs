@@ -40,6 +40,9 @@ const forbiddenImportFragments = [
   '.module.css',
   '@agenthub/shared/ui',
   '@agenthub/shared/workbench',
+  // #1759：workbench 独立成包后 Mobile 同样不得依赖（Hub-only，
+  // bundle 不得包含端级 workbench 巨石）。
+  '@agenthub/workbench',
 ];
 
 const forbiddenRuntimePatterns = [
