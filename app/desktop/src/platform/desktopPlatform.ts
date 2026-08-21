@@ -20,19 +20,28 @@ import type { EvidenceRef } from '@shared/transcript';
 import type { TranscriptBlock } from '@shared/transcript';
 import type { RunInfo, StartRunRequest } from '@shared/types';
 import { createHubClient } from '@/api/hubClient';
+import { applyAllRunDiffs, applyRunDiff } from '@/api/edgeClient';
 import { edgeAuthHeaders } from '@/api/edgeAuth';
 import { getAccessToken } from '@/hooks/useAuth';
 import { getEdgeBaseUrl } from '@/config';
-import { fetchRuntimeSessions } from '@shared/workbench';
+import { fetchDesktopRuntimeSessions } from './desktopRuntimeSessions';
 import { pickDesktopComposerAttachments } from './desktopAttachments';
-import { canOpenDesktopEvidencePreview, openDesktopEvidencePreview } from './desktopPreview';
+import {
+  canOpenDesktopEvidencePreview,
+  openDesktopEvidencePreview,
+  resolveDesktopEvidenceContentUrl,
+  resolveDesktopRuntimeEvidenceContent,
+} from './desktopPreview';
 import { resolveDesktopTargetPreference, type DesktopTargetPreference } from './targetPreference';
 import { createDesktopSettingsAdapter } from './desktopSettingsAdapter';
 
 export const DESKTOP_FALLBACK_CONVERSATION_ID = WORKBENCH_DEMO_FALLBACK_CONVERSATION_ID;
-export const desktopConversations: WorkbenchConversation[] = workbenchDemoRuntimeStore.getSnapshot().conversations;
+export const desktopConversations: WorkbenchConversation[] =
+  workbenchDemoRuntimeStore.getSnapshot().conversations;
 export const desktopAgents: WorkbenchAgent[] = demoWorkbenchAgents;
-export const desktopTranscript: TranscriptBlock[] = resolveDemoWorkbenchTranscript(DESKTOP_FALLBACK_CONVERSATION_ID);
+export const desktopTranscript: TranscriptBlock[] = resolveDemoWorkbenchTranscript(
+  DESKTOP_FALLBACK_CONVERSATION_ID,
+);
 
 export function resolveDesktopPreviewTranscript(conversationId: string): TranscriptBlock[] {
   return workbenchDemoRuntimeStore.resolveTranscript(conversationId);
@@ -176,6 +185,28 @@ export function createDesktopPlatform(options: DesktopPlatformOptions = {}): Des
     preview: {
       canOpenEvidence: canOpenDesktopEvidencePreview,
       openEvidence: options.openPreview ?? openDesktopEvidencePreview,
+      // Interactive diff write-back goes through the Local Edge apply endpoints
+      // (#1817). Desktop owns the Edge connection, so it owns this port leg.
+      async applyRunDiff(input) {
+        await applyRunDiff(input.runId, {
+          filePath: input.decision.filePath,
+          hunkIndex: input.decision.hunkIndex,
+          accepted: input.decision.accepted,
+          workDir: input.workDir,
+        });
+      },
+      async applyAllRunDiffs(input) {
+        await applyAllRunDiffs(input.runId, {
+          decisions: input.decisions.map((decision) => ({
+            filePath: decision.filePath,
+            hunkIndex: decision.hunkIndex,
+            accepted: decision.accepted,
+          })),
+          workDir: input.workDir,
+        });
+      },
+      resolveContentUrl: resolveDesktopEvidenceContentUrl,
+      resolveRuntimeEvidenceContent: resolveDesktopRuntimeEvidenceContent,
     },
     settings: createDesktopSettingsAdapter(),
     // exactOptionalPropertyTypes: omit key when undefined rather than assign undefined.
@@ -190,7 +221,11 @@ export function createDesktopPlatform(options: DesktopPlatformOptions = {}): Des
           const run = await options.submitRun({
             projectId: options.activeProjectId,
             threadId: options.activeThreadId,
-            prompt: formatComposerPromptWithContext(intent.text, intent.attachments, intent.mentions),
+            prompt: formatComposerPromptWithContext(
+              intent.text,
+              intent.attachments,
+              intent.mentions,
+            ),
             ...edgeSelectedAgent(intent),
             ...edgePermissionMode(intent),
             ...edgeWorkDir(intent),
@@ -224,7 +259,7 @@ export function readLocalCliDiscovery(): Promise<LocalCliDiscoveryManifest> {
 
 /** Desktop host: Edge GET /v1/runtime-sessions via typed fetch (no foreign store). */
 export async function readRuntimeSessions(limit = 50): Promise<RuntimeSessionSummary[]> {
-  return fetchRuntimeSessions({
+  return fetchDesktopRuntimeSessions({
     edgeBaseUrl: getEdgeBaseUrl(),
     limit,
     fetchImpl: async (input, init) => {
@@ -238,7 +273,8 @@ export async function readRuntimeSessions(limit = 50): Promise<RuntimeSessionSum
 }
 
 function edgeSelectedAgent(intent: ComposerIntent): Pick<StartRunRequest, 'agentId' | 'model'> {
-  const mention = intent.mentions.find((item) => item.status !== 'unavailable') ?? intent.mentions[0];
+  const mention =
+    intent.mentions.find((item) => item.status !== 'unavailable') ?? intent.mentions[0];
   if (!mention) return {};
   return {
     agentId: mention.runtimeId?.trim() || mention.id,

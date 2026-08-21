@@ -1,8 +1,7 @@
 import React from 'react';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { SessionImportList } from './SessionImportList';
-import { fetchRuntimeSessions } from './fetchRuntimeSessions';
 
 describe('SessionImportList', () => {
   it('renders runtime, title, updatedAt, and import mode badge', () => {
@@ -17,7 +16,7 @@ describe('SessionImportList', () => {
             sourceMode: 'import',
           },
         ]}
-      />,
+      />
     );
     expect(screen.getByText('sess-a')).toBeTruthy();
     expect(screen.getByText('claude-code')).toBeTruthy();
@@ -42,41 +41,8 @@ describe('SessionImportList', () => {
           },
         ]}
         sourceModeLabel={() => '观察模式'}
-      />,
+      />
     );
     expect(screen.getByText('观察模式')).toBeTruthy();
-  });
-});
-
-describe('fetchRuntimeSessions', () => {
-  it('unwraps Edge success envelope', async () => {
-    const fetchImpl = vi.fn(async () => ({
-      ok: true,
-      json: async () => ({
-        code: 'OK',
-        data: {
-          items: [
-            {
-              id: 'a',
-              runtime: 'claude-code',
-              title: 'a',
-              sourceMode: 'import',
-              updatedAt: '2026-07-19T01:00:00Z',
-            },
-          ],
-        },
-      }),
-    })) as unknown as typeof fetch;
-
-    const items = await fetchRuntimeSessions({
-      edgeBaseUrl: 'http://127.0.0.1:3210',
-      limit: 5,
-      fetchImpl,
-    });
-    expect(items).toHaveLength(1);
-    expect(items[0]?.sourceMode).toBe('import');
-    expect(fetchImpl).toHaveBeenCalledWith(
-      'http://127.0.0.1:3210/v1/runtime-sessions?limit=5',
-    );
   });
 });

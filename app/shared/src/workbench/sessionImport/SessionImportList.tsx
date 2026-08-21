@@ -16,7 +16,8 @@ function defaultSourceLabel(mode: string | undefined): string {
 
 /**
  * Presentational list of local runtime session summaries (#1183).
- * Data is supplied by host (Edge GET /v1/runtime-sessions); no foreign store mutation.
+ * Data is supplied by the host via `HostDiagnosticsPort.listRuntimeSessions`;
+ * no foreign store mutation.
  */
 export function SessionImportList({
   items,
@@ -26,14 +27,20 @@ export function SessionImportList({
 }: SessionImportListProps): React.ReactElement {
   if (!items.length) {
     return (
-      <div className={[styles.root, className].filter(Boolean).join(' ')} data-testid="session-import-list">
+      <div
+        className={[styles.root, className].filter(Boolean).join(' ')}
+        data-testid="session-import-list"
+      >
         <div className={styles.empty}>{emptyLabel}</div>
       </div>
     );
   }
 
   return (
-    <ul className={[styles.root, className].filter(Boolean).join(' ')} data-testid="session-import-list">
+    <ul
+      className={[styles.root, className].filter(Boolean).join(' ')}
+      data-testid="session-import-list"
+    >
       {items.map((item) => (
         <li key={`${item.runtime}:${item.id}`} className={styles.row}>
           <div className={styles.title}>{item.title || item.id}</div>

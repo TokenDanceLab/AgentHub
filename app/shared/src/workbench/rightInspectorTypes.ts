@@ -1,4 +1,5 @@
 import type { RuntimeEvidenceSnapshot } from '../inspector';
+import type { PreviewPort } from '../platform';
 import type {
   ChildAgentTranscriptBlock,
   ContextUsageTranscriptBlock,
@@ -23,6 +24,12 @@ export interface RightInspectorProps {
   maxWidth: number;
   minWidth: number;
   onOpenPreview?: ((evidence: EvidenceRef) => Promise<void>) | undefined;
+  /**
+   * Platform preview port (diff hunk write-back + evidence content-URL
+   * resolution) for the file preview router (#1817). Absent capabilities
+   * degrade to explicit read-only notices.
+   */
+  previewPort?: PreviewPort | undefined;
   reviewFileRequest?: FileItem | null | undefined;
   runtimeEvidence?: RuntimeEvidenceSnapshot | undefined;
   /** Workspace directory for the active run — required for diff apply write-back. */

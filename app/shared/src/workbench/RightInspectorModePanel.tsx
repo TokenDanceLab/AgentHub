@@ -1,5 +1,6 @@
 import React from 'react';
 import type { RuntimeEvidenceSnapshot } from '../inspector';
+import type { PreviewPort } from '../platform';
 import type { EvidenceRef, ContextUsageTranscriptBlock } from '../transcript';
 import {
   BrowserModeBody,
@@ -39,6 +40,8 @@ export interface RightInspectorModePanelProps {
   deployStatus: 'pending' | 'building' | 'deploying' | 'deployed' | 'failed' | undefined;
   files: EvidenceRef[];
   previewFile: PreviewFile | null;
+  /** Platform preview port for the file preview router (#1817). */
+  previewPort?: PreviewPort | undefined;
   onFileClick: (file: FileItem) => void;
   onClosePreview: () => void;
   onOpenPreview: ((evidence: EvidenceRef) => Promise<void>) | undefined;
@@ -64,6 +67,7 @@ export function RightInspectorModePanel({
   deployStatus,
   files,
   previewFile,
+  previewPort,
   onFileClick,
   onClosePreview,
   onOpenPreview,
@@ -109,6 +113,7 @@ export function RightInspectorModePanel({
           files={files}
           overviewFiles={overviewFiles}
           previewFile={previewFile}
+          previewPort={previewPort}
           runtimeEvidence={runtimeEvidence}
           onClose={onClosePreview}
           onFallbackFileClick={onFileClick}

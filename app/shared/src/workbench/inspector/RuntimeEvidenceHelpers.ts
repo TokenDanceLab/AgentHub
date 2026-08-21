@@ -1,4 +1,5 @@
 import type { RuntimeEvidenceSnapshot } from '../../inspector';
+import type { RuntimeEvidenceContentRef } from '../../platform';
 import type { FileDiff } from '../../types/chat';
 import type { PreviewFile } from './FilePreviewRouter';
 import type { TaskItem } from './OverviewPanel';
@@ -17,7 +18,10 @@ export function runtimeEvidenceOverviewTasks(runtimeEvidence: RuntimeEvidenceSna
     tasks.push({ label: `跟随 ${runtimeEvidence.runId}`, status: 'active' });
   }
   if (runtimeEvidence.artifacts.length > 0) {
-    tasks.push({ label: `Hub replay artifact index: ${runtimeEvidence.artifacts.length}`, status: 'done' });
+    tasks.push({
+      label: `Hub replay artifact index: ${runtimeEvidence.artifacts.length}`,
+      status: 'done',
+    });
   }
   if (runtimeEvidence.diffs.length > 0) {
     tasks.push({ label: `Diff snapshot: ${runtimeEvidence.diffs.length}`, status: 'done' });
@@ -25,24 +29,30 @@ export function runtimeEvidenceOverviewTasks(runtimeEvidence: RuntimeEvidenceSna
   if (runtimeEvidence.previews.length > 0) {
     tasks.push({ label: `Preview index: ${runtimeEvidence.previews.length}`, status: 'done' });
   }
-  return tasks.length > 0
-    ? tasks
-    : [{ label: '等待 Hub replay evidence', status: 'todo' }];
+  return tasks.length > 0 ? tasks : [{ label: '等待 Hub replay evidence', status: 'todo' }];
 }
 
-export function runtimeEvidenceOverviewFiles(runtimeEvidence: RuntimeEvidenceSnapshot): PreviewFile[] {
+export function runtimeEvidenceOverviewFiles(
+  runtimeEvidence: RuntimeEvidenceSnapshot
+): PreviewFile[] {
   return [
     ...runtimeEvidence.artifacts.map((artifact) => {
       const artifactRunId = artifact.runId || runtimeEvidence.runId;
-      const artifactContentUrl = artifactRunId
-        ? `/v1/runs/${artifactRunId}/artifacts/${artifact.id}/content`
-        : undefined;
       return {
         name: artifact.path,
         type: artifact.kind,
         isPrimary: true,
         owner: 'Hub replay',
-        content: artifactContentUrl ?? [
+        // Host-owned content endpoint ref (Desktop resolves it against the
+        // Local Edge); shared never constructs host REST paths.
+        contentRef: artifactRunId
+          ? ({
+              kind: 'artifact',
+              runId: artifactRunId,
+              id: artifact.id,
+            } satisfies RuntimeEvidenceContentRef)
+          : undefined,
+        content: [
           `# ${artifact.path}`,
           '',
           `- Run: ${artifact.runId || runtimeEvidence.runId || 'unknown'}`,
@@ -64,21 +74,31 @@ export function runtimeEvidenceOverviewFiles(runtimeEvidence: RuntimeEvidenceSna
     })),
     ...runtimeEvidence.previews.map((preview) => {
       const previewRunId = preview.runId || runtimeEvidence.runId;
-      const previewContentUrl = preview.url || (previewRunId
-        ? `/v1/runs/${previewRunId}/previews/${preview.id}/content`
-        : undefined);
+      const hasDisplayableUrl = Boolean(preview.url);
       return {
         name: preview.url || preview.id,
         type: 'preview',
         owner: 'Hub replay',
-        content: previewContentUrl ?? [
-          `# Preview ${preview.id}`,
-          '',
-          `- Run: ${preview.runId || runtimeEvidence.runId || 'unknown'}`,
-          `- Status: ${preview.status}`,
-          `- URL: ${preview.url || 'not available'}`,
-          `- Created: ${preview.createdAt || 'unknown'}`,
-        ].join('\n'),
+        // Same host-owned ref contract as artifacts; previews with their own
+        // URL display that URL directly and need no endpoint resolution.
+        contentRef:
+          !hasDisplayableUrl && previewRunId
+            ? ({
+                kind: 'preview',
+                runId: previewRunId,
+                id: preview.id,
+              } satisfies RuntimeEvidenceContentRef)
+            : undefined,
+        content:
+          preview.url ??
+          [
+            `# Preview ${preview.id}`,
+            '',
+            `- Run: ${preview.runId || runtimeEvidence.runId || 'unknown'}`,
+            `- Status: ${preview.status}`,
+            `- URL: ${preview.url || 'not available'}`,
+            `- Created: ${preview.createdAt || 'unknown'}`,
+          ].join('\n'),
       };
     }),
   ];
@@ -91,7 +111,7 @@ export function runtimeEvidenceOverviewKicker(runtimeEvidence: RuntimeEvidenceSn
 export function runtimeDiffPreviewFile(
   file: FileDiff,
   runId: string | undefined,
-  workDir: string | undefined,
+  workDir: string | undefined
 ): PreviewFile {
   return {
     name: file.filePath,
@@ -102,7 +122,7 @@ export function runtimeDiffPreviewFile(
       'Artifact content/apply/discard are not available in this inspector slice.',
     ].join('\n'),
     diffContent: fileDiffToText(file),
-    interactiveDiff: (runId && workDir) ? { runId, fileDiff: file, workDir } : undefined,
+    interactiveDiff: runId && workDir ? { runId, fileDiff: file, workDir } : undefined,
   };
 }
 
@@ -128,7 +148,7 @@ export function diffMeta(file: FileDiff): string {
 }
 
 export function artifactWorkspacePreviewStatus(
-  previews: RuntimeEvidenceSnapshot['previews'],
+  previews: RuntimeEvidenceSnapshot['previews']
 ): string {
   const readyPreview = previews.find((preview) => preview.status === 'ready');
   return readyPreview?.status ?? previews[0]?.status ?? 'none';
@@ -139,14 +159,14 @@ export function artifactWorkspaceDiffLabel(diffCount: number): string {
 }
 
 export function artifactWorkspaceTopic(
-  artifact: RuntimeEvidenceSnapshot['artifacts'][number],
+  artifact: RuntimeEvidenceSnapshot['artifacts'][number]
 ): string {
   return artifact.threadId || 'unknown';
 }
 
 export function artifactWorkspaceVersion(
   artifact: RuntimeEvidenceSnapshot['artifacts'][number],
-  runId: string | undefined,
+  runId: string | undefined
 ): string {
   return artifact.runId || runId || 'unknown';
 }

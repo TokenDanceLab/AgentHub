@@ -39,18 +39,6 @@ FORBIDDEN_PATTERNS = [
 
 # 已知缺陷 allowlist：文件 + 豁免模式 + 原因（向 allowlist 文件加入非豁免模式仍 FAIL）
 KNOWN_DEFECTS = {
-    "app/shared/src/workbench/inspector/FilePreviewRouter.tsx": (
-        {"/v1/runs"},
-        "local Edge REST helpers + comment /v1/runs — drift, route via PreviewPort (audit-A P)",
-    ),
-    "app/shared/src/workbench/inspector/RuntimeEvidenceHelpers.ts": (
-        {"/v1/runs"},
-        "constructs Edge content paths /v1/runs/.../content — known Edge-path coupling",
-    ),
-    "app/shared/src/workbench/inspector/RuntimeEvidenceHelpers.test.ts": (
-        {"/v1/runs"},
-        "test data with Edge content paths",
-    ),
     "app/shared/src/ui/DiffReviewPanelTypes.ts": (
         {"/v1/runs"},
         "comment mentions Edge POST /v1/runs/:id/apply (doc only)",

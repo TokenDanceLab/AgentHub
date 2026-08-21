@@ -1,6 +1,11 @@
-import type { RuntimeSessionImportItem } from './types';
+import type { RuntimeSessionImportItem } from '@shared/workbench';
 
-export type FetchRuntimeSessionsOptions = {
+/**
+ * Desktop host: Edge GET /v1/runtime-sessions via typed fetch.
+ * The Edge REST path lives on the Desktop platform adapter only — shared
+ * code consumes this data through `HostDiagnosticsPort.listRuntimeSessions`.
+ */
+export type FetchDesktopRuntimeSessionsOptions = {
   edgeBaseUrl: string;
   limit?: number;
   fetchImpl?: typeof fetch;
@@ -11,11 +16,8 @@ type Envelope = {
   items?: RuntimeSessionImportItem[];
 };
 
-/**
- * Fetch local runtime session summaries from Edge GET /v1/runtime-sessions.
- */
-export async function fetchRuntimeSessions(
-  opts: FetchRuntimeSessionsOptions,
+export async function fetchDesktopRuntimeSessions(
+  opts: FetchDesktopRuntimeSessionsOptions,
 ): Promise<RuntimeSessionImportItem[]> {
   const fetchImpl = opts.fetchImpl ?? fetch;
   const base = opts.edgeBaseUrl.replace(/\/$/, '');

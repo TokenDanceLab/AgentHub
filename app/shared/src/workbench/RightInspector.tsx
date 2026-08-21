@@ -45,6 +45,7 @@ export function RightInspector({
   maxWidth,
   minWidth,
   onOpenPreview,
+  previewPort,
   reviewFileRequest,
   runtimeEvidence,
   workDir,
@@ -196,6 +197,7 @@ export function RightInspector({
         overviewFiles={overviewFiles}
         overviewTasks={overviewTasks}
         previewFile={previewFile}
+        previewPort={previewPort}
         runResult={runResult}
         runtimeEvidence={runtimeEvidence}
         visibleTabs={visibleTabs}

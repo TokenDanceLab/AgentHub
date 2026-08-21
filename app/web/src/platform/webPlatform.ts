@@ -20,7 +20,7 @@ import {
   type SendMessageResponse,
 } from '@/api/hubClient';
 import { getAccessToken } from '@/hooks/useAuth';
-import { canOpenWebEvidencePreview, openWebEvidencePreview } from './webPreview';
+import { canOpenWebEvidencePreview, openWebEvidencePreview, resolveWebEvidenceContentUrl } from './webPreview';
 import { createWebSettingsAdapter } from './webSettingsAdapter';
 import { recordWebAgentTaskIndex } from './webPlatformAgentTask';
 import {
@@ -124,6 +124,11 @@ export function createWebPlatform(options: WebPlatformOptions = {}): AgentHubPla
     preview: {
       canOpenEvidence: canOpenWebEvidencePreview,
       openEvidence: openWebEvidencePreview,
+      resolveContentUrl: resolveWebEvidenceContentUrl,
+      // applyRunDiff / applyAllRunDiffs are intentionally omitted (#1817):
+      // Web is Hub-only and has no Local Edge write-back path. The omission
+      // IS the unsupported contract — the inspector renders an explicit
+      // read-only review notice and a warning toast on apply attempts.
     },
     attachments: {
       async pickFiles(): Promise<never[]> {
