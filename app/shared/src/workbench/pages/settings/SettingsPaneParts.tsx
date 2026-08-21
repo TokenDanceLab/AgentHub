@@ -22,9 +22,10 @@ import {
   statePanelIconName,
   statePanelKindClassName,
 } from './SettingsPaneHelpers';
-import type { SettingsPageProps, StatePanelKind } from './types';
+import type { StatePanelKind } from './types';
 import { useTranslation } from 'react-i18next';
 import { CHATVIEW_I18N_NAMESPACE } from '../../../chatview/i18n/resources';
+import { SHARED_WORKBENCH_I18N_NAMESPACE } from '../../../i18n';
 
 /* ═══════════════════════════════════════════════════════════════════════
    SettingsPaneParts — presentational residual slices from SettingsPanes
@@ -108,6 +109,11 @@ interface StatePanelProps {
   copy: string;
   actionLabel: string;
   onAction?: (() => void) | undefined;
+  /**
+   * Preview-only panels have no real action behind the button; disabling it
+   * keeps the sample honest (#1818).
+   */
+  actionDisabled?: boolean | undefined;
 }
 
 export function StatePanel({
@@ -117,6 +123,7 @@ export function StatePanel({
   copy,
   actionLabel,
   onAction,
+  actionDisabled = false,
 }: StatePanelProps): React.ReactElement {
   const kindClass = statePanelKindClassName(kind, styles);
   const stateIcon = statePanelIconName(kind);
@@ -138,7 +145,7 @@ export function StatePanel({
       </div>
       <h3>{title}</h3>
       <p>{copy}</p>
-      <button type="button" onClick={onAction}>{actionLabel}</button>
+      <button disabled={actionDisabled} type="button" onClick={onAction}>{actionLabel}</button>
     </article>
   );
 }
@@ -180,27 +187,27 @@ export function AgentConfigLink({
 
 /* ── State preview grid ── */
 
-export function StatePreviewSection({
-  onChangeSetting,
-}: {
-  onChangeSetting: SettingsPageProps['onChangeSetting'];
-}): React.ReactElement {
+export function StatePreviewSection(): React.ReactElement {
+  const { t: tw } = useTranslation(SHARED_WORKBENCH_I18N_NAMESPACE);
   return (
     <section className={`${styles.stateSystem} state-system settings-state-system`}>
       <div className={`${styles.sectionTitleRow} section-title-row`}>
         <h2>状态组件预览</h2>
         <span>Design System</span>
       </div>
+      {/* Sample panels only demonstrate state styling; their action buttons
+          are disabled because no real action is wired (#1818). */}
+      <p className={styles.statePreviewNote}>{tw('settings.statePreviewNote')}</p>
       <div className={`${styles.stateGrid} state-grid`}>
         {STATE_PREVIEW_SPECS.map((spec) => (
           <StatePanel
+            actionDisabled
             key={spec.kind}
             kind={spec.kind}
             label={spec.label}
             title={spec.title}
             copy={spec.copy}
             actionLabel={spec.actionLabel}
-            onAction={() => onChangeSetting(spec.actionKey, spec.actionLabel)}
           />
         ))}
       </div>

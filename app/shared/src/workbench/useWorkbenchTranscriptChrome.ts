@@ -33,7 +33,8 @@ export interface UseWorkbenchTranscriptChromeOptions {
   onRegenerate?: ((blockId: string) => void) | undefined;
   /**
    * Hub session id for REST message actions (#1383). Optional — Desktop/demo
-   * shells omit it and pin/unpin/react keep the placeholder toast.
+   * shells omit it; the react/pin/unpin/recall menu entries are then hidden
+   * instead of faking a success toast (#1818).
    */
   sessionId?: string | null | undefined;
   onPinMessage?: ((messageId: string, sessionId: string) => Promise<void> | void) | undefined;

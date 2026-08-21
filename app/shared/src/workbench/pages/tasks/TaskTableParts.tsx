@@ -236,12 +236,29 @@ export function TaskGroupTitle({
 
 export function TaskTableEmptyState({
   emptyStateLabel,
+  comingSoon = false,
   onAddRow,
 }: {
   emptyStateLabel?: string | undefined;
+  /**
+   * Honest empty state for real data mode (#1818): the task backend is not
+   * connected yet, so say so explicitly and offer no create action.
+   */
+  comingSoon?: boolean | undefined;
   onAddRow?: (() => void) | undefined;
 }) {
   const { t } = useTranslation(SHARED_WORKBENCH_I18N_NAMESPACE);
+
+  if (comingSoon) {
+    return (
+      <EmptyState
+        description={t('tasks.emptyComingSoon.description')}
+        title={t('tasks.emptyComingSoon.title')}
+        titleLevel={3}
+        {...taskEmptyStateClassProps()}
+      />
+    );
+  }
 
   return (
     <EmptyState

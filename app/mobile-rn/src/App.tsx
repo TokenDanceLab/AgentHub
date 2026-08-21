@@ -419,12 +419,59 @@ function MobileAppContent({ preview }: { preview: PreviewOptions }): React.React
         tabRailPlacement={useInlineTabRail ? 'inlinePane' : 'bottom'}
         unreadThreads={counters.unreadThreads}
       >
+        {/* The mobile build is fixture-driven end to end; the banner keeps
+            the demo identity explicit instead of implying a live workspace
+            (#1818). */}
+        <FixturePreviewBanner />
         {localPreviewEnabled && localPreviewPhase === 'unavailable' ? (
           <PreviewUnavailableBanner onRetry={retryPreviewSnapshot} />
         ) : null}
         {content[activeTab]}
       </AppShell>
     </>
+  );
+}
+
+function FixturePreviewBanner(): React.ReactElement {
+  const { tokens } = useAgentHubTheme();
+  const t = useStrings();
+
+  return (
+    <View
+      accessibilityLabel={t.fixturePreviewBannerTitle}
+      style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: tokens.space.sm,
+        borderBottomWidth: 1,
+        borderBottomColor: tokens.color.line,
+        backgroundColor: tokens.color.tint,
+        paddingHorizontal: tokens.space.md,
+        paddingVertical: tokens.space.xs,
+      }}
+      testID="fixture-preview-banner"
+    >
+      <AgentHubIcon color={tokens.color.accent} name="shield" size={14} />
+      <View style={{ flex: 1, minWidth: 0 }}>
+        <Text
+          numberOfLines={1}
+          style={{
+            color: tokens.color.ink,
+            fontSize: tokens.type.xs,
+            fontWeight: tokens.type.weight.semibold,
+            lineHeight: tokens.type.lineHeight.xs,
+          }}
+        >
+          {t.fixturePreviewBannerTitle}
+        </Text>
+        <Text
+          numberOfLines={2}
+          style={{ color: tokens.color.inkMuted, fontSize: tokens.type.xs, lineHeight: tokens.type.lineHeight.xs }}
+        >
+          {t.fixturePreviewBannerDescription}
+        </Text>
+      </View>
+    </View>
   );
 }
 

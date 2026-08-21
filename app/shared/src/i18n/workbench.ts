@@ -94,8 +94,6 @@ export const sharedWorkbenchResources = {
       copy: '复制',
       copyLink: '复制消息链接',
       forward: '转发',
-      addTask: '添加任务',
-      exportDoc: '导出文档',
       delete: '删除',
       close: '关闭',
       backToOverview: '返回概览',
@@ -104,9 +102,6 @@ export const sharedWorkbenchResources = {
       settings: { label: '设置', title: '设置' },
       toggleTheme: { label: '切换主题', title: '切换主题' },
       account: {
-        myCard: '我的个人名片',
-        myQrAndLink: '我的二维码与链接',
-        addAccount: '登录更多账号',
         logout: '退出登录',
         currentUser: '当前用户',
       },
@@ -145,6 +140,8 @@ export const sharedWorkbenchResources = {
         localSessionImport: '本地会话导入',
         statePolicy: '状态策略',
       },
+      comingSoon: '即将支持',
+      statePreviewNote: '以下卡片仅预览状态样式，操作按钮暂未接入。',
       loadFailed: '设置加载失败',
     },
     projects: {
@@ -263,6 +260,11 @@ export const sharedWorkbenchResources = {
       newTask: '新建任务',
       status: { pending: '待执行', active: '进行中', done: '已完成', failed: '失败', cancelled: '已取消' },
       empty: { title: '暂无任务', description: '创建任务分派给 Agent 队友' },
+      emptyComingSoon: {
+        title: '任务列表即将接入',
+        description: '真实任务数据源尚未接入，当前没有可展示的任务。',
+      },
+      demoBadge: '演示数据',
       emptySearch: {
         title: '没有匹配的任务',
         description: '换个关键词试试，或新建任务。',
@@ -277,7 +279,7 @@ export const sharedWorkbenchResources = {
       },
     },
     profilePopover: {
-      sendMessage: '发送消息', editProfile: '编辑资料', copyLink: '复制链接',
+      sendMessage: '发送消息', copyLink: '复制链接',
       viewAgentConfig: '查看 Agent 配置', viewContactCard: '查看联系人资料',
     },
     contextMenu: {
@@ -407,8 +409,6 @@ export const sharedWorkbenchResources = {
       copy: 'Copy',
       copyLink: 'Copy message link',
       forward: 'Forward',
-      addTask: 'Add task',
-      exportDoc: 'Export doc',
       delete: 'Delete',
       close: 'Close',
       backToOverview: 'Back to overview',
@@ -417,9 +417,6 @@ export const sharedWorkbenchResources = {
       settings: { label: 'Settings', title: 'Settings' },
       toggleTheme: { label: 'Toggle theme', title: 'Toggle theme' },
       account: {
-        myCard: 'My profile card',
-        myQrAndLink: 'My QR code & link',
-        addAccount: 'Add account',
         logout: 'Sign out',
         currentUser: 'Current user',
       },
@@ -458,6 +455,8 @@ export const sharedWorkbenchResources = {
         localSessionImport: 'Local session import',
         statePolicy: 'State policy',
       },
+      comingSoon: 'Coming soon',
+      statePreviewNote: 'These cards preview state styling only; their action buttons are not wired yet.',
       loadFailed: 'Settings load failed',
     },
     projects: {
@@ -576,6 +575,11 @@ export const sharedWorkbenchResources = {
       newTask: 'New task',
       status: { pending: 'Pending', active: 'Active', done: 'Done', failed: 'Failed', cancelled: 'Cancelled' },
       empty: { title: 'No tasks yet', description: 'Create tasks for Agent teammates' },
+      emptyComingSoon: {
+        title: 'Task list is coming soon',
+        description: 'The real task data source is not connected yet, so there are no tasks to show.',
+      },
+      demoBadge: 'Demo data',
       emptySearch: {
         title: 'No matching tasks',
         description: 'Try a different keyword, or create a new task.',
@@ -590,7 +594,7 @@ export const sharedWorkbenchResources = {
       },
     },
     profilePopover: {
-      sendMessage: 'Send message', editProfile: 'Edit profile', copyLink: 'Copy link',
+      sendMessage: 'Send message', copyLink: 'Copy link',
       viewAgentConfig: 'View agent config', viewContactCard: 'View contact card',
     },
     contextMenu: {

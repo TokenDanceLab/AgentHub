@@ -187,9 +187,30 @@
   margin-bottom: var(--td-space-4);
 }
 
+.headTitleRow {
+  display: flex;
+  align-items: center;
+  gap: var(--td-space-2, 8px);
+}
+
 .headTitle {
   font: 600 1.375rem/1.2 var(--td-font);
   margin-bottom: var(--sp-xxs);
+}
+
+/* Explicit demo-data marker for mock task rows (#1818) — demo content must
+   never be mistaken for real workspace tasks. */
+.demoBadge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border: 1px solid var(--td-line-strong);
+  border-radius: var(--td-radius-control);
+  background: var(--td-tint);
+  color: var(--td-plum);
+  font: 600 0.6875rem/1.4 var(--td-font);
+  letter-spacing: 0.02em;
+  white-space: nowrap;
 }
 
 .headSubcopy {
