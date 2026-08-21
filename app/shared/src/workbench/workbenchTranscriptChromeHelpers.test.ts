@@ -197,16 +197,13 @@ describe('workbenchTranscriptChromeHelpers', () => {
       'bar.selectAll',
       'bar.clear',
       'context.copy',
-      'context.forward',
-      'context.addTask',
-      'context.exportDoc',
       'context.delete',
       'bar.exit',
     ]);
 
     actions[0]?.onClick();
     actions[2]?.onClick();
-    actions[7]?.onClick();
+    actions[4]?.onClick();
     expect(onSelectAll).toHaveBeenCalledOnce();
     expect(onMultiAction).toHaveBeenCalledWith('copy');
     expect(onExit).toHaveBeenCalledOnce();
@@ -814,11 +811,11 @@ describe('workbenchTranscriptChromeHelpers', () => {
       composerInputRef: { current: null },
     });
 
-    // Without conversations the forward item keeps the plain action shape.
+    // Without conversations there is no real forward path, so the entry is
+    // omitted instead of keeping a placeholder-toast action (#1818).
     const plain = controller.contextMenuGroups('a');
     const plainForward = plain[0]?.find((item) => item.label === 'context.forward');
-    expect(plainForward?.chevron).toBe(false);
-    expect(plainForward?.submenu).toBeUndefined();
+    expect(plainForward).toBeUndefined();
 
     // With conversations the forward item gains the picker submenu.
     const conversations: Array<{ id: string; title: string; kind: 'direct' | 'group' }> = [

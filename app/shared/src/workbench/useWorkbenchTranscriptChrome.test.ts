@@ -161,21 +161,18 @@ describe('useWorkbenchTranscriptChrome', () => {
       'bar.selectAll',
       'bar.clear',
       'context.copy',
-      'context.forward',
-      'context.addTask',
-      'context.exportDoc',
       'context.delete',
       'bar.exit',
     ]);
 
     const groups = result.current.contextMenuGroups('b1');
     expect(groups).toHaveLength(3);
+    // Without a Hub session the react entry is omitted; forward needs a
+    // conversation list; both stay hidden in this session-less shell (#1818).
     expect(groups[0]?.map((item) => item.label)).toEqual([
       'context.copy',
-      'context.react',
       'context.reply',
       'context.quote',
-      'context.forward',
     ]);
 
     expect(typeof result.current.setContextMenu).toBe('function');
@@ -191,8 +188,11 @@ describe('useWorkbenchTranscriptChrome', () => {
   });
 
   it('builds context menu groups shaped for agent and user blocks', () => {
+    // A session id enables the Hub REST entries (recall et al.), so the
+    // agent/user shape assertions below run with one (#1818).
     const { result } = renderTranscriptChrome({
       transcript: [textBlock(), userTextBlock()],
+      sessionId: 'sess-1',
     });
 
     const agentGroups = result.current.contextMenuGroups('b1');
@@ -448,25 +448,27 @@ describe('useWorkbenchTranscriptChrome', () => {
     expect(result.current.toastMessage).toBe('toast.recalled');
   });
 
-  it('keeps placeholder toasts for REST actions without a session id', () => {
+  it('hides REST menu entries and plans no fake toasts without a session id (#1818)', () => {
     const onPinMessage = vi.fn();
     const { result } = renderTranscriptChrome({
       transcript: [textBlock(), userTextBlock()],
       onPinMessage,
     });
 
+    // No pin/react/recall entries in a session-less shell.
+    const labels = result.current.contextMenuGroups('u1').flat().map((item) => item.label);
+    expect(labels).not.toContain('context.pinMessage');
+    expect(labels).not.toContain('context.react');
+    expect(labels).not.toContain('context.recall');
+    // No forward entry without picker conversations either.
+    expect(labels).not.toContain('context.forward');
+
+    // A stray pin action plans nothing — no handler call, no fake toast.
     act(() => {
-      findMenuAction(result.current.contextMenuGroups('b1'), 'context.pinMessage')?.();
+      result.current.handleTranscriptBlockAction('pin', 'b1');
     });
     expect(onPinMessage).not.toHaveBeenCalled();
-    expect(result.current.toastMessage).toBe('toast.pinUpdated');
-    expect(result.current.actionedBlockIds).toEqual(['b1']);
-
-    // Plain forward (no picker conversations) keeps the select-target toast.
-    act(() => {
-      findMenuAction(result.current.contextMenuGroups('b1'), 'context.forward')?.();
-    });
-    expect(result.current.toastMessage).toBe('toast.forwardSelectTarget');
+    expect(result.current.toastVisible).toBe(false);
   });
 
   it('forwards to chosen targets through the context menu picker submenu', () => {

@@ -23,6 +23,7 @@ import {
   StatePreviewSection,
 } from './SettingsPaneParts';
 import { SessionImportList } from '../../sessionImport';
+import { writeClipboardText } from '../../workbenchTranscriptChromeStateHelpers';
 import { resolvePermissionValue } from './SettingsPaneHelpers';
 import { PERMISSION_ROWS } from './types';
 import type { SettingsPageProps, SettingsPaneId } from './types';
@@ -52,14 +53,16 @@ export function AppearancePane(props: SettingsPageProps): React.ReactElement {
         <SettingsRow label="主题" description="默认浅色；左下角主题按钮只负责快速切换当前预览。">
           <SettingSegment options={['跟随系统', '浅色', '深色']} active={props.theme} onChange={(v) => props.onChangeSetting('theme', v)} />
         </SettingsRow>
-        <SettingsRow label="消息密度" description="聊天列表、气泡和 Agent 运行块保持紧凑但可扫描。">
-          <SettingSegment options={['紧凑', '标准', '宽松']} active={props.density} onChange={(v) => props.onChangeSetting('density', v)} />
+        {/* Density / run-step default / animation intensity are persisted but
+            not consumed anywhere yet — disabled until they take effect (#1818). */}
+        <SettingsRow comingSoon label="消息密度" description="聊天列表、气泡和 Agent 运行块保持紧凑但可扫描。">
+          <SettingSegment disabled options={['紧凑', '标准', '宽松']} active={props.density} onChange={(v) => props.onChangeSetting('density', v)} />
         </SettingsRow>
-        <SettingsRow label="运行步骤默认状态" description="工具调用、文件编辑和深度思考默认折叠，只显示摘要。">
-          <SettingSegment options={['折叠', '展开']} active={props.runStepDefault} onChange={(v) => props.onChangeSetting('runStepDefault', v)} />
+        <SettingsRow comingSoon label="运行步骤默认状态" description="工具调用、文件编辑和深度思考默认折叠，只显示摘要。">
+          <SettingSegment disabled options={['折叠', '展开']} active={props.runStepDefault} onChange={(v) => props.onChangeSetting('runStepDefault', v)} />
         </SettingsRow>
-        <SettingsRow label="动画强度" description="折叠展开使用 150-200ms 的透明度和位移动画。">
-          <SettingSegment options={['减少', '标准']} active={props.animationIntensity} onChange={(v) => props.onChangeSetting('animationIntensity', v)} />
+        <SettingsRow comingSoon label="动画强度" description="折叠展开使用 150-200ms 的透明度和位移动画。">
+          <SettingSegment disabled options={['减少', '标准']} active={props.animationIntensity} onChange={(v) => props.onChangeSetting('animationIntensity', v)} />
         </SettingsRow>
       </SettingsSection>
 
@@ -67,8 +70,8 @@ export function AppearancePane(props: SettingsPageProps): React.ReactElement {
         <SettingsRow label="右侧概览" description="新聊天默认显示，用户可从聊天头部收起。">
           <SettingSwitch active={props.inspectorVisible} onChange={(v) => props.onChangeSetting('inspectorVisible', v)} />
         </SettingsRow>
-        <SettingsRow label="连续 Agent 头像" description="连续发送时只显示第一条头像，后续消息按气泡列对齐。">
-          <SettingSwitch active={props.stackedAvatars} onChange={(v) => props.onChangeSetting('stackedAvatars', v)} />
+        <SettingsRow comingSoon label="连续 Agent 头像" description="连续发送时只显示第一条头像，后续消息按气泡列对齐。">
+          <SettingSwitch disabled active={props.stackedAvatars} onChange={(v) => props.onChangeSetting('stackedAvatars', v)} />
         </SettingsRow>
         <SettingsRow label="Composer 宽度" description="随右侧概览折叠状态自适应，不使用固定硬编码宽度。">
           <SettingValue value="自适应" />
@@ -82,24 +85,26 @@ export function NotifyPane(props: SettingsPageProps): React.ReactElement {
   const { t: tw } = useTranslation(SHARED_WORKBENCH_I18N_NAMESPACE);
   return (
     <>
+      {/* Notification routing is not wired to a real notification center
+          yet; every control here stays disabled + coming soon (#1818). */}
       <SettingsSection title={tw("settings.section.runNotifications")}>
-        <SettingsRow label="任务完成" description="Builder、Reviewer、Deployer 完成后在当前会话内提示。">
-          <SettingSwitch active={props.taskCompleteNotify} onChange={(v) => props.onChangeSetting('taskCompleteNotify', v)} />
+        <SettingsRow comingSoon label="任务完成" description="Builder、Reviewer、Deployer 完成后在当前会话内提示。">
+          <SettingSwitch disabled active={props.taskCompleteNotify} onChange={(v) => props.onChangeSetting('taskCompleteNotify', v)} />
         </SettingsRow>
-        <SettingsRow label="审批请求" description="写文件、部署、外部调用等中高风险操作强提醒。">
-          <SettingSegment options={['静默', '横幅', '强提醒']} active={props.approvalNotifyLevel} onChange={(v) => props.onChangeSetting('approvalNotifyLevel', v)} />
+        <SettingsRow comingSoon label="审批请求" description="写文件、部署、外部调用等中高风险操作强提醒。">
+          <SettingSegment disabled options={['静默', '横幅', '强提醒']} active={props.approvalNotifyLevel} onChange={(v) => props.onChangeSetting('approvalNotifyLevel', v)} />
         </SettingsRow>
-        <SettingsRow label="失败和阻塞" description="失败、超时、权限不足统一进入通知中心。">
-          <SettingSwitch active={props.failureNotify} onChange={(v) => props.onChangeSetting('failureNotify', v)} />
+        <SettingsRow comingSoon label="失败和阻塞" description="失败、超时、权限不足统一进入通知中心。">
+          <SettingSwitch disabled active={props.failureNotify} onChange={(v) => props.onChangeSetting('failureNotify', v)} />
         </SettingsRow>
       </SettingsSection>
 
       <SettingsSection title={tw("settings.section.collaborationNotifications")}>
-        <SettingsRow label="项目群消息" description="项目成员提及、公告更新和产物变更。">
-          <SettingSegment options={['全部', '提及', '关闭']} active={props.projectGroupNotifyLevel} onChange={(v) => props.onChangeSetting('projectGroupNotifyLevel', v)} />
+        <SettingsRow comingSoon label="项目群消息" description="项目成员提及、公告更新和产物变更。">
+          <SettingSegment disabled options={['全部', '提及', '关闭']} active={props.projectGroupNotifyLevel} onChange={(v) => props.onChangeSetting('projectGroupNotifyLevel', v)} />
         </SettingsRow>
-        <SettingsRow label="云文档更新" description="评论、权限请求、归档状态和分享失效。">
-          <SettingSegment options={['全部', '重要', '关闭']} active={props.docUpdateNotifyLevel} onChange={(v) => props.onChangeSetting('docUpdateNotifyLevel', v)} />
+        <SettingsRow comingSoon label="云文档更新" description="评论、权限请求、归档状态和分享失效。">
+          <SettingSegment disabled options={['全部', '重要', '关闭']} active={props.docUpdateNotifyLevel} onChange={(v) => props.onChangeSetting('docUpdateNotifyLevel', v)} />
         </SettingsRow>
         <SettingsRow label="免打扰" description="保留紧急审批，其余提醒压到侧栏角标。">
           <SettingValue value={props.dndWindow} />
@@ -121,18 +126,19 @@ export function AgentDefaultsPane(props: SettingsPageProps): React.ReactElement 
         <SettingsRow label="默认执行器" description="Builder 会话显示 Claude Code，其他 Agent 可单独覆盖。">
           <SettingValue value={props.defaultExecutor} />
         </SettingsRow>
-        <SettingsRow label="工具调用展示" description="Read、rg、Shell、Write、Browser 等工具以统一步骤块渲染。">
-          <SettingSegment options={['摘要', '详情']} active={props.toolCallDisplay} onChange={(v) => props.onChangeSetting('toolCallDisplay', v)} />
+        <SettingsRow comingSoon label="工具调用展示" description="Read、rg、Shell、Write、Browser 等工具以统一步骤块渲染。">
+          <SettingSegment disabled options={['摘要', '详情']} active={props.toolCallDisplay} onChange={(v) => props.onChangeSetting('toolCallDisplay', v)} />
         </SettingsRow>
-        <SettingsRow label="深度思考" description="运行中展示摘要，展开后显示完整推理块。">
-          <SettingSegment options={['隐藏', '摘要', '完整']} active={props.deepThinkingDisplay} onChange={(v) => props.onChangeSetting('deepThinkingDisplay', v)} />
+        <SettingsRow comingSoon label="深度思考" description="运行中展示摘要，展开后显示完整推理块。">
+          <SettingSegment disabled options={['隐藏', '摘要', '完整']} active={props.deepThinkingDisplay} onChange={(v) => props.onChangeSetting('deepThinkingDisplay', v)} />
         </SettingsRow>
       </SettingsSection>
 
       <SettingsSection title={tw("settings.section.permissionPolicy")}>
         {PERMISSION_ROWS.map(([tool, value, desc]) => (
-          <SettingsRow key={tool} label={tool} description={desc} wide>
+          <SettingsRow comingSoon key={tool} label={tool} description={desc} wide>
             <SettingSegment
+              disabled
               options={['允许', '需确认', '禁止']}
               active={resolvePermissionValue(props.permissions, tool, value)}
               onChange={(v) => props.onChangeSetting(`perm_${tool}`, v)}
@@ -159,17 +165,18 @@ export function LocalDevPane(props: SettingsPageProps): React.ReactElement {
   return (
     <>
       <SettingsSection title={tw("settings.section.localPreview")}>
+        {/* Copy buttons write the value to the clipboard — a real effect (#1818). */}
         <SettingsRow label="Vite 地址" description="用于实时预览 AgentHub Desktop design demo。">
-          <SettingPath value={props.vitePreviewUrl} onCopy={() => props.onChangeSetting('copy_viteUrl', props.vitePreviewUrl)} />
+          <SettingPath value={props.vitePreviewUrl} onCopy={() => writeClipboardText(props.vitePreviewUrl)} />
         </SettingsRow>
         <SettingsRow label="工作区" description="当前设计 demo 仓库路径。">
-          <SettingPath value={props.workspacePath} onCopy={() => props.onChangeSetting('copy_workspacePath', props.workspacePath)} />
+          <SettingPath value={props.workspacePath} onCopy={() => writeClipboardText(props.workspacePath)} />
         </SettingsRow>
         <SettingsRow label="目标项目" description="后续迁移到真实 AgentHub Desktop 的参考项目。">
-          <SettingPath value={props.targetProjectPath} onCopy={() => props.onChangeSetting('copy_targetProjectPath', props.targetProjectPath)} />
+          <SettingPath value={props.targetProjectPath} onCopy={() => writeClipboardText(props.targetProjectPath)} />
         </SettingsRow>
-        <SettingsRow label="热更新覆盖层" description="保留 Vite 错误 overlay，开发时能直接看到语法问题。">
-          <SettingSwitch active={props.hrmOverlayEnabled} onChange={(v) => props.onChangeSetting('hrmOverlayEnabled', v)} />
+        <SettingsRow comingSoon label="热更新覆盖层" description="保留 Vite 错误 overlay，开发时能直接看到语法问题。">
+          <SettingSwitch disabled active={props.hrmOverlayEnabled} onChange={(v) => props.onChangeSetting('hrmOverlayEnabled', v)} />
         </SettingsRow>
         <SettingsRow label="数据模式" description="Auto 可开发回退；Mock/Fixture 固定本地数据；Observed/Approved real 不回退。">
           <DataModeControl active={props.dataMode} onChange={(v) => props.onChangeSetting('dataMode', v)} />
@@ -185,8 +192,8 @@ export function LocalDevPane(props: SettingsPageProps): React.ReactElement {
         <SettingsRow label="视觉 QA" description="需要时用浏览器截图检查桌面和窄宽布局。">
           <SettingValue value={props.visualQaMode} />
         </SettingsRow>
-        <SettingsRow label="日志级别" description="仅 demo 前端事件和交互状态。">
-          <SettingSegment options={['错误', '标准', '详细']} active={props.logLevel} onChange={(v) => props.onChangeSetting('logLevel', v)} />
+        <SettingsRow comingSoon label="日志级别" description="仅 demo 前端事件和交互状态。">
+          <SettingSegment disabled options={['错误', '标准', '详细']} active={props.logLevel} onChange={(v) => props.onChangeSetting('logLevel', v)} />
         </SettingsRow>
         <SettingsRow label="设计系统校验" description="重大 UI 改动后再跑设计治理脚本，日常迭代保持轻量。">
           <SettingValue value={props.designSystemValidation} />
@@ -231,18 +238,20 @@ export function StatesPane(props: SettingsPageProps): React.ReactElement {
   return (
     <>
       <SettingsSection title={tw("settings.section.statePolicy")}>
-        <SettingsRow label="空状态" description="说明当前为空，并提供一个明确下一步。">
-          <SettingSwitch active={props.stateStrategies.empty} onChange={(v) => props.onChangeSetting('stateStrategy_empty', v)} />
+        {/* Strategy flags are persisted but not consumed yet — disabled with
+            a coming-soon note until they gate real rendering (#1818). */}
+        <SettingsRow comingSoon label="空状态" description="说明当前为空，并提供一个明确下一步。">
+          <SettingSwitch disabled active={props.stateStrategies.empty} onChange={(v) => props.onChangeSetting('stateStrategy_empty', v)} />
         </SettingsRow>
-        <SettingsRow label="无效状态" description="链接失效、权限不足和数据过期使用 warning 语义。">
-          <SettingSwitch active={props.stateStrategies.invalid} onChange={(v) => props.onChangeSetting('stateStrategy_invalid', v)} />
+        <SettingsRow comingSoon label="无效状态" description="链接失效、权限不足和数据过期使用 warning 语义。">
+          <SettingSwitch disabled active={props.stateStrategies.invalid} onChange={(v) => props.onChangeSetting('stateStrategy_invalid', v)} />
         </SettingsRow>
-        <SettingsRow label="404 状态" description="项目归档、页面移动或不存在时给出返回路径。">
-          <SettingSwitch active={props.stateStrategies.missing} onChange={(v) => props.onChangeSetting('stateStrategy_missing', v)} />
+        <SettingsRow comingSoon label="404 状态" description="项目归档、页面移动或不存在时给出返回路径。">
+          <SettingSwitch disabled active={props.stateStrategies.missing} onChange={(v) => props.onChangeSetting('stateStrategy_missing', v)} />
         </SettingsRow>
       </SettingsSection>
 
-      <StatePreviewSection onChangeSetting={props.onChangeSetting} />
+      <StatePreviewSection />
     </>
   );
 }

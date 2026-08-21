@@ -41,11 +41,14 @@ export function WorkbenchTasksRouteView({
     <TasksPage
       activePane={tasksRoute.tasksPane}
       activeFilterCount={model.activeFilterCount}
+      comingSoonEmptyState={model.tasksComingSoon}
       crossProjectCount={model.crossProjectCount}
+      // Mock/demo task rows stay available in non-real modes but are always
+      // labeled as demo data (#1818).
+      demoDataActive={!realDataMode}
       dueTodayCount={model.dueTodayCount}
       fieldConfigActive={model.fieldConfigActive}
       fieldConfigLabel={model.fieldConfigLabel}
-      emptyStateLabel={model.emptyStateLabel}
       groupActive={model.groupActive}
       groupLabel={model.groupLabel}
       groups={tasksRoute.visibleTaskGroups}

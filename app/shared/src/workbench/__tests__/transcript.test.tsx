@@ -202,13 +202,17 @@ describe('AgentHubWorkbench', () => {
 
     const menu = screen.getByRole('menu', { name: '卡片操作菜单' });
     expect(menu).toBeInTheDocument();
-    expect(within(menu).getAllByRole('menuitem')).toHaveLength(13);
+    // Honest menu (#1818): no fake entries (创建话题/添加任务/导出) and no
+    // Hub-only entries (表情回复/置顶/撤回) without a session id.
+    expect(within(menu).getAllByRole('menuitem')).toHaveLength(6);
     expect(within(menu).getByText('复制')).toBeInTheDocument();
-    expect(within(menu).getByRole('menuitem', { name: /表情回复/ })).toBeInTheDocument();
-    expect(within(menu).getByRole('menuitem', { name: /创建话题/ })).toBeInTheDocument();
+    expect(within(menu).getByRole('menuitem', { name: /回复/ })).toBeInTheDocument();
+    expect(within(menu).getByRole('menuitem', { name: /转发/ })).toBeInTheDocument();
     expect(within(menu).getByRole('menuitem', { name: /复制消息链接/ })).toBeInTheDocument();
-    expect(within(menu).getByRole('menuitem', { name: /添加任务/ })).toBeInTheDocument();
     expect(within(menu).getByRole('menuitem', { name: /删除/ })).toBeInTheDocument();
+    expect(within(menu).queryByRole('menuitem', { name: /表情回复/ })).not.toBeInTheDocument();
+    expect(within(menu).queryByRole('menuitem', { name: /创建话题/ })).not.toBeInTheDocument();
+    expect(within(menu).queryByRole('menuitem', { name: /添加任务/ })).not.toBeInTheDocument();
 
     fireEvent.click(within(menu).getByRole('menuitem', { name: /多选/ }));
 
@@ -217,9 +221,9 @@ describe('AgentHubWorkbench', () => {
     expect(within(toolbar).getByRole('button', { name: '全选' })).toBeInTheDocument();
     expect(within(toolbar).getByRole('button', { name: '清空' })).toBeInTheDocument();
     expect(within(toolbar).getByRole('button', { name: '复制' })).toBeInTheDocument();
-    expect(within(toolbar).getByRole('button', { name: '转发' })).toBeInTheDocument();
-    expect(within(toolbar).getByRole('button', { name: '添加任务' })).toBeInTheDocument();
     expect(within(toolbar).getByRole('button', { name: '删除' })).toBeInTheDocument();
+    expect(within(toolbar).queryByRole('button', { name: '转发' })).not.toBeInTheDocument();
+    expect(within(toolbar).queryByRole('button', { name: '添加任务' })).not.toBeInTheDocument();
     expect(screen.queryByPlaceholderText('发消息给 Builder')).not.toBeInTheDocument();
 
     fireEvent.click(within(toolbar).getByRole('button', { name: '清空' }));
@@ -231,6 +235,36 @@ describe('AgentHubWorkbench', () => {
   });
 
   it('pins a transcript card from the message action menu', () => {
+    const platform = createMockPlatform({
+      surface: 'desktop',
+      capabilities: { browserPreview: true },
+      conversations: [{ id: 'builder', title: 'Builder', kind: 'direct' }],
+    });
+    const onPinMessage = vi.fn();
+
+    const { container } = render(
+      <AgentHubWorkbench
+        agents={agents}
+        platform={platform}
+        conversations={platform.seed.conversations}
+        transcript={transcript}
+        activeConversationId="builder"
+        onPinMessage={onPinMessage}
+      />,
+    );
+
+    const firstCard = container.querySelector('[data-selectable-card="tool-1"]');
+    expect(firstCard).toBeInTheDocument();
+    fireEvent.contextMenu(firstCard!, { clientX: 120, clientY: 180 });
+
+    const menu = screen.getByRole('menu', { name: '卡片操作菜单' });
+    fireEvent.click(within(menu).getByRole('menuitem', { name: /置顶消息/ }));
+
+    expect(onPinMessage).toHaveBeenCalledWith('tool-1', 'builder');
+    expect(screen.getByText('已更新置顶')).toBeInTheDocument();
+  });
+
+  it('omits the Hub pin entry from the message action menu without a session', () => {
     const platform = createMockPlatform({
       surface: 'desktop',
       capabilities: { browserPreview: true },
@@ -251,9 +285,7 @@ describe('AgentHubWorkbench', () => {
     fireEvent.contextMenu(firstCard!, { clientX: 120, clientY: 180 });
 
     const menu = screen.getByRole('menu', { name: '卡片操作菜单' });
-    fireEvent.click(within(menu).getByRole('menuitem', { name: /置顶消息/ }));
-
-    expect(screen.getByText('已更新置顶')).toBeInTheDocument();
+    expect(within(menu).queryByRole('menuitem', { name: /置顶消息/ })).not.toBeInTheDocument();
   });
 
   it('enters multi-select with the design long-press gesture', () => {

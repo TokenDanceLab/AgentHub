@@ -200,14 +200,24 @@ export function AccountProfileBody({
           <ProfileTitleRow badge={badge} name={name} />
           <p>{accountOrgStatusText(org, status)}</p>
         </div>
-        <button
-          className={styles.accountStatus}
-          type="button"
-          onClick={onStatusToggle}
-        >
-          <DesignNavIcon name="check" size={13} />
-          {accountStatusLabel(status)}
-        </button>
+        {/* Without a real toggle handler the status renders as a passive
+            chip — a clickable button with no effect would be a fake
+            interaction (#1818). */}
+        {onStatusToggle ? (
+          <button
+            className={styles.accountStatus}
+            type="button"
+            onClick={onStatusToggle}
+          >
+            <DesignNavIcon name="check" size={13} />
+            {accountStatusLabel(status)}
+          </button>
+        ) : (
+          <span className={styles.accountStatus}>
+            <DesignNavIcon name="check" size={13} />
+            {accountStatusLabel(status)}
+          </span>
+        )}
       </div>
 
       {actions && actions.length > 0 && (
