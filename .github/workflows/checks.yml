@@ -159,8 +159,11 @@ jobs:
       # Fallback: keep the required check reported even when the Go path
       # filter deselects this job (skipped jobs never satisfy branch
       # protection and permanently block frontend-only PRs).
+      # The job default cwd (edge-server) does not exist when checkout was
+      # deselected; anchor the fallback at the repo root.
       - name: Report no-Go-changes skip (required check)
         if: ${{ !cancelled() && github.event_name != 'workflow_dispatch' && needs.changes.result == 'success' && needs.changes.outputs.go != 'true' }}
+        working-directory: .
         run: |
           echo "skipped: no Go changes; reporting success for required check go-edge"
           exit 0
@@ -170,6 +173,7 @@ jobs:
       # the skipped real gates as green.
       - name: Fail when Go path filter failed
         if: ${{ !cancelled() && github.event_name != 'workflow_dispatch' && needs.changes.result != 'success' }}
+        working-directory: .
         run: |
           echo "::error::changes job result: ${{ needs.changes.result }}; cannot decide Go gates for go-edge"
           exit 1
@@ -348,8 +352,11 @@ jobs:
       # Fallback: keep the required check reported even when the Go path
       # filter deselects this job (skipped jobs never satisfy branch
       # protection and permanently block frontend-only PRs).
+      # The job default cwd (hub-server) does not exist when checkout was
+      # deselected; anchor the fallback at the repo root.
       - name: Report no-Go-changes skip (required check)
         if: ${{ !cancelled() && github.event_name != 'workflow_dispatch' && needs.changes.result == 'success' && needs.changes.outputs.go != 'true' }}
+        working-directory: .
         run: |
           echo "skipped: no Go changes; reporting success for required check go-hub"
           exit 0
@@ -359,6 +366,7 @@ jobs:
       # the skipped real gates as green.
       - name: Fail when Go path filter failed
         if: ${{ !cancelled() && github.event_name != 'workflow_dispatch' && needs.changes.result != 'success' }}
+        working-directory: .
         run: |
           echo "::error::changes job result: ${{ needs.changes.result }}; cannot decide Go gates for go-hub"
           exit 1
