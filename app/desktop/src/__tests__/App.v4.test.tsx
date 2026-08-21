@@ -11,7 +11,7 @@ import { useAgentProfileList, useCreateAgentProfile, useUpdateAgentProfile, useD
 import { useHubExecutionTargets, useSyncLocalEdgeExecutionTarget } from '@/api/executionTargetQueries';
 import { useModelCatalog } from '@/api/modelCatalogQueries';
 import { useRunEvidence } from '@/api/runEvidenceQueries';
-import { useCreateRun } from '@/api/runQueries';
+import { useCreateRun, useCancelRun, useRuns, useDecideEdgePermission } from '@/api/runQueries';
 import { useCreateThread, useCurrentUser, useThreadMessages, useThreadPins, useThreads } from '@/api/threadQueries';
 import type { EventHandler, StatusHandler, StreamHandle } from '@/api/eventClient';
 import { queryClient } from '@/api/queryClient';
@@ -67,9 +67,16 @@ vi.mock('@/api/agentProfileQueries', () => ({
   hubAgentProfileToWorkbenchAgent: vi.fn((profile) => profile),
 }));
 
-vi.mock('@/api/runQueries', () => ({
-  useCreateRun: vi.fn(),
-}));
+vi.mock('@/api/runQueries', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/api/runQueries')>();
+  return {
+    ...actual,
+    useCreateRun: vi.fn(),
+    useCancelRun: vi.fn(),
+    useRuns: vi.fn(),
+    useDecideEdgePermission: vi.fn(),
+  };
+});
 
 vi.mock('@/api/hubClient', () => ({
   createHubClient: vi.fn(),
@@ -170,6 +177,8 @@ vi.mock('@/demo/demoEvidence', () => ({
 
 const eventHandlers: EventHandler[] = [];
 const createRunMutateAsync = vi.fn();
+const cancelRunMutateAsync = vi.fn();
+const decideEdgePermissionMutateAsync = vi.fn();
 const tryAutoLogin = vi.fn().mockResolvedValue(undefined);
 const refetchHealth = vi.fn();
 const composerInputLabel = /^(Composer input|aria\.composerInput)$/;
@@ -213,6 +222,9 @@ const mockedUseModelCatalog = vi.mocked(useModelCatalog);
 const mockedUseRunEvidence = vi.mocked(useRunEvidence);
 const mockedCreateEventStream = vi.mocked(createEventStream);
 const mockedUseCreateRun = vi.mocked(useCreateRun);
+const mockedUseCancelRun = vi.mocked(useCancelRun);
+const mockedUseRuns = vi.mocked(useRuns);
+const mockedUseDecideEdgePermission = vi.mocked(useDecideEdgePermission);
 const mockedUseCreateThread = vi.mocked(useCreateThread);
 const mockedCreateHubClient = vi.mocked(createHubClient);
 const mockedQueryClient = vi.mocked(queryClient);
@@ -295,6 +307,23 @@ describe('Desktop App v4 root', () => {
     mockedUseCreateRun.mockReturnValue({
       mutateAsync: createRunMutateAsync,
     } as ReturnType<typeof useCreateRun>);
+    cancelRunMutateAsync.mockResolvedValue({
+      runId: 'run-live',
+      projectId: 'project-1',
+      threadId: 'thread-real',
+      status: 'cancelled',
+      createdAt: '2026-06-07T04:00:01Z',
+    });
+    mockedUseCancelRun.mockReturnValue({
+      mutateAsync: cancelRunMutateAsync,
+    } as ReturnType<typeof useCancelRun>);
+    decideEdgePermissionMutateAsync.mockResolvedValue(undefined);
+    mockedUseDecideEdgePermission.mockReturnValue({
+      mutateAsync: decideEdgePermissionMutateAsync,
+    } as ReturnType<typeof useDecideEdgePermission>);
+    mockedUseRuns.mockReturnValue({
+      data: undefined,
+    } as ReturnType<typeof useRuns>);
     mockedUseCreateThread.mockReturnValue({
       mutateAsync: vi.fn(),
     } as ReturnType<typeof useCreateThread>);
@@ -736,6 +765,110 @@ describe('Desktop App v4 root', () => {
       threadId: 'thread-real',
     });
     expect(getComposerInput()).toHaveValue('');
+  });
+
+  it('cancels the active Edge run through the composer stop button (#1816 W1)', async () => {
+    window.localStorage.setItem(WORKBENCH_DATA_MODE_STORAGE_KEY, 'approved-real');
+    mockedUseThreads.mockReturnValue({
+      data: {
+        items: [
+          {
+            threadId: 'thread-real',
+            projectId: 'project-1',
+            title: '真实 Edge 会话',
+            status: 'active',
+            createdAt: '2026-06-07T05:00:00Z',
+            updatedAt: '2026-06-07T05:00:00Z',
+          },
+        ],
+        page: { hasMore: false },
+      },
+    } as ReturnType<typeof useThreads>);
+    mockedUseThreadMessages.mockReturnValue({
+      data: { items: [], page: { hasMore: false } },
+    } as ReturnType<typeof useThreadMessages>);
+    mockedUseRuns.mockReturnValue({
+      data: {
+        items: [
+          {
+            runId: 'run-live',
+            projectId: 'project-1',
+            threadId: 'thread-real',
+            status: 'started',
+            createdAt: '2026-06-07T05:00:01Z',
+          },
+        ],
+        page: { hasMore: false },
+      },
+    } as ReturnType<typeof useRuns>);
+
+    renderWithProviders(<DesktopWorkbenchApp />);
+
+    const stopButton = await screen.findByRole('button', {
+      name: /^(停止运行|Stop|action\.stopRun)$/,
+    });
+    fireEvent.click(stopButton);
+
+    await waitFor(() => {
+      expect(cancelRunMutateAsync).toHaveBeenCalledTimes(1);
+    });
+    expect(cancelRunMutateAsync).toHaveBeenCalledWith('run-live');
+  });
+
+  it('routes local permission approvals to the Edge permission decide mutation (#1816 W1)', async () => {
+    window.localStorage.setItem(WORKBENCH_DATA_MODE_STORAGE_KEY, 'approved-real');
+    mockedUseThreads.mockReturnValue({
+      data: {
+        items: [
+          {
+            threadId: 'thread-real',
+            projectId: 'project-1',
+            title: '真实 Edge 会话',
+            status: 'active',
+            createdAt: '2026-06-07T06:00:00Z',
+            updatedAt: '2026-06-07T06:00:00Z',
+          },
+        ],
+        page: { hasMore: false },
+      },
+    } as ReturnType<typeof useThreads>);
+    mockedUseThreadMessages.mockReturnValue({
+      data: { items: [], page: { hasMore: false } },
+    } as ReturnType<typeof useThreadMessages>);
+
+    renderWithProviders(<DesktopWorkbenchApp />);
+    expect(await screen.findByRole('heading', { name: '真实 Edge 会话' })).toBeInTheDocument();
+
+    act(() => {
+      emitEdgeEvent({
+        version: 'v1',
+        id: 'evt-permission',
+        seq: 1,
+        type: 'run.agent.permission_requested',
+        scope: { threadId: 'thread-real', runId: 'run-live' },
+        sentAt: '2026-06-07T06:00:01Z',
+        payload: {
+          runId: 'run-live',
+          requestId: 'perm-live',
+          toolName: 'shell',
+          title: 'Execute shell command',
+        },
+      });
+    });
+
+    const approveButton = await screen.findByRole('button', {
+      name: /^(批准|Approve|card\.approval\.approve)$/,
+    });
+    fireEvent.click(approveButton);
+
+    await waitFor(() => {
+      expect(decideEdgePermissionMutateAsync).toHaveBeenCalledTimes(1);
+    });
+    expect(decideEdgePermissionMutateAsync).toHaveBeenCalledWith({
+      runId: 'run-live',
+      requestId: 'perm-live',
+      decision: 'allow',
+    });
   });
 });
 

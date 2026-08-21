@@ -3,10 +3,33 @@
 // Streaming data is normalized through the v4 shared transcript/event model.
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import type { QueryClient } from '@tanstack/react-query';
-import { startRun, cancelRun, fetchRuns } from './edgeClient';
+import { startRun, cancelRun, fetchRuns, decidePermission } from './edgeClient';
+import type { PermissionDecideRequest } from './edgeClient';
 import { RunInfoSchema, safeParse, listResponseSchema } from './schemas';
 import { edgeQueryKeys } from '@shared/stores/queryKeys';
 import type { RunInfo, ListResponse, StartRunRequest } from '@shared/types';
+
+// Terminal Edge run statuses (edge-server lifecycle: runs settle into
+// completed/failed/cancelled; everything else is still cancellable).
+// Unknown future statuses are treated as active on purpose — the stop
+// affordance should rather show once too often than hide a live run.
+const EDGE_RUN_TERMINAL_STATUSES = new Set([
+  'completed',
+  'finished',
+  'failed',
+  'cancelled',
+  'canceled',
+]);
+
+/** Whether an Edge run status represents a run that is still active. */
+export function isEdgeRunStatusActive(status: string): boolean {
+  return !EDGE_RUN_TERMINAL_STATUSES.has(status);
+}
+
+/** First still-active run in the list, in server order. */
+export function findActiveEdgeRun(runs: RunInfo[] | undefined): RunInfo | undefined {
+  return (runs ?? []).find((run) => isEdgeRunStatusActive(run.status));
+}
 
 type RunQuerySnapshot = Array<[readonly unknown[], ListResponse<RunInfo> | undefined]>;
 
@@ -113,6 +136,22 @@ export function useCancelRun() {
     },
     onSettled: () => {
       qc.invalidateQueries({ queryKey: edgeQueryKeys.runs.root });
+      qc.invalidateQueries({ queryKey: edgeQueryKeys.threads.root });
+    },
+  });
+}
+
+/**
+ * Decide a pending Edge permission request for a local run
+ * (`POST /v1/permissions/decide`). The `permission_result` block normally
+ * arrives through the Edge event stream; the thread invalidation closes the
+ * replay gap when the persisted transcript is reloaded before that happens.
+ */
+export function useDecideEdgePermission() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (req: PermissionDecideRequest) => decidePermission(req),
+    onSettled: () => {
       qc.invalidateQueries({ queryKey: edgeQueryKeys.threads.root });
     },
   });
