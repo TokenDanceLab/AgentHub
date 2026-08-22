@@ -524,7 +524,9 @@ func (s *AgentTeamService) FailTimedOutAssignments(ctx context.Context) (int, er
 
 // terminateTimedOutAssignment fails one timed-out assignment and records its
 // team event (best-effort); it returns true when the assignment counted as
-// terminated. Status-update failures still count the row but skip the event.
+// terminated. A status-update failure (or a lost status race) returns false
+// and is excluded from the FailTimedOutAssignments count; an event-append
+// failure still counts the assignment as terminated.
 func (s *AgentTeamService) terminateTimedOutAssignment(ctx context.Context, a *model.AgentTeamAssignment) bool {
 	reason := "assignment timeout reached"
 	updated, err := repository.UpdateAssignmentStatusIf(s.db.WithContext(ctx), a.ID,

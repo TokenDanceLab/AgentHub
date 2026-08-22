@@ -17,6 +17,8 @@ one surgical text mutation, and asserts the CI policy verifier exits non-zero:
 11. delete the go-hub changes-failure fail-closed step → required check false-green again
 12. re-add continue-on-error to the go-hub Lint step → debt-clear hard gate back to warning-only
 13. re-add only-new-issues to the go-hub Lint step → full-repo lint gate back to patch-only
+14. re-add a truthy-expression continue-on-error to the go-hub Lint step → hard gate softened by an expression
+15. re-add an inline-comment `continue-on-error: true` to the go-hub Lint step → hard gate softened by a commented true
 
 The unmutated copy must exit 0, proving the policy test only reddens on
 actual policy violations (fail-closed, no false green).
@@ -220,6 +222,30 @@ def readd_go_hub_lint_only_new_issues(text: str) -> str:
     return text[:start] + body.replace(anchor, anchor + "          only-new-issues: true\n", 1) + text[end:]
 
 
+def readd_go_hub_lint_continue_on_error_expression(text: str) -> str:
+    """在 go-hub Lint step 加上 truthy 表达式形式的 continue-on-error，模拟硬
+    门禁被表达式软化的回归（校验器必须拒绝非字面量值）。"""
+    start, end, body = get_go_hub_body(text)
+    anchor = "        uses: golangci/golangci-lint-action@v9\n"
+    if body.count(anchor) != 1:
+        raise AssertionError(f"expected exactly one golangci-lint-action use in go-hub, found {body.count(anchor)}")
+    return text[:start] + body.replace(
+        anchor, "        continue-on-error: ${{ github.event_name == 'workflow_dispatch' }}\n" + anchor, 1
+    ) + text[end:]
+
+
+def readd_go_hub_lint_continue_on_error_comment(text: str) -> str:
+    """在 go-hub Lint step 加上带行内注释的 continue-on-error: true，模拟旧正则
+    漏判 `true # comment` 的回归（校验器必须拒绝）。"""
+    start, end, body = get_go_hub_body(text)
+    anchor = "        uses: golangci/golangci-lint-action@v9\n"
+    if body.count(anchor) != 1:
+        raise AssertionError(f"expected exactly one golangci-lint-action use in go-hub, found {body.count(anchor)}")
+    return text[:start] + body.replace(
+        anchor, "        continue-on-error: true  # soft gate\n" + anchor, 1
+    ) + text[end:]
+
+
 class VerifyCiGatesMutationTests(unittest.TestCase):
     def assert_mutation_fails(self, mutated_text: str, case_name: str) -> None:
         exit_code, output = run_verifier(mutated_text)
@@ -300,6 +326,20 @@ class VerifyCiGatesMutationTests(unittest.TestCase):
         self.assert_mutation_fails(
             readd_go_hub_lint_only_new_issues(read_workflow()),
             "re-added go-hub Lint only-new-issues",
+        )
+
+    def test_readd_go_hub_lint_continue_on_error_expression_fails(self):
+        """go-hub Lint 用 truthy 表达式 continue-on-error 软化时，校验器必须非零退出（防回退）。"""
+        self.assert_mutation_fails(
+            readd_go_hub_lint_continue_on_error_expression(read_workflow()),
+            "re-added go-hub Lint truthy-expression continue-on-error",
+        )
+
+    def test_readd_go_hub_lint_continue_on_error_comment_fails(self):
+        """go-hub Lint 用带行内注释的 continue-on-error: true 软化时，校验器必须非零退出（防回退）。"""
+        self.assert_mutation_fails(
+            readd_go_hub_lint_continue_on_error_comment(read_workflow()),
+            "re-added go-hub Lint inline-comment continue-on-error",
         )
 
 

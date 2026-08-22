@@ -53,12 +53,25 @@ def assert_not_contains(text: str, pattern: str, message: str) -> None:
         fail(message)
 
 
+CONTINUE_ON_ERROR_VALUE = re.compile(r"(?m)^\s+continue-on-error:\s*(\S.*?)\s*(?:#.*)?$", re.IGNORECASE)
+
+
 def assert_step_continue_on_error(job_block: str, step_name: str, expected: bool) -> None:
     step = get_step_block(job_block, step_name)
-    has_continue = re.search(r"(?m)^\s+continue-on-error:\s+true\s*$", step, re.IGNORECASE) is not None
-    if has_continue != expected:
-        want = "warning-only" if expected else "hard-blocking"
-        fail(f"step '{step_name}' must be {want}")
+    match = CONTINUE_ON_ERROR_VALUE.search(step)
+    value = match.group(1).strip().lower() if match else None
+    if expected:
+        # warning-only: the step must be explicitly enabled with the literal
+        # `true` (an optional inline comment is allowed). A truthy expression
+        # could evaluate false and silently harden the step, so it is rejected.
+        if value != "true":
+            fail(f"step '{step_name}' must be warning-only (continue-on-error: true)")
+    else:
+        # hard-blocking: only an absent setting or the literal `false` is
+        # acceptable. `true` (with or without an inline comment) and any truthy
+        # expression are rejected so a hard gate cannot be softened.
+        if value is not None and value != "false":
+            fail(f"step '{step_name}' must be hard-blocking (continue-on-error must be absent or false)")
 
 
 def main() -> int:

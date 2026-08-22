@@ -177,9 +177,6 @@ func (s *AgentTeamService) createAssignmentAndTaskTx(tx *gorm.DB, ctx context.Co
 	return assignment, nil
 }
 
-// resolveRouteError maps a transaction failure back to the API surface: the
-// rejectRoute marker becomes a logged rejection + 400, and any other error is
-// recorded as a rejected route event before being surfaced raw.
 // handleCompeteRoute runs the compete branch of HandleRouteDecision: it
 // dispatches the compete batch and returns the first assignment for API
 // compatibility (the full list is available via ListAssignments).
@@ -194,6 +191,9 @@ func (s *AgentTeamService) handleCompeteRoute(ctx context.Context, userID, teamI
 	return &assignments[0], nil
 }
 
+// resolveRouteError maps a transaction failure back to the API surface: the
+// rejectRoute marker becomes a logged rejection + 400, and any other error is
+// recorded as a rejected route event before being surfaced raw.
 func (s *AgentTeamService) resolveRouteError(runID string, decision model.CoordinatorRouteDecision, err error) error {
 	if reason, rejected := routeRejectionReason(err); rejected {
 		return s.rejectRouteDecision(runID, decision, reason)

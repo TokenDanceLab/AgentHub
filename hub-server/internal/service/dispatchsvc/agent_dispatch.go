@@ -296,7 +296,7 @@ func (s *DispatchService) dispatchRouteHubRelay(ctx context.Context, task *model
 
 // pushPendingTargetTaskOffline best-effort queues the payload on the target
 // device's pending-target queue (hub_relay fallback); failures bump the
-// labelled offline-push metric and log the given message key.
+// hub_relay offline-push metric and log DispatchLogRelayOfflinePushFailed.
 func (s *DispatchService) pushPendingTargetTaskOffline(ctx context.Context, task *model.PendingAgentTask, ai *model.AgentInstance, payload []byte, cacheClient dispatchCache) {
 	if pushErr := cacheClient.PushPendingTargetTask(ctx, ai.InviterUserID, task.TargetID, task.EdgeDeviceID, string(payload)); !dispatch.OfflineQueuePushSucceeded(pushErr) {
 		if metrics.AgentDispatchOfflinePushFailures != nil {

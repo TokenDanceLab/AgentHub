@@ -135,10 +135,8 @@ func (s *Service) validateReplyToMessage(sessionID string, replyToMsgID *string)
 	return nil
 }
 
-// validatePrivateSendAllowed blocks sends to a private session peer that has
-// blocked the sender; non-private sessions are never blocked here.
 // persistSendMessageTx inserts the message with its attachment references and
-// touches the session activity marker inside one transaction; a duplicate-key
+// touches the session activity marker inside one transaction; duplicate-key
 // insert races are recovered by the caller.
 func (s *Service) persistSendMessageTx(msg *model.Message, sessionID string, attachmentIDs []string) error {
 	return s.db.Transaction(func(tx *gorm.DB) error {
@@ -154,6 +152,8 @@ func (s *Service) persistSendMessageTx(msg *model.Message, sessionID string, att
 	})
 }
 
+// validatePrivateSendAllowed blocks sends to a private session peer that has
+// blocked the sender; non-private sessions are never blocked here.
 func (s *Service) validatePrivateSendAllowed(session *model.Session, sessionID, senderUserID string) error {
 	if session.Type != model.SessionTypePrivate {
 		return nil
