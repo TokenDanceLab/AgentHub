@@ -528,10 +528,30 @@ describe('useWorkbenchTranscriptChrome', () => {
     act(() => {
       result.current.multiSelectActions.find((action) => action.label === 'context.delete')?.onClick();
     });
+    // #1823: the destructive delete raises the confirm gate; nothing is
+    // removed until the user confirms.
+    expect(result.current.deleteConfirmPending).toBe(true);
+    expect(result.current.softHiddenBlockIds).toEqual([]);
+
+    act(() => {
+      result.current.cancelDeleteConfirm();
+    });
+    expect(result.current.deleteConfirmPending).toBe(false);
+    expect(result.current.softHiddenBlockIds).toEqual([]);
+    expect(result.current.selectionMode).toBe(true);
+
+    act(() => {
+      result.current.multiSelectActions.find((action) => action.label === 'context.delete')?.onClick();
+    });
+    expect(result.current.deleteConfirmPending).toBe(true);
+    act(() => {
+      result.current.confirmMultiDelete();
+    });
     expect(result.current.softHiddenBlockIds).toEqual(['b1', 'b2']);
     expect(result.current.selectionMode).toBe(false);
     expect(result.current.selectedBlockIds).toEqual([]);
     expect(result.current.toastMessage).toBe('toast.multiDelete:2');
+    expect(result.current.deleteConfirmPending).toBe(false);
 
     act(() => {
       result.current.handleBlockSelect('b1', { shiftKey: true });
@@ -578,9 +598,18 @@ describe('useWorkbenchTranscriptChrome', () => {
     act(() => {
       document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Delete' }));
     });
+    // #1823: bare Delete raises the confirm gate instead of deleting.
+    expect(result.current.deleteConfirmPending).toBe(true);
+    expect(result.current.softHiddenBlockIds).toEqual([]);
+    expect(result.current.selectionMode).toBe(true);
+
+    act(() => {
+      result.current.confirmMultiDelete();
+    });
     expect(result.current.softHiddenBlockIds).toEqual(['b1', 'b2']);
     expect(result.current.selectionMode).toBe(false);
     expect(result.current.toastMessage).toBe('toast.multiDelete:2');
+    expect(result.current.deleteConfirmPending).toBe(false);
   });
 
   it('enters selection after the hold delay and consumes the pointer up', () => {

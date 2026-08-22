@@ -71,8 +71,20 @@ export function AgentStreamingBar({ className }: AgentStreamingBarProps): React.
   const totalToolCalls = agents.reduce((sum, a) => sum + (a.toolCalls ?? 0), 0);
   const toolCallsLabel = totalToolCalls > 0 ? ` · ${t('agentStreaming.toolCalls', { count: totalToolCalls })}` : '';
 
+  // A11y (#1823): role=status announces on every mutation, so tool-call
+  // counters and status icons chattered the screen reader during a stream.
+  // While any agent is running the region drops to aria-live="off" (the #11
+  // transcript pattern); when the last agent finishes it returns to 'polite'
+  // and the terminal state is announced at most once.
+  const anyActive = agents.some((a) => isActive(a.status));
+
   return (
-    <div className={`${styles.bar} ${className ?? ''}`} role="status" aria-live="polite">
+    <div
+      className={`${styles.bar} ${className ?? ''}`}
+      role="status"
+      aria-live={anyActive ? 'off' : 'polite'}
+      aria-busy={anyActive}
+    >
       {agents.length === 1 ? (
         <div className={styles.agent}>
           <span className={`${styles.icon} ${isActive(agents[0]!.status) ? styles.iconPulse : ''}`} aria-hidden="true">{STATUS_ICON[agents[0]!.status]}</span>

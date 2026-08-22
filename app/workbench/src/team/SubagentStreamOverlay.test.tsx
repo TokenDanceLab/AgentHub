@@ -302,3 +302,30 @@ describe('SubagentStreamOverlay', () => {
     expect(within(dialog).queryByText(/B-only result/)).not.toBeInTheDocument();
   });
 });
+
+describe('SubagentStreamOverlay live region governance (#1823)', () => {
+  beforeEach(() => {
+    testStore = createSubagentStreamStore();
+  });
+
+  it('drops the overlay live region to off while any subagent streams', () => {
+    render(<SubagentStreamOverlay />);
+    act(() => {
+      testStore.push(makeEvent({ agent_task_id: 'task-1', event_type: 'text_delta', payload: { delta: 'tick' } }));
+    });
+    const overlay = screen.getByRole('region');
+    expect(overlay).toHaveAttribute('aria-live', 'off');
+    expect(overlay).toHaveAttribute('aria-busy', 'true');
+  });
+
+  it('returns the overlay to polite once the subagent completes', () => {
+    render(<SubagentStreamOverlay />);
+    act(() => {
+      testStore.push(makeEvent({ agent_task_id: 'task-1', event_type: 'text_delta', payload: { delta: 'tick' } }));
+      testStore.push(makeEvent({ agent_task_id: 'task-1', event_seq: 2, event_type: 'done', payload: {} }));
+    });
+    const overlay = screen.getByRole('region');
+    expect(overlay).toHaveAttribute('aria-live', 'polite');
+    expect(overlay).toHaveAttribute('aria-busy', 'false');
+  });
+});

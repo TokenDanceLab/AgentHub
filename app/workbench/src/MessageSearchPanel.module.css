@@ -178,3 +178,9 @@
   color: var(--td-ink-muted);
   line-height: 1;
 }
+
+/* ── A11y (#1823): visible keyboard focus ring for interactive targets ── */
+.resultItem:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}

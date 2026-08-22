@@ -33,6 +33,7 @@ import {
   planBlockPointerUp,
   planBlockSelect,
   planContextAction,
+  planConfirmMultiDelete,
   planMultiAction,
   planSelectionHotkeyEffect,
   planTranscriptBlockAction,
@@ -430,7 +431,14 @@ describe('workbenchTranscriptChromeHelpers', () => {
       transcript,
       t,
     });
-    expect(del).toEqual([
+    // #1823: delete now raises the confirm gate; the destructive plan
+    // (soft-hide + exit + toast) runs via planConfirmMultiDelete.
+    expect(del).toEqual([{ type: 'confirmDelete', count: 2 }]);
+    expect(planConfirmMultiDelete({
+      selectedBlockIds: ['a', 'b'],
+      transcript,
+      t,
+    })).toEqual([
       { type: 'softHide', blockIds: ['a', 'b'] },
       { type: 'exitSelection' },
       { type: 'toast', message: 'toast.multiDelete:2' },
@@ -499,6 +507,7 @@ describe('workbenchTranscriptChromeHelpers', () => {
       focusComposer: vi.fn(),
       onRegenerate: vi.fn(),
       onApprovalDecision: vi.fn(),
+      onRequestDeleteConfirm: vi.fn(),
       pulseBlock: vi.fn(),
       showWorkbenchToast: vi.fn(),
       exitSelection: vi.fn(),
@@ -519,6 +528,8 @@ describe('workbenchTranscriptChromeHelpers', () => {
       },
       { type: 'pulse', blockId: 'a' },
       { type: 'toast', message: 'done' },
+      // #1823: destructive multi-delete gate before any softHide runs.
+      { type: 'confirmDelete', count: 2 },
       { type: 'exitSelection' },
     ], handlers);
 
@@ -531,6 +542,7 @@ describe('workbenchTranscriptChromeHelpers', () => {
       approvalId: 'req',
       decision: 'allow',
     });
+    expect(handlers.onRequestDeleteConfirm).toHaveBeenCalledWith(2);
     expect(handlers.pulseBlock).toHaveBeenCalledWith('a');
     expect(handlers.showWorkbenchToast).toHaveBeenCalledWith('done');
     expect(handlers.exitSelection).toHaveBeenCalledOnce();
@@ -739,6 +751,7 @@ describe('workbenchTranscriptChromeHelpers', () => {
       setSelectBarRect: vi.fn(),
       setToastMessage: vi.fn(),
       setToastVisible: vi.fn(),
+      setDeleteConfirmPending: vi.fn(),
     };
     const refs = {
       selectionModeRef: { current: false },
@@ -765,6 +778,8 @@ describe('workbenchTranscriptChromeHelpers', () => {
     controller.exitSelection();
     expect(writers.setSelectionMode).toHaveBeenCalledWith(false);
     expect(writers.setSelectedBlockIds).toHaveBeenCalledWith([]);
+    // #1823: leaving selection mode must also drop the pending delete gate.
+    expect(writers.setDeleteConfirmPending).toHaveBeenCalledWith(false);
 
     controller.enterSelection('b');
     expect(refs.selectionModeRef.current).toBe(true);
@@ -810,6 +825,7 @@ describe('workbenchTranscriptChromeHelpers', () => {
       setSelectBarRect: vi.fn(),
       setToastMessage: vi.fn(),
       setToastVisible: vi.fn(),
+      setDeleteConfirmPending: vi.fn(),
     };
     const controller = createTranscriptChromeController({
       refs,

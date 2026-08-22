@@ -174,3 +174,9 @@
     font-size: 12px;
   }
 }
+
+/* ── A11y (#1823): visible keyboard focus ring for interactive targets ── */
+.suggestionChip:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}

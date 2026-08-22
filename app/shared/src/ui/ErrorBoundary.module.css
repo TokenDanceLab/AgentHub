@@ -91,3 +91,9 @@
   white-space: pre-wrap;
   word-break: break-word;
 }
+
+/* ── A11y (#1823): visible keyboard focus ring for interactive targets ── */
+.stackSummary:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}

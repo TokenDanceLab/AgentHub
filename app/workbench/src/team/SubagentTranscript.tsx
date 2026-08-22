@@ -162,8 +162,22 @@ export function SubagentTranscript({
   }
 
   // ── Rendered transcript ──
+  // A11y (#1823): this log rides inside the SubagentStreamOverlay live
+  // region and receives entries at token rate while the subagent streams.
+  // While the newest entry is an in-flight category the log drops to
+  // aria-live="off" (the #11 transcript pattern); when the agent completes
+  // the region returns to 'polite' and the accumulated content is announced
+  // at most once (SR-dependent).
+  const lastCategory = entries.length > 0 ? entries[entries.length - 1]!.category : 'other';
+  const isStreaming = lastCategory === 'thinking' || lastCategory === 'tool_call' || lastCategory === 'text_delta';
   return (
-    <div className={styles.transcript} role="log" aria-label={t('subagentStream.transcriptLabel')} aria-live="polite">
+    <div
+      className={styles.transcript}
+      role="log"
+      aria-label={t('subagentStream.transcriptLabel')}
+      aria-live={isStreaming ? 'off' : 'polite'}
+      aria-busy={isStreaming}
+    >
       {entries.map(({ event, category, config }) => (
         <div
           key={event.event_seq}

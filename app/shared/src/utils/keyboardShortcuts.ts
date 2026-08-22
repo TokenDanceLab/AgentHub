@@ -9,7 +9,7 @@
    and adds event-specific helpers.
    ═══════════════════════════════════════════════════════════════════════ */
 
-export type ShortcutGroupId = 'conversation' | 'composer' | 'navigation' | 'workspace';
+export type ShortcutGroupId = 'conversation' | 'composer' | 'navigation' | 'workspace' | 'selection';
 
 export interface KeyboardShortcut {
   /** Unique shortcut id (kebab-case). */
@@ -67,6 +67,18 @@ export const KEYBOARD_SHORTCUT_GROUPS: KeyboardShortcutGroup[] = [
       { id: 'open-folder', keys: ['Ctrl/⌘', 'O'], labelKey: 'shortcut.openFolder', detailKey: 'shortcut.openFolder.detail' },
       { id: 'settings', keys: ['Ctrl/⌘', ','], labelKey: 'shortcut.settings', detailKey: 'shortcut.settings.detail' },
       { id: 'close-window', keys: ['Ctrl/⌘', 'W'], labelKey: 'shortcut.closeWindow', detailKey: 'shortcut.closeWindow.detail' },
+    ],
+  },
+  {
+    // #1823: box-selection transcript hotkeys (registered for the Settings
+    // registry; they are selection-mode scoped, not rebindable — resolveSelectionHotkey
+    // in the workbench chrome owns the bindings).
+    id: 'selection',
+    labelKey: 'shortcut.group.selection',
+    shortcuts: [
+      { id: 'select-all-messages', keys: ['Ctrl/⌘', 'A'], labelKey: 'shortcut.selectAll', detailKey: 'shortcut.selectAll.detail' },
+      { id: 'copy-selected-messages', keys: ['Ctrl/⌘', 'C'], labelKey: 'shortcut.copySelected', detailKey: 'shortcut.copySelected.detail' },
+      { id: 'delete-selected-messages', keys: ['Delete'], labelKey: 'shortcut.deleteSelected', detailKey: 'shortcut.deleteSelected.detail' },
     ],
   },
 ];

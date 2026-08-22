@@ -87,3 +87,27 @@ describe('SubagentTranscript', () => {
     expect(entries[1]!.getAttribute('data-event-category')).toBe('tool_call');
   });
 });
+
+describe('SubagentTranscript live region governance (#1823)', () => {
+  it('drops aria-live to off while the newest entry is an in-flight category', () => {
+    const { container } = render(
+      <SubagentTranscript
+        events={[makeEvent({ event_seq: 1, event_type: 'text_delta', payload: { delta: 'tick' } })]}
+      />,
+    );
+    const log = container.querySelector('[role="log"]')!;
+    expect(log).toHaveAttribute('aria-live', 'off');
+    expect(log).toHaveAttribute('aria-busy', 'true');
+  });
+
+  it('returns to polite once the agent completed', () => {
+    const { container } = render(
+      <SubagentTranscript
+        events={[makeEvent({ event_seq: 2, event_type: 'result', payload: { summary: 'done okay' } })]}
+      />,
+    );
+    const log = container.querySelector('[role="log"]')!;
+    expect(log).toHaveAttribute('aria-live', 'polite');
+    expect(log).toHaveAttribute('aria-busy', 'false');
+  });
+});

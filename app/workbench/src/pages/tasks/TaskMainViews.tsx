@@ -6,7 +6,7 @@
    CSS remains on shared TasksPage.module.css.
    ═══════════════════════════════════════════════════════════════════════ */
 
-import React, { useEffect, useRef } from 'react';
+import React, { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { SHARED_WORKBENCH_I18N_NAMESPACE } from '@shared/i18n';
 import { StatusNotice } from '@shared/ui';
@@ -111,6 +111,46 @@ export function TaskMain({
   const { t } = useTranslation(SHARED_WORKBENCH_I18N_NAMESPACE);
   const title = PANE_TITLES[activePane] ?? '我负责的';
 
+  // ── Roving tabindex for the view-mode tablist (#1823) ────────────────
+  // One Tab stop for the strip; Arrow/Home/End move focus between the
+  // 列表/看板/仪表盘 tabs without switching the mode (activation stays on
+  // click/Enter, matching the #1835 TerminalPanel pattern).
+  const viewTabsRef = useRef<HTMLDivElement>(null);
+  const viewTabsId = useId();
+  const [rovingViewId, setRovingViewId] = useState<string | null>(null);
+
+  const handleViewTabsKeyDown = useCallback((event: React.KeyboardEvent<HTMLDivElement>) => {
+    const tabButtons = viewTabsRef.current
+      ? Array.from(viewTabsRef.current.querySelectorAll<HTMLButtonElement>('[role="tab"]'))
+      : [];
+    if (tabButtons.length === 0) return;
+    const activeIndex = tabButtons.findIndex((button) => button === document.activeElement);
+    // Focus on a non-tab stop is not part of the roving strip — arrow keys
+    // should not hijack it (#1835 review).
+    if (activeIndex < 0) return;
+    let nextIndex: number | null = null;
+    switch (event.key) {
+      case 'ArrowRight':
+        nextIndex = (activeIndex + 1) % tabButtons.length;
+        break;
+      case 'ArrowLeft':
+        nextIndex = (activeIndex - 1 + tabButtons.length) % tabButtons.length;
+        break;
+      case 'Home':
+        nextIndex = 0;
+        break;
+      case 'End':
+        nextIndex = tabButtons.length - 1;
+        break;
+      default:
+        return;
+    }
+    event.preventDefault();
+    const target = tabButtons[nextIndex];
+    target?.focus();
+    setRovingViewId(target?.dataset.mode ?? null);
+  }, []);
+
   // ── Infinite-scroll sentinel (T14 pattern; wired to the mock data-layer
   //    cursor pagination, #1510) ──
   const sentinelRef = useRef<HTMLDivElement>(null);
@@ -183,23 +223,42 @@ export function TaskMain({
       </div>
 
       {/* View tabs */}
-      <div className={styles.viewTabs} role="tablist">
-        {VIEW_MODES.map((mode) => (
-          <button
-            key={mode.id}
-            type="button"
-            role="tab"
-            className={`${styles.viewTab} ${
-              viewMode === mode.id ? styles.viewTabActive : ''
-            }`}
-            aria-selected={viewMode === mode.id}
-            onClick={() => onViewModeChange(mode.id)}
-          >
-            {mode.label}
-          </button>
-        ))}
+      <div
+        className={styles.viewTabs}
+        role="tablist"
+        ref={viewTabsRef}
+        onKeyDown={handleViewTabsKeyDown}
+      >
+        {VIEW_MODES.map((mode) => {
+          const selected = viewMode === mode.id;
+          const isTabStop = mode.id === (rovingViewId ?? viewMode);
+          return (
+            <button
+              key={mode.id}
+              type="button"
+              role="tab"
+              id={`${viewTabsId}-tab-${mode.id}`}
+              aria-controls={`${viewTabsId}-panel`}
+              aria-selected={selected}
+              tabIndex={isTabStop ? 0 : -1}
+              data-mode={mode.id}
+              className={`${styles.viewTab} ${
+                selected ? styles.viewTabActive : ''
+              }`}
+              onClick={() => onViewModeChange(mode.id)}
+            >
+              {mode.label}
+            </button>
+          );
+        })}
       </div>
 
+      {/* Tabpanel: toolbar + task surface controlled by the view tabs (#1823) */}
+      <div
+        role="tabpanel"
+        id={`${viewTabsId}-panel`}
+        aria-labelledby={`${viewTabsId}-tab-${viewMode}`}
+      >
       {/* Toolbar */}
       <div className={`${styles.toolbar} task-toolbar`}>
         {onCreateTask && (
@@ -304,6 +363,7 @@ export function TaskMain({
           加载中…
         </StatusNotice>
       ) : null}
+      </div>
     </main>
   );
 }

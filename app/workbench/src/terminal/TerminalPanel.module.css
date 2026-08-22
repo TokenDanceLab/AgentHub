@@ -286,3 +286,21 @@
     transform: none;
   }
 }
+
+/* ── A11y (#1823): visible keyboard focus ring for interactive targets ── */
+.tab:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.tabClose:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.toolBtn:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.primaryBtn:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}

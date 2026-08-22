@@ -7,6 +7,7 @@ import {
   buildTranscriptContextMenuGroups,
   buildTranscriptMultiSelectActions,
   createTranscriptChromeEffectHandlers,
+  planConfirmMultiDelete,
   planContextAction,
   planMultiAction,
   planTranscriptBlockAction,
@@ -136,6 +137,7 @@ export {
   planContextAction,
   planTranscriptBlockAction,
   planMultiAction,
+  planConfirmMultiDelete,
   createTranscriptChromeEffectHandlers,
   applyTranscriptChromeSideEffects,
   buildTranscriptContextMenuGroups,
@@ -172,6 +174,8 @@ export interface TranscriptChromeStateWriters {
   setSelectBarRect: (value: SelectBarRect | null) => void;
   setToastMessage: (value: string) => void;
   setToastVisible: (value: boolean) => void;
+  /** #1823: destructive multi-delete confirm-gate state. */
+  setDeleteConfirmPending: (value: boolean) => void;
 }
 
 export interface TranscriptChromeControllerDeps {
@@ -220,6 +224,8 @@ export interface TranscriptChromeController {
   ) => void;
   runContextAction: (action: string, blockId: string) => void;
   runMultiAction: (action: string) => void;
+  /** #1823: executes the confirmed destructive multi-delete (soft-hide). */
+  confirmMultiDelete: () => void;
   handleSelectionHotkey: (event: {
     key: string;
     ctrlKey: boolean;
@@ -269,6 +275,7 @@ export function createTranscriptChromeController(
     const snapshot = createExitSelectionSnapshot();
     writers.setSelectionMode(snapshot.selectionMode);
     writers.setSelectedBlockIds(snapshot.selectedBlockIds);
+    writers.setDeleteConfirmPending(false);
   };
 
   const enterSelection = (blockId: string): void => {
@@ -285,6 +292,7 @@ export function createTranscriptChromeController(
     writers.setSelectedBlockIds(snapshot.selectedBlockIds);
     writers.setActionedBlockIds(snapshot.actionedBlockIds);
     writers.setSoftHiddenBlockIds(snapshot.softHiddenBlockIds);
+    writers.setDeleteConfirmPending(false);
   };
 
   const effectHandlers = (): TranscriptChromeEffectHandlers => createTranscriptChromeEffectHandlers({
@@ -294,6 +302,7 @@ export function createTranscriptChromeController(
     focusComposer: () => focusComposerInput(deps.composerInputRef),
     onRegenerate: deps.onRegenerate,
     onApprovalDecision: deps.onApprovalDecision,
+    onRequestDeleteConfirm: () => writers.setDeleteConfirmPending(true),
     onPinMessage: deps.onPinMessage,
     onUnpinMessage: deps.onUnpinMessage,
     onForwardMessage: deps.onForwardMessage,
@@ -401,6 +410,17 @@ export function createTranscriptChromeController(
     }), effectHandlers());
   };
 
+  // #1823: the destructive multi-delete runs only after the user confirmed
+  // the inline prompt (SelectionDeleteConfirm). planMultiAction('delete')
+  // just raises the confirm gate; this applies the soft-hide plan.
+  const confirmMultiDelete = (): void => {
+    applyTranscriptChromeSideEffects(planConfirmMultiDelete({
+      selectedBlockIds: getSelectedBlockIds(),
+      transcript: getTranscript(),
+      t,
+    }), effectHandlers());
+  };
+
   const handleSelectionHotkey = (event: {
     key: string;
     ctrlKey: boolean;
@@ -441,6 +461,7 @@ export function createTranscriptChromeController(
     handleTranscriptBlockAction,
     runContextAction,
     runMultiAction,
+    confirmMultiDelete,
     handleSelectionHotkey,
     updateSelectBarRect,
     disposeSelectionHold: () => disposeSelectionHoldRef(refs.selectionHoldRef),

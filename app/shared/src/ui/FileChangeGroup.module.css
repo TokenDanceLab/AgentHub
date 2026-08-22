@@ -145,3 +145,17 @@
 @media (hover: none) {
   .previewHint { opacity: 1; }
 }
+
+/* ── A11y (#1823): visible keyboard focus ring for interactive targets ── */
+.header:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.fileRow:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.diffBtn:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}

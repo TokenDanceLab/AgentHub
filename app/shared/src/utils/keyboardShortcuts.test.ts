@@ -14,12 +14,13 @@ import {
 const CUSTOM_BINDINGS_KEY = 'agenthub-custom-keybindings';
 
 describe('KEYBOARD_SHORTCUT_GROUPS', () => {
-  it('declares the four canonical groups in order', () => {
+  it('declares the five canonical groups in order', () => {
     expect(KEYBOARD_SHORTCUT_GROUPS.map((g) => g.id)).toEqual([
       'conversation',
       'composer',
       'navigation',
       'workspace',
+      'selection',
     ]);
   });
 
@@ -42,11 +43,11 @@ describe('KEYBOARD_SHORTCUT_GROUPS', () => {
     }
   });
 
-  it('flattens KEYBOARD_SHORTCUTS from the groups (15 canonical bindings)', () => {
-    expect(KEYBOARD_SHORTCUTS).toHaveLength(15);
+  it('flattens KEYBOARD_SHORTCUTS from the groups (18 canonical bindings)', () => {
+    expect(KEYBOARD_SHORTCUTS).toHaveLength(18);
     expect(KEYBOARD_SHORTCUTS[0]).toEqual(KEYBOARD_SHORTCUT_GROUPS[0]!.shortcuts[0]);
     expect(KEYBOARD_SHORTCUTS.at(-1)).toEqual(
-      KEYBOARD_SHORTCUT_GROUPS[3]!.shortcuts.at(-1),
+      KEYBOARD_SHORTCUT_GROUPS[4]!.shortcuts.at(-1),
     );
   });
 });

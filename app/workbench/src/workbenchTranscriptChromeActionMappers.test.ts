@@ -9,6 +9,7 @@ import {
   createTranscriptChromeEffectHandlers,
   forwardActionForTargets,
   planContextAction,
+  planConfirmMultiDelete,
   planMultiAction,
   planTranscriptBlockAction,
 } from './workbenchTranscriptChromeActionMappers';
@@ -59,8 +60,17 @@ describe('workbenchTranscriptChromeActionMappers', () => {
       transcript,
       t,
     });
-    expect(multiDelete.some((effect) => effect.type === 'softHide')).toBe(true);
-    expect(multiDelete.some((effect) => effect.type === 'exitSelection')).toBe(true);
+    // #1823: destructive multi-delete gates on a confirm step; the
+    // softHide/exit effects run only via planConfirmMultiDelete.
+    expect(multiDelete).toEqual([{ type: 'confirmDelete', count: 1 }]);
+
+    const confirmedDelete = planConfirmMultiDelete({
+      selectedBlockIds: ['b1'],
+      transcript,
+      t,
+    });
+    expect(confirmedDelete.some((effect) => effect.type === 'softHide')).toBe(true);
+    expect(confirmedDelete.some((effect) => effect.type === 'exitSelection')).toBe(true);
   });
 
   it('copies the full text of text blocks instead of the truncated title', () => {

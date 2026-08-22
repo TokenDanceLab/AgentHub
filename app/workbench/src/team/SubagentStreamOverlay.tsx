@@ -288,6 +288,12 @@ export function SubagentStreamOverlay({
   const dialogEntry = dialogTaskId != null
     ? entries.find((entry) => entry.taskId === dialogTaskId) ?? null
     : null;
+  // A11y (#1823): the whole overlay is a live region, but streaming chips
+  // mutate it at token rate — while any entry is active the region drops to
+  // aria-live="off" (the #11 transcript pattern) so screen readers are not
+  // bombarded; when the last active entry completes the region returns to
+  // 'polite' and the terminal state is announced at most once.
+  const anyActive = entries.some((entry) => isActiveStatus(entry.status));
 
   return (
     <>
@@ -295,7 +301,8 @@ export function SubagentStreamOverlay({
         className={`${styles.overlay} ${position === 'bottom-left' ? styles.positionLeft : styles.positionRight}`}
         role="region"
         aria-label="Subagent stream status"
-        aria-live="polite"
+        aria-live={anyActive ? 'off' : 'polite'}
+        aria-busy={anyActive}
       >
         {stackedCount > 0 ? (
           <div className={styles.stackedBadge}>

@@ -64,6 +64,8 @@ export interface WorkbenchTranscriptChrome {
   toastMessage: string;
   toastVisible: boolean;
   selectBarRect: { left: number; width: number } | null;
+  /** #1823: destructive multi-delete awaits the inline confirm gate. */
+  deleteConfirmPending: boolean;
   multiSelectActions: Array<MultiSelectBarAction>;
   contextMenuGroups: (blockId: string) => Array<Array<ContextMenuItem>>;
   showWorkbenchToast: (message: string) => void;
@@ -79,6 +81,10 @@ export interface WorkbenchTranscriptChrome {
   handleBlockPointerUp: (block: TranscriptBlock, event: TranscriptPointerEvent) => void;
   copyText: (text: string) => void;
   resetSelection: () => void;
+  /** #1823: runs the confirmed multi-delete (soft-hide selected blocks). */
+  confirmMultiDelete: () => void;
+  /** #1823: dismisses the pending delete confirm without deleting. */
+  cancelDeleteConfirm: () => void;
   selectionModeRef: MutableRefObject<boolean>;
 }
 
@@ -107,6 +113,7 @@ export function useWorkbenchTranscriptChrome({
   const [selectBarRect, setSelectBarRect] = useState<{ left: number; width: number } | null>(null);
   const [toastMessage, setToastMessage] = useState('');
   const [toastVisible, setToastVisible] = useState(false);
+  const [deleteConfirmPending, setDeleteConfirmPending] = useState(false);
 
   const selectionModeRef = useRef(false);
   const selectionHoldRef = useRef<SelectionHoldState | null>(null);
@@ -143,6 +150,7 @@ export function useWorkbenchTranscriptChrome({
       setSelectBarRect,
       setToastMessage,
       setToastVisible,
+      setDeleteConfirmPending,
     },
     getTranscript: () => transcriptRef.current,
     getSelectedBlockIds: () => selectedBlockIdsRef.current,
@@ -221,6 +229,7 @@ export function useWorkbenchTranscriptChrome({
     toastMessage,
     toastVisible,
     selectBarRect,
+    deleteConfirmPending,
     multiSelectActions,
     contextMenuGroups: controller.contextMenuGroups,
     showWorkbenchToast: controller.showWorkbenchToast,
@@ -232,6 +241,8 @@ export function useWorkbenchTranscriptChrome({
     handleBlockPointerUp: controller.handleBlockPointerUp,
     copyText: controller.copyText,
     resetSelection: controller.resetSelection,
+    confirmMultiDelete: controller.confirmMultiDelete,
+    cancelDeleteConfirm: () => setDeleteConfirmPending(false),
     selectionModeRef,
   };
 }

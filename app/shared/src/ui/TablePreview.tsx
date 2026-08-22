@@ -12,7 +12,7 @@
    scrollable HTML table with sortable columns.
    ═══════════════════════════════════════════════════════════════════════ */
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useCallback, useId, useRef, useState, useEffect, useMemo } from 'react';
 import { AlertCircle, ArrowUp, ArrowDown, ArrowUpDown, RotateCcw, X } from 'lucide-react';
 import { Button } from './Button';
 import styles from './TablePreview.module.css';
@@ -233,6 +233,46 @@ export const TablePreview: React.FC<TablePreviewProps> = ({
 
   const fileExt = fileName.split('.').pop()?.toUpperCase() ?? '';
 
+  // ── Roving tabindex for the sheet tablist (#1823) ────────────────────
+  // One Tab stop for the strip; Arrow/Home/End move focus between sheet
+  // tabs without switching the sheet (activation stays on click/Enter,
+  // matching the #1835 TerminalPanel pattern).
+  const sheetTabsRef = useRef<HTMLDivElement>(null);
+  const sheetTabsId = useId();
+  const [rovingSheetId, setRovingSheetId] = useState<string | null>(null);
+
+  const handleSheetTabsKeyDown = useCallback((event: React.KeyboardEvent<HTMLDivElement>) => {
+    const tabButtons = sheetTabsRef.current
+      ? Array.from(sheetTabsRef.current.querySelectorAll<HTMLButtonElement>('[role="tab"]'))
+      : [];
+    if (tabButtons.length === 0) return;
+    const activeIndex = tabButtons.findIndex((button) => button === document.activeElement);
+    // Focus outside the tab strip (e.g. the close button): arrow keys own
+    // the strip only, do not hijack other controls (#1835 review).
+    if (activeIndex < 0) return;
+    let nextIndex: number | null = null;
+    switch (event.key) {
+      case 'ArrowRight':
+        nextIndex = (activeIndex + 1) % tabButtons.length;
+        break;
+      case 'ArrowLeft':
+        nextIndex = (activeIndex - 1 + tabButtons.length) % tabButtons.length;
+        break;
+      case 'Home':
+        nextIndex = 0;
+        break;
+      case 'End':
+        nextIndex = tabButtons.length - 1;
+        break;
+      default:
+        return;
+    }
+    event.preventDefault();
+    const target = tabButtons[nextIndex];
+    target?.focus();
+    setRovingSheetId(target?.dataset.sheetName ?? null);
+  }, []);
+
   return (
     <section className={styles.root} aria-label={`${fileName} spreadsheet preview`}>
       {/* ── Header ── */}
@@ -258,19 +298,33 @@ export const TablePreview: React.FC<TablePreviewProps> = ({
 
       {/* ── Sheet tabs ── */}
       {sheetNames.length > 1 && (
-        <div className={styles.sheetTabs} role="tablist" aria-label={t("aria.worksheet")}>
-          {sheetNames.map((name) => (
-            <button
-              key={name}
-              role="tab"
-              type="button"
-              aria-selected={name === activeSheet}
-              className={`${styles.sheetTab} ${name === activeSheet ? styles.sheetTabActive : ''}`}
-              onClick={() => handleSheetSwitch(name)}
-            >
-              {name}
-            </button>
-          ))}
+        <div
+          className={styles.sheetTabs}
+          role="tablist"
+          aria-label={t("aria.worksheet")}
+          ref={sheetTabsRef}
+          onKeyDown={handleSheetTabsKeyDown}
+        >
+          {sheetNames.map((name) => {
+            const selected = name === activeSheet;
+            const isTabStop = name === (rovingSheetId ?? activeSheet);
+            return (
+              <button
+                key={name}
+                role="tab"
+                type="button"
+                id={`${sheetTabsId}-tab-${name}`}
+                aria-controls={`${sheetTabsId}-panel`}
+                aria-selected={selected}
+                tabIndex={isTabStop ? 0 : -1}
+                className={`${styles.sheetTab} ${selected ? styles.sheetTabActive : ''}`}
+                data-sheet-name={name}
+                onClick={() => handleSheetSwitch(name)}
+              >
+                {name}
+              </button>
+            );
+          })}
         </div>
       )}
 
@@ -296,7 +350,12 @@ export const TablePreview: React.FC<TablePreviewProps> = ({
 
       {/* ── Table ── */}
       {!loading && !error && headers.length > 0 && (
-        <div className={styles.tableWrapper}>
+        <div
+          className={styles.tableWrapper}
+          role="tabpanel"
+          id={`${sheetTabsId}-panel`}
+          aria-labelledby={sheetNames.length > 1 ? `${sheetTabsId}-tab-${activeSheet}` : undefined}
+        >
           <table className={styles.table}>
             <thead>
               <tr>
@@ -305,6 +364,15 @@ export const TablePreview: React.FC<TablePreviewProps> = ({
                     key={i}
                     className={styles.th}
                     onClick={() => handleSort(i)}
+                    onKeyDown={(event) => {
+                      // #1823: the sortable column header is a keyboard
+                      // target — Enter/Space sort exactly like a click.
+                      if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault();
+                        handleSort(i);
+                      }
+                    }}
+                    tabIndex={0}
                     role="columnheader"
                     aria-sort={
                       sort.column === i
