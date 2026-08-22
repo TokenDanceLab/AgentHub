@@ -12,10 +12,10 @@ import (
 	"testing"
 
 	"github.com/agenthub/edge-server/internal/adapters"
-	"github.com/agenthub/edge-server/internal/permission"
 	"github.com/agenthub/edge-server/internal/errcode"
 	"github.com/agenthub/edge-server/internal/events"
 	"github.com/agenthub/edge-server/internal/lifecycle"
+	"github.com/agenthub/edge-server/internal/permission"
 	"github.com/agenthub/edge-server/internal/store"
 )
 

@@ -114,7 +114,7 @@ func AgentSpecV1ToSDKFixtureStream(spec AgentHubAgentSpecV1) (SDKFixtureStream, 
 			WorkspacePathPolicy: invocation.WorkDirPolicy,
 			RawSDKObjectPolicy:  invocation.RawSDKObjectPolicy,
 			Capabilities:        &capability,
-			Health: &SDKFixtureHealth{
+			Health: &FixtureHealth{
 				State:  "fixture-ready",
 				Reason: "AgentHubAgentSpec v1 fixture export; no SDK package, model call, API call, CLI process, or production credential was used",
 				Checks: map[string]string{
@@ -321,8 +321,8 @@ func runtimeInvocationFixtureParserContract(strategy string) []string {
 	return base
 }
 
-func runtimeInvocationFixtureCapabilities(spec AgentHubAgentSpecV1) SDKFixtureCapabilities {
-	return SDKFixtureCapabilities{
+func runtimeInvocationFixtureCapabilities(spec AgentHubAgentSpecV1) FixtureCapabilities {
+	return FixtureCapabilities{
 		Streaming:       true,
 		ToolCalls:       len(spec.ToolAllowlist) > 0,
 		FileChanges:     containsAgentSpecTool(spec.ToolAllowlist, "write_file") || containsAgentSpecTool(spec.ToolAllowlist, "edit_file"),

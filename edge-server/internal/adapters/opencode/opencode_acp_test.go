@@ -295,7 +295,7 @@ func TestOpenCodeACPAdapterDefaultBinaryPath(t *testing.T) {
 }
 
 func TestOpenCodeACPAdapterPreflightFailsFast(t *testing.T) {
-	a := &OpenCodeACPAdapter{
+	a := &ACPAdapter{
 		AcpAdapter: acp.NewAcpAdapterWithID(opencodeACPAdapterID, "", nil, "OpenCode (ACP)"),
 	}
 	if a.Available() {

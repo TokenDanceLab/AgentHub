@@ -56,13 +56,13 @@ const opencodeACPVersionPin = "1.18.5"
 // PATH (PATHEXT resolves opencode.exe on Windows).
 const opencodeACPDefaultBinary = "opencode"
 
-// OpenCodeACPAdapter runs the native `opencode acp` ACP agent.
+// ACPAdapter runs the native `opencode acp` ACP agent.
 //
 // It embeds AcpAdapter and inherits BuildCommand/Metadata/Capabilities/
 // ParseStream/NeedsStdin/Available/SetPermissionBroker from it; this wrapper
 // only supplies the opencode-acp configuration via NewAcpAdapterConfig plus a
 // PreflightCheck override (see file doc for why the override is retained).
-type OpenCodeACPAdapter struct {
+type ACPAdapter struct {
 	*acp.AcpAdapter
 }
 
@@ -72,11 +72,11 @@ type OpenCodeACPAdapter struct {
 // "opencode" (resolved via PATH). The agent receives the single static arg
 // "acp" — ACP mode is native to the binary, and the prompt travels over
 // stdio (session/prompt), never argv.
-func NewOpenCodeACPAdapter(binaryPath string) *OpenCodeACPAdapter {
+func NewOpenCodeACPAdapter(binaryPath string) *ACPAdapter {
 	if binaryPath == "" {
 		binaryPath = opencodeACPDefaultBinary
 	}
-	return &OpenCodeACPAdapter{AcpAdapter: acp.NewAcpAdapterConfig(acp.AcpAdapterConfig{
+	return &ACPAdapter{AcpAdapter: acp.NewAcpAdapterConfig(acp.AcpAdapterConfig{
 		ID:           opencodeACPAdapterID,
 		Binary:       binaryPath,
 		Args:         []string{"acp"},
@@ -101,7 +101,7 @@ func NewOpenCodeACPAdapter(binaryPath string) *OpenCodeACPAdapter {
 // failure; this override guarantees that behavior regardless of how the
 // wrapper was constructed. Authentication — provider API keys or opencode
 // auth login — is left to the opencode process itself.
-func (a *OpenCodeACPAdapter) PreflightCheck() error {
+func (a *ACPAdapter) PreflightCheck() error {
 	if !a.Available() {
 		return fmt.Errorf("opencode-acp launcher %q not found on PATH (install opencode >= %s)", a.AgentBinary(), opencodeACPVersionPin)
 	}
@@ -110,7 +110,7 @@ func (a *OpenCodeACPAdapter) PreflightCheck() error {
 
 // compile-time guard: the wrapper satisfies the full AgentAdapter contract
 // (via the embedded AcpAdapter).
-var _ adapters.AgentAdapter = (*OpenCodeACPAdapter)(nil)
+var _ adapters.AgentAdapter = (*ACPAdapter)(nil)
 
 // Verified: end-to-end runs against the real `opencode acp` process were
 // exercised on the DevSpace dev machine (opencode 1.18.18 installed via npm,

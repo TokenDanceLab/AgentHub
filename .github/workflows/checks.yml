@@ -55,13 +55,37 @@ jobs:
 
       - name: Lint
         if: github.event_name == 'workflow_dispatch' || needs.changes.outputs.go == 'true'
-        # Wave 10: advisory — gocognit findings in pre-existing complex functions
+        # #1840: report-only — the action's raw exit code cannot consult the
+        # baseline, and GitHub refuses PR diffs >300 files, so the action
+        # falls back to a full-repo lint that reports the 6 baseline-
+        # registered exported-stutter findings and would hard-fail a
+        # debt-clean large PR. The hard gate lives in the fingerprint ratchet
+        # step below. only-new-issues stays so small PRs still produce a
+        # new-findings-only report.
         continue-on-error: true
         uses: golangci/golangci-lint-action@v9
         with:
           working-directory: edge-server
           version: ${{ env.GOLANGCI_LINT_VERSION }}
-          args: --timeout=5m
+          args: --timeout=5m --output.json.path=${{ runner.temp }}/edge-lint-report.json
+          only-new-issues: true
+
+      # #1840: finding fingerprint ratchet — any finding NOT in the baseline
+      # (new linter, new rule, escalated severity, replacement with same count)
+      # hard-fails this job. Baseline-registered findings pass whether the
+      # report is patch-filtered or the >300-file full-lint fallback, so the
+      # 6 pre-existing exported-stutter findings never block a debt-clean PR.
+      # Reads the same JSON report the Lint step just produced (single source,
+      # no version drift; gofmt is excluded as toolchain-drift-prone).
+      - name: Verify Edge lint fingerprint ratchet (#1840)
+        if: github.event_name == 'workflow_dispatch' || needs.changes.outputs.go == 'true'
+        working-directory: .
+        run: python ./scripts/verify/verify-edge-lint-ratchet.py --LintJsonPath "${{ runner.temp }}/edge-lint-report.json"
+
+      - name: Self-test Edge lint fingerprint ratchet
+        if: github.event_name == 'workflow_dispatch' || needs.changes.outputs.go == 'true'
+        working-directory: .
+        run: python ./scripts/verify/tests/verify-edge-lint-ratchet.Tests.py
 
       - name: Download shard coverage data
         if: github.event_name == 'workflow_dispatch' || needs.changes.outputs.go == 'true'
