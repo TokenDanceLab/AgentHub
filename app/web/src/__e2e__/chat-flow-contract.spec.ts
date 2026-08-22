@@ -6,7 +6,10 @@ import {
   type E2EObservedRequest,
 } from '../../../shared/src/testing/e2eDataModeContract';
 
-const HUB_ORIGIN = 'http://localhost:8080';
+// Must match playwright.config.ts webServer VITE_HUB_URL: the fail-closed
+// reserved origin keeps every Hub call inside the route stub instead of
+// reaching localhost or production.
+const HUB_ORIGIN = 'https://hub.test.invalid';
 const WEB_E2E_PORT = Number(process.env.AGENTHUB_WEB_E2E_PORT ?? 5174);
 const WEB_E2E_APP_ORIGIN = `http://127.0.0.1:${WEB_E2E_PORT}`;
 const SESSION_ID = 'session-chat-flow';
@@ -72,7 +75,7 @@ test.describe('Web shared chat flow contract', () => {
     expect(order.reply).toBeGreaterThan(order.toolB);
 
     await expect.poll(() => backendRequests.endpoints.has(`GET /web/agent-tasks/${TASK_ID}/events`)).toBe(true);
-    await expect.poll(() => backendRequests.endpoints.has(`GET /web/agent-tasks/${TASK_ID}/summary`)).toBe(true);
+    await expect.poll(() => backendRequests.endpoints.has(`GET /web/agent-tasks/${TASK_ID}/events/summary`)).toBe(true);
     await expect(page.getByText('mock (auto fallback)')).toHaveCount(0);
     await expect.poll(() => horizontalOverflow(page)).toBeLessThanOrEqual(1);
     assertE2EDataModeScenario(WEB_CHAT_FLOW_SCENARIO, backendRequests.requests);
@@ -81,7 +84,10 @@ test.describe('Web shared chat flow contract', () => {
   test('keeps a submitted Hub user message visible while the send request is in flight', async ({ page }) => {
     collectPageDiagnostics(page);
     const backendRequests = await installChatFlowHubStub(page, { messagePostDelayMs: 800 });
-    await enterApprovedRealHubSession(page);
+    // A finished (not running) task keeps the replay transcript hydrated while
+    // leaving the composer on the Send control — a running task switches the
+    // composer to the Stop control and blocks plain message sends.
+    await enterApprovedRealHubSession(page, { activeTaskStatus: 'done' });
     expect(page.viewportSize()).toEqual(DESKTOP_WORKSPACE_VIEWPORT);
 
     const transcript = page.getByRole('log');
@@ -130,7 +136,7 @@ function collectPageDiagnostics(page: Page): void {
 function isExpectedBrowserDiagnostic(text: string): boolean {
   return (
     text.includes("The Content Security Policy directive 'frame-ancestors' is ignored") ||
-    text.includes("WebSocket connection to 'ws://localhost:8080/client/ws")
+    text.includes("WebSocket connection to 'wss://hub.test.invalid/client/ws")
   );
 }
 
@@ -152,13 +158,16 @@ async function expectTranscriptWithoutModeDebug(transcript: ReturnType<Page['get
   await expect(transcript).not.toContainText('demo+edge');
 }
 
-async function enterApprovedRealHubSession(page: Page): Promise<void> {
-  await page.addInitScript(({ sessionId, taskId }) => {
+async function enterApprovedRealHubSession(
+  page: Page,
+  options: { activeTaskStatus?: string } = {},
+): Promise<void> {
+  await page.addInitScript(({ sessionId, taskId, status }) => {
     window.localStorage.setItem('agenthub.workbench.dataMode', 'approved-real');
     window.localStorage.setItem(`agenthub.web.activeAgentTask.${sessionId}`, JSON.stringify({
       taskId,
       sessionId,
-      status: 'running',
+      status,
     }));
     window.sessionStorage.setItem('agenthub_hub_token', 'stubbed-chat-flow-token');
     window.sessionStorage.setItem('agenthub_token_source', 'hub');
@@ -166,7 +175,7 @@ async function enterApprovedRealHubSession(page: Page): Promise<void> {
       userId: 'user-chat-flow',
       username: 'chat-flow',
     }));
-  }, { sessionId: SESSION_ID, taskId: TASK_ID });
+  }, { sessionId: SESSION_ID, taskId: TASK_ID, status: options.activeTaskStatus ?? 'running' });
 
   await page.goto('/');
 }
@@ -213,7 +222,10 @@ async function installChatFlowHubStub(page: Page, options: ChatFlowHubStubOption
       return;
     }
 
-    await route.continue();
+    // External hosts (Google Fonts etc.) must never be reached: a hanging
+    // external stylesheet blocks the document load event and makes the lane
+    // flaky. Fulfill with an empty stylesheet instead of continuing.
+    await route.fulfill({ status: 200, contentType: 'text/css', body: '' });
   });
 
   return { endpoints, requests };
@@ -313,7 +325,7 @@ async function fulfillHubRoute(
     return;
   }
 
-  if (pathname === `/web/agent-tasks/${TASK_ID}/summary`) {
+  if (pathname === `/web/agent-tasks/${TASK_ID}/events/summary`) {
     await route.fulfill(json(hubEnvelope({
       task_id: TASK_ID,
       edge_run_id: 'run-chat-flow',

@@ -8,7 +8,10 @@ import {
 } from '../../../shared/src/testing/e2eDataModeContract';
 
 const ARTIFACT_DIR = path.resolve(process.cwd(), '.tmp', 'task-contract-replay');
-const HUB_ORIGIN = 'http://localhost:8080';
+// Must match playwright.config.ts webServer VITE_HUB_URL: the fail-closed
+// reserved origin keeps every Hub call inside the route stub instead of
+// reaching localhost or production.
+const HUB_ORIGIN = 'https://hub.test.invalid';
 const WEB_E2E_PORT = Number(process.env.AGENTHUB_WEB_E2E_PORT ?? 5174);
 const WEB_E2E_APP_ORIGIN = `http://127.0.0.1:${WEB_E2E_PORT}`;
 const WEB_TASK_CONTRACT_SCENARIO = createE2EDataModeScenario({
@@ -28,7 +31,14 @@ test.describe('Web Hub task approval/artifact contract', () => {
       requests: [],
     };
 
-    await page.route('http://localhost:8080/**', async (route) => {
+    // External hosts (Google Fonts etc.) must never be reached: a hanging
+    // external stylesheet blocks the page load event and makes the lane flaky.
+    await page.route('https://fonts.googleapis.com/**', (route) =>
+      route.fulfill({ status: 200, contentType: 'text/css', body: '' }));
+    await page.route('https://fonts.gstatic.com/**', (route) =>
+      route.fulfill({ status: 200, contentType: 'text/css', body: '' }));
+
+    await page.route(`${HUB_ORIGIN}/**`, async (route) => {
       const request = route.request();
       const url = new URL(request.url());
       requested.endpoints.add(`${request.method()} ${url.pathname}`);
@@ -170,7 +180,7 @@ test.describe('Web Hub task approval/artifact contract', () => {
         return route.fulfill(json(hubEnvelope([])));
       }
 
-      if (url.pathname === '/web/agent-tasks/task-web-contract/summary') {
+      if (url.pathname === '/web/agent-tasks/task-web-contract/events/summary') {
         return route.fulfill(json(hubEnvelope({
           task_id: 'task-web-contract',
           edge_run_id: 'edge-run-contract',
@@ -303,7 +313,7 @@ function writeReplayManifest(requested: BackendRequestLog): void {
     sessionId: 'session-web-contract',
     approvalReplayObserved: requestedEndpoints.includes('GET /web/agent-tasks/task-web-contract/approvals'),
     artifactReplayObserved: requestedEndpoints.includes('GET /web/agent-tasks/task-web-contract/artifacts'),
-    summaryReplayObserved: requestedEndpoints.includes('GET /web/agent-tasks/task-web-contract/summary'),
+    summaryReplayObserved: requestedEndpoints.includes('GET /web/agent-tasks/task-web-contract/events/summary'),
     HubSessionSource: 'stubbed-hub-session',
     WebReplayObserved: true,
     RealExecutionSource: 'none',

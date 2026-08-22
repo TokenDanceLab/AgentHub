@@ -9,8 +9,12 @@ export default defineConfig({
   // chat-real.spec.ts needs the live Hub+Edge stack and is driven by
   // playwright.real.config.ts (pnpm test:e2e:real) instead (#1678).
   testIgnore: ['**/chat-real.spec.ts'],
-  timeout: 60_000,
-  expect: { timeout: 10_000 },
+  // Hydration budgets: on loaded dev boxes (live dev stack / parallel CI
+  // lanes) the first vite compilation + Hub stub hydration can exceed the
+  // historical 10s expect window, so the windows carry headroom. Assertions
+  // still fail closed once the budget is exhausted.
+  timeout: 90_000,
+  expect: { timeout: 20_000 },
   retries: 0,
   use: {
     baseURL: webE2EBaseURL,
