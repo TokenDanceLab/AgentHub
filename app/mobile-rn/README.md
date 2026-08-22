@@ -48,13 +48,24 @@ corepack pnpm ios
 
 | Gate | Command | What it proves | What it does not prove |
 |---|---|---|---|
-| Static RN boundary | `corepack pnpm verify` | Typecheck, lint, brand assets, import boundaries, and unit tests pass for current source. | Native device behavior, live Hub, real login, push delivery, or packaged release. |
+| Static RN boundary | `corepack pnpm verify` | Typecheck, lint, brand assets, import boundaries, and unit tests pass for current source (incl. shared auth-core session flows, deep-link/notification intent routing, lifecycle bridge behavior). | Native device behavior, live Hub, real login, push delivery, or packaged release. |
 | Mock Hub contract | `corepack pnpm mock:hub:check` | Local simulator endpoints and typed update stream shape are coherent. | Real Hub availability or auth. |
 | Expo Web visual QA | `corepack pnpm visual:qa` | 5177 browser preview layout, i18n, privacy text, and interaction geometry remain stable. | Native renderer, device APIs, or backend correctness. |
 | Native readiness shape | `corepack pnpm native:check` | Expo config and development profiles are no-secret and structurally valid. | Install/open proof, SecureStore persistence, notifications, media picker behavior, or real OIDC. |
 | Android packaging | `corepack pnpm android:package` | A local installable APK can be built when the Android toolchain is available. | Device proof unless the APK is installed/opened in the same task and evidence is recorded. |
 
 All mock, fixture, readiness-only, and preview-only results must be recorded with `real_tested=false`. `approved-real` is an evidence mode label, not proof by itself.
+
+## Push and notification capabilities
+
+Verified boundary (lane C-1824, 2026-08-23): **hub-server has no push delivery facility** — zero hits in Go sources for FCM/APNs/Expo-push/`push_token`, no dependency in `go.mod`, and `registerDevice` (hub-server/internal/handler/device.go + shared `HubRegisterDeviceRequest`) carries no token field. The Expo push token therefore stays **local (on-device) only** and is never forwarded to the Hub; notification click intents route in-app via `notificationBridge` + shared `notificationIntents` (unit-tested). Do not add `push_token` to `registerDevice` or claim server-side push until the Hub ships a delivery path.
+
+## Auth and deep-link boundaries
+
+- Login runs the real TokenDance ID OIDC flow through the shared auth core (`@agenthub/shared/api/auth` createHubAuthCore, #1537): PKCE → Hub authorize → `expo-web-browser` → `agenthub://auth/callback` → code exchange → SecureStore-backed session with refresh fallback and signed-out cleanup on refresh failure.
+- The OIDC pending state (PKCE verifier) is memory-only — parity with Desktop Tauri mode; if the OS kills the app mid-login the user restarts (no silent callback acceptance without the verifier).
+- Deep links (`agenthub://`, app.config.ts) cover cold start (`getInitialURL`) and warm start (`url` listener); **if the app is not installed there is no handler and no web fallback** — no-op by design.
+- Account `hubSync` status stays fixture/preview-backed until the mobile live data plane becomes the UI truth; the lifecycle bridge itself is unit-tested (#1824).
 
 ## Data Modes
 

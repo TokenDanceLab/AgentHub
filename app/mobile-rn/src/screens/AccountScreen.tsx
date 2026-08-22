@@ -12,6 +12,12 @@ interface AccountScreenProps {
   themeMode: MobileThemeMode;
   onChangeThemeMode: (mode: MobileThemeMode) => void;
   onClose?: () => void;
+  /** Starts the TokenDance ID OIDC login through the shared Hub auth core. */
+  onSignIn?: () => void;
+  /** Clears the local Hub session (best-effort hub logout). */
+  onSignOut?: () => void;
+  /** True while a login/logout round trip is in flight. */
+  authBusy?: boolean;
 }
 
 interface AccountMenuItem {
@@ -33,6 +39,9 @@ export function AccountScreen({
   themeMode,
   onChangeThemeMode,
   onClose,
+  onSignIn,
+  onSignOut,
+  authBusy = false,
 }: AccountScreenProps): React.ReactElement {
   const { tokens } = useAgentHubTheme();
   const { width } = useWindowDimensions();
@@ -181,6 +190,23 @@ export function AccountScreen({
             </Text>
           </View>
         </View>
+
+        {!accountReady && onSignIn ? (
+          <Button
+            icon="shield"
+            label={t.signIn}
+            onPress={onSignIn}
+            variant="primary"
+            disabled={authBusy}
+          />
+        ) : accountReady && onSignOut ? (
+          <Button
+            label={t.signOut}
+            onPress={onSignOut}
+            variant="secondary"
+            disabled={authBusy}
+          />
+        ) : null}
 
         {menuSections.map((section) => (
           <AccountMenuSectionView key={section.title} section={section} />
