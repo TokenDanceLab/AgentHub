@@ -193,4 +193,52 @@ describe('Mobile Hub lifecycle bridge', () => {
     expect(appState.listenerCount).toBe(0);
     expect(createWebSocket).toHaveBeenCalledTimes(1);
   });
+
+  it('does not reconnect when the stream closes while the app is backgrounded', () => {
+    const appState = new FakeAppState('active');
+    const sockets: FakeSocket[] = [];
+    const resyncs: unknown[] = [];
+    const createWebSocket = vi.fn((_url: string) => {
+      const socket = new FakeSocket();
+      sockets.push(socket);
+      return socket;
+    });
+
+    startHubLifecycleBridge({
+      appState,
+      baseUrl: 'https://hub.example.test',
+      createWebSocket,
+      onResyncRequired: (resync) => resyncs.push(resync),
+    });
+
+    appState.transition('background');
+    sockets[0]?.emitClose();
+
+    expect(resyncs).toHaveLength(0);
+    expect(createWebSocket).toHaveBeenCalledTimes(1);
+  });
+
+  it('forwards stream transport errors to onError while the stream stays open', () => {
+    const appState = new FakeAppState('active');
+    const sockets: FakeSocket[] = [];
+    const errors: unknown[] = [];
+    const createWebSocket = vi.fn((_url: string) => {
+      const socket = new FakeSocket();
+      sockets.push(socket);
+      return socket;
+    });
+
+    startHubLifecycleBridge({
+      appState,
+      baseUrl: 'https://hub.example.test',
+      createWebSocket,
+      onError: (error) => errors.push(error),
+    });
+
+    sockets[0]?.onerror?.('transport-failure');
+
+    expect(errors).toHaveLength(1);
+    expect(errors[0]).toMatchObject({ kind: 'socket_error' });
+    expect(createWebSocket).toHaveBeenCalledTimes(1);
+  });
 });
