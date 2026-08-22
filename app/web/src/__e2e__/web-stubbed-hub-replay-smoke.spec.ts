@@ -159,8 +159,10 @@ test.describe('Web stubbed Hub replay smoke', () => {
     // useHubExecutionTargets refetches every 10s, so the error state
     // alternates with the loading state across refetch cycles; poll until
     // an error window is visible instead of asserting at a fixed moment.
+    // Only the stable error prefix is asserted — the tail repeats the
+    // stubbed Hub message verbatim and would couple the lane to copy.
     await expect
-      .poll(() => page.getByText('Hub execution targets unavailable: Hub target inventory unavailable').count(), {
+      .poll(() => page.getByText('Hub execution targets unavailable').count(), {
         timeout: 25_000,
       })
       .toBeGreaterThan(0);
@@ -285,13 +287,20 @@ async function installHubStub(page: Page, scenario: HubScenario = 'healthy-targe
       });
     }
 
-    // Fail closed on any other external host: the render-blocking Google
-    // Fonts stylesheets must never reach the network — a slow/blocked font
-    // CSS keeps the document from firing `load` and makes the lane flaky.
+    // Fail-closed external boundary: only the render-blocking Google Fonts
+    // stylesheets are expected external requests (fulfilled with an empty
+    // stylesheet so the document load event can fire). Every other external
+    // host is recorded and refused, so the scenario assertion fails the test
+    // instead of letting an unexpected remote call succeed silently.
+    if (url.host === 'fonts.googleapis.com' || url.host === 'fonts.gstatic.com') {
+      return route.fulfill({ status: 200, contentType: 'text/css', body: '' });
+    }
+    requests.push({ method: request.method(), url: request.url() });
     return route.fulfill({
-      status: 200,
-      contentType: 'text/css',
-      body: '',
+      status: 503,
+      contentType: 'application/json',
+      body: JSON.stringify({ code: 'blocked_by_e2e_data_mode_contract' }),
+      headers: corsHeaders(),
     });
   });
 

@@ -83,7 +83,7 @@ test.describe('Web shared chat flow contract', () => {
 
   test('keeps a submitted Hub user message visible while the send request is in flight', async ({ page }) => {
     collectPageDiagnostics(page);
-    const backendRequests = await installChatFlowHubStub(page, { messagePostDelayMs: 800 });
+    const backendRequests = await installChatFlowHubStub(page, { messagePostDelayMs: 800, taskStatus: 'done' });
     // A finished (not running) task keeps the replay transcript hydrated while
     // leaving the composer on the Send control — a running task switches the
     // composer to the Stop control and blocks plain message sends.
@@ -182,6 +182,13 @@ async function enterApprovedRealHubSession(
 
 interface ChatFlowHubStubOptions {
   messagePostDelayMs?: number;
+  /**
+   * Task status reported by the stubbed events/summary endpoints. Must stay
+   * consistent with the status seeded into localStorage — a summary refresh
+   * that disagrees with the stored task can flip the composer between the
+   * Send and Stop controls mid-test.
+   */
+  taskStatus?: string;
 }
 
 async function installChatFlowHubStub(page: Page, options: ChatFlowHubStubOptions = {}): Promise<BackendRequestLog> {
@@ -222,10 +229,22 @@ async function installChatFlowHubStub(page: Page, options: ChatFlowHubStubOption
       return;
     }
 
-    // External hosts (Google Fonts etc.) must never be reached: a hanging
-    // external stylesheet blocks the document load event and makes the lane
-    // flaky. Fulfill with an empty stylesheet instead of continuing.
-    await route.fulfill({ status: 200, contentType: 'text/css', body: '' });
+    // Fail-closed external boundary: only the render-blocking Google Fonts
+    // stylesheets are expected external requests (fulfilled with an empty
+    // stylesheet so the document load event can fire). Every other external
+    // host is recorded and refused, so the scenario assertion fails the test
+    // instead of letting an unexpected remote call succeed silently.
+    if (url.host === 'fonts.googleapis.com' || url.host === 'fonts.gstatic.com') {
+      await route.fulfill({ status: 200, contentType: 'text/css', body: '' });
+      return;
+    }
+    requests.push({ method: request.method(), url: request.url() });
+    await route.fulfill({
+      status: 503,
+      contentType: 'application/json',
+      body: JSON.stringify({ code: 'blocked_by_e2e_data_mode_contract' }),
+      headers: corsHeaders(),
+    });
   });
 
   return { endpoints, requests };
@@ -329,7 +348,7 @@ async function fulfillHubRoute(
     await route.fulfill(json(hubEnvelope({
       task_id: TASK_ID,
       edge_run_id: 'run-chat-flow',
-      status: 'running',
+      status: options.taskStatus ?? 'running',
       total_events: chatFlowEvents().length,
       last_event_seq: chatFlowEvents().length,
       event_type_counts: {},

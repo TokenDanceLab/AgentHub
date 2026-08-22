@@ -1251,6 +1251,11 @@ jobs:
         working-directory: ./app
     steps:
       - uses: actions/checkout@v7
+        with:
+          # This job runs pnpm install (repo-controlled lifecycle scripts)
+          # and never needs Git auth after checkout; do not persist the job
+          # token into Git config (artipacked hardening).
+          persist-credentials: false
 
       - uses: pnpm/action-setup@v6
         with:

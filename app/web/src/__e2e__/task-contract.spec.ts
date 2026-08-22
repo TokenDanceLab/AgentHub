@@ -31,12 +31,30 @@ test.describe('Web Hub task approval/artifact contract', () => {
       requests: [],
     };
 
-    // External hosts (Google Fonts etc.) must never be reached: a hanging
-    // external stylesheet blocks the page load event and makes the lane flaky.
-    await page.route('https://fonts.googleapis.com/**', (route) =>
-      route.fulfill({ status: 200, contentType: 'text/css', body: '' }));
-    await page.route('https://fonts.gstatic.com/**', (route) =>
-      route.fulfill({ status: 200, contentType: 'text/css', body: '' }));
+    // Fail-closed external boundary: this catch-all is registered first, so
+    // the Hub route below (routes match last-registered-first) still serves
+    // the stubbed Hub origin. App requests continue to the dev server, the
+    // render-blocking Google Fonts stylesheets get an empty stylesheet so the
+    // document load event can fire, and every other external host is recorded
+    // and refused — the manifest assertion then fails the test instead of an
+    // unexpected remote call succeeding silently.
+    await page.route('**/*', async (route) => {
+      const request = route.request();
+      const url = new URL(request.url());
+      if (url.origin === WEB_E2E_APP_ORIGIN) {
+        return route.continue();
+      }
+      if (url.host === 'fonts.googleapis.com' || url.host === 'fonts.gstatic.com') {
+        return route.fulfill({ status: 200, contentType: 'text/css', body: '' });
+      }
+      requested.requests.push({ method: request.method(), url: request.url() });
+      return route.fulfill({
+        status: 503,
+        contentType: 'application/json',
+        body: JSON.stringify({ code: 'blocked_by_e2e_data_mode_contract' }),
+        headers: { 'access-control-allow-origin': '*' },
+      });
+    });
 
     await page.route(`${HUB_ORIGIN}/**`, async (route) => {
       const request = route.request();
