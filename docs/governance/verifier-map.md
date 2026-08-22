@@ -3,7 +3,7 @@
 > Owner：本文件是 AgentHub「规则 → 机器验证」映射的 SSOT。`AGENTS.md` §9.5 只保留指针，不复制本表。
 > 机器门禁：`scripts/verify/verify-doc-ssot.py` 校验本表验证脚本路径与 CI 文件存在性。
 
-最后更新：2026-08-22（标注 check-secrets.sh 与 verify-i18n-callsites.py 在 validate 内的 advisory 现状；i18n 行口径校准为脚本实际的违规文件数棘轮）
+最后更新：2026-08-22（web stubbed-hub Playwright lane 接入 checks.yml → web-e2e-stubbed；此前同日标注 check-secrets.sh 与 verify-i18n-callsites.py 在 validate 内的 advisory 现状、i18n 行口径校准为脚本实际的违规文件数棘轮）
 
 ## 映射表
 
@@ -49,6 +49,7 @@
 | secrets/token 不落库（当前 advisory：validate step 带 `continue-on-error`，mock/test secret 误报 allowlist 清理后转硬门禁） | `scripts/verify/check-secrets.sh` | checks.yml → validate |
 | 提交格式 `type(scope): 中文摘要`（PR 时） | `scripts/verify/verify-commit-messages.sh` | checks.yml → validate |
 | UI Visual QA shell 行为证明（1440x810 light/dark） | `app/{desktop,web}/scripts/visual-qa-shell.mjs` | checks.yml → visual-qa-shell |
+| Web stubbed-hub 浏览器行为兜底（mock hub + 真 chromium 的 chat flow / replay smoke / task 合同；不是真实登录，`real_tested=false`） | `app/web/src/__e2e__/{chat-flow-contract,web-stubbed-hub-replay-smoke,task-contract}.spec.ts`（入口 `pnpm test:e2e:stubbed-hub`） | checks.yml → web-e2e-stubbed |
 | 真实登录/OIDC e2e 链路（需真实服务与凭据，`scripts/verify/verify-oidc-flow.py` 等 gate 保留在 `scripts/verify/`） | 无 | 无 |
 | 交互型 UI/UX 验收（Type/Motion/Empty 等跨组件行为） | 无 | 无 |
 | 配置组合安全（fail-closed 默认/env 全覆盖） | `hub-server/internal/config/config_validate.go`（校验入口）+ `hub-server/internal/config/constants.go`（`AuthFailClosedDefault`、`RateLimitFailOpenDefault`：auth 路径恒 fail-closed，非 auth 路径可 fail-open） | 无 |
