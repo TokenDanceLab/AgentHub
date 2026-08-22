@@ -101,111 +101,35 @@ func (s *Service) Update(ctx context.Context, id, ownerID string, updates map[st
 		return nil, errcode.AuthDeviceMismatch
 	}
 
-	// Apply updates to model fields
-	if v, ok := updates["name"]; ok {
-		name, err := stringUpdateValue("name", v)
-		if err != nil {
-			return nil, err
-		}
-		p.Name = name
-	}
-	if v, ok := updates["description"]; ok {
-		description, err := stringUpdateValue("description", v)
-		if err != nil {
-			return nil, err
-		}
-		p.Description = description
-	}
-	if v, ok := updates["runtime_id"]; ok {
-		runtimeID, err := stringUpdateValue("runtime_id", v)
-		if err != nil {
-			return nil, err
-		}
-		p.RuntimeID = runtimeID
-	}
-	if v, ok := updates["model"]; ok {
-		modelName, err := stringUpdateValue("model", v)
-		if err != nil {
-			return nil, err
-		}
-		p.Model = modelName
-	}
-	if v, ok := updates["provider"]; ok {
-		provider, err := stringUpdateValue("provider", v)
-		if err != nil {
-			return nil, err
-		}
-		p.Provider = provider
-	}
-	if v, ok := updates["reasoning_effort"]; ok {
-		reasoningEffort, err := stringUpdateValue("reasoning_effort", v)
-		if err != nil {
-			return nil, err
-		}
-		p.ReasoningEffort = reasoningEffort
-	}
-	if v, ok := updates["permission_mode"]; ok {
-		permissionMode, err := stringUpdateValue("permission_mode", v)
-		if err != nil {
-			return nil, err
-		}
-		p.PermissionMode = permissionMode
-	}
-	// JSONB fields — validate before applying
-	if v, ok := updates["model_mapping"]; ok {
-		modelMapping, err := jsonUpdateValue("model_mapping", v, true)
-		if err != nil {
-			return nil, err
-		}
-		p.ModelMapping = modelMapping
-	}
-	if v, ok := updates["skills"]; ok {
-		skills, err := jsonUpdateValue("skills", v, false)
-		if err != nil {
-			return nil, err
-		}
-		p.Skills = skills
-	}
-	if v, ok := updates["mcp_servers"]; ok {
-		mcpServers, err := jsonUpdateValue("mcp_servers", v, false)
-		if err != nil {
-			return nil, err
-		}
-		p.MCPServers = mcpServers
-	}
-	if v, ok := updates["tool_allowlist"]; ok {
-		toolAllowlist, err := jsonUpdateValue("tool_allowlist", v, false)
-		if err != nil {
-			return nil, err
-		}
-		p.ToolAllowlist = toolAllowlist
-	}
-	if v, ok := updates["approval_policy"]; ok {
-		approvalPolicy, err := jsonUpdateValue("approval_policy", v, true)
-		if err != nil {
-			return nil, err
-		}
-		p.ApprovalPolicy = approvalPolicy
-	}
-	if v, ok := updates["target_preferences"]; ok {
-		targetPreferences, err := jsonUpdateValue("target_preferences", v, true)
-		if err != nil {
-			return nil, err
-		}
-		p.TargetPreferences = targetPreferences
-	}
-	if v, ok := updates["context_budget_max_tokens"]; ok {
-		switch val := v.(type) {
-		case float64:
-			if math.Trunc(val) != val {
-				return nil, errcode.ErrBadRequest.WithMessage("context_budget_max_tokens must be an integer")
+	// Apply scalar string updates to model fields (order matters: the first
+	// invalid value still short-circuits exactly as the inline version did).
+	for _, field := range agentProfileStringFields {
+		if v, ok := updates[field.key]; ok {
+			value, err := stringUpdateValue(field.key, v)
+			if err != nil {
+				return nil, err
 			}
-			p.ContextBudgetMaxTokens = int(val)
-		case int:
-			p.ContextBudgetMaxTokens = val
-		default:
-			return nil, errcode.ErrBadRequest.WithMessage("context_budget_max_tokens must be an integer")
+			field.apply(p, value)
 		}
+	}
+
+	// Apply JSONB fields — validate before applying.
+	for _, field := range agentProfileJSONFields {
+		if v, ok := updates[field.key]; ok {
+			value, err := jsonUpdateValue(field.key, v, field.required)
+			if err != nil {
+				return nil, err
+			}
+			field.apply(p, value)
+		}
+	}
+
+	if v, ok := updates["context_budget_max_tokens"]; ok {
+		value, err := intUpdateValue(v)
+		if err != nil {
+			return nil, err
+		}
+		p.ContextBudgetMaxTokens = value
 	}
 
 	if err := p.Validate(); err != nil {
@@ -215,6 +139,57 @@ func (s *Service) Update(ctx context.Context, id, ownerID string, updates map[st
 		return nil, err
 	}
 	return p, nil
+}
+
+type agentProfileStringField struct {
+	key   string
+	apply func(*model.AgentProfile, string)
+}
+
+// agentProfileStringFields maps update keys to profile fields for the scalar
+// string updates — one declarative table replaces seven repeated inline blocks.
+var agentProfileStringFields = []agentProfileStringField{
+	{"name", func(p *model.AgentProfile, v string) { p.Name = v }},
+	{"description", func(p *model.AgentProfile, v string) { p.Description = v }},
+	{"runtime_id", func(p *model.AgentProfile, v string) { p.RuntimeID = v }},
+	{"model", func(p *model.AgentProfile, v string) { p.Model = v }},
+	{"provider", func(p *model.AgentProfile, v string) { p.Provider = v }},
+	{"reasoning_effort", func(p *model.AgentProfile, v string) { p.ReasoningEffort = v }},
+	{"permission_mode", func(p *model.AgentProfile, v string) { p.PermissionMode = v }},
+}
+
+type agentProfileJSONField struct {
+	key      string
+	required bool
+	apply    func(*model.AgentProfile, string)
+}
+
+// agentProfileJSONFields maps update keys to the JSONB profile fields; the
+// required flag selects the "must be an object" validation applied upstream.
+var agentProfileJSONFields = []agentProfileJSONField{
+	{"model_mapping", true, func(p *model.AgentProfile, v string) { p.ModelMapping = v }},
+	{"skills", false, func(p *model.AgentProfile, v string) { p.Skills = v }},
+	{"mcp_servers", false, func(p *model.AgentProfile, v string) { p.MCPServers = v }},
+	{"tool_allowlist", false, func(p *model.AgentProfile, v string) { p.ToolAllowlist = v }},
+	{"approval_policy", true, func(p *model.AgentProfile, v string) { p.ApprovalPolicy = v }},
+	{"target_preferences", true, func(p *model.AgentProfile, v string) { p.TargetPreferences = v }},
+}
+
+// intUpdateValue coerces context_budget_max_tokens to an int; float values
+// must be integral or the update is rejected (matching the previous inline
+// switch behaviour).
+func intUpdateValue(v any) (int, error) {
+	switch val := v.(type) {
+	case float64:
+		if math.Trunc(val) != val {
+			return 0, errcode.ErrBadRequest.WithMessage("context_budget_max_tokens must be an integer")
+		}
+		return int(val), nil
+	case int:
+		return val, nil
+	default:
+		return 0, errcode.ErrBadRequest.WithMessage("context_budget_max_tokens must be an integer")
+	}
 }
 
 func (s *Service) Delete(ctx context.Context, id, ownerID string) error {
