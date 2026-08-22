@@ -13,7 +13,9 @@
     （SSOT 在那里，本文件通过 importlib 读取，不另持一份矩阵）。
   - 诚实规则：
       * status=passed ⇒ real_tested=true 且至少一个 row passed（登录证据为真）；
-      * status=blocked/failed ⇒ real_tested=false（不得谎称跑过）；
+      * status=blocked/failed/no-evidence ⇒ real_tested=false（不得谎称跑过）；
+      * status=no-evidence（playwright exit 0 但无通过行：全 skipped / report
+        缺失或解析失败时的降级状态）⇒ 不得有 passed row；
       * passed row ⇒ real_tested=true（行级一致性）。
   - 无 secret 泄漏：manifest 内不得出现任何非空 secret-like key
     （password/secret/token/credential 值），凭据只允许以路径/方式引用。
@@ -138,8 +140,8 @@ def main():
         fail("manifest rows must be a non-empty array")
 
     status = manifest["status"]
-    if status not in ("passed", "blocked", "failed"):
-        fail(f"manifest status '{status}' not in (passed|blocked|failed)")
+    if status not in ("passed", "blocked", "failed", "no-evidence"):
+        fail(f"manifest status '{status}' not in (passed|blocked|failed|no-evidence)")
 
     for row in rows:
         for field in REQUIRED_ROW_FIELDS:
@@ -157,8 +159,10 @@ def main():
             fail("status=passed but real_tested is not true")
         if not any(row["status"] == "passed" and row["real_tested"] for row in rows):
             fail("status=passed but no row actually passed with real login evidence")
-    if status in ("blocked", "failed") and manifest["real_tested"] is True:
+    if status in ("blocked", "failed", "no-evidence") and manifest["real_tested"] is True:
         fail(f"status={status} but real_tested is true (honesty violation)")
+    if status == "no-evidence" and any(row["status"] == "passed" for row in rows):
+        fail("status=no-evidence but a row claims passed (status should be passed)")
 
     assert_no_secret_values(manifest)
 

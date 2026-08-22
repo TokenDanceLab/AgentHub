@@ -5,10 +5,16 @@
 
 命名契约：
 
-| 文件/目录 | 内容 | 产出方 |
-|---|---|---|
-| `report-<YYYYMMDD-HHMMSS>.json` | Playwright real config JSON 报告 | `playwright.real.config.ts` |
-| `html-<YYYYMMDD-HHMMSS>/` | Playwright HTML 报告 | `playwright.real.config.ts` |
-| `manifest-<YYYYMMDD-HHMMSS>.json` | 真实 E2E lane evidence manifest（六字段合同：evidence_level / real_tested / claim / status / skipped_evidence_levels / planned_evidence_levels） | `scripts/e2e/run-real-e2e-lane.sh`（#1839 B3；`scripts/verify/verify-real-e2e-lane-manifest.py` 校验） |
-| `real-e2e-account.env` | 测试账号凭据（运行期随机账号，chmod 600；重跑时 lane 复用零注册） | `scripts/e2e/provision-real-e2e-stack.sh` |
-| `test-results/` | Playwright trace / 失败截图产物 | playwright 运行 |
+| 文件/目录 | 内容 | 产出方 | 进 CI evidence artifact |
+|---|---|---|---|
+| `report-<YYYYMMDD-HHMMSS>.json` | Playwright real config JSON 报告 | `playwright.real.config.ts` | ✅ |
+| `html-<YYYYMMDD-HHMMSS>/` | Playwright HTML 报告 | `playwright.real.config.ts` | ✅ |
+| `manifest-<YYYYMMDD-HHMMSS>.json` | 真实 E2E lane evidence manifest（六字段合同：evidence_level / real_tested / claim / status / skipped_evidence_levels / planned_evidence_levels） | `scripts/e2e/run-real-e2e-lane.sh`（#1839 B3；`scripts/verify/verify-real-e2e-lane-manifest.py` 校验） | ✅ |
+| `test-results/` | Playwright trace / 失败截图产物 | playwright 运行 | ✅ |
+| `real-e2e-account.env` | 测试账号凭据（运行期随机账号，chmod 600；重跑时 lane 复用零注册） | `scripts/e2e/provision-real-e2e-stack.sh` | ❌ 永不上传 |
+
+CI evidence artifact 上传契约（`checks.yml` real-e2e-stack 的 Upload L3 evidence）：
+
+- 只上传证据文件：`manifest-*.json` / `report-*.json` / `html-*/` / `test-results/`。
+- `real-e2e-account.env`（凭据，600 权限）显式排除在上传路径外——凭据永不离开
+  runner，既不进 git（gitignored），也不进 artifact。

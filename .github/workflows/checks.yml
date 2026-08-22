@@ -1416,12 +1416,15 @@ jobs:
       AGENTHUB_DB_USER: agenthub
       AGENTHUB_DB_NAME: agenthub
       AGENTHUB_DB_SSLMODE: disable
-      AGENTHUB_DB_PASSWORD: b3-lane-dev-password
+      # AGENTHUB_DB_PASSWORD 不落仓：由 creds step 运行期 openssl rand 生成，
+      # 只在 compose / hub 两个 step 以 env 绑定（与 OIDC client 凭据同法）。
       AGENTHUB_REDIS_HOST: 127.0.0.1
       AGENTHUB_REDIS_PORT: "6379"
       AGENTHUB_SERVER_PORT: "8080"
       AGENTHUB_SERVER_ADMIN_PORT: "6060"
-      AGENTHUB_TOKENDANCE_ID_ISSUER_URL: http://127.0.0.1:3000
+      # existing 模式指向外部 ID（id_base_url 输入）；source/image 模式 ID 跑在
+      # runner 本机 127.0.0.1:3000。非 dispatch 事件 inputs 为空时同样落回本机默认。
+      AGENTHUB_TOKENDANCE_ID_ISSUER_URL: ${{ inputs.id_mode == 'existing' && inputs.id_base_url || 'http://127.0.0.1:3000' }}
       AGENTHUB_TOKENDANCE_ID_REDIRECT_URI: http://127.0.0.1:8080/client/auth/oidc/callback
       # B2 spec 走 /workbench 前缀回调；CI 会话需要两版变体（无 base 变体供 H5 兼容）。
       AGENTHUB_TOKENDANCE_ID_ALLOWED_REDIRECT_URIS: http://127.0.0.1:8080/client/auth/oidc/callback,http://127.0.0.1:5174/auth/tokendance/callback,http://localhost:5174/auth/tokendance/callback,http://127.0.0.1:5174/workbench/auth/tokendance/callback,http://localhost:5174/workbench/auth/tokendance/callback
@@ -1469,15 +1472,18 @@ jobs:
           sudo apt-get install -y sqlite3 openssl
           python3 -m pip install bcrypt
 
-      - name: Generate run-time OIDC client credentials and hub JWT secret (never committed)
+      - name: Generate run-time credentials (OIDC client, hub JWT, DB password; never committed)
         id: creds
         shell: bash
         run: |
           echo "cid=c_$(openssl rand -hex 12)" >> "$GITHUB_OUTPUT"
           echo "csec=cs_$(openssl rand -hex 24)" >> "$GITHUB_OUTPUT"
           echo "jwt=$(openssl rand -hex 24)" >> "$GITHUB_OUTPUT"
+          echo "dbpw=$(openssl rand -hex 18)" >> "$GITHUB_OUTPUT"
 
       - name: Start PostgreSQL + Redis (compose)
+        env:
+          AGENTHUB_DB_PASSWORD: ${{ steps.creds.outputs.dbpw }}
         run: docker compose up -d postgres redis
 
       - name: Start TokenDance ID (source, private repo clone)
@@ -1521,6 +1527,10 @@ jobs:
       - name: Start TokenDance ID (image)
         if: inputs.id_mode == 'image'
         shell: bash
+        env:
+          # inputs 先绑 env 再以 shell 变量消费，避免 workflow_dispatch 输入
+          # 被直接插值进 run 块（命令注入）。
+          ID_IMAGE: ${{ inputs.id_image }}
         run: |
           docker run -d --name td-id -p 127.0.0.1:3000:3000 \
             -e TOKENDANCE_SERVER_ADDR=:3000 \
@@ -1531,7 +1541,7 @@ jobs:
             -e TOKENDANCE_SESSION_TTL=24h \
             -e TOKENDANCE_FEATURES_REQUIRE_INVITE=false \
             -v /var/lib/tokendance-id:/app/data \
-            "${{ inputs.id_image }}"
+            "$ID_IMAGE"
           for i in $(seq 1 60); do
             curl -sf -m 3 http://127.0.0.1:3000/health >/dev/null 2>&1 && break
             sleep 2
@@ -1541,11 +1551,14 @@ jobs:
       - name: Start TokenDance ID (existing; lane preflight only)
         if: inputs.id_mode == 'existing'
         shell: bash
-        run: echo "::info::id_mode=existing; lane preflight will probe ${{ inputs.id_base_url }}"
+        env:
+          ID_BASE_URL: ${{ inputs.id_base_url }}
+        run: echo "::info::id_mode=existing; lane preflight will probe $ID_BASE_URL"
 
       - name: Build and start Hub Server
         shell: bash
         env:
+          AGENTHUB_DB_PASSWORD: ${{ steps.creds.outputs.dbpw }}
           AGENTHUB_JWT_SECRET: ${{ steps.creds.outputs.jwt }}
           AGENTHUB_TOKENDANCE_ID_CLIENT_ID: ${{ steps.creds.outputs.cid }}
           AGENTHUB_TOKENDANCE_ID_CLIENT_SECRET: ${{ steps.creds.outputs.csec }}
@@ -1583,14 +1596,17 @@ jobs:
         if: always()
         shell: bash
         env:
-          AGENTHUB_E2E_ID_BASE_URL: http://127.0.0.1:3000
+          # existing 模式 preflight 探测外部 ID（id_base_url 输入，与上面
+          # hub issuer 一致）；source/image 模式 ID 在 runner 本机 127.0.0.1:3000。
+          AGENTHUB_E2E_ID_BASE_URL: ${{ inputs.id_mode == 'existing' && inputs.id_base_url || 'http://127.0.0.1:3000' }}
           AGENTHUB_E2E_HUB_BASE_URL: http://127.0.0.1:8080
           AGENTHUB_E2E_EDGE_BASE_URL: http://127.0.0.1:3210
           AGENTHUB_E2E_WEB_BASE_URL: http://127.0.0.1:5174
           # 与 hub 启动步骤同一对运行期凭据；provision 脚本以此 seed ID 的 OAuth client。
           AGENTHUB_E2E_ID_CLIENT_ID: ${{ steps.creds.outputs.cid }}
           AGENTHUB_E2E_ID_CLIENT_SECRET: ${{ steps.creds.outputs.csec }}
-          # ID 容器/二进制跑在 runner 本机，使用 provision 脚本默认 sqlite 路径。
+          # ID 容器/二进制跑在 runner 本机，使用 provision 脚本默认 sqlite 路径；
+          # existing 远程情景由操作者指向可访问的 sqlite（见 job 头注释）。
           AGENTHUB_E2E_ID_DB: /var/lib/tokendance-id/tokendance.db
         run: bash scripts/e2e/run-real-e2e-lane.sh
 
@@ -1599,7 +1615,14 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: real-e2e-stack-evidence
-          path: tests/artifacts/
+          # 上传契约 = 仅证据文件（见 tests/artifacts/README.md）：manifest /
+          # report / html / trace。real-e2e-account.env（测试账号凭据，chmod 600）
+          # 显式不上传——凭据永不离开 runner。
+          path: |
+            tests/artifacts/manifest-*.json
+            tests/artifacts/report-*.json
+            tests/artifacts/html-*/**
+            tests/artifacts/test-results/**
           if-no-files-found: warn
           retention-days: 14
   # ── Validation ───────────────────────────────

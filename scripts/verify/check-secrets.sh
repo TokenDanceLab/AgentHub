@@ -145,6 +145,22 @@ is_placeholder_value() {
   return 1
 }
 
+is_path_literal() {
+  # Absolute filesystem paths (/var/lib/tokendance-id/tokendance.db,
+  # /tmp/id-private.pem) are location config, not secret values — e.g.
+  # TOKENDANCE_DATABASE_DSN=…/tokendance.db or *_KEY_PATH=/tmp/….pem.
+  # Only plain path charset qualifies; URL-shaped DSNs with userinfo
+  # (scheme://user:pass@host/…) do not match and keep being judged.
+  [[ "$1" =~ ^/[A-Za-z0-9_./-]+$ ]]
+}
+
+is_endpoint_url() {
+  # http(s) endpoint without userinfo (no user:pass@) is public endpoint
+  # config, not a secret. Covers endpoint-holding names that do not end in
+  # _URL/_URI (e.g. TOKENDANCE_JWT_ISSUER=http://127.0.0.1:3000).
+  [[ "$1" =~ ^https?://[^@[:space:]]+$ ]]
+}
+
 trim_line() {
   local line="$1"
   line="${line#"${line%%[![:space:]]*}"}"
@@ -214,7 +230,7 @@ check_added_line() {
     fi
     if [[ "$trimmed" =~ [\"\']?[A-Za-z0-9_.-]*(secret|token|password|passwd|api[_-]?key|private[_-]?key|client[_-]?secret|jwt[_-]?secret|auth[_-]?token)[A-Za-z0-9_.-]*[\"\']?[[:space:]]*[:=][[:space:]]*[\"\']?([^\"\'\#[:space:],}\)]{12,}) ]]; then
       value="${BASH_REMATCH[2]}"
-      if ! is_placeholder_value "$value"; then
+      if ! is_placeholder_value "$value" && ! is_path_literal "$value" && ! is_endpoint_url "$value"; then
         report "$path" "$line_no" "secret-like assignment detected"
       fi
     fi

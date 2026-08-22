@@ -17,6 +17,9 @@
 # 诚实边界（AGENTS §4）：
 #   - 本 lane 只在真实栈上运行；栈缺失时以 blocked 状态落 manifest
 #     （real_tested=false），绝不编造登录证据。
+#   - playwright exit 0 但无通过行（全 spec skipped / report 缺失或
+#     解析失败）时，manifest status 降级为 no-evidence（real_tested=false），
+#     lane 以 FAIL 收口，绝不以 passed 呈现。
 #   - 证据等级为 observed-local（本地单机真栈）；approved-real /
 #     packaged-release 不在本 lane 覆盖。
 #
@@ -67,7 +70,7 @@ stack_status() {
 }
 
 # ── evidence manifest（六字段合同）──────────────────────────
-emit_manifest() { # overall_status -> 打印 manifest 路径
+emit_manifest() { # 请求 status -> stdout "最终status|manifest路径"（passed 请求可能被降级为 no-evidence）
   local status="$1"
   MANIFEST_STATUS="$status" \
   MANIFEST_ARTIFACT_DIR="$ARTIFACT_DIR" \
@@ -88,7 +91,8 @@ import glob, json, os, time
 root = os.environ["MANIFEST_ARTIFACT_DIR"]
 os.makedirs(root, exist_ok=True)
 stamp = time.strftime("%Y%m%d-%H%M%S", time.localtime())
-status = os.environ["MANIFEST_STATUS"]
+requested = os.environ["MANIFEST_STATUS"]
+status = requested
 
 def latest(pattern):
     matches = sorted(glob.glob(os.path.join(root, pattern)), key=os.path.getmtime)
@@ -100,7 +104,7 @@ traces = sorted(glob.glob(os.path.join(root, "test-results", "**", "trace*.zip")
 account_env = os.path.exists(os.path.join(root, "real-e2e-account.env"))
 
 rows = []
-if report_path and status in ("passed", "failed"):
+if report_path and requested in ("passed", "failed"):
     try:
         with open(report_path, encoding="utf-8") as handle:
             report = json.load(handle)
@@ -154,13 +158,22 @@ if report_path and status in ("passed", "failed"):
 failed_rows = [row for row in rows if row["status"] == "failed"]
 passed_rows = [row for row in rows if row["status"] == "passed"]
 
-if status == "passed":
+if requested == "passed":
     real_tested = len(passed_rows) > 0 and len(failed_rows) == 0
-    claim = (
-        "真实全栈（PG/Redis/TokenDance ID/hub/edge/web）上 B2 真实 OIDC 浏览器登录"
-        "与聊天动线 spec 全绿；evidence_level=observed-local（本地单机真栈），非 stub/自签 JWT"
-        if real_tested else "B2 spec 未全绿，运行态无完整 L3 登录证据"
-    )
+    if real_tested:
+        claim = ("真实全栈（PG/Redis/TokenDance ID/hub/edge/web）上 B2 真实 OIDC 浏览器登录"
+                 "与聊天动线 spec 全绿；evidence_level=observed-local（本地单机真栈），非 stub/自签 JWT")
+    else:
+        # playwright exit 0 但无通过行（全 spec skipped / report 缺失或解析失败）：
+        # 降级 status 为 no-evidence，绝不以 passed 呈现（校验器强制该合同）。
+        status = "no-evidence"
+        skipped_rows = [row for row in rows if row["status"] == "skipped"]
+        if skipped_rows and not failed_rows:
+            claim = ("playwright exit 0 但全部 spec skipped：未发生真实登录，"
+                     "运行态无 L3 登录证据（降级 no-evidence，不以 passed 呈现）")
+        else:
+            claim = ("playwright exit 0 但无通过行（report 缺失或解析失败）："
+                     "运行态无 L3 登录证据（降级 no-evidence，不以 passed 呈现）")
     if not rows:
         rows = [{
             "name": "playwright-report-missing",
@@ -175,7 +188,7 @@ if status == "passed":
             "working_directory": os.path.join(os.environ["MANIFEST_REPO_ROOT"], "app", "web"),
             "evidence": "no report-*.json found under tests/artifacts after run",
         }]
-elif status == "blocked":
+elif requested == "blocked":
     real_tested = False
     claim = ("全栈未齐（id/hub/edge/web 探测见 stack 段），未执行真实登录；"
              "blocked 状态如实记录，未编造登录证据")
@@ -251,7 +264,8 @@ manifest = {
 path = os.path.join(root, "manifest-" + stamp + ".json")
 with open(path, "w", encoding="utf-8") as handle:
     json.dump(manifest, handle, indent=2, ensure_ascii=False)
-print(path)
+# 输出契约：最终 status（可能被降级为 no-evidence）| manifest 路径
+print(status + "|" + path)
 PYEOF
 }
 
@@ -262,7 +276,8 @@ main() {
   info "stack state: id=$ID_STATE hub=$HUB_STATE edge=$EDGE_STATE web=$WEB_STATE"
 
   if [ "$ID_STATE" != "up" ] || [ "$HUB_STATE" != "up" ] || [ "$EDGE_STATE" != "up" ] || [ "$WEB_STATE" != "up" ]; then
-    MANIFEST_PATH="$(emit_manifest blocked)"
+    emit_out="$(emit_manifest blocked)"
+    MANIFEST_PATH="${emit_out#*|}"
     die_blocked "full stack incomplete (id=$ID_STATE hub=$HUB_STATE edge=$EDGE_STATE web=$WEB_STATE); manifest=$MANIFEST_PATH"
   fi
   pass "full stack healthy (id/hub/edge/web)"
@@ -281,7 +296,8 @@ main() {
     info "reusing test accounts from $ACC_ENV (login re-verified in provision step)"
   fi
   if ! bash "$REPO_ROOT/scripts/e2e/provision-real-e2e-stack.sh"; then
-    MANIFEST_PATH="$(emit_manifest failed)"
+    emit_out="$(emit_manifest failed)"
+    MANIFEST_PATH="${emit_out#*|}"
     die_failed "account provisioning failed (manifest=$MANIFEST_PATH); see output above"
   fi
   pass "test accounts provisioned (credentials in tests/artifacts/real-e2e-account.env, gitignored)"
@@ -297,20 +313,27 @@ main() {
   info "playwright exit code: $PW_RC"
 
   if [ "$PW_RC" -eq 0 ]; then
-    MANIFEST_PATH="$(emit_manifest passed)"
+    emit_out="$(emit_manifest passed)"
   else
-    MANIFEST_PATH="$(emit_manifest failed)"
+    emit_out="$(emit_manifest failed)"
   fi
-  info "evidence manifest: $MANIFEST_PATH"
+  MANIFEST_STATUS_FINAL="${emit_out%%|*}"
+  MANIFEST_PATH="${emit_out#*|}"
+  info "evidence manifest: $MANIFEST_PATH (final status: $MANIFEST_STATUS_FINAL)"
 
   if ! python3 "$VERIFIER" "$MANIFEST_PATH"; then
     die_failed "manifest contract check failed: $MANIFEST_PATH"
   fi
   pass "manifest contract ok: $MANIFEST_PATH"
 
-  if [ "$PW_RC" -eq 0 ]; then
+  if [ "$PW_RC" -eq 0 ] && [ "$MANIFEST_STATUS_FINAL" = "passed" ]; then
     echo "E2E-RESULT: PASS"
     exit 0
+  fi
+  if [ "$PW_RC" -eq 0 ]; then
+    # playwright exit 0 但 manifest 降级（全 skipped / report 缺失或解析失败）：
+    # 无通过行即无证据，如实以 FAIL 收口，绝不报 PASS。
+    die_failed "playwright exit 0 but manifest status demoted to '$MANIFEST_STATUS_FINAL' (no passed rows; no L3 login evidence)"
   fi
   die_failed "B2 spec exited with $PW_RC"
 }
