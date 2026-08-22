@@ -39,6 +39,33 @@ describe('Mobile RN import boundary verifier', () => {
       await rm(fixtureRoot, { force: true, recursive: true });
     }
   });
+
+  it('rejects Local Edge direct connections and raw child_process imports in runtime source', async () => {
+    const fixtureRoot = await mkdtemp(path.join(tmpdir(), 'agenthub-mobile-boundary-'));
+
+    try {
+      await mkdir(path.join(fixtureRoot, 'src'), { recursive: true });
+      await writeFile(
+        path.join(fixtureRoot, 'src', 'bad-runtime.ts'),
+        [
+          "import { execFile } from 'node:child_process';",
+          'const LOCAL_EDGE = "http://127.0.0.1:3210";',
+          'void execFile;',
+          'void LOCAL_EDGE;',
+          '',
+        ].join('\n'),
+        'utf8',
+      );
+
+      const result = await runBoundaryVerifier(fixtureRoot);
+
+      expect(result.exitCode).not.toBe(0);
+      expect(result.stderr).toContain('child_process raw runtime');
+      expect(result.stderr).toContain('Local Edge direct connection (127.0.0.1:3210)');
+    } finally {
+      await rm(fixtureRoot, { force: true, recursive: true });
+    }
+  });
 });
 
 function runBoundaryVerifier(fixtureRoot: string): Promise<{ exitCode: number | null; stderr: string }> {

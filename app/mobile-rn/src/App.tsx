@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, ScrollView, Text, View, useWindowDimensions } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -8,12 +8,22 @@ import { createHubEventStream, type HubEventStream, type HubWebSocketLike } from
 import { AppShell, BottomTabs } from '@/components/layout';
 import { AgentHubIcon } from '@/components/icons';
 import { Badge, Button, EmptyState, ErrorBoundary, StatusPill, Surface } from '@/components/primitives';
-import { createAgentHubAuthCallbackUrl, startExpoAgentHubDeepLinkBridge, type AgentHubDeepLinkBridge } from '@/integrations/deepLinking';
+import {
+  startExpoAgentHubDeepLinkBridge,
+  type AgentHubDeepLinkBridge,
+} from '@/integrations/deepLinking';
+import {
+  startExpoAgentHubNotificationBridge,
+  type AgentHubNotificationBridge,
+} from '@/integrations/notificationBridge';
+import type { MobileNavigationTarget } from '@/integrations/notificationIntents';
+import { reduceNavigationTarget } from '@/navigation/navigationRouting';
 import {
   registerExpoForPushNotificationsAsync,
   type PushPermissionState,
 } from '@/pushRegistration';
-import { createExpoMobileAuthSession } from '@/session/mobileAuthSession';
+import { createExpoMobileAuthSession, type CreateExpoMobileAuthSessionResult } from '@/session/mobileAuthSession';
+import type { HubSessionSnapshot } from '@/session/sessionState';
 import {
   getMobileFixtureForScenario,
   getPendingReviewCount,
@@ -96,6 +106,13 @@ function MobileAppContent({ preview }: { preview: PreviewOptions }): React.React
   const [selectedThreadId, setSelectedThreadId] = useState(preview.threadId ?? fixture.threads[0]?.id ?? '');
   const [selectedRunId, setSelectedRunId] = useState(preview.runId ?? fixture.runs[0]?.id ?? '');
   const [pushPermission, setPushPermission] = useState<PushPermissionState | undefined>();
+  // Real Hub session state (SecureStore-backed, #1824): overrides the fixture
+  // account surface once the auth assembly is mounted. `missing` so the demo
+  // never claims a live session before one exists.
+  const [hubSessionStatus, setHubSessionStatus] = useState<Extract<HubSessionSnapshot['status'], 'active' | 'missing'>>('missing');
+  const [authHandle, setAuthHandle] = useState<CreateExpoMobileAuthSessionResult | undefined>();
+  const [authPhase, setAuthPhase] = useState<'idle' | 'signing_in' | 'signing_out'>('idle');
+  const [launchSheetMode, setLaunchSheetMode] = useState<MobileInspectorSheetMode | undefined>();
   const counters = useMemo(
     () => ({
       pendingReviews: getPendingReviewCount(fixture),
@@ -173,10 +190,13 @@ function MobileAppContent({ preview }: { preview: PreviewOptions }): React.React
     snapshotReloadKey,
   ]);
 
-  // Mount-once push registration: request permission, fetch the Expo push token,
-  // and register the device with the Hub. Best-effort — failures (denied
-  // permission, hub down) are swallowed; the account surface keeps reflecting
-  // fixture state until the OIDC + SecureStore wiring lands (Task 4/5).
+  // Mount-once push registration (#1824): request notification permission and
+  // grab the Expo push token for LOCAL notification handling. Deliberately no
+  // Hub device registration here — verified (lane C-1824) that hub-server has
+  // no push delivery facility (no FCM/APNs/Expo push consumer, no push_token
+  // field on registerDevice), so forwarding tokens would be a half-wired
+  // claim. The real permission state drives the account surface; delivery is
+  // local only until the Hub side lands a delivery path.
   useEffect(() => {
     let cancelled = false;
     registerExpoForPushNotificationsAsync()
@@ -195,38 +215,85 @@ function MobileAppContent({ preview }: { preview: PreviewOptions }): React.React
     };
   }, []);
 
-  // Mount-once OIDC + SecureStore assembly: wire the deep-link bridge so that
-  // agenthub://auth/callback?code=…&state=… completes the TokenDance ID code
-  // exchange via the shared Hub client (oidcCallback) and persists the Hub
-  // session in expo-secure-store. The bridge also surfaces navigation intents
-  // from push notifications. Best-effort: native module or network failures do
-  // not crash the app; the local fixture remains the UI fallback.
+  // Latest-value ref so the bridge event handlers never read a stale closure
+  // state while still keeping the reducer testable (#1824 deep link routing).
+  const navigationRef = useRef<{ activeTab: MobileTab; threadId: string; runId: string }>({
+    activeTab,
+    threadId: selectedThreadId,
+    runId: selectedRunId,
+  });
+  useEffect(() => {
+    navigationRef.current = { activeTab, threadId: selectedThreadId, runId: selectedRunId };
+  });
+
+  const applyMobileNavigationTarget = (target: MobileNavigationTarget) => {
+    const route = reduceNavigationTarget(navigationRef.current, target);
+    setActiveTab(route.activeTab);
+    if (route.threadId) {
+      setSelectedThreadId(route.threadId);
+    }
+    if (route.runId) {
+      setSelectedRunId(route.runId);
+    }
+    setLaunchSheetMode(route.approvalSheetMode);
+  };
+
+  // Mount-once auth assembly (#1824): the shared Hub auth state machine
+  // (createHubAuthCore) with SecureStore ports + the deep-link OIDC callback
+  // channel, plus the notification bridge so push click intents route
+  // in-app. Cold start restores the stored session; every transition is
+  // reflected in hubSessionStatus so the account surface can stop claiming
+  // fixture-only sign-in states. Best-effort: native module or network
+  // failures do not crash the app; the local fixture remains the UI fallback.
   useEffect(() => {
     let cancelled = false;
-    let bridge: AgentHubDeepLinkBridge | undefined;
+    let deepLinkBridge: AgentHubDeepLinkBridge | undefined;
+    let notificationBridge: AgentHubNotificationBridge | undefined;
     const baseUrl = resolveAppHubBaseUrl();
-    const redirectUri = createAgentHubAuthCallbackUrl('agenthub');
 
     createExpoMobileAuthSession(baseUrl)
-      .then(({ authSession }) => {
+      .then((assembly) => {
         if (cancelled) return;
+        setAuthHandle(assembly);
+        assembly.authSession.subscribe((snapshot) => {
+          if (!cancelled) {
+            setHubSessionStatus(snapshot.status === 'active' ? 'active' : 'missing');
+          }
+        });
         return startExpoAgentHubDeepLinkBridge({
           onAuthCallback(callback) {
+            // Authorization responses arrive via the deep-link bridge; the
+            // auth ports validate state + expiry against the pending login.
             if (callback.kind !== 'success') return;
-            const params = new URLSearchParams({
-              code: callback.code,
-              state: callback.state,
-            });
-            const callbackUrl = `${redirectUri}?${params.toString()}`;
-            authSession
-              .handleCallback(callbackUrl, { baseUrl, redirectUri })
-              .catch(() => {
-                /* surfaced via session status; fixture stays the UI fallback */
-              });
+            assembly.handleIncomingOidcCallback({ code: callback.code, state: callback.state });
           },
-        }).then((started) => {
-          bridge = started;
-        });
+          onNavigate: applyMobileNavigationTarget,
+          onIgnored: () => undefined,
+          onError: () => undefined,
+        })
+          .then((started) => {
+            if (cancelled) return;
+            deepLinkBridge = started;
+            return startExpoAgentHubNotificationBridge({
+              onNavigate: applyMobileNavigationTarget,
+            }).then((startedNotifications) => {
+              if (!cancelled) {
+                notificationBridge = startedNotifications;
+              }
+            });
+          })
+          .catch(() => {
+            /* notifications module unavailable in this runtime — skip */
+          })
+          .then(() => assembly.authSession.restore())
+          .then((snapshot) => {
+            if (!cancelled) {
+              setHubSessionStatus(snapshot.status === 'active' ? 'active' : 'missing');
+            }
+          })
+          .catch(() => {
+            /* restore failure surfaces as missing; fixture stays the fallback */
+          });
       })
       .catch(() => {
         /* native modules unavailable in this runtime — skip assembly */
@@ -234,9 +301,34 @@ function MobileAppContent({ preview }: { preview: PreviewOptions }): React.React
 
     return () => {
       cancelled = true;
-      bridge?.stop();
+      deepLinkBridge?.stop();
+      notificationBridge?.stop();
     };
   }, []);
+
+  const handleSignIn = async () => {
+    if (!authHandle || authPhase !== 'idle') return;
+    setAuthPhase('signing_in');
+    try {
+      const snapshot = await authHandle.authSession.login();
+      setHubSessionStatus(snapshot.status === 'active' ? 'active' : 'missing');
+    } catch {
+      /* OIDC failure (state mismatch / expiry / exchange) leaves status missing */
+    } finally {
+      setAuthPhase('idle');
+    }
+  };
+
+  const handleSignOut = async () => {
+    if (!authHandle || authPhase !== 'idle') return;
+    setAuthPhase('signing_out');
+    try {
+      await authHandle.authSession.logout();
+    } finally {
+      setHubSessionStatus('missing');
+      setAuthPhase('idle');
+    }
+  };
 
   const openAccountDrawer = () => {
     setAccountReturnTab(activeTab === 'account' ? 'chat' : activeTab);
@@ -248,6 +340,26 @@ function MobileAppContent({ preview }: { preview: PreviewOptions }): React.React
       setActiveTab('thread');
     }
   };
+  // Real account surface (#1824): the auth assembly overrides the fixture
+  // identity/session/permission states it actually knows; hubSync stays
+  // fixture-backed (the mobile data plane does not yet claim live sync).
+  const effectiveAccount = useMemo<MobileAccountState>(() => {
+    const notification: MobileAccountState['notification'] =
+      pushPermission === 'granted'
+        ? 'granted'
+        : pushPermission === 'denied'
+          ? 'blocked'
+          : pushPermission === 'unavailable'
+            ? 'blocked'
+            : fixture.account.notification;
+    return {
+      ...fixture.account,
+      tokenDanceId: hubSessionStatus === 'active' ? 'signed_in' : 'signed_out',
+      hubSession: hubSessionStatus === 'active' ? 'active' : 'missing',
+      notification,
+    };
+  }, [fixture.account, hubSessionStatus, pushPermission]);
+
   const selectedThreadRun = getThreadRun(fixture, selectedThreadId);
   const splitPaneChat = (
     <View
@@ -311,7 +423,7 @@ function MobileAppContent({ preview }: { preview: PreviewOptions }): React.React
             backgroundColor: tokens.color.canvas,
           }}
         >
-          <TabletInspectorPane account={fixture.account} run={selectedThreadRun} />
+          <TabletInspectorPane account={effectiveAccount} run={selectedThreadRun} />
         </View>
       ) : null}
     </View>
@@ -350,14 +462,20 @@ function MobileAppContent({ preview }: { preview: PreviewOptions }): React.React
         surface="agents"
       />
     ),
-    tasks: (
-      <TasksScreen
-        fixture={fixture}
-        selectedRunId={selectedRunId}
-        onSelectRun={setSelectedRunId}
-        {...(preview.sheetMode ? { initialSheetMode: preview.sheetMode } : {})}
-      />
-    ),
+    tasks: (() => {
+      const tasksLaunchSheetMode = preview.sheetMode ?? launchSheetMode;
+      return (
+        <TasksScreen
+          fixture={fixture}
+          selectedRunId={selectedRunId}
+          onSelectRun={setSelectedRunId}
+          // Deep-link / notification approval targets remount the screen so the
+          // review sheet is shown for the routed run (#1824).
+          key={`tasks-${tasksLaunchSheetMode ?? 'default'}`}
+          {...(tasksLaunchSheetMode ? { initialSheetMode: tasksLaunchSheetMode } : {})}
+        />
+      );
+    })(),
     projects: (
       <WorkbenchSurfaceScreen
         onNavigate={setActiveTab}
@@ -393,10 +511,13 @@ function MobileAppContent({ preview }: { preview: PreviewOptions }): React.React
     ),
     account: (
       <AccountScreen
-        account={fixture.account}
+        account={effectiveAccount}
         themeMode={mode}
         onChangeThemeMode={setMode}
         onClose={() => setActiveTab(accountReturnTab)}
+        onSignIn={handleSignIn}
+        onSignOut={handleSignOut}
+        authBusy={authPhase !== 'idle'}
       />
     ),
   } satisfies Record<MobileTab, React.ReactNode>;
