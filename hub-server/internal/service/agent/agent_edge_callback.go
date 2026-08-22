@@ -210,15 +210,7 @@ func (s *EdgeCallbackService) HandleTaskStream(ctx context.Context, edgeUserID, 
 	}
 
 	// #132: bump expire_at to keep running task alive while activity continues
-	if err := repository.BumpRunningTaskExpireAt(s.db, taskID, config.RunningTaskHeartbeatTTL); err != nil {
-		slog.Warn("failed to bump running task heartbeat expire_at",
-			"task_id", taskID,
-			"error", err,
-		)
-		if metrics.AgentHeartbeatFailures != nil {
-			metrics.AgentHeartbeatFailures.Inc()
-		}
-	}
+	s.bumpRunningTaskHeartbeat(taskID)
 
 	runEvent := &model.AgentRunEvent{
 		TaskID:          taskID,
@@ -253,32 +245,7 @@ func (s *EdgeCallbackService) HandleTaskStream(ctx context.Context, edgeUserID, 
 	msg.SeqID = seq
 
 	err = s.db.Transaction(func(tx *gorm.DB) error {
-		if err := repository.CreateAgentRunEventWithNextSeqLimited(tx, runEvent, config.MaxRunEventsPerTask); err != nil {
-			return err
-		}
-		if err := repository.InsertMessage(tx, msg); err != nil {
-			return err
-		}
-		// Maintain the team run's token_usage_total counter so the budget
-		// guard (agent_team_guard.go) can short-circuit in O(1) instead of
-		// scanning every run event on each route decision. Best-effort: a
-		// non-team session (no team run for this session) is a no-op, and a
-		// payload with no token usage (delta == 0) skips the lookup. The
-		// lookup runs inside the same transaction so the counter increment
-		// is atomic with the event insert; a failure here rolls back the
-		// whole event+message insert to keep the counter and events in sync.
-		if delta := agentevent.TokenUsageTotalFromPayload(eventPayload); delta > 0 {
-			if teamRun, terr := repository.GetTeamRunBySessionID(tx, ai.SessionID); terr == nil && teamRun != nil {
-				if incErr := repository.IncrementTeamRunTokenUsage(tx, teamRun.ID, delta); incErr != nil {
-					return incErr
-				}
-			} else if terr != nil && !errors.Is(terr, gorm.ErrRecordNotFound) {
-				// A real lookup error (not "no team run for this session")
-				// must fail the transaction so the counter stays honest.
-				return terr
-			}
-		}
-		return nil
+		return s.persistStreamRunEvent(tx, ai, runEvent, msg, eventPayload)
 	})
 	if err != nil {
 		if errors.Is(err, repository.ErrRunEventLimitExceeded) {
@@ -288,32 +255,95 @@ func (s *EdgeCallbackService) HandleTaskStream(ctx context.Context, edgeUserID, 
 	}
 
 	// #154: update session last_message_at when agent stream creates a message
-	if err := repository.TouchSessionLastMessage(s.db, ai.SessionID); err != nil {
-		slog.Warn("failed to touch session last_message_at",
-			"session_id", ai.SessionID,
-			"error", err,
-		)
-		if metrics.SessionTouchFailures != nil {
-			metrics.SessionTouchFailures.Inc()
-		}
-	}
+	s.touchSessionLastMessage(ai.SessionID)
 
 	// #1000: first authorized stream proves Edge received the task — ack outbox
 	// so SentTimeout does not redispatch while Edge is already executing.
 	// After successful persist only (matches HandleTaskAck post-transition ack).
 	s.autoAck(ctx, taskID)
 
-	if s.bus != nil {
-		s.publishToBus(ctx, bus.Event{Type: bus.EventTypeMessageNew, Payload: msg}, "failed to publish message-new event", "session_id", ai.SessionID)
-		s.publishToBus(ctx, bus.Event{Type: ws.TypeAgentStream, Payload: runEvent}, "failed to publish agent-stream event", "task_id", taskID)
-		// #1478 Phase A: fan the same run event into the team-run view when the
-		// run belongs to a team run. No-op when the session is not a team run;
-		// never fails the chat-side stream path that already succeeded above.
-		s.publishTeamSubagentStream(ctx, runEvent, taskID)
-	}
+	s.publishStreamEvents(ctx, ai, taskID, msg, runEvent)
 	s.tryAutoParseRouteDecision(ctx, ai.SessionID, runEvent.Payload)
 
 	return nil
+}
+
+// persistStreamRunEvent inserts the run event + chat message projection for an
+// agent stream tick, and maintains the team run token-usage counter inside the
+// same transaction so the budget guard can short-circuit in O(1).
+func (s *EdgeCallbackService) persistStreamRunEvent(tx *gorm.DB, ai *model.AgentInstance, runEvent *model.AgentRunEvent, msg *model.Message, eventPayload string) error {
+	if err := repository.CreateAgentRunEventWithNextSeqLimited(tx, runEvent, config.MaxRunEventsPerTask); err != nil {
+		return err
+	}
+	if err := repository.InsertMessage(tx, msg); err != nil {
+		return err
+	}
+	// Maintain the team run's token_usage_total counter so the budget
+	// guard (agent_team_guard.go) can short-circuit in O(1) instead of
+	// scanning every run event on each route decision. Best-effort: a
+	// non-team session (no team run for this session) is a no-op, and a
+	// payload with no token usage (delta == 0) skips the lookup. The
+	// lookup runs inside the same transaction so the counter increment
+	// is atomic with the event insert; a failure here rolls back the
+	// whole event+message insert to keep the counter and events in sync.
+	if delta := agentevent.TokenUsageTotalFromPayload(eventPayload); delta > 0 {
+		if teamRun, terr := repository.GetTeamRunBySessionID(tx, ai.SessionID); terr == nil && teamRun != nil {
+			if incErr := repository.IncrementTeamRunTokenUsage(tx, teamRun.ID, delta); incErr != nil {
+				return incErr
+			}
+		} else if terr != nil && !errors.Is(terr, gorm.ErrRecordNotFound) {
+			// A real lookup error (not "no team run for this session")
+			// must fail the transaction so the counter stays honest.
+			return terr
+		}
+	}
+	return nil
+}
+
+// bumpRunningTaskHeartbeat refreshes the task expire_at during activity.
+// Best-effort: a failure warns + increments the heartbeat metric but never
+// fails the stream path (the task is still alive, TTL just shortens).
+func (s *EdgeCallbackService) bumpRunningTaskHeartbeat(taskID string) {
+	if err := repository.BumpRunningTaskExpireAt(s.db, taskID, config.RunningTaskHeartbeatTTL); err != nil {
+		slog.Warn("failed to bump running task heartbeat expire_at",
+			"task_id", taskID,
+			"error", err,
+		)
+		if metrics.AgentHeartbeatFailures != nil {
+			metrics.AgentHeartbeatFailures.Inc()
+		}
+	}
+}
+
+// publishStreamEvents fans a stream persist out to the bus: the chat
+// message-new projection, the WS agent-stream event, and the team-run view
+// fan-out (no-op when the session is not a team run; never fails the chat-side
+// stream path that already persisted).
+func (s *EdgeCallbackService) publishStreamEvents(ctx context.Context, ai *model.AgentInstance, taskID string, msg *model.Message, runEvent *model.AgentRunEvent) {
+	if s.bus == nil {
+		return
+	}
+	s.publishToBus(ctx, bus.Event{Type: bus.EventTypeMessageNew, Payload: msg}, "failed to publish message-new event", "session_id", ai.SessionID)
+	s.publishToBus(ctx, bus.Event{Type: ws.TypeAgentStream, Payload: runEvent}, "failed to publish agent-stream event", "task_id", taskID)
+	// #1478 Phase A: fan the same run event into the team-run view when the
+	// run belongs to a team run. No-op when the session is not a team run;
+	// never fails the chat-side stream path that already succeeded above.
+	s.publishTeamSubagentStream(ctx, runEvent, taskID)
+}
+
+// touchSessionLastMessage updates session.last_message_at when an agent
+// callback creates a message. Best-effort: a failure warns + increments the
+// metric but does not fail the callback path.
+func (s *EdgeCallbackService) touchSessionLastMessage(sessionID string) {
+	if err := repository.TouchSessionLastMessage(s.db, sessionID); err != nil {
+		slog.Warn("failed to touch session last_message_at",
+			"session_id", sessionID,
+			"error", err,
+		)
+		if metrics.SessionTouchFailures != nil {
+			metrics.SessionTouchFailures.Inc()
+		}
+	}
 }
 
 func (s *EdgeCallbackService) tryAutoParseRouteDecision(ctx context.Context, sessionID string, payload string) {
@@ -401,74 +431,98 @@ func (s *EdgeCallbackService) HandleTaskDone(ctx context.Context, edgeUserID, ed
 	}
 
 	// insert final message if content is provided
-	var msg *model.Message
-	if finalContent != "" {
-		if err := agentevent.ValidateAgentCallbackPayloadSize(finalContent); err != nil {
-			return err
-		}
-		// messages.content is jsonb — plain text must be wrapped exactly like
-		// the stream path does, or the insert fails with 22P02 (invalid json).
-		messageContent := finalContent
-		if !json.Valid([]byte(messageContent)) {
-			wrapped, marshalErr := json.Marshal(map[string]string{"content": finalContent})
-			if marshalErr != nil {
-				return marshalErr
-			}
-			messageContent = string(wrapped)
-		}
-		msg = &model.Message{
-			SessionID:   ai.SessionID,
-			SenderType:  model.SenderTypeAgent,
-			SenderID:    task.AgentInstanceID,
-			ClientMsgID: uuidv7.Must(),
-			ContentType: model.ContentTypeText,
-			Content:     messageContent,
-		}
-		if s.seq == nil {
-			return errcode.ErrInternal.WithMessage("edge callback sequence allocator not configured")
-		}
-		seq, err := s.seq.allocateSeq(ctx, ai.SessionID)
-		if err != nil {
-			return err
-		}
-		msg.SeqID = seq
+	msg, err := s.buildDoneFinalMessage(ctx, ai, task, finalContent)
+	if err != nil {
+		return err
 	}
 
 	err = s.db.Transaction(func(tx *gorm.DB) error {
-		if msg != nil {
-			if err := repository.InsertMessage(tx, msg); err != nil {
-				return err
-			}
-		}
-		rowsAffected, err := repository.UpdatePendingTaskStatusAtomic(tx, taskID, task.Status, model.TaskStatusDone, "")
-		if err != nil {
-			return err
-		}
-		if rowsAffected == 0 {
-			return errcode.ErrBadRequest
-		}
-		return nil
+		return s.finishTaskDoneTx(tx, task, msg)
 	})
 	if err != nil {
 		return err
 	}
 
+	s.publishTaskDoneEvents(ctx, ai, task, taskID, msg)
+
+	return nil
+}
+
+// buildDoneFinalMessage produces the done message for the final content (or
+// nil when there is no content to insert), sequencing it in the session.
+func (s *EdgeCallbackService) buildDoneFinalMessage(ctx context.Context, ai *model.AgentInstance, task *model.PendingAgentTask, finalContent string) (*model.Message, error) {
+	if finalContent == "" {
+		return nil, nil
+	}
+	if err := agentevent.ValidateAgentCallbackPayloadSize(finalContent); err != nil {
+		return nil, err
+	}
+	// messages.content is jsonb — plain text must be wrapped exactly like
+	// the stream path does, or the insert fails with 22P02 (invalid json).
+	messageContent, err := wrapFinalMessageContent(finalContent)
+	if err != nil {
+		return nil, err
+	}
+	if s.seq == nil {
+		return nil, errcode.ErrInternal.WithMessage("edge callback sequence allocator not configured")
+	}
+	seq, err := s.seq.allocateSeq(ctx, ai.SessionID)
+	if err != nil {
+		return nil, err
+	}
+	return &model.Message{
+		SessionID:   ai.SessionID,
+		SenderType:  model.SenderTypeAgent,
+		SenderID:    task.AgentInstanceID,
+		ClientMsgID: uuidv7.Must(),
+		ContentType: model.ContentTypeText,
+		Content:     messageContent,
+		SeqID:       seq,
+	}, nil
+}
+
+// wrapFinalMessageContent wraps plain-text final content in the same jsonb
+// shape the stream path uses; valid JSON passes through unchanged.
+func wrapFinalMessageContent(finalContent string) (string, error) {
+	if json.Valid([]byte(finalContent)) {
+		return finalContent, nil
+	}
+	wrapped, err := json.Marshal(map[string]string{"content": finalContent})
+	if err != nil {
+		return "", err
+	}
+	return string(wrapped), nil
+}
+
+// finishTaskDoneTx inserts the done message (when present) and CAS-updates the
+// task status to done inside one transaction.
+func (s *EdgeCallbackService) finishTaskDoneTx(tx *gorm.DB, task *model.PendingAgentTask, msg *model.Message) error {
+	if msg != nil {
+		if err := repository.InsertMessage(tx, msg); err != nil {
+			return err
+		}
+	}
+	rowsAffected, err := repository.UpdatePendingTaskStatusAtomic(tx, task.ID, task.Status, model.TaskStatusDone, "")
+	if err != nil {
+		return err
+	}
+	if rowsAffected == 0 {
+		return errcode.ErrBadRequest
+	}
+	return nil
+}
+
+// publishTaskDoneEvents publishes the post-completion side effects: session
+// touch + message-new (when a message was inserted), outbox ack, and the
+// agent-done bus event.
+func (s *EdgeCallbackService) publishTaskDoneEvents(ctx context.Context, ai *model.AgentInstance, task *model.PendingAgentTask, taskID string, msg *model.Message) {
 	if msg != nil {
 		// #154: update session last_message_at when agent done creates a message
-		if err := repository.TouchSessionLastMessage(s.db, ai.SessionID); err != nil {
-			slog.Warn("failed to touch session last_message_at",
-				"session_id", ai.SessionID,
-				"error", err,
-			)
-			if metrics.SessionTouchFailures != nil {
-				metrics.SessionTouchFailures.Inc()
-			}
-		}
+		s.touchSessionLastMessage(ai.SessionID)
 		if s.bus != nil {
 			s.publishToBus(ctx, bus.Event{Type: bus.EventTypeMessageNew, Payload: msg}, "failed to publish message-new event", "session_id", ai.SessionID)
 		}
 	}
-
 	// #1000: done also acks outbox (covers Edge paths that skip stream/ack).
 	s.autoAck(ctx, taskID)
 
@@ -479,8 +533,6 @@ func (s *EdgeCallbackService) HandleTaskDone(ctx context.Context, edgeUserID, ed
 			SessionID:       ai.SessionID,
 		}}, "failed to publish agent-done event", "task_id", taskID)
 	}
-
-	return nil
 }
 
 // HandleTaskFail marks a task as failed.

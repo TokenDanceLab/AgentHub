@@ -47,7 +47,17 @@ func (m *MCPServer) BeforeSave(tx *gorm.DB) error {
 // Validate checks JSONB types AND rejects plaintext secrets in auth_config.
 // SECURITY: This is the gate that prevents credential leakage into the database.
 func (m *MCPServer) Validate() error {
-	// JSONB type checks
+	if err := m.validateJSONBTypes(); err != nil {
+		return err
+	}
+	if err := m.validateAuthConfigSecrets(); err != nil {
+		return err
+	}
+	return m.validateURLHasNoCredentials()
+}
+
+// validateJSONBTypes verifies every JSONB field holds the expected shape.
+func (m *MCPServer) validateJSONBTypes() error {
 	if m.Args != "" && !isJSONArray(m.Args) {
 		return fmt.Errorf("args must be a JSON array")
 	}
@@ -60,31 +70,39 @@ func (m *MCPServer) Validate() error {
 	if m.ToolSchema != "" && !isJSONObject(m.ToolSchema) {
 		return fmt.Errorf("tool_schema must be a JSON object")
 	}
+	return nil
+}
 
-	// Security: no plaintext secrets in auth_config
-	if m.AuthConfig != "" && m.AuthConfig != "{}" {
-		var cfg map[string]interface{}
-		if err := json.Unmarshal([]byte(m.AuthConfig), &cfg); err == nil {
-			dangerousKeys := []string{"api_key", "secret", "token", "password", "key", "api_secret", "access_token"}
-			for _, key := range dangerousKeys {
-				if val, ok := cfg[key]; ok {
-					if s, isStr := val.(string); isStr && s != "" && s != "***" {
-						return fmt.Errorf("auth_config must not contain plaintext %s (use \"***\" for masked values)", key)
-					}
-				}
+// validateAuthConfigSecrets rejects plaintext (non-masked) secrets in auth_config.
+func (m *MCPServer) validateAuthConfigSecrets() error {
+	if m.AuthConfig == "" || m.AuthConfig == "{}" {
+		return nil
+	}
+	var cfg map[string]interface{}
+	if err := json.Unmarshal([]byte(m.AuthConfig), &cfg); err != nil {
+		return nil
+	}
+	dangerousKeys := []string{"api_key", "secret", "token", "password", "key", "api_secret", "access_token"}
+	for _, key := range dangerousKeys {
+		if val, ok := cfg[key]; ok {
+			if s, isStr := val.(string); isStr && s != "" && s != "***" {
+				return fmt.Errorf("auth_config must not contain plaintext %s (use \"***\" for masked values)", key)
 			}
 		}
 	}
+	return nil
+}
 
-	// Security: check URL doesn't contain embedded credentials
-	if m.URL != "" {
-		for _, pattern := range []string{"@", "token=", "key=", "secret="} {
-			if contains(m.URL, pattern) {
-				return fmt.Errorf("url must not contain credentials")
-			}
+// validateURLHasNoCredentials rejects URLs carrying embedded credentials.
+func (m *MCPServer) validateURLHasNoCredentials() error {
+	if m.URL == "" {
+		return nil
+	}
+	for _, pattern := range []string{"@", "token=", "key=", "secret="} {
+		if contains(m.URL, pattern) {
+			return fmt.Errorf("url must not contain credentials")
 		}
 	}
-
 	return nil
 }
 

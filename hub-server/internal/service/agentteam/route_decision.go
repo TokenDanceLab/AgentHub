@@ -47,16 +47,7 @@ func (s *AgentTeamService) HandleRouteDecision(ctx context.Context, userID, team
 
 	// Compete mode: dispatch the same task to multiple workers in parallel.
 	if decision.Action == "compete" {
-		assignments, err := s.HandleCompeteRouteDecision(ctx, userID, teamID, runID, decision)
-		if err != nil {
-			return nil, err
-		}
-		if len(assignments) == 0 {
-			return nil, s.rejectRouteDecision(runID, decision, "no compete assignments created")
-		}
-		// Return the first assignment for API compatibility; the full list
-		// is available via ListAssignments.
-		return &assignments[0], nil
+		return s.handleCompeteRoute(ctx, userID, teamID, runID, decision)
 	}
 
 	if strings.TrimSpace(decision.NextWorker) == "" {
@@ -82,81 +73,18 @@ func (s *AgentTeamService) HandleRouteDecision(ctx context.Context, userID, team
 	// inside a per-run row lock so two concurrent route decisions cannot
 	// both pass the check-then-act gap (#1383).
 	var assignment *model.AgentTeamAssignment
-	var task *model.AgentTeamTask
 	err = s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		if err := repository.LockTeamRunForUpdate(tx, runID); err != nil {
 			return err
 		}
-		lockedRun, err := repository.GetTeamRunByID(tx, runID)
-		if err != nil {
+		if err := s.enforceRouteGuardrails(tx, runID, decision); err != nil {
 			return err
 		}
-		if isTerminalTeamRunStatus(lockedRun.Status) {
-			return rejectRoute("team run already in terminal status " + lockedRun.Status)
-		}
-		timedOut, err := s.hasTimedOutActiveAssignmentDB(tx, runID)
-		if err != nil {
-			return err
-		}
-		if timedOut {
-			return rejectRoute("assignment timeout reached")
-		}
-		repeatCount, err := s.countMatchingRouteDecisionsDB(tx, runID, decision)
-		if err != nil {
-			return err
-		}
-		if repeatCount >= s.guardrails.MaxRouteRepeats {
-			return rejectRoute("route repeat limit reached")
-		}
-		budgetExceeded, err := s.teamRunBudgetExceededDB(tx, runID)
-		if err != nil {
-			return err
-		}
-		if budgetExceeded {
-			return rejectRoute("team run budget exceeded")
-		}
-		taskCount, err := repository.CountAssignmentsByTeamRun(tx, runID)
-		if err != nil {
-			return err
-		}
-		if taskCount >= s.guardrails.MaxTasksPerTeamRun {
-			return rejectRoute("task limit reached")
-		}
-		activeCount, err := repository.CountActiveAssignmentsByTeamRun(tx, runID)
-		if err != nil {
-			return err
-		}
-		if activeCount >= s.guardrails.MaxActiveSubAgentsPerRun {
-			return rejectRoute("active subagent limit reached")
-		}
-		assignment, err = s.createAssignmentInTx(tx, ctx, userID, runID, supervisor.ID, worker.ID, routeAssignmentType(decision.Action), decision.Instructions, decision.Context)
-		if err != nil {
-			return err
-		}
-		task = newTeamTaskFromRoute(runID, assignment.ID, worker.ID, decision)
-		if err := repository.CreateTeamTask(tx, task); err != nil {
-			return err
-		}
-		decision.Accepted = true
-		decision.SubtaskID = firstNonEmptyString(decision.SubtaskID, task.ID)
-		decision.AgentID = firstNonEmptyString(decision.AgentID, worker.ID)
-
-		if err := s.appendTeamEventTx(tx, runID, model.TeamEventRouteDecided, decision); err != nil {
-			return err
-		}
-		if err := s.appendTeamEventTx(tx, runID, model.TeamEventAssignmentCreated, assignment); err != nil {
-			return err
-		}
-		return s.appendTeamEventTx(tx, runID, model.TeamEventTaskCreated, task)
+		assignment, err = s.createAssignmentAndTaskTx(tx, ctx, userID, runID, supervisor.ID, worker.ID, routeAssignmentType(decision.Action), decision.Instructions, decision.Context, &decision)
+		return err
 	})
 	if err != nil {
-		if reason, rejected := routeRejectionReason(err); rejected {
-			return nil, s.rejectRouteDecision(runID, decision, reason)
-		}
-		if appendErr := s.appendRouteRejected(runID, decision, err.Error()); appendErr != nil {
-			return nil, appendErr
-		}
-		return nil, err
+		return nil, s.resolveRouteError(runID, decision, err)
 	}
 
 	// Human review gate: when enabled, transition to pending_review
@@ -168,6 +96,112 @@ func (s *AgentTeamService) HandleRouteDecision(ctx context.Context, userID, team
 	}
 
 	return assignment, nil
+}
+
+// enforceRouteGuardrails checks the per-run guardrails inside the route
+// decision transaction: terminal status, timeout, repeat limit, budget, task
+// count and active-subagent count. Rejections return the rejectRoute marker
+// so the caller can translate them into the rejected TeamEvent + 400.
+func (s *AgentTeamService) enforceRouteGuardrails(tx *gorm.DB, runID string, decision model.CoordinatorRouteDecision) error {
+	lockedRun, err := repository.GetTeamRunByID(tx, runID)
+	if err != nil {
+		return err
+	}
+	if isTerminalTeamRunStatus(lockedRun.Status) {
+		return rejectRoute("team run already in terminal status " + lockedRun.Status)
+	}
+	timedOut, err := s.hasTimedOutActiveAssignmentDB(tx, runID)
+	if err != nil {
+		return err
+	}
+	if timedOut {
+		return rejectRoute("assignment timeout reached")
+	}
+	repeatCount, err := s.countMatchingRouteDecisionsDB(tx, runID, decision)
+	if err != nil {
+		return err
+	}
+	if repeatCount >= s.guardrails.MaxRouteRepeats {
+		return rejectRoute("route repeat limit reached")
+	}
+	budgetExceeded, err := s.teamRunBudgetExceededDB(tx, runID)
+	if err != nil {
+		return err
+	}
+	if budgetExceeded {
+		return rejectRoute("team run budget exceeded")
+	}
+	taskCount, err := repository.CountAssignmentsByTeamRun(tx, runID)
+	if err != nil {
+		return err
+	}
+	if taskCount >= s.guardrails.MaxTasksPerTeamRun {
+		return rejectRoute("task limit reached")
+	}
+	activeCount, err := repository.CountActiveAssignmentsByTeamRun(tx, runID)
+	if err != nil {
+		return err
+	}
+	if activeCount >= s.guardrails.MaxActiveSubAgentsPerRun {
+		return rejectRoute("active subagent limit reached")
+	}
+	return nil
+}
+
+// createAssignmentAndTaskTx creates the assignment, its team task and the
+// three TeamEvents inside the route decision transaction. decision is mutated
+// in place (Accepted / SubtaskID / AgentID) exactly as the previous inline
+// block did.
+func (s *AgentTeamService) createAssignmentAndTaskTx(tx *gorm.DB, ctx context.Context, userID, runID, supervisorID, workerID, assignmentType, instructions, contextStr string, decision *model.CoordinatorRouteDecision) (*model.AgentTeamAssignment, error) {
+	assignment, err := s.createAssignmentInTx(tx, ctx, userID, runID, supervisorID, workerID, assignmentType, instructions, contextStr)
+	if err != nil {
+		return nil, err
+	}
+	task := newTeamTaskFromRoute(runID, assignment.ID, workerID, *decision)
+	if err := repository.CreateTeamTask(tx, task); err != nil {
+		return nil, err
+	}
+	decision.Accepted = true
+	decision.SubtaskID = firstNonEmptyString(decision.SubtaskID, task.ID)
+	decision.AgentID = firstNonEmptyString(decision.AgentID, workerID)
+
+	if err := s.appendTeamEventTx(tx, runID, model.TeamEventRouteDecided, *decision); err != nil {
+		return nil, err
+	}
+	if err := s.appendTeamEventTx(tx, runID, model.TeamEventAssignmentCreated, assignment); err != nil {
+		return nil, err
+	}
+	if err := s.appendTeamEventTx(tx, runID, model.TeamEventTaskCreated, task); err != nil {
+		return nil, err
+	}
+	return assignment, nil
+}
+
+// handleCompeteRoute runs the compete branch of HandleRouteDecision: it
+// dispatches the compete batch and returns the first assignment for API
+// compatibility (the full list is available via ListAssignments).
+func (s *AgentTeamService) handleCompeteRoute(ctx context.Context, userID, teamID, runID string, decision model.CoordinatorRouteDecision) (*model.AgentTeamAssignment, error) {
+	assignments, err := s.HandleCompeteRouteDecision(ctx, userID, teamID, runID, decision)
+	if err != nil {
+		return nil, err
+	}
+	if len(assignments) == 0 {
+		return nil, s.rejectRouteDecision(runID, decision, "no compete assignments created")
+	}
+	return &assignments[0], nil
+}
+
+// resolveRouteError maps a transaction failure back to the API surface: the
+// rejectRoute marker becomes a logged rejection + 400, and any other error is
+// recorded as a rejected route event before being surfaced raw.
+func (s *AgentTeamService) resolveRouteError(runID string, decision model.CoordinatorRouteDecision, err error) error {
+	if reason, rejected := routeRejectionReason(err); rejected {
+		return s.rejectRouteDecision(runID, decision, reason)
+	}
+	if appendErr := s.appendRouteRejected(runID, decision, err.Error()); appendErr != nil {
+		return appendErr
+	}
+	return err
 }
 
 func (s *AgentTeamService) finishRouteDecision(runID string, decision model.CoordinatorRouteDecision) error {
