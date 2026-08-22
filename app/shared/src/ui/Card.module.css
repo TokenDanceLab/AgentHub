@@ -35,7 +35,15 @@
   box-shadow: var(--elevated-card-shadow, var(--glass-elev-1));
   transition:
     transform var(--motion-press, 90ms ease),
-    box-shadow var(--motion-hover, 90ms ease);
+    box-shadow var(--motion-hover, 90ms ease),
+    background-color var(--motion-hover, 90ms ease),
+    border-color var(--motion-hover, 90ms ease);
+}
+
+/* #1825: elevated parity with .glass — hover lift + stronger shadow. */
+.elevated:hover {
+  transform: var(--glass-hover-lift, translateY(-1px));
+  box-shadow: var(--elevated-card-shadow-strong, var(--glass-elev-2));
 }
 
 .elevated:active {
@@ -77,6 +85,7 @@
   .glass:hover,
   .glass:active,
   .elevated,
+  .elevated:hover,
   .elevated:active {
     transition: none;
     transform: none;

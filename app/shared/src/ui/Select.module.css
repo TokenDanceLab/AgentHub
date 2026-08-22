@@ -52,7 +52,7 @@
 
 .placeholder {
   color: var(--td-ink-subtle);
-  font-weight: 450;
+  font-weight: 500;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -99,6 +99,39 @@
   animation: dropdownInUp 0.12s ease-out;
 }
 
+/* Exit (#1825): unmount is deferred 140ms by useExiting; play the reverse
+   entry animation in the mean time. Reduced-motion unmounts instantly. */
+.dropdownClosing {
+  animation: dropdownOut 0.12s ease-in forwards;
+  pointer-events: none;
+}
+
+.dropdownUp.dropdownClosing {
+  animation-name: dropdownOutUp;
+}
+
+@keyframes dropdownOut {
+  from {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.98);
+  }
+}
+
+@keyframes dropdownOutUp {
+  from {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(4px) scale(0.98);
+  }
+}
+
 @keyframes dropdownIn {
   from {
     opacity: 0;
@@ -134,7 +167,7 @@
   background: transparent;
   cursor: pointer;
   text-align: left;
-  font: 560 0.8125rem var(--td-font);
+  font: 500 0.8125rem var(--td-font);
   color: var(--td-ink);
   transition:
     background var(--td-dur-normal) var(--td-ease),
@@ -150,7 +183,7 @@
 .optionSelected {
   background: var(--td-tint);
   color: var(--td-plum);
-  font-weight: 650;
+  font-weight: 600;
 }
 
 .optionLabel {
@@ -195,4 +228,13 @@
 
 [data-theme='dark'] .chevron {
   opacity: 0.5;
+}
+
+/* Reduced motion: instant open/close, no dropdown slide/fade loop (#1825). */
+@media (prefers-reduced-motion: reduce) {
+  .dropdown,
+  .dropdownUp,
+  .dropdownClosing {
+    animation: none;
+  }
 }

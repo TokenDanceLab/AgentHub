@@ -1,4 +1,4 @@
-import { Fragment, forwardRef, memo, useCallback, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, forwardRef, memo, useCallback, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { TranscriptItem, TranscriptAgentItem, TranscriptUserItem, BlockActionCallback } from '../transcript-item'
 import type { RowItem } from '../types'
 import { ArrowDown } from 'lucide-react'
@@ -339,6 +339,18 @@ const TranscriptImpl = forwardRef<TranscriptHandle, Props>(function Transcript({
   const currentStateRef = useRef<SessionScrollState | null>(null)
   const itemsIdentity = useMemo(() => items.map(itemIdentity).join('\n'), [items])
   const [nearBottom, setNearBottom] = useState(true)
+  /** #1825: identity of the newest same-session message, keyed for a one-shot
+   *  entry animation. Cleared after the animation window so virtualized
+   *  remounts (scrolling history) never replay it. */
+  const [arrivalKey, setArrivalKey] = useState<string | null>(null)
+  const arrivalTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+
+  useEffect(() => () => {
+    if (arrivalTimerRef.current) clearTimeout(arrivalTimerRef.current)
+  }, [])
+
+  const arrivalIdOf = (item: TranscriptItem): string =>
+    isUser(item) ? (item.id ?? `${item.text}|${item.name ?? ''}`) : item.id
 
   useImperativeHandle(ref, () => ({
     scrollToBlockId(blockId: string) {
@@ -408,6 +420,17 @@ const TranscriptImpl = forwardRef<TranscriptHandle, Props>(function Transcript({
     const initialRender = state.previousCount === 0
     if (appendedUserMessage) state.followAfterUserSubmit = true
 
+    // #1825: new-message entry animation — same-session append only (a session
+    // switch must not animate the whole restored history).
+    if (!switched && items.length > state.previousCount && items.length > 0) {
+      const newKey = arrivalIdOf(items[items.length - 1])
+      setArrivalKey(newKey)
+      if (arrivalTimerRef.current) clearTimeout(arrivalTimerRef.current)
+      arrivalTimerRef.current = setTimeout(() => {
+        setArrivalKey((k) => (k === newKey ? null : k))
+      }, 600)
+    }
+
     const shouldFollow = initialRender || state.followAfterUserSubmit || state.shouldAutoFollow
     state.previousCount = items.length
     state.previousIdentities = currentIdentities
@@ -445,12 +468,12 @@ const TranscriptImpl = forwardRef<TranscriptHandle, Props>(function Transcript({
             const footer = renderUserFooter?.(item)
             return (
               <Fragment key={userKey}>
-                <UserMessage item={item} chatMode={chatMode} {...(onBlockContextMenu ? { onContextMenu: onBlockContextMenu } : {})} />
+                <UserMessage item={item} chatMode={chatMode} enter={arrivalKey === userKey} {...(onBlockContextMenu ? { onContextMenu: onBlockContextMenu } : {})} />
                 {footer ?? null}
               </Fragment>
             )
           }
-          if (isAgent(item)) return <AgentGroup key={item.id} item={item} chatMode={chatMode} {...(onAgentClick ? { onAgentClick } : {})} {...(onBlockContextMenu ? { onBlockContextMenu } : {})} {...(onBlockSelect ? { onBlockSelect } : {})} {...(onBlockAction ? { onBlockAction } : {})} {...(onReviewFile ? { onReviewFile } : {})} {...(onDeploySubmit ? { onDeploySubmit } : {})} {...(selectedBlockIds ? { selectedBlockIds } : {})} {...(selectionMode !== undefined ? { selectionMode } : {})} {...(softHiddenBlockIds ? { softHiddenBlockIds } : {})} {...(actionedBlockIds ? { actionedBlockIds } : {})} />
+          if (isAgent(item)) return <AgentGroup key={item.id} item={item} chatMode={chatMode} enter={arrivalKey === item.id} {...(onAgentClick ? { onAgentClick } : {})} {...(onBlockContextMenu ? { onBlockContextMenu } : {})} {...(onBlockSelect ? { onBlockSelect } : {})} {...(onBlockAction ? { onBlockAction } : {})} {...(onReviewFile ? { onReviewFile } : {})} {...(onDeploySubmit ? { onDeploySubmit } : {})} {...(selectedBlockIds ? { selectedBlockIds } : {})} {...(selectionMode !== undefined ? { selectionMode } : {})} {...(softHiddenBlockIds ? { softHiddenBlockIds } : {})} {...(actionedBlockIds ? { actionedBlockIds } : {})} />
           return null
         })}
       </Virtualizer>

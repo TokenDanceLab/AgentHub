@@ -33,7 +33,7 @@
   align-items: center;
   justify-content: center;
   color: var(--text-inv);
-  font: 700 1.125rem var(--td-font);
+  font: 600 1.125rem var(--td-font);
   margin-bottom: var(--td-space-4);
 }
 

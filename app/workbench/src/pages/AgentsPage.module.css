@@ -10,7 +10,6 @@
 /* ── Page shell & nav ── */
 
 .agents-page {
-  --wb-nav: 310px;
   --wb-main-x: 42px;
   --wb-main-y: 32px;
 
@@ -22,11 +21,6 @@
   backdrop-filter: var(--glass-backdrop-filter);
   -webkit-backdrop-filter: var(--glass-backdrop-filter);
   color: var(--td-ink);
-}
-
-.agents-page .workbench-nav {
-  width: var(--wb-nav);
-  flex: 0 0 var(--wb-nav);
 }
 
 .agent-main {
@@ -54,17 +48,13 @@
 
 /* ── Workbench nav (shared with other pages but scoped here) ── */
 
+/* #1825: nav converges on the shared workbench page module (same 310px
+   opaque surface-2 rail as Contacts/Docs/Settings/Tasks) instead of a
+   second glass-colored copy. The copy's unclosed brace (accidental native
+   CSS nesting) is closed here so nav internals are flat selectors again. */
 .workbench-nav {
-  width: var(--wb-nav);
-  flex: 0 0 var(--wb-nav);
-  padding: 26px 12px 14px;
-  border-right: 1px solid var(--glass-border, var(--td-line));
-  background: var(--glass-panel, var(--td-surface-2));
-  backdrop-filter: var(--glass-backdrop-filter);
-  -webkit-backdrop-filter: var(--glass-backdrop-filter);
-  overflow-y: auto;
-  scrollbar-width: thin;
-  scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+  composes: wbNav from './workbench-page-shared.module.css';
+}
 
 .workbench-title {
   padding: 0 12px 18px;
@@ -173,7 +163,6 @@
 .doc-shortcut:hover {
   background: var(--glass-bg-light, var(--td-surface-3));
   color: var(--td-ink);
-}
 }
 
 /* ── Workbench head ── */
@@ -288,7 +277,7 @@
   display: block;
   margin-top: 5px;
   color: var(--td-ink);
-  font: 650 1.0625rem/1.1 var(--td-mono);
+  font: 600 1.0625rem/1.1 var(--td-mono);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -616,7 +605,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font: 700 0.75rem var(--td-font);
+  font: 600 0.75rem var(--td-font);
   flex-shrink: 0;
   cursor: pointer;
   outline: none;
@@ -632,7 +621,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font: 700 0.75rem var(--td-font);
+  font: 600 0.75rem var(--td-font);
   flex-shrink: 0;
 }
 
@@ -643,7 +632,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font: 700 0.75rem var(--td-font);
+  font: 600 0.75rem var(--td-font);
 }
 
 .agent-avatar:hover {
@@ -1308,7 +1297,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  font: 700 0.6875rem var(--td-mono);
+  font: 600 0.6875rem var(--td-mono);
 }
 
 .market-card h3 {

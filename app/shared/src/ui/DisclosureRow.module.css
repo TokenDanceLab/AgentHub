@@ -73,7 +73,7 @@
 .label {
   min-width: 0;
   overflow: hidden;
-  font-weight: 560;
+  font-weight: 500;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -83,7 +83,7 @@
   min-width: max-content;
   color: var(--td-ink-muted);
   font-size: 11px;
-  font-weight: 650;
+  font-weight: 600;
   letter-spacing: 0;
   text-transform: uppercase;
   opacity: 0.72;

@@ -21,6 +21,20 @@
   width: 100%;
   font: inherit;
   cursor: pointer;
+  border-radius: inherit;
+  transition:
+    background-color var(--motion-hover, 90ms ease),
+    transform var(--motion-press, 90ms ease);
+}
+
+/* #1825: itemButton was invisible on hover/active — give the solid tile the
+   standard glass-press feedback. */
+.itemButton:hover {
+  background: var(--td-surface-3);
+}
+
+.itemButton:active {
+  transform: scale(var(--glass-press-scale, 0.985));
 }
 
 .icon {
@@ -34,7 +48,7 @@
   overflow: hidden;
   color: var(--td-ink);
   font-size: 18px;
-  font-weight: 760;
+  font-weight: 600;
   line-height: 1.25;
   text-overflow: ellipsis;
   white-space: nowrap;

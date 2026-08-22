@@ -4,10 +4,6 @@
 
 /* ── Root shell: 4-column CSS grid ── */
 .shell {
-  --inspector-motion-duration: 360ms;
-  --inspector-motion-ease: cubic-bezier(0.22, 1, 0.36, 1);
-  --sidebar-motion-duration: var(--inspector-motion-duration);
-  --sidebar-motion-ease: var(--inspector-motion-ease);
   --composer-scroll-gap: 18px;
 
   display: grid;
@@ -23,7 +19,10 @@
     var(--td-canvas);
   color: var(--td-ink);
   transition:
-    grid-template-columns var(--inspector-motion-duration) var(--inspector-motion-ease),
+    /* #1825: panel choreography consumes the --motion-panel recipe (the
+       grid-template-rows const stays out: the row values (minmax(0,1fr) auto)
+       are identical in both dock states, so nothing animatable changes there). */
+    grid-template-columns var(--motion-panel),
     background var(--td-dur-normal) var(--td-ease);
 }
 
@@ -93,6 +92,16 @@
   margin-bottom: var(--td-space-2);
   flex-shrink: 0;
   overflow: hidden;
+  transition: filter var(--td-dur-fast) var(--td-ease), transform var(--td-dur-fast) var(--td-ease);
+}
+
+/* #1825: railAvatar had zero hover/active feedback. */
+.railAvatar:hover {
+  filter: brightness(1.1);
+}
+
+.railAvatar:active {
+  transform: scale(0.97);
 }
 
 .railButton {
@@ -190,9 +199,9 @@
   /* visibility flips back immediately on expand so the reveal animation runs. */
   visibility: visible;
   transition:
-    width var(--sidebar-motion-duration) var(--sidebar-motion-ease),
-    clip-path var(--sidebar-motion-duration) var(--sidebar-motion-ease),
-    border-color var(--sidebar-motion-duration) var(--sidebar-motion-ease),
+    width var(--motion-panel),
+    clip-path var(--motion-panel),
+    border-color var(--motion-panel),
     background var(--td-dur-normal) var(--td-ease),
     box-shadow var(--td-dur-normal) var(--td-ease),
     visibility 0s linear 0s;
@@ -213,12 +222,12 @@
   pointer-events: none;
   visibility: hidden;
   transition:
-    width var(--sidebar-motion-duration) var(--sidebar-motion-ease),
-    clip-path var(--sidebar-motion-duration) var(--sidebar-motion-ease),
-    border-color var(--sidebar-motion-duration) var(--sidebar-motion-ease),
+    width var(--motion-panel),
+    clip-path var(--motion-panel),
+    border-color var(--motion-panel),
     background var(--td-dur-normal) var(--td-ease),
     box-shadow var(--td-dur-normal) var(--td-ease),
-    visibility 0s linear var(--sidebar-motion-duration);
+    visibility 0s linear var(--dur-normal);
 }
 
 .shell[data-sidebar-resizing='true'] .sidebarFrame {
@@ -238,7 +247,7 @@
   transform: translateX(0);
   transition:
     opacity var(--dur-medium) var(--td-ease),
-    transform var(--sidebar-motion-duration) var(--sidebar-motion-ease);
+    transform var(--motion-panel);
   transition-delay: 70ms;
 }
 
@@ -1395,7 +1404,8 @@
   -webkit-backdrop-filter: var(--glass-backdrop-filter);
   box-shadow: var(--glass-elev-2);
   transition:
-    width var(--motion-panel, var(--dur-panel) var(--ease-panel)),
+    /* #1825: composer row is chrome, not a panel — use the hover micro-recipe. */
+    width var(--motion-hover),
     box-shadow var(--motion-hover),
     border-color var(--motion-hover),
     background-color var(--motion-hover),
@@ -1481,6 +1491,19 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   cursor: pointer;
+  transition: background-color var(--td-dur-fast) var(--td-ease),
+    border-color var(--td-dur-fast) var(--td-ease),
+    transform var(--td-dur-fast) var(--td-ease);
+}
+
+/* #1825: mention chip had zero hover/active feedback. */
+.composerMentionChip:hover {
+  background: color-mix(in srgb, var(--td-plum) 18%, var(--td-tint));
+  border-color: color-mix(in srgb, var(--td-plum) 40%, var(--td-line));
+}
+
+.composerMentionChip:active {
+  transform: scale(0.97);
 }
 
 .composerMainchain {
@@ -1835,7 +1858,7 @@
 .attachmentChipThumb {
   width: 18px;
   height: 18px;
-  border-radius: 2px;
+  border-radius: var(--r-xs);
   background: var(--td-surface-3);
   display: flex;
   align-items: center;
@@ -1899,10 +1922,10 @@
   clip-path: inset(0 0 0 0);
   visibility: visible;
   transition:
-    width var(--inspector-motion-duration) var(--inspector-motion-ease),
-    flex-basis var(--inspector-motion-duration) var(--inspector-motion-ease),
-    clip-path var(--inspector-motion-duration) var(--inspector-motion-ease),
-    border-color var(--inspector-motion-duration) var(--inspector-motion-ease),
+    width var(--motion-panel),
+    flex-basis var(--motion-panel),
+    clip-path var(--motion-panel),
+    border-color var(--motion-panel),
     background var(--td-dur-normal) var(--td-ease),
     box-shadow var(--td-dur-normal) var(--td-ease),
     visibility 0s linear 0s;
@@ -1931,10 +1954,10 @@
   clip-path: inset(0 0 0 0);
   visibility: visible;
   transition:
-    width var(--inspector-motion-duration) var(--inspector-motion-ease),
-    flex-basis var(--inspector-motion-duration) var(--inspector-motion-ease),
-    clip-path var(--inspector-motion-duration) var(--inspector-motion-ease),
-    border-color var(--inspector-motion-duration) var(--inspector-motion-ease),
+    width var(--motion-panel),
+    flex-basis var(--motion-panel),
+    clip-path var(--motion-panel),
+    border-color var(--motion-panel),
     background var(--td-dur-normal) var(--td-ease),
     box-shadow var(--td-dur-normal) var(--td-ease),
     visibility 0s linear 0s;
@@ -1964,13 +1987,13 @@
   pointer-events: none;
   visibility: hidden;
   transition:
-    width var(--inspector-motion-duration) var(--inspector-motion-ease),
-    flex-basis var(--inspector-motion-duration) var(--inspector-motion-ease),
-    clip-path var(--inspector-motion-duration) var(--inspector-motion-ease),
-    border-color var(--inspector-motion-duration) var(--inspector-motion-ease),
+    width var(--motion-panel),
+    flex-basis var(--motion-panel),
+    clip-path var(--motion-panel),
+    border-color var(--motion-panel),
     background var(--td-dur-normal) var(--td-ease),
     box-shadow var(--td-dur-normal) var(--td-ease),
-    visibility 0s linear var(--inspector-motion-duration);
+    visibility 0s linear var(--dur-normal);
 }
 
 .shell[data-inspector-resizing='true'] .inspector,
@@ -2040,7 +2063,7 @@
   transform: translateX(0);
   transition:
     opacity var(--dur-medium) var(--td-ease),
-    transform var(--inspector-motion-duration) var(--inspector-motion-ease);
+    transform var(--motion-panel);
   transition-delay: 90ms;
 }
 
@@ -2229,7 +2252,7 @@
 .inspectorTabMark b {
   display: none;
   color: currentColor;
-  font: 700 0.8125rem/1 var(--td-font);
+  font: 600 0.8125rem/1 var(--td-font);
   transform: translateY(-0.5px);
 }
 
@@ -2382,7 +2405,7 @@
 .fileIcon {
   width: 17px;
   height: 17px;
-  border-radius: 3px;
+  border-radius: var(--r-xs);
   color: var(--td-ink-subtle);
   font-size: 11px;
   flex-shrink: 0;
@@ -2707,12 +2730,12 @@
     visibility: hidden;
     will-change: width, flex-basis, clip-path, transform;
     transition:
-      width var(--inspector-motion-duration) var(--inspector-motion-ease),
-      flex-basis var(--inspector-motion-duration) var(--inspector-motion-ease),
-      clip-path var(--inspector-motion-duration) var(--inspector-motion-ease),
-      border-color var(--inspector-motion-duration) var(--inspector-motion-ease),
-      transform var(--inspector-motion-duration) var(--inspector-motion-ease),
-      visibility 0s linear var(--inspector-motion-duration);
+      width var(--motion-panel),
+      flex-basis var(--motion-panel),
+      clip-path var(--motion-panel),
+      border-color var(--motion-panel),
+      transform var(--motion-panel),
+      visibility 0s linear var(--dur-normal);
   }
 
   /* 收起态：等滑出动画结束后再隐藏，避免 offscreen 内容被 Tab 聚焦。 */
@@ -2727,11 +2750,11 @@
     transform: translateX(0);
     visibility: visible;
     transition:
-      width var(--inspector-motion-duration) var(--inspector-motion-ease),
-      flex-basis var(--inspector-motion-duration) var(--inspector-motion-ease),
-      clip-path var(--inspector-motion-duration) var(--inspector-motion-ease),
-      border-color var(--inspector-motion-duration) var(--inspector-motion-ease),
-      transform var(--inspector-motion-duration) var(--inspector-motion-ease),
+      width var(--motion-panel),
+      flex-basis var(--motion-panel),
+      clip-path var(--motion-panel),
+      border-color var(--motion-panel),
+      transform var(--motion-panel),
       visibility 0s;
   }
 
@@ -3081,6 +3104,28 @@
  * so channel cards keep full height and are not covered by the dock.
  */
 /* P77 #1320: compact base height; large empty glass slab suppressed on Chat path. */
+@keyframes terminalDockIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes terminalDockOut {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+}
+
 .terminalDock {
   grid-column: 3 / -1;
   grid-row: 2;
@@ -3096,6 +3141,14 @@
   box-shadow: var(--glass-elev-1);
   overflow: hidden;
   z-index: 2;
+  /* #1825: dock mount/unmount was a hard snap; WorkbenchFrame defers the
+     unmount by 180ms (useExiting) so the exit animation can play. */
+  animation: terminalDockIn var(--dur-normal) var(--ease-panel);
+}
+
+.terminalDockExiting {
+  animation: terminalDockOut var(--dur-fast) var(--ease-in) forwards;
+  pointer-events: none;
 }
 
 .terminalDock > * {
@@ -3132,6 +3185,11 @@
   .composerRow:hover,
   .composerRow:active::before {
     transform: none;
+  }
+
+  .terminalDock,
+  .terminalDockExiting {
+    animation: none;
   }
 }
 
@@ -3177,7 +3235,8 @@
   color: var(--text-inv);
   font: 600 13px var(--td-font);
   text-decoration: none;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.28);
+  /* #1825: floating pill shadow on the elevation ladder. */
+  box-shadow: var(--e-2, var(--td-shadow-md));
 }
 
 .skipLink:focus {
@@ -3226,7 +3285,7 @@
   padding: 2px 7px;
   border: 1px solid var(--td-line);
   border-bottom-width: 2px;
-  border-radius: 5px;
+  border-radius: var(--r-xs);
   background: var(--bg-3, var(--surface-dim, #f3f4f6));
   color: var(--td-ink-muted);
   font: 500 12px var(--mono, ui-monospace, monospace);
@@ -3338,11 +3397,10 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  /* The 360ms grid-template-columns + clip-path + translateX collapse
-     choreography becomes an instant state change. */
+  /* The panel collapse choreography (grid-template-columns + clip-path +
+     translateX via --motion-panel) becomes an instant state change. */
   .shell {
-    --inspector-motion-duration: 0ms;
-    --sidebar-motion-duration: 0ms;
+    --motion-panel: 0ms var(--ease-panel);
   }
 
   .shell,
@@ -3351,7 +3409,8 @@
   .inspector,
   .engineeringColumn,
   .monitorHead,
-  .inspectorPanel {
+  .inspectorPanel,
+  .composerRow {
     transition-duration: 0ms;
     transition-delay: 0ms;
   }

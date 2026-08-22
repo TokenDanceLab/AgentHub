@@ -24,8 +24,12 @@
   color: var(--td-ink-muted);
   font: inherit;
   font-size: 13px;
-  font-weight: 650;
+  font-weight: 600;
   cursor: pointer;
+  /* #1825: tab switching was a zero-transition snap; animate the swipe. */
+  transition:
+    background-color var(--td-dur-normal) var(--td-ease),
+    color var(--td-dur-normal) var(--td-ease);
 }
 
 .option:disabled {
@@ -63,7 +67,7 @@
 .meta {
   color: currentColor;
   font-size: 11px;
-  font-weight: 720;
+  font-weight: 600;
   line-height: 1;
 }
 
@@ -79,5 +83,12 @@
   .root {
     padding: 3px;
     gap: 2px;
+  }
+}
+
+/* Reduced motion: instant tab switch, no color sweep (#1825). */
+@media (prefers-reduced-motion: reduce) {
+  .option {
+    transition: none;
   }
 }

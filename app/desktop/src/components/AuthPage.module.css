@@ -83,6 +83,15 @@
   transition: all 0.15s;
 }
 
+/* #1825: tab hover/active feedback (was zero-state). */
+.tab:hover:not(.tabActive) {
+  background: var(--td-surface-2);
+}
+
+.tab:active {
+  background: var(--td-surface-3);
+}
+
 .tabActive {
   background: var(--td-surface);
   color: var(--td-ink);
@@ -219,7 +228,7 @@
   box-shadow: 0 10px 28px var(--glass-shadow-subtle);
   color: var(--td-ink);
   font-size: 14px;
-  font-weight: 650;
+  font-weight: 600;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
@@ -289,7 +298,7 @@
 .identityIcon {
   width: 18px;
   height: 18px;
-  border-radius: 5px;
+  border-radius: var(--r-xs);
   flex: 0 0 auto;
 }
 
