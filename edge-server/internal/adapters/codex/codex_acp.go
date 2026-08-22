@@ -56,14 +56,14 @@ const codexACPVersionPin = "1.1.7"
 // codexACPPackageSpec is the npx install spec with the version pin applied.
 const codexACPPackageSpec = codexACPPackage + "@" + codexACPVersionPin
 
-// CodexACPadapter runs the official codex-acp ACP agent binary.
+// ACPAdapter runs the official codex-acp ACP agent binary.
 //
 // It embeds AcpAdapter and inherits the full AgentAdapter contract
 // (BuildCommand, Metadata, Capabilities, Available, PreflightCheck,
 // ParseStream, NeedsStdin, SetPermissionBroker) from it; this wrapper only
 // supplies the codex-acp configuration (binary, args, env keys, version pin,
 // preflight labels) via NewAcpAdapterConfig.
-type CodexACPadapter struct {
+type ACPAdapter struct {
 	*acp.AcpAdapter
 }
 
@@ -73,11 +73,11 @@ type CodexACPadapter struct {
 // Windows and "npx" elsewhere (shared acp.DefaultNpxPath). The agent
 // receives no run-time args beyond `-y @agentclientprotocol/codex-acp`: ACP
 // mode is implicit in the package, and the prompt travels over stdio.
-func NewCodexACPadapter(npxPath string) *CodexACPadapter {
+func NewCodexACPadapter(npxPath string) *ACPAdapter {
 	if npxPath == "" {
 		npxPath = acp.DefaultNpxPath()
 	}
-	return &CodexACPadapter{AcpAdapter: acp.NewAcpAdapterConfig(acp.AcpAdapterConfig{
+	return &ACPAdapter{AcpAdapter: acp.NewAcpAdapterConfig(acp.AcpAdapterConfig{
 		ID:            codexACPadapterID,
 		Binary:        npxPath,
 		Args:          []string{"-y", codexACPPackageSpec},
@@ -91,7 +91,7 @@ func NewCodexACPadapter(npxPath string) *CodexACPadapter {
 
 // compile-time guard: the wrapper satisfies the full AgentAdapter contract
 // (via the embedded AcpAdapter).
-var _ adapters.AgentAdapter = (*CodexACPadapter)(nil)
+var _ adapters.AgentAdapter = (*ACPAdapter)(nil)
 
 // TODO(#1404 真跑验证): an end-to-end run against the real `npx -y
 // @agentclientprotocol/codex-acp` process requires a Node.js/npx environment

@@ -22,37 +22,8 @@ func main() {
 		return
 	}
 
-	logLevel := slog.LevelInfo
-	switch strings.ToLower(getEnv("AGENTHUB_LOG_LEVEL", "info")) {
-	case "debug":
-		logLevel = slog.LevelDebug
-	case "info":
-		logLevel = slog.LevelInfo
-	case "warn":
-		logLevel = slog.LevelWarn
-	case "error":
-		logLevel = slog.LevelError
-	}
-
-	var handler slog.Handler
-	if strings.ToLower(getEnv("AGENTHUB_LOG_FORMAT", "text")) == "json" {
-		handler = slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{Level: logLevel, AddSource: true})
-	} else {
-		handler = slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: logLevel, AddSource: true})
-	}
-	slog.SetDefault(slog.New(handler))
-
-	// Apply soft memory limit to prevent unbounded heap growth on long-running
-	// Edge processes. The Go runtime will trigger GC more aggressively when the
-	// heap approaches this limit and return unused memory to the OS.
-	// Default: 512 MiB. Set AGENTHUB_MEMORY_LIMIT_MB to override (0 = disable).
-	memLimitMB := parseIntEnv("AGENTHUB_MEMORY_LIMIT_MB", 512)
-	if memLimitMB > 0 {
-		limitBytes := int64(memLimitMB) * 1024 * 1024
-		debug.SetMemoryLimit(limitBytes)
-		debug.SetGCPercent(50) // more frequent GC to stay well under the limit
-		slog.Info("memory limit configured", "limit_mb", memLimitMB)
-	}
+	setupLogging()
+	applyMemoryLimit()
 
 	cfg, err := buildConfig(os.Args[1:])
 	if err != nil {
@@ -152,4 +123,46 @@ func main() {
 
 func runtimeManifestFixtureReplayRequested(args []string) bool {
 	return len(args) == 1 && args[0] == sdk.RuntimeManifestFixtureReplayFlag
+}
+
+// setupLogging configures the default slog logger from AGENTHUB_LOG_LEVEL
+// (debug/info/warn/error) and AGENTHUB_LOG_FORMAT (text/json). Extracted from
+// main to keep the composition root under the gocyclo threshold (#1840).
+func setupLogging() {
+	logLevel := slog.LevelInfo
+	switch strings.ToLower(getEnv("AGENTHUB_LOG_LEVEL", "info")) {
+	case "debug":
+		logLevel = slog.LevelDebug
+	case "info":
+		logLevel = slog.LevelInfo
+	case "warn":
+		logLevel = slog.LevelWarn
+	case "error":
+		logLevel = slog.LevelError
+	}
+
+	var handler slog.Handler
+	if strings.ToLower(getEnv("AGENTHUB_LOG_FORMAT", "text")) == "json" {
+		handler = slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{Level: logLevel, AddSource: true})
+	} else {
+		handler = slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: logLevel, AddSource: true})
+	}
+	slog.SetDefault(slog.New(handler))
+}
+
+// applyMemoryLimit applies a soft memory limit to prevent unbounded heap
+// growth on long-running Edge processes. The Go runtime will trigger GC more
+// aggressively when the heap approaches this limit and return unused memory to
+// the OS. Default: 512 MiB. Set AGENTHUB_MEMORY_LIMIT_MB to override
+// (0 = disable). Extracted from main to keep the composition root under the
+// gocyclo threshold (#1840).
+func applyMemoryLimit() {
+	memLimitMB := parseIntEnv("AGENTHUB_MEMORY_LIMIT_MB", 512)
+	if memLimitMB <= 0 {
+		return
+	}
+	limitBytes := int64(memLimitMB) * 1024 * 1024
+	debug.SetMemoryLimit(limitBytes)
+	debug.SetGCPercent(50) // more frequent GC to stay well under the limit
+	slog.Info("memory limit configured", "limit_mb", memLimitMB)
 }

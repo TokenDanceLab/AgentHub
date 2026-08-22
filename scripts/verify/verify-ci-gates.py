@@ -147,12 +147,19 @@ def main() -> int:
         assert_contains(fail_step, r"needs\.changes\.result != 'success'", f"{job_name} must fail closed when the changes job fails")
         assert_contains(fail_step, r"exit 1", f"{job_name} changes-failure step must exit 1")
 
-    # #1536: Edge lint is at 0 issues and hardened to hard-blocking. Complexity
-    # exclusions remain separately owned by #1568.
-    # Wave 10: go-edge Lint set to advisory — gocognit findings in pre-existing
-    # complex functions (admin.go/mcp_server.go/agent_dispatch.go); re-harden
-    # after refactoring or threshold adjustment.
+    # #1840: go-edge Lint is report-only (advisory) — the action's raw exit
+    # code cannot consult the baseline, and >300-file PR diffs fall back to a
+    # full-repo lint that would hard-fail debt-clean large PRs on the 6
+    # baseline-registered exported-stutter findings. The hard gate lives in
+    # the fingerprint ratchet step below, which exempts baseline-registered
+    # findings in both patch and full-lint mode. The step must keep the
+    # pinned golangci-lint action (no placeholder commands) and
+    # only-new-issues so small PRs keep a new-findings report.
     assert_step_continue_on_error(edge, "Lint", True)
+    edge_lint_step = get_step_block(edge, "Lint")
+    assert_contains(edge_lint_step, r"golangci/golangci-lint-action@v9", "go-edge Lint must keep the pinned golangci-lint action (no placeholder commands)")
+    assert_contains(edge_lint_step, r"only-new-issues:\s*true", "go-edge Lint must keep only-new-issues so patch-mode reports stay scoped to new findings")
+    assert_step_continue_on_error(edge, "Verify Edge lint fingerprint ratchet (#1840)", False)
     # #1812: go-hub Lint is hard-blocking — the 17 baseline-registered
     # complexity findings (#1573) are repaid and hub-lint-baseline.json is
     # empty, so a full-repo lint failure is a genuine regression. The
