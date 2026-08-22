@@ -58,21 +58,14 @@ All mock, fixture, readiness-only, and preview-only results must be recorded wit
 
 ## Push and notification capabilities
 
-Verified boundary (lane C-1824, 2026-08-23): **hub-server has no push delivery facility.** Evidence: zero hits across hub-server Go sources for FCM/APNs/Expo-push/`push_token`/ntfy/pushover; `go.mod` carries no push/notification dependency; `registerDevice` (hub-server/internal/handler/device.go + shared `HubRegisterDeviceRequest`) has no token field — there is no device-token store and no sender/queue consuming one.
-
-Current Mobile behavior:
-
-- Notification **permission** and the Expo push token are collected for **local (on-device) notification handling only**. The token is deliberately never forwarded to the Hub (forwarding without a delivery path would be a half-wired claim).
-- Notification **click intents** resolve through `notificationBridge` + shared `notificationIntents` into in-app routing (thread / run / approval / activity) — this routing IS wired and unit-tested.
-- Until the Hub side ships a delivery path (device token storage + sender), Mobile does not claim server-side push. Do not add `push_token` to `registerDevice` before a consumer exists.
+Verified boundary (lane C-1824, 2026-08-23): **hub-server has no push delivery facility** — zero hits in Go sources for FCM/APNs/Expo-push/`push_token`, no dependency in `go.mod`, and `registerDevice` (hub-server/internal/handler/device.go + shared `HubRegisterDeviceRequest`) carries no token field. The Expo push token therefore stays **local (on-device) only** and is never forwarded to the Hub; notification click intents route in-app via `notificationBridge` + shared `notificationIntents` (unit-tested). Do not add `push_token` to `registerDevice` or claim server-side push until the Hub ships a delivery path.
 
 ## Auth and deep-link boundaries
 
-- Mobile login runs the **real TokenDance ID OIDC flow** against the Hub OIDC endpoints through the shared auth state machine (`@agenthub/shared/api/auth` createHubAuthCore, issue #1537): PKCE -> Hub authorize -> `expo-web-browser` -> `agenthub://auth/callback` deep link -> code exchange -> SecureStore-backed session (tokens) with refresh fallback and signed-out cleanup on refresh failure.
-- OIDC callback **pending state (PKCE verifier) is memory-only** — parity with the Desktop Tauri local-callback-server mode. The callback returns to the same process; if the OS kills the app mid-login, the user restarts login (no silent callback acceptance without the verifier).
-- Deep links use the `agenthub://` scheme (app.config.ts). Cold start (`getInitialURL`) and warm start (`url` listener) are wired to in-app routing. **If AgentHub is not installed there is no handler and no web fallback** — an uninstalled deep link is a no-op by design.
-- `hubSync` status on the account surface remains fixture/preview-backed: the mobile live data plane (Hub event stream over the lifecycle bridge) is not yet the UI source of truth. The lifecycle bridge itself (suspend/foreground-resume/resync-cursor behavior) is unit-tested (#1824).
-
+- Login runs the real TokenDance ID OIDC flow through the shared auth core (`@agenthub/shared/api/auth` createHubAuthCore, #1537): PKCE → Hub authorize → `expo-web-browser` → `agenthub://auth/callback` → code exchange → SecureStore-backed session with refresh fallback and signed-out cleanup on refresh failure.
+- The OIDC pending state (PKCE verifier) is memory-only — parity with Desktop Tauri mode; if the OS kills the app mid-login the user restarts (no silent callback acceptance without the verifier).
+- Deep links (`agenthub://`, app.config.ts) cover cold start (`getInitialURL`) and warm start (`url` listener); **if the app is not installed there is no handler and no web fallback** — no-op by design.
+- Account `hubSync` status stays fixture/preview-backed until the mobile live data plane becomes the UI truth; the lifecycle bridge itself is unit-tested (#1824).
 
 ## Data Modes
 
