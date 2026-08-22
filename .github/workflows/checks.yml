@@ -13,6 +13,24 @@ on:
   push:
     branches: [master]
   workflow_dispatch:
+    inputs:
+      id_mode:
+        description: >-
+          TokenDance ID 取得方式（real-e2e-stack lane）：
+          source=私有 tokendance-id 源码构建（默认，需 secrets.TOKENDANCE_ID_CLONE_TOKEN，
+          contents:read 于 TokenDanceLab/tokendance-id）；existing=id_base_url 已有真实 ID
+          （远程 dev 服务器情景）；image=拉取预建 id_image 镜像。
+        default: source
+        type: choice
+        options: [source, existing, image]
+      id_base_url:
+        description: id_mode=existing 时的 ID 基址
+        default: http://127.0.0.1:3000
+        type: string
+      id_image:
+        description: id_mode=image 时的 ID 容器镜像（registry/repo:tag）
+        default: ghcr.io/tokendancelab/tokendance-id:main
+        type: string
 
 permissions:
   contents: read
@@ -1373,6 +1391,217 @@ jobs:
         run: pnpm --filter agenthub-web exec playwright test --config playwright.config.ts --project=chromium smoke.spec.ts
         working-directory: ./app
 
+  # ── Real E2E stack lane (L3, dispatch-only) ─────
+  # #1839 B3: 可重跑真栈 lane——起 PostgreSQL/Redis(docker compose)+TokenDance ID+
+  # hub+edge+web 全栈后跑 B2 真实 OIDC 浏览器 spec（app/e2e/real-oidc-login.spec.ts，
+  # playwright.real.config.ts），产出 tests/artifacts/manifest-<stamp>.json
+  # （六字段 evidence 合同，verify-real-e2e-lane-manifest.py 自检）并上传证据。
+  # L3 不进 PR merge 门禁（AGENTS §5.5）；与 e2e-smoke 同为 dispatch-only，
+  # PR 门禁补强是 web-e2e-stubbed（#1839 B1）。
+  # ID 取得方式（workflow_dispatch 输入 id_mode）：
+  #   source  —— 从私有 TokenDanceLab/tokendance-id 源码构建（默认）。
+  #              克隆需要 secrets.TOKENDANCE_ID_CLONE_TOKEN（contents:read 于该私有仓库）；
+  #              缺失时 lane 以 blocked 状态如实落 manifest（real_tested=false），不硬编。
+  #   existing —— id_base_url 已指向真实 ID（远程 dev 服务器情景），lane 做健康探测；
+  #              provision 仍需可访问的 ID sqlite（AGENTHUB_E2E_ID_DB）或直供 client 凭据。
+  #   image   —— 拉取预建 ID 镜像（id_image 输入）。
+  real-e2e-stack:
+    name: Real E2E stack (L3 lane, dispatch-only)
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      AGENTHUB_DB_HOST: 127.0.0.1
+      AGENTHUB_DB_PORT: "5432"
+      AGENTHUB_DB_USER: agenthub
+      AGENTHUB_DB_NAME: agenthub
+      AGENTHUB_DB_SSLMODE: disable
+      AGENTHUB_DB_PASSWORD: b3-lane-dev-password
+      AGENTHUB_REDIS_HOST: 127.0.0.1
+      AGENTHUB_REDIS_PORT: "6379"
+      AGENTHUB_SERVER_PORT: "8080"
+      AGENTHUB_SERVER_ADMIN_PORT: "6060"
+      AGENTHUB_TOKENDANCE_ID_ISSUER_URL: http://127.0.0.1:3000
+      AGENTHUB_TOKENDANCE_ID_REDIRECT_URI: http://127.0.0.1:8080/client/auth/oidc/callback
+      # B2 spec 走 /workbench 前缀回调；CI 会话需要两版变体（无 base 变体供 H5 兼容）。
+      AGENTHUB_TOKENDANCE_ID_ALLOWED_REDIRECT_URIS: http://127.0.0.1:8080/client/auth/oidc/callback,http://127.0.0.1:5174/auth/tokendance/callback,http://localhost:5174/auth/tokendance/callback,http://127.0.0.1:5174/workbench/auth/tokendance/callback,http://localhost:5174/workbench/auth/tokendance/callback
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+          cache-dependency-path: |
+            edge-server/go.sum
+            hub-server/go.sum
+
+      - uses: pnpm/action-setup@v6
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+          cache-dependency-path: app/pnpm-lock.yaml
+
+      - name: Install (app)
+        run: pnpm install --frozen-lockfile
+        working-directory: ./app
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v5
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('app/pnpm-lock.yaml') }}
+
+      - name: Install Playwright Chromium
+        run: pnpm exec playwright install --with-deps chromium
+        working-directory: ./app
+
+      - name: Install lane prereqs (sqlite3, bcrypt)
+        shell: bash
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y sqlite3 openssl
+          python3 -m pip install bcrypt
+
+      - name: Generate run-time OIDC client credentials and hub JWT secret (never committed)
+        id: creds
+        shell: bash
+        run: |
+          echo "cid=c_$(openssl rand -hex 12)" >> "$GITHUB_OUTPUT"
+          echo "csec=cs_$(openssl rand -hex 24)" >> "$GITHUB_OUTPUT"
+          echo "jwt=$(openssl rand -hex 24)" >> "$GITHUB_OUTPUT"
+
+      - name: Start PostgreSQL + Redis (compose)
+        run: docker compose up -d postgres redis
+
+      - name: Start TokenDance ID (source, private repo clone)
+        if: inputs.id_mode == 'source'
+        shell: bash
+        env:
+          ID_REPO_TOKEN: ${{ secrets.TOKENDANCE_ID_CLONE_TOKEN }}
+        run: |
+          if [ -z "$ID_REPO_TOKEN" ]; then
+            echo "::warning::secrets.TOKENDANCE_ID_CLONE_TOKEN unset — real TokenDance ID unavailable;"
+            echo "::warning::the lane step will record an honest blocked manifest (real_tested=false)."
+            echo "::warning::The token needs contents:read on the private TokenDanceLab/tokendance-id repo."
+            exit 0
+          fi
+          sudo mkdir -p /var/lib/tokendance-id
+          git clone --quiet --depth 1 https://x-access-token:${ID_REPO_TOKEN}@github.com/TokenDanceLab/tokendance-id.git /tmp/tokendance-id
+          (cd /tmp/tokendance-id && go build -o /tmp/tokendance-id-bin ./cmd/tokendance-id)
+          cp /tmp/tokendance-id/configs/config.example.yaml /tmp/tokendance-id/configs/config.yaml
+          openssl genrsa -out /tmp/id-private.pem 2048 >/dev/null 2>&1
+          openssl rsa -in /tmp/id-private.pem -pubout -out /tmp/id-public.pem >/dev/null 2>&1
+          (cd /tmp/tokendance-id && nohup env \
+            TOKENDANCE_SERVER_ADDR=:3000 \
+            TOKENDANCE_DATABASE_DSN=/var/lib/tokendance-id/tokendance.db \
+            TOKENDANCE_JWT_ISSUER=http://127.0.0.1:3000 \
+            TOKENDANCE_JWT_PRIVATE_KEY_PATH=/tmp/id-private.pem \
+            TOKENDANCE_JWT_PUBLIC_KEY_PATH=/tmp/id-public.pem \
+            TOKENDANCE_JWT_ACCESS_TTL=15m \
+            TOKENDANCE_JWT_REFRESH_TTL=24h \
+            TOKENDANCE_SECURITY_COOKIE_SECURE=false \
+            TOKENDANCE_SECURITY_COOKIE_DOMAIN=127.0.0.1 \
+            TOKENDANCE_SESSION_TTL=24h \
+            TOKENDANCE_FEATURES_REQUIRE_INVITE=false \
+            TOKENDANCE_REDIS_ADDR=127.0.0.1:6379 \
+            /tmp/tokendance-id-bin > /tmp/id.log 2>&1 &)
+          for i in $(seq 1 60); do
+            curl -sf -m 3 http://127.0.0.1:3000/health >/dev/null 2>&1 && break
+            sleep 2
+          done
+          curl -sf -m 3 http://127.0.0.1:3000/health >/dev/null || { echo "TokenDance ID did not become healthy"; tail -50 /tmp/id.log; exit 1; }
+
+      - name: Start TokenDance ID (image)
+        if: inputs.id_mode == 'image'
+        shell: bash
+        run: |
+          docker run -d --name td-id -p 127.0.0.1:3000:3000 \
+            -e TOKENDANCE_SERVER_ADDR=:3000 \
+            -e TOKENDANCE_DATABASE_DSN=/app/data/tokendance.db \
+            -e TOKENDANCE_JWT_ISSUER=http://127.0.0.1:3000 \
+            -e TOKENDANCE_SECURITY_COOKIE_SECURE=false \
+            -e TOKENDANCE_SECURITY_COOKIE_DOMAIN=127.0.0.1 \
+            -e TOKENDANCE_SESSION_TTL=24h \
+            -e TOKENDANCE_FEATURES_REQUIRE_INVITE=false \
+            -v /var/lib/tokendance-id:/app/data \
+            "${{ inputs.id_image }}"
+          for i in $(seq 1 60); do
+            curl -sf -m 3 http://127.0.0.1:3000/health >/dev/null 2>&1 && break
+            sleep 2
+          done
+          curl -sf -m 3 http://127.0.0.1:3000/health >/dev/null || { echo "TokenDance ID image did not become healthy"; exit 1; }
+
+      - name: Start TokenDance ID (existing; lane preflight only)
+        if: inputs.id_mode == 'existing'
+        shell: bash
+        run: echo "::info::id_mode=existing; lane preflight will probe ${{ inputs.id_base_url }}"
+
+      - name: Build and start Hub Server
+        shell: bash
+        env:
+          AGENTHUB_JWT_SECRET: ${{ steps.creds.outputs.jwt }}
+          AGENTHUB_TOKENDANCE_ID_CLIENT_ID: ${{ steps.creds.outputs.cid }}
+          AGENTHUB_TOKENDANCE_ID_CLIENT_SECRET: ${{ steps.creds.outputs.csec }}
+        run: |
+          mkdir -p uploads
+          nohup go run ./hub-server/cmd/server-hub > /tmp/hub.log 2>&1 &
+          for i in $(seq 1 60); do
+            curl -sf -m 3 http://127.0.0.1:8080/health >/dev/null 2>&1 && break
+            sleep 2
+          done
+          curl -sf -m 3 http://127.0.0.1:8080/health >/dev/null || { echo "hub did not become healthy"; tail -50 /tmp/hub.log; exit 1; }
+
+      - name: Start Edge Server
+        shell: bash
+        run: |
+          nohup go run ./edge-server/cmd/agenthub-edge > /tmp/edge.log 2>&1 &
+          for i in $(seq 1 30); do
+            curl -sf -m 3 http://127.0.0.1:3210/v1/health >/dev/null 2>&1 && break
+            sleep 2
+          done
+          curl -sf -m 3 http://127.0.0.1:3210/v1/health >/dev/null || { echo "edge did not become healthy"; tail -50 /tmp/edge.log; exit 1; }
+
+      - name: Start Web dev server
+        shell: bash
+        run: |
+          cd app
+          nohup pnpm --filter agenthub-web dev --host 127.0.0.1 --port 5174 > /tmp/web.log 2>&1 &
+          for i in $(seq 1 45); do
+            curl -sf -m 3 -o /dev/null http://127.0.0.1:5174/workbench/ && break
+            sleep 2
+          done
+          curl -sf -m 3 -o /dev/null http://127.0.0.1:5174/workbench/ || { echo "web did not become healthy"; tail -50 /tmp/web.log; exit 1; }
+
+      - name: Run real-e2e lane (B2 spec + evidence manifest)
+        if: always()
+        shell: bash
+        env:
+          AGENTHUB_E2E_ID_BASE_URL: http://127.0.0.1:3000
+          AGENTHUB_E2E_HUB_BASE_URL: http://127.0.0.1:8080
+          AGENTHUB_E2E_EDGE_BASE_URL: http://127.0.0.1:3210
+          AGENTHUB_E2E_WEB_BASE_URL: http://127.0.0.1:5174
+          # 与 hub 启动步骤同一对运行期凭据；provision 脚本以此 seed ID 的 OAuth client。
+          AGENTHUB_E2E_ID_CLIENT_ID: ${{ steps.creds.outputs.cid }}
+          AGENTHUB_E2E_ID_CLIENT_SECRET: ${{ steps.creds.outputs.csec }}
+          # ID 容器/二进制跑在 runner 本机，使用 provision 脚本默认 sqlite 路径。
+          AGENTHUB_E2E_ID_DB: /var/lib/tokendance-id/tokendance.db
+        run: bash scripts/e2e/run-real-e2e-lane.sh
+
+      - name: Upload L3 evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: real-e2e-stack-evidence
+          path: tests/artifacts/
+          if-no-files-found: warn
+          retention-days: 14
   # ── Validation ───────────────────────────────
   validate:
     runs-on: ubuntu-latest
