@@ -17,7 +17,7 @@ import (
 // like "parent/sub/run_x" ("Invalid session ID. Must be a valid UUID"). The
 // ThreadID stays hierarchical (stored on the run), so context isolation is
 // preserved without poisoning the CC session argument.
-func newSubAgentRunContext(run store.Run, task adapters.SubAgentTask, threadID string) RunProcessContext {
+func newSubAgentRunContext(run store.Run, task adapters.SubAgentTask) RunProcessContext {
 	return RunProcessContext{
 		Run:       run,
 		Prompt:    task.Prompt,
@@ -318,7 +318,7 @@ func parentIDFromAgentInstance(inst *agents.AgentInstance) string {
 // task fields, parent workdir memory, and sibling system prompt. Map/IO stays
 // in SpawnSubAgent (parent workdir lookup).
 func buildSubAgentRunContext(run store.Run, task adapters.SubAgentTask, threadID, parentWorkDir string) RunProcessContext {
-	runCtx := newSubAgentRunContext(run, task, threadID)
+	runCtx := newSubAgentRunContext(run, task)
 	runCtx = applyParentWorkDirMemory(runCtx, parentWorkDir, threadID, task.AgentID)
 	runCtx.AppendSystemPrompt = withSiblingSystemPrompt(runCtx.AppendSystemPrompt, task.SiblingAgents)
 	return runCtx

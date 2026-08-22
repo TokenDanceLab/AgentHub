@@ -69,29 +69,29 @@ type SDKFixtureEvent struct {
 	// Provider-neutral Edge contract fields. These are fixture-only projections
 	// of SDK/CLI signals and must stay redacted before they cross the adapter
 	// boundary.
-	AdapterID           string                  `json:"adapterId,omitempty"`
-	CommandName         string                  `json:"commandName,omitempty"`
-	ArgFlags            []string                `json:"argFlags,omitempty"`
-	ConfigKeys          []string                `json:"configKeys,omitempty"`
-	PositionalArgCount  int                     `json:"positionalArgCount,omitempty"`
-	EnvNames            []string                `json:"envNames,omitempty"`
-	WorkDir             string                  `json:"workDir,omitempty"`
-	PromptRedacted      bool                    `json:"promptRedacted,omitempty"`
-	Observed            bool                    `json:"observed,omitempty"`
-	RealTested          bool                    `json:"realTested,omitempty"`
-	RealTestedReason    string                  `json:"realTestedReason,omitempty"`
-	ExecutionMode       string                  `json:"executionMode,omitempty"`
-	NoSpendDefault      bool                    `json:"noSpendDefault,omitempty"`
-	RedactionApplied    bool                    `json:"redactionApplied,omitempty"`
-	ApprovalRequired    bool                    `json:"approvalRequired,omitempty"`
-	ApprovalEvidenceRef string                  `json:"approvalEvidenceRef,omitempty"`
-	TaskID              string                  `json:"taskId,omitempty"`
-	Description         string                  `json:"description,omitempty"`
-	LastToolName        string                  `json:"lastToolName,omitempty"`
-	Percent             float64                 `json:"percent,omitempty"`
-	Usage               *SDKFixtureUsage        `json:"usage,omitempty"`
-	Capabilities        *SDKFixtureCapabilities `json:"capabilities,omitempty"`
-	Health              *SDKFixtureHealth       `json:"health,omitempty"`
+	AdapterID           string               `json:"adapterId,omitempty"`
+	CommandName         string               `json:"commandName,omitempty"`
+	ArgFlags            []string             `json:"argFlags,omitempty"`
+	ConfigKeys          []string             `json:"configKeys,omitempty"`
+	PositionalArgCount  int                  `json:"positionalArgCount,omitempty"`
+	EnvNames            []string             `json:"envNames,omitempty"`
+	WorkDir             string               `json:"workDir,omitempty"`
+	PromptRedacted      bool                 `json:"promptRedacted,omitempty"`
+	Observed            bool                 `json:"observed,omitempty"`
+	RealTested          bool                 `json:"realTested,omitempty"`
+	RealTestedReason    string               `json:"realTestedReason,omitempty"`
+	ExecutionMode       string               `json:"executionMode,omitempty"`
+	NoSpendDefault      bool                 `json:"noSpendDefault,omitempty"`
+	RedactionApplied    bool                 `json:"redactionApplied,omitempty"`
+	ApprovalRequired    bool                 `json:"approvalRequired,omitempty"`
+	ApprovalEvidenceRef string               `json:"approvalEvidenceRef,omitempty"`
+	TaskID              string               `json:"taskId,omitempty"`
+	Description         string               `json:"description,omitempty"`
+	LastToolName        string               `json:"lastToolName,omitempty"`
+	Percent             float64              `json:"percent,omitempty"`
+	Usage               *FixtureUsage        `json:"usage,omitempty"`
+	Capabilities        *FixtureCapabilities `json:"capabilities,omitempty"`
+	Health              *FixtureHealth       `json:"health,omitempty"`
 
 	// Fixture evidence metadata. These fields describe the AgentHub-owned
 	// runtime adapter projection, not provider-native SDK objects.
@@ -103,18 +103,18 @@ type SDKFixtureEvent struct {
 	FixtureOnly         bool   `json:"fixtureOnly,omitempty"`
 }
 
-// SDKFixtureUsage is a provider-neutral usage/cost projection accepted only by
+// FixtureUsage is a provider-neutral usage/cost projection accepted only by
 // fixture contract tests.
-type SDKFixtureUsage struct {
+type FixtureUsage struct {
 	InputTokens  int64   `json:"inputTokens,omitempty"`
 	OutputTokens int64   `json:"outputTokens,omitempty"`
 	TotalTokens  int64   `json:"totalTokens,omitempty"`
 	TotalCostUSD float64 `json:"totalCostUsd,omitempty"`
 }
 
-// SDKFixtureCapabilities is a fixture-only provider-neutral capability shape.
+// FixtureCapabilities is a fixture-only provider-neutral capability shape.
 // It mirrors AgentHub runtime abilities instead of provider SDK feature names.
-type SDKFixtureCapabilities struct {
+type FixtureCapabilities struct {
 	Streaming       bool     `json:"streaming,omitempty"`
 	ToolCalls       bool     `json:"toolCalls,omitempty"`
 	FileChanges     bool     `json:"fileChanges,omitempty"`
@@ -128,17 +128,17 @@ type SDKFixtureCapabilities struct {
 	Transports      []string `json:"transports,omitempty"`
 }
 
-// SDKFixtureHealth records no-spend health evidence for fixture capability
+// FixtureHealth records no-spend health evidence for fixture capability
 // checks. It must not contain provider credentials or raw SDK session objects.
-type SDKFixtureHealth struct {
+type FixtureHealth struct {
 	State    string            `json:"state,omitempty"`
 	Reason   string            `json:"reason,omitempty"`
 	Checks   map[string]string `json:"checks,omitempty"`
 	Metadata map[string]any    `json:"metadata,omitempty"`
 }
 
-// SDKMappedEvent is the AgentHub-owned event projection emitted by the mapper.
-type SDKMappedEvent struct {
+// MappedEvent is the AgentHub-owned event projection emitted by the mapper.
+type MappedEvent struct {
 	Type    string         `json:"type"`
 	Scope   map[string]any `json:"scope"`
 	Payload map[string]any `json:"payload"`
@@ -147,9 +147,9 @@ type SDKMappedEvent struct {
 // MapSDKFixtureStream projects a fixture-only SDK event stream into existing
 // AgentHub runtime/evidence event types. It does not import, instantiate, or
 // register provider SDKs.
-func MapSDKFixtureStream(stream SDKFixtureStream, scope map[string]any) []SDKMappedEvent {
+func MapSDKFixtureStream(stream SDKFixtureStream, scope map[string]any) []MappedEvent {
 	provider := strings.TrimSpace(stream.Provider)
-	mapped := make([]SDKMappedEvent, 0, len(stream.Events))
+	mapped := make([]MappedEvent, 0, len(stream.Events))
 	for _, fixtureEvent := range stream.Events {
 		eventProvider := provider
 		if fixtureEvent.Provider != "" {

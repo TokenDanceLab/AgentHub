@@ -278,7 +278,7 @@ func TestCodexACPadapterDefaultNpxPath(t *testing.T) {
 // TestCodexACPadapterPreflightFailsFast asserts the launcher-missing path
 // fails before spawn.
 func TestCodexACPadapterPreflightFailsFast(t *testing.T) {
-	a := &CodexACPadapter{
+	a := &ACPAdapter{
 		AcpAdapter: acp.NewAcpAdapterConfig(acp.AcpAdapterConfig{
 			ID:            codexACPadapterID,
 			Binary:        "",

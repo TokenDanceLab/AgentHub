@@ -1,4 +1,4 @@
-// Package codex 收纳 AgentHub 的官方 Codex ACP 适配器 CodexACPadapter
+// Package codex 收纳 AgentHub 的官方 Codex ACP 适配器 ACPAdapter
 // （registry id "codex-acp"）：以 `npx -y @agentclientprotocol/codex-acp`
 // 启动官方 ACP 适配器二进制，封装 adapters/acp 子包共享 ACP 运行时
 // AcpAdapter。
@@ -23,6 +23,6 @@
 // 根 internal/adapters 不 import 本子包：根包对 codex 的唯一残留引用是
 // registry.go 中的字符串适配器 ID（"codex-acp"），注册由组合根完成，因此
 // 方向天然单向。AgentHubAgentSpec fixture 的 cli-json 投影需要构造
-// CodexACPadapter，通过 sdk 子包 RegisterCodexACPadapterProvider 反向注入
+// ACPAdapter，通过 sdk 子包 RegisterCodexACPadapterProvider 反向注入
 // （见 fixture_provider.go），避免 sdk import 本包形成环。
 package codex

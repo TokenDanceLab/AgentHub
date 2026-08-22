@@ -61,8 +61,8 @@ func sdkFieldIsEmpty(value any) bool {
 	return false
 }
 
-func oneSDKMappedEvent(eventType string, scope map[string]any, payload map[string]any) []SDKMappedEvent {
-	return []SDKMappedEvent{{
+func oneSDKMappedEvent(eventType string, scope map[string]any, payload map[string]any) []MappedEvent {
+	return []MappedEvent{{
 		Type:    eventType,
 		Scope:   cloneSDKScope(scope),
 		Payload: payload,
@@ -136,7 +136,7 @@ func sdkFixtureCapabilityHealthPayload(event SDKFixtureEvent) map[string]any {
 	return payload
 }
 
-func sdkFixtureCapabilitiesPayload(capabilities SDKFixtureCapabilities) map[string]any {
+func sdkFixtureCapabilitiesPayload(capabilities FixtureCapabilities) map[string]any {
 	payload := map[string]any{}
 	if capabilities.Streaming {
 		payload["streaming"] = true

@@ -66,13 +66,13 @@ const claudeACPVersionPin = "0.67.0"
 // claudeACPPackageSpec is the npx install spec with the version pin applied.
 const claudeACPPackageSpec = claudeACPPackage + "@" + claudeACPVersionPin
 
-// ClaudeACPAdapter runs the official claude-agent-acp ACP agent binary.
+// ACPAdapter runs the official claude-agent-acp ACP agent binary.
 //
 // It embeds AcpAdapter and inherits BuildCommand/Metadata/Capabilities/
 // ParseStream/NeedsStdin/Available/SetPermissionBroker from it; this wrapper
 // only supplies the claude-acp configuration via NewAcpAdapterConfig plus a
 // PreflightCheck override (see file doc for why the override is retained).
-type ClaudeACPAdapter struct {
+type ACPAdapter struct {
 	*acp.AcpAdapter
 }
 
@@ -89,11 +89,11 @@ type ClaudeACPAdapter struct {
 // the agent's own settings.json. ANTHROPIC_AUTH_TOKEN / ANTHROPIC_BASE_URL
 // are also passed through so a cc-switch-style gateway (token + base URL)
 // authenticates the same way the legacy claude-code adapter does.
-func NewClaudeACPAdapter(npxPath, model string) *ClaudeACPAdapter {
+func NewClaudeACPAdapter(npxPath, model string) *ACPAdapter {
 	if npxPath == "" {
 		npxPath = acp.DefaultNpxPath()
 	}
-	return &ClaudeACPAdapter{AcpAdapter: acp.NewAcpAdapterConfig(acp.AcpAdapterConfig{
+	return &ACPAdapter{AcpAdapter: acp.NewAcpAdapterConfig(acp.AcpAdapterConfig{
 		ID:            claudeACPAdapterID,
 		Binary:        npxPath,
 		Args:          []string{"-y", claudeACPPackageSpec},
@@ -115,7 +115,7 @@ func NewClaudeACPAdapter(npxPath, model string) *ClaudeACPAdapter {
 // failure; this override guarantees that behavior regardless of how the
 // wrapper was constructed. Authentication — ANTHROPIC_API_KEY env or Claude
 // Code login — is left to the claude-agent-acp process itself.
-func (a *ClaudeACPAdapter) PreflightCheck() error {
+func (a *ACPAdapter) PreflightCheck() error {
 	if !a.Available() {
 		return fmt.Errorf("claude-acp launcher %q not found on PATH (install Node.js/npx)", a.AgentBinary())
 	}
@@ -124,7 +124,7 @@ func (a *ClaudeACPAdapter) PreflightCheck() error {
 
 // compile-time guard: the wrapper satisfies the full AgentAdapter contract
 // (via the embedded AcpAdapter).
-var _ AgentAdapter = (*ClaudeACPAdapter)(nil)
+var _ AgentAdapter = (*ACPAdapter)(nil)
 
 // Verified: end-to-end runs against the real `npx -y
 // @agentclientprotocol/claude-agent-acp@0.67.0` process were exercised on the

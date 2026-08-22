@@ -425,7 +425,7 @@ func TestNewSubAgentRunContext(t *testing.T) {
 		Model:   "sonnet",
 		Budget:  parentBudget,
 	}
-	got := newSubAgentRunContext(run, task, "th_c")
+	got := newSubAgentRunContext(run, task)
 	if got.Run.ID != "run_c" || got.Prompt != "do work" || got.AgentID != "worker" || got.Model != "sonnet" {
 		t.Fatalf("fields %#v", got)
 	}

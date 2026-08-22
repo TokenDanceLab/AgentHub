@@ -290,14 +290,14 @@ func TestSDKFixtureMapperCapabilityHealthMetadataForProviderFixtures(t *testing.
 		provider   string
 		runtimeID  string
 		transport  string
-		capability SDKFixtureCapabilities
+		capability FixtureCapabilities
 	}{
 		{
 			name:      "openai",
 			provider:  SDKFixtureProviderOpenAI,
 			runtimeID: "openai-agents-sdk-like",
 			transport: "fixture-file",
-			capability: SDKFixtureCapabilities{
+			capability: FixtureCapabilities{
 				Streaming: true, ToolCalls: true, FileChanges: true, PermissionHooks: true, MultiTurn: true,
 				FixtureOnly: true, NoSpendDefault: true, Transports: []string{"fixture-file"},
 			},
@@ -307,7 +307,7 @@ func TestSDKFixtureMapperCapabilityHealthMetadataForProviderFixtures(t *testing.
 			provider:  SDKFixtureProviderClaude,
 			runtimeID: "claude-sdk-like",
 			transport: "fixture-file",
-			capability: SDKFixtureCapabilities{
+			capability: FixtureCapabilities{
 				Streaming: true, ToolCalls: true, FileChanges: true, PermissionHooks: true, MultiTurn: true,
 				FixtureOnly: true, NoSpendDefault: true, Transports: []string{"fixture-file"},
 			},
@@ -317,7 +317,7 @@ func TestSDKFixtureMapperCapabilityHealthMetadataForProviderFixtures(t *testing.
 			provider:  SDKFixtureProviderOpenCode,
 			runtimeID: "opencode-like",
 			transport: "fixture-subprocess",
-			capability: SDKFixtureCapabilities{
+			capability: FixtureCapabilities{
 				Streaming: true, ToolCalls: true, FileChanges: true, PermissionHooks: true, ThinkingVisible: true,
 				FixtureOnly: true, NoSpendDefault: true, Transports: []string{"fixture-subprocess"},
 			},
@@ -327,7 +327,7 @@ func TestSDKFixtureMapperCapabilityHealthMetadataForProviderFixtures(t *testing.
 			provider:  SDKFixtureProviderCustomOpenAICompatible,
 			runtimeID: "custom-openai-compatible",
 			transport: "fixture-file",
-			capability: SDKFixtureCapabilities{
+			capability: FixtureCapabilities{
 				Streaming: true, ToolCalls: true, FileChanges: true, PermissionHooks: true, MCPIntegration: true,
 				FixtureOnly: true, NoSpendDefault: true, Transports: []string{"fixture-file"},
 			},
@@ -348,7 +348,7 @@ func TestSDKFixtureMapperCapabilityHealthMetadataForProviderFixtures(t *testing.
 					WorkspacePathPolicy: "workspace-relative-or-basename",
 					RawSDKObjectPolicy:  "never-expose-above-edge-adapter",
 					Capabilities:        &tt.capability,
-					Health: &SDKFixtureHealth{
+					Health: &FixtureHealth{
 						State:  "fixture-ready",
 						Reason: "no SDK package, model call, API call, or CLI process was executed",
 						Checks: map[string]string{
@@ -506,7 +506,7 @@ func TestSDKFixtureMapperProviderNeutralReplayContract(t *testing.T) {
 				ID:        "contract_usage_1",
 				Type:      "usage",
 				SessionID: "session_contract",
-				Usage: &SDKFixtureUsage{
+				Usage: &FixtureUsage{
 					InputTokens:  120,
 					OutputTokens: 45,
 					TotalTokens:  165,
@@ -520,7 +520,7 @@ func TestSDKFixtureMapperProviderNeutralReplayContract(t *testing.T) {
 				SessionID: "session_contract",
 				Success:   boolPtr(true),
 				Summary:   "provider-neutral terminal result",
-				Usage: &SDKFixtureUsage{
+				Usage: &FixtureUsage{
 					InputTokens:  120,
 					OutputTokens: 45,
 					TotalTokens:  165,
@@ -808,7 +808,7 @@ func readSDKFixtureTestdata(t *testing.T, filename string) []byte {
 	return data
 }
 
-func marshalSDKFixtureGolden(t *testing.T, mapped []SDKMappedEvent) string {
+func marshalSDKFixtureGolden(t *testing.T, mapped []MappedEvent) string {
 	t.Helper()
 	return marshalSDKFixtureJSON(t, mapped)
 }
@@ -834,7 +834,7 @@ func testSDKFixtureScope() map[string]any {
 	}
 }
 
-func mapSDKEventsForHubReplay(mapped []SDKMappedEvent) []map[string]any {
+func mapSDKEventsForHubReplay(mapped []MappedEvent) []map[string]any {
 	replay := make([]map[string]any, len(mapped))
 	for i, evt := range mapped {
 		replay[i] = map[string]any{
@@ -859,7 +859,7 @@ func boolPtr(value bool) *bool {
 	return &value
 }
 
-func firstMappedPayloadOfType(t *testing.T, mapped []SDKMappedEvent, eventType string, callID string) map[string]any {
+func firstMappedPayloadOfType(t *testing.T, mapped []MappedEvent, eventType string, callID string) map[string]any {
 	t.Helper()
 	for _, evt := range mapped {
 		if evt.Type != eventType {
