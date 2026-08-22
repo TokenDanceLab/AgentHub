@@ -73,14 +73,17 @@ export function WorkbenchFrame({
   currentUserId,
   skillMarketItems,
   skillMarketLoading,
+  skillMarketError,
   mcpMarketItems,
   mcpMarketLoading,
+  mcpMarketError,
   highlightedBlockId,
   onHighlightEnd,
   connectionStatus,
   isAgentRunning,
   onCancelRun,
   onEditMessage,
+  transcriptLoading,
   setActivePage,
   children,
 }: WorkbenchFrameProps): React.ReactElement {
@@ -208,6 +211,7 @@ export function WorkbenchFrame({
             isAgentRunning={isAgentRunning}
             onCancelRun={onCancelRun}
             onEditMessage={onEditMessage}
+            transcriptLoading={transcriptLoading}
           />
         ) : (
           <WorkbenchRoutesFrame
@@ -245,8 +249,10 @@ export function WorkbenchFrame({
             settingsService={settingsService}
             skillMarketItems={skillMarketItems}
             skillMarketLoading={skillMarketLoading}
+            skillMarketError={skillMarketError}
             mcpMarketItems={mcpMarketItems}
             mcpMarketLoading={mcpMarketLoading}
+            mcpMarketError={mcpMarketError}
             onNavigatePage={setActivePage}
             currentUserId={currentUserId}
             userDisplayName={userDisplayName}

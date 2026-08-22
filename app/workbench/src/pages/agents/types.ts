@@ -283,6 +283,8 @@ export interface AgentsPageProps {
   /* ── Skill Market view ── */
   skillMarketItems?: SkillMarketItem[];
   skillMarketLoading?: boolean;
+  /** Skill market load error (#1821) — renders the error empty state. */
+  skillMarketError?: string | undefined;
   skillMarketSearchQuery?: string;
   onSkillMarketSearchChange?: ((query: string) => void) | undefined;
   activeSkillTypeFilter?: string;
@@ -294,6 +296,8 @@ export interface AgentsPageProps {
   /* ── MCP Market view ── */
   mcpMarketItems?: MCPMarketItem[];
   mcpMarketLoading?: boolean;
+  /** MCP market load error (#1821) — renders the error empty state. */
+  mcpMarketError?: string | undefined;
   mcpMarketSearchQuery?: string;
   onMcpMarketSearchChange?: ((query: string) => void) | undefined;
   activeTransportFilter?: string;

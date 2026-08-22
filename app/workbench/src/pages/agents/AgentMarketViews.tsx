@@ -85,6 +85,7 @@ export const SkillMarketView: React.FC<AgentsPageProps> = (props) => {
   const {
     skillMarketItems = [],
     skillMarketLoading = false,
+    skillMarketError,
     skillMarketSearchQuery = '',
     onSkillMarketSearchChange,
     activeSkillTypeFilter = '',
@@ -120,6 +121,7 @@ export const SkillMarketView: React.FC<AgentsPageProps> = (props) => {
         skillMarketLoading={skillMarketLoading}
         skillMarketSearchQuery={skillMarketSearchQuery}
         activeSkillTypeFilter={activeSkillTypeFilter}
+        {...(skillMarketError !== undefined ? { skillMarketError } : {})}
         installedSkillIds={installedSkillIds}
         onSkillMarketSearchChange={onSkillMarketSearchChange}
         onSkillInstall={onSkillInstall}
@@ -137,6 +139,7 @@ export const MCPMarketView: React.FC<AgentsPageProps> = (props) => {
   const {
     mcpMarketItems = [],
     mcpMarketLoading = false,
+    mcpMarketError,
     mcpMarketSearchQuery = '',
     onMcpMarketSearchChange,
     activeTransportFilter = '',
@@ -172,6 +175,7 @@ export const MCPMarketView: React.FC<AgentsPageProps> = (props) => {
         mcpMarketLoading={mcpMarketLoading}
         mcpMarketSearchQuery={mcpMarketSearchQuery}
         activeTransportFilter={activeTransportFilter}
+        {...(mcpMarketError !== undefined ? { mcpMarketError } : {})}
         installedMcpIds={installedMcpIds}
         onMcpMarketSearchChange={onMcpMarketSearchChange}
         onMcpInstall={onMcpInstall}

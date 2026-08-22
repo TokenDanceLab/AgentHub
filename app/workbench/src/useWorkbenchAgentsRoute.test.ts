@@ -48,8 +48,12 @@ describe('useWorkbenchAgentsRoute — demo mode mock fallback', () => {
     expect(result.current.agentsPane).toBe('installed');
     expect(result.current.selectedAgentIsDirty).toBe(false);
     expect(result.current.resolvedModels).toEqual(WORKBENCH_MOCK_AGENT_MODELS);
-    expect(result.current.resolvedSkills).toEqual(WORKBENCH_MOCK_AGENT_SKILL_OPTIONS);
-    expect(result.current.resolvedTools).toEqual(WORKBENCH_MOCK_AGENT_TOOL_OPTIONS);
+    // resolveAgentSkills/resolveAgentTools return a plain `.sort()` (code-unit
+    // order) union; the option fixtures are locale-sorted (uniqueSorted), so
+    // compare against a code-unit sort to stay locale-independent (#1821 —
+    // this assertion previously only held under an en collation host).
+    expect(result.current.resolvedSkills).toEqual([...WORKBENCH_MOCK_AGENT_SKILL_OPTIONS].sort());
+    expect(result.current.resolvedTools).toEqual([...WORKBENCH_MOCK_AGENT_TOOL_OPTIONS].sort());
     expect(result.current.agentSaveStateLabel()).toBe('已同步');
   });
 

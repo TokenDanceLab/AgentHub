@@ -370,19 +370,45 @@ describe('workbenchTranscriptChromeActionMappers', () => {
   it('plans Hub REST message actions (pin/unpin/recall/react) when a session id is available', () => {
     const transcript = [textBlock({ id: 'b1' })];
 
+    // #1821: the success toast rides the effect itself — it fires only after
+    // the REST call resolves, and a rejection shows the failure message.
     const pin = planContextAction({ action: 'pin', blockId: 'b1', transcript, t, sessionId: 'sess-1' });
-    expect(pin).toContainEqual({ type: 'pin', messageId: 'b1', sessionId: 'sess-1' });
-    expect(pin.some((e) => e.type === 'toast')).toBe(true);
+    expect(pin).toContainEqual({
+      type: 'pin',
+      messageId: 'b1',
+      sessionId: 'sess-1',
+      successMessage: 'toast.pinUpdated',
+      failureMessage: 'toast.pinFailed',
+    });
+    expect(pin.some((e) => e.type === 'toast')).toBe(false);
     expect(pin.some((e) => e.type === 'pulse')).toBe(true);
 
     const unpin = planContextAction({ action: 'unpin', blockId: 'b1', transcript, t, sessionId: 'sess-1' });
-    expect(unpin).toContainEqual({ type: 'unpin', messageId: 'b1', sessionId: 'sess-1' });
+    expect(unpin).toContainEqual({
+      type: 'unpin',
+      messageId: 'b1',
+      sessionId: 'sess-1',
+      successMessage: 'toast.unpinned',
+      failureMessage: 'toast.unpinFailed',
+    });
 
     const recall = planContextAction({ action: 'recall', blockId: 'b1', transcript, t, sessionId: 'sess-1' });
-    expect(recall).toContainEqual({ type: 'recall', messageId: 'b1' });
+    expect(recall).toContainEqual({
+      type: 'recall',
+      messageId: 'b1',
+      successMessage: 'toast.recalled',
+      failureMessage: 'toast.recallFailed',
+    });
 
     const react = planContextAction({ action: 'react', blockId: 'b1', transcript, t, sessionId: 'sess-1' });
-    expect(react).toContainEqual({ type: 'react', messageId: 'b1', sessionId: 'sess-1', emoji: '👍' });
+    expect(react).toContainEqual({
+      type: 'react',
+      messageId: 'b1',
+      sessionId: 'sess-1',
+      emoji: '👍',
+      successMessage: 'toast.reactionAdded',
+      failureMessage: 'toast.reactionFailed',
+    });
   });
 
   it('plans the react effect with the emoji carried by the picker action string', () => {
@@ -395,8 +421,15 @@ describe('workbenchTranscriptChromeActionMappers', () => {
       t,
       sessionId: 'sess-1',
     });
-    expect(picked).toContainEqual({ type: 'react', messageId: 'b1', sessionId: 'sess-1', emoji: '🔥' });
-    expect(picked.find((e) => e.type === 'toast')?.message).toBe('toast.reactionAdded');
+    expect(picked).toContainEqual({
+      type: 'react',
+      messageId: 'b1',
+      sessionId: 'sess-1',
+      emoji: '🔥',
+      successMessage: 'toast.reactionAdded',
+      failureMessage: 'toast.reactionFailed',
+    });
+    expect(picked.some((e) => e.type === 'toast')).toBe(false);
 
     // Without a session id (Desktop/demo) the picker action plans nothing —
     // no fake success toast for an effect that cannot run (#1818).
@@ -456,9 +489,15 @@ describe('workbenchTranscriptChromeActionMappers', () => {
       t,
       sessionId: 'sess-1',
     });
-    expect(picked).toContainEqual({ type: 'forward', messageId: 'b1', targetSessionIds: ['s9', 's10'] });
+    expect(picked).toContainEqual({
+      type: 'forward',
+      messageId: 'b1',
+      targetSessionIds: ['s9', 's10'],
+      successMessage: 'toast.forwardQueued',
+      failureMessage: 'toast.forwardFailed',
+    });
     expect(picked.some((e) => e.type === 'pulse')).toBe(true);
-    expect(picked.find((e) => e.type === 'toast')?.message).toBe('toast.forwardQueued');
+    expect(picked.some((e) => e.type === 'toast')).toBe(false);
   });
 
   it('round-trips forward target ids through the action string encoding', () => {
@@ -472,7 +511,13 @@ describe('workbenchTranscriptChromeActionMappers', () => {
       blockId: 'b1',
       transcript: [textBlock({ id: 'b1' })],
       t,
-    })).toContainEqual({ type: 'forward', messageId: 'b1', targetSessionIds: ids });
+    })).toContainEqual({
+      type: 'forward',
+      messageId: 'b1',
+      targetSessionIds: ids,
+      successMessage: 'toast.forwardQueued',
+      failureMessage: 'toast.forwardFailed',
+    });
   });
 
   it('wires the forward menu item to a picker submenu that plans the chosen targets (#1385)', () => {
@@ -554,17 +599,106 @@ describe('workbenchTranscriptChromeActionMappers', () => {
       onAddMessageReaction: vi.fn(),
     });
     applyTranscriptChromeSideEffects([
-      { type: 'pin', messageId: 'm1', sessionId: 's1' },
-      { type: 'unpin', messageId: 'm2', sessionId: 's2' },
-      { type: 'forward', messageId: 'm3', targetSessionIds: ['s9'] },
-      { type: 'recall', messageId: 'm4' },
-      { type: 'react', messageId: 'm5', sessionId: 's5', emoji: '🔥' },
+      { type: 'pin', messageId: 'm1', sessionId: 's1', successMessage: 'pin-ok', failureMessage: 'pin-fail' },
+      { type: 'unpin', messageId: 'm2', sessionId: 's2', successMessage: 'unpin-ok', failureMessage: 'unpin-fail' },
+      { type: 'forward', messageId: 'm3', targetSessionIds: ['s9'], successMessage: 'fwd-ok', failureMessage: 'fwd-fail' },
+      { type: 'recall', messageId: 'm4', successMessage: 'recall-ok', failureMessage: 'recall-fail' },
+      { type: 'react', messageId: 'm5', sessionId: 's5', emoji: '🔥', successMessage: 'react-ok', failureMessage: 'react-fail' },
     ], handlers);
     expect(handlers.onPinMessage).toHaveBeenCalledWith('m1', 's1');
     expect(handlers.onUnpinMessage).toHaveBeenCalledWith('m2', 's2');
     expect(handlers.onForwardMessage).toHaveBeenCalledWith('m3', ['s9']);
     expect(handlers.onRecallMessage).toHaveBeenCalledWith('m4');
     expect(handlers.onAddMessageReaction).toHaveBeenCalledWith('m5', 's5', '🔥');
+  });
+
+  it('awaits Hub message actions before the success toast and reports failures (#1821)', async () => {
+    const baseHandlers = {
+      copyText: vi.fn(),
+      softHideBlocks: vi.fn(),
+      dispatchComposer: vi.fn(),
+      focusComposer: vi.fn(),
+      pulseBlock: vi.fn(),
+      showWorkbenchToast: vi.fn(),
+      exitSelection: vi.fn(),
+    };
+
+    // Resolve-controlled pin: no toast before the request settles.
+    let resolvePin: (() => void) | undefined;
+    const slowPin = vi.fn(() => new Promise<void>((resolve) => {
+      resolvePin = () => resolve();
+    }));
+    applyTranscriptChromeSideEffects([
+      { type: 'pin', messageId: 'm1', sessionId: 's1', successMessage: 'pin-ok', failureMessage: 'pin-fail' },
+    ], { ...baseHandlers, onPinMessage: slowPin });
+    expect(slowPin).toHaveBeenCalledWith('m1', 's1');
+    expect(baseHandlers.showWorkbenchToast).not.toHaveBeenCalled();
+    resolvePin?.();
+    await vi.waitFor(() => {
+      expect(baseHandlers.showWorkbenchToast).toHaveBeenCalledWith('pin-ok');
+    });
+
+    // Rejecting pin: the error message (or the failure copy) is shown.
+    const rejectingPin = vi.fn().mockRejectedValue(new Error('hub 503'));
+    applyTranscriptChromeSideEffects([
+      { type: 'pin', messageId: 'm1', sessionId: 's1', successMessage: 'pin-ok', failureMessage: 'pin-fail' },
+    ], { ...baseHandlers, onPinMessage: rejectingPin });
+    await vi.waitFor(() => {
+      expect(baseHandlers.showWorkbenchToast).toHaveBeenCalledWith('hub 503');
+    });
+
+    // Rejecting regenerate: no soft-hide, no pulse — the message stays
+    // visible and the failure is announced (#1821 honest state).
+    const regenerateHandlers = {
+      ...baseHandlers,
+      copyText: vi.fn(),
+      softHideBlocks: vi.fn(),
+      pulseBlock: vi.fn(),
+      showWorkbenchToast: vi.fn(),
+      onRegenerate: vi.fn().mockRejectedValue(new Error('regen refused')),
+    };
+    applyTranscriptChromeSideEffects([
+      { type: 'regenerate', blockId: 'b1', successMessage: 'regen-ok', failureMessage: 'regen-fail' },
+    ], regenerateHandlers);
+    await vi.waitFor(() => {
+      expect(regenerateHandlers.showWorkbenchToast).toHaveBeenCalledWith('regen refused');
+    });
+    expect(regenerateHandlers.softHideBlocks).not.toHaveBeenCalled();
+    expect(regenerateHandlers.pulseBlock).not.toHaveBeenCalled();
+
+    // Resolving regenerate: soft-hide + pulse + success toast land together.
+    const okRegenerateHandlers = {
+      ...baseHandlers,
+      copyText: vi.fn(),
+      softHideBlocks: vi.fn(),
+      pulseBlock: vi.fn(),
+      showWorkbenchToast: vi.fn(),
+      onRegenerate: vi.fn().mockResolvedValue(undefined),
+    };
+    applyTranscriptChromeSideEffects([
+      { type: 'regenerate', blockId: 'b2', successMessage: 'regen-ok', failureMessage: 'regen-fail' },
+    ], okRegenerateHandlers);
+    await vi.waitFor(() => {
+      expect(okRegenerateHandlers.showWorkbenchToast).toHaveBeenCalledWith('regen-ok');
+    });
+    expect(okRegenerateHandlers.softHideBlocks).toHaveBeenCalledWith(['b2']);
+    expect(okRegenerateHandlers.pulseBlock).toHaveBeenCalledWith('b2');
+
+    // Synchronous regenerate handler keeps the immediate legacy behavior.
+    const syncRegenerateHandlers = {
+      ...baseHandlers,
+      copyText: vi.fn(),
+      softHideBlocks: vi.fn(),
+      pulseBlock: vi.fn(),
+      showWorkbenchToast: vi.fn(),
+      onRegenerate: vi.fn(),
+    };
+    applyTranscriptChromeSideEffects([
+      { type: 'regenerate', blockId: 'b3', successMessage: 'regen-ok', failureMessage: 'regen-fail' },
+    ], syncRegenerateHandlers);
+    expect(syncRegenerateHandlers.softHideBlocks).toHaveBeenCalledWith(['b3']);
+    expect(syncRegenerateHandlers.pulseBlock).toHaveBeenCalledWith('b3');
+    expect(syncRegenerateHandlers.showWorkbenchToast).toHaveBeenCalledWith('regen-ok');
   });
 
   it('is a no-op for Hub REST side effects when handlers are not wired', () => {
@@ -578,9 +712,10 @@ describe('workbenchTranscriptChromeActionMappers', () => {
       exitSelection: vi.fn(),
     });
     expect(() => applyTranscriptChromeSideEffects([
-      { type: 'pin', messageId: 'm1', sessionId: 's1' },
-      { type: 'recall', messageId: 'm2' },
+      { type: 'pin', messageId: 'm1', sessionId: 's1', successMessage: 'pin-ok', failureMessage: 'pin-fail' },
+      { type: 'recall', messageId: 'm2', successMessage: 'recall-ok', failureMessage: 'recall-fail' },
     ], handlers)).not.toThrow();
+    // #1821: without a handler there is no real effect, so no success toast.
     expect(handlers.showWorkbenchToast).not.toHaveBeenCalled();
   });
 });

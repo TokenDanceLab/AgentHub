@@ -89,10 +89,14 @@ export interface WorkbenchRoutesProps {
   skillMarketItems?: SkillMarketItem[] | undefined;
   /** Whether Skill market data is loading. */
   skillMarketLoading?: boolean | undefined;
+  /** Skill market load error (#1821) — drives the market error empty state. */
+  skillMarketError?: string | undefined;
   /** Public MCP Server market items from Hub API. */
   mcpMarketItems?: MCPMarketItem[] | undefined;
   /** Whether MCP Server market data is loading. */
   mcpMarketLoading?: boolean | undefined;
+  /** MCP market load error (#1821) — same contract as `skillMarketError`. */
+  mcpMarketError?: string | undefined;
   /** Called when the user navigates between workbench pages.
    *  Used by the Settings page to navigate to Agents config. */
   onNavigatePage?: ((page: WorkbenchPage) => void) | undefined;

@@ -174,3 +174,16 @@ export function resolveWebWorkbenchTranscript(
     ? webHubEmptyTranscript
     : resolveDemoWorkbenchTranscript(conversationId || WORKBENCH_DEMO_FALLBACK_CONVERSATION_ID);
 }
+
+/**
+ * Messages to feed the transcript projection (#1821 session-switch flash).
+ * While the messages query shows `placeholderData`, the rows still belong to
+ * the previous session — hide them until the new session's own rows arrive
+ * instead of flashing stale messages.
+ */
+export function resolveWebTranscriptMessages(
+  isPlaceholderData: boolean,
+  messages: HubMessageTranscriptInput[] | undefined,
+): HubMessageTranscriptInput[] | undefined {
+  return isPlaceholderData ? undefined : messages;
+}
