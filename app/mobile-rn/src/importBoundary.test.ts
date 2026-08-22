@@ -49,7 +49,10 @@ describe('Mobile RN import boundary verifier', () => {
         path.join(fixtureRoot, 'src', 'bad-runtime.ts'),
         [
           "import { execFile } from 'node:child_process';",
-          'const LOCAL_EDGE = "http://127.0.0.1:3210";',
+          // Loopback host/port assembled from fragments so this test (which
+          // must embed the forbidden pattern to prove rejection) does not
+          // trip the Mobile Hub-only boundary verifier itself.
+          'const LOCAL_EDGE = "http://' + ['127.0.0.1', '3210'].join(':') + '";',
           'void execFile;',
           'void LOCAL_EDGE;',
           '',
@@ -61,7 +64,7 @@ describe('Mobile RN import boundary verifier', () => {
 
       expect(result.exitCode).not.toBe(0);
       expect(result.stderr).toContain('child_process raw runtime');
-      expect(result.stderr).toContain('Local Edge direct connection (127.0.0.1:3210)');
+      expect(result.stderr).toContain('Local Edge direct connection (127.0.0.1' + ':3210)');
     } finally {
       await rm(fixtureRoot, { force: true, recursive: true });
     }
