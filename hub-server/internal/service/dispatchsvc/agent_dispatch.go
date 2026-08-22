@@ -210,116 +210,132 @@ func (s *DispatchService) DispatchTask(ctx context.Context, task *model.PendingA
 
 	switch route {
 	case dispatch.RouteHTTP:
-		// Try HTTP direct dispatch to local Edge first for unbound tasks.
-		if dispatch.IsHTTPEdgeDispatchSuccess(s.dispatchToEdgeHTTP(ctx, task, &dp)) {
-			if err := repository.UpdatePendingTaskDispatched(s.db, task.ID, dispatch.SyntheticHTTPEdgeDeviceID); !dispatch.RepoUpdateSucceeded(err) {
-				slog.Error(dispatch.DispatchLogHTTPMarkFailed, "task_id", task.ID, "error", err)
-			}
-			if dispatch.PlanLiveDispatchMark(deliveryID) {
-				if err := s.markDeliverySent(ctx, deliveryID); err != nil {
-					slog.Warn(dispatch.DispatchLogMarkDeliverySentFailed, "task_id", task.ID, "delivery_id", deliveryID, "error", err)
-				}
-			}
-			return
-		}
-		// HTTP miss: fall through to inviter desktop / offline.
-		connID, err := cacheClient.GetRoute(ctx, ai.InviterUserID, dispatch.DesktopDeviceType)
-		if dispatch.IsUnboundInviterDesktopRoute(dispatch.ClassifyUnboundFallbackRoute(connID, dispatch.ManagerPortAvailable(s.mgr != nil), err)) {
-			conn := s.mgr.FindByConnID(connID)
-			if !dispatch.InviterDesktopConnPresent(conn != nil) {
-				if err := cacheClient.PushPendingTask(ctx, ai.InviterUserID, string(payload)); !dispatch.OfflineQueuePushSucceeded(err) {
-					if metrics.AgentDispatchOfflinePushFailures != nil {
-						metrics.AgentDispatchOfflinePushFailures.WithLabelValues("unbound_inviter_desktop").Inc()
-					}
-					slog.Error(dispatch.DispatchLogOfflinePushConnNil, "task_id", task.ID, "user_id", ai.InviterUserID, "error", err)
-				}
-				// Offline queue acceptance is not Edge receipt (#1031).
-				if dispatch.PlanOfflineDispatchMark(deliveryID) {
-					if err := s.markDeliverySent(ctx, deliveryID); err != nil {
-						slog.Warn(dispatch.DispatchLogMarkDeliverySentFailed, "task_id", task.ID, "delivery_id", deliveryID, "error", err)
-					}
-				}
-				return
-			}
-			frame := FramePort{Type: frameTypeAgentDispatch, Payload: json.RawMessage(payload)}
-			if err := repository.UpdatePendingTaskDispatched(s.db, task.ID, conn.DeviceID); !dispatch.RepoUpdateSucceeded(err) {
-				slog.Error(dispatch.DispatchLogMarkAgentDispatched, "task_id", task.ID, "user_id", ai.InviterUserID, "device_id", conn.DeviceID, "error", err)
-				return
-			}
-			result := s.mgr.PushToConn(connID, frame)
-			if !dispatch.UnboundInviterDesktopWSQueued(result.Queued) {
-				slog.Warn(dispatch.DispatchLogWSNotQueuedPreserve, "task_id", task.ID, "user_id", ai.InviterUserID, "device_id", conn.DeviceID, "conn_id", connID, "delivery_status", result.Status, "error", result.Err)
-				if err := cacheClient.PushPendingTask(ctx, ai.InviterUserID, string(payload)); !dispatch.OfflineQueuePushSucceeded(err) {
-					if metrics.AgentDispatchOfflinePushFailures != nil {
-						metrics.AgentDispatchOfflinePushFailures.WithLabelValues("unbound_ws_miss").Inc()
-					}
-					slog.Error(dispatch.DispatchLogPreserveAfterWSFailure, "task_id", task.ID, "user_id", ai.InviterUserID, "device_id", conn.DeviceID, "delivery_status", result.Status, "error", err)
-				}
-				// WS miss → offline queue only; outbox stays pending (#1031).
-				if dispatch.PlanUnboundInviterDesktopMark(false, deliveryID) {
-					if err := s.markDeliverySent(ctx, deliveryID); err != nil {
-						slog.Warn(dispatch.DispatchLogMarkDeliverySentFailed, "task_id", task.ID, "delivery_id", deliveryID, "error", err)
-					}
-				}
-				return
-			}
-			if dispatch.PlanUnboundInviterDesktopMark(true, deliveryID) {
-				if err := s.markDeliverySent(ctx, deliveryID); err != nil {
-					slog.Warn(dispatch.DispatchLogMarkDeliverySentFailed, "task_id", task.ID, "delivery_id", deliveryID, "error", err)
-				}
-			}
-			return
-		}
-		if err := cacheClient.PushPendingTask(ctx, ai.InviterUserID, string(payload)); !dispatch.OfflineQueuePushSucceeded(err) {
-			if metrics.AgentDispatchOfflinePushFailures != nil {
-				metrics.AgentDispatchOfflinePushFailures.WithLabelValues("unbound_only").Inc()
-			}
-			slog.Error(dispatch.DispatchLogOfflinePushFailed, "task_id", task.ID, "user_id", ai.InviterUserID, "error", err)
-		}
-		// Offline-only path: outbox retains ownership until Edge ack/stream (#1031).
-		if dispatch.PlanOfflineDispatchMark(deliveryID) {
-			if err := s.markDeliverySent(ctx, deliveryID); err != nil {
-				slog.Warn(dispatch.DispatchLogMarkDeliverySentFailed, "task_id", task.ID, "delivery_id", deliveryID, "error", err)
-			}
-		}
-		return
-
+		// Try HTTP direct dispatch to local Edge first for unbound tasks;
+		// misses fall through to inviter desktop / offline.
+		s.dispatchRouteHTTP(ctx, task, ai, &dp, payload, deliveryID, cacheClient)
 	case dispatch.RouteMissingEdge:
 		slog.Error(dispatch.DispatchLogMissingTargetEdgeDevice, "task_id", task.ID, "user_id", ai.InviterUserID, "target_id", task.TargetID)
-		return
-
 	case dispatch.RouteHubRelay:
-		// hub_relay uses the relay service; failures fall back to offline target queue.
-		err := s.relay.CreateCommand(ctx, ai.InviterUserID, dispatch.AgentDispatchRelayCommand, json.RawMessage(payload), ai.InviterUserID)
-		if !dispatch.HubRelayCreateSucceeded(err) {
-			slog.Error(dispatch.DispatchLogRelayCreateFailed, "task_id", task.ID, "user_id", ai.InviterUserID, "error", err)
-			if pushErr := cacheClient.PushPendingTargetTask(ctx, ai.InviterUserID, task.TargetID, task.EdgeDeviceID, string(payload)); !dispatch.OfflineQueuePushSucceeded(pushErr) {
-				if metrics.AgentDispatchOfflinePushFailures != nil {
-					metrics.AgentDispatchOfflinePushFailures.WithLabelValues("hub_relay").Inc()
-				}
-				slog.Error(dispatch.DispatchLogRelayOfflinePushFailed, "task_id", task.ID, "user_id", ai.InviterUserID, "error", pushErr)
-			}
-			return
-		}
-		if err := repository.UpdatePendingTaskDispatched(s.db, task.ID, task.EdgeDeviceID); !dispatch.RepoUpdateSucceeded(err) {
-			slog.Error(dispatch.DispatchLogMarkHubRelayDispatched, "task_id", task.ID, "user_id", ai.InviterUserID, "error", err)
-		}
-		if dispatch.PlanLiveDispatchMark(deliveryID) {
-			_ = s.markDeliverySent(ctx, deliveryID)
-		}
-		return
-
+		s.dispatchRouteHubRelay(ctx, task, ai, payload, deliveryID, cacheClient)
 	case dispatch.RouteTargetBound:
-		// local_edge / remote_ssh / cloud_edge / tailscale / hub_relay without relay.
-		live := s.dispatchTargetBoundTask(ctx, cacheClient, task, ai.InviterUserID, task.EdgeDeviceID, payload)
-		if dispatch.PlanTargetBoundDeliveryMark(live, deliveryID) {
-			if err := s.markDeliverySent(ctx, deliveryID); err != nil {
-				slog.Warn(dispatch.DispatchLogMarkDeliverySentFailed, "task_id", task.ID, "delivery_id", deliveryID, "error", err)
-			}
-		}
-		return
+		s.dispatchRouteTargetBound(ctx, task, ai, payload, deliveryID, cacheClient)
 	}
 }
+
+// dispatchRouteHTTP first tries the HTTP direct path to the local Edge
+// instance; on a miss it falls back to the inviter desktop connection or the
+// offline target queue (exactly the previous inline route branch).
+func (s *DispatchService) dispatchRouteHTTP(ctx context.Context, task *model.PendingAgentTask, ai *model.AgentInstance, dp *dispatchPayload, payload []byte, deliveryID string, cacheClient dispatchCache) {
+	if dispatch.IsHTTPEdgeDispatchSuccess(s.dispatchToEdgeHTTP(ctx, task, dp)) {
+		if err := repository.UpdatePendingTaskDispatched(s.db, task.ID, dispatch.SyntheticHTTPEdgeDeviceID); !dispatch.RepoUpdateSucceeded(err) {
+			slog.Error(dispatch.DispatchLogHTTPMarkFailed, "task_id", task.ID, "error", err)
+		}
+		s.markDeliverySentPlan(ctx, dispatch.PlanLiveDispatchMark(deliveryID), deliveryID, task.ID)
+		return
+	}
+	// HTTP miss: fall through to inviter desktop / offline.
+	connID, err := cacheClient.GetRoute(ctx, ai.InviterUserID, dispatch.DesktopDeviceType)
+	if dispatch.IsUnboundInviterDesktopRoute(dispatch.ClassifyUnboundFallbackRoute(connID, dispatch.ManagerPortAvailable(s.mgr != nil), err)) {
+		s.dispatchUnboundInviterDesktop(ctx, task, ai, payload, deliveryID, connID, cacheClient)
+		return
+	}
+	s.pushPendingTaskOffline(ctx, ai.InviterUserID, task.ID, payload, "unbound_only", dispatch.DispatchLogOfflinePushFailed, cacheClient)
+	// Offline-only path: outbox retains ownership until Edge ack/stream (#1031).
+	s.markDeliverySentPlan(ctx, dispatch.PlanOfflineDispatchMark(deliveryID), deliveryID, task.ID)
+}
+
+// dispatchUnboundInviterDesktop pushes the unbound payload to the inviter's
+// desktop connection, or queues it offline when no live connection exists.
+func (s *DispatchService) dispatchUnboundInviterDesktop(ctx context.Context, task *model.PendingAgentTask, ai *model.AgentInstance, payload []byte, deliveryID, connID string, cacheClient dispatchCache) {
+	conn := s.mgr.FindByConnID(connID)
+	if !dispatch.InviterDesktopConnPresent(conn != nil) {
+		s.pushPendingTaskOffline(ctx, ai.InviterUserID, task.ID, payload, "unbound_inviter_desktop", dispatch.DispatchLogOfflinePushConnNil, cacheClient)
+		// Offline queue acceptance is not Edge receipt (#1031).
+		s.markDeliverySentPlan(ctx, dispatch.PlanOfflineDispatchMark(deliveryID), deliveryID, task.ID)
+		return
+	}
+	frame := FramePort{Type: frameTypeAgentDispatch, Payload: json.RawMessage(payload)}
+	if err := repository.UpdatePendingTaskDispatched(s.db, task.ID, conn.DeviceID); !dispatch.RepoUpdateSucceeded(err) {
+		slog.Error(dispatch.DispatchLogMarkAgentDispatched, "task_id", task.ID, "user_id", ai.InviterUserID, "device_id", conn.DeviceID, "error", err)
+		return
+	}
+	result := s.mgr.PushToConn(connID, frame)
+	if !dispatch.UnboundInviterDesktopWSQueued(result.Queued) {
+		slog.Warn(dispatch.DispatchLogWSNotQueuedPreserve, "task_id", task.ID, "user_id", ai.InviterUserID, "device_id", conn.DeviceID, "conn_id", connID, "delivery_status", result.Status, "error", result.Err)
+		if err := cacheClient.PushPendingTask(ctx, ai.InviterUserID, string(payload)); !dispatch.OfflineQueuePushSucceeded(err) {
+			if metrics.AgentDispatchOfflinePushFailures != nil {
+				metrics.AgentDispatchOfflinePushFailures.WithLabelValues("unbound_ws_miss").Inc()
+			}
+			slog.Error(dispatch.DispatchLogPreserveAfterWSFailure, "task_id", task.ID, "user_id", ai.InviterUserID, "device_id", conn.DeviceID, "conn_id", connID, "delivery_status", result.Status, "error", err)
+		}
+		// WS miss → offline queue only; outbox stays pending (#1031).
+		s.markDeliverySentPlan(ctx, dispatch.PlanUnboundInviterDesktopMark(false, deliveryID), deliveryID, task.ID)
+		return
+	}
+	s.markDeliverySentPlan(ctx, dispatch.PlanUnboundInviterDesktopMark(true, deliveryID), deliveryID, task.ID)
+}
+
+// dispatchRouteHubRelay sends the task through the relay service; failures
+// fall back to the offline target queue.
+func (s *DispatchService) dispatchRouteHubRelay(ctx context.Context, task *model.PendingAgentTask, ai *model.AgentInstance, payload []byte, deliveryID string, cacheClient dispatchCache) {
+	err := s.relay.CreateCommand(ctx, ai.InviterUserID, dispatch.AgentDispatchRelayCommand, json.RawMessage(payload), ai.InviterUserID)
+	if !dispatch.HubRelayCreateSucceeded(err) {
+		slog.Error(dispatch.DispatchLogRelayCreateFailed, "task_id", task.ID, "user_id", ai.InviterUserID, "error", err)
+		s.pushPendingTargetTaskOffline(ctx, task, ai, payload, cacheClient)
+		return
+	}
+	if err := repository.UpdatePendingTaskDispatched(s.db, task.ID, task.EdgeDeviceID); !dispatch.RepoUpdateSucceeded(err) {
+		slog.Error(dispatch.DispatchLogMarkHubRelayDispatched, "task_id", task.ID, "user_id", ai.InviterUserID, "error", err)
+	}
+	// Hub-relay success marks the delivery sent with the relay result ("live");
+	// the original code intentionally ignored the mark error here.
+	if dispatch.PlanLiveDispatchMark(deliveryID) {
+		_ = s.markDeliverySent(ctx, deliveryID)
+	}
+}
+
+// pushPendingTargetTaskOffline best-effort queues the payload on the target
+// device's pending-target queue (hub_relay fallback); failures bump the
+// labelled offline-push metric and log the given message key.
+func (s *DispatchService) pushPendingTargetTaskOffline(ctx context.Context, task *model.PendingAgentTask, ai *model.AgentInstance, payload []byte, cacheClient dispatchCache) {
+	if pushErr := cacheClient.PushPendingTargetTask(ctx, ai.InviterUserID, task.TargetID, task.EdgeDeviceID, string(payload)); !dispatch.OfflineQueuePushSucceeded(pushErr) {
+		if metrics.AgentDispatchOfflinePushFailures != nil {
+			metrics.AgentDispatchOfflinePushFailures.WithLabelValues("hub_relay").Inc()
+		}
+		slog.Error(dispatch.DispatchLogRelayOfflinePushFailed, "task_id", task.ID, "user_id", ai.InviterUserID, "error", pushErr)
+	}
+}
+
+// pushPendingTaskOffline best-effort enqueues an unbound payload on the user's
+// offline queue; failures bump the labelled offline-push metric and log the
+// given message key (same attr shape as the previous inline paths).
+func (s *DispatchService) pushPendingTaskOffline(ctx context.Context, userID, taskID string, payload []byte, metricLabel, logMessage string, cacheClient dispatchCache) {
+	if err := cacheClient.PushPendingTask(ctx, userID, string(payload)); !dispatch.OfflineQueuePushSucceeded(err) {
+		if metrics.AgentDispatchOfflinePushFailures != nil {
+			metrics.AgentDispatchOfflinePushFailures.WithLabelValues(metricLabel).Inc()
+		}
+		slog.Error(logMessage, "task_id", taskID, "user_id", userID, "error", err)
+	}
+}
+
+// dispatchRouteTargetBound delivers to a bound target (local_edge /
+// remote_ssh / cloud_edge / tailscale / hub_relay without relay).
+func (s *DispatchService) dispatchRouteTargetBound(ctx context.Context, task *model.PendingAgentTask, ai *model.AgentInstance, payload []byte, deliveryID string, cacheClient dispatchCache) {
+	live := s.dispatchTargetBoundTask(ctx, cacheClient, task, ai.InviterUserID, task.EdgeDeviceID, payload)
+	s.markDeliverySentPlan(ctx, dispatch.PlanTargetBoundDeliveryMark(live, deliveryID), deliveryID, task.ID)
+}
+
+// markDeliverySentPlan marks the delivery sent when the site's plan says so;
+// failures warn — the delivery stays pending for the outbox retry loop.
+func (s *DispatchService) markDeliverySentPlan(ctx context.Context, plan bool, deliveryID, taskID string) {
+	if !plan {
+		return
+	}
+	if err := s.markDeliverySent(ctx, deliveryID); err != nil {
+		slog.Warn(dispatch.DispatchLogMarkDeliverySentFailed, "task_id", taskID, "delivery_id", deliveryID, "error", err)
+	}
+}
+
 func (s *DispatchService) issueRunStartCapability(dp *dispatchPayload) string {
 	if !dispatch.CapabilityPayloadPresent(dp != nil) {
 		return ""

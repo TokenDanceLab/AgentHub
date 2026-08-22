@@ -113,55 +113,9 @@ func (s *Service) UpsertLocalEdgeForDesktopDevice(ctx context.Context, device *m
 
 	var result *model.ExecutionTarget
 	err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		if err := requireDeviceBelongsToOwner(ctx, tx, device.UserID, device.ID, "desktop"); err != nil {
-			return err
-		}
-
-		matches, err := findDesktopLocalEdgeTargetMatches(tx, device.UserID, device.ID, name)
-		if err != nil {
-			return err
-		}
-
-		target, found, err := desktopLocalEdgeTargetFromMatches(matches, device.ID)
-		if err != nil {
-			return err
-		}
-		if !found {
-			target = model.ExecutionTarget{
-				OwnerID:    device.UserID,
-				TargetType: "local_edge",
-			}
-		}
-
-		refreshDesktopLocalEdgeTarget(&target, device, name, capabilities, metadata)
-		if target.ID == "" {
-			created, err := repository.CreateExecutionTargetIfNotExists(tx, &target)
-			if err != nil {
-				return err
-			}
-			if !created {
-				matches, err := findDesktopLocalEdgeTargetMatches(tx, device.UserID, device.ID, name)
-				if err != nil {
-					return err
-				}
-				target, found, err = desktopLocalEdgeTargetFromMatches(matches, device.ID)
-				if err != nil {
-					return err
-				}
-				if !found {
-					return errcode.UserInvalidParam.WithMessage("local_edge target conflict could not be resolved")
-				}
-				refreshDesktopLocalEdgeTarget(&target, device, name, capabilities, metadata)
-				if err := repository.UpdateExecutionTarget(tx, &target); err != nil {
-					return err
-				}
-			}
-		} else if err := repository.UpdateExecutionTarget(tx, &target); err != nil {
-			return err
-		}
-
-		result = &target
-		return nil
+		var err error
+		result, err = s.upsertDesktopLocalEdgeTx(ctx, tx, device, name, capabilities, metadata)
+		return err
 	})
 	if err != nil {
 		return nil, err
@@ -172,6 +126,60 @@ func (s *Service) UpsertLocalEdgeForDesktopDevice(ctx context.Context, device *m
 	// live evidence until the next check-in / route probe.
 	s.recordRegistrationEvidence(ctx, result, device, now)
 	return result, nil
+}
+
+// upsertDesktopLocalEdgeTx creates or refreshes the local_edge target for one
+// desktop device check-in. The create-if-not-exists dance with conflict
+// re-read stays inside the caller's transaction.
+func (s *Service) upsertDesktopLocalEdgeTx(ctx context.Context, tx *gorm.DB, device *model.Device, name, capabilities, metadata string) (*model.ExecutionTarget, error) {
+	if err := requireDeviceBelongsToOwner(ctx, tx, device.UserID, device.ID, "desktop"); err != nil {
+		return nil, err
+	}
+
+	matches, err := findDesktopLocalEdgeTargetMatches(tx, device.UserID, device.ID, name)
+	if err != nil {
+		return nil, err
+	}
+
+	target, found, err := desktopLocalEdgeTargetFromMatches(matches, device.ID)
+	if err != nil {
+		return nil, err
+	}
+	if !found {
+		target = model.ExecutionTarget{
+			OwnerID:    device.UserID,
+			TargetType: "local_edge",
+		}
+	}
+
+	refreshDesktopLocalEdgeTarget(&target, device, name, capabilities, metadata)
+	if target.ID == "" {
+		created, err := repository.CreateExecutionTargetIfNotExists(tx, &target)
+		if err != nil {
+			return nil, err
+		}
+		if !created {
+			matches, err := findDesktopLocalEdgeTargetMatches(tx, device.UserID, device.ID, name)
+			if err != nil {
+				return nil, err
+			}
+			target, found, err = desktopLocalEdgeTargetFromMatches(matches, device.ID)
+			if err != nil {
+				return nil, err
+			}
+			if !found {
+				return nil, errcode.UserInvalidParam.WithMessage("local_edge target conflict could not be resolved")
+			}
+			refreshDesktopLocalEdgeTarget(&target, device, name, capabilities, metadata)
+			if err := repository.UpdateExecutionTarget(tx, &target); err != nil {
+				return nil, err
+			}
+		}
+	} else if err := repository.UpdateExecutionTarget(tx, &target); err != nil {
+		return nil, err
+	}
+	result := target
+	return &result, nil
 }
 
 // recordRegistrationEvidence persists the desktop check-in evidence for a

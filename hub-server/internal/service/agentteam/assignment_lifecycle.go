@@ -42,95 +42,24 @@ func (s *AgentTeamService) createAssignmentInTx(tx *gorm.DB, ctx context.Context
 		aType = model.AssignmentTypeDelegate
 	}
 
-	// 1. Query TeamRun and verify trigger user.
-	run, err := repository.GetTeamRunByID(tx, teamRunID)
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, errcode.AgentTaskNotFound
-		}
+	// 1-3. Query TeamRun + members and verify routing authorization.
+	if err := s.verifyAssignmentRoutingTx(tx, userID, teamRunID, fromMemberID, toMemberID); err != nil {
 		return nil, err
-	}
-	if run.TriggerUserID != userID {
-		return nil, errcode.AgentTaskNotFound
-	}
-
-	// 2. Query fromMember and verify role is supervisor.
-	fromMember, err := repository.GetTeamMemberByID(tx, fromMemberID)
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, errcode.AgentNotFound
-		}
-		return nil, err
-	}
-	if fromMember.Role != model.TeamMemberRoleSupervisor {
-		return nil, errcode.ErrBadRequest
-	}
-
-	// 3. Query toMember and verify same team.
-	toMember, err := repository.GetTeamMemberByID(tx, toMemberID)
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, errcode.AgentNotFound
-		}
-		return nil, err
-	}
-	if toMember.TeamID != fromMember.TeamID {
-		return nil, errcode.ErrBadRequest
-	}
-	if fromMemberID == toMemberID {
-		return nil, errcode.ErrBadRequest
 	}
 
 	// 4. Build ancestor chain and compute depth.
-	ancestorDepth := 0
-	var ancestorIDs []string // member IDs in the chain (both from and to)
-	visitedAncestors := map[string]struct{}{}
-	parentID := fromMemberID
-	for {
-		if _, seen := visitedAncestors[parentID]; seen {
-			return nil, errcode.ErrBadRequest
-		}
-		visitedAncestors[parentID] = struct{}{}
-		parentAssignment, aErr := repository.GetAssignmentByToMember(tx, teamRunID, parentID)
-		if aErr != nil {
-			if errors.Is(aErr, gorm.ErrRecordNotFound) {
-				break // root of chain
-			}
-			return nil, aErr
-		}
-		if parentAssignment.Depth > ancestorDepth {
-			ancestorDepth = parentAssignment.Depth
-		}
-		ancestorIDs = append(ancestorIDs, parentAssignment.FromMemberID, parentAssignment.ToMemberID)
-		parentID = parentAssignment.FromMemberID
+	ancestorDepth, ancestorIDs, err := s.resolveAssignmentChain(tx, teamRunID, fromMemberID)
+	if err != nil {
+		return nil, err
 	}
-
 	newDepth := ancestorDepth + 1
 	if newDepth > s.guardrails.MaxDelegationDepth {
 		return nil, errcode.ErrBadRequest
 	}
 
-	// 5. Check total and active assignment limits for this team run.
-	taskCount, err := repository.CountAssignmentsByTeamRun(tx, teamRunID)
-	if err != nil {
+	// 5-6. Check total/active assignment limits and duplicate ancestors.
+	if err := s.enforceAssignmentLimits(tx, teamRunID, ancestorIDs, toMemberID); err != nil {
 		return nil, err
-	}
-	if taskCount >= s.guardrails.MaxTasksPerTeamRun {
-		return nil, errcode.ErrBadRequest
-	}
-	activeCount, err := repository.CountActiveAssignmentsByTeamRun(tx, teamRunID)
-	if err != nil {
-		return nil, err
-	}
-	if activeCount >= s.guardrails.MaxActiveSubAgentsPerRun {
-		return nil, errcode.ErrBadRequest
-	}
-
-	// 6. Check no duplicate member in ancestor chain.
-	for _, mid := range ancestorIDs {
-		if mid == toMemberID {
-			return nil, errcode.ErrBadRequest
-		}
 	}
 
 	// 7. Create assignment.
@@ -150,6 +79,104 @@ func (s *AgentTeamService) createAssignmentInTx(tx *gorm.DB, ctx context.Context
 	return assignment, nil
 }
 
+// verifyAssignmentRoutingTx checks run ownership, supervisor role, same-team
+// binding and self-assignment; it rejects with the same errcodes the inline
+// version produced (order preserved).
+func (s *AgentTeamService) verifyAssignmentRoutingTx(tx *gorm.DB, userID, teamRunID, fromMemberID, toMemberID string) error {
+	run, err := repository.GetTeamRunByID(tx, teamRunID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return errcode.AgentTaskNotFound
+		}
+		return err
+	}
+	if run.TriggerUserID != userID {
+		return errcode.AgentTaskNotFound
+	}
+
+	fromMember, err := repository.GetTeamMemberByID(tx, fromMemberID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return errcode.AgentNotFound
+		}
+		return err
+	}
+	if fromMember.Role != model.TeamMemberRoleSupervisor {
+		return errcode.ErrBadRequest
+	}
+
+	toMember, err := repository.GetTeamMemberByID(tx, toMemberID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return errcode.AgentNotFound
+		}
+		return err
+	}
+	if toMember.TeamID != fromMember.TeamID {
+		return errcode.ErrBadRequest
+	}
+	if fromMemberID == toMemberID {
+		return errcode.ErrBadRequest
+	}
+	return nil
+}
+
+// resolveAssignmentChain walks the ancestor chain from fromMemberID to the
+// chain root and returns the maximum ancestor depth plus every member id in
+// the chain (depth check + duplicate-member check use these).
+func (s *AgentTeamService) resolveAssignmentChain(tx *gorm.DB, teamRunID, fromMemberID string) (int, []string, error) {
+	ancestorDepth := 0
+	var ancestorIDs []string // member IDs in the chain (both from and to)
+	visitedAncestors := map[string]struct{}{}
+	parentID := fromMemberID
+	for {
+		if _, seen := visitedAncestors[parentID]; seen {
+			return 0, nil, errcode.ErrBadRequest
+		}
+		visitedAncestors[parentID] = struct{}{}
+		parentAssignment, aErr := repository.GetAssignmentByToMember(tx, teamRunID, parentID)
+		if aErr != nil {
+			if errors.Is(aErr, gorm.ErrRecordNotFound) {
+				break // root of chain
+			}
+			return 0, nil, aErr
+		}
+		if parentAssignment.Depth > ancestorDepth {
+			ancestorDepth = parentAssignment.Depth
+		}
+		ancestorIDs = append(ancestorIDs, parentAssignment.FromMemberID, parentAssignment.ToMemberID)
+		parentID = parentAssignment.FromMemberID
+	}
+	return ancestorDepth, ancestorIDs, nil
+}
+
+// enforceAssignmentLimits checks the per-run task/active-count limits and the
+// duplicate-member-in-ancestor-chain guard for one new assignment.
+func (s *AgentTeamService) enforceAssignmentLimits(tx *gorm.DB, teamRunID string, ancestorIDs []string, toMemberID string) error {
+	taskCount, err := repository.CountAssignmentsByTeamRun(tx, teamRunID)
+	if err != nil {
+		return err
+	}
+	if taskCount >= s.guardrails.MaxTasksPerTeamRun {
+		return errcode.ErrBadRequest
+	}
+	activeCount, err := repository.CountActiveAssignmentsByTeamRun(tx, teamRunID)
+	if err != nil {
+		return err
+	}
+	if activeCount >= s.guardrails.MaxActiveSubAgentsPerRun {
+		return errcode.ErrBadRequest
+	}
+
+	// Check no duplicate member in ancestor chain.
+	for _, mid := range ancestorIDs {
+		if mid == toMemberID {
+			return errcode.ErrBadRequest
+		}
+	}
+	return nil
+}
+
 // DispatchAssignment dispatches a pending assignment to the target agent.
 // The flow is CAS-claim-first to prevent dual dispatch (#1383):
 //  1. validate the immutable routing inputs
@@ -165,15 +192,10 @@ func (s *AgentTeamService) DispatchAssignment(ctx context.Context, userID, assig
 		}
 		return err
 	}
-
-	run, err := repository.GetTeamRunByID(s.db, a.TeamRunID)
+	run, err := s.verifyDispatchOwner(a, userID)
 	if err != nil {
 		return err
 	}
-	if run.TriggerUserID != userID {
-		return errcode.AgentTaskNotFound
-	}
-
 	if !canDispatchAssignmentStatus(a.Status) {
 		return errcode.ErrBadRequest
 	}
@@ -182,23 +204,9 @@ func (s *AgentTeamService) DispatchAssignment(ctx context.Context, userID, assig
 	}
 
 	// 2. Find the target agent instance in the team run's session.
-	if run.SessionID == "" {
-		return errcode.AgentNotFound
-	}
-
-	toMember, err := repository.GetTeamMemberByID(s.db, a.ToMemberID)
+	targetAIID, err := s.resolveDispatchTarget(run, a)
 	if err != nil {
 		return err
-	}
-
-	agents, err := repository.ListAgentInstancesBySession(s.db, run.SessionID)
-	if err != nil || len(agents) == 0 {
-		return errcode.AgentNotFound
-	}
-
-	targetAIID := findAgentInstanceIDForMember(agents, toMember)
-	if targetAIID == "" {
-		return errcode.AgentNotFound
 	}
 
 	// Claim before creating the TeamTask/message so a losing concurrent caller
@@ -223,41 +231,81 @@ func (s *AgentTeamService) DispatchAssignment(ctx context.Context, userID, assig
 		return s.releaseDispatchClaim(assignmentID, err)
 	}
 
+	if err := s.deliverAssignmentTask(ctx, userID, a, run, teamTask, targetAIID); err != nil {
+		return s.releaseDispatchClaim(assignmentID, err)
+	}
+	return nil
+}
+
+// verifyDispatchOwner ensures the caller is the team run trigger user and
+// returns the run for the dispatch target resolution.
+func (s *AgentTeamService) verifyDispatchOwner(a *model.AgentTeamAssignment, userID string) (*model.AgentTeamRun, error) {
+	run, err := repository.GetTeamRunByID(s.db, a.TeamRunID)
+	if err != nil {
+		return nil, err
+	}
+	if run.TriggerUserID != userID {
+		return nil, errcode.AgentTaskNotFound
+	}
+	return run, nil
+}
+
+// resolveDispatchTarget resolves the target agent instance inside the team
+// run session for the assignment's to-member.
+func (s *AgentTeamService) resolveDispatchTarget(run *model.AgentTeamRun, a *model.AgentTeamAssignment) (string, error) {
+	if run.SessionID == "" {
+		return "", errcode.AgentNotFound
+	}
+	toMember, err := repository.GetTeamMemberByID(s.db, a.ToMemberID)
+	if err != nil {
+		return "", err
+	}
+	agents, err := repository.ListAgentInstancesBySession(s.db, run.SessionID)
+	if err != nil || len(agents) == 0 {
+		return "", errcode.AgentNotFound
+	}
+	targetAIID := findAgentInstanceIDForMember(agents, toMember)
+	if targetAIID == "" {
+		return "", errcode.AgentNotFound
+	}
+	return targetAIID, nil
+}
+
+// deliverAssignmentTask creates the dispatch message, triggers the external
+// agent task and binds the claim to the created pending task. Any error is
+// propagated to the caller, which releases the dispatch claim.
+func (s *AgentTeamService) deliverAssignmentTask(ctx context.Context, userID string, a *model.AgentTeamAssignment, run *model.AgentTeamRun, teamTask *model.AgentTeamTask, targetAIID string) error {
 	triggerMessageID, err := s.createAssignmentDispatchMessage(ctx, userID, run.SessionID, a)
 	if err != nil {
-		return s.releaseDispatchClaim(assignmentID, err)
+		return err
 	}
 
 	pendingTask, triggerErr := s.agentSvc.TriggerAgentTask(ctx, userID, triggerMessageID, targetAIID, "", "", "", teamRunTargetID(run))
 	if triggerErr != nil {
-		slog.Error("failed to trigger dispatch for assignment", "assignment_id", assignmentID, "error", triggerErr)
-		return s.releaseDispatchClaim(assignmentID, triggerErr)
+		slog.Error("failed to trigger dispatch for assignment", "assignment_id", a.ID, "error", triggerErr)
+		return triggerErr
 	}
 	if pendingTask == nil || pendingTask.ID == "" {
-		return s.releaseDispatchClaim(assignmentID, errcode.ErrInternal)
+		return errcode.ErrInternal
 	}
 
-	bound, err := repository.BindClaimedAssignmentDispatch(s.db, assignmentID, pendingTask.ID)
+	bound, err := repository.BindClaimedAssignmentDispatch(s.db, a.ID, pendingTask.ID)
 	if err != nil {
 		return err
 	}
 	if bound != 1 {
-		return fmt.Errorf("bind dispatch claim for assignment %s: %w", assignmentID, errcode.ErrInternal)
+		return fmt.Errorf("bind dispatch claim for assignment %s: %w", a.ID, errcode.ErrInternal)
 	}
 	// Task is bound and delivered to Edge: advance dispatched → running so
 	// the DB status matches the projection layer (#1384). CompleteAssignment
 	// still accepts dispatched for the #1376 compatibility path.
-	if _, err := repository.MarkAssignmentRunningIfDispatched(s.db, assignmentID); err != nil {
+	if _, err := repository.MarkAssignmentRunningIfDispatched(s.db, a.ID); err != nil {
 		return err
 	}
 	if err := repository.UpdateTeamTaskDispatchBinding(s.db, teamTask.ID, pendingTask.ID); err != nil {
 		return err
 	}
-	if err := s.appendTeamEvent(a.TeamRunID, model.TeamEventAssignmentDispatched, assignmentDispatchedEventPayload(assignmentID, teamTask.ID, pendingTask.ID)); err != nil {
-		return err
-	}
-
-	return nil
+	return s.appendTeamEvent(a.TeamRunID, model.TeamEventAssignmentDispatched, assignmentDispatchedEventPayload(a.ID, teamTask.ID, pendingTask.ID))
 }
 
 func (s *AgentTeamService) releaseDispatchClaim(assignmentID string, cause error) error {
@@ -458,41 +506,9 @@ func (s *AgentTeamService) FailTimedOutAssignments(ctx context.Context) (int, er
 			return failed, nil
 		}
 		for i := range assignments {
-			a := &assignments[i]
-			reason := "assignment timeout reached"
-			updated, err := repository.UpdateAssignmentStatusIf(s.db.WithContext(ctx), a.ID,
-				[]string{
-					model.AssignmentStatusPending,
-					model.AssignmentStatusDispatched,
-					model.AssignmentStatusRunning,
-				},
-				model.AssignmentStatusFailed, reason)
-			if err != nil {
-				if metrics.TeamAssignmentStateTransitionFailures != nil {
-					metrics.TeamAssignmentStateTransitionFailures.WithLabelValues("status_update").Inc()
-				}
-				slog.Warn("failed to terminate timed-out assignment",
-					"assignment_id", a.ID, "team_run_id", a.TeamRunID, "error", err)
-				continue
+			if s.terminateTimedOutAssignment(ctx, &assignments[i]) {
+				failed++
 			}
-			if updated == 0 {
-				continue
-			}
-			if err := s.appendTeamEvent(a.TeamRunID, model.TeamEventAssignmentFailed, map[string]string{
-				"assignment_id": a.ID,
-				"reason":        reason,
-			}); err != nil {
-				if metrics.TeamAssignmentStateTransitionFailures != nil {
-					metrics.TeamAssignmentStateTransitionFailures.WithLabelValues("event_append").Inc()
-				}
-				slog.Warn("failed to append timeout event for assignment",
-					"assignment_id", a.ID, "team_run_id", a.TeamRunID, "error", err)
-				// Status already failed; keep counting so the scan reports progress.
-			}
-			if metrics.TeamAssignmentTimeouts != nil {
-				metrics.TeamAssignmentTimeouts.Inc()
-			}
-			failed++
 		}
 		// A short batch means we drained the backlog; a full batch means more
 		// rows may qualify, so loop again. The next iteration recomputes the
@@ -504,6 +520,46 @@ func (s *AgentTeamService) FailTimedOutAssignments(ctx context.Context) (int, er
 	slog.Warn("timed-out assignment scan hit batch ceiling; remaining rows deferred to next tick",
 		"batch_ceiling", failTimedOutMaxBatches, "terminated_so_far", failed)
 	return failed, nil
+}
+
+// terminateTimedOutAssignment fails one timed-out assignment and records its
+// team event (best-effort); it returns true when the assignment counted as
+// terminated. Status-update failures still count the row but skip the event.
+func (s *AgentTeamService) terminateTimedOutAssignment(ctx context.Context, a *model.AgentTeamAssignment) bool {
+	reason := "assignment timeout reached"
+	updated, err := repository.UpdateAssignmentStatusIf(s.db.WithContext(ctx), a.ID,
+		[]string{
+			model.AssignmentStatusPending,
+			model.AssignmentStatusDispatched,
+			model.AssignmentStatusRunning,
+		},
+		model.AssignmentStatusFailed, reason)
+	if err != nil {
+		if metrics.TeamAssignmentStateTransitionFailures != nil {
+			metrics.TeamAssignmentStateTransitionFailures.WithLabelValues("status_update").Inc()
+		}
+		slog.Warn("failed to terminate timed-out assignment",
+			"assignment_id", a.ID, "team_run_id", a.TeamRunID, "error", err)
+		return false
+	}
+	if updated == 0 {
+		return false
+	}
+	if err := s.appendTeamEvent(a.TeamRunID, model.TeamEventAssignmentFailed, map[string]string{
+		"assignment_id": a.ID,
+		"reason":        reason,
+	}); err != nil {
+		if metrics.TeamAssignmentStateTransitionFailures != nil {
+			metrics.TeamAssignmentStateTransitionFailures.WithLabelValues("event_append").Inc()
+		}
+		slog.Warn("failed to append timeout event for assignment",
+			"assignment_id", a.ID, "team_run_id", a.TeamRunID, "error", err)
+		// Status already failed; keep counting so the scan reports progress.
+	}
+	if metrics.TeamAssignmentTimeouts != nil {
+		metrics.TeamAssignmentTimeouts.Inc()
+	}
+	return true
 }
 
 // handleFaultEscalation processes Layer 2 (AI review) and Layer 3 (replan)

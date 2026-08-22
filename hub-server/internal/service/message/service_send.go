@@ -23,25 +23,16 @@ import (
 // Residual pure-helper peel #1153: send/edit/recall/pin/forward write paths.
 
 func (s *Service) SendMessage(ctx context.Context, sessionID, senderUserID string, req SendMessageRequest) (*SendMessageResponse, error) {
-	if !im.IsValidContentType(req.ContentType) {
-		return nil, errcode.ErrBadRequest
-	}
-
-	content, err := normalizeMessageContent(req.ContentType, req.Content)
-	if err != nil {
-		slog.Warn("invalid message content", "content_type", req.ContentType, "error", err)
-		return nil, errcode.ErrBadRequest
-	}
-	attachmentIDs, ok := attachmentIDsFromContent(req.ContentType, content)
-	if !ok {
-		return nil, errcode.ErrBadRequest
-	}
-
-	active, err := repository.IsMemberActive(s.db, sessionID, model.MemberTypeUser, senderUserID)
+	content, attachmentIDs, err := normalizeSendMessage(req)
 	if err != nil {
 		return nil, err
 	}
-	if !active {
+
+	isActiveMember, err := repository.IsMemberActive(s.db, sessionID, model.MemberTypeUser, senderUserID)
+	if err != nil {
+		return nil, err
+	}
+	if !isActiveMember {
 		return nil, errcode.SessionNotMember
 	}
 
@@ -53,26 +44,11 @@ func (s *Service) SendMessage(ctx context.Context, sessionID, senderUserID strin
 		return nil, errcode.SessionDissolved
 	}
 
-	if req.ReplyToMsgID != nil && *req.ReplyToMsgID != "" {
-		if _, err := repository.GetMessageBySessionAndID(s.db, sessionID, *req.ReplyToMsgID); err != nil {
-			return nil, errcode.MsgNotFound
-		}
+	if err := s.validateReplyToMessage(sessionID, req.ReplyToMsgID); err != nil {
+		return nil, err
 	}
-
-	if session.Type == model.SessionTypePrivate {
-		other, err := repository.GetOtherMemberInPrivate(s.db, sessionID, senderUserID)
-		if err != nil {
-			return nil, err
-		}
-		if other != nil {
-			blocked, err := repository.IsBlockedBy(s.db, other.MemberID, senderUserID)
-			if err != nil {
-				return nil, err
-			}
-			if blocked {
-				return nil, errcode.MsgBlockedByReceiver
-			}
-		}
+	if err := s.validatePrivateSendAllowed(session, sessionID, senderUserID); err != nil {
+		return nil, err
 	}
 
 	// client_msg_id is a NOT NULL UUID column serving as the idempotency key.
@@ -114,7 +90,58 @@ func (s *Service) SendMessage(ctx context.Context, sessionID, senderUserID strin
 	}
 	msg.SeqID = seq
 
-	err = s.db.Transaction(func(tx *gorm.DB) error {
+	err = s.persistSendMessageTx(msg, sessionID, attachmentIDs)
+	if err != nil {
+		if isDuplicateKeyError(err) {
+			if existing, lookupErr := repository.GetMessageByClientMsgID(s.db, sessionID, clientMsgID); lookupErr == nil && existing != nil {
+				return sendMessageResponseFromModel(existing), nil
+			}
+		}
+		return nil, err
+	}
+
+	s.publish(ctx, bus.Event{Type: bus.EventTypeMessageNew, Payload: msg})
+
+	return sendMessageResponseFromModel(msg), nil
+}
+
+// normalizeSendMessage validates content type and normalizes content; it also
+// extracts attachment ids referenced by the content for later permission checks.
+func normalizeSendMessage(req SendMessageRequest) (string, []string, error) {
+	if !im.IsValidContentType(req.ContentType) {
+		return "", nil, errcode.ErrBadRequest
+	}
+	content, err := normalizeMessageContent(req.ContentType, req.Content)
+	if err != nil {
+		slog.Warn("invalid message content", "content_type", req.ContentType, "error", err)
+		return "", nil, errcode.ErrBadRequest
+	}
+	attachmentIDs, ok := attachmentIDsFromContent(req.ContentType, content)
+	if !ok {
+		return "", nil, errcode.ErrBadRequest
+	}
+	return content, attachmentIDs, nil
+}
+
+// validateReplyToMessage checks that a reply target exists in the session when
+// one was supplied (nil or empty reply ids are allowed).
+func (s *Service) validateReplyToMessage(sessionID string, replyToMsgID *string) error {
+	if replyToMsgID == nil || *replyToMsgID == "" {
+		return nil
+	}
+	if _, err := repository.GetMessageBySessionAndID(s.db, sessionID, *replyToMsgID); err != nil {
+		return errcode.MsgNotFound
+	}
+	return nil
+}
+
+// validatePrivateSendAllowed blocks sends to a private session peer that has
+// blocked the sender; non-private sessions are never blocked here.
+// persistSendMessageTx inserts the message with its attachment references and
+// touches the session activity marker inside one transaction; a duplicate-key
+// insert races are recovered by the caller.
+func (s *Service) persistSendMessageTx(msg *model.Message, sessionID string, attachmentIDs []string) error {
+	return s.db.Transaction(func(tx *gorm.DB) error {
 		if err := repository.InsertMessage(tx, msg); err != nil {
 			return err
 		}
@@ -125,19 +152,26 @@ func (s *Service) SendMessage(ctx context.Context, sessionID, senderUserID strin
 		}
 		return repository.TouchSessionLastMessage(tx, sessionID)
 	})
-	if err != nil {
-		if isDuplicateKeyError(err) {
-			existing, lookupErr := repository.GetMessageByClientMsgID(s.db, sessionID, clientMsgID)
-			if lookupErr == nil && existing != nil {
-				return sendMessageResponseFromModel(existing), nil
-			}
-		}
-		return nil, err
+}
+
+func (s *Service) validatePrivateSendAllowed(session *model.Session, sessionID, senderUserID string) error {
+	if session.Type != model.SessionTypePrivate {
+		return nil
 	}
-
-	s.publish(ctx, bus.Event{Type: bus.EventTypeMessageNew, Payload: msg})
-
-	return sendMessageResponseFromModel(msg), nil
+	other, err := repository.GetOtherMemberInPrivate(s.db, sessionID, senderUserID)
+	if err != nil {
+		return err
+	}
+	if other != nil {
+		blocked, err := repository.IsBlockedBy(s.db, other.MemberID, senderUserID)
+		if err != nil {
+			return err
+		}
+		if blocked {
+			return errcode.MsgBlockedByReceiver
+		}
+	}
+	return nil
 }
 
 func (s *Service) RecallMessage(ctx context.Context, msgID, userID string) error {
