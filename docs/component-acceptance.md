@@ -1,6 +1,6 @@
 # AgentHub 组件验收标准（component-acceptance）
 
-最后更新：2026-08-14（自 TokenDanceLab/docs 迁入本仓库，本文件为 AgentHub 单仓 SSOT；#1672 迁移状态见 §1）
+最后更新：2026-08-22（自 TokenDanceLab/docs 迁入本仓库，本文件为 AgentHub 单仓 SSOT；#1672 迁移状态见 §1）
 
 本文是 AgentHub shared 组件的**验收标准 SSOT**：任何 `app/shared/src/ui/` 下的新组件（或对既有组件做可见行为改动）必须对照本文件的 5 维验收标准，并带 `.test.tsx` + `.stories.tsx` + 本文件验收表对照记录。它与跨产品设计契约（`tokendance-design` 仓库 [design-system.md](https://github.com/TokenDanceLab/tokendance-design/blob/master/docs/design/design-system.md) 管 token 收敛、[design-playbook.md](https://github.com/TokenDanceLab/tokendance-design/blob/master/docs/design/design-playbook.md) 管实现流程、[visual-qa-matrix.md](https://github.com/TokenDanceLab/tokendance-design/blob/master/docs/design/visual-qa-matrix.md) 管产品级截图证据）互补：本文管**单组件验收**，矩阵管**产品级视觉证据**。
 
@@ -92,7 +92,7 @@
 | 视觉 | token 化面板（`--td-panel`/`--td-surface-3`）、scrim | ✅ | 随 Modal.stories.tsx 巡检 |
 | 交互 | 打开/关闭、提交/取消路径行为断言 | ✅ | Modal.test.tsx |
 | 键盘 | Esc 关闭、焦点移入/归还 | ✅ | 测试覆盖 |
-| 键盘 | Tab 循环（焦点困在对话框内） | ✅ | `useFocusTrap`（focusTrap.ts）实现 Tab/Shift+Tab 环绕，focusTrap.test.tsx 行为断言；残留项见下方 debt 台账 |
+| 键盘 | Tab 循环（焦点困在对话框内） | ⚠️ | `useFocusTrap`（focusTrap.ts）实现 Tab/Shift+Tab 环绕、focusTrap.test.tsx 有行为断言；必选项未完全闭环（缺 Modal 级断言与真实浏览器复核），按拆分验收记入下方 debt 台账 |
 | a11y | `role="dialog"` + `aria-modal` + 标题关联 | ✅ | |
 | a11y | 焦点环与对比度 | ✅ | |
 | 响应式 | 窄宽下可用、无横向滚动 | ✅ | 宽度上限 + 内滚 |
@@ -114,7 +114,7 @@
 
 | 组件 | 项 | 状态与缺口 | 跟踪载体 |
 |---|---|---|---|
-| Modal | 键盘 Tab 循环（必选） | 已实现并有单测：`Modal.tsx` 经 `useFocusTrap` 困住焦点，`focusTrap.test.tsx` 断言 Tab/Shift+Tab 环绕与焦点归还。残留缺口：无 Modal 级专属断言，且复核发生在 jsdom，未在真实浏览器人工复核 | [#1820](https://github.com/TokenDanceLab/AgentHub/issues/1820)（验收补全）：补 Modal 级 Tab 循环断言 + Visual QA 真实浏览器复核 |
+| Modal | 键盘 Tab 循环（必选） | 部分闭环，必选项未完全达标：`Modal.tsx` 经 `useFocusTrap` 困住焦点，`focusTrap.test.tsx` 断言 Tab/Shift+Tab 环绕与焦点归还；残留缺口为无 Modal 级专属断言、复核仅在 jsdom、未在真实浏览器人工复核。拆分验收：行为实现与共享层单测计入已通过，剩余验证工作记 debt | owner：前端 track；计划：补 Modal 级 Tab 循环断言（Modal.test.tsx）+ Visual QA 真实浏览器复核；跟踪：[#1820](https://github.com/TokenDanceLab/AgentHub/issues/1820)（验收补全） |
 | ToastStack | 自动消失可见时间/可暂停 | 已实现：hover/focus 触发 `pauseAutoDismiss`（ToastStack.tsx + toastStore.ts），满足「可暂停」必选分支。残留缺口：剩余倒计时不可视化（非必选） | 无独立 debt；倒计时可视化为可选增强，如需跟踪归入 [#1820](https://github.com/TokenDanceLab/AgentHub/issues/1820) 验收补全 |
 
 ### 维护规则
