@@ -252,26 +252,21 @@ jobs:
 
       - name: Lint
         if: github.event_name == 'workflow_dispatch' || needs.changes.outputs.go == 'true'
-        # #1657/#1832: report-only — the action's raw exit code cannot consult
-        # the #1573 baseline, and GitHub refuses PR diffs >300 files, so the
-        # action falls back to a full-repo lint that reports the 17
-        # baseline-registered complexity findings and would hard-fail a
-        # debt-clean large PR. The hard gate lives in the fingerprint ratchet
-        # step below. only-new-issues stays so small PRs still produce a
-        # new-findings-only report.
-        continue-on-error: true
+        # #1812: hard fail — the 17 baseline-registered complexity findings
+        # are repaid and hub-lint-baseline.json is empty, so a full-repo lint
+        # failure is a real regression. The fingerprint ratchet step below
+        # still shares the same JSON report as the second line of defence.
         uses: golangci/golangci-lint-action@v9
         with:
           working-directory: hub-server
           version: ${{ env.GOLANGCI_LINT_VERSION }}
           args: --timeout=5m --output.json.path=${{ runner.temp }}/hub-lint-report.json
-          only-new-issues: true
 
       # #1573: finding fingerprint ratchet — any finding NOT in the baseline
       # (new linter, new rule, escalated severity, replacement with same count)
-      # hard-fails this job. Baseline-registered findings pass whether the
-      # report is patch-filtered or the >300-file full-lint fallback, so the
-      # 17 pre-existing complexity findings never block a debt-clean PR.
+      # hard-fails this job. The baseline is empty after the #1812 debt
+      # repay, so every finding is a regression: it fails here as well as in
+      # the Lint step above.
       # Reads the same JSON report the Lint step just produced (single source,
       # no version drift; gofmt is excluded as toolchain-drift-prone).
       - name: Verify Hub lint fingerprint ratchet (#1573)

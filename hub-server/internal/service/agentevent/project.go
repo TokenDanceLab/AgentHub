@@ -32,43 +32,7 @@ func SummarizeAgentRunEvents(task *model.PendingAgentTask, events []model.AgentR
 
 	approvalStates := map[string]string{}
 	for _, event := range events {
-		if event.EventSeq > summary.LastEventSeq {
-			summary.LastEventSeq = event.EventSeq
-		}
-		if summary.EdgeRunID == "" {
-			summary.EdgeRunID = event.EdgeRunID
-		}
-		summary.EventTypeCounts[event.EventType]++
-		if strings.HasPrefix(event.EventType, "run.agent.") {
-			summary.StepCount++
-		}
-
-		payload := map[string]any{}
-		_ = json.Unmarshal([]byte(event.Payload), &payload)
-		switch event.EventType {
-		case model.RunEventTypeOutputBatch:
-			summary.OutputBytes += OutputBytesFromPayload(payload)
-		case "run.agent.tool_call":
-			summary.ToolCallCount++
-		case "run.agent.permission_requested":
-			key := FirstRuntimeString(payload, "requestId", "request_id", "toolUseId", "tool_use_id")
-			if key == "" {
-				key = event.ID
-			}
-			approvalStates[key] = FirstNonEmpty(FirstRuntimeString(payload, "status"), "pending")
-		case "run.agent.permission_decided":
-			key := FirstRuntimeString(payload, "requestId", "request_id", "toolUseId", "tool_use_id")
-			if key == "" {
-				key = event.ID
-			}
-			approvalStates[key] = FirstNonEmpty(FirstRuntimeString(payload, "decision", "status"), "decided")
-		case "run.agent.file_change":
-			summary.ArtifactCount++
-		case "run.agent.result", "run.agent.context_usage":
-			inputTokens, outputTokens := TokenUsageFromPayload(payload)
-			summary.InputTokens += inputTokens
-			summary.OutputTokens += outputTokens
-		}
+		applyRunEventToSummary(&summary, approvalStates, event)
 	}
 	for _, status := range approvalStates {
 		summary.ApprovalCount++
@@ -93,6 +57,49 @@ func SummarizeAgentRunEvents(task *model.PendingAgentTask, events []model.AgentR
 	return summary
 }
 
+// applyRunEventToSummary folds a single runtime event into the summary. The
+// per-event-type projections (output bytes, token usage, approval states, …)
+// live here so the main roll-up loop keeps a flat shape.
+func applyRunEventToSummary(summary *model.AgentRunEventSummary, approvalStates map[string]string, event model.AgentRunEvent) {
+	if event.EventSeq > summary.LastEventSeq {
+		summary.LastEventSeq = event.EventSeq
+	}
+	if summary.EdgeRunID == "" {
+		summary.EdgeRunID = event.EdgeRunID
+	}
+	summary.EventTypeCounts[event.EventType]++
+	if strings.HasPrefix(event.EventType, "run.agent.") {
+		summary.StepCount++
+	}
+
+	payload := map[string]any{}
+	_ = json.Unmarshal([]byte(event.Payload), &payload)
+	switch event.EventType {
+	case model.RunEventTypeOutputBatch:
+		summary.OutputBytes += OutputBytesFromPayload(payload)
+	case "run.agent.tool_call":
+		summary.ToolCallCount++
+	case "run.agent.permission_requested":
+		key := FirstRuntimeString(payload, "requestId", "request_id", "toolUseId", "tool_use_id")
+		if key == "" {
+			key = event.ID
+		}
+		approvalStates[key] = FirstNonEmpty(FirstRuntimeString(payload, "status"), "pending")
+	case "run.agent.permission_decided":
+		key := FirstRuntimeString(payload, "requestId", "request_id", "toolUseId", "tool_use_id")
+		if key == "" {
+			key = event.ID
+		}
+		approvalStates[key] = FirstNonEmpty(FirstRuntimeString(payload, "decision", "status"), "decided")
+	case "run.agent.file_change":
+		summary.ArtifactCount++
+	case "run.agent.result", "run.agent.context_usage":
+		inputTokens, outputTokens := TokenUsageFromPayload(payload)
+		summary.InputTokens += inputTokens
+		summary.OutputTokens += outputTokens
+	}
+}
+
 // ProjectTaskApprovals builds pending/decided approval projections from run events.
 func ProjectTaskApprovals(task *model.PendingAgentTask, events []model.AgentRunEvent) *model.AgentTaskApprovalList {
 	result := &model.AgentTaskApprovalList{
@@ -102,7 +109,11 @@ func ProjectTaskApprovals(task *model.PendingAgentTask, events []model.AgentRunE
 		Pending:   []model.AgentTaskApproval{},
 		Decided:   []model.AgentTaskApproval{},
 	}
-	approvalIndex := map[string]int{}
+	projector := approvalProjector{
+		result: result,
+		index:  make(map[string]int),
+		task:   task,
+	}
 	for _, event := range events {
 		if event.EventSeq > result.LastEventSeq {
 			result.LastEventSeq = event.EventSeq
@@ -119,90 +130,9 @@ func ProjectTaskApprovals(task *model.PendingAgentTask, events []model.AgentRunE
 		}
 		switch event.EventType {
 		case "run.agent.permission_requested":
-			edgeRunID := FirstNonEmptyString(event.EdgeRunID, task.EdgeRunID)
-			requestID := FirstJSONString(payload, "requestId", "request_id")
-			toolUseID := FirstJSONString(payload, "toolUseId", "tool_use_id")
-			key := FirstNonEmptyString(requestID, toolUseID)
-			if key == "" {
-				continue
-			}
-			approvalIndex[key] = len(result.Approvals)
-			result.Approvals = append(result.Approvals, model.AgentTaskApproval{
-				ApprovalID:    ApprovalIDFor(requestID, toolUseID),
-				TaskID:        event.TaskID,
-				TargetID:      strings.TrimSpace(task.TargetID),
-				EdgeDeviceID:  strings.TrimSpace(task.EdgeDeviceID),
-				CorrelationID: FirstJSONString(payload, "correlation_id", "correlationId"),
-				EdgeRunID:     edgeRunID,
-				SessionID:     event.SessionID,
-				SourceEventID: event.ID,
-				EventSeq:      event.EventSeq,
-				RequestID:     requestID,
-				ToolName:      FirstJSONString(payload, "toolName", "tool_name"),
-				ToolUseID:     toolUseID,
-				Status:        FirstNonEmptyString(FirstJSONString(payload, "status"), "pending"),
-				CreatedAt:     event.CreatedAt,
-			})
+			projector.requested(event, payload)
 		case "run.agent.permission_decided":
-			edgeRunID := FirstNonEmptyString(event.EdgeRunID, task.EdgeRunID)
-			requestID := FirstJSONString(payload, "requestId", "request_id")
-			toolUseID := FirstJSONString(payload, "toolUseId", "tool_use_id")
-			key := FirstNonEmptyString(requestID, toolUseID)
-			if key == "" {
-				continue
-			}
-			decision := FirstNonEmptyString(FirstJSONString(payload, "decision", "status"), "decided")
-			decidedAt := event.CreatedAt
-			edgeControl := TaskApprovalEdgeControl(payload)
-			if idx, ok := approvalIndex[key]; ok {
-				result.Approvals[idx].Status = decision
-				result.Approvals[idx].Reason = FirstJSONString(payload, "reason")
-				result.Approvals[idx].DecidedBy = FirstJSONString(payload, "decided_by", "decidedBy")
-				result.Approvals[idx].DecidedAt = &decidedAt
-				if result.Approvals[idx].RequestID == "" {
-					result.Approvals[idx].RequestID = requestID
-				}
-				if result.Approvals[idx].ToolUseID == "" {
-					result.Approvals[idx].ToolUseID = toolUseID
-				}
-				if result.Approvals[idx].ToolName == "" {
-					result.Approvals[idx].ToolName = FirstJSONString(payload, "toolName", "tool_name")
-				}
-				if edgeControl != nil {
-					result.Approvals[idx].EdgeControl = edgeControl
-				}
-				if result.Approvals[idx].TargetID == "" {
-					result.Approvals[idx].TargetID = strings.TrimSpace(task.TargetID)
-				}
-				if result.Approvals[idx].EdgeDeviceID == "" {
-					result.Approvals[idx].EdgeDeviceID = strings.TrimSpace(task.EdgeDeviceID)
-				}
-				if result.Approvals[idx].CorrelationID == "" {
-					result.Approvals[idx].CorrelationID = FirstJSONString(payload, "correlation_id", "correlationId")
-				}
-				continue
-			}
-			approvalIndex[key] = len(result.Approvals)
-			result.Approvals = append(result.Approvals, model.AgentTaskApproval{
-				ApprovalID:    ApprovalIDFor(requestID, toolUseID),
-				TaskID:        event.TaskID,
-				TargetID:      strings.TrimSpace(task.TargetID),
-				EdgeDeviceID:  strings.TrimSpace(task.EdgeDeviceID),
-				CorrelationID: FirstJSONString(payload, "correlation_id", "correlationId"),
-				EdgeRunID:     edgeRunID,
-				SessionID:     event.SessionID,
-				SourceEventID: event.ID,
-				EventSeq:      event.EventSeq,
-				RequestID:     requestID,
-				ToolName:      FirstJSONString(payload, "toolName", "tool_name"),
-				ToolUseID:     toolUseID,
-				Status:        decision,
-				Reason:        FirstJSONString(payload, "reason"),
-				DecidedBy:     FirstJSONString(payload, "decided_by", "decidedBy"),
-				CreatedAt:     event.CreatedAt,
-				DecidedAt:     &decidedAt,
-				EdgeControl:   edgeControl,
-			})
+			projector.decided(event, payload)
 		}
 	}
 	for _, approval := range result.Approvals {
@@ -213,6 +143,109 @@ func ProjectTaskApprovals(task *model.PendingAgentTask, events []model.AgentRunE
 		}
 	}
 	return result
+}
+
+// approvalProjector projects permission_requested / permission_decided events
+// into the combined approval list, keyed by request/tool-use id.
+type approvalProjector struct {
+	result *model.AgentTaskApprovalList
+	index  map[string]int
+	task   *model.PendingAgentTask
+}
+
+func (p *approvalProjector) requested(event model.AgentRunEvent, payload map[string]any) {
+	edgeRunID := FirstNonEmptyString(event.EdgeRunID, p.task.EdgeRunID)
+	requestID := FirstJSONString(payload, "requestId", "request_id")
+	toolUseID := FirstJSONString(payload, "toolUseId", "tool_use_id")
+	key := FirstNonEmptyString(requestID, toolUseID)
+	if key == "" {
+		return
+	}
+	p.index[key] = len(p.result.Approvals)
+	p.result.Approvals = append(p.result.Approvals, model.AgentTaskApproval{
+		ApprovalID:    ApprovalIDFor(requestID, toolUseID),
+		TaskID:        event.TaskID,
+		TargetID:      strings.TrimSpace(p.task.TargetID),
+		EdgeDeviceID:  strings.TrimSpace(p.task.EdgeDeviceID),
+		CorrelationID: FirstJSONString(payload, "correlation_id", "correlationId"),
+		EdgeRunID:     edgeRunID,
+		SessionID:     event.SessionID,
+		SourceEventID: event.ID,
+		EventSeq:      event.EventSeq,
+		RequestID:     requestID,
+		ToolName:      FirstJSONString(payload, "toolName", "tool_name"),
+		ToolUseID:     toolUseID,
+		Status:        FirstNonEmptyString(FirstJSONString(payload, "status"), "pending"),
+		CreatedAt:     event.CreatedAt,
+	})
+}
+
+func (p *approvalProjector) decided(event model.AgentRunEvent, payload map[string]any) {
+	edgeRunID := FirstNonEmptyString(event.EdgeRunID, p.task.EdgeRunID)
+	requestID := FirstJSONString(payload, "requestId", "request_id")
+	toolUseID := FirstJSONString(payload, "toolUseId", "tool_use_id")
+	key := FirstNonEmptyString(requestID, toolUseID)
+	if key == "" {
+		return
+	}
+	decision := FirstNonEmptyString(FirstJSONString(payload, "decision", "status"), "decided")
+	decidedAt := event.CreatedAt
+	edgeControl := TaskApprovalEdgeControl(payload)
+	if idx, ok := p.index[key]; ok {
+		applyDecisionToApproval(&p.result.Approvals[idx], p.task, payload, requestID, toolUseID, decision, decidedAt, edgeControl)
+		return
+	}
+	p.index[key] = len(p.result.Approvals)
+	p.result.Approvals = append(p.result.Approvals, model.AgentTaskApproval{
+		ApprovalID:    ApprovalIDFor(requestID, toolUseID),
+		TaskID:        event.TaskID,
+		TargetID:      strings.TrimSpace(p.task.TargetID),
+		EdgeDeviceID:  strings.TrimSpace(p.task.EdgeDeviceID),
+		CorrelationID: FirstJSONString(payload, "correlation_id", "correlationId"),
+		EdgeRunID:     edgeRunID,
+		SessionID:     event.SessionID,
+		SourceEventID: event.ID,
+		EventSeq:      event.EventSeq,
+		RequestID:     requestID,
+		ToolName:      FirstJSONString(payload, "toolName", "tool_name"),
+		ToolUseID:     toolUseID,
+		Status:        decision,
+		Reason:        FirstJSONString(payload, "reason"),
+		DecidedBy:     FirstJSONString(payload, "decided_by", "decidedBy"),
+		CreatedAt:     event.CreatedAt,
+		DecidedAt:     &decidedAt,
+		EdgeControl:   edgeControl,
+	})
+}
+
+// applyDecisionToApproval merges a permission_decided event into a previously
+// projected approval, filling only the fields the request event left empty.
+func applyDecisionToApproval(approval *model.AgentTaskApproval, task *model.PendingAgentTask, payload map[string]any, requestID, toolUseID, decision string, decidedAt time.Time, edgeControl *model.TeamApprovalEdgeControl) {
+	approval.Status = decision
+	approval.Reason = FirstJSONString(payload, "reason")
+	approval.DecidedBy = FirstJSONString(payload, "decided_by", "decidedBy")
+	approval.DecidedAt = &decidedAt
+	if approval.RequestID == "" {
+		approval.RequestID = requestID
+	}
+	if approval.ToolUseID == "" {
+		approval.ToolUseID = toolUseID
+	}
+	if approval.ToolName == "" {
+		approval.ToolName = FirstJSONString(payload, "toolName", "tool_name")
+	}
+	if edgeControl != nil {
+		approval.EdgeControl = edgeControl
+	}
+	if approval.TargetID == "" {
+		approval.TargetID = strings.TrimSpace(task.TargetID)
+	}
+	if approval.EdgeDeviceID == "" {
+		approval.EdgeDeviceID = strings.TrimSpace(task.EdgeDeviceID)
+	}
+	if approval.CorrelationID == "" {
+		approval.CorrelationID = FirstJSONString(payload, "correlation_id", "correlationId")
+	}
 }
 
 // TaskApprovalEdgeControl extracts optional edge_control payload fields.

@@ -32,57 +32,20 @@ func (s *AgentTeamService) StartTeamRun(ctx context.Context, userID, teamID, tri
 	}
 
 	// Allow owner or team member (user who owns any agent profile in the team).
-	if team.OwnerID != userID {
-		// Batch query all custom agents referenced by team members.
-		var authAgentIDs []string
-		for _, m := range members {
-			if m.AgentProfileID != nil && *m.AgentProfileID != "" {
-				authAgentIDs = append(authAgentIDs, *m.AgentProfileID)
-			}
-		}
-		authAgentMap := make(map[string]*model.CustomAgent)
-		if len(authAgentIDs) > 0 {
-			var authAgents []model.CustomAgent
-			if err := s.db.Where("id IN ? AND deleted_at IS NULL", authAgentIDs).Find(&authAgents).Error; err == nil {
-				for i := range authAgents {
-					authAgentMap[authAgents[i].ID] = &authAgents[i]
-				}
-			}
-		}
-		isMember := false
-		for _, m := range members {
-			if m.AgentProfileID != nil && *m.AgentProfileID != "" {
-				ca, ok := authAgentMap[*m.AgentProfileID]
-				if ok && ca.OwnerUserID == userID {
-					isMember = true
-					break
-				}
-			}
-		}
-		if !isMember {
-			return nil, errcode.AgentNotFound
-		}
+	if err := s.verifyTeamRunAuthorization(team, members, userID); err != nil {
+		return nil, err
 	}
 
 	// Resolve supervisor with members[0] fallback (see resolveTeamSupervisor).
 	// Follow-up (#1385): StartTeamRun is still a large orchestration function
 	// (auth + session/member/agent create + persist + async trigger + bus);
-	// leave that split out of this projection PR.
+	// #1812 pares the auth + persist clusters into helpers.
 	supervisorMember := resolveTeamSupervisor(members)
 	if supervisorMember == nil {
 		return nil, errcode.ErrBadRequest
 	}
 
-	// Create a group session owned by the user.
-	sessionName := team.Name
-	if sessionName == "" {
-		sessionName = "Agent Team"
-	}
-	session := &model.Session{
-		Type:        model.SessionTypeGroup,
-		Name:        sessionName,
-		OwnerUserID: &userID,
-	}
+	// The group session itself is created inside createTeamRunSessionTx.
 	run := &model.AgentTeamRun{
 		TeamID:         teamID,
 		TriggerUserID:  userID,
@@ -99,10 +62,112 @@ func (s *AgentTeamService) StartTeamRun(ctx context.Context, userID, teamID, tri
 		}
 	}
 
+	session, supervisorAIID, triggerMessageID, err := s.createTeamRunSessionTx(team, members, userID, triggerMessage, run, customAgentIDs, supervisorMember)
+	if err != nil {
+		return nil, err
+	}
+
+	// Init seq in Redis for the new session.
+	if s.cacheClient != nil {
+		if err := s.cacheClient.InitSeqIfAbsent(ctx, session.ID, 0); err != nil {
+			slog.Warn("failed to init seq in cache for team session", "session_id", session.ID, "error", err)
+		}
+	}
+
+	// Trigger the task. This dispatches asynchronously.
+	if _, err := s.agentSvc.TriggerAgentTask(ctx, userID, triggerMessageID, supervisorAIID, "", "", supervisorRouteModelParams(), teamRunTargetID(run)); err != nil {
+		slog.Error("failed to trigger supervisor agent task for team run", "run_id", run.ID, "team_id", teamID, "error", err)
+		_ = repository.UpdateTeamRunStatus(s.db, run.ID, model.TeamRunStatusFailed)
+		return run, err
+	}
+	// Persist durable TeamEvent so GetTeamRunState replay can derive running
+	// from the event log (not only the live bus fan-out).
+	if err := s.appendTeamEvent(run.ID, model.TeamEventRunStarted, map[string]string{
+		"team_id":    teamID,
+		"run_id":     run.ID,
+		"session_id": session.ID,
+		"user_id":    userID,
+	}); err != nil {
+		slog.Warn("failed to append team.run.started event", "run_id", run.ID, "error", err)
+	}
+	s.publishTeamEvent(ctx, "team.run.started", map[string]interface{}{
+		"team_id":    teamID,
+		"run_id":     run.ID,
+		"session_id": session.ID,
+		"user_id":    userID,
+	})
+
+	return run, nil
+}
+
+// verifyTeamRunAuthorization allows the team owner, or any user who owns an
+// agent profile referenced by a team member (batch lookup as before).
+func (s *AgentTeamService) verifyTeamRunAuthorization(team *model.AgentTeam, members []model.AgentTeamMember, userID string) error {
+	if team.OwnerID == userID {
+		return nil
+	}
+	authAgentMap := s.authAgentMapByMemberProfiles(members)
+	if isTeamMemberUser(members, authAgentMap, userID) {
+		return nil
+	}
+	return errcode.AgentNotFound
+}
+
+// authAgentMapByMemberProfiles batch-loads the custom agents referenced by
+// team members; lookup failures degrade to an empty map (matching the
+// previous inline behaviour, which ignored the query error).
+func (s *AgentTeamService) authAgentMapByMemberProfiles(members []model.AgentTeamMember) map[string]*model.CustomAgent {
+	var authAgentIDs []string
+	for _, m := range members {
+		if m.AgentProfileID != nil && *m.AgentProfileID != "" {
+			authAgentIDs = append(authAgentIDs, *m.AgentProfileID)
+		}
+	}
+	authAgentMap := make(map[string]*model.CustomAgent)
+	if len(authAgentIDs) == 0 {
+		return authAgentMap
+	}
+	var authAgents []model.CustomAgent
+	if err := s.db.Where("id IN ? AND deleted_at IS NULL", authAgentIDs).Find(&authAgents).Error; err != nil {
+		return authAgentMap
+	}
+	for i := range authAgents {
+		authAgentMap[authAgents[i].ID] = &authAgents[i]
+	}
+	return authAgentMap
+}
+
+// isTeamMemberUser reports whether the user owns any agent profile referenced
+// by a team member.
+func isTeamMemberUser(members []model.AgentTeamMember, authAgentMap map[string]*model.CustomAgent, userID string) bool {
+	for _, m := range members {
+		if m.AgentProfileID != nil && *m.AgentProfileID != "" {
+			ca, ok := authAgentMap[*m.AgentProfileID]
+			if ok && ca.OwnerUserID == userID {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// createTeamRunSessionTx creates the group session, owner member, per-member
+// agent instances and session members, the trigger message and the run record
+// inside one transaction. Returns the created session plus the supervisor
+// agent instance id and trigger message id for the post-commit trigger.
+func (s *AgentTeamService) createTeamRunSessionTx(team *model.AgentTeam, members []model.AgentTeamMember, userID, triggerMessage string, run *model.AgentTeamRun, customAgentIDs []string, supervisorMember *model.AgentTeamMember) (*model.Session, string, string, error) {
+	sessionName := team.Name
+	if sessionName == "" {
+		sessionName = "Agent Team"
+	}
+	session := &model.Session{
+		Type:        model.SessionTypeGroup,
+		Name:        sessionName,
+		OwnerUserID: &userID,
+	}
 	var supervisorAIID string
 	var triggerMessageID string
-
-	err = s.db.Transaction(func(tx *gorm.DB) error {
+	err := s.db.Transaction(func(tx *gorm.DB) error {
 		if err := repository.CreateSession(tx, session); err != nil {
 			return err
 		}
@@ -117,54 +182,10 @@ func (s *AgentTeamService) StartTeamRun(ctx context.Context, userID, teamID, tri
 			return err
 		}
 
-		// Batch query all custom agents referenced by team members.
-		customAgentMap := make(map[string]*model.CustomAgent)
-		if len(customAgentIDs) > 0 {
-			var agents []model.CustomAgent
-			if err := tx.Where("id IN ? AND deleted_at IS NULL", customAgentIDs).Find(&agents).Error; err == nil {
-				for i := range agents {
-					customAgentMap[agents[i].ID] = &agents[i]
-				}
-			}
-		}
-
-		// Create agent instances for each team member.
-		for i := range members {
-			m := &members[i]
-			displayName := team.Name + " Agent"
-			if m.AgentProfileID != nil {
-				if ca, ok := customAgentMap[*m.AgentProfileID]; ok {
-					displayName = ca.Name
-				}
-			}
-			ai := &model.AgentInstance{
-				AgentType:     "codex",
-				SessionID:     session.ID,
-				InviterUserID: userID,
-				DisplayName:   displayName,
-			}
-			if m.AgentProfileID != nil && *m.AgentProfileID != "" {
-				ai.CustomAgentID = m.AgentProfileID
-				if ca, ok := customAgentMap[*m.AgentProfileID]; ok {
-					ai.AgentType = ca.AgentType
-				}
-			}
-			if err := repository.CreateAgentInstance(tx, ai); err != nil {
-				return err
-			}
-			// Track supervisor agent instance ID.
-			if m.ID == supervisorMember.ID {
-				supervisorAIID = ai.ID
-			}
-			sm := &model.SessionMember{
-				SessionID:  session.ID,
-				MemberType: model.MemberTypeAgent,
-				MemberID:   ai.ID,
-				Role:       model.MemberRoleMember,
-			}
-			if err := repository.CreateSessionMember(tx, sm); err != nil {
-				return err
-			}
+		var err error
+		supervisorAIID, err = s.createTeamMemberAgentInstancesTx(tx, team, members, userID, session.ID, customAgentIDs, supervisorMember.ID)
+		if err != nil {
+			return err
 		}
 
 		// Create a trigger message in the session.
@@ -206,40 +227,65 @@ func (s *AgentTeamService) StartTeamRun(ctx context.Context, userID, teamID, tri
 		return nil
 	})
 	if err != nil {
-		return nil, err
+		return nil, "", "", err
 	}
+	return session, supervisorAIID, triggerMessageID, nil
+}
 
-	// Init seq in Redis for the new session.
-	if s.cacheClient != nil {
-		if err := s.cacheClient.InitSeqIfAbsent(ctx, session.ID, 0); err != nil {
-			slog.Warn("failed to init seq in cache for team session", "session_id", session.ID, "error", err)
+// createTeamMemberAgentInstancesTx batch-loads the custom agents referenced by
+// team members, creates one agent instance + session member per member and
+// returns the supervisor agent instance id.
+func (s *AgentTeamService) createTeamMemberAgentInstancesTx(tx *gorm.DB, team *model.AgentTeam, members []model.AgentTeamMember, userID, sessionID string, customAgentIDs []string, supervisorMemberID string) (string, error) {
+	// Batch query all custom agents referenced by team members.
+	customAgentMap := make(map[string]*model.CustomAgent)
+	if len(customAgentIDs) > 0 {
+		var agents []model.CustomAgent
+		if err := tx.Where("id IN ? AND deleted_at IS NULL", customAgentIDs).Find(&agents).Error; err == nil {
+			for i := range agents {
+				customAgentMap[agents[i].ID] = &agents[i]
+			}
 		}
 	}
 
-	// Trigger the task. This dispatches asynchronously.
-	if _, err := s.agentSvc.TriggerAgentTask(ctx, userID, triggerMessageID, supervisorAIID, "", "", supervisorRouteModelParams(), teamRunTargetID(run)); err != nil {
-		slog.Error("failed to trigger supervisor agent task for team run", "run_id", run.ID, "team_id", teamID, "error", err)
-		_ = repository.UpdateTeamRunStatus(s.db, run.ID, model.TeamRunStatusFailed)
-		return run, err
+	supervisorAIID := ""
+	for i := range members {
+		m := &members[i]
+		displayName := team.Name + " Agent"
+		if m.AgentProfileID != nil {
+			if ca, ok := customAgentMap[*m.AgentProfileID]; ok {
+				displayName = ca.Name
+			}
+		}
+		ai := &model.AgentInstance{
+			AgentType:     "codex",
+			SessionID:     sessionID,
+			InviterUserID: userID,
+			DisplayName:   displayName,
+		}
+		if m.AgentProfileID != nil && *m.AgentProfileID != "" {
+			ai.CustomAgentID = m.AgentProfileID
+			if ca, ok := customAgentMap[*m.AgentProfileID]; ok {
+				ai.AgentType = ca.AgentType
+			}
+		}
+		if err := repository.CreateAgentInstance(tx, ai); err != nil {
+			return "", err
+		}
+		// Track supervisor agent instance ID.
+		if m.ID == supervisorMemberID {
+			supervisorAIID = ai.ID
+		}
+		sm := &model.SessionMember{
+			SessionID:  sessionID,
+			MemberType: model.MemberTypeAgent,
+			MemberID:   ai.ID,
+			Role:       model.MemberRoleMember,
+		}
+		if err := repository.CreateSessionMember(tx, sm); err != nil {
+			return "", err
+		}
 	}
-	// Persist durable TeamEvent so GetTeamRunState replay can derive running
-	// from the event log (not only the live bus fan-out).
-	if err := s.appendTeamEvent(run.ID, model.TeamEventRunStarted, map[string]string{
-		"team_id":    teamID,
-		"run_id":     run.ID,
-		"session_id": session.ID,
-		"user_id":    userID,
-	}); err != nil {
-		slog.Warn("failed to append team.run.started event", "run_id", run.ID, "error", err)
-	}
-	s.publishTeamEvent(ctx, "team.run.started", map[string]interface{}{
-		"team_id":    teamID,
-		"run_id":     run.ID,
-		"session_id": session.ID,
-		"user_id":    userID,
-	})
-
-	return run, nil
+	return supervisorAIID, nil
 }
 
 func (s *AgentTeamService) GetTeamRun(ctx context.Context, userID, teamID, runID string) (*model.AgentTeamRun, error) {

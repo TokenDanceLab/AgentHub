@@ -186,6 +186,70 @@ func (s *Service) HandleCallback(ctx context.Context, code, state, codeVerifier,
 	// 1. Atomically consume state from Redis (GetDel = GET + DEL in one command).
 	//    This prevents replay attacks that could exploit the race window between
 	//    separate Get/Delete operations.
+	entry, err := s.consumeCallbackState(ctx, state, codeVerifier, deviceType, deviceID, redirectURI)
+	if err != nil {
+		return nil, err
+	}
+
+	// 2. Exchange authorization code for tokens at TokenDance ID and validate
+	//    the ID token (signature, issuer, audience, expiry).
+	claims, err := s.exchangeAndValidateIDToken(ctx, code, codeVerifier, entry)
+	if err != nil {
+		return nil, err
+	}
+
+	// 3. Find or create Hub user by TokenDance sub, with profile from ID token
+	slog.Debug("oidc.user.find_or_create", "sub", claims.Subject, "picture_len", len(claims.Picture))
+	user, err := repository.FindOrCreateByTokenDanceSub(s.db, claims.Subject, claims.Name, claims.Picture)
+	if err != nil {
+		return nil, fmt.Errorf("find or create user by sub: %w", err)
+	}
+	slog.Debug("oidc.user.mapped", "sub", claims.Subject, "user_id", user.ID)
+
+	// 4. Register/update device
+	if err := repository.UpsertDevice(s.db, &model.Device{
+		ID: deviceID, UserID: user.ID, DeviceType: deviceType, Capabilities: "[]",
+	}); err != nil {
+		return nil, fmt.Errorf("upsert device: %w", err)
+	}
+
+	// 5. Issue Hub access token
+	accessToken, err := jwtutil.GenerateAccessToken(user.ID, deviceType, deviceID,
+		s.jwtCfg.Secret, s.jwtCfg.AccessTTL)
+	if err != nil {
+		return nil, fmt.Errorf("generate access token: %w", err)
+	}
+
+	// 6. Issue Hub refresh token
+	rawRefresh, err := jwtutil.GenerateRefreshToken()
+	if err != nil {
+		return nil, fmt.Errorf("generate refresh token: %w", err)
+	}
+	tokenHash := jwtutil.HashRefreshToken(rawRefresh)
+	rt := &model.RefreshToken{
+		UserID: user.ID, DeviceType: deviceType, DeviceID: deviceID,
+		TokenHash: tokenHash,
+		ExpiresAt: time.Now().Add(s.jwtCfg.RefreshTTL),
+	}
+	if err := repository.UpsertRefreshToken(s.db, rt); err != nil {
+		return nil, fmt.Errorf("upsert refresh token: %w", err)
+	}
+
+	// 7. State was already consumed atomically via GetDel — no explicit Del needed.
+
+	return &CallbackResult{
+		AccessToken:  accessToken,
+		RefreshToken: rawRefresh,
+		ExpiresIn:    int64(s.jwtCfg.AccessTTL.Seconds()),
+		User:         *user,
+	}, nil
+}
+
+// consumeCallbackState atomically consumes the stored authorize state from
+// Redis and verifies device, redirect URI and PKCE code_verifier. Every
+// violation fails closed with OIDCInvalidState, matching the original
+// check order so error precedence is preserved.
+func (s *Service) consumeCallbackState(ctx context.Context, state, codeVerifier, deviceType, deviceID, redirectURI string) (*stateEntry, error) {
 	stateKey := "oidc:state:" + state
 	entryJSON, err := s.cache.GetRDB().GetDel(ctx, stateKey).Result()
 	if err != nil {
@@ -229,8 +293,12 @@ func (s *Service) HandleCallback(ctx context.Context, code, state, codeVerifier,
 	if !slices.Equal([]byte(computedChallenge), []byte(entry.CodeChallenge)) {
 		return nil, errcode.OIDCInvalidState
 	}
+	return &entry, nil
+}
 
-	// 2. Exchange authorization code for tokens at TokenDance ID
+// exchangeAndValidateIDToken exchanges the authorization code for tokens and
+// validates the ID token (signature, issuer, audience, expiry).
+func (s *Service) exchangeAndValidateIDToken(ctx context.Context, code, codeVerifier string, entry *stateEntry) (*jwtutil.TokenDanceClaims, error) {
 	slog.Debug("oidc.token.exchange.start", "redirect_uri", entry.RedirectURI, "code_len", len(code), "verifier_len", len(codeVerifier))
 	tokenResponse, err := s.exchangeCode(ctx, code, codeVerifier, entry.RedirectURI)
 	if err != nil {
@@ -241,7 +309,6 @@ func (s *Service) HandleCallback(ctx context.Context, code, state, codeVerifier,
 		return nil, errcode.OIDCIDTokenInvalid
 	}
 
-	// 3. Validate ID token (signature, issuer, audience, expiry)
 	if s.tdVerifier == nil {
 		return nil, errcode.OIDCIDTokenInvalid
 	}
@@ -253,52 +320,7 @@ func (s *Service) HandleCallback(ctx context.Context, code, state, codeVerifier,
 	if claims.Subject == "" {
 		return nil, errcode.OIDCSubNotFound
 	}
-
-	// 4. Find or create Hub user by TokenDance sub, with profile from ID token
-	slog.Debug("oidc.user.find_or_create", "sub", claims.Subject, "picture_len", len(claims.Picture))
-	user, err := repository.FindOrCreateByTokenDanceSub(s.db, claims.Subject, claims.Name, claims.Picture)
-	if err != nil {
-		return nil, fmt.Errorf("find or create user by sub: %w", err)
-	}
-	slog.Debug("oidc.user.mapped", "sub", claims.Subject, "user_id", user.ID)
-
-	// 5. Register/update device
-	if err := repository.UpsertDevice(s.db, &model.Device{
-		ID: deviceID, UserID: user.ID, DeviceType: deviceType, Capabilities: "[]",
-	}); err != nil {
-		return nil, fmt.Errorf("upsert device: %w", err)
-	}
-
-	// 6. Issue Hub access token
-	accessToken, err := jwtutil.GenerateAccessToken(user.ID, deviceType, deviceID,
-		s.jwtCfg.Secret, s.jwtCfg.AccessTTL)
-	if err != nil {
-		return nil, fmt.Errorf("generate access token: %w", err)
-	}
-
-	// 7. Issue Hub refresh token
-	rawRefresh, err := jwtutil.GenerateRefreshToken()
-	if err != nil {
-		return nil, fmt.Errorf("generate refresh token: %w", err)
-	}
-	tokenHash := jwtutil.HashRefreshToken(rawRefresh)
-	rt := &model.RefreshToken{
-		UserID: user.ID, DeviceType: deviceType, DeviceID: deviceID,
-		TokenHash: tokenHash,
-		ExpiresAt: time.Now().Add(s.jwtCfg.RefreshTTL),
-	}
-	if err := repository.UpsertRefreshToken(s.db, rt); err != nil {
-		return nil, fmt.Errorf("upsert refresh token: %w", err)
-	}
-
-	// 8. State was already consumed atomically via GetDel — no explicit Del needed.
-
-	return &CallbackResult{
-		AccessToken:  accessToken,
-		RefreshToken: rawRefresh,
-		ExpiresIn:    int64(s.jwtCfg.AccessTTL.Seconds()),
-		User:         *user,
-	}, nil
+	return claims, nil
 }
 
 // tokenEndpointResponse is the JSON response from TokenDance ID's /oidc/token endpoint.

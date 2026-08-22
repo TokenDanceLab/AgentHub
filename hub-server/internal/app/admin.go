@@ -197,34 +197,43 @@ func (a *App) startMetricsCollector(ctx context.Context) {
 		for {
 			select {
 			case <-ticker.C:
-				if sqlDB, err := a.DB.DB(); err == nil {
-					stats := sqlDB.Stats()
-					metrics.DBPoolInUse.Set(float64(stats.InUse))
-					// G8: optional pool saturation gauge.
-					if metrics.DBPoolIdle != nil {
-						metrics.DBPoolIdle.Set(float64(stats.Idle))
-					}
-				}
-				if a.mgr != nil {
-					metrics.WSConnections.Set(float64(a.mgr.Count()))
-				}
-				if a.CacheClient != nil {
-					hits := a.CacheClient.PoolStats().Hits
-					if delta := hits - prevRedisPoolHits; delta > 0 {
-						if metrics.RedisPoolHitsTotal != nil {
-							metrics.RedisPoolHitsTotal.Add(float64(delta))
-						}
-					}
-					prevRedisPoolHits = hits
-				}
-				if a.bus != nil {
-					metrics.EventBusQueueLen.Set(float64(a.bus.Running()))
-				}
+				prevRedisPoolHits = a.collectRuntimeMetrics(prevRedisPoolHits)
 			case <-ctx.Done():
 				return nil
 			}
 		}
 	})
+}
+
+// collectRuntimeMetrics reports DB pool, WS connections, Redis hits, and bus
+// queue length for one metrics tick, returning the latest Redis hits counter
+// so the caller can compute the next-tick delta. All sources stay optional:
+// runtime-nil components are skipped exactly as before.
+func (a *App) collectRuntimeMetrics(prevRedisPoolHits uint32) uint32 {
+	if sqlDB, err := a.DB.DB(); err == nil {
+		stats := sqlDB.Stats()
+		metrics.DBPoolInUse.Set(float64(stats.InUse))
+		// G8: optional pool saturation gauge.
+		if metrics.DBPoolIdle != nil {
+			metrics.DBPoolIdle.Set(float64(stats.Idle))
+		}
+	}
+	if a.mgr != nil {
+		metrics.WSConnections.Set(float64(a.mgr.Count()))
+	}
+	if a.CacheClient != nil {
+		hits := a.CacheClient.PoolStats().Hits
+		if delta := hits - prevRedisPoolHits; delta > 0 {
+			if metrics.RedisPoolHitsTotal != nil {
+				metrics.RedisPoolHitsTotal.Add(float64(delta))
+			}
+		}
+		prevRedisPoolHits = hits
+	}
+	if a.bus != nil {
+		metrics.EventBusQueueLen.Set(float64(a.bus.Running()))
+	}
+	return prevRedisPoolHits
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────
