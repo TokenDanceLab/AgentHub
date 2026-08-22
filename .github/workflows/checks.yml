@@ -1232,6 +1232,71 @@ jobs:
           if-no-files-found: warn
           retention-days: 7
 
+  # ── Web stubbed-hub E2E (path-filtered) ───────
+  # #1839 B1: real-chromium behavior lane against a fully stubbed Hub
+  # (pnpm test:e2e:stubbed-hub): chat-flow contract, stubbed-hub replay
+  # smoke, task approval/artifact contract. Mock hub only — this is NOT a
+  # real login / real Hub run (evidence level: stubbed-hub, real_tested=false).
+  # Path filter reuses the unified `changes` job `web` output.
+  web-e2e-stubbed:
+    name: Web stubbed-hub E2E (path-filtered)
+    needs: changes
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      needs.changes.outputs.web == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: ./app
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # This job runs pnpm install (repo-controlled lifecycle scripts)
+          # and never needs Git auth after checkout; do not persist the job
+          # token into Git config (artipacked hardening).
+          persist-credentials: false
+
+      - uses: pnpm/action-setup@v6
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+          cache-dependency-path: app/pnpm-lock.yaml
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v5
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('app/pnpm-lock.yaml') }}
+      - name: Install Playwright Chromium
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Run stubbed-hub E2E lane
+        timeout-minutes: 15
+        working-directory: ./app/web
+        # Vite dev server + all Hub calls are stubbed via Playwright routes;
+        # playwright.config.ts pins VITE_HUB_URL to hub.test.invalid so any
+        # un-stubbed Hub call fails closed. No real Hub/Edge/login required.
+        run: pnpm test:e2e:stubbed-hub
+        env:
+          CI: 'true'
+
+      - name: Upload Playwright failure artifacts
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: web-e2e-stubbed-hub-results
+          path: app/web/test-results/
+          if-no-files-found: ignore
+          retention-days: 7
+
   # ── Backend perf / leak gates ─────────────────
   # Behavior + short microbench only (not production capacity).
   # Manual trigger only — residual T5 / post-polish risk assessment.

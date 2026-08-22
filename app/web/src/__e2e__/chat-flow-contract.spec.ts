@@ -6,7 +6,10 @@ import {
   type E2EObservedRequest,
 } from '../../../shared/src/testing/e2eDataModeContract';
 
-const HUB_ORIGIN = 'http://localhost:8080';
+// Must match playwright.config.ts webServer VITE_HUB_URL: the fail-closed
+// reserved origin keeps every Hub call inside the route stub instead of
+// reaching localhost or production.
+const HUB_ORIGIN = 'https://hub.test.invalid';
 const WEB_E2E_PORT = Number(process.env.AGENTHUB_WEB_E2E_PORT ?? 5174);
 const WEB_E2E_APP_ORIGIN = `http://127.0.0.1:${WEB_E2E_PORT}`;
 const SESSION_ID = 'session-chat-flow';
@@ -72,7 +75,7 @@ test.describe('Web shared chat flow contract', () => {
     expect(order.reply).toBeGreaterThan(order.toolB);
 
     await expect.poll(() => backendRequests.endpoints.has(`GET /web/agent-tasks/${TASK_ID}/events`)).toBe(true);
-    await expect.poll(() => backendRequests.endpoints.has(`GET /web/agent-tasks/${TASK_ID}/summary`)).toBe(true);
+    await expect.poll(() => backendRequests.endpoints.has(`GET /web/agent-tasks/${TASK_ID}/events/summary`)).toBe(true);
     await expect(page.getByText('mock (auto fallback)')).toHaveCount(0);
     await expect.poll(() => horizontalOverflow(page)).toBeLessThanOrEqual(1);
     assertE2EDataModeScenario(WEB_CHAT_FLOW_SCENARIO, backendRequests.requests);
@@ -80,8 +83,11 @@ test.describe('Web shared chat flow contract', () => {
 
   test('keeps a submitted Hub user message visible while the send request is in flight', async ({ page }) => {
     collectPageDiagnostics(page);
-    const backendRequests = await installChatFlowHubStub(page, { messagePostDelayMs: 800 });
-    await enterApprovedRealHubSession(page);
+    const backendRequests = await installChatFlowHubStub(page, { messagePostDelayMs: 800, taskStatus: 'done' });
+    // A finished (not running) task keeps the replay transcript hydrated while
+    // leaving the composer on the Send control — a running task switches the
+    // composer to the Stop control and blocks plain message sends.
+    await enterApprovedRealHubSession(page, { activeTaskStatus: 'done' });
     expect(page.viewportSize()).toEqual(DESKTOP_WORKSPACE_VIEWPORT);
 
     const transcript = page.getByRole('log');
@@ -130,7 +136,7 @@ function collectPageDiagnostics(page: Page): void {
 function isExpectedBrowserDiagnostic(text: string): boolean {
   return (
     text.includes("The Content Security Policy directive 'frame-ancestors' is ignored") ||
-    text.includes("WebSocket connection to 'ws://localhost:8080/client/ws")
+    text.includes("WebSocket connection to 'wss://hub.test.invalid/client/ws")
   );
 }
 
@@ -152,13 +158,16 @@ async function expectTranscriptWithoutModeDebug(transcript: ReturnType<Page['get
   await expect(transcript).not.toContainText('demo+edge');
 }
 
-async function enterApprovedRealHubSession(page: Page): Promise<void> {
-  await page.addInitScript(({ sessionId, taskId }) => {
+async function enterApprovedRealHubSession(
+  page: Page,
+  options: { activeTaskStatus?: string } = {},
+): Promise<void> {
+  await page.addInitScript(({ sessionId, taskId, status }) => {
     window.localStorage.setItem('agenthub.workbench.dataMode', 'approved-real');
     window.localStorage.setItem(`agenthub.web.activeAgentTask.${sessionId}`, JSON.stringify({
       taskId,
       sessionId,
-      status: 'running',
+      status,
     }));
     window.sessionStorage.setItem('agenthub_hub_token', 'stubbed-chat-flow-token');
     window.sessionStorage.setItem('agenthub_token_source', 'hub');
@@ -166,13 +175,20 @@ async function enterApprovedRealHubSession(page: Page): Promise<void> {
       userId: 'user-chat-flow',
       username: 'chat-flow',
     }));
-  }, { sessionId: SESSION_ID, taskId: TASK_ID });
+  }, { sessionId: SESSION_ID, taskId: TASK_ID, status: options.activeTaskStatus ?? 'running' });
 
   await page.goto('/');
 }
 
 interface ChatFlowHubStubOptions {
   messagePostDelayMs?: number;
+  /**
+   * Task status reported by the stubbed events/summary endpoints. Must stay
+   * consistent with the status seeded into localStorage — a summary refresh
+   * that disagrees with the stored task can flip the composer between the
+   * Send and Stop controls mid-test.
+   */
+  taskStatus?: string;
 }
 
 async function installChatFlowHubStub(page: Page, options: ChatFlowHubStubOptions = {}): Promise<BackendRequestLog> {
@@ -213,7 +229,22 @@ async function installChatFlowHubStub(page: Page, options: ChatFlowHubStubOption
       return;
     }
 
-    await route.continue();
+    // Fail-closed external boundary: only the render-blocking Google Fonts
+    // stylesheets are expected external requests (fulfilled with an empty
+    // stylesheet so the document load event can fire). Every other external
+    // host is recorded and refused, so the scenario assertion fails the test
+    // instead of letting an unexpected remote call succeed silently.
+    if (url.host === 'fonts.googleapis.com' || url.host === 'fonts.gstatic.com') {
+      await route.fulfill({ status: 200, contentType: 'text/css', body: '' });
+      return;
+    }
+    requests.push({ method: request.method(), url: request.url() });
+    await route.fulfill({
+      status: 503,
+      contentType: 'application/json',
+      body: JSON.stringify({ code: 'blocked_by_e2e_data_mode_contract' }),
+      headers: corsHeaders(),
+    });
   });
 
   return { endpoints, requests };
@@ -313,11 +344,11 @@ async function fulfillHubRoute(
     return;
   }
 
-  if (pathname === `/web/agent-tasks/${TASK_ID}/summary`) {
+  if (pathname === `/web/agent-tasks/${TASK_ID}/events/summary`) {
     await route.fulfill(json(hubEnvelope({
       task_id: TASK_ID,
       edge_run_id: 'run-chat-flow',
-      status: 'running',
+      status: options.taskStatus ?? 'running',
       total_events: chatFlowEvents().length,
       last_event_seq: chatFlowEvents().length,
       event_type_counts: {},
