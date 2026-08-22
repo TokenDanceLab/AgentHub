@@ -54,6 +54,8 @@ const forbiddenRuntimePatterns = [
   { pattern: /\bid_token\b/, label: 'id_token in runtime source' },
   { pattern: /\bproviderAccessToken\b/, label: 'providerAccessToken in runtime source' },
   { pattern: /\bclient_secret\b/, label: 'client_secret in runtime source' },
+  { pattern: /127\.0\.0\.1:3210/, label: 'Local Edge direct connection (127.0.0.1:3210)' },
+  { pattern: /localhost:3210/, label: 'Local Edge direct connection (localhost:3210)' },
 ];
 
 const importPattern = /(?:import|export)\s+(?:type\s+)?(?:[^'"]*?\s+from\s+)?['"]([^'"]+)['"]/g;
@@ -87,6 +89,9 @@ if (metroConfigSource === null) {
 for (const file of files) {
   const relativePath = path.relative(projectRoot, file).replaceAll(path.sep, '/');
   const content = await readFile(file, 'utf8');
+  // Test specs live under src/ but are not runtime source; only runtime
+  // files (and the fixture roots used by tests) get the tighter checks.
+  const fileIsAppRuntimeSource = file.startsWith(sourceRoot) && !testFilePattern.test(file);
 
   for (const match of content.matchAll(importPattern)) {
     const specifier = match[1];
@@ -104,12 +109,14 @@ for (const file of files) {
         failures.push(`${relativePath}: forbidden Mobile RN import (${specifier})`);
       }
     }
+
+    if (fileIsAppRuntimeSource && specifier.includes('child_process')) {
+      failures.push(`${relativePath}: forbidden Mobile RN import (child_process raw runtime)`);
+    }
   }
 
-  const isAppRuntimeSource = file.startsWith(sourceRoot);
-
   if (
-    isAppRuntimeSource
+    fileIsAppRuntimeSource
     &&
     !testFilePattern.test(file)
     && runtimeFilePattern.test(file)
