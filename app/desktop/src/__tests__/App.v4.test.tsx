@@ -863,12 +863,25 @@ describe('Desktop App v4 root', () => {
       });
     });
 
-    // The waiting approval card arrives collapsed (same as the web shell);
-    // expand it (aria-label `card.expand`) to reveal the approve/deny actions.
-    const approvalCard = await screen.findByRole('button', {
-      name: /^(card\.expand|展开|Expand)$/,
-    });
-    fireEvent.click(approvalCard);
+    // #1821 contract: waiting approval cards auto-expand so the approve/deny
+    // actions are visible by default. The auto-expand effect races this
+    // lookup on scheduler timing (which differs between local and loaded CI
+    // runners), so the card may arrive either collapsed or already open.
+    // Probe aria-expanded instead of assuming "arrives collapsed": a blind
+    // click on an already-open toggle would collapse the card and lock
+    // re-expansion behind the manual-toggle flag, hiding the approve button.
+    // The generous timeout covers slow card arrival under load: the event
+    // reaches the transcript through a coalescing batch timer + React
+    // scheduler hops, which can be starved well past the 1s default on
+    // contended runners.
+    const approvalToggle = await screen.findByRole(
+      'button',
+      { name: /^(card\.expand|展开|Expand|card\.collapse|收起|Collapse)$/ },
+      { timeout: 5000 },
+    );
+    if (approvalToggle.getAttribute('aria-expanded') === 'false') {
+      fireEvent.click(approvalToggle);
+    }
 
     const approveButton = await screen.findByRole('button', {
       name: /^(批准|Approve|card\.approval\.approve)$/,
