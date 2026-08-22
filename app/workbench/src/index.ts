@@ -122,6 +122,8 @@ export {
   DEFAULT_PROJECTS,
   SettingsPage,
   TasksPage,
+  DevicesPage,
+  TokenUsagePage,
 } from './pages';
 export type {
   AgentsPageProps,
@@ -161,6 +163,12 @@ export type {
   TaskStatus,
   TasksPane,
   ViewMode,
+  DevicesPageProps,
+  DevicesPageTarget,
+  DevicesSummary,
+  TokenUsagePageProps,
+  TokenUsagePageTeam,
+  TokenUsagePageRun,
 } from './pages';
 
 /* ═══ Inspector panels ═══ */

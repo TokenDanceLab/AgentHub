@@ -85,6 +85,16 @@ export function WorkbenchFrame({
   onCancelRun,
   onEditMessage,
   transcriptLoading,
+  devicesTargets,
+  devicesLoading,
+  devicesError,
+  onDevicesRetry,
+  devicesPingingId,
+  onDevicePing,
+  usageTeams,
+  usageLoading,
+  usageError,
+  onUsageRetry,
   setActivePage,
   children,
 }: WorkbenchFrameProps): React.ReactElement {
@@ -265,6 +275,16 @@ export function WorkbenchFrame({
             onNavigatePage={setActivePage}
             currentUserId={currentUserId}
             userDisplayName={userDisplayName}
+            devicesTargets={devicesTargets}
+            devicesLoading={devicesLoading}
+            devicesError={devicesError}
+            onDevicesRetry={onDevicesRetry}
+            devicesPingingId={devicesPingingId}
+            onDevicePing={onDevicePing}
+            usageTeams={usageTeams}
+            usageLoading={usageLoading}
+            usageError={usageError}
+            onUsageRetry={onUsageRetry}
           />
         )}
       </main>

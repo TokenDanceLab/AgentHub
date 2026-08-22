@@ -56,13 +56,25 @@ export interface InspectorTranscriptViews {
   runResult: RunResultInfo | undefined;
 }
 
+/**
+ * Execution-target entry the shell feeds the composer picker. `healthy` is an
+ * optional marker (#1819): shells that pre-filter to healthy/online targets may
+ * omit it, entries explicitly flagged `false` are skipped by default
+ * selection, and unmarked entries are treated as selectable.
+ */
+export interface ComposerExecutionTargetOption {
+  id: string;
+  label: string;
+  healthy?: boolean | undefined;
+}
+
 export interface UseWorkbenchSessionChromeOptions {
   platform: AgentHubPlatform;
   conversations: WorkbenchConversation[];
   activeConversationId?: string | undefined;
   onActiveConversationChange?: ((conversationId: string) => void) | undefined;
   agents?: WorkbenchAgent[] | undefined;
-  composerExecutionTargets?: Array<{ id: string; label: string }> | undefined;
+  composerExecutionTargets?: ComposerExecutionTargetOption[] | undefined;
   transcript: TranscriptBlock[];
   runtimeEvidence?: RuntimeEvidenceSnapshot | undefined;
   workbenchStatus?: {
@@ -226,11 +238,25 @@ export function buildInspectorTranscriptViews(
 
 /** Clear selected execution target when it no longer exists in the target list. */
 export function shouldClearSelectedExecutionTarget(
-  composerExecutionTargets: Array<{ id: string; label: string }> | undefined,
+  composerExecutionTargets: ComposerExecutionTargetOption[] | undefined,
   selectedExecutionTargetId: string,
 ): boolean {
   if (!composerExecutionTargets || !selectedExecutionTargetId) return false;
   return !composerExecutionTargets.some((target) => target.id === selectedExecutionTargetId);
+}
+
+/**
+ * Default execution target for auto-selection (#1819): the first entry not
+ * explicitly flagged unhealthy. Returns undefined when the list is missing,
+ * empty, or every entry carries `healthy: false` — an empty picker is more
+ * honest than preselecting a target known to be down.
+ */
+export function resolveDefaultExecutionTargetId(
+  composerExecutionTargets: ComposerExecutionTargetOption[] | undefined,
+): string | undefined {
+  if (!composerExecutionTargets) return undefined;
+  const preferred = composerExecutionTargets.find((target) => target.healthy !== false);
+  return preferred?.id;
 }
 
 /** Local CLI discovery only loads on desktop settings with a host discovery port. */
@@ -297,7 +323,7 @@ export function serializeMainchainEvidenceExport(
 }
 
 export function resolveComposerTargetLabel(
-  composerExecutionTargets: Array<{ id: string; label: string }> | undefined,
+  composerExecutionTargets: ComposerExecutionTargetOption[] | undefined,
   selectedExecutionTargetId: string,
 ): string | undefined {
   return composerExecutionTargets?.find((target) => target.id === selectedExecutionTargetId)?.label;
