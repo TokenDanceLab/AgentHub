@@ -341,6 +341,41 @@ describe('useWorkbenchSettingsRoute with a settingsService', () => {
     unmount();
     expect(service.listeners.size).toBe(0);
   });
+
+  it('survives a rejecting settingsService.init without crashing the route', async () => {
+    // The real service never rejects (it captures errors internally), but the
+    // hook's .catch guard must hold for contract-violating services.
+    const service = createFakeSettingsService({ theme: '深色' });
+    service.init = vi.fn().mockRejectedValue(new Error('init exploded'));
+    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+
+    try {
+      const { result } = renderHook(() => useWorkbenchSettingsRoute({ settingsService: service }));
+      await act(async () => {
+        await Promise.resolve();
+      });
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        'settingsService.init failed in WorkbenchRoutes:',
+        expect.any(Error),
+      );
+      // State stays readable from the service snapshot.
+      expect(result.current.settings.theme).toBe('深色');
+
+      act(() => {
+        result.current.handleRetrySettingsLoad();
+      });
+      await act(async () => {
+        await Promise.resolve();
+      });
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        'settingsService.init retry failed in WorkbenchRoutes:',
+        expect.any(Error),
+      );
+      expect(result.current.settings.theme).toBe('深色');
+    } finally {
+      consoleErrorSpy.mockRestore();
+    }
+  });
 });
 
 describe('useWorkbenchSettingsRoute with createSettingsService', () => {

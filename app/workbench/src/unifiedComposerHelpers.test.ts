@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { ComposerState } from '@shared/composer';
+import type { ComposerMention, ComposerState } from '@shared/composer';
 import {
   MAX_ATTACHMENT_BYTES,
   buildAttachmentOversizeToast,
@@ -8,8 +8,13 @@ import {
   canSubmitFromKeyDown,
   deriveUnifiedComposerState,
   filterAvailableMentionOptions,
+  findMentionById,
+  formatComposerDataModeLabel,
+  formatComposerTargetStateLabel,
   formatQuotePreview,
   formatSelectedAgentLabel,
+  isAttachmentUploadFailed,
+  isAttachmentUploadInFlight,
   isAttachmentUploading,
   isExecutionTargetStillValid,
   isImageAttachment,
@@ -220,6 +225,102 @@ describe('unifiedComposerHelpers', () => {
       ]);
       expect(many).toContain('2 个附件');
       expect(many).toContain('50.0 MB');
+    });
+  });
+
+  describe('attachment upload state flags', () => {
+    it('treats hashing and uploading as in flight, done/failed/undefined as not', () => {
+      expect(isAttachmentUploadInFlight({ percent: 5, phase: 'hashing' })).toBe(true);
+      expect(isAttachmentUploadInFlight({ percent: 60, phase: 'uploading' })).toBe(true);
+      expect(isAttachmentUploadInFlight({ percent: 100, phase: 'done' })).toBe(false);
+      expect(isAttachmentUploadInFlight({ percent: 100, phase: 'failed' })).toBe(false);
+      expect(isAttachmentUploadInFlight(undefined)).toBe(false);
+    });
+
+    it('flags only the failed phase as retryable', () => {
+      expect(isAttachmentUploadFailed({ percent: 100, phase: 'failed' })).toBe(true);
+      expect(isAttachmentUploadFailed({ percent: 100, phase: 'done' })).toBe(false);
+      expect(isAttachmentUploadFailed(undefined)).toBe(false);
+    });
+  });
+
+  describe('label formatting and target validity', () => {
+    it('maps every known dataMode code and echoes unknown ones', () => {
+      expect(formatComposerDataModeLabel('approved-real')).toBe('真实数据');
+      expect(formatComposerDataModeLabel('observed')).toBe('观测数据');
+      expect(formatComposerDataModeLabel('fixture')).toBe('示例数据');
+      expect(formatComposerDataModeLabel('mock')).toBe('模拟数据');
+      expect(formatComposerDataModeLabel('auto')).toBe('自动');
+      expect(formatComposerDataModeLabel('custom-mode')).toBe('custom-mode');
+    });
+
+    it('maps every known target state code and echoes unknown ones', () => {
+      expect(formatComposerTargetStateLabel('ready')).toBe('就绪');
+      expect(formatComposerTargetStateLabel('offline')).toBe('离线');
+      expect(formatComposerTargetStateLabel('busy')).toBe('忙碌');
+      expect(formatComposerTargetStateLabel('error')).toBe('异常');
+      expect(formatComposerTargetStateLabel('weird')).toBe('weird');
+    });
+
+    it('treats missing targets or an empty selection as still valid', () => {
+      expect(isExecutionTargetStillValid(undefined, 't1')).toBe(true);
+      expect(isExecutionTargetStillValid([{ id: 't1', label: 'A' }], '')).toBe(true);
+      expect(isExecutionTargetStillValid([{ id: 't1', label: 'A' }], 't1')).toBe(true);
+    });
+
+    it('resolves no target guidance when selection is optional or already made', () => {
+      expect(resolveTargetStatus({
+        targetSelectionRequired: false,
+        executionTargetId: '',
+        executionTargets: [],
+      })).toBeUndefined();
+      expect(resolveTargetStatus({
+        targetSelectionRequired: true,
+        executionTargetId: 'target-1',
+        executionTargets: [],
+      })).toBeUndefined();
+    });
+
+    it('finds mention options by id', () => {
+      const mentions: ComposerMention[] = [
+        { id: 'profile-builder', label: 'Builder', runtimeId: 'claude-code' },
+        { id: 'profile-reviewer', label: 'Reviewer', runtimeId: 'codex' },
+      ];
+      expect(findMentionById(mentions, 'profile-reviewer')?.label).toBe('Reviewer');
+      expect(findMentionById(mentions, 'missing')).toBeUndefined();
+      expect(filterAvailableMentionOptions(mentions, mentions.slice(0, 1))).toEqual([mentions[1]]);
+    });
+  });
+
+  describe('shouldSubmitComposerKey guards', () => {
+    const base = {
+      altKey: false,
+      shiftKey: false,
+      ctrlKey: false,
+      metaKey: false,
+      isComposing: false,
+      submitBehavior: 'enter-send' as const,
+    };
+
+    it('never submits or inserts newlines for non-Enter keys and chorded Enter', () => {
+      for (const key of ['a', 'Escape', 'Tab']) {
+        expect(shouldSubmitComposerKey({ ...base, key }))
+          .toEqual({ shouldSubmit: false, insertNewline: false });
+      }
+      expect(shouldSubmitComposerKey({ ...base, key: 'Enter', altKey: true }))
+        .toEqual({ shouldSubmit: false, insertNewline: false });
+      expect(shouldSubmitComposerKey({ ...base, key: 'Enter', shiftKey: true }))
+        .toEqual({ shouldSubmit: false, insertNewline: false });
+    });
+
+    it('swallows Enter during IME composition', () => {
+      expect(shouldSubmitComposerKey({ ...base, key: 'Enter', isComposing: true }))
+        .toEqual({ shouldSubmit: false, insertNewline: false });
+    });
+
+    it('leaves plain Enter to the textarea under ctrl-enter-send', () => {
+      expect(shouldSubmitComposerKey({ ...base, key: 'Enter', submitBehavior: 'ctrl-enter-send' }))
+        .toEqual({ shouldSubmit: false, insertNewline: false });
     });
   });
 });
