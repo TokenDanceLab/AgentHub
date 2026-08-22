@@ -19,7 +19,12 @@ import { getAgentActivityStore } from '@shared/transcript/agentActivity';
 import type { ApprovalDecisionAction } from '@shared/transcript';
 import type { WorkbenchAgent, WorkbenchConversation } from '@shared/platform';
 import { useAgentList } from '@/api/agentQueries';
-import { useDecideTeamApproval } from '@/api/agentTeamQueries';
+import { useDecideTeamApproval, useTokenUsageBoard } from '@/api/agentTeamQueries';
+import {
+  useHubExecutionTargets,
+  usePingHubExecutionTarget,
+  type ExecutionTargetInventoryItem,
+} from '@/api/executionTargetQueries';
 import { useDocumentList, useCreateDocument, hubDocToDocRow } from '@/api/documentQueries';
 import { useModelCatalog, useCCSwitchStatus, useCCSwitchProviders } from '@/api/modelCatalogQueries';
 import { useRunEvidence } from '@/api/runEvidenceQueries';
@@ -30,8 +35,10 @@ import { useCreateThread, useCurrentUser, useThreads } from '@/api/threadQueries
 import { DesktopChrome } from '@/components/DesktopChrome';
 import { DesktopEntryGate } from '@/components/DesktopEntryGate';
 import DesktopHubTaskBridge from '@/components/DesktopHubTaskBridge';
+import { OnboardingOverlay } from '@/components/OnboardingOverlay';
 import { useHealth } from '@/hooks/useHealth';
 import { useAuth } from '@/hooks/useAuth';
+import { useHubStore } from '@/stores/hubStore';
 import { createDesktopPlatform } from '@/platform/desktopPlatform';
 import { mapEdgeAgentsToWorkbenchAgents } from '@/platform/edgeCapabilityMapper';
 import { useDesktopWorkbenchModel } from '@/platform/useDesktopWorkbenchModel';
@@ -46,7 +53,7 @@ import {
   hubAgentProfileToWorkbenchAgent,
 } from '@/api/agentProfileQueries';
 import { getHubClient } from '@/api/hubQueries';
-import type { AgentConfig, ConnectionStatusKind, DocRow, SkillMarketItem, MCPMarketItem } from '@agenthub/workbench';
+import type { AgentConfig, ConnectionStatusKind, DevicesPageTarget, DocRow, SkillMarketItem, MCPMarketItem } from '@agenthub/workbench';
 import { getDemoRuntimeEvidence } from '@/demo/demoEvidence';
 import { useToastStore, ToastContainer } from '@shared/ui/toast';
 import { useGlobalKeyboardShortcuts } from '@/hooks/useGlobalKeyboardShortcuts';
@@ -66,6 +73,8 @@ export default function App() {
   const { online: edgeOnline } = useHealth({ enabled: edgeHealthEnabled });
   const queryClient = useQueryClient();
   const { isAuthenticated, logout } = useAuth();
+  const onboardingSeen = useHubStore((s) => s.onboardingSeen);
+  const setOnboardingSeen = useHubStore((s) => s.setOnboardingSeen);
 
   /* eslint-disable react-hooks/set-state-in-effect -- the entry→workbench
      transition must remain an effect: auth state arrives asynchronously from
@@ -115,6 +124,9 @@ export default function App() {
           <DesktopWorkbenchApp onLogout={handleLogout} />
         )}
       </DesktopChrome>
+      {entryMode === 'workbench' && !onboardingSeen ? (
+        <OnboardingOverlay onFinish={() => setOnboardingSeen(true)} />
+      ) : null}
       <ToastContainer />
     </>
   );
@@ -183,6 +195,35 @@ export function DesktopWorkbenchApp({ onLogout }: DesktopWorkbenchAppProps = {})
   // Fetch public Skills for the Skill Market tab
   const hubClient = getHubClient();
   const hubReady = !workbench.isDemo;
+
+  // ── Devices / execution-target management page (#1819) ─────────────
+  // Real Hub inventory (health detail + ping), not the composer's filtered
+  // subset. Undefined in demo mode so the page shows sign-in guidance.
+  const devicesTargetsQuery = useHubExecutionTargets({ enabled: hubReady });
+  const pingExecutionTarget = usePingHubExecutionTarget();
+  const devicesTargets = useMemo(
+    () => (hubReady
+      ? (devicesTargetsQuery.data?.items ?? []).map(mapDesktopExecutionTargetToDeviceEntry)
+      : undefined),
+    [hubReady, devicesTargetsQuery.data],
+  );
+  const handleDevicePing = useCallback((targetId: string) => {
+    pingExecutionTarget.mutate(targetId, {
+      onSuccess: () => {
+        showToast('success', t('devices.pingOk'));
+      },
+      onError: (err) => {
+        showToast('error', t('devices.pingFailed', { detail: err instanceof Error ? err.message : String(err) }));
+      },
+    });
+  }, [pingExecutionTarget, showToast, t]);
+
+  // ── Token usage board (#1819) ──────────────────────────────────────
+  const usageBoard = useTokenUsageBoard(hubReady);
+  const usageTeams = useMemo(
+    () => (hubReady ? usageBoard.data ?? [] : undefined),
+    [hubReady, usageBoard.data],
+  );
   // Narrow domain port for workbench project data (#1546); the shared UI never
   // sees the concrete HubClient. Injected only in live mode — parent-managed
   // projects keep the port dormant while demo mode falls back to mock fixtures.
@@ -639,6 +680,24 @@ export function DesktopWorkbenchApp({ onLogout }: DesktopWorkbenchAppProps = {})
         {...(hubReady && mcpMarketQuery.error
           ? { mcpMarketError: desktopMarketErrorMessage(mcpMarketQuery.error, 'MCP 市场加载失败') }
           : {})}
+        devicesTargets={devicesTargets}
+        devicesLoading={devicesTargetsQuery.isFetching && !devicesTargetsQuery.data}
+        devicesError={
+          devicesTargetsQuery.error
+            ? (devicesTargetsQuery.error instanceof Error ? devicesTargetsQuery.error.message : String(devicesTargetsQuery.error))
+            : null
+        }
+        onDevicesRetry={() => { void devicesTargetsQuery.refetch(); }}
+        devicesPingingId={pingExecutionTarget.isPending ? (pingExecutionTarget.variables ?? null) : null}
+        onDevicePing={handleDevicePing}
+        usageTeams={usageTeams}
+        usageLoading={usageBoard.isFetching && !usageBoard.data}
+        usageError={
+          usageBoard.error
+            ? (usageBoard.error instanceof Error ? usageBoard.error.message : String(usageBoard.error))
+            : null
+        }
+        onUsageRetry={() => { void usageBoard.refetch(); }}
         workbenchStatus={workbenchStatus}
       />
     </>
@@ -656,6 +715,24 @@ function agentProfileErrorMessage(error: unknown): string | undefined {
 function desktopMarketErrorMessage(error: unknown, fallback: string): string {
   if (error instanceof Error && error.message.trim()) return error.message;
   return fallback;
+}
+
+function mapDesktopExecutionTargetToDeviceEntry(
+  target: ExecutionTargetInventoryItem,
+): DevicesPageTarget {
+  const id = String(target.id ?? '');
+  return {
+    id,
+    name: target.name ? String(target.name) : id,
+    targetType: String(target.target_type),
+    healthState: String(target.health_state),
+    isOnline: target.is_online === true,
+    ...(target.trust_level ? { trustLevel: String(target.trust_level) } : {}),
+    ...(target.endpoint ? { endpoint: String(target.endpoint) } : {}),
+    ...(target.workspace_root ? { workspaceRoot: String(target.workspace_root) } : {}),
+    ...(target.device_id ? { deviceId: String(target.device_id) } : {}),
+    ...(target.last_seen_at ? { lastSeenAt: String(target.last_seen_at) } : {}),
+  };
 }
 
 function normalizeHubSkillToMarketItem(raw: Record<string, unknown>): SkillMarketItem {
