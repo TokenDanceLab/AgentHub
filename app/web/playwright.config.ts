@@ -11,14 +11,14 @@ export default defineConfig({
   testIgnore: ['**/chat-real.spec.ts'],
   // Hydration budgets: on loaded dev boxes (live dev stack / parallel CI
   // lanes) the first vite compilation + Hub stub hydration can exceed the
-  // historical 10s expect window, so the windows carry headroom. Assertions
-  // still fail closed once the budget is exhausted.
-  timeout: 90_000,
+  // historical 10s expect / 60s navigation windows, so the windows carry
+  // headroom. Assertions still fail closed once the budget is exhausted.
+  timeout: 120_000,
   expect: { timeout: 20_000 },
   retries: 0,
   use: {
     baseURL: webE2EBaseURL,
-    navigationTimeout: 60_000,
+    navigationTimeout: 120_000,
     screenshot: 'only-on-failure',
   },
   projects: [
@@ -51,6 +51,6 @@ export default defineConfig({
     },
     url: webE2EBaseURL,
     reuseExistingServer: !process.env.CI,
-    timeout: 45_000,
+    timeout: 120_000,
   },
 });
