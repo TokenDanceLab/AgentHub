@@ -70,7 +70,6 @@ export function Modal({
   const contentClasses = [
     styles.content,
     fullscreen ? styles.contentFullscreen : '',
-    exiting ? styles.contentExiting : '',
     contentClassName ?? '',
   ]
     .filter(Boolean)

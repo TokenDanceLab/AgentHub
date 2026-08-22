@@ -422,8 +422,9 @@ const TranscriptImpl = forwardRef<TranscriptHandle, Props>(function Transcript({
 
     // #1825: new-message entry animation — same-session append only (a session
     // switch must not animate the whole restored history).
-    if (!switched && items.length > state.previousCount && items.length > 0) {
-      const newKey = arrivalIdOf(items[items.length - 1])
+    const lastItem = items[items.length - 1]
+    if (!switched && items.length > state.previousCount && lastItem) {
+      const newKey = arrivalIdOf(lastItem)
       setArrivalKey(newKey)
       if (arrivalTimerRef.current) clearTimeout(arrivalTimerRef.current)
       arrivalTimerRef.current = setTimeout(() => {
@@ -464,7 +465,9 @@ const TranscriptImpl = forwardRef<TranscriptHandle, Props>(function Transcript({
 
           const item = seg.item
           if (isUser(item)) {
-            const userKey = item.id ?? item.text + (item.name || '')
+            /* #1825: derive the key from arrivalIdOf so the entry-animation
+               comparison can never drift from the React key. */
+            const userKey = arrivalIdOf(item)
             const footer = renderUserFooter?.(item)
             return (
               <Fragment key={userKey}>

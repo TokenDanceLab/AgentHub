@@ -17,11 +17,9 @@
   .overlay {
     animation: overlayIn 0.15s ease-out;
   }
-  .content {
-    animation: contentIn 0.2s ease-out;
-  }
   /* Exit choreography (#1825): unmount is deferred 200ms by useExiting so
-     the fade/scale-out below can play. Reduced-motion unmounts instantly. */
+     the fade/scale-out below can play (entry lives in the .content block
+     further down). Reduced-motion unmounts instantly. */
   .overlayExiting {
     animation: overlayOut 0.15s ease-in forwards;
   }

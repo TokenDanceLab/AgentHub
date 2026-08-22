@@ -5,7 +5,7 @@
 // the component tree (and its virtua/@lobehub/icons deps) is evaluated.
 import { installWorkbenchTestHooks } from './helpers';
 
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, within, waitFor } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { createMockPlatform } from '@shared/platform/createMockPlatform';
 import { AgentHubWorkbench } from '../AgentHubWorkbench';
@@ -100,7 +100,7 @@ describe('AgentHubWorkbench', () => {
     expect(screen.getByRole('main', { name: '工作区' })).toHaveAttribute('id', 'main-content');
   });
 
-  it('opens and toggles the keyboard-shortcuts help overlay with the global ? key', () => {
+  it('opens and toggles the keyboard-shortcuts help overlay with the global ? key', async () => {
     const platform = createMockPlatform({
       surface: 'desktop',
       capabilities: { browserPreview: false },
@@ -128,7 +128,8 @@ describe('AgentHubWorkbench', () => {
 
     // A second '?' toggles it closed.
     fireEvent.keyDown(document, { key: '?' });
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    // #1825: the Modal stays mounted through its 200ms exit animation.
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
 
     // '?' inside an editable element must not open the overlay.
     const composer = screen.getByPlaceholderText('发消息给 Builder');
@@ -140,6 +141,6 @@ describe('AgentHubWorkbench', () => {
     fireEvent.keyDown(document, { key: '?' });
     expect(screen.getByRole('dialog')).toBeInTheDocument();
     fireEvent.keyDown(document, { key: 'Escape' });
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
   });
 });

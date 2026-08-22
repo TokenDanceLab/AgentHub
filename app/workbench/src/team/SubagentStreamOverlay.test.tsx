@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen, fireEvent, act, within } from '@testing-library/react';
+import { render, screen, fireEvent, act, within, waitFor } from '@testing-library/react';
 import { beforeAll, describe, expect, it, beforeEach, vi } from 'vitest';
 import {
   createSubagentStreamStore,
@@ -257,7 +257,7 @@ describe('SubagentStreamOverlay', () => {
     expect(within(dialog).getByText(/Deep reasoning step/)).toBeInTheDocument();
   });
 
-  it('closes the dialog via the modal close button', () => {
+  it('closes the dialog via the modal close button', async () => {
     act(() => {
       testStore.push(makeEvent({ agent_task_id: 'task-1', event_type: 'thinking', event_seq: 1 }));
     });
@@ -266,7 +266,9 @@ describe('SubagentStreamOverlay', () => {
     expect(screen.getByRole('dialog')).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: '关闭' }));
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    // #1825: the Modal stays mounted through its 200ms exit animation before
+    // unmounting; wait out the window and assert it is gone.
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
   });
 
   it('shows the selected sub-session only when multiple chips exist', () => {

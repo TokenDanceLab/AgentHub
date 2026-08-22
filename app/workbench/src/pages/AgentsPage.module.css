@@ -50,8 +50,8 @@
 
 /* #1825: nav converges on the shared workbench page module (same 310px
    opaque surface-2 rail as Contacts/Docs/Settings/Tasks) instead of a
-   second glass-colored copy. The copy's unclosed brace (accidental native
-   CSS nesting) is closed here so nav internals are flat selectors again. */
+   second glass-colored copy. The copy's unclosed-brace nesting is gone
+   with the copy; the shared module's own brace is repaired there. */
 .workbench-nav {
   composes: wbNav from './workbench-page-shared.module.css';
 }
