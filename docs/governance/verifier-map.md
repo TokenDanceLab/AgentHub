@@ -3,7 +3,7 @@
 > Owner：本文件是 AgentHub「规则 → 机器验证」映射的 SSOT。`AGENTS.md` §9.5 只保留指针，不复制本表。
 > 机器门禁：`scripts/verify/verify-doc-ssot.py` 校验本表验证脚本路径与 CI 文件存在性。
 
-最后更新：2026-08-17（Windows 环境继承合同接入原生 runner）
+最后更新：2026-08-22（标注 check-secrets.sh 与 verify-i18n-callsites.py 在 validate 内的 advisory 现状；i18n 行口径校准为脚本实际的违规文件数棘轮）
 
 ## 映射表
 
@@ -22,7 +22,7 @@
 | hubClient thin-shell SSOT（客户端不分叉 REST 实现） | `scripts/verify/verify-hubclient-ssot.py` | checks.yml → validate |
 | Design token SSOT（CSS 硬编码颜色禁令） | `scripts/verify/verify-design-token-ssot.py` | checks.yml → validate |
 | 核心 token/theme/preset CSS 仅 parser 语法门禁（fail-closed；Stylelint 被 ignore 排除，规则债另立，#1720） | `app/scripts/verify-design-css-syntax.mjs`（内置 `--self-test` 负向自测） | checks.yml → design-css |
-| shared UI i18n callsites ratchet（CJK 字面量不得新增，#1612） | `scripts/verify/verify-i18n-callsites.py` | checks.yml → validate |
+| shared UI i18n callsite ratchet（#1612；违规文件数棘轮：仅当含 CJK 字面量且未导入 `useTranslation` 的违规文件数超过 baseline 时 fail，不比较字面量行数——既有违规文件内新增 CJK 字面量行不会触发；当前 advisory：validate step 带 `continue-on-error`，存量违规文件回填低于 baseline 后转硬门禁） | `scripts/verify/verify-i18n-callsites.py` | checks.yml → validate |
 | 演示诚实：stub/fixture 不得冒充真实登录/API | `scripts/verify/verify-real-e2e-contract.py` | checks.yml → validate |
 | OpenAPI↔hub router 合同一致 | `scripts/verify/verify-openapi-contract.py` | checks.yml → validate |
 | shared 内不出现 Edge 客户端实现 | `scripts/verify/verify-shared-boundary.py` | checks.yml → validate |
@@ -46,7 +46,7 @@
 | Tauri installer 冒烟 | `scripts/release/verify-tauri-installer-smoke.py` | release-readiness.yml |
 | Windows Agent Runtime 环境继承语义（代理变量透传、敏感变量过滤、环境键大小写） | `edge-server/internal/lifecycle/env_sanitizer_test.go` + `edge-server/internal/lifecycle/env_behavior_test.go`（workflow 结构由 `scripts/verify/verify-ci-gates.py` 与 `scripts/release/verify-tauri-package-readiness.py` 保鲜） | checks.yml → windows-go-test（`windows-go` 为稳定 required-check 聚合 job，不执行测试）；release-readiness.yml → windows-installer-smoke-preflight |
 | Tauri dry 打包 | `scripts/release/verify-tauri-package-dry.py` | release-readiness.yml |
-| secrets/token 不落库 | `scripts/verify/check-secrets.sh` | checks.yml → validate |
+| secrets/token 不落库（当前 advisory：validate step 带 `continue-on-error`，mock/test secret 误报 allowlist 清理后转硬门禁） | `scripts/verify/check-secrets.sh` | checks.yml → validate |
 | 提交格式 `type(scope): 中文摘要`（PR 时） | `scripts/verify/verify-commit-messages.sh` | checks.yml → validate |
 | UI Visual QA shell 行为证明（1440x810 light/dark） | `app/{desktop,web}/scripts/visual-qa-shell.mjs` | checks.yml → visual-qa-shell |
 | 真实登录/OIDC e2e 链路（需真实服务与凭据，`scripts/verify/verify-oidc-flow.py` 等 gate 保留在 `scripts/verify/`） | 无 | 无 |

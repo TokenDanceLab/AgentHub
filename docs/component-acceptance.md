@@ -1,6 +1,6 @@
 # AgentHub 组件验收标准（component-acceptance）
 
-最后更新：2026-08-14（自 TokenDanceLab/docs 迁入本仓库，本文件为 AgentHub 单仓 SSOT；#1672 迁移状态见 §1）
+最后更新：2026-08-22（自 TokenDanceLab/docs 迁入本仓库，本文件为 AgentHub 单仓 SSOT；#1672 迁移状态见 §1）
 
 本文是 AgentHub shared 组件的**验收标准 SSOT**：任何 `app/shared/src/ui/` 下的新组件（或对既有组件做可见行为改动）必须对照本文件的 5 维验收标准，并带 `.test.tsx` + `.stories.tsx` + 本文件验收表对照记录。它与跨产品设计契约（`tokendance-design` 仓库 [design-system.md](https://github.com/TokenDanceLab/tokendance-design/blob/master/docs/design/design-system.md) 管 token 收敛、[design-playbook.md](https://github.com/TokenDanceLab/tokendance-design/blob/master/docs/design/design-playbook.md) 管实现流程、[visual-qa-matrix.md](https://github.com/TokenDanceLab/tokendance-design/blob/master/docs/design/visual-qa-matrix.md) 管产品级截图证据）互补：本文管**单组件验收**，矩阵管**产品级视觉证据**。
 
@@ -85,30 +85,39 @@
 | a11y | 可访问名称、focus ring | ✅ | 图标按钮强制 aria-label |
 | 响应式 | 无横向滚动、长文案适配、尺寸稳定 | ✅ | 固定高度按钮 |
 
-### Modal（`app/shared/src/ui/Modal.tsx`，有测试、缺 stories）
+### Modal（`app/shared/src/ui/Modal.tsx`，三件套齐全）
 
 | 维度 | 必选项 | 状态 | 备注 |
 |---|---|---|---|
-| 视觉 | token 化面板（`--td-panel`/`--td-surface-3`）、scrim | ✅ | 需补 Storybook 证据 |
+| 视觉 | token 化面板（`--td-panel`/`--td-surface-3`）、scrim | ✅ | 随 Modal.stories.tsx 巡检 |
 | 交互 | 打开/关闭、提交/取消路径行为断言 | ✅ | Modal.test.tsx |
 | 键盘 | Esc 关闭、焦点移入/归还 | ✅ | 测试覆盖 |
-| 键盘 | Tab 循环（焦点困在对话框内） | ⚠️ | 需人工复核，见 debt 记录 |
+| 键盘 | Tab 循环（焦点困在对话框内） | ⚠️ | `useFocusTrap`（focusTrap.ts）实现 Tab/Shift+Tab 环绕、focusTrap.test.tsx 有行为断言；必选项未完全闭环（缺 Modal 级断言与真实浏览器复核），按拆分验收记入下方 debt 台账 |
 | a11y | `role="dialog"` + `aria-modal` + 标题关联 | ✅ | |
 | a11y | 焦点环与对比度 | ✅ | |
 | 响应式 | 窄宽下可用、无横向滚动 | ✅ | 宽度上限 + 内滚 |
 
-### ToastStack（`app/shared/src/ui/toast/ToastStack.tsx`，有测试、缺 stories）
+### ToastStack（`app/shared/src/ui/toast/ToastStack.tsx`，三件套齐全）
 
 | 维度 | 必选项 | 状态 | 备注 |
 |---|---|---|---|
-| 视觉 | token 化状态色（success/warning/danger）、堆叠间距 | ✅ | 需补 Storybook 证据 |
+| 视觉 | token 化状态色（success/warning/danger）、堆叠间距 | ✅ | 随 ToastStack.stories.tsx 巡检 |
 | 交互 | 入列/出列/自动消失/手动关闭行为断言 | ✅ | Toast.test.tsx + toastStore.test.ts |
 | 键盘 | 关闭按钮可聚焦 | ✅ | |
 | a11y | `role="status"`/`role="alert"` 按消息重要性区分 | ✅ | |
-| a11y | 自动消失提供可见时间或可暂停（成功态可放宽） | ⚠️ | 见 debt 记录 |
+| a11y | 自动消失提供可见时间或可暂停（成功态可放宽） | ✅ | hover/focus 触发 `pauseAutoDismiss`（ToastStack.tsx + toastStore.ts）满足「可暂停」分支；结论见下方 debt 台账 |
 | 响应式 | 窄宽下堆叠不遮挡主操作、可滚动查看 | ✅ | |
 
 ## 验收记录与 debt
+
+### Modal / ToastStack debt 台账（2026-08-22 范本复核）
+
+| 组件 | 项 | 状态与缺口 | 跟踪载体 |
+|---|---|---|---|
+| Modal | 键盘 Tab 循环（必选） | 部分闭环，必选项未完全达标：`Modal.tsx` 经 `useFocusTrap` 困住焦点，`focusTrap.test.tsx` 断言 Tab/Shift+Tab 环绕与焦点归还；残留缺口为无 Modal 级专属断言、复核仅在 jsdom、未在真实浏览器人工复核。拆分验收：行为实现与共享层单测计入已通过，剩余验证工作记 debt | owner：前端 track；计划：补 Modal 级 Tab 循环断言（Modal.test.tsx）+ Visual QA 真实浏览器复核；跟踪：[#1820](https://github.com/TokenDanceLab/AgentHub/issues/1820)（验收补全） |
+| ToastStack | 自动消失可见时间/可暂停 | 已实现：hover/focus 触发 `pauseAutoDismiss`（ToastStack.tsx + toastStore.ts），满足「可暂停」必选分支。残留缺口：剩余倒计时不可视化（非必选） | 无独立 debt；倒计时可视化为可选增强，如需跟踪归入 [#1820](https://github.com/TokenDanceLab/AgentHub/issues/1820) 验收补全 |
+
+### 维护规则
 
 - 每次组件改动在 PR 描述中粘贴/链接对应范本表并更新状态；新增组件复制“范本表”结构新建表格。
 - 范本表的勾选状态本身就是该组件最近一次验收的证据，随组件改动更新，不得保留过期勾选。
