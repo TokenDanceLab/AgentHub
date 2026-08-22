@@ -134,25 +134,22 @@ def main() -> int:
         assert_contains(fail_step, r"needs\.changes\.result != 'success'", f"{job_name} must fail closed when the changes job fails")
         assert_contains(fail_step, r"exit 1", f"{job_name} changes-failure step must exit 1")
 
-    # #1536: Edge lint is at 0 issues and hardened to hard-blocking; Hub lint
-    # still carries pre-existing findings (tracked in #1573) and stays
-    # warning-only until a finding-fingerprint ratchet exists. Complexity
+    # #1536: Edge lint is at 0 issues and hardened to hard-blocking. Complexity
     # exclusions remain separately owned by #1568.
     # Wave 10: go-edge Lint set to advisory — gocognit findings in pre-existing
     # complex functions (admin.go/mcp_server.go/agent_dispatch.go); re-harden
     # after refactoring or threshold adjustment.
     assert_step_continue_on_error(edge, "Lint", True)
-    # #1657/#1832: go-hub Lint is report-only (advisory) — the action's raw
-    # exit code cannot consult the #1573 baseline, and >300-file PR diffs
-    # fall back to a full-repo lint that would hard-fail debt-clean large
-    # PRs. The hard gate lives in the fingerprint ratchet step below, which
-    # exempts baseline-registered findings in both patch and full-lint mode.
-    # The step must keep the pinned golangci-lint action (no placeholder
-    # commands) and only-new-issues so small PRs keep a new-findings report.
-    assert_step_continue_on_error(hub, "Lint", True)
+    # #1812: go-hub Lint is hard-blocking — the 17 baseline-registered
+    # complexity findings (#1573) are repaid and hub-lint-baseline.json is
+    # empty, so a full-repo lint failure is a genuine regression. The
+    # fingerprint ratchet step below stays hard-blocking as the second line of
+    # defence. The step must keep the pinned golangci-lint action and must NOT
+    # set only-new-issues (full-repo lint is the gate now the debt is cleared).
+    assert_step_continue_on_error(hub, "Lint", False)
     hub_lint_step = get_step_block(hub, "Lint")
     assert_contains(hub_lint_step, r"golangci/golangci-lint-action@v9", "go-hub Lint must keep the pinned golangci-lint action (no placeholder commands)")
-    assert_contains(hub_lint_step, r"only-new-issues:\s*true", "go-hub Lint must keep only-new-issues so patch-mode reports stay scoped to new findings")
+    assert_not_contains(hub_lint_step, r"only-new-issues", "go-hub Lint must not use only-new-issues after the #1812 debt repay (full-repo lint is the gate)")
     assert_step_continue_on_error(hub, "Verify Hub lint fingerprint ratchet (#1573)", False)
     # #1574: gosec findings triaged and cleared in both servers; the gosec
     # security scan steps are hard-blocking (no continue-on-error) and run

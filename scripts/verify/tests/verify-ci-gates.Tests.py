@@ -15,6 +15,8 @@ one surgical text mutation, and asserts the CI policy verifier exits non-zero:
 9. delete the go-hub no-Go-changes fallback step → job has no success path when filtered
 10. remove the changes.result=='success' guard from both Go fallbacks → changes failure reports green again
 11. delete the go-hub changes-failure fail-closed step → required check false-green again
+12. re-add continue-on-error to the go-hub Lint step → debt-clear hard gate back to warning-only
+13. re-add only-new-issues to the go-hub Lint step → full-repo lint gate back to patch-only
 
 The unmutated copy must exit 0, proving the policy test only reddens on
 actual policy violations (fail-closed, no false green).
@@ -198,6 +200,26 @@ def delete_go_hub_changes_fail_step(text: str) -> str:
     return text[:start] + body.replace(GO_HUB_CHANGES_FAIL_STEP_TEXT, "", 1) + text[end:]
 
 
+def readd_go_hub_lint_continue_on_error(text: str) -> str:
+    """在 go-hub Lint step 重新加上 continue-on-error，模拟债清后硬门禁被改回
+    warning-only（防回退）。"""
+    start, end, body = get_go_hub_body(text)
+    anchor = "        uses: golangci/golangci-lint-action@v9\n"
+    if body.count(anchor) != 1:
+        raise AssertionError(f"expected exactly one golangci-lint-action use in go-hub, found {body.count(anchor)}")
+    return text[:start] + body.replace(anchor, "        continue-on-error: true\n" + anchor, 1) + text[end:]
+
+
+def readd_go_hub_lint_only_new_issues(text: str) -> str:
+    """在 go-hub Lint step 重新加上 only-new-issues，模拟债清后全量硬 fail 被改回
+    patch-only（防回退）。"""
+    start, end, body = get_go_hub_body(text)
+    anchor = "          args: --timeout=5m --output.json.path=${{ runner.temp }}/hub-lint-report.json\n"
+    if body.count(anchor) != 1:
+        raise AssertionError(f"expected exactly one hub-lint-report.json args line in go-hub, found {body.count(anchor)}")
+    return text[:start] + body.replace(anchor, anchor + "          only-new-issues: true\n", 1) + text[end:]
+
+
 class VerifyCiGatesMutationTests(unittest.TestCase):
     def assert_mutation_fails(self, mutated_text: str, case_name: str) -> None:
         exit_code, output = run_verifier(mutated_text)
@@ -264,6 +286,20 @@ class VerifyCiGatesMutationTests(unittest.TestCase):
         self.assert_mutation_fails(
             delete_go_hub_changes_fail_step(read_workflow()),
             "deleted go-hub changes-failure fail-closed step",
+        )
+
+    def test_readd_go_hub_lint_continue_on_error_fails(self):
+        """债清后 go-hub Lint 被改回 continue-on-error 时，校验器必须非零退出（防回退）。"""
+        self.assert_mutation_fails(
+            readd_go_hub_lint_continue_on_error(read_workflow()),
+            "re-added go-hub Lint continue-on-error",
+        )
+
+    def test_readd_go_hub_lint_only_new_issues_fails(self):
+        """债清后 go-hub Lint 被改回 only-new-issues 时，校验器必须非零退出（防回退）。"""
+        self.assert_mutation_fails(
+            readd_go_hub_lint_only_new_issues(read_workflow()),
+            "re-added go-hub Lint only-new-issues",
         )
 
 
