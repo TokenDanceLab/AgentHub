@@ -151,6 +151,10 @@ describe('blocksToTranscriptItems — agent text bubbles and grouping', () => {
     expect(agent.parts).toHaveLength(2)
     expect(agent.parts![0]).toMatchObject({ type: 'bubble', text: 'first' })
     expect(agent.parts![1]).toMatchObject({ type: 'bubble', text: 'second' })
+    // #1821: each bubble part carries its upstream block id so the rendered
+    // bubble can expose the same selectable/context-menu identity tool rows have.
+    expect(agent.parts![0]).toMatchObject({ blockId: 'a1' })
+    expect(agent.parts![1]).toMatchObject({ blockId: 'a2' })
   })
 
   it('creates the agent item for an empty text block but pushes no bubble', () => {

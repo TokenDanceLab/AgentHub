@@ -182,7 +182,7 @@ export interface TranscriptChromeControllerDeps {
   t: TranscriptChromeTranslate;
   dispatchComposer: (action: ComposerAction) => void;
   composerInputRef: { current: { focus: () => void } | null };
-  onRegenerate?: ((blockId: string) => void) | undefined;
+  onRegenerate?: ((blockId: string) => Promise<void> | void) | undefined;
   onApprovalDecision?: ((decision: ApprovalDecisionAction) => Promise<void> | void) | undefined;
   /**
    * Hub session id for REST message actions (#1383). Absent on Desktop/demo

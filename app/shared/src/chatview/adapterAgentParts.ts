@@ -33,6 +33,9 @@ export function pushAgentBubble(agent: TranscriptAgentItem, block: TextTranscrip
   agent.parts.push({
     type: 'bubble',
     text,
+    // #1821: carry the upstream block id so the rendered bubble gets the same
+    // selectable/context-menu identity (`data-selectable-card`) tool rows have.
+    ...(block.id ? { blockId: block.id } : {}),
     ...(block.displayTitle ? { displayTitle: block.displayTitle } : {}),
     ...(block.displayDetail ? { displayDetail: block.displayDetail } : {}),
     ...(block.badgeLabel ? { badgeLabel: block.badgeLabel } : {}),

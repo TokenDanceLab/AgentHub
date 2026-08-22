@@ -336,11 +336,16 @@ describe('workbenchTranscriptChromeHelpers', () => {
       transcript: [agent],
       t,
     });
-    expect(regenerate.map((effect) => effect.type)).toEqual([
-      'softHide',
-      'regenerate',
-      'pulse',
-      'toast',
+    // #1821: a single regenerate effect carries the success/failure copy; the
+    // applier runs soft-hide + pulse + success toast only after the request
+    // resolves, so a failed regenerate never hides the message.
+    expect(regenerate).toEqual([
+      {
+        type: 'regenerate',
+        blockId: 'agent-1',
+        successMessage: 'action.regenerating',
+        failureMessage: 'toast.regenerateFailed',
+      },
     ]);
   });
 
@@ -373,11 +378,14 @@ describe('workbenchTranscriptChromeHelpers', () => {
       transcript: [agent],
       t,
     });
-    expect(retry.map((effect) => effect.type)).toEqual([
-      'softHide',
-      'regenerate',
-      'pulse',
-      'toast',
+    // #1821: same single-effect contract as the context-menu regenerate path.
+    expect(retry).toEqual([
+      {
+        type: 'regenerate',
+        blockId: 'a1',
+        successMessage: 'action.regenerating',
+        failureMessage: 'toast.regenerateFailed',
+      },
     ]);
 
     const copy = planTranscriptBlockAction({

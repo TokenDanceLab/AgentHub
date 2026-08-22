@@ -68,6 +68,11 @@ export interface ChatViewBridgeProps {
    * ChatView against the adapted items; absent for non-IM transcripts.
    */
   unreadDivider?: UnreadDividerDescriptor | undefined;
+  /**
+   * Transcript items are loading (#1821). With an empty transcript the chat
+   * shows an honest loading state instead of the "no messages" empty state.
+   */
+  transcriptLoading?: boolean | undefined;
 }
 
 /**
@@ -102,6 +107,7 @@ export const ChatViewBridge = React.memo(function ChatViewBridge({
   onDismissPinned,
   onToast,
   unreadDivider,
+  transcriptLoading,
 }: ChatViewBridgeProps): React.ReactElement {
   const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE);
   const chatMode = useMemo<'dm' | 'group'>(
@@ -163,6 +169,7 @@ export const ChatViewBridge = React.memo(function ChatViewBridge({
         typingUserNames={typingUserNames}
         renderUserFooter={renderUserFooter}
         {...(activeConversation?.id !== undefined ? { sessionId: activeConversation.id } : {})}
+        {...(transcriptLoading !== undefined ? { transcriptLoading } : {})}
       />
       <SubagentStreamOverlay />
     </>

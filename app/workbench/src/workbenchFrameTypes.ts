@@ -137,6 +137,11 @@ export interface ChatConversationHostFrameProps {
   onCancelRun?: (() => void) | undefined;
   /** Edit an already-sent message (#1462 CF16). Receives block id + new content. */
   onEditMessage?: ((blockId: string, content: string) => Promise<void> | void) | undefined;
+  /**
+   * Transcript items are loading (#1821). With an empty transcript the chat
+   * shows an honest loading state instead of the "no messages" empty state.
+   */
+  transcriptLoading?: boolean | undefined;
 }
 
 export interface WorkbenchRoutesFrameProps {
@@ -177,8 +182,10 @@ export interface WorkbenchRoutesFrameProps {
   settingsService: WorkbenchSessionChrome['settingsService'];
   skillMarketItems?: SkillMarketItem[] | undefined;
   skillMarketLoading?: boolean | undefined;
+  skillMarketError?: string | undefined;
   mcpMarketItems?: MCPMarketItem[] | undefined;
   mcpMarketLoading?: boolean | undefined;
+  mcpMarketError?: string | undefined;
   onNavigatePage: (page: GlobalRailPage) => void;
   currentUserId?: string | undefined;
   userDisplayName?: string | undefined;

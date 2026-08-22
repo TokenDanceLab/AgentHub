@@ -276,14 +276,17 @@ export function buildWorkbenchFrameProps(
   assignDefined(frameProps, 'currentUserId', props.currentUserId);
   assignDefined(frameProps, 'skillMarketItems', props.skillMarketItems);
   assignDefined(frameProps, 'skillMarketLoading', props.skillMarketLoading);
+  assignDefined(frameProps, 'skillMarketError', props.skillMarketError);
   assignDefined(frameProps, 'mcpMarketItems', props.mcpMarketItems);
   assignDefined(frameProps, 'mcpMarketLoading', props.mcpMarketLoading);
+  assignDefined(frameProps, 'mcpMarketError', props.mcpMarketError);
   assignDefined(frameProps, 'highlightedBlockId', props.highlightedBlockId);
   assignDefined(frameProps, 'onHighlightEnd', props.onHighlightEnd);
   assignDefined(frameProps, 'connectionStatus', props.connectionStatus);
   assignDefined(frameProps, 'isAgentRunning', props.isAgentRunning);
   assignDefined(frameProps, 'onCancelRun', props.onCancelRun);
   assignDefined(frameProps, 'onEditMessage', props.onEditMessage);
+  assignDefined(frameProps, 'transcriptLoading', props.transcriptLoading);
   assignDefined(frameProps, 'children', children);
 
   return frameProps;

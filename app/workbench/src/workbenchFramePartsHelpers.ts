@@ -89,6 +89,7 @@ export function buildChatConversationHostProps(
     showComposerStatus,
     highlightedBlockId,
     onHighlightEnd,
+    transcriptLoading,
   } = props;  const {
     currentConversationId,
     activeConversation,
@@ -164,6 +165,7 @@ export function buildChatConversationHostProps(
   assignIfDefined(hostProps, 'isAgentRunning', props.isAgentRunning);
   assignIfDefined(hostProps, 'onCancelRun', props.onCancelRun);
   assignIfDefined(hostProps, 'onEditMessage', props.onEditMessage);
+  assignIfDefined(hostProps, 'transcriptLoading', transcriptLoading);
 
   return hostProps;
 }
@@ -255,8 +257,10 @@ export function buildWorkbenchRoutesProps(
   assignIfDefined(routesProps, 'ccSwitchProviders', props.ccSwitchProviders);
   assignIfDefined(routesProps, 'skillMarketItems', props.skillMarketItems);
   assignIfDefined(routesProps, 'skillMarketLoading', props.skillMarketLoading);
+  assignIfDefined(routesProps, 'skillMarketError', props.skillMarketError);
   assignIfDefined(routesProps, 'mcpMarketItems', props.mcpMarketItems);
   assignIfDefined(routesProps, 'mcpMarketLoading', props.mcpMarketLoading);
+  assignIfDefined(routesProps, 'mcpMarketError', props.mcpMarketError);
   assignIfDefined(routesProps, 'currentUserId', props.currentUserId);
   assignIfDefined(routesProps, 'userDisplayName', props.userDisplayName);
 

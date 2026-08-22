@@ -20,6 +20,7 @@ import {
   type ApprovalDecisionAction,
   type HubRuntimeEventTranscriptInput,
 } from '@shared/transcript';
+import { useToastStore } from '@shared/ui/toast';
 import { createHubClient } from '@/api/hubClient';
 import { useHubExecutionTargets } from '@/api/executionTargetQueries';
 import {
@@ -71,6 +72,7 @@ import {
 import {
   resolveWebRuntimeEvidence,
   resolveWebTaskContractStatusBlocks,
+  resolveWebTranscriptMessages,
   resolveWebWorkbenchTranscript,
 } from './webWorkbenchTranscript';
 import { errorMessage } from './webWorkbenchError';
@@ -481,13 +483,19 @@ export function useWebWorkbenchModel(selectedConversationId?: string, selectedPr
       // Merge the pinMap store's pinned state into the normalize input:
       // hub messages carry no pin field, so the store (fed by WS frames and
       // seeded from /pins) is the only normalize-time source.
-      withPinnedState(messages.data, pinnedSnapshot.pinnedIds),
+      // #1821: while the messages query shows placeholderData the rows still
+      // belong to the previous session — never surface them as the new
+      // session's transcript (session-switch old-message flash).
+      withPinnedState(
+        resolveWebTranscriptMessages(messages.isPlaceholderData, messages.data),
+        pinnedSnapshot.pinnedIds,
+      ),
       mergedRuntimeEvents,
       dataMode,
       selectedConversationId,
       t,
     ),
-    [hubReady, activeHubSessionId, messages.data, pinnedSnapshot, mergedRuntimeEvents, dataMode, selectedConversationId, t],
+    [hubReady, activeHubSessionId, messages.data, messages.isPlaceholderData, pinnedSnapshot, mergedRuntimeEvents, dataMode, selectedConversationId, t],
   );
   const taskContractStatusBlocks = useMemo(
     () => resolveWebTaskContractStatusBlocks(
@@ -523,8 +531,15 @@ export function useWebWorkbenchModel(selectedConversationId?: string, selectedPr
   const onCancelRun = useCallback(() => {
     const taskId = activeAgentTask.data?.taskId;
     if (!taskId) return;
-    void cancelAgentTaskMut.mutateAsync(taskId).catch(() => {});
-  }, [activeAgentTask.data?.taskId, cancelAgentTaskMut]);
+    // #1821: a failed cancel must be visible — surface the error toast
+    // instead of swallowing the rejection.
+    void cancelAgentTaskMut.mutateAsync(taskId).catch((error: unknown) => {
+      useToastStore.getState().showToast(
+        'error',
+        error instanceof Error && error.message ? error.message : t('toast.cancelFailed'),
+      );
+    });
+  }, [activeAgentTask.data?.taskId, cancelAgentTaskMut, t]);
 
   const workbenchStatus = useMemo(
     () => ({
@@ -576,6 +591,10 @@ export function useWebWorkbenchModel(selectedConversationId?: string, selectedPr
     activeConversationId,
     isAgentRunning,
     onCancelRun,
+    // #1821: while a Hub session's messages are still loading (or the switch
+    // is showing placeholder rows the transcript hides), the shell renders an
+    // honest loading state instead of "no messages" (#5 session-switch item).
+    transcriptLoading: Boolean(activeHubSessionId) && (messages.isPlaceholderData || messages.isLoading),
     contacts: resolveHubContacts(contacts.data as HubContactLike[] | undefined, hubReady, dataMode),
     contactsActions: hubReady ? {
       onSearchUser: (query: string) => searchUser.mutateAsync(query),
@@ -695,6 +714,7 @@ export {
 } from './webWorkbenchRuntimeEvents';
 export {
   resolveWebRuntimeEvidence,
+  resolveWebTranscriptMessages,
   resolveWebWorkbenchTranscript,
 } from './webWorkbenchTranscript';
 export {
