@@ -89,9 +89,9 @@ ProcessExecutor 配置 `RunTimeout`（默认 30 分钟）、`ShutdownGracePeriod
 
 | 家族 | 子包 | 内容 |
 |---|---|---|
-| Claude | `internal/adapters/claude/` | legacy `ClaudeCodeAdapter`（`claude-code`，DEPRECATED）+ 官方 ACP `ClaudeACPAdapter`（`claude-acp`） |
+| Claude | `internal/adapters/claude/` | legacy `ClaudeCodeAdapter`（`claude-code`，DEPRECATED）+ 官方 ACP `ACPAdapter`（`claude-acp`） |
 | Codex | `internal/adapters/codex/` | ACP `CodexACPAdapter`（`codex-acp`） |
-| OpenCode | `internal/adapters/opencode/` | 原生 ACP `OpenCodeACPAdapter`（`opencode-acp`） |
+| OpenCode | `internal/adapters/opencode/` | 原生 ACP `ACPAdapter`（`opencode-acp`） |
 | Orchestrator | `internal/adapters/orchestrator/` | 群聊编排 `OrchestratorAdapter`（`orchestrator`）+ dispatch interceptor 各子层（纯叶子，不依赖根包） |
 | SDK | `internal/adapters/sdk/` | HTTP `AnthropicSDKAdapter`（`anthropic-sdk`）、`OpenAISDKAdapter`（`openai-sdk`） |
 | Test fixtures | `internal/adapters/testdata/` | 测试共享 JSON fixtures（`sdk_fixture_mapper/`）；mapper 代码在根包 `sdk_fixture_mapper.go` |

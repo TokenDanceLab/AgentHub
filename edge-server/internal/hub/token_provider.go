@@ -42,7 +42,7 @@ type TokenProvider struct {
 	// in-flight refresh to drain before returning — otherwise tests and
 	// process shutdown leak live HTTP requests (httptest.Server.Close
 	// blocks on the still-active connection, observed on slow hosts).
-	stopWG   sync.WaitGroup
+	stopWG sync.WaitGroup
 	// lastErr mirrors the most recent rotation error for diagnostics.
 	lastErr string
 }

@@ -122,7 +122,7 @@ func TestFinishSkipsCascadeForDeferredParent(t *testing.T) {
 // paths ("parent/sub/run_x") as session IDs.
 func TestNewSubAgentRunContextUsesFreshSessionUUID(t *testing.T) {
 	run := store.Run{ID: "run-sub", ProjectID: "proj", ThreadID: "thread/sub/run-sub"}
-	ctx := newSubAgentRunContext(run, adapters.SubAgentTask{AgentID: "claude-code", Prompt: "task"}, "thread/sub/run-sub")
+	ctx := newSubAgentRunContext(run, adapters.SubAgentTask{AgentID: "claude-code", Prompt: "task"})
 	if ctx.SessionID == run.ThreadID || ctx.SessionID == "thread/sub/run-sub" {
 		t.Fatalf("SessionID must not be the thread path: %q", ctx.SessionID)
 	}

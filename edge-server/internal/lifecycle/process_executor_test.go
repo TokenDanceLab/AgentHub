@@ -1,12 +1,12 @@
 package lifecycle
 
 import (
-	"github.com/agenthub/edge-server/internal/adapters/sdk"
 	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/agenthub/edge-server/internal/adapters/sdk"
 	"io"
 	"log/slog"
 	"os"

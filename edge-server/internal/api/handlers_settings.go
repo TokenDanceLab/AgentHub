@@ -179,11 +179,11 @@ func (h *Handler) GetHealth(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, httpStatus, map[string]any{
-		"status":     status,
+		"status":      status,
 		"http_status": httpStatus,
-		"version":    "v1",
-		"edgeId":     "local",
-		"checks":     checks,
+		"version":     "v1",
+		"edgeId":      "local",
+		"checks":      checks,
 	})
 }
 

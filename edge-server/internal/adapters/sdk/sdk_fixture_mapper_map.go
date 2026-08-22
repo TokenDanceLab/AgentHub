@@ -4,7 +4,7 @@ import "github.com/agenthub/edge-server/internal/adapters"
 
 // Residual pure-helper peel #1122: mapSDKFixtureEvent type switch body.
 
-func mapSDKFixtureEvent(event SDKFixtureEvent, provider string, scope map[string]any) []SDKMappedEvent {
+func mapSDKFixtureEvent(event SDKFixtureEvent, provider string, scope map[string]any) []MappedEvent {
 	switch normalizeSDKFixtureType(event.Type) {
 	case "message", "assistant_message", "text_block":
 		return oneSDKMappedEvent(BusEventTextBlock, scope, commonSDKPayload(event, provider, map[string]any{
@@ -145,8 +145,8 @@ func mapSDKFixtureEvent(event SDKFixtureEvent, provider string, scope map[string
 
 // mapSDKFixtureToolStateEvent maps a tool_state fixture event into the
 // tool_call (+ tool_result when the tool has finished) event pair.
-func mapSDKFixtureToolStateEvent(event SDKFixtureEvent, provider string, scope map[string]any) []SDKMappedEvent {
-	events := []SDKMappedEvent{{
+func mapSDKFixtureToolStateEvent(event SDKFixtureEvent, provider string, scope map[string]any) []MappedEvent {
+	events := []MappedEvent{{
 		Type:  BusEventToolCall,
 		Scope: cloneSDKScope(scope),
 		Payload: commonSDKPayload(event, provider, map[string]any{
@@ -157,7 +157,7 @@ func mapSDKFixtureToolStateEvent(event SDKFixtureEvent, provider string, scope m
 		}),
 	}}
 	if event.Status == "completed" || event.Status == "error" || event.Output != "" || event.Error != "" {
-		events = append(events, SDKMappedEvent{
+		events = append(events, MappedEvent{
 			Type:  BusEventToolResult,
 			Scope: cloneSDKScope(scope),
 			Payload: commonSDKPayload(event, provider, map[string]any{
@@ -174,7 +174,7 @@ func mapSDKFixtureToolStateEvent(event SDKFixtureEvent, provider string, scope m
 
 // mapSDKFixtureResultEvent maps a terminal result fixture event into the
 // BusEventResult projection.
-func mapSDKFixtureResultEvent(event SDKFixtureEvent, provider string, scope map[string]any) []SDKMappedEvent {
+func mapSDKFixtureResultEvent(event SDKFixtureEvent, provider string, scope map[string]any) []MappedEvent {
 	success := true
 	if event.Success != nil {
 		success = *event.Success

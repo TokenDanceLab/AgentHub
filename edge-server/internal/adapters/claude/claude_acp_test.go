@@ -293,7 +293,7 @@ func TestClaudeACPAdapterVersionPin(t *testing.T) {
 // TestClaudeACPAdapterPreflightFailsFast asserts the launcher-missing path
 // fails before spawn.
 func TestClaudeACPAdapterPreflightFailsFast(t *testing.T) {
-	a := &ClaudeACPAdapter{
+	a := &ACPAdapter{
 		AcpAdapter: acp.NewAcpAdapterWithID(claudeACPAdapterID, "", nil, "Claude Code (ACP)"),
 	}
 	if a.Available() {
