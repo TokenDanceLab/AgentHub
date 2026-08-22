@@ -119,7 +119,7 @@ cd ../hub-server; go test ./... -short -count=1
 
 ```bash
 cd app/desktop; corepack pnpm test; corepack pnpm typecheck
-cd ../web; corepack.cmd pnpm typecheck; corepack.cmd pnpm exec vite build
+cd ../web; corepack pnpm typecheck; corepack pnpm exec vite build
 ```
 
 文档/API：
