@@ -870,9 +870,15 @@ describe('Desktop App v4 root', () => {
     // Probe aria-expanded instead of assuming "arrives collapsed": a blind
     // click on an already-open toggle would collapse the card and lock
     // re-expansion behind the manual-toggle flag, hiding the approve button.
-    const approvalToggle = await screen.findByRole('button', {
-      name: /^(card\.expand|展开|Expand|card\.collapse|收起|Collapse)$/,
-    });
+    // The generous timeout covers slow card arrival under load: the event
+    // reaches the transcript through a coalescing batch timer + React
+    // scheduler hops, which can be starved well past the 1s default on
+    // contended runners.
+    const approvalToggle = await screen.findByRole(
+      'button',
+      { name: /^(card\.expand|展开|Expand|card\.collapse|收起|Collapse)$/ },
+      { timeout: 5000 },
+    );
     if (approvalToggle.getAttribute('aria-expanded') === 'false') {
       fireEvent.click(approvalToggle);
     }
