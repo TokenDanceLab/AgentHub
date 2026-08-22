@@ -1,6 +1,6 @@
 # AgentHub History
 
-最后更新：2026-08-20
+最后更新：2026-08-22
 
 本文件是 AgentHub 源仓的历史材料索引。历史 longform、日期型审计、旧发布材料、过期设计、参考调研、完成的 spec-driven 工件和过期项目 skill 不再保存在 AgentHub active source tree。
 
@@ -17,6 +17,8 @@
 | Root evidence archive commit | `bc774192` merge commit; source archive commit `6cb00e9` |
 | Repo structure SPEC archive PR | TokenDanceLab/docs#4 |
 | Repo structure SPEC archive commit | `b7c6478d` merge commit; source archive commit `b845480` |
+| docs/archives pending batch PR | TokenDanceLab/docs#6（13 文件，源快照 `619119f`） |
+| docs/archives pending batch commit | `34cbb323` merge commit; 外部路径 `archive/agenthub/repo/docs/archives/archives-pending-2026-08-22/` |
 | Archive root | `archive/agenthub/` |
 
 ## Migrated Paths
@@ -32,25 +34,11 @@
 
 ## Pending External Archive (in-repo, awaiting migration)
 
-以下文件已无活跃引用、本通道仅标注 `pending external archive — see docs/history.md`，未真外迁（外迁需管理员）。
+当前无待外迁文件：原 13 个 `pending external archive` 文件已于 2026-08-22 迁入外部归档（TokenDanceLab/docs#6，见上方 External Archive 台账），源仓副本已删除。
 
 **外迁规则**：物理外迁由管理员执行（单次归档 PR：文件移入外部 TokenDanceLab/docs 归档，源仓删除正文），本表是源仓留存索引；外迁前不得重写或继续引用这些文件，新历史材料直接写入外部归档。
 
-| Path | Kind |
-|---|---|
-| `docs/archives/analysis/hub-service-boundary-map.md` | historical boundary map |
-| `docs/archives/analysis/post-polish-module-inventory.md` | post-polish inventory |
-| `docs/archives/analysis/post-polish-project-overview.md` | post-polish overview |
-| `docs/archives/analysis/post-polish-risk-assessment.md` | post-polish risk |
-| `docs/archives/analysis/settings-empty-error-inventory.md` | settings inventory |
-| `docs/archives/analysis/settings-sectionid-residual-inventory.md` | settings inventory |
-| `docs/archives/analysis/local-memory-pointer.md` | local memory pointer |
-| `docs/archives/analysis/frontend-dedupe-plan.md` | strangler plan |
-| `docs/archives/plan/post-polish-milestones.md` | post-polish plan |
-| `docs/archives/plan/post-polish-dependency-graph.md` | post-polish plan |
-| `docs/archives/plan/post-polish-task-breakdown.md` | post-polish plan |
-| `docs/archives/handoff/2026-07-20-phase-74-75-handoff.md` | phase handoff |
-| `docs/archives/branch-hygiene.md` | branch cleanup record |
+留仓例外（不外迁）：`docs/archives/README.md`（本归档索引）与 `docs/archives/reference/backend-performance-gates.md`（被 `hub-server/README.md`、`docs/README.md`、`docs/architecture.md` 活跃引用；活跃文档禁止外链出仓，故必须留仓）。
 
 ## Rules
 
