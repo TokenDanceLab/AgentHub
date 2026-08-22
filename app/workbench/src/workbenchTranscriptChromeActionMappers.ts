@@ -33,7 +33,14 @@ export type TranscriptChromeSideEffect =
     actions: ComposerAction[];
     focusComposer?: true;
   }
-  | { type: 'regenerate'; blockId: string }
+  | {
+    type: 'regenerate';
+    blockId: string;
+    /** Shown only after the regenerate request resolves successfully (#1821). */
+    successMessage: string;
+    /** Shown when the regenerate request rejects (#1821). */
+    failureMessage: string;
+  }
   | {
     type: 'approval';
     decision: ApprovalDecisionAction;
@@ -46,12 +53,39 @@ export type TranscriptChromeSideEffect =
   | { type: 'toast'; message: string }
   | { type: 'exitSelection' }
   // Hub REST message actions (#1383). Planned only when a session id is
-  // available; applied via the optional `on*Message` effect handlers.
-  | { type: 'pin'; messageId: string; sessionId: string }
-  | { type: 'unpin'; messageId: string; sessionId: string }
-  | { type: 'forward'; messageId: string; targetSessionIds: string[] }
-  | { type: 'recall'; messageId: string }
-  | { type: 'react'; messageId: string; sessionId: string; emoji: string };
+  // available; applied via the optional `on*Message` effect handlers. The
+  // success toast rides the resolved request — a rejected request shows the
+  // failure message instead of a fake optimistic success (#1821).
+  | {
+    type: 'pin';
+    messageId: string;
+    sessionId: string;
+    successMessage: string;
+    failureMessage: string;
+  }
+  | {
+    type: 'unpin';
+    messageId: string;
+    sessionId: string;
+    successMessage: string;
+    failureMessage: string;
+  }
+  | {
+    type: 'forward';
+    messageId: string;
+    targetSessionIds: string[];
+    successMessage: string;
+    failureMessage: string;
+  }
+  | { type: 'recall'; messageId: string; successMessage: string; failureMessage: string }
+  | {
+    type: 'react';
+    messageId: string;
+    sessionId: string;
+    emoji: string;
+    successMessage: string;
+    failureMessage: string;
+  };
 
 // #1384: the emoji picker submenu carries the chosen emoji on the menu
 // action string (`react:<emoji>`); plain `react` keeps the default 👍.
@@ -169,12 +203,15 @@ export function planContextAction(options: {
     });
   }
   if (action === 'regenerate' && block && block.kind === 'text' && block.author.role === 'agent') {
-    effects.push(
-      { type: 'softHide', blockIds: [block.id] },
-      { type: 'regenerate', blockId },
-      { type: 'pulse', blockId },
-      { type: 'toast', message: t('action.regenerating') },
-    );
+    // #1821: the soft-hide + success toast only land after the regenerate
+    // request resolves; on rejection the block stays visible and the failure
+    // toast surfaces (no fake "regenerating" state).
+    effects.push({
+      type: 'regenerate',
+      blockId,
+      successMessage: t('action.regenerating'),
+      failureMessage: t('toast.regenerateFailed'),
+    });
     return effects;
   }
 
@@ -190,25 +227,41 @@ export function planContextAction(options: {
   if ((action === 'pin' || action === 'unpin' || reactAction) && sessionId) {
     if (action === 'pin') {
       effects.push(
-        { type: 'pin', messageId: blockId, sessionId },
+        {
+          type: 'pin',
+          messageId: blockId,
+          sessionId,
+          successMessage: t('toast.pinUpdated'),
+          failureMessage: t('toast.pinFailed'),
+        },
         { type: 'pulse', blockId },
-        { type: 'toast', message: t('toast.pinUpdated') },
       );
     }
     if (action === 'unpin') {
       effects.push(
-        { type: 'unpin', messageId: blockId, sessionId },
+        {
+          type: 'unpin',
+          messageId: blockId,
+          sessionId,
+          successMessage: t('toast.unpinned'),
+          failureMessage: t('toast.unpinFailed'),
+        },
         { type: 'pulse', blockId },
-        { type: 'toast', message: t('toast.unpinned') },
       );
     }
     if (reactAction) {
       // #1384: the emoji comes from the picker submenu (`react:<emoji>`);
       // plain `react` keeps the fixed default 👍.
       effects.push(
-        { type: 'react', messageId: blockId, sessionId, emoji: reactEmojiForAction(action) },
+        {
+          type: 'react',
+          messageId: blockId,
+          sessionId,
+          emoji: reactEmojiForAction(action),
+          successMessage: t('toast.reactionAdded'),
+          failureMessage: t('toast.reactionFailed'),
+        },
         { type: 'pulse', blockId },
-        { type: 'toast', message: t('toast.reactionAdded') },
       );
     }
     return effects;
@@ -220,9 +273,13 @@ export function planContextAction(options: {
       return [];
     }
     effects.push(
-      { type: 'recall', messageId: blockId },
+      {
+        type: 'recall',
+        messageId: blockId,
+        successMessage: t('toast.recalled'),
+        failureMessage: t('toast.recallFailed'),
+      },
       { type: 'pulse', blockId },
-      { type: 'toast', message: t('toast.recalled') },
     );
     return effects;
   }
@@ -232,9 +289,14 @@ export function planContextAction(options: {
       // (`forward:<encoded>`); plan the real forward effect so the REST
       // port runs onForwardMessage(messageId, targetSessionIds).
       effects.push(
-        { type: 'forward', messageId: blockId, targetSessionIds: forwardTargetsForAction(action) },
+        {
+          type: 'forward',
+          messageId: blockId,
+          targetSessionIds: forwardTargetsForAction(action),
+          successMessage: t('toast.forwardQueued'),
+          failureMessage: t('toast.forwardFailed'),
+        },
         { type: 'pulse', blockId },
-        { type: 'toast', message: t('toast.forwardQueued') },
       );
       return effects;
     }
@@ -291,12 +353,14 @@ export function planTranscriptBlockAction(options: {
 
   if (action === 'retry' || action === 'regenerate') {
     if (block.kind === 'text' && block.author.role === 'agent') {
-      effects.push(
-        { type: 'softHide', blockIds: [block.id] },
-        { type: 'regenerate', blockId },
-        { type: 'pulse', blockId },
-        { type: 'toast', message: t('action.regenerating') },
-      );
+      // #1821: same honest contract as the context-menu regenerate path — the
+      // soft-hide + success toast ride the resolved request.
+      effects.push({
+        type: 'regenerate',
+        blockId,
+        successMessage: t('action.regenerating'),
+        failureMessage: t('toast.regenerateFailed'),
+      });
     }
   }
 
@@ -351,18 +415,52 @@ export interface TranscriptChromeEffectHandlers {
   softHideBlocks: (blockIds: string[]) => void;
   dispatchComposer: (action: ComposerAction) => void;
   focusComposer: () => void;
-  onRegenerate?: ((blockId: string) => void) | undefined;
+  /**
+   * Regenerate port (#1821). May return a Promise: when it does, the
+   * soft-hide + success toast wait for resolution and a rejection surfaces
+   * the failure toast instead (the block stays visible).
+   */
+  onRegenerate?: ((blockId: string) => Promise<void> | void) | undefined;
   onApprovalDecision?: ((decision: ApprovalDecisionAction) => Promise<void> | void) | undefined;
   pulseBlock: (blockId: string) => void;
   showWorkbenchToast: (message: string) => void;
   exitSelection: () => void;
   // Hub REST message actions (#1383) — optional; without them the side
-  // effects are no-ops and the planner keeps the placeholder toast.
+  // effects are no-ops and no success toast is shown (#1821).
   onPinMessage?: ((messageId: string, sessionId: string) => Promise<void> | void) | undefined;
   onUnpinMessage?: ((messageId: string, sessionId: string) => Promise<void> | void) | undefined;
   onForwardMessage?: ((messageId: string, targetSessionIds: string[]) => Promise<void> | void) | undefined;
   onRecallMessage?: ((messageId: string) => Promise<void> | void) | undefined;
   onAddMessageReaction?: ((messageId: string, sessionId: string, emoji: string) => Promise<void> | void) | undefined;
+}
+
+/** True when the value is a thenable (awaitable handler result, #1821). */
+function isThenable(value: unknown): value is Promise<unknown> {
+  return Boolean(value) && typeof (value as Promise<unknown>).then === 'function';
+}
+
+/**
+ * Await a handler result when it is a Promise (#1821): the success toast
+ * fires only after resolution, and a rejection shows the failure message
+ * (or the error's own message when present). Synchronous handlers keep the
+ * immediate success toast.
+ */
+function announceSettledAction(
+  outcome: Promise<void> | void,
+  successMessage: string,
+  failureMessage: string,
+  showWorkbenchToast: (message: string) => void,
+): void {
+  if (!isThenable(outcome)) {
+    showWorkbenchToast(successMessage);
+    return;
+  }
+  void Promise.resolve(outcome).then(
+    () => showWorkbenchToast(successMessage),
+    (err: unknown) => {
+      showWorkbenchToast(err instanceof Error && err.message ? err.message : failureMessage);
+    },
+  );
 }
 
 export function createTranscriptChromeEffectHandlers(
@@ -410,9 +508,33 @@ export function applyTranscriptChromeSideEffects(
           handlers.focusComposer();
         }
         break;
-      case 'regenerate':
-        handlers.onRegenerate?.(effect.blockId);
+      case 'regenerate': {
+        // #1821: when the port returns a Promise, the soft-hide + success
+        // toast wait for resolution and a rejection keeps the block visible
+        // with the failure toast (no fake "regenerating" empty state).
+        const regenerateHandler = handlers.onRegenerate;
+        if (!regenerateHandler) break;
+        const outcome = regenerateHandler(effect.blockId);
+        if (isThenable(outcome)) {
+          void Promise.resolve(outcome).then(
+            () => {
+              handlers.softHideBlocks([effect.blockId]);
+              handlers.pulseBlock(effect.blockId);
+              handlers.showWorkbenchToast(effect.successMessage);
+            },
+            (err: unknown) => {
+              handlers.showWorkbenchToast(
+                err instanceof Error && err.message ? err.message : effect.failureMessage,
+              );
+            },
+          );
+        } else {
+          handlers.softHideBlocks([effect.blockId]);
+          handlers.pulseBlock(effect.blockId);
+          handlers.showWorkbenchToast(effect.successMessage);
+        }
         break;
+      }
       case 'approval': {
         // #1821: wait for the decision request instead of fire-and-forget —
         // the success toast only fires after it resolves; a rejection shows
@@ -438,21 +560,61 @@ export function applyTranscriptChromeSideEffects(
       case 'exitSelection':
         handlers.exitSelection();
         break;
-      case 'pin':
-        handlers.onPinMessage?.(effect.messageId, effect.sessionId);
+      case 'pin': {
+        const handler = handlers.onPinMessage;
+        if (!handler) break;
+        announceSettledAction(
+          handler(effect.messageId, effect.sessionId),
+          effect.successMessage,
+          effect.failureMessage,
+          handlers.showWorkbenchToast,
+        );
         break;
-      case 'unpin':
-        handlers.onUnpinMessage?.(effect.messageId, effect.sessionId);
+      }
+      case 'unpin': {
+        const handler = handlers.onUnpinMessage;
+        if (!handler) break;
+        announceSettledAction(
+          handler(effect.messageId, effect.sessionId),
+          effect.successMessage,
+          effect.failureMessage,
+          handlers.showWorkbenchToast,
+        );
         break;
-      case 'forward':
-        handlers.onForwardMessage?.(effect.messageId, effect.targetSessionIds);
+      }
+      case 'forward': {
+        const handler = handlers.onForwardMessage;
+        if (!handler) break;
+        announceSettledAction(
+          handler(effect.messageId, effect.targetSessionIds),
+          effect.successMessage,
+          effect.failureMessage,
+          handlers.showWorkbenchToast,
+        );
         break;
-      case 'recall':
-        handlers.onRecallMessage?.(effect.messageId);
+      }
+      case 'recall': {
+        const handler = handlers.onRecallMessage;
+        if (!handler) break;
+        announceSettledAction(
+          handler(effect.messageId),
+          effect.successMessage,
+          effect.failureMessage,
+          handlers.showWorkbenchToast,
+        );
         break;
-      case 'react':
-        handlers.onAddMessageReaction?.(effect.messageId, effect.sessionId, effect.emoji);
+      }
+      case 'react': {
+        const handler = handlers.onAddMessageReaction;
+        if (!handler) break;
+        announceSettledAction(
+          handler(effect.messageId, effect.sessionId, effect.emoji),
+          effect.successMessage,
+          effect.failureMessage,
+          handlers.showWorkbenchToast,
+        );
         break;
+      }
       default:
         break;
     }

@@ -24,6 +24,13 @@ export type TranscriptAgentPart =
   | {
       type: 'bubble'
       text: string
+      /**
+       * Upstream text block id (#1821): the selectable/context-menu identity
+       * of this bubble, matching the `data-selectable-card` semantics tool
+       * rows carry via `stableInteractionId`. Absent for synthetic bubbles
+       * built without an upstream block.
+       */
+      blockId?: string
       displayTitle?: string
       displayDetail?: string
       badgeLabel?: string

@@ -291,11 +291,12 @@ function partitionWithDates(
 /**
  * Build a `blockId → segmentIndex` map for virtualized highlight/search jumps.
  * Only row interaction ids (the value carried by `data-block-id` on RowItem)
- * are mapped — those are the only highlightable targets. User messages carry
- * no `data-block-id`, so a user-id highlight resolves to -1 and falls back to
- * the plain querySelector (which returns null, preserving pre-virtualization
- * behavior). Rows come from an agent item's `rows`, `standaloneRows`, and the
- * row parts interleaved with bubbles in `parts` (RFC §6.3 / §8.1).
+ * are mapped — those are the highlightable targets. Text bubbles (user
+ * messages and agent bubbles, #1821) also carry `data-block-id` but are not
+ * indexed here: their highlight resolves to -1 and falls back to the plain
+ * querySelector, which finds them when mounted. Rows come from an agent
+ * item's `rows`, `standaloneRows`, and the row parts interleaved with bubbles
+ * in `parts` (RFC §6.3 / §8.1).
  */
 function buildBlockIndexMap(segments: TranscriptSegment[]): Map<string, number> {
   const map = new Map<string, number>()
@@ -443,7 +444,7 @@ const TranscriptImpl = forwardRef<TranscriptHandle, Props>(function Transcript({
             const footer = renderUserFooter?.(item)
             return (
               <Fragment key={userKey}>
-                <UserMessage item={item} chatMode={chatMode} />
+                <UserMessage item={item} chatMode={chatMode} {...(onBlockContextMenu ? { onContextMenu: onBlockContextMenu } : {})} />
                 {footer ?? null}
               </Fragment>
             )

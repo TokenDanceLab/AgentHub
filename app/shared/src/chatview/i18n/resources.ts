@@ -31,6 +31,7 @@ export const chatviewResources = {
 
     'chat.you': '你',
     'transcript.empty': '暂无消息',
+    'transcript.loading': '正在加载消息…',
 
     // ═══ Empty state scenario copies ═══
     'empty.generalBlank': '暂无内容',
@@ -233,6 +234,14 @@ export const chatviewResources = {
     'toast.forwardSelectTarget': '请先选择目标会话再转发',
     'toast.editFailed': '编辑失败，请重试',
     'toast.submitFailed': '提交失败，请重试',
+    // #1821: message action failures must be visible — no fake success toast.
+    'toast.pinFailed': '置顶失败，请重试',
+    'toast.unpinFailed': '取消置顶失败，请重试',
+    'toast.recallFailed': '撤回失败，请重试',
+    'toast.reactionFailed': '添加表情失败，请重试',
+    'toast.forwardFailed': '转发失败，请重试',
+    'toast.regenerateFailed': '重新生成失败，请重试',
+    'toast.cancelFailed': '取消任务失败，请重试',
     'toast.dispatchRetryExhausted': '派单重试 {max} 次仍被拒绝，已放弃自动重试，请稍后手动重新触发该 Agent',
     'toast.dispatchRetryFailed': '派单重试失败，请手动重新触发该 Agent',
     'toast.pendingDispatchBadge': '待发送 {count} 条',
@@ -600,6 +609,7 @@ export const chatviewResources = {
 
     'chat.you': 'You',
     'transcript.empty': 'No messages yet',
+    'transcript.loading': 'Loading messages…',
 
     // ═══ Empty state scenario copies ═══
     'empty.generalBlank': 'No content yet',
@@ -803,6 +813,14 @@ export const chatviewResources = {
     'toast.forwardSelectTarget': 'Select a target conversation to forward',
     'toast.editFailed': 'Edit failed, please retry',
     'toast.submitFailed': 'Submit failed, please retry',
+    // #1821: message action failures must be visible — no fake success toast.
+    'toast.pinFailed': 'Pin failed, please retry',
+    'toast.unpinFailed': 'Unpin failed, please retry',
+    'toast.recallFailed': 'Recall failed, please retry',
+    'toast.reactionFailed': 'Reaction failed, please retry',
+    'toast.forwardFailed': 'Forward failed, please retry',
+    'toast.regenerateFailed': 'Regenerate failed, please retry',
+    'toast.cancelFailed': 'Cancel failed, please retry',
     'toast.dispatchRetryExhausted': 'Dispatch retried {max} times and was still rejected; auto-retry stopped. Re-trigger the agent manually later.',
     'toast.dispatchRetryFailed': 'Dispatch retry failed; re-trigger the agent manually.',
     'toast.pendingDispatchBadge': '{count} pending',

@@ -194,6 +194,76 @@ describe('Web app root', () => {
     expect(screen.getByText('来自 Hub session 的真实消息')).toBeInTheDocument();
   });
 
+  // #1821: text bubbles carry the same selectable/context-menu identity as
+  // tool rows (`data-selectable-card`), so the context menu can reach the
+  // Hub message actions — and a failed pin must surface an error toast
+  // instead of being swallowed by `.catch(() => {})`.
+  it('surfaces an error toast when pinning a Hub message fails', async () => {
+    const onPinMessage = vi.fn().mockRejectedValue(new Error('pin failed'));
+    useWebWorkbenchModelMock.mockReturnValue({
+      activeConversationId: 'hub-session-1',
+      conversations: [
+        { id: 'hub-session-1', title: '真实 Hub 会话', kind: 'group', subtitle: 'Hub group' },
+      ],
+      transcript: [
+        {
+          id: 'hub-message-1',
+          kind: 'text',
+          author: { id: 'hub-user', name: '用户', role: 'human' },
+          text: '来自 Hub session 的真实消息',
+        },
+      ],
+      chatActions: { onPinMessage },
+    });
+
+    const { container } = render(<App />);
+
+    const card = container.querySelector('[data-selectable-card="hub-message-1"]');
+    expect(card).not.toBeNull();
+    fireEvent.contextMenu(card!);
+
+    const pinItem = await screen.findByRole('menuitem', { name: 'context.pinMessage' });
+    fireEvent.click(pinItem);
+
+    expect(onPinMessage).toHaveBeenCalledWith('1', 'hub-session-1');
+    // The workbench toast surfaces the rejection reason (role=status chrome
+    // toast), not the optimistic success copy.
+    await screen.findByText('pin failed');
+  });
+
+  // #1821: a failed regenerate must keep the message visible and surface an
+  // error toast — no silent swallow, no fake "regenerating" empty state.
+  it('surfaces an error toast when the regenerate request fails', async () => {
+    hubClientStub.regenerateAgentTask.mockRejectedValueOnce(new Error('regenerate failed'));
+    useWebWorkbenchModelMock.mockReturnValue({
+      activeConversationId: 'hub-session-1',
+      conversations: [
+        { id: 'hub-session-1', title: '真实 Hub 会话', kind: 'group', subtitle: 'Hub group' },
+      ],
+      transcript: [
+        {
+          id: 'hub-message-1',
+          kind: 'text',
+          author: { id: 'hub-agent', name: 'Builder', role: 'agent' },
+          text: 'Agent 的回复内容',
+        },
+      ],
+    });
+
+    const { container } = render(<App />);
+
+    const card = container.querySelector('[data-selectable-card="hub-message-1"]');
+    expect(card).not.toBeNull();
+    fireEvent.contextMenu(card!);
+
+    const regenerateItem = await screen.findByRole('menuitem', { name: 'context.regenerate' });
+    fireEvent.click(regenerateItem);
+
+    await screen.findByText('regenerate failed');
+    // The failed regenerate must not hide the original message.
+    expect(screen.getByText('Agent 的回复内容')).toBeInTheDocument();
+  });
+
   it('keeps Hub Agent Profiles available to the shared composer without legacy demo controls', () => {
     useAgentListMock.mockReturnValue({
       data: {

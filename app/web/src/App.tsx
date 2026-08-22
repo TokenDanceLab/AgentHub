@@ -220,9 +220,14 @@ function WebWorkbenchRoot() {
     void agentList.refetch();
   }, [agentList]);
 
-  const handleRegenerate = useCallback((blockId: string) => {
+  const handleRegenerate = useCallback((blockId: string): Promise<void> => {
+    // #1821: return the real promise — the workbench chrome awaits it, so a
+    // failed regenerate shows an error toast and keeps the message visible
+    // instead of silently soft-hiding it behind a fake "regenerating" toast.
     const messageId = blockId.replace(/^hub-message-/, '');
-    void createHubClient({ getToken: getAccessToken }).regenerateAgentTask(messageId).catch(() => {});
+    return createHubClient({ getToken: getAccessToken })
+      .regenerateAgentTask(messageId)
+      .then(() => undefined);
   }, []);
 
   return (
@@ -266,52 +271,49 @@ function WebWorkbenchRoot() {
         }
         onPinMessage={
           chatActions
-            ? (messageId: string, sessionId: string) => {
-                void chatActions.onPinMessage(
+            ? (messageId: string, sessionId: string) =>
+                // #1821: hand the chrome the real promise — success/failure
+                // toasts ride its resolution instead of a swallowed rejection.
+                chatActions.onPinMessage(
                   messageId.replace(/^hub-message-/, ''),
                   sessionId,
-                ).catch(() => {});
-              }
+                )
             : undefined
         }
         onUnpinMessage={
           chatActions
-            ? (messageId: string, sessionId: string) => {
-                void chatActions.onUnpinMessage(
+            ? (messageId: string, sessionId: string) =>
+                chatActions.onUnpinMessage(
                   messageId.replace(/^hub-message-/, ''),
                   sessionId,
-                ).catch(() => {});
-              }
+                )
             : undefined
         }
         onForwardMessage={
           chatActions
-            ? (messageId: string, targetSessionIds: string[]) => {
-                void chatActions.onForwardMessage(
+            ? (messageId: string, targetSessionIds: string[]) =>
+                chatActions.onForwardMessage(
                   messageId.replace(/^hub-message-/, ''),
                   targetSessionIds,
-                ).catch(() => {});
-              }
+                )
             : undefined
         }
         onRecallMessage={
           chatActions
-            ? (messageId: string) => {
-                void chatActions.onRecallMessage(
+            ? (messageId: string) =>
+                chatActions.onRecallMessage(
                   messageId.replace(/^hub-message-/, ''),
-                ).catch(() => {});
-              }
+                )
             : undefined
         }
         onAddMessageReaction={
           chatActions
-            ? (messageId: string, sessionId: string, emoji: string) => {
-                void chatActions.onAddReaction(
+            ? (messageId: string, sessionId: string, emoji: string) =>
+                chatActions.onAddReaction(
                   messageId.replace(/^hub-message-/, ''),
                   sessionId,
                   emoji,
-                ).catch(() => {});
-              }
+                )
             : undefined
         }
         platform={webPlatform}
@@ -321,13 +323,20 @@ function WebWorkbenchRoot() {
         showMainchainStatus={false}
         workbenchStatus={workbench.workbenchStatus}
         transcript={workbench.transcript}
+        transcriptLoading={workbench.transcriptLoading}
         userDisplayName={userProfile.data?.nickname || userProfile.data?.username}
         userAvatarUrl={userProfile.data?.avatar_url}
         currentUserId={userProfile.data?.id}
         skillMarketItems={skillMarketItems}
         skillMarketLoading={hubReady && skillMarketQuery.isFetching}
+        {...(hubReady && skillMarketQuery.error
+          ? { skillMarketError: errorMessage(skillMarketQuery.error, 'Skill market load failed') }
+          : {})}
         mcpMarketItems={mcpMarketItems}
         mcpMarketLoading={hubReady && mcpMarketQuery.isFetching}
+        {...(hubReady && mcpMarketQuery.error
+          ? { mcpMarketError: errorMessage(mcpMarketQuery.error, 'MCP market load failed') }
+          : {})}
       />
       {showAuthModal && (
         <div className={styles.authOverlay} role="presentation">

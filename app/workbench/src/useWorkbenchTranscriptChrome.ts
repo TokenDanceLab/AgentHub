@@ -30,7 +30,12 @@ export interface UseWorkbenchTranscriptChromeOptions {
   transcript: TranscriptBlock[];
   t: (key: string, options?: Record<string, unknown>) => string;
   onApprovalDecision?: ((action: ApprovalDecisionAction) => Promise<void> | void) | undefined;
-  onRegenerate?: ((blockId: string) => void) | undefined;
+  /**
+   * Regenerate port (#1821). May return a Promise: the chrome then awaits it
+   * so the success toast fires after resolution and a rejection surfaces a
+   * failure toast instead of a fake optimistic success.
+   */
+  onRegenerate?: ((blockId: string) => Promise<void> | void) | undefined;
   /**
    * Hub session id for REST message actions (#1383). Optional — Desktop/demo
    * shells omit it; the react/pin/unpin/recall menu entries are then hidden

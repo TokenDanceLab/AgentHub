@@ -148,8 +148,17 @@ export function DesktopWorkbenchApp({ onLogout }: DesktopWorkbenchAppProps = {})
   const { data: modelCatalog } = useModelCatalog(liveEdgeEnabled);
   const { data: ccSwitchStatus } = useCCSwitchStatus(liveEdgeEnabled);
   const { data: ccSwitchProviders } = useCCSwitchProviders(undefined, liveEdgeEnabled);
-  const { data: profileData } = useAgentProfileList(liveEdgeEnabled);
-  const { data: hubProfileData } = useHubAgentProfiles({ enabled: !workbench.isDemo && !liveEdgeEnabled });
+  const {
+    data: profileData,
+    error: profileError,
+    isFetching: profileFetching,
+    refetch: refetchProfiles,
+  } = useAgentProfileList(liveEdgeEnabled);
+  const {
+    data: hubProfileData,
+    error: hubProfileError,
+    refetch: refetchHubProfiles,
+  } = useHubAgentProfiles({ enabled: !workbench.isDemo && !liveEdgeEnabled });
   const createAgentProfile = useCreateAgentProfile();
   const updateAgentProfile = useUpdateAgentProfile();
   const deleteAgentProfile = useDeleteAgentProfile();
@@ -525,17 +534,25 @@ export function DesktopWorkbenchApp({ onLogout }: DesktopWorkbenchAppProps = {})
     }
   }, [createThread, workbench.conversations, workbench.isDemo]);
 
+  // #1821: error must not collapse into a permanent skeleton — surface the
+  // query error (aligned with the Web RecoveryPanel contract) and make retry
+  // a real refetch instead of a no-op.
+  const agentLoadError = liveEdgeEnabled
+    ? agentProfileErrorMessage(profileError ?? hubProfileError)
+    : undefined;
   const agentProfilesStatus = useMemo(() => ({
-    loading: liveEdgeEnabled && (profileData?.items === undefined),
-    error: agentActionError,
-    actionError: agentActionError,
+    loading: liveEdgeEnabled && profileFetching && profileData?.items === undefined,
+    ...(agentLoadError !== undefined ? { error: agentLoadError } : {}),
+    ...(agentActionError !== undefined ? { actionError: agentActionError } : {}),
     savingAgentId,
     deletingAgentId,
-  }), [liveEdgeEnabled, profileData?.items, agentActionError, savingAgentId, deletingAgentId]);
+  }), [liveEdgeEnabled, profileFetching, profileData?.items, agentLoadError, agentActionError, savingAgentId, deletingAgentId]);
 
   const handleAgentsRetry = useCallback(() => {
     setAgentActionError(undefined);
-  }, []);
+    void refetchProfiles();
+    void refetchHubProfiles();
+  }, [refetchProfiles, refetchHubProfiles]);
 
   const workbenchStatus = useMemo(() => ({
     dataMode: workbench.dataMode,
@@ -609,16 +626,36 @@ export function DesktopWorkbenchApp({ onLogout }: DesktopWorkbenchAppProps = {})
         showMainchainStatus={false}
         transcript={workbench.transcript}
         transcriptUnreadDivider={transcriptUnreadDivider}
+        transcriptLoading={workbench.itemsLoading}
         userDisplayName={currentUser?.displayName}
         userAvatarUrl={currentUser?.avatarUrl}
         skillMarketItems={skillMarketItems}
         skillMarketLoading={hubReady && skillMarketQuery.isFetching}
+        {...(hubReady && skillMarketQuery.error
+          ? { skillMarketError: desktopMarketErrorMessage(skillMarketQuery.error, 'Skill 市场加载失败') }
+          : {})}
         mcpMarketItems={mcpMarketItems}
         mcpMarketLoading={hubReady && mcpMarketQuery.isFetching}
+        {...(hubReady && mcpMarketQuery.error
+          ? { mcpMarketError: desktopMarketErrorMessage(mcpMarketQuery.error, 'MCP 市场加载失败') }
+          : {})}
         workbenchStatus={workbenchStatus}
       />
     </>
   );
+}
+
+/** Extract a user-facing message from an agent-profile query error (#1821). */
+function agentProfileErrorMessage(error: unknown): string | undefined {
+  if (!error) return undefined;
+  if (error instanceof Error && error.message.trim()) return error.message;
+  return 'Agent 配置加载失败';
+}
+
+/** Extract a user-facing message from a market query error (#1821). */
+function desktopMarketErrorMessage(error: unknown, fallback: string): string {
+  if (error instanceof Error && error.message.trim()) return error.message;
+  return fallback;
 }
 
 function normalizeHubSkillToMarketItem(raw: Record<string, unknown>): SkillMarketItem {

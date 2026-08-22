@@ -22,8 +22,10 @@ export interface WorkbenchAgentsRouteViewProps {
   onAgentsRetry?: (() => void) | undefined;
   skillMarketItems?: SkillMarketItem[] | undefined;
   skillMarketLoading?: boolean | undefined;
+  skillMarketError?: string | undefined;
   mcpMarketItems?: MCPMarketItem[] | undefined;
   mcpMarketLoading?: boolean | undefined;
+  mcpMarketError?: string | undefined;
   ccSwitchStatus?: import('./pages/AgentsPage').CCSwitchStatusInfo | undefined;
   ccSwitchProviders?: import('./pages/AgentsPage').CCSwitchProviderInfo[] | undefined;
 }
@@ -37,8 +39,10 @@ export function WorkbenchAgentsRouteView({
   onAgentsRetry,
   skillMarketItems,
   skillMarketLoading,
+  skillMarketError,
   mcpMarketItems,
   mcpMarketLoading,
+  mcpMarketError,
   ccSwitchStatus,
   ccSwitchProviders,
 }: WorkbenchAgentsRouteViewProps): React.ReactElement {
@@ -92,8 +96,10 @@ export function WorkbenchAgentsRouteView({
       {...(agentsRoute.effectiveSelectedAgentId ? { selectedAgentId: agentsRoute.effectiveSelectedAgentId } : {})}
       skillMarketItems={skillMarketItems ?? []}
       skillMarketLoading={skillMarketLoading ?? false}
+      skillMarketError={skillMarketError}
       mcpMarketItems={mcpMarketItems ?? []}
       mcpMarketLoading={mcpMarketLoading ?? false}
+      mcpMarketError={mcpMarketError}
       ccSwitchStatus={ccSwitchStatus}
       ccSwitchProviders={ccSwitchProviders}
     />

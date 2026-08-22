@@ -198,8 +198,10 @@ export function WorkbenchRoutes({
   settingsService,
   skillMarketItems,
   skillMarketLoading,
+  skillMarketError,
   mcpMarketItems,
   mcpMarketLoading,
+  mcpMarketError,
   onNavigatePage,
   currentUserId,
   userDisplayName,
@@ -262,8 +264,10 @@ export function WorkbenchRoutes({
           onAgentsRetry={onAgentsRetry}
           skillMarketItems={skillMarketItems}
           skillMarketLoading={skillMarketLoading}
+          skillMarketError={skillMarketError}
           mcpMarketItems={mcpMarketItems}
           mcpMarketLoading={mcpMarketLoading}
+          mcpMarketError={mcpMarketError}
           ccSwitchStatus={ccSwitchStatus}
           ccSwitchProviders={ccSwitchProviders}
         />
