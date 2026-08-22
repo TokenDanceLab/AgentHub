@@ -50,6 +50,7 @@ export const AgentGroup = memo(function AgentGroup({ item, chatMode, onAgentClic
   const renderBubble = useCallback((
     part: {
       text: string
+      blockId?: string
       displayTitle?: string
       displayDetail?: string
       badgeLabel?: string
@@ -57,7 +58,19 @@ export const AgentGroup = memo(function AgentGroup({ item, chatMode, onAgentClic
     },
     key: string,
     showReply: boolean,
-  ) => (
+  ) => {
+    // #1821: text bubbles get the same selectable/context-menu identity tool
+    // rows have (RowItem's `data-selectable-card` + onContextMenu contract) —
+    // only when both an upstream block id and a handler exist.
+    const bubbleBlockId = part.blockId
+    const bubbleProps = bubbleBlockId && onBlockContextMenu
+      ? {
+          'data-block-id': bubbleBlockId,
+          'data-selectable-card': bubbleBlockId,
+          onContextMenu: (event: React.MouseEvent) => onBlockContextMenu(bubbleBlockId, event),
+        }
+      : {}
+    return (
       <div key={key} className="bubble-group">
         <MessageDisplayMeta
           badgeLabel={part.badgeLabel ?? item.badgeLabel}
@@ -71,11 +84,12 @@ export const AgentGroup = memo(function AgentGroup({ item, chatMode, onAgentClic
             <span className="reply-quote-preview">{item.replyPreview ?? ''}</span>
           </div>
         )}
-        <div className="agent-bubble">
+        <div className="agent-bubble" {...bubbleProps}>
           <MarkdownContent content={part.text} />
         </div>
       </div>
-  ), [item.badgeLabel, item.badgeVariant, item.displayDetail, item.displayTitle, item.replyBlockId, item.replyAuthor, item.replyPreview])
+    )
+  }, [item.badgeLabel, item.badgeVariant, item.displayDetail, item.displayTitle, item.replyBlockId, item.replyAuthor, item.replyPreview, onBlockContextMenu])
 
   const renderRow = useCallback((row: (typeof item.rows)[number]) => {
     if (row.type === 'route' && row.orchAgents?.length) {

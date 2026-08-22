@@ -118,16 +118,27 @@ export interface AgentHubWorkbenchProps {
   skillMarketItems?: SkillMarketItem[] | undefined;
   /** Whether Skill market data is loading. */
   skillMarketLoading?: boolean | undefined;
+  /**
+   * Skill market load error (#1821). Shown as the market's error empty state;
+   * absent when the query succeeded or never ran.
+   */
+  skillMarketError?: string | undefined;
   /** Public MCP Server market items from Hub API. */
   mcpMarketItems?: MCPMarketItem[] | undefined;
   /** Whether MCP Server market data is loading. */
   mcpMarketLoading?: boolean | undefined;
+  /** MCP market load error (#1821); same contract as `skillMarketError`. */
+  mcpMarketError?: string | undefined;
   /** Block ID to highlight (e.g. from a search result click). Cleared after 3 s animation. */
   highlightedBlockId?: string | undefined;
   /** Called when the highlight animation ends. */
   onHighlightEnd?: (() => void) | undefined;
-  /** Called when the user requests regeneration of an agent message. Receives the block ID. */
-  onRegenerate?: ((blockId: string) => void) | undefined;
+  /**
+   * Called when the user requests regeneration of an agent message. Receives
+   * the block ID. May return a Promise: the chrome awaits it so a failed
+   * regenerate surfaces an error toast instead of a fake success (#1821).
+   */
+  onRegenerate?: ((blockId: string) => Promise<void> | void) | undefined;
   /** Whether an agent run is currently active (stop button morph, #1462 CF13). */
   isAgentRunning?: boolean | undefined;
   /** Cancel the active agent run (stop button handler). */
@@ -138,7 +149,8 @@ export interface AgentHubWorkbenchProps {
    * Hub REST message actions (#1383). `activeConversationId` is reused as the
    * session id. All handlers receive the raw block id (`hub-message-<uuid>`);
    * parents strip the prefix before calling the Hub API. Optional — Desktop/demo
-   * shells omit them and pin/unpin/recall/react keep the placeholder toast.
+   * shells omit them and pin/unpin/recall/react stay hidden (#1818). Returned
+   * Promises are awaited by the chrome so failures surface a toast (#1821).
    */
   onPinMessage?: ((messageId: string, sessionId: string) => Promise<void> | void) | undefined;
   onUnpinMessage?: ((messageId: string, sessionId: string) => Promise<void> | void) | undefined;
@@ -147,4 +159,10 @@ export interface AgentHubWorkbenchProps {
   onAddMessageReaction?: ((messageId: string, sessionId: string, emoji: string) => Promise<void> | void) | undefined;
   /** WebSocket connection status for the rail indicator dot. */
   connectionStatus?: ConnectionStatusKind | undefined;
+  /**
+   * Transcript items are loading (session switch / first load, #1821). When
+   * the transcript is empty, the chat shows an honest loading state instead
+   * of the misleading "no messages" empty state.
+   */
+  transcriptLoading?: boolean | undefined;
 }

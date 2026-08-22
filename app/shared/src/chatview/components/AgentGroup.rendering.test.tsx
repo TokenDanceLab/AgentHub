@@ -80,6 +80,56 @@ describe('AgentGroup rendering', () => {
     expect(getByText('我会检查这次 Desktop/Web 聊天流。')).toBeInTheDocument();
   });
 
+  it('carries the selectable identity and context-menu trigger on agent text bubbles (#1821)', () => {
+    const item: TranscriptAgentItem = {
+      id: 'agent-bubble-selectable',
+      agent: 'Builder',
+      role: 'agent',
+      time: '',
+      rows: [],
+      standaloneRows: [],
+      runs: [],
+      bubbles: ['Agent 的文本回复'],
+      parts: [
+        { type: 'bubble', text: 'Agent 的文本回复', blockId: 'hub-message-9' },
+      ],
+    };
+    const onBlockContextMenu = vi.fn();
+
+    const { container } = render(
+      <AgentGroup item={item} chatMode="group" onBlockContextMenu={onBlockContextMenu} />,
+    );
+
+    const bubble = container.querySelector('[data-selectable-card="hub-message-9"]');
+    expect(bubble).not.toBeNull();
+    expect(bubble).toHaveAttribute('data-block-id', 'hub-message-9');
+
+    fireEvent.contextMenu(bubble!);
+    expect(onBlockContextMenu).toHaveBeenCalledTimes(1);
+    expect(onBlockContextMenu.mock.calls[0]?.[0]).toBe('hub-message-9');
+  });
+
+  it('keeps bubbles without a block id or handler free of selectable wiring (#1821)', () => {
+    const item: TranscriptAgentItem = {
+      id: 'agent-bubble-plain',
+      agent: 'Builder',
+      role: 'agent',
+      time: '',
+      rows: [],
+      standaloneRows: [],
+      runs: [],
+      bubbles: ['没有上游 block id 的回复'],
+      parts: [
+        { type: 'bubble', text: '没有上游 block id 的回复' },
+      ],
+    };
+
+    const { container } = render(
+      <AgentGroup item={item} chatMode="group" onBlockContextMenu={vi.fn()} />,
+    );
+    expect(container.querySelector('[data-selectable-card]')).toBeNull();
+  });
+
   it('auto-expands fail cards for collapsible non-tool/non-approval/non-sub types', () => {
     const item: TranscriptAgentItem = {
       id: 'agent-fail',

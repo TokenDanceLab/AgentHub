@@ -6,12 +6,32 @@ import { CHATVIEW_I18N_NAMESPACE } from '../i18n/resources'
 import MarkdownContent from '../../ui/Markdown'
 import { MessageDisplayMeta } from './MessageDisplayMeta'
 
-interface Props { item: TranscriptUserItem; chatMode: 'dm' | 'group' }
+interface Props {
+  item: TranscriptUserItem
+  chatMode: 'dm' | 'group'
+  /**
+   * Context-menu trigger for the user message bubble (#1821). Mirrors the
+   * tool-row contract in RowItem: the bubble carries `data-selectable-card`
+   * with the upstream block id and fires this handler on contextmenu.
+   */
+  onContextMenu?: (id: string, event: React.MouseEvent) => void
+}
 
 /** Render a user message bubble in the transcript.
  *  In DM mode: avatar only, right-aligned. In group mode: name + time + avatar. */
-export const UserMessage = memo(function UserMessage({ item, chatMode }: Props) {
+export const UserMessage = memo(function UserMessage({ item, chatMode, onContextMenu }: Props) {
   const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE)
+
+  // #1821: text bubbles get the same selectable/context-menu identity tool
+  // rows have — only when both an upstream block id and a handler exist.
+  const selectableId = item.id
+  const bubbleProps = selectableId && onContextMenu
+    ? {
+        'data-block-id': selectableId,
+        'data-selectable-card': selectableId,
+        onContextMenu: (event: React.MouseEvent) => onContextMenu(selectableId, event),
+      }
+    : {}
 
   if (chatMode === 'dm') {
     return (
@@ -25,7 +45,7 @@ export const UserMessage = memo(function UserMessage({ item, chatMode }: Props) 
             detail={item.displayDetail}
             title={item.displayTitle}
           />
-          <div className="user-bubble">
+          <div className="user-bubble" {...bubbleProps}>
             <MarkdownContent content={item.text} />
           </div>
         </div>
@@ -49,7 +69,7 @@ export const UserMessage = memo(function UserMessage({ item, chatMode }: Props) 
           detail={item.displayDetail}
           title={item.displayTitle}
         />
-        <div className="user-bubble">
+        <div className="user-bubble" {...bubbleProps}>
           <MarkdownContent content={item.text} />
         </div>
       </div>

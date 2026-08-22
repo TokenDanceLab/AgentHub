@@ -81,6 +81,11 @@ export interface ConversationHostProps {
    * the ChatView; absent for non-IM transcripts.
    */
   transcriptUnreadDivider?: UnreadDividerDescriptor | undefined;
+  /**
+   * Transcript items are loading (#1821). With an empty transcript the chat
+   * shows an honest loading state instead of the "no messages" empty state.
+   */
+  transcriptLoading?: boolean | undefined;
 }
 
 type PendingUserBlock = TextTranscriptBlock & {
@@ -112,6 +117,7 @@ export const ConversationHost = React.memo(function ConversationHost({
   searchOpen, onSearchOpenChange,
   isAgentRunning, onCancelRun, onEditMessage,
   transcriptUnreadDivider,
+  transcriptLoading,
 }: ConversationHostProps): React.ReactElement {
   const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE);
   const [uploadProgresses, setUploadProgresses] = useState<Record<string, AttachmentUploadState>>({});
@@ -423,7 +429,8 @@ export const ConversationHost = React.memo(function ConversationHost({
           softHiddenBlockIds={softHiddenBlockIds} actionedBlockIds={actionedBlockIds}
           highlightedBlockId={resolvedHighlight} onHighlightEnd={handleSearchHighlightEnd}
           connectionStatus={connectionStatus} dismissedPinnedIds={dismissedPinnedLocal}
-          onDismissPinned={handleDismissPinned} onToast={onToast} />
+          onDismissPinned={handleDismissPinned} onToast={onToast}
+          {...(transcriptLoading !== undefined ? { transcriptLoading } : {})} />
       </div>
       <MessageSearchPanel open={searchOpen} onClose={() => onSearchOpenChange(false)}
         onJumpToMessage={handleSearchJump} highlightMessageId={searchHighlightId}

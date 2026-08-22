@@ -76,10 +76,26 @@ interface Props {
    * items (merged agent groups are treated as a unit) before passing it down.
    */
   unreadDivider?: UnreadDividerDescriptor | undefined
+  /**
+   * Transcript items are still loading (#1821) — e.g. a session switch or the
+   * first load. When the adapted items are empty, an honest loading state
+   * renders instead of the misleading "no messages" empty state.
+   */
+  transcriptLoading?: boolean | undefined
 }
 
-function EmptyTranscriptState() {
+function EmptyTranscriptState({ loading }: { loading?: boolean }) {
   const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE)
+  // #1821: a loading transcript must not claim "no messages" — session
+  // switches and first loads get an honest loading state instead.
+  if (loading) {
+    return (
+      <EmptyState
+        title={t('transcript.loading')}
+        description={t('empty.generalBlank.desc')}
+      />
+    )
+  }
   return (
     <EmptyState
       title={t('transcript.empty')}
@@ -173,7 +189,7 @@ const visuallyHiddenStyle: React.CSSProperties = {
  * Takes TranscriptBlock[] from the upstream data source and renders via ChatView component tree.
  * i18n resolved via react-i18next (chatview namespace), co-existing with the consumer's root provider.
  */
-export const ChatViewTranscript = memo(function ChatViewTranscript({ transcript, sessionId, chatMode = 'group', onAgentClick, onBlockContextMenu, onBlockSelect, onBlockAction, onReviewFile, onDeploySubmit, selectedBlockIds, selectionMode, softHiddenBlockIds, actionedBlockIds, highlightedBlockId, onHighlightEnd, pinnedAnnouncement, typingUserNames, renderUserFooter, unreadDivider }: Props) {
+export const ChatViewTranscript = memo(function ChatViewTranscript({ transcript, sessionId, chatMode = 'group', onAgentClick, onBlockContextMenu, onBlockSelect, onBlockAction, onReviewFile, onDeploySubmit, selectedBlockIds, selectionMode, softHiddenBlockIds, actionedBlockIds, highlightedBlockId, onHighlightEnd, pinnedAnnouncement, typingUserNames, renderUserFooter, unreadDivider, transcriptLoading }: Props) {
   const items = useMemo(() => {
     try {
       return blocksToTranscriptItems(transcript)
@@ -323,7 +339,7 @@ export const ChatViewTranscript = memo(function ChatViewTranscript({ transcript,
         </div>
       )}
       {items.length === 0 ? (
-        <EmptyTranscriptState />
+        <EmptyTranscriptState {...(transcriptLoading ? { loading: true } : {})} />
       ) : (
         <TranscriptErrorBoundary>
           <Transcript ref={transcriptRef} items={items} chatMode={chatMode} unreadDivider={resolvedUnreadDivider} compactDividers={resolvedCompactDividers} {...(sessionId !== undefined ? { sessionId } : {})} {...(onAgentClick ? { onAgentClick } : {})} {...(onBlockContextMenu ? { onBlockContextMenu } : {})} {...(onBlockSelect ? { onBlockSelect } : {})} {...(onBlockAction ? { onBlockAction } : {})} {...(onReviewFile ? { onReviewFile } : {})} {...(onDeploySubmit ? { onDeploySubmit } : {})} {...(selectedBlockIds ? { selectedBlockIds } : {})} {...(selectionMode !== undefined ? { selectionMode } : {})} {...(softHiddenBlockIds ? { softHiddenBlockIds } : {})} {...(actionedBlockIds ? { actionedBlockIds } : {})} {...(renderUserFooter ? { renderUserFooter } : {})} />
