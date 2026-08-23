@@ -91,7 +91,11 @@ export function DiffReviewFileTabs({
       onKeyDown={handleTabsKeyDown}
     >
       {files.map((file, idx) => {
-        const isTabStop = idx === (rovingTabIndex ?? safeIndex);
+        // #1823: a remembered roving target can dangle after the file
+        // collection changes — fall back to the selected tab so the strip
+        // always keeps exactly one Tab stop.
+        const rovingValid = rovingTabIndex !== null && rovingTabIndex >= 0 && rovingTabIndex < files.length;
+        const isTabStop = idx === (rovingValid ? rovingTabIndex : safeIndex);
         return (
           <button type="button"
             key={file.filePath}

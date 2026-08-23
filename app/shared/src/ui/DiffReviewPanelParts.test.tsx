@@ -174,4 +174,27 @@ describe('DiffReviewFileTabs roving tabindex (#1823)', () => {
     expect(tabs[1]).toHaveAttribute('tabindex', '-1');
     expect(tabs[0]).toHaveAttribute('tabindex', '-1');
   });
+
+  it('falls back to the selected tab when the remembered roving target leaves the collection (#1823)', () => {
+    const onSelectFile = vi.fn();
+    const { rerender } = render(
+      <DiffReviewFileTabs files={mockFiles} safeIndex={0} onSelectFile={onSelectFile} />,
+    );
+    const tabs = screen.getAllByRole('tab');
+    tabs[0]!.focus();
+    fireEvent.keyDown(tabs[0]!, { key: 'ArrowRight' });
+    fireEvent.keyDown(tabs[1]!, { key: 'ArrowRight' });
+    expect(tabs[2]).toHaveAttribute('tabindex', '0');
+
+    // The file collection shrinks — remembered index 2 dangles. The strip
+    // must fall back to the selected tab instead of leaving every remaining
+    // tab at tabIndex=-1 (keyboard users would lose the Tab stop entirely).
+    rerender(
+      <DiffReviewFileTabs files={mockFiles.slice(0, 2)} safeIndex={0} onSelectFile={onSelectFile} />,
+    );
+    const remaining = screen.getAllByRole('tab');
+    expect(remaining).toHaveLength(2);
+    expect(remaining[0]).toHaveAttribute('tabindex', '0');
+    expect(remaining[1]).toHaveAttribute('tabindex', '-1');
+  });
 });

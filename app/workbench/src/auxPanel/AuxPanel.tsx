@@ -88,7 +88,11 @@ export function AuxPanel({
       >
         {available.map((tab) => {
           const selected = tab === effective;
-          const isTabStop = tab === (rovingTabId ?? effective);
+          // #1823: a remembered roving target can dangle after availability
+          // shrinks (e.g. workspace closed) — fall back to the effective
+          // tab so the strip always keeps exactly one Tab stop.
+          const rovingValid = rovingTabId !== null && available.includes(rovingTabId);
+          const isTabStop = tab === (rovingValid ? rovingTabId : effective);
           return (
             <button
               key={tab}

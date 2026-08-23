@@ -98,4 +98,43 @@ describe('AuxPanel tablist roving tabindex (#1823)', () => {
     fireEvent.click(tabs[1]);
     expect(onActiveTabChange).toHaveBeenCalledWith('file_tree');
   });
+
+  it('falls back to the effective tab when availability shrinks (#1823)', () => {
+    const onActiveTabChange = vi.fn();
+    const { rerender } = render(
+      <AuxPanel
+        hasWorkspace
+        activeTab="session_details"
+        onActiveTabChange={onActiveTabChange}
+        labels={labels}
+        children={{
+          session_details: <div>details</div>,
+          file_tree: <div>tree</div>,
+          changes: <div>changes</div>,
+          git_log: <div>log</div>,
+        }}
+      />,
+    );
+    const first = screen.getByRole('tab', { name: '会话详情' });
+    first.focus();
+    fireEvent.keyDown(first, { key: 'ArrowRight' });
+    const second = screen.getByRole('tab', { name: '文件树' });
+    expect(second).toHaveAttribute('tabindex', '0');
+
+    // Workspace closes: only 会话详情 stays available. The remembered
+    // roving target dangles — the strip must fall back to the effective tab
+    // instead of leaving every tab at tabIndex=-1.
+    rerender(
+      <AuxPanel
+        hasWorkspace={false}
+        activeTab="session_details"
+        onActiveTabChange={onActiveTabChange}
+        labels={labels}
+        children={{ session_details: <div>details</div> }}
+      />,
+    );
+    const remaining = screen.getAllByRole('tab');
+    expect(remaining).toHaveLength(1);
+    expect(remaining[0]).toHaveAttribute('tabindex', '0');
+  });
 });

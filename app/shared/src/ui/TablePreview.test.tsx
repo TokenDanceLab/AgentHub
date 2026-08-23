@@ -88,6 +88,54 @@ describe('TablePreview #1823 keyboard accessibility', () => {
     expect(betaTab).toHaveAttribute('tabindex', '-1');
   }, 20000);
 
+  it('uses index-based tab ids so whitespace sheet names keep the tabpanel association (#1823)', async () => {
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([['a'], ['1']]), 'Quarterly Results');
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([['b'], ['2']]), 'Notes');
+    const out = XLSX.write(wb, { type: 'array', bookType: 'xlsx' });
+    const blob = new Blob([out as unknown as BlobPart], {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    });
+    render(<TablePreview fileUrl="/q.xlsx" fileName="q.xlsx" fileBlob={blob} />);
+
+    const qTab = await screen.findByRole('tab', { name: 'Quarterly Results' }, { timeout: 15000 });
+    const panel = screen.getByRole('tabpanel');
+    // Ids derive from the stable sheet index — a name with whitespace can
+    // never break the aria-labelledby idref list.
+    expect(qTab.id).toMatch(/-tab-0$/);
+    expect(panel.id).not.toBe('');
+    expect(panel.getAttribute('aria-labelledby')).toBe(qTab.id);
+    expect(qTab.getAttribute('aria-controls')).toBe(panel.id);
+  }, 20000);
+
+  it('falls back to the active sheet when the remembered roving sheet disappears (#1823)', async () => {
+    const { rerender } = render(
+      <TablePreview fileUrl="/two.xlsx" fileName="two.xlsx" fileBlob={twoSheetBlob()} />,
+    );
+    const alphaTab = await screen.findByRole('tab', { name: 'Alpha' }, { timeout: 15000 });
+    const betaTab = screen.getByRole('tab', { name: 'Beta' });
+    alphaTab.focus();
+    fireEvent.keyDown(alphaTab, { key: 'ArrowRight' });
+    expect(betaTab).toHaveAttribute('tabindex', '0');
+
+    // The sheet collection changes: Beta is gone, replaced by Gamma. The
+    // remembered roving target dangles — the strip must fall back to the
+    // active sheet instead of leaving every tab at tabIndex=-1.
+    const wb2 = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb2, XLSX.utils.aoa_to_sheet([['a', 'b'], ['1', '2']]), 'Alpha');
+    XLSX.utils.book_append_sheet(wb2, XLSX.utils.aoa_to_sheet([['x', 'y'], ['3', '4']]), 'Gamma');
+    const out2 = XLSX.write(wb2, { type: 'array', bookType: 'xlsx' });
+    const blob2 = new Blob([out2 as unknown as BlobPart], {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    });
+    rerender(<TablePreview fileUrl="/three.xlsx" fileName="three.xlsx" fileBlob={blob2} />);
+
+    const gammaTab = await screen.findByRole('tab', { name: 'Gamma' }, { timeout: 15000 });
+    const alphaAfter = screen.getByRole('tab', { name: 'Alpha' });
+    expect(gammaTab).toHaveAttribute('tabindex', '-1');
+    expect(alphaAfter).toHaveAttribute('tabindex', '0');
+  }, 20000);
+
   it('associates the sheet tablist with the table as tabpanel', async () => {
     render(<TablePreview fileUrl="/two.xlsx" fileName="two.xlsx" fileBlob={twoSheetBlob()} />);
     const alphaTab = await screen.findByRole('tab', { name: 'Alpha' }, { timeout: 15000 });

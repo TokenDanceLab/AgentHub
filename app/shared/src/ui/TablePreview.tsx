@@ -241,6 +241,10 @@ export const TablePreview: React.FC<TablePreviewProps> = ({
   const sheetTabsId = useId();
   const [rovingSheetId, setRovingSheetId] = useState<string | null>(null);
 
+  // #1823: tab/panel ARIA ids use the stable sheet index — worksheet names
+  // can contain whitespace, which would break aria-labelledby idrefs.
+  const activeSheetIndex = sheetNames.indexOf(activeSheet);
+
   const handleSheetTabsKeyDown = useCallback((event: React.KeyboardEvent<HTMLDivElement>) => {
     const tabButtons = sheetTabsRef.current
       ? Array.from(sheetTabsRef.current.querySelectorAll<HTMLButtonElement>('[role="tab"]'))
@@ -305,15 +309,19 @@ export const TablePreview: React.FC<TablePreviewProps> = ({
           ref={sheetTabsRef}
           onKeyDown={handleSheetTabsKeyDown}
         >
-          {sheetNames.map((name) => {
+          {sheetNames.map((name, sheetIndex) => {
             const selected = name === activeSheet;
-            const isTabStop = name === (rovingSheetId ?? activeSheet);
+            // #1823: a remembered roving target can dangle after the sheet
+            // collection changes — fall back to the active sheet so the
+            // strip always keeps exactly one Tab stop.
+            const rovingValid = rovingSheetId !== null && sheetNames.includes(rovingSheetId);
+            const isTabStop = name === (rovingValid ? rovingSheetId : activeSheet);
             return (
               <button
                 key={name}
                 role="tab"
                 type="button"
-                id={`${sheetTabsId}-tab-${name}`}
+                id={`${sheetTabsId}-tab-${sheetIndex}`}
                 aria-controls={`${sheetTabsId}-panel`}
                 aria-selected={selected}
                 tabIndex={isTabStop ? 0 : -1}
@@ -360,7 +368,11 @@ export const TablePreview: React.FC<TablePreviewProps> = ({
           className={styles.tableWrapper}
           role="tabpanel"
           id={`${sheetTabsId}-panel`}
-          aria-labelledby={sheetNames.length > 1 ? `${sheetTabsId}-tab-${activeSheet}` : undefined}
+          aria-labelledby={
+            sheetNames.length > 1 && activeSheetIndex >= 0
+              ? `${sheetTabsId}-tab-${activeSheetIndex}`
+              : undefined
+          }
         >
           <table className={styles.table}>
             <thead>

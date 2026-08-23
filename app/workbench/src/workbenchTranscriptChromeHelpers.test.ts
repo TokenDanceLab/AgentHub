@@ -55,6 +55,7 @@ import {
   transcriptBlockIds,
   writeClipboardText,
 } from './workbenchTranscriptChromeHelpers';
+import type { DeleteConfirmRequest } from './workbenchTranscriptChromeHelpers';
 
 const t = (key: string, options?: Record<string, unknown>) => (
   options?.count !== undefined ? `${key}:${options.count}` : key
@@ -761,6 +762,7 @@ describe('workbenchTranscriptChromeHelpers', () => {
       runMultiActionRef: { current: null as ((action: string) => void) | null },
       toastTimerRef: { current: null as number | null },
       pulseTimersRef: { current: new Map<string, number>() },
+      deleteConfirmRef: { current: null },
     };
     const controller = createTranscriptChromeController({
       refs,
@@ -808,6 +810,99 @@ describe('workbenchTranscriptChromeHelpers', () => {
     controller.disposeTimers();
   });
 
+  it('confirm gate snapshot survives controller re-creation (#1823)', () => {
+    // The hook builds the controller inside a useMemo whose deps can change
+    // while the confirm dialog stays mounted on React state. The pending
+    // snapshot lives in the hook-owned ref, so a fresh controller instance
+    // must still confirm the original block set.
+    const refs = {
+      selectionModeRef: { current: false },
+      selectionHoldRef: { current: null },
+      suppressSelectionPointerUpRef: { current: false },
+      runMultiActionRef: { current: null as ((action: string) => void) | null },
+      toastTimerRef: { current: null as number | null },
+      pulseTimersRef: { current: new Map<string, number>() },
+      deleteConfirmRef: { current: null as DeleteConfirmRequest | null },
+    };
+    const writers = {
+      setContextMenu: vi.fn(),
+      setSelectionMode: vi.fn(),
+      setSelectedBlockIds: vi.fn(),
+      setActionedBlockIds: vi.fn(),
+      setSoftHiddenBlockIds: vi.fn(),
+      setSelectBarRect: vi.fn(),
+      setToastMessage: vi.fn(),
+      setToastVisible: vi.fn(),
+      setDeleteConfirmPending: vi.fn(),
+    };
+    const deps = {
+      refs,
+      writers,
+      getTranscript: () => [textBlock({ id: 'a', text: 'Alpha' }), textBlock({ id: 'b', text: 'Beta' })],
+      getSelectedBlockIds: () => ['a', 'b'],
+      t,
+      dispatchComposer: vi.fn(),
+      composerInputRef: { current: null },
+    };
+
+    const first = createTranscriptChromeController(deps);
+    first.runMultiAction('delete');
+    expect(writers.setDeleteConfirmPending).toHaveBeenLastCalledWith({ count: 2, blockIds: ['a', 'b'] });
+    expect(refs.deleteConfirmRef.current).toEqual({ count: 2, blockIds: ['a', 'b'] });
+
+    // Selection mutates while the gate is open, then the controller is
+    // rebuilt (memo deps changed) — the rebuilt instance must still confirm
+    // the snapshot, not the live selection.
+    const rebuilt = createTranscriptChromeController(deps);
+    rebuilt.confirmMultiDelete();
+    expect(writers.setSoftHiddenBlockIds).toHaveBeenCalledTimes(1);
+    const softHideUpdater = writers.setSoftHiddenBlockIds.mock.calls[0]![0] as
+      (current: string[]) => string[];
+    expect(softHideUpdater([])).toEqual(['a', 'b']);
+    expect(refs.deleteConfirmRef.current).toBeNull();
+    expect(writers.setDeleteConfirmPending).toHaveBeenLastCalledWith(null);
+  });
+
+  it('confirmMultiDelete is a strict no-op without a pending gate (#1823)', () => {
+    const refs = {
+      selectionModeRef: { current: false },
+      selectionHoldRef: { current: null },
+      suppressSelectionPointerUpRef: { current: false },
+      runMultiActionRef: { current: null as ((action: string) => void) | null },
+      toastTimerRef: { current: null as number | null },
+      pulseTimersRef: { current: new Map<string, number>() },
+      deleteConfirmRef: { current: null as DeleteConfirmRequest | null },
+    };
+    const writers = {
+      setContextMenu: vi.fn(),
+      setSelectionMode: vi.fn(),
+      setSelectedBlockIds: vi.fn(),
+      setActionedBlockIds: vi.fn(),
+      setSoftHiddenBlockIds: vi.fn(),
+      setSelectBarRect: vi.fn(),
+      setToastMessage: vi.fn(),
+      setToastVisible: vi.fn(),
+      setDeleteConfirmPending: vi.fn(),
+    };
+    const controller = createTranscriptChromeController({
+      refs,
+      writers,
+      getTranscript: () => [textBlock({ id: 'a' }), textBlock({ id: 'b' })],
+      getSelectedBlockIds: () => ['a', 'b'],
+      t,
+      dispatchComposer: vi.fn(),
+      composerInputRef: { current: null },
+    });
+
+    controller.confirmMultiDelete();
+    // Never falls back to the live selection — nothing is hidden, no state
+    // transitions fire, and the gate writer is not touched.
+    expect(writers.setSoftHiddenBlockIds).not.toHaveBeenCalled();
+    expect(writers.setSelectionMode).not.toHaveBeenCalled();
+    expect(writers.setToastVisible).not.toHaveBeenCalled();
+    expect(writers.setDeleteConfirmPending).not.toHaveBeenCalled();
+  });
+
   it('passes conversations into the context menu builder for the forward picker (#1385)', () => {
     const refs = {
       selectionModeRef: { current: false },
@@ -816,6 +911,7 @@ describe('workbenchTranscriptChromeHelpers', () => {
       runMultiActionRef: { current: null },
       toastTimerRef: { current: null },
       pulseTimersRef: { current: new Map<string, number>() },
+      deleteConfirmRef: { current: null },
     };
     const writers = {
       setContextMenu: vi.fn(),

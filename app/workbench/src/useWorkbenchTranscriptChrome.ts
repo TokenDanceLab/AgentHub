@@ -124,6 +124,9 @@ export function useWorkbenchTranscriptChrome({
   const runMultiActionRef = useRef<((action: string) => void) | null>(null);
   const toastTimerRef = useRef<number | null>(null);
   const pulseTimersRef = useRef<Map<string, number>>(new Map());
+  // #1823: pending delete snapshot survives controller re-creation (the
+  // controller useMemo deps can change while the confirm dialog is open).
+  const deleteConfirmRef = useRef<DeleteConfirmRequest | null>(null);
   const transcriptRef = useRef(transcript);
   const selectedBlockIdsRef = useRef(selectedBlockIds);
   const controllerRef = useRef<TranscriptChromeController | null>(null);
@@ -143,6 +146,7 @@ export function useWorkbenchTranscriptChrome({
       runMultiActionRef,
       toastTimerRef,
       pulseTimersRef,
+      deleteConfirmRef,
     },
     writers: {
       setContextMenu,
