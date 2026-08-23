@@ -115,6 +115,26 @@ describe('AgentsPage profile catalog rendering', () => {
     expect(screen.queryByLabelText('Builder AgentSpec fixture')).not.toBeInTheDocument();
   });
 
+  it('shows 未设置 placeholder on empty optional text fields (#1874)', () => {
+    const [baseAgent] = WORKBENCH_AGENT_PROFILE_FIXTURES;
+    const emptyTargetAgent = { ...baseAgent, targetPreference: undefined, targetPreferences: undefined };
+    render(
+      <AgentsPage
+        activePane="installed"
+        onPaneChange={() => undefined}
+        installedCount={1}
+        runnableCount={0}
+        confirmCount={0}
+        defaultModelLabel="DeepSeek-V4-Pro"
+        agents={[emptyTargetAgent]}
+        selectedAgentId={emptyTargetAgent.id}
+        allSkills={WORKBENCH_AGENT_SKILL_OPTIONS}
+        allTools={WORKBENCH_AGENT_TOOL_OPTIONS}
+      />,
+    );
+    expect(screen.getAllByPlaceholderText('未设置').length).toBeGreaterThan(0);
+  });
+
   it('shows market profile configuration summaries before install', () => {
     render(
       <AgentsPage
