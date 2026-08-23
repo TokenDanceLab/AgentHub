@@ -54,8 +54,8 @@ export const WithCustomLabels: Story = {
       empty: 'Nothing to review',
       acceptAll: 'Approve all',
       rejectAll: 'Discard all',
-      acceptLine: 'Accept line',
-      rejectLine: 'Reject line',
+      acceptHunk: 'Accept hunk',
+      rejectHunk: 'Reject hunk',
     },
   },
 };

@@ -154,7 +154,7 @@ function InteractiveDiffPreview({
       if (!interactiveDiff) return;
       if (!previewPort?.applyRunDiff) {
         showToast('warning', t('diffReview.applyUnsupported'));
-        return;
+        throw new Error('diffReview.applyUnsupported');
       }
       try {
         await previewPort.applyRunDiff({
@@ -176,6 +176,7 @@ function InteractiveDiffPreview({
       } catch (err) {
         console.error('[FilePreviewRouter] apply hunk failed:', err);
         showToast('error', t('diffReview.applyFailed'));
+        throw err;
       }
     },
     [interactiveDiff, previewPort, showToast, t]
@@ -186,7 +187,7 @@ function InteractiveDiffPreview({
       if (!interactiveDiff) return;
       if (!previewPort?.applyAllRunDiffs) {
         showToast('warning', t('diffReview.applyUnsupported'));
-        return;
+        throw new Error('diffReview.applyUnsupported');
       }
       try {
         await previewPort.applyAllRunDiffs({
@@ -210,6 +211,7 @@ function InteractiveDiffPreview({
       } catch (err) {
         console.error('[FilePreviewRouter] bulk apply diff failed:', err);
         showToast('error', t('diffReview.applyAllFailed'));
+        throw err;
       }
     },
     [interactiveDiff, previewPort, showToast, t]
