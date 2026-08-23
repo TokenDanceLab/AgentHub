@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { getAccessToken } from '@/hooks/useAuth';
 import { hubQueryKeys } from '@shared/stores/queryKeys';
+import type { TokenUsagePageTeam } from '@agenthub/workbench';
 import { createHubClient } from './hubClient';
 import type {
   AddAgentTeamMemberRequest,
@@ -307,5 +308,50 @@ export function useTeamTasks(
       return client.listTeamTasks(teamId, runId);
     },
     enabled: opts?.enabled ?? (!!teamId && !!runId),
+  });
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   Token usage board (#1819). No aggregate usage endpoint exists on the Hub,
+   so this composes real data client-side: list the caller's teams, then each
+   team's runs, mapping the migration-0066 `token_usage_total` counter through.
+   Pre-0066 runs carry undefined (rendered as “—”, never faked as 0).
+   ═══════════════════════════════════════════════════════════════════════ */
+
+export function useTokenUsageBoard(
+  enabled: boolean,
+  opts?: { getToken?: () => string | null; baseUrl?: string },
+) {
+  return useQuery<TokenUsagePageTeam[]>({
+    queryKey: hubQueryKeys.agentTeams.usageBoard,
+    queryFn: async () => {
+      const token = (opts?.getToken ?? getAccessToken)();
+      if (!token) throw new Error('Hub session is required');
+      const client = createHubClient(
+        opts?.baseUrl ? { baseUrl: opts.baseUrl, getToken: () => token } : { getToken: () => token },
+      );
+      const teams = await client.listAgentTeams();
+      return Promise.all(
+        teams.map(async (team) => {
+          const runs = await client.listTeamRuns(team.id);
+          return {
+            id: String(team.id),
+            name: team.name ? String(team.name) : String(team.id),
+            runs: runs.map((run) => ({
+              id: String(run.id),
+              status: String(run.status),
+              ...(run.created_at ? { createdAt: String(run.created_at) } : {}),
+              ...(run.trigger_message ? { triggerMessage: String(run.trigger_message) } : {}),
+              ...(typeof run.token_usage_total === 'number'
+                ? { tokenUsageTotal: run.token_usage_total }
+                : {}),
+            })),
+          };
+        }),
+      );
+    },
+    enabled,
+    staleTime: 30_000,
+    placeholderData: (prev) => prev,
   });
 }

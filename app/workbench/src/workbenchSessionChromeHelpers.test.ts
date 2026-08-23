@@ -10,6 +10,7 @@ import {
   mapAgentsToComposerMentions,
   resolveComposerTargetLabel,
   resolveCurrentConversationId,
+  resolveDefaultExecutionTargetId,
   serializeMainchainEvidenceExport,
   shouldClearSelectedExecutionTarget,
   shouldLoadLocalCliDiscovery,
@@ -190,6 +191,21 @@ describe('workbenchSessionChromeHelpers', () => {
     expect(shouldClearSelectedExecutionTarget(targets, '')).toBe(false);
     expect(shouldClearSelectedExecutionTarget(targets, 't1')).toBe(false);
     expect(shouldClearSelectedExecutionTarget(targets, 'gone')).toBe(true);
+  });
+
+  it('resolves only confirmed-healthy targets as the default (#1819, #1856)', () => {
+    expect(resolveDefaultExecutionTargetId(undefined)).toBeUndefined();
+    expect(resolveDefaultExecutionTargetId([])).toBeUndefined();
+    expect(resolveDefaultExecutionTargetId([
+      { id: 'a', label: 'A', healthy: false },
+      { id: 'b', label: 'B', healthy: true },
+    ])).toBe('b');
+    expect(resolveDefaultExecutionTargetId([
+      { id: 'a', label: 'A', healthy: false },
+    ])).toBeUndefined();
+    // Unmarked (unknown health) entries never auto-select — explicit
+    // selection remains available, but a default must be confirmed healthy.
+    expect(resolveDefaultExecutionTargetId([{ id: 'a', label: 'A' }])).toBeUndefined();
   });
 
   it('gates local CLI discovery to desktop settings with host port', () => {

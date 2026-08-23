@@ -500,6 +500,10 @@ export interface HubExecutionTarget {
   capabilities?: Record<string, unknown> | string;
   metadata?: Record<string, unknown> | string;
   config?: Record<string, unknown>;
+  // Server DTO (hub-server execution_target.go) serializes the last heartbeat
+  // and the auth method; surfaced in the Devices health detail (#1819).
+  last_seen_at?: string;
+  auth_method?: string;
   created_at?: string;
   updated_at?: string;
 }

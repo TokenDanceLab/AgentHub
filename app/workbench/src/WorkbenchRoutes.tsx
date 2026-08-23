@@ -1,10 +1,12 @@
 import React, { useCallback, useMemo } from 'react';
 import { WorkbenchAgentsRouteView } from './WorkbenchAgentsRouteView';
 import { WorkbenchContactsRouteView } from './WorkbenchContactsRouteView';
+import { WorkbenchDevicesRouteView } from './WorkbenchDevicesRouteView';
 import { WorkbenchDocsRouteView } from './WorkbenchDocsRouteView';
 import { WorkbenchProjectsRouteView } from './WorkbenchProjectsRouteView';
 import { WorkbenchSettingsRouteView } from './WorkbenchSettingsRouteView';
 import { WorkbenchTasksRouteView } from './WorkbenchTasksRouteView';
+import { WorkbenchUsageRouteView } from './WorkbenchUsageRouteView';
 import { PageErrorBoundary } from './PageErrorBoundary';
 import { useWorkbenchAgentsRoute } from './useWorkbenchAgentsRoute';
 import { useWorkbenchContactsRoute } from './useWorkbenchContactsRoute';
@@ -205,6 +207,16 @@ export function WorkbenchRoutes({
   onNavigatePage,
   currentUserId,
   userDisplayName,
+  devicesTargets,
+  devicesLoading,
+  devicesError,
+  onDevicesRetry,
+  devicesPingingId,
+  onDevicePing,
+  usageTeams,
+  usageLoading,
+  usageError,
+  onUsageRetry,
 }: WorkbenchRoutesProps): React.ReactElement {
   const settingsRoute = useWorkbenchSettingsRoute({
     settingsService,
@@ -248,6 +260,8 @@ export function WorkbenchRoutes({
     activePage === 'agents' ||
     activePage === 'runs' ||
     activePage === 'projects' ||
+    activePage === 'devices' ||
+    activePage === 'usage' ||
     activePage === 'settings';
 
   return (
@@ -284,6 +298,28 @@ export function WorkbenchRoutes({
           userDisplayName={userDisplayName}
           onOpenAgentConfig={handleOpenAgentConfig}
         />
+      )}
+      {activePage === 'devices' && (
+        <PageErrorBoundary>
+          <WorkbenchDevicesRouteView
+            targets={devicesTargets}
+            loading={devicesLoading}
+            error={devicesError}
+            onRetry={onDevicesRetry}
+            pingingTargetId={devicesPingingId}
+            onPingTarget={onDevicePing}
+          />
+        </PageErrorBoundary>
+      )}
+      {activePage === 'usage' && (
+        <PageErrorBoundary>
+          <WorkbenchUsageRouteView
+            teams={usageTeams}
+            loading={usageLoading}
+            error={usageError}
+            onRetry={onUsageRetry}
+          />
+        </PageErrorBoundary>
       )}
       <WorkbenchTasksRouteGate
         active={activePage === 'runs'}

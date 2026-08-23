@@ -22,7 +22,13 @@ import {
 } from '@shared/transcript';
 import { useToastStore } from '@shared/ui/toast';
 import { createHubClient } from '@/api/hubClient';
-import { useHubExecutionTargets } from '@/api/executionTargetQueries';
+import {
+  useHubExecutionTargets,
+  usePingHubExecutionTarget,
+  type ExecutionTargetInventoryItem,
+} from '@/api/executionTargetQueries';
+import { useTokenUsageBoard } from '@/api/tokenUsageQueries';
+import type { DevicesPageTarget } from '@agenthub/workbench';
 import {
   useCreateHubWorkspaceProject,
   useHubWorkspaceProjectThreadMessages,
@@ -437,6 +443,9 @@ export function useWebWorkbenchModel(selectedConversationId?: string, selectedPr
           return {
             id,
             label: name ? `${name} (${id})` : id,
+            // Already filtered to online + healthy above; the explicit marker
+            // lets session-chrome default selection trust the entry (#1819).
+            healthy: true,
           };
         })
       : undefined,
@@ -451,6 +460,37 @@ export function useWebWorkbenchModel(selectedConversationId?: string, selectedPr
       targets: executionTargets.data?.items,
     }),
     [hubReady, dataMode, executionTargets.isFetching, executionTargets.error, executionTargets.data],
+  );
+
+  // ── Devices / execution-target management page (#1819) ─────────────
+  // Full registered inventory (not the healthy-only composer filter) with
+  // health detail; ping reuses the existing Hub mutation.
+  const devicesTargets = useMemo(
+    () => hubReady || realMode
+      ? (executionTargets.data?.items ?? []).map(mapWebExecutionTargetToDeviceEntry)
+      : undefined,
+    [hubReady, realMode, executionTargets.data],
+  );
+  const pingExecutionTarget = usePingHubExecutionTarget();
+  const handleDevicePing = useCallback((targetId: string) => {
+    pingExecutionTarget.mutate(targetId, {
+      onSuccess: () => {
+        useToastStore.getState().showToast('success', t('devices.pingOk'));
+      },
+      onError: (err) => {
+        useToastStore.getState().showToast(
+          'error',
+          t('devices.pingFailed', { detail: err instanceof Error ? err.message : String(err) }),
+        );
+      },
+    });
+  }, [pingExecutionTarget, t]);
+
+  // ── Token usage board (#1819) ──────────────────────────────────────
+  const usageBoard = useTokenUsageBoard(hubReady);
+  const usageTeams = useMemo(
+    () => (hubReady || realMode ? usageBoard.data ?? [] : undefined),
+    [hubReady, realMode, usageBoard.data],
   );
 
   // Transcript normalization pipeline (#1352): every step below is pure and
@@ -621,6 +661,22 @@ export function useWebWorkbenchModel(selectedConversationId?: string, selectedPr
     } : undefined,
     conversations: resolvedConversations,
     composerExecutionTargets,
+    // Devices / execution-target management page (#1819)
+    devicesTargets,
+    devicesLoading: executionTargets.isFetching && !executionTargets.data,
+    devicesError: executionTargets.error
+      ? (executionTargets.error instanceof Error ? executionTargets.error.message : String(executionTargets.error))
+      : null,
+    onDevicesRetry: () => { void executionTargets.refetch(); },
+    devicesPingingId: pingExecutionTarget.isPending ? (pingExecutionTarget.variables ?? null) : null,
+    onDevicePing: handleDevicePing,
+    // Token usage board (#1819)
+    usageTeams,
+    usageLoading: usageBoard.isFetching && !usageBoard.data,
+    usageError: usageBoard.error
+      ? (usageBoard.error instanceof Error ? usageBoard.error.message : String(usageBoard.error))
+      : null,
+    onUsageRetry: () => { void usageBoard.refetch(); },
     projects: resolveWebWorkbenchProjects(
       mergeWorkspaceProjectDetail(projects.data?.items, selectedProject.data),
       hubReady,
@@ -703,6 +759,28 @@ export function useWebSessionAutoMarkRead(
     if (!hubReady || !sessionId || lastReadSeq == null) return;
     markReadRef.current({ sessionId, lastReadSeq });
   }, [hubReady, sessionId, lastReadSeq]);
+}
+
+/**
+ * Map a Hub execution-target inventory row to the Devices page entry (#1819).
+ * Only forwards fields the Hub actually returned (exactOptionalPropertyTypes).
+ */
+export function mapWebExecutionTargetToDeviceEntry(
+  target: ExecutionTargetInventoryItem,
+): DevicesPageTarget {
+  const id = String(target.id ?? '');
+  return {
+    id,
+    name: target.name ? String(target.name) : id,
+    targetType: String(target.target_type),
+    healthState: String(target.health_state),
+    isOnline: target.is_online === true,
+    ...(target.trust_level ? { trustLevel: String(target.trust_level) } : {}),
+    ...(target.endpoint ? { endpoint: String(target.endpoint) } : {}),
+    ...(target.workspace_root ? { workspaceRoot: String(target.workspace_root) } : {}),
+    ...(target.device_id ? { deviceId: String(target.device_id) } : {}),
+    ...(target.last_seen_at ? { lastSeenAt: String(target.last_seen_at) } : {}),
+  };
 }
 
 // Stable public re-exports (tests + external consumers)

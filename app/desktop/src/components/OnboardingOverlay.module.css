@@ -1,0 +1,121 @@
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: var(--td-z-overlay);
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: color-mix(in oklch, var(--td-canvas) 72%, transparent);
+  backdrop-filter: blur(6px);
+}
+
+.dialog {
+  width: min(100%, 460px);
+  display: grid;
+  gap: 14px;
+  padding: 28px;
+  border: 1px solid var(--td-line);
+  border-radius: var(--td-radius-panel);
+  background: var(--td-surface);
+  box-shadow: var(--td-shadow-md);
+  outline: none;
+}
+
+.dialog:focus-visible {
+  box-shadow:
+    var(--td-shadow-md),
+    0 0 0 2px var(--td-focus);
+}
+
+.eyebrow {
+  margin: 0;
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--td-ink-subtle);
+}
+
+.title {
+  margin: 0;
+  font-size: 20px;
+  line-height: 1.3;
+  color: var(--td-ink);
+}
+
+.body {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--td-ink-muted);
+}
+
+.progress {
+  display: flex;
+  gap: 8px;
+  margin: 4px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.dot,
+.dotActive {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--r-full);
+  background: var(--td-line);
+  transition:
+    background var(--td-dur-fast) var(--td-ease),
+    transform var(--td-dur-fast) var(--td-ease);
+}
+
+.dotActive {
+  background: var(--td-plum);
+  transform: scale(1.15);
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.primaryButton,
+.secondaryButton {
+  height: 34px;
+  padding: 0 16px;
+  border-radius: var(--td-radius-control);
+  font-size: 13px;
+  cursor: pointer;
+  transition:
+    background var(--td-dur-fast) var(--td-ease),
+    border-color var(--td-dur-fast) var(--td-ease),
+    color var(--td-dur-fast) var(--td-ease);
+}
+
+.primaryButton {
+  border: 1px solid transparent;
+  background: var(--td-plum);
+  color: var(--td-ink-on-plum);
+}
+
+.primaryButton:hover {
+  background: var(--td-plum-hover);
+}
+
+.primaryButton:focus-visible,
+.secondaryButton:focus-visible {
+  outline: 2px solid var(--td-focus);
+  outline-offset: 2px;
+}
+
+.secondaryButton {
+  border: 1px solid var(--td-line);
+  background: var(--td-surface-2);
+  color: var(--td-ink-muted);
+}
+
+.secondaryButton:hover {
+  background: var(--td-tint);
+  color: var(--td-plum);
+}

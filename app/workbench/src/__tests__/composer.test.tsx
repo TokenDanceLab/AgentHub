@@ -262,7 +262,7 @@ describe('AgentHubWorkbench', () => {
     expect(screen.getByText('已复制主链证据 JSON')).toBeInTheDocument();
   });
 
-  it('blocks @Agent task start until a Desktop/Edge target is selected', () => {
+  it('blocks @Agent task start when no healthy Desktop/Edge target is available', () => {
     const platform = createMockPlatform({
       surface: 'web',
       conversations: [{ id: 'team', title: 'Agent 协作群', kind: 'group' }],
@@ -271,7 +271,7 @@ describe('AgentHubWorkbench', () => {
     render(
       <AgentHubWorkbench
         agents={agents}
-        composerExecutionTargets={[{ id: 'target-local-edge-1', label: 'Alpha Desktop' }]}
+        composerExecutionTargets={[{ id: 'target-local-edge-1', label: 'Alpha Desktop', healthy: false }]}
         platform={platform}
         conversations={platform.seed.conversations}
         activeConversationId="team"

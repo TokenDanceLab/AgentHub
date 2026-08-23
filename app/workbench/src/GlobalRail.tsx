@@ -15,6 +15,8 @@ export type GlobalRailPage =
   | 'agents'
   | 'runs'
   | 'projects'
+  | 'devices'
+  | 'usage'
   | 'settings';
 
 interface NavItem {
@@ -30,6 +32,8 @@ const topNavItems: NavItem[] = [
   { id: 'agents', label: 'Agent', icon: 'railAgent' },
   { id: 'runs', label: '任务', icon: 'tasks' },
   { id: 'projects', label: '项目', icon: 'railProjects' },
+  { id: 'devices', label: '设备', icon: 'railDevices' },
+  { id: 'usage', label: '用量', icon: 'railUsage' },
 ];
 
 export type ConnectionStatusKind = 'connected' | 'connecting' | 'disconnected';
@@ -74,6 +78,8 @@ export function GlobalRail({
     agents: t('nav.agents'),
     runs: t('nav.tasks'),
     projects: t('nav.projects'),
+    devices: t('nav.devices'),
+    usage: t('nav.usage'),
     settings: t('user.settings'),
   };
 

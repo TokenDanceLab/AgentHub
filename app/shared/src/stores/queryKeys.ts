@@ -52,6 +52,8 @@ export const hubQueryKeys = {
       ['hub', 'agent-teams', teamId, 'runs', runId, 'events'] as const,
     runTasks: (teamId: string, runId: string) =>
       ['hub', 'agent-teams', teamId, 'runs', runId, 'tasks'] as const,
+    // Token/cost board (#1819): aggregates every team's runs client-side.
+    usageBoard: ['hub', 'agent-teams', 'usage-board'] as const,
   },
 
   // Workspace projects

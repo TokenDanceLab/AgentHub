@@ -104,6 +104,21 @@ export interface WorkbenchRoutesProps {
   currentUserId?: string | undefined;
   /** Current user display name for Settings page. */
   userDisplayName?: string | undefined;
+  /* ── Devices / execution-target management (#1819) ── */
+  /** Registered execution targets; undefined = shell not Hub-connected. */
+  devicesTargets?: import('./pages/DevicesPage').DevicesPageTarget[] | undefined;
+  devicesLoading?: boolean | undefined;
+  devicesError?: string | null | undefined;
+  onDevicesRetry?: (() => void) | undefined;
+  /** Target id currently being pinged (row busy state). */
+  devicesPingingId?: string | null | undefined;
+  onDevicePing?: ((targetId: string) => void) | undefined;
+  /* ── Token / cost usage board (#1819) ── */
+  /** Per-team runs with recorded token counters; undefined = not Hub-connected. */
+  usageTeams?: import('./pages/TokenUsagePage').TokenUsagePageTeam[] | undefined;
+  usageLoading?: boolean | undefined;
+  usageError?: string | null | undefined;
+  onUsageRetry?: (() => void) | undefined;
 }
 
 export type { WorkbenchContactsActions, WorkbenchContactsData } from './useWorkbenchContactsRoute';
