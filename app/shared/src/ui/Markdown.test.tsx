@@ -335,6 +335,6 @@ describe('markdown table header stickiness (codeg parity)', () => {
     const thRule = markdownCss.match(/\.root th\s*\{(?<body>[^}]*)\}/)?.groups?.body ?? '';
     expect(thRule).toMatch(/position:\s*sticky;/);
     expect(thRule).toMatch(/top:\s*0;/);
-    expect(thRule).toMatch(/z-index:\s*1;/);
+    expect(thRule).toMatch(/z-index:\s*var\(--z-base\);/);
   });
 });

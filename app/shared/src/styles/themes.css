@@ -107,13 +107,19 @@ html[data-theme-sync='true'] *::after {
   --authority-edge: var(--success);
   --authority-hybrid: var(--warning);
 
-  /* Run states */
-  --run-queued: rgba(255,255,255,0.08);
-  --run-starting: var(--primary);
-  --run-running: var(--success);
-  --run-completed: var(--success);
-  --run-failed: var(--danger);
-  --run-cancelled: rgba(255,255,255,0.05);
+  /* Run states — dead token family removed (#1827, zero consumers);
+     run status renders via --state-* / semantic colors. */
+
+  /* State tokens (#1827): theme-paired so body text meets WCAG AA.
+     Dark: dark semantic status colors (all ≥4.5:1 on #1a1a20).
+     --state-error aliases --state-failed (referenced by ProjectsPage). */
+  --state-running: var(--info);
+  --state-thinking: var(--info);
+  --state-waiting: var(--warning);
+  --state-success: var(--success);
+  --state-failed: var(--danger);
+  --state-cancelled: var(--text-3);
+  --state-error: var(--state-failed);
 
   --diff-added-bg: var(--diff-add);
   --diff-added-border: var(--success);
@@ -161,6 +167,11 @@ html[data-theme-sync='true'] *::after {
   --td-moss: var(--success);
   --td-danger: var(--danger);
   --td-warning: var(--warning);
+  --td-info: var(--info);
+  --td-info-bg: var(--info-bg);
+  --td-moss-bg: var(--success-bg);
+  --td-warning-bg: var(--warning-bg);
+  --td-danger-bg: var(--danger-bg);
   --td-focus: var(--bdr-focus);
   --td-radius-control: 8px;
   --td-radius-panel: 16px;
@@ -227,12 +238,7 @@ html[data-theme-sync='true'] *::after {
   --agent-dot-online: var(--success);
   --agent-dot-online-glow: 0 0 6px rgba(105,201,103,0.3);
 
-  /* ── Tool category border colors ─────────────── */
-  --tool-edit: #F59E0B;
-  --tool-bash: #22C55E;
-  --tool-agent: #A855F7;
-  --tool-read: #3B82F6;
-  --tool-default: #71717A;
+  /* Tool category border colors — dead token family removed (#1827, zero consumers). */
 
   /* ── Frosted glass material (dark) ───────────── */
   --glass-tint-plum: rgba(41, 171, 226, 0.055);
@@ -370,13 +376,20 @@ html[data-theme-sync='true'] *::after {
   --authority-edge: var(--success);
   --authority-hybrid: var(--warning);
 
-  /* Run states */
-  --run-queued: rgba(0,0,0,0.06);
-  --run-starting: var(--primary);
-  --run-running: var(--success);
-  --run-completed: var(--success);
-  --run-failed: var(--danger);
-  --run-cancelled: rgba(0,0,0,0.04);
+  /* Run states — dead token family removed (#1827, zero consumers);
+     run status renders via --state-* / semantic colors. */
+
+  /* State tokens (#1827): theme-paired so body text meets WCAG AA.
+     Light: pairs with the AA-certified semantic status colors (#259) —
+     #3d6a9e/#8a5a1a/#2d7a4f/#b03c3c are 4.97–5.60:1 on #f8f9fb.
+     --state-error aliases --state-failed (referenced by ProjectsPage). */
+  --state-running: var(--info);
+  --state-thinking: var(--info);
+  --state-waiting: var(--warning);
+  --state-success: var(--success);
+  --state-failed: var(--danger);
+  --state-cancelled: var(--text-3);
+  --state-error: var(--state-failed);
 
   --diff-added-bg: var(--diff-add);
   --diff-added-border: var(--success);
@@ -424,6 +437,11 @@ html[data-theme-sync='true'] *::after {
   --td-moss: var(--success);
   --td-danger: var(--danger);
   --td-warning: var(--warning);
+  --td-info: var(--info);
+  --td-info-bg: var(--info-bg);
+  --td-moss-bg: var(--success-bg);
+  --td-warning-bg: var(--warning-bg);
+  --td-danger-bg: var(--danger-bg);
   --td-focus: var(--bdr-focus);
   --td-radius-control: 8px;
   --td-radius-panel: 16px;
@@ -490,12 +508,7 @@ html[data-theme-sync='true'] *::after {
   --agent-dot-online: #22c55e;
   --agent-dot-online-glow: 0 0 6px rgba(34,197,94,0.25);
 
-  /* ── Tool category border colors ─────────────── */
-  --tool-edit: #D97706;
-  --tool-bash: #16A34A;
-  --tool-agent: #9333EA;
-  --tool-read: #2563EB;
-  --tool-default: #71717A;
+  /* Tool category border colors — dead token family removed (#1827, zero consumers). */
 
   /* ── Glass tokens (light: white frost material) ─── */
   --glass-bg-subtle: rgba(255, 255, 255, 0.44);

@@ -90,7 +90,7 @@
    tooltip there to match the desktop ShellIconButton behaviour. Focus
    trigger still works in principle, but CSS hides it — TODO: a future
    revision should let focus tooltips render on touch. */
-@media (hover: none), (max-width: 767px) {
+@media (hover: none), (max-width: 768px) {
   .tooltip {
     display: none;
   }

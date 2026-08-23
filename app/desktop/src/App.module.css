@@ -188,7 +188,7 @@
   transform: translate3d(0, -50%, 0) scale(1);
 }
 
-@media (hover: none), (max-width: 767px) {
+@media (hover: none), (max-width: 768px) {
   .iconTooltip {
     display: none;
   }
@@ -1352,7 +1352,7 @@
   .inspectorPanel { width: min(var(--right-panel-width, 280px), 40vw); }
 }
 
-@media (max-width: 767px) {
+@media (max-width: 768px) {
   .topBar {
     height: 28px;
     justify-content: flex-end;

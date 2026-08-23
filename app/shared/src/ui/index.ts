@@ -33,6 +33,8 @@ export { CodePreviewCard } from './CodePreviewCard';
 export type { CodePreviewCardProps } from './CodePreviewCard';
 export { StatusNotice } from './StatusNotice';
 export type { StatusNoticeProps } from './StatusNotice';
+export { StatusBadge, getStatusVariantClassName } from './StatusBadge';
+export type { StatusBadgeProps, StatusVariant } from './StatusBadge';
 export { RecoveryPanel } from './RecoveryPanel';
 export type { RecoveryPanelProps } from './RecoveryPanel';
 export {

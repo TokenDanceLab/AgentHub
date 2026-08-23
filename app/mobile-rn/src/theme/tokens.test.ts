@@ -1,7 +1,20 @@
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { DESKTOP_GLASS_TOKEN_ALIASES } from '@agenthub/shared/designTokens';
 
 import { agentHubMobileTokenAliases, agentHubThemes, getAgentHubTheme } from './tokens';
+
+const themesPath = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../shared/src/styles/themes.css');
+
+function cssToken(block: string, name: string): string {
+  const match = block.match(new RegExp(`--${name}:\\s*([^;]+);`));
+  if (!match) {
+    throw new Error(`--${name} not found in themes.css block`);
+  }
+  return match[1]!.trim();
+}
 
 function resolvePath(source: unknown, path: string): unknown {
   return path.split('.').reduce<unknown>((current, segment) => (
@@ -36,7 +49,7 @@ describe('AgentHub mobile tokens', () => {
   it('keeps light mode as the default white-first mobile surface', () => {
     expect(getAgentHubTheme('light', true)).toBe(agentHubThemes.light);
     expect(agentHubThemes.light.scheme).toBe('light');
-    expect(agentHubThemes.light.color.canvas).toBe('#f7f8fa');
+    expect(agentHubThemes.light.color.canvas).toBe('#f8f9fb');
     expect(agentHubThemes.light.color.surfaceStrong).toBe('#ffffff');
   });
 
@@ -47,10 +60,49 @@ describe('AgentHub mobile tokens', () => {
   });
 
   it('uses AgentHub desktop-aligned dark glass values', () => {
-    expect(agentHubThemes.dark.color.canvas).toBe('#1f1f27');
+    expect(agentHubThemes.dark.color.canvas).toBe('#1a1a20');
     expect(agentHubThemes.dark.color.ink).toBe('#e3e4e6');
     expect(agentHubThemes.dark.color.accent).toBe('#29ABE2');
     expect(agentHubThemes.oled.color.accent).toBe('#29ABE2');
+  });
+
+  it('keeps pure-color slots equal to the shared themes.css SSOT (#1820)', () => {
+    const themes = readFileSync(themesPath, 'utf8');
+    const darkBlock = themes.match(/\[data-theme='dark'\]\s*\{([^}]*)\}/)?.[1] ?? '';
+    const lightBlock =
+      themes.match(/:root:not\(\[data-theme='dark'\]\),\s*\[data-theme='light'\]\s*\{([^}]*)\}/)?.[1] ?? '';
+
+    const hexSlots = [
+      ['canvas', 'app-bg'],
+      ['ink', 'text-1'],
+      ['inkMuted', 'text-2'],
+      ['inkSubtle', 'text-3'],
+      ['accent', 'primary'],
+      ['moss', 'success'],
+      ['warning', 'warning'],
+      ['danger', 'danger'],
+      ['onAccent', 'primary-foreground'],
+    ] as const;
+
+    for (const [slot, cssName] of hexSlots) {
+      expect(agentHubThemes.dark.color[slot], `dark.${slot}`).toBe(cssToken(darkBlock, cssName));
+      expect(agentHubThemes.light.color[slot], `light.${slot}`).toBe(cssToken(lightBlock, cssName));
+    }
+  });
+
+  it('keeps registered platform deltas explicit (RN glass proxy / OLED / mobile-only) (#1820)', () => {
+    // surface/panel 基色对齐 themes.css（见 tokens.ts 登记表），alpha 为 RN 玻璃代理
+    expect(agentHubThemes.dark.color.surface).toBe('rgba(36, 36, 45, 0.92)'); // --surface #24242d
+    expect(agentHubThemes.dark.color.panel).toBe('rgba(46, 46, 56, 0.96)'); // --surface-high #2e2e38
+    expect(agentHubThemes.light.color.surface).toBe('rgba(255, 255, 255, 0.92)'); // --surface #ffffff
+    expect(agentHubThemes.light.color.panel).toBe('rgba(241, 243, 245, 0.96)'); // --surface-high #f1f3f5
+    // OLED 黑场子方案 + mobile-only scrim
+    expect(agentHubThemes.oled.color.canvas).toBe('#000000');
+    expect(agentHubThemes.oled.color.danger).toBe('#e87070');
+    expect(agentHubThemes.oled.color.onAccent).toBe('#f4f5ff');
+    expect(agentHubThemes.dark.color.scrim).toBe('rgba(0, 0, 0, 0.48)');
+    // shadowColor 对齐 --e-* rgba(0,0,0,…) 基色
+    expect(agentHubThemes.light.shadow.sm.shadowColor).toBe('#000000');
   });
 
   it('maps every shared Desktop glass mobile alias to an RN token path', () => {

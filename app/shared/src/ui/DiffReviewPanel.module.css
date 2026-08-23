@@ -318,7 +318,7 @@
   padding: 0 6px;
   text-align: right;
   color: var(--td-ink-muted);
-  opacity: 0.4;
+  opacity: var(--opacity-40);
   user-select: none;
   flex-shrink: 0;
 }

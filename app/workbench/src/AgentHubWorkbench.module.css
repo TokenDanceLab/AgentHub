@@ -565,7 +565,7 @@
   display: inline;
   vertical-align: -1px;
   margin-right: 3px;
-  opacity: 0.5;
+  opacity: var(--opacity-50);
   flex-shrink: 0;
 }
 
@@ -811,7 +811,7 @@
   content: '';
   position: absolute;
   inset: 0;
-  z-index: 0;
+  z-index: var(--z-ambient);
   pointer-events: none;
   background: radial-gradient(
     ellipse 640px 360px at 50% 44%,
@@ -1013,7 +1013,7 @@
 /* ── Workspace Header ── */
 .workspaceHeader {
   position: relative;
-  z-index: 1;
+  z-index: var(--z-base);
   display: flex;
   align-items: flex-start;
   gap: var(--sp-10);
@@ -1241,7 +1241,7 @@
   --composer-col: min(100%, 820px);
 
   position: relative;
-  z-index: 12;
+  z-index: var(--z-composer);
   display: grid;
   gap: var(--td-space-2);
   padding: 12px 22px 20px;
@@ -1274,7 +1274,7 @@
 /* ── Reply-To banner above composer ── */
 .replyToBar {
   position: relative;
-  z-index: 1;
+  z-index: var(--z-base);
   pointer-events: auto;
   display: flex;
   align-items: center;
@@ -1329,7 +1329,7 @@
 /* ── Quote preview banner above composer ── */
 .quoteBar {
   position: relative;
-  z-index: 1;
+  z-index: var(--z-base);
   pointer-events: auto;
   display: flex;
   align-items: center;
@@ -1388,7 +1388,7 @@
 
 .composerRow {
   position: relative;
-  z-index: 1;
+  z-index: var(--z-base);
   pointer-events: auto;
   display: flex;
   align-items: center;
@@ -1454,7 +1454,7 @@
 .composerDragOverlay {
   position: absolute;
   inset: -1px;
-  z-index: 2;
+  z-index: calc(var(--z-base) + 1);
   pointer-events: none;
   display: flex;
   align-items: center;
@@ -1468,7 +1468,7 @@
 
 .composerMentions {
   position: relative;
-  z-index: 1;
+  z-index: var(--z-base);
   pointer-events: auto;
   display: flex;
   flex-wrap: wrap;
@@ -1508,7 +1508,7 @@
 
 .composerMainchain {
   position: relative;
-  z-index: 1;
+  z-index: var(--z-base);
   pointer-events: auto;
   display: flex;
   flex-wrap: wrap;
@@ -1614,7 +1614,7 @@
 }
 
 .composerAgentSelect:disabled {
-  opacity: 0.65;
+  opacity: var(--opacity-65);
   cursor: not-allowed;
 }
 
@@ -1635,13 +1635,13 @@
 }
 
 .composerTargetSelect:disabled {
-  opacity: 0.65;
+  opacity: var(--opacity-65);
   cursor: not-allowed;
 }
 
 .composerStatus {
   position: relative;
-  z-index: 1;
+  z-index: var(--z-base);
   width: min(100%, 820px);
   margin: -2px auto 0;
   display: flex;
@@ -1792,7 +1792,7 @@
 }
 
 .attachmentButton:disabled {
-  opacity: 0.5;
+  opacity: var(--opacity-50);
   cursor: not-allowed;
 }
 
@@ -1809,7 +1809,7 @@
 /* ── Attachment preview bar ── */
 .composerAttachmentBar {
   position: relative;
-  z-index: 1;
+  z-index: var(--z-base);
   pointer-events: auto;
   display: flex;
   flex-wrap: wrap;
@@ -2229,7 +2229,7 @@
 .inspectorTab:disabled {
   color: var(--td-ink-subtle);
   cursor: not-allowed;
-  opacity: 0.5;
+  opacity: var(--opacity-50);
 }
 
 .inspectorTabIcon {
@@ -2278,7 +2278,7 @@
 
 .inspectorPanel {
   position: relative;
-  z-index: 0;
+  z-index: var(--z-ambient);
   width: var(--inspector-w);
   min-width: var(--inspector-w);
   flex: 1;
@@ -2678,7 +2678,7 @@
 }
 
 /* ═══ Container queries ═══ */
-@media (max-width: 760px) {
+@media (max-width: 768px) {
   .shell,
   .shell[data-inspector-collapsed='true'],
   .shell[data-sidebar-collapsed='true'],
@@ -3142,7 +3142,7 @@
   -webkit-backdrop-filter: var(--glass-backdrop-filter);
   box-shadow: var(--glass-elev-1);
   overflow: hidden;
-  z-index: 2;
+  z-index: calc(var(--z-base) + 1);
   /* #1825: dock mount/unmount was a hard snap; WorkbenchFrame defers the
      unmount by 180ms (useExiting) so the exit animation can play. */
   animation: terminalDockIn var(--dur-normal) var(--ease-panel);
@@ -3230,7 +3230,7 @@
   position: fixed;
   top: -100%;
   left: 12px;
-  z-index: 1000;
+  z-index: calc(var(--z-toast) + 1);
   padding: 10px 16px;
   border-radius: var(--td-radius-control);
   background: var(--td-plum);

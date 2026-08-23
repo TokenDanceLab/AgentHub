@@ -8,7 +8,7 @@
   position: sticky;
   bottom: 16px;
   align-self: center;
-  z-index: 10;
+  z-index: var(--z-chat-float);
   flex-shrink: 0;
   width: 36px;
   height: 36px;
@@ -22,7 +22,7 @@
   justify-content: center;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
   transition: opacity 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
-  opacity: 0.85;
+  opacity: var(--opacity-85);
 }
 .scroll-to-bottom-btn:hover {
   opacity: 1;
@@ -112,7 +112,7 @@
   --chat-col:min(100%, 820px);
 
   position:absolute;
-  z-index:11;
+  z-index:var(--z-chat-pinned);
   top:8px;
   left:max(20px, calc((100% - var(--chat-col)) / 2));
   width:min(calc(100% - 40px), var(--chat-col));

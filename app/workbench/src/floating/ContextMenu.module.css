@@ -145,7 +145,7 @@
   position: absolute;
   top: 0;
   left: 100%;
-  z-index: 2;
+  z-index: calc(var(--z-base) + 1);
   padding: var(--sp-xxs);
   border: 1px solid var(--glass-border-strong, var(--td-line-strong));
   border-radius: var(--r-md);
