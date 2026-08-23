@@ -123,11 +123,10 @@ Applied first to AuxPanel, TerminalPanel, Card glass/elevated. Respect `prefers-
 | Score rubric / pass bar | 分数值不再由本仓维护（旧 `visual-qa-scorecard.md` 已不在源仓，`docs/history.md` 无对应外迁条目——89/100 等分数断言不可复核，已删除）；验收以 `visual:qa:shell` 截图证据 + PR 人工审阅为准 |
 | Optional multi-scene battery | `app/web/scripts/visual-qa.mjs` — **legacy / non-gate** (do not use for merge gate) |
 
-**窄视口门禁（#1827 结论：本轮不做）**。理由：断点体系尚未落地（见 §10——760–1920 区间无
-布局策略、JS 断点 hook 在途），desktop Tauri 窗口 `minWidth 800×minHeight 600`；此时设
-1 个窄视口（如 900×810）门禁只会把「主区被压」的现状固化进红色门禁，而修复责任在响应式
-lane——本 lane 无法闭环。处置：断点 lane 合并后，在 `visual-qa-shell.mjs` 补 ≥1 个窄视口
-场景并同步 `assert-visual-qa-shell.mjs` 期望文件清单，届时再开为门禁。
+**窄视口状态**。断点 SSOT 与 `useMediaQuery` 已由 #1861/#1864 落地；2026-08-23 的
+768px 补充检查暴露 Agents 页仍会裁切（#1866）。当前 merge gate 仍是 1440×810 light+dark；
+在 #1866 完成页面重排与行为断言前，768px 截图只能作为诊断证据，不能写成已通过的 Visual QA。
+#1866 关闭时应把 768px 场景加入 Desktop/Web capture，并同步对应非空白/几何断言。
 
 Do not cite `1440x920` as the Desktop/Web gate viewport.
 
@@ -140,4 +139,4 @@ Do not cite `1440x920` as the Desktop/Web gate viewport.
 | Fluid type | `--headline-*` / `--body-lg` / `--title-sm` | `clamp()`; `--body` / `--label` stay fixed 14/12 |
 | Root scale wide | `html` @ 1920 / 2560 | 17px / 18px for viewing distance |
 | HiDPI glass | `@media (min-resolution: 192dpi)` in tokens + themes | blur ~1.4×, stronger hairline borders, focus ring 3–4px |
-| Breakpoint SSOT | `tokens-base.css` 注释声明 + `styles/breakpoints.ts` JS 表（双份同改，`breakpoints.test.ts` cross-check）——minimal 420 / mobile 480 / compact 720 / narrow 768 / medium 1024 / standard 1280 / wide 1440 / xwide 1920 / ultra 2560（`--bp-narrow: 768px` 由 `tokens-base.test.ts` 断言） | 剩余非 SSOT `@media`：`app/web/src/components/AuthPage.module.css` 760（legacy，未归一至 narrow 768）+ desktop/App.module.css 1023/1279（既定成对约定）。760–1920 布局策略仍无 CSS `@media`；JS hook 在 #1827 响应式部分在途 |
+| Breakpoint SSOT | `tokens-base.css` 注释声明 + `styles/breakpoints.ts` JS 表（双份同改，`breakpoints.test.ts` cross-check）——minimal 420 / mobile 480 / compact 720 / narrow 768 / medium 1024 / standard 1280 / wide 1440 / xwide 1920 / ultra 2560（`--bp-narrow: 768px` 由 `tokens-base.test.ts` 断言） | React 响应式消费统一走 `app/shared/src/hooks/useMediaQuery.ts`；剩余非 SSOT `@media` 仅 `app/web/src/components/AuthPage.module.css` 的 legacy 760，Desktop `App.module.css` 的 1023/1279 是登记的成对窗口约定。Agents 页 768px 消费缺口由 #1866 跟踪。 |

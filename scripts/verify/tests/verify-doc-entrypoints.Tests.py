@@ -13,6 +13,7 @@ mirroring the original ps1 test. Negative behaviors proven here (#1719):
 - README one-sided maturity change (DOC-README-PARITY)
 - AGENTS.md over the 300-line budget (DOC-MAX-LINES)
 - verifier-map owner pointer missing from AGENTS.md (DOC-VERIFIER-MAP-OWNER)
+- drift-prone AGENTS section-number reference (DOC-AGENTS-NUMBERED-REF)
 """
 
 import hashlib
@@ -79,12 +80,19 @@ class VerifyDocEntrypointsTests(unittest.TestCase):
             os.path.join(REPO_ROOT, "docs", "README.md"),
             os.path.join(self.fixture, "docs", "README.md"),
         )
-        shutil.copyfile(
-            os.path.join(REPO_ROOT, "docs", "governance", "README.md"),
-            os.path.join(self.fixture, "docs", "governance", "README.md"),
-        )
-        verifier_map_rel = os.path.join("docs", "governance", "verifier-map.md")
-        shutil.copyfile(os.path.join(REPO_ROOT, verifier_map_rel), os.path.join(self.fixture, verifier_map_rel))
+        # Overlay all tracked Markdown from the caller so behavior tests exercise
+        # the exact documentation surface under review, including unstaged edits.
+        markdown_files = subprocess.run(
+            ["git", "-C", REPO_ROOT, "ls-files", "*.md"],
+            capture_output=True, text=True, encoding="utf-8", errors="replace", check=True,
+        ).stdout.splitlines()
+        for rel in markdown_files:
+            source = os.path.join(REPO_ROOT, rel)
+            target = os.path.join(self.fixture, rel)
+            if not os.path.isfile(source):
+                continue
+            os.makedirs(os.path.dirname(target) or self.fixture, exist_ok=True)
+            shutil.copyfile(source, target)
 
         # Mirror the caller's doc-slimming state: docs/analysis, docs/plan,
         # docs/progress and docs/roadmap.md were removed on master but still
@@ -204,6 +212,20 @@ class VerifyDocEntrypointsTests(unittest.TestCase):
         finally:
             self.restore_bytes(readme_path, original_bytes)
 
+    def assert_agents_numbered_reference(self):
+        readme_path = os.path.join(self.fixture, "README.md")
+        with open(readme_path, "rb") as handle:
+            original_bytes = handle.read()
+        try:
+            with open(readme_path, "a", encoding="utf-8", newline="\n") as handle:
+                handle.write("\n分支规则见 `AGENTS.md` §6。\n")
+            self.assert_failure_code(
+                "DOC-AGENTS-NUMBERED-REF",
+                "README with drift-prone AGENTS section-number reference",
+            )
+        finally:
+            self.restore_bytes(readme_path, original_bytes)
+
     def assert_agents_line_budget(self):
         agents_path = os.path.join(self.fixture, "AGENTS.md")
         with open(agents_path, "rb") as handle:
@@ -249,6 +271,7 @@ class VerifyDocEntrypointsTests(unittest.TestCase):
             self.assert_readme_owner_link_required()
             self.assert_sibling_escape_link()
             self.assert_readme_maturity_parity()
+            self.assert_agents_numbered_reference()
             self.assert_agents_line_budget()
             self.assert_verifier_map_owner()
 
