@@ -108,6 +108,39 @@
 | a11y | 自动消失提供可见时间或可暂停（成功态可放宽） | ✅ | hover/focus 触发 `pauseAutoDismiss`（ToastStack.tsx + toastStore.ts）满足「可暂停」分支；结论见下方 debt 台账 |
 | 响应式 | 窄宽下堆叠不遮挡主操作、可滚动查看 | ✅ | |
 
+### DevicesPage（`app/workbench/src/pages/DevicesPage.tsx`，三件套齐全）
+
+| 维度 | 必选项 | 状态 | 备注 |
+|---|---|---|---|
+| 视觉 | token 化配色（健康/告警/错误徽章 + 行边框） | ✅ | `--td-moss`/`--td-warning`/`--td-danger`/`--td-line` 等 |
+| 视觉 | light/dark 对比度与 2x 边框 | ✅ | 随 DevicesPage.stories.tsx 巡检 |
+| 交互 | ping 按钮异步禁用/恢复、错误重试、空态/未登录态 | ✅ | DevicesPage.test.tsx 行为断言 |
+| 键盘 | Tab 聚焦、Enter/Space 触发 ping/retry | ✅ | 原生 button 语义 |
+| a11y | 可访问名称、`:focus-visible` 焦点环、状态行语义 | ✅ | 错误态 `role="alert"`、空态 `role="status"` |
+| 响应式 | 字段换行、长端点截断、无横向滚动 | ✅ | 字段 flex-wrap + ellipsis |
+
+### TokenUsagePage（`app/workbench/src/pages/TokenUsagePage.tsx`，三件套齐全）
+
+| 维度 | 必选项 | 状态 | 备注 |
+|---|---|---|---|
+| 视觉 | token 化卡片/表格/状态徽章 | ✅ | `--td-surface-2`/`--td-line`/`--td-plum` 等 |
+| 视觉 | light/dark 对比度与 2x 边框 | ✅ | 随 TokenUsagePage.stories.tsx 巡检 |
+| 交互 | 错误重试、空态/未登录态、未记录计数显示「—」不造假 0 | ✅ | TokenUsagePage.test.tsx 行为断言 |
+| 键盘 | Tab 聚焦、Enter/Space 触发 retry | ✅ | 原生 button 语义 |
+| a11y | 可访问名称、`:focus-visible`、`role="alert"`/`role="status"` | ✅ | |
+| 响应式 | 团队卡片自适应栅格、表格列不溢出、无横向滚动 | ✅ | `auto-fill` 栅格 + 数字列 nowrap |
+
+### OnboardingOverlay（`app/desktop/src/components/OnboardingOverlay.tsx`，三件套齐全）
+
+| 维度 | 必选项 | 状态 | 备注 |
+|---|---|---|---|
+| 视觉 | token 化遮罩/面板/按钮 | ✅ | `--td-surface`/`--td-plum`/`--td-z-overlay` 等 |
+| 视觉 | light/dark 对比度 | ✅ | 随 OnboardingOverlay.stories.tsx 巡检 |
+| 交互 | 步进/跳过/完成调用 onFinish、Esc 关闭 | ✅ | OnboardingOverlay.test.tsx 行为断言 |
+| 键盘 | Esc 关闭、焦点移入/归还、Tab 循环 | ✅ | 复用共享 `useFocusTrap`（`app/shared/src/ui/focusTrap.ts`）；OnboardingOverlay.test.tsx 断言初始聚焦、Tab 环绕与关闭后焦点归还触发元素 |
+| a11y | `role="dialog"` + `aria-modal`、步骤进度可访问名 | ✅ | `aria-label` + `aria-current="step"` |
+| 响应式 | 窄宽下面板自适应、无横向滚动 | ✅ | `min(100%, 460px)` |
+
 ## 验收记录与 debt
 
 ### Modal / ToastStack debt 台账（2026-08-22 范本复核）

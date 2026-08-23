@@ -287,6 +287,16 @@ export function buildWorkbenchFrameProps(
   assignDefined(frameProps, 'onCancelRun', props.onCancelRun);
   assignDefined(frameProps, 'onEditMessage', props.onEditMessage);
   assignDefined(frameProps, 'transcriptLoading', props.transcriptLoading);
+  assignDefined(frameProps, 'devicesTargets', props.devicesTargets);
+  assignDefined(frameProps, 'devicesLoading', props.devicesLoading);
+  assignDefined(frameProps, 'devicesError', props.devicesError);
+  assignDefined(frameProps, 'onDevicesRetry', props.onDevicesRetry);
+  assignDefined(frameProps, 'devicesPingingId', props.devicesPingingId);
+  assignDefined(frameProps, 'onDevicePing', props.onDevicePing);
+  assignDefined(frameProps, 'usageTeams', props.usageTeams);
+  assignDefined(frameProps, 'usageLoading', props.usageLoading);
+  assignDefined(frameProps, 'usageError', props.usageError);
+  assignDefined(frameProps, 'onUsageRetry', props.onUsageRetry);
   assignDefined(frameProps, 'children', children);
 
   return frameProps;

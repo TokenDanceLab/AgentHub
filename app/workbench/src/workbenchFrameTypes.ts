@@ -126,7 +126,7 @@ export interface ChatConversationHostFrameProps {
   toggleInspector: () => void;
   showMainchainStatus: boolean;
   workbenchStatus?: WorkbenchFrameWorkbenchStatus | undefined;
-  composerExecutionTargets?: Array<{ id: string; label: string }> | undefined;
+  composerExecutionTargets?: Array<{ id: string; label: string; healthy?: boolean }> | undefined;
   showComposerAgentPicker: boolean;
   showComposerStatus: boolean;
   highlightedBlockId?: string | undefined;
@@ -189,6 +189,18 @@ export interface WorkbenchRoutesFrameProps {
   onNavigatePage: (page: GlobalRailPage) => void;
   currentUserId?: string | undefined;
   userDisplayName?: string | undefined;
+  /* ── Devices / execution-target management (#1819) ── */
+  devicesTargets?: import('./pages/DevicesPage').DevicesPageTarget[] | undefined;
+  devicesLoading?: boolean | undefined;
+  devicesError?: string | null | undefined;
+  onDevicesRetry?: (() => void) | undefined;
+  devicesPingingId?: string | null | undefined;
+  onDevicePing?: ((targetId: string) => void) | undefined;
+  /* ── Token / cost usage board (#1819) ── */
+  usageTeams?: import('./pages/TokenUsagePage').TokenUsagePageTeam[] | undefined;
+  usageLoading?: boolean | undefined;
+  usageError?: string | null | undefined;
+  onUsageRetry?: (() => void) | undefined;
 }
 
 export interface ChatInspectorFrameProps {

@@ -360,6 +360,14 @@ export const ConversationHost = React.memo(function ConversationHost({
       const submitPayload = { ...finalIntent, ...(selectedExecutionTargetId ? { executionTargetId: selectedExecutionTargetId } : {}) };
       const submitResult = await platform.runs.submitComposerIntent(submitPayload);
       dispatchComposer({ type: 'setSubmitState', submitState: 'idle' });
+      // #1819: a send without a dispatch mention delivers the message but
+      // triggers no agent task — say so explicitly instead of failing silent.
+      const submittedDispatchMention = submitPayload.mentions.find(
+        (mention) => mention.dispatchRole !== 'context',
+      );
+      if (!submittedDispatchMention) {
+        onToast(t('toast.sentWithoutDispatch'));
+      }
       // Recoverable 409 turn_in_progress: the Hub message was sent (SendMessage
       // is independent) but task dispatch was rejected because the agent instance
       // already has a non-terminal task (#1430). Keep the optimistic user block

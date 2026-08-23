@@ -236,6 +236,16 @@ function WebWorkbenchRoot() {
         activeConversationId={workbench.activeConversationId}
         agents={agents}
         composerExecutionTargets={workbench.composerExecutionTargets}
+        devicesTargets={workbench.devicesTargets}
+        devicesLoading={workbench.devicesLoading}
+        devicesError={workbench.devicesError}
+        onDevicesRetry={workbench.onDevicesRetry}
+        devicesPingingId={workbench.devicesPingingId}
+        onDevicePing={workbench.onDevicePing}
+        usageTeams={workbench.usageTeams}
+        usageLoading={workbench.usageLoading}
+        usageError={workbench.usageError}
+        onUsageRetry={workbench.onUsageRetry}
         connectionStatus={realMode ? connectionStatus : undefined}
         agentProfilesStatus={agentProfilesStatus}
         contacts={workbench.contacts}

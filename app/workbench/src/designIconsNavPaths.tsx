@@ -47,6 +47,22 @@ export function navIconPaths(name: DesignNavIconName): React.ReactNode {
           <rect x="14" y="14" width="7" height="7" />
         </>
       );
+    case 'railDevices':
+      return (
+        <>
+          <rect x="3" y="4.5" width="18" height="12" rx="2" />
+          <path d="M2 20h20" />
+        </>
+      );
+    case 'railUsage':
+      return (
+        <>
+          <path d="M5 20v-6" />
+          <path d="M12 20V6" />
+          <path d="M19 20v-10" />
+          <path d="M3 20h18" />
+        </>
+      );
     case 'railSettings':
       return (
         <>

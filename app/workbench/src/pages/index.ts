@@ -61,3 +61,13 @@ export type {
   TasksPane,
   ViewMode,
 } from './TasksPage';
+
+export { DevicesPage } from './DevicesPage';
+export type { DevicesPageProps, DevicesPageTarget, DevicesSummary } from './DevicesPage';
+
+export { TokenUsagePage } from './TokenUsagePage';
+export type {
+  TokenUsagePageProps,
+  TokenUsagePageTeam,
+  TokenUsagePageRun,
+} from './TokenUsagePage';
