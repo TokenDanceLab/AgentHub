@@ -182,6 +182,11 @@ describe('workbenchAgentsRouteHelpers', () => {
     expect(resolveAgentSkills([], ['skill-a'])).toEqual(['skill-a']);
     expect(resolveAgentTools([AGENT_A, AGENT_B])).toEqual(['Browser Screenshot', 'Read File', 'Shell']);
     expect(resolveAgentTools([], ['tool-a'])).toEqual(['tool-a']);
+
+    // #1872: real mode must not silently fall back to mock catalogs.
+    expect(resolveAgentModels(undefined, [AGENT_A], undefined, true)).toEqual([]);
+    expect(resolveAgentSkills([], undefined, true)).toEqual([]);
+    expect(resolveAgentTools([], undefined, true)).toEqual([]);
   });
 
   it('resolves selection guards and adjacent agent ids', () => {

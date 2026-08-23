@@ -58,6 +58,7 @@ export interface WorkbenchAgentsRoute {
   agentsPane: AgentsPaneId;
   setAgentsPane: (pane: AgentsPaneId) => void;
   agentConfigs: AgentConfig[];
+  realDataMode: boolean;
   resolvedModels: ModelInfo[];
   resolvedSkills: string[];
   resolvedTools: string[];
@@ -123,8 +124,9 @@ export function resolveAgentModels(
   modelCatalog: WorkbenchAgentsModelCatalogItem[] | undefined,
   agentConfigs: AgentConfig[],
   mockModels: ModelInfo[] = WORKBENCH_MOCK_AGENT_MODELS,
+  realDataMode: boolean = false,
 ): ModelInfo[] {
-  if (!modelCatalog || modelCatalog.length === 0) return mockModels;
+  if (!modelCatalog || modelCatalog.length === 0) return realDataMode ? [] : mockModels;
   return modelCatalog.map((item) => ({
     name: item.label || item.value,
     state: resolveModelCatalogState(item),
@@ -136,19 +138,21 @@ export function resolveAgentModels(
 export function resolveAgentSkills(
   agentConfigs: AgentConfig[],
   mockSkills: string[] = WORKBENCH_MOCK_AGENT_SKILL_OPTIONS,
+  realDataMode: boolean = false,
 ): string[] {
   // uniqueSorted keeps the same collation that builds the mock option
   // lists — a bare .sort() orders mixed zh/en names differently (#1826).
   const fromAgents = uniqueSorted(agentConfigs.flatMap((a) => a.skills).filter(Boolean));
-  return fromAgents.length > 0 ? fromAgents : mockSkills;
+  return fromAgents.length > 0 ? fromAgents : realDataMode ? [] : mockSkills;
 }
 
 export function resolveAgentTools(
   agentConfigs: AgentConfig[],
   mockTools: string[] = WORKBENCH_MOCK_AGENT_TOOL_OPTIONS,
+  realDataMode: boolean = false,
 ): string[] {
   const fromAgents = uniqueSorted(agentConfigs.flatMap((a) => Object.keys(a.tools)).filter(Boolean));
-  return fromAgents.length > 0 ? fromAgents : mockTools;
+  return fromAgents.length > 0 ? fromAgents : realDataMode ? [] : mockTools;
 }
 
 export function resolveEffectiveSelectedAgentId(

@@ -51,8 +51,9 @@ export function WorkbenchAgentsRouteView({
       agentsRoute.agentConfigs,
       agentsRoute.resolvedTools,
       agents !== undefined,
+      agentsRoute.realDataMode,
     ),
-    [agents, agentsRoute.agentConfigs, agentsRoute.resolvedTools],
+    [agents, agentsRoute.agentConfigs, agentsRoute.resolvedTools, agentsRoute.realDataMode],
   );
 
   return (
@@ -64,13 +65,13 @@ export function WorkbenchAgentsRouteView({
       agentsLoading={agentProfilesStatus?.loading}
       allSkills={agentsRoute.resolvedSkills}
       allTools={agentsRoute.resolvedTools}
-      auditEntries={WORKBENCH_MOCK_AGENT_AUDIT_ROWS}
+      auditEntries={agentsRoute.realDataMode ? [] : WORKBENCH_MOCK_AGENT_AUDIT_ROWS}
       confirmCount={model.confirmCount}
       defaultModelLabel={model.defaultModelLabel}
       installedCount={model.installedCount}
       marketFeatured={model.marketFeatured}
       marketTemplates={model.marketTemplates}
-      modelHealthRows={WORKBENCH_MOCK_AGENT_MODEL_HEALTH}
+      modelHealthRows={agentsRoute.realDataMode ? [] : WORKBENCH_MOCK_AGENT_MODEL_HEALTH}
       modelRoutes={model.modelRoutes}
       models={agentsRoute.resolvedModels}
       onPaneChange={agentsRoute.setAgentsPane}
@@ -84,7 +85,7 @@ export function WorkbenchAgentsRouteView({
       onMarketInstall={agentsRoute.handleMarketInstall}
       onAgentsRetry={onAgentsRetry}
       onToolPermissionSet={agentsRoute.handleToolPermissionSet}
-      policyRules={WORKBENCH_MOCK_AGENT_POLICY_RULES}
+      policyRules={agentsRoute.realDataMode ? [] : WORKBENCH_MOCK_AGENT_POLICY_RULES}
       recentShortcuts={model.recentShortcuts}
       runnableCount={model.runnableCount}
       saveStateLabel={agentsRoute.agentSaveStateLabel()}
@@ -92,7 +93,7 @@ export function WorkbenchAgentsRouteView({
       savingAgentId={agentProfilesStatus?.savingAgentId}
       deletingAgentId={agentProfilesStatus?.deletingAgentId}
       toolMatrixAgents={model.toolMatrixAgents}
-      toolMatrixTools={WORKBENCH_MOCK_AGENT_TOOL_OPTIONS}
+      toolMatrixTools={agentsRoute.realDataMode ? [] : WORKBENCH_MOCK_AGENT_TOOL_OPTIONS}
       {...(agentsRoute.effectiveSelectedAgentId ? { selectedAgentId: agentsRoute.effectiveSelectedAgentId } : {})}
       skillMarketItems={skillMarketItems ?? []}
       skillMarketLoading={skillMarketLoading ?? false}
