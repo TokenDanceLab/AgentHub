@@ -67,8 +67,8 @@ describe('AgentHubWorkbench', () => {
     );
 
     const shell = screen.getByTestId('agenthub-workbench');
-    const sidebar = screen.getByRole('complementary', { name: 'Conversation sidebar' });
-    const resizer = screen.getByRole('separator', { name: '调整最近频道宽度' });
+    const sidebar = screen.getByRole('complementary', { name: '会话侧边栏' });
+    const resizer = screen.getByRole('separator', { name: '调整侧边栏宽度' });
 
     expect(shell).toHaveStyle({ '--sidebar-w': '260px' });
     expect(shell).toHaveAttribute('data-sidebar-collapsed', 'false');
@@ -248,7 +248,7 @@ describe('AgentHubWorkbench', () => {
           transcript={transcript}
         />,
       );
-      const sidebar = screen.getByRole('complementary', { name: 'Conversation sidebar' });
+      const sidebar = screen.getByRole('complementary', { name: '会话侧边栏' });
       const select = within(sidebar).getByRole('combobox');
       fireEvent.change(select, { target: { value: 'name' } });
       expect(select).toHaveValue('name');
@@ -277,7 +277,7 @@ describe('AgentHubWorkbench', () => {
           transcript={transcript}
         />,
       );
-      const sidebar = screen.getByRole('complementary', { name: 'Conversation sidebar' });
+      const sidebar = screen.getByRole('complementary', { name: '会话侧边栏' });
       const select = within(sidebar).getByRole('combobox');
       fireEvent.change(select, { target: { value: 'name' } });
       expect(select).toHaveValue('name');
@@ -347,7 +347,7 @@ describe('AgentHubWorkbench', () => {
           transcript={transcript}
         />,
       );
-      const sidebar = screen.getByRole('complementary', { name: 'Conversation sidebar' });
+      const sidebar = screen.getByRole('complementary', { name: '会话侧边栏' });
       const select = within(sidebar).getByRole('combobox');
       fireEvent.change(select, { target: { value: 'active' } });
       expect(select).toHaveValue('active');

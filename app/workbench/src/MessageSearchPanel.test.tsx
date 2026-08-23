@@ -1,7 +1,15 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeAll } from 'vitest';
 import { render, screen, fireEvent, act } from '@testing-library/react';
 import MessageSearchPanel from './MessageSearchPanel';
 import type { ChatMessage } from '@shared/types/chat';
+
+// The close-button aria-label resolves through the chatview bundle (en
+// keeps the original 'Close search' copy) — opt into en (Issue #1717).
+import { useTestI18nLanguage } from '@shared/testing/i18n';
+
+beforeAll(async () => {
+  await useTestI18nLanguage('en');
+});
 
 const baseMessages: ChatMessage[] = [
   {

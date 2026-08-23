@@ -54,7 +54,8 @@
     "ariaLabel": "线程消息与 Run 时间线",
     "title": "IM 消息流",
     "subtitle": "@Agent 协作",
-    "empty": "此线程未加载消息。"
+    "empty": "此线程未加载消息。",
+    "emptyHint": "发送一条消息以开始这段对话。"
   },
   "message": {
     "author": {
@@ -157,6 +158,6 @@
     "loading": "正在加载 Hub 快照。Reducer 拿到真实数据前，写入操作会保持锁定。",
     "offlineSnapshot": "Hub 已离线。当前显示最后一次 reducer 快照，写入操作已锁定。",
     "offlineEmpty": "Hub 不可用，且尚未加载任何快照。页面不会展示伪造的成功状态。",
-    "empty": "尚无 Hub 快照数据。请登录并连接 Hub 以加载项目、线程、Agent 和 Run。"
+    "empty": "尚无 Hub 快照数据。请登录并连接 Hub 以加载项目、线程、Run 和 Runtime 清单。"
   }
 }

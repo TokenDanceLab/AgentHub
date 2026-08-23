@@ -473,7 +473,7 @@ describe('AgentHubWorkbench', () => {
     );
 
     fireEvent.click(screen.getByRole('button', { name: 'Agent' }));
-    const agentsPage = screen.getByRole('region', { name: 'Workbench page' });
+    const agentsPage = screen.getByRole('region', { name: '工作台页面' });
     const agentsAlert = within(agentsPage).getByRole('alert', { name: 'Agent 加载失败' });
     expect(agentsAlert).toHaveTextContent('Hub AgentProfiles unavailable');
     expect(within(agentsPage).queryByRole('region', { name: '暂无已安装 Agent' })).not.toBeInTheDocument();
@@ -481,13 +481,13 @@ describe('AgentHubWorkbench', () => {
     expect(within(agentsPage).queryByText('DeepSeek-V4-Pro')).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: '项目' }));
-    const projectsPage = screen.getByRole('region', { name: 'Workbench page' });
+    const projectsPage = screen.getByRole('region', { name: '工作台页面' });
     expect(within(projectsPage).getByRole('alert')).toHaveTextContent('Hub Projects unavailable');
     expect(within(projectsPage).getByRole('heading', { name: '暂无项目' })).toBeInTheDocument();
     expect(within(projectsPage).queryByRole('heading', { name: 'AI 游戏项目' })).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: '任务' }));
-    const tasksPage = screen.getByRole('region', { name: 'Workbench page' });
+    const tasksPage = screen.getByRole('region', { name: '工作台页面' });
     // Real mode without a task backend shows the honest coming-soon empty
     // state instead of mock task rows (#1818).
     const tasksEmpty = within(tasksPage).getByRole('region', { name: /任务列表即将接入|Task list is coming soon/i });
@@ -606,7 +606,7 @@ describe('AgentHubWorkbench', () => {
     );
 
     fireEvent.click(screen.getByRole('button', { name: '任务' }));
-    const page = screen.getByRole('region', { name: 'Workbench page' });
+    const page = screen.getByRole('region', { name: '工作台页面' });
 
     expect(screen.getByTestId('agenthub-workbench')).toHaveAttribute('data-page', 'runs');
     expect(within(page).getByRole('heading', { name: '我负责的' })).toBeInTheDocument();

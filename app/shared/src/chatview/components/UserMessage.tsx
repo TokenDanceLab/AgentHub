@@ -6,6 +6,10 @@ import { CHATVIEW_I18N_NAMESPACE } from '../i18n/resources'
 import MarkdownContent from '../../ui/Markdown'
 import { MessageDisplayMeta } from './MessageDisplayMeta'
 
+function userAvatarInitial(name: string | undefined, fallback: string): string {
+  return (name?.trim() || fallback).slice(0, 1).toUpperCase()
+}
+
 interface Props {
   item: TranscriptUserItem
   chatMode: 'dm' | 'group'
@@ -21,6 +25,7 @@ interface Props {
  *  In DM mode: avatar only, right-aligned. In group mode: name + time + avatar. */
 export const UserMessage = memo(function UserMessage({ item, chatMode, onContextMenu }: Props) {
   const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE)
+  const avatarInitial = userAvatarInitial(item.name, t('chat.you'))
 
   // #1821: text bubbles get the same selectable/context-menu identity tool
   // rows have — only when both an upstream block id and a handler exist.
@@ -49,7 +54,7 @@ export const UserMessage = memo(function UserMessage({ item, chatMode, onContext
             <MarkdownContent content={item.text} />
           </div>
         </div>
-        <div className="dm-avatar"><div className="ag-av user-av">D</div></div>
+        <div className="dm-avatar"><div className="ag-av user-av">{avatarInitial}</div></div>
       </div>
     )
   }
@@ -73,7 +78,7 @@ export const UserMessage = memo(function UserMessage({ item, chatMode, onContext
           <MarkdownContent content={item.text} />
         </div>
       </div>
-      <div className="dm-avatar"><div className="ag-av user-av">D</div></div>
+      <div className="dm-avatar"><div className="ag-av user-av">{avatarInitial}</div></div>
     </div>
   )
 })

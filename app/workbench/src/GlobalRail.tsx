@@ -165,7 +165,7 @@ export function GlobalRail({
   }
 
   return (
-    <nav aria-label="Global rail" className={styles.rail} onKeyDown={handleRailKeyDown} ref={railRef}>
+    <nav aria-label={t('aria.globalRail')} className={styles.rail} onKeyDown={handleRailKeyDown} ref={railRef}>
       <div
         aria-label={displayName}
         aria-expanded={profileOpen}

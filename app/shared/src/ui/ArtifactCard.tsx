@@ -1,11 +1,13 @@
 import { useState } from 'react';
 import { FileText, Globe, Image, Monitor, Download, ExternalLink, CheckCircle2 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { formatComposerAttachmentSize as formatSize } from '../composer/attachments';
 import { Button } from './Button';
 import { SkeletonBar } from './SkeletonBar';
 import styles from './ArtifactCard.module.css';
 import { PREVIEW_SANDBOX_REMOTE } from './previewSandbox';
 import { Tooltip } from './Tooltip';
+import { CHATVIEW_I18N_NAMESPACE } from '../chatview/i18n/resources';
 
 export interface ArtifactCardProps {
   artifactId: string;
@@ -35,6 +37,7 @@ export function ArtifactCard({
   canApplyDiff,
   diffApplied,
 }: ArtifactCardProps) {
+  const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE);
   const Icon = TYPE_ICON[artifactType] ?? FileText;
   const sizeLabel = formatSize(size);
   const url = artifactUrl;
@@ -51,7 +54,7 @@ export function ArtifactCard({
         {sizeLabel && <span className={styles.size}>{sizeLabel}</span>}
         <div className={styles.actions}>
           {canApplyDiff && !diffApplied && (
-            <Tooltip label="Apply diff">
+            <Tooltip label={t('ui.applyDiff', 'Apply diff')}>
               <Button
                 variant="secondary"
                 size="sm"
@@ -60,7 +63,7 @@ export function ArtifactCard({
                     new CustomEvent('agenthub:apply-artifact-diff', { detail: { artifactId } }),
                   )
                 }
-                aria-label="Apply diff"
+                aria-label={t('ui.applyDiff', 'Apply diff')}
               >
                 <CheckCircle2 size={14} />
                 <span className={styles.applyLabel}>Apply</span>
@@ -74,25 +77,25 @@ export function ArtifactCard({
             </span>
           )}
           {url && (
-            <Tooltip label="Open artifact">
+            <Tooltip label={t('ui.openArtifact', 'Open artifact')}>
               <a
                 className={styles.iconAction}
                 href={url}
                 target="_blank"
                 rel="noopener noreferrer"
-                aria-label="Open artifact"
+                aria-label={t('ui.openArtifact', 'Open artifact')}
               >
                 <ExternalLink size={14} />
               </a>
             </Tooltip>
           )}
           {url && (
-            <Tooltip label="Download artifact">
+            <Tooltip label={t('ui.downloadArtifact', 'Download artifact')}>
               <a
                 className={styles.iconAction}
                 href={url}
                 download
-                aria-label="Download artifact"
+                aria-label={t('ui.downloadArtifact', 'Download artifact')}
               >
                 <Download size={14} />
               </a>

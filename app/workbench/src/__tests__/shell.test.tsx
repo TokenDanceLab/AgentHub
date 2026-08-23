@@ -38,13 +38,13 @@ describe('AgentHubWorkbench', () => {
       />,
     );
 
-    expect(screen.getByRole('navigation', { name: 'Global rail' })).toBeInTheDocument();
-    expect(screen.getByRole('complementary', { name: 'Conversation sidebar' })).toBeInTheDocument();
-    expect(screen.getByRole('main', { name: 'Workspace' })).toHaveAttribute('data-surface', 'desktop');
-    expect(screen.getByRole('complementary', { name: 'Right inspector' })).toBeInTheDocument();
+    expect(screen.getByRole('navigation', { name: '全局导航栏' })).toBeInTheDocument();
+    expect(screen.getByRole('complementary', { name: '会话侧边栏' })).toBeInTheDocument();
+    expect(screen.getByRole('main', { name: '工作区' })).toHaveAttribute('data-surface', 'desktop');
+    expect(screen.getByRole('complementary', { name: '右侧窗口' })).toBeInTheDocument();
     /* #1821: the workspace header tab row (消息/云文档/新建频道) was dead chrome —
        no shell callback could switch views — and was removed. */
-    expect(screen.queryByRole('tablist', { name: 'Workspace tabs' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('tablist', { name: '工作区标签页' })).not.toBeInTheDocument();
     expect(screen.queryByRole('tab', { name: '云文档' })).not.toBeInTheDocument();
     /* P76: default primary card is overview only. */
     const inspectorTablist = screen.getByRole('tablist', { name: '右侧工作区' });
@@ -66,7 +66,7 @@ describe('AgentHubWorkbench', () => {
     expect(screen.queryByRole('button', { name: 'Plan' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Deploy' })).not.toBeInTheDocument();
     expect(screen.queryByTestId('composer-attachment-input')).not.toBeInTheDocument();
-    const transcriptRegion = screen.getByRole('region', { name: 'Transcript' });
+    const transcriptRegion = screen.getByRole('region', { name: '会话记录' });
     expect(within(transcriptRegion).getByText('全面参考 tokendance-design/desktop')).toBeInTheDocument();
     expect(within(transcriptRegion).getAllByText('Read desktop/index.html').length).toBeGreaterThan(0);
     expect(within(transcriptRegion).queryByText('Hub replay for desktop run')).not.toBeInTheDocument();
@@ -97,7 +97,7 @@ describe('AgentHubWorkbench', () => {
 
     const skipLink = screen.getByRole('link', { name: '跳到主要内容' });
     expect(skipLink).toHaveAttribute('href', '#main-content');
-    expect(screen.getByRole('main', { name: 'Workspace' })).toHaveAttribute('id', 'main-content');
+    expect(screen.getByRole('main', { name: '工作区' })).toHaveAttribute('id', 'main-content');
   });
 
   it('opens and toggles the keyboard-shortcuts help overlay with the global ? key', () => {

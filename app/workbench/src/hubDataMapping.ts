@@ -8,6 +8,8 @@
  * Extracted from app/web/src/platform/useWebWorkbenchModel.ts to avoid drift.
  */
 
+import { appDateLocaleTag } from '@shared/i18n/locale';
+import { getI18n } from 'react-i18next';
 import type { ContactMember, ProjectInfo } from './pages';
 import type { WorkbenchContactsData } from './WorkbenchRoutes';
 import type { DocRow } from './pages/DocsPage';
@@ -285,7 +287,7 @@ function formatSessionTime(value: string | undefined): string | undefined {
   if (!value) return undefined;
   const parsed = Date.parse(value);
   if (!Number.isFinite(parsed)) return undefined;
-  return new Date(parsed).toLocaleString('zh-CN', {
+  return new Date(parsed).toLocaleString(appDateLocaleTag(getI18n()?.language), {
     hour: '2-digit',
     minute: '2-digit',
     month: '2-digit',

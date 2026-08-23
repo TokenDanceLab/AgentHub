@@ -1,6 +1,7 @@
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { SHARED_WORKBENCH_I18N_NAMESPACE } from '@shared/i18n';
+import { CHATVIEW_I18N_NAMESPACE } from '@shared/chatview/i18n/resources';
 import { buildInspectorEvidenceModel } from '@shared/inspector';
 import type { FileDiff } from '@shared/types/chat';
 import {
@@ -59,6 +60,7 @@ export function RightInspector({
   width,
 }: RightInspectorProps): React.ReactElement {
   const { t } = useTranslation(SHARED_WORKBENCH_I18N_NAMESPACE);
+  const { t: tChatview } = useTranslation(CHATVIEW_I18N_NAMESPACE);
   const inspectorTabs = getInspectorTabs(t);
   const [activeMode, setActiveMode] = useState<InspectorMode>('overview');
   const [visibleTabs, setVisibleTabs] = useState<Set<InspectorMode>>(() => new Set(defaultVisibleTabs));
@@ -158,7 +160,7 @@ export function RightInspector({
   return (
     <aside
       aria-hidden={collapsed}
-      aria-label="Right inspector"
+      aria-label={tChatview('aria.rightInspector')}
       className={styles.inspector}
       data-preview={inspectorDataPreviewAttr(activeMode)}
       /* #1823: `aria-hidden` must never wrap focusable content. `inert`

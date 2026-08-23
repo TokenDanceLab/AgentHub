@@ -73,7 +73,7 @@ describe('AgentHubWorkbench', () => {
       />,
     );
 
-    const transcriptRegion = screen.getByRole('region', { name: 'Transcript' });
+    const transcriptRegion = screen.getByRole('region', { name: '会话记录' });
     expect(within(transcriptRegion).getByText('检查当前 DesktopUI')).toBeInTheDocument();
     expect(within(transcriptRegion).getByText('我先检查浏览器中的聊天布局。')).toBeInTheDocument();
     expect(within(transcriptRegion).queryByText('2 agents active')).not.toBeInTheDocument();
@@ -397,7 +397,7 @@ describe('AgentHubWorkbench', () => {
       />,
     );
 
-    fireEvent.change(screen.getByRole('textbox', { name: 'Composer input' }), {
+    fireEvent.change(screen.getByRole('textbox', { name: '输入框' }), {
       target: { value: '研究一下AgentHub项目' },
     });
     fireEvent.click(screen.getByRole('button', { name: '发送消息' }));
@@ -426,7 +426,7 @@ describe('AgentHubWorkbench', () => {
       />,
     );
 
-    fireEvent.change(screen.getByRole('textbox', { name: 'Composer input' }), {
+    fireEvent.change(screen.getByRole('textbox', { name: '输入框' }), {
       target: { value: '继续修复聊天流' },
     });
     fireEvent.click(screen.getByRole('button', { name: '发送消息' }));
@@ -473,7 +473,7 @@ describe('AgentHubWorkbench', () => {
     );
 
     for (let index = 0; index < 2; index += 1) {
-      fireEvent.change(screen.getByRole('textbox', { name: 'Composer input' }), {
+      fireEvent.change(screen.getByRole('textbox', { name: '输入框' }), {
         target: { value: '继续修复聊天流' },
       });
       fireEvent.click(screen.getByRole('button', { name: '发送消息' }));

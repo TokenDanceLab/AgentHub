@@ -46,6 +46,7 @@ const workspaceLabel = /^(Workspace|aria\.workspace)$/;
 const workspaceTabsLabel = /^(Workspace tabs|aria\.workspaceTabs)$/;
 const conversationSidebarLabel = /^(Conversation sidebar|aria\.conversationSidebar)$/;
 const composerInputLabel = /^(Composer input|aria\.composerInput)$/;
+const globalRailLabel = /^(Global rail|aria\.globalRail)$/;
 const sendMessageLabel = /^(发送消息|Send message|profile\.sendMessage)$/;
 const atAgentLabel = /^(@Agent|aria\.atAgent)$/;
 
@@ -145,7 +146,7 @@ describe('Web app root', () => {
     const { container } = render(<App />);
     const text = visibleText(container);
 
-    expect(screen.getByRole('navigation', { name: 'Global rail' })).toBeInTheDocument();
+    expect(screen.getByRole('navigation', { name: globalRailLabel })).toBeInTheDocument();
     expect(screen.getByRole('complementary', { name: conversationSidebarLabel })).toBeInTheDocument();
     expect(screen.getByRole('main', { name: workspaceLabel })).toHaveAttribute('data-surface', 'web');
     expect(screen.queryByRole('group', { name: 'Window controls' })).not.toBeInTheDocument();

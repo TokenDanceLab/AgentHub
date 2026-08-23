@@ -85,7 +85,7 @@
   border-radius: var(--td-radius-control);
   background: transparent;
   color: var(--td-ink-muted);
-  font-size: var(--font-size-2xs);
+  font-size: var(--td-text-xs);
   font-family: var(--td-font);
   font-weight: var(--font-weight-medium);
   white-space: nowrap;

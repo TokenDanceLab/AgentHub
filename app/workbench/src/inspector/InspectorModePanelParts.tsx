@@ -1,6 +1,8 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import type { EvidenceRef, ContextUsageTranscriptBlock } from '@shared/transcript';
 import { formatTokens } from '@shared/context/breakdown';
+import { CHATVIEW_I18N_NAMESPACE } from '@shared/chatview/i18n/resources';
 import {
   DesignFileIcon,
   DesignNavIcon,
@@ -35,6 +37,7 @@ export function OverviewContextUsage({
 }: {
   blocks: ContextUsageTranscriptBlock[];
 }): React.ReactElement {
+  const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE);
   // Use the latest block (most recent context usage snapshot).
   const latest = resolveLatestContextUsage(blocks);
   if (!latest) {
@@ -45,7 +48,7 @@ export function OverviewContextUsage({
   const barVariant = contextBarVariantClass(usagePercent, styles);
 
   return (
-    <div className={styles.contextSection} role="status" aria-label="Context usage">
+    <div className={styles.contextSection} role="status" aria-label={t('aria.contextUsage')}>
       <div className={styles.contextHead}>
         <span>{latest.modelLabel || 'Context'}</span>
         {usagePercent != null && (
@@ -113,13 +116,14 @@ export function BrowserPanelFallback({
   onOpenPreview?: ((evidence: EvidenceRef) => Promise<void>) | undefined;
   onOpenUrl: (url: string) => void;
 }): React.ReactElement {
+  const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE);
   if (artifacts.length > 0) {
     return (
       <div className={styles.browserPreviewCard}>
         <DesignNavIcon className={styles.browserPreviewIcon} name="browser" size={24} />
         <strong>浏览器预览已启用</strong>
         <span>{`检测到 ${artifacts.length} 个可预览产物。`}</span>
-        <ul aria-label="Preview artifacts" className={styles.browserArtifactList}>
+        <ul aria-label={t('aria.previewArtifacts')} className={styles.browserArtifactList}>
           {artifacts.map((artifact) => {
             const canOpen = canOpenEvidence(artifact, onOpenPreview, canOpenPreview);
             return (
@@ -176,9 +180,10 @@ export function FilesPanel({
   onFallbackFileClick?: ((file: FileItem) => void) | undefined;
   onOpenPreview?: ((evidence: EvidenceRef) => Promise<void>) | undefined;
 }): React.ReactElement {
+  const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE);
   if (files.length === 0 && fallbackFiles && fallbackFiles.length > 0) {
     return (
-      <ul aria-label="Changed files" className={styles.fileList}>
+      <ul aria-label={t('aria.changedFiles')} className={styles.fileList}>
         {fallbackFiles.map((file) => (
           <li key={file.name}>
             <button type="button"
@@ -207,7 +212,7 @@ export function FilesPanel({
   }
 
   return (
-    <ul aria-label="Changed files" className={styles.fileList}>
+    <ul aria-label={t('aria.changedFiles')} className={styles.fileList}>
       {files.map((file) => {
         const canOpen = canOpenEvidence(file, onOpenPreview, canOpenPreview);
         return (

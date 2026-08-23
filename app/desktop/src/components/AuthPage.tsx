@@ -110,16 +110,16 @@ export default function AuthPage({ onLoginSuccess, onClose }: Props) {
       {showAdvanced && (
         <div className={styles.devPanel}>
           <div className={styles.devRow}>
-            <span className={styles.devLabel}>Hub REST</span>
+            <span className={styles.devLabel}>{t('auth.hubRest')}</span>
             <span className={styles.devValue}>{hubUrl}</span>
             <span className={hubDotClass} aria-hidden="true" />
           </div>
           <div className={styles.devRow}>
-            <span className={styles.devLabel}>Hub WS</span>
+            <span className={styles.devLabel}>{t('auth.hubWs')}</span>
             <span className={styles.devValue}>{HUB_WS_URL}</span>
           </div>
           <div className={styles.devRow}>
-            <span className={styles.devLabel}>Status</span>
+            <span className={styles.devLabel}>{t('auth.hubStatus')}</span>
             <span className={styles.devValue}>
               {hubStatus === 'connected' ? t('auth.hubConnected')
                 : hubStatus === 'disconnected' ? t('auth.hubDisconnected')

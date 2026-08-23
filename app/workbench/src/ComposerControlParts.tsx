@@ -31,7 +31,7 @@ export function ComposerAgentPicker({
   const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE);
   return (
     <label className={styles.composerAgentPicker}>
-      <span>Agent</span>
+      <span>{t('composer.agentPicker')}</span>
       <select
         aria-label={t('aria.atAgent')}
         className={styles.composerAgentSelect}
@@ -66,7 +66,7 @@ export function ComposerTargetPicker({
   const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE);
   return (
     <label className={styles.composerTargetPicker}>
-      <span>执行目标</span>
+      <span>{t('composer.targetPicker')}</span>
       <select
         aria-label={t('aria.target')}
         className={styles.composerTargetSelect}
