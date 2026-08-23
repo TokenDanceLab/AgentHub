@@ -1,5 +1,5 @@
 import '@testing-library/jest-dom/vitest';
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import App from '@/App';
@@ -366,6 +366,64 @@ describe('Web app root', () => {
     await waitFor(() => {
       expect(ensureAuthMock).toHaveBeenCalled();
       expect(screen.getByRole('dialog', { name: 'TokenDance ID login' })).toBeInTheDocument();
+    });
+  });
+
+  describe('#1819 sidebar new-conversation entry', () => {
+    function withContacts() {
+      useWebWorkbenchModelMock.mockReturnValue({
+        activeConversationId: 'agent-collab',
+        conversations: [
+          { id: 'agent-collab', title: 'Agent 协作群', kind: 'group', subtitle: '共享 v4 Web 工作台' },
+        ],
+        transcript: [
+          {
+            id: 'web-msg-1',
+            kind: 'text',
+            author: { id: 'system', name: 'AgentHub', role: 'system' },
+            text: 'Web 已接入 shared v4 workbench。',
+          },
+        ],
+        contacts: {
+          members: [
+            { id: 'peer-1', name: 'Peer One', initials: 'P', org: 'TokenDance', status: '在线' },
+          ],
+        },
+      });
+    }
+
+    it('opens the picker and creates a real private session via createPrivateSession', async () => {
+      withContacts();
+      render(<App />);
+
+      const newButton = await screen.findByRole('button', { name: /newConversation/ });
+      fireEvent.click(newButton);
+
+      const dialog = await screen.findByRole('dialog', { name: /newConversation.title/ });
+      fireEvent.click(await within(dialog).findByRole('button', { name: /Peer One/ }));
+
+      await waitFor(() => {
+        expect(hubClientStub.createPrivateSession).toHaveBeenCalledWith({ target_user_id: 'peer-1' });
+      });
+    });
+
+    it('keeps the create failure visible in the modal instead of swallowing it', async () => {
+      hubClientStub.createPrivateSession.mockRejectedValueOnce(new Error('server down'));
+      withContacts();
+      render(<App />);
+
+      const newButton = await screen.findByRole('button', { name: /newConversation/ });
+      fireEvent.click(newButton);
+
+      const dialog = await screen.findByRole('dialog', { name: /newConversation.title/ });
+      fireEvent.click(await within(dialog).findByRole('button', { name: /Peer One/ }));
+
+      const alert = await waitFor(() => {
+        const node = within(dialog).getByRole('alert');
+        expect(node).toBeInTheDocument();
+        return node;
+      });
+      expect(alert).toHaveTextContent(/error\.startConversation|server down/);
     });
   });
 });

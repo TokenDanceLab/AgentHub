@@ -22,7 +22,11 @@ const hostPropsLog = vi.hoisted(() => ({ last: null as Record<string, unknown> |
 
 vi.mock('./ConversationSidebar', () => ({
   ConversationSidebar: (props: Record<string, unknown>) => (
-    <div data-testid="sidebar" data-active-id={props.activeConversationId as string}>
+    <div
+      data-active-id={props.activeConversationId as string}
+      data-on-start-new-conversation={String(Boolean(props.onStartNewConversation))}
+      data-testid="sidebar"
+    >
       {/* #1835 review: a focusable descendant so the collapsed-sidebar test
           can prove `inert` (not just aria-hidden) blocks Tab focus. */}
       <input aria-label="aria.searchConversations" data-testid="sidebar-search" />
@@ -266,6 +270,39 @@ describe('WorkbenchFrameParts', () => {
       const searchInput = screen.getByTestId('sidebar-search');
       expect(searchInput.closest('[inert]')).toBeNull();
       expect(screen.getByRole('textbox', { name: 'aria.searchConversations' })).toBeInTheDocument();
+    });
+
+    it('forwards onStartNewConversation to the ConversationSidebar (#1819)', () => {
+      render(
+        <ChatSidebarFrame
+          conversations={[]}
+          currentConversationId="c1"
+          onSelectConversation={vi.fn()}
+          onAvatarClick={vi.fn()}
+          onStartNewConversation={vi.fn()}
+          sidebarWidth={260}
+          sidebarCollapsed={false}
+          resizeSidebarBy={vi.fn()}
+          beginSidebarResize={vi.fn()}
+        />,
+      );
+      expect(screen.getByTestId('sidebar').getAttribute('data-on-start-new-conversation')).toBe('true');
+    });
+
+    it('leaves onStartNewConversation undefined when the frame does not wire it (#1819)', () => {
+      render(
+        <ChatSidebarFrame
+          conversations={[]}
+          currentConversationId="c1"
+          onSelectConversation={vi.fn()}
+          onAvatarClick={vi.fn()}
+          sidebarWidth={260}
+          sidebarCollapsed={false}
+          resizeSidebarBy={vi.fn()}
+          beginSidebarResize={vi.fn()}
+        />,
+      );
+      expect(screen.getByTestId('sidebar').getAttribute('data-on-start-new-conversation')).toBe('false');
     });
   });
 

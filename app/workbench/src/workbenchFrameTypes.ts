@@ -96,6 +96,8 @@ export interface ChatSidebarFrameProps {
   onAvatarClick: (conversation: WorkbenchConversation, anchor: HTMLElement) => void;
   onConversationPin?: ((conversationId: string, pinned: boolean) => void) | undefined;
   onConversationArchive?: ((conversationId: string, archived: boolean) => void) | undefined;
+  /** Started when the user clicks the sidebar "new conversation" entry (#1819). */
+  onStartNewConversation?: (() => void) | undefined;
   sidebarWidth: number;
   sidebarCollapsed: boolean;
   resizeSidebarBy: (delta: number) => void;

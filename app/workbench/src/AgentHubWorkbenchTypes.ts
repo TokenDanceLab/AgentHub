@@ -84,6 +84,9 @@ export interface AgentHubWorkbenchProps {
   onApprovalDecision?: ((action: ApprovalDecisionAction) => Promise<void> | void) | undefined;
   /** 用户想与某个联系人/Agent 开始私聊，但当前没有已有会话时触发。上层负责创建会话并切换。 */
   onNavigateToConversation?: ((target: { name: string; id: string; kind: 'dm' | 'group' }) => void) | undefined;
+  /** 会话侧边栏「新建会话」点击时触发（#1819）。上层负责调 createSession 链并切换；
+   *  失败时上层以可见方式（toast/modal 错误）呈现，不吞错。 */
+  onStartNewConversation?: (() => void) | undefined;
   /** Contact mutation actions passed through to ContactsPage. */
   contactsActions?: WorkbenchContactsActions | undefined;
   /** Document rows for DocsPage (real data first, mock fallback). */

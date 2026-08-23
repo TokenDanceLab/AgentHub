@@ -42,6 +42,7 @@ export function buildConversationSidebarProps(
     | 'onAvatarClick'
     | 'onConversationPin'
     | 'onConversationArchive'
+    | 'onStartNewConversation'
   >,
 ): ConversationSidebarProps {
   const sidebarProps: ConversationSidebarProps = {
@@ -52,6 +53,7 @@ export function buildConversationSidebarProps(
   assignIfDefined(sidebarProps, 'onAvatarClick', props.onAvatarClick);
   assignIfDefined(sidebarProps, 'onPinConversation', props.onConversationPin);
   assignIfDefined(sidebarProps, 'onArchiveConversation', props.onConversationArchive);
+  assignIfDefined(sidebarProps, 'onStartNewConversation', props.onStartNewConversation);
   return sidebarProps;
 }
 

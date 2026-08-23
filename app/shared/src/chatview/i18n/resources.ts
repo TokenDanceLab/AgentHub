@@ -114,6 +114,18 @@ export const chatviewResources = {
     'card.approval.risk.high': '高风险',
     'card.approval.risk.critical': '严重风险',
     'card.approval.kbdHint': 'A 批准 · R 拒绝 · Esc 收起',
+    'card.approval.requestedAt': '申请于 {{time}}',
+    // #1819: pending-approval reminder surface (badge + arrival toast).
+    'card.approval.pendingBadge': '待审批 {{count}} 条',
+    'card.approval.pendingBadgeAria': '{{count}} 条审批等待处理，点击跳转',
+    'card.approval.jumpToFirst': '跳转到待审批请求',
+    'toast.approvalPendingArrived': '收到 {{count}} 条新的审批请求',
+    // #1816: per-message approval mode (composer approval-mode picker).
+    'composer.approvalMode.label': '审批模式',
+    'composer.approvalMode.suggest': '建议（按 Agent 默认）',
+    'composer.approvalMode.workspaceWrite': '允许写入',
+    'composer.approvalMode.readOnly': '只读计划',
+    'composer.approvalMode.aria': '审批模式：{{mode}}',
     'card.deploy.ready': '预览已就绪',
     'card.deploy.fail': '部署失败',
     'card.deploy.running': '正在部署',
@@ -203,9 +215,15 @@ export const chatviewResources = {
     'sidebar.sortActive': '活跃',
     'sidebar.archive': '归档',
     'sidebar.archived': '已归档',
+    'sidebar.newConversation': '新建会话',
     'searchPanel.label': '搜索消息',
     'searchPanel.placeholder': '搜索消息内容...',
     'searchPanel.noResults': '未找到匹配的消息',
+
+    // ═══ New conversation (sidebar direct entry, #1819) ═══
+    'newConversation.title': '开始新会话',
+    'newConversation.searchPlaceholder': '搜索联系人…',
+    'newConversation.empty': '暂无可用联系人',
 
     // ═══ Sim (legacy demo) ═══
     'sim.next': '下一步',
@@ -221,6 +239,7 @@ export const chatviewResources = {
     'error.agentProfile.create': 'Agent Profile 创建失败',
     'error.agentProfile.save': 'Agent Profile 保存失败',
     'error.agentProfile.delete': 'Agent Profile 删除失败',
+    'error.startConversation': '新建会话失败：{{detail}}',
 
     // ═══ Document ═══
     'doc.untitled': '未命名文档',
@@ -507,6 +526,7 @@ export const chatviewResources = {
     'aria.settings': '设置',
     'aria.toggleTheme': '切换主题',
     'aria.conversationSidebar': '会话侧边栏',
+    'aria.newConversation': '新建会话',
 
     // ═══ Live region announcements（#1503）═══
     'a11y.approvalArrived': '收到审批请求：{{tool}}',
@@ -793,6 +813,18 @@ export const chatviewResources = {
     'card.approval.risk.high': 'High risk',
     'card.approval.risk.critical': 'Critical risk',
     'card.approval.kbdHint': 'A Approve · R Deny · Esc Collapse',
+    'card.approval.requestedAt': 'Requested at {{time}}',
+    // #1819: pending-approval reminder surface (badge + arrival toast).
+    'card.approval.pendingBadge': '{{count}} pending approval(s)',
+    'card.approval.pendingBadgeAria': '{{count}} approval(s) awaiting decision — jump to it',
+    'card.approval.jumpToFirst': 'Jump to pending approval',
+    'toast.approvalPendingArrived': '{{count}} new approval request(s) received',
+    // #1816: per-message approval mode (composer approval-mode picker).
+    'composer.approvalMode.label': 'Approval mode',
+    'composer.approvalMode.suggest': 'Suggest (agent default)',
+    'composer.approvalMode.workspaceWrite': 'Allow workspace write',
+    'composer.approvalMode.readOnly': 'Read-only plan',
+    'composer.approvalMode.aria': 'Approval mode: {{mode}}',
     'card.deploy.ready': 'Preview Ready',
     'card.deploy.fail': 'Deploy failed',
     'card.deploy.running': 'Deploying...',
@@ -884,9 +916,15 @@ export const chatviewResources = {
     'sidebar.sortActive': 'Active',
     'sidebar.archive': 'Archive',
     'sidebar.archived': 'Archived',
+    'sidebar.newConversation': 'New conversation',
     'searchPanel.label': 'Search messages',
     'searchPanel.placeholder': 'Search message content...',
     'searchPanel.noResults': 'No matching messages',
+
+    // ═══ New conversation (sidebar direct entry, #1819) ═══
+    'newConversation.title': 'Start a new conversation',
+    'newConversation.searchPlaceholder': 'Search contacts…',
+    'newConversation.empty': 'No contacts available',
 
     // ═══ Sim (legacy demo) ═══
     'sim.next': 'Next',
@@ -902,6 +940,7 @@ export const chatviewResources = {
     'error.agentProfile.create': 'Agent Profile creation failed',
     'error.agentProfile.save': 'Agent Profile save failed',
     'error.agentProfile.delete': 'Agent Profile deletion failed',
+    'error.startConversation': 'Failed to start a new conversation: {{detail}}',
 
     // ═══ Document ═══
     'doc.untitled': 'Untitled document',
@@ -1188,6 +1227,7 @@ export const chatviewResources = {
     'aria.settings': 'Settings',
     'aria.toggleTheme': 'Toggle theme',
     'aria.conversationSidebar': 'Conversation sidebar',
+    'aria.newConversation': 'New conversation',
 
     // ═══ Live region announcements (#1503) ═══
     'a11y.approvalArrived': 'Approval request received: {{tool}}',
