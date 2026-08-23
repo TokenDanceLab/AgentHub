@@ -3,6 +3,10 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- theme pre-bootstrap (#1827): external classic script because the CSP
+         below is `script-src 'self'` (blocks inline scripts). Sets
+         data-theme/data-theme-preset before first paint to prevent FOUC. -->
+    <script src="/theme-bootstrap.js"></script>
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https://avatars.githubusercontent.com https://*.vectorcontrol.tech https://fonts.gstatic.com; connect-src 'self' http://127.0.0.1:* ws://127.0.0.1:* http://localhost:* ws://localhost:* https://*.vectorcontrol.tech wss://*.vectorcontrol.tech; frame-ancestors 'none'; form-action 'self'; base-uri 'self'" />
     <title>AgentHub Desktop</title>
     <!-- Material Symbols icon font — desktop was missing the font link that web/index.html already has, so Material Symbols ligatures rendered as raw text -->

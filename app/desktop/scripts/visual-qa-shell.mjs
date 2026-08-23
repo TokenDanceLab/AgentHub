@@ -76,12 +76,17 @@ async function maybeStartDevServer() {
 
 async function enterDemoWorkbench(page) {
   await page.goto(baseUrl, { waitUntil: 'domcontentloaded' });
-  const demo = page.getByRole('button', { name: '使用 Demo 模式继续' });
+  // Locale-stable demo entry (#1827): the localized title differs
+  // ("Continue in Demo mode" / "使用 Demo 模式继续"), match on the common
+  // "Demo" token so the capture works in both zh and en runners (CI = en).
+  const demo = page.getByRole('button', { name: /Demo/ });
   if (await demo.isVisible().catch(() => false)) {
     await demo.click();
   }
   await page.getByTestId('agenthub-workbench').waitFor({ state: 'visible', timeout: 20_000 });
-  await page.getByRole('main', { name: 'Workspace' }).waitFor({ state: 'visible', timeout: 15_000 });
+  // Shell loaded: main region presence is locale-independent (its aria-label
+  // is localized through chatview i18n — "Workspace" / "工作区").
+  await page.getByRole('main').first().waitFor({ state: 'visible', timeout: 15_000 });
 }
 
 async function captureTheme(browser, theme) {
