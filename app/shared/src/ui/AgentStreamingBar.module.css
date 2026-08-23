@@ -68,7 +68,7 @@
 }
 
 .statusThinking {
-  color: var(--info);
+  color: var(--td-info);
 }
 
 .statusDone {

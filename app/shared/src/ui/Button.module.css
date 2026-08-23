@@ -19,12 +19,12 @@
 }
 
 .base:disabled {
-  opacity: 0.5;
+  opacity: var(--opacity-50);
   cursor: not-allowed;
   pointer-events: none;
 }
 .base:active:not(:disabled) {
-  opacity: 0.85;
+  opacity: var(--opacity-85);
 }
 @media (prefers-reduced-motion: no-preference) {
   .base:active:not(:disabled) {

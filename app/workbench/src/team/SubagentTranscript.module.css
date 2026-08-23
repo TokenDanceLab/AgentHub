@@ -47,7 +47,7 @@
 
 .entryIcon {
   flex-shrink: 0;
-  opacity: 0.85;
+  opacity: var(--opacity-85);
 }
 
 .transcriptThinking .entryIcon  { color: var(--td-accent-purple); }
@@ -155,12 +155,12 @@
 }
 
 .emptyIcon {
-  opacity: 0.5;
+  opacity: var(--opacity-50);
   animation: emptyPulse 2s ease-in-out infinite;
 }
 
 @keyframes emptyPulse {
-  0%, 100% { opacity: 0.4; }
+  0%, 100% { opacity: var(--opacity-40); }
   50% { opacity: 0.7; }
 }
 
