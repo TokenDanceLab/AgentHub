@@ -1748,7 +1748,6 @@ jobs:
         run: bash scripts/verify/tests/verify-commit-messages.Tests.sh
 
       - name: Secret guard
-        continue-on-error: true  # Wave 10: mock/test secrets trigger false positive; re-enable after allowlist
         shell: bash
         env:
           BASE_REF: ${{ github.base_ref }}

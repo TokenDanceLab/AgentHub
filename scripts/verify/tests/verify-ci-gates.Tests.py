@@ -226,6 +226,15 @@ def delete_go_hub_changes_fail_step(text: str) -> str:
     return text[:start] + body.replace(GO_HUB_CHANGES_FAIL_STEP_TEXT, "", 1) + text[end:]
 
 
+def readd_secret_guard_continue_on_error(text: str) -> str:
+    """给 validate 的 Secret guard step 重新加上 continue-on-error，模拟服务端
+    fail-open 回退（防回退）。"""
+    anchor = "- name: Secret guard\n"
+    if text.count(anchor) != 1:
+        raise AssertionError(f"expected exactly one Secret guard step, found {text.count(anchor)}")
+    return text.replace(anchor, anchor + "        continue-on-error: true\n", 1)
+
+
 def readd_go_hub_lint_continue_on_error(text: str) -> str:
     """在 go-hub Lint step 重新加上 continue-on-error，模拟债清后硬门禁被改回
     warning-only（防回退）。"""
@@ -343,6 +352,13 @@ class VerifyCiGatesMutationTests(unittest.TestCase):
         self.assert_mutation_fails(
             readd_go_hub_lint_continue_on_error(read_workflow()),
             "re-added go-hub Lint continue-on-error",
+        )
+
+    def test_readd_secret_guard_continue_on_error_fails(self):
+        """validate Secret guard 被改回 continue-on-error（服务端 fail-open）时，校验器必须非零退出（防回退）。"""
+        self.assert_mutation_fails(
+            readd_secret_guard_continue_on_error(read_workflow()),
+            "re-added Secret guard continue-on-error",
         )
 
     def test_readd_go_hub_lint_only_new_issues_fails(self):
