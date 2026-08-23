@@ -231,13 +231,20 @@
   box-shadow: var(--focus-ring);
 }
 
+/* Dark theme: deeper float shadow than the light elev-3 recipe — the
+   dropdown floats above everything (z-dropdown 100) and needs more
+   separation on dark material. Shadow colors come from the glass token
+   family (--glass-shadow / --glass-shadow-subtle, dark pair
+   rgba(0,0,0,.52/.34)); the inset top bevel is the dark white hairline
+   (--glass-border-subtle, rgba(255,255,255,.10)). Geometry stays local —
+   same convention as desktop/App.module.css composite shadows. */
 [data-theme='dark'] .dropdown {
   background: color-mix(in srgb, var(--td-surface) 94%, transparent);
   border-color: color-mix(in srgb, var(--td-line) 90%, transparent);
   box-shadow:
-    0 24px 68px -28px rgba(0, 0, 0, 0.72),
-    0 12px 30px -18px rgba(0, 0, 0, 0.56),
-    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    0 24px 68px -28px var(--glass-shadow),
+    0 12px 30px -18px var(--glass-shadow-subtle),
+    inset 0 1px 0 var(--glass-border-subtle);
 }
 
 [data-theme='dark'] .option:hover,
