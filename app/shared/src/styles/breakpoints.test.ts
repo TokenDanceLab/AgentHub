@@ -27,7 +27,9 @@ describe('breakpoints SSOT', () => {
 
   it('ships the canonical mobile/narrow values and the mid-range strategy set', () => {
     expect(BREAKPOINTS).toEqual({
+      minimal: 420,
       mobile: 480,
+      compact: 720,
       narrow: 768,
       medium: 1024,
       standard: 1280,
@@ -38,7 +40,9 @@ describe('breakpoints SSOT', () => {
   });
 
   it('builds integer max-width queries for the compact tiers', () => {
+    expect(maxWidthQuery('minimal')).toBe('(max-width: 420px)');
     expect(maxWidthQuery('mobile')).toBe('(max-width: 480px)');
+    expect(maxWidthQuery('compact')).toBe('(max-width: 720px)');
     expect(maxWidthQuery('narrow')).toBe('(max-width: 768px)');
   });
 

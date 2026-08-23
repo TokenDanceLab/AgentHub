@@ -783,7 +783,9 @@
   stroke-linejoin: round;
 }
 
-@media (max-width: 700px) {
+/* compact tier (≤720) — legacy 700 folded up; SSOT: styles/tokens-base.css +
+   styles/breakpoints.ts (#1827). */
+@media (max-width: 720px) {
   .page {
     min-width: 0;
   }
