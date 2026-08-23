@@ -100,4 +100,34 @@ describe('hubClientEnvelope (#799)', () => {
       status: 404,
     });
   });
+
+  it('parseHubError falls back to HUB_ERROR for plain message bodies', async () => {
+    // A body with a message but no string `code` is not a Hub envelope.
+    const error = await parseHubError(jsonResponse({ message: 'boom' }, { status: 422 }));
+    expect(error).toMatchObject({ code: 'HUB_ERROR', message: 'boom', status: 422 });
+
+    // Non-string code values are ignored the same way.
+    const numericCode = await parseHubError(
+      jsonResponse({ message: 'still boom', code: 42 }, { status: 422 }),
+    );
+    expect(numericCode).toMatchObject({ code: 'HUB_ERROR', message: 'still boom' });
+  });
+
+  it('parseHubError derives a generic code from the status when no body helps', async () => {
+    const serverError = await parseHubError(
+      new Response(null, { status: 503, statusText: 'Service Unavailable' }),
+    );
+    expect(serverError).toMatchObject({
+      code: 'INTERNAL_ERROR',
+      message: 'Service Unavailable',
+      status: 503,
+    });
+
+    const clientError = await parseHubError(new Response(null, { status: 400 }));
+    expect(clientError).toMatchObject({
+      code: 'BAD_REQUEST',
+      message: 'HTTP 400',
+      status: 400,
+    });
+  });
 });
