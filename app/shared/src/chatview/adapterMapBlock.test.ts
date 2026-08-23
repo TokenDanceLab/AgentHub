@@ -443,6 +443,33 @@ describe('mapBlock — permission_request blocks', () => {
     })
     expect(row.apReason).toBe('Access request')
   })
+
+  it('#1819 propagates createdAt to waitingSince so the waiting card can show requested time', () => {
+    const row = mapRow({
+      id: 'pr4', kind: 'permission_request', author: makeAuthor('a1'),
+      requestId: 'req-4', title: 'Allow write', status: 'pending',
+      createdAt: '2026-08-23T08:30:00.000Z',
+    })
+    expect(row.waitingSince).toBe('2026-08-23T08:30:00.000Z')
+  })
+
+  it('#1819 omits waitingSince when the block carries no createdAt', () => {
+    const row = mapRow({
+      id: 'pr5', kind: 'permission_request', author: makeAuthor('a1'),
+      requestId: 'req-5', title: 'Allow write', status: 'pending',
+    })
+    expect(row.waitingSince).toBeUndefined()
+  })
+
+  it('#1819 never surfaces waitingSince on decided approval rows', () => {
+    const row = mapRow({
+      id: 'pr6', kind: 'permission_result', author: makeAuthor('a1'),
+      requestId: 'req-6', title: 'Allowed', status: 'completed', decision: 'allow',
+      createdAt: '2026-08-23T08:30:00.000Z',
+    })
+    expect(row.status).toBe('ok')
+    expect(row.waitingSince).toBeUndefined()
+  })
 })
 
 describe('mapBlock — permission_result blocks', () => {

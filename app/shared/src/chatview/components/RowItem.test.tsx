@@ -17,6 +17,59 @@ beforeEach(() => { vi.useFakeTimers({ shouldAdvanceTime: true }) });
 afterEach(() => { vi.useRealTimers() });
 
 // ---------------------------------------------------------------------------
+// #1819: waiting-approval "requested at" time feedback
+// ---------------------------------------------------------------------------
+describe('RowItem waiting-approval requested-at meta (#1819)', () => {
+  const waitingApproval = (overrides: Partial<RowItemType> = {}): RowItemType => ({
+    id: 'approval-waiting-time',
+    type: 'approval',
+    label: 'approval',
+    status: 'waiting',
+    collapsible: true,
+    apReason: JSON.stringify({ command: 'npm run build', cwd: '/repo' }),
+    ...overrides,
+  });
+
+  it('renders "Requested at HH:MM" when waitingSince is present', () => {
+    const { container } = render(
+      <RowItem item={waitingApproval({ waitingSince: '2026-08-23T08:30:00.000Z' })} />,
+    );
+    const meta = container.querySelector('.ap-waiting-meta');
+    expect(meta).not.toBeNull();
+    expect(meta!.textContent).toMatch(/Requested at \d{1,2}:\d{2}/);
+  });
+
+  it('hides the meta line when waitingSince is absent', () => {
+    const { container } = render(<RowItem item={waitingApproval()} />);
+    expect(container.querySelector('.ap-waiting-meta')).toBeNull();
+  });
+
+  it('hides the meta line when waitingSince is not a valid date', () => {
+    const { container } = render(
+      <RowItem item={waitingApproval({ waitingSince: 'not-a-date' })} />,
+    );
+    expect(container.querySelector('.ap-waiting-meta')).toBeNull();
+  });
+
+  it('never renders the meta line on decided approval cards', () => {
+    const { container } = render(
+      <RowItem
+        item={{
+          id: 'approval-done',
+          type: 'approval',
+          label: 'approval',
+          status: 'ok',
+          collapsible: true,
+          apReason: 'Write',
+          waitingSince: '2026-08-23T08:30:00.000Z',
+        }}
+      />,
+    );
+    expect(container.querySelector('.ap-waiting-meta')).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
 // QW6: Think card Shimmer + duration
 // ---------------------------------------------------------------------------
 describe('RowItem think card (QW6)', () => {
