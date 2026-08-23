@@ -39,6 +39,16 @@
   box-shadow: var(--focus-ring);
 }
 
+/* Unified error state (#1827): --td-danger outline; the focus ring keeps
+   priority while the trigger is focused (accessibility). */
+.triggerInvalid {
+  box-shadow: 0 0 0 1px var(--td-danger);
+}
+
+.triggerInvalid:focus-visible {
+  box-shadow: var(--focus-ring);
+}
+
 .trigger:disabled {
   opacity: 0.4;
   cursor: not-allowed;
@@ -193,6 +203,15 @@
   white-space: nowrap;
 }
 
+/* Disabled option (#1827): de-emphasized, not hoverable, not selectable. */
+.optionDisabled,
+.optionDisabled:hover,
+.optionDisabled.optionFocused {
+  background: transparent;
+  color: var(--td-ink-faint);
+  cursor: not-allowed;
+}
+
 .check {
   flex-shrink: 0;
   color: currentColor;
@@ -224,6 +243,14 @@
 [data-theme='dark'] .option:hover,
 [data-theme='dark'] .optionFocused {
   background: var(--td-surface-3);
+}
+
+/* Dark theme disabled option — must also beat the [data-theme] hover rule. */
+[data-theme='dark'] .optionDisabled,
+[data-theme='dark'] .optionDisabled:hover,
+[data-theme='dark'] .optionDisabled.optionFocused {
+  background: transparent;
+  color: var(--td-ink-faint);
 }
 
 [data-theme='dark'] .chevron {

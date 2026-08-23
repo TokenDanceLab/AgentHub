@@ -114,67 +114,10 @@
   gap: 12px;
 }
 
-.field {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.label {
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--td-ink-muted);
-}
-
-/* ── Input — unified borderless style ─────── */
-.input {
-  padding: 10px 14px;
-  border: 1px solid var(--glass-border);
-  border-radius: 10px;
-  background: var(--glass-bg-light);
-  color: var(--td-ink);
-  font-size: 14px;
-  font-family: var(--td-font);
-  outline: none;
-  transition: background 0.2s, box-shadow 0.2s;
-  -webkit-font-smoothing: antialiased;
-  width: 100%;
-  box-sizing: border-box;
-}
-.input::placeholder { color: var(--td-ink-faint); }
-/* #1823: the old ring was --glass-tint-plum (4% alpha) — effectively
-   invisible. --focus-ring is the design-system focus token (≥3:1). */
-.input:focus-visible {
-  background: var(--glass-bg-medium);
-  border-color: var(--td-focus);
-  box-shadow: var(--focus-ring);
-}
-.input:disabled { opacity: 0.5; }
-.inputError { box-shadow: 0 0 0 1px var(--glass-tint-danger); }
-
-/* ── Password field wrapper ───────────────── */
-.passwordWrapper {
-  position: relative;
-  display: flex;
-  align-items: center;
-}
-.passwordWrapper .input { flex: 1; padding-right: 40px; }
-.passwordToggle {
-  position: absolute;
-  right: 10px;
-  border: none;
-  background: transparent;
-  color: var(--td-ink-muted);
-  cursor: pointer;
-  padding: 4px;
-  display: flex;
-}
-
-/* ── Error ────────────────────────────────── */
-.error {
-  font-size: 11px;
-  color: var(--td-danger);
-}
+/* #1827: the duplicated .field/.label/.input/.passwordWrapper/.error blocks
+   were the hand-written fork of the shared form family — removed; the family
+   (shared/src/ui/FormField|Input) owns field layout and the unified error
+   state (--td-danger + aria-invalid) now. */
 .errorBanner {
   min-height: 44px;
   padding: 9px 12px;
@@ -332,21 +275,6 @@
 
 /* ── Advanced section ─────────────────────── */
 .advancedSection { margin-top: 8px; }
-.hubInput {
-  width: 100%;
-  padding: 8px 12px;
-  border: 1px solid var(--glass-border);
-  border-radius: 8px;
-  background: var(--glass-bg-light);
-  color: var(--td-ink);
-  font-size: 13px;
-  font-family: var(--td-mono);
-  outline: none;
-  box-sizing: border-box;
-}
-.hubInput:focus {
-  box-shadow: var(--focus-ring);
-}
 .hubStatus {
   display: flex;
   align-items: center;
@@ -439,9 +367,7 @@
   }
 
   .identityButton,
-  .submitButton,
-  .input,
-  .hubInput {
+  .submitButton {
     min-height: 44px;
     border: 1px solid var(--glass-border);
     background: var(--glass-bg-light);
@@ -479,6 +405,7 @@
     transition: none;
   }
 }
+
 
 /* Theme preset switcher (#1820) — token-only styles. */
 .presetSection {

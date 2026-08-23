@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { X, ChevronDown, Terminal } from 'lucide-react';
 import type { UserProfile } from '@/api/hubClient';
 import { HUB_URL, HUB_WS_URL } from '@/config';
+import { Input } from '@shared/ui';
 import LoginForm from '@/components/LoginForm';
 import tokenDanceLogo from '@/assets/tokendance-icon-rounded.svg';
 import styles from './AuthPage.module.css';
@@ -126,13 +127,16 @@ export default function AuthPage({ onLoginSuccess, onClose }: Props) {
                   : t('auth.hubChecking')}
             </span>
           </div>
-          <input
-            className={styles.devInput}
+          {/* #1827: unified shared Input (replaces the hand-rolled .devInput). */}
+          <Input
+            size="sm"
+            mono
             type="url"
             value={hubUrl}
             onChange={handleHubUrlChange}
             placeholder="http://localhost:8080"
             aria-label={t('auth.hubUrl')}
+            className={styles.devInputMargin}
           />
         </div>
       )}

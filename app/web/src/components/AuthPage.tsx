@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { X, ChevronDown } from 'lucide-react';
-import { TokenDanceMark } from '@shared/ui';
+import { TokenDanceMark, Input } from '@shared/ui';
 import type { UserProfile } from '@/api/hubClient';
 import { HUB_URL } from '@/config';
 import LoginForm from '@/components/LoginForm';
@@ -110,8 +110,10 @@ export default function AuthPage({ onLoginSuccess, onClose }: Props) {
 
       {showAdvanced && (
         <div className={styles.advancedSection}>
-          <input
-            className={styles.hubInput}
+          {/* #1827: unified shared Input (visual parity with the old .hubInput). */}
+          <Input
+            size="sm"
+            mono
             type="url"
             value={hubUrl}
             onChange={handleHubUrlChange}
