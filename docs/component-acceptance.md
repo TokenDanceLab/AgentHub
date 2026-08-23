@@ -289,7 +289,7 @@
 | 交互 | 展示型（N/A） | ✅ | 不适用项 |
 | 键盘 | 无可达交互（N/A） | ✅ | 不适用项 |
 | a11y | 可访问名、焦点环 | ✅ | 默认 `aria-hidden`；文本字形可作可访问名 |
-| 响应式 | 尺寸稳定 | ✅ | `flex-shrink: 0`，size 驱动 | 
+| 响应式 | 尺寸稳定 | ✅ | `flex-shrink: 0`，size 驱动 |
 
 ### Markdown（`app/shared/src/ui/Markdown.tsx`，#1820 补 stories，三件套齐全）
 
