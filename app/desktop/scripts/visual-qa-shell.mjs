@@ -17,7 +17,7 @@
  */
 import { chromium } from '@playwright/test';
 import { spawn } from 'node:child_process';
-import { mkdir } from 'node:fs/promises';
+import { mkdir, rm } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -75,7 +75,7 @@ async function maybeStartDevServer() {
 }
 
 async function enterDemoWorkbench(page) {
-  await page.goto(baseUrl, { waitUntil: 'domcontentloaded' });
+  await page.goto(baseUrl, { waitUntil: 'domcontentloaded', timeout: 60_000 });
   // Locale-stable demo entry (#1827): the localized title differs
   // ("Continue in Demo mode" / "使用 Demo 模式继续"), match on the common
   // "Demo" token so the capture works in both zh and en runners (CI = en).
@@ -95,6 +95,9 @@ async function captureTheme(browser, theme) {
   await page.addInitScript(
     ({ key, theme: t }) => {
       window.localStorage.setItem(key, t);
+      // Shell QA must capture the workbench, not the one-time onboarding
+      // dialog. Onboarding has its own component/story/unit acceptance.
+      window.localStorage.setItem('agenthub_onboarding_seen', 'true');
     },
     { key: THEME_KEY, theme },
   );
@@ -118,6 +121,11 @@ async function captureTheme(browser, theme) {
 
 async function main() {
   await mkdir(outDir, { recursive: true });
+  // Remove the expected outputs before capture. If navigation/rendering fails,
+  // a later assertion must not pass on PNGs left by an older run.
+  for (const theme of themes) {
+    await rm(path.join(outDir, `desktop-shell-${theme}-1440x810${dprSuffix}.png`), { force: true });
+  }
   const server = await maybeStartDevServer();
   const browser = await chromium.launch({ headless: true });
   const results = [];
@@ -137,7 +145,6 @@ async function main() {
     console.log(`wrote ${r.file}`);
   }
   console.log(`Desktop visual-qa shell capture done (${results.length} shots) → ${outDir}`);
-  console.log('Score with visual-qa-scorecard');
 }
 
 main().catch((err) => {

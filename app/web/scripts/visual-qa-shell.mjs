@@ -21,7 +21,7 @@
  */
 import { chromium } from '@playwright/test';
 import { spawn } from 'node:child_process';
-import { mkdir } from 'node:fs/promises';
+import { mkdir, rm } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -227,6 +227,10 @@ async function maybeStartDevServer() {
       shell: process.platform === 'win32',
       env: {
         ...process.env,
+        // The capture navigates the origin root. Override the production
+        // /workbench/ asset base so the standalone Vite server mounts there,
+        // matching the renderer Playwright contract.
+        VITE_BASE_PATH: '/',
         // Pin mock data mode so workbench renders with demo agents/conversations
         VITE_AGENTHUB_DATA_MODE: 'mock',
         // Pin hub URL so the app routes all calls through Playwright mock
@@ -271,9 +275,9 @@ async function captureTheme(browser, theme) {
     { v4Key: THEME_KEY_V4, legacyKey: THEME_KEY_LEGACY, theme },
   );
 
-  // Navigate to the app root with absolute URL (#1216 pattern)
-  const appUrl = new URL('/', baseUrl).toString();
-  await page.goto(appUrl, { waitUntil: 'networkidle', timeout: 45_000 });
+  // Respect an explicitly supplied QA path while the default spawned server
+  // mounts at the origin root through VITE_BASE_PATH above.
+  await page.goto(baseUrl, { waitUntil: 'domcontentloaded', timeout: 60_000 });
 
   // Wait for the workbench shell to appear — confirms React mounted without crash
   try {
@@ -382,6 +386,11 @@ async function captureTheme(browser, theme) {
 
 async function main() {
   await mkdir(outDir, { recursive: true });
+  // Remove the expected outputs before capture. If navigation/rendering fails,
+  // a later assertion must not pass on PNGs left by an older run.
+  for (const theme of themes) {
+    await rm(path.join(outDir, `web-shell-${theme}-1440x810${dprSuffix}.png`), { force: true });
+  }
   const server = await maybeStartDevServer();
   const browser = await chromium.launch({ headless: true });
   const results = [];
@@ -401,7 +410,6 @@ async function main() {
     console.log(`wrote ${r.file}`);
   }
   console.log(`Web visual-qa shell capture done (${results.length} shots) → ${outDir}`);
-  console.log('Score with visual-qa-scorecard');
 }
 
 main().catch((err) => {
