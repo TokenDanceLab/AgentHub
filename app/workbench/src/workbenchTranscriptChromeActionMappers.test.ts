@@ -718,4 +718,90 @@ describe('workbenchTranscriptChromeActionMappers', () => {
     // #1821: without a handler there is no real effect, so no success toast.
     expect(handlers.showWorkbenchToast).not.toHaveBeenCalled();
   });
+
+  it('ignores approval effects when no decision handler is wired (#1821)', () => {
+    const handlers = {
+      copyText: vi.fn(),
+      softHideBlocks: vi.fn(),
+      dispatchComposer: vi.fn(),
+      focusComposer: vi.fn(),
+      pulseBlock: vi.fn(),
+      showWorkbenchToast: vi.fn(),
+      exitSelection: vi.fn(),
+    };
+    expect(() => applyTranscriptChromeSideEffects([
+      {
+        type: 'approval',
+        decision: { approvalId: 'req-1', decision: 'allow' },
+        successMessage: 'ok',
+        failureMessage: 'nope',
+      },
+    ], handlers)).not.toThrow();
+    expect(handlers.showWorkbenchToast).not.toHaveBeenCalled();
+  });
+
+  it('plans an empty target list for a forward action with an empty payload', () => {
+    const effects = planContextAction({
+      action: 'forward:',
+      blockId: 'b1',
+      transcript: [textBlock({ id: 'b1' })],
+      t,
+      sessionId: 'sess-1',
+    });
+    expect(effects).toContainEqual({
+      type: 'forward',
+      messageId: 'b1',
+      targetSessionIds: [],
+      successMessage: 'toast.forwardQueued',
+      failureMessage: 'toast.forwardFailed',
+    });
+    expect(effects.some((e) => e.type === 'toast')).toBe(false);
+  });
+
+  it('wires every primary menu item onClick to its action string', () => {
+    const onAction = vi.fn();
+    const onEnterSelection = vi.fn();
+    const conversations: Array<{ id: string; title: string; kind: 'direct' | 'group' }> = [
+      { id: 's1', title: '需求', kind: 'direct' },
+    ];
+    const groups = buildTranscriptContextMenuGroups({
+      blockId: 'agent-1',
+      transcript: [textBlock({ id: 'agent-1' })],
+      t,
+      onAction,
+      onEnterSelection,
+      conversations,
+      hubMessageActions: true,
+    });
+    const items = groups.flat();
+    const click = (label: string) => items.find((item) => item.label === label)?.onClick?.();
+
+    click('context.reply');
+    expect(onAction).toHaveBeenLastCalledWith('reply', 'agent-1');
+    click('context.quote');
+    expect(onAction).toHaveBeenLastCalledWith('quote', 'agent-1');
+    click('context.copyLink');
+    expect(onAction).toHaveBeenLastCalledWith('link', 'agent-1');
+    click('context.regenerate');
+    expect(onAction).toHaveBeenLastCalledWith('regenerate', 'agent-1');
+    click('context.forward');
+    expect(onAction).toHaveBeenLastCalledWith('forward', 'agent-1');
+    click('context.multiSelect');
+    // multiSelect routes through onEnterSelection, not onAction.
+    expect(onEnterSelection).toHaveBeenCalledWith('agent-1');
+    expect(onAction).toHaveBeenCalledTimes(5);
+  });
+
+  it('wires the edit menu item onClick for user text blocks', () => {
+    const onAction = vi.fn();
+    const groups = buildTranscriptContextMenuGroups({
+      blockId: 'u1',
+      transcript: [textBlock({ id: 'u1', author: { id: 'u', role: 'human', name: 'You' } })],
+      t,
+      onAction,
+      onEnterSelection: vi.fn(),
+    });
+    groups.flat().find((item) => item.label === 'context.edit')?.onClick?.();
+    expect(onAction).toHaveBeenCalledWith('edit', 'u1');
+  });
 });

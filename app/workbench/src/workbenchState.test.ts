@@ -5,8 +5,8 @@ import {
   workbenchReducer,
   type WorkbenchState,
 } from './workbenchState';
-import type { AnyEvent } from './events';
-import type { Approval, Artifact, Preview, Project, Run, Thread, ThreadItem } from './types';
+import type { AnyEvent } from '@shared/events';
+import type { Approval, Artifact, Preview, Project, Run, Thread, ThreadItem } from '@shared/types';
 
 const sentAt = '2026-05-24T10:00:00.000Z';
 
@@ -393,5 +393,90 @@ describe('workbenchReducer', () => {
     expect(state.projects).toHaveLength(1);
     expect(state.connection.status).toBe('disconnected');
     expect(state.connection.error).toBe('Edge WebSocket closed');
+  });
+
+  it('replaces thread items on threadItems.loaded, compacting nullish entries and list envelopes', () => {
+    const seeded = createWorkbenchState({
+      threadItems: [
+        {
+          id: 'old-item',
+          threadId: 'thread-1',
+          kind: 'message',
+          role: 'agent',
+          content: 'old',
+          createdAt: sentAt,
+        },
+      ],
+    });
+
+    // ListResponse envelope + nullish entries that arrive from loose payloads.
+    const fromEnvelope = workbenchReducer(seeded, {
+      type: 'threadItems.loaded',
+      threadItems: {
+        items: [
+          {
+            id: 'new-item',
+            threadId: 'thread-1',
+            kind: 'message',
+            role: 'user',
+            content: 'new',
+            createdAt: sentAt,
+          },
+          null as unknown as ThreadItem,
+        ],
+        page: { hasMore: false },
+      },
+    });
+    expect(fromEnvelope.threadItems).toHaveLength(1);
+    expect(fromEnvelope.threadItems[0]?.id).toBe('new-item');
+
+    // Plain-array form and the null payload (reset to empty).
+    const fromArray = workbenchReducer(seeded, {
+      type: 'threadItems.loaded',
+      threadItems: [
+        undefined as unknown as ThreadItem,
+        {
+          id: 'array-item',
+          threadId: 'thread-1',
+          kind: 'message',
+          role: 'agent',
+          content: 'array',
+          createdAt: sentAt,
+        },
+      ],
+    });
+    expect(fromArray.threadItems.map((item) => item.id)).toEqual(['array-item']);
+
+    const fromNull = workbenchReducer(seeded, { type: 'threadItems.loaded', threadItems: null });
+    expect(fromNull.threadItems).toEqual([]);
+  });
+
+  it('tracks connection lifecycle statuses without touching loaded data', () => {
+    const seeded = createWorkbenchState({
+      projects: [{ id: 'proj-1', name: 'AgentHub', createdAt: sentAt }],
+    });
+
+    const loading = workbenchReducer(seeded, { type: 'connection.loading' });
+    expect(loading.connection).toEqual({ status: 'loading' });
+    expect(loading.projects).toHaveLength(1);
+
+    const connected = workbenchReducer(loading, { type: 'connection.connected' });
+    expect(connected.connection).toEqual({ status: 'connected' });
+
+    const disconnected = workbenchReducer(connected, { type: 'connection.disconnected' });
+    expect(disconnected.connection.status).toBe('disconnected');
+    expect(disconnected.connection.error).toBeUndefined();
+
+    const errored = workbenchReducer(seeded, {
+      type: 'connection.error',
+      error: 'handshake failed',
+    });
+    expect(errored.connection).toEqual({ status: 'error', error: 'handshake failed' });
+  });
+
+  it('returns the same state reference for unknown action types', () => {
+    const seeded = createWorkbenchState();
+    const next = workbenchReducer(seeded, { type: 'totally.unknown' } as unknown as Parameters<typeof workbenchReducer>[1]);
+    expect(next).toBe(seeded);
   });
 });
