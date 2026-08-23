@@ -133,7 +133,7 @@ Stubbed Hub, fixture, readiness-only and manifest-only outputs must set `real_te
 |---|---|
 | Transcript ordering/grouping/markdown | Shared Vitest over `app/shared/src/transcript/` and `app/shared/src/chatview/` |
 | Send visibility and auto-follow | Desktop/Web Playwright chat-flow specs; Mobile remains framework/boundary-only until a dedicated UI slice |
-| Layout cleanliness | Desktop/Web Visual QA gate at 16:9 `1440x810` light+dark via `visual-qa-shell.mjs` / `visual:qa:shell` （scorecard 已外迁，见 `docs/history.md`）; check overflow and final-message visibility |
+| Layout cleanliness | Desktop/Web Visual QA gate at 16:9 `1440x810` light+dark via `visual-qa-shell.mjs` / `visual:qa:shell`（旧视觉分数断言已删除，见 [07-design-system-ssot.md](07-design-system-ssot.md)）; check overflow and final-message visibility |
 | Data boundary | `app/shared/src/testing/e2eDataModeContract.ts` plus surface-specific E2E assertions |
 | Packaged Desktop | Tauri package/sidecar/icon/installer evidence, not Vite-only |
 

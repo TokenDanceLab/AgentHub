@@ -10,8 +10,11 @@ then asserts:
   2. Every coverage.include file with statements but 0% lines is an
      imported-by-nobody production module; their count must not grow past
      the baseline's uncoveredFiles (0% ratchet — new untested code or a
-     deleted test both trip it). production_files == 0 (include glob broken)
-     is a failure.
+     deleted test both trip it). *.stories.ts(x) Storybook render fixtures
+     are excluded from the production/uncovered counts (vitest never
+     executes them, so they would ratchet on every new component story;
+     #1535 include contract: stories are non-production fixtures).
+     production_files == 0 (include glob broken) is a failure.
   3. Skipped test count == 0 for every package (defeats .skip / .todo as a
      way to silently mask a coverage drop).
 Exit 0 on pass, exit 1 on any regression, uncovered growth, or skipped test.
@@ -95,6 +98,40 @@ def invoke_vitest_coverage(app_dir: str, pkg_filter: str, config: str) -> int:
 def read_json(path: str):
     with open(path, encoding="utf-8-sig") as handle:
         return json.load(handle)
+
+
+STORY_SUFFIXES = (".stories.ts", ".stories.tsx")
+
+
+def is_story_file(name: str) -> bool:
+    """True for Storybook render fixtures (*.stories.ts/x).
+
+    Vitest never executes stories (they are a Storybook-only surface), so
+    they always report 0% lines and are not production modules — counting
+    them would ratchet uncovered on every new component story alone.
+    """
+    return os.path.basename(name.replace("\\", "/")).endswith(STORY_SUFFIXES)
+
+
+def count_production_coverage(coverage_summary: dict) -> tuple[int, int]:
+    """Return (production_files, uncovered_files) from coverage-summary.json.
+
+    coverage-summary.json lists every file matched by coverage.include.
+    Files with statements but 0% lines are production modules no test
+    imports. *.stories.ts(x) Storybook render fixtures are excluded from
+    both counts (non-production fixtures, like the __e2e__ specs that the
+    include glob already ignores via the coverage factory defaults).
+    """
+    production_files = 0
+    uncovered_files = 0
+    for name, entry in coverage_summary.items():
+        if name == "total" or is_story_file(name):
+            continue
+        production_files += 1
+        lines_info = entry.get("lines")
+        if lines_info is not None and int(lines_info.get("total", 0)) > 0 and float(lines_info.get("pct", 0)) == 0.0:
+            uncovered_files += 1
+    return production_files, uncovered_files
 
 
 def git_text(*args: str) -> str:
@@ -288,19 +325,14 @@ def main() -> int:
         # --- uncovered production modules (include contract, #1535) -------------
         # coverage-summary.json lists every file matched by coverage.include.
         # Files with statements but 0% lines are production modules no test
-        # imports. The baseline records uncoveredFiles; it must not grow (new
-        # untested code or a deleted test both trip it). production_files == 0
-        # means the include glob matched nothing — broken config, fail-closed.
+        # imports. *.stories.ts(x) Storybook render fixtures are excluded
+        # from the counts (vitest never executes them — otherwise every new
+        # story would ratchet uncovered). The baseline records
+        # uncoveredFiles; it must not grow (new untested code or a deleted
+        # test both trip it). production_files == 0 means the include glob
+        # matched nothing — broken config, fail-closed.
         if parsed_coverage and totals:
-            production_files = 0
-            uncovered_files = 0
-            for name, entry in coverage_summary.items():
-                if name == "total":
-                    continue
-                production_files += 1
-                lines_info = entry.get("lines")
-                if lines_info is not None and int(lines_info.get("total", 0)) > 0 and float(lines_info.get("pct", 0)) == 0.0:
-                    uncovered_files += 1
+            production_files, uncovered_files = count_production_coverage(coverage_summary)
             if production_files == 0:
                 failures.append(f"[{pkg_filter}] coverage include matched 0 production files — include glob broken (fail-closed)")
             if pkg.get("uncoveredFiles") is not None:

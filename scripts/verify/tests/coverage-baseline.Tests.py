@@ -47,6 +47,31 @@ class CoverageBaselineSafetyTests(unittest.TestCase):
         baseline = MODULE.read_json(MODULE.DEFAULT_BASELINE_PATH)
         MODULE.validate_baseline_source(baseline)
 
+    def test_production_counts_exclude_story_fixtures(self):
+        # Storybook render fixtures are never executed by vitest (always 0%),
+        # so they must not ride the uncovered ratchet (#1535 include contract).
+        summary = {
+            "total": {},
+            "ui/Button.stories.tsx": {"lines": {"total": 40, "pct": 0.0}},
+            "ui/emails.stories.ts": {"lines": {"total": 10, "pct": 0.0}},
+            "ui/Button.tsx": {"lines": {"total": 100, "pct": 100.0}},
+            "ui/ReportView.ts": {"lines": {"total": 30, "pct": 0.0}},
+        }
+        production, uncovered = MODULE.count_production_coverage(summary)
+        self.assertEqual(production, 2)
+        self.assertEqual(uncovered, 1)
+
+    def test_covered_story_still_not_production(self):
+        # Even a story that a test happens to import stays a non-production
+        # fixture; the contract classifies it, not its measured pct.
+        summary = {
+            "total": {},
+            "ui/Button.stories.tsx": {"lines": {"total": 40, "pct": 100.0}},
+        }
+        production, uncovered = MODULE.count_production_coverage(summary)
+        self.assertEqual(production, 0)
+        self.assertEqual(uncovered, 0)
+
     def test_write_refuses_metric_regression(self):
         baseline = sample_baseline()
         values = measurement()

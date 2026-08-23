@@ -17,8 +17,8 @@
         "functions": 81.30,
         "branches": 79.96
       },
-      "uncoveredFiles": 32,
-      "coverageNote": "2026-08-23 remeasure (#1764 frontend test debt): master@a10cdf58 already advanced past the 2026-08-03 baseline (84.19 lines pre-change); this lane adds diff.ts parse/normalize/parseUnifiedDiff, composerReducer (mention/quote/attachment/draft-capture), agentActivity Hub WS lifecycle, hubClientEnvelope error fallbacks (+37 tests). Floors 60/60/60/60 (all dims above 60). 2026-08-23 branch sync (#1820, 显式重基线）：067dd739 删除 21 个孤儿组件及其测试——被删代码此前在分母内计覆盖率，lines 85.96→84.68 / stmts 84.16→82.96 / fns 83.76→81.30 为合法降线（br 78.84→79.96 反升）；tests 2519→2431（-88）。uncovered 25→32 增量为 *.stories.tsx storybook 渲染夹具（vitest 不执行、恒 0%，随 #1820 剩余 16 组件 stories + #1827 表单族 stories 新增），非新增未测业务代码；后续可选：#1535 include 合同把 *.stories.tsx 归为非生产。Floors 60/60/60/60 不变。",
+      "uncoveredFiles": 1,
+      "coverageNote": "2026-08-23 remeasure (#1764 frontend test debt): master@a10cdf58 already advanced past the 2026-08-03 baseline (84.19 lines pre-change); this lane adds diff.ts parse/normalize/parseUnifiedDiff, composerReducer (mention/quote/attachment/draft-capture), agentActivity Hub WS lifecycle, hubClientEnvelope error fallbacks (+37 tests). Floors 60/60/60/60 (all dims above 60). 2026-08-23 branch sync (#1820, 显式重基线）：067dd739 删除 21 个孤儿组件及其测试——被删代码此前在分母内计覆盖率，lines 85.96→84.68 / stmts 84.16→82.96 / fns 83.76→81.30 为合法降线（br 78.84→79.96 反升）；tests 2519→2431（-88）。uncovered 25→32 增量为 *.stories.tsx storybook 渲染夹具（vitest 不执行、恒 0%，随 #1820 剩余 16 组件 stories + #1827 表单族 stories 新增），非新增未测业务代码；#1535 include 合同口径已落地（verify-coverage-baseline.py 统计层）：*.stories.ts(x) 归为非生产渲染夹具、不计入 production/uncovered——vitest 从不执行 stories，否则每条新 story 都会撑大 uncovered，uncoveredFiles 32→1 为合同调整非覆盖率改善。残余 1 个 0% 生产模块：src/testing/lobehubIcons.ts。Floors 60/60/60/60 不变。",
       "tests": {
         "total": 2431,
         "passed": 2431,
@@ -34,8 +34,8 @@
         "functions": 83.57,
         "branches": 79.37
       },
-      "uncoveredFiles": 7,
-      "coverageNote": "2026-08-21 首次入基线（#1759 第二阶段 workbench 独立成 @agenthub/workbench 第 6 包；拆包时 vitest.config floors 59/52/52/59 即按本次实测设定，低于 60 的维度是提升目标非永久豁免）。2026-08-23 #1764 补债：workbenchState reducer/applyEvent 守卫分支、tasks-route handler 工厂、transcript chrome labels/menu wiring、settingsService/Types、mention popover 测量、composer helpers（+70 tests）；顺带修复 useWorkbenchAgentsRoute 排序断言的 locale 依赖（.sort() vs localeCompare，zh-CN 环境确定性失败）。uncovered 7 文件：MessageSearchPanel.stories.tsx / WorkbenchDocsRouteView.tsx / index.ts / auxPanel/AuxPanel.tsx / floating/PersonPanel.tsx / pages/projects/ProjectMembers.tsx / pages/projects/ProjectTabViews.tsx。",
+      "uncoveredFiles": 5,
+      "coverageNote": "2026-08-21 首次入基线（#1759 第二阶段 workbench 独立成 @agenthub/workbench 第 6 包；拆包时 vitest.config floors 59/52/52/59 即按本次实测设定，低于 60 的维度是提升目标非永久豁免）。2026-08-23 #1764 补债：workbenchState reducer/applyEvent 守卫分支、tasks-route handler 工厂、transcript chrome labels/menu wiring、settingsService/Types、mention popover 测量、composer helpers（+70 tests）；顺带修复 useWorkbenchAgentsRoute 排序断言的 locale 依赖（.sort() vs localeCompare，zh-CN 环境确定性失败）。#1535 include 合同口径落地（verify-coverage-baseline.py 统计层）：*.stories.ts(x) 归为非生产渲染夹具、不计入 production/uncovered；uncoveredFiles 7→5——残余 5 个 0% 生产模块：WorkbenchDocsRouteView.tsx / index.ts / floating/PersonPanel.tsx / pages/projects/ProjectMembers.tsx / pages/projects/ProjectTabViews.tsx（MessageSearchPanel.stories.tsx 与后续新增 story 不再计列；auxPanel/AuxPanel.tsx 已获测试覆盖移出计数）。",
       "tests": {
         "total": 1134,
         "passed": 1134,
