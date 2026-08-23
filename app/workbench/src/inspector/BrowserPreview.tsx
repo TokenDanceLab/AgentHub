@@ -8,6 +8,11 @@ import { Button } from '@shared/ui/Button';
 import { Tooltip } from '@shared/ui/Tooltip';
 import { useTranslation } from 'react-i18next';
 import { CHATVIEW_I18N_NAMESPACE } from '@shared/chatview/i18n/resources';
+import {
+  PREVIEW_SANDBOX_SRCDOC,
+  PREVIEW_SANDBOX_REMOTE,
+  isSafeRemotePreviewUrl,
+} from '@shared/ui/previewSandbox';
 import styles from './BrowserPreview.module.css';
 
 /* ═══════════════════════════════════════════════════════════════════════
@@ -124,6 +129,7 @@ export const BrowserPreview: React.FC<BrowserPreviewProps> = ({
   const blankSrcDoc = themedBlank
     ? buildThemedBlankPreviewSrcDoc(hostTheme)
     : undefined;
+  const unsafeRemote = !themedBlank && !isSafeRemotePreviewUrl(url);
 
   return (
     <section
@@ -197,13 +203,20 @@ export const BrowserPreview: React.FC<BrowserPreviewProps> = ({
             title={t('browserPreview.iframeTitle', { url: addressLabel })}
             srcDoc={blankSrcDoc}
             loading="lazy"
+            sandbox={PREVIEW_SANDBOX_SRCDOC}
           />
+        ) : unsafeRemote ? (
+          <div className={styles.frameBlocked} role="note">
+            {t('browserPreview.unsafeUrl')}
+          </div>
         ) : (
           <iframe
             className={styles.frame}
             title={t('browserPreview.iframeTitle', { url })}
             src={url}
             loading="lazy"
+            sandbox={PREVIEW_SANDBOX_REMOTE}
+            referrerPolicy="no-referrer"
           />
         )}
       </div>

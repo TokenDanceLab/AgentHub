@@ -321,7 +321,7 @@
 .preview-favicon {
   width: 20px;
   height: 20px;
-  object-fit: contain;
+  color: var(--td-ink-subtle);
 }
 
 .preview-body {
