@@ -748,8 +748,14 @@ describe('workbenchTranscriptChromeActionMappers', () => {
       t,
       sessionId: 'sess-1',
     });
-    expect(effects).toContainEqual({ type: 'forward', messageId: 'b1', targetSessionIds: [] });
-    expect(effects.find((e) => e.type === 'toast')?.message).toBe('toast.forwardQueued');
+    expect(effects).toContainEqual({
+      type: 'forward',
+      messageId: 'b1',
+      targetSessionIds: [],
+      successMessage: 'toast.forwardQueued',
+      failureMessage: 'toast.forwardFailed',
+    });
+    expect(effects.some((e) => e.type === 'toast')).toBe(false);
   });
 
   it('wires every primary menu item onClick to its action string', () => {
