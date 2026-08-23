@@ -1,6 +1,9 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
+import { getI18n, useTranslation } from 'react-i18next';
 import type { ChatMessage } from '@shared/types/chat';
 import type { TranscriptBlock } from '@shared/transcript';
+import { appDateLocaleTag } from '@shared/i18n/locale';
+import { CHATVIEW_I18N_NAMESPACE } from '@shared/chatview/i18n/resources';
 import { useFocusTrap } from '@shared/ui/focusTrap';
 import { Button } from '@shared/ui/Button';
 import { DesignNavIcon } from './designIcons';
@@ -122,6 +125,7 @@ export function MessageSearchPanel({
   searchPlaceholder,
   noResultsLabel,
 }: Props) {
+  const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE);
   const [immediateQuery, setImmediateQuery] = useState('');
   const [query, setQuery] = useState('');
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -223,7 +227,7 @@ export function MessageSearchPanel({
   const formatTs = useCallback((timestamp: string) => {
     const date = new Date(timestamp);
     if (Number.isNaN(date.getTime())) return '';
-    return new Intl.DateTimeFormat('en-US', {
+    return new Intl.DateTimeFormat(appDateLocaleTag(getI18n()?.language), {
       month: 'short',
       day: 'numeric',
       hour: 'numeric',
@@ -256,7 +260,7 @@ export function MessageSearchPanel({
             placeholder={searchPlaceholder}
             aria-label={searchLabel}
           />
-          <Button variant="ghost" size="sm" onClick={onClose} aria-label="Close search">
+          <Button variant="ghost" size="sm" onClick={onClose} aria-label={t('ui.closeSearch')}>
             <DesignNavIcon name="close" size={14} strokeWidth={2} />
           </Button>
         </div>

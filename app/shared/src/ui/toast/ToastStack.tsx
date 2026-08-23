@@ -1,6 +1,8 @@
 import { CheckCircle, XCircle, AlertTriangle, Info, X } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { useToastStore } from './toastStore';
 import type { ToastItem, ToastType } from './toastStore';
+import { CHATVIEW_I18N_NAMESPACE } from '../../chatview/i18n/resources';
 import styles from './ToastStack.module.css';
 
 const TOAST_ICONS: Record<ToastType, typeof CheckCircle> = {
@@ -26,6 +28,7 @@ const liveRegion: Record<ToastType, 'polite' | 'assertive'> = {
 };
 
 function Toast({ toast }: { toast: ToastItem }) {
+  const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE);
   const dismissToast = useToastStore((s) => s.dismissToast);
   const pauseAutoDismiss = useToastStore((s) => s.pauseAutoDismiss);
   const resumeAutoDismiss = useToastStore((s) => s.resumeAutoDismiss);
@@ -59,7 +62,7 @@ function Toast({ toast }: { toast: ToastItem }) {
         type="button"
         className={styles.close}
         onClick={() => dismissToast(toast.id)}
-        aria-label="Close notification"
+        aria-label={t('ui.closeNotification', 'Close notification')}
       >
         <X size={14} />
       </button>
@@ -68,12 +71,13 @@ function Toast({ toast }: { toast: ToastItem }) {
 }
 
 export function ToastContainer() {
+  const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE);
   const toasts = useToastStore((s) => s.toasts);
 
   if (toasts.length === 0) return null;
 
   return (
-    <div className={styles.container} aria-label="Notifications" aria-live="polite">
+    <div className={styles.container} aria-label={t('aria.notifications', 'Notifications')} aria-live="polite">
       {toasts.map((toast) => (
         <Toast key={toast.id} toast={toast} />
       ))}

@@ -2,9 +2,11 @@
 // Used by ArtifactPreview, fullscreen diff, and future overlay content.
 import { useEffect, useCallback, useRef, type ReactNode } from 'react';
 import { X, Maximize2, Minimize2 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { useFocusTrap } from './focusTrap';
 import { Tooltip } from './Tooltip';
 import { Button } from './Button';
+import { CHATVIEW_I18N_NAMESPACE } from '../chatview/i18n/resources';
 import styles from './Modal.module.css';
 
 export interface ModalProps {
@@ -31,6 +33,7 @@ export function Modal({
   overlayClassName,
   contentClassName,
 }: ModalProps) {
+  const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE);
   const overlayRef = useRef<HTMLDivElement | null>(null);
   useFocusTrap(overlayRef, open);
 
@@ -95,12 +98,12 @@ export function Modal({
                 </Button>
               </Tooltip>
             )}
-            <Tooltip label="Close">
+            <Tooltip label={t('ui.close', 'Close')}>
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={onClose}
-                aria-label="Close"
+                aria-label={t('ui.close', 'Close')}
                 type="button"
               >
                 <X size={16} />

@@ -265,7 +265,7 @@ describe('SubagentStreamOverlay', () => {
     fireEvent.click(screen.getByRole('button', { name: '打开完整会话' }));
     expect(screen.getByRole('dialog')).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Close' }));
+    fireEvent.click(screen.getByRole('button', { name: '关闭' }));
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 

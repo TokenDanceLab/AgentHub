@@ -1,5 +1,7 @@
 import type { ReactNode } from 'react';
 import { getCurrentWindow } from '@tauri-apps/api/window';
+import { useTranslation } from 'react-i18next';
+import { CHATVIEW_I18N_NAMESPACE } from '@shared/chatview/i18n/resources';
 import { DesignNavIcon } from '@agenthub/workbench/designIcons';
 import {
   DESKTOP_NAVIGATE_BACK_EVENT,
@@ -16,6 +18,8 @@ export interface DesktopChromeProps {
 }
 
 export function DesktopChrome({ children, showNavigationControls = true }: DesktopChromeProps) {
+  const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE);
+
   function dispatchDesktopEvent(eventName: string): void {
     window.dispatchEvent(new Event(eventName));
   }
@@ -53,31 +57,31 @@ export function DesktopChrome({ children, showNavigationControls = true }: Deskt
     <div className={styles.host}>
       <div className={`${styles.chrome} window-chrome`} data-desktop-window-chrome>
         {showNavigationControls ? (
-          <div aria-label="Desktop navigation controls" className={styles.toolbar} role="group">
+          <div aria-label={t('aria.navControls')} className={styles.toolbar} role="group">
             <button
-              aria-label="切换左侧栏"
+              aria-label={t('aria.toggleSidebar')}
               className={`${styles.chromeButton} ${styles.sidebarButton}`}
               onClick={() => dispatchDesktopEvent(DESKTOP_TOGGLE_SIDEBAR_EVENT)}
-              title="收起 / 展开左侧栏"
+              title={t('aria.toggleSidebar')}
               type="button"
             >
               <DesignNavIcon name="sidebarLeft" size={15} strokeWidth={1.85} />
             </button>
             <div className={styles.historyGroup}>
               <button
-                aria-label="后退"
+                aria-label={t('aria.goBack')}
                 className={styles.chromeButton}
                 onClick={() => runNavigationCommand('back')}
-                title="上一页"
+                title={t('aria.goBack')}
                 type="button"
               >
                 <DesignNavIcon name="back" size={15} strokeWidth={1.85} />
               </button>
               <button
-                aria-label="前进"
+                aria-label={t('aria.goForward')}
                 className={styles.chromeButton}
                 onClick={() => runNavigationCommand('forward')}
-                title="下一页"
+                title={t('aria.goForward')}
                 type="button"
               >
                 <DesignNavIcon name="forward" size={15} strokeWidth={1.85} />
@@ -88,12 +92,12 @@ export function DesktopChrome({ children, showNavigationControls = true }: Deskt
         <div className={styles.drag}>
           <span className={styles.dragHandle} aria-hidden="true" />
         </div>
-        <div aria-label="Window controls" className={styles.controls} role="group">
+        <div aria-label={t('aria.windowControls')} className={styles.controls} role="group">
           <button
-            aria-label="最小化"
+            aria-label={t('aria.minimize')}
             className={styles.windowButton}
             onClick={() => void runWindowCommand('minimize')}
-            title="最小化"
+            title={t('aria.minimize')}
             type="button"
           >
             <svg viewBox="0 0 24 24">
@@ -101,10 +105,10 @@ export function DesktopChrome({ children, showNavigationControls = true }: Deskt
             </svg>
           </button>
           <button
-            aria-label="最大化"
+            aria-label={t('aria.maximize')}
             className={styles.windowButton}
             onClick={() => void runWindowCommand('toggleMaximize')}
-            title="最大化"
+            title={t('aria.maximize')}
             type="button"
           >
             <svg viewBox="0 0 24 24">
@@ -112,10 +116,10 @@ export function DesktopChrome({ children, showNavigationControls = true }: Deskt
             </svg>
           </button>
           <button
-            aria-label="关闭"
+            aria-label={t('aria.close')}
             className={`${styles.windowButton} ${styles.windowButtonClose}`}
             onClick={() => void runWindowCommand('close')}
-            title="关闭"
+            title={t('aria.close')}
             type="button"
           >
             <svg viewBox="0 0 24 24">

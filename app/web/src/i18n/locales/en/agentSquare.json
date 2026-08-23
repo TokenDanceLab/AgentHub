@@ -19,7 +19,7 @@
 
   "header.title": "Catalog",
   "header.subtitle": "Find the right specialist before a run starts",
-  "header.description": "Local catalog preview only. Hub /web/custom-agents is not connected yet.",
+  "header.description": "Local catalog preview only. Hub custom agents are not connected yet.",
 
   "search.placeholder": "Search agents or skills",
   "search.ariaLabel": "Search agents",
@@ -48,7 +48,7 @@
   "filters.clearFilters": "Clear filters",
   "filters.clearedTitle": "Filters cleared",
   "filters.cleared": "The catalog is back to the full local preview set.",
-  "source.hub": "Hub /web/custom-agents",
+  "source.hub": "Hub custom agents",
   "source.hubDetail": "Loaded from the Hub custom-agent contract for the current Web session.",
   "source.loading": "Loading Hub catalog",
   "source.catalogMock": "Catalog fallback",
