@@ -38,10 +38,12 @@ export const defaultVisibleTabs = new Set<InspectorMode>(['overview']);
 
 export function getQuickOpenItems(t: (key: string) => string) {
   return [
+    // #1822: files keeps a real registered shortcut (Ctrl+P, workbench
+    // dispatcher); browser has no registered shortcut (Ctrl+T is reserved
+    // by Web browsers) so it no longer displays a fake label. The old
+    // chat/terminal entries had `mode: null` and a no-op click — removed.
     { id: 'files', label: t('inspector.quickOpenFiles'), shortcut: 'Ctrl+P', mode: 'files' as InspectorMode },
-    { id: 'chat', label: t('inspector.quickOpenChat'), shortcut: '', mode: null },
-    { id: 'browser', label: t('inspector.quickOpenBrowser'), shortcut: 'Ctrl+T', mode: 'browser' as InspectorMode },
-    { id: 'terminal', label: t('inspector.quickOpenTerminal'), shortcut: 'Ctrl+`', mode: null },
+    { id: 'browser', label: t('inspector.quickOpenBrowser'), shortcut: '', mode: 'browser' as InspectorMode },
   ];
 }
 

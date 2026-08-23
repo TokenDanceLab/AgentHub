@@ -123,8 +123,11 @@ describe('AgentHubWorkbench', () => {
     const dialog = screen.getByRole('dialog', { name: '键盘快捷键' });
     expect(within(dialog).getByText('会话')).toBeInTheDocument();
     expect(within(dialog).getByText('导航')).toBeInTheDocument();
-    expect(within(dialog).getByText('Ctrl/⌘ + N')).toBeInTheDocument();
+    expect(within(dialog).getByText('Ctrl/⌘ + K')).toBeInTheDocument();
     expect(within(dialog).getByText('Enter')).toBeInTheDocument();
+    // #1856 gave new-thread a real handler, so the help panel lists it again
+    // alongside the #1822-implemented bindings.
+    expect(within(dialog).getByText('Ctrl/⌘ + N')).toBeInTheDocument();
 
     // A second '?' toggles it closed.
     fireEvent.keyDown(document, { key: '?' });

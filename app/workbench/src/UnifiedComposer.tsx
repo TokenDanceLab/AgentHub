@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { browserFilesToComposerAttachments, clearDraft, loadDraft, saveDraft } from '@shared/composer';
-import type { ComposerMention } from '@shared/composer';
+import { browserFilesToComposerAttachments, clearDraft, loadDraft, saveDraft, serializeDraft } from '@shared/composer';
+import type { ComposerAttachment, ComposerMention, QuoteContext, ReplyToContext } from '@shared/composer';
 import { CHATVIEW_I18N_NAMESPACE } from '@shared/chatview/i18n/resources';
 import {
   detectMentionTrigger,
@@ -166,16 +166,33 @@ export function UnifiedComposer({
   const listboxId = useId();
 
   /* ═══════════════ Draft persistence (T10/UI6) ═══════════════
-     Save composer draft (text + mentions) per conversationId via
-     requestIdleCallback batching, load on mount, flush on hidden,
-     clear on submit (empty state).                              */
+     Save composer draft per conversationId via requestIdleCallback
+     batching, load on mount, flush on hidden, clear on submit (empty
+     state). #1822: the persisted payload now also carries uploaded
+     attachment refs and the reply/quote context; in-flight attachments
+     are additionally kept in a memory cache so a same-session
+     conversation switch restores them fully.                    */
 
   const draftLoadedRef = useRef<string | null>(null);
   const pendingDraftRef = useRef<{
     conversationId: string;
     text: string;
     mentions: ComposerMention[];
+    // #1822: full snapshot — in-memory only for File-bearing attachments.
+    attachments: ComposerAttachment[];
+    replyTo: ReplyToContext | null;
+    quote: QuoteContext | null;
   } | null>(null);
+  // #1822: same-session draft cache — keeps File objects alive across a
+  // conversation switch (localStorage cannot). localStorage stays the
+  // cross-reload fallback (text + mentions + ref'd attachments + reply/quote).
+  const memoryDraftCacheRef = useRef<Map<string, {
+    text: string;
+    mentions: ComposerMention[];
+    attachments: ComposerAttachment[];
+    replyTo: ReplyToContext | null;
+    quote: QuoteContext | null;
+  }>>(new Map());
   const ricIdRef = useRef<number | null>(null);
 
   /** Flush any pending draft to localStorage immediately. */
@@ -189,7 +206,14 @@ export function UnifiedComposer({
     const pending = pendingDraftRef.current;
     pendingDraftRef.current = null;
     if (!pending) return;
-    saveDraft(pending.conversationId, { text: pending.text, mentions: pending.mentions });
+    saveDraft(pending.conversationId, serializeDraft(pending));
+    memoryDraftCacheRef.current.set(pending.conversationId, {
+      text: pending.text,
+      mentions: pending.mentions,
+      attachments: pending.attachments,
+      replyTo: pending.replyTo,
+      quote: pending.quote,
+    });
   }
 
   // Load + Save draft in a single effect to avoid a race between the load
@@ -211,16 +235,57 @@ export function UnifiedComposer({
     if (draftLoadedRef.current !== cid) {
       draftLoadedRef.current = cid;
       // Only load when the composer is empty (fresh mount / conversation switch).
-      if (composer.text === '' && composer.mentions.length === 0) {
-        const draft = loadDraft(cid);
+      if (
+        composer.text === '' &&
+        composer.mentions.length === 0 &&
+        composer.attachments.length === 0 &&
+        composer.replyTo === null &&
+        composer.quote === null
+      ) {
+        // #1822: same-session cache first (keeps File attachments), then
+        // localStorage (cross-reload). Mentions are validated against the
+        // current roster so stale agent ids never become ghost chips (#1821).
+        const rosterIds = new Set(runtime.mentionableAgents.map((m) => m.id));
+        const memoryDraft = memoryDraftCacheRef.current.get(cid);
+        const draft = memoryDraft ?? loadDraft(cid);
         if (draft) {
-          // Restore text + mentions, validating mentions against the current
-          // roster so stale agent ids never become ghost chips (#1821).
-          const rosterIds = new Set(runtime.mentionableAgents.map((m) => m.id));
           const validMentions = draft.mentions.filter((m) => rosterIds.has(m.id));
           dispatchComposer({ type: 'setText', text: draft.text });
           for (const m of validMentions) {
             dispatchComposer({ type: 'addMention', mention: m });
+          }
+          if (memoryDraft) {
+            for (const attachment of memoryDraft.attachments) {
+              dispatchComposer({ type: 'addAttachment', attachment });
+            }
+          } else if (draft.attachments) {
+            for (const attachment of draft.attachments) {
+              // Restored from localStorage: only ref'd attachments survive
+              // serialization, so rehydrate the chip with its ref (no File).
+              // Conditional spread: `draft` is a union of the memory-cache
+              // shape (ComposerAttachment[], optional ref) and the serialized
+              // draft, so the element ref reads `AttachmentRef | undefined`;
+              // writing the property only when present keeps the literal
+              // valid under exactOptionalPropertyTypes (typescript 6).
+              const restoredRef = attachment.attachmentRef;
+              dispatchComposer({
+                type: 'addAttachment',
+                attachment: {
+                  id: attachment.id,
+                  name: attachment.name,
+                  ...(attachment.size !== undefined ? { size: attachment.size } : {}),
+                  ...(attachment.mime !== undefined ? { mime: attachment.mime } : {}),
+                  ...(restoredRef ? { attachmentRef: restoredRef } : {}),
+                  source: 'browser',
+                },
+              });
+            }
+          }
+          if (draft.replyTo) {
+            dispatchComposer({ type: 'setReplyTo', replyTo: draft.replyTo });
+          }
+          if (draft.quote) {
+            dispatchComposer({ type: 'setQuote', quote: draft.quote });
           }
           return; // Don't save/clear this cycle — let the re-render handle it.
         }
@@ -228,13 +293,20 @@ export function UnifiedComposer({
     }
 
     // ══ Phase 2: Save / Clear draft ══
-    if (composer.text === '' && composer.mentions.length === 0) {
+    if (
+      composer.text === '' &&
+      composer.mentions.length === 0 &&
+      composer.attachments.length === 0 &&
+      composer.replyTo === null &&
+      composer.quote === null
+    ) {
       // Flush any draft still pending for the PREVIOUS conversation first:
       // switching conversations within the idle-callback window used to drop
       // the old draft silently (#1821).
       flushDraft();
       // Empty state after user interaction or submit → clear draft.
       clearDraft(cid);
+      memoryDraftCacheRef.current.delete(cid);
       if (ricIdRef.current !== null) {
         if (typeof window.cancelIdleCallback === 'function') {
           window.cancelIdleCallback(ricIdRef.current);
@@ -249,13 +321,17 @@ export function UnifiedComposer({
       conversationId: cid,
       text: composer.text,
       mentions: composer.mentions,
+      attachments: composer.attachments,
+      replyTo: composer.replyTo,
+      quote: composer.quote,
     };
     if (ricIdRef.current !== null) return; // already scheduled
     ricIdRef.current =
       typeof window.requestIdleCallback === 'function'
         ? window.requestIdleCallback(flushDraft, { timeout: 500 })
         : window.setTimeout(flushDraft, 200);
-  }, [composer.text, composer.mentions, composer.conversationId, dispatchComposer, runtime.mentionableAgents]);
+  }, [composer.text, composer.mentions, composer.attachments, composer.replyTo, composer.quote,
+    composer.conversationId, dispatchComposer, runtime.mentionableAgents]);
 
   // Force-flush pending draft when the page is hidden; flush on unmount.
   useEffect(() => {
@@ -268,6 +344,21 @@ export function UnifiedComposer({
       flushDraft();
     };
   }, []);
+
+  /* ═══════════════ Auto-grow (#1822) ═══════════════
+     The composer textarea is rows=1; grow it to fit the content up to
+     the CSS max-height instead of scrolling forever at one line. */
+
+  useEffect(() => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+    textarea.style.height = 'auto';
+    if (textarea.scrollHeight > 0) {
+      textarea.style.height = `${textarea.scrollHeight}px`;
+    } else {
+      textarea.style.height = '';
+    }
+  }, [composer.text]);
 
   const mentionCandidates = mentionTrigger
     ? filterMentionCandidates({
@@ -531,6 +622,7 @@ export function UnifiedComposer({
   return (
     <form
       className={styles.composer}
+      data-composer-form=""
       onSubmit={onSubmit}
       onDragEnter={handleFormDragEnter}
       onDragOver={handleFormDragOver}

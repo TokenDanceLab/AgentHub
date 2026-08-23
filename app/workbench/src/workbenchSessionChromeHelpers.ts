@@ -31,6 +31,7 @@ import type { SettingsService } from './settingsService';
 import type { GlobalRailPage } from './GlobalRail';
 import { matchesShortcut } from '@shared/utils/keyboardUtils';
 import type { KeyboardEventLike } from '@shared/utils/keyboardUtils';
+import { getResolvedBinding } from '@shared/utils/keyboardShortcuts';
 
 /* ═══════════════════════════════════════════════════════════════════════
    workbenchSessionChromeHelpers — pure residual slices from
@@ -284,9 +285,38 @@ export function shouldLoadSessionImport(input: {
     && input.hasListRuntimeSessions;
 }
 
-/** Ctrl/Cmd+F search shortcut for chat page. */
+/**
+ * Chat-page search shortcut (canonical Ctrl/⌘+F).
+ * #1822: reads the RESOLVED binding so a user remap recorded in the
+ * Settings ShortcutsPane takes effect here too (previously hard-coded,
+ * so a remapped chat-search could never fire).
+ */
 export function isChatSearchShortcut(event: KeyboardEventLike): boolean {
-  return matchesShortcut(event, ['Ctrl/⌘', 'F']);
+  const binding = getResolvedBinding('chat-search');
+  if (!binding) return false;
+  return matchesShortcut(event, binding);
+}
+
+/**
+ * #1822: whether a keyboard event originates from an editable target.
+ * Global shortcut dispatchers must skip these so the default editing
+ * behavior (typing, browser find-in-page inside the composer, …) is never
+ * hijacked — Ctrl+F would otherwise open the session search while the user
+ * is typing in the composer.
+ */
+export function isEditableKeyboardTarget(target: unknown): boolean {
+  if (!(target instanceof HTMLElement)) return false;
+  const tag = target.tagName.toLowerCase();
+  return (
+    tag === 'input' ||
+    tag === 'textarea' ||
+    tag === 'select' ||
+    target.isContentEditable === true ||
+    // Attribute fallback: some engines (jsdom) never derive the boolean
+    // `isContentEditable` from the contenteditable attribute.
+    target.contentEditable === 'true' ||
+    target.contentEditable === 'plaintext-only'
+  );
 }
 
 export interface MainchainEvidenceExportPayload {

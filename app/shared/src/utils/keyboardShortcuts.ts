@@ -9,6 +9,8 @@
    and adds event-specific helpers.
    ═══════════════════════════════════════════════════════════════════════ */
 
+import type { KeyboardEventLike } from './keyboardUtils';
+
 export type ShortcutGroupId = 'conversation' | 'composer' | 'navigation' | 'workspace' | 'selection';
 
 export interface KeyboardShortcut {
@@ -64,6 +66,10 @@ export const KEYBOARD_SHORTCUT_GROUPS: KeyboardShortcutGroup[] = [
       { id: 'close', keys: ['Esc'], labelKey: 'shortcut.close', detailKey: 'shortcut.close.detail' },
       { id: 'toggle-sidebar', keys: ['Ctrl/⌘', 'B'], labelKey: 'shortcut.toggleSidebar', detailKey: 'shortcut.toggleSidebar.detail' },
       { id: 'toggle-run-panel', keys: ['Ctrl/⌘', 'J'], labelKey: 'shortcut.toggleRunPanel', detailKey: 'shortcut.toggleRunPanel.detail' },
+      // #1822/#1853: quick-open is a live binding (inspector Files tab) — it
+      // lives in the canonical table so the recorder detects conflicts with
+      // its reserved combo.
+      { id: 'quick-open', keys: ['Ctrl/⌘', 'P'], labelKey: 'shortcut.quickOpen', detailKey: 'shortcut.quickOpen.detail' },
     ],
   },
   {
@@ -110,6 +116,11 @@ function loadCustomBindings(): Record<string, string[]> {
   }
 }
 
+function isRebindableId(id: string): boolean {
+  const shortcut = KEYBOARD_SHORTCUTS.find((s) => s.id === id);
+  return shortcut?.rebindable !== false;
+}
+
 /**
  * Resolve shortcut groups with any user-customized bindings applied.
  * Custom bindings are stored in localStorage under `agenthub-custom-keybindings`.
@@ -130,9 +141,12 @@ export function hasCustomKeybindings(): boolean {
   return Object.keys(loadCustomBindings()).some((id) => isRebindableId(id));
 }
 
-function isRebindableId(id: string): boolean {
-  const shortcut = KEYBOARD_SHORTCUTS.find((s) => s.id === id);
-  return shortcut?.rebindable !== false;
+/** Read all saved custom bindings (for merge-style updates; non-rebindable
+ *  ids are filtered out of the persisted store anyway). */
+export function getCustomKeybindings(): CustomKeybinding[] {
+  return Object.entries(loadCustomBindings())
+    .filter(([id]) => isRebindableId(id))
+    .map(([id, keys]) => ({ id, keys }));
 }
 
 export function saveCustomKeybindings(bindings: CustomKeybinding[]): void {
@@ -157,15 +171,57 @@ export function getBinding(id: string): string[] | undefined {
 }
 
 /**
- * Check for binding conflicts against the canonical shortcut config.
+ * Look up the *resolved* binding for a shortcut by id — custom user
+ * bindings from localStorage take precedence over canonical (#1822:
+ * dispatchers must read resolved, not canonical, or custom keybindings
+ * silently never take effect).
+ */
+export function getResolvedBinding(id: string): string[] | undefined {
+  return getResolvedShortcutGroups()
+    .flatMap((group) => group.shortcuts)
+    .find((s) => s.id === id)?.keys;
+}
+
+/**
+ * Derive a canonical key-token array from a live KeyboardEvent
+ * (DOM-independent — accepts the KeyboardEventLike subset).
+ * Used by the Settings ShortcutsPane recorder to capture keyboard combos.
+ */
+export function deriveKeysFromEvent(event: KeyboardEventLike): string[] {
+  const result: string[] = [];
+  if (event.ctrlKey) result.push('Ctrl');
+  else if (event.metaKey) result.push('⌘');
+  if (event.altKey) result.push('Alt');
+  if (event.shiftKey) result.push('Shift');
+  const mainKey = event.key;
+  if (!mainKey || ['Control', 'Meta', 'Alt', 'Shift'].includes(mainKey)) {
+    // Modifier-only keydown (e.g. pressing Ctrl alone) carries no main key —
+    // return an empty array so the recorder never saves a modifier-only
+    // binding (#1853 review).
+    return [];
+  }
+  result.push(mainKey.length === 1 ? mainKey.toUpperCase() : mainKey);
+  return result;
+}
+
+/**
+ * Check for binding conflicts against the RESOLVED shortcut config.
  * Returns the conflicting shortcut, or null if no conflict.
+ *
+ * Token normalization: the recorder derives 'Ctrl' (Windows) or '⌘' (macOS)
+ * while canonical bindings use the combined 'Ctrl/⌘' token — both must
+ * compare equal, or a recorded Ctrl+P would silently shadow quick-open
+ * (#1853 review). Resolved groups (not canonical) are compared so a combo
+ * freed by an earlier remap no longer reports a false conflict.
  */
 export function checkConflicts(keys: string[], capturingId: string): KeyboardShortcut | null {
-  const keyStr = keys.join('+');
-  for (const group of KEYBOARD_SHORTCUT_GROUPS) {
+  const normalize = (token: string): string =>
+    token === 'Ctrl' || token === '⌘' ? 'Ctrl/⌘' : token;
+  const keyStr = keys.map(normalize).join('+');
+  for (const group of getResolvedShortcutGroups()) {
     for (const s of group.shortcuts) {
       if (s.id === capturingId) continue;
-      if (s.keys.join('+') === keyStr) return s;
+      if (s.keys.map(normalize).join('+') === keyStr) return s;
     }
   }
   return null;

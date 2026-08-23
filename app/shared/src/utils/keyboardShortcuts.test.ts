@@ -4,7 +4,10 @@ import {
   KEYBOARD_SHORTCUT_GROUPS,
   KEYBOARD_SHORTCUTS,
   checkConflicts,
+  deriveKeysFromEvent,
   getBinding,
+  getCustomKeybindings,
+  getResolvedBinding,
   getResolvedShortcutGroups,
   hasCustomKeybindings,
   resetKeybindings,
@@ -43,12 +46,21 @@ describe('KEYBOARD_SHORTCUT_GROUPS', () => {
     }
   });
 
-  it('flattens KEYBOARD_SHORTCUTS from the groups (18 canonical bindings)', () => {
-    expect(KEYBOARD_SHORTCUTS).toHaveLength(18);
+  it('flattens KEYBOARD_SHORTCUTS from the groups (19 bindings incl. quick-open)', () => {
+    // 18 canonical bindings after the #1823 selection group + #1822's
+    // quick-open entry (#1853 review: the live Ctrl/⌘+P binding is canonical).
+    expect(KEYBOARD_SHORTCUTS).toHaveLength(19);
     expect(KEYBOARD_SHORTCUTS[0]).toEqual(KEYBOARD_SHORTCUT_GROUPS[0]!.shortcuts[0]);
     expect(KEYBOARD_SHORTCUTS.at(-1)).toEqual(
       KEYBOARD_SHORTCUT_GROUPS[4]!.shortcuts.at(-1),
     );
+  });
+
+  it('#1823: selection-mode hotkeys are marked non-rebindable', () => {
+    const selection = KEYBOARD_SHORTCUT_GROUPS.find((g) => g.id === 'selection')!;
+    expect(selection.shortcuts.every((s) => s.rebindable === false)).toBe(true);
+    // quick-open and every pre-existing entry stay rebindable.
+    expect(KEYBOARD_SHORTCUTS.find((s) => s.id === 'quick-open')?.rebindable).not.toBe(false);
   });
 });
 
@@ -58,6 +70,7 @@ describe('getBinding', () => {
     expect(getBinding('send')).toEqual(['Enter']);
     expect(getBinding('help')).toEqual(['?']);
     expect(getBinding('settings')).toEqual(['Ctrl/⌘', ',']);
+    expect(getBinding('quick-open')).toEqual(['Ctrl/⌘', 'P']);
   });
 
   it('returns undefined for an unknown shortcut id', () => {
@@ -66,7 +79,62 @@ describe('getBinding', () => {
   });
 });
 
+describe('getResolvedBinding', () => {
+  beforeEach(() => {
+    localStorage.clear();
+  });
+  afterEach(() => {
+    localStorage.clear();
+  });
+
+  it('falls back to canonical keys without custom bindings', () => {
+    expect(getResolvedBinding('search')).toEqual(['Ctrl/⌘', 'K']);
+  });
+
+  it('returns customized keys when a binding was remapped', () => {
+    saveCustomKeybindings([{ id: 'search', keys: ['Ctrl/⌘', 'L'] }]);
+    expect(getResolvedBinding('search')).toEqual(['Ctrl/⌘', 'L']);
+  });
+});
+
+describe('deriveKeysFromEvent', () => {
+  it('derives a canonical token array from a Ctrl+Shift+K event', () => {
+    expect(deriveKeysFromEvent({ key: 'k', ctrlKey: true, shiftKey: true, metaKey: false, altKey: false }))
+      .toEqual(['Ctrl', 'Shift', 'K']);
+  });
+
+  it('uses the ⌘ token for macOS meta', () => {
+    expect(deriveKeysFromEvent({ key: 'k', ctrlKey: false, metaKey: true, shiftKey: false, altKey: false }))
+      .toEqual(['⌘', 'K']);
+  });
+
+  it('rejects a chord of modifier-only keys (#1853 review)', () => {
+    expect(deriveKeysFromEvent({ key: 'Control', ctrlKey: true, metaKey: false, shiftKey: false, altKey: false }))
+      .toEqual([]);
+    expect(deriveKeysFromEvent({ key: 'Shift', ctrlKey: false, metaKey: false, shiftKey: true, altKey: false }))
+      .toEqual([]);
+    expect(deriveKeysFromEvent({ key: 'Meta', ctrlKey: false, metaKey: true, shiftKey: false, altKey: false }))
+      .toEqual([]);
+  });
+
+  it('derives a bare main key as uppercase single char', () => {
+    expect(deriveKeysFromEvent({ key: 'g', ctrlKey: false, metaKey: false, shiftKey: false, altKey: false }))
+      .toEqual(['G']);
+  });
+
+  it('preserves named keys (Enter, ArrowUp)', () => {
+    expect(deriveKeysFromEvent({ key: 'Enter', ctrlKey: false, metaKey: false, shiftKey: true, altKey: false }))
+      .toEqual(['Shift', 'Enter']);
+  });
+});
+
 describe('checkConflicts', () => {
+  // checkConflicts reads RESOLVED groups — earlier describes may leave
+  // custom bindings behind, so isolate storage per test.
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
   it('reports the conflicting shortcut for duplicate key combos', () => {
     const conflict = checkConflicts(['Ctrl/⌘', 'K'], 'new-thread');
     expect(conflict?.id).toBe('search');
@@ -91,6 +159,27 @@ describe('checkConflicts', () => {
     // '?' only belongs to help; asserting the identity of the reported entry.
     const conflict = checkConflicts(['?'], 'send');
     expect(conflict?.id).toBe('help');
+  });
+
+  it('#1853 review: normalizes recorder-derived Ctrl/⌘ against canonical Ctrl/⌘', () => {
+    // The recorder derives 'Ctrl' (Windows) — it must conflict with the
+    // canonical 'Ctrl/⌘+B' binding, not bypass the check.
+    expect(checkConflicts(['Ctrl', 'B'], 'settings')?.id).toBe('toggle-sidebar');
+    expect(checkConflicts(['⌘', 'B'], 'settings')?.id).toBe('toggle-sidebar');
+    // quick-open is canonical — recording Ctrl+P for search conflicts.
+    expect(checkConflicts(['Ctrl', 'P'], 'search')?.id).toBe('quick-open');
+  });
+
+  it('#1853 review: conflicts are detected against resolved bindings', () => {
+    // Remap search to Ctrl+L: the freed Ctrl+K combo must no longer conflict.
+    try {
+      saveCustomKeybindings([{ id: 'search', keys: ['Ctrl/⌘', 'L'] }]);
+      expect(checkConflicts(['Ctrl', 'K'], 'settings')).toBeNull();
+      // ...while the remapped Ctrl+L now does.
+      expect(checkConflicts(['Ctrl', 'L'], 'settings')?.id).toBe('search');
+    } finally {
+      resetKeybindings();
+    }
   });
 });
 
@@ -146,6 +235,18 @@ describe('custom keybindings (localStorage-backed)', () => {
     expect(hasCustomKeybindings()).toBe(false);
     saveCustomKeybindings([{ id: 'send', keys: ['Ctrl/⌘', 'Enter'] }]);
     expect(hasCustomKeybindings()).toBe(true);
+  });
+
+  it('#1853 review: getCustomKeybindings reads back saved entries for merging', () => {
+    expect(getCustomKeybindings()).toEqual([]);
+    saveCustomKeybindings([
+      { id: 'send', keys: ['Ctrl/⌘', 'Enter'] },
+      { id: 'newline', keys: ['Ctrl/⌘', 'Shift', 'Enter'] },
+    ]);
+    expect(getCustomKeybindings()).toEqual([
+      { id: 'send', keys: ['Ctrl/⌘', 'Enter'] },
+      { id: 'newline', keys: ['Ctrl/⌘', 'Shift', 'Enter'] },
+    ]);
   });
 
   it('treats an empty binding list as no customization', () => {

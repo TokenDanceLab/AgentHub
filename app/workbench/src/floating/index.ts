@@ -3,7 +3,6 @@
 import type { ComponentProps } from 'react';
 
 import { ContextMenu } from './ContextMenu';
-import { EmojiPicker } from './EmojiPicker';
 import { ForwardConversationPicker } from './ForwardConversationPicker';
 import { MultiSelectBar } from './MultiSelectBar';
 import { PersonPanel } from './PersonPanel';
@@ -13,7 +12,6 @@ import { DemoToast } from './DemoToast';
 
 export {
   ContextMenu,
-  EmojiPicker,
   ForwardConversationPicker,
   MultiSelectBar,
   PersonPanel,
@@ -23,7 +21,6 @@ export {
 };
 
 export type { ContextMenuProps, ContextMenuItem } from './ContextMenu';
-export type { EmojiPickerProps } from './EmojiPicker';
 export type { ForwardConversationPickerProps } from './ForwardConversationPicker';
 export type { MultiSelectBarProps, MultiSelectBarAction } from './MultiSelectBar';
 export type { SelectionDeleteConfirmProps } from './SelectionDeleteConfirm';
