@@ -23,6 +23,20 @@
   border-color: var(--td-danger);
 }
 
+/* Non-rebindable selection-mode hotkeys (#1823) — declarative display only. */
+.fixedKey {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-family: var(--mono, ui-monospace, monospace);
+  font-size: 0.8125rem;
+  color: var(--td-ink-muted);
+  background: var(--glass-bg-subtle);
+  padding: 2px 8px;
+  border-radius: 4px;
+  border: 1px solid var(--td-line);
+}
+
 .resetButton {
   display: inline-flex;
   align-items: center;

@@ -358,31 +358,40 @@ export function ShortcutsPane(_props: SettingsPageProps): React.ReactElement {
                 key={shortcut.id}
                 label={shortcut.labelKey}
                 description={
-                  recordingId === shortcut.id
-                    ? tw('settings.shortcuts.recording', { defaultValue: '按下新的按键组合…（Esc 取消）' })
-                    : recordedConflict
-                      ? tw('settings.shortcuts.conflict', {
-                        defaultValue: '该组合与「{{id}}」冲突，未保存',
-                        id: conflictState.conflictingId,
-                      })
-                      : hasConflict
-                        ? `冲突: 与 "${conflictIdNow}" 按键相同`
-                        : (shortcut.detailKey ?? '')
+                  shortcut.rebindable === false
+                    ? (shortcut.detailKey ?? '')
+                    : recordingId === shortcut.id
+                      ? tw('settings.shortcuts.recording', { defaultValue: '按下新的按键组合…（Esc 取消）' })
+                      : recordedConflict
+                        ? tw('settings.shortcuts.conflict', {
+                          defaultValue: '该组合与「{{id}}」冲突，未保存',
+                          id: conflictState.conflictingId,
+                        })
+                        : hasConflict
+                          ? `冲突: 与 "${conflictIdNow}" 按键相同`
+                          : (shortcut.detailKey ?? '')
                 }
               >
-                <button
-                  type="button"
-                  aria-label={tw('settings.shortcuts.remap', { defaultValue: '重新绑定' })}
-                  className={hasConflict || recordedConflict ? styles.keyButtonDanger : styles.keyButton}
-                  onClick={() => {
-                    setConflictState(null);
-                    setRecordingId((current) => current === shortcut.id ? null : shortcut.id);
-                  }}
-                >
-                  {recordingId === shortcut.id
-                    ? tw('settings.shortcuts.recording', { defaultValue: '按下…' })
-                    : formatKeys(shortcut.keys)}
-                </button>
+                {shortcut.rebindable === false ? (
+                  // #1823: selection-mode hotkeys are declarative only —
+                  // resolveSelectionHotkey owns their fixed bindings, so the
+                  // pane renders them without a recorder.
+                  <span className={styles.fixedKey}>{formatKeys(shortcut.keys)}</span>
+                ) : (
+                  <button
+                    type="button"
+                    aria-label={tw('settings.shortcuts.remap', { defaultValue: '重新绑定' })}
+                    className={hasConflict || recordedConflict ? styles.keyButtonDanger : styles.keyButton}
+                    onClick={() => {
+                      setConflictState(null);
+                      setRecordingId((current) => current === shortcut.id ? null : shortcut.id);
+                    }}
+                  >
+                    {recordingId === shortcut.id
+                      ? tw('settings.shortcuts.recording', { defaultValue: '按下…' })
+                      : formatKeys(shortcut.keys)}
+                  </button>
+                )}
               </SettingsRow>
             );
           })}

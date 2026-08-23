@@ -79,6 +79,33 @@ describe('ShortcutsPane (#1822 custom keybindings)', () => {
     }
   });
 
+  it('renders master-added canonical rows (product loops #1856)', () => {
+    renderPane();
+    for (const combo of [
+      'Ctrl/⌘ + N',
+      'Ctrl/⌘ + Alt + N',
+      '/',
+      'Ctrl/⌘ + O',
+      'Ctrl/⌘ + W',
+    ]) {
+      expect(remapButton(combo)).toBeInTheDocument();
+    }
+  });
+
+  it('#1823: selection-mode hotkeys render as fixed rows without a recorder', () => {
+    renderPane();
+    // The selection group rows show their combos as static text — no remap
+    // button, because resolveSelectionHotkey owns those fixed bindings.
+    expect(screen.getByText('Ctrl/⌘ + A')).toBeInTheDocument();
+    expect(screen.getByText('Ctrl/⌘ + C')).toBeInTheDocument();
+    expect(screen.getByText('Delete')).toBeInTheDocument();
+    const remapButtons = screen.getAllByRole('button', { name: '重新绑定' });
+    expect(remapButtons.map((b) => b.textContent)).not.toContain('Ctrl/⌘ + A');
+    expect(remapButtons.map((b) => b.textContent)).not.toContain('Delete');
+    // 19 canonical bindings − 3 non-rebindable selection rows = 16 recorders.
+    expect(remapButtons).toHaveLength(16);
+  });
+
   it('records a new combo on click + keydown and persists it immediately', () => {
     renderPane();
     fireEvent.click(remapButton('Ctrl/⌘ + K'));

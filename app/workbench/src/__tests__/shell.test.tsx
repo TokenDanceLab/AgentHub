@@ -125,9 +125,9 @@ describe('AgentHubWorkbench', () => {
     expect(within(dialog).getByText('导航')).toBeInTheDocument();
     expect(within(dialog).getByText('Ctrl/⌘ + K')).toBeInTheDocument();
     expect(within(dialog).getByText('Enter')).toBeInTheDocument();
-    // #1822: the new-thread claim (Ctrl/⌘+N) had no handler anywhere and was
-    // removed from the canonical table — the help panel must not list it.
-    expect(within(dialog).queryByText('Ctrl/⌘ + N')).not.toBeInTheDocument();
+    // #1856 gave new-thread a real handler, so the help panel lists it again
+    // alongside the #1822-implemented bindings.
+    expect(within(dialog).getByText('Ctrl/⌘ + N')).toBeInTheDocument();
 
     // A second '?' toggles it closed.
     fireEvent.keyDown(document, { key: '?' });

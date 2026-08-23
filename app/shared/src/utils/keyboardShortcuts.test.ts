@@ -83,6 +83,9 @@ describe('getResolvedBinding', () => {
   beforeEach(() => {
     localStorage.clear();
   });
+  afterEach(() => {
+    localStorage.clear();
+  });
 
   it('falls back to canonical keys without custom bindings', () => {
     expect(getResolvedBinding('search')).toEqual(['Ctrl/⌘', 'K']);
@@ -126,6 +129,12 @@ describe('deriveKeysFromEvent', () => {
 });
 
 describe('checkConflicts', () => {
+  // checkConflicts reads RESOLVED groups — earlier describes may leave
+  // custom bindings behind, so isolate storage per test.
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
   it('reports the conflicting shortcut for duplicate key combos', () => {
     const conflict = checkConflicts(['Ctrl/⌘', 'K'], 'new-thread');
     expect(conflict?.id).toBe('search');
