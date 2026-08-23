@@ -148,6 +148,12 @@
   stroke-linecap: round;
   stroke-linejoin: round;
 }
+.nav-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 
 .doc-shortcut {
   padding: 8px 12px 8px 38px;
@@ -550,6 +556,9 @@
   font: 500 0.6875rem var(--td-mono);
   font-style: normal;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
 }
 
 /* ── Capability tags in agent list rows ── */
@@ -2194,4 +2203,84 @@
 .transport-badge {
   background: var(--success-bg);
   color: var(--td-moss);
+}
+
+/* ── Responsive tiers (#1866) ────────────────────────────────────────
+   Consumes the SSOT breakpoint tiers (styles/tokens-base.css
+   "Responsive Breakpoints" comment + styles/breakpoints.ts). Literal px
+   here by the same convention as SettingsPage (≤720) and TasksPage (≤768).
+   narrow 768 → mobile shell: page nav compacts, list+detail stack.
+   compact 720 → summary single column. mobile 480 → icon-only rail. */
+
+@media (max-width: 768px) {
+  .agents-page {
+    --wb-main-x: 18px;
+    --wb-main-y: 20px;
+  }
+
+  .agents-page .workbench-nav {
+    width: 208px;
+    flex-basis: 208px;
+    padding: 20px 10px 14px;
+  }
+
+  .agent-summary-strip {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  /* Stack list + detail and let the page scroll instead of dual-scroll */
+  .agent-main:has(.agent-layout) {
+    overflow-y: auto;
+  }
+
+  .agent-layout {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto auto;
+  }
+
+  .agent-section {
+    height: auto;
+    min-height: 220px;
+    max-height: 400px;
+  }
+
+  .agent-config-list {
+    max-height: 320px;
+  }
+
+  .agent-detail {
+    height: auto;
+    min-height: 320px;
+  }
+}
+
+@media (max-width: 720px) {
+  .agent-summary-strip {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 480px) {
+  .agents-page .workbench-nav {
+    width: 64px;
+    flex-basis: 64px;
+    padding: 16px 6px 12px;
+  }
+
+  .workbench-title,
+  .workbench-search,
+  .nav-caption,
+  .doc-shortcut {
+    display: none;
+  }
+
+  .nav-row {
+    justify-content: center;
+    padding: 0;
+    gap: 0;
+  }
+
+  .nav-label {
+    display: none;
+  }
 }
