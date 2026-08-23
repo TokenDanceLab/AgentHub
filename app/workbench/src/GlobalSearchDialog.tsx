@@ -126,7 +126,7 @@ export function GlobalSearchDialog({
             placeholder={t('globalSearch.placeholder', { defaultValue: '搜索或切换会话…' })}
             aria-label={t('globalSearch.label', { defaultValue: '全局搜索' })}
           />
-          <Button variant="ghost" size="sm" onClick={onClose} aria-label="Close search">
+          <Button variant="ghost" size="sm" onClick={onClose} aria-label={t('ui.closeSearch', { defaultValue: '关闭搜索' })}>
             <DesignNavIcon name="close" size={14} strokeWidth={2} />
           </Button>
         </div>

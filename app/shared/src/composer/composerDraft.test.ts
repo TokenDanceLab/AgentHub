@@ -159,6 +159,22 @@ describe('#1822 serialized draft payloads (attachments / reply / quote)', () => 
     expect(loadDraft(SESSION_A)).toBeNull();
   });
 
+  it('#1853 review: rejects refs missing the required mime_type', () => {
+    localStorage.setItem(
+      `agenthub.composer.draft.${SESSION_A}`,
+      JSON.stringify({
+        text: 'x',
+        mentions: [],
+        attachments: [{
+          id: 'a1',
+          name: 'design.pdf',
+          attachmentRef: { id: 'att-1', name: 'design.pdf', size: 1024 },
+        }],
+      }),
+    );
+    expect(loadDraft(SESSION_A)).toBeNull();
+  });
+
   it('accepts valid replyTo/quote shapes and rejects broken ones', () => {
     const valid = { text: 't', mentions: [], replyTo: { messageId: 'm', author: 'a', preview: 'p' } };
     saveDraft(SESSION_A, valid);

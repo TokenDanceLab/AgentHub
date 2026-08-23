@@ -283,6 +283,11 @@ export const ConversationHost = React.memo(function ConversationHost({
      chips instead. The composer's own form handlers keep precedence
      (events originating inside [data-composer-form] are skipped here). */
   const [filesDragging, setFilesDragging] = useState(false);
+  // Live conversation id for the drop continuation — a ref keeps the
+  // listener effect stable while always reading the current value
+  // (#1853 review: switching mid-conversion must not leak attachments).
+  const composerConversationIdRef = useRef(composer.conversationId);
+  composerConversationIdRef.current = composer.conversationId;
   useEffect(() => {
     // Routing decisions live in composerDocumentFileDrop (unit-tested);
     // ConversationHost only owns listener registration + the dragging flag.
@@ -290,6 +295,7 @@ export const ConversationHost = React.memo(function ConversationHost({
       dispatchComposer,
       onToast,
       onDraggingChange: setFilesDragging,
+      getCurrentConversationId: () => composerConversationIdRef.current,
     };
     const onDocumentDragOver = (event: DragEvent): void => handleDocumentDragOver(callbacks, event);
     const onDocumentDragLeave = (event: DragEvent): void => handleDocumentDragLeave(callbacks, event);

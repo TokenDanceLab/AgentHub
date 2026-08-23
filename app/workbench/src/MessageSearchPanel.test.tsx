@@ -240,13 +240,14 @@ describe('MessageSearchPanel', () => {
     expect(document.activeElement).toBe(closeBtn);
   });
 
-  it('cycles Tab through result buttons back to the input', async () => {
+  it('cycles Tab through result options back to the input', async () => {
     render(<MessageSearchPanel {...defaultProps} />);
     const input = screen.getByPlaceholderText<HTMLInputElement>('Type to search...');
     fireEvent.change(input, { target: { value: 'auth module' } });
     await flushDebounce();
-    const resultButtons = screen.getAllByRole('button').filter((btn) => btn !== input);
-    const lastResult = resultButtons[resultButtons.length - 1]!;
+    const resultOptions = screen.getAllByRole('option');
+    expect(resultOptions.length).toBeGreaterThan(0);
+    const lastResult = resultOptions[resultOptions.length - 1]!;
     lastResult.focus();
     fireEvent.keyDown(lastResult, { key: 'Tab' });
     expect(document.activeElement).toBe(input);
@@ -255,8 +256,8 @@ describe('MessageSearchPanel', () => {
   // ── #1822 keyboard navigation ─────────────────────────
 
   function activeResultButtons(): HTMLElement[] {
-    return screen.getAllByRole('button').filter(
-      (btn) => btn.getAttribute('aria-current') === 'true',
+    return screen.getAllByRole('option').filter(
+      (btn) => btn.getAttribute('aria-selected') === 'true',
     );
   }
 

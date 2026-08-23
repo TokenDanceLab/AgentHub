@@ -47,6 +47,7 @@ function makeCallbacks(
     dispatchComposer: vi.fn(),
     onToast: vi.fn(),
     onDraggingChange: vi.fn(),
+    getCurrentConversationId: vi.fn(() => 'c1'),
     ...overrides,
   };
 }
@@ -202,6 +203,42 @@ describe('handleDocumentDrop', () => {
     await vi.waitFor(() => {
       expect(cb.dispatchComposer).toHaveBeenCalledWith(
         expect.objectContaining({ type: 'addAttachment', attachment: expect.objectContaining({ id: 'a2' }) }),
+      );
+    });
+  });
+
+  it('#1853 review: drops the attachment when the conversation changed mid-conversion', async () => {
+    let currentConversation = 'c1';
+    const cb = makeCallbacks({ getCurrentConversationId: () => currentConversation });
+    let resolveConversion!: (attachments: ComposerAttachment[]) => void;
+    vi.mocked(browserFilesToComposerAttachments).mockReturnValue(
+      new Promise<ComposerAttachment[]>((resolve) => {
+        resolveConversion = resolve;
+      }),
+    );
+    const event = dragEvent('drop', { dataTransfer: { types: ['Files'], files: [file('a.pdf')] } });
+    handleDocumentDrop(cb, event);
+    expect(event.defaultPrevented).toBe(true);
+
+    // Switch conversations while File.text() is still pending.
+    currentConversation = 'c2';
+    resolveConversion([{ id: 'a1', name: 'a.pdf', size: 1024 } as ComposerAttachment]);
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(cb.dispatchComposer).not.toHaveBeenCalled();
+  });
+
+  it('#1853 review: dispatches when the conversation stayed the same', async () => {
+    let currentConversation = 'c1';
+    const cb = makeCallbacks({ getCurrentConversationId: () => currentConversation });
+    vi.mocked(browserFilesToComposerAttachments).mockResolvedValue([
+      { id: 'a3', name: 'same.pdf', size: 2048 } as ComposerAttachment,
+    ]);
+    handleDocumentDrop(cb, dragEvent('drop', { dataTransfer: { types: ['Files'], files: [file('same.pdf', 2048)] } }));
+    await vi.waitFor(() => {
+      expect(cb.dispatchComposer).toHaveBeenCalledWith(
+        expect.objectContaining({ type: 'addAttachment', attachment: expect.objectContaining({ id: 'a3' }) }),
       );
     });
   });

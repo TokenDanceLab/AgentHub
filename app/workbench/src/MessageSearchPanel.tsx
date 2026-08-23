@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
+import { useState, useMemo, useCallback, useEffect, useRef, useId } from 'react';
 import { getI18n, useTranslation } from 'react-i18next';
 import type { ChatMessage } from '@shared/types/chat';
 import type { TranscriptBlock } from '@shared/transcript';
@@ -131,6 +131,7 @@ export function MessageSearchPanel({
   // #1822: keyboard row navigation — ArrowUp/Down move the active row,
   // Enter jumps to it (mirrors clicking a result).
   const [activeIndex, setActiveIndex] = useState(0);
+  const listboxId = useId();
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inputRef = useState<HTMLInputElement | null>(null);
   const panelRef = useRef<HTMLDivElement | null>(null);
@@ -287,6 +288,13 @@ export function MessageSearchPanel({
             ref={setInputRef}
             className={styles.input}
             type="search"
+            role="combobox"
+            aria-expanded={results.length > 0}
+            aria-controls={listboxId}
+            aria-activedescendant={
+              results[activeIndex] ? `${listboxId}-option-${activeIndex}` : undefined
+            }
+            aria-autocomplete="list"
             value={immediateQuery}
             onChange={(e) => setImmediateQuery(e.target.value)}
             placeholder={searchPlaceholder}
@@ -297,7 +305,7 @@ export function MessageSearchPanel({
           </Button>
         </div>
 
-        <div className={styles.results}>
+        <div className={styles.results} role="listbox" id={listboxId}>
           {query.trim() === '' && (
             <div className={styles.hint}>{searchPlaceholder}</div>
           )}
@@ -308,8 +316,10 @@ export function MessageSearchPanel({
             <button type="button"
               key={`${result.messageId}-${idx}`}
               ref={idx === activeIndex ? activeResultRef : undefined}
+              role="option"
+              id={`${listboxId}-option-${idx}`}
+              aria-selected={idx === activeIndex}
               className={`${styles.resultItem} ${idx === activeIndex ? styles.resultItemActive : ''} ${highlightMessageId === result.messageId ? styles.resultItemHighlight : ''}`}
-              aria-current={idx === activeIndex ? 'true' : undefined}
               onClick={() => handleResultClick(result)}
             >
               <div className={styles.resultMeta}>
@@ -328,9 +338,12 @@ export function MessageSearchPanel({
         </div>
 
         <div className={styles.footer}>
-          <kbd>ESC</kbd> to close
+          <kbd>ESC</kbd> {t('messageSearch.footerClose', { defaultValue: '关闭' })}
           {results.length > 0 && (
-            <span aria-hidden="true"> · <kbd>↑↓</kbd> navigate · <kbd>Enter</kbd> jump</span>
+            <span aria-hidden="true">
+              {' '}· <kbd>↑↓</kbd> {t('messageSearch.footerNavigate', { defaultValue: '选择' })}{' '}
+              · <kbd>Enter</kbd> {t('messageSearch.footerJump', { defaultValue: '跳转' })}
+            </span>
           )}
         </div>
       </div>

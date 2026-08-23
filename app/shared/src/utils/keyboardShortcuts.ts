@@ -141,7 +141,8 @@ export function hasCustomKeybindings(): boolean {
   return Object.keys(loadCustomBindings()).some((id) => isRebindableId(id));
 }
 
-/** Read all saved custom bindings (for merge-style updates). */
+/** Read all saved custom bindings (for merge-style updates; non-rebindable
+ *  ids are filtered out of the persisted store anyway). */
 export function getCustomKeybindings(): CustomKeybinding[] {
   return Object.entries(loadCustomBindings())
     .filter(([id]) => isRebindableId(id))

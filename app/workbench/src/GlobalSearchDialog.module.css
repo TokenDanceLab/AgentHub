@@ -1,7 +1,12 @@
 /* Global search dialog (#1822) — shared by Web and Desktop shells. */
 
 .overlay {
+  /* #1853 review: fixed + inset — the dialog mounts outside the frame and
+     must cover the viewport so click-away works everywhere. */
+  position: fixed;
+  inset: 0;
   display: flex;
+  align-items: flex-start;
   justify-content: center;
   padding-top: 12px;
   z-index: 100;

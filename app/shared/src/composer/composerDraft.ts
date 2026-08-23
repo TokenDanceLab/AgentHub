@@ -47,8 +47,15 @@ function isValidDraftAttachment(raw: unknown): raw is SerializedDraftAttachment 
   const ref = obj.attachmentRef;
   if (!ref || typeof ref !== 'object') return false;
   const refObj = ref as Record<string, unknown>;
-  // Minimal ref validation — id + name + size are the fields consumers use.
-  return typeof refObj.id === 'string' && typeof refObj.name === 'string' && typeof refObj.size === 'number';
+  // Minimal ref validation — id + name + size are the fields consumers use;
+  // mime_type is required by AttachmentRef (#1853 review: a ref without it
+  // is malformed and must not be restored into composer state).
+  return (
+    typeof refObj.id === 'string'
+    && typeof refObj.name === 'string'
+    && typeof refObj.size === 'number'
+    && typeof refObj.mime_type === 'string'
+  );
 }
 
 function isValidDraft(raw: unknown): raw is ComposerDraft {

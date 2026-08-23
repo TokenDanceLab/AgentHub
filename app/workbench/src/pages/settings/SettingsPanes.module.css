@@ -1,0 +1,41 @@
+/* ShortcutsPane remap controls (#1822/#1853) — design tokens only, no
+   hard-coded colors (verify-design-css-syntax gate). */
+
+.keyButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-family: var(--mono, ui-monospace, monospace);
+  font-size: 0.8125rem;
+  color: var(--td-ink-muted);
+  background: var(--glass-bg-subtle);
+  padding: 2px 8px;
+  border-radius: 4px;
+  border: 1px solid var(--td-line);
+  cursor: pointer;
+}
+
+/* The recorded shortcut that collided — error styling lives on THIS row
+   only, not on every row of the pane. */
+.keyButtonDanger {
+  color: var(--td-danger);
+  background: var(--danger-bg);
+  border-color: var(--td-danger);
+}
+
+.resetButton {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.8125rem;
+  padding: 2px 8px;
+  border-radius: 4px;
+  border: 1px solid var(--td-line);
+  background: var(--glass-bg-subtle);
+  color: var(--td-ink-muted);
+  cursor: pointer;
+}
+
+.resetButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}

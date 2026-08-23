@@ -21,6 +21,8 @@ export interface ComposerDocumentFileDropCallbacks {
   dispatchComposer: Dispatch<ComposerAction>;
   onToast: (message: string) => void;
   onDraggingChange: (dragging: boolean) => void;
+  /** Live conversation id — the host updates this on every render. */
+  getCurrentConversationId: () => string;
 }
 
 /** Whether the event target lives inside the composer form (its own
@@ -68,7 +70,12 @@ export function handleDocumentDrop(
   const oversizeToast = buildAttachmentOversizeToast(rejected);
   if (oversizeToast) callbacks.onToast(oversizeToast);
   if (accepted.length === 0) return;
+  // #1853 review: capture the source conversation before the async
+  // conversion — a switch while File.text() is pending resets the composer,
+  // and the unscoped continuation would land the attachment in the new one.
+  const sourceConversationId = callbacks.getCurrentConversationId();
   void browserFilesToComposerAttachments(accepted).then((attachments) => {
+    if (callbacks.getCurrentConversationId() !== sourceConversationId) return;
     dispatchComposerAttachmentAdds(callbacks.dispatchComposer, attachments);
   });
 }

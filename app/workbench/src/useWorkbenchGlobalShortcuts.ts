@@ -16,8 +16,9 @@ import { isEditableKeyboardTarget } from './workbenchSessionChromeHelpers';
    - settings (Ctrl/⌘+,)       → navigate to the settings page
    - toggle-sidebar (Ctrl/⌘+B) → collapse/expand the conversation sidebar
    - toggle-run-panel (Ctrl/⌘+J) → collapse/expand the right inspector
-   - Ctrl+P                    → quick-open the inspector Files tab (claimed
-                                 by the inspector quick-open menu)
+   - quick-open (Ctrl/⌘+P)     → open the inspector Files tab (canonical
+                                 entry as of #1853 review — the recorder and
+                                 help panel list it like any other binding)
 
    Deliberately NOT handled here:
    - chat-search (Ctrl/⌘+F) — owned by useWorkbenchSessionChrome (needs the
@@ -83,11 +84,8 @@ export function useWorkbenchGlobalShortcuts(options: UseWorkbenchGlobalShortcuts
         optionsRef.current.onToggleRunPanel();
         return;
       }
-
-      // Inspector quick-open claim (not part of the canonical groups — it
-      // belongs to the inspector's own quick-open menu): Ctrl+P opens the
-      // Files tab.
-      if (matchesShortcut(e, ['Ctrl/⌘', 'P'])) {
+      const quickOpenBinding = bindingFor('quick-open');
+      if (quickOpenBinding && matchesShortcut(e, quickOpenBinding)) {
         e.preventDefault();
         optionsRef.current.onQuickOpen();
         return;

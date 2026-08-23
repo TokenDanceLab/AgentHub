@@ -72,6 +72,7 @@ describe('ShortcutsPane (#1822 custom keybindings)', () => {
       'Esc',
       'Ctrl/⌘ + B',
       'Ctrl/⌘ + J',
+      'Ctrl/⌘ + P',
       'Ctrl/⌘ + ,',
     ]) {
       expect(remapButton(combo)).toBeInTheDocument();
@@ -132,5 +133,32 @@ describe('ShortcutsPane (#1822 custom keybindings)', () => {
   it('reset stays disabled until a custom binding or recording exists', () => {
     renderPane();
     expect(screen.getByRole('button', { name: '重置为默认' })).toBeDisabled();
+  });
+
+  it('#1853 review: recording a second shortcut preserves the first remap', () => {
+    renderPane();
+    fireEvent.click(remapButton('Ctrl/⌘ + K'));
+    fireEvent.keyDown(document, { key: 'l', ctrlKey: true });
+    expect(remapButton('Ctrl + L')).toBeInTheDocument();
+
+    fireEvent.click(remapButton('Ctrl/⌘ + B'));
+    fireEvent.keyDown(document, { key: 'm', ctrlKey: true });
+
+    expect(remapButton('Ctrl + L')).toBeInTheDocument();
+    expect(remapButton('Ctrl + M')).toBeInTheDocument();
+    expect(getResolvedBinding('search')).toEqual(['Ctrl', 'L']);
+    expect(getResolvedBinding('toggle-sidebar')).toEqual(['Ctrl', 'M']);
+  });
+
+  it('#1853 review: conflict rejection shows on the recorded row', () => {
+    renderPane();
+    fireEvent.click(remapButton('Ctrl/⌘ + K'));
+    fireEvent.keyDown(document, { key: 'Enter' });
+
+    // The recorded row (search) carries the rejection message naming the
+    // colliding shortcut (send) — not the send row.
+    expect(screen.getByText('该组合与「send」冲突，未保存')).toBeInTheDocument();
+    expect(remapButton('Ctrl/⌘ + K')).toBeInTheDocument();
+    expect(remapButton('Enter')).toBeInTheDocument();
   });
 });

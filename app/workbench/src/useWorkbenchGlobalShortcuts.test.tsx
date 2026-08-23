@@ -115,4 +115,13 @@ describe('useWorkbenchGlobalShortcuts', () => {
     fire('s', { ctrlKey: true });
     expect(onOpenSettings).toHaveBeenCalledOnce();
   });
+
+  it('#1853 review: quick-open follows its resolved binding too', () => {
+    saveCustomKeybindings([{ id: 'quick-open', keys: ['Ctrl/⌘', 'Shift', 'P'] }]);
+    fire('p', { ctrlKey: true, shiftKey: true });
+    expect(onQuickOpen).toHaveBeenCalledOnce();
+    // The canonical Ctrl+P no longer fires once remapped.
+    fire('p', { ctrlKey: true });
+    expect(onQuickOpen).toHaveBeenCalledOnce();
+  });
 });
