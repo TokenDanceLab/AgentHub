@@ -162,7 +162,7 @@ git worktree add .worktrees/<topic> -b <type>/<topic> origin/master
 并行波次开发模型（2026-08-23 定）：
 
 - 开发在本地 worktree 完成；L3 真实 E2E/Visual QA 等验证在「远程 dev 服务器」执行（§5.5 L3 同口径，入口 `scripts/dev/devserver.sh`）——开发 lane 不放远程（容量受限）。**公开仓不写内部主机别名/规格**（§9 隐私红线）。
-- 本地 worktree 的 `app/node_modules` 可用 junction 借主树（`New-Item -ItemType Junction`）；主树 `pnpm install` 只在全部 lane 收工后做；junction 依赖版本与 lockfile 不一致时本地 typecheck 可能与 CI 不同——CI 是最终裁决。
+- 本地 worktree 可把 app 下的 node_modules 用 junction 借主树（`New-Item -ItemType Junction`）；主树 `pnpm install` 只在全部 lane 收工后做；junction 依赖版本与 lockfile 不一致时本地 typecheck 可能与 CI 不同——CI 是最终裁决。
 - 多 lane 测试串行单进程（`vitest run --no-file-parallelism --maxWorkers=1`），防过载假红。
 - CodeRabbit 自动评审已关闭（#1858），按需 `@coderabbitai`；五道硬门禁（validate/go-hub/go-edge/windows-go/windows-frontend）是合并唯一强制 gate。
 - 并行 lane 任务书必须含地界/法/验收；主线做最终验收与合并裁决。
