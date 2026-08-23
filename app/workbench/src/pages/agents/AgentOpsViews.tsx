@@ -54,10 +54,12 @@ export const AgentPolicyView: React.FC<AgentsPageProps> = (props) => {
             配置 Agent 执行边界、审批默认值和风险分级。这里展示前端 demo 的策略矩阵。
           </p>
         </div>
-        <button className={`${styles['outline-action']} outline-action`} type="button" onClick={onPolicyAdd}>
-          <DesignNavIcon name="plus" size={15} />
-          新增策略
-        </button>
+        {onPolicyAdd && (
+          <button className={`${styles['outline-action']} outline-action`} type="button" onClick={onPolicyAdd}>
+            <DesignNavIcon name="plus" size={15} />
+            新增策略
+          </button>
+        )}
       </div>
 
       <div className={styles['agent-policy-layout']}>
@@ -88,10 +90,12 @@ export const AgentToolsView: React.FC<AgentsPageProps> = (props) => {
             按 Agent 查看工具授权。权限值可在“Agent 配置”页直接修改，这里做集中总览。
           </p>
         </div>
-        <button className={`${styles['outline-action']} outline-action`} type="button" onClick={onToolsAddAgent}>
-          <DesignNavIcon name="plus" size={15} />
-          添加 Agent
-        </button>
+        {onToolsAddAgent && (
+          <button className={`${styles['outline-action']} outline-action`} type="button" onClick={onToolsAddAgent}>
+            <DesignNavIcon name="plus" size={15} />
+            添加 Agent
+          </button>
+        )}
       </div>
 
       <ToolPermissionMatrix
@@ -127,10 +131,12 @@ export const AgentModelsView: React.FC<AgentsPageProps> = (props) => {
             定义可选模型、默认用途和 Agent 分配。当前 demo 只修改前端展示状态。
           </p>
         </div>
-        <button className={`${styles['outline-action']} outline-action`} type="button" onClick={onModelAdd}>
-          <DesignNavIcon name="plus" size={15} />
-          添加模型
-        </button>
+        {onModelAdd && (
+          <button className={`${styles['outline-action']} outline-action`} type="button" onClick={onModelAdd}>
+            <DesignNavIcon name="plus" size={15} />
+            添加模型
+          </button>
+        )}
       </div>
 
       {ccSwitchStatus ? (
@@ -170,10 +176,12 @@ export const AgentAuditView: React.FC<AgentsPageProps> = (props) => {
             记录 Agent 工具调用、审批结果和目标资源，用于 demo 中展示治理闭环。
           </p>
         </div>
-        <button className={`${styles['outline-action']} outline-action`} type="button" onClick={onAuditExport}>
-          <DesignNavIcon name="download" size={15} />
-          导出日志
-        </button>
+        {onAuditExport && (
+          <button className={`${styles['outline-action']} outline-action`} type="button" onClick={onAuditExport}>
+            <DesignNavIcon name="download" size={15} />
+            导出日志
+          </button>
+        )}
       </div>
 
       <AuditFilterBar

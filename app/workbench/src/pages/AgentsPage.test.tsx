@@ -365,3 +365,72 @@ describe('AgentsPage data source badge', () => {
     expect(container.querySelector('[data-data-source]')).toBeNull();
   });
 });
+
+describe('AgentsPage no-handler controls', () => {
+  const minimal = {
+    activePane: 'installed' as const,
+    onPaneChange: () => undefined,
+    installedCount: 0,
+    runnableCount: 0,
+    confirmCount: 0,
+    defaultModelLabel: '—',
+    agents: [],
+  };
+
+  it('hides publish template without onMarketPublish', () => {
+    render(<AgentsPage {...minimal} activePane="market" />);
+    expect(screen.queryByRole('button', { name: '发布模板' })).toBeNull();
+  });
+  it('shows publish template with onMarketPublish', () => {
+    render(<AgentsPage {...minimal} activePane="market" onMarketPublish={() => undefined} />);
+    expect(screen.queryByRole('button', { name: '发布模板' })).not.toBeNull();
+  });
+
+  it('hides policy add without onPolicyAdd', () => {
+    render(<AgentsPage {...minimal} activePane="policy" />);
+    expect(screen.queryByRole('button', { name: '新增策略' })).toBeNull();
+  });
+  it('shows policy add with onPolicyAdd', () => {
+    render(<AgentsPage {...minimal} activePane="policy" onPolicyAdd={() => undefined} />);
+    expect(screen.queryByRole('button', { name: '新增策略' })).not.toBeNull();
+  });
+
+  it('hides tools add agent without onToolsAddAgent', () => {
+    render(<AgentsPage {...minimal} activePane="tools" />);
+    expect(screen.queryByRole('button', { name: '添加 Agent' })).toBeNull();
+  });
+  it('shows tools add agent with onToolsAddAgent', () => {
+    render(<AgentsPage {...minimal} activePane="tools" onToolsAddAgent={() => undefined} />);
+    expect(screen.queryByRole('button', { name: '添加 Agent' })).not.toBeNull();
+  });
+
+  it('hides model add without onModelAdd', () => {
+    render(<AgentsPage {...minimal} activePane="models" />);
+    expect(screen.queryByRole('button', { name: '添加模型' })).toBeNull();
+  });
+  it('shows model add with onModelAdd', () => {
+    render(<AgentsPage {...minimal} activePane="models" onModelAdd={() => undefined} />);
+    expect(screen.queryByRole('button', { name: '添加模型' })).not.toBeNull();
+  });
+
+  it('hides audit export without onAuditExport', () => {
+    render(<AgentsPage {...minimal} activePane="audit" />);
+    expect(screen.queryByRole('button', { name: '导出日志' })).toBeNull();
+  });
+  it('shows audit export with onAuditExport', () => {
+    render(<AgentsPage {...minimal} activePane="audit" onAuditExport={() => undefined} />);
+    expect(screen.queryByRole('button', { name: '导出日志' })).not.toBeNull();
+  });
+
+  it('disables nav search without onSearchChange', () => {
+    const { container } = render(<AgentsPage {...minimal} activePane="installed" />);
+    const navSearch = container.querySelector('aside input');
+    expect(navSearch?.hasAttribute('disabled')).toBe(true);
+  });
+
+  it('keeps nav search enabled with onSearchChange', () => {
+    const { container } = render(<AgentsPage {...minimal} activePane="installed" onSearchChange={() => undefined} />);
+    const navSearch = container.querySelector('aside input');
+    expect(navSearch?.hasAttribute('disabled')).toBe(false);
+  });
+});
