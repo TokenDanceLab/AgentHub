@@ -4,6 +4,7 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -103,6 +104,40 @@ jwt:
 	}
 }
 
+func TestEnvExampleRequiresGeneratedJWTSecret(t *testing.T) {
+	_, testFile, _, ok := runtime.Caller(0)
+	if !ok {
+		t.Fatal("runtime.Caller() could not locate config_test.go")
+	}
+
+	envExamplePath := filepath.Clean(filepath.Join(filepath.Dir(testFile), "..", "..", "..", ".env.example"))
+	content, err := os.ReadFile(envExamplePath)
+	if err != nil {
+		t.Fatalf("read %s: %v", envExamplePath, err)
+	}
+
+	var jwtSecretValues []string
+	for _, line := range strings.Split(string(content), "\n") {
+		line = strings.TrimSpace(line)
+		if strings.HasPrefix(line, "AGENTHUB_JWT_SECRET=") {
+			jwtSecretValues = append(jwtSecretValues, strings.TrimSpace(strings.TrimPrefix(line, "AGENTHUB_JWT_SECRET=")))
+		}
+	}
+	if len(jwtSecretValues) != 1 {
+		t.Fatalf("%s must define AGENTHUB_JWT_SECRET exactly once; found %d entries", envExamplePath, len(jwtSecretValues))
+	}
+
+	secret := jwtSecretValues[0]
+	for _, prefix := range weakSecretPrefixes {
+		if strings.HasPrefix(secret, prefix) {
+			t.Fatalf("%s AGENTHUB_JWT_SECRET matches runtime placeholder prefix %q", envExamplePath, prefix)
+		}
+	}
+	if secret != "" {
+		t.Fatalf("%s must leave AGENTHUB_JWT_SECRET empty so each developer generates a private value", envExamplePath)
+	}
+}
+
 func TestJWTSecretEmptyRejected(t *testing.T) {
 	yaml := `
 jwt:
@@ -141,7 +176,7 @@ jwt:
 }
 
 // TestJWTSecretDocumentedDevPlaceholderRejected covers the publicly-known
-// dev placeholder shipped in .env.example
+// former dev placeholder that shipped in .env.example
 // ("dev-secret-change-in-production-min-length-32", 41 chars). It previously
 // bypassed the exact-match blocklist while passing the 32-char minimum,
 // letting a public-known secret into production. Prefix matching now rejects
@@ -154,7 +189,7 @@ jwt:
 `
 	path := writeTempConfig(t, yaml)
 
-	// The exact value documented in .env.example — a public-known secret.
+	// The former value documented in .env.example — a public-known secret.
 	t.Setenv("AGENTHUB_JWT_SECRET", "dev-secret-change-in-production-min-length-32")
 	cfg, err := Load(path)
 	if err != nil {
@@ -186,7 +221,7 @@ jwt:
 	}
 }
 
-// TestJWTSecretProdPlaceholderRejected covers the production .env.example
+// TestJWTSecretProdPlaceholderRejected covers the former production .env.example
 // placeholder "change-me-production-min-length-32-chars" (41 chars). It
 // previously bypassed the exact-match blocklist while passing the 32-char
 // minimum, letting a public-known secret into production. Prefix matching
@@ -199,7 +234,7 @@ jwt:
 `
 	path := writeTempConfig(t, yaml)
 
-	// The exact value documented in .env.example — a public-known secret.
+	// The former value documented in .env.example — a public-known secret.
 	t.Setenv("AGENTHUB_JWT_SECRET", "change-me-production-min-length-32-chars")
 	cfg, err := Load(path)
 	if err != nil {
