@@ -3,6 +3,7 @@
  * Peel companion of DiffReviewPanel (#1151). Pure only; zero behavior change.
  */
 
+import React, { useCallback, useRef, useState } from 'react';
 import { Check, X } from 'lucide-react';
 import { cx } from './cx';
 import { Tooltip } from './Tooltip';
@@ -25,6 +26,7 @@ import styles from './DiffReviewPanel.module.css';
 export function DiffReviewFileTabs({
   files,
   safeIndex,
+  tabsId,
   fileTabsClassName,
   fileTabClassName,
   activeFileTabClassName,
@@ -32,34 +34,99 @@ export function DiffReviewFileTabs({
 }: {
   files: DiffReviewFile[];
   safeIndex: number;
+  /**
+   * Id prefix shared with the tabpanel rendered by DiffReviewPanel
+   * (`${tabsId}-tab-${idx}` / `${tabsId}-panel`). Optional — the parts
+   * component keeps working standalone without tabpanel association (#1823).
+   */
+  tabsId?: string | undefined;
   fileTabsClassName?: string | undefined;
   fileTabClassName?: string | undefined;
   activeFileTabClassName?: string | undefined;
   onSelectFile: (idx: number) => void;
 }) {
+  // ── Roving tabindex (#1823) ──────────────────────────────────────────
+  // One Tab stop for the strip; Arrow/Home/End move focus without changing
+  // the selected file (activation stays on click/Enter, matching the #1835
+  // TerminalPanel pattern).
+  const tabsRef = useRef<HTMLDivElement>(null);
+  const [rovingTabIndex, setRovingTabIndex] = useState<number | null>(null);
+
+  const handleTabsKeyDown = useCallback((event: React.KeyboardEvent<HTMLDivElement>) => {
+    const tabButtons = tabsRef.current
+      ? Array.from(tabsRef.current.querySelectorAll<HTMLButtonElement>('[role="tab"]'))
+      : [];
+    if (tabButtons.length === 0) return;
+    const activeIndex = tabButtons.findIndex((button) => button === document.activeElement);
+    // Focus on a non-tab stop is not part of the roving strip — arrow keys
+    // should not hijack it (#1835 review).
+    if (activeIndex < 0) return;
+    let nextIndex: number | null;
+    switch (event.key) {
+      case 'ArrowRight':
+        nextIndex = (activeIndex + 1) % tabButtons.length;
+        break;
+      case 'ArrowLeft':
+        nextIndex = (activeIndex - 1 + tabButtons.length) % tabButtons.length;
+        break;
+      case 'Home':
+        nextIndex = 0;
+        break;
+      case 'End':
+        nextIndex = tabButtons.length - 1;
+        break;
+      default:
+        return;
+    }
+    event.preventDefault();
+    tabButtons[nextIndex]?.focus();
+    setRovingTabIndex(nextIndex);
+  }, []);
+
   return (
-    <div className={cx(styles.fileTabs, fileTabsClassName)} role="tablist">
-      {files.map((file, idx) => (
-        <button type="button"
-          key={file.filePath}
-          className={cx(
-            styles.fileTab,
-            fileTabClassName,
-            idx === safeIndex && styles.fileTabActive,
-            idx === safeIndex && activeFileTabClassName,
-          )}
-          role="tab"
-          aria-selected={idx === safeIndex}
-          onClick={() => onSelectFile(idx)}
-        >
-          <span
-            className={`${styles.fileTabBadge} ${fileActionClass(file.status)}`}
+    <div
+      className={cx(styles.fileTabs, fileTabsClassName)}
+      role="tablist"
+      ref={tabsRef}
+      onKeyDown={handleTabsKeyDown}
+    >
+      {files.map((file, idx) => {
+        // #1823: a remembered roving target can dangle after the file
+        // collection changes — fall back to the selected tab so the strip
+        // always keeps exactly one Tab stop.
+        const rovingValid = rovingTabIndex !== null && rovingTabIndex >= 0 && rovingTabIndex < files.length;
+        const isTabStop = idx === (rovingValid ? rovingTabIndex : safeIndex);
+        return (
+          <button type="button"
+            key={file.filePath}
+            className={cx(
+              styles.fileTab,
+              fileTabClassName,
+              idx === safeIndex && styles.fileTabActive,
+              idx === safeIndex && activeFileTabClassName,
+            )}
+            role="tab"
+            id={tabsId !== undefined ? `${tabsId}-tab-${idx}` : undefined}
+            aria-controls={tabsId !== undefined ? `${tabsId}-panel` : undefined}
+            aria-selected={idx === safeIndex}
+            tabIndex={isTabStop ? 0 : -1}
+            data-tab-index={idx}
+            onClick={() => {
+              // #1823: click activation selects the tab AND moves the roving
+              // stop to it — otherwise Tab later returns to the stale stop.
+              setRovingTabIndex(idx);
+              onSelectFile(idx);
+            }}
           >
-            {fileActionLabel(file.status)}
-          </span>
-          <span>{file.filePath}</span>
-        </button>
-      ))}
+            <span
+              className={`${styles.fileTabBadge} ${fileActionClass(file.status)}`}
+            >
+              {fileActionLabel(file.status)}
+            </span>
+            <span>{file.filePath}</span>
+          </button>
+        );
+      })}
     </div>
   );
 }

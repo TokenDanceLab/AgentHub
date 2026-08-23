@@ -7,7 +7,7 @@
  * importing from `./DiffReviewPanel` remain stable.
  */
 
-import { useState, useMemo, useCallback, useEffect } from 'react';
+import { useState, useMemo, useCallback, useEffect, useId } from 'react';
 import { cx } from './cx';
 import { languageFromPath } from './syntaxHighlight';
 import styles from './DiffReviewPanel.module.css';
@@ -268,6 +268,11 @@ export function DiffReviewPanel({
     [hunkKey, activeFilePath],
   );
 
+  // ── Tabpanel id prefix (#1823) ───────────────────────────────────────
+  // Shared by DiffReviewFileTabs (tab ids) and the diff content (panel),
+  // keeping the tab/tabpanel association stable.
+  const tabsId = useId();
+
   // ── Empty state ──────────────────────────────────────────────────────
 
   if (files.length === 0 || !activeFile) {
@@ -286,6 +291,7 @@ export function DiffReviewPanel({
       <DiffReviewFileTabs
         files={files}
         safeIndex={safeIndex}
+        tabsId={tabsId}
         fileTabsClassName={fileTabsClassName}
         fileTabClassName={fileTabClassName}
         activeFileTabClassName={activeFileTabClassName}
@@ -306,7 +312,12 @@ export function DiffReviewPanel({
       />
 
       {/* ── Side-by-side diff ─────────────────────── */}
-      <div className={cx(styles.diffContent, diffContentClassName)}>
+      <div
+        className={cx(styles.diffContent, diffContentClassName)}
+        role="tabpanel"
+        id={`${tabsId}-panel`}
+        aria-labelledby={`${tabsId}-tab-${safeIndex}`}
+      >
         <div className={styles.sideBySide}>
           {/* ── Left column (old) ─────────────────── */}
           <DiffReviewSideColumn

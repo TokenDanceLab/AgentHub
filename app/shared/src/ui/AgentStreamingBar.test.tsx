@@ -1,6 +1,6 @@
 import React from 'react';
 import { describe, it, expect, afterEach, afterAll, beforeAll } from 'vitest';
-import { render } from '@testing-library/react';
+import { act, render } from '@testing-library/react';
 import { AgentStreamingBar } from './AgentStreamingBar';
 import { getAgentActivityStore } from '../transcript/agentActivity';
 import { useTestI18nLanguage, TEST_I18N_DEFAULT_LNG } from '../testing/i18n';
@@ -49,5 +49,30 @@ describe('AgentStreamingBar', () => {
     const { queryByText, getByText } = render(<AgentStreamingBar />);
     expect(queryByText(/次工具调用/)).not.toBeInTheDocument();
     expect(getByText('Sonnet')).toBeInTheDocument();
+  });
+});
+
+describe('AgentStreamingBar live region governance (#1823)', () => {
+  it('drops aria-live to off while an agent is active and back to polite when done', () => {
+    const store = getAgentActivityStore();
+    store.pushAgentStatus('run-1', 'Sonnet', 'streaming');
+    const { getByRole } = render(<AgentStreamingBar />);
+    const status = getByRole('status');
+    expect(status).toHaveAttribute('aria-live', 'off');
+    expect(status).toHaveAttribute('aria-busy', 'true');
+
+    act(() => {
+      store.pushAgentStatus('run-1', 'Sonnet', 'done');
+    });
+    expect(getByRole('status')).toHaveAttribute('aria-live', 'polite');
+    expect(getByRole('status')).toHaveAttribute('aria-busy', 'false');
+  });
+
+  it('stays polite when all agents are finished', () => {
+    const store = getAgentActivityStore();
+    store.pushAgentStatus('run-1', 'Sonnet', 'done');
+    const { getByRole } = render(<AgentStreamingBar />);
+    expect(getByRole('status')).toHaveAttribute('aria-live', 'polite');
+    expect(getByRole('status')).toHaveAttribute('aria-busy', 'false');
   });
 });
