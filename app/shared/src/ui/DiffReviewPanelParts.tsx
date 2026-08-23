@@ -233,16 +233,14 @@ export function DiffReviewSideColumn({
   filePath,
   rows,
   activeLang,
-  acceptedLines,
-  rejectedLines,
-  lineKey,
   rowToHunkIndex,
   hunkStates,
   hunkKeyFor,
   appliedLabel,
   rejectedLabel,
-  acceptLineLabel,
-  rejectLineLabel,
+  submittingLabel,
+  acceptHunkLabel,
+  rejectHunkLabel,
   diffRowClassName,
   lineActionBtnClassName,
   columnClassName,
@@ -254,16 +252,14 @@ export function DiffReviewSideColumn({
   filePath: string;
   rows: SideBySideRow[];
   activeLang: string;
-  acceptedLines: Set<string>;
-  rejectedLines: Set<string>;
-  lineKey: (rowIndex: number) => string;
   rowToHunkIndex: Map<number, number>;
-  hunkStates: Record<string, 'applied' | 'rejected'>;
+  hunkStates: Record<string, 'applied' | 'rejected' | 'submitting'>;
   hunkKeyFor: (hunkIndex: number) => string;
   appliedLabel: string;
   rejectedLabel: string;
-  acceptLineLabel: string;
-  rejectLineLabel: string;
+  submittingLabel: string;
+  acceptHunkLabel: string;
+  rejectHunkLabel: string;
   diffRowClassName?: string | undefined;
   lineActionBtnClassName?: string | undefined;
   columnClassName?: string | undefined;
@@ -278,11 +274,20 @@ export function DiffReviewSideColumn({
       </div>
       {rows.map((row, rowIndex) => {
         const cell = side === 'left' ? row.left : row.right;
-        const rowState = rejectedLines.has(lineKey(rowIndex))
-          ? 'rejected'
-          : acceptedLines.has(lineKey(rowIndex))
-            ? 'accepted'
-            : 'default';
+
+        // Hunk-level state drives row visual + action availability (#1870):
+        // the whole hunk is the review unit, not the single line pair.
+        const hunkIdx = rowToHunkIndex.get(rowIndex);
+        const hunkState = hunkIdx != null
+          ? hunkStates[hunkKeyFor(hunkIdx)]
+          : undefined;
+        const rowState = hunkState === 'applied'
+          ? 'accepted'
+          : hunkState === 'rejected'
+            ? 'rejected'
+            : hunkState === 'submitting'
+              ? 'submitting'
+              : 'default';
         const rowClass = cx(
           styles.diffRow,
           diffRowClassName,
@@ -292,19 +297,29 @@ export function DiffReviewSideColumn({
           rowState === 'rejected' && styles.diffRowRejected,
         );
 
-        // Check if this is the first row of a new hunk with a committed state
-        const hunkIdx = rowToHunkIndex.get(rowIndex);
-        const hunkState = hunkIdx != null
-          ? hunkStates[hunkKeyFor(hunkIdx)]
-          : undefined;
         const prevHunkIdx = rowIndex > 0 ? rowToHunkIndex.get(rowIndex - 1) : undefined;
         const isFirstRowOfHunk = hunkIdx != null && hunkIdx !== prevHunkIdx;
+        const acceptDisabled = hunkState === 'submitting' || hunkState === 'applied';
+        const rejectDisabled = hunkState === 'submitting' || hunkState === 'rejected';
 
         return (
           <div key={rowIndex} className={rowClass}>
             {isFirstRowOfHunk && hunkState && (
-              <span className={cx(styles.hunkBadge, hunkState === 'applied' ? styles.hunkBadgeApplied : styles.hunkBadgeRejected)}>
-                {hunkState === 'applied' ? appliedLabel : rejectedLabel}
+              <span
+                className={cx(
+                  styles.hunkBadge,
+                  hunkState === 'applied'
+                    ? styles.hunkBadgeApplied
+                    : hunkState === 'rejected'
+                      ? styles.hunkBadgeRejected
+                      : styles.hunkBadgeSubmitting,
+                )}
+              >
+                {hunkState === 'applied'
+                  ? appliedLabel
+                  : hunkState === 'rejected'
+                    ? rejectedLabel
+                    : submittingLabel}
               </span>
             )}
             <span className={styles.lineNum}>
@@ -318,7 +333,7 @@ export function DiffReviewSideColumn({
             />
             {row.rowType !== 'context' && (
               <div className={styles.lineActions}>
-                <Tooltip label={acceptLineLabel}>
+                <Tooltip label={acceptHunkLabel}>
                   <button type="button"
                     className={cx(
                       styles.lineActionBtn,
@@ -327,12 +342,13 @@ export function DiffReviewSideColumn({
                       rowState === 'accepted' && styles.lineAcceptBtnActive,
                     )}
                     onClick={() => onAcceptClick(rowIndex)}
-                    aria-label={acceptLineLabel}
+                    aria-label={acceptHunkLabel}
+                    disabled={acceptDisabled}
                   >
                     <Check size={11} />
                   </button>
                 </Tooltip>
-                <Tooltip label={rejectLineLabel}>
+                <Tooltip label={rejectHunkLabel}>
                   <button type="button"
                     className={cx(
                       styles.lineActionBtn,
@@ -341,7 +357,8 @@ export function DiffReviewSideColumn({
                       rowState === 'rejected' && styles.lineRejectBtnActive,
                     )}
                     onClick={() => onRejectClick(rowIndex)}
-                    aria-label={rejectLineLabel}
+                    aria-label={rejectHunkLabel}
+                    disabled={rejectDisabled}
                   >
                     <X size={11} />
                   </button>

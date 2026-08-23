@@ -1,10 +1,15 @@
 /**
- * DiffReviewPanel public surface — side-by-side diff review with line/hunk accept-reject.
- * Residual pure-helper peel of DiffReviewPanel (#1151). Pure only; zero behavior change.
+ * DiffReviewPanel public surface — side-by-side diff review with hunk accept-reject.
+ * Residual pure-helper peel of DiffReviewPanel (#1151).
  *
  * Implementations live in companions (DiffReviewPanelTypes / DiffReviewPanelHelpers /
  * DiffReviewPanelParts); this file keeps the public orchestrator so consumers
  * importing from `./DiffReviewPanel` remain stable.
+ *
+ * #1870: the review unit is a HUNK (the backend Edge apply contract is
+ * hunk-indexed), not a single line. The panel therefore keeps hunk-level
+ * state and drives a hunk write-back state machine:
+ *   idle -> submitting -> applied/rejected | rolled-back-on-failure.
  */
 
 import { useState, useMemo, useCallback, useEffect, useId } from 'react';
@@ -15,8 +20,6 @@ import {
   buildRowToHunkIndex,
   buildSideBySideRows,
   hunkStateKey,
-  leftLineKey,
-  rightLineKey,
 } from './DiffReviewPanelHelpers';
 import {
   DiffReviewFileTabs,
@@ -36,6 +39,9 @@ export type {
   DiffHunkDecision,
   DiffReviewPanelProps,
 } from './DiffReviewPanelTypes';
+
+/** Committed + transient write-back state for one hunk. */
+type HunkState = 'applied' | 'rejected' | 'submitting';
 
 // ── DiffReviewPanel ────────────────────────────────────────────────────
 
@@ -60,10 +66,9 @@ export function DiffReviewPanel({
   const labels = { ...DEFAULT_LABELS, ...customLabels };
 
   const [activeFileIndex, setActiveFileIndex] = useState(0);
-  const [acceptedLines, setAcceptedLines] = useState<Set<string>>(new Set());
-  const [rejectedLines, setRejectedLines] = useState<Set<string>>(new Set());
-  // Hunk-level committed state: tracks hunks that have been applied/rejected via Edge API
-  const [hunkStates, setHunkStates] = useState<Record<string, 'applied' | 'rejected'>>({});
+  // Hunk-level state: 'applied' | 'rejected' after write-back, 'submitting'
+  // while an Edge apply is in flight. Line-level accept/reject is gone (#1870).
+  const [hunkStates, setHunkStates] = useState<Record<string, HunkState>>({});
 
   // When focusedFilePath changes from outside, switch to matching tab
   useEffect(() => {
@@ -98,12 +103,11 @@ export function DiffReviewPanel({
     return sideBySideRows.filter((r) => r.rowType === 'modified').length;
   }, [sideBySideRows, activeFile]);
 
-  // Line key helpers
-  const leftKey = useCallback((rowIndex: number) => leftLineKey(safeIndex, rowIndex), [safeIndex]);
-  const rightKey = useCallback((rowIndex: number) => rightLineKey(safeIndex, rowIndex), [safeIndex]);
-
   // Hunk state key helper: "filePath:hunkIndex"
-  const hunkKey = useCallback((filePath: string, hunkIndex: number) => hunkStateKey(filePath, hunkIndex), []);
+  const hunkKey = useCallback(
+    (filePath: string, hunkIndex: number) => hunkStateKey(filePath, hunkIndex),
+    [],
+  );
 
   // Build hunk index mapping: maps row index to hunk index for the active file
   const rowToHunkIndex = useMemo(() => {
@@ -111,155 +115,117 @@ export function DiffReviewPanel({
     return buildRowToHunkIndex(activeFile.hunks);
   }, [activeFile]);
 
-  // Toggle accept for a line pair and commit hunk decision
-  const toggleAccept = useCallback(
-    (rowIndex: number) => {
-      const lKey = leftKey(rowIndex);
-      const rKey = rightKey(rowIndex);
-
-      setAcceptedLines((prev) => {
-        const next = new Set(prev);
-        if (next.has(lKey) || next.has(rKey)) {
-          next.delete(lKey);
-          next.delete(rKey);
-        } else {
-          next.add(lKey);
-          next.add(rKey);
-        }
-        return next;
-      });
-      setRejectedLines((prev) => {
-        const next = new Set(prev);
-        next.delete(lKey);
-        next.delete(rKey);
-        return next;
-      });
-    },
-    [leftKey, rightKey],
-  );
-
-  // Commit hunk decision to Edge API
+  // Commit one hunk decision.
+  //   - Without an Edge write-back port: toggle local review state (read-only).
+  //   - With write-back: submitting -> applied/rejected, or roll back on failure.
   const commitHunkDecision = useCallback(
-    (filePath: string, hunkIndex: number, accepted: boolean) => {
+    async (filePath: string, hunkIndex: number, accepted: boolean) => {
       const key = hunkKey(filePath, hunkIndex);
-      setHunkStates((prev) => ({ ...prev, [key]: accepted ? 'applied' : 'rejected' }));
-      if (onApplyHunk && runId) {
-        onApplyHunk({ filePath, hunkIndex, accepted });
+      const target: HunkState = accepted ? 'applied' : 'rejected';
+      const applyHunk = onApplyHunk;
+
+      if (!applyHunk || !runId) {
+        // Read-only review: no Edge write-back, just mark locally.
+        setHunkStates((prev) => ({ ...prev, [key]: target }));
+        return;
+      }
+
+      setHunkStates((prev) => ({ ...prev, [key]: 'submitting' }));
+      try {
+        await applyHunk({ filePath, hunkIndex, accepted });
+        setHunkStates((prev) => ({ ...prev, [key]: target }));
+      } catch {
+        setHunkStates((prev) => {
+          const next = { ...prev };
+          delete next[key];
+          return next;
+        });
       }
     },
-    [onApplyHunk, runId, hunkKey],
+    [hunkKey, onApplyHunk, runId],
   );
 
-  // Toggle reject for a line pair
-  const toggleReject = useCallback(
-    (rowIndex: number) => {
-      const lKey = leftKey(rowIndex);
-      const rKey = rightKey(rowIndex);
+  // Batch commit every hunk with the same decision.
+  const commitAllHunks = useCallback(
+    async (accepted: boolean) => {
+      if (!activeFile) return;
+      const decisions: DiffHunkDecision[] = activeFile.hunks.map((_hunk, hunkIdx) => ({
+        filePath: activeFile.filePath,
+        hunkIndex: hunkIdx,
+        accepted,
+      }));
+      if (decisions.length === 0) return;
 
-      setRejectedLines((prev) => {
-        const next = new Set(prev);
-        if (next.has(lKey) || next.has(rKey)) {
-          next.delete(lKey);
-          next.delete(rKey);
-        } else {
-          next.add(lKey);
-          next.add(rKey);
-        }
+      const target: HunkState = accepted ? 'applied' : 'rejected';
+      const keys = decisions.map((d) => hunkKey(d.filePath, d.hunkIndex));
+      const applyAllHunks = onApplyAllHunks;
+
+      if (!applyAllHunks || !runId) {
+        setHunkStates((prev) => {
+          const next = { ...prev };
+          for (const key of keys) next[key] = target;
+          return next;
+        });
+        return;
+      }
+
+      setHunkStates((prev) => {
+        const next = { ...prev };
+        for (const key of keys) next[key] = 'submitting';
         return next;
       });
-      setAcceptedLines((prev) => {
-        const next = new Set(prev);
-        next.delete(lKey);
-        next.delete(rKey);
-        return next;
-      });
+      try {
+        await applyAllHunks(decisions);
+        setHunkStates((prev) => {
+          const next = { ...prev };
+          for (const key of keys) next[key] = target;
+          return next;
+        });
+      } catch {
+        setHunkStates((prev) => {
+          const next = { ...prev };
+          for (const key of keys) delete next[key];
+          return next;
+        });
+      }
     },
-    [leftKey, rightKey],
+    [activeFile, hunkKey, onApplyAllHunks, runId],
   );
 
-  // Accept all / reject all — also commits hunk decisions
   const handleAcceptAll = useCallback(() => {
-    const allKeys = new Set<string>();
-    sideBySideRows.forEach((_row, rowIndex) => {
-      allKeys.add(leftKey(rowIndex));
-      allKeys.add(rightKey(rowIndex));
-    });
-    setAcceptedLines(allKeys);
-    setRejectedLines(new Set());
-
-    // Commit hunk-level decisions
-    if (activeFile) {
-      const decisions: DiffHunkDecision[] = [];
-      const newStates: Record<string, 'applied' | 'rejected'> = {};
-      activeFile.hunks.forEach((_hunk, hunkIdx) => {
-        const key = hunkKey(activeFile.filePath, hunkIdx);
-        newStates[key] = 'applied';
-        decisions.push({ filePath: activeFile.filePath, hunkIndex: hunkIdx, accepted: true });
-      });
-      setHunkStates((prev) => ({ ...prev, ...newStates }));
-      if (onApplyAllHunks && decisions.length > 0) {
-        onApplyAllHunks(decisions);
-      }
-    }
-
+    void commitAllHunks(true);
     onAcceptAll?.();
-  }, [sideBySideRows, leftKey, rightKey, onAcceptAll, activeFile, onApplyAllHunks, hunkKey]);
+  }, [commitAllHunks, onAcceptAll]);
 
   const handleRejectAll = useCallback(() => {
-    const allKeys = new Set<string>();
-    sideBySideRows.forEach((_row, rowIndex) => {
-      allKeys.add(leftKey(rowIndex));
-      allKeys.add(rightKey(rowIndex));
-    });
-    setRejectedLines(allKeys);
-    setAcceptedLines(new Set());
-
-    // Commit hunk-level decisions
-    if (activeFile) {
-      const decisions: DiffHunkDecision[] = [];
-      const newStates: Record<string, 'applied' | 'rejected'> = {};
-      activeFile.hunks.forEach((_hunk, hunkIdx) => {
-        const key = hunkKey(activeFile.filePath, hunkIdx);
-        newStates[key] = 'rejected';
-        decisions.push({ filePath: activeFile.filePath, hunkIndex: hunkIdx, accepted: false });
-      });
-      setHunkStates((prev) => ({ ...prev, ...newStates }));
-      if (onApplyAllHunks && decisions.length > 0) {
-        onApplyAllHunks(decisions);
-      }
-    }
-
+    void commitAllHunks(false);
     onRejectAll?.();
-  }, [sideBySideRows, leftKey, rightKey, onRejectAll, activeFile, onApplyAllHunks, hunkKey]);
+  }, [commitAllHunks, onRejectAll]);
 
-  // Handle accept line click — toggle local state and commit hunk decision
   const handleAcceptClick = useCallback(
     (rowIndex: number) => {
-      toggleAccept(rowIndex);
-      // Commit hunk decision for the row's hunk
-      if (activeFile) {
-        const hunkIdx = rowToHunkIndex.get(rowIndex);
-        if (hunkIdx != null) {
-          commitHunkDecision(activeFile.filePath, hunkIdx, true);
-        }
-      }
+      if (!activeFile) return;
+      const hunkIdx = rowToHunkIndex.get(rowIndex);
+      if (hunkIdx == null) return;
+      const key = hunkKey(activeFile.filePath, hunkIdx);
+      const state = hunkStates[key];
+      if (state === 'submitting' || state === 'applied') return;
+      void commitHunkDecision(activeFile.filePath, hunkIdx, true);
     },
-    [toggleAccept, activeFile, rowToHunkIndex, commitHunkDecision],
+    [activeFile, rowToHunkIndex, hunkKey, hunkStates, commitHunkDecision],
   );
 
-  // Handle reject line click — toggle local state and commit hunk decision
   const handleRejectClick = useCallback(
     (rowIndex: number) => {
-      toggleReject(rowIndex);
-      // Commit hunk decision for the row's hunk
-      if (activeFile) {
-        const hunkIdx = rowToHunkIndex.get(rowIndex);
-        if (hunkIdx != null) {
-          commitHunkDecision(activeFile.filePath, hunkIdx, false);
-        }
-      }
+      if (!activeFile) return;
+      const hunkIdx = rowToHunkIndex.get(rowIndex);
+      if (hunkIdx == null) return;
+      const key = hunkKey(activeFile.filePath, hunkIdx);
+      const state = hunkStates[key];
+      if (state === 'submitting' || state === 'rejected') return;
+      void commitHunkDecision(activeFile.filePath, hunkIdx, false);
     },
-    [toggleReject, activeFile, rowToHunkIndex, commitHunkDecision],
+    [activeFile, rowToHunkIndex, hunkKey, hunkStates, commitHunkDecision],
   );
 
   const activeFilePath = activeFile?.filePath ?? '';
@@ -269,8 +235,6 @@ export function DiffReviewPanel({
   );
 
   // ── Tabpanel id prefix (#1823) ───────────────────────────────────────
-  // Shared by DiffReviewFileTabs (tab ids) and the diff content (panel),
-  // keeping the tab/tabpanel association stable.
   const tabsId = useId();
 
   // ── Empty state ──────────────────────────────────────────────────────
@@ -326,16 +290,14 @@ export function DiffReviewPanel({
             filePath={activeFile.filePath}
             rows={sideBySideRows}
             activeLang={activeLang}
-            acceptedLines={acceptedLines}
-            rejectedLines={rejectedLines}
-            lineKey={leftKey}
             rowToHunkIndex={rowToHunkIndex}
             hunkStates={hunkStates}
             hunkKeyFor={hunkKeyFor}
             appliedLabel={labels.applied}
             rejectedLabel={labels.rejected}
-            acceptLineLabel={labels.acceptLine}
-            rejectLineLabel={labels.rejectLine}
+            submittingLabel={labels.submitting}
+            acceptHunkLabel={labels.acceptHunk}
+            rejectHunkLabel={labels.rejectHunk}
             diffRowClassName={diffRowClassName}
             lineActionBtnClassName={lineActionBtnClassName}
             columnClassName={styles.columnLeft}
@@ -350,16 +312,14 @@ export function DiffReviewPanel({
             filePath={activeFile.filePath}
             rows={sideBySideRows}
             activeLang={activeLang}
-            acceptedLines={acceptedLines}
-            rejectedLines={rejectedLines}
-            lineKey={rightKey}
             rowToHunkIndex={rowToHunkIndex}
             hunkStates={hunkStates}
             hunkKeyFor={hunkKeyFor}
             appliedLabel={labels.applied}
             rejectedLabel={labels.rejected}
-            acceptLineLabel={labels.acceptLine}
-            rejectLineLabel={labels.rejectLine}
+            submittingLabel={labels.submitting}
+            acceptHunkLabel={labels.acceptHunk}
+            rejectHunkLabel={labels.rejectHunk}
             diffRowClassName={diffRowClassName}
             lineActionBtnClassName={lineActionBtnClassName}
             onAcceptClick={handleAcceptClick}

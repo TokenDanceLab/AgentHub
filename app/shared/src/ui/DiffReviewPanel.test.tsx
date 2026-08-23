@@ -1,6 +1,6 @@
 import React from 'react';
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { DiffReviewPanel } from './DiffReviewPanel';
 import type { DiffReviewFile } from './DiffReviewPanel';
@@ -196,50 +196,78 @@ describe('DiffReviewPanel', () => {
     expect(screen.getByRole('button', { name: 'Deny' })).toBeDefined();
   });
 
-  // ── Line-level accept / reject ─────────────────────────────────────────
+  // ── Hunk-level accept / reject (#1870) ──────────────────────────────
 
-  it('renders accept and reject line action buttons for modified rows', () => {
+  it('renders accept and reject hunk action buttons for modified rows', () => {
     render(<DiffReviewPanel files={[mockFileModified]} />);
-    // Each modified row pair has accept + reject buttons in both columns
-    // Using aria-label for precise selection
-    const acceptBtns = screen.getAllByRole('button', { name: 'Accept line' });
-    const rejectBtns = screen.getAllByRole('button', { name: 'Reject line' });
+    const acceptBtns = screen.getAllByRole('button', { name: 'Accept hunk' });
+    const rejectBtns = screen.getAllByRole('button', { name: 'Reject hunk' });
     // 1 modified pair × 2 columns = 2 each
     expect(acceptBtns.length).toBeGreaterThanOrEqual(2);
     expect(rejectBtns.length).toBeGreaterThanOrEqual(2);
   });
 
-  it('does not render line action buttons for context rows', () => {
+  it('does not render hunk action buttons for context rows', () => {
     render(<DiffReviewPanel files={[mockFileModified]} />);
-    // Context rows (line 1 and line 4) should not have action buttons
-    // The accept/reject buttons count should only cover the modified row
-    // We verify by checking the overall count is correct
-    const acceptBtns = screen.getAllByRole('button', { name: 'Accept line' });
+    const acceptBtns = screen.getAllByRole('button', { name: 'Accept hunk' });
     expect(acceptBtns.length).toBe(2); // Left + right for the one modified pair
   });
 
-  it('toggles accept state on line accept button click', async () => {
+  it('accepting a hunk (read-only) marks it applied and disables accept', async () => {
     const user = userEvent.setup();
     render(<DiffReviewPanel files={[mockFileModified]} />);
-    const acceptBtns = screen.getAllByRole('button', { name: 'Accept line' });
-    // Click accept on first (left column)
+    const acceptBtns = screen.getAllByRole('button', { name: 'Accept hunk' });
     await user.click(acceptBtns[0]!);
-    // After clicking accept, the reject state should be cleared and accept should be active
-    // The button should gain the active class (we check DOM)
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-    expect(acceptBtns[0]!.className).toBeTruthy();
-    // Toggling again should deactivate
-    await user.click(acceptBtns[0]!);
-    expect(acceptBtns[0]!.className).toBeTruthy();
+    const acceptBtnAfter = screen.getAllByRole('button', { name: 'Accept hunk' })[0]!;
+    expect(acceptBtnAfter.disabled).toBe(true);
+    expect(screen.getAllByText('Applied').length).toBeGreaterThan(0);
   });
 
-  it('toggles reject state on line reject button click', async () => {
+  it('rejecting a hunk (read-only) marks it rejected and disables reject', async () => {
     const user = userEvent.setup();
     render(<DiffReviewPanel files={[mockFileModified]} />);
-    const rejectBtns = screen.getAllByRole('button', { name: 'Reject line' });
+    const rejectBtns = screen.getAllByRole('button', { name: 'Reject hunk' });
     await user.click(rejectBtns[0]!);
-    // Reject button should have active class
-    expect(rejectBtns[0]!.className).toBeTruthy();
+    const rejectBtnAfter = screen.getAllByRole('button', { name: 'Reject hunk' })[0]!;
+    expect(rejectBtnAfter.disabled).toBe(true);
+    expect(screen.getAllByText('Rejected').length).toBeGreaterThan(0);
+  });
+
+  it('marks hunk applied only after async write-back resolves', async () => {
+    const user = userEvent.setup();
+    let resolveApply!: () => void;
+    const applyHunk = vi.fn(() => new Promise<void>((resolve) => { resolveApply = resolve; }));
+    render(
+      <DiffReviewPanel
+        files={[mockFileModified]}
+        runId="run-1"
+        onApplyHunk={applyHunk}
+      />,
+    );
+    const acceptBtns = screen.getAllByRole('button', { name: 'Accept hunk' });
+    await user.click(acceptBtns[0]!);
+    expect(screen.getAllByText('Submitting...').length).toBeGreaterThan(0);
+    expect(screen.queryAllByText('Applied').length).toBe(0);
+    resolveApply();
+    await waitFor(() => expect(screen.queryAllByText('Applied').length).toBeGreaterThan(0));
+    expect(applyHunk).toHaveBeenCalledWith({ filePath: 'src/edited-file.ts', hunkIndex: 0, accepted: true });
+  });
+
+  it('rolls back hunk state when async write-back rejects', async () => {
+    const user = userEvent.setup();
+    const applyHunk = vi.fn(() => Promise.reject(new Error('boom')));
+    render(
+      <DiffReviewPanel
+        files={[mockFileModified]}
+        runId="run-1"
+        onApplyHunk={applyHunk}
+      />,
+    );
+    const acceptBtns = screen.getAllByRole('button', { name: 'Accept hunk' });
+    await user.click(acceptBtns[0]!);
+    await waitFor(() => expect(screen.queryAllByText('Applied').length).toBe(0));
+    const acceptBtnAfter = screen.getAllByRole('button', { name: 'Accept hunk' })[0]!;
+    expect(acceptBtnAfter.disabled).toBe(false);
   });
 
   // ── CSS className props ────────────────────────────────────────────────

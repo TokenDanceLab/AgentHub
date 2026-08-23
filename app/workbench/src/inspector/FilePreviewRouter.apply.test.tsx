@@ -81,7 +81,7 @@ describe('FilePreviewRouter interactive diff apply dispatch (#1817)', () => {
     // Supported surface: no read-only capability notice.
     expect(screen.queryByRole('note')).toBeNull();
 
-    fireEvent.click(screen.getAllByRole('button', { name: 'Accept line' })[0]!);
+    fireEvent.click(screen.getAllByRole('button', { name: 'Accept hunk' })[0]!);
 
     await waitFor(() => {
       expect(port.applyRunDiff).toHaveBeenCalledTimes(1);
@@ -107,7 +107,7 @@ describe('FilePreviewRouter interactive diff apply dispatch (#1817)', () => {
       />,
     );
 
-    fireEvent.click(screen.getAllByRole('button', { name: 'Reject line' })[0]!);
+    fireEvent.click(screen.getAllByRole('button', { name: 'Reject hunk' })[0]!);
 
     await waitFor(() => {
       expect(port.applyRunDiff).toHaveBeenCalledWith({
@@ -131,7 +131,7 @@ describe('FilePreviewRouter interactive diff apply dispatch (#1817)', () => {
       />,
     );
 
-    fireEvent.click(screen.getAllByRole('button', { name: 'Accept line' })[0]!);
+    fireEvent.click(screen.getAllByRole('button', { name: 'Accept hunk' })[0]!);
 
     await waitFor(() => {
       expect(currentToasts().some((toast) => toast.type === 'error')).toBe(true);
@@ -201,7 +201,7 @@ describe('FilePreviewRouter interactive diff apply dispatch (#1817)', () => {
     const notice = screen.getByRole('note');
     expect(notice).toBeInTheDocument();
 
-    fireEvent.click(screen.getAllByRole('button', { name: 'Accept line' })[0]!);
+    fireEvent.click(screen.getAllByRole('button', { name: 'Accept hunk' })[0]!);
 
     await waitFor(() => {
       expect(currentToasts().some((toast) => toast.type === 'warning')).toBe(true);
