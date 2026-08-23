@@ -149,7 +149,41 @@ func (ra *ResultAggregator) handleEvent(evt events.EventEnvelope) {
 		ra.handleRunComplete(evt, agents.StatusError)
 	case "run.cancelled":
 		ra.handleRunComplete(evt, agents.StatusDisconnected)
+	case events.GapEventType:
+		ra.handleGap()
 	}
+}
+
+// handleGap reconciles tracked parents after the subscriber dropped terminal
+// run events (channel-full data loss). Because the gap payload only carries
+// dropped sequence numbers — not which runs were affected — it sweeps every
+// parent with registered children and re-checks completion from the registry's
+// current state. Child terminal status is set by sendSubAgentResult (a direct
+// call, not the lossy event path), so this rebuilds the parent's terminal
+// outcome even when a run.finished/failed/cancelled event was dropped.
+func (ra *ResultAggregator) handleGap() {
+	for _, parentID := range ra.parentsWithChildren() {
+		ra.checkAllChildrenComplete(parentID)
+	}
+}
+
+// parentsWithChildren returns the de-duplicated set of parent IDs that have at
+// least one registered child instance, derived from the registry's current
+// state.
+func (ra *ResultAggregator) parentsWithChildren() []string {
+	seen := make(map[string]struct{})
+	var parents []string
+	for _, inst := range ra.registry.List() {
+		if inst.ParentID == "" {
+			continue
+		}
+		if _, ok := seen[inst.ParentID]; ok {
+			continue
+		}
+		seen[inst.ParentID] = struct{}{}
+		parents = append(parents, inst.ParentID)
+	}
+	return parents
 }
 
 func (ra *ResultAggregator) handleRunComplete(evt events.EventEnvelope, status agents.Status) {
