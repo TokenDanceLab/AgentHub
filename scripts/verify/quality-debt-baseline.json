@@ -37,15 +37,6 @@
       "review_by": "2026-10-01"
     },
     {
-      "location": "validate: Secret guard",
-      "kind": "continue-on-error",
-      "reason": "mock/test secrets trigger false positives in check-secrets; allowlist pending (#1576)",
-      "issue": 1573,
-      "owner": "security-owners",
-      "introduced_at": "2026-08-11",
-      "review_by": "2026-10-01"
-    },
-    {
       "location": "validate: Verify i18n callsites ratchet (#1612)",
       "kind": "continue-on-error",
       "reason": "two frontend files regressed CJK-literal baseline; gate posts failure annotation while advisory (#1612)",

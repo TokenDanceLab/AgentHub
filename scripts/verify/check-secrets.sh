@@ -137,7 +137,7 @@ is_placeholder_value() {
   [[ ${#value} -lt 16 ]] && return 0
 
   case "$lower" in
-    *example*|*sample*|*placeholder*|*changeme*|*change-me*|*change-in-production*|*replace*|*redacted*|*dummy*|*fake*|*mock*|*test*|*local-smoke-token*|*dev-secret*|*token-a*|*token-b*|*secret!!*|your-*)
+    *example*|*sample*|*placeholder*|*changeme*|*change-me*|*change-in-production*|*replace*|*redacted*|*dummy*|*fake*|*mock*|*test*|*local-smoke-token*|*dev-secret*|*token-a*|*token-b*|*secret!!*|*ci-integration-*|*not-a-real-secret*|your-*)
       return 0
       ;;
   esac
