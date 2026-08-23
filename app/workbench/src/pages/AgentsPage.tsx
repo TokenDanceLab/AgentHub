@@ -17,6 +17,7 @@ import {
   AgentToolsView,
   AgentModelsView,
   AgentAuditView,
+  DataSourceBadge,
 } from './agents';
 import type {
   AgentsPaneId,
@@ -37,6 +38,7 @@ import type {
 
 export type {
   AgentsPaneId,
+  PaneDataSource,
   AgentState,
   ToolPermission,
   RiskLevel,
@@ -69,6 +71,7 @@ export const AgentsPage: React.FC<AgentsPageProps> = (props) => {
   const {
     activePane,
     onPaneChange,
+    dataSource = 'real',
     searchQuery = '',
     onSearchChange,
     recentShortcuts = [],
@@ -114,6 +117,7 @@ export const AgentsPage: React.FC<AgentsPageProps> = (props) => {
     <section className={`${styles['agents-page']} workbench agents-page`}>
       <aside className={`${styles['workbench-nav']} workbench-nav`}>
         <div className={`${styles['workbench-title']} workbench-title`}>{t('nav.agents')}</div>
+        <DataSourceBadge source={dataSource} />
         <input
           className={`${styles['workbench-search']} workbench-search`}
           placeholder={t('agents.installed.search')}

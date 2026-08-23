@@ -329,3 +329,39 @@ describe('AgentsPage load/action status', () => {
     expect(within(notice).getByText('保存失败')).toBeInTheDocument();
   });
 });
+
+describe('AgentsPage data source badge', () => {
+  it('renders a demo provenance badge when dataSource=demo', () => {
+    const { container } = render(
+      <AgentsPage
+        activePane="installed"
+        onPaneChange={() => undefined}
+        installedCount={0}
+        runnableCount={0}
+        confirmCount={0}
+        defaultModelLabel="—"
+        agents={[]}
+        dataSource="demo"
+      />,
+    );
+    const badge = container.querySelector('[data-data-source="demo"]');
+    expect(badge).not.toBeNull();
+    expect(badge?.textContent).toContain('Demo 数据');
+  });
+
+  it('renders nothing when dataSource=real', () => {
+    const { container } = render(
+      <AgentsPage
+        activePane="installed"
+        onPaneChange={() => undefined}
+        installedCount={0}
+        runnableCount={0}
+        confirmCount={0}
+        defaultModelLabel="—"
+        agents={[]}
+        dataSource="real"
+      />,
+    );
+    expect(container.querySelector('[data-data-source]')).toBeNull();
+  });
+});
