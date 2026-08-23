@@ -263,6 +263,16 @@ export function buildWorkbenchRoutesProps(
   assignIfDefined(routesProps, 'mcpMarketError', props.mcpMarketError);
   assignIfDefined(routesProps, 'currentUserId', props.currentUserId);
   assignIfDefined(routesProps, 'userDisplayName', props.userDisplayName);
+  assignIfDefined(routesProps, 'devicesTargets', props.devicesTargets);
+  assignIfDefined(routesProps, 'devicesLoading', props.devicesLoading);
+  assignIfDefined(routesProps, 'devicesError', props.devicesError);
+  assignIfDefined(routesProps, 'onDevicesRetry', props.onDevicesRetry);
+  assignIfDefined(routesProps, 'devicesPingingId', props.devicesPingingId);
+  assignIfDefined(routesProps, 'onDevicePing', props.onDevicePing);
+  assignIfDefined(routesProps, 'usageTeams', props.usageTeams);
+  assignIfDefined(routesProps, 'usageLoading', props.usageLoading);
+  assignIfDefined(routesProps, 'usageError', props.usageError);
+  assignIfDefined(routesProps, 'onUsageRetry', props.onUsageRetry);
 
   return routesProps;
 }

@@ -386,6 +386,91 @@ describe('useWorkbenchSessionChrome', () => {
     expect(result.current.selectedExecutionTargetId).toBe('');
   });
 
+  it('auto-selects the first healthy execution target by default (#1819)', () => {
+    const { result } = renderSessionChrome({
+      composerExecutionTargets: [
+        { id: 't1', label: 'Target 1', healthy: true },
+        { id: 't2', label: 'Target 2', healthy: true },
+      ],
+    });
+
+    expect(result.current.selectedExecutionTargetId).toBe('t1');
+  });
+
+  it('skips explicitly unhealthy targets when auto-selecting (#1819)', () => {
+    const { result } = renderSessionChrome({
+      composerExecutionTargets: [
+        { id: 'down', label: 'Down', healthy: false },
+        { id: 'up', label: 'Up', healthy: true },
+      ],
+    });
+
+    expect(result.current.selectedExecutionTargetId).toBe('up');
+  });
+
+  it('leaves the target unselected when every candidate is unhealthy (#1819)', () => {
+    const { result } = renderSessionChrome({
+      composerExecutionTargets: [
+        { id: 'a', label: 'A', healthy: false },
+        { id: 'b', label: 'B', healthy: false },
+      ],
+    });
+
+    expect(result.current.selectedExecutionTargetId).toBe('');
+  });
+
+  it('does not override an explicit user selection with the default (#1819)', () => {
+    const { result, rerender } = renderSessionChrome({
+      composerExecutionTargets: [{ id: 't1', label: 'Target 1', healthy: true }],
+    });
+
+    act(() => {
+      result.current.setSelectedExecutionTargetId('');
+    });
+    // User cleared it — the default must not re-select behind their back.
+    expect(result.current.selectedExecutionTargetId).toBe('');
+
+    rerender({ composerExecutionTargets: [{ id: 't2', label: 'Target 2', healthy: true }] });
+    expect(result.current.selectedExecutionTargetId).toBe('');
+  });
+
+  it('replaces an auto-selected target when it turns unhealthy (#1856)', () => {
+    const { result, rerender } = renderSessionChrome({
+      composerExecutionTargets: [
+        { id: 't1', label: 'Target 1', healthy: true },
+        { id: 't2', label: 'Target 2', healthy: true },
+      ],
+    });
+
+    expect(result.current.selectedExecutionTargetId).toBe('t1');
+
+    rerender({
+      composerExecutionTargets: [
+        { id: 't1', label: 'Target 1', healthy: false },
+        { id: 't2', label: 'Target 2', healthy: true },
+      ],
+    });
+    expect(result.current.selectedExecutionTargetId).toBe('t2');
+  });
+
+  it('keeps an explicitly selected target even when it turns unhealthy (#1856)', () => {
+    const { result, rerender } = renderSessionChrome({
+      composerExecutionTargets: [{ id: 't1', label: 'Target 1', healthy: true }],
+    });
+
+    act(() => {
+      result.current.setSelectedExecutionTargetId('t1');
+    });
+
+    rerender({
+      composerExecutionTargets: [
+        { id: 't1', label: 'Target 1', healthy: false },
+        { id: 't2', label: 'Target 2', healthy: true },
+      ],
+    });
+    expect(result.current.selectedExecutionTargetId).toBe('t1');
+  });
+
   it('loads local CLI discovery on desktop settings and clears it elsewhere', async () => {
     const discovery: LocalCliDiscoveryManifest = {
       mode: 'no-spend-discovery',

@@ -46,6 +46,7 @@ vi.mock('@/api/executionTargetQueries', () => ({
   )),
   useHubExecutionTargets: vi.fn(),
   useSyncLocalEdgeExecutionTarget: vi.fn(),
+  usePingHubExecutionTarget: vi.fn(() => ({ mutate: vi.fn(), isPending: false, variables: null })),
 }));
 
 vi.mock('@/api/modelCatalogQueries', () => ({
@@ -112,6 +113,7 @@ vi.mock('@/hooks/useHubIntegration', () => ({
 
 vi.mock('@/api/agentTeamQueries', () => ({
   useDecideTeamApproval: vi.fn(() => ({ mutateAsync: vi.fn() })),
+  useTokenUsageBoard: vi.fn(() => ({ data: undefined, isFetching: false, error: null, refetch: vi.fn() })),
 }));
 
 vi.mock('@/api/documentQueries', () => ({

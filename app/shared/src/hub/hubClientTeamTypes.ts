@@ -91,6 +91,10 @@ export interface HubAgentTeamRun {
   // Go json:"mode" is not omitempty (always serialized; default "supervisor").
   mode: 'supervisor' | 'compete' | string;
   status: 'queued' | 'running' | 'pending_review' | 'completed' | 'failed' | 'cancelled' | string;
+  // Migration 0066 counter; omitempty — absent for runs recorded before the
+  // column existed (no backfill yet). Consumers must treat undefined as
+  // "not recorded", never as 0 (#1819).
+  token_usage_total?: number;
   created_at?: string;
   updated_at?: string;
 }

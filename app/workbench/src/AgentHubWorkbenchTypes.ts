@@ -55,7 +55,7 @@ export interface AgentHubWorkbenchProps {
   platform: AgentHubPlatform;
   conversations: WorkbenchConversation[];
   agents?: WorkbenchAgent[];
-  composerExecutionTargets?: Array<{ id: string; label: string }> | undefined;
+  composerExecutionTargets?: Array<{ id: string; label: string; healthy?: boolean }> | undefined;
   workbenchStatus?: AgentHubWorkbenchStatus | undefined;
   agentProfilesStatus?: WorkbenchAgentProfilesStatus | undefined;
   contacts?: WorkbenchContactsData | undefined;
@@ -165,4 +165,22 @@ export interface AgentHubWorkbenchProps {
    * of the misleading "no messages" empty state.
    */
   transcriptLoading?: boolean | undefined;
+  /* ── Devices / execution-target management page (#1819) ──
+     Real data from the Hub execution-target inventory + ping mutation.
+     `devicesTargets === undefined` means the shell is not Hub-connected and
+     the page renders sign-in guidance instead of an empty list. */
+  devicesTargets?: import('./pages/DevicesPage').DevicesPageTarget[] | undefined;
+  devicesLoading?: boolean | undefined;
+  devicesError?: string | null | undefined;
+  onDevicesRetry?: (() => void) | undefined;
+  /** Execution-target id currently being pinged (busy row state). */
+  devicesPingingId?: string | null | undefined;
+  onDevicePing?: ((targetId: string) => void) | undefined;
+  /* ── Token / cost usage board (#1819) ──
+     Shell composes each team's runs (token_usage_total from migration 0066).
+     `usageTeams === undefined` means the shell is not Hub-connected. */
+  usageTeams?: import('./pages/TokenUsagePage').TokenUsagePageTeam[] | undefined;
+  usageLoading?: boolean | undefined;
+  usageError?: string | null | undefined;
+  onUsageRetry?: (() => void) | undefined;
 }

@@ -6,6 +6,7 @@ import {
   useRef,
   useState,
 } from 'react';
+import type { SetStateAction } from 'react';
 import {
   composerReducer,
   createInitialComposerState,
@@ -27,6 +28,7 @@ import {
   mapAgentsToComposerMentions,
   resolveComposerTargetLabel,
   resolveCurrentConversationId,
+  resolveDefaultExecutionTargetId,
   serializeMainchainEvidenceExport,
   shouldClearSelectedExecutionTarget,
   shouldLoadLocalCliDiscovery,
@@ -44,10 +46,12 @@ export {
   mapAgentsToComposerMentions,
   resolveComposerTargetLabel,
   resolveCurrentConversationId,
+  resolveDefaultExecutionTargetId,
   serializeMainchainEvidenceExport,
   shouldClearSelectedExecutionTarget,
   shouldLoadLocalCliDiscovery,
   shouldLoadSessionImport,
+  type ComposerExecutionTargetOption,
   type UseWorkbenchSessionChromeOptions,
   type WorkbenchSessionChrome,
 } from './workbenchSessionChromeHelpers';
@@ -113,6 +117,13 @@ export function useWorkbenchSessionChrome({
   });
 
   const [selectedExecutionTargetId, setSelectedExecutionTargetId] = useState('');
+  // #1819: once the picker (user) explicitly sets or clears the target,
+  // default auto-selection stops re-firing — the user's choice wins.
+  const executionTargetUserTouchedRef = useRef(false);
+  const selectExecutionTarget = useCallback((value: SetStateAction<string>) => {
+    executionTargetUserTouchedRef.current = true;
+    setSelectedExecutionTargetId(value);
+  }, []);
   const [dismissedPinnedIds, setDismissedPinnedIds] = useState<Set<string>>(new Set());
   const [localCliDiscovery, setLocalCliDiscovery] = useState<WorkbenchSessionChrome['localCliDiscovery']>(null);
   const [sessionImportItems, setSessionImportItems] = useState<WorkbenchSessionChrome['sessionImportItems']>([]);
@@ -186,6 +197,25 @@ export function useWorkbenchSessionChrome({
   useEffect(() => {
     if (shouldClearSelectedExecutionTarget(composerExecutionTargets, selectedExecutionTargetId)) {
       setSelectedExecutionTargetId('');
+      return;
+    }
+    if (executionTargetUserTouchedRef.current) return;
+    // System-owned selection (#1819): if the auto-picked target lost its
+    // confirmed-health marker, drop it so the next healthy candidate takes
+    // over instead of routing work to a target known to be unhealthy.
+    const selectedEntry = composerExecutionTargets?.find(
+      (target) => target.id === selectedExecutionTargetId,
+    );
+    if (selectedExecutionTargetId && selectedEntry && selectedEntry.healthy === false) {
+      setSelectedExecutionTargetId('');
+      return;
+    }
+    // #1819: auto-select the first confirmed-healthy execution target while
+    // nothing is selected and the user has not made an explicit choice, so
+    // send/run flows start with a live target instead of an empty picker.
+    if (!selectedExecutionTargetId) {
+      const defaultTargetId = resolveDefaultExecutionTargetId(composerExecutionTargets);
+      if (defaultTargetId) setSelectedExecutionTargetId(defaultTargetId);
     }
   }, [composerExecutionTargets, selectedExecutionTargetId]);
 
@@ -317,7 +347,7 @@ export function useWorkbenchSessionChrome({
     selectConversation,
     activeConversation,
     selectedExecutionTargetId,
-    setSelectedExecutionTargetId,
+    setSelectedExecutionTargetId: selectExecutionTarget,
     dismissedPinnedIds,
     setDismissedPinnedIds,
     localCliDiscovery,
