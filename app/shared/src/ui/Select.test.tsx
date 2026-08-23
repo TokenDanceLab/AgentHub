@@ -42,7 +42,9 @@ describe('Select', () => {
       expect(screen.getByRole('listbox')).toBeInTheDocument();
       fireEvent.keyDown(screen.getByRole('listbox'), { key: 'Escape' });
       // #1825: the dropdown stays mounted through its ~140ms exit animation,
-      // then unmounts. Advance past the window and assert it is gone.
+      // then unmounts. Pin the exit-mounted state before advancing past the
+      // window and asserting it is gone.
+      expect(screen.getByRole('listbox')).toBeInTheDocument();
       act(() => {
         vi.advanceTimersByTime(200);
       });

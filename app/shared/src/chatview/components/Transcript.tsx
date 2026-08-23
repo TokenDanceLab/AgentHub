@@ -1,6 +1,5 @@
 import { Fragment, forwardRef, memo, useCallback, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { TranscriptItem, TranscriptAgentItem, TranscriptUserItem, BlockActionCallback } from '../transcript-item'
-import type { RowItem } from '../types'
 import { ArrowDown } from 'lucide-react'
 import { Virtualizer, type VirtualizerHandle } from 'virtua'
 import { UserMessage } from './UserMessage'
@@ -9,6 +8,7 @@ import { DateDivider } from './DateDivider'
 import { UnreadDivider } from './UnreadDivider'
 import { CompactDivider } from './CompactDivider'
 import { stableInteractionId } from './RowItem'
+import { isStreamingItems } from './streaming'
 import { useTranslation, getI18n } from 'react-i18next'
 import { CHATVIEW_I18N_NAMESPACE } from '../i18n/resources'
 import { appDateLocaleTag } from '../../i18n/locale'
@@ -150,26 +150,6 @@ function containsNewUserMessage(
 
 function isAgent(item: TranscriptItem): item is TranscriptAgentItem {
   return !isUser(item)
-}
-
-/**
- * A11y (#11): true while any row in the transcript is still streaming
- * (`status: 'running'` — the adapter maps every non-completed agent group to
- * it, so a streaming reply always surfaces here). Drives `aria-busy` and the
- * live-region throttle on the role=log container below.
- */
-function isRowStreaming(row: RowItem): boolean {
-  if (row.status === 'running') return true
-  if (row.children?.some(isRowStreaming)) return true
-  return row.orchAgents?.some((a) => a.status === 'running') ?? false
-}
-
-function isStreamingItems(items: TranscriptItem[]): boolean {
-  return items.some((item) => {
-    if (!isAgent(item)) return false
-    if (item.rows.some(isRowStreaming) || item.standaloneRows.some(isRowStreaming)) return true
-    return item.parts?.some((part) => part.type === 'row' && isRowStreaming(part.row)) ?? false
-  })
 }
 
 /** Extract the item's time string — `time` on both user and agent items. */
@@ -420,10 +400,14 @@ const TranscriptImpl = forwardRef<TranscriptHandle, Props>(function Transcript({
     const initialRender = state.previousCount === 0
     if (appendedUserMessage) state.followAfterUserSubmit = true
 
-    // #1825: new-message entry animation — same-session append only (a session
-    // switch must not animate the whole restored history).
+    // #1825: new-message entry animation — only for genuine appends at the
+    // end (previousIdentities is an unchanged prefix of the current list).
+    // Prepended history (pagination) grows the list too and must not replay
+    // the animation on the existing newest message.
+    const appendedAtEnd = currentIdentities.length > state.previousIdentities.length &&
+      state.previousIdentities.every((id, i) => currentIdentities[i] === id)
     const lastItem = items[items.length - 1]
-    if (!switched && items.length > state.previousCount && lastItem) {
+    if (!switched && appendedAtEnd && lastItem) {
       const newKey = arrivalIdOf(lastItem)
       setArrivalKey(newKey)
       if (arrivalTimerRef.current) clearTimeout(arrivalTimerRef.current)

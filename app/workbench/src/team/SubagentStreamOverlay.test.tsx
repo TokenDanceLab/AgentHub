@@ -267,7 +267,9 @@ describe('SubagentStreamOverlay', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '关闭' }));
     // #1825: the Modal stays mounted through its 200ms exit animation before
-    // unmounting; wait out the window and assert it is gone.
+    // unmounting. Pin the exit-mounted state, then wait out the window and
+    // assert it is gone.
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
   });
 

@@ -65,9 +65,9 @@
 }
 
 /* #1825: white-alpha marker is invisible against the light theme canvas;
-   mirror the .root light override. */
+   mirror the .root light override using the ink token in OKLCH space. */
 [data-theme='light'] .marker {
-  background: rgba(15, 23, 42, 0.035);
+  background: color-mix(in oklch, var(--td-ink) 3.5%, transparent);
 }
 
 .entryText {

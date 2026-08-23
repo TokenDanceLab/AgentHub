@@ -540,3 +540,10 @@
   box-shadow: var(--focus-ring);
   background: var(--glass-bg-subtle);
 }
+
+/* Reduced motion (#1825): tab hover/active feedback flips instantly. */
+@media (prefers-reduced-motion: reduce) {
+  .tab {
+    transition: none;
+  }
+}

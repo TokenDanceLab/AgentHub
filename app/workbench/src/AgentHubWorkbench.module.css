@@ -1498,8 +1498,8 @@
 
 /* #1825: mention chip had zero hover/active feedback. */
 .composerMentionChip:hover {
-  background: color-mix(in srgb, var(--td-plum) 18%, var(--td-tint));
-  border-color: color-mix(in srgb, var(--td-plum) 40%, var(--td-line));
+  background: color-mix(in oklch, var(--td-plum) 18%, var(--td-tint));
+  border-color: color-mix(in oklch, var(--td-plum) 40%, var(--td-line));
 }
 
 .composerMentionChip:active {

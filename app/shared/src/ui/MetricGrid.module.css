@@ -68,3 +68,13 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* Reduced motion (#1825): no hover sweep / press scale on the metric tile. */
+@media (prefers-reduced-motion: reduce) {
+  .itemButton,
+  .itemButton:hover,
+  .itemButton:active {
+    transition: none;
+    transform: none;
+  }
+}

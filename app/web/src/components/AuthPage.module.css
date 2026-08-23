@@ -472,3 +472,10 @@
     min-height: 44px;
   }
 }
+
+/* Reduced motion (#1825): tab hover/active feedback flips instantly. */
+@media (prefers-reduced-motion: reduce) {
+  .tab {
+    transition: none;
+  }
+}

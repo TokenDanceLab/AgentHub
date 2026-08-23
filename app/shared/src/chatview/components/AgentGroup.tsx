@@ -6,6 +6,7 @@ import { IconShield, IconFile, IconFileText, IconSearch, IconPlayerPlay } from '
 import { roleInitial } from '../design/roles'
 import MarkdownContent from '../../ui/Markdown'
 import { MessageDisplayMeta } from './MessageDisplayMeta'
+import { isAgentItemStreaming } from './streaming'
 
 const evidenceIconMap: Record<string, typeof IconFile> = {
   file: IconFile,
@@ -38,10 +39,11 @@ interface Props {
  *  Dispatches orchestrator cards via {@link OrchestratorCard} and
  *  regular cards via {@link RowItem}. */
 export const AgentGroup = memo(function AgentGroup({ item, chatMode, onAgentClick, onBlockContextMenu, onBlockSelect, onBlockAction, onReviewFile, onDeploySubmit, selectedBlockIds, selectionMode, softHiddenBlockIds, actionedBlockIds, enter }: Props) {
-  // #1825: streaming bubble activity indicator — any running row marks the
-  // agent item as mid-stream; the last bubble carries the caret.
-  const isStreaming = item.rows.some((r) => r.status === 'running') ||
-    item.standaloneRows.some((r) => r.status === 'running')
+  // #1825: streaming bubble activity indicator — any running row (including
+  // nested child rows and ordered-part rows, same view Transcript uses for
+  // aria-busy) marks the agent item as mid-stream; the last bubble carries
+  // the caret.
+  const isStreaming = isAgentItemStreaming(item)
   const initial = roleInitial[item.role] ?? item.agent[0]
   const avatar = (
     <div className={`ag-av ${item.role}`}>
