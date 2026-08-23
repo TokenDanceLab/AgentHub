@@ -479,3 +479,51 @@
     transition: none;
   }
 }
+
+/* Theme preset switcher (#1820) — token-only styles. */
+.presetSection {
+  display: flex;
+  flex-direction: column;
+  gap: var(--wb-gap-xs);
+  margin-top: var(--wb-gap-sm);
+}
+.presetLabel {
+  font-size: var(--td-text-xs);
+  color: var(--td-ink-muted);
+}
+.presetGrid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--wb-gap-xs);
+}
+.presetChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border: 1px solid var(--td-line);
+  border-radius: var(--td-radius-control);
+  background: var(--td-surface-2);
+  color: var(--td-ink);
+  cursor: pointer;
+  font-size: var(--td-text-xs);
+}
+.presetChip:hover {
+  background: var(--td-surface-3);
+}
+.presetChipActive {
+  border-color: var(--td-plum);
+  box-shadow: var(--focus-ring);
+}
+.presetSwatches {
+  display: inline-flex;
+  border-radius: var(--r-xs);
+  overflow: hidden;
+}
+.presetSwatch {
+  width: 10px;
+  height: 14px;
+}
+.presetName {
+  line-height: 1;
+}

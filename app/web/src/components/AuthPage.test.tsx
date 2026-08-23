@@ -3,6 +3,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import AuthPage from '@/components/AuthPage';
 import LoginForm from '@/components/LoginForm';
+import { ThemeProvider } from '@/contexts/ThemeContext';
 
 // Raw-key visible copy is provided by the key-echo default language of the
 // web test i18next instance (Issue #1717) — no react-i18next mock here.
@@ -78,6 +79,13 @@ describe('LoginForm', () => {
 describe('AuthPage', () => {
   const onLoginSuccess = vi.fn();
 
+  const renderAuthPage = (props: { onClose?: () => void } = {}) =>
+    render(
+      <ThemeProvider>
+        <AuthPage onLoginSuccess={onLoginSuccess} {...props} />
+      </ThemeProvider>,
+    );
+
   beforeEach(() => {
     vi.clearAllMocks();
     mockUser = null;
@@ -85,7 +93,7 @@ describe('AuthPage', () => {
   });
 
   it('renders the login form and advanced settings toggle', () => {
-    render(<AuthPage onLoginSuccess={onLoginSuccess} />);
+    renderAuthPage();
     expect(screen.getByRole('heading', { name: 'auth.title' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'auth.tokenDanceLogin' })).toBeInTheDocument();
     expect(screen.getByText('auth.advancedSettings')).toBeInTheDocument();
@@ -96,7 +104,7 @@ describe('AuthPage', () => {
       'fetch',
       vi.fn().mockResolvedValue({ ok: true, status: 200 }),
     );
-    render(<AuthPage onLoginSuccess={onLoginSuccess} />);
+    renderAuthPage();
 
     fireEvent.click(screen.getByText('auth.advancedSettings'));
 
@@ -112,7 +120,7 @@ describe('AuthPage', () => {
       'fetch',
       vi.fn().mockResolvedValue({ ok: true, status: 200 }),
     );
-    render(<AuthPage onLoginSuccess={onLoginSuccess} />);
+    renderAuthPage();
 
     fireEvent.click(screen.getByText('auth.advancedSettings'));
 
@@ -123,7 +131,7 @@ describe('AuthPage', () => {
 
   it('reports a disconnected Hub when the health endpoint fails', async () => {
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('hub down')));
-    render(<AuthPage onLoginSuccess={onLoginSuccess} />);
+    renderAuthPage();
 
     fireEvent.click(screen.getByText('auth.advancedSettings'));
 
@@ -132,9 +140,26 @@ describe('AuthPage', () => {
     });
   });
 
+  it('switches and resets theme presets from the advanced settings section (#1820)', async () => {
+    renderAuthPage();
+
+    fireEvent.click(screen.getByText('auth.advancedSettings'));
+
+    const group = await screen.findByRole('group', { name: 'auth.preset.label' });
+    expect(group).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Dracula' }));
+    expect(localStorage.getItem('agenthub-v4-theme-preset')).toBe('dracula');
+    expect(document.documentElement.getAttribute('data-theme-preset')).toBe('dracula');
+
+    fireEvent.click(screen.getByRole('button', { name: 'auth.preset.default' }));
+    expect(localStorage.getItem('agenthub-v4-theme-preset')).toBeNull();
+    expect(document.documentElement.getAttribute('data-theme-preset')).toBeNull();
+  });
+
   it('calls onClose when the close button is pressed', () => {
     const onClose = vi.fn();
-    render(<AuthPage onLoginSuccess={onLoginSuccess} onClose={onClose} />);
+    renderAuthPage({ onClose });
 
     fireEvent.click(screen.getByRole('button', { name: 'action.close' }));
     expect(onClose).toHaveBeenCalledTimes(1);
