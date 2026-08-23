@@ -122,6 +122,7 @@ export const AgentsPage: React.FC<AgentsPageProps> = (props) => {
           className={`${styles['workbench-search']} workbench-search`}
           placeholder={t('agents.installed.search')}
           value={searchQuery}
+          disabled={!onSearchChange}
           onChange={(e) => onSearchChange?.(e.target.value)}
         />
         <div className={styles['nav-caption']}>配置中心</div>

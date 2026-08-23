@@ -46,9 +46,11 @@ export const AgentMarketView: React.FC<AgentsPageProps> = (props) => {
             从 TokenDance 模板库安装可复用 Agent，不影响已安装配置。
           </p>
         </div>
-        <button className={`${styles['outline-action']} outline-action`} type="button" onClick={onMarketPublish}>
-          发布模板
-        </button>
+        {onMarketPublish && (
+          <button className={`${styles['outline-action']} outline-action`} type="button" onClick={onMarketPublish}>
+            发布模板
+          </button>
+        )}
       </div>
 
       <AgentMarketToolbar
