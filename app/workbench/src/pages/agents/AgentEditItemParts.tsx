@@ -82,6 +82,7 @@ export const AgentEditGrid: React.FC<{
           ) : (
             <input
               value={String(agent[field.key as keyof AgentConfig] ?? '')}
+              placeholder="未设置"
               onChange={(e) => onFieldChange?.(field.key, e.target.value)}
             />
           )}
