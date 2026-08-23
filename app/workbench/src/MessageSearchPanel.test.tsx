@@ -251,4 +251,56 @@ describe('MessageSearchPanel', () => {
     fireEvent.keyDown(lastResult, { key: 'Tab' });
     expect(document.activeElement).toBe(input);
   });
+
+  // ── #1822 keyboard navigation ─────────────────────────
+
+  function activeResultButtons(): HTMLElement[] {
+    return screen.getAllByRole('button').filter(
+      (btn) => btn.getAttribute('aria-current') === 'true',
+    );
+  }
+
+  it('ArrowDown/ArrowUp move the active row', async () => {
+    render(<MessageSearchPanel {...defaultProps} />);
+    const input = screen.getByPlaceholderText<HTMLInputElement>('Type to search...');
+    fireEvent.change(input, { target: { value: 'auth' } });
+    await flushDebounce();
+    expect(activeResultButtons().length).toBe(1);
+
+    // Move down twice — the active row stays unique and clamps at the last.
+    fireEvent.keyDown(input, { key: 'ArrowDown' });
+    fireEvent.keyDown(input, { key: 'ArrowDown' });
+    fireEvent.keyDown(input, { key: 'ArrowDown' });
+    expect(activeResultButtons().length).toBe(1);
+
+    // Move back up — still unique.
+    fireEvent.keyDown(input, { key: 'ArrowUp' });
+    expect(activeResultButtons().length).toBe(1);
+  });
+
+  it('Enter jumps to the active result (same as clicking it)', async () => {
+    const onJump = vi.fn();
+    render(<MessageSearchPanel {...defaultProps} onJumpToMessage={onJump} />);
+    const input = screen.getByPlaceholderText<HTMLInputElement>('Type to search...');
+    fireEvent.change(input, { target: { value: 'auth' } });
+    await flushDebounce();
+
+    fireEvent.keyDown(input, { key: 'ArrowDown' });
+    fireEvent.keyDown(input, { key: 'ArrowDown' });
+    fireEvent.keyDown(input, { key: 'Enter' });
+
+    // 'auth' matches m2 (auth module) and m3 (src/auth.ts) — after two
+    // ArrowDowns the active result is m3 (messageIndex 2).
+    expect(onJump).toHaveBeenCalledWith('m3', 2);
+  });
+
+  it('Enter on the first result jumps to it without any ArrowDown', async () => {
+    const onJump = vi.fn();
+    render(<MessageSearchPanel {...defaultProps} onJumpToMessage={onJump} />);
+    const input = screen.getByPlaceholderText<HTMLInputElement>('Type to search...');
+    fireEvent.change(input, { target: { value: 'bug' } });
+    await flushDebounce();
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(onJump).toHaveBeenCalledWith('m1', 0);
+  });
 });

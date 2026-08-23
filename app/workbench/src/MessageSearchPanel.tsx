@@ -128,9 +128,13 @@ export function MessageSearchPanel({
   const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE);
   const [immediateQuery, setImmediateQuery] = useState('');
   const [query, setQuery] = useState('');
+  // #1822: keyboard row navigation — ArrowUp/Down move the active row,
+  // Enter jumps to it (mirrors clicking a result).
+  const [activeIndex, setActiveIndex] = useState(0);
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inputRef = useState<HTMLInputElement | null>(null);
   const panelRef = useRef<HTMLDivElement | null>(null);
+  const activeResultRef = useRef<HTMLButtonElement | null>(null);
   useFocusTrap(panelRef, open);
 
   const searchableItems = useMemo(
@@ -206,14 +210,15 @@ export function MessageSearchPanel({
     return items;
   }, [searchableItems, query]);
 
-  const handleKeyDown = useCallback(
-    (e: React.KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        onClose();
-      }
-    },
-    [onClose],
-  );
+  // Reset the keyboard selection whenever the result set changes, and keep
+  // the active row in view while navigating.
+  useEffect(() => {
+    setActiveIndex(0);
+  }, [results]);
+
+  useEffect(() => {
+    activeResultRef.current?.scrollIntoView({ block: 'nearest' });
+  }, [activeIndex, results]);
 
   const handleResultClick = useCallback(
     (result: SearchResult) => {
@@ -222,6 +227,33 @@ export function MessageSearchPanel({
       onJumpToMessage(result.messageId, result.messageIndex);
     },
     [onJumpToMessage],
+  );
+
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+        return;
+      }
+      if (results.length === 0) return;
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setActiveIndex((i) => Math.min(i + 1, results.length - 1));
+        return;
+      }
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setActiveIndex((i) => Math.max(i - 1, 0));
+        return;
+      }
+      if (e.key === 'Enter') {
+        const active = results[activeIndex];
+        if (!active) return;
+        e.preventDefault();
+        handleResultClick(active);
+      }
+    },
+    [onClose, results, activeIndex, handleResultClick],
   );
 
   const formatTs = useCallback((timestamp: string) => {
@@ -275,7 +307,9 @@ export function MessageSearchPanel({
           {results.map((result, idx) => (
             <button type="button"
               key={`${result.messageId}-${idx}`}
-              className={`${styles.resultItem} ${highlightMessageId === result.messageId ? styles.resultItemHighlight : ''}`}
+              ref={idx === activeIndex ? activeResultRef : undefined}
+              className={`${styles.resultItem} ${idx === activeIndex ? styles.resultItemActive : ''} ${highlightMessageId === result.messageId ? styles.resultItemHighlight : ''}`}
+              aria-current={idx === activeIndex ? 'true' : undefined}
               onClick={() => handleResultClick(result)}
             >
               <div className={styles.resultMeta}>
@@ -295,6 +329,9 @@ export function MessageSearchPanel({
 
         <div className={styles.footer}>
           <kbd>ESC</kbd> to close
+          {results.length > 0 && (
+            <span aria-hidden="true"> · <kbd>↑↓</kbd> navigate · <kbd>Enter</kbd> jump</span>
+          )}
         </div>
       </div>
     </div>

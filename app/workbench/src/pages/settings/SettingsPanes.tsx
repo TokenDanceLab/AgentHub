@@ -3,7 +3,7 @@
    Residual thin: helpers + parts (#686).
    ═══════════════════════════════════════════════════════════════════════ */
 
-import React from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { CHATVIEW_I18N_NAMESPACE } from '@shared/chatview/i18n/resources';
 import { SHARED_WORKBENCH_I18N_NAMESPACE } from '@shared/i18n';
@@ -28,8 +28,12 @@ import { resolvePermissionValue } from './SettingsPaneHelpers';
 import { PERMISSION_ROWS } from './types';
 import type { SettingsPageProps, SettingsPaneId } from './types';
 import {
-  getResolvedShortcutGroups,
   checkConflicts,
+  deriveKeysFromEvent,
+  getResolvedShortcutGroups,
+  hasCustomKeybindings,
+  resetKeybindings,
+  saveCustomKeybindings,
 } from '@shared/utils/keyboardShortcuts';
 import type { KeyboardShortcutGroup } from '@shared/utils/keyboardShortcuts';
 
@@ -270,41 +274,124 @@ function shortcutConflictId(group: KeyboardShortcutGroup, shortcutId: string): s
 }
 
 export function ShortcutsPane(_props: SettingsPageProps): React.ReactElement {
-  const groups = getResolvedShortcutGroups();
+  const { t: tw } = useTranslation(SHARED_WORKBENCH_I18N_NAMESPACE);
+  // #1822: previously read-only and dead — saveCustomKeybindings /
+  // resetKeybindings had no UI callers. Rows now record a key combo on
+  // click (capture listener) and persist via saveCustomKeybindings; the
+  // dispatcher reads resolved groups, so remaps take effect immediately.
+  const [groups, setGroups] = useState<KeyboardShortcutGroup[]>(getResolvedShortcutGroups);
+  const [recordingId, setRecordingId] = useState<string | null>(null);
+  const [conflictId, setConflictId] = useState<string | null>(null);
+  const hasCustom = useMemo(() => hasCustomKeybindings(), [groups]);
+
+  useEffect(() => {
+    const targetId = recordingId;
+    if (!targetId) return;
+    function handleRecord(event: KeyboardEvent): void {
+      event.preventDefault();
+      event.stopPropagation();
+      if (event.key === 'Escape') {
+        setRecordingId(null);
+        return;
+      }
+      const keys = deriveKeysFromEvent(event);
+      if (keys.length === 0) return;
+      // Guarded above (`if (!targetId) return`) — assert to keep the closure's
+      // captured narrow (task TS version does not retain it in nested function
+      // declarations).
+      const capturedId = targetId as string;
+      // Block a remap that collides with a canonical binding of another
+      // shortcut — the conflict badge would otherwise show two rows sharing
+      // one combo with both firing.
+      const conflict = checkConflicts(keys, capturedId);
+      if (conflict) {
+        setConflictId(conflict.id);
+        setRecordingId(null);
+        return;
+      }
+      setConflictId(null);
+      saveCustomKeybindings([{ id: capturedId, keys }]);
+      setRecordingId(null);
+      setGroups(getResolvedShortcutGroups());
+    }
+    document.addEventListener('keydown', handleRecord, true);
+    return () => document.removeEventListener('keydown', handleRecord, true);
+  }, [recordingId]);
 
   return (
     <>
+      <SettingsRow
+        label={tw('settings.shortcuts.customize', { defaultValue: '自定义快捷键' })}
+        description={tw('settings.shortcuts.customizeDetail', { defaultValue: '点击按键组合即可录制新的绑定；所有绑定立即生效。' })}
+      >
+        <button
+          type="button"
+          onClick={() => {
+            resetKeybindings();
+            setConflictId(null);
+            setGroups(getResolvedShortcutGroups());
+          }}
+          disabled={!hasCustom && !recordingId}
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            fontSize: '0.8125rem',
+            padding: '2px 8px',
+            borderRadius: 4,
+            border: '1px solid var(--td-line)',
+            background: 'var(--bg-3)',
+            color: 'var(--td-ink-muted)',
+            cursor: hasCustom || recordingId ? 'pointer' : 'not-allowed',
+            opacity: hasCustom || recordingId ? 1 : 0.6,
+          }}
+        >
+          {tw('settings.shortcuts.reset', { defaultValue: '重置为默认' })}
+        </button>
+      </SettingsRow>
       {groups.map((group) => (
         <SettingsSection key={group.id} title={group.labelKey}>
           {group.shortcuts.map((shortcut) => {
-            const conflictId = shortcutConflictId(group, shortcut.id);
-            const hasConflict = conflictId !== null;
+            const conflictIdNow = shortcutConflictId(group, shortcut.id);
+            const hasConflict = conflictIdNow !== null;
             return (
               <SettingsRow
                 key={shortcut.id}
                 label={shortcut.labelKey}
                 description={
-                  hasConflict
-                    ? `冲突: 与 "${conflictId}" 按键相同`
-                    : (shortcut.detailKey ?? '')
+                  recordingId === shortcut.id
+                    ? tw('settings.shortcuts.recording', { defaultValue: '按下新的按键组合…（Esc 取消）' })
+                    : conflictId === shortcut.id
+                      ? tw('settings.shortcuts.conflict', { defaultValue: '该组合与「{{id}}」冲突，未保存', id: conflictId })
+                      : hasConflict
+                        ? `冲突: 与 "${conflictIdNow}" 按键相同`
+                        : (shortcut.detailKey ?? '')
                 }
               >
-                <span
+                <button
+                  type="button"
+                  aria-label={tw('settings.shortcuts.remap', { defaultValue: '重新绑定' })}
                   style={{
                     display: 'inline-flex',
                     alignItems: 'center',
                     gap: 4,
                     fontFamily: 'var(--mono, monospace)',
                     fontSize: '0.8125rem',
-                    color: hasConflict ? 'var(--td-danger, #e5484d)' : 'var(--td-ink-muted)',
-                    background: hasConflict ? 'var(--danger-bg, rgba(229,72,77,0.08))' : 'var(--bg-3)',
+                    color: hasConflict || conflictId !== null ? 'var(--td-danger, #e5484d)' : 'var(--td-ink-muted)',
+                    background: hasConflict || conflictId !== null ? 'var(--danger-bg, rgba(229,72,77,0.08))' : 'var(--bg-3)',
                     padding: '2px 8px',
                     borderRadius: 4,
-                    border: hasConflict ? '1px solid var(--td-danger, #e5484d)' : '1px solid var(--td-line)',
+                    border: hasConflict || conflictId !== null ? '1px solid var(--td-danger, #e5484d)' : '1px solid var(--td-line)',
+                    cursor: 'pointer',
+                  }}
+                  onClick={() => {
+                    setConflictId(null);
+                    setRecordingId((current) => current === shortcut.id ? null : shortcut.id);
                   }}
                 >
-                  {formatKeys(shortcut.keys)}
-                </span>
+                  {recordingId === shortcut.id
+                    ? tw('settings.shortcuts.recording', { defaultValue: '按下…' })
+                    : formatKeys(shortcut.keys)}
+                </button>
               </SettingsRow>
             );
           })}

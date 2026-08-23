@@ -1,3 +1,5 @@
+/* Global search dialog (#1822) — shared by Web and Desktop shells. */
+
 .overlay {
   display: flex;
   justify-content: center;
@@ -8,7 +10,7 @@
 .panel {
   width: 100%;
   max-width: 560px;
-  max-height: 420px;
+  max-height: 440px;
   background: var(--td-surface);
   border: 1px solid var(--td-line);
   border-radius: var(--r-md);
@@ -70,7 +72,6 @@
   scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
 }
 
-.hint,
 .empty {
   padding: 32px 12px;
   text-align: center;
@@ -99,21 +100,9 @@
   background: var(--glass-bg-subtle);
 }
 
-/* #1822: keyboard-navigated row — harder accent than hover so the
-   ↑↓ selection is visible without a pointer. */
 .resultItemActive {
   background: var(--glass-bg-strong, var(--glass-bg-subtle));
   outline: 1px solid var(--td-line-strong, var(--td-line));
-}
-
-.resultItemHighlight {
-  background: color-mix(in oklch, var(--td-plum) 10%, transparent);
-  animation: highlightPulse 0.4s ease-out;
-}
-
-@keyframes highlightPulse {
-  0% { background: color-mix(in oklch, var(--td-plum) 20%, transparent); }
-  100% { background: color-mix(in oklch, var(--td-plum) 2%, transparent); }
 }
 
 .resultMeta {
@@ -123,72 +112,24 @@
   margin-bottom: 3px;
 }
 
-.resultAgent {
-  font-size: 11px;
-  font-weight: 500;
-  color: var(--td-ink-muted);
+.resultTitle {
+  font-size: 13px;
+  font-weight: 520;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  max-width: 140px;
 }
 
-.resultTime {
+.resultKind {
   font-size: 11px;
   color: var(--td-ink-muted);
   margin-left: auto;
-}
-
-.resultSnippet {
-  color: color-mix(in oklch, var(--td-ink) 72%, var(--td-ink-muted) 28%);
-  font-size: 12.5px;
-  line-height: 1.55;
-  overflow: hidden;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  word-break: break-word;
-}
-
-.resultMark {
-  background: color-mix(in oklch, var(--td-warning) 34%, transparent);
-  color: var(--td-ink);
-  border-radius: var(--r-xs);
-  padding: 0 1px;
-}
-
-.footer {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 4px;
-  padding: 6px 10px;
-  border-top: 1px solid var(--td-line);
-  font-size: 11px;
-  color: var(--td-ink-muted);
   flex-shrink: 0;
 }
 
-.footer kbd {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 22px;
-  height: 18px;
-  padding: 0 5px;
-  border: 1px solid var(--glass-border-strong);
-  border-radius: var(--r-xs);
-  background: var(--glass-bg-subtle);
-  font-family: var(--td-font);
-  font-size: 10px;
-  font-weight: 500;
+.footer {
+  padding: 7px 12px;
+  border-top: 1px solid var(--td-line);
   color: var(--td-ink-muted);
-  line-height: 1;
-}
-
-/* ── A11y (#1823): visible keyboard focus ring for interactive targets ── */
-.resultItem:focus-visible {
-  outline: 2px solid transparent;
-  outline-offset: 2px;
-  box-shadow: var(--focus-ring);
+  font-size: 12px;
 }

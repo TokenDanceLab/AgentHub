@@ -517,3 +517,45 @@ describe('UnifiedComposer draft persistence', () => {
     ).toHaveLength(0);
   });
 });
+
+describe('UnifiedComposer auto-grow (#1822)', () => {
+  it('sizes the textarea to its scrollHeight whenever the draft text changes', () => {
+    const base: ComposerState = { ...draftComposer, text: '' };
+    const { container, rerender } = render(
+      <UnifiedComposer
+        composer={base}
+        dispatchComposer={vi.fn()}
+        mentionableAgents={[]}
+        onSubmit={vi.fn()}
+      />,
+    );
+    const textarea = container.querySelector('textarea');
+    expect(textarea).not.toBeNull();
+    if (!textarea) return;
+
+    // jsdom has no layout engine (scrollHeight stays 0) — stub a growing
+    // scrollHeight and rerender with changed text so the auto-grow effect
+    // re-runs, mirroring what a real browser reports for multi-line drafts.
+    Object.defineProperty(textarea, 'scrollHeight', { configurable: true, value: 72 });
+    rerender(
+      <UnifiedComposer
+        composer={{ ...base, text: 'line one\nline two' }}
+        dispatchComposer={vi.fn()}
+        mentionableAgents={[]}
+        onSubmit={vi.fn()}
+      />,
+    );
+    expect(textarea.style.height).toBe('72px');
+
+    Object.defineProperty(textarea, 'scrollHeight', { configurable: true, value: 120 });
+    rerender(
+      <UnifiedComposer
+        composer={{ ...base, text: 'line one\nline two\nline three' }}
+        dispatchComposer={vi.fn()}
+        mentionableAgents={[]}
+        onSubmit={vi.fn()}
+      />,
+    );
+    expect(textarea.style.height).toBe('120px');
+  });
+});

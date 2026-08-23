@@ -5,11 +5,19 @@ import type { TranscriptBlock, TextTranscriptBlock } from '@shared/transcript';
 import { isSidebarOnlyTranscriptBlock, orderTranscriptBlocks } from '@shared/transcript';
 import type { ComposerIntent, ComposerMention } from '@shared/composer';
 import {
+  browserFilesToComposerAttachments,
   buildComposerIntent,
   captureComposerDraft,
   composerReducer,
   createInitialComposerState,
 } from '@shared/composer';
+import {
+  buildAttachmentOversizeToast,
+  partitionAttachmentsBySize,
+} from './unifiedComposerHelpers';
+import {
+  dispatchComposerAttachmentAdds,
+} from './unifiedComposerHostHelpers';
 import {
   enqueuePendingIntent,
   MAX_PENDING_DISPATCH_RETRIES,
@@ -271,6 +279,57 @@ export const ConversationHost = React.memo(function ConversationHost({
     setPendingUserBlocks((current) => unacknowledgedPendingUserBlocks(transcript, current));
   }, [transcript]);
 
+  /* #1822: file drag-and-drop beyond the composer form — dropping files on
+     the transcript/sidebar/headers used to let the browser open the file.
+     Route any Files drag anywhere outside the composer to the attachment
+     chips instead. The composer's own form handlers keep precedence
+     (events originating inside [data-composer-form] are skipped here). */
+  const [filesDragging, setFilesDragging] = useState(false);
+  useEffect(() => {
+    const isInsideComposer = (target: EventTarget | null): boolean =>
+      target instanceof HTMLElement && Boolean(target.closest('[data-composer-form]'));
+    function handleDocumentDragOver(event: DragEvent): void {
+      if (!event.dataTransfer?.types?.includes('Files')) return;
+      if (isInsideComposer(event.target)) {
+        setFilesDragging(false);
+        return;
+      }
+      event.preventDefault();
+      setFilesDragging(true);
+    }
+    function handleDocumentDragLeave(event: DragEvent): void {
+      if (
+        !(event.relatedTarget instanceof Node) ||
+        !document.body.contains(event.relatedTarget)
+      ) {
+        setFilesDragging(false);
+      }
+    }
+    function handleDocumentDrop(event: DragEvent): void {
+      setFilesDragging(false);
+      if (!event.dataTransfer?.types?.includes('Files')) return;
+      if (isInsideComposer(event.target)) return;
+      event.preventDefault();
+      const files = Array.from(event.dataTransfer.files);
+      if (files.length === 0) return;
+      const { accepted, rejected } = partitionAttachmentsBySize(files);
+      const oversizeToast = buildAttachmentOversizeToast(rejected);
+      if (oversizeToast) onToast(oversizeToast);
+      if (accepted.length === 0) return;
+      void browserFilesToComposerAttachments(accepted).then((attachments) => {
+        dispatchComposerAttachmentAdds(dispatchComposer, attachments);
+      });
+    }
+    document.addEventListener('dragover', handleDocumentDragOver);
+    document.addEventListener('dragleave', handleDocumentDragLeave);
+    document.addEventListener('drop', handleDocumentDrop);
+    return () => {
+      document.removeEventListener('dragover', handleDocumentDragOver);
+      document.removeEventListener('dragleave', handleDocumentDragLeave);
+      document.removeEventListener('drop', handleDocumentDrop);
+    };
+  }, [dispatchComposer, onToast]);
+
   const submitComposer = useCallback(async (event: FormEvent<HTMLFormElement>): Promise<void> => {
     event.preventDefault();
     if (isSubmittingRef.current) return;
@@ -449,6 +508,11 @@ export const ConversationHost = React.memo(function ConversationHost({
 
   return (
     <>
+      {filesDragging && (
+        <div className={styles.transcriptDropOverlay} role="status" aria-live="polite">
+          {t('composer.dropToAttach', { defaultValue: '松开鼠标以添加附件' })}
+        </div>
+      )}
       <WorkspaceHeader activeConversation={activeConversation}
         inspectorCollapsed={inspectorCollapsed} onToggleInspector={onToggleInspector} onOpenSearch={() => onSearchOpenChange(true)} />
       {showMainchainStatus && <MainchainStatusStrip summary={mainchainSummary} onExportEvidence={onExportMainchainEvidence} />}

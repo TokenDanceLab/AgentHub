@@ -3,7 +3,6 @@ import type { ComposerAction } from '@shared/composer';
 import type { WorkbenchConversation } from '@shared/platform';
 import type { ApprovalDecisionAction, TranscriptBlock } from '@shared/transcript';
 import type { ContextMenuItem, MultiSelectBarAction } from './floating';
-import { EmojiPicker } from './floating/EmojiPicker';
 import { ForwardConversationPicker } from './floating/ForwardConversationPicker';
 import {
   blockTitle,
@@ -711,28 +710,9 @@ export function buildTranscriptContextMenuGroups({
   return [
     [
       { label: t('context.copy'), icon: 'fileText', shortcut: 'Ctrl C', onClick: () => onAction('copy', blockId) },
-      // Emoji reactions are a Hub REST action; without a session the entry
-      // is omitted (#1818).
-      ...(hubMessageActions
-        ? [{
-            label: t('context.react'),
-            icon: 'star' as const,
-            chevron: true,
-            // Plain click path (default 👍) is kept for direct callers; the menu
-            // click/Enter opens the picker submenu instead (#1384).
-            onClick: () => onAction('react', blockId),
-            submenu: (close: () => void) => createElement(EmojiPicker, {
-              ariaLabel: t('aria.emojiPicker'),
-              autoFocus: true,
-              onSelect: (emoji: string) => {
-                // The chosen emoji rides the action string (`react:<emoji>`);
-                // planContextAction decodes it back into the react effect.
-                onAction(`react:${emoji}`, blockId);
-                close();
-              },
-            }),
-          }]
-        : []),
+      // #1822: the react submenu was write-only (POST fires but nothing in
+      // the transcript ever renders or cancels a reaction) — entry removed
+      // until a real reaction display exists.
       { label: t('context.reply'), icon: 'notes', onClick: () => onAction('reply', blockId) },
       ...(isTextBlock ? [{ label: t('context.quote'), icon: 'copy' as const, onClick: () => onAction('quote', blockId) }] : []),
       ...(isUserText ? [{ label: t('context.edit'), icon: 'edit' as const, onClick: () => onAction('edit', blockId) }] : []),

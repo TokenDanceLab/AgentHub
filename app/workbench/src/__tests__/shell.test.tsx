@@ -123,8 +123,11 @@ describe('AgentHubWorkbench', () => {
     const dialog = screen.getByRole('dialog', { name: '键盘快捷键' });
     expect(within(dialog).getByText('会话')).toBeInTheDocument();
     expect(within(dialog).getByText('导航')).toBeInTheDocument();
-    expect(within(dialog).getByText('Ctrl/⌘ + N')).toBeInTheDocument();
+    expect(within(dialog).getByText('Ctrl/⌘ + K')).toBeInTheDocument();
     expect(within(dialog).getByText('Enter')).toBeInTheDocument();
+    // #1822: the new-thread claim (Ctrl/⌘+N) had no handler anywhere and was
+    // removed from the canonical table — the help panel must not list it.
+    expect(within(dialog).queryByText('Ctrl/⌘ + N')).not.toBeInTheDocument();
 
     // A second '?' toggles it closed.
     fireEvent.keyDown(document, { key: '?' });
