@@ -24,6 +24,7 @@ build/
 output/
 .next/
 .vite/
+storybook-static/
 *.tgz
 *.zip
 app/desktop/app/

@@ -847,6 +847,7 @@ jobs:
               - 'app/web/scripts/visual-qa*'
               - 'app/web/scripts/assert-visual-qa-shell.mjs'
               - 'app/desktop/scripts/visual-qa*'
+              - 'app/desktop/scripts/assert-visual-qa-shell.mjs'
               - 'app/web/src/**'
               - 'app/web/package.json'
               - 'app/desktop/package.json'
@@ -1266,6 +1267,68 @@ jobs:
         with:
           name: web-visual-qa-shell-screenshots
           path: app/web/screenshots/visual-qa/
+          if-no-files-found: warn
+          retention-days: 7
+
+  # ── Visual QA Desktop Shell (path-filtered) ─────
+  # Desktop half of the P74 gate evidence (#1287, #1827): same capture matrix
+  # (1440x810 light+dark, non-blank assert, no pixel goldens) against the
+  # desktop vite dev server with demo workbench entry — no real Hub required.
+  visual-qa-desktop:
+    name: Visual QA Desktop shell (path-filtered)
+    needs: changes
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      needs.changes.outputs.shell == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: ./app
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v6
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+          cache-dependency-path: app/pnpm-lock.yaml
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v5
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('app/pnpm-lock.yaml') }}
+      - name: Install Playwright Chromium
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Capture desktop visual:qa:shell
+        timeout-minutes: 15
+        working-directory: ./app/desktop
+        run: pnpm visual:qa:shell
+        env:
+          CI: 'true'
+          # Script spawns vite on 5199 with demo workbench entry; no real Hub required.
+
+      - name: Assert non-blank shell screenshots (desktop)
+        working-directory: ./app/desktop
+        run: pnpm assert:visual:qa:shell
+        env:
+          VISUAL_QA_SHELL_MIN_BYTES: '8000'
+
+      - name: Upload visual QA shell screenshots (desktop)
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: desktop-visual-qa-shell-screenshots
+          path: app/desktop/screenshots/visual-qa/
           if-no-files-found: warn
           retention-days: 7
 
