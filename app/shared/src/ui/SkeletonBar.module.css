@@ -9,7 +9,7 @@
 .line {
   display: block;
   border-radius: var(--td-radius-control);
-  background: oklch(0 0 0 / 0.08);
+  background: color-mix(in oklch, var(--td-ink-muted) 12%, transparent);
 }
 
 /* Variant shapes: circle for avatar placeholders, block for card bodies. */

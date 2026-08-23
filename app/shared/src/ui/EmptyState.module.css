@@ -5,7 +5,7 @@
   justify-content: flex-start;
   max-width: 520px;
   margin: 0 auto;
-  padding: var(--wb-gap-3xl, 120px) var(--wb-gap-md, var(--td-space-3, 1rem)) var(--td-space-5, 1.5rem);
+  padding: 120px var(--wb-gap-md) var(--td-space-5);
   color: var(--td-ink);
   text-align: center;
   user-select: none;
@@ -22,7 +22,7 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: var(--wb-gap-sm, var(--td-space-3, 0.75rem));
+  gap: var(--wb-gap-sm);
 }
 
 /* ── Icon with gradient background ─────────────────────────────────── */
@@ -37,8 +37,8 @@
   background:
     linear-gradient(
       135deg,
-      var(--glass-tint-plum, rgba(0, 113, 188, 0.12)),
-      var(--glass-tint-sky, rgba(59, 130, 246, 0.12))
+      var(--glass-tint-plum),
+      var(--glass-tint-sky)
     );
   backdrop-filter: var(--glass-backdrop-filter);
   -webkit-backdrop-filter: var(--glass-backdrop-filter);
@@ -59,7 +59,7 @@
   max-width: 420px;
   margin: 0;
   color: var(--td-ink-muted);
-  font-size: var(--td-text-sm, 0.875rem);
+  font-size: var(--td-text-sm);
   line-height: 1.5;
 }
 
@@ -86,8 +86,8 @@
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
-  gap: var(--wb-gap-xs, 8px);
-  margin-top: var(--wb-gap-xs, var(--td-space-2, 0.5rem));
+  gap: var(--wb-gap-xs);
+  margin-top: var(--wb-gap-xs);
 }
 
 .suggestionChip {
@@ -139,7 +139,7 @@
 /* ── Entry animation (fadeInUp, 12px translateY, 60fps) ─────────────── */
 @media (prefers-reduced-motion: no-preference) {
   .container {
-    animation: emptyStateIn 0.32s var(--td-ease-out, cubic-bezier(0, 0, 0.2, 1));
+    animation: emptyStateIn 0.32s var(--td-ease-out);
   }
 
   @keyframes emptyStateIn {
@@ -157,7 +157,7 @@
 @media (max-width: 767px) {
   .container {
     max-width: 100%;
-    padding: 80px var(--td-space-2, 0.75rem) var(--td-space-4, 1rem);
+    padding: 80px var(--td-space-2) var(--td-space-4);
   }
 
   .title {

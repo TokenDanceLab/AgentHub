@@ -31,8 +31,8 @@ function formatTime(iso: string): string {
 }
 
 /**
- * @deprecated 此组件暂无消费方（不在 ui barrel，无应用消费点），待清理或接入。
- *   Wave 10：默认导出已转 named export；保留组件以备未来接入或清理。
+ * Artifact version history browse/compare/revert timeline.
+ * 消费方：暂无应用内直接消费点，经 ui barrel 导出（#1820）。
  */
 export function ArtifactVersionTimeline({
   artifactId: _artifactId,

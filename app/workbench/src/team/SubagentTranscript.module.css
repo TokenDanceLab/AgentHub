@@ -11,7 +11,7 @@
   border-top: 1px solid var(--td-line);
   max-height: 360px;
   overflow-y: auto;
-  font-family: var(--td-font, 'Inter', system-ui, sans-serif);
+  font-family: var(--td-font);
   font-size: 0.75rem;
   line-height: 1.5;
   color: var(--td-ink);
@@ -77,7 +77,7 @@
 
 .entrySeq {
   font-size: 0.625rem;
-  font-family: var(--td-mono, 'JetBrains Mono', monospace);
+  font-family: var(--td-mono);
   color: var(--td-ink-muted);
   flex-shrink: 0;
 }
@@ -109,7 +109,7 @@
 }
 
 .toolName {
-  font-family: var(--td-mono, 'JetBrains Mono', monospace);
+  font-family: var(--td-mono);
   font-size: 0.625rem;
   color: var(--td-accent-amber);
   background: var(--glass-tint-amber);
@@ -118,7 +118,7 @@
 }
 
 .toolInput {
-  font-family: var(--td-mono, 'JetBrains Mono', monospace);
+  font-family: var(--td-mono);
   font-size: 0.625rem;
   color: var(--td-ink-muted);
 }
@@ -138,7 +138,7 @@
 .payloadGeneric {
   color: var(--td-ink-muted);
   font-size: 0.625rem;
-  font-family: var(--td-mono, 'JetBrains Mono', monospace);
+  font-family: var(--td-mono);
 }
 
 /* ── Empty state ──────────────────────────────────────────────────────────── */

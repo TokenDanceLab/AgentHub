@@ -390,7 +390,7 @@
   padding: 8px 10px;
   border: 1px solid var(--td-line);
   border-radius: var(--r-md);
-  background: var(--td-surface-3, var(--td-surface));
+  background: var(--td-surface-3);
   color: var(--td-ink-muted);
 }
 
@@ -425,7 +425,7 @@
   max-width: 100%;
   margin: 0;
   min-height: 140px;
-  padding: var(--wb-gap-md, 16px);
+  padding: var(--wb-gap-md);
   border: 1px solid var(--glass-border, var(--td-line));
   border-radius: var(--glass-card-radius, var(--r-md));
   background: var(--glass-card-bg, var(--glass-panel, var(--td-surface-2)));
@@ -1024,7 +1024,7 @@
 
 .agent-token {
   min-height: 28px;
-  padding: 0 var(--wb-gap-xs, 9px);
+  padding: 0 var(--wb-gap-xs);
   border: 1px solid var(--glass-border, var(--td-line));
   border-radius: var(--r-full);
   background: var(--glass-input-bg, var(--td-surface-2));

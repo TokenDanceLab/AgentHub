@@ -104,69 +104,10 @@
   gap: 12px;
 }
 
-.field {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.label {
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--td-ink-muted);
-}
-
-.input {
-  padding: 10px 14px;
-  border: none;
-  border-radius: 10px;
-  background: var(--glass-bg-light);
-  color: var(--td-ink);
-  font-size: 14px;
-  font-family: var(--td-font);
-  outline: none;
-  transition: background 0.2s, box-shadow 0.2s;
-  -webkit-font-smoothing: antialiased;
-  width: 100%;
-  box-sizing: border-box;
-}
-
-.input::placeholder { color: var(--td-ink-faint); }
-
-.input:focus {
-  background: var(--glass-bg-subtle);
-  box-shadow: var(--focus-ring);
-}
-
-.input:disabled { opacity: 0.5; }
-.inputError { box-shadow: 0 0 0 1px var(--glass-tint-danger); }
-
-.passwordWrapper {
-  position: relative;
-  display: flex;
-  align-items: center;
-}
-
-.passwordWrapper .input {
-  flex: 1;
-  padding-right: 40px;
-}
-
-.passwordToggle {
-  position: absolute;
-  right: 10px;
-  border: none;
-  background: transparent;
-  color: var(--td-ink-faint);
-  cursor: pointer;
-  padding: 4px;
-  display: flex;
-}
-
-.error {
-  font-size: 11px;
-  color: var(--td-danger);
-}
+/* #1827: the duplicated .field/.label/.input/.passwordWrapper/.error blocks
+   were the hand-written fork of the shared form family — removed; the family
+   (shared/src/ui/FormField|Input) owns field layout and the unified error
+   state (--td-danger + aria-invalid) now. */
 
 .errorBanner {
   padding: 8px 12px;
@@ -518,27 +459,11 @@
   min-width: 0;
 }
 
-.devInput {
+/* #1827: the hand-rolled .devInput (11px/transparent/7px radius — below the
+   12px CJK floor) migrated to the shared Input sm+mono: 13px, glass field.
+   Only the inter-row spacing stays page-owned. */
+.devInputMargin {
   margin-top: 4px;
-  width: 100%;
-  padding: 7px 10px;
-  border: 1px solid transparent;
-  border-radius: 7px;
-  background: transparent;
-  color: var(--td-ink);
-  font-size: 11px;
-  font-family: var(--td-mono);
-  outline: none;
-  box-sizing: border-box;
-  transition: border-color 0.15s, background 0.15s;
-}
-
-.devInput::placeholder { color: var(--td-ink-faint); }
-
-.devInput:focus {
-  border-color: var(--td-focus);
-  box-shadow: var(--focus-ring);
-  background: var(--glass-bg-subtle);
 }
 
 /* Reduced motion (#1825): tab hover/active feedback flips instantly. */

@@ -135,7 +135,6 @@
   "action.discard": "丢弃",
   "action.approve": "批准",
   "action.reject": "拒绝",
-
   "auth.title": "AgentHub",
   "auth.tagline": "在本地运行 AI 编程代理",
   "auth.advancedSettings": "高级设置",
@@ -143,6 +142,14 @@
   "auth.hubConnected": "Hub 可访问",
   "auth.hubDisconnected": "Hub 不可访问",
   "auth.hubChecking": "正在检查连接...",
+  "auth.preset.label": "主题预设",
+  "auth.preset.default": "默认",
+  "auth.preset.classic-blue": "经典蓝",
+  "auth.preset.claude-warm": "Claude 暖",
+  "auth.preset.chatgpt-minimal": "ChatGPT 极简",
+  "auth.preset.deepseek-tech": "DeepSeek 科技",
+  "auth.preset.one-dark-pro": "One Dark Pro",
+  "auth.preset.dracula": "Dracula",
   "auth.tokenDancePrimary": "推荐使用 TokenDance ID，同步 Hub、设备、Agent 权限与未来跨端身份。",
   "auth.tokenDanceLogin": "使用 TokenDance ID 登录",
   "auth.tokenDanceCallbackPending": "正在打开 TokenDance ID 登录。请在那里完成授权后返回 AgentHub。",
@@ -155,7 +162,6 @@
   "webChat.signInRequired": "使用网页聊天需要先登录",
   "webChat.deviceKicked": "本设备会话已被 Hub 注销（可能在其他登录中被替换），请重新登录。",
   "webChat.deviceKicked.signIn": "重新登录",
-
   "diff.empty.title": "暂无变更可显示",
   "diff.empty.description": "运行报告变更文件后，Diff 输出会显示在这里。",
   "diff.changedFiles_one": "{{count}} 个变更文件",
@@ -242,12 +248,10 @@
   "teamRun.event.approvalDecided": "审批已决定",
   "teamRun.event.conflictResolved": "冲突已解决",
   "teamRun.event.unknown": "事件",
-
   "code.copy": "复制代码",
   "code.copied": "已复制",
   "prompt.agentSuggestions": "Agent 建议",
   "prompt.routeAuto": "自动",
-
   "notification.bell": "通知",
   "notification.bellUnread": "通知 ({{count}} 条未读)",
   "notification.panel": "通知面板",
@@ -260,13 +264,11 @@
   "notification.type.agentTask": "Agent 任务",
   "notification.type.message": "消息",
   "notification.type.system": "系统",
-
   "time.justNow": "刚刚",
   "time.minutesAgo": "{{count}}分钟前",
   "time.hoursAgo": "{{count}}小时前",
   "time.daysAgo": "{{count}}天前",
   "time.yesterday": "昨天",
-
   "chat.action.copy": "复制",
   "chat.action.copied": "已复制",
   "chat.action.retry": "重试",
@@ -300,7 +302,6 @@
   "chat.retry": "重试",
   "toast.copied": "已复制到剪贴板",
   "toast.error": "复制失败",
-
   "welcome.title": "欢迎",
   "welcome.eyebrow": "开始使用",
   "welcome.headline": "AgentHub",
@@ -334,11 +335,9 @@
   "welcome.tokendance": "TokenDance ID",
   "welcome.approvalAsk": "需要时询问",
   "welcome.suggestionsLabel": "试试这些提示",
-
   "agent.status.available": "可用",
   "agent.status.unavailable": "不可用",
   "agent.status.configuring": "配置中",
-
   "im.contact.empty": "暂无对话",
   "im.contact.emptyDescription": "登录或同步后，Hub 联系人和 Agent 会话将显示在这里。",
   "im.contact.search": "搜索对话...",
@@ -366,17 +365,14 @@
   "im.message.emptyDescription": "开始 Hub 对话吧。",
   "im.search": "搜索对话...",
   "im.searchClear": "清除搜索",
-
   "diff.actions.diffApplied": "已应用",
   "diff.actions.applyDiff": "应用差异",
-
   "error.network": "网络错误",
   "error.auth": "认证错误",
   "error.agent": "Agent 错误",
   "error.runtime": "运行时错误",
   "error.unknown": "未知错误",
   "error.retry": "重试",
-
   "errorBoundary.chunkLoadDesc": "新版本可用，请重新加载以继续。",
   "errorBoundary.chunkLoadTitle": "需要更新",
   "errorBoundary.desc": "渲染此部分时发生意外错误。",

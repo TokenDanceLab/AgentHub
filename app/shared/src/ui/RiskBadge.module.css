@@ -6,8 +6,8 @@
   align-items: center;
   gap: 5px;
   padding: 3px 10px;
-  border-radius: var(--r-full, 999px);
-  font: 500 0.75rem var(--td-font, -apple-system, BlinkMacSystemFont, 'Inter', 'PingFang SC', system-ui, sans-serif);
+  border-radius: var(--r-full);
+  font: 500 var(--td-text-xs) var(--td-font);
   white-space: nowrap;
   line-height: 1.4;
 }

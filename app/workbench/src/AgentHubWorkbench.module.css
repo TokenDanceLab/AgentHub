@@ -371,7 +371,7 @@
 .conversationList li::after {
   content: '';
   display: block;
-  height: var(--wb-gap-2xs, 4px);
+  height: var(--wb-gap-2xs);
 }
 
 /* Row wrapper (#1715): the option surface owns hover/active/current styling.
@@ -384,7 +384,7 @@
   width: 100%;
   min-width: 0;
   min-height: 40px;
-  padding: var(--wb-gap-2xs, 6px) var(--wb-gap-xs, 10px);
+  padding: var(--wb-gap-2xs) var(--wb-gap-xs);
   border-radius: var(--r-md);
   background: transparent;
   transition:
@@ -451,14 +451,14 @@
   width: 100%;
   min-width: 0;
   min-height: 40px;
-  padding: var(--wb-gap-2xs, 6px) var(--wb-gap-xs, 10px);
+  padding: var(--wb-gap-2xs) var(--wb-gap-xs);
 }
 
 .conversationRenameInput {
   width: 100%;
   min-width: 0;
   height: 30px;
-  padding: 0 var(--wb-gap-2xs, 6px);
+  padding: 0 var(--wb-gap-2xs);
   border: 1px solid var(--td-line);
   border-radius: var(--td-radius-control);
   background: var(--td-surface);
@@ -477,7 +477,7 @@
 }
 
 .conversationDeleteText {
-  margin: 0 0 var(--wb-gap-sm, 12px);
+  margin: 0 0 var(--wb-gap-sm);
   color: var(--td-ink-muted);
   line-height: 1.5;
   word-break: break-word;
@@ -486,7 +486,7 @@
 .conversationDeleteActions {
   display: flex;
   justify-content: flex-end;
-  gap: var(--wb-gap-xs, 10px);
+  gap: var(--wb-gap-xs);
 }
 
 .conversationDeleteCancel,
@@ -745,9 +745,9 @@
 .conversationEmptyAction {
   margin-top: var(--td-space-1);
   padding: 4px 10px;
-  border: 1px solid var(--td-line-strong, transparent);
-  border-radius: var(--td-radius-control, 6px);
-  background: var(--td-surface-3, transparent);
+  border: 1px solid var(--td-line-strong);
+  border-radius: var(--td-radius-control);
+  background: var(--td-surface-3);
   color: var(--td-ink-muted);
   font: 500 0.75rem var(--td-font);
   cursor: pointer;
@@ -756,8 +756,8 @@
 
 .conversationEmptyAction:hover,
 .conversationEmptyAction:focus-visible {
-  background: var(--surface-highest, var(--td-surface-3, transparent));
-  border-color: var(--td-focus, var(--td-plum, currentColor));
+  background: var(--surface-highest);
+  border-color: var(--td-focus);
   color: var(--td-ink);
   outline: none;
 }
@@ -833,10 +833,10 @@
 .mainchainStrip {
   display: flex;
   align-items: center;
-  gap: var(--wb-gap-xs, 8px);
+  gap: var(--wb-gap-xs);
   min-width: 0;
   min-height: 36px;
-  padding: var(--wb-gap-2xs, 4px) var(--wb-gap-sm, 12px);
+  padding: var(--wb-gap-2xs) var(--wb-gap-sm);
   border-bottom: 1px solid var(--glass-border, var(--td-line));
   background: var(--glass-panel, color-mix(in srgb, var(--td-surface) 86%, var(--td-canvas)));
   backdrop-filter: var(--glass-backdrop-filter);
@@ -848,7 +848,7 @@
   min-width: 0;
   display: grid;
   grid-template-columns: repeat(9, minmax(56px, 1fr));
-  gap: var(--wb-gap-2xs, 4px);
+  gap: var(--wb-gap-2xs);
 }
 
 .mainchainNode {
@@ -857,7 +857,7 @@
   min-height: 28px;
   display: flex;
   align-items: center;
-  gap: var(--wb-gap-2xs, 6px);
+  gap: var(--wb-gap-2xs);
   padding: 4px 6px;
   border: 1px solid var(--glass-border-subtle, var(--td-line));
   border-radius: var(--td-radius-control);
@@ -1662,7 +1662,7 @@
 
 .composerMentionPopover {
   position: fixed;
-  z-index: var(--td-z-popover, 500);
+  z-index: var(--td-z-popover);
   width: min(280px, calc(100vw - 32px));
   max-height: 240px;
   overflow-y: auto;
@@ -2312,7 +2312,7 @@
   max-width: min(66.66%, 520px);
   width: 100%;
   margin: auto;
-  padding: var(--td-space-8, 48px) var(--td-space-5, 24px);
+  padding: var(--td-space-8) var(--td-space-5);
   border: 1px solid var(--glass-border-strong, var(--td-line));
   border-radius: var(--glass-card-radius, var(--r-xl));
   background: var(--glass-card-bg, var(--glass-panel));
@@ -2565,7 +2565,7 @@
 .browserPreviewCard {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
-  gap: var(--wb-gap-2xs, 4px) var(--wb-gap-xs, 9px);
+  gap: var(--wb-gap-2xs) var(--wb-gap-xs);
   align-items: start;
   margin: var(--wb-gap-xs, var(--td-space-2));
   padding: var(--wb-gap-md, var(--td-space-3));
@@ -2726,7 +2726,7 @@
     width: min(var(--inspector-w, 400px), 100vw);
     min-width: 0;
     flex: none;
-    z-index: calc(var(--td-z-overlay, 300) + 50);
+    z-index: calc(var(--td-z-overlay) + 50);
     box-shadow: var(--glass-elev-1);
     transform: translateX(105%);
     visibility: hidden;
@@ -3288,9 +3288,9 @@
   border: 1px solid var(--td-line);
   border-bottom-width: 2px;
   border-radius: var(--r-xs);
-  background: var(--bg-3, var(--surface-dim, #f3f4f6));
+  background: var(--surface-dim);
   color: var(--td-ink-muted);
-  font: 500 12px var(--mono, ui-monospace, monospace);
+  font: 500 12px var(--td-mono);
 }
 
 /* ═══ Print stylesheet — workbench chrome (二轮调研 #7) ═══════════════════

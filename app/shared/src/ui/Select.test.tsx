@@ -143,4 +143,82 @@ describe('Select', () => {
     fireEvent.keyDown(listbox, { key: 'Home' });
     expect(activeOptionLabel(listbox)).toBe('Option A');
   });
+
+  // ── #1827: disabled options / error state / resize repositioning ──
+
+  const mixedOptions: Array<[string, string, boolean?]> = [
+    ['a', 'Alpha'],
+    ['b', 'Blocked', true],
+    ['c', 'Gamma'],
+  ];
+
+  it('skips disabled options on ArrowDown/ArrowUp navigation', () => {
+    render(<Select options={mixedOptions} value="" onChange={() => {}} placeholder="Select" />);
+    fireEvent.click(screen.getByRole('button'));
+    const listbox = screen.getByRole('listbox');
+    expect(activeOptionLabel(listbox)).toBe('Alpha');
+    fireEvent.keyDown(listbox, { key: 'ArrowDown' });
+    expect(activeOptionLabel(listbox)).toBe('Gamma');
+    fireEvent.keyDown(listbox, { key: 'ArrowUp' });
+    expect(activeOptionLabel(listbox)).toBe('Alpha');
+  });
+
+  it('does not select a disabled option on Enter or click', () => {
+    const onChange = vi.fn();
+    render(<Select options={mixedOptions} value="a" onChange={onChange} />);
+    fireEvent.click(screen.getByRole('button'));
+    const listbox = screen.getByRole('listbox');
+    // Keyboard: focus is on Alpha; ArrowDown lands on Gamma skipping Blocked
+    fireEvent.keyDown(listbox, { key: 'Enter' });
+    expect(onChange).toHaveBeenCalledWith('a');
+    // Click on the disabled option: no change
+    fireEvent.click(listbox.querySelector('[role="option"][aria-disabled="true"]')!);
+    expect(onChange).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps disabled options out of Home/End focus', () => {
+    render(<Select options={mixedOptions} value="" onChange={() => {}} placeholder="Select" />);
+    fireEvent.click(screen.getByRole('button'));
+    const listbox = screen.getByRole('listbox');
+    fireEvent.keyDown(listbox, { key: 'End' });
+    expect(activeOptionLabel(listbox)).toBe('Gamma');
+    fireEvent.keyDown(listbox, { key: 'Home' });
+    expect(activeOptionLabel(listbox)).toBe('Alpha');
+  });
+
+  it('reports aria-invalid on the trigger when invalid', () => {
+    render(<Select options={options} value="" onChange={() => {}} invalid ariaLabel="Pick" />);
+    expect(screen.getByRole('button')).toHaveAttribute('aria-invalid', 'true');
+  });
+
+  it('does not set aria-invalid when valid', () => {
+    render(<Select options={options} value="" onChange={() => {}} ariaLabel="Pick" />);
+    expect(screen.getByRole('button')).not.toHaveAttribute('aria-invalid');
+  });
+
+  it('recomputes the dropdown anchor on window resize', () => {
+    const rect = {
+      left: 50, top: 700, bottom: 730, width: 220,
+      right: 270, height: 30, x: 50, y: 700, toJSON: () => ({}),
+    } as DOMRect;
+    const spy = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue(rect);
+    const defineHeight = (v: number) => {
+      Object.defineProperty(window, 'innerHeight', { value: v, writable: true, configurable: true });
+    };
+    defineHeight(768);
+    const manyOptions = Array.from({ length: 12 }, (_, i) => [`k${i}`, `K${i}`] as [string, string]);
+    try {
+      render(<Select options={manyOptions} value="" onChange={() => {}} placeholder="Select" />);
+      fireEvent.click(screen.getByRole('button'));
+      const listbox = screen.getByRole('listbox');
+      // 12 options -> ~496px panel; 38px below -> must flip up
+      expect(listbox.style.bottom).toBe('74px');
+      defineHeight(1200);
+      fireEvent(window, new Event('resize'));
+      expect(listbox.style.top).toBe('736px');
+      expect(listbox.style.bottom).toBe('');
+    } finally {
+      spy.mockRestore();
+    }
+  });
 });

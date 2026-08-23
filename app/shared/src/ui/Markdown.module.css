@@ -42,7 +42,7 @@
   color: var(--td-ink-subtle);
   text-decoration: none;
   opacity: 0;
-  transition: opacity var(--td-dur-fast, 90ms) var(--td-ease, ease);
+  transition: opacity var(--td-dur-fast) var(--td-ease);
 }
 
 .root :is(h1, h2, h3, h4, h5, h6):hover .headingAnchor,

@@ -1,10 +1,12 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { X, ChevronDown } from 'lucide-react';
-import { TokenDanceMark } from '@shared/ui';
+import { TokenDanceMark, Input } from '@shared/ui';
 import type { UserProfile } from '@/api/hubClient';
 import { HUB_URL } from '@/config';
 import LoginForm from '@/components/LoginForm';
+import { THEME_PRESETS, THEME_PRESET_META, type ThemePreset } from '@shared/theme';
+import { useThemeContext } from '@/contexts/ThemeContext';
 import styles from './AuthPage.module.css';
 
 type HubStatus = 'connected' | 'disconnected' | 'checking';
@@ -16,6 +18,9 @@ interface Props {
 
 export default function AuthPage({ onLoginSuccess, onClose }: Props) {
   const { t } = useTranslation();
+  // Preset UI is a Web-theme enhancement; surfaces rendered outside the
+  // ThemeProvider (tests, isolated previews) simply omit the switcher.
+  const themeContext = useThemeContext();
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [hubUrl, setHubUrl] = useState(() => {
     try {
@@ -105,8 +110,10 @@ export default function AuthPage({ onLoginSuccess, onClose }: Props) {
 
       {showAdvanced && (
         <div className={styles.advancedSection}>
-          <input
-            className={styles.hubInput}
+          {/* #1827: unified shared Input (visual parity with the old .hubInput). */}
+          <Input
+            size="sm"
+            mono
             type="url"
             value={hubUrl}
             onChange={handleHubUrlChange}
@@ -123,6 +130,47 @@ export default function AuthPage({ onLoginSuccess, onClose }: Props) {
                   : t('auth.hubChecking')}
             </span>
           </div>
+          {/* Web theme preset switcher (#1820): CSS preset palettes load via
+              styles/presets.css; shared themePresets registry drives this UI. */}
+          {themeContext && (() => {
+            const { theme, themePreset, setThemePreset } = themeContext;
+            return (
+              <div className={styles.presetSection}>
+                <span className={styles.presetLabel}>{t('auth.preset.label')}</span>
+                <div className={styles.presetGrid} role="group" aria-label={t('auth.preset.label')}>
+                  <button
+                    type="button"
+                    className={themePreset === undefined ? `${styles.presetChip} ${styles.presetChipActive}` : styles.presetChip}
+                    aria-pressed={themePreset === undefined}
+                    onClick={() => setThemePreset(undefined)}
+                  >
+                    {t('auth.preset.default')}
+                  </button>
+                  {THEME_PRESETS.map((preset: ThemePreset) => {
+                    const meta = THEME_PRESET_META[preset];
+                    const swatches = meta[theme === 'dark' ? 'darkPreview' : 'lightPreview'];
+                    return (
+                      <button
+                        key={preset}
+                        type="button"
+                        className={themePreset === preset ? `${styles.presetChip} ${styles.presetChipActive}` : styles.presetChip}
+                        aria-pressed={themePreset === preset}
+                        onClick={() => setThemePreset(preset)}
+                        title={t(`auth.preset.${preset}`, { defaultValue: meta.label })}
+                      >
+                        <span className={styles.presetSwatches} aria-hidden="true">
+                          {swatches.map((swatch) => (
+                            <span key={swatch} className={styles.presetSwatch} style={{ background: swatch }} />
+                          ))}
+                        </span>
+                        <span className={styles.presetName}>{t(`auth.preset.${preset}`, { defaultValue: meta.label })}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })()}
         </div>
       )}
     </div>

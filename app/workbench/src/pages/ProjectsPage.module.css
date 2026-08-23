@@ -70,7 +70,7 @@
   padding: 8px 10px;
   border: 1px solid var(--td-line);
   border-radius: var(--r-md);
-  background: var(--td-surface-3, var(--td-surface));
+  background: var(--td-surface-3);
   color: var(--td-ink-muted);
 }
 

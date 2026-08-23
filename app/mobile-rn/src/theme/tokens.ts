@@ -1,10 +1,27 @@
 import type { TextStyle, ViewStyle } from 'react-native';
+import { DESKTOP_GLASS_TOKEN_ALIASES } from '@agenthub/shared/designTokens';
 
 export type AgentHubColorScheme = 'light' | 'dark' | 'oled';
 export type AgentHubFontWeight = '400' | '500' | '600';
 
 const systemUiFont =
   '-apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif';
+
+// Desktop glass contract — derived from the cross-platform alias registry
+// (shared/src/designTokens.ts) so the registry is a real product consumer,
+// not a test-only file. RN has no CSS backdrop-filter; map blur/elev to the
+// nearest elevation proxies.
+const GLASS_ALIAS_TO_RN_PATH: Record<string, string> = {
+  '--td-glass-blur': 'shadow.lg',
+  '--td-glass-card': 'color.surface',
+  '--td-glass-elev': 'shadow.md',
+};
+
+const mobileGlassAliases = Object.fromEntries(
+  DESKTOP_GLASS_TOKEN_ALIASES.filter((token) => token.alias.startsWith('--td-glass-')).map(
+    (token) => [token.alias, GLASS_ALIAS_TO_RN_PATH[token.alias] ?? 'shadow.md'],
+  ),
+) as Record<string, string>;
 
 export interface AgentHubTextRole extends Pick<TextStyle, 'fontSize' | 'fontWeight' | 'includeFontPadding' | 'lineHeight'> {
   fontSize: number;
@@ -165,11 +182,8 @@ export const agentHubMobileTokenAliases = {
   '--td-shadow-lg': 'shadow.lg',
   '--td-shadow-panel': 'shadow.panel',
   '--td-shadow-hairline': 'shadow.hairline',
-  // Desktop glass contract (DESKTOP_GLASS_TOKEN_ALIASES).
-  // RN has no CSS backdrop-filter; map blur/elev to nearest elevation proxies.
-  '--td-glass-blur': 'shadow.lg',
-  '--td-glass-card': 'color.surface',
-  '--td-glass-elev': 'shadow.md',
+  // Desktop glass contract: derived from DESKTOP_GLASS_TOKEN_ALIASES above.
+  ...mobileGlassAliases,
 } as const;
 
 const semanticTypeRoles = {

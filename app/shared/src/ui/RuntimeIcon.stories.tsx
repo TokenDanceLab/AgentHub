@@ -95,7 +95,7 @@ const gridStyle: React.CSSProperties = {
 
 const itemStyle: React.CSSProperties = {
   alignItems: 'center',
-  border: '1px solid var(--td-line, #d8dee8)',
+  border: '1px solid var(--td-line)',
   borderRadius: 8,
   display: 'flex',
   gap: 10,
@@ -104,6 +104,6 @@ const itemStyle: React.CSSProperties = {
 };
 
 const labelStyle: React.CSSProperties = {
-  color: 'var(--td-ink, #172033)',
+  color: 'var(--td-ink)',
   font: '600 13px/1.3 system-ui, sans-serif',
 };
