@@ -1,0 +1,72 @@
+/* SelectionDeleteConfirm — destructive multi-delete confirm gate (#1823).
+   Fixed bar directly above the MultiSelectBar, same glass language. */
+
+.confirm {
+  position: fixed;
+  z-index: calc(var(--z-multi-select) + 1);
+  left: calc(var(--selectbar-left, 0px) + var(--selectbar-width, 100vw) / 2);
+  bottom: 74px;
+  transform: translateX(-50%);
+  min-height: 44px;
+  padding: 6px 8px 6px 12px;
+  border: 1px solid var(--glass-border-strong, var(--td-line-strong));
+  border-radius: var(--r-xl);
+  background: var(--glass-panel-overlay, var(--glass-panel));
+  box-shadow: var(--glass-elev-3, var(--td-shadow-lg));
+  backdrop-filter: var(--glass-backdrop-filter);
+  -webkit-backdrop-filter: var(--glass-backdrop-filter);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: min(calc(var(--selectbar-width, 100vw) - 44px), 980px);
+}
+
+.message {
+  flex: 0 1 auto;
+  min-width: 0;
+  color: var(--td-ink);
+  font: 600 0.8125rem var(--td-font);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.confirmBtn,
+.cancelBtn {
+  flex: 0 0 auto;
+  min-height: 30px;
+  padding: 0 var(--td-space-3);
+  border-radius: var(--td-radius-control);
+  font: 500 0.75rem var(--td-font);
+  cursor: pointer;
+  transition:
+    background var(--td-dur-fast, 120ms) var(--td-ease),
+    border-color var(--td-dur-fast, 120ms) var(--td-ease),
+    color var(--td-dur-fast, 120ms) var(--td-ease);
+}
+
+.confirmBtn:focus-visible,
+.cancelBtn:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.confirmBtn {
+  border: 1px solid var(--td-danger);
+  background: var(--td-danger);
+  color: var(--destructive-foreground);
+}
+
+.confirmBtn:hover {
+  filter: brightness(1.08);
+}
+
+.cancelBtn {
+  border: 1px solid var(--glass-border-strong, var(--td-line-strong));
+  background: transparent;
+  color: var(--td-ink);
+}
+
+.cancelBtn:hover {
+  background: var(--glass-bg-medium, var(--td-surface-3));
+}

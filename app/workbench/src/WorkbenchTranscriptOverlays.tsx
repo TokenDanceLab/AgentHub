@@ -3,11 +3,15 @@ import type { WorkbenchConversation } from '@shared/platform';
 import {
   ContextMenu,
   MultiSelectBar,
+  SelectionDeleteConfirm,
   DemoToast,
   type ContextMenuItem,
   type MultiSelectBarAction,
 } from './floating';
-import type { WorkbenchContextMenuState } from './useWorkbenchTranscriptChrome';
+import type {
+  DeleteConfirmRequest,
+  WorkbenchContextMenuState,
+} from './useWorkbenchTranscriptChrome';
 
 export interface WorkbenchTranscriptOverlaysProps {
   isChatPage: boolean;
@@ -25,6 +29,13 @@ export interface WorkbenchTranscriptOverlaysProps {
   selectedCount: number;
   totalCount: number;
   selectBarRect: { left: number; width: number } | null;
+  /** #1823: destructive multi-delete gate is pending (awaiting confirm).
+   *  Carries the count + blockIds snapshot the dialog promises to delete. */
+  deleteConfirmPending: DeleteConfirmRequest | null;
+  /** #1823: confirms the pending destructive multi-delete. */
+  onConfirmDelete: () => void;
+  /** #1823: dismisses the pending confirm without deleting. */
+  onCancelDelete: () => void;
   toastMessage: string;
   toastVisible: boolean;
 }
@@ -40,6 +51,9 @@ export function WorkbenchTranscriptOverlays({
   selectedCount,
   totalCount,
   selectBarRect,
+  deleteConfirmPending,
+  onConfirmDelete,
+  onCancelDelete,
   toastMessage,
   toastVisible,
 }: WorkbenchTranscriptOverlaysProps): React.ReactElement {
@@ -60,6 +74,15 @@ export function WorkbenchTranscriptOverlays({
           actions={multiSelectActions}
           count={selectedCount}
           total={totalCount}
+          workspaceLeft={selectBarRect?.left}
+          workspaceWidth={selectBarRect?.width}
+        />
+      )}
+      {isChatPage && selectionMode && deleteConfirmPending && (
+        <SelectionDeleteConfirm
+          count={deleteConfirmPending.count}
+          onConfirm={onConfirmDelete}
+          onCancel={onCancelDelete}
           workspaceLeft={selectBarRect?.left}
           workspaceWidth={selectBarRect?.width}
         />
