@@ -89,4 +89,35 @@ describe('GlobalSearchDialog', () => {
     fireEvent.click(screen.getByText('Auth bug triage'));
     expect(onSelect).toHaveBeenCalledWith('c1');
   });
+
+  it('caps the result list at 50 rows', () => {
+    const many = Array.from({ length: 55 }, (_, i) => ({
+      id: `c${i}`,
+      title: `Conversation ${i}`,
+      kind: 'direct' as const,
+      avatarLabel: 'A',
+    }));
+    render(
+      <GlobalSearchDialog open conversations={many} onClose={onClose} onSelect={onSelect} />,
+    );
+    expect(screen.getAllByText(/^Conversation \d+$/)).toHaveLength(50);
+  });
+
+  it('resets query and selection when reopened', () => {
+    const { rerender } = render(
+      <GlobalSearchDialog open conversations={conversations} onClose={onClose} onSelect={onSelect} />,
+    );
+    const input = screen.getByRole('searchbox');
+    fireEvent.change(input, { target: { value: 'deploy' } });
+    expect(screen.getByText('Deploy pipeline')).toBeInTheDocument();
+
+    rerender(
+      <GlobalSearchDialog open={false} conversations={conversations} onClose={onClose} onSelect={onSelect} />,
+    );
+    rerender(
+      <GlobalSearchDialog open conversations={conversations} onClose={onClose} onSelect={onSelect} />,
+    );
+    expect(screen.getByRole('searchbox')).toHaveValue('');
+    expect(screen.getByText('Auth bug triage')).toBeInTheDocument();
+  });
 });

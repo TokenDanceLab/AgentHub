@@ -5,19 +5,17 @@ import type { TranscriptBlock, TextTranscriptBlock } from '@shared/transcript';
 import { isSidebarOnlyTranscriptBlock, orderTranscriptBlocks } from '@shared/transcript';
 import type { ComposerIntent, ComposerMention } from '@shared/composer';
 import {
-  browserFilesToComposerAttachments,
   buildComposerIntent,
   captureComposerDraft,
   composerReducer,
   createInitialComposerState,
 } from '@shared/composer';
 import {
-  buildAttachmentOversizeToast,
-  partitionAttachmentsBySize,
-} from './unifiedComposerHelpers';
-import {
-  dispatchComposerAttachmentAdds,
-} from './unifiedComposerHostHelpers';
+  handleDocumentDragLeave,
+  handleDocumentDragOver,
+  handleDocumentDrop,
+  type ComposerDocumentFileDropCallbacks,
+} from './composerDocumentFileDrop';
 import {
   enqueuePendingIntent,
   MAX_PENDING_DISPATCH_RETRIES,
@@ -286,47 +284,23 @@ export const ConversationHost = React.memo(function ConversationHost({
      (events originating inside [data-composer-form] are skipped here). */
   const [filesDragging, setFilesDragging] = useState(false);
   useEffect(() => {
-    const isInsideComposer = (target: EventTarget | null): boolean =>
-      target instanceof HTMLElement && Boolean(target.closest('[data-composer-form]'));
-    function handleDocumentDragOver(event: DragEvent): void {
-      if (!event.dataTransfer?.types?.includes('Files')) return;
-      if (isInsideComposer(event.target)) {
-        setFilesDragging(false);
-        return;
-      }
-      event.preventDefault();
-      setFilesDragging(true);
-    }
-    function handleDocumentDragLeave(event: DragEvent): void {
-      if (
-        !(event.relatedTarget instanceof Node) ||
-        !document.body.contains(event.relatedTarget)
-      ) {
-        setFilesDragging(false);
-      }
-    }
-    function handleDocumentDrop(event: DragEvent): void {
-      setFilesDragging(false);
-      if (!event.dataTransfer?.types?.includes('Files')) return;
-      if (isInsideComposer(event.target)) return;
-      event.preventDefault();
-      const files = Array.from(event.dataTransfer.files);
-      if (files.length === 0) return;
-      const { accepted, rejected } = partitionAttachmentsBySize(files);
-      const oversizeToast = buildAttachmentOversizeToast(rejected);
-      if (oversizeToast) onToast(oversizeToast);
-      if (accepted.length === 0) return;
-      void browserFilesToComposerAttachments(accepted).then((attachments) => {
-        dispatchComposerAttachmentAdds(dispatchComposer, attachments);
-      });
-    }
-    document.addEventListener('dragover', handleDocumentDragOver);
-    document.addEventListener('dragleave', handleDocumentDragLeave);
-    document.addEventListener('drop', handleDocumentDrop);
+    // Routing decisions live in composerDocumentFileDrop (unit-tested);
+    // ConversationHost only owns listener registration + the dragging flag.
+    const callbacks: ComposerDocumentFileDropCallbacks = {
+      dispatchComposer,
+      onToast,
+      onDraggingChange: setFilesDragging,
+    };
+    const onDocumentDragOver = (event: DragEvent): void => handleDocumentDragOver(callbacks, event);
+    const onDocumentDragLeave = (event: DragEvent): void => handleDocumentDragLeave(callbacks, event);
+    const onDocumentDrop = (event: DragEvent): void => handleDocumentDrop(callbacks, event);
+    document.addEventListener('dragover', onDocumentDragOver);
+    document.addEventListener('dragleave', onDocumentDragLeave);
+    document.addEventListener('drop', onDocumentDrop);
     return () => {
-      document.removeEventListener('dragover', handleDocumentDragOver);
-      document.removeEventListener('dragleave', handleDocumentDragLeave);
-      document.removeEventListener('drop', handleDocumentDrop);
+      document.removeEventListener('dragover', onDocumentDragOver);
+      document.removeEventListener('dragleave', onDocumentDragLeave);
+      document.removeEventListener('drop', onDocumentDrop);
     };
   }, [dispatchComposer, onToast]);
 

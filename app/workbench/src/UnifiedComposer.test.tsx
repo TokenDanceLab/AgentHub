@@ -516,6 +516,72 @@ describe('UnifiedComposer draft persistence', () => {
       dispatchComposer.mock.calls.filter((c) => c[0].type === 'setText' || c[0].type === 'addMention'),
     ).toHaveLength(0);
   });
+
+  it('#1822: restores ref-bearing attachments, replyTo and quote from a persisted draft', () => {
+    const attachmentRef = {
+      id: 'att-1',
+      name: 'design.pdf',
+      size: 1024,
+      mime_type: 'application/pdf',
+      url: '/files/1',
+    };
+    saveDraft('hub-session-draft', {
+      text: 'quote reply',
+      mentions: [],
+      attachments: [
+        { id: 'a1', name: 'design.pdf', size: 1024, mime: 'application/pdf', attachmentRef },
+      ],
+      replyTo: { messageId: 'msg-1', author: 'Alice', preview: '答案在…' },
+      quote: { text: '引用的原句', author: 'Bob', messageId: 'msg-2' },
+    });
+    const dispatchComposer = vi.fn();
+    render(
+      <UnifiedComposer
+        composer={draftComposer}
+        dispatchComposer={dispatchComposer}
+        mentionableAgents={[]}
+        onSubmit={vi.fn()}
+      />,
+    );
+    expect(dispatchComposer).toHaveBeenCalledWith({ type: 'setText', text: 'quote reply' });
+    expect(dispatchComposer).toHaveBeenCalledWith({
+      type: 'setReplyTo',
+      replyTo: { messageId: 'msg-1', author: 'Alice', preview: '答案在…' },
+    });
+    expect(dispatchComposer).toHaveBeenCalledWith({
+      type: 'setQuote',
+      quote: { text: '引用的原句', author: 'Bob', messageId: 'msg-2' },
+    });
+    expect(dispatchComposer).toHaveBeenCalledWith({
+      type: 'addAttachment',
+      attachment: expect.objectContaining({
+        id: 'a1',
+        name: 'design.pdf',
+        attachmentRef,
+        source: 'browser',
+      }),
+    });
+  });
+
+  it('#1822: refuses a malformed persisted draft instead of restoring partial state', () => {
+    localStorage.setItem(
+      'agenthub.composer.draft.hub-session-draft',
+      JSON.stringify({ text: 'x', mentions: [], attachments: [{ id: 'a1', name: 'n' }] }),
+    );
+    const dispatchComposer = vi.fn();
+    render(
+      <UnifiedComposer
+        composer={draftComposer}
+        dispatchComposer={dispatchComposer}
+        mentionableAgents={[]}
+        onSubmit={vi.fn()}
+      />,
+    );
+    // Invalid attachment shape → whole draft rejected → nothing restored.
+    expect(dispatchComposer).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'setText' }));
+    expect(dispatchComposer).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'addAttachment' }));
+    expect(dispatchComposer).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'setReplyTo' }));
+  });
 });
 
 describe('UnifiedComposer auto-grow (#1822)', () => {
