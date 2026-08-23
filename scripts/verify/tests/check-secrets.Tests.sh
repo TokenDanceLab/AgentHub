@@ -1,10 +1,13 @@
 #!/usr/bin/env bash
 # Self-tests for check-secrets.sh — fail-closed secret guard contract.
 #
-# Positive: placeholder values, *.env.example files, and *_URL endpoint
-# assignments pass.
-# Negative: real AWS keys, GitHub tokens, private key blocks, and API keys
-# (sk-...) in staged diffs must ALL exit non-zero.
+# Positive: placeholder values, *.env.example files, *_URL endpoint
+# assignments, absolute path literals, and userinfo-less endpoint URL values
+# without query/fragment pass.
+# Negative: real AWS keys, GitHub tokens, private key blocks, API keys
+# (sk-), URL DSNs with userinfo (user:pass@), URLs carrying query-string
+# credentials (?access_token=…), and real password literals in staged diffs
+# must ALL exit non-zero.
 #
 # Runs in CI validate job alongside verify-vulnerability-gates.Tests.sh.
 set -uo pipefail
@@ -96,6 +99,52 @@ YAML
 git add api.yaml
 bash "$SCRIPT" --staged >/dev/null 2>&1
 check "sk- API key fails" yes $?
+
+echo "=== path-literal assignment passes ==="
+git reset --quiet
+cat > paths.yaml <<'YAML'
+TOKENDANCE_DATABASE_DSN=/var/lib/tokendance-id/tokendance.db
+TOKENDANCE_JWT_PRIVATE_KEY_PATH=/tmp/id-private.pem
+YAML
+git add paths.yaml
+bash "$SCRIPT" --staged >/dev/null 2>&1
+check "path-literal assignment passes" no $?
+
+echo "=== endpoint URL value assignment passes ==="
+git reset --quiet
+cat > issuer.yaml <<'YAML'
+TOKENDANCE_JWT_ISSUER=http://127.0.0.1:3000
+YAML
+git add issuer.yaml
+bash "$SCRIPT" --staged >/dev/null 2>&1
+check "endpoint URL value assignment passes" no $?
+
+echo "=== URL with query-string credential still fails ==="
+git reset --quiet
+cat > qs.yaml <<'YAML'
+SOME_TOKEN_ENDPOINT=https://auth.svc/cb?access_token=real-secret-value-123
+YAML
+git add qs.yaml
+bash "$SCRIPT" --staged >/dev/null 2>&1
+check "URL with query-string credential still fails" yes $?
+
+echo "=== URL DSN with userinfo still fails ==="
+git reset --quiet
+cat > dsn.yaml <<'YAML'
+AGENTHUB_TOKEN_DSN=postgres://agenthub:realpassword123@db.internal:5432/agenthub
+YAML
+git add dsn.yaml
+bash "$SCRIPT" --staged >/dev/null 2>&1
+check "URL DSN with userinfo still fails" yes $?
+
+echo "=== real password literal still fails ==="
+git reset --quiet
+cat > pw.yaml <<'YAML'
+AGENTHUB_DB_PASSWORD=b3-lane-dev-password
+YAML
+git add pw.yaml
+bash "$SCRIPT" --staged >/dev/null 2>&1
+check "real password literal still fails" yes $?
 
 echo ""
 echo "Results: $PASS passed, $FAIL failed"
