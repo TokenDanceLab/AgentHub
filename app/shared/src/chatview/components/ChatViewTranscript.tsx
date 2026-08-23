@@ -10,6 +10,7 @@ import { ExternalLink, Pin, X } from 'lucide-react'
 
 import { Transcript, type TranscriptHandle } from './Transcript'
 import { TypingIndicator } from './TypingIndicator'
+import { prefersReducedMotion } from '../design/motion'
 import { CHATVIEW_I18N_NAMESPACE } from '../i18n/resources'
 import { EmptyState } from '../../ui/EmptyState'
 import { Button } from '../../ui/Button'
@@ -275,7 +276,8 @@ export const ChatViewTranscript = memo(function ChatViewTranscript({ transcript,
       // Remove previous highlight if any
       clearHighlight()
 
-      el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      // #1825: smooth scroll only when the user has not opted out of motion.
+      el.scrollIntoView({ behavior: prefersReducedMotion() ? 'auto' : 'smooth', block: 'center' })
       el.classList.add('highlighted')
 
       if (timerRef.current) clearTimeout(timerRef.current)

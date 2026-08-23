@@ -95,10 +95,7 @@
 }
 
 /* ── Reduced motion (#12): stop streaming pulse loop ──────────────────
-   Note: README.md motion table classifies iconPulse as "informational
-   exempt", but that exemption relied on the never-imported global.css
-   kill-switch (dead code). Streaming state is also conveyed by the
-   status text, so the pulse can safely stop. */
+   State remains readable through the status text and a static icon. */
 @media (prefers-reduced-motion: reduce) {
   .iconPulse {
     animation: none;

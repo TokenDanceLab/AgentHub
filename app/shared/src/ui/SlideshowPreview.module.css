@@ -107,7 +107,7 @@
   aspect-ratio: 16 / 9;
   background: white;
   border-radius: var(--r-md, 8px);
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+  box-shadow: var(--glass-elev-1, var(--td-shadow-sm));
   padding: 32px;
   display: flex;
   flex-direction: column;
@@ -138,7 +138,7 @@
 
 .slideText:first-child {
   font-size: 1.125rem;
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .slideEmpty {
@@ -187,7 +187,7 @@
 }
 
 .thumbnailNumber {
-  font-weight: 700;
+  font-weight: 600;
   font-size: 0.75rem;
 }
 

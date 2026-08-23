@@ -221,7 +221,7 @@
 .fileIcon {
   width: 17px;
   height: 17px;
-  border-radius: 3px;
+  border-radius: var(--r-xs);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -393,13 +393,13 @@
 .markdownPreview h1 {
   margin: 0 0 var(--sp-10);
   color: var(--td-ink);
-  font: 700 1.125rem/1.2 var(--td-font);
+  font: 600 1.125rem/1.2 var(--td-font);
 }
 
 .markdownPreview h2 {
   margin: 13px 0 6px;
   color: var(--td-ink);
-  font: 650 0.9375rem/1.35 var(--td-font);
+  font: 600 0.9375rem/1.35 var(--td-font);
 }
 
 .markdownPreview p {

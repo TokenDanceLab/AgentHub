@@ -59,7 +59,7 @@
   padding: 1px 7px;
   border-radius: var(--r-full);
   font-size: var(--td-text-xs, 0.75rem);
-  font-weight: 700;
+  font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.04em;
   background: oklch(0 0 0 / 0.08);
