@@ -12,16 +12,16 @@
     "@agenthub/shared": {
       "dir": "app/shared",
       "coverage": {
-        "lines": 85.96,
-        "statements": 84.16,
-        "functions": 83.76,
-        "branches": 78.84
+        "lines": 84.68,
+        "statements": 82.96,
+        "functions": 81.30,
+        "branches": 79.96
       },
-      "uncoveredFiles": 25,
-      "coverageNote": "2026-08-23 remeasure (#1764 frontend test debt): master@a10cdf58 already advanced past the 2026-08-03 baseline (84.19 lines pre-change); this lane adds diff.ts parse/normalize/parseUnifiedDiff, composerReducer (mention/quote/attachment/draft-capture), agentActivity Hub WS lifecycle, hubClientEnvelope error fallbacks (+37 tests). Floors 60/60/60/60 (all dims above 60).",
+      "uncoveredFiles": 32,
+      "coverageNote": "2026-08-23 remeasure (#1764 frontend test debt): master@a10cdf58 already advanced past the 2026-08-03 baseline (84.19 lines pre-change); this lane adds diff.ts parse/normalize/parseUnifiedDiff, composerReducer (mention/quote/attachment/draft-capture), agentActivity Hub WS lifecycle, hubClientEnvelope error fallbacks (+37 tests). Floors 60/60/60/60 (all dims above 60). 2026-08-23 branch sync (#1820, 显式重基线）：067dd739 删除 21 个孤儿组件及其测试——被删代码此前在分母内计覆盖率，lines 85.96→84.68 / stmts 84.16→82.96 / fns 83.76→81.30 为合法降线（br 78.84→79.96 反升）；tests 2519→2431（-88）。uncovered 25→32 增量为 *.stories.tsx storybook 渲染夹具（vitest 不执行、恒 0%，随 #1820 剩余 16 组件 stories + #1827 表单族 stories 新增），非新增未测业务代码；后续可选：#1535 include 合同把 *.stories.tsx 归为非生产。Floors 60/60/60/60 不变。",
       "tests": {
-        "total": 2519,
-        "passed": 2519,
+        "total": 2431,
+        "passed": 2431,
         "failed": 0,
         "skipped": 0
       }

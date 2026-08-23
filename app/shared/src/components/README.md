@@ -80,7 +80,7 @@ Tier follows a two-tier reduced-motion principle: maintainer opts into reduced-m
 }
 ```
 
-There is **no global reduced-motion reset**: `chatview/design/global.css` is an unwired/dead file (its kill-switch never reaches the app). The real mechanism is per-component blocks — each component owns its own `prefers-reduced-motion` gate (see `RowItem.css`, `AgentStreamingBar.module.css`, `tokens-base.css` `.ah-glass-press`, `Card.module.css`, `Modal.module.css`, …). When adding motion, add its gate in the same file. Transition property lists are the mechanism for chrome feedback (e.g. `--motion-hover/press/panel` recipes); under `reduce` those components override `transition: none` or `transition-duration: 0ms`.
+There is **no global reduced-motion reset**: `chatview/design/global.css` is an unwired/dead file (its kill-switch never reaches the app). The real mechanism is per-component blocks — each component owns its own `prefers-reduced-motion` gate (see `RowItem.css`, `AgentStreamingBar.module.css`, `tokens-base.css` `.ah-glass-press`, `Modal.module.css`, …). When adding motion, add its gate in the same file. Transition property lists are the mechanism for chrome feedback (e.g. `--motion-hover/press/panel` recipes); under `reduce` those components override `transition: none` or `transition-duration: 0ms`.
 
 > Rule of thumb: **If the user didn't ask for it and it moves, it's decorative.** Loading spinners, search highlights, and running-state indicators are informational because they communicate system state the user is waiting for — keep their static form visible when the loop stops.
 

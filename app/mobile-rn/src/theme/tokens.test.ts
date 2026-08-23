@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DESKTOP_GLASS_TOKEN_ALIASES } from '../../../shared/src/designTokens';
+import { DESKTOP_GLASS_TOKEN_ALIASES } from '@agenthub/shared/designTokens';
 
 import { agentHubMobileTokenAliases, agentHubThemes, getAgentHubTheme } from './tokens';
 

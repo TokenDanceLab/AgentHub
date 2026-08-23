@@ -1,22 +1,53 @@
 import { useState, useRef, useCallback, useEffect, useId, type KeyboardEvent } from 'react';
 import { createPortal } from 'react-dom';
 import { useExiting } from './useExiting';
+import { cx } from './cx';
 import styles from './Select.module.css';
+
+/** Option tuple: [value, label, disabled?] — the 2-tuple form stays valid (#1827). */
+export type SelectOption = [value: string, label: string, disabled?: boolean];
 
 export interface SelectProps {
   value: string;
-  options: Array<[string, string]>;
+  options: SelectOption[];
   onChange: (value: string) => void;
   placeholder?: string;
   className?: string;
   ariaLabel?: string;
+  /** Unified error state (semantic + visual): aria-invalid + --td-danger ring on the trigger. */
+  invalid?: boolean;
 }
 
-export function Select({ value, options, onChange, placeholder, className, ariaLabel }: SelectProps) {
+/** First enabled index at or after `from`, wrapping; -1 when none are enabled. */
+function nextEnabled(options: SelectOption[], from: number, dir: 1 | -1): number {
+  const len = options.length;
+  if (len === 0) return -1;
+  let i = from;
+  for (let n = 0; n < len; n++) {
+    i = (i + dir + len) % len;
+    if (!options[i]?.[2]) return i;
+  }
+  return -1;
+}
+
+function clampToEnabled(options: SelectOption[], idx: number): number {
+  if (!options[idx]?.[2]) return idx;
+  const next = nextEnabled(options, idx, 1);
+  return next >= 0 ? next : idx;
+}
+
+interface AnchorRect {
+  left: number;
+  top: number;
+  bottom: number;
+  width: number;
+}
+
+export function Select({ value, options, onChange, placeholder, className, ariaLabel, invalid = false }: SelectProps) {
   const [open, setOpen] = useState(false);
   const [focusIdx, setFocusIdx] = useState(0);
   const [position, setPosition] = useState<'down' | 'up'>('down');
-  const [triggerWidth, setTriggerWidth] = useState(158);
+  const [anchor, setAnchor] = useState<AnchorRect | null>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const mountedRef = useRef(false);
@@ -39,6 +70,25 @@ export function Select({ value, options, onChange, placeholder, className, ariaL
     setFocusIdx(0);
   }, []);
 
+  // Measure the trigger and decide flip-up/down (#1827: recomputed on open
+  // AND on window resize — a resized viewport must not leave the anchor stale).
+  const recomputeAnchor = useCallback(() => {
+    if (!triggerRef.current) return;
+    const rect = triggerRef.current.getBoundingClientRect();
+    setAnchor({ left: rect.left, top: rect.top, bottom: rect.bottom, width: rect.width });
+    const spaceBelow = window.innerHeight - rect.bottom;
+    // Estimate panel height ~ 40px * min(6, options.length) + 16px padding
+    const approxPanelH = Math.min(6, options.length) * 40 + 16;
+    setPosition(spaceBelow < approxPanelH + 8 ? 'up' : 'down');
+  }, [options.length]);
+
+  useEffect(() => {
+    if (!open) return;
+    recomputeAnchor();
+    window.addEventListener('resize', recomputeAnchor);
+    return () => window.removeEventListener('resize', recomputeAnchor);
+  }, [open, recomputeAnchor]);
+
   // Click outside
   useEffect(() => {
     if (!open) return;
@@ -54,22 +104,11 @@ export function Select({ value, options, onChange, placeholder, className, ariaL
     return () => document.removeEventListener('mousedown', handler, true);
   }, [open, close]);
 
-  // Position: flip up if near bottom
-  useEffect(() => {
-    if (!open || !triggerRef.current) return;
-    const anchorRect = triggerRef.current.getBoundingClientRect();
-    setTriggerWidth(anchorRect.width);
-    const spaceBelow = window.innerHeight - anchorRect.bottom;
-    // Estimate panel height ~ 40px * min(6, options.length) + 16px padding
-    const approxPanelH = Math.min(6, options.length) * 40 + 16;
-    setPosition(spaceBelow < approxPanelH + 8 ? 'up' : 'down');
-  }, [open, options.length]);
-
-  // Focus selected on open
+  // Focus selected on open (skipping disabled options)
   useEffect(() => {
     if (!open) return;
     const idx = options.findIndex(([v]) => v === value);
-    setFocusIdx(idx >= 0 ? idx : 0);
+    setFocusIdx(clampToEnabled(options, idx >= 0 ? idx : 0));
   }, [open, value, options]);
 
   // Restore focus on close
@@ -82,28 +121,41 @@ export function Select({ value, options, onChange, placeholder, className, ariaL
 
   const handleKey = (e: KeyboardEvent) => {
     switch (e.key) {
-      case 'ArrowDown':
+      case 'ArrowDown': {
         e.preventDefault();
-        setFocusIdx((i) => (i + 1) % options.length);
+        const next = nextEnabled(options, focusIdx, 1);
+        if (next >= 0) setFocusIdx(next);
         break;
-      case 'ArrowUp':
+      }
+      case 'ArrowUp': {
         e.preventDefault();
-        setFocusIdx((i) => (i - 1 + options.length) % options.length);
+        const prev = nextEnabled(options, focusIdx, -1);
+        if (prev >= 0) setFocusIdx(prev);
         break;
+      }
       case 'Home':
         e.preventDefault();
-        if (open) setFocusIdx(0);
+        if (open) {
+          const first = nextEnabled(options, -1, 1);
+          if (first >= 0) setFocusIdx(first);
+        }
         break;
       case 'End':
         e.preventDefault();
-        if (open) setFocusIdx(options.length - 1);
+        if (open) {
+          const last = nextEnabled(options, options.length, -1);
+          if (last >= 0) setFocusIdx(last);
+        }
         break;
       case 'Enter':
       case ' ':
         e.preventDefault();
-        if (open && options[focusIdx]) {
-          onChange(options[focusIdx][0]);
-          close();
+        if (open) {
+          const current = options[focusIdx];
+          if (current && !current[2]) {
+            onChange(current[0]);
+            close();
+          }
         } else {
           setOpen(true);
         }
@@ -113,8 +165,8 @@ export function Select({ value, options, onChange, placeholder, className, ariaL
         close();
         break;
       default:
-        // Typeahead: consecutive printable characters jump to the first option
-        // whose label contains the accumulated string (resets after 500ms).
+        // Typeahead: consecutive printable characters jump to the first enabled
+        // option whose label contains the accumulated string (resets after 500ms).
         if (open && e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
           e.preventDefault();
           const typeahead = typeaheadRef.current;
@@ -125,16 +177,14 @@ export function Select({ value, options, onChange, placeholder, className, ariaL
             typeahead.timer = null;
           }, 500);
           const needle = typeahead.chars.toLowerCase();
-          const matchIdx = options.findIndex(([, label]) =>
-            label.toLowerCase().includes(needle),
-          );
+          const matchIdx = options.findIndex(([, label], i) => !options[i]?.[2] && label.toLowerCase().includes(needle));
           if (matchIdx >= 0) setFocusIdx(matchIdx);
         }
         break;
     }
   };
 
-  const triggerClass = [styles.trigger, className].filter(Boolean).join(' ');
+  const triggerClass = cx(styles.trigger, invalid && styles.triggerInvalid, className);
 
   return (
     <span className={styles.container}>
@@ -147,9 +197,10 @@ export function Select({ value, options, onChange, placeholder, className, ariaL
         aria-haspopup="listbox"
         aria-expanded={open}
         aria-label={ariaLabel}
+        {...(invalid ? { 'aria-invalid': true } : {})}
       >
         <span className={selectedLabel ? styles.label : styles.placeholder}>
-          {selectedLabel || placeholder || ' '}
+          {selectedLabel || placeholder || ' '}
         </span>
         <svg
           className={`${styles.chevron} ${open ? styles.chevronOpen : ''}`}
@@ -172,34 +223,37 @@ export function Select({ value, options, onChange, placeholder, className, ariaL
             aria-activedescendant={optionId(focusIdx)}
             onKeyDown={handleKey}
             style={
-              triggerRef.current
+              anchor
                 ? {
                     position: 'absolute',
-                    left: triggerRef.current.getBoundingClientRect().left,
-                    minWidth: triggerWidth,
-                    width: triggerWidth,
+                    left: anchor.left,
+                    minWidth: anchor.width,
+                    width: anchor.width,
                     [position === 'up' ? 'bottom' : 'top']:
                       position === 'up'
-                        ? window.innerHeight - triggerRef.current.getBoundingClientRect().top + 6
-                        : triggerRef.current.getBoundingClientRect().bottom + 6,
+                        ? window.innerHeight - anchor.top + 6
+                        : anchor.bottom + 6,
                   }
                 : undefined
             }
           >
-            {options.map(([optValue, label], idx) => (
+            {options.map(([optValue, label, disabled], idx) => (
               <button
                 key={optValue}
                 id={optionId(idx)}
                 type="button"
                 tabIndex={-1}
-                className={`${styles.option} ${optValue === value ? styles.optionSelected : ''} ${idx === focusIdx ? styles.optionFocused : ''}`}
+                aria-disabled={disabled || undefined}
+                disabled={disabled}
+                className={`${styles.option} ${optValue === value ? styles.optionSelected : ''} ${idx === focusIdx ? styles.optionFocused : ''} ${disabled ? styles.optionDisabled : ''}`}
                 role="option"
                 aria-selected={optValue === value}
                 onClick={() => {
+                  if (disabled) return;
                   onChange(optValue);
                   close();
                 }}
-                onMouseEnter={() => setFocusIdx(idx)}
+                onMouseEnter={() => !disabled && setFocusIdx(idx)}
               >
                 <span className={styles.optionLabel}>{label}</span>
                 {optValue === value && (

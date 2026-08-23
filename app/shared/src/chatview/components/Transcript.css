@@ -28,7 +28,7 @@
   opacity: 1;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.18);
   color: var(--td-ink);
-  border-color: var(--td-line-strong, var(--td-line));
+  border-color: var(--td-line-strong);
 }
 .scroll-to-bottom-btn:active {
   transform: scale(0.95);
@@ -142,12 +142,12 @@
   color:var(--td-ink);
   box-shadow:0 4px 14px rgba(18, 18, 32, 0.045);
   pointer-events:auto;
-  transition:border-color var(--chat-dur, 160ms) var(--td-ease), box-shadow var(--td-dur-slow, 400ms) var(--td-ease);
+  transition:border-color var(--chat-dur, 160ms) var(--td-ease), box-shadow var(--td-dur-slow) var(--td-ease);
 }
 
 .chatview-pinned-banner:hover {
   border-color:var(--td-line-strong);
-  box-shadow:var(--td-shadow-md, var(--td-shadow-sm));
+  box-shadow:var(--td-shadow-md);
 }
 
 .chatview-pinned-mark {

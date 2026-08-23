@@ -11,6 +11,7 @@ import {
   type DesignNavIconName,
 } from '../../designIcons';
 import { getWorkbenchDataModeContract } from '@shared/demo';
+import { Switch } from '@shared/ui';
 import styles from '../SettingsPage.module.css';
 import { useTranslation } from 'react-i18next';
 import { CHATVIEW_I18N_NAMESPACE } from '@shared/chatview/i18n/resources';
@@ -169,20 +170,13 @@ interface SettingSwitchProps {
   disabled?: boolean;
 }
 
+/**
+ * Settings switch — thin alias over the shared design-system Switch
+ * (#1827): the hand-rolled 42x24 pill moved to shared/src/ui/Switch with
+ * token-identical visuals + a missing ':focus-visible' ring.
+ */
 export function SettingSwitch({ active, onChange, disabled = false }: SettingSwitchProps): React.ReactElement {
-  return (
-    <button
-      aria-checked={active}
-      aria-disabled={disabled || undefined}
-      className={`${styles.switch}${active ? ` ${styles.switchOn}` : ''}${disabled ? ` ${styles.switchDisabled}` : ''}`}
-      disabled={disabled}
-      role="switch"
-      type="button"
-      onClick={() => onChange(!active)}
-    >
-      <span className={styles.switchThumb} />
-    </button>
-  );
+  return <Switch checked={active} onChange={onChange} disabled={disabled} />;
 }
 
 /* ── Value button ── */

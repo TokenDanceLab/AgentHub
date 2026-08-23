@@ -1,0 +1,60 @@
+.root {
+  box-sizing: border-box;
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  width: 42px;
+  height: 24px;
+  padding: var(--sp-2);
+  border: 1px solid var(--td-line);
+  border-radius: var(--r-full);
+  background: var(--td-surface-3);
+  cursor: pointer;
+  transition:
+    background var(--td-dur-normal) var(--td-ease),
+    border-color var(--td-dur-normal) var(--td-ease),
+    box-shadow var(--td-dur-normal) var(--td-ease);
+}
+
+.thumb {
+  display: block;
+  width: 18px;
+  height: 18px;
+  border-radius: var(--r-full);
+  background: var(--td-surface);
+  box-shadow: var(--td-shadow-sm);
+  transition: transform var(--dur-medium) var(--td-ease);
+}
+
+.root:hover {
+  box-shadow: var(--td-shadow-sm);
+}
+
+.root:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.on {
+  background: var(--td-plum);
+  border-color: var(--td-plum);
+}
+
+.on .thumb {
+  transform: translateX(18px);
+}
+
+/* Disabled keeps the current state visible but ignores interaction (#1818). */
+.disabled,
+.disabled:hover {
+  opacity: 0.55;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .root,
+  .thumb {
+    transition: none;
+  }
+}

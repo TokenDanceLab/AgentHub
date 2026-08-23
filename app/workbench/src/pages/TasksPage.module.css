@@ -190,7 +190,7 @@
 .headTitleRow {
   display: flex;
   align-items: center;
-  gap: var(--td-space-2, 8px);
+  gap: var(--td-space-2);
 }
 
 .headTitle {

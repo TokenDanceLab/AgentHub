@@ -135,7 +135,6 @@
   "action.discard": "Discard",
   "action.approve": "Approve",
   "action.reject": "Reject",
-
   "auth.title": "AgentHub",
   "auth.tagline": "Run AI coding agents locally",
   "auth.advancedSettings": "Advanced settings",
@@ -143,6 +142,14 @@
   "auth.hubConnected": "Hub reachable",
   "auth.hubDisconnected": "Hub not reachable",
   "auth.hubChecking": "Checking connection...",
+  "auth.preset.label": "Theme preset",
+  "auth.preset.default": "Default",
+  "auth.preset.classic-blue": "Classic Blue",
+  "auth.preset.claude-warm": "Claude Warm",
+  "auth.preset.chatgpt-minimal": "ChatGPT Minimal",
+  "auth.preset.deepseek-tech": "DeepSeek Tech",
+  "auth.preset.one-dark-pro": "One Dark Pro",
+  "auth.preset.dracula": "Dracula",
   "auth.tokenDancePrimary": "Recommended for Hub sync, devices, agent permissions, and future cross-device identity.",
   "auth.tokenDanceLogin": "Continue with TokenDance ID",
   "auth.tokenDanceCallbackPending": "Opening TokenDance ID sign-in. Complete authorization there to return to AgentHub.",
@@ -155,7 +162,6 @@
   "webChat.signInRequired": "Sign in is required to use web chat",
   "webChat.deviceKicked": "This device session was signed out by the Hub (it may have been replaced by another login). Please sign in again.",
   "webChat.deviceKicked.signIn": "Sign in",
-
   "diff.empty.title": "No changes to display",
   "diff.empty.description": "Diff output will appear here after the run reports changed files.",
   "diff.changedFiles_one": "{{count}} changed file",
@@ -242,12 +248,10 @@
   "teamRun.event.approvalDecided": "Approval decided",
   "teamRun.event.conflictResolved": "Conflict resolved",
   "teamRun.event.unknown": "Event",
-
   "code.copy": "Copy code",
   "code.copied": "Copied",
   "prompt.agentSuggestions": "Agent suggestions",
   "prompt.routeAuto": "Auto",
-
   "notification.bell": "Notifications",
   "notification.bellUnread": "Notifications ({{count}} unread)",
   "notification.panel": "Notifications panel",
@@ -260,13 +264,11 @@
   "notification.type.agentTask": "Agent task",
   "notification.type.message": "Message",
   "notification.type.system": "System",
-
   "time.justNow": "just now",
   "time.minutesAgo": "{{count}}m ago",
   "time.hoursAgo": "{{count}}h ago",
   "time.daysAgo": "{{count}}d ago",
   "time.yesterday": "Yesterday",
-
   "chat.action.copy": "Copy",
   "chat.action.copied": "Copied",
   "chat.action.retry": "Retry",
@@ -300,7 +302,6 @@
   "chat.retry": "Retry",
   "toast.copied": "Copied to clipboard",
   "toast.error": "Copy failed",
-
   "welcome.title": "Welcome",
   "welcome.eyebrow": "GET STARTED",
   "welcome.headline": "AgentHub",
@@ -334,11 +335,9 @@
   "welcome.tokendance": "TokenDance ID",
   "welcome.approvalAsk": "Ask when needed",
   "welcome.suggestionsLabel": "Try these prompts",
-
   "agent.status.available": "Available",
   "agent.status.unavailable": "Unavailable",
   "agent.status.configuring": "Configuring",
-
   "im.contact.empty": "No conversations yet",
   "im.contact.emptyDescription": "Hub contacts and agent sessions will appear here after sign-in or sync.",
   "im.contact.search": "Search conversations...",
@@ -366,17 +365,14 @@
   "im.message.emptyDescription": "Start a Hub conversation to begin.",
   "im.search": "Search conversations...",
   "im.searchClear": "Clear search",
-
   "diff.actions.diffApplied": "Applied",
   "diff.actions.applyDiff": "Apply diff",
-
   "error.network": "Network error",
   "error.auth": "Authentication error",
   "error.agent": "Agent error",
   "error.runtime": "Runtime error",
   "error.unknown": "Unknown error",
   "error.retry": "Retry",
-
   "errorBoundary.chunkLoadDesc": "A new version of the app is available. Please reload to continue.",
   "errorBoundary.chunkLoadTitle": "Update Required",
   "errorBoundary.desc": "An unexpected error occurred while rendering this section.",
