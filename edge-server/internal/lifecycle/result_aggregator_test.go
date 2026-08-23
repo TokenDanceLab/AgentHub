@@ -362,3 +362,32 @@ func TestResultAggregator_NoChildrenNoEvent(t *testing.T) {
 	case <-time.After(100 * time.Millisecond):
 	}
 }
+
+func TestResultAggregator_RecordSubAgentSpawnKeyDomain(t *testing.T) {
+	bus := newTestBus(t)
+	reg := agents.NewRegistry()
+
+	// Parent agent instance ID differs from its run ID, mirroring production
+	// where the orchestrator parent run ID != parent agent instance ID.
+	_ = reg.Register(&agents.AgentInstance{
+		ID:        "parent-agent-id",
+		AdapterID: "orchestrator",
+		Status:    agents.StatusBusy,
+	})
+	reg.SetRunID("parent-agent-id", "parent-run-id")
+
+	collector := NewSubAgentResultCollector(time.Minute)
+	ra := NewResultAggregator(bus, reg).WithCollector(collector)
+
+	ra.RecordSubAgentSpawn("parent-run-id")
+
+	// The collector key must be the parent RUN ID (the same domain used by
+	// StoreSubAgentResult / checkAllChildrenComplete), not the parent agent
+	// instance ID.
+	if _, ok := collector.firstSpawn["parent-run-id"]; !ok {
+		t.Fatal("RecordSubAgentSpawn did not record under parent run ID")
+	}
+	if _, ok := collector.firstSpawn["parent-agent-id"]; ok {
+		t.Fatal("RecordSubAgentSpawn recorded under parent agent instance ID, want parent run ID")
+	}
+}
