@@ -7,6 +7,22 @@ export type AgentHubFontWeight = '400' | '500' | '600';
 const systemUiFont =
   '-apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif';
 
+/**
+ * RN ↔ themes.css 对齐登记表（#1820）
+ *
+ * RN 无 CSS 变量可引用，本文件每个色值都绑定到 shared SSOT
+ * `app/shared/src/styles/themes.css` 的语义槽位（--td-* 契约 + 扩展斜坡）。
+ * 对齐规则：
+ *  - 纯色槽位：值与 themes.css 解析值逐字一致（hex 及以上同源）。
+ *  - 平台代理（登记为 intentional delta，不得擅自改动）：
+ *      · surface/surfaceStrong/panel：基色取自 CSS 对应台阶，alpha 为 RN 玻璃
+ *        代理（原生无 backdrop-filter，半透明叠底模拟 frost）。
+ *      · oled：RN-only 子方案（无 CSS 对应主题），色相/状态色沿用 dark 语义，
+ *        表面色为 OLED 省电调优（黑场）。
+ *      · scrim：mobile-only 遮蔽（themes.css 无 --td-scrim 槽位）。
+ *      · shadow：RN 原生阴影 API 代理 CSS --e-1/e-2/e-3（--td-shadow-*），
+ *        shadowColor 对齐其 rgba 基色 #000000，opacity/radius/offset 为原生调优。
+ */
 // Desktop glass contract — derived from the cross-platform alias registry
 // (shared/src/designTokens.ts) so the registry is a real product consumer,
 // not a test-only file. RN has no CSS backdrop-filter; map blur/elev to the
@@ -203,27 +219,27 @@ export const agentHubThemes = {
   dark: {
     scheme: 'dark',
     color: {
-      canvas: '#1f1f27',
-      surface: 'rgba(37, 37, 45, 0.92)',
-      surfaceStrong: 'rgba(42, 42, 52, 0.96)',
-      panel: 'rgba(31, 31, 39, 0.96)',
-      tint: 'rgba(41, 171, 226, 0.14)',
-      ink: '#e3e4e6',
-      inkMuted: '#a0a1aa',
-      inkSubtle: '#8a8d98',
-      line: 'rgba(255, 255, 255, 0.075)',
-      focus: 'rgba(41, 171, 226, 0.42)',
-      accent: '#29ABE2',
-      accentSoft: 'rgba(41, 171, 226, 0.18)',
-      moss: '#69c967',
-      mossSoft: 'rgba(105, 201, 103, 0.14)',
-      warning: '#d4aa4c',
-      warningSoft: 'rgba(212, 170, 76, 0.14)',
-      danger: '#ff7e78',
-      dangerSoft: 'rgba(255, 126, 120, 0.14)',
-      onAccent: '#ffffff',
-      onDanger: '#ffffff',
-      scrim: 'rgba(0, 0, 0, 0.48)',
+      canvas: '#1a1a20', // themes.css dark --app-bg（--td-canvas）
+      surface: 'rgba(36, 36, 45, 0.92)', // --td-surface → --surface #24242d + RN 玻璃代理 alpha
+      surfaceStrong: 'rgba(40, 40, 48, 0.96)', // --td-surface-2 → --surface-low #282830 + alpha
+      panel: 'rgba(46, 46, 56, 0.96)', // --td-panel → --surface-high #2e2e38 + alpha
+      tint: 'rgba(41, 171, 226, 0.08)', // --primary-light
+      ink: '#e3e4e6', // --text-1（--td-ink）
+      inkMuted: '#9a9aa4', // --text-2（--td-ink-muted）
+      inkSubtle: '#83838d', // --text-3（--td-ink-subtle）
+      line: 'rgba(255, 255, 255, 0.06)', // --bdr（--td-line）
+      focus: 'rgba(41, 171, 226, 0.6)', // --ring（--td-brand-ring / --td-focus）
+      accent: '#29ABE2', // --primary（--td-plum）
+      accentSoft: 'rgba(41, 171, 226, 0.14)', // --primary-soft（--td-brand-soft）
+      moss: '#69c967', // --success（--td-moss）
+      mossSoft: 'rgba(105, 201, 103, 0.08)', // --success-bg
+      warning: '#d4aa4c', // --warning（--td-warning）
+      warningSoft: 'rgba(212, 170, 76, 0.08)', // --warning-bg
+      danger: '#e87070', // --danger（--td-danger）
+      dangerSoft: 'rgba(232, 112, 112, 0.06)', // --danger-bg
+      onAccent: '#f4f5ff', // --primary-foreground（--td-ink-on-plum）
+      onDanger: '#ffffff', // --destructive-foreground
+      scrim: 'rgba(0, 0, 0, 0.48)', // 登记：mobile-only 遮蔽（CSS 无 --td-scrim）
     },
     radius: { control: 8, panel: 10, sheet: 14 },
     space: { xs: 4, sm: 8, md: 12, lg: 16, xl: 24, xxl: 32, xxxl: 40, xxxxl: 48 },
@@ -240,37 +256,38 @@ export const agentHubThemes = {
     },
     touch: { minimum: 44, primary: 48 },
     shadow: {
+      // shadowColor 对齐 --e-* rgba(0,0,0,…) 基色（#000000）；opacity/radius/offset 为原生调优代理。
       sm: { shadowColor: '#000000', shadowOpacity: 0.16, shadowRadius: 2, shadowOffset: { width: 0, height: 1 }, elevation: 1 },
       md: { shadowColor: '#000000', shadowOpacity: 0.2, shadowRadius: 24, shadowOffset: { width: 0, height: 8 }, elevation: 4 },
       lg: { shadowColor: '#000000', shadowOpacity: 0.24, shadowRadius: 48, shadowOffset: { width: 0, height: 18 }, elevation: 8 },
       panel: { shadowColor: '#000000', shadowOpacity: 0.24, shadowRadius: 48, shadowOffset: { width: 0, height: 18 }, elevation: 8 },
-      hairline: { borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.075)' },
+      hairline: { borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.06)' }, // --bdr（--td-line）
     },
   },
   light: {
     scheme: 'light',
     color: {
-      canvas: '#f7f8fa',
-      surface: 'rgba(255, 255, 255, 0.92)',
-      surfaceStrong: '#ffffff',
-      panel: 'rgba(255, 255, 255, 0.96)',
-      tint: 'rgba(0, 113, 188, 0.08)',
-      ink: '#171720',
-      inkMuted: '#525463',
-      inkSubtle: '#6b6e78',
-      line: 'rgba(15, 23, 42, 0.1)',
-      focus: 'rgba(0, 113, 188, 0.32)',
-      accent: '#0071BC',
-      accentSoft: 'rgba(0, 113, 188, 0.12)',
-      moss: '#2f855a',
-      mossSoft: 'rgba(47, 133, 90, 0.12)',
-      warning: '#b7791f',
-      warningSoft: 'rgba(183, 121, 31, 0.08)',
-      danger: '#d92d30',
-      dangerSoft: 'rgba(217, 45, 48, 0.09)',
-      onAccent: '#ffffff',
-      onDanger: '#ffffff',
-      scrim: 'rgba(15, 23, 42, 0.36)',
+      canvas: '#f8f9fb', // themes.css light --app-bg（--td-canvas）
+      surface: 'rgba(255, 255, 255, 0.92)', // --td-surface → --surface #ffffff + RN 玻璃代理 alpha
+      surfaceStrong: '#ffffff', // 登记：RN 折叠表面台阶，取最强可用 = --surface
+      panel: 'rgba(241, 243, 245, 0.96)', // --td-panel → --surface-high #f1f3f5 + alpha
+      tint: 'rgba(0, 113, 188, 0.06)', // --primary-light
+      ink: '#1a1a2e', // --text-1（--td-ink）
+      inkMuted: '#585870', // --text-2（--td-ink-muted）
+      inkSubtle: '#6a6a7c', // --text-3（--td-ink-subtle）
+      line: 'rgba(0, 0, 0, 0.045)', // --bdr（--td-line）
+      focus: 'rgba(0, 113, 188, 0.8)', // --ring（--td-brand-ring / --td-focus）
+      accent: '#0071BC', // --primary（--td-plum）
+      accentSoft: 'rgba(0, 113, 188, 0.11)', // --primary-soft（--td-brand-soft）
+      moss: '#2d7a4f', // --success（--td-moss）
+      mossSoft: 'rgba(45, 122, 79, 0.08)', // --success-bg
+      warning: '#8a5a1a', // --warning（--td-warning）
+      warningSoft: 'rgba(138, 90, 26, 0.08)', // --warning-bg
+      danger: '#b03c3c', // --danger（--td-danger）
+      dangerSoft: 'rgba(176, 60, 60, 0.06)', // --danger-bg
+      onAccent: '#ffffff', // --primary-foreground（--td-ink-on-plum）
+      onDanger: '#ffffff', // --destructive-foreground
+      scrim: 'rgba(15, 23, 42, 0.36)', // 登记：mobile-only 遮蔽（CSS 无 --td-scrim）
     },
     radius: { control: 8, panel: 10, sheet: 14 },
     space: { xs: 4, sm: 8, md: 12, lg: 16, xl: 24, xxl: 32, xxxl: 40, xxxxl: 48 },
@@ -287,37 +304,38 @@ export const agentHubThemes = {
     },
     touch: { minimum: 44, primary: 48 },
     shadow: {
-      sm: { shadowColor: '#0f172a', shadowOpacity: 0.05, shadowRadius: 2, shadowOffset: { width: 0, height: 1 }, elevation: 1 },
-      md: { shadowColor: '#0f172a', shadowOpacity: 0.08, shadowRadius: 24, shadowOffset: { width: 0, height: 8 }, elevation: 3 },
-      lg: { shadowColor: '#0f172a', shadowOpacity: 0.1, shadowRadius: 42, shadowOffset: { width: 0, height: 18 }, elevation: 6 },
-      panel: { shadowColor: '#0f172a', shadowOpacity: 0.1, shadowRadius: 42, shadowOffset: { width: 0, height: 18 }, elevation: 6 },
-      hairline: { borderWidth: 1, borderColor: 'rgba(15, 23, 42, 0.1)' },
+      // shadowColor 对齐 --e-* rgba(0,0,0,…) 基色（#000000）；opacity/radius/offset 为原生调优代理。
+      sm: { shadowColor: '#000000', shadowOpacity: 0.05, shadowRadius: 2, shadowOffset: { width: 0, height: 1 }, elevation: 1 },
+      md: { shadowColor: '#000000', shadowOpacity: 0.08, shadowRadius: 24, shadowOffset: { width: 0, height: 8 }, elevation: 3 },
+      lg: { shadowColor: '#000000', shadowOpacity: 0.1, shadowRadius: 42, shadowOffset: { width: 0, height: 18 }, elevation: 6 },
+      panel: { shadowColor: '#000000', shadowOpacity: 0.1, shadowRadius: 42, shadowOffset: { width: 0, height: 18 }, elevation: 6 },
+      hairline: { borderWidth: 1, borderColor: 'rgba(0, 0, 0, 0.045)' }, // --bdr（--td-line）
     },
   },
   oled: {
     scheme: 'oled',
     color: {
-      canvas: '#000000',
+      canvas: '#000000', // 登记：RN-only OLED 黑场子方案（无 CSS 对应主题），色相/状态色沿用 dark 语义
       surface: '#0a0a0a',
       surfaceStrong: '#121212',
       panel: '#050505',
-      tint: 'rgba(41, 171, 226, 0.16)',
-      ink: '#e3e4e6',
-      inkMuted: '#a0a1aa',
-      inkSubtle: '#8a8d98',
-      line: 'rgba(255, 255, 255, 0.065)',
-      focus: 'rgba(41, 171, 226, 0.42)',
-      accent: '#29ABE2',
-      accentSoft: 'rgba(41, 171, 226, 0.18)',
-      moss: '#69c967',
-      mossSoft: 'rgba(105, 201, 103, 0.14)',
-      warning: '#d4aa4c',
-      warningSoft: 'rgba(212, 170, 76, 0.14)',
-      danger: '#ff7e78',
-      dangerSoft: 'rgba(255, 126, 120, 0.14)',
-      onAccent: '#ffffff',
-      onDanger: '#ffffff',
-      scrim: 'rgba(0, 0, 0, 0.58)',
+      tint: 'rgba(41, 171, 226, 0.16)', // 登记：OLED 表面对比调优
+      ink: '#e3e4e6', // --text-1
+      inkMuted: '#9a9aa4', // --text-2
+      inkSubtle: '#83838d', // --text-3
+      line: 'rgba(255, 255, 255, 0.06)', // --bdr
+      focus: 'rgba(41, 171, 226, 0.6)', // --ring
+      accent: '#29ABE2', // --primary
+      accentSoft: 'rgba(41, 171, 226, 0.14)', // --primary-soft
+      moss: '#69c967', // --success
+      mossSoft: 'rgba(105, 201, 103, 0.08)', // --success-bg
+      warning: '#d4aa4c', // --warning
+      warningSoft: 'rgba(212, 170, 76, 0.08)', // --warning-bg
+      danger: '#e87070', // --danger
+      dangerSoft: 'rgba(232, 112, 112, 0.06)', // --danger-bg
+      onAccent: '#f4f5ff', // --primary-foreground
+      onDanger: '#ffffff', // --destructive-foreground
+      scrim: 'rgba(0, 0, 0, 0.58)', // 登记：mobile-only 遮蔽（OLED 加强）
     },
     radius: { control: 8, panel: 10, sheet: 14 },
     space: { xs: 4, sm: 8, md: 12, lg: 16, xl: 24, xxl: 32, xxxl: 40, xxxxl: 48 },
@@ -338,7 +356,7 @@ export const agentHubThemes = {
       md: {},
       lg: {},
       panel: {},
-      hairline: { borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.065)' },
+      hairline: { borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.06)' }, // --bdr
     },
   },
 } as const satisfies Record<AgentHubColorScheme, AgentHubThemeTokens>;
