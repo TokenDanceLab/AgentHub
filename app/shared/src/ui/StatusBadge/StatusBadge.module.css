@@ -1,0 +1,44 @@
+.badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: var(--td-space-1) var(--td-space-2);
+  border-radius: var(--radius-full);
+  font-size: var(--td-text-xs);
+  font-weight: var(--font-weight-normal);
+  white-space: nowrap;
+}
+
+/* ── Status variants ─────────────────────────────────────────────────── */
+.online,
+.done {
+  color: var(--td-moss);
+  background: color-mix(in oklch, var(--td-moss) 12%, transparent);
+  border: 1px solid color-mix(in oklch, var(--td-moss) 20%, transparent);
+}
+
+.offline {
+  color: var(--td-ink-muted);
+  background: var(--secondary);
+  border: 1px solid var(--td-line);
+}
+
+.running,
+.inProgress {
+  color: var(--info);
+  background: color-mix(in oklch, var(--info) 12%, transparent);
+  border: 1px solid color-mix(in oklch, var(--info) 20%, transparent);
+}
+
+.error {
+  color: var(--td-danger);
+  background: color-mix(in oklch, var(--td-danger) 12%, transparent);
+  border: 1px solid color-mix(in oklch, var(--td-danger) 20%, transparent);
+}
+
+.pending,
+.review {
+  color: var(--td-warning);
+  background: color-mix(in oklch, var(--td-warning) 12%, transparent);
+  border: 1px solid color-mix(in oklch, var(--td-warning) 20%, transparent);
+}
