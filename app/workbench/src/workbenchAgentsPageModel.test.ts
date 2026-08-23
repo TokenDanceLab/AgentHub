@@ -79,6 +79,17 @@ describe('workbenchAgentsPageModel', () => {
     ]);
   });
 
+  it('keeps real mode free of mock market and shortcuts (#1872)', () => {
+    expect(buildAgentRecentShortcuts(false, [], true)).toEqual([]);
+    const realMarket = splitAgentMarketTemplates(undefined, true);
+    expect(realMarket.marketFeatured).toEqual([]);
+    expect(realMarket.marketTemplates).toEqual([]);
+    const realModel = buildAgentsPageDerivedModel([], [], false, true);
+    expect(realModel.marketFeatured).toEqual([]);
+    expect(realModel.marketTemplates).toEqual([]);
+    expect(realModel.recentShortcuts).toEqual([]);
+  });
+
   it('splits market templates and assembles derived model', () => {
     const market = splitAgentMarketTemplates([
       { name: 'A', description: '', category: '', detail: '' },

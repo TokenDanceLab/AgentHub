@@ -51,16 +51,16 @@ export function useWorkbenchAgentsRoute({
   );
 
   const resolvedModels = useMemo(
-    () => resolveAgentModels(modelCatalog, agentConfigs),
-    [modelCatalog, agentConfigs],
+    () => resolveAgentModels(modelCatalog, agentConfigs, undefined, realDataMode),
+    [modelCatalog, agentConfigs, realDataMode],
   );
   const resolvedSkills = useMemo(
-    () => resolveAgentSkills(agentConfigs),
-    [agentConfigs],
+    () => resolveAgentSkills(agentConfigs, undefined, realDataMode),
+    [agentConfigs, realDataMode],
   );
   const resolvedTools = useMemo(
-    () => resolveAgentTools(agentConfigs),
-    [agentConfigs],
+    () => resolveAgentTools(agentConfigs, undefined, realDataMode),
+    [agentConfigs, realDataMode],
   );
 
   const effectiveSelectedAgentId = resolveEffectiveSelectedAgentId(selectedAgentId, agentConfigs);
@@ -110,6 +110,7 @@ export function useWorkbenchAgentsRoute({
     agentsPane,
     setAgentsPane,
     agentConfigs,
+    realDataMode,
     resolvedModels,
     resolvedSkills,
     resolvedTools,
