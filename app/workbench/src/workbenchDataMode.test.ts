@@ -138,4 +138,23 @@ describe('workbenchDataMode', () => {
   ] as const)('%s', (_label, input, expected) => {
     expect(getWorkbenchSectionSource(input)).toEqual(expected);
   });
+
+  it('describes live, loading and unavailable catalog states with distinct messages', () => {
+    const live = getWorkbenchCatalogState(
+      state({
+        connection: { status: 'connected' },
+        projects: [{ id: 'p1', name: 'AgentHub', createdAt: '2026-05-24T10:00:00.000Z' }],
+      }),
+    );
+    expect(live).toMatchObject({ mode: 'live', hasLiveCatalog: true });
+    expect(live.message).toBe('Edge catalog is loaded from the live snapshot.');
+
+    const loading = getWorkbenchCatalogState(state({ connection: { status: 'loading' } }));
+    expect(loading).toMatchObject({ mode: 'loading', hasLiveCatalog: false });
+    expect(loading.message).toBe('Loading Edge catalog snapshot...');
+
+    const unavailable = getWorkbenchCatalogState(state());
+    expect(unavailable).toMatchObject({ mode: 'unavailable', hasLiveCatalog: false });
+    expect(unavailable.message).toBe('No Edge snapshot is available yet.');
+  });
 });

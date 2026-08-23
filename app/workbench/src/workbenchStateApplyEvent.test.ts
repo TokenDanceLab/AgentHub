@@ -296,4 +296,194 @@ describe('applyEvent', () => {
       expect(before.lastSeq).toBe(frozen.lastSeq);
     });
   });
+
+  describe('thread updates', () => {
+    it('merges thread.updated fields into the existing thread', () => {
+      const state = applyAll([
+        event(1, 'thread.created', { threadId: 'th-1', projectId: 'p-1' }),
+        event(2, 'thread.updated', {
+          threadId: 'th-1',
+          title: 'Renamed',
+          status: 'archived',
+          conversationId: 'conv-1',
+        }),
+      ]);
+      expect(state.threads).toHaveLength(1);
+      expect(state.threads[0]).toMatchObject({
+        id: 'th-1',
+        projectId: 'p-1',
+        title: 'Renamed',
+        status: 'archived',
+        conversationId: 'conv-1',
+      });
+    });
+
+    it('keeps the current thread status when the update carries an invalid one', () => {
+      const state = applyAll([
+        event(1, 'thread.created', { threadId: 'th-2' }),
+        event(2, 'thread.updated', { threadId: 'th-2', status: 'banana' }),
+      ]);
+      expect(state.threads[0]?.status).toBe('active');
+    });
+
+    it('skips thread events without any resolvable id but still bumps seq', () => {
+      const state = applyEvent(initialWorkbenchState, event(4, 'thread.updated', { title: 'x' }));
+      expect(state.threads).toHaveLength(0);
+      expect(state.lastSeq).toBe(4);
+    });
+  });
+
+  describe('items and runners', () => {
+    it('creates and updates thread items via item.created / item.updated', () => {
+      const created = applyEvent(
+        initialWorkbenchState,
+        event(1, 'item.created', {
+          itemId: 'item-1',
+          threadId: 'th-1',
+          kind: 'message',
+          role: 'user',
+          content: 'hello',
+        }),
+      );
+      expect(created.threadItems[0]).toMatchObject({
+        id: 'item-1',
+        threadId: 'th-1',
+        kind: 'message',
+        role: 'user',
+        content: 'hello',
+        createdAt: sentAt,
+      });
+
+      // Partial update keeps prior kind/role when the payload omits them.
+      const updated = applyEvent(
+        created,
+        event(2, 'item.updated', { itemId: 'item-1', threadId: 'th-1', content: 'edited' }),
+      );
+      expect(updated.threadItems).toHaveLength(1);
+      expect(updated.threadItems[0]).toMatchObject({
+        id: 'item-1',
+        kind: 'message',
+        role: 'user',
+        content: 'edited',
+      });
+    });
+
+    it('resolves the item threadId from scope when the payload omits it', () => {
+      const state = applyEvent(
+        initialWorkbenchState,
+        event(1, 'item.created', { itemId: 'item-2', content: 'scoped' }, { threadId: 'th-scope' }),
+      );
+      expect(state.threadItems[0]?.threadId).toBe('th-scope');
+    });
+
+    it('bumps seq without adding an item when ids are missing', () => {
+      const state = applyEvent(initialWorkbenchState, event(5, 'item.created', { content: 'no ids' }));
+      expect(state.threadItems).toHaveLength(0);
+      expect(state.lastSeq).toBe(5);
+    });
+
+    it('tracks runner.online and runner.offline, preserving known fields', () => {
+      const online = applyEvent(
+        initialWorkbenchState,
+        event(1, 'runner.online', { runnerId: 'edge-1', name: 'Edge Runner', capabilities: 'shell' }),
+      );
+      expect(online.runners[0]).toMatchObject({
+        id: 'edge-1',
+        name: 'Edge Runner',
+        status: 'online',
+        capabilities: 'shell',
+      });
+
+      const offline = applyEvent(online, event(2, 'runner.offline', { runnerId: 'edge-1' }));
+      expect(offline.runners).toHaveLength(1);
+      expect(offline.runners[0]).toMatchObject({
+        id: 'edge-1',
+        name: 'Edge Runner',
+        status: 'offline',
+        capabilities: 'shell',
+      });
+    });
+
+    it('ignores runner events without a runnerId', () => {
+      const state = applyEvent(initialWorkbenchState, event(3, 'runner.online', { name: 'ghost' }));
+      expect(state.runners).toHaveLength(0);
+      expect(state.lastSeq).toBe(3);
+    });
+  });
+
+  describe('missing-id guards keep collections intact but advance seq', () => {
+    it('message.delta without messageId/threadId', () => {
+      const state = applyEvent(initialWorkbenchState, event(1, 'message.delta', { delta: 'text' }));
+      expect(state.threadItems).toHaveLength(0);
+      expect(state.lastSeq).toBe(1);
+    });
+
+    it('run.output without runId', () => {
+      const state = applyEvent(initialWorkbenchState, event(2, 'run.output', { text: 'log' }));
+      expect(state.runLogs).toEqual({});
+      expect(state.lastSeq).toBe(2);
+    });
+
+    it('run.output.batch resolves runId from scope and routes streams', () => {
+      const state = applyEvent(
+        initialWorkbenchState,
+        event(
+          3,
+          'run.output.batch',
+          { chunks: [{ text: 'out1' }, { text: 'err1', stream: 'stderr' }] },
+          { runId: 'r-scope' },
+        ),
+      );
+      expect(state.runLogs['r-scope']?.stdout).toBe('out1');
+      expect(state.runLogs['r-scope']?.stderr).toBe('err1');
+    });
+
+    it('approval.requested requires approvalId, runId and threadId', () => {
+      const missingThread = applyEvent(
+        initialWorkbenchState,
+        event(4, 'approval.requested', { approvalId: 'a-1', runId: 'r-1' }),
+      );
+      expect(missingThread.approvals).toHaveLength(0);
+      expect(missingThread.runs).toHaveLength(0);
+      expect(missingThread.lastSeq).toBe(4);
+    });
+
+    it('approval.decided without approvalId or for an unknown id changes nothing', () => {
+      const noId = applyEvent(initialWorkbenchState, event(5, 'approval.decided', { decision: 'approved' }));
+      expect(noId.approvals).toHaveLength(0);
+      expect(noId.lastSeq).toBe(5);
+
+      const seeded = applyEvent(
+        initialWorkbenchState,
+        event(6, 'approval.requested', {
+          approvalId: 'a-2',
+          runId: 'r-2',
+          threadId: 'th-2',
+          kind: 'command',
+          summary: 'ok?',
+        }),
+      );
+      const unknown = applyEvent(seeded, event(7, 'approval.decided', { approvalId: 'a-missing', decision: 'approved' }));
+      expect(unknown.approvals[0]).toMatchObject({ id: 'a-2', status: 'pending' });
+    });
+
+    it('artifact.created requires artifactId, runId and threadId', () => {
+      const state = applyEvent(
+        initialWorkbenchState,
+        event(8, 'artifact.created', { artifactId: 'art-x', runId: 'r-x' }),
+      );
+      expect(state.artifacts).toHaveLength(0);
+      expect(state.lastSeq).toBe(8);
+    });
+
+    it('preview.ready and preview.stopped require previewId and runId', () => {
+      const ready = applyEvent(initialWorkbenchState, event(9, 'preview.ready', { previewId: 'pv-x' }));
+      expect(ready.previews).toHaveLength(0);
+      expect(ready.lastSeq).toBe(9);
+
+      const stopped = applyEvent(initialWorkbenchState, event(10, 'preview.stopped', { runId: 'r-x' }));
+      expect(stopped.previews).toHaveLength(0);
+      expect(stopped.lastSeq).toBe(10);
+    });
+  });
 });

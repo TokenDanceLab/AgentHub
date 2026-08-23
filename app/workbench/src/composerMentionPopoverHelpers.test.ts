@@ -1,8 +1,24 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   clampPopoverPosition,
+  measureCaretCoords,
   planMentionPopoverKeyDown,
 } from './composerMentionPopoverHelpers';
+
+function domRect(partial: Partial<DOMRect>): DOMRect {
+  return {
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    width: 0,
+    height: 0,
+    x: 0,
+    y: 0,
+    toJSON: () => ({}),
+    ...partial,
+  } as DOMRect;
+}
 
 describe('planMentionPopoverKeyDown', () => {
   it('returns none when the popover is closed', () => {
@@ -97,5 +113,67 @@ describe('clampPopoverPosition', () => {
   it('respects a custom margin', () => {
     const coords = clampPopoverPosition({ ...base, caretTop: 300, margin: 12 });
     expect(coords.top).toBe(300 - 200 - 12);
+  });
+});
+
+describe('measureCaretCoords', () => {
+  it('returns null for a missing textarea or one without layout', () => {
+    expect(measureCaretCoords(null, 0)).toBeNull();
+
+    // jsdom reports a zero rect for unrendered elements → treated as no layout.
+    const detached = document.createElement('textarea');
+    expect(measureCaretCoords(detached, 3)).toBeNull();
+  });
+
+  it('returns null when the textarea has a rect but no parent to host the mirror', () => {
+    const textarea = document.createElement('textarea');
+    vi.spyOn(textarea, 'getBoundingClientRect').mockReturnValue(domRect({ width: 200, height: 24 }));
+    expect(measureCaretCoords(textarea, 0)).toBeNull();
+  });
+
+  it('builds a mirror div, clamps the caret offset, and cleans the mirror up', () => {
+    const parent = document.createElement('div');
+    document.body.appendChild(parent);
+    const textarea = document.createElement('textarea');
+    textarea.value = 'hello mention';
+    parent.appendChild(textarea);
+    vi.spyOn(textarea, 'getBoundingClientRect').mockReturnValue(domRect({ width: 200, height: 24 }));
+    // jsdom spans have no layout; simulate a measured caret marker.
+    const markerSpy = vi
+      .spyOn(HTMLSpanElement.prototype, 'getBoundingClientRect')
+      .mockReturnValue(domRect({ top: 40, left: 55, width: 2, height: 18 }));
+
+    try {
+      // caretOffset beyond the text length must clamp to the end, not throw.
+      const coords = measureCaretCoords(textarea, 999);
+      expect(coords).toEqual({ top: 40, left: 55, height: 18 });
+      // The mirror div is removed after measurement; only the textarea stays.
+      expect(Array.from(parent.children)).toEqual([textarea]);
+    } finally {
+      markerSpy.mockRestore();
+      parent.remove();
+    }
+  });
+
+  it('prefers a numeric computed line-height over the marker/rect height', () => {
+    const parent = document.createElement('div');
+    document.body.appendChild(parent);
+    const textarea = document.createElement('textarea');
+    textarea.value = 'abc';
+    textarea.style.lineHeight = '30px';
+    parent.appendChild(textarea);
+    vi.spyOn(textarea, 'getBoundingClientRect').mockReturnValue(domRect({ width: 200, height: 24 }));
+    const markerSpy = vi
+      .spyOn(HTMLSpanElement.prototype, 'getBoundingClientRect')
+      .mockReturnValue(domRect({ top: 10, left: 12, width: 2, height: 18 }));
+
+    try {
+      const coords = measureCaretCoords(textarea, 1);
+      expect(coords?.height).toBe(30);
+      expect(coords?.top).toBe(10);
+    } finally {
+      markerSpy.mockRestore();
+      parent.remove();
+    }
   });
 });

@@ -1,8 +1,8 @@
 {
   "$schema": "coverage-baseline.v1",
-  "measuredAt": "2026-08-03",
-  "masterSha": "a36add8d90a05577cca056e571faa96299fac549",
-  "masterShaShort": "a36add8d9",
+  "measuredAt": "2026-08-23",
+  "masterSha": "a10cdf58321f3a41ed334f31950a6ce338b31a52",
+  "masterShaShort": "a10cdf583",
   "measuredOn": "Windows (verify-coverage-baseline.py per-package runs; #1535 include contract: every package now counts ALL production src/**/*.ts(x) in the denominator via app/test-config/coverage.ts factory. Web/desktop/mobile numbers dropped vs the 2026-08-02 baseline because untested production modules now enter the denominator — truth revealed, not a relaxation. e2e Playwright specs (src/__e2e__/**) and pure entry main.tsx are the only narrow exclusions; see config comments.)",
   "ciPlatform": "ubuntu-latest (v8 coverage is execution-path based; numbers are cross-platform deterministic)",
   "policy": "Coverage baseline gate — numbers must not regress. If a metric drops below the value recorded here (minus the v8 run-to-run tolerance), the gate fails (exit 1). Absolute floors in each vitest config enforce a hard minimum independent of the baseline. uncoveredFiles (0%-line production modules) must not grow — new untested code or a deleted test trips it. A second assertion requires skipped tests == 0 so .skip / .todo cannot silently mask a regression. To raise the bar, update this file with freshly measured numbers + a new measuredAt/masterSha; never lower a number without an explicit baseline re-baseline decision.",
@@ -12,16 +12,16 @@
     "@agenthub/shared": {
       "dir": "app/shared",
       "coverage": {
-        "lines": 76.43,
-        "statements": 74.82,
-        "functions": 74.01,
-        "branches": 70.48
+        "lines": 85.96,
+        "statements": 84.16,
+        "functions": 83.76,
+        "branches": 78.84
       },
-      "uncoveredFiles": 38,
-      "coverageNote": "Factory rewrite (#1535) is behavior-identical to the previous inline config: numbers unchanged from 2026-08-02 baseline. Floors 60/60/60/60 (all dims above 60).",
+      "uncoveredFiles": 25,
+      "coverageNote": "2026-08-23 remeasure (#1764 frontend test debt): master@a10cdf58 already advanced past the 2026-08-03 baseline (84.19 lines pre-change); this lane adds diff.ts parse/normalize/parseUnifiedDiff, composerReducer (mention/quote/attachment/draft-capture), agentActivity Hub WS lifecycle, hubClientEnvelope error fallbacks (+37 tests). Floors 60/60/60/60 (all dims above 60).",
       "tests": {
-        "total": 1738,
-        "passed": 1738,
+        "total": 2519,
+        "passed": 2519,
         "failed": 0,
         "skipped": 0
       }
@@ -29,16 +29,16 @@
     "@agenthub/workbench": {
       "dir": "app/workbench",
       "coverage": {
-        "lines": 83.67,
-        "statements": 82.28,
-        "functions": 81.66,
-        "branches": 75.61
+        "lines": 86.48,
+        "statements": 85.06,
+        "functions": 83.57,
+        "branches": 79.37
       },
       "uncoveredFiles": 7,
-      "coverageNote": "2026-08-21 首次入基线（#1759 第二阶段 workbench 独立成 @agenthub/workbench 第 6 包；拆包时 vitest.config floors 59/52/52/59 即按本次实测设定，低于 60 的维度是提升目标非永久豁免）。uncovered 7 文件：MessageSearchPanel.stories.tsx / WorkbenchDocsRouteView.tsx / index.ts / auxPanel/AuxPanel.tsx / floating/PersonPanel.tsx / pages/projects/ProjectMembers.tsx / pages/projects/ProjectTabViews.tsx。",
+      "coverageNote": "2026-08-21 首次入基线（#1759 第二阶段 workbench 独立成 @agenthub/workbench 第 6 包；拆包时 vitest.config floors 59/52/52/59 即按本次实测设定，低于 60 的维度是提升目标非永久豁免）。2026-08-23 #1764 补债：workbenchState reducer/applyEvent 守卫分支、tasks-route handler 工厂、transcript chrome labels/menu wiring、settingsService/Types、mention popover 测量、composer helpers（+70 tests）；顺带修复 useWorkbenchAgentsRoute 排序断言的 locale 依赖（.sort() vs localeCompare，zh-CN 环境确定性失败）。uncovered 7 文件：MessageSearchPanel.stories.tsx / WorkbenchDocsRouteView.tsx / index.ts / auxPanel/AuxPanel.tsx / floating/PersonPanel.tsx / pages/projects/ProjectMembers.tsx / pages/projects/ProjectTabViews.tsx。",
       "tests": {
-        "total": 1020,
-        "passed": 1020,
+        "total": 1134,
+        "passed": 1134,
         "failed": 0,
         "skipped": 0
       }
