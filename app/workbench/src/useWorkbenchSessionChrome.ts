@@ -11,6 +11,7 @@ import {
   composerReducer,
   createInitialComposerState,
   saveDraft,
+  serializeDraft,
 } from '@shared/composer';
 import { toggleAppliedAgentHubTheme } from '@shared/theme';
 import { collectTranscriptEvidence } from '@shared/transcript';
@@ -25,6 +26,7 @@ import {
   buildMainchainEvidenceExportPayload,
   findConversationById,
   isChatSearchShortcut,
+  isEditableKeyboardTarget,
   mapAgentsToComposerMentions,
   resolveComposerTargetLabel,
   resolveCurrentConversationId,
@@ -188,8 +190,17 @@ export function useWorkbenchSessionChrome({
   useEffect(() => {
     // Flush current composer state as a draft for the outgoing session
     // before resetting so the draft is available on switch-back (CF20).
-    if (composer.text || composer.mentions.length > 0 || composer.attachments.length > 0) {
-      saveDraft(composer.conversationId, { text: composer.text, mentions: composer.mentions });
+    // #1822: serialize attachments (ref'd ones) + reply/quote context too —
+    // the old text+mentions-only save dropped them on conversation switch.
+    if (composer.text || composer.mentions.length > 0 || composer.attachments.length > 0 ||
+        composer.replyTo !== null || composer.quote !== null) {
+      saveDraft(composer.conversationId, serializeDraft({
+        text: composer.text,
+        mentions: composer.mentions,
+        attachments: composer.attachments,
+        replyTo: composer.replyTo,
+        quote: composer.quote,
+      }));
     }
     dispatchComposer({ type: 'setConversationId', conversationId: currentConversationId });
   }, [currentConversationId]);
@@ -292,6 +303,10 @@ export function useWorkbenchSessionChrome({
     if (!isChatPage) return;
 
     function handleSearchShortcut(event: KeyboardEvent): void {
+      // #1822: never hijack Ctrl+F while the user is typing in the composer
+      // or any editable target — the default behavior (browser find, text
+      // editing) must win there.
+      if (isEditableKeyboardTarget(event.target)) return;
       if (isChatSearchShortcut(event)) {
         event.preventDefault();
         setSearchOpen(true);

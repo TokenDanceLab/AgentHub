@@ -95,7 +95,13 @@ export function toolPermissionsFromAllowlist(allowlist: string[]): Record<string
 }
 
 export function uniqueSorted(items: string[]): string[] {
-  return Array.from(new Set(items)).sort((a, b) => a.localeCompare(b));
+  // Code-unit order, not localeCompare: the demo-mode catalog assertions
+  // (#1855) compare against a bare `.sort()` to stay locale-independent, and
+  // localeCompare's collation flips mixed zh/en ordering per host locale
+  // (zh hosts put CJK first, en hosts ASCII first) — the same input then
+  // fails the assertion on zh hosts. A deterministic code-unit sort keeps
+  // fixture and resolved lists identical on every host.
+  return Array.from(new Set(items)).sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
 }
 
 export function toMCPServerSpec(id: string): AgentHubAgentSpecMCPServerV1 {

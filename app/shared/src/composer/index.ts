@@ -24,9 +24,11 @@ export {
   clearDraft,
   loadDraft,
   saveDraft,
+  serializeDraft,
 } from './composerDraft';
 export type {
   ComposerDraft,
+  SerializedDraftAttachment,
 } from './composerDraft';
 export type {
   ApprovalMode,

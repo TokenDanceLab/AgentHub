@@ -467,7 +467,7 @@ describe('workbenchTranscriptChromeActionMappers', () => {
     expect(demo).toEqual([]);
   });
 
-  it('wires the react menu item to an emoji picker submenu that plans the chosen emoji', () => {
+  it('no longer offers the react menu entry (#1822 — write-only reaction, nothing renders it)', () => {
     const onAction = vi.fn();
     const groups = buildTranscriptContextMenuGroups({
       blockId: 'b1',
@@ -477,16 +477,8 @@ describe('workbenchTranscriptChromeActionMappers', () => {
       onEnterSelection: vi.fn(),
       hubMessageActions: true,
     });
-    const reactItem = groups[0]?.find((item) => item.label === 'context.react');
-    expect(reactItem?.chevron).toBe(true);
-    expect(typeof reactItem?.submenu).toBe('function');
-
-    const close = vi.fn();
-    const submenu = reactItem!.submenu as (close: () => void) => ReactNode;
-    const { getByRole } = render(submenu(close));
-    fireEvent.click(getByRole('gridcell', { name: '❤️' }));
-    expect(onAction).toHaveBeenCalledWith('react:❤️', 'b1');
-    expect(close).toHaveBeenCalledOnce();
+    const labels = groups.flat().map((i) => i.label);
+    expect(labels).not.toContain('context.react');
   });
 
   it('plans nothing for pin/recall without a session id instead of a fake toast (#1818)', () => {

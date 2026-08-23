@@ -25,12 +25,13 @@ describe('InspectorTabChrome', () => {
     expect(inspectorTabLabel('files', t)).toBe('inspector.files');
   });
 
-  it('keeps quick-open mode targets stable', () => {
+  it('keeps quick-open mode targets stable (#1822: dead chat/terminal entries removed)', () => {
     expect(getQuickOpenItems(t).map((item) => [item.id, item.mode])).toEqual([
       ['files', 'files'],
-      ['chat', null],
       ['browser', 'browser'],
-      ['terminal', null],
     ]);
+    // Only files keeps a shortcut claim — Ctrl+P is registered by the
+    // workbench dispatcher. Ctrl+T/Ctrl+` labels removed (#1822).
+    expect(getQuickOpenItems(t).map((item) => item.shortcut)).toEqual(['Ctrl+P', '']);
   });
 });

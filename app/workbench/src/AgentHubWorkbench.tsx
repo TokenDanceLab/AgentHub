@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { CHATVIEW_I18N_NAMESPACE } from '@shared/chatview/i18n/resources';
 import Modal from '@shared/ui/Modal';
@@ -9,6 +9,10 @@ import { useWorkbenchPanelLayout } from './useWorkbenchPanelLayout';
 import { useWorkbenchProfileChrome } from './useWorkbenchProfileChrome';
 import { useWorkbenchSessionChrome } from './useWorkbenchSessionChrome';
 import { useWorkbenchTranscriptChrome } from './useWorkbenchTranscriptChrome';
+import { useWorkbenchGlobalShortcuts } from './useWorkbenchGlobalShortcuts';
+import { GlobalSearchDialog } from './GlobalSearchDialog';
+import { WORKBENCH_INSPECTOR_QUICK_OPEN_EVENT } from './desktopChromeEvents';
+import { isEditableKeyboardTarget } from './workbenchSessionChromeHelpers';
 import { WorkbenchFrame } from './WorkbenchFrame';
 import { WorkbenchProfileOverlays } from './WorkbenchProfileOverlays';
 import { WorkbenchTranscriptOverlays } from './WorkbenchTranscriptOverlays';
@@ -45,6 +49,8 @@ export function AgentHubWorkbench(props: AgentHubWorkbenchProps): React.ReactEle
   const [activePage, setActivePage] = useState<GlobalRailPage>('chat');
   const isChatPage = isWorkbenchChatPage(activePage);
   const [shortcutHelpOpen, setShortcutHelpOpen] = useState(false);
+  // #1822: Ctrl/⌘+K global search dialog (conversation switcher).
+  const [globalSearchOpen, setGlobalSearchOpen] = useState(false);
 
   // Global '?' opens/closes the keyboard-shortcuts help overlay (#8).
   // Reuses getResolvedShortcutGroups() — the same data source as the
@@ -52,14 +58,7 @@ export function AgentHubWorkbench(props: AgentHubWorkbenchProps): React.ReactEle
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent): void {
       if (event.key !== '?' || event.ctrlKey || event.metaKey || event.altKey) return;
-      const target = event.target as HTMLElement | null;
-      const tag = target?.tagName?.toLowerCase() ?? '';
-      const isEditable =
-        tag === 'input' ||
-        tag === 'textarea' ||
-        tag === 'select' ||
-        target?.isContentEditable === true;
-      if (isEditable) return;
+      if (isEditableKeyboardTarget(event.target)) return;
       event.preventDefault();
       setShortcutHelpOpen((open) => !open);
     }
@@ -73,6 +72,29 @@ export function AgentHubWorkbench(props: AgentHubWorkbenchProps): React.ReactEle
     platformSurface: platform.surface,
     setActivePage,
   });
+
+  // #1822: shared global dispatcher (Web + Desktop): search / settings /
+  // toggle-sidebar / toggle-run-panel / inspector quick-open. Reads
+  // resolved groups so custom keybindings actually take effect.
+  const handleQuickOpen = useCallback((): void => {
+    layout.openInspector();
+    window.dispatchEvent(new CustomEvent(WORKBENCH_INSPECTOR_QUICK_OPEN_EVENT, {
+      detail: { mode: 'files' },
+    }));
+  }, [layout]);
+
+  useWorkbenchGlobalShortcuts({
+    onSearch: () => setGlobalSearchOpen(true),
+    onOpenSettings: () => setActivePage('settings'),
+    onToggleSidebar: layout.toggleSidebar,
+    onToggleRunPanel: layout.toggleInspector,
+    onQuickOpen: handleQuickOpen,
+  });
+
+  const handleGlobalSearchSelect = useCallback((conversationId: string): void => {
+    props.onActiveConversationChange?.(conversationId);
+    setGlobalSearchOpen(false);
+  }, [props.onActiveConversationChange]);
 
   // Session owns composer/workspace refs and may run before transcript chrome is composed.
   // Bridge transcript helpers through a ref so user-driven handlers always see the latest impl.
@@ -156,6 +178,13 @@ export function AgentHubWorkbench(props: AgentHubWorkbenchProps): React.ReactEle
       >
         <ShortcutHelpContent />
       </Modal>
+      <GlobalSearchDialog
+        open={globalSearchOpen}
+        conversations={props.conversations}
+        currentConversationId={session.currentConversationId}
+        onClose={() => setGlobalSearchOpen(false)}
+        onSelect={handleGlobalSearchSelect}
+      />
     </>
   );
 }
