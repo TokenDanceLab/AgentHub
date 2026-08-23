@@ -96,6 +96,8 @@
   stroke-linejoin: round;
 }
 
+/* compact tier (≤720) — dense chrome band; SSOT: styles/tokens-base.css +
+   styles/breakpoints.ts (#1827). */
 @media (max-width: 720px) {
   .bar {
     max-width: min(calc(var(--selectbar-width, 100vw) - 24px), 620px);
