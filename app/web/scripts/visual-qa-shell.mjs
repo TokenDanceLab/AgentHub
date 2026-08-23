@@ -21,7 +21,7 @@
  */
 import { chromium } from '@playwright/test';
 import { spawn } from 'node:child_process';
-import { mkdir, rm } from 'node:fs/promises';
+import { mkdir, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -385,9 +385,22 @@ async function captureTheme(browser, theme, vp = { width: 1440, height: 810, lab
   const file = path.join(outDir, `web-shell-${theme}-${vp.label}${dprSuffix}.png`);
   await page.screenshot({ path: file, fullPage: false });
 
+  // #1866: emit a DOM/geometry contract alongside the PNG so the gate can
+  // prove it captured the Agents workbench (not an onboarding/blank shell) and
+  // that the page has no horizontal overflow.
+  const contract = await page.evaluate(() => ({
+    viewport: { width: window.innerWidth, height: window.innerHeight },
+    workbenchShell: Boolean(document.querySelector('[data-testid="agenthub-workbench"]')),
+    agentsPage: Boolean(document.querySelector('section.agents-page, .agents-page')),
+    horizontalOverflow:
+      document.documentElement.scrollWidth > document.documentElement.clientWidth + 1,
+  }));
+  const contractFile = path.join(outDir, `web-shell-${theme}-${vp.label}${dprSuffix}.json`);
+  await writeFile(contractFile, JSON.stringify(contract, null, 2) + '\n');
+
   const applied = await page.evaluate(() => document.documentElement.getAttribute('data-theme'));
   await context.close();
-  return { file, applied, theme };
+  return { file, contractFile, contract, applied, theme };
 }
 
 async function main() {
@@ -416,6 +429,7 @@ async function main() {
       console.warn(`warn: expected data-theme=${r.theme}, got ${r.applied}`);
     }
     console.log(`wrote ${r.file}`);
+    console.log(`contract ${r.contractFile} overflow=${r.contract.horizontalOverflow}`);
   }
   console.log(`Web visual-qa shell capture done (${results.length} shots) → ${outDir}`);
 }
