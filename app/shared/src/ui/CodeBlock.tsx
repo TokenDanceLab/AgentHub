@@ -48,6 +48,14 @@ const LazyHighlighter = lazy(async (): Promise<{ default: React.FC<HighlighterPr
 });
 
 // ── Fallback shown while the highlighter chunk loads ────────────────────
+//
+// INTENTIONAL hardcode (see docs/architecture/07-design-system-ssot.md §4):
+// these two colors are the oneDark theme binding pair of
+// react-syntax-highlighter (background #282c34, base text #abb2bf) — the
+// code block renders with oneDark in BOTH app themes, so no theme token
+// pair exists or should exist. If the library's oneDark palette changes on
+// upgrade, update this block and the Markdown.module.css fade-out gradient
+// (same pair) in the same commit.
 
 const fallbackStyle: CSSProperties = {
   margin: 0,

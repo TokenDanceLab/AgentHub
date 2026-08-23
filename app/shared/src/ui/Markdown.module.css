@@ -383,7 +383,10 @@
   height: 48px;
   pointer-events: none;
   /* Fade-out matches oneDark's background (#282c34) — the code block is
-     always rendered with the oneDark theme regardless of app theme. */
+     always rendered with the oneDark theme regardless of app theme, so
+     this rgba(40,44,52,·) pair has no token mapping (see CodeBlock.tsx
+     fallbackStyle + docs/architecture/07-design-system-ssot.md §4
+     "syntax binding pair" row — change together with it). */
   background: linear-gradient(180deg, transparent, rgba(40, 44, 52, 0.85));
 }
 
