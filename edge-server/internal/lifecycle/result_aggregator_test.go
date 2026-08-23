@@ -391,3 +391,92 @@ func TestResultAggregator_RecordSubAgentSpawnKeyDomain(t *testing.T) {
 		t.Fatal("RecordSubAgentSpawn recorded under parent agent instance ID, want parent run ID")
 	}
 }
+
+func TestResultAggregator_GapReconcilesTerminalChildren(t *testing.T) {
+	bus := newTestBus(t)
+	reg := agents.NewRegistry()
+
+	_ = reg.Register(&agents.AgentInstance{
+		ID:        "parent-gap",
+		AdapterID: "orchestrator",
+		Status:    agents.StatusBusy,
+	})
+	// Child already reached terminal state via the direct sendSubAgentResult
+	// path; only its run.finished event was dropped (gap).
+	_ = reg.Register(&agents.AgentInstance{
+		ID:        "child-gap",
+		AdapterID: "codex",
+		ParentID:  "parent-gap",
+		RunID:     "run-child-gap",
+		Status:    agents.StatusCompleted,
+	})
+
+	collector := NewSubAgentResultCollector(time.Minute)
+	ra := NewResultAggregator(bus, reg).WithCollector(collector)
+	stop := ra.Start()
+	defer stop()
+
+	subID, ch, _ := bus.Subscribe(0)
+	defer bus.Unsubscribe(subID)
+
+drainGap:
+	for {
+		select {
+		case <-ch:
+		case <-time.After(10 * time.Millisecond):
+			break drainGap
+		}
+	}
+
+	bus.Publish(events.GapEventType, map[string]any{}, &events.GapPayload{
+		FirstDroppedSeq: 1,
+		LastDroppedSeq:  5,
+		DroppedCount:    5,
+	})
+
+	timeout := time.After(500 * time.Millisecond)
+	for {
+		select {
+		case evt := <-ch:
+			if evt.Type != "run.agent.sub_agents_complete" {
+				continue
+			}
+			payload, ok := evt.Payload.(*SubAgentAggregatedResult)
+			if !ok {
+				t.Fatalf("payload type = %T, want *SubAgentAggregatedResult", evt.Payload)
+			}
+			if payload.ParentID != "parent-gap" {
+				t.Fatalf("parentId = %q, want parent-gap", payload.ParentID)
+			}
+			return
+		case <-timeout:
+			t.Fatal("timed out waiting for sub_agents_complete after gap")
+		}
+	}
+}
+
+func TestResultAggregator_ParentsWithChildren(t *testing.T) {
+	bus := newTestBus(t)
+	reg := agents.NewRegistry()
+
+	_ = reg.Register(&agents.AgentInstance{ID: "p1", AdapterID: "orchestrator"})
+	_ = reg.Register(&agents.AgentInstance{ID: "p2", AdapterID: "orchestrator"})
+	_ = reg.Register(&agents.AgentInstance{ID: "c1", AdapterID: "codex", ParentID: "p1", RunID: "r1"})
+	_ = reg.Register(&agents.AgentInstance{ID: "c2", AdapterID: "codex", ParentID: "p1", RunID: "r2"})
+	_ = reg.Register(&agents.AgentInstance{ID: "c3", AdapterID: "codex", ParentID: "p2", RunID: "r3"})
+	// Top-level instance with no parent must not appear as a parent.
+	_ = reg.Register(&agents.AgentInstance{ID: "top", AdapterID: "codex", ParentID: "", RunID: "r4"})
+
+	ra := NewResultAggregator(bus, reg)
+	got := ra.parentsWithChildren()
+	if len(got) != 2 {
+		t.Fatalf("parentsWithChildren = %#v, want exactly 2 unique parents", got)
+	}
+	gotSet := map[string]bool{}
+	for _, p := range got {
+		gotSet[p] = true
+	}
+	if !gotSet["p1"] || !gotSet["p2"] {
+		t.Fatalf("parentsWithChildren = %#v, want p1 and p2", got)
+	}
+}
