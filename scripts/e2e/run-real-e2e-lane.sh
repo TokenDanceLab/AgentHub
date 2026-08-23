@@ -72,7 +72,13 @@ stack_status() {
 # ── evidence manifest（六字段合同）──────────────────────────
 emit_manifest() { # 请求 status -> stdout "最终status|manifest路径"（passed 请求可能被降级为 no-evidence）
   local status="$1"
+  # #1873 Slice C: 公开 artifact 携带 commit（代码版本）+ scope（测试范围），
+  # 但不复制私有运行事实（账号/真实 endpoint 等）。
+  local commit
+  commit="$(git -C "$REPO_ROOT" rev-parse HEAD 2>/dev/null || echo unknown)"
   MANIFEST_STATUS="$status" \
+  MANIFEST_COMMIT="$commit" \
+  MANIFEST_SCOPE="app/web/$SPEC_TARGET" \
   MANIFEST_ARTIFACT_DIR="$ARTIFACT_DIR" \
   MANIFEST_SPEC_TARGET="$SPEC_TARGET" \
   MANIFEST_ID_BASE_URL="$ID_BASE_URL" \
@@ -250,6 +256,8 @@ manifest = {
     "schema": "agenthub-real-e2e-lane-v1",
     "kind": "real-e2e-lane",
     "generated_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+    "commit": os.environ["MANIFEST_COMMIT"],
+    "scope": os.environ["MANIFEST_SCOPE"],
     # ── 六字段合同（REQUIRED_SMOKE_FIELDS，见 verify-real-e2e-contract.py）──
     "evidence_level": "observed-local",
     "real_tested": real_tested,
