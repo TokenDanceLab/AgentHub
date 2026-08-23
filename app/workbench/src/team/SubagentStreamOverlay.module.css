@@ -52,7 +52,7 @@
   -webkit-backdrop-filter: blur(var(--glass-blur-lg));
   overflow: hidden;
   pointer-events: auto;
-  font-family: var(--td-font, 'Inter', system-ui, sans-serif);
+  font-family: var(--td-font);
   color: var(--td-ink);
   transition: border-color 0.2s ease;
 }
@@ -257,7 +257,7 @@
 }
 
 .toolCall code {
-  font-family: var(--td-mono, 'JetBrains Mono', monospace);
+  font-family: var(--td-mono);
   font-size: 0.625rem;
   color: var(--td-accent-amber);
   background: var(--td-accent-amber-bg);

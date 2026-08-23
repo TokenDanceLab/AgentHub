@@ -154,7 +154,7 @@
 /* web kind */
 .ap-web { font:var(--chat-label); font-family:var(--td-mono); color:var(--td-plum); word-break:break-all }
 .ap-web a { color:inherit; text-decoration:underline; text-underline-offset:2px }
-.ap-web a:hover { color:var(--td-plum-hover, var(--td-plum)) }
+.ap-web a:hover { color:var(--td-plum-hover) }
 
 /* fallback JSON */
 .ap-json { font:var(--chat-label); font-family:var(--td-mono); white-space:pre-wrap; word-break:break-all; color:var(--td-ink-muted); background:var(--td-surface-2); padding:var(--chat-sp-sm) var(--chat-sp-md); border-radius:var(--chat-r-sm); border:1px solid var(--td-line); overflow-x:auto }

@@ -40,9 +40,9 @@
   font: 500 0.75rem var(--td-font);
   cursor: pointer;
   transition:
-    background var(--td-dur-fast, 120ms) var(--td-ease),
-    border-color var(--td-dur-fast, 120ms) var(--td-ease),
-    color var(--td-dur-fast, 120ms) var(--td-ease);
+    background var(--td-dur-fast) var(--td-ease),
+    border-color var(--td-dur-fast) var(--td-ease),
+    color var(--td-dur-fast) var(--td-ease);
 }
 
 .confirmBtn:focus-visible,

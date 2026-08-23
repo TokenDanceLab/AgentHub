@@ -228,10 +228,10 @@ function runtimeIconFrameStyle(size: RuntimeIconSize, framed: boolean): React.CS
   const boxSize = runtimeIconBoxSize(size);
   return {
     alignItems: 'center',
-    background: framed ? 'var(--td-surface-2, transparent)' : 'transparent',
-    border: framed ? '1px solid var(--td-line, var(--td-line, transparent))' : '0',
-    borderRadius: 'var(--td-radius-control, 6px)',
-    color: 'var(--td-ink-muted, currentColor)',
+    background: framed ? 'var(--td-surface-2)' : 'transparent',
+    border: framed ? '1px solid var(--td-line)' : '0',
+    borderRadius: 'var(--td-radius-control)',
+    color: 'var(--td-ink-muted)',
     display: 'inline-flex',
     flex: 'none',
     height: boxSize,

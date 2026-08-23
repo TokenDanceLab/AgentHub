@@ -2,7 +2,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: var(--td-space-2, 0.5rem);
+  gap: var(--td-space-2);
   border: 1px solid transparent;
   border-radius: var(--r-md);
   font-family: var(--td-font);
@@ -34,9 +34,9 @@
 
 /* ── Sizes ─────────────────────── */
 
-.sm { height: 32px; padding: 0 10px; font-size: var(--td-text-xs, 0.75rem); border-radius: var(--td-radius-control); }
-.md { height: 36px; padding: 0 14px; font-size: var(--td-text-sm, 0.875rem); }
-.lg { height: 44px; padding: 0 20px; font-size: var(--td-text-base, 1rem); border-radius: var(--td-radius-panel); }
+.sm { height: 32px; padding: 0 10px; font-size: var(--td-text-xs); border-radius: var(--td-radius-control); }
+.md { height: 36px; padding: 0 14px; font-size: var(--td-text-sm); }
+.lg { height: 44px; padding: 0 20px; font-size: var(--td-text-base); border-radius: var(--td-radius-panel); }
 
 /* ── Variants ──────────────────── */
 
@@ -91,7 +91,7 @@
 }
 
 .gradient {
-  color: var(--td-ink-on-plum, #fff);
+  color: var(--td-ink-on-plum);
   font-weight: 600;
   background: var(--td-plum);
   /* #1825: elevation via the --e-* ladder, not a free-floating glow value. */
@@ -138,13 +138,13 @@
   .sm {
     min-height: var(--touch-target-min, 44px);
     padding: 0 12px;
-    font-size: var(--td-text-sm, 0.875rem);
+    font-size: var(--td-text-sm);
   }
 
   .md {
     min-height: var(--touch-target-min, 44px);
     padding: 0 16px;
-    font-size: var(--td-text-base, 1rem);
+    font-size: var(--td-text-base);
   }
 
   .lg {

@@ -65,7 +65,7 @@
   gap: 6px;
   padding: 8px 20px;
   border: none;
-  border-radius: var(--td-radius-control, 6px);
+  border-radius: var(--td-radius-control);
   background: var(--td-plum);
   color: var(--td-ink-on-plum);
   font-size: 14px;
@@ -90,7 +90,7 @@
   gap: 6px;
   padding: 8px 20px;
   border: 1px solid var(--td-line);
-  border-radius: var(--td-radius-control, 6px);
+  border-radius: var(--td-radius-control);
   background: transparent;
   color: var(--td-ink);
   font-size: 14px;
@@ -127,7 +127,7 @@
   margin: 0;
   padding: 12px;
   background: var(--td-tint);
-  border-radius: var(--td-radius-control, 6px);
+  border-radius: var(--td-radius-control);
   overflow: auto;
   max-height: 200px;
   font-size: 12px;
