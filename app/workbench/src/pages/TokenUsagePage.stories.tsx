@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/react';
 import { TokenUsagePage, type TokenUsagePageTeam } from './TokenUsagePage';
 
+// real_tested=false — static story fixtures, not live Hub API verification.
 const teams: TokenUsagePageTeam[] = [
   {
     id: 'team-release',

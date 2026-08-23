@@ -434,6 +434,43 @@ describe('useWorkbenchSessionChrome', () => {
     expect(result.current.selectedExecutionTargetId).toBe('');
   });
 
+  it('replaces an auto-selected target when it turns unhealthy (#1856)', () => {
+    const { result, rerender } = renderSessionChrome({
+      composerExecutionTargets: [
+        { id: 't1', label: 'Target 1', healthy: true },
+        { id: 't2', label: 'Target 2', healthy: true },
+      ],
+    });
+
+    expect(result.current.selectedExecutionTargetId).toBe('t1');
+
+    rerender({
+      composerExecutionTargets: [
+        { id: 't1', label: 'Target 1', healthy: false },
+        { id: 't2', label: 'Target 2', healthy: true },
+      ],
+    });
+    expect(result.current.selectedExecutionTargetId).toBe('t2');
+  });
+
+  it('keeps an explicitly selected target even when it turns unhealthy (#1856)', () => {
+    const { result, rerender } = renderSessionChrome({
+      composerExecutionTargets: [{ id: 't1', label: 'Target 1', healthy: true }],
+    });
+
+    act(() => {
+      result.current.setSelectedExecutionTargetId('t1');
+    });
+
+    rerender({
+      composerExecutionTargets: [
+        { id: 't1', label: 'Target 1', healthy: false },
+        { id: 't2', label: 'Target 2', healthy: true },
+      ],
+    });
+    expect(result.current.selectedExecutionTargetId).toBe('t1');
+  });
+
   it('loads local CLI discovery on desktop settings and clears it elsewhere', async () => {
     const discovery: LocalCliDiscoveryManifest = {
       mode: 'no-spend-discovery',

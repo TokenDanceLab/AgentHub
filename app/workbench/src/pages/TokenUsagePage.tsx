@@ -47,6 +47,15 @@ export function sumRecordedTokens(teams: TokenUsagePageTeam[]): number {
   return total;
 }
 
+/**
+ * Whether any run carries a recorded counter (#1856 review). Aggregates that
+ * sum to 0 only because counters are missing must render “—” — never a fake
+ * zero total — so presence of a recorded counter is tracked separately.
+ */
+export function hasRecordedTokens(teams: TokenUsagePageTeam[]): boolean {
+  return teams.some((team) => team.runs.some((run) => typeof run.tokenUsageTotal === 'number'));
+}
+
 /** Compact token count for summary tiles (12.4k style). */
 export function formatTokenCount(count: number): string {
   if (count < 1000) return String(count);
@@ -124,6 +133,7 @@ export function TokenUsagePage({
   }
 
   const total = sumRecordedTokens(teams);
+  const anyRecorded = hasRecordedTokens(teams);
 
   return (
     <div className={styles.page} data-testid="usage-page">
@@ -131,14 +141,15 @@ export function TokenUsagePage({
         <h2 className={styles.title}>{t('usage.title')}</h2>
         <div className={styles.totalTile} data-testid="usage-total">
           <span className={styles.totalLabel}>{t('usage.total')}</span>
-          <span className={styles.totalValue} title={String(total)}>
-            {formatTokenCount(total)}
+          <span className={styles.totalValue} title={anyRecorded ? String(total) : undefined}>
+            {anyRecorded ? formatTokenCount(total) : '—'}
           </span>
         </div>
       </header>
       <div className={styles.teamGrid}>
         {teams.map((team) => {
           const teamTotal = sumRecordedTokens([team]);
+          const teamRecorded = hasRecordedTokens([team]);
           return (
             <section
               className={styles.teamCard}
@@ -149,7 +160,7 @@ export function TokenUsagePage({
                 <h3 className={styles.teamName}>{team.name}</h3>
                 <span className={styles.teamMeta}>
                   {t('usage.runs', { count: team.runs.length })} ·{' '}
-                  {t('usage.tokens', { count: teamTotal })}
+                  {teamRecorded ? t('usage.tokens', { count: teamTotal }) : '—'}
                 </span>
               </header>
               {team.runs.length > 0 ? (

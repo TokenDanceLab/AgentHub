@@ -199,10 +199,21 @@ export function useWorkbenchSessionChrome({
       setSelectedExecutionTargetId('');
       return;
     }
-    // #1819: auto-select the first healthy execution target while nothing is
-    // selected and the user has not made an explicit choice, so send/run
-    // flows start with a live target instead of an empty picker.
-    if (!selectedExecutionTargetId && !executionTargetUserTouchedRef.current) {
+    if (executionTargetUserTouchedRef.current) return;
+    // System-owned selection (#1819): if the auto-picked target lost its
+    // confirmed-health marker, drop it so the next healthy candidate takes
+    // over instead of routing work to a target known to be unhealthy.
+    const selectedEntry = composerExecutionTargets?.find(
+      (target) => target.id === selectedExecutionTargetId,
+    );
+    if (selectedExecutionTargetId && selectedEntry && selectedEntry.healthy === false) {
+      setSelectedExecutionTargetId('');
+      return;
+    }
+    // #1819: auto-select the first confirmed-healthy execution target while
+    // nothing is selected and the user has not made an explicit choice, so
+    // send/run flows start with a live target instead of an empty picker.
+    if (!selectedExecutionTargetId) {
       const defaultTargetId = resolveDefaultExecutionTargetId(composerExecutionTargets);
       if (defaultTargetId) setSelectedExecutionTargetId(defaultTargetId);
     }

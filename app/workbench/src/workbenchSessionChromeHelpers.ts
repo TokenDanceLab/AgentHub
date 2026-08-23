@@ -58,9 +58,9 @@ export interface InspectorTranscriptViews {
 
 /**
  * Execution-target entry the shell feeds the composer picker. `healthy` is an
- * optional marker (#1819): shells that pre-filter to healthy/online targets may
- * omit it, entries explicitly flagged `false` are skipped by default
- * selection, and unmarked entries are treated as selectable.
+ * optional marker (#1819): only entries explicitly flagged `true` qualify for
+ * default auto-selection; unmarked (unknown) or `false` entries remain
+ * available for explicit user selection.
  */
 export interface ComposerExecutionTargetOption {
   id: string;
@@ -246,16 +246,17 @@ export function shouldClearSelectedExecutionTarget(
 }
 
 /**
- * Default execution target for auto-selection (#1819): the first entry not
- * explicitly flagged unhealthy. Returns undefined when the list is missing,
- * empty, or every entry carries `healthy: false` — an empty picker is more
- * honest than preselecting a target known to be down.
+ * Default execution target for auto-selection (#1819): the first entry the
+ * shell explicitly confirmed healthy. Returns undefined when the list is
+ * missing, empty, or no entry carries `healthy: true` — an empty picker is
+ * more honest than preselecting a target whose health is unconfirmed or
+ * known-bad. Unmarked entries stay available for explicit user selection.
  */
 export function resolveDefaultExecutionTargetId(
   composerExecutionTargets: ComposerExecutionTargetOption[] | undefined,
 ): string | undefined {
   if (!composerExecutionTargets) return undefined;
-  const preferred = composerExecutionTargets.find((target) => target.healthy !== false);
+  const preferred = composerExecutionTargets.find((target) => target.healthy === true);
   return preferred?.id;
 }
 

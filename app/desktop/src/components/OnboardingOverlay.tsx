@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import type React from 'react';
 import { useTranslation } from 'react-i18next';
+import { useFocusTrap } from '@shared/ui/focusTrap';
 import styles from './OnboardingOverlay.module.css';
 
 interface OnboardingStepDescriptor {
@@ -35,9 +36,10 @@ export function OnboardingOverlay({ onFinish }: OnboardingOverlayProps): React.R
   };
   const isLastStep = clampedStepIndex >= ONBOARDING_STEPS.length - 1;
 
-  useEffect(() => {
-    dialogRef.current?.focus();
-  }, [stepIndex]);
+  // Modal focus contract (#1856 CodeRabbit): the shared trap moves focus into
+  // the dialog, cycles Tab/Shift+Tab inside, and returns focus to the trigger
+  // on unmount. Escape stays a local handler because it finishes onboarding.
+  useFocusTrap(dialogRef, true);
 
   const handleKeyDown = useCallback(
     (event: React.KeyboardEvent<HTMLDivElement>): void => {

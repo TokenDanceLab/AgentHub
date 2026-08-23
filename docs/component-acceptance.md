@@ -137,7 +137,7 @@
 | 视觉 | token 化遮罩/面板/按钮 | ✅ | `--td-surface`/`--td-plum`/`--td-z-overlay` 等 |
 | 视觉 | light/dark 对比度 | ✅ | 随 OnboardingOverlay.stories.tsx 巡检 |
 | 交互 | 步进/跳过/完成调用 onFinish、Esc 关闭 | ✅ | OnboardingOverlay.test.tsx 行为断言 |
-| 键盘 | Esc 关闭、焦点移入对话框 | ✅ | `dialogRef.focus()` + keydown |
+| 键盘 | Esc 关闭、焦点移入/归还、Tab 循环 | ✅ | 复用共享 `useFocusTrap`（`app/shared/src/ui/focusTrap.ts`）；OnboardingOverlay.test.tsx 断言初始聚焦、Tab 环绕与关闭后焦点归还触发元素 |
 | a11y | `role="dialog"` + `aria-modal`、步骤进度可访问名 | ✅ | `aria-label` + `aria-current="step"` |
 | 响应式 | 窄宽下面板自适应、无横向滚动 | ✅ | `min(100%, 460px)` |
 

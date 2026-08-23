@@ -193,7 +193,7 @@ describe('workbenchSessionChromeHelpers', () => {
     expect(shouldClearSelectedExecutionTarget(targets, 'gone')).toBe(true);
   });
 
-  it('resolves the first non-unhealthy target as the default (#1819)', () => {
+  it('resolves only confirmed-healthy targets as the default (#1819, #1856)', () => {
     expect(resolveDefaultExecutionTargetId(undefined)).toBeUndefined();
     expect(resolveDefaultExecutionTargetId([])).toBeUndefined();
     expect(resolveDefaultExecutionTargetId([
@@ -203,8 +203,9 @@ describe('workbenchSessionChromeHelpers', () => {
     expect(resolveDefaultExecutionTargetId([
       { id: 'a', label: 'A', healthy: false },
     ])).toBeUndefined();
-    // Unmarked entries are selectable (shells that pre-filter may omit healthy).
-    expect(resolveDefaultExecutionTargetId([{ id: 'a', label: 'A' }])).toBe('a');
+    // Unmarked (unknown health) entries never auto-select — explicit
+    // selection remains available, but a default must be confirmed healthy.
+    expect(resolveDefaultExecutionTargetId([{ id: 'a', label: 'A' }])).toBeUndefined();
   });
 
   it('gates local CLI discovery to desktop settings with host port', () => {

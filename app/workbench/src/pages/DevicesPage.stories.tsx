@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/react';
 import { DevicesPage, type DevicesPageTarget } from './DevicesPage';
 
+// real_tested=false — static story fixtures, not a live Hub inventory.
 const targets: DevicesPageTarget[] = [
   {
     id: 'target-local-edge-alpha',

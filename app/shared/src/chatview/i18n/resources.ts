@@ -421,11 +421,11 @@ export const chatviewResources = {
 
     // ═══ Devices / execution-target management (#1819) ═══
     'devices.title': '设备与执行目标',
-    'devices.summary': '{online}/{total} 在线 · {healthy} 健康',
+    'devices.summary': '{{online}}/{{total}} 在线 · {{healthy}} 健康',
     'devices.ping': 'Ping',
     'devices.pinging': '检测中…',
     'devices.pingOk': '目标可达，已刷新健康状态',
-    'devices.pingFailed': 'Ping 失败：{detail}',
+    'devices.pingFailed': 'Ping 失败：{{detail}}',
     'devices.empty.title': '还没有已注册的设备',
     'devices.empty.body': '在桌面端连接 Local Edge 或登录后，已注册的设备与执行目标会出现在这里。',
     'devices.signedOut.title': '登录后可查看设备',
@@ -452,9 +452,8 @@ export const chatviewResources = {
     // ═══ Token / cost usage board (#1819) ═══
     'usage.title': 'Token 用量',
     'usage.total': '总计（已记录）',
-    'usage.tokens': '{count} tokens',
-    'usage.team': '{name}',
-    'usage.runs': '{count} 次运行',
+    'usage.tokens': '{{count}} tokens',
+    'usage.runs': '{{count}} 次运行',
     'usage.run.status': '状态',
     'usage.run.created': '创建时间',
     'usage.run.tokens': 'Token',
@@ -1080,11 +1079,11 @@ export const chatviewResources = {
 
     // ═══ Devices / execution-target management (#1819) ═══
     'devices.title': 'Devices & execution targets',
-    'devices.summary': '{online}/{total} online · {healthy} healthy',
+    'devices.summary': '{{online}}/{{total}} online · {{healthy}} healthy',
     'devices.ping': 'Ping',
     'devices.pinging': 'Pinging…',
     'devices.pingOk': 'Target reachable — health refreshed',
-    'devices.pingFailed': 'Ping failed: {detail}',
+    'devices.pingFailed': 'Ping failed: {{detail}}',
     'devices.empty.title': 'No registered devices yet',
     'devices.empty.body': 'Connect Local Edge on the desktop app or sign in — registered devices and execution targets will show up here.',
     'devices.signedOut.title': 'Sign in to see your devices',
@@ -1111,9 +1110,8 @@ export const chatviewResources = {
     // ═══ Token / cost usage board (#1819) ═══
     'usage.title': 'Token usage',
     'usage.total': 'Total (recorded)',
-    'usage.tokens': '{count} tokens',
-    'usage.team': '{name}',
-    'usage.runs': '{count} runs',
+    'usage.tokens': '{{count}} tokens',
+    'usage.runs': '{{count}} runs',
     'usage.run.status': 'Status',
     'usage.run.created': 'Created',
     'usage.run.tokens': 'Tokens',
