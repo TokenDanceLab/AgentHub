@@ -34,6 +34,10 @@ import type { ConnectionStatusKind } from './GlobalRail';
 import { ChatViewBridge } from './ChatViewBridge';
 import { MainchainStatusStrip } from './MainchainStatusStrip';
 import type { MainchainSummary } from './mainchain';
+import {
+  countPendingApprovals,
+  firstPendingApprovalBlockId,
+} from './workbenchApprovalSummary';
 import { UnifiedComposer } from './UnifiedComposer';
 import { WorkspaceHeader } from './WorkspaceHeader';
 import type { UnreadDividerDescriptor } from '@shared/chatview';
@@ -184,6 +188,43 @@ export const ConversationHost = React.memo(function ConversationHost({
       return next;
     });
   }, []);
+
+  // ── #1819 pending-approval reminder (badge + count + arrival toast) ────
+  // Honest surface boundary: there is no Hub endpoint that aggregates pending
+  // approvals across sessions. The badge covers the ACTIVE conversation's
+  // transcript (the client-side data surface) — see workbenchApprovalSummary.
+  const pendingApprovalCount = useMemo(() => countPendingApprovals(transcript), [transcript]);
+  const firstPendingApprovalId = useMemo(
+    () => firstPendingApprovalBlockId(transcript),
+    [transcript],
+  );
+  // Arrival toast fires only on a NET INCREASE within the same conversation —
+  // never on first mount or a conversation switch (else every session with
+  // leftovers would fake an "arrival"). Reset on switch so counts do not bleed
+  // across conversations.
+  const pendingApprovalArrivalRef = useRef<{ conversationId: string; count: number } | null>(null);
+  useEffect(() => {
+    const previous = pendingApprovalArrivalRef.current;
+    if (
+      previous &&
+      previous.conversationId === currentConversationId &&
+      pendingApprovalCount > previous.count
+    ) {
+      onToast(t('toast.approvalPendingArrived', {
+        count: String(pendingApprovalCount - previous.count),
+      }));
+    }
+    pendingApprovalArrivalRef.current = {
+      conversationId: currentConversationId,
+      count: pendingApprovalCount,
+    };
+  }, [pendingApprovalCount, currentConversationId, onToast, t]);
+  const handleApprovalJump = useCallback((): void => {
+    if (!firstPendingApprovalId) return;
+    // Reuses the transcript highlight path (scroll + pulse, auto-clear).
+    setSearchHighlightId(firstPendingApprovalId);
+    onSearchOpenChange(false);
+  }, [firstPendingApprovalId, onSearchOpenChange]);
 
   // ── Pending dispatch queue (CF22) ──────────────────────────────────────
   // Queue is ref-authoritative (mutations are synchronous read-modify-write,
@@ -496,6 +537,24 @@ export const ConversationHost = React.memo(function ConversationHost({
       <WorkspaceHeader activeConversation={activeConversation}
         inspectorCollapsed={inspectorCollapsed} onToggleInspector={onToggleInspector} onOpenSearch={() => onSearchOpenChange(true)} />
       {showMainchainStatus && <MainchainStatusStrip summary={mainchainSummary} onExportEvidence={onExportMainchainEvidence} />}
+      {pendingApprovalCount > 0 && !selectionMode && (
+        <div className={styles.pendingApprovalStrip} role="status" aria-live="polite">
+          <button
+            type="button"
+            className={styles.pendingApprovalJump}
+            aria-label={t('card.approval.pendingBadgeAria', { count: String(pendingApprovalCount) })}
+            onClick={handleApprovalJump}
+          >
+            <span className={styles.pendingApprovalDot} aria-hidden="true" />
+            <span className={styles.pendingApprovalCount}>
+              {t('card.approval.pendingBadge', { count: String(pendingApprovalCount) })}
+            </span>
+            <span className={styles.pendingApprovalJumpHint}>
+              {t('card.approval.jumpToFirst')}
+            </span>
+          </button>
+        </div>
+      )}
       <div className={styles.transcriptRegion} role="region" aria-label={t('aria.transcript')}>
         <ChatViewBridge displayTranscript={displayTranscript} activeConversation={activeConversation}
           unreadDivider={transcriptUnreadDivider}
