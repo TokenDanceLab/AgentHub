@@ -408,7 +408,11 @@ func newHandlerFromConfig(cfg Config) (*api.Handler, error) {
 	msgQueue := agents.NewQueue()
 
 	// Result aggregator collects sub-agent output and routes it back to the parent orchestrator.
-	resultAgg := lifecycle.NewResultAggregator(bus, agentReg)
+	// Attach the timeout-based result collector so a parent orchestrator is
+	// finalized (with partial results) if a sub-agent never reports terminal
+	// state instead of hanging forever on a lossy subscriber drop.
+	resultAgg := lifecycle.NewResultAggregator(bus, agentReg).
+		WithCollector(lifecycle.NewSubAgentResultCollector(lifecycle.DefaultSubAgentTimeout))
 	resultAggStop := resultAgg.Start()
 	// Wire the aggregator's stop function into shutdown hooks so its goroutine
 	// exits cleanly instead of being orphaned on process exit (#988 shutdown gap).

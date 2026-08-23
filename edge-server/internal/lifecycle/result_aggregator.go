@@ -83,11 +83,12 @@ func (ra *ResultAggregator) RecordSubAgentSpawn(parentRunID string) {
 	if ra.collector == nil {
 		return
 	}
-	// The parent's agent instance ID may differ from its run ID.
-	// Map via registry: find agent by run ID, use its ID as the collector key.
-	if inst := ra.registry.FindByRunID(parentRunID); inst != nil {
-		ra.collector.RecordSpawn(inst.ID)
-	}
+	// The collector keys are parent run IDs: StoreSubAgentResult and
+	// checkAllChildrenComplete both key by the child's ParentID, which equals
+	// the parent run ID. RecordSpawn must use the same key domain so timeout
+	// tracking starts for the same parent the results are later aggregated
+	// under — not the parent's agent instance ID (which differs from its run ID).
+	ra.collector.RecordSpawn(parentRunID)
 }
 
 // StoreSubAgentResult persists a completed sub-agent's structured result
