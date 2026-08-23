@@ -56,16 +56,21 @@ export function buildToolMatrixAgents(agentConfigs: AgentConfig[]): ToolMatrixAg
 export function buildAgentRecentShortcuts(
   agentsProvided: boolean,
   agentConfigs: AgentConfig[],
+  realDataMode: boolean = false,
 ): string[] {
   if (!agentsProvided) {
-    return ['Builder 权限更新', 'Browser QA 已安装', 'DeepSeek-V4-Pro 路由'];
+    return realDataMode ? [] : ['Builder 权限更新', 'Browser QA 已安装', 'DeepSeek-V4-Pro 路由'];
   }
   return agentConfigs.slice(0, 3).map((agent) => `${agent.name} 已同步`);
 }
 
 export function splitAgentMarketTemplates(
   templates: MarketTemplate[] = WORKBENCH_MOCK_AGENT_MARKET_TEMPLATES,
+  realDataMode: boolean = false,
 ): { marketFeatured: MarketTemplate[]; marketTemplates: MarketTemplate[] } {
+  if (realDataMode) {
+    return { marketFeatured: [], marketTemplates: [] };
+  }
   return {
     marketFeatured: templates.slice(0, 3),
     marketTemplates: templates.slice(3),
@@ -77,8 +82,9 @@ export function buildAgentsPageDerivedModel(
   agentConfigs: AgentConfig[],
   resolvedTools: string[],
   agentsProvided: boolean,
+  realDataMode: boolean = false,
 ): AgentsPageDerivedModel {
-  const market = splitAgentMarketTemplates();
+  const market = splitAgentMarketTemplates(undefined, realDataMode);
   return {
     confirmCount: countConfirmTools(agentConfigs, resolvedTools),
     defaultModelLabel: agentConfigs[0]?.model ?? '未配置模型',
@@ -86,7 +92,7 @@ export function buildAgentsPageDerivedModel(
     marketFeatured: market.marketFeatured,
     marketTemplates: market.marketTemplates,
     modelRoutes: buildModelRoutes(agentConfigs),
-    recentShortcuts: buildAgentRecentShortcuts(agentsProvided, agentConfigs),
+    recentShortcuts: buildAgentRecentShortcuts(agentsProvided, agentConfigs, realDataMode),
     runnableCount: agentConfigs.filter(
       (agent) => agent.state === 'running' || agent.state === 'ready',
     ).length,
