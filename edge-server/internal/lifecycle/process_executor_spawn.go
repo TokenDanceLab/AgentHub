@@ -106,5 +106,11 @@ func (e *ProcessExecutor) SpawnSubAgent(parentRun store.Run, task adapters.SubAg
 		return "", "", err
 	}
 
+	// Start the parent's sub-agent timeout clock in the result aggregator so
+	// the collector timeout fallback can emit partial results if a child hangs.
+	if e.resultAgg != nil {
+		e.resultAgg.RecordSubAgentSpawn(parentRun.ID)
+	}
+
 	return agentInstanceID, runID, nil
 }
