@@ -4,6 +4,7 @@ import { useEffect, useCallback, useRef, type ReactNode } from 'react';
 import { X, Maximize2, Minimize2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useFocusTrap } from './focusTrap';
+import { useExiting } from './useExiting';
 import { Tooltip } from './Tooltip';
 import { Button } from './Button';
 import { CHATVIEW_I18N_NAMESPACE } from '../chatview/i18n/resources';
@@ -37,6 +38,10 @@ export function Modal({
   const overlayRef = useRef<HTMLDivElement | null>(null);
   useFocusTrap(overlayRef, open);
 
+  // Keep the overlay mounted through the exit animation after onClose flips
+  // `open` false (#1825); reduced-motion drops it immediately.
+  const { mounted, exiting } = useExiting(open, 200);
+
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
@@ -60,7 +65,7 @@ export function Modal({
     };
   }, [open]);
 
-  if (!open) return null;
+  if (!mounted) return null;
 
   const contentClasses = [
     styles.content,
@@ -73,7 +78,7 @@ export function Modal({
   return (
     <div
       ref={overlayRef}
-      className={`${styles.overlay} ${overlayClassName ?? ''}`}
+      className={`${styles.overlay}${exiting ? ` ${styles.overlayExiting}` : ''}${overlayClassName ? ` ${overlayClassName}` : ''}`}
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}

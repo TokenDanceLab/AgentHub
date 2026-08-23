@@ -58,12 +58,12 @@ export type { ComponentNameProps } from './ComponentName';
 ### Motion Classification: Informational vs Decorative
 
 Animations are classified into two tiers for `prefers-reduced-motion: reduce` behavior.
-Tier follows a two-tier reduced-motion principle: maintainer opts into reduced-motion but expects **user-requested motion** to play normally.
+Tier follows a two-tier reduced-motion principle: maintainer opts into reduced-motion but expects **user-requested motion / state indicators** to remain legible.
 
 | Category | Behavior under `reduce` | Examples |
 |----------|------------------------|----------|
-| **Informational (exempt)** | Play normally — not shortened or suppressed | Spinner/loading indicators (`previewSpin`, `deploySpin`, `skeletonShimmer`, `skeletonPulse`, `TextShimmer.shimmer`, `AgentStreamingBar.iconPulse`), user-requested search feedback (`highlightPulse`), active-state indicators (`SubagentStreamOverlay.avatarPulse`, `AgentHubWorkbench.connectionBlink`) |
-| **Decorative (fully reduced)** | `animation-duration: 0.001ms !important; transition-duration: 0.001ms !important` | Entrance/slide-in animations (`rowBdExpand`, `routeSlideIn`, `editorIn`, `previewIn`, `panelIn`, `dropdownIn`, `modalPanelIn`, `contentIn`, `overlayIn`, `emptyStateIn`, `fileMenuIn`, `inspectorMenuIn`, `permissionPopoverIn`), UI pulse effects (`routePulse`, `dagPulse`), hover lift (`ah-glass-press`), tab and chrome transitions |
+| **Informational (state stays legible)** | The animation loop halts, but the indicator keeps its static shape/text so the state remains readable. Implemented as a per-component `@media (prefers-reduced-motion: reduce) { animation: none }` block. | Spinner/loading rings keep their ring (loop stops) (`previewSpin`, `deploySpin`, `row-spinner`), status text stays (`AgentStreamingBar.iconPulse`, `AgentHubWorkbench.connectionBlink` → static dot), `thinkShimmer` text stays solid |
+| **Decorative (fully reduced)** | Entrance/slide animations are wrapped in `@media (prefers-reduced-motion: no-preference)` so they never run; infinite decorative pulses get `animation: none` under `reduce`. | Entrance animations (`rowBdExpand`, `routeSlideIn`, `editorIn`, `previewIn`, `panelIn`, `dropdownIn`, `modalPanelIn`, `contentIn`, `overlayIn`, `emptyStateIn`, `fileMenuIn`, `inspectorMenuIn`, `permissionPopoverIn`), UI pulse effects (`routePulse`, `dagPulse`), hover lift (`ah-glass-press`), tab and chrome transitions |
 
 **Implementation rule:**
 
@@ -73,15 +73,16 @@ Tier follows a two-tier reduced-motion principle: maintainer opts into reduced-m
   .my-panel { animation: slideIn 0.3s var(--ease-panel); }
 }
 
-/* Informational spinner — always plays */
+/* Informational indicator — state stays, the loop stops */
 .my-spinner { animation: spin 0.8s linear infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .my-spinner { animation: none; }
+}
 ```
 
-The global reduced-motion reset at `chatview/design/global.css:24` zeroes all `animation-duration` and `transition-duration` to `0.001ms`. If a motion is informational and must be exempt, either:
-1. Animate via a non-duration property (e.g. `opacity` swap) outside the `*` selector scope, or
-2. Override within a `@media (prefers-reduced-motion: no-preference)` block (preferred).
+There is **no global reduced-motion reset**: `chatview/design/global.css` is an unwired/dead file (its kill-switch never reaches the app). The real mechanism is per-component blocks — each component owns its own `prefers-reduced-motion` gate (see `RowItem.css`, `AgentStreamingBar.module.css`, `tokens-base.css` `.ah-glass-press`, `Card.module.css`, `Modal.module.css`, …). When adding motion, add its gate in the same file. Transition property lists are the mechanism for chrome feedback (e.g. `--motion-hover/press/panel` recipes); under `reduce` those components override `transition: none` or `transition-duration: 0ms`.
 
-> Rule of thumb: **If the user didn't ask for it and it moves, it's decorative.** Loading spinners, search highlights, and running-state indicators are informational because they communicate system state the user is waiting for.
+> Rule of thumb: **If the user didn't ask for it and it moves, it's decorative.** Loading spinners, search highlights, and running-state indicators are informational because they communicate system state the user is waiting for — keep their static form visible when the loop stops.
 
 ## Props Rules
 

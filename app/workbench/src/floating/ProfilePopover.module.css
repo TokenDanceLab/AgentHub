@@ -46,7 +46,7 @@
   align-items: center;
   justify-content: center;
   flex: 0 0 44px;
-  font: 700 0.9375rem var(--td-font);
+  font: 600 0.9375rem var(--td-font);
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--td-ink-on-plum) 24%, transparent);
 }
 
@@ -74,7 +74,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font: 650 0.9375rem/1.25 var(--td-font);
+  font: 600 0.9375rem/1.25 var(--td-font);
 }
 
 .badge {

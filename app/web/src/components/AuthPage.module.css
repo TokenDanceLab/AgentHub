@@ -61,7 +61,7 @@
   margin: 0;
   color: var(--td-ink);
   font-size: 18px;
-  font-weight: 620;
+  font-weight: 600;
   letter-spacing: 0;
   line-height: 1.2;
 }
@@ -92,6 +92,15 @@
   cursor: pointer;
   transition: all 0.15s;
 }
+/* #1825: tab hover/active feedback (was zero-state). */
+.tab:hover:not(.tabActive) {
+  background: var(--glass-bg-hover);
+}
+
+.tab:active {
+  background: var(--glass-bg-active);
+}
+
 .tabActive {
   background: var(--glass-bg-medium);
   color: var(--td-ink);
@@ -223,7 +232,7 @@
   box-shadow: none;
   color: var(--td-ink);
   font-size: 14px;
-  font-weight: 650;
+  font-weight: 600;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
@@ -248,7 +257,7 @@
 .identityIcon {
   width: 18px;
   height: 18px;
-  border-radius: 5px;
+  border-radius: var(--r-xs);
   flex: 0 0 auto;
 }
 
@@ -461,5 +470,12 @@
 
   .advancedToggle {
     min-height: 44px;
+  }
+}
+
+/* Reduced motion (#1825): tab hover/active feedback flips instantly. */
+@media (prefers-reduced-motion: reduce) {
+  .tab {
+    transition: none;
   }
 }

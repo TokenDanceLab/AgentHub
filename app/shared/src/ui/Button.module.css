@@ -92,12 +92,13 @@
 
 .gradient {
   color: var(--td-ink-on-plum, #fff);
-  font-weight: 700;
+  font-weight: 600;
   background: var(--td-plum);
-  box-shadow: 0 10px 22px oklch(0.55 0.16 255 / 0.24);
+  /* #1825: elevation via the --e-* ladder, not a free-floating glow value. */
+  box-shadow: var(--e-2, var(--td-shadow-md));
 }
 .gradient:hover:not(:disabled) {
-  box-shadow: 0 14px 28px oklch(0.55 0.16 255 / 0.32);
+  box-shadow: var(--e-3, var(--td-shadow-lg));
 }
 
 @media (prefers-reduced-motion: no-preference) {

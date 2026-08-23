@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, act } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import { Select } from './Select';
 
@@ -34,12 +34,24 @@ describe('Select', () => {
     expect(onChange).toHaveBeenCalledWith('b');
   });
 
-  it('closes on Escape', () => {
-    render(<Select options={options} value="" onChange={() => {}} placeholder="Select" />);
-    fireEvent.click(screen.getByRole('button'));
-    expect(screen.getByRole('listbox')).toBeInTheDocument();
-    fireEvent.keyDown(screen.getByRole('listbox'), { key: 'Escape' });
-    expect(screen.queryByRole('listbox')).toBeNull();
+  it('closes on Escape (unmount deferred by the exit window)', () => {
+    vi.useFakeTimers();
+    try {
+      render(<Select options={options} value="" onChange={() => {}} placeholder="Select" />);
+      fireEvent.click(screen.getByRole('button'));
+      expect(screen.getByRole('listbox')).toBeInTheDocument();
+      fireEvent.keyDown(screen.getByRole('listbox'), { key: 'Escape' });
+      // #1825: the dropdown stays mounted through its ~140ms exit animation,
+      // then unmounts. Pin the exit-mounted state before advancing past the
+      // window and asserting it is gone.
+      expect(screen.getByRole('listbox')).toBeInTheDocument();
+      act(() => {
+        vi.advanceTimersByTime(200);
+      });
+      expect(screen.queryByRole('listbox')).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('navigates with ArrowDown and selects with Enter', () => {

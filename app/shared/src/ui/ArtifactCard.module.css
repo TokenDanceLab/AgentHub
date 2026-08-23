@@ -21,7 +21,7 @@
 
 .typeLabel {
   font-size: 10px;
-  font-weight: 650;
+  font-weight: 600;
   text-transform: uppercase;
   color: var(--td-ink-muted);
   flex-shrink: 0;

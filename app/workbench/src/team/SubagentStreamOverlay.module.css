@@ -152,7 +152,7 @@
   background: var(--td-plum);
   color: var(--td-ink-on-plum);
   font-size: 0.625rem;
-  font-weight: 700;
+  font-weight: 600;
   text-transform: uppercase;
   flex-shrink: 0;
 }
@@ -262,7 +262,7 @@
   color: var(--td-accent-amber);
   background: var(--td-accent-amber-bg);
   padding: 1px 4px;
-  border-radius: 3px;
+  border-radius: var(--r-xs);
 }
 
 .result {

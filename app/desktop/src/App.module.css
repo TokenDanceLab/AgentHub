@@ -121,7 +121,7 @@
   box-shadow: 0 10px 28px var(--glass-shadow-subtle);
   color: var(--td-ink);
   font-size: 11px;
-  font-weight: 560;
+  font-weight: 500;
   line-height: 1.55;
   min-height: 1.55em;
   opacity: 0;
@@ -200,7 +200,7 @@
   overflow: hidden;
   color: color-mix(in oklch, var(--td-ink) 70%, var(--td-ink-muted) 30%);
   font-size: 13px;
-  font-weight: 460;
+  font-weight: 500;
   line-height: 1.5;
   min-height: 1.5em;
   padding: 1px 0 3px;
@@ -356,7 +356,7 @@
 .sidebarSectionLabel {
   padding: 10px 16px 2px;
   font-size: 11px;
-  font-weight: 520;
+  font-weight: 500;
   line-height: 1.5;
   min-height: 1.5em;
   text-transform: uppercase;
@@ -422,7 +422,7 @@
   min-width: 0;
   overflow: hidden;
   font-size: 13px;
-  font-weight: 420;
+  font-weight: 400;
   line-height: 1.45;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -526,7 +526,7 @@
   border-bottom: 1px solid var(--glass-border-subtle);
   flex-shrink: 0;
   font-size: var(--td-text-sm);
-  font-weight: 430;
+  font-weight: 400;
 }
 
 [data-theme='dark'] .workspaceHeader {
@@ -538,7 +538,7 @@
   min-height: 1.5em;
   padding: 1px 0 3px;
   font-size: 13px;
-  font-weight: 430;
+  font-weight: 400;
   line-height: 1.5;
   letter-spacing: 0;
 }
@@ -603,7 +603,7 @@
   background: var(--td-danger);
   color: var(--destructive-foreground);
   font-size: 9px;
-  font-weight: 760;
+  font-weight: 600;
   line-height: 1;
 }
 
@@ -1009,7 +1009,7 @@
   color: color-mix(in oklch, var(--td-ink-muted) 94%, var(--td-ink) 6%);
   font: inherit;
   font-size: 12.5px;
-  font-weight: 450;
+  font-weight: 500;
   line-height: 1.34;
   letter-spacing: 0;
   cursor: pointer;
@@ -1091,7 +1091,7 @@
   cursor: pointer;
   font: inherit;
   font-size: 12.5px;
-  font-weight: 450;
+  font-weight: 500;
   text-align: left;
 }
 
@@ -1138,7 +1138,7 @@
   color: var(--td-ink-muted);
   font-family: var(--td-font);
   font-size: 12px;
-  font-weight: 430;
+  font-weight: 400;
   line-height: 1.32;
 }
 
@@ -1213,7 +1213,7 @@
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  border-radius: 4px;
+  border-radius: var(--r-xs);
   transition: background 0.12s, color 0.12s;
 }
 
@@ -1239,7 +1239,7 @@
 .bannerBtn {
   padding: 2px 10px;
   border: 1px solid var(--td-line);
-  border-radius: 5px;
+  border-radius: var(--r-xs);
   background: transparent;
   color: var(--td-ink);
   cursor: pointer;
@@ -1422,11 +1422,11 @@
 }
 
 .workspaceHeader h2 {
-  font-weight: 560;
+  font-weight: 500;
 }
 
 .workspaceThreadTitle {
-  font-weight: 460;
+  font-weight: 500;
 }
 
 .banner {

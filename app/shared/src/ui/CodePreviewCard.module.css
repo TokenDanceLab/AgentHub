@@ -26,7 +26,7 @@
   overflow: hidden;
   color: var(--td-ink, var(--td-ink));
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 600;
   line-height: 1.35;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -35,7 +35,7 @@
 .meta {
   color: var(--td-ink-muted, var(--td-ink-muted));
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 600;
   line-height: 1.2;
   white-space: nowrap;
 }
@@ -67,7 +67,7 @@
 
 .more {
   color: var(--td-ink, var(--td-ink));
-  font-weight: 700;
+  font-weight: 600;
 }
 
 /* ── Responsive ─────────────────── */

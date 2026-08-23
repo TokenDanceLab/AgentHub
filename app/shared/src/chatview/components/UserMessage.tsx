@@ -19,13 +19,16 @@ interface Props {
    * with the upstream block id and fires this handler on contextmenu.
    */
   onContextMenu?: (id: string, event: React.MouseEvent) => void
+  /** #1825: one-shot entry animation for the newest same-session message. */
+  enter?: boolean | undefined
 }
 
 /** Render a user message bubble in the transcript.
  *  In DM mode: avatar only, right-aligned. In group mode: name + time + avatar. */
-export const UserMessage = memo(function UserMessage({ item, chatMode, onContextMenu }: Props) {
+export const UserMessage = memo(function UserMessage({ item, chatMode, onContextMenu, enter }: Props) {
   const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE)
   const avatarInitial = userAvatarInitial(item.name, t('chat.you'))
+  const rowClass = enter ? 'grp-row user-row-right grp-enter' : 'grp-row user-row-right'
 
   // #1821: text bubbles get the same selectable/context-menu identity tool
   // rows have — only when both an upstream block id and a handler exist.
@@ -40,7 +43,7 @@ export const UserMessage = memo(function UserMessage({ item, chatMode, onContext
 
   if (chatMode === 'dm') {
     return (
-      <div className="grp-row user-row-right">
+      <div className={rowClass}>
         <div className="dm-spacer" aria-hidden="true"><div className="ag-av">&nbsp;</div></div>
         <div className="grp-content user-content-right">
           <MessageDisplayMeta
@@ -60,7 +63,7 @@ export const UserMessage = memo(function UserMessage({ item, chatMode, onContext
   }
 
   return (
-    <div className="grp-row user-row-right">
+    <div className={rowClass}>
       <div className="dm-spacer" aria-hidden="true"><div className="ag-av">&nbsp;</div></div>
       <div className="grp-content user-content-right">
         <div className="user-meta">

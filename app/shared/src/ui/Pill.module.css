@@ -7,7 +7,7 @@
   border: 1px solid var(--td-line);
   border-radius: var(--r-full);
   font-size: var(--td-text-xs, 0.75rem);
-  font-weight: 700;
+  font-weight: 600;
   white-space: nowrap;
   line-height: 1;
 }

@@ -349,6 +349,9 @@ export const RowItem = memo(function RowItem({ item, onToggle, onApprove, onReje
         {...(item.collapsible ? { 'aria-expanded': isOpen, 'aria-label': isOpen ? t('card.collapse') : t('card.expand') } : {})}
       >
         <IconComp className={`row-icon${item.fileOp === 'cr' ? ' cr' : item.fileOp === 'mod' ? ' mod' : item.fileOp === 'del' ? ' del' : ''}`} size={16} />
+        {item.status === 'running' && (item.type === 'tool' || item.type === 'file' || item.type === 'sub') && (
+          <span className="row-spinner" aria-hidden="true" />
+        )}
         <span className="row-label">
           {item.type === 'file' ? (
             <><span className={`file-act ${item.fileOp||''}`}>{labelText}</span>

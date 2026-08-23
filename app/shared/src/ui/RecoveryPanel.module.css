@@ -31,7 +31,7 @@
   margin: 0;
   color: var(--td-ink-muted);
   font-size: 11px;
-  font-weight: 760;
+  font-weight: 600;
   letter-spacing: 0;
   line-height: 1.45;
   text-transform: uppercase;
@@ -41,7 +41,7 @@
   margin: 0;
   color: var(--td-ink);
   font-size: 16px;
-  font-weight: 700;
+  font-weight: 600;
   line-height: 1.45;
 }
 
@@ -72,8 +72,22 @@
   background: var(--td-surface);
   color: var(--td-ink);
   font: inherit;
-  font-weight: 660;
+  font-weight: 600;
   cursor: pointer;
+  transition:
+    background-color var(--motion-hover, 90ms ease),
+    border-color var(--motion-hover, 90ms ease),
+    transform var(--motion-press, 90ms ease);
+}
+
+/* #1825: action buttons had no hover/active feedback. */
+.action:hover:not(:disabled) {
+  background: var(--td-surface-3);
+  border-color: var(--td-line-strong);
+}
+
+.action:active:not(:disabled) {
+  transform: scale(var(--glass-press-scale, 0.985));
 }
 
 .action:disabled {
@@ -84,5 +98,15 @@
 @media (max-width: 420px) {
   .actions {
     grid-template-columns: 1fr;
+  }
+}
+
+/* Reduced motion: no hover lift / press scale on actions (#1825). */
+@media (prefers-reduced-motion: reduce) {
+  .action,
+  .action:hover:not(:disabled),
+  .action:active:not(:disabled) {
+    transition: none;
+    transform: none;
   }
 }

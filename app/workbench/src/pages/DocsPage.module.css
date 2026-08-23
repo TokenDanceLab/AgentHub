@@ -408,7 +408,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font: 650 0.5625rem/1 var(--td-font);
+  font: 600 0.5625rem/1 var(--td-font);
   letter-spacing: 0;
   flex-shrink: 0;
   box-shadow: inset 0 0 0 1px color-mix(in srgb, white 24%, transparent);
@@ -522,6 +522,17 @@
   font: 500 0.6875rem var(--td-font);
   cursor: pointer;
   white-space: nowrap;
+  transition: filter var(--td-dur-fast) var(--td-ease), transform var(--td-dur-fast) var(--td-ease);
+}
+
+/* #1825: destructive confirm button had zero state feedback. */
+.confirmDeleteBtn:hover:not(:disabled) {
+  filter: brightness(1.1);
+}
+
+.confirmDeleteBtn:active:not(:disabled) {
+  transform: scale(0.97);
+  opacity: 0.85;
 }
 
 .cancelDeleteBtn {
@@ -576,4 +587,14 @@
   white-space: nowrap;
   color: var(--td-ink);
   font: 600 0.8125rem var(--td-font);
+}
+
+/* Reduced motion: no button feedback choreography (#1825). */
+@media (prefers-reduced-motion: reduce) {
+  .confirmDeleteBtn {
+    animation: none;
+    transition: none;
+    transform: none;
+    filter: none;
+  }
 }

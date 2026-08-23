@@ -55,7 +55,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  font: 700 0.625rem var(--td-mono);
+  font: 600 0.625rem var(--td-mono);
   border: 1px solid var(--td-line);
 }
 
@@ -783,7 +783,7 @@
 
 .qrCell {
   background: var(--qr-cell);
-  border-radius: 2px;
+  border-radius: var(--r-xs);
 }
 
 .qrCellOn {
@@ -802,7 +802,7 @@
   justify-content: center;
   background: var(--td-plum);
   color: var(--text-inv);
-  font: 700 0.8125rem var(--td-mono);
+  font: 600 0.8125rem var(--td-mono);
   border: 4px solid white;
 }
 
@@ -866,6 +866,27 @@
   cursor: pointer;
 }
 
+/* #1825: solid primary buttons had zero hover/active feedback — same
+   micro-recipe as Button.module.css primary. */
+.linkCopyBtn,
+.codeBtn,
+.phoneSendBtn {
+  transition: filter var(--td-dur-fast) var(--td-ease), transform var(--td-dur-fast) var(--td-ease);
+}
+
+.linkCopyBtn:hover:not(:disabled),
+.codeBtn:hover:not(:disabled),
+.phoneSendBtn:hover:not(:disabled) {
+  filter: brightness(1.1);
+}
+
+.linkCopyBtn:active:not(:disabled),
+.codeBtn:active:not(:disabled),
+.phoneSendBtn:active:not(:disabled) {
+  transform: scale(0.97);
+  opacity: 0.85;
+}
+
 .linkHint {
   color: var(--td-ink-muted);
   font: 400 0.8125rem/1.5 var(--td-font);
@@ -891,7 +912,7 @@
   background: var(--td-surface);
   border: 1px solid var(--td-line);
   color: var(--td-ink);
-  font: 700 1.25rem var(--td-mono);
+  font: 600 1.25rem var(--td-mono);
   letter-spacing: 0;
 }
 
@@ -999,9 +1020,14 @@
   .modalBackdrop,
   .modal,
   .modalClose,
-  .modalTab {
+  .modalTab,
+  .linkCopyBtn,
+  .codeBtn,
+  .phoneSendBtn {
     animation: none;
     transition: none;
+    transform: none;
+    filter: none;
   }
 }
 
