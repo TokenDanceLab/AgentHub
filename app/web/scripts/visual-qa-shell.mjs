@@ -33,7 +33,13 @@ const baseUrl =
   process.env.AGENTHUB_WEB_QA_URL ??
   process.env.WEB_QA_URL ??
   `http://127.0.0.1:${port}/`;
-const viewport = { width: 1440, height: 810 };
+// #1866: narrow-tier evidence alongside the 1440×810 gate. The gate
+// assertion still only requires the 1440 shots; these extra captures are
+// review artifacts for the 768px responsive tier.
+const VIEWPORTS = [
+  { width: 1440, height: 810, label: '1440x810' },
+  { width: 768, height: 900, label: '768x900' },
+];
 const dpr = Math.max(1, Number(process.env.VISUAL_QA_DPR ?? 1) || 1);
 const dprSuffix = dpr === 1 ? '' : `@${dpr}x`;
 const themes = ['light', 'dark'];
@@ -246,9 +252,9 @@ async function maybeStartDevServer() {
   };
 }
 
-async function captureTheme(browser, theme) {
+async function captureTheme(browser, theme, vp = { width: 1440, height: 810, label: '1440x810' }) {
   const context = await browser.newContext({
-    viewport,
+    viewport: { width: vp.width, height: vp.height },
     deviceScaleFactor: dpr,
     serviceWorkers: 'block',
     // Match prefers-color-scheme so system-theme resolution is predictable
@@ -284,7 +290,7 @@ async function captureTheme(browser, theme) {
     await page.waitForSelector(WORKBENCH_SHELL, { state: 'visible', timeout: 30_000 });
   } catch {
     // Diagnostic capture on failure
-    const diagFile = path.join(outDir, `web-shell-${theme}-1440x810${dprSuffix}-DIAGNOSTIC.png`);
+    const diagFile = path.join(outDir, `web-shell-${theme}-${vp.label}${dprSuffix}-DIAGNOSTIC.png`);
     await page.screenshot({ path: diagFile, fullPage: false });
     const pageUrl = page.url();
     const pageTitle = await page.title();
@@ -307,7 +313,7 @@ async function captureTheme(browser, theme) {
     await agentsRail.click();
     await page.waitForSelector(AGENTS_PAGE, { state: 'visible', timeout: 15_000 });
   } catch {
-    const diagFile = path.join(outDir, `web-shell-${theme}-1440x810${dprSuffix}-AGENTS-DIAGNOSTIC.png`);
+    const diagFile = path.join(outDir, `web-shell-${theme}-${vp.label}${dprSuffix}-AGENTS-DIAGNOSTIC.png`);
     await page.screenshot({ path: diagFile, fullPage: false });
     const pageUrl = page.url();
     const bodyText = await page.evaluate(() =>
@@ -376,7 +382,7 @@ async function captureTheme(browser, theme) {
   // Extra settle time for CSS transitions, fonts, and lazy async chunks
   await wait(800);
 
-  const file = path.join(outDir, `web-shell-${theme}-1440x810${dprSuffix}.png`);
+  const file = path.join(outDir, `web-shell-${theme}-${vp.label}${dprSuffix}.png`);
   await page.screenshot({ path: file, fullPage: false });
 
   const applied = await page.evaluate(() => document.documentElement.getAttribute('data-theme'));
@@ -395,8 +401,10 @@ async function main() {
   const browser = await chromium.launch({ headless: true });
   const results = [];
   try {
-    for (const theme of themes) {
-      results.push(await captureTheme(browser, theme));
+    for (const vp of VIEWPORTS) {
+      for (const theme of themes) {
+        results.push(await captureTheme(browser, theme, vp));
+      }
     }
   } finally {
     await browser.close();
