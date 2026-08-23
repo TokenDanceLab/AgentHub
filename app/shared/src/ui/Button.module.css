@@ -53,12 +53,12 @@
 }
 
 .secondary {
-  background: var(--secondary);
-  color: var(--secondary-foreground);
+  background: var(--td-surface-2);
+  color: var(--td-ink);
   border-color: var(--td-line);
 }
 .secondary:hover:not(:disabled) {
-  background: var(--accent);
+  background: var(--td-surface-3);
 }
 .secondary:focus-visible:not(:disabled) {
   outline: none;
@@ -70,7 +70,7 @@
   color: var(--td-ink-muted);
 }
 .ghost:hover:not(:disabled) {
-  background: var(--secondary);
+  background: var(--td-surface-2);
   color: var(--td-ink);
 }
 .ghost:focus-visible:not(:disabled) {
@@ -124,12 +124,12 @@
   height: 36px;
   padding: 0;
   border-radius: var(--r-md);
-  background: var(--secondary);
-  color: var(--secondary-foreground);
+  background: var(--td-surface-2);
+  color: var(--td-ink);
   border-color: var(--td-line);
 }
 .icon:hover:not(:disabled) {
-  background: var(--accent);
+  background: var(--td-surface-3);
 }
 
 /* ── Responsive ─────────────────── */

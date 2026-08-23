@@ -37,8 +37,8 @@
   background:
     linear-gradient(
       135deg,
-      var(--glass-tint-plum, rgba(0, 113, 188, 0.12)),
-      var(--glass-tint-sky, rgba(59, 130, 246, 0.12))
+      var(--glass-tint-plum),
+      var(--glass-tint-sky)
     );
   backdrop-filter: var(--glass-backdrop-filter);
   -webkit-backdrop-filter: var(--glass-backdrop-filter);
