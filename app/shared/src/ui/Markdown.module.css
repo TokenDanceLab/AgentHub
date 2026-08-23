@@ -147,7 +147,7 @@
 }
 
 .root del {
-  opacity: 0.5;
+  opacity: var(--opacity-50);
 }
 
 /* ── Blockquotes ────────────────────────────── */
@@ -156,7 +156,7 @@
   margin: 0.5em 0;
   padding: 0.25em 0.75em;
   border-left: 3px solid var(--td-line-strong);
-  opacity: 0.85;
+  opacity: var(--opacity-85);
 }
 
 .root blockquote p {
@@ -234,7 +234,7 @@
      the header stays visible while a long table scrolls vertically. */
   position: sticky;
   top: 0;
-  z-index: 1;
+  z-index: var(--z-base);
 }
 
 /* Zebra striping — odd rows stay transparent so the rounded table border

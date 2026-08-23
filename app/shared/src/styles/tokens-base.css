@@ -127,6 +127,13 @@
   --z-context-menu: 80;
   --z-demo-toast: 90;
 
+  /* 应用内微层（组件内部提升；语义锚点见引用文件） */
+  --z-ambient: 0;          /* 基底装饰/滚动容器：置于 --z-base 之下 */
+  --z-chat-float: 10;      /* chat 悬浮控件（scroll-to-bottom 按钮，Transcript.css） */
+  --z-chat-pinned: 11;     /* chat 置顶摘要内衬（Transcript.css） */
+  --z-composer: 12;        /* workbench 输入底座：内容层之上、dropdown 之下 */
+  --z-session-gate: 60;    /* 全屏会话门（web auth overlay；与 --z-profile-popover 同层互斥） */
+
   /* TokenDance contract z-stacking (design-system.md §4.3) */
   --td-z-nav:     var(--z-sticky);
   --td-z-overlay: var(--z-overlay);
@@ -201,15 +208,18 @@
   --glass-press-scale: 0.985;
   --glass-hover-lift: translateY(-1px);
 
-  /* ═══════════════════════════════════════════════════════════════════════
-     v4 State Colors
-     ═══════════════════════════════════════════════════════════════════════ */
-  --state-running:    #5e8dcc;
-  --state-thinking:   #5e8dcc;
-  --state-waiting:    #c0883a;
-  --state-success:    #409467;
-  --state-failed:     #d15252;
-  --state-cancelled:  #858595;
+  /* ── Opacity de-emphasis scale (#1827) ────────────────────────────────
+     Five tiers replace per-component hardcoded `opacity: 0.3/0.4/0.5/0.65/0.85`.
+     Theme-independent; values are the exact former per-component constants
+     (no visual drift). --opacity-30/40: disabled previews/controls;
+     --opacity-50: disabled controls + faded text; --opacity-65/85: muted
+     decor (icons) and pressed/soft states. (chatview keeps its scoped
+     --opacity-disabled/--opacity-route-mid/--opacity-dag-mid aliases.) */
+  --opacity-30: 0.3;
+  --opacity-40: 0.4;
+  --opacity-50: 0.5;
+  --opacity-65: 0.65;
+  --opacity-85: 0.85;
 
   /* ── Semantic Colors (theme-independent defaults — overridden in themes.css) */
   --primary:      #0071BC;
@@ -358,12 +368,18 @@
 
   /* ── Responsive Breakpoints (documentation — copy into @media) ──── */
   /* CSS custom properties cannot be used inside @media queries.       */
-  /* --bp-mobile:  480px;  compact / touch-target enlarge              */
-  /* --bp-narrow:  760px;  sidebar collapse, mobile shell (SSOT)       */
-  /* --bp-medium:  1024px; full desktop layout                         */
-  /* --bp-wide:    1440px; design target (visual QA viewport)          */
-  /* --bp-xwide:   1920px; large desktop — root type bump              */
-  /* --bp-ultra:   2560px; ultrawide — root type bump                  */
+  /* JS/TS machine SSOT + layout strategy: styles/breakpoints.ts.      */
+  /* --bp-mobile:   480px;  ≤480 compact / touch-target enlarge        */
+  /* --bp-narrow:   768px;  ≤768 mobile shell, sidebar collapse (SSOT) */
+  /* --bp-medium:  1024px;  ≥1024 full desktop layout                  */
+  /* --bp-standard:1280px;  ≥1280 standard desktop window (3-panel)    */
+  /* --bp-wide:    1440px;  ≥1440 design target (visual QA viewport)   */
+  /* --bp-xwide:   1920px;  ≥1920 large desktop — root type bump       */
+  /* --bp-ultra:   2560px;  ≥2560 ultrawide — root type bump           */
+  /* 768–1023 (tablet band) has no CSS @media by design: the workbench  */
+  /* workspace-pressure auto-collapse (#721) keeps the chat main       */
+  /* column ≥ 560px there; desktop/App.module.css keeps its legacy     */
+  /* 1023/1279 max-width pairing (medium−1 / standard−1 clamp marks).  */
 
   /* ── Touch Targets (WCAG 2.5.5) ─────────────────────────────────── */
   --touch-target-min: 44px;
