@@ -69,10 +69,11 @@ export interface DiffReviewLabels {
   modified?: string;
   acceptAll?: string;
   rejectAll?: string;
-  acceptLine?: string;
-  rejectLine?: string;
+  acceptHunk?: string;
+  rejectHunk?: string;
   applied?: string;
   rejected?: string;
+  submitting?: string;
 }
 
 export interface DiffHunkDecision {
@@ -110,8 +111,9 @@ export const DEFAULT_LABELS: Required<DiffReviewLabels> = {
   modified: 'Modified',
   acceptAll: 'Accept All',
   rejectAll: 'Reject All',
-  acceptLine: 'Accept line',
-  rejectLine: 'Reject line',
+  acceptHunk: 'Accept hunk',
+  rejectHunk: 'Reject hunk',
   applied: 'Applied',
   rejected: 'Rejected',
+  submitting: 'Submitting...',
 };

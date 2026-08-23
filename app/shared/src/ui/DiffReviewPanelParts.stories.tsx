@@ -49,16 +49,14 @@ export const SideColumn: Story = {
       filePath="src/utils.ts"
       rows={rows}
       activeLang="typescript"
-      acceptedLines={new Set()}
-      rejectedLines={new Set(['1'])}
-      lineKey={(rowIndex) => `left-${rowIndex}`}
       rowToHunkIndex={rowToHunkIndex}
       hunkStates={{ 'src/utils.ts:0': 'rejected' }}
       hunkKeyFor={hunkKeyFor}
       appliedLabel="Applied"
       rejectedLabel="Rejected"
-      acceptLineLabel="Accept line"
-      rejectLineLabel="Reject line"
+      submittingLabel="Submitting..."
+      acceptHunkLabel="Accept hunk"
+      rejectHunkLabel="Reject hunk"
       onAcceptClick={() => {}}
       onRejectClick={() => {}}
     />
