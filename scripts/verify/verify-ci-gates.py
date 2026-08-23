@@ -89,6 +89,7 @@ def main() -> int:
     edge = get_job_block(workflow, "go-edge")
     hub = get_job_block(workflow, "go-hub")
     backend_fixture = get_job_block(workflow, "backend-e2e-fixture")
+    backend_required = get_job_block(workflow, "backend-required")
     # CI5: backend-focused-subset job removed (redundant with go-edge/go-hub
     # full `go test ./...` runs that already cover the focused packages).
     desktop = get_job_block(workflow, "frontend-desktop")
@@ -214,6 +215,17 @@ def main() -> int:
     assert_contains(windows_frontend, r"if:\s+always\(\)", "windows-frontend must report a stable result when its matrix is skipped")
     assert_contains(windows_frontend, re.escape("MATRIX_RESULT: ${{ needs.windows-frontend-test.result }}"), "windows-frontend must bind the Windows frontend matrix result for fail-closed aggregation")
     assert_contains(windows_frontend, re.escape('MATRIX_RESULT" != "success"'), "windows-frontend must fail when its Windows frontend matrix did not succeed")
+    assert_contains(backend_required, re.escape("needs: [changes, go-edge, go-hub, backend-integration, backend-edge-e2e, backend-e2e-fixture]"), "backend-required must aggregate all backend L0/L1/L2 lanes")
+    assert_contains(backend_required, re.escape("if: always()"), "backend-required must report a stable result when its lanes are path-filtered")
+    assert_contains(backend_required, re.escape("CHANGES_STATUS: ${{ needs.changes.result }}"), "backend-required must bind the changes result for fail-closed aggregation")
+    assert_contains(backend_required, re.escape("CHANGE_RESULT: ${{ needs.changes.outputs.go }}"), "backend-required must bind the Go path-filter output for no-op success")
+    assert_contains(backend_required, re.escape('CHANGES_STATUS" != "success"'), "backend-required must fail closed when the changes job fails")
+    assert_contains(backend_required, re.escape('CHANGE_RESULT" != "true"'), "backend-required must treat a Go-less PR as a successful no-op")
+    assert_contains(backend_required, re.escape('EDGE_RESULT" != "success"'), "backend-required must fail when the go-edge lane did not succeed")
+    assert_contains(backend_required, re.escape('HUB_RESULT" != "success"'), "backend-required must fail when the go-hub lane did not succeed")
+    assert_contains(backend_required, re.escape('INTEGRATION_RESULT" != "success"'), "backend-required must fail when the backend-integration lane did not succeed")
+    assert_contains(backend_required, re.escape('EDGE_E2E_RESULT" != "success"'), "backend-required must fail when the backend-edge-e2e lane did not succeed")
+    assert_contains(backend_required, re.escape('FIXTURE_RESULT" != "success"'), "backend-required must fail when the backend-e2e-fixture lane did not succeed")
 
     assert_contains(backend_fixture, r"working-directory:\s+hub-server", "backend-e2e-fixture must run from hub-server")
     assert_contains(backend_fixture, r"TeamRun fixture E2E", "backend-e2e-fixture must name the TeamRun fixture step")

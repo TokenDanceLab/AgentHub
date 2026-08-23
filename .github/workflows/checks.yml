@@ -586,6 +586,52 @@ jobs:
             exit 1
           fi
 
+  backend-required:
+    name: backend-required
+    needs: [changes, go-edge, go-hub, backend-integration, backend-edge-e2e, backend-e2e-fixture]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Assert backend L0/L1/L2 matrix
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          CHANGE_RESULT: ${{ needs.changes.outputs.go }}
+          CHANGES_STATUS: ${{ needs.changes.result }}
+          EDGE_RESULT: ${{ needs.go-edge.result }}
+          HUB_RESULT: ${{ needs.go-hub.result }}
+          INTEGRATION_RESULT: ${{ needs.backend-integration.result }}
+          EDGE_E2E_RESULT: ${{ needs.backend-edge-e2e.result }}
+          FIXTURE_RESULT: ${{ needs.backend-e2e-fixture.result }}
+        run: |
+          if [ "$EVENT_NAME" != "workflow_dispatch" ] && [ "$CHANGES_STATUS" != "success" ]; then
+            echo "::error::changes job result: $CHANGES_STATUS; cannot decide backend gates"
+            exit 1
+          fi
+          if [ "$EVENT_NAME" != "workflow_dispatch" ] && [ "$CHANGE_RESULT" != "true" ]; then
+            echo "Backend L0/L1/L2 not selected by path filter; treating as successful no-op."
+            exit 0
+          fi
+          if [ "$EDGE_RESULT" != "success" ]; then
+            echo "::error::go-edge result: $EDGE_RESULT"
+            exit 1
+          fi
+          if [ "$HUB_RESULT" != "success" ]; then
+            echo "::error::go-hub result: $HUB_RESULT"
+            exit 1
+          fi
+          if [ "$INTEGRATION_RESULT" != "success" ]; then
+            echo "::error::backend-integration result: $INTEGRATION_RESULT"
+            exit 1
+          fi
+          if [ "$EDGE_E2E_RESULT" != "success" ]; then
+            echo "::error::backend-edge-e2e result: $EDGE_E2E_RESULT"
+            exit 1
+          fi
+          if [ "$FIXTURE_RESULT" != "success" ]; then
+            echo "::error::backend-e2e-fixture result: $FIXTURE_RESULT"
+            exit 1
+          fi
+
   # ── Backend E2E: Fixture-only ────────────────
   backend-e2e-fixture:
     name: Backend E2E (fixture-only)

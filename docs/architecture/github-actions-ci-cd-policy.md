@@ -37,6 +37,7 @@ AgentHub 使用 Ubuntu 和 Windows 原生 runner 验证不同类别的问题：
 
 - Go：`go-edge-test`、`go-hub-test` 的 race/shard 是主单元门禁；`go-edge`、`go-hub` 负责 lint、gosec、staticcheck 和 coverage。
 - 服务行为：fixture E2E、Edge->Hub callback、PostgreSQL + Redis integration。
+- `backend-required` 是后端 L0/L1/L2 的稳定 required-check 聚合：`needs` 聚合 `go-edge`/`go-hub`/`backend-integration`/`backend-edge-e2e`/`backend-e2e-fixture`，`if: always()` 恒报；Go 无变化时退出 `success` 作为有意 no-op，`changes` 失败时 fail-closed，Go 变化时任一 lane 非 `success` 即失败。
 - 前端：Desktop/Web/mobile 按路径执行，coverage、CSS syntax、vulnerability gate 和 Visual QA 各自独立。
 
 ### Windows
