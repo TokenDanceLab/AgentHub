@@ -189,6 +189,7 @@ def main() -> int:
     assert_contains(validate, r"Self-test vulnerability gates", "validate must self-test the vulnerability gates")
     assert_contains(validate, r"Self-test gosec gate", "validate must self-test the gosec fail-closed contract")
     assert_contains(validate, r"Self-test secret guard", "validate must self-test the secret guard fail-closed contract")
+    assert_step_continue_on_error(validate, "Secret guard", False)
 
     # Native Windows is a compatibility contract, not a duplicate release
     # pipeline: backend and frontend matrix legs must remain path-filtered and
