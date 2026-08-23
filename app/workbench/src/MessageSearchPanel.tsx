@@ -319,6 +319,10 @@ export function MessageSearchPanel({
               role="option"
               id={`${listboxId}-option-${idx}`}
               aria-selected={idx === activeIndex}
+              // #1853 review: keep the keyboard cursor aligned with the
+              // focused option — otherwise Enter on a tabbed-to result
+              // activates results[activeIndex] instead of the focused one.
+              onFocus={() => setActiveIndex(idx)}
               className={`${styles.resultItem} ${idx === activeIndex ? styles.resultItemActive : ''} ${highlightMessageId === result.messageId ? styles.resultItemHighlight : ''}`}
               onClick={() => handleResultClick(result)}
             >

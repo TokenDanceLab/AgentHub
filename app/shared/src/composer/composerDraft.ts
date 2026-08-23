@@ -68,7 +68,15 @@ function isValidDraft(raw: unknown): raw is ComposerDraft {
       !!m &&
       typeof m === 'object' &&
       typeof (m as Record<string, unknown>).id === 'string' &&
-      typeof (m as Record<string, unknown>).label === 'string',
+      typeof (m as Record<string, unknown>).label === 'string' &&
+      // #1853 review: dispatchRole must be a known role or absent — a
+      // persisted 'unknown' would flow into typed composer state and be
+      // classified as a dispatch mention downstream.
+      (
+        (m as Record<string, unknown>).dispatchRole === undefined ||
+        (m as Record<string, unknown>).dispatchRole === 'context' ||
+        (m as Record<string, unknown>).dispatchRole === 'dispatch'
+      ),
   )) {
     return false;
   }

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { WorkbenchConversation } from '@shared/platform';
 import { useFocusTrap } from '@shared/ui/focusTrap';
@@ -41,6 +41,7 @@ export function GlobalSearchDialog({
   const inputRef = useRef<HTMLInputElement | null>(null);
   const panelRef = useRef<HTMLDivElement | null>(null);
   const activeRowRef = useRef<HTMLButtonElement | null>(null);
+  const listboxId = useId();
   useFocusTrap(panelRef, open);
 
   const results = useMemo<WorkbenchConversation[]>(() => {
@@ -83,6 +84,10 @@ export function GlobalSearchDialog({
       onClose();
       return;
     }
+    // #1853 review: arrow/Enter activation belongs to the search input only —
+    // Enter on the close button or a result button must honor that control
+    // (result buttons activate themselves via their own click handler).
+    if (e.target !== inputRef.current) return;
     if (results.length === 0) return;
     if (e.key === 'ArrowDown') {
       e.preventDefault();
@@ -121,6 +126,13 @@ export function GlobalSearchDialog({
             ref={inputRef}
             className={styles.input}
             type="search"
+            role="combobox"
+            aria-expanded={results.length > 0}
+            aria-controls={listboxId}
+            aria-activedescendant={
+              results[activeIndex] ? `${listboxId}-option-${activeIndex}` : undefined
+            }
+            aria-autocomplete="list"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder={t('globalSearch.placeholder', { defaultValue: '搜索或切换会话…' })}
@@ -131,7 +143,7 @@ export function GlobalSearchDialog({
           </Button>
         </div>
 
-        <div className={styles.results}>
+        <div className={styles.results} role="listbox" id={listboxId}>
           {results.length === 0 && (
             <div className={styles.empty}>{t('globalSearch.empty', { defaultValue: '没有匹配的会话' })}</div>
           )}
@@ -140,8 +152,13 @@ export function GlobalSearchDialog({
               key={conversation.id}
               ref={idx === activeIndex ? activeRowRef : undefined}
               type="button"
+              role="option"
+              id={`${listboxId}-option-${idx}`}
+              aria-selected={idx === activeIndex}
+              // #1853 review: 'current' marks the open conversation — it must
+              // NOT track the keyboard cursor (that's aria-selected).
+              aria-current={currentConversationId === conversation.id ? 'true' : undefined}
               className={`${styles.resultItem} ${idx === activeIndex ? styles.resultItemActive : ''}`}
-              aria-current={idx === activeIndex ? 'true' : undefined}
               onClick={() => selectConversation(conversation.id)}
             >
               <div className={styles.resultMeta}>

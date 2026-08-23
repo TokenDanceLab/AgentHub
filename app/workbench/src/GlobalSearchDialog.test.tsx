@@ -58,7 +58,7 @@ describe('GlobalSearchDialog', () => {
     render(
       <GlobalSearchDialog open conversations={conversations} onClose={onClose} onSelect={onSelect} />,
     );
-    const input = screen.getByRole('searchbox');
+    const input = screen.getByRole('combobox');
     fireEvent.keyDown(input, { key: 'ArrowDown' });
     fireEvent.keyDown(input, { key: 'Enter' });
     expect(onSelect).toHaveBeenCalledWith('c2');
@@ -68,17 +68,33 @@ describe('GlobalSearchDialog', () => {
     render(
       <GlobalSearchDialog open conversations={conversations} onClose={onClose} onSelect={onSelect} />,
     );
-    const input = screen.getByRole('searchbox');
+    const input = screen.getByRole('combobox');
     fireEvent.change(input, { target: { value: 'deploy' } });
     fireEvent.keyDown(input, { key: 'Enter' });
     expect(onSelect).toHaveBeenCalledWith('c3');
+  });
+
+  it('#1853 review: Enter on non-input controls does not hijack the active row', () => {
+    render(
+      <GlobalSearchDialog open conversations={conversations} onClose={onClose} onSelect={onSelect} />,
+    );
+    // Enter on a result button must activate THAT button (its own click
+    // handler), not the keyboard-cursor row — the dialog-level handler only
+    // listens to the search input.
+    const deployRow = screen.getByRole('option', { name: /Deploy pipeline/ });
+    fireEvent.keyDown(deployRow, { key: 'Enter' });
+    expect(onSelect).not.toHaveBeenCalled();
+
+    const closeButton = screen.getByRole('button', { name: '关闭搜索' });
+    fireEvent.keyDown(closeButton, { key: 'Enter' });
+    expect(onSelect).not.toHaveBeenCalled();
   });
 
   it('closes on Escape', () => {
     render(
       <GlobalSearchDialog open conversations={conversations} onClose={onClose} onSelect={onSelect} />,
     );
-    fireEvent.keyDown(screen.getByRole('searchbox'), { key: 'Escape' });
+    fireEvent.keyDown(screen.getByRole('combobox'), { key: 'Escape' });
     expect(onClose).toHaveBeenCalledOnce();
   });
 
@@ -107,7 +123,7 @@ describe('GlobalSearchDialog', () => {
     const { rerender } = render(
       <GlobalSearchDialog open conversations={conversations} onClose={onClose} onSelect={onSelect} />,
     );
-    const input = screen.getByRole('searchbox');
+    const input = screen.getByRole('combobox');
     fireEvent.change(input, { target: { value: 'deploy' } });
     expect(screen.getByText('Deploy pipeline')).toBeInTheDocument();
 
@@ -117,7 +133,7 @@ describe('GlobalSearchDialog', () => {
     rerender(
       <GlobalSearchDialog open conversations={conversations} onClose={onClose} onSelect={onSelect} />,
     );
-    expect(screen.getByRole('searchbox')).toHaveValue('');
+    expect(screen.getByRole('combobox')).toHaveValue('');
     expect(screen.getByText('Auth bug triage')).toBeInTheDocument();
   });
 });

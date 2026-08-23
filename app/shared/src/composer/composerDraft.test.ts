@@ -186,4 +186,22 @@ describe('#1822 serialized draft payloads (attachments / reply / quote)', () => 
     );
     expect(loadDraft(SESSION_A)).toBeNull();
   });
+
+  it('#1853 review: accepts only known dispatchRole values on mentions', () => {
+    const validContext = {
+      text: 't',
+      mentions: [{ id: 'm1', label: 'M', dispatchRole: 'context' }],
+    };
+    saveDraft(SESSION_A, validContext);
+    expect(loadDraft(SESSION_A)?.mentions[0]?.dispatchRole).toBe('context');
+
+    localStorage.setItem(
+      `agenthub.composer.draft.${SESSION_A}`,
+      JSON.stringify({
+        text: 't',
+        mentions: [{ id: 'm1', label: 'M', dispatchRole: 'unknown' }],
+      }),
+    );
+    expect(loadDraft(SESSION_A)).toBeNull();
+  });
 });

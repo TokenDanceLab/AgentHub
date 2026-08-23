@@ -277,6 +277,9 @@ function shortcutConflictId(group: KeyboardShortcutGroup, shortcutId: string): s
 
 export function ShortcutsPane(_props: SettingsPageProps): React.ReactElement {
   const { t: tw } = useTranslation(SHARED_WORKBENCH_I18N_NAMESPACE);
+  // shortcut.* keys live in the chatview bundle — translate labels with the
+  // owning namespace instead of rendering raw keys (#1853 review).
+  const { t: tc } = useTranslation(CHATVIEW_I18N_NAMESPACE);
   // #1822: previously read-only and dead — saveCustomKeybindings /
   // resetKeybindings had no UI callers. Rows now record a key combo on
   // click (capture listener) and persist via saveCustomKeybindings; the
@@ -346,7 +349,7 @@ export function ShortcutsPane(_props: SettingsPageProps): React.ReactElement {
         </button>
       </SettingsRow>
       {groups.map((group) => (
-        <SettingsSection key={group.id} title={group.labelKey}>
+        <SettingsSection key={group.id} title={tc(group.labelKey)}>
           {group.shortcuts.map((shortcut) => {
             const conflictIdNow = shortcutConflictId(group, shortcut.id);
             const hasConflict = conflictIdNow !== null;
@@ -356,10 +359,10 @@ export function ShortcutsPane(_props: SettingsPageProps): React.ReactElement {
             return (
               <SettingsRow
                 key={shortcut.id}
-                label={shortcut.labelKey}
+                label={tc(shortcut.labelKey)}
                 description={
                   shortcut.rebindable === false
-                    ? (shortcut.detailKey ?? '')
+                    ? (shortcut.detailKey ? tc(shortcut.detailKey) : '')
                     : recordingId === shortcut.id
                       ? tw('settings.shortcuts.recording', { defaultValue: '按下新的按键组合…（Esc 取消）' })
                       : recordedConflict
@@ -369,7 +372,7 @@ export function ShortcutsPane(_props: SettingsPageProps): React.ReactElement {
                         })
                         : hasConflict
                           ? `冲突: 与 "${conflictIdNow}" 按键相同`
-                          : (shortcut.detailKey ?? '')
+                          : (shortcut.detailKey ? tc(shortcut.detailKey) : '')
                 }
               >
                 {shortcut.rebindable === false ? (

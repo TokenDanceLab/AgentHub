@@ -304,4 +304,22 @@ describe('MessageSearchPanel', () => {
     fireEvent.keyDown(input, { key: 'Enter' });
     expect(onJump).toHaveBeenCalledWith('m1', 0);
   });
+
+  it('#1853 review: Enter activates the tab-focused result, not the cursor row', async () => {
+    const onJump = vi.fn();
+    render(<MessageSearchPanel {...defaultProps} onJumpToMessage={onJump} />);
+    const input = screen.getByPlaceholderText<HTMLInputElement>('Type to search...');
+    fireEvent.change(input, { target: { value: 'auth' } });
+    await flushDebounce();
+    // 'auth' matches m2 (messageIndex 1) and m3 (messageIndex 2); the
+    // keyboard cursor starts on the first row (m2).
+    const options = screen.getAllByRole('option');
+    expect(options).toHaveLength(2);
+
+    // Tab to the second result — focus updates the cursor (onFocus), so
+    // Enter must open THAT result instead of the original cursor row.
+    fireEvent.focus(options[1]!);
+    fireEvent.keyDown(options[1]!, { key: 'Enter' });
+    expect(onJump).toHaveBeenCalledWith('m3', 2);
+  });
 });
