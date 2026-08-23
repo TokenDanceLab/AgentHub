@@ -61,6 +61,10 @@ export {
 } from './AgentInstalledParts';
 
 export {
+  DataSourceBadge,
+} from './DataSourceBadge';
+
+export {
   AgentPolicyView,
   AgentToolsView,
   AgentModelsView,
@@ -89,6 +93,7 @@ export {
 
 export type {
   AgentsPaneId,
+  PaneDataSource,
   AgentState,
   ToolPermission,
   RiskLevel,

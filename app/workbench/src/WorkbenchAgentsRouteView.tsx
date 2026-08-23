@@ -59,6 +59,7 @@ export function WorkbenchAgentsRouteView({
   return (
     <AgentsPage
       activePane={agentsRoute.agentsPane}
+      dataSource={agentsRoute.realDataMode ? 'real' : 'demo'}
       agents={agentsRoute.agentConfigs}
       agentActionError={agentProfilesStatus?.actionError}
       agentsError={agentProfilesStatus?.error}

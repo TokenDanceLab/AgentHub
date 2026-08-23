@@ -12,6 +12,8 @@ export type AgentsPaneId =
   | 'models'
   | 'audit';
 
+export type PaneDataSource = 'real' | 'demo' | 'unavailable';
+
 export type AgentState = 'running' | 'ready' | 'idle' | 'waiting';
 
 export type ToolPermission = '允许' | '需确认' | '禁止';
@@ -182,6 +184,9 @@ export interface AgentsPageProps {
   activePane: AgentsPaneId;
   /** Called when user clicks a nav item */
   onPaneChange: (pane: AgentsPaneId) => void;
+
+  /** Data provenance for the page (real | demo | unavailable). */
+  dataSource?: PaneDataSource;
 
   /** Search query in the left nav */
   searchQuery?: string;
