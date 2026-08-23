@@ -22,6 +22,7 @@ export {
 
 export {
   ComposerAgentPicker,
+  ComposerApprovalModePicker,
   ComposerAttachButton,
   ComposerSendButton,
   ComposerTargetPicker,
