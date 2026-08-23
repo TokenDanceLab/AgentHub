@@ -7,7 +7,7 @@ import {
   IconBrain, IconFileText, IconSearch, IconFile, IconEdit,
   IconShield, IconArrowForward, IconSubtask, IconPlayerPlay, IconChevronDown,
   IconTarget, IconUpload, IconChart, IconDatabase, IconBraces,
-  IconMarkdown, IconCss, IconTerminal,
+  IconMarkdown, IconCss, IconTerminal, IconGlobe,
 } from './Icons'
 import { CHATVIEW_I18N_NAMESPACE } from '../i18n/resources'
 import { cardLabelKey, toolKey, isToolResult } from '../design/labels'
@@ -503,7 +503,7 @@ export const RowItem = memo(function RowItem({ item, onToggle, onApprove, onReje
           {item.type === 'preview' && item.url && (
             <a className="preview-card" href={item.url} rel="noopener noreferrer" target="_blank">
               <div className="preview-thumb" aria-hidden="true">
-                <img alt="" className="preview-favicon" loading="lazy" src={`https://www.google.com/s2/favicons?domain=${encodeURIComponent(item.previewDomain || '')}&sz=32`} />
+                <IconGlobe className="preview-favicon" size={20} />
               </div>
               <div className="preview-body">
                 {item.previewDomain && <span className="preview-domain">{item.previewDomain}</span>}

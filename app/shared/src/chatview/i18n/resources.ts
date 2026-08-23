@@ -348,6 +348,7 @@ export const chatviewResources = {
     'deploy.action.deployToPublic': '部署到公网',
     'browserPreview.iframeTitle': '预览 {{url}}',
     'browserPreview.readOnly': '只读预览',
+    'browserPreview.unsafeUrl': '无法加载此预览 URL（仅支持 http/https）',
 
     // ═══ Mainchain labels ═══
     'mainchain.waitingTask': '等待 task/replay',
@@ -1049,6 +1050,7 @@ export const chatviewResources = {
     'deploy.action.deployToPublic': 'Deploy to public',
     'browserPreview.iframeTitle': 'Preview {{url}}',
     'browserPreview.readOnly': 'Read-only preview',
+    'browserPreview.unsafeUrl': 'Cannot load this preview URL (http/https only)',
 
     // ═══ Mainchain labels ═══
     'mainchain.waitingTask': 'Waiting task/replay',
