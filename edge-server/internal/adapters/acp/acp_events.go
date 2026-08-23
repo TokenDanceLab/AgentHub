@@ -14,6 +14,7 @@ package acp
 
 import (
 	"encoding/json"
+	"strings"
 
 	"github.com/coder/acp-go-sdk"
 )
@@ -96,17 +97,23 @@ func mapContentBlock(block acp.ContentBlock, eventType, status string) []mappedE
 // carries its result: emit tool_result alongside so downstream consumers
 // see the full tool lifecycle from one update.
 func mapToolCall(t acp.SessionUpdateToolCall) []mappedEvent {
+	toolName := acpSessionToolName(t.Title, t.Kind)
 	ev := mappedEvent{EventType: BusEventToolCall, Payload: map[string]any{
 		"tool_call_id": string(t.ToolCallId),
 		"title":        t.Title,
 		"kind":         string(t.Kind),
+		"toolName":     toolName,
 		"status":       string(t.Status),
 	}}
+	if input, ok := t.RawInput.(map[string]any); ok && len(input) > 0 {
+		ev.Payload["input"] = input
+	}
 	out := []mappedEvent{ev}
 
 	if t.Status == acp.ToolCallStatusCompleted {
 		result := mappedEvent{EventType: BusEventToolResult, Payload: map[string]any{
 			"tool_call_id": string(t.ToolCallId),
+			"toolName":     toolName,
 			"status":       string(t.Status),
 		}}
 		if raw := rawOutputString(t.RawOutput); raw != "" {
@@ -115,6 +122,21 @@ func mapToolCall(t acp.SessionUpdateToolCall) []mappedEvent {
 		out = append(out, result)
 	}
 	return out
+}
+
+// acpSessionToolName derives a tool name for the tool_call/tool_result payload.
+// ACP identifies the tool call by id/kind/title; prefer the human-readable
+// title, falling back to the kind, then "unknown". SecureEmitter relies on this
+// name to route tool_call events through the unified ToolAllowlistHook /
+// SecurityHook chain (#1879).
+func acpSessionToolName(title string, kind acp.ToolKind) string {
+	if t := strings.TrimSpace(title); t != "" {
+		return t
+	}
+	if k := strings.TrimSpace(string(kind)); k != "" {
+		return k
+	}
+	return "unknown"
 }
 
 // rawOutputString marshals the typed RawOutput (any, decoded by the SDK) back
