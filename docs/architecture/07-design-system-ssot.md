@@ -23,9 +23,9 @@ Issue: #466 (P9.1 SSOT map) · residual hardcode closed via #879 / #910 / #1021 
 | **Desktop re-exports** | `app/desktop/src/styles/{tokens,themes,presets}.css` | Thin `@import` of shared（presets.css 另 re-export `folder-colors.css`；无本地覆盖） |
 | **Web re-exports** | `app/web/src/styles/{tokens,themes,presets}.css` | Thin `@import` of shared（presets.css 另 re-export `folder-colors.css`；无本地覆盖） |
 | **Desktop ThemeContext** | `app/desktop/src/contexts/ThemeContext.tsx` | Thin React provider over shared theme + **preset API** |
-| **Web ThemeContext** | `app/web/src/contexts/ThemeContext.tsx` | Thin React provider over shared theme (**no presets UI yet**) |
+| **Web ThemeContext** | `app/web/src/contexts/ThemeContext.tsx` | Thin React provider over shared theme + **preset API; preset UI in AuthPage advanced settings (#1820)** |
 | **Mobile RN tokens** | `app/mobile-rn/src/theme/tokens.ts` (+ `AgentHubThemeProvider.tsx`) | RN numeric/color tokens; maps `--td-*` via designTokens aliases |
-| **Package surface** | `app/shared/package.json` | exports `./theme` (includes presets); **no** `./designTokens` or `./styles/*` export yet |
+| **Package surface** | `app/shared/package.json` | exports `./theme` (includes presets) + `./designTokens` (alias/surface-rules registry, #1820); **no** `./styles/*` export (CSS stays shell-imported) |
 
 Entry CSS load: desktop/web `main.tsx` imports surface `styles/{tokens,themes,presets}.css` → shared SSOT.
 
@@ -45,20 +45,21 @@ Entry CSS load: desktop/web `main.tsx` imports surface `styles/{tokens,themes,pr
 |---|---|
 | Desktop vs Web `presets.css` 差异 | 已消解——两者均为 `presets-base.css` + `folder-colors.css` 的纯 re-export，无本地覆盖（旧「opaque vs glass borders」表述不实：实际属性为 `data-theme-preset`，且无 tokendance 预设；若新增差异仅允许薄表面覆盖） |
 | Chatview `.chatview` scoped tokens | Isolation from host theme; document drift risk; merge is a follow-up |
-| Desktop ThemeContext exposes presets; Web does not | Product choice; both must use shared preset SSOT when/if Web adds UI |
+| Desktop ThemeContext exposes presets; Web does not | Product choice; both must use shared preset SSOT when/if Web adds UI | **Closed #1820** — Web preset API + AuthPage preset switcher landed on shared `themePresets` |
 
 ## 4. Known forks / residual (follow-ups)
 
 | Item | Status | Follow-up |
 |---|---|---|
 | ThemeContext dual providers | **Mitigated in #466** — preset constants + apply moved to shared; providers are thin wrappers | Optional: one shared React provider with `enablePresets` |
-| Stale CSS status fallbacks | **#466** ApprovalCard bare status tokens; **#482** Welcome/Auth glass; **#607** shared UI bare semantic/surface tokens | Re-audit: semantic 族（`var(--danger|success|warning|primary|…, …)`）fallback 已清零；但 `var(--td-*, 字面量)` fallback 仍有 110+ 处与 SSOT 值冲突（radius/time/dur/surface 等），清理见 #1827（token 契约部分，进行中） |
+| Stale CSS status fallbacks | **#466** ApprovalCard bare status tokens; **#482** Welcome/Auth glass; **#607** shared UI bare semantic/surface tokens | Re-audit: no remaining `var(--danger|success|warning|primary|…, …)` fallback form in app CSS |
+| `--td-*` fallback drift | **Closed #1820** — radius-control / text-sm/xs / dur-normal / wb-gap-2xs / r-full 双值统一为 SSOT；`white`/`#eee`、`--bg-3`/`--mono`/`--wb-gap-3xl`/`--ah-border-subtle` 死链清除 | — |
 | EntryGate / FileExplorer hardcode | **Closed #879** — desktop modules map to design-token SSOT | — |
 | Ghost `var(--color-*)` product consumers | **Closed #910 / #1021** — product modules use semantic SSOT; `--color-*` remains legacy/preset-private | — |
 | ModelDropdown + IM rgba chrome | **Open residual** — `ModelDropdown.module.css` (~22 hex/rgba); IM panels retain local rgba chrome | Hardcode pass to semantic / glass tokens |
 | Chatview parallel spacing / density | **Partial in #491** — chatview `--chat-sp-md` aliases base compat `--space-md` (12px，非 v4 `--sp-md` 16px); lg/xl = 16/24（P76 有意密度；v4 为 16/24/32）. **#518 residual inventory** — radius / type / dark remain intentional forks; **#607 reconfirmed hold** | Full merge + dark palette needs deliberate redesign |
 | Workbench raw `px` spacing | **Partial in #480** — fully-mappable spacing → `--sp-*` / compat `--space-md|3xl`; odd steps remain raw | Optional: scale extension or redesign normalize |
-| `designTokens.ts` not package-exported | Open | Export when mobile/web path aliases stabilize |
+| `designTokens.ts` not package-exported | **Closed #1820** — `./designTokens` export registered; mobile-rn `theme/tokens.ts` derives glass aliases from registry | — |
 | Mobile RN color SSOT | Open | Align RN values to themes.css via registry |
 
 ## 5. #466 concrete dedupe landed

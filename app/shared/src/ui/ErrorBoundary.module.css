@@ -82,7 +82,7 @@
   margin: 0;
   padding: 12px;
   background: var(--td-tint);
-  border-radius: var(--td-radius-control, 6px);
+  border-radius: var(--td-radius-control);
   overflow: auto;
   max-height: 200px;
   font-size: 12px;

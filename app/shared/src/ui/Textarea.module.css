@@ -1,0 +1,70 @@
+.base {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 72px;
+  padding: 10px 14px;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--td-radius-control);
+  background: var(--glass-bg-light);
+  color: var(--td-ink);
+  font: 400 var(--td-text-sm) / 1.5 var(--td-font);
+  outline: none;
+  resize: vertical;
+  transition:
+    background var(--td-dur-normal) var(--td-ease),
+    border-color var(--td-dur-normal) var(--td-ease),
+    box-shadow var(--td-dur-normal) var(--td-ease);
+  -webkit-font-smoothing: antialiased;
+}
+
+.base::placeholder {
+  color: var(--td-ink-faint);
+}
+
+.base:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.base:focus-visible {
+  border-color: var(--td-focus);
+  background: var(--glass-bg-medium);
+  box-shadow: var(--focus-ring);
+}
+
+.base:not(:focus-visible):hover {
+  background: var(--glass-bg-hover);
+}
+
+.invalid {
+  border-color: var(--td-danger);
+}
+
+.invalid:focus-visible {
+  border-color: var(--td-danger);
+  background: var(--glass-bg-medium);
+  box-shadow: var(--focus-ring);
+}
+
+/* Focus keeps the error border (error must stay visible while correcting);
+   the focus ring itself is already guaranteed by the .base rule. */
+.invalid:not(:focus-visible):hover {
+  background: var(--glass-bg-hover);
+}
+
+.sm {
+  padding: 8px 12px;
+  min-height: 56px;
+  /* 13px — compact sibling of Input sm (#1827). */
+  font-size: 13px;
+}
+
+.mono {
+  font-family: var(--td-mono);
+}
+
+@media (width <= 760px) {
+  .base {
+    min-height: var(--touch-target-min);
+  }
+}

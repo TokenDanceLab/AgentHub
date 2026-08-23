@@ -177,7 +177,7 @@
   padding: 10px 12px;
   border: 1px solid var(--td-line);
   border-radius: var(--r-md);
-  background: var(--td-surface-3, var(--td-surface));
+  background: var(--td-surface-3);
   color: var(--td-ink-muted);
 }
 
@@ -402,62 +402,21 @@
   color: var(--td-plum);
 }
 
-/* ── Switch ── */
-.switch {
-  width: 42px;
-  height: 24px;
-  padding: var(--sp-2);
-  border: 1px solid var(--td-line);
-  border-radius: var(--r-full);
-  background: var(--td-surface-3);
-  cursor: pointer;
-  transition:
-    background var(--td-dur-normal) var(--td-ease),
-    border-color var(--td-dur-normal) var(--td-ease),
-    box-shadow var(--td-dur-normal) var(--td-ease);
-}
-
-.switchThumb {
-  display: block;
-  width: 18px;
-  height: 18px;
-  border-radius: var(--r-full);
-  background: var(--td-surface);
-  box-shadow: var(--td-shadow-sm);
-  transition: transform var(--dur-medium) var(--ease-panel, var(--td-ease));
-}
-
-.switch:hover {
-  box-shadow: var(--td-shadow-sm);
-}
-
-.switchOn {
-  background: var(--td-plum);
-  border-color: var(--td-plum);
-}
-
-.switchOn .switchThumb {
-  transform: translateX(18px);
-}
+/* #1827: the hand-rolled .switch/.switchThumb pill moved into the shared
+   design system (shared/src/ui/Switch) with token-identical visuals. */
 
 /* ── Disabled (coming-soon) controls (#1818) ── */
-.segmentDisabled,
-.switchDisabled {
+.segmentDisabled {
   opacity: 0.55;
   cursor: not-allowed;
 }
 
-.segmentDisabled .segmentBtn,
-.switchDisabled {
+.segmentDisabled .segmentBtn {
   cursor: not-allowed;
 }
 
 .segmentDisabled .segmentBtn:hover {
   color: var(--td-ink-muted);
-}
-
-.switchDisabled:hover {
-  box-shadow: none;
 }
 
 /* Inline "coming soon" marker shown next to a disabled setting (#1818). */
@@ -477,7 +436,7 @@
 
 /* Honest note under the state preview grid (#1818). */
 .statePreviewNote {
-  margin: 0 0 var(--td-space-3, 12px);
+  margin: 0 0 var(--td-space-3);
   color: var(--td-ink-subtle);
   font: 400 0.75rem/1.45 var(--td-font);
 }

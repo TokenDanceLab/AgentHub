@@ -19,7 +19,7 @@
 
 .offline {
   color: var(--td-ink-muted);
-  background: var(--secondary);
+  background: var(--td-surface-2);
   border: 1px solid var(--td-line);
 }
 

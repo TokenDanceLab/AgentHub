@@ -5,11 +5,11 @@
 .overlay {
   position: fixed;
   inset: 0;
-  z-index: var(--td-z-modal, 1000);
+  z-index: var(--td-z-modal);
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(0, 0, 0, 0.56);
+  background: var(--glass-shadow);
   backdrop-filter: blur(4px);
 }
 

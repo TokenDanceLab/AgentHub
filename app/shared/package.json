@@ -15,6 +15,7 @@
     "./hub/hubClient": "./src/hub/hubClient.ts",
     "./api/auth": "./src/api/auth/index.ts",
     "./theme": "./src/theme.ts",
+    "./designTokens": "./src/designTokens.ts",
     "./composer": "./src/composer/index.ts",
     "./i18n": "./src/i18n/index.ts",
     "./inspector": "./src/inspector/index.ts",

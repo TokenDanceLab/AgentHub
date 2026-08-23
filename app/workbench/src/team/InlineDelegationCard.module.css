@@ -28,7 +28,7 @@
   backdrop-filter: blur(var(--glass-blur-lg));
   -webkit-backdrop-filter: blur(var(--glass-blur-lg));
   overflow: hidden;
-  font-family: var(--td-font, 'Inter', system-ui, sans-serif);
+  font-family: var(--td-font);
   color: var(--td-ink);
   transition: border-color 0.2s ease;
 }

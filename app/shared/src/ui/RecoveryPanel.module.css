@@ -17,7 +17,7 @@
   height: 38px;
   border: 1px solid var(--td-line);
   border-radius: var(--td-radius-panel);
-  background: color-mix(in oklch, var(--td-surface, white) 70%, transparent);
+  background: color-mix(in oklch, var(--td-surface) 70%, transparent);
   color: var(--td-ink-muted);
 }
 
