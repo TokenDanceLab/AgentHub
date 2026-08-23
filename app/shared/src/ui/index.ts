@@ -15,47 +15,14 @@ export type {
   EmptyStateCopy,
   EmptyStateCopyMatrix,
 } from './EmptyState';
-export { SelectableRow } from './SelectableRow';
-export type { SelectableRowProps } from './SelectableRow';
 export { TokenDanceMark } from './TokenDanceMark';
 export type { TokenDanceMarkProps } from './TokenDanceMark';
 export { CodePreviewCard } from './CodePreviewCard';
 export type { CodePreviewCardProps } from './CodePreviewCard';
-export { DisclosureRow } from './DisclosureRow';
-export type { DisclosureRowProps } from './DisclosureRow';
-export { MetricGrid } from './MetricGrid';
-export type { MetricGridItem, MetricGridProps } from './MetricGrid';
-export { MessageBubble } from './MessageBubble';
-export type { MessageBubbleProps } from './MessageBubble';
-export { ActivityCard } from './ActivityCard';
-export type { ActivityCardProps } from './ActivityCard';
-export { ContextSummary } from './ContextSummary';
-export type { ContextSummaryProps, ContextSummaryItem } from './ContextSummary';
-export { SectionHeader } from './SectionHeader';
-export type { SectionHeaderProps, SectionHeaderAction } from './SectionHeader';
 export { StatusNotice } from './StatusNotice';
 export type { StatusNoticeProps } from './StatusNotice';
 export { RecoveryPanel } from './RecoveryPanel';
 export type { RecoveryPanelProps } from './RecoveryPanel';
-export { ActionList } from './ActionList';
-export type { ActionListProps } from './ActionList';
-export { SegmentedControl } from './SegmentedControl';
-export type { SegmentedControlProps, SegmentedControlOption } from './SegmentedControl';
-export { SurfaceHeader } from './SurfaceHeader';
-export type { SurfaceHeaderProps } from './SurfaceHeader';
-export { TriageCard } from './TriageCard';
-export type { TriageCardProps } from './TriageCard';
-export { ToolTimeline } from './ToolTimeline';
-export type {
-  ToolTimelineToolUse,
-  ToolTimelineFileChange,
-  ToolTimelineAgentTask,
-  ToolTimelineChildAgent,
-  ToolTimelineRouteDecision,
-  ToolTimelineBlock,
-  ToolTimelineLabels,
-  ToolTimelineProps,
-} from './ToolTimeline';
 export {
   RuntimeIcon,
   resolveRuntimeIcon,
@@ -80,13 +47,7 @@ export {
   runtimeIconRegistry,
 } from './runtimeIconRegistry';
 export type { RuntimeIconRegistry, RuntimeIconRegistryInput } from './runtimeIconRegistry';
-export { PermissionModePicker } from './PermissionModePicker';
-export type { PermissionModePickerProps, PermissionModeOption } from './PermissionModePicker';
-export { ArtifactCard } from './ArtifactCard';
-export type { ArtifactCardProps } from './ArtifactCard';
 export { PREVIEW_SANDBOX_REMOTE, PREVIEW_SANDBOX_SRCDOC } from './previewSandbox';
-export { DeployCard } from './DeployCard';
-export type { DeployCardProps } from './DeployCard';
 export { SlideshowPreview } from './SlideshowPreview';
 export type { SlideshowPreviewProps } from './SlideshowPreview';
 export { TablePreview } from './TablePreview';
@@ -110,14 +71,9 @@ export type { ErrorConfig, ErrorBoundaryExtension } from './ErrorBoundary';
 // ── Wave 9 public barrel additions (previously exported only from file paths) ──
 export { Button } from './Button';
 export type { ButtonProps } from './Button';
-export { Avatar } from './Avatar';
-export { Pill } from './Pill';
-export { Card, CardHeader, CardContent, CardFooter } from './Card';
 export { CodeBlock } from './CodeBlock';
-export { CollapsibleBlock } from './CollapsibleBlock';
-export { FileChangeGroup } from './FileChangeGroup';
-export type { FileChangeGroupProps, FileChangeItem } from './FileChangeGroup';
 export { Icon } from './Icon';
-export { ProgressBar } from './ProgressBar';
 export { SkeletonBar } from './SkeletonBar';
 export type { SkeletonBarProps, SkeletonBarVariant } from './SkeletonBar';
+export { ArtifactVersionTimeline } from './ArtifactVersionTimeline';
+export type { ArtifactVersion, ArtifactVersionTimelineProps } from './ArtifactVersionTimeline';
