@@ -184,4 +184,43 @@ describe('custom keybindings (localStorage-backed)', () => {
     expect(getResolvedShortcutGroups()).toEqual(KEYBOARD_SHORTCUT_GROUPS);
     getItemSpy.mockRestore();
   });
+
+  it('never applies custom bindings to non-rebindable selection shortcuts (#1823)', () => {
+    // Simulate a stored override for the selection-mode hotkeys.
+    localStorage.setItem(
+      CUSTOM_BINDINGS_KEY,
+      JSON.stringify({
+        'select-all-messages': ['Ctrl/⌘', 'Shift', 'A'],
+        'delete-selected-messages': ['Backspace'],
+        send: ['Ctrl/⌘', 'Enter'],
+      }),
+    );
+
+    const resolved = getResolvedShortcutGroups();
+    const selectionGroup = resolved.find((g) => g.id === 'selection')!;
+    expect(selectionGroup.shortcuts.find((s) => s.id === 'select-all-messages')!.keys)
+      .toEqual(['Ctrl/⌘', 'A']);
+    expect(selectionGroup.shortcuts.find((s) => s.id === 'delete-selected-messages')!.keys)
+      .toEqual(['Delete']);
+    // Rebinding still works for rebindable shortcuts in the same store.
+    expect(resolved.find((g) => g.id === 'composer')!.shortcuts.find((s) => s.id === 'send')!.keys)
+      .toEqual(['Ctrl/⌘', 'Enter']);
+  });
+
+  it('filters non-rebindable selection shortcuts out of persistence (#1823)', () => {
+    saveCustomKeybindings([
+      { id: 'select-all-messages', keys: ['Ctrl/⌘', 'Shift', 'A'] },
+      { id: 'send', keys: ['Ctrl/⌘', 'Enter'] },
+    ]);
+    expect(localStorage.getItem(CUSTOM_BINDINGS_KEY)).toBe(
+      JSON.stringify({ send: ['Ctrl/⌘', 'Enter'] }),
+    );
+    expect(hasCustomKeybindings()).toBe(true);
+
+    // Only non-rebindable entries stored → no customization remains.
+    localStorage.clear();
+    saveCustomKeybindings([{ id: 'delete-selected-messages', keys: ['Backspace'] }]);
+    expect(localStorage.getItem(CUSTOM_BINDINGS_KEY)).toBe('{}');
+    expect(hasCustomKeybindings()).toBe(false);
+  });
 });

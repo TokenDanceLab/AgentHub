@@ -72,6 +72,22 @@ describe('TablePreview #1823 keyboard accessibility', () => {
     expect(document.activeElement).toBe(betaTab);
   }, 20000);
 
+  it('moves the roving stop to the clicked sheet tab (#1823)', async () => {
+    render(<TablePreview fileUrl="/two.xlsx" fileName="two.xlsx" fileBlob={twoSheetBlob()} />);
+    const alphaTab = await screen.findByRole('tab', { name: 'Alpha' }, { timeout: 15000 });
+    const betaTab = screen.getByRole('tab', { name: 'Beta' });
+
+    alphaTab.focus();
+    fireEvent.keyDown(alphaTab, { key: 'ArrowRight' });
+    expect(betaTab).toHaveAttribute('tabindex', '0');
+
+    // A click activates a sheet — the roving stop must follow it so the next
+    // Tab press returns to the clicked sheet, not the stale focused one.
+    fireEvent.click(alphaTab);
+    expect(alphaTab).toHaveAttribute('tabindex', '0');
+    expect(betaTab).toHaveAttribute('tabindex', '-1');
+  }, 20000);
+
   it('associates the sheet tablist with the table as tabpanel', async () => {
     render(<TablePreview fileUrl="/two.xlsx" fileName="two.xlsx" fileBlob={twoSheetBlob()} />);
     const alphaTab = await screen.findByRole('tab', { name: 'Alpha' }, { timeout: 15000 });

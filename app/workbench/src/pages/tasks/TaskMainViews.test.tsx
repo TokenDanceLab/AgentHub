@@ -86,11 +86,28 @@ describe('TaskMain view tablist roving tabindex (#1823)', () => {
 
   it('associates the tablist with the tabpanel', () => {
     const { container } = render(<TaskMain {...baseProps} />);
-    const tablist = screen.getByRole('tablist');
     const panel = container.querySelector('[role="tabpanel"]');
     const listTab = screen.getByRole('tab', { name: '列表' });
     expect(panel).not.toBeNull();
     expect(listTab.getAttribute('aria-controls')).toBe(panel!.id);
     expect(panel!.getAttribute('aria-labelledby')).toBe(listTab.id);
+  });
+
+  it('moves the roving stop to the clicked view tab (#1823)', () => {
+    render(<TaskMain {...baseProps} />);
+    const listTab = screen.getByRole('tab', { name: '列表' });
+    listTab.focus();
+    fireEvent.keyDown(listTab, { key: 'ArrowRight' });
+    const boardTab = screen.getByRole('tab', { name: '看板' });
+    expect(boardTab).toHaveAttribute('tabindex', '0');
+
+    // A click activates another tab — the roving stop must follow it so the
+    // next Tab press returns to the clicked tab, not the stale focused one.
+    const dashTab = screen.getByRole('tab', { name: '仪表盘' });
+    fireEvent.click(dashTab);
+    expect(baseProps.onViewModeChange).toHaveBeenCalledWith('dashboard');
+    expect(dashTab).toHaveAttribute('tabindex', '0');
+    expect(boardTab).toHaveAttribute('tabindex', '-1');
+    expect(listTab).toHaveAttribute('tabindex', '-1');
   });
 });

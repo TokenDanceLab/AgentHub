@@ -13,6 +13,7 @@ import type { ContextMenuItem, MultiSelectBarAction } from './floating';
 import type { TranscriptContextMenuEvent, TranscriptPointerEvent } from './transcriptEventTypes';
 import {
   createTranscriptChromeController,
+  type DeleteConfirmRequest,
   type SelectionHoldState,
   type TranscriptChromeController,
   type WorkbenchContextMenuState,
@@ -23,6 +24,7 @@ export {
   SELECTION_HOLD_DELAY_MS,
   blockTitle,
   isNestedInteractiveTarget,
+  type DeleteConfirmRequest,
   type WorkbenchContextMenuState,
 } from './workbenchTranscriptChromeHelpers';
 
@@ -64,8 +66,9 @@ export interface WorkbenchTranscriptChrome {
   toastMessage: string;
   toastVisible: boolean;
   selectBarRect: { left: number; width: number } | null;
-  /** #1823: destructive multi-delete awaits the inline confirm gate. */
-  deleteConfirmPending: boolean;
+  /** #1823: destructive multi-delete awaits the inline confirm gate.
+   *  Carries the blockIds snapshot the confirm dialog promises to delete. */
+  deleteConfirmPending: DeleteConfirmRequest | null;
   multiSelectActions: Array<MultiSelectBarAction>;
   contextMenuGroups: (blockId: string) => Array<Array<ContextMenuItem>>;
   showWorkbenchToast: (message: string) => void;
@@ -113,7 +116,7 @@ export function useWorkbenchTranscriptChrome({
   const [selectBarRect, setSelectBarRect] = useState<{ left: number; width: number } | null>(null);
   const [toastMessage, setToastMessage] = useState('');
   const [toastVisible, setToastVisible] = useState(false);
-  const [deleteConfirmPending, setDeleteConfirmPending] = useState(false);
+  const [deleteConfirmPending, setDeleteConfirmPending] = useState<DeleteConfirmRequest | null>(null);
 
   const selectionModeRef = useRef(false);
   const selectionHoldRef = useRef<SelectionHoldState | null>(null);
@@ -242,7 +245,7 @@ export function useWorkbenchTranscriptChrome({
     copyText: controller.copyText,
     resetSelection: controller.resetSelection,
     confirmMultiDelete: controller.confirmMultiDelete,
-    cancelDeleteConfirm: () => setDeleteConfirmPending(false),
+    cancelDeleteConfirm: controller.cancelDeleteConfirm,
     selectionModeRef,
   };
 }

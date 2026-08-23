@@ -1060,7 +1060,8 @@
 .linkInput:focus-visible,
 .phoneSelect:focus-visible,
 .phoneInput:focus-visible {
-  outline: none;
+  outline: 2px solid transparent;
+  outline-offset: 2px;
   border-color: var(--td-focus);
   box-shadow: var(--focus-ring);
 }

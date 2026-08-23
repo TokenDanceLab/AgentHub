@@ -25,6 +25,17 @@ import {
    exactOptionalPropertyTypes: only assign optional fields when defined.
    ═══════════════════════════════════════════════════════════════════════ */
 
+/**
+ * #1823: pending destructive multi-delete request. `blockIds` is the
+ * selection snapshot captured when the confirm gate was raised — the
+ * confirmed delete acts on this snapshot, never on the live selection
+ * (which the user can still mutate while the dialog is open).
+ */
+export interface DeleteConfirmRequest {
+  count: number;
+  blockIds: string[];
+}
+
 export type TranscriptChromeSideEffect =
   | { type: 'copy'; text: string }
   | { type: 'softHide'; blockIds: string[] }
@@ -53,7 +64,11 @@ export type TranscriptChromeSideEffect =
   | { type: 'toast'; message: string }
   // #1823: multi-delete is destructive with no undo — the Delete hotkey and
   // the bar button both gate on an explicit confirm step before softHide.
-  | { type: 'confirmDelete'; count: number }
+  // blockIds is a snapshot cloned when the gate was requested: the user can
+  // keep changing the live selection (e.g. Ctrl/⌘+A) while the confirm is
+  // open, and the confirmed delete must remove exactly what the dialog
+  // promised, not whatever is selected at confirm time.
+  | { type: 'confirmDelete'; request: DeleteConfirmRequest }
   | { type: 'exitSelection' }
   // Hub REST message actions (#1383). Planned only when a session id is
   // available; applied via the optional `on*Message` effect handlers. The
@@ -406,8 +421,12 @@ export function planMultiAction(options: {
   if (action === 'delete') {
     // #1823: destructive multi-delete is gated on an explicit confirm step.
     // The actual softHide/exit/toast effects run only after the user
-    // confirms (planConfirmMultiDelete).
-    effects.push({ type: 'confirmDelete', count });
+    // confirms (planConfirmMultiDelete). The selection is cloned into the
+    // request so later selection changes cannot alter what gets deleted.
+    effects.push({
+      type: 'confirmDelete',
+      request: { count, blockIds: [...selectedBlockIds] },
+    });
   }
   return effects;
 }
@@ -421,7 +440,7 @@ export function planConfirmMultiDelete(options: {
   transcript: TranscriptBlock[];
   t: TranscriptChromeTranslate;
 }): TranscriptChromeSideEffect[] {
-  const { selectedBlockIds, transcript, t } = options;
+  const { selectedBlockIds, t } = options;
   const count = selectedBlockIds.length;
   if (!count) return [];
   return [
@@ -446,7 +465,7 @@ export interface TranscriptChromeEffectHandlers {
   pulseBlock: (blockId: string) => void;
   showWorkbenchToast: (message: string) => void;
   /** #1823: destructive multi-delete gate. Received before softHide runs. */
-  onRequestDeleteConfirm?: ((count: number) => void) | undefined;
+  onRequestDeleteConfirm?: ((request: DeleteConfirmRequest) => void) | undefined;
   exitSelection: () => void;
   // Hub REST message actions (#1383) — optional; without them the side
   // effects are no-ops and no success toast is shown (#1821).
@@ -584,7 +603,7 @@ export function applyTranscriptChromeSideEffects(
         handlers.showWorkbenchToast(effect.message);
         break;
       case 'confirmDelete':
-        handlers.onRequestDeleteConfirm?.(effect.count);
+        handlers.onRequestDeleteConfirm?.({ count: effect.request.count, blockIds: [...effect.request.blockIds] });
         break;
       case 'exitSelection':
         handlers.exitSelection();

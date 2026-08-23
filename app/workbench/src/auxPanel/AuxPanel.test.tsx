@@ -55,6 +55,24 @@ describe('AuxPanel tablist roving tabindex (#1823)', () => {
     expect(onActiveTabChange).not.toHaveBeenCalled();
   });
 
+  it('moves the roving stop to the clicked tab (#1823)', () => {
+    const { onActiveTabChange } = renderAux();
+    const first = screen.getByRole('tab', { name: '会话详情' });
+    first.focus();
+    fireEvent.keyDown(first, { key: 'ArrowRight' });
+    const second = screen.getByRole('tab', { name: '文件树' });
+    expect(second).toHaveAttribute('tabindex', '0');
+
+    // A click activates another tab — the roving stop must follow it so the
+    // next Tab press returns to the clicked tab, not the stale focused one.
+    const changesTab = screen.getByRole('tab', { name: '变更' });
+    fireEvent.click(changesTab);
+    expect(onActiveTabChange).toHaveBeenCalledWith('changes');
+    expect(changesTab).toHaveAttribute('tabindex', '0');
+    expect(second).toHaveAttribute('tabindex', '-1');
+    expect(first).toHaveAttribute('tabindex', '-1');
+  });
+
   it('wraps around with ArrowLeft and supports Home/End', () => {
     renderAux();
     const tabs = screen.getAllByRole('tab');

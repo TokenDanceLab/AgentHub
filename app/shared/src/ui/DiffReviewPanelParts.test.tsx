@@ -155,4 +155,23 @@ describe('DiffReviewFileTabs roving tabindex (#1823)', () => {
     expect(tabs[0]).toHaveAttribute('aria-controls', 'diff-tabs-panel');
     expect(tabs[1]).toHaveAttribute('id', 'diff-tabs-tab-1');
   });
+
+  it('moves the roving stop to the clicked file tab (#1823)', () => {
+    const onSelectFile = vi.fn();
+    render(
+      <DiffReviewFileTabs files={mockFiles} safeIndex={0} onSelectFile={onSelectFile} />,
+    );
+    const tabs = screen.getAllByRole('tab');
+    tabs[0]!.focus();
+    fireEvent.keyDown(tabs[0]!, { key: 'ArrowRight' });
+    expect(tabs[1]).toHaveAttribute('tabindex', '0');
+
+    // A click activates another tab — the roving stop must follow it so the
+    // next Tab press returns to the clicked tab, not the stale focused one.
+    fireEvent.click(tabs[2]!);
+    expect(onSelectFile).toHaveBeenCalledWith(2);
+    expect(tabs[2]).toHaveAttribute('tabindex', '0');
+    expect(tabs[1]).toHaveAttribute('tabindex', '-1');
+    expect(tabs[0]).toHaveAttribute('tabindex', '-1');
+  });
 });

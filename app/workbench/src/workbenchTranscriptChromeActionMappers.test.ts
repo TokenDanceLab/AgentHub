@@ -61,8 +61,28 @@ describe('workbenchTranscriptChromeActionMappers', () => {
       t,
     });
     // #1823: destructive multi-delete gates on a confirm step; the
-    // softHide/exit effects run only via planConfirmMultiDelete.
-    expect(multiDelete).toEqual([{ type: 'confirmDelete', count: 1 }]);
+    // softHide/exit effects run only via planConfirmMultiDelete. The
+    // request carries a blockIds snapshot so later selection changes
+    // cannot alter what the dialog promised.
+    expect(multiDelete).toEqual([{
+      type: 'confirmDelete',
+      request: { count: 1, blockIds: ['b1'] },
+    }]);
+
+    // The snapshot is a clone — mutating the caller's array later does not
+    // leak into the planned request.
+    const selected = ['b1', 'b2'];
+    const multiDeleteTwo = planMultiAction({
+      action: 'delete',
+      selectedBlockIds: selected,
+      transcript,
+      t,
+    });
+    selected.push('b3');
+    expect(multiDeleteTwo).toEqual([{
+      type: 'confirmDelete',
+      request: { count: 2, blockIds: ['b1', 'b2'] },
+    }]);
 
     const confirmedDelete = planConfirmMultiDelete({
       selectedBlockIds: ['b1'],

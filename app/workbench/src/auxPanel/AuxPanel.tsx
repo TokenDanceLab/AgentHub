@@ -52,7 +52,7 @@ export function AuxPanel({
     // Focus on a non-tab stop is not part of the roving strip — arrow keys
     // should not hijack it (#1835 review).
     if (activeIndex < 0) return;
-    let nextIndex: number | null = null;
+    let nextIndex: number | null;
     switch (event.key) {
       case 'ArrowRight':
         nextIndex = (activeIndex + 1) % tabButtons.length;
@@ -100,7 +100,13 @@ export function AuxPanel({
               tabIndex={isTabStop ? 0 : -1}
               className={selected ? styles.tabActive : styles.tab}
               data-tab={tab}
-              onClick={() => onActiveTabChange(tab)}
+              onClick={() => {
+                // #1823: click activation selects the tab AND moves the
+                // roving stop to it — otherwise Tab later returns to the
+                // stale stop.
+                setRovingTabId(tab);
+                onActiveTabChange(tab);
+              }}
             >
               {labels[tab]}
             </button>

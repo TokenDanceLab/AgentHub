@@ -257,7 +257,13 @@ function SubagentStreamChip({ entry, defaultExpanded, onOpenSession }: SubagentS
 
       {/* ── Expanded transcript (#1406 Phase 3) ── */}
       {expanded ? (
-        <SubagentTranscript events={entry.events} />
+        <SubagentTranscript
+          events={entry.events}
+          // #1823: the overlay region is the single live-announcement
+          // owner — per-task logs stay off so a completed task never
+          // announces while another task still streams.
+          liveAnnounce={false}
+        />
       ) : null}
     </div>
   );

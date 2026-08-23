@@ -1,6 +1,6 @@
 import React from 'react';
 import { render, screen } from '@testing-library/react';
-import { beforeAll, describe, expect, it, vi } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
 import type { TeamSubagentStreamEvent } from './SubagentStreamStore';
 import { SubagentTranscript } from './SubagentTranscript';
 
@@ -108,6 +108,18 @@ describe('SubagentTranscript live region governance (#1823)', () => {
     );
     const log = container.querySelector('[role="log"]')!;
     expect(log).toHaveAttribute('aria-live', 'polite');
+    expect(log).toHaveAttribute('aria-busy', 'false');
+  });
+
+  it('stays off even after completion when an enclosing region owns announcements (#1823)', () => {
+    const { container } = render(
+      <SubagentTranscript
+        liveAnnounce={false}
+        events={[makeEvent({ event_seq: 2, event_type: 'result', payload: { summary: 'done okay' } })]}
+      />,
+    );
+    const log = container.querySelector('[role="log"]')!;
+    expect(log).toHaveAttribute('aria-live', 'off');
     expect(log).toHaveAttribute('aria-busy', 'false');
   });
 });

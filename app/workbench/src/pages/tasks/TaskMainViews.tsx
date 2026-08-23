@@ -128,7 +128,7 @@ export function TaskMain({
     // Focus on a non-tab stop is not part of the roving strip — arrow keys
     // should not hijack it (#1835 review).
     if (activeIndex < 0) return;
-    let nextIndex: number | null = null;
+    let nextIndex: number | null;
     switch (event.key) {
       case 'ArrowRight':
         nextIndex = (activeIndex + 1) % tabButtons.length;
@@ -245,7 +245,13 @@ export function TaskMain({
               className={`${styles.viewTab} ${
                 selected ? styles.viewTabActive : ''
               }`}
-              onClick={() => onViewModeChange(mode.id)}
+              onClick={() => {
+                // #1823: click activation switches the view AND moves the
+                // roving stop to it — otherwise Tab later returns to the
+                // stale stop.
+                setRovingViewId(mode.id);
+                onViewModeChange(mode.id);
+              }}
             >
               {mode.label}
             </button>

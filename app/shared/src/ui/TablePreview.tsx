@@ -250,7 +250,7 @@ export const TablePreview: React.FC<TablePreviewProps> = ({
     // Focus outside the tab strip (e.g. the close button): arrow keys own
     // the strip only, do not hijack other controls (#1835 review).
     if (activeIndex < 0) return;
-    let nextIndex: number | null = null;
+    let nextIndex: number | null;
     switch (event.key) {
       case 'ArrowRight':
         nextIndex = (activeIndex + 1) % tabButtons.length;
@@ -319,7 +319,13 @@ export const TablePreview: React.FC<TablePreviewProps> = ({
                 tabIndex={isTabStop ? 0 : -1}
                 className={`${styles.sheetTab} ${selected ? styles.sheetTabActive : ''}`}
                 data-sheet-name={name}
-                onClick={() => handleSheetSwitch(name)}
+                onClick={() => {
+                  // #1823: click activation switches the sheet AND moves the
+                  // roving stop to it — otherwise Tab later returns to the
+                  // stale stop.
+                  setRovingSheetId(name);
+                  handleSheetSwitch(name);
+                }}
               >
                 {name}
               </button>

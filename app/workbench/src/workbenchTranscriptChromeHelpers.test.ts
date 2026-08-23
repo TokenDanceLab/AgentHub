@@ -432,8 +432,9 @@ describe('workbenchTranscriptChromeHelpers', () => {
       t,
     });
     // #1823: delete now raises the confirm gate; the destructive plan
-    // (soft-hide + exit + toast) runs via planConfirmMultiDelete.
-    expect(del).toEqual([{ type: 'confirmDelete', count: 2 }]);
+    // (soft-hide + exit + toast) runs via planConfirmMultiDelete. The
+    // request carries the selection snapshot.
+    expect(del).toEqual([{ type: 'confirmDelete', request: { count: 2, blockIds: ['a', 'b'] } }]);
     expect(planConfirmMultiDelete({
       selectedBlockIds: ['a', 'b'],
       transcript,
@@ -529,7 +530,7 @@ describe('workbenchTranscriptChromeHelpers', () => {
       { type: 'pulse', blockId: 'a' },
       { type: 'toast', message: 'done' },
       // #1823: destructive multi-delete gate before any softHide runs.
-      { type: 'confirmDelete', count: 2 },
+      { type: 'confirmDelete', request: { count: 2, blockIds: ['a', 'b'] } },
       { type: 'exitSelection' },
     ], handlers);
 
@@ -542,7 +543,7 @@ describe('workbenchTranscriptChromeHelpers', () => {
       approvalId: 'req',
       decision: 'allow',
     });
-    expect(handlers.onRequestDeleteConfirm).toHaveBeenCalledWith(2);
+    expect(handlers.onRequestDeleteConfirm).toHaveBeenCalledWith({ count: 2, blockIds: ['a', 'b'] });
     expect(handlers.pulseBlock).toHaveBeenCalledWith('a');
     expect(handlers.showWorkbenchToast).toHaveBeenCalledWith('done');
     expect(handlers.exitSelection).toHaveBeenCalledOnce();
@@ -779,7 +780,7 @@ describe('workbenchTranscriptChromeHelpers', () => {
     expect(writers.setSelectionMode).toHaveBeenCalledWith(false);
     expect(writers.setSelectedBlockIds).toHaveBeenCalledWith([]);
     // #1823: leaving selection mode must also drop the pending delete gate.
-    expect(writers.setDeleteConfirmPending).toHaveBeenCalledWith(false);
+    expect(writers.setDeleteConfirmPending).toHaveBeenCalledWith(null);
 
     controller.enterSelection('b');
     expect(refs.selectionModeRef.current).toBe(true);

@@ -8,7 +8,10 @@ import {
   type ContextMenuItem,
   type MultiSelectBarAction,
 } from './floating';
-import type { WorkbenchContextMenuState } from './useWorkbenchTranscriptChrome';
+import type {
+  DeleteConfirmRequest,
+  WorkbenchContextMenuState,
+} from './useWorkbenchTranscriptChrome';
 
 export interface WorkbenchTranscriptOverlaysProps {
   isChatPage: boolean;
@@ -26,8 +29,9 @@ export interface WorkbenchTranscriptOverlaysProps {
   selectedCount: number;
   totalCount: number;
   selectBarRect: { left: number; width: number } | null;
-  /** #1823: destructive multi-delete gate is pending (awaiting confirm). */
-  deleteConfirmPending: boolean;
+  /** #1823: destructive multi-delete gate is pending (awaiting confirm).
+   *  Carries the count + blockIds snapshot the dialog promises to delete. */
+  deleteConfirmPending: DeleteConfirmRequest | null;
   /** #1823: confirms the pending destructive multi-delete. */
   onConfirmDelete: () => void;
   /** #1823: dismisses the pending confirm without deleting. */
@@ -74,9 +78,9 @@ export function WorkbenchTranscriptOverlays({
           workspaceWidth={selectBarRect?.width}
         />
       )}
-      {isChatPage && selectionMode && deleteConfirmPending && selectedCount > 0 && (
+      {isChatPage && selectionMode && deleteConfirmPending && (
         <SelectionDeleteConfirm
-          count={selectedCount}
+          count={deleteConfirmPending.count}
           onConfirm={onConfirmDelete}
           onCancel={onCancelDelete}
           workspaceLeft={selectBarRect?.left}
