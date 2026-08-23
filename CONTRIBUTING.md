@@ -8,7 +8,7 @@
 
 1. Read [AGENTS.md](AGENTS.md) first. It is the project rule SSOT.
 2. Read [docs/developer-quickstart.md](docs/developer-quickstart.md) for local setup.
-3. Start from the latest `master`: create a `feat/<topic>` (or `docs/<topic>`) branch, or use a `.worktrees/` worktree. `master` 禁直接 push，全部通过 PR squash merge（AGENTS.md §6 是 SSOT）。
+3. Start from the latest `master`: create a `feat/<topic>` (or `docs/<topic>`) branch, or use a `.worktrees/` worktree. `master` 禁直接 push，全部通过 PR squash merge（分支、worktree 与 squash 规则以 [AGENTS.md](AGENTS.md) 为 SSOT）。
 
 ## Branch lifecycle
 
@@ -41,7 +41,7 @@ make test-hub-integration                         # L1 集成（先 scripts/dev/
 python scripts/verify/verify-doc-ssot.py          # 文档/规则一致性门禁
 ```
 
-改动文件对应的最窄 gate 优先；宣称 merge-ready 前跑对应完整 gate（分层与 CI job 映射见 [AGENTS.md](AGENTS.md) §5.5）。
+改动文件对应的最窄 gate 优先；宣称 merge-ready 前跑对应完整 gate（测试分层与 CI job 映射见 [AGENTS.md](AGENTS.md) 的“测试分层（L0-L4）”）。
 
 ## Pull Requests
 

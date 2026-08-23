@@ -90,7 +90,7 @@ pnpm dev                                    # 5. 起 Desktop Vite（:5173）；w
 - 安全风险登记表正文与威胁模型（本仓只保留无细节的发布门禁状态）
 - 私有部署拓扑、运维证据与路由
 
-公开文档不包含真实服务器地址、生产 secret、token、日志或个人路径（见 `AGENTS.md` §9）。治理公开区说明见 [docs/governance/README.md](docs/governance/README.md)。
+公开文档不包含真实服务器地址、生产 secret、token、日志或个人路径（见 `AGENTS.md` 的“安全和隐私”）。治理公开区说明见 [docs/governance/README.md](docs/governance/README.md)。
 
 ## 贡献
 

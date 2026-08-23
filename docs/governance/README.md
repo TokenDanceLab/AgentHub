@@ -44,6 +44,6 @@ P0 remote-control fixture 只验证拓扑合同和离线证据形状：`Web -> H
 
 ## 维护规则
 
-- 新的机器门禁进 `verifier-map.md`，不写回 `AGENTS.md` 长表（§9.5 只保留指针）。
+- 新的机器门禁进 `verifier-map.md`，不写回 `AGENTS.md` 长表（`AGENTS.md` 的“规则 → 机器验证映射”只保留指针）。
 - 安全风险、威胁模型、治理执行的维护在本仓 `SECURITY.md`（摘要）与私有 docs 中枢（正文）双处同步；本仓不写真实 endpoint、token、secret 或 session 证据。
 - 私有 docs 中枢的维护规则见 TokenDanceLab/docs `governance/agenthub/README.md`。
