@@ -8,6 +8,7 @@
 - 约 35 个 (路径, 标记) 必须出现在对应文档；
 - 约 30 个禁止正则扫描活跃文档；
 - 行数上限表（AGENTS.md 300 行预算）；AGENTS.md 反引号路径存在性；
+- 文档引用 AGENTS 规则时必须使用主题名，禁止易漂移的章节编号；
 - 规则→机器验证映射 SSOT（docs/governance/verifier-map.md）存在性 + AGENTS owner 指针；
 - 活跃文档内部 markdown 相对链接目标存在性（DOC-BROKEN-LINK）；
 - standalone clone 可达性：活跃文档不得有解析出仓库的相对链接/路径（DOC-OUT-OF-REPO-LINK）；
@@ -230,6 +231,31 @@ def check_forbidden_patterns() -> None:
         for pattern, message in forbidden:
             if re.search(pattern, content):
                 fail(f"{rel} contains {message}")
+
+
+def check_no_numbered_agents_references() -> None:
+    """Prevent drift-prone references such as ``AGENTS.md §6``.
+
+    AGENTS headings may be reordered as the project evolves. Consumer docs must
+    name the topic (for example, “Git 和 worktree”) so a renumbering does not
+    silently break every pointer. CHANGELOG.md is immutable historical prose and
+    is therefore excluded.
+    """
+    pattern = re.compile(r"AGENTS\.md[^\n]{0,80}§\s*\d", re.IGNORECASE)
+    offenders: list[str] = []
+    for rel in git_ls_files(["*.md"]):
+        rel = normalize_path(rel)
+        if rel == "CHANGELOG.md" or rel.endswith("AGENTS.md") or not exists(rel):
+            continue
+        content = re.sub(r"```[\s\S]*?```", "", read_text(rel))
+        for line_no, line in enumerate(content.splitlines(), start=1):
+            if pattern.search(line):
+                offenders.append(f"{rel}:{line_no}")
+    if offenders:
+        fail(
+            "reference AGENTS rules by topic name, not section number: " + ", ".join(offenders),
+            "DOC-AGENTS-NUMBERED-REF",
+        )
 
 
 def check_max_lines() -> None:
@@ -485,6 +511,7 @@ def main() -> int:
     check_readme_parity()
     check_required_markers()
     check_forbidden_patterns()
+    check_no_numbered_agents_references()
     check_max_lines()
     check_verifier_map_owner()
     check_agents_md_mapping_table()

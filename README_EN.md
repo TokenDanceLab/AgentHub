@@ -90,7 +90,7 @@ This repository is **public** and contains only:
 - Security risk register details and threat model (this repo keeps only the detail-free release-gate status)
 - Private deployment topology, ops evidence, and routing
 
-Public docs contain no real server addresses, production secrets, tokens, logs, or personal paths (see `AGENTS.md` §9). Governance public-area notes: [docs/governance/README.md](docs/governance/README.md).
+Public docs contain no real server addresses, production secrets, tokens, logs, or personal paths (see the security and privacy rules in `AGENTS.md`). Governance public-area notes: [docs/governance/README.md](docs/governance/README.md).
 
 ## Contributing
 
