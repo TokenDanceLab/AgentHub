@@ -233,6 +233,50 @@ def readd_secret_guard_continue_on_error(text: str) -> str:
     if text.count(anchor) != 1:
         raise AssertionError(f"expected exactly one Secret guard step, found {text.count(anchor)}")
     return text.replace(anchor, anchor + "        continue-on-error: true\n", 1)
+def delete_backend_required_needs_lane(text):
+    """从 backend-required 的 needs 里删掉 backend-integration，模拟 L1 lane 悄悄掉出 required 聚合（防回退）。"""
+    anchor = "needs: [changes, go-edge, go-hub, backend-integration, backend-edge-e2e, backend-e2e-fixture]"
+    if text.count(anchor) != 1:
+        raise AssertionError(f"expected exactly one backend-required needs line, found {text.count(anchor)}")
+    return text.replace(anchor, "needs: [changes, go-edge, go-hub, backend-edge-e2e, backend-e2e-fixture]", 1)
+
+
+def flip_backend_required_changes_fail_closed(text):
+    """把 changes 失败 fail-closed 条件翻转，模拟 false green（防回退）。"""
+    anchor = '"$CHANGES_STATUS" != "success"'
+    if text.count(anchor) != 1:
+        raise AssertionError(f"expected exactly one CHANGES_STATUS fail-closed guard, found {text.count(anchor)}")
+    return text.replace(anchor, '"$CHANGES_STATUS" == "success"', 1)
+
+
+def flip_backend_required_noop_branch(text):
+    """把 Go-less no-op 分支条件翻转，模拟前端 PR 被错误阻塞（防回退）。"""
+    marker = "  backend-required:"
+    idx = text.find(marker)
+    if idx < 0:
+        raise AssertionError("backend-required job not found")
+    anchor = '"$CHANGE_RESULT" != "true"'
+    sub = text[idx:]
+    j = sub.find(anchor)
+    if j < 0:
+        raise AssertionError("backend-required no-op branch not found")
+    pos = idx + j
+    return text[:pos] + '"$CHANGE_RESULT" == "true"' + text[pos + len(anchor):]
+
+
+def restore_backend_required_path_filter(text):
+    """把 backend-required 的 if: always() 改回路径筛选，模拟 required check 重新可被跳过（防回退）。"""
+    marker = "  backend-required:"
+    idx = text.find(marker)
+    if idx < 0:
+        raise AssertionError("backend-required job not found")
+    always = "    if: always()"
+    sub = text[idx:]
+    j = sub.find(always)
+    if j < 0:
+        raise AssertionError("backend-required always() if not found")
+    pos = idx + j
+    return text[:pos] + "    if: github.event_name == 'workflow_dispatch'" + text[pos + len(always):]
 
 
 def readd_go_hub_lint_continue_on_error(text: str) -> str:
@@ -359,6 +403,34 @@ class VerifyCiGatesMutationTests(unittest.TestCase):
         self.assert_mutation_fails(
             readd_secret_guard_continue_on_error(read_workflow()),
             "re-added Secret guard continue-on-error",
+        )
+
+    def test_delete_backend_required_needs_lane_fails(self):
+        """backend-required 聚合丢失 L1 lane 时，校验器必须非零退出（防回退）。"""
+        self.assert_mutation_fails(
+            delete_backend_required_needs_lane(read_workflow()),
+            "deleted backend-required needs lane",
+        )
+
+    def test_flip_backend_required_changes_fail_closed_fails(self):
+        """changes 失败 fail-closed 被翻转时，校验器必须非零退出（防 false green）。"""
+        self.assert_mutation_fails(
+            flip_backend_required_changes_fail_closed(read_workflow()),
+            "flipped backend-required changes fail-closed",
+        )
+
+    def test_flip_backend_required_noop_branch_fails(self):
+        """Go-less no-op 分支被翻转时，校验器必须非零退出（防前端 PR 被阻塞）。"""
+        self.assert_mutation_fails(
+            flip_backend_required_noop_branch(read_workflow()),
+            "flipped backend-required no-op branch",
+        )
+
+    def test_restore_backend_required_path_filter_fails(self):
+        """backend-required 被改回路径筛选时，校验器必须非零退出（防 required check 可跳过）。"""
+        self.assert_mutation_fails(
+            restore_backend_required_path_filter(read_workflow()),
+            "restored backend-required path filter",
         )
 
     def test_readd_go_hub_lint_only_new_issues_fails(self):
