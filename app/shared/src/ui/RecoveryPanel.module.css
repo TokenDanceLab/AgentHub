@@ -95,6 +95,8 @@
   opacity: 0.68;
 }
 
+/* minimal tier (≤420) — deep compact below the mobile shell; SSOT:
+   styles/tokens-base.css + styles/breakpoints.ts (#1827). */
 @media (max-width: 420px) {
   .actions {
     grid-template-columns: 1fr;
