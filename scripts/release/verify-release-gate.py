@@ -171,35 +171,143 @@ def assert_rc_tag_policy(version: str) -> None:
         blocker(f"desktop version is not an accepted stable or rc semver: {version}")
 
 
-def get_open_high_risks(repo_root: str) -> list:
+SECURITY_GATE_HEADING = "## 发布门禁风险状态"
+KNOWN_RISK_SEVERITIES = {"critical", "high", "medium", "low"}
+NON_BLOCKING_CRITICAL_HIGH_STATUSES = {
+    "accepted",
+    "mitigated",
+    "mitigated in repo",
+    "closed",
+}
+BLOCKING_CRITICAL_HIGH_STATUS_MARKERS = (
+    "rotate required",
+    "verification required",
+)
+
+
+def normalize_risk_status(status: str) -> str:
+    return " ".join(status.split()).casefold()
+
+
+def split_markdown_table_row(line: str) -> list[str] | None:
+    stripped = line.strip()
+    if not stripped.startswith("|") or not stripped.endswith("|"):
+        return None
+    return [cell.replace(r"\|", "|").strip() for cell in re.split(r"(?<!\\)\|", stripped[1:-1])]
+
+
+def parse_security_release_risks(security_text: str) -> tuple[list, list]:
+    """Return policy blockers and fail-closed register integrity errors.
+
+    Only Critical/High rows participate in release status semantics. Exact
+    ``Open`` and statuses containing ``rotate required`` or
+    ``verification required`` are policy blockers. Known terminal/accepted
+    statuses are allowed; unknown statuses and malformed risk rows are
+    integrity failures so a damaged table cannot silently bypass the gate.
+    """
+
+    lines = security_text.splitlines()
+    heading_index = next((index for index, line in enumerate(lines) if line.strip() == SECURITY_GATE_HEADING), None)
+    if heading_index is None:
+        return [], [f"required section is missing: {SECURITY_GATE_HEADING}"]
+
+    blocking_risks = []
+    integrity_errors = []
+    for index in range(heading_index + 1, len(lines)):
+        line = lines[index]
+        if line.startswith("## "):
+            break
+        if "AH-SR-" not in line.upper():
+            continue
+
+        line_number = index + 1
+        cells = split_markdown_table_row(line)
+        if cells is None or len(cells) != 4:
+            integrity_errors.append(
+                f"line {line_number}: malformed risk row; expected exactly four pipe-delimited cells"
+            )
+            continue
+
+        risk_id, severity, status, risk = cells
+        if not re.fullmatch(r"AH-SR-\d+", risk_id, re.IGNORECASE):
+            integrity_errors.append(f"line {line_number}: malformed risk ID: {risk_id!r}")
+            continue
+
+        severity_key = severity.casefold()
+        if severity_key not in KNOWN_RISK_SEVERITIES:
+            integrity_errors.append(
+                f"line {line_number}: {risk_id} has unknown severity {severity!r}"
+            )
+            continue
+        if severity_key not in {"critical", "high"}:
+            continue
+        if not status or not risk:
+            integrity_errors.append(
+                f"line {line_number}: {risk_id}({severity}) must have non-empty Status and summary cells"
+            )
+            continue
+
+        status_key = normalize_risk_status(status)
+        gate_reason = None
+        if status_key == "open":
+            gate_reason = "status is Open"
+        else:
+            marker = next(
+                (candidate for candidate in BLOCKING_CRITICAL_HIGH_STATUS_MARKERS if candidate in status_key),
+                None,
+            )
+            if marker is not None:
+                gate_reason = f"status contains {marker}"
+
+        if gate_reason is not None:
+            blocking_risks.append(
+                {
+                    "id": risk_id,
+                    "severity": severity,
+                    "status": status,
+                    "risk": risk,
+                    "gateReason": gate_reason,
+                }
+            )
+        elif status_key not in NON_BLOCKING_CRITICAL_HIGH_STATUSES:
+            integrity_errors.append(
+                f"line {line_number}: {risk_id}({severity}) has unknown release-gate status {status!r}"
+            )
+
+    return blocking_risks, integrity_errors
+
+
+def get_blocking_high_risks(repo_root: str) -> tuple[list, list]:
     risk_path = os.path.join(repo_root, "SECURITY.md")
     if not os.path.isfile(risk_path):
-        blocker("security policy is missing")
-        return []
+        return [], ["security policy is missing"]
 
-    pattern = re.compile(r"^\|\s*(?P<id>AH-SR-\d+)\s*\|\s*(?P<severity>Critical|High)\s*\|\s*Open\s*\|\s*(?P<risk>[^|]+)\|", re.IGNORECASE)
-    risks = []
     with open(risk_path, encoding="utf-8", errors="replace") as handle:
-        for line in handle:
-            match = pattern.match(line)
-            if match:
-                risks.append({"id": match.group("id"), "severity": match.group("severity"), "risk": match.group("risk").strip()})
-    return risks
+        return parse_security_release_risks(handle.read())
 
 
 def assert_security_release_gate(repo_root: str, allow_open_high_risks: bool) -> list:
     step("security release gate")
-    open_risks = get_open_high_risks(repo_root)
-    if not open_risks:
-        add_ready("no Open Critical/High risks in security register")
-        return open_risks
+    blocking_risks, integrity_errors = get_blocking_high_risks(repo_root)
+    for error in integrity_errors:
+        blocker(f"security risk register integrity failure: {error}")
 
-    ids = ", ".join(f"{risk['id']}({risk['severity']})" for risk in open_risks)
+    if not blocking_risks:
+        if not integrity_errors:
+            add_ready("no policy-blocking Critical/High risks in security register")
+        return blocking_risks
+
+    ids = ", ".join(
+        f"{risk['id']}({risk['severity']}: {risk['status']})" for risk in blocking_risks
+    )
     if allow_open_high_risks:
-        warn(f"Open Critical/High risks are being reported but not failing because -AllowOpenHighRisks was set: {ids}")
+        warn(
+            "policy-blocking Critical/High risks are being reported but not failing "
+            f"because -AllowOpenHighRisks was set: {ids}"
+        )
     else:
-        blocker(f"Open Critical/High risks block public release: {ids}")
-    return open_risks
+        blocker(f"policy-blocking Critical/High risks block public release: {ids}")
+    return blocking_risks
 
 
 def assert_artifact_manifest(repo_root: str, artifacts_root: str) -> list:
@@ -261,7 +369,12 @@ def main() -> int:
     parser.add_argument("-DevRef", "--DevRef", default="origin/dev/demo-user", help="dev git ref")
     parser.add_argument("-ArtifactsRoot", "--ArtifactsRoot", default="", help="artifact root for the manifest gate")
     parser.add_argument("-ReportPath", "--ReportPath", default=".tmp/release-gate-report.json", help="release gate report output path")
-    parser.add_argument("-AllowOpenHighRisks", "--AllowOpenHighRisks", action="store_true", help="report Open Critical/High risks without failing")
+    parser.add_argument(
+        "-AllowOpenHighRisks",
+        "--AllowOpenHighRisks",
+        action="store_true",
+        help="report policy-blocking Critical/High risks without failing; malformed/unknown statuses still fail closed",
+    )
     parser.add_argument("-SkipRefCheck", "--SkipRefCheck", action="store_true", help="skip the git ref divergence check")
     args = parser.parse_args()
 
@@ -272,7 +385,7 @@ def main() -> int:
     assert_workflow_policy(REPO_ROOT)
     version = get_desktop_version(REPO_ROOT)
     assert_rc_tag_policy(version)
-    open_high_risks = assert_security_release_gate(REPO_ROOT, args.AllowOpenHighRisks)
+    blocking_high_risks = assert_security_release_gate(REPO_ROOT, args.AllowOpenHighRisks)
     manifest = assert_artifact_manifest(REPO_ROOT, args.ArtifactsRoot)
 
     step("blocking external approval slices")
@@ -288,7 +401,8 @@ def main() -> int:
         "ready": ready,
         "warnings": warnings,
         "blockers": blockers,
-        "openCriticalHighRisks": open_high_risks,
+        "blockingCriticalHighRisks": blocking_high_risks,
+        "openCriticalHighRisks": blocking_high_risks,
         "artifactsRoot": args.ArtifactsRoot,
         "manifest": manifest,
     }
