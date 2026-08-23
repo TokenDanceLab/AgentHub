@@ -516,6 +516,11 @@
   color: var(--diff-removed-border);
 }
 
+.hunkBadgeSubmitting {
+  background: var(--td-surface-3);
+  color: var(--td-ink-subtle);
+}
+
 /* ── Empty state ───────────────────────────────────────────────── */
 .empty {
   display: flex;
