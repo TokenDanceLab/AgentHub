@@ -52,6 +52,7 @@ docker compose up -d
 | Web Vite | 5174 |
 | Mobile RN Expo Web | 5177 |
 | Local Edge | 3210 |
+| TokenDance ID（外部服务，非本 compose；远程 dev 服务器 start.sh） | 3000 |
 
 默认 compose 绑定开发本机；远程调试必须显式配置网络和防火墙，不能把默认开发密码或 admin 端口暴露出去。
 
@@ -60,7 +61,7 @@ docker compose up -d
 | Claim | 最低证据 |
 |---|---|
 | Compose 配置形状正确 | `docker compose config` 或 CI compose check |
-| OIDC 配置形状正确 | OIDC/session tests + WSL 全栈 E2E 真实 OIDC 流（`verify-oidc-readiness.py` 已退役 2026-08-07，见 `AGENTS.md` §9.5） |
+| OIDC 配置形状正确 | OIDC/session tests + WSL 全栈 E2E 真实 OIDC 流（`verify-oidc-readiness.py` 已退役 2026-08-07，见 `AGENTS.md` §9.5）；真实 E2E lane（`scripts/e2e/run-real-e2e-lane.sh`，workflow_dispatch `real-e2e-stack`，evidence manifest 六字段合同） |
 | Hub/Edge API 行为正确 | 相关 Go handler/service tests + OpenAPI parse |
 | Web/Desktop UI 流程正确 | Playwright UI + Visual QA，按证据等级标注 |
 | Desktop packaged 行为正确 | Tauri package/sidecar/icon/installer evidence |
