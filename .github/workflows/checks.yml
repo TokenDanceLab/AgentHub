@@ -1469,17 +1469,27 @@ jobs:
         shell: bash
         run: |
           sudo apt-get update -y
-          sudo apt-get install -y sqlite3 openssl
-          python3 -m pip install bcrypt
+          sudo apt-get install -y sqlite3 openssl python3-bcrypt
+          # 不用 pip 装系统 python（PEP 668 externally-managed）；provision 的
+          # python3 -c 'import bcrypt' 走系统解释器，apt 包即满足。
 
       - name: Generate run-time credentials (OIDC client, hub JWT, DB password; never committed)
         id: creds
         shell: bash
         run: |
-          echo "cid=c_$(openssl rand -hex 12)" >> "$GITHUB_OUTPUT"
-          echo "csec=cs_$(openssl rand -hex 24)" >> "$GITHUB_OUTPUT"
-          echo "jwt=$(openssl rand -hex 24)" >> "$GITHUB_OUTPUT"
-          echo "dbpw=$(openssl rand -hex 18)" >> "$GITHUB_OUTPUT"
+          cid="c_$(openssl rand -hex 12)"
+          csec="cs_$(openssl rand -hex 24)"
+          jwt="$(openssl rand -hex 24)"
+          dbpw="$(openssl rand -hex 18)"
+          # step outputs 不进 masking 系统：先 add-mask 再写 GITHUB_OUTPUT，
+          # 避免后续步骤/失败回显把明文凭据打进公开 run log。
+          for v in "$csec" "$jwt" "$dbpw"; do echo "::add-mask::$v"; done
+          {
+            echo "cid=$cid"
+            echo "csec=$csec"
+            echo "jwt=$jwt"
+            echo "dbpw=$dbpw"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Start PostgreSQL + Redis (compose)
         env:
@@ -1499,6 +1509,9 @@ jobs:
             exit 0
           fi
           sudo mkdir -p /var/lib/tokendance-id
+          # 目录须归 runner 用户：ID 二进制以非特权 runner 运行并要在此创建
+          # tokendance.db（lane/provision 的 AGENTHUB_E2E_ID_DB 同路径读写）。
+          sudo chown "$(id -u):$(id -g)" /var/lib/tokendance-id
           git clone --quiet --depth 1 https://x-access-token:${ID_REPO_TOKEN}@github.com/TokenDanceLab/tokendance-id.git /tmp/tokendance-id
           (cd /tmp/tokendance-id && go build -o /tmp/tokendance-id-bin ./cmd/tokendance-id)
           cp /tmp/tokendance-id/configs/config.example.yaml /tmp/tokendance-id/configs/config.yaml
@@ -1532,7 +1545,11 @@ jobs:
           # 被直接插值进 run 块（命令注入）。
           ID_IMAGE: ${{ inputs.id_image }}
         run: |
-          docker run -d --name td-id -p 127.0.0.1:3000:3000 \
+          sudo mkdir -p /var/lib/tokendance-id
+          # 挂载目录归 runner 用户；容器以 --user 同属主运行，库文件归 runner，
+          # lane/provision 的 sqlite 读写不受 root 属主影响。
+          sudo chown "$(id -u):$(id -g)" /var/lib/tokendance-id
+          docker run -d --user "$(id -u):$(id -g)" --name td-id -p 127.0.0.1:3000:3000 \
             -e TOKENDANCE_SERVER_ADDR=:3000 \
             -e TOKENDANCE_DATABASE_DSN=/app/data/tokendance.db \
             -e TOKENDANCE_JWT_ISSUER=http://127.0.0.1:3000 \

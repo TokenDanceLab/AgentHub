@@ -85,6 +85,7 @@ emit_manifest() { # 请求 status -> stdout "最终status|manifest路径"（pass
   MANIFEST_EDGE_STATE="$EDGE_STATE" \
   MANIFEST_WEB_STATE="$WEB_STATE" \
   MANIFEST_PW_RC="${PW_RC:-0}" \
+  MANIFEST_RUN_STARTED_AT="${RUN_STARTED_AT:-0}" \
   python3 - <<'PYEOF'
 import glob, json, os, time
 
@@ -93,14 +94,23 @@ os.makedirs(root, exist_ok=True)
 stamp = time.strftime("%Y%m%d-%H%M%S", time.localtime())
 requested = os.environ["MANIFEST_STATUS"]
 status = requested
+run_started = float(os.environ.get("MANIFEST_RUN_STARTED_AT") or 0)
 
 def latest(pattern):
-    matches = sorted(glob.glob(os.path.join(root, pattern)), key=os.path.getmtime)
+    # tests/artifacts 跨运行持久：只取本次运行开始之后产出的证据，
+    # 否则上一次运行的 report/html 会被误算为本次证据（no-evidence 降级失效）。
+    matches = sorted(
+        (p for p in glob.glob(os.path.join(root, pattern)) if os.path.getmtime(p) >= run_started),
+        key=os.path.getmtime,
+    )
     return matches[-1] if matches else None
 
 report_path = latest("report-*.json")
 html_path = latest("html-*")
-traces = sorted(glob.glob(os.path.join(root, "test-results", "**", "trace*.zip"), recursive=True))
+traces = sorted(
+    (p for p in glob.glob(os.path.join(root, "test-results", "**", "trace*.zip"), recursive=True)
+     if os.path.getmtime(p) >= run_started),
+)
 account_env = os.path.exists(os.path.join(root, "real-e2e-account.env"))
 
 rows = []
@@ -116,12 +126,22 @@ if report_path and requested in ("passed", "failed"):
         collect(report)
         for spec in specs:
             title = spec.get("title") or os.environ["MANIFEST_SPEC_TARGET"]
-            results = spec.get("results") or []
+            # Playwright >=1.60 JSONReportSpec：results 在 spec.tests[].results
+            # （JSONReportTest），spec 上没有 results 字段；老版本 schema 才有
+            # spec.results。两种形态都兼容：先展开 tests，缺失时回退 spec.results。
+            results = []
+            for test in spec.get("tests") or []:
+                results.extend(test.get("results") or [])
+            if not results:
+                results = spec.get("results") or []
             statuses = [result.get("status") for result in results]
-            if spec.get("ok") is True:
-                outcome = "passed"
-            elif statuses and all(s in ("skipped", "pending") for s in statuses):
+            if statuses and all(s in ("skipped", "pending") for s in statuses):
+                # 全 skipped/pending 必须先于 ok 判定：skipped 的 spec.ok 为 true
+                # （Playwright #34174），否则 skip 会被误报成 passed。
                 outcome = "skipped"
+            elif spec.get("ok") is True and any(s == "passed" for s in statuses):
+                # passed 要求 ok 且至少一个执行结果状态为 passed。
+                outcome = "passed"
             else:
                 outcome = "failed"
             duration_ms = sum(int(result.get("duration", 0) or 0) for result in results)
@@ -271,6 +291,9 @@ PYEOF
 
 # ── 主流程 ──────────────────────────────────────────────────
 main() {
+  # 本次运行起点：emit_manifest 只采信此时间之后产出的证据文件，
+  # 防止 tests/artifacts 上一次运行的残留被误归为本次证据。
+  RUN_STARTED_AT="$(date +%s)"
   info "preflight: id=$ID_BASE_URL hub=$HUB_BASE_URL edge=$EDGE_BASE_URL web=$WEB_BASE_URL"
   stack_status
   info "stack state: id=$ID_STATE hub=$HUB_STATE edge=$EDGE_STATE web=$WEB_STATE"

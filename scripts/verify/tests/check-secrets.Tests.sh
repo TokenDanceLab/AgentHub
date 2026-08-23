@@ -3,10 +3,11 @@
 #
 # Positive: placeholder values, *.env.example files, *_URL endpoint
 # assignments, absolute path literals, and userinfo-less endpoint URL values
-# pass.
+# without query/fragment pass.
 # Negative: real AWS keys, GitHub tokens, private key blocks, API keys
-# (sk-), URL DSNs with userinfo (user:pass@), and real password literals in
-# staged diffs must ALL exit non-zero.
+# (sk-), URL DSNs with userinfo (user:pass@), URLs carrying query-string
+# credentials (?access_token=…), and real password literals in staged diffs
+# must ALL exit non-zero.
 #
 # Runs in CI validate job alongside verify-vulnerability-gates.Tests.sh.
 set -uo pipefail
@@ -117,6 +118,15 @@ YAML
 git add issuer.yaml
 bash "$SCRIPT" --staged >/dev/null 2>&1
 check "endpoint URL value assignment passes" no $?
+
+echo "=== URL with query-string credential still fails ==="
+git reset --quiet
+cat > qs.yaml <<'YAML'
+SOME_TOKEN_ENDPOINT=https://auth.svc/cb?access_token=real-secret-value-123
+YAML
+git add qs.yaml
+bash "$SCRIPT" --staged >/dev/null 2>&1
+check "URL with query-string credential still fails" yes $?
 
 echo "=== URL DSN with userinfo still fails ==="
 git reset --quiet

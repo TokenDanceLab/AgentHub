@@ -155,10 +155,12 @@ is_path_literal() {
 }
 
 is_endpoint_url() {
-  # http(s) endpoint without userinfo (no user:pass@) is public endpoint
-  # config, not a secret. Covers endpoint-holding names that do not end in
-  # _URL/_URI (e.g. TOKENDANCE_JWT_ISSUER=http://127.0.0.1:3000).
-  [[ "$1" =~ ^https?://[^@[:space:]]+$ ]]
+  # http(s) endpoint without userinfo (no user:pass@) and without query or
+  # fragment (no ?access_token=… / #…) is public endpoint config, not a
+  # secret. Covers endpoint-holding names that do not end in _URL/_URI
+  # (e.g. TOKENDANCE_JWT_ISSUER=http://127.0.0.1:3000). Credential-bearing
+  # query/fragment keeps falling through to the assignment rule.
+  [[ "$1" =~ ^https?://[^@[:space:]?#]+$ ]]
 }
 
 trim_line() {
