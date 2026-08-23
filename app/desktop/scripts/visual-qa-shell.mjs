@@ -17,7 +17,7 @@
  */
 import { chromium } from '@playwright/test';
 import { spawn } from 'node:child_process';
-import { mkdir, rm } from 'node:fs/promises';
+import { mkdir, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -114,9 +114,20 @@ async function captureTheme(browser, theme) {
   await wait(200);
   const file = path.join(outDir, `desktop-shell-${theme}-1440x810${dprSuffix}.png`);
   await page.screenshot({ path: file, fullPage: false });
+  // #1874: emit a DOM/geometry contract next to the PNG so the gate can prove it
+  // captured the workbench (not an onboarding/blank shell) with no horizontal overflow.
+  const contract = await page.evaluate(() => ({
+    viewport: { width: window.innerWidth, height: window.innerHeight },
+    workbenchShell: Boolean(document.querySelector('[data-testid="agenthub-workbench"]')),
+    onboardingVisible: Boolean(document.querySelector('[data-testid="onboarding-overlay"]')),
+    horizontalOverflow:
+      document.documentElement.scrollWidth > document.documentElement.clientWidth + 1,
+  }));
+  const contractFile = path.join(outDir, `desktop-shell-${theme}-1440x810${dprSuffix}.json`);
+  await writeFile(contractFile, JSON.stringify(contract, null, 2) + '\n');
   const applied = await page.evaluate(() => document.documentElement.getAttribute('data-theme'));
   await context.close();
-  return { file, applied, theme };
+  return { file, contractFile, contract, applied, theme };
 }
 
 async function main() {
@@ -125,6 +136,7 @@ async function main() {
   // a later assertion must not pass on PNGs left by an older run.
   for (const theme of themes) {
     await rm(path.join(outDir, `desktop-shell-${theme}-1440x810${dprSuffix}.png`), { force: true });
+    await rm(path.join(outDir, `desktop-shell-${theme}-1440x810${dprSuffix}.json`), { force: true });
   }
   const server = await maybeStartDevServer();
   const browser = await chromium.launch({ headless: true });
@@ -143,6 +155,7 @@ async function main() {
       console.warn(`warn: expected data-theme=${r.theme}, got ${r.applied}`);
     }
     console.log(`wrote ${r.file}`);
+    console.log(`contract ${r.contractFile} overflow=${r.contract.horizontalOverflow}`);
   }
   console.log(`Desktop visual-qa shell capture done (${results.length} shots) → ${outDir}`);
 }

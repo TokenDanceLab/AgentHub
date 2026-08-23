@@ -14,7 +14,7 @@
  *   VISUAL_QA_SHELL_MIN_BYTES (default 8000)
  *   VISUAL_QA_SHELL_OUT_DIR   (optional override)
  */
-import { readdir, stat } from 'node:fs/promises';
+import { readdir, readFile, stat } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -55,6 +55,41 @@ async function main() {
     console.log('ok ' + name + ' (' + info.size + ' bytes)');
   }
 
+  // #1874: consume the DOM/geometry contracts. Fail closed on horizontal overflow
+  // across every captured width, and require the gate shots to prove the workbench
+  // shell (not an onboarding/blank shell).
+  const contractNames = names.filter(function (n) { return /^desktop-shell-.*\.json$/.test(n); });
+  if (contractNames.length === 0) {
+    failures.push('no DOM/geometry contract found (expected desktop-shell-*.json next to PNGs)');
+  }
+  for (const name of contractNames) {
+    let contract;
+    try {
+      contract = JSON.parse(await readFile(path.join(outDir, name), 'utf8'));
+    } catch {
+      failures.push('unparseable contract: ' + name);
+      continue;
+    }
+    if (contract.horizontalOverflow !== false) {
+      failures.push('horizontal overflow captured in ' + name);
+    }
+  }
+
+  for (const base of ['desktop-shell-light-1440x810', 'desktop-shell-dark-1440x810']) {
+    const name = base + '.json';
+    if (!names.includes(name)) {
+      failures.push('missing contract: ' + name);
+      continue;
+    }
+    const contract = JSON.parse(await readFile(path.join(outDir, name), 'utf8'));
+    if (contract.workbenchShell !== true) {
+      failures.push(name + ': workbench shell not captured');
+    }
+    if (contract.onboardingVisible !== false) {
+      failures.push(name + ': onboarding overlay visible (onboarding-seen flag did not take effect)');
+    }
+  }
+
   const diag = names.filter(function (n) { return n.includes('DIAGNOSTIC'); });
   if (diag.length > 0) {
     console.warn('warn: diagnostic captures present: ' + diag.join(', '));
@@ -70,7 +105,7 @@ async function main() {
   }
 
   console.log(
-    'visual:qa:shell assert ok (' + expected.length + ' shots, min ' + minBytes + ' bytes) -> ' + outDir,
+    'visual:qa:shell assert ok (' + expected.length + ' shots + ' + contractNames.length + ' contracts, min ' + minBytes + ' bytes) -> ' + outDir,
   );
 }
 
