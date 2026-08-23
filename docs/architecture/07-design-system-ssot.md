@@ -115,9 +115,17 @@ Applied first to AuxPanel, TerminalPanel, Card glass/elevated. Respect `prefers-
 | Layer | SSOT |
 |---|---|
 | Capture matrix (Visual QA gate，已收口 2026-07-20) | `app/{desktop,web}/scripts/visual-qa-shell.mjs` · `visual:qa:shell` · **1440×810** light+dark · DPR **1x default** |
+| CI 双半边（#1827） | web：`visual-qa-shell` job；desktop：`visual-qa-desktop` job（两者均 path-filtered `shell`，chromium only，非空白断言 + artifact 上传，禁 pixel golden） |
+| Desktop 断言 | `app/desktop/scripts/assert-visual-qa-shell.mjs` · `assert:visual:qa:shell` |
 | Optional 2x capture | `visual:qa:shell:2x` / `VISUAL_QA_DPR=2` · files suffix `@2x` |
 | Score rubric / pass bar | 分数值不再由本仓维护（旧 `visual-qa-scorecard.md` 已不在源仓，`docs/history.md` 无对应外迁条目——89/100 等分数断言不可复核，已删除）；验收以 `visual:qa:shell` 截图证据 + PR 人工审阅为准 |
 | Optional multi-scene battery | `app/web/scripts/visual-qa.mjs` — **legacy / non-gate** (do not use for merge gate) |
+
+**窄视口门禁（#1827 结论：本轮不做）**。理由：断点体系尚未落地（见 §10——760–1920 区间无
+布局策略、JS 断点 hook 在途），desktop Tauri 窗口 `minWidth 800×minHeight 600`；此时设
+1 个窄视口（如 900×810）门禁只会把「主区被压」的现状固化进红色门禁，而修复责任在响应式
+lane——本 lane 无法闭环。处置：断点 lane 合并后，在 `visual-qa-shell.mjs` 补 ≥1 个窄视口
+场景并同步 `assert-visual-qa-shell.mjs` 期望文件清单，届时再开为门禁。
 
 Do not cite `1440x920` as the Desktop/Web gate viewport.
 
