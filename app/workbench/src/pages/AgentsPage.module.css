@@ -63,6 +63,25 @@
   color: var(--td-ink);
 }
 
+/* #1872: page-level provenance pill for demo/unavailable data (real = none). */
+.data-source-badge {
+  display: inline-flex;
+  align-items: center;
+  margin: 0 12px 12px;
+  padding: 4px 10px;
+  border: 1px solid transparent;
+  border-radius: var(--r-full);
+  background: var(--warning-bg);
+  color: var(--td-warning);
+  font: 600 0.75rem/1.2 var(--td-font);
+  letter-spacing: 0.01em;
+}
+
+.data-source-badge[data-data-source='unavailable'] {
+  background: var(--danger-bg);
+  color: var(--td-danger);
+}
+
 .workbench-search {
   width: 100%;
   height: 40px;
