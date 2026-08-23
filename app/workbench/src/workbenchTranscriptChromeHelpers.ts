@@ -7,9 +7,11 @@ import {
   buildTranscriptContextMenuGroups,
   buildTranscriptMultiSelectActions,
   createTranscriptChromeEffectHandlers,
+  planConfirmMultiDelete,
   planContextAction,
   planMultiAction,
   planTranscriptBlockAction,
+  type DeleteConfirmRequest,
   type TranscriptChromeEffectHandlers,
 } from './workbenchTranscriptChromeActionMappers';
 import {
@@ -136,12 +138,14 @@ export {
   planContextAction,
   planTranscriptBlockAction,
   planMultiAction,
+  planConfirmMultiDelete,
   createTranscriptChromeEffectHandlers,
   applyTranscriptChromeSideEffects,
   buildTranscriptContextMenuGroups,
   buildTranscriptMultiSelectActions,
   type TranscriptChromeSideEffect,
   type TranscriptChromeEffectHandlers,
+  type DeleteConfirmRequest,
   type BuildTranscriptContextMenuGroupsOptions,
   type BuildTranscriptMultiSelectActionsOptions,
 } from './workbenchTranscriptChromeActionMappers';
@@ -155,6 +159,13 @@ export interface TranscriptChromeMutableRefs {
   runMultiActionRef: { current: ((action: string) => void) | null };
   toastTimerRef: { current: number | null };
   pulseTimersRef: { current: Map<string, number> };
+  /**
+   * #1823: pending destructive multi-delete snapshot. Lives in a ref (owned
+   * by the hook, passed in here) so it outlives controller re-creation —
+   * the controller is built inside a useMemo whose deps can change while
+   * the confirm dialog stays mounted on React state.
+   */
+  deleteConfirmRef: { current: DeleteConfirmRequest | null };
 }
 
 export interface TranscriptChromeStateWriters {
@@ -172,6 +183,8 @@ export interface TranscriptChromeStateWriters {
   setSelectBarRect: (value: SelectBarRect | null) => void;
   setToastMessage: (value: string) => void;
   setToastVisible: (value: boolean) => void;
+  /** #1823: destructive multi-delete confirm-gate state (snapshot or none). */
+  setDeleteConfirmPending: (value: DeleteConfirmRequest | null) => void;
 }
 
 export interface TranscriptChromeControllerDeps {
@@ -220,6 +233,10 @@ export interface TranscriptChromeController {
   ) => void;
   runContextAction: (action: string, blockId: string) => void;
   runMultiAction: (action: string) => void;
+  /** #1823: executes the confirmed destructive multi-delete (soft-hide). */
+  confirmMultiDelete: () => void;
+  /** #1823: dismisses the pending delete confirm without deleting. */
+  cancelDeleteConfirm: () => void;
   handleSelectionHotkey: (event: {
     key: string;
     ctrlKey: boolean;
@@ -244,6 +261,13 @@ export function createTranscriptChromeController(
 ): TranscriptChromeController {
   const { refs, writers, getTranscript, getSelectedBlockIds, t } = deps;
 
+  // #1823: the delete confirm snapshot lives in refs.deleteConfirmRef (owned
+  // by the hook) — it must outlive controller re-creation. The controller is
+  // built inside a useMemo whose deps (t, handlers) can change while the
+  // confirm dialog stays mounted on React state; a closure copy would reset
+  // to null and confirmMultiDelete could then act on the live selection.
+  const pendingDeleteRequest = (): DeleteConfirmRequest | null => refs.deleteConfirmRef.current;
+
   const showWorkbenchToast = (message: string): void => {
     writers.setToastMessage(message);
     writers.setToastVisible(true);
@@ -267,8 +291,10 @@ export function createTranscriptChromeController(
 
   const exitSelection = (): void => {
     const snapshot = createExitSelectionSnapshot();
+    refs.deleteConfirmRef.current = null;
     writers.setSelectionMode(snapshot.selectionMode);
     writers.setSelectedBlockIds(snapshot.selectedBlockIds);
+    writers.setDeleteConfirmPending(null);
   };
 
   const enterSelection = (blockId: string): void => {
@@ -280,11 +306,13 @@ export function createTranscriptChromeController(
 
   const resetSelection = (): void => {
     const snapshot = createResetSelectionSnapshot();
+    refs.deleteConfirmRef.current = null;
     writers.setContextMenu(snapshot.contextMenu);
     writers.setSelectionMode(snapshot.selectionMode);
     writers.setSelectedBlockIds(snapshot.selectedBlockIds);
     writers.setActionedBlockIds(snapshot.actionedBlockIds);
     writers.setSoftHiddenBlockIds(snapshot.softHiddenBlockIds);
+    writers.setDeleteConfirmPending(null);
   };
 
   const effectHandlers = (): TranscriptChromeEffectHandlers => createTranscriptChromeEffectHandlers({
@@ -294,6 +322,14 @@ export function createTranscriptChromeController(
     focusComposer: () => focusComposerInput(deps.composerInputRef),
     onRegenerate: deps.onRegenerate,
     onApprovalDecision: deps.onApprovalDecision,
+    onRequestDeleteConfirm: (request) => {
+      // #1823: store a private clone in the hook-owned ref — confirmMultiDelete
+      // must act on this snapshot, not on whatever the live selection holds
+      // at confirm time, and the snapshot must survive controller re-creation.
+      const snapshot = { count: request.count, blockIds: [...request.blockIds] };
+      refs.deleteConfirmRef.current = snapshot;
+      writers.setDeleteConfirmPending(snapshot);
+    },
     onPinMessage: deps.onPinMessage,
     onUnpinMessage: deps.onUnpinMessage,
     onForwardMessage: deps.onForwardMessage,
@@ -401,6 +437,30 @@ export function createTranscriptChromeController(
     }), effectHandlers());
   };
 
+  // #1823: the destructive multi-delete runs only after the user confirmed
+  // the inline prompt (SelectionDeleteConfirm). planMultiAction('delete')
+  // just raises the confirm gate; this applies the soft-hide plan against
+  // the blockIds snapshot captured when the gate was raised — the live
+  // selection may have changed in the meantime (e.g. Ctrl/⌘+A). With no
+  // pending request this is a strict no-op: never fall back to the live
+  // selection (the dialog only mounts while a request is pending).
+  const confirmMultiDelete = (): void => {
+    const request = pendingDeleteRequest();
+    if (!request) return;
+    refs.deleteConfirmRef.current = null;
+    writers.setDeleteConfirmPending(null);
+    applyTranscriptChromeSideEffects(planConfirmMultiDelete({
+      selectedBlockIds: request.blockIds,
+      transcript: getTranscript(),
+      t,
+    }), effectHandlers());
+  };
+
+  const cancelDeleteConfirm = (): void => {
+    refs.deleteConfirmRef.current = null;
+    writers.setDeleteConfirmPending(null);
+  };
+
   const handleSelectionHotkey = (event: {
     key: string;
     ctrlKey: boolean;
@@ -441,6 +501,8 @@ export function createTranscriptChromeController(
     handleTranscriptBlockAction,
     runContextAction,
     runMultiAction,
+    confirmMultiDelete,
+    cancelDeleteConfirm,
     handleSelectionHotkey,
     updateSelectBarRect,
     disposeSelectionHold: () => disposeSelectionHoldRef(refs.selectionHoldRef),

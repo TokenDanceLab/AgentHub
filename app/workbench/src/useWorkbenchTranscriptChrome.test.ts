@@ -526,12 +526,33 @@ describe('useWorkbenchTranscriptChrome', () => {
       result.current.handleBlockSelect('b2', { shiftKey: true });
     });
     act(() => {
-      result.current.multiSelectActions.find((action) => action.label === 'context.delete')?.onClick();
+      result.current.multiSelectActions.find((action) => action.danger)?.onClick();
+    });
+    // #1823: the destructive delete raises the confirm gate; nothing is
+    // removed until the user confirms. The gate carries the selection
+    // snapshot the dialog promises to delete.
+    expect(result.current.deleteConfirmPending).toEqual({ count: 2, blockIds: ['b1', 'b2'] });
+    expect(result.current.softHiddenBlockIds).toEqual([]);
+
+    act(() => {
+      result.current.cancelDeleteConfirm();
+    });
+    expect(result.current.deleteConfirmPending).toBeNull();
+    expect(result.current.softHiddenBlockIds).toEqual([]);
+    expect(result.current.selectionMode).toBe(true);
+
+    act(() => {
+      result.current.multiSelectActions.find((action) => action.danger)?.onClick();
+    });
+    expect(result.current.deleteConfirmPending).toEqual({ count: 2, blockIds: ['b1', 'b2'] });
+    act(() => {
+      result.current.confirmMultiDelete();
     });
     expect(result.current.softHiddenBlockIds).toEqual(['b1', 'b2']);
     expect(result.current.selectionMode).toBe(false);
     expect(result.current.selectedBlockIds).toEqual([]);
     expect(result.current.toastMessage).toBe('toast.multiDelete:2');
+    expect(result.current.deleteConfirmPending).toBeNull();
 
     act(() => {
       result.current.handleBlockSelect('b1', { shiftKey: true });
@@ -578,9 +599,49 @@ describe('useWorkbenchTranscriptChrome', () => {
     act(() => {
       document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Delete' }));
     });
+    // #1823: bare Delete raises the confirm gate instead of deleting.
+    expect(result.current.deleteConfirmPending).toEqual({ count: 2, blockIds: ['b1', 'b2'] });
+    expect(result.current.softHiddenBlockIds).toEqual([]);
+    expect(result.current.selectionMode).toBe(true);
+
+    act(() => {
+      result.current.confirmMultiDelete();
+    });
     expect(result.current.softHiddenBlockIds).toEqual(['b1', 'b2']);
     expect(result.current.selectionMode).toBe(false);
     expect(result.current.toastMessage).toBe('toast.multiDelete:2');
+    expect(result.current.deleteConfirmPending).toBeNull();
+  });
+
+  it('confirms the original snapshot even when the selection changes while the gate is open (#1823)', () => {
+    const blocks = [textBlock({ id: 'b1' }), textBlock({ id: 'b2' })];
+    const { result } = renderTranscriptChrome({ transcript: blocks });
+
+    act(() => {
+      findMenuAction(result.current.contextMenuGroups('b1'), 'context.multiSelect')?.();
+    });
+    expect(result.current.selectedBlockIds).toEqual(['b1']);
+
+    act(() => {
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Delete' }));
+    });
+    expect(result.current.deleteConfirmPending).toEqual({ count: 1, blockIds: ['b1'] });
+
+    // The user changes the live selection while the confirm dialog is open
+    // (Ctrl/⌘+A) — the confirmed delete must still remove exactly what the
+    // dialog promised, not the new selection.
+    act(() => {
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'a', ctrlKey: true }));
+    });
+    expect(result.current.selectedBlockIds).toEqual(['b1', 'b2']);
+
+    act(() => {
+      result.current.confirmMultiDelete();
+    });
+    expect(result.current.softHiddenBlockIds).toEqual(['b1']);
+    expect(result.current.selectionMode).toBe(false);
+    expect(result.current.toastMessage).toBe('toast.multiDelete:1');
+    expect(result.current.deleteConfirmPending).toBeNull();
   });
 
   it('enters selection after the hold delay and consumes the pointer up', () => {

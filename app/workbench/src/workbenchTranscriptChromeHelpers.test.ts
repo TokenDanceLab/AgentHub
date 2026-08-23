@@ -33,6 +33,7 @@ import {
   planBlockPointerUp,
   planBlockSelect,
   planContextAction,
+  planConfirmMultiDelete,
   planMultiAction,
   planSelectionHotkeyEffect,
   planTranscriptBlockAction,
@@ -54,12 +55,14 @@ import {
   transcriptBlockIds,
   writeClipboardText,
 } from './workbenchTranscriptChromeHelpers';
+import type { DeleteConfirmRequest } from './workbenchTranscriptChromeHelpers';
 
-const t = (key: string, options?: Record<string, unknown>) => (
-  options?.count !== undefined ? `${key}:${options.count}` : key
-);
+const t = (key: string, options?: Record<string, unknown>) =>
+  options?.count !== undefined ? `${key}:${options.count}` : key;
 
-function textBlock(overrides: Partial<Extract<TranscriptBlock, { kind: 'text' }>> = {}): TranscriptBlock {
+function textBlock(
+  overrides: Partial<Extract<TranscriptBlock, { kind: 'text' }>> = {}
+): TranscriptBlock {
   return {
     id: 'b1',
     kind: 'text',
@@ -71,7 +74,7 @@ function textBlock(overrides: Partial<Extract<TranscriptBlock, { kind: 'text' }>
 }
 
 function permissionBlock(
-  overrides: Partial<Extract<TranscriptBlock, { kind: 'permission_request' }>> = {},
+  overrides: Partial<Extract<TranscriptBlock, { kind: 'permission_request' }>> = {}
 ): Extract<TranscriptBlock, { kind: 'permission_request' }> {
   return {
     id: 'perm-1',
@@ -96,23 +99,34 @@ describe('workbenchTranscriptChromeHelpers', () => {
   it('resolves block titles for common kinds', () => {
     expect(blockTitle(textBlock(), t)).toBe('hello world from agent');
     expect(blockTitle(textBlock({ text: '' }), t)).toBe('Agent');
-    expect(blockTitle({
-      id: 'tool',
-      kind: 'tool_call',
-      toolName: 'bash',
-      status: 'running',
-      author: { id: 'agent-1', role: 'agent', name: 'Agent' },
-      createdAt: '2026-01-01T00:00:00.000Z',
-    }, t)).toBe('bash');
-    expect(blockTitle({
-      id: 'think',
-      kind: 'thinking',
-      content: '…',
-      author: { id: 'agent-1', role: 'agent', name: 'Agent' },
-      createdAt: '2026-01-01T00:00:00.000Z',
-    }, t)).toBe('mainchain.thinking');
-    expect(resolveBlockTitleById([textBlock({ id: 'x', text: 'abc' })], 'missing', t))
-      .toBe('mainchain.selectedCard');
+    expect(
+      blockTitle(
+        {
+          id: 'tool',
+          kind: 'tool_call',
+          toolName: 'bash',
+          status: 'running',
+          author: { id: 'agent-1', role: 'agent', name: 'Agent' },
+          createdAt: '2026-01-01T00:00:00.000Z',
+        },
+        t
+      )
+    ).toBe('bash');
+    expect(
+      blockTitle(
+        {
+          id: 'think',
+          kind: 'thinking',
+          content: '…',
+          author: { id: 'agent-1', role: 'agent', name: 'Agent' },
+          createdAt: '2026-01-01T00:00:00.000Z',
+        },
+        t
+      )
+    ).toBe('mainchain.thinking');
+    expect(resolveBlockTitleById([textBlock({ id: 'x', text: 'abc' })], 'missing', t)).toBe(
+      'mainchain.selectedCard'
+    );
   });
 
   it('labels card and multi actions through the same i18n keys', () => {
@@ -219,11 +233,7 @@ describe('workbenchTranscriptChromeHelpers', () => {
   });
 
   it('resolves selection ranges from transcript order', () => {
-    const transcript = [
-      textBlock({ id: 'a' }),
-      textBlock({ id: 'b' }),
-      textBlock({ id: 'c' }),
-    ];
+    const transcript = [textBlock({ id: 'a' }), textBlock({ id: 'b' }), textBlock({ id: 'c' })];
     expect(resolveSelectionRangeIds(transcript, ['a'], 'c')).toEqual(['a', 'b', 'c']);
     expect(resolveSelectionRangeIds(transcript, [], 'b')).toEqual(['b']);
     expect(resolveSelectionRangeIds(transcript, ['missing'], 'missing-2')).toBeNull();
@@ -246,14 +256,23 @@ describe('workbenchTranscriptChromeHelpers', () => {
   });
 
   it('maps selection hotkeys', () => {
-    expect(resolveSelectionHotkey({ key: 'Escape', ctrlKey: false, metaKey: false }))
-      .toEqual({ type: 'escape' });
-    expect(resolveSelectionHotkey({ key: 'a', ctrlKey: true, metaKey: false }))
-      .toEqual({ type: 'selectAll', preventDefault: true });
-    expect(resolveSelectionHotkey({ key: 'c', ctrlKey: false, metaKey: true }))
-      .toEqual({ type: 'multiAction', action: 'copy', preventDefault: true });
-    expect(resolveSelectionHotkey({ key: 'Delete', ctrlKey: false, metaKey: false }))
-      .toEqual({ type: 'multiAction', action: 'delete', preventDefault: true });
+    expect(resolveSelectionHotkey({ key: 'Escape', ctrlKey: false, metaKey: false })).toEqual({
+      type: 'escape',
+    });
+    expect(resolveSelectionHotkey({ key: 'a', ctrlKey: true, metaKey: false })).toEqual({
+      type: 'selectAll',
+      preventDefault: true,
+    });
+    expect(resolveSelectionHotkey({ key: 'c', ctrlKey: false, metaKey: true })).toEqual({
+      type: 'multiAction',
+      action: 'copy',
+      preventDefault: true,
+    });
+    expect(resolveSelectionHotkey({ key: 'Delete', ctrlKey: false, metaKey: false })).toEqual({
+      type: 'multiAction',
+      action: 'delete',
+      preventDefault: true,
+    });
     expect(resolveSelectionHotkey({ key: 'x', ctrlKey: false, metaKey: false })).toBeNull();
   });
 
@@ -271,14 +290,17 @@ describe('workbenchTranscriptChromeHelpers', () => {
     });
     expect(Object.keys(sparse).sort()).toEqual(['approvalId', 'decision']);
 
-    const full = buildPermissionApprovalDecision(permissionBlock({
-      teamId: 'team-1',
-      teamRunId: 'run-1',
-      agentTaskId: 'task-1',
-      targetId: 'target-1',
-      edgeDeviceId: 'edge-1',
-      correlationId: 'corr-1',
-    }), 'deny');
+    const full = buildPermissionApprovalDecision(
+      permissionBlock({
+        teamId: 'team-1',
+        teamRunId: 'run-1',
+        agentTaskId: 'task-1',
+        targetId: 'target-1',
+        edgeDeviceId: 'edge-1',
+        correlationId: 'corr-1',
+      }),
+      'deny'
+    );
     expect(full).toEqual({
       approvalId: 'req-1',
       decision: 'deny',
@@ -396,22 +418,26 @@ describe('workbenchTranscriptChromeHelpers', () => {
       metadata: { text: 'meta-title' },
     });
     expect(copy[0]).toEqual({ type: 'copy', text: 'meta-title' });
-    expect(planTranscriptBlockAction({
-      action: 'copy',
-      blockId: 'missing',
-      transcript: [agent],
-      t,
-    })).toEqual([]);
+    expect(
+      planTranscriptBlockAction({
+        action: 'copy',
+        blockId: 'missing',
+        transcript: [agent],
+        t,
+      })
+    ).toEqual([]);
   });
 
   it('plans multi actions for empty, copy, and delete selections', () => {
     const transcript = [textBlock({ id: 'a', text: 'A' }), textBlock({ id: 'b', text: 'B' })];
-    expect(planMultiAction({
-      action: 'copy',
-      selectedBlockIds: [],
-      transcript,
-      t,
-    })).toEqual([{ type: 'toast', message: 'toast.noCardSelected' }]);
+    expect(
+      planMultiAction({
+        action: 'copy',
+        selectedBlockIds: [],
+        transcript,
+        t,
+      })
+    ).toEqual([{ type: 'toast', message: 'toast.noCardSelected' }]);
 
     const copy = planMultiAction({
       action: 'copy',
@@ -430,7 +456,17 @@ describe('workbenchTranscriptChromeHelpers', () => {
       transcript,
       t,
     });
-    expect(del).toEqual([
+    // #1823: delete now raises the confirm gate; the destructive plan
+    // (soft-hide + exit + toast) runs via planConfirmMultiDelete. The
+    // request carries the selection snapshot.
+    expect(del).toEqual([{ type: 'confirmDelete', request: { count: 2, blockIds: ['a', 'b'] } }]);
+    expect(
+      planConfirmMultiDelete({
+        selectedBlockIds: ['a', 'b'],
+        transcript,
+        t,
+      })
+    ).toEqual([
       { type: 'softHide', blockIds: ['a', 'b'] },
       { type: 'exitSelection' },
       { type: 'toast', message: 'toast.multiDelete:2' },
@@ -443,38 +479,46 @@ describe('workbenchTranscriptChromeHelpers', () => {
     card.appendChild(button);
     document.body.append(card);
 
-    expect(shouldBeginHoldSelection({
-      button: 0,
-      target: card,
-      currentTarget: card,
-      shiftKey: false,
-      clientX: 0,
-      clientY: 0,
-    })).toBe(true);
-    expect(shouldBeginHoldSelection({
-      button: 0,
-      target: button,
-      currentTarget: card,
-      shiftKey: false,
-      clientX: 0,
-      clientY: 0,
-    })).toBe(false);
-    expect(shouldHandleSelectionPointerUp(true, {
-      button: 0,
-      target: card,
-      currentTarget: card,
-      shiftKey: false,
-      clientX: 0,
-      clientY: 0,
-    })).toBe(true);
-    expect(shouldHandleSelectionPointerUp(false, {
-      button: 0,
-      target: card,
-      currentTarget: card,
-      shiftKey: false,
-      clientX: 0,
-      clientY: 0,
-    })).toBe(false);
+    expect(
+      shouldBeginHoldSelection({
+        button: 0,
+        target: card,
+        currentTarget: card,
+        shiftKey: false,
+        clientX: 0,
+        clientY: 0,
+      })
+    ).toBe(true);
+    expect(
+      shouldBeginHoldSelection({
+        button: 0,
+        target: button,
+        currentTarget: card,
+        shiftKey: false,
+        clientX: 0,
+        clientY: 0,
+      })
+    ).toBe(false);
+    expect(
+      shouldHandleSelectionPointerUp(true, {
+        button: 0,
+        target: card,
+        currentTarget: card,
+        shiftKey: false,
+        clientX: 0,
+        clientY: 0,
+      })
+    ).toBe(true);
+    expect(
+      shouldHandleSelectionPointerUp(false, {
+        button: 0,
+        target: card,
+        currentTarget: card,
+        shiftKey: false,
+        clientX: 0,
+        clientY: 0,
+      })
+    ).toBe(false);
 
     const escape = resolveSelectionHotkey({ key: 'Escape', ctrlKey: false, metaKey: false });
     const selectAll = resolveSelectionHotkey({ key: 'a', ctrlKey: true, metaKey: false });
@@ -487,7 +531,10 @@ describe('workbenchTranscriptChromeHelpers', () => {
       x: 10,
       y: 20,
     });
-    expect(transcriptBlockIds([textBlock({ id: 'a' }), textBlock({ id: 'b' })])).toEqual(['a', 'b']);
+    expect(transcriptBlockIds([textBlock({ id: 'a' }), textBlock({ id: 'b' })])).toEqual([
+      'a',
+      'b',
+    ]);
     card.remove();
   });
 
@@ -499,28 +546,34 @@ describe('workbenchTranscriptChromeHelpers', () => {
       focusComposer: vi.fn(),
       onRegenerate: vi.fn(),
       onApprovalDecision: vi.fn(),
+      onRequestDeleteConfirm: vi.fn(),
       pulseBlock: vi.fn(),
       showWorkbenchToast: vi.fn(),
       exitSelection: vi.fn(),
     };
 
-    applyTranscriptChromeSideEffects([
-      { type: 'copy', text: 'x' },
-      { type: 'softHide', blockIds: ['a'] },
-      {
-        type: 'composer',
-        actions: [{ type: 'setText', text: 'hi' }],
-        focusComposer: true,
-      },
-      { type: 'regenerate', blockId: 'a' },
-      {
-        type: 'approval',
-        decision: { approvalId: 'req', decision: 'allow' },
-      },
-      { type: 'pulse', blockId: 'a' },
-      { type: 'toast', message: 'done' },
-      { type: 'exitSelection' },
-    ], handlers);
+    applyTranscriptChromeSideEffects(
+      [
+        { type: 'copy', text: 'x' },
+        { type: 'softHide', blockIds: ['a'] },
+        {
+          type: 'composer',
+          actions: [{ type: 'setText', text: 'hi' }],
+          focusComposer: true,
+        },
+        { type: 'regenerate', blockId: 'a' },
+        {
+          type: 'approval',
+          decision: { approvalId: 'req', decision: 'allow' },
+        },
+        { type: 'pulse', blockId: 'a' },
+        { type: 'toast', message: 'done' },
+        // #1823: destructive multi-delete gate before any softHide runs.
+        { type: 'confirmDelete', request: { count: 2, blockIds: ['a', 'b'] } },
+        { type: 'exitSelection' },
+      ],
+      handlers
+    );
 
     expect(handlers.copyText).toHaveBeenCalledWith('x');
     expect(handlers.softHideBlocks).toHaveBeenCalledWith(['a']);
@@ -530,6 +583,10 @@ describe('workbenchTranscriptChromeHelpers', () => {
     expect(handlers.onApprovalDecision).toHaveBeenCalledWith({
       approvalId: 'req',
       decision: 'allow',
+    });
+    expect(handlers.onRequestDeleteConfirm).toHaveBeenCalledWith({
+      count: 2,
+      blockIds: ['a', 'b'],
     });
     expect(handlers.pulseBlock).toHaveBeenCalledWith('a');
     expect(handlers.showWorkbenchToast).toHaveBeenCalledWith('done');
@@ -557,11 +614,7 @@ describe('workbenchTranscriptChromeHelpers', () => {
   it('plans residual block select/hold/pointer-up flows', () => {
     const card = document.createElement('div');
     document.body.append(card);
-    const transcript = [
-      textBlock({ id: 'a' }),
-      textBlock({ id: 'b' }),
-      textBlock({ id: 'c' }),
-    ];
+    const transcript = [textBlock({ id: 'a' }), textBlock({ id: 'b' }), textBlock({ id: 'c' })];
 
     expect(planBlockSelect('b', false, transcript, ['a'])).toEqual({
       type: 'toggle',
@@ -576,22 +629,26 @@ describe('workbenchTranscriptChromeHelpers', () => {
       blockId: 'missing',
     });
 
-    expect(planBeginHoldSelection('b1', {
-      button: 1,
-      target: card,
-      currentTarget: card,
-      shiftKey: false,
-      clientX: 1,
-      clientY: 2,
-    })).toEqual({ type: 'ignore' });
-    expect(planBeginHoldSelection('b1', {
-      button: 0,
-      target: card,
-      currentTarget: card,
-      shiftKey: false,
-      clientX: 1,
-      clientY: 2,
-    })).toEqual({
+    expect(
+      planBeginHoldSelection('b1', {
+        button: 1,
+        target: card,
+        currentTarget: card,
+        shiftKey: false,
+        clientX: 1,
+        clientY: 2,
+      })
+    ).toEqual({ type: 'ignore' });
+    expect(
+      planBeginHoldSelection('b1', {
+        button: 0,
+        target: card,
+        currentTarget: card,
+        shiftKey: false,
+        clientX: 1,
+        clientY: 2,
+      })
+    ).toEqual({
       type: 'begin',
       blockId: 'b1',
       clientX: 1,
@@ -603,42 +660,48 @@ describe('workbenchTranscriptChromeHelpers', () => {
     expect(planUpdateHoldSelection({ x: 0, y: 0 }, 0, 0)).toEqual({ type: 'noop' });
     expect(planUpdateHoldSelection({ x: 0, y: 0 }, 100, 0)).toEqual({ type: 'cancel' });
 
-    expect(planBlockPointerUp('b1', {
-      suppressPointerUp: true,
-      selectionMode: true,
-      event: {
-        button: 0,
-        target: card,
-        currentTarget: card,
-        shiftKey: false,
-        clientX: 0,
-        clientY: 0,
-      },
-    })).toEqual({ type: 'consumeSuppress' });
-    expect(planBlockPointerUp('b1', {
-      suppressPointerUp: false,
-      selectionMode: false,
-      event: {
-        button: 0,
-        target: card,
-        currentTarget: card,
-        shiftKey: true,
-        clientX: 0,
-        clientY: 0,
-      },
-    })).toEqual({ type: 'noop' });
-    expect(planBlockPointerUp('b1', {
-      suppressPointerUp: false,
-      selectionMode: true,
-      event: {
-        button: 0,
-        target: card,
-        currentTarget: card,
-        shiftKey: true,
-        clientX: 0,
-        clientY: 0,
-      },
-    })).toEqual({ type: 'select', blockId: 'b1', shiftKey: true });
+    expect(
+      planBlockPointerUp('b1', {
+        suppressPointerUp: true,
+        selectionMode: true,
+        event: {
+          button: 0,
+          target: card,
+          currentTarget: card,
+          shiftKey: false,
+          clientX: 0,
+          clientY: 0,
+        },
+      })
+    ).toEqual({ type: 'consumeSuppress' });
+    expect(
+      planBlockPointerUp('b1', {
+        suppressPointerUp: false,
+        selectionMode: false,
+        event: {
+          button: 0,
+          target: card,
+          currentTarget: card,
+          shiftKey: true,
+          clientX: 0,
+          clientY: 0,
+        },
+      })
+    ).toEqual({ type: 'noop' });
+    expect(
+      planBlockPointerUp('b1', {
+        suppressPointerUp: false,
+        selectionMode: true,
+        event: {
+          button: 0,
+          target: card,
+          currentTarget: card,
+          shiftKey: true,
+          clientX: 0,
+          clientY: 0,
+        },
+      })
+    ).toEqual({ type: 'select', blockId: 'b1', shiftKey: true });
 
     card.remove();
   });
@@ -646,7 +709,12 @@ describe('workbenchTranscriptChromeHelpers', () => {
   it('disposes timers, schedules pulse/toast, and applies hotkey plans', () => {
     vi.useFakeTimers();
     const holdRef = {
-      current: createSelectionHoldState('b1', 1, 2, window.setTimeout(() => {}, 1000) as unknown as number),
+      current: createSelectionHoldState(
+        'b1',
+        1,
+        2,
+        window.setTimeout(() => {}, 1000) as unknown as number
+      ),
     };
     disposeSelectionHoldRef(holdRef);
     expect(holdRef.current).toBeNull();
@@ -666,7 +734,10 @@ describe('workbenchTranscriptChromeHelpers', () => {
     expect(pulseTimers.has('b1')).toBe(false);
 
     toastTimerRef.current = window.setTimeout(() => {}, 1000);
-    pulseTimers.set('x', window.setTimeout(() => {}, 1000));
+    pulseTimers.set(
+      'x',
+      window.setTimeout(() => {}, 1000)
+    );
     disposeToastAndPulseTimers(toastTimerRef, { current: pulseTimers });
     expect(toastTimerRef.current).toBeNull();
     expect(pulseTimers.size).toBe(0);
@@ -677,18 +748,17 @@ describe('workbenchTranscriptChromeHelpers', () => {
     const clearSelection = vi.fn();
     const selectAll = vi.fn();
     const runMultiAction = vi.fn();
-    const plan = planSelectionHotkeyEffect(
-      { key: 'Escape', ctrlKey: false, metaKey: false },
-      [textBlock({ id: 'a' })],
-    );
+    const plan = planSelectionHotkeyEffect({ key: 'Escape', ctrlKey: false, metaKey: false }, [
+      textBlock({ id: 'a' }),
+    ]);
     expect(plan).not.toBeNull();
     if (plan) applySelectionHotkeyPlan(plan, { clearSelection, selectAll, runMultiAction });
     expect(clearSelection).toHaveBeenCalledOnce();
 
-    const selectAllPlan = planSelectionHotkeyEffect(
-      { key: 'a', ctrlKey: true, metaKey: false },
-      [textBlock({ id: 'a' }), textBlock({ id: 'b' })],
-    );
+    const selectAllPlan = planSelectionHotkeyEffect({ key: 'a', ctrlKey: true, metaKey: false }, [
+      textBlock({ id: 'a' }),
+      textBlock({ id: 'b' }),
+    ]);
     if (selectAllPlan) {
       applySelectionHotkeyPlan(selectAllPlan, { clearSelection, selectAll, runMultiAction });
     }
@@ -696,7 +766,7 @@ describe('workbenchTranscriptChromeHelpers', () => {
 
     const deletePlan = planSelectionHotkeyEffect(
       { key: 'Delete', ctrlKey: false, metaKey: false },
-      [textBlock({ id: 'a' })],
+      [textBlock({ id: 'a' })]
     );
     if (deletePlan) {
       applySelectionHotkeyPlan(deletePlan, { clearSelection, selectAll, runMultiAction });
@@ -705,20 +775,24 @@ describe('workbenchTranscriptChromeHelpers', () => {
 
     const holdStarted = vi.fn();
     const holdRef2 = { current: null as ReturnType<typeof createSelectionHoldState> | null };
-    beginSelectionHold(holdRef2, {
-      type: 'begin',
-      blockId: 'b9',
-      clientX: 3,
-      clientY: 4,
-      delayMs: 20,
-    }, holdStarted);
+    beginSelectionHold(
+      holdRef2,
+      {
+        type: 'begin',
+        blockId: 'b9',
+        clientX: 3,
+        clientY: 4,
+        delayMs: 20,
+      },
+      holdStarted
+    );
     expect(holdRef2.current?.blockId).toBe('b9');
     vi.advanceTimersByTime(20);
     expect(holdStarted).toHaveBeenCalledOnce();
     expect(holdRef2.current).toBeNull();
 
     const element = {
-      getBoundingClientRect: () => ({ left: 10, width: 200 } as DOMRect),
+      getBoundingClientRect: () => ({ left: 10, width: 200 }) as DOMRect,
     };
     expect(resolveSelectBarRectFromElement(element)).toEqual({ left: 10, width: 200 });
     expect(resolveSelectBarRectFromElement(null)).toBeNull();
@@ -739,6 +813,7 @@ describe('workbenchTranscriptChromeHelpers', () => {
       setSelectBarRect: vi.fn(),
       setToastMessage: vi.fn(),
       setToastVisible: vi.fn(),
+      setDeleteConfirmPending: vi.fn(),
     };
     const refs = {
       selectionModeRef: { current: false },
@@ -747,11 +822,15 @@ describe('workbenchTranscriptChromeHelpers', () => {
       runMultiActionRef: { current: null as ((action: string) => void) | null },
       toastTimerRef: { current: null as number | null },
       pulseTimersRef: { current: new Map<string, number>() },
+      deleteConfirmRef: { current: null },
     };
     const controller = createTranscriptChromeController({
       refs,
       writers,
-      getTranscript: () => [textBlock({ id: 'a', text: 'Alpha' }), textBlock({ id: 'b', text: 'Beta' })],
+      getTranscript: () => [
+        textBlock({ id: 'a', text: 'Alpha' }),
+        textBlock({ id: 'b', text: 'Beta' }),
+      ],
       getSelectedBlockIds: () => ['a'],
       t,
       dispatchComposer: vi.fn(),
@@ -765,6 +844,8 @@ describe('workbenchTranscriptChromeHelpers', () => {
     controller.exitSelection();
     expect(writers.setSelectionMode).toHaveBeenCalledWith(false);
     expect(writers.setSelectedBlockIds).toHaveBeenCalledWith([]);
+    // #1823: leaving selection mode must also drop the pending delete gate.
+    expect(writers.setDeleteConfirmPending).toHaveBeenCalledWith(null);
 
     controller.enterSelection('b');
     expect(refs.selectionModeRef.current).toBe(true);
@@ -778,7 +859,12 @@ describe('workbenchTranscriptChromeHelpers', () => {
 
     const multi = controller.multiSelectActions();
     expect(multi.map((action) => action.label)).toContain('bar.selectAll');
-    expect(controller.contextMenuGroups('a').flat().map((item) => item.label)).toContain('context.copy');
+    expect(
+      controller
+        .contextMenuGroups('a')
+        .flat()
+        .map((item) => item.label)
+    ).toContain('context.copy');
 
     controller.handleSelectionHotkey({
       key: 'Escape',
@@ -792,14 +878,19 @@ describe('workbenchTranscriptChromeHelpers', () => {
     controller.disposeTimers();
   });
 
-  it('passes conversations into the context menu builder for the forward picker (#1385)', () => {
+  it('confirm gate snapshot survives controller re-creation (#1823)', () => {
+    // The hook builds the controller inside a useMemo whose deps can change
+    // while the confirm dialog stays mounted on React state. The pending
+    // snapshot lives in the hook-owned ref, so a fresh controller instance
+    // must still confirm the original block set.
     const refs = {
       selectionModeRef: { current: false },
       selectionHoldRef: { current: null },
       suppressSelectionPointerUpRef: { current: false },
-      runMultiActionRef: { current: null },
-      toastTimerRef: { current: null },
+      runMultiActionRef: { current: null as ((action: string) => void) | null },
+      toastTimerRef: { current: null as number | null },
       pulseTimersRef: { current: new Map<string, number>() },
+      deleteConfirmRef: { current: null as DeleteConfirmRequest | null },
     };
     const writers = {
       setContextMenu: vi.fn(),
@@ -810,6 +901,105 @@ describe('workbenchTranscriptChromeHelpers', () => {
       setSelectBarRect: vi.fn(),
       setToastMessage: vi.fn(),
       setToastVisible: vi.fn(),
+      setDeleteConfirmPending: vi.fn(),
+    };
+    let liveSelectedBlockIds = ['a', 'b'];
+    const deps = {
+      refs,
+      writers,
+      getTranscript: () => [
+        textBlock({ id: 'a', text: 'Alpha' }),
+        textBlock({ id: 'b', text: 'Beta' }),
+      ],
+      getSelectedBlockIds: () => liveSelectedBlockIds,
+      t,
+      dispatchComposer: vi.fn(),
+      composerInputRef: { current: null },
+    };
+
+    const first = createTranscriptChromeController(deps);
+    first.runMultiAction('delete');
+    expect(writers.setDeleteConfirmPending).toHaveBeenLastCalledWith({
+      count: 2,
+      blockIds: ['a', 'b'],
+    });
+    expect(refs.deleteConfirmRef.current).toEqual({ count: 2, blockIds: ['a', 'b'] });
+
+    // The live selection really mutates while the gate is open, then the
+    // controller is rebuilt (memo deps changed) — the rebuilt instance must
+    // still confirm the snapshot, not the live selection (which is now ['b']).
+    liveSelectedBlockIds = ['b'];
+    const rebuilt = createTranscriptChromeController(deps);
+    rebuilt.confirmMultiDelete();
+    expect(writers.setSoftHiddenBlockIds).toHaveBeenCalledTimes(1);
+    const softHideUpdater = writers.setSoftHiddenBlockIds.mock.calls[0]![0] as (
+      current: string[]
+    ) => string[];
+    expect(softHideUpdater([])).toEqual(['a', 'b']);
+    expect(refs.deleteConfirmRef.current).toBeNull();
+    expect(writers.setDeleteConfirmPending).toHaveBeenLastCalledWith(null);
+  });
+
+  it('confirmMultiDelete is a strict no-op without a pending gate (#1823)', () => {
+    const refs = {
+      selectionModeRef: { current: false },
+      selectionHoldRef: { current: null },
+      suppressSelectionPointerUpRef: { current: false },
+      runMultiActionRef: { current: null as ((action: string) => void) | null },
+      toastTimerRef: { current: null as number | null },
+      pulseTimersRef: { current: new Map<string, number>() },
+      deleteConfirmRef: { current: null as DeleteConfirmRequest | null },
+    };
+    const writers = {
+      setContextMenu: vi.fn(),
+      setSelectionMode: vi.fn(),
+      setSelectedBlockIds: vi.fn(),
+      setActionedBlockIds: vi.fn(),
+      setSoftHiddenBlockIds: vi.fn(),
+      setSelectBarRect: vi.fn(),
+      setToastMessage: vi.fn(),
+      setToastVisible: vi.fn(),
+      setDeleteConfirmPending: vi.fn(),
+    };
+    const controller = createTranscriptChromeController({
+      refs,
+      writers,
+      getTranscript: () => [textBlock({ id: 'a' }), textBlock({ id: 'b' })],
+      getSelectedBlockIds: () => ['a', 'b'],
+      t,
+      dispatchComposer: vi.fn(),
+      composerInputRef: { current: null },
+    });
+
+    controller.confirmMultiDelete();
+    // Never falls back to the live selection — nothing is hidden, no state
+    // transitions fire, and the gate writer is not touched.
+    expect(writers.setSoftHiddenBlockIds).not.toHaveBeenCalled();
+    expect(writers.setSelectionMode).not.toHaveBeenCalled();
+    expect(writers.setToastVisible).not.toHaveBeenCalled();
+    expect(writers.setDeleteConfirmPending).not.toHaveBeenCalled();
+  });
+
+  it('passes conversations into the context menu builder for the forward picker (#1385)', () => {
+    const refs = {
+      selectionModeRef: { current: false },
+      selectionHoldRef: { current: null },
+      suppressSelectionPointerUpRef: { current: false },
+      runMultiActionRef: { current: null },
+      toastTimerRef: { current: null },
+      pulseTimersRef: { current: new Map<string, number>() },
+      deleteConfirmRef: { current: null },
+    };
+    const writers = {
+      setContextMenu: vi.fn(),
+      setSelectionMode: vi.fn(),
+      setSelectedBlockIds: vi.fn(),
+      setActionedBlockIds: vi.fn(),
+      setSoftHiddenBlockIds: vi.fn(),
+      setSelectBarRect: vi.fn(),
+      setToastMessage: vi.fn(),
+      setToastVisible: vi.fn(),
+      setDeleteConfirmPending: vi.fn(),
     };
     const controller = createTranscriptChromeController({
       refs,

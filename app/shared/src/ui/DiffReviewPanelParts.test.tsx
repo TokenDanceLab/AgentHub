@@ -109,3 +109,92 @@ describe('DiffReviewToolbar', () => {
     expect(onRejectAll).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('DiffReviewFileTabs roving tabindex (#1823)', () => {
+  it('moves focus with Arrow keys without changing the selected file', () => {
+    const onSelectFile = vi.fn();
+    render(
+      <DiffReviewFileTabs files={mockFiles} safeIndex={0} onSelectFile={onSelectFile} />,
+    );
+    const tabs = screen.getAllByRole('tab');
+    tabs[0]!.focus();
+    fireEvent.keyDown(tabs[0]!, { key: 'ArrowRight' });
+
+    expect(document.activeElement).toBe(tabs[1]);
+    expect(tabs[1]).toHaveAttribute('tabindex', '0');
+    expect(tabs[0]).toHaveAttribute('tabindex', '-1');
+    // Activation stays on click/Enter — selection unchanged by arrows.
+    expect(tabs[0]).toHaveAttribute('aria-selected', 'true');
+    expect(tabs[1]).toHaveAttribute('aria-selected', 'false');
+    expect(onSelectFile).not.toHaveBeenCalled();
+  });
+
+  it('wraps around with ArrowLeft and supports Home/End', () => {
+    render(
+      <DiffReviewFileTabs files={mockFiles} safeIndex={0} onSelectFile={vi.fn()} />,
+    );
+    const tabs = screen.getAllByRole('tab');
+    tabs[0]!.focus();
+    fireEvent.keyDown(tabs[0]!, { key: 'ArrowLeft' });
+    expect(document.activeElement).toBe(tabs[2]);
+
+    fireEvent.keyDown(tabs[2]!, { key: 'End' });
+    expect(document.activeElement).toBe(tabs[2]);
+
+    fireEvent.keyDown(tabs[2]!, { key: 'Home' });
+    expect(document.activeElement).toBe(tabs[0]);
+  });
+
+  it('exposes shared tab/panel ids when tabsId is provided', () => {
+    const tabsId = 'diff-tabs';
+    render(
+      <DiffReviewFileTabs files={mockFiles} safeIndex={1} tabsId={tabsId} onSelectFile={vi.fn()} />,
+    );
+    const tabs = screen.getAllByRole('tab');
+    expect(tabs[0]).toHaveAttribute('id', 'diff-tabs-tab-0');
+    expect(tabs[0]).toHaveAttribute('aria-controls', 'diff-tabs-panel');
+    expect(tabs[1]).toHaveAttribute('id', 'diff-tabs-tab-1');
+  });
+
+  it('moves the roving stop to the clicked file tab (#1823)', () => {
+    const onSelectFile = vi.fn();
+    render(
+      <DiffReviewFileTabs files={mockFiles} safeIndex={0} onSelectFile={onSelectFile} />,
+    );
+    const tabs = screen.getAllByRole('tab');
+    tabs[0]!.focus();
+    fireEvent.keyDown(tabs[0]!, { key: 'ArrowRight' });
+    expect(tabs[1]).toHaveAttribute('tabindex', '0');
+
+    // A click activates another tab — the roving stop must follow it so the
+    // next Tab press returns to the clicked tab, not the stale focused one.
+    fireEvent.click(tabs[2]!);
+    expect(onSelectFile).toHaveBeenCalledWith(2);
+    expect(tabs[2]).toHaveAttribute('tabindex', '0');
+    expect(tabs[1]).toHaveAttribute('tabindex', '-1');
+    expect(tabs[0]).toHaveAttribute('tabindex', '-1');
+  });
+
+  it('falls back to the selected tab when the remembered roving target leaves the collection (#1823)', () => {
+    const onSelectFile = vi.fn();
+    const { rerender } = render(
+      <DiffReviewFileTabs files={mockFiles} safeIndex={0} onSelectFile={onSelectFile} />,
+    );
+    const tabs = screen.getAllByRole('tab');
+    tabs[0]!.focus();
+    fireEvent.keyDown(tabs[0]!, { key: 'ArrowRight' });
+    fireEvent.keyDown(tabs[1]!, { key: 'ArrowRight' });
+    expect(tabs[2]).toHaveAttribute('tabindex', '0');
+
+    // The file collection shrinks — remembered index 2 dangles. The strip
+    // must fall back to the selected tab instead of leaving every remaining
+    // tab at tabIndex=-1 (keyboard users would lose the Tab stop entirely).
+    rerender(
+      <DiffReviewFileTabs files={mockFiles.slice(0, 2)} safeIndex={0} onSelectFile={onSelectFile} />,
+    );
+    const remaining = screen.getAllByRole('tab');
+    expect(remaining).toHaveLength(2);
+    expect(remaining[0]).toHaveAttribute('tabindex', '0');
+    expect(remaining[1]).toHaveAttribute('tabindex', '-1');
+  });
+});

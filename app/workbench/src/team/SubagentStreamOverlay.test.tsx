@@ -302,3 +302,61 @@ describe('SubagentStreamOverlay', () => {
     expect(within(dialog).queryByText(/B-only result/)).not.toBeInTheDocument();
   });
 });
+
+describe('SubagentStreamOverlay live region governance (#1823)', () => {
+  beforeEach(() => {
+    testStore = createSubagentStreamStore();
+  });
+
+  it('drops the overlay live region to off while any subagent streams', () => {
+    render(<SubagentStreamOverlay />);
+    act(() => {
+      testStore.push(makeEvent({ agent_task_id: 'task-1', event_type: 'text_delta', payload: { delta: 'tick' } }));
+    });
+    const overlay = screen.getByRole('region');
+    expect(overlay).toHaveAttribute('aria-live', 'off');
+    expect(overlay).toHaveAttribute('aria-busy', 'true');
+  });
+
+  it('returns the overlay to polite once the subagent completes', () => {
+    render(<SubagentStreamOverlay />);
+    act(() => {
+      testStore.push(makeEvent({ agent_task_id: 'task-1', event_type: 'text_delta', payload: { delta: 'tick' } }));
+      testStore.push(makeEvent({ agent_task_id: 'task-1', event_seq: 2, event_type: 'done', payload: {} }));
+    });
+    const overlay = screen.getByRole('region');
+    expect(overlay).toHaveAttribute('aria-live', 'polite');
+    expect(overlay).toHaveAttribute('aria-busy', 'false');
+  });
+
+  it('keeps a single live-region owner while one task completes and another streams', () => {
+    render(<SubagentStreamOverlay maxVisible={5} />);
+    act(() => {
+      testStore.push(makeEvent({ agent_task_id: 'task-1', event_type: 'thinking', event_seq: 1 }));
+      testStore.push(makeEvent({ agent_task_id: 'task-2', event_type: 'thinking', event_seq: 1 }));
+    });
+    const overlay = screen.getByRole('region');
+    expect(overlay).toHaveAttribute('aria-live', 'off');
+
+    // task-1 completes while task-2 keeps streaming: the overlay stays off
+    // AND the completed task's nested log must not independently restore
+    // polite (child aria-live would override the inherited value).
+    act(() => {
+      testStore.push(makeEvent({ agent_task_id: 'task-1', event_seq: 2, event_type: 'done', payload: {} }));
+    });
+    expect(overlay).toHaveAttribute('aria-live', 'off');
+    const logs = document.querySelectorAll('[role="log"]');
+    expect(logs.length).toBeGreaterThan(0);
+    for (const log of logs) {
+      expect(log).toHaveAttribute('aria-live', 'off');
+    }
+
+    // When the last task completes the overlay — the sole owner — announces
+    // the terminal state exactly once.
+    act(() => {
+      testStore.push(makeEvent({ agent_task_id: 'task-2', event_seq: 2, event_type: 'done', payload: {} }));
+    });
+    expect(overlay).toHaveAttribute('aria-live', 'polite');
+    expect(overlay).toHaveAttribute('aria-busy', 'false');
+  });
+});

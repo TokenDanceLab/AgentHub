@@ -14,12 +14,13 @@ import {
 const CUSTOM_BINDINGS_KEY = 'agenthub-custom-keybindings';
 
 describe('KEYBOARD_SHORTCUT_GROUPS', () => {
-  it('declares the four canonical groups in order', () => {
+  it('declares the five canonical groups in order', () => {
     expect(KEYBOARD_SHORTCUT_GROUPS.map((g) => g.id)).toEqual([
       'conversation',
       'composer',
       'navigation',
       'workspace',
+      'selection',
     ]);
   });
 
@@ -42,11 +43,11 @@ describe('KEYBOARD_SHORTCUT_GROUPS', () => {
     }
   });
 
-  it('flattens KEYBOARD_SHORTCUTS from the groups (15 canonical bindings)', () => {
-    expect(KEYBOARD_SHORTCUTS).toHaveLength(15);
+  it('flattens KEYBOARD_SHORTCUTS from the groups (18 canonical bindings)', () => {
+    expect(KEYBOARD_SHORTCUTS).toHaveLength(18);
     expect(KEYBOARD_SHORTCUTS[0]).toEqual(KEYBOARD_SHORTCUT_GROUPS[0]!.shortcuts[0]);
     expect(KEYBOARD_SHORTCUTS.at(-1)).toEqual(
-      KEYBOARD_SHORTCUT_GROUPS[3]!.shortcuts.at(-1),
+      KEYBOARD_SHORTCUT_GROUPS[4]!.shortcuts.at(-1),
     );
   });
 });
@@ -182,5 +183,44 @@ describe('custom keybindings (localStorage-backed)', () => {
     expect(hasCustomKeybindings()).toBe(false);
     expect(getResolvedShortcutGroups()).toEqual(KEYBOARD_SHORTCUT_GROUPS);
     getItemSpy.mockRestore();
+  });
+
+  it('never applies custom bindings to non-rebindable selection shortcuts (#1823)', () => {
+    // Simulate a stored override for the selection-mode hotkeys.
+    localStorage.setItem(
+      CUSTOM_BINDINGS_KEY,
+      JSON.stringify({
+        'select-all-messages': ['Ctrl/⌘', 'Shift', 'A'],
+        'delete-selected-messages': ['Backspace'],
+        send: ['Ctrl/⌘', 'Enter'],
+      }),
+    );
+
+    const resolved = getResolvedShortcutGroups();
+    const selectionGroup = resolved.find((g) => g.id === 'selection')!;
+    expect(selectionGroup.shortcuts.find((s) => s.id === 'select-all-messages')!.keys)
+      .toEqual(['Ctrl/⌘', 'A']);
+    expect(selectionGroup.shortcuts.find((s) => s.id === 'delete-selected-messages')!.keys)
+      .toEqual(['Delete']);
+    // Rebinding still works for rebindable shortcuts in the same store.
+    expect(resolved.find((g) => g.id === 'composer')!.shortcuts.find((s) => s.id === 'send')!.keys)
+      .toEqual(['Ctrl/⌘', 'Enter']);
+  });
+
+  it('filters non-rebindable selection shortcuts out of persistence (#1823)', () => {
+    saveCustomKeybindings([
+      { id: 'select-all-messages', keys: ['Ctrl/⌘', 'Shift', 'A'] },
+      { id: 'send', keys: ['Ctrl/⌘', 'Enter'] },
+    ]);
+    expect(localStorage.getItem(CUSTOM_BINDINGS_KEY)).toBe(
+      JSON.stringify({ send: ['Ctrl/⌘', 'Enter'] }),
+    );
+    expect(hasCustomKeybindings()).toBe(true);
+
+    // Only non-rebindable entries stored → no customization remains.
+    localStorage.clear();
+    saveCustomKeybindings([{ id: 'delete-selected-messages', keys: ['Backspace'] }]);
+    expect(localStorage.getItem(CUSTOM_BINDINGS_KEY)).toBe('{}');
+    expect(hasCustomKeybindings()).toBe(false);
   });
 });

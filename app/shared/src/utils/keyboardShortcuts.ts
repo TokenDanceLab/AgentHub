@@ -9,7 +9,7 @@
    and adds event-specific helpers.
    ═══════════════════════════════════════════════════════════════════════ */
 
-export type ShortcutGroupId = 'conversation' | 'composer' | 'navigation' | 'workspace';
+export type ShortcutGroupId = 'conversation' | 'composer' | 'navigation' | 'workspace' | 'selection';
 
 export interface KeyboardShortcut {
   /** Unique shortcut id (kebab-case). */
@@ -20,6 +20,12 @@ export interface KeyboardShortcut {
   labelKey: string;
   /** Optional i18n key for a longer description. */
   detailKey?: string;
+  /**
+   * When false the shortcut is declarative only: the registry renders it,
+   * but custom binding resolution and persistence ignore it (#1823
+   * selection-mode hotkeys — resolveSelectionHotkey owns the fixed keys).
+   */
+  rebindable?: boolean;
 }
 
 export interface KeyboardShortcutGroup {
@@ -69,6 +75,18 @@ export const KEYBOARD_SHORTCUT_GROUPS: KeyboardShortcutGroup[] = [
       { id: 'close-window', keys: ['Ctrl/⌘', 'W'], labelKey: 'shortcut.closeWindow', detailKey: 'shortcut.closeWindow.detail' },
     ],
   },
+  {
+    // #1823: box-selection transcript hotkeys (registered for the Settings
+    // registry; they are selection-mode scoped, not rebindable — resolveSelectionHotkey
+    // in the workbench chrome owns the bindings).
+    id: 'selection',
+    labelKey: 'shortcut.group.selection',
+    shortcuts: [
+      { id: 'select-all-messages', keys: ['Ctrl/⌘', 'A'], labelKey: 'shortcut.selectAll', detailKey: 'shortcut.selectAll.detail', rebindable: false },
+      { id: 'copy-selected-messages', keys: ['Ctrl/⌘', 'C'], labelKey: 'shortcut.copySelected', detailKey: 'shortcut.copySelected.detail', rebindable: false },
+      { id: 'delete-selected-messages', keys: ['Delete'], labelKey: 'shortcut.deleteSelected', detailKey: 'shortcut.deleteSelected.detail', rebindable: false },
+    ],
+  },
 ];
 
 /** Flattened array of all keyboard shortcuts. */
@@ -95,24 +113,35 @@ function loadCustomBindings(): Record<string, string[]> {
 /**
  * Resolve shortcut groups with any user-customized bindings applied.
  * Custom bindings are stored in localStorage under `agenthub-custom-keybindings`.
+ * Non-rebindable shortcuts (`rebindable: false`, #1823 selection-mode
+ * hotkeys) always keep their canonical keys.
  */
 export function getResolvedShortcutGroups(): KeyboardShortcutGroup[] {
   const custom = loadCustomBindings();
   return KEYBOARD_SHORTCUT_GROUPS.map((group) => ({
     ...group,
     shortcuts: group.shortcuts.map((s) =>
-      s.id in custom ? { ...s, keys: custom[s.id]! } : s,
+      s.rebindable !== false && s.id in custom ? { ...s, keys: custom[s.id]! } : s,
     ),
   }));
 }
 
 export function hasCustomKeybindings(): boolean {
-  return Object.keys(loadCustomBindings()).length > 0;
+  return Object.keys(loadCustomBindings()).some((id) => isRebindableId(id));
+}
+
+function isRebindableId(id: string): boolean {
+  const shortcut = KEYBOARD_SHORTCUTS.find((s) => s.id === id);
+  return shortcut?.rebindable !== false;
 }
 
 export function saveCustomKeybindings(bindings: CustomKeybinding[]): void {
   const obj: Record<string, string[]> = {};
   for (const b of bindings) {
+    // #1823: non-rebindable shortcuts (selection-mode hotkeys) never enter
+    // persistence — a saved override must not shadow the fixed bindings
+    // resolveSelectionHotkey owns.
+    if (!isRebindableId(b.id)) continue;
     obj[b.id] = b.keys;
   }
   localStorage.setItem(CUSTOM_BINDINGS_KEY, JSON.stringify(obj));

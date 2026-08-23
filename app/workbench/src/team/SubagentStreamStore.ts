@@ -37,7 +37,11 @@ export interface SubagentStreamState {
 export type SubagentStreamListener = (state: SubagentStreamState) => void;
 
 export interface SubagentStreamStore {
-  /** Current state snapshot (mutated in-place; copy for immutability). */
+  /**
+   * Current state snapshot. The `state` object identity is stable, but each
+   * push/reset replaces `state.byTaskId` (and the changed task's event array)
+   * so snapshot consumers (useSyncExternalStore) observe the change.
+   */
   readonly state: SubagentStreamState;
   /**
    * Feed a raw team.subagent.stream WS frame payload into the store.
@@ -115,15 +119,19 @@ export function createSubagentStreamStore(): SubagentStreamStore {
     let events = state.byTaskId[agentTaskId];
     if (!events) {
       events = [];
-      state.byTaskId[agentTaskId] = events;
     }
 
     // UPSERT by event_seq: skip if already present.
     if (events.some((e) => e.event_seq === eventSeq)) return;
 
-    events.push(event);
     // Keep sorted by event_seq (server sends in order, but be defensive).
-    events.sort((a, b) => a.event_seq - b.event_seq);
+    const nextEvents = [...events, event].sort((a, b) => a.event_seq - b.event_seq);
+    // Replace the byTaskId record (and the changed task's array) instead of
+    // mutating in place: useSyncExternalStore consumers (SubagentStreamOverlay)
+    // compare snapshots with Object.is, so an in-place mutation kept the
+    // snapshot reference identical and suppressed re-renders for streams that
+    // started after mount (#1823).
+    state.byTaskId = { ...state.byTaskId, [agentTaskId]: nextEvents };
 
     notify();
   }

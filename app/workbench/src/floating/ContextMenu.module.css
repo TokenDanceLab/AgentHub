@@ -159,3 +159,10 @@
   left: auto;
   right: 100%;
 }
+
+/* ── A11y (#1823): visible keyboard focus ring for interactive targets ── */
+.item:focus-visible {
+  outline: 2px solid transparent;
+  outline-offset: 2px;
+  box-shadow: var(--focus-ring);
+}

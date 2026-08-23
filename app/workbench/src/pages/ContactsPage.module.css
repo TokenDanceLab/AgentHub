@@ -1055,3 +1055,13 @@
   border-color: var(--td-line-strong);
   color: var(--td-ink);
 }
+
+/* ── A11y (#1823): visible keyboard focus ring for interactive targets ── */
+.linkInput:focus-visible,
+.phoneSelect:focus-visible,
+.phoneInput:focus-visible {
+  outline: 2px solid transparent;
+  outline-offset: 2px;
+  border-color: var(--td-focus);
+  box-shadow: var(--focus-ring);
+}

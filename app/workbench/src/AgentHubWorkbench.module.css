@@ -766,8 +766,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 26px;
-  height: 26px;
+  width: 32px;
+  height: 32px;
   padding: 0;
   border: 0;
   border-radius: var(--r-xs);
@@ -1120,15 +1120,15 @@
   align-items: center;
   flex-wrap: nowrap;
   gap: var(--sp-xxs);
-  height: 28px;
+  height: 32px;
   min-width: 0;
   overflow: hidden;
 }
 
 .workspaceTab {
   flex: 0 1 auto;
-  min-width: 28px;
-  height: 28px;
+  min-width: 32px;
+  height: 32px;
   padding: 0 var(--sp-10);
   border: 0;
   border-radius: var(--r-md);
@@ -1169,14 +1169,14 @@
 
 /* Tab variants matching design demo */
 .workspaceTabIconOnly {
-  width: 28px;
+  width: 32px;
   padding: 0;
   justify-content: center;
   color: var(--td-ink-subtle);
 }
 
 .workspaceTabIconOnly[aria-selected='true'] {
-  width: 28px;
+  width: 32px;
   padding: 0;
 }
 
@@ -3375,27 +3375,10 @@
   color: var(--td-ink);
 }
 
-/* Small chrome controls keep their 26–28px visual box (dense command-center
-   density is Lane D's contract) but grow an invisible ≥32px pointer/touch
-   target via ::before, which does not participate in layout. */
-.workspaceTab,
-.conversationActionBtn {
-  position: relative;
-}
-
-.workspaceTab::before,
-.conversationActionBtn::before {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  min-width: 32px;
-  min-height: 32px;
-  width: 100%;
-  height: 100%;
-  transform: translate(-50%, -50%);
-  content: '';
-}
-
+/* #1835 grew an invisible ≥32px hit target via ::before while keeping the
+   26–28px visual box; #1823 closes the item by sizing the boxes themselves
+   up to the ≥32px floor (WCAG 2.5.8 / touch-target bar), so the ::before
+   expansion is no longer needed. */
 @media (prefers-reduced-motion: reduce) {
   /* The panel collapse choreography (grid-template-columns + clip-path +
      translateX via --motion-panel) becomes an instant state change. */

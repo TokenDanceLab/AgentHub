@@ -321,6 +321,9 @@ export function buildTranscriptOverlaysProps(input: {
     selectedCount: transcriptChrome.selectedBlockIds.length,
     totalCount: transcriptLength,
     selectBarRect: transcriptChrome.selectBarRect,
+    deleteConfirmPending: transcriptChrome.deleteConfirmPending,
+    onConfirmDelete: transcriptChrome.confirmMultiDelete,
+    onCancelDelete: transcriptChrome.cancelDeleteConfirm,
     toastMessage: transcriptChrome.toastMessage,
     toastVisible: transcriptChrome.toastVisible,
   };

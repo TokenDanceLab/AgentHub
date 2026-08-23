@@ -13,6 +13,7 @@ import type { ContextMenuItem, MultiSelectBarAction } from './floating';
 import type { TranscriptContextMenuEvent, TranscriptPointerEvent } from './transcriptEventTypes';
 import {
   createTranscriptChromeController,
+  type DeleteConfirmRequest,
   type SelectionHoldState,
   type TranscriptChromeController,
   type WorkbenchContextMenuState,
@@ -23,6 +24,7 @@ export {
   SELECTION_HOLD_DELAY_MS,
   blockTitle,
   isNestedInteractiveTarget,
+  type DeleteConfirmRequest,
   type WorkbenchContextMenuState,
 } from './workbenchTranscriptChromeHelpers';
 
@@ -64,6 +66,9 @@ export interface WorkbenchTranscriptChrome {
   toastMessage: string;
   toastVisible: boolean;
   selectBarRect: { left: number; width: number } | null;
+  /** #1823: destructive multi-delete awaits the inline confirm gate.
+   *  Carries the blockIds snapshot the confirm dialog promises to delete. */
+  deleteConfirmPending: DeleteConfirmRequest | null;
   multiSelectActions: Array<MultiSelectBarAction>;
   contextMenuGroups: (blockId: string) => Array<Array<ContextMenuItem>>;
   showWorkbenchToast: (message: string) => void;
@@ -79,6 +84,10 @@ export interface WorkbenchTranscriptChrome {
   handleBlockPointerUp: (block: TranscriptBlock, event: TranscriptPointerEvent) => void;
   copyText: (text: string) => void;
   resetSelection: () => void;
+  /** #1823: runs the confirmed multi-delete (soft-hide selected blocks). */
+  confirmMultiDelete: () => void;
+  /** #1823: dismisses the pending delete confirm without deleting. */
+  cancelDeleteConfirm: () => void;
   selectionModeRef: MutableRefObject<boolean>;
 }
 
@@ -107,6 +116,7 @@ export function useWorkbenchTranscriptChrome({
   const [selectBarRect, setSelectBarRect] = useState<{ left: number; width: number } | null>(null);
   const [toastMessage, setToastMessage] = useState('');
   const [toastVisible, setToastVisible] = useState(false);
+  const [deleteConfirmPending, setDeleteConfirmPending] = useState<DeleteConfirmRequest | null>(null);
 
   const selectionModeRef = useRef(false);
   const selectionHoldRef = useRef<SelectionHoldState | null>(null);
@@ -114,6 +124,9 @@ export function useWorkbenchTranscriptChrome({
   const runMultiActionRef = useRef<((action: string) => void) | null>(null);
   const toastTimerRef = useRef<number | null>(null);
   const pulseTimersRef = useRef<Map<string, number>>(new Map());
+  // #1823: pending delete snapshot survives controller re-creation (the
+  // controller useMemo deps can change while the confirm dialog is open).
+  const deleteConfirmRef = useRef<DeleteConfirmRequest | null>(null);
   const transcriptRef = useRef(transcript);
   const selectedBlockIdsRef = useRef(selectedBlockIds);
   const controllerRef = useRef<TranscriptChromeController | null>(null);
@@ -133,6 +146,7 @@ export function useWorkbenchTranscriptChrome({
       runMultiActionRef,
       toastTimerRef,
       pulseTimersRef,
+      deleteConfirmRef,
     },
     writers: {
       setContextMenu,
@@ -143,6 +157,7 @@ export function useWorkbenchTranscriptChrome({
       setSelectBarRect,
       setToastMessage,
       setToastVisible,
+      setDeleteConfirmPending,
     },
     getTranscript: () => transcriptRef.current,
     getSelectedBlockIds: () => selectedBlockIdsRef.current,
@@ -221,6 +236,7 @@ export function useWorkbenchTranscriptChrome({
     toastMessage,
     toastVisible,
     selectBarRect,
+    deleteConfirmPending,
     multiSelectActions,
     contextMenuGroups: controller.contextMenuGroups,
     showWorkbenchToast: controller.showWorkbenchToast,
@@ -232,6 +248,8 @@ export function useWorkbenchTranscriptChrome({
     handleBlockPointerUp: controller.handleBlockPointerUp,
     copyText: controller.copyText,
     resetSelection: controller.resetSelection,
+    confirmMultiDelete: controller.confirmMultiDelete,
+    cancelDeleteConfirm: controller.cancelDeleteConfirm,
     selectionModeRef,
   };
 }

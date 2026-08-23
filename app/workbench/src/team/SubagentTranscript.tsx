@@ -137,11 +137,21 @@ export interface SubagentTranscriptProps {
   events: readonly TeamSubagentStreamEvent[];
   /** Show empty hint when events array is empty. Default true. */
   showEmpty?: boolean;
+  /**
+   * Whether this log announces its own terminal state via aria-live.
+   * Default true. Overlay hosts (SubagentStreamOverlay) pass false: the
+   * overlay region is the single live-announcement owner for the aggregate
+   * stream state (#1823) — a nested log flipping back to 'polite' while
+   * another task still streams would override the inherited 'off' and
+   * chatter mid-stream.
+   */
+  liveAnnounce?: boolean;
 }
 
 export function SubagentTranscript({
   events,
   showEmpty = true,
+  liveAnnounce = true,
 }: SubagentTranscriptProps): React.ReactElement {
   const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE);
   const entries = useMemo(() => buildEntries(events), [events]);
@@ -162,8 +172,22 @@ export function SubagentTranscript({
   }
 
   // ── Rendered transcript ──
+  // A11y (#1823): this log receives entries at token rate while the
+  // subagent streams. While the newest entry is an in-flight category the
+  // log drops to aria-live="off" (the #11 transcript pattern); when the
+  // agent completes it returns to 'polite' and the accumulated content is
+  // announced at most once (SR-dependent) — unless liveAnnounce is false,
+  // in which case an enclosing live region owns the announcement.
+  const lastCategory = entries.length > 0 ? entries[entries.length - 1]?.category ?? 'other' : 'other';
+  const isStreaming = lastCategory === 'thinking' || lastCategory === 'tool_call' || lastCategory === 'text_delta';
   return (
-    <div className={styles.transcript} role="log" aria-label={t('subagentStream.transcriptLabel')} aria-live="polite">
+    <div
+      className={styles.transcript}
+      role="log"
+      aria-label={t('subagentStream.transcriptLabel')}
+      aria-live={!liveAnnounce || isStreaming ? 'off' : 'polite'}
+      aria-busy={isStreaming}
+    >
       {entries.map(({ event, category, config }) => (
         <div
           key={event.event_seq}
