@@ -2,7 +2,12 @@ reviews:
   profile: chill
   review_status: true
   auto_review:
-    enabled: true
+    # 2026-08-23: 关闭自动评审——CodeRabbit 每轮 push 都会追加新评论，
+    # 与分支保护「合并前解决全部评论」叠加形成 O(n²) 的合并阻塞循环
+    # （本轮 12 PR 队列实测被拖慢数小时）。改为按需评审：PR 需要时
+    # 手动 @coderabbitai review。五道硬 CI 门禁（validate/go-edge/
+    # go-hub/windows-go/windows-frontend）保持为质量兜底。
+    enabled: false
     drafts: false
     base_branches:
       - master
