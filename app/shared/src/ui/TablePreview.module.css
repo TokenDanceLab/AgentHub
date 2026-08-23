@@ -69,7 +69,9 @@
   font: 500 0.6875rem/1.4 var(--td-font);
   cursor: pointer;
   white-space: nowrap;
-  transition: background var(--td-dur-normal) var(--td-ease), color var(--td-dur-normal) var(--td-ease);
+  transition:
+    background var(--td-dur-normal) var(--td-ease),
+    color var(--td-dur-normal) var(--td-ease);
 }
 
 .sheetTab:hover {
@@ -109,10 +111,28 @@
   font-weight: 600;
   font-size: 0.6875rem;
   text-align: left;
+  white-space: nowrap;
+  transition:
+    background var(--td-dur-normal) var(--td-ease),
+    color var(--td-dur-normal) var(--td-ease);
+}
+
+/* #1851 review: the sortable header is a native button inside the th —
+   chrome reset so the whole header cell reads as one interactive target. */
+.thBtn {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: inherit;
+  font-size: inherit;
+  line-height: inherit;
+  text-align: inherit;
   cursor: pointer;
   user-select: none;
-  white-space: nowrap;
-  transition: background var(--td-dur-normal) var(--td-ease), color var(--td-dur-normal) var(--td-ease);
 }
 
 .th:hover {
@@ -200,6 +220,18 @@
   min-height: 200px;
 }
 
+/* #1851 review: controlled tabpanel content for empty worksheets. */
+.emptySheet {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--td-ink-subtle);
+  font-size: var(--td-text-sm, 0.8125rem);
+  padding: var(--td-space-5);
+  min-height: 120px;
+}
+
 .spinner {
   width: 28px;
   height: 28px;
@@ -210,7 +242,9 @@
 }
 
 @keyframes previewSpin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 /* ── Error state ── */
@@ -250,7 +284,9 @@
   color: var(--td-ink-muted);
   font-size: var(--td-text-xs, 0.6875rem);
   cursor: pointer;
-  transition: background var(--td-dur-normal) var(--td-ease), color var(--td-dur-normal) var(--td-ease);
+  transition:
+    background var(--td-dur-normal) var(--td-ease),
+    color var(--td-dur-normal) var(--td-ease);
 }
 
 .retryBtn:hover {
@@ -276,7 +312,7 @@
   outline-offset: 2px;
   box-shadow: var(--focus-ring);
 }
-.th:focus-visible {
+.thBtn:focus-visible {
   outline: 2px solid transparent;
   outline-offset: 2px;
   box-shadow: var(--focus-ring);

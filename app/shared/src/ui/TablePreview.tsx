@@ -158,76 +158,100 @@ export const TablePreview: React.FC<TablePreviewProps> = ({
     });
   }, [loadFile]);
 
-  const handleSort = useCallback((colIndex: number) => {
-    setSort((prev) => {
-      let newDirection: SortDirection;
-      if (prev.column !== colIndex) {
-        newDirection = 'asc';
-      } else if (prev.direction === 'asc') {
-        newDirection = 'desc';
-      } else if (prev.direction === 'desc') {
-        newDirection = null;
-      } else {
-        newDirection = 'asc';
-      }
-
-      if (newDirection === null) {
-        setRows(rawRows);
-      } else {
-        setRows((prevRows) =>
-          [...prevRows].sort((a, b) => {
-            const valA = a[colIndex] ?? '';
-            const valB = b[colIndex] ?? '';
-            const cmp = valA.localeCompare(valB, undefined, { numeric: true });
-            return newDirection === 'asc' ? cmp : -cmp;
-          }),
-        );
-      }
-
-      return { column: colIndex, direction: newDirection };
-    });
-  }, [rawRows]);
-
-  const handleSheetSwitch = useCallback((sheetName: string) => {
-    setActiveSheet(sheetName);
-    if (fileBlob) {
-      /* Re-parse from the same blob — we already have it loaded */
-      fileBlob.arrayBuffer().then(async (ab) => {
-        assertPreviewSizeAllowed(ab.byteLength);
-        const XLSX = await getXLSX();
-        const wb = XLSX.read(ab, { type: 'array' });
-        parseSheet(wb, sheetName);
-      }).catch((err) => {
-        console.error('TablePreview: sheet switch (blob) failed:', sheetName, err);
-      });
-    } else {
-      fetch(fileUrl).then((response) => {
-        if (!response.ok) {
-          console.error('TablePreview: sheet switch fetch failed:', response.status, response.statusText);
-          return;
+  const handleSort = useCallback(
+    (colIndex: number) => {
+      setSort((prev) => {
+        let newDirection: SortDirection;
+        if (prev.column !== colIndex) {
+          newDirection = 'asc';
+        } else if (prev.direction === 'asc') {
+          newDirection = 'desc';
+        } else if (prev.direction === 'desc') {
+          newDirection = null;
+        } else {
+          newDirection = 'asc';
         }
-        response.arrayBuffer().then(async (ab) => {
-          assertPreviewSizeAllowed(ab.byteLength);
-          const XLSX = await getXLSX();
-          const wb = XLSX.read(ab, { type: 'array' });
-          parseSheet(wb, sheetName);
-        }).catch((err) => {
-          console.error('TablePreview: sheet switch (fetch→arrayBuffer) failed:', sheetName, err);
-        });
-      }).catch((err) => {
-        console.error('TablePreview: sheet switch fetch failed:', sheetName, err);
+
+        if (newDirection === null) {
+          setRows(rawRows);
+        } else {
+          setRows((prevRows) =>
+            [...prevRows].sort((a, b) => {
+              const valA = a[colIndex] ?? '';
+              const valB = b[colIndex] ?? '';
+              const cmp = valA.localeCompare(valB, undefined, { numeric: true });
+              return newDirection === 'asc' ? cmp : -cmp;
+            })
+          );
+        }
+
+        return { column: colIndex, direction: newDirection };
       });
-    }
-  }, [fileBlob, fileUrl, parseSheet]);
+    },
+    [rawRows]
+  );
+
+  const handleSheetSwitch = useCallback(
+    (sheetName: string) => {
+      setActiveSheet(sheetName);
+      if (fileBlob) {
+        /* Re-parse from the same blob — we already have it loaded */
+        fileBlob
+          .arrayBuffer()
+          .then(async (ab) => {
+            assertPreviewSizeAllowed(ab.byteLength);
+            const XLSX = await getXLSX();
+            const wb = XLSX.read(ab, { type: 'array' });
+            parseSheet(wb, sheetName);
+          })
+          .catch((err) => {
+            console.error('TablePreview: sheet switch (blob) failed:', sheetName, err);
+          });
+      } else {
+        fetch(fileUrl)
+          .then((response) => {
+            if (!response.ok) {
+              console.error(
+                'TablePreview: sheet switch fetch failed:',
+                response.status,
+                response.statusText
+              );
+              return;
+            }
+            response
+              .arrayBuffer()
+              .then(async (ab) => {
+                assertPreviewSizeAllowed(ab.byteLength);
+                const XLSX = await getXLSX();
+                const wb = XLSX.read(ab, { type: 'array' });
+                parseSheet(wb, sheetName);
+              })
+              .catch((err) => {
+                console.error(
+                  'TablePreview: sheet switch (fetch→arrayBuffer) failed:',
+                  sheetName,
+                  err
+                );
+              });
+          })
+          .catch((err) => {
+            console.error('TablePreview: sheet switch fetch failed:', sheetName, err);
+          });
+      }
+    },
+    [fileBlob, fileUrl, parseSheet]
+  );
 
   const sortIcon = useMemo(() => {
     return (colIndex: number) => {
       if (sort.column !== colIndex || sort.direction === null) {
         return <ArrowUpDown size={12} className={styles.sortIcon} />;
       }
-      return sort.direction === 'asc'
-        ? <ArrowUp size={12} className={styles.sortIconActive} />
-        : <ArrowDown size={12} className={styles.sortIconActive} />;
+      return sort.direction === 'asc' ? (
+        <ArrowUp size={12} className={styles.sortIconActive} />
+      ) : (
+        <ArrowDown size={12} className={styles.sortIconActive} />
+      );
     };
   }, [sort]);
 
@@ -282,17 +306,19 @@ export const TablePreview: React.FC<TablePreviewProps> = ({
       {/* ── Header ── */}
       <div className={styles.header}>
         <div className={styles.title}>
-          <span className={styles.fileName} title={fileName}>{fileName}</span>
+          <span className={styles.fileName} title={fileName}>
+            {fileName}
+          </span>
           <span className={styles.badge}>{fileExt}</span>
         </div>
         {onClose && (
-          <Tooltip label={t("aria.closePreview")}>
+          <Tooltip label={t('aria.closePreview')}>
             <Button
               variant="ghost"
               size="sm"
               type="button"
               onClick={onClose}
-              aria-label={t("aria.closePreview")}
+              aria-label={t('aria.closePreview')}
             >
               <X size={16} />
             </Button>
@@ -305,7 +331,7 @@ export const TablePreview: React.FC<TablePreviewProps> = ({
         <div
           className={styles.sheetTabs}
           role="tablist"
-          aria-label={t("aria.worksheet")}
+          aria-label={t('aria.worksheet')}
           ref={sheetTabsRef}
           onKeyDown={handleSheetTabsKeyDown}
         >
@@ -363,7 +389,7 @@ export const TablePreview: React.FC<TablePreviewProps> = ({
       )}
 
       {/* ── Table ── */}
-      {!loading && !error && headers.length > 0 && (
+      {!loading && !error && (headers.length > 0 || sheetNames.length > 1) && (
         <div
           className={styles.tableWrapper}
           role="tabpanel"
@@ -374,54 +400,57 @@ export const TablePreview: React.FC<TablePreviewProps> = ({
               : undefined
           }
         >
-          <table className={styles.table}>
-            <thead>
-              <tr>
-                {headers.map((header, i) => (
-                  <th
-                    key={i}
-                    className={styles.th}
-                    onClick={() => handleSort(i)}
-                    onKeyDown={(event) => {
-                      // #1823: the sortable column header is a keyboard
-                      // target — Enter/Space sort exactly like a click.
-                      if (event.key === 'Enter' || event.key === ' ') {
-                        event.preventDefault();
-                        handleSort(i);
+          {headers.length > 0 ? (
+            <table className={styles.table}>
+              <thead>
+                <tr>
+                  {headers.map((header, i) => (
+                    <th
+                      key={i}
+                      className={styles.th}
+                      aria-sort={
+                        sort.column === i
+                          ? sort.direction === 'asc'
+                            ? 'ascending'
+                            : sort.direction === 'desc'
+                              ? 'descending'
+                              : 'none'
+                          : 'none'
                       }
-                    }}
-                    tabIndex={0}
-                    role="columnheader"
-                    aria-sort={
-                      sort.column === i
-                        ? sort.direction === 'asc'
-                          ? 'ascending'
-                          : sort.direction === 'desc'
-                            ? 'descending'
-                            : 'none'
-                        : 'none'
-                    }
-                  >
-                    <span className={styles.thContent}>
-                      <span className={styles.thText}>{header || `Column ${i + 1}`}</span>
-                      {sortIcon(i)}
-                    </span>
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((row, ri) => (
-                <tr key={ri} className={styles.tr}>
-                  {row.map((cell, ci) => (
-                    <td key={ci} className={styles.td} title={cell}>
-                      {cell}
-                    </td>
+                    >
+                      {/* #1851 review: the sortable header is a native button —
+                        th+tabIndex+onKeyDown exposed no interactive control
+                        to AT; Enter/Space activation and focusability now
+                        come from the button, aria-sort stays on the th. */}
+                      <button type="button" className={styles.thBtn} onClick={() => handleSort(i)}>
+                        <span className={styles.thContent}>
+                          <span className={styles.thText}>{header || `Column ${i + 1}`}</span>
+                          {sortIcon(i)}
+                        </span>
+                      </button>
+                    </th>
                   ))}
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {rows.map((row, ri) => (
+                  <tr key={ri} className={styles.tr}>
+                    {row.map((cell, ci) => (
+                      <td key={ci} className={styles.td} title={cell}>
+                        {cell}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          ) : (
+            /* #1851 review: multi-sheet empty workbooks still mount the
+             controlled tabpanel so the tabs' aria-controls resolves. */
+            <div className={styles.emptySheet}>
+              <span>空工作表</span>
+            </div>
+          )}
         </div>
       )}
 

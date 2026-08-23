@@ -1,5 +1,6 @@
 import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import * as XLSX from 'xlsx';
 import { MAX_PREVIEW_FILE_BYTES, TablePreview } from './TablePreview';
@@ -15,9 +16,7 @@ describe('TablePreview size guard', () => {
 
     render(<TablePreview fileUrl="/big.xlsx" fileName="big.xlsx" fileBlob={oversized} />);
 
-    expect(
-      await screen.findByText(/文件过大/, undefined, { timeout: 5000 }),
-    ).toBeInTheDocument();
+    expect(await screen.findByText(/文件过大/, undefined, { timeout: 5000 })).toBeInTheDocument();
     /* Existing error branch: retry button rendered, no table. */
     expect(screen.getByRole('button', { name: '重试' })).toBeInTheDocument();
     expect(screen.queryByRole('table')).not.toBeInTheDocument();
@@ -38,8 +37,22 @@ describe('TablePreview size guard', () => {
 describe('TablePreview #1823 keyboard accessibility', () => {
   function twoSheetBlob(): Blob {
     const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet([['a', 'b'], ['1', '2']]), 'Alpha');
-    XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet([['x', 'y'], ['3', '4']]), 'Beta');
+    XLSX.utils.book_append_sheet(
+      workbook,
+      XLSX.utils.aoa_to_sheet([
+        ['a', 'b'],
+        ['1', '2'],
+      ]),
+      'Alpha'
+    );
+    XLSX.utils.book_append_sheet(
+      workbook,
+      XLSX.utils.aoa_to_sheet([
+        ['x', 'y'],
+        ['3', '4'],
+      ]),
+      'Beta'
+    );
     const out = XLSX.write(workbook, { type: 'array', bookType: 'xlsx' });
     return new Blob([out as unknown as BlobPart], {
       type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
@@ -110,7 +123,7 @@ describe('TablePreview #1823 keyboard accessibility', () => {
 
   it('falls back to the active sheet when the remembered roving sheet disappears (#1823)', async () => {
     const { rerender } = render(
-      <TablePreview fileUrl="/two.xlsx" fileName="two.xlsx" fileBlob={twoSheetBlob()} />,
+      <TablePreview fileUrl="/two.xlsx" fileName="two.xlsx" fileBlob={twoSheetBlob()} />
     );
     const alphaTab = await screen.findByRole('tab', { name: 'Alpha' }, { timeout: 15000 });
     const betaTab = screen.getByRole('tab', { name: 'Beta' });
@@ -122,8 +135,22 @@ describe('TablePreview #1823 keyboard accessibility', () => {
     // remembered roving target dangles — the strip must fall back to the
     // active sheet instead of leaving every tab at tabIndex=-1.
     const wb2 = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb2, XLSX.utils.aoa_to_sheet([['a', 'b'], ['1', '2']]), 'Alpha');
-    XLSX.utils.book_append_sheet(wb2, XLSX.utils.aoa_to_sheet([['x', 'y'], ['3', '4']]), 'Gamma');
+    XLSX.utils.book_append_sheet(
+      wb2,
+      XLSX.utils.aoa_to_sheet([
+        ['a', 'b'],
+        ['1', '2'],
+      ]),
+      'Alpha'
+    );
+    XLSX.utils.book_append_sheet(
+      wb2,
+      XLSX.utils.aoa_to_sheet([
+        ['x', 'y'],
+        ['3', '4'],
+      ]),
+      'Gamma'
+    );
     const out2 = XLSX.write(wb2, { type: 'array', bookType: 'xlsx' });
     const blob2 = new Blob([out2 as unknown as BlobPart], {
       type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
@@ -145,22 +172,49 @@ describe('TablePreview #1823 keyboard accessibility', () => {
     expect(panel.getAttribute('aria-labelledby')).toBe(alphaTab.id);
   }, 20000);
 
-  it('sortable column header is keyboard reachable and operatable', async () => {
+  it('sortable column header is a native button — keyboard reachable and operatable', async () => {
     const csv = new Blob([new TextEncoder().encode('name,score\nAlice,90\nBob,81')]);
     render(<TablePreview fileUrl="/sort.csv" fileName="sort.csv" fileBlob={csv} />);
 
     const nameHeader = await screen.findByText('name', {}, { timeout: 15000 });
+    // #1851 review: the sort control is a button inside the th; aria-sort
+    // stays on the th, focus/Enter/Space come from the button.
     const th = nameHeader.closest('th')!;
-    expect(th).toHaveAttribute('tabindex', '0');
+    const sortBtn = nameHeader.closest('button')!;
+    expect(sortBtn).not.toBeNull();
+    expect(th).toHaveAttribute('aria-sort', 'none');
+    expect(th).not.toHaveAttribute('tabindex');
 
     // Keyboard sort (Enter) same as click: asc sort turns into desc.
-    th.focus();
-    fireEvent.keyDown(th, { key: 'Enter' });
+    sortBtn.focus();
+    expect(document.activeElement).toBe(sortBtn);
+    const user = userEvent.setup();
+    await user.keyboard('{Enter}');
     let cells = screen.getAllByRole('cell').map((c) => c.textContent ?? '');
     expect(cells).toEqual(['Alice', '90', 'Bob', '81']);
 
-    fireEvent.keyDown(th, { key: 'Enter' });
+    await user.keyboard('{Enter}');
     cells = screen.getAllByRole('cell').map((c) => c.textContent ?? '');
     expect(cells).toEqual(['Bob', '81', 'Alice', '90']);
+  }, 20000);
+
+  it('keeps the controlled tabpanel mounted for a multi-sheet empty workbook (#1851 review)', async () => {
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([]), 'Sheet1');
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([]), 'Sheet2');
+    const out = XLSX.write(wb, { type: 'array', bookType: 'xlsx' });
+    const blob = new Blob([out as unknown as BlobPart], {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    });
+    render(<TablePreview fileUrl="/empty.xlsx" fileName="empty.xlsx" fileBlob={blob} />);
+
+    const sheet1Tab = await screen.findByRole('tab', { name: 'Sheet1' }, { timeout: 15000 });
+    // No headers: the panel must still exist so every tab's aria-controls
+    // resolves to a real element.
+    const panel = screen.getByRole('tabpanel');
+    expect(panel.id).not.toBe('');
+    expect(sheet1Tab.getAttribute('aria-controls')).toBe(panel.id);
+    expect(panel.getAttribute('aria-labelledby')).toBe(sheet1Tab.id);
+    expect(panel).toHaveTextContent('空工作表');
   }, 20000);
 });
