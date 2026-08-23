@@ -100,6 +100,8 @@ export function useWorkbenchPanelLayout({
   const inspectorWidthRef = useRef(INSPECTOR_DEFAULT_WIDTH);
   const sidebarWidthRef = useRef(SIDEBAR_DEFAULT_WIDTH);
   const sidebarShouldCollapseRef = useRef(false);
+  const sidebarCollapsedRef = useRef(false);
+  const isChatPageRef = useRef(isChatPage);
 
   useEffect(() => {
     inspectorWidthRef.current = inspectorWidth;
@@ -108,6 +110,14 @@ export function useWorkbenchPanelLayout({
   useEffect(() => {
     sidebarWidthRef.current = sidebarWidth;
   }, [sidebarWidth]);
+
+  useEffect(() => {
+    sidebarCollapsedRef.current = sidebarCollapsed;
+  }, [sidebarCollapsed]);
+
+  useEffect(() => {
+    isChatPageRef.current = isChatPage;
+  }, [isChatPage]);
 
   // Persist inspector layout across restarts (mirror of the state machine).
   useEffect(() => {
@@ -254,6 +264,47 @@ export function useWorkbenchPanelLayout({
     window.addEventListener(DESKTOP_TOGGLE_SIDEBAR_EVENT, handleDesktopToggleSidebar);
     return () => window.removeEventListener(DESKTOP_TOGGLE_SIDEBAR_EVENT, handleDesktopToggleSidebar);
   }, [activePage, platformSurface, toggleSidebar]);
+
+  // Window resize → re-evaluate workspace-pressure sidebar collapse (#1827).
+  // The check used to run only during pointer resizes, so shrinking the
+  // window below the 3-panel comfort zone kept the chat main area squeezed
+  // (~560px at 1280px windows) until the inspector was touched. Collapse is
+  // one-directional (dedupe with the pointer-resize plan), reads the latest
+  // widths through refs, and is rAF-throttled per frame.
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+
+    let framePending = false;
+    let rafId = 0;
+
+    function evaluateWorkspacePressure(): void {
+      framePending = false;
+      maybeCollapseSidebarForWorkspacePressure({
+        isChatPage: isChatPageRef.current,
+        sidebarCollapsed: sidebarCollapsedRef.current,
+        viewportWidth: window.innerWidth,
+        sidebarWidth: sidebarWidthRef.current,
+        nextInspectorWidth: inspectorWidthRef.current,
+        setSidebarCollapsed,
+      });
+    }
+
+    function handleViewportResize(): void {
+      if (framePending) return;
+      framePending = true;
+      if (typeof window.requestAnimationFrame === 'function') {
+        rafId = window.requestAnimationFrame(evaluateWorkspacePressure);
+      } else {
+        evaluateWorkspacePressure();
+      }
+    }
+
+    window.addEventListener('resize', handleViewportResize);
+    return () => {
+      window.removeEventListener('resize', handleViewportResize);
+      if (rafId !== 0) window.cancelAnimationFrame(rafId);
+    };
+  }, [setSidebarCollapsed]);
 
   useEffect(() => {
     if (!inspectorResizing) return;

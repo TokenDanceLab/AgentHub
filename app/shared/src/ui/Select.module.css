@@ -50,7 +50,7 @@
 }
 
 .trigger:disabled {
-  opacity: 0.4;
+  opacity: var(--opacity-40);
   cursor: not-allowed;
 }
 
@@ -254,7 +254,7 @@
 }
 
 [data-theme='dark'] .chevron {
-  opacity: 0.5;
+  opacity: var(--opacity-50);
 }
 
 /* Reduced motion: instant open/close, no dropdown slide/fade loop (#1825). */

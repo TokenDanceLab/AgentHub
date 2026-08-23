@@ -532,7 +532,7 @@
 
 .confirmDeleteBtn:active:not(:disabled) {
   transform: scale(0.97);
-  opacity: 0.85;
+  opacity: var(--opacity-85);
 }
 
 .cancelDeleteBtn {

@@ -445,7 +445,7 @@
   font: 500 0.75rem var(--td-font);
 }
 
-@media (max-width: 760px) {
+@media (max-width: 768px) {
   .toolbarBtn:has(svg) {
     width: 32px;
     padding: 0;

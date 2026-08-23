@@ -97,6 +97,35 @@
   --text-2: var(--text-weaker);
   --bdr: rgba(255, 255, 255, 0.06);
   --primary-hover: #60A5FA;
+
+  /* #1827 family coverage — preset palette must own danger/state/role/focus
+     and brand-tinted glass; otherwise these families fall through to the
+     AgentHub default theme values. */
+  --danger: var(--destructive);
+  --danger-bg: color-mix(in srgb, var(--destructive) 8%, transparent);
+  --state-running: var(--info);
+  --state-thinking: var(--info);
+  --state-waiting: var(--warning);
+  --state-success: var(--success);
+  --state-failed: var(--danger);
+  --state-error: var(--state-failed);
+  --state-cancelled: var(--muted-foreground);
+  --role-orchestrator: var(--brand);
+  --role-orch: var(--brand);
+  --role-builder: var(--info);
+  --role-reviewer: var(--success);
+  --role-deployer: var(--info);
+  --role-researcher: var(--warning);
+  --bdr-focus: var(--primary);
+  --glass-tint-plum: color-mix(in srgb, var(--primary) 6%, transparent);
+  --glass-tint-moss: color-mix(in srgb, var(--success) 5%, transparent);
+  --glass-tint-danger: color-mix(in srgb, var(--danger) 8%, transparent);
+  --glass-tint-amber: color-mix(in srgb, var(--warning) 6%, transparent);
+  --glass-tint-sky: color-mix(in srgb, var(--info) 5%, transparent);
+  --glass-panel: color-mix(in srgb, var(--card) 70%, transparent);
+  --glass-panel-strong: color-mix(in srgb, var(--card) 84%, transparent);
+  --glass-panel-overlay: color-mix(in srgb, var(--card) 94%, transparent);
+
 }
 
 /* Classic Blue — Light */
@@ -189,6 +218,35 @@
   --text-2: var(--text-weaker);
   --bdr: var(--border);
   --primary-hover: #1D4ED8;
+
+  /* #1827 family coverage — preset palette must own danger/state/role/focus
+     and brand-tinted glass; otherwise these families fall through to the
+     AgentHub default theme values. */
+  --danger: var(--destructive);
+  --danger-bg: color-mix(in srgb, var(--destructive) 8%, transparent);
+  --state-running: var(--info);
+  --state-thinking: var(--info);
+  --state-waiting: var(--warning);
+  --state-success: var(--success);
+  --state-failed: var(--danger);
+  --state-error: var(--state-failed);
+  --state-cancelled: var(--muted-foreground);
+  --role-orchestrator: var(--brand);
+  --role-orch: var(--brand);
+  --role-builder: var(--info);
+  --role-reviewer: var(--success);
+  --role-deployer: var(--info);
+  --role-researcher: var(--warning);
+  --bdr-focus: var(--primary);
+  --glass-tint-plum: color-mix(in srgb, var(--primary) 4%, transparent);
+  --glass-tint-moss: color-mix(in srgb, var(--success) 4%, transparent);
+  --glass-tint-danger: color-mix(in srgb, var(--danger) 3%, transparent);
+  --glass-tint-amber: color-mix(in srgb, var(--warning) 4%, transparent);
+  --glass-tint-sky: color-mix(in srgb, var(--info) 4%, transparent);
+  --glass-panel: color-mix(in srgb, var(--card) 82%, transparent);
+  --glass-panel-strong: color-mix(in srgb, var(--card) 91%, transparent);
+  --glass-panel-overlay: color-mix(in srgb, var(--card) 96%, transparent);
+
 }
 
 /* ── Claude Warm ────────────────────────────────────────────────────────
@@ -282,6 +340,35 @@
   --text-2: var(--text-weaker);
   --bdr: rgba(255, 255, 255, 0.06);
   --primary-hover: #FBBF24;
+
+  /* #1827 family coverage — preset palette must own danger/state/role/focus
+     and brand-tinted glass; otherwise these families fall through to the
+     AgentHub default theme values. */
+  --danger: var(--destructive);
+  --danger-bg: color-mix(in srgb, var(--destructive) 8%, transparent);
+  --state-running: var(--info);
+  --state-thinking: var(--info);
+  --state-waiting: var(--warning);
+  --state-success: var(--success);
+  --state-failed: var(--danger);
+  --state-error: var(--state-failed);
+  --state-cancelled: var(--muted-foreground);
+  --role-orchestrator: var(--brand);
+  --role-orch: var(--brand);
+  --role-builder: var(--info);
+  --role-reviewer: var(--success);
+  --role-deployer: var(--info);
+  --role-researcher: var(--warning);
+  --bdr-focus: var(--primary);
+  --glass-tint-plum: color-mix(in srgb, var(--primary) 6%, transparent);
+  --glass-tint-moss: color-mix(in srgb, var(--success) 5%, transparent);
+  --glass-tint-danger: color-mix(in srgb, var(--danger) 8%, transparent);
+  --glass-tint-amber: color-mix(in srgb, var(--warning) 6%, transparent);
+  --glass-tint-sky: color-mix(in srgb, var(--info) 5%, transparent);
+  --glass-panel: color-mix(in srgb, var(--card) 70%, transparent);
+  --glass-panel-strong: color-mix(in srgb, var(--card) 84%, transparent);
+  --glass-panel-overlay: color-mix(in srgb, var(--card) 94%, transparent);
+
 }
 
 /* Claude Warm — Light */
@@ -374,6 +461,35 @@
   --text-2: var(--text-weaker);
   --bdr: var(--border);
   --primary-hover: #B45309;
+
+  /* #1827 family coverage — preset palette must own danger/state/role/focus
+     and brand-tinted glass; otherwise these families fall through to the
+     AgentHub default theme values. */
+  --danger: var(--destructive);
+  --danger-bg: color-mix(in srgb, var(--destructive) 8%, transparent);
+  --state-running: var(--info);
+  --state-thinking: var(--info);
+  --state-waiting: var(--warning);
+  --state-success: var(--success);
+  --state-failed: var(--danger);
+  --state-error: var(--state-failed);
+  --state-cancelled: var(--muted-foreground);
+  --role-orchestrator: var(--brand);
+  --role-orch: var(--brand);
+  --role-builder: var(--info);
+  --role-reviewer: var(--success);
+  --role-deployer: var(--info);
+  --role-researcher: var(--warning);
+  --bdr-focus: var(--primary);
+  --glass-tint-plum: color-mix(in srgb, var(--primary) 4%, transparent);
+  --glass-tint-moss: color-mix(in srgb, var(--success) 4%, transparent);
+  --glass-tint-danger: color-mix(in srgb, var(--danger) 3%, transparent);
+  --glass-tint-amber: color-mix(in srgb, var(--warning) 4%, transparent);
+  --glass-tint-sky: color-mix(in srgb, var(--info) 4%, transparent);
+  --glass-panel: color-mix(in srgb, var(--card) 82%, transparent);
+  --glass-panel-strong: color-mix(in srgb, var(--card) 91%, transparent);
+  --glass-panel-overlay: color-mix(in srgb, var(--card) 96%, transparent);
+
 }
 
 /* ── ChatGPT Minimal ────────────────────────────────────────────────────
@@ -468,6 +584,35 @@
   --text-2: var(--text-weaker);
   --bdr: rgba(255, 255, 255, 0.06);
   --primary-hover: #2EC4A0;
+
+  /* #1827 family coverage — preset palette must own danger/state/role/focus
+     and brand-tinted glass; otherwise these families fall through to the
+     AgentHub default theme values. */
+  --danger: var(--destructive);
+  --danger-bg: color-mix(in srgb, var(--destructive) 8%, transparent);
+  --state-running: var(--info);
+  --state-thinking: var(--info);
+  --state-waiting: var(--warning);
+  --state-success: var(--success);
+  --state-failed: var(--danger);
+  --state-error: var(--state-failed);
+  --state-cancelled: var(--muted-foreground);
+  --role-orchestrator: var(--brand);
+  --role-orch: var(--brand);
+  --role-builder: var(--info);
+  --role-reviewer: var(--success);
+  --role-deployer: var(--info);
+  --role-researcher: var(--warning);
+  --bdr-focus: var(--primary);
+  --glass-tint-plum: color-mix(in srgb, var(--primary) 6%, transparent);
+  --glass-tint-moss: color-mix(in srgb, var(--success) 5%, transparent);
+  --glass-tint-danger: color-mix(in srgb, var(--danger) 8%, transparent);
+  --glass-tint-amber: color-mix(in srgb, var(--warning) 6%, transparent);
+  --glass-tint-sky: color-mix(in srgb, var(--info) 5%, transparent);
+  --glass-panel: color-mix(in srgb, var(--card) 70%, transparent);
+  --glass-panel-strong: color-mix(in srgb, var(--card) 84%, transparent);
+  --glass-panel-overlay: color-mix(in srgb, var(--card) 94%, transparent);
+
 }
 
 /* ChatGPT Minimal — Light */
@@ -560,6 +705,35 @@
   --text-2: var(--text-weaker);
   --bdr: var(--border);
   --primary-hover: #0D8A6B;
+
+  /* #1827 family coverage — preset palette must own danger/state/role/focus
+     and brand-tinted glass; otherwise these families fall through to the
+     AgentHub default theme values. */
+  --danger: var(--destructive);
+  --danger-bg: color-mix(in srgb, var(--destructive) 8%, transparent);
+  --state-running: var(--info);
+  --state-thinking: var(--info);
+  --state-waiting: var(--warning);
+  --state-success: var(--success);
+  --state-failed: var(--danger);
+  --state-error: var(--state-failed);
+  --state-cancelled: var(--muted-foreground);
+  --role-orchestrator: var(--brand);
+  --role-orch: var(--brand);
+  --role-builder: var(--info);
+  --role-reviewer: var(--success);
+  --role-deployer: var(--info);
+  --role-researcher: var(--warning);
+  --bdr-focus: var(--primary);
+  --glass-tint-plum: color-mix(in srgb, var(--primary) 4%, transparent);
+  --glass-tint-moss: color-mix(in srgb, var(--success) 4%, transparent);
+  --glass-tint-danger: color-mix(in srgb, var(--danger) 3%, transparent);
+  --glass-tint-amber: color-mix(in srgb, var(--warning) 4%, transparent);
+  --glass-tint-sky: color-mix(in srgb, var(--info) 4%, transparent);
+  --glass-panel: color-mix(in srgb, var(--card) 82%, transparent);
+  --glass-panel-strong: color-mix(in srgb, var(--card) 91%, transparent);
+  --glass-panel-overlay: color-mix(in srgb, var(--card) 96%, transparent);
+
 }
 
 /* ── DeepSeek Tech ──────────────────────────────────────────────────────
@@ -655,6 +829,35 @@
   --text-2: var(--text-weaker);
   --bdr: rgba(255, 255, 255, 0.06);
   --primary-hover: #A5B4FC;
+
+  /* #1827 family coverage — preset palette must own danger/state/role/focus
+     and brand-tinted glass; otherwise these families fall through to the
+     AgentHub default theme values. */
+  --danger: var(--destructive);
+  --danger-bg: color-mix(in srgb, var(--destructive) 8%, transparent);
+  --state-running: var(--info);
+  --state-thinking: var(--info);
+  --state-waiting: var(--warning);
+  --state-success: var(--success);
+  --state-failed: var(--danger);
+  --state-error: var(--state-failed);
+  --state-cancelled: var(--muted-foreground);
+  --role-orchestrator: var(--brand);
+  --role-orch: var(--brand);
+  --role-builder: var(--info);
+  --role-reviewer: var(--success);
+  --role-deployer: var(--info);
+  --role-researcher: var(--warning);
+  --bdr-focus: var(--primary);
+  --glass-tint-plum: color-mix(in srgb, var(--primary) 6%, transparent);
+  --glass-tint-moss: color-mix(in srgb, var(--success) 5%, transparent);
+  --glass-tint-danger: color-mix(in srgb, var(--danger) 8%, transparent);
+  --glass-tint-amber: color-mix(in srgb, var(--warning) 6%, transparent);
+  --glass-tint-sky: color-mix(in srgb, var(--info) 5%, transparent);
+  --glass-panel: color-mix(in srgb, var(--card) 70%, transparent);
+  --glass-panel-strong: color-mix(in srgb, var(--card) 84%, transparent);
+  --glass-panel-overlay: color-mix(in srgb, var(--card) 94%, transparent);
+
 }
 
 /* DeepSeek Tech — Light */
@@ -747,6 +950,35 @@
   --text-2: var(--text-weaker);
   --bdr: var(--border);
   --primary-hover: #4F46E5;
+
+  /* #1827 family coverage — preset palette must own danger/state/role/focus
+     and brand-tinted glass; otherwise these families fall through to the
+     AgentHub default theme values. */
+  --danger: var(--destructive);
+  --danger-bg: color-mix(in srgb, var(--destructive) 8%, transparent);
+  --state-running: var(--info);
+  --state-thinking: var(--info);
+  --state-waiting: var(--warning);
+  --state-success: var(--success);
+  --state-failed: var(--danger);
+  --state-error: var(--state-failed);
+  --state-cancelled: var(--muted-foreground);
+  --role-orchestrator: var(--brand);
+  --role-orch: var(--brand);
+  --role-builder: var(--info);
+  --role-reviewer: var(--success);
+  --role-deployer: var(--info);
+  --role-researcher: var(--warning);
+  --bdr-focus: var(--primary);
+  --glass-tint-plum: color-mix(in srgb, var(--primary) 4%, transparent);
+  --glass-tint-moss: color-mix(in srgb, var(--success) 4%, transparent);
+  --glass-tint-danger: color-mix(in srgb, var(--danger) 3%, transparent);
+  --glass-tint-amber: color-mix(in srgb, var(--warning) 4%, transparent);
+  --glass-tint-sky: color-mix(in srgb, var(--info) 4%, transparent);
+  --glass-panel: color-mix(in srgb, var(--card) 82%, transparent);
+  --glass-panel-strong: color-mix(in srgb, var(--card) 91%, transparent);
+  --glass-panel-overlay: color-mix(in srgb, var(--card) 96%, transparent);
+
 }
 
 /* ── One Dark Pro ───────────────────────────────────────────────────────
@@ -841,6 +1073,35 @@
   --text-2: var(--text-weaker);
   --bdr: rgba(255, 255, 255, 0.06);
   --primary-hover: #82C0F4;
+
+  /* #1827 family coverage — preset palette must own danger/state/role/focus
+     and brand-tinted glass; otherwise these families fall through to the
+     AgentHub default theme values. */
+  --danger: var(--destructive);
+  --danger-bg: color-mix(in srgb, var(--destructive) 8%, transparent);
+  --state-running: var(--info);
+  --state-thinking: var(--info);
+  --state-waiting: var(--warning);
+  --state-success: var(--success);
+  --state-failed: var(--danger);
+  --state-error: var(--state-failed);
+  --state-cancelled: var(--muted-foreground);
+  --role-orchestrator: var(--brand);
+  --role-orch: var(--brand);
+  --role-builder: var(--info);
+  --role-reviewer: var(--success);
+  --role-deployer: var(--info);
+  --role-researcher: var(--warning);
+  --bdr-focus: var(--primary);
+  --glass-tint-plum: color-mix(in srgb, var(--primary) 6%, transparent);
+  --glass-tint-moss: color-mix(in srgb, var(--success) 5%, transparent);
+  --glass-tint-danger: color-mix(in srgb, var(--danger) 8%, transparent);
+  --glass-tint-amber: color-mix(in srgb, var(--warning) 6%, transparent);
+  --glass-tint-sky: color-mix(in srgb, var(--info) 5%, transparent);
+  --glass-panel: color-mix(in srgb, var(--card) 70%, transparent);
+  --glass-panel-strong: color-mix(in srgb, var(--card) 84%, transparent);
+  --glass-panel-overlay: color-mix(in srgb, var(--card) 94%, transparent);
+
 }
 
 /* One Dark Pro — Light */
@@ -933,6 +1194,35 @@
   --text-2: var(--text-weaker);
   --bdr: var(--border);
   --primary-hover: #4FA8E8;
+
+  /* #1827 family coverage — preset palette must own danger/state/role/focus
+     and brand-tinted glass; otherwise these families fall through to the
+     AgentHub default theme values. */
+  --danger: var(--destructive);
+  --danger-bg: color-mix(in srgb, var(--destructive) 8%, transparent);
+  --state-running: var(--info);
+  --state-thinking: var(--info);
+  --state-waiting: var(--warning);
+  --state-success: var(--success);
+  --state-failed: var(--danger);
+  --state-error: var(--state-failed);
+  --state-cancelled: var(--muted-foreground);
+  --role-orchestrator: var(--brand);
+  --role-orch: var(--brand);
+  --role-builder: var(--info);
+  --role-reviewer: var(--success);
+  --role-deployer: var(--info);
+  --role-researcher: var(--warning);
+  --bdr-focus: var(--primary);
+  --glass-tint-plum: color-mix(in srgb, var(--primary) 4%, transparent);
+  --glass-tint-moss: color-mix(in srgb, var(--success) 4%, transparent);
+  --glass-tint-danger: color-mix(in srgb, var(--danger) 3%, transparent);
+  --glass-tint-amber: color-mix(in srgb, var(--warning) 4%, transparent);
+  --glass-tint-sky: color-mix(in srgb, var(--info) 4%, transparent);
+  --glass-panel: color-mix(in srgb, var(--card) 82%, transparent);
+  --glass-panel-strong: color-mix(in srgb, var(--card) 91%, transparent);
+  --glass-panel-overlay: color-mix(in srgb, var(--card) 96%, transparent);
+
 }
 
 /* ── Dracula ────────────────────────────────────────────────────────────
@@ -1026,6 +1316,35 @@
   --text-2: var(--text-weaker);
   --bdr: rgba(255, 255, 255, 0.06);
   --primary-hover: #D0B3FB;
+
+  /* #1827 family coverage — preset palette must own danger/state/role/focus
+     and brand-tinted glass; otherwise these families fall through to the
+     AgentHub default theme values. */
+  --danger: var(--destructive);
+  --danger-bg: color-mix(in srgb, var(--destructive) 8%, transparent);
+  --state-running: var(--info);
+  --state-thinking: var(--info);
+  --state-waiting: var(--warning);
+  --state-success: var(--success);
+  --state-failed: var(--danger);
+  --state-error: var(--state-failed);
+  --state-cancelled: var(--muted-foreground);
+  --role-orchestrator: var(--brand);
+  --role-orch: var(--brand);
+  --role-builder: var(--info);
+  --role-reviewer: var(--success);
+  --role-deployer: var(--info);
+  --role-researcher: var(--warning);
+  --bdr-focus: var(--primary);
+  --glass-tint-plum: color-mix(in srgb, var(--primary) 6%, transparent);
+  --glass-tint-moss: color-mix(in srgb, var(--success) 5%, transparent);
+  --glass-tint-danger: color-mix(in srgb, var(--danger) 8%, transparent);
+  --glass-tint-amber: color-mix(in srgb, var(--warning) 6%, transparent);
+  --glass-tint-sky: color-mix(in srgb, var(--info) 5%, transparent);
+  --glass-panel: color-mix(in srgb, var(--card) 70%, transparent);
+  --glass-panel-strong: color-mix(in srgb, var(--card) 84%, transparent);
+  --glass-panel-overlay: color-mix(in srgb, var(--card) 94%, transparent);
+
 }
 
 /* Dracula — Light */
@@ -1118,6 +1437,35 @@
   --text-2: var(--text-weaker);
   --bdr: var(--border);
   --primary-hover: #A877F5;
+
+  /* #1827 family coverage — preset palette must own danger/state/role/focus
+     and brand-tinted glass; otherwise these families fall through to the
+     AgentHub default theme values. */
+  --danger: var(--destructive);
+  --danger-bg: color-mix(in srgb, var(--destructive) 8%, transparent);
+  --state-running: var(--info);
+  --state-thinking: var(--info);
+  --state-waiting: var(--warning);
+  --state-success: var(--success);
+  --state-failed: var(--danger);
+  --state-error: var(--state-failed);
+  --state-cancelled: var(--muted-foreground);
+  --role-orchestrator: var(--brand);
+  --role-orch: var(--brand);
+  --role-builder: var(--info);
+  --role-reviewer: var(--success);
+  --role-deployer: var(--info);
+  --role-researcher: var(--warning);
+  --bdr-focus: var(--primary);
+  --glass-tint-plum: color-mix(in srgb, var(--primary) 4%, transparent);
+  --glass-tint-moss: color-mix(in srgb, var(--success) 4%, transparent);
+  --glass-tint-danger: color-mix(in srgb, var(--danger) 3%, transparent);
+  --glass-tint-amber: color-mix(in srgb, var(--warning) 4%, transparent);
+  --glass-tint-sky: color-mix(in srgb, var(--info) 4%, transparent);
+  --glass-panel: color-mix(in srgb, var(--card) 82%, transparent);
+  --glass-panel-strong: color-mix(in srgb, var(--card) 91%, transparent);
+  --glass-panel-overlay: color-mix(in srgb, var(--card) 96%, transparent);
+
 }
 
 /* ═══ Global focus fallback (a11y #8/#13) ═══════════════════════════════
