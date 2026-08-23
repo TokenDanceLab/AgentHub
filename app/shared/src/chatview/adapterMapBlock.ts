@@ -161,6 +161,9 @@ export function mapBlock(b: TranscriptBlock): RowItem | null {
         collapsible: true, standalone: true,
         apReason: parts.filter(Boolean).join(SEP),
         riskLevel: 'risk' in a && a.risk ? a.risk : undefined,
+        // #1819: waiting cards surface "requested at" from the block's
+        // createdAt; decided cards show no pending meta (only waiting matters).
+        ...(st === 'waiting' && a.createdAt ? { waitingSince: a.createdAt } : {}),
       } as RowItem
     }
 

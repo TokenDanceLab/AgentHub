@@ -24,6 +24,7 @@ import {
 import styles from './AgentHubWorkbench.module.css';
 import {
   ComposerAgentPicker,
+  ComposerApprovalModePicker,
   ComposerAttachButton as ComposerAttachButtonBase,
   ComposerAttachmentBar as ComposerAttachmentBarBase,
   ComposerEditBar as ComposerEditBarBase,
@@ -741,6 +742,11 @@ export function UnifiedComposer({
             onChange={handleExecutionTargetChange}
           />
         )}
+        <ComposerApprovalModePicker
+          approvalMode={composer.approvalMode}
+          isSubmitting={view.isSubmitting}
+          onChange={(mode) => dispatchComposer({ type: 'setApprovalMode', approvalMode: mode })}
+        />
         <ComposerSendButton
           hasMentions={view.hasMentions}
           isRunning={isRunning}

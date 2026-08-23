@@ -11,6 +11,7 @@ import {
 } from './Icons'
 import { CHATVIEW_I18N_NAMESPACE } from '../i18n/resources'
 import { cardLabelKey, toolKey, isToolResult } from '../design/labels'
+import { formatApprovalWaitingSince } from '../adapterShared'
 import MarkdownContent from '../../ui/Markdown'
 import { Button } from '../../ui/Button'
 import { RiskBadge } from '../../ui/RiskBadge'
@@ -466,6 +467,19 @@ export const RowItem = memo(function RowItem({ item, onToggle, onApprove, onReje
               outside the buffer window, so its arrival is never announced to screen readers.
               Fix: a live region OUTSIDE the virtualizer (ChatViewTranscript/consumer level)
               fed by an approval-arrival signal — needs data flow changes, deferred. */}
+          {/* #1819 waiting-approval time feedback: the request has no deadline
+              upstream (Edge/Hub carry nothing like expires_at), so we surface
+              the honest created-time ("requested at HH:MM") instead of a fake
+              countdown or timed-out state. Hidden when the timestamp is
+              missing/invalid. */}
+          {item.type === 'approval' && item.status === 'waiting' && (() => {
+            const waitingSinceLabel = formatApprovalWaitingSince(item.waitingSince)
+            return waitingSinceLabel ? (
+              <div className="ap-waiting-meta">
+                {t('card.approval.requestedAt', { time: waitingSinceLabel })}
+              </div>
+            ) : null
+          })()}
           {item.apReason && item.status==='waiting' && (
             <div className={`ap-actions${item.riskLevel ? ' has-risk' : ''}`}>
               {item.riskLevel && (

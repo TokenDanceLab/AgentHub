@@ -258,3 +258,50 @@ describe('ConversationSidebar interaction structure (#1715)', () => {
     expect(secondButton).toHaveAttribute('tabindex', '0');
   });
 });
+
+describe('ConversationSidebar new-conversation entry (#1819)', () => {
+  it('renders the sidebar header button when onStartNewConversation is wired', async () => {
+    const user = userEvent.setup();
+    const onStartNewConversation = vi.fn();
+    renderSidebar({ onStartNewConversation });
+    const button = screen.getByRole('button', { name: 'New conversation' });
+    expect(button).toBeInTheDocument();
+    await user.click(button);
+    expect(onStartNewConversation).toHaveBeenCalledOnce();
+  });
+
+  it('does not render the button when the callback is absent', () => {
+    renderSidebar({ onStartNewConversation: undefined });
+    expect(screen.queryByRole('button', { name: 'New conversation' })).not.toBeInTheDocument();
+  });
+
+  it('renders the empty-state CTA (no conversations) and fires the callback', async () => {
+    const user = userEvent.setup();
+    const onStartNewConversation = vi.fn();
+    renderSidebar({
+      conversations: [],
+      onStartNewConversation,
+    });
+    expect(screen.getByText('No conversations')).toBeInTheDocument();
+    // Scope to the list so the header icon button (same accessible name)
+    // is not matched — the CTA lives inside the empty row.
+    const listbox = screen.getByRole('listbox');
+    const cta = within(listbox).getByRole('button', { name: 'New conversation' });
+    await user.click(cta);
+    expect(onStartNewConversation).toHaveBeenCalledOnce();
+  });
+
+  it('keeps the search empty-state clean (only clear-search, no CTA) during a query hit', () => {
+    renderSidebar({
+      conversations: [],
+      onStartNewConversation: vi.fn(),
+    });
+    // The search box is present; typing a query switches to the search
+    // empty state (clear-search action only — no new-conversation CTA).
+    fireEvent.change(screen.getByPlaceholderText('Search...'), { target: { value: 'zzz' } });
+    expect(screen.getByText('No matching results')).toBeInTheDocument();
+    const listbox = screen.getByRole('listbox');
+    expect(within(listbox).getAllByRole('button')).toHaveLength(1);
+    expect(within(listbox).getByRole('button', { name: 'Clear search' })).toBeInTheDocument();
+  });
+});

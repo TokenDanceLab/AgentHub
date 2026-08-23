@@ -57,6 +57,7 @@ export function WorkbenchFrame({
   onProjectUpdate,
   projectsPort,
   onNavigateToConversation,
+  onStartNewConversation,
   contactsActions,
   documents,
   documentsActions,
@@ -186,6 +187,7 @@ export function WorkbenchFrame({
           onAvatarClick={openConversationAvatar}
           onConversationPin={onConversationPin}
           onConversationArchive={onConversationArchive}
+          onStartNewConversation={onStartNewConversation}
           sidebarWidth={sidebarWidth}
           sidebarCollapsed={sidebarCollapsed}
           resizeSidebarBy={resizeSidebarBy}

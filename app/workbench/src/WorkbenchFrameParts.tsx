@@ -44,6 +44,7 @@ export function ChatSidebarFrame({
   onAvatarClick,
   onConversationPin,
   onConversationArchive,
+  onStartNewConversation,
   sidebarWidth,
   sidebarCollapsed,
   resizeSidebarBy,
@@ -56,6 +57,7 @@ export function ChatSidebarFrame({
     onAvatarClick,
     onConversationPin,
     onConversationArchive,
+    onStartNewConversation,
   });
 
   return (
