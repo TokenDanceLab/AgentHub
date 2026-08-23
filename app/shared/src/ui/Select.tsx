@@ -50,7 +50,13 @@ export function Select({ value, options, onChange, placeholder, className, ariaL
   const [anchor, setAnchor] = useState<AnchorRect | null>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
-  const mountedRef = useRef(false);
+  // Tracks the previous `open` value so the restore-focus effect reacts only
+  // to a true open -> close transition. A plain "mounted" flag is not enough:
+  // React 19 + StrictMode re-runs effects on the simulated second mount while
+  // refs persist, so an effect-initialized flag would fire focus() on the
+  // second pass (open === false both times) — stealing focus on page load
+  // (dev-only double blue focus ring on the workbench status form).
+  const wasOpenRef = useRef(false);
   const typeaheadRef = useRef<{ chars: string; timer: ReturnType<typeof setTimeout> | null }>({
     chars: '',
     timer: null,
@@ -111,12 +117,15 @@ export function Select({ value, options, onChange, placeholder, className, ariaL
     setFocusIdx(clampToEnabled(options, idx >= 0 ? idx : 0));
   }, [open, value, options]);
 
-  // Restore focus on close
+  // Restore focus on close — only for a real open -> close transition, never
+  // on mount (including StrictMode's second effect pass where open stays
+  // false and refs persist from the first pass).
   useEffect(() => {
-    if (!open && mountedRef.current) {
+    const wasOpen = wasOpenRef.current;
+    wasOpenRef.current = open;
+    if (wasOpen && !open) {
       triggerRef.current?.focus();
     }
-    mountedRef.current = true;
   }, [open]);
 
   const handleKey = (e: KeyboardEvent) => {

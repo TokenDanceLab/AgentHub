@@ -1,3 +1,4 @@
+import { StrictMode } from 'react';
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent, act } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
@@ -220,5 +221,34 @@ describe('Select', () => {
     } finally {
       spy.mockRestore();
     }
+  });
+
+  // ── StrictMode 双挂载：mount 不得抢焦点（回归）──
+  // React 19 + StrictMode 会 mount → 伪 unmount → 再 mount，effect 跑两遍且
+  // ref 跨两遍保留。restore-focus effect 若在第二遍把 open=false 当作
+  // “已关闭”处理，就会依次 focus 每个 Select trigger，最后一个胜出
+  // （右侧栏「状态」表单出现双层蓝焦点环，dev 必现）。此回归固定：
+  // 双挂载下无自动 focus。
+
+  it('does not grab focus when mounted under StrictMode double-mount', () => {
+    render(
+      <StrictMode>
+        <Select options={options} value="" onChange={() => {}} placeholder="Select" />
+      </StrictMode>,
+    );
+    expect(document.activeElement).toBe(document.body);
+    expect(screen.getByRole('button')).not.toHaveFocus();
+  });
+
+  it('still restores focus to the trigger after close under StrictMode', () => {
+    render(
+      <StrictMode>
+        <Select options={options} value="" onChange={() => {}} placeholder="Select" />
+      </StrictMode>,
+    );
+    const trigger = screen.getByRole('button');
+    fireEvent.click(trigger);
+    fireEvent.keyDown(screen.getByRole('listbox'), { key: 'Escape' });
+    expect(trigger).toHaveFocus();
   });
 });
