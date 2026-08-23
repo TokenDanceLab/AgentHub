@@ -1,5 +1,5 @@
 import React from 'react';
-import { cx } from '../../ui/cx';
+import { cx } from '../cx';
 import styles from './StatusBadge.module.css';
 
 export type StatusVariant = 'online' | 'offline' | 'running' | 'error' | 'pending' | 'done' | 'in progress' | 'review';

@@ -57,6 +57,15 @@ function stubSynchronousRequestAnimationFrame(): void {
   });
 }
 
+/** jsdom viewport override; the layout hook reads window.innerWidth live. */
+function setViewportWidth(width: number): void {
+  Object.defineProperty(window, 'innerWidth', {
+    configurable: true,
+    writable: true,
+    value: width,
+  });
+}
+
 describe('useWorkbenchPanelLayout', () => {
   beforeEach(() => {
     window.localStorage.clear();
@@ -65,6 +74,7 @@ describe('useWorkbenchPanelLayout', () => {
   afterEach(() => {
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
+    setViewportWidth(DEFAULT_VIEWPORT_WIDTH);
   });
 
   it('initializes with default panel state, refs, and shell CSS variables', () => {
@@ -357,6 +367,58 @@ describe('useWorkbenchPanelLayout', () => {
     });
     expect(result.current.inspectorWidth).toBe(600);
     expect(result.current.sidebarCollapsed).toBe(false);
+  });
+
+  it('auto-collapses the sidebar when a window resize squeezes the chat workspace (#1827)', () => {
+    stubSynchronousRequestAnimationFrame();
+    const { result } = renderPanelLayout();
+    expect(result.current.sidebarCollapsed).toBe(false);
+
+    // 900px window: 900 - 52 rail - 260 sidebar - 400 inspector = 188 < 560.
+    setViewportWidth(900);
+    act(() => {
+      window.dispatchEvent(new Event('resize'));
+    });
+    expect(result.current.sidebarCollapsed).toBe(true);
+  });
+
+  it('keeps the sidebar open on non-chat pages after a squeezing window resize', () => {
+    stubSynchronousRequestAnimationFrame();
+    const { result } = renderPanelLayout({ isChatPage: false });
+
+    setViewportWidth(900);
+    act(() => {
+      window.dispatchEvent(new Event('resize'));
+    });
+    expect(result.current.sidebarCollapsed).toBe(false);
+  });
+
+  it('does not collapse at the 1280px standard desktop width (568px main ≥ 560px threshold)', () => {
+    stubSynchronousRequestAnimationFrame();
+    const { result } = renderPanelLayout();
+
+    setViewportWidth(1280);
+    act(() => {
+      window.dispatchEvent(new Event('resize'));
+    });
+    expect(result.current.sidebarCollapsed).toBe(false);
+  });
+
+  it('never expands the sidebar back when the window grows (collapse is one-directional)', () => {
+    stubSynchronousRequestAnimationFrame();
+    const { result } = renderPanelLayout();
+
+    setViewportWidth(900);
+    act(() => {
+      window.dispatchEvent(new Event('resize'));
+    });
+    expect(result.current.sidebarCollapsed).toBe(true);
+
+    setViewportWidth(1600);
+    act(() => {
+      window.dispatchEvent(new Event('resize'));
+    });
+    expect(result.current.sidebarCollapsed).toBe(true);
   });
 
   it('collapses the inspector when the settings default-collapse event fires', () => {

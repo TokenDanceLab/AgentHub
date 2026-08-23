@@ -51,9 +51,11 @@ describe('shared root CSS tokens', () => {
     expect(css).toMatch(/--label:\s*500\s+0\.75rem\/1\.5/);
   });
 
-  it('documents unified breakpoints and bumps root type on wide screens (#1309)', () => {
+  it('documents unified breakpoints and bumps root type on wide screens (#1309 / #1827)', () => {
     const css = readCss(tokensPath);
-    expect(css).toMatch(/--bp-narrow:\s*760px/);
+    // #1827: 760/767/768 normalized to the canonical narrow tier 768px.
+    expect(css).toMatch(/--bp-narrow:\s*768px/);
+    expect(css).toMatch(/--bp-standard:\s*1280px/);
     expect(css).toMatch(/@media\s*\(min-width:\s*1920px\)\s*\{\s*html\s*\{\s*font-size:\s*17px/);
     expect(css).toMatch(/@media\s*\(min-width:\s*2560px\)\s*\{\s*html\s*\{\s*font-size:\s*18px/);
   });
@@ -125,5 +127,65 @@ describe('shared root CSS tokens', () => {
     expect(readCss(tokensPath)).toMatch(/--r-sm:\s*8px/);
     expect(darkBlock).toMatch(/--td-radius-control:\s*8px/);
     expect(lightBlock).toMatch(/--td-radius-control:\s*8px/);
+  });
+
+  it('defines the five-tier opacity de-emphasis scale (#1827)', () => {
+    const css = readCss(tokensPath);
+    expect(css).toMatch(/--opacity-30:\s*0\.3;/);
+    expect(css).toMatch(/--opacity-40:\s*0\.4;/);
+    expect(css).toMatch(/--opacity-50:\s*0\.5;/);
+    expect(css).toMatch(/--opacity-65:\s*0\.65;/);
+    expect(css).toMatch(/--opacity-85:\s*0\.85;/);
+  });
+
+  it('theme-pairs --state-* for WCAG AA body text (#1827)', () => {
+    const base = readCss(tokensPath);
+    const themes = readCss(themesPath);
+    // State colors are theme-sensitive (light AA pairs vs dark status pairs);
+    // a single fixed hex cannot pass 4.5:1 on both #f8f9fb and #1a1a20.
+    expect(base).not.toMatch(/--state-running:/);
+    const darkBlock = themes.match(/\[data-theme='dark'\]\s*\{([^}]*)\}/)?.[1] ?? '';
+    const lightBlock =
+      themes.match(/:root:not\(\[data-theme='dark'\]\),\s*\[data-theme='light'\]\s*\{([^}]*)\}/)?.[1] ?? '';
+    for (const block of [darkBlock, lightBlock]) {
+      expect(block).toMatch(/--state-running:\s*var\(--info\);/);
+      expect(block).toMatch(/--state-thinking:\s*var\(--info\);/);
+      expect(block).toMatch(/--state-waiting:\s*var\(--warning\);/);
+      expect(block).toMatch(/--state-success:\s*var\(--success\);/);
+      expect(block).toMatch(/--state-failed:\s*var\(--danger\);/);
+      expect(block).toMatch(/--state-error:\s*var\(--state-failed\);/);
+    }
+  });
+
+  it('declares the --td-* status companions in both themes (#1827)', () => {
+    const themes = readCss(themesPath);
+    expect(themes).toMatch(/--td-info:\s*var\(--info\);/);
+    expect(themes).toMatch(/--td-info-bg:\s*var\(--info-bg\);/);
+    expect(themes).toMatch(/--td-moss-bg:\s*var\(--success-bg\);/);
+    expect(themes).toMatch(/--td-warning-bg:\s*var\(--warning-bg\);/);
+    expect(themes).toMatch(/--td-danger-bg:\s*var\(--danger-bg\);/);
+    expect((themes.match(/--td-info:\s*var\(--info\);/g) ?? []).length).toBe(2);
+  });
+
+  it('removes the zero-consumer --run-* and --tool-* families (#1827)', () => {
+    const themes = readCss(themesPath);
+    expect(themes).not.toMatch(/--run-queued:|--run-starting:|--run-failed:/);
+    expect(themes).not.toMatch(/--tool-edit:|--tool-bash:|--tool-read:/);
+  });
+
+  it('covers danger/state/focus families in every preset variant (#1827)', () => {
+    const presets = readCss(presetsPath);
+    const darkVariant = `:not\\(\\[data-theme='light'\\]\\)`;
+    const lightVariant = `\\[data-theme='light'\\]`;
+    for (const preset of THEME_PRESETS) {
+      for (const variant of [darkVariant, lightVariant]) {
+        const selectorPattern = `\\[data-theme-preset='${preset}'\\]${variant}`;
+        const block = presets.match(new RegExp(`${selectorPattern}\\s*\\{([^}]*)\\}`))?.[1] ?? '';
+        for (const decl of ['--danger:', '--danger-bg:', '--state-running:', '--state-failed:',
+                            '--role-orchestrator:', '--bdr-focus:', '--glass-tint-plum:']) {
+          expect(block, `${preset}${variant} must declare ${decl}`).toContain(decl);
+        }
+      }
+    }
   });
 });

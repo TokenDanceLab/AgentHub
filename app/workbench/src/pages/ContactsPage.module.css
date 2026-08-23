@@ -394,7 +394,7 @@
 }
 
 .acceptBtn:disabled {
-  opacity: 0.5;
+  opacity: var(--opacity-50);
   cursor: not-allowed;
 }
 
@@ -416,7 +416,7 @@
 }
 
 .rejectBtn:disabled {
-  opacity: 0.5;
+  opacity: var(--opacity-50);
   cursor: not-allowed;
 }
 
@@ -884,7 +884,7 @@
 .codeBtn:active:not(:disabled),
 .phoneSendBtn:active:not(:disabled) {
   transform: scale(0.97);
-  opacity: 0.85;
+  opacity: var(--opacity-85);
 }
 
 .linkHint {

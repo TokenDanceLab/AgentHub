@@ -154,7 +154,7 @@
   }
 }
 
-@media (max-width: 767px) {
+@media (max-width: 768px) {
   .container {
     max-width: 100%;
     padding: 80px var(--td-space-2) var(--td-space-4);

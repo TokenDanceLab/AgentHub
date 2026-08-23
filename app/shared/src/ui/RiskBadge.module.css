@@ -23,22 +23,22 @@
 }
 
 .low {
-  background: var(--success-bg);
+  background: var(--td-moss-bg);
   color: var(--td-moss);
 }
 
 .medium {
-  background: var(--warning-bg);
+  background: var(--td-warning-bg);
   color: var(--td-warning);
 }
 
 .high {
-  background: var(--danger-bg);
+  background: var(--td-danger-bg);
   color: var(--td-danger);
 }
 
 .critical {
-  background: var(--danger-bg);
+  background: var(--td-danger-bg);
   color: var(--td-danger);
   border: 1px solid var(--td-danger);
 }

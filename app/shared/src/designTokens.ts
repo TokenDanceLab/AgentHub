@@ -15,25 +15,30 @@ export interface DesignSurfaceRule {
   readonly rule: string;
 }
 
+/**
+ * Desktop glass token contract register（#1820 同步）。
+ * desktopValue 列 = themes.css [data-theme='dark'] 解析值（dark 基线；
+ * light 见各 webAlias 在 themes.css light 块中的定义）。
+ */
 export const DESKTOP_GLASS_TOKEN_ALIASES = [
   {
     alias: '--td-canvas',
     intent: 'App canvas',
-    desktopValue: '#1f1f27',
+    desktopValue: '#1a1a20',
     webAlias: '--td-canvas',
     mobileAlias: '--td-canvas',
   },
   {
     alias: '--td-surface',
     intent: 'Primary glass panel',
-    desktopValue: 'rgba(37, 37, 45, 0.82)',
+    desktopValue: '#24242d',
     webAlias: '--td-surface',
     mobileAlias: '--td-surface',
   },
   {
     alias: '--td-panel',
     intent: 'Command-center panel',
-    desktopValue: 'rgba(31, 31, 39, 0.9)',
+    desktopValue: '#2e2e38',
     webAlias: '--td-panel',
     mobileAlias: '--td-panel',
   },
@@ -47,14 +52,14 @@ export const DESKTOP_GLASS_TOKEN_ALIASES = [
   {
     alias: '--td-ink-muted',
     intent: 'Secondary readable text',
-    desktopValue: '#a0a1aa',
+    desktopValue: '#9a9aa4',
     webAlias: '--td-ink-muted',
     mobileAlias: '--td-ink-50',
   },
   {
     alias: '--td-line',
     intent: 'Glass hairline border',
-    desktopValue: 'rgba(255, 255, 255, 0.075)',
+    desktopValue: 'rgba(255, 255, 255, 0.06)',
     webAlias: '--td-line',
     mobileAlias: '--td-line',
   },
@@ -75,7 +80,7 @@ export const DESKTOP_GLASS_TOKEN_ALIASES = [
   {
     alias: '--td-danger',
     intent: 'Destructive and offline state',
-    desktopValue: '#ff7e78',
+    desktopValue: '#e87070',
     webAlias: '--td-danger',
     mobileAlias: '--td-danger',
   },
@@ -89,21 +94,21 @@ export const DESKTOP_GLASS_TOKEN_ALIASES = [
   {
     alias: '--td-glass-blur',
     intent: 'Frosted glass blur radius',
-    desktopValue: '28px',
+    desktopValue: '30px',
     webAlias: '--glass-blur-lg',
     mobileAlias: '--td-glass-blur',
   },
   {
     alias: '--td-glass-card',
     intent: 'Frosted glass card fill',
-    desktopValue: 'rgba(255, 255, 255, 0.72)',
+    desktopValue: 'rgba(30, 30, 38, 0.70)',
     webAlias: '--glass-card-bg',
     mobileAlias: '--td-glass-card',
   },
   {
     alias: '--td-glass-elev',
     intent: 'Glass card elevation shadow',
-    desktopValue: '0 10px 28px rgba(15, 23, 42, 0.08)',
+    desktopValue: '0 12px 36px rgba(0, 0, 0, 0.46)',
     webAlias: '--glass-elev-2',
     mobileAlias: '--td-glass-elev',
   },

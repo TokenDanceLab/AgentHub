@@ -85,7 +85,7 @@
 }
 
 .navBtn:disabled {
-  opacity: 0.3;
+  opacity: var(--opacity-30);
   cursor: default;
 }
 
