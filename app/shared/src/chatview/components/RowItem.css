@@ -10,7 +10,21 @@
   overflow:hidden;
 }
 .row-item.selected { outline: 2px solid var(--td-plum); outline-offset: -2px }
-.row-item.soft-hidden { display:none }
+/* #1825: deleted / soft-hidden rows collapse out with a short exit instead
+   of a display:none snap. The row stays in the items array (the class sits
+   on it), and this static target also covers prefers-reduced-motion, where
+   the exit animation is dropped and the collapse is instant. */
+.row-item.soft-hidden {
+  max-height:0; padding-top:0; padding-bottom:0;
+  border-top-width:0; border-bottom-width:0;
+  margin-top:-1px; opacity:0; visibility:hidden;
+  overflow:hidden; pointer-events:none;
+}
+.row-item.soft-hidden { animation:rowSoftHide var(--chat-dur) var(--td-ease) forwards }
+@keyframes rowSoftHide {
+  from { max-height:var(--think-max-h, 2000px); opacity:1; visibility:visible; }
+  to { max-height:0; opacity:0; visibility:hidden; }
+}
 .card-stack > .row-item {
   width:100%;
   border-radius:0;
@@ -82,6 +96,18 @@
 .file-act.cr { background:var(--success-bg); color:var(--td-moss) }
 .file-act.mod { background:var(--warning-bg); color:var(--td-warning) }
 .file-act.del { background:var(--danger-bg); color:var(--td-danger) }
+
+/* #1825: running tool/file/subagent cards get a small spinner beside the
+   label (state was conveyed only by cursor: default). A static ring remains
+   under reduced-motion — the running state is informational, not decorative. */
+.row-spinner {
+  flex-shrink:0; width:10px; height:10px;
+  border:2px solid var(--td-surface-3);
+  border-top-color: var(--info);
+  border-radius:50%;
+  animation: rowSpin var(--spinner-speed, 0.8s) var(--spinner-easing, linear) infinite;
+}
+@keyframes rowSpin { to { transform: rotate(360deg) } }
 .file-stat { font:var(--chat-label-xs); color:var(--td-ink-subtle); margin-left:var(--chat-sp-xs) }
 .file-stat-add { color:var(--td-moss) }
 .file-stat-del { color:var(--td-danger) }
@@ -188,8 +214,8 @@
 
 .ctx-bar-wrap { display:flex; align-items:center; gap:var(--chat-sp-sm) }
 .ctx-bar-wrap .pct { font:var(--chat-label-xs); color:var(--td-ink-subtle); flex-shrink:0; min-width:36px }
-.ctx-bar-wrap .ctx-bar { flex:1; height:var(--chat-sp-xs); background:var(--surface-highest); border-radius:2px; overflow:hidden }
-.ctx-bar-wrap .ctx-fill { height:100%; border-radius:2px; transition:width var(--chat-dur-bar) var(--td-ease); width:var(--ctx-pct, 0%) }
+.ctx-bar-wrap .ctx-bar { flex:1; height:var(--chat-sp-xs); background:var(--surface-highest); border-radius:var(--chat-r-xs); overflow:hidden }
+.ctx-bar-wrap .ctx-fill { height:100%; border-radius:var(--chat-r-xs); transition:width var(--chat-dur-bar) var(--td-ease); width:var(--ctx-pct, 0%) }
 .ctx-bar-wrap .ctx-fill.ok { background:var(--td-moss) }
 .ctx-bar-wrap .ctx-fill.warn { background:var(--td-warning) }
 .ctx-meta { display:flex; gap:var(--chat-sp-sm); font:var(--chat-label-xs); color:var(--td-ink-subtle); flex-wrap:wrap }
@@ -327,15 +353,19 @@
 
 /* ── Reduced motion (#12): kill infinite/decorative loops ────────────
    thinkShimmer / routePulse / dagPulse are infinite loops; highlightFadeOut
-   and routeSlideIn are decorative one-shots (README motion tier 2).
-   apConfirmPulse is an infinite pulse covered here as a bonus (same tier). */
+   and routeSlideIn are decorative one-shots (motion tier 2 in
+   shared/src/components/README.md). apConfirmPulse is an infinite pulse
+   covered here as a bonus (same tier). row-spinner keeps its static ring
+   (informational state), row-item.soft-hidden collapses instantly. */
 @media (prefers-reduced-motion: reduce) {
   .think-shimmer,
   .row-item.route,
   .row-item.route > .row-hd .row-icon,
   .row-item.highlighted,
   .dag-pulse,
-  .ap-approve.critical.confirming {
+  .ap-approve.critical.confirming,
+  .row-spinner,
+  .row-item.soft-hidden {
     animation: none;
   }
 }

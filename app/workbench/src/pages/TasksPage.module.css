@@ -329,7 +329,7 @@
 
 .statValue {
   color: var(--td-ink);
-  font: 700 1.25rem var(--td-mono);
+  font: 600 1.25rem var(--td-mono);
 }
 
 /* ── View tabs ── */
@@ -807,7 +807,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font: 650 0.5625rem/1 var(--td-font);
+  font: 600 0.5625rem/1 var(--td-font);
   letter-spacing: 0;
   flex-shrink: 0;
   box-shadow: inset 0 0 0 1px color-mix(in srgb, white 24%, transparent);

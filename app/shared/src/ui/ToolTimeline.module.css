@@ -29,7 +29,7 @@
 .headerLabel {
   color: color-mix(in oklch, var(--td-ink) 84%, var(--td-ink-muted) 16%);
   font-size: 12px;
-  font-weight: 720;
+  font-weight: 600;
   line-height: 1.4;
 }
 
@@ -64,6 +64,12 @@
   background: rgba(255, 255, 255, 0.035);
 }
 
+/* #1825: white-alpha marker is invisible against the light theme canvas;
+   mirror the .root light override using the ink token in OKLCH space. */
+[data-theme='light'] .marker {
+  background: color-mix(in oklch, var(--td-ink) 3.5%, transparent);
+}
+
 .entryText {
   display: flex;
   min-width: 0;
@@ -77,7 +83,7 @@
   overflow: hidden;
   color: color-mix(in oklch, var(--td-ink) 91%, transparent);
   font-size: 12px;
-  font-weight: 660;
+  font-weight: 600;
   line-height: 1.42;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -100,7 +106,7 @@
   padding: 2px 7px;
   border-radius: var(--r-full);
   font-size: 11px;
-  font-weight: 720;
+  font-weight: 600;
   line-height: 1.35;
 }
 

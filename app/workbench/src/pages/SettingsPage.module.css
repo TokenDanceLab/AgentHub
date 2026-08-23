@@ -105,7 +105,7 @@
 .scopeRow {
   min-height: 42px;
   margin: var(--sp-2) var(--td-space-2);
-  padding: 7px 10px 7px 34px;
+  padding: 7px 10px 7px 38px;
   border-radius: var(--td-radius-control);
   color: var(--td-ink-muted);
   cursor: pointer;

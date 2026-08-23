@@ -114,7 +114,7 @@
   color: var(--td-accent-amber);
   background: var(--glass-tint-amber);
   padding: 1px 5px;
-  border-radius: 4px;
+  border-radius: var(--r-xs);
 }
 
 .toolInput {

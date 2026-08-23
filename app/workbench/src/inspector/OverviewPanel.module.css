@@ -315,7 +315,7 @@
 .fileIcon {
   width: 17px;
   height: 17px;
-  border-radius: 3px;
+  border-radius: var(--r-xs);
   color: var(--td-ink-subtle);
   font-size: 12px;
   flex-shrink: 0;

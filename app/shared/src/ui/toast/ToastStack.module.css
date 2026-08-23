@@ -23,9 +23,12 @@
   line-height: var(--td-leading-normal);
   cursor: default;
   animation: toast-slide-in var(--duration-medium) var(--td-ease-out);
+  /* #1825: light theme shadow was using background tokens (--glass-bg-*,
+     white alpha) — invisible on white canvas. Use the glass elevation
+     ladder so the float reads on both themes. */
   box-shadow:
-    0 16px 36px var(--glass-bg-heavy),
-    0 4px 12px var(--glass-bg-medium),
+    var(--glass-elev-3, var(--td-shadow-lg)),
+    var(--glass-elev-1, var(--td-shadow-sm)),
     0 1px 0 rgba(255, 255, 255, 0.55) inset;
   word-break: break-word;
   border: 1px solid var(--glass-border);

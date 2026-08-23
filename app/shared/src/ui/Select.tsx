@@ -1,5 +1,6 @@
 import { useState, useRef, useCallback, useEffect, useId, type KeyboardEvent } from 'react';
 import { createPortal } from 'react-dom';
+import { useExiting } from './useExiting';
 import styles from './Select.module.css';
 
 export interface SelectProps {
@@ -24,6 +25,10 @@ export function Select({ value, options, onChange, placeholder, className, ariaL
     timer: null,
   });
   const listboxId = useId();
+
+  // Keep the dropdown mounted briefly on close so its exit animation plays
+  // (#1825); reduced-motion drops it immediately.
+  const { mounted, exiting } = useExiting(open, 140);
 
   const optionId = (idx: number) => `${listboxId}-option-${idx}`;
 
@@ -157,11 +162,11 @@ export function Select({ value, options, onChange, placeholder, className, ariaL
         </svg>
       </button>
 
-      {open &&
+      {mounted &&
         createPortal(
           <div
             ref={dropdownRef}
-            className={`${styles.dropdown} ${position === 'up' ? styles.dropdownUp : ''}`}
+            className={`${styles.dropdown} ${position === 'up' ? styles.dropdownUp : ''}${exiting ? ` ${styles.dropdownClosing}` : ''}`}
             role="listbox"
             id={listboxId}
             aria-activedescendant={optionId(focusIdx)}

@@ -118,7 +118,7 @@
 
 .resultAgent {
   font-size: 11px;
-  font-weight: 520;
+  font-weight: 500;
   color: var(--td-ink-muted);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -174,7 +174,7 @@
   background: var(--glass-bg-subtle);
   font-family: var(--td-font);
   font-size: 10px;
-  font-weight: 520;
+  font-weight: 500;
   color: var(--td-ink-muted);
   line-height: 1;
 }

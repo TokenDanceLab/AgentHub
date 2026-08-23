@@ -19,6 +19,7 @@ import {
 } from './WorkbenchFrameParts';
 import styles from './AgentHubWorkbench.module.css';
 import { TerminalPanel } from './terminal';
+import { useExiting } from '@shared/ui/useExiting';
 
 export type { WorkbenchFrameProps } from './workbenchFrameTypes';
 
@@ -144,6 +145,14 @@ export function WorkbenchFrame({
   const showInitialLoading = Boolean(
     !showLoadError && workbenchStatus?.initialLoading && conversations.length === 0,
   );
+
+  // Terminal dock mount/unmount choreography (#1825): keep the dock mounted
+  // 180ms while the exit animation plays; instant flip under reduced motion.
+  const dockVisible = shouldRenderTerminalDock({
+    isChatPage,
+    localTerminal: platform.capabilities.localTerminal,
+  });
+  const { mounted: dockMounted, exiting: dockExiting } = useExiting(dockVisible, 180);
 
   return (
     <div
@@ -271,18 +280,15 @@ export function WorkbenchFrame({
           beginInspectorResize={beginInspectorResize}
         />
       )}
-      {shouldRenderTerminalDock({
-        isChatPage,
-        localTerminal: platform.capabilities.localTerminal,
-      }) ? (
+      {dockMounted && (
         <div
-          className={styles.terminalDock}
+          className={`${styles.terminalDock}${dockExiting ? ` ${styles.terminalDockExiting}` : ''}`}
           data-testid="workbench-terminal-dock"
           data-local-terminal="enabled"
         >
           <TerminalPanel {...buildTerminalPanelDockProps(platform)} />
         </div>
-      ) : null}
+      )}
       {children}
     </div>
   );

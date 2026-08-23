@@ -78,7 +78,7 @@
   background: var(--td-plum);
   color: var(--td-ink-on-plum);
   font-size: 0.625rem;
-  font-weight: 700;
+  font-weight: 600;
   text-transform: uppercase;
   flex-shrink: 0;
 }

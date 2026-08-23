@@ -6,6 +6,7 @@ import { IconShield, IconFile, IconFileText, IconSearch, IconPlayerPlay } from '
 import { roleInitial } from '../design/roles'
 import MarkdownContent from '../../ui/Markdown'
 import { MessageDisplayMeta } from './MessageDisplayMeta'
+import { isAgentItemStreaming } from './streaming'
 
 const evidenceIconMap: Record<string, typeof IconFile> = {
   file: IconFile,
@@ -29,13 +30,20 @@ interface Props {
   selectionMode?: boolean
   softHiddenBlockIds?: Set<string>
   actionedBlockIds?: Set<string>
+  /** #1825: set on the newest same-session append -> one-shot entry animation. */
+  enter?: boolean | undefined
 }
 
 /** Render an agent item in the transcript: avatar, name, time, card stack,
  *  standalone cards, chat bubbles, and evidence chips.
  *  Dispatches orchestrator cards via {@link OrchestratorCard} and
  *  regular cards via {@link RowItem}. */
-export const AgentGroup = memo(function AgentGroup({ item, chatMode, onAgentClick, onBlockContextMenu, onBlockSelect, onBlockAction, onReviewFile, onDeploySubmit, selectedBlockIds, selectionMode, softHiddenBlockIds, actionedBlockIds }: Props) {
+export const AgentGroup = memo(function AgentGroup({ item, chatMode, onAgentClick, onBlockContextMenu, onBlockSelect, onBlockAction, onReviewFile, onDeploySubmit, selectedBlockIds, selectionMode, softHiddenBlockIds, actionedBlockIds, enter }: Props) {
+  // #1825: streaming bubble activity indicator — any running row (including
+  // nested child rows and ordered-part rows, same view Transcript uses for
+  // aria-busy) marks the agent item as mid-stream; the last bubble carries
+  // the caret.
+  const isStreaming = isAgentItemStreaming(item)
   const initial = roleInitial[item.role] ?? item.agent[0]
   const avatar = (
     <div className={`ag-av ${item.role}`}>
@@ -58,6 +66,7 @@ export const AgentGroup = memo(function AgentGroup({ item, chatMode, onAgentClic
     },
     key: string,
     showReply: boolean,
+    streaming: boolean,
   ) => {
     // #1821: text bubbles get the same selectable/context-menu identity tool
     // rows have (RowItem's `data-selectable-card` + onContextMenu contract) —
@@ -71,7 +80,7 @@ export const AgentGroup = memo(function AgentGroup({ item, chatMode, onAgentClic
         }
       : {}
     return (
-      <div key={key} className="bubble-group">
+      <div key={key} className={`bubble-group${streaming ? ' streaming' : ''}`}>
         <MessageDisplayMeta
           badgeLabel={part.badgeLabel ?? item.badgeLabel}
           badgeVariant={part.badgeVariant ?? item.badgeVariant}
@@ -121,6 +130,7 @@ export const AgentGroup = memo(function AgentGroup({ item, chatMode, onAgentClic
     let stackIndex = 0;
     let rowStack: ReactNode[] = [];
     const content: ReactNode[] = [];
+    const bubbleTotal = parts.filter((p) => p.type === 'bubble').length;
     const flushRowStack = () => {
       if (rowStack.length === 0) return;
       const rows = rowStack;
@@ -138,7 +148,7 @@ export const AgentGroup = memo(function AgentGroup({ item, chatMode, onAgentClic
         flushRowStack();
         const currentBubbleIndex = bubbleIndex;
         bubbleIndex += 1;
-        content.push(renderBubble(part, `bubble-${index}`, currentBubbleIndex === 0));
+        content.push(renderBubble(part, `bubble-${index}`, currentBubbleIndex === 0, isStreaming && currentBubbleIndex === bubbleTotal - 1));
         return;
       }
       rowStack.push(renderRow(part.row));
@@ -146,11 +156,11 @@ export const AgentGroup = memo(function AgentGroup({ item, chatMode, onAgentClic
 
     flushRowStack();
     return content;
-  }, [item.parts, renderBubble, renderRow])
+  }, [item.parts, renderBubble, renderRow, isStreaming])
 
   const fallbackBubblesContent = useMemo(() => item.bubbles.map((text, i) => (
-    renderBubble({ text }, `bubble-${i}`, i === 0)
-  )), [item.bubbles, renderBubble])
+    renderBubble({ text }, `bubble-${i}`, i === 0, isStreaming && i === item.bubbles.length - 1)
+  )), [item.bubbles, renderBubble, isStreaming])
 
   const evidenceChipsContent = useMemo(() => {
     const visibleEvidenceRefs = item.evidenceRefs?.filter(ref => ref.kind !== 'run') ?? []
@@ -208,7 +218,7 @@ export const AgentGroup = memo(function AgentGroup({ item, chatMode, onAgentClic
 
   if (chatMode === 'dm') {
     return (
-      <div className="grp-row">
+      <div className={enter ? 'grp-row grp-enter' : 'grp-row'}>
         <div
           className="dm-avatar"
           onClick={onAgentClick ? (e) => onAgentClick(item.agent, e.currentTarget) : undefined}
@@ -223,7 +233,7 @@ export const AgentGroup = memo(function AgentGroup({ item, chatMode, onAgentClic
   }
 
   return (
-    <div className="grp-row">
+    <div className={enter ? 'grp-row grp-enter' : 'grp-row'}>
       <div
         className="dm-avatar"
         onClick={onAgentClick ? (e) => onAgentClick(item.agent, e.currentTarget) : undefined}
