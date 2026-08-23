@@ -10,6 +10,7 @@ import {
   createMarketInstalledAgent,
   workbenchAgentToAgentConfig,
 } from './workbenchAgentMapping';
+import { uniqueSorted } from './agentProfileCatalogHelpers';
 
 /* ═══════════════════════════════════════════════════════════════════════
    workbenchAgentsRouteHelpers — pure residual slices from
@@ -136,7 +137,9 @@ export function resolveAgentSkills(
   agentConfigs: AgentConfig[],
   mockSkills: string[] = WORKBENCH_MOCK_AGENT_SKILL_OPTIONS,
 ): string[] {
-  const fromAgents = Array.from(new Set(agentConfigs.flatMap((a) => a.skills))).filter(Boolean).sort();
+  // uniqueSorted keeps the same collation that builds the mock option
+  // lists — a bare .sort() orders mixed zh/en names differently (#1826).
+  const fromAgents = uniqueSorted(agentConfigs.flatMap((a) => a.skills).filter(Boolean));
   return fromAgents.length > 0 ? fromAgents : mockSkills;
 }
 
@@ -144,7 +147,7 @@ export function resolveAgentTools(
   agentConfigs: AgentConfig[],
   mockTools: string[] = WORKBENCH_MOCK_AGENT_TOOL_OPTIONS,
 ): string[] {
-  const fromAgents = Array.from(new Set(agentConfigs.flatMap((a) => Object.keys(a.tools)))).filter(Boolean).sort();
+  const fromAgents = uniqueSorted(agentConfigs.flatMap((a) => Object.keys(a.tools)).filter(Boolean));
   return fromAgents.length > 0 ? fromAgents : mockTools;
 }
 

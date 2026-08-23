@@ -1,7 +1,9 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { buildRuntimeEvidenceInspectorModel } from '@shared/inspector';
 import type { RuntimeEvidenceSnapshot } from '@shared/inspector';
 import type { FileDiff } from '@shared/types/chat';
+import { CHATVIEW_I18N_NAMESPACE } from '@shared/chatview/i18n/resources';
 import styles from '../AgentHubWorkbench.module.css';
 import {
   RuntimeEvidenceArtifactsSection,
@@ -37,6 +39,7 @@ export function RuntimeEvidencePanel({
   onOpenDiff,
   onOpenPreviewUrl,
 }: RuntimeEvidencePanelProps): React.ReactElement {
+  const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE);
   const evidenceModel = buildRuntimeEvidenceInspectorModel(runtimeEvidence);
   const diffSummary = evidenceModel.channels.find((channel) => channel.channel === 'diff');
   const artifactSummary = evidenceModel.channels.find((channel) => channel.channel === 'artifacts');
@@ -50,7 +53,7 @@ export function RuntimeEvidencePanel({
       </div>
 
       {evidenceModel.stateItems.length > 0 && (
-        <ul className={styles.runtimeEvidenceStateList} aria-label="Runtime evidence state">
+        <ul className={styles.runtimeEvidenceStateList} aria-label={t('aria.runtimeEvidence')}>
           {evidenceModel.stateItems.map((item) => (
             <li key={`${item.kind}-${item.channel}`} className={styles.runtimeEvidenceState} data-state={item.kind}>{item.label}</li>
           ))}

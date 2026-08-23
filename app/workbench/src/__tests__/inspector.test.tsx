@@ -218,7 +218,7 @@ describe('AgentHubWorkbench', () => {
     );
 
     const shell = screen.getByTestId('agenthub-workbench');
-    const inspector = screen.getByRole('complementary', { name: 'Right inspector' });
+    const inspector = screen.getByRole('complementary', { name: '右侧窗口' });
     const resizer = screen.getByRole('separator', { name: '调整右侧栏宽度' });
 
     expect(shell).toHaveStyle({ '--inspector-w': '400px' });
@@ -280,7 +280,7 @@ describe('AgentHubWorkbench', () => {
       value: 1440,
     });
     const shell = screen.getByTestId('agenthub-workbench');
-    const inspector = screen.getByRole('complementary', { name: 'Right inspector' });
+    const inspector = screen.getByRole('complementary', { name: '右侧窗口' });
     const resizer = screen.getByRole('separator', { name: '调整右侧栏宽度' });
 
     fireEvent.pointerDown(resizer, { clientX: 1040, pointerId: 1 });
@@ -315,7 +315,7 @@ describe('AgentHubWorkbench', () => {
       />
     );
 
-    const inspector = within(screen.getByRole('complementary', { name: 'Right inspector' }));
+    const inspector = within(screen.getByRole('complementary', { name: '右侧窗口' }));
 
     /* P76: tasks section open, files collapsed by default → one expanded section head. */
     expect(inspector.getAllByRole('button', { expanded: true }).length).toBeGreaterThanOrEqual(1);
@@ -443,13 +443,13 @@ describe('AgentHubWorkbench', () => {
       />
     );
 
-    const transcriptRegion = screen.getByRole('region', { name: 'Transcript' });
+    const transcriptRegion = screen.getByRole('region', { name: '会话记录' });
     expect(within(transcriptRegion).queryByText('Card Contract Auditor')).not.toBeInTheDocument();
     expect(
       within(transcriptRegion).queryByText('Audit chat card contracts')
     ).not.toBeInTheDocument();
 
-    const inspector = within(screen.getByRole('complementary', { name: 'Right inspector' }));
+    const inspector = within(screen.getByRole('complementary', { name: '右侧窗口' }));
     expect(inspector.getByText('Agent 调度树')).toBeInTheDocument();
     expect(inspector.getByText('Card Contract Auditor')).toBeInTheDocument();
   });
@@ -517,7 +517,7 @@ describe('AgentHubWorkbench', () => {
       screen.queryByText('+ CREATE TABLE IF NOT EXISTS chat_threads (id TEXT PRIMARY KEY);')
     ).not.toBeInTheDocument();
     // run_step_group blocks are sidebar-only — files appear in inspector overview (expand 产物 if collapsed).
-    const inspector = within(screen.getByRole('complementary', { name: 'Right inspector' }));
+    const inspector = within(screen.getByRole('complementary', { name: '右侧窗口' }));
     const expandFiles = inspector.queryByRole('button', { name: '展开 产物' });
     if (expandFiles) fireEvent.click(expandFiles);
     fireEvent.click(
@@ -558,7 +558,7 @@ describe('AgentHubWorkbench', () => {
     restoreInspectorTab('browser');
     fireEvent.click(screen.getByRole('tab', { name: /浏览器/ }));
 
-    expect(screen.getByRole('main', { name: 'Workspace' })).toHaveAttribute('data-surface', 'web');
+    expect(screen.getByRole('main', { name: '工作区' })).toHaveAttribute('data-surface', 'web');
     expect(screen.getByRole('region', { name: '内置浏览器预览' })).toBeInTheDocument();
     // Browser preview URL format varies by platform; verify the region renders
     const browserRegion = screen.getByRole('region', { name: '内置浏览器预览' });
@@ -731,7 +731,7 @@ describe('AgentHubWorkbench', () => {
         'true'
       );
       // byRole skips aria-hidden elements (and their names) — query the DOM directly.
-      expect(document.querySelector('aside[aria-label="Right inspector"]')).toHaveAttribute(
+      expect(document.querySelector('aside[aria-label="右侧窗口"]')).toHaveAttribute(
         'aria-hidden',
         'true'
       );

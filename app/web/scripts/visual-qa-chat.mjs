@@ -31,10 +31,14 @@ const themes = ['light', 'dark'];
 const THEME_KEY_V4 = 'agenthub-v4-theme';
 const THEME_KEY_LEGACY = 'agenthub-theme';
 const WORKBENCH_SHELL = '[data-testid="agenthub-workbench"]';
-const CHAT_RAIL_BUTTON = 'nav[aria-label="Global rail"] button[aria-label="对话"], nav[aria-label="Global rail"] button[aria-label="消息"]';
-const WORKSPACE = 'main[aria-label="Workspace"], [role="main"][aria-label="Workspace"]';
-const COMPOSER = 'textarea, [aria-label="Composer input"], [placeholder*="发消息"]';
-const INSPECTOR = 'aside[aria-label="Right inspector"]';
+// Locale-stable rail selector: the nav aria-label resolves through chatview
+// i18n (zh: 全局导航栏), so target the data-rail-page hook instead (#1826).
+const CHAT_RAIL_BUTTON = 'button[data-rail-page="chat"]';
+// Locale note (#1826): aria-labels resolve through chatview i18n — keep
+// zh+en alternatives (or stable hooks) for every label-based selector.
+const WORKSPACE = 'main#main-content, [role="main"]#main-content, main[aria-label="Workspace"], main[aria-label="工作区"]';
+const COMPOSER = 'textarea, [aria-label="Composer input"], [aria-label="输入框"], [placeholder*="发消息"]';
+const INSPECTOR = 'aside[aria-label="Right inspector"], aside[aria-label="右侧窗口"]';
 const hubUrlPattern =
   /https?:\/\/(?:localhost:8080|127\.0\.0\.1:8080|hub\.vectorcontrol\.tech|api\.hub\.vectorcontrol\.tech)\/.*/;
 
@@ -215,7 +219,7 @@ async function captureTheme(browser, theme) {
   try {
     const firstConvo = page
       .locator(
-        '[aria-label="Conversation sidebar"] button, [aria-label="Conversation sidebar"] [role="button"], .conversation-item, [data-testid*="conversation"]',
+        '[aria-label="Conversation sidebar"] button, [aria-label="会话侧边栏"] button, [aria-label="Conversation sidebar"] [role="button"], [aria-label="会话侧边栏"] [role="button"], .conversation-item, [data-testid*="conversation"]',
       )
       .first();
     if (await firstConvo.isVisible().catch(() => false)) {

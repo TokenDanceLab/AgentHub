@@ -9,8 +9,9 @@ import { DateDivider } from './DateDivider'
 import { UnreadDivider } from './UnreadDivider'
 import { CompactDivider } from './CompactDivider'
 import { stableInteractionId } from './RowItem'
-import { useTranslation } from 'react-i18next'
+import { useTranslation, getI18n } from 'react-i18next'
 import { CHATVIEW_I18N_NAMESPACE } from '../i18n/resources'
+import { appDateLocaleTag } from '../../i18n/locale'
 import './Transcript.css'
 
 const AUTO_FOLLOW_THRESHOLD_PX = 96
@@ -202,7 +203,7 @@ function formatItemDate(time: string): string {
   if (!time) return ''
   const parsed = new Date(time)
   if (Number.isNaN(parsed.getTime())) return time
-  return parsed.toLocaleDateString('zh-CN', {
+  return parsed.toLocaleDateString(appDateLocaleTag(getI18n()?.language), {
     year: 'numeric',
     month: 'long',
     day: 'numeric',

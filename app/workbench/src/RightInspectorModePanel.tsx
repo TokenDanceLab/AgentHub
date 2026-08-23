@@ -14,6 +14,8 @@ import {
 } from './inspector';
 import type { DagNode } from '@shared/ui/DagTree';
 import type { FileDiff } from '@shared/types/chat';
+import { useTranslation } from 'react-i18next';
+import { CHATVIEW_I18N_NAMESPACE } from '@shared/chatview/i18n/resources';
 import styles from './AgentHubWorkbench.module.css';
 
 /* ═══════════════════════════════════════════════════════════════════════
@@ -75,10 +77,11 @@ export function RightInspectorModePanel({
   onOpenDiff,
   onOpenPreviewUrl,
 }: RightInspectorModePanelProps): React.ReactElement {
+  const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE);
   return (
     <div className={styles.inspectorPanel} role="tabpanel">
       {visibleTabs.size === 0 && (
-        <p className={styles.inspectorEmpty}>右侧窗口已关闭。使用 + 重新打开概览、浏览器或文件。</p>
+        <p className={styles.inspectorEmpty}>{t('inspector.emptyPanel')}</p>
       )}
 
       {activeMode === 'overview' && visibleTabs.has('overview') && (

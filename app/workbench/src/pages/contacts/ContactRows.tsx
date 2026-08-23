@@ -1,4 +1,6 @@
 import React, { useCallback } from 'react';
+import { appDateLocaleTag } from '@shared/i18n/locale';
+import { getI18n } from 'react-i18next';
 import styles from '../ContactsPage.module.css';
 import { capabilityColor } from './shared';
 import type {
@@ -103,7 +105,7 @@ export function FriendRequestCard({ request, direction, onAccept, onReject, load
   const initials = (request.nickname || request.username).slice(0, 2).toUpperCase();
   const displayName = request.nickname || request.username;
   const timeLabel = request.created_at
-    ? new Date(request.created_at).toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' })
+    ? new Date(request.created_at).toLocaleDateString(appDateLocaleTag(getI18n()?.language), { month: 'short', day: 'numeric' })
     : '';
   return (
     <div className={styles.requestCard} data-card-surface>

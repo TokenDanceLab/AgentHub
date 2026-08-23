@@ -41,7 +41,7 @@ describe('AgentHubWorkbench', () => {
       />,
     );
 
-    fireEvent.change(screen.getByRole('textbox', { name: 'Composer input' }), {
+    fireEvent.change(screen.getByRole('textbox', { name: '输入框' }), {
       target: { value: '开始 v4 shared workbench' },
     });
     fireEvent.click(screen.getByRole('button', { name: '发送消息' }));
@@ -96,9 +96,9 @@ describe('AgentHubWorkbench', () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Add attachment' }));
+    fireEvent.click(screen.getByRole('button', { name: '添加附件' }));
     expect(await screen.findByText('notes.md')).toBeInTheDocument();
-    fireEvent.change(screen.getByRole('textbox', { name: 'Composer input' }), {
+    fireEvent.change(screen.getByRole('textbox', { name: '输入框' }), {
       target: { value: '附带笔记' },
     });
     fireEvent.click(screen.getByRole('button', { name: '发送消息' }));
@@ -108,7 +108,7 @@ describe('AgentHubWorkbench', () => {
     await waitFor(() => {
       expect(screen.getByText('上传失败')).toBeInTheDocument();
     });
-    expect(screen.getByRole('textbox', { name: 'Composer input' })).toHaveValue('附带笔记');
+    expect(screen.getByRole('textbox', { name: '输入框' })).toHaveValue('附带笔记');
     expect(screen.getByText('notes.md')).toBeInTheDocument();
     expect(platform.submittedIntents).toHaveLength(0);
 
@@ -168,13 +168,13 @@ describe('AgentHubWorkbench', () => {
     fireEvent.change(screen.getByLabelText('@Agent'), {
       target: { value: 'builder' },
     });
-    fireEvent.change(screen.getByLabelText('Desktop/Edge target'), {
+    fireEvent.change(screen.getByLabelText('执行目标'), {
       target: { value: 'target-local-edge-1' },
     });
     expect(screen.getByText('Agent @Builder')).toBeInTheDocument();
     expect(screen.getByText('目标 Alpha Desktop')).toBeInTheDocument();
     expect(screen.getByText('需填写内容')).toBeInTheDocument();
-    fireEvent.change(screen.getByRole('textbox', { name: 'Composer input' }), {
+    fireEvent.change(screen.getByRole('textbox', { name: '输入框' }), {
       target: { value: 'Start the Web main chain' },
     });
     expect(screen.getByText('任务就绪')).toBeInTheDocument();
@@ -239,7 +239,7 @@ describe('AgentHubWorkbench', () => {
       />,
     );
 
-    const strip = screen.getByRole('region', { name: 'Demo main chain status' });
+    const strip = screen.getByRole('region', { name: 'Demo 主链状态' });
     expect(within(strip).getByText('Web')).toBeInTheDocument();
     expect(within(strip).getByText('Hub task')).toBeInTheDocument();
     expect(within(strip).getByText('task-v4')).toBeInTheDocument();
@@ -287,7 +287,7 @@ describe('AgentHubWorkbench', () => {
     fireEvent.change(screen.getByLabelText('@Agent'), {
       target: { value: 'builder' },
     });
-    fireEvent.change(screen.getByRole('textbox', { name: 'Composer input' }), {
+    fireEvent.change(screen.getByRole('textbox', { name: '输入框' }), {
       target: { value: 'Run the remote task' },
     });
 
@@ -320,7 +320,7 @@ describe('AgentHubWorkbench', () => {
       />,
     );
 
-    const strip = screen.getByRole('region', { name: 'Demo main chain status' });
+    const strip = screen.getByRole('region', { name: 'Demo 主链状态' });
     expect(within(strip).getByText('等待 task/replay')).toBeInTheDocument();
     expect(within(strip).getByText('等待 worker route')).toBeInTheDocument();
     expect(within(strip).getByText('0 route / 0 event')).toBeInTheDocument();
@@ -347,7 +347,7 @@ describe('AgentHubWorkbench', () => {
       />,
     );
 
-    const input = screen.getByRole('textbox', { name: 'Composer input' });
+    const input = screen.getByRole('textbox', { name: '输入框' });
     fireEvent.change(input, { target: { value: '先换行' } });
     fireEvent.keyDown(input, { key: 'Enter', ctrlKey: true });
     expect(platform.submittedIntents).toEqual([]);
@@ -386,7 +386,7 @@ describe('AgentHubWorkbench', () => {
     expect(window.localStorage.getItem('agenthub.workbench.composerSubmitBehavior')).toBe('ctrl-enter-send');
 
     fireEvent.click(screen.getByRole('button', { name: '对话' }));
-    const input = screen.getByRole('textbox', { name: 'Composer input' });
+    const input = screen.getByRole('textbox', { name: '输入框' });
     fireEvent.change(input, { target: { value: '需要快捷键发送' } });
     fireEvent.keyDown(input, { key: 'Enter' });
     expect(platform.submittedIntents).toEqual([]);
@@ -417,7 +417,7 @@ describe('AgentHubWorkbench', () => {
       />,
     );
 
-    fireEvent.change(screen.getByRole('textbox', { name: 'Composer input' }), {
+    fireEvent.change(screen.getByRole('textbox', { name: '输入框' }), {
       target: { value: '没有真实 thread 时不要假提交' },
     });
     fireEvent.click(screen.getByRole('button', { name: '发送消息' }));

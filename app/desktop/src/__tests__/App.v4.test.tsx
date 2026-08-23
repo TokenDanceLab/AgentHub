@@ -191,6 +191,21 @@ const sendMessageLabel = /^(发送消息|Send message|profile\.sendMessage)$/;
 const overviewInspectorTabLabel = /^×(概览|Overview|inspector\.overview)$/;
 const browserInspectorTabLabel = /^×(浏览器|Browser|inspector\.browser)$/;
 const logoutLabel = /^(退出登录|Log out|user\.logout)$/;
+/* #1826: DesktopChrome chrome labels now resolve through chatview aria.*
+   keys. Desktop suites run in the key-echo pseudo-language, so accept the
+   translated label or the raw key (same convention as the labels above). */
+const windowControlsLabel = /^(Window controls|aria\.windowControls)$/;
+const minimizeLabel = /^(最小化|Minimize|aria\.minimize)$/;
+const maximizeLabel = /^(最大化|Maximize|aria\.maximize)$/;
+const closeLabel = /^(关闭|Close|aria\.close)$/;
+const navControlsLabel = /^(Desktop navigation controls|aria\.navControls)$/;
+const toggleSidebarLabel = /^(切换左侧栏|Toggle sidebar|aria\.toggleSidebar)$/;
+const goBackLabel = /^(后退|Go back|aria\.goBack)$/;
+const goForwardLabel = /^(前进|Go forward|aria\.goForward)$/;
+const desktopEntryLabel = /^(Desktop entry|aria\.desktopEntry)$/;
+const globalRailLabel = /^(Global rail|aria\.globalRail)$/;
+const rightInspectorLabel = /^(Right inspector|aria\.rightInspector)$/;
+const mainChainStatusLabel = /^(Demo main chain status|aria\.mainChainStatus)$/;
 
 function getComposerInput(): HTMLTextAreaElement {
   return screen.getByLabelText(composerInputLabel) as HTMLTextAreaElement;
@@ -398,22 +413,22 @@ describe('Desktop App v4 root', () => {
   it('shows the Desktop login card before entering the workbench', () => {
     renderWithProviders(<App />);
 
-    expect(screen.getByRole('group', { name: 'Window controls' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '最小化' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '最大化' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '关闭' })).toBeInTheDocument();
-    expect(screen.queryByRole('group', { name: 'Desktop navigation controls' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: '切换左侧栏' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: '后退' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: '前进' })).not.toBeInTheDocument();
-    expect(screen.getByRole('main', { name: 'Desktop entry' })).toBeInTheDocument();
+    expect(screen.getByRole('group', { name: windowControlsLabel })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: minimizeLabel })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: maximizeLabel })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: closeLabel })).toBeInTheDocument();
+    expect(screen.queryByRole('group', { name: navControlsLabel })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: toggleSidebarLabel })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: goBackLabel })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: goForwardLabel })).not.toBeInTheDocument();
+    expect(screen.getByRole('main', { name: desktopEntryLabel })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: '登录 AgentHub' })).toBeInTheDocument();
     expect(screen.getByAltText('AgentHub')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '切换主题' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '使用 TokenDance ID 继续' })).toBeInTheDocument();
     expect(screen.getByTestId('tokendance-id-logo')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '使用 Demo 模式继续' })).toBeInTheDocument();
-    expect(screen.queryByRole('navigation', { name: 'Global rail' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('navigation', { name: globalRailLabel })).not.toBeInTheDocument();
   });
 
   it('enters a clean Desktop demo workbench from the login card', () => {
@@ -421,15 +436,15 @@ describe('Desktop App v4 root', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '使用 Demo 模式继续' }));
 
-    const desktopNavigation = screen.getByRole('group', { name: 'Desktop navigation controls' });
+    const desktopNavigation = screen.getByRole('group', { name: navControlsLabel });
     expect(desktopNavigation).toBeInTheDocument();
-    expect(within(desktopNavigation).getByRole('button', { name: '切换左侧栏' })).toBeInTheDocument();
-    expect(within(desktopNavigation).getByRole('button', { name: '后退' })).toBeInTheDocument();
-    expect(within(desktopNavigation).getByRole('button', { name: '前进' })).toBeInTheDocument();
-    expect(screen.getByRole('navigation', { name: 'Global rail' })).toBeInTheDocument();
+    expect(within(desktopNavigation).getByRole('button', { name: toggleSidebarLabel })).toBeInTheDocument();
+    expect(within(desktopNavigation).getByRole('button', { name: goBackLabel })).toBeInTheDocument();
+    expect(within(desktopNavigation).getByRole('button', { name: goForwardLabel })).toBeInTheDocument();
+    expect(screen.getByRole('navigation', { name: globalRailLabel })).toBeInTheDocument();
     expect(screen.getByRole('complementary', { name: conversationSidebarLabel })).toBeInTheDocument();
     expect(screen.getByRole('main', { name: workspaceLabel })).toHaveAttribute('data-surface', 'desktop');
-    expect(screen.getByRole('complementary', { name: 'Right inspector' })).toBeInTheDocument();
+    expect(screen.getByRole('complementary', { name: rightInspectorLabel })).toBeInTheDocument();
     // #1821: the legacy workspace tab row was dead chrome and was removed
     // from WorkspaceHeader (both surfaces).
     expect(screen.queryByRole('tablist', { name: workspaceTabsLabel })).not.toBeInTheDocument();
@@ -447,7 +462,7 @@ describe('Desktop App v4 root', () => {
     expect(getComposerInput()).toBeInTheDocument();
     expect(screen.queryByRole('combobox', { name: '数据模式' })).not.toBeInTheDocument();
     expect(screen.queryByLabelText('@Agent')).not.toBeInTheDocument();
-    expect(screen.queryByRole('region', { name: 'Demo main chain status' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: mainChainStatusLabel })).not.toBeInTheDocument();
 
     // Demo mode writes 'mock' to localStorage
     expect(window.localStorage.getItem(WORKBENCH_DATA_MODE_STORAGE_KEY)).toBe('mock');
@@ -463,8 +478,8 @@ describe('Desktop App v4 root', () => {
     fireEvent.click(edgeButton);
 
     // Should enter workbench (same shell as demo)
-    expect(screen.getByRole('group', { name: 'Desktop navigation controls' })).toBeInTheDocument();
-    expect(screen.getByRole('navigation', { name: 'Global rail' })).toBeInTheDocument();
+    expect(screen.getByRole('group', { name: navControlsLabel })).toBeInTheDocument();
+    expect(screen.getByRole('navigation', { name: globalRailLabel })).toBeInTheDocument();
 
     // Should write 'observed' to localStorage (not 'mock')
     expect(window.localStorage.getItem(WORKBENCH_DATA_MODE_STORAGE_KEY)).toBe('observed');
@@ -523,7 +538,7 @@ describe('Desktop App v4 root', () => {
     });
     expect(testQueryClient.getQueryData(['private-session'])).toBeUndefined();
     expect(window.localStorage.getItem(WORKBENCH_DATA_MODE_STORAGE_KEY)).toBeNull();
-    expect(screen.queryByRole('navigation', { name: 'Global rail' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('navigation', { name: globalRailLabel })).not.toBeInTheDocument();
   });
 
   it('mounts the Hub task bridge on the Desktop active path when Hub auth and Local Edge are available', async () => {

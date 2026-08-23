@@ -42,7 +42,9 @@ const THEME_KEY_LEGACY = 'agenthub-theme';
 const WORKBENCH_SHELL = '[data-testid="agenthub-workbench"]';
 // Frosted Agents page surface (#1226 / #1242) — prefer over bare chat workbench.
 const AGENTS_PAGE = 'section.agents-page, .agents-page';
-const AGENTS_RAIL_BUTTON = 'nav[aria-label="Global rail"] button[aria-label="Agent"]';
+// Locale-stable rail selector: aria-label resolves through chatview i18n
+// (zh: 全局导航栏), so target the data-rail-page hook instead (#1826).
+const AGENTS_RAIL_BUTTON = 'button[data-rail-page="agents"]';
 const hubUrlPattern =
   /https?:\/\/(?:localhost:8080|127\.0\.0\.1:8080|hub\.vectorcontrol\.tech|api\.hub\.vectorcontrol\.tech)\/.*/;
 

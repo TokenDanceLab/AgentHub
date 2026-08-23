@@ -319,7 +319,7 @@ describe('hubSessionToConversation', () => {
       unreadCount: 3,
       members: ['alice'],
     });
-    expect(conversation.updatedLabel).toMatch(/\d{2}\/\d{2} \d{2}:\d{2}/);
+    expect(conversation.updatedLabel).toMatch(/\d{1,2}\/\d{1,2},? \d{1,2}:\d{2}/);
   });
 
   it('maps a group session with fallback title and session_id', () => {
@@ -341,7 +341,7 @@ describe('hubSessionToConversation', () => {
       avatarLabel: '评审',
     });
     expect(conversation.subtitle).toBeUndefined();
-    expect(conversation.updatedLabel).toMatch(/\d{2}\/\d{2} \d{2}:\d{2}/);
+    expect(conversation.updatedLabel).toMatch(/\d{1,2}\/\d{1,2},? \d{1,2}:\d{2}/);
   });
 
   it('falls back to 私聊 for private sessions without a name', () => {

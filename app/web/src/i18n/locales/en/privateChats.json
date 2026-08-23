@@ -11,6 +11,7 @@
   "sidebar": {
     "title": "Private Chats",
     "empty": "No Hub private chats are available.",
+    "emptyHint": "Connect to Hub to start using private chats.",
     "emptyTitle": "No private chats"
   },
   "chat": {

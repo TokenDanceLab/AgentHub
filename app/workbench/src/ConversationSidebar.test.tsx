@@ -231,7 +231,7 @@ describe('ConversationSidebar interaction structure (#1715)', () => {
     const firstRow = conversationRows()[0]!;
     await user.click(within(firstRow).getByRole('button', { name: 'Archive' }));
     // #1821: archive confirms in a Modal (no more native window.confirm).
-    await user.click(screen.getByRole('button', { name: '归档' }));
+    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Archive' }));
     expect(props.onArchiveConversation).toHaveBeenCalledWith('c1', true);
     expect(props.onSelectConversation).not.toHaveBeenCalled();
   });
