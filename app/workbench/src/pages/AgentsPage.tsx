@@ -135,7 +135,7 @@ export const AgentsPage: React.FC<AgentsPageProps> = (props) => {
                 strokeWidth={DESIGN_NAV_GLYPH_STROKE_WIDTH}
               />
             </span>
-            {item.label}
+            <span className={styles['nav-label']}>{item.label}</span>
           </button>
         ))}
         <div className={styles['nav-caption']}>最近变更</div>
