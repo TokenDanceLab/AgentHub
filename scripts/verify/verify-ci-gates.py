@@ -4,7 +4,7 @@ r"""CI gate policy verifier — ps1 迁移（契约见 server docs/design/ps1-to
 用正则解析 .github/workflows/checks.yml 的 job/step 结构并断言 CI 政策：
 覆盖门禁、gosec/vuln 扫描、backend fixture/focused 边界、前端 pnpm 缓存、
 coverage include、commit-message/quality-debt/doc-ssot 自测、mobile light、
-visual-qa-shell、changes 路径筛选等。断言引用脚本名与本批迁移后 checks.yml
+visual-qa-shell（web+desktop 双半边）、changes 路径筛选等。断言引用脚本名与本批迁移后 checks.yml
 实际内容一致（本批脚本 .py，其余保持 .ps1）。
 
 CLI 兼容：--WorkflowPath 默认 ".github/workflows/checks.yml"（相对 cwd）；
@@ -98,6 +98,7 @@ def main() -> int:
     e2e = get_job_block(workflow, "e2e-smoke")
     changes = get_job_block(workflow, "changes")
     visual_shell = get_job_block(workflow, "visual-qa-shell")
+    desktop_visual = get_job_block(workflow, "visual-qa-desktop")
     validate = get_job_block(workflow, "validate")
     backend_perf = get_job_block(workflow, "backend-perf-leak-gates")
     # #audit: frontend coverage baseline gate split out of the unconditional
@@ -443,6 +444,22 @@ def main() -> int:
     assert_not_contains(visual_shell, r"pixel[-_ ]?golden", "visual-qa-shell must not fail on pixel golden")
     assert_not_contains(visual_shell, r"toHaveScreenshot", "visual-qa-shell must not use Playwright pixel golden matchers")
     assert_not_contains(visual_shell, r"windows-latest", "visual-qa-shell must stay on ubuntu for cost control")
+
+    # Desktop 半边（#1827）：与 web 半边同样的门禁政策——chromium only、
+    # 非空白断言上传、硬超时、禁 pixel golden、禁 windows-latest。
+    assert_contains(desktop_visual, r"Visual QA Desktop shell \(path-filtered\)", "visual-qa-desktop must use a clear job name")
+    assert_contains(desktop_visual, r"needs:\s+changes", "visual-qa-desktop must depend on unified changes job")
+    assert_contains(desktop_visual, r"Install Playwright Chromium", "visual-qa-desktop must install chromium only")
+    assert_contains(desktop_visual, re.escape("playwright install --with-deps chromium"), "visual-qa-desktop must install chromium only")
+    assert_contains(desktop_visual, re.escape("pnpm visual:qa:shell"), "visual-qa-desktop must run visual:qa:shell")
+    assert_contains(desktop_visual, re.escape("pnpm assert:visual:qa:shell"), "visual-qa-desktop must assert non-blank screenshots")
+    assert_contains(desktop_visual, r"Upload visual QA shell screenshots", "visual-qa-desktop must upload artifacts")
+    assert_contains(desktop_visual, r"desktop-visual-qa-shell-screenshots", "visual-qa-desktop must name the artifact")
+    assert_contains(desktop_visual, r"(?m)^\s+timeout-minutes:\s+20\s*$", "visual-qa-desktop job must have a hard timeout")
+    assert_contains(get_step_block(desktop_visual, "Capture desktop visual:qa:shell"), r"(?m)^\s+timeout-minutes:\s+15\s*$", "visual-qa-desktop capture step must have a hard timeout")
+    assert_not_contains(desktop_visual, r"pixel[-_ ]?golden", "visual-qa-desktop must not fail on pixel golden")
+    assert_not_contains(desktop_visual, r"toHaveScreenshot", "visual-qa-desktop must not use Playwright pixel golden matchers")
+    assert_not_contains(desktop_visual, r"windows-latest", "visual-qa-desktop must stay on ubuntu for cost control")
 
     print("ci gate policy ok")
     return 0

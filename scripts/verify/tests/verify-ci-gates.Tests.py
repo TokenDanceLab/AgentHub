@@ -19,6 +19,8 @@ one surgical text mutation, and asserts the CI policy verifier exits non-zero:
 13. re-add only-new-issues to the go-hub Lint step → full-repo lint gate back to patch-only
 14. re-add a truthy-expression continue-on-error to the go-hub Lint step → hard gate softened by an expression
 15. re-add an inline-comment `continue-on-error: true` to the go-hub Lint step → hard gate softened by a commented true
+16. delete the visual-qa-desktop job → desktop visual QA half silently drops out of CI
+17. delete the desktop assert step → desktop screenshots no longer verified non-blank
 
 The unmutated copy must exit 0, proving the policy test only reddens on
 actual policy violations (fail-closed, no false green).
@@ -37,6 +39,28 @@ VERIFIER_PATH = os.path.join(REPO_ROOT, "scripts", "verify", "verify-ci-gates.py
 
 DESIGN_CSS_STEP_VERIFY = "      - name: Verify design CSS syntax\n        run: pnpm test:css-syntax\n"
 DESIGN_CSS_STEP_SELF_TEST = "      - name: Self-test design CSS syntax gate (negative)\n        run: pnpm test:css-syntax:self-test\n"
+
+DESKTOP_VISUAL_ASSERT_STEP = (
+    "      - name: Assert non-blank shell screenshots (desktop)\n"
+    "        working-directory: ./app/desktop\n"
+    "        run: pnpm assert:visual:qa:shell\n"
+)
+
+
+def delete_visual_qa_desktop_job(text: str) -> str:
+    """删除 visual-qa-desktop job，模拟 desktop 视觉 QA 半边悄悄退出 CI（防回退）。"""
+    pattern = re.compile(r"(?ms)^  visual-qa-desktop:\r?\n.*?(?=^  [A-Za-z0-9_-]+:\r?\n|\Z)")
+    mutated, count = pattern.subn("", text)
+    if count != 1:
+        raise AssertionError(f"expected exactly one visual-qa-desktop job block, removed {count}")
+    return mutated
+
+
+def delete_desktop_visual_assert_step(text: str) -> str:
+    """删除 desktop visual QA 非空白断言步骤，模拟截图不再被校验（防回退）。"""
+    if DESKTOP_VISUAL_ASSERT_STEP not in text:
+        raise AssertionError("desktop visual QA assert step text not found in workflow")
+    return text.replace(DESKTOP_VISUAL_ASSERT_STEP, "", 1)
 
 
 def read_workflow() -> str:
@@ -340,6 +364,20 @@ class VerifyCiGatesMutationTests(unittest.TestCase):
         self.assert_mutation_fails(
             readd_go_hub_lint_continue_on_error_comment(read_workflow()),
             "re-added go-hub Lint inline-comment continue-on-error",
+        )
+
+    def test_delete_visual_qa_desktop_job_fails(self):
+        """visual-qa-desktop job 被删除时，校验器必须非零退出（desktop 视觉 QA 半边防回退）。"""
+        self.assert_mutation_fails(
+            delete_visual_qa_desktop_job(read_workflow()),
+            "deleted visual-qa-desktop job",
+        )
+
+    def test_delete_desktop_visual_assert_step_fails(self):
+        """desktop 视觉 QA 非空白断言步骤被删除时，校验器必须非零退出（防回退）。"""
+        self.assert_mutation_fails(
+            delete_desktop_visual_assert_step(read_workflow()),
+            "deleted desktop visual QA assert step",
         )
 
 

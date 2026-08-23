@@ -1,6 +1,6 @@
 # AgentHub 组件验收标准（component-acceptance）
 
-最后更新：2026-08-22（自 TokenDanceLab/docs 迁入本仓库，本文件为 AgentHub 单仓 SSOT；#1672 迁移状态见 §1）
+最后更新：2026-08-23（自 TokenDanceLab/docs 迁入本仓库，本文件为 AgentHub 单仓 SSOT；#1672 迁移状态见 §1）
 
 本文是 AgentHub shared 组件的**验收标准 SSOT**：任何 `app/shared/src/ui/` 下的新组件（或对既有组件做可见行为改动）必须对照本文件的 5 维验收标准，并带 `.test.tsx` + `.stories.tsx` + 本文件验收表对照记录。它与跨产品设计契约（`tokendance-design` 仓库 [design-system.md](https://github.com/TokenDanceLab/tokendance-design/blob/master/docs/design/design-system.md) 管 token 收敛、[design-playbook.md](https://github.com/TokenDanceLab/tokendance-design/blob/master/docs/design/design-playbook.md) 管实现流程、[visual-qa-matrix.md](https://github.com/TokenDanceLab/tokendance-design/blob/master/docs/design/visual-qa-matrix.md) 管产品级截图证据）互补：本文管**单组件验收**，矩阵管**产品级视觉证据**。
 
@@ -71,7 +71,7 @@
 
 ## 范本表
 
-以下三个组件为本文件首批验收范本，作为新组件对照格式示例（勾选状态以各组件最近一次验收记录为准，验收记录应随 PR 更新）。
+以下组件为本文件验收范本（首批三个之外，按组件族与页面验收扩编：DevicesPage / TokenUsagePage / OnboardingOverlay），作为新组件对照格式示例（勾选状态以各组件最近一次验收记录为准，验收记录应随 PR 更新）。
 
 ### Button（`app/shared/src/ui/Button.tsx`，三件套齐全）
 
@@ -102,7 +102,7 @@
 | 维度 | 必选项 | 状态 | 备注 |
 |---|---|---|---|
 | 视觉 | token 化状态色（success/warning/danger）、堆叠间距 | ✅ | 随 ToastStack.stories.tsx 巡检 |
-| 交互 | 入列/出列/自动消失/手动关闭行为断言 | ✅ | Toast.test.tsx + toastStore.test.ts |
+| 交互 | 入列/出列/自动消失/手动关闭行为断言 | ✅ | `toast/__tests__/Toast.test.tsx` + `toast/__tests__/toastStore.test.ts`（2026-08-23 复核存在） |
 | 键盘 | 关闭按钮可聚焦 | ✅ | |
 | a11y | `role="status"`/`role="alert"` 按消息重要性区分 | ✅ | |
 | a11y | 自动消失提供可见时间或可暂停（成功态可放宽） | ✅ | hover/focus 触发 `pauseAutoDismiss`（ToastStack.tsx + toastStore.ts）满足「可暂停」分支；结论见下方 debt 台账 |
