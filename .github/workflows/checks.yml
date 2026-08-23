@@ -1823,6 +1823,9 @@ jobs:
       - name: Verify real E2E contract
         run: python scripts/verify/verify-real-e2e-contract.py
 
+      - name: Self-test real E2E lane manifest private-name scan
+        run: python scripts/verify/tests/verify-real-e2e-lane-manifest.Tests.py
+
       - name: Validate OpenAPI YAML
         run: |
           python -m pip install --quiet PyYAML

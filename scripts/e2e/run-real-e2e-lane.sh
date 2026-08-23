@@ -74,7 +74,6 @@ emit_manifest() { # 请求 status -> stdout "最终status|manifest路径"（pass
   local status="$1"
   MANIFEST_STATUS="$status" \
   MANIFEST_ARTIFACT_DIR="$ARTIFACT_DIR" \
-  MANIFEST_REPO_ROOT="$REPO_ROOT" \
   MANIFEST_SPEC_TARGET="$SPEC_TARGET" \
   MANIFEST_ID_BASE_URL="$ID_BASE_URL" \
   MANIFEST_HUB_BASE_URL="$HUB_BASE_URL" \
@@ -157,7 +156,7 @@ if report_path and requested in ("passed", "failed"):
                 "exit_code": 0 if outcome == "passed" else 1,
                 "duration_ms": duration_ms,
                 "command": "playwright test --config playwright.real.config.ts --project=chromium " + os.environ["MANIFEST_SPEC_TARGET"],
-                "working_directory": os.path.join(os.environ["MANIFEST_REPO_ROOT"], "app", "web"),
+                "working_directory": "app/web",
                 "evidence": os.path.basename(report_path) if report_path else "",
             })
     except Exception as exc:
@@ -205,7 +204,7 @@ if requested == "passed":
             "exit_code": 1,
             "duration_ms": 0,
             "command": "playwright test --config playwright.real.config.ts",
-            "working_directory": os.path.join(os.environ["MANIFEST_REPO_ROOT"], "app", "web"),
+            "working_directory": "app/web",
             "evidence": "no report-*.json found under tests/artifacts after run",
         }]
 elif requested == "blocked":
@@ -222,7 +221,7 @@ elif requested == "blocked":
         "exit_code": 2,
         "duration_ms": 0,
         "command": "probe id/.well-known/openid-configuration hub/health edge/v1/health web/workbench/",
-        "working_directory": os.environ["MANIFEST_REPO_ROOT"],
+        "working_directory": ".",
         "evidence": "id=%s hub=%s edge=%s web=%s" % (
             os.environ["MANIFEST_ID_STATE"], os.environ["MANIFEST_HUB_STATE"],
             os.environ["MANIFEST_EDGE_STATE"], os.environ["MANIFEST_WEB_STATE"]),
@@ -241,7 +240,7 @@ else:  # failed
             "exit_code": int(os.environ.get("MANIFEST_PW_RC") or 1),
             "duration_ms": 0,
             "command": "bash scripts/e2e/run-real-e2e-lane.sh",
-            "working_directory": os.environ["MANIFEST_REPO_ROOT"],
+            "working_directory": ".",
             "evidence": "lane aborted before playwright report production",
         }]
 
