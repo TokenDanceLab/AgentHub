@@ -1,6 +1,6 @@
 # AgentHub 开发快速上手
 
-最后更新：2026-08-17
+最后更新：2026-08-23
 
 本文档只保留新人启动本地开发环境需要的最短路径。规则、分支、E2E 证据等级和发布门禁以 `AGENTS.md` 为准。
 
@@ -12,7 +12,7 @@
 | Node.js 22+ + corepack | pnpm workspace 和前端构建 |
 | PostgreSQL 16+ | Hub 数据库 |
 | Redis 7+ | Hub cache/session |
-| Git 2.40+ | 分支和 worktree |
+| Git 2.40+；OpenSSL | 分支和 worktree；POSIX shell 生成本地 JWT secret |
 | Rust + Tauri CLI；Playwright browsers | 仅 Desktop native/packaging 与 E2E/UI 工作需要 |
 
 ## 获取代码
@@ -30,8 +30,15 @@ git worktree add .worktrees/my-topic -b feat/my-topic
 
 ## 环境配置
 
+复制模板后立即生成随机 JWT secret，并导出到当前 shell（`.env` 只留本机，不提交）：
+
+POSIX shell（需要 `openssl`）：
 ```bash
-cp .env.example .env
+cp .env.example .env && secret="$(openssl rand -hex 32)" && sed -i.bak "s/^AGENTHUB_JWT_SECRET=.*/AGENTHUB_JWT_SECRET=$secret/" .env && rm -f .env.bak && export AGENTHUB_JWT_SECRET="$secret" && unset secret
+```
+Windows PowerShell：
+```powershell
+Copy-Item .env.example .env; $b=New-Object byte[] 32; [Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($b); $s=([BitConverter]::ToString($b)).Replace('-','').ToLowerInvariant(); $p=(Resolve-Path .env); $c=[IO.File]::ReadAllText($p); [IO.File]::WriteAllText($p,([regex]::Replace($c,'(?m)^AGENTHUB_JWT_SECRET=.*$',"AGENTHUB_JWT_SECRET=$s")),(New-Object Text.UTF8Encoding($false))); $env:AGENTHUB_JWT_SECRET=$s; Remove-Variable b,s,p,c
 ```
 
 至少确认（名称以仓库根 `.env.example` 为准）：
