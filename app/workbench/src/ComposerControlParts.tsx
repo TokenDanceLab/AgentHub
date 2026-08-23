@@ -1,9 +1,16 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { ComposerMention } from '@shared/composer';
+import type { ApprovalMode, ComposerMention } from '@shared/composer';
 import { CHATVIEW_I18N_NAMESPACE } from '@shared/chatview/i18n/resources';
+import { PermissionModePicker } from '@shared/ui';
 import { DesignNavIcon } from './designIcons';
 import styles from './AgentHubWorkbench.module.css';
+import {
+  activeComposerApprovalModeLabel,
+  approvalModeToPickerValue,
+  buildComposerApprovalModeOptions,
+  pickerValueToApprovalMode,
+} from './composerApprovalMode';
 import {
   agentPickerPlaceholder,
   formatAgentOptionLabel,
@@ -147,5 +154,50 @@ export function ComposerAttachButton({
     >
       <DesignNavIcon name="paperclip" />
     </button>
+  );
+}
+
+/**
+ * #1816 — per-message approval-mode picker (the UI carrier for
+ * `composerReducer.setApprovalMode`, which previously had no dispatch source).
+ * Reuses the shared PermissionModePicker; mapping/labels live in
+ * composerApprovalMode.ts. Disabled while a submit is in flight.
+ */
+export function ComposerApprovalModePicker({
+  approvalMode,
+  isSubmitting,
+  onChange,
+}: {
+  approvalMode: ApprovalMode;
+  isSubmitting: boolean;
+  onChange: (mode: ApprovalMode) => void;
+}): React.ReactElement {
+  const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE);
+  const translate = t as (key: string, options?: Record<string, unknown>) => string;
+  const options = useMemo(
+    () => buildComposerApprovalModeOptions((key) => translate(key)),
+    [translate],
+  );
+  const triggerLabel = useMemo(
+    () => activeComposerApprovalModeLabel(approvalMode, (key) => translate(key)),
+    [approvalMode, translate],
+  );
+  return (
+    <PermissionModePicker
+      value={approvalModeToPickerValue(approvalMode)}
+      label={triggerLabel}
+      ariaLabel={translate('composer.approvalMode.aria', { mode: triggerLabel })}
+      options={options}
+      disabled={isSubmitting}
+      // Conditional spread: desktop's tsconfig types css-module values as
+      // possibly-undefined and compiles with exactOptionalPropertyTypes.
+      {...(styles.composerApprovalModePicker
+        ? { className: styles.composerApprovalModePicker }
+        : {})}
+      onChange={(value) => {
+        const mode = pickerValueToApprovalMode(value);
+        if (mode) onChange(mode);
+      }}
+    />
   );
 }

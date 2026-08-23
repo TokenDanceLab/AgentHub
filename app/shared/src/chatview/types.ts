@@ -38,6 +38,15 @@ export interface RowItem {
    *  actions row; critical level triggers a second-confirm on the approve
    *  button and the approve button turns red (T16). */
   riskLevel?: 'low' | 'medium' | 'high' | 'critical'
+  /**
+   * ISO timestamp of when the (waiting) approval request was raised
+   * (#1819). Propagated from the upstream transcript block's `createdAt`;
+   * the waiting card surfaces it as "requested at HH:MM" so the user can
+   * judge how long the request has been pending. The upstream data model
+   * has no deadline/expiry field, so this is intentionally NOT a countdown
+   * or a timeout state — showing invented deadlines would be a lie.
+   */
+  waitingSince?: string
   standalone?: boolean
   url?: string
   deployMeta?: string

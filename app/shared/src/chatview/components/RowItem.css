@@ -163,6 +163,13 @@
 .think-shimmer { background:linear-gradient(90deg, var(--td-ink-muted) 0%, var(--td-ink) 48%, var(--td-ink-muted) 52%, var(--td-ink-muted) 100%); background-size:200% 100%; -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent; animation:thinkShimmer 2s linear infinite }
 @keyframes thinkShimmer { 0% { background-position: 100% center } 100% { background-position: -100% center } }
 .think-duration { color:var(--td-ink-subtle); font:var(--chat-label-xs); font-weight:400; margin-left:var(--chat-sp-xxs) }
+/* ── #1819 waiting-approval "requested at" meta (honest time feedback:
+   the upstream model carries no deadline, so we show created-time only) ── */
+.ap-waiting-meta {
+  font: var(--chat-label-xs);
+  color: var(--td-ink-subtle);
+  margin-top: var(--chat-sp-2);
+}
 .ap-actions { display:flex; align-items:center; gap:var(--chat-sp-sm); flex-wrap:wrap }
 .ap-actions.has-risk { padding-top:var(--chat-sp-2) }
 .ap-kbd-hint { font:var(--chat-label-xs); color:var(--td-ink-subtle); margin-left:auto; user-select:none; opacity:0.85 }

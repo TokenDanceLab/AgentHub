@@ -575,6 +575,35 @@ export function DesktopWorkbenchApp({ onLogout }: DesktopWorkbenchAppProps = {})
     }
   }, [createThread, workbench.conversations, workbench.isDemo]);
 
+  // #1819: sidebar "新建会话" direct entry. Live: real Edge thread creation
+  // (the same createThread chain handleNavigateToConversation uses for a
+  // named target, here with an auto-title that the first message refines).
+  // Errors surface as a toast — never swallowed.
+  const handleStartNewConversation = useCallback(() => {
+    if (workbench.isDemo) {
+      const conversationId = `demo-new-${Date.now()}`;
+      const title = t('sidebar.newConversation');
+      workbenchDemoRuntimeStore.addConversation({
+        id: conversationId,
+        title,
+        kind: 'direct',
+        avatarLabel: title.slice(0, 1),
+        avatarColor: 'var(--td-plum)',
+      });
+      setSelectedConversationId(conversationId);
+      return;
+    }
+    createThread.mutateAsync({})
+      .then((thread) => {
+        setSelectedConversationId(thread.threadId);
+      })
+      .catch((error: unknown) => {
+        showToast('error', t('error.startConversation', {
+          detail: error instanceof Error ? error.message : String(error),
+        }));
+      });
+  }, [createThread, showToast, t, workbench.isDemo]);
+
   // #1821: error must not collapse into a permanent skeleton — surface the
   // query error (aligned with the Web RecoveryPanel contract) and make retry
   // a real refetch instead of a no-op.
@@ -624,6 +653,7 @@ export function DesktopWorkbenchApp({ onLogout }: DesktopWorkbenchAppProps = {})
         onAgentsRetry={handleAgentsRetry}
         onLogout={onLogout}
         onNavigateToConversation={handleNavigateToConversation}
+        onStartNewConversation={handleStartNewConversation}
         onEditMessage={
           chatActions
             ? async (blockId: string, content: string) => {

@@ -79,6 +79,19 @@ export function timeStr(iso?: string) {
 }
 
 /**
+ * Locale-aware "requested at HH:MM" label for waiting approval cards (#1819).
+ * Returns undefined for missing/invalid input so the meta line is hidden
+ * rather than rendering an invented or broken timestamp.
+ */
+export function formatApprovalWaitingSince(iso?: string): string | undefined {
+  if (!iso) return undefined
+  const parsed = Date.parse(iso)
+  if (!Number.isFinite(parsed)) return undefined
+  const locale = (typeof navigator !== 'undefined' && navigator.language) || 'en-US'
+  return new Date(parsed).toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' })
+}
+
+/**
  * Canonical mapper from EvidenceRefStatus (or generic status string)
  * to RowItem status.
  *

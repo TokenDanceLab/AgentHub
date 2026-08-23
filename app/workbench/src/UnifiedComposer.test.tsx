@@ -1,8 +1,7 @@
 import '@testing-library/jest-dom/vitest';
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import type { FormEvent } from 'react';
-import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import { clearDraft, loadDraft, saveDraft } from '@shared/composer';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';import { clearDraft, loadDraft, saveDraft } from '@shared/composer';
 import type { ComposerMention, ComposerState } from '@shared/composer';
 import { UnifiedComposer } from './UnifiedComposer';
 
@@ -623,5 +622,71 @@ describe('UnifiedComposer auto-grow (#1822)', () => {
       />,
     );
     expect(textarea.style.height).toBe('120px');
+  });
+});
+
+describe('UnifiedComposer approval-mode picker (#1816)', () => {
+  it('renders the trigger showing the current approval mode label', () => {
+    render(
+      <UnifiedComposer
+        composer={mentionedComposer}
+        dispatchComposer={vi.fn()}
+        mentionableAgents={[]}
+        onSubmit={vi.fn()}
+      />,
+    );
+    expect(screen.getByRole('button', { name: 'Approval mode: Suggest (agent default)' }))
+      .toBeInTheDocument();
+  });
+
+  it('dispatches setApprovalMode when a mode option is picked', () => {
+    const dispatchComposer = vi.fn();
+    render(
+      <UnifiedComposer
+        composer={mentionedComposer}
+        dispatchComposer={dispatchComposer}
+        mentionableAgents={[]}
+        onSubmit={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Approval mode: Suggest (agent default)' }));
+    const option = screen.getByRole('button', { name: /Allow workspace write/i });
+    fireEvent.click(option);
+
+    expect(dispatchComposer).toHaveBeenCalledWith({
+      type: 'setApprovalMode',
+      approvalMode: 'workspace-write',
+    });
+  });
+
+  it('keeps the current mode when an unknown picker value is delivered', () => {
+    // Guard against future Edge modes appearing in the picker options while
+    // the composer message-level vocabulary stays 3-value.
+    const dispatchComposer = vi.fn();
+    render(
+      <UnifiedComposer
+        composer={{ ...mentionedComposer, approvalMode: 'read-only' }}
+        dispatchComposer={dispatchComposer}
+        mentionableAgents={[]}
+        onSubmit={vi.fn()}
+      />,
+    );
+    expect(screen.getByRole('button', { name: 'Approval mode: Read-only plan' })
+      ).toBeInTheDocument();
+    expect(dispatchComposer).not.toHaveBeenCalled();
+  });
+
+  it('disables the picker while submitting', () => {
+    render(
+      <UnifiedComposer
+        composer={{ ...mentionedComposer, submitState: 'submitting' }}
+        dispatchComposer={vi.fn()}
+        mentionableAgents={[]}
+        onSubmit={vi.fn()}
+      />,
+    );
+    expect(screen.getByRole('button', { name: 'Approval mode: Suggest (agent default)' }))
+      .toBeDisabled();
   });
 });
