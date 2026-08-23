@@ -11,6 +11,7 @@
   "sidebar": {
     "title": "私聊",
     "empty": "没有可用的 Hub 私聊。",
+    "emptyHint": "连接 Hub 后即可使用私聊。",
     "emptyTitle": "暂无私聊"
   },
   "chat": {

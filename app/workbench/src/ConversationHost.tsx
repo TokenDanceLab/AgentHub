@@ -1,5 +1,6 @@
 import React, { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 import type { TranscriptBlock, TextTranscriptBlock } from '@shared/transcript';
 import { isSidebarOnlyTranscriptBlock, orderTranscriptBlocks } from '@shared/transcript';
 import type { ComposerIntent, ComposerMention } from '@shared/composer';
@@ -19,6 +20,7 @@ import {
   type PendingDispatchIntent,
 } from './composer/pendingIntents';
 import type { AgentHubPlatform, WorkbenchConversation } from '@shared/platform';
+import { AppError } from '@shared/errors';
 import { CHATVIEW_I18N_NAMESPACE } from '@shared/chatview/i18n/resources';
 import type { AttachmentUploadState } from './UnifiedComposer';
 import type { FileItem } from './inspector';
@@ -35,6 +37,29 @@ import { useComposerSubmitBehavior } from './workbenchPreferences';
 import styles from './AgentHubWorkbench.module.css';
 
 export type { MainchainSummary } from './mainchain';
+
+/**
+ * Map a platform/API failure to user-facing toast copy (#1826).
+ *
+ * REST errors carry a machine code (api/conventions.md §5, surfaced as
+ * `AppError.code`); the code with dedicated account copy maps to a chatview
+ * toast key. Every other error falls back to the caller's fallback key so
+ * English dev copy / raw server messages never reach the user; full detail
+ * stays in the console for diagnosis.
+ */
+function toastErrorCopy(
+  t: TFunction,
+  error: unknown,
+  fallbackKey: string,
+): string {
+  if (error instanceof AppError && error.code === 'turn_in_progress') {
+    return t('toast.turnInProgress');
+  }
+  if (error instanceof Error) {
+    console.error('[ConversationHost] action failed:', error.message);
+  }
+  return t(fallbackKey);
+}
 
 export interface ConversationHostProps {
   transcript: TranscriptBlock[];
@@ -216,7 +241,7 @@ export const ConversationHost = React.memo(function ConversationHost({
       });
     } catch (err) {
       mutatePendingIntents((current) => removePendingIntent(current, head));
-      onToast(err instanceof Error ? err.message : t('toast.dispatchRetryFailed'));
+      onToast(toastErrorCopy(t, err, 'toast.dispatchRetryFailed'));
     } finally {
       flushInFlightRef.current = false;
     }
@@ -268,7 +293,7 @@ export const ConversationHost = React.memo(function ConversationHost({
         dispatchComposer({ type: 'setSubmitState', submitState: 'idle' });
       } catch (err) {
         dispatchComposer({ type: 'setSubmitState', submitState: 'error' });
-        onToast(err instanceof Error ? err.message : t('toast.editFailed'));
+        onToast(toastErrorCopy(t, err, 'toast.editFailed'));
       } finally {
         isSubmittingRef.current = false;
       }
@@ -377,7 +402,7 @@ export const ConversationHost = React.memo(function ConversationHost({
         },
       });
       dispatchComposer({ type: 'setSubmitState', submitState: 'error' });
-      onToast(err instanceof Error ? err.message : t('toast.submitFailed'));
+      onToast(toastErrorCopy(t, err, 'toast.submitFailed'));
     } finally { isSubmittingRef.current = false; }
   }, [composer, currentConversationId, platform, selectedExecutionTargetId, isAgentRunning,
     onToast, dispatchComposer, t, transcript, onEditMessage, mutatePendingIntents, flushPendingIntents]);
@@ -435,7 +460,8 @@ export const ConversationHost = React.memo(function ConversationHost({
       <MessageSearchPanel open={searchOpen} onClose={() => onSearchOpenChange(false)}
         onJumpToMessage={handleSearchJump} highlightMessageId={searchHighlightId}
         onHighlightEnd={handleSearchHighlightEnd} transcriptBlocks={displayTranscript}
-        searchLabel="搜索消息" searchPlaceholder="搜索消息内容..." noResultsLabel="未找到匹配的消息" />
+        searchLabel={t('searchPanel.label')} searchPlaceholder={t('searchPanel.placeholder')}
+        noResultsLabel={t('searchPanel.noResults')} />
       {!selectionMode && (
         <>
           {pendingIntentsRef.current.length > 0 && (

@@ -45,10 +45,10 @@ describe('AgentHubWorkbench', () => {
     fireEvent.click(screen.getByRole('button', { name: '联系人' }));
 
     expect(screen.getByTestId('agenthub-workbench')).toHaveAttribute('data-page', 'contacts');
-    expect(screen.getByRole('main', { name: 'Workspace' })).toHaveAttribute('data-mode', 'workbench');
-    expect(screen.queryByRole('complementary', { name: 'Conversation sidebar' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('complementary', { name: 'Right inspector' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('tablist', { name: 'Workspace tabs' })).not.toBeInTheDocument();
+    expect(screen.getByRole('main', { name: '工作区' })).toHaveAttribute('data-mode', 'workbench');
+    expect(screen.queryByRole('complementary', { name: '会话侧边栏' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('complementary', { name: '右侧窗口' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('tablist', { name: '工作区标签页' })).not.toBeInTheDocument();
     expect(screen.queryByPlaceholderText('发消息给 Builder')).not.toBeInTheDocument();
     expect(screen.getByRole('heading', { name: '组织内联系人' })).toBeInTheDocument();
 
@@ -221,7 +221,7 @@ describe('AgentHubWorkbench', () => {
     expect(handleConversationChange).toHaveBeenCalledWith('builder');
     expect(screen.queryByRole('dialog', { name: 'Builder 资料卡' })).not.toBeInTheDocument();
     await waitFor(() => {
-      expect(screen.getByRole('textbox', { name: 'Composer input' })).toHaveFocus();
+      expect(screen.getByRole('textbox', { name: '输入框' })).toHaveFocus();
     });
   });
 

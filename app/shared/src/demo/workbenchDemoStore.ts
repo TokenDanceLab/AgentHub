@@ -6,6 +6,8 @@
 import type { ComposerIntent, ComposerSubmitResult } from '../composer';
 import type { WorkbenchConversation } from '../platform';
 import type { TranscriptBlock } from '../transcript';
+import { getI18n } from 'react-i18next';
+import { appDateLocaleTag } from '../i18n/locale';
 import { TEAMRUN_DEMO_CONVERSATION_ID, teamRunDemoTranscript } from './teamrunDemo';
 import { demoConversationsBase, demoWorkbenchAgents } from './workbenchDemoAgents';
 import { demoWorkbenchPins } from './workbenchDemoMessages';
@@ -278,7 +280,7 @@ function isDemoHumanContact(conversationId: string): boolean {
 function formatDemoPinTime(timestamp: string): string | undefined {
   const parsed = Date.parse(timestamp);
   if (!Number.isFinite(parsed)) return undefined;
-  return new Date(parsed).toLocaleTimeString('zh-CN', {
+  return new Date(parsed).toLocaleTimeString(appDateLocaleTag(getI18n()?.language), {
     hour: '2-digit',
     minute: '2-digit',
   });

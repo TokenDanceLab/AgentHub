@@ -16,7 +16,7 @@
     "rejected": "Rejected",
     "loading": "Loading",
     "ready": "Ready",
-    "waiting_approval": "Waiting Approval"
+    "waiting_approval": "Awaiting approval"
   },
   "leftRail": {
     "ariaLabel": "Project and thread navigation",
@@ -42,10 +42,10 @@
     "starting": "Starting"
   },
   "state": {
-    "loading": "Loading the Edge snapshot. Actions stay locked until the reducer has real data.",
-    "offlineSnapshot": "Edge is offline. Showing the last reducer snapshot; write actions are locked.",
-    "offlineEmpty": "Edge is unavailable and no snapshot has been loaded. No mock success state is shown.",
-    "empty": "No Edge snapshot data is available yet. Start Edge to load projects, threads, runs, and Runtime inventory."
+    "loading": "Loading the Hub snapshot. Actions stay locked until the reducer has real data.",
+    "offlineSnapshot": "Hub is offline. Showing the last reducer snapshot; write actions are locked.",
+    "offlineEmpty": "Hub is unavailable and no snapshot has been loaded. No mock success state is shown.",
+    "empty": "No Hub snapshot data is available yet. Sign in and connect Hub to load projects, threads, runs, and Runtime inventory."
   },
   "runSummary": {
     "ariaLabel": "Run summary",
@@ -60,7 +60,8 @@
     "ariaLabel": "Thread messages and run timeline",
     "title": "IM Message Flow",
     "subtitle": "@Agent collaboration",
-    "empty": "No messages loaded for this thread."
+    "empty": "No messages loaded for this thread.",
+    "emptyHint": "Send a message to start this conversation."
   },
   "message": {
     "author": {

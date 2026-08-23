@@ -9,6 +9,8 @@ import {
   type WorkbenchDataMode,
 } from '@shared/demo';
 import { normalizeThreadItemsToTranscript } from '@shared/transcript';
+import { appDateLocaleTag } from '@shared/i18n/locale';
+import { getI18n } from 'react-i18next';
 import { normalizeHubMessagesToTranscript } from '@shared/transcript';
 import { orderTranscriptBlocks } from '@shared/transcript';
 import { getPinMapStore, withPinnedState } from '@shared/transcript';
@@ -541,7 +543,7 @@ function threadSubtitle(thread: ThreadInfo): string {
 function formatTimestamp(timestamp: string): string | undefined {
   const parsed = Date.parse(timestamp);
   if (!Number.isFinite(parsed)) return undefined;
-  return new Date(parsed).toLocaleString('zh-CN', {
+  return new Date(parsed).toLocaleString(appDateLocaleTag(getI18n()?.language), {
     hour: '2-digit',
     minute: '2-digit',
     month: '2-digit',
@@ -564,7 +566,7 @@ function latestThreadItemTimestampMs(items: ThreadItemInfo[] | undefined): numbe
 function formatPinTime(timestamp: string): string | undefined {
   const parsed = Date.parse(timestamp);
   if (!Number.isFinite(parsed)) return undefined;
-  return new Date(parsed).toLocaleTimeString('zh-CN', {
+  return new Date(parsed).toLocaleTimeString(appDateLocaleTag(getI18n()?.language), {
     hour: '2-digit',
     minute: '2-digit',
   });

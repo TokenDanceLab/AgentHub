@@ -292,7 +292,7 @@ export function ConversationSidebar({
     if (onArchiveConversation) {
       items.push({
         icon: showArchived ? 'inbox' : 'archive',
-        label: showArchived ? '取消归档' : '归档',
+        label: showArchived ? t('aria.unarchive') : t('sidebar.archive'),
         onClick: () => onArchiveConversation(conversation.id, !showArchived),
       });
     }
@@ -343,7 +343,7 @@ export function ConversationSidebar({
       <input
         aria-label={t('aria.searchConversations')}
         className={styles.sidebarSearch}
-        placeholder="搜索..."
+        placeholder={t('sidebar.searchPlaceholder')}
         type="search"
         value={searchQuery}
         onChange={(event) => setSearchQuery(event.target.value)}
@@ -354,9 +354,9 @@ export function ConversationSidebar({
         value={sortBy}
         onChange={(event) => setSortBy(event.target.value as SortBy)}
       >
-        <option value="recent">最近活动</option>
-        <option value="name">名称</option>
-        <option value="active">活跃</option>
+        <option value="recent">{t('sidebar.sortRecent')}</option>
+        <option value="name">{t('sidebar.sortName')}</option>
+        <option value="active">{t('sidebar.sortActive')}</option>
       </select>
       {archivedCount > 0 && (
         <button type="button"
@@ -367,7 +367,7 @@ export function ConversationSidebar({
           <span className={styles.archiveFilterIcon} aria-hidden="true">
             <DesignNavIcon name="archive" size={14} />
           </span>
-          <span>{showArchived ? '已归档' : '归档'}</span>
+          <span>{showArchived ? t('sidebar.archived') : t('sidebar.archive')}</span>
           <span className={styles.archiveFilterCount}>{archivedCount}</span>
         </button>
       )}
@@ -641,12 +641,11 @@ export function ConversationSidebar({
           contentClassName={styles.conversationDeleteContent}
           onClose={() => setArchiveTarget(null)}
           open
-          title={t('conversation.archiveTitle', { defaultValue: '归档会话' })}
+          title={t('conversation.archiveTitle')}
         >
           <p className={styles.conversationDeleteText}>
             {t('conversation.archiveBody', {
               title: archiveTarget.title,
-              defaultValue: '确定要归档会话“{{title}}”吗？归档后可随时恢复。',
             })}
           </p>
           <div className={styles.conversationDeleteActions}>
@@ -664,7 +663,7 @@ export function ConversationSidebar({
                 onArchiveConversation?.(target.id, true);
               }}
             >
-              {t('conversation.archiveConfirm', { defaultValue: '归档' })}
+              {t('conversation.archiveConfirm')}
             </button>
           </div>
         </Modal>

@@ -136,8 +136,9 @@ describe('FilePreviewRouter interactive diff apply dispatch (#1817)', () => {
     await waitFor(() => {
       expect(currentToasts().some((toast) => toast.type === 'error')).toBe(true);
     });
-    // Silent console fallback is the defect this lane removes.
-    expect(consoleError).not.toHaveBeenCalled();
+    // #1826: the user-facing toast carries i18n copy; the raw error detail
+    // stays in the console for diagnosis instead of leaking into the toast.
+    expect(consoleError).toHaveBeenCalled();
   });
 
   it('routes accept-all through PreviewPort.applyAllRunDiffs with every hunk decision', async () => {

@@ -1,7 +1,9 @@
 import React, { type ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
 import { cx } from './cx';
 import styles from './MessageBubble.module.css';
 import { SkeletonBar } from './SkeletonBar';
+import { CHATVIEW_I18N_NAMESPACE } from '../chatview/i18n/resources';
 
 export interface MessageBubbleProps {
   author: ReactNode;
@@ -41,6 +43,7 @@ export function MessageBubble({
   isLoading,
   error,
 }: MessageBubbleProps) {
+  const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE);
   if (error) {
     const ContentTag = contentAs;
     return (
@@ -60,7 +63,7 @@ export function MessageBubble({
 
   if (isLoading) {
     return (
-      <article className={cx(styles.row, align === 'end' && styles.rowEnd, className)} data-align={align} aria-busy="true" aria-label="Loading message">
+      <article className={cx(styles.row, align === 'end' && styles.rowEnd, className)} data-align={align} aria-busy="true" aria-label={t('ui.loading', 'Loading message')}>
         <div className={cx(styles.bubble, bubbleClassName)}>
           <div className={cx(styles.meta, metaClassName)}>
             <strong className={authorClassName}>

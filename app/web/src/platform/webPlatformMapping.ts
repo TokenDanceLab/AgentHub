@@ -3,6 +3,8 @@ import {
   normalizeWorkbenchDataMode,
   type WorkbenchDataMode,
 } from '@shared/demo';
+import { appDateLocaleTag } from '@shared/i18n/locale';
+import { getI18n } from 'react-i18next';
 import type { WorkbenchAgent, WorkbenchConversation } from '@shared/platform';
 import type { AgentInfo } from '@shared/types';
 import type { MessageResponse, Session } from '@/api/hubClient';
@@ -100,7 +102,7 @@ export function formatHubPinTime(timestamp: string | undefined): string | undefi
   if (!timestamp) return undefined;
   const parsed = Date.parse(timestamp);
   if (!Number.isFinite(parsed)) return undefined;
-  return new Date(parsed).toLocaleTimeString('zh-CN', {
+  return new Date(parsed).toLocaleTimeString(appDateLocaleTag(getI18n()?.language), {
     hour: '2-digit',
     minute: '2-digit',
   });

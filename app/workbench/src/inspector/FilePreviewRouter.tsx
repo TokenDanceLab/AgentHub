@@ -1,6 +1,8 @@
 import React, { useCallback, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import type { PreviewPort, RuntimeEvidenceContentRef } from '@shared/platform';
 import type { FileDiff } from '@shared/types/chat';
+import { CHATVIEW_I18N_NAMESPACE } from '@shared/chatview/i18n/resources';
 import {
   DiffReviewPanel,
   type DiffHunkDecision,
@@ -116,14 +118,6 @@ function extractFileUrl(content: string | undefined): string {
   return '';
 }
 
-function describeError(err: unknown): string {
-  if (err instanceof Error) return err.message;
-  return String(err);
-}
-
-const APPLY_UNSUPPORTED_NOTE =
-  '当前端不支持将 diff 写回工作区（仅桌面本地 Edge 支持），当前为只读评审。';
-
 /** Interactive diff preview with hunk accept/reject that writes back to the workdir via the platform PreviewPort. */
 function InteractiveDiffPreview({
   file,
@@ -134,6 +128,7 @@ function InteractiveDiffPreview({
   onClose: () => void;
   previewPort?: PreviewPort | undefined;
 }): React.ReactElement {
+  const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE);
   const interactiveDiff = file.interactiveDiff;
   const showToast = useToastStore((state) => state.showToast);
   const applySupported = Boolean(previewPort?.applyRunDiff && previewPort?.applyAllRunDiffs);
@@ -158,7 +153,7 @@ function InteractiveDiffPreview({
     async (decision: DiffHunkDecision) => {
       if (!interactiveDiff) return;
       if (!previewPort?.applyRunDiff) {
-        showToast('warning', APPLY_UNSUPPORTED_NOTE);
+        showToast('warning', t('diffReview.applyUnsupported'));
         return;
       }
       try {
@@ -173,22 +168,24 @@ function InteractiveDiffPreview({
         });
         showToast(
           'success',
-          decision.accepted
-            ? `已应用 hunk：${decision.filePath} #${decision.hunkIndex + 1}`
-            : `已拒绝 hunk：${decision.filePath} #${decision.hunkIndex + 1}`
+          t(decision.accepted ? 'diffReview.hunkApplied' : 'diffReview.hunkRejected', {
+            file: decision.filePath,
+            index: decision.hunkIndex + 1,
+          })
         );
       } catch (err) {
-        showToast('error', `Diff 应用失败：${describeError(err)}`);
+        console.error('[FilePreviewRouter] apply hunk failed:', err);
+        showToast('error', t('diffReview.applyFailed'));
       }
     },
-    [interactiveDiff, previewPort, showToast]
+    [interactiveDiff, previewPort, showToast, t]
   );
 
   const handleApplyAllHunks = useCallback(
     async (decisions: DiffHunkDecision[]) => {
       if (!interactiveDiff) return;
       if (!previewPort?.applyAllRunDiffs) {
-        showToast('warning', APPLY_UNSUPPORTED_NOTE);
+        showToast('warning', t('diffReview.applyUnsupported'));
         return;
       }
       try {
@@ -204,13 +201,18 @@ function InteractiveDiffPreview({
         const acceptedCount = decisions.filter((item) => item.accepted).length;
         showToast(
           'success',
-          `已批量处理 ${decisions.length} 个 hunk（应用 ${acceptedCount}，拒绝 ${decisions.length - acceptedCount}）`
+          t('diffReview.applyAllSuccess', {
+            total: decisions.length,
+            applied: acceptedCount,
+            rejected: decisions.length - acceptedCount,
+          })
         );
       } catch (err) {
-        showToast('error', `Diff 批量应用失败：${describeError(err)}`);
+        console.error('[FilePreviewRouter] bulk apply diff failed:', err);
+        showToast('error', t('diffReview.applyAllFailed'));
       }
     },
-    [interactiveDiff, previewPort, showToast]
+    [interactiveDiff, previewPort, showToast, t]
   );
 
   if (!interactiveDiff) return <></>;
@@ -220,7 +222,7 @@ function InteractiveDiffPreview({
     <div className={styles.filePreview}>
       <div className={styles.filePreviewHeader}>
         <button className={styles.filePreviewClose} onClick={onClose} type="button">
-          {'<'} 返回
+          {'<'} {t('diffReview.back')}
         </button>
         <span className={styles.filePreviewTitle}>{fileDiff.filePath}</span>
       </div>
@@ -235,7 +237,7 @@ function InteractiveDiffPreview({
             borderBottom: '1px solid var(--td-border-hairline)',
           }}
         >
-          {APPLY_UNSUPPORTED_NOTE}
+          {t('diffReview.applyUnsupported')}
         </div>
       )}
       <DiffReviewPanel
@@ -253,13 +255,14 @@ export function FilePreviewRouter({
   onClose,
   previewPort,
 }: FilePreviewRouterProps): React.ReactElement {
+  const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE);
   // Interactive diff review with accept/reject write-back
   if (file.interactiveDiff) {
     return <InteractiveDiffPreview file={file} onClose={onClose} previewPort={previewPort} />;
   }
 
   const kind = detectFilePreviewKind(file.name);
-  const content = file.content ?? `${file.name}\n\n暂无文件内容。`;
+  const content = file.content ?? `${file.name}\n\n${t('filePreview.noContent')}`;
   // Structured runtime-evidence refs resolve through the host port; plain
   // content refs keep the generic string resolution path (#1817).
   const contentUrl = file.contentRef
@@ -300,7 +303,7 @@ export function FilePreviewRouter({
           filename={file.name}
           owner={file.owner}
           language={file.type}
-          content={file.content ?? `${file.name}\n\n暂无文件内容。`}
+          content={file.content ?? `${file.name}\n\n${t('filePreview.noContent')}`}
           diffContent={file.diffContent}
           onClose={onClose}
         />
@@ -357,19 +360,20 @@ function NativePdfPreview({
   contentUrl?: string | undefined;
   filename: string;
 }): React.ReactElement {
+  const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE);
   if (!contentUrl) {
     return (
       <NativePreviewFallback
-        detail="未提供可访问的 PDF 内容地址（当前端无可用内容端点），无法渲染预览。"
+        detail={t('filePreview.pdfNoUrl')}
         filename={filename}
-        title={`PDF 预览: ${filename}`}
+        title={t('filePreview.pdfTitle', { filename })}
       />
     );
   }
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
       <iframe
-        title={`PDF 预览 ${filename}`}
+        title={t('filePreview.pdfTitle', { filename })}
         src={contentUrl}
         style={{ flex: 1, border: 0, minHeight: 0 }}
         role="document"
@@ -379,9 +383,10 @@ function NativePdfPreview({
 }
 
 function NativeHtmlPreview({ content }: { content: string }): React.ReactElement {
+  const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE);
   return (
     <iframe
-      title="HTML 预览"
+      title={t('filePreview.htmlTitle')}
       style={{ flex: 1, border: 0, minHeight: 0, width: '100%' }}
       srcDoc={content}
       sandbox={PREVIEW_SANDBOX_SRCDOC}
@@ -397,14 +402,15 @@ function NativeImagePreview({
   contentUrl?: string | undefined;
   filename: string;
 }): React.ReactElement {
+  const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE);
   const [loadFailed, setLoadFailed] = useState(false);
 
   if (!contentUrl) {
     return (
       <NativePreviewFallback
-        detail="未提供可访问的图片内容地址（当前端无可用内容端点），无法渲染预览。"
+        detail={t('filePreview.imageNoUrl')}
         filename={filename}
-        title={`图片预览: ${filename}`}
+        title={t('filePreview.imageTitle', { filename })}
       />
     );
   }
@@ -412,9 +418,9 @@ function NativeImagePreview({
   if (loadFailed) {
     return (
       <NativePreviewFallback
-        detail="图片内容地址存在，但加载失败（可能已失效或当前端无访问权限）。"
+        detail={t('filePreview.imageLoadFailed')}
         filename={filename}
-        title={`图片预览: ${filename}`}
+        title={t('filePreview.imageTitle', { filename })}
       />
     );
   }
