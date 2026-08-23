@@ -95,9 +95,9 @@ describe('useWorkbenchAgentsRoute — real data mode', () => {
     expect(result.current.effectiveSelectedAgentId).toBe('');
     expect(result.current.selectedAgentIsDirty).toBe(false);
     expect(result.current.agentSaveStateLabel()).toBe('已同步');
-    // Mock catalogs still back the pickers when the list is empty.
-    expect(result.current.resolvedSkills).toEqual(WORKBENCH_MOCK_AGENT_SKILL_OPTIONS);
-    expect(result.current.resolvedModels).toEqual(WORKBENCH_MOCK_AGENT_MODELS);
+    // Real mode must NOT silently fall back to mock catalogs (#1872).
+    expect(result.current.resolvedSkills).toEqual([]);
+    expect(result.current.resolvedModels).toEqual([]);
 
     // Save/delete are guarded no-ops without a selection.
     await act(async () => {
