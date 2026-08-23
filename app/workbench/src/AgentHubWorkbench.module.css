@@ -290,11 +290,20 @@
   box-shadow: 0 0 0 3px var(--td-tint);
 }
 
+.sidebarSearchRow {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-xxs);
+  margin: var(--sp-10) var(--sp-10) var(--sp-xxs);
+}
+
 .sidebarSearch {
+  flex: 1 1 auto;
+  min-width: 0;
   width: auto;
   height: 38px;
   min-height: 38px;
-  margin: var(--sp-10) var(--sp-10) var(--sp-xxs);
+  margin: 0;
   padding: 0 var(--sp-14);
   border: 1px solid var(--glass-border, var(--td-line));
   border-radius: var(--r-md);
@@ -315,6 +324,40 @@
   border-color: var(--td-focus);
   box-shadow: var(--focus-ring);
   background: var(--glass-input-bg, var(--td-surface));
+}
+
+/* #1819: sidebar "new conversation" direct entry. Icon-only square button
+   adjacent to the search box; tokens only (no hardcoded colors). */
+.sidebarNewButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  border: 1px solid var(--glass-border, var(--td-line));
+  border-radius: var(--r-md);
+  background: var(--glass-input-bg, var(--td-surface-2));
+  color: var(--td-ink-muted);
+  cursor: pointer;
+  transition:
+    border-color var(--td-dur-normal) var(--td-ease),
+    box-shadow var(--td-dur-normal) var(--td-ease),
+    color var(--td-dur-normal) var(--td-ease),
+    background var(--td-dur-normal) var(--td-ease);
+}
+
+.sidebarNewButton:hover {
+  border-color: var(--td-line-strong, var(--td-plum));
+  background: var(--glass-input-bg, var(--td-surface));
+  color: var(--td-ink);
+}
+
+.sidebarNewButton:focus-visible {
+  border-color: var(--td-focus);
+  box-shadow: var(--focus-ring);
+  outline: none;
 }
 
 .sidebarSort {
@@ -1271,6 +1314,61 @@
   user-select: none;
 }
 
+/* ── #1819 pending-approval reminder strip (badge/count + jump) ── */
+.pendingApprovalStrip {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 32px;
+  padding: var(--wb-gap-2xs, 4px) var(--wb-gap-sm, 12px);
+  border-bottom: 1px solid var(--glass-border, var(--td-line));
+  background: var(--glass-panel, color-mix(in srgb, var(--td-surface) 86%, var(--td-canvas)));
+  backdrop-filter: var(--glass-backdrop-filter);
+  -webkit-backdrop-filter: var(--glass-backdrop-filter);
+}
+
+.pendingApprovalJump {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: min(100%, 520px);
+  padding: 2px 12px;
+  border: 1px solid var(--glass-border-strong, var(--td-line));
+  border-radius: 999px;
+  background: var(--glass-bg-light, var(--td-surface-2));
+  color: var(--td-ink-muted);
+  font: 600 12px/20px var(--td-font);
+  cursor: pointer;
+  transition:
+    background var(--td-dur-normal) var(--td-ease),
+    color var(--td-dur-normal) var(--td-ease),
+    border-color var(--td-dur-normal) var(--td-ease);
+}
+
+.pendingApprovalJump:hover {
+  background: var(--surface-highest);
+  color: var(--td-ink);
+  border-color: var(--td-warning);
+}
+
+.pendingApprovalDot {
+  width: 8px;
+  height: 8px;
+  flex: 0 0 auto;
+  border-radius: var(--r-full);
+  background: var(--td-warning);
+}
+
+.pendingApprovalCount {
+  white-space: nowrap;
+}
+
+.pendingApprovalJumpHint {
+  white-space: nowrap;
+  color: var(--td-ink-subtle);
+  font-weight: 400;
+}
+
 /* ── Reply-To banner above composer ── */
 .replyToBar {
   position: relative;
@@ -1767,6 +1865,13 @@
 }
 
 /* ── Attachment button ── */
+/* ── #1816 composer approval-mode picker (shared PermissionModePicker;
+   its own module styles realize the trigger/popover chrome) ── */
+.composerApprovalModePicker {
+  order: 0;
+  flex: 0 0 auto;
+}
+
 .attachmentButton {
   order: 0;
   width: 32px;
@@ -2891,6 +2996,11 @@
     height: var(--touch-target-min, 44px);
   }
 
+  .sidebarNewButton {
+    width: var(--touch-target-min, 44px);
+    height: var(--touch-target-min, 44px);
+  }
+
   .conversationButton {
     min-height: var(--touch-target-min, 44px);
   }
@@ -3312,6 +3422,7 @@
   .mainchainStrip,
   .composer,
   .pendingIntentBadge,
+  .pendingApprovalStrip,
   .replyToBar,
   .quoteBar,
   .composerMentions,

@@ -45,6 +45,12 @@ export interface ConversationSidebarProps {
   onDeleteConversation?: ((conversationId: string) => void) | undefined;
   /** Called after a conversation link has been copied to the clipboard. */
   onCopyConversationLink?: ((conversationId: string, link: string) => void) | undefined;
+  /** Called when the user wants to start a new conversation (#1819). The
+   *  shell owns the create-session call chain (Edge `createThread` on
+   *  Desktop, Hub `createPrivateSession` after peer selection on Web); this
+   *  callback only signals intent. Renders the header button + empty-state
+   *  CTA; both absent when the prop is not wired (backward compatible). */
+  onStartNewConversation?: (() => void) | undefined;
 }
 
 /**
@@ -101,6 +107,7 @@ export function ConversationSidebar({
   onRenameConversation,
   onDeleteConversation,
   onCopyConversationLink,
+  onStartNewConversation,
 }: ConversationSidebarProps): React.ReactElement {
   const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE);
   const [searchQuery, setSearchQuery] = useState('');
@@ -340,14 +347,27 @@ export function ConversationSidebar({
 
   return (
     <aside aria-label={t('aria.conversationSidebar')} className={styles.sidebar}>
-      <input
-        aria-label={t('aria.searchConversations')}
-        className={styles.sidebarSearch}
-        placeholder={t('sidebar.searchPlaceholder')}
-        type="search"
-        value={searchQuery}
-        onChange={(event) => setSearchQuery(event.target.value)}
-      />
+      <div className={styles.sidebarSearchRow}>
+        <input
+          aria-label={t('aria.searchConversations')}
+          className={styles.sidebarSearch}
+          placeholder={t('sidebar.searchPlaceholder')}
+          type="search"
+          value={searchQuery}
+          onChange={(event) => setSearchQuery(event.target.value)}
+        />
+        {onStartNewConversation && (
+          <button
+            aria-label={t('aria.newConversation')}
+            className={styles.sidebarNewButton}
+            title={t('aria.newConversation')}
+            type="button"
+            onClick={onStartNewConversation}
+          >
+            <DesignNavIcon name="plus" size={16} />
+          </button>
+        )}
+      </div>
       <select
         aria-label={t('aria.sortConversations') ?? '排序方式'}
         className={styles.sidebarSort}
@@ -407,6 +427,15 @@ export function ConversationSidebar({
                 <span className={styles.conversationEmptyHint}>
                   {t('sidebar.emptyHint')}
                 </span>
+                {onStartNewConversation && (
+                  <button
+                    type="button"
+                    className={styles.conversationEmptyAction}
+                    onClick={onStartNewConversation}
+                  >
+                    {t('sidebar.newConversation')}
+                  </button>
+                )}
               </>
             )}
           </li>

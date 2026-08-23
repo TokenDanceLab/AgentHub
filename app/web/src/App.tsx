@@ -3,7 +3,7 @@ import { useCallback, useMemo, useState, useSyncExternalStore } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AgentHubWorkbench } from '@agenthub/workbench';
 import { CHATVIEW_I18N_NAMESPACE } from '@shared/chatview/i18n/resources';
-import type { AgentConfig, ProjectDraft, ProjectInfo, SkillMarketItem, MCPMarketItem } from '@agenthub/workbench';
+import type { AgentConfig, ContactMember, ProjectDraft, ProjectInfo, SkillMarketItem, MCPMarketItem } from '@agenthub/workbench';
 import {
   allowsWorkbenchDemoRuntimeMutation,
   getWorkbenchDataModeContract,
@@ -21,6 +21,7 @@ import {
 } from '@/api/agentQueries';
 import { createHubClient } from '@/api/hubClient';
 import AuthPage from '@/components/AuthPage';
+import { StartConversationModal } from '@/components/StartConversationModal';
 import {
   createWebPlatform,
   resolveWebWorkbenchAgents,
@@ -149,6 +150,36 @@ function WebWorkbenchRoot() {
     }
   }, [hubClientForConversations]);
 
+  // #1819: sidebar "新建会话" — the Hub has no blank-session API (sessions
+  // are always peer-bounded), so the direct entry opens the contact picker
+  // and creates through the same real createPrivateSession chain the
+  // Contacts page uses. Errors stay visible in the modal (never swallowed;
+  // the legacy onNavigateToConversation catch → undefined is NOT copied).
+  const [startConversationOpen, setStartConversationOpen] = useState(false);
+  const [startConversationBusy, setStartConversationBusy] = useState(false);
+  const [startConversationError, setStartConversationError] = useState<string | undefined>();
+
+  const handleStartNewConversation = useCallback(() => {
+    setStartConversationError(undefined);
+    setStartConversationOpen(true);
+  }, []);
+
+  const handleStartConversation = useCallback(async (member: ContactMember) => {
+    setStartConversationBusy(true);
+    setStartConversationError(undefined);
+    try {
+      const result = await hubClientForConversations.createPrivateSession({ target_user_id: member.id });
+      setStartConversationOpen(false);
+      setSelectedConversationId(result.session_id);
+    } catch (error) {
+      setStartConversationError(t('error.startConversation', {
+        detail: error instanceof Error ? error.message : String(error),
+      }));
+    } finally {
+      setStartConversationBusy(false);
+    }
+  }, [hubClientForConversations, t]);
+
   async function handleAgentCreate(agent: AgentConfig): Promise<void> {
     setAgentActionError(undefined);
     setSavingAgentId(agent.id);
@@ -266,6 +297,7 @@ function WebWorkbenchRoot() {
         projectsPort={hubReady ? webProjectsPort : undefined}
         onApprovalDecision={workbench.onApprovalDecision}
         onNavigateToConversation={handleNavigateToConversation}
+        onStartNewConversation={handleStartNewConversation}
         onRegenerate={handleRegenerate}
         isAgentRunning={workbench.isAgentRunning}
         onCancelRun={workbench.onCancelRun}
@@ -356,6 +388,14 @@ function WebWorkbenchRoot() {
           />
         </div>
       )}
+      <StartConversationModal
+        busy={startConversationBusy}
+        error={startConversationError}
+        members={workbench.contacts?.members ?? []}
+        open={startConversationOpen}
+        onClose={() => setStartConversationOpen(false)}
+        onStart={(member) => { void handleStartConversation(member); }}
+      />
     </>
   );
 }

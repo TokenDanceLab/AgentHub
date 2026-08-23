@@ -21,6 +21,7 @@ import { useDeviceRegistration } from '@/hooks/useDeviceRegistration';
 import { useHealth } from '@/hooks/useHealth';
 import { useHubEventStream } from '@/hooks/useHubEventStream';
 import { useHubIntegration } from '@/hooks/useHubIntegration';
+import { useToastStore } from '@shared/ui/toast';
 
 vi.mock('@/api/eventClient', () => ({
   createEventStream: vi.fn(),
@@ -644,6 +645,56 @@ describe('Desktop App v4 root', () => {
     expect(screen.getByText('把 Desktop 接到真实 thread')).toBeInTheDocument();
     expect(screen.getByText('已读取 Edge thread item。')).toBeInTheDocument();
     expect(mockedUseThreadMessages).toHaveBeenCalledWith('thread-real');
+  });
+
+  it('starts a real Edge thread from the sidebar new-conversation button (#1819)', async () => {
+    window.localStorage.setItem(WORKBENCH_DATA_MODE_STORAGE_KEY, 'approved-real');
+    const createThreadMutateAsync = vi.fn(async () => ({
+      threadId: 'thread-new',
+      projectId: 'project-1',
+      title: '',
+      status: 'active',
+      createdAt: '2026-06-07T05:00:00Z',
+      updatedAt: '2026-06-07T05:00:00Z',
+    }));
+    mockedUseCreateThread.mockReturnValue({
+      mutateAsync: createThreadMutateAsync,
+    } as ReturnType<typeof useCreateThread>);
+    mockedUseThreads.mockReturnValue({
+      data: { items: [], page: { hasMore: false } },
+    } as ReturnType<typeof useThreads>);
+
+    renderWithProviders(<DesktopWorkbenchApp />);
+
+    // Empty thread list renders both the header icon button and the
+    // empty-state CTA (same key-echo name); the header button is first.
+    const newButtons = await screen.findAllByRole('button', { name: /newConversation/ });
+    fireEvent.click(newButtons[0]!);
+    await waitFor(() => {
+      expect(createThreadMutateAsync).toHaveBeenCalledWith({});
+    });
+  });
+
+  it('surfaces a visible error toast when the new Edge thread cannot be created (#1819)', async () => {
+    window.localStorage.setItem(WORKBENCH_DATA_MODE_STORAGE_KEY, 'approved-real');
+    mockedUseCreateThread.mockReturnValue({
+      mutateAsync: vi.fn(async () => { throw new Error('edge offline'); }),
+    } as ReturnType<typeof useCreateThread>);
+    mockedUseThreads.mockReturnValue({
+      data: { items: [], page: { hasMore: false } },
+    } as ReturnType<typeof useThreads>);
+
+    renderWithProviders(<DesktopWorkbenchApp />);
+
+    const newButtons = await screen.findAllByRole('button', { name: /newConversation/ });
+    fireEvent.click(newButtons[0]!);
+    // DesktopWorkbenchApp renders without the outer App ToastContainer, so the
+    // visible-failure contract is asserted at the shared toast store level:
+    // an error toast was queued with the startConversation message.
+    const { showToast: mockedShowToast } = useToastStore() as { showToast: ReturnType<typeof vi.fn> };
+    await waitFor(() => {
+      expect(mockedShowToast).toHaveBeenCalledWith('error', expect.stringMatching(/error\.startConversation|edge offline/));
+    });
   });
 
   // TODO: normalizeEdgeEvents rewrite (Wave 7) changed tool_call content rendering;
