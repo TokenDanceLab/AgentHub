@@ -19,6 +19,8 @@
       * passed row ⇒ real_tested=true（行级一致性）。
   - 无 secret 泄漏：manifest 内不得出现任何非空 secret-like key
     （password/secret/token/credential 值），凭据只允许以路径/方式引用。
+  - 无私有信息泄漏：所有字符串值不得含非 loopback URL host、非 loopback IP、
+    绝对文件系统路径或内网后缀 hostname（#1873）。
 
 失败语义：任何违反 → 非零退出 + stderr 信息（ps1 $ErrorActionPreference='Stop' 对齐）。
 
@@ -101,6 +103,91 @@ def assert_no_secret_values(manifest, context="manifest"):
     walk(manifest, context)
 
 
+LOOPBACK_IPV4_RE = re.compile(r"^127(?:\.\d{1,3}){3}$")
+LOOPBACK_HOSTS = {"localhost", "127.0.0.1", "::1", "[::1]"}
+
+URL_RE = re.compile(r"https?://([^\s/?#]+)", re.IGNORECASE)
+IPV4_RE = re.compile(r"(?<![\d.])(?:\d{1,3}\.){3}\d{1,3}(?![\d.])")
+WINDOWS_ABS_PATH_RE = re.compile(r"\b[A-Za-z]:[\\/][^\s\"']*")
+UNIX_ABS_PATH_RE = re.compile(r"(?<![\w./\\])/(?![\s/])[\w.-]+")
+INTERNAL_SUFFIX_HOST_RE = re.compile(
+    r"\b[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?\.(?:internal|local|corp|lan)\b",
+    re.IGNORECASE,
+)
+
+
+def _url_hosts(value):
+    """提取字符串内所有 http(s):// URL 的 host（去端口/去 IPv6 方括号）。"""
+    hosts = []
+    for match in URL_RE.finditer(value):
+        authority = match.group(1)
+        host = authority
+        if host.startswith("["):
+            end = host.find("]")
+            host = host[1:end] if end != -1 else host
+        else:
+            host = host.split(":", 1)[0]
+        hosts.append(host)
+    return hosts
+
+
+def _is_loopback_host(host):
+    """host 是否 loopback/localhost（公开 artifact 唯一允许的端点形态）。"""
+    lowered = host.lower()
+    return lowered in LOOPBACK_HOSTS or LOOPBACK_IPV4_RE.match(lowered)
+
+
+def _is_valid_ipv4(ip):
+    parts = ip.split(".")
+    return len(parts) == 4 and all(p.isdigit() and 0 <= int(p) <= 255 for p in parts)
+
+
+def assert_no_private_names(manifest, context="manifest"):
+    """递归扫描所有字符串值，拦截私有信息泄漏（#1873 第一切片）。
+
+    公开 Actions artifact 只应携带 sanitized manifest；以下形态 fail-closed：
+      * http(s):// URL host 非 loopback/localhost（含单标签内网 host、内网 IP、IPv6）
+      * 非 loopback IPv4（127.0.0.0/8 之外）
+      * 绝对文件系统路径（Windows 盘符或 Unix 前导 /）
+      * 内网后缀 hostname（*.internal / *.local / *.corp / *.lan）
+
+    允许（不误报）：loopback/localhost URL、相对路径（tests/artifacts/...、
+    app/web）、镜像引用 postgres:16 / redis:7、报告 basename、枚举值。
+    单标签内网 host 仅在 URL host 位置判定（唯一无歧义位置）；裸单标签
+    token（web/up/none/passed 等）不视作 hostname，避免把枚举误报为泄漏。
+    """
+
+    def walk(node, path_):
+        if isinstance(node, dict):
+            for key, value in node.items():
+                walk(value, f"{path_}.{key}")
+        elif isinstance(node, list):
+            for idx, value in enumerate(node):
+                walk(value, f"{path_}[{idx}]")
+        elif isinstance(node, str):
+            _check_string(node, path_)
+
+    def _check_string(value, path_):
+        if not value.strip():
+            return
+        for host in _url_hosts(value):
+            if not _is_loopback_host(host):
+                fail(f"manifest leaks non-loopback URL host '{host}' at {path_}: "
+                     f"public artifacts only allow loopback/localhost endpoints")
+        for match in IPV4_RE.finditer(value):
+            ip = match.group(0)
+            if _is_valid_ipv4(ip) and not LOOPBACK_IPV4_RE.match(ip):
+                fail(f"manifest leaks non-loopback IPv4 '{ip}' at {path_}")
+        if WINDOWS_ABS_PATH_RE.search(value):
+            fail(f"manifest leaks absolute Windows path at {path_}: redact filesystem paths")
+        if UNIX_ABS_PATH_RE.search(value):
+            fail(f"manifest leaks absolute Unix path at {path_}: redact filesystem paths")
+        if INTERNAL_SUFFIX_HOST_RE.search(value):
+            fail(f"manifest leaks internal-suffix hostname at {path_}: only public hostnames allowed")
+
+    walk(manifest, context)
+
+
 def main():
     parser = argparse.ArgumentParser(description="Verify a real-e2e lane evidence manifest against the six-field contract.")
     parser.add_argument("manifest", help="path to tests/artifacts/manifest-<stamp>.json")
@@ -165,6 +252,7 @@ def main():
         fail("status=no-evidence but a row claims passed (status should be passed)")
 
     assert_no_secret_values(manifest)
+    assert_no_private_names(manifest)
 
     print("real-e2e lane manifest contract ok")
     return 0
