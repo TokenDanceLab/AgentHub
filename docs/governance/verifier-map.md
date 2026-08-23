@@ -1,9 +1,9 @@
 # 规则 → 机器验证映射（verifier-map）
 
-> Owner：本文件是 AgentHub「规则 → 机器验证」映射的 SSOT。`AGENTS.md` §9.5 只保留指针，不复制本表。
+> Owner：本文件是 AgentHub「规则 → 机器验证」映射的 SSOT。`AGENTS.md` 的“规则 → 机器验证映射”只保留指针，不复制本表。
 > 机器门禁：`scripts/verify/verify-doc-ssot.py` 校验本表验证脚本路径与 CI 文件存在性。
 
-最后更新：2026-08-22（web stubbed-hub Playwright lane 接入 checks.yml → web-e2e-stubbed；此前同日标注 check-secrets.sh 与 verify-i18n-callsites.py 在 validate 内的 advisory 现状、i18n 行口径校准为脚本实际的违规文件数棘轮）
+最后更新：2026-08-23（文档门禁新增 AGENTS 主题名引用校验，禁止章节编号漂移；保留 web stubbed-hub Playwright、secrets/i18n advisory 与违规文件数棘轮口径）
 
 ## 映射表
 
@@ -16,7 +16,7 @@
 | Hub lint finding fingerprint ratchet（防新增/替换，#1573；go-hub 硬门禁，全量 lint 回退模式对 baseline 存量豁免） | `scripts/verify/verify-hub-lint-ratchet.py`（负向自测 `scripts/verify/tests/verify-hub-lint-ratchet.Tests.py`，baseline `scripts/verify/hub-lint-baseline.json`） | checks.yml → go-hub |
 | Edge lint finding fingerprint ratchet（防新增/替换，#1840 对偶 #1573；go-edge 硬门禁，全量 lint 回退模式对 baseline 存量豁免） | `scripts/verify/verify-edge-lint-ratchet.py`（负向自测 `scripts/verify/tests/verify-edge-lint-ratchet.Tests.py`，baseline `scripts/verify/edge-lint-baseline.json`） | checks.yml → go-edge |
 | skill 白名单只提交 active skill | `scripts/verify/verify-project-skills.py` | checks.yml → validate |
-| 文档与 Agent 入口 SSOT：根级入口/路径/行数/标记/映射表保鲜 | `scripts/verify/verify-doc-ssot.py`（负向自测 `scripts/verify/tests/verify-doc-entrypoints.Tests.py`） | checks.yml → validate |
+| 文档与 Agent 入口 SSOT：根级入口/路径/行数/标记/映射表保鲜；引用 AGENTS 规则必须写主题名、禁止章节编号 | `scripts/verify/verify-doc-ssot.py`（负向自测 `scripts/verify/tests/verify-doc-entrypoints.Tests.py`） | checks.yml → validate |
 | Web Hub-only 边界（不直连 Local Edge） | `scripts/verify/verify-web-hub-boundary.py` | checks.yml → validate |
 | Hub 纯包导入（不依赖框架包） | `scripts/verify/verify-hub-pure-packages.py` | checks.yml → validate |
 | Mobile Hub-only 边界（不直连 Local Edge/runtime） | `scripts/verify/verify-mobile-hub-boundary.py` | checks.yml → validate |
@@ -60,6 +60,6 @@
 
 ## 维护规则
 
-- 新增或变更机器门禁时更新本表；不要回写 `AGENTS.md` 的长表，`AGENTS.md` §9.5 只维护指针。
+- 新增或变更机器门禁时更新本表；不要回写 `AGENTS.md` 的长表，`AGENTS.md` 的“规则 → 机器验证映射”只维护指针。
 - 验证脚本路径、负向自测路径与 CI job 名会被 `verify-doc-ssot.py` 校验存在性；行内其他说明文字不做存在性检查。
 - 检查器退役时改写对应行的脚本列为说明文字（见 OIDC readiness 行先例），保留历史事实而不是删行。
