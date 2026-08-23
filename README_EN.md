@@ -55,17 +55,17 @@ AgentHub lets you collaborate with human teammates and AI agents in the same gro
 
 ## Quick Start
 
-Minimal local bootstrap (5 steps). Requires Docker, Go 1.26+, Node 22+/corepack, pnpm 10+.
+Minimal local bootstrap (5 steps). Requires OpenSSL, Docker, Go 1.26+, Node 22+/corepack, pnpm 10+.
 
 ```bash
-cp .env.example .env                        # 1. Copy dev env vars (includes dev defaults)
+cp .env.example .env && secret="$(openssl rand -hex 32)" && sed -i.bak "s/^AGENTHUB_JWT_SECRET=.*/AGENTHUB_JWT_SECRET=$secret/" .env && rm -f .env.bak && export AGENTHUB_JWT_SECRET="$secret" && unset secret  # 1. Copy config and generate a random dev secret
 docker compose up -d postgres redis         # 2. Start infra (PG16 + Redis7, 127.0.0.1 only)
 cd hub-server && go run ./cmd/server-hub    # 3. Start Hub Server (auto-migrates; API on :8080)
 cd ../app && corepack pnpm install          # 4. Install frontend deps
 pnpm dev                                    # 5. Start Desktop Vite (:5173); web uses pnpm dev:web
 ```
 
-Full bootstrap, OIDC setup, and Edge Server debugging: [docs/developer-quickstart.md](docs/developer-quickstart.md). Production deployment and required vars: [docs/architecture/05-deployment.md](docs/architecture/05-deployment.md).
+`.env.example` does not ship a reusable JWT secret. See [docs/developer-quickstart.md](docs/developer-quickstart.md) for the Windows PowerShell command, full bootstrap, OIDC setup, and Edge Server debugging. Production deployment and required vars: [docs/architecture/05-deployment.md](docs/architecture/05-deployment.md).
 
 ## Development
 
