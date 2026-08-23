@@ -139,6 +139,20 @@
   color-scheme: inherit;
 }
 
+/* Unsafe remote URL fallback (non-http(s) scheme): explicit notice, no iframe */
+.frameBlocked {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  box-sizing: border-box;
+  color: var(--td-ink-subtle);
+  font: 400 0.75rem var(--td-font);
+  text-align: center;
+}
+
 /* ── Status bar ── */
 .status {
   min-height: 30px;

@@ -633,3 +633,30 @@ describe('RowItem keyboard equivalents (Wave10 a11y)', () => {
     expect(onBlockSelect).not.toHaveBeenCalled();
   });
 });
+
+// ---------------------------------------------------------------------------
+// #1871: preview card must not leak the preview domain to a third-party
+// favicon service (previously Google s2/favicons).
+// ---------------------------------------------------------------------------
+describe('RowItem preview card privacy (#1871)', () => {
+  it('renders a local icon instead of a third-party favicon request', () => {
+    const item: RowItemType = {
+      id: 'preview-privacy-1',
+      type: 'preview',
+      label: 'Deploy',
+      status: 'ok',
+      collapsible: true,
+      open: true,
+      content: 'preview',
+      url: 'https://prod.example.com',
+      previewDomain: 'example.com',
+      previewTitle: 'Example',
+    };
+    const { container } = render(<RowItem item={item} />);
+
+    expect(container.querySelector('a.preview-card')).not.toBeNull();
+    expect(container.querySelector('img.preview-favicon')).toBeNull();
+    expect(container.textContent).not.toContain('google.com/s2/favicons');
+    expect(container.querySelector('a.preview-card svg')).not.toBeNull();
+  });
+});

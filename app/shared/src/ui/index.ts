@@ -61,7 +61,11 @@ export {
   runtimeIconRegistry,
 } from './runtimeIconRegistry';
 export type { RuntimeIconRegistry, RuntimeIconRegistryInput } from './runtimeIconRegistry';
-export { PREVIEW_SANDBOX_REMOTE, PREVIEW_SANDBOX_SRCDOC } from './previewSandbox';
+export {
+  PREVIEW_SANDBOX_REMOTE,
+  PREVIEW_SANDBOX_SRCDOC,
+  isSafeRemotePreviewUrl,
+} from './previewSandbox';
 export { SlideshowPreview } from './SlideshowPreview';
 export type { SlideshowPreviewProps } from './SlideshowPreview';
 export { TablePreview } from './TablePreview';
