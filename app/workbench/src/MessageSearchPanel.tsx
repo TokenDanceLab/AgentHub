@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
+import { useState, useMemo, useCallback, useEffect, useRef, useId } from 'react';
 import { getI18n, useTranslation } from 'react-i18next';
 import type { ChatMessage } from '@shared/types/chat';
 import type { TranscriptBlock } from '@shared/transcript';
@@ -128,9 +128,14 @@ export function MessageSearchPanel({
   const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE);
   const [immediateQuery, setImmediateQuery] = useState('');
   const [query, setQuery] = useState('');
+  // #1822: keyboard row navigation — ArrowUp/Down move the active row,
+  // Enter jumps to it (mirrors clicking a result).
+  const [activeIndex, setActiveIndex] = useState(0);
+  const listboxId = useId();
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inputRef = useState<HTMLInputElement | null>(null);
   const panelRef = useRef<HTMLDivElement | null>(null);
+  const activeResultRef = useRef<HTMLButtonElement | null>(null);
   useFocusTrap(panelRef, open);
 
   const searchableItems = useMemo(
@@ -206,14 +211,15 @@ export function MessageSearchPanel({
     return items;
   }, [searchableItems, query]);
 
-  const handleKeyDown = useCallback(
-    (e: React.KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        onClose();
-      }
-    },
-    [onClose],
-  );
+  // Reset the keyboard selection whenever the result set changes, and keep
+  // the active row in view while navigating.
+  useEffect(() => {
+    setActiveIndex(0);
+  }, [results]);
+
+  useEffect(() => {
+    activeResultRef.current?.scrollIntoView({ block: 'nearest' });
+  }, [activeIndex, results]);
 
   const handleResultClick = useCallback(
     (result: SearchResult) => {
@@ -222,6 +228,33 @@ export function MessageSearchPanel({
       onJumpToMessage(result.messageId, result.messageIndex);
     },
     [onJumpToMessage],
+  );
+
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+        return;
+      }
+      if (results.length === 0) return;
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setActiveIndex((i) => Math.min(i + 1, results.length - 1));
+        return;
+      }
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setActiveIndex((i) => Math.max(i - 1, 0));
+        return;
+      }
+      if (e.key === 'Enter') {
+        const active = results[activeIndex];
+        if (!active) return;
+        e.preventDefault();
+        handleResultClick(active);
+      }
+    },
+    [onClose, results, activeIndex, handleResultClick],
   );
 
   const formatTs = useCallback((timestamp: string) => {
@@ -255,6 +288,13 @@ export function MessageSearchPanel({
             ref={setInputRef}
             className={styles.input}
             type="search"
+            role="combobox"
+            aria-expanded={results.length > 0}
+            aria-controls={listboxId}
+            aria-activedescendant={
+              results[activeIndex] ? `${listboxId}-option-${activeIndex}` : undefined
+            }
+            aria-autocomplete="list"
             value={immediateQuery}
             onChange={(e) => setImmediateQuery(e.target.value)}
             placeholder={searchPlaceholder}
@@ -265,7 +305,7 @@ export function MessageSearchPanel({
           </Button>
         </div>
 
-        <div className={styles.results}>
+        <div className={styles.results} role="listbox" id={listboxId}>
           {query.trim() === '' && (
             <div className={styles.hint}>{searchPlaceholder}</div>
           )}
@@ -275,7 +315,15 @@ export function MessageSearchPanel({
           {results.map((result, idx) => (
             <button type="button"
               key={`${result.messageId}-${idx}`}
-              className={`${styles.resultItem} ${highlightMessageId === result.messageId ? styles.resultItemHighlight : ''}`}
+              ref={idx === activeIndex ? activeResultRef : undefined}
+              role="option"
+              id={`${listboxId}-option-${idx}`}
+              aria-selected={idx === activeIndex}
+              // #1853 review: keep the keyboard cursor aligned with the
+              // focused option — otherwise Enter on a tabbed-to result
+              // activates results[activeIndex] instead of the focused one.
+              onFocus={() => setActiveIndex(idx)}
+              className={`${styles.resultItem} ${idx === activeIndex ? styles.resultItemActive : ''} ${highlightMessageId === result.messageId ? styles.resultItemHighlight : ''}`}
               onClick={() => handleResultClick(result)}
             >
               <div className={styles.resultMeta}>
@@ -294,7 +342,13 @@ export function MessageSearchPanel({
         </div>
 
         <div className={styles.footer}>
-          <kbd>ESC</kbd> to close
+          <kbd>ESC</kbd> {t('messageSearch.footerClose', { defaultValue: '关闭' })}
+          {results.length > 0 && (
+            <span aria-hidden="true">
+              {' '}· <kbd>↑↓</kbd> {t('messageSearch.footerNavigate', { defaultValue: '选择' })}{' '}
+              · <kbd>Enter</kbd> {t('messageSearch.footerJump', { defaultValue: '跳转' })}
+            </span>
+          )}
         </div>
       </div>
     </div>

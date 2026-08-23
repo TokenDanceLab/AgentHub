@@ -1,12 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import type { TranscriptBlock } from '@shared/transcript';
 import type { WorkbenchAgent, WorkbenchConversation } from '@shared/platform';
+import { resetKeybindings, saveCustomKeybindings } from '@shared/utils/keyboardShortcuts';
 import {
   LOCAL_CLI_DISCOVERY_FALLBACK,
   buildInspectorTranscriptViews,
   buildMainchainEvidenceExportPayload,
   findConversationById,
   isChatSearchShortcut,
+  isEditableKeyboardTarget,
   mapAgentsToComposerMentions,
   resolveComposerTargetLabel,
   resolveCurrentConversationId,
@@ -271,6 +273,17 @@ describe('workbenchSessionChromeHelpers', () => {
     expect(isChatSearchShortcut({ key: 'k', ctrlKey: true, metaKey: false })).toBe(false);
   });
 
+  it('#1822: chat search shortcut follows the user-remapped (resolved) binding', () => {
+    saveCustomKeybindings([{ id: 'chat-search', keys: ['Ctrl/⌘', 'H'] }]);
+    try {
+      expect(isChatSearchShortcut({ key: 'h', ctrlKey: true, metaKey: false })).toBe(true);
+      // The canonical Ctrl+F no longer matches once remapped.
+      expect(isChatSearchShortcut({ key: 'f', ctrlKey: true, metaKey: false })).toBe(false);
+    } finally {
+      resetKeybindings();
+    }
+  });
+
   it('builds and serializes mainchain evidence export payload', () => {
     const payload = buildMainchainEvidenceExportPayload({
       exportedAt: '2026-01-01T00:00:00.000Z',
@@ -303,5 +316,36 @@ describe('workbenchSessionChromeHelpers', () => {
     expect(resolveComposerTargetLabel(targets, 't2')).toBe('Two');
     expect(resolveComposerTargetLabel(targets, 'gone')).toBeUndefined();
     expect(resolveComposerTargetLabel(undefined, 't1')).toBeUndefined();
+  });
+});
+
+describe('isEditableKeyboardTarget (#1822)', () => {
+  function el(tag: string, extra?: Partial<HTMLElement>): HTMLElement {
+    const node = document.createElement(tag);
+    if (extra?.isContentEditable !== undefined) {
+      // Assign directly: jsdom 29 does not expose contentEditable to the
+      // `in` operator, so an `'contentEditable' in node` guard would skip it.
+      node.contentEditable = 'true';
+    }
+    return node;
+  }
+
+  it('flags input/textarea/select/contenteditable as editable', () => {
+    expect(isEditableKeyboardTarget(el('input'))).toBe(true);
+    expect(isEditableKeyboardTarget(el('textarea'))).toBe(true);
+    expect(isEditableKeyboardTarget(el('select'))).toBe(true);
+    expect(isEditableKeyboardTarget(el('div', { isContentEditable: true }))).toBe(true);
+  });
+
+  it('does not flag non-editable targets', () => {
+    expect(isEditableKeyboardTarget(el('div'))).toBe(false);
+    expect(isEditableKeyboardTarget(el('button'))).toBe(false);
+    expect(isEditableKeyboardTarget(document.body)).toBe(false);
+  });
+
+  it('does not flag null or non-element targets', () => {
+    expect(isEditableKeyboardTarget(null)).toBe(false);
+    expect(isEditableKeyboardTarget({ tagName: 'DIV' })).toBe(false);
+    expect(isEditableKeyboardTarget(undefined)).toBe(false);
   });
 });

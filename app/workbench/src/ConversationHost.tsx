@@ -11,6 +11,12 @@ import {
   createInitialComposerState,
 } from '@shared/composer';
 import {
+  handleDocumentDragLeave,
+  handleDocumentDragOver,
+  handleDocumentDrop,
+  type ComposerDocumentFileDropCallbacks,
+} from './composerDocumentFileDrop';
+import {
   enqueuePendingIntent,
   MAX_PENDING_DISPATCH_RETRIES,
   markPendingIntentRetried,
@@ -271,6 +277,39 @@ export const ConversationHost = React.memo(function ConversationHost({
     setPendingUserBlocks((current) => unacknowledgedPendingUserBlocks(transcript, current));
   }, [transcript]);
 
+  /* #1822: file drag-and-drop beyond the composer form — dropping files on
+     the transcript/sidebar/headers used to let the browser open the file.
+     Route any Files drag anywhere outside the composer to the attachment
+     chips instead. The composer's own form handlers keep precedence
+     (events originating inside [data-composer-form] are skipped here). */
+  const [filesDragging, setFilesDragging] = useState(false);
+  // Live conversation id for the drop continuation — a ref keeps the
+  // listener effect stable while always reading the current value
+  // (#1853 review: switching mid-conversion must not leak attachments).
+  const composerConversationIdRef = useRef(composer.conversationId);
+  composerConversationIdRef.current = composer.conversationId;
+  useEffect(() => {
+    // Routing decisions live in composerDocumentFileDrop (unit-tested);
+    // ConversationHost only owns listener registration + the dragging flag.
+    const callbacks: ComposerDocumentFileDropCallbacks = {
+      dispatchComposer,
+      onToast,
+      onDraggingChange: setFilesDragging,
+      getCurrentConversationId: () => composerConversationIdRef.current,
+    };
+    const onDocumentDragOver = (event: DragEvent): void => handleDocumentDragOver(callbacks, event);
+    const onDocumentDragLeave = (event: DragEvent): void => handleDocumentDragLeave(callbacks, event);
+    const onDocumentDrop = (event: DragEvent): void => handleDocumentDrop(callbacks, event);
+    document.addEventListener('dragover', onDocumentDragOver);
+    document.addEventListener('dragleave', onDocumentDragLeave);
+    document.addEventListener('drop', onDocumentDrop);
+    return () => {
+      document.removeEventListener('dragover', onDocumentDragOver);
+      document.removeEventListener('dragleave', onDocumentDragLeave);
+      document.removeEventListener('drop', onDocumentDrop);
+    };
+  }, [dispatchComposer, onToast]);
+
   const submitComposer = useCallback(async (event: FormEvent<HTMLFormElement>): Promise<void> => {
     event.preventDefault();
     if (isSubmittingRef.current) return;
@@ -449,6 +488,11 @@ export const ConversationHost = React.memo(function ConversationHost({
 
   return (
     <>
+      {filesDragging && (
+        <div className={styles.transcriptDropOverlay} role="status" aria-live="polite">
+          {t('composer.dropToAttach', { defaultValue: '松开鼠标以添加附件' })}
+        </div>
+      )}
       <WorkspaceHeader activeConversation={activeConversation}
         inspectorCollapsed={inspectorCollapsed} onToggleInspector={onToggleInspector} onOpenSearch={() => onSearchOpenChange(true)} />
       {showMainchainStatus && <MainchainStatusStrip summary={mainchainSummary} onExportEvidence={onExportMainchainEvidence} />}

@@ -411,7 +411,7 @@ describe('useWorkbenchTranscriptChrome', () => {
     expect(onApprovalDecision).toHaveBeenCalledTimes(2);
   });
 
-  it('wires pin/unpin/react/recall through the REST handlers with a session id', () => {
+  it('wires pin/unpin/recall through the REST handlers with a session id', () => {
     const onPinMessage = vi.fn();
     const onUnpinMessage = vi.fn();
     const onAddMessageReaction = vi.fn();
@@ -437,11 +437,11 @@ describe('useWorkbenchTranscriptChrome', () => {
     expect(onUnpinMessage).toHaveBeenCalledWith('pinned-1', 's1');
     expect(result.current.toastMessage).toBe('toast.unpinned');
 
-    act(() => {
-      findMenuAction(result.current.contextMenuGroups('b1'), 'context.react')?.();
-    });
-    expect(onAddMessageReaction).toHaveBeenCalledWith('b1', 's1', '👍');
-    expect(result.current.toastMessage).toBe('toast.reactionAdded');
+    // #1822: the react menu entry was write-only (POST fired but the
+    // transcript never rendered or cancelled reactions) — removed.
+    const labels = result.current.contextMenuGroups('b1').flat().map((item) => item.label);
+    expect(labels).not.toContain('context.react');
+    expect(onAddMessageReaction).not.toHaveBeenCalled();
 
     act(() => {
       findMenuAction(result.current.contextMenuGroups('u1'), 'context.recall')?.();

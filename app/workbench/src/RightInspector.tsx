@@ -12,6 +12,7 @@ import {
   getInspectorTabs,
   type InspectorMode,
 } from './inspector';
+import { WORKBENCH_INSPECTOR_QUICK_OPEN_EVENT } from './desktopChromeEvents';
 import styles from './AgentHubWorkbench.module.css';
 import { RightInspectorModePanel } from './RightInspectorModePanel';
 import { RightInspectorResizer } from './RightInspectorResizer';
@@ -67,6 +68,22 @@ export function RightInspector({
   const [quickOpenVisible, setQuickOpenVisible] = useState(false);
   const [previewFile, setPreviewFile] = useState<PreviewFile | null>(null);
   const [browserUrl, setBrowserUrl] = useState<string | null>(null);
+
+  // #1822: Ctrl+P quick-open from the workbench keyboard dispatcher. The
+  // event targets the inspector because tab visibility is owned here; the
+  // dispatcher expands the inspector first (openInspector), so the detail
+  // only needs the mode.
+  useEffect(() => {
+    function handleQuickOpen(event: Event): void {
+      const mode = (event as CustomEvent<{ mode?: string }>).detail?.mode;
+      if (mode !== 'files' && mode !== 'browser') return;
+      setQuickOpenVisible(false);
+      setVisibleTabs((current) => withInspectorTab(current, mode));
+      setActiveMode(mode);
+    }
+    window.addEventListener(WORKBENCH_INSPECTOR_QUICK_OPEN_EVENT, handleQuickOpen);
+    return () => window.removeEventListener(WORKBENCH_INSPECTOR_QUICK_OPEN_EVENT, handleQuickOpen);
+  }, []);
 
   const model = buildInspectorEvidenceModel(evidence);
   const dagNodes = useMemo(() => resolveDagNodesFromRouteBlocks(routeBlocks), [routeBlocks]);

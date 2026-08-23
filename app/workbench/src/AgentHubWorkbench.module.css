@@ -1555,6 +1555,8 @@
   color: var(--td-ink);
   outline: none;
   resize: none;
+  /* #1822 auto-grow: scroll past the max-height instead of clipping. */
+  overflow-y: auto;
 }
 
 .composerInput::placeholder {
@@ -3407,4 +3409,20 @@
   .connectionDot[data-status='connecting'] {
     animation: none;
   }
+}
+
+/* #1822: full-viewport Files drop zone for drops outside the composer. */
+.transcriptDropOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: color-mix(in oklch, var(--td-surface) 82%, transparent);
+  border: 2px dashed var(--td-plum);
+  color: var(--td-ink);
+  font-size: 14px;
+  font-weight: 520;
+  pointer-events: none;
 }

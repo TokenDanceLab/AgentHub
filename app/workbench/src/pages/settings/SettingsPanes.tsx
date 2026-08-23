@@ -3,7 +3,7 @@
    Residual thin: helpers + parts (#686).
    ═══════════════════════════════════════════════════════════════════════ */
 
-import React from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { CHATVIEW_I18N_NAMESPACE } from '@shared/chatview/i18n/resources';
 import { SHARED_WORKBENCH_I18N_NAMESPACE } from '@shared/i18n';
@@ -28,10 +28,16 @@ import { resolvePermissionValue } from './SettingsPaneHelpers';
 import { PERMISSION_ROWS } from './types';
 import type { SettingsPageProps, SettingsPaneId } from './types';
 import {
-  getResolvedShortcutGroups,
   checkConflicts,
+  deriveKeysFromEvent,
+  getCustomKeybindings,
+  getResolvedShortcutGroups,
+  hasCustomKeybindings,
+  resetKeybindings,
+  saveCustomKeybindings,
 } from '@shared/utils/keyboardShortcuts';
 import type { KeyboardShortcutGroup } from '@shared/utils/keyboardShortcuts';
+import styles from './SettingsPanes.module.css';
 
 export {
   DataModeStatus,
@@ -270,41 +276,125 @@ function shortcutConflictId(group: KeyboardShortcutGroup, shortcutId: string): s
 }
 
 export function ShortcutsPane(_props: SettingsPageProps): React.ReactElement {
-  const groups = getResolvedShortcutGroups();
+  const { t: tw } = useTranslation(SHARED_WORKBENCH_I18N_NAMESPACE);
+  // shortcut.* keys live in the chatview bundle — translate labels with the
+  // owning namespace instead of rendering raw keys (#1853 review).
+  const { t: tc } = useTranslation(CHATVIEW_I18N_NAMESPACE);
+  // #1822: previously read-only and dead — saveCustomKeybindings /
+  // resetKeybindings had no UI callers. Rows now record a key combo on
+  // click (capture listener) and persist via saveCustomKeybindings; the
+  // dispatcher reads resolved groups, so remaps take effect immediately.
+  const [groups, setGroups] = useState<KeyboardShortcutGroup[]>(getResolvedShortcutGroups);
+  const [recordingId, setRecordingId] = useState<string | null>(null);
+  // #1853 review: keep BOTH ids — the shortcut being recorded (whose row
+  // shows the rejection) and the shortcut it collided with (message context).
+  const [conflictState, setConflictState] = useState<{ recordedId: string; conflictingId: string } | null>(null);
+  const hasCustom = useMemo(() => hasCustomKeybindings(), [groups]);
+
+  useEffect(() => {
+    const targetId = recordingId;
+    if (!targetId) return;
+    function handleRecord(event: KeyboardEvent): void {
+      event.preventDefault();
+      event.stopPropagation();
+      if (event.key === 'Escape') {
+        setRecordingId(null);
+        return;
+      }
+      const keys = deriveKeysFromEvent(event);
+      if (keys.length === 0) return;
+      // Guarded above (`if (!targetId) return`) — assert to keep the closure's
+      // captured narrow (task TS version does not retain it in nested function
+      // declarations).
+      const capturedId = targetId as string;
+      // Block a remap that collides with another (resolved) binding — the
+      // conflict badge would otherwise show two rows sharing one combo.
+      const conflict = checkConflicts(keys, capturedId);
+      if (conflict) {
+        setConflictState({ recordedId: capturedId, conflictingId: conflict.id });
+        setRecordingId(null);
+        return;
+      }
+      setConflictState(null);
+      // #1853 review: MERGE with existing custom bindings — a whole-map
+      // replace silently dropped every previously remapped shortcut.
+      saveCustomKeybindings([
+        ...getCustomKeybindings().filter((binding) => binding.id !== capturedId),
+        { id: capturedId, keys },
+      ]);
+      setRecordingId(null);
+      setGroups(getResolvedShortcutGroups());
+    }
+    document.addEventListener('keydown', handleRecord, true);
+    return () => document.removeEventListener('keydown', handleRecord, true);
+  }, [recordingId]);
 
   return (
     <>
+      <SettingsRow
+        label={tw('settings.shortcuts.customize', { defaultValue: '自定义快捷键' })}
+        description={tw('settings.shortcuts.customizeDetail', { defaultValue: '点击按键组合即可录制新的绑定；所有绑定立即生效。' })}
+      >
+        <button
+          type="button"
+          className={styles.resetButton}
+          onClick={() => {
+            resetKeybindings();
+            setConflictState(null);
+            setGroups(getResolvedShortcutGroups());
+          }}
+          disabled={!hasCustom && !recordingId}
+        >
+          {tw('settings.shortcuts.reset', { defaultValue: '重置为默认' })}
+        </button>
+      </SettingsRow>
       {groups.map((group) => (
-        <SettingsSection key={group.id} title={group.labelKey}>
+        <SettingsSection key={group.id} title={tc(group.labelKey)}>
           {group.shortcuts.map((shortcut) => {
-            const conflictId = shortcutConflictId(group, shortcut.id);
-            const hasConflict = conflictId !== null;
+            const conflictIdNow = shortcutConflictId(group, shortcut.id);
+            const hasConflict = conflictIdNow !== null;
+            // #1853 review: the rejection belongs to the RECORDED shortcut —
+            // not to the colliding one and not to every row.
+            const recordedConflict = conflictState?.recordedId === shortcut.id;
             return (
               <SettingsRow
                 key={shortcut.id}
-                label={shortcut.labelKey}
+                label={tc(shortcut.labelKey)}
                 description={
-                  hasConflict
-                    ? `冲突: 与 "${conflictId}" 按键相同`
-                    : (shortcut.detailKey ?? '')
+                  shortcut.rebindable === false
+                    ? (shortcut.detailKey ? tc(shortcut.detailKey) : '')
+                    : recordingId === shortcut.id
+                      ? tw('settings.shortcuts.recording', { defaultValue: '按下新的按键组合…（Esc 取消）' })
+                      : recordedConflict
+                        ? tw('settings.shortcuts.conflict', {
+                          defaultValue: '该组合与「{{id}}」冲突，未保存',
+                          id: conflictState.conflictingId,
+                        })
+                        : hasConflict
+                          ? `冲突: 与 "${conflictIdNow}" 按键相同`
+                          : (shortcut.detailKey ? tc(shortcut.detailKey) : '')
                 }
               >
-                <span
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: 4,
-                    fontFamily: 'var(--mono, monospace)',
-                    fontSize: '0.8125rem',
-                    color: hasConflict ? 'var(--td-danger, #e5484d)' : 'var(--td-ink-muted)',
-                    background: hasConflict ? 'var(--danger-bg, rgba(229,72,77,0.08))' : 'var(--bg-3)',
-                    padding: '2px 8px',
-                    borderRadius: 4,
-                    border: hasConflict ? '1px solid var(--td-danger, #e5484d)' : '1px solid var(--td-line)',
-                  }}
-                >
-                  {formatKeys(shortcut.keys)}
-                </span>
+                {shortcut.rebindable === false ? (
+                  // #1823: selection-mode hotkeys are declarative only —
+                  // resolveSelectionHotkey owns their fixed bindings, so the
+                  // pane renders them without a recorder.
+                  <span className={styles.fixedKey}>{formatKeys(shortcut.keys)}</span>
+                ) : (
+                  <button
+                    type="button"
+                    aria-label={tw('settings.shortcuts.remap', { defaultValue: '重新绑定' })}
+                    className={hasConflict || recordedConflict ? styles.keyButtonDanger : styles.keyButton}
+                    onClick={() => {
+                      setConflictState(null);
+                      setRecordingId((current) => current === shortcut.id ? null : shortcut.id);
+                    }}
+                  >
+                    {recordingId === shortcut.id
+                      ? tw('settings.shortcuts.recording', { defaultValue: '按下…' })
+                      : formatKeys(shortcut.keys)}
+                  </button>
+                )}
               </SettingsRow>
             );
           })}

@@ -56,7 +56,6 @@ import { getHubClient } from '@/api/hubQueries';
 import type { AgentConfig, ConnectionStatusKind, DevicesPageTarget, DocRow, SkillMarketItem, MCPMarketItem } from '@agenthub/workbench';
 import { getDemoRuntimeEvidence } from '@/demo/demoEvidence';
 import { useToastStore, ToastContainer } from '@shared/ui/toast';
-import { useGlobalKeyboardShortcuts } from '@/hooks/useGlobalKeyboardShortcuts';
 
 export default function App() {
   const [entryMode, setEntryMode] = useState<'entry' | 'workbench'>('entry');
@@ -149,8 +148,9 @@ export function DesktopWorkbenchApp({ onLogout }: DesktopWorkbenchAppProps = {})
   const agentsRef = useRef<WorkbenchAgent[] | undefined>(undefined);
   const showToast = useToastStore((s) => s.showToast);
 
-  // Central keyboard shortcut dispatch
-  useGlobalKeyboardShortcuts();
+  // Desktop workbench state — the shared AgentHubWorkbench owns the global
+  // keyboard dispatcher (#1822), so the former desktop-only
+  // useGlobalKeyboardShortcuts hook is gone.
 
   const liveEdgeEnabled = edgeOnline && !workbench.isDemo;
   // In auto mode with Local Edge fallback, also fetch evidence from Edge API.

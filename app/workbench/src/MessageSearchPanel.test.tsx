@@ -240,15 +240,86 @@ describe('MessageSearchPanel', () => {
     expect(document.activeElement).toBe(closeBtn);
   });
 
-  it('cycles Tab through result buttons back to the input', async () => {
+  it('cycles Tab through result options back to the input', async () => {
     render(<MessageSearchPanel {...defaultProps} />);
     const input = screen.getByPlaceholderText<HTMLInputElement>('Type to search...');
     fireEvent.change(input, { target: { value: 'auth module' } });
     await flushDebounce();
-    const resultButtons = screen.getAllByRole('button').filter((btn) => btn !== input);
-    const lastResult = resultButtons[resultButtons.length - 1]!;
+    const resultOptions = screen.getAllByRole('option');
+    expect(resultOptions.length).toBeGreaterThan(0);
+    const lastResult = resultOptions[resultOptions.length - 1]!;
     lastResult.focus();
     fireEvent.keyDown(lastResult, { key: 'Tab' });
     expect(document.activeElement).toBe(input);
+  });
+
+  // ── #1822 keyboard navigation ─────────────────────────
+
+  function activeResultButtons(): HTMLElement[] {
+    return screen.getAllByRole('option').filter(
+      (btn) => btn.getAttribute('aria-selected') === 'true',
+    );
+  }
+
+  it('ArrowDown/ArrowUp move the active row', async () => {
+    render(<MessageSearchPanel {...defaultProps} />);
+    const input = screen.getByPlaceholderText<HTMLInputElement>('Type to search...');
+    fireEvent.change(input, { target: { value: 'auth' } });
+    await flushDebounce();
+    expect(activeResultButtons().length).toBe(1);
+
+    // Move down twice — the active row stays unique and clamps at the last.
+    fireEvent.keyDown(input, { key: 'ArrowDown' });
+    fireEvent.keyDown(input, { key: 'ArrowDown' });
+    fireEvent.keyDown(input, { key: 'ArrowDown' });
+    expect(activeResultButtons().length).toBe(1);
+
+    // Move back up — still unique.
+    fireEvent.keyDown(input, { key: 'ArrowUp' });
+    expect(activeResultButtons().length).toBe(1);
+  });
+
+  it('Enter jumps to the active result (same as clicking it)', async () => {
+    const onJump = vi.fn();
+    render(<MessageSearchPanel {...defaultProps} onJumpToMessage={onJump} />);
+    const input = screen.getByPlaceholderText<HTMLInputElement>('Type to search...');
+    fireEvent.change(input, { target: { value: 'auth' } });
+    await flushDebounce();
+
+    fireEvent.keyDown(input, { key: 'ArrowDown' });
+    fireEvent.keyDown(input, { key: 'ArrowDown' });
+    fireEvent.keyDown(input, { key: 'Enter' });
+
+    // 'auth' matches m2 (auth module) and m3 (src/auth.ts) — after two
+    // ArrowDowns the active result is m3 (messageIndex 2).
+    expect(onJump).toHaveBeenCalledWith('m3', 2);
+  });
+
+  it('Enter on the first result jumps to it without any ArrowDown', async () => {
+    const onJump = vi.fn();
+    render(<MessageSearchPanel {...defaultProps} onJumpToMessage={onJump} />);
+    const input = screen.getByPlaceholderText<HTMLInputElement>('Type to search...');
+    fireEvent.change(input, { target: { value: 'bug' } });
+    await flushDebounce();
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(onJump).toHaveBeenCalledWith('m1', 0);
+  });
+
+  it('#1853 review: Enter activates the tab-focused result, not the cursor row', async () => {
+    const onJump = vi.fn();
+    render(<MessageSearchPanel {...defaultProps} onJumpToMessage={onJump} />);
+    const input = screen.getByPlaceholderText<HTMLInputElement>('Type to search...');
+    fireEvent.change(input, { target: { value: 'auth' } });
+    await flushDebounce();
+    // 'auth' matches m2 (messageIndex 1) and m3 (messageIndex 2); the
+    // keyboard cursor starts on the first row (m2).
+    const options = screen.getAllByRole('option');
+    expect(options).toHaveLength(2);
+
+    // Tab to the second result — focus updates the cursor (onFocus), so
+    // Enter must open THAT result instead of the original cursor row.
+    fireEvent.focus(options[1]!);
+    fireEvent.keyDown(options[1]!, { key: 'Enter' });
+    expect(onJump).toHaveBeenCalledWith('m3', 2);
   });
 });
