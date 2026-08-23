@@ -369,7 +369,9 @@
   /* ── Responsive Breakpoints (documentation — copy into @media) ──── */
   /* CSS custom properties cannot be used inside @media queries.       */
   /* JS/TS machine SSOT + layout strategy: styles/breakpoints.ts.      */
+  /* --bp-minimal:  420px;  ≤420 deep compact, single-column stacks    */
   /* --bp-mobile:   480px;  ≤480 compact / touch-target enlarge        */
+  /* --bp-compact:  720px;  ≤720 dense chrome band (mobile↔narrow)     */
   /* --bp-narrow:   768px;  ≤768 mobile shell, sidebar collapse (SSOT) */
   /* --bp-medium:  1024px;  ≥1024 full desktop layout                  */
   /* --bp-standard:1280px;  ≥1280 standard desktop window (3-panel)    */
