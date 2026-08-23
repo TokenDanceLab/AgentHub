@@ -702,6 +702,26 @@
 .agent-detail > * {
   width: min(100%, 392px);
 }
+/* #1874: Chromium/WebKit thin scrollbar — Firefox gets scrollbar-width: thin,
+   Chromium needs ::-webkit-scrollbar to match the same slim affordance. */
+.agent-detail::-webkit-scrollbar,
+.agent-section::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+.agent-detail::-webkit-scrollbar-thumb,
+.agent-section::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+  border-radius: var(--r-full);
+}
+.agent-detail::-webkit-scrollbar-thumb:hover,
+.agent-section::-webkit-scrollbar-thumb:hover {
+  background: var(--scrollbar-thumb-hover);
+}
+.agent-detail::-webkit-scrollbar-track,
+.agent-section::-webkit-scrollbar-track {
+  background: var(--scrollbar-track);
+}
 
 .agent-detail:hover {
   border-color: var(--glass-border-strong, var(--td-line-strong));
