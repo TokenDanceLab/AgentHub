@@ -41,6 +41,7 @@ func TestMapACPSessionUpdate_ToolCallCompletedEmitsResult(t *testing.T) {
 		"read file",
 		acp.WithStartKind(acp.ToolKindRead),
 		acp.WithStartStatus(acp.ToolCallStatusCompleted),
+		acp.WithStartRawInput(map[string]any{"path": "/tmp/a.txt"}),
 		acp.WithStartRawOutput(map[string]any{"ok": true}),
 	))
 	if len(got) != 2 {
@@ -49,8 +50,17 @@ func TestMapACPSessionUpdate_ToolCallCompletedEmitsResult(t *testing.T) {
 	if got[0].EventType != BusEventToolCall || got[0].Payload["tool_call_id"] != "tc_1" {
 		t.Errorf("tool_call event wrong: %+v", got[0])
 	}
+	if got[0].Payload["toolName"] != "read file" {
+		t.Errorf("tool_call toolName = %v, want read file", got[0].Payload["toolName"])
+	}
+	if input, ok := got[0].Payload["input"].(map[string]any); !ok || input["path"] != "/tmp/a.txt" {
+		t.Errorf("tool_call input = %v, want map with path /tmp/a.txt", got[0].Payload["input"])
+	}
 	if got[1].EventType != BusEventToolResult {
 		t.Fatalf("second event = %q, want %q", got[1].EventType, BusEventToolResult)
+	}
+	if got[1].Payload["toolName"] != "read file" {
+		t.Errorf("tool_result toolName = %v, want read file", got[1].Payload["toolName"])
 	}
 	if got[1].Payload["raw_output"] != `{"ok":true}` {
 		t.Errorf("raw_output = %v, want {\"ok\":true}", got[1].Payload["raw_output"])
@@ -68,6 +78,38 @@ func TestMapACPSessionUpdate_ToolCallInProgressNoResult(t *testing.T) {
 	}
 	if got[0].Payload["status"] != "in_progress" {
 		t.Errorf("status = %v, want in_progress", got[0].Payload["status"])
+	}
+	if got[0].Payload["toolName"] != "read file" {
+		t.Errorf("toolName = %v, want read file", got[0].Payload["toolName"])
+	}
+}
+
+func TestMapACPSessionUpdate_ToolCallToolNameKindFallback(t *testing.T) {
+	got := mapACPSessionUpdate(acp.StartToolCall(
+		"tc_3",
+		"",
+		acp.WithStartKind(acp.ToolKindExecute),
+		acp.WithStartStatus(acp.ToolCallStatusInProgress),
+	))
+	if len(got) != 1 || got[0].EventType != BusEventToolCall {
+		t.Fatalf("expected one tool_call event, got %+v", got)
+	}
+	if got[0].Payload["toolName"] != "execute" {
+		t.Errorf("toolName = %v, want kind fallback execute", got[0].Payload["toolName"])
+	}
+}
+
+func TestMapACPSessionUpdate_ToolCallNoNameFallsBackUnknown(t *testing.T) {
+	got := mapACPSessionUpdate(acp.StartToolCall(
+		"tc_4",
+		"",
+		acp.WithStartStatus(acp.ToolCallStatusInProgress),
+	))
+	if len(got) != 1 || got[0].EventType != BusEventToolCall {
+		t.Fatalf("expected one tool_call event, got %+v", got)
+	}
+	if got[0].Payload["toolName"] != "unknown" {
+		t.Errorf("toolName = %v, want unknown", got[0].Payload["toolName"])
 	}
 }
 
