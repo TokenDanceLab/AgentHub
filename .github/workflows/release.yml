@@ -45,9 +45,11 @@ jobs:
           fi
           echo "tag ancestry ok: $GITHUB_REF_NAME is on master"
 
-  # ── Security Gate: release readiness (no Open High + signing policy) ─
-  # Hard-blocking (no continue-on-error): Open Critical/High risks block
-  # release. Signing policy (scripts/release/verify-release-gate.py):
+  # ── Security Gate: release readiness (risk status + signing policy) ─
+  # Hard-blocking (no continue-on-error): exact Open, rotate required, or any
+  # verification required Critical/High status blocks release; malformed or
+  # unknown Critical/High statuses fail closed.
+  # Signing policy (scripts/release/verify-release-gate.py):
   #   - RELEASE_SIGNING_APPROVED=true + signing evidence → signed release
   #   - RELEASE_UNSIGNED_OK=true → Windows unsigned release (SmartScreen
   #     warning; updater still self-signed via TAURI_SIGNING_PRIVATE_KEY)
@@ -67,6 +69,7 @@ jobs:
       - name: Run release gate verifier
         shell: bash
         run: |
+          python scripts/verify/tests/verify-release-gate.Tests.py
           python scripts/release/verify-release-gate.py -RepoRoot . -SkipRefCheck
 
   # ── Go: Edge Server + Hub Server ─────────────
