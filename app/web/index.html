@@ -16,6 +16,16 @@
             document.documentElement.dataset.theme =
               window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
           }
+          // Preset FOUC (#1827): apply the stored theme preset before first
+          // paint so preset colors do not flash. The preset list must stay in
+          // sync with app/shared/src/themePresets.ts (THEME_PRESETS).
+          var PRESETS = ['classic-blue','claude-warm','chatgpt-minimal','deepseek-tech','one-dark-pro','dracula'];
+          var p = localStorage.getItem('agenthub-v4-theme-preset');
+          if (p && PRESETS.indexOf(p) >= 0) {
+            document.documentElement.setAttribute('data-theme-preset', p);
+          } else {
+            document.documentElement.removeAttribute('data-theme-preset');
+          }
         } catch(e){}
       })();
     </script>
