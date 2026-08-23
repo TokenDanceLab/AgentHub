@@ -104,7 +104,7 @@ Mobile shared workbench (viewer / limited control)
 | Backend performance/leak | 机器门禁 `scripts/verify/verify-backend-perf-leak-gates.py` 执行行为门禁与短微基准；证据等级分类见 [archives/reference/backend-performance-gates.md](archives/reference/backend-performance-gates.md)（已归档 2026-08-19） |
 | Hub service 纯包边界 | 机器门禁 `scripts/verify/verify-hub-pure-packages.py`（`dispatch`/`deliveryoutbox`/`im`/`agentevent` 禁 import gorm/cache/ws/service 树，见 [architecture/01-hub-server.md](architecture/01-hub-server.md) §Service 领域子包） |
 | Edge adapters 依赖方向 | 机器门禁 `scripts/verify/verify-orchestrator-deps.py` + `TestLeafDoesNotImportRootAdapters`（orchestrator 纯叶子不 import 根包，见 [architecture/02-edge-server.md](architecture/02-edge-server.md) §Adapter 家族子包） |
-| Shared transcript/UI | shared unit/contract + Desktop/Web Playwright + Visual QA；Visual QA gate 89/100（已收口 2026-07-20）· 视口 16:9 `1440x810` light+dark via `visual-qa-shell.mjs` / `visual:qa:shell`（scorecard 已外迁，见 `docs/history.md`） |
+| Shared transcript/UI | shared unit/contract + Desktop/Web Playwright + Visual QA；验收以 `visual:qa:shell` 截图证据 + PR 人工审阅为准（旧视觉分数断言已删除，见 [architecture/07-design-system-ssot.md](architecture/07-design-system-ssot.md)）；视口 16:9 `1440x810` light+dark via `visual-qa-shell.mjs` |
 | Desktop packaged claim | Tauri package/sidecar/icon/installer evidence, not Vite-only |
 | Real login/model/API claim | approved-real evidence with explicit approval and no silent fallback |
 
