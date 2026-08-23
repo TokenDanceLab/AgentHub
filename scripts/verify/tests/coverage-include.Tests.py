@@ -13,6 +13,10 @@
      ratchet 会拦下门禁。
   5. 删除 probe 并复核计数回落，确保后续真实 gate 不受影响。
 
+统计口径与 verify-coverage-baseline.py 保持一致：#1535 include 合同中
+*.stories.ts(x) Storybook 渲染夹具为非生产文件，不计入 production/uncovered
+（vitest 从不执行 stories，若计入则每新增一个 story 都会撑大 uncovered）。
+
 退出码：0=通过 / 1=失败。stdlib only；--RepoRoot 与 ps1 -RepoRoot 同名兼容。
 """
 
@@ -75,6 +79,10 @@ def main() -> int:
         probe_lines = None
         for name, entry in coverage_summary.items():
             if name == "total":
+                continue
+            # 与 verify-coverage-baseline.py 的合同口径一致：Storybook 渲染
+            # 夹具（*.stories.ts/x）非生产文件，不计入 production/uncovered。
+            if os.path.basename(name.replace("\\", "/")).endswith((".stories.ts", ".stories.tsx")):
                 continue
             production += 1
             lines_info = entry.get("lines") or {}
