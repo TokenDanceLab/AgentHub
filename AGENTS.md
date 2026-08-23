@@ -152,10 +152,20 @@ git worktree add .worktrees/<topic> -b <type>/<topic> origin/master
 规则：
 
 - `master` 禁止直接 push；所有变更通过 PR，合并仅用 **Squash and merge**（GitHub 已禁 merge/rebase commit）——一个 PR 一个主题，合入后 master 每主题仅一个 squash commit；禁止堆碎 commit、禁止用多次小 PR 凑历史。
+- **域分组集成例外**（2026-08-23 定）：同一文件域的多条并行 lane（如设计系统域：token/组件/基建共享大量 CSS/docs 文件）可先在本地按序 merge 进一个 integration 分支，冲突只解一次，**一个 PR** 提回 master；PR body 必须列出全部 `Closes #<issue>` 引用保留自动关单。不同文件域（产品面/后端面）仍各自独立 PR。
 - 项目级 worktree 固定放 `.worktrees/`，一个 worktree 对应一个短分支和一个任务卡/PR。
+- **一个 worktree 同时只放一个写 agent**：多 agent 并行写同一 worktree 会互相覆盖 barrel/未提交文件（2026-08-23 实测）；并行 lane 需要各自的 worktree。
 - 不按历史 handoff 或旧审计推断分支状态；用 `git status --short --branch`、`git worktree list`、GitHub issue/PR live 状态。
 - 完成后运行验收、push、开 PR；合并后删除分支和 worktree。
 - 不在共享分支 force-push（amend 后 force-with-lease 除外）。
+
+并行波次开发模型（2026-08-23 定）：
+
+- 开发在本地 worktree 完成；L3 真实 E2E/Visual QA 等验证在「远程 dev 服务器」执行（§5.5 L3 同口径，入口 `scripts/dev/devserver.sh`）——开发 lane 不放远程（容量受限）。**公开仓不写内部主机别名/规格**（§9 隐私红线）。
+- 本地 worktree 可把 app 下的 node_modules 用 junction 借主树（`New-Item -ItemType Junction`）；主树 `pnpm install` 只在全部 lane 收工后做；junction 依赖版本与 lockfile 不一致时本地 typecheck 可能与 CI 不同——CI 是最终裁决。
+- 多 lane 测试串行单进程（`vitest run --no-file-parallelism --maxWorkers=1`），防过载假红。
+- CodeRabbit 自动评审已关闭（#1858），按需 `@coderabbitai`；五道硬门禁（validate/go-hub/go-edge/windows-go/windows-frontend）是合并唯一强制 gate。
+- 并行 lane 任务书必须含地界/法/验收；主线做最终验收与合并裁决。
 
 防线（三层，防 master 直 push / 历史重写 / 非 squash 合入）：(1) GitHub branch protection + repo 设置——master 禁 force/直 push、必须 PR、线性历史、squash only、要求 `validate`/`go-hub`/`go-edge`/`windows-go`/`windows-frontend`、`enforce_admins: true`；(2) 本地 pre-push hook（`scripts/git-hooks/pre-push`，`bash scripts/git-hooks/install.sh` 启用）——master 直 push 本地拦截，feat/fix/docs/chore/* 放行，`git push --no-verify` 紧急绕过；(3) CI——`scripts/verify/verify-commit-messages.sh` + `verify-ci-gates.py` 在 `validate` job fail-closed 校验 Conventional Commits 与 job 结构。详见 `scripts/git-hooks/` 与 `.github/workflows/checks.yml`。
 
