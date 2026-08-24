@@ -1,6 +1,10 @@
 import { defineConfig, devices } from '@playwright/test';
 
-const webE2EPort = Number(process.env.AGENTHUB_WEB_E2E_PORT ?? 5174);
+// Keep fixture E2E off the regular Web dev port (5174). Reusing a developer's
+// Vite process would also reuse its compile-time VITE_HUB_URL and can silently
+// turn the fail-closed stubbed-Hub suite into a signed-out localhost session.
+const webE2EPort = Number(process.env.AGENTHUB_WEB_E2E_PORT ?? 5184);
+process.env.AGENTHUB_WEB_E2E_PORT = String(webE2EPort);
 const webE2EBaseURL = `http://127.0.0.1:${webE2EPort}`;
 const webWorkspaceViewport = { width: 1440, height: 810 };
 
@@ -50,7 +54,9 @@ export default defineConfig({
       VITE_HUB_WS_URL: 'wss://hub.test.invalid/client/ws',
     },
     url: webE2EBaseURL,
-    reuseExistingServer: !process.env.CI,
+    // Never accept an arbitrary process that only happens to answer on the
+    // configured port: fixture routing depends on this server's Vite env.
+    reuseExistingServer: false,
     timeout: 120_000,
   },
 });
