@@ -22,7 +22,11 @@ import { fileURLToPath } from 'node:url';
  *     单测重建；i18n 降级文案也从应用自己的 i18next 实例读取；
  *   - 网络断言为 context 级真实浏览器网络平面监听（复刻 #1884 回归
  *     语义：预览路径不得产生任何栈外第三方请求——单测 jsdom 无法
- *     观测真实网络，这正是本 spec 的增量证据价值）。
+ *     观测真实网络，这正是本 spec 的增量证据价值）。网络面对栈外
+ *     全封闭：应用层已知外部依赖（Turnstile、index.html 设计字体）
+ *     被 route abort 后按「已阻断的已知外部依赖」豁免，未阻断而成功
+ *     的栈外请求仍判失败；栈内主机按回环等价归一（localhost ≡
+ *     127.0.0.1 ≡ [::1]，同端口）。
  *
  * ── 诚实边界：注入部分 ──
  *   预览 URL 本身（javascript: / data: / protocol-relative / https 各形状）
@@ -135,14 +139,27 @@ async function stackIsUp(credentials: RealE2ECredentials): Promise<boolean> {
 const credentials = loadCredentials();
 
 /**
- * 本机离线环境无法加载 Cloudflare Turnstile CDN 脚本；abort 触发前端组件的
- * 错误分支从而允许提交。服务端 Turnstile 校验未配置 secret 时恒通过
- * （TokenDance ID 源码注释明示），故此处理不构成任何安全旁路。
- * （与 real-oidc-login.spec.ts 同步；被 abort 的 turnstile 请求在网络
- * 断言中按「已阻断的登录期栈外请求」豁免，见 observeNetwork。）
+ * 应用层已知外部依赖统一 route abort，使本 lane 网络面对栈外全封闭：
+ * - challenges.cloudflare.com：本机离线环境无法加载 Turnstile CDN 脚本；
+ *   abort 触发前端组件的错误分支从而允许提交。服务端 Turnstile 校验未配置
+ *   secret 时恒通过（TokenDance ID 源码注释明示），不构成任何安全旁路。
+ *   （与 real-oidc-login.spec.ts 同步。）
+ * - fonts.googleapis.com / fonts.gstatic.com：app/web/index.html 的设计字体
+ *   （Hanken Grotesk + Material Symbols）外链——产品真实外部依赖，与预览
+ *   门禁无关；abort 后浏览器自动回退系统字体，不影响本 spec 断言。
+ * 被 abort 的已知外部请求在 observeNetwork 中按「已阻断的已知外部依赖」
+ * 豁免；未经阻断而成功的栈外请求仍然失败——封闭性断言不因豁免清单失效。
  */
-async function blockTurnstileCdn(context: BrowserContext): Promise<void> {
-  await context.route('**/challenges.cloudflare.com/**', (route) => route.abort());
+const KNOWN_APP_EXTERNAL_HOSTS = new Set([
+  'challenges.cloudflare.com',
+  'fonts.googleapis.com',
+  'fonts.gstatic.com',
+]);
+
+async function blockKnownAppExternals(context: BrowserContext): Promise<void> {
+  for (const host of KNOWN_APP_EXTERNAL_HOSTS) {
+    await context.route(`**/${host}/**`, (route) => route.abort());
+  }
 }
 
 /**
@@ -212,10 +229,34 @@ interface ObservedRequest {
 }
 
 /**
+ * URL.host 归一：localhost / 127.0.0.1 / [::1] 是同一回环的不同写法，
+ * 不得因写法差异把栈内请求判成栈外（web 应用实际以 localhost:8080
+ * 访问栈清单里的 127.0.0.1:8080 hub）。
+ */
+function canonicalHost(host: string): string {
+  let hostname: string;
+  let port = '';
+  if (host.startsWith('[')) {
+    const close = host.indexOf(']');
+    hostname = close >= 0 ? host.slice(0, close + 1) : host;
+    port = close >= 0 ? host.slice(close + 1) : '';
+  } else {
+    const idx = host.lastIndexOf(':');
+    hostname = idx >= 0 ? host.slice(0, idx) : host;
+    port = idx >= 0 ? host.slice(idx) : '';
+  }
+  const lower = hostname.toLowerCase();
+  if (lower === 'localhost' || lower === '127.0.0.1' || lower === '[::1]') {
+    hostname = '127.0.0.1';
+  }
+  return hostname + port;
+}
+
+/**
  * context 级监听：覆盖登录 + 预览两个阶段的全部请求。
- * 栈内主机 = 四个配置化 endpoint 的 host（含端口）；断言时按
- * 「预览阶段零栈外请求；全程栈外请求必须是被 route abort 的
- * turnstile（登录页已知外部依赖，已被阻断）」裁决。
+ * 栈内主机 = 四个配置化 endpoint 的 host（含端口，回环写法归一）；
+ * 断言时按「预览阶段零栈外请求；全程栈外请求必须是被 route abort 的
+ * 已知外部依赖（见 KNOWN_APP_EXTERNAL_HOSTS，已被阻断）」裁决。
  */
 function observeNetwork(context: BrowserContext, stackHosts: ReadonlySet<string>) {
   const observed: ObservedRequest[] = [];
@@ -223,7 +264,7 @@ function observeNetwork(context: BrowserContext, stackHosts: ReadonlySet<string>
   context.on('request', (request) => {
     let host: string;
     try {
-      host = new URL(request.url()).host;
+      host = canonicalHost(new URL(request.url()).host);
     } catch {
       host = 'unparseable';
     }
@@ -239,9 +280,9 @@ function observeNetwork(context: BrowserContext, stackHosts: ReadonlySet<string>
       for (const entry of observed) {
         if (stackHosts.has(entry.host)) continue;
         const failed = entry.request.failure() !== null;
-        const isAbortedTurnstile = entry.host === 'challenges.cloudflare.com' && failed && entry.phase === 'login';
-        if (!isAbortedTurnstile && !failed) nonAbortedOffStack.push(entry.request.url());
-        if (entry.phase === 'preview') previewPhaseOffStack.push(entry.request.url());
+        const isBlockedKnownExternal = KNOWN_APP_EXTERNAL_HOSTS.has(entry.host) && failed;
+        if (!isBlockedKnownExternal && !failed) nonAbortedOffStack.push(entry.request.url());
+        if (entry.phase === 'preview' && !isBlockedKnownExternal) previewPhaseOffStack.push(entry.request.url());
       }
       return { previewPhaseOffStack, nonAbortedOffStack, total: observed.length };
     },
@@ -252,7 +293,7 @@ function stackHostSet(credentials: RealE2ECredentials): Set<string> {
   const hosts = new Set<string>();
   for (const base of [credentials.idBaseUrl, credentials.hubBaseUrl, credentials.edgeBaseUrl, credentials.webBaseUrl]) {
     try {
-      hosts.add(new URL(base).host);
+      hosts.add(canonicalHost(new URL(base).host));
     } catch {
       // 非法 base 由预检兜底，这里忽略。
     }
@@ -439,7 +480,7 @@ test.describe('私有 URL 验证真实场景 (#1922 项4)', () => {
       void dialog.dismiss();
     });
 
-    await blockTurnstileCdn(page.context());
+    await blockKnownAppExternals(page.context());
     const token = await performRealOidcLogin(page, creds.userEmail, creds.userPassword, creds.idBaseUrl);
     expect(token).toBeTruthy();
     network.markPreviewPhase();
@@ -506,7 +547,7 @@ test.describe('私有 URL 验证真实场景 (#1922 项4)', () => {
     });
 
     const network = observeNetwork(page.context(), stackHostSet(creds));
-    await blockTurnstileCdn(page.context());
+    await blockKnownAppExternals(page.context());
     const token = await performRealOidcLogin(page, creds.userEmail, creds.userPassword, creds.idBaseUrl);
     expect(token).toBeTruthy();
     network.markPreviewPhase();
