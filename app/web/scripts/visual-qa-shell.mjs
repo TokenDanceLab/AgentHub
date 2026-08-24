@@ -408,8 +408,36 @@ async function captureTheme(browser, theme, vp = { width: 1440, height: 810, lab
         // 改用全局类 + 语义选择器定位三栏（rail / 中间列表 / 右侧编辑详情）。
         rail: measure(document.querySelector('button[data-rail-page="agents"]')?.closest('nav')),
         list: measure(document.querySelector('.agent-config-row')?.parentElement),
-        detail: measure(document.querySelector('section.agents-page aside')),
+        // #1874: 精确指向编辑详情面板（data-testid），而非第一个 <aside>
+        // （第一个 aside 是配置导航 rail，会误把 rail 当作详情面板）。
+        detail: measure(document.querySelector('[data-testid="agent-edit-detail"]')),
       },
+      // 详情面板是否可内部滚动（内容超高时保存 CTA 可滚动到达）。
+      detailScrollable: (() => {
+        const el = document.querySelector('[data-testid="agent-edit-detail"]');
+        return el ? el.scrollHeight > el.clientHeight + 1 : false;
+      })(),
+      // 保存 CTA（保存配置/保存中）是否存在且可达：要么在视口内，要么
+      // 某个可滚动祖先（桌面详情面板或窄屏页面）能滚动到它（#1874）。
+      saveCta: (() => {
+        const el = document.querySelector('[data-testid="agent-edit-detail"]');
+        const btn = el ? Array.from(el.querySelectorAll('button')).find((b) => /\u4fdd\u5b58/.test(b.textContent || '')) : null;
+        if (!btn) return { exists: false };
+        const rect = btn.getBoundingClientRect();
+        let node = btn.parentElement;
+        let scrollable = false;
+        while (node) {
+          if (node.scrollHeight > node.clientHeight + 1) {
+            const oy = getComputedStyle(node).overflowY;
+            if (oy === 'auto' || oy === 'scroll') { scrollable = true; break; }
+          }
+          node = node.parentElement;
+        }
+        if (!scrollable) {
+          scrollable = document.documentElement.scrollHeight > document.documentElement.clientHeight + 1;
+        }
+        return { exists: true, reachable: rect.bottom <= window.innerHeight || scrollable };
+      })(),
     };
   });
   const contractFile = path.join(outDir, `web-shell-${theme}-${vp.label}${dprSuffix}.json`);
