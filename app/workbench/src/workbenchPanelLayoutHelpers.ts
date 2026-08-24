@@ -95,12 +95,13 @@ export function shouldCollapseSidebarForWorkspacePressure(params: {
   sidebarWidth: number;
   nextInspectorWidth: number;
   railWidth?: number;
+  minWorkspaceWidth?: number;
 }): boolean {
   if (!params.isChatPage || params.sidebarCollapsed) return false;
   const railWidth = params.railWidth ?? GLOBAL_RAIL_WIDTH;
   const availableWorkspaceWidth =
     params.viewportWidth - railWidth - params.sidebarWidth - params.nextInspectorWidth;
-  return availableWorkspaceWidth < WORKSPACE_AUTO_COLLAPSE_WIDTH;
+  return availableWorkspaceWidth < (params.minWorkspaceWidth ?? WORKSPACE_AUTO_COLLAPSE_WIDTH);
 }
 
 export type ToggleCollapsedPlan =
@@ -408,6 +409,7 @@ export function maybeCollapseSidebarForWorkspacePressure(params: {
   viewportWidth: number;
   sidebarWidth: number;
   nextInspectorWidth: number;
+  minWorkspaceWidth?: number;
   setSidebarCollapsed: (value: boolean) => void;
 }): void {
   if (shouldCollapseSidebarForWorkspacePressure({
@@ -416,6 +418,9 @@ export function maybeCollapseSidebarForWorkspacePressure(params: {
     viewportWidth: params.viewportWidth,
     sidebarWidth: params.sidebarWidth,
     nextInspectorWidth: params.nextInspectorWidth,
+    ...(params.minWorkspaceWidth === undefined
+      ? {}
+      : { minWorkspaceWidth: params.minWorkspaceWidth }),
   })) {
     params.setSidebarCollapsed(true);
   }

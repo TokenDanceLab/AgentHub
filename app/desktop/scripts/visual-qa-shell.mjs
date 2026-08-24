@@ -26,7 +26,10 @@ const projectRoot = path.resolve(__dirname, '..');
 const outDir = path.join(projectRoot, 'screenshots', 'visual-qa');
 const port = Number(process.env.AGENTHUB_DESKTOP_E2E_PORT ?? 5199);
 const baseUrl = process.env.AGENTHUB_DESKTOP_QA_URL ?? `http://127.0.0.1:${port}`;
-const viewport = { width: 1440, height: 810 };
+const viewports = [
+  { width: 1440, height: 810, label: '1440x810' },
+  { width: 800, height: 900, label: '800x900' },
+];
 const dpr = Math.max(1, Number(process.env.VISUAL_QA_DPR ?? 1) || 1);
 const dprSuffix = dpr === 1 ? '' : `@${dpr}x`;
 const themes = ['light', 'dark'];
@@ -89,8 +92,8 @@ async function enterDemoWorkbench(page) {
   await page.getByRole('main').first().waitFor({ state: 'visible', timeout: 15_000 });
 }
 
-async function captureTheme(browser, theme) {
-  const context = await browser.newContext({ viewport, deviceScaleFactor: dpr });
+async function captureTheme(browser, theme, vp) {
+  const context = await browser.newContext({ viewport: { width: vp.width, height: vp.height }, deviceScaleFactor: dpr });
   const page = await context.newPage();
   await page.addInitScript(
     ({ key, theme: t }) => {
@@ -112,7 +115,7 @@ async function captureTheme(browser, theme) {
     { key: THEME_KEY, theme },
   );
   await wait(200);
-  const file = path.join(outDir, `desktop-shell-${theme}-1440x810${dprSuffix}.png`);
+  const file = path.join(outDir, `desktop-shell-${theme}-${vp.label}${dprSuffix}.png`);
   await page.screenshot({ path: file, fullPage: false });
   // #1874: emit a DOM/geometry contract next to the PNG so the gate can prove it
   // captured the workbench (not an onboarding/blank shell) with no horizontal overflow.
@@ -123,7 +126,7 @@ async function captureTheme(browser, theme) {
     horizontalOverflow:
       document.documentElement.scrollWidth > document.documentElement.clientWidth + 1,
   }));
-  const contractFile = path.join(outDir, `desktop-shell-${theme}-1440x810${dprSuffix}.json`);
+  const contractFile = path.join(outDir, `desktop-shell-${theme}-${vp.label}${dprSuffix}.json`);
   await writeFile(contractFile, JSON.stringify(contract, null, 2) + '\n');
   const applied = await page.evaluate(() => document.documentElement.getAttribute('data-theme'));
   await context.close();
@@ -135,15 +138,19 @@ async function main() {
   // Remove the expected outputs before capture. If navigation/rendering fails,
   // a later assertion must not pass on PNGs left by an older run.
   for (const theme of themes) {
-    await rm(path.join(outDir, `desktop-shell-${theme}-1440x810${dprSuffix}.png`), { force: true });
-    await rm(path.join(outDir, `desktop-shell-${theme}-1440x810${dprSuffix}.json`), { force: true });
+    for (const vp of viewports) {
+      await rm(path.join(outDir, `desktop-shell-${theme}-${vp.label}${dprSuffix}.png`), { force: true });
+      await rm(path.join(outDir, `desktop-shell-${theme}-${vp.label}${dprSuffix}.json`), { force: true });
+    }
   }
   const server = await maybeStartDevServer();
   const browser = await chromium.launch({ headless: true });
   const results = [];
   try {
     for (const theme of themes) {
-      results.push(await captureTheme(browser, theme));
+      for (const vp of viewports) {
+        results.push(await captureTheme(browser, theme, vp));
+      }
     }
   } finally {
     await browser.close();
