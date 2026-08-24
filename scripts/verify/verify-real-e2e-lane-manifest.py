@@ -52,6 +52,11 @@ REQUIRED_ROW_FIELDS = [
     "evidence",
 ]
 
+# #1873 Slice C: 公开 artifact 必须携带可追溯的 provenance（哪个 commit、哪个
+# scope），但不能复制私有运行事实（非 loopback endpoint/账号/绝对路径等，
+# 由 assert_no_private_names 扫描）。
+REQUIRED_PROVENANCE_FIELDS = ["commit", "scope"]
+
 SECRET_KEY_RE = re.compile(r"(password|passwd|secret|access[_-]?token|refresh[_-]?token|id[_-]?token|private_key|license|api[_-]?key)", re.IGNORECASE)
 
 
@@ -205,6 +210,9 @@ def main():
     for field in REQUIRED_SMOKE_FIELDS:
         if field not in manifest:
             fail(f"manifest missing required field '{field}'")
+    for field in REQUIRED_PROVENANCE_FIELDS:
+        if field not in manifest or not isinstance(manifest[field], str) or not manifest[field].strip():
+            fail(f"manifest missing/empty required provenance field '{field}'")
     if not isinstance(manifest["real_tested"], bool):
         fail("manifest field 'real_tested' must be a boolean")
     for field in ("evidence_level", "claim", "status"):
