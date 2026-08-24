@@ -115,6 +115,8 @@ interface Props {
   onCopy?: (id: string, text: string) => void
   onFileClick?: (id: string) => void
   onDeploySubmit?: (id: string) => void
+  /** #1871: false disables the preview card's external-open (surface capability gate). */
+  previewExternalOpenEnabled?: boolean
   onContextMenu?: (id: string, event: React.MouseEvent) => void
   onBlockSelect?: (id: string, shiftKey: boolean) => void
   onReviewFile?: (file: { name: string; path?: string; url?: string; content?: string; language?: string }) => void
@@ -127,7 +129,7 @@ interface Props {
 /** Render a single card/row inside an agent group in the transcript.
  *  Handles think, tool, file, sub, approval, route, deploy, attachment,
  *  context, and session card types with collapsible content areas. */
-export const RowItem = memo(function RowItem({ item, onToggle, onApprove, onReject, onRetry, onCopy, onFileClick, onDeploySubmit, onContextMenu, onBlockSelect, onReviewFile: _onReviewFile, selected, selectedAny: _selectedAny, softHidden, actioned: _actioned }: Props) {
+export const RowItem = memo(function RowItem({ item, onToggle, onApprove, onReject, onRetry, onCopy, onFileClick, onDeploySubmit, previewExternalOpenEnabled, onContextMenu, onBlockSelect, onReviewFile: _onReviewFile, selected, selectedAny: _selectedAny, softHidden, actioned: _actioned }: Props) {
   const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE)
   const [open, setOpen] = useState(item.open ?? false)
   const userToggledRef = useRef(false)
@@ -502,11 +504,11 @@ export const RowItem = memo(function RowItem({ item, onToggle, onApprove, onReje
             </div>
           )}
           {item.type === 'preview' && item.url && (
-            // #1871: external-open is capability-gated — only safe http(s)
-            // preview URLs render as an outbound link. Unsafe schemes
-            // (javascript:/data:/file:) stay as an inert card instead of a
-            // clickable escape from the sandboxed transcript surface.
-            isSafeRemotePreviewUrl(item.url) ? (
+            // #1871: external-open is capability-gated — only when the surface
+            // enables it AND the URL is a safe http(s) scheme does it render as an
+            // outbound link. Otherwise it stays an inert card (no clickable escape
+            // from the sandboxed transcript surface).
+            (previewExternalOpenEnabled !== false && isSafeRemotePreviewUrl(item.url)) ? (
               <a className="preview-card" href={item.url} rel="noopener noreferrer" target="_blank">
                 <div className="preview-thumb" aria-hidden="true">
                   <IconGlobe className="preview-favicon" size={20} />

@@ -558,6 +558,7 @@ export const ConversationHost = React.memo(function ConversationHost({
       <div className={styles.transcriptRegion} role="region" aria-label={t('aria.transcript')}>
         <ChatViewBridge displayTranscript={displayTranscript} activeConversation={activeConversation}
           unreadDivider={transcriptUnreadDivider}
+          previewExternalOpenEnabled={platform.capabilities.browserPreview}
           onAgentClick={onAgentClick} onBlockContextMenu={onBlockContextMenu}
           onBlockSelect={onBlockSelect} onBlockAction={onBlockAction}
           onReviewFile={onReviewFile} onDeploySubmit={onDeploySubmit}
