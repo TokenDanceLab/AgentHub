@@ -39,6 +39,7 @@ interface Props {
   onBlockAction?: BlockActionCallback | undefined
   onReviewFile?: ((file: { name: string; path?: string; url?: string; content?: string; language?: string }) => void) | undefined
   onDeploySubmit?: ((id: string) => void) | undefined
+  previewExternalOpenEnabled?: boolean | undefined
   selectedBlockIds?: Set<string>
   selectionMode?: boolean
   softHiddenBlockIds?: Set<string>
@@ -190,7 +191,7 @@ const visuallyHiddenStyle: React.CSSProperties = {
  * Takes TranscriptBlock[] from the upstream data source and renders via ChatView component tree.
  * i18n resolved via react-i18next (chatview namespace), co-existing with the consumer's root provider.
  */
-export const ChatViewTranscript = memo(function ChatViewTranscript({ transcript, sessionId, chatMode = 'group', onAgentClick, onBlockContextMenu, onBlockSelect, onBlockAction, onReviewFile, onDeploySubmit, selectedBlockIds, selectionMode, softHiddenBlockIds, actionedBlockIds, highlightedBlockId, onHighlightEnd, pinnedAnnouncement, typingUserNames, renderUserFooter, unreadDivider, transcriptLoading }: Props) {
+export const ChatViewTranscript = memo(function ChatViewTranscript({ transcript, sessionId, chatMode = 'group', onAgentClick, onBlockContextMenu, onBlockSelect, onBlockAction, onReviewFile, onDeploySubmit, previewExternalOpenEnabled, selectedBlockIds, selectionMode, softHiddenBlockIds, actionedBlockIds, highlightedBlockId, onHighlightEnd, pinnedAnnouncement, typingUserNames, renderUserFooter, unreadDivider, transcriptLoading }: Props) {
   const items = useMemo(() => {
     try {
       return blocksToTranscriptItems(transcript)
@@ -344,7 +345,7 @@ export const ChatViewTranscript = memo(function ChatViewTranscript({ transcript,
         <EmptyTranscriptState {...(transcriptLoading ? { loading: true } : {})} />
       ) : (
         <TranscriptErrorBoundary>
-          <Transcript ref={transcriptRef} items={items} chatMode={chatMode} unreadDivider={resolvedUnreadDivider} compactDividers={resolvedCompactDividers} {...(sessionId !== undefined ? { sessionId } : {})} {...(onAgentClick ? { onAgentClick } : {})} {...(onBlockContextMenu ? { onBlockContextMenu } : {})} {...(onBlockSelect ? { onBlockSelect } : {})} {...(onBlockAction ? { onBlockAction } : {})} {...(onReviewFile ? { onReviewFile } : {})} {...(onDeploySubmit ? { onDeploySubmit } : {})} {...(selectedBlockIds ? { selectedBlockIds } : {})} {...(selectionMode !== undefined ? { selectionMode } : {})} {...(softHiddenBlockIds ? { softHiddenBlockIds } : {})} {...(actionedBlockIds ? { actionedBlockIds } : {})} {...(renderUserFooter ? { renderUserFooter } : {})} />
+          <Transcript ref={transcriptRef} items={items} chatMode={chatMode} unreadDivider={resolvedUnreadDivider} compactDividers={resolvedCompactDividers} {...(sessionId !== undefined ? { sessionId } : {})} {...(onAgentClick ? { onAgentClick } : {})} {...(onBlockContextMenu ? { onBlockContextMenu } : {})} {...(onBlockSelect ? { onBlockSelect } : {})} {...(onBlockAction ? { onBlockAction } : {})} {...(onReviewFile ? { onReviewFile } : {})} {...(onDeploySubmit ? { onDeploySubmit } : {})} {...(previewExternalOpenEnabled !== undefined ? { previewExternalOpenEnabled } : {})} {...(selectedBlockIds ? { selectedBlockIds } : {})} {...(selectionMode !== undefined ? { selectionMode } : {})} {...(softHiddenBlockIds ? { softHiddenBlockIds } : {})} {...(actionedBlockIds ? { actionedBlockIds } : {})} {...(renderUserFooter ? { renderUserFooter } : {})} />
           {/* Ephemeral typing indicator — shown when other session members are typing */}
           {typingUserNames && typingUserNames.length > 0 && (
             <TypingIndicator names={typingUserNames} chatMode={chatMode} />
