@@ -12,6 +12,14 @@ export type AgentHubSurface = 'desktop' | 'web' | 'mobile';
 
 export interface SurfaceCapabilities {
   localEdge: boolean;
+  /**
+   * Surface can browse/open files on the local workspace filesystem —
+   * AuxPanel folder tabs and local composer file picks (#1172/#1181).
+   * Desktop earns this via Local Edge. Hub chat attachments do NOT count:
+   * they flow through the Hub data plane, which every surface shares.
+   * When false (Web, Mobile — both Hub-only), shell-local file entries
+   * such as aux panel folder tabs must stay hidden.
+   */
   localFiles: boolean;
   browserPreview: boolean;
   /**
