@@ -7,6 +7,7 @@ import {
   INSPECTOR_DEFAULT_WIDTH,
   INSPECTOR_WIDTH_STORAGE_KEY,
   SIDEBAR_DEFAULT_WIDTH,
+  WORKSPACE_MOUNT_COLLAPSE_INSPECTOR_WIDTH,
   WORKSPACE_MOUNT_COLLAPSE_WIDTH,
 } from './workbenchLayoutConstants';
 import {
@@ -282,6 +283,12 @@ export function useWorkbenchPanelLayout({
       minWorkspaceWidth: WORKSPACE_MOUNT_COLLAPSE_WIDTH,
       setSidebarCollapsed,
     });
+    // At a genuinely narrow Desktop window the fixed 400px inspector column
+    // still crushes the chat main area after the sidebar collapses. Collapse it
+    // on mount as well (one-directional + idempotent); the user can re-open it.
+    if (window.innerWidth < WORKSPACE_MOUNT_COLLAPSE_INSPECTOR_WIDTH) {
+      setInspectorCollapsed(true);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
