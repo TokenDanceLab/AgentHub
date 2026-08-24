@@ -99,6 +99,21 @@ func (ra *ResultAggregator) StoreSubAgentResult(parentID string, result SubAgent
 	}
 }
 
+// OnSubAgentTerminal is the reliable lifecycle hook for a child run reaching a
+// terminal state. It is invoked directly by ProcessExecutor.sendSubAgentResult so
+// an orchestrator parent whose finish was parked (outcomeDeferred) can finalize
+// without depending on the lossy event-bus subscriber — under backpressure the bus
+// can drop run.finished/failed/cancelled and leave the parent parked indefinitely.
+//
+// Idempotent: the collector's exhaustion guard suppresses duplicate
+// sub_agents_complete emission, and FinalizeParentRun itself no-ops on repeat.
+func (ra *ResultAggregator) OnSubAgentTerminal(parentID string) {
+	if parentID == "" {
+		return
+	}
+	ra.checkAllChildrenComplete(parentID)
+}
+
 // Start begins listening on the event bus for run completion events.
 // Returns a cleanup function that unsubscribes from the bus and stops
 // the timeout fallback goroutine (if a collector is configured).

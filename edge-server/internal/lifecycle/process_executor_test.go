@@ -2273,6 +2273,59 @@ func TestSendSubAgentResult_NonSubAgentNoAction(t *testing.T) {
 	executor.sendSubAgentResult("run-nosub", "finished", nil)
 }
 
+// TestSendSubAgentResultFinalizesParentDirectly verifies the #1880 reliable
+// lifecycle hook: when a child run reaches a terminal state, sendSubAgentResult
+// finalizes a parked orchestrator parent directly (no lossy event-bus subscriber
+// involvement), so a dropped run.finished/failed/cancelled cannot strand the parent.
+func TestSendSubAgentResultFinalizesParentDirectly(t *testing.T) {
+	bus := events.NewBus(10)
+	s := store.New()
+	_, _ = s.CreateProject("proj-direct", "direct-project", "")
+	_, _ = s.CreateThread("thread-direct", "proj-direct", "direct-thread", "", "", "")
+	_, _ = s.CreateRun("parent-direct", "proj-direct", "thread-direct")
+	_, _ = s.CreateRun("child-direct", "proj-direct", "thread-direct")
+
+	reg := agents.NewRegistry()
+	queue := agents.NewQueue()
+	_ = reg.Register(&agents.AgentInstance{ID: "parent-agent", AdapterID: "orchestrator", Status: agents.StatusBusy})
+	_ = reg.Register(&agents.AgentInstance{
+		ID: "child-agent", AdapterID: "claude-code", ParentID: "parent-agent",
+		RunID: "child-direct", Status: agents.StatusBusy,
+	})
+
+	executor, err := NewProcessExecutor(bus, s, ProcessExecutorConfig{
+		Command: os.Args[0],
+		Args:    []string{processExecutorHelperRunFlag, "--", "success"},
+		Env:     append(os.Environ(), "AGENTHUB_PROCESS_EXECUTOR_HELPER=1"),
+	}, nil, nil)
+	if err != nil {
+		t.Fatalf("NewProcessExecutor: %v", err)
+	}
+	executor.WithAgentRegistry(reg).WithMessageQueue(queue)
+
+	ra := NewResultAggregator(bus, reg)
+	finalized := make(chan string, 1)
+	ra.WithParentFinalizer(func(parentID string) { finalized <- parentID })
+	executor.WithResultAggregator(ra)
+
+	executor.mu.Lock()
+	executor.runToAgent["child-direct"] = "child-agent"
+	executor.mu.Unlock()
+	queue.EnsureAgent("parent-agent", 64)
+
+	// Direct terminal delivery; no run.finished is published to the bus.
+	executor.sendSubAgentResult("child-direct", "finished", map[string]any{"output": "ok"})
+
+	select {
+	case parentID := <-finalized:
+		if parentID != "parent-agent" {
+			t.Fatalf("finalized parent = %q, want parent-agent", parentID)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("sendSubAgentResult did not finalize the parent via the direct lifecycle hook")
+	}
+}
+
 // ── SanitizeSubAgentResult tests ──────────────────────────────────────────────
 
 func TestSanitizeSubAgentResult_Nil(t *testing.T) {

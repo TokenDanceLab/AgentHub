@@ -205,6 +205,13 @@ func (e *ProcessExecutor) sendSubAgentResult(runID, status string, payload any) 
 
 	// Decrement per-parent active child count so the slot can be reused.
 	e.agentRegistry.DecrChildCount(inst.ParentID)
+
+	// Reliable lifecycle hook: check parent completion on the direct path so a
+	// parked orchestrator parent finalizes even if the lossy event-bus subscriber
+	// drops the terminal run event (#1880).
+	if e.resultAgg != nil {
+		e.resultAgg.OnSubAgentTerminal(parentID)
+	}
 }
 
 // publishStructuredOutput uses the configured AgentAdapter to parse the CLI's
