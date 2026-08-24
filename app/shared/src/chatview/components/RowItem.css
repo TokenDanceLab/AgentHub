@@ -303,6 +303,12 @@
   box-shadow: var(--td-shadow-md);
 }
 
+/* #1871: blocked (unsafe-scheme) preview stays inert — no hover elevation. */
+.preview-card-blocked:hover {
+  border-color: var(--td-line);
+  box-shadow: none;
+}
+
 .preview-card:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
