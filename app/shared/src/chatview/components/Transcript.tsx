@@ -70,6 +70,7 @@ interface Props {
   onBlockAction?: BlockActionCallback
   onReviewFile?: (file: { name: string; path?: string; url?: string; content?: string; language?: string }) => void
   onDeploySubmit?: (id: string) => void
+  previewExternalOpenEnabled?: boolean
   selectedBlockIds?: Set<string>
   selectionMode?: boolean
   softHiddenBlockIds?: Set<string>
@@ -297,7 +298,7 @@ function buildBlockIndexMap(segments: TranscriptSegment[]): Map<string, number> 
   return map
 }
 
-const TranscriptImpl = forwardRef<TranscriptHandle, Props>(function Transcript({ items, sessionId, chatMode, onAgentClick, onBlockContextMenu, onBlockSelect, onBlockAction, onReviewFile, onDeploySubmit, selectedBlockIds, selectionMode, softHiddenBlockIds, actionedBlockIds, renderUserFooter, unreadDivider, compactDividers }: Props, ref) {
+const TranscriptImpl = forwardRef<TranscriptHandle, Props>(function Transcript({ items, sessionId, chatMode, onAgentClick, onBlockContextMenu, onBlockSelect, onBlockAction, onReviewFile, onDeploySubmit, previewExternalOpenEnabled, selectedBlockIds, selectionMode, softHiddenBlockIds, actionedBlockIds, renderUserFooter, unreadDivider, compactDividers }: Props, ref) {
   const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE)
   const segments = useMemo(() => partitionWithDates(items, unreadDivider, compactDividers), [items, unreadDivider, compactDividers])
   /**
@@ -460,7 +461,7 @@ const TranscriptImpl = forwardRef<TranscriptHandle, Props>(function Transcript({
               </Fragment>
             )
           }
-          if (isAgent(item)) return <AgentGroup key={item.id} item={item} chatMode={chatMode} enter={arrivalKey === item.id} {...(onAgentClick ? { onAgentClick } : {})} {...(onBlockContextMenu ? { onBlockContextMenu } : {})} {...(onBlockSelect ? { onBlockSelect } : {})} {...(onBlockAction ? { onBlockAction } : {})} {...(onReviewFile ? { onReviewFile } : {})} {...(onDeploySubmit ? { onDeploySubmit } : {})} {...(selectedBlockIds ? { selectedBlockIds } : {})} {...(selectionMode !== undefined ? { selectionMode } : {})} {...(softHiddenBlockIds ? { softHiddenBlockIds } : {})} {...(actionedBlockIds ? { actionedBlockIds } : {})} />
+          if (isAgent(item)) return <AgentGroup key={item.id} item={item} chatMode={chatMode} enter={arrivalKey === item.id} {...(onAgentClick ? { onAgentClick } : {})} {...(onBlockContextMenu ? { onBlockContextMenu } : {})} {...(onBlockSelect ? { onBlockSelect } : {})} {...(onBlockAction ? { onBlockAction } : {})} {...(onReviewFile ? { onReviewFile } : {})} {...(onDeploySubmit ? { onDeploySubmit } : {})} {...(previewExternalOpenEnabled !== undefined ? { previewExternalOpenEnabled } : {})} {...(selectedBlockIds ? { selectedBlockIds } : {})} {...(selectionMode !== undefined ? { selectionMode } : {})} {...(softHiddenBlockIds ? { softHiddenBlockIds } : {})} {...(actionedBlockIds ? { actionedBlockIds } : {})} />
           return null
         })}
       </Virtualizer>
