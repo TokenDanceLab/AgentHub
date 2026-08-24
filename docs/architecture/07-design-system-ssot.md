@@ -1,9 +1,9 @@
 # Design system SSOT map
 
-最后更新：2026-08-23
+最后更新：2026-08-24
 Issue: #466 (P9.1 SSOT map) · residual hardcode closed via #879 / #910 / #1021 · open residual ModelDropdown + IM rgba chrome · **#1197 frosted-glass material layer**
 
-> 权威入口：本文件是 **design tokens / theme runtime / surface CSS ownership** 的 SSOT map。
+> 权威入口：本文件是 **design tokens / theme runtime / surface CSS ownership** 的 SSOT map。Design token SSOT 由 `app/shared/src/styles/`（CSS 值）与 `app/shared/src/designTokens.ts`（跨平台 alias / surface rules）共同组成；后者不是第二份颜色值表。
 > 可选审计清单（design-token-usage-audit.md）已外迁，见 `docs/history.md`。
 > 主架构索引：[architecture.md](../architecture.md)
 
@@ -38,6 +38,8 @@ Entry CSS load: desktop/web `main.tsx` imports surface `styles/{tokens,themes,pr
 5. **Brand icon hex** in brand assets (e.g. `designIcons.tsx`) is brand-literal OK. Product chrome (status, surfaces, text) must use theme tokens.
 6. **CSS fallbacks** on tokens (`var(--td-*, 字面量)` 等) 若写则必须与 SSOT 一致——不得残留与 tokens/themes 定义冲突的开/闭区间字面量（否则 dark mode 或预设下渲染漂移）。当前 app CSS 仍有 110+ 处 `var(--td-*, 字面量)` fallback 与 SSOT 值矛盾（#1827 token 契约部分清理中）；新代码优先裸 `var(--token)`。
 7. **Product CSS** uses semantic tokens `--success` / `--danger` / `--primary` / `--bdr` (and related surface tokens). **`--color-*` is legacy alias / preset-private only** — not for new product module consumers (#910 / #1021 closed ghost product usage).
+8. **Design token gate**：修改 `app/shared/src/styles/` 或 `app/shared/src/designTokens.ts` 后，必须运行 `python scripts/verify/verify-design-token-ssot.py`，且 `app/shared/src/designTokens.test.ts`、`app/shared/src/styles/tokens-base.test.ts` 全绿。
+9. **Shared component acceptance**：`app/shared/src/ui/` 下的新组件必须同时提供 `<组件>.test.tsx`、`<组件>.stories.tsx`，并逐项勾选 [component-acceptance.md](../component-acceptance.md)；缺件不得合入。
 
 ## 3. Legitimate surface glue (not forks)
 
@@ -116,17 +118,15 @@ Applied first to AuxPanel, TerminalPanel, Card glass/elevated. Respect `prefers-
 
 | Layer | SSOT |
 |---|---|
-| Capture matrix (Visual QA gate，已收口 2026-07-20) | `app/{desktop,web}/scripts/visual-qa-shell.mjs` · `visual:qa:shell` · **1440×810** light+dark · DPR **1x default** |
+| Capture matrix (Visual QA merge gate) | `app/desktop/scripts/visual-qa-shell.mjs` + `app/web/scripts/visual-qa-shell.mjs`；两端 `package.json` 均以 `visual:qa:shell` 暴露；标准审阅矩阵为 **1440×810** light+dark · DPR **1x default** |
+| Supplemental narrow captures | 同一 gate 额外生成并断言 Web **768×900**、Desktop **800×900** 的 light+dark 截图与 DOM/几何合同；这些补充宽度不替代 1440×810 标准审阅矩阵 |
 | CI 双半边（#1827） | web：`visual-qa-shell` job；desktop：`visual-qa-desktop` job（两者均 path-filtered `shell`，chromium only，非空白断言 + artifact 上传，禁 pixel golden） |
-| Desktop 断言 | `app/desktop/scripts/assert-visual-qa-shell.mjs` · `assert:visual:qa:shell` |
+| Gate assertions | `app/{desktop,web}/scripts/assert-visual-qa-shell.mjs` · `assert:visual:qa:shell` |
 | Optional 2x capture | `visual:qa:shell:2x` / `VISUAL_QA_DPR=2` · files suffix `@2x` |
 | Score rubric / pass bar | 分数值不再由本仓维护（旧 `visual-qa-scorecard.md` 已不在源仓，`docs/history.md` 无对应外迁条目——89/100 等分数断言不可复核，已删除）；验收以 `visual:qa:shell` 截图证据 + PR 人工审阅为准 |
 | Optional multi-scene battery | `app/web/scripts/visual-qa.mjs` — **legacy / non-gate** (do not use for merge gate) |
 
-**窄视口状态**。断点 SSOT 与 `useMediaQuery` 已由 #1861/#1864 落地；2026-08-23 的
-768px 补充检查暴露 Agents 页仍会裁切（#1866）。当前 merge gate 仍是 1440×810 light+dark；
-在 #1866 完成页面重排与行为断言前，768px 截图只能作为诊断证据，不能写成已通过的 Visual QA。
-#1866 关闭时应把 768px 场景加入 Desktop/Web capture，并同步对应非空白/几何断言。
+**窄视口状态**。标准审阅矩阵仍是 1440×810 light+dark；当前脚本和断言已把 Web 768×900、Desktop 800×900 纳入同一次 gate，用于补充非空白与横向溢出合同。不得把补充窄视口写成两端统一断点，也不得用它替代 1440×810 的标准截图审阅。
 
 Do not cite `1440x920` as the Desktop/Web gate viewport.
 
