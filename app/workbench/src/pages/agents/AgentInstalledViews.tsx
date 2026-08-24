@@ -67,14 +67,16 @@ export const AgentInstalledView: React.FC<AgentsPageProps> = (props) => {
             管理已安装的 Agent 配置、技能与工具权限。
           </p>
         </div>
-        <button
-          className={`${styles['outline-action']} outline-action`}
-          type="button"
-          onClick={onAgentAdd}
-        >
-          <DesignNavIcon name="plus" size={15} />
-          添加 Agent
-        </button>
+        {onAgentAdd ? (
+          <button
+            className={`${styles['outline-action']} outline-action`}
+            type="button"
+            onClick={onAgentAdd}
+          >
+            <DesignNavIcon name="plus" size={15} />
+            添加 Agent
+          </button>
+        ) : null}
       </div>
 
       {/* Summary strip */}

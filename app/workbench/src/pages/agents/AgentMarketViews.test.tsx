@@ -71,3 +71,31 @@ describe('MCPMarketView error state (#1821)', () => {
     expect(screen.queryByText('MCP 市场暂时不可用')).not.toBeInTheDocument();
   });
 });
+
+describe('Skill/MCP market install unavailable (#1872)', () => {
+  it('disables skill install action when no onSkillInstall handler is wired', () => {
+    render(<SkillMarketView {...baseProps({
+      skillMarketItems: [{ id: 's1', name: 'code-review', description: 'review diffs', skill_type: 'tool' }],
+      skillMarketLoading: false,
+    })} />);
+    expect(screen.getByRole('button', { name: '安装' })).toBeDisabled();
+  });
+
+  it('enables skill install action when a handler is wired', () => {
+    render(<SkillMarketView {...baseProps({
+      skillMarketItems: [{ id: 's1', name: 'code-review', description: 'review diffs', skill_type: 'tool' }],
+      skillMarketLoading: false,
+      onSkillInstall: vi.fn(),
+    })} />);
+    expect(screen.getByRole('button', { name: '安装' })).toBeEnabled();
+  });
+
+  it('disables MCP install action when no onMcpInstall handler is wired', () => {
+    render(<MCPMarketView {...baseProps({
+      activePane: 'mcpMarket',
+      mcpMarketItems: [{ id: 'm1', name: 'gh', description: 'github mcp', transport: 'stdio' }],
+      mcpMarketLoading: false,
+    })} />);
+    expect(screen.getByRole('button', { name: '安装' })).toBeDisabled();
+  });
+});
