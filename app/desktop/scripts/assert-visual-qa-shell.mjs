@@ -24,7 +24,12 @@ const outDir = process.env.VISUAL_QA_SHELL_OUT_DIR
   ? path.resolve(process.env.VISUAL_QA_SHELL_OUT_DIR)
   : path.join(projectRoot, 'screenshots', 'visual-qa');
 const minBytes = Number(process.env.VISUAL_QA_SHELL_MIN_BYTES ?? 8000);
-const expected = ['desktop-shell-light-1440x810.png', 'desktop-shell-dark-1440x810.png'];
+const expected = [
+  'desktop-shell-light-1440x810.png',
+  'desktop-shell-dark-1440x810.png',
+  'desktop-shell-light-800x900.png',
+  'desktop-shell-dark-800x900.png',
+];
 
 async function main() {
   let names;
@@ -75,7 +80,7 @@ async function main() {
     }
   }
 
-  for (const base of ['desktop-shell-light-1440x810', 'desktop-shell-dark-1440x810']) {
+  for (const base of ['desktop-shell-light-1440x810', 'desktop-shell-dark-1440x810', 'desktop-shell-light-800x900', 'desktop-shell-dark-800x900']) {
     const name = base + '.json';
     if (!names.includes(name)) {
       failures.push('missing contract: ' + name);
