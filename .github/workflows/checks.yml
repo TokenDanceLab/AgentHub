@@ -885,10 +885,17 @@ jobs:
               - 'app/shared/src/theme*.ts'
               - 'app/shared/src/themePresets.*'
               - 'app/shared/src/designTokens.*'
+              # transcript + shared components live entirely in these two
+              # directories (#1940): a pure shared-component visual change
+              # must trigger the Visual QA gate.
+              - 'app/shared/src/ui/**'
+              - 'app/shared/src/chatview/**'
               - 'app/web/scripts/visual-qa*'
               - 'app/web/scripts/assert-visual-qa-shell.mjs'
+              - 'app/web/scripts/assert-visual-qa-chat.mjs'
               - 'app/desktop/scripts/visual-qa*'
               - 'app/desktop/scripts/assert-visual-qa-shell.mjs'
+              - 'app/desktop/scripts/assert-visual-qa-chat.mjs'
               - 'app/web/src/**'
               - 'app/web/package.json'
               - 'app/desktop/package.json'
@@ -1296,11 +1303,26 @@ jobs:
           CI: 'true'
           # Script spawns vite on 5174 with mock hub route; no real Hub required.
 
+      - name: Capture web visual:qa:chat
+        timeout-minutes: 15
+        working-directory: ./app/web
+        run: pnpm visual:qa:chat
+        env:
+          CI: 'true'
+          # Script spawns vite on 5174 with a fully stubbed Hub session
+          # (approved-real replay of a finished task); no real Hub required.
+
       - name: Assert non-blank shell screenshots
         working-directory: ./app/web
         run: pnpm assert:visual:qa:shell
         env:
           VISUAL_QA_SHELL_MIN_BYTES: '8000'
+
+      - name: Assert chat screenshots (non-blank + geometry contract)
+        working-directory: ./app/web
+        run: node scripts/assert-visual-qa-chat.mjs
+        env:
+          VISUAL_QA_CHAT_MIN_BYTES: '8000'
 
       - name: Upload visual QA shell screenshots
         if: always()
@@ -1358,11 +1380,26 @@ jobs:
           CI: 'true'
           # Script spawns vite on 5199 with demo workbench entry; no real Hub required.
 
+      - name: Capture desktop visual:qa:chat
+        timeout-minutes: 15
+        working-directory: ./app/desktop
+        run: pnpm visual:qa:chat
+        env:
+          CI: 'true'
+          # Script spawns vite on 5199 with demo workbench entry (builder
+          # demo transcript renders completed cards); no real Hub required.
+
       - name: Assert non-blank shell screenshots (desktop)
         working-directory: ./app/desktop
         run: pnpm assert:visual:qa:shell
         env:
           VISUAL_QA_SHELL_MIN_BYTES: '8000'
+
+      - name: Assert chat screenshots (desktop, non-blank + geometry contract)
+        working-directory: ./app/desktop
+        run: node scripts/assert-visual-qa-chat.mjs
+        env:
+          VISUAL_QA_CHAT_MIN_BYTES: '8000'
 
       - name: Upload visual QA shell screenshots (desktop)
         if: always()
