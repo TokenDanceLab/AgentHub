@@ -386,6 +386,27 @@ describe('useWorkbenchPanelLayout', () => {
     expect(result.current.sidebarCollapsed).toBe(false);
   });
 
+  it('auto-collapses the inspector on mount at a narrow viewport (#1910 follow-up)', () => {
+    setViewportWidth(800);
+    const { result } = renderPanelLayout();
+    // 800 < 880 → collapse the fixed 400px inspector so it does not crush the chat column.
+    expect(result.current.inspectorCollapsed).toBe(true);
+  });
+
+  it('keeps the inspector open on mount at a wider desktop viewport (#1910 follow-up)', () => {
+    setViewportWidth(1024);
+    const { result } = renderPanelLayout();
+    // 1024 >= 880 → keep the inspector open.
+    expect(result.current.inspectorCollapsed).toBe(false);
+  });
+
+  it('does not auto-collapse the inspector on mount on non-desktop surfaces (#1910 follow-up)', () => {
+    setViewportWidth(800);
+    const { result } = renderPanelLayout({ platformSurface: 'web' });
+    // The mount-time inspector collapse is Desktop-only.
+    expect(result.current.inspectorCollapsed).toBe(false);
+  });
+
   it('keeps the sidebar open on non-chat pages regardless of workspace pressure', () => {
     const { result } = renderPanelLayout({ isChatPage: false });
 
