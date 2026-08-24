@@ -1,9 +1,19 @@
 /**
- * P76 Visual QA — Web Chat path capture (#1314)
- * Viewport 1440x810 · themes light+dark · mock hub · Chat main path (not Agents)
+ * Visual QA — Web Chat path capture (gate half, #1940)
+ * Viewport 1440x810 · themes light+dark · fully stubbed Hub · Chat main path
  *
- * Optional density gate companion (does NOT replace visual:qa:shell merge gate).
- * Score notes: visual-qa-scorecard §4 Chat path
+ * Merge-gate companion of visual-qa-shell.mjs: captures the chat content
+ * surface (transcript + composer + inspector) and emits a DOM/geometry
+ * contract JSON next to each PNG. The assert step
+ * (scripts/assert-visual-qa-chat.mjs) fails closed on missing shots or a
+ * broken contract. No pixel goldens.
+ *
+ * Transcript source: the proven stubbed-Hub replay pattern of
+ * app/web/src/__e2e__/chat-flow-contract.spec.ts (#1839) — approved-real
+ * data mode + a finished agent task whose replay events render one tool
+ * card pair and one markdown text block with a fenced code block. Task
+ * status 'done' pins the STREAMING-ENDED state: replay hydrated, composer
+ * on Send (not Stop), no typing indicator.
  *
  * Usage (from app/web):
  *   node scripts/visual-qa-chat.mjs
@@ -12,7 +22,7 @@
  */
 import { chromium } from '@playwright/test';
 import { spawn } from 'node:child_process';
-import { mkdir } from 'node:fs/promises';
+import { mkdir, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -31,14 +41,15 @@ const themes = ['light', 'dark'];
 const THEME_KEY_V4 = 'agenthub-v4-theme';
 const THEME_KEY_LEGACY = 'agenthub-theme';
 const WORKBENCH_SHELL = '[data-testid="agenthub-workbench"]';
-// Locale-stable rail selector: the nav aria-label resolves through chatview
-// i18n (zh: 全局导航栏), so target the data-rail-page hook instead (#1826).
+// Locale-stable rail selector: aria-labels resolve through chatview i18n,
+// so target the data-rail-page hook instead (#1826).
 const CHAT_RAIL_BUTTON = 'button[data-rail-page="chat"]';
-// Locale note (#1826): aria-labels resolve through chatview i18n — keep
-// zh+en alternatives (or stable hooks) for every label-based selector.
-const WORKSPACE = 'main#main-content, [role="main"]#main-content, main[aria-label="Workspace"], main[aria-label="工作区"]';
-const COMPOSER = 'textarea, [aria-label="Composer input"], [aria-label="输入框"], [placeholder*="发消息"]';
-const INSPECTOR = 'aside[aria-label="Right inspector"], aside[aria-label="右侧窗口"]';
+const TRANSCRIPT_LOG = '[role="log"]';
+const SESSION_ID = 'session_web_chat';
+const TASK_ID = 'task_web_chat_qa';
+// callId is ours to choose — stableInteractionId renders `call-<toolCallId>`
+// as the tool card data-block-id (chatview stable DOM identity).
+const TOOL_CALL_ID = 'vqa-read';
 const hubUrlPattern =
   /https?:\/\/(?:localhost:8080|127\.0\.0\.1:8080|hub\.vectorcontrol\.tech|api\.hub\.vectorcontrol\.tech)\/.*/;
 
@@ -61,7 +72,7 @@ async function waitForUrl(url, timeoutMs = 45_000) {
 }
 
 function hubEnvelope(data) {
-  return { code: 'OK', data, message: '' };
+  return { code: 'ok', data };
 }
 
 function json(data) {
@@ -75,6 +86,70 @@ function json(data) {
       'access-control-allow-methods': 'GET,POST,PUT,PATCH,DELETE,OPTIONS',
     },
   };
+}
+
+/**
+ * Replay events for the finished task: one tool_call/tool_result card pair
+ * plus one markdown text block carrying a fenced code block. Shapes mirror
+ * chat-flow-contract.spec.ts chatFlowEvents (proven against the shared
+ * transcript normalize pipeline).
+ */
+function chatVisualQaEvents() {
+  return [
+    {
+      id: 'evt-vqa-tool-call',
+      task_id: TASK_ID,
+      edge_run_id: 'run-web-chat-qa',
+      session_id: SESSION_ID,
+      agent_instance_id: 'agent-builder',
+      agent_label: 'Builder',
+      event_seq: 1,
+      event_type: 'run.agent.tool_call',
+      payload: { callId: TOOL_CALL_ID, toolName: 'Read', path: 'src/shared/chatview/adapter.ts' },
+      created_at: '2026-06-26T08:00:01Z',
+    },
+    {
+      id: 'evt-vqa-tool-result',
+      task_id: TASK_ID,
+      edge_run_id: 'run-web-chat-qa',
+      session_id: SESSION_ID,
+      agent_instance_id: 'agent-builder',
+      agent_label: 'Builder',
+      event_seq: 2,
+      event_type: 'run.agent.tool_result',
+      payload: { callId: TOOL_CALL_ID, toolName: 'Read', summary: 'adapter.ts · 412 lines · transcript normalize pipeline verified' },
+      created_at: '2026-06-26T08:00:02Z',
+    },
+    {
+      id: 'evt-vqa-text-block',
+      task_id: TASK_ID,
+      edge_run_id: 'run-web-chat-qa',
+      session_id: SESSION_ID,
+      agent_instance_id: 'agent-builder',
+      agent_label: 'Builder',
+      event_seq: 3,
+      event_type: 'run.agent.text_block',
+      payload: {
+        // Fenced block exercises the Markdown → CodeBlock render path in
+        // BOTH themes; the table keeps a second markdown structure alive.
+        content: [
+          '视觉合同捕获完成，回放已结束。代码块合同如下：',
+          '',
+          '```ts',
+          'export function visualQaChatContract(): string {',
+          "  return 'non-blank + geometry, no pixel golden';",
+          '}',
+          '```',
+          '',
+          '| 合同项 | 状态 |',
+          '| --- | --- |',
+          '| code block | rendered |',
+          '| tool card | completed |',
+        ].join('\n'),
+      },
+      created_at: '2026-06-26T08:00:03Z',
+    },
+  ];
 }
 
 async function installMockHub(context) {
@@ -108,31 +183,117 @@ async function installMockHub(context) {
         json(
           hubEnvelope([
             {
-              session_id: 'session_web_chat',
+              id: SESSION_ID,
               type: 'group',
-              name: 'Chat density review',
-              owner_user_id: 'user_visual',
-              created_at: '2026-05-30T01:10:00Z',
-              updated_at: '2026-05-30T01:30:00Z',
+              name: 'Chat visual QA',
+              member_count: 2,
+              unread_count: 0,
             },
           ]),
         ),
       );
     }
-    if (pathname.includes('/client/edges') || pathname.includes('/client/targets')) {
+    if (pathname === `/client/sessions/${SESSION_ID}/messages`) {
+      return route.fulfill(
+        json(
+          hubEnvelope([
+            {
+              id: 'message-vqa-user',
+              session_id: SESSION_ID,
+              seq_id: 1,
+              client_msg_id: 'client-vqa-user',
+              sender_type: 'user',
+              sender_id: 'user_visual',
+              sender: { nickname: 'Visual Reviewer' },
+              content_type: 'text',
+              content: '启动聊天内容面的视觉合同捕获。',
+              created_at: '2026-06-26T08:00:00Z',
+            },
+          ]),
+        ),
+      );
+    }
+    if (pathname === `/client/sessions/${SESSION_ID}/pins`) {
+      return route.fulfill(json(hubEnvelope([])));
+    }
+    if (pathname === '/client/contacts' || pathname === '/client/notifications') {
+      return route.fulfill(json(hubEnvelope([])));
+    }
+    if (pathname === '/web/agent-profiles' || pathname === '/web/projects') {
+      return route.fulfill(json(hubEnvelope({ items: [], page: { hasMore: false } })));
+    }
+    if (pathname === '/web/execution-targets') {
       return route.fulfill(
         json(
           hubEnvelope({
             items: [
               {
-                id: 'target-local-edge-1',
-                label: 'Alpha Desktop',
-                kind: 'local',
-                status: 'online',
-                updated_at: '2026-05-30T01:25:00Z',
+                id: 'target-vqa',
+                name: 'Chat QA Desktop Edge',
+                target_type: 'local_edge',
+                workspace_allowlist: [],
+                trust_level: 'local',
+                health_state: 'healthy',
+                is_online: true,
               },
             ],
             page: { hasMore: false },
+          }),
+        ),
+      );
+    }
+    if (pathname === `/web/agent-tasks/${TASK_ID}/events`) {
+      return route.fulfill(json(hubEnvelope(chatVisualQaEvents())));
+    }
+    if (pathname === `/web/agent-tasks/${TASK_ID}/events/summary`) {
+      // status 'done' = streaming-ENDED: replay stays hydrated while the
+      // composer keeps the Send control (chat-flow-contract.spec.ts).
+      return route.fulfill(
+        json(
+          hubEnvelope({
+            task_id: TASK_ID,
+            edge_run_id: 'run-web-chat-qa',
+            status: 'done',
+            total_events: chatVisualQaEvents().length,
+            last_event_seq: chatVisualQaEvents().length,
+            event_type_counts: {},
+            tool_call_count: 1,
+            step_count: 1,
+            artifact_count: 0,
+            approval_count: 0,
+            pending_approvals: 0,
+            decided_approvals: 0,
+            input_tokens: 0,
+            output_tokens: 0,
+            output_bytes: 0,
+          }),
+        ),
+      );
+    }
+    if (pathname === `/web/agent-tasks/${TASK_ID}/approvals`) {
+      return route.fulfill(
+        json(
+          hubEnvelope({
+            task_id: TASK_ID,
+            edge_run_id: 'run-web-chat-qa',
+            session_id: SESSION_ID,
+            approvals: [],
+            pending: [],
+            decided: [],
+            last_event_seq: chatVisualQaEvents().length,
+          }),
+        ),
+      );
+    }
+    if (pathname === `/web/agent-tasks/${TASK_ID}/artifacts`) {
+      return route.fulfill(
+        json(
+          hubEnvelope({
+            task_id: TASK_ID,
+            edge_run_id: 'run-web-chat-qa',
+            session_id: SESSION_ID,
+            artifacts: [],
+            last_event_seq: chatVisualQaEvents().length,
           }),
         ),
       );
@@ -154,7 +315,9 @@ async function maybeStartDevServer() {
       shell: process.platform === 'win32',
       env: {
         ...process.env,
-        VITE_AGENTHUB_DATA_MODE: 'mock',
+        // Match visual-qa-shell.mjs: mount at the origin root and pin the
+        // hub URL so every Hub call lands in the Playwright route stub.
+        VITE_BASE_PATH: '/',
         VITE_HUB_URL: 'http://localhost:8080',
       },
     },
@@ -177,23 +340,30 @@ async function captureTheme(browser, theme) {
   await installMockHub(context);
   const page = await context.newPage();
 
+  // Storage before navigation: theme (v4 SSOT + legacy), locale, hub auth,
+  // approved-real data mode and the finished active task (replay source).
   await page.addInitScript(
-    ({ v4Key, legacyKey, theme: t }) => {
+    ({ v4Key, legacyKey, theme: t, sessionId, taskId }) => {
       window.localStorage.setItem(v4Key, t);
       window.localStorage.setItem(legacyKey, t);
       window.localStorage.setItem('agenthub-language', 'zh');
       window.localStorage.setItem('agenthub_hub_url', 'http://localhost:8080');
+      window.localStorage.setItem('agenthub.workbench.dataMode', 'approved-real');
+      window.localStorage.setItem(
+        `agenthub.web.activeAgentTask.${sessionId}`,
+        JSON.stringify({ taskId, sessionId, status: 'done' }),
+      );
       window.sessionStorage.setItem('agenthub_hub_token', 'visual-qa-token');
+      window.sessionStorage.setItem('agenthub_token_source', 'hub');
       window.sessionStorage.setItem(
         'agenthub_hub_user',
         JSON.stringify({ userId: 'user_visual', username: 'visual-reviewer' }),
       );
     },
-    { v4Key: THEME_KEY_V4, legacyKey: THEME_KEY_LEGACY, theme },
+    { v4Key: THEME_KEY_V4, legacyKey: THEME_KEY_LEGACY, theme, sessionId: SESSION_ID, taskId: TASK_ID },
   );
 
-  const appUrl = new URL('/', baseUrl).toString();
-  await page.goto(appUrl, { waitUntil: 'networkidle', timeout: 45_000 });
+  await page.goto(baseUrl, { waitUntil: 'domcontentloaded', timeout: 60_000 });
 
   try {
     await page.waitForSelector(WORKBENCH_SHELL, { state: 'visible', timeout: 30_000 });
@@ -203,32 +373,45 @@ async function captureTheme(browser, theme) {
     throw new Error(`Workbench shell not visible for chat theme=${theme}. Diagnostic: ${diagFile}`);
   }
 
-  // Prefer Chat rail (not Agents) so capture shows transcript + composer + inspector.
+  // Prefer the Chat rail so capture shows transcript + composer + inspector.
   try {
     const chatRail = page.locator(CHAT_RAIL_BUTTON).first();
     if (await chatRail.isVisible().catch(() => false)) {
       await chatRail.click();
     }
   } catch {
-    /* mock shell may already be on chat */
+    /* the single-session stub may already land on chat */
   }
 
-  await page.waitForSelector(WORKSPACE, { state: 'visible', timeout: 15_000 }).catch(() => {});
-
-  // Select first conversation in sidebar if present.
+  // Fail closed with a diagnostic if the replayed transcript (code block +
+  // tool card) does not materialize — the assert step trusts only captures
+  // that reached this contract.
   try {
-    const firstConvo = page
-      .locator(
-        '[aria-label="Conversation sidebar"] button, [aria-label="会话侧边栏"] button, [aria-label="Conversation sidebar"] [role="button"], [aria-label="会话侧边栏"] [role="button"], .conversation-item, [data-testid*="conversation"]',
-      )
-      .first();
-    if (await firstConvo.isVisible().catch(() => false)) {
-      await firstConvo.click();
-    }
+    await page.waitForSelector(TRANSCRIPT_LOG, { state: 'visible', timeout: 20_000 });
+    await page.waitForFunction(
+      ({ callId }) => {
+        const log = document.querySelector('[role="log"]');
+        if (!log) return false;
+        const copyBtn = Array.from(log.querySelectorAll('button')).find((b) =>
+          /^(复制|Copy)$/.test((b.getAttribute('aria-label') || '').trim()),
+        );
+        const card = log.querySelector(`[data-block-id="call-${callId}"]`);
+        return Boolean(copyBtn) && Boolean(card);
+      },
+      { callId: TOOL_CALL_ID },
+      { timeout: 20_000 },
+    );
   } catch {
-    /* optional */
+    const diagFile = path.join(outDir, `web-chat-${theme}-1440x810${dprSuffix}-CONTENT-DIAGNOSTIC.png`);
+    await page.screenshot({ path: diagFile, fullPage: false });
+    const bodyText = await page.evaluate(() => (document.body?.innerText ?? '(no body)').slice(0, 300));
+    throw new Error(
+      `Chat transcript contract content (code block + tool card) not rendered for theme=${theme}. ` +
+        `Body: ${bodyText.slice(0, 200)}. Diagnostic: ${diagFile}`,
+    );
   }
 
+  // Re-apply theme attributes after React hydration to guarantee correctness.
   await page.evaluate(
     ({ v4Key, legacyKey, theme: t }) => {
       window.localStorage.setItem(v4Key, t);
@@ -239,36 +422,70 @@ async function captureTheme(browser, theme) {
     { v4Key: THEME_KEY_V4, legacyKey: THEME_KEY_LEGACY, theme },
   );
 
-  await page
-    .waitForFunction(
-      () => {
-        const shell = document.querySelector('[data-testid="agenthub-workbench"]');
-        const body = document.body;
-        return Boolean(shell) && Boolean(body) && body.innerText.trim().length > 5;
-      },
-      { timeout: 12_000 },
-    )
-    .catch(() => {
-      console.warn(`warn: chat content check inconclusive for theme=${theme}`);
-    });
-
-  // Prefer composer + inspector presence for density review shots.
-  const hasComposer = await page.locator(COMPOSER).first().isVisible().catch(() => false);
-  const hasInspector = await page.locator(INSPECTOR).first().isVisible().catch(() => false);
-  if (!hasComposer) console.warn(`warn: composer not visible for theme=${theme}`);
-  if (!hasInspector) console.warn(`warn: inspector not visible for theme=${theme}`);
-
+  // Settle for CSS transitions, fonts, and the lazy syntax-highlighter chunk.
   await wait(800);
 
   const file = path.join(outDir, `web-chat-${theme}-1440x810${dprSuffix}.png`);
   await page.screenshot({ path: file, fullPage: false });
+
+  // DOM/geometry contract (no pixel goldens): proves the capture hit the chat
+  // content surface with a code block message and a completed tool card, in
+  // the streaming-ended state, without horizontal overflow.
+  const contract = await page.evaluate((callId) => {
+    const measure = (el) => {
+      if (!el) return { exists: false };
+      const rect = el.getBoundingClientRect();
+      return { exists: true, width: Math.round(rect.width), height: Math.round(rect.height) };
+    };
+    const log = document.querySelector('[role="log"]');
+    // CodeBlock header copy button (aria-label 复制/Copy) is the locale-stable
+    // hook for fenced blocks; the wrapper is the header's parent.
+    const copyBtn = log
+      ? Array.from(log.querySelectorAll('button')).find((b) =>
+          /^(复制|Copy)$/.test((b.getAttribute('aria-label') || '').trim()),
+        )
+      : null;
+    const codeBlockWrapper = copyBtn ? copyBtn.closest('div')?.parentElement : null;
+    const toolCard = log ? log.querySelector(`[data-block-id="call-${callId}"]`) : null;
+    const buttons = Array.from(document.querySelectorAll('button'));
+    const named = (re) =>
+      buttons.some((b) => re.test(b.textContent || '') || re.test(b.getAttribute('aria-label') || ''));
+    return {
+      viewport: { width: window.innerWidth, height: window.innerHeight },
+      appliedTheme: document.documentElement.getAttribute('data-theme'),
+      dataMode:
+        document.querySelector('[data-testid="agenthub-workbench"]')?.getAttribute('data-data-mode') ?? '',
+      workbenchShell: Boolean(document.querySelector('[data-testid="agenthub-workbench"]')),
+      chatLog: measure(log),
+      userMessage: { count: log ? log.querySelectorAll('.user-bubble').length : 0 },
+      codeBlock: measure(codeBlockWrapper),
+      toolCard: measure(toolCard),
+      streamingEnded: {
+        typingIndicator: Boolean(document.querySelector('.typingIndicator')),
+        sendVisible: named(/^(?:Send message|发送消息)$/),
+        stopVisible: named(/^(?:Stop|停止)/),
+      },
+      composer: measure(document.querySelector('textarea')),
+      horizontalOverflow:
+        document.documentElement.scrollWidth > document.documentElement.clientWidth + 1,
+    };
+  }, TOOL_CALL_ID);
+  const contractFile = path.join(outDir, `web-chat-${theme}-1440x810${dprSuffix}.json`);
+  await writeFile(contractFile, JSON.stringify(contract, null, 2) + '\n');
+
   const applied = await page.evaluate(() => document.documentElement.getAttribute('data-theme'));
   await context.close();
-  return { file, applied, theme, hasComposer, hasInspector };
+  return { file, contractFile, contract, applied, theme };
 }
 
 async function main() {
   await mkdir(outDir, { recursive: true });
+  // Remove expected outputs before capture so a failed run cannot pass the
+  // assert step on stale files from an older run (same policy as the shell gate).
+  for (const theme of themes) {
+    await rm(path.join(outDir, `web-chat-${theme}-1440x810${dprSuffix}.png`), { force: true });
+    await rm(path.join(outDir, `web-chat-${theme}-1440x810${dprSuffix}.json`), { force: true });
+  }
   const server = await maybeStartDevServer();
   const browser = await chromium.launch({ headless: true });
   const results = [];
@@ -285,10 +502,12 @@ async function main() {
     if (r.applied !== r.theme) {
       console.warn(`warn: expected data-theme=${r.theme}, got ${r.applied}`);
     }
-    console.log(`wrote ${r.file} (composer=${r.hasComposer} inspector=${r.hasInspector})`);
+    console.log(`wrote ${r.file}`);
+    console.log(
+      `contract ${r.contractFile} codeBlock=${r.contract.codeBlock.exists} toolCard=${r.contract.toolCard.exists} overflow=${r.contract.horizontalOverflow}`,
+    );
   }
   console.log(`Web visual-qa chat capture done (${results.length} shots) → ${outDir}`);
-  console.log('Optional density notes — not the Agents shell merge gate. See scorecard §4.');
 }
 
 main().catch((err) => {
