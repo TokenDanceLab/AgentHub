@@ -2,7 +2,7 @@
 
 > 子文档 | 主索引：[architecture.md](../architecture.md)
 >
-> 最后更新：2026-07-27
+> 最后更新：2026-08-24
 
 本文档只记录 Desktop/Web/Mobile 共享前端的数据流合同和 source owner。具体 hook、组件 props、测试用例数量以源码和测试为准，不在这里复制清单。
 
@@ -20,6 +20,7 @@ Desktop/Web/Mobile app shell
 规则：
 
 - `app/workbench/`（`@agenthub/workbench`）拥有端级 workbench shell；`app/shared/` 拥有 transcript、composer、inspector 和 chatview 组件合同。依赖方向固定为 workbench → shared 单向（#1759）。
+- 通用组件放在 `app/shared/src/ui/`，Desktop/Web 从 shared 导入，不维护端内副本；组件样式使用 CSS Modules，并消费 `app/shared/src/styles/` 的 OKLCH/语义 token，避免组件级硬编码颜色。新 shared 组件必须同时提供 `<组件>.test.tsx`、`<组件>.stories.tsx`，并逐项勾选 [component-acceptance.md](../component-acceptance.md) 的验收表；缺件不得合入。
 - Desktop/Web/Mobile 只提供 platform adapter、认证、查询、runtime bridge 和壳层能力。
 - Shared UI 不直接调用 Tauri invoke、Hub client 或 Edge client。
 - Desktop renderer 不直接执行 CLI；本地执行走 Tauri host typed API、Local Edge 和 Edge adapter。
@@ -133,7 +134,7 @@ Stubbed Hub, fixture, readiness-only and manifest-only outputs must set `real_te
 |---|---|
 | Transcript ordering/grouping/markdown | Shared Vitest over `app/shared/src/transcript/` and `app/shared/src/chatview/` |
 | Send visibility and auto-follow | Desktop/Web Playwright chat-flow specs; Mobile remains framework/boundary-only until a dedicated UI slice |
-| Layout cleanliness | Desktop/Web Visual QA gate at 16:9 `1440x810` light+dark via `visual-qa-shell.mjs` / `visual:qa:shell`（旧视觉分数断言已删除，见 [07-design-system-ssot.md](07-design-system-ssot.md)）; check overflow and final-message visibility |
+| Layout cleanliness | Desktop/Web Visual QA merge gate 分别运行 `app/desktop/scripts/visual-qa-shell.mjs` 与 `app/web/scripts/visual-qa-shell.mjs`（package script：`visual:qa:shell`）；标准审阅矩阵为 `1440x810` light+dark，同一 gate 还补充 Web `768x900`、Desktop `800x900` 的窄视口非空白/几何合同；`app/web/scripts/visual-qa.mjs` 是可选/遗留多场景电池，不是 merge gate（旧视觉分数断言已删除，见 [07-design-system-ssot.md](07-design-system-ssot.md)） |
 | Data boundary | `app/shared/src/testing/e2eDataModeContract.ts` plus surface-specific E2E assertions |
 | Packaged Desktop | Tauri package/sidecar/icon/installer evidence, not Vite-only |
 

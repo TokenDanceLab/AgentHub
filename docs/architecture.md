@@ -1,6 +1,6 @@
 # AgentHub 架构概览
 
-最后更新：2026-08-20
+最后更新：2026-08-24
 
 本文档是架构入口，只保留当前结构、边界和 owner 链接。旧长版架构说明见 [history.md](history.md)。
 
@@ -104,7 +104,7 @@ Mobile shared workbench (viewer / limited control)
 | Backend performance/leak | 机器门禁 `scripts/verify/verify-backend-perf-leak-gates.py` 执行行为门禁与短微基准；证据等级分类见 [archives/reference/backend-performance-gates.md](archives/reference/backend-performance-gates.md)（已归档 2026-08-19） |
 | Hub service 纯包边界 | 机器门禁 `scripts/verify/verify-hub-pure-packages.py`（`dispatch`/`deliveryoutbox`/`im`/`agentevent` 禁 import gorm/cache/ws/service 树，见 [architecture/01-hub-server.md](architecture/01-hub-server.md) §Service 领域子包） |
 | Edge adapters 依赖方向 | 机器门禁 `scripts/verify/verify-orchestrator-deps.py` + `TestLeafDoesNotImportRootAdapters`（orchestrator 纯叶子不 import 根包，见 [architecture/02-edge-server.md](architecture/02-edge-server.md) §Adapter 家族子包） |
-| Shared transcript/UI | shared unit/contract + Desktop/Web Playwright + Visual QA；验收以 `visual:qa:shell` 截图证据 + PR 人工审阅为准（旧视觉分数断言已删除，见 [architecture/07-design-system-ssot.md](architecture/07-design-system-ssot.md)）；视口 16:9 `1440x810` light+dark via `visual-qa-shell.mjs` |
+| Shared transcript/UI | shared unit/contract + Desktop/Web Playwright + Visual QA；merge gate 入口是 `app/{desktop,web}/scripts/visual-qa-shell.mjs`（两端 package script 均为 `visual:qa:shell`），标准审阅矩阵为 `1440x810` light+dark，并由同一 gate 补充 Web `768x900`、Desktop `800x900` 窄视口的非空白/几何合同；`app/web/scripts/visual-qa.mjs` 是可选/遗留多场景电池，不是 merge gate（旧视觉分数断言已删除，见 [architecture/07-design-system-ssot.md](architecture/07-design-system-ssot.md)） |
 | Desktop packaged claim | Tauri package/sidecar/icon/installer evidence, not Vite-only |
 | Real login/model/API claim | approved-real evidence with explicit approval and no silent fallback |
 
