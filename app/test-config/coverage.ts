@@ -28,11 +28,14 @@ export function createCoverage(options: CoverageOptions) {
     provider: 'v8' as const,
     // 生产源码全量进分母 —— 这是本合同的根基，不可删。
     include: ['src/**/*.ts', 'src/**/*.tsx'],
-    // 默认排除只覆盖"非生产代码"类别：测试自身、测试目录（含 Playwright
+    // 默认排除只覆盖"非生产代码"类别：测试自身、Storybook 渲染夹具
+    // （*.stories.ts/x，vitest 从不执行、且非生产模块）、测试目录（含 Playwright
     // e2e spec）。夹具/生成物/纯声明文件由各 package 按需窄排除（有理由才排）。
     exclude: [
       'src/**/*.test.ts',
       'src/**/*.test.tsx',
+      'src/**/*.stories.ts',
+      'src/**/*.stories.tsx',
       'src/**/__tests__/**',
       'src/__e2e__/**',
       ...exclude,
