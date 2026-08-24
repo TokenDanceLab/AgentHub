@@ -1,6 +1,6 @@
 # AgentHub 开发快速上手
 
-最后更新：2026-08-23
+最后更新：2026-08-24
 
 本文档只保留新人启动本地开发环境需要的最短路径。规则、分支、E2E 证据等级和发布门禁以 `AGENTS.md` 为准。
 
@@ -115,19 +115,19 @@ AGENTHUB_TOKENDANCE_ID_ISSUER_URL=http://127.0.0.1:3000
 
 ## 测试速查
 
-后端：
+本地入口以根 `Makefile` 为准，均从仓库根执行：
 
-```bash
-cd edge-server; go test ./... -short -count=1
-cd ../hub-server; go test ./... -short -count=1
-```
+| 层 | 命令 | 真实范围 |
+|---|---|---|
+| L0 后端 | `make test` | `test-edge` + `test-hub`，均为 `go test -short` |
+| L0 前端 | `make fe-test` / `make fe-typecheck` / `make fe-build` | workspace unit tests；Desktop/Web typecheck 与 production build |
+| L1 集成 | `scripts/dev/dev-up.sh` 后执行 `make test-hub-integration` | 真实 PostgreSQL 16 + Redis 7；`-tags integration` |
+| L2 fixture | `make test-edge-e2e` / `make e2e-local` | callback mock hub；后者组合 teamrun + OIDC/scenarios smoke |
+| 全量本地 | `make test-all` | Edge/Hub 非 `-short` race + L1，需 PostgreSQL + Redis |
 
-前端：
-
-```bash
-cd app/desktop; corepack pnpm test; corepack pnpm typecheck
-cd ../web; corepack pnpm typecheck; corepack pnpm exec vite build
-```
+L3 的常规执行面是远程 dev 服务器（#1681），仓库内统一入口是 `scripts/dev/devserver.sh`。
+常用顺序：`scripts/dev/devserver.sh sync` → `start` → `status` → `test` / `integration`。
+`test` 回传服务器侧 Hub/Edge `-short` 报告，`integration` 重建独立测试库后回传 Hub integration 报告；二者本身不等于浏览器真实登录证据。准备好 TokenDance ID + Hub + Edge + Web 全栈后，真实 OIDC 浏览器 lane 执行 `bash scripts/e2e/run-real-e2e-lane.sh`。CI 中同一入口由 `checks.yml` 的 `real-e2e-stack` job 调用，但该 job 仅 `workflow_dispatch`，不阻塞 PR。
 
 文档/API：
 
@@ -139,7 +139,7 @@ python -c "import yaml, pathlib; yaml.safe_load(pathlib.Path('api/openapi.yaml')
 git diff --check
 ```
 
-GitHub Actions 的 Ubuntu/Windows 分层、路径过滤、矩阵并行、缓存和免费额度策略见 [architecture/github-actions-ci-cd-policy.md](architecture/github-actions-ci-cd-policy.md)。普通 PR 会运行相关的 Windows 原生 Go/前端合同；Mobile full、Playwright、Visual QA、benchmark 和 Linux Tauri 预检通过 `workflow_dispatch` 按需运行。
+GitHub Actions 的 Ubuntu/Windows 分层、路径过滤、矩阵并行、缓存和免费额度策略见 [architecture/github-actions-ci-cd-policy.md](architecture/github-actions-ci-cd-policy.md)。普通 PR 按路径运行 Windows 原生 Go/前端合同、Web/Desktop Visual QA shell 和 Web stubbed-hub Playwright；Mobile full、`e2e-smoke`、`real-e2e-stack`、backend perf/leak、benchmark 和 Linux Tauri no-bundle 只通过 `workflow_dispatch` 按需运行。
 
 E2E/Visual QA 只证明实际跑过的层级；PR 中写明证据等级（`fixture-unit`/`playwright-ui`/`visual-qa`/`stubbed-hub`/`observed-local`/`approved-real`/`packaged-release`）。
 
