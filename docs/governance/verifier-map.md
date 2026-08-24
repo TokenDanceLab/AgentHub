@@ -26,6 +26,7 @@
 | shared UI i18n callsite ratchet（#1612；违规文件数棘轮：仅当含 CJK 字面量且未导入 `useTranslation` 的违规文件数超过 baseline 时 fail，不比较字面量行数——既有违规文件内新增 CJK 字面量行不会触发；当前 advisory：validate step 带 `continue-on-error`，存量违规文件回填低于 baseline 后转硬门禁） | `scripts/verify/verify-i18n-callsites.py` | checks.yml → validate |
 | 演示诚实：stub/fixture 不得冒充真实登录/API | `scripts/verify/verify-real-e2e-contract.py` | checks.yml → validate |
 | 真实 E2E lane evidence manifest 六字段合同 + 私有信息脱敏（#1839/#1873：非 loopback URL host / 内网 IP / 绝对路径 / 内网后缀 hostname fail-closed） | `scripts/verify/verify-real-e2e-lane-manifest.py`（负向自测 `scripts/verify/tests/verify-real-e2e-lane-manifest.Tests.py`） | checks.yml → real-e2e-stack（自测 → validate） |
+| real-e2e-stack ID 环境不透明化（#1873：不接受任意 URL / 镜像；只接受预登记 opaque ID choice；ID endpoint loopback-only；image 固定 allowlist） | `scripts/verify/verify-e2e-env-allowlist.py`（负向自测 `scripts/verify/tests/verify-e2e-env-allowlist.Tests.py`） | checks.yml → validate |
 | OpenAPI↔hub router 合同一致 | `scripts/verify/verify-openapi-contract.py` | checks.yml → validate |
 | shared 内不出现 Edge 客户端实现 | `scripts/verify/verify-shared-boundary.py` | checks.yml → validate |
 | 前端包依赖方向：shared 不得 import workbench，workbench 只依赖 shared（#1759） | `scripts/verify/verify-frontend-package-boundary.py`（负向自测 `scripts/verify/tests/verify-frontend-package-boundary.Tests.py`）+ app/eslint.config.mjs `no-restricted-imports` | checks.yml → validate |
