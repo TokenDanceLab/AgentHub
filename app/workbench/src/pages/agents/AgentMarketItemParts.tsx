@@ -103,11 +103,18 @@ export const MarketCard: React.FC<{
     <div>
       <button
         type="button"
+        disabled={!onInstall}
+        title={!onInstall ? '当前环境不支持安装模板' : undefined}
         onClick={() => onInstall?.(template.name, template.description, template.category)}
       >
         安装
       </button>
-      <button type="button" onClick={() => onPreview?.(template.name)}>
+      <button
+        type="button"
+        disabled={!onPreview}
+        title={!onPreview ? '当前环境不支持预览' : undefined}
+        onClick={() => onPreview?.(template.name)}
+      >
         预览
       </button>
     </div>
@@ -121,6 +128,8 @@ export const MarketTemplateListRow: React.FC<{
   <button
     className={styles['market-list-row']}
     type="button"
+    disabled={!onInstall}
+    title={!onInstall ? '当前环境不支持安装模板' : undefined}
     onClick={() => onInstall?.(template.name, template.description, template.category)}
   >
     <div className={styles['market-icon']}>
@@ -180,6 +189,8 @@ export const SkillMarketItemRow: React.FC<{
       <button
         className={`${styles['market-action-btn']} ${styles.uninstall}`}
         type="button"
+        disabled={!onSkillUninstall}
+        title={!onSkillUninstall ? '当前环境不支持卸载 Skill' : undefined}
         onClick={() => onSkillUninstall?.(skill.id)}
       >
         卸载
@@ -188,6 +199,8 @@ export const SkillMarketItemRow: React.FC<{
       <button
         className={`${styles['market-action-btn']} ${styles.install}`}
         type="button"
+        disabled={!onSkillInstall}
+        title={!onSkillInstall ? '当前环境不支持安装 Skill' : undefined}
         onClick={() => onSkillInstall?.(skill)}
       >
         安装
@@ -216,6 +229,8 @@ export const McpMarketItemRow: React.FC<{
       <button
         className={`${styles['market-action-btn']} ${styles.uninstall}`}
         type="button"
+        disabled={!onMcpUninstall}
+        title={!onMcpUninstall ? '当前环境不支持卸载 MCP' : undefined}
         onClick={() => onMcpUninstall?.(mcp.id)}
       >
         卸载
@@ -224,6 +239,8 @@ export const McpMarketItemRow: React.FC<{
       <button
         className={`${styles['market-action-btn']} ${styles.install}`}
         type="button"
+        disabled={!onMcpInstall}
+        title={!onMcpInstall ? '当前环境不支持安装 MCP' : undefined}
         onClick={() => onMcpInstall?.(mcp)}
       >
         安装

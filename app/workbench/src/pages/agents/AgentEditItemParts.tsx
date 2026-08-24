@@ -83,6 +83,7 @@ export const AgentEditGrid: React.FC<{
             <input
               value={String(agent[field.key as keyof AgentConfig] ?? '')}
               placeholder="未设置"
+              disabled={!onFieldChange}
               onChange={(e) => onFieldChange?.(field.key, e.target.value)}
             />
           )}
@@ -135,6 +136,8 @@ export const AgentSkillChipGrid: React.FC<{
           key={skill}
           className={`${styles['skill-chip']} ${agent.skills.includes(skill) ? styles.active : ''}`}
           type="button"
+          disabled={!onAgentSkillToggle}
+          title={!onAgentSkillToggle ? '当前环境不支持修改技能' : undefined}
           onClick={() => onAgentSkillToggle?.(skill)}
         >
           <RuntimeBrandIcon kind="tool" name={skill} size="compact" framed={false} decorative />
@@ -166,6 +169,8 @@ export const AgentToolPermissions: React.FC<{
               key={option}
               className={`${defaultToolPermission(agent.tools, tool) === option ? styles.active : ''}`}
               type="button"
+              disabled={!onToolPermissionSet}
+              title={!onToolPermissionSet ? '当前环境不支持修改工具权限' : undefined}
               onClick={() => onToolPermissionSet?.(tool, option)}
             >
               {option}
@@ -289,7 +294,7 @@ export const AgentEditActions: React.FC<{
     <Button
       variant="primary"
       type="button"
-      disabled={isBusy}
+      disabled={isBusy || !onAgentSave}
       onClick={onAgentSave}
     >
       {isSaving ? '保存中' : '保存配置'}
@@ -297,7 +302,7 @@ export const AgentEditActions: React.FC<{
     <Button
       variant="secondary"
       type="button"
-      disabled={isBusy}
+      disabled={isBusy || !onAgentDuplicate}
       onClick={onAgentDuplicate}
     >
       复制 Agent
@@ -305,7 +310,7 @@ export const AgentEditActions: React.FC<{
     <Button
       variant="destructive"
       type="button"
-      disabled={isBusy}
+      disabled={isBusy || !onAgentDelete}
       onClick={onAgentDelete}
     >
       {isDeleting ? '删除中' : '删除'}
