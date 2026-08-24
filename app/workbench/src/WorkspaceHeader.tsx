@@ -47,17 +47,17 @@ export function WorkspaceHeader({
 
       <div className={styles.workspaceHeaderCopy}>
         <div className={styles.workspaceTitleRow}>
-          <h1 className={styles.workspaceTitle}>
+          <h1 className={styles.workspaceTitle} title={activeConversation?.title}>
             {activeConversation?.title ?? 'AgentHub'}
           </h1>
           {runtimeLabel ? (
-            <span className={styles.workspaceKind}>{runtimeLabel}</span>
+            <span className={styles.workspaceKind} title={runtimeLabel}>{runtimeLabel}</span>
           ) : null}
-          <span className={styles.workspaceThread}>
+          <span className={styles.workspaceThread} title={threadLabel}>
             {threadLabel}
           </span>
           {hasModel ? (
-            <span className={styles.workspaceModel}>{activeConversation?.model}</span>
+            <span className={styles.workspaceModel} title={activeConversation?.model}>{activeConversation?.model}</span>
           ) : null}
         </div>
       </div>
