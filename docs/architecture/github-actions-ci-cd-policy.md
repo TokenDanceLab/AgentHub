@@ -1,6 +1,6 @@
 # GitHub Actions CI/CD policy
 
-最后更新：2026-08-17
+最后更新：2026-08-24
 
 本文档定义 AgentHub 的免费 GitHub-hosted runner 测试链路。它描述职责和触发边界；具体 job、版本和脚本以 `.github/workflows/checks.yml`、`release-readiness.yml`、`release.yml` 及仓库内 verifier 为准。
 
@@ -17,10 +17,18 @@ AgentHub 使用 Ubuntu 和 Windows 原生 runner 验证不同类别的问题：
 
 | 层 | 触发 | 平台 | 内容 | 目的 |
 |---|---|---|---|---|
-| Fast PR | `pull_request` / `push` 到 `master`，按路径过滤 | Ubuntu + Windows | Go unit/race shards、Hub/Edge fixture、前端 unit/type/build、Windows 原生合同、架构和安全 verifier | 在免费额度内提供持续反馈 |
-| Extended manual | `workflow_dispatch` | Ubuntu | Mobile full、Playwright smoke、Visual QA、backend perf/leak、benchmark、Linux Tauri no-bundle | 按需获取高成本证据 |
-| Release readiness | 相关发布/桌面文件变更或手动触发 | Ubuntu + Windows（macOS 仅显式手动） | package policy、Windows installer preflight、可选 unsigned dry package | 发布前验证，不替代 PR 快速门禁 |
+| Fast PR | `pull_request` / `push` 到 `master`，按路径过滤 | Ubuntu + Windows | Go unit/race shards、Hub/Edge fixture、前端 unit/type/build、Windows 原生合同、Web/Desktop Visual QA shell、Web stubbed-hub Playwright、架构和安全 verifier | 在免费额度内提供持续反馈 |
+| Extended manual | `workflow_dispatch` | Ubuntu | Mobile full、`e2e-smoke`、`real-e2e-stack` L3、backend perf/leak、benchmark、Linux Tauri no-bundle；路径型 Visual QA/stubbed-hub 也可手动重跑 | 按需获取高成本或真实栈证据，不进入 PR 阻塞门禁 |
+| Release readiness | 相关发布/桌面文件变更或手动触发 | Ubuntu + Windows（macOS 仅显式手动） | `readiness-policy`、`windows-installer-smoke-preflight`；`windows-package-dry`、`macos-unsigned-dry-policy`、`macos-package-dry` 仅显式 opt-in | 发布前验证，不替代 PR 快速门禁；不存在名为 `release-readiness` 的 job |
 | Release | semver tag | Ubuntu + Windows | release gate、跨平台 Go artifacts、Tauri 发布产物 | 只从 tag 进入发布 |
+
+## 分支保护与稳定 required checks
+
+`master` 分支保护使用 `strict=true`，PR 必须先与目标分支保持 up-to-date。仓库要求的稳定 required-check 契约是 `validate`、`go-hub`、`go-edge`、`windows-go`、`windows-frontend`、`backend-required`。
+
+- `go-edge` / `go-hub` 在无 Go 变更时用受控 no-op 恒报，真实单元执行在 `go-edge-test` / `go-hub-test` 的两分片矩阵。
+- `windows-go` / `windows-frontend` 只聚合执行矩阵结果，不自己跑测试。
+- `backend-required` 聚合后端 L0/L1/L2；`real-e2e-stack` 是 dispatch-only L3，不属于 required checks。
 
 ## 并行与成本策略
 
@@ -46,6 +54,12 @@ AgentHub 使用 Ubuntu 和 Windows 原生 runner 验证不同类别的问题：
 - `windows-frontend-test` 是执行矩阵：在 `windows-latest` 上对 `agenthub-desktop` 和 `agenthub-web` 并行执行 typecheck、unit tests 和 production build。
 - `windows-go` 和 `windows-frontend` 是稳定 required-check 聚合 job：它们 `if: always()` 报告矩阵结果，分支保护只认这两个稳定名，不随矩阵基数变化。当路径过滤跳过执行矩阵时，聚合 job 退出 `success` 作为有意 no-op；该 success 只代表“未触发”，不提供测试执行证据。
 - Windows 原生合同不宣称 Tauri installer 可发布；installer 与 signing 仍由 release-readiness/release 的专门 job 负责。
+
+### L3 真实 E2E
+
+- L3 没有阻塞 PR 的 CI job；`checks.yml` 提供 `real-e2e-stack`（显示名 `Real E2E stack (L3 lane, dispatch-only)`），仅在 `workflow_dispatch` 时启动全栈并调用 `scripts/e2e/run-real-e2e-lane.sh`。
+- 日常 L3 执行面是远程 dev 服务器，统一控制入口为 `scripts/dev/devserver.sh sync|start|stop|status|test|integration`（#1681）。其中 `test` 与 `integration` 分别回传服务器侧短测试和集成测试报告，不应单独冒充真实 OIDC 浏览器证据。
+- `scripts/e2e/wsl-full-stack-e2e.sh` 是 WSL 专属兼容入口，不是唯一 L3 入口，也不是 required check。
 
 ## 开发者入口
 
@@ -80,7 +94,7 @@ PowerShell 命令中的 `go test ./edge-server/...` 仅适用于从仓库根运�
 
 ## 证据边界
 
-- `success` 只表示对应 job 实际执行并通过；被路径过滤跳过的 job 不得被描述为已测试。
+- 执行型 job 的 `success` 表示对应步骤实际通过；`go-edge`/`go-hub`/`windows-go`/`windows-frontend`/`backend-required` 的受控 no-op `success` 只表示路径未触发，不提供测试执行证据。
 - fixture、mock、stubbed Hub、observed local、approved real 和 packaged release 证据必须按 `scripts/verify/verify-real-e2e-contract.py` 的等级记录。
 - screenshot 和构建产物上传到 workflow artifact，不提交仓库；临时输出、coverage、Playwright report 和 package dry artifacts 必须保持 gitignored。
 - CI 失败首先修复脚本或代码；不得用 `continue-on-error`、`|| true`、空测试保护或降低 baseline 制造假绿。现有 advisory gate 必须有 owner、原因和收紧条件。

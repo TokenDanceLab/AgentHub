@@ -3,7 +3,7 @@
 > Owner：本文件是 AgentHub「规则 → 机器验证」映射的 SSOT。`AGENTS.md` 的“规则 → 机器验证映射”只保留指针，不复制本表。
 > 机器门禁：`scripts/verify/verify-doc-ssot.py` 校验本表验证脚本路径与 CI 文件存在性。
 
-最后更新：2026-08-23（文档门禁新增 AGENTS 主题名引用校验，禁止章节编号漂移；保留 web stubbed-hub Playwright、secrets/i18n advisory 与违规文件数棘轮口径）
+最后更新：2026-08-24（CI job 映射对齐 checks/release-readiness 现状；明确 real-e2e-stack 为 dispatch-only L3）
 
 ## 映射表
 
@@ -25,7 +25,7 @@
 | 核心 token/theme/preset CSS 仅 parser 语法门禁（fail-closed；Stylelint 被 ignore 排除，规则债另立，#1720） | `app/scripts/verify-design-css-syntax.mjs`（内置 `--self-test` 负向自测） | checks.yml → design-css |
 | shared UI i18n callsite ratchet（#1612；违规文件数棘轮：仅当含 CJK 字面量且未导入 `useTranslation` 的违规文件数超过 baseline 时 fail，不比较字面量行数——既有违规文件内新增 CJK 字面量行不会触发；当前 advisory：validate step 带 `continue-on-error`，存量违规文件回填低于 baseline 后转硬门禁） | `scripts/verify/verify-i18n-callsites.py` | checks.yml → validate |
 | 演示诚实：stub/fixture 不得冒充真实登录/API | `scripts/verify/verify-real-e2e-contract.py` | checks.yml → validate |
-| 真实 E2E lane evidence manifest 六字段合同 + 私有信息脱敏（#1839/#1873：非 loopback URL host / 内网 IP / 绝对路径 / 内网后缀 hostname fail-closed） | `scripts/verify/verify-real-e2e-lane-manifest.py`（负向自测 `scripts/verify/tests/verify-real-e2e-lane-manifest.Tests.py`） | checks.yml → real-e2e-stack（自测 → validate） |
+| 真实 E2E lane evidence manifest 六字段合同 + 私有信息脱敏（#1839/#1873：非 loopback URL host / 内网 IP / 绝对路径 / 内网后缀 hostname fail-closed；L3 仅 dispatch，不阻塞 PR） | `scripts/verify/verify-real-e2e-lane-manifest.py`（负向自测 `scripts/verify/tests/verify-real-e2e-lane-manifest.Tests.py`） | checks.yml → real-e2e-stack（自测 → validate） |
 | real-e2e-stack ID 环境不透明化（#1873：不接受任意 URL / 镜像；只接受预登记 opaque ID choice；ID endpoint loopback-only；image 固定 allowlist） | `scripts/verify/verify-e2e-env-allowlist.py`（负向自测 `scripts/verify/tests/verify-e2e-env-allowlist.Tests.py`） | checks.yml → validate |
 | OpenAPI↔hub router 合同一致 | `scripts/verify/verify-openapi-contract.py` | checks.yml → validate |
 | shared 内不出现 Edge 客户端实现 | `scripts/verify/verify-shared-boundary.py` | checks.yml → validate |
@@ -44,15 +44,15 @@
 | P0 remote-control fixture 就绪 | `scripts/verify/verify-p0-remote-control-fixture.py` | checks.yml → backend-e2e-fixture |
 | 后端 perf/leak 门禁（手动触发） | `scripts/verify/verify-backend-perf-leak-gates.py` | checks.yml → backend-perf-leak-gates |
 | 部署形状 SSOT：唯一 production compose、镜像名 SSOT、遗留清单关闭（#1527） | `scripts/verify/verify-deployment-shape.py`（负向自测 `scripts/verify/tests/verify-deployment-shape.Tests.py`） | cd-pr-check.yml → deployment-files |
-| Tauri packaged 行为与签名门禁 | `scripts/release/verify-tauri-package-readiness.py` | release-readiness.yml |
+| Tauri packaged 行为与签名门禁 | `scripts/release/verify-tauri-package-readiness.py` | release-readiness.yml → readiness-policy |
 | 发布安全风险状态门禁（Critical/High 的 `Open`、`rotate required`、`* verification required` 阻断发布；未知或损坏状态 fail-closed） | `scripts/release/verify-release-gate.py`（负向自测 `scripts/verify/tests/verify-release-gate.Tests.py`） | release.yml → security-gate |
-| pnpm 工具链版本与 `app/package.json#packageManager` 一致 | `scripts/release/verify-tauri-package-readiness.py` | checks.yml / release-readiness.yml / release.yml |
-| Tauri installer 冒烟 | `scripts/release/verify-tauri-installer-smoke.py` | release-readiness.yml |
+| pnpm 工具链版本与 `app/package.json#packageManager` 一致 | `scripts/release/verify-tauri-package-readiness.py` | release-readiness.yml → readiness-policy（同时检查 checks.yml / release.yml 的工具链版本引用） |
+| Tauri installer 冒烟 | `scripts/release/verify-tauri-installer-smoke.py` | release-readiness.yml → windows-installer-smoke-preflight |
 | Windows Agent Runtime 环境继承语义（代理变量透传、敏感变量过滤、环境键大小写） | `edge-server/internal/lifecycle/env_sanitizer_test.go` + `edge-server/internal/lifecycle/env_behavior_test.go`（workflow 结构由 `scripts/verify/verify-ci-gates.py` 与 `scripts/release/verify-tauri-package-readiness.py` 保鲜） | checks.yml → windows-go-test（`windows-go` 为稳定 required-check 聚合 job，不执行测试）；release-readiness.yml → windows-installer-smoke-preflight |
-| Tauri dry 打包 | `scripts/release/verify-tauri-package-dry.py` | release-readiness.yml |
+| Tauri dry 打包 | `scripts/release/verify-tauri-package-dry.py` | release-readiness.yml → windows-package-dry / macos-package-dry |
 | secrets/token 不落库（hard-blocking，无 `continue-on-error`；mock/test secret 已精确 allowlist） | `scripts/verify/check-secrets.sh` | checks.yml → validate |
 | 提交格式 `type(scope): 中文摘要`（PR 时） | `scripts/verify/verify-commit-messages.sh` | checks.yml → validate |
-| UI Visual QA shell 行为证明（1440x810 light/dark） | `app/{desktop,web}/scripts/visual-qa-shell.mjs` | checks.yml → visual-qa-shell |
+| UI Visual QA shell 行为证明（1440x810 light/dark） | `app/{desktop,web}/scripts/visual-qa-shell.mjs` | checks.yml → visual-qa-shell / visual-qa-desktop |
 | Web stubbed-hub 浏览器行为兜底（mock hub + 真 chromium 的 chat flow / replay smoke / task 合同；不是真实登录，`real_tested=false`） | `app/web/src/__e2e__/{chat-flow-contract,web-stubbed-hub-replay-smoke,task-contract}.spec.ts`（入口 `pnpm test:e2e:stubbed-hub`） | checks.yml → web-e2e-stubbed |
 | 真实登录/OIDC e2e 链路（需真实服务与凭据，`scripts/verify/verify-oidc-flow.py` 等 gate 保留在 `scripts/verify/`） | 无 | 无 |
 | 交互型 UI/UX 验收（Type/Motion/Empty 等跨组件行为） | 无 | 无 |
@@ -63,5 +63,5 @@
 ## 维护规则
 
 - 新增或变更机器门禁时更新本表；不要回写 `AGENTS.md` 的长表，`AGENTS.md` 的“规则 → 机器验证映射”只维护指针。
-- 验证脚本路径、负向自测路径与 CI job 名会被 `verify-doc-ssot.py` 校验存在性；行内其他说明文字不做存在性检查。
+- `verify-doc-ssot.py` 校验验证脚本路径、负向自测路径与 CI workflow 文件存在性；CI job ID 需逐条对照对应 workflow，`verify-ci-gates.py` 只覆盖其内建的结构合同。
 - 检查器退役时改写对应行的脚本列为说明文字（见 OIDC readiness 行先例），保留历史事实而不是删行。
