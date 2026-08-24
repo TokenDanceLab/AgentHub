@@ -2017,6 +2017,58 @@ jobs:
         if: matrix.package == 'agenthub-mobile-rn'
         run: python ./scripts/verify/tests/coverage-include.Tests.py
 
+  # ── 前端 L0 稳定 required 聚合（对偶 backend-required / windows-go 恒报模式） ─
+  # AGENTS「测试分层」L0：前端 vitest lanes（frontend-desktop / frontend-web /
+  # frontend-mobile-light / frontend-coverage）是 PR merge 门禁，但此前未列入
+  # branch protection required checks——前端 L0 红不阻塞合并，与「L0-L2 是 PR
+  # merge 门禁」的文档合同不符。本 job 恒报：路径未选中 → success no-op；
+  # changes 失败 → fail-closed；任一选中 lane 非 success → fail。
+  frontend-required:
+    name: Frontend L0 required aggregate
+    needs: [changes, frontend-desktop, frontend-web, frontend-mobile-light, frontend-coverage]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Assert frontend L0 lanes
+        env:
+          CHANGES_STATUS: ${{ needs.changes.result }}
+          EVENT_NAME: ${{ github.event_name }}
+          DESKTOP_FILTER: ${{ needs.changes.outputs.desktop }}
+          DESKTOP_RESULT: ${{ needs.frontend-desktop.result }}
+          WEB_FILTER: ${{ needs.changes.outputs.web }}
+          WEB_RESULT: ${{ needs.frontend-web.result }}
+          MOBILE_FILTER: ${{ needs.changes.outputs.mobile }}
+          MOBILE_RESULT: ${{ needs.frontend-mobile-light.result }}
+          COVERAGE_FILTER: ${{ needs.changes.outputs.frontend }}
+          COVERAGE_RESULT: ${{ needs.frontend-coverage.result }}
+        run: |
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            DESKTOP_FILTER=true
+            WEB_FILTER=true
+            MOBILE_FILTER=true
+            COVERAGE_FILTER=true
+          elif [ "$CHANGES_STATUS" != "success" ]; then
+            echo "::error::changes job result: $CHANGES_STATUS; cannot decide frontend gates"
+            exit 1
+          fi
+          assert_lane() {
+            label="$1"; filter="$2"; result="$3"
+            if [ "$filter" = "true" ]; then
+              if [ "$result" != "success" ]; then
+                echo "::error::${label} result: ${result}"
+                exit 1
+              fi
+            elif [ "$result" != "skipped" ] && [ "$result" != "success" ]; then
+              echo "::error::${label} ran without path-filter selection; result: ${result}"
+              exit 1
+            fi
+          }
+          assert_lane "frontend-desktop" "$DESKTOP_FILTER" "$DESKTOP_RESULT"
+          assert_lane "frontend-web" "$WEB_FILTER" "$WEB_RESULT"
+          assert_lane "frontend-mobile-light" "$MOBILE_FILTER" "$MOBILE_RESULT"
+          assert_lane "frontend-coverage" "$COVERAGE_FILTER" "$COVERAGE_RESULT"
+          echo "frontend L0 aggregate ok"
+
   # ── Design CSS syntax gate (fail-closed, #1720) ─
   # 核心 token/theme/preset CSS 被 .stylelintignore 排除在 Stylelint 之外，
   # 注释 `*/` 之类的语法错误因此假绿。本 job 只做 parser 语法检查

@@ -21,6 +21,9 @@ one surgical text mutation, and asserts the CI policy verifier exits non-zero:
 15. re-add an inline-comment `continue-on-error: true` to the go-hub Lint step → hard gate softened by a commented true
 16. delete the visual-qa-desktop job → desktop visual QA half silently drops out of CI
 17. delete the desktop assert step → desktop screenshots no longer verified non-blank
+18. delete frontend-coverage from frontend-required needs → L0 lane silently drops out of required aggregate
+19. flip frontend-required changes-failure fail-closed guard → false green
+20. restore frontend-required path filter if → required check skip-able again
 
 The unmutated copy must exit 0, proving the policy test only reddens on
 actual policy violations (fail-closed, no false green).
@@ -243,10 +246,17 @@ def delete_backend_required_needs_lane(text):
 
 def flip_backend_required_changes_fail_closed(text):
     """把 changes 失败 fail-closed 条件翻转，模拟 false green（防回退）。"""
+    marker = "  backend-required:"
+    idx = text.find(marker)
+    if idx < 0:
+        raise AssertionError("backend-required job not found")
     anchor = '"$CHANGES_STATUS" != "success"'
-    if text.count(anchor) != 1:
-        raise AssertionError(f"expected exactly one CHANGES_STATUS fail-closed guard, found {text.count(anchor)}")
-    return text.replace(anchor, '"$CHANGES_STATUS" == "success"', 1)
+    sub = text[idx:]
+    j = sub.find(anchor)
+    if j < 0:
+        raise AssertionError("backend-required CHANGES_STATUS guard not found")
+    pos = idx + j
+    return text[:pos] + '"$CHANGES_STATUS" == "success"' + text[pos + len(anchor):]
 
 
 def flip_backend_required_noop_branch(text):
@@ -275,6 +285,44 @@ def restore_backend_required_path_filter(text):
     j = sub.find(always)
     if j < 0:
         raise AssertionError("backend-required always() if not found")
+    pos = idx + j
+    return text[:pos] + "    if: github.event_name == 'workflow_dispatch'" + text[pos + len(always):]
+
+
+def delete_frontend_required_needs_lane(text):
+    """从 frontend-required 的 needs 里删掉 frontend-coverage，模拟前端 L0 lane 悄悄掉出 required 聚合（防回退）。"""
+    anchor = "needs: [changes, frontend-desktop, frontend-web, frontend-mobile-light, frontend-coverage]"
+    if text.count(anchor) != 1:
+        raise AssertionError(f"expected exactly one frontend-required needs line, found {text.count(anchor)}")
+    return text.replace(anchor, "needs: [changes, frontend-desktop, frontend-web, frontend-mobile-light]", 1)
+
+
+def flip_frontend_required_changes_fail_closed(text):
+    """把 frontend-required 的 changes 失败 fail-closed 条件翻转，模拟 false green（防回退）。"""
+    marker = "  frontend-required:"
+    idx = text.find(marker)
+    if idx < 0:
+        raise AssertionError("frontend-required job not found")
+    anchor = '"$CHANGES_STATUS" != "success"'
+    sub = text[idx:]
+    j = sub.find(anchor)
+    if j < 0:
+        raise AssertionError("frontend-required CHANGES_STATUS guard not found")
+    pos = idx + j
+    return text[:pos] + '"$CHANGES_STATUS" == "success"' + text[pos + len(anchor):]
+
+
+def restore_frontend_required_path_filter(text):
+    """把 frontend-required 的 if: always() 改回路径筛选，模拟 required check 重新可被跳过（防回退）。"""
+    marker = "  frontend-required:"
+    idx = text.find(marker)
+    if idx < 0:
+        raise AssertionError("frontend-required job not found")
+    always = "    if: always()"
+    sub = text[idx:]
+    j = sub.find(always)
+    if j < 0:
+        raise AssertionError("frontend-required always() if not found")
     pos = idx + j
     return text[:pos] + "    if: github.event_name == 'workflow_dispatch'" + text[pos + len(always):]
 
@@ -466,6 +514,27 @@ class VerifyCiGatesMutationTests(unittest.TestCase):
         self.assert_mutation_fails(
             delete_desktop_visual_assert_step(read_workflow()),
             "deleted desktop visual QA assert step",
+        )
+
+    def test_delete_frontend_required_needs_lane_fails(self):
+        """frontend-required 聚合丢失 coverage lane 时，校验器必须非零退出（防回退）。"""
+        self.assert_mutation_fails(
+            delete_frontend_required_needs_lane(read_workflow()),
+            "deleted frontend-required needs lane",
+        )
+
+    def test_flip_frontend_required_changes_fail_closed_fails(self):
+        """frontend-required changes 失败 fail-closed 被翻转时，校验器必须非零退出（防 false green）。"""
+        self.assert_mutation_fails(
+            flip_frontend_required_changes_fail_closed(read_workflow()),
+            "flipped frontend-required changes fail-closed",
+        )
+
+    def test_restore_frontend_required_path_filter_fails(self):
+        """frontend-required 被改回路径筛选时，校验器必须非零退出（防 required check 可跳过）。"""
+        self.assert_mutation_fails(
+            restore_frontend_required_path_filter(read_workflow()),
+            "restored frontend-required path filter",
         )
 
 
