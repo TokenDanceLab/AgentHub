@@ -54,6 +54,7 @@ export function RightInspector({
   contextBlocks,
   routeBlocks,
   deployPreviewUrl,
+  browserFocusRequest,
   deployStatus,
   runResult,
   onResizeBy,
@@ -68,6 +69,7 @@ export function RightInspector({
   const [quickOpenVisible, setQuickOpenVisible] = useState(false);
   const [previewFile, setPreviewFile] = useState<PreviewFile | null>(null);
   const [browserUrl, setBrowserUrl] = useState<string | null>(null);
+  const [browserFocusPending, setBrowserFocusPending] = useState(false);
 
   // #1822: Ctrl+P quick-open from the workbench keyboard dispatcher. The
   // event targets the inspector because tab visibility is owned here; the
@@ -88,6 +90,8 @@ export function RightInspector({
   const model = buildInspectorEvidenceModel(evidence);
   const dagNodes = useMemo(() => resolveDagNodesFromRouteBlocks(routeBlocks), [routeBlocks]);
   const lastAutoSwitchedUrl = useRef<string | null>(null);
+  const lastBrowserFocusSequence = useRef(0);
+  const inspectorRef = useRef<HTMLElement | null>(null);
   const tablistRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -104,6 +108,33 @@ export function RightInspector({
     setBrowserUrl(deployPreviewUrl!);
     setActiveMode('browser');
   }, [deployPreviewUrl, browserPreviewEnabled]);
+
+  useEffect(() => {
+    if (
+      !browserFocusRequest
+      || browserFocusRequest.sequence <= lastBrowserFocusSequence.current
+    ) {
+      return;
+    }
+    // Consume every explicit request exactly once. Unsupported surfaces must
+    // not replay an old request if capabilities change later.
+    lastBrowserFocusSequence.current = browserFocusRequest.sequence;
+    if (!browserPreviewEnabled) return;
+    setVisibleTabs((current) => withInspectorTab(current, 'browser'));
+    setBrowserUrl(browserFocusRequest.url);
+    setActiveMode('browser');
+    setBrowserFocusPending(true);
+  }, [browserFocusRequest, browserPreviewEnabled]);
+
+  useEffect(() => {
+    if (!browserFocusPending || activeMode !== 'browser') return;
+    const focusTarget = inspectorRef.current?.querySelector<HTMLElement>(
+      '[data-browser-preview-focus-target]',
+    );
+    if (!focusTarget) return;
+    focusTarget.focus({ preventScroll: true });
+    setBrowserFocusPending(false);
+  }, [activeMode, browserFocusPending, browserUrl]);
 
   useEffect(() => {
     if (!reviewFileRequest) return;
@@ -171,7 +202,8 @@ export function RightInspector({
     setVisibleTabs((current) => withInspectorTab(current, 'browser'));
     setBrowserUrl(url);
     setActiveMode('browser');
-  }, []);
+    if (browserPreviewEnabled) setBrowserFocusPending(true);
+  }, [browserPreviewEnabled]);
 
   const onResizerKeyDown = useMemo(
     () => createInspectorResizerKeyDownHandler(onResizeBy),
@@ -184,6 +216,7 @@ export function RightInspector({
 
   return (
     <aside
+      ref={inspectorRef}
       aria-hidden={collapsed}
       aria-label={tChatview('aria.rightInspector')}
       className={styles.inspector}

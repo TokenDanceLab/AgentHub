@@ -659,8 +659,18 @@ describe('useWorkbenchSessionChrome', () => {
     expect(window.localStorage.getItem('agenthub-v4-theme')).toBe('light');
   });
 
-  it('opens the inspector for review files and deploy submissions', () => {
-    const { result, openInspector, showWorkbenchToast } = renderSessionChrome();
+  it('opens the inspector and emits an exact one-shot focus request for deploy submissions', () => {
+    const { result, openInspector, showWorkbenchToast } = renderSessionChrome({
+      transcript: [{
+        id: 'deploy-focus',
+        kind: 'deploy',
+        createdAt: '2026-08-24T08:00:00.000Z',
+        author: { id: 'builder', name: 'Builder', role: 'agent' },
+        runId: 'run-1',
+        status: 'deployed',
+        url: 'https://preview.example/focus',
+      }],
+    });
     const file = { name: 'README.md', type: 'md', isPrimary: true };
 
     act(() => {
@@ -670,9 +680,21 @@ describe('useWorkbenchSessionChrome', () => {
     expect(result.current.reviewFileRequest).toEqual(file);
 
     act(() => {
-      result.current.handleDeploySubmit('run-1');
+      result.current.handleDeploySubmit('deploy-focus');
     });
     expect(openInspector).toHaveBeenCalledTimes(2);
+    expect(result.current.inspectorBrowserFocusRequest).toEqual({
+      sequence: 1,
+      url: 'https://preview.example/focus',
+    });
+
+    act(() => {
+      result.current.handleDeploySubmit('deploy-focus');
+    });
+    expect(result.current.inspectorBrowserFocusRequest).toEqual({
+      sequence: 2,
+      url: 'https://preview.example/focus',
+    });
     expect(showWorkbenchToast).toHaveBeenCalledWith('toast.deployPreviewOpened');
   });
 

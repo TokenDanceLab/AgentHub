@@ -47,6 +47,7 @@ function sessionMock(overrides: Record<string, unknown> = {}) {
     inspectorRouteBlocks: [{ id: 'r1' }],
     inspectorContextBlocks: [{ id: 'c1' }],
     inspectorDeployPreviewUrl: 'https://preview.example',
+    inspectorBrowserFocusRequest: { sequence: 1, url: 'https://preview.example' },
     inspectorRunResult: { status: 'ok' },
     ...overrides,
   };
@@ -354,6 +355,7 @@ describe('workbenchFramePartsHelpers', () => {
       expect(props.contextBlocks).toEqual([{ id: 'c1' }]);
       expect(props.routeBlocks).toEqual([{ id: 'r1' }]);
       expect(props.deployPreviewUrl).toBe('https://preview.example');
+      expect(props.browserFocusRequest).toEqual({ sequence: 1, url: 'https://preview.example' });
       expect(props.runResult).toEqual({ status: 'ok' });
       expect('runtimeEvidence' in props).toBe(false);
     });
@@ -370,6 +372,7 @@ describe('workbenchFramePartsHelpers', () => {
           inspectorRouteBlocks: undefined,
           inspectorContextBlocks: undefined,
           inspectorDeployPreviewUrl: undefined,
+          inspectorBrowserFocusRequest: undefined,
           inspectorRunResult: undefined,
           composer: { workDir: '   ' },
         }) as any,
@@ -391,6 +394,7 @@ describe('workbenchFramePartsHelpers', () => {
       expect('contextBlocks' in props).toBe(false);
       expect('routeBlocks' in props).toBe(false);
       expect('deployPreviewUrl' in props).toBe(false);
+      expect('browserFocusRequest' in props).toBe(false);
       expect('runResult' in props).toBe(false);
     });
   });

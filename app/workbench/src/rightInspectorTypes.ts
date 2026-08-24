@@ -9,6 +9,7 @@ import type {
   SubtaskTranscriptBlock,
 } from '@shared/transcript';
 import type { FileItem, RunResultInfo } from './inspector/OverviewPanel';
+import type { BrowserPreviewFocusRequest } from './workbenchSessionChromeHelpers';
 
 /* ═══════════════════════════════════════════════════════════════════════
    rightInspectorTypes — public props / shared residual types for
@@ -40,6 +41,8 @@ export interface RightInspectorProps {
   routeBlocks?: Array<RouteDecisionTranscriptBlock | SubagentTranscriptBlock | SubtaskTranscriptBlock | ChildAgentTranscriptBlock> | undefined;
   /** Deploy preview URL to auto-load in the browser tab. When set, switches to browser. */
   deployPreviewUrl?: string | undefined;
+  /** One-shot explicit-open request; tab navigation must not trigger this focus path. */
+  browserFocusRequest?: BrowserPreviewFocusRequest | null | undefined;
   /** Deploy status indicator for the browser tab. */
   deployStatus?: 'pending' | 'building' | 'deploying' | 'deployed' | 'failed' | undefined;
   /** Run result from the transcript, displayed as a banner in the overview tab. */
