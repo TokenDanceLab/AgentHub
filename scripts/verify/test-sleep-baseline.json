@@ -1,7 +1,6 @@
 {
  "edge-server/internal/adapters/acp/acp_client_test.go": 3,
  "edge-server/internal/adapters/claude/claude_acp_test.go": 1,
- "edge-server/internal/adapters/cli_json_readiness_test.go": 1,
  "edge-server/internal/adapters/codex/codex_acp_test.go": 1,
  "edge-server/internal/adapters/opencode/opencode_acp_test.go": 1,
  "edge-server/internal/adapters/orchestrator/plan_approval_test.go": 3,
@@ -19,7 +18,6 @@
  "hub-server/internal/cache/client_test.go": 2,
  "hub-server/internal/middleware/rate_limit_test.go": 1,
  "hub-server/internal/middleware/timeout_test.go": 3,
- "hub-server/internal/middleware/ws_rate_limit_test.go": 1,
  "hub-server/internal/service/audit/reliability_test.go": 1,
  "hub-server/internal/ws/heartbeat_cancel_test.go": 3,
  "hub-server/tests/integration/ws_reconnect_replay_test.go": 3
