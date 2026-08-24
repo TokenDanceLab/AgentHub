@@ -659,4 +659,26 @@ describe('RowItem preview card privacy (#1871)', () => {
     expect(container.textContent).not.toContain('google.com/s2/favicons');
     expect(container.querySelector('a.preview-card svg')).not.toBeNull();
   });
+
+  it('renders an unsafe-scheme preview as an inert card (no external link)', () => {
+    const item: RowItemType = {
+      id: 'preview-privacy-2',
+      type: 'preview',
+      label: 'Deploy',
+      status: 'ok',
+      collapsible: true,
+      open: true,
+      content: 'preview',
+      url: 'javascript:alert(1)',
+      previewDomain: '',
+      previewTitle: 'javascript:alert(1)',
+    };
+    const { container } = render(<RowItem item={item} />);
+
+    // External-open is scheme-gated (#1871): unsafe schemes must not become
+    // a clickable escape from the sandboxed transcript surface.
+    expect(container.querySelector('a.preview-card')).toBeNull();
+    expect(container.querySelector('div.preview-card.preview-card-blocked')).not.toBeNull();
+    expect(container.textContent).toContain('javascript:alert(1)');
+  });
 });
