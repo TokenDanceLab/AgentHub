@@ -48,4 +48,16 @@ describe('BrowserPreview sandbox + scheme gating', () => {
     expect(after).not.toBeNull();
     expect(after).not.toBe(before);
   });
+
+  it('status bar shows factual sandbox/read-only state, not hardcoded surface claims (#1946)', () => {
+    const { container } = render(
+      <BrowserPreview url="https://example.com" onClose={vi.fn()} />,
+    );
+    // No surface/origin claims that are wrong on at least one surface.
+    expect(container.textContent).not.toContain('Local Vite');
+    expect(container.textContent).not.toContain('Desktop');
+    // Factual, i18n-driven state instead (test env renders raw keys).
+    expect(container.textContent).toContain('browserPreview.sandboxed');
+    expect(container.textContent).toContain('browserPreview.readOnly');
+  });
 });
