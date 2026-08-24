@@ -28,7 +28,6 @@ export type { AgentEditPanelProps } from './AgentEditPanel';
 
 export {
   AgentCapabilityStrip,
-  AgentConfigSummary,
   AgentDetailHead,
   AgentEditActions,
   AgentEditGrid,
@@ -36,7 +35,6 @@ export {
   AgentMiniLog,
   AgentRuntimeLine,
   AgentSkillChipGrid,
-  AgentSpecFixturePanel,
   AgentToolPermissions,
 } from './AgentEditItemParts';
 
