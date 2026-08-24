@@ -18,7 +18,9 @@ export interface MobilePlatformOptions {
 
 const mobileCapabilities: SurfaceCapabilities = {
   localEdge: false,
-  localFiles: true,
+  // Hub-only data plane: no local workspace file browse/open path (pickFiles
+  // throws; attachments flow through the Hub client). Flag stays false (#1947).
+  localFiles: false,
   browserPreview: false,
   localTerminal: false,
 };
