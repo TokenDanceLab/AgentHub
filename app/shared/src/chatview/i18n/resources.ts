@@ -178,6 +178,10 @@ export const chatviewResources = {
     'card.session.fail': '会话失败',
     'card.ctx.fail': '上下文耗尽',
     'card.attachment.fail': '附件加载失败',
+    'card.attachment.imageLoading': '图片加载中…',
+    'card.attachment.imageUnavailable': '图片预览不可用',
+    'card.attachment.imageLoadFailed': '图片加载失败',
+    'card.attachment.imageEnlarge': '放大查看图片 {{name}}',
 
     'card.preview.ready': '预览就绪',
     'card.preview.running': '正在生成预览...',
@@ -882,6 +886,10 @@ export const chatviewResources = {
     'card.session.fail': 'Session failed',
     'card.ctx.fail': 'Context exhausted',
     'card.attachment.fail': 'Attachment failed',
+    'card.attachment.imageLoading': 'Loading image…',
+    'card.attachment.imageUnavailable': 'Image preview unavailable',
+    'card.attachment.imageLoadFailed': 'Image failed to load',
+    'card.attachment.imageEnlarge': 'View image {{name}} larger',
 
     'card.preview.ready': 'Preview Ready',
     'card.preview.running': 'Generating preview...',

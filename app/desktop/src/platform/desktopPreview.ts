@@ -1,8 +1,15 @@
 import { open } from '@tauri-apps/plugin-shell';
-import { resolveEvidencePreviewTarget } from '@shared/platform';
+import {
+  createAttachmentImageUrlResolver,
+  resolveEvidencePreviewTarget,
+  type AttachmentImageUrlResolver,
+} from '@shared/platform';
 import type { RuntimeEvidenceContentRef } from '@shared/platform';
+import type { AttachmentRef } from '@shared/composer';
 import type { EvidenceRef } from '@shared/transcript';
-import { getEdgeBaseUrl } from '@/config';
+import { getEdgeBaseUrl, HUB_URL } from '@/config';
+import { getCachedRefreshedAccessToken } from '@/api/hubClient';
+import { getAccessToken } from '@/hooks/useAuth';
 
 export function canOpenDesktopEvidencePreview(evidence: EvidenceRef): boolean {
   return Boolean(resolveEvidencePreviewTarget(evidence));
@@ -49,4 +56,25 @@ export function resolveDesktopRuntimeEvidenceContent(
   if (!edgeBase) return undefined;
   const collection = ref.kind === 'artifact' ? 'artifacts' : 'previews';
   return `${edgeBase}/v1/runs/${ref.runId}/${collection}/${ref.id}/content`;
+}
+
+let desktopAttachmentImageResolver: AttachmentImageUrlResolver | undefined;
+
+/**
+ * PreviewPort.resolveAttachmentImageUrl for Desktop (#1938). Chat
+ * attachments live on the Hub (the composer uploads them there), so
+ * Desktop resolves them against HUB_URL with the desktop access token —
+ * never through the Local Edge, keeping parity with Web. Desktop's thin
+ * hub client does not export its single-flight refresh hook, so a 401
+ * degrades to the honest chip fallback; the next regular Hub request
+ * refreshes the token and a retry resolves the image.
+ */
+export function resolveDesktopAttachmentImageUrl(
+  attachment: AttachmentRef,
+): Promise<string | undefined> {
+  desktopAttachmentImageResolver ??= createAttachmentImageUrlResolver({
+    hubBaseUrl: HUB_URL,
+    getToken: () => getCachedRefreshedAccessToken() ?? getAccessToken(),
+  });
+  return desktopAttachmentImageResolver(attachment);
 }

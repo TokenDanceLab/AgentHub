@@ -253,6 +253,11 @@ export function mapBlock(b: TranscriptBlock): RowItem | null {
         collapsible: false, standalone: true,
         fileName: a.attachmentRef.name,
         fileSize: a.attachmentRef.size ? `${Math.round(a.attachmentRef.size / 1024)} KB` : undefined,
+        // #1938: keep the image marker + ref on the row so image
+        // attachments render an inline thumbnail (URL resolved through the
+        // platform port) instead of degrading to a bare file chip.
+        attachmentKind: a.contentType,
+        attachmentRef: a.attachmentRef,
       } as RowItem
     }
 

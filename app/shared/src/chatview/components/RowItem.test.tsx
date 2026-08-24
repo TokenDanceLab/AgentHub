@@ -12,6 +12,8 @@ beforeAll(async () => {
 
 import { RowItem } from './RowItem';
 import type { RowItem as RowItemType } from '../types';
+import { registerAttachmentImageUrlResolver } from '../../platform/attachmentImagePort';
+import type { AttachmentRef } from '../../composer/types';
 
 beforeEach(() => { vi.useFakeTimers({ shouldAdvanceTime: true }) });
 afterEach(() => { vi.useRealTimers() });
@@ -749,5 +751,73 @@ describe('RowItem deploy URL trigger a11y (#1922)', () => {
     expect(trigger).not.toBeNull();
     expect(trigger!.getAttribute('role')).toBeNull();
     expect(trigger!.getAttribute('tabindex')).toBeNull();
+  });
+});
+
+
+// ---------------------------------------------------------------------------
+// #1938: attachment rows — image rows render through ImageAttachmentRow,
+// file rows keep the plain chip.
+// ---------------------------------------------------------------------------
+describe('RowItem attachment rows (#1938)', () => {
+  const attachmentRef: AttachmentRef = {
+    id: 'att-77',
+    name: 'screenshot.png',
+    size: 4096,
+    mime_type: 'image/png',
+  };
+
+  const attachmentItem = (overrides: Partial<RowItemType> = {}): RowItemType => ({
+    id: 'att-row-1',
+    type: 'attachment',
+    label: 'screenshot.png',
+    status: 'ok',
+    collapsible: false,
+    standalone: true,
+    fileName: 'screenshot.png',
+    fileSize: '4 KB',
+    ...overrides,
+  });
+
+  it('renders an image attachment through the platform port (thumbnail button, no bare chip)', async () => {
+    const unregister = registerAttachmentImageUrlResolver(async () => 'blob:row-image');
+    try {
+      const { container } = render(
+        <RowItem item={attachmentItem({ attachmentKind: 'image', attachmentRef })} />,
+      );
+      const img = await screen.findByAltText('screenshot.png');
+      expect(img).toHaveAttribute('src', 'blob:row-image');
+      expect(container.querySelector('.att-image-thumb')).not.toBeNull();
+    } finally {
+      unregister();
+    }
+  });
+
+  it('keeps a file attachment on the existing chip rendering (no thumbnail, no image notice)', () => {
+    const { container } = render(
+      <RowItem
+        item={attachmentItem({
+          fileName: 'report.pdf',
+          label: 'report.pdf',
+          fileSize: '4 KB',
+          attachmentKind: 'file',
+          attachmentRef: { ...attachmentRef, name: 'report.pdf', mime_type: 'application/pdf' },
+        })}
+      />,
+    );
+    // Non-image attachments keep the pre-#1938 rendering verbatim.
+    expect(container.querySelector('.att-image-thumb')).toBeNull();
+    expect(container.querySelector('.att-image-status')).toBeNull();
+    expect(container.querySelector('img')).toBeNull();
+    expect(container.textContent).toContain('report.pdf');
+  });
+
+  it('degrades an image row to the chip with a notice when no resolver is registered', async () => {
+    const { container } = render(
+      <RowItem item={attachmentItem({ attachmentKind: 'image', attachmentRef })} />,
+    );
+    expect(await screen.findByText('Image preview unavailable')).toBeInTheDocument();
+    expect(container.querySelector('img')).toBeNull();
+    expect(container.querySelector('.att-image-thumb')).toBeNull();
   });
 });
