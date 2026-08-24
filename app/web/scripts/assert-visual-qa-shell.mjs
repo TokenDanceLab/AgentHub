@@ -25,7 +25,12 @@ const outDir = process.env.VISUAL_QA_SHELL_OUT_DIR
   ? path.resolve(process.env.VISUAL_QA_SHELL_OUT_DIR)
   : path.join(projectRoot, 'screenshots', 'visual-qa');
 const minBytes = Number(process.env.VISUAL_QA_SHELL_MIN_BYTES ?? 8000);
-const expected = ['web-shell-light-1440x810.png', 'web-shell-dark-1440x810.png'];
+const expected = [
+  'web-shell-light-1440x810.png',
+  'web-shell-dark-1440x810.png',
+  'web-shell-light-768x900.png',
+  'web-shell-dark-768x900.png',
+];
 
 async function readContract(names, name) {
   if (!names.includes(name)) {
@@ -98,6 +103,18 @@ async function main() {
     }
     if (contract.agentsPage !== true) {
       failures.push(name + ': Agents page not captured');
+    }
+    // #1874 Slice 3: 三 Pane 几何合同——rail / 已安装列表 / 编辑详情必须真实
+    // 存在且宽度 > 0，避免把缺详情面板的空壳或 onboarding 误判为已捕获。
+    const panes = contract.panes;
+    if (!panes || !panes.rail?.exists || !panes.list?.exists || !panes.detail?.exists) {
+      failures.push(name + ': three-pane geometry incomplete (rail/list/detail must exist)');
+    } else if (
+      !(panes.rail.width > 0) ||
+      !(panes.list.width > 0) ||
+      !(panes.detail.width > 0)
+    ) {
+      failures.push(name + ': three-pane geometry has a zero-width pane');
     }
   }
 

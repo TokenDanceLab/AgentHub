@@ -388,13 +388,30 @@ async function captureTheme(browser, theme, vp = { width: 1440, height: 810, lab
   // #1866: emit a DOM/geometry contract alongside the PNG so the gate can
   // prove it captured the Agents workbench (not an onboarding/blank shell) and
   // that the page has no horizontal overflow.
-  const contract = await page.evaluate(() => ({
-    viewport: { width: window.innerWidth, height: window.innerHeight },
-    workbenchShell: Boolean(document.querySelector('[data-testid="agenthub-workbench"]')),
-    agentsPage: Boolean(document.querySelector('section.agents-page, .agents-page')),
-    horizontalOverflow:
-      document.documentElement.scrollWidth > document.documentElement.clientWidth + 1,
-  }));
+  const contract = await page.evaluate(() => {
+    // #1874 Slice 3: 证明三 Pane（rail / 已安装列表 / 编辑详情）都真实存在且
+    // 有正宽度，而不只是页面存在一个空壳。避免把 onboarding / blank shell
+    // 或缺少详情面板的页面误判为已捕获。
+    const measure = (el) => {
+      if (!el) return { exists: false };
+      const rect = el.getBoundingClientRect();
+      return { exists: true, width: Math.round(rect.width), height: Math.round(rect.height) };
+    };
+    return {
+      viewport: { width: window.innerWidth, height: window.innerHeight },
+      workbenchShell: Boolean(document.querySelector('[data-testid="agenthub-workbench"]')),
+      agentsPage: Boolean(document.querySelector('section.agents-page, .agents-page')),
+      horizontalOverflow:
+        document.documentElement.scrollWidth > document.documentElement.clientWidth + 1,
+      panes: {
+        // CSS Modules 会哈希类名，不能用 .agent-config-list / aside.agent-detail；
+        // 改用全局类 + 语义选择器定位三栏（rail / 中间列表 / 右侧编辑详情）。
+        rail: measure(document.querySelector('button[data-rail-page="agents"]')?.closest('nav')),
+        list: measure(document.querySelector('.agent-config-row')?.parentElement),
+        detail: measure(document.querySelector('section.agents-page aside')),
+      },
+    };
+  });
   const contractFile = path.join(outDir, `web-shell-${theme}-${vp.label}${dprSuffix}.json`);
   await writeFile(contractFile, JSON.stringify(contract, null, 2) + '\n');
 
