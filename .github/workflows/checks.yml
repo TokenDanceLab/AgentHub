@@ -2024,7 +2024,7 @@ jobs:
   # merge 门禁」的文档合同不符。本 job 恒报：路径未选中 → success no-op；
   # changes 失败 → fail-closed；任一选中 lane 非 success → fail。
   frontend-required:
-    name: Frontend L0 required aggregate
+    name: frontend-required
     needs: [changes, frontend-desktop, frontend-web, frontend-mobile-light, frontend-coverage]
     if: always()
     runs-on: ubuntu-latest
