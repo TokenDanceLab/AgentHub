@@ -45,4 +45,27 @@ describe('BrowserPreview sandbox + scheme gating', () => {
     expect(after).not.toBeNull();
     expect(after).not.toBe(before);
   });
+
+  it('moves focus into the preview on mount and restores it on close (#1922 item 3)', () => {
+    const trigger = document.createElement('button');
+    trigger.textContent = 'deploy';
+    document.body.appendChild(trigger);
+    trigger.focus();
+    expect(document.activeElement).toBe(trigger);
+
+    const { container, unmount } = render(
+      <BrowserPreview url="https://example.com" onClose={vi.fn()} />,
+    );
+
+    // Focus moves into the preview pane on open.
+    const section = container.querySelector('section');
+    expect(section).not.toBeNull();
+    expect(document.activeElement).toBe(section);
+
+    unmount();
+
+    // Focus returns to the trigger that opened the preview on close.
+    expect(document.activeElement).toBe(trigger);
+    trigger.remove();
+  });
 });

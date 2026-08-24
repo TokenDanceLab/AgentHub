@@ -1,4 +1,4 @@
-import React, { useState, useSyncExternalStore } from 'react';
+import React, { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import {
   getAppliedAgentHubTheme,
   type AgentHubTheme,
@@ -128,6 +128,20 @@ export const BrowserPreview: React.FC<BrowserPreviewProps> = ({
   // Refresh remounts the iframe (key bump) so the embedded preview reloads.
   // Back/Forward remain disabled until iframe history is actually wired.
   const [frameKey, setFrameKey] = useState(0);
+  const sectionRef = useRef<HTMLElement | null>(null);
+
+  // #1922 item 3: stable focus path — when the preview opens, remember the
+  // trigger that opened it and move focus into the preview chrome; when it
+  // closes (unmount), return focus to that trigger so keyboard users never
+  // get stranded. The preview is a read-only pane, not a modal, so we do not
+  // trap Tab here.
+  useEffect(() => {
+    const trigger = document.activeElement as HTMLElement | null;
+    sectionRef.current?.focus();
+    return () => {
+      trigger?.focus();
+    };
+  }, []);
   const addressLabel = themedBlank ? (url.trim() || 'about:blank') : url;
   const blankSrcDoc = themedBlank
     ? buildThemedBlankPreviewSrcDoc(hostTheme)
@@ -136,6 +150,8 @@ export const BrowserPreview: React.FC<BrowserPreviewProps> = ({
 
   return (
     <section
+      ref={sectionRef}
+      tabIndex={-1}
       className={styles.pane}
       aria-label={t('aria.browserPreview')}
     >
