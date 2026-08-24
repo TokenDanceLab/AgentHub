@@ -35,9 +35,10 @@ export default defineConfig({
     exclude: ['**/node_modules/**', '**/dist/**', '**/.worktrees/**', '**/reference/**'],
     setupFiles: ['./src/__tests__/setup.ts'],
     coverage: createCoverage({
-      // 绝对 floors：2026-08-21 独立成包（#1759 第二阶段）首次实测后设定，
-      // 规则同其他包：floor(实测)-1，低于 60 的维度是提升目标非永久豁免。
-      thresholds: { lines: 59, branches: 52, functions: 52, statements: 59 },
+      // 绝对 floors：2026-08-24 实测（vitest --coverage，含 stories 从分母
+      // 排除后）lines 88.22 / stmt 86.57 / fn 85.67 / br 80.95 → 每维 floor-1
+      // 上修 87/85/84/79。全维度已越过 60 豁免线，不再走“提升目标非永久豁免”。
+      thresholds: { lines: 87, branches: 79, functions: 84, statements: 85 },
       // workbenchProjectsPort.ts — 纯类型契约（#1546），零运行时语句
       exclude: ['src/workbenchProjectsPort.ts'],
     }),
