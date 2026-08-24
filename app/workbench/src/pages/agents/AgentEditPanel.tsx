@@ -12,8 +12,8 @@ import type { AgentConfig, AgentRecentEvent, ToolPermission } from './types';
    to AgentEditItemParts + AgentEditHelpers (#695).
 
    #1280: default product detail is one primary frosted card. Capability
-   strip + edit grid already carry readiness / policy fields, so the
-   duplicate AgentConfigSummary block is omitted from this view.
+   strip + edit grid already carry readiness / policy fields; the duplicate
+   AgentConfigSummary block was removed as dead code (#1872 Slice E).
    ═══════════════════════════════════════════════════════════════════════ */
 
 export interface AgentEditPanelProps {
