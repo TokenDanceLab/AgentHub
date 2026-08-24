@@ -131,6 +131,8 @@ export const AgentsPage: React.FC<AgentsPageProps> = (props) => {
             key={item.id}
             className={`${styles['nav-row']} ${activePane === item.id ? styles.active : ''}`}
             type="button"
+            data-pane-id={item.id}
+            aria-current={activePane === item.id ? 'page' : undefined}
             onClick={() => onPaneChange(item.id)}
           >
             <span className={styles['nav-glyph']}>
