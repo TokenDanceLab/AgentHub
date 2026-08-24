@@ -119,3 +119,43 @@ describe('AgentInstalledView with agents', () => {
     expect(screen.queryByTestId('agent-list-skeleton')).not.toBeInTheDocument();
   });
 });
+
+describe('AgentInstalledView no-handler controls (#1872)', () => {
+  it('hides the add-agent header action when no onAgentAdd handler is wired', () => {
+    render(<AgentInstalledView {...baseProps()} />);
+    expect(screen.queryByRole('button', { name: /添加 Agent/ })).not.toBeInTheDocument();
+  });
+
+  it('shows the add-agent header action only when a handler is provided', () => {
+    render(
+      <AgentInstalledView {...baseProps({ agents: [agent('a1', 'Alpha')], onAgentAdd: vi.fn() })} />,
+    );
+    expect(screen.getByRole('button', { name: /添加 Agent/ })).toBeInTheDocument();
+  });
+
+  it('disables skill chips / tool permissions / edit actions when handlers are missing', () => {
+    render(
+      <AgentInstalledView
+        {...baseProps({
+          agents: [agent('a1', 'Alpha')],
+          allSkills: ['code-review', 'security-audit'],
+          allTools: ['bash', 'git'],
+        })}
+      />,
+    );
+
+    for (const skill of ['code-review', 'security-audit']) {
+      const chip = screen.getByRole('button', { name: new RegExp(skill) });
+      expect(chip).toBeDisabled();
+    }
+    // each tool exposes 允许/需确认/禁止 permission buttons
+    for (const label of ['允许', '需确认', '禁止']) {
+      for (const btn of screen.getAllByRole('button', { name: label })) {
+        expect(btn).toBeDisabled();
+      }
+    }
+    expect(screen.getByRole('button', { name: /保存配置/ })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /复制 Agent/ })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /删除/ })).toBeDisabled();
+  });
+});

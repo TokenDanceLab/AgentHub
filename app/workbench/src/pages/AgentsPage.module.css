@@ -1051,7 +1051,7 @@
     box-shadow var(--td-dur-normal) var(--td-ease);
 }
 
-.skill-chip:hover {
+.skill-chip:hover:not(:disabled) {
   color: var(--td-ink);
   border-color: var(--glass-border-strong, var(--td-line-strong));
   background: var(--glass-input-bg-hover, var(--td-surface-2));
@@ -1062,6 +1062,11 @@
   background: var(--td-tint);
   color: var(--td-plum);
   box-shadow: var(--glass-elev-1);
+}
+
+.skill-chip:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
 }
 
 .agent-token-grid {
@@ -1148,7 +1153,7 @@
     box-shadow var(--dur-medium) var(--td-ease);
 }
 
-.permission-segment button:hover {
+.permission-segment button:hover:not(:disabled) {
   color: var(--td-ink);
   background: var(--glass-bg-subtle, transparent);
 }
@@ -1157,6 +1162,11 @@
   background: var(--glass-bg-strong, var(--td-surface));
   color: var(--td-plum);
   box-shadow: var(--glass-elev-1);
+}
+
+.permission-segment button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
 }
 
 /* ── Edit actions ── */
@@ -1434,9 +1444,14 @@
     border-color var(--td-dur-normal) var(--td-ease);
 }
 
-.market-list-row:hover {
+.market-list-row:hover:not(:disabled) {
   background: var(--td-surface-3);
   border-color: var(--td-line);
+}
+
+.market-list-row:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
 }
 
 .market-list-row strong {
@@ -2202,13 +2217,18 @@
     border-color var(--td-dur-normal) var(--td-ease);
 }
 
+.market-item-card .market-action-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
 .market-action-btn.install {
   background: var(--td-plum);
   color: var(--text-inv);
   border-color: transparent;
 }
 
-.market-action-btn.install:hover {
+.market-action-btn.install:hover:not(:disabled) {
   background: var(--td-plum-hover);
   box-shadow: var(--td-shadow-sm);
 }
@@ -2218,7 +2238,7 @@
   color: var(--td-ink-muted);
 }
 
-.market-action-btn.uninstall:hover {
+.market-action-btn.uninstall:hover:not(:disabled) {
   background: var(--td-surface-3);
   color: var(--td-danger);
   border-color: var(--td-danger);
