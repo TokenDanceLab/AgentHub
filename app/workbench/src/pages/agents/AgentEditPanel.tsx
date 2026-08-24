@@ -47,7 +47,7 @@ export const AgentEditPanel: React.FC<AgentEditPanelProps> = ({
   );
 
   return (
-    <aside className={styles['agent-detail']}>
+    <aside className={styles['agent-detail']} data-testid="agent-edit-detail">
       <AgentDetailHead
         agent={agent} saveStateLabel={saveStateLabel}
         isDirty={isDirty} onAgentProfileOpen={onAgentProfileOpen}
