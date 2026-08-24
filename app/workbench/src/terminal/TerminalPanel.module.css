@@ -145,14 +145,14 @@
 
 .empty {
   flex: 1;
-  min-height: 120px;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: var(--wb-gap-xs, var(--td-space-2));
-  margin: var(--wb-gap-sm, var(--td-space-4));
-  padding: var(--wb-gap-md, var(--td-space-5));
+  gap: var(--wb-gap-2xs, var(--td-space-1));
+  margin: var(--wb-gap-2xs, var(--td-space-1));
+  padding: var(--wb-gap-xs, var(--td-space-2)) var(--wb-gap-sm, var(--td-space-4));
   text-align: center;
   border: 1px solid var(--glass-border, var(--td-line));
   border-radius: var(--glass-card-radius, var(--r-md));
@@ -166,8 +166,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 48px;
-  height: 48px;
+  width: 36px;
+  height: 36px;
   border-radius: var(--td-radius-panel);
   background: var(--glass-bg-subtle);
   color: var(--td-ink-muted);
