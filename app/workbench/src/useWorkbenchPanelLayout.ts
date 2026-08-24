@@ -7,6 +7,7 @@ import {
   INSPECTOR_DEFAULT_WIDTH,
   INSPECTOR_WIDTH_STORAGE_KEY,
   SIDEBAR_DEFAULT_WIDTH,
+  WORKSPACE_MOUNT_COLLAPSE_WIDTH,
 } from './workbenchLayoutConstants';
 import {
   applyInspectorClientXPlan,
@@ -264,6 +265,25 @@ export function useWorkbenchPanelLayout({
     window.addEventListener(DESKTOP_TOGGLE_SIDEBAR_EVENT, handleDesktopToggleSidebar);
     return () => window.removeEventListener(DESKTOP_TOGGLE_SIDEBAR_EVENT, handleDesktopToggleSidebar);
   }, [activePage, platformSurface, toggleSidebar]);
+
+  // #1874: the resize listener below only fires on subsequent resizes, so a fresh
+  // Desktop load at a narrow window paints the expanded sidebar and crushes the chat
+  // column until the window is resized. Evaluate workspace pressure once on mount
+  // with a tighter crush threshold (not the live-resize comfort threshold); collapse
+  // is one-directional + idempotent and Desktop-only.
+  useEffect(() => {
+    if (typeof window === 'undefined' || platformSurface !== 'desktop') return;
+    maybeCollapseSidebarForWorkspacePressure({
+      isChatPage,
+      sidebarCollapsed,
+      viewportWidth: window.innerWidth,
+      sidebarWidth,
+      nextInspectorWidth: inspectorWidth,
+      minWorkspaceWidth: WORKSPACE_MOUNT_COLLAPSE_WIDTH,
+      setSidebarCollapsed,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Window resize → re-evaluate workspace-pressure sidebar collapse (#1827).
   // The check used to run only during pointer resizes, so shrinking the
