@@ -1,4 +1,4 @@
-import { render } from '@testing-library/react';
+import { fireEvent, render } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { BrowserPreview } from './BrowserPreview';
 
@@ -30,5 +30,19 @@ describe('BrowserPreview sandbox + scheme gating', () => {
     expect(iframe).not.toBeNull();
     expect(iframe!.getAttribute('sandbox')).toBe('allow-scripts');
     expect(iframe!.hasAttribute('srcDoc')).toBe(true);
+  });
+
+  it('reloads the iframe when the refresh button is clicked (#1871 item 2)', () => {
+    const { container, getByRole } = render(
+      <BrowserPreview url="https://example.com" onClose={vi.fn()} />,
+    );
+    const before = container.querySelector('iframe');
+    expect(before).not.toBeNull();
+
+    fireEvent.click(getByRole('button', { name: 'aria.refresh' }));
+
+    const after = container.querySelector('iframe');
+    expect(after).not.toBeNull();
+    expect(after).not.toBe(before);
   });
 });
