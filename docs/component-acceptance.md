@@ -1,18 +1,18 @@
 # AgentHub 组件验收标准（component-acceptance）
 
-最后更新：2026-08-23（自 TokenDanceLab/docs 迁入本仓库，本文件为 AgentHub 单仓 SSOT；#1672 迁移状态见 §1）
+最后更新：2026-08-24（自 TokenDanceLab/docs 迁入本仓库，本文件为 AgentHub 单仓 SSOT；#1672 迁移状态见 §1）
 
 本文是 AgentHub shared 组件的**验收标准 SSOT**：任何 `app/shared/src/ui/` 下的新组件（或对既有组件做可见行为改动）必须对照本文件的 5 维验收标准，并带 `.test.tsx` + `.stories.tsx` + 本文件验收表对照记录。它与跨产品设计契约（`tokendance-design` 仓库 [design-system.md](https://github.com/TokenDanceLab/tokendance-design/blob/master/docs/design/design-system.md) 管 token 收敛、[design-playbook.md](https://github.com/TokenDanceLab/tokendance-design/blob/master/docs/design/design-playbook.md) 管实现流程、[visual-qa-matrix.md](https://github.com/TokenDanceLab/tokendance-design/blob/master/docs/design/visual-qa-matrix.md) 管产品级截图证据）互补：本文管**单组件验收**，矩阵管**产品级视觉证据**。
 
 ## 新组件三件套（硬规则）
 
-新增 shared 组件时，PR/任务验收必须同时提交三件套，缺一不可：
+新增 shared 组件时，PR/任务验收必须同时提交三件套，缺一不得合入：
 
 | 件 | 路径约定 | 内容要求 |
 |---|---|---|
 | 组件测试 | `<组件>.test.tsx`（复杂组件可在 `__tests__/` 内拆分） | 覆盖交互、状态、错误、键盘路径的行为断言；禁止只测渲染快照或复制实现 switch |
 | 组件故事 | `<组件>.stories.tsx` | 覆盖默认态、禁用/加载/错误态、紧凑/窄宽场景，供视觉 QA 与故事书巡检 |
-| 验收表对照 | PR/issue 描述或 `docs/` 附表中逐项勾选本文 5 维标准 | 注明组件路径、token 使用（`--td-*` 优先）、截图/渲染证据路径、未覆盖项的原因 |
+| 验收表对照 | 对照本文件的组件验收表逐项勾选 5 维标准（记录可放在 PR/issue 描述或 `docs/` 附表） | 注明组件路径、token 使用（`--td-*` 优先）、截图/渲染证据路径、未覆盖项的原因 |
 
 已有组件缺件时按同规则补件，不能以“旧组件”为由跳过。
 
@@ -407,4 +407,5 @@
 - 每次组件改动在 PR 描述中粘贴/链接对应范本表并更新状态；新增组件复制“范本表”结构新建表格。
 - 范本表的勾选状态本身就是该组件最近一次验收的证据，随组件改动更新，不得保留过期勾选。
 - 未达必选的项 = 验收不通过，必须修复或拆分；可选未做 = 记入 `docs/` 或 issue debt（owner + 计划）。
-- 涉及可见 UI 变化的组件，提交前跑对应验证：`python scripts/verify/verify-design-token-ssot.py`、`cd app/shared && npx vitest run src/designTokens.test.ts src/styles/tokens-base.test.ts`，并按 [visual-qa-matrix.md](https://github.com/TokenDanceLab/tokendance-design/blob/master/docs/design/visual-qa-matrix.md) 提供产品级证据。
+- 修改 `app/shared/src/styles/` 或 `app/shared/src/designTokens.ts` 时，必须运行 `python scripts/verify/verify-design-token-ssot.py`，且 `app/shared/src/designTokens.test.ts`、`app/shared/src/styles/tokens-base.test.ts` 全绿。
+- 涉及可见 UI 变化时，按受影响端运行 `app/{desktop,web}/scripts/visual-qa-shell.mjs` 对应的 `visual:qa:shell`；标准审阅矩阵为 `1440x810` light+dark，同一 gate 的 Web `768x900` / Desktop `800x900` 是补充窄视口合同。`app/web/scripts/visual-qa.mjs` 为可选/遗留多场景电池，不是 merge gate；产品级证据仍按 [visual-qa-matrix.md](https://github.com/TokenDanceLab/tokendance-design/blob/master/docs/design/visual-qa-matrix.md) 组织。
