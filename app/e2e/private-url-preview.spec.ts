@@ -396,7 +396,13 @@ async function mountPreviewSurfaces(page: Page, plan: MountPlan): Promise<{ down
     host.style.cssText =
       'position:fixed;left:16px;bottom:16px;z-index:2147483647;width:420px;max-height:70vh;overflow:auto;padding:12px;';
     host.innerHTML = '';
-    const root = reactDomClientMod.createRoot(host);
+    // Vite dev 下 react-dom/client 的模块形态随发现到的 URL 而变（预构建
+    // ESM 有具名 createRoot；/@fs/ 的 CJS 入口经 interop 挂在 default 上）。
+    const createRootFn = reactDomClientMod.createRoot ?? reactDomClientMod.default?.createRoot;
+    if (typeof createRootFn !== 'function') {
+      throw new Error('react-dom/client createRoot not resolvable from running bundle module');
+    }
+    const root = createRootFn(host);
     root.render(React.createElement(React.Fragment, null, ...children));
     await new Promise((resolve) => {
       requestAnimationFrame(() => requestAnimationFrame(resolve));
