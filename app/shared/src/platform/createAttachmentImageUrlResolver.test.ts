@@ -12,7 +12,9 @@ function makeRef(id = 'att-1'): AttachmentRef {
 function imageResponse(status = 200, type = 'image/png'): Response {
   // Hub serves attachments with an explicit Content-Type header. The blob
   // type derives from that header, which the resolver image guard uses.
-  return new Response(new Blob(['img-bytes'], { type }), {
+  // String body (not a Blob body) keeps the fixture portable across the
+  // jsdom/undici Response implementations used by the different suites.
+  return new Response('img-bytes', {
     status,
     headers: { 'Content-Type': type },
   });
