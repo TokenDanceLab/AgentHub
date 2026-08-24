@@ -18,6 +18,7 @@ import { RiskBadge } from '../../ui/RiskBadge'
 import type { RiskLevel } from '../../ui/RiskBadge'
 import { useCopiedFlag } from '../../ui/useCopiedFlag'
 import { isSafeRemotePreviewUrl } from '../../ui/previewSandbox'
+import { ImageAttachmentRow } from './ImageAttachment'
 import './RowItem.css'
 
 type IconComponent = React.FC<{ size?: number; className?: string }>
@@ -379,6 +380,14 @@ export const RowItem = memo(function RowItem({ item, onToggle, onApprove, onReje
         {item.extra && <span className="row-extra">{item.extra}</span>}
         {item.collapsible && <IconChevronDown className="row-chevron" size={12} />}
       </button>
+      {/* #1938: image attachment body renders unconditionally — the row is
+          not collapsible, so gating it on isOpen would hide it forever.
+          Non-image attachments keep their previous header-only rendering. */}
+      {item.type === 'attachment' && item.attachmentKind === 'image' && item.attachmentRef && (
+        <div className="row-bd">
+          <ImageAttachmentRow item={item} />
+        </div>
+      )}
       {isOpen && (
         <div className="row-bd">
           {item.content && item.type !== 'file' && <div className="row-text">{item.content}</div>}

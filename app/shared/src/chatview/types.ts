@@ -3,6 +3,8 @@
    Shared package types — no AgentHub or upstream dependency.
    ══════════════════════════════════════════════════════════════════════ */
 
+import type { AttachmentRef } from '../composer/types'
+
 /** Agent role: arbitrary string (consumers define their own set). */
 export type AgentRole = string
 
@@ -52,6 +54,17 @@ export interface RowItem {
   deployMeta?: string
   fileName?: string
   fileSize?: string
+  /**
+   * Attachment payload kind (#1938). `'image'` rows render an inline
+   * thumbnail (click to enlarge); `'file'` rows keep the plain chip.
+   * Carried explicitly so rendering never re-parses the free-form `extra`.
+   */
+  attachmentKind?: 'image' | 'file'
+  /**
+   * Hub attachment ref for image rows (#1938) — the platform port resolves
+   * `id` into a displayable URL; absent for non-attachment rows.
+   */
+  attachmentRef?: AttachmentRef
   ctxPct?: number
   ctxStats?: string[]
   sessionTags?: string[]
