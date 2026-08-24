@@ -246,6 +246,25 @@ describe('PermissionModePicker', () => {
     expect(screen.getByRole('button').getAttribute('aria-haspopup')).toBe('menu');
   });
 
+  it('exposes menu/menuitemradio roles with aria-checked when open', async () => {
+    const user = userEvent.setup();
+    render(
+      <PermissionModePicker
+        value="acceptEdits"
+        label="Permissions"
+        options={DEFAULT_OPTIONS}
+        onChange={vi.fn()}
+      />,
+    );
+    await user.click(screen.getByRole('button'));
+
+    expect(screen.getByRole('menu')).toBeDefined();
+    const items = screen.getAllByRole('menuitemradio');
+    expect(items.length).toBe(DEFAULT_OPTIONS.length);
+    expect(screen.getByText('Accept Edits').closest('button')!.getAttribute('aria-checked')).toBe('true');
+    expect(screen.getByText('Default').closest('button')!.getAttribute('aria-checked')).toBe('false');
+  });
+
   it('moves focus into the first option when the popover opens', async () => {
     const user = userEvent.setup();
     render(
@@ -258,7 +277,7 @@ describe('PermissionModePicker', () => {
     );
     const trigger = screen.getByRole('button');
     await user.click(trigger);
-    const optionButtons = screen.getAllByRole('button').slice(1);
+    const optionButtons = screen.getAllByRole('menuitemradio');
     expect(optionButtons.length).toBe(DEFAULT_OPTIONS.length);
     expect(document.activeElement).toBe(optionButtons[0]!);
   });
@@ -274,7 +293,7 @@ describe('PermissionModePicker', () => {
       />,
     );
     await user.click(screen.getByRole('button'));
-    const optionButtons = screen.getAllByRole('button').slice(1);
+    const optionButtons = screen.getAllByRole('menuitemradio');
     fireEvent.keyDown(optionButtons[0]!, { key: 'ArrowDown' });
     expect(document.activeElement).toBe(optionButtons[1]!);
     fireEvent.keyDown(optionButtons[1]!, { key: 'ArrowDown' });
@@ -294,7 +313,7 @@ describe('PermissionModePicker', () => {
       />,
     );
     await user.click(screen.getByRole('button'));
-    const optionButtons = screen.getAllByRole('button').slice(1);
+    const optionButtons = screen.getAllByRole('menuitemradio');
     fireEvent.keyDown(optionButtons[0]!, { key: 'End' });
     expect(document.activeElement).toBe(optionButtons[optionButtons.length - 1]!);
     fireEvent.keyDown(optionButtons[optionButtons.length - 1]!, { key: 'Home' });
@@ -314,7 +333,7 @@ describe('PermissionModePicker', () => {
     );
     const trigger = screen.getByRole('button');
     await user.click(trigger);
-    const optionButtons = screen.getAllByRole('button').slice(1);
+    const optionButtons = screen.getAllByRole('menuitemradio');
     fireEvent.keyDown(optionButtons[0]!, { key: 'ArrowDown' });
     fireEvent.keyDown(optionButtons[1]!, { key: 'Enter' });
     expect(onChange).toHaveBeenCalledWith('acceptEdits');
@@ -334,7 +353,7 @@ describe('PermissionModePicker', () => {
     );
     const trigger = screen.getByRole('button');
     await user.click(trigger);
-    const optionButtons = screen.getAllByRole('button').slice(1);
+    const optionButtons = screen.getAllByRole('menuitemradio');
     fireEvent.keyDown(optionButtons[0]!, { key: ' ' });
     expect(onChange).toHaveBeenCalledWith('default');
     expect(trigger.getAttribute('aria-expanded')).toBe('false');
