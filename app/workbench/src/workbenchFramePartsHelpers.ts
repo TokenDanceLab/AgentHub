@@ -297,6 +297,7 @@ export function buildChatInspectorProps(
     inspectorRouteBlocks,
     inspectorContextBlocks,
     inspectorDeployPreviewUrl,
+    inspectorBrowserFocusRequest,
     inspectorRunResult,
     composer,
   } = session;
@@ -322,6 +323,7 @@ export function buildChatInspectorProps(
   assignIfDefined(inspectorProps, 'contextBlocks', inspectorContextBlocks);
   assignIfDefined(inspectorProps, 'routeBlocks', inspectorRouteBlocks);
   assignIfDefined(inspectorProps, 'deployPreviewUrl', inspectorDeployPreviewUrl);
+  assignIfDefined(inspectorProps, 'browserFocusRequest', inspectorBrowserFocusRequest);
   assignIfDefined(inspectorProps, 'runResult', inspectorRunResult);
 
   return inspectorProps;

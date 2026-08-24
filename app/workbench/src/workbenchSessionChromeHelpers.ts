@@ -95,6 +95,11 @@ export interface UseWorkbenchSessionChromeOptions {
   t: (key: string, options?: Record<string, unknown>) => string;
 }
 
+export interface BrowserPreviewFocusRequest {
+  sequence: number;
+  url: string;
+}
+
 export interface WorkbenchSessionChrome {
   settingsService: SettingsService | null;
   currentConversationId: string;
@@ -125,6 +130,7 @@ export interface WorkbenchSessionChrome {
   inspectorRouteBlocks: InspectorRouteTranscriptBlock[];
   inspectorContextBlocks: ContextUsageTranscriptBlock[];
   inspectorDeployPreviewUrl: string | undefined;
+  inspectorBrowserFocusRequest: BrowserPreviewFocusRequest | null;
   inspectorRunResult: RunResultInfo | undefined;
   mentionableAgents: ComposerMention[];
   handleToggleTheme: () => void;

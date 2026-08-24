@@ -11,6 +11,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { createMockPlatform } from '@shared/platform/createMockPlatform';
 import type { TranscriptBlock } from '@shared/transcript/types';
 import { AgentHubWorkbench } from '../AgentHubWorkbench';
+import { RightInspector } from '../RightInspector';
 import { DESIGN_NAV_GLYPH_STROKE_WIDTH } from '../designIcons';
 import {
   workbenchAgents as agents,
@@ -20,7 +21,7 @@ import {
 installWorkbenchTestHooks();
 
 describe('AgentHubWorkbench', () => {
-  it('renders read-only runtime evidence snapshots in the right inspector', () => {
+  it('renders read-only runtime evidence snapshots in the right inspector', async () => {
     const platform = createMockPlatform({
       surface: 'desktop',
       capabilities: { browserPreview: true },
@@ -142,6 +143,8 @@ describe('AgentHubWorkbench', () => {
     fireEvent.click(screen.getByRole('button', { name: '打开预览 preview-1' }));
     expect(screen.getByRole('tab', { name: /浏览器/ })).toHaveAttribute('aria-selected', 'true');
     expect(screen.getByText('http://127.0.0.1:4173/preview')).toBeInTheDocument();
+    const runtimePreviewRegion = screen.getByRole('region', { name: '内置浏览器预览' });
+    await waitFor(() => expect(document.activeElement).toBe(runtimePreviewRegion));
   });
 
   it('renders runtime evidence loading, error, and empty states', () => {
@@ -563,6 +566,44 @@ describe('AgentHubWorkbench', () => {
     // Browser preview URL format varies by platform; verify the region renders
     const browserRegion = screen.getByRole('region', { name: '内置浏览器预览' });
     expect(browserRegion).toBeInTheDocument();
+  });
+
+  it('moves focus into Preview only for a new explicit-open request (#1922 item 3)', async () => {
+    const baseProps = {
+      defaultBrowserUrl: 'about:blank',
+      evidence: [],
+      browserPreviewEnabled: true,
+      collapsed: false,
+      maxWidth: 560,
+      minWidth: 280,
+      onResizeBy: vi.fn(),
+      onResizeStart: vi.fn(),
+      width: 420,
+    };
+    const { rerender } = render(<RightInspector {...baseProps} />);
+
+    restoreInspectorTab('browser');
+    const browserTab = screen.getByRole('tab', { name: /浏览器/ });
+    browserTab.focus();
+    fireEvent.click(browserTab);
+    expect(document.activeElement).toBe(browserTab);
+
+    const focusRequest = { sequence: 1, url: 'https://preview.example/focus' };
+    rerender(<RightInspector {...baseProps} browserFocusRequest={focusRequest} />);
+
+    const browserRegion = screen.getByRole('region', { name: '内置浏览器预览' });
+    await waitFor(() => expect(document.activeElement).toBe(browserRegion));
+    expect(browserRegion).toHaveAttribute('tabindex', '-1');
+
+    const overviewTab = screen.getByRole('tab', { name: /概览/ });
+    overviewTab.focus();
+    fireEvent.click(overviewTab);
+    expect(document.activeElement).toBe(overviewTab);
+
+    // Re-rendering the same request must not replay focus or switch modes.
+    rerender(<RightInspector {...baseProps} browserFocusRequest={{ ...focusRequest }} />);
+    expect(document.activeElement).toBe(overviewTab);
+    expect(overviewTab).toHaveAttribute('aria-selected', 'true');
   });
 
   it('returns focus to the overview tab when the preview is closed (#1922 item 3)', () => {

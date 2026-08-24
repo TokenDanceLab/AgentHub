@@ -138,6 +138,8 @@ export const BrowserPreview: React.FC<BrowserPreviewProps> = ({
     <section
       className={styles.pane}
       aria-label={t('aria.browserPreview')}
+      data-browser-preview-focus-target
+      tabIndex={-1}
     >
       {/* ── Toolbar ── */}
       <div className={styles.toolbar}>
