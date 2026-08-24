@@ -90,6 +90,7 @@ def main() -> int:
     hub = get_job_block(workflow, "go-hub")
     backend_fixture = get_job_block(workflow, "backend-e2e-fixture")
     backend_required = get_job_block(workflow, "backend-required")
+    frontend_required = get_job_block(workflow, "frontend-required")
     # CI5: backend-focused-subset job removed (redundant with go-edge/go-hub
     # full `go test ./...` runs that already cover the focused packages).
     desktop = get_job_block(workflow, "frontend-desktop")
@@ -226,6 +227,23 @@ def main() -> int:
     assert_contains(backend_required, re.escape('INTEGRATION_RESULT" != "success"'), "backend-required must fail when the backend-integration lane did not succeed")
     assert_contains(backend_required, re.escape('EDGE_E2E_RESULT" != "success"'), "backend-required must fail when the backend-edge-e2e lane did not succeed")
     assert_contains(backend_required, re.escape('FIXTURE_RESULT" != "success"'), "backend-required must fail when the backend-e2e-fixture lane did not succeed")
+
+    # 前端 L0 稳定 required 聚合（对偶 backend-required）：AGENTS 测试分层规定
+    # L0-L2 是 PR merge 门禁，frontend-* lanes（desktop/web/mobile-light/coverage）
+    # 此前只是 path-filtered advisory job。frontend-required 以 if: always() 恒报：
+    # changes 失败 fail-closed；路径未选中 success no-op；选中 lane 非 success 即失败。
+    assert_contains(frontend_required, re.escape("needs: [changes, frontend-desktop, frontend-web, frontend-mobile-light, frontend-coverage]"), "frontend-required must aggregate all frontend L0 lanes")
+    assert_contains(frontend_required, re.escape("if: always()"), "frontend-required must report a stable result when its lanes are path-filtered")
+    assert_contains(frontend_required, re.escape("CHANGES_STATUS: ${{ needs.changes.result }}"), "frontend-required must bind the changes result for fail-closed aggregation")
+    assert_contains(frontend_required, re.escape("DESKTOP_FILTER: ${{ needs.changes.outputs.desktop }}"), "frontend-required must bind the desktop path-filter output")
+    assert_contains(frontend_required, re.escape("WEB_FILTER: ${{ needs.changes.outputs.web }}"), "frontend-required must bind the web path-filter output")
+    assert_contains(frontend_required, re.escape("MOBILE_FILTER: ${{ needs.changes.outputs.mobile }}"), "frontend-required must bind the mobile path-filter output")
+    assert_contains(frontend_required, re.escape("COVERAGE_FILTER: ${{ needs.changes.outputs.frontend }}"), "frontend-required must bind the frontend-coverage path-filter output")
+    assert_contains(frontend_required, re.escape('CHANGES_STATUS" != "success"'), "frontend-required must fail closed when the changes job fails")
+    assert_contains(frontend_required, re.escape('assert_lane "frontend-desktop" "$DESKTOP_FILTER" "$DESKTOP_RESULT"'), "frontend-required must enforce the frontend-desktop lane")
+    assert_contains(frontend_required, re.escape('assert_lane "frontend-web" "$WEB_FILTER" "$WEB_RESULT"'), "frontend-required must enforce the frontend-web lane")
+    assert_contains(frontend_required, re.escape('assert_lane "frontend-mobile-light" "$MOBILE_FILTER" "$MOBILE_RESULT"'), "frontend-required must enforce the frontend-mobile-light lane")
+    assert_contains(frontend_required, re.escape('assert_lane "frontend-coverage" "$COVERAGE_FILTER" "$COVERAGE_RESULT"'), "frontend-required must enforce the frontend-coverage lane")
 
     assert_contains(backend_fixture, r"working-directory:\s+hub-server", "backend-e2e-fixture must run from hub-server")
     assert_contains(backend_fixture, r"TeamRun fixture E2E", "backend-e2e-fixture must name the TeamRun fixture step")
