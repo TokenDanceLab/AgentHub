@@ -52,7 +52,7 @@
 | Tauri dry 打包 | `scripts/release/verify-tauri-package-dry.py` | release-readiness.yml → windows-package-dry / macos-package-dry |
 | secrets/token 不落库（hard-blocking，无 `continue-on-error`；mock/test secret 已精确 allowlist） | `scripts/verify/check-secrets.sh` | checks.yml → validate |
 | 提交格式 `type(scope): 中文摘要`（PR 时） | `scripts/verify/verify-commit-messages.sh` | checks.yml → validate |
-| UI Visual QA shell 行为证明（1440x810 light/dark） | `app/{desktop,web}/scripts/visual-qa-shell.mjs` | checks.yml → visual-qa-shell / visual-qa-desktop |
+| UI Visual QA 行为证明（shell + chat 内容面，1440x810 light/dark，非空白 + 几何合同，禁 pixel golden；chat 半边的代码块场景走 web 端 stubbed-hub 回放） | `app/{desktop,web}/scripts/visual-qa-shell.mjs` + `app/{desktop,web}/scripts/visual-qa-chat.mjs`（assert：`assert-visual-qa-{shell,chat}.mjs`） | checks.yml → visual-qa-shell / visual-qa-desktop |
 | Web stubbed-hub 浏览器行为兜底（mock hub + 真 chromium 的 chat flow / replay smoke / task 合同；不是真实登录，`real_tested=false`） | `app/web/src/__e2e__/{chat-flow-contract,web-stubbed-hub-replay-smoke,task-contract}.spec.ts`（入口 `pnpm test:e2e:stubbed-hub`） | checks.yml → web-e2e-stubbed |
 | 真实登录/OIDC e2e 链路（需真实服务与凭据，`scripts/verify/verify-oidc-flow.py` 等 gate 保留在 `scripts/verify/`） | 无 | 无 |
 | 交互型 UI/UX 验收（Type/Motion/Empty 等跨组件行为） | 无 | 无 |
