@@ -81,7 +81,10 @@ function DagTreeNode({ node }: { node: DagNode }): React.ReactElement {
         tabIndex={hasChildren ? 0 : -1}
       >
         <span aria-hidden="true" style={statusMarkStyle(node.status)} />
-        <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+        <span
+          title={node.label}
+          style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+        >
           {node.label}
         </span>
         {node.duration && (
