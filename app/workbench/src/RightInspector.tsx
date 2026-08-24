@@ -88,6 +88,7 @@ export function RightInspector({
   const model = buildInspectorEvidenceModel(evidence);
   const dagNodes = useMemo(() => resolveDagNodesFromRouteBlocks(routeBlocks), [routeBlocks]);
   const lastAutoSwitchedUrl = useRef<string | null>(null);
+  const tablistRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     if (!shouldAutoSwitchDeployPreview(
@@ -132,6 +133,13 @@ export function RightInspector({
     setPreviewFile(null);
     setBrowserUrl(null);
     setActiveMode('overview');
+    // #1922 item 3: return focus to the overview tab after closing the
+    // preview so keyboard users are not stranded when the close button
+    // unmounts. Tab selection via arrow keys already keeps focus on the tab
+    // (roving-tabindex), so this only handles the explicit close path.
+    tablistRef.current
+      ?.querySelector<HTMLButtonElement>('[data-inspector-tab="overview"]')
+      ?.focus();
   }, []);
 
   const browserPreviewUrl = resolveBrowserPreviewUrl(browserUrl, runtimeEvidence, defaultBrowserUrl);
@@ -204,6 +212,7 @@ export function RightInspector({
         onSelectMode={setActiveMode}
         onToggleQuickOpen={openNewInspectorWindow}
         t={t}
+        tablistRef={tablistRef}
       />
 
       <RightInspectorModePanel
