@@ -401,6 +401,7 @@ async function captureTheme(browser, theme, vp = { width: 1440, height: 810, lab
       viewport: { width: window.innerWidth, height: window.innerHeight },
       workbenchShell: Boolean(document.querySelector('[data-testid="agenthub-workbench"]')),
       agentsPage: Boolean(document.querySelector('section.agents-page, .agents-page')),
+      activePane: 'installed',
       horizontalOverflow:
         document.documentElement.scrollWidth > document.documentElement.clientWidth + 1,
       panes: {
@@ -443,9 +444,43 @@ async function captureTheme(browser, theme, vp = { width: 1440, height: 810, lab
   const contractFile = path.join(outDir, `web-shell-${theme}-${vp.label}${dprSuffix}.json`);
   await writeFile(contractFile, JSON.stringify(contract, null, 2) + '\n');
 
+  // #1874: cover three structurally-different panes (Installed/Tools/Audit) at
+  // the gate viewport so the shell gate proves more than a single surface.
+  if (vp.label === '1440x810') {
+    for (const paneId of ['tools', 'audit']) {
+      await capturePane(page, theme, vp, paneId, dprSuffix);
+    }
+  }
+
   const applied = await page.evaluate(() => document.documentElement.getAttribute('data-theme'));
   await context.close();
   return { file, contractFile, contract, applied, theme };
+}
+
+async function capturePane(page, theme, vp, paneId, dprSuffix) {
+  if (paneId !== 'installed') {
+    const btn = page.locator(`button[data-pane-id="${paneId}"]`).first();
+    await btn.waitFor({ state: 'visible', timeout: 10_000 });
+    await btn.click();
+    await wait(400);
+  }
+  const file = path.join(outDir, `web-shell-${theme}-${vp.label}-${paneId}${dprSuffix}.png`);
+  await page.screenshot({ path: file, fullPage: false });
+  const contract = await page.evaluate((pane) => {
+    const heading = document.querySelector('section.agents-page h1');
+    return {
+      viewport: { width: window.innerWidth, height: window.innerHeight },
+      workbenchShell: Boolean(document.querySelector('[data-testid="agenthub-workbench"]')),
+      agentsPage: Boolean(document.querySelector('section.agents-page, .agents-page')),
+      activePane: pane,
+      paneHeading: heading ? heading.textContent.trim() : '',
+      horizontalOverflow:
+        document.documentElement.scrollWidth > document.documentElement.clientWidth + 1,
+    };
+  }, paneId);
+  const contractFile = path.join(outDir, `web-shell-${theme}-${vp.label}-${paneId}${dprSuffix}.json`);
+  await writeFile(contractFile, JSON.stringify(contract, null, 2) + '\n');
+  return { file, contractFile, contract };
 }
 
 async function main() {
