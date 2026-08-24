@@ -17,6 +17,7 @@ import { Button } from '../../ui/Button'
 import { RiskBadge } from '../../ui/RiskBadge'
 import type { RiskLevel } from '../../ui/RiskBadge'
 import { useCopiedFlag } from '../../ui/useCopiedFlag'
+import { isSafeRemotePreviewUrl } from '../../ui/previewSandbox'
 import './RowItem.css'
 
 type IconComponent = React.FC<{ size?: number; className?: string }>
@@ -501,16 +502,33 @@ export const RowItem = memo(function RowItem({ item, onToggle, onApprove, onReje
             </div>
           )}
           {item.type === 'preview' && item.url && (
-            <a className="preview-card" href={item.url} rel="noopener noreferrer" target="_blank">
-              <div className="preview-thumb" aria-hidden="true">
-                <IconGlobe className="preview-favicon" size={20} />
+            // #1871: external-open is capability-gated — only safe http(s)
+            // preview URLs render as an outbound link. Unsafe schemes
+            // (javascript:/data:/file:) stay as an inert card instead of a
+            // clickable escape from the sandboxed transcript surface.
+            isSafeRemotePreviewUrl(item.url) ? (
+              <a className="preview-card" href={item.url} rel="noopener noreferrer" target="_blank">
+                <div className="preview-thumb" aria-hidden="true">
+                  <IconGlobe className="preview-favicon" size={20} />
+                </div>
+                <div className="preview-body">
+                  {item.previewDomain && <span className="preview-domain">{item.previewDomain}</span>}
+                  <span className="preview-title">{item.previewTitle || item.url}</span>
+                  <span className="preview-url-text">{item.url}</span>
+                </div>
+              </a>
+            ) : (
+              <div className="preview-card preview-card-blocked">
+                <div className="preview-thumb" aria-hidden="true">
+                  <IconGlobe className="preview-favicon" size={20} />
+                </div>
+                <div className="preview-body">
+                  {item.previewDomain && <span className="preview-domain">{item.previewDomain}</span>}
+                  <span className="preview-title">{item.previewTitle || item.url}</span>
+                  <span className="preview-url-text">{item.url}</span>
+                </div>
               </div>
-              <div className="preview-body">
-                {item.previewDomain && <span className="preview-domain">{item.previewDomain}</span>}
-                <span className="preview-title">{item.previewTitle || item.url}</span>
-                <span className="preview-url-text">{item.url}</span>
-              </div>
-            </a>
+            )
           )}
           {item.url && item.type !== 'preview' && <div className="dp-url" onClick={() => onDeploySubmit?.(item.id)} style={{cursor: onDeploySubmit ? 'pointer' : undefined}}>{item.url}</div>}
           {item.deployMeta && <div className="dp-meta">{item.deployMeta}</div>}
