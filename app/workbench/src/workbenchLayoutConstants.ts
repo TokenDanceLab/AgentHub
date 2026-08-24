@@ -12,6 +12,10 @@ export const WORKSPACE_AUTO_COLLAPSE_WIDTH = 560;
 // when the chat column would be crushed below this width. Deliberately tighter than
 // the live-resize comfort threshold above so a 1024px desktop window keeps its shell.
 export const WORKSPACE_MOUNT_COLLAPSE_WIDTH = 200;
+// Narrow-window mount threshold for the inspector (#1910 follow-up): on first
+// render of a Desktop chat page, collapse the inspector below this viewport width
+// so its fixed 400px column does not crush the chat main area at e.g. 800px.
+export const WORKSPACE_MOUNT_COLLAPSE_INSPECTOR_WIDTH = 880;
 
 /** localStorage key for the persisted inspector width (px number). */
 export const INSPECTOR_WIDTH_STORAGE_KEY = 'agenthub.workbench.inspectorWidth';
