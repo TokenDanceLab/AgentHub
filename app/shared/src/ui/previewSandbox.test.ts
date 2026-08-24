@@ -29,4 +29,14 @@ describe('isSafeRemotePreviewUrl', () => {
     expect(isSafeRemotePreviewUrl('')).toBe(false);
     expect(isSafeRemotePreviewUrl('not a url')).toBe(false);
   });
+
+  it('rejects userinfo-carrying URLs (#1933)', () => {
+    expect(isSafeRemotePreviewUrl('http://user:pass@example.com/')).toBe(false);
+    expect(isSafeRemotePreviewUrl('https://user:pass@example.com/deep/path?q=1')).toBe(false);
+    expect(isSafeRemotePreviewUrl('https://user@example.com')).toBe(false);
+    expect(isSafeRemotePreviewUrl('HTTPS://USER:PASS@EXAMPLE.COM')).toBe(false);
+    // '@' outside the authority (path segment) is not userinfo and stays allowed.
+    expect(isSafeRemotePreviewUrl('https://example.com/@handle')).toBe(true);
+    expect(isSafeRemotePreviewUrl('https://example.com/path?a=b@c')).toBe(true);
+  });
 });
