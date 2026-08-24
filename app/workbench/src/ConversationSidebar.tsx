@@ -7,9 +7,17 @@ import { ContextMenu, type ContextMenuItem } from './floating';
 import { CHATVIEW_I18N_NAMESPACE } from '@shared/chatview/i18n/resources';
 import Modal from '@shared/ui/Modal';
 import { Tooltip } from '@shared/ui/Tooltip';
+import type { ConversationLiveStatus } from './workbenchAttentionModel';
 import styles from './AgentHubWorkbench.module.css';
 
 const SORT_STORAGE_KEY = 'agenthub.conversationSort';
+
+/** F1 live-status dot copy (label map is the single per-status text source). */
+const LIVE_STATUS_LABEL: Record<ConversationLiveStatus, string> = {
+  running: '运行中',
+  'awaiting-approval': '待批准',
+  done: '已完成',
+};
 type SortBy = 'recent' | 'name' | 'active';
 
 function loadSortBy(): SortBy {
@@ -51,6 +59,12 @@ export interface ConversationSidebarProps {
    *  callback only signals intent. Renders the header button + empty-state
    *  CTA; both absent when the prop is not wired (backward compatible). */
   onStartNewConversation?: (() => void) | undefined;
+  /**
+   * F1 live status per conversation (running / awaiting-approval / done),
+   * derived by the shell from the run/approval model via
+   * `workbenchAttentionModel`. Rows without an entry render no dot.
+   */
+  liveStatusByConversation?: Record<string, ConversationLiveStatus> | undefined;
 }
 
 /**
@@ -108,6 +122,7 @@ export function ConversationSidebar({
   onDeleteConversation,
   onCopyConversationLink,
   onStartNewConversation,
+  liveStatusByConversation,
 }: ConversationSidebarProps): React.ReactElement {
   const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE);
   const [searchQuery, setSearchQuery] = useState('');
@@ -447,6 +462,7 @@ export function ConversationSidebar({
               const isGroup = conversation.kind === 'group';
               const isPinned = Boolean(conversation.pinned);
               const isFocusedRow = index === focusIndex;
+              const liveStatus = liveStatusByConversation?.[conversation.id];
 
               return (
                 <li
@@ -519,6 +535,14 @@ export function ConversationSidebar({
                         }}
                         tabIndex={isFocusedRow ? 0 : -1}
                       >
+                        {liveStatus && (
+                          <span
+                            aria-label={LIVE_STATUS_LABEL[liveStatus]}
+                            className={styles.conversationLiveDot}
+                            data-live-status={liveStatus}
+                            title={LIVE_STATUS_LABEL[liveStatus]}
+                          />
+                        )}
                         <span
                           aria-label={`${conversation.title} 资料卡`}
                           className={`${styles.conversationAvatar} ${onAvatarClick ? styles.conversationAvatarClickable : ''}`}

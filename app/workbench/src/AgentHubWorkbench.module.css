@@ -105,6 +105,7 @@
 }
 
 .railButton {
+  position: relative;
   width: 36px;
   height: 36px;
   display: flex;
@@ -3536,4 +3537,119 @@
   font-size: 14px;
   font-weight: 520;
   pointer-events: none;
+}
+
+/* ═══ F1/F6 attention: live dots, rail badge, status-strip chips ═══
+   Colors reuse the status tokens StatusBadge already speaks:
+   running → --state-running, awaiting → --state-waiting/--td-warning,
+   done → --td-moss. No hardcoded hues. */
+
+.conversationLiveDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.conversationLiveDot[data-live-status='running'] {
+  background: var(--state-running);
+  box-shadow: 0 0 4px color-mix(in oklch, var(--state-running) 55%, transparent);
+  animation: liveDotPulse 1.6s ease-in-out infinite;
+}
+
+.conversationLiveDot[data-live-status='awaiting-approval'] {
+  background: var(--state-waiting);
+  box-shadow: 0 0 4px color-mix(in oklch, var(--state-waiting) 55%, transparent);
+}
+
+.conversationLiveDot[data-live-status='done'] {
+  background: var(--td-moss);
+}
+
+@keyframes liveDotPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+
+.railAttentionBadge {
+  position: absolute;
+  top: 1px;
+  right: 0;
+  min-width: 15px;
+  height: 15px;
+  padding: 0 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--r-full);
+  background: var(--td-warning);
+  color: var(--warning-foreground);
+  font: 600 0.5625rem var(--td-font);
+  line-height: 1;
+  pointer-events: none;
+}
+
+.mainchainAttention {
+  display: flex;
+  align-items: center;
+  gap: var(--wb-gap-2xs);
+  flex-shrink: 0;
+}
+
+.mainchainAttentionChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 24px;
+  padding: 2px 8px;
+  border-radius: var(--td-radius-control);
+  border: 1px solid transparent;
+  font: 500 0.6875rem var(--td-font);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+button.mainchainAttentionChip {
+  transition:
+    background var(--td-dur-normal) var(--td-ease),
+    border-color var(--td-dur-normal) var(--td-ease);
+}
+
+button.mainchainAttentionChip:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.mainchainAttentionChip[data-attention-kind='running'] {
+  color: var(--state-running);
+  border-color: color-mix(in oklch, var(--state-running) 30%, transparent);
+  background: color-mix(in oklch, var(--state-running) 10%, transparent);
+}
+
+button.mainchainAttentionChip[data-attention-kind='running']:hover {
+  background: color-mix(in oklch, var(--state-running) 18%, transparent);
+}
+
+.mainchainAttentionChip[data-attention-kind='awaiting'] {
+  color: var(--td-warning);
+  border-color: color-mix(in oklch, var(--td-warning) 35%, transparent);
+  background: color-mix(in oklch, var(--td-warning) 12%, transparent);
+}
+
+button.mainchainAttentionChip[data-attention-kind='awaiting']:hover {
+  background: color-mix(in oklch, var(--td-warning) 20%, transparent);
+}
+
+.mainchainAttentionDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  flex-shrink: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .conversationLiveDot[data-live-status='running'] {
+    animation: none;
+  }
 }
