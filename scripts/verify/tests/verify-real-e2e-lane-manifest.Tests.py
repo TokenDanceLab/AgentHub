@@ -31,6 +31,8 @@ GOOD = {
     "schema": "agenthub-real-e2e-lane-v1",
     "kind": "real-e2e-lane",
     "generated_at": "2026-08-24T12:34:56Z",
+    "commit": "0123456789abcdef0123456789abcdef01234567",
+    "scope": "app/web/real-oidc-login.spec.ts",
     "evidence_level": "observed-local",
     "real_tested": True,
     "claim": "真实全栈 OIDC 登录",
@@ -140,6 +142,16 @@ class LaneManifestPrivateNameTests(unittest.TestCase):
         m = copy.deepcopy(GOOD)
         m["rows"][0]["evidence"] = "backend db.internal reachable"
         self.assert_fails(m, "internal-suffix hostname")
+
+    def test_missing_commit_fails(self):
+        m = copy.deepcopy(GOOD)
+        del m["commit"]
+        self.assert_fails(m, "missing commit provenance")
+
+    def test_empty_scope_fails(self):
+        m = copy.deepcopy(GOOD)
+        m["scope"] = ""
+        self.assert_fails(m, "empty scope provenance")
 
 
 if __name__ == "__main__":
