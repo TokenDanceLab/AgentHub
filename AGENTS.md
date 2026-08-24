@@ -121,7 +121,7 @@ Mobile 主线是 Expo + React Native development build。旧 Tauri Mobile 不再
 
 | 层 | 内容 | 入口 | CI job |
 |---|---|---|---|
-| L0 单元 | Go `-short`（零依赖）+ 前端 vitest | `make test` / `make fe-test` | `go-edge-test`/`go-hub-test`（2-shard 包轮转）+ `go-edge`/`go-hub`（lint/覆盖率门禁）+ `frontend-*`（checks.yml）+ Windows 原生合同（`windows-go-test`/`windows-frontend-test` 执行矩阵 → `windows-go`/`windows-frontend` 稳定 required-check 聚合，见 `docs/architecture/github-actions-ci-cd-policy.md`） |
+| L0 单元 | Go `-short`（零依赖）+ 前端 vitest | `make test` / `make fe-test` | `go-edge-test`/`go-hub-test`（2-shard 包轮转）+ `go-edge`/`go-hub`（lint/覆盖率门禁）+ `frontend-*`（checks.yml，经 `frontend-required` 稳定 required-check 聚合）+ Windows 原生合同（`windows-go-test`/`windows-frontend-test` 执行矩阵 → `windows-go`/`windows-frontend` 稳定 required-check 聚合，见 `docs/architecture/github-actions-ci-cd-policy.md`） |
 | L1 集成 | Go 集成（真实 PG16+Redis7，OIDC mock，`-tags integration`） | `make test-hub-integration`（先 `scripts/dev/dev-up.sh` 起容器） | `backend-integration`（service 容器；由 `backend-required` 聚合） |
 | L2 回调 E2E | Edge→Hub 回调链路（进程内 mock hub / fixture smoke） | `make test-edge-e2e` / `make e2e-local` | `backend-edge-e2e` / `backend-e2e-fixture`（由 `backend-required` 聚合） |
 | L3 真实 E2E | Playwright 真实登录/聊天流（真实 ID+Hub+Edge 栈） | 远程 dev 服务器：`scripts/dev/devserver.sh test|integration`（见 #1681） | 无阻塞 CI；`real-e2e-stack` dispatch-only（`checks.yml`）；常规入口 `scripts/dev/devserver.sh`（#1681），WSL 本机 `scripts/e2e/wsl-full-stack-e2e.sh` |
@@ -129,7 +129,7 @@ Mobile 主线是 Expo + React Native development build。旧 Tauri Mobile 不再
 
 规则：
 
-- L0-L2 是 PR merge 门禁（squash 前必须绿；经 `go-edge`/`go-hub` 与 `backend-required` 稳定聚合 required check）；L3 在远程 dev 服务器手动/脚本执行并落证据（`tests/artifacts/`，gitignore）；L4 是发布门禁。
+- L0-L2 是 PR merge 门禁（squash 前必须绿；经 `go-edge`/`go-hub`、`backend-required` 与 `frontend-required` 稳定聚合 required check）；L3 在远程 dev 服务器手动/脚本执行并落证据（`tests/artifacts/`，gitignore）；L4 是发布门禁。
 - 异步等待一律 `pkg/testkit` 的 `Eventually`/`WaitFor`，禁止裸 `time.Sleep` 轮询回调（docstring 明示 Prefer this over time.Sleep）。
 - 前端 coverage 契约由 `app/test-config/coverage.ts` factory 强制生产源码全量进分母，阈值在各 package `vitest.config.ts`（CI/本地同源，禁止两套阈值漂移）。
 - 证据等级（9 级，见 `scripts/verify/verify-real-e2e-contract.py`）与分层正交：L3 内按证据等级记录 real_tested 状态。
@@ -164,10 +164,10 @@ git worktree add .worktrees/<topic> -b <type>/<topic> origin/master
 - 开发在本地 worktree 完成；L3 真实 E2E/Visual QA 等验证在「远程 dev 服务器」执行（§5.5 L3 同口径，入口 `scripts/dev/devserver.sh`）——开发 lane 不放远程（容量受限）。**公开仓不写内部主机别名/规格**（§9 隐私红线）。
 - 本地 worktree 可把 app 下的 node_modules 用 junction 借主树（`New-Item -ItemType Junction`）；主树 `pnpm install` 只在全部 lane 收工后做；junction 依赖版本与 lockfile 不一致时本地 typecheck 可能与 CI 不同——CI 是最终裁决。
 - 多 lane 测试串行单进程（`vitest run --no-file-parallelism --maxWorkers=1`），防过载假红。
-- CodeRabbit 自动评审已关闭（#1858），按需 `@coderabbitai`；硬门禁（validate/go-hub/go-edge/windows-go/windows-frontend/backend-required）是合并唯一强制 gate。
+- CodeRabbit 自动评审已关闭（#1858），按需 `@coderabbitai`；硬门禁（validate/go-hub/go-edge/windows-go/windows-frontend/backend-required/frontend-required）是合并唯一强制 gate。
 - 并行 lane 任务书必须含地界/法/验收；主线做最终验收与合并裁决。
 
-防线（三层，防 master 直 push / 历史重写 / 非 squash 合入）：(1) GitHub branch protection + repo 设置——master 禁 force/直 push、必须 PR、线性历史、squash only、要求 `validate`/`go-hub`/`go-edge`/`windows-go`/`windows-frontend`/`backend-required`、`enforce_admins: true`；(2) 本地 pre-push hook（`scripts/git-hooks/pre-push`，`bash scripts/git-hooks/install.sh` 启用）——master 直 push 本地拦截，feat/fix/docs/chore/* 放行，`git push --no-verify` 紧急绕过；(3) CI——`scripts/verify/verify-commit-messages.sh` + `verify-ci-gates.py` 在 `validate` job fail-closed 校验 Conventional Commits 与 job 结构。详见 `scripts/git-hooks/` 与 `.github/workflows/checks.yml`。
+防线（三层，防 master 直 push / 历史重写 / 非 squash 合入）：(1) GitHub branch protection + repo 设置——master 禁 force/直 push、必须 PR、线性历史、squash only、要求 `validate`/`go-hub`/`go-edge`/`windows-go`/`windows-frontend`/`backend-required`/`frontend-required`、`enforce_admins: true`；(2) 本地 pre-push hook（`scripts/git-hooks/pre-push`，`bash scripts/git-hooks/install.sh` 启用）——master 直 push 本地拦截，feat/fix/docs/chore/* 放行，`git push --no-verify` 紧急绕过；(3) CI——`scripts/verify/verify-commit-messages.sh` + `verify-ci-gates.py` 在 `validate` job fail-closed 校验 Conventional Commits 与 job 结构。详见 `scripts/git-hooks/` 与 `.github/workflows/checks.yml`。
 
 提交格式：
 
