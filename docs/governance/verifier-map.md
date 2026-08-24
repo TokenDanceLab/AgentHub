@@ -3,7 +3,7 @@
 > Owner：本文件是 AgentHub「规则 → 机器验证」映射的 SSOT。`AGENTS.md` 的“规则 → 机器验证映射”只保留指针，不复制本表。
 > 机器门禁：`scripts/verify/verify-doc-ssot.py` 校验本表验证脚本路径与 CI 文件存在性。
 
-最后更新：2026-08-25（新增前端 L0 稳定 required 聚合 frontend-required；CI job 映射对齐 checks/release-readiness 现状）
+最后更新：2026-08-25（新增 test-sleep 值预算门禁行；前端 L0 稳定 required 聚合 frontend-required；CI job 映射对齐 checks/release-readiness 现状）
 
 ## 映射表
 
@@ -15,6 +15,7 @@
 | action runtime 只允许 node24（防 Node-20 major 回退，#1580） | `scripts/verify/verify-action-runtimes.py`（负向自测 `scripts/verify/tests/verify-action-runtimes.Tests.py`） | checks.yml → validate |
 | Hub lint finding fingerprint ratchet（防新增/替换，#1573；go-hub 硬门禁，全量 lint 回退模式对 baseline 存量豁免） | `scripts/verify/verify-hub-lint-ratchet.py`（负向自测 `scripts/verify/tests/verify-hub-lint-ratchet.Tests.py`，baseline `scripts/verify/hub-lint-baseline.json`） | checks.yml → go-hub |
 | Edge lint finding fingerprint ratchet（防新增/替换，#1840 对偶 #1573；go-edge 硬门禁，全量 lint 回退模式对 baseline 存量豁免） | `scripts/verify/verify-edge-lint-ratchet.py`（负向自测 `scripts/verify/tests/verify-edge-lint-ratchet.Tests.py`，baseline `scripts/verify/edge-lint-baseline.json`） | checks.yml → go-edge |
+| test-sleep 门禁（#1550 计数棘轮只缩不增；#1565/#1948 值预算：预算文件存在、预算内路径真实、count/total_ms/max_ms/逐值与源码一致、非常量表达式 fail-closed、改 sleep 值不更预算即红） | `scripts/verify/verify-test-sleep-ratchet.py`（负向自测 `scripts/verify/tests/verify-test-sleep-budget.Tests.py`，值预算 `scripts/verify/test-sleep-budget.json`，计数基线 `scripts/verify/test-sleep-baseline.json`） | checks.yml → validate |
 | skill 白名单只提交 active skill | `scripts/verify/verify-project-skills.py` | checks.yml → validate |
 | 文档与 Agent 入口 SSOT：根级入口/路径/行数/标记/映射表保鲜；引用 AGENTS 规则必须写主题名、禁止章节编号 | `scripts/verify/verify-doc-ssot.py`（负向自测 `scripts/verify/tests/verify-doc-entrypoints.Tests.py`） | checks.yml → validate |
 | Web Hub-only 边界（不直连 Local Edge） | `scripts/verify/verify-web-hub-boundary.py` | checks.yml → validate |
