@@ -10,6 +10,7 @@ import {
 } from '@shared/demo';
 import {
   createMockTerminalPort,
+  registerAttachmentImageUrlResolver,
   type AgentHubPlatform,
   type LocalCliDiscoveryManifest,
   type RuntimeSessionSummary,
@@ -29,6 +30,7 @@ import { pickDesktopComposerAttachments } from './desktopAttachments';
 import {
   canOpenDesktopEvidencePreview,
   openDesktopEvidencePreview,
+  resolveDesktopAttachmentImageUrl,
   resolveDesktopEvidenceContentUrl,
   resolveDesktopRuntimeEvidenceContent,
 } from './desktopPreview';
@@ -141,6 +143,10 @@ export function createDesktopPlatform(options: DesktopPlatformOptions = {}): Des
   const localTerminal = true;
   const terminal = localTerminal ? createMockTerminalPort() : undefined;
 
+  // #1938: let the shared transcript reach the desktop attachment-image
+  // resolver without prop threading through workbench glue.
+  registerAttachmentImageUrlResolver(resolveDesktopAttachmentImageUrl);
+
   return {
     surface: 'desktop',
     capabilities: {
@@ -207,6 +213,7 @@ export function createDesktopPlatform(options: DesktopPlatformOptions = {}): Des
       },
       resolveContentUrl: resolveDesktopEvidenceContentUrl,
       resolveRuntimeEvidenceContent: resolveDesktopRuntimeEvidenceContent,
+      resolveAttachmentImageUrl: resolveDesktopAttachmentImageUrl,
     },
     settings: createDesktopSettingsAdapter(),
     // exactOptionalPropertyTypes: omit key when undefined rather than assign undefined.

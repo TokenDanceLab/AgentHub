@@ -191,6 +191,16 @@ export interface PreviewPort {
    * and the inspector renders a capability notice.
    */
   resolveRuntimeEvidenceContent?(ref: RuntimeEvidenceContentRef): string | undefined;
+  /**
+   * Resolve one image attachment into a displayable URL (#1938) — typically
+   * a blob: object URL fetched with the surface's own Hub session auth,
+   * since `GET /client/attachments/:id` is not public. Returns `undefined`
+   * when the surface cannot serve the content (missing id, signed-out,
+   * fetch failed, non-image bytes) so the transcript row degrades to the
+   * file chip with an honest status notice instead of a broken image.
+   * Both surfaces resolve against Hub — Web never reaches Local Edge.
+   */
+  resolveAttachmentImageUrl?(attachment: AttachmentRef): Promise<string | undefined>;
 }
 
 export type LocalCliRuntimeId = 'codex' | 'claude-code' | 'opencode';

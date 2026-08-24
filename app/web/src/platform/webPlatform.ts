@@ -6,6 +6,7 @@ import {
   type WorkbenchDataMode,
   type WorkbenchDemoRuntimeStore,
 } from '@shared/demo';
+import { registerAttachmentImageUrlResolver } from '@shared/platform';
 import type { AgentHubPlatform, RedispatchTaskResult, WorkbenchConversation } from '@shared/platform';
 import type { AttachmentRef, ComposerAttachment, ComposerIntent, ComposerSubmitResult } from '@shared/composer';
 import { computeFileHash } from '@shared/composer';
@@ -20,7 +21,7 @@ import {
   type SendMessageResponse,
 } from '@/api/hubClient';
 import { getAccessToken } from '@/hooks/useAuth';
-import { canOpenWebEvidencePreview, openWebEvidencePreview, resolveWebEvidenceContentUrl } from './webPreview';
+import { canOpenWebEvidencePreview, openWebEvidencePreview, resolveWebAttachmentImageUrl, resolveWebEvidenceContentUrl } from './webPreview';
 import { createWebSettingsAdapter } from './webSettingsAdapter';
 import { recordWebAgentTaskIndex } from './webPlatformAgentTask';
 import {
@@ -108,6 +109,10 @@ export function createWebPlatform(options: WebPlatformOptions = {}): AgentHubPla
   const now = options.now ?? (() => new Date().toISOString());
   const ensureAuth = options.ensureAuth;
 
+  // #1938: let the shared transcript reach the web attachment-image
+  // resolver without prop threading through workbench glue.
+  registerAttachmentImageUrlResolver(resolveWebAttachmentImageUrl);
+
   return {
     surface: 'web',
     capabilities: {
@@ -125,6 +130,7 @@ export function createWebPlatform(options: WebPlatformOptions = {}): AgentHubPla
       canOpenEvidence: canOpenWebEvidencePreview,
       openEvidence: openWebEvidencePreview,
       resolveContentUrl: resolveWebEvidenceContentUrl,
+      resolveAttachmentImageUrl: resolveWebAttachmentImageUrl,
       // applyRunDiff / applyAllRunDiffs are intentionally omitted (#1817):
       // Web is Hub-only and has no Local Edge write-back path. The omission
       // IS the unsupported contract — the inspector renders an explicit

@@ -1,5 +1,12 @@
 export { createMockTerminalPort } from './createMockPlatform';
 export { resolveEvidencePreviewTarget } from './previewTargets';
+export {
+  getAttachmentImageUrlResolver,
+  registerAttachmentImageUrlResolver,
+} from './attachmentImagePort';
+export { createAttachmentImageUrlResolver } from './createAttachmentImageUrlResolver';
+export type { AttachmentImageUrlResolver } from './attachmentImagePort';
+export type { AttachmentImageUrlResolverDeps } from './createAttachmentImageUrlResolver';
 export type {
   AgentHubPlatform,
   AgentHubSurface,

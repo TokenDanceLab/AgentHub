@@ -773,27 +773,32 @@ describe('mapBlock — deploy blocks', () => {
 })
 
 describe('mapBlock — attachment blocks', () => {
-  it('maps a file attachment with a rounded KB size', () => {
+  it('maps an image attachment with a rounded KB size and keeps the image marker + ref (#1938)', () => {
+    const attachmentRef = { id: 'att-1', name: 'photo.png', size: 2048, mime_type: 'image/png' }
     const row = mapRow({
       id: 'at1', kind: 'attachment', author: makeAuthor('a1'),
-      attachmentRef: { id: 'att-1', name: 'photo.png', size: 2048, mime_type: 'image/png' },
+      attachmentRef,
       contentType: 'image',
     })
     expect(row).toEqual({
       id: 'at1', type: 'attachment', label: 'photo.png', extra: 'image', status: 'ok',
       collapsible: false, standalone: true,
       fileName: 'photo.png', fileSize: '2 KB',
+      attachmentKind: 'image', attachmentRef,
     })
   })
 
-  it('omits fileSize for a zero-size attachment', () => {
+  it('omits fileSize for a zero-size attachment and marks it as a file row (#1938)', () => {
+    const attachmentRef = { id: 'att-2', name: 'empty.txt', size: 0, mime_type: 'text/plain' }
     const row = mapRow({
       id: 'at2', kind: 'attachment', author: makeAuthor('a1'),
-      attachmentRef: { id: 'att-2', name: 'empty.txt', size: 0, mime_type: 'text/plain' },
+      attachmentRef,
       contentType: 'file',
     })
     expect(row.fileSize).toBeUndefined()
     expect(row.extra).toBe('file')
+    expect(row.attachmentKind).toBe('file')
+    expect(row.attachmentRef).toEqual(attachmentRef)
   })
 
   it('rounds a fractional KB size to the nearest integer', () => {
