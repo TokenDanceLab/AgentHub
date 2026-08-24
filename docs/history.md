@@ -34,7 +34,7 @@
 
 ## Pending External Archive (in-repo, awaiting migration)
 
-当前无待外迁文件：原 13 个 `pending external archive` 文件已于 2026-08-22 迁入外部归档（TokenDanceLab/docs#6，见上方 External Archive 台账），源仓副本已删除。
+截至 2026-08-22 无待外迁文件：原 13 个 `pending external archive` 文件已全部迁入外部归档（TokenDanceLab/docs#6，见上方 External Archive 台账），源仓副本已删除；后续新增项以本表为准登记。
 
 **外迁规则**：物理外迁由管理员执行（单次归档 PR：文件移入外部 TokenDanceLab/docs 归档，源仓删除正文），本表是源仓留存索引；外迁前不得重写或继续引用这些文件，新历史材料直接写入外部归档。
 
