@@ -83,11 +83,8 @@ describe('Agents installed/detail Chinese-first product chrome', () => {
   it('keeps banned engineering EN meta out of installed product chrome sources', () => {
     const offenders = productCopySources().flatMap((path) => {
       const source = readFileSync(path, 'utf8');
-      // AgentSpec fixture dump is a developer-only panel; strip that block if present.
       // Internal capability reason strings are not product chrome — strip reason fields.
-      const productSource = source
-        .replace(/export const AgentSpecFixturePanel[\s\S]*?(?=export const AgentEditGrid)/, '')
-        .replace(/reason:\s*'[^']*'/g, "reason: ''");
+      const productSource = source.replace(/reason:\s*'[^']*'/g, "reason: ''");
       return findBannedProductEnMeta(productSource).map(
         (hit) => `${relative(WORKBENCH_ROOT, path)}: ${hit}`,
       );

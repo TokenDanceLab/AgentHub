@@ -1,10 +1,7 @@
 import React from 'react';
 import { RuntimeBrandIcon } from '../../RuntimeBrandIcon';
-import { agentConfigToAgentSpecFixture } from '../../agentProfileCatalog';
-import { formatAgentHubAgentSpecV1 } from '@shared/agentSpec';
 import { Button, Select } from '@shared/ui';
 import styles from '../AgentsPage.module.css';
-import { ConfigSummaryRow, formatList } from './shared';
 import {
   AgentAvatar,
   CapabilityBadge,
@@ -27,37 +24,6 @@ import type {
    Extracted from AgentEditPanel as Phase 29 residual thin #695.
    CSS remains on shared AgentsPage.module.css.
    ═══════════════════════════════════════════════════════════════════════ */
-
-/* ── AgentSpecFixturePanel ── */
-
-export const AgentSpecFixturePanel: React.FC<{ agent: AgentConfig }> = ({ agent }) => {
-  const spec = agentConfigToAgentSpecFixture(agent);
-  const preview = formatAgentHubAgentSpecV1(spec);
-
-  return (
-    <section className={styles['agent-spec-fixture']} aria-label={`${agent.name} AgentSpec fixture`}>
-      <div className={styles['section-title-row']}>
-        <h3>AgentSpec fixture</h3>
-        <span>no-spend</span>
-      </div>
-      <div className={styles['agent-spec-grid']}>
-        <ConfigSummaryRow label="Runtime" value={`${spec.runtime.id} · ${spec.runtime.profile}`} />
-        <ConfigSummaryRow label="Model" value={`${spec.runtime.provider} / ${spec.runtime.model}`} />
-        <ConfigSummaryRow label="Tools" value={formatList(spec.tool_allowlist, '未声明 tool')} />
-        <ConfigSummaryRow label="MCP" value={formatList(spec.mcp_servers.map((server) => server.id), '未绑定 MCP')} />
-        <ConfigSummaryRow label="Memory" value={`${spec.memory_policy.mode} · ${spec.memory_policy.retention}`} />
-        <ConfigSummaryRow label="Approval" value={[
-          spec.approval_policy.mode,
-          formatList(spec.approval_policy.require_approval_for, ''),
-        ].filter(Boolean).join(' · ')} />
-      </div>
-      <pre className={styles['agent-spec-preview']}>{preview}</pre>
-      <p className={styles['agent-spec-note']}>
-        仅编译 fixture JSON，不导入 SDK、不启动 CLI、不调用模型。
-      </p>
-    </section>
-  );
-};
 
 /* ── AgentEditGrid ── */
 
@@ -262,21 +228,6 @@ export const AgentCapabilityStrip: React.FC<{
     <span className={`${styles['capability-readiness']} ${styles[capabilitySummary.readiness]}`}>
       {READINESS_LABEL[capabilitySummary.readiness] ?? capabilitySummary.readiness}
     </span>
-  </div>
-);
-
-/* ── AgentConfigSummary ── */
-
-export const AgentConfigSummary: React.FC<{
-  agent: AgentConfig;
-  capabilitySummary: CapabilitySummary;
-}> = ({ agent, capabilitySummary }) => (
-  <div className={styles['agent-config-summary']} aria-label={`${agent.name} 配置摘要`}>
-    <ConfigSummaryRow label="工作区说明" value={capabilitySummary.agentsMd} />
-    <ConfigSummaryRow label="MCP" value={formatList(agent.mcpServers, '未绑定 MCP')} />
-    <ConfigSummaryRow label="记忆" value={agent.memorySummary || formatList(agent.memorySources, '未声明记忆源')} />
-    <ConfigSummaryRow label="审批" value={agent.approvalMode ? `${agent.approvalMode} · ${agent.approval}` : agent.approval} />
-    <ConfigSummaryRow label="目标" value={agent.targetPreference || formatList(agent.targetPreferences, '未声明目标')} />
   </div>
 );
 
