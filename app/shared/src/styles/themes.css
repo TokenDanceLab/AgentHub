@@ -578,6 +578,15 @@ html[data-theme-sync='true'] *::after {
     rgba(59, 130, 246, 0.018) 0%,
     transparent 64%
   );
+
+  /* Composer surface — PermissionModePicker light overrides (#1914) */
+  --composer-control-bg-hover: rgba(15, 23, 42, 0.08);
+  --composer-option-hover-bg: rgba(15, 23, 42, 0.06);
+  --composer-panel-edge: rgba(15, 23, 42, 0.08);
+  --composer-panel-bg-light: rgba(248, 249, 252, 0.96);
+  --composer-panel-shadow:
+    0 18px 42px rgba(15, 23, 42, 0.14),
+    0 2px 10px rgba(15, 23, 42, 0.08);
 }
 
 /* ── High-DPI theme border visibility (#1306 / #1307) ────────────────
