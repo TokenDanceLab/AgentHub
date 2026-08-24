@@ -88,13 +88,6 @@ async function main() {
     if (contract.horizontalOverflow !== false) {
       failures.push('horizontal overflow captured in ' + name);
     }
-    // #1874: save CTA (保存配置/保存中) must exist and be reachable either in
-    // viewport or via a scrollable ancestor (detail panel or page).
-    if (contract.saveCta?.exists !== true) {
-      failures.push('save CTA not captured in ' + name);
-    } else if (contract.saveCta.reachable !== true) {
-      failures.push('save CTA not reachable in ' + name);
-    }
   }
 
   // Gate shots must prove the Agents workbench shell (not onboarding/blank).
@@ -122,6 +115,35 @@ async function main() {
       !(panes.detail.width > 0)
     ) {
       failures.push(name + ': three-pane geometry has a zero-width pane');
+    }
+    // #1874: save CTA (保存配置/保存中) must exist and be reachable either
+    // in viewport or via a scrollable ancestor (detail panel or page).
+    if (contract.saveCta?.exists !== true) {
+      failures.push(name + ': save CTA not captured');
+    } else if (contract.saveCta.reachable !== true) {
+      failures.push(name + ': save CTA not reachable');
+    }
+  }
+
+  // #1874: Tools/Audit panes must also be captured at the gate viewport so the
+  // shell gate covers three structurally-different panes, not just Installed.
+  for (const base of ['web-shell-light-1440x810', 'web-shell-dark-1440x810']) {
+    for (const pane of ['tools', 'audit']) {
+      const name = base + '-' + pane + '.json';
+      if (!names.includes(name)) {
+        failures.push('missing pane contract: ' + name);
+        continue;
+      }
+      const contract = JSON.parse(await readFile(path.join(outDir, name), 'utf8'));
+      if (contract.activePane !== pane) {
+        failures.push(name + ': activePane mismatch (expected ' + pane + ')');
+      }
+      if (!contract.paneHeading) {
+        failures.push(name + ': pane heading empty');
+      }
+      if (contract.horizontalOverflow !== false) {
+        failures.push(name + ': horizontal overflow');
+      }
     }
   }
 
