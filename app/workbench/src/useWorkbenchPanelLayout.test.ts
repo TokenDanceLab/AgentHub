@@ -25,7 +25,10 @@ import { GLOBAL_RAIL_WIDTH } from './workbenchPanelLayoutHelpers';
    workspace-pressure sidebar collapse, and both window event shortcuts.
    ═══════════════════════════════════════════════════════════════════════ */
 
-const DEFAULT_VIEWPORT_WIDTH = 1024;
+const DEFAULT_VIEWPORT_WIDTH = 1440;
+// Pointer-resize assertions run at a fixed base viewport so the arithmetic
+// stays below INSPECTOR_MAX_WIDTH regardless of the default window width.
+const RESIZE_BASE_VIEWPORT = 1024;
 
 interface PanelLayoutRenderOptions {
   activePage?: GlobalRailPage;
@@ -69,6 +72,7 @@ function setViewportWidth(width: number): void {
 describe('useWorkbenchPanelLayout', () => {
   beforeEach(() => {
     window.localStorage.clear();
+    setViewportWidth(DEFAULT_VIEWPORT_WIDTH);
   });
 
   afterEach(() => {
@@ -194,17 +198,18 @@ describe('useWorkbenchPanelLayout', () => {
 
   it('begins, moves, and stops an inspector pointer resize', () => {
     const { result } = renderPanelLayout({ isChatPage: false });
+    setViewportWidth(RESIZE_BASE_VIEWPORT);
 
     act(() => {
       result.current.beginInspectorResize(500);
     });
     expect(result.current.inspectorResizing).toBe(true);
-    expect(result.current.inspectorWidth).toBe(DEFAULT_VIEWPORT_WIDTH - 500);
+    expect(result.current.inspectorWidth).toBe(RESIZE_BASE_VIEWPORT - 500);
 
     act(() => {
       dispatchPointerEvent('pointermove', 700);
     });
-    expect(result.current.inspectorWidth).toBe(DEFAULT_VIEWPORT_WIDTH - 700);
+    expect(result.current.inspectorWidth).toBe(RESIZE_BASE_VIEWPORT - 700);
     expect(result.current.inspectorCollapsed).toBe(false);
 
     act(() => {
@@ -231,10 +236,11 @@ describe('useWorkbenchPanelLayout', () => {
   it('snap-collapses the inspector when dragged below the collapse threshold', () => {
     stubSynchronousRequestAnimationFrame();
     const { result } = renderPanelLayout();
+    setViewportWidth(RESIZE_BASE_VIEWPORT);
 
     // clientX leaves only 50px (< INSPECTOR_COLLAPSE_SNAP_WIDTH=96).
     act(() => {
-      result.current.beginInspectorResize(DEFAULT_VIEWPORT_WIDTH - 50);
+      result.current.beginInspectorResize(RESIZE_BASE_VIEWPORT - 50);
     });
     expect(result.current.inspectorWidth).toBe(INSPECTOR_MIN_WIDTH);
     expect(result.current.inspectorResizing).toBe(false);
@@ -351,12 +357,33 @@ describe('useWorkbenchPanelLayout', () => {
 
   it('auto-collapses the sidebar under workspace pressure on the chat page', () => {
     const { result } = renderPanelLayout();
-    // 1024 - 52 rail - 260 sidebar - 600 inspector = 112 < 560 → collapse.
+    // 1440 - 52 rail - 260 sidebar - 600 inspector = 528 < 560 → collapse.
     act(() => {
       result.current.resizeInspectorBy(200);
     });
     expect(result.current.inspectorWidth).toBe(600);
     expect(result.current.sidebarCollapsed).toBe(true);
+  });
+
+  it('auto-collapses the sidebar on mount at a narrow viewport (#1874)', () => {
+    setViewportWidth(800);
+    const { result } = renderPanelLayout();
+    // 800 - 52 rail - 260 sidebar - 400 inspector = 88 < 200 (mount crush) → collapse.
+    expect(result.current.sidebarCollapsed).toBe(true);
+  });
+
+  it('keeps the sidebar open on mount at a wider desktop viewport (#1874)', () => {
+    setViewportWidth(1024);
+    const { result } = renderPanelLayout();
+    // 1024 - 52 rail - 260 sidebar - 400 inspector = 312 >= 200 → keep the shell open.
+    expect(result.current.sidebarCollapsed).toBe(false);
+  });
+
+  it('does not auto-collapse the sidebar on mount on non-desktop surfaces (#1874)', () => {
+    setViewportWidth(800);
+    const { result } = renderPanelLayout({ platformSurface: 'web' });
+    // The mount-time pressure collapse is Desktop-only; Web owns its own responsive tier.
+    expect(result.current.sidebarCollapsed).toBe(false);
   });
 
   it('keeps the sidebar open on non-chat pages regardless of workspace pressure', () => {

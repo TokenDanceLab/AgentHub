@@ -8,6 +8,10 @@ export const SIDEBAR_MAX_WIDTH = 360;
 export const SIDEBAR_DEFAULT_WIDTH = 260;
 export const SIDEBAR_COLLAPSE_SNAP_WIDTH = 96;
 export const WORKSPACE_AUTO_COLLAPSE_WIDTH = 560;
+// Narrow-window mount threshold (#1874): collapse the sidebar on first render only
+// when the chat column would be crushed below this width. Deliberately tighter than
+// the live-resize comfort threshold above so a 1024px desktop window keeps its shell.
+export const WORKSPACE_MOUNT_COLLAPSE_WIDTH = 200;
 
 /** localStorage key for the persisted inspector width (px number). */
 export const INSPECTOR_WIDTH_STORAGE_KEY = 'agenthub.workbench.inspectorWidth';
