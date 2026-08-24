@@ -206,6 +206,7 @@
 /* Deploy */ .row-item.deploy > .row-hd .row-icon { color:var(--td-plum) }
 .row-item.deploy > .row-bd { display:grid; gap:var(--chat-sp-xs); padding-bottom:var(--chat-sp-sm) }
 .row-item.deploy .dp-url { font:var(--chat-label); color:var(--td-plum); word-break:break-all }
+.row-item.deploy .dp-url:focus-visible { outline:none; box-shadow:var(--focus-ring) }
 .row-item.deploy .dp-meta { font:var(--chat-label-xs); color:var(--td-ink-subtle) }
 .row-item.deploy.fail > .row-hd .row-icon { color:var(--td-danger) }
 .row-item.deploy.fail > .row-bd { border-left-color:var(--td-danger) }
