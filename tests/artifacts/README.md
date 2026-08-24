@@ -25,3 +25,7 @@ CI evidence artifact 上传契约（`checks.yml` real-e2e-stack；公私分离 #
   non-public-safe，路由 private evidence store（不公开）。
 - `real-e2e-account.env`（凭据，600 权限）显式排除在上传路径外——凭据永不离开
   runner，既不进 git（gitignored），也不进 artifact。
+- real-e2e-stack lane 的 TokenDance ID 只接受预登记 opaque ID（`id_env` choice：
+  source/image/local），ID endpoint 恒为 runner 本机 loopback（127.0.0.1:3000），
+  不接受任意 URL / 镜像（#1873 Slice B；由
+  `scripts/verify/verify-e2e-env-allowlist.py` 门禁）。
