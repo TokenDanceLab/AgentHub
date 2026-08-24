@@ -109,7 +109,7 @@ Mobile 主线是 Expo + React Native development build。旧 Tauri Mobile 不再
 - 通用组件在 `app/shared/src/ui/`，Desktop/Web 从 shared 导入，禁止复制本地 UI 副本。
 - CSS Modules + OKLCH tokens，避免硬编码颜色。
 - 用户消息、Agent 回复、工具/审批/产物卡片必须按时间线性展示；调试、mock、mode 信息不得进入主聊天流。
-- UI 改动用自动化 Playwright + Visual QA 证明行为和布局；Desktop/Web gate 视口为 `1440x810` light+dark，入口 `app/{desktop,web}/scripts/visual-qa-shell.mjs`（`visual:qa:shell`）。`app/web/scripts/visual-qa.mjs` 为可选/遗留多场景电池，不是 merge gate。
+- UI 改动用自动化 Playwright + Visual QA 证明行为和布局；Desktop/Web gate 视口为 `1440x810` light+dark；同一 gate 另生成并断言 Web `768x900`、Desktop `800x900` 窄视口的非空白/几何合同，作为补充而非替代标准审阅矩阵。入口 `app/{desktop,web}/scripts/visual-qa-shell.mjs`（`visual:qa:shell`）。`app/web/scripts/visual-qa.mjs` 为可选/遗留多场景电池，不是 merge gate。
 - 新 shared 组件必须带三件套：`<组件>.test.tsx` + `<组件>.stories.tsx` + 对照 `docs/component-acceptance.md` 验收表逐项勾选；缺件不得合入。
 - 设计 token 改动（`app/shared/src/styles/`、`app/shared/src/designTokens.ts`）必须跑 `python scripts/verify/verify-design-token-ssot.py`，且 `app/shared/src/designTokens.test.ts`、`app/shared/src/styles/tokens-base.test.ts` 全绿后交付。
 
@@ -124,8 +124,8 @@ Mobile 主线是 Expo + React Native development build。旧 Tauri Mobile 不再
 | L0 单元 | Go `-short`（零依赖）+ 前端 vitest | `make test` / `make fe-test` | `go-edge-test`/`go-hub-test`（2-shard 包轮转）+ `go-edge`/`go-hub`（lint/覆盖率门禁）+ `frontend-*`（checks.yml）+ Windows 原生合同（`windows-go-test`/`windows-frontend-test` 执行矩阵 → `windows-go`/`windows-frontend` 稳定 required-check 聚合，见 `docs/architecture/github-actions-ci-cd-policy.md`） |
 | L1 集成 | Go 集成（真实 PG16+Redis7，OIDC mock，`-tags integration`） | `make test-hub-integration`（先 `scripts/dev/dev-up.sh` 起容器） | `backend-integration`（service 容器；由 `backend-required` 聚合） |
 | L2 回调 E2E | Edge→Hub 回调链路（进程内 mock hub / fixture smoke） | `make test-edge-e2e` / `make e2e-local` | `backend-edge-e2e` / `backend-e2e-fixture`（由 `backend-required` 聚合） |
-| L3 真实 E2E | Playwright 真实登录/聊天流（真实 ID+Hub+Edge 栈） | 远程 dev 服务器：`scripts/dev/devserver.sh test|integration`（见 #1681） | 仓库自认空白（`wsl-full-stack-e2e.sh` WSL 专属） |
-| L4 发布门禁 | 打包/安装器/真实证据 | `release-readiness.yml` | `release-readiness` |
+| L3 真实 E2E | Playwright 真实登录/聊天流（真实 ID+Hub+Edge 栈） | 远程 dev 服务器：`scripts/dev/devserver.sh test|integration`（见 #1681） | 无阻塞 CI；`real-e2e-stack` dispatch-only（`checks.yml`）；常规入口 `scripts/dev/devserver.sh`（#1681），WSL 本机 `scripts/e2e/wsl-full-stack-e2e.sh` |
+| L4 发布门禁 | 打包/安装器/真实证据 | `release-readiness.yml` | workflow（内含 `readiness-policy`、`windows-installer-smoke-preflight`、`windows-package-dry`、`macos-unsigned-dry-policy`、`macos-package-dry`） |
 
 规则：
 
