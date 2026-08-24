@@ -18,7 +18,9 @@ const outDir = path.resolve("screenshots");
 /** Legacy battery desktop viewport (historical). Gate uses 1440×810 via visual-qa-shell.mjs. */
 const desktopViewport = { width: 1440, height: 920 };
 const mobileViewport = { width: 390, height: 844 };
-const hubUrlPattern = /https?:\/\/(?:localhost:8080|127\.0\.0\.1:8080|hub\.vectorcontrol\.tech|api\.hub\.vectorcontrol\.tech)\/.*/;
+// Loopback-only: the legacy battery runs against the local dev stack; no
+// production/remote hostnames belong in this repository (privacy red line).
+const hubUrlPattern = /https?:\/\/(?:localhost:8080|127\.0\.0\.1:8080)\/.*/;
 
 const agentProfiles = [
   {
@@ -32,7 +34,7 @@ const agentProfiles = [
     permission_mode: "approval",
     tool_allowlist: JSON.stringify(["shell", "apply_patch"]),
     mcp_servers: JSON.stringify(["filesystem"]),
-    target_preferences: JSON.stringify({ work_dir: "D:\\Code\\TokenDance\\AgentHub" }),
+    target_preferences: JSON.stringify({ work_dir: "C:\\agenthub-workspace" }),
     version: 12,
   },
   {
