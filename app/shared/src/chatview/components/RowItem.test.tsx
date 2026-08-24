@@ -681,4 +681,26 @@ describe('RowItem preview card privacy (#1871)', () => {
     expect(container.querySelector('div.preview-card.preview-card-blocked')).not.toBeNull();
     expect(container.textContent).toContain('javascript:alert(1)');
   });
+
+  it('renders a safe http(s) preview as an inert card when external open is disabled', () => {
+    const item: RowItemType = {
+      id: 'preview-capability-gate',
+      type: 'preview',
+      label: 'Deploy',
+      status: 'ok',
+      collapsible: true,
+      open: true,
+      content: 'preview',
+      url: 'https://prod.example.com',
+      previewDomain: 'example.com',
+      previewTitle: 'Example',
+    };
+    const { container } = render(<RowItem item={item} previewExternalOpenEnabled={false} />);
+
+    // External-open is capability-gated (#1871): a surface without a browser
+    // preview (e.g. Web) must render the safe-URL preview as an inert card,
+    // never a clickable outbound link.
+    expect(container.querySelector('a.preview-card')).toBeNull();
+    expect(container.querySelector('div.preview-card.preview-card-blocked')).not.toBeNull();
+  });
 });

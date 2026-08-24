@@ -40,6 +40,7 @@ export interface ChatViewBridgeProps {
     | undefined;
   /** Called when "Deploy" is triggered from a block. */
   onDeploySubmit?: ((id: string) => void) | undefined;
+  previewExternalOpenEnabled?: boolean | undefined;
   /** Set of currently selected block IDs. */
   selectedBlockIds: Set<string>;
   /** Whether multi-select mode is active. */
@@ -96,6 +97,7 @@ export const ChatViewBridge = React.memo(function ChatViewBridge({
   onBlockAction,
   onReviewFile,
   onDeploySubmit,
+  previewExternalOpenEnabled,
   selectedBlockIds,
   selectionMode,
   softHiddenBlockIds,
@@ -158,6 +160,7 @@ export const ChatViewBridge = React.memo(function ChatViewBridge({
         onBlockAction={onBlockAction}
         onReviewFile={onReviewFile}
         onDeploySubmit={onDeploySubmit}
+        {...(previewExternalOpenEnabled !== undefined ? { previewExternalOpenEnabled } : {})}
         selectedBlockIds={selectedBlockIds}
         selectionMode={selectionMode}
         softHiddenBlockIds={softHiddenBlockIds}
