@@ -31,11 +31,18 @@
 }
 
 .trigger:hover,
-.trigger:focus-visible,
 .trigger[aria-expanded='true'] {
   background: var(--composer-control-bg-hover, rgba(255, 255, 255, 0.078));
   color: var(--composer-control-text-active, var(--td-ink-muted));
+}
+
+.trigger:focus-visible {
+  background: var(--composer-control-bg-hover, rgba(255, 255, 255, 0.078));
+  color: var(--composer-control-text-active, var(--td-ink-muted));
+  /* Visible keyboard focus ring (a11y 2.4.7/2.4.11): suppress the default
+     outline and replace it with the shared --focus-ring box-shadow. */
   outline: none;
+  box-shadow: var(--focus-ring);
 }
 
 .trigger:disabled {
@@ -104,10 +111,14 @@
 }
 
 .option:hover,
-.option:focus-visible,
 .optionActive {
   background: var(--composer-option-hover-bg, rgba(255, 255, 255, 0.046));
+}
+
+.option:focus-visible {
+  background: var(--composer-option-hover-bg, rgba(255, 255, 255, 0.046));
   outline: none;
+  box-shadow: var(--focus-ring);
 }
 
 .optionIcon {

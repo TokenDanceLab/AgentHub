@@ -379,6 +379,19 @@
 | a11y | `role="tooltip"` + `aria-describedby` 生命周期 | ✅ | idref 仅在开启时挂载（防悬空引用） |
 | 响应式 | viewport 翻转 | ✅ | 四侧翻转（#1507），开启时按视口测量 |
 
+### PermissionModePicker（`app/shared/src/ui/PermissionModePicker.tsx`，#1913 补 stories）
+
+| 维度 | 必选项 | 状态 | 备注 |
+|---|---|---|---|
+| 视觉 | token 化（composer 控件族 + `--td-*` 兜底） | ✅ | `--composer-*` 消费，`--td-ink-muted`/`--td-radius-control` 兜底；light 主题 3 处 rgba 覆盖为既有 debt（见下） |
+| 视觉 | light/dark 对比度 + hover/active 状态区分 | ✅ | 随 PermissionModePicker.stories.tsx 巡检（default/acceptEdits/plan/bypass/disabled/custom-aria 6 态） |
+| 交互 | 打开/关闭、选中回调、外部点击/Esc 关闭、disabled 拒绝打开 | ✅ | PermissionModePicker.test.tsx 行为断言（open/select/close/outside/escape/disabled） |
+| 键盘 | Tab 聚焦、Enter/Space 触发、方向键/Home/End 导航、焦点移入/归还 | ✅ | test.tsx 覆盖；#1913 补可见焦点环 |
+| a11y | 可访问名称（label 文本 + ariaLabel）、`aria-expanded` + `aria-haspopup="menu"` | ✅ | 触发按钮 |
+| a11y | 可见焦点环不被 `outline:none` 静默移除（2.4.7/2.4.11） | ✅ | #1913 为 `:focus-visible` 补 `box-shadow: var(--focus-ring)` 可见焦点环，替代原先静默的 `outline:none` |
+| a11y | 语义角色正确 | ⚠️ | 触发 `aria-haspopup="menu"`，但浮层/选项仍为裸 `div`+`button`，缺 `role="menu"`/`role="menuitemradio"`（记 debt，见下） |
+| 响应式 | 触发 170px 截断 + 270px 面板 viewport 夹取，无横向滚动 | ✅ | trigger/option ellipsis + left clamp |
+
 ## 验收记录与 debt
 
 ### Modal / ToastStack debt 台账（2026-08-22 范本复核）
@@ -386,6 +399,7 @@
 | 组件 | 项 | 状态与缺口 | 跟踪载体 |
 |---|---|---|---|
 | Modal | 键盘 Tab 循环（必选） | 部分闭环，必选项未完全达标：`Modal.tsx` 经 `useFocusTrap` 困住焦点，`focusTrap.test.tsx` 断言 Tab/Shift+Tab 环绕与焦点归还；残留缺口为无 Modal 级专属断言、复核仅在 jsdom、未在真实浏览器人工复核。拆分验收：行为实现与共享层单测计入已通过，剩余验证工作记 debt | owner：前端 track；计划：补 Modal 级 Tab 循环断言（Modal.test.tsx）+ Visual QA 真实浏览器复核；跟踪：[#1820](https://github.com/TokenDanceLab/AgentHub/issues/1820)（验收补全） |
+| PermissionModePicker | 语义角色：menu/menuitemradio | 触发已 `aria-haspopup="menu"`，浮层/选项未加对应 ARIA 角色（裸 `div`+`button`）；light 主题 3 处 rgba 硬编码色。拆分验收：交互/键盘/焦点环已达标，语义角色与硬编码色清零记 debt | owner：前端 track；计划：浮层补 `role="menu"` + 选项 `role="menuitemradio"`/`aria-checked`（同步 test 的 role 查询），light rgba 收进 `--composer-*` 变量；跟踪：[#1914](https://github.com/TokenDanceLab/AgentHub/issues/1914) |
 | ToastStack | 自动消失可见时间/可暂停 | 已实现：hover/focus 触发 `pauseAutoDismiss`（ToastStack.tsx + toastStore.ts），满足「可暂停」必选分支。残留缺口：剩余倒计时不可视化（非必选） | 无独立 debt；倒计时可视化为可选增强，如需跟踪归入 [#1820](https://github.com/TokenDanceLab/AgentHub/issues/1820) 验收补全 |
 
 ### 维护规则
