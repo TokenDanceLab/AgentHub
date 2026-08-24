@@ -532,7 +532,24 @@ export const RowItem = memo(function RowItem({ item, onToggle, onApprove, onReje
               </div>
             )
           )}
-          {item.url && item.type !== 'preview' && <div className="dp-url" onClick={() => onDeploySubmit?.(item.id)} style={{cursor: onDeploySubmit ? 'pointer' : undefined}}>{item.url}</div>}
+          {item.url && item.type !== 'preview' && (onDeploySubmit ? (
+            <div
+              className="dp-url"
+              role="button"
+              tabIndex={0}
+              aria-label={t('card.deploy.openPreview', { url: item.url })}
+              onClick={() => onDeploySubmit(item.id)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                  event.preventDefault();
+                  onDeploySubmit(item.id);
+                }
+              }}
+              style={{ cursor: 'pointer' }}
+            >{item.url}</div>
+          ) : (
+            <div className="dp-url">{item.url}</div>
+          ))}
           {item.deployMeta && <div className="dp-meta">{item.deployMeta}</div>}
           {item.fileName && <div className={`att-row${onFileClick ? ' clickable' : ''}`} onClick={onFileClick ? () => onFileClick(item.id) : undefined}><span className="att-name">{item.fileName}</span>{item.fileSize && <span className="att-size">{item.fileSize}</span>}</div>}
           {item.ctxPct !== undefined && (<>
