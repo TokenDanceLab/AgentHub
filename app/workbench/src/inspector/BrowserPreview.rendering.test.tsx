@@ -7,6 +7,9 @@ describe('BrowserPreview sandbox + scheme gating', () => {
     const { container } = render(
       <BrowserPreview url="https://example.com" onClose={vi.fn()} />,
     );
+    const region = container.querySelector('section');
+    expect(region).not.toBeNull();
+    expect(region).toHaveAttribute('tabindex', '-1');
     const iframe = container.querySelector('iframe');
     expect(iframe).not.toBeNull();
     expect(iframe!.getAttribute('sandbox')).toBe('allow-scripts');

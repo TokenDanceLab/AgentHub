@@ -101,6 +101,7 @@ function sessionMock(overrides: Record<string, unknown> = {}) {
     inspectorRouteBlocks: [],
     inspectorContextBlocks: [],
     inspectorDeployPreviewUrl: null,
+    inspectorBrowserFocusRequest: null,
     inspectorRunResult: null,
     settingsService: { getSettings: vi.fn(), setSettings: vi.fn() },
     localCliDiscovery: { status: 'idle' },
