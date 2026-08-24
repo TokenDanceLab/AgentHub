@@ -1,5 +1,6 @@
 import React from 'react';
 import { DesignNavIcon } from '../../designIcons';
+import { EmptyState } from '@shared/ui';
 import styles from '../AgentsPage.module.css';
 import {
   AuditEntriesSection,
@@ -29,6 +30,7 @@ import type { AgentsPageProps } from './types';
 
 export const AgentPolicyView: React.FC<AgentsPageProps> = (props) => {
   const {
+    dataSource,
     policyRules = [],
     onPolicyAdd,
     approvalReadAuto = true,
@@ -38,6 +40,7 @@ export const AgentPolicyView: React.FC<AgentsPageProps> = (props) => {
     onApprovalToggle,
   } = props;
 
+  const realNoPolicy = dataSource === 'real' && policyRules.length === 0;
   const checks = [
     { label: '只读动作自动通过', checked: approvalReadAuto },
     { label: '写入动作进入用户确认', checked: approvalWriteConfirm },
@@ -51,7 +54,9 @@ export const AgentPolicyView: React.FC<AgentsPageProps> = (props) => {
         <div>
           <h1>运行策略</h1>
           <p className={styles['head-subcopy']}>
-            配置 Agent 执行边界、审批默认值和风险分级。这里展示前端 demo 的策略矩阵。
+            {dataSource === 'real'
+              ? '配置 Agent 执行边界、审批默认值和风险分级。策略数据由真实后端提供。'
+              : '配置 Agent 执行边界、审批默认值和风险分级。这里展示前端 demo 的策略矩阵。'}
           </p>
         </div>
         {onPolicyAdd && (
@@ -63,7 +68,15 @@ export const AgentPolicyView: React.FC<AgentsPageProps> = (props) => {
       </div>
 
       <div className={styles['agent-policy-layout']}>
-        <PolicyMatrixSection policyRules={policyRules} />
+        {realNoPolicy ? (
+          <EmptyState
+            title="策略数据当前不可用"
+            description="real 模式未接入真实策略数据源，暂无策略可展示。"
+            titleLevel={3}
+          />
+        ) : (
+          <PolicyMatrixSection policyRules={policyRules} />
+        )}
         <PolicyApprovalSection checks={checks} onApprovalToggle={onApprovalToggle} />
       </div>
     </main>
@@ -76,10 +89,12 @@ export const AgentPolicyView: React.FC<AgentsPageProps> = (props) => {
 
 export const AgentToolsView: React.FC<AgentsPageProps> = (props) => {
   const {
+    dataSource,
     toolMatrixAgents = [],
     toolMatrixTools = [],
     onToolsAddAgent,
   } = props;
+  const realNoTools = dataSource === 'real' && toolMatrixAgents.length === 0;
 
   return (
     <main className={`${styles['agent-main']} workbench-main`}>
@@ -98,10 +113,18 @@ export const AgentToolsView: React.FC<AgentsPageProps> = (props) => {
         )}
       </div>
 
-      <ToolPermissionMatrix
-        toolMatrixAgents={toolMatrixAgents}
-        toolMatrixTools={toolMatrixTools}
-      />
+      {realNoTools ? (
+        <EmptyState
+          title="工具权限矩阵当前不可用"
+          description="real 模式未接入真实工具权限数据源，暂无工具矩阵可展示。"
+          titleLevel={3}
+        />
+      ) : (
+        <ToolPermissionMatrix
+          toolMatrixAgents={toolMatrixAgents}
+          toolMatrixTools={toolMatrixTools}
+        />
+      )}
       <ToolPermissionLegend />
     </main>
   );
@@ -113,6 +136,7 @@ export const AgentToolsView: React.FC<AgentsPageProps> = (props) => {
 
 export const AgentModelsView: React.FC<AgentsPageProps> = (props) => {
   const {
+    dataSource,
     models = [],
     modelRoutes = [],
     modelHealthRows = [],
@@ -121,6 +145,7 @@ export const AgentModelsView: React.FC<AgentsPageProps> = (props) => {
     ccSwitchStatus,
     ccSwitchProviders = [],
   } = props;
+  const realNoHealth = dataSource === 'real' && modelHealthRows.length === 0;
 
   return (
     <main className={`${styles['agent-main']} workbench-main`}>
@@ -128,7 +153,9 @@ export const AgentModelsView: React.FC<AgentsPageProps> = (props) => {
         <div>
           <h1>模型配置</h1>
           <p className={styles['head-subcopy']}>
-            定义可选模型、默认用途和 Agent 分配。当前 demo 只修改前端展示状态。
+            {dataSource === 'real'
+              ? '定义可选模型、默认用途和 Agent 分配。模型健康数据由真实后端提供。'
+              : '定义可选模型、默认用途和 Agent 分配。当前 demo 只修改前端展示状态。'}
           </p>
         </div>
         {onModelAdd && (
@@ -148,7 +175,15 @@ export const AgentModelsView: React.FC<AgentsPageProps> = (props) => {
 
       <ModelCardsGrid models={models} />
       <ModelRoutingSection modelRoutes={modelRoutes} onModelRouteClick={onModelRouteClick} />
-      <ModelHealthSection modelHealthRows={modelHealthRows} />
+      {realNoHealth ? (
+        <EmptyState
+          title="模型健康数据当前不可用"
+          description="real 模式未接入真实模型健康数据源，暂无健康状态可展示。"
+          titleLevel={3}
+        />
+      ) : (
+        <ModelHealthSection modelHealthRows={modelHealthRows} />
+      )}
     </main>
   );
 };
@@ -159,11 +194,13 @@ export const AgentModelsView: React.FC<AgentsPageProps> = (props) => {
 
 export const AgentAuditView: React.FC<AgentsPageProps> = (props) => {
   const {
+    dataSource,
     auditEntries = [],
     activeAuditFilter = '全部',
     onAuditFilterChange,
     onAuditExport,
   } = props;
+  const realNoAudit = dataSource === 'real' && auditEntries.length === 0;
 
   const filters = ['全部', '需确认', '禁止', '今天'];
 
@@ -173,7 +210,9 @@ export const AgentAuditView: React.FC<AgentsPageProps> = (props) => {
         <div>
           <h1>审计日志</h1>
           <p className={styles['head-subcopy']}>
-            记录 Agent 工具调用、审批结果和目标资源，用于 demo 中展示治理闭环。
+            {dataSource === 'real'
+              ? '记录 Agent 工具调用、审批结果和目标资源。审计数据由真实后端提供。'
+              : '记录 Agent 工具调用、审批结果和目标资源，用于 demo 中展示治理闭环。'}
           </p>
         </div>
         {onAuditExport && (
@@ -189,7 +228,15 @@ export const AgentAuditView: React.FC<AgentsPageProps> = (props) => {
         activeAuditFilter={activeAuditFilter}
         onAuditFilterChange={onAuditFilterChange}
       />
-      <AuditEntriesSection auditEntries={auditEntries} />
+      {realNoAudit ? (
+        <EmptyState
+          title="审计日志当前不可用"
+          description="real 模式未接入真实审计数据源，暂无审计记录可展示。"
+          titleLevel={3}
+        />
+      ) : (
+        <AuditEntriesSection auditEntries={auditEntries} />
+      )}
     </main>
   );
 };
