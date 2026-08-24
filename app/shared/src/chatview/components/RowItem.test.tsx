@@ -704,3 +704,50 @@ describe('RowItem preview card privacy (#1871)', () => {
     expect(container.querySelector('div.preview-card.preview-card-blocked')).not.toBeNull();
   });
 });
+
+// ---------------------------------------------------------------------------
+// Deploy URL trigger keyboard accessibility (#1922 item 3 prerequisite)
+// ---------------------------------------------------------------------------
+describe('RowItem deploy URL trigger a11y (#1922)', () => {
+  const deployItem = (overrides: Partial<RowItemType> = {}): RowItemType => ({
+    id: 'deploy-a11y',
+    type: 'deploy',
+    label: 'Deploy',
+    status: 'ok',
+    collapsible: true,
+    open: true,
+    content: 'deploy',
+    url: 'https://prod.example.com',
+    ...overrides,
+  });
+
+  it('renders the deploy URL as a keyboard-accessible button when a handler is provided', () => {
+    const onDeploySubmit = vi.fn();
+    const { container } = render(<RowItem item={deployItem()} onDeploySubmit={onDeploySubmit} />);
+
+    const trigger = container.querySelector('.dp-url');
+    expect(trigger).not.toBeNull();
+    expect(trigger!.getAttribute('role')).toBe('button');
+    expect(trigger!.getAttribute('tabindex')).toBe('0');
+
+    fireEvent.keyDown(trigger!, { key: 'Enter' });
+    expect(onDeploySubmit).toHaveBeenCalledWith('deploy-a11y');
+  });
+
+  it('activates the deploy URL on Space as well as Enter', () => {
+    const onDeploySubmit = vi.fn();
+    const { container } = render(<RowItem item={deployItem()} onDeploySubmit={onDeploySubmit} />);
+    const trigger = container.querySelector('.dp-url')!;
+
+    fireEvent.keyDown(trigger, { key: ' ' });
+    expect(onDeploySubmit).toHaveBeenCalledWith('deploy-a11y');
+  });
+
+  it('keeps the deploy URL inert (non-focusable) when no handler is provided', () => {
+    const { container } = render(<RowItem item={deployItem()} />);
+    const trigger = container.querySelector('.dp-url');
+    expect(trigger).not.toBeNull();
+    expect(trigger!.getAttribute('role')).toBeNull();
+    expect(trigger!.getAttribute('tabindex')).toBeNull();
+  });
+});
