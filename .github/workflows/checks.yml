@@ -1736,16 +1736,39 @@ jobs:
           AGENTHUB_E2E_ID_DB: /var/lib/tokendance-id/tokendance.db
         run: bash scripts/e2e/run-real-e2e-lane.sh
 
-      - name: Upload L3 evidence
+      - name: Sanitize raw L3 artifacts (fail-closed content scan)
+        id: sanitize
+        if: always()
+        shell: bash
+        run: |
+          # #1873 Slice D：上传前对 raw artifact（report/html/trace）做内容扫描。
+          # 真实 E2E trace 必然含 OIDC code/JWT/cookie/workspace 路径 → 判 non-public-safe，
+          # 只上传 sanitized manifest；raw evidence 路由 private evidence store（Slice A）。
+          if python3 scripts/verify/verify-real-e2e-artifacts.py tests/artifacts; then
+            echo "raw_public_safe=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "raw_public_safe=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Upload sanitized L3 evidence (manifest provenance)
         if: always()
         uses: actions/upload-artifact@v7
         with:
           name: real-e2e-stack-evidence
-          # 上传契约 = 仅证据文件（见 tests/artifacts/README.md）：manifest /
-          # report / html / trace。real-e2e-account.env（测试账号凭据，chmod 600）
-          # 显式不上传——凭据永不离开 runner。
+          # 上传契约（见 tests/artifacts/README.md）：public artifact 只上传
+          # sanitized manifest（commit/evidence_level/real_tested/scope provenance，
+          # 不含私有运行事实）。real-e2e-account.env（凭据）永不上传。
           path: |
             tests/artifacts/manifest-*.json
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Upload raw L3 evidence (only when content scan passes)
+        if: always() && steps.sanitize.outputs.raw_public_safe == 'true'
+        uses: actions/upload-artifact@v7
+        with:
+          name: real-e2e-stack-raw-evidence
+          path: |
             tests/artifacts/report-*.json
             tests/artifacts/html-*/**
             tests/artifacts/test-results/**

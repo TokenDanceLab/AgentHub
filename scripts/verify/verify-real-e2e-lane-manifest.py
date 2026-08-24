@@ -114,7 +114,7 @@ LOOPBACK_HOSTS = {"localhost", "127.0.0.1", "::1", "[::1]"}
 URL_RE = re.compile(r"https?://([^\s/?#]+)", re.IGNORECASE)
 IPV4_RE = re.compile(r"(?<![\d.])(?:\d{1,3}\.){3}\d{1,3}(?![\d.])")
 WINDOWS_ABS_PATH_RE = re.compile(r"\b[A-Za-z]:[\\/][^\s\"']*")
-UNIX_ABS_PATH_RE = re.compile(r"(?<![\w./\\])/(?![\s/])[\w.-]+")
+UNIX_ABS_PATH_RE = re.compile(r"(?<![\w./\\])/(?![\s/])[\w.-]+(?:/[\w.-]+)+")
 INTERNAL_SUFFIX_HOST_RE = re.compile(
     r"\b[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?\.(?:internal|local|corp|lan)\b",
     re.IGNORECASE,
@@ -147,6 +147,33 @@ def _is_valid_ipv4(ip):
     return len(parts) == 4 and all(p.isdigit() and 0 <= int(p) <= 255 for p in parts)
 
 
+def private_info_violation(value, path_, label="manifest"):
+    """对单个字符串做私有信息 fail-closed 扫描，返回违规信息或 None。
+
+    与 assert_no_private_names 共用同一份正则 SSOT（URL_RE/IPV4_RE/
+    WINDOWS_ABS_PATH_RE/UNIX_ABS_PATH_RE/INTERNAL_SUFFIX_HOST_RE）。
+    供 verify-real-e2e-artifacts.py 对 raw artifact（report JSON / HTML /
+    trace.network）做同口径内容扫描，避免两套阈值漂移（AGENTS §5.5）。
+    """
+    if not value.strip():
+        return None
+    for host in _url_hosts(value):
+        if not _is_loopback_host(host):
+            return (f"{label} leaks non-loopback URL host '{host}' at {path_}: "
+                    f"public artifacts only allow loopback/localhost endpoints")
+    for match in IPV4_RE.finditer(value):
+        ip = match.group(0)
+        if _is_valid_ipv4(ip) and not LOOPBACK_IPV4_RE.match(ip):
+            return f"{label} leaks non-loopback IPv4 '{ip}' at {path_}"
+    if WINDOWS_ABS_PATH_RE.search(value):
+        return f"{label} leaks absolute Windows path at {path_}: redact filesystem paths"
+    if UNIX_ABS_PATH_RE.search(value):
+        return f"{label} leaks absolute Unix path at {path_}: redact filesystem paths"
+    if INTERNAL_SUFFIX_HOST_RE.search(value):
+        return f"{label} leaks internal-suffix hostname at {path_}: only public hostnames allowed"
+    return None
+
+
 def assert_no_private_names(manifest, context="manifest"):
     """递归扫描所有字符串值，拦截私有信息泄漏（#1873 第一切片）。
 
@@ -173,22 +200,9 @@ def assert_no_private_names(manifest, context="manifest"):
             _check_string(node, path_)
 
     def _check_string(value, path_):
-        if not value.strip():
-            return
-        for host in _url_hosts(value):
-            if not _is_loopback_host(host):
-                fail(f"manifest leaks non-loopback URL host '{host}' at {path_}: "
-                     f"public artifacts only allow loopback/localhost endpoints")
-        for match in IPV4_RE.finditer(value):
-            ip = match.group(0)
-            if _is_valid_ipv4(ip) and not LOOPBACK_IPV4_RE.match(ip):
-                fail(f"manifest leaks non-loopback IPv4 '{ip}' at {path_}")
-        if WINDOWS_ABS_PATH_RE.search(value):
-            fail(f"manifest leaks absolute Windows path at {path_}: redact filesystem paths")
-        if UNIX_ABS_PATH_RE.search(value):
-            fail(f"manifest leaks absolute Unix path at {path_}: redact filesystem paths")
-        if INTERNAL_SUFFIX_HOST_RE.search(value):
-            fail(f"manifest leaks internal-suffix hostname at {path_}: only public hostnames allowed")
+        violation = private_info_violation(value, path_, label="manifest")
+        if violation:
+            fail(violation)
 
     walk(manifest, context)
 
