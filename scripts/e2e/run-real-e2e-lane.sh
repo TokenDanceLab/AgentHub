@@ -6,9 +6,11 @@
 #   1. 全栈 preflight：TokenDance ID / hub / edge / web 健康探测。
 #   2. 测试账号供给（委托 provision-real-e2e-stack.sh：运行期随机账号，
 #      凭据落 tests/artifacts/real-e2e-account.env，gitignored chmod 600）。
-#   3. 跑 B2 真实 OIDC 浏览器 spec（playwright.real.config.ts chromium，
-#      app/e2e/real-oidc-login.spec.ts）——真实 Authorization Code + PKCE
-#      浏览器登录 + 聊天落 hub，无任何 stub/自签 JWT 旁路。
+#   3. 跑真实栈 spec（playwright.real.config.ts chromium）——默认不带位置
+#      过滤，运行 testMatch 全部 spec（chat-real / real-oidc-login /
+#      private-url-preview）；设 AGENTHUB_E2E_SPEC_TARGET 可只跑单个 spec。
+#      真实 Authorization Code + PKCE 浏览器登录 + 聊天落 hub + 私有 URL
+#      门禁场景，无任何 stub/自签 JWT 旁路。
 #   4. 输出 evidence manifest（六字段合同：evidence_level / real_tested /
 #      claim / status / skipped_evidence_levels / planned_evidence_levels）
 #      到 tests/artifacts/manifest-<YYYYMMDD-HHMMSS>.json（gitignored），
@@ -34,6 +36,9 @@
 #   AGENTHUB_E2E_ID_CLIENT_ID / _ID_CLIENT_SECRET （直供 client 凭据，跳过 start.sh 提取）
 #   AGENTHUB_E2E_START_SH （hub OIDC 凭据提取源，默认 /root/agenthub-dev/start.sh）
 #   AGENTHUB_E2E_ID_DB （ID sqlite，默认 /var/lib/tokendance-id/tokendance.db）
+#   AGENTHUB_E2E_SPEC_TARGET （只跑指定 spec 文件名，如 real-oidc-login.spec.ts；
+#                             不设 = 不带位置过滤，跑 playwright.real.config.ts
+#                             testMatch 全部 spec）
 #   AGENTHUB_E2E_PLAYWRIGHT_EXTRA_ARGS （追加给 playwright 的参数）
 # ─────────────────────────────────────────────────────────────
 set -uo pipefail  # 不用 -e：provision/playwright 退出码需显式处理
@@ -46,7 +51,12 @@ WEB_BASE_URL="${AGENTHUB_E2E_WEB_BASE_URL:-http://127.0.0.1:5174}"
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 ARTIFACT_DIR="$REPO_ROOT/tests/artifacts"
 VERIFIER="$REPO_ROOT/scripts/verify/verify-real-e2e-lane-manifest.py"
-SPEC_TARGET="real-oidc-login.spec.ts"   # B2 spec；playwright.real.config.ts 的 testMatch 覆盖它
+# 默认（不设 AGENTHUB_E2E_SPEC_TARGET）：不传位置过滤 → playwright 按
+# playwright.real.config.ts 的 testMatch 跑全部 real spec；设置后只跑
+# 指定 spec 文件（单 spec 调试/回放）。
+SPEC_TARGET="${AGENTHUB_E2E_SPEC_TARGET:-}"
+# manifest 里的展示标签：空目标用 sentinel，避免 scope/command 出现空值。
+SPEC_LABEL="${SPEC_TARGET:-all-testMatch}"
 
 ID_STATE="down"; HUB_STATE="down"; EDGE_STATE="down"; WEB_STATE="down"
 PW_RC=""
@@ -78,9 +88,11 @@ emit_manifest() { # 请求 status -> stdout "最终status|manifest路径"（pass
   commit="$(git -C "$REPO_ROOT" rev-parse HEAD 2>/dev/null || echo unknown)"
   MANIFEST_STATUS="$status" \
   MANIFEST_COMMIT="$commit" \
-  MANIFEST_SCOPE="app/web/$SPEC_TARGET" \
+  MANIFEST_SCOPE="$(
+    if [ -n "$SPEC_TARGET" ]; then echo "app/web/$SPEC_TARGET"; else echo "app/web (playwright.real.config.ts all testMatch)"; fi
+  )" \
   MANIFEST_ARTIFACT_DIR="$ARTIFACT_DIR" \
-  MANIFEST_SPEC_TARGET="$SPEC_TARGET" \
+  MANIFEST_SPEC_TARGET="$SPEC_LABEL" \
   MANIFEST_ID_BASE_URL="$ID_BASE_URL" \
   MANIFEST_HUB_BASE_URL="$HUB_BASE_URL" \
   MANIFEST_EDGE_BASE_URL="$EDGE_BASE_URL" \
@@ -100,6 +112,10 @@ stamp = time.strftime("%Y%m%d-%H%M%S", time.localtime())
 requested = os.environ["MANIFEST_STATUS"]
 status = requested
 run_started = float(os.environ.get("MANIFEST_RUN_STARTED_AT") or 0)
+# SPEC_TARGET sentinel：all-testMatch = 不带位置过滤跑全部 testMatch spec。
+spec_target = os.environ["MANIFEST_SPEC_TARGET"]
+spec_command = ("playwright test --config playwright.real.config.ts --project=chromium"
+                + ("" if spec_target == "all-testMatch" else " " + spec_target))
 
 def latest(pattern):
     # tests/artifacts 跨运行持久：只取本次运行开始之后产出的证据，
@@ -156,12 +172,12 @@ if report_path and requested in ("passed", "failed"):
                 "area": "web",
                 "evidence_level": "observed-local",
                 "real_tested": real_tested,
-                "claim": "真实 TokenDance ID OIDC 浏览器登录（Authorization Code + PKCE）与聊天落 hub；本地单机真栈证据，非 stub/fixture" if real_tested else
-                         "B2 spec 未完成真实登录（跳过或失败），运行态无 L3 登录证据",
+                "claim": "真实栈（本地单机真栈）上执行并通过；observed-local 证据，非 stub/fixture" if real_tested else
+                         "spec 未完成（跳过或失败），运行态无对应 L3 证据",
                 "status": outcome,
                 "exit_code": 0 if outcome == "passed" else 1,
                 "duration_ms": duration_ms,
-                "command": "playwright test --config playwright.real.config.ts --project=chromium " + os.environ["MANIFEST_SPEC_TARGET"],
+                "command": spec_command,
                 "working_directory": "app/web",
                 "evidence": os.path.basename(report_path) if report_path else "",
             })
@@ -186,8 +202,8 @@ passed_rows = [row for row in rows if row["status"] == "passed"]
 if requested == "passed":
     real_tested = len(passed_rows) > 0 and len(failed_rows) == 0
     if real_tested:
-        claim = ("真实全栈（PG/Redis/TokenDance ID/hub/edge/web）上 B2 真实 OIDC 浏览器登录"
-                 "与聊天动线 spec 全绿；evidence_level=observed-local（本地单机真栈），非 stub/自签 JWT")
+        claim = ("真实全栈（PG/Redis/TokenDance ID/hub/edge/web）上 playwright.real.config.ts "
+                 "testMatch 全部 spec 全绿；evidence_level=observed-local（本地单机真栈），非 stub/自签 JWT")
     else:
         # playwright exit 0 但无通过行（全 spec skipped / report 缺失或解析失败）：
         # 降级 status 为 no-evidence，绝不以 passed 呈现（校验器强制该合同）。
@@ -234,7 +250,7 @@ elif requested == "blocked":
     }]
 else:  # failed
     real_tested = False
-    claim = "栈齐但 B2 spec 失败或 provision 失败；运行态无完整 L3 登录证据"
+    claim = "栈齐但 real spec 失败或 provision 失败；运行态无完整 L3 证据"
     if not rows:
         rows = [{
             "name": "lane-abort",
@@ -332,13 +348,14 @@ main() {
   fi
   pass "test accounts provisioned (credentials in tests/artifacts/real-e2e-account.env, gitignored)"
 
-  info "running B2 real OIDC browser spec (chromium, playwright.real.config.ts)"
+  info "running real spec(s) (chromium, playwright.real.config.ts): ${SPEC_LABEL}"
   cd "$REPO_ROOT/app/web" || die_failed "app/web not found"
   # CI=true 会让 config 以 reuseExistingServer=false 重启 webServer，与已启动的
   # web 冲突；置空 CI 让其复用现有 5174（retries=0，确定性）。
+  # SPEC_TARGET 为空时不传位置过滤 → testMatch 全部 spec 都跑（#1922 项4）。
   # shellcheck disable=SC2086
   CI= pnpm exec playwright test --config playwright.real.config.ts \
-    --project=chromium "$SPEC_TARGET" ${AGENTHUB_E2E_PLAYWRIGHT_EXTRA_ARGS:-}
+    --project=chromium ${SPEC_TARGET:+"$SPEC_TARGET"} ${AGENTHUB_E2E_PLAYWRIGHT_EXTRA_ARGS:-}
   PW_RC=$?
   info "playwright exit code: $PW_RC"
 
@@ -365,7 +382,7 @@ main() {
     # 无通过行即无证据，如实以 FAIL 收口，绝不报 PASS。
     die_failed "playwright exit 0 but manifest status demoted to '$MANIFEST_STATUS_FINAL' (no passed rows; no L3 login evidence)"
   fi
-  die_failed "B2 spec exited with $PW_RC"
+  die_failed "real spec(s) ${SPEC_LABEL} exited with $PW_RC"
 }
 
 main

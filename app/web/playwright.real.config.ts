@@ -14,8 +14,9 @@ import { fileURLToPath } from 'node:url';
 // real services.
 //
 // Included specs:
-//   - chat-real.spec.ts          Hub/Edge API + IM lifecycle (dev-secret JWT lane)
-//   - real-oidc-login.spec.ts    real browser OIDC login + chat flow (#1839 B2)
+//   - chat-real.spec.ts            Hub/Edge API + IM lifecycle (dev-secret JWT lane)
+//   - real-oidc-login.spec.ts      real browser OIDC login + chat flow (#1839 B2)
+//   - private-url-preview.spec.ts  private-URL gate real-scenario (#1922 item 4)
 //
 // CI status: never run in CI (e2e-smoke only runs smoke.spec.ts under
 // playwright.config.ts). Run locally with all services up:
@@ -39,7 +40,9 @@ const stamp = runTimestamp();
 
 export default defineConfig({
   testDir: '../e2e',
-  testMatch: ['chat-real.spec.ts', 'real-oidc-login.spec.ts'],
+  // 显式列表 = 真实栈 lane 的 spec 清单（run-real-e2e-lane.sh 默认不带位置
+  // 过滤运行本列表全部 spec；新增 real spec 必须在此注册）。
+  testMatch: ['chat-real.spec.ts', 'real-oidc-login.spec.ts', 'private-url-preview.spec.ts'],
   timeout: 30_000,
   expect: { timeout: 5_000 },
   retries: process.env.CI ? 2 : 0,
