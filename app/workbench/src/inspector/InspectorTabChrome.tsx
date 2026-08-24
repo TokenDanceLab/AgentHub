@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React from 'react';
 import {
   DESIGN_NAV_GLYPH_SIZE,
   DESIGN_NAV_GLYPH_STROKE_WIDTH,
@@ -96,6 +96,7 @@ export interface InspectorMonitorHeadProps {
   onSelectMode: (mode: InspectorMode) => void;
   onToggleQuickOpen: () => void;
   t: (key: string) => string;
+  tablistRef: React.RefObject<HTMLDivElement | null>;
 }
 
 /** Tablist + quick-open / restore menu for the right inspector. */
@@ -109,11 +110,11 @@ export function InspectorMonitorHead({
   onSelectMode,
   onToggleQuickOpen,
   t,
+  tablistRef,
 }: InspectorMonitorHeadProps): React.ReactElement {
   const inspectorTabs = getInspectorTabs(t);
   const quickOpenItems = getQuickOpenItems(t);
   const visibleInspectorTabs = inspectorTabs.filter((tab) => visibleTabs.has(tab.mode));
-  const tablistRef = useRef<HTMLDivElement>(null);
 
   /* Roving tabindex (#8): ArrowLeft/Right + Home/End move the single tab stop
      between visible tabs, skipping the capability-disabled browser tab.

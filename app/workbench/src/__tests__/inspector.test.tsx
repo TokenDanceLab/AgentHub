@@ -565,6 +565,35 @@ describe('AgentHubWorkbench', () => {
     expect(browserRegion).toBeInTheDocument();
   });
 
+  it('returns focus to the overview tab when the preview is closed (#1922 item 3)', () => {
+    const platform = createMockPlatform({
+      surface: 'desktop',
+      capabilities: { browserPreview: true },
+      conversations: [{ id: 'builder', title: 'Builder', kind: 'direct' }],
+    });
+
+    render(
+      <AgentHubWorkbench
+        agents={agents}
+        platform={platform}
+        conversations={platform.seed.conversations}
+        transcript={transcript}
+      />
+    );
+
+    restoreInspectorTab('browser');
+    fireEvent.click(screen.getByRole('tab', { name: /浏览器/ }));
+    expect(screen.getByRole('region', { name: '内置浏览器预览' })).toBeInTheDocument();
+
+    // Close the preview via its close button; focus should return to the
+    // overview tab (roving tabstop) instead of being dropped to <body>.
+    fireEvent.click(screen.getByRole('button', { name: '关闭预览' }));
+
+    const overviewTab = screen.getByRole('tab', { name: /概览/ });
+    expect(overviewTab).toHaveAttribute('aria-selected', 'true');
+    expect(document.activeElement).toBe(overviewTab);
+  });
+
   it('roves inspector tabs with arrow keys across visible tabs', () => {
     const platform = createMockPlatform({
       surface: 'desktop',
