@@ -24,11 +24,11 @@ AgentHub 使用 Ubuntu 和 Windows 原生 runner 验证不同类别的问题：
 
 ## 分支保护与稳定 required checks
 
-`master` 分支保护使用 `strict=true`，PR 必须先与目标分支保持 up-to-date。仓库要求的稳定 required-check 契约是 `validate`、`go-hub`、`go-edge`、`windows-go`、`windows-frontend`、`backend-required`。
+`master` 分支保护使用 `strict=true`，PR 必须先与目标分支保持 up-to-date。仓库要求的稳定 required-check 契约是 `validate`、`go-hub`、`go-edge`、`windows-go`、`windows-frontend`、`backend-required`、`frontend-required`。
 
 - `go-edge` / `go-hub` 在无 Go 变更时用受控 no-op 恒报，真实单元执行在 `go-edge-test` / `go-hub-test` 的两分片矩阵。
 - `windows-go` / `windows-frontend` 只聚合执行矩阵结果，不自己跑测试。
-- `backend-required` 聚合后端 L0/L1/L2；`real-e2e-stack` 是 dispatch-only L3，不属于 required checks。
+- `backend-required` 聚合后端 L0/L1/L2；`frontend-required` 聚合前端 L0；`real-e2e-stack` 是 dispatch-only L3，不属于 required checks。
 
 ## 并行与成本策略
 
@@ -46,7 +46,8 @@ AgentHub 使用 Ubuntu 和 Windows 原生 runner 验证不同类别的问题：
 - Go：`go-edge-test`、`go-hub-test` 的 race/shard 是主单元门禁；`go-edge`、`go-hub` 负责 lint、gosec、staticcheck 和 coverage。
 - 服务行为：fixture E2E、Edge->Hub callback、PostgreSQL + Redis integration。
 - `backend-required` 是后端 L0/L1/L2 的稳定 required-check 聚合：`needs` 聚合 `go-edge`/`go-hub`/`backend-integration`/`backend-edge-e2e`/`backend-e2e-fixture`，`if: always()` 恒报；Go 无变化时退出 `success` 作为有意 no-op，`changes` 失败时 fail-closed，Go 变化时任一 lane 非 `success` 即失败。
-- 前端：Desktop/Web/mobile 按路径执行，coverage、CSS syntax、vulnerability gate 和 Visual QA 各自独立。
+- `frontend-required` 是前端 L0 的稳定 required-check 聚合：`needs` 聚合 `frontend-desktop`/`frontend-web`/`frontend-mobile-light`/`frontend-coverage`，`if: always()` 恒报；路径未选中时退出 `success` 作为有意 no-op，`changes` 失败时 fail-closed，任一选中 lane 非 `success` 即失败（AGENTS「测试分层」L0 是 PR merge 门禁）。
+- 前端其余面：Visual QA shell、stubbed-hub Playwright、CSS syntax、vulnerability gate 按路径执行，当前仍是 advisory（非 required check）。
 
 ### Windows
 
@@ -94,7 +95,7 @@ PowerShell 命令中的 `go test ./edge-server/...` 仅适用于从仓库根运�
 
 ## 证据边界
 
-- 执行型 job 的 `success` 表示对应步骤实际通过；`go-edge`/`go-hub`/`windows-go`/`windows-frontend`/`backend-required` 的受控 no-op `success` 只表示路径未触发，不提供测试执行证据。
+- 执行型 job 的 `success` 表示对应步骤实际通过；`go-edge`/`go-hub`/`windows-go`/`windows-frontend`/`backend-required`/`frontend-required` 的受控 no-op `success` 只表示路径未触发，不提供测试执行证据。
 - fixture、mock、stubbed Hub、observed local、approved real 和 packaged release 证据必须按 `scripts/verify/verify-real-e2e-contract.py` 的等级记录。
 - screenshot 和构建产物上传到 workflow artifact，不提交仓库；临时输出、coverage、Playwright report 和 package dry artifacts 必须保持 gitignored。
 - CI 失败首先修复脚本或代码；不得用 `continue-on-error`、`|| true`、空测试保护或降低 baseline 制造假绿。现有 advisory gate 必须有 owner、原因和收紧条件。
