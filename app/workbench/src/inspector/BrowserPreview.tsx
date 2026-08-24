@@ -231,8 +231,7 @@ export const BrowserPreview: React.FC<BrowserPreviewProps> = ({
 
       {/* ── Status bar ── */}
       <div className={styles.status}>
-        <span className={styles.statusItem}>Desktop</span>
-        <span className={styles.statusItem}>Local Vite</span>
+        <span className={styles.statusItem}>{t('browserPreview.sandboxed')}</span>
         <span className={styles.statusItem}>{t('browserPreview.readOnly')}</span>
       </div>
     </section>
