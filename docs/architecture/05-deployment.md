@@ -61,7 +61,7 @@ docker compose up -d
 | Claim | 最低证据 |
 |---|---|
 | Compose 配置形状正确 | `docker compose config` 或 CI compose check |
-| OIDC 配置形状正确 | OIDC/session tests + WSL 全栈 E2E 真实 OIDC 流（`verify-oidc-readiness.py` 已退役 2026-08-07，当前映射见 `docs/governance/verifier-map.md` 的 OIDC 行）；真实 E2E lane（`scripts/e2e/run-real-e2e-lane.sh`，workflow_dispatch `real-e2e-stack`，evidence manifest 六字段合同） |
+| OIDC 配置形状正确 | OIDC/session tests + L3 真实 OIDC 流（远程 dev 服务器入口 `scripts/dev/devserver.sh`；WSL 本机 `scripts/e2e/wsl-full-stack-e2e.sh`），当前映射见 `docs/governance/verifier-map.md` 的 OIDC 行；真实 E2E lane（`scripts/e2e/run-real-e2e-lane.sh`，workflow_dispatch `real-e2e-stack`，evidence manifest 六字段合同） |
 | Hub/Edge API 行为正确 | 相关 Go handler/service tests + OpenAPI parse |
 | Web/Desktop UI 流程正确 | Playwright UI + Visual QA，按证据等级标注 |
 | Desktop packaged 行为正确 | Tauri package/sidecar/icon/installer evidence |
