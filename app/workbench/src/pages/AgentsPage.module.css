@@ -327,6 +327,10 @@
   min-height: 0;
   display: grid;
   grid-template-columns: minmax(320px, 1fr) minmax(300px, 1fr);
+  /* #1874: constrain the implicit row to the definite container height so
+     .agent-section/.agent-detail `height:100%` resolves and their internal
+     scroll works instead of the panel overflowing past the viewport. */
+  grid-template-rows: minmax(0, 1fr);
   gap: var(--sp-10);
   align-items: stretch;
 }
@@ -2293,6 +2297,9 @@
   }
 
   .agent-layout {
+    flex: none;
+    height: auto;
+    min-height: 0;
     grid-template-columns: 1fr;
     grid-template-rows: auto auto;
   }
@@ -2300,16 +2307,22 @@
   .agent-section {
     height: auto;
     min-height: 220px;
-    max-height: 400px;
+    max-height: none;
+    overflow: visible;
   }
 
   .agent-config-list {
-    max-height: 320px;
+    flex: none;
+    height: auto;
+    min-height: 0;
+    max-height: none;
+    overflow: visible;
   }
 
   .agent-detail {
     height: auto;
     min-height: 320px;
+    overflow: visible;
   }
 }
 
