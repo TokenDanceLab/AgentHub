@@ -53,10 +53,10 @@ exchange、JWKS fetch（#1595 验收）。
 | 2 | Edge→Hub callback（`edge-server/internal/hub/callback.go`） | 运营商配置 Hub URL/token（`AGENTHUB_HUB_URL/HUB_TOKEN` + callback policy flags）；信任边界=Hub 服务器 | 有预算重试（10s 默认）；只重试 ack/done/fail（幂等）；stream 不重试；429+Retry-After 重试；4xx/3xx/超限终态 | 固定地址；redirect 拒绝 | 64 KiB fail-closed | 统一合同（#1595，per-attempt）；journal 记录 attempts | ✅ 已收口（#1564 + #1595 指标） |
 | 3 | Hub OIDC token exchange（`service/oidc/oidc.go`） | 运营商配置 TokenDance ID issuer/client secret（`tokendance_id.*`）；信任边界=TokenDance ID | 无重试（一次性授权码交换，重试不安全） | 固定地址；redirect 拒绝（client_secret 在 form body） | 64 KiB fail-closed | 日志含 request_id + body_sha256；统一合同（#1595） | ✅ 已收口（#1564 + #1595 指标） |
 | 4 | Hub JWKS fetch（`jwtutil/tokendance.go` 实例化 verifier，#1551） | 运营商配置 JWKS URI；信任边界=TokenDance ID | 无重试；cache TTL 1h 注入 | 固定地址；redirect 拒绝 | 64 KiB fail-closed | 统一合同（#1595） | ✅ 已收口（#1564 + #1595 指标） |
-| 5 | Hub execution-target ping（`service/execution_target.go` → `egress` 包，#1540） | 用户提供地址；egress allowlist 是唯一放行路径 | 无重试（探测语义） | ✅ 默认拒绝 + DNS-rebinding 防御 | 64 KiB（`io.LimitReader`） | 无 | ✅ 已收口 |
+| 5 | Hub execution-target ping（`service/executiontarget/execution_target_ping.go` → `egress` 包，#1540） | 用户提供地址；egress allowlist 是唯一放行路径 | 无重试（探测语义） | ✅ 默认拒绝 + DNS-rebinding 防御 | 64 KiB（`io.LimitReader`） | 无 | ✅ 已收口 |
 | 6 | Edge HubMCPSyncer（`adapters/mcp_config.go`） | 运营商配置 Hub MCP sync URL/token；信任边界=Hub 服务器 | 无重试（周期同步） | 固定地址；redirect 拒绝（`edgehttp` 注入） | 64 KiB fail-closed | 统一合同（#1595） | ✅ 已收口（#1593） |
-| 7 | Edge OpenAI SDK 适配器（`adapters/openai_sdk_request.go`） | 用户配置 API key/baseURL；信任边界=模型 provider | 有界重试（attempts + jitter，ctx 可取消；无显式总 budget） | 固定地址 | 流式响应未限 ⚠️ | `BusEventAPIRetry` 事件 | ✅ 已收口（#1592） |
-| 8 | Edge Anthropic SDK 适配器（`adapters/anthropic_sdk_request.go`） | 同上 | 同上 | 固定地址 | 流式响应未限 ⚠️ | `BusEventAPIRetry` 事件 | ✅ 已收口（#1592） |
+| 7 | Edge OpenAI SDK 适配器（`adapters/sdk/openai_sdk_request.go`） | 用户配置 API key/baseURL；信任边界=模型 provider | 有界重试（attempts + jitter，ctx 可取消；无显式总 budget） | 固定地址 | 流式响应未限 ⚠️ | `BusEventAPIRetry` 事件 | ✅ 已收口（#1592） |
+| 8 | Edge Anthropic SDK 适配器（`adapters/sdk/anthropic_sdk_request.go`） | 同上 | 同上 | 固定地址 | 流式响应未限 ⚠️ | `BusEventAPIRetry` 事件 | ✅ 已收口（#1592） |
 | 9 | 统一 outbound metrics/correlation 合同 | — | — | — | — | `outbound_requests_total` / `outbound_request_duration_seconds`（见 1.1） | ✅ 已落地（#1595）：dispatch / callback / OIDC / JWKS |
 
 ## 3. 未迁移项清单

@@ -87,10 +87,6 @@ Orchestrator 的 `ParseStream` 在 Claude Code 输出流上包装了 `dispatchIn
 3. **单 finish dispatch 跳过**：当 orchestrator 发出仅含完成语义描述的单个 dispatch 时，跳过 fanOut 直接发出进度汇总。
 4. **同 Agent 顺序执行**：当所有 dispatch 都指向同一 Agent 时，自动从并发 fanOut 降级为顺序执行，避免单个 adapter 的实例内竞争。
 
-**Failure Recovery 现状**（旧决策矩阵已随 #4ddde5b 删除）：
-
-> 旧 `FailureRecoveryManager` 的三分类（transient/capability/cancel）+ 断路器（Closed/Open/Half-Open）决策矩阵已于 2026-08-14 删除，不再维护。当前失败处理为 lifecycle `FaultEscalation` 纯自动重试（`MaxRetries` 默认 1）+ agent in-context 自纠错，见上表 Failure Recovery 行。
-
 ## Runtime Manifest / Fixture（测试/开发辅助，不计入生产 adapter 数）
 
 | Adapter | 注册 ID | 文件 | 功能 |
