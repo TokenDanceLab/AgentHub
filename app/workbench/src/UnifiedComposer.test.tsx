@@ -651,7 +651,7 @@ describe('UnifiedComposer approval-mode picker (#1816)', () => {
     );
 
     fireEvent.click(screen.getByRole('button', { name: 'Approval mode: Suggest (agent default)' }));
-    const option = screen.getByRole('button', { name: /Allow workspace write/i });
+    const option = screen.getByRole('menuitemradio', { name: /Allow workspace write/i });
     fireEvent.click(option);
 
     expect(dispatchComposer).toHaveBeenCalledWith({

@@ -162,6 +162,8 @@ export function PermissionModePicker({
   const popover = open && createPortal(
     <div
       ref={popoverRef}
+      role="menu"
+      aria-label={ariaLabel ?? label}
       className={cx(styles.popover, pos.up ? styles.popoverUp : undefined, popoverClassName)}
       onKeyDown={handlePopoverKeyDown}
       style={{
@@ -177,6 +179,9 @@ export function PermissionModePicker({
         <button
           key={option.value}
           type="button"
+          role="menuitemradio"
+          aria-checked={option.value === value}
+          tabIndex={-1}
           className={cx(
             styles.option,
             optionClassName,
