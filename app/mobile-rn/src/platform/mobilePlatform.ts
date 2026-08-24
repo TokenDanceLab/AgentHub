@@ -18,7 +18,10 @@ export interface MobilePlatformOptions {
 
 const mobileCapabilities: SurfaceCapabilities = {
   localEdge: false,
-  localFiles: true,
+  // Mobile is Hub-only and has no local workspace/file access (#1947):
+  // pickFiles throws and there is no local file-open path, so the flag must
+  // not claim local file capability (keeps shell folder tabs hidden).
+  localFiles: false,
   browserPreview: false,
   localTerminal: false,
 };

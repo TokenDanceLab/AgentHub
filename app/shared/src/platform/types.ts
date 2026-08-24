@@ -12,6 +12,14 @@ export type AgentHubSurface = 'desktop' | 'web' | 'mobile';
 
 export interface SurfaceCapabilities {
   localEdge: boolean;
+  /**
+   * The surface can open and operate a local workspace on the device file
+   * system (Desktop + Local Edge). When false, shell entries that depend on
+   * local files (aux panel folder tabs, file-tree / git chrome) must stay
+   * hidden. This flag describes local file-system access only — it is NOT a
+   * "renderable attachments" signal: rendering Hub-delivered attachments is
+   * a transcript concern and stays independent of this flag (#1947).
+   */
   localFiles: boolean;
   browserPreview: boolean;
   /**
