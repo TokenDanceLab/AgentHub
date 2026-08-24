@@ -88,6 +88,13 @@ async function main() {
     if (contract.horizontalOverflow !== false) {
       failures.push('horizontal overflow captured in ' + name);
     }
+    // #1874: save CTA (保存配置/保存中) must exist and be reachable either in
+    // viewport or via a scrollable ancestor (detail panel or page).
+    if (contract.saveCta?.exists !== true) {
+      failures.push('save CTA not captured in ' + name);
+    } else if (contract.saveCta.reachable !== true) {
+      failures.push('save CTA not reachable in ' + name);
+    }
   }
 
   // Gate shots must prove the Agents workbench shell (not onboarding/blank).
