@@ -1,4 +1,4 @@
-import React, { useSyncExternalStore } from 'react';
+import React, { useState, useSyncExternalStore } from 'react';
 import {
   getAppliedAgentHubTheme,
   type AgentHubTheme,
@@ -125,6 +125,9 @@ export const BrowserPreview: React.FC<BrowserPreviewProps> = ({
   const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE);
   const hostTheme = useHostAgentHubTheme();
   const themedBlank = isThemedBlankPreviewUrl(url);
+  // Refresh remounts the iframe (key bump) so the embedded preview reloads.
+  // Back/Forward remain disabled until iframe history is actually wired.
+  const [frameKey, setFrameKey] = useState(0);
   const addressLabel = themedBlank ? (url.trim() || 'about:blank') : url;
   const blankSrcDoc = themedBlank
     ? buildThemedBlankPreviewSrcDoc(hostTheme)
@@ -168,6 +171,7 @@ export const BrowserPreview: React.FC<BrowserPreviewProps> = ({
             className={styles.navBtn}
             type="button"
             aria-label={t('aria.refresh')}
+            onClick={() => setFrameKey((key) => key + 1)}
           >
             <DesignNavIcon name="refresh" size={15} strokeWidth={DESIGN_NAV_GLYPH_STROKE_WIDTH} />
           </button>
@@ -199,6 +203,7 @@ export const BrowserPreview: React.FC<BrowserPreviewProps> = ({
       <div className={styles.frameShell}>
         {themedBlank ? (
           <iframe
+            key={frameKey}
             className={`${styles.frame} ${styles.frameBlank}`}
             title={t('browserPreview.iframeTitle', { url: addressLabel })}
             srcDoc={blankSrcDoc}
@@ -211,6 +216,7 @@ export const BrowserPreview: React.FC<BrowserPreviewProps> = ({
           </div>
         ) : (
           <iframe
+            key={frameKey}
             className={styles.frame}
             title={t('browserPreview.iframeTitle', { url })}
             src={url}
