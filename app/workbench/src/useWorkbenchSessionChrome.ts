@@ -35,6 +35,7 @@ import {
   shouldClearSelectedExecutionTarget,
   shouldLoadLocalCliDiscovery,
   shouldLoadSessionImport,
+  type BrowserPreviewFocusRequest,
   type UseWorkbenchSessionChromeOptions,
   type WorkbenchSessionChrome,
 } from './workbenchSessionChromeHelpers';
@@ -53,6 +54,7 @@ export {
   shouldClearSelectedExecutionTarget,
   shouldLoadLocalCliDiscovery,
   shouldLoadSessionImport,
+  type BrowserPreviewFocusRequest,
   type ComposerExecutionTargetOption,
   type UseWorkbenchSessionChromeOptions,
   type WorkbenchSessionChrome,
@@ -133,6 +135,11 @@ export function useWorkbenchSessionChrome({
   const [sessionImportError, setSessionImportError] = useState<string | null>(null);
   const [sessionImportTick, setSessionImportTick] = useState(0);
   const [reviewFileRequest, setReviewFileRequest] = useState<FileItem | null>(null);
+  const [inspectorBrowserFocusRequest, setInspectorBrowserFocusRequest] =
+    useState<BrowserPreviewFocusRequest | null>(null);
+  const browserFocusSequenceRef = useRef(0);
+  const transcriptRef = useRef(transcript);
+  transcriptRef.current = transcript;
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchHighlightId, setSearchHighlightId] = useState<string | null>(null);
   const workspaceRef = useRef<HTMLElement>(null);
@@ -330,8 +337,18 @@ export function useWorkbenchSessionChrome({
     setReviewFileRequest({ ...file });
   }, [openInspector, setReviewFileRequest]);
 
-  const handleDeploySubmit = useCallback((_id: string): void => {
+  const handleDeploySubmit = useCallback((id: string): void => {
     openInspector();
+    const deployBlock = transcriptRef.current.find(
+      (block) => block.id === id && block.kind === 'deploy',
+    );
+    if (deployBlock?.kind === 'deploy' && deployBlock.url) {
+      browserFocusSequenceRef.current += 1;
+      setInspectorBrowserFocusRequest({
+        sequence: browserFocusSequenceRef.current,
+        url: deployBlock.url,
+      });
+    }
     showWorkbenchToastRef.current(t('toast.deployPreviewOpened'));
   }, [openInspector, t]);
 
@@ -385,6 +402,7 @@ export function useWorkbenchSessionChrome({
     inspectorRouteBlocks: inspectorViews.routeBlocks,
     inspectorContextBlocks: inspectorViews.contextBlocks,
     inspectorDeployPreviewUrl: inspectorViews.deployPreviewUrl,
+    inspectorBrowserFocusRequest,
     inspectorRunResult: inspectorViews.runResult,
     mentionableAgents,
     handleToggleTheme,
