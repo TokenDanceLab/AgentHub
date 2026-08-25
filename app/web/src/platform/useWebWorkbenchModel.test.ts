@@ -20,6 +20,7 @@ import {
   workspaceProjectToProjectInfo,
 } from './webWorkbenchProjects';
 import {
+  resolveWebActiveHubSessionId,
   resolveWebSessionLastReadSeq,
   resolveWebWorkbenchContacts,
   useWebSessionAutoMarkRead,
@@ -1095,5 +1096,109 @@ describe('web session auto mark-read (#1352)', () => {
     expect(secondMarkRead).toHaveBeenCalledTimes(1);
     expect(secondMarkRead).toHaveBeenCalledWith({ sessionId: 'session-a', lastReadSeq: 2 });
     expect(firstMarkRead).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('resolveWebActiveHubSessionId (#1972 gate wiring)', () => {
+  it('activates the Hub transcript for a session that only carries snake_case session_id', () => {
+    // Real REST /client/sessions payloads have no `id` field; the gate must
+    // use the same derivation as webPlatformMapping (id ?? session_id).
+    expect(resolveWebActiveHubSessionId(
+      true,
+      [{ session_id: 'hub-session-1', type: 'private' }],
+      'hub-session-1',
+    )).toBe('hub-session-1');
+  });
+
+  it('activates for legacy payloads that still carry id', () => {
+    expect(resolveWebActiveHubSessionId(
+      true,
+      [{ id: 'hub-session-2', type: 'group' }],
+      'hub-session-2',
+    )).toBe('hub-session-2');
+  });
+
+  it('does not activate for conversation ids that match no Hub session', () => {
+    const sessions = [{ session_id: 'hub-session-1', type: 'private' }];
+
+    expect(resolveWebActiveHubSessionId(true, sessions, 'edge-thread-1')).toBeNull();
+    expect(resolveWebActiveHubSessionId(true, [], 'hub-session-1')).toBeNull();
+    expect(resolveWebActiveHubSessionId(true, undefined, 'hub-session-1')).toBeNull();
+    expect(resolveWebActiveHubSessionId(true, sessions, undefined)).toBeNull();
+  });
+
+  it('does not activate before the Hub is ready', () => {
+    expect(resolveWebActiveHubSessionId(
+      false,
+      [{ session_id: 'hub-session-1', type: 'private' }],
+      'hub-session-1',
+    )).toBeNull();
+  });
+
+  it('renders the real-shape REST image payload (with and without attachments) through the web transcript path', () => {
+    const translate = vi.fn((key: string) => (
+      key === 'message.attachmentMissingImage' ? 'Image attachment missing' : key
+    ));
+    // Receive-path contract (#1972 acceptance 3): REST payload -> messages
+    // query result -> normalizeHubMessages. The live WS path converges here
+    // too — message.new frames only invalidate ['web-v4','hub-messages',
+    // session_id] (webHubRealtime), so the refetched payload is the only
+    // transcript source for live messages as well.
+    const transcript = resolveWebWorkbenchTranscript(
+      true,
+      'hub-session-1',
+      [
+        {
+          id: 'msg-img-with',
+          session_id: 'hub-session-1',
+          seq_id: 20,
+          sender_type: 'user',
+          sender_id: 'user-1',
+          content_type: 'image',
+          content: '{"text": "user image", "attachment_id": "att-1"}',
+          created_at: '2026-08-25T00:10:08Z',
+          attachments: [{
+            id: 'att-1',
+            size: 62798,
+            mime_type: 'image/png',
+            created_at: '2026-08-25T00:10:08Z',
+          }],
+        },
+        {
+          id: 'msg-img-missing',
+          session_id: 'hub-session-1',
+          seq_id: 21,
+          sender_type: 'user',
+          sender_id: 'user-1',
+          content_type: 'image',
+          content: '{"text": "user image", "attachment_id": "att-gone"}',
+          created_at: '2026-08-25T00:11:08Z',
+        },
+      ],
+      [],
+      undefined,
+      undefined,
+      translate,
+    );
+
+    expect(transcript).toEqual([
+      expect.objectContaining({
+        id: 'hub-message-msg-img-with',
+        kind: 'attachment',
+        contentType: 'image',
+        attachmentRef: expect.objectContaining({ id: 'att-1', mime_type: 'image/png' }),
+      }),
+      expect.objectContaining({
+        id: 'hub-message-msg-img-missing',
+        kind: 'attachment',
+        contentType: 'image',
+        attachmentRef: expect.objectContaining({
+          id: '',
+          name: 'Image attachment missing',
+          size: 0,
+        }),
+      }),
+    ]);
+    expect(translate).toHaveBeenCalledWith('message.attachmentMissingImage');
   });
 });

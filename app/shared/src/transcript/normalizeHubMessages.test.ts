@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { normalizeHubMessagesToTranscript } from './normalizeHubMessages';
 
 describe('normalizeHubMessagesToTranscript', () => {
@@ -344,6 +344,154 @@ describe('normalizeHubMessagesToTranscript', () => {
         summary: 'Route shared transcript contract review to Reviewer.',
         targetAgent: 'Reviewer',
       },
+    ]);
+  });
+});
+
+describe('normalizeHubMessagesToTranscript attachment pass-through (#1972)', () => {
+  // Mirrors the real REST /client/sessions/{id}/messages payload shape: the
+  // Hub joins message_attachments into each message and the client carries
+  // them untouched into the normalizer.
+  const imageMessageWithAttachment = {
+    id: 'msg-img-1',
+    session_id: 'hub-session-1',
+    seq_id: 20,
+    sender_type: 'user',
+    sender_id: 'user-1',
+    sender: { nickname: 'ImageSender' },
+    content_type: 'image',
+    content: '{"text": "user image caption", "attachment_id": "att-1"}',
+    created_at: '2026-08-25T00:10:08Z',
+    attachments: [{
+      id: 'att-1',
+      hash: 'd9209d6f6fe12fe1',
+      size: 62798,
+      mime_type: 'image/png',
+      uploader_user_id: 'user-1',
+      metadata: '{"width": 320, "height": 200}',
+      created_at: '2026-08-25T00:10:08Z',
+    }],
+  };
+
+  it('projects a REST image message with its joined attachment into an attachment block', () => {
+    const blocks = normalizeHubMessagesToTranscript([imageMessageWithAttachment]);
+
+    expect(blocks).toHaveLength(1);
+    expect(blocks[0]).toMatchObject({
+      id: 'hub-message-msg-img-1',
+      kind: 'attachment',
+      contentType: 'image',
+      attachmentRef: {
+        id: 'att-1',
+        size: 62798,
+        mime_type: 'image/png',
+        hash: 'd9209d6f6fe12fe1',
+        created_at: '2026-08-25T00:10:08Z',
+      },
+    });
+  });
+
+  it('projects a REST file message with its joined attachment into a file attachment block', () => {
+    const blocks = normalizeHubMessagesToTranscript([{
+      ...imageMessageWithAttachment,
+      id: 'msg-file-1',
+      content_type: 'file',
+      attachments: [{
+        id: 'att-2',
+        size: 1024,
+        mime_type: 'application/pdf',
+        original_name: 'report.pdf',
+      }],
+    }]);
+
+    expect(blocks).toHaveLength(1);
+    expect(blocks[0]).toMatchObject({
+      id: 'hub-message-msg-file-1',
+      kind: 'attachment',
+      contentType: 'file',
+      attachmentRef: {
+        id: 'att-2',
+        name: 'report.pdf',
+        original_name: 'report.pdf',
+        size: 1024,
+        mime_type: 'application/pdf',
+      },
+    });
+  });
+
+  it('keeps an image message whose attachment data is missing as an honest degraded entry', () => {
+    const { attachments: _attachments, ...withoutAttachment } = imageMessageWithAttachment;
+
+    const blocks = normalizeHubMessagesToTranscript([withoutAttachment]);
+
+    // The message must not be silently dropped (#1972 acceptance 2).
+    expect(blocks).toHaveLength(1);
+    expect(blocks[0]).toMatchObject({
+      id: 'hub-message-msg-img-1',
+      kind: 'attachment',
+      contentType: 'image',
+      // Empty id is the degradation marker: the renderer resolves it to the
+      // #1938 chip + explicit status notice instead of a broken image.
+      attachmentRef: { id: '', name: '图片附件缺失', size: 0, mime_type: '' },
+    });
+  });
+
+  it('keeps a file message with an empty attachments array as a degraded entry', () => {
+    const blocks = normalizeHubMessagesToTranscript([{
+      ...imageMessageWithAttachment,
+      id: 'msg-file-empty',
+      content_type: 'file',
+      attachments: [],
+    }]);
+
+    expect(blocks).toHaveLength(1);
+    expect(blocks[0]).toMatchObject({
+      id: 'hub-message-msg-file-empty',
+      kind: 'attachment',
+      contentType: 'file',
+      attachmentRef: { id: '', name: '文件附件缺失', size: 0, mime_type: '' },
+    });
+  });
+
+  it('routes degraded attachment labels through the injected translator', () => {
+    const translate = vi.fn((key: string) => {
+      if (key === 'message.attachmentMissingImage') return 'Image attachment missing';
+      if (key === 'message.attachmentMissingFile') return 'File attachment missing';
+      return key;
+    });
+    const { attachments: _attachments, ...withoutAttachment } = imageMessageWithAttachment;
+
+    const imageBlocks = normalizeHubMessagesToTranscript([withoutAttachment], translate);
+    const fileBlocks = normalizeHubMessagesToTranscript([{
+      ...withoutAttachment,
+      id: 'msg-file-missing',
+      content_type: 'file',
+    }], translate);
+
+    expect(imageBlocks[0]).toMatchObject({ attachmentRef: { name: 'Image attachment missing' } });
+    expect(fileBlocks[0]).toMatchObject({ attachmentRef: { name: 'File attachment missing' } });
+    expect(translate).toHaveBeenCalledWith('message.attachmentMissingImage');
+    expect(translate).toHaveBeenCalledWith('message.attachmentMissingFile');
+  });
+
+  it('still drops nothing but the runtime diagnostics when attachment messages mix in', () => {
+    const blocks = normalizeHubMessagesToTranscript([
+      imageMessageWithAttachment,
+      {
+        id: 'msg-text-1',
+        session_id: 'hub-session-1',
+        seq_id: 19,
+        sender_type: 'user',
+        sender_id: 'user-1',
+        content_type: 'text',
+        content: '{"text":"before the image"}',
+        created_at: '2026-08-25T00:09:00Z',
+      },
+    ]);
+
+    expect(blocks.map((block) => block.id)).toEqual([
+      'hub-message-msg-text-1',
+      'hub-message-msg-img-1',
     ]);
   });
 });
