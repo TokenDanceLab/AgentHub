@@ -159,6 +159,7 @@ export function FilesModeBody({
         runtimeEvidence={runtimeEvidence}
         onOpenDiff={onOpenDiff}
         onOpenPreviewUrl={onOpenPreviewUrl}
+        previewPort={previewPort}
       />
     );
   }

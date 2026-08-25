@@ -2,6 +2,7 @@ import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { buildRuntimeEvidenceInspectorModel } from '@shared/inspector';
 import type { RuntimeEvidenceSnapshot } from '@shared/inspector';
+import type { PreviewPort } from '@shared/platform';
 import type { FileDiff } from '@shared/types/chat';
 import { CHATVIEW_I18N_NAMESPACE } from '@shared/chatview/i18n/resources';
 import styles from '../AgentHubWorkbench.module.css';
@@ -32,12 +33,20 @@ export interface RuntimeEvidencePanelProps {
   runtimeEvidence: RuntimeEvidenceSnapshot;
   onOpenDiff: (file: FileDiff) => void;
   onOpenPreviewUrl: (url: string) => void;
+  /**
+   * Platform preview port forwarded to the artifacts section (#1945) so the
+   * artifact row can expose a download action on surfaces that own the
+   * backing runtime. Optional so fixture/demo shells keep rendering; absent
+   * `downloadArtifactContent` degrades to the unavailable notice.
+   */
+  previewPort?: PreviewPort | undefined;
 }
 
 export function RuntimeEvidencePanel({
   runtimeEvidence,
   onOpenDiff,
   onOpenPreviewUrl,
+  previewPort,
 }: RuntimeEvidencePanelProps): React.ReactElement {
   const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE);
   const evidenceModel = buildRuntimeEvidenceInspectorModel(runtimeEvidence);
@@ -81,6 +90,7 @@ export function RuntimeEvidencePanel({
           artifacts={runtimeEvidence.artifacts}
           count={artifactSummary?.count}
           diffCount={runtimeEvidence.diffs.length}
+          previewPort={previewPort}
           previews={runtimeEvidence.previews}
           runId={runtimeEvidence.runId}
           sourceLabel={artifactSummary?.sourceLabel}

@@ -2590,6 +2590,45 @@
   overflow-wrap: anywhere;
 }
 
+/* Artifact download action (#1945) — compact control inside the workspace
+   projection; the unavailable notice degrades inline without layout shift. */
+.artifactDownloadButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 9px;
+  border: 1px solid var(--td-line);
+  border-radius: var(--td-radius-control);
+  background: transparent;
+  color: var(--td-plum);
+  font: 600 0.6875rem var(--td-font);
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background var(--td-dur-normal) var(--td-ease),
+    color var(--td-dur-normal) var(--td-ease),
+    box-shadow var(--td-dur-normal) var(--td-ease);
+}
+
+.artifactDownloadButton:hover:not(:disabled) {
+  background: var(--td-surface-3);
+}
+
+.artifactDownloadButton:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.artifactDownloadButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.62;
+}
+
+.artifactDownloadNotice {
+  color: var(--td-ink-subtle);
+  font-style: italic;
+}
+
 /* ── Runtime evidence ── */
 .runtimeEvidence {
   display: grid;

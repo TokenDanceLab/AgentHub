@@ -168,6 +168,18 @@ export interface RuntimeEvidenceContentRef {
   id: string;
 }
 
+/**
+ * Input for `PreviewPort.downloadArtifactContent` (#1945). The neutral ref
+ * identifies the artifact content; host adapters map it onto their own
+ * content endpoint and perform the download. `suggestedName` is a display
+ * file name only (basename of the artifact path) — never a host path.
+ */
+export interface DownloadArtifactInput {
+  ref: RuntimeEvidenceContentRef;
+  /** Suggested file name for the saved download (defaults to the artifact id). */
+  suggestedName?: string | undefined;
+}
+
 export interface PreviewPort {
   canOpenEvidence?(evidence: EvidenceRef): boolean;
   openEvidence(evidence: EvidenceRef): Promise<void>;
@@ -199,6 +211,16 @@ export interface PreviewPort {
    * and the inspector renders a capability notice.
    */
   resolveRuntimeEvidenceContent?(ref: RuntimeEvidenceContentRef): string | undefined;
+  /**
+   * Download one runtime-evidence artifact's content to the user's device
+   * (#1945). Surfaces that own the backing runtime resolve the content via
+   * their own endpoint and perform the download (Desktop → Local Edge).
+   * Surfaces without a reachable artifact content endpoint — Web is Hub-only
+   * and Hub exposes no artifact content route, only a metadata projection —
+   * omit this method, and the inspector degrades to the consistent
+   * "download unavailable" notice instead of a silent no-op.
+   */
+  downloadArtifactContent?(input: DownloadArtifactInput): Promise<void>;
   /**
    * Resolve one image attachment into a displayable URL (#1938) — typically
    * a blob: object URL fetched with the surface's own Hub session auth,

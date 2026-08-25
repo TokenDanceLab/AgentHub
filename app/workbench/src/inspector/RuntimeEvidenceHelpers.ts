@@ -170,3 +170,31 @@ export function artifactWorkspaceVersion(
 ): string {
   return artifact.runId || runId || 'unknown';
 }
+
+/**
+ * Build the neutral content ref used for an artifact download (#1945).
+ * Mirrors the artifact `contentRef` mapping in `runtimeEvidenceOverviewFiles`:
+ * the run id falls back to the snapshot run id, and a missing run id yields
+ * `undefined` so the renderer can disable the action instead of resolving a
+ * malformed host endpoint.
+ */
+export function artifactDownloadRef(
+  artifact: RuntimeEvidenceSnapshot['artifacts'][number],
+  fallbackRunId: string | undefined
+): RuntimeEvidenceContentRef | undefined {
+  const runId = artifact.runId || fallbackRunId;
+  if (!runId || !artifact.id) return undefined;
+  return { kind: 'artifact', runId, id: artifact.id };
+}
+
+/**
+ * Derive a display file name for a downloaded artifact from its workspace
+ * path basename; falls back to the artifact id. Returns a bare file name —
+ * never a host path — so it is safe to use as a download `suggestedName`.
+ */
+export function artifactDownloadName(
+  artifact: RuntimeEvidenceSnapshot['artifacts'][number]
+): string {
+  const base = artifact.path.split(/[\\/]/).pop()?.trim();
+  return base || artifact.id;
+}
