@@ -1959,8 +1959,15 @@ jobs:
       - name: Verify Outbound client hygiene (#1549)
         run: python ./scripts/verify/verify-outbound-client-hygiene.py
 
-      - name: Verify test-sleep ratchet (#1550)
+      # #1948: 棘轮升级为双门禁——计数棘轮（#1550，基线
+      # scripts/verify/test-sleep-baseline.json）外加值预算（#1565，预算
+      # scripts/verify/test-sleep-budget.json）：预算文件必须存在、预算内路径
+      # 必须真实、count/total_ms/max_ms/逐值必须与源码一致；负向自测防假绿。
+      - name: Verify test-sleep ratchet + value budget (#1550/#1948)
         run: python ./scripts/verify/verify-test-sleep-ratchet.py
+
+      - name: Self-test test-sleep value budget gate (negative)
+        run: python scripts/verify/tests/verify-test-sleep-budget.Tests.py
 
       - name: Verify auth dependency ownership (#1551)
         run: python ./scripts/verify/verify-auth-dep-ownership.py

@@ -1,5 +1,5 @@
 {
- "_comment": "Per-file time.Sleep budget baseline (#1565). Extends the #1550 count ratchet (scripts/verify/test-sleep-baseline.json) with value budgets: count, total_ms (sum of all resolved sleeps), max_ms (largest single sleep) and the exact per-sleep values, so a 20ms sleep cannot silently become 20s and the lane wall-clock cannot grow unapproved. Any count/value increase requires -UpdateBaseline (tracked approval). kinds: poll_deadline (interval inside a deadline-guarded loop), negative_window (assert 'did not happen'), simulated_slow (handler/mock/loader slow behavior), real_protocol (real heartbeat/debounce/subprocess time), grace_window (async callback/drain grace). owner/review required per file.",
+ "_comment": "Per-file time.Sleep budget baseline (#1565). Extends the #1550 count ratchet (scripts/verify/test-sleep-baseline.json) with value budgets: count, total_ms (sum of all resolved sleeps), max_ms (largest single sleep) and the exact per-sleep values, so a 20ms sleep cannot silently become 20s and the lane wall-clock cannot grow unapproved. Any count/value increase requires -UpdateBaseline (tracked approval). kinds: poll_deadline (interval inside a deadline-guarded loop), negative_window (assert 'did not happen'), simulated_slow (handler/mock/loader slow behavior), real_protocol (real heartbeat/debounce/subprocess time), grace_window (async callback/drain grace). owner/review required per file. Gate (#1948): verify-test-sleep-ratchet.py enforces this file — it must exist, every budgeted path must exist on disk, and count/total_ms/max_ms plus the exact per-sleep values must match the source; unresolvable (non-constant) sleep expressions and files with sleeps but no entry fail closed.",
  "edge-server/internal/adapters/acp/acp_client_test.go": {
   "count": 3,
   "total_ms": 15,
@@ -22,17 +22,6 @@
   "reason": "Simulated slow ACP server response in mock handler; channel barrier not applicable (server must appear slow to client).",
   "sleeps": [
    { "ms": 5, "kind": "simulated_slow" }
-  ]
- },
- "edge-server/internal/adapters/cli_json_readiness_test.go": {
-  "count": 1,
-  "total_ms": 10,
-  "max_ms": 10,
-  "owner": "DeliciousBuding",
-  "review": "2026-11-02",
-  "reason": "waitForBrokeredPermissionDecision poll interval; loop is deadline-guarded (1s) with loud failure.",
-  "sleeps": [
-   { "ms": 10, "kind": "poll_deadline" }
   ]
  },
  "edge-server/internal/adapters/codex/codex_acp_test.go": {
@@ -248,18 +237,7 @@
    { "ms": 5000, "kind": "simulated_slow" }
   ]
  },
- "hub-server/internal/middleware/ws_rate_limit_test.go": {
-  "count": 1,
-  "total_ms": 50,
-  "max_ms": 50,
-  "owner": "DeliciousBuding",
-  "review": "2026-11-02",
-  "reason": "Grace window letting the eviction goroutine run after Acquire.",
-  "sleeps": [
-   { "ms": 50, "kind": "grace_window" }
-  ]
- },
- "hub-server/internal/service/audit_reliability_test.go": {
+ "hub-server/internal/service/audit/reliability_test.go": {
   "count": 1,
   "total_ms": 10,
   "max_ms": 10,

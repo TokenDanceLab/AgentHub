@@ -24,6 +24,7 @@ one surgical text mutation, and asserts the CI policy verifier exits non-zero:
 18. delete frontend-coverage from frontend-required needs → L0 lane silently drops out of required aggregate
 19. flip frontend-required changes-failure fail-closed guard → false green
 20. restore frontend-required path filter if → required check skip-able again
+21. delete the test-sleep value budget negative self-test step → budget gate loses its regression tripwire
 
 The unmutated copy must exit 0, proving the policy test only reddens on
 actual policy violations (fail-closed, no false green).
@@ -327,6 +328,19 @@ def restore_frontend_required_path_filter(text):
     return text[:pos] + "    if: github.event_name == 'workflow_dispatch'" + text[pos + len(always):]
 
 
+TEST_SLEEP_SELF_TEST_STEP = (
+    "      - name: Self-test test-sleep value budget gate (negative)\n"
+    "        run: python scripts/verify/tests/verify-test-sleep-budget.Tests.py\n"
+)
+
+
+def delete_test_sleep_budget_self_test_step(text):
+    """删除 test-sleep 值预算负向自测步骤，模拟预算门禁的回归探针悄悄退出 CI（防回退）。"""
+    if TEST_SLEEP_SELF_TEST_STEP not in text:
+        raise AssertionError("test-sleep budget self-test step text not found in workflow")
+    return text.replace(TEST_SLEEP_SELF_TEST_STEP, "", 1)
+
+
 def readd_go_hub_lint_continue_on_error(text: str) -> str:
     """在 go-hub Lint step 重新加上 continue-on-error，模拟债清后硬门禁被改回
     warning-only（防回退）。"""
@@ -535,6 +549,13 @@ class VerifyCiGatesMutationTests(unittest.TestCase):
         self.assert_mutation_fails(
             restore_frontend_required_path_filter(read_workflow()),
             "restored frontend-required path filter",
+        )
+
+    def test_delete_test_sleep_budget_self_test_step_fails(self):
+        """test-sleep 值预算负向自测步骤被删除时，校验器必须非零退出（防回退）。"""
+        self.assert_mutation_fails(
+            delete_test_sleep_budget_self_test_step(read_workflow()),
+            "deleted test-sleep budget self-test step",
         )
 
 

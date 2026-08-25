@@ -376,6 +376,15 @@ def main() -> int:
     quality_debt_self_test_step = get_step_block(validate, "Self-test quality-debt ratchet (negative)")
     assert_contains(quality_debt_self_test_step, r"verify-quality-debt-ratchet\.Tests\.py", "quality-debt self-test step must call its test script")
     assert_step_continue_on_error(validate, "Self-test quality-debt ratchet (negative)", False)
+
+    # #1948: test-sleep 双门禁（#1550 计数棘轮 + #1565 值预算）同一脚本；
+    # 值预算负向自测防止门禁自身回归（改 sleep 值不更预算必须红）。两步硬门禁。
+    test_sleep_step = get_step_block(validate, "Verify test-sleep ratchet + value budget (#1550/#1948)")
+    assert_contains(test_sleep_step, r"scripts/verify/verify-test-sleep-ratchet\.py", "test-sleep gate must call the ratchet + value budget verifier")
+    assert_step_continue_on_error(validate, "Verify test-sleep ratchet + value budget (#1550/#1948)", False)
+    test_sleep_self_test_step = get_step_block(validate, "Self-test test-sleep value budget gate (negative)")
+    assert_contains(test_sleep_self_test_step, r"verify-test-sleep-budget\.Tests\.py", "test-sleep budget self-test step must call its test script")
+    assert_step_continue_on_error(validate, "Self-test test-sleep value budget gate (negative)", False)
     assert_contains(validate, r"Verify project skill whitelist", "validate job must run the project skill whitelist verifier")
     assert_contains(validate, r"scripts/verify/verify-project-skills\.py", "validate job must call scripts/verify/verify-project-skills.py")
     doc_ssot_step = get_step_block(validate, "Verify doc SSOT")
