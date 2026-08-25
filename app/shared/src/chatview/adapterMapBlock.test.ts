@@ -973,3 +973,29 @@ describe('mapBlock — skipped kinds', () => {
     expect(mapBlock(unknown)).toBeNull()
   })
 })
+
+
+describe('mapBlock — checkpoint blocks (#1968)', () => {
+  it('maps a checkpoint block to a standalone checkpoint row carrying preview keys', () => {
+    const row = mapRow({
+      id: 'cp1', kind: 'checkpoint', author: makeAuthor('edge'),
+      runId: 'run-1', checkpointId: 'cp-run-1', fileCount: 4, totalBytes: 1024,
+    })
+    expect(row).toEqual({
+      id: 'cp1', type: 'checkpoint', label: '', status: 'ok',
+      collapsible: false, standalone: true,
+      checkpointId: 'cp-run-1', checkpointRunId: 'run-1',
+      checkpointFileCount: 4, checkpointTotalBytes: 1024,
+    })
+  })
+
+  it('keeps zero-file inventories visible (honest empty checkpoint)', () => {
+    const row = mapRow({
+      id: 'cp2', kind: 'checkpoint', author: makeAuthor('edge'),
+      runId: 'run-2', checkpointId: 'cp-run-2', fileCount: 0, totalBytes: 0,
+    })
+    expect(row.type).toBe('checkpoint')
+    expect(row.checkpointFileCount).toBe(0)
+    expect(row.checkpointTotalBytes).toBe(0)
+  })
+})

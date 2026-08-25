@@ -246,6 +246,58 @@ export interface PreviewPort {
   ): Promise<string | undefined>;
 }
 
+/**
+ * One file entry of a pre-run checkpoint inventory (#1968). Metadata only —
+ * contents are fetched per file through `CheckpointPort.file`.
+ */
+export interface CheckpointFileEntry {
+  path: string;
+  sizeBytes: number;
+  hash: string;
+  /** True when Edge captured a text preview for this file. */
+  hasText: boolean;
+}
+
+/** Pre-run checkpoint metadata + file inventory (#1968). */
+export interface CheckpointSummary {
+  runId: string;
+  checkpointId: string;
+  workDir: string;
+  fileCount: number;
+  totalBytes: number;
+  createdAt: string;
+  files: CheckpointFileEntry[];
+}
+
+/** Pre-run content of one checkpoint file (#1968). */
+export interface CheckpointFileContent {
+  runId: string;
+  path: string;
+  sizeBytes: number;
+  hash: string;
+  content: string;
+}
+
+/**
+ * Read-only access to a run's pre-run workspace checkpoint (#1968). Present
+ * only on surfaces with a Local Edge (Desktop); Web omits it and the
+ * checkpoint preview degrades to an honest surface-unavailable notice.
+ * Restore/write-back is intentionally NOT part of this port — see the
+ * restore semantics in docs/architecture/02-edge-server.md.
+ */
+export interface CheckpointPort {
+  /**
+   * Fetch checkpoint metadata + file inventory. Resolves `undefined` when
+   * the run has no checkpoint (honest absence); rejects on transport errors.
+   */
+  list(runId: string): Promise<CheckpointSummary | undefined>;
+  /**
+   * Fetch the pre-run content of one file (path must exactly match the
+   * inventory). Resolves `undefined` when absent; rejects on transport errors.
+   */
+  file(runId: string, path: string): Promise<CheckpointFileContent | undefined>;
+}
+
 export type LocalCliRuntimeId = 'codex' | 'claude-code' | 'opencode';
 
 export interface LocalCliDiscoveryItem {
@@ -424,6 +476,12 @@ export interface AgentHubPlatform {
    * Web keeps this omitted; renderer never shells out to git.
    */
   workspaceGit?: WorkspaceGitPort | undefined;
+  /**
+   * Optional read-only pre-run checkpoint port (#1968). Present only on
+   * surfaces with a Local Edge (Desktop); Web omits it and the checkpoint
+   * timeline card preview degrades to an honest surface notice.
+   */
+  checkpoint?: CheckpointPort | undefined;
   /** Agent activity state for the streaming status bar. */
   agentActivity?: AgentActivitySnapshot;
 }

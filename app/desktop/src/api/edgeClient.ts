@@ -18,6 +18,7 @@ import type {
   Preview,
   UserProfileInfo,
 } from '@shared/types';
+import type { CheckpointFileContent, CheckpointSummary } from '@shared/platform';
 import { parseError } from '@shared/errors';
 import type { AppError } from '@shared/errors';
 import { edgeAuthHeaders, getEdgeAuthToken, refreshEdgeAuthToken } from './edgeAuth';
@@ -29,6 +30,8 @@ import {
   RunDiffSchema,
   ApplyRunDiffResponseSchema,
   ApplyAllRunDiffsResponseSchema,
+  RunCheckpointSchema,
+  RunCheckpointFileSchema,
   ArtifactSchema,
   PreviewSchema,
   ThreadInfoSchema,
@@ -366,6 +369,31 @@ export async function applyAllRunDiffs(runId: string, request: ApplyAllRunDiffsR
   });
   if (!res.ok) throw await parseError(res);
   return safeParse<ApplyAllRunDiffsResponse>(ApplyAllRunDiffsResponseSchema, unwrapEdgeResponse(await res.json()), 'applyAllRunDiffs');
+}
+
+// ── #1968 pre-run checkpoint (read-only evidence) ─────────────────────
+// 404 resolves to `undefined` — honest absence (run has no checkpoint or
+// the path is not in the checkpoint), not an error.
+
+/** Fetch pre-run checkpoint metadata + file inventory. */
+export async function fetchRunCheckpoint(runId: string): Promise<CheckpointSummary | undefined> {
+  const res = await edgeFetch(`${BASE}/v1/runs/${encodeURIComponent(runId)}/checkpoint`, {
+    ...edgeDevRequestInit(),
+  });
+  if (res.status === 404) return undefined;
+  if (!res.ok) throw await parseError(res);
+  return safeParse<CheckpointSummary>(RunCheckpointSchema, unwrapEdgeResponse(await res.json()), 'runCheckpoint');
+}
+
+/** Fetch the pre-run content of one checkpoint file (exact inventory path). */
+export async function fetchRunCheckpointFile(runId: string, path: string): Promise<CheckpointFileContent | undefined> {
+  const res = await edgeFetch(
+    `${BASE}/v1/runs/${encodeURIComponent(runId)}/checkpoint/file?path=${encodeURIComponent(path)}`,
+    { ...edgeDevRequestInit() },
+  );
+  if (res.status === 404) return undefined;
+  if (!res.ok) throw await parseError(res);
+  return safeParse<CheckpointFileContent>(RunCheckpointFileSchema, unwrapEdgeResponse(await res.json()), 'runCheckpointFile');
 }
 
 export async function fetchArtifacts(): Promise<ListResponse<Artifact>> {

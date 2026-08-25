@@ -56,6 +56,28 @@ type WorkdirSnapshot struct {
 	Files map[string]fileRecord // relative path → record
 }
 
+// CheckpointFiles projects the pre-run snapshot into store checkpoint
+// records (#1968), sorted by path for deterministic timelines. Returns the
+// file list and the summed pre-run byte size.
+func (s *WorkdirSnapshot) CheckpointFiles() ([]store.CheckpointFile, int64) {
+	if s == nil {
+		return nil, 0
+	}
+	files := make([]store.CheckpointFile, 0, len(s.Files))
+	var totalBytes int64
+	for path, rec := range s.Files {
+		totalBytes += rec.Size
+		files = append(files, store.CheckpointFile{
+			Path:    path,
+			Size:    rec.Size,
+			Hash:    rec.Hash,
+			Content: rec.Content,
+		})
+	}
+	sort.Slice(files, func(i, j int) bool { return files[i].Path < files[j].Path })
+	return files, totalBytes
+}
+
 // TakeWorkdirSnapshot walks the workdir and captures file state.
 // Returns nil if workDir is empty or not accessible.
 func TakeWorkdirSnapshot(workDir string) *WorkdirSnapshot {

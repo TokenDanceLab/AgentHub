@@ -131,6 +131,9 @@ export function cardLabelKey(item: RowItem): LabelResult {
       if (status === 'running') return { key: 'card.preview.running' }
       return { key: 'card.preview.ready' }
 
+    case 'checkpoint':
+      return { key: 'card.checkpoint', params: { count: String(item.checkpointFileCount ?? 0) } }
+
     default:
       return { key: (item.label || item.type) as TransKey }
   }

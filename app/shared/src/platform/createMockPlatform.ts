@@ -3,6 +3,7 @@ import type { EvidenceRef } from '../transcript';
 import type {
   AgentHubPlatform,
   AgentHubSurface,
+  CheckpointPort,
   PreviewPort,
   RedispatchTaskResult,
   SurfaceCapabilities,
@@ -40,6 +41,8 @@ export interface MockPlatformSeed {
   terminal?: TerminalPort;
   workspaceFiles?: WorkspaceFilesPort;
   workspaceGit?: WorkspaceGitPort;
+  /** Optional read-only checkpoint port (#1968); omitted = Hub-only surface. */
+  checkpoint?: CheckpointPort;
 }
 
 export interface MockTerminalPort extends TerminalPort {
@@ -260,6 +263,7 @@ export function createMockPlatform(seed: MockPlatformSeed = {}): MockPlatform {
     ...(terminal ? { terminal } : {}),
     ...(seed.workspaceFiles ? { workspaceFiles: seed.workspaceFiles } : {}),
     ...(seed.workspaceGit ? { workspaceGit: seed.workspaceGit } : {}),
+    ...(seed.checkpoint ? { checkpoint: seed.checkpoint } : {}),
     runs: {
       async submitComposerIntent(intent: ComposerIntent): Promise<ComposerSubmitResult> {
         submittedIntents.push(intent);

@@ -10,6 +10,18 @@ func copyMap[K comparable, V any](source map[K]V) map[K]V {
 	return copied
 }
 
+// cloneCheckpointMap deep-copies checkpoint values (Files slice included)
+// so snapshot round-trips never share backing arrays (#1968).
+func cloneCheckpointMap(source map[string]RunCheckpoint) map[string]RunCheckpoint {
+	out := make(map[string]RunCheckpoint, len(source))
+	for key, cp := range source {
+		files := append([]CheckpointFile(nil), cp.Files...)
+		cp.Files = files
+		out[key] = cp
+	}
+	return out
+}
+
 func cloneArtifactMap(source map[string]Artifact) map[string]Artifact {
 	copied := make(map[string]Artifact, len(source))
 	for key, value := range source {
