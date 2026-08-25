@@ -108,7 +108,8 @@ export function WorkbenchRoutesFrame(
  * RightInspector host for chat page.
  * When `platform.capabilities.localFiles` (Desktop), stacks AuxPanel below
  * the inspector for the local engineering-loop chrome (#1181).
- * Web keeps RightInspector only.
+ * Web adds the Preview aux surface only when normalized Hub evidence exists;
+ * it never gains local workspace/host capabilities (#1966).
  */
 export function ChatInspectorFrame(
   props: ChatInspectorFrameProps,
@@ -119,9 +120,12 @@ export function ChatInspectorFrame(
     </PageErrorBoundary>
   );
   const localFiles = Boolean(props.platform.capabilities.localFiles);
-  if (!localFiles) {
-    return inspector;
-  }
+  const hasRuntimePreview = Boolean(
+    props.runtimeEvidence?.artifacts?.length || props.runtimeEvidence?.previews?.length,
+  );
+  // Web remains Hub-only: it gets the normalized preview surface only when
+  // Hub evidence exists; no Local Edge/file tabs or host URLs are invented.
+  if (!localFiles && !hasRuntimePreview) return inspector;
   const workDir = resolveComposerWorkDir(props.session.composer?.workDir);
   const hasWorkspace = Boolean(workDir);
   return (
@@ -129,6 +133,8 @@ export function ChatInspectorFrame(
       inspector={inspector}
       hasWorkspace={hasWorkspace}
       localFiles={localFiles}
+      conversationId={props.session.currentConversationId}
+      runtimeEvidence={props.runtimeEvidence}
       platform={props.platform}
       inspectorCollapsed={props.inspectorCollapsed}
       {...(workDir ? { workDir } : {})}

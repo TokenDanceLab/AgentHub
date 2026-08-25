@@ -55,6 +55,7 @@ export interface WorkbenchPanelLayout {
   resizeInspectorBy: (delta: number) => void;
   resizeSidebarBy: (delta: number) => void;
   openInspector: (width?: number) => void;
+  closeInspector: () => void;
   restoreInspectorWidth: (width?: number) => void;
   restoreSidebarWidth: (width?: number) => void;
   shellStyle: React.CSSProperties;
@@ -467,6 +468,7 @@ export function buildWorkbenchPanelLayoutResult(params: {
   resizeInspectorBy: (delta: number) => void;
   resizeSidebarBy: (delta: number) => void;
   openInspector: (width?: number) => void;
+  closeInspector: () => void;
   restoreInspectorWidth: (width?: number) => void;
   restoreSidebarWidth: (width?: number) => void;
 }): WorkbenchPanelLayout {
@@ -490,6 +492,7 @@ export function buildWorkbenchPanelLayoutResult(params: {
     resizeInspectorBy: params.resizeInspectorBy,
     resizeSidebarBy: params.resizeSidebarBy,
     openInspector: params.openInspector,
+    closeInspector: params.closeInspector,
     restoreInspectorWidth: params.restoreInspectorWidth,
     restoreSidebarWidth: params.restoreSidebarWidth,
     shellStyle: buildPanelShellStyle({

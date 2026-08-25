@@ -14,6 +14,10 @@ import { GlobalSearchDialog } from './GlobalSearchDialog';
 import { WORKBENCH_INSPECTOR_QUICK_OPEN_EVENT } from './desktopChromeEvents';
 import { isEditableKeyboardTarget } from './workbenchSessionChromeHelpers';
 import { WorkbenchFrame } from './WorkbenchFrame';
+import {
+  engineeringColumnActivitySignal,
+  useEngineeringColumnAutoOpen,
+} from './useEngineeringColumnAutoOpen';
 import { WorkbenchProfileOverlays } from './WorkbenchProfileOverlays';
 import { WorkbenchTranscriptOverlays } from './WorkbenchTranscriptOverlays';
 import {
@@ -73,24 +77,6 @@ export function AgentHubWorkbench(props: AgentHubWorkbenchProps): React.ReactEle
     setActivePage,
   });
 
-  // #1822: shared global dispatcher (Web + Desktop): search / settings /
-  // toggle-sidebar / toggle-run-panel / inspector quick-open. Reads
-  // resolved groups so custom keybindings actually take effect.
-  const handleQuickOpen = useCallback((): void => {
-    layout.openInspector();
-    window.dispatchEvent(new CustomEvent(WORKBENCH_INSPECTOR_QUICK_OPEN_EVENT, {
-      detail: { mode: 'files' },
-    }));
-  }, [layout]);
-
-  useWorkbenchGlobalShortcuts({
-    onSearch: () => setGlobalSearchOpen(true),
-    onOpenSettings: () => setActivePage('settings'),
-    onToggleSidebar: layout.toggleSidebar,
-    onToggleRunPanel: layout.toggleInspector,
-    onQuickOpen: handleQuickOpen,
-  });
-
   const handleGlobalSearchSelect = useCallback((conversationId: string): void => {
     props.onActiveConversationChange?.(conversationId);
     setGlobalSearchOpen(false);
@@ -109,11 +95,42 @@ export function AgentHubWorkbench(props: AgentHubWorkbenchProps): React.ReactEle
     t: translate,
   }));
 
+  const activitySignal = engineeringColumnActivitySignal({
+    isAgentRunning: props.isAgentRunning,
+    runtimeEvidence: props.runtimeEvidence,
+  });
+  const engineeringColumn = useEngineeringColumnAutoOpen({
+    conversationId: session.currentConversationId,
+    isChatPage,
+    platformSurface: platform.surface,
+    activitySignal,
+    layout,
+  });
+  const managedLayout = engineeringColumn.layout;
+
+  // #1822 + #1964: the global run-panel shortcut is a manual toggle, so it
+  // participates in the same per-conversation suppression contract as the
+  // header button. Quick-open is an explicit request and always expands.
+  const handleQuickOpen = useCallback((): void => {
+    managedLayout.openInspector();
+    window.dispatchEvent(new CustomEvent(WORKBENCH_INSPECTOR_QUICK_OPEN_EVENT, {
+      detail: { mode: 'files' },
+    }));
+  }, [managedLayout]);
+
+  useWorkbenchGlobalShortcuts({
+    onSearch: () => setGlobalSearchOpen(true),
+    onOpenSettings: () => setActivePage('settings'),
+    onToggleSidebar: managedLayout.toggleSidebar,
+    onToggleRunPanel: engineeringColumn.toggleInspector,
+    onQuickOpen: handleQuickOpen,
+  });
+
   const transcriptChrome = useWorkbenchTranscriptChrome(buildTranscriptChromeOptions({
     props,
     t: translate,
     session,
-    layout,
+    layout: managedLayout,
   }));
 
   transcriptHelpersRef.current = {
@@ -135,7 +152,7 @@ export function AgentHubWorkbench(props: AgentHubWorkbenchProps): React.ReactEle
     props,
     activePage,
     isChatPage,
-    layout,
+    layout: managedLayout,
     session,
     transcriptChrome,
     profile,
