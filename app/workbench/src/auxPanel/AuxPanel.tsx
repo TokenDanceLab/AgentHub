@@ -9,6 +9,7 @@ import styles from './AuxPanel.module.css';
 export type AuxPanelProps = {
   hasWorkspace: boolean;
   localFiles?: boolean;
+  previewAvailable?: boolean;
   activeTab: AuxPanelTab;
   onActiveTabChange: (tab: AuxPanelTab) => void;
   labels: Record<AuxPanelTab, string>;
@@ -23,6 +24,7 @@ export type AuxPanelProps = {
 export function AuxPanel({
   hasWorkspace,
   localFiles = true,
+  previewAvailable = false,
   activeTab,
   onActiveTabChange,
   labels,
@@ -30,8 +32,8 @@ export function AuxPanel({
   className,
 }: AuxPanelProps): React.ReactElement {
   const available = useMemo(
-    () => resolveAvailableAuxTabs({ hasWorkspace, localFiles }),
-    [hasWorkspace, localFiles],
+    () => resolveAvailableAuxTabs({ hasWorkspace, localFiles, previewAvailable }),
+    [hasWorkspace, localFiles, previewAvailable],
   );
   const effective = resolveEffectiveAuxTab(activeTab, available);
 

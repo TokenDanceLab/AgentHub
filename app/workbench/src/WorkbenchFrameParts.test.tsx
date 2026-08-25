@@ -448,6 +448,36 @@ describe('WorkbenchFrameParts', () => {
       expect(screen.queryByTestId('aux-panel')).toBeNull();
     });
 
+    it('mounts Hub-only Preview aux surface on Web only when runtime evidence exists', () => {
+      const session = sessionMock();
+      render(
+        <ChatInspectorFrame
+          platform={platformMock({ surface: 'web', capabilities: { localFiles: false } }) as any}
+          session={session as any}
+          runtimeEvidence={{
+            runId: 'run-web',
+            diffs: [],
+            artifacts: [{
+              id: 'artifact-web',
+              runId: 'run-web',
+              threadId: 'thread-web',
+              kind: 'file',
+              path: 'report.md',
+              sizeBytes: 12,
+            }],
+            previews: [],
+          }}
+          inspectorCollapsed={false}
+          inspectorWidth={400}
+          resizeInspectorBy={vi.fn()}
+          beginInspectorResize={vi.fn()}
+        />,
+      );
+      const column = screen.getByTestId('chat-engineering-column');
+      expect(column.getAttribute('data-local-files')).toBe('false');
+      expect(screen.getByTestId('right-inspector')).toBeTruthy();
+    });
+
     it('stacks AuxPanel column when localFiles is true (Desktop)', () => {
       const session = sessionMock({ composer: { workDir: '/tmp/workspace' } });
       render(

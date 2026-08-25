@@ -59,3 +59,57 @@
   font-size: 11px;
   color: var(--td-ink-muted);
 }
+
+.previewPane {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+.previewToolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-2);
+  min-height: 32px;
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--td-line);
+  color: var(--td-ink-muted);
+  font-size: 12px;
+}
+
+.previewDetailButton {
+  min-height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--td-line);
+  border-radius: var(--td-radius-control);
+  background: var(--td-surface);
+  color: var(--td-ink);
+  font: inherit;
+  cursor: pointer;
+}
+
+.previewDetailButton:hover:not(:disabled),
+.previewDetailButton:focus-visible {
+  border-color: var(--td-accent);
+  box-shadow: var(--focus-ring);
+  outline: none;
+}
+
+.previewDetailButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.previewBody {
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+}
+
+.previewBody > * {
+  min-width: 0;
+  width: 100%;
+}

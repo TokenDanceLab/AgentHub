@@ -7,10 +7,13 @@ import {
 
 export function resolveAvailableAuxTabs(input: AuxPanelAvailabilityInput): AuxPanelTab[] {
   const localFiles = input.localFiles !== false;
-  if (!input.hasWorkspace || !localFiles) {
-    return ['session_details'];
+  const tabs: AuxPanelTab[] = localFiles ? ['session_details'] : [];
+  if (input.hasWorkspace && localFiles) {
+    tabs.push('file_tree', 'changes');
   }
-  return [...AUX_PANEL_TAB_ORDER];
+  if (input.previewAvailable) tabs.push('preview');
+  if (input.hasWorkspace && localFiles) tabs.push('git_log');
+  return tabs.length > 0 ? tabs : ['session_details'];
 }
 
 /**

@@ -102,6 +102,7 @@ export function installWorkbenchTestHooks(): void {
     // mounts (useWorkbenchPanelLayout reads them in its state initializers).
     window.localStorage.removeItem('agenthub.workbench.inspectorWidth');
     window.localStorage.removeItem('agenthub.workbench.inspectorCollapsed');
+    window.localStorage.removeItem('agenthub.workbench.engineeringColumnByConversation.v1');
   });
 }
 
