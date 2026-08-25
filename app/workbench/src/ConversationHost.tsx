@@ -8,7 +8,7 @@ import {
   selectRunReview,
   summarizeRunReviewFiles,
 } from '@shared/transcript';
-import { RunReviewOverlay } from '@shared/ui';
+import { RunReviewOverlay, type DiffHunkDecision } from '@shared/ui';
 import type { ComposerIntent, ComposerMention } from '@shared/composer';
 import {
   buildComposerIntent,
@@ -269,8 +269,10 @@ export const ConversationHost = React.memo(function ConversationHost({
   // Run evidence is the hard grouping boundary: select exactly one active/
   // latest run and never merge file changes across run ids. Legacy events
   // without run evidence use an explicitly labelled conversation fallback.
-  // This surface is inspection-only because transcript evidence has no trusted
-  // historical workDir; using the current composer workDir would be unsafe.
+  // Apply/写回 is wired only when Edge reported a trusted run workDir in the
+  // evidence AND the platform exposes the apply port (Desktop Local Edge);
+  // a missing workDir or port keeps the surface honestly read-only — the
+  // composer's current directory is never guessed for a historical run.
   const runReviewSelection = useMemo(
     () => selectRunReview(orderTranscriptBlocks(transcript)),
     [transcript],
@@ -281,6 +283,17 @@ export const ConversationHost = React.memo(function ConversationHost({
     [runReviewFiles],
   );
   const legacyRunReview = runReviewSelection.scope === 'legacy';
+  const runReviewWorkDir = legacyRunReview ? undefined : runReviewSelection.workDir;
+  // Evidence ref ids are `run-<runId>`; the apply port needs the raw Edge id.
+  const runReviewRunId = useMemo(() => {
+    const evidenceId = runReviewSelection.runEvidenceId;
+    if (!evidenceId) return undefined;
+    return evidenceId.startsWith('run-') ? evidenceId.slice('run-'.length) : evidenceId;
+  }, [runReviewSelection.runEvidenceId]);
+  const runReviewApplyPort = platform.preview?.applyAllRunDiffs;
+  const canApplyRunReview = Boolean(
+    !legacyRunReview && runReviewRunId && runReviewWorkDir && runReviewApplyPort,
+  );
   const [runReviewOpen, setRunReviewOpen] = useState(false);
   // Close the overlay on conversation switch so an aggregate never bleeds
   // across sessions (same bleed guard as the arrival-toast ref above).
@@ -293,6 +306,34 @@ export const ConversationHost = React.memo(function ConversationHost({
   const handleCloseRunReview = useCallback((): void => {
     setRunReviewOpen(false);
   }, []);
+  const handleRunReviewApplyHunk = useCallback(
+    async (decision: DiffHunkDecision): Promise<void> => {
+      const applyRunDiff = platform.preview?.applyRunDiff;
+      if (!canApplyRunReview || !runReviewRunId || !runReviewWorkDir || !applyRunDiff) {
+        // Defensive: the overlay only exposes actions when apply is wired.
+        throw new Error('run review apply is not supported on this surface');
+      }
+      await applyRunDiff({ runId: runReviewRunId, workDir: runReviewWorkDir, decision });
+    },
+    [canApplyRunReview, runReviewRunId, runReviewWorkDir, platform.preview],
+  );
+  const handleRunReviewApplyAllHunks = useCallback(
+    async (decisions: DiffHunkDecision[]): Promise<void> => {
+      if (!canApplyRunReview || !runReviewRunId || !runReviewWorkDir || !runReviewApplyPort) {
+        throw new Error('run review apply is not supported on this surface');
+      }
+      await runReviewApplyPort({ runId: runReviewRunId, workDir: runReviewWorkDir, decisions });
+    },
+    [canApplyRunReview, runReviewRunId, runReviewWorkDir, runReviewApplyPort],
+  );
+  const handleRunReviewAcceptRun = useCallback((): void => {
+    onToast(t('runReview.acceptedToast'));
+    setRunReviewOpen(false);
+  }, [onToast, t]);
+  const handleRunReviewRejectRun = useCallback((): void => {
+    onToast(t('runReview.rejectedToast'));
+    setRunReviewOpen(false);
+  }, [onToast, t]);
 
   // ── Pending dispatch queue (CF22 / #1965) ─────────────────────────────
   // Ref-authoritative queues are isolated by conversation. The active
@@ -714,7 +755,9 @@ export const ConversationHost = React.memo(function ConversationHost({
               className={styles.pendingApprovalReviewAll}
               aria-label={t(legacyRunReview
                 ? 'card.approval.viewLegacyChangesAria'
-                : 'card.approval.viewAllChangesAria', { count: String(runReviewFiles.length) })}
+                : canApplyRunReview
+                  ? 'card.approval.viewAllChangesApplyAria'
+                  : 'card.approval.viewAllChangesAria', { count: String(runReviewFiles.length) })}
               onClick={handleOpenRunReview}
             >
               {t(legacyRunReview
@@ -746,28 +789,50 @@ export const ConversationHost = React.memo(function ConversationHost({
         onHighlightEnd={handleSearchHighlightEnd} transcriptBlocks={displayTranscript}
         searchLabel={t('searchPanel.label')} searchPlaceholder={t('searchPanel.placeholder')}
         noResultsLabel={t('searchPanel.noResults')} />
-      {/* #1967 aggregate inspection is intentionally read-only: transcript
-          evidence has no trusted historical workDir, so no apply port is wired. */}
+      {/* #1967 run review: accept/reject is wired only with a trusted
+          executor-reported workDir plus the platform apply port; every other
+          combination stays honestly read-only with a reason-specific notice. */}
       <RunReviewOverlay
         open={runReviewOpen}
         files={runReviewFiles}
-        title={t(legacyRunReview ? 'runReview.legacyTitle' : 'runReview.title')}
+        title={t(canApplyRunReview
+          ? 'runReview.titleApplicable'
+          : legacyRunReview ? 'runReview.legacyTitle' : 'runReview.title')}
         closeLabel={t('runReview.close')}
         summary={t('runReview.summary', {
           count: String(runReviewSummary.fileCount),
           additions: String(runReviewSummary.additions),
           deletions: String(runReviewSummary.deletions),
         })}
-        readOnly
-        readOnlyNotice={t(legacyRunReview
-          ? 'runReview.legacyReadOnlyNotice'
-          : 'runReview.readOnlyNotice')}
+        readOnly={!canApplyRunReview}
+        {...(canApplyRunReview ? {
+          runId: runReviewRunId,
+          onApplyHunk: handleRunReviewApplyHunk,
+          onApplyAllHunks: handleRunReviewApplyAllHunks,
+          onAcceptRun: handleRunReviewAcceptRun,
+          onRejectRun: handleRunReviewRejectRun,
+        } : {
+          readOnlyNotice: t(legacyRunReview
+            ? 'runReview.legacyReadOnlyNotice'
+            : runReviewWorkDir
+              ? 'runReview.webReadOnlyNotice'
+              : 'runReview.noWorkDirNotice'),
+        })}
         onClose={handleCloseRunReview}
         panelLabels={{
           empty: t('runReview.empty'),
           original: t('runReview.original'),
           modified: t('runReview.modified'),
           runTitle: t(legacyRunReview ? 'runReview.legacyRunTitle' : 'runReview.runTitle'),
+          acceptRun: t('runReview.acceptRun'),
+          rejectRun: t('runReview.rejectRun'),
+          acceptAll: t('runReview.acceptAll'),
+          rejectAll: t('runReview.rejectAll'),
+          acceptHunk: t('runReview.acceptHunk'),
+          rejectHunk: t('runReview.rejectHunk'),
+          applied: t('runReview.applied'),
+          rejected: t('runReview.rejected'),
+          submitting: t('runReview.submitting'),
         }}
       />
       {!selectionMode && (

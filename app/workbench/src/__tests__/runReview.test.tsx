@@ -5,7 +5,7 @@ import { installWorkbenchTestHooks } from './helpers';
 
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { createMockPlatform } from '@shared/platform/createMockPlatform';
 import type { TranscriptBlock } from '@shared/transcript/types';
 import { AgentHubWorkbench } from '../AgentHubWorkbench';
@@ -20,6 +20,7 @@ function fileChange(
   path: string,
   lines: Array<{ type: 'add' | 'del' | 'ctx'; content: string }>,
   runId: string | null = 'run-latest',
+  workDir?: string | undefined,
 ): TranscriptBlock {
   return {
     id,
@@ -29,7 +30,13 @@ function fileChange(
     action: lines.some((line) => line.type === 'del') ? 'modified' : 'created',
     lines,
     ...(runId ? {
-      evidenceRefs: [{ id: `run-${runId}`, kind: 'run', label: `Run ${runId}`, status: 'running' }],
+      evidenceRefs: [{
+        id: `run-${runId}`,
+        kind: 'run',
+        label: `Run ${runId}`,
+        status: 'running',
+        ...(workDir ? { workDir } : {}),
+      }],
     } : {}),
   };
 }
@@ -107,8 +114,9 @@ describe('AgentHubWorkbench run-level aggregate review (#1967)', () => {
     const dialog = screen.getByRole('dialog', { name: '运行变更（只读）' });
     expect(dialog).toBeInTheDocument();
     expect(screen.getAllByText('src/a.ts').length).toBeGreaterThan(0);
-    // Web Hub-only boundary: no write-back surface here — honest notice.
-    expect(screen.getByText(/此处仅供查看/)).toBeInTheDocument();
+    // No executor-reported workDir in the evidence: honest read-only notice
+    // instead of guessing a workspace.
+    expect(screen.getByText(/执行器未上报该运行的工作目录/)).toBeInTheDocument();
     expect(screen.getByText('最近运行的变更')).toBeInTheDocument();
     // Transcript evidence has no trusted historical workDir: every write-back
     // action must be absent instead of locally faking applied/rejected state.
@@ -158,5 +166,128 @@ describe('AgentHubWorkbench run-level aggregate review (#1967)', () => {
     expect(screen.getByRole('dialog', { name: '运行变更（只读）' })).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: '关闭变更查看' }));
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+});
+
+function renderWorkbenchWithApplyPort(
+  transcript: TranscriptBlock[],
+  opts: { omitApplyPort?: boolean } = {},
+) {
+  const applyRunDiff = vi.fn(async (): Promise<void> => {});
+  const applyAllRunDiffs = vi.fn(async (): Promise<void> => {});
+  const platform = createMockPlatform({
+    surface: 'desktop',
+    conversations: [{ id: 'c1', title: '会话一', kind: 'direct' }],
+    preview: {
+      openEvidence: async (): Promise<void> => {},
+      ...(opts.omitApplyPort ? {} : { applyRunDiff, applyAllRunDiffs }),
+    },
+  });
+  const view = render(
+    <AgentHubWorkbench
+      agents={agents}
+      platform={platform}
+      conversations={platform.seed.conversations}
+      transcript={transcript}
+    />,
+  );
+  return { view, applyRunDiff, applyAllRunDiffs };
+}
+
+describe('AgentHubWorkbench run-level apply wiring (#1967 remainder)', () => {
+  const addLine = [{ type: 'add' as const, content: 'export const a = 1;' }];
+
+  it('accept-run writes every hunk back through the port with the trusted workDir', async () => {
+    const user = userEvent.setup();
+    const { applyAllRunDiffs } = renderWorkbenchWithApplyPort([
+      fileChange('fc-1', 'src/a.ts', addLine, 'run-latest', '/tmp/ws-run'),
+    ]);
+
+    await user.click(screen.getByRole('button', { name: '审查最近运行的变更（1 个文件）' }));
+    const dialog = screen.getByRole('dialog', { name: '运行变更' });
+    expect(dialog).toBeInTheDocument();
+    // Trusted workDir + apply port: no read-only notice, run actions visible.
+    expect(screen.queryByText(/执行器未上报该运行的工作目录/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/当前表面不直连本地执行环境/)).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: '整体批准' }));
+
+    expect(applyAllRunDiffs).toHaveBeenCalledTimes(1);
+    expect(applyAllRunDiffs).toHaveBeenCalledWith({
+      runId: 'run-latest',
+      workDir: '/tmp/ws-run',
+      decisions: [{ filePath: 'src/a.ts', hunkIndex: 0, accepted: true }],
+    });
+    // Success closes the overlay.
+    await vi.waitFor(() => {
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    });
+  });
+
+  it('reject-run commits every hunk as rejected and closes the overlay', async () => {
+    const user = userEvent.setup();
+    const { applyAllRunDiffs } = renderWorkbenchWithApplyPort([
+      fileChange('fc-1', 'src/a.ts', addLine, 'run-latest', '/tmp/ws-run'),
+    ]);
+
+    await user.click(screen.getByRole('button', { name: '审查最近运行的变更（1 个文件）' }));
+    await user.click(screen.getByRole('button', { name: '整体驳回' }));
+
+    expect(applyAllRunDiffs).toHaveBeenCalledWith({
+      runId: 'run-latest',
+      workDir: '/tmp/ws-run',
+      decisions: [{ filePath: 'src/a.ts', hunkIndex: 0, accepted: false }],
+    });
+    await vi.waitFor(() => {
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    });
+  });
+
+  it('single-hunk accept uses the trusted workDir on the per-hunk port', async () => {
+    const user = userEvent.setup();
+    const { applyRunDiff } = renderWorkbenchWithApplyPort([
+      fileChange('fc-1', 'src/a.ts', addLine, 'run-latest', '/tmp/ws-run'),
+    ]);
+
+    await user.click(screen.getByRole('button', { name: '审查最近运行的变更（1 个文件）' }));
+    const dialog = screen.getByRole('dialog', { name: '运行变更' });
+    // One accept control per hunk row plus the aria-labelled twin; take the
+    // first rendered hunk-row action.
+    const [acceptHunk] = within(dialog).getAllByRole('button', { name: '接受此块' });
+    await user.click(acceptHunk);
+
+    expect(applyRunDiff).toHaveBeenCalledWith({
+      runId: 'run-latest',
+      workDir: '/tmp/ws-run',
+      decision: { filePath: 'src/a.ts', hunkIndex: 0, accepted: true },
+    });
+  });
+
+  it('stays read-only with the Hub-only notice when the platform has no apply port', async () => {
+    const user = userEvent.setup();
+    renderWorkbenchWithApplyPort([
+      fileChange('fc-1', 'src/a.ts', addLine, 'run-latest', '/tmp/ws-run'),
+    ], { omitApplyPort: true });
+
+    await user.click(screen.getByRole('button', { name: '只读查看最近运行的变更（1 个文件）' }));
+    expect(screen.getByRole('dialog', { name: '运行变更（只读）' })).toBeInTheDocument();
+    expect(screen.getByText(/当前表面不直连本地执行环境/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '整体批准' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '接受此块' })).not.toBeInTheDocument();
+  });
+
+  it('legacy conversation scope never becomes applicable even with a port', async () => {
+    const user = userEvent.setup();
+    const { applyAllRunDiffs } = renderWorkbenchWithApplyPort([
+      fileChange('legacy-1', 'src/a.ts', addLine, null),
+    ]);
+
+    await user.click(screen.getByRole('button', {
+      name: '只读查看缺少运行标识的会话变更（1 个文件）',
+    }));
+    expect(screen.getByRole('dialog', { name: '会话变更兼容视图（只读）' })).toBeInTheDocument();
+    expect(screen.getByText(/旧事件缺少运行标识/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '整体批准' })).not.toBeInTheDocument();
+    expect(applyAllRunDiffs).not.toHaveBeenCalled();
   });
 });

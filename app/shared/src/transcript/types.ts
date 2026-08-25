@@ -18,6 +18,13 @@ export interface EvidenceRef {
   path?: string;
   uri?: string;
   mimeType?: string;
+  /**
+   * Executor-reported working directory for `kind: 'run'` refs (#1967).
+   * Only present when the Edge executor resolved a workspace for the run;
+   * it is the sole trusted workDir evidence for run-level diff apply.
+   * Absence means run review must stay read-only — never guess a workDir.
+   */
+  workDir?: string;
 }
 
 export interface ApprovalDecisionAction {

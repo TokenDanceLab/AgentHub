@@ -256,7 +256,7 @@
 | 视觉 | light/dark 对比度 | ✅ | 随 RunReviewOverlay.stories.tsx 巡检（ReadOnly/ReadOnlyZh/Empty 3 态） |
 | 交互 | 打开/关闭（按钮、Esc、backdrop）行为断言 | ✅ | RunReviewOverlay.test.tsx 覆盖三种关闭路径与内容点击不误关 |
 | 交互 | 聚合文件渲染 + 单 run 边界 | ✅ | `kind=run` evidence ref 选择当前/最新单 run，跨 run 文件不混合；同 run/path 的多个 `editId` 片段合并并对重放 hunk 去重；无 run evidence 时明示会话级 legacy 兼容视图 |
-| 交互 | Workbench 诚实只读边界 | ✅ | transcript 只有 run id、无可信历史 workDir；ConversationHost 禁止借用当前 composer workDir，传 `readOnly` 并隐藏全部写回动作，提示条使用 `role="status"`；Web 同样只读 |
+| 交互 | Workbench 写回能力诚实边界（#1967） | ✅ | 写回仅在 `kind=run` evidence 携带执行器上报的 `workDir` 且平台有 apply port（Desktop Local Edge）时启用；无 workDir / 无 port（Web Hub-only）/ legacy 三种只读态各配诚实提示（`role="status"`）；禁止用当前 composer workDir 猜测历史运行目录 |
 | 键盘 | 焦点困在浮层、Esc 关闭、关闭归还焦点 | ✅ | `useFocusTrap`（focusTrap.ts）+ 测试断言焦点移入/归还触发元素 |
 | a11y | `role="dialog"` + `aria-modal` + 可访问名 | ✅ | `aria-label` = 宿主标题；关闭按钮强制 `aria-label` |
 | a11y | 打开期间锁定 body 滚动并在关闭后恢复 | ✅ | 测试断言 `overflow` 变化（Modal 同构） |

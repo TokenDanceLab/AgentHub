@@ -54,6 +54,7 @@ Hub/Edge 实时面均为 **at-least-once**：重连、离线队列、outbox、�
 - `seq` 同 stream 单调；断线用 cursor / 最后事件 ID。`seq <= lastSeq` 丢弃（workbench 水位）；实体按 payload id **UPSERT**。
 - 不能回放 → `system.gap` / `error`，客户端 REST snapshot。stdout/stderr 合并为 `run.output.batch`。
 - Provider 字段停在 adapter 边界；进 transcript 前脱敏 token、authorization、绝对路径、provider trace body。
+- Run lifecycle（`run.started`/`run.finished` 等）payload 仅在 executor 真实解析出工作目录时携带 `workDir`；它是 run 级 diff 审查（#1967）唯一可信 workDir 证据——客户端禁止用当前 composer 目录等猜测值补全，缺失即只读。
 
 ## Hub Frame
 

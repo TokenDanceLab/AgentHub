@@ -780,6 +780,35 @@ func TestStoreSetRunRetryCount(t *testing.T) {
 	}
 }
 
+func TestStoreSetRunWorkDir(t *testing.T) {
+	s := New()
+	s.CreateProject("proj_workdir", "WorkDir", "")
+	s.CreateThread("thread_workdir", "proj_workdir", "WorkDir Thread", "", "", "")
+	run, _ := s.CreateRun("run_workdir", "proj_workdir", "thread_workdir")
+
+	// Missing run.
+	_, ok := s.SetRunWorkDir("run_missing", "/tmp/ws")
+	if ok {
+		t.Fatal("SetRunWorkDir missing run returned ok=true")
+	}
+
+	// Set and overwrite: the executor-reported value is authoritative evidence
+	// for run-level diff review (#1967).
+	updated, ok := s.SetRunWorkDir(run.ID, "/tmp/ws-first")
+	if !ok || updated.WorkDir != "/tmp/ws-first" {
+		t.Fatalf("SetRunWorkDir first = %#v, want workDir=/tmp/ws-first", updated)
+	}
+	updated, ok = s.SetRunWorkDir(run.ID, "/tmp/ws-second")
+	if !ok || updated.WorkDir != "/tmp/ws-second" {
+		t.Fatalf("SetRunWorkDir second = %#v, want workDir=/tmp/ws-second", updated)
+	}
+
+	got, ok := s.GetRun(run.ID)
+	if !ok || got.WorkDir != "/tmp/ws-second" {
+		t.Fatalf("GetRun workDir = %q, want /tmp/ws-second", got.WorkDir)
+	}
+}
+
 // ── UserProfile tests ─────────────────────────────────────────────────────
 
 func TestStoreGetCurrentUser(t *testing.T) {
