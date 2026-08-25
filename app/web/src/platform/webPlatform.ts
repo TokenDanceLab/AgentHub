@@ -135,6 +135,12 @@ export function createWebPlatform(options: WebPlatformOptions = {}): AgentHubPla
       // Web is Hub-only and has no Local Edge write-back path. The omission
       // IS the unsupported contract — the inspector renders an explicit
       // read-only review notice and a warning toast on apply attempts.
+      //
+      // downloadArtifactContent is intentionally omitted too (#1945): Hub
+      // exposes artifact metadata only (/web/agent-tasks/{id}/artifacts is a
+      // metadata projection with no content route), and Web never reaches a
+      // Local Edge. The omission degrades the artifact row to the consistent
+      // "download unavailable" notice instead of a silent no-op.
     },
     attachments: {
       async pickFiles(): Promise<never[]> {
