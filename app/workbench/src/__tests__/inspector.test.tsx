@@ -142,8 +142,8 @@ describe('AgentHubWorkbench', () => {
     fireEvent.click(screen.getByRole('tab', { name: /文件/ }));
     fireEvent.click(screen.getByRole('button', { name: '打开预览 preview-1' }));
     expect(screen.getByRole('tab', { name: /浏览器/ })).toHaveAttribute('aria-selected', 'true');
-    expect(screen.getByText('http://127.0.0.1:4173/preview')).toBeInTheDocument();
-    const runtimePreviewRegion = screen.getByRole('region', { name: '内置浏览器预览' });
+    expect(screen.getAllByText('http://127.0.0.1:4173/preview').length).toBeGreaterThanOrEqual(1);
+    const runtimePreviewRegion = within(screen.getByRole('complementary', { name: '右侧窗口' })).getByRole('region', { name: '内置浏览器预览' });
     await waitFor(() => expect(document.activeElement).toBe(runtimePreviewRegion));
   });
 

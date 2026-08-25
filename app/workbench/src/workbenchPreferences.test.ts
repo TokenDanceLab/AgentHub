@@ -4,9 +4,12 @@ import {
   composerSubmitBehaviorLabel,
   normalizeComposerSubmitBehavior,
   readComposerSubmitBehavior,
+  readEngineeringColumnPreference,
   subscribeWorkbenchPreference,
   WORKBENCH_COMPOSER_SUBMIT_BEHAVIOR_KEY,
+  WORKBENCH_ENGINEERING_COLUMN_PREFERENCES_KEY,
   writeComposerSubmitBehavior,
+  writeEngineeringColumnPreference,
 } from './workbenchPreferences';
 
 describe('normalizeComposerSubmitBehavior', () => {
@@ -95,5 +98,43 @@ describe('subscribeWorkbenchPreference', () => {
 
     unsubscribeFirst();
     unsubscribeSecond();
+  });
+});
+
+
+describe('engineering column conversation preferences (#1964)', () => {
+  beforeEach(() => {
+    window.localStorage.clear();
+  });
+
+  it('persists collapse and auto-open suppression per conversation', () => {
+    writeEngineeringColumnPreference('conv-a', { collapsed: true, autoOpenSuppressed: true });
+    writeEngineeringColumnPreference('conv-b', { collapsed: false, autoOpenSuppressed: false });
+
+    expect(readEngineeringColumnPreference('conv-a')).toEqual({
+      collapsed: true,
+      autoOpenSuppressed: true,
+    });
+    expect(readEngineeringColumnPreference('conv-b')).toEqual({
+      collapsed: false,
+      autoOpenSuppressed: false,
+    });
+    expect(readEngineeringColumnPreference('conv-c')).toBeUndefined();
+    expect(window.localStorage.getItem(WORKBENCH_ENGINEERING_COLUMN_PREFERENCES_KEY)).toContain('conv-a');
+  });
+
+  it('fails closed on malformed storage without leaking preferences across sessions', () => {
+    window.localStorage.setItem(WORKBENCH_ENGINEERING_COLUMN_PREFERENCES_KEY, '{bad-json');
+    expect(readEngineeringColumnPreference('conv-a')).toBeUndefined();
+
+    window.localStorage.setItem(
+      WORKBENCH_ENGINEERING_COLUMN_PREFERENCES_KEY,
+      JSON.stringify({ 'conv-a': { collapsed: 'yes' }, 'conv-b': { collapsed: true } }),
+    );
+    expect(readEngineeringColumnPreference('conv-a')).toBeUndefined();
+    expect(readEngineeringColumnPreference('conv-b')).toEqual({
+      collapsed: true,
+      autoOpenSuppressed: false,
+    });
   });
 });
