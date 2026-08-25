@@ -76,6 +76,7 @@ describe('RunReviewOverlay (#1967)', () => {
         onClose={() => {}}
         {...baseProps}
         summary="2 files · +3 −1"
+        readOnly
         readOnlyNotice="Aggregate review is read-only."
       />,
     );
@@ -87,6 +88,22 @@ describe('RunReviewOverlay (#1967)', () => {
   it('omits the read-only notice when a write-back port is wired', () => {
     render(<RunReviewOverlay open onClose={() => {}} {...baseProps} />);
     expect(screen.queryByRole('status')).toBeNull();
+  });
+
+  it('hides run, file, and hunk write-back actions in read-only mode', () => {
+    render(
+      <RunReviewOverlay
+        open
+        readOnly
+        readOnlyNotice="Inspection only."
+        onClose={() => {}}
+        {...baseProps}
+      />,
+    );
+    expect(screen.queryByRole('button', { name: 'Accept run' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Reject run' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Accept All' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Accept hunk' })).toBeNull();
   });
 
   it('hosts the run-level toolbar and forwards accept/reject-run', async () => {

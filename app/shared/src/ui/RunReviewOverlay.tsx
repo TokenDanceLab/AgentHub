@@ -32,6 +32,8 @@ export interface RunReviewOverlayProps {
    * diffs back (Web Hub-only). Absent when write-back is wired.
    */
   readOnlyNotice?: string | undefined;
+  /** Hide every accept/reject action; the overlay becomes inspection-only. */
+  readOnly?: boolean | undefined;
   onClose: () => void;
   /** Edge run ID + apply ports — passed through to the panel unchanged. */
   runId?: string | undefined;
@@ -50,6 +52,7 @@ export function RunReviewOverlay({
   closeLabel,
   summary,
   readOnlyNotice,
+  readOnly = false,
   onClose,
   runId,
   onApplyHunk,
@@ -117,6 +120,7 @@ export function RunReviewOverlay({
           <DiffReviewPanel
             files={files}
             runLevel
+            readOnly={readOnly}
             {...(runId !== undefined ? { runId } : {})}
             {...(onApplyHunk ? { onApplyHunk } : {})}
             {...(onApplyAllHunks ? { onApplyAllHunks } : {})}

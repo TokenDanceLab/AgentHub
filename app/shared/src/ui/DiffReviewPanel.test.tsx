@@ -356,6 +356,24 @@ describe('DiffReviewPanel', () => {
     expect(within(toolbar).getByRole('button', { name: 'Reject run' })).toBeDefined();
   });
 
+  it('read-only mode keeps file/run summaries but hides every accept/reject action', () => {
+    render(
+      <DiffReviewPanel
+        files={[mockFileAdded, mockFileModified]}
+        runLevel
+        readOnly
+      />,
+    );
+    expect(screen.getByTestId('diff-review-run-toolbar')).toBeDefined();
+    expect(screen.getByText('All changes in this run')).toBeDefined();
+    expect(screen.queryByRole('button', { name: 'Accept run' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Reject run' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Accept All' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Reject All' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Accept hunk' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Reject hunk' })).toBeNull();
+  });
+
   it('prefers the host-interpolated run summary label', () => {
     render(
       <DiffReviewPanel
@@ -367,7 +385,7 @@ describe('DiffReviewPanel', () => {
     expect(screen.getByText('1 个文件 · +3 −0')).toBeDefined();
   });
 
-  it('accepting the run marks hunks of EVERY file applied (read-only)', async () => {
+  it('accepting the run marks hunks of EVERY file applied in local mark mode', async () => {
     const user = userEvent.setup();
     const onAcceptRun = vi.fn();
     render(
@@ -387,7 +405,7 @@ describe('DiffReviewPanel', () => {
     expect(screen.getAllByText('Applied').length).toBeGreaterThan(0);
   });
 
-  it('rejecting the run marks hunks of EVERY file rejected (read-only)', async () => {
+  it('rejecting the run marks hunks of EVERY file rejected in local mark mode', async () => {
     const user = userEvent.setup();
     const onRejectRun = vi.fn();
     render(
@@ -406,12 +424,14 @@ describe('DiffReviewPanel', () => {
     const user = userEvent.setup();
     let resolveApply!: () => void;
     const applyAllHunks = vi.fn(() => new Promise<void>((resolve) => { resolveApply = resolve; }));
+    const onAcceptRun = vi.fn();
     render(
       <DiffReviewPanel
         files={[mockFileAdded, mockFileModified]}
         runId="run-1"
         runLevel
         onApplyAllHunks={applyAllHunks}
+        onAcceptRun={onAcceptRun}
       />,
     );
     await user.click(screen.getByRole('button', { name: 'Accept run' }));
@@ -422,25 +442,42 @@ describe('DiffReviewPanel', () => {
     // Submitting until the port resolves — same state machine as per-file batch.
     expect(screen.getAllByText('Submitting...').length).toBeGreaterThan(0);
     expect(screen.queryAllByText('Applied').length).toBe(0);
+    expect(onAcceptRun).not.toHaveBeenCalled();
     resolveApply();
     await waitFor(() => expect(screen.getAllByText('Applied').length).toBeGreaterThanOrEqual(2));
+    expect(onAcceptRun).toHaveBeenCalledTimes(1);
   });
 
-  it('run reject rolls back every hunk when the write-back port rejects', async () => {
+  it('run batch failure restores the exact mixed state and does not fire the run callback', async () => {
     const user = userEvent.setup();
     const applyAllHunks = vi.fn(() => Promise.reject(new Error('boom')));
+    const onRejectRun = vi.fn();
     render(
       <DiffReviewPanel
         files={[mockFileAdded, mockFileModified]}
         runId="run-1"
         runLevel
         onApplyAllHunks={applyAllHunks}
+        onRejectRun={onRejectRun}
       />,
     );
+
+    // Establish a mixed local review state before the run-level batch.
+    await user.click(screen.getAllByRole('button', { name: 'Accept hunk' })[0]!);
+    expect(screen.getAllByText('Applied').length).toBeGreaterThan(0);
+    const tabs = screen.getByRole('tablist').querySelectorAll('[role="tab"]');
+    await user.click(tabs[1]!);
+    await user.click(screen.getAllByRole('button', { name: 'Reject hunk' })[0]!);
+    expect(screen.getAllByText('Rejected').length).toBeGreaterThan(0);
+
     await user.click(screen.getByRole('button', { name: 'Reject run' }));
     await waitFor(() => expect(applyAllHunks).toHaveBeenCalled());
-    // Rollback: no committed/rejected state lingers on any file's hunk.
-    expect(screen.queryAllByText('Rejected').length).toBe(0);
-    expect(screen.queryAllByText('Submitting...').length).toBe(0);
+    await waitFor(() => expect(screen.queryAllByText('Submitting...').length).toBe(0));
+
+    // Active file restores rejected; first file restores applied.
+    expect(screen.getAllByText('Rejected').length).toBeGreaterThan(0);
+    await user.click(tabs[0]!);
+    expect(screen.getAllByText('Applied').length).toBeGreaterThan(0);
+    expect(onRejectRun).not.toHaveBeenCalled();
   });
 });

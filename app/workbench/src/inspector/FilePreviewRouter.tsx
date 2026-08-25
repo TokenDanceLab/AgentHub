@@ -272,6 +272,7 @@ function InteractiveDiffPreview({
       <DiffReviewPanel
         files={reviewFiles}
         runId={runId}
+        readOnly={!applySupported}
         onApplyHunk={handleApplyHunk}
         onApplyAllHunks={handleApplyAllHunks}
       />

@@ -63,6 +63,7 @@ export const ReadOnly: Story = {
     title: 'Run change review',
     closeLabel: 'Close run change review',
     summary: '3 files · +3 −3',
+    readOnly: true,
     readOnlyNotice: 'Aggregate review is read-only: to write changes back, use the interactive diff in file preview (Desktop Local Edge only).',
     onClose: () => {},
   },
@@ -75,6 +76,7 @@ export const ReadOnlyZh: Story = {
     title: '运行变更审查',
     closeLabel: '关闭运行变更审查',
     summary: '3 个文件 · +3 −3',
+    readOnly: true,
     readOnlyNotice: '聚合审查为只读：如需写回工作区，请在文件预览中使用交互式 Diff（仅桌面本地 Edge 支持）。',
     onClose: () => {},
     panelLabels: {

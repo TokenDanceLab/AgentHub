@@ -68,6 +68,9 @@ export {
   fileChangeActionToReviewStatus,
   fileChangeBlockHunks,
   fileChangeBlockToReviewFile,
+  selectRunReview,
   summarizeRunReviewFiles,
+  type RunReviewScope,
+  type RunReviewSelection,
   type RunReviewSummary,
 } from './runChangeAggregate';

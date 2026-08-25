@@ -11,6 +11,7 @@ import {
   fileChangeActionToReviewStatus,
   fileChangeBlockHunks,
   fileChangeBlockToReviewFile,
+  selectRunReview,
   summarizeRunReviewFiles,
 } from './runChangeAggregate';
 
@@ -24,6 +25,10 @@ function fileChange(overrides: Partial<FileChangeTranscriptBlock> & { path: stri
     action: 'modified',
     ...overrides,
   };
+}
+
+function runRefs(runId: string, status: 'pending' | 'running' | 'completed' | 'failed' = 'running') {
+  return [{ id: `run-${runId}`, kind: 'run' as const, label: `Run ${runId}`, status }];
 }
 
 function runStepGroup(children: TranscriptBlock[]): RunStepGroupTranscriptBlock {
@@ -174,20 +179,87 @@ describe('runChangeAggregate (#1967)', () => {
       expect(files).toHaveLength(1);
     });
 
-    it('lets a later change of the same path supersede the earlier one', () => {
+    it('preserves unique snippets from repeated edits of the same run/path and dedupes replayed fragments', () => {
+      const earlyPatch = [
+        '--- a/a.ts',
+        '+++ b/a.ts',
+        '@@ -1 +1 @@',
+        '-const value = 1;',
+        '+const value = 2;',
+      ].join('\n');
+      const laterPatch = [
+        '--- a/a.ts',
+        '+++ b/a.ts',
+        '@@ -4,0 +5 @@',
+        '+export const enabled = true;',
+      ].join('\n');
       const files = collectRunReviewFiles([
-        fileChange({ path: 'a.ts', additions: 1, deletions: 0, lines: [{ type: 'add', content: 'v1' }] }),
-        fileChange({ path: 'a.ts', additions: 2, deletions: 1, lines: [
-          { type: 'add', content: 'v2-a' },
-          { type: 'add', content: 'v2-b' },
-          { type: 'del', content: 'v1' },
-        ] }),
+        fileChange({ path: 'a.ts', editId: 'edit-1', patch: earlyPatch }),
+        // Same edit fragment replayed with a different event id: one hunk only.
+        fileChange({ id: 'fc-a-replay', path: 'a.ts', editId: 'edit-1', patch: earlyPatch }),
+        // Later event is only a partial snippet; it must not erase edit-1.
+        fileChange({ id: 'fc-a-later', path: 'a.ts', editId: 'edit-2', patch: laterPatch }),
       ]);
+
       expect(files).toHaveLength(1);
+      expect(files[0]!.hunks).toHaveLength(2);
       expect(files[0]!.additions).toBe(2);
       expect(files[0]!.deletions).toBe(1);
-      const contents = files[0]!.hunks[0]!.lines.map((line) => line.content);
-      expect(contents).toEqual(['v2-a', 'v2-b', 'v1']);
+      const contents = files[0]!.hunks.flatMap((hunk) => hunk.lines.map((line) => line.content));
+      expect(contents).toContain('const value = 2;');
+      expect(contents).toContain('export const enabled = true;');
+    });
+
+    it('selects only the latest active run and never mixes file changes across two runs', () => {
+      const selection = selectRunReview([
+        fileChange({
+          path: 'src/old-only.ts',
+          evidenceRefs: runRefs('old'),
+          lines: [{ type: 'add', content: 'old' }],
+        }),
+        fileChange({
+          path: 'src/shared.ts',
+          evidenceRefs: runRefs('old'),
+          lines: [{ type: 'add', content: 'old shared' }],
+        }),
+        {
+          id: 'old-finished',
+          kind: 'finished',
+          author,
+          title: 'old finished',
+          runId: 'old',
+          evidenceRefs: runRefs('old', 'completed'),
+        },
+        fileChange({
+          path: 'src/new-only.ts',
+          evidenceRefs: runRefs('new'),
+          lines: [{ type: 'add', content: 'new' }],
+        }),
+        fileChange({
+          path: 'src/shared.ts',
+          evidenceRefs: runRefs('new'),
+          lines: [{ type: 'add', content: 'new shared' }],
+        }),
+      ]);
+
+      expect(selection.scope).toBe('run');
+      expect(selection.runEvidenceId).toBe('run-new');
+      expect(selection.files.map((file) => file.filePath)).toEqual([
+        'src/new-only.ts',
+        'src/shared.ts',
+      ]);
+      expect(selection.files.map((file) => file.filePath)).not.toContain('src/old-only.ts');
+      expect(selection.files[1]!.hunks[0]!.lines[0]!.content).toBe('new shared');
+    });
+
+    it('uses an explicit legacy conversation scope when no file has run evidence', () => {
+      const selection = selectRunReview([
+        fileChange({ path: 'legacy-a.ts', lines: [{ type: 'add', content: 'a' }] }),
+        fileChange({ path: 'legacy-b.ts', lines: [{ type: 'add', content: 'b' }] }),
+      ]);
+      expect(selection.scope).toBe('legacy');
+      expect(selection.runEvidenceId).toBeUndefined();
+      expect(selection.files.map((file) => file.filePath)).toEqual(['legacy-a.ts', 'legacy-b.ts']);
     });
 
     it('returns an empty list for an empty transcript', () => {

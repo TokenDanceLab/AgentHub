@@ -108,6 +108,8 @@ export interface DiffReviewPanelProps {
    * per-file batch — no second review state system.
    */
   runLevel?: boolean;
+  /** Hide every accept/reject control for an explicitly read-only surface. */
+  readOnly?: boolean;
   /** Notified after a run-level accept (batch commit already dispatched). */
   onAcceptRun?: () => void;
   /** Notified after a run-level reject (batch commit already dispatched). */

@@ -242,8 +242,9 @@
 | 视觉 | token 化 diff 行/徽章 | ✅ | DiffReviewPanel.module.css `--td-*`/`--diff-*`，无硬编码色；#1967 run 工具条复用 `--td-surface-2`/`--td-line` |
 | 视觉 | light/dark 对比度 | ✅ | 随 DiffReviewPanel.stories.tsx 巡检（default/empty/custom labels/run-level 5 态） |
 | 交互 | accept/reject 行为断言 | ✅ | DiffReviewPanel.test.tsx 覆盖行/全量 accept-reject 与 hunk 状态提交 |
-| 交互 | run 级整体批准/驳回（#1967） | ✅ | `runLevel` 工具条行为断言：跨文件批量走同一 `onApplyAllHunks` 端口与同一 hunk 状态机（含 submitting/失败回滚），不产生第二套审批状态 |
-| 键盘 | 方向键列表导航、原生按钮 | ✅ | tablist roving（箭头/Home/End，#1823）；行操作与 run 操作均为原生 button |
+| 交互 | run 级批量写回合同（#1967） | ✅ | 仅可信宿主传入 `runId` + apply port 时可用；跨文件批量复用 `onApplyAllHunks`，失败按操作前 snapshot 精确恢复 mixed 状态，`onAcceptRun`/`onRejectRun` 仅在异步成功后回调 |
+| 交互 | 显式只读模式 | ✅ | `readOnly` 隐藏 run/file/hunk 全部 accept/reject 控件；不会把本地标记伪装成工作区写回 |
+| 键盘 | 方向键列表导航、原生按钮 | ✅ | tablist roving（箭头/Home/End，#1823）；可写面操作为原生 button，只读面不暴露动作 |
 | a11y | 语义角色、可访问名 | ✅ | `role="tablist"/"tab"/"tabpanel"` + `aria-selected`，行操作与 run 操作按钮 `aria-label` |
 | 响应式 | 窄宽下可用 | ⚠️ | 双列 side-by-side 窄宽未单独验证；run 工具条 `flex-wrap` 降级 |
 
@@ -254,8 +255,8 @@
 | 视觉 | token 化浮层（`--glass-*` + `--td-*`） | ✅ | RunReviewOverlay.module.css 复用 Modal 玻璃面板配方，无硬编码调色板；只读提示条 `--td-warning` 派生 |
 | 视觉 | light/dark 对比度 | ✅ | 随 RunReviewOverlay.stories.tsx 巡检（ReadOnly/ReadOnlyZh/Empty 3 态） |
 | 交互 | 打开/关闭（按钮、Esc、backdrop）行为断言 | ✅ | RunReviewOverlay.test.tsx 覆盖三种关闭路径与内容点击不误关 |
-| 交互 | 聚合文件渲染 + run 级批准/驳回转发 | ✅ | 测试断言多文件进 panel tab、`onAcceptRun`/`onRejectRun` 转发；审查态归 DiffReviewPanel 既有 hunk 状态机，无第二套状态 |
-| 交互 | Web Hub-only 诚实降级 | ✅ | 无写回端口时渲染宿主 `readOnlyNotice`（`role="status"`）；有端口时不渲染（负向断言） |
+| 交互 | 聚合文件渲染 + 单 run 边界 | ✅ | `kind=run` evidence ref 选择当前/最新单 run，跨 run 文件不混合；同 run/path 的多个 `editId` 片段合并并对重放 hunk 去重；无 run evidence 时明示会话级 legacy 兼容视图 |
+| 交互 | Workbench 诚实只读边界 | ✅ | transcript 只有 run id、无可信历史 workDir；ConversationHost 禁止借用当前 composer workDir，传 `readOnly` 并隐藏全部写回动作，提示条使用 `role="status"`；Web 同样只读 |
 | 键盘 | 焦点困在浮层、Esc 关闭、关闭归还焦点 | ✅ | `useFocusTrap`（focusTrap.ts）+ 测试断言焦点移入/归还触发元素 |
 | a11y | `role="dialog"` + `aria-modal` + 可访问名 | ✅ | `aria-label` = 宿主标题；关闭按钮强制 `aria-label` |
 | a11y | 打开期间锁定 body 滚动并在关闭后恢复 | ✅ | 测试断言 `overflow` 变化（Modal 同构） |

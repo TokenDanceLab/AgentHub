@@ -3,9 +3,9 @@ import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 import type { TranscriptBlock, TextTranscriptBlock } from '@shared/transcript';
 import {
-  collectRunReviewFiles,
   isSidebarOnlyTranscriptBlock,
   orderTranscriptBlocks,
+  selectRunReview,
   summarizeRunReviewFiles,
 } from '@shared/transcript';
 import { RunReviewOverlay } from '@shared/ui';
@@ -258,16 +258,21 @@ export const ConversationHost = React.memo(function ConversationHost({
   }, [firstPendingApprovalId, handleApprovalJump, onOpenApprovalQueueFallback]);
 
   // ── #1967 run-level aggregate review entry ──────────────────────────
-  // Same honest boundary as the pending-approval summary: the aggregate
-  // covers the ACTIVE conversation's transcript (no Hub endpoint lists a
-  // run's diff). Review state stays owned by DiffReviewPanel's existing
-  // hunk machine — this surface is a read-only review until a write-back
-  // port is wired (Web Hub-only: the overlay shows the honest notice).
-  const runReviewFiles = useMemo(() => collectRunReviewFiles(transcript), [transcript]);
+  // Run evidence is the hard grouping boundary: select exactly one active/
+  // latest run and never merge file changes across run ids. Legacy events
+  // without run evidence use an explicitly labelled conversation fallback.
+  // This surface is inspection-only because transcript evidence has no trusted
+  // historical workDir; using the current composer workDir would be unsafe.
+  const runReviewSelection = useMemo(
+    () => selectRunReview(orderTranscriptBlocks(transcript)),
+    [transcript],
+  );
+  const runReviewFiles = runReviewSelection.files;
   const runReviewSummary = useMemo(
     () => summarizeRunReviewFiles(runReviewFiles),
     [runReviewFiles],
   );
+  const legacyRunReview = runReviewSelection.scope === 'legacy';
   const [runReviewOpen, setRunReviewOpen] = useState(false);
   // Close the overlay on conversation switch so an aggregate never bleeds
   // across sessions (same bleed guard as the arrival-toast ref above).
@@ -622,10 +627,14 @@ export const ConversationHost = React.memo(function ConversationHost({
             <button
               type="button"
               className={styles.pendingApprovalReviewAll}
-              aria-label={t('card.approval.viewAllChangesAria', { count: String(runReviewFiles.length) })}
+              aria-label={t(legacyRunReview
+                ? 'card.approval.viewLegacyChangesAria'
+                : 'card.approval.viewAllChangesAria', { count: String(runReviewFiles.length) })}
               onClick={handleOpenRunReview}
             >
-              {t('card.approval.viewAllChanges')}
+              {t(legacyRunReview
+                ? 'card.approval.viewLegacyChanges'
+                : 'card.approval.viewAllChanges')}
               <span className={styles.pendingApprovalReviewCount} aria-hidden="true">
                 {runReviewFiles.length}
               </span>
@@ -652,34 +661,28 @@ export const ConversationHost = React.memo(function ConversationHost({
         onHighlightEnd={handleSearchHighlightEnd} transcriptBlocks={displayTranscript}
         searchLabel={t('searchPanel.label')} searchPlaceholder={t('searchPanel.placeholder')}
         noResultsLabel={t('searchPanel.noResults')} />
-      {/* #1967 run-level aggregate review overlay (read-only on this surface
-          until a write-back port is wired; the notice copy says so). */}
+      {/* #1967 aggregate inspection is intentionally read-only: transcript
+          evidence has no trusted historical workDir, so no apply port is wired. */}
       <RunReviewOverlay
         open={runReviewOpen}
         files={runReviewFiles}
-        title={t('runReview.title')}
+        title={t(legacyRunReview ? 'runReview.legacyTitle' : 'runReview.title')}
         closeLabel={t('runReview.close')}
         summary={t('runReview.summary', {
           count: String(runReviewSummary.fileCount),
           additions: String(runReviewSummary.additions),
           deletions: String(runReviewSummary.deletions),
         })}
-        readOnlyNotice={t('runReview.readOnlyNotice')}
+        readOnly
+        readOnlyNotice={t(legacyRunReview
+          ? 'runReview.legacyReadOnlyNotice'
+          : 'runReview.readOnlyNotice')}
         onClose={handleCloseRunReview}
         panelLabels={{
           empty: t('runReview.empty'),
           original: t('runReview.original'),
           modified: t('runReview.modified'),
-          acceptAll: t('runReview.acceptAll'),
-          rejectAll: t('runReview.rejectAll'),
-          acceptHunk: t('runReview.acceptHunk'),
-          rejectHunk: t('runReview.rejectHunk'),
-          applied: t('runReview.applied'),
-          rejected: t('runReview.rejected'),
-          submitting: t('runReview.submitting'),
-          runTitle: t('runReview.runTitle'),
-          acceptRun: t('runReview.acceptRun'),
-          rejectRun: t('runReview.rejectRun'),
+          runTitle: t(legacyRunReview ? 'runReview.legacyRunTitle' : 'runReview.runTitle'),
         }}
       />
       {!selectionMode && (

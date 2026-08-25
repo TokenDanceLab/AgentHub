@@ -141,6 +141,7 @@ export function DiffReviewToolbar({
   acceptAllLabel,
   rejectAllLabel,
   toolbarClassName,
+  hideActions,
   onAcceptAll,
   onRejectAll,
 }: {
@@ -151,6 +152,7 @@ export function DiffReviewToolbar({
   acceptAllLabel: string;
   rejectAllLabel: string;
   toolbarClassName?: string | undefined;
+  hideActions?: boolean | undefined;
   onAcceptAll: () => void;
   onRejectAll: () => void;
 }) {
@@ -164,24 +166,26 @@ export function DiffReviewToolbar({
           <span className={styles.statsModified}>~{modifiedCount}</span>
         )}
       </div>
-      <div className={styles.toolbarActions}>
-        <button type="button"
-          className={`${styles.toolbarBtn} ${styles.acceptAllBtn}`}
-          onClick={onAcceptAll}
-          aria-label={acceptAllLabel}
-        >
-          <Check size={12} />
-          <span>{acceptAllLabel}</span>
-        </button>
-        <button type="button"
-          className={`${styles.toolbarBtn} ${styles.rejectAllBtn}`}
-          onClick={onRejectAll}
-          aria-label={rejectAllLabel}
-        >
-          <X size={12} />
-          <span>{rejectAllLabel}</span>
-        </button>
-      </div>
+      {!hideActions ? (
+        <div className={styles.toolbarActions}>
+          <button type="button"
+            className={`${styles.toolbarBtn} ${styles.acceptAllBtn}`}
+            onClick={onAcceptAll}
+            aria-label={acceptAllLabel}
+          >
+            <Check size={12} />
+            <span>{acceptAllLabel}</span>
+          </button>
+          <button type="button"
+            className={`${styles.toolbarBtn} ${styles.rejectAllBtn}`}
+            onClick={onRejectAll}
+            aria-label={rejectAllLabel}
+          >
+            <X size={12} />
+            <span>{rejectAllLabel}</span>
+          </button>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -197,6 +201,7 @@ export function DiffReviewRunToolbar({
   acceptRunLabel,
   rejectRunLabel,
   runToolbarClassName,
+  hideActions,
   onAcceptRun,
   onRejectRun,
 }: {
@@ -206,6 +211,7 @@ export function DiffReviewRunToolbar({
   acceptRunLabel: string;
   rejectRunLabel: string;
   runToolbarClassName?: string | undefined;
+  hideActions?: boolean | undefined;
   onAcceptRun: () => void;
   onRejectRun: () => void;
 }) {
@@ -213,24 +219,26 @@ export function DiffReviewRunToolbar({
     <div className={cx(styles.runToolbar, runToolbarClassName)} data-testid="diff-review-run-toolbar">
       <span className={styles.runToolbarTitle}>{title}</span>
       {summary ? <span className={styles.runToolbarSummary}>{summary}</span> : null}
-      <div className={styles.toolbarActions}>
-        <button type="button"
-          className={`${styles.toolbarBtn} ${styles.acceptAllBtn}`}
-          onClick={onAcceptRun}
-          aria-label={acceptRunLabel}
-        >
-          <Check size={12} />
-          <span>{acceptRunLabel}</span>
-        </button>
-        <button type="button"
-          className={`${styles.toolbarBtn} ${styles.rejectAllBtn}`}
-          onClick={onRejectRun}
-          aria-label={rejectRunLabel}
-        >
-          <X size={12} />
-          <span>{rejectRunLabel}</span>
-        </button>
-      </div>
+      {!hideActions ? (
+        <div className={styles.toolbarActions}>
+          <button type="button"
+            className={`${styles.toolbarBtn} ${styles.acceptAllBtn}`}
+            onClick={onAcceptRun}
+            aria-label={acceptRunLabel}
+          >
+            <Check size={12} />
+            <span>{acceptRunLabel}</span>
+          </button>
+          <button type="button"
+            className={`${styles.toolbarBtn} ${styles.rejectAllBtn}`}
+            onClick={onRejectRun}
+            aria-label={rejectRunLabel}
+          >
+            <X size={12} />
+            <span>{rejectRunLabel}</span>
+          </button>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -293,6 +301,7 @@ export function DiffReviewSideColumn({
   diffRowClassName,
   lineActionBtnClassName,
   columnClassName,
+  hideActions,
   onAcceptClick,
   onRejectClick,
 }: {
@@ -312,6 +321,7 @@ export function DiffReviewSideColumn({
   diffRowClassName?: string | undefined;
   lineActionBtnClassName?: string | undefined;
   columnClassName?: string | undefined;
+  hideActions?: boolean | undefined;
   onAcceptClick: (rowIndex: number) => void;
   onRejectClick: (rowIndex: number) => void;
 }) {
@@ -380,7 +390,7 @@ export function DiffReviewSideColumn({
                 __html: renderLineHtml(row, cell, activeLang),
               }}
             />
-            {row.rowType !== 'context' && (
+            {!hideActions && row.rowType !== 'context' && (
               <div className={styles.lineActions}>
                 <Tooltip label={acceptHunkLabel}>
                   <button type="button"
