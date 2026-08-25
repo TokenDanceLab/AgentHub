@@ -281,6 +281,7 @@ describe('AgentHubWorkbenchHelpers', () => {
     expect('onAgentCreate' in minimal).toBe(false);
     expect('projectsPort' in minimal).toBe(false);
     expect('connectionStatus' in minimal).toBe(false);
+    expect('attention' in minimal).toBe(false);
     // children may be null — only assign when defined; null is defined
     expect(minimal.children).toBeNull();
 
@@ -298,6 +299,7 @@ describe('AgentHubWorkbenchHelpers', () => {
         userDisplayName: 'User',
         connectionStatus: 'connected',
         highlightedBlockId: 'b1',
+        attention: { runs: [], approvals: [], threads: [] },
       }),
       activePage: 'agents',
       isChatPage: false,
@@ -317,6 +319,7 @@ describe('AgentHubWorkbenchHelpers', () => {
     expect(full.userDisplayName).toBe('User');
     expect(full.connectionStatus).toBe('connected');
     expect(full.highlightedBlockId).toBe('b1');
+    expect(full.attention).toEqual({ runs: [], approvals: [], threads: [] });
     expect(full.showComposerAgentPicker).toBe(false);
     expect('children' in full).toBe(false);
   });

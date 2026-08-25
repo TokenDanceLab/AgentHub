@@ -23,6 +23,12 @@ export {
   runtimeEvidenceSourceSummary,
 } from './mainchain';
 export { MainchainStatusStrip } from './MainchainStatusStrip';
+export {
+  deriveConversationLiveStatus,
+  findFirstAwaitingConversationId,
+  isRunActive,
+  summarizeWorkbenchAttention,
+} from './workbenchAttentionModel';
 export type { TranscriptContextMenuEvent, TranscriptPointerEvent } from './transcriptEventTypes';
 export {
   buildAgentCapabilityContractFromConfig,
@@ -91,6 +97,12 @@ export type {
   MainchainWorkbenchStatus,
 } from './mainchain';
 export type { MainchainStatusStripProps } from './MainchainStatusStrip';
+export type {
+  ConversationLiveStatus,
+  WorkbenchAttentionCounts,
+  WorkbenchAttentionInput,
+  WorkbenchAttentionSummary,
+} from './workbenchAttentionModel';
 export type {
   WorkbenchAgentProfilesStatus,
   WorkbenchContactsData,

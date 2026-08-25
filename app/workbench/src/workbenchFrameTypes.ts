@@ -27,6 +27,10 @@ import type { WorkbenchTranscriptChrome } from './useWorkbenchTranscriptChrome';
 import type { WorkbenchProfileChrome } from './useWorkbenchProfileChrome';
 import type { WorkbenchProjectsPort } from './workbenchProjectsPort';
 import type {
+  ConversationLiveStatus,
+  WorkbenchAttentionCounts,
+} from './workbenchAttentionModel';
+import type {
   AgentHubWorkbenchModelCatalogItem,
   AgentHubWorkbenchProjectsStatus,
   AgentHubWorkbenchProps,
@@ -98,6 +102,8 @@ export interface ChatSidebarFrameProps {
   onConversationArchive?: ((conversationId: string, archived: boolean) => void) | undefined;
   /** Started when the user clicks the sidebar "new conversation" entry (#1819). */
   onStartNewConversation?: (() => void) | undefined;
+  /** F1 live status dots per conversation (absent = no run inventory). */
+  liveStatusByConversation?: Record<string, ConversationLiveStatus> | undefined;
   sidebarWidth: number;
   sidebarCollapsed: boolean;
   resizeSidebarBy: (delta: number) => void;
@@ -144,6 +150,12 @@ export interface ChatConversationHostFrameProps {
    * shows an honest loading state instead of the "no messages" empty state.
    */
   transcriptLoading?: boolean | undefined;
+  /** F6 global attention counts for the status strip chips. */
+  attentionCounts?: WorkbenchAttentionCounts | undefined;
+  /** F6 running chip click-through (Tasks page queue). */
+  onOpenRunningQueue?: (() => void) | undefined;
+  /** F6 awaiting chip fallback when the active conversation has no pending block. */
+  onOpenApprovalQueueFallback?: (() => void) | undefined;
 }
 
 export interface WorkbenchRoutesFrameProps {
