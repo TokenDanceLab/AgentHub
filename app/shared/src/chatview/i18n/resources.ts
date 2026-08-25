@@ -758,6 +758,12 @@ export const chatviewResources = {
     'prompt.peerContext.conflict': '如果需要在共享文件上工作...',
     'prompt.peerContext.modifySame': '如果两个 Agent 修改同一个文件...',
 
+    // ═══ Task queue / task-conversation deep links (#1963) ═══
+    'taskQueue.title': '任务队列',
+    'taskQueue.openConversation': '进入承载会话',
+    'taskQueue.backToTask': '返回任务',
+    'taskQueue.backToConversation': '返回会话',
+
     // ═══ OIDC pages (for Go template rendering) ═══
     'oidc.missingParams.title': 'AgentHub — 缺少参数',
     'oidc.missingParams.heading': '缺少参数',
@@ -1511,6 +1517,12 @@ export const chatviewResources = {
     'prompt.peerContext.noModify': 'Do not modify files that other agents are working on',
     'prompt.peerContext.conflict': 'If you need to work on shared files...',
     'prompt.peerContext.modifySame': 'If two agents modify the same file...',
+
+    // ═══ Task queue / task-conversation deep links (#1963) ═══
+    'taskQueue.title': 'Task queue',
+    'taskQueue.openConversation': 'Open hosting conversation',
+    'taskQueue.backToTask': 'Back to task',
+    'taskQueue.backToConversation': 'Back to conversation',
 
     // ═══ OIDC pages (for Go template rendering) ═══
     'oidc.missingParams.title': 'AgentHub — Missing Parameters',
