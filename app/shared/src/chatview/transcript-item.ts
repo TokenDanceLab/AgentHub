@@ -13,6 +13,14 @@ export interface TranscriptUserItem {
   name?: string
   time?: string
   text: string
+  /**
+   * Attachment rows carried by human-authored attachment blocks (#1957).
+   * Image rows render an inline thumbnail through the shared
+   * ImageAttachmentRow (same platform-port resolution and degradation as
+   * agent rows); non-image rows keep the file-chip semantics. Absent for
+   * text-only user messages.
+   */
+  attachments?: RowItem[]
   displayTitle?: string
   displayDetail?: string
   badgeLabel?: string
