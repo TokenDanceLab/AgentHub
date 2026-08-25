@@ -70,6 +70,20 @@ ensure_docker_network() {
   require_cmd python3
   require_cmd git
 
+  # 0-pre. docker compose 插件可用性（幂等自动修复）。非登录 shell 的
+  # PATH 可能把 docker 解析到不带 compose 插件的裸 CLI；缺失时安装
+  # docker-compose-v2 插件（与既有 0a/0b 同一自动修复纪律）。
+  if ! docker compose version >/dev/null 2>&1; then
+    info "docker compose plugin missing; installing docker-compose-v2"
+    sudo apt-get update -qq >/dev/null 2>&1 || true
+    sudo apt-get install -y -qq docker-compose-v2 >/dev/null
+    if docker compose version >/dev/null 2>&1; then
+      info "docker compose plugin installed"
+    else
+      fail "docker-self-check|docker compose still unavailable after installing docker-compose-v2"
+    fi
+  fi
+
   # 0a. daemon.json 中死链 registry-mirrors 移除（例如 mirror.baidubce.com）
   if [ -f /etc/docker/daemon.json ]; then
     local mirror_changed
