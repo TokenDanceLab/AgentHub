@@ -254,3 +254,31 @@ describe('AgentGroup rendering', () => {
     }
   });
 });
+
+describe('AgentGroup fenced code (#1971)', () => {
+  it('renders agent fenced code bubbles as code blocks', () => {
+    const item: TranscriptAgentItem = {
+      id: 'agent-fenced',
+      agent: 'Hub Agent',
+      role: 'agent',
+      time: '',
+      rows: [],
+      standaloneRows: [],
+      runs: [],
+      parts: [
+        {
+          type: 'bubble',
+          text: 'Here is a fenced code sample:\n```python\ndef greet():\n    return 42\n```\n',
+          blockId: 'hub-message-m2',
+        },
+      ],
+      bubbles: ['Here is a fenced code sample:\n```python\ndef greet():\n    return 42\n```\n'],
+    };
+
+    const { container, getByText } = render(<AgentGroup item={item} chatMode="dm" />);
+
+    expect(getByText('Here is a fenced code sample:')).toBeInTheDocument();
+    expect(container.textContent).toContain('return 42');
+    expect(container.querySelectorAll('pre, code, [class*="codeBlockWrapper"]').length).toBeGreaterThan(0);
+  });
+});
