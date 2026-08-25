@@ -74,6 +74,15 @@ export interface DiffReviewLabels {
   applied?: string;
   rejected?: string;
   submitting?: string;
+  /**
+   * Run-level toolbar (#1967): title for the whole-run change aggregate,
+   * batch accept/reject across every file's hunks, and an optional
+   * host-interpolated summary line (e.g. "3 files · +12 −5").
+   */
+  runTitle?: string;
+  runSummary?: string;
+  acceptRun?: string;
+  rejectRun?: string;
 }
 
 export interface DiffHunkDecision {
@@ -92,6 +101,19 @@ export interface DiffReviewPanelProps {
   onApplyHunk?: (decision: DiffHunkDecision) => void | Promise<void>;
   /** Called when all hunks are accepted or rejected in batch. */
   onApplyAllHunks?: (decisions: DiffHunkDecision[]) => void | Promise<void>;
+  /**
+   * Run-level review (#1967): render the whole-run summary toolbar above
+   * the file tabs. Accept/reject-run commits every hunk of every file
+   * through the SAME hunk state machine + `onApplyAllHunks` port as the
+   * per-file batch — no second review state system.
+   */
+  runLevel?: boolean;
+  /** Hide every accept/reject control for an explicitly read-only surface. */
+  readOnly?: boolean;
+  /** Notified after a run-level accept (batch commit already dispatched). */
+  onAcceptRun?: () => void;
+  /** Notified after a run-level reject (batch commit already dispatched). */
+  onRejectRun?: () => void;
   labels?: DiffReviewLabels;
   /** When set, the panel will switch to the tab matching this file path. */
   focusedFilePath?: string;
@@ -116,4 +138,8 @@ export const DEFAULT_LABELS: Required<DiffReviewLabels> = {
   applied: 'Applied',
   rejected: 'Rejected',
   submitting: 'Submitting...',
+  runTitle: 'All changes in this run',
+  runSummary: '',
+  acceptRun: 'Accept run',
+  rejectRun: 'Reject run',
 };
