@@ -4,6 +4,7 @@ import { ProfilePopover, DemoToast } from './floating';
 import { DesignNavIcon, type DesignNavIconName } from './designIcons';
 import { CHATVIEW_I18N_NAMESPACE } from '@shared/chatview/i18n/resources';
 import { Tooltip } from '@shared/ui/Tooltip';
+import type { WorkbenchAttentionCounts } from './workbenchAttentionModel';
 import styles from './AgentHubWorkbench.module.css';
 
 /* ═══ Page routing ═══ */
@@ -50,6 +51,12 @@ export interface GlobalRailProps {
   userAvatarUrl?: string | undefined;
   /** WebSocket connection status shown as a colored dot in the rail footer. */
   connectionStatus?: ConnectionStatusKind | undefined;
+  /**
+   * Global attention counts (F1/F6). When present and non-zero, the Tasks
+   * entry carries a count badge; clicking it navigates to the Tasks queue.
+   * Absent when the shell provides no run/approval inventory.
+   */
+  attention?: WorkbenchAttentionCounts | undefined;
 }
 
 export function GlobalRail({
@@ -60,6 +67,7 @@ export function GlobalRail({
   userDisplayName,
   userAvatarUrl,
   connectionStatus,
+  attention,
 }: GlobalRailProps): React.ReactElement {
   const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE);
   const [internalPage, setInternalPage] = useState<GlobalRailPage>('chat');
@@ -82,6 +90,11 @@ export function GlobalRail({
     usage: t('nav.usage'),
     settings: t('user.settings'),
   };
+
+  const attentionTotal = (attention?.runningCount ?? 0) + (attention?.awaitingApprovalCount ?? 0);
+  const attentionBreakdown = attention && attentionTotal > 0
+    ? `运行中 ${attention.runningCount} · 待批准 ${attention.awaitingApprovalCount}`
+    : undefined;
 
   // Use controlled props when provided, otherwise fall back to internal state.
   const isControlled = activePageProp !== undefined;
@@ -191,20 +204,32 @@ export function GlobalRail({
         )}
       </div>
 
-      {topNavItems.map((item, index) => (
-        <button type="button"
-          aria-current={activePage === item.id ? 'page' : undefined}
-          aria-label={navLabelMap[item.id] ?? item.label}
-          className={styles.railButton}
-          data-rail-page={item.id}
-          key={item.id}
-          onClick={() => handleNavigate(item.id)}
-          tabIndex={rovingIndex === index ? 0 : -1}
-          title={navLabelMap[item.id] ?? item.label}
-        >
-          <DesignNavIcon name={item.icon} size={18} />
-        </button>
-      ))}
+      {topNavItems.map((item, index) => {
+        const showAttentionBadge = item.id === 'runs' && attentionTotal > 0;
+        const baseLabel = navLabelMap[item.id] ?? item.label;
+        const itemLabel = showAttentionBadge && attentionBreakdown
+          ? `${baseLabel}（${attentionBreakdown}）`
+          : baseLabel;
+        return (
+          <button type="button"
+            aria-current={activePage === item.id ? 'page' : undefined}
+            aria-label={itemLabel}
+            className={styles.railButton}
+            data-rail-page={item.id}
+            key={item.id}
+            onClick={() => handleNavigate(item.id)}
+            tabIndex={rovingIndex === index ? 0 : -1}
+            title={itemLabel}
+          >
+            <DesignNavIcon name={item.icon} size={18} />
+            {showAttentionBadge && (
+              <span aria-hidden="true" className={styles.railAttentionBadge} data-rail-attention>
+                {attentionTotal}
+              </span>
+            )}
+          </button>
+        );
+      })}
 
       <div className={styles.railSpacer} />
 

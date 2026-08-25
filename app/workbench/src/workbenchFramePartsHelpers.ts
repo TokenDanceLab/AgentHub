@@ -43,6 +43,7 @@ export function buildConversationSidebarProps(
     | 'onConversationPin'
     | 'onConversationArchive'
     | 'onStartNewConversation'
+    | 'liveStatusByConversation'
   >,
 ): ConversationSidebarProps {
   const sidebarProps: ConversationSidebarProps = {
@@ -54,6 +55,7 @@ export function buildConversationSidebarProps(
   assignIfDefined(sidebarProps, 'onPinConversation', props.onConversationPin);
   assignIfDefined(sidebarProps, 'onArchiveConversation', props.onConversationArchive);
   assignIfDefined(sidebarProps, 'onStartNewConversation', props.onStartNewConversation);
+  assignIfDefined(sidebarProps, 'liveStatusByConversation', props.liveStatusByConversation);
   return sidebarProps;
 }
 
@@ -92,6 +94,9 @@ export function buildChatConversationHostProps(
     highlightedBlockId,
     onHighlightEnd,
     transcriptLoading,
+    attentionCounts,
+    onOpenRunningQueue,
+    onOpenApprovalQueueFallback,
   } = props;  const {
     currentConversationId,
     activeConversation,
@@ -168,6 +173,9 @@ export function buildChatConversationHostProps(
   assignIfDefined(hostProps, 'onCancelRun', props.onCancelRun);
   assignIfDefined(hostProps, 'onEditMessage', props.onEditMessage);
   assignIfDefined(hostProps, 'transcriptLoading', transcriptLoading);
+  assignIfDefined(hostProps, 'attentionCounts', attentionCounts);
+  assignIfDefined(hostProps, 'onOpenRunningQueue', onOpenRunningQueue);
+  assignIfDefined(hostProps, 'onOpenApprovalQueueFallback', onOpenApprovalQueueFallback);
 
   return hostProps;
 }

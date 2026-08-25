@@ -45,6 +45,7 @@ export function ChatSidebarFrame({
   onConversationPin,
   onConversationArchive,
   onStartNewConversation,
+  liveStatusByConversation,
   sidebarWidth,
   sidebarCollapsed,
   resizeSidebarBy,
@@ -58,6 +59,7 @@ export function ChatSidebarFrame({
     onConversationPin,
     onConversationArchive,
     onStartNewConversation,
+    liveStatusByConversation,
   });
 
   return (

@@ -9,8 +9,10 @@ import type { TranscriptBlock } from '@shared/transcript';
  * groups. There is no Hub endpoint that lists pending approvals across
  * sessions (verified: listTaskApprovals is per-task; team approvals are per
  * team-run; Hub notifications never carry approval types), so the badge/
- * count/toast covers the ACTIVE conversation only — cross-session coverage
- * would need a new backend surface.
+ * count/toast covers the ACTIVE conversation only. Cross-session attention
+ * (rail badge / status-strip counts / sidebar live dots) is derived in
+ * workbenchAttentionModel.ts from the shell-provided run/approval/thread
+ * model arrays instead of a backend aggregation endpoint.
  */
 
 /**

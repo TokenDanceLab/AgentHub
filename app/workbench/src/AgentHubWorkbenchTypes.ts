@@ -16,6 +16,7 @@ import type { AgentConfig, ProjectDraft, DocRow } from './pages';
 import type { SkillMarketItem, MCPMarketItem } from './pages/AgentsPage';
 import type { ProjectInfo } from './pages/ProjectsPage';
 import type { WorkbenchProjectsPort } from './workbenchProjectsPort';
+import type { WorkbenchAttentionInput } from './workbenchAttentionModel';
 
 /* ═══════════════════════════════════════════════════════════════════════
    AgentHubWorkbenchTypes — public props contract residual extract (#683).
@@ -142,6 +143,13 @@ export interface AgentHubWorkbenchProps {
    * regenerate surfaces an error toast instead of a fake success (#1821).
    */
   onRegenerate?: ((blockId: string) => Promise<void> | void) | undefined;
+  /**
+   * F1/F6 attention source: the shell's existing run/approval/thread model
+   * arrays. The workbench derives sidebar live dots, the rail badge and the
+   * status-strip counts from this single input (workbenchAttentionModel).
+   * Absent on surfaces without a run inventory — all attention chrome hides.
+   */
+  attention?: WorkbenchAttentionInput | undefined;
   /** Whether an agent run is currently active (stop button morph, #1462 CF13). */
   isAgentRunning?: boolean | undefined;
   /** Cancel the active agent run (stop button handler). */
