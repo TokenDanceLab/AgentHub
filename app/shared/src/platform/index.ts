@@ -4,9 +4,16 @@ export {
   getAttachmentImageUrlResolver,
   registerAttachmentImageUrlResolver,
 } from './attachmentImagePort';
+export {
+  getAttachmentMediaUrlResolver,
+  registerAttachmentMediaUrlResolver,
+} from './attachmentMediaPort';
 export { createAttachmentImageUrlResolver } from './createAttachmentImageUrlResolver';
+export { createAttachmentMediaUrlResolver } from './createAttachmentMediaUrlResolver';
 export type { AttachmentImageUrlResolver } from './attachmentImagePort';
+export type { AttachmentMediaUrlResolver } from './attachmentMediaPort';
 export type { AttachmentImageUrlResolverDeps } from './createAttachmentImageUrlResolver';
+export type { AttachmentMediaUrlResolverDeps } from './createAttachmentMediaUrlResolver';
 export type {
   AgentHubPlatform,
   AgentHubSurface,

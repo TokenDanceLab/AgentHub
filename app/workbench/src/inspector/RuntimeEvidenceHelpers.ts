@@ -43,6 +43,8 @@ export function runtimeEvidenceOverviewFiles(
         type: artifact.kind,
         isPrimary: true,
         owner: 'Hub replay',
+        // Known artifact size feeds the media preview size caps (#1939).
+        sizeBytes: artifact.sizeBytes,
         // Host-owned content endpoint ref (Desktop resolves it against the
         // Local Edge); shared never constructs host REST paths.
         contentRef: artifactRunId

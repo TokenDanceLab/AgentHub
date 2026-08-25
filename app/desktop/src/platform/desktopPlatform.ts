@@ -11,6 +11,7 @@ import {
 import {
   createMockTerminalPort,
   registerAttachmentImageUrlResolver,
+  registerAttachmentMediaUrlResolver,
   type AgentHubPlatform,
   type LocalCliDiscoveryManifest,
   type RuntimeSessionSummary,
@@ -32,6 +33,7 @@ import {
   downloadDesktopArtifactContent,
   openDesktopEvidencePreview,
   resolveDesktopAttachmentImageUrl,
+  resolveDesktopAttachmentMediaUrl,
   resolveDesktopEvidenceContentUrl,
   resolveDesktopRuntimeEvidenceContent,
 } from './desktopPreview';
@@ -147,6 +149,8 @@ export function createDesktopPlatform(options: DesktopPlatformOptions = {}): Des
   // #1938: let the shared transcript reach the desktop attachment-image
   // resolver without prop threading through workbench glue.
   registerAttachmentImageUrlResolver(resolveDesktopAttachmentImageUrl);
+  // #1939: same registration path for audio/video attachment media.
+  registerAttachmentMediaUrlResolver(resolveDesktopAttachmentMediaUrl);
 
   return {
     surface: 'desktop',
@@ -215,6 +219,7 @@ export function createDesktopPlatform(options: DesktopPlatformOptions = {}): Des
       resolveContentUrl: resolveDesktopEvidenceContentUrl,
       resolveRuntimeEvidenceContent: resolveDesktopRuntimeEvidenceContent,
       resolveAttachmentImageUrl: resolveDesktopAttachmentImageUrl,
+      resolveAttachmentMediaUrl: resolveDesktopAttachmentMediaUrl,
       // Desktop owns the Local Edge, so it resolves artifact content via the
       // Edge endpoint and performs a real download (#1945).
       downloadArtifactContent: downloadDesktopArtifactContent,

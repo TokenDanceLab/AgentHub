@@ -7,7 +7,7 @@ import {
   IconBrain, IconFileText, IconSearch, IconFile, IconEdit,
   IconShield, IconArrowForward, IconSubtask, IconPlayerPlay, IconChevronDown,
   IconTarget, IconUpload, IconChart, IconDatabase, IconBraces,
-  IconMarkdown, IconCss, IconTerminal, IconGlobe,
+  IconMarkdown, IconCss, IconTerminal, IconGlobe, IconMusic, IconVideo,
 } from './Icons'
 import { CHATVIEW_I18N_NAMESPACE } from '../i18n/resources'
 import { cardLabelKey, toolKey, isToolResult } from '../design/labels'
@@ -19,6 +19,7 @@ import type { RiskLevel } from '../../ui/RiskBadge'
 import { useCopiedFlag } from '../../ui/useCopiedFlag'
 import { isSafeRemotePreviewUrl } from '../../ui/previewSandbox'
 import { ImageAttachmentRow } from './ImageAttachment'
+import { MediaAttachmentRow } from './MediaAttachment'
 import './RowItem.css'
 
 type IconComponent = React.FC<{ size?: number; className?: string }>
@@ -50,6 +51,18 @@ function fileIcon(item: RowItemType): IconComponent {
     case 'html': case 'json': return IconBraces
     default: return IconFile
   }
+}
+
+/**
+ * Attachment row icon (#1939): kind-driven, mirroring the #1938 image
+ * scheme — audio/video rows get media icons from the explicit
+ * `attachmentKind` marker (never re-parsed from free-form text); image and
+ * generic file rows keep the upload icon.
+ */
+function attachmentIcon(item: RowItemType): IconComponent {
+  if (item.attachmentKind === 'audio') return IconMusic
+  if (item.attachmentKind === 'video') return IconVideo
+  return IconUpload
 }
 
 function FileTypeIcon({ item }: { item: RowItemType }) {
@@ -188,8 +201,10 @@ export const RowItem = memo(function RowItem({ item, onToggle, onApprove, onReje
     setConfirmingApprove(false)
   }, [item.id, item.status, item.type])
 
-  // Icon: file cards use extension-based icon; others use toolName or type
+  // Icon: file cards use extension-based icon; attachment cards use the
+  // kind-driven icon table (#1939); others use toolName or type
   const IconComp = item.type === 'file' ? fileIcon(item)
+    : item.type === 'attachment' ? attachmentIcon(item)
     : iconOverride[toolKey(item)] || iconMap[item.type] || IconFileText
 
   const { key: labelKey, params: labelParams } = cardLabelKey(item)
@@ -380,12 +395,19 @@ export const RowItem = memo(function RowItem({ item, onToggle, onApprove, onReje
         {item.extra && <span className="row-extra">{item.extra}</span>}
         {item.collapsible && <IconChevronDown className="row-chevron" size={12} />}
       </button>
-      {/* #1938: image attachment body renders unconditionally — the row is
-          not collapsible, so gating it on isOpen would hide it forever.
-          Non-image attachments keep their previous header-only rendering. */}
+      {/* #1938/#1939: media attachment bodies render unconditionally — the
+          row is not collapsible, so gating them on isOpen would hide them
+          forever. Image rows keep the thumbnail/lightbox body; audio/video
+          rows render a native player resolved through the platform port.
+          Other attachments keep their previous header-only rendering. */}
       {item.type === 'attachment' && item.attachmentKind === 'image' && item.attachmentRef && (
         <div className="row-bd">
           <ImageAttachmentRow item={item} />
+        </div>
+      )}
+      {item.type === 'attachment' && (item.attachmentKind === 'audio' || item.attachmentKind === 'video') && item.attachmentRef && (
+        <div className="row-bd">
+          <MediaAttachmentRow item={item} />
         </div>
       )}
       {isOpen && (

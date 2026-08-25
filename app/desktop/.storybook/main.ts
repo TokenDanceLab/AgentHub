@@ -5,6 +5,7 @@ const config: StorybookConfig = {
   stories: [
     '../src/**/*.stories.{ts,tsx}',
     '../../shared/src/ui/**/*.stories.{ts,tsx}',
+    '../../shared/src/chatview/components/**/*.stories.{ts,tsx}',
   ],
   addons: [
     '@storybook/addon-essentials',

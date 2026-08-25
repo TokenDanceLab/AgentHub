@@ -5,11 +5,13 @@ import {
   diffLineClass,
   fileTypeLabel,
   highlightDiffLine,
+  isAudioFile,
   isHtmlFile,
   isImageFile,
   isMarkdownFile,
   isPdfFile,
   isTextFile,
+  isVideoFile,
   nativeModeLabel,
   openWithIconClass,
   openWithItems,
@@ -33,6 +35,20 @@ describe('FilePreviewHelpers', () => {
     expect(isTextFile('notes.csv')).toBe(true);
     expect(isMarkdownFile('handoff.mdx')).toBe(true);
     expect(isPdfFile('shot.png')).toBe(false);
+  });
+
+  it('detects audio/video media by extension through the shared SSOT (#1939)', () => {
+    expect(isAudioFile('voice.mp3')).toBe(true);
+    expect(isAudioFile('voice.OGG')).toBe(true);
+    expect(isAudioFile('voice.m4a')).toBe(true);
+    expect(isVideoFile('clip.mp4')).toBe(true);
+    expect(isVideoFile('clip.WEBM')).toBe(true);
+    expect(isVideoFile('clip.mkv')).toBe(true);
+    // Cross-family and non-media negatives.
+    expect(isAudioFile('clip.mp4')).toBe(false);
+    expect(isVideoFile('voice.mp3')).toBe(false);
+    expect(isAudioFile('notes.txt')).toBe(false);
+    expect(isVideoFile('app.ts')).toBe(false);
   });
 
   it('plans default and native preview modes', () => {

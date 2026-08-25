@@ -55,14 +55,16 @@ export interface RowItem {
   fileName?: string
   fileSize?: string
   /**
-   * Attachment payload kind (#1938). `'image'` rows render an inline
-   * thumbnail (click to enlarge); `'file'` rows keep the plain chip.
+   * Attachment payload kind (#1938, media kinds added by #1939). `'image'`
+   * rows render an inline thumbnail (click to enlarge); `'audio'`/`'video'`
+   * rows render an inline native player (URL resolved through the platform
+   * port, same honesty contract); `'file'` rows keep the plain chip.
    * Carried explicitly so rendering never re-parses the free-form `extra`.
    */
-  attachmentKind?: 'image' | 'file'
+  attachmentKind?: 'image' | 'audio' | 'video' | 'file'
   /**
-   * Hub attachment ref for image rows (#1938) — the platform port resolves
-   * `id` into a displayable URL; absent for non-attachment rows.
+   * Hub attachment ref for media rows (#1938/#1939) — the platform port
+   * resolves `id` into a displayable URL; absent for non-attachment rows.
    */
   attachmentRef?: AttachmentRef
   ctxPct?: number

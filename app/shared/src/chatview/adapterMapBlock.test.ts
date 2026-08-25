@@ -809,6 +809,51 @@ describe('mapBlock — attachment blocks', () => {
     })
     expect(row.fileSize).toBe('2 KB')
   })
+
+  it('derives the audio kind from the Hub mime for file attachments (#1939)', () => {
+    const attachmentRef = { id: 'att-4', name: 'voice.mp3', size: 2048, mime_type: 'audio/mpeg' }
+    const row = mapRow({
+      id: 'at4', kind: 'attachment', author: makeAuthor('a1'),
+      attachmentRef,
+      contentType: 'file',
+    })
+    expect(row.attachmentKind).toBe('audio')
+    expect(row.attachmentRef).toEqual(attachmentRef)
+  })
+
+  it('derives the video kind from the Hub mime for file attachments (#1939)', () => {
+    const row = mapRow({
+      id: 'at5', kind: 'attachment', author: makeAuthor('a1'),
+      attachmentRef: { id: 'att-5', name: 'demo.mp4', size: 4096, mime_type: 'video/mp4' },
+      contentType: 'file',
+    })
+    expect(row.attachmentKind).toBe('video')
+  })
+
+  it('falls back to the filename extension when the stored mime is generic (#1939)', () => {
+    const video = mapRow({
+      id: 'at6', kind: 'attachment', author: makeAuthor('a1'),
+      attachmentRef: { id: 'att-6', name: 'clip.MP4', size: 4096, mime_type: 'application/octet-stream' },
+      contentType: 'file',
+    })
+    expect(video.attachmentKind).toBe('video')
+
+    const audio = mapRow({
+      id: 'at7', kind: 'attachment', author: makeAuthor('a1'),
+      attachmentRef: { id: 'att-7', name: 'voice.ogg', size: 1024, mime_type: '' },
+      contentType: 'file',
+    })
+    expect(audio.attachmentKind).toBe('audio')
+  })
+
+  it('keeps an explicit image content type on the image kind regardless of name (#1939)', () => {
+    const row = mapRow({
+      id: 'at8', kind: 'attachment', author: makeAuthor('a1'),
+      attachmentRef: { id: 'att-8', name: 'weird.mp3.png', size: 10, mime_type: 'image/png' },
+      contentType: 'image',
+    })
+    expect(row.attachmentKind).toBe('image')
+  })
 })
 
 describe('mapBlock — failure blocks', () => {
