@@ -22,6 +22,10 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'node',
+    // Flake retry policy SSOT: docs/governance/known-flaky.md. Unit-lane budget
+    // is 0 (fail-closed); raising it needs a registry entry with a review
+    // deadline.
+    retries: 0,
     include: ['src/**/*.test.ts'],
     coverage: createCoverage({
       // 绝对 floors（2026-08-15 re-baseline：CI 实测 34.51/34.27/26.83/21.16，

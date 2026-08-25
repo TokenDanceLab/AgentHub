@@ -8,6 +8,8 @@ export default defineConfig({
   testDir: './src/__e2e__',
   timeout: 60_000,
   expect: { timeout: 10_000 },
+  // Flake retry policy SSOT: docs/governance/known-flaky.md. Budget stays 0
+  // (fail-closed); raising it needs a registry entry with a review deadline.
   retries: 0,
   use: {
     baseURL: desktopE2EBaseURL,
