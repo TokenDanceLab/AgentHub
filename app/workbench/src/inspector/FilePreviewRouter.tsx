@@ -12,11 +12,19 @@ import { DocxPreview } from '@shared/ui/DocxPreview';
 import { SlideshowPreview } from '@shared/ui/SlideshowPreview';
 import { TablePreview } from '@shared/ui/TablePreview';
 import { PREVIEW_SANDBOX_SRCDOC } from '@shared/ui/previewSandbox';
+import {
+  formatPreviewByteLimit,
+  isNativelyPlayableMediaFileName,
+  isSafeMediaSourceUrl,
+  isWithinPreviewSizeLimit,
+  maxPreviewBytesForKind,
+  type MediaKind,
+} from '@shared/ui/mediaPreview';
 import { useToastStore } from '@shared/ui/toast/toastStore';
 import { DesignFileIcon } from '../designIcons';
 import styles from '../AgentHubWorkbench.module.css';
 import { FilePreview } from './FilePreview';
-import { resolvePreviewContentUrl } from './FilePreviewHelpers';
+import { isAudioFile, isVideoFile, resolvePreviewContentUrl } from './FilePreviewHelpers';
 import type { FileItem } from './OverviewPanel';
 
 /* ═══════════════════════════════════════════════════════════════════════
@@ -34,6 +42,12 @@ import type { FileItem } from './OverviewPanel';
      .pdf                  -> browser-native PDF iframe (needs a resolvable
                               content URL; honest notice otherwise)
      .html / .htm          -> sandboxed HTML iframe (srcDoc)
+     .mp3/.wav/...         -> native <audio controls> via evidence content URL
+     .mp4/.webm/...        -> native <video controls> via evidence content URL
+                              (audio/video honor the shared media caps:
+                              format cap, size cap, safe-src scheme gate;
+                              any gate hit renders an honest notice — never
+                              an empty player or a binary dump, #1939)
      .png/.jpg/...         -> image via evidence content URL (honest notice
                               when no resolvable URL exists)
      .txt / .log           -> plain <pre>
@@ -56,6 +70,12 @@ export type PreviewFile = FileItem & {
    * shared code never constructs host REST paths itself (#1817).
    */
   contentRef?: RuntimeEvidenceContentRef | undefined;
+  /**
+   * Known file size in bytes when the evidence mapper has one (#1939).
+   * Media previews gate on it against the shared size thresholds; an
+   * absent size is not gated (nothing honest to compare against).
+   */
+  sizeBytes?: number | undefined;
   /** When present, this is an interactive diff from a run — enables accept/reject with Edge apply. */
   interactiveDiff?:
     | {
@@ -88,6 +108,8 @@ type FilePreviewKind =
   | 'docx'
   | 'pdf'
   | 'html'
+  | 'audio'
+  | 'video'
   | 'image'
   | 'text';
 
@@ -101,6 +123,11 @@ function detectFilePreviewKind(fileName: string): FilePreviewKind {
   if (lower.endsWith('.docx')) return 'docx';
   if (lower.endsWith('.pdf')) return 'pdf';
   if (lower.endsWith('.html') || lower.endsWith('.htm')) return 'html';
+  // Media detection delegates to the shared extension SSOT (#1939); keeping
+  // it out of the inline regexes means transcript rows and the inspector
+  // router can never disagree on what counts as audio/video.
+  if (isAudioFile(lower)) return 'audio';
+  if (isVideoFile(lower)) return 'video';
   if (/\.(png|jpe?g|gif|svg|webp|bmp|ico|avif)$/.test(lower)) return 'image';
   if (/\.(txt|log)$/.test(lower)) return 'text';
   return 'code';
@@ -293,6 +320,17 @@ export function FilePreviewRouter({
     case 'html':
       return <NativeHtmlPreview content={content} />;
 
+    case 'audio':
+    case 'video':
+      return (
+        <NativeMediaPreview
+          kind={kind}
+          contentUrl={contentUrl}
+          filename={file.name}
+          sizeBytes={file.sizeBytes}
+        />
+      );
+
     case 'image':
       return <NativeImagePreview contentUrl={contentUrl} filename={file.name} />;
 
@@ -394,6 +432,129 @@ function NativeHtmlPreview({ content }: { content: string }): React.ReactElement
       sandbox={PREVIEW_SANDBOX_SRCDOC}
       role="document"
     />
+  );
+}
+
+/**
+ * Native `<audio controls>` / `<video controls>` preview (#1939).
+ *
+ * Gate order — every gate renders an explicit notice; the player only
+ * mounts when all gates pass (never an empty player, never binary dump):
+ *  1. format cap: detected-but-unplayable extensions (e.g. .wma/.mkv) get
+ *     an "unsupported format" notice (shared playable set defines the cap);
+ *  2. size cap: a known `sizeBytes` above the shared threshold gets a
+ *     "too large" notice (unknown sizes are not gated);
+ *  3. content source: absent or scheme-unsafe URLs (javascript:/data:/
+ *     file:/userinfo-carrying/relative — see isSafeMediaSourceUrl) get the
+ *     honest "no content source" notice and never reach the player `src`;
+ *  4. runtime failure: media-element error flips to a load-failed notice.
+ */
+function NativeMediaPreview({
+  kind,
+  contentUrl,
+  filename,
+  sizeBytes,
+}: {
+  kind: MediaKind;
+  contentUrl?: string | undefined;
+  filename: string;
+  sizeBytes?: number | undefined;
+}): React.ReactElement {
+  const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE);
+  const [loadFailed, setLoadFailed] = useState(false);
+  const title = t(
+    kind === 'audio' ? 'filePreview.audioTitle' : 'filePreview.videoTitle',
+    { filename },
+  );
+
+  if (!isNativelyPlayableMediaFileName(filename)) {
+    return (
+      <NativePreviewFallback
+        detail={t('filePreview.mediaUnsupportedFormat')}
+        filename={filename}
+        title={title}
+      />
+    );
+  }
+
+  if (!isWithinPreviewSizeLimit(kind, sizeBytes)) {
+    return (
+      <NativePreviewFallback
+        detail={t('filePreview.mediaTooLarge', {
+          limit: formatPreviewByteLimit(maxPreviewBytesForKind(kind)),
+        })}
+        filename={filename}
+        title={title}
+      />
+    );
+  }
+
+  const safeUrl = contentUrl && isSafeMediaSourceUrl(contentUrl) ? contentUrl : undefined;
+  if (!safeUrl) {
+    return (
+      <NativePreviewFallback
+        detail={t('filePreview.mediaNoUrl')}
+        filename={filename}
+        title={title}
+      />
+    );
+  }
+
+  if (loadFailed) {
+    return (
+      <NativePreviewFallback
+        detail={t('filePreview.mediaLoadFailed')}
+        filename={filename}
+        title={title}
+      />
+    );
+  }
+
+  return (
+    <div
+      style={{
+        flex: 1,
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 8,
+        padding: 24,
+        overflow: 'auto',
+        minHeight: 0,
+      }}
+    >
+      {kind === 'audio' ? (
+        <audio
+          aria-label={title}
+          controls
+          preload="metadata"
+          src={safeUrl}
+          onError={() => setLoadFailed(true)}
+          style={{ width: '100%', maxWidth: 480 }}
+        />
+      ) : (
+        <video
+          aria-label={title}
+          controls
+          preload="metadata"
+          src={safeUrl}
+          onError={() => setLoadFailed(true)}
+          style={{ maxWidth: '100%', maxHeight: '100%', width: 'auto', height: 'auto' }}
+        />
+      )}
+      {/* Visible name doubles as the accessible caption for the player. */}
+      <span
+        style={{
+          color: 'var(--td-ink-subtle)',
+          font: '400 0.75rem var(--td-font)',
+          textAlign: 'center',
+          wordBreak: 'break-word',
+        }}
+      >
+        {filename}
+      </span>
+    </div>
   );
 }
 
