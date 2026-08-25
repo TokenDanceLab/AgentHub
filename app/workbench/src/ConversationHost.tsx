@@ -23,13 +23,20 @@ import {
   type ComposerDocumentFileDropCallbacks,
 } from './composerDocumentFileDrop';
 import {
+  describePendingIntent,
   enqueuePendingIntent,
+  markPendingIntentDispatching,
+  markPendingIntentFailed,
   MAX_PENDING_DISPATCH_RETRIES,
   markPendingIntentRetried,
-  peekPendingIntent,
+  movePendingIntent,
+  peekDispatchablePendingIntent,
   PENDING_DISPATCH_RETRY_DELAY_MS,
   removePendingIntent,
+  retargetPendingIntent,
+  retryPendingIntent,
   type PendingDispatchIntent,
+  type PendingIntentMove,
 } from './composer/pendingIntents';
 import type { AgentHubPlatform, WorkbenchConversation } from '@shared/platform';
 import { AppError } from '@shared/errors';
@@ -38,6 +45,7 @@ import type { AttachmentUploadState } from './UnifiedComposer';
 import type { FileItem } from './inspector';
 import type { ConnectionStatusKind } from './GlobalRail';
 import { ChatViewBridge } from './ChatViewBridge';
+import { ComposerDispatchQueue } from './ComposerDispatchQueue';
 import { MainchainStatusStrip } from './MainchainStatusStrip';
 import type { MainchainSummary } from './mainchain';
 import {
@@ -286,84 +294,160 @@ export const ConversationHost = React.memo(function ConversationHost({
     setRunReviewOpen(false);
   }, []);
 
-  // ── Pending dispatch queue (CF22) ──────────────────────────────────────
-  // Queue is ref-authoritative (mutations are synchronous read-modify-write,
-  // never split across an await) with a version tick to trigger re-renders.
-  const [, bumpPendingIntentsVersion] = useState(0);
-  const pendingIntentsRef = useRef<PendingDispatchIntentEntry[]>([]);
-  const isAgentRunningRef = useRef(false);
-  const flushInFlightRef = useRef(false);
+  // ── Pending dispatch queue (CF22 / #1965) ─────────────────────────────
+  // Ref-authoritative queues are isolated by conversation. The active
+  // conversation's run signal can only flush its own queue; an inactive
+  // conversation can neither block nor accidentally dispatch another one.
+  const [pendingIntentsVersion, bumpPendingIntentsVersion] = useState(0);
+  const pendingIntentsByConversationRef = useRef<Record<string, PendingDispatchIntentEntry[]>>({});
+  const runningByConversationRef = useRef<Record<string, boolean>>({});
+  const flushInFlightConversationsRef = useRef<Set<string>>(new Set());
+  const retryTimersRef = useRef<Map<string, number>>(new Map());
+  const mountedRef = useRef(true);
+  const currentConversationIdRef = useRef(currentConversationId);
+  const flushPendingIntentsRef = useRef<(conversationId: string) => Promise<void>>(async () => {});
+  currentConversationIdRef.current = currentConversationId;
 
-  const mutatePendingIntents = useCallback(
-    (mutate: (current: PendingDispatchIntentEntry[]) => PendingDispatchIntentEntry[]) => {
-      pendingIntentsRef.current = mutate(pendingIntentsRef.current);
-      bumpPendingIntentsVersion((version) => version + 1);
-    },
-    [],
-  );
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      for (const timer of retryTimersRef.current.values()) window.clearTimeout(timer);
+      retryTimersRef.current.clear();
+      // Dispatch requests already handed to the platform cannot be recalled;
+      // cleanup only prevents hidden retries or state writes after unmount.
+      flushInFlightConversationsRef.current.clear();
+    };
+  }, []);
 
-  /**
-   * Retry the dispatch of the queue head (one at a time — a successful
-   * dispatch makes the agent busy again, so the rest wait for the next
-   * run end). Only `platform.runs.redispatchTask` is called: the message
-   * itself is never re-sent.
-   */
-  const flushPendingIntents = useCallback(async (): Promise<void> => {
-    if (flushInFlightRef.current) return;
+  const mutatePendingIntents = useCallback((
+    conversationId: string,
+    mutate: (current: PendingDispatchIntentEntry[]) => PendingDispatchIntentEntry[],
+  ): void => {
+    if (!mountedRef.current) return;
+    const current = pendingIntentsByConversationRef.current[conversationId] ?? [];
+    const next = mutate(current);
+    if (next === current) return;
+    if (next.length === 0) delete pendingIntentsByConversationRef.current[conversationId];
+    else pendingIntentsByConversationRef.current[conversationId] = next;
+    bumpPendingIntentsVersion((version) => version + 1);
+  }, []);
+
+  const schedulePendingFlush = useCallback((
+    conversationId: string,
+    delay = PENDING_DISPATCH_RETRY_DELAY_MS,
+  ): void => {
+    const existing = retryTimersRef.current.get(conversationId);
+    if (existing !== undefined) window.clearTimeout(existing);
+    const timer = window.setTimeout(() => {
+      retryTimersRef.current.delete(conversationId);
+      if (!mountedRef.current || currentConversationIdRef.current !== conversationId) return;
+      void flushPendingIntentsRef.current(conversationId);
+    }, delay);
+    retryTimersRef.current.set(conversationId, timer);
+  }, []);
+
+  /** Dispatch one eligible row for the active conversation. */
+  const flushPendingIntents = useCallback(async (conversationId: string): Promise<void> => {
+    if (!mountedRef.current || currentConversationIdRef.current !== conversationId) return;
+    if (flushInFlightConversationsRef.current.has(conversationId)) return;
     const redispatchTask = platform.runs.redispatchTask;
-    if (!redispatchTask) return; // surface without separable dispatch: toast-only (unchanged behavior)
-    // Skip while a run is active: dispatch would 409 and burn a retry. The
-    // run-end transition flushes the queue at the right moment instead.
-    if (isAgentRunningRef.current) return;
-    const head = peekPendingIntent(pendingIntentsRef.current);
-    if (!head) return;
-    // The message lives in its original conversation — never dispatch a
-    // queued intent after the user has switched away. Surface the drop so it
-    // is not silent (#1821).
-    if (head.intent.conversationId !== currentConversationId) {
-      mutatePendingIntents((current) => removePendingIntent(current, head));
-      onToast(t('toast.pendingDispatchDroppedOnSwitch', { defaultValue: '已切换会话，待派单任务已取消' }));
-      return;
-    }
-    flushInFlightRef.current = true;
+    if (!redispatchTask || runningByConversationRef.current[conversationId]) return;
+    const queue = pendingIntentsByConversationRef.current[conversationId] ?? [];
+    const nextIntent = peekDispatchablePendingIntent(queue);
+    if (!nextIntent) return;
+
+    flushInFlightConversationsRef.current.add(conversationId);
+    mutatePendingIntents(conversationId, (current) =>
+      markPendingIntentDispatching(current, nextIntent));
     try {
-      const result = await redispatchTask(head.intent, head.messageId);
-      mutatePendingIntents((current) => {
-        const headNow = peekPendingIntent(current);
-        if (!headNow || headNow.messageId !== head.messageId) return current;
-        if (result.turnInProgress) {
-          const { queue: nextQueue, outcome } = markPendingIntentRetried(current, headNow);
-          if (outcome === 'abandoned') {
-            onToast(t('toast.dispatchRetryExhausted', { max: MAX_PENDING_DISPATCH_RETRIES }));
-            return nextQueue;
-          }
-          // Still busy — the run-end signal may have raced the Hub task
-          // status; give the status a moment and try the head once more.
-          if (!isAgentRunningRef.current) {
-            window.setTimeout(() => void flushPendingIntents(), PENDING_DISPATCH_RETRY_DELAY_MS);
-          }
-          return nextQueue;
+      const result = await redispatchTask(nextIntent.intent, nextIntent.messageId);
+      if (!mountedRef.current) return;
+      if (result.turnInProgress) {
+        let retryOutcome: 'requeued' | 'abandoned' | undefined;
+        mutatePendingIntents(conversationId, (current) => {
+          const currentEntry = current.find((item) => item.messageId === nextIntent.messageId);
+          if (!currentEntry) return current;
+          const resultState = markPendingIntentRetried(current, currentEntry);
+          retryOutcome = resultState.outcome;
+          return resultState.queue;
+        });
+        if (retryOutcome === 'abandoned') {
+          onToast(t('toast.dispatchRetryExhausted', { max: MAX_PENDING_DISPATCH_RETRIES }));
+        } else if (!runningByConversationRef.current[conversationId]) {
+          schedulePendingFlush(conversationId);
         }
-        return removePendingIntent(current, headNow);
+        return;
+      }
+      mutatePendingIntents(conversationId, (current) => {
+        const currentEntry = current.find((item) => item.messageId === nextIntent.messageId);
+        return currentEntry ? removePendingIntent(current, currentEntry) : current;
       });
     } catch (err) {
-      mutatePendingIntents((current) => removePendingIntent(current, head));
+      mutatePendingIntents(conversationId, (current) => {
+        const currentEntry = current.find((item) => item.messageId === nextIntent.messageId);
+        return currentEntry ? markPendingIntentFailed(current, currentEntry) : current;
+      });
       onToast(toastErrorCopy(t, err, 'toast.dispatchRetryFailed'));
     } finally {
-      flushInFlightRef.current = false;
+      flushInFlightConversationsRef.current.delete(conversationId);
     }
-  }, [platform, currentConversationId, mutatePendingIntents, onToast]);
+  }, [mutatePendingIntents, onToast, platform, schedulePendingFlush, t]);
+  flushPendingIntentsRef.current = flushPendingIntents;
 
-  // Agent run reached a terminal state (run.finished / run.failed /
-  // run.cancelled are folded into the shell's isAgentRunning signal) —
-  // flush any queued dispatch intents.
+  // A terminal run state only releases the ACTIVE conversation queue. When a
+  // conversation is revisited, its preserved queue is evaluated against that
+  // conversation's current run signal.
   useEffect(() => {
-    const wasRunning = isAgentRunningRef.current;
-    isAgentRunningRef.current = isAgentRunning ?? false;
-    if (wasRunning && !(isAgentRunning ?? false)) {
-      void flushPendingIntents();
-    }
-  }, [isAgentRunning, flushPendingIntents]);
+    runningByConversationRef.current[currentConversationId] = isAgentRunning ?? false;
+    if (!(isAgentRunning ?? false)) schedulePendingFlush(currentConversationId, 0);
+  }, [currentConversationId, isAgentRunning, schedulePendingFlush]);
+
+  const currentPendingIntents = pendingIntentsByConversationRef.current[currentConversationId] ?? [];
+  const pendingQueueItems = useMemo(
+    () => currentPendingIntents.map((entry) => describePendingIntent(entry)),
+    // The ref is authoritative; this version is the render invalidation token.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [currentConversationId, pendingIntentsVersion],
+  );
+  const retargetOptions = useMemo(
+    () => mentionableAgents.filter((agent) =>
+      agent.dispatchRole !== 'context' && agent.status !== 'unavailable'),
+    [mentionableAgents],
+  );
+
+  const handlePendingUndo = useCallback((messageId: string): void => {
+    mutatePendingIntents(currentConversationId, (current) => {
+      const entry = current.find((item) => item.messageId === messageId);
+      if (!entry || entry.status === 'dispatching') return current;
+      return removePendingIntent(current, entry);
+    });
+    onToast(t('composer.queue.undoConfirmed'));
+  }, [currentConversationId, mutatePendingIntents, onToast, t]);
+
+  const handlePendingMove = useCallback((messageId: string, move: PendingIntentMove): void => {
+    mutatePendingIntents(currentConversationId, (current) =>
+      movePendingIntent(current, messageId, move));
+  }, [currentConversationId, mutatePendingIntents]);
+
+  const handlePendingRetarget = useCallback((messageId: string, targetId: string): void => {
+    const target = retargetOptions.find((agent) => agent.id === targetId);
+    if (!target) return;
+    mutatePendingIntents(currentConversationId, (current) =>
+      retargetPendingIntent(current, messageId, target));
+  }, [currentConversationId, mutatePendingIntents, retargetOptions]);
+
+  const handlePendingRetry = useCallback((messageId: string): void => {
+    mutatePendingIntents(currentConversationId, (current) =>
+      retryPendingIntent(current, messageId));
+    if (!(isAgentRunning ?? false)) schedulePendingFlush(currentConversationId, 0);
+  }, [currentConversationId, isAgentRunning, mutatePendingIntents, schedulePendingFlush]);
+
+  const handlePendingClearAll = useCallback((): void => {
+    mutatePendingIntents(currentConversationId, (current) =>
+      current.filter((entry) => entry.status === 'dispatching'));
+    onToast(t('composer.queue.clearConfirmed'));
+  }, [currentConversationId, mutatePendingIntents, onToast, t]);
 
   const displayTranscript = useMemo(() => {
     const chat = transcript.filter((b) => !isSidebarOnlyTranscriptBlock(b));
@@ -518,16 +602,17 @@ export const ConversationHost = React.memo(function ConversationHost({
       if (submitResult.turnInProgress) {
         const dispatchMention = submitPayload.mentions.find((mention) => mention.dispatchRole !== 'context');
         if (dispatchMention && platform.runs.redispatchTask) {
-          mutatePendingIntents((current) => enqueuePendingIntent(current, {
+          mutatePendingIntents(capturedConversationId, (current) => enqueuePendingIntent(current, {
             agentId: dispatchMention.id,
             messageId: submitResult.intentId,
             attempt: 0,
+            status: 'queued',
             intent: submitPayload,
           }));
           // If no run is reported active the busy window may already be over
           // (no run-end transition will fire) — schedule a short-delayed flush.
           if (!(isAgentRunning ?? false)) {
-            window.setTimeout(() => void flushPendingIntents(), PENDING_DISPATCH_RETRY_DELAY_MS);
+            schedulePendingFlush(capturedConversationId);
           }
         }
         onToast(t('toast.turnInProgress'));
@@ -553,7 +638,7 @@ export const ConversationHost = React.memo(function ConversationHost({
       onToast(toastErrorCopy(t, err, 'toast.submitFailed'));
     } finally { isSubmittingRef.current = false; }
   }, [composer, currentConversationId, platform, selectedExecutionTargetId, isAgentRunning,
-    onToast, dispatchComposer, t, transcript, onEditMessage, mutatePendingIntents, flushPendingIntents]);
+    onToast, dispatchComposer, t, transcript, onEditMessage, mutatePendingIntents, schedulePendingFlush]);
 
   /**
    * Retry a failed attachment upload from its chip (#1821). The attachment
@@ -687,34 +772,16 @@ export const ConversationHost = React.memo(function ConversationHost({
       />
       {!selectionMode && (
         <>
-          {pendingIntentsRef.current.length > 0 && (
-            <div className={styles.pendingIntentBadge} role="status">
-              {t('toast.pendingDispatchBadge', { count: pendingIntentsRef.current.length })}
-              <button
-                aria-label={t('toast.pendingDispatchCancel', { defaultValue: '取消待派单任务' })}
-                onClick={() => {
-                  mutatePendingIntents(() => []);
-                  onToast(t('toast.pendingDispatchCancelled', { defaultValue: '已取消待派单任务' }));
-                }}
-                style={{
-                  marginLeft: 8,
-                  border: 'none',
-                  background: 'transparent',
-                  color: 'inherit',
-                  cursor: 'pointer',
-                  fontSize: 12,
-                  lineHeight: '20px',
-                  padding: 0,
-                  // The badge itself is pointer-events:none (CSS); the cancel
-                  // button opts back in so the click actually lands.
-                  pointerEvents: 'auto',
-                }}
-                type="button"
-              >
-                {t('toast.pendingDispatchCancelAction', { defaultValue: '取消' })}
-              </button>
-            </div>
-          )}
+          <ComposerDispatchQueue
+            isRunning={isAgentRunning ?? false}
+            items={pendingQueueItems}
+            onClearAll={handlePendingClearAll}
+            onMove={handlePendingMove}
+            onRetarget={handlePendingRetarget}
+            onRetry={handlePendingRetry}
+            onUndo={handlePendingUndo}
+            retargetOptions={retargetOptions}
+          />
           <PageErrorBoundary>
             <UnifiedComposer composer={composer} dispatchComposer={dispatchComposer}
               executionTargets={composerExecutionTargets} executionTargetId={selectedExecutionTargetId}
