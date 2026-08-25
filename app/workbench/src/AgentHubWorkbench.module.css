@@ -3628,6 +3628,11 @@
   pointer-events: none;
 }
 
+.railAttentionBadge[data-tone='danger'] {
+  background: var(--td-danger);
+  color: var(--text-inv);
+}
+
 .mainchainAttention {
   display: flex;
   align-items: center;
@@ -3645,10 +3650,10 @@
   border: 1px solid transparent;
   font: 500 0.6875rem var(--td-font);
   white-space: nowrap;
-  cursor: pointer;
 }
 
 button.mainchainAttentionChip {
+  cursor: pointer;
   transition:
     background var(--td-dur-normal) var(--td-ease),
     border-color var(--td-dur-normal) var(--td-ease);

@@ -12,11 +12,12 @@ import styles from './AgentHubWorkbench.module.css';
 
 const SORT_STORAGE_KEY = 'agenthub.conversationSort';
 
-/** F1 live-status dot copy (label map is the single per-status text source). */
-const LIVE_STATUS_LABEL: Record<ConversationLiveStatus, string> = {
-  running: '运行中',
-  'awaiting-approval': '待批准',
-  done: '已完成',
+/** F1 live-status dot labels — sharedWorkbench ns keys (zh/en parity is
+ *  enforced by the shared i18n resources test). */
+const LIVE_STATUS_LABEL_KEY: Record<ConversationLiveStatus, string> = {
+  running: 'sharedWorkbench:attention.stateRunning',
+  'awaiting-approval': 'sharedWorkbench:attention.stateAwaitingApproval',
+  done: 'sharedWorkbench:attention.stateDone',
 };
 type SortBy = 'recent' | 'name' | 'active';
 
@@ -537,10 +538,11 @@ export function ConversationSidebar({
                       >
                         {liveStatus && (
                           <span
-                            aria-label={LIVE_STATUS_LABEL[liveStatus]}
+                            aria-label={t(LIVE_STATUS_LABEL_KEY[liveStatus])}
                             className={styles.conversationLiveDot}
                             data-live-status={liveStatus}
-                            title={LIVE_STATUS_LABEL[liveStatus]}
+                            role="img"
+                            title={t(LIVE_STATUS_LABEL_KEY[liveStatus])}
                           />
                         )}
                         <span
