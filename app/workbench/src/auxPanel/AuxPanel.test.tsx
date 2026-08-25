@@ -7,6 +7,7 @@ const labels: Record<AuxPanelTab, string> = {
   session_details: '会话详情',
   file_tree: '文件树',
   changes: '变更',
+  preview: '预览',
   git_log: 'Git 日志',
 };
 
@@ -22,6 +23,7 @@ function renderAux(activeTab: AuxPanelTab = 'session_details'): { onActiveTabCha
         session_details: <div>details</div>,
         file_tree: <div>tree</div>,
         changes: <div>changes</div>,
+        preview: <div>preview</div>,
         git_log: <div>log</div>,
       }}
     />,
@@ -111,6 +113,7 @@ describe('AuxPanel tablist roving tabindex (#1823)', () => {
           session_details: <div>details</div>,
           file_tree: <div>tree</div>,
           changes: <div>changes</div>,
+          preview: <div>preview</div>,
           git_log: <div>log</div>,
         }}
       />,

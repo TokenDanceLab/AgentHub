@@ -1,21 +1,14 @@
 # Frontend Data Flow
 
-> 子文档 | 主索引：[architecture.md](../architecture.md)
+> 子文档 | 主索引：[architecture.md](../architecture.md) · Hub API：[01-hub-server.md](01-hub-server.md)
 >
-> 最后更新：2026-08-24
+> 最后更新：2026-08-25
 
 本文档只记录 Desktop/Web/Mobile 共享前端的数据流合同和 source owner。具体 hook、组件 props、测试用例数量以源码和测试为准，不在这里复制清单。
 
 ## 设计边界
 
-前端分三层：
-
-```text
-Desktop/Web/Mobile app shell
-  -> platform adapter
-  -> @agenthub/workbench shell + app/shared chatview
-  -> transcript normalizer + renderer
-```
+前端分三层：`app shell（Desktop/Web/Mobile） -> platform adapter -> @agenthub/workbench shell + app/shared chatview -> transcript normalizer + renderer`。
 
 规则：
 
@@ -59,6 +52,12 @@ UI 可以根据 `capabilities` 隐藏或禁用动作，但不能 fork 另一套�
 | Client lane E2E/contract gates | `app/desktop/src/__e2e__/chat-flow-ui.spec.ts`, `app/web/src/__e2e__/`, `app/mobile-rn/src/importBoundary.test.ts`, `app/mobile-rn/src/api/` |
 
 Do not add per-hook inventory tables here. If a file moves, update this owner map and the nearest README/source test, not a duplicate implementation checklist.
+
+## 工程列焦点合同
+
+- 自动展开：active run 或新产物 evidence 可自动展开工程列；用户在运行中手动收回时按会话持久化抑制，切换会话恢复各自选择；无 active run/产物的纯聊天不改变布局默认。窄视口可延后自动展开以保留可恢复的聊天表面，头部按钮与键盘切换仍可用。
+- Preview 焦点：工程列 `Preview` 标签跟随最新规范化 preview/artifact evidence，但不修改 `RightInspector` 当前详情标签；只有显式“在详情中查看 / View details”动作才请求 inspector 切换到 Browser 或 Files，避免快览与详情表面争焦点。
+- 表面边界：Desktop 可经 Local Edge 支持的 `PreviewPort` 解析产物内容，Web 保持 Hub-only；Hub 未提供安全 preview URL/content endpoint 时，Preview 必须诚实显示不可用，不构造 Local Edge URL。
 
 ## Transcript Pipeline
 
@@ -137,11 +136,6 @@ Stubbed Hub, fixture, readiness-only and manifest-only outputs must set `real_te
 | Layout cleanliness | Desktop/Web Visual QA merge gate 分别运行 `app/desktop/scripts/visual-qa-shell.mjs` 与 `app/web/scripts/visual-qa-shell.mjs`（package script：`visual:qa:shell`）；标准审阅矩阵为 `1440x810` light+dark，同一 gate 还补充 Web `768x900`、Desktop `800x900` 的窄视口非空白/几何合同；`app/web/scripts/visual-qa.mjs` 是可选/遗留多场景电池，不是 merge gate（旧视觉分数断言已删除，见 [07-design-system-ssot.md](07-design-system-ssot.md)） |
 | Data boundary | `app/shared/src/testing/e2eDataModeContract.ts` plus surface-specific E2E assertions |
 | Packaged Desktop | Tauri package/sidecar/icon/installer evidence, not Vite-only |
-
-## Related Docs
-
-- [architecture.md](../architecture.md) — system overview and non-negotiable boundaries
-- [01-hub-server.md](01-hub-server.md) — Hub API and realtime ownership
 
 ## 前端 CI 易踩坑（站立规则）
 

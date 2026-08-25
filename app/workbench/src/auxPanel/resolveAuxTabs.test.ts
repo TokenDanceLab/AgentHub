@@ -16,11 +16,27 @@ describe('resolveAvailableAuxTabs (#1172)', () => {
     ]);
   });
 
+  it('exposes preview without local file capability when runtime evidence exists', () => {
+    expect(resolveAvailableAuxTabs({ hasWorkspace: false, localFiles: false, previewAvailable: true })).toEqual([
+      'preview',
+    ]);
+  });
+
   it('full tab order with workspace + localFiles', () => {
     expect(resolveAvailableAuxTabs({ hasWorkspace: true, localFiles: true })).toEqual([
       'session_details',
       'file_tree',
       'changes',
+      'git_log',
+    ]);
+  });
+
+  it('places preview beside the engineering tabs when enabled', () => {
+    expect(resolveAvailableAuxTabs({ hasWorkspace: true, localFiles: true, previewAvailable: true })).toEqual([
+      'session_details',
+      'file_tree',
+      'changes',
+      'preview',
       'git_log',
     ]);
   });

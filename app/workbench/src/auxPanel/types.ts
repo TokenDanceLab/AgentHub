@@ -3,12 +3,13 @@
  * Folder-scoped tabs require an open workspace; content is slot-driven only.
  */
 
-export type AuxPanelTab = 'session_details' | 'file_tree' | 'changes' | 'git_log';
+export type AuxPanelTab = 'session_details' | 'file_tree' | 'changes' | 'preview' | 'git_log';
 
 export const AUX_PANEL_TAB_ORDER: readonly AuxPanelTab[] = [
   'session_details',
   'file_tree',
   'changes',
+  'preview',
   'git_log',
 ] as const;
 
@@ -23,4 +24,6 @@ export type AuxPanelAvailabilityInput = {
   hasWorkspace: boolean;
   /** When false (Web), folder-scoped tabs stay hidden. Defaults true for Desktop. */
   localFiles?: boolean;
+  /** Preview is available from normalized runtime evidence on any surface. */
+  previewAvailable?: boolean;
 };

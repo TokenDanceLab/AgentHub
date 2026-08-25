@@ -113,4 +113,3 @@ export function restoreInspectorTab(mode: 'files' | 'browser'): void {
   const restoreLabel = mode === 'files' ? /恢复 文件/ : /恢复 浏览器/;
   fireEvent.click(within(menu).getByRole('menuitem', { name: restoreLabel }));
 }
-
