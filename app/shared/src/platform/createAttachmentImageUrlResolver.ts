@@ -127,4 +127,3 @@ export function createAttachmentImageUrlResolver(
     (blob) => !blob.type || blob.type.startsWith('image/'),
   );
 }
-
