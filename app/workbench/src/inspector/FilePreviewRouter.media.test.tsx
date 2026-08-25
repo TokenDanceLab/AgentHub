@@ -73,14 +73,14 @@ describe('FilePreviewRouter audio/video branches (#1939)', () => {
 
     render(
       <FilePreviewRouter
-        file={mediaFile({ name: 'clip.webm', content: '/v1/runs/run-1/media/clip.webm' })}
+        file={mediaFile({ name: 'clip.webm', content: '/media/run-1/clip.webm' })}
         onClose={vi.fn()}
         previewPort={port}
       />,
     );
 
     const video = screen.getByLabelText('Video preview clip.webm');
-    expect(video).toHaveAttribute('src', 'https://host.example.test/v1/runs/run-1/media/clip.webm');
+    expect(video).toHaveAttribute('src', 'https://host.example.test/media/run-1/clip.webm');
   });
 
   it('accepts blob: object URLs from the port (attachment-fetch shape)', () => {
@@ -123,7 +123,7 @@ describe('FilePreviewRouter audio/video branches (#1939)', () => {
   it('shows the no-content-source notice when no port can resolve a host-relative path', () => {
     render(
       <FilePreviewRouter
-        file={mediaFile({ content: '/v1/runs/run-1/media/voice.mp3' })}
+        file={mediaFile({ content: '/media/run-1/voice.mp3' })}
         onClose={vi.fn()}
         previewPort={undefined}
       />,
