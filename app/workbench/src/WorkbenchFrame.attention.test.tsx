@@ -48,11 +48,14 @@ vi.mock('./terminal', () => ({
   TerminalPanel: () => <div data-testid="terminal-panel-stub" />,
 }));
 
-function renderFrame(attention?: {
-  runs: Array<{ runId: string; projectId: string; threadId: string; status: string; createdAt: string }>;
-  approvals: Array<{ id: string; runId: string; threadId: string; kind: string; summary: string; status: string; createdAt: string }>;
-  threads: Array<{ id: string; projectId: string; status: string; createdAt: string; conversationId?: string }>;
-}) {
+function renderFrame(
+  attention?: {
+    runs: Array<{ runId: string; projectId: string; threadId: string; status: string; createdAt: string }>;
+    approvals: Array<{ id: string; runId: string; threadId: string; kind: string; summary: string; status: string; createdAt: string }>;
+    threads: Array<{ id: string; projectId: string; status: string; createdAt: string; conversationId?: string }>;
+  },
+  overrides?: { transcript?: unknown[]; isAgentRunning?: boolean },
+) {
   const navigateRail = vi.fn();
   const selectConversation = vi.fn();
   railSpy.mockClear();
@@ -105,7 +108,10 @@ function renderFrame(attention?: {
           { id: 'conv-1', title: 'Active', kind: 'direct' },
           { id: 'conv-2', title: 'Waiting', kind: 'direct' },
         ],
-        transcript: [],
+        transcript: overrides?.transcript ?? [],
+        ...(overrides?.isAgentRunning !== undefined
+          ? { isAgentRunning: overrides.isAgentRunning }
+          : {}),
         setActivePage: vi.fn(),
         showComposerAgentPicker: false,
         showComposerStatus: false,
@@ -136,9 +142,15 @@ describe('WorkbenchFrame attention wiring (F1/F6)', () => {
     const { navigateRail, selectConversation } = renderFrame(attentionInput);
 
     // Last render call of each stub carries the derived props.
-    expect(railSpy).toHaveBeenLastCalledWith({ runningCount: 1, awaitingApprovalCount: 1 });
-    expect(sidebarSpy).toHaveBeenLastCalledWith({ 'conv-1': 'running', 'conv-2': 'awaiting-approval' });
-    expect(hostSpy).toHaveBeenLastCalledWith({ runningCount: 1, awaitingApprovalCount: 1 });
+    const expectedSummary = {
+      runningCount: 1,
+      awaitingApprovalCount: 1,
+      failedRunCount: 0,
+      liveStatusByConversation: { 'conv-1': 'running', 'conv-2': 'awaiting-approval' },
+    };
+    expect(railSpy).toHaveBeenLastCalledWith(expectedSummary);
+    expect(sidebarSpy).toHaveBeenLastCalledWith(expectedSummary.liveStatusByConversation);
+    expect(hostSpy).toHaveBeenLastCalledWith(expectedSummary);
 
     // Running chip routes to the Tasks queue through the rail navigation.
     fireEvent.click(screen.getByTestId('open-running'));
@@ -149,10 +161,37 @@ describe('WorkbenchFrame attention wiring (F1/F6)', () => {
     expect(selectConversation).toHaveBeenCalledWith('conv-2');
   });
 
-  it('keeps all attention chrome absent without a run inventory', () => {
+  it('keeps all attention chrome absent when nothing is observable', () => {
+    // No inventory AND no active-conversation signal (empty transcript,
+    // unknown runtime flag) — the fallback derives undefined, not zeros.
     renderFrame();
     expect(railSpy).toHaveBeenLastCalledWith(undefined);
     expect(sidebarSpy).toHaveBeenLastCalledWith(undefined);
     expect(hostSpy).toHaveBeenLastCalledWith(undefined);
+  });
+
+  it('falls back to active-conversation scope without an inventory', () => {
+    // One pending permission_request block in the active transcript +
+    // runtime running flag: counts are real but cover conv-1 only.
+    renderFrame(undefined, {
+      transcript: [
+        {
+          kind: 'permission_request',
+          id: 'pr-1',
+          author: { id: 'agent', name: 'Agent', role: 'agent' },
+        },
+      ],
+      isAgentRunning: true,
+    });
+
+    const expectedScoped = {
+      runningCount: 1,
+      awaitingApprovalCount: 1,
+      activeConversationOnly: true,
+      liveStatusByConversation: { 'conv-1': 'running' },
+    };
+    expect(railSpy).toHaveBeenLastCalledWith(expectedScoped);
+    expect(sidebarSpy).toHaveBeenLastCalledWith({ 'conv-1': 'running' });
+    expect(hostSpy).toHaveBeenLastCalledWith(expectedScoped);
   });
 });

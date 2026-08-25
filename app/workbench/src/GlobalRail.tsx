@@ -91,10 +91,23 @@ export function GlobalRail({
     settings: t('user.settings'),
   };
 
-  const attentionTotal = (attention?.runningCount ?? 0) + (attention?.awaitingApprovalCount ?? 0);
-  const attentionBreakdown = attention && attentionTotal > 0
-    ? `运行中 ${attention.runningCount} · 待批准 ${attention.awaitingApprovalCount}`
-    : undefined;
+  // F1 rail badge = the actionable queue: failed runs + pending approvals
+  // (ux-benchmark F1: 失败运行数、待审批数). Running runs need no user
+  // action; they stay visible on the status-strip chips and sidebar dots.
+  const failedRunCount = attention?.failedRunCount ?? 0;
+  const awaitingApprovalCount = attention?.awaitingApprovalCount ?? 0;
+  const attentionTotal = failedRunCount + awaitingApprovalCount;
+  const attentionParts: string[] = [];
+  if (failedRunCount > 0) {
+    attentionParts.push(t('sharedWorkbench:attention.failedRuns', { count: String(failedRunCount) }));
+  }
+  if (awaitingApprovalCount > 0) {
+    attentionParts.push(t('sharedWorkbench:attention.pendingApprovals', { count: String(awaitingApprovalCount) }));
+  }
+  let attentionBreakdown = attention && attentionTotal > 0 ? attentionParts.join(' · ') : undefined;
+  if (attentionBreakdown && attention?.activeConversationOnly) {
+    attentionBreakdown += ` · ${t('sharedWorkbench:attention.scopeActiveConversation')}`;
+  }
 
   // Use controlled props when provided, otherwise fall back to internal state.
   const isControlled = activePageProp !== undefined;
@@ -222,9 +235,15 @@ export function GlobalRail({
             title={itemLabel}
           >
             <DesignNavIcon name={item.icon} size={18} />
-            {showAttentionBadge && (
-              <span aria-hidden="true" className={styles.railAttentionBadge} data-rail-attention>
-                {attentionTotal}
+            {showAttentionBadge && attentionBreakdown && (
+              <span
+                aria-hidden="true"
+                className={styles.railAttentionBadge}
+                data-rail-attention
+                data-tone={failedRunCount > 0 ? 'danger' : 'warning'}
+                title={t('sharedWorkbench:attention.tasksBadgeAria', { detail: attentionBreakdown })}
+              >
+                {attentionTotal > 99 ? '99+' : attentionTotal}
               </span>
             )}
           </button>

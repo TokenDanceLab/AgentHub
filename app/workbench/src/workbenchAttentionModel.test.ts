@@ -1,5 +1,6 @@
 import type { Approval, Run, Thread } from '@shared/types';
 import {
+  buildActiveConversationAttention,
   deriveConversationLiveStatus,
   findFirstAwaitingConversationId,
   isRunActive,
@@ -102,6 +103,7 @@ describe('summarizeWorkbenchAttention', () => {
     expect(summary.runningCount).toBe(2);
     // pending approval a1 only — r2 already carries it, no double count
     expect(summary.awaitingApprovalCount).toBe(1);
+    expect(summary.failedRunCount).toBe(0);
     expect(summary.liveStatusByConversation).toEqual({
       'conv-a': 'running',
       'conv-b': 'awaiting-approval',
@@ -131,7 +133,7 @@ describe('summarizeWorkbenchAttention', () => {
     expect(summary.liveStatusByConversation['conv-a']).toBe('running');
 
     const empty = summarizeWorkbenchAttention({ runs: [], approvals: [], threads: [] });
-    expect(empty).toEqual({ runningCount: 0, awaitingApprovalCount: 0, liveStatusByConversation: {} });
+    expect(empty).toEqual({ runningCount: 0, awaitingApprovalCount: 0, failedRunCount: 0, liveStatusByConversation: {} });
   });
 });
 
@@ -147,5 +149,74 @@ describe('findFirstAwaitingConversationId', () => {
   it('returns undefined when no conversation awaits approval', () => {
     expect(findFirstAwaitingConversationId([{ id: 'c1' }], { c1: 'running' })).toBeUndefined();
     expect(findFirstAwaitingConversationId([], {})).toBeUndefined();
+  });
+});
+
+describe('summarizeWorkbenchAttention failed runs', () => {
+  it('counts failed runs for the rail badge without giving their row a live dot', () => {
+    const summary = summarizeWorkbenchAttention({
+      runs: [
+        makeRun({ runId: 'r1', threadId: 't1', status: 'failed' }),
+        makeRun({ runId: 'r2', threadId: 't2', status: 'cancelled' }),
+      ],
+      approvals: [],
+      threads: [makeThread('t1', 'conv-a'), makeThread('t2', 'conv-b')],
+    });
+    expect(summary.failedRunCount).toBe(1);
+    expect(summary.runningCount).toBe(0);
+    expect(summary.awaitingApprovalCount).toBe(0);
+    expect(summary.liveStatusByConversation).toEqual({});
+  });
+});
+
+describe('buildActiveConversationAttention (no-inventory fallback)', () => {
+  function permissionRequest(id: string) {
+    return {
+      kind: 'permission_request',
+      id,
+      author: { id: 'agent', name: 'Agent', role: 'agent' as const },
+    };
+  }
+
+  it('derives the awaiting count and dot from the active transcript', () => {
+    const summary = buildActiveConversationAttention({
+      activeConversationId: 'conv-a',
+      transcript: [permissionRequest('p1'), permissionRequest('p2')] as never,
+      isAgentRunning: false,
+    });
+    expect(summary).toEqual({
+      runningCount: 0,
+      awaitingApprovalCount: 2,
+      activeConversationOnly: true,
+      liveStatusByConversation: { 'conv-a': 'awaiting-approval' },
+    });
+  });
+
+  it('running outranks pending approvals, matching the inventory precedence', () => {
+    const summary = buildActiveConversationAttention({
+      activeConversationId: 'conv-a',
+      transcript: [permissionRequest('p1')] as never,
+      isAgentRunning: true,
+    });
+    expect(summary?.liveStatusByConversation['conv-a']).toBe('running');
+    expect(summary?.runningCount).toBe(1);
+    expect(summary?.awaitingApprovalCount).toBe(1);
+    expect(summary?.activeConversationOnly).toBe(true);
+  });
+
+  it('omits runningCount when the runtime flag is unknown instead of faking zero', () => {
+    const summary = buildActiveConversationAttention({
+      activeConversationId: 'conv-a',
+      transcript: [permissionRequest('p1')] as never,
+      isAgentRunning: undefined,
+    });
+    expect(summary).toBeDefined();
+    expect('runningCount' in summary!).toBe(false);
+    expect(summary?.awaitingApprovalCount).toBe(1);
+  });
+
+  it('returns undefined when nothing is observable so chrome hides', () => {
+    expect(buildActiveConversationAttention({ activeConversationId: 'conv-a', transcript: [], isAgentRunning: false })).toBeUndefined();
+    expect(buildActiveConversationAttention({ activeConversationId: 'conv-a', transcript: [], isAgentRunning: undefined })).toBeUndefined();
   });
 });

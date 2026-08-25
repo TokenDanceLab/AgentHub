@@ -1,10 +1,14 @@
 import { fireEvent, render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeAll, describe, expect, it, vi } from 'vitest';
+import { useTestI18nLanguage } from '@shared/testing/i18n';
 import { MainchainStatusStrip } from './MainchainStatusStrip';
 import type { MainchainSummary } from './mainchain';
 
-// Key-echo default of the shared test i18next instance keeps the original
-// identity-mock visible copy for this a11y suite (Issue #1717).
+// Chip copy resolves through the real zh/en bundles (sharedWorkbench ns),
+// so opt into a real language instead of the key-echo default (#1717).
+beforeAll(async () => {
+  await useTestI18nLanguage('en');
+});
 
 const summary: MainchainSummary = {
   nodes: [{ id: 'n1', label: 'Agent A', detail: 'done', state: 'done' }],
@@ -20,7 +24,7 @@ describe('MainchainStatusStrip a11y', () => {
     );
     const strip = getByRole('region');
     expect(strip).toHaveAttribute('aria-live', 'polite');
-    expect(strip).toHaveAttribute('aria-label', 'aria.mainChainStatus');
+    expect(strip).toHaveAttribute('aria-label', 'Demo main chain status');
   });
 });
 
@@ -38,8 +42,8 @@ describe('MainchainStatusStrip attention chips (F6)', () => {
       />,
     );
 
-    const runningChip = screen.getByRole('button', { name: '运行中 2，查看任务队列' });
-    const awaitingChip = screen.getByRole('button', { name: '待批准 3，查看审批' });
+    const runningChip = screen.getByRole('button', { name: '2 running · Open the task queue' });
+    const awaitingChip = screen.getByRole('button', { name: '3 awaiting approval · Jump to pending approval' });
     expect(runningChip).toHaveAttribute('data-attention-kind', 'running');
     expect(awaitingChip).toHaveAttribute('data-attention-kind', 'awaiting');
 
@@ -58,8 +62,8 @@ describe('MainchainStatusStrip attention chips (F6)', () => {
         onOpenApprovalQueue={() => {}}
       />,
     );
-    expect(screen.queryByRole('button', { name: /运行中/ })).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /待批准 1/ })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /running/i })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /1 awaiting approval/ })).toBeInTheDocument();
   });
 
   it('keeps counts visible but non-interactive when no click-through is wired', () => {
@@ -80,5 +84,21 @@ describe('MainchainStatusStrip attention chips (F6)', () => {
       <MainchainStatusStrip summary={summary} onExportEvidence={() => {}} />,
     );
     expect(container.querySelector('[data-attention]')).toBeNull();
+  });
+
+  it('labels scoped counts as active-conversation-only instead of global', () => {
+    render(
+      <MainchainStatusStrip
+        summary={summary}
+        onExportEvidence={() => {}}
+        attention={{ awaitingApprovalCount: 1, activeConversationOnly: true }}
+        onOpenApprovalQueue={() => {}}
+      />,
+    );
+    expect(
+      screen.getByRole('button', {
+        name: '1 awaiting approval · Jump to pending approval · Covers the current conversation only',
+      }),
+    ).toBeInTheDocument();
   });
 });

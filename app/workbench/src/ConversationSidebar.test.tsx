@@ -320,11 +320,11 @@ describe('ConversationSidebar live status dots (F1)', () => {
     });
 
     const runningRow = screen.getByText('Running chat').closest('[data-agent-profile]')!;
-    const runningDot = within(runningRow).getByLabelText('运行中');
+    const runningDot = within(runningRow).getByLabelText('Running');
     expect(runningDot).toHaveAttribute('data-live-status', 'running');
 
     const waitingRow = screen.getByText('Waiting chat').closest('[data-agent-profile]')!;
-    const waitingDot = within(waitingRow).getByLabelText('待批准');
+    const waitingDot = within(waitingRow).getByLabelText('Awaiting approval');
     expect(waitingDot).toHaveAttribute('data-live-status', 'awaiting-approval');
 
     const quietRow = screen.getByText('Quiet chat').closest('[data-agent-profile]')!;

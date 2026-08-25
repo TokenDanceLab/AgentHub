@@ -24,6 +24,7 @@ export {
 } from './mainchain';
 export { MainchainStatusStrip } from './MainchainStatusStrip';
 export {
+  buildActiveConversationAttention,
   deriveConversationLiveStatus,
   findFirstAwaitingConversationId,
   isRunActive,
@@ -98,6 +99,7 @@ export type {
 } from './mainchain';
 export type { MainchainStatusStripProps } from './MainchainStatusStrip';
 export type {
+  ActiveConversationAttentionInput,
   ConversationLiveStatus,
   WorkbenchAttentionCounts,
   WorkbenchAttentionInput,
