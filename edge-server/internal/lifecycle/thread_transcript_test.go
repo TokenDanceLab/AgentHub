@@ -78,6 +78,9 @@ func (w *stubTranscriptWriter) SetRunEvidenceGate(id, result string) (store.Run,
 func (w *stubTranscriptWriter) SetRunRetryCount(id string, count int) (store.Run, bool) {
 	return store.Run{}, false
 }
+func (w *stubTranscriptWriter) SetRunWorkDir(id, workDir string) (store.Run, bool) {
+	return store.Run{}, false
+}
 
 // stubLifecycleStore embeds Writer so newThreadTranscriptEmitter can cast it.
 type stubLifecycleStore struct {
@@ -156,6 +159,9 @@ func (n *nonWriterLifecycle) SetRunEvidenceGate(id, result string) (store.Run, b
 	return store.Run{}, false
 }
 func (n *nonWriterLifecycle) SetRunRetryCount(id string, count int) (store.Run, bool) {
+	return store.Run{}, false
+}
+func (n *nonWriterLifecycle) SetRunWorkDir(id, workDir string) (store.Run, bool) {
 	return store.Run{}, false
 }
 

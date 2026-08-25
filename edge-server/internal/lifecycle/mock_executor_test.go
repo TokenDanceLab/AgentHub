@@ -41,6 +41,27 @@ func (s *lifecycleOnlyStore) SetRunStatusIf(id, status string, allowedCurrent ..
 	return run, ok
 }
 
+func TestRunResponseCarriesWorkDirEvidence(t *testing.T) {
+	run := store.Run{
+		ID:        "run_resp",
+		ProjectID: "proj_resp",
+		ThreadID:  "thread_resp",
+		Status:    "started",
+	}
+
+	// No executor-reported workDir: payload must not invent one.
+	payload := RunResponse(run)
+	if _, present := payload["workDir"]; present {
+		t.Fatalf("RunResponse without workDir contains workDir=%v", payload["workDir"])
+	}
+
+	run.WorkDir = "/tmp/evidence-ws"
+	payload = RunResponse(run)
+	if got, _ := payload["workDir"].(string); got != "/tmp/evidence-ws" {
+		t.Fatalf("RunResponse workDir = %#v, want /tmp/evidence-ws", payload["workDir"])
+	}
+}
+
 func TestMockExecutorAcceptsRunLifecycleStore(t *testing.T) {
 	run := store.Run{
 		ID:        "run_test",

@@ -231,7 +231,7 @@ func (e *MockExecutor) finish(runID string) {
 }
 
 func RunResponse(run store.Run) map[string]any {
-	return map[string]any{
+	payload := map[string]any{
 		"runId":      run.ID,
 		"projectId":  run.ProjectID,
 		"threadId":   run.ThreadID,
@@ -240,6 +240,12 @@ func RunResponse(run store.Run) map[string]any {
 		"startedAt":  run.StartedAt,
 		"finishedAt": run.FinishedAt,
 	}
+	// workDir is executor-reported evidence for run-level diff review
+	// (#1967); omitted when the executor did not resolve one.
+	if run.WorkDir != "" {
+		payload["workDir"] = run.WorkDir
+	}
+	return payload
 }
 
 func runScope(run store.Run) map[string]any {
