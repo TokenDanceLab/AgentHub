@@ -3739,3 +3739,221 @@ button.mainchainAttentionChip[data-attention-kind='awaiting']:hover {
     animation: none;
   }
 }
+
+/* ═══ Task ↔ conversation deep links (#1963) ═══ */
+
+/* Column host for the tasks route: the deep-link bar stacks above TasksPage
+   without clipping its height:100% page section. */
+.tasksDeepLinkHost {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+.tasksDeepLinkHost > section {
+  flex: 1;
+  min-height: 0;
+  height: auto;
+}
+
+/* Deep-link action bar above the tasks page: back-to-conversation and
+   open-hosting-conversation affordances. */
+.tasksDeepLinkBar {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-xxs);
+  padding: var(--td-space-1) var(--sp-10);
+}
+
+.tasksDeepLinkButton {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-xxs);
+  padding: 5px 10px;
+  border: 1px solid var(--td-line);
+  border-radius: var(--r-md);
+  background: var(--td-surface-2);
+  color: var(--td-ink-subtle);
+  font: 500 0.75rem var(--td-font);
+  cursor: pointer;
+  transition:
+    background var(--td-dur-normal) var(--td-ease),
+    color var(--td-dur-normal) var(--td-ease),
+    border-color var(--td-dur-normal) var(--td-ease);
+}
+
+.tasksDeepLinkButton:hover {
+  background: var(--td-tint);
+  border-color: var(--td-plum);
+  color: var(--td-plum);
+}
+
+.tasksDeepLinkButton:focus-visible {
+  border-color: var(--td-focus);
+  box-shadow: var(--focus-ring);
+  outline: none;
+}
+
+/* Sidebar 任务队列 collapsible group (#1963). Mirrors the archiveFilterToggle
+   chrome so the group reads as a sidebar-native filter section. */
+.taskQueueGroup {
+  margin: 0 var(--sp-xxs) var(--td-space-1);
+}
+
+.taskQueueHeader {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-xxs);
+  width: 100%;
+  padding: 5px 10px;
+  border: 1px solid var(--td-line);
+  border-radius: var(--r-md);
+  background: var(--td-surface-2);
+  color: var(--td-ink-subtle);
+  font: 500 0.75rem var(--td-font);
+  cursor: pointer;
+  transition:
+    background var(--td-dur-normal) var(--td-ease),
+    color var(--td-dur-normal) var(--td-ease);
+}
+
+.taskQueueHeader:hover {
+  background: var(--td-surface-3);
+  color: var(--td-ink-muted);
+}
+
+.taskQueueHeader:focus-visible {
+  border-color: var(--td-focus);
+  box-shadow: var(--focus-ring);
+  outline: none;
+}
+
+.taskQueueHeaderIcon {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.taskQueueTitle {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+}
+
+.taskQueueCount {
+  min-width: 16px;
+  height: 16px;
+  padding: 0 var(--td-space-1);
+  border-radius: var(--r-full);
+  background: var(--td-plum);
+  color: var(--text-inv);
+  font: 600 0.625rem var(--td-font);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.taskQueueChevron {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  transition: transform var(--td-dur-normal) var(--td-ease);
+}
+
+.taskQueueChevronCollapsed {
+  transform: rotate(-90deg);
+}
+
+.taskQueueList {
+  margin: var(--sp-xxs) 0 0;
+  padding: 0;
+  list-style: none;
+  max-height: 180px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+}
+
+.taskQueueItem {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-xxs);
+  width: 100%;
+  padding: 5px 10px;
+  border: none;
+  border-radius: var(--r-md);
+  background: transparent;
+  color: var(--td-ink-muted);
+  font: 500 0.75rem var(--td-font);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background var(--td-dur-normal) var(--td-ease),
+    color var(--td-dur-normal) var(--td-ease);
+}
+
+.taskQueueItem:hover {
+  background: var(--td-surface-2);
+  color: var(--td-ink);
+}
+
+.taskQueueItem:focus-visible {
+  box-shadow: var(--focus-ring);
+  outline: none;
+}
+
+.taskQueueItemTitle {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.taskQueueItemStatus {
+  flex-shrink: 0;
+  color: var(--td-ink-subtle);
+  font: 500 0.625rem var(--td-font);
+}
+
+/* Back chip shown on the conversation a task deep link opened (#1963). */
+.taskDeepLinkChip {
+  margin: 0 var(--sp-10) var(--sp-xxs);
+}
+
+.taskDeepLinkChipButton {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-xxs);
+  width: 100%;
+  padding: 5px 10px;
+  border: 1px solid var(--td-plum);
+  border-radius: var(--r-md);
+  background: var(--td-tint);
+  color: var(--td-plum);
+  font: 500 0.75rem var(--td-font);
+  cursor: pointer;
+  transition:
+    background var(--td-dur-normal) var(--td-ease),
+    color var(--td-dur-normal) var(--td-ease);
+}
+
+.taskDeepLinkChipButton:hover {
+  background: color-mix(in oklch, var(--td-plum) 16%, transparent);
+}
+
+.taskDeepLinkChipButton:focus-visible {
+  border-color: var(--td-focus);
+  box-shadow: var(--focus-ring);
+  outline: none;
+}
+
+.taskDeepLinkChipTitle {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--td-ink-muted);
+}

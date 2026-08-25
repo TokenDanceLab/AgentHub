@@ -39,6 +39,12 @@ export interface TaskItem {
   creator: string;
   /** Task status */
   status: TaskStatus;
+  /**
+   * Hosting conversation id (#1963): the conversation this task runs in.
+   * Optional — absent until the task source binds a conversation; task
+   * cards without it offer no conversation deep link.
+   */
+  conversationId?: string | undefined;
 }
 
 export interface TaskGroup {

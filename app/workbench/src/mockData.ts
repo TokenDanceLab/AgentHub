@@ -125,6 +125,9 @@ export const WORKBENCH_MOCK_TASK_GROUPS: TaskGroup[] = [
         dueDate: '明天 18:00',
         creator: 'demo-user',
         status: '进行中',
+        // Demo hosting-conversation binding (#1963); ids match the shared
+        // demo conversation seeds (workbenchDemoAgents).
+        conversationId: 'builder',
       },
       {
         id: 'embedded-docs',
@@ -135,6 +138,7 @@ export const WORKBENCH_MOCK_TASK_GROUPS: TaskGroup[] = [
         dueDate: '今天 22:00',
         creator: 'demo-user',
         status: '待评审',
+        conversationId: 'johnny',
       },
       {
         id: 'project-announcement',
@@ -145,6 +149,7 @@ export const WORKBENCH_MOCK_TASK_GROUPS: TaskGroup[] = [
         dueDate: '6月8日',
         creator: 'Trump',
         status: '待确认',
+        conversationId: 'reviewer',
       },
       {
         id: 'agent-market',
@@ -155,6 +160,7 @@ export const WORKBENCH_MOCK_TASK_GROUPS: TaskGroup[] = [
         dueDate: '6月9日',
         creator: 'Johnny',
         status: '未开始',
+        conversationId: 'builder',
       },
     ],
   },
@@ -322,19 +328,32 @@ const MOCK_TASK_PROJECTS = ['前端重构任务', 'AgentHub 设计评审', '文�
 const MOCK_TASK_ASSIGNEES = ['Builder', 'Johnny', 'Reviewer', 'Trump'] as const;
 const MOCK_TASK_STATUSES = ['未开始', '进行中', '待评审', '待确认', '已完成'] as const;
 
+/** Demo hosting-conversation binding by assignee (#1963). Ids mirror the
+ *  shared demo conversation seeds; assignees without a conversation (Trump)
+ *  stay unbound and their task cards offer no conversation deep link. */
+const MOCK_TASK_HOST_CONVERSATION_BY_ASSIGNEE: Record<string, string> = {
+  Builder: 'builder',
+  Johnny: 'johnny',
+  Reviewer: 'reviewer',
+};
+
 export const WORKBENCH_MOCK_TASK_POOL: TaskItem[] = (() => {
   const pool = WORKBENCH_MOCK_TASK_GROUPS.flatMap((group) => group.tasks);
   for (let i = pool.length + 1; i <= WORKBENCH_MOCK_TASK_POOL_SIZE; i += 1) {
-    pool.push({
+    const assignee = MOCK_TASK_ASSIGNEES[(i - 1) % MOCK_TASK_ASSIGNEES.length] ?? 'Builder';
+    const task: TaskItem = {
       id: `task-${String(i).padStart(3, '0')}`,
       title: `分页任务 ${String(i).padStart(2, '0')}`,
       project: MOCK_TASK_PROJECTS[(i - 1) % MOCK_TASK_PROJECTS.length] ?? '前端重构任务',
-      assignee: MOCK_TASK_ASSIGNEES[(i - 1) % MOCK_TASK_ASSIGNEES.length] ?? 'Builder',
+      assignee,
       startTime: '刚刚',
       dueDate: i % 2 === 0 ? '今天 18:00' : '明天 18:00',
       creator: 'demo-user',
       status: MOCK_TASK_STATUSES[(i - 1) % MOCK_TASK_STATUSES.length] ?? '未开始',
-    });
+    };
+    const hostConversationId = MOCK_TASK_HOST_CONVERSATION_BY_ASSIGNEE[assignee];
+    if (hostConversationId) task.conversationId = hostConversationId;
+    pool.push(task);
   }
   return pool;
 })();

@@ -18,6 +18,11 @@ import {
   type UseWorkbenchTasksRouteOptions,
   type WorkbenchTasksRoute,
 } from './workbenchTasksRouteHelpers';
+import {
+  deriveActiveTaskQueue,
+  publishWorkbenchTaskQueue,
+  useWorkbenchTaskDeepLinkSnapshot,
+} from './workbenchTaskDeepLinks';
 
 export type {
   UseWorkbenchTasksRouteOptions,
@@ -108,6 +113,22 @@ export function useWorkbenchTasksRoute({
   const visibleTasks = flattenTaskGroups(visibleTaskGroups);
   const allTasks = flattenTaskGroups(sourceTaskGroups);
   const selectedTask = allTasks.find((task) => task.id === selectedTaskId) ?? null;
+
+  // ── #1963: sidebar task queue + deep-link focus adoption ──────────────
+  // The sidebar 任务队列 group mirrors this route's live inventory while the
+  // route is mounted; the shell hook seeds the queue only while it is not.
+  const sidebarTaskQueue = useMemo(() => deriveActiveTaskQueue(allTasks), [allTasks]);
+  useEffect(() => {
+    publishWorkbenchTaskQueue(sidebarTaskQueue);
+  }, [sidebarTaskQueue]);
+
+  // Adopt the task selection requested by a conversation→task deep link (and
+  // by the task→conversation back trip, which remounts this route). The
+  // focus token changes per request, so re-linking the same task re-applies.
+  const taskFocus = useWorkbenchTaskDeepLinkSnapshot().taskFocus;
+  useEffect(() => {
+    if (taskFocus) setSelectedTaskId(taskFocus.taskId);
+  }, [taskFocus]);
 
   const handlers = buildWorkbenchTasksRouteHandlers({
     taskGroups,

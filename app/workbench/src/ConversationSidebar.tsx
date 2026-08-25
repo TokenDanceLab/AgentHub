@@ -8,6 +8,11 @@ import { CHATVIEW_I18N_NAMESPACE } from '@shared/chatview/i18n/resources';
 import Modal from '@shared/ui/Modal';
 import { Tooltip } from '@shared/ui/Tooltip';
 import type { ConversationLiveStatus } from './workbenchAttentionModel';
+import {
+  backFromTaskDeepLink,
+  openTaskDetailForConversation,
+  useWorkbenchTaskDeepLinkSnapshot,
+} from './workbenchTaskDeepLinks';
 import styles from './AgentHubWorkbench.module.css';
 
 const SORT_STORAGE_KEY = 'agenthub.conversationSort';
@@ -141,6 +146,23 @@ export function ConversationSidebar({
    * a cancelled rename (#1821).
    */
   const cancelRenameRef = useRef(false);
+
+  // ── #1963 task queue group + deep-link back chip ──────────────────────
+  // Queue entries are published by the tasks route (live inventory) and the
+  // shell hook (demo seed while the route is unmounted); the sidebar only
+  // renders the group, it never owns task data.
+  const deepLinkSnapshot = useWorkbenchTaskDeepLinkSnapshot();
+  const taskQueue = deepLinkSnapshot.taskQueue;
+  // The back chip belongs to the conversation the task deep link opened; it
+  // hides as soon as the user moves to another conversation.
+  const appliedDeepLink = deepLinkSnapshot.applied;
+  const showBackToTask = appliedDeepLink !== null
+    && appliedDeepLink.direction === 'task-to-conversation'
+    && appliedDeepLink.conversationId === activeConversationId;
+  // The queue only ever holds active tasks, so presence = "有活跃任务":
+  // the group renders expanded by default and the user may collapse it.
+  const [taskQueueCollapsed, setTaskQueueCollapsed] = useState(false);
+  const taskQueueOpen = !taskQueueCollapsed;
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -384,6 +406,20 @@ export function ConversationSidebar({
           </button>
         )}
       </div>
+      {showBackToTask && appliedDeepLink && (
+        <div className={styles.taskDeepLinkChip}>
+          <button
+            type="button"
+            className={styles.taskDeepLinkChipButton}
+            data-task-id={appliedDeepLink.taskId}
+            onClick={() => backFromTaskDeepLink()}
+          >
+            <DesignNavIcon name="back" size={14} />
+            <span>{t('taskQueue.backToTask')}</span>
+            <span className={styles.taskDeepLinkChipTitle}>{appliedDeepLink.taskTitle}</span>
+          </button>
+        </div>
+      )}
       <select
         aria-label={t('aria.sortConversations') ?? '排序方式'}
         className={styles.sidebarSort}
@@ -406,6 +442,46 @@ export function ConversationSidebar({
           <span>{showArchived ? t('sidebar.archived') : t('sidebar.archive')}</span>
           <span className={styles.archiveFilterCount}>{archivedCount}</span>
         </button>
+      )}
+      {taskQueue.length > 0 && (
+        <div className={styles.taskQueueGroup}>
+          <button
+            type="button"
+            aria-expanded={taskQueueOpen}
+            className={styles.taskQueueHeader}
+            onClick={() => setTaskQueueCollapsed((collapsed) => !collapsed)}
+          >
+            <span className={styles.taskQueueHeaderIcon} aria-hidden="true">
+              <DesignNavIcon name="tasks" size={14} />
+            </span>
+            <span className={styles.taskQueueTitle}>{t('taskQueue.title')}</span>
+            <span className={styles.taskQueueCount}>{taskQueue.length}</span>
+            <span
+              aria-hidden="true"
+              className={`${styles.taskQueueChevron}${taskQueueOpen ? '' : ` ${styles.taskQueueChevronCollapsed}`}`}
+            >
+              <DesignNavIcon name="chevron" size={14} />
+            </span>
+          </button>
+          {taskQueueOpen && (
+            <ul className={styles.taskQueueList}>
+              {taskQueue.map((task) => (
+                <li key={task.id}>
+                  <button
+                    type="button"
+                    className={styles.taskQueueItem}
+                    data-status={task.status}
+                    data-task-id={task.id}
+                    onClick={() => openTaskDetailForConversation(task)}
+                  >
+                    <span className={styles.taskQueueItemTitle}>{task.title}</span>
+                    <span className={styles.taskQueueItemStatus}>{task.status}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
       )}
       <ul
         aria-activedescendant={
