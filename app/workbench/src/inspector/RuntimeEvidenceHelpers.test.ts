@@ -3,6 +3,8 @@ import type { RuntimeEvidenceSnapshot } from '@shared/inspector';
 import type { Artifact, Preview } from '@shared/types';
 import type { FileDiff } from '@shared/types/chat';
 import {
+  artifactDownloadName,
+  artifactDownloadRef,
   artifactWorkspaceDiffLabel,
   artifactWorkspacePreviewStatus,
   artifactWorkspaceTopic,
@@ -257,5 +259,36 @@ describe('RuntimeEvidenceHelpers', () => {
     expect(artifactWorkspacePreviewStatus([samplePreview({ id: 'p1', status: 'starting' })])).toBe(
       'starting'
     );
+  });
+
+  it('builds the artifact download ref with run id fallback (#1945)', () => {
+    expect(artifactDownloadRef(sampleArtifact({ id: 'art-1', runId: 'run-1' }), 'fallback')).toEqual({
+      kind: 'artifact',
+      runId: 'run-1',
+      id: 'art-1',
+    });
+    // Empty artifact run id falls back to the snapshot run id.
+    expect(artifactDownloadRef(sampleArtifact({ id: 'art-1', runId: '' }), 'fallback')).toEqual({
+      kind: 'artifact',
+      runId: 'fallback',
+      id: 'art-1',
+    });
+    // No resolvable run id means no downloadable ref (renderer disables the action).
+    expect(artifactDownloadRef(sampleArtifact({ id: 'art-1', runId: '' }), undefined)).toBeUndefined();
+    expect(artifactDownloadRef(sampleArtifact({ id: 'art-1', runId: '' }), '')).toBeUndefined();
+    // A missing artifact id also yields no ref.
+    expect(artifactDownloadRef(sampleArtifact({ id: '', runId: 'run-1' }), 'run-1')).toBeUndefined();
+  });
+
+  it('derives a bare download name from the artifact path basename (#1945)', () => {
+    expect(artifactDownloadName(sampleArtifact({ path: 'out/report.md', id: 'a1' }))).toBe(
+      'report.md'
+    );
+    expect(artifactDownloadName(sampleArtifact({ path: 'dist\\bundle/app.js', id: 'a1' }))).toBe(
+      'app.js'
+    );
+    // No usable basename falls back to the artifact id.
+    expect(artifactDownloadName(sampleArtifact({ path: '', id: 'a1' }))).toBe('a1');
+    expect(artifactDownloadName(sampleArtifact({ path: '   ', id: 'a1' }))).toBe('a1');
   });
 });
