@@ -3,6 +3,7 @@ import type { EvidenceRef } from '../transcript';
 import type {
   AgentHubPlatform,
   AgentHubSurface,
+  PreviewPort,
   RedispatchTaskResult,
   SurfaceCapabilities,
   TerminalPort,
@@ -25,6 +26,12 @@ export interface MockPlatformSeed {
   conversations?: WorkbenchConversation[];
   pickFiles?: () => Promise<ComposerAttachment[]>;
   openEvidence?: (evidence: EvidenceRef) => Promise<void>;
+  /**
+   * Full preview port passthrough (#1967 run-review apply tests). Takes
+   * precedence over the `openEvidence`-derived minimal port when both are
+   * provided.
+   */
+  preview?: PreviewPort;
   /**
    * Optional terminal port. When omitted and `capabilities.localTerminal === true`,
    * a fixture mock port is attached so Desktop-shaped tests can exercise the panel.
@@ -238,16 +245,18 @@ export function createMockPlatform(seed: MockPlatformSeed = {}): MockPlatform {
           },
         }
       : {}),
-    ...(seed.openEvidence
-      ? {
-          preview: {
-            async openEvidence(evidence: EvidenceRef): Promise<void> {
-              openedEvidence.push(evidence);
-              await seed.openEvidence?.(evidence);
+    ...(seed.preview
+      ? { preview: seed.preview }
+      : seed.openEvidence
+        ? {
+            preview: {
+              async openEvidence(evidence: EvidenceRef): Promise<void> {
+                openedEvidence.push(evidence);
+                await seed.openEvidence?.(evidence);
+              },
             },
-          },
-        }
-      : {}),
+          }
+        : {}),
     ...(terminal ? { terminal } : {}),
     ...(seed.workspaceFiles ? { workspaceFiles: seed.workspaceFiles } : {}),
     ...(seed.workspaceGit ? { workspaceGit: seed.workspaceGit } : {}),

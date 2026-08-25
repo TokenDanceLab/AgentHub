@@ -11,6 +11,7 @@ import {
   eventRunId,
   fileEvidence,
   normalizeApprovalRisk,
+  eventRunWorkDir,
   normalizeEvidenceStatus,
   normalizeFileAction,
   runEvidence,
@@ -259,6 +260,30 @@ describe('runEvidence', () => {
     ]);
   });
 
+  it('omits workDir when the executor did not report one', () => {
+    expect(runEvidence('run-wd', 'running')).toEqual([
+      { id: 'run-run-wd', kind: 'run', label: 'Run run-wd', status: 'running' },
+    ]);
+    expect(runEvidence('run-wd', 'running', undefined)).toEqual([
+      { id: 'run-run-wd', kind: 'run', label: 'Run run-wd', status: 'running' },
+    ]);
+    expect(runEvidence('run-wd', 'running', '')).toEqual([
+      { id: 'run-run-wd', kind: 'run', label: 'Run run-wd', status: 'running' },
+    ]);
+  });
+
+  it('carries the executor-reported workDir as trusted evidence (#1967)', () => {
+    expect(runEvidence('run-wd2', 'completed', '/tmp/ws-run')).toEqual([
+      {
+        id: 'run-run-wd2',
+        kind: 'run',
+        label: 'Run run-wd2',
+        status: 'completed',
+        workDir: '/tmp/ws-run',
+      },
+    ]);
+  });
+
   it('passes through the status verbatim', () => {
     expect(runEvidence('run-10', 'failed')).toEqual([
       { id: 'run-run-10', kind: 'run', label: 'Run run-10', status: 'failed' },
@@ -266,6 +291,20 @@ describe('runEvidence', () => {
     expect(runEvidence('run-11', 'pending')).toEqual([
       { id: 'run-run-11', kind: 'run', label: 'Run run-11', status: 'pending' },
     ]);
+  });
+});
+
+describe('eventRunWorkDir', () => {
+  it('extracts a trimmed workDir from the payload', () => {
+    const event = edgeEvent('evt-wd', 1, 'run.started', { runId: 'run-1', workDir: '  /tmp/ws  ' });
+    expect(eventRunWorkDir(event)).toBe('/tmp/ws');
+  });
+
+  it('returns undefined when the payload has no usable workDir', () => {
+    expect(eventRunWorkDir(edgeEvent('evt-wd2', 2, 'run.started', { runId: 'run-1' }))).toBeUndefined();
+    expect(eventRunWorkDir(edgeEvent('evt-wd3', 3, 'run.started', { runId: 'run-1', workDir: '' }))).toBeUndefined();
+    expect(eventRunWorkDir(edgeEvent('evt-wd4', 4, 'run.started', { runId: 'run-1', workDir: '   ' }))).toBeUndefined();
+    expect(eventRunWorkDir(edgeEvent('evt-wd5', 5, 'run.started', { runId: 'run-1', workDir: 42 }))).toBeUndefined();
   });
 });
 

@@ -27,8 +27,18 @@ function fileChange(overrides: Partial<FileChangeTranscriptBlock> & { path: stri
   };
 }
 
-function runRefs(runId: string, status: 'pending' | 'running' | 'completed' | 'failed' = 'running') {
-  return [{ id: `run-${runId}`, kind: 'run' as const, label: `Run ${runId}`, status }];
+function runRefs(
+  runId: string,
+  status: 'pending' | 'running' | 'completed' | 'failed' = 'running',
+  workDir?: string | undefined,
+) {
+  return [{
+    id: `run-${runId}`,
+    kind: 'run' as const,
+    label: `Run ${runId}`,
+    status,
+    ...(workDir ? { workDir } : {}),
+  }];
 }
 
 function runStepGroup(children: TranscriptBlock[]): RunStepGroupTranscriptBlock {
@@ -288,5 +298,40 @@ describe('runChangeAggregate (#1967)', () => {
         hunkCount: 0,
       });
     });
+  });
+});
+
+describe('selectRunReview trusted workDir evidence (#1967)', () => {
+  it('exposes the executor-reported workDir of the selected run', () => {
+    const selection = selectRunReview([
+      fileChange({ path: 'src/a.ts', evidenceRefs: runRefs('run-wd', 'completed', '/tmp/ws-run') }),
+    ]);
+    expect(selection.scope).toBe('run');
+    expect(selection.runEvidenceId).toBe('run-run-wd');
+    expect(selection.workDir).toBe('/tmp/ws-run');
+  });
+
+  it('keeps the first reported workDir when later replayed events differ', () => {
+    const selection = selectRunReview([
+      fileChange({ path: 'src/a.ts', evidenceRefs: runRefs('run-wd', 'running', '/tmp/ws-first') }),
+      fileChange({ path: 'src/b.ts', evidenceRefs: runRefs('run-wd', 'completed', '/tmp/ws-replayed') }),
+    ]);
+    expect(selection.workDir).toBe('/tmp/ws-first');
+  });
+
+  it('leaves workDir undefined when the executor never reported one', () => {
+    const selection = selectRunReview([
+      fileChange({ path: 'src/a.ts', evidenceRefs: runRefs('run-nowd', 'completed') }),
+    ]);
+    expect(selection.scope).toBe('run');
+    expect(selection.workDir).toBeUndefined();
+  });
+
+  it('never exposes a workDir for the legacy conversation fallback', () => {
+    const selection = selectRunReview([
+      fileChange({ path: 'src/legacy.ts' }),
+    ]);
+    expect(selection.scope).toBe('legacy');
+    expect(selection.workDir).toBeUndefined();
   });
 });

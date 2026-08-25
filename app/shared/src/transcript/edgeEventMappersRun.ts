@@ -19,6 +19,7 @@ import {
   agentAuthorFromEvent,
   blockBase,
   eventRunId,
+  eventRunWorkDir,
   normalizeEvidenceStatus,
   runEvidence,
 } from './edgeEventEvidence';
@@ -35,7 +36,7 @@ export function runTextBlock(
   }
 
   return {
-    ...blockBase(event, EDGE_AUTHOR, runEvidence(runId, status)),
+    ...blockBase(event, EDGE_AUTHOR, runEvidence(runId, status, eventRunWorkDir(event))),
     kind: 'text',
     text: `Run ${runId} ${action}`,
   };
@@ -51,7 +52,7 @@ export function runStatusBlock(event: EventEnvelope): TranscriptBlock | null {
   const status = normalizeEvidenceStatus(statusText);
 
   return {
-    ...blockBase(event, EDGE_AUTHOR, runEvidence(runId, status)),
+    ...blockBase(event, EDGE_AUTHOR, runEvidence(runId, status, eventRunWorkDir(event))),
     kind: 'text',
     text: `Run ${runId} ${statusText}`,
   };
@@ -70,7 +71,7 @@ export function runFailedBlock(event: EventEnvelope): TranscriptBlock | null {
     errorPayloadMessage(event.payload.error);
 
   return {
-    ...blockBase(event, EDGE_AUTHOR, runEvidence(runId, 'failed')),
+    ...blockBase(event, EDGE_AUTHOR, runEvidence(runId, 'failed', eventRunWorkDir(event))),
     kind: 'failure',
     title: `Run ${runId} failed`,
     runId,
@@ -91,7 +92,7 @@ export function runCancelledBlock(event: EventEnvelope): TranscriptBlock | null 
     errorPayloadMessage(event.payload.error);
 
   return {
-    ...blockBase(event, EDGE_AUTHOR, runEvidence(runId, 'failed')),
+    ...blockBase(event, EDGE_AUTHOR, runEvidence(runId, 'failed', eventRunWorkDir(event))),
     kind: 'failure',
     title: `Run ${runId} cancelled`,
     runId,
@@ -110,7 +111,7 @@ export function runFinishedBlock(event: EventEnvelope): TranscriptBlock | null {
     durationLabel(numberField(event.payload.durationMs));
 
   return {
-    ...blockBase(event, EDGE_AUTHOR, runEvidence(runId, 'completed')),
+    ...blockBase(event, EDGE_AUTHOR, runEvidence(runId, 'completed', eventRunWorkDir(event))),
     kind: 'finished',
     title: `Run ${runId} finished`,
     runId,
@@ -128,7 +129,7 @@ export function outputTextBlock(event: EventEnvelope): TranscriptBlock | null {
   }
 
   return {
-    ...blockBase(event, EDGE_AUTHOR, runEvidence(runId ?? event.id, 'running')),
+    ...blockBase(event, EDGE_AUTHOR, runEvidence(runId ?? event.id, 'running', eventRunWorkDir(event))),
     kind: 'text',
     text,
   };
@@ -154,7 +155,7 @@ export function outputBatchTextBlock(event: EventEnvelope): TranscriptBlock | nu
   }
 
   return {
-    ...blockBase(event, EDGE_AUTHOR, runEvidence(runId ?? event.id, 'running')),
+    ...blockBase(event, EDGE_AUTHOR, runEvidence(runId ?? event.id, 'running', eventRunWorkDir(event))),
     kind: 'text',
     text,
   };
@@ -170,7 +171,7 @@ export function agentTextBlock(event: EventEnvelope): TranscriptBlock | null {
   }
 
   return {
-    ...blockBase(event, agentAuthorFromEvent(event), runEvidence(runId ?? event.id, 'running')),
+    ...blockBase(event, agentAuthorFromEvent(event), runEvidence(runId ?? event.id, 'running', eventRunWorkDir(event))),
     kind: 'text',
     text,
   };
@@ -183,7 +184,7 @@ export function thinkingBlock(event: EventEnvelope): TranscriptBlock | null {
   const status = normalizeEvidenceStatus(stringField(event.payload.status) ?? 'running');
 
   return {
-    ...blockBase(event, agentAuthorFromEvent(event), runEvidence(runId, status)),
+    ...blockBase(event, agentAuthorFromEvent(event), runEvidence(runId, status, eventRunWorkDir(event))),
     kind: 'thinking',
     content,
     isThinking: status === 'running',
