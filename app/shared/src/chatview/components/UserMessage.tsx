@@ -2,12 +2,38 @@ import { memo } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import type { TranscriptUserItem } from '../transcript-item'
+import type { RowItem } from '../types'
 import { CHATVIEW_I18N_NAMESPACE } from '../i18n/resources'
 import MarkdownContent from '../../ui/Markdown'
 import { MessageDisplayMeta } from './MessageDisplayMeta'
+import { ImageAttachmentRow } from './ImageAttachment'
 
 function userAvatarInitial(name: string | undefined, fallback: string): string {
   return (name?.trim() || fallback).slice(0, 1).toUpperCase()
+}
+
+/**
+ * Attachment list inside a user bubble (#1957). Image rows reuse the shared
+ * ImageAttachmentRow (thumbnail + lightbox + platform-port resolution with
+ * the same loading/unavailable/failed degradation as agent rows); non-image
+ * rows keep the file-chip semantics (name + size).
+ */
+function UserAttachmentList({ rows }: { rows: RowItem[] }) {
+  const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE)
+  return (
+    <div className="user-att-list" aria-label={t('aria.attachments')}>
+      {rows.map((row) =>
+        row.attachmentKind === 'image' && row.attachmentRef ? (
+          <ImageAttachmentRow key={row.id} item={row} />
+        ) : (
+          <div key={row.id} className="att-row">
+            <span className="att-name">{row.fileName ?? row.label}</span>
+            {row.fileSize && <span className="att-size">{row.fileSize}</span>}
+          </div>
+        ),
+      )}
+    </div>
+  )
 }
 
 interface Props {
@@ -41,6 +67,21 @@ export const UserMessage = memo(function UserMessage({ item, chatMode, onContext
       }
     : {}
 
+  // #1957: attachment-only user items carry empty text; skip the markdown
+  // node so the bubble wraps just the attachment list. Text-only messages
+  // keep the previous rendering unchanged. The `?? ''` guard tolerates the
+  // adapter's legacy text-less user items (upstream block without text).
+  const attachments = item.attachments
+  const hasAttachments = !!attachments && attachments.length > 0
+  const bubbleContent = (
+    <>
+      {((item.text ?? '').trim() !== '' || !hasAttachments) && (
+        <MarkdownContent content={item.text} />
+      )}
+      {hasAttachments && <UserAttachmentList rows={attachments} />}
+    </>
+  )
+
   if (chatMode === 'dm') {
     return (
       <div className={rowClass}>
@@ -54,7 +95,7 @@ export const UserMessage = memo(function UserMessage({ item, chatMode, onContext
             title={item.displayTitle}
           />
           <div className="user-bubble" {...bubbleProps}>
-            <MarkdownContent content={item.text} />
+            {bubbleContent}
           </div>
         </div>
         <div className="dm-avatar"><div className="ag-av user-av">{avatarInitial}</div></div>
@@ -78,7 +119,7 @@ export const UserMessage = memo(function UserMessage({ item, chatMode, onContext
           title={item.displayTitle}
         />
         <div className="user-bubble" {...bubbleProps}>
-          <MarkdownContent content={item.text} />
+          {bubbleContent}
         </div>
       </div>
       <div className="dm-avatar"><div className="ag-av user-av">{avatarInitial}</div></div>

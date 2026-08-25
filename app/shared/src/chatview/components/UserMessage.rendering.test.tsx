@@ -1,7 +1,13 @@
-import { fireEvent, render } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { fireEvent, render, screen } from '@testing-library/react';
+import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import type { TranscriptUserItem } from '../transcript-item';
+import type { RowItem } from '../types';
 import { UserMessage } from './UserMessage';
+import { useTestI18nLanguage } from '../../testing/i18n';
+import {
+  registerAttachmentImageUrlResolver,
+  getAttachmentImageUrlResolver,
+} from '../../platform/attachmentImagePort';
 
 describe('UserMessage rendering', () => {
   it('renders user markdown tables through the shared markdown renderer', () => {
@@ -73,5 +79,109 @@ describe('UserMessage rendering', () => {
     const noHandler: TranscriptUserItem = { type: 'user', id: 'hub-message-2', text: '有 id 的消息' };
     const { container: bare } = render(<UserMessage item={noHandler} chatMode="dm" />);
     expect(bare.querySelector('[data-selectable-card]')).toBeNull();
+  });
+});
+
+// ── #1957: the sender's own attachments render inline in the user bubble ──
+// Same conventions as ImageAttachment.test.tsx: assertions use the en
+// chatview literals, and the image URL resolver goes through the shared
+// platform port (register per test, unregister in afterEach).
+describe('UserMessage attachments (#1957)', () => {
+  beforeAll(async () => {
+    await useTestI18nLanguage('en');
+  });
+
+  let unregister: (() => void) | undefined;
+  afterEach(() => {
+    unregister?.();
+    unregister = undefined;
+  });
+
+  const imageAttachmentRef = {
+    id: 'att-1', name: 'photo.png', size: 2048, mime_type: 'image/png',
+  };
+
+  function imageRow(): RowItem {
+    return {
+      id: 'blk-att-1', type: 'attachment', label: 'photo.png', status: 'ok',
+      collapsible: false, standalone: true,
+      fileName: 'photo.png', fileSize: '2 KB',
+      attachmentKind: 'image', attachmentRef: imageAttachmentRef,
+    };
+  }
+
+  function fileRow(): RowItem {
+    return {
+      id: 'blk-att-2', type: 'attachment', label: 'notes.md', status: 'ok',
+      collapsible: false, standalone: true,
+      fileName: 'notes.md', fileSize: '2 KB', attachmentKind: 'file',
+    };
+  }
+
+  it('renders an image attachment thumbnail through the shared platform port', async () => {
+    unregister = registerAttachmentImageUrlResolver(async () => 'blob:user-upload');
+    const item: TranscriptUserItem = {
+      type: 'user', id: 'u1', name: 'Ding', text: '', attachments: [imageRow()],
+    };
+
+    const { container } = render(<UserMessage item={item} chatMode="dm" />);
+
+    const img = await screen.findByAltText('photo.png');
+    expect(img).toHaveAttribute('src', 'blob:user-upload');
+    // Name + size subtitle rides under the thumbnail.
+    expect(screen.getByText('photo.png')).toBeInTheDocument();
+    expect(screen.getByText('2 KB')).toBeInTheDocument();
+
+    // The attachment list carries the accessible label and is the bubble's
+    // only child — attachment-only items skip the markdown node entirely.
+    const list = container.querySelector('.user-att-list');
+    expect(list).not.toBeNull();
+    expect(list).toHaveAttribute('aria-label', 'Attachments');
+    const bubble = container.querySelector('.user-bubble');
+    expect(bubble).not.toBeNull();
+    expect(bubble!.children).toHaveLength(1);
+    expect(bubble!.firstElementChild).toBe(list);
+  });
+
+  it('degrades to the chip notice when no surface registered a resolver', async () => {
+    expect(getAttachmentImageUrlResolver()).toBeUndefined();
+    const item: TranscriptUserItem = {
+      type: 'user', id: 'u1', name: 'Ding', text: '', attachments: [imageRow()],
+    };
+
+    render(<UserMessage item={item} chatMode="dm" />);
+
+    expect(await screen.findByText('Image preview unavailable')).toBeInTheDocument();
+    expect(screen.getByText('photo.png')).toBeInTheDocument();
+    expect(document.querySelector('img')).toBeNull();
+  });
+
+  it('renders non-image attachments as file chips without touching the port', () => {
+    expect(getAttachmentImageUrlResolver()).toBeUndefined();
+    const item: TranscriptUserItem = {
+      type: 'user', id: 'u1', name: 'Ding', text: '', attachments: [fileRow()],
+    };
+
+    const { container } = render(<UserMessage item={item} chatMode="group" />);
+
+    expect(screen.getByText('notes.md')).toBeInTheDocument();
+    expect(screen.getByText('2 KB')).toBeInTheDocument();
+    expect(document.querySelector('img')).toBeNull();
+    expect(container.querySelector('.user-att-list .att-row')).not.toBeNull();
+  });
+
+  it('renders text and attachments together when both are present', async () => {
+    unregister = registerAttachmentImageUrlResolver(async () => 'blob:user-upload');
+    const item: TranscriptUserItem = {
+      type: 'user', id: 'u1', name: 'Ding', text: 'here is the screenshot',
+      attachments: [imageRow()],
+    };
+
+    const { container } = render(<UserMessage item={item} chatMode="group" />);
+
+    expect(screen.getByText('here is the screenshot')).toBeInTheDocument();
+    expect(await screen.findByAltText('photo.png')).toBeInTheDocument();
+    const bubble = container.querySelector('.user-bubble');
+    expect(bubble!.children).toHaveLength(2);
   });
 });

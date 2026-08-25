@@ -211,21 +211,33 @@
 .row-item.deploy.fail > .row-hd .row-icon { color:var(--td-danger) }
 .row-item.deploy.fail > .row-bd { border-left-color:var(--td-danger) }
 
-/* Attachment */ .row-item.attachment > .row-hd .row-icon { color:var(--td-ink-muted) }
-.row-item.attachment .att-row { display:flex; align-items:center; gap:var(--chat-sp-sm) }
+/* Attachment. Chip + inline image rules are shared by agent attachment rows
+   (.row-item.attachment) and user bubble attachment lists (.user-att-list,
+   #1957); color-bearing hints stay scoped per surface so the user bubble
+   keeps its on-plum ink. */
+.row-item.attachment > .row-hd .row-icon { color:var(--td-ink-muted) }
+:is(.row-item.attachment, .user-att-list) .att-row { display:flex; align-items:center; gap:var(--chat-sp-sm) }
 .row-item.attachment .att-row.clickable { cursor:pointer }
-.row-item.attachment .att-name { font:var(--chat-label); flex:1 }
+:is(.row-item.attachment, .user-att-list) .att-name { font:var(--chat-label) }
+.row-item.attachment .att-name { flex:1 }
 .row-item.attachment .att-size { font:var(--chat-label-xs); color:var(--td-ink-subtle) }
+.user-att-list .att-size { font:var(--chat-label-xs); color:inherit }
 
 /* Image attachment (#1938): inline thumbnail + lightbox. The degraded
    (loading/unavailable/failed) states reuse .att-row chip styles above. */
-.row-item.attachment .att-image-thumb { display:inline-block; padding:0; border:none; background:none; cursor:zoom-in; border-radius:var(--chat-r-md); line-height:0 }
-.row-item.attachment .att-image-thumb:focus-visible { outline:none; box-shadow:var(--focus-ring) }
-.row-item.attachment .att-image-img { max-width:240px; max-height:180px; width:auto; height:auto; object-fit:cover; border-radius:var(--chat-r-md); border:1px solid var(--td-line) }
-.row-item.attachment .att-image-sub { display:flex; align-items:center; gap:var(--chat-sp-sm); margin-top:var(--chat-sp-xs) }
+:is(.row-item.attachment, .user-att-list) .att-image-thumb { display:inline-block; padding:0; border:none; background:none; cursor:zoom-in; border-radius:var(--chat-r-md); line-height:0 }
+:is(.row-item.attachment, .user-att-list) .att-image-thumb:focus-visible { outline:none; box-shadow:var(--focus-ring) }
+:is(.row-item.attachment, .user-att-list) .att-image-img { max-width:240px; max-height:180px; width:auto; height:auto; object-fit:cover; border-radius:var(--chat-r-md); border:1px solid var(--td-line) }
+:is(.row-item.attachment, .user-att-list) .att-image-sub { display:flex; align-items:center; gap:var(--chat-sp-sm); margin-top:var(--chat-sp-xs) }
 .row-item.attachment .att-image-status { font:var(--chat-label-xs); color:var(--td-ink-subtle); flex-shrink:0 }
+.user-att-list .att-image-status { font:var(--chat-label-xs); color:inherit; flex-shrink:0 }
 .att-image-lightbox-img { display:block; max-width:min(90vw, 1200px); max-height:80vh; width:auto; height:auto; object-fit:contain; margin:0 auto }
 .att-image-lightbox-fail { font:var(--chat-label); color:var(--td-ink-muted); padding:var(--chat-sp-lg) }
+
+/* User bubble attachment list (#1957): right-aligned column hugging the
+   bubble's inline-end edge. */
+.user-att-list { display:flex; flex-direction:column; align-items:flex-end; gap:var(--chat-sp-xs) }
+.user-att-list .att-image-sub { justify-content:flex-end }
 
 /* Context */ .row-item.ctx > .row-hd .row-icon { color:var(--td-ink-muted) }
 .row-item.ctx > .row-bd { display:grid; gap:var(--chat-sp-sm) }
