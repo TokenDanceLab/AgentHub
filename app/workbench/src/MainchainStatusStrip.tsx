@@ -29,6 +29,11 @@ export function MainchainStatusStrip({
   const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE);
   const runningCount = attention?.runningCount ?? 0;
   const awaitingApprovalCount = attention?.awaitingApprovalCount ?? 0;
+  // Fallback-mode scope marker: counts then cover the ACTIVE conversation
+  // only, and the chips must say so instead of implying fleet-wide totals.
+  const scopeHint = attention?.activeConversationOnly
+    ? t('sharedWorkbench:attention.scopeActiveConversation')
+    : undefined;
   return (
     // A11y (#10): the strip's node states/labels change at runtime — a
     // polite live region announces the changes without stealing focus.
@@ -46,14 +51,22 @@ export function MainchainStatusStrip({
           {runningCount > 0 && renderAttentionChip({
             handler: onOpenRunningQueue,
             kind: 'running',
-            label: `运行中 ${runningCount}`,
-            ariaLabel: `运行中 ${runningCount}，查看任务队列`,
+            label: t('sharedWorkbench:attention.running', { count: String(runningCount) }),
+            ariaLabel: chipAria(
+              t('sharedWorkbench:attention.running', { count: String(runningCount) }),
+              t('sharedWorkbench:attention.openTaskQueue'),
+              scopeHint,
+            ),
           })}
           {awaitingApprovalCount > 0 && renderAttentionChip({
             handler: onOpenApprovalQueue,
             kind: 'awaiting',
-            label: `待批准 ${awaitingApprovalCount}`,
-            ariaLabel: `待批准 ${awaitingApprovalCount}，查看审批`,
+            label: t('sharedWorkbench:attention.awaitingApproval', { count: String(awaitingApprovalCount) }),
+            ariaLabel: chipAria(
+              t('sharedWorkbench:attention.awaitingApproval', { count: String(awaitingApprovalCount) }),
+              t('sharedWorkbench:attention.openApprovalQueue'),
+              scopeHint,
+            ),
           })}
         </div>
       )}
@@ -63,6 +76,10 @@ export function MainchainStatusStrip({
   );
 }
 
+/** aria/title for an attention chip: label · queue action · scope hint. */
+function chipAria(label: string, action: string, scopeHint: string | undefined): string {
+  return scopeHint ? `${label} · ${action} · ${scopeHint}` : `${label} · ${action}`;
+}
 
 interface AttentionChipSpec {
   handler: (() => void) | undefined;
