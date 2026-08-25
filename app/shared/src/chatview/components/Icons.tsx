@@ -27,3 +27,6 @@ export { Terminal as IconTerminal } from 'lucide-react'
 export { GitBranch as IconGitBranch } from 'lucide-react'
 export { Brain as IconBrain } from 'lucide-react'
 export { Globe as IconGlobe } from 'lucide-react'
+// Media attachment row icons (#1939) — mirror the #1938 kind-driven icon routing.
+export { Music as IconMusic } from 'lucide-react'
+export { Video as IconVideo } from 'lucide-react'

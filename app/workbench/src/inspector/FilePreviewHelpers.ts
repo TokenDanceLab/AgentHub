@@ -1,4 +1,5 @@
 import type { PreviewPort } from '@shared/platform';
+import { isAudioFileName, isVideoFileName } from '@shared/ui/mediaPreview';
 import { highlightLine } from '@shared/ui/syntaxHighlight';
 import type { DesignOpenWithIconName } from '../designIcons';
 import styles from './FilePreview.module.css';
@@ -50,6 +51,16 @@ export function isHtmlFile(filename: string): boolean {
 
 export function isImageFile(filename: string): boolean {
   return /\.(png|jpe?g|gif|svg|webp|bmp|ico|avif)$/i.test(filename);
+}
+
+/** Audio media detection delegates to the shared media SSOT (#1939). */
+export function isAudioFile(filename: string): boolean {
+  return isAudioFileName(filename);
+}
+
+/** Video media detection delegates to the shared media SSOT (#1939). */
+export function isVideoFile(filename: string): boolean {
+  return isVideoFileName(filename);
 }
 
 export function isTextFile(filename: string): boolean {

@@ -13,6 +13,7 @@ beforeAll(async () => {
 import { RowItem } from './RowItem';
 import type { RowItem as RowItemType } from '../types';
 import { registerAttachmentImageUrlResolver } from '../../platform/attachmentImagePort';
+import { registerAttachmentMediaUrlResolver } from '../../platform/attachmentMediaPort';
 import type { AttachmentRef } from '../../composer/types';
 
 beforeEach(() => { vi.useFakeTimers({ shouldAdvanceTime: true }) });
@@ -819,5 +820,101 @@ describe('RowItem attachment rows (#1938)', () => {
     expect(await screen.findByText('Image preview unavailable')).toBeInTheDocument();
     expect(container.querySelector('img')).toBeNull();
     expect(container.querySelector('.att-image-thumb')).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// #1939: audio/video attachment rows — same surface contract as #1938:
+// kind-driven icon, inline body resolved through the platform media port,
+// honest chip fallback without a resolver.
+// ---------------------------------------------------------------------------
+describe('RowItem audio/video attachment rows (#1939)', () => {
+  const audioRef: AttachmentRef = {
+    id: 'att-88',
+    name: 'voice-note.mp3',
+    size: 4096,
+    mime_type: 'audio/mpeg',
+  };
+
+  const mediaItem = (overrides: Partial<RowItemType> = {}): RowItemType => ({
+    id: 'media-row-1',
+    type: 'attachment',
+    label: 'voice-note.mp3',
+    status: 'ok',
+    collapsible: false,
+    standalone: true,
+    fileName: 'voice-note.mp3',
+    fileSize: '4 KB',
+    ...overrides,
+  });
+
+  it('renders an audio attachment as an inline player through the platform port', async () => {
+    const unregister = registerAttachmentMediaUrlResolver(async () => 'blob:row-audio');
+    try {
+      const { container } = render(
+        <RowItem item={mediaItem({ attachmentKind: 'audio', attachmentRef: audioRef })} />,
+      );
+      const audio = await screen.findByLabelText('Audio voice-note.mp3');
+      expect(audio).toHaveAttribute('controls');
+      expect(audio).toHaveAttribute('src', 'blob:row-audio');
+      expect(container.querySelector('.row-bd')).not.toBeNull();
+    } finally {
+      unregister();
+    }
+  });
+
+  it('renders a video attachment as an inline player through the platform port', async () => {
+    const videoRef: AttachmentRef = { id: 'att-89', name: 'demo.mp4', size: 8192, mime_type: 'video/mp4' };
+    const unregister = registerAttachmentMediaUrlResolver(async () => 'blob:row-video');
+    try {
+      render(
+        <RowItem
+          item={mediaItem({
+            attachmentKind: 'video',
+            attachmentRef: videoRef,
+            fileName: 'demo.mp4',
+            label: 'demo.mp4',
+          })}
+        />,
+      );
+      const video = await screen.findByLabelText('Video demo.mp4');
+      expect(video).toHaveAttribute('controls');
+      expect(video).toHaveAttribute('src', 'blob:row-video');
+    } finally {
+      unregister();
+    }
+  });
+
+  it('uses media icons from the kind-driven icon table (music/video, not upload)', () => {
+    const audio = render(
+      <RowItem item={mediaItem({ attachmentKind: 'audio', attachmentRef: audioRef })} />,
+    );
+    expect(audio.container.querySelector('.row-icon.lucide-music')).not.toBeNull();
+    audio.unmount();
+
+    const video = render(
+      <RowItem
+        item={mediaItem({
+          attachmentKind: 'video',
+          attachmentRef: { ...audioRef, name: 'demo.mp4', mime_type: 'video/mp4' },
+        })}
+      />,
+    );
+    expect(video.container.querySelector('.row-icon.lucide-video')).not.toBeNull();
+    video.unmount();
+
+    // Generic file attachments keep the upload icon (no #1938-era change).
+    const file = render(
+      <RowItem item={mediaItem({ attachmentKind: 'file', fileName: 'report.pdf', label: 'report.pdf' })} />,
+    );
+    expect(file.container.querySelector('.row-icon.lucide-upload')).not.toBeNull();
+  });
+
+  it('degrades an audio row to the chip with a notice when no media resolver is registered', async () => {
+    const { container } = render(
+      <RowItem item={mediaItem({ attachmentKind: 'audio', attachmentRef: audioRef })} />,
+    );
+    expect(await screen.findByText('Audio preview unavailable')).toBeInTheDocument();
+    expect(container.querySelector('audio')).toBeNull();
   });
 });

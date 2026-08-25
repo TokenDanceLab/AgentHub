@@ -26,6 +26,33 @@ import {
   extractDomain,
   deriveTitleFromUrl,
 } from './adapterShared'
+import type { AttachmentRef } from '../composer/types'
+import { isAudioFileName, isVideoFileName } from '../ui/mediaPreview'
+
+/**
+ * Attachment payload kind for the transcript row (#1939).
+ *
+ * Hub only distinguishes `image` from `file` attachments, so audio/video
+ * arrive as `contentType: 'file'` and are re-derived here: the Hub-stored
+ * mime type leads (`audio/*` / `video/*`), the filename extension is the
+ * fallback for attachments stored with a generic/empty mime. Explicit
+ * `image` content type is trusted as-is. Exported for behavior tests.
+ */
+export function resolveAttachmentKind(
+  attachmentRef: AttachmentRef,
+  contentType: 'image' | 'file',
+): NonNullable<RowItem['attachmentKind']> {
+  if (contentType === 'image') return 'image'
+  // Hub-stored mime is authoritative when it names a media family;
+  // otherwise (absent/generic mime, e.g. application/octet-stream) the
+  // filename extension decides.
+  const mime = (attachmentRef.mime_type ?? '').toLowerCase()
+  if (mime.startsWith('audio/')) return 'audio'
+  if (mime.startsWith('video/')) return 'video'
+  if (isAudioFileName(attachmentRef.name)) return 'audio'
+  if (isVideoFileName(attachmentRef.name)) return 'video'
+  return 'file'
+}
 
 /**
  * Map a single TranscriptBlock to a RowItem, or return `null`
@@ -253,10 +280,10 @@ export function mapBlock(b: TranscriptBlock): RowItem | null {
         collapsible: false, standalone: true,
         fileName: a.attachmentRef.name,
         fileSize: a.attachmentRef.size ? `${Math.round(a.attachmentRef.size / 1024)} KB` : undefined,
-        // #1938: keep the image marker + ref on the row so image
-        // attachments render an inline thumbnail (URL resolved through the
-        // platform port) instead of degrading to a bare file chip.
-        attachmentKind: a.contentType,
+        // #1938/#1939: keep the kind marker + ref on the row so image and
+        // audio/video attachments render inline previews (URL resolved
+        // through the platform port) instead of degrading to a bare chip.
+        attachmentKind: resolveAttachmentKind(a.attachmentRef, a.contentType),
         attachmentRef: a.attachmentRef,
       } as RowItem
     }
