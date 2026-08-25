@@ -381,6 +381,18 @@ func (h *Handler) handleRunSubRoute(w http.ResponseWriter, r *http.Request) {
 		h.PostApplyAllRunDiffs(w, r, runID)
 		return
 	}
+	// GET /v1/runs/{runId}/checkpoint/file — single checkpoint file preview (#1968)
+	if strings.HasSuffix(r.URL.Path, "/checkpoint/file") && r.Method == http.MethodGet {
+		runID := strings.TrimSuffix(strings.TrimPrefix(r.URL.Path, "/v1/runs/"), "/checkpoint/file")
+		h.GetRunCheckpointFile(w, r, runID)
+		return
+	}
+	// GET /v1/runs/{runId}/checkpoint — checkpoint metadata + inventory (#1968)
+	if strings.HasSuffix(r.URL.Path, "/checkpoint") && r.Method == http.MethodGet {
+		runID := strings.TrimSuffix(strings.TrimPrefix(r.URL.Path, "/v1/runs/"), "/checkpoint")
+		h.GetRunCheckpoint(w, r, runID)
+		return
+	}
 	if r.Method == http.MethodGet {
 		runID := strings.TrimPrefix(r.URL.Path, "/v1/runs/")
 		repo := ensureStore(h)

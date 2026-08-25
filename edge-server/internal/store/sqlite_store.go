@@ -398,6 +398,15 @@ func (s *SQLiteStore) ListRunDiffFiles(runID string) []RunDiffFile {
 	return s.store.ListRunDiffFiles(runID)
 }
 
+func (s *SQLiteStore) UpsertRunCheckpoint(cp RunCheckpoint) (RunCheckpoint, error) {
+	checkpoint, err := s.store.UpsertRunCheckpoint(cp)
+	return persistAfterSQLiteWrite(s, checkpoint, err)
+}
+
+func (s *SQLiteStore) GetRunCheckpoint(runID string) (RunCheckpoint, bool) {
+	return s.store.GetRunCheckpoint(runID)
+}
+
 func (s *SQLiteStore) UpsertArtifact(artifact Artifact) (Artifact, error) {
 	created, err := s.store.UpsertArtifact(artifact)
 	return persistAfterSQLiteWrite(s, created, err)

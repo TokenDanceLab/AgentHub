@@ -23,6 +23,7 @@ import {
   normalizeEvidenceStatus,
   runEvidence,
 } from './edgeEventEvidence';
+import type { CheckpointTranscriptBlock } from './types';
 
 export function runTextBlock(
   event: EventEnvelope,
@@ -174,6 +175,25 @@ export function agentTextBlock(event: EventEnvelope): TranscriptBlock | null {
     ...blockBase(event, agentAuthorFromEvent(event), runEvidence(runId ?? event.id, 'running', eventRunWorkDir(event))),
     kind: 'text',
     text,
+  };
+}
+
+export function checkpointBlock(event: EventEnvelope): CheckpointTranscriptBlock | null {
+  const runId = eventRunId(event);
+  const checkpointId = stringField(event.payload.checkpointId);
+  if (!runId || !checkpointId) {
+    console.warn('normalizeEdgeEvents: run.checkpoint missing runId/checkpointId', { eventId: event.id });
+    return null;
+  }
+  // The checkpoint ref doubles as run evidence: it carries the executor-
+  // reported workDir so run-level review/applies can trust it (#1967/#1968).
+  return {
+    ...blockBase(event, EDGE_AUTHOR, runEvidence(runId, 'running', eventRunWorkDir(event))),
+    kind: 'checkpoint',
+    runId,
+    checkpointId,
+    fileCount: numberField(event.payload.fileCount) ?? 0,
+    totalBytes: numberField(event.payload.totalBytes) ?? 0,
   };
 }
 

@@ -8,7 +8,7 @@ import {
   selectRunReview,
   summarizeRunReviewFiles,
 } from '@shared/transcript';
-import { RunReviewOverlay, type DiffHunkDecision } from '@shared/ui';
+import { RunReviewOverlay, CheckpointPreviewOverlay, type DiffHunkDecision } from '@shared/ui';
 import type { ComposerIntent, ComposerMention } from '@shared/composer';
 import {
   buildComposerIntent,
@@ -56,6 +56,7 @@ import type { WorkbenchAttentionCounts } from './workbenchAttentionModel';
 import { UnifiedComposer } from './UnifiedComposer';
 import { WorkspaceHeader } from './WorkspaceHeader';
 import type { UnreadDividerDescriptor } from '@shared/chatview';
+import type { RowItem } from '@shared/chatview/types';
 import MessageSearchPanel from './MessageSearchPanel';
 import { PageErrorBoundary } from './PageErrorBoundary';
 import { useComposerSubmitBehavior } from './workbenchPreferences';
@@ -299,12 +300,23 @@ export const ConversationHost = React.memo(function ConversationHost({
   // across sessions (same bleed guard as the arrival-toast ref above).
   useEffect(() => {
     setRunReviewOpen(false);
+    setCheckpointPreviewRunId(null);
   }, [currentConversationId]);
   const handleOpenRunReview = useCallback((): void => {
     setRunReviewOpen(true);
   }, []);
   const handleCloseRunReview = useCallback((): void => {
     setRunReviewOpen(false);
+  }, []);
+
+  // #1968 checkpoint timeline: the run id of the previewed pre-run snapshot
+  // (null = overlay closed). Read-only preview; restore is never offered.
+  const [checkpointPreviewRunId, setCheckpointPreviewRunId] = useState<string | null>(null);
+  const handleCheckpointClick = useCallback((item: RowItem): void => {
+    if (item.checkpointRunId) setCheckpointPreviewRunId(item.checkpointRunId);
+  }, []);
+  const handleCloseCheckpointPreview = useCallback((): void => {
+    setCheckpointPreviewRunId(null);
   }, []);
   const handleRunReviewApplyHunk = useCallback(
     async (decision: DiffHunkDecision): Promise<void> => {
@@ -776,7 +788,7 @@ export const ConversationHost = React.memo(function ConversationHost({
           previewExternalOpenEnabled={platform.capabilities.browserPreview}
           onAgentClick={onAgentClick} onBlockContextMenu={onBlockContextMenu}
           onBlockSelect={onBlockSelect} onBlockAction={onBlockAction}
-          onReviewFile={onReviewFile} onDeploySubmit={onDeploySubmit}
+          onReviewFile={onReviewFile} onCheckpointClick={handleCheckpointClick} onDeploySubmit={onDeploySubmit}
           selectedBlockIds={selectedBlockIds} selectionMode={selectionMode}
           softHiddenBlockIds={softHiddenBlockIds} actionedBlockIds={actionedBlockIds}
           highlightedBlockId={resolvedHighlight} onHighlightEnd={handleSearchHighlightEnd}
@@ -834,6 +846,27 @@ export const ConversationHost = React.memo(function ConversationHost({
           rejected: t('runReview.rejected'),
           submitting: t('runReview.submitting'),
         }}
+      />
+      {/* #1968 checkpoint timeline: read-only pre-run snapshot preview.
+          Surfaces without a checkpoint port (Web, Hub-only) render the
+          honest surfaceUnavailable notice inside the overlay. */}
+      <CheckpointPreviewOverlay
+        open={checkpointPreviewRunId !== null}
+        runId={checkpointPreviewRunId ?? ''}
+        {...(platform.checkpoint ? { port: platform.checkpoint } : {})}
+        title={t('checkpoint.title')}
+        closeLabel={t('checkpoint.close')}
+        labels={{
+          summary: t('checkpoint.summary'),
+          fileListAria: t('checkpoint.fileListAria'),
+          selectFile: t('checkpoint.selectFile'),
+          emptyContent: t('checkpoint.emptyContent'),
+          absent: t('checkpoint.absent'),
+          restoreUnavailable: t('checkpoint.restoreUnavailable'),
+          surfaceUnavailable: t('checkpoint.surfaceUnavailable'),
+          loadFailed: t('checkpoint.loadFailed'),
+        }}
+        onClose={handleCloseCheckpointPreview}
       />
       {!selectionMode && (
         <>

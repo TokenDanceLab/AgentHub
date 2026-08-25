@@ -235,6 +235,18 @@ export interface SubagentTranscriptBlock extends TranscriptBlockBase {
   runId?: string;
 }
 
+export interface CheckpointTranscriptBlock extends TranscriptBlockBase {
+  kind: 'checkpoint';
+  /** Edge run id this checkpoint belongs to (timeline grouping key). */
+  runId: string;
+  /** Checkpoint id on the Edge (`cp-<runId>`); used by the preview port. */
+  checkpointId: string;
+  /** Pre-run file inventory size. */
+  fileCount: number;
+  /** Summed pre-run byte size across captured files. */
+  totalBytes: number;
+}
+
 export interface SubtaskTranscriptBlock extends TranscriptBlockBase {
   kind: 'subtask';
   title: string;
@@ -366,6 +378,7 @@ export type TranscriptBlock =
   | FinishedTranscriptBlock
   | ReplayGapTranscriptBlock
   | AttachmentTranscriptBlock
+  | CheckpointTranscriptBlock
   | DeployTranscriptBlock
   | CompactBoundaryTranscriptBlock;
 

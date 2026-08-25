@@ -3,6 +3,41 @@ import { describe, expect, it, vi } from 'vitest';
 import type { TranscriptAgentItem } from '../transcript-item';
 import { AgentGroup } from './AgentGroup';
 
+describe('AgentGroup checkpoint wiring (#1968)', () => {
+  const checkpointItem: TranscriptAgentItem = {
+    id: 'agent-cp',
+    agent: 'Edge',
+    role: 'agent',
+    time: '',
+    rows: [],
+    standaloneRows: [{
+      id: 'cp-row', type: 'checkpoint', label: '', status: 'ok',
+      collapsible: false, standalone: true,
+      checkpointId: 'cp-run-7', checkpointRunId: 'run-7',
+      checkpointFileCount: 2, checkpointTotalBytes: 512,
+    }],
+    runs: [],
+    bubbles: [],
+  };
+
+  it('threads onCheckpointClick down to the checkpoint card', () => {
+    const onCheckpointClick = vi.fn();
+    const { container } = render(
+      <AgentGroup item={checkpointItem} chatMode="group" onCheckpointClick={onCheckpointClick} />,
+    );
+    const card = container.querySelector('.row-item.checkpoint');
+    expect(card).not.toBeNull();
+    fireEvent.click(card!.firstElementChild ?? card!);
+    expect(onCheckpointClick).toHaveBeenCalledTimes(1);
+    expect(onCheckpointClick.mock.calls[0][0]).toMatchObject({ checkpointRunId: 'run-7' });
+  });
+
+  it('renders the checkpoint card without a handler (no crash)', () => {
+    const { container } = render(<AgentGroup item={checkpointItem} chatMode="group" />);
+    expect(container.querySelector('.row-item.checkpoint')).not.toBeNull();
+  });
+});
+
 describe('AgentGroup rendering', () => {
   it('renders agent markdown tables and keeps run-only evidence out of the chat body', () => {
     const item: TranscriptAgentItem = {

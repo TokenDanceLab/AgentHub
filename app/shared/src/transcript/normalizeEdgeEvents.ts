@@ -4,6 +4,7 @@ import {
   agentResultBlock,
   agentTextBlock,
   artifactCreatedBlock,
+  checkpointBlock,
   compactBoundaryBlock,
   contextUsageBlock,
   fileChangeBlock,
@@ -191,6 +192,8 @@ function normalizeEdgeEvent(event: EventEnvelope): TranscriptBlock | null {
   if (SKIPPED_EVENT_TYPES.has(event.type)) return null;
 
   switch (event.type) {
+    case 'run.checkpoint':
+      return checkpointBlock(event);
     case 'run.output':
       return outputTextBlock(event);
     case 'run.output.batch':

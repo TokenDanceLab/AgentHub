@@ -111,7 +111,7 @@ SSOT：`frame.go` ↔ `hubEvents.ts` ↔ OpenAPI `HubWebSocketFrame.type`（31 �
 | 族 | 代表事件 | Owner / 测试 |
 |---|---|---|
 | IM / Project | `project.created`, `thread.created`, `message.created`, `item.created`, `thread.pin.created` | `events.ts`, Edge store/API tests |
-| Run lifecycle | `run.queued`, `run.started`, `run.output.batch`, `run.finished`, `run.failed`, `run.cancelled` | Edge lifecycle/API tests |
+| Run lifecycle | `run.queued`, `run.checkpoint`, `run.started`, `run.output.batch`, `run.finished`, `run.failed`, `run.cancelled` | Edge lifecycle/API tests |
 | Runtime adapter | `run.agent.text_delta`, `run.agent.thinking`, `run.agent.tool_call`, `run.agent.tool_result`, `run.agent.file_change`, `run.agent.permission_requested`, `run.agent.permission_decided`, `run.agent.result` | adapters + transcript tests |
 | Artifact / preview | `artifact.created`, `preview.ready`, `preview.stopped` | Edge evidence/preview tests |
 | Hub IM | `auth.ok`, `message.new`, `message.recall`, `message.reaction_added`, `session.created`, `device.online` | `frame.go`, Hub WS tests |

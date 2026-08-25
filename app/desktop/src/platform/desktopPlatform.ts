@@ -22,7 +22,7 @@ import type { EvidenceRef } from '@shared/transcript';
 import type { TranscriptBlock } from '@shared/transcript';
 import type { RunInfo, StartRunRequest } from '@shared/types';
 import { createHubClient } from '@/api/hubClient';
-import { applyAllRunDiffs, applyRunDiff } from '@/api/edgeClient';
+import { applyAllRunDiffs, applyRunDiff, fetchRunCheckpoint, fetchRunCheckpointFile } from '@/api/edgeClient';
 import { edgeAuthHeaders } from '@/api/edgeAuth';
 import { getAccessToken } from '@/hooks/useAuth';
 import { getEdgeBaseUrl } from '@/config';
@@ -223,6 +223,12 @@ export function createDesktopPlatform(options: DesktopPlatformOptions = {}): Des
       // Desktop owns the Local Edge, so it resolves artifact content via the
       // Edge endpoint and performs a real download (#1945).
       downloadArtifactContent: downloadDesktopArtifactContent,
+    },
+    // Read-only pre-run checkpoint access (#1968). Desktop owns the Local
+    // Edge connection, so it owns this port leg; restore is never wired.
+    checkpoint: {
+      list: fetchRunCheckpoint,
+      file: fetchRunCheckpointFile,
     },
     settings: createDesktopSettingsAdapter(),
     // exactOptionalPropertyTypes: omit key when undefined rather than assign undefined.

@@ -189,7 +189,8 @@ export function blocksToTranscriptItems(blocks: TranscriptBlock[]): TranscriptIt
       if (!currentAgent) continue
       // Standalone cards vs inline rows
       const standalone = row.type === 'route' || row.type === 'deploy' || row.type === 'ctx' ||
-        row.type === 'approval' || row.type === 'session' || row.type === 'attachment' || row.type === 'preview'
+        row.type === 'approval' || row.type === 'session' || row.type === 'attachment' || row.type === 'preview' ||
+        row.type === 'checkpoint'
       // Merge: tool_result replaces the first unmatched tool_call (same toolName).
       // Using FIFO (findIndex of first unmatched) instead of findLastIndex
       // so that multiple calls to the same tool pair correctly with their results

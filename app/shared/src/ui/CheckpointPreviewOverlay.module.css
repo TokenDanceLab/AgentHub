@@ -1,0 +1,261 @@
+/* =======================================================================
+   CheckpointPreviewOverlay — pre-run snapshot preview dialog (#1968)
+   Uses OKLCH via CSS variables only — no hardcoded colors
+   ======================================================================= */
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: var(--td-z-modal);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--glass-shadow);
+  backdrop-filter: blur(4px);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .overlay {
+    animation: checkpointOverlayIn 0.15s ease-out;
+  }
+
+  .content {
+    animation: checkpointContentIn 0.2s ease-out;
+  }
+}
+
+.content {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: min(94vw, 1080px);
+  height: min(88vh, 780px);
+  border: 1px solid var(--glass-border, var(--td-line));
+  border-radius: var(--td-radius-panel);
+  background: var(--glass-panel-overlay, var(--td-surface));
+  box-shadow: var(--glass-elev-3, var(--td-shadow-lg));
+  backdrop-filter: var(--glass-backdrop-filter);
+  -webkit-backdrop-filter: var(--glass-backdrop-filter);
+  overflow: hidden;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: var(--td-space-2);
+  padding: var(--td-space-2) var(--td-space-3);
+  border-bottom: 1px solid var(--td-line);
+  flex-shrink: 0;
+  min-width: 0;
+}
+
+.title {
+  font-size: var(--td-text-sm);
+  font-weight: var(--font-weight-semibold);
+  font-family: var(--td-font);
+  color: var(--td-ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+  flex-shrink: 0;
+}
+
+.summary {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--td-mono);
+  font-size: var(--font-size-2xs);
+  font-weight: var(--font-weight-medium);
+  color: var(--td-ink-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.closeBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  border-radius: var(--td-radius-control);
+  background: transparent;
+  color: var(--td-ink-muted);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .closeBtn {
+    transition: background var(--td-dur-fast), color var(--td-dur-fast);
+  }
+}
+
+.closeBtn:hover {
+  background: var(--hover-overlay);
+  color: var(--td-ink);
+}
+
+.closeBtn:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+/* Honesty notice (#1968): restore is never wired — always visible. */
+.restoreNotice {
+  padding: var(--td-space-1) var(--td-space-3);
+  border-bottom: 1px solid var(--td-line);
+  background: color-mix(in oklch, var(--td-warning) 8%, transparent);
+  color: var(--td-ink-muted);
+  font-size: var(--td-text-xs);
+  font-family: var(--td-font);
+  line-height: 1.5;
+  flex-shrink: 0;
+}
+
+.body {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(220px, 300px) 1fr;
+}
+
+.notice {
+  display: flex;
+  flex-direction: column;
+  gap: var(--td-space-2);
+  align-items: flex-start;
+  justify-content: center;
+  grid-column: 1 / -1;
+  padding: var(--td-space-4);
+  color: var(--td-ink-muted);
+  font-size: var(--td-text-xs);
+  font-family: var(--td-font);
+  line-height: 1.6;
+}
+
+.fileList {
+  list-style: none;
+  margin: 0;
+  padding: var(--td-space-1);
+  overflow-y: auto;
+  border-right: 1px solid var(--td-line);
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.fileItem {
+  display: flex;
+  align-items: baseline;
+  gap: var(--td-space-2);
+  width: 100%;
+  padding: var(--td-space-1) var(--td-space-2);
+  border: none;
+  border-radius: var(--td-radius-control);
+  background: transparent;
+  color: var(--td-ink);
+  font-size: var(--td-text-xs);
+  font-family: var(--td-mono);
+  text-align: left;
+  cursor: pointer;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .fileItem {
+    transition: background var(--td-dur-fast);
+  }
+}
+
+.fileItem:hover {
+  background: var(--hover-overlay);
+}
+
+.fileItem:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.fileItemActive {
+  background: color-mix(in oklch, var(--td-accent) 14%, transparent);
+}
+
+.filePath {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  direction: rtl; /* keep the file name visible when truncating long paths */
+}
+
+.fileSize {
+  flex-shrink: 0;
+  color: var(--td-ink-muted);
+  font-size: var(--font-size-2xs);
+}
+
+.filePane {
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.filePane .notice {
+  grid-column: auto;
+  flex: 1;
+}
+
+.fileContent {
+  flex: 1;
+  margin: 0;
+  padding: var(--td-space-3);
+  overflow: auto;
+  font-family: var(--td-mono);
+  font-size: var(--td-text-xs);
+  line-height: 1.6;
+  color: var(--td-ink);
+  white-space: pre;
+}
+
+@media (max-width: 768px) {
+  .content {
+    width: 100vw;
+    height: 100vh;
+    border-radius: 0;
+  }
+
+  .body {
+    grid-template-columns: 1fr;
+    grid-template-rows: minmax(120px, 32%) 1fr;
+  }
+
+  .fileList {
+    border-right: none;
+    border-bottom: 1px solid var(--td-line);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  @keyframes checkpointOverlayIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+
+  @keyframes checkpointContentIn {
+    from {
+      opacity: 0;
+      transform: scale(0.96) translateY(12px);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1) translateY(0);
+    }
+  }
+}

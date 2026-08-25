@@ -918,3 +918,60 @@ describe('RowItem audio/video attachment rows (#1939)', () => {
     expect(container.querySelector('audio')).toBeNull();
   });
 });
+
+
+// ---------------------------------------------------------------------------
+// #1968: checkpoint timeline card — whole header click opens the preview
+// ---------------------------------------------------------------------------
+describe('RowItem checkpoint timeline card (#1968)', () => {
+  const checkpointRow = (overrides: Partial<RowItemType> = {}): RowItemType => ({
+    id: 'cp-card',
+    type: 'checkpoint',
+    label: '',
+    status: 'ok',
+    collapsible: false,
+    standalone: true,
+    checkpointId: 'cp-run-1',
+    checkpointRunId: 'run-1',
+    checkpointFileCount: 3,
+    checkpointTotalBytes: 2048,
+    ...overrides,
+  });
+
+  it('renders the snapshot card with the file count label', () => {
+    render(<RowItem item={checkpointRow()} />);
+    expect(screen.getByText('Pre-run snapshot · 3 files')).toBeInTheDocument();
+  });
+
+  it('invokes onCheckpointClick with the row item on header click', () => {
+    const onCheckpointClick = vi.fn();
+    const { container } = render(
+      <RowItem item={checkpointRow()} onCheckpointClick={onCheckpointClick} />,
+    );
+    const card = container.querySelector('.row-item.checkpoint');
+    expect(card).not.toBeNull();
+    fireEvent.click(card!.firstElementChild ?? card!);
+    expect(onCheckpointClick).toHaveBeenCalledTimes(1);
+    expect(onCheckpointClick.mock.calls[0][0]).toMatchObject({
+      type: 'checkpoint',
+      checkpointRunId: 'run-1',
+      checkpointId: 'cp-run-1',
+    });
+  });
+
+  it('does not toggle open state on checkpoint click (preview-only)', () => {
+    const onToggle = vi.fn();
+    const { container } = render(
+      <RowItem item={checkpointRow()} onToggle={onToggle} onCheckpointClick={() => {}} />,
+    );
+    const card = container.querySelector('.row-item.checkpoint');
+    fireEvent.click(card!.firstElementChild ?? card!);
+    expect(onToggle).not.toHaveBeenCalled();
+  });
+
+  it('clicking without a handler is a safe no-op', () => {
+    const { container } = render(<RowItem item={checkpointRow()} />);
+    const card = container.querySelector('.row-item.checkpoint');
+    expect(() => fireEvent.click(card!.firstElementChild ?? card!)).not.toThrow();
+  });
+});

@@ -284,6 +284,7 @@ func newEmptyStore() *Store {
 		diffs:         make(map[string]RunDiffFile),
 		artifacts:     make(map[string]Artifact),
 		previews:      make(map[string]Preview),
+		checkpoints:   make(map[string]RunCheckpoint),
 		userProfiles:  make(map[string]UserProfile),
 		agentProfiles: make(map[string]AgentProfile),
 		settings:      make(map[string]string),

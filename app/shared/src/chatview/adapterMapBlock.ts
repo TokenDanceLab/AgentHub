@@ -16,6 +16,7 @@ import type {
   FailureTranscriptBlock,
   ChildAgentTranscriptBlock, SubtaskTranscriptBlock,
   PreviewTranscriptBlock,
+  CheckpointTranscriptBlock,
 } from '../transcript/types'
 import type { RowItem } from './types'
 import {
@@ -311,6 +312,20 @@ export function mapBlock(b: TranscriptBlock): RowItem | null {
         url: p.url,
         previewDomain: domain,
         previewTitle: displayTitle,
+      } as RowItem
+    }
+
+    case 'checkpoint': {
+      const c = b as CheckpointTranscriptBlock
+      return {
+        id: c.id, type: 'checkpoint',
+        label: '',
+        status: 'ok',
+        collapsible: false, standalone: true,
+        checkpointId: c.checkpointId,
+        checkpointRunId: c.runId,
+        checkpointFileCount: c.fileCount,
+        checkpointTotalBytes: c.totalBytes,
       } as RowItem
     }
 
