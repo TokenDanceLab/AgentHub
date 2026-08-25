@@ -889,7 +889,7 @@ func TestBuildAndMaterializeFileSnapshot(t *testing.T) {
 	settings := map[string]string{"theme": "dark"}
 
 	snap := buildFileSnapshot(
-		projects, threads, runs, items, pins, diffs, artifacts, previews, userProfiles, agentProfiles,
+		projects, threads, runs, items, pins, diffs, artifacts, previews, map[string]RunCheckpoint{"r1": {ID: "cp1", RunID: "r1", Files: []CheckpointFile{{Path: "a.txt", Size: 1, Hash: "h", Content: "x"}}}}, userProfiles, agentProfiles,
 		[]string{"p1"}, []string{"t1"}, []string{"r1"}, []string{"i1"}, []string{"pin"},
 		[]string{"d1"}, []string{"a1"}, []string{"pv1"}, []string{"u1"}, []string{"ag1"},
 		settings, "mtime",
@@ -911,12 +911,15 @@ func TestBuildAndMaterializeFileSnapshot(t *testing.T) {
 	// materialize should normalize orders (drop missing, append unseen sorted).
 	snap.ProjectOrder = []string{"missing", "p1"}
 	snap.Projects["p2"] = Project{ID: "p2", Name: "Extra"}
-	gotProjects, gotThreads, gotRuns, gotItems, gotPins, gotDiffs, gotArtifacts, gotPreviews, gotUsers, gotAgents,
+	gotProjects, gotThreads, gotRuns, gotItems, gotPins, gotDiffs, gotArtifacts, gotPreviews, gotCheckpoints, gotUsers, gotAgents,
 		projectOrder, threadOrder, runOrder, itemOrder, pinOrder, diffOrder, artifactOrder, previewOrder, userOrder, agentOrder,
 		gotSettings, gotSettingsMtime :=
 		materializeFileSnapshot(snap)
 	if len(gotProjects) != 2 || gotProjects["p1"].Name != "Local" || gotProjects["p2"].Name != "Extra" {
 		t.Fatalf("materialize projects = %#v", gotProjects)
+	}
+	if cp, ok := gotCheckpoints["r1"]; !ok || cp.ID != "cp1" || len(cp.Files) != 1 || cp.Files[0].Path != "a.txt" {
+		t.Fatalf("materialize checkpoints = %#v", gotCheckpoints)
 	}
 	if !reflect.DeepEqual(projectOrder, []string{"p1", "p2"}) {
 		t.Fatalf("materialize projectOrder = %#v", projectOrder)

@@ -9,6 +9,7 @@ type Reader interface {
 	ListThreads(projectID string) []Thread
 	GetRun(id string) (Run, bool)
 	ListRuns(threadID string) []Run
+	GetRunCheckpoint(runID string) (RunCheckpoint, bool)
 	GetItem(id string) (Item, bool)
 	ListThreadItems(threadID string) []Item
 	ListThreadPins(threadID string) []ThreadPin
@@ -38,6 +39,7 @@ type Writer interface {
 	PinThreadItem(threadID, itemID, pinnedBy string) (ThreadPin, error)
 	DeleteThreadPin(threadID, itemID string) bool
 	UpsertRunDiffFile(file RunDiffFile) (RunDiffFile, error)
+	UpsertRunCheckpoint(cp RunCheckpoint) (RunCheckpoint, error)
 	UpsertArtifact(artifact Artifact) (Artifact, error)
 	UpsertPreview(preview Preview) (Preview, error)
 	CreateUserProfile(profile UserProfile) (UserProfile, error)
@@ -62,6 +64,7 @@ type RunLifecycleStore interface {
 	SetRunEvidenceGate(id, result string) (Run, bool)
 	SetRunRetryCount(id string, count int) (Run, bool)
 	SetRunWorkDir(id, workDir string) (Run, bool)
+	UpsertRunCheckpoint(cp RunCheckpoint) (RunCheckpoint, error)
 }
 
 type RunCleaner interface {

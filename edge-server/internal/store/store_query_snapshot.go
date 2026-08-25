@@ -13,6 +13,7 @@ func buildFileSnapshot(
 	diffs map[string]RunDiffFile,
 	artifacts map[string]Artifact,
 	previews map[string]Preview,
+	checkpoints map[string]RunCheckpoint,
 	userProfiles map[string]UserProfile,
 	agentProfiles map[string]AgentProfile,
 	projectOrder, threadOrder, runOrder, itemOrder, pinOrder, diffOrder, artifactOrder, previewOrder, userProfileOrder, agentProfileOrder []string,
@@ -28,6 +29,7 @@ func buildFileSnapshot(
 		Diffs:             copyMap(diffs),
 		Artifacts:         cloneArtifactMap(artifacts),
 		Previews:          copyMap(previews),
+		Checkpoints:       cloneCheckpointMap(checkpoints),
 		UserProfiles:      copyMap(userProfiles),
 		AgentProfiles:     copyMap(agentProfiles),
 		ProjectOrder:      append([]string(nil), projectOrder...),
@@ -57,6 +59,7 @@ func materializeFileSnapshot(snapshot fileSnapshot) (
 	diffs map[string]RunDiffFile,
 	artifacts map[string]Artifact,
 	previews map[string]Preview,
+	checkpoints map[string]RunCheckpoint,
 	userProfiles map[string]UserProfile,
 	agentProfiles map[string]AgentProfile,
 	projectOrder, threadOrder, runOrder, itemOrder, pinOrder, diffOrder, artifactOrder, previewOrder, userProfileOrder, agentProfileOrder []string,
@@ -71,6 +74,7 @@ func materializeFileSnapshot(snapshot fileSnapshot) (
 	diffs = copyMap(snapshot.Diffs)
 	artifacts = cloneArtifactMap(snapshot.Artifacts)
 	previews = copyMap(snapshot.Previews)
+	checkpoints = cloneCheckpointMap(snapshot.Checkpoints)
 	userProfiles = copyMap(snapshot.UserProfiles)
 	agentProfiles = copyMap(snapshot.AgentProfiles)
 	projectOrder = normalizeOrder(snapshot.ProjectOrder, projects)

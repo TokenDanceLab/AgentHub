@@ -25,6 +25,8 @@ type fileSnapshot struct {
 	Artifacts map[string]Artifact    `json:"artifacts"`
 	Previews  map[string]Preview     `json:"previews"`
 
+	Checkpoints map[string]RunCheckpoint `json:"checkpoints,omitempty"`
+
 	UserProfiles  map[string]UserProfile  `json:"userProfiles,omitempty"`
 	AgentProfiles map[string]AgentProfile `json:"agentProfiles,omitempty"`
 
@@ -334,6 +336,19 @@ func (f *FileStore) UpsertRunDiffFile(file RunDiffFile) (RunDiffFile, error) {
 
 func (f *FileStore) ListRunDiffFiles(runID string) []RunDiffFile {
 	return f.store.ListRunDiffFiles(runID)
+}
+
+func (f *FileStore) UpsertRunCheckpoint(cp RunCheckpoint) (RunCheckpoint, error) {
+	checkpoint, err := f.store.UpsertRunCheckpoint(cp)
+	if err != nil {
+		return RunCheckpoint{}, err
+	}
+	f.schedulePersist()
+	return checkpoint, nil
+}
+
+func (f *FileStore) GetRunCheckpoint(runID string) (RunCheckpoint, bool) {
+	return f.store.GetRunCheckpoint(runID)
 }
 
 func (f *FileStore) UpsertArtifact(artifact Artifact) (Artifact, error) {

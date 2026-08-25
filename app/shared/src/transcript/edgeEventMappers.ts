@@ -8,6 +8,7 @@
 
 export {
   agentTextBlock,
+  checkpointBlock,
   outputBatchTextBlock,
   outputTextBlock,
   runCancelledBlock,

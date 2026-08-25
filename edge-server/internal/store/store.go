@@ -22,6 +22,7 @@ type Store struct {
 	diffs         map[string]RunDiffFile
 	artifacts     map[string]Artifact
 	previews      map[string]Preview
+	checkpoints   map[string]RunCheckpoint
 	userProfiles  map[string]UserProfile
 	agentProfiles map[string]AgentProfile
 	settings      map[string]string
@@ -56,6 +57,7 @@ func (s *Store) snapshot() fileSnapshot {
 		s.diffs,
 		s.artifacts,
 		s.previews,
+		s.checkpoints,
 		s.userProfiles,
 		s.agentProfiles,
 		s.projectOrder,
@@ -77,7 +79,7 @@ func (s *Store) applySnapshot(snapshot fileSnapshot) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	s.projects, s.threads, s.runs, s.items, s.pins, s.diffs, s.artifacts, s.previews, s.userProfiles, s.agentProfiles,
+	s.projects, s.threads, s.runs, s.items, s.pins, s.diffs, s.artifacts, s.previews, s.checkpoints, s.userProfiles, s.agentProfiles,
 		s.projectOrder, s.threadOrder, s.runOrder, s.itemOrder, s.pinOrder, s.diffOrder, s.artifactOrder, s.previewOrder, s.userProfileOrder, s.agentProfileOrder,
 		s.settings, s.settingsMtime =
 		materializeFileSnapshot(snapshot)

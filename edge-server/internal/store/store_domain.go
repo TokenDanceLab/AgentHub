@@ -42,6 +42,41 @@ func (s *Store) ListRunDiffFiles(runID string) []RunDiffFile {
 	return listDiffsForRun(s.diffOrder, s.diffs, runID)
 }
 
+// UpsertRunCheckpoint stores the pre-run workdir snapshot for a run (#1968).
+// The run must exist; checkpoints are keyed by RunID (1:1, later snapshots
+// replace earlier ones for the same run).
+func (s *Store) UpsertRunCheckpoint(cp RunCheckpoint) (RunCheckpoint, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if cp.RunID == "" {
+		return RunCheckpoint{}, ErrNotFound
+	}
+	if _, runExists := s.runs[cp.RunID]; !runExists {
+		return RunCheckpoint{}, ErrNotFound
+	}
+	if cp.CreatedAt == "" {
+		cp.CreatedAt = nowString()
+	}
+	s.checkpoints[cp.RunID] = cp
+	return cp, nil
+}
+
+// GetRunCheckpoint returns a deep copy of the stored checkpoint for a run
+// (#1968) so callers can never mutate store-owned slices.
+func (s *Store) GetRunCheckpoint(runID string) (RunCheckpoint, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	cp, ok := s.checkpoints[runID]
+	if !ok {
+		return RunCheckpoint{}, false
+	}
+	files := append([]CheckpointFile(nil), cp.Files...)
+	cp.Files = files
+	return cp, true
+}
+
 func (s *Store) UpsertArtifact(artifact Artifact) (Artifact, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()

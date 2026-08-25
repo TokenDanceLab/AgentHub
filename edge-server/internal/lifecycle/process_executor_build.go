@@ -75,6 +75,13 @@ func (e *ProcessExecutor) buildAndStartProcess(
 		e.workDirs[run.ID] = workDir
 		e.surfacers[run.ID] = snapshot
 		e.mu.Unlock()
+		// #1968 checkpoint evidence: persist the pre-run snapshot and emit the
+		// checkpoint event before run.started so the timeline card precedes
+		// run output. A nil snapshot (empty/inaccessible workdir) is an honest
+		// absence — no checkpoint event, no card.
+		if snapshot != nil {
+			e.publishRunCheckpoint(run, workDir, snapshot)
+		}
 	}
 
 	_, extraEnv, err := e.profile.ExtraEnvTemplate.Expand(runCtx)
@@ -476,4 +483,33 @@ func (e *ProcessExecutor) handleFaultEscalation(
 	slog.Warn("process: fault escalation auto-retry", "runId", run.ID, "retryCount", newCount, "maxRetries", e.faultEscalationCfg.MaxRetries)
 	safeGo("run.faultEscalation", func() { e.run(newCtx, *run, runCtx) })
 	return true
+}
+
+// publishRunCheckpoint persists the pre-run workdir snapshot as the run's
+// checkpoint and emits the run.checkpoint event (#1968). Persistence failure
+// degrades to a warning: the run proceeds without checkpoint evidence rather
+// than failing the run (honest absence, same contract as workDir evidence).
+func (e *ProcessExecutor) publishRunCheckpoint(run store.Run, workDir string, snapshot *adapters.WorkdirSnapshot) {
+	files, totalBytes := snapshot.CheckpointFiles()
+	cp := store.RunCheckpoint{
+		ID:         "cp-" + run.ID,
+		RunID:      run.ID,
+		WorkDir:    workDir,
+		FileCount:  len(files),
+		TotalBytes: totalBytes,
+		Files:      files,
+	}
+	saved, err := e.store.UpsertRunCheckpoint(cp)
+	if err != nil {
+		slog.Warn("executor.checkpoint.persist_failed", "runId", run.ID, "error", err)
+		return
+	}
+	e.bus.Publish("run.checkpoint", runScope(run), map[string]any{
+		"runId":        run.ID,
+		"checkpointId": saved.ID,
+		"workDir":      saved.WorkDir,
+		"fileCount":    saved.FileCount,
+		"totalBytes":   saved.TotalBytes,
+		"createdAt":    saved.CreatedAt,
+	})
 }

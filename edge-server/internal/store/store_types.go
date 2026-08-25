@@ -49,6 +49,29 @@ type RunDiffFile struct {
 	UpdatedAt string `json:"updatedAt"`
 }
 
+// CheckpointFile captures one file's pre-run state for the run checkpoint
+// preview (#1968).
+type CheckpointFile struct {
+	Path    string `json:"path"`
+	Size    int64  `json:"sizeBytes"`
+	Hash    string `json:"hash"`
+	Content string `json:"content,omitempty"`
+}
+
+// RunCheckpoint is the pre-run workdir snapshot of a run (#1968), keyed by
+// RunID (1:1). Read-only evidence: it survives run completion and feeds the
+// timeline checkpoint-card preview. Restore/write-back is deliberately NOT
+// wired here — see docs/architecture/02-edge-server.md restore semantics.
+type RunCheckpoint struct {
+	ID         string           `json:"checkpointId"`
+	RunID      string           `json:"runId"`
+	WorkDir    string           `json:"workDir"`
+	FileCount  int              `json:"fileCount"`
+	TotalBytes int64            `json:"totalBytes"`
+	CreatedAt  string           `json:"createdAt"`
+	Files      []CheckpointFile `json:"files"`
+}
+
 type Artifact struct {
 	ID            string                 `json:"id"`
 	RunID         string                 `json:"runId"`

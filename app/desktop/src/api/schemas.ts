@@ -188,6 +188,34 @@ export const ApplyAllRunDiffsResponseSchema = z.object({
   applied: z.number(),
 });
 
+// GET /v1/runs/{runId}/checkpoint — pre-run checkpoint inventory (#1968).
+// Read-only evidence; no content and no restore/write-back surface.
+export const RunCheckpointFileEntrySchema = z.object({
+  path: z.string(),
+  sizeBytes: z.number(),
+  hash: z.string(),
+  hasText: z.boolean(),
+});
+
+export const RunCheckpointSchema = z.object({
+  runId: z.string(),
+  checkpointId: z.string(),
+  workDir: z.string(),
+  fileCount: z.number(),
+  totalBytes: z.number(),
+  createdAt: z.string(),
+  files: z.array(RunCheckpointFileEntrySchema),
+});
+
+// GET /v1/runs/{runId}/checkpoint/file?path=... — single pre-run file (#1968).
+export const RunCheckpointFileSchema = z.object({
+  runId: z.string(),
+  path: z.string(),
+  sizeBytes: z.number(),
+  hash: z.string(),
+  content: z.string(),
+});
+
 export const ArtifactSchema = z.object({
   id: z.string(),
   runId: z.string(),
