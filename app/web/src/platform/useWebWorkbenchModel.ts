@@ -21,7 +21,7 @@ import {
   type HubRuntimeEventTranscriptInput,
 } from '@shared/transcript';
 import { useToastStore } from '@shared/ui/toast';
-import { createHubClient } from '@/api/hubClient';
+import { createHubClient, type Session } from '@/api/hubClient';
 import {
   useHubExecutionTargets,
   usePingHubExecutionTarget,
@@ -85,6 +85,28 @@ import { errorMessage } from './webWorkbenchError';
 
 const hubClient = createHubClient({ getToken: getAccessToken });
 
+/**
+ * Resolve the active Hub session id for transcript queries (#1972).
+ *
+ * REST `/client/sessions` payloads only carry snake_case `session_id`,
+ * while conversation ids are derived as `session.id ?? session.session_id`
+ * in webPlatformMapping. The activation gate must use the same derivation —
+ * matching on `session.id` alone is always false against real payloads,
+ * which leaves the hub-messages/pins/agent-task queries permanently
+ * disabled and the transcript stuck on the preview/empty fallback.
+ */
+export function resolveWebActiveHubSessionId(
+  hubReady: boolean,
+  sessions: Session[] | undefined,
+  activeConversationId: string | undefined,
+): string | null {
+  if (!hubReady || !activeConversationId) return null;
+  const matched = sessions?.some(
+    (session) => (session.id ?? session.session_id) === activeConversationId,
+  );
+  return matched ? activeConversationId : null;
+}
+
 export function useWebWorkbenchModel(selectedConversationId?: string, selectedProjectId?: string) {
   const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE);
   const dataModeOverride = useSyncExternalStore(
@@ -133,11 +155,9 @@ export function useWebWorkbenchModel(selectedConversationId?: string, selectedPr
   const activeConversationId = selectedConversationId
     ?? conversations[0]?.id
     ?? 'agent-collab';
-  // Only treat as Hub session when the resolved id is actually a Hub session.
-  const activeHubSessionId = hubReady
-    && sessions.data?.some((session) => session.id === activeConversationId)
-    ? activeConversationId
-    : null;
+  // Only treat as Hub session when the resolved id is actually a Hub session
+  // (id derivation aligned with webPlatformMapping; see resolveWebActiveHubSessionId, #1972).
+  const activeHubSessionId = resolveWebActiveHubSessionId(hubReady, sessions.data, activeConversationId);
 
   useEffect(() => {
     setLiveRuntimeEvents([]);

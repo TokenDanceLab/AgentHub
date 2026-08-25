@@ -362,6 +362,8 @@ export const chatviewResources = {
 
     // ═══ Message state ═══
     'message.recalled': '消息已撤回',
+    'message.attachmentMissingImage': '图片附件缺失',
+    'message.attachmentMissingFile': '文件附件缺失',
 
     // ═══ Chat kind ═══
     'chat.kind.group': '群聊',
@@ -1114,6 +1116,8 @@ export const chatviewResources = {
 
     // ═══ Message state ═══
     'message.recalled': 'Message recalled',
+    'message.attachmentMissingImage': 'Image attachment missing',
+    'message.attachmentMissingFile': 'File attachment missing',
 
     // ═══ Chat kind ═══
     'chat.kind.group': 'Group',
