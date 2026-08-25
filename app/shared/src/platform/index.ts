@@ -15,6 +15,7 @@ export type {
   AttachmentPort,
   ConversationKind,
   ConversationPort,
+  DownloadArtifactInput,
   HostDiagnosticsPort,
   LocalCliDiscoveryItem,
   LocalCliDiscoveryManifest,
