@@ -1,9 +1,18 @@
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ReactNode } from 'react';
 import type { WorkbenchConversation } from '@shared/platform';
 import { ConversationSidebar } from './ConversationSidebar';
+import type { TaskItem } from './pages';
+import {
+  backFromTaskDeepLink,
+  consumeWorkbenchTaskDeepLinkIntent,
+  getWorkbenchTaskDeepLinkSnapshot,
+  openConversationForTask,
+  publishWorkbenchTaskQueue,
+  resetWorkbenchTaskDeepLinksForTest,
+} from './workbenchTaskDeepLinks';
 
 /* ──────────────────────────────────────────────────────────────────────
    ConversationSidebar actions tests (#1508): rename / copy link / delete.
@@ -334,5 +343,108 @@ describe('ConversationSidebar live status dots (F1)', () => {
   it('renders no dots at all when the shell provides no run inventory', () => {
     const { container } = renderSidebar();
     expect(container.querySelector('[data-live-status]')).toBeNull();
+  });
+});
+
+/* ── Task queue group + task deep links (#1963) ─────────────────────── */
+
+function makeQueueTask(overrides: Partial<TaskItem> = {}): TaskItem {
+  return {
+    id: 'sqlite-plan',
+    title: 'B0 SQLite 迁移方案',
+    project: '前端重构任务',
+    assignee: 'Builder',
+    startTime: '今天 14:49',
+    dueDate: '明天 18:00',
+    creator: 'demo-user',
+    status: '进行中',
+    ...overrides,
+  };
+}
+
+describe('ConversationSidebar task queue group (#1963)', () => {
+  beforeEach(() => {
+    resetWorkbenchTaskDeepLinksForTest();
+  });
+
+  afterEach(() => {
+    resetWorkbenchTaskDeepLinksForTest();
+  });
+
+  it('hides the task queue group when there are no active tasks', () => {
+    renderSidebar();
+    expect(screen.queryByText('Task queue')).not.toBeInTheDocument();
+  });
+
+  it('renders the group expanded by default when active tasks exist', () => {
+    publishWorkbenchTaskQueue([
+      makeQueueTask(),
+      makeQueueTask({ id: 'embedded-docs', title: '云文档内嵌子页对齐', status: '待评审' }),
+    ]);
+    renderSidebar();
+
+    const header = screen.getByRole('button', { name: /Task queue/ });
+    expect(header).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByText('B0 SQLite 迁移方案')).toBeInTheDocument();
+    expect(screen.getByText('云文档内嵌子页对齐')).toBeInTheDocument();
+  });
+
+  it('collapses and re-expands the group through the header toggle', () => {
+    publishWorkbenchTaskQueue([makeQueueTask()]);
+    renderSidebar();
+
+    const header = screen.getByRole('button', { name: /Task queue/ });
+    fireEvent.click(header);
+    expect(header).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByText('B0 SQLite 迁移方案')).not.toBeInTheDocument();
+
+    fireEvent.click(header);
+    expect(header).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByText('B0 SQLite 迁移方案')).toBeInTheDocument();
+  });
+
+  it('queues a conversation→task deep link when a queue entry is clicked', () => {
+    publishWorkbenchTaskQueue([makeQueueTask()]);
+    renderSidebar();
+
+    fireEvent.click(screen.getByText('B0 SQLite 迁移方案').closest('button')!);
+
+    const { pending } = getWorkbenchTaskDeepLinkSnapshot();
+    expect(pending?.type).toBe('open');
+    if (pending?.type !== 'open') return;
+    expect(pending.link.direction).toBe('conversation-to-task');
+    expect(pending.link.taskId).toBe('sqlite-plan');
+  });
+
+  it('shows a back chip on the conversation a task deep link opened', () => {
+    // Simulate the shell applying a task→conversation deep link onto c1.
+    openConversationForTask(makeQueueTask({ conversationId: 'c1' }));
+    consumeWorkbenchTaskDeepLinkIntent();
+    renderSidebar();
+
+    const chip = screen.getByRole('button', { name: /Back to task/ });
+    expect(within(chip).getByText('B0 SQLite 迁移方案')).toBeInTheDocument();
+
+    fireEvent.click(chip);
+    const { pending } = getWorkbenchTaskDeepLinkSnapshot();
+    expect(pending?.type).toBe('back');
+    if (pending?.type !== 'back') return;
+    expect(pending.link.direction).toBe('task-to-conversation');
+  });
+
+  it('hides the back chip once the user moves to another conversation', () => {
+    openConversationForTask(makeQueueTask({ conversationId: 'c1' }));
+    consumeWorkbenchTaskDeepLinkIntent();
+    renderSidebar({ activeConversationId: 'c2' });
+    expect(screen.queryByRole('button', { name: /Back to task/ })).not.toBeInTheDocument();
+  });
+
+  it('hides the back chip after the back trip has been applied', () => {
+    openConversationForTask(makeQueueTask({ conversationId: 'c1' }));
+    consumeWorkbenchTaskDeepLinkIntent();
+    backFromTaskDeepLink();
+    consumeWorkbenchTaskDeepLinkIntent();
+    renderSidebar();
+    expect(screen.queryByRole('button', { name: /Back to task/ })).not.toBeInTheDocument();
   });
 });
