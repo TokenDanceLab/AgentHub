@@ -4,6 +4,7 @@ import type { EventEnvelope, EventScope } from '../events';
 import { EDGE_AUTHOR } from './edgeEventEvidence';
 import {
   agentTextBlock,
+  checkpointBlock,
   outputBatchTextBlock,
   outputTextBlock,
   runCancelledBlock,
@@ -617,5 +618,58 @@ describe('run workDir evidence pass-through (#1967)', () => {
       label: 'Run run-nowd',
       status: 'running',
     });
+  });
+});
+
+
+describe('checkpointBlock (#1968)', () => {
+  it('builds a checkpoint block carrying run evidence with the executor workDir', () => {
+    const block = checkpointBlock(edgeEvent('evt-cp', 1, 'run.checkpoint', {
+      runId: 'run-9',
+      checkpointId: 'cp-run-9',
+      workDir: '/tmp/project',
+      fileCount: 3,
+      totalBytes: 2048,
+      createdAt: '2026-06-07T03:00:01Z',
+    }));
+    expect(block).not.toBeNull();
+    expect(block?.kind).toBe('checkpoint');
+    expect(block?.runId).toBe('run-9');
+    expect(block?.checkpointId).toBe('cp-run-9');
+    expect(block?.fileCount).toBe(3);
+    expect(block?.totalBytes).toBe(2048);
+    // The checkpoint ref doubles as run evidence (#1967 chain): the trusted
+    // workDir must ride along so run review/apply can rely on it.
+    expect(block?.evidenceRefs).toEqual([{
+      id: 'run-run-9',
+      kind: 'run',
+      label: 'Run run-9',
+      status: 'running',
+      workDir: '/tmp/project',
+    }]);
+  });
+
+  it('keeps evidence workDir absent when Edge reported none (read-only contract)', () => {
+    const block = checkpointBlock(edgeEvent('evt-cp2', 2, 'run.checkpoint', {
+      runId: 'run-10', checkpointId: 'cp-run-10', fileCount: 1, totalBytes: 8,
+    }));
+    expect(block?.evidenceRefs?.[0]).toMatchObject({ id: 'run-run-10', status: 'running' });
+    expect(block?.evidenceRefs?.[0]).not.toHaveProperty('workDir');
+  });
+
+  it('defaults fileCount/totalBytes to 0 when absent', () => {
+    const block = checkpointBlock(edgeEvent('evt-cp3', 3, 'run.checkpoint', {
+      runId: 'run-11', checkpointId: 'cp-run-11',
+    }));
+    expect(block?.fileCount).toBe(0);
+    expect(block?.totalBytes).toBe(0);
+  });
+
+  it('returns null when runId or checkpointId is missing (warns, no block)', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    expect(checkpointBlock(edgeEvent('evt-cp4', 4, 'run.checkpoint', { checkpointId: 'cp-x' }))).toBeNull();
+    expect(checkpointBlock(edgeEvent('evt-cp5', 5, 'run.checkpoint', { runId: 'run-12' }))).toBeNull();
+    expect(warn).toHaveBeenCalledTimes(2);
+    warn.mockRestore();
   });
 });

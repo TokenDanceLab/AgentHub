@@ -8,6 +8,7 @@ import {
   IconShield, IconArrowForward, IconSubtask, IconPlayerPlay, IconChevronDown,
   IconTarget, IconUpload, IconChart, IconDatabase, IconBraces,
   IconMarkdown, IconCss, IconTerminal, IconGlobe, IconMusic, IconVideo,
+  IconHistory,
 } from './Icons'
 import { CHATVIEW_I18N_NAMESPACE } from '../i18n/resources'
 import { cardLabelKey, toolKey, isToolResult } from '../design/labels'
@@ -29,6 +30,7 @@ const iconMap: Record<string, IconComponent> = {
   approval: IconShield, route: IconArrowForward,
   deploy: IconTarget, attachment: IconUpload, ctx: IconChart, session: IconPlayerPlay,
   preview: IconTarget,
+  checkpoint: IconHistory,
 }
 
 /** Stable toolName → icon routing — keys never translated */
@@ -134,6 +136,8 @@ interface Props {
   onContextMenu?: (id: string, event: React.MouseEvent) => void
   onBlockSelect?: (id: string, shiftKey: boolean) => void
   onReviewFile?: (file: { name: string; path?: string; url?: string; content?: string; language?: string }) => void
+  /** Checkpoint timeline card click (#1968): opens the read-only snapshot preview. */
+  onCheckpointClick?: (item: RowItemType) => void
   selected?: boolean
   selectedAny?: boolean
   softHidden?: boolean
@@ -143,7 +147,7 @@ interface Props {
 /** Render a single card/row inside an agent group in the transcript.
  *  Handles think, tool, file, sub, approval, route, deploy, attachment,
  *  context, and session card types with collapsible content areas. */
-export const RowItem = memo(function RowItem({ item, onToggle, onApprove, onReject, onRetry, onCopy, onFileClick, onDeploySubmit, previewExternalOpenEnabled, onContextMenu, onBlockSelect, onReviewFile: _onReviewFile, selected, selectedAny: _selectedAny, softHidden, actioned: _actioned }: Props) {
+export const RowItem = memo(function RowItem({ item, onToggle, onApprove, onReject, onRetry, onCopy, onFileClick, onDeploySubmit, previewExternalOpenEnabled, onContextMenu, onBlockSelect, onReviewFile: _onReviewFile, onCheckpointClick, selected, selectedAny: _selectedAny, softHidden, actioned: _actioned }: Props) {
   const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE)
   const [open, setOpen] = useState(item.open ?? false)
   const userToggledRef = useRef(false)
@@ -215,6 +219,12 @@ export const RowItem = memo(function RowItem({ item, onToggle, onApprove, onReje
   const cls = `row-item ${item.type}${item.fileOp ? ' ' + item.fileOp : ''}${item.standalone ? ' standalone' : ''}${item.collapsible ? ' collapsible' : ''}${isOpen ? ' open' : ''}${item.status === 'running' ? ' running' : ''}${item.status === 'fail' ? ' fail' : ''}${resultClass}${selected ? ' selected' : ''}${softHidden ? ' soft-hidden' : ''}`
 
   const handleClick = (e: React.MouseEvent) => {
+    // Checkpoint timeline card: the whole header is the preview trigger (#1968).
+    if (item.type === 'checkpoint') {
+      e.stopPropagation()
+      onCheckpointClick?.(item)
+      return
+    }
     if (item.status === 'running' || !item.collapsible) return
     e.stopPropagation()
     userToggledRef.current = true

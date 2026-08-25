@@ -9,7 +9,7 @@ import type { AttachmentRef } from '../composer/types'
 export type AgentRole = string
 
 /** Discriminated row card kind — determines icon, label, and rendering strategy. */
-export type RowType = 'think' | 'tool' | 'file' | 'sub' | 'approval' | 'route' | 'deploy' | 'attachment' | 'ctx' | 'session' | 'preview'
+export type RowType = 'think' | 'tool' | 'file' | 'sub' | 'approval' | 'route' | 'deploy' | 'attachment' | 'ctx' | 'session' | 'preview' | 'checkpoint'
 
 /** A single row/card displayed inside an agent group in the transcript.
  *  Core data model for all card types: think, tool, file, sub, approval,
@@ -67,6 +67,15 @@ export interface RowItem {
    * resolves `id` into a displayable URL; absent for non-attachment rows.
    */
   attachmentRef?: AttachmentRef
+  /**
+   * Checkpoint timeline card (#1968): pre-run snapshot evidence. Click opens
+   * the read-only checkpoint preview; restore is intentionally not wired
+   * (see docs/architecture/02-edge-server.md restore semantics).
+   */
+  checkpointId?: string
+  checkpointRunId?: string
+  checkpointFileCount?: number
+  checkpointTotalBytes?: number
   ctxPct?: number
   ctxStats?: string[]
   sessionTags?: string[]

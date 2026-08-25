@@ -176,6 +176,23 @@ export interface RunStartedEvent extends EventEnvelope {
   };
 }
 
+/**
+ * Pre-run workdir checkpoint evidence (#1968). Emitted before run.started
+ * when the executor resolved a workdir and captured a snapshot; absent for
+ * runs without a workdir (honest absence — no checkpoint, no timeline card).
+ */
+export interface RunCheckpointEvent extends EventEnvelope {
+  type: 'run.checkpoint';
+  payload: {
+    runId: string;
+    checkpointId: string;
+    fileCount: number;
+    totalBytes: number;
+    createdAt: string;
+    [key: string]: unknown;
+  };
+}
+
 export interface RunStatusChangedEvent extends EventEnvelope {
   type: 'run.status.changed';
   payload: {
@@ -477,6 +494,7 @@ export type AnyEvent =
   | RunnerOnlineEvent
   | RunnerOfflineEvent
   | RunQueuedEvent
+  | RunCheckpointEvent
   | RunStartedEvent
   | RunStatusChangedEvent
   | RunOutputEvent
