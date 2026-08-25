@@ -188,7 +188,7 @@ describe('FilePreviewRouter interactive diff apply dispatch (#1817)', () => {
     });
   });
 
-  it('web-shaped port renders the read-only notice and warns on apply attempts', async () => {
+  it('web-shaped port renders the read-only notice and hides every write-back action', () => {
     const port = webShapedPort();
     render(
       <FilePreviewRouter
@@ -198,33 +198,14 @@ describe('FilePreviewRouter interactive diff apply dispatch (#1817)', () => {
       />,
     );
 
-    const notice = screen.getByRole('note');
-    expect(notice).toBeInTheDocument();
-
-    fireEvent.click(screen.getAllByRole('button', { name: 'Accept hunk' })[0]!);
-
-    await waitFor(() => {
-      expect(currentToasts().some((toast) => toast.type === 'warning')).toBe(true);
-    });
-    // Unsupported surface never attempts a write-back.
+    expect(screen.getByRole('note')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Accept hunk' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Reject hunk' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Accept All' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Reject All' })).toBeNull();
+    expect(currentToasts()).toHaveLength(0);
     expect(port.applyRunDiff).toBeUndefined();
     expect(port.applyAllRunDiffs).toBeUndefined();
-  });
-
-  it('accept-all on an unsupported surface warns instead of dispatching', async () => {
-    render(
-      <FilePreviewRouter
-        file={interactiveDiffFile()}
-        onClose={vi.fn()}
-        previewPort={webShapedPort()}
-      />,
-    );
-
-    fireEvent.click(screen.getByRole('button', { name: 'Accept All' }));
-
-    await waitFor(() => {
-      expect(currentToasts().some((toast) => toast.type === 'warning')).toBe(true);
-    });
   });
 
   it('missing port entirely still degrades to the explicit read-only notice', () => {
@@ -235,5 +216,7 @@ describe('FilePreviewRouter interactive diff apply dispatch (#1817)', () => {
       />,
     );
     expect(screen.getByRole('note')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Accept hunk' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Accept All' })).toBeNull();
   });
 });

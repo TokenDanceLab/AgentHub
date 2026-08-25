@@ -23,6 +23,7 @@ import {
 } from './DiffReviewPanelHelpers';
 import {
   DiffReviewFileTabs,
+  DiffReviewRunToolbar,
   DiffReviewSideColumn,
   DiffReviewToolbar,
 } from './DiffReviewPanelParts';
@@ -42,6 +43,25 @@ export type {
 
 /** Committed + transient write-back state for one hunk. */
 type HunkState = 'applied' | 'rejected' | 'submitting';
+type HunkStateSnapshot = Record<string, HunkState | undefined>;
+
+function snapshotHunkStates(states: Record<string, HunkState>, keys: string[]): HunkStateSnapshot {
+  const snapshot: HunkStateSnapshot = {};
+  for (const key of keys) snapshot[key] = states[key];
+  return snapshot;
+}
+
+function restoreHunkStates(
+  states: Record<string, HunkState>,
+  snapshot: HunkStateSnapshot,
+): Record<string, HunkState> {
+  const next = { ...states };
+  for (const [key, value] of Object.entries(snapshot)) {
+    if (value === undefined) delete next[key];
+    else next[key] = value;
+  }
+  return next;
+}
 
 // ── DiffReviewPanel ────────────────────────────────────────────────────
 
@@ -52,6 +72,10 @@ export function DiffReviewPanel({
   onRejectAll,
   onApplyHunk,
   onApplyAllHunks,
+  runLevel,
+  readOnly = false,
+  onAcceptRun,
+  onRejectRun,
   labels: customLabels,
   focusedFilePath,
   className,
@@ -116,16 +140,19 @@ export function DiffReviewPanel({
   }, [activeFile]);
 
   // Commit one hunk decision.
-  //   - Without an Edge write-back port: toggle local review state (read-only).
-  //   - With write-back: submitting -> applied/rejected, or roll back on failure.
+  //   - Explicit `readOnly`: controls are hidden, so no decision can start.
+  //   - Without an Edge port in writable/mark mode: toggle local mark state.
+  //   - With write-back: submitting -> applied/rejected, or exact rollback.
   const commitHunkDecision = useCallback(
     async (filePath: string, hunkIndex: number, accepted: boolean) => {
+      if (readOnly) return;
       const key = hunkKey(filePath, hunkIndex);
       const target: HunkState = accepted ? 'applied' : 'rejected';
       const applyHunk = onApplyHunk;
+      const previousState = hunkStates[key];
 
       if (!applyHunk || !runId) {
-        // Read-only review: no Edge write-back, just mark locally.
+        // Local mark mode only; read-only callers never expose this action.
         setHunkStates((prev) => ({ ...prev, [key]: target }));
         return;
       }
@@ -135,20 +162,16 @@ export function DiffReviewPanel({
         await applyHunk({ filePath, hunkIndex, accepted });
         setHunkStates((prev) => ({ ...prev, [key]: target }));
       } catch {
-        setHunkStates((prev) => {
-          const next = { ...prev };
-          delete next[key];
-          return next;
-        });
+        setHunkStates((prev) => restoreHunkStates(prev, { [key]: previousState }));
       }
     },
-    [hunkKey, onApplyHunk, runId],
+    [hunkKey, hunkStates, onApplyHunk, readOnly, runId],
   );
 
   // Batch commit every hunk with the same decision.
   const commitAllHunks = useCallback(
     async (accepted: boolean) => {
-      if (!activeFile) return;
+      if (readOnly || !activeFile) return;
       const decisions: DiffHunkDecision[] = activeFile.hunks.map((_hunk, hunkIdx) => ({
         filePath: activeFile.filePath,
         hunkIndex: hunkIdx,
@@ -159,6 +182,7 @@ export function DiffReviewPanel({
       const target: HunkState = accepted ? 'applied' : 'rejected';
       const keys = decisions.map((d) => hunkKey(d.filePath, d.hunkIndex));
       const applyAllHunks = onApplyAllHunks;
+      const previousStates = snapshotHunkStates(hunkStates, keys);
 
       if (!applyAllHunks || !runId) {
         setHunkStates((prev) => {
@@ -182,15 +206,69 @@ export function DiffReviewPanel({
           return next;
         });
       } catch {
-        setHunkStates((prev) => {
-          const next = { ...prev };
-          for (const key of keys) delete next[key];
-          return next;
-        });
+        setHunkStates((prev) => restoreHunkStates(prev, previousStates));
       }
     },
-    [activeFile, hunkKey, onApplyAllHunks, runId],
+    [activeFile, hunkKey, hunkStates, onApplyAllHunks, readOnly, runId],
   );
+
+  // Run-level batch (#1967): commit EVERY hunk of EVERY file with the same
+  // decision. Reuses the per-file batch contract verbatim — same hunk state
+  // machine, same `onApplyAllHunks` port (decisions already carry their
+  // filePath), so a run-level review never introduces a second state system.
+  const commitAllFiles = useCallback(
+    async (accepted: boolean): Promise<boolean> => {
+      if (readOnly) return false;
+      const decisions: DiffHunkDecision[] = [];
+      for (const file of files) {
+        file.hunks.forEach((_hunk, hunkIdx) => {
+          decisions.push({ filePath: file.filePath, hunkIndex: hunkIdx, accepted });
+        });
+      }
+      if (decisions.length === 0) return false;
+
+      const target: HunkState = accepted ? 'applied' : 'rejected';
+      const keys = decisions.map((d) => hunkKey(d.filePath, d.hunkIndex));
+      const applyAllHunks = onApplyAllHunks;
+      const previousStates = snapshotHunkStates(hunkStates, keys);
+
+      if (!applyAllHunks || !runId) {
+        setHunkStates((prev) => {
+          const next = { ...prev };
+          for (const key of keys) next[key] = target;
+          return next;
+        });
+        return true;
+      }
+
+      setHunkStates((prev) => {
+        const next = { ...prev };
+        for (const key of keys) next[key] = 'submitting';
+        return next;
+      });
+      try {
+        await applyAllHunks(decisions);
+        setHunkStates((prev) => {
+          const next = { ...prev };
+          for (const key of keys) next[key] = target;
+          return next;
+        });
+        return true;
+      } catch {
+        setHunkStates((prev) => restoreHunkStates(prev, previousStates));
+        return false;
+      }
+    },
+    [files, hunkKey, hunkStates, onApplyAllHunks, readOnly, runId],
+  );
+
+  const handleAcceptRun = useCallback(async () => {
+    if (await commitAllFiles(true)) onAcceptRun?.();
+  }, [commitAllFiles, onAcceptRun]);
+
+  const handleRejectRun = useCallback(async () => {
+    if (await commitAllFiles(false)) onRejectRun?.();
+  }, [commitAllFiles, onRejectRun]);
 
   const handleAcceptAll = useCallback(() => {
     void commitAllHunks(true);
@@ -234,6 +312,19 @@ export function DiffReviewPanel({
     [hunkKey, activeFilePath],
   );
 
+  // Run-level summary fallback: when the host does not interpolate one,
+  // the toolbar still shows the numeric aggregate (counts need no i18n).
+  const runSummary = useMemo(() => {
+    if (labels.runSummary) return labels.runSummary;
+    let additions = 0;
+    let deletions = 0;
+    for (const file of files) {
+      additions += file.additions;
+      deletions += file.deletions;
+    }
+    return `${files.length} · +${additions} −${deletions}`;
+  }, [labels.runSummary, files]);
+
   // ── Tabpanel id prefix (#1823) ───────────────────────────────────────
   const tabsId = useId();
 
@@ -251,6 +342,19 @@ export function DiffReviewPanel({
 
   return (
     <div className={cx(styles.root, className)} data-testid="diff-review-panel">
+      {/* ── Run-level toolbar (#1967) ─────────────── */}
+      {runLevel && (
+        <DiffReviewRunToolbar
+          title={labels.runTitle}
+          summary={runSummary}
+          acceptRunLabel={labels.acceptRun}
+          rejectRunLabel={labels.rejectRun}
+          hideActions={readOnly}
+          onAcceptRun={handleAcceptRun}
+          onRejectRun={handleRejectRun}
+        />
+      )}
+
       {/* ── File tabs ─────────────────────────────── */}
       <DiffReviewFileTabs
         files={files}
@@ -271,6 +375,7 @@ export function DiffReviewPanel({
         acceptAllLabel={labels.acceptAll}
         rejectAllLabel={labels.rejectAll}
         toolbarClassName={toolbarClassName}
+        hideActions={readOnly}
         onAcceptAll={handleAcceptAll}
         onRejectAll={handleRejectAll}
       />
@@ -301,6 +406,7 @@ export function DiffReviewPanel({
             diffRowClassName={diffRowClassName}
             lineActionBtnClassName={lineActionBtnClassName}
             columnClassName={styles.columnLeft}
+            hideActions={readOnly}
             onAcceptClick={handleAcceptClick}
             onRejectClick={handleRejectClick}
           />
@@ -322,6 +428,7 @@ export function DiffReviewPanel({
             rejectHunkLabel={labels.rejectHunk}
             diffRowClassName={diffRowClassName}
             lineActionBtnClassName={lineActionBtnClassName}
+            hideActions={readOnly}
             onAcceptClick={handleAcceptClick}
             onRejectClick={handleRejectClick}
           />

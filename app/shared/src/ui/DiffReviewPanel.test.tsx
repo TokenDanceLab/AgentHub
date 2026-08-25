@@ -1,6 +1,6 @@
 import React from 'react';
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { DiffReviewPanel } from './DiffReviewPanel';
 import type { DiffReviewFile } from './DiffReviewPanel';
@@ -336,5 +336,148 @@ describe('DiffReviewPanel', () => {
       );
       expect(wordSpans.length).toBe(0);
     });
+  });
+
+  // ── Run-level review (#1967) ────────────────────────────────────────
+
+  it('does not render the run toolbar by default', () => {
+    render(<DiffReviewPanel files={[mockFileAdded, mockFileModified]} />);
+    expect(screen.queryByTestId('diff-review-run-toolbar')).toBeNull();
+  });
+
+  it('renders the run toolbar with title, computed summary, and run actions when runLevel is set', () => {
+    render(<DiffReviewPanel files={[mockFileAdded, mockFileModified]} runLevel />);
+    const toolbar = screen.getByTestId('diff-review-run-toolbar');
+    expect(toolbar).toBeDefined();
+    expect(screen.getByText('All changes in this run')).toBeDefined();
+    // Computed fallback: 2 files · +(3+2) −(0+2)
+    expect(screen.getByText('2 · +5 −2')).toBeDefined();
+    expect(within(toolbar).getByRole('button', { name: 'Accept run' })).toBeDefined();
+    expect(within(toolbar).getByRole('button', { name: 'Reject run' })).toBeDefined();
+  });
+
+  it('read-only mode keeps file/run summaries but hides every accept/reject action', () => {
+    render(
+      <DiffReviewPanel
+        files={[mockFileAdded, mockFileModified]}
+        runLevel
+        readOnly
+      />,
+    );
+    expect(screen.getByTestId('diff-review-run-toolbar')).toBeDefined();
+    expect(screen.getByText('All changes in this run')).toBeDefined();
+    expect(screen.queryByRole('button', { name: 'Accept run' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Reject run' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Accept All' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Reject All' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Accept hunk' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Reject hunk' })).toBeNull();
+  });
+
+  it('prefers the host-interpolated run summary label', () => {
+    render(
+      <DiffReviewPanel
+        files={[mockFileAdded]}
+        runLevel
+        labels={{ runSummary: '1 个文件 · +3 −0' }}
+      />,
+    );
+    expect(screen.getByText('1 个文件 · +3 −0')).toBeDefined();
+  });
+
+  it('accepting the run marks hunks of EVERY file applied in local mark mode', async () => {
+    const user = userEvent.setup();
+    const onAcceptRun = vi.fn();
+    render(
+      <DiffReviewPanel
+        files={[mockFileAdded, mockFileModified]}
+        runLevel
+        onAcceptRun={onAcceptRun}
+      />,
+    );
+    await user.click(screen.getByRole('button', { name: 'Accept run' }));
+    expect(onAcceptRun).toHaveBeenCalledTimes(1);
+    // Both files' hunks carry the applied badge — the batch crossed tabs.
+    expect(screen.getAllByText('Applied').length).toBeGreaterThanOrEqual(2);
+    // Switch to the second file tab: its hunk is applied too.
+    const tabs = screen.getByRole('tablist').querySelectorAll('[role="tab"]');
+    await user.click(tabs[1]!);
+    expect(screen.getAllByText('Applied').length).toBeGreaterThan(0);
+  });
+
+  it('rejecting the run marks hunks of EVERY file rejected in local mark mode', async () => {
+    const user = userEvent.setup();
+    const onRejectRun = vi.fn();
+    render(
+      <DiffReviewPanel
+        files={[mockFileAdded, mockFileModified]}
+        runLevel
+        onRejectRun={onRejectRun}
+      />,
+    );
+    await user.click(screen.getByRole('button', { name: 'Reject run' }));
+    expect(onRejectRun).toHaveBeenCalledTimes(1);
+    expect(screen.getAllByText('Rejected').length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('run accept routes through the existing onApplyAllHunks port with all-file decisions', async () => {
+    const user = userEvent.setup();
+    let resolveApply!: () => void;
+    const applyAllHunks = vi.fn(() => new Promise<void>((resolve) => { resolveApply = resolve; }));
+    const onAcceptRun = vi.fn();
+    render(
+      <DiffReviewPanel
+        files={[mockFileAdded, mockFileModified]}
+        runId="run-1"
+        runLevel
+        onApplyAllHunks={applyAllHunks}
+        onAcceptRun={onAcceptRun}
+      />,
+    );
+    await user.click(screen.getByRole('button', { name: 'Accept run' }));
+    expect(applyAllHunks).toHaveBeenCalledWith([
+      { filePath: 'src/new-file.ts', hunkIndex: 0, accepted: true },
+      { filePath: 'src/edited-file.ts', hunkIndex: 0, accepted: true },
+    ]);
+    // Submitting until the port resolves — same state machine as per-file batch.
+    expect(screen.getAllByText('Submitting...').length).toBeGreaterThan(0);
+    expect(screen.queryAllByText('Applied').length).toBe(0);
+    expect(onAcceptRun).not.toHaveBeenCalled();
+    resolveApply();
+    await waitFor(() => expect(screen.getAllByText('Applied').length).toBeGreaterThanOrEqual(2));
+    expect(onAcceptRun).toHaveBeenCalledTimes(1);
+  });
+
+  it('run batch failure restores the exact mixed state and does not fire the run callback', async () => {
+    const user = userEvent.setup();
+    const applyAllHunks = vi.fn(() => Promise.reject(new Error('boom')));
+    const onRejectRun = vi.fn();
+    render(
+      <DiffReviewPanel
+        files={[mockFileAdded, mockFileModified]}
+        runId="run-1"
+        runLevel
+        onApplyAllHunks={applyAllHunks}
+        onRejectRun={onRejectRun}
+      />,
+    );
+
+    // Establish a mixed local review state before the run-level batch.
+    await user.click(screen.getAllByRole('button', { name: 'Accept hunk' })[0]!);
+    expect(screen.getAllByText('Applied').length).toBeGreaterThan(0);
+    const tabs = screen.getByRole('tablist').querySelectorAll('[role="tab"]');
+    await user.click(tabs[1]!);
+    await user.click(screen.getAllByRole('button', { name: 'Reject hunk' })[0]!);
+    expect(screen.getAllByText('Rejected').length).toBeGreaterThan(0);
+
+    await user.click(screen.getByRole('button', { name: 'Reject run' }));
+    await waitFor(() => expect(applyAllHunks).toHaveBeenCalled());
+    await waitFor(() => expect(screen.queryAllByText('Submitting...').length).toBe(0));
+
+    // Active file restores rejected; first file restores applied.
+    expect(screen.getAllByText('Rejected').length).toBeGreaterThan(0);
+    await user.click(tabs[0]!);
+    expect(screen.getAllByText('Applied').length).toBeGreaterThan(0);
+    expect(onRejectRun).not.toHaveBeenCalled();
   });
 });

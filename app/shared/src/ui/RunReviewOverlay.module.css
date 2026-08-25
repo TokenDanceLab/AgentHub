@@ -1,0 +1,149 @@
+/* ═══════════════════════════════════════════════════════════════════
+   RunReviewOverlay — run-level aggregate diff review dialog (#1967)
+   Uses OKLCH via CSS variables only — no hardcoded colors
+   ═══════════════════════════════════════════════════════════════════ */
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: var(--td-z-modal);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--glass-shadow);
+  backdrop-filter: blur(4px);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .overlay {
+    animation: runReviewOverlayIn 0.15s ease-out;
+  }
+
+  .content {
+    animation: runReviewContentIn 0.2s ease-out;
+  }
+}
+
+.content {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: min(94vw, 1280px);
+  height: min(88vh, 900px);
+  border: 1px solid var(--glass-border, var(--td-line));
+  border-radius: var(--td-radius-panel);
+  background: var(--glass-panel-overlay, var(--td-surface));
+  box-shadow: var(--glass-elev-3, var(--td-shadow-lg));
+  backdrop-filter: var(--glass-backdrop-filter);
+  -webkit-backdrop-filter: var(--glass-backdrop-filter);
+  overflow: hidden;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: var(--td-space-2);
+  padding: var(--td-space-2) var(--td-space-3);
+  border-bottom: 1px solid var(--td-line);
+  flex-shrink: 0;
+  min-width: 0;
+}
+
+.title {
+  font-size: var(--td-text-sm);
+  font-weight: var(--font-weight-semibold);
+  font-family: var(--td-font);
+  color: var(--td-ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+  flex-shrink: 0;
+}
+
+.summary {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--td-mono);
+  font-size: var(--font-size-2xs);
+  font-weight: var(--font-weight-medium);
+  color: var(--td-ink-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.closeBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  border-radius: var(--td-radius-control);
+  background: transparent;
+  color: var(--td-ink-muted);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .closeBtn {
+    transition: background var(--td-dur-fast), color var(--td-dur-fast);
+  }
+}
+
+.closeBtn:hover {
+  background: var(--hover-overlay);
+  color: var(--td-ink);
+}
+
+.closeBtn:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.readOnlyNotice {
+  padding: var(--td-space-1) var(--td-space-3);
+  border-bottom: 1px solid var(--td-line);
+  background: color-mix(in oklch, var(--td-warning) 8%, transparent);
+  color: var(--td-ink-muted);
+  font-size: var(--td-text-xs);
+  font-family: var(--td-font);
+  line-height: 1.5;
+  flex-shrink: 0;
+}
+
+.body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+@media (max-width: 768px) {
+  .content {
+    width: 100vw;
+    height: 100vh;
+    border-radius: 0;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  @keyframes runReviewOverlayIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+
+  @keyframes runReviewContentIn {
+    from {
+      opacity: 0;
+      transform: scale(0.96) translateY(12px);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1) translateY(0);
+    }
+  }
+}
