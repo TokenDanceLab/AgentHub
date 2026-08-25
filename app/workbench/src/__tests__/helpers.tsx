@@ -102,6 +102,7 @@ export function installWorkbenchTestHooks(): void {
     // mounts (useWorkbenchPanelLayout reads them in its state initializers).
     window.localStorage.removeItem('agenthub.workbench.inspectorWidth');
     window.localStorage.removeItem('agenthub.workbench.inspectorCollapsed');
+    window.localStorage.removeItem('agenthub.workbench.engineeringColumnByConversation.v1');
   });
 }
 
@@ -112,3 +113,4 @@ export function restoreInspectorTab(mode: 'files' | 'browser'): void {
   const restoreLabel = mode === 'files' ? /恢复 文件/ : /恢复 浏览器/;
   fireEvent.click(within(menu).getByRole('menuitem', { name: restoreLabel }));
 }
+

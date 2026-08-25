@@ -163,6 +163,10 @@ export function useWorkbenchPanelLayout({
     setInspectorCollapsed(false);
   }, [restoreInspectorWidth]);
 
+  const closeInspector = useCallback((): void => {
+    setInspectorCollapsed(true);
+  }, []);
+
   const collapseSidebarForWorkspacePressure = useCallback((nextInspectorWidth: number): void => {
     maybeCollapseSidebarForWorkspacePressure({
       isChatPage,
@@ -377,6 +381,7 @@ export function useWorkbenchPanelLayout({
     resizeInspectorBy,
     resizeSidebarBy,
     openInspector,
+    closeInspector,
     restoreInspectorWidth,
     restoreSidebarWidth,
   });
