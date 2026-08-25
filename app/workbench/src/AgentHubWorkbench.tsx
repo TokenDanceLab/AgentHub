@@ -10,6 +10,7 @@ import { useWorkbenchProfileChrome } from './useWorkbenchProfileChrome';
 import { useWorkbenchSessionChrome } from './useWorkbenchSessionChrome';
 import { useWorkbenchTranscriptChrome } from './useWorkbenchTranscriptChrome';
 import { useWorkbenchGlobalShortcuts } from './useWorkbenchGlobalShortcuts';
+import { useWorkbenchTaskDeepLinks } from './useWorkbenchTaskDeepLinks';
 import { GlobalSearchDialog } from './GlobalSearchDialog';
 import { WORKBENCH_INSPECTOR_QUICK_OPEN_EVENT } from './desktopChromeEvents';
 import { isEditableKeyboardTarget } from './workbenchSessionChromeHelpers';
@@ -55,6 +56,15 @@ export function AgentHubWorkbench(props: AgentHubWorkbenchProps): React.ReactEle
   const [shortcutHelpOpen, setShortcutHelpOpen] = useState(false);
   // #1822: Ctrl/⌘+K global search dialog (conversation switcher).
   const [globalSearchOpen, setGlobalSearchOpen] = useState(false);
+
+  // #1963: task ↔ conversation deep links — intents queued by the tasks
+  // route view / conversation sidebar become page + conversation navigation
+  // here (and the back trips go through the same store).
+  useWorkbenchTaskDeepLinks({
+    setActivePage,
+    onActiveConversationChange: props.onActiveConversationChange,
+    dataMode: props.workbenchStatus?.dataMode,
+  });
 
   // Global '?' opens/closes the keyboard-shortcuts help overlay (#8).
   // Reuses getResolvedShortcutGroups() — the same data source as the
