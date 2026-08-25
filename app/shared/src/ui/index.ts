@@ -3,6 +3,8 @@ export { Modal } from './Modal';
 export type { ModalProps } from './Modal';
 export { DiffReviewPanel } from './DiffReviewPanel';
 export type { DiffReviewFile, DiffReviewLabels, DiffHunkDecision, DiffReviewPanelProps } from './DiffReviewPanel';
+export { RunReviewOverlay } from './RunReviewOverlay';
+export type { RunReviewOverlayProps } from './RunReviewOverlay';
 export { Select } from './Select';
 export type { SelectProps, SelectOption } from './Select';
 export { FormField } from './FormField';
