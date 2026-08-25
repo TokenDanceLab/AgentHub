@@ -3,7 +3,7 @@
 > Owner：本文件是 AgentHub「flake 登记、重试预算与 CI annotation 约定」的 SSOT。其他文档涉及 flaky 处置时以本文件为准，不复制规则。
 > 相关：规则 → 机器验证映射见 [verifier-map](verifier-map.md)。本登记表暂无机器门禁，靠到期复审纪律与评审执行。
 
-最后更新：2026-08-25（登记表建立；登记首个真实 flake FLK-001）
+最后更新：2026-08-25（登记 FLK-002：web stubbed-hub chat-flow-contract 发送按钮偶发禁用超时）
 
 ## 为什么需要登记表
 
@@ -82,6 +82,29 @@ Flaky 测试侵蚀门禁可信度：一旦「偶发红、重跑转绿」成为�
 | 日期 | 动作 | 结果 |
 |---|---|---|
 | 2026-08-25 | Windows CI 偶发红，执行 `gh run rerun --failed` | 转绿；建立本登记条目，根因静态确认，修复未落地 |
+
+### FLK-002 chat-flow-contract in-flight 发送按钮偶发禁用超时
+
+| 字段 | 值 |
+|---|---|
+| 编号 | FLK-002 |
+| 测试标识 | `app/web/src/__e2e__/chat-flow-contract.spec.ts` › "Web shared chat flow contract › keeps a submitted Hub user message visible while the send request is in flight"（spec 第 84 行） |
+| 车道 | checks.yml → `Web stubbed-hub E2E (path-filtered)`，ubuntu-latest chromium |
+| Owner | Web E2E 车道维护者 |
+| 首现日期 | 2026-08-25 |
+| 复现命令 | `cd app/web && pnpm exec playwright test --config playwright.config.ts --project=chromium src/__e2e__/chat-flow-contract.spec.ts`（压测复现追加 `--repeat-each=30`） |
+| 到期复审日 | 2026-09-24 |
+| 状态 | 观察中（根因未确认） |
+
+**现象**：2026-08-25 #1981 车道（run 32832310745）该用例在 `composer.fill` 后断言发送按钮 `toBeEnabled()`，按钮持续 `disabled` 20s 超时；同批 8 个 stubbed-hub 用例通过。同一提交本机复跑 2/2 绿，`gh run rerun --failed` 转绿。
+
+**初步排查**：stubbed-hub 环境 `hub.test.invalid` 的 WS 重连噪音是该车道正常背景音，与禁用态无直接因果；静态审查未发现 #1981 改动（派发队列）触碰 sendability 判定路径。怀疑 CI 负载下 sendability/就绪态时序抖动，根因待本地压测复现后确认。
+
+**处置记录**：
+
+| 日期 | 动作 | 结果 |
+|---|---|---|
+| 2026-08-25 | CI 偶发红（#1981），本机复跑 2/2 绿，执行 `gh run rerun --failed` | 转绿；当日回填本登记条目，根因待压测复现 |
 
 ## 维护规则
 
