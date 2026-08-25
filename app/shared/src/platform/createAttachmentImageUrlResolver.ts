@@ -9,9 +9,13 @@
  * base URL; all fetch/cache/degrade logic lives here once.
  *
  * Honesty contract: any failure (missing id, signed-out, non-2xx after the
- * optional refresh retry, non-image bytes, network error) yields
+ * optional refresh retry, mismatched bytes, network error) yields
  * `undefined` so the row degrades to the file chip with an explicit status
  * notice — never a silent broken image.
+ *
+ * The fetch/cache machinery is shared with the media resolver factory
+ * (#1939) via `createAttachmentObjectUrlResolver`; only the blob-type
+ * acceptance gate differs between content kinds.
  */
 import type { AttachmentRef } from '../composer/types';
 import { buildAttachmentDownloadUrl } from '../hub/hubClientPayloadBodies';
@@ -35,9 +39,19 @@ export interface AttachmentImageUrlResolverDeps {
 
 const DEFAULT_CACHE_LIMIT = 64;
 
-export function createAttachmentImageUrlResolver(
+/**
+ * Shared authenticated-fetch → blob: object URL machinery (#1939 split).
+ * `acceptBlob` is the per-content-kind byte gate: when the Hub-reported
+ * blob type is set and the predicate rejects it, the resolver yields
+ * `undefined` so the row degrades honestly instead of rendering mismatched
+ * bytes. An empty blob type passes — Hub sometimes stores no mime, and
+ * refusing those would silently break attachments the kind marker already
+ * classified upstream.
+ */
+export function createAttachmentObjectUrlResolver(
   deps: AttachmentImageUrlResolverDeps,
-): AttachmentImageUrlResolver {
+  acceptBlob: (blob: Blob) => boolean,
+): (attachment: AttachmentRef) => Promise<string | undefined> {
   const baseUrl = deps.hubBaseUrl.trim().replace(/\/+$/, '');
   const doFetch = deps.fetchImpl ?? globalThis.fetch;
   const cacheLimit = deps.cacheLimit ?? DEFAULT_CACHE_LIMIT;
@@ -61,7 +75,7 @@ export function createAttachmentImageUrlResolver(
     return doFetch(buildAttachmentDownloadUrl(baseUrl, id), { method: 'GET', headers });
   }
 
-  return async function resolveAttachmentImageUrl(
+  return async function resolveAttachmentObjectUrl(
     attachment: AttachmentRef,
   ): Promise<string | undefined> {
     const id = attachment.id?.trim();
@@ -86,9 +100,10 @@ export function createAttachmentImageUrlResolver(
         }
         if (!res.ok) return undefined;
         const blob = await res.blob();
-        // Hub echoes the stored mime; reject non-image bytes so the row
-        // degrades honestly instead of rendering a broken thumbnail.
-        if (blob.type && !blob.type.startsWith('image/')) return undefined;
+        // Hub echoes the stored mime; reject bytes the caller's gate does
+        // not accept so the row degrades honestly instead of rendering a
+        // broken/mismatched preview.
+        if (!acceptBlob(blob)) return undefined;
         const objectUrl = URL.createObjectURL(blob);
         urlCache.set(id, objectUrl);
         evictIfNeeded();
@@ -103,3 +118,13 @@ export function createAttachmentImageUrlResolver(
     return task;
   };
 }
+
+export function createAttachmentImageUrlResolver(
+  deps: AttachmentImageUrlResolverDeps,
+): AttachmentImageUrlResolver {
+  return createAttachmentObjectUrlResolver(
+    deps,
+    (blob) => !blob.type || blob.type.startsWith('image/'),
+  );
+}
+
