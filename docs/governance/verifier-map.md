@@ -3,7 +3,7 @@
 > Owner：本文件是 AgentHub「规则 → 机器验证」映射的 SSOT。`AGENTS.md` 的“规则 → 机器验证映射”只保留指针，不复制本表。
 > 机器门禁：`scripts/verify/verify-doc-ssot.py` 校验本表验证脚本路径与 CI 文件存在性。
 
-最后更新：2026-08-25（新增 test-sleep 值预算门禁行与 flake 登记处置映射行；前端 L0 稳定 required 聚合 frontend-required；CI job 映射对齐 checks/release-readiness 现状）
+最后更新：2026-08-25（新增 shared 组件三件套棘轮行 #1951、test-sleep 值预算门禁行与 flake 登记处置映射行；前端 L0 稳定 required 聚合 frontend-required；CI job 映射对齐 checks/release-readiness 现状）
 
 ## 映射表
 
@@ -25,6 +25,7 @@
 | Design token SSOT（CSS 硬编码颜色禁令） | `scripts/verify/verify-design-token-ssot.py` | checks.yml → validate |
 | 核心 token/theme/preset CSS 仅 parser 语法门禁（fail-closed；Stylelint 被 ignore 排除，规则债另立，#1720） | `app/scripts/verify-design-css-syntax.mjs`（内置 `--self-test` 负向自测） | checks.yml → design-css |
 | shared UI i18n callsite ratchet（#1612；违规文件数棘轮：仅当含 CJK 字面量且未导入 `useTranslation` 的违规文件数超过 baseline 时 fail，不比较字面量行数——既有违规文件内新增 CJK 字面量行不会触发；当前 advisory：validate step 带 `continue-on-error`，存量违规文件回填低于 baseline 后转硬门禁） | `scripts/verify/verify-i18n-callsites.py` | checks.yml → validate |
+| shared 组件三件套棘轮（#1951：扫描 `app/shared/src/ui/**` 的 PascalCase 组件 `.tsx`；必须配对 `<组件>.test.tsx`（或 `__tests__/<组件>.test.tsx`）+ `<组件>.stories.tsx`，无关测试不得代替；验收标准见 `docs/component-acceptance.md`；存量缺件显式登记在基线、只缩不增） | `scripts/verify/verify-shared-trio-ratchet.py`（负向自测 `scripts/verify/tests/verify-shared-trio-ratchet.Tests.py`，基线 `scripts/verify/shared-trio-baseline.json`） | checks.yml → validate |
 | 演示诚实：stub/fixture 不得冒充真实登录/API | `scripts/verify/verify-real-e2e-contract.py` | checks.yml → validate |
 | 真实 E2E lane evidence manifest 六字段合同 + 私有信息脱敏（#1839/#1873：非 loopback URL host / 内网 IP / 绝对路径 / 内网后缀 hostname fail-closed；L3 仅 dispatch，不阻塞 PR） | `scripts/verify/verify-real-e2e-lane-manifest.py`（负向自测 `scripts/verify/tests/verify-real-e2e-lane-manifest.Tests.py`） | checks.yml → real-e2e-stack（自测 → validate） |
 | real-e2e-stack ID 环境不透明化（#1873：不接受任意 URL / 镜像；只接受预登记 opaque ID choice；ID endpoint loopback-only；image 固定 allowlist） | `scripts/verify/verify-e2e-env-allowlist.py`（负向自测 `scripts/verify/tests/verify-e2e-env-allowlist.Tests.py`） | checks.yml → validate |
