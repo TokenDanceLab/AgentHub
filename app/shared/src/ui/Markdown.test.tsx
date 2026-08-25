@@ -338,3 +338,13 @@ describe('markdown table header stickiness (codeg parity)', () => {
     expect(thRule).toMatch(/z-index:\s*var\(--z-base\);/);
   });
 });
+
+describe('fenced code baseline (#1971)', () => {
+  test('renders fenced code blocks with their exact source', () => {
+    const container = renderMarkdown('Here is a fenced code sample:\n```python\nprint("hello")\n```\n');
+    const codeText = container.textContent ?? '';
+    expect(codeText).toContain('print("hello")');
+    expect(container.querySelectorAll('pre, code').length).toBeGreaterThan(0);
+    expect(codeText).not.toContain('```');
+  });
+});

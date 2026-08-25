@@ -1404,3 +1404,45 @@ describe('Cross-pipeline: Edge + Hub blocks mixed in same TranscriptItem[]', () 
     }
   })
 })
+
+describe('Pipeline: Hub fenced-code content survives normalization (#1971)', () => {
+  it('keeps fence structure from snake_case REST messages through blocks and items', () => {
+    const fenced = 'Here is a fenced code sample:\n```python\nprint("hello")\n```\n'
+    const blocks = normalizeHubMessagesToTranscript([
+      {
+        id: 'm1',
+        session_id: 'hub-session-1',
+        seq_id: 1,
+        sender_type: 'user',
+        sender_id: 'partner-1',
+        content_type: 'text',
+        content: JSON.stringify({ text: fenced }),
+      },
+      {
+        id: 'm2',
+        session_id: 'hub-session-1',
+        seq_id: 2,
+        sender_type: 'agent',
+        sender_id: 'agent-1',
+        content_type: 'text',
+        content: JSON.stringify({ text: fenced }),
+      },
+    ])
+
+    expect(blocks).toHaveLength(2)
+    for (const block of blocks) {
+      expect(block.kind).toBe('text')
+      if (block.kind === 'text') {
+        expect(block.text).toContain('```python')
+        expect(block.text).toContain('print("hello")')
+      }
+    }
+
+    const items = blocksToTranscriptItems(blocks)
+    const agentItem = items.find((item) => isTranscriptAgentItem(item))
+    expect(agentItem).toBeDefined()
+    if (agentItem && isTranscriptAgentItem(agentItem)) {
+      expect(agentItem.bubbles.some((bubble) => bubble.includes('```python'))).toBe(true)
+    }
+  })
+})

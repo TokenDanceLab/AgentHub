@@ -185,3 +185,19 @@ describe('UserMessage attachments (#1957)', () => {
     expect(bubble!.children).toHaveLength(2);
   });
 });
+
+describe('UserMessage fenced code (#1971)', () => {
+  it('renders Hub-delivered fenced code as a code block, not plain text', () => {
+    const item: TranscriptUserItem = {
+      type: 'user',
+      name: 'partner',
+      text: 'partner fenced probe\n```python\nprint("hello fenced")\n```\n',
+    };
+
+    const { container, getByText } = render(<UserMessage item={item} chatMode="dm" />);
+
+    expect(getByText('partner fenced probe')).toBeInTheDocument();
+    expect(getByText('print("hello fenced")')).toBeInTheDocument();
+    expect(container.querySelectorAll('pre, code, [class*="codeBlockWrapper"]').length).toBeGreaterThan(0);
+  });
+});
