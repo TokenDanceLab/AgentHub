@@ -433,6 +433,20 @@ def main() -> int:
     assert_contains(validate, r"Verify Shared UI hubClient gate", "validate job must run the Shared UI hubClient gate verifier")
     assert_contains(validate, r"scripts/verify/verify-shared-ui-hubclient.py", "validate job must call scripts/verify/verify-shared-ui-hubclient.ps1")
     assert_step_continue_on_error(validate, "Verify Shared UI hubClient gate", False)
+    shared_trio_step = get_step_block(validate, "Verify shared component trio ratchet (#1951)")
+    assert_contains(
+        shared_trio_step,
+        r"scripts/verify/verify-shared-trio-ratchet\.py",
+        "shared trio ratchet step must call its verifier",
+    )
+    assert_step_continue_on_error(validate, "Verify shared component trio ratchet (#1951)", False)
+    shared_trio_self_test_step = get_step_block(validate, "Self-test shared component trio ratchet (negative)")
+    assert_contains(
+        shared_trio_self_test_step,
+        r"scripts/verify/tests/verify-shared-trio-ratchet\.Tests\.py",
+        "shared trio ratchet self-test step must call its negative test script",
+    )
+    assert_step_continue_on_error(validate, "Self-test shared component trio ratchet (negative)", False)
     assert_contains(validate, r"check-secrets\.sh", "validate job must keep secret guard")
     # coverage baseline gate now lives in frontend-coverage (see above);
     # validate must not re-introduce it.

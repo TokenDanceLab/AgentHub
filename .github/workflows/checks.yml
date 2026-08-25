@@ -1993,6 +1993,17 @@ jobs:
       - name: Verify v4 old UI active paths
         run: python ./scripts/verify/verify-v4-old-ui-active-paths.py
 
+      # #1951: shared 组件三件套棘轮 — app/shared/src/ui/** 的 PascalCase
+      # 组件 .tsx 必须带 <组件>.test.tsx + <组件>.stories.tsx（复杂测试可放
+      # __tests__/<组件>.test.tsx；无关测试不得代替）。存量缺件显式登记在
+      # scripts/verify/shared-trio-baseline.json，棘轮只缩不增；补齐缺件
+      # 后必须同步收缩基线，负向自测防假绿。
+      - name: Verify shared component trio ratchet (#1951)
+        run: python ./scripts/verify/verify-shared-trio-ratchet.py
+
+      - name: Self-test shared component trio ratchet (negative)
+        run: python scripts/verify/tests/verify-shared-trio-ratchet.Tests.py
+
       # #1612: i18n callsites ratchet — shared UI must not add new CJK
       # string literals (every user-visible string routes through the i18n
       # dictionary). The gate enforces a non-increasing baseline; the script

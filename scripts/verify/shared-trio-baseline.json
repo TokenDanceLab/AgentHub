@@ -1,0 +1,11 @@
+{
+  "_comment": "shared 组件三件套（PascalCase 组件 + .test.tsx + .stories.tsx）棘轮的存量缺件基线（#1951）。门禁只缩不增：未登记的新缺件即红（STR-NEW-DEBT）；缺件补齐后必须同步收缩或移除对应条目，否则同样红（STR-BASELINE-STALE）。missing 取值限于 test / stories；测试可邻接组件或位于同目录 __tests__/<组件>.test.tsx，其他测试文件不能代替。",
+  "exemptions": [
+    {
+      "component": "app/shared/src/ui/StatusBadge/StatusBadge.tsx",
+      "missing": ["stories"],
+      "issue": 1951,
+      "reason": "存量缺件：已有同目录 StatusBadge.test.tsx，缺 StatusBadge.stories.tsx；补齐后移除本条目"
+    }
+  ]
+}
