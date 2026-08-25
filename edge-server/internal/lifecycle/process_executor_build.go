@@ -150,6 +150,14 @@ func (e *ProcessExecutor) buildAndStartProcess(
 		*runStartTime = time.Now()
 	}
 
+	// Record the executor-resolved workDir as run evidence before the started
+	// transition so run.started carries it (#1967). Empty workDir is honest:
+	// it means no workspace was resolved and run review stays read-only.
+	if workDir != "" {
+		if _, ok := e.store.SetRunWorkDir(run.ID, workDir); !ok {
+			slog.Warn("executor.run.workdir_record_failed", "runId", run.ID, "workDir", workDir)
+		}
+	}
 	started, ok := e.store.SetRunStatusIf(run.ID, "started", "queued")
 	if planPublishStatus(ok).Publish {
 		e.bus.Publish("run.started", runScope(started), RunResponse(started))

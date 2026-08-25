@@ -572,3 +572,50 @@ describe('thinkingBlock', () => {
     ]);
   });
 });
+
+describe('run workDir evidence pass-through (#1967)', () => {
+  it('run.started carries the executor-reported workDir into the run evidence ref', () => {
+    const block = runTextBlock(
+      edgeEvent('evt-wd-start', 1, 'run.started', {
+        runId: 'run-wd',
+        startedAt: '2026-06-07T03:00:01Z',
+        workDir: '/tmp/ws-run-wd',
+      }),
+      'started',
+      'running',
+    );
+    expect(block?.evidenceRefs?.[0]?.workDir).toBe('/tmp/ws-run-wd');
+  });
+
+  it('run.finished keeps the trusted workDir evidence', () => {
+    const block = runFinishedBlock(
+      edgeEvent('evt-wd-end', 2, 'run.finished', { runId: 'run-wd', workDir: '/tmp/ws-run-wd' }),
+    );
+    expect(block?.evidenceRefs?.[0]?.workDir).toBe('/tmp/ws-run-wd');
+  });
+
+  it('output batches keep the workDir attached to the running run ref', () => {
+    const block = outputBatchTextBlock(
+      edgeEvent('evt-wd-out', 3, 'run.output.batch', {
+        runId: 'run-wd',
+        workDir: '/tmp/ws-run-wd',
+        chunks: [{ text: 'hello' }],
+      }),
+    );
+    expect(block?.evidenceRefs?.[0]?.workDir).toBe('/tmp/ws-run-wd');
+  });
+
+  it('omits workDir on evidence refs when the executor reported none', () => {
+    const block = runTextBlock(
+      edgeEvent('evt-wd-none', 4, 'run.started', { runId: 'run-nowd', startedAt: '2026-06-07T03:00:04Z' }),
+      'started',
+      'running',
+    );
+    expect(block?.evidenceRefs?.[0]).toEqual({
+      id: 'run-run-nowd',
+      kind: 'run',
+      label: 'Run run-nowd',
+      status: 'running',
+    });
+  });
+});

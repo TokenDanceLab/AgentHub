@@ -135,6 +135,15 @@ func (s *Store) SetRunRetryCount(id string, count int) (Run, bool) {
 	return setRunRetryCountInMaps(s.runs, id, count)
 }
 
+// SetRunWorkDir records the executor-resolved working directory on a run.
+// The value is evidence for run-level diff review (#1967): clients may apply
+// run diffs only against a workDir reported by the executor, never a guess.
+func (s *Store) SetRunWorkDir(id, workDir string) (Run, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return setRunWorkDirInMaps(s.runs, id, workDir)
+}
+
 func (s *Store) CreateItem(item Item) (Item, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()

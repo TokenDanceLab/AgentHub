@@ -1717,6 +1717,60 @@ func TestProcessExecutorFaultEscalationExhaustedSingleFinish(t *testing.T) {
 	}
 }
 
+func TestProcessExecutorRunStartedCarriesWorkDir(t *testing.T) {
+	bus := events.NewBus(100)
+	s := store.New()
+	run := newExecutorTestRun(t, s)
+	workDir := t.TempDir()
+	_, ch, _ := bus.Subscribe(0)
+
+	executor, err := NewProcessExecutor(bus, s, ProcessExecutorConfig{
+		Command: os.Args[0],
+		Args:    []string{processExecutorHelperRunFlag, "--", "success"},
+		Env:     append(os.Environ(), "AGENTHUB_PROCESS_EXECUTOR_HELPER=1"),
+		WorkDir: workDir,
+	}, nil, nil)
+	if err != nil {
+		t.Fatalf("NewProcessExecutor returned error: %v", err)
+	}
+	executor.faultEscalationCfg = FaultEscalationConfig{Enabled: false}
+
+	if err := executor.Start(run, RunProcessContext{}); err != nil {
+		t.Fatalf("Start returned error: %v", err)
+	}
+
+	sawWorkDir := false
+	for {
+		evt := nextEvent(t, ch)
+		switch evt.Type {
+		case "run.started":
+			payload, ok := evt.Payload.(map[string]any)
+			if !ok {
+				t.Fatalf("run.started payload = %T, want map", evt.Payload)
+			}
+			if got, _ := payload["workDir"].(string); got != workDir {
+				t.Fatalf("run.started workDir = %#v, want %q", payload["workDir"], workDir)
+			}
+			sawWorkDir = true
+		case "run.output.batch":
+		case "run.finished":
+			if !sawWorkDir {
+				t.Fatal("run finished without run.started carrying workDir")
+			}
+			stored, ok := s.GetRun(run.ID)
+			if !ok {
+				t.Fatalf("run %q was not stored", run.ID)
+			}
+			if stored.WorkDir != workDir {
+				t.Fatalf("stored run workDir = %q, want %q", stored.WorkDir, workDir)
+			}
+			return
+		default:
+			// Other lifecycle events are not part of this contract.
+		}
+	}
+}
+
 func newTestProcessExecutor(t *testing.T, bus *events.Bus, s store.RunLifecycleStore, mode string) *ProcessExecutor {
 	t.Helper()
 

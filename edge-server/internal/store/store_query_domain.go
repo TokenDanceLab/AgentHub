@@ -234,6 +234,11 @@ func applyRunRetryCount(run Run, count int) Run {
 	return run
 }
 
+func applyRunWorkDir(run Run, workDir string) Run {
+	run.WorkDir = workDir
+	return run
+}
+
 func cloneUserSettings(settings map[string]string, mtime string) UserSettings {
 	values := make(map[string]string, len(settings))
 	for k, v := range settings {

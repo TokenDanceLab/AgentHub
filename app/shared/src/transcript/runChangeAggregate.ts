@@ -93,6 +93,12 @@ export interface RunReviewSelection {
   scope: RunReviewScope;
   /** Exact `EvidenceRef.id` used as the single-run grouping key. */
   runEvidenceId?: string | undefined;
+  /**
+   * Executor-reported workspace of the selected run (#1967). Only present
+   * for `scope: 'run'` when Edge reported a workDir; apply/批准写回 is only
+   * allowed when this field is set. Legacy scopes never carry a workDir.
+   */
+  workDir?: string | undefined;
   files: DiffReviewFile[];
 }
 
@@ -111,6 +117,7 @@ interface RunBucket {
   files: Map<string, FileChangeAccumulator>;
   lastSeen: number;
   status?: 'pending' | 'running' | 'completed' | 'failed' | undefined;
+  workDir?: string | undefined;
 }
 
 function runEvidence(block: TranscriptBlock) {
@@ -199,6 +206,11 @@ export function selectRunReview(blocks: TranscriptBlock[]): RunReviewSelection {
         };
         bucket.lastSeen = sequence;
         bucket.status = evidence.status;
+        // The executor reports one workspace per run; the first non-empty
+        // value wins so later replayed events cannot overwrite it.
+        if (!bucket.workDir && evidence.workDir) {
+          bucket.workDir = evidence.workDir;
+        }
         runs.set(evidence.id, bucket);
       }
 
@@ -229,6 +241,7 @@ export function selectRunReview(blocks: TranscriptBlock[]): RunReviewSelection {
     return {
       scope: 'run',
       runEvidenceId: selected[0],
+      ...(selected[1].workDir ? { workDir: selected[1].workDir } : {}),
       files: materializeFiles(selected[1].files),
     };
   }

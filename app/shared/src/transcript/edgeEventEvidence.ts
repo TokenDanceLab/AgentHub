@@ -54,14 +54,29 @@ export function blockBase(event: EventEnvelope, author: TranscriptAuthor, eviden
   };
 }
 
-export function runEvidence(runId: string | undefined, status: EvidenceRefStatus): EvidenceRef[] {
+export function runEvidence(
+  runId: string | undefined,
+  status: EvidenceRefStatus,
+  workDir?: string | undefined,
+): EvidenceRef[] {
   if (!runId) return [];
   return [{
     id: `run-${runId}`,
     kind: 'run' as const,
     label: `Run ${runId}`,
     status,
+    // Executor-reported workspace (#1967); omitted when absent so callers
+    // can distinguish "no trusted workDir" from an empty string.
+    ...(workDir ? { workDir } : {}),
   }];
+}
+
+/**
+ * Executor-reported workspace from a run event payload (#1967). Undefined
+ * when Edge did not resolve a workDir — callers must keep review read-only.
+ */
+export function eventRunWorkDir(event: EventEnvelope): string | undefined {
+  return stringField(event.payload.workDir);
 }
 
 export function toolEvidence(

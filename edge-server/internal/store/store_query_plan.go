@@ -166,6 +166,13 @@ func setRunRetryCountInMaps(runs map[string]Run, id string, count int) (Run, boo
 	return run, ok
 }
 
+func setRunWorkDirInMaps(runs map[string]Run, id string, workDir string) (Run, bool) {
+	run, exists := runs[id]
+	run, ok := resolveSetRunWorkDir(run, exists, workDir)
+	storeIf(runs, id, run, ok)
+	return run, ok
+}
+
 // updateAgentProfileInMaps applies a patch when the profile exists.
 func updateAgentProfileInMaps(
 	profiles map[string]AgentProfile,
