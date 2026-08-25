@@ -299,7 +299,12 @@ export interface ReplayGapTranscriptBlock extends TranscriptBlockBase {
 
 export interface AttachmentTranscriptBlock extends TranscriptBlockBase {
   kind: 'attachment';
-  /** The attachment reference stored on the Hub server. */
+  /**
+   * The attachment reference stored on the Hub server. A degraded entry
+   * (attachment data missing on an image/file message, #1972) uses an empty
+   * `id`, which the renderer resolves to the #1938 honest fallback: file
+   * chip plus explicit status notice instead of a silently dropped message.
+   */
   attachmentRef: import('../composer').AttachmentRef;
   /** Whether this is an image or a generic file attachment. */
   contentType: 'image' | 'file';

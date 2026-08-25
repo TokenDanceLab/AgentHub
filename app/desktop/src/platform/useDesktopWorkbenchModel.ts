@@ -149,6 +149,17 @@ function useEdgeAvailableForDemo(enabled: boolean): boolean {
   return enabled && available;
 }
 
+/**
+ * Stable conversation id for one Hub session (#1972). Real REST
+ * `/client/sessions` payloads carry snake_case `session_id`; compatibility
+ * fixtures and older clients may still carry `id`. Selection matching and
+ * query activation must use `(id ?? session_id)`, otherwise the real REST
+ * shape leaves Hub message/pin queries disabled.
+ */
+function hubSessionMatchId(session: { id?: string; session_id?: string }): string | undefined {
+  return session.id ?? session.session_id;
+}
+
 export function useDesktopWorkbenchModel(
   selectedConversationId?: string,
   t?: (key: string) => string,
@@ -241,7 +252,7 @@ export function useDesktopWorkbenchModel(
   // Never fall back to hubSessions[0] when the user is on an Edge thread (or any
   // non-Hub id) — that steals Edge selection whenever any Hub session exists (#1010).
   const matchedHubSession = useHubConversations
-    ? hubSessions.find((s) => s.id === selectedConversationId)
+    ? hubSessions.find((s) => hubSessionMatchId(s) === selectedConversationId)
     : undefined;
   const matchedThread = edgeEnabled
     ? threads.find((thread) => thread.threadId === selectedConversationId)
@@ -251,7 +262,10 @@ export function useDesktopWorkbenchModel(
     ?? (!selectedConversationId && useHubConversations ? hubSessions[0] : undefined);
   const activeThread = matchedThread
     ?? (!selectedConversationId && !activeHubSession && edgeEnabled ? threads[0] : undefined);
-  const activeConversationId = activeHubSession?.id ?? activeThread?.threadId ?? selectedConversationId ?? '';
+  // Conversation id derivation aligned with hubSessionToConversation (#1972):
+  // real REST sessions only carry snake_case session_id.
+  const activeHubSessionId = activeHubSession ? hubSessionMatchId(activeHubSession) : undefined;
+  const activeConversationId = activeHubSessionId ?? activeThread?.threadId ?? selectedConversationId ?? '';
 
   // Edge thread messages (execution path).
   const threadItemsQuery = useThreadMessages(edgeEnabled ? activeThread?.threadId ?? null : null);
@@ -262,26 +276,26 @@ export function useDesktopWorkbenchModel(
   const liveTranscript = useDesktopEdgeEvents(edgeEnabled ? activeThread?.threadId : undefined, persistedUntilMs);
 
   // Hub session messages (IM path) — only when a Hub session is active.
-  const hubMessagesQuery = useHubMessages(activeHubSession?.id ?? '', { enabled: hubReady && !!activeHubSession?.id });
+  const hubMessagesQuery = useHubMessages(activeHubSessionId ?? '', { enabled: hubReady && !!activeHubSessionId });
   const hubMessages = useMemo(() => hubMessagesQuery.data ?? [], [hubMessagesQuery.data]);
 
   // Hub session pins — seed the pinMap store from GET /client/sessions/{id}/pins.
   // Keyed per session (query key matches hubQueryKeys.threads.pins, which
   // hubEventBridge invalidates on MESSAGE_PIN/MESSAGE_UNPIN); each arrival
   // re-seeds the session bucket (server list is authoritative).
-  const hubPinsQuery = useHubPinnedMessages(activeHubSession?.id ?? '', { enabled: hubReady && !!activeHubSession?.id });
+  const hubPinsQuery = useHubPinnedMessages(activeHubSessionId ?? '', { enabled: hubReady && !!activeHubSessionId });
   useEffect(() => {
-    if (activeHubSession?.id && hubPinsQuery.data) {
+    if (activeHubSessionId && hubPinsQuery.data) {
       getPinMapStore().loadPinnedForSession(
-        activeHubSession.id,
+        activeHubSessionId,
         hubPinsQuery.data.map((message) => message.id),
       );
-    } else if (!activeHubSession?.id) {
+    } else if (!activeHubSessionId) {
       // Signed out / no Hub session: drop the session pointer so stale frames
       // can never leak into a later session.
       getPinMapStore().setActiveSession(null);
     }
-  }, [activeHubSession?.id, hubPinsQuery.data]);
+  }, [activeHubSessionId, hubPinsQuery.data]);
 
   const demoModel = useMemo(() => {
     // When auto mode can use Local Edge fallback, use Edge API data for
