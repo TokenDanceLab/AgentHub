@@ -21,6 +21,9 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'jsdom',
+    // Flake 重试政策 SSOT：docs/governance/known-flaky.md。单元车道预算为 0
+    //（fail-closed）；上调预算须先登记并走到期复审。
+    retries: 0,
     include: ['src/**/*.test.ts', 'src/**/*.test.tsx', '../shared/src/**/*.test.ts', '../shared/src/**/*.test.tsx', '../workbench/src/**/*.test.ts', '../workbench/src/**/*.test.tsx'],
     setupFiles: ['./src/__tests__/setup.ts'],
     execArgv: ['--max-old-space-size=8192'],
