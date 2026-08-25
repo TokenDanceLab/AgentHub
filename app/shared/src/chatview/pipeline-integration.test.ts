@@ -495,9 +495,9 @@ describe('Pipeline 2: Hub message -> normalize -> adapter -> TranscriptItem', ()
   /* -- 2e. Image attachment with agent sender_role => standalone attachment RowItem -- */
 
   it('2e: image message from agent with attachment => attachment block => standalone RowItem', () => {
-    // The adapter only processes structured blocks for role='agent'|'system'.
-    // User attachments (role='human') fall through without being mapped.
-    // Use agent sender_type so the block reaches the structured-rows path.
+    // Agent-authored attachment blocks reach the structured-rows path and
+    // become standalone cards; human-authored attachment blocks are covered
+    // by 2e2 (#1957) and ride a user item instead.
     const msgs: HubMessageTranscriptInput[] = [
       {
         id: 'img-agent-msg',
@@ -533,6 +533,51 @@ describe('Pipeline 2: Hub message -> normalize -> adapter -> TranscriptItem', ()
     expect(row.type).toBe('attachment')
     expect(row.fileName).toBe('screenshot.png')
     expect(row.fileSize).toBe('50 KB')
+  })
+
+  /* -- 2e2. Image attachment with user sender_type => user item attachment row (#1957) -- */
+
+  it('2e2: image message from user => attachment block => user item attachment row (#1957)', () => {
+    // Closing the send-image -> see-image loop: the sender's own upload is
+    // normalized into a human-authored attachment block and the adapter
+    // keeps it on a user item (image marker + ref preserved for the port).
+    const msgs: HubMessageTranscriptInput[] = [
+      {
+        id: 'img-user-msg',
+        session_id: 'session-1',
+        seq_id: 11,
+        sender_type: 'user',
+        sender_id: 'user-alice',
+        sender: { nickname: 'Alice' },
+        content_type: 'image',
+        created_at: NOW,
+        attachments: [{
+          id: 'att-2',
+          hash: 'def456',
+          size: 2048,
+          mime_type: 'image/png',
+          original_name: 'photo.png',
+        }],
+      },
+    ]
+
+    const blocks = normalizeHubMessagesToTranscript(msgs)
+    expect(blocks).toHaveLength(1)
+    expect(blocks[0]!.kind).toBe('attachment')
+    expect(blocks[0]!.author.role).toBe('human')
+
+    const items = blocksToTranscriptItems(blocks)
+    expect(items).toHaveLength(1)
+    const userItem = items[0] as TranscriptUserItem
+    expect(userItem.type).toBe('user')
+    expect(userItem.name).toBe('Alice')
+    expect(userItem.text).toBe('')
+    expect(userItem.attachments).toHaveLength(1)
+    const row = userItem.attachments![0]!
+    expect(row.type).toBe('attachment')
+    expect(row.attachmentKind).toBe('image')
+    expect(row.fileName).toBe('photo.png')
+    expect(row.fileSize).toBe('2 KB')
   })
 
   /* -- 2f. Agent DM display metadata => displayTitle + badgeLabel -- */

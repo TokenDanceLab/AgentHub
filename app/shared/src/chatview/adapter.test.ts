@@ -89,6 +89,79 @@ describe('blocksToTranscriptItems — user messages', () => {
     expect((items[1] as TranscriptUserItem).text).toBe('b')
   })
 
+  // #1957: the sender's own uploads must render inline in the transcript —
+  // human attachment blocks keep their contentType and ride a user item.
+  it('converts a human image attachment block into a user item with an image row (#1957)', () => {
+    const attachmentRef = { id: 'att-1', name: 'photo.png', size: 2048, mime_type: 'image/png' }
+    const blocks: TranscriptBlock[] = [
+      {
+        id: 'h1', kind: 'attachment', createdAt: makeTime(0), author: makeUser('alice'),
+        attachmentRef, contentType: 'image',
+      },
+    ]
+    const items = blocksToTranscriptItems(blocks)
+    expect(items).toHaveLength(1)
+    const item = items[0] as TranscriptUserItem
+    expect(item.type).toBe('user')
+    expect(item.id).toBe('h1')
+    expect(item.name).toBe(DEFAULT_USER_NAME)
+    expect(item.time).toBeTruthy()
+    // Attachment-only items carry empty text; the row keeps the image marker
+    // and ref so the renderer can resolve a thumbnail through the port.
+    expect(item.text).toBe('')
+    expect(item.attachments).toHaveLength(1)
+    const row = item.attachments?.[0]
+    expect(row).toMatchObject({
+      id: 'h1', type: 'attachment',
+      attachmentKind: 'image', attachmentRef,
+      fileName: 'photo.png', fileSize: '2 KB',
+    })
+  })
+
+  it('converts a human file attachment block into a user item with a chip row (#1957)', () => {
+    const attachmentRef = { id: 'att-2', name: 'notes.md', size: 1536, mime_type: 'text/markdown' }
+    const blocks: TranscriptBlock[] = [
+      {
+        id: 'h1', kind: 'attachment', createdAt: makeTime(0), author: makeUser('alice'),
+        attachmentRef, contentType: 'file',
+      },
+    ]
+    const item = blocksToTranscriptItems(blocks)[0] as TranscriptUserItem
+    expect(item.type).toBe('user')
+    expect(item.text).toBe('')
+    expect(item.attachments).toHaveLength(1)
+    expect(item.attachments?.[0]).toMatchObject({
+      type: 'attachment', attachmentKind: 'file', attachmentRef,
+      fileName: 'notes.md', fileSize: '2 KB',
+    })
+  })
+
+  it('omits the attachments key for text-only user items (#1957)', () => {
+    const blocks: TranscriptBlock[] = [
+      { id: 'u1', kind: 'text', createdAt: makeTime(0), author: makeUser('alice'), text: 'hello' },
+    ]
+    const item = blocksToTranscriptItems(blocks)[0] as TranscriptUserItem
+    expect(item.attachments).toBeUndefined()
+  })
+
+  it('flushes a pending agent group before a human attachment item (#1957)', () => {
+    const blocks: TranscriptBlock[] = [
+      { id: 'th1', kind: 'thinking', createdAt: makeTime(1), author: makeAuthor('b1'), content: 'x', isThinking: true },
+      {
+        id: 'h1', kind: 'attachment', createdAt: makeTime(2), author: makeUser('alice'),
+        attachmentRef: { id: 'att-1', name: 'photo.png', size: 2048, mime_type: 'image/png' },
+        contentType: 'image',
+      },
+      { id: 'tc1', kind: 'tool_call', createdAt: makeTime(3), author: makeAuthor('b1'), toolName: 'Read', status: 'running' },
+    ]
+    const items = blocksToTranscriptItems(blocks)
+    expect(items).toHaveLength(3)
+    expect(items[0]).toMatchObject({ agent: DEFAULT_AGENT_NAME })
+    expect((items[1] as TranscriptUserItem).type).toBe('user')
+    expect((items[1] as TranscriptUserItem).attachments).toHaveLength(1)
+    expect(items[2]).toMatchObject({ agent: DEFAULT_AGENT_NAME })
+  })
+
   it('flushes a pending agent item before pushing a user item', () => {
     const blocks: TranscriptBlock[] = [
       { id: 'th1', kind: 'thinking', createdAt: makeTime(1), author: makeAuthor('b1'), content: 'x', isThinking: true },
@@ -839,7 +912,7 @@ describe('resolveUnreadAnchorItemIndex', () => {
     expect(resolveUnreadAnchorItemIndex(blocks, items, { anchorBlockId: 'u2', count: 1 })).toBe(2)
   })
 
-  it('ignores human non-text blocks when counting item starts', () => {
+  it('counts human attachment blocks as item starts (#1957)', () => {
     const blocks: TranscriptBlock[] = [
       userText('u1', 'alice', 0),
       {
@@ -849,6 +922,25 @@ describe('resolveUnreadAnchorItemIndex', () => {
       agentText('a1', 'b1', 2),
     ]
     const items = blocksToTranscriptItems(blocks)
+    // u1 user item + att1 user item + a1 agent item.
+    expect(items).toHaveLength(3)
+    // The attachment block starts its own user item, so an anchor on it
+    // resolves to item 1 and an anchor on the following agent text to item 2.
+    expect(resolveUnreadAnchorItemIndex(blocks, items, { anchorBlockId: 'att1', count: 1 })).toBe(1)
+    expect(resolveUnreadAnchorItemIndex(blocks, items, { anchorBlockId: 'a1', count: 1 })).toBe(2)
+  })
+
+  it('still ignores human non-text non-attachment blocks when counting item starts', () => {
+    const blocks: TranscriptBlock[] = [
+      userText('u1', 'alice', 0),
+      {
+        id: 'th1', kind: 'thinking', createdAt: makeTime(1), author: makeUser('alice'),
+        content: 'x', isThinking: true,
+      },
+      agentText('a1', 'b1', 2),
+    ]
+    const items = blocksToTranscriptItems(blocks)
+    // Human-authored thinking blocks are dropped by the adapter.
     expect(items).toHaveLength(2)
     expect(resolveUnreadAnchorItemIndex(blocks, items, { anchorBlockId: 'a1', count: 1 })).toBe(1)
   })
@@ -943,12 +1035,25 @@ describe('resolveCompactDividerIndices', () => {
     expect(resolveCompactDividerIndices(blocks)).toEqual([{ index: 2 }])
   })
 
-  it('does not count human non-text blocks as items', () => {
+  it('counts human attachment blocks as items (#1957)', () => {
     const blocks: TranscriptBlock[] = [
       userText('u1', 'alice', 0),
       {
         id: 'att1', kind: 'attachment', createdAt: makeTime(1), author: makeUser('alice'),
         attachmentRef: { id: 'att-1', name: 'f.txt', size: 10, mime_type: 'text/plain' }, contentType: 'file',
+      },
+      boundary('cb1'),
+    ]
+    // u1 and att1 each start a user item, so the divider lands before item 2.
+    expect(resolveCompactDividerIndices(blocks)).toEqual([{ index: 2 }])
+  })
+
+  it('does not count human non-text non-attachment blocks as items', () => {
+    const blocks: TranscriptBlock[] = [
+      userText('u1', 'alice', 0),
+      {
+        id: 'th1', kind: 'thinking', createdAt: makeTime(1), author: makeUser('alice'),
+        content: 'x', isThinking: true,
       },
       boundary('cb1'),
     ]
@@ -987,7 +1092,8 @@ describe('resolveCompactDividerIndices', () => {
 
   it('does not count a human-authored timeline, diverging from the adapter grouping', () => {
     // The adapter itself creates an agent item for this block; the compact
-    // divider simulation only counts human *text* and agent/system blocks.
+    // divider simulation only counts human *text or attachment* and
+    // agent/system blocks.
     const blocks: TranscriptBlock[] = [
       {
         id: 'tl1', kind: 'agent_timeline', createdAt: makeTime(0), author: makeUser('alice'),

@@ -42,6 +42,9 @@ export { SEP }
  *   TranscriptAgentItem.
  * - User text blocks (`role === 'human'`, `kind === 'text'`) produce
  *   TranscriptUserItem entries.
+ * - User attachment blocks (`role === 'human'`, `kind === 'attachment'`)
+ *   produce TranscriptUserItem entries carrying the attachment row (#1957),
+ *   closing the send-image → see-image loop for the sender's own uploads.
  * - Agent text blocks become chat bubbles.
  * - Tool call + tool result pairs with the same `toolName` are merged into
  *   a single card (the result replaces the call).
@@ -63,9 +66,19 @@ export function blocksToTranscriptItems(blocks: TranscriptBlock[]): TranscriptIt
     _seq++
     const groupId = block.author?.id ?? 'unknown'
 
-    // ── User text ──
-    if (role === 'human' && block.kind === 'text') {
+    // ── User text or attachment (#1957) ──
+    if (role === 'human' && (block.kind === 'text' || block.kind === 'attachment')) {
       if (currentAgent) { items.push(currentAgent); currentAgent = null }
+      if (block.kind === 'attachment') {
+        const row = mapBlock(block)
+        if (row) {
+          items.push({
+            type: 'user', id: block.id, name: block.author?.name, time: timeStr(block.createdAt), text: '',
+            attachments: [row],
+          })
+        }
+        continue
+      }
       const t = block as TextTranscriptBlock
       items.push({
         type: 'user', id: block.id, name: block.author?.name, time: timeStr(block.createdAt), text: t.text,
@@ -216,7 +229,8 @@ export function blocksToTranscriptItems(blocks: TranscriptBlock[]): TranscriptIt
  * transcript block id of the first unread message. This helper converts that
  * block-level anchor to an ITEM-level index, because blocks and items are not
  * 1:1 — consecutive same-author agent blocks merge into one TranscriptAgentItem
- * and some blocks are dropped (human non-text).
+ * and some blocks are dropped (human non-text blocks other than attachments,
+ * which start their own user items since #1957).
  *
  * Placement rules:
  * - Exact: the anchor block's containing item (the item whose render starts at
@@ -249,7 +263,9 @@ export function resolveUnreadAnchorItemIndex(
     if (!block) continue
     const role = block.author?.role ?? 'system'
     const author = block.author?.id ?? 'unknown'
-    if (role === 'human' && block.kind === 'text') {
+    if (role === 'human' && (block.kind === 'text' || block.kind === 'attachment')) {
+      // Human attachment blocks start their own user item (#1957), exactly
+      // like human text blocks.
       starts++
       prevAgentAuthor = null
     } else if (role === 'agent' || role === 'system') {
@@ -257,7 +273,7 @@ export function resolveUnreadAnchorItemIndex(
       if (author !== prevAgentAuthor) starts++
       prevAgentAuthor = author
     }
-    // Human non-text blocks are dropped by the adapter — they start nothing.
+    // Remaining human non-text blocks are dropped by the adapter — they start nothing.
   }
   return Math.max(0, starts - 1)
 }
@@ -310,9 +326,10 @@ export function resolveCompactDividerIndices(blocks: TranscriptBlock[]): Compact
     const role = block.author?.role ?? 'system'
     const author = block.author?.id ?? 'unknown'
 
-    // Mirror the adapter grouping: user text and agent/system blocks increment
-    // the item counter; compact_boundary and human non-text blocks do not.
-    if (role === 'human' && block.kind === 'text') {
+    // Mirror the adapter grouping: user text, user attachment (#1957) and
+    // agent/system blocks increment the item counter; compact_boundary and
+    // remaining human non-text blocks do not.
+    if (role === 'human' && (block.kind === 'text' || block.kind === 'attachment')) {
       itemIdx++
       prevAgentAuthor = null
     } else if (role === 'agent' || role === 'system') {
@@ -320,7 +337,7 @@ export function resolveCompactDividerIndices(blocks: TranscriptBlock[]): Compact
       if (author !== prevAgentAuthor) itemIdx++
       prevAgentAuthor = author
     }
-    // Human non-text, compact_boundary, and other edge cases are already handled above.
+    // Remaining human non-text, compact_boundary, and other edge cases are already handled above.
   }
 
   return result
