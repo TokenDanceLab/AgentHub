@@ -62,3 +62,12 @@ export type {
 } from './types';
 
 export { isSidebarOnlyTranscriptBlock } from './types';
+export {
+  collectRunReviewFiles,
+  countHunkLines,
+  fileChangeActionToReviewStatus,
+  fileChangeBlockHunks,
+  fileChangeBlockToReviewFile,
+  summarizeRunReviewFiles,
+  type RunReviewSummary,
+} from './runChangeAggregate';

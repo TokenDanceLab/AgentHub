@@ -137,6 +137,46 @@
   box-shadow: var(--focus-ring);
 }
 
+/* ── Run-level toolbar (#1967) ───────────────────────────────── */
+.runToolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--td-space-2);
+  padding: var(--td-space-2) var(--td-space-3);
+  border-bottom: 1px solid var(--td-line);
+  background: var(--td-surface-2);
+  flex-shrink: 0;
+  min-width: 0;
+}
+
+.runToolbarTitle {
+  font-size: var(--td-text-xs);
+  font-weight: var(--font-weight-semibold);
+  font-family: var(--td-font);
+  color: var(--td-ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.runToolbarSummary {
+  font-family: var(--td-mono);
+  font-size: var(--font-size-2xs);
+  font-weight: var(--font-weight-medium);
+  color: var(--td-ink-muted);
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.runToolbar .toolbarActions {
+  margin-left: auto;
+}
+
 /* ── File tabs ────────────────────────────────────────────────── */
 .fileTabs {
   display: flex;

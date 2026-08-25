@@ -23,6 +23,7 @@ import {
 } from './DiffReviewPanelHelpers';
 import {
   DiffReviewFileTabs,
+  DiffReviewRunToolbar,
   DiffReviewSideColumn,
   DiffReviewToolbar,
 } from './DiffReviewPanelParts';
@@ -52,6 +53,9 @@ export function DiffReviewPanel({
   onRejectAll,
   onApplyHunk,
   onApplyAllHunks,
+  runLevel,
+  onAcceptRun,
+  onRejectRun,
   labels: customLabels,
   focusedFilePath,
   className,
@@ -192,6 +196,66 @@ export function DiffReviewPanel({
     [activeFile, hunkKey, onApplyAllHunks, runId],
   );
 
+  // Run-level batch (#1967): commit EVERY hunk of EVERY file with the same
+  // decision. Reuses the per-file batch contract verbatim — same hunk state
+  // machine, same `onApplyAllHunks` port (decisions already carry their
+  // filePath), so a run-level review never introduces a second state system.
+  const commitAllFiles = useCallback(
+    async (accepted: boolean) => {
+      const decisions: DiffHunkDecision[] = [];
+      for (const file of files) {
+        file.hunks.forEach((_hunk, hunkIdx) => {
+          decisions.push({ filePath: file.filePath, hunkIndex: hunkIdx, accepted });
+        });
+      }
+      if (decisions.length === 0) return;
+
+      const target: HunkState = accepted ? 'applied' : 'rejected';
+      const keys = decisions.map((d) => hunkKey(d.filePath, d.hunkIndex));
+      const applyAllHunks = onApplyAllHunks;
+
+      if (!applyAllHunks || !runId) {
+        setHunkStates((prev) => {
+          const next = { ...prev };
+          for (const key of keys) next[key] = target;
+          return next;
+        });
+        return;
+      }
+
+      setHunkStates((prev) => {
+        const next = { ...prev };
+        for (const key of keys) next[key] = 'submitting';
+        return next;
+      });
+      try {
+        await applyAllHunks(decisions);
+        setHunkStates((prev) => {
+          const next = { ...prev };
+          for (const key of keys) next[key] = target;
+          return next;
+        });
+      } catch {
+        setHunkStates((prev) => {
+          const next = { ...prev };
+          for (const key of keys) delete next[key];
+          return next;
+        });
+      }
+    },
+    [files, hunkKey, onApplyAllHunks, runId],
+  );
+
+  const handleAcceptRun = useCallback(() => {
+    void commitAllFiles(true);
+    onAcceptRun?.();
+  }, [commitAllFiles, onAcceptRun]);
+
+  const handleRejectRun = useCallback(() => {
+    void commitAllFiles(false);
+    onRejectRun?.();
+  }, [commitAllFiles, onRejectRun]);
+
   const handleAcceptAll = useCallback(() => {
     void commitAllHunks(true);
     onAcceptAll?.();
@@ -234,6 +298,19 @@ export function DiffReviewPanel({
     [hunkKey, activeFilePath],
   );
 
+  // Run-level summary fallback: when the host does not interpolate one,
+  // the toolbar still shows the numeric aggregate (counts need no i18n).
+  const runSummary = useMemo(() => {
+    if (labels.runSummary) return labels.runSummary;
+    let additions = 0;
+    let deletions = 0;
+    for (const file of files) {
+      additions += file.additions;
+      deletions += file.deletions;
+    }
+    return `${files.length} · +${additions} −${deletions}`;
+  }, [labels.runSummary, files]);
+
   // ── Tabpanel id prefix (#1823) ───────────────────────────────────────
   const tabsId = useId();
 
@@ -251,6 +328,18 @@ export function DiffReviewPanel({
 
   return (
     <div className={cx(styles.root, className)} data-testid="diff-review-panel">
+      {/* ── Run-level toolbar (#1967) ─────────────── */}
+      {runLevel && (
+        <DiffReviewRunToolbar
+          title={labels.runTitle}
+          summary={runSummary}
+          acceptRunLabel={labels.acceptRun}
+          rejectRunLabel={labels.rejectRun}
+          onAcceptRun={handleAcceptRun}
+          onRejectRun={handleRejectRun}
+        />
+      )}
+
       {/* ── File tabs ─────────────────────────────── */}
       <DiffReviewFileTabs
         files={files}

@@ -186,6 +186,55 @@ export function DiffReviewToolbar({
   );
 }
 
+// ── Run-level toolbar (#1967) ─────────────────────────────────────────
+// Whole-run summary + accept/reject-run actions. Pure presentation; the
+// batch commit semantics live in DiffReviewPanel (same hunk state machine
+// as the per-file toolbar — no second review state system).
+
+export function DiffReviewRunToolbar({
+  title,
+  summary,
+  acceptRunLabel,
+  rejectRunLabel,
+  runToolbarClassName,
+  onAcceptRun,
+  onRejectRun,
+}: {
+  title: string;
+  /** Host-interpolated summary line (e.g. "3 files · +12 −5"); hidden when empty. */
+  summary?: string | undefined;
+  acceptRunLabel: string;
+  rejectRunLabel: string;
+  runToolbarClassName?: string | undefined;
+  onAcceptRun: () => void;
+  onRejectRun: () => void;
+}) {
+  return (
+    <div className={cx(styles.runToolbar, runToolbarClassName)} data-testid="diff-review-run-toolbar">
+      <span className={styles.runToolbarTitle}>{title}</span>
+      {summary ? <span className={styles.runToolbarSummary}>{summary}</span> : null}
+      <div className={styles.toolbarActions}>
+        <button type="button"
+          className={`${styles.toolbarBtn} ${styles.acceptAllBtn}`}
+          onClick={onAcceptRun}
+          aria-label={acceptRunLabel}
+        >
+          <Check size={12} />
+          <span>{acceptRunLabel}</span>
+        </button>
+        <button type="button"
+          className={`${styles.toolbarBtn} ${styles.rejectAllBtn}`}
+          onClick={onRejectRun}
+          aria-label={rejectRunLabel}
+        >
+          <X size={12} />
+          <span>{rejectRunLabel}</span>
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ── Side column (left/old or right/new) ────────────────────────────────
 
 // ── Word-diff class mapper + line HTML (P6 Step 4) ───────────────────

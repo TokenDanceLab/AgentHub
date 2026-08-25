@@ -59,3 +59,33 @@ export const WithCustomLabels: Story = {
     },
   },
 };
+// #1967: run-level aggregate review — whole-run summary toolbar with
+// accept/reject-run spanning every file's hunks.
+export const RunLevel: Story = {
+  args: {
+    files,
+    runLevel: true,
+    labels: { runSummary: '2 files · +7 −1' },
+  },
+};
+export const RunLevelZh: Story = {
+  args: {
+    files,
+    runLevel: true,
+    labels: {
+      runTitle: '本次运行的全部变更',
+      runSummary: '2 个文件 · +7 −1',
+      acceptRun: '整体批准',
+      rejectRun: '整体驳回',
+      acceptAll: '接受本文件',
+      rejectAll: '拒绝本文件',
+      acceptHunk: '接受此块',
+      rejectHunk: '拒绝此块',
+      applied: '已接受',
+      rejected: '已拒绝',
+      submitting: '提交中…',
+      original: '原始',
+      modified: '修改后',
+    },
+  },
+};
