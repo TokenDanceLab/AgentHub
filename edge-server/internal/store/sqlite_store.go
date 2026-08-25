@@ -346,6 +346,14 @@ func (s *SQLiteStore) SetRunRetryCount(id string, count int) (Run, bool) {
 	return finalizeSQLiteBoolWrite(run, true, s.syncPersist())
 }
 
+func (s *SQLiteStore) SetRunWorkDir(id, workDir string) (Run, bool) {
+	run, ok := s.store.SetRunWorkDir(id, workDir)
+	if !ok {
+		return finalizeSQLiteBoolWrite(Run{}, false, nil)
+	}
+	return finalizeSQLiteBoolWrite(run, true, s.syncPersist())
+}
+
 func (s *SQLiteStore) CreateItem(item Item) (Item, error) {
 	created, err := s.store.CreateItem(item)
 	return persistAfterSQLiteWrite(s, created, err)

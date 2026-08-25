@@ -47,6 +47,7 @@ type Writer interface {
 	UpsertSettings(patch map[string]string) (UserSettings, error)
 	SetRunEvidenceGate(id, result string) (Run, bool)
 	SetRunRetryCount(id string, count int) (Run, bool)
+	SetRunWorkDir(id, workDir string) (Run, bool)
 }
 
 type Repository interface {
@@ -60,6 +61,7 @@ type RunLifecycleStore interface {
 	SetRunStatusIf(id, status string, allowedCurrent ...string) (Run, bool)
 	SetRunEvidenceGate(id, result string) (Run, bool)
 	SetRunRetryCount(id string, count int) (Run, bool)
+	SetRunWorkDir(id, workDir string) (Run, bool)
 }
 
 type RunCleaner interface {

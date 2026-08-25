@@ -268,6 +268,14 @@ func (f *FileStore) SetRunRetryCount(id string, count int) (Run, bool) {
 	return run, ok
 }
 
+func (f *FileStore) SetRunWorkDir(id, workDir string) (Run, bool) {
+	run, ok := f.store.SetRunWorkDir(id, workDir)
+	if ok {
+		f.schedulePersist()
+	}
+	return run, ok
+}
+
 func (f *FileStore) CreateItem(item Item) (Item, error) {
 	created, err := f.store.CreateItem(item)
 	if err != nil {

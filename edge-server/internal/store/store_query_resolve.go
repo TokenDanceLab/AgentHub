@@ -213,6 +213,14 @@ func resolveSetRunRetryCount(run Run, exists bool, count int) (Run, bool) {
 	return applyRunRetryCount(run, count), true
 }
 
+// resolveSetRunWorkDir records the executor-resolved workdir when the run exists.
+func resolveSetRunWorkDir(run Run, exists bool, workDir string) (Run, bool) {
+	if !exists {
+		return Run{}, false
+	}
+	return applyRunWorkDir(run, workDir), true
+}
+
 // prepareRunDiffFileUpsert validates run existence and normalizes path/status.
 // ok is false when the run is missing or the normalized path is empty.
 func prepareRunDiffFileUpsert(runExists bool, file RunDiffFile) (key string, prepared RunDiffFile, ok bool) {
