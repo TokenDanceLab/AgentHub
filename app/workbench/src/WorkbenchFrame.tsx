@@ -11,6 +11,7 @@ import {
 } from './workbenchFrameHelpers';
 import type { WorkbenchFrameProps } from './workbenchFrameTypes';
 import {
+  buildActiveConversationAttention,
   findFirstAwaitingConversationId,
   summarizeWorkbenchAttention,
 } from './workbenchAttentionModel';
@@ -142,10 +143,20 @@ export function WorkbenchFrame({
   } = profile;
 
   /* ── F1/F6 attention: one derivation feeds sidebar dots, rail badge and
-     status-strip counts so the surfaces never disagree. ── */
+     status-strip counts so the surfaces never disagree. Inventory mode uses
+     the shell's run/approval/thread arrays; otherwise the active-conversation
+     fallback observes what the workbench already holds client-side (pending
+     approvals in the active transcript + the runtime running flag) and marks
+     the summary `activeConversationOnly` so surfaces scope their copy. ── */
   const attentionSummary = useMemo(
-    () => (attention ? summarizeWorkbenchAttention(attention) : undefined),
-    [attention],
+    () => (attention
+      ? summarizeWorkbenchAttention(attention)
+      : buildActiveConversationAttention({
+          activeConversationId: currentConversationId,
+          transcript,
+          isAgentRunning,
+        })),
+    [attention, currentConversationId, transcript, isAgentRunning],
   );
   const openRunningQueue = useCallback(() => navigateRail('runs'), [navigateRail]);
   const openApprovalQueueFallback = useCallback(() => {
@@ -200,14 +211,7 @@ export function WorkbenchFrame({
         onToggleTheme={handleToggleTheme}
         userDisplayName={userDisplayName}
         userAvatarUrl={userAvatarUrl}
-        {...(attentionSummary
-          ? {
-              attention: {
-                runningCount: attentionSummary.runningCount,
-                awaitingApprovalCount: attentionSummary.awaitingApprovalCount,
-              },
-            }
-          : {})}
+        {...(attentionSummary ? { attention: attentionSummary } : {})}
       />
       {isChatPage && (
         <ChatSidebarFrame
@@ -266,14 +270,7 @@ export function WorkbenchFrame({
             onCancelRun={onCancelRun}
             onEditMessage={onEditMessage}
             transcriptLoading={transcriptLoading}
-            {...(attentionSummary
-              ? {
-                  attentionCounts: {
-                    runningCount: attentionSummary.runningCount,
-                    awaitingApprovalCount: attentionSummary.awaitingApprovalCount,
-                  },
-                }
-              : {})}
+            {...(attentionSummary ? { attentionCounts: attentionSummary } : {})}
             onOpenRunningQueue={openRunningQueue}
             onOpenApprovalQueueFallback={openApprovalQueueFallback}
           />

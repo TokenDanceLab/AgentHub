@@ -1,4 +1,6 @@
 import type { Approval, Run, RunStatus, Thread } from '@shared/types';
+import type { TranscriptBlock } from '@shared/transcript';
+import { countPendingApprovals } from './workbenchApprovalSummary';
 
 /**
  * F1/F6 attention model — pure derivation of live conversation status and
@@ -8,10 +10,13 @@ import type { Approval, Run, RunStatus, Thread } from '@shared/types';
  * this module is the single derivation source shared by the conversation
  * sidebar live dots (F1), the rail badge and the status-strip chips (F6).
  *
- * Honest boundary: shells without a run inventory (demo surfaces) simply do
- * not provide the input — every consumer renders nothing when the summary is
- * absent. Cross-session pending approvals have no dedicated Hub endpoint;
- * this surface aggregates whatever the shell's client-side model contains.
+ * Honest boundary: shells without a run inventory fall back to
+ * `buildActiveConversationAttention`, which only observes the ACTIVE
+ * conversation (transcript pending approvals + runtime running flag) and
+ * marks the summary `activeConversationOnly` so surfaces scope their copy;
+ * when nothing at all is observable, consumers render nothing. Cross-session
+ * pending approvals have no dedicated Hub endpoint; this surface aggregates
+ * whatever the shell's client-side model contains.
  */
 
 /** Live status shown as a dot on a conversation row (F1). */
@@ -26,8 +31,15 @@ export interface WorkbenchAttentionInput {
 
 /** Global attention counts shown in the rail badge and status strip (F6). */
 export interface WorkbenchAttentionCounts {
-  runningCount: number;
+  /** undefined = not observable (active-conversation fallback without the
+   *  runtime flag) — surfaces treat it as "no running chip", never zero. */
+  runningCount?: number | undefined;
   awaitingApprovalCount: number;
+  /** Failed runs. undefined = not observable. */
+  failedRunCount?: number | undefined;
+  /** true = counts cover only the ACTIVE conversation (fallback mode);
+   *  surfaces must label the scope instead of implying fleet-wide counts. */
+  activeConversationOnly?: boolean | undefined;
 }
 
 export interface WorkbenchAttentionSummary extends WorkbenchAttentionCounts {
@@ -85,6 +97,7 @@ export function summarizeWorkbenchAttention(
   const { runs, approvals, threads } = input;
 
   const runningCount = runs.filter((run) => isRunActive(run.status)).length;
+  const failedRunCount = runs.filter((run) => run.status === 'failed').length;
 
   const pendingApprovals = approvals.filter((approval) => approval.status === 'pending');
   const runIdsWithPendingApproval = new Set(pendingApprovals.map((approval) => approval.runId));
@@ -132,7 +145,7 @@ export function summarizeWorkbenchAttention(
     if (status) liveStatusByConversation[conversationId] = status;
   }
 
-  return { runningCount, awaitingApprovalCount, liveStatusByConversation };
+  return { runningCount, awaitingApprovalCount, failedRunCount, liveStatusByConversation };
 }
 
 /**
@@ -150,4 +163,45 @@ export function findFirstAwaitingConversationId(
     }
   }
   return undefined;
+}
+
+export interface ActiveConversationAttentionInput {
+  activeConversationId?: string | undefined;
+  /** Client-side transcript of the active conversation. */
+  transcript?: TranscriptBlock[] | undefined;
+  /** Active-conversation runtime flag (the stop-button contract). */
+  isAgentRunning?: boolean | undefined;
+}
+
+/**
+ * Active-conversation fallback for shells that wire no run inventory
+ * (today's Web/Desktop reality). The workbench still observes the ACTIVE
+ * conversation: pending approvals in its client-side transcript
+ * (workbenchApprovalSummary boundary — no Hub endpoint aggregates approvals
+ * across sessions) and the runtime running flag. Returns undefined when
+ * nothing is observable so all attention chrome hides instead of showing
+ * scoped-out zeros. Precedence mirrors `deriveConversationLiveStatus`
+ * (running > awaiting-approval).
+ */
+export function buildActiveConversationAttention(
+  input: ActiveConversationAttentionInput,
+): WorkbenchAttentionSummary | undefined {
+  const pendingApprovals = countPendingApprovals(input.transcript ?? []);
+  const running = input.isAgentRunning === true;
+  if (pendingApprovals === 0 && !running) return undefined;
+
+  const liveStatusByConversation: Record<string, ConversationLiveStatus> = {};
+  const activeId = input.activeConversationId;
+  if (activeId) {
+    liveStatusByConversation[activeId] = running ? 'running' : 'awaiting-approval';
+  }
+
+  return {
+    ...(input.isAgentRunning !== undefined
+      ? { runningCount: input.isAgentRunning ? 1 : 0 }
+      : {}),
+    awaitingApprovalCount: pendingApprovals,
+    activeConversationOnly: true,
+    liveStatusByConversation,
+  };
 }
