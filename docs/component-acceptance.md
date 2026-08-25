@@ -392,6 +392,32 @@
 | a11y | 语义角色正确 | ✅ | 浮层 `role="menu"` + 选项 `role="menuitemradio"`/`aria-checked`/`tabIndex=-1`；触发 `aria-haspopup="menu"` |
 | 响应式 | 触发 170px 截断 + 270px 面板 viewport 夹取，无横向滚动 | ✅ | trigger/option ellipsis + left clamp |
 
+### RuntimeEvidenceParts 产物下载动作（`app/workbench/src/inspector/RuntimeEvidenceParts.tsx`，#1945）
+
+背景：产物行原硬编码「Download: unavailable — no download action」。本次将下载动作改经 `PreviewPort.downloadArtifactContent` 平台端口：Desktop（拥有 Local Edge）解析 Edge 内容端点并执行真实下载；Web 为 Hub-only，Hub 仅有产物元数据投影、无内容端点，故省略 `downloadArtifactContent`，renderer 统一降级为「下载不可用」文案。renderer 全程不构造 host REST 路径。
+
+| 维度 | 必选项 | 状态 | 备注 |
+|---|---|---|---|
+| 视觉 | token 化按钮/降级提示 | ✅ | `--td-plum`/`--td-line`/`--td-surface-3`/`--td-ink-subtle`/`--td-radius-control`，无组件级硬编码调色板 |
+| 视觉 | light/dark 对比、hover/按下/禁用可区分且无布局位移 | ✅ | hover/focus-visible/disabled 由 background/box-shadow/opacity 表达；降级提示行内展示 |
+| 交互 | 异步下载禁用按钮防重复提交、失败错误 toast | ✅ | RuntimeEvidenceParts.test.tsx 行为断言（调用端口/下载中禁用/失败 toast） |
+| 交互 | 不支持端统一降级为提示而非静默无操作 | ✅ | 省略 `downloadArtifactContent` 时渲染 `role="status"` 提示 |
+| 键盘 | Tab 聚焦、Enter/Space 触发 | ✅ | 原生 button 语义 |
+| a11y | 可访问名、焦点环、提示语义 | ✅ | 按钮 `aria-label`=`ui.downloadArtifact`，提示 `role="status"` |
+| 响应式 | 窄宽无横向滚动、长文件名适配 | ✅ | artifactWorkspace flex-wrap + `overflow-wrap: anywhere` |
+
+降级文案（中英一致，#1945）：
+- `inspector.artifactDownloadUnavailable`
+  - zh：`下载不可用：当前端无产物内容端点。`
+  - en：`Download unavailable: this client has no artifact content endpoint.`
+- 可达性评估结论：Hub 无产物内容端点——`GET /web/agent-tasks/{id}/artifacts` 为仅元数据投影（`api/openapi.yaml`：does not expose content），契约内唯一内容路由 `/v1/artifacts/{artifactId}/content` 属 Edge-local 且 `x-agenthub-status: planned`。Web 为 Hub-only（不直连 Local Edge），故产物内容下载明确记录为不支持并统一降级文案。
+
+产物与证据：
+- 端口：`app/shared/src/platform/types.ts` `PreviewPort.downloadArtifactContent` + `DownloadArtifactInput`。
+- Desktop：`app/desktop/src/platform/desktopPreview.ts` `downloadDesktopArtifactContent`（经 `resolveDesktopRuntimeEvidenceContent` 解析端点 + Edge Bearer fetch + blob 下载）。
+- Web：`app/web/src/platform/webPlatform.ts` 省略 `downloadArtifactContent`，统一降级。
+- 测试：`RuntimeEvidenceParts.test.tsx`（Desktop-shaped 下载 / Web-shaped 降级）、`desktopPreview.test.ts` 下载行为、`RuntimeEvidenceHelpers.test.ts` ref/文件名。本机仅 L0 单测，real_tested=false。
+
 ## 验收记录与 debt
 
 ### Modal / ToastStack debt 台账（2026-08-22 范本复核）
