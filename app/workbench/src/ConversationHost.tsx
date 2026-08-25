@@ -2,7 +2,13 @@ import React, { FormEvent, useCallback, useEffect, useMemo, useRef, useState } f
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 import type { TranscriptBlock, TextTranscriptBlock } from '@shared/transcript';
-import { isSidebarOnlyTranscriptBlock, orderTranscriptBlocks } from '@shared/transcript';
+import {
+  isSidebarOnlyTranscriptBlock,
+  orderTranscriptBlocks,
+  selectRunReview,
+  summarizeRunReviewFiles,
+} from '@shared/transcript';
+import { RunReviewOverlay } from '@shared/ui';
 import type { ComposerIntent, ComposerMention } from '@shared/composer';
 import {
   buildComposerIntent,
@@ -250,6 +256,35 @@ export const ConversationHost = React.memo(function ConversationHost({
     }
     onOpenApprovalQueueFallback?.();
   }, [firstPendingApprovalId, handleApprovalJump, onOpenApprovalQueueFallback]);
+
+  // ── #1967 run-level aggregate review entry ──────────────────────────
+  // Run evidence is the hard grouping boundary: select exactly one active/
+  // latest run and never merge file changes across run ids. Legacy events
+  // without run evidence use an explicitly labelled conversation fallback.
+  // This surface is inspection-only because transcript evidence has no trusted
+  // historical workDir; using the current composer workDir would be unsafe.
+  const runReviewSelection = useMemo(
+    () => selectRunReview(orderTranscriptBlocks(transcript)),
+    [transcript],
+  );
+  const runReviewFiles = runReviewSelection.files;
+  const runReviewSummary = useMemo(
+    () => summarizeRunReviewFiles(runReviewFiles),
+    [runReviewFiles],
+  );
+  const legacyRunReview = runReviewSelection.scope === 'legacy';
+  const [runReviewOpen, setRunReviewOpen] = useState(false);
+  // Close the overlay on conversation switch so an aggregate never bleeds
+  // across sessions (same bleed guard as the arrival-toast ref above).
+  useEffect(() => {
+    setRunReviewOpen(false);
+  }, [currentConversationId]);
+  const handleOpenRunReview = useCallback((): void => {
+    setRunReviewOpen(true);
+  }, []);
+  const handleCloseRunReview = useCallback((): void => {
+    setRunReviewOpen(false);
+  }, []);
 
   // ── Pending dispatch queue (CF22) ──────────────────────────────────────
   // Queue is ref-authoritative (mutations are synchronous read-modify-write,
@@ -570,22 +605,41 @@ export const ConversationHost = React.memo(function ConversationHost({
           onOpenApprovalQueue={handleOpenApprovalQueue}
         />
       )}
-      {pendingApprovalCount > 0 && !selectionMode && (
+      {(pendingApprovalCount > 0 || runReviewFiles.length > 0) && !selectionMode && (
         <div className={styles.pendingApprovalStrip} role="status" aria-live="polite">
-          <button
-            type="button"
-            className={styles.pendingApprovalJump}
-            aria-label={t('card.approval.pendingBadgeAria', { count: String(pendingApprovalCount) })}
-            onClick={handleApprovalJump}
-          >
-            <span className={styles.pendingApprovalDot} aria-hidden="true" />
-            <span className={styles.pendingApprovalCount}>
-              {t('card.approval.pendingBadge', { count: String(pendingApprovalCount) })}
-            </span>
-            <span className={styles.pendingApprovalJumpHint}>
-              {t('card.approval.jumpToFirst')}
-            </span>
-          </button>
+          {pendingApprovalCount > 0 && (
+            <button
+              type="button"
+              className={styles.pendingApprovalJump}
+              aria-label={t('card.approval.pendingBadgeAria', { count: String(pendingApprovalCount) })}
+              onClick={handleApprovalJump}
+            >
+              <span className={styles.pendingApprovalDot} aria-hidden="true" />
+              <span className={styles.pendingApprovalCount}>
+                {t('card.approval.pendingBadge', { count: String(pendingApprovalCount) })}
+              </span>
+              <span className={styles.pendingApprovalJumpHint}>
+                {t('card.approval.jumpToFirst')}
+              </span>
+            </button>
+          )}
+          {runReviewFiles.length > 0 && (
+            <button
+              type="button"
+              className={styles.pendingApprovalReviewAll}
+              aria-label={t(legacyRunReview
+                ? 'card.approval.viewLegacyChangesAria'
+                : 'card.approval.viewAllChangesAria', { count: String(runReviewFiles.length) })}
+              onClick={handleOpenRunReview}
+            >
+              {t(legacyRunReview
+                ? 'card.approval.viewLegacyChanges'
+                : 'card.approval.viewAllChanges')}
+              <span className={styles.pendingApprovalReviewCount} aria-hidden="true">
+                {runReviewFiles.length}
+              </span>
+            </button>
+          )}
         </div>
       )}
       <div className={styles.transcriptRegion} role="region" aria-label={t('aria.transcript')}>
@@ -607,6 +661,30 @@ export const ConversationHost = React.memo(function ConversationHost({
         onHighlightEnd={handleSearchHighlightEnd} transcriptBlocks={displayTranscript}
         searchLabel={t('searchPanel.label')} searchPlaceholder={t('searchPanel.placeholder')}
         noResultsLabel={t('searchPanel.noResults')} />
+      {/* #1967 aggregate inspection is intentionally read-only: transcript
+          evidence has no trusted historical workDir, so no apply port is wired. */}
+      <RunReviewOverlay
+        open={runReviewOpen}
+        files={runReviewFiles}
+        title={t(legacyRunReview ? 'runReview.legacyTitle' : 'runReview.title')}
+        closeLabel={t('runReview.close')}
+        summary={t('runReview.summary', {
+          count: String(runReviewSummary.fileCount),
+          additions: String(runReviewSummary.additions),
+          deletions: String(runReviewSummary.deletions),
+        })}
+        readOnly
+        readOnlyNotice={t(legacyRunReview
+          ? 'runReview.legacyReadOnlyNotice'
+          : 'runReview.readOnlyNotice')}
+        onClose={handleCloseRunReview}
+        panelLabels={{
+          empty: t('runReview.empty'),
+          original: t('runReview.original'),
+          modified: t('runReview.modified'),
+          runTitle: t(legacyRunReview ? 'runReview.legacyRunTitle' : 'runReview.runTitle'),
+        }}
+      />
       {!selectionMode && (
         <>
           {pendingIntentsRef.current.length > 0 && (

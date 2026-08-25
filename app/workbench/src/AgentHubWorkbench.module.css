@@ -1370,6 +1370,48 @@
   font-weight: 400;
 }
 
+/* ── #1967 run-level aggregate review entry (view-all-changes) ── */
+.pendingApprovalReviewAll {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: min(100%, 520px);
+  margin-left: var(--wb-gap-xs, 8px);
+  padding: 2px 12px;
+  border: 1px solid var(--glass-border-strong, var(--td-line));
+  border-radius: 999px;
+  background: var(--glass-bg-light, var(--td-surface-2));
+  color: var(--td-ink-muted);
+  font: 600 12px/20px var(--td-font);
+  cursor: pointer;
+  transition:
+    background var(--td-dur-normal) var(--td-ease),
+    color var(--td-dur-normal) var(--td-ease),
+    border-color var(--td-dur-normal) var(--td-ease);
+}
+
+.pendingApprovalReviewAll:hover {
+  background: var(--surface-highest);
+  color: var(--td-ink);
+  border-color: var(--td-plum);
+}
+
+.pendingApprovalReviewAll:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.pendingApprovalReviewCount {
+  padding: 0 6px;
+  border-radius: var(--r-full);
+  background: color-mix(in oklch, var(--td-plum) 14%, transparent);
+  color: var(--td-plum);
+  font-family: var(--td-mono);
+  font-size: 11px;
+  line-height: 16px;
+  white-space: nowrap;
+}
+
 /* ── Reply-To banner above composer ── */
 .replyToBar {
   position: relative;
