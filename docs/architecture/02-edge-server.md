@@ -139,6 +139,22 @@ RunEvent -> EvidenceRef -> Inspector -> Artifact/File/Preview
 Edge EventStore -> Hub Sync -> Web/Desktop/Mobile viewers
 ```
 
+## Checkpoint 与恢复语义（#1968）
+
+**Checkpoint = run 前快照**：执行开始前对 workdir 取快照（`adapters.TakeWorkdirSnapshot`：≤500 文件、单文件文本内容 ≤128KB、跳过隐藏/忽略目录），作为该 run 的 checkpoint 持久化，供时间线卡预览。无 workdir 的 run 诚实缺省——不发射 checkpoint、前端不渲染卡。
+
+**数据合同**：
+
+- 事件 `run.checkpoint`（Edge→客户端）：`runId`、`checkpointId`、`fileCount`、`totalBytes`、`createdAt`；在 run.started 之前发射（快照先于进程启动）。
+- 存储 `RunCheckpoint`（与 run 1:1）：文件清单（相对路径/大小/SHA-256）+ 文本内容预览副本；只读，不随 run 结束删除（回放/审查证据面）。
+- API：`GET /v1/runs/{runId}/checkpoint`（元数据 + 文件清单）、`GET /v1/runs/{runId}/checkpoint/file?path=...`（单文件预览内容；路径必须命中 checkpoint 记录，防路径逃逸）。
+
+**恢复语义（先文档后实现；本期不落写回）**：
+
+- 恢复 = 把 checkpoint 状态写回 workdir，属写回操作。按 #1870 收口结论，写回走远程证据轨道：需携带执行器上报的可信 workDir 证据（同 run 审查 workDir 合同）、用户显式批准动作与审计记录；Web 表面禁止（Hub-only 边界）。
+- 权限边界：恢复只允许写回 checkpoint 自身 run 的 workdir；跨目录、符号链接逃逸、checkpoint 文件集之外的写入一律拒绝（与 `validateWorkDirAllowed` 硬边界同源）。
+- 本期产品形态：时间线卡提供只读预览 + 明示「恢复未接线」的诚实提示；不提供假恢复按钮，不产生第二套回滚状态机。
+
 ## 相关文档
 
 - [01-hub-server.md](01-hub-server.md) — Hub 与 Edge 的同步和中继关系
