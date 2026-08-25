@@ -233,6 +233,11 @@
 .user-att-list .att-image-status { font:var(--chat-label-xs); color:inherit; flex-shrink:0 }
 .att-image-lightbox-img { display:block; max-width:min(90vw, 1200px); max-height:80vh; width:auto; height:auto; object-fit:contain; margin:0 auto }
 .att-image-lightbox-fail { font:var(--chat-label); color:var(--td-ink-muted); padding:var(--chat-sp-lg) }
+/* #1939: inline audio/video attachment players — same row contract as the
+   image thumbnail (media URL comes from the platform port as a blob: URL). */
+.row-item.attachment .att-media-player { display:block; width:100%; max-width:320px; margin-top:var(--chat-sp-xs) }
+.row-item.attachment .att-media-video { display:block; max-width:320px; max-height:180px; width:auto; height:auto; border-radius:var(--chat-r-md); border:1px solid var(--td-line); margin-top:var(--chat-sp-xs) }
+.row-item.attachment .att-media-sub { display:flex; align-items:center; gap:var(--chat-sp-sm); margin-top:var(--chat-sp-xs) }
 
 /* User bubble attachment list (#1957): right-aligned column hugging the
    bubble's inline-end edge. */

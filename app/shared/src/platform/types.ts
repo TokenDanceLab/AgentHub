@@ -7,6 +7,7 @@ import type {
 import type { AttachmentUploadProgress } from '../composer/upload';
 import type { EvidenceRef } from '../transcript';
 import type { AgentActivitySnapshot } from '../transcript/agentActivity';
+import type { MediaKind } from '../ui/mediaPreview';
 
 export type AgentHubSurface = 'desktop' | 'web' | 'mobile';
 
@@ -231,6 +232,18 @@ export interface PreviewPort {
    * Both surfaces resolve against Hub — Web never reaches Local Edge.
    */
   resolveAttachmentImageUrl?(attachment: AttachmentRef): Promise<string | undefined>;
+  /**
+   * Resolve one audio/video attachment into a displayable URL (#1939).
+   * Same Hub blob-fetch contract as `resolveAttachmentImageUrl`; `kind`
+   * lets the resolver verify the fetched bytes match the expected media
+   * family before handing out the object URL. Returns `undefined` when the
+   * surface cannot serve the content, and the transcript row degrades to
+   * the file chip with an honest status notice instead of a dead player.
+   */
+  resolveAttachmentMediaUrl?(
+    attachment: AttachmentRef,
+    kind: MediaKind,
+  ): Promise<string | undefined>;
 }
 
 export type LocalCliRuntimeId = 'codex' | 'claude-code' | 'opencode';

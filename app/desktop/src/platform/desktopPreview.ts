@@ -1,13 +1,16 @@
 import { open } from '@tauri-apps/plugin-shell';
 import {
   createAttachmentImageUrlResolver,
+  createAttachmentMediaUrlResolver,
   resolveEvidencePreviewTarget,
   type AttachmentImageUrlResolver,
+  type AttachmentMediaUrlResolver,
   type DownloadArtifactInput,
 } from '@shared/platform';
 import type { RuntimeEvidenceContentRef } from '@shared/platform';
 import type { AttachmentRef } from '@shared/composer';
 import type { EvidenceRef } from '@shared/transcript';
+import type { MediaKind } from '@shared/ui/mediaPreview';
 import { getEdgeBaseUrl, HUB_URL } from '@/config';
 import { getCachedRefreshedAccessToken } from '@/api/hubClient';
 import { edgeAuthHeaders } from '@/api/edgeAuth';
@@ -120,4 +123,23 @@ export function resolveDesktopAttachmentImageUrl(
     getToken: () => getCachedRefreshedAccessToken() ?? getAccessToken(),
   });
   return desktopAttachmentImageResolver(attachment);
+}
+
+let desktopAttachmentMediaResolver: AttachmentMediaUrlResolver | undefined;
+
+/**
+ * PreviewPort.resolveAttachmentMediaUrl for Desktop (#1939). Same Hub-only
+ * contract as the image resolver (#1938): chat attachments live on the Hub,
+ * so audio/video bytes are resolved against HUB_URL with the desktop access
+ * token — never through the Local Edge, keeping parity with Web.
+ */
+export function resolveDesktopAttachmentMediaUrl(
+  attachment: AttachmentRef,
+  kind: MediaKind,
+): Promise<string | undefined> {
+  desktopAttachmentMediaResolver ??= createAttachmentMediaUrlResolver({
+    hubBaseUrl: HUB_URL,
+    getToken: () => getCachedRefreshedAccessToken() ?? getAccessToken(),
+  });
+  return desktopAttachmentMediaResolver(attachment, kind);
 }
