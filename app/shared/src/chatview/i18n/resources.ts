@@ -275,6 +275,7 @@ export const chatviewResources = {
     'toast.forwardFailed': '转发失败，请重试',
     'toast.regenerateFailed': '重新生成失败，请重试',
     'toast.cancelFailed': '取消任务失败，请重试',
+    'toast.artifactDownloadFailed': '产物下载失败，请重试',
     'toast.sentWithoutDispatch': '消息已发送；未 @ Agent，不会触发任务。@ 提及 Agent 后再发送即可派单。',
     'toast.dispatchRetryExhausted': '派单重试 {max} 次仍被拒绝，已放弃自动重试，请稍后手动重新触发该 Agent',
     'toast.dispatchRetryFailed': '派单重试失败，请手动重新触发该 Agent',
@@ -525,6 +526,8 @@ export const chatviewResources = {
     'inspector.diffPreview': 'Diff 预览',
     'inspector.markdownPreview': 'Markdown 预览',
     'inspector.emptyPanel': '右侧窗口已关闭。使用 + 重新打开概览、浏览器或文件。',
+    // #1945: artifact content download degrade notice (Web Hub-only boundary).
+    'inspector.artifactDownloadUnavailable': '下载不可用：当前端无产物内容端点。',
 
     // ═══ Aria labels ═══
     'aria.workspace': '工作区',
@@ -983,6 +986,7 @@ export const chatviewResources = {
     'toast.forwardFailed': 'Forward failed, please retry',
     'toast.regenerateFailed': 'Regenerate failed, please retry',
     'toast.cancelFailed': 'Cancel failed, please retry',
+    'toast.artifactDownloadFailed': 'Artifact download failed, please retry',
     'toast.sentWithoutDispatch': 'Message sent; no agent was @mentioned, so no task was triggered. @ an agent to dispatch.',
     'toast.dispatchRetryExhausted': 'Dispatch retried {max} times and was still rejected; auto-retry stopped. Re-trigger the agent manually later.',
     'toast.dispatchRetryFailed': 'Dispatch retry failed; re-trigger the agent manually.',
@@ -1233,6 +1237,8 @@ export const chatviewResources = {
     'inspector.diffPreview': 'Diff preview',
     'inspector.markdownPreview': 'Markdown preview',
     'inspector.emptyPanel': 'The right panel is closed. Use + to reopen Overview, Browser, or Files.',
+    // #1945: artifact content download degrade notice (Web Hub-only boundary).
+    'inspector.artifactDownloadUnavailable': 'Download unavailable: this client has no artifact content endpoint.',
 
     // ═══ Aria labels ═══
     'aria.workspace': 'Workspace',
