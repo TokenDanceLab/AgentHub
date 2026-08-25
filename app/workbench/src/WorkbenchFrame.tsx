@@ -1,4 +1,5 @@
 import React from 'react';
+import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { GlobalRail, type GlobalRailPage } from './GlobalRail';
 import { CHATVIEW_I18N_NAMESPACE } from '@shared/chatview/i18n/resources';
@@ -9,6 +10,10 @@ import {
   shouldRenderTerminalDock,
 } from './workbenchFrameHelpers';
 import type { WorkbenchFrameProps } from './workbenchFrameTypes';
+import {
+  findFirstAwaitingConversationId,
+  summarizeWorkbenchAttention,
+} from './workbenchAttentionModel';
 import {
   ChatConversationHostFrame,
   ChatInspectorFrame,
@@ -96,6 +101,7 @@ export function WorkbenchFrame({
   usageLoading,
   usageError,
   onUsageRetry,
+  attention,
   setActivePage,
   children,
 }: WorkbenchFrameProps): React.ReactElement {
@@ -134,6 +140,22 @@ export function WorkbenchFrame({
     openAgentProfileFromConfig,
     openConversationAvatar,
   } = profile;
+
+  /* ── F1/F6 attention: one derivation feeds sidebar dots, rail badge and
+     status-strip counts so the surfaces never disagree. ── */
+  const attentionSummary = useMemo(
+    () => (attention ? summarizeWorkbenchAttention(attention) : undefined),
+    [attention],
+  );
+  const openRunningQueue = useCallback(() => navigateRail('runs'), [navigateRail]);
+  const openApprovalQueueFallback = useCallback(() => {
+    if (!attentionSummary) return;
+    const target = findFirstAwaitingConversationId(
+      conversations,
+      attentionSummary.liveStatusByConversation,
+    );
+    if (target && target !== currentConversationId) selectConversation(target);
+  }, [attentionSummary, conversations, currentConversationId, selectConversation]);
 
   const shellDataAttrs = buildWorkbenchShellDataAttrs({
     inspectorCollapsed,
@@ -178,6 +200,14 @@ export function WorkbenchFrame({
         onToggleTheme={handleToggleTheme}
         userDisplayName={userDisplayName}
         userAvatarUrl={userAvatarUrl}
+        {...(attentionSummary
+          ? {
+              attention: {
+                runningCount: attentionSummary.runningCount,
+                awaitingApprovalCount: attentionSummary.awaitingApprovalCount,
+              },
+            }
+          : {})}
       />
       {isChatPage && (
         <ChatSidebarFrame
@@ -188,6 +218,9 @@ export function WorkbenchFrame({
           onConversationPin={onConversationPin}
           onConversationArchive={onConversationArchive}
           onStartNewConversation={onStartNewConversation}
+          {...(attentionSummary
+            ? { liveStatusByConversation: attentionSummary.liveStatusByConversation }
+            : {})}
           sidebarWidth={sidebarWidth}
           sidebarCollapsed={sidebarCollapsed}
           resizeSidebarBy={resizeSidebarBy}
@@ -233,6 +266,16 @@ export function WorkbenchFrame({
             onCancelRun={onCancelRun}
             onEditMessage={onEditMessage}
             transcriptLoading={transcriptLoading}
+            {...(attentionSummary
+              ? {
+                  attentionCounts: {
+                    runningCount: attentionSummary.runningCount,
+                    awaitingApprovalCount: attentionSummary.awaitingApprovalCount,
+                  },
+                }
+              : {})}
+            onOpenRunningQueue={openRunningQueue}
+            onOpenApprovalQueueFallback={openApprovalQueueFallback}
           />
         ) : (
           <WorkbenchRoutesFrame

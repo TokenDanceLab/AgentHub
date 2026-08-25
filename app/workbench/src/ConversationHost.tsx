@@ -38,6 +38,7 @@ import {
   countPendingApprovals,
   firstPendingApprovalBlockId,
 } from './workbenchApprovalSummary';
+import type { WorkbenchAttentionCounts } from './workbenchAttentionModel';
 import { UnifiedComposer } from './UnifiedComposer';
 import { WorkspaceHeader } from './WorkspaceHeader';
 import type { UnreadDividerDescriptor } from '@shared/chatview';
@@ -121,6 +122,19 @@ export interface ConversationHostProps {
    * shows an honest loading state instead of the "no messages" empty state.
    */
   transcriptLoading?: boolean | undefined;
+  /**
+   * Global attention counts (F6) for the status strip chips. Absent when the
+   * shell provides no run/approval inventory.
+   */
+  attentionCounts?: WorkbenchAttentionCounts | undefined;
+  /** Click-through for the strip's running chip (Tasks page queue). */
+  onOpenRunningQueue?: (() => void) | undefined;
+  /**
+   * Click-through fallback for the strip's awaiting chip when the ACTIVE
+   * conversation has no pending approval block to jump to; the frame then
+   * switches to a conversation that does.
+   */
+  onOpenApprovalQueueFallback?: (() => void) | undefined;
 }
 
 type PendingUserBlock = TextTranscriptBlock & {
@@ -153,6 +167,7 @@ export const ConversationHost = React.memo(function ConversationHost({
   isAgentRunning, onCancelRun, onEditMessage,
   transcriptUnreadDivider,
   transcriptLoading,
+  attentionCounts, onOpenRunningQueue, onOpenApprovalQueueFallback,
 }: ConversationHostProps): React.ReactElement {
   const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE);
   const [uploadProgresses, setUploadProgresses] = useState<Record<string, AttachmentUploadState>>({});
@@ -225,6 +240,16 @@ export const ConversationHost = React.memo(function ConversationHost({
     setSearchHighlightId(firstPendingApprovalId);
     onSearchOpenChange(false);
   }, [firstPendingApprovalId, onSearchOpenChange]);
+  // F6 approval chip: jump to this conversation's approval summary when it
+  // has pending blocks; otherwise let the frame switch to a conversation
+  // that does (global counts can originate from other sessions).
+  const handleOpenApprovalQueue = useCallback((): void => {
+    if (firstPendingApprovalId) {
+      handleApprovalJump();
+      return;
+    }
+    onOpenApprovalQueueFallback?.();
+  }, [firstPendingApprovalId, handleApprovalJump, onOpenApprovalQueueFallback]);
 
   // ── Pending dispatch queue (CF22) ──────────────────────────────────────
   // Queue is ref-authoritative (mutations are synchronous read-modify-write,
@@ -536,7 +561,15 @@ export const ConversationHost = React.memo(function ConversationHost({
       )}
       <WorkspaceHeader activeConversation={activeConversation}
         inspectorCollapsed={inspectorCollapsed} onToggleInspector={onToggleInspector} onOpenSearch={() => onSearchOpenChange(true)} />
-      {showMainchainStatus && <MainchainStatusStrip summary={mainchainSummary} onExportEvidence={onExportMainchainEvidence} />}
+      {showMainchainStatus && (
+        <MainchainStatusStrip
+          summary={mainchainSummary}
+          onExportEvidence={onExportMainchainEvidence}
+          {...(attentionCounts ? { attention: attentionCounts } : {})}
+          {...(onOpenRunningQueue ? { onOpenRunningQueue } : {})}
+          onOpenApprovalQueue={handleOpenApprovalQueue}
+        />
+      )}
       {pendingApprovalCount > 0 && !selectionMode && (
         <div className={styles.pendingApprovalStrip} role="status" aria-live="polite">
           <button

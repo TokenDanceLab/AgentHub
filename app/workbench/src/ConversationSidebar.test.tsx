@@ -305,3 +305,34 @@ describe('ConversationSidebar new-conversation entry (#1819)', () => {
     expect(within(listbox).getByRole('button', { name: 'Clear search' })).toBeInTheDocument();
   });
 });
+
+
+/* ── F1 live status dots ────────────────────────────────────────────── */
+describe('ConversationSidebar live status dots (F1)', () => {
+  it('renders a dot per mapped conversation with the status semantics, none elsewhere', () => {
+    renderSidebar({
+      conversations: [
+        { id: 'c1', title: 'Running chat', kind: 'direct' },
+        { id: 'c2', title: 'Waiting chat', kind: 'direct' },
+        { id: 'c3', title: 'Quiet chat', kind: 'direct' },
+      ],
+      liveStatusByConversation: { c1: 'running', c2: 'awaiting-approval' },
+    });
+
+    const runningRow = screen.getByText('Running chat').closest('[data-agent-profile]')!;
+    const runningDot = within(runningRow).getByLabelText('运行中');
+    expect(runningDot).toHaveAttribute('data-live-status', 'running');
+
+    const waitingRow = screen.getByText('Waiting chat').closest('[data-agent-profile]')!;
+    const waitingDot = within(waitingRow).getByLabelText('待批准');
+    expect(waitingDot).toHaveAttribute('data-live-status', 'awaiting-approval');
+
+    const quietRow = screen.getByText('Quiet chat').closest('[data-agent-profile]')!;
+    expect(quietRow.querySelector('[data-live-status]')).toBeNull();
+  });
+
+  it('renders no dots at all when the shell provides no run inventory', () => {
+    const { container } = renderSidebar();
+    expect(container.querySelector('[data-live-status]')).toBeNull();
+  });
+});
