@@ -38,6 +38,20 @@ export function resolveWebEvidenceContentUrl(contentRef: string): string | undef
   return undefined;
 }
 
+/**
+ * Artifact content download is deliberately NOT implemented on Web (#1945).
+ *
+ * Reachability assessment: Hub exposes runtime artifacts as a metadata-only
+ * projection — `GET /web/agent-tasks/{id}/artifacts` returns artifact
+ * metadata projected from run events and "does not expose content, apply, or
+ * discard actions" (api/openapi.yaml). The only artifact content route in the
+ * contract is the Edge-local `GET /v1/artifacts/{artifactId}/content`, which
+ * is still `planned` and unreachable from Web anyway (Web is Hub-only and
+ * never connects to a Local Edge). Therefore `PreviewPort.downloadArtifactContent`
+ * is omitted on Web and the inspector degrades to the consistent
+ * "download unavailable" notice (`inspector.artifactDownloadUnavailable`).
+ */
+
 let webAttachmentImageResolver: AttachmentImageUrlResolver | undefined;
 
 /**

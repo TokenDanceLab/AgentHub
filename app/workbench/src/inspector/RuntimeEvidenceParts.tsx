@@ -1,9 +1,15 @@
-import React from 'react';
+import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import type { RuntimeEvidenceChannel, RuntimeEvidenceSnapshot } from '@shared/inspector';
+import type { PreviewPort } from '@shared/platform';
 import type { FileDiff } from '@shared/types/chat';
+import { CHATVIEW_I18N_NAMESPACE } from '@shared/chatview/i18n/resources';
+import { useToastStore } from '@shared/ui/toast/toastStore';
 import { DesignFileIcon, DesignNavIcon } from '../designIcons';
 import styles from '../AgentHubWorkbench.module.css';
 import {
+  artifactDownloadName,
+  artifactDownloadRef,
   artifactWorkspaceDiffLabel,
   artifactWorkspacePreviewStatus,
   artifactWorkspaceTopic,
@@ -66,12 +72,14 @@ export function ArtifactWorkspaceProjection({
   artifact,
   diffCount,
   evidenceSourceLabel,
+  previewPort,
   previewStatus,
   runId,
 }: {
   artifact: RuntimeEvidenceSnapshot['artifacts'][number];
   diffCount: number;
   evidenceSourceLabel?: string | undefined;
+  previewPort?: PreviewPort | undefined;
   previewStatus: string;
   runId?: string | undefined;
 }): React.ReactElement {
@@ -87,13 +95,70 @@ export function ArtifactWorkspaceProjection({
       <span>Topic: {topic}</span>
       <span>Version: {version}</span>
       <span>Preview: {previewStatus}</span>
-      <span>
-        Download: unavailable — no download action; preview resolves artifact content via host port
-      </span>
+      <ArtifactDownloadControl artifact={artifact} previewPort={previewPort} runId={runId} />
       <span>Export: unavailable — this panel has no export action (review-only evidence)</span>
       <span>Evidence: {evidenceSourceLabel ?? 'None'}</span>
       <span>Diff projection: {diffLabel}</span>
     </div>
+  );
+}
+
+/* ═══ Artifact download action (#1945) ═══════════════════════════════════
+   Goes through the platform PreviewPort: surfaces that own the backing
+   runtime (Desktop → Local Edge) implement `downloadArtifactContent` and get
+   a real download button; surfaces without a reachable artifact content
+   endpoint (Web — Hub-only, no Hub content route) omit the port method and
+   render the consistent "download unavailable" notice. The renderer never
+   constructs a host REST path — the endpoint mapping stays in the port.
+   ═══════════════════════════════════════════════════════════════════════ */
+function ArtifactDownloadControl({
+  artifact,
+  previewPort,
+  runId,
+}: {
+  artifact: RuntimeEvidenceSnapshot['artifacts'][number];
+  previewPort?: PreviewPort | undefined;
+  runId?: string | undefined;
+}): React.ReactElement {
+  const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE);
+  const showToast = useToastStore((state) => state.showToast);
+  const [downloading, setDownloading] = useState(false);
+  const downloadArtifactContent = previewPort?.downloadArtifactContent;
+
+  // Hub-only surfaces (Web) omit the port method — degrade to the consistent
+  // unavailable notice instead of a silent no-op (#1945).
+  if (!downloadArtifactContent) {
+    return (
+      <span className={styles.artifactDownloadNotice} role="status">
+        {t('inspector.artifactDownloadUnavailable')}
+      </span>
+    );
+  }
+
+  const ref = artifactDownloadRef(artifact, runId);
+  const handleDownload = async (): Promise<void> => {
+    if (!ref || downloading) return;
+    setDownloading(true);
+    try {
+      await downloadArtifactContent({ ref, suggestedName: artifactDownloadName(artifact) });
+    } catch (err) {
+      console.error('[RuntimeEvidenceParts] artifact download failed:', err);
+      showToast('error', t('toast.artifactDownloadFailed'));
+    } finally {
+      setDownloading(false);
+    }
+  };
+
+  return (
+    <button
+      type="button"
+      aria-label={t('ui.downloadArtifact')}
+      className={styles.artifactDownloadButton}
+      disabled={downloading || !ref}
+      onClick={handleDownload}
+    >
+      {t('ui.downloadArtifact')}
+    </button>
   );
 }
 
@@ -151,6 +216,7 @@ export function RuntimeEvidenceArtifactsSection({
   artifacts,
   count,
   diffCount,
+  previewPort,
   previews,
   runId,
   sourceLabel,
@@ -158,6 +224,7 @@ export function RuntimeEvidenceArtifactsSection({
   artifacts: RuntimeEvidenceSnapshot['artifacts'];
   count?: number | undefined;
   diffCount: number;
+  previewPort?: PreviewPort | undefined;
   previews: RuntimeEvidenceSnapshot['previews'];
   runId?: string | undefined;
   sourceLabel?: string | undefined;
@@ -184,6 +251,7 @@ export function RuntimeEvidenceArtifactsSection({
             artifact={artifact}
             diffCount={diffCount}
             evidenceSourceLabel={sourceLabel}
+            previewPort={previewPort}
             previewStatus={previewStatus}
             runId={runId}
           />

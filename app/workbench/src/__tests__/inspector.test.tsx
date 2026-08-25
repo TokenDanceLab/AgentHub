@@ -110,11 +110,11 @@ describe('AgentHubWorkbench', () => {
     expect(screen.getByText('Topic: thread-1')).toBeInTheDocument();
     expect(screen.getByText('Version: run-edge-1')).toBeInTheDocument();
     expect(screen.getByText('Preview: ready')).toBeInTheDocument();
-    expect(
-      screen.getByText(
-        'Download: unavailable — no download action; preview resolves artifact content via host port'
-      )
-    ).toBeInTheDocument();
+    // The mock platform exposes no `downloadArtifactContent`, so the artifact
+    // row degrades to the consistent unavailable notice (#1945) instead of the
+    // old hardcoded "no download action" line.
+    expect(screen.getByText('下载不可用：当前端无产物内容端点。')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '下载产物' })).toBeNull();
     expect(
       screen.getByText(
         'Export: unavailable — this panel has no export action (review-only evidence)'
