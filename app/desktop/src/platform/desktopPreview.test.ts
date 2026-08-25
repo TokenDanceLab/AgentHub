@@ -11,8 +11,19 @@ vi.mock('@/hooks/useAuth', () => ({
   getAccessToken: vi.fn(() => 'desktop-token'),
 }));
 
+// Desktop artifact download authenticates against the Local Edge via the
+// shared helper; the mock pins a deterministic header so the download test
+// can assert the request carries Edge auth without depending on config state.
+vi.mock('@/api/edgeAuth', () => ({
+  edgeAuthHeaders: vi.fn((base?: Record<string, string>) => ({
+    ...(base ?? {}),
+    Authorization: 'Bearer edge-token',
+  })),
+}));
+
 import type { AttachmentRef } from '@shared/composer';
 import {
+  downloadDesktopArtifactContent,
   resolveDesktopAttachmentImageUrl,
   resolveDesktopEvidenceContentUrl,
   resolveDesktopRuntimeEvidenceContent,
@@ -134,5 +145,67 @@ describe('resolveDesktopAttachmentImageUrl (#1938)', () => {
     await expect(
       resolveDesktopAttachmentImageUrl(makeRef('att-desktop-pdf')),
     ).resolves.toBeUndefined();
+  });
+});
+
+// ── #1945: artifact content download ────────────────────────────────────
+// Desktop owns the Local Edge, so the download resolves the artifact ref via
+// the same port mapping as preview (no host REST path in the renderer),
+// fetches the bytes with the Edge auth header, and hands them to the OS as a
+// real file download. The renderer-visible failure surfaces as a thrown error
+// (the inspector maps it to an error toast).
+
+describe('downloadDesktopArtifactContent (#1945)', () => {
+  function artifactRef() {
+    return { kind: 'artifact', runId: 'run-1', id: 'artifact-1' } as const;
+  }
+
+  it('fetches the port-resolved Edge content URL with the Edge auth header', async () => {
+    fetchImpl.mockReset();
+    createObjectURL.mockClear();
+    const clickSpy = vi
+      .spyOn(HTMLAnchorElement.prototype, 'click')
+      .mockImplementation(() => {});
+    fetchImpl.mockResolvedValue(new Response('artifact-bytes', { status: 200 }));
+
+    await downloadDesktopArtifactContent({
+      ref: artifactRef(),
+      suggestedName: 'summary.pdf',
+    });
+
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchImpl.mock.calls[0]!;
+    // Assert the endpoint path only — never a Local Edge host literal (#1956).
+    expect(String(url)).toContain('/v1/runs/run-1/artifacts/artifact-1/content');
+    expect((init?.headers as Record<string, string>).Authorization).toBe('Bearer edge-token');
+
+    // The bytes are handed to the OS as a file download under the suggested name.
+    expect(createObjectURL).toHaveBeenCalledTimes(1);
+    expect(clickSpy).toHaveBeenCalledTimes(1);
+    clickSpy.mockRestore();
+  });
+
+  it('falls back to the artifact id when no suggested name is provided', async () => {
+    fetchImpl.mockReset();
+    const clickSpy = vi
+      .spyOn(HTMLAnchorElement.prototype, 'click')
+      .mockImplementation(function (this: HTMLAnchorElement) {
+        expect(this.download).toBe('artifact-1');
+      });
+    fetchImpl.mockResolvedValue(new Response('bytes', { status: 200 }));
+
+    await downloadDesktopArtifactContent({ ref: artifactRef() });
+
+    expect(clickSpy).toHaveBeenCalledTimes(1);
+    clickSpy.mockRestore();
+  });
+
+  it('throws on a non-ok content response so the inspector can surface an error', async () => {
+    fetchImpl.mockReset();
+    fetchImpl.mockResolvedValue(new Response('not found', { status: 404 }));
+
+    await expect(
+      downloadDesktopArtifactContent({ ref: artifactRef(), suggestedName: 'summary.pdf' }),
+    ).rejects.toThrow(/HTTP 404/);
   });
 });

@@ -29,6 +29,7 @@ import { fetchDesktopRuntimeSessions } from './desktopRuntimeSessions';
 import { pickDesktopComposerAttachments } from './desktopAttachments';
 import {
   canOpenDesktopEvidencePreview,
+  downloadDesktopArtifactContent,
   openDesktopEvidencePreview,
   resolveDesktopAttachmentImageUrl,
   resolveDesktopEvidenceContentUrl,
@@ -214,6 +215,9 @@ export function createDesktopPlatform(options: DesktopPlatformOptions = {}): Des
       resolveContentUrl: resolveDesktopEvidenceContentUrl,
       resolveRuntimeEvidenceContent: resolveDesktopRuntimeEvidenceContent,
       resolveAttachmentImageUrl: resolveDesktopAttachmentImageUrl,
+      // Desktop owns the Local Edge, so it resolves artifact content via the
+      // Edge endpoint and performs a real download (#1945).
+      downloadArtifactContent: downloadDesktopArtifactContent,
     },
     settings: createDesktopSettingsAdapter(),
     // exactOptionalPropertyTypes: omit key when undefined rather than assign undefined.

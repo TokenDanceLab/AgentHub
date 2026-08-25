@@ -3,12 +3,14 @@ import {
   createAttachmentImageUrlResolver,
   resolveEvidencePreviewTarget,
   type AttachmentImageUrlResolver,
+  type DownloadArtifactInput,
 } from '@shared/platform';
 import type { RuntimeEvidenceContentRef } from '@shared/platform';
 import type { AttachmentRef } from '@shared/composer';
 import type { EvidenceRef } from '@shared/transcript';
 import { getEdgeBaseUrl, HUB_URL } from '@/config';
 import { getCachedRefreshedAccessToken } from '@/api/hubClient';
+import { edgeAuthHeaders } from '@/api/edgeAuth';
 import { getAccessToken } from '@/hooks/useAuth';
 
 export function canOpenDesktopEvidencePreview(evidence: EvidenceRef): boolean {
@@ -56,6 +58,47 @@ export function resolveDesktopRuntimeEvidenceContent(
   if (!edgeBase) return undefined;
   const collection = ref.kind === 'artifact' ? 'artifacts' : 'previews';
   return `${edgeBase}/v1/runs/${ref.runId}/${collection}/${ref.id}/content`;
+}
+
+/**
+ * PreviewPort.downloadArtifactContent for Desktop (#1945). Desktop owns the
+ * Local Edge connection, so it maps the neutral artifact ref onto the Edge
+ * content endpoint (via `resolveDesktopEvidenceContent`'s sibling above),
+ * fetches the bytes with the Edge auth token, and hands them to the OS as a
+ * real file download. The renderer never constructs the host REST path — the
+ * endpoint shape lives only in `resolveDesktopRuntimeEvidenceContent`.
+ * Throws when the content URL cannot be resolved or the fetch fails so the
+ * inspector surfaces an explicit failure instead of a silent no-op.
+ */
+export async function downloadDesktopArtifactContent(input: DownloadArtifactInput): Promise<void> {
+  const url = resolveDesktopRuntimeEvidenceContent(input.ref);
+  if (!url) {
+    throw new Error('Artifact content is not downloadable: Local Edge base URL is unavailable');
+  }
+  const headers = edgeAuthHeaders();
+  const response = await fetch(url, { method: 'GET', ...(headers ? { headers } : {}) });
+  if (!response.ok) {
+    throw new Error(`Artifact content download failed with HTTP ${response.status}`);
+  }
+  const blob = await response.blob();
+  const filename = input.suggestedName?.trim() || input.ref.id;
+  triggerBlobDownload(blob, filename);
+}
+
+/**
+ * Save blob bytes as a user-facing file download via a transient anchor.
+ * Uses the standard webview download path (object URL + `download` attribute)
+ * so no extra host FS capability is required.
+ */
+function triggerBlobDownload(blob: Blob, filename: string): void {
+  const objectUrl = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = objectUrl;
+  anchor.download = filename;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(objectUrl);
 }
 
 let desktopAttachmentImageResolver: AttachmentImageUrlResolver | undefined;
