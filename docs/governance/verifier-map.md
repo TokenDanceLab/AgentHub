@@ -3,7 +3,7 @@
 > Owner：本文件是 AgentHub「规则 → 机器验证」映射的 SSOT。`AGENTS.md` 的“规则 → 机器验证映射”只保留指针，不复制本表。
 > 机器门禁：`scripts/verify/verify-doc-ssot.py` 校验本表验证脚本路径与 CI 文件存在性。
 
-最后更新：2026-08-25（新增 test-sleep 值预算门禁行；前端 L0 稳定 required 聚合 frontend-required；CI job 映射对齐 checks/release-readiness 现状）
+最后更新：2026-08-25（新增 test-sleep 值预算门禁行与 flake 登记处置映射行；前端 L0 稳定 required 聚合 frontend-required；CI job 映射对齐 checks/release-readiness 现状）
 
 ## 映射表
 
@@ -60,6 +60,7 @@
 | 配置组合安全（fail-closed 默认/env 全覆盖） | `hub-server/internal/config/config_validate.go`（校验入口）+ `hub-server/internal/config/constants.go`（`AuthFailClosedDefault`、`RateLimitFailOpenDefault`：auth 路径恒 fail-closed，非 auth 路径可 fail-open） | 无 |
 | edge debug 端点鉴权（Dev→nil / LocalAuthToken→Bearer / HubJWTSecret→hub-JWT 校验） | `edge-server/internal/httpserver/server_auth.go`（`debugAuthFunc` 分层鉴权，pprof/config/state 端点） | 无 |
 | 域 SSOT（CSP / Desktop 默认 URL / compose 回调域 三方一致） | `app/desktop/src-tauri/tauri.conf.json`（CSP + 默认 URL）；compose 回调域见 `deployments/production/.env.example`；专用 verifier 暂未建 | 无 |
+| flake 登记与处置（登记字段合同、到期移除纪律、重试预算与 CI annotation 约定，#1950） | `docs/governance/known-flaky.md`（流程 SSOT；暂无机器门禁，靠到期复审与评审执行） | 无 |
 
 ## 维护规则
 
