@@ -25,6 +25,8 @@ one surgical text mutation, and asserts the CI policy verifier exits non-zero:
 19. flip frontend-required changes-failure fail-closed guard → false green
 20. restore frontend-required path filter if → required check skip-able again
 21. delete the test-sleep value budget negative self-test step → budget gate loses its regression tripwire
+22. delete the shared-trio real verifier step → component debt gate silently exits CI
+23. delete the shared-trio negative self-test step → false-green tripwire silently exits CI
 
 The unmutated copy must exit 0, proving the policy test only reddens on
 actual policy violations (fail-closed, no false green).
@@ -51,6 +53,16 @@ DESKTOP_VISUAL_ASSERT_STEP = (
 )
 
 
+SHARED_TRIO_VERIFY_STEP = (
+    "      - name: Verify shared component trio ratchet (#1951)\n"
+    "        run: python ./scripts/verify/verify-shared-trio-ratchet.py\n"
+)
+SHARED_TRIO_SELF_TEST_STEP = (
+    "      - name: Self-test shared component trio ratchet (negative)\n"
+    "        run: python scripts/verify/tests/verify-shared-trio-ratchet.Tests.py\n"
+)
+
+
 def delete_visual_qa_desktop_job(text: str) -> str:
     """删除 visual-qa-desktop job，模拟 desktop 视觉 QA 半边悄悄退出 CI（防回退）。"""
     pattern = re.compile(r"(?ms)^  visual-qa-desktop:\r?\n.*?(?=^  [A-Za-z0-9_-]+:\r?\n|\Z)")
@@ -65,6 +77,12 @@ def delete_desktop_visual_assert_step(text: str) -> str:
     if DESKTOP_VISUAL_ASSERT_STEP not in text:
         raise AssertionError("desktop visual QA assert step text not found in workflow")
     return text.replace(DESKTOP_VISUAL_ASSERT_STEP, "", 1)
+
+
+def delete_shared_trio_step(text: str, step: str, label: str) -> str:
+    if step not in text:
+        raise AssertionError(f"{label} step text not found in workflow")
+    return text.replace(step, "", 1)
 
 
 def read_workflow() -> str:
@@ -556,6 +574,21 @@ class VerifyCiGatesMutationTests(unittest.TestCase):
         self.assert_mutation_fails(
             delete_test_sleep_budget_self_test_step(read_workflow()),
             "deleted test-sleep budget self-test step",
+        )
+
+
+    def test_delete_shared_trio_verify_step_fails(self):
+        """shared trio 实仓门禁被删除时，CI 政策校验器必须非零退出。"""
+        self.assert_mutation_fails(
+            delete_shared_trio_step(read_workflow(), SHARED_TRIO_VERIFY_STEP, "shared trio verifier"),
+            "deleted shared trio verifier step",
+        )
+
+    def test_delete_shared_trio_self_test_step_fails(self):
+        """shared trio 负向自测被删除时，CI 政策校验器必须非零退出。"""
+        self.assert_mutation_fails(
+            delete_shared_trio_step(read_workflow(), SHARED_TRIO_SELF_TEST_STEP, "shared trio self-test"),
+            "deleted shared trio self-test step",
         )
 
 
