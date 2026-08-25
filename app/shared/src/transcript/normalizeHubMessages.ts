@@ -64,6 +64,13 @@ export interface HubMessageTranscriptInput {
 const RECALLED_TEXT_FALLBACK = '消息已撤回';
 
 /**
+ * zh fallbacks for the missing-attachment degraded labels (#1972) when no
+ * translator is injected. Keys live in the shared 'chatview' namespace.
+ */
+const ATTACHMENT_MISSING_IMAGE_FALLBACK = '图片附件缺失';
+const ATTACHMENT_MISSING_FILE_FALLBACK = '文件附件缺失';
+
+/**
  * Plain-text translator callback for i18n of normalizer-owned labels.
  * Key space: the shared 'chatview' namespace (see chatview/i18n/resources.ts).
  */
@@ -160,7 +167,28 @@ function normalizeHubMessage(
         contentType: contentType === 'image' ? 'image' : 'file',
       };
     }
-    // Fallback: treat as text if attachment data is missing
+    // #1972 honest degradation: the Hub delivered an image/file message but
+    // the attachment record is missing. Emit an attachment block with an
+    // unresolvable ref (empty id) so the renderer degrades to the #1938
+    // chip + explicit status notice. The text fallback below cannot render
+    // image/file content, so dropping the message there would silently lose
+    // it — forbidden by the #1972 acceptance contract.
+    return {
+      id,
+      author: normalizeAuthor(message),
+      ...(message.created_at ? { createdAt: message.created_at } : {}),
+      ...(pinned ? { pinned: true } : {}),
+      kind: 'attachment',
+      attachmentRef: {
+        id: '',
+        name: contentType === 'image'
+          ? (t?.('message.attachmentMissingImage') ?? ATTACHMENT_MISSING_IMAGE_FALLBACK)
+          : (t?.('message.attachmentMissingFile') ?? ATTACHMENT_MISSING_FILE_FALLBACK),
+        size: 0,
+        mime_type: '',
+      },
+      contentType: contentType === 'image' ? 'image' : 'file',
+    };
   }
 
   const metadata = recalled ? null : hubContentMetadata(message.content);
