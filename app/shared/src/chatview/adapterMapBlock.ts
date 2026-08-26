@@ -140,6 +140,16 @@ export function mapBlock(b: TranscriptBlock): RowItem | null {
       if (a.uri) extraParts.push(a.uri)
       if (a.mimeType) extraParts.push(a.mimeType)
       const extra = extraParts.filter(Boolean).join(SEP)
+      // Runtime evidence uses artifact-<id> references when the direct
+      // artifactId field is absent. Mirror the web evidence mapper's
+      // conservative extraction: unknown ids are not invented.
+      const evidenceArtifactRefId = a.evidenceRefs?.find((ref) => ref.kind === 'artifact')?.id
+      const evidenceArtifactId = evidenceArtifactRefId?.startsWith('artifact-')
+        ? evidenceArtifactRefId.slice('artifact-'.length)
+        : undefined
+      const artifactId = a.artifactId || evidenceArtifactId
+      const artifactRunId = a.evidenceRefs
+        ?.find((ref) => ref.kind === 'run')?.id.replace(/^run-/, '')
       return {
         id: a.id, type: 'file',
         label: '',
@@ -148,6 +158,9 @@ export function mapBlock(b: TranscriptBlock): RowItem | null {
         collapsible: true,
         fileOp: a.action === 'deleted' ? 'del' : a.action === 'created' ? 'cr' : 'mod',
         content: (a.path || a.title)?.split('.').pop()?.toUpperCase() || a.artifactKind || '',
+        ...(artifactId ? { artifactId } : {}),
+        ...(artifactRunId && artifactId ? { artifactRunId } : {}),
+        ...(artifactId && (a.path || a.title) ? { artifactPath: a.path || a.title } : {}),
       } as RowItem
     }
 
