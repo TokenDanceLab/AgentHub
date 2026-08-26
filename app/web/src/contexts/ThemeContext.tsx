@@ -7,6 +7,7 @@ import {
   getSystemAgentHubTheme,
   persistAgentHubThemeMode,
   persistAgentHubThemePreset,
+  subscribeAgentHubThemePreset,
   resolveAgentHubTheme,
   type AgentHubTheme,
   type AgentHubThemeMode,
@@ -35,8 +36,9 @@ const ThemeContext = createContext<ThemeContextValue | null>(null);
 
 /**
  * Thin React wrapper over shared theme SSOT (`@shared/theme`).
- * Web does not expose preset UI yet; CSS presets still load via styles/presets.css.
- * Preset registry/apply lives in shared for desktop (and future web) consumers.
+ * Preset registry/apply/subscription lives in shared; the workbench settings
+ * surface owns the preset picker (#1986) and writes through the shared SSOT,
+ * which this provider follows via `subscribeAgentHubThemePreset`.
  */
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const [themeMode, setThemeModeState] = useState<ThemeMode>(getStoredAgentHubThemeMode);
@@ -82,6 +84,15 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     applyAgentHubThemePreset(themePreset);
   }, [themePreset]);
+
+  // #1986: preset writes can originate from other surfaces (workbench
+  // settings). Subscribe so provider state never goes stale; a provider's
+  // own write echoes back as an identity no-op.
+  useEffect(() => {
+    return subscribeAgentHubThemePreset((preset) => {
+      setThemePresetState((current) => (current === preset ? current : preset));
+    });
+  }, []);
 
   const toggleTheme = useCallback(() => {
     if (themeMode === 'system') {

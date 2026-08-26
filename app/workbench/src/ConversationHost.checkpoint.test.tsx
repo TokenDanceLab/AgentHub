@@ -131,9 +131,11 @@ describe('ConversationHost checkpoint preview wiring (#1968)', () => {
     expect(screen.queryByTestId('checkpoint-preview-overlay')).toBeNull();
     triggerCheckpointClick();
     expect(await screen.findByTestId('checkpoint-preview-overlay')).toBeInTheDocument();
-    // Inventory fetched through the platform port for the clicked run.
-    expect(port.list).toHaveBeenCalledWith('run-9');
+    // Wait on the fetch OUTCOME (file list renders) before asserting the port
+    // call — the overlay fetches in an open effect, so asserting the call
+    // right after the dialog appears races the effect on slow runners.
     expect(await screen.findByText('a.txt')).toBeInTheDocument();
+    expect(port.list).toHaveBeenCalledWith('run-9');
     // Honesty contract: the restore notice is visible; no restore action exists.
     expect(screen.getByTestId('checkpoint-restore-notice')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /restore/i })).toBeNull();
