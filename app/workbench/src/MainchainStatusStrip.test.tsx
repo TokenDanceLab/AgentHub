@@ -102,3 +102,50 @@ describe('MainchainStatusStrip attention chips (F6)', () => {
     ).toBeInTheDocument();
   });
 });
+
+
+describe('MainchainStatusStrip usage chip (#1990, UX F14)', () => {
+  it('renders the compact usage total and routes to the usage page on click', () => {
+    const onOpenUsage = vi.fn();
+    render(
+      <MainchainStatusStrip
+        summary={summary}
+        onExportEvidence={() => {}}
+        usageTokenTotal={12400}
+        onOpenUsage={onOpenUsage}
+      />,
+    );
+    const chip = screen.getByRole('button', { name: '12.4k tokens used · Open the usage board' });
+    expect(chip).toHaveAttribute('data-attention-kind', 'usage');
+    fireEvent.click(chip);
+    expect(onOpenUsage).toHaveBeenCalledTimes(1);
+  });
+
+  it('renders a plain status chip without a handler (demo surfaces stay honest)', () => {
+    render(
+      <MainchainStatusStrip summary={summary} onExportEvidence={() => {}} usageTokenTotal={42} />,
+    );
+    expect(screen.getByText('42 tokens used')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /tokens used/ })).toBeNull();
+  });
+
+  it('hides the chip entirely without a total (no fake 0)', () => {
+    const { container } = render(
+      <MainchainStatusStrip summary={summary} onExportEvidence={() => {}} />,
+    );
+    expect(container.querySelector('[data-attention-kind="usage"]')).toBeNull();
+  });
+
+  it('coexists with attention chips in the same strip', () => {
+    render(
+      <MainchainStatusStrip
+        summary={summary}
+        onExportEvidence={() => {}}
+        attention={{ runningCount: 1, awaitingApprovalCount: 0 }}
+        usageTokenTotal={900}
+      />,
+    );
+    expect(screen.getByText('900 tokens used')).toBeInTheDocument();
+    expect(screen.getByText(/1 running/)).toBeInTheDocument();
+  });
+});

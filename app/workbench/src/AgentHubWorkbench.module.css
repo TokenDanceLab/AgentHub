@@ -3942,6 +3942,17 @@ button.mainchainAttentionChip[data-attention-kind='awaiting']:hover {
   background: color-mix(in oklch, var(--td-warning) 20%, transparent);
 }
 
+/* #1990 (UX F14): usage chip — neutral accent, informational not alarming. */
+.mainchainAttentionChip[data-attention-kind='usage'] {
+  color: var(--td-accent);
+  border-color: color-mix(in oklch, var(--td-accent) 30%, transparent);
+  background: color-mix(in oklch, var(--td-accent) 10%, transparent);
+}
+
+button.mainchainAttentionChip[data-attention-kind='usage']:hover {
+  background: color-mix(in oklch, var(--td-accent) 18%, transparent);
+}
+
 .mainchainAttentionDot {
   width: 6px;
   height: 6px;
