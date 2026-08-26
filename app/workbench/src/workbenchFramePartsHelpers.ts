@@ -97,6 +97,8 @@ export function buildChatConversationHostProps(
     attentionCounts,
     onOpenRunningQueue,
     onOpenApprovalQueueFallback,
+    usageTokenTotal,
+    onOpenUsage,
   } = props;  const {
     currentConversationId,
     activeConversation,
@@ -176,6 +178,8 @@ export function buildChatConversationHostProps(
   assignIfDefined(hostProps, 'attentionCounts', attentionCounts);
   assignIfDefined(hostProps, 'onOpenRunningQueue', onOpenRunningQueue);
   assignIfDefined(hostProps, 'onOpenApprovalQueueFallback', onOpenApprovalQueueFallback);
+  assignIfDefined(hostProps, 'usageTokenTotal', usageTokenTotal);
+  assignIfDefined(hostProps, 'onOpenUsage', onOpenUsage);
 
   return hostProps;
 }

@@ -4,6 +4,7 @@ import { CHATVIEW_I18N_NAMESPACE } from '@shared/chatview/i18n/resources';
 import styles from './AgentHubWorkbench.module.css';
 import type { MainchainSummary } from './mainchain';
 import type { WorkbenchAttentionCounts } from './workbenchAttentionModel';
+import { formatTokenCount } from './pages/TokenUsagePage';
 
 export interface MainchainStatusStripProps {
   summary: MainchainSummary;
@@ -17,6 +18,13 @@ export interface MainchainStatusStripProps {
   onOpenRunningQueue?: (() => void) | undefined;
   /** Click-through for the awaiting-approval chip (approval summary). */
   onOpenApprovalQueue?: (() => void) | undefined;
+  /**
+   * Live total of recorded usage-board tokens (#1990, F14). Absent when the
+   * shell has no Hub usage data — the chip stays honestly hidden then.
+   */
+  usageTokenTotal?: number | undefined;
+  /** Click-through for the usage chip (opens the Usage page). */
+  onOpenUsage?: (() => void) | undefined;
 }
 
 export function MainchainStatusStrip({
@@ -24,7 +32,9 @@ export function MainchainStatusStrip({
   onExportEvidence,
   onOpenApprovalQueue,
   onOpenRunningQueue,
+  onOpenUsage,
   summary,
+  usageTokenTotal,
 }: MainchainStatusStripProps): React.ReactElement {
   const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE);
   const runningCount = attention?.runningCount ?? 0;
@@ -46,7 +56,7 @@ export function MainchainStatusStrip({
           </div>
         ))}
       </div>
-      {(runningCount > 0 || awaitingApprovalCount > 0) && (
+      {(runningCount > 0 || awaitingApprovalCount > 0 || usageTokenTotal !== undefined) && (
         <div className={styles.mainchainAttention} data-attention>
           {runningCount > 0 && renderAttentionChip({
             handler: onOpenRunningQueue,
@@ -68,6 +78,19 @@ export function MainchainStatusStrip({
               scopeHint,
             ),
           })}
+          {/* #1990 (UX F14): live usage total from the usage board's real
+              token_usage_total counters; click through to the Usage page.
+              Absent total = chip hidden (honest, never a fake 0). */}
+          {usageTokenTotal !== undefined && renderAttentionChip({
+            handler: onOpenUsage,
+            kind: 'usage',
+            label: t('sharedWorkbench:usage.chip', { count: formatTokenCount(usageTokenTotal) }),
+            ariaLabel: chipAria(
+              t('sharedWorkbench:usage.chip', { count: formatTokenCount(usageTokenTotal) }),
+              t('sharedWorkbench:usage.openBoard'),
+              undefined,
+            ),
+          })}
         </div>
       )}
       <button type="button" className={styles.mainchainExport} disabled={!summary.exportEnabled}
@@ -83,7 +106,7 @@ function chipAria(label: string, action: string, scopeHint: string | undefined):
 
 interface AttentionChipSpec {
   handler: (() => void) | undefined;
-  kind: 'running' | 'awaiting';
+  kind: 'running' | 'awaiting' | 'usage';
   label: string;
   ariaLabel: string;
 }

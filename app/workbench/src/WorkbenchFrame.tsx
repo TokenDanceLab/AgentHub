@@ -10,6 +10,7 @@ import {
   shouldRenderTerminalDock,
 } from './workbenchFrameHelpers';
 import type { WorkbenchFrameProps } from './workbenchFrameTypes';
+import { sumUsageTeamTokens } from './workbenchUsageSummary';
 import {
   buildActiveConversationAttention,
   findFirstAwaitingConversationId,
@@ -159,6 +160,11 @@ export function WorkbenchFrame({
     [attention, currentConversationId, transcript, isAgentRunning],
   );
   const openRunningQueue = useCallback(() => navigateRail('runs'), [navigateRail]);
+  // #1990 (UX F14): live usage chip — aggregate the usage board's recorded
+  // token counters (same real data the Usage page renders); undefined keeps
+  // the chip honestly hidden when the shell has no Hub usage data.
+  const usageTokenTotal = useMemo(() => sumUsageTeamTokens(usageTeams), [usageTeams]);
+  const openUsagePage = useCallback(() => navigateRail('usage'), [navigateRail]);
   const openApprovalQueueFallback = useCallback(() => {
     if (!attentionSummary) return;
     const target = findFirstAwaitingConversationId(
@@ -273,6 +279,9 @@ export function WorkbenchFrame({
             {...(attentionSummary ? { attentionCounts: attentionSummary } : {})}
             onOpenRunningQueue={openRunningQueue}
             onOpenApprovalQueueFallback={openApprovalQueueFallback}
+            {...(usageTokenTotal !== undefined
+              ? { usageTokenTotal, onOpenUsage: openUsagePage }
+              : {})}
           />
         ) : (
           <WorkbenchRoutesFrame
