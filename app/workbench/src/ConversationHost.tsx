@@ -145,6 +145,13 @@ export interface ConversationHostProps {
   /** Click-through for the strip's running chip (Tasks page queue). */
   onOpenRunningQueue?: (() => void) | undefined;
   /**
+   * Live total of recorded usage-board tokens (#1990, F14). Absent when the
+   * shell has no Hub usage data; the status-strip chip stays hidden then.
+   */
+  usageTokenTotal?: number | undefined;
+  /** Click-through for the usage chip (opens the Usage page). */
+  onOpenUsage?: (() => void) | undefined;
+  /**
    * Click-through fallback for the strip's awaiting chip when the ACTIVE
    * conversation has no pending approval block to jump to; the frame then
    * switches to a conversation that does.
@@ -182,7 +189,7 @@ export const ConversationHost = React.memo(function ConversationHost({
   isAgentRunning, onCancelRun, onEditMessage,
   transcriptUnreadDivider,
   transcriptLoading,
-  attentionCounts, onOpenRunningQueue, onOpenApprovalQueueFallback,
+  attentionCounts, onOpenRunningQueue, onOpenApprovalQueueFallback, usageTokenTotal, onOpenUsage,
 }: ConversationHostProps): React.ReactElement {
   const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE);
   const [uploadProgresses, setUploadProgresses] = useState<Record<string, AttachmentUploadState>>({});
@@ -740,6 +747,8 @@ export const ConversationHost = React.memo(function ConversationHost({
           onExportEvidence={onExportMainchainEvidence}
           {...(attentionCounts ? { attention: attentionCounts } : {})}
           {...(onOpenRunningQueue ? { onOpenRunningQueue } : {})}
+          {...(usageTokenTotal !== undefined ? { usageTokenTotal } : {})}
+          {...(onOpenUsage ? { onOpenUsage } : {})}
           onOpenApprovalQueue={handleOpenApprovalQueue}
         />
       )}
