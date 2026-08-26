@@ -1,31 +1,26 @@
 import { useEffect } from 'react';
-import { isWorkbenchRealDataMode } from '@shared/demo';
+import { normalizeWorkbenchDataMode } from '@shared/demo';
 import type { GlobalRailPage } from './GlobalRail';
 import { WORKBENCH_MOCK_TASK_POOL } from './mockData';
 import {
-  consumeWorkbenchTaskDeepLinkIntent,
   deriveActiveTaskQueue,
-  getWorkbenchTaskDeepLinkSnapshot,
-  publishWorkbenchTaskQueue,
-  subscribeWorkbenchTaskDeepLinks,
+  useWorkbenchTaskDeepLinkStore,
   type WorkbenchTaskDeepLinkIntent,
+  type WorkbenchTaskQueueSource,
 } from './workbenchTaskDeepLinks';
-
-/* ═══════════════════════════════════════════════════════════════════════
-   Shell-side application of task ↔ conversation deep links (#1963).
-
-   Surfaces (tasks route view, conversation sidebar) only queue intents in
-   `workbenchTaskDeepLinks`; this hook — mounted once by the workbench
-   shell — is the single consumer that turns an intent into page /
-   conversation navigation, keeping the deep link reversible ("可后退")
-   through the same intent store.
-   ═══════════════════════════════════════════════════════════════════════ */
 
 export interface UseWorkbenchTaskDeepLinksOptions {
   setActivePage: (page: GlobalRailPage) => void;
   onActiveConversationChange?: ((conversationId: string) => void) | undefined;
-  /** Platform data mode (`workbenchStatus.dataMode`) — governs the demo seed. */
+  /** Compatibility field only; only explicit mock/fixture may seed local tasks. */
   dataMode?: string | undefined;
+}
+
+export function resolveTaskQueueDemoSource(dataMode: string | undefined): WorkbenchTaskQueueSource {
+  const normalized = normalizeWorkbenchDataMode(dataMode);
+  if (normalized === 'mock') return 'demo';
+  if (normalized === 'fixture') return 'fixture';
+  return null;
 }
 
 function navigateForDeepLinkIntent(
@@ -43,37 +38,43 @@ function navigateForDeepLinkIntent(
     options.setActivePage('runs');
     return;
   }
-  // Back trip: return to the page the deep link started from. The other half
-  // of the origin state (task focus / active conversation) is preserved by
-  // the store and the surfaces themselves.
-  options.setActivePage(intent.link.direction === 'task-to-conversation' ? 'runs' : 'chat');
+
+  if (intent.link.direction === 'task-to-conversation') {
+    options.setActivePage('runs');
+    return;
+  }
+
+  // Restore the conversation that originated the task link, even if the
+  // externally controlled active conversation changed while Tasks was open.
+  if (intent.link.conversationId) {
+    options.onActiveConversationChange?.(intent.link.conversationId);
+  }
+  options.setActivePage('chat');
 }
 
 export function useWorkbenchTaskDeepLinks(options: UseWorkbenchTaskDeepLinksOptions): void {
   const { setActivePage, onActiveConversationChange, dataMode } = options;
+  const store = useWorkbenchTaskDeepLinkStore();
 
   useEffect(() => {
     function applyPendingIntent(): void {
-      if (!getWorkbenchTaskDeepLinkSnapshot().pending) return;
-      const intent = consumeWorkbenchTaskDeepLinkIntent();
+      if (!store.getSnapshot().pending) return;
+      const intent = store.consume();
       if (intent) navigateForDeepLinkIntent(intent, { setActivePage, onActiveConversationChange });
     }
 
-    // Drain anything queued before mount (e.g. a restored intent in tests),
-    // then follow the store for live intents.
     applyPendingIntent();
-    return subscribeWorkbenchTaskDeepLinks(applyPendingIntent);
-  }, [setActivePage, onActiveConversationChange]);
+    return store.subscribe(applyPendingIntent);
+  }, [store, setActivePage, onActiveConversationChange]);
 
-  // Sidebar queue seed for the chat page, where the tasks route hook is
-  // unmounted and cannot publish: demo mode derives the queue from the mock
-  // pool; real data mode has no task backend yet (#1818) so the queue stays
-  // empty and the group hides. While the tasks route is mounted it
-  // republishes its live inventory over this seed.
-  const realDataMode = isWorkbenchRealDataMode(dataMode);
+  // dataMode does not prove source. Only explicit mock/fixture modes seed the
+  // local pool; auto/observed/approved-real stay empty until a task backend
+  // publishes a runtime inventory.
+  const demoSource = resolveTaskQueueDemoSource(dataMode);
   useEffect(() => {
-    publishWorkbenchTaskQueue(
-      realDataMode ? [] : deriveActiveTaskQueue(WORKBENCH_MOCK_TASK_POOL),
+    store.publishTaskQueue(
+      demoSource ? deriveActiveTaskQueue(WORKBENCH_MOCK_TASK_POOL) : [],
+      demoSource,
     );
-  }, [realDataMode]);
+  }, [store, demoSource]);
 }
