@@ -23,6 +23,7 @@ import {
   StatePreviewSection,
 } from './SettingsPaneParts';
 import { SessionImportList } from '../../sessionImport';
+import { ThemePresetPicker } from './ThemePresetPicker';
 import { writeClipboardText } from '../../workbenchTranscriptChromeStateHelpers';
 import { resolvePermissionValue } from './SettingsPaneHelpers';
 import { PERMISSION_ROWS } from './types';
@@ -58,6 +59,11 @@ export function AppearancePane(props: SettingsPageProps): React.ReactElement {
       <SettingsSection title={tw("settings.section.interface")}>
         <SettingsRow label="主题" description="默认浅色；左下角主题按钮只负责快速切换当前预览。">
           <SettingSegment options={['跟随系统', '浅色', '深色']} active={props.theme} onChange={(v) => props.onChangeSetting('theme', v)} />
+        </SettingsRow>
+        {/* #1986 (UX F15): preset switcher lives in workbench settings; the
+            shared SSOT applies/persists/notifies so both surfaces stay in sync. */}
+        <SettingsRow wide label={tw("settings.themePreset.label")} description={tw("settings.themePreset.description")}>
+          <ThemePresetPicker groupLabel={tw("settings.themePreset.aria")} defaultLabel={tw("settings.themePreset.default")} />
         </SettingsRow>
         {/* Density / run-step default / animation intensity are persisted but
             not consumed anywhere yet — disabled until they take effect (#1818). */}

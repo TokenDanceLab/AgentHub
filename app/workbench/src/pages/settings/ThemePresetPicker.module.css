@@ -1,0 +1,64 @@
+/* ═══════════════════════════════════════════════════════════════════
+   ThemePresetPicker — preset chip grid (#1986, UX F15)
+   Uses OKLCH via CSS variables only — no hardcoded colors
+   ═══════════════════════════════════════════════════════════════════ */
+
+.picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--td-space-2);
+}
+
+.chip {
+  display: flex;
+  align-items: center;
+  gap: var(--td-space-2);
+  padding: var(--td-space-1) var(--td-space-2);
+  border: 1px solid var(--td-line);
+  border-radius: var(--td-radius-control);
+  background: var(--td-surface);
+  color: var(--td-ink);
+  font-size: var(--td-text-xs);
+  font-family: var(--td-font);
+  cursor: pointer;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .chip {
+    transition: border-color var(--td-dur-fast), background var(--td-dur-fast);
+  }
+}
+
+.chip:hover {
+  border-color: var(--td-ink-muted);
+}
+
+.chip:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.chipActive {
+  border-color: var(--td-accent);
+  background: color-mix(in oklch, var(--td-accent) 12%, transparent);
+}
+
+.chipLabel {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 160px;
+}
+
+.swatches {
+  display: inline-flex;
+  gap: 3px;
+  flex-shrink: 0;
+}
+
+.swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 1px solid var(--td-line);
+}
