@@ -10,9 +10,12 @@ export {
   THEME_PRESET_META,
   applyAgentHubThemePreset,
   getStoredAgentHubThemePreset,
+  setAgentHubThemePreset,
+  subscribeAgentHubThemePreset,
   isThemePreset,
   persistAgentHubThemePreset,
   type ThemePreset,
+  type ThemePresetListener,
 } from './themePresets';
 
 const TRANSITION_SYNC_ATTR = 'data-theme-sync';
