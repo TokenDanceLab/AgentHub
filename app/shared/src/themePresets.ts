@@ -70,16 +70,21 @@ export function getStoredAgentHubThemePreset(): ThemePreset | undefined {
 }
 
 export function persistAgentHubThemePreset(preset: ThemePreset | undefined): void {
-  if (typeof localStorage === 'undefined') return;
-  try {
-    if (preset) {
-      localStorage.setItem(AGENTHUB_THEME_PRESET_STORAGE_KEY, preset);
-    } else {
-      localStorage.removeItem(AGENTHUB_THEME_PRESET_STORAGE_KEY);
+  if (typeof localStorage !== 'undefined') {
+    try {
+      if (preset) {
+        localStorage.setItem(AGENTHUB_THEME_PRESET_STORAGE_KEY, preset);
+      } else {
+        localStorage.removeItem(AGENTHUB_THEME_PRESET_STORAGE_KEY);
+      }
+    } catch {
+      /* localStorage unavailable */
     }
-  } catch {
-    /* localStorage unavailable */
   }
+  // In-app state sync (#1986): surfaces holding preset state (ThemeProviders)
+  // subscribe here so a write from any surface updates every consumer —
+  // persistence is best-effort, notification is unconditional.
+  notifyAgentHubThemePresetListeners(preset);
 }
 
 /** Apply or clear `data-theme-preset` on <html>. Matches presets-base.css selectors. */
@@ -91,4 +96,40 @@ export function applyAgentHubThemePreset(preset: ThemePreset | undefined): void 
   } else {
     root.removeAttribute('data-theme-preset');
   }
+}
+
+
+// ── #1986: preset change subscription ───────────────────────────────────────
+// The workbench (surface-agnostic) writes presets through `setAgentHubThemePreset`
+// while Web/Desktop each hold a ThemeProvider with its own `themePreset` state.
+// Without this subscription an external write leaves provider state stale
+// (AuthPage chip highlight, future preset consumers). Listeners receive the
+// new preset (`undefined` = default) after persistence was attempted.
+
+export type ThemePresetListener = (preset: ThemePreset | undefined) => void;
+
+const themePresetListeners = new Set<ThemePresetListener>();
+
+/** Subscribe to preset changes (any surface's writes). Returns unsubscribe. */
+export function subscribeAgentHubThemePreset(listener: ThemePresetListener): () => void {
+  themePresetListeners.add(listener);
+  return () => {
+    themePresetListeners.delete(listener);
+  };
+}
+
+function notifyAgentHubThemePresetListeners(preset: ThemePreset | undefined): void {
+  for (const listener of [...themePresetListeners]) {
+    listener(preset);
+  }
+}
+
+/**
+ * One-stop preset write (#1986): apply the DOM attribute, persist, and notify
+ * subscribers. Use this from UI surfaces instead of calling apply/persist
+ * separately so no consumer can observe a half-applied change.
+ */
+export function setAgentHubThemePreset(preset: ThemePreset | undefined): void {
+  applyAgentHubThemePreset(preset);
+  persistAgentHubThemePreset(preset);
 }

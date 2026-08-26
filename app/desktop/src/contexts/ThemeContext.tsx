@@ -1,4 +1,4 @@
-import { createContext, useEffect, useMemo, useState, useCallback, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useMemo, useState, useCallback, type ReactNode } from 'react';
 import {
   THEME_PRESETS,
   THEME_PRESET_META,
@@ -9,6 +9,7 @@ import {
   getSystemAgentHubTheme,
   persistAgentHubThemeMode,
   persistAgentHubThemePreset,
+  subscribeAgentHubThemePreset,
   type AgentHubTheme,
   type AgentHubThemeMode,
   type ThemePreset,
@@ -76,6 +77,15 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     applyAgentHubThemePreset(themePreset);
   }, [themePreset]);
 
+  // #1986: preset writes can originate from other surfaces (workbench
+  // settings). Subscribe so provider state never goes stale; a provider's
+  // own write echoes back as an identity no-op.
+  useEffect(() => {
+    return subscribeAgentHubThemePreset((preset) => {
+      setThemePresetState((current) => (current === preset ? current : preset));
+    });
+  }, []);
+
   const toggleTheme = useCallback(() => {
     if (themeMode === 'system') {
       // Exiting system mode: pick the opposite of current system preference
@@ -104,4 +114,16 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       {children}
     </ThemeContext.Provider>
   );
+}
+
+
+/** Consumer hook for the desktop theme context (#1986). Mirrors the web
+ *  surface's `useTheme`; throws outside the provider so misuse fails loudly
+ *  instead of silently dropping theme/preset state. */
+export function useTheme(): ThemeContextValue {
+  const ctx = useContext(ThemeContext);
+  if (!ctx) {
+    throw new Error('useTheme must be used within a ThemeProvider');
+  }
+  return ctx;
 }

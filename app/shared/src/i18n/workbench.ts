@@ -167,6 +167,12 @@ export const sharedWorkbenchResources = {
         localSessionImport: '本地会话导入',
         statePolicy: '状态策略',
       },
+      themePreset: {
+        label: '主题预设',
+        description: '为工作台切换配色预设；选择「默认」恢复 AgentHub 原色，立即生效并跨表面同步。',
+        default: '默认',
+        aria: '主题预设选择',
+      },
       comingSoon: '即将支持',
       shortcuts: {
         customize: '自定义快捷键',
@@ -516,6 +522,12 @@ export const sharedWorkbenchResources = {
         debug: 'Debug',
         localSessionImport: 'Local session import',
         statePolicy: 'State policy',
+      },
+      themePreset: {
+        label: 'Theme preset',
+        description: 'Switch the workbench color preset; choose "Default" to restore AgentHub colors. Applies instantly and syncs across surfaces.',
+        default: 'Default',
+        aria: 'Theme preset selection',
       },
       comingSoon: 'Coming soon',
       shortcuts: {

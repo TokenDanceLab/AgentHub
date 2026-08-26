@@ -6,6 +6,8 @@ import {
   getStoredAgentHubThemePreset,
   isThemePreset,
   persistAgentHubThemePreset,
+  setAgentHubThemePreset,
+  subscribeAgentHubThemePreset,
 } from './themePresets';
 
 describe('themePresets SSOT', () => {
@@ -44,5 +46,51 @@ describe('themePresets SSOT', () => {
 
     applyAgentHubThemePreset(undefined);
     expect(document.documentElement.hasAttribute('data-theme-preset')).toBe(false);
+  });
+});
+
+
+describe('themePreset subscription + one-stop setter (#1986)', () => {
+  afterEach(() => {
+    document.documentElement.removeAttribute('data-theme-preset');
+    localStorage.clear();
+  });
+
+  it('notifies subscribers when a preset is persisted', () => {
+    const seen: Array<string | undefined> = [];
+    const unsubscribe = subscribeAgentHubThemePreset((preset) => seen.push(preset));
+    persistAgentHubThemePreset('dracula');
+    persistAgentHubThemePreset(undefined);
+    unsubscribe();
+    persistAgentHubThemePreset('classic-blue'); // after unsubscribe: silent
+    expect(seen).toEqual(['dracula', undefined]);
+    expect(getStoredAgentHubThemePreset()).toBe('classic-blue');
+  });
+
+  it('setAgentHubThemePreset applies the attribute, persists, and notifies in one call', () => {
+    const seen: Array<string | undefined> = [];
+    const unsubscribe = subscribeAgentHubThemePreset((preset) => seen.push(preset));
+    setAgentHubThemePreset('claude-warm');
+    expect(document.documentElement.getAttribute('data-theme-preset')).toBe('claude-warm');
+    expect(getStoredAgentHubThemePreset()).toBe('claude-warm');
+    expect(seen).toEqual(['claude-warm']);
+    setAgentHubThemePreset(undefined);
+    expect(document.documentElement.hasAttribute('data-theme-preset')).toBe(false);
+    expect(getStoredAgentHubThemePreset()).toBeUndefined();
+    expect(seen).toEqual(['claude-warm', undefined]);
+    unsubscribe();
+  });
+
+  it('unsubscribing one listener does not silence the others', () => {
+    const a: Array<string | undefined> = [];
+    const b: Array<string | undefined> = [];
+    const unsubA = subscribeAgentHubThemePreset((preset) => a.push(preset));
+    const unsubB = subscribeAgentHubThemePreset((preset) => b.push(preset));
+    unsubA();
+    setAgentHubThemePreset('deepseek-tech');
+    expect(a).toEqual([]);
+    expect(b).toEqual(['deepseek-tech']);
+    unsubB();
+    setAgentHubThemePreset(undefined);
   });
 });
