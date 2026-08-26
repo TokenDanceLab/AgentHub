@@ -6,7 +6,8 @@
 // the component tree (and its virtua/@lobehub/icons deps) is evaluated.
 import { installWorkbenchTestHooks } from './helpers';
 
-import { act, fireEvent, render, screen, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { useState, type ReactElement } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createMockPlatform } from '@shared/platform/createMockPlatform';
 import { AgentHubWorkbench } from '../AgentHubWorkbench';
@@ -359,4 +360,86 @@ describe('AgentHubWorkbench', () => {
       expect(titles[2]).toHaveTextContent('Charlie');
     });
   });
+  it('round-trips task-052 from c1 and restores c1 after an external switch to c2', async () => {
+    function TaskDeepLinkHarness(): ReactElement {
+      const [activeConversationId, setActiveConversationId] = useState('c1');
+      const platform = createMockPlatform({
+        surface: 'desktop',
+        capabilities: { browserPreview: true },
+        conversations: [
+          { id: 'c1', title: 'Conversation One', kind: 'direct' },
+          { id: 'c2', title: 'Conversation Two', kind: 'direct' },
+        ],
+      });
+      return (
+        <>
+          <button type="button" onClick={() => setActiveConversationId('c2')}>
+            switch externally to c2
+          </button>
+          <output data-testid="active-conversation">{activeConversationId}</output>
+          <AgentHubWorkbench
+            activeConversationId={activeConversationId}
+            agents={agents}
+            platform={platform}
+            conversations={platform.seed.conversations}
+            onActiveConversationChange={setActiveConversationId}
+            transcript={transcript}
+            workbenchStatus={{ dataMode: 'mock' }}
+          />
+        </>
+      );
+    }
+
+    render(<TaskDeepLinkHarness />);
+    expect(screen.getByText('演示')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /分页任务 52/ }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('agenthub-workbench')).toHaveAttribute('data-page', 'runs');
+      expect(screen.getByRole('region', { name: '分页任务 52 任务详情' })).toBeInTheDocument();
+    });
+    expect(screen.getByRole('button', { name: /分页任务 52/ })).toHaveAttribute('aria-pressed', 'true');
+
+    fireEvent.click(screen.getByRole('button', { name: 'switch externally to c2' }));
+    expect(screen.getByTestId('active-conversation')).toHaveTextContent('c2');
+    fireEvent.click(screen.getByRole('button', { name: '返回会话' }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('agenthub-workbench')).toHaveAttribute('data-page', 'chat');
+      expect(screen.getByTestId('active-conversation')).toHaveTextContent('c1');
+    });
+
+    // A second trip proves the second-page target remains recoverable after remount.
+    fireEvent.click(screen.getByRole('button', { name: /分页任务 52/ }));
+    await waitFor(() => {
+      expect(screen.getByRole('region', { name: '分页任务 52 任务详情' })).toBeInTheDocument();
+    });
+  });
+
+  it.each(['auto', 'observed', 'approved-real'])(
+    'does not mix demo tasks into the %s workbench surface',
+    (dataMode) => {
+      const platform = createMockPlatform({
+        surface: 'web',
+        conversations: [{ id: 'c1', title: 'Conversation One', kind: 'direct' }],
+      });
+      render(
+        <AgentHubWorkbench
+          activeConversationId="c1"
+          agents={agents}
+          platform={platform}
+          conversations={platform.seed.conversations}
+          transcript={transcript}
+          workbenchStatus={{ dataMode }}
+        />,
+      );
+      expect(screen.queryByText('任务队列')).not.toBeInTheDocument();
+      expect(screen.queryByText('演示')).not.toBeInTheDocument();
+      expect(screen.queryByText('Fixture')).not.toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole('button', { name: '任务' }));
+      expect(screen.queryByText('分页任务 01')).not.toBeInTheDocument();
+      expect(screen.queryByText('分页任务 52')).not.toBeInTheDocument();
+    },
+  );
 });

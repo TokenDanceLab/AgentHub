@@ -11,6 +11,7 @@ import { useWorkbenchSessionChrome } from './useWorkbenchSessionChrome';
 import { useWorkbenchTranscriptChrome } from './useWorkbenchTranscriptChrome';
 import { useWorkbenchGlobalShortcuts } from './useWorkbenchGlobalShortcuts';
 import { useWorkbenchTaskDeepLinks } from './useWorkbenchTaskDeepLinks';
+import { WorkbenchTaskDeepLinkProvider } from './workbenchTaskDeepLinks';
 import { GlobalSearchDialog } from './GlobalSearchDialog';
 import { WORKBENCH_INSPECTOR_QUICK_OPEN_EVENT } from './desktopChromeEvents';
 import { isEditableKeyboardTarget } from './workbenchSessionChromeHelpers';
@@ -46,6 +47,14 @@ export type {
  * Owns page state + chrome hooks; frame/overlay props come from pure helpers.
  */
 export function AgentHubWorkbench(props: AgentHubWorkbenchProps): React.ReactElement {
+  return (
+    <WorkbenchTaskDeepLinkProvider>
+      <AgentHubWorkbenchContent {...props} />
+    </WorkbenchTaskDeepLinkProvider>
+  );
+}
+
+function AgentHubWorkbenchContent(props: AgentHubWorkbenchProps): React.ReactElement {
   const { platform, transcript } = props;
   const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE);
   const translate = t as (key: string, options?: Record<string, unknown>) => string;

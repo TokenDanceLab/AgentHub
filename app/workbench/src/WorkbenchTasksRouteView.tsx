@@ -7,8 +7,7 @@ import { TasksPage } from './pages/TasksPage';
 import type { WorkbenchTasksRoute } from './useWorkbenchTasksRoute';
 import { buildTasksPageDerivedModel } from './workbenchTasksPageModel';
 import {
-  backFromTaskDeepLink,
-  openConversationForTask,
+  useWorkbenchTaskDeepLinkActions,
   useWorkbenchTaskDeepLinkSnapshot,
 } from './workbenchTaskDeepLinks';
 import styles from './AgentHubWorkbench.module.css';
@@ -53,6 +52,7 @@ export function WorkbenchTasksRouteView({
   // offers the forward jump. Both trips go through the deep-link store, so
   // the shell applies navigation and the return trip stays available.
   const appliedDeepLink = useWorkbenchTaskDeepLinkSnapshot().applied;
+  const deepLinkActions = useWorkbenchTaskDeepLinkActions();
   const arrivedFromConversation = appliedDeepLink?.direction === 'conversation-to-task';
   const selectedTask = tasksRoute.selectedTask;
   const canOpenHostingConversation = Boolean(selectedTask?.conversationId);
@@ -65,7 +65,7 @@ export function WorkbenchTasksRouteView({
             <button
               type="button"
               className={styles.tasksDeepLinkButton}
-              onClick={() => backFromTaskDeepLink()}
+              onClick={() => deepLinkActions.back()}
             >
               <DesignNavIcon name="back" size={14} />
               <span>{t('taskQueue.backToConversation')}</span>
@@ -76,7 +76,7 @@ export function WorkbenchTasksRouteView({
               type="button"
               className={styles.tasksDeepLinkButton}
               data-task-id={selectedTask.id}
-              onClick={() => openConversationForTask(selectedTask)}
+              onClick={() => deepLinkActions.openConversationForTask(selectedTask)}
             >
               <DesignNavIcon name="chat" size={14} />
               <span>{t('taskQueue.openConversation')}</span>

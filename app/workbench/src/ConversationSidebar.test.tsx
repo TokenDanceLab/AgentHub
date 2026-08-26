@@ -389,6 +389,15 @@ describe('ConversationSidebar task queue group (#1963)', () => {
     expect(screen.getByText('云文档内嵌子页对齐')).toBeInTheDocument();
   });
 
+  it.each([
+    ['demo', 'Demo'],
+    ['fixture', 'Fixture'],
+  ] as const)('labels %s queue provenance in the sidebar', (source, label) => {
+    publishWorkbenchTaskQueue([makeQueueTask()], source);
+    renderSidebar();
+    expect(screen.getByText(label)).toBeInTheDocument();
+  });
+
   it('collapses and re-expands the group through the header toggle', () => {
     publishWorkbenchTaskQueue([makeQueueTask()]);
     renderSidebar();

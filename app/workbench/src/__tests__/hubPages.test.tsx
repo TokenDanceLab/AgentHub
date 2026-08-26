@@ -602,6 +602,7 @@ describe('AgentHubWorkbench', () => {
         platform={platform}
         conversations={platform.seed.conversations}
         transcript={transcript}
+        workbenchStatus={{ dataMode: 'mock' }}
       />,
     );
 
