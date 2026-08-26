@@ -1,5 +1,5 @@
 import React from 'react';
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { useTestI18nLanguage } from '@shared/testing/i18n';
 import type { AgentHubPlatform } from '@shared/platform';
@@ -10,6 +10,7 @@ import {
   resolveEngineeringPreview,
 } from './ChatEngineeringColumn';
 import { WORKBENCH_INSPECTOR_QUICK_OPEN_EVENT } from './desktopChromeEvents';
+import { WORKBENCH_ENGINEERING_PREVIEW_FOCUS_EVENT } from './workbenchPreviewEvents';
 
 beforeAll(async () => {
   await useTestI18nLanguage('zh');
@@ -40,6 +41,24 @@ function evidence(id: string, path = `reports/${id}.md`): RuntimeEvidenceSnapsho
       sizeBytes: 20,
       createdAt: `2026-08-25T00:00:0${id.length}.000Z`,
     }],
+    previews: [],
+  };
+}
+
+function evidenceWithArtifacts(): RuntimeEvidenceSnapshot {
+  return {
+    runId: 'run-1',
+    diffs: [],
+    artifacts: [
+      {
+        id: 'artifact-first', runId: 'run-1', threadId: 'thread-1', kind: 'file',
+        path: 'reports/first.md', sizeBytes: 10, createdAt: '2026-08-25T00:00:01.000Z',
+      },
+      {
+        id: 'artifact-second', runId: 'run-1', threadId: 'thread-1', kind: 'file',
+        path: 'reports/second.md', sizeBytes: 20, createdAt: '2026-08-25T00:00:02.000Z',
+      },
+    ],
     previews: [],
   };
 }
@@ -152,5 +171,70 @@ describe('ChatEngineeringColumn Preview (#1966)', () => {
     fireEvent.click(auxTab('预览'));
     expect(screen.getByText(/不会构造虚假地址或内容/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '在详情中查看' })).toBeDisabled();
+  });
+});
+
+
+describe('ChatEngineeringColumn artifact focus intent (#1992, F10)', () => {
+  it('resolves the clicked artifact rather than the newest artifact', () => {
+    const snapshot = evidenceWithArtifacts();
+    const focused = resolveEngineeringPreview(snapshot, {
+      artifactId: 'artifact-first', artifactRunId: 'run-1',
+    });
+    expect(focused?.kind).toBe('file');
+    if (focused?.kind === 'file') expect(focused.file.name).toBe('reports/first.md');
+  });
+
+  it('returns null for a missing focus target instead of showing another artifact', () => {
+    expect(resolveEngineeringPreview(evidenceWithArtifacts(), {
+      artifactId: 'artifact-missing', artifactRunId: 'run-1',
+    })).toBeNull();
+  });
+
+  it('activates Preview for the matching conversation without changing the inspector', () => {
+    const snapshot = evidenceWithArtifacts();
+    render(
+      <ChatEngineeringColumn
+        inspector={<div data-testid="inspector-detail" data-mode="overview" />}
+        hasWorkspace
+        localFiles
+        conversationId="conv-target"
+        runtimeEvidence={snapshot}
+        platform={platform}
+      />,
+    );
+    // User may have left another aux tab selected; the intent must reclaim
+    // Preview because this is an explicit artifact click.
+    fireEvent.click(auxTab('会话'));
+    expect(auxTab('会话')).toHaveAttribute('aria-selected', 'true');
+    act(() => {
+      window.dispatchEvent(new CustomEvent(WORKBENCH_ENGINEERING_PREVIEW_FOCUS_EVENT, {
+        detail: { conversationId: 'conv-target', artifactId: 'artifact-first', artifactRunId: 'run-1' },
+      }));
+    });
+    expect(auxTab('预览')).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByTestId('inspector-detail')).toHaveAttribute('data-mode', 'overview');
+    expect(screen.getByTitle('reports/first.md')).toBeInTheDocument();
+    expect(screen.queryByTitle('reports/second.md')).toBeNull();
+  });
+
+  it('ignores a focus intent from another conversation', () => {
+    render(
+      <ChatEngineeringColumn
+        inspector={<div data-testid="inspector-detail" data-mode="overview" />}
+        hasWorkspace
+        localFiles
+        conversationId="conv-target"
+        runtimeEvidence={evidenceWithArtifacts()}
+        platform={platform}
+      />,
+    );
+    fireEvent.click(auxTab('会话'));
+    act(() => {
+      window.dispatchEvent(new CustomEvent(WORKBENCH_ENGINEERING_PREVIEW_FOCUS_EVENT, {
+        detail: { conversationId: 'conv-other', artifactId: 'artifact-first', artifactRunId: 'run-1' },
+      }));
+    });
+    expect(auxTab('会话')).toHaveAttribute('aria-selected', 'true');
   });
 });

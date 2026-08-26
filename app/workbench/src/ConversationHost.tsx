@@ -57,6 +57,7 @@ import { UnifiedComposer } from './UnifiedComposer';
 import { WorkspaceHeader } from './WorkspaceHeader';
 import type { UnreadDividerDescriptor } from '@shared/chatview';
 import type { RowItem } from '@shared/chatview/types';
+import { WORKBENCH_ENGINEERING_PREVIEW_FOCUS_EVENT } from './workbenchPreviewEvents';
 import MessageSearchPanel from './MessageSearchPanel';
 import { PageErrorBoundary } from './PageErrorBoundary';
 import { useComposerSubmitBehavior } from './workbenchPreferences';
@@ -325,6 +326,20 @@ export const ConversationHost = React.memo(function ConversationHost({
   const handleCloseCheckpointPreview = useCallback((): void => {
     setCheckpointPreviewRunId(null);
   }, []);
+
+  // #1992 F10: artifact-card click is a transient focus intent only. The
+  // engineering column consumes it for the active conversation; the
+  // inspector/transcript state remains untouched.
+  const handleArtifactClick = useCallback((item: RowItem): void => {
+    if (!item.artifactId || typeof window === 'undefined') return;
+    const detail = {
+      conversationId: currentConversationId,
+      artifactId: item.artifactId,
+      ...(item.artifactPath ? { artifactPath: item.artifactPath } : {}),
+      ...(item.artifactRunId ? { artifactRunId: item.artifactRunId } : {}),
+    };
+    window.dispatchEvent(new CustomEvent(WORKBENCH_ENGINEERING_PREVIEW_FOCUS_EVENT, { detail }));
+  }, [currentConversationId]);
   const handleRunReviewApplyHunk = useCallback(
     async (decision: DiffHunkDecision): Promise<void> => {
       const applyRunDiff = platform.preview?.applyRunDiff;
@@ -797,7 +812,8 @@ export const ConversationHost = React.memo(function ConversationHost({
           previewExternalOpenEnabled={platform.capabilities.browserPreview}
           onAgentClick={onAgentClick} onBlockContextMenu={onBlockContextMenu}
           onBlockSelect={onBlockSelect} onBlockAction={onBlockAction}
-          onReviewFile={onReviewFile} onCheckpointClick={handleCheckpointClick} onDeploySubmit={onDeploySubmit}
+          onReviewFile={onReviewFile} onArtifactClick={handleArtifactClick}
+          onCheckpointClick={handleCheckpointClick} onDeploySubmit={onDeploySubmit}
           selectedBlockIds={selectedBlockIds} selectionMode={selectionMode}
           softHiddenBlockIds={softHiddenBlockIds} actionedBlockIds={actionedBlockIds}
           highlightedBlockId={resolvedHighlight} onHighlightEnd={handleSearchHighlightEnd}

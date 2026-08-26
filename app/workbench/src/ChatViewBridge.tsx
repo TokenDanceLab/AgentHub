@@ -38,6 +38,8 @@ export interface ChatViewBridgeProps {
   onReviewFile?:
     | ((file: { name: string; path?: string; url?: string; content?: string; language?: string }) => void)
     | undefined;
+  /** Called when an artifact timeline card is clicked (#1992). */
+  onArtifactClick?: ((item: import('@shared/chatview/types').RowItem) => void) | undefined;
   /** Called when a checkpoint timeline card is clicked (#1968). */
   onCheckpointClick?: ((item: import('@shared/chatview/types').RowItem) => void) | undefined;
   /** Called when "Deploy" is triggered from a block. */
@@ -98,6 +100,7 @@ export const ChatViewBridge = React.memo(function ChatViewBridge({
   onBlockSelect,
   onBlockAction,
   onReviewFile,
+  onArtifactClick,
   onCheckpointClick,
   onDeploySubmit,
   previewExternalOpenEnabled,
@@ -162,6 +165,7 @@ export const ChatViewBridge = React.memo(function ChatViewBridge({
         onBlockSelect={onBlockSelect}
         onBlockAction={onBlockAction}
         onReviewFile={onReviewFile}
+        {...(onArtifactClick ? { onArtifactClick } : {})}
         {...(onCheckpointClick ? { onCheckpointClick } : {})}
         onDeploySubmit={onDeploySubmit}
         {...(previewExternalOpenEnabled !== undefined ? { previewExternalOpenEnabled } : {})}

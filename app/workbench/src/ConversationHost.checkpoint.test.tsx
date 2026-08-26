@@ -13,6 +13,7 @@ import { createInitialComposerState } from '@shared/composer';
 import { createMockPlatform } from '@shared/platform/createMockPlatform';
 import type { CheckpointPort } from '@shared/platform';
 import type { RowItem } from '@shared/chatview/types';
+import { WORKBENCH_ENGINEERING_PREVIEW_FOCUS_EVENT } from './workbenchPreviewEvents';
 import { useTestI18nLanguage } from '@shared/testing/i18n';
 
 beforeAll(async () => {
@@ -57,6 +58,12 @@ const checkpointRow: RowItem = {
   collapsible: false, standalone: true,
   checkpointId: 'cp-run-9', checkpointRunId: 'run-9',
   checkpointFileCount: 1, checkpointTotalBytes: 128,
+};
+
+const artifactRow: RowItem = {
+  id: 'row-artifact', type: 'file', label: '', status: 'ok',
+  collapsible: true, fileOp: 'cr', content: 'MD', extra: 'reports/result.md',
+  artifactId: 'artifact-9', artifactRunId: 'run-9', artifactPath: 'reports/result.md',
 };
 
 function fakePort(): CheckpointPort {
@@ -117,6 +124,33 @@ function triggerCheckpointClick(): void {
   expect(onCheckpointClick).toBeDefined();
   onCheckpointClick!(checkpointRow);
 }
+
+function triggerArtifactClick(): void {
+  const onArtifactClick = bridgePropsLog.last?.onArtifactClick as
+    | ((item: RowItem) => void)
+    | undefined;
+  expect(onArtifactClick).toBeDefined();
+  onArtifactClick!(artifactRow);
+}
+
+describe('ConversationHost artifact Preview focus wiring (#1992)', () => {
+  it('passes onArtifactClick and emits a conversation-scoped focus intent', () => {
+    const events: CustomEvent[] = [];
+    const listener = (event: Event) => events.push(event as CustomEvent);
+    window.addEventListener(WORKBENCH_ENGINEERING_PREVIEW_FOCUS_EVENT, listener);
+    renderHost(createMockPlatform({ surface: 'desktop' }));
+    expect(typeof bridgePropsLog.last?.onArtifactClick).toBe('function');
+    triggerArtifactClick();
+    window.removeEventListener(WORKBENCH_ENGINEERING_PREVIEW_FOCUS_EVENT, listener);
+    expect(events).toHaveLength(1);
+    expect(events[0]?.detail).toEqual({
+      conversationId: 'conv-1',
+      artifactId: 'artifact-9',
+      artifactPath: 'reports/result.md',
+      artifactRunId: 'run-9',
+    });
+  });
+});
 
 describe('ConversationHost checkpoint preview wiring (#1968)', () => {
   it('passes onCheckpointClick down to the chat bridge', () => {
