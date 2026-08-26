@@ -125,6 +125,10 @@ export const sharedWorkbenchResources = {
       pendingApprovals: '{{count}} 个待审批',
       tasksBadgeAria: '需要关注：{{detail}}',
     },
+    usage: {
+      chip: '已用 {{count}} tokens',
+      openBoard: '打开用量页',
+    },
     globalRail: {
       settings: { label: '设置', title: '设置' },
       toggleTheme: { label: '切换主题', title: '切换主题' },
@@ -480,6 +484,10 @@ export const sharedWorkbenchResources = {
       failedRuns: '{{count}} failed runs',
       pendingApprovals: '{{count}} pending approvals',
       tasksBadgeAria: 'Needs attention: {{detail}}',
+    },
+    usage: {
+      chip: '{{count}} tokens used',
+      openBoard: 'Open the usage board',
     },
     globalRail: {
       settings: { label: 'Settings', title: 'Settings' },

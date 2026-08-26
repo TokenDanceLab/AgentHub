@@ -155,7 +155,14 @@ export interface ChatConversationHostFrameProps {
   /** F6 running chip click-through (Tasks page queue). */
   onOpenRunningQueue?: (() => void) | undefined;
   /** F6 awaiting chip fallback when the active conversation has no pending block. */
-  onOpenApprovalQueueFallback?: (() => void) | undefined;
+    /**
+   * Live total of recorded usage-board tokens (#1990, F14). Absent when the
+   * shell has no Hub usage data — the chip then stays honestly hidden.
+   */
+  usageTokenTotal?: number | undefined;
+  /** Click-through for the usage chip (opens the Usage page). */
+  onOpenUsage?: (() => void) | undefined;
+onOpenApprovalQueueFallback?: (() => void) | undefined;
 }
 
 export interface WorkbenchRoutesFrameProps {

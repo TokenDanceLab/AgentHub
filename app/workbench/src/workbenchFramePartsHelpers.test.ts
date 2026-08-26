@@ -167,6 +167,43 @@ describe('workbenchFramePartsHelpers', () => {
       expect('composerExecutionTargets' in props).toBe(false);
     });
 
+    it('wires the usage chip props when the shell has recorded totals (#1990)', () => {
+      const onOpenUsage = vi.fn();
+      const props = buildChatConversationHostProps({
+        platform: platformMock() as any,
+        session: sessionMock() as any,
+        transcriptChrome: transcriptChromeMock() as any,
+        profile: profileMock() as any,
+        transcript: [],
+        inspectorCollapsed: false,
+        toggleInspector: vi.fn(),
+        showMainchainStatus: true,
+        showComposerAgentPicker: false,
+        showComposerStatus: false,
+        usageTokenTotal: 1550,
+        onOpenUsage,
+      });
+      expect(props.usageTokenTotal).toBe(1550);
+      expect(props.onOpenUsage).toBe(onOpenUsage);
+    });
+
+    it('keeps the usage chip props absent without recorded totals (honest)', () => {
+      const props = buildChatConversationHostProps({
+        platform: platformMock() as any,
+        session: sessionMock() as any,
+        transcriptChrome: transcriptChromeMock() as any,
+        profile: profileMock() as any,
+        transcript: [],
+        inspectorCollapsed: false,
+        toggleInspector: vi.fn(),
+        showMainchainStatus: true,
+        showComposerAgentPicker: false,
+        showComposerStatus: false,
+      });
+      expect('usageTokenTotal' in props).toBe(false);
+      expect('onOpenUsage' in props).toBe(false);
+    });
+
     it('falls back composer target label when conversation title is missing', () => {
       const props = buildChatConversationHostProps({
         platform: platformMock() as any,
