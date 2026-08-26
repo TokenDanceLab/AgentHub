@@ -798,6 +798,8 @@ export const chatviewResources = {
 
     // ═══ Task queue / task-conversation deep links (#1963) ═══
     'taskQueue.title': '任务队列',
+    'taskQueue.sourceDemo': '演示',
+    'taskQueue.sourceFixture': 'Fixture',
     'taskQueue.openConversation': '进入承载会话',
     'taskQueue.backToTask': '返回任务',
     'taskQueue.backToConversation': '返回会话',
@@ -1594,6 +1596,8 @@ export const chatviewResources = {
 
     // ═══ Task queue / task-conversation deep links (#1963) ═══
     'taskQueue.title': 'Task queue',
+    'taskQueue.sourceDemo': 'Demo',
+    'taskQueue.sourceFixture': 'Fixture',
     'taskQueue.openConversation': 'Open hosting conversation',
     'taskQueue.backToTask': 'Back to task',
     'taskQueue.backToConversation': 'Back to conversation',
@@ -1609,4 +1613,3 @@ export const chatviewResources = {
     'oidc.loginSuccess.closeHint': 'You may close this page and return to the AgentHub desktop app.',
   },
 }
-

@@ -4057,6 +4057,17 @@ button.mainchainAttentionChip[data-attention-kind='awaiting']:hover {
   text-align: left;
 }
 
+.taskQueueSourceBadge {
+  flex: 0 0 auto;
+  padding: 1px 5px;
+  border: 1px solid color-mix(in oklch, var(--td-warning) 45%, transparent);
+  border-radius: 999px;
+  color: var(--td-warning);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  line-height: 14px;
+}
+
 .taskQueueCount {
   min-width: 16px;
   height: 16px;

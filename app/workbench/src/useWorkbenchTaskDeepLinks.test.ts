@@ -56,7 +56,7 @@ describe('useWorkbenchTaskDeepLinks intent application (#1963)', () => {
   it('applies a conversation→task intent as tasks-page navigation without touching the conversation', () => {
     const { setActivePage, onActiveConversationChange } = renderShellHook();
     act(() => {
-      openTaskDetailForConversation(makeTask());
+      openTaskDetailForConversation(makeTask(), 'c1');
     });
     expect(setActivePage).toHaveBeenCalledWith('runs');
     expect(onActiveConversationChange).not.toHaveBeenCalled();
@@ -80,10 +80,10 @@ describe('useWorkbenchTaskDeepLinks intent application (#1963)', () => {
     expect(getWorkbenchTaskDeepLinkSnapshot().taskFocus?.taskId).toBe('sqlite-plan');
   });
 
-  it('back from the task detail returns to the chat page without changing the conversation', () => {
+  it('back from the task detail restores the conversation that opened it', () => {
     const { setActivePage, onActiveConversationChange } = renderShellHook();
     act(() => {
-      openTaskDetailForConversation(makeTask());
+      openTaskDetailForConversation(makeTask(), 'c1');
     });
     setActivePage.mockClear();
 
@@ -91,24 +91,33 @@ describe('useWorkbenchTaskDeepLinks intent application (#1963)', () => {
       backFromTaskDeepLink();
     });
     expect(setActivePage).toHaveBeenCalledWith('chat');
-    expect(onActiveConversationChange).not.toHaveBeenCalled();
+    expect(onActiveConversationChange).toHaveBeenCalledWith('c1');
     expect(getWorkbenchTaskDeepLinkSnapshot().applied).toBeNull();
   });
 });
 
 describe('useWorkbenchTaskDeepLinks sidebar queue seed (#1963)', () => {
-  it('seeds the demo queue with active mock tasks outside real data mode', () => {
-    renderShellHook({ dataMode: 'mock' });
-    const queue = getWorkbenchTaskDeepLinkSnapshot().taskQueue;
-    expect(queue.length).toBeGreaterThan(0);
-    for (const task of queue) expect(isActiveTaskStatus(task.status)).toBe(true);
+  it('seeds and labels the queue only in explicit mock/fixture modes', () => {
+    const mock = renderShellHook({ dataMode: 'mock' });
+    let snapshot = getWorkbenchTaskDeepLinkSnapshot();
+    expect(snapshot.taskQueue.length).toBeGreaterThan(0);
+    expect(snapshot.taskQueueSource).toBe('demo');
+    for (const task of snapshot.taskQueue) expect(isActiveTaskStatus(task.status)).toBe(true);
+
+    mock.setActivePage.mockClear();
+    renderShellHook({ dataMode: 'fixture' });
+    snapshot = getWorkbenchTaskDeepLinkSnapshot();
+    expect(snapshot.taskQueue.length).toBeGreaterThan(0);
+    expect(snapshot.taskQueueSource).toBe('fixture');
   });
 
-  it('keeps the queue empty in real data mode (no task backend yet, #1818)', () => {
-    // Pre-fill to prove the seed overwrites a stale demo queue on mode switch.
-    publishWorkbenchTaskQueue([makeTask()]);
-    expect(getWorkbenchTaskDeepLinkSnapshot().taskQueue).toHaveLength(1);
-    renderShellHook({ dataMode: 'observed' });
-    expect(getWorkbenchTaskDeepLinkSnapshot().taskQueue).toEqual([]);
-  });
+  it.each(['auto', 'observed', 'approved-real'])(
+    'keeps %s free of local demo tasks without an explicit task source',
+    (dataMode) => {
+      publishWorkbenchTaskQueue([makeTask()], 'demo');
+      renderShellHook({ dataMode });
+      expect(getWorkbenchTaskDeepLinkSnapshot().taskQueue).toEqual([]);
+      expect(getWorkbenchTaskDeepLinkSnapshot().taskQueueSource).toBeNull();
+    },
+  );
 });

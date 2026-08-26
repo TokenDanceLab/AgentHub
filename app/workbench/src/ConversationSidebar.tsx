@@ -9,8 +9,7 @@ import Modal from '@shared/ui/Modal';
 import { Tooltip } from '@shared/ui/Tooltip';
 import type { ConversationLiveStatus } from './workbenchAttentionModel';
 import {
-  backFromTaskDeepLink,
-  openTaskDetailForConversation,
+  useWorkbenchTaskDeepLinkActions,
   useWorkbenchTaskDeepLinkSnapshot,
 } from './workbenchTaskDeepLinks';
 import styles from './AgentHubWorkbench.module.css';
@@ -152,7 +151,9 @@ export function ConversationSidebar({
   // shell hook (demo seed while the route is unmounted); the sidebar only
   // renders the group, it never owns task data.
   const deepLinkSnapshot = useWorkbenchTaskDeepLinkSnapshot();
+  const deepLinkActions = useWorkbenchTaskDeepLinkActions();
   const taskQueue = deepLinkSnapshot.taskQueue;
+  const taskQueueSource = deepLinkSnapshot.taskQueueSource;
   // The back chip belongs to the conversation the task deep link opened; it
   // hides as soon as the user moves to another conversation.
   const appliedDeepLink = deepLinkSnapshot.applied;
@@ -412,7 +413,7 @@ export function ConversationSidebar({
             type="button"
             className={styles.taskDeepLinkChipButton}
             data-task-id={appliedDeepLink.taskId}
-            onClick={() => backFromTaskDeepLink()}
+            onClick={() => deepLinkActions.back()}
           >
             <DesignNavIcon name="back" size={14} />
             <span>{t('taskQueue.backToTask')}</span>
@@ -455,6 +456,11 @@ export function ConversationSidebar({
               <DesignNavIcon name="tasks" size={14} />
             </span>
             <span className={styles.taskQueueTitle}>{t('taskQueue.title')}</span>
+            {(taskQueueSource === 'demo' || taskQueueSource === 'fixture') && (
+              <span className={styles.taskQueueSourceBadge}>
+                {t(taskQueueSource === 'demo' ? 'taskQueue.sourceDemo' : 'taskQueue.sourceFixture')}
+              </span>
+            )}
             <span className={styles.taskQueueCount}>{taskQueue.length}</span>
             <span
               aria-hidden="true"
@@ -472,7 +478,7 @@ export function ConversationSidebar({
                     className={styles.taskQueueItem}
                     data-status={task.status}
                     data-task-id={task.id}
-                    onClick={() => openTaskDetailForConversation(task)}
+                    onClick={() => deepLinkActions.openTaskDetailForConversation(task, activeConversationId)}
                   >
                     <span className={styles.taskQueueItemTitle}>{task.title}</span>
                     <span className={styles.taskQueueItemStatus}>{task.status}</span>
