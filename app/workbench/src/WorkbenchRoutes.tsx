@@ -14,6 +14,8 @@ import { useWorkbenchDocsRoute } from './useWorkbenchDocsRoute';
 import { useWorkbenchProjectsRoute } from './useWorkbenchProjectsRoute';
 import { useWorkbenchSettingsRoute } from './useWorkbenchSettingsRoute';
 import { useWorkbenchTasksRoute } from './useWorkbenchTasksRoute';
+import { resolveTaskQueueDemoSource } from './useWorkbenchTaskDeepLinks';
+import type { WorkbenchTaskQueueSource } from './workbenchTaskDeepLinks';
 import { buildWorkbenchProfileSources } from './workbenchProfileSources';
 import type { WorkbenchRoutesProps } from './workbenchRoutesTypes';
 import type { WorkbenchProfileSource } from './profileRegistry';
@@ -62,6 +64,7 @@ interface WorkbenchTasksRouteGateProps {
   /** 当前是否为该 route 的 active page（rail 上为 'runs'）。 */
   active: boolean;
   realDataMode: boolean;
+  taskQueueSource: WorkbenchTaskQueueSource;
   currentUserId?: string | undefined;
   userDisplayName?: string | undefined;
   profiles: WorkbenchProfileSource[];
@@ -70,12 +73,14 @@ interface WorkbenchTasksRouteGateProps {
 const WorkbenchTasksRouteGate = React.memo(function WorkbenchTasksRouteGate({
   active,
   realDataMode,
+  taskQueueSource,
   currentUserId,
   userDisplayName,
   profiles,
 }: WorkbenchTasksRouteGateProps): React.ReactElement | null {
   const tasksRoute = useWorkbenchTasksRoute({
     realDataMode,
+    taskQueueSource,
     currentUserId,
     userDisplayName,
   });
@@ -223,6 +228,8 @@ export function WorkbenchRoutes({
     dataMode,
   });
   const { realDataMode } = settingsRoute;
+  const taskQueueSource = resolveTaskQueueDemoSource(dataMode);
+  const tasksRealDataMode = taskQueueSource === null;
 
   const agentsRoute = useWorkbenchAgentsRoute({
     agents,
@@ -323,7 +330,8 @@ export function WorkbenchRoutes({
       )}
       <WorkbenchTasksRouteGate
         active={activePage === 'runs'}
-        realDataMode={realDataMode}
+        realDataMode={tasksRealDataMode}
+        taskQueueSource={taskQueueSource}
         currentUserId={currentUserId}
         userDisplayName={userDisplayName}
         profiles={profileSources}

@@ -125,6 +125,20 @@ describe('useWorkbenchTasksRoute task deep-link integration (#1963)', () => {
     expect(result.current.selectedTask?.id).toBe('sqlite-plan');
   });
 
+  it('loads the page containing task-052 before adopting its deep-link focus', () => {
+    const target = WORKBENCH_MOCK_TASK_POOL.find((task) => task.id === 'task-052');
+    if (!target) throw new Error('expected task-052 in the second mock page');
+
+    openTaskDetailForConversation(target, 'c1');
+    consumeWorkbenchTaskDeepLinkIntent();
+
+    const { result } = renderHook(() => useWorkbenchTasksRoute({ realDataMode: false }));
+    expect(result.current.selectedTaskId).toBe('task-052');
+    expect(result.current.selectedTask).toEqual(target);
+    expect(loadedTaskCount(result.current)).toBe(WORKBENCH_MOCK_TASK_POOL.length);
+    expect(result.current.hasMore).toBe(false);
+  });
+
   it('re-adopts the focus when the same task is deep-linked twice', () => {
     const target = WORKBENCH_MOCK_TASK_POOL.find((task) => task.id === 'sqlite-plan');
     if (!target) throw new Error('expected the sqlite-plan seed task');

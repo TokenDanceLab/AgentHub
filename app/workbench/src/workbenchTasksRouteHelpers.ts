@@ -1,4 +1,5 @@
 import type { TaskGroup, TaskItem, TasksPane, ViewMode } from './pages';
+import type { WorkbenchTaskQueueSource } from './workbenchTaskDeepLinks';
 import type { TaskEditDraft } from './pages/TasksPage';
 import {
   type TaskGroupMode,
@@ -103,6 +104,7 @@ export interface UseWorkbenchTasksRouteOptions {
   realDataMode: boolean;
   currentUserId?: string | undefined;
   userDisplayName?: string | undefined;
+  taskQueueSource?: WorkbenchTaskQueueSource | undefined;
 }
 
 export interface WorkbenchTasksRoute {
