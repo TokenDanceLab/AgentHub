@@ -47,6 +47,12 @@ const CHAT_RAIL_BUTTON = 'button[data-rail-page="chat"]';
 const TRANSCRIPT_LOG = '[role="log"]';
 const SESSION_ID = 'session_web_chat';
 const TASK_ID = 'task_web_chat_qa';
+// UX F8 goal scene (#1998): a second conversation whose replay carries real
+// create_goal tool events, proving the goal banner projection end-to-end.
+const GOAL_SESSION_ID = 'session_web_goal';
+const GOAL_TASK_ID = 'task_web_goal_qa';
+const GOAL_CALL_ID = 'vqa-goal-create';
+const GOAL_OBJECTIVE = 'Migrate every endpoint to the single typed API client';
 // callId is ours to choose — stableInteractionId renders `call-<toolCallId>`
 // as the tool card data-block-id (chatview stable DOM identity).
 const TOOL_CALL_ID = 'vqa-read';
@@ -152,7 +158,64 @@ function chatVisualQaEvents() {
   ];
 }
 
-async function installMockHub(context) {
+function goalVisualQaEvents() {
+  return [
+    {
+      id: 'evt-vqa-goal-call',
+      task_id: GOAL_TASK_ID,
+      edge_run_id: 'run-web-goal-qa',
+      session_id: GOAL_SESSION_ID,
+      agent_instance_id: 'agent-builder',
+      agent_label: 'Builder',
+      event_seq: 1,
+      event_type: 'run.agent.tool_call',
+      payload: {
+        callId: GOAL_CALL_ID,
+        toolName: 'create_goal',
+        status: 'completed',
+        input: { objective: GOAL_OBJECTIVE },
+      },
+      created_at: '2026-08-28T02:00:01Z',
+    },
+    {
+      id: 'evt-vqa-goal-result',
+      task_id: GOAL_TASK_ID,
+      edge_run_id: 'run-web-goal-qa',
+      session_id: GOAL_SESSION_ID,
+      agent_instance_id: 'agent-builder',
+      agent_label: 'Builder',
+      event_seq: 2,
+      event_type: 'run.agent.tool_result',
+      payload: { callId: GOAL_CALL_ID, toolName: 'create_goal', summary: 'Goal registered' },
+      created_at: '2026-08-28T02:00:02Z',
+    },
+    {
+      id: 'evt-vqa-goal-text',
+      task_id: GOAL_TASK_ID,
+      edge_run_id: 'run-web-goal-qa',
+      session_id: GOAL_SESSION_ID,
+      agent_instance_id: 'agent-builder',
+      agent_label: 'Builder',
+      event_seq: 3,
+      event_type: 'run.agent.text_block',
+      payload: { content: '目标已登记，开始长程迁移。' },
+      created_at: '2026-08-28T02:00:03Z',
+    },
+  ];
+}
+
+async function installMockHub(context, scene = 'main') {
+  // Scene switch: 'main' keeps the historic gate fixture untouched; 'goal'
+  // serves a single goal conversation so the capture lands on it directly.
+  const isGoal = scene === 'goal';
+  const sessionId = isGoal ? GOAL_SESSION_ID : SESSION_ID;
+  const taskId = isGoal ? GOAL_TASK_ID : TASK_ID;
+  const sessionName = isGoal ? 'Goal visual QA' : 'Chat visual QA';
+  const userMessageText = isGoal
+    ? '启动长程目标会话：登记迁移目标。'
+    : '启动聊天内容面的视觉合同捕获。';
+  const replayEvents = isGoal ? goalVisualQaEvents() : chatVisualQaEvents();
+
   await context.route(hubUrlPattern, async (route) => {
     const request = route.request();
     const url = new URL(request.url());
@@ -183,9 +246,9 @@ async function installMockHub(context) {
         json(
           hubEnvelope([
             {
-              id: SESSION_ID,
+              id: sessionId,
               type: 'group',
-              name: 'Chat visual QA',
+              name: sessionName,
               member_count: 2,
               unread_count: 0,
             },
@@ -193,27 +256,27 @@ async function installMockHub(context) {
         ),
       );
     }
-    if (pathname === `/client/sessions/${SESSION_ID}/messages`) {
+    if (pathname === `/client/sessions/${sessionId}/messages`) {
       return route.fulfill(
         json(
           hubEnvelope([
             {
               id: 'message-vqa-user',
-              session_id: SESSION_ID,
+              session_id: sessionId,
               seq_id: 1,
               client_msg_id: 'client-vqa-user',
               sender_type: 'user',
               sender_id: 'user_visual',
               sender: { nickname: 'Visual Reviewer' },
               content_type: 'text',
-              content: '启动聊天内容面的视觉合同捕获。',
+              content: userMessageText,
               created_at: '2026-06-26T08:00:00Z',
             },
           ]),
         ),
       );
     }
-    if (pathname === `/client/sessions/${SESSION_ID}/pins`) {
+    if (pathname === `/client/sessions/${sessionId}/pins`) {
       return route.fulfill(json(hubEnvelope([])));
     }
     if (pathname === '/client/contacts' || pathname === '/client/notifications') {
@@ -242,20 +305,20 @@ async function installMockHub(context) {
         ),
       );
     }
-    if (pathname === `/web/agent-tasks/${TASK_ID}/events`) {
-      return route.fulfill(json(hubEnvelope(chatVisualQaEvents())));
+    if (pathname === `/web/agent-tasks/${taskId}/events`) {
+      return route.fulfill(json(hubEnvelope(replayEvents)));
     }
-    if (pathname === `/web/agent-tasks/${TASK_ID}/events/summary`) {
+    if (pathname === `/web/agent-tasks/${taskId}/events/summary`) {
       // status 'done' = streaming-ENDED: replay stays hydrated while the
       // composer keeps the Send control (chat-flow-contract.spec.ts).
       return route.fulfill(
         json(
           hubEnvelope({
-            task_id: TASK_ID,
-            edge_run_id: 'run-web-chat-qa',
+            task_id: taskId,
+            edge_run_id: isGoal ? 'run-web-goal-qa' : 'run-web-chat-qa',
             status: 'done',
-            total_events: chatVisualQaEvents().length,
-            last_event_seq: chatVisualQaEvents().length,
+            total_events: replayEvents.length,
+            last_event_seq: replayEvents.length,
             event_type_counts: {},
             tool_call_count: 1,
             step_count: 1,
@@ -270,30 +333,30 @@ async function installMockHub(context) {
         ),
       );
     }
-    if (pathname === `/web/agent-tasks/${TASK_ID}/approvals`) {
+    if (pathname === `/web/agent-tasks/${taskId}/approvals`) {
       return route.fulfill(
         json(
           hubEnvelope({
-            task_id: TASK_ID,
-            edge_run_id: 'run-web-chat-qa',
-            session_id: SESSION_ID,
+            task_id: taskId,
+            edge_run_id: isGoal ? 'run-web-goal-qa' : 'run-web-chat-qa',
+            session_id: sessionId,
             approvals: [],
             pending: [],
             decided: [],
-            last_event_seq: chatVisualQaEvents().length,
+            last_event_seq: replayEvents.length,
           }),
         ),
       );
     }
-    if (pathname === `/web/agent-tasks/${TASK_ID}/artifacts`) {
+    if (pathname === `/web/agent-tasks/${taskId}/artifacts`) {
       return route.fulfill(
         json(
           hubEnvelope({
-            task_id: TASK_ID,
-            edge_run_id: 'run-web-chat-qa',
-            session_id: SESSION_ID,
+            task_id: taskId,
+            edge_run_id: isGoal ? 'run-web-goal-qa' : 'run-web-chat-qa',
+            session_id: sessionId,
             artifacts: [],
-            last_event_seq: chatVisualQaEvents().length,
+            last_event_seq: replayEvents.length,
           }),
         ),
       );
@@ -330,14 +393,16 @@ async function maybeStartDevServer() {
   };
 }
 
-async function captureTheme(browser, theme) {
+async function captureTheme(browser, theme, scene, vp = { width: 1440, height: 810, label: '1440x810' }) {
+  const isGoal = scene === 'goal';
+  const shotBase = isGoal ? `web-chat-goal-${theme}-${vp.label}` : `web-chat-${theme}-${vp.label}`;
   const context = await browser.newContext({
-    viewport,
+    viewport: { width: vp.width, height: vp.height },
     deviceScaleFactor: dpr,
     serviceWorkers: 'block',
     colorScheme: theme,
   });
-  await installMockHub(context);
+  await installMockHub(context, scene);
   const page = await context.newPage();
 
   // Storage before navigation: theme (v4 SSOT + legacy), locale, hub auth,
@@ -360,7 +425,13 @@ async function captureTheme(browser, theme) {
         JSON.stringify({ userId: 'user_visual', username: 'visual-reviewer' }),
       );
     },
-    { v4Key: THEME_KEY_V4, legacyKey: THEME_KEY_LEGACY, theme, sessionId: SESSION_ID, taskId: TASK_ID },
+    {
+      v4Key: THEME_KEY_V4,
+      legacyKey: THEME_KEY_LEGACY,
+      theme,
+      sessionId: isGoal ? GOAL_SESSION_ID : SESSION_ID,
+      taskId: isGoal ? GOAL_TASK_ID : TASK_ID,
+    },
   );
 
   await page.goto(baseUrl, { waitUntil: 'domcontentloaded', timeout: 60_000 });
@@ -368,9 +439,9 @@ async function captureTheme(browser, theme) {
   try {
     await page.waitForSelector(WORKBENCH_SHELL, { state: 'visible', timeout: 30_000 });
   } catch {
-    const diagFile = path.join(outDir, `web-chat-${theme}-1440x810${dprSuffix}-DIAGNOSTIC.png`);
+    const diagFile = path.join(outDir, `${shotBase}${dprSuffix}-DIAGNOSTIC.png`);
     await page.screenshot({ path: diagFile, fullPage: false });
-    throw new Error(`Workbench shell not visible for chat theme=${theme}. Diagnostic: ${diagFile}`);
+    throw new Error(`Workbench shell not visible for chat theme=${theme} scene=${scene}. Diagnostic: ${diagFile}`);
   }
 
   // Prefer the Chat rail so capture shows transcript + composer + inspector.
@@ -383,30 +454,35 @@ async function captureTheme(browser, theme) {
     /* the single-session stub may already land on chat */
   }
 
-  // Fail closed with a diagnostic if the replayed transcript (code block +
-  // tool card) does not materialize — the assert step trusts only captures
-  // that reached this contract.
+  // Fail closed with a diagnostic if the scene content does not materialize
+  // — the assert step trusts only captures that reached this contract.
   try {
     await page.waitForSelector(TRANSCRIPT_LOG, { state: 'visible', timeout: 20_000 });
-    await page.waitForFunction(
-      ({ callId }) => {
-        const log = document.querySelector('[role="log"]');
-        if (!log) return false;
-        const copyBtn = Array.from(log.querySelectorAll('button')).find((b) =>
-          /^(复制|Copy)$/.test((b.getAttribute('aria-label') || '').trim()),
-        );
-        const card = log.querySelector(`[data-block-id="call-${callId}"]`);
-        return Boolean(copyBtn) && Boolean(card);
-      },
-      { callId: TOOL_CALL_ID },
-      { timeout: 20_000 },
-    );
+    if (isGoal) {
+      // Goal scene (#1998): the banner is the contract content. It renders
+      // above the transcript, projected from the replayed create_goal call.
+      await page.waitForSelector('section[data-goal-status]', { state: 'visible', timeout: 20_000 });
+    } else {
+      await page.waitForFunction(
+        ({ callId }) => {
+          const log = document.querySelector('[role="log"]');
+          if (!log) return false;
+          const copyBtn = Array.from(log.querySelectorAll('button')).find((b) =>
+            /^(复制|Copy)$/.test((b.getAttribute('aria-label') || '').trim()),
+          );
+          const card = log.querySelector(`[data-block-id="call-${callId}"]`);
+          return Boolean(copyBtn) && Boolean(card);
+        },
+        { callId: TOOL_CALL_ID },
+        { timeout: 20_000 },
+      );
+    }
   } catch {
-    const diagFile = path.join(outDir, `web-chat-${theme}-1440x810${dprSuffix}-CONTENT-DIAGNOSTIC.png`);
+    const diagFile = path.join(outDir, `${shotBase}${dprSuffix}-CONTENT-DIAGNOSTIC.png`);
     await page.screenshot({ path: diagFile, fullPage: false });
     const bodyText = await page.evaluate(() => (document.body?.innerText ?? '(no body)').slice(0, 300));
     throw new Error(
-      `Chat transcript contract content (code block + tool card) not rendered for theme=${theme}. ` +
+      `Chat contract content not rendered for theme=${theme} scene=${scene}. ` +
         `Body: ${bodyText.slice(0, 200)}. Diagnostic: ${diagFile}`,
     );
   }
@@ -425,7 +501,7 @@ async function captureTheme(browser, theme) {
   // Settle for CSS transitions, fonts, and the lazy syntax-highlighter chunk.
   await wait(800);
 
-  const file = path.join(outDir, `web-chat-${theme}-1440x810${dprSuffix}.png`);
+  const file = path.join(outDir, `${shotBase}${dprSuffix}.png`);
   await page.screenshot({ path: file, fullPage: false });
 
   // DOM/geometry contract (no pixel goldens): proves the capture hit the chat
@@ -466,17 +542,27 @@ async function captureTheme(browser, theme) {
         stopVisible: named(/^(?:Stop|停止)/),
       },
       composer: measure(document.querySelector('textarea')),
+      // UX F8 (#1998): goal banner geometry — exists only in the goal scene.
+      goalBanner: measure(document.querySelector('section[data-goal-status]')),
+      goalStatus: document.querySelector('section[data-goal-status]')?.getAttribute('data-goal-status') ?? '',
       horizontalOverflow:
         document.documentElement.scrollWidth > document.documentElement.clientWidth + 1,
     };
   }, TOOL_CALL_ID);
-  const contractFile = path.join(outDir, `web-chat-${theme}-1440x810${dprSuffix}.json`);
+  const contractFile = path.join(outDir, `${shotBase}${dprSuffix}.json`);
   await writeFile(contractFile, JSON.stringify(contract, null, 2) + '\n');
 
   const applied = await page.evaluate(() => document.documentElement.getAttribute('data-theme'));
   await context.close();
-  return { file, contractFile, contract, applied, theme };
+  return { file, contractFile, contract, applied, theme, scene };
 }
+
+// #1998 goal scene viewports: the 1440x810 gate tier plus the 768x900
+// narrow responsive tier (supplementary evidence, same overflow contract).
+const GOAL_VIEWPORTS = [
+  { width: 1440, height: 810, label: '1440x810' },
+  { width: 768, height: 900, label: '768x900' },
+];
 
 async function main() {
   await mkdir(outDir, { recursive: true });
@@ -485,13 +571,24 @@ async function main() {
   for (const theme of themes) {
     await rm(path.join(outDir, `web-chat-${theme}-1440x810${dprSuffix}.png`), { force: true });
     await rm(path.join(outDir, `web-chat-${theme}-1440x810${dprSuffix}.json`), { force: true });
+    for (const vp of GOAL_VIEWPORTS) {
+      await rm(path.join(outDir, `web-chat-goal-${theme}-${vp.label}${dprSuffix}.png`), { force: true });
+      await rm(path.join(outDir, `web-chat-goal-${theme}-${vp.label}${dprSuffix}.json`), { force: true });
+    }
   }
   const server = await maybeStartDevServer();
   const browser = await chromium.launch({ headless: true });
   const results = [];
   try {
     for (const theme of themes) {
-      results.push(await captureTheme(browser, theme));
+      results.push(await captureTheme(browser, theme, 'main'));
+    }
+    // UX F8 goal scene (#1998): real replayed create_goal events projected
+    // into the conversation goal banner, gate + narrow tiers.
+    for (const vp of GOAL_VIEWPORTS) {
+      for (const theme of themes) {
+        results.push(await captureTheme(browser, theme, 'goal', vp));
+      }
     }
   } finally {
     await browser.close();
