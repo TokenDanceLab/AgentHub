@@ -6,6 +6,8 @@ import { DesignNavIcon } from './designIcons';
 import { TasksPage } from './pages/TasksPage';
 import type { WorkbenchTasksRoute } from './useWorkbenchTasksRoute';
 import { buildTasksPageDerivedModel } from './workbenchTasksPageModel';
+import type { TaskReviewMergePort } from './workbenchBoardColumns';
+import type { AgentHubSurface } from '@shared/platform';
 import {
   useWorkbenchTaskDeepLinkActions,
   useWorkbenchTaskDeepLinkSnapshot,
@@ -16,6 +18,16 @@ export interface WorkbenchTasksRouteViewProps {
   tasksRoute: WorkbenchTasksRoute;
   realDataMode: boolean;
   profiles: WorkbenchProfileSource[];
+  /**
+   * Workbench surface (#1999): Hub-only surfaces state that merging needs
+   * Desktop / Local Edge and never render merge controls.
+   */
+  platformSurface?: AgentHubSurface | undefined;
+  /**
+   * Real review-before-merge capability port (#1999). Never invented here;
+   * absent port keeps approve/merge controls at zero (fail-closed).
+   */
+  reviewMergePort?: TaskReviewMergePort | null | undefined;
 }
 
 /** Thin tasks route shell: pure model + TasksPage prop wiring. */
@@ -23,6 +35,8 @@ export function WorkbenchTasksRouteView({
   tasksRoute,
   realDataMode,
   profiles,
+  platformSurface,
+  reviewMergePort,
 }: WorkbenchTasksRouteViewProps): React.ReactElement {
   const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE);
   const model = useMemo(
@@ -99,6 +113,8 @@ export function WorkbenchTasksRouteView({
         groupLabel={model.groupLabel}
         groups={tasksRoute.visibleTaskGroups}
         profiles={profiles}
+        platformSurface={platformSurface}
+        reviewMergePort={reviewMergePort}
         editingDraft={tasksRoute.editingTaskDraft}
         editingTaskId={tasksRoute.editingTaskId}
         navMenuOpen={tasksRoute.taskNavMenuOpen}

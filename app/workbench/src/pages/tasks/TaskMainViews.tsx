@@ -15,6 +15,7 @@ import styles from '../TasksPage.module.css';
 import { TaskSelectionStrip, TaskTable } from './TaskTableViews';
 import { PANE_TITLES, StatCard, VIEW_MODES } from './shared';
 import type { TasksPageProps } from './types';
+import { needsHubOnlyMergeNotice } from '../../workbenchBoardColumns';
 
 export type TaskMainProps = Pick<
   TasksPageProps,
@@ -25,6 +26,8 @@ export type TaskMainProps = Pick<
   | 'emptyStateLabel'
   | 'comingSoonEmptyState'
   | 'demoDataActive'
+  | 'platformSurface'
+  | 'reviewMergePort'
   | 'profiles'
   | 'selectedTask'
   | 'taskActionLabel'
@@ -71,6 +74,8 @@ export function TaskMain({
   emptyStateLabel,
   comingSoonEmptyState = false,
   demoDataActive = false,
+  platformSurface,
+  reviewMergePort,
   profiles,
   selectedTask,
   taskActionLabel,
@@ -321,6 +326,8 @@ export function TaskMain({
 
       <TaskSelectionStrip
         actionLabel={taskActionLabel}
+        platformSurface={platformSurface}
+        reviewMergePort={reviewMergePort}
         task={selectedTask}
         onAssignToMe={onAssignSelectedTaskToMe}
         onCycleStatus={onCycleSelectedTaskStatus}
@@ -329,6 +336,22 @@ export function TaskMain({
         onFilterByAssignee={onFilterBySelectedTaskAssignee}
         onGroupByProject={onGroupBySelectedTaskProject}
       />
+
+      {/* Hub-only honesty notice (#1999): Web/Mobile may show awaiting-review
+          tasks but never merge them — merging needs Desktop / Local Edge. */}
+      {needsHubOnlyMergeNotice({
+        surface: platformSurface,
+        statuses: groups.flatMap((group) => group.tasks.map((task) => task.status)),
+      }) && (
+        <StatusNotice
+          icon={<DesignNavIcon name="laptop" size={14} />}
+          role="status"
+        >
+          <span data-testid="tasks-hub-only-merge-notice">
+            {t('tasks.board.hubOnlyMergeNotice')}
+          </span>
+        </StatusNotice>
+      )}
 
       {/* Task table */}
       <TaskTable

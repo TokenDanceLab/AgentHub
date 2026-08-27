@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import type { TaskGroup, TaskItem } from './pages';
+import { boardColumnDisplayLabels } from './workbenchBoardColumns';
 import {
   DESIGN_DONE_TASK,
   buildTaskGroups,
   flattenTaskGroups,
+  groupTasks,
   sortTasks,
   taskMatchesPane,
 } from './workbenchTaskGroups';
@@ -55,6 +57,21 @@ describe('workbenchTaskGroups', () => {
   it('sorts by due date when requested', () => {
     const sorted = sortTasks(TASKS, 'due');
     expect(sorted.map((task) => task.id)).toEqual(['embedded-docs', 'sqlite-plan', 'other']);
+  });
+
+  it('derives status-group order and column chrome from the board-column SSOT (#1999)', () => {
+    const groups = groupTasks(TASKS, 'status');
+    // Group labels follow the SSOT display order (derived, not hardcoded).
+    const expected = boardColumnDisplayLabels().filter((label) =>
+      groups.some((group) => group.label === label),
+    );
+    expect(groups.map((group) => group.label)).toEqual(expected);
+    // Status groups carry their SSOT column id/tone; empty columns drop out.
+    for (const group of groups) {
+      expect(group.columnId).toBeTruthy();
+      expect(group.tone).toBeTruthy();
+    }
+    expect(groups.find((group) => group.label === '待确认')).toBeUndefined();
   });
 
   it('builds visible groups and falls back to design done task', () => {

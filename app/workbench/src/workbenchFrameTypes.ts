@@ -178,6 +178,8 @@ export interface ChatConversationHostFrameProps {
 
 export interface WorkbenchRoutesFrameProps {
   activePage: Exclude<GlobalRailPage, 'chat'>;
+  /** Workbench surface for the Tasks review-before-merge gate (#1999). */
+  platformSurface?: import('@shared/platform').AgentHubSurface | undefined;
   agents?: WorkbenchAgent[] | undefined;
   agentProfilesStatus?: WorkbenchAgentProfilesStatus | undefined;
   dataMode?: string | undefined;

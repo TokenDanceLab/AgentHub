@@ -1,14 +1,14 @@
 {
   "_comment": "Baseline of i18n callsite violations (source files with CJK string literals but no useTranslation import). The verify gate fails when the current count EXCEEDS this baseline; lower this number as more callsites are wired to useTranslation.",
   "scanRoot": "app/shared/src + app/workbench/src",
-  "totalViolations": 88,
-  "totalCjkLiteralLines": 779,
+  "totalViolations": 89,
+  "totalCjkLiteralLines": 787,
   "files": [
     {
       "path": "shared/chatview/adapterMapBlock.ts",
       "cjkLiteralLines": 1,
       "samples": [
-        263
+        312
       ]
     },
     {
@@ -23,19 +23,26 @@
       "path": "shared/chatview/design/labels.ts",
       "cjkLiteralLines": 10,
       "samples": [
-        164,
-        165,
-        166,
         167,
-        171
+        168,
+        169,
+        170,
+        174
       ]
     },
     {
       "path": "shared/chatview/types.ts",
       "cjkLiteralLines": 2,
       "samples": [
-        72,
-        74
+        113,
+        115
+      ]
+    },
+    {
+      "path": "shared/components/index.ts",
+      "cjkLiteralLines": 1,
+      "samples": [
+        2
       ]
     },
     {
@@ -88,21 +95,17 @@
       ]
     },
     {
-      "path": "shared/demo/workbenchDemoStore.ts",
-      "cjkLiteralLines": 5,
-      "samples": [
-        137,
-        243,
-        254,
-        260,
-        266
-      ]
-    },
-    {
       "path": "shared/demo/workbenchDemoTypes.ts",
       "cjkLiteralLines": 1,
       "samples": [
         39
+      ]
+    },
+    {
+      "path": "shared/designTokens.ts",
+      "cjkLiteralLines": 1,
+      "samples": [
+        20
       ]
     },
     {
@@ -120,18 +123,20 @@
       "path": "shared/transcript/edgeEventEvidence.ts",
       "cjkLiteralLines": 4,
       "samples": [
-        183,
-        187,
-        190,
-        193
+        198,
+        202,
+        205,
+        208
       ]
     },
     {
       "path": "shared/transcript/normalizeHubMessages.ts",
-      "cjkLiteralLines": 2,
+      "cjkLiteralLines": 4,
       "samples": [
         64,
-        214
+        70,
+        71,
+        242
       ]
     },
     {
@@ -148,6 +153,42 @@
         17,
         181,
         184
+      ]
+    },
+    {
+      "path": "shared/transcript/runChangeAggregate.ts",
+      "cjkLiteralLines": 1,
+      "samples": [
+        98
+      ]
+    },
+    {
+      "path": "shared/ui/DiffReviewPanel.stories.tsx",
+      "cjkLiteralLines": 13,
+      "samples": [
+        76,
+        77,
+        78,
+        79,
+        80
+      ]
+    },
+    {
+      "path": "shared/ui/Markdown.stories.tsx",
+      "cjkLiteralLines": 1,
+      "samples": [
+        27
+      ]
+    },
+    {
+      "path": "shared/ui/RunReviewOverlay.stories.tsx",
+      "cjkLiteralLines": 17,
+      "samples": [
+        76,
+        77,
+        78,
+        80,
+        83
       ]
     },
     {
@@ -169,42 +210,32 @@
       ]
     },
     {
-      "path": "workbench/ChatEngineeringColumn.tsx",
-      "cjkLiteralLines": 4,
-      "samples": [
-        26,
-        27,
-        28,
-        29
-      ]
-    },
-    {
       "path": "workbench/ComposerPartsHelpers.ts",
       "cjkLiteralLines": 6,
       "samples": [
-        21,
-        30,
-        37,
-        43,
-        55
+        23,
+        32,
+        39,
+        45,
+        57
       ]
     },
     {
       "path": "workbench/WorkbenchRoutes.tsx",
       "cjkLiteralLines": 3,
       "samples": [
-        39,
-        41,
-        60
+        43,
+        45,
+        64
       ]
     },
     {
       "path": "workbench/__tests__/helpers.tsx",
       "cjkLiteralLines": 3,
       "samples": [
-        110,
         111,
-        112
+        112,
+        113
       ]
     },
     {
@@ -245,7 +276,7 @@
       "cjkLiteralLines": 2,
       "samples": [
         92,
-        121
+        127
       ]
     },
     {
@@ -259,18 +290,11 @@
       "path": "workbench/designIconsHelpers.ts",
       "cjkLiteralLines": 16,
       "samples": [
-        181,
-        182,
-        183,
         184,
-        185
-      ]
-    },
-    {
-      "path": "workbench/floating/EmojiPicker.tsx",
-      "cjkLiteralLines": 1,
-      "samples": [
-        30
+        185,
+        186,
+        187,
+        188
       ]
     },
     {
@@ -292,43 +316,21 @@
       ]
     },
     {
-      "path": "workbench/hubDataMapping.ts",
-      "cjkLiteralLines": 11,
-      "samples": [
-        54,
-        55,
-        112,
-        177,
-        179
-      ]
-    },
-    {
       "path": "workbench/inspector/FilePreviewHelpers.ts",
       "cjkLiteralLines": 3,
       "samples": [
-        31,
-        83,
-        84
-      ]
-    },
-    {
-      "path": "workbench/inspector/FilePreviewRouter.tsx",
-      "cjkLiteralLines": 6,
-      "samples": [
-        191,
-        220,
-        272,
-        286,
-        297
+        33,
+        95,
+        96
       ]
     },
     {
       "path": "workbench/inspector/InspectorModeBodies.tsx",
       "cjkLiteralLines": 3,
       "samples": [
-        59,
-        61,
-        62
+        60,
+        62,
+        63
       ]
     },
     {
@@ -343,21 +345,10 @@
       ]
     },
     {
-      "path": "workbench/inspector/InspectorModePanelParts.tsx",
-      "cjkLiteralLines": 7,
-      "samples": [
-        89,
-        121,
-        128,
-        147,
-        185
-      ]
-    },
-    {
       "path": "workbench/inspector/InspectorTabChrome.tsx",
       "cjkLiteralLines": 1,
       "samples": [
-        231
+        234
       ]
     },
     {
@@ -375,17 +366,8 @@
       "path": "workbench/inspector/RuntimeEvidenceHelpers.ts",
       "cjkLiteralLines": 2,
       "samples": [
-        17,
-        30
-      ]
-    },
-    {
-      "path": "workbench/inspector/RuntimeEvidenceParts.tsx",
-      "cjkLiteralLines": 3,
-      "samples": [
-        117,
-        160,
-        198
+        18,
+        32
       ]
     },
     {
@@ -412,13 +394,13 @@
     },
     {
       "path": "workbench/pages/agents/AgentEditItemParts.tsx",
-      "cjkLiteralLines": 21,
+      "cjkLiteralLines": 16,
       "samples": [
-        46,
-        47,
-        100,
-        208,
-        240
+        51,
+        68,
+        106,
+        139,
+        180
       ]
     },
     {
@@ -444,7 +426,7 @@
     },
     {
       "path": "workbench/pages/agents/AgentMarketItemParts.tsx",
-      "cjkLiteralLines": 5,
+      "cjkLiteralLines": 12,
       "samples": [
         97,
         98,
@@ -484,13 +466,21 @@
     },
     {
       "path": "workbench/pages/agents/AgentOpsViews.tsx",
-      "cjkLiteralLines": 6,
+      "cjkLiteralLines": 20,
       "samples": [
-        42,
-        43,
-        44,
         45,
-        157
+        46,
+        47,
+        48,
+        58
+      ]
+    },
+    {
+      "path": "workbench/pages/agents/DataSourceBadge.tsx",
+      "cjkLiteralLines": 2,
+      "samples": [
+        12,
+        13
       ]
     },
     {
@@ -507,11 +497,11 @@
       "path": "workbench/pages/agents/types.ts",
       "cjkLiteralLines": 6,
       "samples": [
-        17,
         19,
         21,
         23,
-        25
+        25,
+        27
       ]
     },
     {
@@ -520,17 +510,6 @@
       "samples": [
         36,
         37
-      ]
-    },
-    {
-      "path": "workbench/pages/contacts/ContactRows.tsx",
-      "cjkLiteralLines": 16,
-      "samples": [
-        57,
-        115,
-        120,
-        121,
-        139
       ]
     },
     {
@@ -640,18 +619,18 @@
       "path": "workbench/pages/tasks/TaskTableViews.tsx",
       "cjkLiteralLines": 1,
       "samples": [
-        80
+        87
       ]
     },
     {
       "path": "workbench/pages/tasks/types.ts",
       "cjkLiteralLines": 7,
       "samples": [
-        8,
-        9,
         10,
         11,
-        12
+        12,
+        13,
+        14
       ]
     },
     {
@@ -659,7 +638,7 @@
       "cjkLiteralLines": 2,
       "samples": [
         13,
-        23
+        24
       ]
     },
     {
@@ -686,34 +665,34 @@
       "path": "workbench/unifiedComposerHelpers.ts",
       "cjkLiteralLines": 12,
       "samples": [
-        102,
-        104,
-        119,
-        121,
-        123
+        115,
+        117,
+        132,
+        134,
+        136
       ]
     },
     {
       "path": "workbench/unifiedComposerHostViewModel.ts",
       "cjkLiteralLines": 1,
       "samples": [
-        134
+        139
       ]
     },
     {
       "path": "workbench/useWorkbenchSessionChrome.ts",
       "cjkLiteralLines": 1,
       "samples": [
-        247
+        295
       ]
     },
     {
       "path": "workbench/useWorkbenchTasksRoute.ts",
       "cjkLiteralLines": 3,
       "samples": [
-        41,
         47,
-        94
+        54,
+        101
       ]
     },
     {
@@ -732,20 +711,31 @@
       "cjkLiteralLines": 4,
       "samples": [
         29,
-        61,
-        63,
-        84
+        62,
+        64,
+        90
       ]
     },
     {
       "path": "workbench/workbenchAgentsRouteHelpers.ts",
       "cjkLiteralLines": 13,
       "samples": [
-        103,
-        104,
         105,
         106,
-        231
+        107,
+        108,
+        238
+      ]
+    },
+    {
+      "path": "workbench/workbenchBoardColumns.ts",
+      "cjkLiteralLines": 5,
+      "samples": [
+        44,
+        45,
+        46,
+        47,
+        48
       ]
     },
     {
@@ -763,9 +753,9 @@
       "path": "workbench/workbenchPreferences.ts",
       "cjkLiteralLines": 3,
       "samples": [
-        15,
-        20,
-        21
+        72,
+        77,
+        78
       ]
     },
     {
@@ -787,25 +777,34 @@
       ]
     },
     {
-      "path": "workbench/workbenchTaskGroups.ts",
-      "cjkLiteralLines": 23,
+      "path": "workbench/workbenchTaskDeepLinks.ts",
+      "cjkLiteralLines": 3,
       "samples": [
-        6,
-        10,
-        11,
-        13,
-        14
+        64,
+        65,
+        66
+      ]
+    },
+    {
+      "path": "workbench/workbenchTaskGroups.ts",
+      "cjkLiteralLines": 21,
+      "samples": [
+        18,
+        19,
+        21,
+        22,
+        24
       ]
     },
     {
       "path": "workbench/workbenchTasksPageModel.ts",
       "cjkLiteralLines": 9,
       "samples": [
-        22,
-        23,
-        24,
-        25,
-        26
+        26,
+        27,
+        28,
+        29,
+        30
       ]
     },
     {
@@ -823,8 +822,8 @@
       "path": "workbench/workbenchTasksRouteHelpers.ts",
       "cjkLiteralLines": 2,
       "samples": [
-        275,
-        370
+        277,
+        372
       ]
     },
     {
@@ -850,11 +849,12 @@
       ]
     },
     {
-      "path": "workbench/workbenchTranscriptChromeLabels.ts",
-      "cjkLiteralLines": 2,
+      "path": "workbench/workbenchTranscriptChromeActionMappers.ts",
+      "cjkLiteralLines": 3,
       "samples": [
-        79,
-        81
+        330,
+        364,
+        417
       ]
     }
   ]

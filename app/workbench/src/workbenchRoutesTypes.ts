@@ -1,4 +1,4 @@
-import type { LocalCliDiscoveryManifest, WorkbenchAgent } from '@shared/platform';
+import type { AgentHubSurface, LocalCliDiscoveryManifest, WorkbenchAgent } from '@shared/platform';
 import type {
   DocRow,
   ProjectDraft,
@@ -102,6 +102,12 @@ export interface WorkbenchRoutesProps {
   onNavigatePage?: ((page: WorkbenchPage) => void) | undefined;
   /** Current user's Hub ID, used to filter "my" tasks. */
   currentUserId?: string | undefined;
+  /**
+   * Workbench surface (#1999): Tasks review-before-merge chrome fails
+   * closed on Hub-only surfaces (web/mobile) and says merging needs
+   * Desktop / Local Edge.
+   */
+  platformSurface?: AgentHubSurface | undefined;
   /** Current user display name for Settings page. */
   userDisplayName?: string | undefined;
   /* ── Devices / execution-target management (#1819) ── */
