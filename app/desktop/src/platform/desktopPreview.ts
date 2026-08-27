@@ -11,6 +11,7 @@ import type { RuntimeEvidenceContentRef } from '@shared/platform';
 import type { AttachmentRef } from '@shared/composer';
 import type { EvidenceRef } from '@shared/transcript';
 import type { MediaKind } from '@shared/ui/mediaPreview';
+import { isWorkbenchFixtureDataMode, resolveWorkbenchDataMode } from '@shared/demo';
 import { getEdgeBaseUrl, HUB_URL } from '@/config';
 import { getCachedRefreshedAccessToken } from '@/api/hubClient';
 import { edgeAuthHeaders } from '@/api/edgeAuth';
@@ -104,6 +105,23 @@ function triggerBlobDownload(blob: Blob, filename: string): void {
   URL.revokeObjectURL(objectUrl);
 }
 
+/**
+ * Data-mode gate for Hub attachment fetches (#1995). The data-mode SSOT
+ * (`@shared/demo/dataMode`) decides which backends a surface may contact:
+ * pinned mock/fixture modes must not reach the Hub ("Hub and local Edge
+ * are not contacted"), so both attachment resolvers then degrade to the
+ * honest chip fallback (undefined, see attachmentMediaPort) instead of
+ * issuing a live Hub request. auto/observed/approved-real keep the
+ * authenticated Hub fetch unchanged. Resolved per call (not at
+ * registration) so a runtime data-mode override takes effect without
+ * re-creating the platform.
+ */
+function desktopDataModeAllowsHubAttachments(): boolean {
+  return !isWorkbenchFixtureDataMode(
+    resolveWorkbenchDataMode(import.meta.env.VITE_AGENTHUB_DATA_MODE),
+  );
+}
+
 let desktopAttachmentImageResolver: AttachmentImageUrlResolver | undefined;
 
 /**
@@ -118,6 +136,7 @@ let desktopAttachmentImageResolver: AttachmentImageUrlResolver | undefined;
 export function resolveDesktopAttachmentImageUrl(
   attachment: AttachmentRef,
 ): Promise<string | undefined> {
+  if (!desktopDataModeAllowsHubAttachments()) return Promise.resolve(undefined);
   desktopAttachmentImageResolver ??= createAttachmentImageUrlResolver({
     hubBaseUrl: HUB_URL,
     getToken: () => getCachedRefreshedAccessToken() ?? getAccessToken(),
@@ -137,6 +156,7 @@ export function resolveDesktopAttachmentMediaUrl(
   attachment: AttachmentRef,
   kind: MediaKind,
 ): Promise<string | undefined> {
+  if (!desktopDataModeAllowsHubAttachments()) return Promise.resolve(undefined);
   desktopAttachmentMediaResolver ??= createAttachmentMediaUrlResolver({
     hubBaseUrl: HUB_URL,
     getToken: () => getCachedRefreshedAccessToken() ?? getAccessToken(),

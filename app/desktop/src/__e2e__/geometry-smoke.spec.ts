@@ -68,7 +68,7 @@ async function enterDemoWorkbench(page: Page): Promise<void> {
     }
   });
   await page.goto('/', { waitUntil: 'domcontentloaded' });
-  const demoButton = page.getByRole('button', { name: '使用 Demo 模式继续' });
+  const demoButton = page.getByRole('button', { name: /^(使用 Demo 模式继续|Continue in Demo mode)$/ });
   const workbench = page.getByTestId('agenthub-workbench');
   if (await demoButton.isVisible().catch(() => false)) {
     await demoButton.click();
