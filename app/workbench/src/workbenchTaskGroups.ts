@@ -1,9 +1,17 @@
-import type { TaskGroup, TaskItem, TaskStatus, TasksPane, ViewMode } from './pages';
+import type { TaskGroup, TaskItem, TasksPane, ViewMode } from './pages';
+import {
+  BOARD_COLUMNS_IN_DISPLAY_ORDER,
+  TASK_STATUS_SEQUENCE,
+} from './workbenchBoardColumns';
 
 export type TaskSortMode = 'custom' | 'due';
 export type TaskGroupMode = 'custom' | 'project' | 'status';
 
-export const TASK_STATUS_SEQUENCE: TaskStatus[] = ['未开始', '进行中', '待评审', '待确认', '已完成'];
+/**
+ * Lifecycle status sequence — owned by the board-column SSOT (#1999);
+ * re-exported so existing consumers keep their import path.
+ */
+export { TASK_STATUS_SEQUENCE };
 
 export const DESIGN_DONE_TASK: TaskItem = {
   id: 'readme-structure-done',
@@ -61,14 +69,24 @@ export function sortTasks(tasks: TaskItem[], mode: TaskSortMode): TaskItem[] {
 export function groupTasks(tasks: TaskItem[], mode: TaskGroupMode): TaskGroup[] {
   if (mode === 'custom') return [{ label: '默认分组', tasks }];
 
-  const labels = mode === 'status'
-    ? ['进行中', '待评审', '待确认', '未开始', '已完成']
-    : Array.from(new Set(tasks.map((task) => task.project)));
+  // Status groups derive 1:1 from the board-column SSOT (#1999): each
+  // group carries its column id/tone so board chrome never re-derives the
+  // mapping locally.
+  if (mode === 'status') {
+    return BOARD_COLUMNS_IN_DISPLAY_ORDER
+      .map((column) => ({
+        label: column.label,
+        tasks: tasks.filter((task) => task.status === column.status),
+        columnId: column.id,
+        tone: column.tone,
+      }))
+      .filter((group) => group.tasks.length > 0);
+  }
 
-  return labels
+  return Array.from(new Set(tasks.map((task) => task.project)))
     .map((label) => ({
       label,
-      tasks: tasks.filter((task) => (mode === 'status' ? task.status : task.project) === label),
+      tasks: tasks.filter((task) => task.project === label),
     }))
     .filter((group) => group.tasks.length > 0);
 }

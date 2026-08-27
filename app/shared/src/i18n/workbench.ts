@@ -322,6 +322,13 @@ export const sharedWorkbenchResources = {
         title: '无权限查看任务',
         description: '你没有查看此任务的权限。',
       },
+      board: {
+        awaitingReviewMarker: '等待评审',
+        approveReview: '批准评审',
+        merge: '合并',
+        reviewControlsAria: '评审与合并操作',
+        hubOnlyMergeNotice: '合并需要 Desktop / Local Edge；当前表面只展示待评审任务，不会执行合并。',
+      },
     },
     profilePopover: {
       sendMessage: '发送消息', copyLink: '复制链接',
@@ -681,6 +688,13 @@ export const sharedWorkbenchResources = {
       noPermission: {
         title: 'No permission to view tasks',
         description: 'You don\'t have permission to view this task.',
+      },
+      board: {
+        awaitingReviewMarker: 'Awaiting review',
+        approveReview: 'Approve review',
+        merge: 'Merge',
+        reviewControlsAria: 'Review and merge actions',
+        hubOnlyMergeNotice: 'Merging requires Desktop / Local Edge; this surface only shows awaiting-review tasks and never merges.',
       },
     },
     profilePopover: {
