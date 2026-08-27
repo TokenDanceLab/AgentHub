@@ -1,0 +1,59 @@
+/* ═══ Conversation goal banner (#1998, UX F8) ═══
+   Projection strip between the workspace header and the transcript:
+   status chip (attention-model classes) + objective copy + fail-closed
+   stop entry. Layout must never overflow horizontally: the objective
+   truncates with ellipsis while the chip and stop button keep their size. */
+
+.goalBanner {
+  display: flex;
+  align-items: center;
+  gap: var(--wb-gap-xs);
+  padding: var(--wb-gap-2xs) var(--wb-gap-sm);
+  border-bottom: 1px solid var(--border-subtle);
+  background: color-mix(in oklch, var(--td-accent) 4%, transparent);
+  min-width: 0;
+}
+
+.goalObjective {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  font: 500 0.75rem var(--td-font);
+  color: var(--td-ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.goalStop {
+  flex-shrink: 0;
+  min-height: 24px;
+  padding: 2px 10px;
+  border: 1px solid color-mix(in oklch, var(--td-danger) 35%, transparent);
+  border-radius: var(--td-radius-control);
+  background: color-mix(in oklch, var(--td-danger) 10%, transparent);
+  color: var(--td-danger);
+  font: 500 0.6875rem var(--td-font);
+  cursor: pointer;
+  transition:
+    background var(--td-dur-normal) var(--td-ease),
+    border-color var(--td-dur-normal) var(--td-ease);
+}
+
+.goalStop:hover {
+  background: color-mix(in oklch, var(--td-danger) 18%, transparent);
+}
+
+.goalStop:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+/* Narrow viewports (768/800 tiers): keep a single dense strip; ellipsis on
+   the objective already absorbs the width loss, so no reflow needed. */
+@media (max-width: 900px) {
+  .goalBanner {
+    padding: var(--wb-gap-2xs) var(--wb-gap-xs);
+    gap: var(--wb-gap-2xs);
+  }
+}

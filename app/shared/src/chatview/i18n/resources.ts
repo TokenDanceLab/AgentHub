@@ -610,6 +610,14 @@ export const chatviewResources = {
     // #1945: artifact content download degrade notice (Web Hub-only boundary).
     'inspector.artifactDownloadUnavailable': '下载不可用：当前端无产物内容端点。',
 
+    // ═══ Goal banner (#1998, UX F8) ═══
+    'goalBanner.aria': '会话目标',
+    'goalBanner.status.active': '目标进行中',
+    'goalBanner.status.blocked': '目标受阻',
+    'goalBanner.status.completed': '目标已完成',
+    'goalBanner.stop': '停止',
+    'goalBanner.stopAria': '停止当前运行',
+
     // ═══ Aria labels ═══
     'aria.workspace': '工作区',
     'aria.workspaceTabs': '工作区标签页',
@@ -1422,6 +1430,14 @@ export const chatviewResources = {
     'inspector.emptyPanel': 'The right panel is closed. Use + to reopen Overview, Browser, or Files.',
     // #1945: artifact content download degrade notice (Web Hub-only boundary).
     'inspector.artifactDownloadUnavailable': 'Download unavailable: this client has no artifact content endpoint.',
+
+    // ═══ Goal banner (#1998, UX F8) ═══
+    'goalBanner.aria': 'Conversation goal',
+    'goalBanner.status.active': 'Goal in progress',
+    'goalBanner.status.blocked': 'Goal blocked',
+    'goalBanner.status.completed': 'Goal completed',
+    'goalBanner.stop': 'Stop',
+    'goalBanner.stopAria': 'Stop the current run',
 
     // ═══ Aria labels ═══
     'aria.workspace': 'Workspace',
