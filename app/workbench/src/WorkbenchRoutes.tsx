@@ -68,6 +68,7 @@ interface WorkbenchTasksRouteGateProps {
   currentUserId?: string | undefined;
   userDisplayName?: string | undefined;
   profiles: WorkbenchProfileSource[];
+  platformSurface?: WorkbenchRoutesProps['platformSurface'];
 }
 
 const WorkbenchTasksRouteGate = React.memo(function WorkbenchTasksRouteGate({
@@ -77,6 +78,7 @@ const WorkbenchTasksRouteGate = React.memo(function WorkbenchTasksRouteGate({
   currentUserId,
   userDisplayName,
   profiles,
+  platformSurface,
 }: WorkbenchTasksRouteGateProps): React.ReactElement | null {
   const tasksRoute = useWorkbenchTasksRoute({
     realDataMode,
@@ -91,6 +93,7 @@ const WorkbenchTasksRouteGate = React.memo(function WorkbenchTasksRouteGate({
         tasksRoute={tasksRoute}
         realDataMode={realDataMode}
         profiles={profiles}
+        platformSurface={platformSurface}
       />
     </PageErrorBoundary>
   );
@@ -212,6 +215,7 @@ export function WorkbenchRoutes({
   onNavigatePage,
   currentUserId,
   userDisplayName,
+  platformSurface,
   devicesTargets,
   devicesLoading,
   devicesError,
@@ -335,6 +339,7 @@ export function WorkbenchRoutes({
         currentUserId={currentUserId}
         userDisplayName={userDisplayName}
         profiles={profileSources}
+        platformSurface={platformSurface}
       />
       <WorkbenchProjectsRouteGate
         active={activePage === 'projects'}

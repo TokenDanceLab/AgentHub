@@ -3,6 +3,8 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import type { WorkbenchProfileSource } from '../../profileRegistry';
+import type { BoardColumnTone, TaskReviewMergePort } from '../../workbenchBoardColumns';
+import type { AgentHubSurface } from '@shared/platform';
 
 export type TaskStatus =
   | '未开始'
@@ -52,6 +54,13 @@ export interface TaskGroup {
   label: string;
   /** Tasks in this group */
   tasks: TaskItem[];
+  /**
+   * Board column id from the board-column SSOT (#1999) — present only for
+   * status-grouped (board) groups; carries the column tone for chrome.
+   */
+  columnId?: string | undefined;
+  /** Board column tone (#1999); present together with columnId. */
+  tone?: BoardColumnTone | undefined;
 }
 
 export type TaskEditDraft = Pick<TaskItem, 'title' | 'project' | 'assignee' | 'startTime' | 'dueDate' | 'creator'>;
@@ -81,6 +90,16 @@ export interface TasksPageProps {
    * mistaken for real workspace tasks (#1818).
    */
   demoDataActive?: boolean | undefined;
+  /**
+   * Workbench surface (#1999): Hub-only surfaces (web/mobile) never render
+   * merge controls and state that merging requires Desktop / Local Edge.
+   */
+  platformSurface?: AgentHubSurface | undefined;
+  /**
+   * Real review-before-merge capability port (#1999). Absent port = zero
+   * approve/merge controls (fail-closed); the Tasks route never invents one.
+   */
+  reviewMergePort?: TaskReviewMergePort | null | undefined;
   /** Agent/user profiles available for assignee and creator avatar resolution */
   profiles?: WorkbenchProfileSource[] | undefined;
   /** Selected task details, rendered as a compact in-page action strip */

@@ -936,3 +936,82 @@
   outline-offset: 2px;
   box-shadow: var(--focus-ring);
 }
+/* ── Board column SSOT chrome (#1999, UX F13) ─────────────────────────────
+   Status tones reuse the shared semantic state palette (presets-base.css);
+   no second status-color system and no hardcoded colors here. */
+
+.groupTitle[data-board-tone='idle'] {
+  color: var(--state-cancelled);
+}
+
+.groupTitle[data-board-tone='running'] {
+  color: var(--state-running);
+}
+
+.groupTitle[data-board-tone='review'] {
+  color: var(--state-waiting);
+}
+
+.groupTitle[data-board-tone='confirm'] {
+  color: var(--state-thinking);
+}
+
+.groupTitle[data-board-tone='done'] {
+  color: var(--state-success);
+}
+
+/* Explicit awaiting-review marker on task cards (#1999 review-before-merge). */
+.reviewMarker {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin-left: var(--sp-2);
+  padding: 1px 6px;
+  border: 1px solid var(--state-waiting);
+  border-radius: var(--r-full);
+  background: var(--warning-bg);
+  color: var(--state-waiting);
+  font: 600 0.6875rem var(--td-font);
+  white-space: nowrap;
+}
+
+.reviewMarker svg {
+  flex: 0 0 auto;
+}
+
+/* Review/merge controls in the selection strip — only rendered when a real
+   capability port exists on a desktop surface (fail-closed gate in TS). */
+.reviewMergeControls {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-xxs);
+}
+
+.reviewMergeControls .reviewApproveBtn,
+.reviewMergeControls .reviewMergeBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.reviewMergeControls .reviewApproveBtn {
+  border-color: var(--state-waiting);
+  color: var(--state-waiting);
+}
+
+.reviewMergeControls .reviewApproveBtn:hover {
+  background: var(--warning-bg);
+  border-color: var(--state-waiting);
+  color: var(--state-waiting);
+}
+
+.reviewMergeControls .reviewMergeBtn {
+  border-color: var(--state-success);
+  color: var(--state-success);
+}
+
+.reviewMergeControls .reviewMergeBtn:hover {
+  background: var(--success-bg);
+  border-color: var(--state-success);
+  color: var(--state-success);
+}
