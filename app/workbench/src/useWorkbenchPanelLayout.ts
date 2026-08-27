@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { DESKTOP_TOGGLE_SIDEBAR_EVENT } from './desktopChromeEvents';
 import type { GlobalRailPage } from './GlobalRail';
 import {
@@ -7,9 +7,25 @@ import {
   INSPECTOR_DEFAULT_WIDTH,
   INSPECTOR_WIDTH_STORAGE_KEY,
   SIDEBAR_DEFAULT_WIDTH,
+  SPLIT_LAYOUT_STORAGE_KEY,
   WORKSPACE_MOUNT_COLLAPSE_INSPECTOR_WIDTH,
   WORKSPACE_MOUNT_COLLAPSE_WIDTH,
 } from './workbenchLayoutConstants';
+import {
+  countLeaves,
+  createLeaf,
+  findLeafByConversation,
+  listLeaves,
+  moveConversationToPane,
+  placeIncomingConversation,
+  removePane,
+  serializeSplitLayout,
+  splitPane,
+  tryParseSplitLayout,
+  type SplitLayoutNode,
+  type SplitOrientation,
+} from './workbenchSplitLayout';
+import type { WorkbenchSplitState } from './workbenchPanelLayoutHelpers';
 import {
   applyInspectorClientXPlan,
   applyInspectorResizeByPlan,
@@ -87,11 +103,38 @@ function storeInspectorCollapsed(collapsed: boolean): void {
   }
 }
 
+// ── Split-view layout persistence (#1997, localStorage, best-effort) ──────
+// Defensive hydration: any malformed/hostile blob is rejected by
+// tryParseSplitLayout and falls back to a single group (no white screen).
+
+function loadStoredSplitLayout(): SplitLayoutNode | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    return tryParseSplitLayout(window.localStorage.getItem(SPLIT_LAYOUT_STORAGE_KEY));
+  } catch {
+    return null;
+  }
+}
+
+function storeSplitLayout(node: SplitLayoutNode | null): void {
+  if (typeof window === 'undefined') return;
+  try {
+    if (node === null) {
+      window.localStorage.removeItem(SPLIT_LAYOUT_STORAGE_KEY);
+    } else {
+      window.localStorage.setItem(SPLIT_LAYOUT_STORAGE_KEY, serializeSplitLayout(node));
+    }
+  } catch {
+    // Quota / private-mode — persistence is best-effort.
+  }
+}
+
 export function useWorkbenchPanelLayout({
   activePage,
   isChatPage,
   platformSurface,
   setActivePage,
+  activeConversationId,
 }: UseWorkbenchPanelLayoutOptions): WorkbenchPanelLayout {
   const [inspectorWidth, setInspectorWidth] = useState(loadStoredInspectorWidth);
   const [inspectorCollapsed, setInspectorCollapsed] = useState(loadStoredInspectorCollapsed);
@@ -361,6 +404,109 @@ export function useWorkbenchPanelLayout({
     });
   }, [sidebarResizing, updateSidebarWidthFromClientX]);
 
+  // ── Split-view layout state (#1997, UX F3) ──────────────────────────────
+  // Stored tree + render-time placement derivation (pure). The active pane is
+  // whichever leaf holds the active conversation; when the selection lands on
+  // a conversation absent from the tree it is placed into the first empty
+  // pane, else the first pane that is not the previously active one (parallel
+  // review must not evict what the user is looking at).
+  const [splitTree, setSplitTree] = useState<SplitLayoutNode | null>(loadStoredSplitLayout);
+  const previousSplitConversationRef = useRef<string | undefined>(undefined);
+
+  const effectiveSplitTree = useMemo(() => {
+    if (!splitTree) return null;
+    if (!activeConversationId) return splitTree;
+    return placeIncomingConversation(
+      splitTree,
+      activeConversationId,
+      previousSplitConversationRef.current,
+    ).tree;
+  }, [splitTree, activeConversationId]);
+
+  useEffect(() => {
+    previousSplitConversationRef.current = activeConversationId ?? undefined;
+  }, [activeConversationId]);
+
+  useEffect(() => {
+    storeSplitLayout(effectiveSplitTree);
+  }, [effectiveSplitTree]);
+
+  const splitActive = effectiveSplitTree !== null && countLeaves(effectiveSplitTree) >= 2;
+
+  const splitActivePane = useCallback((orientation: SplitOrientation): void => {
+    const base = effectiveSplitTree
+      ?? (activeConversationId ? createLeaf('split-pane-main', activeConversationId) : null);
+    if (!base) return;
+    const activeLeaf = (activeConversationId
+      ? findLeafByConversation(base, activeConversationId)
+      : null) ?? listLeaves(base)[0] ?? null;
+    if (!activeLeaf) return;
+    const next = splitPane(base, activeLeaf.paneId, orientation);
+    if (next) setSplitTree(next);
+  }, [activeConversationId, effectiveSplitTree]);
+
+  const unsplitPane = useCallback((paneId: string): void => {
+    if (!effectiveSplitTree) return;
+    const activeLeaf = activeConversationId
+      ? findLeafByConversation(effectiveSplitTree, activeConversationId)
+      : null;
+    if (activeLeaf?.paneId === paneId) {
+      // Unsplit on the active pane collapses back to a single group.
+      setSplitTree(null);
+      return;
+    }
+    const next = removePane(effectiveSplitTree, paneId);
+    setSplitTree(next !== null && countLeaves(next) >= 2 ? next : null);
+  }, [activeConversationId, effectiveSplitTree]);
+
+  const collapseAll = useCallback((): void => {
+    setSplitTree(null);
+  }, []);
+
+  const placeConversation = useCallback((conversationId: string): boolean => {
+    if (!effectiveSplitTree || !splitActive) return false;
+    if (findLeafByConversation(effectiveSplitTree, conversationId)) return true;
+    const placed = placeIncomingConversation(
+      effectiveSplitTree,
+      conversationId,
+      activeConversationId ?? undefined,
+    );
+    if (placed.changed) setSplitTree(placed.tree);
+    return true;
+  }, [activeConversationId, effectiveSplitTree, splitActive]);
+
+  const movePaneConversationToPane = useCallback((sourcePaneId: string, targetPaneId: string): void => {
+    if (!effectiveSplitTree) return;
+    const moved = moveConversationToPane(effectiveSplitTree, sourcePaneId, targetPaneId);
+    if (moved) setSplitTree(countLeaves(moved) >= 2 ? moved : null);
+  }, [effectiveSplitTree]);
+
+  // Memoized so the state object survives shell re-renders (keystrokes,
+  // toasts) — downstream ConversationHost memo gates stay intact (#perf).
+  const splitState: WorkbenchSplitState = useMemo(() => ({
+    tree: effectiveSplitTree,
+    active: splitActive,
+    panes: effectiveSplitTree
+      ? listLeaves(effectiveSplitTree).map((leaf) => ({
+          paneId: leaf.paneId,
+          conversationId: leaf.conversationId,
+        }))
+      : [],
+    splitActivePane,
+    unsplitPane,
+    collapseAll,
+    placeConversation,
+    moveConversationToPane: movePaneConversationToPane,
+  }), [
+    effectiveSplitTree,
+    splitActive,
+    splitActivePane,
+    unsplitPane,
+    collapseAll,
+    placeConversation,
+    movePaneConversationToPane,
+  ]);
+
   return buildWorkbenchPanelLayoutResult({
     inspectorWidth,
     inspectorCollapsed,
@@ -384,5 +530,6 @@ export function useWorkbenchPanelLayout({
     closeInspector,
     restoreInspectorWidth,
     restoreSidebarWidth,
+    split: splitState,
   });
 }

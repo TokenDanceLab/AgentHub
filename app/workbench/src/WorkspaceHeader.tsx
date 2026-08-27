@@ -1,9 +1,11 @@
-import React from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { WorkbenchConversation } from '@shared/platform';
 import { DesignNavIcon } from './designIcons';
 import { CHATVIEW_I18N_NAMESPACE } from '@shared/chatview/i18n/resources';
 import { Tooltip } from '@shared/ui/Tooltip';
+import { ContextMenu, type ContextMenuItem } from './floating/ContextMenu';
+import type { WorkbenchSplitControls } from './workbenchFrameTypes';
 import styles from './AgentHubWorkbench.module.css';
 
 export interface WorkspaceHeaderProps {
@@ -12,6 +14,16 @@ export interface WorkspaceHeaderProps {
   onToggleInspector: () => void;
   /** Called when the user clicks the search icon. */
   onOpenSearch?: (() => void) | undefined;
+  /**
+   * Split-view controls (#1997, UX F3). Absent when the honesty gate hides
+   * the surface (fewer than two conversations) — no split entry renders.
+   */
+  splitControls?: WorkbenchSplitControls | undefined;
+}
+
+interface SplitMenuState {
+  x: number;
+  y: number;
 }
 
 export function WorkspaceHeader({
@@ -19,16 +31,76 @@ export function WorkspaceHeader({
   inspectorCollapsed,
   onToggleInspector,
   onOpenSearch,
+  splitControls,
 }: WorkspaceHeaderProps): React.ReactElement {
   const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE);
+  const [splitMenu, setSplitMenu] = useState<SplitMenuState | null>(null);
+  const splitButtonRef = useRef<HTMLButtonElement>(null);
   const initial = activeConversation?.avatarLabel ?? (activeConversation?.title ?? 'A').slice(0, 1);
   const hasModel = Boolean(activeConversation?.model);
   const runtimeLabel = activeConversation?.runtimeLabel ?? activeConversation?.subtitle;
   const threadLabel = activeConversation?.threadLabel
     ?? (activeConversation?.kind === 'group' ? '协作群' : '私聊');
 
+  const closeSplitMenu = useCallback((): void => setSplitMenu(null), []);
+
+  const openSplitMenuFromButton = useCallback((): void => {
+    const rect = splitButtonRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    setSplitMenu({ x: rect.right, y: rect.bottom + 4 });
+  }, []);
+
+  const handleHeaderContextMenu = useCallback((event: React.MouseEvent): void => {
+    if (!splitControls) return;
+    event.preventDefault();
+    setSplitMenu({ x: event.clientX, y: event.clientY });
+  }, [splitControls]);
+
+  // Split view context menu (#1997): Split Right / Split Down always offered;
+  // Move to Group + Unsplit only while a split is active (flow convergence).
+  const splitMenuGroups = useCallback((): Array<Array<ContextMenuItem>> => {
+    if (!splitControls) return [];
+    const layoutGroup: ContextMenuItem[] = [];
+    if (splitControls.onSplitRight) {
+      layoutGroup.push({ icon: 'split', label: t('split.right'), onClick: splitControls.onSplitRight });
+    }
+    if (splitControls.onSplitDown) {
+      layoutGroup.push({ icon: 'download', label: t('split.down'), onClick: splitControls.onSplitDown });
+    }
+    if (!splitControls.hasSplit) return layoutGroup.length > 0 ? [layoutGroup] : [];
+    const moveGroup: ContextMenuItem[] = [];
+    if (splitControls.moveTargets.length > 0) {
+      moveGroup.push({
+        icon: 'forward',
+        label: t('split.moveToGroup'),
+        chevron: true,
+        submenu: (close) => (
+          <div role="group" aria-label={t('split.moveToGroup')}>
+            {splitControls.moveTargets.map((target) => (
+              <button
+                key={target.paneId}
+                className={styles.splitMoveTarget}
+                role="menuitem"
+                type="button"
+                title={target.title}
+                onClick={() => {
+                  splitControls.onMoveToPane(target.paneId);
+                  close();
+                }}
+              >
+                {target.title}
+              </button>
+            ))}
+          </div>
+        ),
+      });
+    }
+    moveGroup.push({ icon: 'close', label: t('split.unsplit'), onClick: splitControls.onUnsplit });
+    return [layoutGroup, moveGroup];
+  }, [splitControls, t]);
+
   return (
-    <header className={styles.workspaceHeader}>
+    <header className={styles.workspaceHeader} onContextMenu={handleHeaderContextMenu}>
       <div
         aria-hidden="true"
         className={styles.workspaceAvatar}
@@ -67,6 +139,22 @@ export function WorkspaceHeader({
           instead of leaving dead chrome; shells that gain those capabilities
           should wire callbacks when re-adding them. */}
       <div className={styles.workspaceActions}>
+        {splitControls ? (
+          <Tooltip label={t('aria.splitMenu')}>
+            <button
+              ref={splitButtonRef}
+              aria-haspopup="menu"
+              aria-expanded={splitMenu !== null}
+              aria-label={t('aria.splitMenu')}
+              className={styles.iconButton}
+              data-testid="workbench-split-menu"
+              onClick={openSplitMenuFromButton}
+              type="button"
+            >
+              <DesignNavIcon name="split" />
+            </button>
+          </Tooltip>
+        ) : null}
         <Tooltip label={t('aria.search')}>
           <button
             aria-label={t('aria.search')}
@@ -89,6 +177,17 @@ export function WorkspaceHeader({
           </button>
         </Tooltip>
       </div>
+      {splitControls ? (
+        <ContextMenu
+          isOpen={splitMenu !== null}
+          groups={splitMenuGroups()}
+          title={t('split.menuTitle')}
+          subtitle={t('split.menuSubtitle')}
+          x={splitMenu?.x ?? 0}
+          y={splitMenu?.y ?? 0}
+          onClose={closeSplitMenu}
+        />
+      ) : null}
     </header>
   );
 }

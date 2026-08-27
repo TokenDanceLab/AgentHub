@@ -165,6 +165,7 @@ export type DesignNavIconName =
   | 'send'
   | 'sidebarLeft'
   | 'sidebarRight'
+  | 'split'
   | 'star'
   | 'states'
   | 'stop'
