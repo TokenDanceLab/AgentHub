@@ -119,13 +119,24 @@ async function captureTheme(browser, theme, vp) {
   await page.screenshot({ path: file, fullPage: false });
   // #1874: emit a DOM/geometry contract next to the PNG so the gate can prove it
   // captured the workbench (not an onboarding/blank shell) with no horizontal overflow.
-  const contract = await page.evaluate(() => ({
-    viewport: { width: window.innerWidth, height: window.innerHeight },
-    workbenchShell: Boolean(document.querySelector('[data-testid="agenthub-workbench"]')),
-    onboardingVisible: Boolean(document.querySelector('[data-testid="onboarding-overlay"]')),
-    horizontalOverflow:
-      document.documentElement.scrollWidth > document.documentElement.clientWidth + 1,
-  }));
+  const contract = await page.evaluate(() => {
+    const banner = document.querySelector('section[data-goal-status]');
+    const bannerRect = banner ? banner.getBoundingClientRect() : null;
+    return {
+      viewport: { width: window.innerWidth, height: window.innerHeight },
+      workbenchShell: Boolean(document.querySelector('[data-testid="agenthub-workbench"]')),
+      onboardingVisible: Boolean(document.querySelector('[data-testid="onboarding-overlay"]')),
+      // UX F8 (#1998): goal banner geometry on the demo chat landing page
+      // (builder demo transcript carries a goal arc) — recorded on every
+      // tier so the narrow 800 width proves no layout breakage.
+      goalBanner: banner && bannerRect
+        ? { exists: true, width: Math.round(bannerRect.width), height: Math.round(bannerRect.height) }
+        : { exists: false },
+      goalStatus: banner ? banner.getAttribute('data-goal-status') : '',
+      horizontalOverflow:
+        document.documentElement.scrollWidth > document.documentElement.clientWidth + 1,
+    };
+  });
   const contractFile = path.join(outDir, `desktop-shell-${theme}-${vp.label}${dprSuffix}.json`);
   await writeFile(contractFile, JSON.stringify(contract, null, 2) + '\n');
   const applied = await page.evaluate(() => document.documentElement.getAttribute('data-theme'));

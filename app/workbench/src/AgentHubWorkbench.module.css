@@ -3980,6 +3980,14 @@ button.mainchainAttentionChip[data-attention-kind='usage']:hover {
   background: color-mix(in oklch, var(--td-accent) 18%, transparent);
 }
 
+/* #1998 (UX F8): goal banner chip — terminal success tone of the same
+   attention-chip palette (workbenchGoalBanner). */
+.mainchainAttentionChip[data-attention-kind='goal-complete'] {
+  color: var(--state-success);
+  border-color: color-mix(in oklch, var(--state-success) 35%, transparent);
+  background: color-mix(in oklch, var(--state-success) 12%, transparent);
+}
+
 .mainchainAttentionDot {
   width: 6px;
   height: 6px;

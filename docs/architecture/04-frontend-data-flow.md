@@ -1,8 +1,6 @@
 # Frontend Data Flow
 
-> 子文档 | 主索引：[architecture.md](../architecture.md) · Hub API：[01-hub-server.md](01-hub-server.md)
->
-> 最后更新：2026-08-25
+> 子文档 | 主索引：[architecture.md](../architecture.md) · Hub API：[01-hub-server.md](01-hub-server.md) · 最后更新：2026-08-28
 
 本文档只记录 Desktop/Web/Mobile 共享前端的数据流合同和 source owner。具体 hook、组件 props、测试用例数量以源码和测试为准，不在这里复制清单。
 
@@ -51,8 +49,6 @@ UI 可以根据 `capabilities` 隐藏或禁用动作，但不能 fork 另一套�
 | Web/Mobile app shell and adapter wiring | `app/web/src/App.tsx`, `app/web/src/platform/`, `app/web/src/api/`, `app/mobile-rn/src/platform/`, `app/mobile-rn/src/api/` |
 | Client lane E2E/contract gates | `app/desktop/src/__e2e__/chat-flow-ui.spec.ts`, `app/web/src/__e2e__/`, `app/mobile-rn/src/importBoundary.test.ts`, `app/mobile-rn/src/api/` |
 
-Do not add per-hook inventory tables here. If a file moves, update this owner map and the nearest README/source test, not a duplicate implementation checklist.
-
 ## 工程列焦点合同
 
 - 自动展开：active run 或新产物 evidence 可自动展开工程列；用户在运行中手动收回时按会话持久化抑制，切换会话恢复各自选择；无 active run/产物的纯聊天不改变布局默认。窄视口可延后自动展开以保留可恢复的聊天表面，头部按钮与键盘切换仍可用。
@@ -64,6 +60,10 @@ Do not add per-hook inventory tables here. If a file moves, update this owner ma
 
 - `WorkbenchFrame` 将 `MainchainStatusStrip` 渲染为全局底部状态栏（shell 第 3 行、rail 右侧），所有 rail 页面可见；全局段 = 连接态 + F6 注意力 chips + F14 usage chip（与 rail/sidebar 同源推导），会话段（证据链 + 导出）仅聊天页且 `showMainchainStatus` 开启时渲染。
 - 诚实合同：无数据不渲染；作用域计数带标注；awaiting chip 在聊天页发一次性 `agenthub:approval-jump` 做 transcript 内高亮，其他页面先回聊天并选中首个等待会话。
+
+## 会话目标横幅合同（F8 #1998）
+
+- `deriveGoalSummary`（`workbenchGoalSummary.ts`）从 transcript 的 goal 工具调用（create/update goal）纯派生目标摘要：工具名词汇表是显式 SSOT，未知词汇/缺目标文本/创建失败一律 none（fail-closed，不渲染不猜测）。`ConversationHost` 仅在聊天页头部投影 `WorkbenchGoalBanner`（transcript 的投影，非新数据源）；停止入口仅在 `onCancelRun` 接入时渲染，无暂停按钮（Hub 无暂停通道）；状态芯片复用注意力模型色板。
 
 ## Transcript Pipeline
 

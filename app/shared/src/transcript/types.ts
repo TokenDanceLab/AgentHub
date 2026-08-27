@@ -79,6 +79,14 @@ export interface ToolCallTranscriptBlock extends TranscriptBlockBase {
   status: EvidenceRefStatus;
   target?: string;
   summary?: string;
+  /**
+   * Bounded scalar projection of the tool's invocation arguments
+   * (`payload.input`, #1998 UX F8). Only flat string (<= 512 chars) /
+   * number / boolean entries survive; rich payloads (patches, file
+   * contents) are intentionally dropped so transcripts stay light.
+   * Absent when the event carried no usable scalar arguments.
+   */
+  input?: Readonly<Record<string, string | number | boolean>>;
 }
 
 export interface ToolResultTranscriptBlock extends TranscriptBlockBase {

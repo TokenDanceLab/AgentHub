@@ -4,6 +4,7 @@ import type { EventEnvelope, EventScope } from '../events';
 import { AGENT_AUTHOR } from './edgeEventEvidence';
 import {
   fileChangeBlock,
+  scalarToolInputProjection,
   toolCallBlock,
   toolResultBlock,
 } from './edgeEventMappersTools';
@@ -401,5 +402,79 @@ describe('fileChangeBlock', () => {
       }),
     );
     expect(block?.author).toEqual({ id: 'agent-b', name: 'Beta', role: 'agent' });
+  });
+});
+
+describe('tool call input projection (#1998)', () => {
+  it('projects flat scalar arguments onto the tool_call block', () => {
+    // Shape mirrors the Edge SDK/NDJSON adapters: tool_call events carry the
+    // parsed tool arguments under payload.input (here the Codex goal tools).
+    const block = toolCallBlock(
+      edgeEvent('evt-goal-create', 11, 'run.agent.tool_call', {
+        runId: 'run-goal',
+        toolName: 'create_goal',
+        callId: 'call-goal-1',
+        status: 'completed',
+        input: { objective: 'Ship the quarterly report pipeline', token_budget: 120000 },
+      }),
+    );
+    expect(block).toMatchObject({
+      kind: 'tool_call',
+      toolName: 'create_goal',
+      input: { objective: 'Ship the quarterly report pipeline', token_budget: 120000 },
+    });
+  });
+
+  it('keeps blocks without usable scalar arguments unchanged', () => {
+    const noInput = toolCallBlock(
+      edgeEvent('evt-ni', 12, 'run.agent.tool_call', { toolName: 'Read', callId: 'c-ni' }),
+    );
+    expect(noInput && 'input' in noInput).toBe(false);
+
+    const richInput = toolCallBlock(
+      edgeEvent('evt-ri', 13, 'run.agent.tool_call', {
+        toolName: 'apply_patch',
+        callId: 'c-ri',
+        input: { patch: 'x'.repeat(600) },
+      }),
+    );
+    expect(richInput && 'input' in richInput).toBe(false);
+  });
+});
+
+describe('scalarToolInputProjection', () => {
+  it('keeps short strings, numbers and booleans', () => {
+    expect(
+      scalarToolInputProjection({ objective: 'refactor fetch', dryRun: true, retries: 2 }),
+    ).toEqual({ objective: 'refactor fetch', dryRun: true, retries: 2 });
+  });
+
+  it('drops oversized strings, nested values and non-finite numbers', () => {
+    expect(
+      scalarToolInputProjection({
+        patch: 'x'.repeat(513),
+        nested: { deep: true },
+        list: [1, 2],
+        nan: Number.NaN,
+        keep: 'ok',
+      }),
+    ).toEqual({ keep: 'ok' });
+  });
+
+  it('caps the number of projected entries', () => {
+    const input: Record<string, string> = {};
+    for (let i = 0; i < 20; i += 1) input['k' + String(i)] = 'v' + String(i);
+    const projected = scalarToolInputProjection(input);
+    expect(projected).toBeDefined();
+    expect(Object.keys(projected ?? {})).toHaveLength(12);
+  });
+
+  it('returns undefined for non-object inputs', () => {
+    expect(scalarToolInputProjection(undefined)).toBeUndefined();
+    expect(scalarToolInputProjection(null)).toBeUndefined();
+    expect(scalarToolInputProjection('text')).toBeUndefined();
+    expect(scalarToolInputProjection([1, 2])).toBeUndefined();
+    expect(scalarToolInputProjection({})).toBeUndefined();
+    expect(scalarToolInputProjection({ patch: 'x'.repeat(600) })).toBeUndefined();
   });
 });

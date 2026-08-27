@@ -127,6 +127,24 @@ async function main() {
     }
   }
 
+  // UX F8 goal scene (#1998): every goal contract must prove the banner
+  // rendered with positive geometry in the active state.
+  const goalContractNames = contractNames.filter(function (n) { return /^web-chat-goal-.*\.json$/.test(n); });
+  if (goalContractNames.length === 0) {
+    failures.push('no goal-scene contracts found (expected web-chat-goal-*.json)');
+  }
+  for (const name of goalContractNames) {
+    const contract = JSON.parse(await readFile(path.join(outDir, name), 'utf8'));
+    if (!contract.goalBanner || contract.goalBanner.exists !== true) {
+      failures.push(name + ': goal banner not captured');
+    } else if (!(contract.goalBanner.width > 0) || !(contract.goalBanner.height > 0)) {
+      failures.push(name + ': goal banner has a zero-size box (' + contract.goalBanner.width + 'x' + contract.goalBanner.height + ')');
+    }
+    if (contract.goalStatus !== 'active') {
+      failures.push(name + ': expected active goal status, got ' + (contract.goalStatus || '(none)'));
+    }
+  }
+
   const diag = names.filter(function (n) { return n.includes('DIAGNOSTIC'); });
   if (diag.length > 0) {
     console.warn('warn: diagnostic captures present: ' + diag.join(', '));
