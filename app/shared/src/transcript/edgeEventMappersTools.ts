@@ -24,6 +24,47 @@ import {
   toolEvidence,
 } from './edgeEventEvidence';
 
+/** Maximum serialized length for a string argument kept in the projection. */
+const INPUT_STRING_LIMIT = 512;
+/** Maximum number of scalar arguments kept in the projection. */
+const INPUT_ENTRY_LIMIT = 12;
+
+/**
+ * Bounded scalar projection of a tool call's raw `input` arguments (#1998,
+ * UX F8). Edge adapters emit the parsed tool arguments object on tool_call
+ * events (e.g. the Codex goal tools carry `objective` / `status` there),
+ * but transcripts must stay light: only flat string / number / boolean
+ * entries survive, strings are capped, and at most a handful of entries are
+ * kept. Returns undefined when nothing useful remains, so blocks without
+ * scalar arguments keep their exact previous shape.
+ */
+export function scalarToolInputProjection(
+  input: unknown,
+): Record<string, string | number | boolean> | undefined {
+  if (input === null || typeof input !== 'object' || Array.isArray(input)) return undefined;
+  const out: Record<string, string | number | boolean> = {};
+  let count = 0;
+  for (const [key, value] of Object.entries(input as Record<string, unknown>)) {
+    if (count >= INPUT_ENTRY_LIMIT) break;
+    if (typeof value === 'string') {
+      if (value.length === 0 || value.length > INPUT_STRING_LIMIT) continue;
+      out[key] = value;
+      count += 1;
+      continue;
+    }
+    if (typeof value === 'boolean') {
+      out[key] = value;
+      count += 1;
+      continue;
+    }
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      out[key] = value;
+      count += 1;
+    }
+  }
+  return count > 0 ? out : undefined;
+}
+
 export function toolCallBlock(event: EventEnvelope): TranscriptBlock | null {
   const toolName = stringField(event.payload.toolName) ?? stringField(event.payload.name);
   const callId = stringField(event.payload.callId) ?? stringField(event.payload.id);
@@ -44,6 +85,8 @@ export function toolCallBlock(event: EventEnvelope): TranscriptBlock | null {
     cleanText(stringField(event.payload.description)) ??
     cleanText(stringField(event.payload.reason));
 
+  const inputProjection = scalarToolInputProjection(event.payload.input);
+
   return {
     ...blockBase(event, agentAuthorFromEvent(event), [
       ...runEvidence(runId, status),
@@ -55,6 +98,7 @@ export function toolCallBlock(event: EventEnvelope): TranscriptBlock | null {
     status,
     ...(target ? { target } : {}),
     ...(summary ? { summary } : {}),
+    ...(inputProjection ? { input: inputProjection } : {}),
   };
 }
 

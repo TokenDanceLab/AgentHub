@@ -51,6 +51,18 @@ export const chatviewBuilderTranscript: TranscriptBlock[] = [
     runtimeLabel: 'Claude Sonnet 4',
   },
 
+  /* ── Goal registration: long refactor states its objective (#1998, UX F8).
+       Shape mirrors the real transcript projection: tool_call block with a
+       bounded scalar input projection (objective). ── */
+  {
+    id: 'bgoal1', kind: 'tool_call', createdAt: T(1.6), author: B('builder'),
+    callId: 'call-goal-create',
+    toolName: 'create_goal',
+    status: 'completed',
+    input: { objective: 'Refactor the API client layer into a single typed createApiClient factory and migrate every endpoint wrapper' },
+  },
+  { id: 'bgoal1r', kind: 'tool_result', createdAt: T(1.7), author: B('builder'), callId: 'call-goal-create', toolName: 'create_goal', status: 'completed', summary: 'Goal registered: refactor the API client layer into a single typed client' },
+
   /* ── Think 1: Survey scope ── */
   {
     id: 'bth1', kind: 'thinking', createdAt: T(2), author: B('builder'),
@@ -434,6 +446,16 @@ export const chatviewBuilderTranscript: TranscriptBlock[] = [
     risk: 'low',
     reason: 'Non-breaking incremental migration. Each call site changes one import line. Legacy stubs remain active until all call sites are migrated. Rollback: revert the PR — old client.ts untouched throughout.',
   },
+
+  /* ── Goal closed: migration finished, goal marked complete (#1998, UX F8) ── */
+  {
+    id: 'bgoal2', kind: 'tool_call', createdAt: T(37), author: B('builder'),
+    callId: 'call-goal-update',
+    toolName: 'update_goal',
+    status: 'completed',
+    input: { status: 'complete' },
+  },
+  { id: 'bgoal2r', kind: 'tool_result', createdAt: T(37.5), author: B('builder'), callId: 'call-goal-update', toolName: 'update_goal', status: 'completed', summary: 'Goal marked complete' },
 
   /* ── Thinking with evidenceRefs ── */
   {

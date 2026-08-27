@@ -118,6 +118,12 @@ async function main() {
     if (contract.streamingEnded?.typingIndicator !== false) {
       failures.push(name + ': typing indicator visible (transcript not in finished state)');
     }
+    // UX F8 (#1998): demo builder transcript goal arc must project the banner.
+    if (!contract.goalBanner || contract.goalBanner.exists !== true) {
+      failures.push(name + ': goal banner not captured');
+    } else if (!(contract.goalBanner.width > 0) || !(contract.goalBanner.height > 0)) {
+      failures.push(name + ': goal banner has a zero-size box (' + contract.goalBanner.width + 'x' + contract.goalBanner.height + ')');
+    }
   }
 
   const diag = names.filter(function (n) { return n.includes('DIAGNOSTIC'); });

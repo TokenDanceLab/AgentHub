@@ -78,6 +78,12 @@ async function main() {
     if (contract.horizontalOverflow !== false) {
       failures.push('horizontal overflow captured in ' + name);
     }
+    // UX F8 (#1998): demo chat landing page must project the goal banner.
+    if (contract.goalBanner && contract.goalBanner.exists === true) {
+      if (!(contract.goalBanner.width > 0) || !(contract.goalBanner.height > 0)) {
+        failures.push(name + ': goal banner has a zero-size box');
+      }
+    }
   }
 
   for (const base of ['desktop-shell-light-1440x810', 'desktop-shell-dark-1440x810', 'desktop-shell-light-800x900', 'desktop-shell-dark-800x900']) {

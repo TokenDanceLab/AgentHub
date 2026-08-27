@@ -54,6 +54,8 @@ import {
 import { UnifiedComposer } from './UnifiedComposer';
 import { WorkspaceHeader } from './WorkspaceHeader';
 import type { WorkbenchSplitControls } from './workbenchFrameTypes';
+import { WorkbenchGoalBanner } from './WorkbenchGoalBanner';
+import { deriveGoalSummary } from './workbenchGoalSummary';
 import type { UnreadDividerDescriptor } from '@shared/chatview';
 import type { RowItem } from '@shared/chatview/types';
 import { WORKBENCH_ENGINEERING_PREVIEW_FOCUS_EVENT } from './workbenchPreviewEvents';
@@ -514,6 +516,10 @@ export const ConversationHost = React.memo(function ConversationHost({
     ]);
   }, [transcript, pendingUserBlocks]);
 
+  /* UX F8 (#1998): conversation goal banner — pure projection of goal tool
+     calls in the transcript; undefined hides the banner entirely. */
+  const goalSummary = useMemo(() => deriveGoalSummary(displayTranscript), [displayTranscript]);
+
   useEffect(() => {
     setPendingUserBlocks((current) => unacknowledgedPendingUserBlocks(transcript, current));
   }, [transcript]);
@@ -738,6 +744,9 @@ export const ConversationHost = React.memo(function ConversationHost({
       <WorkspaceHeader activeConversation={activeConversation}
         inspectorCollapsed={inspectorCollapsed} onToggleInspector={onToggleInspector} onOpenSearch={() => onSearchOpenChange(true)}
         {...(splitControls ? { splitControls } : {})} />
+      {goalSummary && (
+        <WorkbenchGoalBanner summary={goalSummary} onCancelRun={onCancelRun} />
+      )}
       {(pendingApprovalCount > 0 || runReviewFiles.length > 0) && !selectionMode && (
         <div className={styles.pendingApprovalStrip} role="status" aria-live="polite">
           {pendingApprovalCount > 0 && (

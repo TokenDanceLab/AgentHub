@@ -4,6 +4,7 @@ export { ConversationSidebar } from './ConversationSidebar';
 export { GlobalRail } from './GlobalRail';
 export { RightInspector } from './RightInspector';
 export { UnifiedComposer } from './UnifiedComposer';
+export { WorkbenchGoalBanner } from './WorkbenchGoalBanner';
 export { WorkbenchRoutes } from './WorkbenchRoutes';
 export { WorkspaceHeader } from './WorkspaceHeader';
 export {
@@ -30,6 +31,7 @@ export {
   isRunActive,
   summarizeWorkbenchAttention,
 } from './workbenchAttentionModel';
+export { GOAL_TOOL_NAMES, deriveGoalSummary } from './workbenchGoalSummary';
 export type { TranscriptContextMenuEvent, TranscriptPointerEvent } from './transcriptEventTypes';
 export {
   buildAgentCapabilityContractFromConfig,
@@ -105,6 +107,8 @@ export type {
   WorkbenchAttentionInput,
   WorkbenchAttentionSummary,
 } from './workbenchAttentionModel';
+export type { WorkbenchGoalBannerProps } from './WorkbenchGoalBanner';
+export type { WorkbenchGoalStatus, WorkbenchGoalSummary } from './workbenchGoalSummary';
 export type {
   WorkbenchAgentProfilesStatus,
   WorkbenchContactsData,

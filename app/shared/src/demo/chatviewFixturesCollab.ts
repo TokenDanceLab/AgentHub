@@ -44,6 +44,16 @@ export const chatviewAgentCollabTranscript: TranscriptBlock[] = [
     isThinking: false,
   },
 
+  /* ── Goal registration: long RBAC task states its objective (#1998, UX F8) ── */
+  {
+    id: 'ggoal1', kind: 'tool_call', createdAt: T(1.5), author: O('orch'),
+    callId: 'call-collab-goal-create',
+    toolName: 'create_goal',
+    status: 'completed',
+    input: { objective: 'Ship deny-by-default RBAC middleware with admin/editor/viewer roles and YAML policy config' },
+  },
+  { id: 'ggoal1r', kind: 'tool_result', createdAt: T(1.6), author: O('orch'), callId: 'call-collab-goal-create', toolName: 'create_goal', status: 'completed', summary: 'Goal registered: RBAC middleware with three roles and YAML policy' },
+
   /* ── Orchestrator tool calls (3 total) ── */
   { id: 'goto1', kind: 'tool_call', createdAt: T(2), author: O('orch'), toolName: 'Read', status: 'running' },
   { id: 'gotr1', kind: 'tool_result', createdAt: T(3), author: O('orch'), toolName: 'Read', status: 'completed', summary: 'src/middleware/index.ts · 45 lines · current chain: cors → auth → rateLimit → router' },
@@ -302,4 +312,14 @@ export const chatviewAgentCollabTranscript: TranscriptBlock[] = [
     // Themed blank — never load external white placeholder pages (#1247)
     url: 'about:blank',
   },
+  /* ── Goal closed: RBAC middleware shipped, goal complete (#1998, UX F8) ── */
+  {
+    id: 'ggoal2', kind: 'tool_call', createdAt: T(39), author: O('orch'),
+    callId: 'call-collab-goal-update',
+    toolName: 'update_goal',
+    status: 'completed',
+    input: { status: 'complete' },
+  },
+  { id: 'ggoal2r', kind: 'tool_result', createdAt: T(39.5), author: O('orch'), callId: 'call-collab-goal-update', toolName: 'update_goal', status: 'completed', summary: 'Goal marked complete' },
+
 ]
