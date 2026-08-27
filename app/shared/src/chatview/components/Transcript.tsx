@@ -69,6 +69,8 @@ interface Props {
   onBlockSelect?: (blockId: string, shiftKey: boolean) => void
   onBlockAction?: BlockActionCallback
   onReviewFile?: (file: { name: string; path?: string; url?: string; content?: string; language?: string }) => void
+  /** Artifact card click (#1992): focuses the matching engineering Preview tab. */
+  onArtifactClick?: (item: import('../types').RowItem) => void
   /** Checkpoint timeline card click (#1968): opens the read-only snapshot preview. */
   onCheckpointClick?: (item: import('../types').RowItem) => void
   onDeploySubmit?: (id: string) => void
@@ -300,7 +302,7 @@ function buildBlockIndexMap(segments: TranscriptSegment[]): Map<string, number> 
   return map
 }
 
-const TranscriptImpl = forwardRef<TranscriptHandle, Props>(function Transcript({ items, sessionId, chatMode, onAgentClick, onBlockContextMenu, onBlockSelect, onBlockAction, onReviewFile, onCheckpointClick, onDeploySubmit, previewExternalOpenEnabled, selectedBlockIds, selectionMode, softHiddenBlockIds, actionedBlockIds, renderUserFooter, unreadDivider, compactDividers }: Props, ref) {
+const TranscriptImpl = forwardRef<TranscriptHandle, Props>(function Transcript({ items, sessionId, chatMode, onAgentClick, onBlockContextMenu, onBlockSelect, onBlockAction, onReviewFile, onArtifactClick, onCheckpointClick, onDeploySubmit, previewExternalOpenEnabled, selectedBlockIds, selectionMode, softHiddenBlockIds, actionedBlockIds, renderUserFooter, unreadDivider, compactDividers }: Props, ref) {
   const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE)
   const segments = useMemo(() => partitionWithDates(items, unreadDivider, compactDividers), [items, unreadDivider, compactDividers])
   /**
@@ -463,7 +465,7 @@ const TranscriptImpl = forwardRef<TranscriptHandle, Props>(function Transcript({
               </Fragment>
             )
           }
-          if (isAgent(item)) return <AgentGroup key={item.id} item={item} chatMode={chatMode} enter={arrivalKey === item.id} {...(onAgentClick ? { onAgentClick } : {})} {...(onBlockContextMenu ? { onBlockContextMenu } : {})} {...(onBlockSelect ? { onBlockSelect } : {})} {...(onBlockAction ? { onBlockAction } : {})} {...(onReviewFile ? { onReviewFile } : {})} {...(onCheckpointClick ? { onCheckpointClick } : {})} {...(onDeploySubmit ? { onDeploySubmit } : {})} {...(previewExternalOpenEnabled !== undefined ? { previewExternalOpenEnabled } : {})} {...(selectedBlockIds ? { selectedBlockIds } : {})} {...(selectionMode !== undefined ? { selectionMode } : {})} {...(softHiddenBlockIds ? { softHiddenBlockIds } : {})} {...(actionedBlockIds ? { actionedBlockIds } : {})} />
+          if (isAgent(item)) return <AgentGroup key={item.id} item={item} chatMode={chatMode} enter={arrivalKey === item.id} {...(onAgentClick ? { onAgentClick } : {})} {...(onBlockContextMenu ? { onBlockContextMenu } : {})} {...(onBlockSelect ? { onBlockSelect } : {})} {...(onBlockAction ? { onBlockAction } : {})} {...(onReviewFile ? { onReviewFile } : {})} {...(onArtifactClick ? { onArtifactClick } : {})} {...(onCheckpointClick ? { onCheckpointClick } : {})} {...(onDeploySubmit ? { onDeploySubmit } : {})} {...(previewExternalOpenEnabled !== undefined ? { previewExternalOpenEnabled } : {})} {...(selectedBlockIds ? { selectedBlockIds } : {})} {...(selectionMode !== undefined ? { selectionMode } : {})} {...(softHiddenBlockIds ? { softHiddenBlockIds } : {})} {...(actionedBlockIds ? { actionedBlockIds } : {})} />
           return null
         })}
       </Virtualizer>

@@ -22,6 +22,7 @@ import {
   type AuxPanelTab,
 } from './auxPanel';
 import { WORKBENCH_INSPECTOR_QUICK_OPEN_EVENT } from './desktopChromeEvents';
+import { WORKBENCH_ENGINEERING_PREVIEW_FOCUS_EVENT, type EngineeringPreviewFocusDetail } from './workbenchPreviewEvents';
 import shellStyles from './AgentHubWorkbench.module.css';
 import styles from './ChatEngineeringColumn.module.css';
 
@@ -53,16 +54,30 @@ export function engineeringPreviewSignal(
 
 export function resolveEngineeringPreview(
   runtimeEvidence: RuntimeEvidenceSnapshot | undefined,
+  focus?: Pick<EngineeringPreviewFocusDetail, 'artifactId' | 'artifactRunId'> | undefined,
 ): { kind: 'browser'; url: string } | { kind: 'file'; file: PreviewFile } | null {
   if (!runtimeEvidence) return null;
-  const browserPreview = [...runtimeEvidence.previews]
-    .reverse()
-    .find((preview) => preview.status === 'ready' && Boolean(preview.url));
-  if (browserPreview?.url) return { kind: 'browser', url: browserPreview.url };
   const artifactFiles = runtimeEvidenceOverviewFiles(runtimeEvidence).slice(
     0,
     runtimeEvidence.artifacts.length,
   );
+
+  // A user click is stronger than the automatic "newest evidence" rule. If
+  // the requested artifact is not in the current snapshot, return null rather
+  // than silently showing a different artifact (F10 honesty contract).
+  if (focus) {
+    const index = runtimeEvidence.artifacts.findIndex((artifact) => (
+      artifact.id === focus.artifactId
+      && (!focus.artifactRunId || !artifact.runId || artifact.runId === focus.artifactRunId)
+    ));
+    const focusedFile = index >= 0 ? artifactFiles[index] : undefined;
+    return focusedFile ? { kind: 'file', file: focusedFile } : null;
+  }
+
+  const browserPreview = [...runtimeEvidence.previews]
+    .reverse()
+    .find((preview) => preview.status === 'ready' && Boolean(preview.url));
+  if (browserPreview?.url) return { kind: 'browser', url: browserPreview.url };
   const file = artifactFiles.at(-1);
   return file ? { kind: 'file', file } : null;
 }
@@ -85,7 +100,13 @@ export function ChatEngineeringColumn({
   inspectorCollapsed,
 }: ChatEngineeringColumnProps): React.ReactElement {
   const { t } = useTranslation(SHARED_WORKBENCH_I18N_NAMESPACE);
-  const preview = useMemo(() => resolveEngineeringPreview(runtimeEvidence), [runtimeEvidence]);
+  const [focusedArtifact, setFocusedArtifact] = useState<
+    Pick<EngineeringPreviewFocusDetail, 'artifactId' | 'artifactRunId'> | undefined
+  >(undefined);
+  const preview = useMemo(
+    () => resolveEngineeringPreview(runtimeEvidence, focusedArtifact),
+    [focusedArtifact, runtimeEvidence],
+  );
   const previewSignal = engineeringPreviewSignal(runtimeEvidence);
   const previewAvailable = localFiles || Boolean(previewSignal);
   const available = useMemo(
@@ -116,7 +137,26 @@ export function ChatEngineeringColumn({
     setActiveTab(tab);
   }, [conversationId]);
 
+  // F10: transcript artifact clicks arrive as a transient, conversation-
+  // scoped UI intent. The engineering column owns the selection and Preview
+  // tab; RightInspector and transcript state are intentionally untouched.
   useEffect(() => {
+    const handlePreviewFocus = (event: Event): void => {
+      const detail = (event as CustomEvent<EngineeringPreviewFocusDetail>).detail;
+      if (!detail || detail.conversationId !== conversationId || !detail.artifactId) return;
+      setFocusedArtifact({
+        artifactId: detail.artifactId,
+        ...(detail.artifactRunId ? { artifactRunId: detail.artifactRunId } : {}),
+      });
+      activeTabByConversation.current.set(conversationId, 'preview');
+      setActiveTab('preview');
+    };
+    window.addEventListener(WORKBENCH_ENGINEERING_PREVIEW_FOCUS_EVENT, handlePreviewFocus);
+    return () => window.removeEventListener(WORKBENCH_ENGINEERING_PREVIEW_FOCUS_EVENT, handlePreviewFocus);
+  }, [conversationId]);
+
+  useEffect(() => {
+    setFocusedArtifact(undefined);
     const remembered = activeTabByConversation.current.get(conversationId);
     setActiveTab(remembered ?? (previewSignal ? 'preview' : available[0] ?? 'session_details'));
   }, [conversationId]); // available and signal are handled by the effects below.

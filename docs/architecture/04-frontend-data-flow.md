@@ -57,6 +57,7 @@ Do not add per-hook inventory tables here. If a file moves, update this owner ma
 
 - 自动展开：active run 或新产物 evidence 可自动展开工程列；用户在运行中手动收回时按会话持久化抑制，切换会话恢复各自选择；无 active run/产物的纯聊天不改变布局默认。窄视口可延后自动展开以保留可恢复的聊天表面，头部按钮与键盘切换仍可用。
 - Preview 焦点：工程列 `Preview` 标签跟随最新规范化 preview/artifact evidence，但不修改 `RightInspector` 当前详情标签；只有显式“在详情中查看 / View details”动作才请求 inspector 切换到 Browser 或 Files，避免快览与详情表面争焦点。
+- 产物卡聚焦（F10）：Transcript 中携带真实 `artifactId` 的产物卡通过一次性的 `WORKBENCH_ENGINEERING_PREVIEW_FOCUS_EVENT` 请求工程列选择对应 artifact 并激活 `Preview`；事件携带 `conversationId`，工程列拒绝其他会话的 intent。该事件是瞬时 UI intent，不写入 transcript/store；artifact 不可解析时显示已有诚实不可用态，不回退到另一份最新产物。
 - 表面边界：Desktop 可经 Local Edge 支持的 `PreviewPort` 解析产物内容，Web 保持 Hub-only；Hub 未提供安全 preview URL/content endpoint 时，Preview 必须诚实显示不可用，不构造 Local Edge URL。
 
 ## Transcript Pipeline
