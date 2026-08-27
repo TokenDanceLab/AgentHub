@@ -768,6 +768,7 @@ export const chatviewResources = {
     // ═══ UI components ═══
     'ui.applyDiff': '应用 Diff',
     'ui.openArtifact': '打开产物',
+    'ui.openArtifactNamed': '打开产物 {{name}}',
     'ui.downloadArtifact': '下载产物',
     'ui.loading': '正在加载消息',
     'ui.closeSearch': '关闭搜索',
@@ -1566,6 +1567,7 @@ export const chatviewResources = {
     // ═══ UI components ═══
     'ui.applyDiff': 'Apply diff',
     'ui.openArtifact': 'Open artifact',
+    'ui.openArtifactNamed': 'Open artifact {{name}}',
     'ui.downloadArtifact': 'Download artifact',
     'ui.loading': 'Loading message',
     'ui.closeSearch': 'Close search',

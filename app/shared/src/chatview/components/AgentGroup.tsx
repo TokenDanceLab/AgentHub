@@ -25,6 +25,7 @@ interface Props {
   onBlockSelect?: (blockId: string, shiftKey: boolean) => void
   onBlockAction?: BlockActionCallback
   onReviewFile?: (file: { name: string; path?: string; url?: string; content?: string; language?: string }) => void
+  onArtifactClick?: (item: import('../types').RowItem) => void
   onCheckpointClick?: (item: import('../types').RowItem) => void
   onDeploySubmit?: (id: string) => void
   previewExternalOpenEnabled?: boolean
@@ -40,7 +41,7 @@ interface Props {
  *  standalone cards, chat bubbles, and evidence chips.
  *  Dispatches orchestrator cards via {@link OrchestratorCard} and
  *  regular cards via {@link RowItem}. */
-export const AgentGroup = memo(function AgentGroup({ item, chatMode, onAgentClick, onBlockContextMenu, onBlockSelect, onBlockAction, onReviewFile, onCheckpointClick, onDeploySubmit, previewExternalOpenEnabled, selectedBlockIds, selectionMode, softHiddenBlockIds, actionedBlockIds, enter }: Props) {
+export const AgentGroup = memo(function AgentGroup({ item, chatMode, onAgentClick, onBlockContextMenu, onBlockSelect, onBlockAction, onReviewFile, onArtifactClick, onCheckpointClick, onDeploySubmit, previewExternalOpenEnabled, selectedBlockIds, selectionMode, softHiddenBlockIds, actionedBlockIds, enter }: Props) {
   // #1825: streaming bubble activity indicator — any running row (including
   // nested child rows and ordered-part rows, same view Transcript uses for
   // aria-busy) marks the agent item as mid-stream; the last bubble carries
@@ -118,6 +119,7 @@ export const AgentGroup = memo(function AgentGroup({ item, chatMode, onAgentClic
         {...(onBlockContextMenu ? { onContextMenu: onBlockContextMenu } : {})}
         {...(onBlockSelect ? { onBlockSelect } : {})}
         {...(onReviewFile ? { onReviewFile } : {})}
+        {...(onArtifactClick ? { onArtifactClick } : {})}
         {...(onCheckpointClick ? { onCheckpointClick } : {})}
         {...(selectedBlockIds ? { selected: selectedBlockIds.has(row.id) } : {})}
         {...(selectionMode !== undefined ? { selectedAny: selectionMode } : {})}
@@ -125,7 +127,7 @@ export const AgentGroup = memo(function AgentGroup({ item, chatMode, onAgentClic
         {...(actionedBlockIds ? { actioned: actionedBlockIds.has(row.id) } : {})}
       />
     );
-  }, [actionedBlockIds, handleApprove, handleReject, handleRetry, onBlockContextMenu, onBlockSelect, onCheckpointClick, onDeploySubmit, previewExternalOpenEnabled, onReviewFile, selectedBlockIds, selectionMode, softHiddenBlockIds])
+  }, [actionedBlockIds, handleApprove, handleReject, handleRetry, onArtifactClick, onBlockContextMenu, onBlockSelect, onCheckpointClick, onDeploySubmit, previewExternalOpenEnabled, onReviewFile, selectedBlockIds, selectionMode, softHiddenBlockIds])
 
   const orderedBodyContent = useMemo(() => {
     const parts = item.parts;

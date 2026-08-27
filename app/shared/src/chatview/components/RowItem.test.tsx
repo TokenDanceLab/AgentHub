@@ -975,3 +975,71 @@ describe('RowItem checkpoint timeline card (#1968)', () => {
     expect(() => fireEvent.click(card!.firstElementChild ?? card!)).not.toThrow();
   });
 });
+
+
+// ---------------------------------------------------------------------------
+// #1992 F10: artifact card focuses engineering Preview instead of expanding
+// an empty file row.
+// ---------------------------------------------------------------------------
+describe('RowItem artifact Preview focus (#1992)', () => {
+  const artifactRow = (overrides: Partial<RowItemType> = {}): RowItemType => ({
+    id: 'artifact-card',
+    type: 'file',
+    label: '',
+    status: 'ok',
+    collapsible: true,
+    fileOp: 'cr',
+    content: 'MD',
+    extra: 'reports/result.md',
+    artifactId: 'artifact-1',
+    artifactRunId: 'run-1',
+    artifactPath: 'reports/result.md',
+    ...overrides,
+  });
+
+  it('exposes an open-artifact accessible name rather than expand/collapse semantics', () => {
+    const { container } = render(<RowItem item={artifactRow()} />);
+    const header = screen.getByRole('button', { name: 'Open artifact reports/result.md' });
+    expect(header).not.toHaveAttribute('aria-expanded');
+    expect(container.querySelector('.row-chevron')).toBeNull();
+  });
+
+  it('calls onArtifactClick from the row keyboard stop as well', () => {
+    const onArtifactClick = vi.fn();
+    const { container } = render(<RowItem item={artifactRow()} onArtifactClick={onArtifactClick} />);
+    const card = container.querySelector('.row-item.artifact-preview-target');
+    expect(card).not.toBeNull();
+    fireEvent.keyDown(card!, { key: 'Enter' });
+    expect(onArtifactClick).toHaveBeenCalledTimes(1);
+  });
+
+  it('calls onArtifactClick and does not toggle the file row', () => {
+    const onArtifactClick = vi.fn();
+    const onToggle = vi.fn();
+    render(<RowItem item={artifactRow()} onArtifactClick={onArtifactClick} onToggle={onToggle} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Open artifact reports/result.md' }));
+    expect(onArtifactClick).toHaveBeenCalledTimes(1);
+    expect(onArtifactClick.mock.calls[0][0]).toMatchObject({
+      artifactId: 'artifact-1', artifactRunId: 'run-1', artifactPath: 'reports/result.md',
+    });
+    expect(onToggle).not.toHaveBeenCalled();
+  });
+
+  it('keeps ordinary file rows on their existing expand behavior', () => {
+    const onToggle = vi.fn();
+    const { container } = render(<RowItem item={artifactRow({ artifactId: undefined })} onToggle={onToggle} />);
+    const header = container.querySelector('button.row-hd');
+    expect(header).toHaveAttribute('aria-expanded', 'false');
+    fireEvent.click(header!);
+    expect(onToggle).toHaveBeenCalledWith('artifact-card');
+  });
+
+  it('does not offer a focus target when the artifact id is absent', () => {
+    const onArtifactClick = vi.fn();
+    const { container } = render(
+      <RowItem item={artifactRow({ artifactId: undefined })} onArtifactClick={onArtifactClick} />,
+    );
+    fireEvent.click(container.querySelector('button.row-hd')!);
+    expect(onArtifactClick).not.toHaveBeenCalled();
+  });
+});

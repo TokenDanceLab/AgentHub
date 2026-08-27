@@ -136,6 +136,8 @@ interface Props {
   onContextMenu?: (id: string, event: React.MouseEvent) => void
   onBlockSelect?: (id: string, shiftKey: boolean) => void
   onReviewFile?: (file: { name: string; path?: string; url?: string; content?: string; language?: string }) => void
+  /** Artifact card click (#1992): focuses the matching engineering Preview tab. */
+  onArtifactClick?: (item: RowItemType) => void
   /** Checkpoint timeline card click (#1968): opens the read-only snapshot preview. */
   onCheckpointClick?: (item: RowItemType) => void
   selected?: boolean
@@ -147,7 +149,7 @@ interface Props {
 /** Render a single card/row inside an agent group in the transcript.
  *  Handles think, tool, file, sub, approval, route, deploy, attachment,
  *  context, and session card types with collapsible content areas. */
-export const RowItem = memo(function RowItem({ item, onToggle, onApprove, onReject, onRetry, onCopy, onFileClick, onDeploySubmit, previewExternalOpenEnabled, onContextMenu, onBlockSelect, onReviewFile: _onReviewFile, onCheckpointClick, selected, selectedAny: _selectedAny, softHidden, actioned: _actioned }: Props) {
+export const RowItem = memo(function RowItem({ item, onToggle, onApprove, onReject, onRetry, onCopy, onFileClick, onDeploySubmit, previewExternalOpenEnabled, onContextMenu, onBlockSelect, onReviewFile: _onReviewFile, onArtifactClick, onCheckpointClick, selected, selectedAny: _selectedAny, softHidden, actioned: _actioned }: Props) {
   const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE)
   const [open, setOpen] = useState(item.open ?? false)
   const userToggledRef = useRef(false)
@@ -216,9 +218,17 @@ export const RowItem = memo(function RowItem({ item, onToggle, onApprove, onReje
   const resultClass = isToolResult(item) ? ' result-row' : ''
   const interactionId = stableInteractionId(item)
 
-  const cls = `row-item ${item.type}${item.fileOp ? ' ' + item.fileOp : ''}${item.standalone ? ' standalone' : ''}${item.collapsible ? ' collapsible' : ''}${isOpen ? ' open' : ''}${item.status === 'running' ? ' running' : ''}${item.status === 'fail' ? ' fail' : ''}${resultClass}${selected ? ' selected' : ''}${softHidden ? ' soft-hidden' : ''}`
+  const cls = `row-item ${item.type}${item.fileOp ? ' ' + item.fileOp : ''}${item.artifactId ? ' artifact-preview-target' : ''}${item.standalone ? ' standalone' : ''}${item.collapsible ? ' collapsible' : ''}${isOpen ? ' open' : ''}${item.status === 'running' ? ' running' : ''}${item.status === 'fail' ? ' fail' : ''}${resultClass}${selected ? ' selected' : ''}${softHidden ? ' soft-hidden' : ''}`
 
   const handleClick = (e: React.MouseEvent) => {
+    // Artifact card: focus the matching engineering Preview instead of
+    // expanding an empty file row (#1992). Only rows carrying a real
+    // artifactId are interactive; ordinary file rows keep old semantics.
+    if (item.type === 'file' && item.artifactId) {
+      e.stopPropagation()
+      onArtifactClick?.(item)
+      return
+    }
     // Checkpoint timeline card: the whole header is the preview trigger (#1968).
     if (item.type === 'checkpoint') {
       e.stopPropagation()
@@ -347,6 +357,11 @@ export const RowItem = memo(function RowItem({ item, onToggle, onApprove, onReje
     // and we don't double-fire block-select on top of a button click.
     if (e.key === 'Enter' || e.key === ' ') {
       if (target && (target.tagName === 'BUTTON' || target.tagName === 'A' || target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) return
+      if (item.type === 'file' && item.artifactId) {
+        e.preventDefault()
+        onArtifactClick?.(item)
+        return
+      }
       if (onBlockSelect) {
         e.preventDefault()
         onBlockSelect(interactionId, e.shiftKey)
@@ -376,7 +391,11 @@ export const RowItem = memo(function RowItem({ item, onToggle, onApprove, onReje
         type="button"
         className="row-hd"
         onClick={handleClick}
-        {...(item.collapsible ? { 'aria-expanded': isOpen, 'aria-label': isOpen ? t('card.collapse') : t('card.expand') } : {})}
+        {...(item.collapsible && !item.artifactId
+          ? { 'aria-expanded': isOpen, 'aria-label': isOpen ? t('card.collapse') : t('card.expand') }
+          : item.artifactId
+            ? { 'aria-label': t('ui.openArtifactNamed', { name: item.artifactPath ?? item.extra ?? item.id }) }
+            : {})}
       >
         <IconComp className={`row-icon${item.fileOp === 'cr' ? ' cr' : item.fileOp === 'mod' ? ' mod' : item.fileOp === 'del' ? ' del' : ''}`} size={16} />
         {item.status === 'running' && (item.type === 'tool' || item.type === 'file' || item.type === 'sub') && (
@@ -403,7 +422,7 @@ export const RowItem = memo(function RowItem({ item, onToggle, onApprove, onReje
           ) : labelText}
         </span>
         {item.extra && <span className="row-extra">{item.extra}</span>}
-        {item.collapsible && <IconChevronDown className="row-chevron" size={12} />}
+        {item.collapsible && !item.artifactId && <IconChevronDown className="row-chevron" size={12} />}
       </button>
       {/* #1938/#1939: media attachment bodies render unconditionally — the
           row is not collapsible, so gating them on isOpen would hide them

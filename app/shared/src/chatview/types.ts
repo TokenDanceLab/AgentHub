@@ -76,6 +76,14 @@ export interface RowItem {
   checkpointRunId?: string
   checkpointFileCount?: number
   checkpointTotalBytes?: number
+  /**
+   * Runtime artifact identity for the F10 transcript → engineering Preview
+   * focus intent. Absent means this is an ordinary file row and must not
+   * fabricate an artifact target.
+   */
+  artifactId?: string
+  artifactRunId?: string
+  artifactPath?: string
   ctxPct?: number
   ctxStats?: string[]
   sessionTags?: string[]

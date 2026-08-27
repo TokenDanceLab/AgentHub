@@ -46,6 +46,9 @@
 }
 .row-hd:hover { background:var(--td-surface-3) }
 .row-hd:focus-visible { outline:none; box-shadow:var(--focus-ring) }
+/* F10: artifact rows are preview triggers, not expandable empty file rows. */
+.row-item.artifact-preview-target > .row-hd { cursor:pointer }
+.row-item.artifact-preview-target > .row-hd:hover { background:color-mix(in oklch, var(--td-accent) 8%, var(--td-surface-3)) }
 /* ── Wave10 a11y: keyboard focus ring on the block row itself (the div is the
    tab stop via tabIndex=0). Only matches keyboard focus, not inner-button
    focus, so there's no double ring when the header button is focused. ── */

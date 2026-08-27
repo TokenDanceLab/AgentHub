@@ -278,6 +278,31 @@ describe('mapBlock — artifact blocks', () => {
     })
   })
 
+  it('carries real artifact identity for the engineering Preview focus intent', () => {
+    const row = mapRow({
+      id: 'a-focus', kind: 'artifact', author: makeAuthor('a1'), title: 'Report',
+      artifactId: 'artifact-42', path: 'out/report.md',
+      evidenceRefs: [{ id: 'run-9', kind: 'run', label: 'Run run-9', status: 'completed' }],
+    })
+    expect(row).toMatchObject({
+      type: 'file', artifactId: 'artifact-42', artifactRunId: '9', artifactPath: 'out/report.md',
+    })
+  })
+
+  it('derives only prefixed artifact evidence ids and never fabricates unknown ids', () => {
+    const prefixed = mapRow({
+      id: 'a-prefix', kind: 'artifact', author: makeAuthor('a1'), title: 'x.md',
+      path: 'x.md', evidenceRefs: [{ id: 'artifact-7', kind: 'artifact', label: 'x', status: 'completed' }],
+    })
+    expect(prefixed.artifactId).toBe('7')
+
+    const unknown = mapRow({
+      id: 'a-unknown', kind: 'artifact', author: makeAuthor('a1'), title: 'x.md',
+      path: 'x.md', evidenceRefs: [{ id: 'opaque-evidence', kind: 'artifact', label: 'x', status: 'completed' }],
+    })
+    expect(unknown).not.toHaveProperty('artifactId')
+  })
+
   it('maps a deleted artifact to the del fileOp', () => {
     const row = mapRow({
       id: 'a2', kind: 'artifact', author: makeAuthor('a1'), title: 'x.pdf', action: 'deleted',
