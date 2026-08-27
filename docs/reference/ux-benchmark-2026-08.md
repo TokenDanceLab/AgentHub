@@ -1,7 +1,29 @@
 # AgentHub 工作台 UX 对标报告（2026-08）
 
-最后更新：2026-08-25 · lane：UX 对标审计（只读研究 + 远程截图）
+最后更新：2026-08-28 · lane：UX 对标审计（只读研究 + 远程截图）→ 交付状态已登记
 参考产品：[codeg](https://github.com/xintaofei/codeg)（公开 README / [docs.codeg.app](https://docs.codeg.app/guide/) / 公开截图）、[Cursor Agent](https://cursor.com/docs/agent)（公开文档：[Agents Window](https://cursor.com/docs/agent/agents-window)、[Agent Review](https://cursor.com/docs/agent/agent-review)）。第三方材料仅以公开 URL 引用，不 vendor 进本仓。
+
+## 0.5 交付状态（2026-08-28）
+
+F1–F15 已全部合入 master（squash，issue 号即提案编号）；本报告由「建议清单」转为已交付的架构参考。
+
+| # | 交付载体 | 状态 |
+|---|---|---|
+| F1/F6 | #1961 会话行 live 状态点 + 全局注意力计数底座；#1970 降级口径与失败计数 | 已交付 |
+| F2 | #1963 Tasks↔会话双向深链；#1988 任务队列来源徽标与 provider 隔离 | 已交付 |
+| F3 | #1997 会话分屏布局树与并行 review 面板 | 已交付 |
+| F4/F9 | #1964/#1966 工程列自动展开与 Preview 标签 | 已交付 |
+| F5 | #1994 全局底部状态栏 | 已交付 |
+| F7 | #1965 run 中可见派发队列与撤销/改向（queue/steer） | 已交付 |
+| F8 | #1998 会话级目标横幅投影（fail-closed） | 已交付 |
+| F10 | #1992 产物卡点击聚焦工程列 Preview | 已交付 |
+| F11 | #1967 run 聚合只读审查入口 + 可信 workDir 真实批准/驳回 | 已交付 |
+| F12 | #1968 checkpoint 时间线卡与只读预览 | 已交付；restore 为有意门禁 |
+| F13 | #1999 Tasks 看板列 SSOT 与 review-before-merge | 已交付 |
+| F14 | #1990 状态条 live token chip 直达用量页 | 已交付 |
+| F15 | #1986 工作台主题预设切换入口 | 已交付 |
+
+F12 边界说明：时间线卡与只读预览已落地；「恢复」动作展示 `checkpoint.restoreUnavailable` 诚实态（恢复未接线：写回需远程证据轨道与显式批准），不假装可用——真实 restore 需要 Edge 工作区快照能力端口，另立任务跟踪。
 
 ## 0. 方法与边界
 
