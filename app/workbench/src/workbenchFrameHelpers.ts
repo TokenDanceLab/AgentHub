@@ -60,19 +60,16 @@ export function buildWorkbenchShellDataAttrs(input: {
 }
 
 export interface WorkspaceMainDataAttrs {
-  'data-mainchain': ShellBooleanAttr;
   'data-mode': 'chat' | 'workbench';
   'data-surface': string;
   'data-workspace-main': true;
 }
 
 export function buildWorkspaceMainDataAttrs(input: {
-  showMainchainStatus: boolean;
   isChatPage: boolean;
   surface: string;
 }): WorkspaceMainDataAttrs {
   return {
-    'data-mainchain': shellBooleanAttr(input.showMainchainStatus),
     'data-mode': input.isChatPage ? 'chat' : 'workbench',
     'data-surface': input.surface,
     'data-workspace-main': true,

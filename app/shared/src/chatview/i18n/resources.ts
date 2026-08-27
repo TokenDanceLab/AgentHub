@@ -780,7 +780,7 @@ export const chatviewResources = {
     'im.send': '发送消息',
 
     // ═══ Connection dot ═══
-    'connectionDot.label': 'WebSocket {status}',
+    'connectionDot.label': 'WebSocket {{status}}',
 
     // ═══ Go adapter descriptions (for frontend display) ═══
     'adapter.description.anthropicSdk': 'Anthropic Messages API via direct HTTP — 无需 CLI，直接调用 Claude API',
@@ -1579,7 +1579,7 @@ export const chatviewResources = {
     'im.send': 'Send message',
 
     // ═══ Connection dot ═══
-    'connectionDot.label': 'WebSocket {status}',
+    'connectionDot.label': 'WebSocket {{status}}',
 
     // ═══ Go adapter descriptions (for frontend display) ═══
     'adapter.description.anthropicSdk': 'Anthropic Messages API via direct HTTP — no CLI needed, direct Claude API calls',

@@ -72,12 +72,10 @@ describe('workbenchFrameHelpers', () => {
   it('builds workspace main data attrs for chat and workbench modes', () => {
     expect(
       buildWorkspaceMainDataAttrs({
-        showMainchainStatus: true,
         isChatPage: true,
         surface: 'web',
       }),
     ).toEqual({
-      'data-mainchain': 'true',
       'data-mode': 'chat',
       'data-surface': 'web',
       'data-workspace-main': true,
@@ -85,12 +83,10 @@ describe('workbenchFrameHelpers', () => {
 
     expect(
       buildWorkspaceMainDataAttrs({
-        showMainchainStatus: false,
         isChatPage: false,
         surface: 'desktop',
       }),
     ).toEqual({
-      'data-mainchain': 'false',
       'data-mode': 'workbench',
       'data-surface': 'desktop',
       'data-workspace-main': true,

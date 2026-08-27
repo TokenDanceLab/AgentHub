@@ -26,6 +26,9 @@ import {
 } from './WorkbenchFrameParts';
 import styles from './AgentHubWorkbench.module.css';
 import { TerminalPanel } from './terminal';
+import { MainchainStatusStrip } from './MainchainStatusStrip';
+import { WORKBENCH_APPROVAL_JUMP_EVENT } from './workbenchApprovalEvents';
+import { firstPendingApprovalBlockId } from './workbenchApprovalSummary';
 import { useExiting } from '@shared/ui/useExiting';
 
 export type { WorkbenchFrameProps } from './workbenchFrameTypes';
@@ -174,6 +177,25 @@ export function WorkbenchFrame({
     if (target && target !== currentConversationId) selectConversation(target);
   }, [attentionSummary, conversations, currentConversationId, selectConversation]);
 
+  // #1994 (UX F5): the global status bar owns the awaiting-approval chip.
+  // On the chat page a click asks the mounted ConversationHost to jump within
+  // the active transcript (transient intent); elsewhere the bar first returns
+  // to chat and selects the first awaiting conversation.
+  const firstPendingApprovalId = useMemo(
+    () => firstPendingApprovalBlockId(transcript),
+    [transcript],
+  );
+  const handleOpenApprovalQueue = useCallback((): void => {
+    if (isChatPage && firstPendingApprovalId) {
+      window.dispatchEvent(new CustomEvent(WORKBENCH_APPROVAL_JUMP_EVENT, {
+        detail: { conversationId: currentConversationId },
+      }));
+      return;
+    }
+    setActivePage('chat');
+    openApprovalQueueFallback();
+  }, [isChatPage, firstPendingApprovalId, currentConversationId, setActivePage, openApprovalQueueFallback]);
+
   const shellDataAttrs = buildWorkbenchShellDataAttrs({
     inspectorCollapsed,
     inspectorResizing,
@@ -184,7 +206,6 @@ export function WorkbenchFrame({
     dataMode: workbenchStatus?.dataMode,
   });
   const workspaceDataAttrs = buildWorkspaceMainDataAttrs({
-    showMainchainStatus,
     isChatPage,
     surface: platform.surface,
   });
@@ -265,7 +286,6 @@ export function WorkbenchFrame({
             connectionStatus={connectionStatus}
             inspectorCollapsed={inspectorCollapsed}
             toggleInspector={toggleInspector}
-            showMainchainStatus={showMainchainStatus}
             workbenchStatus={workbenchStatus}
             composerExecutionTargets={composerExecutionTargets}
             showComposerAgentPicker={showComposerAgentPicker}
@@ -276,12 +296,6 @@ export function WorkbenchFrame({
             onCancelRun={onCancelRun}
             onEditMessage={onEditMessage}
             transcriptLoading={transcriptLoading}
-            {...(attentionSummary ? { attentionCounts: attentionSummary } : {})}
-            onOpenRunningQueue={openRunningQueue}
-            onOpenApprovalQueueFallback={openApprovalQueueFallback}
-            {...(usageTokenTotal !== undefined
-              ? { usageTokenTotal, onOpenUsage: openUsagePage }
-              : {})}
           />
         ) : (
           <WorkbenchRoutesFrame
@@ -360,6 +374,20 @@ export function WorkbenchFrame({
           <TerminalPanel {...buildTerminalPanelDockProps(platform)} />
         </div>
       )}
+      {/* #1994 (UX F5): global bottom status bar — visible on every rail
+          page; conversation chain segments only on the chat page. */}
+      <MainchainStatusStrip
+        {...(connectionStatus ? { connectionStatus } : {})}
+        showConversationChain={isChatPage && showMainchainStatus}
+        summary={session.mainchainSummary}
+        onExportEvidence={session.exportMainchainEvidence}
+        {...(attentionSummary ? { attention: attentionSummary } : {})}
+        onOpenRunningQueue={openRunningQueue}
+        onOpenApprovalQueue={handleOpenApprovalQueue}
+        {...(usageTokenTotal !== undefined
+          ? { usageTokenTotal, onOpenUsage: openUsagePage }
+          : {})}
+      />
       {children}
     </div>
   );

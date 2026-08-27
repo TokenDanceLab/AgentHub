@@ -58,8 +58,12 @@ describe('AgentHubWorkbench CSS module contract', () => {
     expect(css).toMatch(/\.terminalDock\s*\{[^}]*grid-column:\s*3\s*\/\s*-1;/s);
     expect(css).not.toMatch(/\.terminalDock\s*\{[^}]*grid-column:\s*1\s*\/\s*-1;/s);
 
-    // Left chrome keeps full height beside the dock so conversation cards are not shortened.
+    // Rail keeps full height; the sidebar stops above the global status
+    // bar so conversation cards are not shortened beside the dock (#1994).
     expect(css).toMatch(/\.rail\s*\{[^}]*grid-row:\s*1\s*\/\s*-1;/s);
-    expect(css).toMatch(/\.sidebarFrame\s*\{[^}]*grid-row:\s*1\s*\/\s*-1;/s);
+    expect(css).toMatch(/\.sidebarFrame\s*\{[^}]*grid-row:\s*1\s*\/\s*3;/s);
+
+    // The global status bar spans everything right of the rail on row 3.
+    expect(css).toMatch(/\.workbenchStatusBar\s*\{[^}]*grid-column:\s*2\s*\/\s*-1;[^}]*grid-row:\s*3;/s);
   });
 });

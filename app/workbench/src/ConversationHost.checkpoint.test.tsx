@@ -34,9 +34,6 @@ vi.mock('./WorkspaceHeader', () => ({
   WorkspaceHeader: () => <div data-testid="workspace-header" />,
 }));
 
-vi.mock('./MainchainStatusStrip', () => ({
-  MainchainStatusStrip: () => null,
-}));
 
 vi.mock('./ComposerDispatchQueue', () => ({
   ComposerDispatchQueue: () => null,

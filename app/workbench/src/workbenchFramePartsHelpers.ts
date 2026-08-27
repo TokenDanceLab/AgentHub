@@ -86,7 +86,6 @@ export function buildChatConversationHostProps(
     connectionStatus,
     inspectorCollapsed,
     toggleInspector,
-    showMainchainStatus,
     workbenchStatus,
     composerExecutionTargets,
     showComposerAgentPicker,
@@ -94,11 +93,6 @@ export function buildChatConversationHostProps(
     highlightedBlockId,
     onHighlightEnd,
     transcriptLoading,
-    attentionCounts,
-    onOpenRunningQueue,
-    onOpenApprovalQueueFallback,
-    usageTokenTotal,
-    onOpenUsage,
   } = props;  const {
     currentConversationId,
     activeConversation,
@@ -110,11 +104,9 @@ export function buildChatConversationHostProps(
     composerInputRef,
     composer,
     dispatchComposer,
-    mainchainSummary,
     mentionableAgents,
     openReviewFile,
     handleDeploySubmit,
-    exportMainchainEvidence,
   } = session;
   const {
     selectionMode,
@@ -132,9 +124,6 @@ export function buildChatConversationHostProps(
     transcript,
     inspectorCollapsed,
     onToggleInspector: toggleInspector,
-    showMainchainStatus,
-    mainchainSummary,
-    onExportMainchainEvidence: exportMainchainEvidence,
     onAgentClick: openAgentProfile,
     onBlockContextMenu: stable?.onBlockContextMenu
       ?? createTranscriptBlockContextMenuHandler(transcript, openBlockContextMenu),
@@ -175,11 +164,6 @@ export function buildChatConversationHostProps(
   assignIfDefined(hostProps, 'onCancelRun', props.onCancelRun);
   assignIfDefined(hostProps, 'onEditMessage', props.onEditMessage);
   assignIfDefined(hostProps, 'transcriptLoading', transcriptLoading);
-  assignIfDefined(hostProps, 'attentionCounts', attentionCounts);
-  assignIfDefined(hostProps, 'onOpenRunningQueue', onOpenRunningQueue);
-  assignIfDefined(hostProps, 'onOpenApprovalQueueFallback', onOpenApprovalQueueFallback);
-  assignIfDefined(hostProps, 'usageTokenTotal', usageTokenTotal);
-  assignIfDefined(hostProps, 'onOpenUsage', onOpenUsage);
 
   return hostProps;
 }
