@@ -57,6 +57,29 @@ export type WorkbenchFrameWorkbenchStatus = AgentHubWorkbenchStatus;
 export type WorkbenchFrameProjectsStatus = AgentHubWorkbenchProjectsStatus;
 export type WorkbenchFrameModelCatalogItem = AgentHubWorkbenchModelCatalogItem;
 
+/* ── Split view (#1997, UX F3) ─────────────────────────────────────────
+   Conversation-header split controls. Absent (undefined) when the honesty
+   gate hides the surface (<2 conversations) — the header renders no entry. */
+
+/** Another pane offered as a Move-to-Group target (labeled by its title). */
+export interface WorkbenchSplitMoveTarget {
+  paneId: string;
+  title: string;
+}
+
+export interface WorkbenchSplitControls {
+  /** Whether a split (>=2 panes) is currently active. */
+  hasSplit: boolean;
+  /** Other panes of the layout, labeled for the Move-to-Group submenu. */
+  moveTargets: WorkbenchSplitMoveTarget[];
+  /** Absent on read-only pane chrome (splitting targets the active pane). */
+  onSplitRight?: (() => void) | undefined;
+  onSplitDown?: (() => void) | undefined;
+  /** Active pane: collapse the whole layout. Inactive pane: close that pane. */
+  onUnsplit: () => void;
+  onMoveToPane: (paneId: string) => void;
+}
+
 export interface WorkbenchFrameProps
   extends Omit<
     AgentHubWorkbenchProps,
@@ -149,6 +172,8 @@ export interface ChatConversationHostFrameProps {
    * shows an honest loading state instead of the "no messages" empty state.
    */
   transcriptLoading?: boolean | undefined;
+  /** Split-view header controls (#1997); absent hides the split entry. */
+  splitControls?: WorkbenchSplitControls | undefined;
 }
 
 export interface WorkbenchRoutesFrameProps {
