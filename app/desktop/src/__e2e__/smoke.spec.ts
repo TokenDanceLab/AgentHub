@@ -13,9 +13,15 @@ test.describe('AgentHub Desktop smoke', () => {
   test('entry gate is visible before a mode is selected', async ({ page }) => {
     await page.goto('/');
     await expect(page.getByRole('main', { name: 'Desktop entry' })).toBeVisible();
-    await expect(page.getByRole('button', { name: '使用 TokenDance ID 继续' })).toBeVisible();
+    // Desktop i18n follows navigator.language; Playwright defaults to en-US,
+    // so entry buttons must match both locales (#2001, same rot as #1995).
+    await expect(
+      page.getByRole('button', { name: /^(使用 TokenDance ID 继续|Continue with TokenDance ID)$/ })
+    ).toBeVisible();
     await expect(page.getByRole('button', { name: /Local Edge/ })).toBeVisible();
-    await expect(page.getByRole('button', { name: '使用 Demo 模式继续' })).toBeVisible();
+    await expect(
+      page.getByRole('button', { name: /^(使用 Demo 模式继续|Continue in Demo mode)$/ })
+    ).toBeVisible();
   });
 
   test('Workspace shell is visible after entering demo mode', async ({ page }) => {
@@ -49,7 +55,20 @@ test.describe('AgentHub Desktop smoke', () => {
 });
 
 async function enterDemoWorkbench(page: Page): Promise<void> {
+  await page.addInitScript(() => {
+    try {
+      // First-run onboarding (#1819) is a one-time product overlay; this
+      // suite tests smoke behavior, so seed it as seen (persisted state)
+      // to keep the mock workbench deterministically interactive (#2001).
+      window.localStorage.setItem('agenthub_onboarding_seen', 'true');
+    } catch {
+      // Some initial browser documents deny localStorage; the app origin will still run this script.
+    }
+  });
   await page.goto('/', { waitUntil: 'domcontentloaded' });
-  await page.getByRole('button', { name: '使用 Demo 模式继续' }).click();
+  const demoButton = page.getByRole('button', {
+    name: /^(使用 Demo 模式继续|Continue in Demo mode)$/,
+  });
+  await demoButton.click();
   await expect(page.getByTestId('agenthub-workbench')).toBeVisible();
 }
