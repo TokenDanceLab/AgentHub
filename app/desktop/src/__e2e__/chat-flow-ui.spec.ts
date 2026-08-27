@@ -110,12 +110,16 @@ async function enterDemoWorkbench(page: Page, onWorkbenchRuntime?: () => void): 
   await page.addInitScript(() => {
     try {
       window.localStorage.removeItem('agenthub.workbench.composerSubmitBehavior');
+      // First-run onboarding (#1819) is a one-time product overlay; this
+      // suite tests chat-flow behavior, so seed it as seen (persisted state)
+      // to keep the mock workbench deterministically interactive (#1995).
+      window.localStorage.setItem('agenthub_onboarding_seen', 'true');
     } catch {
       // Some initial browser documents deny localStorage; the app origin will still run this script.
     }
   });
   await page.goto('/', { waitUntil: 'domcontentloaded' });
-  const demoButton = page.getByRole('button', { name: '使用 Demo 模式继续' });
+  const demoButton = page.getByRole('button', { name: /^(使用 Demo 模式继续|Continue in Demo mode)$/ });
   const workbench = page.getByTestId('agenthub-workbench');
   if (await demoButton.isVisible().catch(() => false)) {
     await demoButton.click({ timeout: 5_000 }).catch(async (error: unknown) => {

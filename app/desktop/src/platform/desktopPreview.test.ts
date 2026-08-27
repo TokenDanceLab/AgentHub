@@ -1,7 +1,7 @@
 // Desktop PreviewPort content-URL resolution (#1817): absolute evidence URLs
 // pass through; host-relative API paths resolve against the Local Edge base
 // URL because Desktop owns the Edge connection.
-import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 
 vi.mock('@/api/hubClient', () => ({
   getCachedRefreshedAccessToken: vi.fn(() => null),
@@ -22,9 +22,11 @@ vi.mock('@/api/edgeAuth', () => ({
 }));
 
 import type { AttachmentRef } from '@shared/composer';
+import { WORKBENCH_DATA_MODE_STORAGE_KEY } from '@shared/demo';
 import {
   downloadDesktopArtifactContent,
   resolveDesktopAttachmentImageUrl,
+  resolveDesktopAttachmentMediaUrl,
   resolveDesktopEvidenceContentUrl,
   resolveDesktopRuntimeEvidenceContent,
 } from './desktopPreview';
@@ -145,6 +147,43 @@ describe('resolveDesktopAttachmentImageUrl (#1938)', () => {
     await expect(
       resolveDesktopAttachmentImageUrl(makeRef('att-desktop-pdf')),
     ).resolves.toBeUndefined();
+  });
+});
+
+// ── #1995: data-mode gate — pinned mock/fixture surfaces never fetch Hub
+// attachment bytes; the transcript row degrades to the honest chip fallback.
+
+describe('attachment resolver data-mode gate (#1995)', () => {
+  afterEach(() => {
+    window.localStorage.removeItem(WORKBENCH_DATA_MODE_STORAGE_KEY);
+  });
+
+  it('returns undefined without any Hub fetch in mock data mode', async () => {
+    fetchImpl.mockReset();
+    window.localStorage.setItem(WORKBENCH_DATA_MODE_STORAGE_KEY, 'mock');
+
+    await expect(
+      resolveDesktopAttachmentImageUrl(makeRef('att-gate-mock-image')),
+    ).resolves.toBeUndefined();
+    await expect(
+      resolveDesktopAttachmentMediaUrl(makeRef('att-gate-mock-audio'), 'audio'),
+    ).resolves.toBeUndefined();
+    await expect(
+      resolveDesktopAttachmentMediaUrl(makeRef('att-gate-mock-video'), 'video'),
+    ).resolves.toBeUndefined();
+
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it('keeps the authenticated Hub fetch path in approved-real data mode', async () => {
+    fetchImpl.mockReset();
+    fetchImpl.mockResolvedValue(imageResponse());
+    window.localStorage.setItem(WORKBENCH_DATA_MODE_STORAGE_KEY, 'approved-real');
+
+    await expect(
+      resolveDesktopAttachmentImageUrl(makeRef('att-gate-real-image')),
+    ).resolves.toBe('blob:desktop-object-url');
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
   });
 });
 
