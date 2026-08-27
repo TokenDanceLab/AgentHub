@@ -24,6 +24,12 @@ import {
   WorkspaceLoadErrorState,
   WorkspaceLoadingState,
 } from './WorkbenchFrameParts';
+import { WorkbenchSplitHost } from './WorkbenchSplitHost';
+import { SplitConversationPane } from './SplitConversationPane';
+import { useSplitTranscriptCache } from './workbenchSplitTranscriptCache';
+import { findConversationById } from './workbenchSessionChromeHelpers';
+import type { WorkbenchSplitControls } from './workbenchFrameTypes';
+import type { GroupLeaf } from './workbenchSplitLayout';
 import styles from './AgentHubWorkbench.module.css';
 import { TerminalPanel } from './terminal';
 import { MainchainStatusStrip } from './MainchainStatusStrip';
@@ -125,6 +131,7 @@ export function WorkbenchFrame({
     resizeInspectorBy,
     resizeSidebarBy,
     shellStyle,
+    split,
   } = layout;
   const {
     settingsService,
@@ -140,6 +147,14 @@ export function WorkbenchFrame({
     handleToggleTheme,
   } = session;
   const { selectionMode } = transcriptChrome;
+
+  /* ── Split view (#1997, UX F3): sidebar selection first routes through the
+     split layout (≥2 panes → the conversation drops into an inactive pane),
+     then performs the normal single-active selection. ── */
+  const handleSidebarSelectConversation = useCallback((conversationId: string): void => {
+    split?.placeConversation(conversationId);
+    selectConversation(conversationId);
+  }, [split, selectConversation]);
   const {
     focusedAgentId,
     openAgentProfileFromConfig,
@@ -196,6 +211,106 @@ export function WorkbenchFrame({
     openApprovalQueueFallback();
   }, [isChatPage, firstPendingApprovalId, currentConversationId, setActivePage, openApprovalQueueFallback]);
 
+  /* ── Split view state + chrome (#1997, UX F3) ───────────────────────────
+     Honesty gate: no split entry renders with fewer than two conversations.
+     The active pane's header gets Split Right/Down + Move to Group +
+     Unsplit; read-only panes get focus/move/close. ── */
+  const splitActive = split?.active ?? false;
+  const splitAllowed = Boolean(split) && conversations.length >= 2;
+  const splitTranscriptCache = useSplitTranscriptCache(currentConversationId, transcript);
+
+  const paneTitleOf = useCallback((leaf: GroupLeaf): string => {
+    if (!leaf.conversationId) return '';
+    return findConversationById(conversations, leaf.conversationId)?.title ?? leaf.conversationId;
+  }, [conversations]);
+
+  const buildMoveTargets = useCallback((excludePaneId?: string): WorkbenchSplitControls['moveTargets'] => {
+    if (!split) return [];
+    return split.panes
+      .filter((pane) => pane.paneId !== excludePaneId && pane.conversationId !== currentConversationId)
+      .map((pane) => ({
+        paneId: pane.paneId,
+        title: pane.conversationId
+          ? (findConversationById(conversations, pane.conversationId)?.title ?? pane.conversationId)
+          : t('split.emptyPaneTarget'),
+      }));
+  }, [split, conversations, currentConversationId, t]);
+
+  // Memoized: ConversationHost is React.memo — a fresh controls object every
+  // shell render (keystrokes) would bust its memo gate (#perf).
+  const activeSplitControls = useMemo((): WorkbenchSplitControls | undefined => {
+    if (!splitAllowed || !split) return undefined;
+    return {
+      hasSplit: splitActive,
+      moveTargets: splitActive ? buildMoveTargets() : [],
+      onSplitRight: () => split.splitActivePane('horizontal'),
+      onSplitDown: () => split.splitActivePane('vertical'),
+      onUnsplit: split.collapseAll,
+      onMoveToPane: (targetPaneId: string): void => {
+        const activeLeaf = currentConversationId
+          ? split.panes.find((pane) => pane.conversationId === currentConversationId)
+          : undefined;
+        if (activeLeaf) split.moveConversationToPane(activeLeaf.paneId, targetPaneId);
+      },
+    };
+  }, [splitAllowed, split, splitActive, buildMoveTargets, currentConversationId]);
+
+  const renderReadOnlyPane = useCallback((leaf: GroupLeaf): React.ReactElement => {
+    const conversation = leaf.conversationId
+      ? findConversationById(conversations, leaf.conversationId)
+      : undefined;
+    const paneControls: WorkbenchSplitControls | undefined = splitAllowed && split
+      ? {
+          hasSplit: true,
+          moveTargets: buildMoveTargets(leaf.paneId).filter((target) => target.paneId !== leaf.paneId),
+          onUnsplit: () => split.unsplitPane(leaf.paneId),
+          onMoveToPane: (targetPaneId: string): void => {
+            split.moveConversationToPane(leaf.paneId, targetPaneId);
+          },
+        }
+      : undefined;
+    return (
+      <SplitConversationPane
+        paneId={leaf.paneId}
+        conversation={conversation}
+        transcript={(leaf.conversationId && splitTranscriptCache.get(leaf.conversationId)) || []}
+        {...(attentionSummary && leaf.conversationId && attentionSummary.liveStatusByConversation[leaf.conversationId]
+          ? { liveStatus: attentionSummary.liveStatusByConversation[leaf.conversationId] }
+          : {})}
+        {...(paneControls ? { splitControls: paneControls } : {})}
+        onFocus={(): void => {
+          if (leaf.conversationId) selectConversation(leaf.conversationId);
+        }}
+        onClose={(): void => split?.unsplitPane(leaf.paneId)}
+      />
+    );
+  }, [split, splitAllowed, conversations, splitTranscriptCache, attentionSummary, selectConversation, buildMoveTargets]);
+
+  const chatHostElement = (
+    <ChatConversationHostFrame
+      platform={platform}
+      session={session}
+      transcriptChrome={transcriptChrome}
+      profile={profile}
+      transcript={transcript}
+      transcriptUnreadDivider={transcriptUnreadDivider}
+      connectionStatus={connectionStatus}
+      inspectorCollapsed={inspectorCollapsed}
+      toggleInspector={toggleInspector}
+      workbenchStatus={workbenchStatus}
+      composerExecutionTargets={composerExecutionTargets}
+      showComposerAgentPicker={showComposerAgentPicker}
+      showComposerStatus={showComposerStatus}
+      highlightedBlockId={highlightedBlockId}
+      onHighlightEnd={onHighlightEnd}
+      isAgentRunning={isAgentRunning}
+      onCancelRun={onCancelRun}
+      onEditMessage={onEditMessage}
+      transcriptLoading={transcriptLoading}
+      {...(activeSplitControls ? { splitControls: activeSplitControls } : {})}
+    />
+  );
+
   const shellDataAttrs = buildWorkbenchShellDataAttrs({
     inspectorCollapsed,
     inspectorResizing,
@@ -244,7 +359,7 @@ export function WorkbenchFrame({
         <ChatSidebarFrame
           conversations={conversations}
           currentConversationId={currentConversationId}
-          onSelectConversation={selectConversation}
+          onSelectConversation={handleSidebarSelectConversation}
           onAvatarClick={openConversationAvatar}
           onConversationPin={onConversationPin}
           onConversationArchive={onConversationArchive}
@@ -265,6 +380,7 @@ export function WorkbenchFrame({
         className={styles.workspace}
         id="main-content"
         {...workspaceDataAttrs}
+        {...(splitActive ? { 'data-split': 'true' } : {})}
       >
         {showLoadError ? (
           <WorkspaceLoadErrorState
@@ -276,27 +392,18 @@ export function WorkbenchFrame({
         ) : showInitialLoading ? (
           <WorkspaceLoadingState label={t('connection.connecting')} />
         ) : isChatPage ? (
-          <ChatConversationHostFrame
-            platform={platform}
-            session={session}
-            transcriptChrome={transcriptChrome}
-            profile={profile}
-            transcript={transcript}
-            transcriptUnreadDivider={transcriptUnreadDivider}
-            connectionStatus={connectionStatus}
-            inspectorCollapsed={inspectorCollapsed}
-            toggleInspector={toggleInspector}
-            workbenchStatus={workbenchStatus}
-            composerExecutionTargets={composerExecutionTargets}
-            showComposerAgentPicker={showComposerAgentPicker}
-            showComposerStatus={showComposerStatus}
-            highlightedBlockId={highlightedBlockId}
-            onHighlightEnd={onHighlightEnd}
-            isAgentRunning={isAgentRunning}
-            onCancelRun={onCancelRun}
-            onEditMessage={onEditMessage}
-            transcriptLoading={transcriptLoading}
-          />
+          split ? (
+            <WorkbenchSplitHost
+              tree={split.tree}
+              splitActive={splitActive}
+              activeConversationId={currentConversationId}
+              activeHost={chatHostElement}
+              renderReadOnlyPane={renderReadOnlyPane}
+              paneTitleOf={paneTitleOf}
+            />
+          ) : (
+            chatHostElement
+          )
         ) : (
           <WorkbenchRoutesFrame
             activePage={activePage as Exclude<GlobalRailPage, 'chat'>}

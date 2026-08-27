@@ -14,7 +14,7 @@
     "test:e2e:smoke": "playwright test --config playwright.config.ts --project=chromium smoke.spec.ts",
     "test:e2e:real": "playwright test --config playwright.real.config.ts",
     "test:e2e:chat-flow": "playwright test --config playwright.config.ts --project=chromium chat-flow-contract.spec.ts",
-    "test:e2e:stubbed-hub": "playwright test --config playwright.config.ts --project=chromium chat-flow-contract.spec.ts web-stubbed-hub-replay-smoke.spec.ts web-stubbed-hub-fenced-code.spec.ts task-contract.spec.ts",
+    "test:e2e:stubbed-hub": "playwright test --config playwright.config.ts --project=chromium chat-flow-contract.spec.ts web-stubbed-hub-replay-smoke.spec.ts web-stubbed-hub-fenced-code.spec.ts task-contract.spec.ts web-stubbed-hub-split.spec.ts",
     "test:e2e:approved-real-stub": "pnpm test:e2e:stubbed-hub",
     "test:visual:chat-flow": "node scripts/manual-chat-flow-check.mjs",
     "visual:qa:shell": "node scripts/visual-qa-shell.mjs",

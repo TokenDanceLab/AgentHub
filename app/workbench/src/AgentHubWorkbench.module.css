@@ -4222,3 +4222,185 @@ button.mainchainAttentionChip[data-attention-kind='usage']:hover {
   white-space: nowrap;
   color: var(--td-ink-muted);
 }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   Split view (#1997, UX F3) — conversation panes tile the chat workspace.
+   Single-group mode: one full-bleed .chatPane (grid rows mirror .workspace
+   so ConversationHost children keep their row contracts). Split mode:
+   panes are absolutely positioned from computeRects inline styles.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+.chatPane {
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr) auto auto;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* Single-group placement: the pane fills every workspace row. */
+.workspace > .chatPane {
+  grid-row: 1 / -1;
+  grid-column: 1;
+}
+
+.chatPane > .workspaceHeader { grid-row: 1; }
+.chatPane > .pendingApprovalStrip { grid-row: 2; }
+.chatPane > .transcriptRegion { grid-row: 3; }
+.chatPane > .composerQueue { grid-row: 4; }
+.chatPane > .composer { grid-row: 5; }
+
+/* The read-only pane body is the sole child of its .chatPane grid. */
+.chatPane > .splitPaneBody {
+  grid-row: 1 / -1;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
+.workspace[data-split='true'] > .chatPane {
+  position: absolute;
+  background: var(--td-canvas);
+  border: 1px solid var(--glass-border, var(--td-line));
+  border-radius: var(--td-radius-lg, 12px);
+  box-shadow: var(--td-shadow-sm, 0 1px 2px rgb(0 0 0 / 6%));
+}
+
+/* Active pane cue: the pane holding composer/keyboard focus. */
+.workspace[data-split='true'] > .chatPane[data-split-active='true'] {
+  border-color: color-mix(in oklab, var(--td-plum) 55%, var(--glass-border, var(--td-line)));
+}
+
+/* ── Read-only pane chrome ── */
+
+.splitPaneBody {
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.splitPaneHeader {
+  display: flex;
+  align-items: center;
+  gap: var(--wb-gap-xs, 6px);
+  padding: var(--wb-gap-2xs, 4px) var(--wb-gap-sm, 10px);
+  border-bottom: 1px solid var(--glass-border, var(--td-line));
+  background: var(--glass-panel, color-mix(in srgb, var(--td-surface) 86%, var(--td-canvas)));
+  min-width: 0;
+}
+
+.splitPaneTitleButton {
+  display: flex;
+  align-items: center;
+  gap: var(--wb-gap-xs, 6px);
+  flex: 1;
+  min-width: 0;
+  padding: var(--wb-gap-2xs, 4px);
+  border: none;
+  border-radius: var(--td-radius-sm, 6px);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  text-align: start;
+}
+
+.splitPaneTitleButton:hover {
+  background: var(--glass-hover, color-mix(in srgb, var(--td-surface) 70%, transparent));
+}
+
+.splitPaneAvatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  flex: none;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #fff;
+  overflow: hidden;
+}
+
+.splitPaneTitle {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.splitLiveDot {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--td-line);
+}
+
+.splitLiveDot[data-live-status='running'] {
+  background: var(--td-accent, var(--td-plum));
+  animation: splitLivePulse 1.6s ease-in-out infinite;
+}
+
+.splitLiveDot[data-live-status='awaiting-approval'] {
+  background: var(--td-warning, #d97706);
+}
+
+@keyframes splitLivePulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+
+.splitReadOnlyBadge {
+  flex: none;
+  padding: 1px 6px;
+  border: 1px solid var(--glass-border, var(--td-line));
+  border-radius: 999px;
+  font-size: 10px;
+  color: var(--td-ink-muted, inherit);
+  opacity: 0.8;
+}
+
+.splitPaneTranscript {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.splitPaneEmpty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  padding: var(--wb-gap-lg, 24px);
+  color: var(--td-ink-muted, inherit);
+  font-size: 12.5px;
+  text-align: center;
+}
+
+/* Move-to-Group submenu rows (rendered inside ContextMenu submenu panel). */
+.splitMoveTarget {
+  display: block;
+  width: 100%;
+  padding: 6px 10px;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 12.5px;
+  text-align: start;
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.splitMoveTarget:hover,
+.splitMoveTarget:focus-visible {
+  background: var(--glass-hover, color-mix(in srgb, var(--td-surface) 70%, transparent));
+}

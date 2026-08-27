@@ -531,6 +531,13 @@ export function navIconPaths(name: DesignNavIconName): React.ReactNode {
       );
     case 'chevron':
       return <polyline points="6 9 12 15 18 9" />;
+    case 'split':
+      return (
+        <>
+          <rect x="3.5" y="4.5" width="17" height="15" rx="2" />
+          <path d="M12 4.5v15" />
+        </>
+      );
     case 'close':
       return (
         <>

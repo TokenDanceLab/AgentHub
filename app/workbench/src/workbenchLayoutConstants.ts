@@ -23,3 +23,6 @@ export const INSPECTOR_WIDTH_STORAGE_KEY = 'agenthub.workbench.inspectorWidth';
 export const INSPECTOR_COLLAPSED_STORAGE_KEY = 'agenthub.workbench.inspectorCollapsed';
 /** Window CustomEvent: settings (inspectorVisible=false) ask the inspector to start collapsed. */
 export const INSPECTOR_DEFAULT_COLLAPSE_EVENT = 'agenthub:inspector-default-collapse';
+
+/** localStorage key for the persisted split-view layout tree blob (#1997). */
+export const SPLIT_LAYOUT_STORAGE_KEY = 'agenthub.workbench.splitLayout';
