@@ -132,7 +132,6 @@ export interface ChatConversationHostFrameProps {
   connectionStatus?: ConnectionStatusKind | undefined;
   inspectorCollapsed: boolean;
   toggleInspector: () => void;
-  showMainchainStatus: boolean;
   workbenchStatus?: WorkbenchFrameWorkbenchStatus | undefined;
   composerExecutionTargets?: Array<{ id: string; label: string; healthy?: boolean }> | undefined;
   showComposerAgentPicker: boolean;
@@ -150,19 +149,6 @@ export interface ChatConversationHostFrameProps {
    * shows an honest loading state instead of the "no messages" empty state.
    */
   transcriptLoading?: boolean | undefined;
-  /** F6 global attention counts for the status strip chips. */
-  attentionCounts?: WorkbenchAttentionCounts | undefined;
-  /** F6 running chip click-through (Tasks page queue). */
-  onOpenRunningQueue?: (() => void) | undefined;
-  /** F6 awaiting chip fallback when the active conversation has no pending block. */
-    /**
-   * Live total of recorded usage-board tokens (#1990, F14). Absent when the
-   * shell has no Hub usage data — the chip then stays honestly hidden.
-   */
-  usageTokenTotal?: number | undefined;
-  /** Click-through for the usage chip (opens the Usage page). */
-  onOpenUsage?: (() => void) | undefined;
-onOpenApprovalQueueFallback?: (() => void) | undefined;
 }
 
 export interface WorkbenchRoutesFrameProps {

@@ -1,5 +1,6 @@
 import React, { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { WORKBENCH_APPROVAL_JUMP_EVENT } from './workbenchApprovalEvents';
 import type { TFunction } from 'i18next';
 import type { TranscriptBlock, TextTranscriptBlock } from '@shared/transcript';
 import {
@@ -46,13 +47,10 @@ import type { FileItem } from './inspector';
 import type { ConnectionStatusKind } from './GlobalRail';
 import { ChatViewBridge } from './ChatViewBridge';
 import { ComposerDispatchQueue } from './ComposerDispatchQueue';
-import { MainchainStatusStrip } from './MainchainStatusStrip';
-import type { MainchainSummary } from './mainchain';
 import {
   countPendingApprovals,
   firstPendingApprovalBlockId,
 } from './workbenchApprovalSummary';
-import type { WorkbenchAttentionCounts } from './workbenchAttentionModel';
 import { UnifiedComposer } from './UnifiedComposer';
 import { WorkspaceHeader } from './WorkspaceHeader';
 import type { UnreadDividerDescriptor } from '@shared/chatview';
@@ -93,7 +91,6 @@ export interface ConversationHostProps {
   activeConversation?: WorkbenchConversation | undefined;
   connectionStatus?: ConnectionStatusKind | undefined;
   inspectorCollapsed: boolean; onToggleInspector: () => void;
-  showMainchainStatus: boolean; mainchainSummary: MainchainSummary; onExportMainchainEvidence: () => void;
   workbenchStatus?: { dataMode?: string; replayLabel?: string; targetLabel?: string; initialLoading?: boolean; loadError?: string } | undefined;
   onAgentClick: (agentName: string, anchor: HTMLElement) => void;
   onBlockContextMenu: (blockId: string, event: React.MouseEvent) => void;
@@ -138,26 +135,6 @@ export interface ConversationHostProps {
    * shows an honest loading state instead of the "no messages" empty state.
    */
   transcriptLoading?: boolean | undefined;
-  /**
-   * Global attention counts (F6) for the status strip chips. Absent when the
-   * shell provides no run/approval inventory.
-   */
-  attentionCounts?: WorkbenchAttentionCounts | undefined;
-  /** Click-through for the strip's running chip (Tasks page queue). */
-  onOpenRunningQueue?: (() => void) | undefined;
-  /**
-   * Live total of recorded usage-board tokens (#1990, F14). Absent when the
-   * shell has no Hub usage data; the status-strip chip stays hidden then.
-   */
-  usageTokenTotal?: number | undefined;
-  /** Click-through for the usage chip (opens the Usage page). */
-  onOpenUsage?: (() => void) | undefined;
-  /**
-   * Click-through fallback for the strip's awaiting chip when the ACTIVE
-   * conversation has no pending approval block to jump to; the frame then
-   * switches to a conversation that does.
-   */
-  onOpenApprovalQueueFallback?: (() => void) | undefined;
 }
 
 type PendingUserBlock = TextTranscriptBlock & {
@@ -178,7 +155,7 @@ type PendingDispatchIntentEntry = PendingDispatchIntent<ComposerIntent & { execu
 
 export const ConversationHost = React.memo(function ConversationHost({
   transcript, activeConversation, connectionStatus, inspectorCollapsed, onToggleInspector,
-  showMainchainStatus, mainchainSummary, onExportMainchainEvidence, workbenchStatus,
+  workbenchStatus,
   onAgentClick, onBlockContextMenu, onBlockSelect, onBlockAction, onReviewFile, onDeploySubmit,
   selectedBlockIds, selectionMode, softHiddenBlockIds, actionedBlockIds,
   highlightedBlockId, onHighlightEnd, dismissedPinnedIds, onToast,
@@ -190,7 +167,6 @@ export const ConversationHost = React.memo(function ConversationHost({
   isAgentRunning, onCancelRun, onEditMessage,
   transcriptUnreadDivider,
   transcriptLoading,
-  attentionCounts, onOpenRunningQueue, onOpenApprovalQueueFallback, usageTokenTotal, onOpenUsage,
 }: ConversationHostProps): React.ReactElement {
   const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE);
   const [uploadProgresses, setUploadProgresses] = useState<Record<string, AttachmentUploadState>>({});
@@ -263,16 +239,17 @@ export const ConversationHost = React.memo(function ConversationHost({
     setSearchHighlightId(firstPendingApprovalId);
     onSearchOpenChange(false);
   }, [firstPendingApprovalId, onSearchOpenChange]);
-  // F6 approval chip: jump to this conversation's approval summary when it
-  // has pending blocks; otherwise let the frame switch to a conversation
-  // that does (global counts can originate from other sessions).
-  const handleOpenApprovalQueue = useCallback((): void => {
-    if (firstPendingApprovalId) {
+  // #1994 (UX F5): the global status bar's awaiting chip dispatches this
+  // transient intent; the host owns the transcript highlight/scroll.
+  useEffect(() => {
+    const handleApprovalJumpIntent = (event: Event): void => {
+      const detail = (event as CustomEvent<{ conversationId?: string }>).detail;
+      if (!detail || detail.conversationId !== currentConversationId) return;
       handleApprovalJump();
-      return;
-    }
-    onOpenApprovalQueueFallback?.();
-  }, [firstPendingApprovalId, handleApprovalJump, onOpenApprovalQueueFallback]);
+    };
+    window.addEventListener(WORKBENCH_APPROVAL_JUMP_EVENT, handleApprovalJumpIntent);
+    return () => window.removeEventListener(WORKBENCH_APPROVAL_JUMP_EVENT, handleApprovalJumpIntent);
+  }, [currentConversationId, handleApprovalJump]);
 
   // ── #1967 run-level aggregate review entry ──────────────────────────
   // Run evidence is the hard grouping boundary: select exactly one active/
@@ -756,17 +733,6 @@ export const ConversationHost = React.memo(function ConversationHost({
       )}
       <WorkspaceHeader activeConversation={activeConversation}
         inspectorCollapsed={inspectorCollapsed} onToggleInspector={onToggleInspector} onOpenSearch={() => onSearchOpenChange(true)} />
-      {showMainchainStatus && (
-        <MainchainStatusStrip
-          summary={mainchainSummary}
-          onExportEvidence={onExportMainchainEvidence}
-          {...(attentionCounts ? { attention: attentionCounts } : {})}
-          {...(onOpenRunningQueue ? { onOpenRunningQueue } : {})}
-          {...(usageTokenTotal !== undefined ? { usageTokenTotal } : {})}
-          {...(onOpenUsage ? { onOpenUsage } : {})}
-          onOpenApprovalQueue={handleOpenApprovalQueue}
-        />
-      )}
       {(pendingApprovalCount > 0 || runReviewFiles.length > 0) && !selectionMode && (
         <div className={styles.pendingApprovalStrip} role="status" aria-live="polite">
           {pendingApprovalCount > 0 && (

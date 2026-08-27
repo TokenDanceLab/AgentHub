@@ -87,6 +87,9 @@ test.describe('Web stubbed Hub replay smoke', () => {
     await expect(approvalBlock.getByRole('button', { name: 'Approve' })).toBeVisible();
     await expect(approvalBlock.getByRole('button', { name: 'Deny' })).toBeVisible();
     await expect(page.getByText('reports/web-stubbed-replay-smoke.md').first()).toBeVisible();
+    // F5 (#1994): the frame-level global status bar renders the connection
+    // segment on the chat page (real Hub WS state, never faked).
+    await expect(page.getByText(/WebSocket/).first()).toBeVisible();
     await expect(page.getByText('运行证据').first()).toBeVisible();
     await expect(page.getByText('Hub replay artifact index: 1')).toBeVisible();
 
@@ -98,6 +101,10 @@ test.describe('Web stubbed Hub replay smoke', () => {
     await expect(page.getByRole('region', { name: 'Workbench page' })).toContainText(
       'The real task data source is not connected yet, so there are no tasks to show.',
     );
+
+    // F5 (#1994): leaving the chat page keeps the real attention chip visible
+    // (scoped to the active conversation, no fake fleet totals).
+    await expect(page.getByRole('button', { name: /1 awaiting approval/ })).toBeVisible();
 
     await expect.poll(() => requests.endpoints.has('GET /client/auth/me')).toBe(true);
     await expect.poll(() => requests.endpoints.has('GET /client/sessions')).toBe(true);

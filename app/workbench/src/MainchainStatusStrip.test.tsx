@@ -13,18 +13,39 @@ beforeAll(async () => {
 const summary: MainchainSummary = {
   nodes: [{ id: 'n1', label: 'Agent A', detail: 'done', state: 'done' }],
   exportEnabled: false,
-  exportLabel: '导出',
+  exportLabel: 'Export',
   exportDetail: '',
 };
 
-describe('MainchainStatusStrip a11y', () => {
-  it('renders a polite live region with the status label', () => {
-    const { getByRole } = render(
-      <MainchainStatusStrip summary={summary} onExportEvidence={() => {}} />
+describe('global status bar honesty (#1994, UX F5)', () => {
+  it('renders nothing when there is no real data to show', () => {
+    const { container } = render(<MainchainStatusStrip />);
+    expect(container.firstChild).toBeNull();
+  });
+
+  it('renders a polite live region with the connection chip', () => {
+    render(<MainchainStatusStrip connectionStatus="connected" />);
+    const bar = screen.getByRole('region');
+    expect(bar).toHaveAttribute('aria-live', 'polite');
+    expect(bar).toHaveAttribute('aria-label', 'Demo main chain status');
+    expect(screen.getByText('WebSocket Connected')).toBeInTheDocument();
+  });
+
+  it('hides the conversation chain unless the frame enables it', () => {
+    render(
+      <MainchainStatusStrip connectionStatus="connected" summary={summary} onExportEvidence={() => {}} />,
     );
-    const strip = getByRole('region');
-    expect(strip).toHaveAttribute('aria-live', 'polite');
-    expect(strip).toHaveAttribute('aria-label', 'Demo main chain status');
+    expect(screen.queryByRole('list')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Export' })).not.toBeInTheDocument();
+  });
+
+  it('shows chain nodes + export with showConversationChain (chat page)', () => {
+    render(
+      <MainchainStatusStrip showConversationChain summary={summary} onExportEvidence={() => {}} />,
+    );
+    expect(screen.getByRole('list')).toBeInTheDocument();
+    expect(screen.getByText('Agent A')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Export' })).toBeDisabled();
   });
 });
 
@@ -34,8 +55,6 @@ describe('MainchainStatusStrip attention chips (F6)', () => {
     const onOpenApprovalQueue = vi.fn();
     render(
       <MainchainStatusStrip
-        summary={summary}
-        onExportEvidence={() => {}}
         attention={{ runningCount: 2, awaitingApprovalCount: 3 }}
         onOpenRunningQueue={onOpenRunningQueue}
         onOpenApprovalQueue={onOpenApprovalQueue}
@@ -56,8 +75,6 @@ describe('MainchainStatusStrip attention chips (F6)', () => {
   it('renders only chips with non-zero counts', () => {
     render(
       <MainchainStatusStrip
-        summary={summary}
-        onExportEvidence={() => {}}
         attention={{ runningCount: 0, awaitingApprovalCount: 1 }}
         onOpenApprovalQueue={() => {}}
       />,
@@ -66,31 +83,14 @@ describe('MainchainStatusStrip attention chips (F6)', () => {
     expect(screen.getByRole('button', { name: /1 awaiting approval/ })).toBeInTheDocument();
   });
 
-  it('keeps counts visible but non-interactive when no click-through is wired', () => {
-    const { container } = render(
-      <MainchainStatusStrip
-        summary={summary}
-        onExportEvidence={() => {}}
-        attention={{ runningCount: 4, awaitingApprovalCount: 0 }}
-      />,
-    );
-    const chip = container.querySelector('[data-attention-kind="running"]');
-    expect(chip).not.toBeNull();
-    expect(chip?.tagName.toLowerCase()).toBe('span');
-  });
-
   it('renders no attention chrome without an inventory', () => {
-    const { container } = render(
-      <MainchainStatusStrip summary={summary} onExportEvidence={() => {}} />,
-    );
+    const { container } = render(<MainchainStatusStrip connectionStatus="connected" />);
     expect(container.querySelector('[data-attention]')).toBeNull();
   });
 
   it('labels scoped counts as active-conversation-only instead of global', () => {
     render(
       <MainchainStatusStrip
-        summary={summary}
-        onExportEvidence={() => {}}
         attention={{ awaitingApprovalCount: 1, activeConversationOnly: true }}
         onOpenApprovalQueue={() => {}}
       />,
@@ -103,18 +103,10 @@ describe('MainchainStatusStrip attention chips (F6)', () => {
   });
 });
 
-
 describe('MainchainStatusStrip usage chip (#1990, UX F14)', () => {
   it('renders the compact usage total and routes to the usage page on click', () => {
     const onOpenUsage = vi.fn();
-    render(
-      <MainchainStatusStrip
-        summary={summary}
-        onExportEvidence={() => {}}
-        usageTokenTotal={12400}
-        onOpenUsage={onOpenUsage}
-      />,
-    );
+    render(<MainchainStatusStrip usageTokenTotal={12400} onOpenUsage={onOpenUsage} />);
     const chip = screen.getByRole('button', { name: '12.4k tokens used · Open the usage board' });
     expect(chip).toHaveAttribute('data-attention-kind', 'usage');
     fireEvent.click(chip);
@@ -122,25 +114,19 @@ describe('MainchainStatusStrip usage chip (#1990, UX F14)', () => {
   });
 
   it('renders a plain status chip without a handler (demo surfaces stay honest)', () => {
-    render(
-      <MainchainStatusStrip summary={summary} onExportEvidence={() => {}} usageTokenTotal={42} />,
-    );
+    render(<MainchainStatusStrip usageTokenTotal={42} />);
     expect(screen.getByText('42 tokens used')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /tokens used/ })).toBeNull();
   });
 
   it('hides the chip entirely without a total (no fake 0)', () => {
-    const { container } = render(
-      <MainchainStatusStrip summary={summary} onExportEvidence={() => {}} />,
-    );
+    const { container } = render(<MainchainStatusStrip connectionStatus="connected" />);
     expect(container.querySelector('[data-attention-kind="usage"]')).toBeNull();
   });
 
-  it('coexists with attention chips in the same strip', () => {
+  it('coexists with attention chips in the same bar', () => {
     render(
       <MainchainStatusStrip
-        summary={summary}
-        onExportEvidence={() => {}}
         attention={{ runningCount: 1, awaitingApprovalCount: 0 }}
         usageTokenTotal={900}
       />,
