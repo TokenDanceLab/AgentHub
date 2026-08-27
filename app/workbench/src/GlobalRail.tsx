@@ -305,7 +305,7 @@ export function GlobalRail({
   );
 }
 
-function connectionStatusLabel(status: ConnectionStatusKind, t: (key: string) => string): string {
+export function connectionStatusLabel(status: ConnectionStatusKind, t: (key: string) => string): string {
   switch (status) {
     case 'connected':
       return t('connection.connected');

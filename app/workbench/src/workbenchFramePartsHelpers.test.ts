@@ -144,7 +144,6 @@ describe('workbenchFramePartsHelpers', () => {
         transcript,
         inspectorCollapsed: true,
         toggleInspector,
-        showMainchainStatus: true,
         showComposerAgentPicker: true,
         showComposerStatus: false,
       });
@@ -167,8 +166,9 @@ describe('workbenchFramePartsHelpers', () => {
       expect('composerExecutionTargets' in props).toBe(false);
     });
 
-    it('wires the usage chip props when the shell has recorded totals (#1990)', () => {
-      const onOpenUsage = vi.fn();
+    it('no longer forwards status-strip props to the host (#1994 frame-level bar)', () => {
+      // The global status bar lives in WorkbenchFrame now; the host must not
+      // receive strip-only props even when the shell still supplies them.
       const props = buildChatConversationHostProps({
         platform: platformMock() as any,
         session: sessionMock() as any,
@@ -177,31 +177,17 @@ describe('workbenchFramePartsHelpers', () => {
         transcript: [],
         inspectorCollapsed: false,
         toggleInspector: vi.fn(),
-        showMainchainStatus: true,
         showComposerAgentPicker: false,
         showComposerStatus: false,
         usageTokenTotal: 1550,
-        onOpenUsage,
-      });
-      expect(props.usageTokenTotal).toBe(1550);
-      expect(props.onOpenUsage).toBe(onOpenUsage);
-    });
-
-    it('keeps the usage chip props absent without recorded totals (honest)', () => {
-      const props = buildChatConversationHostProps({
-        platform: platformMock() as any,
-        session: sessionMock() as any,
-        transcriptChrome: transcriptChromeMock() as any,
-        profile: profileMock() as any,
-        transcript: [],
-        inspectorCollapsed: false,
-        toggleInspector: vi.fn(),
-        showMainchainStatus: true,
-        showComposerAgentPicker: false,
-        showComposerStatus: false,
-      });
+        onOpenUsage: vi.fn(),
+        attentionCounts: { runningCount: 1, awaitingApprovalCount: 0 },
+      } as never);
       expect('usageTokenTotal' in props).toBe(false);
       expect('onOpenUsage' in props).toBe(false);
+      expect('attentionCounts' in props).toBe(false);
+      expect('mainchainSummary' in props).toBe(false);
+      expect('showMainchainStatus' in props).toBe(false);
     });
 
     it('falls back composer target label when conversation title is missing', () => {
@@ -213,7 +199,6 @@ describe('workbenchFramePartsHelpers', () => {
         transcript: [],
         inspectorCollapsed: false,
         toggleInspector: vi.fn(),
-        showMainchainStatus: false,
         showComposerAgentPicker: false,
         showComposerStatus: false,
       });
@@ -233,7 +218,6 @@ describe('workbenchFramePartsHelpers', () => {
         connectionStatus: 'connected' as any,
         inspectorCollapsed: false,
         toggleInspector: vi.fn(),
-        showMainchainStatus: false,
         workbenchStatus: { dataMode: 'live' },
         composerExecutionTargets: targets,
         showComposerAgentPicker: false,
@@ -265,7 +249,6 @@ describe('workbenchFramePartsHelpers', () => {
         transcript,
         inspectorCollapsed: false,
         toggleInspector: vi.fn(),
-        showMainchainStatus: false,
         showComposerAgentPicker: false,
         showComposerStatus: false,
       });
@@ -446,7 +429,6 @@ describe('workbenchFramePartsHelpers', () => {
         transcript: [{ id: 't1' }] as any,
         inspectorCollapsed: false,
         toggleInspector: vi.fn(),
-        showMainchainStatus: false,
         showComposerAgentPicker: false,
         showComposerStatus: false,
         ...overrides,
