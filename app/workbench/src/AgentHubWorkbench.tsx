@@ -94,6 +94,10 @@ function AgentHubWorkbenchContent(props: AgentHubWorkbenchProps): React.ReactEle
     isChatPage,
     platformSurface: platform.surface,
     setActivePage,
+    // #1997 (UX F3): split-view placement derives from the shell selection.
+    ...(props.activeConversationId !== undefined
+      ? { activeConversationId: props.activeConversationId }
+      : {}),
   });
 
   const handleGlobalSearchSelect = useCallback((conversationId: string): void => {

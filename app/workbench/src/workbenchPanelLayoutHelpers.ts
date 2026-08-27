@@ -13,6 +13,7 @@ import {
   SIDEBAR_MIN_WIDTH,
   WORKSPACE_AUTO_COLLAPSE_WIDTH,
 } from './workbenchLayoutConstants';
+import type { SplitLayoutNode, SplitOrientation } from './workbenchSplitLayout';
 
 /* ═══════════════════════════════════════════════════════════════════════
    workbenchPanelLayoutHelpers — pure residual slices from
@@ -33,6 +34,11 @@ export interface UseWorkbenchPanelLayoutOptions {
   isChatPage: boolean;
   platformSurface: AgentHubPlatform['surface'];
   setActivePage: (page: GlobalRailPage) => void;
+  /**
+   * Shell-selected conversation id (#1997): drives the split-tree placement
+   * derivation. Absent on surfaces without a conversation selection.
+   */
+  activeConversationId?: string | undefined;
 }
 
 export interface WorkbenchPanelLayout {
@@ -59,6 +65,40 @@ export interface WorkbenchPanelLayout {
   restoreInspectorWidth: (width?: number) => void;
   restoreSidebarWidth: (width?: number) => void;
   shellStyle: React.CSSProperties;
+  /**
+   * Split-view layout state (#1997, UX F3). Present when the host wires the
+   * chat-page split surface; `tree === null` / `active === false` means the
+   * workspace renders a single conversation group.
+   */
+  split?: WorkbenchSplitState | undefined;
+}
+
+/** Read-only projection of one split pane for chrome surfaces. */
+export interface WorkbenchSplitPaneSummary {
+  paneId: string;
+  conversationId: string | null;
+}
+
+/** Split-view actions + derived state exposed by useWorkbenchPanelLayout. */
+export interface WorkbenchSplitState {
+  /** Effective layout tree (active-conversation placement already derived). */
+  tree: SplitLayoutNode | null;
+  /** True when the effective tree holds at least two panes. */
+  active: boolean;
+  /** Pane list in document (visual) order. */
+  panes: WorkbenchSplitPaneSummary[];
+  /** Split the active pane; 'horizontal' = Split Right, 'vertical' = Split Down. */
+  splitActivePane: (orientation: SplitOrientation) => void;
+  /** Remove a pane; unsplitting the active pane collapses to a single group. */
+  unsplitPane: (paneId: string) => void;
+  /** Collapse the whole layout back to a single group. */
+  collapseAll: () => void;
+  /** Sidebar routing: drop an incoming conversation into the split. Returns
+   *  false when no split is active (caller falls through to plain selection). */
+  placeConversation: (conversationId: string) => boolean;
+  /** Move to Group: move one pane's conversation into another pane (swap, or
+   *  fill an empty target and collapse the source). */
+  moveConversationToPane: (sourcePaneId: string, targetPaneId: string) => void;
 }
 
 export function clampInspectorWidth(value: number): number {
@@ -471,6 +511,7 @@ export function buildWorkbenchPanelLayoutResult(params: {
   closeInspector: () => void;
   restoreInspectorWidth: (width?: number) => void;
   restoreSidebarWidth: (width?: number) => void;
+  split?: WorkbenchSplitState | undefined;
 }): WorkbenchPanelLayout {
   return {
     inspectorWidth: params.inspectorWidth,
@@ -499,5 +540,6 @@ export function buildWorkbenchPanelLayoutResult(params: {
       inspectorWidth: params.inspectorWidth,
       sidebarWidth: params.sidebarWidth,
     }),
+    ...(params.split !== undefined ? { split: params.split } : {}),
   };
 }

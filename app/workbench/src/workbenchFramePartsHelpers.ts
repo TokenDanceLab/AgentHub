@@ -93,6 +93,7 @@ export function buildChatConversationHostProps(
     highlightedBlockId,
     onHighlightEnd,
     transcriptLoading,
+    splitControls,
   } = props;  const {
     currentConversationId,
     activeConversation,
@@ -164,6 +165,7 @@ export function buildChatConversationHostProps(
   assignIfDefined(hostProps, 'onCancelRun', props.onCancelRun);
   assignIfDefined(hostProps, 'onEditMessage', props.onEditMessage);
   assignIfDefined(hostProps, 'transcriptLoading', transcriptLoading);
+  assignIfDefined(hostProps, 'splitControls', splitControls);
 
   return hostProps;
 }

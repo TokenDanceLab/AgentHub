@@ -53,6 +53,7 @@ import {
 } from './workbenchApprovalSummary';
 import { UnifiedComposer } from './UnifiedComposer';
 import { WorkspaceHeader } from './WorkspaceHeader';
+import type { WorkbenchSplitControls } from './workbenchFrameTypes';
 import type { UnreadDividerDescriptor } from '@shared/chatview';
 import type { RowItem } from '@shared/chatview/types';
 import { WORKBENCH_ENGINEERING_PREVIEW_FOCUS_EVENT } from './workbenchPreviewEvents';
@@ -135,6 +136,8 @@ export interface ConversationHostProps {
    * shows an honest loading state instead of the "no messages" empty state.
    */
   transcriptLoading?: boolean | undefined;
+  /** Split-view header controls (#1997); absent hides the split entry. */
+  splitControls?: WorkbenchSplitControls | undefined;
 }
 
 type PendingUserBlock = TextTranscriptBlock & {
@@ -167,6 +170,7 @@ export const ConversationHost = React.memo(function ConversationHost({
   isAgentRunning, onCancelRun, onEditMessage,
   transcriptUnreadDivider,
   transcriptLoading,
+  splitControls,
 }: ConversationHostProps): React.ReactElement {
   const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE);
   const [uploadProgresses, setUploadProgresses] = useState<Record<string, AttachmentUploadState>>({});
@@ -732,7 +736,8 @@ export const ConversationHost = React.memo(function ConversationHost({
         </div>
       )}
       <WorkspaceHeader activeConversation={activeConversation}
-        inspectorCollapsed={inspectorCollapsed} onToggleInspector={onToggleInspector} onOpenSearch={() => onSearchOpenChange(true)} />
+        inspectorCollapsed={inspectorCollapsed} onToggleInspector={onToggleInspector} onOpenSearch={() => onSearchOpenChange(true)}
+        {...(splitControls ? { splitControls } : {})} />
       {(pendingApprovalCount > 0 || runReviewFiles.length > 0) && !selectionMode && (
         <div className={styles.pendingApprovalStrip} role="status" aria-live="polite">
           {pendingApprovalCount > 0 && (
