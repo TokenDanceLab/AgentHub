@@ -20,6 +20,7 @@
     "visual:qa:shell": "node scripts/visual-qa-shell.mjs",
     "visual:qa:shell:2x": "node scripts/visual-qa-shell-2x.mjs",
     "visual:qa:chat": "node scripts/visual-qa-chat.mjs",
+    "visual:qa:tasks-board": "node scripts/visual-qa-tasks-board.mjs",
     "assert:visual:qa:shell": "node scripts/assert-visual-qa-shell.mjs",
     "lint": "eslint src --max-warnings 0",
     "typecheck": "tsc -p tsconfig.json --noEmit",

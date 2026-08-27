@@ -407,6 +407,7 @@ export function WorkbenchFrame({
         ) : (
           <WorkbenchRoutesFrame
             activePage={activePage as Exclude<GlobalRailPage, 'chat'>}
+            platformSurface={platform.surface}
             agents={agents}
             agentProfilesStatus={agentProfilesStatus}
             dataMode={workbenchStatus?.dataMode}

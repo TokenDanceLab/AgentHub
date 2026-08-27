@@ -22,6 +22,13 @@ import {
   taskStatusIconClassName,
 } from './TaskTableHelpers';
 import type { TaskEditDraft, TaskGroup, TaskItem, TaskStatus } from './types';
+import type { AgentHubSurface } from '@shared/platform';
+import {
+  isAwaitingReviewStatus,
+  resolveReviewMergeDecision,
+  type BoardColumnTone,
+  type TaskReviewMergePort,
+} from '../../workbenchBoardColumns';
 
 /* ═══════════════════════════════════════════════════════════════════════
    TaskTableParts — presentational residual slices from TaskTableViews
@@ -36,6 +43,8 @@ import type { TaskEditDraft, TaskGroup, TaskItem, TaskStatus } from './types';
 export function TaskSelectionStrip({
   task,
   actionLabel,
+  platformSurface,
+  reviewMergePort,
   onCycleStatus,
   onAssignToMe,
   onGroupByProject,
@@ -45,6 +54,10 @@ export function TaskSelectionStrip({
 }: {
   task?: TaskItem | null | undefined;
   actionLabel?: string | undefined;
+  /** Workbench surface (#1999): only desktop hosts the Local Edge merge path. */
+  platformSurface?: AgentHubSurface | null | undefined;
+  /** Real review-before-merge capability port (#1999); absent = zero controls. */
+  reviewMergePort?: TaskReviewMergePort | null | undefined;
   onCycleStatus?: (() => void) | undefined;
   onAssignToMe?: (() => void) | undefined;
   onGroupByProject?: (() => void) | undefined;
@@ -52,9 +65,19 @@ export function TaskSelectionStrip({
   onEdit?: (() => void) | undefined;
   onDelete?: (() => void) | undefined;
 }) {
+  const { t } = useTranslation(SHARED_WORKBENCH_I18N_NAMESPACE);
   if (!task) {
     return null;
   }
+
+  // review-before-merge (#1999): approve/merge render only when a real
+  // capability port exists on a desktop surface for an awaiting-review
+  // task; everything else fails closed to zero controls.
+  const reviewMerge = resolveReviewMergeDecision({
+    status: task.status,
+    port: reviewMergePort,
+    surface: platformSurface,
+  });
 
   return (
     <div
@@ -70,6 +93,33 @@ export function TaskSelectionStrip({
       <span className={styles.selectionMuted}>{taskSelectionMetaLine(task)}</span>
       <div className={styles.selectionActions}>
         {actionLabel && <strong className={styles.selectionFeedback}>{actionLabel}</strong>}
+        {reviewMerge.controlsVisible && reviewMergePort && (
+          <span
+            className={styles.reviewMergeControls}
+            role="group"
+            aria-label={t('tasks.board.reviewControlsAria')}
+            data-testid="task-review-merge-controls"
+          >
+            <button
+              type="button"
+              className={styles.reviewApproveBtn}
+              data-testid="task-review-approve"
+              onClick={() => reviewMergePort.approveReview(task.id)}
+            >
+              <DesignNavIcon name="audit" size={13} />
+              {t('tasks.board.approveReview')}
+            </button>
+            <button
+              type="button"
+              className={styles.reviewMergeBtn}
+              data-testid="task-review-merge"
+              onClick={() => reviewMergePort.mergeTask(task.id)}
+            >
+              <DesignNavIcon name="check" size={13} />
+              {t('tasks.board.merge')}
+            </button>
+          </span>
+        )}
         <button type="button" onClick={onCycleStatus}>推进状态</button>
         <button type="button" onClick={onAssignToMe}>指派给我</button>
         <button type="button" onClick={onGroupByProject}>按项目分组</button>
@@ -160,6 +210,7 @@ export function TaskRow({
   onSaveEdit?: (() => void) | undefined;
   onCancelEdit?: (() => void) | undefined;
 }) {
+  const { t } = useTranslation(SHARED_WORKBENCH_I18N_NAMESPACE);
   const handleClick = useCallback(() => {
     onClick?.(task);
   }, [task, onClick]);
@@ -194,6 +245,12 @@ export function TaskRow({
         <TaskStatusIcon status={task.status} />
         <span className={styles.nameLabel}>{task.title}</span>
         <em className={styles.nameBadge}>{task.status}</em>
+        {isAwaitingReviewStatus(task.status) && (
+          <span className={styles.reviewMarker} data-testid="task-review-marker">
+            <DesignNavIcon name="audit" size={11} />
+            {t('tasks.board.awaitingReviewMarker')}
+          </span>
+        )}
       </span>
       <span>{task.project}</span>
       <ProfileCell name={task.assignee} profiles={profiles} />
@@ -220,13 +277,23 @@ export function TaskTableHead({ showCreatorColumn }: { showCreatorColumn: boolea
 export function TaskGroupTitle({
   label,
   count,
+  columnId,
+  tone,
 }: {
   label: string;
   count: number;
+  /** Board column id from the board-column SSOT (#1999). */
+  columnId?: string | undefined;
+  /** Board column tone from the board-column SSOT (#1999). */
+  tone?: BoardColumnTone | undefined;
 }) {
   return (
-    <div className={taskGroupTitleClassName()}>
-      <DesignNavIcon name="running" size={14} />
+    <div
+      className={taskGroupTitleClassName()}
+      {...(columnId ? { 'data-board-column-id': columnId } : {})}
+      {...(tone ? { 'data-board-tone': tone } : {})}
+    >
+      <DesignNavIcon name={columnId && tone === 'review' ? 'audit' : 'running'} size={14} />
       {label}
       {' '}
       <em className={styles.groupCount}>{count}</em>
@@ -309,7 +376,12 @@ export function TaskGroupRows({
     <>
       {groups.map((group) => (
         <React.Fragment key={group.label}>
-          <TaskGroupTitle label={group.label} count={group.tasks.length} />
+          <TaskGroupTitle
+            columnId={group.columnId}
+            count={group.tasks.length}
+            label={group.label}
+            tone={group.tone}
+          />
           {group.tasks.map((task) => (
             <TaskRow
               key={task.id}

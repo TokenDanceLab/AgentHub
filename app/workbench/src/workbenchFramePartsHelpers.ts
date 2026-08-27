@@ -263,6 +263,7 @@ export function buildWorkbenchRoutesProps(
   assignIfDefined(routesProps, 'mcpMarketError', props.mcpMarketError);
   assignIfDefined(routesProps, 'currentUserId', props.currentUserId);
   assignIfDefined(routesProps, 'userDisplayName', props.userDisplayName);
+  assignIfDefined(routesProps, 'platformSurface', props.platformSurface);
   assignIfDefined(routesProps, 'devicesTargets', props.devicesTargets);
   assignIfDefined(routesProps, 'devicesLoading', props.devicesLoading);
   assignIfDefined(routesProps, 'devicesError', props.devicesError);
