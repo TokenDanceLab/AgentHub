@@ -5,7 +5,9 @@ import { computeFileHash } from '@shared/composer';
 import {
   WORKBENCH_DEMO_FALLBACK_CONVERSATION_ID,
   demoWorkbenchAgents,
+  isWorkbenchFixtureDataMode,
   resolveDemoWorkbenchTranscript,
+  resolveWorkbenchDataMode,
   workbenchDemoRuntimeStore,
 } from '@shared/demo';
 import {
@@ -281,6 +283,12 @@ export function readLocalCliDiscovery(): Promise<LocalCliDiscoveryManifest> {
 
 /** Desktop host: Edge GET /v1/runtime-sessions via typed fetch (no foreign store). */
 export async function readRuntimeSessions(limit = 50): Promise<RuntimeSessionSummary[]> {
+  // Data-mode gate (#1995): the workbench chrome calls this port on mount
+  // (entry preflight). Pinned mock/fixture surfaces must not contact the
+  // Local Edge, so they receive an honest empty import list instead of a
+  // live fetch; auto/observed/approved-real keep the Edge fetch unchanged.
+  const mode = resolveWorkbenchDataMode(import.meta.env.VITE_AGENTHUB_DATA_MODE);
+  if (isWorkbenchFixtureDataMode(mode)) return [];
   return fetchDesktopRuntimeSessions({
     edgeBaseUrl: getEdgeBaseUrl(),
     limit,

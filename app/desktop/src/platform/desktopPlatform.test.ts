@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { WORKBENCH_DATA_MODE_STORAGE_KEY } from '@shared/demo';
 import { createDesktopPlatform } from './desktopPlatform';
 
 describe('createDesktopPlatform', () => {
@@ -398,6 +399,23 @@ describe('createDesktopPlatform', () => {
       const calledUrl = String(fetchSpy.mock.calls[0]?.[0] ?? '');
       expect(calledUrl).toContain('/v1/runtime-sessions?limit=10');
     } finally {
+      fetchSpy.mockRestore();
+    }
+  });
+
+  it('skips the Edge runtime-sessions preflight in pinned mock data mode (#1995)', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+      ok: true,
+      json: async () => ({ items: [] }),
+    } as Response);
+    window.localStorage.setItem(WORKBENCH_DATA_MODE_STORAGE_KEY, 'mock');
+
+    try {
+      const platform = createDesktopPlatform();
+      await expect(platform.host.listRuntimeSessions(10)).resolves.toEqual([]);
+      expect(fetchSpy).not.toHaveBeenCalled();
+    } finally {
+      window.localStorage.removeItem(WORKBENCH_DATA_MODE_STORAGE_KEY);
       fetchSpy.mockRestore();
     }
   });
