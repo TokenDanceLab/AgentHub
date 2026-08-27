@@ -288,8 +288,14 @@ test.describe('Web Hub task approval/artifact contract', () => {
     await expect(page.getByText('@Agent done')).toBeVisible();
     await expect.poll(() => requested.endpoints.has('GET /web/agent-tasks/task-web-contract/approvals')).toBe(true);
     await expect.poll(() => requested.endpoints.has('GET /web/agent-tasks/task-web-contract/artifacts')).toBe(true);
-    await page.getByRole('button', { name: /Awaiting approval|Expand/ }).first().click();
+    // Waiting approval cards auto-expand (RowItem), so the reason from the
+    // stubbed approvals endpoint renders without a toggle.
     await expect(page.getByText('Stubbed Hub approval endpoint')).toBeVisible();
+    // F10 (#1992): artifact rows are preview triggers, not expandable rows —
+    // clicking one focuses the engineering Preview on that exact artifact.
+    const transcript = page.getByRole('region', { name: 'Transcript' });
+    await transcript.getByRole('button', { name: /reports\/contract-smoke\.md/ }).click();
+    await expect(page.getByRole('region', { name: 'reports/contract-smoke.md read-only preview' })).toBeVisible();
     await expect(page.getByText('reports/contract-smoke.md').first()).toBeVisible();
 
     writeReplayManifest(requested);

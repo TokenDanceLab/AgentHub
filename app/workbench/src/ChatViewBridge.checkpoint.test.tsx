@@ -38,6 +38,20 @@ function checkpointBlock(): TranscriptBlock {
   } as TranscriptBlock;
 }
 
+function artifactBlock(): TranscriptBlock {
+  return {
+    id: 'blk-artifact',
+    kind: 'artifact',
+    createdAt: '2026-08-26T01:01:00.000Z',
+    author,
+    title: 'result.md',
+    artifactId: 'artifact-42',
+    path: 'reports/result.md',
+    artifactKind: 'file',
+    action: 'created',
+  } as TranscriptBlock;
+}
+
 function userBlock(): TranscriptBlock {
   return {
     id: 'blk-user',
@@ -53,6 +67,20 @@ function renderBridge(onCheckpointClick?: (item: RowItem) => void) {
     <ChatViewBridge
       displayTranscript={[userBlock(), checkpointBlock()]}
       {...(onCheckpointClick ? { onCheckpointClick } : {})}
+      selectedBlockIds={new Set<string>()}
+      selectionMode={false}
+      softHiddenBlockIds={new Set<string>()}
+      actionedBlockIds={new Set<string>()}
+      dismissedPinnedIds={new Set<string>()}
+    />,
+  );
+}
+
+function renderArtifactBridge(onArtifactClick: (item: RowItem) => void) {
+  return render(
+    <ChatViewBridge
+      displayTranscript={[userBlock(), artifactBlock()]}
+      onArtifactClick={onArtifactClick}
       selectedBlockIds={new Set<string>()}
       selectionMode={false}
       softHiddenBlockIds={new Set<string>()}
@@ -82,6 +110,23 @@ describe('ChatViewBridge checkpoint timeline (#1968)', () => {
       checkpointId: 'cp-run-42',
       checkpointFileCount: 2,
       checkpointTotalBytes: 1536,
+    });
+  });
+});
+
+
+describe('ChatViewBridge artifact Preview focus (#1992)', () => {
+  it('maps an artifact block to a named clickable card and bubbles the row', () => {
+    const onArtifactClick = vi.fn();
+    const { container } = renderArtifactBridge(onArtifactClick);
+    const card = container.querySelector('.row-item.file');
+    expect(card).not.toBeNull();
+    expect(card!.querySelector('button.row-hd')).toHaveAccessibleName('Open artifact reports/result.md');
+    fireEvent.click(card!.querySelector('button.row-hd')!);
+    expect(onArtifactClick).toHaveBeenCalledTimes(1);
+    expect(onArtifactClick.mock.calls[0][0]).toMatchObject({
+      artifactId: 'artifact-42',
+      artifactPath: 'reports/result.md',
     });
   });
 });
