@@ -296,6 +296,9 @@ test.describe('Web Hub task approval/artifact contract', () => {
     const transcript = page.getByRole('region', { name: 'Transcript' });
     await transcript.getByRole('button', { name: /reports\/contract-smoke\.md/ }).click();
     await expect(page.getByRole('region', { name: 'reports/contract-smoke.md read-only preview' })).toBeVisible();
+    // F5 (#1994): the global status bar surfaces the real pending-approval
+    // count from the stubbed Hub approvals endpoint.
+    await expect(page.getByRole('button', { name: /1 awaiting approval/ })).toBeVisible();
     await expect(page.getByText('reports/contract-smoke.md').first()).toBeVisible();
 
     writeReplayManifest(requested);

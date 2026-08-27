@@ -60,6 +60,11 @@ Do not add per-hook inventory tables here. If a file moves, update this owner ma
 - 产物卡聚焦（F10）：Transcript 中携带真实 `artifactId` 的产物卡通过一次性的 `WORKBENCH_ENGINEERING_PREVIEW_FOCUS_EVENT` 请求工程列选择对应 artifact 并激活 `Preview`；事件携带 `conversationId`，工程列拒绝其他会话的 intent。该事件是瞬时 UI intent，不写入 transcript/store；artifact 不可解析时显示已有诚实不可用态，不回退到另一份最新产物。
 - 表面边界：Desktop 可经 Local Edge 支持的 `PreviewPort` 解析产物内容，Web 保持 Hub-only；Hub 未提供安全 preview URL/content endpoint 时，Preview 必须诚实显示不可用，不构造 Local Edge URL。
 
+## 全局状态栏合同（F5 #1994）
+
+- `WorkbenchFrame` 将 `MainchainStatusStrip` 渲染为全局底部状态栏（shell 第 3 行、rail 右侧），所有 rail 页面可见；全局段 = 连接态 + F6 注意力 chips + F14 usage chip（与 rail/sidebar 同源推导），会话段（证据链 + 导出）仅聊天页且 `showMainchainStatus` 开启时渲染。
+- 诚实合同：无数据不渲染；作用域计数带标注；awaiting chip 在聊天页发一次性 `agenthub:approval-jump` 做 transcript 内高亮，其他页面先回聊天并选中首个等待会话。
+
 ## Transcript Pipeline
 
 The visible chat flow is a single timeline:

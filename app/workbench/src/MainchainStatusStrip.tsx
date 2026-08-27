@@ -2,13 +2,28 @@ import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { CHATVIEW_I18N_NAMESPACE } from '@shared/chatview/i18n/resources';
 import styles from './AgentHubWorkbench.module.css';
+import { connectionStatusLabel, type ConnectionStatusKind } from './GlobalRail';
 import type { MainchainSummary } from './mainchain';
 import type { WorkbenchAttentionCounts } from './workbenchAttentionModel';
 import { formatTokenCount } from './pages/TokenUsagePage';
 
+/**
+ * Workbench global bottom status bar (#1994, UX F5).
+ *
+ * Global segments render on every rail page: Hub connection state, the F6
+ * attention chips (running / awaiting approval) and the F14 live usage chip.
+ * Conversation-scoped segments (evidence chain nodes + evidence export)
+ * render only when the frame enables `showConversationChain` (chat page with
+ * showMainchainStatus), so demo surfaces keep the chain and real surfaces
+ * stay honest. The bar renders nothing when it has no real data to show.
+ */
 export interface MainchainStatusStripProps {
-  summary: MainchainSummary;
-  onExportEvidence: () => void;
+  /** Hub WebSocket state; absent keeps the connection chip hidden. */
+  connectionStatus?: ConnectionStatusKind | undefined;
+  /** Conversation evidence chain (frame-gated, chat page only). */
+  summary?: MainchainSummary | undefined;
+  onExportEvidence?: (() => void) | undefined;
+  showConversationChain?: boolean | undefined;
   /**
    * Global attention counts (F6). Absent when the shell provides no
    * run/approval inventory — the chips stay hidden.
@@ -16,7 +31,7 @@ export interface MainchainStatusStripProps {
   attention?: WorkbenchAttentionCounts | undefined;
   /** Click-through for the running chip (Tasks page queue). */
   onOpenRunningQueue?: (() => void) | undefined;
-  /** Click-through for the awaiting-approval chip (approval summary). */
+  /** Click-through for the awaiting-approval chip (frame-owned, #1994). */
   onOpenApprovalQueue?: (() => void) | undefined;
   /**
    * Live total of recorded usage-board tokens (#1990, F14). Absent when the
@@ -29,13 +44,15 @@ export interface MainchainStatusStripProps {
 
 export function MainchainStatusStrip({
   attention,
+  connectionStatus,
   onExportEvidence,
   onOpenApprovalQueue,
   onOpenRunningQueue,
   onOpenUsage,
+  showConversationChain,
   summary,
   usageTokenTotal,
-}: MainchainStatusStripProps): React.ReactElement {
+}: MainchainStatusStripProps): React.ReactElement | null {
   const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE);
   const runningCount = attention?.runningCount ?? 0;
   const awaitingApprovalCount = attention?.awaitingApprovalCount ?? 0;
@@ -44,19 +61,33 @@ export function MainchainStatusStrip({
   const scopeHint = attention?.activeConversationOnly
     ? t('sharedWorkbench:attention.scopeActiveConversation')
     : undefined;
+  const showChain = Boolean(showConversationChain && summary && onExportEvidence);
+  const hasChips = runningCount > 0 || awaitingApprovalCount > 0 || usageTokenTotal !== undefined;
+  if (!connectionStatus && !showChain && !hasChips) return null;
+  const connectionLabel = connectionStatus
+    ? t('connectionDot.label', { status: connectionStatusLabel(connectionStatus, t) })
+    : undefined;
   return (
-    // A11y (#10): the strip's node states/labels change at runtime — a
+    // A11y (#10): the bar's node states/labels change at runtime — a
     // polite live region announces the changes without stealing focus.
-    <section className={styles.mainchainStrip} aria-label={t('aria.mainChainStatus')} aria-live="polite">
-      <div className={styles.mainchainTrack} role="list">
-        {summary.nodes.map((n) => (
-          <div className={styles.mainchainNode} data-state={n.state} key={n.id} role="listitem">
-            <span className={styles.mainchainDot} aria-hidden="true" />
-            <span className={styles.mainchainCopy}><strong>{n.label}</strong><em>{n.detail}</em></span>
-          </div>
-        ))}
-      </div>
-      {(runningCount > 0 || awaitingApprovalCount > 0 || usageTokenTotal !== undefined) && (
+    <section className={styles.workbenchStatusBar} aria-label={t('aria.mainChainStatus')} aria-live="polite">
+      {connectionStatus && connectionLabel && (
+        <span className={styles.statusBarConnection} title={connectionLabel}>
+          <span className={styles.connectionDot} data-status={connectionStatus} aria-hidden="true" />
+          <span className={styles.statusBarConnectionLabel}>{connectionLabel}</span>
+        </span>
+      )}
+      {showChain && summary && (
+        <div className={styles.mainchainTrack} role="list">
+          {summary.nodes.map((n) => (
+            <div className={styles.mainchainNode} data-state={n.state} key={n.id} role="listitem">
+              <span className={styles.mainchainDot} aria-hidden="true" />
+              <span className={styles.mainchainCopy}><strong>{n.label}</strong><em>{n.detail}</em></span>
+            </div>
+          ))}
+        </div>
+      )}
+      {hasChips && (
         <div className={styles.mainchainAttention} data-attention>
           {runningCount > 0 && renderAttentionChip({
             handler: onOpenRunningQueue,
@@ -93,8 +124,10 @@ export function MainchainStatusStrip({
           })}
         </div>
       )}
-      <button type="button" className={styles.mainchainExport} disabled={!summary.exportEnabled}
-        onClick={onExportEvidence} title={summary.exportDetail}>{summary.exportLabel}</button>
+      {showChain && summary && (
+        <button type="button" className={styles.mainchainExport} disabled={!summary.exportEnabled}
+          onClick={onExportEvidence} title={summary.exportDetail}>{summary.exportLabel}</button>
+      )}
     </section>
   );
 }
