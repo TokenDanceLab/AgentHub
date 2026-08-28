@@ -36,7 +36,7 @@ export const AgentInstalledView: React.FC<AgentsPageProps> = (props) => {
     selectedAgentId,
     onAgentSelect,
     onAgentProfileOpen,
-    saveStateLabel = '已同步',
+    saveStateLabel,
     isDirty = false,
     allSkills = [],
     allTools = [],
@@ -53,6 +53,7 @@ export const AgentInstalledView: React.FC<AgentsPageProps> = (props) => {
   } = props;
 
   const { t } = useTranslation(SHARED_WORKBENCH_I18N_NAMESPACE);
+  const resolvedSaveStateLabel = saveStateLabel ?? t('agents.installed.synced');
   const selectedAgent = agents.find((a) => a.id === selectedAgentId) || agents[0];
   const selectedAgentBusy = Boolean(selectedAgent && (savingAgentId === selectedAgent.id || deletingAgentId === selectedAgent.id));
   const showInstalledSkeleton = agentsLoading && agents.length === 0 && !agentsError;
@@ -64,7 +65,7 @@ export const AgentInstalledView: React.FC<AgentsPageProps> = (props) => {
         <div>
           <h1>{t('agents.installed.title')}</h1>
           <p className={styles['head-subcopy']}>
-            管理已安装的 Agent 配置、技能与工具权限。
+            {t('agents.installed.subcopy')}
           </p>
         </div>
         {onAgentAdd ? (
@@ -74,38 +75,38 @@ export const AgentInstalledView: React.FC<AgentsPageProps> = (props) => {
             onClick={onAgentAdd}
           >
             <DesignNavIcon name="plus" size={15} />
-            添加 Agent
+            {t('agents.empty.add')}
           </button>
         ) : null}
       </div>
 
       {/* Summary strip */}
       <div className={styles['agent-summary-strip']}>
-        <AgentStat label="已安装" value={installedCount} meta="配置档案" />
-        <AgentStat label="可运行" value={runnableCount} meta="就绪 / 运行中" />
-        <AgentStat label="需确认权限" value={confirmCount} meta="工具门禁" />
-        <AgentStat label="默认模型" value={defaultModelLabel} meta="模型路由" />
+        <AgentStat label={t('agents.installed.stats.installed')} value={installedCount} meta={t('agents.installed.stats.installedMeta')} />
+        <AgentStat label={t('agents.installed.stats.runnable')} value={runnableCount} meta={t('agents.installed.stats.runnableMeta')} />
+        <AgentStat label={t('agents.installed.stats.confirm')} value={confirmCount} meta={t('agents.installed.stats.confirmMeta')} />
+        <AgentStat label={t('agents.detail.model')} value={defaultModelLabel} meta={t('agents.installed.stats.defaultModelMeta')} />
       </div>
 
       {/* Layout: list + edit panel */}
       <div className={styles['agent-layout']}>
         <section className={styles['agent-section']}>
           <div className={styles['section-title-row']}>
-            <h2>已安装</h2>
-            <span>{agentsLoading ? '同步中' : `${agents.length} 个`}</span>
+            <h2>{t('agents.nav.installed')}</h2>
+            <span>{agentsLoading ? t('agents.installed.syncing') : t('agents.installed.count', { count: agents.length })}</span>
           </div>
           {agentsError && agents.length === 0 ? (
             <div className={styles.statusStack}>
               <RecoveryPanel
                 {...(styles.recoveryPanel ? { className: styles.recoveryPanel } : {})}
                 icon={<DesignNavIcon name="error404" size={18} />}
-                eyebrow="恢复"
-                title="Agent 加载失败"
-                description="无法从当前 Hub 读取已安装配置。列表暂时不可用，请重试同步。"
+                eyebrow={t('agents.installed.recovery.eyebrow')}
+                title={t('agents.installed.recovery.title')}
+                description={t('agents.installed.recovery.description')}
                 meta={agentsError}
                 primaryAction={{
-                  label: '重试',
-                  busyLabel: '重试中…',
+                  label: t('agents.installed.recovery.retry'),
+                  busyLabel: t('agents.installed.recovery.retrying'),
                   busy: agentsLoading,
                   icon: <DesignNavIcon name="refresh" size={14} />,
                   onClick: () => {
@@ -130,7 +131,7 @@ export const AgentInstalledView: React.FC<AgentsPageProps> = (props) => {
                           className={styles.statusAction}
                           onClick={onAgentsRetry}
                         >
-                          重试
+                          {t('agents.installed.recovery.retry')}
                         </button>
                       ),
                     }
@@ -195,10 +196,10 @@ export const AgentInstalledView: React.FC<AgentsPageProps> = (props) => {
                   </div>
                   <small>
                     {agent.targetPreference
-                      ? `目标：${agent.targetPreference}`
+                      ? t('agents.installed.targetPrefix', { value: agent.targetPreference })
                       : agent.skills.length > 0
                         ? agent.skills.join(' · ')
-                        : '未配置技能'}
+                        : t('agents.installed.noSkills')}
                   </small>
                 </div>
                 <em>{agent.model}</em>
@@ -212,7 +213,7 @@ export const AgentInstalledView: React.FC<AgentsPageProps> = (props) => {
           <AgentEditPanel
             agent={selectedAgent}
             actionError={agentActionError}
-            saveStateLabel={saveStateLabel}
+            saveStateLabel={resolvedSaveStateLabel}
             isDirty={isDirty}
             isDeleting={deletingAgentId === selectedAgent.id}
             isSaving={savingAgentId === selectedAgent.id}

@@ -82,12 +82,12 @@ export const AgentsPage: React.FC<AgentsPageProps> = (props) => {
   const navItems: { id: AgentsPaneId; label: string; icon: DesignNavIconName }[] = [
     { id: 'installed', label: t('agents.nav.installed'), icon: 'package' },
     { id: 'market', label: t('agents.nav.market'), icon: 'store' },
-    { id: 'skillMarket', label: 'Skill 市场', icon: 'library' },
-    { id: 'mcpMarket', label: 'MCP 市场', icon: 'service' },
-    { id: 'policy', label: '运行策略', icon: 'policy' },
+    { id: 'skillMarket', label: t('agents.nav.skillMarket'), icon: 'library' },
+    { id: 'mcpMarket', label: t('agents.nav.mcpMarket'), icon: 'service' },
+    { id: 'policy', label: t('agents.ops.policy.title'), icon: 'policy' },
     { id: 'tools', label: t('agents.detail.tools'), icon: 'tools' },
-    { id: 'models', label: '模型配置', icon: 'model' },
-    { id: 'audit', label: '审计日志', icon: 'audit' },
+    { id: 'models', label: t('agents.ops.models.title'), icon: 'model' },
+    { id: 'audit', label: t('agents.ops.audit.title'), icon: 'audit' },
   ];
 
   const renderPane = () => {
@@ -125,7 +125,7 @@ export const AgentsPage: React.FC<AgentsPageProps> = (props) => {
           disabled={!onSearchChange}
           onChange={(e) => onSearchChange?.(e.target.value)}
         />
-        <div className={styles['nav-caption']}>配置中心</div>
+        <div className={styles['nav-caption']}>{t('agents.nav.captionConfig')}</div>
         {navItems.map((item) => (
           <button
             key={item.id}
@@ -145,7 +145,7 @@ export const AgentsPage: React.FC<AgentsPageProps> = (props) => {
             <span className={styles['nav-label']}>{item.label}</span>
           </button>
         ))}
-        <div className={styles['nav-caption']}>最近变更</div>
+        <div className={styles['nav-caption']}>{t('agents.nav.captionRecent')}</div>
         {recentShortcuts.map((item, i) => (
           <div key={i} className={styles['doc-shortcut']}>
             {item}

@@ -25,6 +25,7 @@ export const AgentMarketView: React.FC<AgentsPageProps> = (props) => {
   const {
     marketTemplates = [],
     marketFeatured = [],
+    // MarketCategory enum identifier: data-plane default, not UI copy (#2015).
     activeMarketCategory = '推荐',
     onMarketCategoryChange,
     onMarketInstall,
@@ -35,6 +36,8 @@ export const AgentMarketView: React.FC<AgentsPageProps> = (props) => {
   } = props;
 
   const { t } = useTranslation(SHARED_WORKBENCH_I18N_NAMESPACE);
+  // MarketCategory enum identifiers (data plane); chip labels render the
+  // values verbatim until the cross-surface enum display decision (#2015).
   const categories: MarketCategory[] = ['推荐', '研发', '文档', '测试', '安全', '发布'];
 
   return (
@@ -43,12 +46,12 @@ export const AgentMarketView: React.FC<AgentsPageProps> = (props) => {
         <div>
           <h1>{t('agents.market.title')}</h1>
           <p className={styles['head-subcopy']}>
-            从 TokenDance 模板库安装可复用 Agent，不影响已安装配置。
+            {t('agents.market.subcopy')}
           </p>
         </div>
         {onMarketPublish && (
           <button className={`${styles['outline-action']} outline-action`} type="button" onClick={onMarketPublish}>
-            发布模板
+            {t('agents.market.publish')}
           </button>
         )}
       </div>
@@ -97,15 +100,16 @@ export const SkillMarketView: React.FC<AgentsPageProps> = (props) => {
     installedSkillIds = [],
   } = props;
 
+  const { t } = useTranslation(SHARED_WORKBENCH_I18N_NAMESPACE);
   const skillTypes = ['', 'prompt', 'tool', 'workflow', 'integration'];
 
   return (
     <main className={`${styles['agent-main']} ${styles['agent-market-main']} workbench-main`}>
       <div className={`${styles['workbench-head']} workbench-head`}>
         <div>
-          <h1>Skill 市场</h1>
+          <h1>{t('agents.nav.skillMarket')}</h1>
           <p className={styles['head-subcopy']}>
-            浏览公共 Skill，一键安装到当前 Agent Profile。已安装的 Skill 可随时卸载。
+            {t('agents.market.skillSubcopy')}
           </p>
         </div>
       </div>
@@ -151,15 +155,16 @@ export const MCPMarketView: React.FC<AgentsPageProps> = (props) => {
     installedMcpIds = [],
   } = props;
 
+  const { t } = useTranslation(SHARED_WORKBENCH_I18N_NAMESPACE);
   const transports = ['', 'stdio', 'http', 'sse'];
 
   return (
     <main className={`${styles['agent-main']} ${styles['agent-market-main']} workbench-main`}>
       <div className={`${styles['workbench-head']} workbench-head`}>
         <div>
-          <h1>MCP 市场</h1>
+          <h1>{t('agents.nav.mcpMarket')}</h1>
           <p className={styles['head-subcopy']}>
-            浏览公共 MCP Server，安装到 Agent Profile 以扩展工具能力。支持 stdio、HTTP、SSE 传输。
+            {t('agents.market.mcpSubcopy')}
           </p>
         </div>
       </div>
