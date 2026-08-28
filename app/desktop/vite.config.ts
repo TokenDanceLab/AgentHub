@@ -87,11 +87,11 @@ export default defineConfig({
       'Content-Security-Policy': [
         "default-src 'self'",
         "script-src 'self' 'unsafe-inline'",
-        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-        "font-src 'self' https://fonts.gstatic.com",
+        "style-src 'self' 'unsafe-inline'",
+        "font-src 'self'",
         // Embedded Edge sends back inline images as data: URIs for content previews.
         // avatars.githubusercontent.com covers GitHub avatar proxying.
-        "img-src 'self' data: blob: https://avatars.githubusercontent.com https://*.vectorcontrol.tech https://fonts.gstatic.com",
+        "img-src 'self' data: blob: https://avatars.githubusercontent.com https://*.vectorcontrol.tech",
         // Connect covers: Edge localhost API, Hub API + WS, Desktop OIDC redirect.
         "connect-src 'self' http://127.0.0.1:* ws://127.0.0.1:* http://localhost:* ws://localhost:* https://*.vectorcontrol.tech wss://*.vectorcontrol.tech",
         "frame-ancestors 'none'",

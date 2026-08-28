@@ -6,7 +6,7 @@ interface IconProps {
   'aria-hidden'?: boolean;
 }
 
-/** Material Symbols icon rendered via Google Fonts. */
+/** Material Symbols icon rendered via the self-hosted Material Symbols Outlined font. */
 export function Icon({ name, size = 20, filled = false, className, 'aria-hidden': ariaHidden }: IconProps) {
   return (
     <span
