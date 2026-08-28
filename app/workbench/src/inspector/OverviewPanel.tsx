@@ -1,4 +1,6 @@
 import React, { useState, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
+import { SHARED_WORKBENCH_I18N_NAMESPACE } from '@shared/i18n';
 import type { DagNode } from '@shared/ui/DagTree';
 import { DagTree } from '@shared/ui/DagTree';
 import { DesignFileIcon, DesignNavIcon } from '../designIcons';
@@ -63,13 +65,17 @@ export const OverviewPanel: React.FC<OverviewPanelProps> = ({
   tasks,
   files,
   runResult,
-  taskSectionTitle = '任务',
+  taskSectionTitle,
   kicker,
-  primaryFileLabel = '交付文件',
-  workingFileLabel = '工作文件',
+  primaryFileLabel,
+  workingFileLabel,
   dagNodes,
   onFileClick,
 }) => {
+  const { t } = useTranslation(SHARED_WORKBENCH_I18N_NAMESPACE);
+  const tasksTitle = taskSectionTitle ?? t('inspector.tasks');
+  const primaryTitle = primaryFileLabel ?? t('inspector.deliverableFiles');
+  const workingTitle = workingFileLabel ?? t('inspector.workingFiles');
   /* P76: single primary card — tasks open by default; files collapsed until needed. */
   const [tasksOpen, setTasksOpen] = useState(true);
   const [filesOpen, setFilesOpen] = useState(false);
@@ -79,17 +85,18 @@ export const OverviewPanel: React.FC<OverviewPanelProps> = ({
 
   const primaryFiles = files.filter((f) => f.isPrimary);
   const workingFiles = files.filter((f) => !f.isPrimary);
-  const taskToggleLabel = `${tasksOpen ? '折叠' : '展开'} ${taskSectionTitle}`;
-  const filesToggleLabel = `${filesOpen ? '折叠' : '展开'} 产物`;
+  const collapseLabel = (open: boolean) => (open ? t('inspector.collapseSection') : t('inspector.expandSection'));
+  const taskToggleLabel = `${collapseLabel(tasksOpen)} ${tasksTitle}`;
+  const filesToggleLabel = `${collapseLabel(filesOpen)} ${t('inspector.artifacts')}`;
 
   return (
     <div className={styles.panel}>
       {/* ── Run result banner ── */}
       {runResult && (
         <div className={`${styles.runResult} ${runResult.success ? styles.runResultOk : styles.runResultFail}`}>
-          <span className={styles.runResultTitle}>{runResult.success ? '运行结果' : '运行失败'}</span>
+          <span className={styles.runResultTitle}>{runResult.success ? t('inspector.runResultOk') : t('inspector.runResultFail')}</span>
           <span className={`${styles.runResultBadge} ${runResult.success ? styles.badgeOk : styles.badgeFail}`}>
-            {runResult.success ? '完成' : '失败'}
+            {runResult.success ? t('inspector.resultDone') : t('inspector.resultFailed')}
           </span>
           {runResult.summary && (
             <span className={styles.runResultSummary}>{runResult.summary}</span>
@@ -100,7 +107,7 @@ export const OverviewPanel: React.FC<OverviewPanelProps> = ({
       {/* ── Tasks section ── */}
       <section className={`${styles.section} ${tasksOpen ? '' : styles.sectionCollapsed}`}>
         <div className={styles.sectionHead}>
-          <span>{taskSectionTitle}</span>
+          <span>{tasksTitle}</span>
           <button
             type="button"
             className={styles.sectionToggle}
@@ -146,13 +153,13 @@ export const OverviewPanel: React.FC<OverviewPanelProps> = ({
 
       {/* ── DagTree: agent dispatch hierarchy (between tasks and files) ── */}
       {dagNodes && dagNodes.length > 0 && (
-        <DagTree nodes={dagNodes} title="Agent 调度树" />
+        <DagTree nodes={dagNodes} title={t('inspector.dagTitle')} />
       )}
 
       {/* ── Files section ── */}
       <section className={`${styles.section} ${filesOpen ? '' : styles.sectionCollapsed}`}>
         <div className={styles.sectionHead}>
-          <span>产物</span>
+          <span>{t('inspector.artifacts')}</span>
           <button
             type="button"
             className={styles.sectionToggle}
@@ -171,7 +178,7 @@ export const OverviewPanel: React.FC<OverviewPanelProps> = ({
 
         {primaryFiles.length > 0 && (
           <>
-            <div className={styles.subhead}>{primaryFileLabel}</div>
+            <div className={styles.subhead}>{primaryTitle}</div>
             <div className={styles.fileList}>
               {primaryFiles.map((file, i) => (
                 <button
@@ -183,7 +190,7 @@ export const OverviewPanel: React.FC<OverviewPanelProps> = ({
                     file.isOpen ? styles.fileOpen : '',
                   ].filter(Boolean).join(' ')}
                   onClick={() => onFileClick?.(file)}
-                  aria-label={`打开 ${file.name} 只读预览`}
+                  aria-label={t('inspector.readOnlyPreview', { name: file.name })}
                 >
                   <DesignFileIcon className={styles.fileIcon} name={file.name} type={file.type} />
                   <span className={styles.fileName}>{file.name}</span>
@@ -198,7 +205,7 @@ export const OverviewPanel: React.FC<OverviewPanelProps> = ({
 
         {workingFiles.length > 0 && (
           <>
-            <div className={styles.subhead}>{workingFileLabel}</div>
+            <div className={styles.subhead}>{workingTitle}</div>
             <div className={styles.fileList}>
               {workingFiles.map((file, i) => (
                 <button
@@ -206,7 +213,7 @@ export const OverviewPanel: React.FC<OverviewPanelProps> = ({
                   type="button"
                   className={`${styles.file}${file.isOpen ? ` ${styles.fileOpen}` : ''}`}
                   onClick={() => onFileClick?.(file)}
-                  aria-label={`打开 ${file.name} 只读预览`}
+                  aria-label={t('inspector.readOnlyPreview', { name: file.name })}
                 >
                   <DesignFileIcon className={styles.fileIcon} name={file.name} type={file.type} />
                   <span className={styles.fileName}>{file.name}</span>
