@@ -4,6 +4,7 @@ import {
   evaluateSidebarVsTerminalDock,
   type GeometryRect,
 } from '../../../shared/src/testing/geometrySmoke';
+import { assertFontGuardHermetic, blockExternalFonts } from '../../../e2e/fontBlocker';
 
 /**
  * Desktop geometry smoke (#1284) — mock/demo workbench with localTerminal dock.
@@ -15,6 +16,10 @@ test.describe('Desktop geometry smoke (#1284)', () => {
   test('keeps conversation sidebar clear of the terminal dock', async ({ page }) => {
     collectPageDiagnostics(page);
     await blockLiveBackends(page);
+    // #2014: blockLiveBackends continues every non-listed host, so external
+    // font CDN requests need the shared guard; record passthrough for the
+    // hermetic assertion below.
+    const fontGuard = await blockExternalFonts(page, { recordPassthrough: true });
     await enterDemoWorkbench(page);
 
     expect(page.viewportSize()).toEqual(DESKTOP_WORKSPACE_VIEWPORT);
@@ -42,6 +47,13 @@ test.describe('Desktop geometry smoke (#1284)', () => {
 
     const result = evaluateSidebarVsTerminalDock(sidebarBox, dockBox);
     expect(result, result.reason ?? 'sidebar vs terminal dock geometry').toMatchObject({ ok: true });
+
+    // #2014: fonts must be intercepted by the guard. id/gateway hosts are not
+    // covered by blockLiveBackends' list and would reach the network, so they
+    // are forbidden here; hub hosts are already 503'd downstream.
+    assertFontGuardHermetic(fontGuard, {
+      forbiddenBoundaries: new Set(['tokendance-id', 'gateway']),
+    });
   });
 });
 

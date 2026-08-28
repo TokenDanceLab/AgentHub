@@ -6,6 +6,7 @@ import {
   type E2ERequestPhase,
   type E2EObservedRequest,
 } from '../../../shared/src/testing/e2eDataModeContract';
+import { blockExternalFonts, isExternalFontUrl, type E2EFontGuard } from '../../../e2e/fontBlocker';
 
 const DESKTOP_E2E_PORT = Number(process.env.AGENTHUB_DESKTOP_E2E_PORT ?? 5199);
 const DESKTOP_E2E_APP_ORIGIN = `http://127.0.0.1:${DESKTOP_E2E_PORT}`;
@@ -31,6 +32,9 @@ test.describe('Desktop shared chat flow UI', () => {
   test('keeps submitted user messages visible, distinct, and auto-followed', async ({ page }) => {
     collectPageDiagnostics(page);
     const backendRequests = await blockLiveBackends(page);
+    // #2014: registered after blockLiveBackends, so the guard is matched
+    // first and fulfills font requests before the data-mode catch-all.
+    const fontGuard = await blockExternalFonts(page, { recordPassthrough: true });
     await enterDemoWorkbench(page, backendRequests.markWorkbenchRuntime);
     expect(page.viewportSize()).toEqual(DESKTOP_WORKSPACE_VIEWPORT);
     await expect(page.getByTestId('agenthub-workbench')).toHaveAttribute('data-data-mode', 'mock');
@@ -58,21 +62,29 @@ test.describe('Desktop shared chat flow UI', () => {
     await expect(transcript.locator('.user-bubble').filter({ hasText: repeatedMessage })).toHaveCount(2);
     await expect.poll(() => transcriptScrollGap(page)).toBeLessThanOrEqual(4);
     assertE2EDataModeScenario(DESKTOP_MOCK_CHAT_FLOW_SCENARIO, backendRequests.requests);
+    assertNoExternalFontReachedBackend(fontGuard, backendRequests.requests);
   });
 
   test('does not create horizontal overflow at the 16:9 desktop workspace viewport', async ({ page }) => {
     collectPageDiagnostics(page);
     const backendRequests = await blockLiveBackends(page);
+    // #2014: registered after blockLiveBackends, so the guard is matched
+    // first and fulfills font requests before the data-mode catch-all.
+    const fontGuard = await blockExternalFonts(page, { recordPassthrough: true });
 
     await page.setViewportSize(DESKTOP_WORKSPACE_VIEWPORT);
     await enterDemoWorkbench(page, backendRequests.markWorkbenchRuntime);
     await expect.poll(() => horizontalOverflow(page)).toBeLessThanOrEqual(1);
     assertE2EDataModeScenario(DESKTOP_MOCK_CHAT_FLOW_SCENARIO, backendRequests.requests);
+    assertNoExternalFontReachedBackend(fontGuard, backendRequests.requests);
   });
 
   test('renders consecutive approval and preview cards as one merged stack', async ({ page }) => {
     collectPageDiagnostics(page);
     const backendRequests = await blockLiveBackends(page);
+    // #2014: registered after blockLiveBackends, so the guard is matched
+    // first and fulfills font requests before the data-mode catch-all.
+    const fontGuard = await blockExternalFonts(page, { recordPassthrough: true });
 
     await page.setViewportSize(DESKTOP_WORKSPACE_VIEWPORT);
     await enterDemoWorkbench(page, backendRequests.markWorkbenchRuntime);
@@ -93,16 +105,21 @@ test.describe('Desktop shared chat flow UI', () => {
     expect(metrics.approvalTopLeftRadius).toBeGreaterThan(0);
     expect(metrics.previewBottomLeftRadius).toBeGreaterThan(0);
     assertE2EDataModeScenario(DESKTOP_MOCK_CHAT_FLOW_SCENARIO, backendRequests.requests);
+    assertNoExternalFontReachedBackend(fontGuard, backendRequests.requests);
   });
 
   test('does not create horizontal overflow at the narrow regression viewport', async ({ page }) => {
     collectPageDiagnostics(page);
     const backendRequests = await blockLiveBackends(page);
+    // #2014: registered after blockLiveBackends, so the guard is matched
+    // first and fulfills font requests before the data-mode catch-all.
+    const fontGuard = await blockExternalFonts(page, { recordPassthrough: true });
 
     await page.setViewportSize(NARROW_REGRESSION_VIEWPORT);
     await enterDemoWorkbench(page, backendRequests.markWorkbenchRuntime);
     await expect.poll(() => horizontalOverflow(page)).toBeLessThanOrEqual(1);
     assertE2EDataModeScenario(DESKTOP_MOCK_CHAT_FLOW_SCENARIO, backendRequests.requests);
+    assertNoExternalFontReachedBackend(fontGuard, backendRequests.requests);
   });
 });
 
@@ -278,6 +295,20 @@ async function approvalPreviewCardStackMetrics(page: Page): Promise<{
       previewBottomLeftRadius: px(previewStyle.borderBottomLeftRadius),
     };
   });
+}
+
+/**
+ * #2014 hermetic evidence: font requests must never reach the data-mode
+ * boundary log nor pass the shared guard toward the network.
+ */
+function assertNoExternalFontReachedBackend(
+  fontGuard: E2EFontGuard,
+  backendRequests: E2EObservedRequest[],
+): void {
+  const fontHits = [...fontGuard.passthroughRequests, ...backendRequests].filter((request) =>
+    isExternalFontUrl(request.url),
+  );
+  expect(fontHits, 'external font requests must be intercepted by the shared guard (#2014)').toHaveLength(0);
 }
 
 async function blockLiveBackends(page: Page): Promise<BackendRequestLog> {
