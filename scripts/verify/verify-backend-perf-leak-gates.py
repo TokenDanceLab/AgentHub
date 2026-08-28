@@ -64,8 +64,15 @@ def main() -> int:
 
         invoke_step("Hub microbenchmarks", HUB_ROOT, [
             "test", "./internal/service", "./internal/ws", "./internal/jwtutil",
+            "./internal/middleware", "./internal/repository",
             "-run", "^$",
-            "-bench", "Benchmark(EventBus|Frame|Generate|Parse|JWT|KeyManager|HashRefreshToken)",
+            # middleware: AuthHandler（JWT 校验）、限流（WS 令牌桶/连接数/
+            # Redis 滑动窗口/全局固定窗口）；repository: 审计链写入（内存
+            # sqlite 纯路径）与链哈希。
+            "-bench", "Benchmark(EventBus|Frame|Generate|Parse|JWT|KeyManager|HashRefreshToken"
+            "|AuthHandler|WSIPRateLimitNewIP|WSUserConnLimiterAcquireRelease"
+            "|RateLimitSlidingWindowAllow|GlobalRateLimitAllow"
+            "|CreateAuditEventSQLite|AuditLinkHash)",
             f"-benchtime={args.Benchtime}",
             "-count=1",
         ])
