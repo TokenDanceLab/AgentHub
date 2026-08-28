@@ -1,8 +1,8 @@
 {
   "_comment": "Baseline of i18n callsite violations (source files with CJK string literals but no useTranslation import). The verify gate fails when the current count EXCEEDS this baseline; lower this number as more callsites are wired to useTranslation.",
   "scanRoot": "app/shared/src + app/workbench/src",
-  "totalViolations": 82,
-  "totalCjkLiteralLines": 665,
+  "totalViolations": 77,
+  "totalCjkLiteralLines": 597,
   "files": [
     {
       "path": "shared/chatview/adapterMapBlock.ts",
@@ -334,32 +334,10 @@
       ]
     },
     {
-      "path": "workbench/inspector/InspectorModePanelHelpers.ts",
-      "cjkLiteralLines": 12,
-      "samples": [
-        19,
-        20,
-        21,
-        22,
-        23
-      ]
-    },
-    {
       "path": "workbench/inspector/InspectorTabChrome.tsx",
       "cjkLiteralLines": 1,
       "samples": [
         234
-      ]
-    },
-    {
-      "path": "workbench/inspector/OverviewPanel.tsx",
-      "cjkLiteralLines": 13,
-      "samples": [
-        44,
-        47,
-        50,
-        66,
-        68
       ]
     },
     {
@@ -610,15 +588,6 @@
       ]
     },
     {
-      "path": "workbench/useWorkbenchTasksRoute.ts",
-      "cjkLiteralLines": 3,
-      "samples": [
-        47,
-        54,
-        101
-      ]
-    },
-    {
       "path": "workbench/workbenchAgentMapping.ts",
       "cjkLiteralLines": 17,
       "samples": [
@@ -641,13 +610,13 @@
     },
     {
       "path": "workbench/workbenchAgentsRouteHelpers.ts",
-      "cjkLiteralLines": 13,
+      "cjkLiteralLines": 7,
       "samples": [
-        105,
-        106,
-        107,
-        108,
-        238
+        109,
+        110,
+        111,
+        112,
+        242
       ]
     },
     {
@@ -732,32 +701,13 @@
     },
     {
       "path": "workbench/workbenchTasksRouteGroupHelpers.ts",
-      "cjkLiteralLines": 7,
+      "cjkLiteralLines": 5,
       "samples": [
-        69,
-        82,
-        88,
-        93,
-        98
-      ]
-    },
-    {
-      "path": "workbench/workbenchTasksRouteHelpers.ts",
-      "cjkLiteralLines": 2,
-      "samples": [
-        277,
-        372
-      ]
-    },
-    {
-      "path": "workbench/workbenchTasksRoutePlanners.ts",
-      "cjkLiteralLines": 30,
-      "samples": [
-        28,
-        29,
-        30,
-        31,
-        32
+        79,
+        92,
+        104,
+        109,
+        119
       ]
     },
     {
