@@ -1,10 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   auditEntryKey,
-  ccSwitchConnectionLabel,
   ccSwitchConnectionTone,
-  ccSwitchInstallLabel,
-  ccSwitchRoutingLabel,
   compactClassNames,
   formatModelRouteSubtitle,
   hasVisibleModelAliases,
@@ -22,15 +19,9 @@ describe('AgentOpsHelpers', () => {
     expect(policyRiskIconName('低风险')).toBe('tools');
   });
 
-  it('formats cc-switch connection / install / routing labels and tones', () => {
-    expect(ccSwitchConnectionLabel(true)).toBe('已连接');
-    expect(ccSwitchConnectionLabel(false)).toBe('未启用');
+  it('maps cc-switch connection tones (labels moved to i18n, #2007)', () => {
     expect(ccSwitchConnectionTone(true)).toBe('active');
     expect(ccSwitchConnectionTone(false)).toBe('inactive');
-    expect(ccSwitchInstallLabel(true)).toBe('已安装');
-    expect(ccSwitchInstallLabel(false)).toBe('未检测到');
-    expect(ccSwitchRoutingLabel(true)).toBe('活跃');
-    expect(ccSwitchRoutingLabel(false)).toBe('未启用');
   });
 
   it('lists model aliases while hiding *_name metadata keys', () => {

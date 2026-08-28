@@ -184,7 +184,7 @@ export const AgentInstalledView: React.FC<AgentsPageProps> = (props) => {
                     {agent.provider ? ` · ${agent.provider}` : ''}
                   </span>
                   <div className={styles['agent-capability-tags']}>
-                    {deriveCapabilityTags(agent).map((tag) => (
+                    {deriveCapabilityTags(agent, t).map((tag) => (
                       <span
                         key={tag.label}
                         className={`${styles['capability-tag']} ${styles[tag.color]}`}

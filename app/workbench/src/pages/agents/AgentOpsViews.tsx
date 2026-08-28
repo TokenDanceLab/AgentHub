@@ -1,4 +1,6 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
+import { SHARED_WORKBENCH_I18N_NAMESPACE } from '@shared/i18n';
 import { DesignNavIcon } from '../../designIcons';
 import { EmptyState } from '@shared/ui';
 import styles from '../AgentsPage.module.css';
@@ -40,29 +42,30 @@ export const AgentPolicyView: React.FC<AgentsPageProps> = (props) => {
     onApprovalToggle,
   } = props;
 
+  const { t } = useTranslation(SHARED_WORKBENCH_I18N_NAMESPACE);
   const realNoPolicy = dataSource === 'real' && policyRules.length === 0;
   const checks = [
-    { label: '只读动作自动通过', checked: approvalReadAuto },
-    { label: '写入动作进入用户确认', checked: approvalWriteConfirm },
-    { label: '高风险动作默认禁止', checked: approvalHighRiskDeny },
-    { label: '每次运行记录审计事件', checked: approvalAuditEvents },
+    { label: t('agents.ops.policy.approvalReadAuto'), checked: approvalReadAuto },
+    { label: t('agents.ops.policy.approvalWriteConfirm'), checked: approvalWriteConfirm },
+    { label: t('agents.ops.policy.approvalHighRiskDeny'), checked: approvalHighRiskDeny },
+    { label: t('agents.ops.policy.approvalAuditEvents'), checked: approvalAuditEvents },
   ];
 
   return (
     <main className={`${styles['agent-main']} workbench-main`}>
       <div className={`${styles['workbench-head']} workbench-head`}>
         <div>
-          <h1>运行策略</h1>
+          <h1>{t('agents.ops.policy.title')}</h1>
           <p className={styles['head-subcopy']}>
             {dataSource === 'real'
-              ? '配置 Agent 执行边界、审批默认值和风险分级。策略数据由真实后端提供。'
-              : '配置 Agent 执行边界、审批默认值和风险分级。这里展示前端 demo 的策略矩阵。'}
+              ? t('agents.ops.policy.subcopyReal')
+              : t('agents.ops.policy.subcopyDemo')}
           </p>
         </div>
         {onPolicyAdd && (
           <button className={`${styles['outline-action']} outline-action`} type="button" onClick={onPolicyAdd}>
             <DesignNavIcon name="plus" size={15} />
-            新增策略
+            {t('agents.ops.policy.add')}
           </button>
         )}
       </div>
@@ -70,8 +73,8 @@ export const AgentPolicyView: React.FC<AgentsPageProps> = (props) => {
       <div className={styles['agent-policy-layout']}>
         {realNoPolicy ? (
           <EmptyState
-            title="策略数据当前不可用"
-            description="real 模式未接入真实策略数据源，暂无策略可展示。"
+            title={t('agents.ops.policy.emptyTitle')}
+            description={t('agents.ops.policy.emptyDescription')}
             titleLevel={3}
           />
         ) : (
@@ -94,29 +97,30 @@ export const AgentToolsView: React.FC<AgentsPageProps> = (props) => {
     toolMatrixTools = [],
     onToolsAddAgent,
   } = props;
+  const { t } = useTranslation(SHARED_WORKBENCH_I18N_NAMESPACE);
   const realNoTools = dataSource === 'real' && toolMatrixAgents.length === 0;
 
   return (
     <main className={`${styles['agent-main']} workbench-main`}>
       <div className={`${styles['workbench-head']} workbench-head`}>
         <div>
-          <h1>工具权限</h1>
+          <h1>{t('agents.ops.tools.title')}</h1>
           <p className={styles['head-subcopy']}>
-            按 Agent 查看工具授权。权限值可在“Agent 配置”页直接修改，这里做集中总览。
+            {t('agents.ops.tools.subcopy')}
           </p>
         </div>
         {onToolsAddAgent && (
           <button className={`${styles['outline-action']} outline-action`} type="button" onClick={onToolsAddAgent}>
             <DesignNavIcon name="plus" size={15} />
-            添加 Agent
+            {t('agents.ops.tools.addAgent')}
           </button>
         )}
       </div>
 
       {realNoTools ? (
         <EmptyState
-          title="工具权限矩阵当前不可用"
-          description="real 模式未接入真实工具权限数据源，暂无工具矩阵可展示。"
+          title={t('agents.ops.tools.emptyTitle')}
+          description={t('agents.ops.tools.emptyDescription')}
           titleLevel={3}
         />
       ) : (
@@ -145,23 +149,24 @@ export const AgentModelsView: React.FC<AgentsPageProps> = (props) => {
     ccSwitchStatus,
     ccSwitchProviders = [],
   } = props;
+  const { t } = useTranslation(SHARED_WORKBENCH_I18N_NAMESPACE);
   const realNoHealth = dataSource === 'real' && modelHealthRows.length === 0;
 
   return (
     <main className={`${styles['agent-main']} workbench-main`}>
       <div className={`${styles['workbench-head']} workbench-head`}>
         <div>
-          <h1>模型配置</h1>
+          <h1>{t('agents.ops.models.title')}</h1>
           <p className={styles['head-subcopy']}>
             {dataSource === 'real'
-              ? '定义可选模型、默认用途和 Agent 分配。模型健康数据由真实后端提供。'
-              : '定义可选模型、默认用途和 Agent 分配。当前 demo 只修改前端展示状态。'}
+              ? t('agents.ops.models.subcopyReal')
+              : t('agents.ops.models.subcopyDemo')}
           </p>
         </div>
         {onModelAdd && (
           <button className={`${styles['outline-action']} outline-action`} type="button" onClick={onModelAdd}>
             <DesignNavIcon name="plus" size={15} />
-            添加模型
+            {t('agents.ops.models.add')}
           </button>
         )}
       </div>
@@ -177,8 +182,8 @@ export const AgentModelsView: React.FC<AgentsPageProps> = (props) => {
       <ModelRoutingSection modelRoutes={modelRoutes} onModelRouteClick={onModelRouteClick} />
       {realNoHealth ? (
         <EmptyState
-          title="模型健康数据当前不可用"
-          description="real 模式未接入真实模型健康数据源，暂无健康状态可展示。"
+          title={t('agents.ops.models.emptyTitle')}
+          description={t('agents.ops.models.emptyDescription')}
           titleLevel={3}
         />
       ) : (
@@ -200,25 +205,28 @@ export const AgentAuditView: React.FC<AgentsPageProps> = (props) => {
     onAuditFilterChange,
     onAuditExport,
   } = props;
+  const { t } = useTranslation(SHARED_WORKBENCH_I18N_NAMESPACE);
   const realNoAudit = dataSource === 'real' && auditEntries.length === 0;
 
+  // Filter identifiers (data plane): display labels resolve through
+  // AuditFilterBar's i18n label map so the IDs stay stable. #2007
   const filters = ['全部', '需确认', '禁止', '今天'];
 
   return (
     <main className={`${styles['agent-main']} workbench-main`}>
       <div className={`${styles['workbench-head']} workbench-head`}>
         <div>
-          <h1>审计日志</h1>
+          <h1>{t('agents.ops.audit.title')}</h1>
           <p className={styles['head-subcopy']}>
             {dataSource === 'real'
-              ? '记录 Agent 工具调用、审批结果和目标资源。审计数据由真实后端提供。'
-              : '记录 Agent 工具调用、审批结果和目标资源，用于 demo 中展示治理闭环。'}
+              ? t('agents.ops.audit.subcopyReal')
+              : t('agents.ops.audit.subcopyDemo')}
           </p>
         </div>
         {onAuditExport && (
           <button className={`${styles['outline-action']} outline-action`} type="button" onClick={onAuditExport}>
             <DesignNavIcon name="download" size={15} />
-            导出日志
+            {t('agents.ops.audit.export')}
           </button>
         )}
       </div>
@@ -230,8 +238,8 @@ export const AgentAuditView: React.FC<AgentsPageProps> = (props) => {
       />
       {realNoAudit ? (
         <EmptyState
-          title="审计日志当前不可用"
-          description="real 模式未接入真实审计数据源，暂无审计记录可展示。"
+          title={t('agents.ops.audit.emptyTitle')}
+          description={t('agents.ops.audit.emptyDescription')}
           titleLevel={3}
         />
       ) : (
