@@ -1,10 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
+import { SHARED_WORKBENCH_I18N_NAMESPACE } from '@shared/i18n';
+import { createTestI18n } from '@shared/testing/i18n';
 import type { ContextUsageTranscriptBlock, EvidenceRef } from '@shared/transcript';
 import {
   canOpenEvidence,
   contextBarFillWidth,
   contextBarVariantClass,
-  DEPLOY_STATUS_LABEL,
   deployDotColor,
   deployStatusLabel,
   evidenceOverviewFiles,
@@ -19,6 +20,9 @@ import {
   resolveContextUsagePercent,
   resolveLatestContextUsage,
 } from './InspectorModePanelHelpers';
+
+/** Real zh bundle keeps historical copy expectations honest (#2023). */
+const tZh = createTestI18n({ lng: 'zh' }).getFixedT('zh', SHARED_WORKBENCH_I18N_NAMESPACE);
 
 function ref(partial: Partial<EvidenceRef> & Pick<EvidenceRef, 'id' | 'kind' | 'label'>): EvidenceRef {
   return partial;
@@ -36,11 +40,11 @@ function contextBlock(
 
 describe('InspectorModePanelHelpers', () => {
   it('maps evidence into overview tasks with empty fallback', () => {
-    expect(evidenceOverviewTasks([])).toEqual([
+    expect(evidenceOverviewTasks(tZh, [])).toEqual([
       { label: '等待 transcript evidence', status: 'todo' },
     ]);
 
-    const tasks = evidenceOverviewTasks([
+    const tasks = evidenceOverviewTasks(tZh, [
       ref({ id: 'r1', kind: 'run', label: 'Run A', status: 'completed' }),
       ref({ id: 'a1', kind: 'artifact', label: 'Art' }),
       ref({ id: 'f1', kind: 'file', label: 'f.ts' }),
@@ -55,7 +59,7 @@ describe('InspectorModePanelHelpers', () => {
   });
 
   it('maps file/artifact evidence into overview preview files', () => {
-    const files = evidenceOverviewFiles([
+    const files = evidenceOverviewFiles(tZh, [
       ref({ id: 'f1', kind: 'file', label: 'readme.md', uri: 'file://readme.md' }),
       ref({ id: 'a1', kind: 'artifact', label: 'out.ts' }),
       ref({ id: 't1', kind: 'tool', label: 'ignored' }),
@@ -147,9 +151,9 @@ describe('InspectorModePanelHelpers', () => {
   });
 
   it('keeps deploy status labels and colors stable', () => {
-    expect(DEPLOY_STATUS_LABEL.deployed).toBe('已就绪');
-    expect(deployStatusLabel('building')).toBe('构建中');
-    expect(deployStatusLabel('unknown-status')).toBe('unknown-status');
+    expect(deployStatusLabel(tZh, 'deployed')).toBe('已就绪');
+    expect(deployStatusLabel(tZh, 'building')).toBe('构建中');
+    expect(deployStatusLabel(tZh, 'unknown-status')).toBe('unknown-status');
     expect(isDeployReady('deployed')).toBe(true);
     expect(isDeployFailed('failed')).toBe(true);
     expect(isDeployInProgress('building')).toBe(true);
@@ -160,5 +164,31 @@ describe('InspectorModePanelHelpers', () => {
     expect(deployDotColor('pending')).toBe('var(--td-plum)');
     expect(formatDeployUrlDisplay('https://example.com/app')).toBe('example.com/app');
     expect(formatDeployUrlDisplay('http://localhost:5173')).toBe('localhost:5173');
+  });
+});
+
+describe('inspector evidence/deploy labels en convergence (#2023)', () => {
+  const tEn = createTestI18n({ lng: 'en' }).getFixedT('en', SHARED_WORKBENCH_I18N_NAMESPACE);
+
+  it('renders natural English evidence overview copy', () => {
+    expect(evidenceOverviewTasks(tEn, [])).toEqual([
+      { label: 'Waiting for transcript evidence', status: 'todo' },
+    ]);
+    const tasks = evidenceOverviewTasks(tEn, [
+      ref({ id: 'a1', kind: 'artifact', label: 'Art' }),
+      ref({ id: 'f1', kind: 'file', label: 'f.ts' }),
+      ref({ id: 't1', kind: 'tool', label: 'bash' }),
+    ]);
+    expect(tasks).toEqual([
+      { label: 'Artifacts: 1', status: 'done' },
+      { label: 'Changed files: 1', status: 'done' },
+      { label: 'Tool calls: 1', status: 'done' },
+    ]);
+  });
+
+  it('renders natural English deploy status copy', () => {
+    expect(deployStatusLabel(tEn, 'deployed')).toBe('Ready');
+    expect(deployStatusLabel(tEn, 'building')).toBe('Building');
+    expect(deployStatusLabel(tEn, 'unknown-status')).toBe('unknown-status');
   });
 });

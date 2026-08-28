@@ -1,3 +1,4 @@
+import type { TFunction } from 'i18next';
 import type { TaskGroup, TaskItem, TaskStatus, TasksPane } from './pages';
 import type { TaskEditDraft } from './pages/TasksPage';
 import { WORKBENCH_MOCK_TASK_GROUPS } from './mockData';
@@ -17,6 +18,15 @@ import {
    exactOptionalPropertyTypes: only assign `?: T` fields when defined,
    unless the public field type explicitly allows `| undefined`.
    ═══════════════════════════════════════════════════════════════════════ */
+
+/**
+ * Translator signature for pure helpers receiving the component's `t`
+ * (#2015 pattern). Display-only feedback labels resolve through the
+ * sharedWorkbench bundle; identifiers persisted into task state (group
+ * labels, 未命名任务 title fallback, 当前用户 assignee fallback, TaskStatus
+ * enum values) stay verbatim — data-plane per the #2023 decision.
+ */
+export type TasksTranslator = TFunction<'sharedWorkbench'>;
 
 /** Resolve mock-backed or local task groups for the active data mode. */
 export function resolveSourceTaskGroups(
@@ -83,9 +93,10 @@ export function resolveTaskAssignee(
 }
 
 export function resolveTaskAssigneeLabel(
+  t: TasksTranslator,
   userDisplayName?: string | undefined,
 ): string {
-  return userDisplayName ?? '当前用户';
+  return userDisplayName ?? t('tasks.action.currentUser');
 }
 
 export function prependTaskToGroups(groups: TaskGroup[], task: TaskItem): TaskGroup[] {
@@ -98,17 +109,19 @@ export function appendCustomTaskGroup(groups: TaskGroup[], nextIndex: number): T
   return [...groups, { label: `自定义分组 ${nextIndex}`, tasks: [] }];
 }
 
-export function prepareTaskEditSave(draft: TaskEditDraft): {
+export function prepareTaskEditSave(t: TasksTranslator, draft: TaskEditDraft): {
   title: string;
   patch: TaskEditDraft;
   taskActionLabel: string;
 } {
+  // 未命名任务 is the persisted task-title fallback (task data), not UI copy;
+  // only the save feedback label resolves through the bundle.
   const title = draft.title.trim() || '未命名任务';
   const patch = { ...draft, title };
   return {
     title,
     patch,
-    taskActionLabel: `${title} 已保存`,
+    taskActionLabel: t('tasks.action.taskSaved', { title }),
   };
 }
 

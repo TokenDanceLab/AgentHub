@@ -6,6 +6,7 @@ import {
   type TaskSortMode,
 } from './workbenchTaskGroups';
 import {
+  type TasksTranslator,
   appendCustomTaskGroup,
   nextTaskGroupMode,
   patchTaskEditDraft,
@@ -165,6 +166,8 @@ export interface WorkbenchTasksRouteStateAccessors {
   localTaskCounter: number;
   currentUserId?: string | undefined;
   userDisplayName?: string | undefined;
+  /** sharedWorkbench translator for action feedback labels (#2023). */
+  translator: TasksTranslator;
   setTasksPane: TasksRouteSetState<TasksPane>;
   setTaskViewMode: TasksRouteSetState<ViewMode>;
   setTaskGroups: TasksRouteSetState<TaskGroup[]>;
@@ -215,6 +218,7 @@ export function buildWorkbenchTasksRouteHandlers(
     localTaskCounter,
     currentUserId,
     userDisplayName,
+    translator,
     setTasksPane,
     setTaskViewMode,
     setTaskGroups,
@@ -232,7 +236,7 @@ export function buildWorkbenchTasksRouteHandlers(
 
   return {
     handleTaskPaneChange(pane) {
-      const plan = planTaskPaneChange(pane);
+      const plan = planTaskPaneChange(translator, pane);
       setTasksPane(plan.tasksPane);
       setSelectedTaskId(plan.selectedTaskId);
       setEditingTaskId(plan.editingTaskId);
@@ -241,7 +245,7 @@ export function buildWorkbenchTasksRouteHandlers(
       setTaskActionLabel(plan.taskActionLabel);
     },
     handleCreateTask() {
-      const plan = planCreateTask(localTaskCounter);
+      const plan = planCreateTask(translator, localTaskCounter);
       setLocalTaskCounter((current) => current + 1);
       setTaskGroups((current) => prependTaskToGroups(current, plan.nextTask));
       setTasksPane(plan.tasksPane);
@@ -252,14 +256,14 @@ export function buildWorkbenchTasksRouteHandlers(
       setTaskActionLabel(plan.taskActionLabel);
     },
     handleNewTaskGroup() {
-      const plan = planNewTaskGroup(taskGroups.length);
+      const plan = planNewTaskGroup(translator, taskGroups.length);
       setTaskGroups((current) => appendCustomTaskGroup(current, plan.nextIndex));
       setTaskGroupMode(plan.taskGroupMode);
       setTaskViewMode(plan.taskViewMode);
       setTaskActionLabel(plan.taskActionLabel);
     },
     handleTaskList() {
-      const plan = planTaskListReset();
+      const plan = planTaskListReset(translator, );
       setTaskViewMode(plan.taskViewMode);
       setTaskGroupMode(plan.taskGroupMode);
       setTaskNavMenuOpen(plan.taskNavMenuOpen);
@@ -267,17 +271,17 @@ export function buildWorkbenchTasksRouteHandlers(
     },
     handleTaskSort() {
       setTaskSortMode((current) => {
-        const plan = planTaskSortToggle(current);
+        const plan = planTaskSortToggle(translator, current);
         setTaskActionLabel(plan.taskActionLabel);
         return plan.next;
       });
     },
     handleTaskGroup() {
       setTaskGroupMode((current) => nextTaskGroupMode(current));
-      setTaskActionLabel('已切换任务分组方式');
+      setTaskActionLabel(translator('tasks.action.groupModeSwitched'));
     },
     handleEditSelectedTask() {
-      const plan = planEditSelectedTask(selectedTask);
+      const plan = planEditSelectedTask(translator, selectedTask);
       if ('kind' in plan) {
         setTaskActionLabel(plan.taskActionLabel);
         return;
@@ -292,7 +296,7 @@ export function buildWorkbenchTasksRouteHandlers(
       setEditingTaskDraft((current) => patchTaskEditDraft(current, field, value));
     },
     handleSaveTaskEdit() {
-      const plan = planSaveTaskEdit(editingTaskId, editingTaskDraft);
+      const plan = planSaveTaskEdit(translator, editingTaskId, editingTaskDraft);
       if (plan.kind === 'feedback') {
         setTaskActionLabel(plan.taskActionLabel);
         return;
@@ -303,13 +307,13 @@ export function buildWorkbenchTasksRouteHandlers(
       setTaskActionLabel(plan.taskActionLabel);
     },
     handleCancelTaskEdit() {
-      const plan = planCancelTaskEdit(editingTaskDraft);
+      const plan = planCancelTaskEdit(translator, editingTaskDraft);
       if (plan) setTaskActionLabel(plan.taskActionLabel);
       setEditingTaskId(null);
       setEditingTaskDraft(null);
     },
     handleDeleteSelectedTask() {
-      const plan = planDeleteSelectedTask(selectedTask);
+      const plan = planDeleteSelectedTask(translator, selectedTask);
       if (plan.kind === 'feedback') {
         setTaskActionLabel(plan.taskActionLabel);
         return;
@@ -321,7 +325,7 @@ export function buildWorkbenchTasksRouteHandlers(
       setTaskActionLabel(plan.taskActionLabel);
     },
     handleCycleSelectedTaskStatus() {
-      const plan = planCycleSelectedTaskStatus(selectedTask);
+      const plan = planCycleSelectedTaskStatus(translator, selectedTask);
       if (plan.kind === 'feedback') {
         setTaskActionLabel(plan.taskActionLabel);
         return;
@@ -330,7 +334,7 @@ export function buildWorkbenchTasksRouteHandlers(
       setTaskActionLabel(plan.taskActionLabel);
     },
     handleAssignSelectedTaskToMe() {
-      const plan = planAssignSelectedTaskToMe(selectedTask, userDisplayName, currentUserId);
+      const plan = planAssignSelectedTaskToMe(translator, selectedTask, userDisplayName, currentUserId);
       if (plan.kind === 'feedback') {
         setTaskActionLabel(plan.taskActionLabel);
         return;
@@ -339,7 +343,7 @@ export function buildWorkbenchTasksRouteHandlers(
       setTaskActionLabel(plan.taskActionLabel);
     },
     handleGroupBySelectedTaskProject() {
-      const plan = planGroupBySelectedTaskProject(selectedTask);
+      const plan = planGroupBySelectedTaskProject(translator, selectedTask);
       if (plan.kind === 'feedback') {
         setTaskActionLabel(plan.taskActionLabel);
         return;
@@ -349,7 +353,7 @@ export function buildWorkbenchTasksRouteHandlers(
       setTaskActionLabel(plan.taskActionLabel);
     },
     handleFilterBySelectedTaskAssignee() {
-      const plan = planFilterBySelectedTaskAssignee(selectedTask, currentUserId);
+      const plan = planFilterBySelectedTaskAssignee(translator, selectedTask, currentUserId);
       if (plan.kind === 'feedback') {
         setTaskActionLabel(plan.taskActionLabel);
         return;
@@ -359,7 +363,7 @@ export function buildWorkbenchTasksRouteHandlers(
       setTaskActionLabel(plan.taskActionLabel);
     },
     handleTaskClick(task) {
-      const plan = planTaskClick(task, editingTaskId);
+      const plan = planTaskClick(translator, task, editingTaskId);
       setSelectedTaskId(plan.selectedTaskId);
       if (plan.clearEdit) {
         setEditingTaskId(null);
@@ -369,18 +373,18 @@ export function buildWorkbenchTasksRouteHandlers(
     },
     handleNavMore() {
       setTaskNavMenuOpen((current) => !current);
-      setTaskActionLabel('任务更多操作');
+      setTaskActionLabel(translator('tasks.action.navMore'));
     },
     handleToolbarFieldConfig() {
       setTaskShowCreator((current) => {
-        const plan = planToolbarFieldConfig(current);
+        const plan = planToolbarFieldConfig(translator, current);
         setTaskActionLabel(plan.taskActionLabel);
         return plan.next;
       });
     },
     handleToolbarFilter() {
       setTaskFilterActive((current) => {
-        const plan = planToolbarFilter(current);
+        const plan = planToolbarFilter(translator, current);
         setTaskActionLabel(plan.taskActionLabel);
         return plan.next;
       });

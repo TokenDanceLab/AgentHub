@@ -1,4 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
+import { SHARED_WORKBENCH_I18N_NAMESPACE } from '@shared/i18n';
+import { createTestI18n } from '@shared/testing/i18n';
 import type { EvidenceRef } from '@shared/transcript';
 import type { RuntimeEvidenceSnapshot } from '@shared/inspector';
 import {
@@ -32,6 +34,9 @@ function emptyRuntimeEvidence(overrides: Partial<RuntimeEvidenceSnapshot> = {}):
     ...overrides,
   };
 }
+
+/** Real zh bundle keeps historical copy expectations honest (#2023). */
+const tZh = createTestI18n({ lng: 'zh' }).getFixedT('zh', SHARED_WORKBENCH_I18N_NAMESPACE);
 
 describe('rightInspectorHelpers', () => {
   it('maps shell boolean attrs and preview mode attr', () => {
@@ -174,10 +179,10 @@ describe('rightInspectorHelpers', () => {
         status: 'completed',
       },
     ];
-    const files = resolveOverviewFiles(evidence, undefined, 'src/a.ts');
+    const files = resolveOverviewFiles(tZh, evidence, undefined, 'src/a.ts');
     expect(files.some((file) => file.name.includes('a.ts') && file.isOpen === true)).toBe(true);
 
-    const tasks = resolveOverviewTasks(evidence, undefined);
+    const tasks = resolveOverviewTasks(tZh, evidence, undefined);
     expect(Array.isArray(tasks)).toBe(true);
 
     const rich = [{ name: 'src/a.ts', type: 'ts', content: 'export {}', isOpen: true }];
