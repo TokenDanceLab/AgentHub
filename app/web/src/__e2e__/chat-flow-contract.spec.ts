@@ -84,7 +84,7 @@ test.describe('Web shared chat flow contract', () => {
 
   test('keeps a submitted Hub user message visible while the send request is in flight', async ({ page }) => {
     collectPageDiagnostics(page);
-    const backendRequests = await installChatFlowHubStub(page, { messagePostDelayMs: 800, taskStatus: 'done' });
+    const backendRequests = await installChatFlowHubStub(page, { messagePostDelayMs: 800, taskStatus: 'done', sessionListDelayMs: 700 });
     // A finished (not running) task keeps the replay transcript hydrated while
     // leaving the composer on the Send control — a running task switches the
     // composer to the Stop control and blocks plain message sends.
@@ -179,6 +179,16 @@ async function enterApprovedRealHubSession(
   }, { sessionId: SESSION_ID, taskId: TASK_ID, status: options.activeTaskStatus ?? 'running' });
 
   await page.goto('/');
+  // FLK-002 root cause: before GET /client/sessions resolves, the session
+  // chrome sits on a phantom 'default' conversation. When the real session id
+  // lands, currentConversationId switches and the composer takes a full
+  // setConversationId reset — any text typed before the switch is wiped, and
+  // the send button stays disabled (CI signature), or a submit already in
+  // flight posts to the phantom conversation (late-click signature). Loaded
+  // CI stretched the hydration lag past the test's fill time. Wait for the
+  // hydrated session heading before driving the composer; the delay knob in
+  // installChatFlowHubStub keeps this race deterministic locally.
+  await expect(page.getByRole('heading', { name: 'Chat flow contract' })).toBeVisible();
 }
 
 interface ChatFlowHubStubOptions {
@@ -190,6 +200,13 @@ interface ChatFlowHubStubOptions {
    * Send and Stop controls mid-test.
    */
   taskStatus?: string;
+  /**
+   * Delays the GET /client/sessions response to simulate loaded-CI session
+   * hydration latency (FLK-002 regression guard): entering the session must
+   * wait out the lag instead of racing it, so the composer never sits on the
+   * phantom 'default' conversation while the test types.
+   */
+  sessionListDelayMs?: number;
 }
 
 async function installChatFlowHubStub(page: Page, options: ChatFlowHubStubOptions = {}): Promise<BackendRequestLog> {
@@ -267,6 +284,7 @@ async function fulfillHubRoute(
   }
 
   if (pathname === '/client/sessions') {
+    await delay(options.sessionListDelayMs ?? 0);
     await route.fulfill(json(hubEnvelope([{
       id: SESSION_ID,
       type: 'group',

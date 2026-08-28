@@ -3,7 +3,7 @@
 > Owner：本文件是 AgentHub「flake 登记、重试预算与 CI annotation 约定」的 SSOT。其他文档涉及 flaky 处置时以本文件为准，不复制规则。
 > 相关：规则 → 机器验证映射见 [verifier-map](verifier-map.md)。本登记表暂无机器门禁，靠到期复审纪律与评审执行。
 
-最后更新：2026-08-28（FLK-001 根因修复并归档）
+最后更新：2026-08-28（FLK-001、FLK-002 根因修复并归档）
 
 ## 为什么需要登记表
 
@@ -60,6 +60,10 @@ Flaky 测试侵蚀门禁可信度：一旦「偶发红、重跑转绿」成为�
 
 ## 活跃登记
 
+（当前无活跃登记项；FLK-001/FLK-002 均已修复，见下方已归档登记。）
+
+## 已归档登记
+
 ### FLK-001 TestTokenProviderRefreshFailureRetries
 
 | 字段 | 值 |
@@ -95,7 +99,7 @@ Flaky 测试侵蚀门禁可信度：一旦「偶发红、重跑转绿」成为�
 | 首现日期 | 2026-08-25 |
 | 复现命令 | `cd app/web && pnpm exec playwright test --config playwright.config.ts --project=chromium src/__e2e__/chat-flow-contract.spec.ts`（压测复现追加 `--repeat-each=30`） |
 | 到期复审日 | 2026-09-24 |
-| 状态 | 观察中（根因未确认） |
+| 状态 | 已修复（归档） |
 
 **现象**：2026-08-25 #1981 车道（run 32832310745）该用例在 `composer.fill` 后断言发送按钮 `toBeEnabled()`，按钮持续 `disabled` 20s 超时；同批 8 个 stubbed-hub 用例通过。同一提交本机复跑 2/2 绿，`gh run rerun --failed` 转绿。
 
@@ -106,6 +110,7 @@ Flaky 测试侵蚀门禁可信度：一旦「偶发红、重跑转绿」成为�
 | 日期 | 动作 | 结果 |
 |---|---|---|
 | 2026-08-25 | CI 偶发红（#1981），本机复跑 2/2 绿，执行 `gh run rerun --failed` | 转绿；当日回填本登记条目，根因待压测复现 |
+| 2026-08-28 | 根因确认并修复：`GET /client/sessions` 水合完成前 composer 停在幻影 default 会话，真实会话落地触发 `setConversationId` 全量重置，擦除已输入文本且发送按钮保持禁用（CI 签名）；修复为进入会话后先等水合 heading 再驱动 composer，并新增 `sessionListDelayMs` 旋钮本地确定性复现 CI 水合延迟 | 修复版 `--repeat-each=30` 60/60 零失败；负向对照（去掉等待 + 700ms 延迟）5/5 复现失败；状态转已修复（归档） |
 
 ## 维护规则
 
