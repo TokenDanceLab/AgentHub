@@ -1,6 +1,6 @@
 # AgentHub 开发快速上手
 
-最后更新：2026-08-24
+最后更新：2026-08-29
 
 本文档只保留新人启动本地开发环境需要的最短路径。规则、分支、E2E 证据等级和发布门禁以 `AGENTS.md` 为准。
 
@@ -141,7 +141,7 @@ git diff --check
 
 GitHub Actions 的 Ubuntu/Windows 分层、路径过滤、矩阵并行、缓存和免费额度策略见 [architecture/github-actions-ci-cd-policy.md](architecture/github-actions-ci-cd-policy.md)。普通 PR 按路径运行 Windows 原生 Go/前端合同、Web/Desktop Visual QA shell 和 Web stubbed-hub Playwright；Mobile full、`e2e-smoke`、`real-e2e-stack`、backend perf/leak、benchmark 和 Linux Tauri no-bundle 只通过 `workflow_dispatch` 按需运行。
 
-E2E/Visual QA 只证明实际跑过的层级；PR 中写明证据等级（`fixture-unit`/`playwright-ui`/`visual-qa`/`stubbed-hub`/`observed-local`/`approved-real`/`packaged-release`）。
+E2E/Visual QA 只证明实际跑过的层级；PR 中写明证据等级（`fixture-unit`/`playwright-ui`/`visual-qa`/`stubbed-hub`/`observed-local`/`approved-real`/`backend-api`/`performance-leak`/`packaged-release`，9 级，见 `scripts/verify/verify-real-e2e-contract.py`）。
 
 ## 常见问题
 
@@ -162,9 +162,9 @@ E2E/Visual QA 只证明实际跑过的层级；PR 中写明证据等级（`fixtu
 
 唯一发布入口：本地打 tag → `git push origin <tag>` → release.yml 构建并出 GitHub Release。
 
-1. 前置：master 全绿；`app/desktop/package.json`、`src-tauri/tauri.conf.json`、`src-tauri/Cargo.toml` 版本一致（校验 `scripts/release/verify-release-gate.py`）。Linux 桌面构建可在发布前手动预检：`gh workflow run checks.yml` 跑 `desktop-linux-build`（`tauri build --no-bundle`，不产出安装包、不需签名密钥）。
+1. 前置：master 全绿；`app/desktop/package.json`、`src-tauri/tauri.conf.json`、`src-tauri/Cargo.toml` 版本一致（校验 `scripts/release/verify-release-gate.py`）。Linux 桌面构建可在发布前手动预检：`gh workflow run checks.yml`（`desktop-linux-build` 是 dispatch-only job，会与其他按需 job 一并运行；核心是 `tauri build --no-bundle`，不产出安装包、不需签名密钥）。
 2. 版本选择（见 `AGENTS.md` 的“发布流程”）：默认升 patch；升 minor 需产品理由；RC 走 `vX.Y.Z-rc.N`。
 3. 打 tag：`git tag vX.Y.Z`；commit 须在 master 祖先链、格式 `^v\d+\.\d+\.\d+(-rc\.\d+)?$`（release.yml tag-guard 双重守卫）；`git push origin <tag>` 触发构建发布。
 4. 产物与签名：build-desktop（Windows NSIS + portable）恒定；build-desktop-linux（AppImage + deb，GitHub Releases 手动更新，AppImage auto-updater 另记账债）恒定；macOS 桌面已停用（2026-08-11）；build-mobile 由 `RELEASE_MOBILE_ENABLED=true` 门控；无商业证书时设 `RELEASE_UNSIGNED_OK=true`（SmartScreen 提示、updater 自签），有证书后用 `RELEASE_SIGNING_APPROVED=true`。git-cliff 生成中英双语 changelog（`cliff.toml`）+ `SHA256SUMS`，标题 `AgentHub vX.Y.Z`。冻结开关：`verify-release-gate.py` 末尾两条无条件 Blocker 是发布冻结开关，等管理员批准后再发布；不是故障。
-5. 发布后核对（run 全绿后）：`gh release view vX.Y.Z --json name,assets --jq '{name, assets: [.assets[].name]}'` 应含 14 个产物：`AgentHub_<ver>_x64-setup.exe` / `_x64-portable.zip` / `_x64-setup.exe.sig`、`AgentHub_<ver>_x86_64.AppImage` / `_amd64.deb`、updater `latest.json`、`agenthub-{edge,hub}-<ver>-{linux,windows,darwin}-amd64`（darwin 含 arm64）、`SHA256SUMS`；描述含安装指引/校验命令/commit 分组，unsigned 发布含 SmartScreen 说明。
+5. 发布后核对（run 全绿后）：`gh release view vX.Y.Z --json name,assets --jq '{name, assets: [.assets[].name]}'` 应含 14 个产物：`AgentHub_<ver>_x64-setup.exe` / `_x64-portable.zip` / `_x64-setup.exe.sig`、`AgentHub_<ver>_x86_64.AppImage` / `_amd64.deb`、updater `latest.json`、`agenthub-edge-<ver>-{linux,windows,darwin}-amd64`（darwin 含 arm64）、`agenthub-hub-<ver>-linux-amd64` / `-darwin-amd64` / `-darwin-arm64`（无 Windows 版）、`SHA256SUMS`；描述含安装指引/校验命令/commit 分组，unsigned 发布含 SmartScreen 说明。
 6. 失败重发：修复 → push master → `git tag -f vX.Y.Z <sha> && git push origin vX.Y.Z --force`（重推触发新 run，同 concurrency 自动取消旧 run）→ `gh release delete vX.Y.Z --yes --cleanup-tag=false`（softprops 不覆盖已存在 release，tag 保留）→ 等待完成后按步骤 5 核对。已知坑：release 描述超 125,000 字符会被 GitHub 截断（cliff.toml 已 slice(20)，勿改大）；`TAURI_SIGNING_PRIVATE_KEY` 缺失时 `.sig`/`latest.json` 不生成但构建仍成功，核对时注意。
