@@ -8,7 +8,6 @@ import {
   formatMarketTemplateListMeta,
   formatMcpMarketMeta,
   formatSkillMarketMeta,
-  marketCountLabel,
   marketFilterLabel,
   resolveMarketEmptyKind,
   resolveMarketRuntimeName,
@@ -68,14 +67,10 @@ describe('AgentMarketHelpers', () => {
     expect(formatMcpMarketMeta({})).toBe('');
   });
 
-  it('maps empty filter chips and loading counts', () => {
+  it('maps empty filter chips to the all label (loading counts moved to i18n, #2007)', () => {
     expect(marketFilterLabel('')).toBe('全部');
     expect(marketFilterLabel('prompt')).toBe('prompt');
     expect(marketFilterLabel('', 'All')).toBe('All');
-
-    expect(marketCountLabel(true, 0, 'skills')).toBe('加载中');
-    expect(marketCountLabel(false, 4, 'skills')).toBe('4 skills');
-    expect(marketCountLabel(false, 0, 'servers')).toBe('0 servers');
   });
 
   it('classifies empty results by error, search, filter, then blank priority', () => {

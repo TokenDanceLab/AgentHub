@@ -1,4 +1,6 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
+import { SHARED_WORKBENCH_I18N_NAMESPACE } from '@shared/i18n';
 import type { EmptyStateAction, EmptyStateCopyMatrix } from '@shared/ui';
 import styles from '../AgentsPage.module.css';
 import {
@@ -9,7 +11,7 @@ import {
   McpMarketItemRow,
   SkillMarketItemRow,
 } from './AgentMarketItemParts';
-import { marketCountLabel, resolveMarketEmptyKind } from './AgentMarketHelpers';
+import { resolveMarketEmptyKind } from './AgentMarketHelpers';
 import type {
   MarketCategory,
   MarketTemplate,
@@ -27,74 +29,28 @@ import type {
 
 export { MarketCard } from './AgentMarketItemParts';
 
-const AGENT_MARKET_EMPTY_COPY: EmptyStateCopyMatrix = {
-  blank: {
-    title: '暂无 Agent 模板',
-    description: '模板库为空时在此展示；发布或同步后可在这里安装。',
-  },
-  search: {
-    title: '没有匹配的 Agent 模板',
-    description: '换个关键词，或清空搜索后再看推荐与分类。',
-  },
-  filter: {
-    title: '当前分类下没有模板',
-    description: '切换到”推荐”或其他分类，或清空筛选后再试。',
-  },
-  error: {
-    title: 'Agent 模板暂时不可用',
-    description: '市场数据加载失败。恢复后可重试浏览与安装。',
-  },
-  noPermission: {
-    title: '无权限访问 Agent 市场',
-    description: '你没有访问此市场的权限，请联系管理员开通。',
-  },
-};
-
-const SKILL_MARKET_EMPTY_COPY: EmptyStateCopyMatrix = {
-  blank: {
-    title: '暂无公共 Skill',
-    description: 'Hub 上暂无已发布的 Skill，发布后在此浏览安装。',
-  },
-  search: {
-    title: '没有匹配的 Skill',
-    description: '换个关键词，或清空搜索后浏览全部公共 Skill。',
-  },
-  filter: {
-    title: '当前类型下没有 Skill',
-    description: '切换到”全部”或其他 Skill 类型后再试。',
-  },
-  error: {
-    title: 'Skill 市场暂时不可用',
-    description: '公共 Skill 列表加载失败。恢复后可重试浏览与安装。',
-  },
-  noPermission: {
-    title: '无权限访问 Skill 市场',
-    description: '你没有访问此市场的权限，请联系管理员开通。',
-  },
-};
-
-const MCP_MARKET_EMPTY_COPY: EmptyStateCopyMatrix = {
-  blank: {
-    title: '暂无公共 MCP Server',
-    description: 'Hub 上暂无已发布的 MCP Server，发布后在此浏览安装。',
-  },
-  search: {
-    title: '没有匹配的 MCP Server',
-    description: '换个关键词，或清空搜索后浏览全部公共 MCP。',
-  },
-  filter: {
-    title: '当前传输方式下没有 MCP',
-    description: '切换到”全部”或其他 transport 后再试。',
-  },
-  error: {
-    title: 'MCP 市场暂时不可用',
-    description: '公共 MCP 列表加载失败。恢复后可重试浏览与安装。',
-  },
-  noPermission: {
-    title: '无权限访问 MCP 市场',
-    description: '你没有访问此市场的权限，请联系管理员开通。',
-  },
-};
+/**
+ * Builds an EmptyState copy matrix from the sharedWorkbench bundle.
+ * `surface` selects the agents.market.emptyAgent | emptySkill | emptyMcp
+ * key group; every kind resolves an explicit title/description key pair
+ * (zh/en parity enforced by the resource test). #2007 i18n convergence.
+ */
+function buildMarketEmptyCopy(
+  t: (key: string) => string,
+  surface: 'emptyAgent' | 'emptySkill' | 'emptyMcp',
+): EmptyStateCopyMatrix {
+  const copy = (kind: 'blank' | 'search' | 'filter' | 'error' | 'noPermission') => ({
+    title: t(`agents.market.${surface}.${kind}.title`),
+    description: t(`agents.market.${surface}.${kind}.description`),
+  });
+  return {
+    blank: copy('blank'),
+    search: copy('search'),
+    filter: copy('filter'),
+    error: copy('error'),
+    noPermission: copy('noPermission'),
+  };
+}
 
 function clearSearchAction(
   label: string,
@@ -136,11 +92,13 @@ export const MarketFeaturedSection: React.FC<{
   marketFeatured: MarketTemplate[];
   onMarketInstall?: ((name: string, description: string, category: string) => void) | undefined;
   onMarketPreview?: ((name: string) => void) | undefined;
-}> = ({ marketFeatured, onMarketInstall, onMarketPreview }) => (
+}> = ({ marketFeatured, onMarketInstall, onMarketPreview }) => {
+  const { t } = useTranslation(SHARED_WORKBENCH_I18N_NAMESPACE);
+  return (
   <section className={`${styles['agent-section']} ${styles['market-featured']}`}>
     <div className={styles['section-title-row']}>
-      <h2>推荐模板</h2>
-      <span>精选</span>
+      <h2>{t('agents.market.featuredTitle')}</h2>
+      <span>{t('agents.market.featuredBadge')}</span>
     </div>
     <div className={`${styles['market-grid']} ${styles.featured}`}>
       {marketFeatured.map((tmpl) => (
@@ -153,7 +111,8 @@ export const MarketFeaturedSection: React.FC<{
       ))}
     </div>
   </section>
-);
+  );
+};
 
 export const MarketTemplatesList: React.FC<{
   marketTemplates: MarketTemplate[];
@@ -170,6 +129,7 @@ export const MarketTemplatesList: React.FC<{
   onMarketSearchChange,
   onMarketInstall,
 }) => {
+  const { t } = useTranslation(SHARED_WORKBENCH_I18N_NAMESPACE);
   const emptyKind = resolveMarketEmptyKind({
     error: marketError,
     searchQuery: marketSearchQuery,
@@ -180,15 +140,15 @@ export const MarketTemplatesList: React.FC<{
   return (
     <section className={`${styles['agent-section']} ${styles['market-list-section']}`}>
       <div className={styles['section-title-row']}>
-        <h2>全部模板</h2>
+        <h2>{t('agents.market.allTitle')}</h2>
         <span>{marketTemplates.length} templates</span>
       </div>
       {marketTemplates.length === 0 && (
         <MarketCompactEmpty
           kind={emptyKind}
-          copy={AGENT_MARKET_EMPTY_COPY}
+          copy={buildMarketEmptyCopy(t, 'emptyAgent')}
           {...(emptyKind === 'search'
-            ? { action: clearSearchAction('清空搜索', onMarketSearchChange) }
+            ? { action: clearSearchAction(t('agents.market.clearSearch'), onMarketSearchChange) }
             : {})}
         />
       )}
@@ -217,16 +177,19 @@ export const SkillMarketToolbar: React.FC<{
   skillTypes,
   onSkillMarketSearchChange,
   onSkillTypeFilterChange,
-}) => (
+}) => {
+  const { t } = useTranslation(SHARED_WORKBENCH_I18N_NAMESPACE);
+  return (
   <MarketFilterToolbar
     searchQuery={skillMarketSearchQuery}
-    searchPlaceholder="搜索 Skill 名称或描述"
+    searchPlaceholder={t('agents.market.searchSkill')}
     filters={skillTypes}
     activeFilter={activeSkillTypeFilter}
     onSearchChange={onSkillMarketSearchChange}
     onFilterChange={onSkillTypeFilterChange}
   />
-);
+  );
+};
 
 export const SkillMarketSection: React.FC<{
   skillMarketItems: SkillMarketItem[];
@@ -249,6 +212,7 @@ export const SkillMarketSection: React.FC<{
   onSkillInstall,
   onSkillUninstall,
 }) => {
+  const { t } = useTranslation(SHARED_WORKBENCH_I18N_NAMESPACE);
   const emptyKind = resolveMarketEmptyKind({
     error: skillMarketError,
     searchQuery: skillMarketSearchQuery,
@@ -259,15 +223,19 @@ export const SkillMarketSection: React.FC<{
   return (
     <section className={styles['agent-section']}>
       <div className={styles['section-title-row']}>
-        <h2>公共 Skill</h2>
-        <span>{marketCountLabel(skillMarketLoading, skillMarketItems.length, 'skills')}</span>
+        <h2>{t('agents.market.skillTitle')}</h2>
+        <span>
+          {skillMarketLoading
+            ? t('agents.market.loading')
+            : `${skillMarketItems.length} skills`}
+        </span>
       </div>
       {skillMarketItems.length === 0 && !skillMarketLoading && (
         <MarketCompactEmpty
           kind={emptyKind}
-          copy={SKILL_MARKET_EMPTY_COPY}
+          copy={buildMarketEmptyCopy(t, 'emptySkill')}
           {...(emptyKind === 'search'
-            ? { action: clearSearchAction('清空搜索', onSkillMarketSearchChange) }
+            ? { action: clearSearchAction(t('agents.market.clearSearch'), onSkillMarketSearchChange) }
             : {})}
         />
       )}
@@ -298,16 +266,19 @@ export const McpMarketToolbar: React.FC<{
   transports,
   onMcpMarketSearchChange,
   onTransportFilterChange,
-}) => (
+}) => {
+  const { t } = useTranslation(SHARED_WORKBENCH_I18N_NAMESPACE);
+  return (
   <MarketFilterToolbar
     searchQuery={mcpMarketSearchQuery}
-    searchPlaceholder="搜索 MCP Server 名称或描述"
+    searchPlaceholder={t('agents.market.searchMcp')}
     filters={transports}
     activeFilter={activeTransportFilter}
     onSearchChange={onMcpMarketSearchChange}
     onFilterChange={onTransportFilterChange}
   />
-);
+  );
+};
 
 export const McpMarketSection: React.FC<{
   mcpMarketItems: MCPMarketItem[];
@@ -330,6 +301,7 @@ export const McpMarketSection: React.FC<{
   onMcpInstall,
   onMcpUninstall,
 }) => {
+  const { t } = useTranslation(SHARED_WORKBENCH_I18N_NAMESPACE);
   const emptyKind = resolveMarketEmptyKind({
     error: mcpMarketError,
     searchQuery: mcpMarketSearchQuery,
@@ -340,15 +312,19 @@ export const McpMarketSection: React.FC<{
   return (
     <section className={styles['agent-section']}>
       <div className={styles['section-title-row']}>
-        <h2>公共 MCP Server</h2>
-        <span>{marketCountLabel(mcpMarketLoading, mcpMarketItems.length, 'servers')}</span>
+        <h2>{t('agents.market.mcpTitle')}</h2>
+        <span>
+          {mcpMarketLoading
+            ? t('agents.market.loading')
+            : `${mcpMarketItems.length} servers`}
+        </span>
       </div>
       {mcpMarketItems.length === 0 && !mcpMarketLoading && (
         <MarketCompactEmpty
           kind={emptyKind}
-          copy={MCP_MARKET_EMPTY_COPY}
+          copy={buildMarketEmptyCopy(t, 'emptyMcp')}
           {...(emptyKind === 'search'
-            ? { action: clearSearchAction('清空搜索', onMcpMarketSearchChange) }
+            ? { action: clearSearchAction(t('agents.market.clearSearch'), onMcpMarketSearchChange) }
             : {})}
         />
       )}

@@ -8,10 +8,19 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import React from 'react';
-import { describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
 import { render, screen } from '../../__tests__/setup';
 import { MCPMarketView, SkillMarketView } from './AgentMarketViews';
 import type { AgentsPageProps } from './types';
+
+// Market empty-state / action copy resolves via the sharedWorkbench
+// namespace after the #2007 i18n convergence; opt into the zh bundle of
+// the shared test i18next instance (Issue #1717).
+import { useTestI18nLanguage } from '@shared/testing/i18n';
+
+beforeAll(async () => {
+  await useTestI18nLanguage('zh');
+});
 
 function baseProps(overrides: Partial<AgentsPageProps> = {}): AgentsPageProps {
   return {

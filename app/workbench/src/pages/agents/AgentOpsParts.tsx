@@ -1,4 +1,6 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
+import { SHARED_WORKBENCH_I18N_NAMESPACE } from '@shared/i18n';
 import styles from '../AgentsPage.module.css';
 import { auditEntryKey } from './AgentOpsHelpers';
 import {
@@ -36,10 +38,12 @@ import type {
 
 export const PolicyMatrixSection: React.FC<{
   policyRules: PolicyRule[];
-}> = ({ policyRules }) => (
+}> = ({ policyRules }) => {
+  const { t } = useTranslation(SHARED_WORKBENCH_I18N_NAMESPACE);
+  return (
   <section className={styles['agent-section']}>
     <div className={styles['section-title-row']}>
-      <h2>策略矩阵</h2>
+      <h2>{t('agents.ops.policy.matrixTitle')}</h2>
       <span>{policyRules.length} rules</span>
     </div>
     <div className={styles['agent-rule-list']}>
@@ -48,15 +52,18 @@ export const PolicyMatrixSection: React.FC<{
       ))}
     </div>
   </section>
-);
+  );
+};
 
 export const PolicyApprovalSection: React.FC<{
   checks: Array<{ label: string; checked: boolean }>;
   onApprovalToggle?: ((index: number, checked: boolean) => void) | undefined;
-}> = ({ checks, onApprovalToggle }) => (
+}> = ({ checks, onApprovalToggle }) => {
+  const { t } = useTranslation(SHARED_WORKBENCH_I18N_NAMESPACE);
+  return (
   <section className={`${styles['agent-section']} ${styles['policy-side']}`}>
     <div className={styles['section-title-row']}>
-      <h2>默认审批流</h2>
+      <h2>{t('agents.ops.policy.approvalTitle')}</h2>
       <span>demo</span>
     </div>
     {checks.map((item, i) => (
@@ -69,21 +76,24 @@ export const PolicyApprovalSection: React.FC<{
       />
     ))}
     <div className={styles['policy-note']}>
-      <strong>策略命中顺序</strong>
+      <strong>{t('agents.ops.policy.hitOrderTitle')}</strong>
       <p>
-        先匹配工具风险，再匹配目标资源，最后落到 Agent 自身权限。所有拒绝项写入审计日志。
+        {t('agents.ops.policy.hitOrderDescription')}
       </p>
     </div>
   </section>
-);
+  );
+};
 
 export const ToolPermissionMatrix: React.FC<{
   toolMatrixAgents: ToolMatrixAgent[];
   toolMatrixTools: string[];
-}> = ({ toolMatrixAgents, toolMatrixTools }) => (
+}> = ({ toolMatrixAgents, toolMatrixTools }) => {
+  const { t } = useTranslation(SHARED_WORKBENCH_I18N_NAMESPACE);
+  return (
   <section className={styles['agent-section']}>
     <div className={styles['section-title-row']}>
-      <h2>权限总览</h2>
+      <h2>{t('agents.ops.tools.overviewTitle')}</h2>
       <span>{toolMatrixAgents.length} agents</span>
     </div>
     <div className={styles['tool-matrix']}>
@@ -97,38 +107,45 @@ export const ToolPermissionMatrix: React.FC<{
       ))}
     </div>
   </section>
-);
+  );
+};
 
-export const ToolPermissionLegend: React.FC = () => (
+export const ToolPermissionLegend: React.FC = () => {
+  const { t } = useTranslation(SHARED_WORKBENCH_I18N_NAMESPACE);
+  return (
   <div className={styles['permission-legend']}>
     <span>
       <i className={styles.allow} />
-      允许: 低风险直接执行
+      {t('agents.ops.tools.legendAllow')}
     </span>
     <span>
       <i className={styles.confirm} />
-      需确认: 进入用户审批
+      {t('agents.ops.tools.legendConfirm')}
     </span>
     <span>
       <i className={styles.deny} />
-      禁止: 不下发工具调用
+      {t('agents.ops.tools.legendDeny')}
     </span>
   </div>
-);
+  );
+};
 
 export const CcSwitchStatusSection: React.FC<{
   ccSwitchStatus: CCSwitchStatusInfo;
   ccSwitchProviders?: CCSwitchProviderInfo[] | undefined;
-}> = ({ ccSwitchStatus, ccSwitchProviders = [] }) => (
+}> = ({ ccSwitchStatus, ccSwitchProviders = [] }) => {
+  const { t } = useTranslation(SHARED_WORKBENCH_I18N_NAMESPACE);
+  return (
   <section className={styles['ccswitch-section']}>
     <div className={styles['section-title-row']}>
-      <h2>cc-switch 透明代理</h2>
+      <h2>{t('agents.ops.ccSwitch.title')}</h2>
       <CcSwitchStatusBadge routingActive={ccSwitchStatus.routingActive} />
     </div>
     <CcSwitchStatusGrid status={ccSwitchStatus} />
     <CcSwitchCurrentProviders providers={ccSwitchProviders} />
   </section>
-);
+  );
+};
 
 export const ModelCardsGrid: React.FC<{
   models: ModelInfo[];
@@ -143,10 +160,12 @@ export const ModelCardsGrid: React.FC<{
 export const ModelRoutingSection: React.FC<{
   modelRoutes: ModelRoute[];
   onModelRouteClick?: ((agentId: string) => void) | undefined;
-}> = ({ modelRoutes, onModelRouteClick }) => (
+}> = ({ modelRoutes, onModelRouteClick }) => {
+  const { t } = useTranslation(SHARED_WORKBENCH_I18N_NAMESPACE);
+  return (
   <section className={`${styles['agent-section']} ${styles['model-routing']}`}>
     <div className={styles['section-title-row']}>
-      <h2>路由规则</h2>
+      <h2>{t('agents.ops.models.routingTitle')}</h2>
       <span>priority</span>
     </div>
     {modelRoutes.map((route) => (
@@ -157,52 +176,78 @@ export const ModelRoutingSection: React.FC<{
       />
     ))}
   </section>
-);
+  );
+};
 
 export const ModelHealthSection: React.FC<{
   modelHealthRows: ModelHealth[];
-}> = ({ modelHealthRows }) => (
+}> = ({ modelHealthRows }) => {
+  const { t } = useTranslation(SHARED_WORKBENCH_I18N_NAMESPACE);
+  return (
   <section className={`${styles['agent-section']} ${styles['model-health']}`}>
     <div className={styles['section-title-row']}>
-      <h2>模型健康</h2>
+      <h2>{t('agents.ops.models.healthTitle')}</h2>
       <span>mock</span>
     </div>
     {modelHealthRows.map((row) => (
       <ModelHealthRow key={row.name} row={row} />
     ))}
   </section>
-);
+  );
+};
+
+/**
+ * Audit filter identifiers are data values (they round-trip through
+ * onAuditFilterChange and match AuditResult enums); only their display
+ * labels resolve through i18n. Unknown IDs render verbatim. #2007
+ */
+const AUDIT_FILTER_LABEL_KEYS: Record<string, string> = {
+  '全部': 'agents.ops.audit.filters.all',
+  '需确认': 'agents.ops.audit.filters.needsConfirm',
+  '禁止': 'agents.ops.audit.filters.denied',
+  '今天': 'agents.ops.audit.filters.today',
+};
 
 export const AuditFilterBar: React.FC<{
   filters: string[];
   activeAuditFilter: string;
   onAuditFilterChange?: ((filter: string) => void) | undefined;
-}> = ({ filters, activeAuditFilter, onAuditFilterChange }) => (
+}> = ({ filters, activeAuditFilter, onAuditFilterChange }) => {
+  const { t } = useTranslation(SHARED_WORKBENCH_I18N_NAMESPACE);
+  return (
   <div className={styles['audit-filter-bar']}>
-    {filters.map((filter) => (
-      <AuditFilterChip
-        key={filter}
-        filter={filter}
-        active={activeAuditFilter === filter}
-        onAuditFilterChange={onAuditFilterChange}
-      />
-    ))}
+    {filters.map((filter) => {
+      const labelKey = AUDIT_FILTER_LABEL_KEYS[filter];
+      return (
+        <AuditFilterChip
+          key={filter}
+          filter={filter}
+          label={labelKey ? t(labelKey) : filter}
+          active={activeAuditFilter === filter}
+          onAuditFilterChange={onAuditFilterChange}
+        />
+      );
+    })}
   </div>
-);
+  );
+};
 
 export const AuditEntriesSection: React.FC<{
   auditEntries: AuditEntry[];
-}> = ({ auditEntries }) => (
+}> = ({ auditEntries }) => {
+  const { t } = useTranslation(SHARED_WORKBENCH_I18N_NAMESPACE);
+  return (
   <section className={`${styles['agent-section']} ${styles['audit-section']}`}>
     <div className={styles['audit-head']}>
-      <span>时间</span>
+      <span>{t('agents.ops.audit.headTime')}</span>
       <span>Agent</span>
-      <span>工具</span>
-      <span>结果</span>
-      <span>目标</span>
+      <span>{t('agents.ops.audit.headTool')}</span>
+      <span>{t('agents.ops.audit.headResult')}</span>
+      <span>{t('agents.ops.audit.headTarget')}</span>
     </div>
     {auditEntries.map((entry, i) => (
       <AuditEntryRow key={auditEntryKey(entry, i)} entry={entry} />
     ))}
   </section>
-);
+  );
+};
