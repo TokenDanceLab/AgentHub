@@ -2,6 +2,7 @@ import type { RuntimeEvidenceSnapshot } from '@shared/inspector';
 import type { RuntimeEvidenceContentRef } from '@shared/platform';
 import type { FileDiff } from '@shared/types/chat';
 import type { PreviewFile } from './FilePreviewRouter';
+import type { InspectorTranslator } from './InspectorModePanelHelpers';
 import type { TaskItem } from './OverviewPanel';
 
 /* ═══════════════════════════════════════════════════════════════════════
@@ -10,12 +11,18 @@ import type { TaskItem } from './OverviewPanel';
 
    Overview mappers, diff text builders, and workspace status helpers.
    No React / no intentional UX change.
+
+   i18n note (#2032): overview task labels resolve through the
+   sharedWorkbench bundle via a passed-in translator.
    ═══════════════════════════════════════════════════════════════════════ */
 
-export function runtimeEvidenceOverviewTasks(runtimeEvidence: RuntimeEvidenceSnapshot): TaskItem[] {
+export function runtimeEvidenceOverviewTasks(
+  t: InspectorTranslator,
+  runtimeEvidence: RuntimeEvidenceSnapshot,
+): TaskItem[] {
   const tasks: TaskItem[] = [];
   if (runtimeEvidence.runId) {
-    tasks.push({ label: `跟随 ${runtimeEvidence.runId}`, status: 'active' });
+    tasks.push({ label: t('inspector.followRun', { runId: runtimeEvidence.runId }), status: 'active' });
   }
   if (runtimeEvidence.artifacts.length > 0) {
     tasks.push({
@@ -29,10 +36,11 @@ export function runtimeEvidenceOverviewTasks(runtimeEvidence: RuntimeEvidenceSna
   if (runtimeEvidence.previews.length > 0) {
     tasks.push({ label: `Preview index: ${runtimeEvidence.previews.length}`, status: 'done' });
   }
-  return tasks.length > 0 ? tasks : [{ label: '等待 Hub replay evidence', status: 'todo' }];
+  return tasks.length > 0 ? tasks : [{ label: t('inspector.waitingReplay'), status: 'todo' }];
 }
 
 export function runtimeEvidenceOverviewFiles(
+  _t: InspectorTranslator,
   runtimeEvidence: RuntimeEvidenceSnapshot
 ): PreviewFile[] {
   return [
