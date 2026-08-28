@@ -55,14 +55,18 @@ func (c *Client) BlacklistRefreshToken(ctx context.Context, tokenHash string, tt
 // IsRefreshTokenBlacklisted checks whether a key (token hash, or compound
 // userID:deviceID[:deviceType] key) exists in the Redis refresh token
 // blacklist. Returns true if the key is present, false otherwise.
-// Redis errors are logged and result in a false return (fail-open to DB-only
-// revocation), so a transient Redis outage does not block all token refresh.
+// Redis errors are propagated to the caller (#2053, symmetric with the
+// AH-SR-052 access contract, #2040): Service.RefreshToken is the policy
+// decision point and picks fail-open vs fail-closed via
+// AGENTHUB_AUTH_FAIL_CLOSED (service/auth enforceRefreshBlacklist).
+// Swallowing errors here made that fail-closed branch unreachable in the
+// production wiring.
 func (c *Client) IsRefreshTokenBlacklisted(ctx context.Context, key string) (bool, error) {
 	n, err := c.rdb.Exists(ctx, "rt_blacklist:"+key).Result()
 	if err != nil {
-		slog.Warn("redis IsRefreshTokenBlacklisted failed, falling back to DB-only",
+		slog.Warn("redis IsRefreshTokenBlacklisted failed",
 			"key", key, "error", err)
-		return false, nil
+		return false, err
 	}
 	return n > 0, nil
 }

@@ -54,7 +54,7 @@ func outageCacheClient(t *testing.T) (*cache.Client, *miniredis.Miniredis) {
 // blacklist (rotation/logout race window before the DB commit) — optionally
 // blacklists the token hash while Redis is up, optionally takes Redis down,
 // then calls RefreshToken.
-func runRefreshFailClosedCase(t *testing.T, failClosedEnv string, blacklisted bool, outage bool) (*LoginResponse, error, sqlmock.Sqlmock) {
+func runRefreshFailClosedCase(t *testing.T, failClosedEnv string, blacklisted bool, outage bool) (*LoginResponse, sqlmock.Sqlmock, error) {
 	t.Helper()
 	t.Setenv("AGENTHUB_AUTH_FAIL_CLOSED", failClosedEnv)
 
@@ -96,7 +96,7 @@ func runRefreshFailClosedCase(t *testing.T, failClosedEnv string, blacklisted bo
 
 	svc := NewService(db, jwtCfg(), cacheClient)
 	resp, err := svc.RefreshToken(context.Background(), rawRT)
-	return resp, err, mock
+	return resp, mock, err
 }
 
 // TestRefreshTokenRealRedisFailClosedMatrix is the #2053 behavioral gate:
@@ -132,7 +132,7 @@ func TestRefreshTokenRealRedisFailClosedMatrix(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			resp, err, mock := runRefreshFailClosedCase(t, tc.failClosedEnv, tc.blacklisted, tc.outage)
+			resp, mock, err := runRefreshFailClosedCase(t, tc.failClosedEnv, tc.blacklisted, tc.outage)
 			if tc.wantRotation {
 				require.NoError(t, err, "refresh must rotate when the blacklist check passes or fails open")
 				require.NotNil(t, resp)
