@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import { SHARED_WORKBENCH_I18N_NAMESPACE } from '@shared/i18n';
+import { createTestI18n } from '@shared/testing/i18n';
 import type { TaskGroup, TaskItem, TasksPane, ViewMode } from './pages';
 import type { TaskEditDraft } from './pages/TasksPage';
 import type { TaskGroupMode, TaskSortMode } from './workbenchTaskGroups';
@@ -8,6 +10,9 @@ import {
   type WorkbenchTasksRouteHandlers,
   type WorkbenchTasksRouteStateAccessors,
 } from './workbenchTasksRouteHelpers';
+
+/** Real zh bundle keeps historical copy expectations honest (#2023). */
+const t = createTestI18n({ lng: 'zh' }).getFixedT('zh', SHARED_WORKBENCH_I18N_NAMESPACE);
 
 const TASK: TaskItem = {
   id: 't1',
@@ -51,6 +56,7 @@ describe('workbenchTasksRouteHelpers handlers', () => {
     let taskNavMenuOpen = false;
 
     const access: WorkbenchTasksRouteStateAccessors = {
+      translator: t,
       get taskGroups() { return taskGroups; },
       get selectedTask() {
         return taskGroups.flatMap((group) => group.tasks).find((task) => task.id === selectedTaskId) ?? null;
@@ -185,6 +191,7 @@ function createTasksHarness(
   // how the real hook observes fresh accessors on every render.
   const build = (): WorkbenchTasksRouteHandlers => {
     const access: WorkbenchTasksRouteStateAccessors = {
+      translator: t,
       get taskGroups() { return state.taskGroups; },
       get selectedTask() {
         return state.taskGroups.flatMap((group) => group.tasks).find((task) => task.id === state.selectedTaskId) ?? null;

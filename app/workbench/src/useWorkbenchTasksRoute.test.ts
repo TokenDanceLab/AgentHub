@@ -1,11 +1,12 @@
 import { act, renderHook } from '@testing-library/react';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, beforeAll, describe, expect, it } from 'vitest';
 import {
   WORKBENCH_MOCK_PAGE_SIZE,
   WORKBENCH_MOCK_TASK_POOL,
 } from './mockData';
 import { flattenTaskGroups } from './workbenchTaskGroups';
 import { useWorkbenchTasksRoute } from './useWorkbenchTasksRoute';
+import { useTestI18nLanguage } from '@shared/testing/i18n';
 import {
   consumeWorkbenchTaskDeepLinkIntent,
   getWorkbenchTaskDeepLinkSnapshot,
@@ -19,6 +20,10 @@ import {
 function loadedTaskCount(route: ReturnType<typeof useWorkbenchTasksRoute>): number {
   return flattenTaskGroups(route.sourceTaskGroups).length;
 }
+
+beforeAll(async () => {
+  await useTestI18nLanguage('zh');
+});
 
 describe('useWorkbenchTasksRoute mock cursor pagination (#1510)', () => {
   it('loads the first page (PAGE_SIZE) and reports hasMore when the pool is larger', () => {

@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import { SHARED_WORKBENCH_I18N_NAMESPACE } from '@shared/i18n';
 import type { TaskGroup, TaskItem, TasksPane, ViewMode } from './pages';
 import type { TaskEditDraft } from './pages/TasksPage';
 import {
@@ -35,6 +37,7 @@ export function useWorkbenchTasksRoute({
   userDisplayName,
   taskQueueSource,
 }: UseWorkbenchTasksRouteOptions): WorkbenchTasksRoute {
+  const { t } = useTranslation(SHARED_WORKBENCH_I18N_NAMESPACE);
   const [tasksPane, setTasksPane] = useState<TasksPane>('owned');
   const [taskViewMode, setTaskViewMode] = useState<ViewMode>('list');
   const [taskGroups, setTaskGroups] = useState<TaskGroup[]>([]);
@@ -44,7 +47,7 @@ export function useWorkbenchTasksRoute({
   const [taskShowCreator, setTaskShowCreator] = useState(true);
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [taskNavMenuOpen, setTaskNavMenuOpen] = useState(false);
-  const [taskActionLabel, setTaskActionLabel] = useState('筛选已启用');
+  const [taskActionLabel, setTaskActionLabel] = useState(() => t('tasks.action.filterEnabled'));
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
   const [editingTaskDraft, setEditingTaskDraft] = useState<TaskEditDraft | null>(null);
   const [localTaskCounter, setLocalTaskCounter] = useState(1);
@@ -155,6 +158,7 @@ export function useWorkbenchTasksRoute({
   }, [mockPaginationEnabled, taskFocus]);
 
   const handlers = buildWorkbenchTasksRouteHandlers({
+    translator: t,
     taskGroups,
     selectedTask,
     editingTaskId,

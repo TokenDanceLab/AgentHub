@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import { SHARED_WORKBENCH_I18N_NAMESPACE } from '@shared/i18n';
+import { createTestI18n } from '@shared/testing/i18n';
 import type { TaskGroup, TaskItem } from './pages';
 import {
   appendCustomTaskGroup,
@@ -39,6 +41,9 @@ const GROUPS: TaskGroup[] = [
   },
 ];
 
+/** Real zh bundle keeps historical copy expectations honest (#2023). */
+const tZh = createTestI18n({ lng: 'zh' }).getFixedT('zh', SHARED_WORKBENCH_I18N_NAMESPACE);
+
 describe('workbenchTasksRouteGroupHelpers', () => {
   it('resolves source task groups for mock and real modes', () => {
     const mock = [{ label: 'mock', tasks: [TASK] }];
@@ -59,7 +64,7 @@ describe('workbenchTasksRouteGroupHelpers', () => {
     });
     expect(patchTaskEditDraft(null, 'title', 'x')).toBeNull();
     expect(patchTaskEditDraft(buildTaskEditDraft(TASK), 'assignee', 'Me')?.assignee).toBe('Me');
-    expect(prepareTaskEditSave({
+    expect(prepareTaskEditSave(tZh, {
       title: '   ',
       project: 'P',
       assignee: 'A',
@@ -111,8 +116,8 @@ describe('workbenchTasksRouteGroupHelpers', () => {
     expect(resolveTaskAssignee('Alice', 'u1')).toBe('Alice');
     expect(resolveTaskAssignee(undefined, 'u1')).toBe('u1');
     expect(resolveTaskAssignee(undefined, undefined)).toBe('当前用户');
-    expect(resolveTaskAssigneeLabel('Alice')).toBe('Alice');
-    expect(resolveTaskAssigneeLabel(undefined)).toBe('当前用户');
+    expect(resolveTaskAssigneeLabel(tZh, 'Alice')).toBe('Alice');
+    expect(resolveTaskAssigneeLabel(tZh, undefined)).toBe('当前用户');
     expect(resolveFilterPaneForAssignee('Builder', 'Builder')).toBe('owned');
     expect(resolveFilterPaneForAssignee('u2', 'u1')).toBe('all');
   });
