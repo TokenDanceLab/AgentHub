@@ -1,8 +1,8 @@
 {
   "_comment": "Baseline of i18n callsite violations (source files with CJK string literals but no useTranslation import). The verify gate fails when the current count EXCEEDS this baseline; lower this number as more callsites are wired to useTranslation.",
   "scanRoot": "app/shared/src + app/workbench/src",
-  "totalViolations": 89,
-  "totalCjkLiteralLines": 787,
+  "totalViolations": 84,
+  "totalCjkLiteralLines": 696,
   "files": [
     {
       "path": "shared/chatview/adapterMapBlock.ts",
@@ -404,75 +404,20 @@
       ]
     },
     {
-      "path": "workbench/pages/agents/AgentInstalledParts.tsx",
-      "cjkLiteralLines": 17,
-      "samples": [
-        35,
-        89,
-        90,
-        92,
-        93
-      ]
-    },
-    {
       "path": "workbench/pages/agents/AgentMarketHelpers.ts",
-      "cjkLiteralLines": 4,
+      "cjkLiteralLines": 3,
       "samples": [
         59,
         60,
-        66,
-        101
-      ]
-    },
-    {
-      "path": "workbench/pages/agents/AgentMarketItemParts.tsx",
-      "cjkLiteralLines": 12,
-      "samples": [
-        97,
-        98,
-        99,
-        100,
-        101
-      ]
-    },
-    {
-      "path": "workbench/pages/agents/AgentMarketParts.tsx",
-      "cjkLiteralLines": 37,
-      "samples": [
-        32,
-        33,
-        36,
-        37,
-        40
+        96
       ]
     },
     {
       "path": "workbench/pages/agents/AgentOpsHelpers.ts",
-      "cjkLiteralLines": 5,
+      "cjkLiteralLines": 2,
       "samples": [
         17,
-        22,
-        32,
-        37,
-        69
-      ]
-    },
-    {
-      "path": "workbench/pages/agents/AgentOpsItemParts.tsx",
-      "cjkLiteralLines": 1,
-      "samples": [
-        174
-      ]
-    },
-    {
-      "path": "workbench/pages/agents/AgentOpsViews.tsx",
-      "cjkLiteralLines": 20,
-      "samples": [
-        45,
-        46,
-        47,
-        48,
-        58
+        54
       ]
     },
     {
