@@ -56,7 +56,7 @@ export function resolveOverviewTasks(
   evidence: EvidenceRef[],
   runtimeEvidence: RuntimeEvidenceSnapshot | undefined,
 ): TaskItem[] {
-  if (runtimeEvidence) return runtimeEvidenceOverviewTasks(runtimeEvidence);
+  if (runtimeEvidence) return runtimeEvidenceOverviewTasks(t, runtimeEvidence);
   return evidenceOverviewTasks(t, evidence);
 }
 
@@ -68,7 +68,7 @@ export function resolveOverviewFiles(
   openFileName: string | undefined,
 ): PreviewFile[] {
   const files = runtimeEvidence
-    ? runtimeEvidenceOverviewFiles(runtimeEvidence)
+    ? runtimeEvidenceOverviewFiles(t, runtimeEvidence)
     : evidenceOverviewFiles(t, evidence);
   return files.map((file) => ({
     ...file,

@@ -91,7 +91,7 @@ export function DeployStatusBar({
       className={styles.deployStatusBar}
       data-deploy-status={status}
       role="status"
-      aria-label={`部署状态: ${statusLabel}`}
+      aria-label={tWorkbench('inspector.deployStatusAria', { label: statusLabel })}
     >
       <span
         className={styles.deployStatusDot}
@@ -119,19 +119,20 @@ export function BrowserPanelFallback({
   onOpenUrl: (url: string) => void;
 }): React.ReactElement {
   const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE);
+  const { t: tWorkbench } = useTranslation(SHARED_WORKBENCH_I18N_NAMESPACE);
   if (artifacts.length > 0) {
     return (
       <div className={styles.browserPreviewCard}>
         <DesignNavIcon className={styles.browserPreviewIcon} name="browser" size={24} />
-        <strong>浏览器预览已启用</strong>
-        <span>{`检测到 ${artifacts.length} 个可预览产物。`}</span>
+        <strong>{tWorkbench('inspector.browserReady')}</strong>
+        <span>{tWorkbench('inspector.detectedArtifacts', { count: artifacts.length })}</span>
         <ul aria-label={t('aria.previewArtifacts')} className={styles.browserArtifactList}>
           {artifacts.map((artifact) => {
             const canOpen = canOpenEvidence(artifact, onOpenPreview, canOpenPreview);
             return (
               <li key={artifact.id}>
                 <button type="button"
-                  aria-label={`打开产物 ${artifact.label}`}
+                  aria-label={tWorkbench('inspector.openArtifact', { name: artifact.label })}
                   className={styles.browserArtifactButton}
                   disabled={!canOpen}
                   onClick={() => {
@@ -150,7 +151,7 @@ export function BrowserPanelFallback({
                     type={artifact.uri ? 'link' : undefined}
                   />
                   <span className={styles.fileName}>{artifact.label}</span>
-                  <span className={styles.fileMeta}>{canOpen ? '打开' : '待接入'}</span>
+                  <span className={styles.fileMeta}>{canOpen ? tWorkbench('inspector.open') : tWorkbench('inspector.pendingIntegration')}</span>
                 </button>
               </li>
             );
@@ -163,8 +164,8 @@ export function BrowserPanelFallback({
   return (
     <div className={styles.browserPreviewCard}>
       <DesignNavIcon className={styles.browserPreviewIcon} name="browser" size={24} />
-      <strong>浏览器预览已启用</strong>
-      <span>等待 run 产出可预览地址或 artifact。</span>
+      <strong>{tWorkbench('inspector.browserReady')}</strong>
+      <span>{tWorkbench('inspector.browserWaiting')}</span>
     </div>
   );
 }
@@ -183,19 +184,20 @@ export function FilesPanel({
   onOpenPreview?: ((evidence: EvidenceRef) => Promise<void>) | undefined;
 }): React.ReactElement {
   const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE);
+  const { t: tWorkbench } = useTranslation(SHARED_WORKBENCH_I18N_NAMESPACE);
   if (files.length === 0 && fallbackFiles && fallbackFiles.length > 0) {
     return (
       <ul aria-label={t('aria.changedFiles')} className={styles.fileList}>
         {fallbackFiles.map((file) => (
           <li key={file.name}>
             <button type="button"
-              aria-label={`打开文件 ${file.name}`}
+              aria-label={tWorkbench('inspector.openFile', { name: file.name })}
               className={styles.fileRow}
               onClick={() => onFallbackFileClick?.(file)}
             >
               <DesignFileIcon className={styles.fileIcon} name={file.name} type={file.type} />
               <span className={styles.fileName}>{file.name}</span>
-              <span className={styles.fileMeta}>预览</span>
+              <span className={styles.fileMeta}>{tWorkbench('inspector.previewLabel')}</span>
             </button>
           </li>
         ))}
@@ -207,8 +209,8 @@ export function FilesPanel({
     return (
       <div className={styles.browserPreviewCard}>
         <DesignNavIcon className={styles.browserPreviewIcon} name="fileText" size={24} />
-        <strong>暂无变更文件</strong>
-        <span>等待 run 产出文件、diff 或 artifact evidence。</span>
+        <strong>{tWorkbench('inspector.emptyFiles')}</strong>
+        <span>{tWorkbench('inspector.waitingFiles')}</span>
       </div>
     );
   }
@@ -220,7 +222,7 @@ export function FilesPanel({
         return (
           <li key={file.id}>
             <button type="button"
-              aria-label={`打开文件 ${file.label}`}
+              aria-label={tWorkbench('inspector.openFile', { name: file.label })}
               className={styles.fileRow}
               disabled={!canOpen}
               onClick={() => {
@@ -232,7 +234,7 @@ export function FilesPanel({
             >
               <DesignFileIcon className={styles.fileIcon} name={file.label} />
               <span className={styles.fileName}>{file.label}</span>
-              <span className={styles.fileMeta}>{canOpen ? '打开' : '待接入'}</span>
+              <span className={styles.fileMeta}>{canOpen ? tWorkbench('inspector.open') : tWorkbench('inspector.pendingIntegration')}</span>
             </button>
           </li>
         );
