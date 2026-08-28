@@ -27,14 +27,14 @@ interface NavItem {
 }
 
 const topNavItems: NavItem[] = [
-  { id: 'chat', label: '对话', icon: 'chat' },
-  { id: 'contacts', label: '联系人', icon: 'railContacts' },
-  { id: 'docs', label: '云文档', icon: 'railDocs' },
+  { id: 'chat', label: 'Chat', icon: 'chat' },
+  { id: 'contacts', label: 'Contacts', icon: 'railContacts' },
+  { id: 'docs', label: 'Docs', icon: 'railDocs' },
   { id: 'agents', label: 'Agent', icon: 'railAgent' },
-  { id: 'runs', label: '任务', icon: 'tasks' },
-  { id: 'projects', label: '项目', icon: 'railProjects' },
-  { id: 'devices', label: '设备', icon: 'railDevices' },
-  { id: 'usage', label: '用量', icon: 'railUsage' },
+  { id: 'runs', label: 'Tasks', icon: 'tasks' },
+  { id: 'projects', label: 'Projects', icon: 'railProjects' },
+  { id: 'devices', label: 'Devices', icon: 'railDevices' },
+  { id: 'usage', label: 'Usage', icon: 'railUsage' },
 ];
 
 export type ConnectionStatusKind = 'connected' | 'connecting' | 'disconnected';

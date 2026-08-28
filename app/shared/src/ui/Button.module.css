@@ -130,6 +130,28 @@
   width: 100%;
 }
 
+/* ── Loading ───────────────────── */
+
+.loading {
+  cursor: progress;
+}
+
+.spinner {
+  width: 1em;
+  height: 1em;
+  flex: none;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: var(--r-full);
+  animation: button-spin var(--spinner-speed, 0.8s) linear infinite;
+}
+
+@keyframes button-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 /* ── Icon-only ─────────────────── */
 
 .icon {

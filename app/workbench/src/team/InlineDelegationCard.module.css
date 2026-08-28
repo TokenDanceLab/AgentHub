@@ -78,7 +78,7 @@
   border-radius: 50%;
   background: var(--td-plum);
   color: var(--td-ink-on-plum);
-  font-size: 0.625rem;
+  font-size: 0.6875rem;
   font-weight: 600;
   text-transform: uppercase;
   flex-shrink: 0;
@@ -116,7 +116,7 @@
   display: inline-flex;
   align-items: center;
   gap: 3px;
-  font-size: 0.625rem;
+  font-size: 0.6875rem;
   font-weight: 500;
   white-space: nowrap;
   flex-shrink: 0;

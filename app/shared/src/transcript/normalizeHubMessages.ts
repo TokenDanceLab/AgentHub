@@ -310,13 +310,12 @@ function visibleIMState(
   const toAgentLabel = agentLabel(metadata.toAgent);
   const fromAgentLabel = agentLabel(metadata.fromAgent) ?? (sender.role === 'agent' ? sender.name : undefined);
   const mentionLabels = metadata.mentions.map(agentLabel).filter((label): label is string => Boolean(label));
-  const taskID = metadata.agentTask?.id ?? metadata.agentTask?.task_id;
   const taskStatus = metadata.agentTask?.status;
+  // 内部 taskID 不进主聊天流（AGENTS §5）——detail 只保留人类可读信息
   const detailParts = [
     metadata.imKind ? `IM ${metadata.imKind}` : undefined,
     fromAgentLabel && toAgentLabel ? `${fromAgentLabel} -> ${toAgentLabel}` : undefined,
     mentionLabels.length ? `mentions ${mentionLabels.map((label) => `@${label}`).join(', ')}` : undefined,
-    taskID ? `task ${taskID}` : undefined,
   ].filter((part): part is string => Boolean(part));
 
   const isAgentDM = metadata.imKind === 'agent_dm' || Boolean(toAgentLabel);
