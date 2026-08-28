@@ -134,19 +134,16 @@
   ]
  },
  "edge-server/internal/lifecycle/process_executor_test.go": {
-  "count": 6,
-  "total_ms": 5130,
+  "count": 3,
+  "total_ms": 5090,
   "max_ms": 5000,
   "owner": "DeliciousBuding",
-  "review": "2026-11-02",
-  "reason": "10ms poll intervals (deadline-guarded) x2; 80ms negative window proving child stays alive after Cancel; 10ms cancel-race goroutine pacing; 5000ms helper-subprocess 'sleep' mode (real subprocess protocol time, killed by executor); 20ms poll interval (3s deadline).",
+  "review": "2026-08-29",
+  "reason": "80ms negative window proving child stays alive after Cancel (did-not-happen assertion, kept bounded); 10ms cancel-race goroutine pacing (simulated slow); 5000ms helper-subprocess 'sleep' mode (real subprocess protocol time, killed by executor). The three former deadline-guarded poll intervals (10ms x2, 20ms) were converted to testkit.Eventually (approved 2026-08-29, #2038).",
   "sleeps": [
-   { "ms": 10, "kind": "poll_deadline" },
    { "ms": 80, "kind": "negative_window" },
    { "ms": 10, "kind": "simulated_slow" },
-   { "ms": 5000, "kind": "real_protocol" },
-   { "ms": 10, "kind": "poll_deadline" },
-   { "ms": 20, "kind": "poll_deadline" }
+   { "ms": 5000, "kind": "real_protocol" }
   ]
  },
  "edge-server/internal/skills/skills_test.go": {
