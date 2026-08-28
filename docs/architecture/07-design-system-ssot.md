@@ -20,8 +20,8 @@ Issue: #466 (P9.1 SSOT map) · residual hardcode closed via #879 / #910 / #1021 
 | **UI primitives** | `app/shared/src/ui/**` | Shared components + module CSS |
 | **Workbench shell** | `app/workbench/src/**` | Product shell CSS/TS（#1759 独立为 `@agenthub/workbench`） |
 | **Chatview scoped fork** | `app/shared/src/chatview/design/tokens.css` | Re-declares surfaces/text/status under `.chatview` (intentional isolation; value-drift risk) |
-| **Desktop re-exports** | `app/desktop/src/styles/{tokens,themes,presets}.css` | Thin `@import` of shared（presets.css 另 re-export `folder-colors.css`；无本地覆盖） |
-| **Web re-exports** | `app/web/src/styles/{tokens,themes,presets}.css` | Thin `@import` of shared（presets.css 另 re-export `folder-colors.css`；无本地覆盖） |
+| **Desktop re-exports** | `app/desktop/src/styles/{tokens,themes,presets}.css` | Thin `@import` of shared（presets.css 另 re-export `presets-folder-colors.css`；无本地覆盖） |
+| **Web re-exports** | `app/web/src/styles/{tokens,themes,presets}.css` | Thin `@import` of shared（presets.css 另 re-export `presets-folder-colors.css`；无本地覆盖） |
 | **Desktop ThemeContext** | `app/desktop/src/contexts/ThemeContext.tsx` | Thin React provider over shared theme + **preset API** |
 | **Web ThemeContext** | `app/web/src/contexts/ThemeContext.tsx` | Thin React provider over shared theme + **preset API; preset UI in AuthPage advanced settings (#1820)** |
 | **Mobile RN tokens** | `app/mobile-rn/src/theme/tokens.ts` (+ `AgentHubThemeProvider.tsx`) | RN numeric/color tokens; maps `--td-*` via designTokens aliases |
@@ -45,7 +45,7 @@ Entry CSS load: desktop/web `main.tsx` imports surface `styles/{tokens,themes,pr
 
 | Delta | Why allowed |
 |---|---|
-| Desktop vs Web `presets.css` 差异 | 已消解——两者均为 `presets-base.css` + `folder-colors.css` 的纯 re-export，无本地覆盖（旧「opaque vs glass borders」表述不实：实际属性为 `data-theme-preset`，且无 tokendance 预设；若新增差异仅允许薄表面覆盖） |
+| Desktop vs Web `presets.css` 差异 | 已消解——两者均为 `presets-base.css` + `presets-folder-colors.css` 的纯 re-export，无本地覆盖（旧「opaque vs glass borders」表述不实：实际属性为 `data-theme-preset`，且无 tokendance 预设；若新增差异仅允许薄表面覆盖） |
 | Chatview `.chatview` scoped tokens | Isolation from host theme; document drift risk; merge is a follow-up |
 | Desktop ThemeContext exposes presets; Web does not | Product choice; both must use shared preset SSOT when/if Web adds UI | **Closed #1820** — Web preset API + AuthPage preset switcher landed on shared `themePresets` |
 
