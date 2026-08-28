@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { assertFontGuardHermetic, blockExternalFonts, type E2EFontGuard } from '../../../e2e/fontBlocker';
 
 /**
  * AgentHub Desktop — OIDC Login E2E Tests
@@ -97,6 +98,23 @@ async function mockOIDCFlow(page: import('@playwright/test').Page, params: MockO
 }
 
 // ── Tests ────────────────────────────────────────
+
+let oidcFontGuard: E2EFontGuard | undefined;
+
+// #2014 hermetic guard (file-level): intercept external font CDN requests
+// on every login-flow page and record the rest. Registered before the
+// per-test mockOIDCFlow routes, which are matched first (last-registered-
+// first), so only requests no mock route handles reach the guard.
+test.beforeEach(async ({ page }) => {
+  oidcFontGuard = await blockExternalFonts(page, { recordPassthrough: true });
+});
+
+test.afterEach(() => {
+  if (!oidcFontGuard) {
+    throw new Error('font guard was not installed before the test');
+  }
+  assertFontGuardHermetic(oidcFontGuard);
+});
 
 test.describe('OIDC Login — Desktop', () => {
   test('login button redirects to TokenDance ID', async ({ page }) => {

@@ -7,6 +7,7 @@ import {
   createE2EDataModeScenario,
   type E2EObservedRequest,
 } from '../../../shared/src/testing/e2eDataModeContract';
+import { fulfillExternalFontIfMatch } from '../../../e2e/fontBlocker';
 
 const ARTIFACT_DIR = path.resolve(process.cwd(), '.tmp', 'web-stubbed-hub-replay-smoke');
 // Must match playwright.config.ts webServer VITE_HUB_URL: the fail-closed
@@ -299,8 +300,8 @@ async function installHubStub(page: Page, scenario: HubScenario = 'healthy-targe
     // stylesheet so the document load event can fire). Every other external
     // host is recorded and refused, so the scenario assertion fails the test
     // instead of letting an unexpected remote call succeed silently.
-    if (url.host === 'fonts.googleapis.com' || url.host === 'fonts.gstatic.com') {
-      return route.fulfill({ status: 200, contentType: 'text/css', body: '' });
+    if (await fulfillExternalFontIfMatch(route)) {
+      return;
     }
     requests.push({ method: request.method(), url: request.url() });
     return route.fulfill({

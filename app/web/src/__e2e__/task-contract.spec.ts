@@ -6,6 +6,7 @@ import {
   createE2EDataModeScenario,
   type E2EObservedRequest,
 } from '../../../shared/src/testing/e2eDataModeContract';
+import { fulfillExternalFontIfMatch } from '../../../e2e/fontBlocker';
 
 const ARTIFACT_DIR = path.resolve(process.cwd(), '.tmp', 'task-contract-replay');
 // Must match playwright.config.ts webServer VITE_HUB_URL: the fail-closed
@@ -44,8 +45,8 @@ test.describe('Web Hub task approval/artifact contract', () => {
       if (url.origin === WEB_E2E_APP_ORIGIN) {
         return route.continue();
       }
-      if (url.host === 'fonts.googleapis.com' || url.host === 'fonts.gstatic.com') {
-        return route.fulfill({ status: 200, contentType: 'text/css', body: '' });
+      if (await fulfillExternalFontIfMatch(route)) {
+        return;
       }
       requested.requests.push({ method: request.method(), url: request.url() });
       return route.fulfill({

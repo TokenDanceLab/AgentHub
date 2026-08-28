@@ -1,4 +1,5 @@
 import { expect, test, type Route } from '@playwright/test';
+import { fulfillExternalFontIfMatch } from '../../../e2e/fontBlocker';
 
 // #1971 contract: Hub-delivered text messages whose body contains fenced
 // code must render as code blocks in the Web transcript, for both human
@@ -43,8 +44,8 @@ test.describe('Web stubbed Hub fenced-code transcript (#1971)', () => {
       const url = new URL(request.url());
 
       if (url.host !== HUB_ORIGIN_HOST) {
-        if (url.host === 'fonts.googleapis.com' || url.host === 'fonts.gstatic.com') {
-          return route.fulfill({ status: 200, contentType: 'text/css', body: '' });
+        if (await fulfillExternalFontIfMatch(route)) {
+          return;
         }
         return route.continue();
       }
