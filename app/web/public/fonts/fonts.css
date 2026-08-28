@@ -1,0 +1,57 @@
+/* Self-hosted fonts (#2024). Replaces the Google Fonts <link> tags removed
+   from index.html: no request to fonts.googleapis.com / fonts.gstatic.com
+   remains. Files live next to this stylesheet in public/fonts/ so the
+   relative url()s resolve under any VITE_BASE_PATH (web default
+   '/workbench/'). Provenance and license notes: README.md in this folder. */
+
+/* Hanken Grotesk (SIL OFL 1.1) — variable wght file from Google Fonts v12;
+   the 400 800 range covers the 400/500/600/700/800 weights the previous
+   css2 request enumerated. unicode-range subsets kept verbatim so browsers
+   only download the subset a page actually renders. */
+@font-face {
+  font-family: "Hanken Grotesk";
+  font-style: normal;
+  font-weight: 400 800;
+  font-display: swap;
+  src: url("hanken-grotesk-latin-ext.woff2") format("woff2");
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+@font-face {
+  font-family: "Hanken Grotesk";
+  font-style: normal;
+  font-weight: 400 800;
+  font-display: swap;
+  src: url("hanken-grotesk-latin.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+/* Material Symbols Outlined (Apache-2.0) — single variable file served by
+   Google Fonts v368 for wght,FILL@100..700,0..1; keeps the FILL/wght
+   variation axes used by Icon.tsx ligature rendering. */
+@font-face {
+  font-family: "Material Symbols Outlined";
+  font-style: normal;
+  font-weight: 100 700;
+  font-display: swap;
+  src: url("material-symbols-outlined.woff2") format("woff2");
+}
+
+/* Helper class shipped by the Google Fonts stylesheet this file replaces.
+   The app renders icons through Icon.tsx inline styles, but the class stays
+   available for parity with the previous external payload. */
+.material-symbols-outlined {
+  font-family: "Material Symbols Outlined", sans-serif;
+  font-weight: normal;
+  font-style: normal;
+  font-size: 24px;
+  line-height: 1;
+  letter-spacing: normal;
+  text-transform: none;
+  display: inline-block;
+  white-space: nowrap;
+  word-wrap: normal;
+  direction: ltr;
+  -webkit-font-feature-settings: "liga";
+  -webkit-font-smoothing: antialiased;
+}
