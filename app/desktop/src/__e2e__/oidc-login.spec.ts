@@ -1,6 +1,17 @@
 import { test, expect } from '@playwright/test';
 import { assertFontGuardHermetic, blockExternalFonts, type E2EFontGuard } from '../../../e2e/fontBlocker';
 
+// The desktop renderer ships a CSP meta (app/desktop/index.html) whose
+// connect-src only allows 'self', loopback and *.vectorcontrol.tech. The E2E
+// webServer env points VITE_HUB_URL at the RFC 6761 fail-closed sentinel
+// `https://hub.test.invalid` (playwright.config.ts), so CSP kills every
+// mocked Hub fetch before it can reach Playwright route interception
+// ("Failed to fetch" — the request is never dispatched). Bypass CSP for this
+// suite so the page.route mocks below stay the only Hub surface; the sentinel
+// host can never resolve to a real endpoint, and the #2014 font/hermetic
+// guards below still run on every test.
+test.use({ bypassCSP: true });
+
 /**
  * AgentHub Desktop — OIDC Login E2E Tests
  *
@@ -83,6 +94,17 @@ async function mockOIDCFlow(page: import('@playwright/test').Page, params: MockO
     });
   });
 
+  // The mocked authorization_url points at a reserved example host (RFC
+  // 2606); fulfill it locally so the browser-redirect navigation completes
+  // without touching the network — no real IDP exists for this flow.
+  await page.route('https://id.example.com/**', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'text/html',
+      body: '<!DOCTYPE html><html><head><title>Mock TokenDance ID</title></head><body>mock authorization endpoint</body></html>',
+    });
+  });
+
   await page.route('**/client/auth/me', async (route) => {
     await route.fulfill({
       status: 200,
@@ -128,7 +150,9 @@ test.describe('OIDC Login — Desktop', () => {
       await loginBtn.click();
 
       // Should have redirected to TokenDance ID
-      await page.waitForURL(/id\.vectorcontrol\.tech\/oidc\/authorize/, { timeout: 10000 });
+      // The Hub mock returns authorization_url on id.example.com; the app
+      // must navigate the window to exactly that URL (browser-mode redirect).
+      await page.waitForURL(/id\.example\.com\/oidc\/authorize/, { timeout: 10000 });
       const url = new URL(page.url());
       expect(url.searchParams.get('response_type')).toBe('code');
       expect(url.searchParams.get('code_challenge_method')).toBe('S256');
@@ -162,13 +186,16 @@ test.describe('OIDC Login — Desktop', () => {
     // Wait for token exchange to complete
     await page.waitForTimeout(3000);
 
-    // Verify the token callback was called with correct parameters
+    // Verify the token callback was called with correct parameters. Explicit
+    // destructure + guard keeps this safe under noUncheckedIndexedAccess.
     expect(tokenCalls.length).toBeGreaterThan(0);
-    if (tokenCalls.length > 0) {
-      expect(tokenCalls[0].code).toBe('test-auth-code-67890');
-      expect(tokenCalls[0].state).toBe('test-state-mock-12345');
-      expect(tokenCalls[0].code_verifier).toBe('test-code-verifier-base64url');
+    const [firstTokenCall] = tokenCalls;
+    if (!firstTokenCall) {
+      throw new Error('expected at least one OIDC token exchange call');
     }
+    expect(firstTokenCall.code).toBe('test-auth-code-67890');
+    expect(firstTokenCall.state).toBe('test-state-mock-12345');
+    expect(firstTokenCall.code_verifier).toBe('test-code-verifier-base64url');
 
     // URL should have been cleaned up (no /auth/tokendance/callback)
     const finalUrl = page.url();
@@ -311,6 +338,17 @@ test.describe('OIDC Login — Session Persistence', () => {
     await page.route('**/client/auth/logout', async (route) => {
       logoutCalls++;
       await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ code: 'OK' }) });
+    });
+
+    // The one-time onboarding overlay (#1819) sits above the workbench and
+    // intercepts pointer events; seed it as seen so the profile-menu logout
+    // interactions below stay reachable. addInitScript survives navigations.
+    await page.addInitScript(() => {
+      try {
+        window.localStorage.setItem('agenthub_onboarding_seen', 'true');
+      } catch {
+        // Some initial browser documents deny localStorage; the app origin will still run this script.
+      }
     });
 
     await page.goto('/');
