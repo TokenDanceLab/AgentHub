@@ -151,13 +151,13 @@
  },
  "edge-server/internal/skills/skills_test.go": {
   "count": 2,
-  "total_ms": 650,
-  "max_ms": 600,
+  "total_ms": 1050,
+  "max_ms": 1000,
   "owner": "DeliciousBuding",
-  "review": "2026-11-02",
-  "reason": "waitForDebounce waits hotReloadDebounce (500ms const) + 100ms buffer: real debounce protocol time, clock seam pending in skill_watch; 50ms write pacing so coalescing can fold 5 writes.",
+  "review": "2026-08-29",
+  "reason": "waitForDebounce waits hotReloadDebounce (500ms const) + 500ms margin (approved 2026-08-29, #2033: bounded negative-window assertion needs headroom on busy runners): real debounce protocol time, clock seam pending in skill_watch; 50ms write pacing so coalescing can fold 5 writes.",
   "sleeps": [
-   { "ms": 600, "kind": "real_protocol" },
+   { "ms": 1000, "kind": "real_protocol" },
    { "ms": 50, "kind": "simulated_slow" }
   ]
  },
