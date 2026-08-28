@@ -9,6 +9,7 @@
   color: var(--td-ink);
   text-align: center;
   user-select: none;
+
   /* glass card density */
   border: 1px solid var(--glass-border-strong, var(--td-line));
   border-radius: var(--glass-card-radius, var(--r-xl));
@@ -147,6 +148,7 @@
       opacity: 0;
       transform: translateY(12px);
     }
+
     to {
       opacity: 1;
       transform: translateY(0);
@@ -154,7 +156,7 @@
   }
 }
 
-@media (max-width: 768px) {
+@media (width <= 768px) {
   .container {
     max-width: 100%;
     padding: 80px var(--td-space-2) var(--td-space-4);

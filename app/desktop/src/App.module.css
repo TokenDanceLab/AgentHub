@@ -188,7 +188,7 @@
   transform: translate3d(0, -50%, 0) scale(1);
 }
 
-@media (hover: none), (max-width: 768px) {
+@media (hover: none), (width <= 768px) {
   .iconTooltip {
     display: none;
   }
@@ -414,7 +414,7 @@
 
 .sidebarSearch svg {
   flex: 0 0 auto;
-  color: currentColor;
+  color: currentcolor;
 }
 
 .sidebarSearch span {
@@ -895,7 +895,7 @@
   align-items: center;
   justify-content: space-between;
   height: 36px;
-  padding: 0 10px 0 10px;
+  padding: 0 10px;
   background: var(--glass-light-fill);
   backdrop-filter: blur(24px) saturate(1.12);
   -webkit-backdrop-filter: blur(24px) saturate(1.12);
@@ -1342,17 +1342,17 @@
    Responsive
    ═══════════════════════════════════════════════ */
 
-@media (max-width: 1279px) {
+@media (width <= 1279px) {
   .sidebar { width: min(var(--left-sidebar-width, 320px), 28vw); }
   .inspectorPanel { width: min(var(--right-panel-width, 320px), 35vw); }
 }
 
-@media (max-width: 1023px) {
+@media (width <= 1023px) {
   .sidebar { width: min(var(--left-sidebar-width, 320px), 34vw); }
   .inspectorPanel { width: min(var(--right-panel-width, 280px), 40vw); }
 }
 
-@media (max-width: 768px) {
+@media (width <= 768px) {
   .topBar {
     height: 28px;
     justify-content: flex-end;

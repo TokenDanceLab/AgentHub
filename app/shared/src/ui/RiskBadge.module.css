@@ -1,4 +1,5 @@
 /* ── RiskBadge — risk severity pill ── */
+
 /* Mirrors desktop ApprovalCard risk badge visual, now shared. */
 
 .badge {
@@ -19,7 +20,7 @@
   height: 6px;
   border-radius: 50%;
   flex-shrink: 0;
-  background: currentColor;
+  background: currentcolor;
 }
 
 .low {

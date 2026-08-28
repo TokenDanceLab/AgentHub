@@ -116,7 +116,7 @@
   border: none;
 }
 
-@media (max-width: 768px) {
+@media (width <= 768px) {
   .header { padding: 10px 12px; gap: 6px; }
   .previewFrame { height: 220px; }
   .previewImage { max-height: 240px; }

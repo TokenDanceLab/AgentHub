@@ -111,18 +111,18 @@
   width: 15px;
   height: 15px;
   fill: none;
-  stroke: currentColor;
+  stroke: currentcolor;
   stroke-width: 1.9;
   stroke-linecap: round;
   stroke-linejoin: round;
 }
 
 .item:hover .icon {
-  color: currentColor;
+  color: currentcolor;
 }
 
 .item.active .icon {
-  color: currentColor;
+  color: currentcolor;
 }
 
 .shortcut {

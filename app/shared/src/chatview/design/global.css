@@ -8,7 +8,7 @@
    are the real reduced-motion handling. Kept on purpose — may be wired
    up by a future consumer. */
 
-@import './tokens.css';
+@import url('./tokens.css');
 
 *,
 *::before,

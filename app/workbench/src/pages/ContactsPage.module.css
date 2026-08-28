@@ -115,7 +115,7 @@
 .navGlyph {
   width: 20px;
   height: 20px;
-  color: currentColor;
+  color: currentcolor;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -126,7 +126,7 @@
   width: 17px;
   height: 17px;
   fill: none;
-  stroke: currentColor;
+  stroke: currentcolor;
   stroke-width: 1.85;
   stroke-linecap: round;
   stroke-linejoin: round;
@@ -531,28 +531,28 @@
 }
 
 .capabilityTag.tagBlue {
-  background: oklch(0.92 0.06 250);
-  color: oklch(0.35 0.12 250);
+  background: oklch(92% 0.06 250deg);
+  color: oklch(35% 0.12 250deg);
 }
 
 .capabilityTag.tagGreen {
-  background: oklch(0.92 0.06 150);
-  color: oklch(0.35 0.12 150);
+  background: oklch(92% 0.06 150deg);
+  color: oklch(35% 0.12 150deg);
 }
 
 .capabilityTag.tagOrange {
-  background: oklch(0.93 0.06 70);
-  color: oklch(0.38 0.12 70);
+  background: oklch(93% 0.06 70deg);
+  color: oklch(38% 0.12 70deg);
 }
 
 .capabilityTag.tagPurple {
-  background: oklch(0.92 0.06 310);
-  color: oklch(0.35 0.12 310);
+  background: oklch(92% 0.06 310deg);
+  color: oklch(35% 0.12 310deg);
 }
 
 .capabilityTag.tagTeal {
-  background: oklch(0.92 0.06 185);
-  color: oklch(0.35 0.12 185);
+  background: oklch(92% 0.06 185deg);
+  color: oklch(35% 0.12 185deg);
 }
 
 .memberOrg {
@@ -991,6 +991,7 @@
   from {
     opacity: 0;
   }
+
   to {
     opacity: 1;
   }
@@ -1001,6 +1002,7 @@
     opacity: 0;
     transform: translateY(10px) scale(0.985);
   }
+
   to {
     opacity: 1;
     transform: translateY(0) scale(1);
