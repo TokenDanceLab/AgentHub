@@ -166,6 +166,24 @@ func TestIsAccessTokenBlacklisted_Miss(t *testing.T) {
 	assert.False(t, hit, "a never-blacklisted jti must not be reported as blacklisted")
 }
 
+// TestIsAccessTokenBlacklisted_RedisDownPropagatesError proves the AH-SR-052
+// contract (#2040): a Redis outage is not swallowed here. The error is
+// returned to the caller so the auth middleware can apply the configured
+// fail-open/fail-closed policy (AGENTHUB_AUTH_FAIL_CLOSED). Swallowing the
+// error made the middleware fail-closed branch unreachable in production.
+func TestIsAccessTokenBlacklisted_RedisDownPropagatesError(t *testing.T) {
+	c, mr := testClient(t)
+	ctx := context.Background()
+
+	const jti = "at-jti-redis-down"
+	require.NoError(t, c.BlacklistAccessToken(ctx, jti, 5*time.Minute))
+	mr.Close() // simulate a Redis outage
+
+	hit, err := c.IsAccessTokenBlacklisted(ctx, jti)
+	require.Error(t, err, "Redis errors must be propagated to the caller; fail-open/fail-closed is the middleware's policy decision")
+	assert.False(t, hit, "on Redis errors the jti must not be reported as blacklisted")
+}
+
 // TestBlacklistAccessToken_RevokeIsIdempotent proves re-revoking the same jti
 // is a no-op success and the key stays blacklisted.
 func TestBlacklistAccessToken_RevokeIsIdempotent(t *testing.T) {
