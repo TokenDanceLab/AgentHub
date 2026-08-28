@@ -19,7 +19,21 @@ test.describe('TeamRun UI evidence fixture', () => {
     // other-http abort below records them as blocked live-backend hits.
     const fontGuard = await blockExternalFonts(page);
 
+    // The desktop entry gate requires an explicit mode choice before the
+    // workbench renders; enter demo mode like smoke/chat-flow (#2001) so this
+    // fixture evidence stays auth-free. Seed the one-time onboarding overlay
+    // (#1819) as seen so it never blocks the workbench interactions below.
+    await page.addInitScript(() => {
+      try {
+        window.localStorage.setItem('agenthub_onboarding_seen', 'true');
+      } catch {
+        // Some initial browser documents deny localStorage; the app origin will still run this script.
+      }
+    });
     await page.goto('/', { waitUntil: 'domcontentloaded' });
+    await page
+      .getByRole('button', { name: /^(使用 Demo 模式继续|Continue in Demo mode)$/ })
+      .click();
     await expect(page.getByTestId('agenthub-workbench')).toBeVisible();
 
     await page.getByRole('button', { name: /TeamRun Fixture/ }).click();
@@ -27,24 +41,38 @@ test.describe('TeamRun UI evidence fixture', () => {
     await expect(page.getByRole('region', { name: 'Transcript' })).toContainText(
       'TeamRun Console fixture state 已载入',
     );
-    await expect(page.getByText('TeamRun route / task / event list')).toBeVisible();
-    await expect(page.getByText('run.agent.route_decision', { exact: true })).toBeVisible();
-    await expect(page.getByText('team.route.decided', { exact: true })).toBeVisible();
-    await expect(page.getByText('Worker fixture task', { exact: true })).toBeVisible();
+    // run_session / agent_timeline / route_decision / subagent blocks are
+    // sidebar-only since isSidebarOnlyTranscriptBlock (shared/src/transcript/
+    // types.ts) — the chatview adapter drops them from the transcript stream
+    // (adapterMapBlock.ts skip list). Their fixture evidence now surfaces in
+    // the right inspector: run evidence index (run_session) and the agent
+    // delegation tree (route_decision + subagent). Assert that live surface
+    // instead of the retired inline transcript rows.
+    const runInspector = page.getByRole('complementary', { name: 'Right inspector' });
+    await expect(runInspector).toContainText('run-teamrun-1');
+    await expect(
+      runInspector.getByRole('treeitem', { name: 'delegate → Demo Worker' }),
+    ).toBeVisible();
+    await expect(
+      runInspector.getByRole('treeitem', { name: 'Demo Worker', exact: true }),
+    ).toBeVisible();
 
     await page.screenshot({
       fullPage: true,
       path: testInfo.outputPath('teamrun-transcript.png'),
     });
 
-    await page.getByRole('tab', { name: /文件/ }).click();
+    // The retired right-inspector Files tab used to list block-level evidence
+    // files (teamrun-state/tasks/events.json). Those blocks are now
+    // sidebar-only, and the redesigned inspector aggregates run-level evidence
+    // in the Overview panel; expand the artifacts section and assert the
+    // fixture's evidence artifact surface there.
+    await runInspector
+      .getByRole('button', { name: /^(展开|Expand).*(产物|Artifacts)/i })
+      .click();
+    await expect(runInspector).toContainText('fixture/evidence-capture.json');
 
-    const inspector = page.getByRole('complementary', { name: 'Right inspector' });
-    await expect(inspector).toContainText('teamrun-state.json');
-    await expect(inspector).toContainText('teamrun-tasks.json');
-    await expect(inspector).toContainText('teamrun-events.json');
-
-    await inspector.screenshot({
+    await runInspector.screenshot({
       path: testInfo.outputPath('teamrun-inspector-files.png'),
     });
 
