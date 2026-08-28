@@ -22,7 +22,7 @@
     "visual:qa:shell:2x": "node scripts/visual-qa-shell-2x.mjs",
     "visual:qa:chat": "node scripts/visual-qa-chat.mjs",
     "assert:visual:qa:shell": "node scripts/assert-visual-qa-shell.mjs",
-    "test:e2e:smoke": "playwright test --config playwright.config.ts --project=chromium smoke.spec.ts",
+    "test:e2e:smoke": "playwright test --config playwright.config.ts --project=chromium __e2e__/smoke.spec.ts",
     "test:e2e:ui": "playwright test --ui",
     "analyze": "pnpm build && npx vite-bundle-visualizer",
     "lint": "eslint src",
