@@ -14,9 +14,13 @@ import (
 
 // newCoalesceTestEmitter builds a hubCallbackEmitter wired to a recording
 // callback with a bound hub task, mirroring the run-time wiring in
-// publishStructuredOutput + the bind path in ProcessExecutor.run.
-func newCoalesceTestEmitter(t *testing.T, runID string) (*hubCallbackEmitter, *recordingHubCallback) {
+// publishStructuredOutput + the bind path in ProcessExecutor.run. base seeds
+// a per-invocation unique runID (#2038) so -count=N iterations never share
+// the package-scoped hub callback queue; the resolved runID is returned for
+// tests that address executor maps directly.
+func newCoalesceTestEmitter(t *testing.T, base string) (*hubCallbackEmitter, *recordingHubCallback, string) {
 	t.Helper()
+	runID := uniqueHubTestRunID(base)
 	bus := events.NewBus(10)
 	s := store.New()
 	executor := newTestProcessExecutor(t, bus, s, "success")
@@ -33,7 +37,7 @@ func newCoalesceTestEmitter(t *testing.T, runID string) (*hubCallbackEmitter, *r
 	if !ok {
 		t.Fatal("newHubCallbackEmitter did not produce a *hubCallbackEmitter")
 	}
-	return typed, cb
+	return typed, cb, runID
 }
 
 func waitForStreams(t *testing.T, cb *recordingHubCallback, want int) {
@@ -59,7 +63,7 @@ func blockEvent(text string) (string, map[string]any) {
 // TestHubCallbackEmitterCoalescesDeltas verifies #1407: token-level deltas
 // accumulate into one stream callback instead of one callback per delta.
 func TestHubCallbackEmitterCoalescesDeltas(t *testing.T) {
-	emitter, cb := newCoalesceTestEmitter(t, "run-coalesce-basic")
+	emitter, cb, _ := newCoalesceTestEmitter(t, "run-coalesce-basic")
 
 	for _, delta := range []string{"Hel", "lo ", "wor", "ld"} {
 		eventType, payload := deltaEvent(delta)
@@ -86,7 +90,7 @@ func TestHubCallbackEmitterCoalescesDeltas(t *testing.T) {
 // TestHubCallbackEmitterFlushesOnNewline verifies line breaks chunk deltas at
 // natural chat boundaries instead of the byte cap.
 func TestHubCallbackEmitterFlushesOnNewline(t *testing.T) {
-	emitter, cb := newCoalesceTestEmitter(t, "run-coalesce-newline")
+	emitter, cb, _ := newCoalesceTestEmitter(t, "run-coalesce-newline")
 
 	eventType, payload := deltaEvent("first line\n")
 	emitter.Emit(eventType, map[string]any{}, payload)
@@ -108,7 +112,7 @@ func TestHubCallbackEmitterFlushesOnNewline(t *testing.T) {
 // chunks a long delta run without line breaks: the pending buffer flushes
 // as one chunk once it crosses the cap.
 func TestHubCallbackEmitterFlushesOnSizeThreshold(t *testing.T) {
-	emitter, cb := newCoalesceTestEmitter(t, "run-coalesce-size")
+	emitter, cb, _ := newCoalesceTestEmitter(t, "run-coalesce-size")
 
 	part1 := strings.Repeat("x", 200)
 	part2 := strings.Repeat("y", 100)
@@ -139,7 +143,7 @@ func TestHubCallbackEmitterFlushesOnSizeThreshold(t *testing.T) {
 // TestHubCallbackEmitterTextBlockBoundary verifies a text block flushes the
 // pending delta buffer before forwarding the block itself.
 func TestHubCallbackEmitterTextBlockBoundary(t *testing.T) {
-	emitter, cb := newCoalesceTestEmitter(t, "run-coalesce-block")
+	emitter, cb, _ := newCoalesceTestEmitter(t, "run-coalesce-block")
 
 	eventType, payload := deltaEvent("pending")
 	emitter.Emit(eventType, map[string]any{}, payload)
@@ -157,7 +161,7 @@ func TestHubCallbackEmitterTextBlockBoundary(t *testing.T) {
 // TestHubCallbackEmitterResultFlushesPending verifies the fallback (result)
 // boundary drains pending deltas so nothing strands after the run finishes.
 func TestHubCallbackEmitterResultFlushesPending(t *testing.T) {
-	emitter, cb := newCoalesceTestEmitter(t, "run-coalesce-result")
+	emitter, cb, _ := newCoalesceTestEmitter(t, "run-coalesce-result")
 
 	eventType, payload := deltaEvent("tail")
 	emitter.Emit(eventType, map[string]any{}, payload)
@@ -174,7 +178,7 @@ func TestHubCallbackEmitterResultFlushesPending(t *testing.T) {
 // TestHubCallbackEmitterCollectorUnaffected verifies the done-final collector
 // still receives every delta even when stream callbacks are coalesced.
 func TestHubCallbackEmitterCollectorUnaffected(t *testing.T) {
-	executor, cb := newCoalesceTestEmitter(t, "run-coalesce-collector")
+	executor, cb, runID := newCoalesceTestEmitter(t, "run-coalesce-collector")
 
 	for _, delta := range []string{"a", "b", "c", "\n", "d"} {
 		eventType, payload := deltaEvent(delta)
@@ -182,7 +186,7 @@ func TestHubCallbackEmitterCollectorUnaffected(t *testing.T) {
 	}
 	executor.FlushHubStream()
 
-	got := executor.executor.hubFinalContent("run-coalesce-collector")
+	got := executor.executor.hubFinalContent(runID)
 	if got != "abc\nd" {
 		t.Fatalf("hubFinalContent = %q, want %q (collector must not be coalesced)", got, "abc\nd")
 	}
