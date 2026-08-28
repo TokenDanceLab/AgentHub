@@ -12,6 +12,7 @@
   margin: 4px 0 8px;
   width: 100%;
   max-width: 520px;
+
   /* Inline cards sit to the left of the right-aligned user bubble so the
      status reads as a follow-up to the dispatch instruction. */
   margin-right: auto;
@@ -151,7 +152,7 @@
 
 /* ── Responsive: narrow viewport ─────────────────────────────────────────── */
 
-@media (max-width: 480px) {
+@media (width <= 480px) {
   .stack {
     max-width: 100%;
     margin-right: 0;

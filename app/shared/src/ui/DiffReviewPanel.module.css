@@ -382,7 +382,7 @@
 /* Syntax highlighting token overrides — ensure no backgrounds bleed.
    ADR: Prism tokens are class-based <span class="token keyword"> via
    highlightLine() → dangerouslySetInnerHTML (no inline styles, no global
-   <style> tag — react-syntax-highlighter useInlineStyles=true applies token
+   \3c style> tag — react-syntax-highlighter useInlineStyles=true applies token
    colors as inline styles on its OWN spans, not these). Calibrated
    specificity (0,2,1) beats Prism theme rules (.token.* at (0,2,0)) by one
    element column — matching codeg's (0,4,1)>(0,4,0) pattern, no !important. */
@@ -575,7 +575,7 @@
 }
 
 /* ── Responsive ────────────────────────────────────────────────── */
-@media (max-width: 768px) {
+@media (width <= 768px) {
   .sideBySide {
     grid-template-columns: 1fr;
   }

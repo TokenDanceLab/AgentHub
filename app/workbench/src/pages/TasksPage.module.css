@@ -47,7 +47,7 @@
   width: 16px;
   height: 16px;
   fill: none;
-  stroke: currentColor;
+  stroke: currentcolor;
   stroke-width: 1.9;
   stroke-linecap: round;
   stroke-linejoin: round;
@@ -139,7 +139,7 @@
 .navGlyph {
   width: 20px;
   height: 20px;
-  color: currentColor;
+  color: currentcolor;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -150,7 +150,7 @@
   width: 17px;
   height: 17px;
   fill: none;
-  stroke: currentColor;
+  stroke: currentcolor;
   stroke-width: 1.85;
   stroke-linecap: round;
   stroke-linejoin: round;
@@ -288,7 +288,7 @@
   width: 16px;
   height: 16px;
   fill: none;
-  stroke: currentColor;
+  stroke: currentcolor;
   stroke-width: 1.9;
   stroke-linecap: round;
   stroke-linejoin: round;
@@ -428,7 +428,7 @@
   width: 15px;
   height: 15px;
   fill: none;
-  stroke: currentColor;
+  stroke: currentcolor;
   stroke-width: 1.9;
   stroke-linecap: round;
   stroke-linejoin: round;
@@ -445,7 +445,7 @@
   font: 500 0.75rem var(--td-font);
 }
 
-@media (max-width: 768px) {
+@media (width <= 768px) {
   .toolbarBtn:has(svg) {
     width: 32px;
     padding: 0;
@@ -561,6 +561,7 @@
 /* ── Task table ── */
 .table {
   min-width: 600px;
+
   /* was 860px — lowered; grid-template-columns provide natural floor */
   border-top: 1px solid var(--td-line);
 }
@@ -613,7 +614,7 @@
   width: 14px;
   height: 14px;
   fill: none;
-  stroke: currentColor;
+  stroke: currentcolor;
   stroke-width: 1.9;
   stroke-linecap: round;
   stroke-linejoin: round;
@@ -899,7 +900,7 @@
   width: 15px;
   height: 15px;
   fill: none;
-  stroke: currentColor;
+  stroke: currentcolor;
   stroke-width: 1.9;
   stroke-linecap: round;
   stroke-linejoin: round;
@@ -936,6 +937,7 @@
   outline-offset: 2px;
   box-shadow: var(--focus-ring);
 }
+
 /* ── Board column SSOT chrome (#1999, UX F13) ─────────────────────────────
    Status tones reuse the shared semantic state palette (presets-base.css);
    no second status-color system and no hardcoded colors here. */

@@ -1,4 +1,5 @@
 /* SubagentStreamOverlay — #1406 Phase 2 */
+
 /* Fixed corner stack of subagent stream chips/cards with glass-card tokens. */
 
 /* ── Overlay container ──────────────────────────────────────────────────── */
@@ -280,7 +281,7 @@
 
 /* ── Responsive: narrow viewport ────────────────────────────────────────── */
 
-@media (max-width: 480px) {
+@media (width <= 480px) {
   .overlay {
     bottom: 72px;
     max-width: 100%;

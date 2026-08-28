@@ -51,7 +51,7 @@
 
 /* Narrow viewports (768/800 tiers): keep a single dense strip; ellipsis on
    the objective already absorbs the width loss, so no reflow needed. */
-@media (max-width: 900px) {
+@media (width <= 900px) {
   .goalBanner {
     padding: var(--wb-gap-2xs) var(--wb-gap-xs);
     gap: var(--wb-gap-2xs);
