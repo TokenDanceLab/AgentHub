@@ -57,7 +57,12 @@ test.describe('Web split view (stubbed hub)', () => {
     // remount (forbidden by the layout contract) replaces this node.
     await page.evaluate(() => {
       const node = document.querySelector('[data-split-active="true"] [role="log"]');
-      (window as unknown as { __splitProbeLog?: Element }).__splitProbeLog = node ?? undefined;
+      const probeTarget = window as unknown as { __splitProbeLog?: Element };
+      if (node) {
+        probeTarget.__splitProbeLog = node;
+      } else {
+        delete probeTarget.__splitProbeLog;
+      }
       node?.setAttribute('data-split-probe', 'mounted');
     });
 
