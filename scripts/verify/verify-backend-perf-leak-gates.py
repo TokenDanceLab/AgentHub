@@ -35,9 +35,30 @@ def main() -> int:
     parser.add_argument("--IncludeNoisyAgentTeamBenchmark", action="store_true", help="also run the noisy Hub AgentTeam microbenchmark")
     args = parser.parse_args()
 
-    invoke_step("Hub EventBus/outbox/OIDC TTL behavior", HUB_ROOT, [
-        "test", "./internal/service",
-        "-run", "TestBus|TestOutbox|TestGenerateAuthorizationURL|TestHandleCallback_(StateExpired|RejectsStaleStateEntryBeforeTokenExchange)",
+    # EventBus/outbox/OIDC TTL 行为测试已拆分子包（EventBus→internal/bus、
+    # outbox→service/deliveryoutbox + service/agent gorm 编排测试、
+    # OIDC→service/oidc）；旧 ./internal/service + TestBus/TestOutbox 过滤
+    # 不再命中任何测试（空门禁），故按子包拆分步骤：bus/deliveryoutbox 整包
+    # 运行（新增测试自动纳入），agent/oidc 保持窄过滤。
+    invoke_step("Hub EventBus behavior", HUB_ROOT, [
+        "test", "./internal/bus",
+        "-short", "-count=1",
+    ])
+
+    invoke_step("Hub outbox behavior (deliveryoutbox)", HUB_ROOT, [
+        "test", "./internal/service/deliveryoutbox",
+        "-short", "-count=1",
+    ])
+
+    invoke_step("Hub outbox orchestration integration (service/agent)", HUB_ROOT, [
+        "test", "./internal/service/agent",
+        "-run", "TestOutbox",
+        "-short", "-count=1",
+    ])
+
+    invoke_step("Hub OIDC TTL behavior (service/oidc)", HUB_ROOT, [
+        "test", "./internal/service/oidc",
+        "-run", "TestGenerateAuthorizationURL|TestHandleCallback_(StateExpired|RejectsStaleStateEntryBeforeTokenExchange)",
         "-short", "-count=1",
     ])
 
