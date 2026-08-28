@@ -34,11 +34,13 @@
   background: var(--glass-bg-hover);
 }
 
-.invalid {
+.invalid,
+.base[aria-invalid='true'] {
   border-color: var(--td-danger);
 }
 
-.invalid:focus-visible {
+.invalid:focus-visible,
+.base[aria-invalid='true']:focus-visible {
   border-color: var(--td-danger);
   background: var(--glass-bg-medium);
   box-shadow: var(--focus-ring);

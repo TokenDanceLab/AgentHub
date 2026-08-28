@@ -125,8 +125,8 @@ describe('shared root CSS tokens', () => {
 
     expect(radiusControl?.webAlias).toBe('--r-sm');
     expect(readCss(tokensPath)).toMatch(/--r-sm:\s*8px/);
-    expect(darkBlock).toMatch(/--td-radius-control:\s*8px/);
-    expect(lightBlock).toMatch(/--td-radius-control:\s*8px/);
+    expect(darkBlock).toMatch(/--td-radius-control:\s*var\(--r-sm\)/);
+    expect(lightBlock).toMatch(/--td-radius-control:\s*var\(--r-sm\)/);
   });
 
   it('defines the five-tier opacity de-emphasis scale (#1827)', () => {

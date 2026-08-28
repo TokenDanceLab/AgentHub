@@ -80,7 +80,7 @@
 }
 
 .tabStatus {
-  font-size: 10px;
+  font-size: 11px;
   color: var(--td-ink-subtle);
   flex-shrink: 0;
 }

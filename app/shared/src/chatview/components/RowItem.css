@@ -68,7 +68,7 @@
 .row-icon { color:var(--td-ink-muted); flex-shrink:0; width:var(--icon-size); text-align:center; font-size:0.875rem }
 .row-label { font-weight:600; flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
 .row-extra { color:var(--td-ink-subtle); font:var(--chat-label-xs); flex-shrink:0 }
-.row-chevron { color:var(--td-ink-subtle); transition:transform var(--chat-dur) ease; flex-shrink:0; font-size:0.625rem }
+.row-chevron { color:var(--td-ink-subtle); transition:transform var(--chat-dur) ease; flex-shrink:0; font-size:0.6875rem }
 .row-item.open > .row-hd .row-chevron { transform:rotate(180deg) }
 .row-item:not(.collapsible) > .row-hd .row-chevron { display:none }
 
@@ -93,13 +93,13 @@
 .row-item.fail > .row-bd { border-left-color:var(--td-danger) }
 
 /* Think */  .row-item.think > .row-hd .row-icon { color:var(--info) }
-.row-item.think > .row-bd { color:var(--td-ink-muted); white-space:pre-wrap; max-height:var(--think-max-h); overflow-y:auto; scrollbar-width:thin; scrollbar-color:var(--scrollbar-thumb) var(--scrollbar-track) }
+.row-item.think > .row-bd { color:var(--td-ink-muted); font-style:italic; white-space:pre-wrap; max-height:var(--think-max-h); overflow-y:auto; scrollbar-width:thin; scrollbar-color:var(--scrollbar-thumb) var(--scrollbar-track) }
 .row-item.think.fail > .row-hd .row-icon { color:var(--td-danger) }
 .row-item.think.fail > .row-bd { border-left-color:var(--td-danger) }
 
 /* Tool */  .row-item.tool > .row-hd .row-label { font-size:0.6875rem; font-weight:500 }
 .row-item.tool > .row-bd { font:var(--chat-label); font-weight:400; line-height:1.5 }
-.row-item.tool.result-row > .row-bd { border-left-color:var(--td-moss) }
+.row-item.tool.result-row > .row-bd { border-left-color:var(--td-moss); font-family:var(--chat-font-mono) }
 .row-item.tool.result-row.fail > .row-bd { border-left-color:var(--td-danger) }
 .row-item.tool.fail > .row-hd .row-icon { color:var(--td-danger) }
 .row-item.tool.fail > .row-bd { border-left-color:var(--td-danger) }
@@ -394,7 +394,7 @@
 }
 
 .preview-domain {
-  font: 400 0.625rem var(--td-mono);
+  font: 400 0.6875rem var(--td-mono);
   color: var(--td-ink-subtle);
   text-transform: lowercase;
   white-space: nowrap;

@@ -173,8 +173,8 @@ html[data-theme-sync='true'] *::after {
   --td-warning-bg: var(--warning-bg);
   --td-danger-bg: var(--danger-bg);
   --td-focus: var(--bdr-focus);
-  --td-radius-control: 8px;
-  --td-radius-panel: 16px;
+  --td-radius-control: var(--r-sm);
+  --td-radius-panel: var(--r-lg);
   --td-space-1: var(--sp-xs);      /* 4px */
   --td-space-2: var(--sp-sm);      /* 8px */
   --td-space-3: var(--space-md);   /* 12px */
@@ -443,8 +443,8 @@ html[data-theme-sync='true'] *::after {
   --td-warning-bg: var(--warning-bg);
   --td-danger-bg: var(--danger-bg);
   --td-focus: var(--bdr-focus);
-  --td-radius-control: 8px;
-  --td-radius-panel: 16px;
+  --td-radius-control: var(--r-sm);
+  --td-radius-panel: var(--r-lg);
   --td-space-1: var(--sp-xs);      /* 4px */
   --td-space-2: var(--sp-sm);      /* 8px */
   --td-space-3: var(--space-md);   /* 12px */

@@ -23,11 +23,11 @@ export interface PermissionModePickerProps {
   activeOptionClassName?: string;
 }
 
-function optionIcon(value: string) {
-  if (value === 'acceptEdits') return <ShieldCheck size={16} />;
-  if (value === 'bypassPermissions' || value === 'dontAsk') return <ShieldAlert size={16} />;
-  if (value === 'plan') return <Hand size={16} />;
-  return <Settings size={16} />;
+function optionIcon(value: string, size = 16) {
+  if (value === 'acceptEdits') return <ShieldCheck size={size} />;
+  if (value === 'bypassPermissions' || value === 'dontAsk') return <ShieldAlert size={size} />;
+  if (value === 'plan') return <Hand size={size} />;
+  return <Settings size={size} />;
 }
 
 export function PermissionModePicker({
@@ -214,7 +214,7 @@ export function PermissionModePicker({
         aria-haspopup="menu"
         onClick={() => open ? setOpen(false) : openPicker()}
       >
-        <ShieldCheck size={14} />
+        {optionIcon(value, 14)}
         <span>{label}</span>
       </button>
       {popover}

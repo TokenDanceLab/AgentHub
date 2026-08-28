@@ -668,7 +668,7 @@
 }
 
 .conversationTime {
-  font: 400 0.625rem var(--td-mono);
+  font: 400 0.6875rem var(--td-mono);
   color: var(--td-ink-subtle);
   white-space: nowrap;
 }
@@ -682,7 +682,7 @@
   border-radius: var(--r-full);
   background: var(--td-plum);
   color: var(--text-inv);
-  font: 600 0.625rem var(--td-font);
+  font: 600 0.6875rem var(--td-font);
   padding: 0 5px;
   flex-shrink: 0;
 }
@@ -730,7 +730,7 @@
   border-radius: var(--r-full);
   background: var(--surface-highest);
   color: var(--td-ink-subtle);
-  font: 600 0.625rem var(--td-font);
+  font: 600 0.6875rem var(--td-font);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1027,7 +1027,7 @@
 
 .mainchainCopy em {
   color: var(--td-ink-subtle);
-  font: 400 0.625rem/1.2 var(--td-font);
+  font: 400 0.6875rem/1.2 var(--td-font);
   font-style: normal;
 }
 
@@ -2261,7 +2261,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 10px;
+  font-size: 11px;
   flex-shrink: 0;
 }
 
@@ -3919,7 +3919,7 @@
   border-radius: var(--r-full);
   background: var(--td-warning);
   color: var(--warning-foreground);
-  font: 600 0.5625rem var(--td-font);
+  font: 600 0.6875rem var(--td-font);
   line-height: 1;
   pointer-events: none;
 }
@@ -4132,7 +4132,7 @@ button.mainchainAttentionChip[data-attention-kind='usage']:hover {
   border-radius: var(--r-full);
   background: var(--td-plum);
   color: var(--text-inv);
-  font: 600 0.625rem var(--td-font);
+  font: 600 0.6875rem var(--td-font);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -4198,7 +4198,7 @@ button.mainchainAttentionChip[data-attention-kind='usage']:hover {
 .taskQueueItemStatus {
   flex-shrink: 0;
   color: var(--td-ink-subtle);
-  font: 500 0.625rem var(--td-font);
+  font: 500 0.6875rem var(--td-font);
 }
 
 /* Back chip shown on the conversation a task deep link opened (#1963). */
@@ -4378,7 +4378,7 @@ button.mainchainAttentionChip[data-attention-kind='usage']:hover {
   padding: 1px 6px;
   border: 1px solid var(--glass-border, var(--td-line));
   border-radius: 999px;
-  font-size: 10px;
+  font-size: 11px;
   color: var(--td-ink-muted, inherit);
   opacity: 0.8;
 }

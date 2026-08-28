@@ -41,11 +41,13 @@
 
 /* Unified error state (#1827): --td-danger outline; the focus ring keeps
    priority while the trigger is focused (accessibility). */
-.triggerInvalid {
+.triggerInvalid,
+.trigger[aria-invalid='true'] {
   box-shadow: 0 0 0 1px var(--td-danger);
 }
 
-.triggerInvalid:focus-visible {
+.triggerInvalid:focus-visible,
+.trigger[aria-invalid='true']:focus-visible {
   box-shadow: var(--focus-ring);
 }
 
