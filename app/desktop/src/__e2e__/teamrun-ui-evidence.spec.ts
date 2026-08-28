@@ -1,4 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
+import { blockExternalFonts, isExternalFontUrl } from '../../../e2e/fontBlocker';
 
 const LIVE_BACKEND_HOSTS = new Set([
   'api.hub.vectorcontrol.tech',
@@ -14,6 +15,9 @@ const LIVE_BACKEND_HOSTS = new Set([
 test.describe('TeamRun UI evidence fixture', () => {
   test('captures Desktop transcript and inspector evidence without live auth or runtime calls', async ({ page }, testInfo) => {
     const blocked = await blockLiveBackends(page);
+    // #2014: intercept external font CDN requests before the generic
+    // other-http abort below records them as blocked live-backend hits.
+    const fontGuard = await blockExternalFonts(page);
 
     await page.goto('/', { waitUntil: 'domcontentloaded' });
     await expect(page.getByTestId('agenthub-workbench')).toBeVisible();
@@ -44,8 +48,16 @@ test.describe('TeamRun UI evidence fixture', () => {
       path: testInfo.outputPath('teamrun-inspector-files.png'),
     });
 
+    expect(
+      blocked.filter((url) => isExternalFontUrl(url)),
+      'external font requests must be intercepted by the shared guard before the generic abort (#2014)',
+    ).toHaveLength(0);
     await testInfo.attach('blocked-live-backend-requests.json', {
       body: Buffer.from(JSON.stringify(blocked, null, 2)),
+      contentType: 'application/json',
+    });
+    await testInfo.attach('font-guard-intercepted.json', {
+      body: Buffer.from(JSON.stringify(fontGuard.fontRequests, null, 2)),
       contentType: 'application/json',
     });
   });

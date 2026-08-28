@@ -16,6 +16,7 @@ import {
   createE2EDataModeScenario,
   type E2EObservedRequest,
 } from '../../../shared/src/testing/e2eDataModeContract';
+import { fulfillExternalFontIfMatch } from '../../../e2e/fontBlocker';
 
 // Must match playwright.config.ts webServer VITE_HUB_URL: the fail-closed
 // reserved origin keeps every Hub call inside the route stub.
@@ -194,8 +195,9 @@ async function installSplitHubStub(page: Page): Promise<BackendRequestLog> {
       return;
     }
 
-    if (url.host === 'fonts.googleapis.com' || url.host === 'fonts.gstatic.com') {
-      await route.fulfill({ status: 200, contentType: 'text/css', body: '' });
+    // Shared font interception (#2014): the render-blocking Google Fonts
+    // stylesheets get an empty stylesheet so the document load event can fire.
+    if (await fulfillExternalFontIfMatch(route)) {
       return;
     }
     requests.push({ method: request.method(), url: request.url() });

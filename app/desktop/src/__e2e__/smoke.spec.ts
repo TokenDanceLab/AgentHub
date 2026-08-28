@@ -1,6 +1,36 @@
 import { test, expect, type Page } from '@playwright/test';
+import { classifyE2ERequest } from '../../../shared/src/testing/e2eDataModeContract';
+import { assertFontGuardHermetic, blockExternalFonts, type E2EFontGuard } from '../../../e2e/fontBlocker';
 
 test.describe('AgentHub Desktop smoke', () => {
+  let fontGuard: E2EFontGuard | undefined;
+
+  // #2014 hermetic guard: intercept external font CDN requests and record
+  // everything else, so smoke proves “zero font hits / zero production host
+  // hits” without the full data-mode contract machinery.
+  test.beforeEach(async ({ page }) => {
+    fontGuard = await blockExternalFonts(page, { recordPassthrough: true });
+  });
+
+  test.afterEach(async ({}, testInfo) => {
+    if (!fontGuard) {
+      throw new Error('font guard was not installed before the test');
+    }
+    assertFontGuardHermetic(fontGuard);
+    const passthroughByBoundary: Record<string, number> = {};
+    for (const request of fontGuard.passthroughRequests) {
+      const boundary = classifyE2ERequest(request.url);
+      passthroughByBoundary[boundary] = (passthroughByBoundary[boundary] ?? 0) + 1;
+    }
+    await testInfo.attach('font-guard-report.json', {
+      body: Buffer.from(JSON.stringify({
+        interceptedFontRequests: fontGuard.fontRequests,
+        passthroughByBoundary,
+      }, null, 2)),
+      contentType: 'application/json',
+    });
+  });
+
   test('app loads without crash', async ({ page }) => {
     await page.goto('/');
     // Wait for React to hydrate by confirming #root has child content
