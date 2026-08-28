@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import { SHARED_WORKBENCH_I18N_NAMESPACE } from '@shared/i18n';
+import { createTestI18n } from '@shared/testing/i18n';
 import type { RuntimeEvidenceSnapshot } from '@shared/inspector';
 import type { Artifact, Preview } from '@shared/types';
 import type { FileDiff } from '@shared/types/chat';
@@ -17,6 +19,9 @@ import {
   runtimeEvidenceOverviewKicker,
   runtimeEvidenceOverviewTasks,
 } from './RuntimeEvidenceHelpers';
+
+/** Real zh bundle keeps historical copy expectations honest (#2032). */
+const tZh = createTestI18n({ lng: 'zh' }).getFixedT('zh', SHARED_WORKBENCH_I18N_NAMESPACE);
 
 function sampleDiff(overrides: Partial<FileDiff> = {}): FileDiff {
   return {
@@ -74,11 +79,12 @@ function emptyEvidence(overrides: Partial<RuntimeEvidenceSnapshot> = {}): Runtim
 
 describe('RuntimeEvidenceHelpers', () => {
   it('builds overview tasks for empty and populated evidence', () => {
-    expect(runtimeEvidenceOverviewTasks(emptyEvidence())).toEqual([
+    expect(runtimeEvidenceOverviewTasks(tZh, emptyEvidence())).toEqual([
       { label: '等待 Hub replay evidence', status: 'todo' },
     ]);
 
     const tasks = runtimeEvidenceOverviewTasks(
+      tZh,
       emptyEvidence({
         runId: 'run-1',
         artifacts: [sampleArtifact()],
@@ -101,6 +107,7 @@ describe('RuntimeEvidenceHelpers', () => {
 
   it('maps overview files for artifacts, diffs, and previews', () => {
     const files = runtimeEvidenceOverviewFiles(
+      tZh,
       emptyEvidence({
         runId: 'run-9',
         artifacts: [
@@ -146,6 +153,7 @@ describe('RuntimeEvidenceHelpers', () => {
 
   it('keeps displayable preview URLs in content and skips the endpoint ref', () => {
     const files = runtimeEvidenceOverviewFiles(
+      tZh,
       emptyEvidence({
         runId: 'run-9',
         previews: [
@@ -170,6 +178,7 @@ describe('RuntimeEvidenceHelpers', () => {
 
   it('falls back to markdown metadata when artifact/preview content URLs are unavailable', () => {
     const files = runtimeEvidenceOverviewFiles(
+      tZh,
       emptyEvidence({
         artifacts: [
           sampleArtifact({
@@ -290,5 +299,33 @@ describe('RuntimeEvidenceHelpers', () => {
     // No usable basename falls back to the artifact id.
     expect(artifactDownloadName(sampleArtifact({ path: '', id: 'a1' }))).toBe('a1');
     expect(artifactDownloadName(sampleArtifact({ path: '   ', id: 'a1' }))).toBe('a1');
+  });
+});
+
+describe('runtime evidence overview labels en convergence (#2032)', () => {
+  const tEn = createTestI18n({ lng: 'en' }).getFixedT('en', SHARED_WORKBENCH_I18N_NAMESPACE);
+
+  it('renders natural English task labels for empty and populated evidence', () => {
+    expect(runtimeEvidenceOverviewTasks(tEn, emptyEvidence())).toEqual([
+      { label: 'Waiting for Hub replay evidence', status: 'todo' },
+    ]);
+
+    const tasks = runtimeEvidenceOverviewTasks(
+      tEn,
+      emptyEvidence({ runId: 'run-7', artifacts: [sampleArtifact()] }),
+    );
+    expect(tasks).toEqual([
+      { label: 'Following run-7', status: 'active' },
+      { label: 'Hub replay artifact index: 1', status: 'done' },
+    ]);
+  });
+
+  it('maps overview files with the en translator without copy drift', () => {
+    const files = runtimeEvidenceOverviewFiles(
+      tEn,
+      emptyEvidence({ runId: 'run-7', artifacts: [sampleArtifact({ id: 'art-en' })] }),
+    );
+    expect(files).toHaveLength(1);
+    expect(files[0]).toMatchObject({ name: 'out/report.md', owner: 'Hub replay' });
   });
 });

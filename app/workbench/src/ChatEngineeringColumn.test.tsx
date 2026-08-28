@@ -1,7 +1,8 @@
 import React from 'react';
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
-import { useTestI18nLanguage } from '@shared/testing/i18n';
+import { SHARED_WORKBENCH_I18N_NAMESPACE } from '@shared/i18n';
+import { createTestI18n, useTestI18nLanguage } from '@shared/testing/i18n';
 import type { AgentHubPlatform } from '@shared/platform';
 import type { RuntimeEvidenceSnapshot } from '@shared/inspector';
 import {
@@ -15,6 +16,9 @@ import { WORKBENCH_ENGINEERING_PREVIEW_FOCUS_EVENT } from './workbenchPreviewEve
 beforeAll(async () => {
   await useTestI18nLanguage('zh');
 });
+
+/** Real zh bundle for pure resolveEngineeringPreview assertions (#2032). */
+const tZh = createTestI18n({ lng: 'zh' }).getFixedT('zh', SHARED_WORKBENCH_I18N_NAMESPACE);
 
 const platform = {
   surface: 'desktop',
@@ -70,7 +74,7 @@ function auxTab(name: string): HTMLElement {
 describe('ChatEngineeringColumn Preview (#1966)', () => {
   it('resolves real preview evidence without constructing a URL', () => {
     expect(engineeringPreviewSignal(undefined)).toBeNull();
-    const resolved = resolveEngineeringPreview(evidence('artifact-1'));
+    const resolved = resolveEngineeringPreview(tZh, evidence('artifact-1'));
     expect(resolved?.kind).toBe('file');
     if (resolved?.kind === 'file') {
       expect(resolved.file.name).toBe('reports/artifact-1.md');
@@ -178,7 +182,7 @@ describe('ChatEngineeringColumn Preview (#1966)', () => {
 describe('ChatEngineeringColumn artifact focus intent (#1992, F10)', () => {
   it('resolves the clicked artifact rather than the newest artifact', () => {
     const snapshot = evidenceWithArtifacts();
-    const focused = resolveEngineeringPreview(snapshot, {
+    const focused = resolveEngineeringPreview(tZh, snapshot, {
       artifactId: 'artifact-first', artifactRunId: 'run-1',
     });
     expect(focused?.kind).toBe('file');
@@ -186,7 +190,7 @@ describe('ChatEngineeringColumn artifact focus intent (#1992, F10)', () => {
   });
 
   it('returns null for a missing focus target instead of showing another artifact', () => {
-    expect(resolveEngineeringPreview(evidenceWithArtifacts(), {
+    expect(resolveEngineeringPreview(tZh, evidenceWithArtifacts(), {
       artifactId: 'artifact-missing', artifactRunId: 'run-1',
     })).toBeNull();
   });
