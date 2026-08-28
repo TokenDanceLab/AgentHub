@@ -68,6 +68,12 @@
   --sp-14: 14px;
   --sp-16: 16px;
 
+  /* Canonical v4 scale: --sp-* / --r-* / --font-size-* are the authoritative step
+     sets (asserted by tokens-base.test.ts). --space-* / --radius-* are the legacy
+     aliases; --td-space-* / --td-radius-* / --td-text-* (themes.css) are the cross-app
+     contract aliases (#2045). All must resolve onto this v4 scale via var() — do not
+     re-specify raw px/rem in the alias layer. Theme colors + the --td-* contract
+     aliases live in themes.css. */
   /* Backward-compat spacing (aliased to v4 where values match) */
   --space-0:   0;
   --space-xs:  var(--sp-xs);  /* 4px */
