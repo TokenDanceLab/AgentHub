@@ -5,6 +5,7 @@ import {
   createE2EDataModeScenario,
   type E2EObservedRequest,
 } from '../../../shared/src/testing/e2eDataModeContract';
+import { fulfillExternalFontIfMatch } from '../../../e2e/fontBlocker';
 
 // Must match playwright.config.ts webServer VITE_HUB_URL: the fail-closed
 // reserved origin keeps every Hub call inside the route stub instead of
@@ -234,8 +235,7 @@ async function installChatFlowHubStub(page: Page, options: ChatFlowHubStubOption
     // stylesheet so the document load event can fire). Every other external
     // host is recorded and refused, so the scenario assertion fails the test
     // instead of letting an unexpected remote call succeed silently.
-    if (url.host === 'fonts.googleapis.com' || url.host === 'fonts.gstatic.com') {
-      await route.fulfill({ status: 200, contentType: 'text/css', body: '' });
+    if (await fulfillExternalFontIfMatch(route)) {
       return;
     }
     requests.push({ method: request.method(), url: request.url() });
