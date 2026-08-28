@@ -8,6 +8,7 @@
 
   display: grid;
   grid-template-columns: 52px minmax(0, var(--sidebar-w)) minmax(0, 1fr) minmax(0, var(--inspector-w));
+
   /* Row 2 hosts the capability-gated terminal dock (#1182); row 3 hosts the
      global status bar (#1994). Both collapse when empty. */
   grid-template-rows: minmax(0, 1fr) auto auto;
@@ -128,7 +129,7 @@
   width: 18px;
   height: 18px;
   fill: none;
-  stroke: currentColor;
+  stroke: currentcolor;
   stroke-width: 1.75;
   stroke-linecap: round;
   stroke-linejoin: round;
@@ -163,19 +164,19 @@
 }
 
 .connectionDot[data-status='connected'] {
-  background: oklch(0.72 0.19 145);
-  box-shadow: 0 0 4px oklch(0.72 0.19 145 / 0.5);
+  background: oklch(72% 0.19 145deg);
+  box-shadow: 0 0 4px oklch(72% 0.19 145deg / 50%);
 }
 
 .connectionDot[data-status='connecting'] {
-  background: oklch(0.78 0.15 85);
-  box-shadow: 0 0 4px oklch(0.78 0.15 85 / 0.4);
+  background: oklch(78% 0.15 85deg);
+  box-shadow: 0 0 4px oklch(78% 0.15 85deg / 40%);
   animation: connectionBlink 1.2s ease-in-out infinite;
 }
 
 .connectionDot[data-status='disconnected'] {
-  background: oklch(0.62 0.2 25);
-  box-shadow: 0 0 4px oklch(0.62 0.2 25 / 0.3);
+  background: oklch(62% 0.2 25deg);
+  box-shadow: 0 0 4px oklch(62% 0.2 25deg / 30%);
 }
 
 @keyframes connectionBlink {
@@ -198,6 +199,7 @@
   backdrop-filter: var(--glass-backdrop-filter);
   -webkit-backdrop-filter: var(--glass-backdrop-filter);
   clip-path: inset(0 0 0 0);
+
   /* visibility flips back immediately on expand so the reveal animation runs. */
   visibility: visible;
   transition:
@@ -394,6 +396,7 @@
 .conversationList {
   display: flex;
   flex-direction: column;
+
   /* Virtualized list (virtua): row offsets are accumulated from each row's
      measured CONTENT box — a flex `gap` here is invisible to that math and
      would misalign rows progressively as the list grows. Row spacing moves
@@ -554,7 +557,7 @@
 .conversationDeleteConfirm {
   border-color: transparent;
   background: var(--td-danger);
-  color: var(--text-inv, #fff);
+  color: var(--text-inv);
 }
 
 .conversationDeleteConfirm:hover {
@@ -1111,7 +1114,7 @@
   font: 600 13px var(--td-font);
   flex-shrink: 0;
   overflow: hidden;
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.22), var(--td-shadow-sm);
+  box-shadow: inset 0 0 0 1px rgba(255 255 255 / 22%), var(--td-shadow-sm);
 }
 
 .workspaceHeaderCopy {
@@ -1223,7 +1226,7 @@
   width: 15px;
   height: 15px;
   fill: none;
-  stroke: currentColor;
+  stroke: currentcolor;
   stroke-width: 1.8;
   stroke-linecap: round;
   stroke-linejoin: round;
@@ -1301,7 +1304,7 @@
   width: 15px;
   height: 15px;
   fill: none;
-  stroke: currentColor;
+  stroke: currentcolor;
   stroke-width: 1.75;
   stroke-linecap: round;
   stroke-linejoin: round;
@@ -1939,6 +1942,7 @@
   color: var(--td-ink);
   outline: none;
   resize: none;
+
   /* #1822 auto-grow: scroll past the max-height instead of clipping. */
   overflow-y: auto;
 }
@@ -2116,7 +2120,7 @@
   height: 36px;
   border-radius: 50%;
   background: var(--td-plum);
-  color: #fff;
+  color: var(--td-ink-on-plum);
   border: 0;
   font-size: 13.3333px;
   line-height: normal;
@@ -2139,7 +2143,7 @@
 
 .sendButton:disabled {
   background: var(--td-plum);
-  color: #fff;
+  color: var(--td-ink-on-plum);
   cursor: pointer;
   transform: none;
 }
@@ -2147,10 +2151,11 @@
 .sendButton svg {
   width: 16px;
   height: 16px;
-  color: currentColor;
+  color: currentcolor;
 }
 
 /* ── Attachment button ── */
+
 /* ── #1816 composer approval-mode picker (shared PermissionModePicker;
    its own module styles realize the trigger/popover chrome) ── */
 .composerApprovalModePicker {
@@ -2191,7 +2196,7 @@
   width: 17px;
   height: 17px;
   fill: none;
-  stroke: currentColor;
+  stroke: currentcolor;
   stroke-width: 1.75;
   stroke-linecap: round;
   stroke-linejoin: round;
@@ -2638,24 +2643,24 @@
   align-items: center;
   justify-content: center;
   flex: 0 0 auto;
-  color: currentColor;
+  color: currentcolor;
   opacity: 0.72;
 }
 
 .inspectorTabMark b {
   display: none;
-  color: currentColor;
+  color: currentcolor;
   font: 600 0.8125rem/1 var(--td-font);
   transform: translateY(-0.5px);
 }
 
 .inspectorTab:hover .inspectorTabMark {
-  background: color-mix(in srgb, currentColor 13%, transparent);
+  background: color-mix(in srgb, currentcolor 13%, transparent);
   opacity: 1;
 }
 
 .inspectorTab[aria-selected='true'] .inspectorTabMark {
-  background: color-mix(in srgb, currentColor 13%, transparent);
+  background: color-mix(in srgb, currentcolor 13%, transparent);
   opacity: 1;
 }
 
@@ -2694,6 +2699,7 @@
   padding: 0;
   scroll-padding-bottom: var(--composer-scroll-gap);
 }
+
 .transcriptRegion > *:last-child {
   scroll-margin-bottom: var(--composer-scroll-gap);
 }
@@ -3100,7 +3106,7 @@
 }
 
 /* ═══ Wide screen (#1309) — keep content readable on ultrawide ═══ */
-@media (min-width: 1920px) {
+@media (width >= 1920px) {
   .workspace {
     /* Soft cap: ultrawide does not force unreadably long lines in page chrome */
     --composer-max: min(100%, 960px);
@@ -3108,7 +3114,7 @@
 }
 
 /* ═══ Container queries ═══ */
-@media (max-width: 768px) {
+@media (width <= 768px) {
   .shell,
   .shell[data-inspector-collapsed='true'],
   .shell[data-sidebar-collapsed='true'],
@@ -3310,7 +3316,7 @@
    where a coarse pointer (touch) or a ≤480px mobile viewport makes 28-40px
    targets hard to hit. Mirrors the ui-library pattern (Button/Avatar/...)
    at the --bp-mobile breakpoint, reusing the shared --touch-target-min token. */
-@media (pointer: coarse), (max-width: 480px) {
+@media (pointer: coarse), (width <= 480px) {
   .railButton,
   .iconButton {
     width: var(--touch-target-min, 44px);
@@ -3540,12 +3546,14 @@
  * Span workspace + inspector only (shell cols 3–4), not rail / conversation sidebar,
  * so channel cards keep full height and are not covered by the dock.
  */
+
 /* P77 #1320: compact base height; large empty glass slab suppressed on Chat path. */
 @keyframes terminalDockIn {
   from {
     opacity: 0;
     transform: translateY(10px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
@@ -3557,6 +3565,7 @@
     opacity: 1;
     transform: translateY(0);
   }
+
   to {
     opacity: 0;
     transform: translateY(10px);
@@ -3578,6 +3587,7 @@
   box-shadow: var(--glass-elev-1);
   overflow: hidden;
   z-index: calc(var(--z-base) + 1);
+
   /* #1825: dock mount/unmount was a hard snap; WorkbenchFrame defers the
      unmount by 180ms (useExiting) so the exit animation can play. */
   animation: terminalDockIn var(--dur-normal) var(--ease-panel);
@@ -3672,6 +3682,7 @@
   color: var(--text-inv);
   font: 600 13px var(--td-font);
   text-decoration: none;
+
   /* #1825: floating pill shadow on the elevation ladder. */
   box-shadow: var(--e-2, var(--td-shadow-md));
 }
@@ -3992,7 +4003,7 @@ button.mainchainAttentionChip[data-attention-kind='usage']:hover {
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: currentColor;
+  background: currentcolor;
   flex-shrink: 0;
 }
 
@@ -4270,7 +4281,7 @@ button.mainchainAttentionChip[data-attention-kind='usage']:hover {
   background: var(--td-canvas);
   border: 1px solid var(--glass-border, var(--td-line));
   border-radius: var(--td-radius-lg, 12px);
-  box-shadow: var(--td-shadow-sm, 0 1px 2px rgb(0 0 0 / 6%));
+  box-shadow: var(--td-shadow-sm, 0 1px 2px rgba(0 0 0 / 6%));
 }
 
 /* Active pane cue: the pane holding composer/keyboard focus. */
@@ -4326,7 +4337,7 @@ button.mainchainAttentionChip[data-attention-kind='usage']:hover {
   border-radius: 6px;
   font-size: 11px;
   font-weight: 600;
-  color: #fff;
+  color: var(--on-primary);
   overflow: hidden;
 }
 
@@ -4354,7 +4365,7 @@ button.mainchainAttentionChip[data-attention-kind='usage']:hover {
 }
 
 .splitLiveDot[data-live-status='awaiting-approval'] {
-  background: var(--td-warning, #d97706);
+  background: var(--td-warning);
 }
 
 @keyframes splitLivePulse {

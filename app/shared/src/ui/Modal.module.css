@@ -17,12 +17,14 @@
   .overlay {
     animation: overlayIn 0.15s ease-out;
   }
+
   /* Exit choreography (#1825): unmount is deferred 200ms by useExiting so
      the fade/scale-out below can play (entry lives in the .content block
      further down). Reduced-motion unmounts instantly. */
   .overlayExiting {
     animation: overlayOut 0.15s ease-in forwards;
   }
+
   .overlayExiting .content {
     animation: contentOut 0.2s ease-in forwards;
   }
@@ -36,6 +38,7 @@
   max-height: 92vh;
   border: 1px solid var(--glass-border, var(--td-line));
   border-radius: var(--td-radius-panel);
+
   /* #1825: same-level floating layer material parity with ContextMenu —
      glass panel recipe instead of opaque surface + hardcoded rgba shadow. */
   background: var(--glass-panel-overlay, var(--td-surface));
@@ -96,6 +99,7 @@
       opacity: 0;
       transform: scale(0.96) translateY(12px);
     }
+
     to {
       opacity: 1;
       transform: scale(1) translateY(0);
@@ -112,6 +116,7 @@
       opacity: 1;
       transform: scale(1) translateY(0);
     }
+
     to {
       opacity: 0;
       transform: scale(0.97) translateY(8px);

@@ -30,6 +30,7 @@
   justify-content: center;
   transition: background 0.15s, border-color 0.15s, color 0.15s;
 }
+
 .closeBtn:hover {
   border-color: var(--glass-border-strong);
   background: var(--glass-bg-hover);
@@ -44,6 +45,7 @@
   padding-inline: 34px;
   text-align: center;
 }
+
 .logo {
   display: block;
   width: 44px;
@@ -54,9 +56,11 @@
     inset 0 1px 0 var(--glass-input-bg-hover),
     0 12px 28px var(--glass-tint-sky);
 }
+
 [data-theme='dark'] .logo {
   box-shadow: 0 12px 28px var(--glass-shadow);
 }
+
 .appName {
   margin: 0;
   color: var(--td-ink);
@@ -65,6 +69,7 @@
   letter-spacing: 0;
   line-height: 1.2;
 }
+
 .tagline {
   margin: 0;
   color: var(--td-ink-muted);
@@ -80,6 +85,7 @@
   padding: 2px;
   margin-bottom: 18px;
 }
+
 .tab {
   flex: 1;
   padding: 7px 0;
@@ -92,6 +98,7 @@
   cursor: pointer;
   transition: all 0.15s;
 }
+
 /* #1825: tab hover/active feedback (was zero-state). */
 .tab:hover:not(.tabActive) {
   background: var(--glass-bg-hover);
@@ -158,10 +165,12 @@
   font-size: 11px;
   font-weight: 500;
 }
+
 .identityDivider span {
   height: 1px;
   background: var(--glass-bg-strong);
 }
+
 .identityDivider strong {
   font: inherit;
   color: inherit;
@@ -184,14 +193,17 @@
   transition: border-color 0.15s, background 0.15s, transform 0.12s;
   width: 100%;
 }
+
 .identityButton:hover {
   border-color: var(--glass-border-strong);
   background: var(--glass-bg-hover);
 }
+
 .identityButton:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
+
 .identityButton:disabled {
   opacity: 0.5;
   cursor: not-allowed;
@@ -228,10 +240,12 @@
   vertical-align: -3px;
   margin-right: 6px;
 }
+
 @keyframes spin { to { transform: rotate(360deg); } }
 
 /* ── Switch link ──────────────────────────── */
 .switch { text-align: center; }
+
 .switchButton {
   border: none;
   background: transparent;
@@ -275,6 +289,7 @@
 
 /* ── Advanced section ─────────────────────── */
 .advancedSection { margin-top: 8px; }
+
 .hubStatus {
   display: flex;
   align-items: center;
@@ -292,11 +307,12 @@
 .hubStatusDotConnected { background: var(--td-moss); }
 .hubStatusDotDisconnected { background: var(--td-danger); }
 .hubStatusDotChecking { background: var(--td-warning); animation: pulse 1.5s infinite; }
+
 @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
 
 .hubStatusText { font-size: 11px; }
 
-@media (max-width: 760px) {
+@media (width <= 760px) {
   .page {
     width: 100%;
     min-width: 0;
@@ -414,15 +430,18 @@
   gap: var(--wb-gap-xs);
   margin-top: var(--wb-gap-sm);
 }
+
 .presetLabel {
   font-size: var(--td-text-xs);
   color: var(--td-ink-muted);
 }
+
 .presetGrid {
   display: flex;
   flex-wrap: wrap;
   gap: var(--wb-gap-xs);
 }
+
 .presetChip {
   display: inline-flex;
   align-items: center;
@@ -435,22 +454,27 @@
   cursor: pointer;
   font-size: var(--td-text-xs);
 }
+
 .presetChip:hover {
   background: var(--td-surface-3);
 }
+
 .presetChipActive {
   border-color: var(--td-plum);
   box-shadow: var(--focus-ring);
 }
+
 .presetSwatches {
   display: inline-flex;
   border-radius: var(--r-xs);
   overflow: hidden;
 }
+
 .presetSwatch {
   width: 10px;
   height: 14px;
 }
+
 .presetName {
   line-height: 1;
 }

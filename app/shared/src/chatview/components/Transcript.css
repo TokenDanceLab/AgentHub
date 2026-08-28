@@ -3,6 +3,7 @@
    ══════════════════════════════════════════════════════════════════════ */
 
 .transcript { display:flex; flex-direction:column; gap:0; min-width:0; flex:1; min-height:0; overflow-y:auto; scroll-behavior:smooth; scrollbar-gutter:stable; scrollbar-width:thin; padding:0 0 0 10px }
+
 /* ── Scroll-to-bottom button ────────────────────────────────────────── */
 .scroll-to-bottom-btn {
   position: sticky;
@@ -20,16 +21,18 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+  box-shadow: 0 2px 8px rgba(0 0 0 / 12%);
   transition: opacity 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
   opacity: var(--opacity-85);
 }
+
 .scroll-to-bottom-btn:hover {
   opacity: 1;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.18);
+  box-shadow: 0 4px 12px rgba(0 0 0 / 18%);
   color: var(--td-ink);
   border-color: var(--td-line-strong);
 }
+
 .scroll-to-bottom-btn:active {
   transform: scale(0.95);
 }
@@ -52,11 +55,13 @@
   align-self: stretch;
   color: var(--td-ink-subtle);
 }
+
 .unread-divider-line {
   flex: 1;
   height: 1px;
   background: var(--td-line);
 }
+
 .unread-divider-label {
   display: inline-flex;
   align-items: baseline;
@@ -64,6 +69,7 @@
   font: 400 0.625rem var(--td-font);
   white-space: nowrap;
 }
+
 .unread-divider-read-through {
   color: var(--td-ink-muted);
 }
@@ -77,11 +83,13 @@
   align-self: stretch;
   color: var(--td-ink-subtle);
 }
+
 .compact-divider-line {
   flex: 1;
   height: 1px;
   background: var(--td-line);
 }
+
 .compact-divider-label {
   display: inline-flex;
   align-items: baseline;
@@ -140,7 +148,7 @@
   border-radius:var(--chat-r-sm);
   background:color-mix(in srgb, var(--td-surface) 96%, var(--td-surface-2) 4%);
   color:var(--td-ink);
-  box-shadow:0 4px 14px rgba(18, 18, 32, 0.045);
+  box-shadow:0 4px 14px rgba(18 18 32 / 4.5%);
   pointer-events:auto;
   transition:border-color var(--chat-dur, 160ms) var(--td-ease), box-shadow var(--td-dur-slow) var(--td-ease);
 }
@@ -225,6 +233,7 @@
   margin-bottom:var(--chat-sp-md);
 }
 .grp-content { flex:1; min-width:0; display:flex; flex-direction:column; gap:var(--chat-sp-2) }
+
 .card-stack {
   align-self:flex-start;
   display:flex;
@@ -234,11 +243,14 @@
   max-width:100%;
   min-width:0;
 }
+
 /* first child aligns flush to avatar top */
 .grp-content > :first-child { margin-top:0 }
+
 /* Bubbles sit on a stable reading column; user replies still shrink right. */
 .grp-content > .agent-bubble { align-self:flex-start; max-width:72% }
 .grp-content > .user-bubble { align-self:flex-end; max-width:68% }
+
 .bubble-group {
   align-self:flex-start;
   display:flex;
@@ -260,18 +272,22 @@
   color:var(--td-ink-subtle);
   font:var(--chat-label-xs);
 }
+
 .message-display-meta[data-align='right'] {
   align-items:flex-end;
 }
+
 .message-display-meta-line {
   display:flex;
   align-items:center;
   gap:var(--chat-sp-xs);
   min-width:0;
 }
+
 .message-display-meta[data-align='right'] .message-display-meta-line {
   justify-content:flex-end;
 }
+
 .message-display-title {
   min-width:0;
   overflow:hidden;
@@ -280,6 +296,7 @@
   color:var(--td-ink-muted);
   font-weight:600;
 }
+
 .message-display-badge {
   flex:0 0 auto;
   display:inline-flex;
@@ -292,26 +309,31 @@
   color:var(--td-ink-muted);
   font:600 0.6875rem/1.2 var(--td-font);
 }
+
 .message-display-badge[data-variant='thinking'] {
   border-color:color-mix(in srgb, var(--td-plum) 28%, transparent);
   background:color-mix(in srgb, var(--td-plum) 12%, transparent);
   color:var(--td-plum);
 }
+
 .message-display-badge[data-variant='success'] {
   border-color:color-mix(in srgb, var(--td-moss) 30%, transparent);
   background:color-mix(in srgb, var(--td-moss) 12%, transparent);
   color:var(--td-moss);
 }
+
 .message-display-badge[data-variant='warning'] {
   border-color:color-mix(in srgb, var(--td-warning) 32%, transparent);
   background:color-mix(in srgb, var(--td-warning) 13%, transparent);
   color:var(--td-warning);
 }
+
 .message-display-badge[data-variant='danger'] {
   border-color:color-mix(in srgb, var(--td-danger) 32%, transparent);
   background:color-mix(in srgb, var(--td-danger) 12%, transparent);
   color:var(--td-danger);
 }
+
 .message-display-detail {
   max-width:100%;
   overflow:hidden;
@@ -327,6 +349,7 @@
   border-radius:var(--chat-r-lg); padding:var(--chat-sp-xxs) var(--chat-sp-sm);
   font:var(--chat-bubble-font); line-height:1.55; word-break:break-word;
 }
+
 .agent-bubble {
   background:var(--td-surface); border:1px solid var(--td-line);
   border-radius:var(--chat-r-md); padding:var(--chat-sp-xxs) var(--chat-sp-sm);
@@ -334,19 +357,23 @@
   max-width:100%;
   min-width:0;
 }
+
 .agent-bubble > div,
 .user-bubble > div { max-width:100%; color:inherit }
 .agent-bubble > div > :first-child { margin-top:0 }
 .agent-bubble > div > :last-child { margin-bottom:0 }
 .user-bubble > div > :first-child { margin-top:0 }
 .user-bubble > div > :last-child { margin-bottom:0 }
+
 .agent-bubble table,
 .user-bubble table { max-width:100% }
 .agent-bubble code { font:var(--chat-label); background:var(--td-surface-3); padding:1px 5px; border-radius:var(--chat-r-xs) }
+
 .user-bubble a {
   color:var(--td-ink-on-plum);
   text-decoration-color:color-mix(in srgb, var(--td-ink-on-plum) 70%, transparent);
 }
+
 .user-bubble code {
   font:var(--chat-label);
   color:var(--td-ink-on-plum);
@@ -354,17 +381,21 @@
   padding:1px 5px;
   border-radius:var(--chat-r-xs);
 }
+
 .user-bubble table {
   border-color:color-mix(in srgb, var(--td-ink-on-plum) 28%, transparent);
   background:color-mix(in srgb, var(--td-ink-on-plum) 7%, transparent);
 }
+
 .user-bubble th,
 .user-bubble td {
   border-color:color-mix(in srgb, var(--td-ink-on-plum) 24%, transparent);
 }
+
 .user-bubble th {
   background:color-mix(in srgb, var(--td-ink-on-plum) 12%, transparent);
 }
+
 .user-bubble tr:nth-child(even) td {
   background:color-mix(in srgb, var(--td-ink-on-plum) 6%, transparent);
 }
@@ -404,6 +435,7 @@
    while scrolling history never replay it. transform/opacity only — layout
    height is untouched, keeping virtua measurements stable. */
 .grp-row.grp-enter { animation:grpEnter var(--chat-dur-slow) var(--td-ease) both }
+
 @keyframes grpEnter {
   from { opacity:0; transform:translateY(6px) }
   to { opacity:1; transform:none }
@@ -416,12 +448,14 @@
   background:var(--td-plum);
   animation:streamCaret 1s steps(1) infinite;
 }
+
 @keyframes streamCaret { 0%,49% { opacity:1 } 50%,100% { opacity:0 } }
 
 /* Reduced motion: instant scroll plus no entry/caret animation; the caret
    stays solid (state remains readable without the blink). */
 @media (prefers-reduced-motion: reduce) {
   .transcript { scroll-behavior:auto }
+
   .grp-row.grp-enter,
   .bubble-group.streaming .agent-bubble::after { animation:none }
 }

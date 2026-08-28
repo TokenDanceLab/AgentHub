@@ -131,7 +131,7 @@
   width: 15px;
   height: 15px;
   fill: none;
-  stroke: currentColor;
+  stroke: currentcolor;
   stroke-width: 1.9;
   stroke-linecap: round;
   stroke-linejoin: round;
@@ -204,14 +204,14 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  color: currentColor;
+  color: currentcolor;
 }
 
 .filterBtnIcon svg {
   width: 15px;
   height: 15px;
   fill: none;
-  stroke: currentColor;
+  stroke: currentcolor;
   stroke-width: 1.9;
   stroke-linecap: round;
   stroke-linejoin: round;
@@ -345,7 +345,6 @@
   font: 500 0.875rem var(--td-font);
   cursor: pointer;
   font-family: inherit;
-  transition: background var(--td-dur-normal) var(--td-ease);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -545,7 +544,7 @@
   width: 15px;
   height: 15px;
   fill: none;
-  stroke: currentColor;
+  stroke: currentcolor;
   stroke-width: 1.9;
   stroke-linecap: round;
   stroke-linejoin: round;
@@ -613,7 +612,7 @@
   width: 15px;
   height: 15px;
   fill: none;
-  stroke: currentColor;
+  stroke: currentcolor;
   stroke-width: 1.9;
   stroke-linecap: round;
   stroke-linejoin: round;
@@ -679,7 +678,7 @@
   width: 15px;
   height: 15px;
   fill: none;
-  stroke: currentColor;
+  stroke: currentcolor;
   stroke-width: 1.9;
   stroke-linecap: round;
   stroke-linejoin: round;

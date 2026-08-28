@@ -72,7 +72,7 @@
 
 /* ── Responsive ─────────────────── */
 
-@media (max-width: 480px) {
+@media (width <= 480px) {
   .card {
     padding: 8px 10px;
     gap: 6px;

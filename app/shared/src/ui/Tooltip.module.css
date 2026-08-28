@@ -9,6 +9,7 @@
   position: relative;
   display: inline-block;
   overflow: visible;
+
   /* The host is a zero-padding wrapper; its box tracks the child's box so
      the absolutely-positioned tooltip anchors to the trigger element. */
 }
@@ -52,6 +53,7 @@
   from {
     opacity: 0;
   }
+
   to {
     opacity: 1;
   }
@@ -90,7 +92,7 @@
    tooltip there to match the desktop ShellIconButton behaviour. Focus
    trigger still works in principle, but CSS hides it — TODO: a future
    revision should let focus tooltips render on touch. */
-@media (hover: none), (max-width: 768px) {
+@media (hover: none), (width <= 768px) {
   .tooltip {
     display: none;
   }

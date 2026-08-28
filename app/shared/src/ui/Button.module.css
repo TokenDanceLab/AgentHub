@@ -23,9 +23,11 @@
   cursor: not-allowed;
   pointer-events: none;
 }
+
 .base:active:not(:disabled) {
   opacity: var(--opacity-85);
 }
+
 @media (prefers-reduced-motion: no-preference) {
   .base:active:not(:disabled) {
     transform: scale(0.97);
@@ -44,9 +46,11 @@
   background: var(--td-plum);
   color: var(--td-ink-on-plum);
 }
+
 .primary:hover:not(:disabled) {
   filter: brightness(1.1);
 }
+
 .primary:focus-visible:not(:disabled) {
   outline: none;
   box-shadow: var(--focus-ring);
@@ -57,9 +61,11 @@
   color: var(--td-ink);
   border-color: var(--td-line);
 }
+
 .secondary:hover:not(:disabled) {
   background: var(--td-surface-3);
 }
+
 .secondary:focus-visible:not(:disabled) {
   outline: none;
   box-shadow: var(--focus-ring);
@@ -69,10 +75,12 @@
   background: transparent;
   color: var(--td-ink-muted);
 }
+
 .ghost:hover:not(:disabled) {
   background: var(--td-surface-2);
   color: var(--td-ink);
 }
+
 .ghost:focus-visible:not(:disabled) {
   outline: none;
   box-shadow: var(--focus-ring);
@@ -82,9 +90,11 @@
   background: var(--td-danger);
   color: var(--destructive-foreground);
 }
+
 .destructive:hover:not(:disabled) {
   filter: brightness(1.1);
 }
+
 .destructive:focus-visible:not(:disabled) {
   outline: none;
   box-shadow: var(--focus-ring);
@@ -94,9 +104,11 @@
   color: var(--td-ink-on-plum);
   font-weight: 600;
   background: var(--td-plum);
+
   /* #1825: elevation via the --e-* ladder, not a free-floating glow value. */
   box-shadow: var(--e-2, var(--td-shadow-md));
 }
+
 .gradient:hover:not(:disabled) {
   box-shadow: var(--e-3, var(--td-shadow-lg));
 }
@@ -106,6 +118,7 @@
     transform: translateY(-1px);
   }
 }
+
 .gradient:focus-visible:not(:disabled) {
   outline: none;
   box-shadow: var(--focus-ring);
@@ -128,13 +141,14 @@
   color: var(--td-ink);
   border-color: var(--td-line);
 }
+
 .icon:hover:not(:disabled) {
   background: var(--td-surface-3);
 }
 
 /* ── Responsive ─────────────────── */
 
-@media (max-width: 480px) {
+@media (width <= 480px) {
   .sm {
     min-height: var(--touch-target-min, 44px);
     padding: 0 12px;
