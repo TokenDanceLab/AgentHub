@@ -2,9 +2,11 @@ package api
 
 import "testing"
 
-// TODO(quad-scan Q8): PostDeployments / PostApplyRunDiff / PostApplyAllRunDiffs
-// full-chain tests need a store.Repository mock + Handler construction + SSH,
-// and belong to a separate wave. Not fabricated here.
+// Quad-scan Q8 resolved (#2056): PostDeployments / PostApplyRunDiff /
+// PostApplyAllRunDiffs handler behavior tests now live in
+// deploy_handler_test.go and diff_apply_handler_test.go, built on the real
+// in-memory store.Repository plus a re-exec'd test binary standing in for
+// the ssh/scp binaries. Only the real-host gap below remains skipped here.
 
 // runSSHCommand / runSCP (deploy.go) exec the ssh/scp binaries against a real
 // SSH target host. They are intentionally NOT covered here:
