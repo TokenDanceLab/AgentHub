@@ -9,7 +9,7 @@
 import React from 'react';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { render, screen, within } from '../../__tests__/setup';
-import { AgentMarketView, SkillMarketView } from './AgentMarketViews';
+import { AgentMarketView, MCPMarketView, SkillMarketView } from './AgentMarketViews';
 import { MarketFeaturedSection } from './AgentMarketParts';
 import {
   AgentPolicyView,
@@ -19,6 +19,17 @@ import {
 } from './AgentOpsViews';
 import { AgentAvatar } from './AgentInstalledParts';
 import { AgentInstalledView } from './AgentInstalledViews';
+import {
+  AgentCapabilityStrip,
+  AgentEditActions,
+  AgentEditGrid,
+  AgentMcpMemorySection,
+  AgentMiniLog,
+  AgentSkillChipGrid,
+  AgentToolPermissions,
+} from './AgentEditItemParts';
+import { DataSourceBadge } from './DataSourceBadge';
+import { AgentsPage } from '../AgentsPage';
 import type { AgentConfig, AgentsPageProps } from './types';
 
 import { useTestI18nLanguage } from '@shared/testing/i18n';
@@ -221,5 +232,199 @@ describe('AgentInstalledParts en copy (#2007)', () => {
     const list = screen.getByText('Front-end development');
     expect(list).toBeInTheDocument();
     expect(screen.getByText('Testing')).toBeInTheDocument();
+  });
+});
+
+describe('AgentsPage nav en copy (#2015)', () => {
+  it('renders nav labels and captions in English', () => {
+    render(<AgentsPage {...baseProps()} />);
+    expect(screen.getByRole('button', { name: 'Installed' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Agent marketplace' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Skill market' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'MCP market' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Execution policy' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Tool permissions' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Model configuration' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Audit log' })).toBeInTheDocument();
+    expect(screen.getByText('Configuration')).toBeInTheDocument();
+    expect(screen.getByText('Recent changes')).toBeInTheDocument();
+  });
+});
+
+describe('AgentInstalledViews en copy (#2015)', () => {
+  it('renders head subcopy, stats strip, section head, and row details in English', () => {
+    render(
+      <AgentInstalledView
+        {...baseProps({
+          agents: [
+            agent('a1', 'Alpha', { targetPreference: 'cloud' }),
+            agent('a2', 'Beta'),
+          ],
+          installedCount: 2,
+          runnableCount: 1,
+          confirmCount: 0,
+          defaultModelLabel: 'claude-sonnet',
+        })}
+      />,
+    );
+    expect(
+      screen.getByText('Manage installed agent configurations, skills, and tool permissions.'),
+    ).toBeInTheDocument();
+    expect(screen.getByText('Configuration profiles')).toBeInTheDocument();
+    expect(screen.getByText('Ready / running')).toBeInTheDocument();
+    expect(screen.getByText('Tool gating')).toBeInTheDocument();
+    expect(screen.getByText('Model routing')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Installed' })).toBeInTheDocument();
+    expect(screen.getByText('2 total')).toBeInTheDocument();
+    expect(screen.getByText('Target: cloud')).toBeInTheDocument();
+    expect(screen.getByText('No skills configured')).toBeInTheDocument();
+  });
+
+  it('renders the recovery panel in English when the agent list fails to load', () => {
+    render(
+      <AgentInstalledView
+        {...baseProps({ agents: [], agentsError: 'GET /agents 500', onAgentsRetry: vi.fn() })}
+      />,
+    );
+    expect(screen.getByText('Recovery')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Failed to load agents' })).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        'Could not read installed configurations from the current Hub. The list is temporarily unavailable; retry syncing.',
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument();
+  });
+
+  it('renders the syncing section state and head add action in English', () => {
+    render(
+      <AgentInstalledView
+        {...baseProps({ agents: [], agentsLoading: true, onAgentAdd: vi.fn() })}
+      />,
+    );
+    expect(screen.getByText('Syncing')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Add agent' })).toBeInTheDocument();
+  });
+});
+
+describe('AgentMarketViews en copy (#2015)', () => {
+  it('renders market head subcopy and publish action in English', () => {
+    render(
+      <AgentMarketView
+        {...baseProps({ activePane: 'market', onMarketPublish: vi.fn() })}
+      />,
+    );
+    expect(
+      screen.getByText(
+        'Install reusable agents from the TokenDance template library without affecting installed configurations.',
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Publish template' })).toBeInTheDocument();
+  });
+
+  it('renders the skill market head in English', () => {
+    render(<SkillMarketView {...baseProps({ activePane: 'skillMarket' })} />);
+    expect(screen.getByRole('heading', { name: 'Skill market' })).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        'Browse public skills and install them to the current agent profile with one click. Installed skills can be uninstalled at any time.',
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it('renders the MCP market head in English', () => {
+    render(<MCPMarketView {...baseProps({ activePane: 'mcpMarket' })} />);
+    expect(screen.getByRole('heading', { name: 'MCP market' })).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        'Browse public MCP servers and install them to an agent profile to extend tool capabilities. Supports stdio, HTTP, and SSE transports.',
+      ),
+    ).toBeInTheDocument();
+  });
+});
+
+describe('AgentEditItemParts en copy (#2015)', () => {
+  it('renders edit grid field labels and placeholder in English', () => {
+    render(<AgentEditGrid agent={agent('a1', 'Alpha')} />);
+    expect(screen.getByText('Name')).toBeInTheDocument();
+    expect(screen.getByText('Role')).toBeInTheDocument();
+    expect(screen.getByText('Runtime')).toBeInTheDocument();
+    expect(screen.getByText('Default model')).toBeInTheDocument();
+    expect(screen.getByText('Run mode')).toBeInTheDocument();
+    expect(screen.getByText('Status')).toBeInTheDocument();
+    expect(screen.getByText('Approval policy')).toBeInTheDocument();
+    expect(screen.getByText('Target preference')).toBeInTheDocument();
+    expect(screen.getByText('Context scope')).toBeInTheDocument();
+    expect(screen.getAllByPlaceholderText('Not set').length).toBeGreaterThan(0);
+  });
+
+  it('renders edit action buttons in English', () => {
+    render(
+      <AgentEditActions
+        isBusy={false}
+        isSaving={false}
+        isDeleting={false}
+        onAgentSave={() => undefined}
+        onAgentDuplicate={() => undefined}
+        onAgentDelete={() => undefined}
+      />,
+    );
+    expect(screen.getByRole('button', { name: 'Save configuration' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Duplicate agent' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Delete' })).toBeInTheDocument();
+  });
+
+  it('renders capability strip labels, aria, and readiness in English', () => {
+    render(
+      <AgentCapabilityStrip
+        agent={agent('a1', 'Alpha')}
+        capabilitySummary={{
+          agentsMd: 'ok',
+          skills: 'ok',
+          mcp: '\u2014',
+          memory: '\u2014',
+          tools: 'ok',
+          avatar: '\u2014',
+          readiness: 'ready',
+        }}
+      />,
+    );
+    expect(screen.getByLabelText('Capability readiness of Alpha')).toBeInTheDocument();
+    expect(screen.getByText('Workspace doc')).toBeInTheDocument();
+    expect(screen.getByText('Ready')).toBeInTheDocument();
+  });
+
+  it('renders mcp/memory and skill sections in English', () => {
+    render(<AgentMcpMemorySection agent={agent('a1', 'Alpha')} />);
+    expect(screen.getByRole('heading', { name: 'MCP / memory' })).toBeInTheDocument();
+    expect(screen.getByText('Policy pending')).toBeInTheDocument();
+
+    render(<AgentSkillChipGrid agent={agent('a1', 'Alpha')} allSkills={['frontend']} />);
+    expect(screen.getByRole('heading', { name: 'Skills' })).toBeInTheDocument();
+    expect(screen.getByText('0 enabled')).toBeInTheDocument();
+  });
+
+  it('renders mini log in English and keeps enum segment labels on the data plane', () => {
+    render(<AgentMiniLog recentEvents={[]} />);
+    expect(screen.getByRole('heading', { name: 'Recent runs' })).toBeInTheDocument();
+    expect(screen.getByText('0 events')).toBeInTheDocument();
+
+    render(<AgentToolPermissions agent={agent('a1', 'Alpha')} allTools={['shell']} />);
+    expect(screen.getByRole('heading', { name: 'Tool permissions' })).toBeInTheDocument();
+    // ToolPermission enum identifiers remain direct-display data (#2015 decision point).
+    expect(screen.getByRole('button', { name: '\u5141\u8bb8' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '\u9700\u786e\u8ba4' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '\u7981\u6b62' })).toBeInTheDocument();
+  });
+});
+
+describe('DataSourceBadge en copy (#2015)', () => {
+  it('renders provenance pills in English', () => {
+    const demo = render(<DataSourceBadge source="demo" />);
+    expect(demo.container.querySelector('[data-data-source="demo"]')?.textContent).toBe('Demo data');
+    const unavailable = render(<DataSourceBadge source="unavailable" />);
+    expect(
+      unavailable.container.querySelector('[data-data-source="unavailable"]')?.textContent,
+    ).toBe('Currently unavailable');
   });
 });

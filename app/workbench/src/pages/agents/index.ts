@@ -42,13 +42,13 @@ export {
   EDIT_ENGINE_OPTIONS,
   EDIT_MODEL_OPTIONS,
   EDIT_MODE_OPTIONS,
-  EDIT_STATE_OPTIONS,
   TOOL_PERMISSION_LABELS,
   buildStatusNoticeClassName,
   defaultToolPermission,
   getEditFieldConfigs,
+  getEditStateOptions,
 } from './AgentEditHelpers';
-export type { EditFieldConfig } from './AgentEditHelpers';
+export type { EditFieldConfig, EditHelpersTranslator } from './AgentEditHelpers';
 
 export {
   AgentAvatar,
