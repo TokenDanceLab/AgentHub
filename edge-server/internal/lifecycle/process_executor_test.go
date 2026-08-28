@@ -23,9 +23,21 @@ import (
 	"github.com/agenthub/edge-server/internal/events"
 	"github.com/agenthub/edge-server/internal/runnerctx"
 	"github.com/agenthub/edge-server/internal/store"
+	"github.com/agenthub/edge-server/internal/testkit"
 )
 
 const processExecutorHelperRunFlag = "-test.run=^TestProcessExecutorHelper$"
+
+const (
+	// processTrackedWaitTimeout is the Eventually budget for waiting until the
+	// executor tracks a started process; Cancel needs the tracked handle to
+	// arm the grace path (#2038).
+	processTrackedWaitTimeout = 5 * time.Second
+
+	// childCancelSettleWaitTimeout is the Eventually budget for a cascaded
+	// child run's store status to settle on cancelled (#2038).
+	childCancelSettleWaitTimeout = 3 * time.Second
+)
 
 func TestProcessExecutorRequiresCommand(t *testing.T) {
 	_, err := NewProcessExecutor(events.NewBus(10), store.New(), ProcessExecutorConfig{}, nil, nil)
@@ -1460,19 +1472,15 @@ func TestProcessExecutorCancelGraceNotImmediateKill(t *testing.T) {
 
 	// Wait until the child is tracked so Cancel arms the grace path (not just
 	// context cancel before Start).
-	deadline := time.Now().Add(5 * time.Second)
-	for {
+	testkit.Eventually(t, processTrackedWaitTimeout, func() bool {
 		executor.mu.Lock()
-		proc := executor.processes[run.ID]
-		executor.mu.Unlock()
-		if proc != nil {
-			break
-		}
-		if time.Now().After(deadline) {
-			t.Fatal("timed out waiting for process to be tracked")
-		}
-		time.Sleep(10 * time.Millisecond)
-	}
+		defer executor.mu.Unlock()
+		return executor.processes[run.ID] != nil
+	}, "started process should be tracked", func() string {
+		executor.mu.Lock()
+		defer executor.mu.Unlock()
+		return fmt.Sprintf("tracked processes=%d", len(executor.processes))
+	})
 
 	// Confirm grace path is armed and cancelDone is registered before the
 	// run context is cancelled (unit-level proof for #988).
@@ -3207,20 +3215,16 @@ func TestProcessExecutorParentFinishCascadesCancelToChildRunIDs(t *testing.T) {
 	}
 
 	// Wait until both processes are tracked so Cancel has a grace path.
-	deadline := time.Now().Add(5 * time.Second)
-	for {
+	testkit.Eventually(t, processTrackedWaitTimeout, func() bool {
 		executor.mu.Lock()
-		parentProc := executor.processes[parent.ID]
-		childProc := executor.processes[child.ID]
-		executor.mu.Unlock()
-		if parentProc != nil && childProc != nil {
-			break
-		}
-		if time.Now().After(deadline) {
-			t.Fatal("timed out waiting for parent/child processes to be tracked")
-		}
-		time.Sleep(10 * time.Millisecond)
-	}
+		defer executor.mu.Unlock()
+		return executor.processes[parent.ID] != nil && executor.processes[child.ID] != nil
+	}, "parent and child processes should be tracked", func() string {
+		executor.mu.Lock()
+		defer executor.mu.Unlock()
+		return fmt.Sprintf("tracked processes=%d parentTracked=%v childTracked=%v",
+			len(executor.processes), executor.processes[parent.ID] != nil, executor.processes[child.ID] != nil)
+	})
 
 	// Parent process finishes (success helper would exit immediately; here we
 	// Cancel the parent so finish() runs with a registry cascade). Using Cancel
@@ -3265,13 +3269,15 @@ func TestProcessExecutorParentFinishCascadesCancelToChildRunIDs(t *testing.T) {
 	}
 	if stored.Status != "cancelled" && stored.Status != "cancelling" {
 		// Allow brief race before store settles to cancelled.
-		deadline = time.Now().Add(3 * time.Second)
-		for stored.Status != "cancelled" && time.Now().Before(deadline) {
-			time.Sleep(20 * time.Millisecond)
-			stored, _ = s.GetRun(child.ID)
-		}
-		if stored.Status != "cancelled" {
-			t.Fatalf("child run status = %q, want cancelled", stored.Status)
-		}
+		testkit.Eventually(t, childCancelSettleWaitTimeout, func() bool {
+			current, _ := s.GetRun(child.ID)
+			return current.Status == "cancelled"
+		}, "child run status should settle to cancelled", func() string {
+			current, ok := s.GetRun(child.ID)
+			if !ok {
+				return "child run missing from store"
+			}
+			return fmt.Sprintf("childStatus=%q", current.Status)
+		})
 	}
 }

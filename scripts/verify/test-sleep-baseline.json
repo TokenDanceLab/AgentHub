@@ -10,7 +10,7 @@
  "edge-server/internal/hub/hub_behavior_test.go": 1,
  "edge-server/internal/lifecycle/decision_loop_test.go": 1,
  "edge-server/internal/lifecycle/process_executor_hub_callback_test.go": 1,
- "edge-server/internal/lifecycle/process_executor_test.go": 6,
+ "edge-server/internal/lifecycle/process_executor_test.go": 3,
  "edge-server/internal/skills/skills_test.go": 2,
  "edge-server/tests/hub_e2e_test.go": 7,
  "hub-server/internal/app/background_test.go": 2,
