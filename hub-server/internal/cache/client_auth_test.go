@@ -36,6 +36,25 @@ func TestIsRefreshTokenBlacklisted_Miss(t *testing.T) {
 	assert.False(t, hit, "a never-blacklisted key must not be reported as blacklisted")
 }
 
+// TestIsRefreshTokenBlacklisted_RedisDownPropagatesError proves the #2053
+// contract (symmetric with the AH-SR-052 access contract, #2040): a Redis
+// outage is not swallowed here. The error is returned to the caller so the
+// refresh decision point (service/auth RefreshToken) can apply the configured
+// fail-open/fail-closed policy (AGENTHUB_AUTH_FAIL_CLOSED). Swallowing the
+// error made that fail-closed branch unreachable in production.
+func TestIsRefreshTokenBlacklisted_RedisDownPropagatesError(t *testing.T) {
+	c, mr := testClient(t)
+	ctx := context.Background()
+
+	const blacklistKey = "rt-hash-redis-down"
+	require.NoError(t, c.BlacklistRefreshToken(ctx, blacklistKey, 5*time.Minute))
+	mr.Close() // simulate a Redis outage
+
+	hit, err := c.IsRefreshTokenBlacklisted(ctx, blacklistKey)
+	require.Error(t, err, "Redis errors must be propagated to the caller; fail-open/fail-closed is the refresh decision point's policy decision")
+	assert.False(t, hit, "on Redis errors the key must not be reported as blacklisted")
+}
+
 // TestBlacklistRefreshToken_RevokeIsIdempotent proves re-revoking the same
 // token hash does not error and the key stays blacklisted (semantic: a
 // second logout of an already-revoked token is a no-op, not a failure).
