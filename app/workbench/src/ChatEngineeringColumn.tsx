@@ -22,6 +22,7 @@ import {
   type AuxPanelTab,
 } from './auxPanel';
 import { WORKBENCH_INSPECTOR_QUICK_OPEN_EVENT } from './desktopChromeEvents';
+import type { InspectorTranslator } from './inspector/InspectorModePanelHelpers';
 import { WORKBENCH_ENGINEERING_PREVIEW_FOCUS_EVENT, type EngineeringPreviewFocusDetail } from './workbenchPreviewEvents';
 import shellStyles from './AgentHubWorkbench.module.css';
 import styles from './ChatEngineeringColumn.module.css';
@@ -53,11 +54,12 @@ export function engineeringPreviewSignal(
 }
 
 export function resolveEngineeringPreview(
+  t: InspectorTranslator,
   runtimeEvidence: RuntimeEvidenceSnapshot | undefined,
   focus?: Pick<EngineeringPreviewFocusDetail, 'artifactId' | 'artifactRunId'> | undefined,
 ): { kind: 'browser'; url: string } | { kind: 'file'; file: PreviewFile } | null {
   if (!runtimeEvidence) return null;
-  const artifactFiles = runtimeEvidenceOverviewFiles(runtimeEvidence).slice(
+  const artifactFiles = runtimeEvidenceOverviewFiles(t, runtimeEvidence).slice(
     0,
     runtimeEvidence.artifacts.length,
   );
@@ -104,8 +106,8 @@ export function ChatEngineeringColumn({
     Pick<EngineeringPreviewFocusDetail, 'artifactId' | 'artifactRunId'> | undefined
   >(undefined);
   const preview = useMemo(
-    () => resolveEngineeringPreview(runtimeEvidence, focusedArtifact),
-    [focusedArtifact, runtimeEvidence],
+    () => resolveEngineeringPreview(t, runtimeEvidence, focusedArtifact),
+    [focusedArtifact, runtimeEvidence, t],
   );
   const previewSignal = engineeringPreviewSignal(runtimeEvidence);
   const previewAvailable = localFiles || Boolean(previewSignal);
