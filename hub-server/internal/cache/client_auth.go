@@ -78,17 +78,20 @@ func (c *Client) BlacklistAccessToken(ctx context.Context, jti string, ttl time.
 }
 
 // IsAccessTokenBlacklisted reports whether an access-token jti is blacklisted.
-// Redis errors fail open (return false) so a transient outage does not deny
-// all authenticated traffic; logout still revokes refresh tokens in DB.
+// Redis errors are propagated to the caller (AH-SR-052 contract, #2040): the
+// auth middleware is the policy decision point and picks fail-open vs
+// fail-closed via AGENTHUB_AUTH_FAIL_CLOSED (middleware/auth.go
+// acceptAccessClaims). Swallowing errors here made that fail-closed branch
+// unreachable in the production wiring.
 func (c *Client) IsAccessTokenBlacklisted(ctx context.Context, jti string) (bool, error) {
 	if jti == "" {
 		return false, nil
 	}
 	n, err := c.rdb.Exists(ctx, "at_blacklist:"+jti).Result()
 	if err != nil {
-		slog.Warn("redis IsAccessTokenBlacklisted failed, fail-open",
+		slog.Warn("redis IsAccessTokenBlacklisted failed",
 			"jti", jti, "error", err)
-		return false, nil
+		return false, err
 	}
 	return n > 0, nil
 }
