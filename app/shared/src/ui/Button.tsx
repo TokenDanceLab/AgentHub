@@ -8,6 +8,8 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: ButtonVariant;
   size?: ButtonSize;
   fullWidth?: boolean;
+  /** Shows an inline spinner and blocks interaction (aria-busy). */
+  loading?: boolean;
 }
 
 function variantClass(v: ButtonVariant): string {
@@ -30,12 +32,27 @@ function sizeClass(s: ButtonSize): string {
 }
 
 const Button = forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ className, variant = 'primary', size = 'md', fullWidth, children, ...props }, ref) => {
-    const cls = [styles.base, variantClass(variant), sizeClass(size), fullWidth && styles.fullWidth, className]
+  ({ className, variant = 'primary', size = 'md', fullWidth, loading, disabled, children, ...props }, ref) => {
+    const cls = [
+      styles.base,
+      variantClass(variant),
+      sizeClass(size),
+      fullWidth && styles.fullWidth,
+      loading && styles.loading,
+      className,
+    ]
       .filter(Boolean)
       .join(' ');
     return (
-      <button type="button" ref={ref} className={cls} {...props}>
+      <button
+        type="button"
+        ref={ref}
+        className={cls}
+        aria-busy={loading || undefined}
+        disabled={disabled || loading}
+        {...props}
+      >
+        {loading ? <span className={styles.spinner} aria-hidden="true" /> : null}
         {children}
       </button>
     );
