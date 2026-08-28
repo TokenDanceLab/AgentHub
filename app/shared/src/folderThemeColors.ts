@@ -3,7 +3,7 @@
  *
  * Mirrors the themePresets.ts pattern: TS registry + DOM apply helper so
  * desktop/web shells share one palette. CSS values live in
- * `styles/folder-colors.css` under `[data-folder-accent=...]`.
+ * `styles/presets-folder-colors.css` under `[data-folder-accent=...]`.
  *
  * Design intent (agenthub-uiux-gap-analysis #M): each workspace folder may
  * carry an accent key; the active folder's accent drives `--td-accent` (and
@@ -149,7 +149,7 @@ export function getFolderThemeColorMeta(
 }
 
 /**
- * Apply or clear `data-folder-accent` on <html>. Matches folder-colors.css
+ * Apply or clear `data-folder-accent` on <html>. Matches presets-folder-colors.css
  * selectors. Pass undefined to revert to the default (no accent attribute →
  * --td-accent falls back to --primary).
  */
