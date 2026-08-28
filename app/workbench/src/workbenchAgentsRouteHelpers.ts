@@ -1,3 +1,4 @@
+import type { TFunction } from 'i18next';
 import type { WorkbenchAgent } from '@shared/platform';
 import type { AgentConfig, AgentsPaneId, ModelInfo, ModelState, ToolPermission } from './pages/AgentsPage';
 import {
@@ -23,6 +24,9 @@ import { uniqueSorted } from './agentProfileCatalogHelpers';
    exactOptionalPropertyTypes: only assign `?: T` fields when defined,
    unless the public field type explicitly allows `| undefined`.
    ═══════════════════════════════════════════════════════════════════════ */
+
+/** Translator for the sharedWorkbench bundle (component `t`, #2023). */
+export type AgentsTranslator = TFunction<'sharedWorkbench'>;
 
 export interface WorkbenchAgentsRouteStatus {
   loading?: boolean | undefined;
@@ -339,13 +343,13 @@ export interface AgentSaveStateLabelInput {
   actionError?: string | undefined;
 }
 
-export function resolveAgentSaveStateLabel(input: AgentSaveStateLabelInput): string {
-  if (input.selectedAgentDeleting) return '删除中';
-  if (input.selectedAgentSaving) return input.selectedAgentIsDraft ? '创建中' : '保存中';
-  if (input.actionError) return '保存失败';
-  if (input.selectedAgentIsDraft) return '草稿';
-  if (input.selectedAgentIsDirty) return '未保存';
-  return '已同步';
+export function resolveAgentSaveStateLabel(t: AgentsTranslator, input: AgentSaveStateLabelInput): string {
+  if (input.selectedAgentDeleting) return t('agents.edit.saveState.deleting');
+  if (input.selectedAgentSaving) return input.selectedAgentIsDraft ? t('agents.edit.saveState.creating') : t('agents.edit.saveState.saving');
+  if (input.actionError) return t('agents.edit.saveState.saveFailed');
+  if (input.selectedAgentIsDraft) return t('agents.edit.saveState.draft');
+  if (input.selectedAgentIsDirty) return t('agents.edit.saveState.unsaved');
+  return t('agents.edit.saveState.synced');
 }
 
 export type AgentsRouteSetState<T> = (value: T | ((prev: T) => T)) => void;
@@ -358,6 +362,8 @@ export interface WorkbenchAgentsRouteStateAccessors {
   selectedAgentIsDraft: boolean;
   agentProfilesStatus?: WorkbenchAgentsRouteStatus | undefined;
   selectedAgentDeleting: boolean;
+  /** sharedWorkbench translator for save-state labels (#2023). */
+  translator: AgentsTranslator;
   selectedAgentSaving: boolean;
   selectedAgentIsDirty: boolean;
   onAgentCreate?: ((agent: AgentConfig) => Promise<void> | void) | undefined;
@@ -430,6 +436,7 @@ export function buildWorkbenchAgentsRouteHandlers(
     selectedAgentDeleting,
     selectedAgentSaving,
     selectedAgentIsDirty,
+    translator,
     onAgentCreate,
     onAgentUpdate,
     onAgentDelete,
@@ -511,7 +518,7 @@ export function buildWorkbenchAgentsRouteHandlers(
       patchSelectedAgent(access, buildAgentFieldPatch(field, value));
     },
     agentSaveStateLabel() {
-      return resolveAgentSaveStateLabel({
+      return resolveAgentSaveStateLabel(translator, {
         selectedAgentDeleting,
         selectedAgentSaving,
         selectedAgentIsDraft,

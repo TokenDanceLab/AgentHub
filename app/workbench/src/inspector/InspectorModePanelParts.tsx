@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import type { EvidenceRef, ContextUsageTranscriptBlock } from '@shared/transcript';
 import { formatTokens } from '@shared/context/breakdown';
 import { CHATVIEW_I18N_NAMESPACE } from '@shared/chatview/i18n/resources';
+import { SHARED_WORKBENCH_I18N_NAMESPACE } from '@shared/i18n';
 import {
   DesignFileIcon,
   DesignNavIcon,
@@ -79,9 +80,10 @@ export function DeployStatusBar({
   status: DeployStatus;
   url?: string | undefined;
 }): React.ReactElement {
+  const { t: tWorkbench } = useTranslation(SHARED_WORKBENCH_I18N_NAMESPACE);
   const isReady = isDeployReady(status);
   const isDeploying = isDeployInProgress(status);
-  const statusLabel = deployStatusLabel(status);
+  const statusLabel = deployStatusLabel(tWorkbench, status);
   const dotColor = deployDotColor(status);
 
   return (

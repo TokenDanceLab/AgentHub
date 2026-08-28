@@ -5,6 +5,7 @@ import {
   createLocalTask,
 } from './workbenchTaskGroups';
 import {
+  type TasksTranslator,
   buildTaskEditDraft,
   nextTaskSortMode,
   nextTaskStatus,
@@ -20,19 +21,29 @@ import {
 
    Pane/sort/group labels, create/edit/delete/cycle/assign/filter plans,
    toolbar toggles. No React hooks / no intentional UX change.
+
+   i18n note (#2023): action feedback labels resolve through the
+   sharedWorkbench bundle via a passed-in translator (component `t`);
+   TaskStatus enum identifiers interpolated into copy stay verbatim
+   (data-plane per the #2023 decision).
    exactOptionalPropertyTypes: only assign `?: T` fields when defined,
    unless the public field type explicitly allows `| undefined`.
    ═══════════════════════════════════════════════════════════════════════ */
 
-const TASK_PANE_LABELS: Record<TasksPane, string> = {
-  owned: '我负责的',
-  watching: '我关注的',
-  activity: '动态',
-  done: '已完成',
-  all: '任务视图',
-  created: '任务视图',
-  assigned: '任务视图',
-};
+function taskPaneLabel(t: TasksTranslator, pane: TasksPane): string {
+  switch (pane) {
+    case 'owned':
+      return t('tasks.action.panes.owned');
+    case 'watching':
+      return t('tasks.action.panes.watching');
+    case 'activity':
+      return t('tasks.action.panes.activity');
+    case 'done':
+      return t('tasks.action.panes.done');
+    default:
+      return t('tasks.action.panes.view');
+  }
+}
 
 export interface TaskSelectionReset {
   selectedTaskId: null;
@@ -67,7 +78,7 @@ export interface TaskListResetPlan {
   taskViewMode: 'list';
   taskGroupMode: 'custom';
   taskNavMenuOpen: false;
-  taskActionLabel: '已回到任务清单';
+  taskActionLabel: string;
 }
 
 export interface TaskSortTogglePlan {
@@ -142,53 +153,53 @@ export interface ToggleFlagPlan {
   taskActionLabel: string;
 }
 
-export function buildTaskPaneChangeLabel(pane: TasksPane): string {
-  return `已切换到${TASK_PANE_LABELS[pane]}`;
+export function buildTaskPaneChangeLabel(t: TasksTranslator, pane: TasksPane): string {
+  return t('tasks.action.paneSwitched', { pane: taskPaneLabel(t, pane) });
 }
 
-export function planTaskPaneChange(pane: TasksPane): TaskPaneChangePlan {
+export function planTaskPaneChange(t: TasksTranslator, pane: TasksPane): TaskPaneChangePlan {
   return {
     tasksPane: pane,
     selectedTaskId: null,
     editingTaskId: null,
     editingTaskDraft: null,
     taskNavMenuOpen: false,
-    taskActionLabel: buildTaskPaneChangeLabel(pane),
+    taskActionLabel: buildTaskPaneChangeLabel(t, pane),
   };
 }
 
-export function buildTaskSortActionLabel(mode: TaskSortMode): string {
-  return mode === 'due' ? '已按截止时间排序' : '已恢复拖拽自定义排序';
+export function buildTaskSortActionLabel(t: TasksTranslator, mode: TaskSortMode): string {
+  return mode === 'due' ? t('tasks.action.sortDue') : t('tasks.action.sortDrag');
 }
 
-export function planTaskSortToggle(current: TaskSortMode): TaskSortTogglePlan {
+export function planTaskSortToggle(t: TasksTranslator, current: TaskSortMode): TaskSortTogglePlan {
   const next = nextTaskSortMode(current);
   return {
     next,
-    taskActionLabel: buildTaskSortActionLabel(next),
+    taskActionLabel: buildTaskSortActionLabel(t, next),
   };
 }
 
-export function planTaskListReset(): TaskListResetPlan {
+export function planTaskListReset(t: TasksTranslator): TaskListResetPlan {
   return {
     taskViewMode: 'list',
     taskGroupMode: 'custom',
     taskNavMenuOpen: false,
-    taskActionLabel: '已回到任务清单',
+    taskActionLabel: t('tasks.action.backToList'),
   };
 }
 
-export function planNewTaskGroup(groupCount: number): NewTaskGroupPlan {
+export function planNewTaskGroup(t: TasksTranslator, groupCount: number): NewTaskGroupPlan {
   const nextIndex = groupCount + 1;
   return {
     nextIndex,
     taskGroupMode: 'custom',
     taskViewMode: 'list',
-    taskActionLabel: `已创建自定义分组 ${nextIndex}`,
+    taskActionLabel: t('tasks.action.groupCreated', { index: nextIndex }),
   };
 }
 
-export function planCreateTask(localTaskCounter: number): CreateTaskPlan {
+export function planCreateTask(t: TasksTranslator, localTaskCounter: number): CreateTaskPlan {
   const nextTask = createLocalTask(localTaskCounter);
   return {
     nextTask,
@@ -197,35 +208,36 @@ export function planCreateTask(localTaskCounter: number): CreateTaskPlan {
     selectedTaskId: nextTask.id,
     editingTaskId: nextTask.id,
     editingTaskDraft: buildTaskEditDraft(nextTask),
-    taskActionLabel: `已创建 ${nextTask.title}`,
+    taskActionLabel: t('tasks.action.taskCreated', { title: nextTask.title }),
   };
 }
 
-export function planStartTaskEdit(task: TaskItem): StartTaskEditPlan {
+export function planStartTaskEdit(t: TasksTranslator, task: TaskItem): StartTaskEditPlan {
   return {
     selectedTaskId: task.id,
     editingTaskId: task.id,
     editingTaskDraft: buildTaskEditDraft(task),
     taskViewMode: 'list',
-    taskActionLabel: `正在编辑 ${task.title}`,
+    taskActionLabel: t('tasks.action.editing', { title: task.title }),
   };
 }
 
-export function planEditSelectedTask(selectedTask: TaskItem | null): StartTaskEditPlan | SelectedTaskGuardPlan {
+export function planEditSelectedTask(t: TasksTranslator, selectedTask: TaskItem | null): StartTaskEditPlan | SelectedTaskGuardPlan {
   if (!selectedTask) {
-    return { kind: 'feedback', taskActionLabel: '请先选择任务' };
+    return { kind: 'feedback', taskActionLabel: t('tasks.action.selectFirst') };
   }
-  return planStartTaskEdit(selectedTask);
+  return planStartTaskEdit(t, selectedTask);
 }
 
 export function planSaveTaskEdit(
+  t: TasksTranslator,
   editingTaskId: string | null,
   editingTaskDraft: TaskEditDraft | null,
 ): SaveTaskEditPlan | TaskActionFeedbackPlan {
   if (!editingTaskId || !editingTaskDraft) {
-    return { kind: 'feedback', taskActionLabel: '没有正在编辑的任务' };
+    return { kind: 'feedback', taskActionLabel: t('tasks.action.noEditingTask') };
   }
-  const saved = prepareTaskEditSave(editingTaskDraft);
+  const saved = prepareTaskEditSave(t, editingTaskDraft);
   return {
     kind: 'save',
     taskId: editingTaskId,
@@ -234,14 +246,14 @@ export function planSaveTaskEdit(
   };
 }
 
-export function planCancelTaskEdit(editingTaskDraft: TaskEditDraft | null): TaskActionFeedbackPlan | null {
+export function planCancelTaskEdit(t: TasksTranslator, editingTaskDraft: TaskEditDraft | null): TaskActionFeedbackPlan | null {
   if (!editingTaskDraft) return null;
-  return { kind: 'feedback', taskActionLabel: '已取消编辑' };
+  return { kind: 'feedback', taskActionLabel: t('tasks.action.editCancelled') };
 }
 
-export function planDeleteSelectedTask(selectedTask: TaskItem | null): DeleteSelectedTaskPlan | SelectedTaskGuardPlan {
+export function planDeleteSelectedTask(t: TasksTranslator, selectedTask: TaskItem | null): DeleteSelectedTaskPlan | SelectedTaskGuardPlan {
   if (!selectedTask) {
-    return { kind: 'feedback', taskActionLabel: '请先选择任务' };
+    return { kind: 'feedback', taskActionLabel: t('tasks.action.selectFirst') };
   }
   return {
     kind: 'delete',
@@ -249,89 +261,97 @@ export function planDeleteSelectedTask(selectedTask: TaskItem | null): DeleteSel
     selectedTaskId: null,
     editingTaskId: null,
     editingTaskDraft: null,
-    taskActionLabel: `${selectedTask.title} 已删除`,
+    taskActionLabel: t('tasks.action.taskDeleted', { title: selectedTask.title }),
   };
 }
 
 export function planCycleSelectedTaskStatus(
+  t: TasksTranslator,
   selectedTask: TaskItem | null,
 ): CycleSelectedTaskStatusPlan | SelectedTaskGuardPlan {
   if (!selectedTask) {
-    return { kind: 'feedback', taskActionLabel: '请先选择任务' };
+    return { kind: 'feedback', taskActionLabel: t('tasks.action.selectFirst') };
   }
   const status = nextTaskStatus(selectedTask.status);
   return {
     kind: 'cycle',
     taskId: selectedTask.id,
     status,
-    taskActionLabel: `${selectedTask.title} 已推进到 ${status}`,
+    // TaskStatus enum identifiers stay verbatim (data-plane, #2023 decision).
+    taskActionLabel: t('tasks.action.statusAdvanced', { title: selectedTask.title, status }),
   };
 }
 
 export function planAssignSelectedTaskToMe(
+  t: TasksTranslator,
   selectedTask: TaskItem | null,
   userDisplayName?: string | undefined,
   currentUserId?: string | undefined,
 ): AssignSelectedTaskPlan | SelectedTaskGuardPlan {
   if (!selectedTask) {
-    return { kind: 'feedback', taskActionLabel: '请先选择任务' };
+    return { kind: 'feedback', taskActionLabel: t('tasks.action.selectFirst') };
   }
   const assignee = resolveTaskAssignee(userDisplayName, currentUserId);
   return {
     kind: 'assign',
     taskId: selectedTask.id,
     assignee,
-    taskActionLabel: `${selectedTask.title} 已指派给 ${resolveTaskAssigneeLabel(userDisplayName)}`,
+    taskActionLabel: t('tasks.action.taskAssigned', {
+      title: selectedTask.title,
+      assignee: resolveTaskAssigneeLabel(t, userDisplayName),
+    }),
   };
 }
 
 export function planGroupBySelectedTaskProject(
+  t: TasksTranslator,
   selectedTask: TaskItem | null,
 ): GroupBySelectedProjectPlan | SelectedTaskGuardPlan {
   if (!selectedTask) {
-    return { kind: 'feedback', taskActionLabel: '请先选择任务' };
+    return { kind: 'feedback', taskActionLabel: t('tasks.action.selectFirst') };
   }
   return {
     kind: 'group-project',
     taskGroupMode: 'project',
     taskViewMode: 'list',
-    taskActionLabel: `已按项目查看：${selectedTask.project}`,
+    taskActionLabel: t('tasks.action.groupByProject', { project: selectedTask.project }),
   };
 }
 
 export function planFilterBySelectedTaskAssignee(
+  t: TasksTranslator,
   selectedTask: TaskItem | null,
   currentUserId?: string | undefined,
 ): FilterBySelectedAssigneePlan | SelectedTaskGuardPlan {
   if (!selectedTask) {
-    return { kind: 'feedback', taskActionLabel: '请先选择任务' };
+    return { kind: 'feedback', taskActionLabel: t('tasks.action.selectFirst') };
   }
   return {
     kind: 'filter-assignee',
     tasksPane: resolveFilterPaneForAssignee(selectedTask.assignee, currentUserId),
     taskFilterActive: false,
-    taskActionLabel: `当前负责人：${selectedTask.assignee}`,
+    taskActionLabel: t('tasks.action.currentAssignee', { assignee: selectedTask.assignee }),
   };
 }
 
-export function planTaskClick(task: TaskItem, editingTaskId: string | null): TaskClickPlan {
+export function planTaskClick(t: TasksTranslator, task: TaskItem, editingTaskId: string | null): TaskClickPlan {
   return {
     selectedTaskId: task.id,
     clearEdit: Boolean(editingTaskId && editingTaskId !== task.id),
-    taskActionLabel: `已选中 ${task.title}`,
+    taskActionLabel: t('tasks.action.taskSelected', { title: task.title }),
   };
 }
 
-export function planToolbarFieldConfig(currentlyShown: boolean): ToggleFlagPlan {
+export function planToolbarFieldConfig(t: TasksTranslator, currentlyShown: boolean): ToggleFlagPlan {
   return {
     next: !currentlyShown,
-    taskActionLabel: currentlyShown ? '已隐藏创建人字段' : '已显示创建人字段',
+    taskActionLabel: currentlyShown ? t('tasks.action.creatorFieldHidden') : t('tasks.action.creatorFieldShown'),
   };
 }
 
-export function planToolbarFilter(currentlyActive: boolean): ToggleFlagPlan {
+export function planToolbarFilter(t: TasksTranslator, currentlyActive: boolean): ToggleFlagPlan {
   return {
     next: !currentlyActive,
-    taskActionLabel: currentlyActive ? '已关闭筛选' : '筛选已启用',
+    taskActionLabel: currentlyActive ? t('tasks.action.filterClosed') : t('tasks.action.filterEnabled'),
   };
 }

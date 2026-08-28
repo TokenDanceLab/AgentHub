@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import { SHARED_WORKBENCH_I18N_NAMESPACE } from '@shared/i18n';
 import type { AgentsPaneId, AgentConfig } from './pages/AgentsPage';
 import {
   buildWorkbenchAgentsRouteHandlers,
@@ -34,6 +36,7 @@ export function useWorkbenchAgentsRoute({
   onAgentUpdate,
   onAgentDelete,
 }: UseWorkbenchAgentsRouteOptions): WorkbenchAgentsRoute {
+  const { t } = useTranslation(SHARED_WORKBENCH_I18N_NAMESPACE);
   const [agentsPane, setAgentsPane] = useState<AgentsPaneId>('installed');
   const [selectedAgentId, setSelectedAgentId] = useState<string | undefined>(focusedAgentId);
   const [agentDrafts, setAgentDrafts] = useState<Record<string, AgentConfig>>({});
@@ -94,6 +97,7 @@ export function useWorkbenchAgentsRoute({
     selectedAgentDeleting,
     selectedAgentSaving,
     selectedAgentIsDirty,
+    translator: t,
     ...(agentProfilesStatus !== undefined ? { agentProfilesStatus } : {}),
     ...(onAgentCreate !== undefined ? { onAgentCreate } : {}),
     ...(onAgentUpdate !== undefined ? { onAgentUpdate } : {}),

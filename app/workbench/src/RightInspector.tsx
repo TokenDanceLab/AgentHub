@@ -144,13 +144,13 @@ export function RightInspector({
   }, [reviewFileRequest]);
 
   const overviewTasks = useMemo(
-    () => resolveOverviewTasks(evidence, runtimeEvidence),
-    [evidence, runtimeEvidence],
+    () => resolveOverviewTasks(t, evidence, runtimeEvidence),
+    [evidence, runtimeEvidence, t],
   );
 
   const overviewFiles = useMemo(
-    () => resolveOverviewFiles(evidence, runtimeEvidence, previewFile?.name),
-    [evidence, previewFile?.name, runtimeEvidence],
+    () => resolveOverviewFiles(t, evidence, runtimeEvidence, previewFile?.name),
+    [evidence, previewFile?.name, runtimeEvidence, t],
   );
 
   const handleFileClick = useCallback((file: FileItem) => {

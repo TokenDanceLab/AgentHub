@@ -10,6 +10,7 @@ import {
   evidenceOverviewFiles,
   evidenceOverviewTasks,
 } from './inspector/InspectorModePanels';
+import type { InspectorTranslator } from './inspector/InspectorModePanelHelpers';
 import type { InspectorMode, InspectorTabDef } from './inspector/InspectorTabChrome';
 import type { FileItem, TaskItem } from './inspector/OverviewPanel';
 import {
@@ -51,22 +52,24 @@ export function resolveDagNodesFromRouteBlocks(
 }
 
 export function resolveOverviewTasks(
+  t: InspectorTranslator,
   evidence: EvidenceRef[],
   runtimeEvidence: RuntimeEvidenceSnapshot | undefined,
 ): TaskItem[] {
   if (runtimeEvidence) return runtimeEvidenceOverviewTasks(runtimeEvidence);
-  return evidenceOverviewTasks(evidence);
+  return evidenceOverviewTasks(t, evidence);
 }
 
 /** Mark the currently open overview file for OverviewPanel highlight. */
 export function resolveOverviewFiles(
+  t: InspectorTranslator,
   evidence: EvidenceRef[],
   runtimeEvidence: RuntimeEvidenceSnapshot | undefined,
   openFileName: string | undefined,
 ): PreviewFile[] {
   const files = runtimeEvidence
     ? runtimeEvidenceOverviewFiles(runtimeEvidence)
-    : evidenceOverviewFiles(evidence);
+    : evidenceOverviewFiles(t, evidence);
   return files.map((file) => ({
     ...file,
     isOpen: openFileName === file.name,
