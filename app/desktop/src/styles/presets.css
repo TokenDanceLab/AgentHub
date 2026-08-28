@@ -1,3 +1,3 @@
 /* AgentHub Desktop Presets — thin re-export of shared preset themes */
 @import '@shared/styles/presets-base.css';
-@import '@shared/styles/folder-colors.css';
+@import '@shared/styles/presets-folder-colors.css';
