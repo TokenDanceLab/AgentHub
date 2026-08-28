@@ -1,11 +1,15 @@
 package skills
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/agenthub/edge-server/internal/testkit"
 )
 
 // ============================================================================
@@ -698,10 +702,37 @@ func skillNames(skills []*Skill) []string {
 // TestHotReload
 // ============================================================================
 
-// waitForDebounce waits for the hot reload debounce window plus a small buffer
-// to ensure pending reloads have been processed.
+// hotReloadWaitTimeout is the Eventually budget for positive hot-reload
+// assertions (#2033): far larger than hotReloadDebounce (500ms) so busy CI
+// machines still converge, while tests return as soon as the reload lands.
+const hotReloadWaitTimeout = 5 * time.Second
+
+// waitForDebounce performs a BOUNDED wait of the hot-reload debounce window
+// plus margin. It is retained only for the negative assertion in
+// TestHotReloadStopWatch: a negative assertion ("the skill must NOT be
+// picked up") cannot be expressed with testkit.Eventually — that condition
+// would have to be polled forever — so it must wait a bounded window in
+// which a broken (still-active) watcher could react, then assert absence.
+// Positive hot-reload assertions must use testkit.Eventually instead. The
+// margin is generous so that even on a busy machine a hypothetical
+// still-active watcher has time to expose itself before we assert absence.
 func waitForDebounce() {
-	time.Sleep(hotReloadDebounce + 100*time.Millisecond)
+	time.Sleep(hotReloadDebounce + 500*time.Millisecond)
+}
+
+// registryDump returns a state snapshot printer for testkit.Eventually: on
+// timeout it shows the current skill count and sorted names so a flake can
+// be diagnosed from the failure message alone.
+func registryDump(reg *SkillRegistry) func() string {
+	return func() string {
+		list := reg.List()
+		names := make([]string, 0, len(list))
+		for _, s := range list {
+			names = append(names, s.Name)
+		}
+		sort.Strings(names)
+		return fmt.Sprintf("registry state: Count=%d skills=%v", reg.Count(), names)
+	}
 }
 
 func TestHotReloadNewSkill(t *testing.T) {
@@ -727,7 +758,13 @@ func TestHotReloadNewSkill(t *testing.T) {
 
 	// Create a new skill after watcher started.
 	mustWriteFile(t, filepath.Join(baseDir, "beta", "SKILL.md"), basicSkillMD("beta", "Beta skill"))
-	waitForDebounce()
+
+	// Positive assertion: poll the real registry state instead of sleeping a
+	// fixed debounce window, which flakes when event delivery exceeds the
+	// window on busy machines (#2033).
+	testkit.Eventually(t, hotReloadWaitTimeout, func() bool {
+		return reg.Count() == 2
+	}, "hot reload should add the new skill beta (Count=2)", registryDump(reg))
 
 	if reg.Count() != 2 {
 		t.Fatalf("Count = %d, want 2 after hot reload of new skill", reg.Count())
@@ -768,7 +805,14 @@ triggers: hello, world
 Updated body content.
 `
 	mustWriteFile(t, filepath.Join(baseDir, "alpha", "SKILL.md"), updated)
-	waitForDebounce()
+
+	// Positive assertion: poll until the reloaded entry is visible. The
+	// reload swaps the whole skill entry atomically under the registry lock,
+	// so once the new Description is observable, the new Triggers are too.
+	testkit.Eventually(t, hotReloadWaitTimeout, func() bool {
+		skill, ok := reg.Get("alpha")
+		return ok && skill.Description == "Updated description"
+	}, "hot reload should apply the modified description for alpha", registryDump(reg))
 
 	skill, ok := reg.Get("alpha")
 	if !ok {
@@ -801,7 +845,11 @@ func TestHotReloadRemovedSkill(t *testing.T) {
 	if err := os.Remove(filepath.Join(baseDir, "alpha", "SKILL.md")); err != nil {
 		t.Fatalf("Remove: %v", err)
 	}
-	waitForDebounce()
+
+	// Positive assertion: poll until the removal is reflected in the registry.
+	testkit.Eventually(t, hotReloadWaitTimeout, func() bool {
+		return reg.Count() == 0
+	}, "hot reload should remove alpha (Count=0)", registryDump(reg))
 
 	if reg.Count() != 0 {
 		t.Fatalf("Count = %d, want 0 after removal", reg.Count())
@@ -835,7 +883,13 @@ func TestHotReloadDebouncePreventsDoubleLoad(t *testing.T) {
 		mustWriteFile(t, filepath.Join(baseDir, "beta", "SKILL.md"), content)
 		time.Sleep(50 * time.Millisecond)
 	}
-	waitForDebounce()
+
+	// Positive assertion: poll until the (coalesced) reload lands. All writes
+	// target the same path, so the count transitions 0 -> 1 exactly once and
+	// stays 1; any Count > 1 would mean debounce failed to coalesce.
+	testkit.Eventually(t, hotReloadWaitTimeout, func() bool {
+		return reg.Count() == 1
+	}, "debounced hot reload should load beta exactly once (Count=1)", registryDump(reg))
 
 	// Should still be exactly 1 skill, not 5.
 	if reg.Count() != 1 {
@@ -864,6 +918,11 @@ func TestHotReloadStopWatch(t *testing.T) {
 
 	// Create a new skill after stop — should NOT be picked up.
 	mustWriteFile(t, filepath.Join(baseDir, "beta", "SKILL.md"), basicSkillMD("beta", "Beta skill"))
+
+	// Negative assertion: "beta must NOT appear" cannot be polled with
+	// testkit.Eventually (it would run forever), so we wait a bounded window
+	// in which a broken (still-active) watcher would have picked the skill
+	// up, then assert absence (#2033).
 	waitForDebounce()
 
 	if reg.Count() != 1 {
@@ -898,7 +957,14 @@ func TestHotReloadEmptyDir(t *testing.T) {
 
 	// Create a new skill subdirectory and SKILL.md at once.
 	mustWriteFile(t, filepath.Join(baseDir, "gamma", "SKILL.md"), basicSkillMD("gamma", "Gamma skill"))
-	waitForDebounce()
+
+	// Positive assertion: poll until the registry reflects the skill created
+	// in a brand-new subdirectory. This was the case that flaked on busy CI
+	// machines with the old fixed-sleep wait (#2033).
+	testkit.Eventually(t, hotReloadWaitTimeout, func() bool {
+		_, ok := reg.Get("gamma")
+		return reg.Count() == 1 && ok
+	}, "hot reload should pick up gamma created in a new subdirectory (Count=1)", registryDump(reg))
 
 	if reg.Count() != 1 {
 		t.Fatalf("Count = %d, want 1 (skill created in new subdirectory under watched dir)", reg.Count())
