@@ -141,9 +141,15 @@ func TestTokenProviderRefreshFailureRetries(t *testing.T) {
 	p.StartAutoRefresh()
 	defer p.Stop()
 
+	// Wait on the client-side signal that is actually asserted: LastError is
+	// written only after the client processes the 500 response, while the
+	// server-side request counter increments earlier and left a race window
+	// that flaked on slow Windows CI scheduling (FLK-001).
 	testkit.Eventually(t, 5*time.Second, func() bool {
-		return refreshCalls.Load() >= 1
-	}, "refresh fired", func() string { return fmt.Sprintf("refreshCalls=%d", refreshCalls.Load()) })
+		return p.LastError() != ""
+	}, "rotation failure recorded in LastError", func() string {
+		return fmt.Sprintf("refreshCalls=%d lastError=%q", refreshCalls.Load(), p.LastError())
+	})
 	if err := p.LastError(); !strings.Contains(err, "refresh status 500") {
 		t.Fatalf("LastError = %q, want refresh status 500", err)
 	}

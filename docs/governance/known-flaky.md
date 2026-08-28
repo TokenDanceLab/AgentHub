@@ -3,7 +3,7 @@
 > Owner：本文件是 AgentHub「flake 登记、重试预算与 CI annotation 约定」的 SSOT。其他文档涉及 flaky 处置时以本文件为准，不复制规则。
 > 相关：规则 → 机器验证映射见 [verifier-map](verifier-map.md)。本登记表暂无机器门禁，靠到期复审纪律与评审执行。
 
-最后更新：2026-08-25（登记 FLK-002：web stubbed-hub chat-flow-contract 发送按钮偶发禁用超时）
+最后更新：2026-08-28（FLK-001 根因修复并归档）
 
 ## 为什么需要登记表
 
@@ -71,17 +71,18 @@ Flaky 测试侵蚀门禁可信度：一旦「偶发红、重跑转绿」成为�
 | 首现日期 | 2026-08-25 |
 | 复现命令 | `cd edge-server && go test ./internal/hub/ -run '^TestTokenProviderRefreshFailureRetries$' -count=50 -short`（压测复现；CI 全量为 `go test ./... -short -count=1 -timeout 15m`） |
 | 到期复审日 | 2026-09-24 |
-| 状态 | 待修复 |
+| 状态 | 已修复（归档） |
 
 **现象**：2026-08-25 的 Windows CI 运行中出现一次偶发失败（`LastError` 断言为空），`gh run rerun --failed` 后转绿；同车道 Linux 运行未见复现。
 
-**根因（静态审查确认，修复未落地）**：测试以 mock 服务端请求计数（`refreshCalls >= 1`）作为等待信号，而计数在**服务端收到请求时**即自增；被断言的 `LastError()` 由**客户端**在收到 500 响应后才写入（`token_provider.go` 的 `setLastErr("refresh status " + resp.Status)`）。两个信号之间存在时序窗口，Windows CI 调度延迟拉大该窗口时，断言先于错误记录执行，导致偶发失败。修复方向：把等待信号改为直接轮询 `LastError()` 非空（或与请求计数合取）；属测试代码变更，按车道纪律另起 PR 实施。
+**根因（静态审查确认，2026-08-28 根因修复落地）**：测试以 mock 服务端请求计数（`refreshCalls >= 1`）作为等待信号，而计数在**服务端收到请求时**即自增；被断言的 `LastError()` 由**客户端**在收到 500 响应后才写入（`token_provider.go` 的 `setLastErr("refresh status " + resp.Status)`）。两个信号之间存在时序窗口，Windows CI 调度延迟拉大该窗口时，断言先于错误记录执行，导致偶发失败。修复方向：把等待信号改为直接轮询 `LastError()` 非空（或与请求计数合取）；属测试代码变更，按车道纪律另起 PR 实施（2026-08-28 落地，见处置记录）。
 
 **处置记录**：
 
 | 日期 | 动作 | 结果 |
 |---|---|---|
 | 2026-08-25 | Windows CI 偶发红，执行 `gh run rerun --failed` | 转绿；建立本登记条目，根因静态确认，修复未落地 |
+| 2026-08-28 | 根因修复：等待信号由服务端请求计数改为 testkit.Eventually 轮询客户端 LastError() 非空，消除服务端计数/客户端错误记录间的时序窗口 | 本机 Windows 压测 -count=200 零失败、internal/hub 全包 -short 全绿、go vet 干净；状态转已修复（归档） |
 
 ### FLK-002 chat-flow-contract in-flight 发送按钮偶发禁用超时
 
