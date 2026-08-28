@@ -2,7 +2,7 @@
   "_comment": "Baseline of i18n callsite violations (source files with CJK string literals but no useTranslation import). The verify gate fails when the current count EXCEEDS this baseline; lower this number as more callsites are wired to useTranslation.",
   "scanRoot": "app/shared/src + app/workbench/src",
   "totalViolations": 77,
-  "totalCjkLiteralLines": 603,
+  "totalCjkLiteralLines": 597,
   "files": [
     {
       "path": "shared/chatview/adapterMapBlock.ts",
@@ -610,13 +610,13 @@
     },
     {
       "path": "workbench/workbenchAgentsRouteHelpers.ts",
-      "cjkLiteralLines": 13,
+      "cjkLiteralLines": 7,
       "samples": [
-        105,
-        106,
-        107,
-        108,
-        238
+        109,
+        110,
+        111,
+        112,
+        242
       ]
     },
     {

@@ -1,6 +1,7 @@
 // real_tested=true
 import { act, renderHook } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeAll, describe, expect, it, vi } from 'vitest';
+import { useTestI18nLanguage } from '@shared/testing/i18n';
 import type { WorkbenchAgent } from '@shared/platform';
 import {
   WORKBENCH_MOCK_AGENT_CONFIGS,
@@ -22,6 +23,10 @@ import {
    the empty-selection no-ops, the save/delete failure short-circuits and
    the selection-repair effect.
    ═══════════════════════════════════════════════════════════════════════ */
+
+beforeAll(async () => {
+  await useTestI18nLanguage('zh');
+});
 
 function renderAgentsRoute(options: UseWorkbenchAgentsRouteOptions) {
   return renderHook((props: UseWorkbenchAgentsRouteOptions) => useWorkbenchAgentsRoute(props), {

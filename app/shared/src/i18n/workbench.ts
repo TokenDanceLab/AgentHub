@@ -555,6 +555,15 @@ export const sharedWorkbenchResources = {
           idle: '空闲',
           waiting: '等待中',
         },
+        saveState: {
+          deleting: '删除中',
+          creating: '创建中',
+          saving: '保存中',
+          saveFailed: '保存失败',
+          draft: '草稿',
+          unsaved: '未保存',
+          synced: '已同步',
+        },
         readiness: {
           ready: '就绪',
           partial: '部分就绪',
@@ -1220,6 +1229,15 @@ export const sharedWorkbenchResources = {
           ready: 'Ready',
           idle: 'Idle',
           waiting: 'Waiting',
+        },
+        saveState: {
+          deleting: 'Deleting',
+          creating: 'Creating',
+          saving: 'Saving',
+          saveFailed: 'Save failed',
+          draft: 'Draft',
+          unsaved: 'Unsaved',
+          synced: 'Synced',
         },
         readiness: {
           ready: 'Ready',

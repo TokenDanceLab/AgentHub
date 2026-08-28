@@ -1,4 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
+import { SHARED_WORKBENCH_I18N_NAMESPACE } from '@shared/i18n';
+import { createTestI18n } from '@shared/testing/i18n';
 import type { AgentConfig } from './pages/AgentsPage';
 import {
   buildAgentFieldPatch,
@@ -57,6 +59,9 @@ const AGENT_B: AgentConfig = {
   skills: ['browser'],
   tools: { 'Browser Screenshot': '允许' },
 };
+
+/** Real zh bundle keeps historical copy expectations honest (#2023). */
+const tZh = createTestI18n({ lng: 'zh' }).getFixedT('zh', SHARED_WORKBENCH_I18N_NAMESPACE);
 
 describe('workbenchAgentsRouteHelpers', () => {
   it('resolves source agent configs for mock and real modes', () => {
@@ -241,44 +246,44 @@ describe('workbenchAgentsRouteHelpers', () => {
   });
 
   it('resolves save-state labels', () => {
-    expect(resolveAgentSaveStateLabel({
+    expect(resolveAgentSaveStateLabel(tZh, {
       selectedAgentDeleting: true,
       selectedAgentSaving: false,
       selectedAgentIsDraft: false,
       selectedAgentIsDirty: false,
     })).toBe('删除中');
-    expect(resolveAgentSaveStateLabel({
+    expect(resolveAgentSaveStateLabel(tZh, {
       selectedAgentDeleting: false,
       selectedAgentSaving: true,
       selectedAgentIsDraft: true,
       selectedAgentIsDirty: false,
     })).toBe('创建中');
-    expect(resolveAgentSaveStateLabel({
+    expect(resolveAgentSaveStateLabel(tZh, {
       selectedAgentDeleting: false,
       selectedAgentSaving: true,
       selectedAgentIsDraft: false,
       selectedAgentIsDirty: false,
     })).toBe('保存中');
-    expect(resolveAgentSaveStateLabel({
+    expect(resolveAgentSaveStateLabel(tZh, {
       selectedAgentDeleting: false,
       selectedAgentSaving: false,
       selectedAgentIsDraft: false,
       selectedAgentIsDirty: false,
       actionError: 'boom',
     })).toBe('保存失败');
-    expect(resolveAgentSaveStateLabel({
+    expect(resolveAgentSaveStateLabel(tZh, {
       selectedAgentDeleting: false,
       selectedAgentSaving: false,
       selectedAgentIsDraft: true,
       selectedAgentIsDirty: false,
     })).toBe('草稿');
-    expect(resolveAgentSaveStateLabel({
+    expect(resolveAgentSaveStateLabel(tZh, {
       selectedAgentDeleting: false,
       selectedAgentSaving: false,
       selectedAgentIsDraft: false,
       selectedAgentIsDirty: true,
     })).toBe('未保存');
-    expect(resolveAgentSaveStateLabel({
+    expect(resolveAgentSaveStateLabel(tZh, {
       selectedAgentDeleting: false,
       selectedAgentSaving: false,
       selectedAgentIsDraft: false,
@@ -311,6 +316,7 @@ describe('workbenchAgentsRouteHelpers', () => {
       selectedAgentDeleting: false,
       selectedAgentSaving: false,
       selectedAgentIsDirty: false,
+      translator: tZh,
       onAgentCreate,
       onAgentUpdate,
       onAgentDelete,
