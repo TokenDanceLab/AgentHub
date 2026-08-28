@@ -67,7 +67,7 @@ describe('workbench v4 demo data source', () => {
       expect.objectContaining({
         id: 'hub-message-a2a-agent-to-agent',
         displayTitle: 'Agent -> Agent',
-        displayDetail: 'IM agent_dm · Builder -> Reviewer · task task-a2a-review',
+        displayDetail: 'IM agent_dm · Builder -> Reviewer',
       }),
       expect.objectContaining({
         id: 'hub-message-project-group-mention-reviewer',

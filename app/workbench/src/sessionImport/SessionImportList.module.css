@@ -13,7 +13,7 @@
 
 .row {
   padding: 8px;
-  border-bottom: 1px solid var(--ah-border-subtle, rgba(255 255 255 / 6%));
+  border-bottom: 1px solid var(--td-line);
 }
 
 .title {
@@ -39,7 +39,7 @@
 .mode {
   padding: 0 6px;
   border-radius: 999px;
-  background: rgba(99 140 255 / 12%);
+  background: var(--td-brand-soft);
   color: var(--primary);
 }
 

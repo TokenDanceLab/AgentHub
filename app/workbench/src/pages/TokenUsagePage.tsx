@@ -127,6 +127,16 @@ export function TokenUsagePage({
         <div className={styles.placeholder} role="status">
           <h2 className={styles.placeholderTitle}>{t('usage.empty.title')}</h2>
           <p className={styles.placeholderBody}>{t('usage.empty.body')}</p>
+          {onRetry ? (
+            <button
+              className={styles.retryButton}
+              data-testid="usage-empty-retry"
+              onClick={onRetry}
+              type="button"
+            >
+              {t('connection.retry')}
+            </button>
+          ) : null}
         </div>
       </div>
     );
