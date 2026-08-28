@@ -1,7 +1,12 @@
 import React from 'react';
-import { describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
 import { render } from '../../__tests__/setup';
+import { useTestI18nLanguage } from '@shared/testing/i18n';
 import { DataSourceBadge } from './DataSourceBadge';
+
+beforeAll(async () => {
+  await useTestI18nLanguage('zh');
+});
 
 describe('DataSourceBadge', () => {
   it('renders nothing in real mode', () => {

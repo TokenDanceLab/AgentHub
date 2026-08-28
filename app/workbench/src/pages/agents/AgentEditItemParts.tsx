@@ -1,4 +1,6 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
+import { SHARED_WORKBENCH_I18N_NAMESPACE } from '@shared/i18n';
 import { RuntimeBrandIcon } from '../../RuntimeBrandIcon';
 import { Button, Select } from '@shared/ui';
 import styles from '../AgentsPage.module.css';
@@ -18,12 +20,12 @@ import type {
   ToolPermission,
 } from './types';
 
-/* ═══════════════════════════════════════════════════════════════════════
+/* ═══════════════════════════════════════════════════════════════════════════════════════
    Agent edit panel presentational sub-parts.
 
    Extracted from AgentEditPanel as Phase 29 residual thin #695.
    CSS remains on shared AgentsPage.module.css.
-   ═══════════════════════════════════════════════════════════════════════ */
+   ═══════════════════════════════════════════════════════════════════════════════════════ */
 
 /* ── AgentEditGrid ── */
 
@@ -31,7 +33,8 @@ export const AgentEditGrid: React.FC<{
   agent: AgentConfig;
   onFieldChange?: ((field: string, value: string) => void) | undefined;
 }> = ({ agent, onFieldChange }) => {
-  const fieldConfigs = getEditFieldConfigs();
+  const { t } = useTranslation(SHARED_WORKBENCH_I18N_NAMESPACE);
+  const fieldConfigs = getEditFieldConfigs(t);
   return (
     <div className={styles['agent-edit-grid']}>
       {fieldConfigs.map((field) => (
@@ -48,7 +51,7 @@ export const AgentEditGrid: React.FC<{
           ) : (
             <input
               value={String(agent[field.key as keyof AgentConfig] ?? '')}
-              placeholder="未设置"
+              placeholder={t('agents.edit.notSet')}
               disabled={!onFieldChange}
               onChange={(e) => onFieldChange?.(field.key, e.target.value)}
             />
@@ -61,28 +64,31 @@ export const AgentEditGrid: React.FC<{
 
 /* ── AgentMcpMemorySection ── */
 
-export const AgentMcpMemorySection: React.FC<{ agent: AgentConfig }> = ({ agent }) => (
-  <section className={styles['agent-skill-editor']}>
-    <div className={styles['section-title-row']}>
-      <h3>MCP / 记忆</h3>
-      <span>{agent.memoryRetention || '策略待定'}</span>
-    </div>
-    <div className={styles['agent-token-grid']}>
-      {(agent.mcpServers ?? []).map((server) => (
-        <span key={`mcp-${server}`} className={styles['agent-token']}>
-          <RuntimeBrandIcon kind="tool" name="MCP Server" size="compact" framed={false} decorative />
-          {server}
-        </span>
-      ))}
-      {(agent.memorySources ?? []).map((source) => (
-        <span key={`memory-${source}`} className={styles['agent-token']}>
-          <RuntimeBrandIcon kind="tool" name="Agent Profile" size="compact" framed={false} decorative />
-          {source}
-        </span>
-      ))}
-    </div>
-  </section>
-);
+export const AgentMcpMemorySection: React.FC<{ agent: AgentConfig }> = ({ agent }) => {
+  const { t } = useTranslation(SHARED_WORKBENCH_I18N_NAMESPACE);
+  return (
+    <section className={styles['agent-skill-editor']}>
+      <div className={styles['section-title-row']}>
+        <h3>{t('agents.edit.mcpMemoryTitle')}</h3>
+        <span>{agent.memoryRetention || t('agents.edit.memoryPolicyPending')}</span>
+      </div>
+      <div className={styles['agent-token-grid']}>
+        {(agent.mcpServers ?? []).map((server) => (
+          <span key={`mcp-${server}`} className={styles['agent-token']}>
+            <RuntimeBrandIcon kind="tool" name="MCP Server" size="compact" framed={false} decorative />
+            {server}
+          </span>
+        ))}
+        {(agent.memorySources ?? []).map((source) => (
+          <span key={`memory-${source}`} className={styles['agent-token']}>
+            <RuntimeBrandIcon kind="tool" name="Agent Profile" size="compact" framed={false} decorative />
+            {source}
+          </span>
+        ))}
+      </div>
+    </section>
+  );
+};
 
 /* ── AgentSkillChipGrid ── */
 
@@ -90,29 +96,32 @@ export const AgentSkillChipGrid: React.FC<{
   agent: AgentConfig;
   allSkills: string[];
   onAgentSkillToggle?: ((skill: string) => void) | undefined;
-}> = ({ agent, allSkills, onAgentSkillToggle }) => (
-  <section className={styles['agent-skill-editor']}>
-    <div className={styles['section-title-row']}>
-      <h3>技能</h3>
-      <span>已启用 {agent.skills.length} 个</span>
-    </div>
-    <div className={styles['skill-chip-grid']}>
-      {allSkills.map((skill) => (
-        <button
-          key={skill}
-          className={`${styles['skill-chip']} ${agent.skills.includes(skill) ? styles.active : ''}`}
-          type="button"
-          disabled={!onAgentSkillToggle}
-          title={!onAgentSkillToggle ? '当前环境不支持修改技能' : undefined}
-          onClick={() => onAgentSkillToggle?.(skill)}
-        >
-          <RuntimeBrandIcon kind="tool" name={skill} size="compact" framed={false} decorative />
-          {skill}
-        </button>
-      ))}
-    </div>
-  </section>
-);
+}> = ({ agent, allSkills, onAgentSkillToggle }) => {
+  const { t } = useTranslation(SHARED_WORKBENCH_I18N_NAMESPACE);
+  return (
+    <section className={styles['agent-skill-editor']}>
+      <div className={styles['section-title-row']}>
+        <h3>{t('agents.detail.skills')}</h3>
+        <span>{t('agents.edit.skillsEnabled', { count: agent.skills.length })}</span>
+      </div>
+      <div className={styles['skill-chip-grid']}>
+        {allSkills.map((skill) => (
+          <button
+            key={skill}
+            className={`${styles['skill-chip']} ${agent.skills.includes(skill) ? styles.active : ''}`}
+            type="button"
+            disabled={!onAgentSkillToggle}
+            title={!onAgentSkillToggle ? t('agents.edit.skillToggleUnavailable') : undefined}
+            onClick={() => onAgentSkillToggle?.(skill)}
+          >
+            <RuntimeBrandIcon kind="tool" name={skill} size="compact" framed={false} decorative />
+            {skill}
+          </button>
+        ))}
+      </div>
+    </section>
+  );
+};
 
 /* ── AgentToolPermissions ── */
 
@@ -120,50 +129,58 @@ export const AgentToolPermissions: React.FC<{
   agent: AgentConfig;
   allTools: string[];
   onToolPermissionSet?: ((tool: string, value: ToolPermission) => void) | undefined;
-}> = ({ agent, allTools, onToolPermissionSet }) => (
-  <section className={styles['editable-tools']}>
-    <div className={styles['section-title-row']}>
-      <h3>工具权限</h3>
-      <span>允许 / 需确认 / 禁止</span>
-    </div>
-    {allTools.map((tool) => (
-      <div key={tool} className={`${styles['scope-row']} ${styles.editable}`}>
-        <span>{tool}</span>
-        <div className={styles['permission-segment']}>
-          {TOOL_PERMISSION_LABELS.map((option) => (
-            <button
-              key={option}
-              className={`${defaultToolPermission(agent.tools, tool) === option ? styles.active : ''}`}
-              type="button"
-              disabled={!onToolPermissionSet}
-              title={!onToolPermissionSet ? '当前环境不支持修改工具权限' : undefined}
-              onClick={() => onToolPermissionSet?.(tool, option)}
-            >
-              {option}
-            </button>
-          ))}
-        </div>
+}> = ({ agent, allTools, onToolPermissionSet }) => {
+  const { t } = useTranslation(SHARED_WORKBENCH_I18N_NAMESPACE);
+  return (
+    <section className={styles['editable-tools']}>
+      <div className={styles['section-title-row']}>
+        <h3>{t('agents.detail.tools')}</h3>
+        {/* Legend mirrors the ToolPermission enum identifiers rendered below
+            (data-plane direct display; cross-surface enum decision #2015). */}
+        <span>允许 / 需确认 / 禁止</span>
       </div>
-    ))}
-  </section>
-);
+      {allTools.map((tool) => (
+        <div key={tool} className={`${styles['scope-row']} ${styles.editable}`}>
+          <span>{tool}</span>
+          <div className={styles['permission-segment']}>
+            {TOOL_PERMISSION_LABELS.map((option) => (
+              <button
+                key={option}
+                className={`${defaultToolPermission(agent.tools, tool) === option ? styles.active : ''}`}
+                type="button"
+                disabled={!onToolPermissionSet}
+                title={!onToolPermissionSet ? t('agents.edit.toolPermissionUnavailable') : undefined}
+                onClick={() => onToolPermissionSet?.(tool, option)}
+              >
+                {option}
+              </button>
+            ))}
+          </div>
+        </div>
+      ))}
+    </section>
+  );
+};
 
 /* ── AgentMiniLog ── */
 
-export const AgentMiniLog: React.FC<{ recentEvents: AgentRecentEvent[] }> = ({ recentEvents }) => (
-  <section className={styles['agent-mini-log']}>
-    <div className={styles['section-title-row']}>
-      <h3>最近运行</h3>
-      <span>{recentEvents.length} 条</span>
-    </div>
-    {recentEvents.map((evt, i) => (
-      <div key={i}>
-        <time>{evt.time}</time>
-        <span>{evt.text}</span>
+export const AgentMiniLog: React.FC<{ recentEvents: AgentRecentEvent[] }> = ({ recentEvents }) => {
+  const { t } = useTranslation(SHARED_WORKBENCH_I18N_NAMESPACE);
+  return (
+    <section className={styles['agent-mini-log']}>
+      <div className={styles['section-title-row']}>
+        <h3>{t('agents.detail.recentRuns')}</h3>
+        <span>{t('agents.edit.eventCount', { count: recentEvents.length })}</span>
       </div>
-    ))}
-  </section>
-);
+      {recentEvents.map((evt, i) => (
+        <div key={i}>
+          <time>{evt.time}</time>
+          <span>{evt.text}</span>
+        </div>
+      ))}
+    </section>
+  );
+};
 
 /* ── AgentDetailHead ── */
 
@@ -172,18 +189,21 @@ export const AgentDetailHead: React.FC<{
   saveStateLabel: string;
   isDirty: boolean;
   onAgentProfileOpen?: ((agent: AgentConfig, anchor: HTMLElement) => void) | undefined;
-}> = ({ agent, saveStateLabel, isDirty, onAgentProfileOpen }) => (
-  <div className={`${styles['detail-head']} ${styles.editable}`}>
-    <AgentAvatar agent={agent} onAgentProfileOpen={onAgentProfileOpen} />
-    <div>
-      <h2>{agent.name}</h2>
-      <span>{agent.role.trim() || 'Hub 配置档案'}</span>
+}> = ({ agent, saveStateLabel, isDirty, onAgentProfileOpen }) => {
+  const { t } = useTranslation(SHARED_WORKBENCH_I18N_NAMESPACE);
+  return (
+    <div className={`${styles['detail-head']} ${styles.editable}`}>
+      <AgentAvatar agent={agent} onAgentProfileOpen={onAgentProfileOpen} />
+      <div>
+        <h2>{agent.name}</h2>
+        <span>{agent.role.trim() || t('agents.edit.defaultRole')}</span>
+      </div>
+      <span className={`${styles['agent-save-state']} ${isDirty ? styles.dirty : ''}`}>
+        {saveStateLabel}
+      </span>
     </div>
-    <span className={`${styles['agent-save-state']} ${isDirty ? styles.dirty : ''}`}>
-      {saveStateLabel}
-    </span>
-  </div>
-);
+  );
+};
 
 /* ── AgentRuntimeLine ── */
 
@@ -208,28 +228,32 @@ interface CapabilitySummary {
   readiness: string;
 }
 
-const READINESS_LABEL: Record<string, string> = {
-  ready: '就绪',
-  partial: '部分就绪',
-  blocked: '受阻',
+const READINESS_LABEL_KEY: Record<string, 'agents.edit.readiness.ready' | 'agents.edit.readiness.partial' | 'agents.edit.readiness.blocked'> = {
+  ready: 'agents.edit.readiness.ready',
+  partial: 'agents.edit.readiness.partial',
+  blocked: 'agents.edit.readiness.blocked',
 };
 
 export const AgentCapabilityStrip: React.FC<{
   agent: AgentConfig;
   capabilitySummary: CapabilitySummary;
-}> = ({ agent, capabilitySummary }) => (
-  <div className={styles['agent-capability-strip']} aria-label={`${agent.name} 能力就绪状态`}>
-    <CapabilityBadge label="工作区说明" value={capabilitySummary.agentsMd} />
-    <CapabilityBadge label="技能" value={capabilitySummary.skills} />
-    <CapabilityBadge label="MCP" value={capabilitySummary.mcp} />
-    <CapabilityBadge label="记忆" value={capabilitySummary.memory} />
-    <CapabilityBadge label="工具" value={capabilitySummary.tools} />
-    <CapabilityBadge label="头像" value={capabilitySummary.avatar} />
-    <span className={`${styles['capability-readiness']} ${styles[capabilitySummary.readiness]}`}>
-      {READINESS_LABEL[capabilitySummary.readiness] ?? capabilitySummary.readiness}
-    </span>
-  </div>
-);
+}> = ({ agent, capabilitySummary }) => {
+  const { t } = useTranslation(SHARED_WORKBENCH_I18N_NAMESPACE);
+  const readinessKey = READINESS_LABEL_KEY[capabilitySummary.readiness];
+  return (
+    <div className={styles['agent-capability-strip']} aria-label={t('agents.edit.capabilityAria', { name: agent.name })}>
+      <CapabilityBadge label={t('agents.edit.capability.agentsMd')} value={capabilitySummary.agentsMd} />
+      <CapabilityBadge label={t('agents.edit.capability.skills')} value={capabilitySummary.skills} />
+      <CapabilityBadge label={t('agents.edit.capability.mcp')} value={capabilitySummary.mcp} />
+      <CapabilityBadge label={t('agents.edit.capability.memory')} value={capabilitySummary.memory} />
+      <CapabilityBadge label={t('agents.edit.capability.tools')} value={capabilitySummary.tools} />
+      <CapabilityBadge label={t('agents.edit.capability.avatar')} value={capabilitySummary.avatar} />
+      <span className={`${styles['capability-readiness']} ${styles[capabilitySummary.readiness]}`}>
+        {readinessKey ? t(readinessKey) : capabilitySummary.readiness}
+      </span>
+    </div>
+  );
+};
 
 /* ── AgentEditActions ── */
 
@@ -240,31 +264,34 @@ export const AgentEditActions: React.FC<{
   onAgentSave?: (() => void) | undefined;
   onAgentDuplicate?: (() => void) | undefined;
   onAgentDelete?: (() => void) | undefined;
-}> = ({ isBusy, isSaving, isDeleting, onAgentSave, onAgentDuplicate, onAgentDelete }) => (
-  <div className={styles['agent-edit-actions']} aria-busy={isBusy ? 'true' : undefined}>
-    <Button
-      variant="primary"
-      type="button"
-      disabled={isBusy || !onAgentSave}
-      onClick={onAgentSave}
-    >
-      {isSaving ? '保存中' : '保存配置'}
-    </Button>
-    <Button
-      variant="secondary"
-      type="button"
-      disabled={isBusy || !onAgentDuplicate}
-      onClick={onAgentDuplicate}
-    >
-      复制 Agent
-    </Button>
-    <Button
-      variant="destructive"
-      type="button"
-      disabled={isBusy || !onAgentDelete}
-      onClick={onAgentDelete}
-    >
-      {isDeleting ? '删除中' : '删除'}
-    </Button>
-  </div>
-);
+}> = ({ isBusy, isSaving, isDeleting, onAgentSave, onAgentDuplicate, onAgentDelete }) => {
+  const { t } = useTranslation(SHARED_WORKBENCH_I18N_NAMESPACE);
+  return (
+    <div className={styles['agent-edit-actions']} aria-busy={isBusy ? 'true' : undefined}>
+      <Button
+        variant="primary"
+        type="button"
+        disabled={isBusy || !onAgentSave}
+        onClick={onAgentSave}
+      >
+        {isSaving ? t('agents.edit.saving') : t('agents.edit.save')}
+      </Button>
+      <Button
+        variant="secondary"
+        type="button"
+        disabled={isBusy || !onAgentDuplicate}
+        onClick={onAgentDuplicate}
+      >
+        {t('agents.edit.duplicate')}
+      </Button>
+      <Button
+        variant="destructive"
+        type="button"
+        disabled={isBusy || !onAgentDelete}
+        onClick={onAgentDelete}
+      >
+        {isDeleting ? t('agents.edit.deleting') : t('agents.edit.delete')}
+      </Button>
+    </div>
+  );
+};
