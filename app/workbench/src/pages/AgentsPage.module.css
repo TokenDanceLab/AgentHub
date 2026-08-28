@@ -597,7 +597,7 @@
   display: inline-block;
   padding: 1px 6px;
   border-radius: var(--td-radius-control);
-  font: 500 0.625rem/1.4 var(--td-font);
+  font: 500 0.6875rem/1.4 var(--td-font);
   white-space: nowrap;
 }
 
@@ -853,7 +853,7 @@
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  font: 600 0.625rem/1.2 var(--td-font);
+  font: 600 0.6875rem/1.2 var(--td-font);
 }
 
 .capability-badge em {
