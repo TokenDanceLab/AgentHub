@@ -845,7 +845,11 @@ func TestHotReloadRemovedSkill(t *testing.T) {
 	if err := os.Remove(filepath.Join(baseDir, "alpha", "SKILL.md")); err != nil {
 		t.Fatalf("Remove: %v", err)
 	}
-	waitForDebounce()
+
+	// Positive assertion: poll until the removal is reflected in the registry.
+	testkit.Eventually(t, hotReloadWaitTimeout, func() bool {
+		return reg.Count() == 0
+	}, "hot reload should remove alpha (Count=0)", registryDump(reg))
 
 	if reg.Count() != 0 {
 		t.Fatalf("Count = %d, want 0 after removal", reg.Count())
@@ -879,7 +883,13 @@ func TestHotReloadDebouncePreventsDoubleLoad(t *testing.T) {
 		mustWriteFile(t, filepath.Join(baseDir, "beta", "SKILL.md"), content)
 		time.Sleep(50 * time.Millisecond)
 	}
-	waitForDebounce()
+
+	// Positive assertion: poll until the (coalesced) reload lands. All writes
+	// target the same path, so the count transitions 0 -> 1 exactly once and
+	// stays 1; any Count > 1 would mean debounce failed to coalesce.
+	testkit.Eventually(t, hotReloadWaitTimeout, func() bool {
+		return reg.Count() == 1
+	}, "debounced hot reload should load beta exactly once (Count=1)", registryDump(reg))
 
 	// Should still be exactly 1 skill, not 5.
 	if reg.Count() != 1 {
