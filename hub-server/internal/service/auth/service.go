@@ -60,18 +60,19 @@ func (s *Service) RefreshToken(ctx context.Context, rawRefreshToken string) (*Lo
 	// the per-user-device key (set during logout without device_type), and
 	// the per-user-device-type key (set during logout with device_type).
 	// Any hit means the token was revoked through Redis before the DB
-	// commit completed, closing the race window.
-	if blacklisted, _ := resolveAuthCache(s.cacheClient).IsRefreshTokenBlacklisted(ctx, tokenHash); blacklisted {
-		return nil, errcode.AuthRefreshInvalid
+	// commit completed, closing the race window. Redis errors apply the
+	// fail-open/fail-closed policy (see enforceRefreshBlacklist, #2053).
+	if err := s.enforceRefreshBlacklist(ctx, tokenHash); err != nil {
+		return nil, err
 	}
 	deviceKey := rt.UserID + ":" + rt.DeviceID
-	if blacklisted, _ := resolveAuthCache(s.cacheClient).IsRefreshTokenBlacklisted(ctx, deviceKey); blacklisted {
-		return nil, errcode.AuthRefreshInvalid
+	if err := s.enforceRefreshBlacklist(ctx, deviceKey); err != nil {
+		return nil, err
 	}
 	if rt.DeviceType != "" {
 		deviceTypeKey := rt.UserID + ":" + rt.DeviceID + ":" + rt.DeviceType
-		if blacklisted, _ := resolveAuthCache(s.cacheClient).IsRefreshTokenBlacklisted(ctx, deviceTypeKey); blacklisted {
-			return nil, errcode.AuthRefreshInvalid
+		if err := s.enforceRefreshBlacklist(ctx, deviceTypeKey); err != nil {
+			return nil, err
 		}
 	}
 
@@ -118,6 +119,36 @@ func (s *Service) RefreshToken(ctx context.Context, rawRefreshToken string) (*Lo
 		RefreshToken: rawRefresh,
 		ExpiresIn:    int64(s.jwtCfg.AccessTTL.Seconds()),
 	}, nil
+}
+
+// enforceRefreshBlacklist checks one refresh-blacklist key and rejects the
+// refresh with AuthRefreshInvalid when the key is blacklisted.
+//
+// Redis errors follow the same policy as the access path (#2053, mirrors
+// middleware/auth.go acceptAccessClaims, #2049): the default policy is
+// fail-open (treat the key as not blacklisted) to avoid locking users out
+// during a Redis outage — the DB revoked flag remains the source of truth
+// and the blacklist only closes the pre-commit race window. Operators
+// hardening production set AGENTHUB_AUTH_FAIL_CLOSED=true so a Redis outage
+// cannot let a revoked (logged-out or rotated) refresh token rotate again:
+// the refresh is rejected with AuthRefreshInvalid because revocation status
+// could not be verified.
+func (s *Service) enforceRefreshBlacklist(ctx context.Context, key string) error {
+	blacklisted, err := resolveAuthCache(s.cacheClient).IsRefreshTokenBlacklisted(ctx, key)
+	if err != nil {
+		if config.AuthFailClosed() {
+			slog.Warn("refresh blacklist check error, fail-closed",
+				"key", key, "error", err)
+			return errcode.AuthRefreshInvalid
+		}
+		slog.Warn("refresh blacklist check error, fail-open",
+			"key", key, "error", err)
+		return nil
+	}
+	if blacklisted {
+		return errcode.AuthRefreshInvalid
+	}
+	return nil
 }
 
 // Logout revokes all refresh tokens for the given user and device,
