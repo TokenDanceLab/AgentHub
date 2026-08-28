@@ -22,7 +22,7 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self'; script-src 'self'; frame-src 'none'; object-src 'none'; connect-src 'self' http://127.0.0.1:* ws://127.0.0.1:* http://localhost:* https://*.vectorcontrol.tech wss://*.vectorcontrol.tech; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://fonts.gstatic.com https://*.vectorcontrol.tech https://avatars.githubusercontent.com; font-src 'self' https://fonts.gstatic.com"
+      "csp": "default-src 'self'; script-src 'self'; frame-src 'none'; object-src 'none'; connect-src 'self' http://127.0.0.1:* ws://127.0.0.1:* http://localhost:* https://*.vectorcontrol.tech wss://*.vectorcontrol.tech; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://*.vectorcontrol.tech https://avatars.githubusercontent.com; font-src 'self'"
     }
   },
   "bundle": {
