@@ -93,13 +93,13 @@
 .row-item.fail > .row-bd { border-left-color:var(--td-danger) }
 
 /* Think */  .row-item.think > .row-hd .row-icon { color:var(--info) }
-.row-item.think > .row-bd { color:var(--td-ink-muted); white-space:pre-wrap; max-height:var(--think-max-h); overflow-y:auto; scrollbar-width:thin; scrollbar-color:var(--scrollbar-thumb) var(--scrollbar-track) }
+.row-item.think > .row-bd { color:var(--td-ink-muted); font-style:italic; white-space:pre-wrap; max-height:var(--think-max-h); overflow-y:auto; scrollbar-width:thin; scrollbar-color:var(--scrollbar-thumb) var(--scrollbar-track) }
 .row-item.think.fail > .row-hd .row-icon { color:var(--td-danger) }
 .row-item.think.fail > .row-bd { border-left-color:var(--td-danger) }
 
 /* Tool */  .row-item.tool > .row-hd .row-label { font-size:0.6875rem; font-weight:500 }
 .row-item.tool > .row-bd { font:var(--chat-label); font-weight:400; line-height:1.5 }
-.row-item.tool.result-row > .row-bd { border-left-color:var(--td-moss) }
+.row-item.tool.result-row > .row-bd { border-left-color:var(--td-moss); font-family:var(--chat-font-mono) }
 .row-item.tool.result-row.fail > .row-bd { border-left-color:var(--td-danger) }
 .row-item.tool.fail > .row-hd .row-icon { color:var(--td-danger) }
 .row-item.tool.fail > .row-bd { border-left-color:var(--td-danger) }
