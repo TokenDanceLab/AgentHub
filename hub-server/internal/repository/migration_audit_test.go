@@ -340,3 +340,28 @@ func requireSQL(t *testing.T, sql string, want string) {
 		t.Fatalf("expected SQL to contain %q", want)
 	}
 }
+
+func TestMigration0068IndexCoverageFixes(t *testing.T) {
+	up := readMigration(t, "0068_index_coverage_fixes.up.sql")
+	down := readMigration(t, "0068_index_coverage_fixes.down.sql")
+
+	normalizedUp := normalizeSQL(up)
+	// 1. 冗余的裸 prev_hash 索引必须删除（唯一索引 0061 已覆盖同列）。
+	requireSQL(t, normalizedUp, "drop index if exists idx_audit_events_prev_hash")
+	// 2-6. 五个确定性缺失索引必须以幂等方式创建。
+	requireSQL(t, normalizedUp, "create index if not exists idx_session_members_member_active on session_members (member_id) where left_at is null")
+	requireSQL(t, normalizedUp, "create index if not exists idx_agent_teams_owner_created on agent_teams (owner_id, created_at desc)")
+	requireSQL(t, normalizedUp, "create index if not exists idx_pending_agent_tasks_instance_created on pending_agent_tasks (agent_instance_id, created_at desc)")
+	requireSQL(t, normalizedUp, "create index if not exists idx_custom_agents_owner on custom_agents (owner_user_id) where deleted_at is null")
+	requireSQL(t, normalizedUp, "create index if not exists idx_friendships_friend_status on friendships (friend_id, status)")
+
+	normalizedDown := normalizeSQL(down)
+	// down 必须逆序删除五个新索引，并恢复 0040 的裸 prev_hash 索引
+	// （0061.down 注释预期该索引在其回滚后仍存在）。
+	requireSQL(t, normalizedDown, "drop index if exists idx_friendships_friend_status")
+	requireSQL(t, normalizedDown, "drop index if exists idx_custom_agents_owner")
+	requireSQL(t, normalizedDown, "drop index if exists idx_pending_agent_tasks_instance_created")
+	requireSQL(t, normalizedDown, "drop index if exists idx_agent_teams_owner_created")
+	requireSQL(t, normalizedDown, "drop index if exists idx_session_members_member_active")
+	requireSQL(t, normalizedDown, "create index if not exists idx_audit_events_prev_hash on audit_events(prev_hash)")
+}
