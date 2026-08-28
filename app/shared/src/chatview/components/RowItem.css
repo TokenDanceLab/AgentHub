@@ -68,7 +68,7 @@
 .row-icon { color:var(--td-ink-muted); flex-shrink:0; width:var(--icon-size); text-align:center; font-size:0.875rem }
 .row-label { font-weight:600; flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
 .row-extra { color:var(--td-ink-subtle); font:var(--chat-label-xs); flex-shrink:0 }
-.row-chevron { color:var(--td-ink-subtle); transition:transform var(--chat-dur) ease; flex-shrink:0; font-size:0.625rem }
+.row-chevron { color:var(--td-ink-subtle); transition:transform var(--chat-dur) ease; flex-shrink:0; font-size:0.6875rem }
 .row-item.open > .row-hd .row-chevron { transform:rotate(180deg) }
 .row-item:not(.collapsible) > .row-hd .row-chevron { display:none }
 
@@ -394,7 +394,7 @@
 }
 
 .preview-domain {
-  font: 400 0.625rem var(--td-mono);
+  font: 400 0.6875rem var(--td-mono);
   color: var(--td-ink-subtle);
   text-transform: lowercase;
   white-space: nowrap;

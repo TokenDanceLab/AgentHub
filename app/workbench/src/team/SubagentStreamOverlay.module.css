@@ -152,7 +152,7 @@
   border-radius: 50%;
   background: var(--td-plum);
   color: var(--td-ink-on-plum);
-  font-size: 0.625rem;
+  font-size: 0.6875rem;
   font-weight: 600;
   text-transform: uppercase;
   flex-shrink: 0;
@@ -187,7 +187,7 @@
 }
 
 .chipStatus {
-  font-size: 0.625rem;
+  font-size: 0.6875rem;
   font-weight: 500;
   white-space: nowrap;
   flex-shrink: 0;
@@ -259,7 +259,7 @@
 
 .toolCall code {
   font-family: var(--td-mono);
-  font-size: 0.625rem;
+  font-size: 0.6875rem;
   color: var(--td-accent-amber);
   background: var(--td-accent-amber-bg);
   padding: 1px 4px;
@@ -276,7 +276,7 @@
 
 .generic {
   color: var(--td-ink-muted);
-  font-size: 0.625rem;
+  font-size: 0.6875rem;
 }
 
 /* ── Responsive: narrow viewport ────────────────────────────────────────── */
