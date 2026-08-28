@@ -918,6 +918,11 @@ func TestHotReloadStopWatch(t *testing.T) {
 
 	// Create a new skill after stop — should NOT be picked up.
 	mustWriteFile(t, filepath.Join(baseDir, "beta", "SKILL.md"), basicSkillMD("beta", "Beta skill"))
+
+	// Negative assertion: "beta must NOT appear" cannot be polled with
+	// testkit.Eventually (it would run forever), so we wait a bounded window
+	// in which a broken (still-active) watcher would have picked the skill
+	// up, then assert absence (#2033).
 	waitForDebounce()
 
 	if reg.Count() != 1 {
@@ -952,7 +957,14 @@ func TestHotReloadEmptyDir(t *testing.T) {
 
 	// Create a new skill subdirectory and SKILL.md at once.
 	mustWriteFile(t, filepath.Join(baseDir, "gamma", "SKILL.md"), basicSkillMD("gamma", "Gamma skill"))
-	waitForDebounce()
+
+	// Positive assertion: poll until the registry reflects the skill created
+	// in a brand-new subdirectory. This was the case that flaked on busy CI
+	// machines with the old fixed-sleep wait (#2033).
+	testkit.Eventually(t, hotReloadWaitTimeout, func() bool {
+		_, ok := reg.Get("gamma")
+		return reg.Count() == 1 && ok
+	}, "hot reload should pick up gamma created in a new subdirectory (Count=1)", registryDump(reg))
 
 	if reg.Count() != 1 {
 		t.Fatalf("Count = %d, want 1 (skill created in new subdirectory under watched dir)", reg.Count())
