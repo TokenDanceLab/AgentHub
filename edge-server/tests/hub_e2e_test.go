@@ -35,7 +35,37 @@ import (
 	"github.com/agenthub/edge-server/internal/lifecycle"
 	"github.com/agenthub/edge-server/internal/runners"
 	"github.com/agenthub/edge-server/internal/store"
+	"github.com/agenthub/edge-server/internal/testkit"
 )
+
+const (
+	// runTerminalWaitTimeout is the Eventually budget for an E2E run to reach
+	// a terminal store status (finished/failed/cancelled); it spans
+	// subprocess startup plus executor teardown (#2055).
+	runTerminalWaitTimeout = 10 * time.Second
+
+	// roundTripWaitTimeout is the Eventually budget for the round-trip run
+	// to reach a terminal status; the headroom covers the full ack→done
+	// callback sequence (#2055).
+	roundTripWaitTimeout = 15 * time.Second
+)
+
+// isTerminalRunStatus reports whether status is a terminal run lifecycle
+// state (finished/failed/cancelled).
+func isTerminalRunStatus(status string) bool {
+	return status == "finished" || status == "failed" || status == "cancelled"
+}
+
+// runCallbackDump renders run status plus mock Hub callback counters for
+// Eventually timeout diagnostics.
+func runCallbackDump(runID string, h *api.Handler, mockHub *hubCallbackMock) string {
+	status := "<missing>"
+	if run, ok := h.Store.GetRun(runID); ok {
+		status = run.Status
+	}
+	return fmt.Sprintf("run %s status=%q (acks=%d done=%d fail=%d stream=%d)",
+		runID, status, mockHub.ackCount(), mockHub.doneCount(), mockHub.failCount(), mockHub.streamCount())
+}
 
 // ── Hub mock with full Edge callback endpoint support ──────────────────────
 
@@ -237,19 +267,15 @@ func TestHubE2E_RunCompletes_FiresDoneCallback(t *testing.T) {
 	t.Logf("created run %s for task %s", runID, taskID)
 
 	// Wait for the run to finish (echo exits almost immediately)
-	deadline := time.Now().Add(10 * time.Second)
-	var runStatus string
-	for time.Now().Before(deadline) {
+	testkit.Eventually(t, runTerminalWaitTimeout, func() bool {
 		run, ok := edgeH.Store.GetRun(runID)
-		if ok {
-			runStatus = run.Status
-			if runStatus == "finished" || runStatus == "failed" || runStatus == "cancelled" {
-				break
-			}
-		}
-		time.Sleep(100 * time.Millisecond)
+		return ok && isTerminalRunStatus(run.Status)
+	}, "run should reach a terminal status before callback assertions", func() string {
+		return runCallbackDump(runID, edgeH, mockHub)
+	})
+	if run, ok := edgeH.Store.GetRun(runID); ok {
+		t.Logf("run %s final status: %s", runID, run.Status)
 	}
-	t.Logf("run %s final status: %s", runID, runStatus)
 
 	// Give the async callback goroutine a moment to fire
 	time.Sleep(500 * time.Millisecond)
@@ -352,14 +378,14 @@ func TestHubE2E_RunFails_FiresFailCallback(t *testing.T) {
 	t.Logf("created failing run %s for task %s", runID, taskID)
 
 	// Wait for run to terminate with failure
-	deadline := time.Now().Add(10 * time.Second)
-	for time.Now().Before(deadline) {
+	testkit.Eventually(t, runTerminalWaitTimeout, func() bool {
 		run, ok := storeRepo.GetRun(runID)
-		if ok && (run.Status == "failed" || run.Status == "finished" || run.Status == "cancelled") {
-			t.Logf("run %s status: %s", runID, run.Status)
-			break
-		}
-		time.Sleep(100 * time.Millisecond)
+		return ok && isTerminalRunStatus(run.Status)
+	}, "failing run should reach a terminal status", func() string {
+		return runCallbackDump(runID, h, mockHub)
+	})
+	if run, ok := storeRepo.GetRun(runID); ok {
+		t.Logf("run %s status: %s", runID, run.Status)
 	}
 
 	time.Sleep(500 * time.Millisecond) // allow async callback
@@ -536,19 +562,12 @@ func TestHubE2E_CompleteRoundTrip(t *testing.T) {
 	t.Logf("roundtrip: run %s, task %s", runID, taskID)
 
 	// Wait for completion
-	deadline := time.Now().Add(15 * time.Second)
-	for time.Now().Before(deadline) {
+	testkit.Eventually(t, roundTripWaitTimeout, func() bool {
 		run, ok := edgeH.Store.GetRun(runID)
-		if ok {
-			status := run.Status
-			t.Logf("run %s status: %s (callback stats: ack=%d done=%d fail=%d)",
-				runID, status, mockHub.ackCount(), mockHub.doneCount(), mockHub.failCount())
-			if status == "finished" || status == "failed" || status == "cancelled" {
-				break
-			}
-		}
-		time.Sleep(200 * time.Millisecond)
-	}
+		return ok && isTerminalRunStatus(run.Status)
+	}, "round-trip run should reach a terminal status", func() string {
+		return runCallbackDump(runID, edgeH, mockHub)
+	})
 	time.Sleep(500 * time.Millisecond) // allow async callbacks to fire
 
 	// Verify Hub received both ack and done callbacks
