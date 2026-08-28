@@ -1,4 +1,6 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
+import { SHARED_WORKBENCH_I18N_NAMESPACE } from '@shared/i18n';
 import {
   DesignNavIcon,
   DESIGN_NAV_ICON_SIZE,
@@ -6,10 +8,7 @@ import {
 import { RuntimeBrandIcon } from '../../RuntimeBrandIcon';
 import styles from '../AgentsPage.module.css';
 import {
-  ccSwitchConnectionLabel,
   ccSwitchConnectionTone,
-  ccSwitchInstallLabel,
-  ccSwitchRoutingLabel,
   formatModelRouteSubtitle,
   hasVisibleModelAliases,
   listCurrentCcSwitchProviders,
@@ -115,44 +114,61 @@ export const ToolMatrixAgentRow: React.FC<{
 
 export const CcSwitchStatusBadge: React.FC<{
   routingActive: boolean;
-}> = ({ routingActive }) => (
+}> = ({ routingActive }) => {
+  const { t } = useTranslation(SHARED_WORKBENCH_I18N_NAMESPACE);
+  return (
   <span
     className={`${styles['ccswitch-badge']} ${styles[ccSwitchConnectionTone(routingActive)]}`}
   >
-    {ccSwitchConnectionLabel(routingActive)}
+    {t(routingActive
+      ? 'agents.ops.ccSwitch.connected'
+      : 'agents.ops.ccSwitch.connectionInactive')}
   </span>
-);
+  );
+};
 
 export const CcSwitchStatusGrid: React.FC<{
   status: CCSwitchStatusInfo;
-}> = ({ status }) => (
+}> = ({ status }) => {
+  const { t } = useTranslation(SHARED_WORKBENCH_I18N_NAMESPACE);
+  return (
   <div className={styles['ccswitch-status-grid']}>
     <div className={styles['ccswitch-status-row']}>
-      <span>安装状态</span>
-      <strong>{ccSwitchInstallLabel(status.installed)}</strong>
+      <span>{t('agents.ops.ccSwitch.installLabel')}</span>
+      <strong>
+        {t(status.installed
+          ? 'agents.ops.ccSwitch.installed'
+          : 'agents.ops.ccSwitch.notDetected')}
+      </strong>
     </div>
     <div className={styles['ccswitch-status-row']}>
-      <span>路由状态</span>
-      <strong>{ccSwitchRoutingLabel(status.routingActive)}</strong>
+      <span>{t('agents.ops.ccSwitch.routingLabel')}</span>
+      <strong>
+        {t(status.routingActive
+          ? 'agents.ops.ccSwitch.routingActive'
+          : 'agents.ops.ccSwitch.routingInactive')}
+      </strong>
     </div>
     {status.proxyPort ? (
       <div className={styles['ccswitch-status-row']}>
-        <span>代理端口</span>
+        <span>{t('agents.ops.ccSwitch.proxyPort')}</span>
         <strong>{status.proxyPort}</strong>
       </div>
     ) : null}
     {status.activeAppTypes?.length ? (
       <div className={styles['ccswitch-status-row']}>
-        <span>活跃应用</span>
+        <span>{t('agents.ops.ccSwitch.activeApps')}</span>
         <strong>{status.activeAppTypes.join(', ')}</strong>
       </div>
     ) : null}
   </div>
-);
+  );
+};
 
 export const CcSwitchProviderCard: React.FC<{
   provider: CCSwitchProviderInfo;
 }> = ({ provider }) => {
+  const { t } = useTranslation(SHARED_WORKBENCH_I18N_NAMESPACE);
   const aliases = listModelAliases(provider.modelAliases);
   return (
     <div className={styles['ccswitch-provider']}>
@@ -171,7 +187,7 @@ export const CcSwitchProviderCard: React.FC<{
           ))}
         </div>
       ) : (
-        <p className={styles['ccswitch-no-aliases']}>当前 Provider 无模型别名映射</p>
+        <p className={styles['ccswitch-no-aliases']}>{t('agents.ops.ccSwitch.noAliases')}</p>
       )}
     </div>
   );
@@ -234,15 +250,17 @@ export const ModelHealthRow: React.FC<{ row: ModelHealth }> = ({ row }) => (
 
 export const AuditFilterChip: React.FC<{
   filter: string;
+  /** Localized display label; the raw filter id still drives callbacks. */
+  label: string;
   active: boolean;
   onAuditFilterChange?: ((filter: string) => void) | undefined;
-}> = ({ filter, active, onAuditFilterChange }) => (
+}> = ({ filter, label, active, onAuditFilterChange }) => (
   <button
     className={`${active ? styles.active : ''}`}
     type="button"
     onClick={() => onAuditFilterChange?.(filter)}
   >
-    {filter}
+    {label}
   </button>
 );
 

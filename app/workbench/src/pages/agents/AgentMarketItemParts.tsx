@@ -1,4 +1,6 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
+import { SHARED_WORKBENCH_I18N_NAMESPACE } from '@shared/i18n';
 import { DesignNavIcon } from '../../designIcons';
 import { RuntimeBrandIcon } from '../../RuntimeBrandIcon';
 import {
@@ -36,6 +38,8 @@ export type MarketFilterToolbarProps<T extends string = string> = {
   activeFilter: T;
   onSearchChange?: ((query: string) => void) | undefined;
   onFilterChange?: ((filter: T) => void) | undefined;
+  /** Translated label for the empty ("all") chip; defaults to zh 全部. */
+  allLabel?: string | undefined;
 };
 
 export function MarketFilterToolbar<T extends string>({
@@ -45,7 +49,9 @@ export function MarketFilterToolbar<T extends string>({
   activeFilter,
   onSearchChange,
   onFilterChange,
+  allLabel,
 }: MarketFilterToolbarProps<T>): React.ReactElement {
+  const { t } = useTranslation(SHARED_WORKBENCH_I18N_NAMESPACE);
   return (
     <div className={styles['market-toolbar']}>
       <input
@@ -63,7 +69,7 @@ export function MarketFilterToolbar<T extends string>({
             type="button"
             onClick={() => onFilterChange?.(filter)}
           >
-            {marketFilterLabel(filter)}
+            {marketFilterLabel(filter, allLabel ?? t('agents.market.filters.all'))}
           </button>
         ))}
       </div>
@@ -75,7 +81,9 @@ export const MarketCard: React.FC<{
   template: MarketTemplate;
   onInstall?: ((name: string, description: string, category: string) => void) | undefined;
   onPreview?: ((name: string) => void) | undefined;
-}> = ({ template, onInstall, onPreview }) => (
+}> = ({ template, onInstall, onPreview }) => {
+  const { t } = useTranslation(SHARED_WORKBENCH_I18N_NAMESPACE);
+  return (
   <article className={`${styles['market-card']} agent-card`} data-card-surface>
     <div className={styles['market-card-head']}>
       <div className={styles['market-icon']}>
@@ -94,42 +102,45 @@ export const MarketCard: React.FC<{
     <small>{template.detail}</small>
     <div className={styles['market-config-summary']}>
       <ConfigSummaryRow label="Runtime" value={formatMarketRuntimeStack(template)} />
-      <ConfigSummaryRow label="Skills" value={formatList(template.skills, '未声明 skill')} />
-      <ConfigSummaryRow label="MCP" value={formatList(template.mcpServers, '未绑定 MCP')} />
-      <ConfigSummaryRow label="Memory" value={template.memorySummary || '未声明 memory'} />
-      <ConfigSummaryRow label="Approval" value={template.approvalSummary || '未声明审批策略'} />
-      <ConfigSummaryRow label="Target" value={formatList(template.targetPreferences, '未声明 target')} />
+      <ConfigSummaryRow label="Skills" value={formatList(template.skills, t('agents.market.summary.noSkills'))} />
+      <ConfigSummaryRow label="MCP" value={formatList(template.mcpServers, t('agents.market.summary.noMcp'))} />
+      <ConfigSummaryRow label="Memory" value={template.memorySummary || t('agents.market.summary.noMemory')} />
+      <ConfigSummaryRow label="Approval" value={template.approvalSummary || t('agents.market.summary.noApproval')} />
+      <ConfigSummaryRow label="Target" value={formatList(template.targetPreferences, t('agents.market.summary.noTarget'))} />
     </div>
     <div>
       <button
         type="button"
         disabled={!onInstall}
-        title={!onInstall ? '当前环境不支持安装模板' : undefined}
+        title={!onInstall ? t('agents.market.installUnavailable') : undefined}
         onClick={() => onInstall?.(template.name, template.description, template.category)}
       >
-        安装
+        {t('agents.market.install')}
       </button>
       <button
         type="button"
         disabled={!onPreview}
-        title={!onPreview ? '当前环境不支持预览' : undefined}
+        title={!onPreview ? t('agents.market.previewUnavailable') : undefined}
         onClick={() => onPreview?.(template.name)}
       >
-        预览
+        {t('agents.market.preview')}
       </button>
     </div>
   </article>
-);
+  );
+};
 
 export const MarketTemplateListRow: React.FC<{
   template: MarketTemplate;
   onInstall?: ((name: string, description: string, category: string) => void) | undefined;
-}> = ({ template, onInstall }) => (
+}> = ({ template, onInstall }) => {
+  const { t } = useTranslation(SHARED_WORKBENCH_I18N_NAMESPACE);
+  return (
   <button
     className={styles['market-list-row']}
     type="button"
     disabled={!onInstall}
-    title={!onInstall ? '当前环境不支持安装模板' : undefined}
+    title={!onInstall ? t('agents.market.installUnavailable') : undefined}
     onClick={() => onInstall?.(template.name, template.description, template.category)}
   >
     <div className={styles['market-icon']}>
@@ -147,9 +158,10 @@ export const MarketTemplateListRow: React.FC<{
     </div>
     <em>{template.category}</em>
     <small>{formatMarketTemplateListMeta(template)}</small>
-    <b>安装</b>
+    <b>{t('agents.market.install')}</b>
   </button>
-);
+  );
+};
 
 export const MarketCompactEmpty: React.FC<{
   kind: EmptyStateKind;
@@ -174,7 +186,9 @@ export const SkillMarketItemRow: React.FC<{
   isInstalled: boolean;
   onSkillInstall?: ((skill: SkillMarketItem) => void) | undefined;
   onSkillUninstall?: ((skillId: string) => void) | undefined;
-}> = ({ skill, isInstalled, onSkillInstall, onSkillUninstall }) => (
+}> = ({ skill, isInstalled, onSkillInstall, onSkillUninstall }) => {
+  const { t } = useTranslation(SHARED_WORKBENCH_I18N_NAMESPACE);
+  return (
   <div className={`${styles['market-list-row']} ${styles['market-item-card']}`}>
     <div className={styles['market-icon']}>
       <DesignNavIcon name="library" size={16} />
@@ -190,31 +204,34 @@ export const SkillMarketItemRow: React.FC<{
         className={`${styles['market-action-btn']} ${styles.uninstall}`}
         type="button"
         disabled={!onSkillUninstall}
-        title={!onSkillUninstall ? '当前环境不支持卸载 Skill' : undefined}
+        title={!onSkillUninstall ? t('agents.market.skillUninstallUnavailable') : undefined}
         onClick={() => onSkillUninstall?.(skill.id)}
       >
-        卸载
+        {t('agents.market.uninstall')}
       </button>
     ) : (
       <button
         className={`${styles['market-action-btn']} ${styles.install}`}
         type="button"
         disabled={!onSkillInstall}
-        title={!onSkillInstall ? '当前环境不支持安装 Skill' : undefined}
+        title={!onSkillInstall ? t('agents.market.skillInstallUnavailable') : undefined}
         onClick={() => onSkillInstall?.(skill)}
       >
-        安装
+        {t('agents.market.install')}
       </button>
     )}
   </div>
-);
+  );
+};
 
 export const McpMarketItemRow: React.FC<{
   mcp: MCPMarketItem;
   isInstalled: boolean;
   onMcpInstall?: ((mcp: MCPMarketItem) => void) | undefined;
   onMcpUninstall?: ((mcpId: string) => void) | undefined;
-}> = ({ mcp, isInstalled, onMcpInstall, onMcpUninstall }) => (
+}> = ({ mcp, isInstalled, onMcpInstall, onMcpUninstall }) => {
+  const { t } = useTranslation(SHARED_WORKBENCH_I18N_NAMESPACE);
+  return (
   <div className={`${styles['market-list-row']} ${styles['market-item-card']}`}>
     <div className={styles['market-icon']}>
       <DesignNavIcon name="service" size={16} />
@@ -230,21 +247,22 @@ export const McpMarketItemRow: React.FC<{
         className={`${styles['market-action-btn']} ${styles.uninstall}`}
         type="button"
         disabled={!onMcpUninstall}
-        title={!onMcpUninstall ? '当前环境不支持卸载 MCP' : undefined}
+        title={!onMcpUninstall ? t('agents.market.mcpUninstallUnavailable') : undefined}
         onClick={() => onMcpUninstall?.(mcp.id)}
       >
-        卸载
+        {t('agents.market.uninstall')}
       </button>
     ) : (
       <button
         className={`${styles['market-action-btn']} ${styles.install}`}
         type="button"
         disabled={!onMcpInstall}
-        title={!onMcpInstall ? '当前环境不支持安装 MCP' : undefined}
+        title={!onMcpInstall ? t('agents.market.mcpInstallUnavailable') : undefined}
         onClick={() => onMcpInstall?.(mcp)}
       >
-        安装
+        {t('agents.market.install')}
       </button>
     )}
   </div>
-);
+  );
+};

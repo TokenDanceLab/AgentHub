@@ -61,11 +61,6 @@ export function marketFilterLabel(value: string, allLabel = '全部'): string {
   return value || allLabel;
 }
 
-/** Section counter: loading vs. N units. */
-export function marketCountLabel(loading: boolean, count: number, unit: string): string {
-  return loading ? '加载中' : `${count} ${unit}`;
-}
-
 export interface MarketEmptyContext {
   error?: string | undefined;
   searchQuery: string;

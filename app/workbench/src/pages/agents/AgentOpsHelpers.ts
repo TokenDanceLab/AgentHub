@@ -17,24 +17,9 @@ export function policyRiskIconName(riskLevel: RiskLevel): 'policy' | 'tools' {
   return riskLevel === '高风险' ? 'policy' : 'tools';
 }
 
-/** cc-switch connection badge text. */
-export function ccSwitchConnectionLabel(routingActive: boolean): string {
-  return routingActive ? '已连接' : '未启用';
-}
-
 /** CSS module key for the connection badge (active | inactive). */
 export function ccSwitchConnectionTone(routingActive: boolean): 'active' | 'inactive' {
   return routingActive ? 'active' : 'inactive';
-}
-
-/** Install status row value. */
-export function ccSwitchInstallLabel(installed: boolean): string {
-  return installed ? '已安装' : '未检测到';
-}
-
-/** Routing status row value. */
-export function ccSwitchRoutingLabel(routingActive: boolean): string {
-  return routingActive ? '活跃' : '未启用';
 }
 
 /**
