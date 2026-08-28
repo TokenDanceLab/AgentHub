@@ -166,3 +166,29 @@ describe('InspectorModePanelHelpers', () => {
     expect(formatDeployUrlDisplay('http://localhost:5173')).toBe('localhost:5173');
   });
 });
+
+describe('inspector evidence/deploy labels en convergence (#2023)', () => {
+  const tEn = createTestI18n({ lng: 'en' }).getFixedT('en', SHARED_WORKBENCH_I18N_NAMESPACE);
+
+  it('renders natural English evidence overview copy', () => {
+    expect(evidenceOverviewTasks(tEn, [])).toEqual([
+      { label: 'Waiting for transcript evidence', status: 'todo' },
+    ]);
+    const tasks = evidenceOverviewTasks(tEn, [
+      ref({ id: 'a1', kind: 'artifact', label: 'Art' }),
+      ref({ id: 'f1', kind: 'file', label: 'f.ts' }),
+      ref({ id: 't1', kind: 'tool', label: 'bash' }),
+    ]);
+    expect(tasks).toEqual([
+      { label: 'Artifacts: 1', status: 'done' },
+      { label: 'Changed files: 1', status: 'done' },
+      { label: 'Tool calls: 1', status: 'done' },
+    ]);
+  });
+
+  it('renders natural English deploy status copy', () => {
+    expect(deployStatusLabel(tEn, 'deployed')).toBe('Ready');
+    expect(deployStatusLabel(tEn, 'building')).toBe('Building');
+    expect(deployStatusLabel(tEn, 'unknown-status')).toBe('unknown-status');
+  });
+});

@@ -394,3 +394,23 @@ describe('workbenchAgentsRouteHelpers', () => {
     expect(buildHandlers().agentSaveStateLabel()).toBe('已同步');
   });
 });
+
+describe('agents save-state labels en convergence (#2023)', () => {
+  const tEn = createTestI18n({ lng: 'en' }).getFixedT('en', SHARED_WORKBENCH_I18N_NAMESPACE);
+  const base = {
+    selectedAgentDeleting: false,
+    selectedAgentSaving: false,
+    selectedAgentIsDraft: false,
+    selectedAgentIsDirty: false,
+  };
+
+  it('renders natural English save-state copy', () => {
+    expect(resolveAgentSaveStateLabel(tEn, { ...base })).toBe('Synced');
+    expect(resolveAgentSaveStateLabel(tEn, { ...base, selectedAgentIsDirty: true })).toBe('Unsaved');
+    expect(resolveAgentSaveStateLabel(tEn, { ...base, selectedAgentIsDraft: true })).toBe('Draft');
+    expect(resolveAgentSaveStateLabel(tEn, { ...base, selectedAgentSaving: true, selectedAgentIsDraft: true })).toBe('Creating');
+    expect(resolveAgentSaveStateLabel(tEn, { ...base, selectedAgentSaving: true })).toBe('Saving');
+    expect(resolveAgentSaveStateLabel(tEn, { ...base, selectedAgentDeleting: true })).toBe('Deleting');
+    expect(resolveAgentSaveStateLabel(tEn, { ...base, actionError: 'boom' })).toBe('Save failed');
+  });
+});
