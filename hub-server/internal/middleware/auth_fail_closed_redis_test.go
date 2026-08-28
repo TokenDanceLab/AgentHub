@@ -19,11 +19,12 @@ import (
 	"time"
 
 	"github.com/alicebob/miniredis/v2"
-
-	"github.com/agenthub/hub-server/internal/jwtutil"
+	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/redis/go-redis/v9"
 
 	"github.com/agenthub/hub-server/internal/cache"
+	"github.com/agenthub/hub-server/internal/jwtutil"
+	"github.com/agenthub/hub-server/internal/metrics"
 )
 
 // realRedisBlacklistChecker builds the same checker production wires into
@@ -85,6 +86,10 @@ func runRealRedisAuthCase(t *testing.T, failClosedEnv string, blacklistJTIBefore
 // gate: Redis reachability x AGENTHUB_AUTH_FAIL_CLOSED x expected behavior,
 // with the production-wired *cache.Client as blacklist checker.
 func TestAuthMiddlewareRealRedisFailClosedMatrix(t *testing.T) {
+	// Create the metrics (nil-guarded in production code) so the outage
+	// observability assertions below can read JTIBlacklistCheckErrors.
+	metrics.Register()
+
 	cases := []struct {
 		name          string
 		failClosedEnv string
@@ -113,6 +118,10 @@ func TestAuthMiddlewareRealRedisFailClosedMatrix(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
+			var errMetricBefore float64
+			if tc.outage {
+				errMetricBefore = testutil.ToFloat64(metrics.JTIBlacklistCheckErrors)
+			}
 			allowed, status := runRealRedisAuthCase(t, tc.failClosedEnv, tc.blacklisted, tc.outage, tc.useWS)
 			if allowed != tc.wantAllowed {
 				if tc.wantAllowed {
@@ -122,6 +131,13 @@ func TestAuthMiddlewareRealRedisFailClosedMatrix(t *testing.T) {
 			}
 			if !tc.wantAllowed && status != http.StatusUnauthorized {
 				t.Fatalf("status = %d, want 401", status)
+			}
+			if tc.outage {
+				// G9: a Redis outage on the blacklist path must be visible in
+				// Grafana regardless of the fail-open/fail-closed decision.
+				if delta := testutil.ToFloat64(metrics.JTIBlacklistCheckErrors) - errMetricBefore; delta != 1 {
+					t.Fatalf("JTIBlacklistCheckErrors delta = %v, want 1: Redis outage must be observable", delta)
+				}
 			}
 		})
 	}

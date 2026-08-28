@@ -1,6 +1,6 @@
 # AgentHub Hub Server
 
-最后更新：2026-08-16
+最后更新：2026-08-29
 
 Hub Server 是 AgentHub 的云端控制面：账号、IM、联系人/群聊、多端同步、设备路由、Edge 中继、Profile catalog 和审计。它不直接启动 Agent CLI；实际执行由 Edge Server 完成。
 
@@ -67,3 +67,5 @@ go test ./... -short -count=1
 Hub session 是 AgentHub 产品授权边界。TokenDance ID bearer middleware 只是一条兼容身份校验路径，不能替代 Hub refresh token、device proof、WebSocket session 或 Hub-local authorization。
 
 `/client/ws` 只接受 Hub-issued HS256 access token。新增登录、session、device、permission 或 Edge callback 行为时，同步 `api/openapi.yaml`、`api/events.md`、`docs/architecture/06-auth-identity.md` 和相关测试。
+
+access jti 黑名单的 fail-open/fail-closed 行为矩阵（Redis 可达性 × `AGENTHUB_AUTH_FAIL_CLOSED`，AH-SR-052 补偿控制）由 `internal/middleware/auth_fail_closed_redis_test.go` 按生产接线（`*cache.Client` + 进程内 miniredis，无真实网络）守护。
