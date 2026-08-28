@@ -1,10 +1,14 @@
 package outboundhttp
 
 import (
+	"context"
 	"errors"
 	"io"
+	"net"
 	"net/http"
+	"net/http/httptest"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -86,3 +90,129 @@ func TestReadLimitedPropagatesReaderError(t *testing.T) {
 type errorReader struct{ err error }
 
 func (r errorReader) Read([]byte) (int, error) { return 0, r.err }
+
+// TestNewClientTimeoutEnforced 证明 Timeout 是整个请求的截止时间：
+// 永不响应的服务器得到 net.Error 超时，而不是无限挂起（审计维度 1）。
+func TestNewClientTimeoutEnforced(t *testing.T) {
+	client := NewClient(200 * time.Millisecond)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		<-r.Context().Done()
+	}))
+	t.Cleanup(srv.Close)
+
+	_, err := client.Get(srv.URL)
+	if err == nil {
+		t.Fatal("Get to a never-responding server succeeded, want timeout error")
+	}
+	var ne net.Error
+	if !errors.As(err, &ne) || !ne.Timeout() {
+		t.Fatalf("error = %v, want net.Error with Timeout()=true", err)
+	}
+}
+
+// TestNewClientRespectsRequestContext 证明客户端尊重调用方绑定的 ctx：
+// outboundhttp 不注入自己的 ctx，NewRequestWithContext 是调用方职责
+// （oidc token 交换与 dispatchsvc Edge 派发均如此绑定）。
+func TestNewClientRespectsRequestContext(t *testing.T) {
+	client := NewClient(10 * time.Second)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		<-r.Context().Done()
+	}))
+	t.Cleanup(srv.Close)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	defer cancel()
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, srv.URL, nil)
+	if err != nil {
+		t.Fatalf("NewRequestWithContext: %v", err)
+	}
+	_, err = client.Do(req)
+	if err == nil {
+		t.Fatal("Do succeeded after ctx deadline, want deadline error")
+	}
+	if !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("error = %v, want context.DeadlineExceeded", err)
+	}
+}
+
+// TestRedirectRefusalBehavior 在 HTTP 行为层证明重定向拒绝：
+// 302 原样返回，Location 目标不收到任何请求。
+func TestRedirectRefusalBehavior(t *testing.T) {
+	var replayHits int64
+	mux := http.NewServeMux()
+	mux.HandleFunc("/replay", func(w http.ResponseWriter, r *http.Request) {
+		atomic.AddInt64(&replayHits, 1)
+		w.WriteHeader(http.StatusOK)
+	})
+	mux.HandleFunc("/origin", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "/replay", http.StatusFound)
+	})
+	srv := httptest.NewServer(mux)
+	t.Cleanup(srv.Close)
+
+	client := NewClient(time.Second)
+	resp, err := client.Get(srv.URL + "/origin")
+	if err != nil {
+		t.Fatalf("Get: %v", err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusFound {
+		t.Fatalf("status = %d, want 302 surfaced untransformed", resp.StatusCode)
+	}
+	if got := atomic.LoadInt64(&replayHits); got != 0 {
+		t.Fatalf("redirect target hits = %d, want 0 (redirect must not be followed)", got)
+	}
+}
+
+// TestPostBodyNeverReplayedOnRedirect 是 token 交换的凭据重放防御核心：
+// 携带 secret 的 POST 遇到 302 时，body 绝不能重放到重定向目标。
+func TestPostBodyNeverReplayedOnRedirect(t *testing.T) {
+	var replayHits int64
+	mux := http.NewServeMux()
+	mux.HandleFunc("/elsewhere", func(w http.ResponseWriter, r *http.Request) {
+		atomic.AddInt64(&replayHits, 1)
+		w.WriteHeader(http.StatusOK)
+	})
+	mux.HandleFunc("/token", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "/elsewhere", http.StatusFound)
+	})
+	srv := httptest.NewServer(mux)
+	t.Cleanup(srv.Close)
+
+	client := NewClient(time.Second)
+	resp, err := client.Post(srv.URL+"/token", "application/x-www-form-urlencoded", strings.NewReader("client_secret=s3cr3t"))
+	if err != nil {
+		t.Fatalf("Post: %v", err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusFound {
+		t.Fatalf("status = %d, want 302 (redirect must not be followed)", resp.StatusCode)
+	}
+	if got := atomic.LoadInt64(&replayHits); got != 0 {
+		t.Fatalf("redirect target hits = %d, want 0 (POST body must never be replayed)", got)
+	}
+}
+
+// TestNoRetryOnServerError 证明无应用层重试语义：
+// 5xx 原样返回（err=nil + 响应），服务端恰好收到 1 次请求。
+func TestNoRetryOnServerError(t *testing.T) {
+	var hits int64
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		atomic.AddInt64(&hits, 1)
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	t.Cleanup(srv.Close)
+
+	client := NewClient(time.Second)
+	resp, err := client.Get(srv.URL)
+	if err != nil {
+		t.Fatalf("Get: %v", err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusInternalServerError {
+		t.Fatalf("status = %d, want 500 surfaced untransformed", resp.StatusCode)
+	}
+	if got := atomic.LoadInt64(&hits); got != 1 {
+		t.Fatalf("server hits = %d, want exactly 1 (no retry)", got)
+	}
+}
