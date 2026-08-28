@@ -109,9 +109,15 @@ func TestTokenProviderAutoRefreshRotatesBeforeExpiry(t *testing.T) {
 	p.StartAutoRefresh()
 	defer p.Stop()
 
+	// Wait on the client-side rotation itself: the server-side request counter
+	// increments before the client processes the 200 response and swaps the
+	// live token in SetTokens, so polling the counter leaves the same race
+	// window that flaked FLK-001 (fixed in #2017).
 	testkit.Eventually(t, 10*time.Second, func() bool {
-		return refreshCalls.Load() >= 1
-	}, "refresh fired before expiry", func() string { return fmt.Sprintf("refreshCalls=%d", refreshCalls.Load()) })
+		return p.AccessToken() != original
+	}, "rotated token live before expiry", func() string {
+		return fmt.Sprintf("refreshCalls=%d rotated=%v", refreshCalls.Load(), p.AccessToken() != original)
+	})
 
 	// The rotated token is the live one; LastError stays clean.
 	if p.AccessToken() == "" {
