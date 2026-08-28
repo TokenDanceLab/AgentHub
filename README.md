@@ -62,7 +62,7 @@ cp .env.example .env && secret="$(openssl rand -hex 32)" && sed -i.bak "s/^AGENT
 docker compose up -d postgres redis         # 2. 起基础设施（PG16 + Redis7，仅绑 127.0.0.1）
 cd hub-server && go run ./cmd/server-hub    # 3. 起 Hub Server（自动跑迁移，API 在 :8080）
 cd ../app && corepack pnpm install          # 4. 装前端依赖
-pnpm dev                                    # 5. 起 Desktop Vite（:5173）；web 用 pnpm dev:web
+corepack pnpm dev                           # 5. 起 Desktop Vite（:5173）；web 用 corepack pnpm dev:web
 ```
 
 `.env.example` 不提供可复用 JWT secret；Windows PowerShell 命令、完整启动路径、OIDC 接入和 Edge Server 调试见 [docs/developer-quickstart.md](docs/developer-quickstart.md)。生产部署与必填变量见 [docs/architecture/05-deployment.md](docs/architecture/05-deployment.md)。
