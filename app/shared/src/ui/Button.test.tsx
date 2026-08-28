@@ -37,6 +37,15 @@ describe('Button', () => {
     expect(btn.disabled).toBe(true);
   });
 
+  it('shows spinner and blocks interaction when loading', () => {
+    const { container } = render(<Button loading>Loading</Button>);
+    const btn = screen.getByRole('button') as HTMLButtonElement;
+    expect(btn.disabled).toBe(true);
+    expect(btn.getAttribute('aria-busy')).toBe('true');
+    expect(btn.className).toContain('loading');
+    expect(container.querySelector('.spinner')).toBeDefined();
+  });
+
   it('renders as forwardRef', () => {
     const { container } = render(<Button>Ref test</Button>);
     expect(container.querySelector('button')).toBeInstanceOf(HTMLButtonElement);
