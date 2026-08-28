@@ -159,19 +159,16 @@
   ]
  },
  "edge-server/tests/hub_e2e_test.go": {
-  "count": 7,
-  "total_ms": 3900,
+  "count": 4,
+  "total_ms": 3500,
   "max_ms": 2000,
   "owner": "DeliciousBuding",
-  "review": "2026-11-02",
-  "reason": "E2E lane (short-skipped in CI): deadline-guarded run-status polls (100/100/200ms, 10-15s deadlines); 500ms x3 async callback grace; 2000ms real run completion (subprocess protocol). Integration grace windows require real time.",
+  "review": "2026-08-29",
+  "reason": "E2E lane (short-skipped in CI): 500ms x3 async callback grace windows (callbacks fire from a goroutine after the run reaches a terminal status; kept bounded); 2000ms real run completion (subprocess protocol time doubling as the negative window proving no callback fires without hubTaskId). The three former deadline-guarded run-status poll intervals (100/100/200ms) were converted to testkit.Eventually (approved 2026-08-29, #2055).",
   "sleeps": [
-   { "ms": 100, "kind": "poll_deadline" },
    { "ms": 500, "kind": "grace_window" },
-   { "ms": 100, "kind": "poll_deadline" },
    { "ms": 500, "kind": "grace_window" },
    { "ms": 2000, "kind": "real_protocol" },
-   { "ms": 200, "kind": "poll_deadline" },
    { "ms": 500, "kind": "grace_window" }
   ]
  },
