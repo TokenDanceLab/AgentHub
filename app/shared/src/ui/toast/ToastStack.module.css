@@ -23,13 +23,14 @@
   line-height: var(--td-leading-normal);
   cursor: default;
   animation: toast-slide-in var(--duration-medium) var(--td-ease-out);
+
   /* #1825: light theme shadow was using background tokens (--glass-bg-*,
      white alpha) — invisible on white canvas. Use the glass elevation
      ladder so the float reads on both themes. */
   box-shadow:
     var(--glass-elev-3, var(--td-shadow-lg)),
     var(--glass-elev-1, var(--td-shadow-sm)),
-    0 1px 0 rgba(255, 255, 255, 0.55) inset;
+    0 1px 0 rgba(255 255 255 / 55%) inset;
   word-break: break-word;
   border: 1px solid var(--glass-border);
   background: var(--glass-input-bg-hover);
@@ -47,8 +48,8 @@
     linear-gradient(180deg, var(--glass-bg-medium), var(--glass-bg-subtle)),
     var(--glass-panel);
   box-shadow:
-    0 16px 34px rgba(0, 0, 0, 0.26),
-    0 4px 12px rgba(0, 0, 0, 0.16);
+    0 16px 34px rgba(0 0 0 / 26%),
+    0 4px 12px rgba(0 0 0 / 16%);
 }
 
 .toast.exiting {
@@ -129,7 +130,7 @@
   font-size: var(--td-text-xs);
   font-weight: var(--font-weight-medium);
   line-height: var(--td-leading-tight);
-  border: 1px solid currentColor;
+  border: 1px solid currentcolor;
   background: transparent;
   color: inherit;
   transition:
@@ -179,6 +180,7 @@
     opacity: 0;
     transform: translate3d(10px, -4px, 0) scale(0.97);
   }
+
   to {
     opacity: 1;
     transform: translate3d(0, 0, 0) scale(1);
@@ -190,6 +192,7 @@
     opacity: 1;
     transform: translate3d(0, 0, 0) scale(1);
   }
+
   to {
     opacity: 0;
     transform: translate3d(10px, -4px, 0) scale(0.97);
@@ -202,6 +205,7 @@
   .toast {
     animation: none;
   }
+
   .toast.exiting {
     animation: none;
     opacity: 0;
@@ -210,7 +214,7 @@
 
 /* ── Mobile ── */
 
-@media (max-width: 768px) {
+@media (width <= 768px) {
   .container {
     top: 8px;
     right: 8px;

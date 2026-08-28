@@ -129,7 +129,7 @@
   width: 15px;
   height: 15px;
   fill: none;
-  stroke: currentColor;
+  stroke: currentcolor;
   stroke-width: 1.85;
   stroke-linecap: round;
   stroke-linejoin: round;
@@ -243,7 +243,7 @@
   min-height: 0;
   padding: var(--td-space-2);
   border-radius: var(--td-radius-control);
-  background: var(--surface-lowest, #0d1117);
+  background: var(--surface-base);
   color: var(--td-ink-muted);
   font-family: var(--td-mono);
   font-size: 12px;
@@ -294,16 +294,19 @@
   outline-offset: 2px;
   box-shadow: var(--focus-ring);
 }
+
 .tabClose:focus-visible {
   outline: 2px solid transparent;
   outline-offset: 2px;
   box-shadow: var(--focus-ring);
 }
+
 .toolBtn:focus-visible {
   outline: 2px solid transparent;
   outline-offset: 2px;
   box-shadow: var(--focus-ring);
 }
+
 .primaryBtn:focus-visible {
   outline: 2px solid transparent;
   outline-offset: 2px;

@@ -14,7 +14,7 @@
   padding: 0 8px;
   border: 0;
   border-radius: var(--composer-control-radius, 10px);
-  background: var(--composer-control-bg, rgba(255, 255, 255, 0.052));
+  background: var(--composer-control-bg, rgba(255 255 255 / 5.2%));
   box-shadow: none;
   color: var(--composer-control-text, var(--td-ink-muted));
   font: inherit;
@@ -32,13 +32,14 @@
 
 .trigger:hover,
 .trigger[aria-expanded='true'] {
-  background: var(--composer-control-bg-hover, rgba(255, 255, 255, 0.078));
+  background: var(--composer-control-bg-hover, rgba(255 255 255 / 7.8%));
   color: var(--composer-control-text-active, var(--td-ink-muted));
 }
 
 .trigger:focus-visible {
-  background: var(--composer-control-bg-hover, rgba(255, 255, 255, 0.078));
+  background: var(--composer-control-bg-hover, rgba(255 255 255 / 7.8%));
   color: var(--composer-control-text-active, var(--td-ink-muted));
+
   /* Visible keyboard focus ring (a11y 2.4.7/2.4.11): suppress the default
      outline and replace it with the shared --focus-ring box-shadow. */
   outline: none;
@@ -112,11 +113,11 @@
 
 .option:hover,
 .optionActive {
-  background: var(--composer-option-hover-bg, rgba(255, 255, 255, 0.046));
+  background: var(--composer-option-hover-bg, rgba(255 255 255 / 4.6%));
 }
 
 .option:focus-visible {
-  background: var(--composer-option-hover-bg, rgba(255, 255, 255, 0.046));
+  background: var(--composer-option-hover-bg, rgba(255 255 255 / 4.6%));
   outline: none;
   box-shadow: var(--focus-ring);
 }

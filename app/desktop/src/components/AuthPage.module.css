@@ -135,6 +135,7 @@
 
 .submitButton:hover { opacity: 0.88; }
 .submitButton:active { transform: scale(0.98); }
+
 .submitButton:disabled {
   opacity: 0.4;
   cursor: not-allowed;
@@ -366,6 +367,7 @@
 
 .hubStatusDotConnected { background: var(--td-moss); }
 .hubStatusDotDisconnected { background: var(--td-danger); }
+
 .hubStatusDotChecking {
   background: var(--td-warning);
   animation: pulse 1.5s infinite;

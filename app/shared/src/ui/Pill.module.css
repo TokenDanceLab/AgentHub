@@ -13,6 +13,7 @@
 }
 
 .default { color: var(--td-ink); background: var(--td-surface-3); }
+
 /* Variant → token mapping (see Pill.tsx comment): blue=info, cyan=td-accent-blue,
    purple=td-accent-purple, green=success, amber=warning/td-accent-amber. */
 .blue    { color: var(--td-info); background: var(--td-info-bg); border-color: color-mix(in srgb, var(--td-info) 22%, transparent); }
@@ -23,7 +24,7 @@
 
 /* ── Responsive ─────────────────── */
 
-@media (max-width: 480px) {
+@media (width <= 480px) {
   .pill {
     min-height: var(--touch-target-min, 44px);
     padding: 6px 12px;

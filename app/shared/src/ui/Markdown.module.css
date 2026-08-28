@@ -24,6 +24,7 @@
 .root h1 { font-size: 1.25em; }
 .root h2 { font-size: 1.15em; }
 .root h3 { font-size: 1.05em; }
+
 .root h4,
 .root h5,
 .root h6 {
@@ -202,6 +203,7 @@
   overflow-x: auto;
   border: 1px solid var(--td-line);
   border-radius: var(--r-md);
+
   /* Transparent so zebra striping (tbody rows) paints through the rounded
      corners; the scroll container clips row backgrounds to the radius. */
   background: transparent;
@@ -230,6 +232,7 @@
 .root th {
   background: var(--td-surface-3);
   font-weight: 500;
+
   /* Sticky header: the table is the scroll container (overflow-x: auto), so
      the header stays visible while a long table scrolls vertically. */
   position: sticky;
@@ -298,7 +301,7 @@
 
 /* ADR: The PreTag <div> receives inline `overflow: auto` from oneDark's
    pre[class*="language-"] style (react-syntax-highlighter useInlineStyles=true
-   applies theme values as inline styles, not a <style> tag). Inline
+   applies theme values as inline styles, not a \3c style> tag). Inline
    overflow:auto already sets overflow-x:auto — same value as this rule, so
    no !important needed. This selector's real job is max-width:100% (no inline
    competitor). It now also applies to the code-block header/body wrappers
@@ -382,12 +385,13 @@
   bottom: 0;
   height: 48px;
   pointer-events: none;
+
   /* Fade-out matches oneDark's background (#282c34) — the code block is
      always rendered with the oneDark theme regardless of app theme, so
      this rgba(40,44,52,·) pair has no token mapping (see CodeBlock.tsx
      fallbackStyle + docs/architecture/07-design-system-ssot.md §4
      "syntax binding pair" row — change together with it). */
-  background: linear-gradient(180deg, transparent, rgba(40, 44, 52, 0.85));
+  background: linear-gradient(180deg, transparent, rgba(40 44 52 / 85%));
 }
 
 .codeToggle {

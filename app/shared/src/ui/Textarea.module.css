@@ -55,6 +55,7 @@
 .sm {
   padding: 8px 12px;
   min-height: 56px;
+
   /* 13px — compact sibling of Input sm (#1827). */
   font-size: 13px;
 }

@@ -78,7 +78,7 @@
 .navGlyph {
   width: 20px;
   height: 20px;
-  color: currentColor;
+  color: currentcolor;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -89,7 +89,7 @@
   width: 17px;
   height: 17px;
   fill: none;
-  stroke: currentColor;
+  stroke: currentcolor;
   stroke-width: 1.85;
   stroke-linecap: round;
   stroke-linejoin: round;
@@ -228,7 +228,7 @@
   width: 16px;
   height: 16px;
   fill: none;
-  stroke: currentColor;
+  stroke: currentcolor;
   stroke-width: 1.9;
   stroke-linecap: round;
   stroke-linejoin: round;
@@ -493,7 +493,7 @@
   width: 14px;
   height: 14px;
   fill: none;
-  stroke: currentColor;
+  stroke: currentcolor;
   stroke-width: 1.9;
   stroke-linecap: round;
   stroke-linejoin: round;
@@ -652,7 +652,7 @@
   width: 17px;
   height: 17px;
   fill: none;
-  stroke: currentColor;
+  stroke: currentcolor;
   stroke-width: 1.85;
   stroke-linecap: round;
   stroke-linejoin: round;
@@ -777,7 +777,7 @@
   width: 14px;
   height: 14px;
   fill: none;
-  stroke: currentColor;
+  stroke: currentcolor;
   stroke-width: 1.9;
   stroke-linecap: round;
   stroke-linejoin: round;
@@ -785,7 +785,7 @@
 
 /* compact tier (≤720) — legacy 700 folded up; SSOT: styles/tokens-base.css +
    styles/breakpoints.ts (#1827). */
-@media (max-width: 720px) {
+@media (width <= 720px) {
   .page {
     min-width: 0;
   }

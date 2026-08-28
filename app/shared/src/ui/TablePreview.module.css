@@ -300,6 +300,7 @@
     opacity: 0;
     transform: translateX(8px);
   }
+
   to {
     opacity: 1;
     transform: translateX(0);
@@ -312,11 +313,13 @@
   outline-offset: 2px;
   box-shadow: var(--focus-ring);
 }
+
 .thBtn:focus-visible {
   outline: 2px solid transparent;
   outline-offset: 2px;
   box-shadow: var(--focus-ring);
 }
+
 .retryBtn:focus-visible {
   outline: 2px solid transparent;
   outline-offset: 2px;

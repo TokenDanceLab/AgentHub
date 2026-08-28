@@ -10,6 +10,7 @@
   overflow:hidden;
 }
 .row-item.selected { outline: 2px solid var(--td-plum); outline-offset: -2px }
+
 /* #1825: deleted / soft-hidden rows collapse out with a short exit instead
    of a display:none snap. The row stays in the items array (the class sits
    on it), and this static target also covers prefers-reduced-motion, where
@@ -21,10 +22,12 @@
   overflow:hidden; pointer-events:none;
 }
 .row-item.soft-hidden { animation:rowSoftHide var(--chat-dur) var(--td-ease) forwards }
+
 @keyframes rowSoftHide {
   from { max-height:var(--think-max-h, 2000px); opacity:1; visibility:visible; }
   to { max-height:0; opacity:0; visibility:hidden; }
 }
+
 .card-stack > .row-item {
   width:100%;
   border-radius:0;
@@ -46,15 +49,19 @@
 }
 .row-hd:hover { background:var(--td-surface-3) }
 .row-hd:focus-visible { outline:none; box-shadow:var(--focus-ring) }
+
 /* F10: artifact rows are preview triggers, not expandable empty file rows. */
 .row-item.artifact-preview-target > .row-hd { cursor:pointer }
 .row-item.artifact-preview-target > .row-hd:hover { background:color-mix(in oklch, var(--td-accent) 8%, var(--td-surface-3)) }
+
 /* ── Wave10 a11y: keyboard focus ring on the block row itself (the div is the
    tab stop via tabIndex=0). Only matches keyboard focus, not inner-button
    focus, so there's no double ring when the header button is focused. ── */
 .row-item:focus-visible { outline:none; box-shadow:var(--focus-ring) }
+
 .row-item.running > .row-hd,
 .row-item:not(.collapsible) > .row-hd { cursor:default; pointer-events:none }
+
 .row-item.running > .row-hd:hover,
 .row-item:not(.collapsible) > .row-hd:hover { background:transparent }
 
@@ -72,7 +79,9 @@
   overflow:hidden;
   animation:rowBdExpand var(--chat-dur) var(--td-ease);
 }
+
 @keyframes rowBdExpand { from { max-height:0; opacity:0 } to { max-height:var(--think-max-h, 2000px); opacity:1 } }
+
 /* Nested RowItems (subagent children): strip card border, keep inner spacing */
 .row-bd .row-item { background:transparent; border:none; border-radius:0; margin:0 }
 .row-bd .row-item + .row-item { border-top:none; margin-top:0 }
@@ -110,6 +119,7 @@
   border-radius:50%;
   animation: rowSpin var(--spinner-speed, 0.8s) var(--spinner-easing, linear) infinite;
 }
+
 @keyframes rowSpin { to { transform: rotate(360deg) } }
 .file-stat { font:var(--chat-label-xs); color:var(--td-ink-subtle); margin-left:var(--chat-sp-xs) }
 .file-stat-add { color:var(--td-moss) }
@@ -135,6 +145,7 @@
 .row-item.approval.ok > .row-bd { border-left-color:var(--td-moss) }
 .row-item.approval.fail > .row-bd { border-left-color:var(--td-danger) }
 .ap-reason { font:var(--chat-label); color:var(--td-ink-muted) }
+
 /* ── Approval structured preview (QW4: six-type render by request kind) ── */
 .ap-scroll { max-height:min(36vh, 18rem); overflow-y:auto; scrollbar-width:thin; scrollbar-color:var(--scrollbar-thumb) var(--scrollbar-track) }
 .ap-section { margin-top:var(--chat-sp-xs) }
@@ -164,8 +175,10 @@
 
 /* Think shimmer (QW6) */
 .think-shimmer { background:linear-gradient(90deg, var(--td-ink-muted) 0%, var(--td-ink) 48%, var(--td-ink-muted) 52%, var(--td-ink-muted) 100%); background-size:200% 100%; -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent; animation:thinkShimmer 2s linear infinite }
+
 @keyframes thinkShimmer { 0% { background-position: 100% center } 100% { background-position: -100% center } }
 .think-duration { color:var(--td-ink-subtle); font:var(--chat-label-xs); font-weight:400; margin-left:var(--chat-sp-xxs) }
+
 /* ── #1819 waiting-approval "requested at" meta (honest time feedback:
    the upstream model carries no deadline, so we show created-time only) ── */
 .ap-waiting-meta {
@@ -176,18 +189,22 @@
 .ap-actions { display:flex; align-items:center; gap:var(--chat-sp-sm); flex-wrap:wrap }
 .ap-actions.has-risk { padding-top:var(--chat-sp-2) }
 .ap-kbd-hint { font:var(--chat-label-xs); color:var(--td-ink-subtle); margin-left:auto; user-select:none; opacity:0.85 }
+
 /* ── T16: critical second-confirm — armed state on the destructive Button
    (danger outline + pulse ring, migrated from .ap-approve.critical.confirming) ── */
 .ap-actions .confirming {
   box-shadow:0 0 0 2px var(--td-surface), 0 0 0 4px var(--td-danger);
   animation:apConfirmPulse 1.2s ease-in-out infinite;
 }
+
 @keyframes apConfirmPulse {
   0%, 100% { box-shadow:0 0 0 2px var(--td-surface), 0 0 0 4px var(--td-danger) }
   50% { box-shadow:0 0 0 2px var(--td-surface), 0 0 0 6px var(--td-danger) }
 }
+
 /* ── Copy→Check feedback (Fable UIUX #4) ── */
 .code-head .copied { color:var(--td-moss) }
+
 /* ── Fail retry (danger outline ghost) ── */
 .fail-retry { color:var(--td-danger); border-color:var(--td-danger) }
 
@@ -200,10 +217,11 @@
 .row-item.route > .row-hd .row-icon { animation:routePulse var(--chat-dur-route) ease infinite }
 
 @keyframes routeSlideIn { from{opacity:0;transform:translateY(-4px)} to{opacity:1;transform:translateY(0)} }
+
 @keyframes routePulse { 0%,100%{opacity:1} 50%{opacity:var(--opacity-route-mid)} }
 
 /* ── Scroll-to-block highlight (search jump) ────────────────────── */
-@keyframes highlightFadeOut { 0%{background:var(--highlight-flash, rgba(0,113,188,0.12));box-shadow:0 0 0 2px var(--td-plum)} 70%{background:var(--highlight-flash, rgba(0,113,188,0.12))} 100%{background:transparent;box-shadow:none} }
+@keyframes highlightFadeOut { 0%{background:var(--highlight-flash, rgba(0 113 188 / 12%));box-shadow:0 0 0 2px var(--td-plum)} 70%{background:var(--highlight-flash, rgba(0 113 188 / 12%))} 100%{background:transparent;box-shadow:none} }
 .row-item.highlighted { animation:highlightFadeOut var(--dur-highlight, 3s) ease forwards }
 
 /* Deploy */ .row-item.deploy > .row-hd .row-icon { color:var(--td-plum) }
@@ -236,6 +254,7 @@
 .user-att-list .att-image-status { font:var(--chat-label-xs); color:inherit; flex-shrink:0 }
 .att-image-lightbox-img { display:block; max-width:min(90vw, 1200px); max-height:80vh; width:auto; height:auto; object-fit:contain; margin:0 auto }
 .att-image-lightbox-fail { font:var(--chat-label); color:var(--td-ink-muted); padding:var(--chat-sp-lg) }
+
 /* #1939: inline audio/video attachment players — same row contract as the
    image thumbnail (media URL comes from the platform port as a blob: URL). */
 .row-item.attachment .att-media-player { display:block; width:100%; max-width:320px; margin-top:var(--chat-sp-xs) }
@@ -271,6 +290,7 @@
   font:var(--chat-label); font-family:var(--td-mono); line-height:1.7; margin-top:var(--chat-sp-xs);
   border:1px solid var(--td-line); border-radius:var(--chat-r-sm); overflow:hidden;
 }
+
 .code-head {
   display:flex; align-items:center; justify-content:space-between;
   padding:5px var(--chat-sp-md); font:var(--chat-label-xs); color:var(--td-ink-muted);
@@ -292,6 +312,7 @@
 .orch-plan-text { font:var(--chat-body); color:var(--td-ink-muted); line-height:1.55 }
 
 .orch-dag { width:100%; height:auto; margin:var(--chat-sp-sm) 0 }
+
 @keyframes dagPulse { 0%,100%{opacity:1 } 50%{opacity:var(--opacity-dag-mid)} }
 .dag-pulse { animation:dagPulse var(--chat-dur-pulse) ease infinite }
 
@@ -299,12 +320,14 @@
 
 /* ── Evidence chips (rendered in AgentGroup, co-located with RowItem styles) ── */
 .evidence-chips { display:flex; gap:4px; flex-wrap:wrap; margin-top:4px }
+
 .evidence-chip {
   display:inline-flex; align-items:center; gap:2px;
   font:var(--chat-label-xs); padding:1px 6px; border-radius:var(--chat-r-xs);
   background:var(--td-surface-2); color:var(--td-ink-muted);
   cursor:default; line-height:1.4;
 }
+
 .evidence-chip:hover {
   background:var(--td-surface-3); color:var(--td-ink);
 }

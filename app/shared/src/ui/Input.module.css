@@ -52,6 +52,7 @@
 
 .sm {
   padding: 8px 12px;
+
   /* 13px — hub/dev-panel URL fields parity (#1827); >= 12px CJK floor. */
   font-size: 13px;
 }

@@ -74,7 +74,7 @@
 .navGlyph {
   width: 20px;
   height: 20px;
-  color: currentColor;
+  color: currentcolor;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -85,7 +85,7 @@
   width: 17px;
   height: 17px;
   fill: none;
-  stroke: currentColor;
+  stroke: currentcolor;
   stroke-width: 1.85;
   stroke-linecap: round;
   stroke-linejoin: round;
@@ -163,7 +163,7 @@
   width: 16px;
   height: 16px;
   fill: none;
-  stroke: currentColor;
+  stroke: currentcolor;
   stroke-width: 1.9;
   stroke-linecap: round;
   stroke-linejoin: round;
@@ -219,7 +219,7 @@
   width: 16px;
   height: 16px;
   fill: none;
-  stroke: currentColor;
+  stroke: currentcolor;
   stroke-width: 1.9;
   stroke-linecap: round;
   stroke-linejoin: round;
@@ -293,7 +293,7 @@
   width: 15px;
   height: 15px;
   fill: none;
-  stroke: currentColor;
+  stroke: currentcolor;
   stroke-width: 1.9;
   stroke-linecap: round;
   stroke-linejoin: round;
@@ -302,6 +302,7 @@
 /* ── Doc table ── */
 .docTable {
   min-width: 560px;
+
   /* was 760px — lowered; grid-template-columns provide natural floor */
 }
 
@@ -447,7 +448,7 @@
   width: 14px;
   height: 14px;
   fill: none;
-  stroke: currentColor;
+  stroke: currentcolor;
   stroke-width: 1.9;
   stroke-linecap: round;
   stroke-linejoin: round;
@@ -477,7 +478,7 @@
   width: 14px;
   height: 14px;
   fill: none;
-  stroke: currentColor;
+  stroke: currentcolor;
   stroke-width: 1.9;
   stroke-linecap: round;
   stroke-linejoin: round;
@@ -507,7 +508,7 @@
   width: 14px;
   height: 14px;
   fill: none;
-  stroke: currentColor;
+  stroke: currentcolor;
   stroke-width: 1.9;
   stroke-linecap: round;
   stroke-linejoin: round;

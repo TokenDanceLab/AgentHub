@@ -8,18 +8,18 @@
 .empty {
   padding: 10px 8px;
   font-size: 12px;
-  color: var(--ah-text-muted, #9aa3b2);
+  color: var(--td-ink-muted);
 }
 
 .row {
   padding: 8px;
-  border-bottom: 1px solid var(--ah-border-subtle, rgba(255, 255, 255, 0.06));
+  border-bottom: 1px solid var(--ah-border-subtle, rgba(255 255 255 / 6%));
 }
 
 .title {
   font-size: 13px;
   font-weight: 600;
-  color: var(--ah-text, #e8ecf4);
+  color: var(--td-ink);
   word-break: break-all;
 }
 
@@ -29,7 +29,7 @@
   gap: 8px;
   margin-top: 4px;
   font-size: 11px;
-  color: var(--ah-text-muted, #9aa3b2);
+  color: var(--td-ink-muted);
 }
 
 .runtime {
@@ -39,8 +39,8 @@
 .mode {
   padding: 0 6px;
   border-radius: 999px;
-  background: rgba(99, 140, 255, 0.12);
-  color: var(--ah-primary, #8ab4ff);
+  background: rgba(99 140 255 / 12%);
+  color: var(--primary);
 }
 
 .time {
