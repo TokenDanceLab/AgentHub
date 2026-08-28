@@ -2,9 +2,11 @@ package lifecycle
 
 import (
 	"context"
+	"fmt"
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -12,6 +14,19 @@ import (
 	"github.com/agenthub/edge-server/internal/hub"
 	"github.com/agenthub/edge-server/internal/store"
 )
+
+// hubTestRunSeq makes hub-callback test runIDs unique per go test -count=N
+// invocation. hubCallbackQueues/hubStreamChunkSeq are package-scoped maps
+// keyed by runID whose entries only drain after a terminal job; the emitter
+// and backpressure tests below never send one, so a reused literal runID
+// would pick up the stale queue (and the consumer goroutine bound to the
+// previous iteration's executor) left by the previous iteration (#2038).
+var hubTestRunSeq atomic.Int64
+
+// uniqueHubTestRunID derives a per-invocation runID from base.
+func uniqueHubTestRunID(base string) string {
+	return fmt.Sprintf("%s-%d", base, hubTestRunSeq.Add(1))
+}
 
 // recordingHubCallback captures Edge→Hub callbacks for regression assertions.
 type recordingHubCallback struct {
@@ -263,7 +278,7 @@ func TestFireHubStreamNonBlockingWhenSemFull(t *testing.T) {
 	cb := newBlockingHubCallback(semCap)
 	executor.WithHubCallback(cb)
 
-	const runID = "run-stream-backpressure"
+	runID := uniqueHubTestRunID("run-stream-backpressure")
 	const taskID = "task-stream-backpressure"
 	executor.mu.Lock()
 	executor.hubTasks[runID] = taskID
