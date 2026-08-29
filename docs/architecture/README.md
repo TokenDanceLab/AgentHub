@@ -17,6 +17,7 @@
 | [07-design-system-ssot.md](07-design-system-ssot.md) | Design tokens / theme runtime / surface CSS ownership map |
 | [08-outbound-http.md](08-outbound-http.md) | 出站 HTTP policy 合同、client inventory、机器门禁（#1540/#1549/#1564） |
 | [09-dev-server-topology.md](09-dev-server-topology.md) | 远程 dev 服务器拓扑（L3 真实测试面）：端口矩阵、运行模型、身份链、重建步骤、证据纪律 |
+| [10-macro-engineering-design.md](10-macro-engineering-design.md) | 宏观工程设计基线：双平面、协议分层、事件一致性、最小代理权、可观测与差距路线 |
 
 ## 约定
 

@@ -1,6 +1,6 @@
 # AgentHub 架构概览
 
-最后更新：2026-08-24
+最后更新：2026-08-29
 
 本文档是架构入口，只保留当前结构、边界和 owner 链接。旧长版架构说明见 [history.md](history.md)。
 
@@ -62,6 +62,10 @@ Mobile shared workbench (viewer / limited control)
 8. Agent Profile、Agent Configuration、Agent Runtime 和 Execution Target 必须保持术语分离。
 9. 真实登录、真实模型消耗、部署、签名、公证、updater、release upload 都需要明确审批。
 10. UI 改动必须有任务和验收；禁止无关重设计、调试信息污染聊天流或绕过 shared workbench 合同。
+11. Hub 是控制面，不执行模型 Turn；任务拆分与路由由确定性 supervisor 承担，LLM 只能提供建议，不直接改路由、授权或审批状态机。
+12. Hub/Edge 自有 REST/WS 是产品契约 SSOT；MCP/A2A/AG-UI 只做 capability mapping，不替换自有契约、不并行引入三套内部协议。
+13. Hub→Edge 交付必须 at-least-once：稳定 event/delivery id + 幂等 consumer；跨业务变更的 outbox 同事务、event version 与 snapshot 策略要可审计，禁止 fire-and-forget 状态分叉。
+14. 授权按最小代理权：task-scoped 凭据 + per-action 授权；secret 不进入 agent context/sandbox；所有能力流量经 typed platform contract / gateway。
 
 ## 产品模型
 
@@ -92,6 +96,7 @@ Mobile shared workbench (viewer / limited control)
 | Design system SSOT | [architecture/07-design-system-ssot.md](architecture/07-design-system-ssot.md) |
 | Outbound HTTP | [architecture/08-outbound-http.md](architecture/08-outbound-http.md) |
 | Dev server topology | [architecture/09-dev-server-topology.md](architecture/09-dev-server-topology.md) |
+| Macro engineering baseline | [architecture/10-macro-engineering-design.md](architecture/10-macro-engineering-design.md) |
 | CI/CD policy | [architecture/github-actions-ci-cd-policy.md](architecture/github-actions-ci-cd-policy.md) |
 | Architecture decisions | [decisions.md](decisions.md) |
 
