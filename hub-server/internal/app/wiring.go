@@ -288,6 +288,8 @@ func (a *App) startServer(ctx context.Context) error {
 		// Macro baseline §5 goal 5 (#2070): bound agent_run_events growth —
 		// purge terminal-task events past retention, keep per-task tail snapshot.
 		agent.StartRunEventRetentionLoop(a.bg.Ctx(), a.DB, agent.DefaultRetentionConfig())
+		// #2066: orphan task recovery — reclaims queued tasks with no outbox row.
+		a.AgentService.StartOrphanRecoveryLoop(a.bg.Ctx())
 	}
 
 	// Admin server (observability always, debug capabilities fail-closed).
