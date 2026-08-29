@@ -2,6 +2,8 @@ import { createElement } from 'react';
 import type { ComposerAction } from '@shared/composer';
 import type { WorkbenchConversation } from '@shared/platform';
 import type { ApprovalDecisionAction, TranscriptBlock } from '@shared/transcript';
+import { AppError } from '@shared/errors';
+import { resolveFailedToastKey } from '@shared/chatview/failedToastKey';
 import type { ContextMenuItem, MultiSelectBarAction } from './floating';
 import { ForwardConversationPicker } from './floating/ForwardConversationPicker';
 import {
@@ -35,6 +37,8 @@ export interface DeleteConfirmRequest {
   blockIds: string[];
 }
 
+
+
 export type TranscriptChromeSideEffect =
   | { type: 'copy'; text: string }
   | { type: 'softHide'; blockIds: string[] }
@@ -50,6 +54,8 @@ export type TranscriptChromeSideEffect =
     successMessage: string;
     /** Shown when the regenerate request rejects (#1821). */
     failureMessage: string;
+    /** #2072 P3: i18n key for errcode-based resolution at error time. */
+    failureFallbackKey?: string;
   }
   | {
     type: 'approval';
@@ -58,6 +64,8 @@ export type TranscriptChromeSideEffect =
     successMessage: string;
     /** Shown when the decision request rejects (#1821). */
     failureMessage: string;
+    /** #2072 P3: i18n key for errcode-based resolution at error time. */
+    failureFallbackKey?: string;
   }
   | { type: 'pulse'; blockId: string }
   | { type: 'toast'; message: string }
@@ -79,6 +87,8 @@ export type TranscriptChromeSideEffect =
     sessionId: string;
     successMessage: string;
     failureMessage: string;
+    /** #2072 P3: i18n key for errcode-based resolution at error time. */
+    failureFallbackKey?: string;
   }
   | {
     type: 'unpin';
@@ -86,6 +96,8 @@ export type TranscriptChromeSideEffect =
     sessionId: string;
     successMessage: string;
     failureMessage: string;
+    /** #2072 P3: i18n key for errcode-based resolution at error time. */
+    failureFallbackKey?: string;
   }
   | {
     type: 'forward';
@@ -93,8 +105,10 @@ export type TranscriptChromeSideEffect =
     targetSessionIds: string[];
     successMessage: string;
     failureMessage: string;
+    /** #2072 P3: i18n key for errcode-based resolution at error time. */
+    failureFallbackKey?: string;
   }
-  | { type: 'recall'; messageId: string; successMessage: string; failureMessage: string }
+  | { type: 'recall'; messageId: string; successMessage: string; failureMessage: string; failureFallbackKey?: string }
   | {
     type: 'react';
     messageId: string;
@@ -102,6 +116,8 @@ export type TranscriptChromeSideEffect =
     emoji: string;
     successMessage: string;
     failureMessage: string;
+    /** #2072 P3: i18n key for errcode-based resolution at error time. */
+    failureFallbackKey?: string;
   };
 
 // #1384: the emoji picker submenu carries the chosen emoji on the menu
@@ -228,6 +244,7 @@ export function planContextAction(options: {
       blockId,
       successMessage: t('action.regenerating'),
       failureMessage: t('toast.regenerateFailed'),
+      failureFallbackKey: 'toast.regenerateFailed',
     });
     return effects;
   }
@@ -250,6 +267,7 @@ export function planContextAction(options: {
           sessionId,
           successMessage: t('toast.pinUpdated'),
           failureMessage: t('toast.pinFailed'),
+          failureFallbackKey: 'toast.pinFailed',
         },
         { type: 'pulse', blockId },
       );
@@ -262,6 +280,7 @@ export function planContextAction(options: {
           sessionId,
           successMessage: t('toast.unpinned'),
           failureMessage: t('toast.unpinFailed'),
+          failureFallbackKey: 'toast.unpinFailed',
         },
         { type: 'pulse', blockId },
       );
@@ -277,6 +296,7 @@ export function planContextAction(options: {
           emoji: reactEmojiForAction(action),
           successMessage: t('toast.reactionAdded'),
           failureMessage: t('toast.reactionFailed'),
+          failureFallbackKey: 'toast.reactionFailed',
         },
         { type: 'pulse', blockId },
       );
@@ -295,6 +315,7 @@ export function planContextAction(options: {
         messageId: blockId,
         successMessage: t('toast.recalled'),
         failureMessage: t('toast.recallFailed'),
+        failureFallbackKey: 'toast.recallFailed',
       },
       { type: 'pulse', blockId },
     );
@@ -312,6 +333,7 @@ export function planContextAction(options: {
           targetSessionIds: forwardTargetsForAction(action),
           successMessage: t('toast.forwardQueued'),
           failureMessage: t('toast.forwardFailed'),
+          failureFallbackKey: 'toast.forwardFailed',
         },
         { type: 'pulse', blockId },
       );
@@ -377,6 +399,7 @@ export function planTranscriptBlockAction(options: {
         blockId,
         successMessage: t('action.regenerating'),
         failureMessage: t('toast.regenerateFailed'),
+        failureFallbackKey: 'toast.regenerateFailed',
       });
     }
   }
@@ -491,6 +514,8 @@ function announceSettledAction(
   successMessage: string,
   failureMessage: string,
   showWorkbenchToast: (message: string) => void,
+  t?: TranscriptChromeTranslate,
+  failureFallbackKey?: string,
 ): void {
   if (!isThenable(outcome)) {
     showWorkbenchToast(successMessage);
@@ -499,7 +524,13 @@ function announceSettledAction(
   void Promise.resolve(outcome).then(
     () => showWorkbenchToast(successMessage),
     (err: unknown) => {
-      showWorkbenchToast(err instanceof Error && err.message ? err.message : failureMessage);
+      // #2072 P3: prefer errcode-based i18n resolution when available;
+      // fall back to raw err.message or the pre-translated failureMessage.
+      if (t && failureFallbackKey) {
+        showWorkbenchToast(t(resolveFailedToastKey(err, failureFallbackKey)));
+      } else {
+        showWorkbenchToast(err instanceof Error && err.message ? err.message : failureMessage);
+      }
     },
   );
 }
@@ -537,6 +568,7 @@ export function createTranscriptChromeEffectHandlers(
 export function applyTranscriptChromeSideEffects(
   effects: TranscriptChromeSideEffect[],
   handlers: TranscriptChromeEffectHandlers,
+  t?: TranscriptChromeTranslate,
 ): void {
   for (const effect of effects) {
     switch (effect.type) {
@@ -567,9 +599,14 @@ export function applyTranscriptChromeSideEffects(
               handlers.showWorkbenchToast(effect.successMessage);
             },
             (err: unknown) => {
-              handlers.showWorkbenchToast(
-                err instanceof Error && err.message ? err.message : effect.failureMessage,
-              );
+              // #2072 P3: prefer errcode-based i18n resolution when available.
+              if (t && effect.failureFallbackKey) {
+                handlers.showWorkbenchToast(t(resolveFailedToastKey(err, effect.failureFallbackKey)));
+              } else {
+                handlers.showWorkbenchToast(
+                  err instanceof Error && err.message ? err.message : effect.failureMessage,
+                );
+              }
             },
           );
         } else {
@@ -588,9 +625,14 @@ export function applyTranscriptChromeSideEffects(
         void Promise.resolve(handler(effect.decision)).then(
           () => handlers.showWorkbenchToast(effect.successMessage),
           (err: unknown) => {
-            handlers.showWorkbenchToast(
-              err instanceof Error ? err.message : effect.failureMessage,
-            );
+            // #2072 P3: prefer errcode-based i18n resolution when available.
+            if (t && effect.failureFallbackKey) {
+              handlers.showWorkbenchToast(t(resolveFailedToastKey(err, effect.failureFallbackKey)));
+            } else {
+              handlers.showWorkbenchToast(
+                err instanceof Error ? err.message : effect.failureMessage,
+              );
+            }
           },
         );
         break;
@@ -615,6 +657,8 @@ export function applyTranscriptChromeSideEffects(
           effect.successMessage,
           effect.failureMessage,
           handlers.showWorkbenchToast,
+          t,
+          effect.failureFallbackKey,
         );
         break;
       }
@@ -626,6 +670,8 @@ export function applyTranscriptChromeSideEffects(
           effect.successMessage,
           effect.failureMessage,
           handlers.showWorkbenchToast,
+          t,
+          effect.failureFallbackKey,
         );
         break;
       }
@@ -637,6 +683,8 @@ export function applyTranscriptChromeSideEffects(
           effect.successMessage,
           effect.failureMessage,
           handlers.showWorkbenchToast,
+          t,
+          effect.failureFallbackKey,
         );
         break;
       }
@@ -648,6 +696,8 @@ export function applyTranscriptChromeSideEffects(
           effect.successMessage,
           effect.failureMessage,
           handlers.showWorkbenchToast,
+          t,
+          effect.failureFallbackKey,
         );
         break;
       }
@@ -659,6 +709,8 @@ export function applyTranscriptChromeSideEffects(
           effect.successMessage,
           effect.failureMessage,
           handlers.showWorkbenchToast,
+          t,
+          effect.failureFallbackKey,
         );
         break;
       }
