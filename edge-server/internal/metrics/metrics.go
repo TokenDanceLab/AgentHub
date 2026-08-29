@@ -50,6 +50,14 @@ type EdgeMetrics struct {
 	// not install a default recover for connected-request handlers).
 	EdgeHTTPPanicRecoveries prometheus.Counter
 
+	// EdgeApprovalDecisionsTotal counts tool approval decisions made by
+	// DecisionLoop.ApproveTool/DenyTool. Label: decision (approve|deny).
+	EdgeApprovalDecisionsTotal *prometheus.CounterVec
+
+	// EdgeArtifactsSurfacedTotal counts artifacts surfaced at run finish.
+	// Label: kind (artifact|preview|image|deploy).
+	EdgeArtifactsSurfacedTotal *prometheus.CounterVec
+
 	// Outbound is the unified outbound HTTP metrics contract (#1595):
 	// outbound_requests_total / outbound_request_duration_seconds with
 	// provider/purpose/category/status labels, shared with the Hub server.
@@ -168,6 +176,16 @@ func newWithHooks(
 		Help: "Total number of Edge HTTP handler panics recovered by recoveryHTTPHandler.",
 	})
 
+	m.EdgeApprovalDecisionsTotal = factory.NewCounterVec(prometheus.CounterOpts{
+		Name: "edge_approval_decisions_total",
+		Help: "Total tool approval decisions (approve/deny) made by DecisionLoop.",
+	}, []string{"decision"})
+
+	m.EdgeArtifactsSurfacedTotal = factory.NewCounterVec(prometheus.CounterOpts{
+		Name: "edge_artifacts_surfaced_total",
+		Help: "Total artifacts surfaced at run finish, partitioned by kind.",
+	}, []string{"kind"})
+
 	// Go runtime + process collectors on the isolated registry so the Edge
 	// /metrics endpoint exposes go_* and process_* alongside edge_* metrics.
 	// Previously only the Hub registered these on the default registry; the
@@ -207,4 +225,11 @@ func (m *EdgeMetrics) RecordWSConnect() {
 // RecordWSDisconnect decrements the WebSocket connections gauge.
 func (m *EdgeMetrics) RecordWSDisconnect() {
 	m.EdgeWSConnections.Dec()
+}
+
+// NewTestEdgeMetrics creates an EdgeMetrics with all counters initialized for
+// unit tests that need to exercise metric increment paths without wiring a
+// real event bus. The registry is isolated so parallel tests don't collide.
+func NewTestEdgeMetrics() *EdgeMetrics {
+	return newWithHooks(nil, nil, nil, nil, nil, nil)
 }

@@ -1,7 +1,9 @@
 package agent
 
 import (
+	"github.com/agenthub/hub-server/internal/metrics"
 	"context"
+	"log/slog"
 	"encoding/json"
 	"errors"
 	"strings"
@@ -157,6 +159,14 @@ func (s *RunEventService) DecideTaskApproval(ctx context.Context, userID, taskID
 	}
 	if err := repository.CreateAgentRunEventWithNextSeq(s.db, event); err != nil {
 		return nil, err
+	}
+
+	// Observability (slice A step 5): log + counter for every persisted decision.
+	slog.Info("approval: task approval decided",
+		"task_id", task.ID, "approval_id", approvalID, "edge_run_id", approval.EdgeRunID,
+		"decision", decision.Decision, "decided_by", userID)
+	if metrics.HubTaskApprovalDecisionsTotal != nil {
+		metrics.HubTaskApprovalDecisionsTotal.WithLabelValues(decision.Decision).Inc()
 	}
 
 	if s.controlSvc != nil {
