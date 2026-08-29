@@ -28,7 +28,7 @@ type Payload struct {
 	TeamMemberRole   string `json:"team_member_role,omitempty"`
 	// TraceID correlates this dispatch with the originating Hub trace. Populated
 	// by AssembleDispatchPayload; empty on legacy payloads is safe (omitempty).
-	TraceID          string `json:"trace_id,omitempty"`
+	TraceID string `json:"trace_id,omitempty"`
 	// Context continuity: thread history and pinned messages for all agent runtimes.
 	Messages       []Message `json:"messages,omitempty"`
 	PinnedMessages []Message `json:"pinned_messages,omitempty"`

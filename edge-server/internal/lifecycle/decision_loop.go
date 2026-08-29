@@ -18,8 +18,8 @@ package lifecycle
 
 import (
 	"fmt"
-	"log/slog"
 	"io"
+	"log/slog"
 	"sync"
 	"sync/atomic"
 	"time"

@@ -19,7 +19,7 @@ type RunProcessContext struct {
 
 	// TraceID correlates this run with the originating Hub dispatch trace.
 	// Populated from the dispatch payload; empty on legacy payloads is safe.
-	TraceID   string
+	TraceID string
 
 	// Session continuity
 	SessionID    string // Specific session to resume

@@ -58,7 +58,7 @@ type runRequest struct {
 	AgentDefinitions        map[string]runnerctx.AgentDefinition `json:"agentDefinitions"`
 	MCPConfig               string                               `json:"mcpConfig"`
 	Ephemeral               bool                                 `json:"ephemeral"`
-	HubTaskID               string                               `json:"hubTaskId"` // Edge-to-Hub direct callback task ID
+	HubTaskID               string                               `json:"hubTaskId"`          // Edge-to-Hub direct callback task ID
 	TraceID                 string                               `json:"trace_id,omitempty"` // Hub dispatch trace correlation id
 	Messages                []runnerctx.Message                  `json:"messages,omitempty"`
 	PinnedMessages          []runnerctx.Message                  `json:"pinnedMessages,omitempty"`

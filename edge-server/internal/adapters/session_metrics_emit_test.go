@@ -15,9 +15,9 @@ func TestSessionMetricsPayloadSkipsEmpty(t *testing.T) {
 
 func TestSessionMetricsPayloadIncludesTokensAndCost(t *testing.T) {
 	msg := &claudeSDKMessage{
-		Model:          "claude-3",
-		TotalCostUSD:   0.05,
-		Usage:          &claudeUsage{InputTokens: 100, OutputTokens: 50},
+		Model:        "claude-3",
+		TotalCostUSD: 0.05,
+		Usage:        &claudeUsage{InputTokens: 100, OutputTokens: 50},
 	}
 	payload, ok := SessionMetricsPayload(msg)
 	if !ok {

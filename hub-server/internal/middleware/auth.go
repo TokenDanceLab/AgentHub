@@ -1,8 +1,8 @@
 package middleware
 
 import (
-	"github.com/agenthub/pkg/reqlog"
 	"context"
+	"github.com/agenthub/pkg/reqlog"
 	"log/slog"
 	"os"
 	"strings"

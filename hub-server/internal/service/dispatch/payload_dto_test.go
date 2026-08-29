@@ -149,14 +149,14 @@ func TestDeadLetterHelpers(t *testing.T) {
 
 func TestAssembleDispatchPayloadGeneratesTraceID(t *testing.T) {
 	p := AssembleDispatchPayload(AssemblePayloadInput{
-		TaskID:          "t",
-		AgentInstanceID: "ai",
-		AgentType:       "claude-code",
-		SessionID:       "s",
+		TaskID:           "t",
+		AgentInstanceID:  "ai",
+		AgentType:        "claude-code",
+		SessionID:        "s",
 		TriggerMessageID: "m",
-		TriggerUserID:   "u",
-		Prompt:          "p",
-		DisplayName:     "n",
+		TriggerUserID:    "u",
+		Prompt:           "p",
+		DisplayName:      "n",
 	})
 	if p.TraceID == "" {
 		t.Fatal("expected non-empty TraceID on assembled payload")
@@ -166,14 +166,14 @@ func TestAssembleDispatchPayloadGeneratesTraceID(t *testing.T) {
 	}
 	// Second assembly must produce a distinct trace id.
 	p2 := AssembleDispatchPayload(AssemblePayloadInput{
-		TaskID:          "t2",
-		AgentInstanceID: "ai",
-		AgentType:       "claude-code",
-		SessionID:       "s",
+		TaskID:           "t2",
+		AgentInstanceID:  "ai",
+		AgentType:        "claude-code",
+		SessionID:        "s",
 		TriggerMessageID: "m",
-		TriggerUserID:   "u",
-		Prompt:          "p",
-		DisplayName:     "n",
+		TriggerUserID:    "u",
+		Prompt:           "p",
+		DisplayName:      "n",
 	})
 	if p2.TraceID == p.TraceID {
 		t.Fatalf("two assemblies produced identical TraceID %q", p.TraceID)
@@ -182,14 +182,14 @@ func TestAssembleDispatchPayloadGeneratesTraceID(t *testing.T) {
 
 func TestMarshalPayloadPreservesTraceID(t *testing.T) {
 	p := AssembleDispatchPayload(AssemblePayloadInput{
-		TaskID:          "t",
-		AgentInstanceID: "ai",
-		AgentType:       "claude-code",
-		SessionID:       "s",
+		TaskID:           "t",
+		AgentInstanceID:  "ai",
+		AgentType:        "claude-code",
+		SessionID:        "s",
 		TriggerMessageID: "m",
-		TriggerUserID:   "u",
-		Prompt:          "p",
-		DisplayName:     "n",
+		TriggerUserID:    "u",
+		Prompt:           "p",
+		DisplayName:      "n",
 	})
 	raw, err := MarshalPayload(p)
 	if err != nil {

@@ -1,11 +1,11 @@
 package agent
 
 import (
-	"github.com/agenthub/hub-server/internal/metrics"
 	"context"
-	"log/slog"
 	"encoding/json"
 	"errors"
+	"github.com/agenthub/hub-server/internal/metrics"
+	"log/slog"
 	"strings"
 	"time"
 
