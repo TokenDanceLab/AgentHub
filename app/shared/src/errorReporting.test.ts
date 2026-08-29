@@ -281,6 +281,8 @@ describe('errcode key mapping completeness (#2072 P1)', () => {
     // undefined for any code — verifying the safe fallback path.
     expect(errcodeToastCopy('unknown_code')).toBeUndefined();
     expect(errcodeToastCopy(undefined)).toBeUndefined();
+  });
+});
 
 describe('event stream error filtering (#2072 P2-⑯)', () => {
   it('filters technical strings from event_stream_parse errors', () => {
