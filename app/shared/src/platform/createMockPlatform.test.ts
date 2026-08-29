@@ -107,3 +107,47 @@ describe('createMockPlatform', () => {
     ]);
   });
 });
+
+describe('SurfaceCapabilities new domains (approval/runtimeEvidence/remoteExecution/sandbox)', () => {
+  it('defaults every new domain to false on the mock surface so UI must opt in', () => {
+    const platform = createMockPlatform({ surface: 'web' });
+
+    expect(platform.capabilities.approval).toBe(false);
+    expect(platform.capabilities.runtimeEvidence).toBe(false);
+    expect(platform.capabilities.remoteExecution).toBe(false);
+    expect(platform.capabilities.sandbox).toBe(false);
+  });
+
+  it('honors explicit opt-in for new capability domains via seed', () => {
+    const platform = createMockPlatform({
+      surface: 'desktop',
+      capabilities: {
+        localEdge: true,
+        localFiles: true,
+        browserPreview: true,
+        approval: true,
+        runtimeEvidence: true,
+        remoteExecution: true,
+        sandbox: true,
+      },
+    });
+
+    expect(platform.capabilities.approval).toBe(true);
+    expect(platform.capabilities.runtimeEvidence).toBe(true);
+    expect(platform.capabilities.remoteExecution).toBe(true);
+    expect(platform.capabilities.sandbox).toBe(true);
+  });
+
+  it('keeps optional new fields type-compatible with partial seeds (no required-field breakage)', () => {
+    // Partial seed that only sets one new field — others fall back to defaultCapabilities.
+    const platform = createMockPlatform({
+      surface: 'web',
+      capabilities: { approval: true },
+    });
+
+    expect(platform.capabilities.approval).toBe(true);
+    expect(platform.capabilities.runtimeEvidence).toBe(false);
+    expect(platform.capabilities.remoteExecution).toBe(false);
+    expect(platform.capabilities.sandbox).toBe(false);
+  });
+});

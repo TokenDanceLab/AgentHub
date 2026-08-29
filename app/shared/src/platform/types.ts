@@ -29,6 +29,40 @@ export interface SurfaceCapabilities {
    * Renderer never owns a PTY — only a typed TerminalPort may talk to the host.
    */
   localTerminal?: boolean | undefined;
+  /**
+   * Surface can host an interactive approval flow (accept/reject hunk,
+   * tool-call confirm, permission prompt). Desktop earns this via Local Edge;
+   * Web earns it via Hub approval endpoints when available.
+   * When false or omitted, approval UI (diff reviewer accept/reject,
+   * tool confirmation dialogs) must stay hidden or render read-only.
+   */
+  approval?: boolean | undefined;
+  /**
+   * Surface can surface runtime evidence content (terminal output, tool
+   * result preview, artifact content) inline. Desktop earns this via Local
+   * Edge evidence download; Web/Mobile may rely on Hub metadata-only
+   * projections and degrade to notice when content route is absent.
+   * When false or omitted, runtime-evidence viewers must stay hidden or
+   * show an explicit unavailable notice — never pretend to have content.
+   */
+  runtimeEvidence?: boolean | undefined;
+  /**
+   * Surface can dispatch work to a remote execution target (Cloud Edge,
+   * Remote Edge, Hub relay). Distinct from localEdge: a surface may have
+   * no local runtime but still submit to remote targets via Hub.
+   * When false or omitted, remote-target selectors and cloud-dispatch
+   * composer affordances must stay hidden.
+   */
+  remoteExecution?: boolean | undefined;
+  /**
+   * Surface can run agent work inside a sandboxed boundary (container,
+   * VM, restricted shell). Desktop Local Edge provides the local sandbox;
+   * Hub-only surfaces typically lack one unless a remote sandbox target
+   * is wired separately.
+   * When false or omitted, sandbox-mode toggles and sandbox-status
+   * indicators must stay hidden — never claim isolation without backing.
+   */
+  sandbox?: boolean | undefined;
 }
 
 export type ConversationKind = 'direct' | 'group';
