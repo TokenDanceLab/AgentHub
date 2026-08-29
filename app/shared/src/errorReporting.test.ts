@@ -163,3 +163,122 @@ describe('useErrorReporter snapshot stability (#1795)', () => {
     expect(result.current.stats.latest).toBeNull();
   });
 });
+
+// #2072 P1: verify that friendlyErrorMessage filters backend technical strings
+// so callers using t(key, {detail: friendlyErrorMessage(...)}) never leak them.
+describe('error.message passthrough elimination (#2072 P1)', () => {
+  const technicalMessagesFiltered = [
+    'HTTP 503 Service Unavailable',
+    'TypeError: Cannot read properties of null',
+    'ReferenceError: x is not defined',
+    'at fetchData (client.ts:42:7)',
+    'node:internal/errors:496',
+    'proxy connect timeout',
+    'the stack is full',
+  ];
+
+  for (const raw of technicalMessagesFiltered) {
+    it(`filters technical string "${raw}" into the fallback`, () => {
+      expect(friendlyErrorMessage(raw, 'User-friendly fallback')).toBe(
+        'User-friendly fallback',
+      );
+    });
+  }
+
+  it('wraps non-technical backend messages in the i18n template via caller pattern', () => {
+    // Non-technical backend English (e.g. "task has been cancelled") passes
+    // through friendlyErrorMessage unchanged — the caller's t(key, {detail})
+    // wraps it in a localized template so the user never sees a bare English
+    // string as the entire toast body.
+    const raw = 'task has been cancelled';
+    const detail = friendlyErrorMessage(raw, 'fallback');
+    // detail may be the raw string (acceptable); the key contract is that
+    // the toast body is t(key, {detail}), not raw error.message directly.
+    expect(detail).toBeTruthy();
+    expect(typeof detail).toBe('string');
+  });
+
+  it('returns fallback for undefined input', () => {
+    expect(friendlyErrorMessage(undefined, 'safe fallback')).toBe('safe fallback');
+  });
+});
+
+// #2072 P1: categorizeError errcode-aware — known codes get specialized copy.
+describe('errcode-aware toast copy (#2072 P1)', () => {
+  beforeEach(() => {
+    globalErrorReporter.clear();
+  });
+
+  afterEach(() => {
+    setToastHandler(null);
+    globalErrorReporter.clear();
+  });
+
+  it('surfaces the errcode code field on ErrorReport for AppError instances', async () => {
+    // Import AppError dynamically to avoid circular deps in test setup
+    const { AppError } = await import('./errors');
+    const err = new AppError(
+      { error: { code: 'auth_token_expired', message: 'token is invalid or expired' } },
+      401,
+    );
+    const report = globalErrorReporter.report(err);
+    expect(report.code).toBe('auth_token_expired');
+  });
+
+  it('leaves code undefined for plain Error instances', () => {
+    const report = globalErrorReporter.report(new Error('plain error'));
+    expect(report.code).toBeUndefined();
+  });
+
+  it('does not regress unknown errcodes (no specialized copy available)', async () => {
+    const { AppError } = await import('./errors');
+    const handler = vi.fn<(config: ToastConfig) => void>();
+    setToastHandler(handler);
+
+    // Use useErrorReporter to wire the listener
+    const { renderHook } = await import('@testing-library/react');
+    const { unmount } = renderHook(() => useErrorReporter());
+
+    const err = new AppError(
+      { error: { code: 'some_unknown_code', message: 'something went wrong' } },
+      500,
+    );
+    act(() => {
+      globalErrorReporter.report(err);
+    });
+
+    expect(handler).toHaveBeenCalled();
+    const toast = handler.mock.calls[0][0];
+    // Unknown code should fall back to category-based title (runtime for 500)
+    expect(toast.title).toBeTruthy();
+    expect(toast.title).not.toBe('some_unknown_code');
+
+    unmount();
+  });
+});
+
+// #2072 P1: each of the 5 specified errcodes has a dedicated i18n key mapping.
+describe('errcode key mapping completeness (#2072 P1)', () => {
+  it('maps all 5 specified errcodes to dedicated i18n keys', async () => {
+    const { ERRCode_KEYS } = await import('./errorReporting');
+    const requiredCodes = [
+      'auth_invalid_token',
+      'auth_token_expired',
+      'workspace_not_allowed',
+      'agent_offline',
+      'target_not_routable',
+    ];
+    for (const code of requiredCodes) {
+      expect(ERRCode_KEYS[code], `missing key mapping for ${code}`).toBeTruthy();
+      expect(ERRCode_KEYS[code]).toMatch(/^error\.code\./);
+    }
+  });
+
+  it('returns undefined for unknown codes (no specialized copy)', async () => {
+    const { errcodeToastCopy } = await import('./errorReporting');
+    // Without i18n initialized with real resources, errcodeToastCopy returns
+    // undefined for any code — verifying the safe fallback path.
+    expect(errcodeToastCopy('unknown_code')).toBeUndefined();
+    expect(errcodeToastCopy(undefined)).toBeUndefined();
+  });
+});

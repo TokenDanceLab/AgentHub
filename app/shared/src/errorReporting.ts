@@ -76,18 +76,51 @@ export function friendlyErrorMessage(raw: string | undefined, fallback: string):
   return technical ? fallback : raw;
 }
 
+
+/** Errcode-specific toast copy for high-value codes (#2072 P1). Returns the
+ *  localized message for known codes, or undefined to fall back to the
+ *  category-based title + friendlyErrorMessage body. */
+export const ERRCode_KEYS: Record<string, string> = {
+  auth_invalid_token: 'error.code.auth_invalid_token',
+  auth_token_expired: 'error.code.auth_token_expired',
+  workspace_not_allowed: 'error.code.workspace_not_allowed',
+  agent_offline: 'error.code.agent_offline',
+  target_not_routable: 'error.code.target_not_routable',
+};
+
+export function errcodeToastCopy(code: string | undefined): string | undefined {
+  if (!code) return undefined;
+  const key = ERRCode_KEYS[code];
+  if (!key) return undefined;
+  try {
+    const i18n = getI18n();
+    if (i18n?.isInitialized) {
+      const resolved = i18n.t(key);
+      // i18next returns the key itself when no translation exists; treat that
+      // as missing so we fall back to the category-based copy.
+      if (resolved !== key && resolved !== '') return resolved;
+    }
+  } catch {
+    // i18n not ready
+  }
+  return undefined;
+}
+
 const errorReporterListener = (report: ErrorReport) => {
   if (!toastHandler) return;
   const fallback = categoryLabel(report.category);
   const traceId = typeof report.context?.traceId === 'string'
     ? (report.context.traceId as string)
     : undefined;
+  // #2072 P1: prefer errcode-specific copy for known high-value codes;
+  // fall back to category label + friendlyErrorMessage for everything else.
+  const errcodeCopy = errcodeToastCopy(report.code);
   toastHandler({
     severity: 'error',
-    title: fallback,
+    title: errcodeCopy ?? fallback,
     // Avoid leaking raw server/technical strings into the toast body; the
     // traceId is surfaced separately so the user can quote it to support.
-    message: friendlyErrorMessage(report.message, fallback),
+    message: errcodeCopy ?? friendlyErrorMessage(report.message, fallback),
     ...(traceId !== undefined && { traceId }),
     // Network errors are recoverable — offer a Retry affordance if a handler
     // is wired (the toast host owns the actual retry callback).

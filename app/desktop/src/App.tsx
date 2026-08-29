@@ -56,6 +56,7 @@ import { getHubClient } from '@/api/hubQueries';
 import type { AgentConfig, ConnectionStatusKind, DevicesPageTarget, DocRow, SkillMarketItem, MCPMarketItem } from '@agenthub/workbench';
 import { getDemoRuntimeEvidence } from '@/demo/demoEvidence';
 import { useToastStore, ToastContainer } from '@shared/ui/toast';
+import { friendlyErrorMessage } from '@shared/errorReporting';
 
 export default function App() {
   const [entryMode, setEntryMode] = useState<'entry' | 'workbench'>('entry');
@@ -213,7 +214,7 @@ export function DesktopWorkbenchApp({ onLogout }: DesktopWorkbenchAppProps = {})
         showToast('success', t('devices.pingOk'));
       },
       onError: (err) => {
-        showToast('error', t('devices.pingFailed', { detail: err instanceof Error ? err.message : String(err) }));
+        showToast('error', t('devices.pingFailed', { detail: friendlyErrorMessage(err instanceof Error ? err.message : String(err), t('error.network')) }));
       },
     });
   }, [pingExecutionTarget, showToast, t]);
@@ -495,10 +496,15 @@ export function DesktopWorkbenchApp({ onLogout }: DesktopWorkbenchAppProps = {})
     void cancelRun.mutateAsync(runId).catch((error: unknown) => {
       showToast(
         'error',
-        error instanceof Error && error.message ? error.message : tIm('toast.error'),
+        t('error.cancelRunFailed', {
+          detail: friendlyErrorMessage(
+            error instanceof Error ? error.message : undefined,
+            t('error.unknown'),
+          ),
+        }),
       );
     });
-  }, [activeEdgeRun, activeRunId, cancelRun, showToast, tIm]);
+  }, [activeEdgeRun, activeRunId, cancelRun, showToast, t]);
 
   const handleApprovalDecision = useCallback(async (action: ApprovalDecisionAction) => {
     if (action.teamId && action.teamRunId) {
@@ -599,7 +605,10 @@ export function DesktopWorkbenchApp({ onLogout }: DesktopWorkbenchAppProps = {})
       })
       .catch((error: unknown) => {
         showToast('error', t('error.startConversation', {
-          detail: error instanceof Error ? error.message : String(error),
+          detail: friendlyErrorMessage(
+            error instanceof Error ? error.message : undefined,
+            t('error.unknown'),
+          ),
         }));
       });
   }, [createThread, showToast, t, workbench.isDemo]);
