@@ -60,10 +60,10 @@ var (
 	AgentDispatchEdgeHTTPFailures *prometheus.CounterVec
 
 	// G9 — JWT / WS auth verification failure observability (security).
-	JWTVerificationFailures *prometheus.CounterVec
-	WSAuthFailures          *prometheus.CounterVec
-	JTIBlacklistCheckErrors        prometheus.Counter
-	RefreshBlacklistCheckErrors    prometheus.Counter
+	JWTVerificationFailures     *prometheus.CounterVec
+	WSAuthFailures              *prometheus.CounterVec
+	JTIBlacklistCheckErrors     prometheus.Counter
+	RefreshBlacklistCheckErrors prometheus.Counter
 
 	// G1 — WS non-buffer-full delivery failures (marshal / conn closed / conn not found).
 	WSDeliveryFailures *prometheus.CounterVec

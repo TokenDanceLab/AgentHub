@@ -70,13 +70,13 @@ func TestRegisterDoesNotPanic(t *testing.T) {
 		t.Error("WSAuthFailures 在 Register() 后不应为 nil")
 	}
 	if JTIBlacklistCheckErrors == nil {
-	if RefreshBlacklistCheckErrors == nil {
-		t.Error("RefreshBlacklistCheckErrors 在 Register() 后不应为 nil")
-	}
+		if RefreshBlacklistCheckErrors == nil {
+			t.Error("RefreshBlacklistCheckErrors 在 Register() 后不应为 nil")
+		}
 		t.Error("JTIBlacklistCheckErrors 在 Register() 后不应为 nil")
-	if RefreshBlacklistCheckErrors == nil {
-		t.Error("RefreshBlacklistCheckErrors 在 Register() 后不应为 nil")
-	}
+		if RefreshBlacklistCheckErrors == nil {
+			t.Error("RefreshBlacklistCheckErrors 在 Register() 后不应为 nil")
+		}
 	}
 	if RefreshBlacklistCheckErrors == nil {
 		t.Error("RefreshBlacklistCheckErrors 在 Register() 后不应为 nil")
