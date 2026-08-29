@@ -17,6 +17,7 @@ import (
 //   - No panic, no DATA RACE across multiple -count runs.
 //   - All submit errors occurred AFTER Close set closed=true (pubAfterClosed == submitErrs).
 //   - Pending always returned to 0 at Close return and after post-wait.
+//
 // Conclusion: window is benign under this stress profile; ants v2.12.1
 // returns err on Submit-after-Release and the existing pending rollback holds.
 func TestPublishCloseRace_Stress(t *testing.T) {
