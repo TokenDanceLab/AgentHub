@@ -363,6 +363,7 @@ func (h *Handler) PostRuns(w http.ResponseWriter, r *http.Request) {
 		SessionID:          req.SessionID,
 		ContinueLast:       req.Continue,
 		WorkDir:            req.WorkDir,
+		HubTaskID:          req.HubTaskID,
 		WorkspaceAllowlist: h.WorkspaceAllowlist,
 		AgentExists: func(agentID string) bool {
 			if h.AdapterRegistry == nil {

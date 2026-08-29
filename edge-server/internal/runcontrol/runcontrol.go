@@ -73,6 +73,11 @@ type CreateParams struct {
 	// prompt and queued-marker items; MCP publishes a single user_message item.
 	Timeline func(run store.Run)
 
+	// HubTaskID is the Hub-side task ID for deduplication. When non-empty,
+	// Create returns the existing run if one with the same HubTaskID already
+	// exists (idempotent redelivery guard for orphan recovery).
+	HubTaskID string
+
 	// BuildContext builds the RunProcessContext handed to the executor.
 	// When nil, the executor start step is skipped.
 	BuildContext func(run store.Run) lifecycle.RunProcessContext
@@ -111,6 +116,16 @@ func Create(repository store.Repository, executor lifecycle.RunExecutor, bus *ev
 		slog.Error("invalid permission mode", "permissionMode", params.PermissionMode, "error", err)
 		return store.Run{}, errcode.ErrInvalidPermissionMode
 	}
+	// HubTaskID dedup: when a non-empty HubTaskID matches an existing run,
+	// return that run idempotently instead of creating a duplicate. This
+	// guards against orphan-recovery redelivery races (issue #2066).
+	if params.HubTaskID != "" {
+		if existing, found := repository.GetRunByHubTaskID(params.HubTaskID); found {
+			runCreationMu.Unlock()
+			slog.Info("run.dedup", "hubTaskId", params.HubTaskID, "existingRunId", existing.ID)
+			return existing, nil
+		}
+	}
 	if active, ok := ActiveRunForThread(repository.ListRuns(params.ThreadID)); ok {
 		runCreationMu.Unlock()
 		return store.Run{}, errcode.ErrActiveRunExists.WithMessagef("thread already has an active run: %s", active.ID)
@@ -125,6 +140,9 @@ func Create(repository store.Repository, executor lifecycle.RunExecutor, bus *ev
 		return store.Run{}, errcode.ErrInvalidAgentID.WithMessagef("unknown agent adapter: %q", params.AgentID)
 	}
 	run, err := repository.CreateRun(generateRunID(), params.ProjectID, params.ThreadID)
+	if err == nil && params.HubTaskID != "" {
+		run, _ = repository.SetRunHubTaskID(run.ID, params.HubTaskID)
+	}
 	runCreationMu.Unlock()
 	if err != nil {
 		if errors.Is(err, store.ErrNotFound) {

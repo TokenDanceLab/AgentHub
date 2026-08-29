@@ -354,6 +354,18 @@ func (s *SQLiteStore) SetRunWorkDir(id, workDir string) (Run, bool) {
 	return finalizeSQLiteBoolWrite(run, true, s.syncPersist())
 }
 
+func (s *SQLiteStore) GetRunByHubTaskID(hubTaskID string) (Run, bool) {
+	return s.store.GetRunByHubTaskID(hubTaskID)
+}
+
+func (s *SQLiteStore) SetRunHubTaskID(id, hubTaskID string) (Run, bool) {
+	run, ok := s.store.SetRunHubTaskID(id, hubTaskID)
+	if !ok {
+		return finalizeSQLiteBoolWrite(Run{}, false, nil)
+	}
+	return finalizeSQLiteBoolWrite(run, true, s.syncPersist())
+}
+
 func (s *SQLiteStore) CreateItem(item Item) (Item, error) {
 	created, err := s.store.CreateItem(item)
 	return persistAfterSQLiteWrite(s, created, err)
