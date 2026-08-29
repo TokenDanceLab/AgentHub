@@ -11,32 +11,11 @@ import (
 	"github.com/agenthub/hub-server/internal/model"
 )
 
-// helper to insert a pending_agent_task row with the given status and
-// finished_at. Uses raw SQL because model.BeforeCreate requires uuidv7 and
-// we want deterministic IDs in tests.
-func insertTask(t *testing.T, db interface{ Exec(string, ...interface{}) interface{ Error() error } }, id, status string, finishedAt *time.Time) {
-	t.Helper()
-	var fa interface{}
-	if finishedAt != nil {
-		fa = finishedAt.Format(time.RFC3339Nano)
-	}
-	sql := fmt.Sprintf(
-		`INSERT INTO pending_agent_tasks (id, agent_instance_id, triggered_by_user_id, trigger_message_id, status, expire_at, finished_at, created_at) VALUES ('%s', 'ai', 'tu', 'tm', '%s', datetime('now'), %v, datetime('now'))`,
-		id, status, func() string {
-			if fa == nil {
-				return "NULL"
-			}
-			return fmt.Sprintf("'%s'", fa)
-		}(),
-	)
-	require.NoError(t, db.Exec(sql).Error())
-}
-
 func TestPurgeTerminalRunEvents_TailAndWindow(t *testing.T) {
 	db := setupSQLite(t)
 
 	now := time.Now().UTC()
-	oldFinished := now.Add(-48 * time.Hour)  // well past default 30d? no — use cutoff=24h below
+	oldFinished := now.Add(-48 * time.Hour)   // well past default 30d? no — use cutoff=24h below
 	recentFinished := now.Add(-1 * time.Hour) // within cutoff
 
 	// Terminal task A: finished 48h ago, 800 events → expect keep tail 500.

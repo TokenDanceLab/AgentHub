@@ -21,9 +21,9 @@ var TerminalTaskStatuses = []string{
 
 // AgentRunEventRetentionResult reports what a retention pass did.
 type AgentRunEventRetentionResult struct {
-	DeletedRows      int64
-	AffectedTasks    int64
-	SkippedNonTerm   int64 // tasks seen but not terminal (for observability only)
+	DeletedRows    int64
+	AffectedTasks  int64
+	SkippedNonTerm int64 // tasks seen but not terminal (for observability only)
 }
 
 // PurgeTerminalRunEvents enforces the agent_run_events retention policy:
