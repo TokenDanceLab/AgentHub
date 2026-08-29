@@ -31,11 +31,12 @@ describe('friendlyErrorMessage', () => {
     expect(friendlyErrorMessage('proxy connect timeout', 'fallback')).toBe('fallback');
   });
 
-  it('hides TypeError / ReferenceError names', () => {
+  it('hides TypeError / ReferenceError / SyntaxError names', () => {
     expect(friendlyErrorMessage('TypeError: Cannot read properties of null', 'fallback')).toBe(
       'fallback',
     );
     expect(friendlyErrorMessage('ReferenceError: x is not defined', 'fallback')).toBe('fallback');
+    expect(friendlyErrorMessage('SyntaxError: Unexpected token < in JSON at position 0', 'fallback')).toBe('fallback');
   });
 
   it('hides stack-frame text', () => {
@@ -280,5 +281,42 @@ describe('errcode key mapping completeness (#2072 P1)', () => {
     // undefined for any code — verifying the safe fallback path.
     expect(errcodeToastCopy('unknown_code')).toBeUndefined();
     expect(errcodeToastCopy(undefined)).toBeUndefined();
+
+describe('event stream error filtering (#2072 P2-⑯)', () => {
+  it('filters technical strings from event_stream_parse errors', () => {
+    const captured: ToastConfig[] = [];
+    setToastHandler((cfg) => captured.push(cfg));
+    try {
+      globalErrorReporter.report(
+        new Error('SyntaxError: Unexpected token < in JSON at position 0'),
+        { context: 'event_stream_parse' },
+      );
+      expect(captured).toHaveLength(1);
+      // Must NOT leak raw technical string
+      expect(captured[0].message).not.toContain('SyntaxError');
+      expect(captured[0].message).not.toContain('Unexpected token');
+      expect(captured[0].message).not.toContain('JSON at position');
+    } finally {
+      setToastHandler(null);
+      globalErrorReporter.clear();
+    }
+  });
+
+  it('passes through user-meaningful reconnect messages', () => {
+    const captured: ToastConfig[] = [];
+    setToastHandler((cfg) => captured.push(cfg));
+    try {
+      globalErrorReporter.report(
+        new Error('Max retries (5) reached, giving up'),
+        { context: 'event_stream_reconnect', retryCount: 5 },
+      );
+      expect(captured).toHaveLength(1);
+      // "Max retries" is user-meaningful (not a stack frame or HTTP status),
+      // so friendlyErrorMessage lets it through.
+      expect(captured[0].message).toContain('Max retries');
+    } finally {
+      setToastHandler(null);
+      globalErrorReporter.clear();
+    }
   });
 });
