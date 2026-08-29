@@ -5,8 +5,10 @@ import (
 	"encoding/json"
 	"testing"
 
+	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/require"
 
+	"github.com/agenthub/hub-server/internal/errcode"
 	"github.com/agenthub/hub-server/internal/handler"
 	"github.com/agenthub/hub-server/internal/service/relay"
 )
@@ -79,11 +81,94 @@ func TestRelayHandlerCreateCommandRejectsMissingTargetOrPayload(t *testing.T) {
 	}
 }
 
+func TestRelayHandlerDeviceAckCommandSuccess(t *testing.T) {
+	svc := &mockRelayService{
+		deviceAckFn: func(ctx context.Context, id string, deviceID string) error {
+			require.Equal(t, "relay-1", id)
+			require.Equal(t, "device-42", deviceID)
+			return nil
+		},
+	}
+	h := handler.NewRelayHandler(svc)
+	c, w := newGinCtx("POST", "/web/relay/commands/relay-1/device-ack", map[string]any{
+		"device_id": "device-42",
+	})
+	c.Params = gin.Params{{Key: "id", Value: "relay-1"}}
+
+	h.DeviceAckCommand(c)
+
+	assertStatus(t, w, 200)
+	assertOK(t, w)
+	require.True(t, svc.deviceAckCalled)
+}
+
+func TestRelayHandlerDeviceAckCommandRejectsWrongDevice(t *testing.T) {
+	svc := &mockRelayService{
+		deviceAckFn: func(ctx context.Context, id string, deviceID string) error {
+			return errcode.ErrForbidden.WithMessage("device does not own this relay command")
+		},
+	}
+	h := handler.NewRelayHandler(svc)
+	c, w := newGinCtx("POST", "/web/relay/commands/relay-1/device-ack", map[string]any{
+		"device_id": "wrong-device",
+	})
+	c.Params = gin.Params{{Key: "id", Value: "relay-1"}}
+
+	h.DeviceAckCommand(c)
+
+	assertStatus(t, w, 403)
+	require.True(t, svc.deviceAckCalled)
+}
+
+func TestRelayHandlerDeviceAckCommandIdempotent(t *testing.T) {
+	// Second ack on already-acked command returns success (service returns nil).
+	callCount := 0
+	svc := &mockRelayService{
+		deviceAckFn: func(ctx context.Context, id string, deviceID string) error {
+			callCount++
+			return nil // idempotent: service returns nil for already-acked
+		},
+	}
+	h := handler.NewRelayHandler(svc)
+
+	// First ack
+	c1, w1 := newGinCtx("POST", "/web/relay/commands/relay-1/device-ack", map[string]any{
+		"device_id": "device-42",
+	})
+	c1.Params = gin.Params{{Key: "id", Value: "relay-1"}}
+	h.DeviceAckCommand(c1)
+	assertStatus(t, w1, 200)
+
+	// Second ack (idempotent)
+	c2, w2 := newGinCtx("POST", "/web/relay/commands/relay-1/device-ack", map[string]any{
+		"device_id": "device-42",
+	})
+	c2.Params = gin.Params{{Key: "id", Value: "relay-1"}}
+	h.DeviceAckCommand(c2)
+	assertStatus(t, w2, 200)
+
+	require.Equal(t, 2, callCount)
+}
+
+func TestRelayHandlerDeviceAckCommandRejectsMissingDeviceID(t *testing.T) {
+	svc := &mockRelayService{}
+	h := handler.NewRelayHandler(svc)
+	c, w := newGinCtx("POST", "/web/relay/commands/relay-1/device-ack", map[string]any{})
+	c.Params = gin.Params{{Key: "id", Value: "relay-1"}}
+
+	h.DeviceAckCommand(c)
+
+	assertStatus(t, w, 400)
+	require.False(t, svc.deviceAckCalled)
+}
+
 type mockRelayService struct {
-	createCalled bool
-	createFn     func(ctx context.Context, targetEdgeID, commandType string, payload json.RawMessage, createdBy string) (*relay.CreateResult, error)
-	getFn        func(ctx context.Context, id string, userID string) (*relay.CommandData, error)
-	ackFn        func(ctx context.Context, id string, userID string) error
+	createCalled    bool
+	createFn        func(ctx context.Context, targetEdgeID, commandType string, payload json.RawMessage, createdBy string) (*relay.CreateResult, error)
+	getFn           func(ctx context.Context, id string, userID string) (*relay.CommandData, error)
+	ackFn           func(ctx context.Context, id string, userID string) error
+	deviceAckCalled bool
+	deviceAckFn     func(ctx context.Context, id string, deviceID string) error
 }
 
 func (m *mockRelayService) CreateCommand(ctx context.Context, targetEdgeID, commandType string, payload json.RawMessage, createdBy string) (*relay.CreateResult, error) {
@@ -104,6 +189,14 @@ func (m *mockRelayService) GetCommand(ctx context.Context, id string, userID str
 func (m *mockRelayService) AckCommand(ctx context.Context, id string, userID string) error {
 	if m.ackFn != nil {
 		return m.ackFn(ctx, id, userID)
+	}
+	return nil
+}
+
+func (m *mockRelayService) DeviceAckCommand(ctx context.Context, id string, deviceID string) error {
+	m.deviceAckCalled = true
+	if m.deviceAckFn != nil {
+		return m.deviceAckFn(ctx, id, deviceID)
 	}
 	return nil
 }

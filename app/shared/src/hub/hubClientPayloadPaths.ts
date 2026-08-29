@@ -281,7 +281,7 @@ export function buildRelayCommandPath(id: string): string {
 }
 
 export function buildAckRelayCommandPath(id: string): string {
-  return `/web/relay/commands/${encodeURIComponent(id)}/ack`;
+  return `/web/relay/commands/${encodeURIComponent(id)}/device-ack`;
 }
 
 export function buildCustomAgentPath(id: string): string {

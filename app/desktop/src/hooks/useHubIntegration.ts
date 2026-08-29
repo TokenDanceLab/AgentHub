@@ -28,6 +28,7 @@ import {
   bindDispatchPayload,
   buildDispatchTargetBinding,
   buildEdgeRunBody,
+  parseDispatchFrame,
   extractCreatedRunId,
   extractRunOutputBatch,
   FINAL_OUTPUT_MAX_CHARS,
@@ -311,13 +312,20 @@ export function useHubIntegration(options: HubIntegrationOptions): HubIntegratio
     }
     // ── agent.dispatch: create Edge run ────────────────
     const unsubDispatch = hubWS.on(HUB_EVENTS.AGENT_DISPATCH, async (payload: unknown) => {
-      const data = payload as Record<string, unknown> | null;
-      if (!data || typeof data.task_id !== 'string' || !data.task_id) {
+      const raw = payload as Record<string, unknown> | null;
+      if (!raw) {
         console.warn('[useHubIntegration] Invalid agent.dispatch payload:', payload);
         return;
       }
 
-      const taskId = data.task_id;
+      // ── Parse dispatch frame (direct or relay-wrapped) ──────────
+      const parsed = parseDispatchFrame(raw);
+      if (!parsed) {
+        console.warn('[useHubIntegration] Invalid agent.dispatch payload:', payload);
+        return;
+      }
+      const { data, relayCommandId } = parsed;
+      const taskId = data.task_id as string;
       const targetBinding = buildDispatchTargetBinding(data, dispatchTarget);
       const dispatchPayload = bindDispatchPayload(data, targetBinding);
       const targetError = validateDispatchTarget(data, dispatchTarget);
@@ -325,6 +333,12 @@ export function useHubIntegration(options: HubIntegrationOptions): HubIntegratio
       // Invalidate team-related caches on dispatch
       void queryClient.invalidateQueries({ queryKey: hubQueryKeys.agentTeams.root });
       if (targetError) {
+        if (relayCommandId) {
+          // Relay fan-out: target mismatch means this device is not the intended consumer.
+          // Skip silently — do not failTask or report to Hub.
+          console.info('[useHubIntegration] Relay command target mismatch, skipping:', relayCommandId, targetError);
+          return;
+        }
         store.getState().addTask({
           taskId,
           agentId: normalizeRuntimeAgentId(
@@ -392,6 +406,14 @@ export function useHubIntegration(options: HubIntegrationOptions): HubIntegratio
 
         // Acknowledge task to Hub (log failures — do not throw into dispatch handler)
         void catchHubReport(`ackTask:${taskId}`, hubClient.ackTask(taskId, runId));
+
+        // Ack relay command if this was a relay-dispatched task
+        if (relayCommandId && dispatchTarget?.deviceId) {
+          void catchHubReport(
+            `ackRelayCommand:${relayCommandId}`,
+            hubClient.ackRelayCommand(relayCommandId, dispatchTarget.deviceId),
+          );
+        }
 
         // Notify consumer
         const updatedTask = store.getState().tasks.find((t) => t.taskId === taskId);

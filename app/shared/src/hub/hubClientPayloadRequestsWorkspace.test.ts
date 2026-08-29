@@ -198,13 +198,12 @@ describe('hubClientPayloadRequestsWorkspace', () => {
     expect(Object.keys(request.init)).toEqual(['method']);
   });
 
-  it('builds a POST ack-relay-command request with encoded id', () => {
-    const request = buildAckRelayCommandRequest('cmd/5');
+  it('builds a POST ack-relay-command request with encoded id and device_id body', () => {
+    const request = buildAckRelayCommandRequest('cmd/5', 'device-42');
     expect(request).toEqual({
-      path: '/web/relay/commands/cmd%2F5/ack',
-      init: { method: 'POST' },
+      path: '/web/relay/commands/cmd%2F5/device-ack',
+      init: { method: 'POST', body: JSON.stringify({ device_id: 'device-42' }) },
     });
-    expect(Object.keys(request.init)).toEqual(['method']);
   });
 
   it('builds a DELETE custom-agent request with only a method init', () => {
