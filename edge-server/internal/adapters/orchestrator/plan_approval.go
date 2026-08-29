@@ -34,7 +34,7 @@ type brokeredPlan struct {
 // PlanApprovalBroker manages pending orchestrator plans and connects them
 // to user approval/rejection decisions. It mirrors the PermissionDecisionBroker
 // pattern: the orchestrator registers a plan and blocks until a decision arrives
-// or the auto-approve timeout fires.
+// or the approval timeout fires (default: deny).
 type PlanApprovalBroker struct {
 	mu      sync.Mutex
 	pending map[planKey]brokeredPlan
@@ -50,7 +50,7 @@ func NewPlanApprovalBroker(config PlanApprovalConfig) *PlanApprovalBroker {
 }
 
 // SubmitPlan registers a proposed plan and returns a waiter function that blocks
-// until the user approves/rejects or the auto-approve timeout fires.
+// until the user approves/rejects or the approval timeout fires (default: deny).
 // Returns nil,false if the broker is nil or the plan has no runID.
 func (b *PlanApprovalBroker) SubmitPlan(ctx context.Context, plan PendingPlan) (func(context.Context) PlanDecision, bool) {
 	if b == nil {
@@ -89,14 +89,14 @@ func (b *PlanApprovalBroker) SubmitPlan(ctx context.Context, plan PendingPlan) (
 		case decision := <-bp.decision:
 			return decision
 		case <-timer.C:
-			slog.Info("plan approval: auto-approving after timeout",
+			slog.Info("plan approval: denying after timeout",
 				"runId", plan.RunID,
 				"timeout", timeout,
 			)
 			b.mu.Lock()
 			delete(b.pending, key)
 			b.mu.Unlock()
-			return PlanDecision{Approved: true, Reason: "auto-approved: timeout reached"}
+			return PlanDecision{Approved: false, Reason: "timeout"}
 		case <-ctx.Done():
 			b.mu.Lock()
 			delete(b.pending, key)

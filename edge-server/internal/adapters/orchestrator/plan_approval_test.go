@@ -86,7 +86,7 @@ func TestPlanApprovalBroker_Reject(t *testing.T) {
 	}
 }
 
-func TestPlanApprovalBroker_AutoApproveTimeout(t *testing.T) {
+func TestPlanApprovalBroker_TimeoutDenies(t *testing.T) {
 	broker := NewPlanApprovalBroker(PlanApprovalConfig{
 		Enabled:            true,
 		AutoApproveTimeout: 100 * time.Millisecond,
@@ -108,17 +108,23 @@ func TestPlanApprovalBroker_AutoApproveTimeout(t *testing.T) {
 	decision := wait(context.Background())
 	elapsed := time.Since(start)
 
-	if !decision.Approved {
-		t.Error("expected auto-approve after timeout")
+	if decision.Approved {
+		t.Error("expected timeout to deny, not approve")
 	}
-	if decision.Reason != "auto-approved: timeout reached" {
-		t.Errorf("expected auto-approve reason, got %q", decision.Reason)
+	if decision.Reason != "timeout" {
+		t.Errorf("expected reason 'timeout', got %q", decision.Reason)
 	}
 	if elapsed < 80*time.Millisecond {
-		t.Errorf("auto-approve fired too quickly: %v", elapsed)
+		t.Errorf("timeout fired too quickly: %v", elapsed)
 	}
 	if elapsed > 500*time.Millisecond {
-		t.Errorf("auto-approve took too long: %v", elapsed)
+		t.Errorf("timeout took too long: %v", elapsed)
+	}
+
+	// Verify plan is removed after timeout denial
+	_, found := broker.GetPending("run_timeout_test")
+	if found {
+		t.Error("expected plan to be removed after timeout denial")
 	}
 }
 
