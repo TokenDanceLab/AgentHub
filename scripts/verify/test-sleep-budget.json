@@ -231,6 +231,18 @@
    { "ms": 5000, "kind": "simulated_slow" }
   ]
  },
+ "hub-server/internal/service/agent/run_event_retention_test.go": {
+  "count": 2,
+  "total_ms": 300,
+  "max_ms": 200,
+  "owner": "DeliciousBuding",
+  "review": "2026-08-30",
+  "reason": "TestStartRunEventRetentionLoop_CancelStops: 200ms startup-pass grace + 100ms post-cancel drain grace; loop test only, no per-iteration sleeps (#2070 retention loop wiring).",
+  "sleeps": [
+   { "ms": 200, "kind": "grace_window" },
+   { "ms": 100, "kind": "grace_window" }
+  ]
+ },
  "hub-server/internal/service/audit/reliability_test.go": {
   "count": 1,
   "total_ms": 10,
