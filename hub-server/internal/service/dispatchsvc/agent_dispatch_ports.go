@@ -148,8 +148,17 @@ type DispatchService struct {
 	// test calls to dispatchTask bypass the semaphore (they already run on
 	// the test goroutine) so the pure dispatch path stays unchanged.
 	dispatchSem chan struct{}
+	audit       PrivilegedActionAuditor
 }
 
+
+// SetAuditService injects the privileged-action auditor (#2067). nil disables recording.
+func (s *DispatchService) SetAuditService(a PrivilegedActionAuditor) {
+	if !dispatch.ServiceReceiverAvailable(s != nil) {
+		return
+	}
+	s.audit = a
+}
 // NewDispatchService constructs a DispatchService. bus/outbox/relay/mgr may be
 // nil for partial tests; write paths that need them fail, degrade, or no-op.
 // edgeCfg/jwtSecret are explicit configuration (zero value = defaults); the

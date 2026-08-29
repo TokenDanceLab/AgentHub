@@ -24,6 +24,7 @@ type Service struct {
 	db     *gorm.DB
 	cache  Cache
 	egress *egress.Client
+	audit  PrivilegedActionAuditor
 }
 
 // Cache is the subset of *cache.Client methods used by
@@ -56,6 +57,14 @@ func (s *Service) SetCache(cache Cache) {
 	s.cache = cache
 }
 
+
+// SetAuditService injects the privileged-action auditor (#2067). nil disables recording.
+func (s *Service) SetAuditService(a PrivilegedActionAuditor) {
+	if s == nil {
+		return
+	}
+	s.audit = a
+}
 func (s *Service) Create(ctx context.Context, ownerID string, req *model.ExecutionTarget) (*model.ExecutionTarget, error) {
 	if req.Name == "" {
 		return nil, errcode.ErrBadRequest
@@ -95,6 +104,7 @@ func (s *Service) Create(ctx context.Context, ownerID string, req *model.Executi
 		}
 		return nil, err
 	}
+	s.recordTargetAudit(ctx, auditActionTargetCreate, req.ID, ownerID, auditOutcomeSuccess, "")
 	return req, nil
 }
 
@@ -342,6 +352,7 @@ func (s *Service) Update(ctx context.Context, id, ownerID string, patch *model.E
 		return nil, err
 	}
 	if t.OwnerID != ownerID {
+		s.recordTargetAudit(ctx, auditActionTargetUpdate, id, ownerID, auditOutcomeDenied, "owner mismatch")
 		return nil, errcode.AuthDeviceMismatch
 	}
 
@@ -363,6 +374,7 @@ func (s *Service) Update(ctx context.Context, id, ownerID string, patch *model.E
 		return nil, err
 	}
 	applyExecutionTargetHealthProjection(t, evidence, time.Now())
+	s.recordTargetAudit(ctx, auditActionTargetUpdate, id, ownerID, auditOutcomeSuccess, "")
 	return t, nil
 }
 
@@ -532,9 +544,14 @@ func (s *Service) Delete(ctx context.Context, id, ownerID string) error {
 		return err
 	}
 	if t.OwnerID != ownerID {
+		s.recordTargetAudit(ctx, auditActionTargetDelete, id, ownerID, auditOutcomeDenied, "owner mismatch")
 		return errcode.AuthDeviceMismatch
 	}
-	return repository.SoftDeleteExecutionTarget(s.db, id, ownerID)
+	if err := repository.SoftDeleteExecutionTarget(s.db, id, ownerID); err != nil {
+		return err
+	}
+	s.recordTargetAudit(ctx, auditActionTargetDelete, id, ownerID, auditOutcomeSuccess, "")
+	return nil
 }
 
 func (s *Service) List(ctx context.Context, ownerID, targetType, cursor string, pageSize int) (*ListResult, error) {

@@ -210,6 +210,12 @@ func (a *App) initServices(ctx context.Context) error {
 	a.AuditService = auditSvc
 	a.AuditHandler = handler.NewAuditHandler(auditSvc)
 
+// Wire audit into services that record privileged actions (#2067).
+	a.SessionService.SetAuditService(sessionAuditAdapter{svc: auditSvc})
+	targetSvc.SetAuditService(executionTargetAuditAdapter{svc: auditSvc})
+	a.AgentTeamService.SetAuditService(agentTeamAuditAdapter{svc: auditSvc})
+	a.AgentService.SetAuditService(agentAuditAdapter{svc: auditSvc})
+
 	// AgentTeam service
 	a.AgentTeamService = agentteam.NewAgentTeamServiceWithGuardrails(a.DB, a.AgentService, a.CacheClient, agentteam.AgentTeamGuardrails{
 		MaxDelegationDepth:       a.Config.AgentTeam.MaxDelegationDepth,
@@ -348,4 +354,72 @@ func (a *App) startServer(ctx context.Context) error {
 	default:
 	}
 	return shutdownErr
+}
+
+// sessionAuditAdapter satisfies session.PrivilegedActionAuditor.
+type sessionAuditAdapter struct {
+	svc *audit.Service
+}
+
+func (a sessionAuditAdapter) RecordPrivilegedAction(ctx context.Context, in session.PrivilegedActionAuditInput) {
+	a.svc.RecordPrivilegedAction(ctx, audit.PrivilegedActionInput{
+		ActorUserID:  in.ActorUserID,
+		Action:       in.Action,
+		ResourceType: in.ResourceType,
+		ResourceID:   in.ResourceID,
+		Outcome:      in.Outcome,
+		AuthBasis:    in.AuthBasis,
+		Reason:       in.Reason,
+	})
+}
+
+// executionTargetAuditAdapter satisfies executiontarget.PrivilegedActionAuditor.
+type executionTargetAuditAdapter struct {
+	svc *audit.Service
+}
+
+func (a executionTargetAuditAdapter) RecordPrivilegedAction(ctx context.Context, in executiontarget.PrivilegedActionAuditInput) {
+	a.svc.RecordPrivilegedAction(ctx, audit.PrivilegedActionInput{
+		ActorUserID:  in.ActorUserID,
+		Action:       in.Action,
+		ResourceType: in.ResourceType,
+		ResourceID:   in.ResourceID,
+		Outcome:      in.Outcome,
+		AuthBasis:    in.AuthBasis,
+		Reason:       in.Reason,
+	})
+}
+
+// agentTeamAuditAdapter satisfies agentteam.PrivilegedActionAuditor.
+type agentTeamAuditAdapter struct {
+	svc *audit.Service
+}
+
+func (a agentTeamAuditAdapter) RecordPrivilegedAction(ctx context.Context, in agentteam.PrivilegedActionAuditInput) {
+	a.svc.RecordPrivilegedAction(ctx, audit.PrivilegedActionInput{
+		ActorUserID:  in.ActorUserID,
+		Action:       in.Action,
+		ResourceType: in.ResourceType,
+		ResourceID:   in.ResourceID,
+		Outcome:      in.Outcome,
+		AuthBasis:    in.AuthBasis,
+		Reason:       in.Reason,
+	})
+}
+
+// agentAuditAdapter satisfies agent.PrivilegedActionAuditor.
+type agentAuditAdapter struct {
+	svc *audit.Service
+}
+
+func (a agentAuditAdapter) RecordPrivilegedAction(ctx context.Context, in agent.PrivilegedActionAuditInput) {
+	a.svc.RecordPrivilegedAction(ctx, audit.PrivilegedActionInput{
+		ActorUserID:  in.ActorUserID,
+		Action:       in.Action,
+		ResourceType: in.ResourceType,
+		ResourceID:   in.ResourceID,
+		Outcome:      in.Outcome,
+		AuthBasis:    in.AuthBasis,
+		Reason:       in.Reason,
+	})
 }
