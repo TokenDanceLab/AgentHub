@@ -11,7 +11,7 @@ import (
 
 	"github.com/agenthub/hub-server/internal/model"
 	"github.com/agenthub/hub-server/internal/repository"
-	"github.com/agenthub/hub-server/internal/service/agentevent"
+	"github.com/agenthub/hub-server/internal/service/agent"
 	"github.com/agenthub/hub-server/internal/uuidv7"
 )
 
@@ -65,8 +65,8 @@ func TestAgentRunEventRetention_PurgesTerminalTail(t *testing.T) {
 	runningID := seedRetentionFixture(t, model.TaskStatusRunning, nil, 800)
 	recentTermID := seedRetentionFixture(t, model.TaskStatusFailed, &recentFinished, 800)
 
-	cfg := agentevent.RetentionConfig{Window: 24 * time.Hour, KeepTail: 500}
-	res, err := agentevent.RunEventsRetentionPass(t.Context(), db, cfg)
+	cfg := agent.RetentionConfig{Window: 24 * time.Hour, KeepTail: 500}
+	res, err := agent.RunEventsRetentionPass(t.Context(), db, cfg)
 	require.NoError(t, err)
 	assert.Equal(t, int64(300), res.DeletedRows, "only old terminal task should lose rows")
 	assert.Equal(t, int64(1), res.AffectedTasks)
@@ -89,7 +89,7 @@ func TestAgentRunEventRetention_NonTerminalNegative(t *testing.T) {
 	runningID := seedRetentionFixture(t, model.TaskStatusRunning, nil, 100)
 	require.NoError(t, db.Exec(`UPDATE agent_run_events SET created_at = NOW() - INTERVAL '72 hours' WHERE task_id = ?`, runningID).Error)
 
-	res, err := agentevent.RunEventsRetentionPass(t.Context(), db, agentevent.RetentionConfig{Window: 24 * time.Hour, KeepTail: 500})
+	res, err := agent.RunEventsRetentionPass(t.Context(), db, agent.RetentionConfig{Window: 24 * time.Hour, KeepTail: 500})
 	require.NoError(t, err)
 	assert.Equal(t, int64(0), res.DeletedRows)
 	assert.Equal(t, int64(0), res.AffectedTasks)

@@ -1,4 +1,4 @@
-package agentevent
+package agent
 
 import (
 	"context"

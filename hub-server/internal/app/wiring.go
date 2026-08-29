@@ -21,7 +21,6 @@ import (
 	"github.com/agenthub/hub-server/internal/repository"
 	"github.com/agenthub/hub-server/internal/service/agent"
 	"github.com/agenthub/hub-server/internal/service/agentcontrol"
-	"github.com/agenthub/hub-server/internal/service/agentevent"
 	"github.com/agenthub/hub-server/internal/service/agentprofile"
 	"github.com/agenthub/hub-server/internal/service/agentteam"
 	"github.com/agenthub/hub-server/internal/service/attachment"
@@ -288,7 +287,7 @@ func (a *App) startServer(ctx context.Context) error {
 		a.AgentService.StartDeliveryCleanupLoop(a.bg.Ctx())
 		// Macro baseline §5 goal 5 (#2070): bound agent_run_events growth —
 		// purge terminal-task events past retention, keep per-task tail snapshot.
-		agentevent.StartRunEventRetentionLoop(a.bg.Ctx(), a.DB, agentevent.DefaultRetentionConfig())
+		agent.StartRunEventRetentionLoop(a.bg.Ctx(), a.DB, agent.DefaultRetentionConfig())
 	}
 
 	// Admin server (observability always, debug capabilities fail-closed).
