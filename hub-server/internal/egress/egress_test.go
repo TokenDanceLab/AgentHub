@@ -84,8 +84,10 @@ func TestClientDefaultDenyLocal(t *testing.T) {
 	if err == nil {
 		t.Fatalf("Get to %s succeeded — default policy must deny local dials", srv.URL)
 	}
-	if !strings.Contains(err.Error(), "not allowed") && !strings.Contains(err.Error(), "restricted") {
-		t.Fatalf("unexpected error shape: %v", err)
+	// Default-deny may refuse at the scheme check (plain http) or at the
+	// address check (restricted network); either is a valid policy refusal.
+	if !errors.Is(err, ErrRestrictedAddress) && !errors.Is(err, ErrPlainHTTPDenied) {
+		t.Fatalf("expected policy refusal (ErrRestrictedAddress or ErrPlainHTTPDenied), got: %v", err)
 	}
 }
 
@@ -151,8 +153,8 @@ func TestClientRefusesPlainHTTPWithoutOptIn(t *testing.T) {
 		t.Fatalf("New: %v", err)
 	}
 	_, err = c.Get(context.Background(), "http://127.0.0.1:1/v1/health")
-	if err == nil || !strings.Contains(err.Error(), "plain http") {
-		t.Fatalf("expected plain-http refusal, got %v", err)
+	if err == nil || !errors.Is(err, ErrPlainHTTPDenied) {
+		t.Fatalf("expected ErrPlainHTTPDenied, got %v", err)
 	}
 }
 
@@ -387,7 +389,7 @@ func TestDialContextPolicyAtDialTime(t *testing.T) {
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}
-	if _, err := deny.dialContext(context.Background(), "tcp", "127.0.0.1:80"); err == nil || !strings.Contains(err.Error(), "not allowed") {
+	if _, err := deny.dialContext(context.Background(), "tcp", "127.0.0.1:80"); err == nil || !errors.Is(err, ErrRestrictedAddress) {
 		t.Fatalf("dialContext to loopback error = %v, want policy refusal", err)
 	}
 	if _, err := deny.dialContext(context.Background(), "tcp", "no-port"); err == nil || !strings.Contains(err.Error(), "invalid dial address") {
@@ -500,5 +502,27 @@ func TestDialContextResolveFailure(t *testing.T) {
 	_, err = c.dialContext(context.Background(), "tcp", "nosuchhost.invalid:443")
 	if err == nil || !strings.Contains(err.Error(), "resolve") {
 		t.Fatalf("dialContext error = %v, want resolve failure", err)
+	}
+}
+
+// TestDialTimeoutDefaultAndConfigurable proves that DialTimeout defaults to 5s
+// when zero and honors an explicit override (#2064 item ⑤).
+func TestDialTimeoutDefaultAndConfigurable(t *testing.T) {
+	// Default: DialTimeout should be 5s.
+	c, err := New(Config{})
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	if c.dialer.Timeout != 5*time.Second {
+		t.Fatalf("default dialer.Timeout = %v, want 5s", c.dialer.Timeout)
+	}
+
+	// Custom: explicit DialTimeout must be honored.
+	c2, err := New(Config{DialTimeout: 10 * time.Second})
+	if err != nil {
+		t.Fatalf("New with DialTimeout: %v", err)
+	}
+	if c2.dialer.Timeout != 10*time.Second {
+		t.Fatalf("custom dialer.Timeout = %v, want 10s", c2.dialer.Timeout)
 	}
 }

@@ -14,6 +14,7 @@ import (
 	"github.com/agenthub/hub-server/internal/config"
 	"github.com/agenthub/hub-server/internal/errcode"
 	"github.com/agenthub/hub-server/internal/jwtutil"
+	"github.com/agenthub/hub-server/internal/metrics"
 	"github.com/agenthub/hub-server/internal/model"
 	"github.com/agenthub/hub-server/internal/repository"
 )
@@ -136,6 +137,9 @@ func (s *Service) RefreshToken(ctx context.Context, rawRefreshToken string) (*Lo
 func (s *Service) enforceRefreshBlacklist(ctx context.Context, key string) error {
 	blacklisted, err := resolveAuthCache(s.cacheClient).IsRefreshTokenBlacklisted(ctx, key)
 	if err != nil {
+		if metrics.RefreshBlacklistCheckErrors != nil {
+			metrics.RefreshBlacklistCheckErrors.Inc()
+		}
 		if config.AuthFailClosed() {
 			slog.Warn("refresh blacklist check error, fail-closed",
 				"key", key, "error", err)

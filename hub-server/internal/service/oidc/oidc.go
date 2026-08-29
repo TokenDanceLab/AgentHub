@@ -312,7 +312,7 @@ func (s *Service) exchangeAndValidateIDToken(ctx context.Context, code, codeVeri
 	if s.tdVerifier == nil {
 		return nil, errcode.OIDCIDTokenInvalid
 	}
-	claims, err := s.tdVerifier.ParseJWT(tokenResponse.IDToken, s.cfg.IssuerURL, s.cfg.ClientID)
+	claims, err := s.tdVerifier.ParseJWT(ctx, tokenResponse.IDToken, s.cfg.IssuerURL, s.cfg.ClientID)
 	if err != nil {
 		return nil, errcode.OIDCIDTokenInvalid
 	}

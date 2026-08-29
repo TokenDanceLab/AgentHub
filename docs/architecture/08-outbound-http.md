@@ -59,6 +59,22 @@ exchange、JWKS fetch（#1595 验收）。
 | 8 | Edge Anthropic SDK 适配器（`adapters/sdk/anthropic_sdk_request.go`） | 同上 | 同上 | 固定地址 | 流式响应未限 ⚠️ | `BusEventAPIRetry` 事件 | ✅ 已收口（#1592） |
 | 9 | 统一 outbound metrics/correlation 合同 | — | — | — | — | `outbound_requests_total` / `outbound_request_duration_seconds`（见 1.1） | ✅ 已落地（#1595）：dispatch / callback / OIDC / JWKS |
 
+
+### 2.1 代理场景 SSRF 检查语义（#2064 item ④）
+
+`egress` 包的 `http.Transport` 使用 `http.ProxyFromEnvironment`，当进程配置了
+`HTTP_PROXY` / `HTTPS_PROXY` 环境变量时，出站请求经代理转发。此时 egress 的
+SSRF 地址分类（`isRestricted`）**作用于代理服务器地址而非最终目标地址**：
+Go 标准库在 transport 层先连接代理，再由代理连接目标；`dialContext` 看到的
+`addr` 参数是代理地址。因此：
+
+- 代理地址本身必须通过 egress 策略（不在 restricted 类别中，或在 allowlist 内）；
+- 最终目标地址的 SSRF 检查由代理服务器承担，egress 不再二次校验；
+- 运营商应确保代理地址可信，且代理自身有适当的出站过滤策略。
+
+当前 `egress` 仅用于 `executiontarget.pingEdgeServer`（用户提供的 Edge 地址
+健康探测），不用于 OIDC/JWKS/dispatch 等运营商固定地址路径。
+
 ## 3. 未迁移项清单
 
 | Issue | 项 | Owner | Review date |

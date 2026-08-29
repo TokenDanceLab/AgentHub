@@ -28,6 +28,8 @@ import (
 	"github.com/agenthub/hub-server/internal/cache"
 	"github.com/agenthub/hub-server/internal/errcode"
 	"github.com/agenthub/hub-server/internal/jwtutil"
+	"github.com/agenthub/hub-server/internal/metrics"
+	"github.com/prometheus/client_golang/prometheus/testutil"
 )
 
 // outageCacheClient builds the same cache client production wires into
@@ -146,4 +148,54 @@ func TestRefreshTokenRealRedisFailClosedMatrix(t *testing.T) {
 			assert.NoError(t, mock.ExpectationsWereMet())
 		})
 	}
+}
+
+// TestRefreshBlacklistCheckErrorsCounter proves that Redis errors in
+// enforceRefreshBlacklist increment RefreshBlacklistCheckErrors (#2064 item ①).
+// Mirrors middleware/auth_fail_closed_redis_test.go JTIBlacklistCheckErrors pattern.
+func TestRefreshBlacklistCheckErrorsCounter(t *testing.T) {
+	metrics.Register()
+
+	t.Setenv("AGENTHUB_AUTH_FAIL_CLOSED", "")
+
+	db, mock, sqlDB := newMockDB(t)
+	t.Cleanup(func() { _ = sqlDB.Close() })
+
+	const rawRT = "raw-refresh-counter-test"
+	tokenHash := jwtutil.HashRefreshToken(rawRT)
+
+	expiry := time.Now().Add(24 * time.Hour)
+	mock.ExpectQuery(sqlRTByHash).
+		WithArgs(sqlmock.AnyArg(), 1).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "user_id", "device_type", "device_id", "token_hash", "revoked", "expires_at"}).
+			AddRow("rt-1", "user-uuid", "desktop", "dev-1", tokenHash, false, expiry))
+
+	// Expect rotation (fail-open default).
+	mock.ExpectExec(sqlRevokeByDevice).
+		WithArgs(true, "user-uuid", "dev-1").
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectQuery(sqlRTByUserDevice).
+		WithArgs("user-uuid", "desktop", "dev-1", 1).
+		WillReturnError(gorm.ErrRecordNotFound)
+	mock.ExpectExec(sqlInsertRT).
+		WillReturnResult(sqlmock.NewResult(2, 1))
+
+	cacheClient, mr := outageCacheClient(t)
+	mr.Close() // Redis outage → triggers error path in enforceRefreshBlacklist
+
+	errBefore := testutil.ToFloat64(metrics.RefreshBlacklistCheckErrors)
+
+	svc := NewService(db, jwtCfg(), cacheClient)
+	resp, err := svc.RefreshToken(context.Background(), rawRT)
+	require.NoError(t, err, "fail-open default must allow rotation during outage")
+	require.NotNil(t, resp)
+
+	errAfter := testutil.ToFloat64(metrics.RefreshBlacklistCheckErrors)
+	delta := errAfter - errBefore
+	// Three blacklist keys are checked per refresh (token hash, device key, device type key);
+	// all three hit the Redis error path during outage.
+	if delta < 1 {
+		t.Fatalf("RefreshBlacklistCheckErrors delta = %v, want >= 1: Redis outage must be observable", delta)
+	}
+	assert.NoError(t, mock.ExpectationsWereMet())
 }
