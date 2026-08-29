@@ -77,7 +77,6 @@ type Service struct {
 	audit      PrivilegedActionAuditor
 }
 
-
 // SetAuditService injects the privileged-action auditor (#2067) and propagates
 // it to composed sub-services (RunEventService, DispatchService). Each sub-
 // service defines its own local port type; we adapt between them here so the

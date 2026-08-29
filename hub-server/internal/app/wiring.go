@@ -210,7 +210,7 @@ func (a *App) initServices(ctx context.Context) error {
 	a.AuditService = auditSvc
 	a.AuditHandler = handler.NewAuditHandler(auditSvc)
 
-// Wire audit into services that record privileged actions (#2067).
+	// Wire audit into services that record privileged actions (#2067).
 	a.SessionService.SetAuditService(sessionAuditAdapter{svc: auditSvc})
 	targetSvc.SetAuditService(executionTargetAuditAdapter{svc: auditSvc})
 	a.AgentTeamService.SetAuditService(agentTeamAuditAdapter{svc: auditSvc})

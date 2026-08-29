@@ -28,6 +28,7 @@ type Cache interface {
 	Invalidate(ctx context.Context, keys ...string) error
 	InitSeqIfAbsent(ctx context.Context, sessionID string, seq int64) error
 }
+
 // PrivilegedActionAuditor is the subset of *audit.Service used by session
 // Service to record per-action audit trails (#2067). Defined as a local port
 // so this package stays decoupled from service/audit and tests can inject a
@@ -48,7 +49,6 @@ type PrivilegedActionAuditInput struct {
 	AuthBasis    string
 	Reason       string
 }
-
 
 // Service owns IM session lifecycle orchestration: private/group create,
 // list/search, member join/leave/remove, ownership transfer, dissolve, group
@@ -92,7 +92,6 @@ func (s *Service) SetCache(cacheClient Cache) {
 	s.cacheClient = resolveCache(cacheClient)
 }
 
-
 // SetAuditService injects (or replaces) the privileged-action auditor (#2067).
 // nil disables audit recording; existing call sites stay no-op safe.
 func (s *Service) SetAuditService(a PrivilegedActionAuditor) {
@@ -101,6 +100,7 @@ func (s *Service) SetAuditService(a PrivilegedActionAuditor) {
 	}
 	s.audit = a
 }
+
 // resolveCache returns c, falling back to cache.NoOpCache when c is nil or a
 // typed-nil cache port. Thin type-bridge over cache.ResolveCache so call sites
 // stay on the package-local Cache interface; the nil-detection logic lives in

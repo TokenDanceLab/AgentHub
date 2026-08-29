@@ -57,7 +57,6 @@ func (s *Service) SetCache(cache Cache) {
 	s.cache = cache
 }
 
-
 // SetAuditService injects the privileged-action auditor (#2067). nil disables recording.
 func (s *Service) SetAuditService(a PrivilegedActionAuditor) {
 	if s == nil {

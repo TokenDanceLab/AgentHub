@@ -96,10 +96,10 @@ func TestReviewDagPlan_AuditDenied_NotTriggerUser(t *testing.T) {
 
 	// Create a run in pending_review status triggered by user-1
 	run := &model.AgentTeamRun{
-		TeamID:          team.ID,
-		TriggerUserID:   "user-1",
-		Status:          model.TeamRunStatusPendingReview,
-		Mode:            "supervisor",
+		TeamID:        team.ID,
+		TriggerUserID: "user-1",
+		Status:        model.TeamRunStatusPendingReview,
+		Mode:          "supervisor",
 	}
 	require.NoError(t, repository.CreateTeamRun(svc.db, run))
 

@@ -8,17 +8,17 @@ import (
 // Privileged-action event_type constants. Each value fits varchar(64) on
 // audit_events and is the canonical key for per-action audit trails (#2067).
 const (
-	EventTaskDispatch      = "task.dispatch"
-	EventTaskCancel        = "task.cancel"
-	EventTaskRegenerate    = "task.regenerate"
-	EventApprovalDecide    = "approval.decide"
-	EventMemberAdd         = "member.add"
-	EventMemberRemove      = "member.remove"
-	EventTargetCreate      = "target.create"
-	EventTargetUpdate      = "target.update"
-	EventTargetDelete      = "target.delete"
-	EventReviewDecide      = "review.decide"
-	EventRouteDecide       = "route.decide"
+	EventTaskDispatch   = "task.dispatch"
+	EventTaskCancel     = "task.cancel"
+	EventTaskRegenerate = "task.regenerate"
+	EventApprovalDecide = "approval.decide"
+	EventMemberAdd      = "member.add"
+	EventMemberRemove   = "member.remove"
+	EventTargetCreate   = "target.create"
+	EventTargetUpdate   = "target.update"
+	EventTargetDelete   = "target.delete"
+	EventReviewDecide   = "review.decide"
+	EventRouteDecide    = "route.decide"
 )
 
 // Outcome values recorded in details.outcome. Kept as plain strings so
