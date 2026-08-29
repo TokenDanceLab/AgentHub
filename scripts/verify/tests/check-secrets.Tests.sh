@@ -146,6 +146,55 @@ git add pw.yaml
 bash "$SCRIPT" --staged >/dev/null 2>&1
 check "real password literal still fails" yes $?
 
+echo "=== i18n locale zh long Chinese value with token key passes ==="
+git reset --quiet
+mkdir -p app/web/src/i18n/locales/zh
+cat > app/web/src/i18n/locales/zh/common.json <<'JSON'
+{
+  "auth.error.oidc.tokenExchangeFailed": "令牌交换失败请检查网络后重新发起登录此操作需要稳定的网络连接才能完成身份验证流程",
+  "auth.tokenDanceCallbackPending": "正在打开TokenDanceID登录请在那里完成授权后返回AgentHub继续操作"
+}
+JSON
+git add app/web/src/i18n/locales/zh/common.json
+bash "$SCRIPT" --staged >/dev/null 2>&1
+check "i18n locale zh long Chinese value with token key passes" no $?
+
+echo "=== non-locale JSON same-shape assignment still fails ==="
+git reset --quiet
+mkdir -p config
+cat > config/settings.json <<'JSON'
+{
+  "auth.tokenServiceSecret": "real-secret-value-that-is-long-enough"
+}
+JSON
+git add config/settings.json
+bash "$SCRIPT" --staged >/dev/null 2>&1
+check "non-locale JSON same-shape assignment still fails" yes $?
+
+echo "=== i18n locale file with literal sk- key still fails ==="
+git reset --quiet
+mkdir -p app/web/src/i18n/locales/en
+cat > app/web/src/i18n/locales/en/demo.json <<'JSON'
+{
+  "demo.skKey": "sk-proj-1234567890abcdefghijklmnopqrstuvwxyz"
+}
+JSON
+git add app/web/src/i18n/locales/en/demo.json
+bash "$SCRIPT" --staged >/dev/null 2>&1
+check "i18n locale file with literal sk- key still fails" yes $?
+
+echo "=== adjacent non-locale i18n dir not exempted ==="
+git reset --quiet
+mkdir -p app/web/src/i18n/config
+cat > app/web/src/i18n/config/tokens.json <<'JSON'
+{
+  "auth.tokenServiceSecret": "real-secret-value-that-is-long-enough"
+}
+JSON
+git add app/web/src/i18n/config/tokens.json
+bash "$SCRIPT" --staged >/dev/null 2>&1
+check "adjacent non-locale i18n dir not exempted" yes $?
+
 echo ""
 echo "Results: $PASS passed, $FAIL failed"
 if [[ "$FAIL" -gt 0 ]]; then
