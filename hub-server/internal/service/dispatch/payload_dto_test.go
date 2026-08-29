@@ -146,3 +146,61 @@ func TestDeadLetterHelpers(t *testing.T) {
 		PendingTaskRedeliverySelect,
 	)
 }
+
+func TestAssembleDispatchPayloadGeneratesTraceID(t *testing.T) {
+	p := AssembleDispatchPayload(AssemblePayloadInput{
+		TaskID:          "t",
+		AgentInstanceID: "ai",
+		AgentType:       "claude-code",
+		SessionID:       "s",
+		TriggerMessageID: "m",
+		TriggerUserID:   "u",
+		Prompt:          "p",
+		DisplayName:     "n",
+	})
+	if p.TraceID == "" {
+		t.Fatal("expected non-empty TraceID on assembled payload")
+	}
+	if len(p.TraceID) != 32 {
+		t.Fatalf("TraceID length = %d, want 32 hex chars", len(p.TraceID))
+	}
+	// Second assembly must produce a distinct trace id.
+	p2 := AssembleDispatchPayload(AssemblePayloadInput{
+		TaskID:          "t2",
+		AgentInstanceID: "ai",
+		AgentType:       "claude-code",
+		SessionID:       "s",
+		TriggerMessageID: "m",
+		TriggerUserID:   "u",
+		Prompt:          "p",
+		DisplayName:     "n",
+	})
+	if p2.TraceID == p.TraceID {
+		t.Fatalf("two assemblies produced identical TraceID %q", p.TraceID)
+	}
+}
+
+func TestMarshalPayloadPreservesTraceID(t *testing.T) {
+	p := AssembleDispatchPayload(AssemblePayloadInput{
+		TaskID:          "t",
+		AgentInstanceID: "ai",
+		AgentType:       "claude-code",
+		SessionID:       "s",
+		TriggerMessageID: "m",
+		TriggerUserID:   "u",
+		Prompt:          "p",
+		DisplayName:     "n",
+	})
+	raw, err := MarshalPayload(p)
+	if err != nil {
+		t.Fatalf("MarshalPayload error: %v", err)
+	}
+	var decoded map[string]any
+	if err := json.Unmarshal(raw, &decoded); err != nil {
+		t.Fatalf("unmarshal error: %v", err)
+	}
+	got, ok := decoded["trace_id"].(string)
+	if !ok || got != p.TraceID {
+		t.Fatalf("decoded trace_id = %v, want %q", decoded["trace_id"], p.TraceID)
+	}
+}
