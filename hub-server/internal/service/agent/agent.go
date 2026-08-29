@@ -34,7 +34,7 @@ type agentCache interface {
 
 // relayDispatcher is the subset of *relay.Service methods used by Service.
 type relayDispatcher interface {
-	CreateCommand(ctx context.Context, targetEdgeID, commandType string, payload json.RawMessage, createdBy string) (*relay.CommandData, error)
+	CreateCommand(ctx context.Context, targetEdgeID, commandType string, payload json.RawMessage, createdBy string) (*relay.CreateResult, error)
 }
 
 type Service struct {

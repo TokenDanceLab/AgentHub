@@ -10,6 +10,7 @@ import (
 
 	"github.com/agenthub/hub-server/internal/cache"
 	"github.com/agenthub/hub-server/internal/errcode"
+	"github.com/agenthub/hub-server/internal/metrics"
 	"github.com/agenthub/hub-server/internal/ws"
 )
 
@@ -25,6 +26,13 @@ type CommandData struct {
 	CreatedAt    time.Time       `json:"created_at"`
 }
 
+// CreateResult carries the outcome of CreateCommand, including whether the
+// WebSocket push reached at least one active connection.
+type CreateResult struct {
+	Command     *CommandData
+	PushReached bool // true when PushToUser queued the frame on ≥1 active conn
+}
+
 // Service manages relay commands between Hub and Edge devices.
 type Service struct {
 	cache *cache.Client
@@ -37,8 +45,10 @@ func NewService(cache *cache.Client, mgr *ws.Manager) *Service {
 }
 
 // CreateCommand stores a new relay command in Redis and pushes it to the target
-// Edge device via WebSocket if online.
-func (s *Service) CreateCommand(ctx context.Context, targetEdgeID, commandType string, payload json.RawMessage, createdBy string) (*CommandData, error) {
+// Edge device via WebSocket if online. The returned CreateResult reports
+// whether the push reached at least one active connection so callers can
+// distinguish live delivery from fire-and-forget persistence.
+func (s *Service) CreateCommand(ctx context.Context, targetEdgeID, commandType string, payload json.RawMessage, createdBy string) (*CreateResult, error) {
 	id := generateRelayID()
 	cmd := &CommandData{
 		ID:           id,
@@ -61,9 +71,16 @@ func (s *Service) CreateCommand(ctx context.Context, targetEdgeID, commandType s
 		"command_type":     commandType,
 		"payload":          string(payload),
 	})
-	s.mgr.PushToUser(targetEdgeID, frame)
+	fanout := s.mgr.PushToUser(targetEdgeID, frame)
 
-	return cmd, nil
+	if metrics.RelayCommandsCreated != nil {
+		metrics.RelayCommandsCreated.Inc()
+	}
+
+	return &CreateResult{
+		Command:     cmd,
+		PushReached: fanout.Queued > 0,
+	}, nil
 }
 
 // GetCommand retrieves a relay command by ID from Redis, verifying it belongs to userID.

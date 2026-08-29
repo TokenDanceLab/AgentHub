@@ -104,11 +104,11 @@ type ManagerPort interface {
 // between FramePort and the wire frame, so the string must stay in sync.
 const frameTypeAgentDispatch = "agent.dispatch"
 
-// RelayPort is the hub_relay command dispatch port. The service layer adapts
-// *relay.Service (whose CreateCommand returns command metadata the dispatch
-// flow does not consume).
+// RelayPort is the hub_relay command dispatch port.
 type RelayPort interface {
-	CreateCommand(ctx context.Context, targetEdgeID, commandType string, payload json.RawMessage, createdBy string) error
+	// CreateCommand persists a relay command and attempts WS push.
+	// Returns pushReached=true when the frame was queued on ≥1 active conn.
+	CreateCommand(ctx context.Context, targetEdgeID, commandType string, payload json.RawMessage, createdBy string) (pushReached bool, err error)
 }
 
 // DispatchService owns agent task dispatch orchestration: trigger, payload build,

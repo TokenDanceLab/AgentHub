@@ -44,13 +44,16 @@ func (a wsManagerAdapter) PushToConn(connID string, frame dispatchsvc.FramePort)
 }
 
 // relayServiceAdapter adapts relayDispatcher (relay.Service subset) onto
-// dispatchsvc.RelayPort. The dispatch flow discards the created command's
-// metadata, so the adapter drops it.
+// dispatchsvc.RelayPort. PushReached is forwarded so the dispatch flow can
+// distinguish live delivery from fire-and-forget persistence.
 type relayServiceAdapter struct {
 	relay relayDispatcher
 }
 
-func (a relayServiceAdapter) CreateCommand(ctx context.Context, targetEdgeID, commandType string, payload json.RawMessage, createdBy string) error {
-	_, err := a.relay.CreateCommand(ctx, targetEdgeID, commandType, payload, createdBy)
-	return err
+func (a relayServiceAdapter) CreateCommand(ctx context.Context, targetEdgeID, commandType string, payload json.RawMessage, createdBy string) (bool, error) {
+	res, err := a.relay.CreateCommand(ctx, targetEdgeID, commandType, payload, createdBy)
+	if err != nil {
+		return false, err
+	}
+	return res.PushReached, nil
 }
