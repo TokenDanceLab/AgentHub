@@ -186,5 +186,29 @@ func mapSDKFixtureResultEvent(event SDKFixtureEvent, provider string, scope map[
 		"reason":         event.Reason,
 		"usage":          sdkUsagePayload(event),
 	})
-	return oneSDKMappedEvent(BusEventResult, scope, payload)
+	out := oneSDKMappedEvent(BusEventResult, scope, payload)
+	// Emit session metrics alongside the result so Hub can aggregate tokens/cost.
+	if event.Usage != nil {
+		mp := map[string]any{}
+		has := false
+		if event.Usage.InputTokens > 0 {
+			mp["inputTokens"] = event.Usage.InputTokens
+			has = true
+		}
+		if event.Usage.OutputTokens > 0 {
+			mp["outputTokens"] = event.Usage.OutputTokens
+			has = true
+		}
+		if event.Usage.TotalCostUSD > 0 {
+			mp["totalCostUsd"] = event.Usage.TotalCostUSD
+			has = true
+		}
+		if event.Model != "" {
+			mp["model"] = event.Model
+		}
+		if has {
+			out = append(out, oneSDKMappedEvent(BusEventSessionMetrics, scope, mp)...)
+		}
+	}
+	return out
 }

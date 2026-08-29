@@ -32,6 +32,7 @@ func (a *App) startAdminServer() error {
 	// Register Prometheus metrics unconditionally so middleware never nil-pointer dereferences.
 	metrics.Register()
 	metrics.RegisterOrphanMetrics()
+	metrics.RegisterSessionMetrics()
 
 	adminPort := a.Config.Server.AdminPort
 	pprofUser := os.Getenv("AGENTHUB_PPROF_USER")
