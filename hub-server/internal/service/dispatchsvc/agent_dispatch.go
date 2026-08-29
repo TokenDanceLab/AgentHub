@@ -104,6 +104,7 @@ func (s *DispatchService) TriggerAgentTask(ctx context.Context, userID, triggerM
 		ai.ID, userID, triggerMessageID, targetID, edgeDeviceID,
 		time.Now().Add(config.PendingTaskTTL),
 	)
+	task.ModelParams = modelParams
 	// #1430: per-agent_instance TurnInProgress gate. Rejects a second concurrent
 	// trigger while one task is non-terminal (queued/dispatched/running). The
 	// check-then-create runs inside a transaction with a row lock so concurrent
