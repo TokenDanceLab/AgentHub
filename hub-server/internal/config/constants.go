@@ -235,3 +235,29 @@ const OrphanTaskGracePeriod = 120 * time.Second
 
 // OrphanTaskScanInterval controls how often the orphan task sweeper runs.
 const OrphanTaskScanInterval = 30 * time.Second
+
+// ── JWT key rotation ─────────────────────────────────────────────────────────
+
+// DefaultJWTRotationInterval is the default period between automatic JWT
+// signing-key rotations. Conservative 24h to minimize disruption while still
+// limiting exposure window of a compromised key. Operators may override via
+// AGENTHUB_JWT_ROTATION_INTERVAL env var.
+const DefaultJWTRotationInterval = 24 * time.Hour
+
+// DefaultJWTRotationGracePeriod is how long a superseded signing key remains
+// registered for verification after rotation. Must exceed the maximum access
+// token TTL so in-flight tokens survive the transition. Defaults to 30m
+// (access_ttl 15m + 15m buffer). Operators may override via
+// AGENTHUB_JWT_ROTATION_GRACE_PERIOD env var.
+const DefaultJWTRotationGracePeriod = 30 * time.Minute
+
+// JWTRotationEnabledEnvVar is the environment variable that enables the
+// automatic JWT key rotation scheduler. Accepts "true"/"1"/"yes" (case-
+// insensitive). Default is disabled (safe opt-in).
+const JWTRotationEnabledEnvVar = "AGENTHUB_JWT_ROTATION_ENABLED"
+
+// JWTRotationIntervalEnvVar overrides DefaultJWTRotationInterval.
+const JWTRotationIntervalEnvVar = "AGENTHUB_JWT_ROTATION_INTERVAL"
+
+// JWTRotationGracePeriodEnvVar overrides DefaultJWTRotationGracePeriod.
+const JWTRotationGracePeriodEnvVar = "AGENTHUB_JWT_ROTATION_GRACE_PERIOD"
