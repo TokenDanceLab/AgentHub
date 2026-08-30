@@ -1,6 +1,6 @@
 # AgentHub Decisions
 
-最后更新：2026-08-20
+最后更新：2026-08-29
 
 本文件是当前架构决策摘要。旧 ADR 全文已外迁到 `docs/history.md` 指向的 TokenDance docs archive；旧正文只作追溯，不覆盖 `AGENTS.md`、`docs/architecture.md`、`docs/architecture/`、`api/` 或当前源码事实。
 
@@ -32,6 +32,9 @@
 | ADR-022 | Accepted 2026-08-09 | 迁移触发器修复原则：已发布迁移不可变（不改 0040/0058.up/0060.up/0016.up），新建后续迁移（0061/0064）以 `DISABLE/ENABLE TRIGGER USER` 或 `NOT VALID` 方式旁路 0040 append-only 触发器；down 链同样补外包。legacy 行 backfill 留给计数器列通道，不在此轮。 | Hub migrations | 是 |
 | ADR-023 | Accepted 2026-08-09 | Tauri 安全加固：sidecar 重启策略、command 门控（最小权限 capability）、SSRF 防护（出站 URL allowlist + 私网拦截）。正文见 Tauri 通道交付。 | Desktop / Security | 是 |
 | ADR-024 | Accepted 2026-08-20；landed #1760/#1761（2026-08-19~20 全量落地） | service/adapters 领域子包化收官：#1761 hub `internal/service/` 平铺大包按领域拆 28 子包（Identity/Agent/IM/执行/资源/审计六族，`handler -> service -> repository` 单向依赖不变，纯包 `dispatch/deliveryoutbox/im/agentevent` 经 `verify-hub-pure-packages.py` 门禁禁止 import gorm/cache/ws/service 树，持久化经 `Store` 接口注入）；#1760 edge `internal/adapters/` 按 Agent 家族拆 `claude/codex/opencode/orchestrator/sdk/testdata` 叶子子包（orchestrator 为唯一纯叶子，`verify-orchestrator-deps.py` + `TestLeafDoesNotImportRootAdapters` 机器门禁，composition root 装配，根包保留共享 ACP 运行时）。新增领域逻辑放入对应子包，不再回平铺包。 | Hub / Edge architecture | 是 |
+
+| ADR-025 | Accepted 2026-08-29（设计基线，未实施） | 双平面正式化：Hub 是控制面（不执行模型 Turn），Edge 是数据面；任务拆分/路由由确定性 supervisor 承担；证据由 Edge 产生并签名，Hub 只校验/审计。完整目标/差距矩阵见 `docs/architecture/10-macro-engineering-design.md`。 | Architecture / Hub / Edge | 是 |
+| ADR-026 | Accepted 2026-08-29（设计基线，未实施） | 协议分层与四条 P0 设计合同：自有 REST/WS 保持产品契约 SSOT，MCP/A2A/AG-UI 只做 capability mapping；事件一致性（outbox 同事务/idempotent/version/snapshot）、最小代理权（task-scoped/per-action/secret 隔离）、OTel GenAI 可观测进入实施 backlog。升级但不替代 ADR-016/ADR-017。 | Architecture / Hub / Edge / Security | 是 |
 
 ## Archive
 
