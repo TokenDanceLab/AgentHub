@@ -106,6 +106,17 @@ should_scan_secret_assignments() {
   return 1
 }
 
+is_i18n_locale_path() {
+  # i18n locale JSON files are translation catalogs, not config. Keys often
+  # contain words like "token"/"secret" (e.g. auth.tokenExchangeFailed) and
+  # Chinese values have no whitespace, triggering the assignment heuristic.
+  # Literal-format checks (sk-/AKIA/ghp_/JWT/etc.) run unconditionally above
+  # and still catch real credentials embedded in locale files.
+  local lower
+  lower="$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')"
+  [[ "$lower" == */i18n/locales/* ]]
+}
+
 check_sensitive_path() {
   local path="$1"
   local normalized="${path//\\//}"
@@ -221,7 +232,7 @@ check_added_line() {
     report "$path" "$line_no" "possible JWT detected"
   fi
 
-  if should_scan_secret_assignments "$path"; then
+  if should_scan_secret_assignments "$path" && ! is_i18n_locale_path "$path"; then
     local value=""
     # Go config wiring (e.g. cfg.TokenDanceID.ClientSecret = envClientSecret or
     # cfg.JWT.Secrets = map[string]string{...}): the RHS is an identifier,
