@@ -23,12 +23,17 @@ func TestRunShutdownHooks_AllComplete(t *testing.T) {
 func TestRunShutdownHooks_SlowHookDoesNotBlockNext(t *testing.T) {
 	// Verifies that a slow hook is skipped after the per-hook budget and
 	// subsequent hooks still run. Uses the package constant; accepts ~2s cost.
+	// The slow hook blocks on a channel (no time.Sleep) and is released at
+	// test cleanup so its goroutine cannot leak.
 	if testing.Short() {
 		t.Skip("skipping slow-hook test in short mode")
 	}
+	release := make(chan struct{})
+	t.Cleanup(func() { close(release) })
+
 	orderCh := make(chan int, 3)
 	hooks := []func(){
-		func() { time.Sleep(shutdownPerHookBudget + 500*time.Millisecond); orderCh <- 1 },
+		func() { <-release; orderCh <- 1 },
 		func() { orderCh <- 2 },
 	}
 	start := time.Now()
@@ -66,9 +71,12 @@ func TestCloseBusWithTimeout_ExceedsBudget(t *testing.T) {
 		t.Skip("skipping bus-close timeout test in short mode")
 	}
 	budget := 50 * time.Millisecond
+	release := make(chan struct{})
+	t.Cleanup(func() { close(release) })
+
 	start := time.Now()
 	err := closeBusWithTimeout(func() error {
-		time.Sleep(budget + 200*time.Millisecond)
+		<-release
 		return nil
 	}, budget)
 	elapsed := time.Since(start)
