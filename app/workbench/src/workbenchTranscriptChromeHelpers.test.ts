@@ -367,6 +367,7 @@ describe('workbenchTranscriptChromeHelpers', () => {
         blockId: 'agent-1',
         successMessage: 'action.regenerating',
         failureMessage: 'toast.regenerateFailed',
+        failureFallbackKey: 'toast.regenerateFailed',
       },
     ]);
   });
@@ -407,6 +408,7 @@ describe('workbenchTranscriptChromeHelpers', () => {
         blockId: 'a1',
         successMessage: 'action.regenerating',
         failureMessage: 'toast.regenerateFailed',
+        failureFallbackKey: 'toast.regenerateFailed',
       },
     ]);
 

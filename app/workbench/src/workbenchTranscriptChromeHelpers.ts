@@ -411,7 +411,7 @@ export function createTranscriptChromeController(
       t,
       selectedText: window.getSelection()?.toString() ?? null,
       ...(deps.sessionId ? { sessionId: deps.sessionId } : {}),
-    }), effectHandlers());
+    }), effectHandlers(), t);
   };
 
   const handleTranscriptBlockAction = (
@@ -425,7 +425,7 @@ export function createTranscriptChromeController(
       transcript: getTranscript(),
       t,
       ...(metadata !== undefined ? { metadata } : {}),
-    }), effectHandlers());
+    }), effectHandlers(), t);
   };
 
   const runMultiAction = (action: string): void => {
@@ -434,7 +434,7 @@ export function createTranscriptChromeController(
       selectedBlockIds: getSelectedBlockIds(),
       transcript: getTranscript(),
       t,
-    }), effectHandlers());
+    }), effectHandlers(), t);
   };
 
   // #1823: the destructive multi-delete runs only after the user confirmed
@@ -453,7 +453,7 @@ export function createTranscriptChromeController(
       selectedBlockIds: request.blockIds,
       transcript: getTranscript(),
       t,
-    }), effectHandlers());
+    }), effectHandlers(), t);
   };
 
   const cancelDeleteConfirm = (): void => {

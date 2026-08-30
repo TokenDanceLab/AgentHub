@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { CHATVIEW_I18N_NAMESPACE } from '@shared/chatview/i18n/resources';
 import type { ProjectDraft } from '@agenthub/workbench';
+import { resolveFailedToastKey } from '@shared/chatview/failedToastKey';
 import {
   getWorkbenchDataModeContract,
   getWorkbenchDataModeOverrideSnapshot,
@@ -600,14 +601,22 @@ export function useWebWorkbenchModel(selectedConversationId?: string, selectedPr
     // #1821: a failed cancel must be visible — surface the error toast
     // instead of swallowing the rejection.
     void cancelAgentTaskMut.mutateAsync(taskId).catch((error: unknown) => {
+      // #2072 P3: resolve errcode-specific i18n key when available; when the
+      // generic fallback applies, keep the #2072 P2 friendly detail behavior.
+      const toastKey = resolveFailedToastKey(error, 'toast.cancelFailed');
       useToastStore.getState().showToast(
         'error',
-        t('toast.cancelFailed', {
-          detail: friendlyErrorMessage(
-            error instanceof Error ? error.message : undefined,
-            t('error.unknown'),
-          ),
-        }),
+        t(
+          toastKey,
+          toastKey === 'toast.cancelFailed'
+            ? {
+                detail: friendlyErrorMessage(
+                  error instanceof Error ? error.message : undefined,
+                  t('error.unknown'),
+                ),
+              }
+            : undefined,
+        ),
       );
     });
   }, [activeAgentTask.data?.taskId, cancelAgentTaskMut, t]);

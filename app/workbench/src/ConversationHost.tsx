@@ -41,6 +41,7 @@ import {
 } from './composer/pendingIntents';
 import type { AgentHubPlatform, WorkbenchConversation } from '@shared/platform';
 import { AppError } from '@shared/errors';
+import { resolveFailedToastKey } from '@shared/chatview/failedToastKey';
 import { CHATVIEW_I18N_NAMESPACE } from '@shared/chatview/i18n/resources';
 import type { AttachmentUploadState } from './UnifiedComposer';
 import type { FileItem } from './inspector';
@@ -86,7 +87,8 @@ function toastErrorCopy(
   if (error instanceof Error) {
     console.error('[ConversationHost] action failed:', error.message);
   }
-  return t(fallbackKey);
+  // #2072 P3: resolve errcode-specific i18n key when available.
+  return t(resolveFailedToastKey(error, fallbackKey));
 }
 
 export interface ConversationHostProps {
