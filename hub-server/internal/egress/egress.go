@@ -28,12 +28,27 @@ package egress
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
 	"net/netip"
 	"strings"
 	"time"
+)
+
+// Sentinel errors for egress policy rejections (#2064 item ③).
+// Callers should use errors.Is to distinguish policy refusals from transient
+// network failures without relying on error message text.
+var (
+	// ErrPlainHTTPDenied is returned when a plain HTTP URL is requested but
+	// AllowPlainHTTP is not set.
+	ErrPlainHTTPDenied = errors.New("egress: plain http is not allowed by egress policy")
+	// ErrRestrictedAddress is returned when a resolved IP falls into a
+	// restricted network category and is not covered by the allowlist.
+	ErrRestrictedAddress = errors.New("egress: address is not allowed by egress policy (restricted network)")
+	// ErrUnsupportedScheme is returned for non-http/https URL schemes.
+	ErrUnsupportedScheme = errors.New("egress: unsupported URL scheme (https required, or http with AllowPlainHTTP)")
 )
 
 // Config is the administrator-controlled egress policy. An empty allowlist
@@ -52,6 +67,8 @@ type Config struct {
 	AllowPlainHTTP bool
 	// Timeout for the whole request; zero means 5 seconds.
 	Timeout time.Duration
+	// DialTimeout is the TCP dial timeout; zero means 5 seconds (#2064 item ⑤).
+	DialTimeout time.Duration
 }
 
 // Client is a fail-closed outbound HTTP client.
@@ -82,11 +99,15 @@ func New(cfg Config) (*Client, error) {
 	if timeout <= 0 {
 		timeout = 5 * time.Second
 	}
+	dialTimeout := cfg.DialTimeout
+	if dialTimeout <= 0 {
+		dialTimeout = 5 * time.Second
+	}
 	c := &Client{
 		allowCIDRs: allowCIDRs,
 		allowHosts: allowHosts,
 		allowPlain: cfg.AllowPlainHTTP,
-		dialer:     &net.Dialer{Timeout: 5 * time.Second},
+		dialer:     &net.Dialer{Timeout: dialTimeout},
 	}
 	transport := &http.Transport{
 		Proxy:                 http.ProxyFromEnvironment,
@@ -112,10 +133,10 @@ func New(cfg Config) (*Client, error) {
 func (c *Client) Do(ctx context.Context, method, url string) (*http.Response, error) {
 	if !strings.HasPrefix(url, "https://") {
 		if !strings.HasPrefix(url, "http://") {
-			return nil, fmt.Errorf("egress: unsupported URL scheme (https required, or http with AllowPlainHTTP)")
+			return nil, ErrUnsupportedScheme
 		}
 		if !c.allowPlain {
-			return nil, fmt.Errorf("egress: plain http is not allowed by egress policy")
+			return nil, ErrPlainHTTPDenied
 		}
 	}
 	req, err := http.NewRequestWithContext(ctx, method, url, nil)
@@ -157,7 +178,7 @@ func (c *Client) dialContext(ctx context.Context, network, addr string) (net.Con
 		}
 		for _, ip := range ips {
 			if !c.ipAllowed(ip) {
-				return nil, fmt.Errorf("egress: host %q resolves to restricted address %s (not covered by allowlist)", host, ip)
+				return nil, fmt.Errorf("%w: host %q resolves to restricted address %s", ErrRestrictedAddress, host, ip)
 			}
 		}
 		// Connect to the first resolved IP directly — no second DNS lookup,
@@ -174,7 +195,7 @@ func (c *Client) dialContext(ctx context.Context, network, addr string) (net.Con
 	}
 	for _, ip := range ips {
 		if !c.ipAllowed(ip) {
-			return nil, fmt.Errorf("egress: address %s is not allowed by egress policy (restricted network)", ip)
+			return nil, fmt.Errorf("%w: %s", ErrRestrictedAddress, ip)
 		}
 	}
 	return c.dialer.DialContext(ctx, network, net.JoinHostPort(ips[0].String(), port))

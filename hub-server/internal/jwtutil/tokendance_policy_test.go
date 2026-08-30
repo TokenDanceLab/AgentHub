@@ -4,6 +4,7 @@ package jwtutil
 // fail-closed body limit, redirect refusal, and secret non-leakage.
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -29,7 +30,7 @@ func TestTokenDanceVerifierBodyLimitFailClosed(t *testing.T) {
 
 	// A cap smaller than the JWKS document must fail closed.
 	v := NewTokenDanceVerifier(srv.URL, VerifierConfig{MaxBodyBytes: 16})
-	if err := v.cache.fetchJWKS(); err == nil {
+	if err := v.cache.fetchJWKS(context.Background()); err == nil {
 		t.Fatal("expected body-limit failure for oversized JWKS")
 	} else if !strings.Contains(err.Error(), "body limit") {
 		t.Fatalf("error should mention the body limit, got: %v", err)
@@ -52,7 +53,7 @@ func TestTokenDanceVerifierRedirectNotFollowed(t *testing.T) {
 	defer redirector.Close()
 
 	v := NewTokenDanceVerifier(redirector.URL, VerifierConfig{})
-	if err := v.cache.fetchJWKS(); err == nil {
+	if err := v.cache.fetchJWKS(context.Background()); err == nil {
 		t.Fatal("expected redirect refusal")
 	}
 	if redirectTargetHits != 0 {
@@ -72,7 +73,7 @@ func TestTokenDanceVerifierErrorDoesNotLeakJWKSBody(t *testing.T) {
 	defer srv.Close()
 
 	v := NewTokenDanceVerifier(srv.URL, VerifierConfig{})
-	err := v.cache.fetchJWKS()
+	err := v.cache.fetchJWKS(context.Background())
 	if err == nil {
 		t.Fatal("expected error for 500 JWKS response")
 	}
@@ -96,7 +97,7 @@ func TestTokenDanceVerifierInjectedClientUsed(t *testing.T) {
 
 	client := testPolicyClient()
 	v := NewTokenDanceVerifier(srv.URL, VerifierConfig{HTTPClient: client})
-	if err := v.cache.fetchJWKS(); err != nil {
+	if err := v.cache.fetchJWKS(context.Background()); err != nil {
 		t.Fatalf("fetch with injected client failed: %v", err)
 	}
 	if fetches != 1 {

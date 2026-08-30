@@ -1,6 +1,7 @@
 package jwtutil
 
 import (
+	"context"
 	"crypto/rsa"
 	"encoding/base64"
 	"encoding/json"
@@ -108,7 +109,7 @@ type jwkKey struct {
 }
 
 // fetchJWKS fetches the JWKS from TokenDance ID and caches the parsed RSA public keys.
-func (c *jwksCache) fetchJWKS() error {
+func (c *jwksCache) fetchJWKS(ctx context.Context) error {
 	c.mu.RLock()
 	if time.Since(c.fetched) < c.ttl && len(c.keys) > 0 {
 		c.mu.RUnlock()
@@ -127,7 +128,11 @@ func (c *jwksCache) fetchJWKS() error {
 		return fmt.Errorf("jwks_uri not configured")
 	}
 
-	resp, err := c.client.Get(c.jwksURI)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.jwksURI, nil)
+	if err != nil {
+		return fmt.Errorf("jwks request build failed: %w", err)
+	}
+	resp, err := c.client.Do(req)
 	if err != nil {
 		c.outbound.Record(outboundmetrics.ProviderTokenDanceID, outboundmetrics.PurposeJWKSFetch, outboundmetrics.CategoryFailure, "network_error")
 		return fmt.Errorf("jwks fetch failed: %w", err)
@@ -203,14 +208,14 @@ func parseJWKKey(k *jwkKey) (*rsa.PublicKey, error) {
 // ParseJWT validates a TokenDance ID-issued RS256 JWT.
 // It fetches the JWKS from the configured endpoint, finds the matching key by kid,
 // and verifies signature, issuer, audience, and standard time claims.
-func (v *TokenDanceVerifier) ParseJWT(tokenString, expectedIssuer, expectedAudience string) (*TokenDanceClaims, error) {
+func (v *TokenDanceVerifier) ParseJWT(ctx context.Context, tokenString, expectedIssuer, expectedAudience string) (*TokenDanceClaims, error) {
 	if expectedIssuer == "" {
 		return nil, fmt.Errorf("expected issuer is required")
 	}
 	if expectedAudience == "" {
 		return nil, fmt.Errorf("expected audience is required")
 	}
-	if err := v.cache.fetchJWKS(); err != nil {
+	if err := v.cache.fetchJWKS(ctx); err != nil {
 		return nil, err
 	}
 
@@ -232,7 +237,7 @@ func (v *TokenDanceVerifier) ParseJWT(tokenString, expectedIssuer, expectedAudie
 	if !ok {
 		// Key not found — refresh cache and retry.
 		v.cache.fetched = time.Time{}
-		if err := v.cache.fetchJWKS(); err != nil {
+		if err := v.cache.fetchJWKS(ctx); err != nil {
 			return nil, fmt.Errorf("jwks refresh failed: %w", err)
 		}
 		v.cache.mu.RLock()

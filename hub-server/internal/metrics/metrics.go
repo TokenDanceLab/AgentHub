@@ -60,9 +60,10 @@ var (
 	AgentDispatchEdgeHTTPFailures *prometheus.CounterVec
 
 	// G9 — JWT / WS auth verification failure observability (security).
-	JWTVerificationFailures *prometheus.CounterVec
-	WSAuthFailures          *prometheus.CounterVec
-	JTIBlacklistCheckErrors prometheus.Counter
+	JWTVerificationFailures     *prometheus.CounterVec
+	WSAuthFailures              *prometheus.CounterVec
+	JTIBlacklistCheckErrors     prometheus.Counter
+	RefreshBlacklistCheckErrors prometheus.Counter
 
 	// G1 — WS non-buffer-full delivery failures (marshal / conn closed / conn not found).
 	WSDeliveryFailures *prometheus.CounterVec
@@ -321,6 +322,16 @@ func Register() {
 			},
 		)
 
+		// #2064 item ①: symmetric counter for refresh-token blacklist check
+		// errors. Wiring point is in service/auth (see BLOCKED.md); the metric
+		// is registered here so dashboards can query it once wired.
+		RefreshBlacklistCheckErrors = prometheus.NewCounter(
+			prometheus.CounterOpts{
+				Name: "refresh_blacklist_check_errors_total",
+				Help: "Total number of refresh-token blacklist check errors (Redis fail-open/fail-closed path, #2064).",
+			},
+		)
+
 		// G1 — WS non-buffer-full delivery failures by reason.
 		WSDeliveryFailures = prometheus.NewCounterVec(
 			prometheus.CounterOpts{
@@ -533,6 +544,7 @@ func Register() {
 		prometheus.MustRegister(JWTVerificationFailures)
 		prometheus.MustRegister(WSAuthFailures)
 		prometheus.MustRegister(JTIBlacklistCheckErrors)
+		prometheus.MustRegister(RefreshBlacklistCheckErrors)
 		prometheus.MustRegister(WSDeliveryFailures)
 		prometheus.MustRegister(WSDisconnects)
 		prometheus.MustRegister(WSReconnects)
