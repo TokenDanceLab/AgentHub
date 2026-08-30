@@ -67,7 +67,7 @@ func SearchSessions(db *gorm.DB, userID, q string) ([]SessionWithMeta, error) {
 			COALESCE(mc.member_count, 0) as member_count
 		FROM sessions s
 		INNER JOIN session_members sm ON sm.session_id = s.id AND sm.member_id = ? AND sm.left_at IS NULL
-		LEFT JOIN (SELECT session_id, COUNT(*) as member_count FROM session_members WHERE left_at IS NULL GROUP BY session_id) mc ON mc.session_id = s.id
+		LEFT JOIN LATERAL (SELECT COUNT(*) as member_count FROM session_members WHERE session_id = s.id AND left_at IS NULL) mc ON true
 		WHERE s.dissolved = false AND (s.type = 'group' OR (s.type = 'private')) AND s.name LIKE ?
 		ORDER BY s.last_message_at DESC NULLS LAST, s.created_at DESC
 		LIMIT 20
@@ -82,7 +82,7 @@ func ListUserSessions(db *gorm.DB, userID string) ([]SessionWithMeta, error) {
 			COALESCE(mc.member_count, 0) as member_count
 		FROM sessions s
 		INNER JOIN session_members sm ON sm.session_id = s.id AND sm.member_id = ? AND sm.left_at IS NULL
-		LEFT JOIN (SELECT session_id, COUNT(*) as member_count FROM session_members WHERE left_at IS NULL GROUP BY session_id) mc ON mc.session_id = s.id
+		LEFT JOIN LATERAL (SELECT COUNT(*) as member_count FROM session_members WHERE session_id = s.id AND left_at IS NULL) mc ON true
 		WHERE s.dissolved = false
 		ORDER BY sm.pinned DESC, COALESCE(s.last_message_at, s.created_at) DESC
 		LIMIT 500
@@ -97,7 +97,7 @@ func ListWorkspaceSessions(db *gorm.DB, workspaceID, userID string) ([]SessionWi
 			COALESCE(mc.member_count, 0) as member_count
 		FROM sessions s
 		INNER JOIN session_members sm ON sm.session_id = s.id AND sm.member_id = ? AND sm.left_at IS NULL
-		LEFT JOIN (SELECT session_id, COUNT(*) as member_count FROM session_members WHERE left_at IS NULL GROUP BY session_id) mc ON mc.session_id = s.id
+		LEFT JOIN LATERAL (SELECT COUNT(*) as member_count FROM session_members WHERE session_id = s.id AND left_at IS NULL) mc ON true
 		WHERE s.workspace_id = ? AND s.dissolved = false
 		ORDER BY sm.pinned DESC, COALESCE(s.last_message_at, s.created_at) DESC
 		LIMIT 500

@@ -767,6 +767,9 @@ func TestSessionRepo_TouchLastMessage(t *testing.T) {
 }
 
 func TestSessionRepo_ListUserSessions(t *testing.T) {
+	// ListUserSessions uses LATERAL (PG-only syntax) for member_count (#2102 F1).
+	// Behavior equivalence is tested in session_member_count_test.go with real PG.
+	t.Skip("LATERAL requires PostgreSQL; see session_member_count_test.go")
 	db := setupSQLite(t)
 
 	s := &model.Session{Type: model.SessionTypeGroup, Name: "ListGroup"}
