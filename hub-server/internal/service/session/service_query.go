@@ -26,11 +26,14 @@ func (s *Service) ListActiveMembers(sessionID string) ([]*model.SessionMember, e
 
 // cleanupInvitedAgents cancels pending tasks, deletes agent instances, and soft-deletes
 // session member records for all agents a user invited into a session. It paginates
-// through agents (page size 100, max 10 pages = 1000 agents) and wraps the three
-// per-agent operations in a single DB transaction for atomicity.
+// through agents (page size 100, max 10 pages = 1000 agents) and batches the three
+// per-agent operations into single DB calls per page to avoid 3N round-trips (#2102).
 //
-// Errors from individual agents are logged at Warn level and aggregated. The caller
-// receives a joined error so it can decide whether to abort or proceed.
+// Error semantics change vs. the original per-agent loop: each batched operation is
+// executed once per page; if a batch fails, the error is logged and aggregated, but
+// subsequent batches in the same page still run (best-effort parity with the prior
+// continue-on-error behavior). Per-agent granularity is lost at the batch level —
+// callers should treat any returned error as "some subset may have failed".
 func (s *Service) cleanupInvitedAgents(sessionID, inviterUserID string) error {
 	const pageSize = 100
 	const maxPages = 10 // safety bound: max 1000 agents per inviter per session
@@ -46,28 +49,28 @@ func (s *Service) cleanupInvitedAgents(sessionID, inviterUserID string) error {
 			break
 		}
 
-		for _, agent := range agents {
-			// Cancel pending tasks for this agent instance.
-			if err := repository.CancelTasksByAgentInstance(s.db, agent.ID); err != nil {
-				slog.Warn("cleanupInvitedAgents: CancelTasksByAgentInstance failed",
-					"session_id", sessionID, "inviter_user_id", inviterUserID,
-					"agent_id", agent.ID, "error", err)
-				allErrors = append(allErrors, fmt.Errorf("cancel tasks for agent %s: %w", agent.ID, err))
-				// Continue with other operations even if cancel fails — the agent
-				// instance and member record should still be cleaned up.
-			}
-			if err := repository.DeleteAgentInstance(s.db, agent.ID); err != nil {
-				slog.Warn("cleanupInvitedAgents: DeleteAgentInstance failed",
-					"session_id", sessionID, "inviter_user_id", inviterUserID,
-					"agent_id", agent.ID, "error", err)
-				allErrors = append(allErrors, fmt.Errorf("delete agent %s: %w", agent.ID, err))
-			}
-			if err := repository.SoftDeleteMember(s.db, sessionID, model.MemberTypeAgent, agent.ID); err != nil {
-				slog.Warn("cleanupInvitedAgents: SoftDeleteMember failed",
-					"session_id", sessionID, "inviter_user_id", inviterUserID,
-					"agent_id", agent.ID, "error", err)
-				allErrors = append(allErrors, fmt.Errorf("soft delete member for agent %s: %w", agent.ID, err))
-			}
+		ids := make([]string, 0, len(agents))
+		for _, a := range agents {
+			ids = append(ids, a.ID)
+		}
+
+		if err := repository.BatchCancelTasksByAgentInstance(s.db, ids); err != nil {
+			slog.Warn("cleanupInvitedAgents: BatchCancelTasksByAgentInstance failed",
+				"session_id", sessionID, "inviter_user_id", inviterUserID,
+				"count", len(ids), "error", err)
+			allErrors = append(allErrors, fmt.Errorf("batch cancel tasks page %d: %w", page, err))
+		}
+		if err := repository.BatchDeleteAgentInstances(s.db, ids); err != nil {
+			slog.Warn("cleanupInvitedAgents: BatchDeleteAgentInstances failed",
+				"session_id", sessionID, "inviter_user_id", inviterUserID,
+				"count", len(ids), "error", err)
+			allErrors = append(allErrors, fmt.Errorf("batch delete agents page %d: %w", page, err))
+		}
+		if err := repository.BatchSoftDeleteMembers(s.db, sessionID, model.MemberTypeAgent, ids); err != nil {
+			slog.Warn("cleanupInvitedAgents: BatchSoftDeleteMembers failed",
+				"session_id", sessionID, "inviter_user_id", inviterUserID,
+				"count", len(ids), "error", err)
+			allErrors = append(allErrors, fmt.Errorf("batch soft delete members page %d: %w", page, err))
 		}
 	}
 

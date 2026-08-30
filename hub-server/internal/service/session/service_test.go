@@ -676,9 +676,9 @@ func TestDeleteForMe_OwnerWithOtherMembersRejected(t *testing.T) {
 		WillReturnRows(sqlmock.NewRows([]string{"id", "session_id", "member_type", "member_id", "role"}).
 			AddRow("mem-1", "sess-1", "user", "owner-1", "owner"))
 
-	// ListActiveMembers: other active members exist
-	mock.ExpectQuery(regexp.QuoteMeta(`SELECT * FROM "session_members" WHERE`)).
-		WithArgs(sqlmock.AnyArg()).
+	// ListActiveMembers (now LIMIT 500): other active members exist
+	mock.ExpectQuery(regexp.QuoteMeta(`SELECT * FROM "session_members" WHERE session_id = $1 AND left_at IS NULL LIMIT $2`)).
+		WithArgs("sess-1", 500).
 		WillReturnRows(sqlmock.NewRows([]string{"id", "session_id", "member_type", "member_id", "role"}).
 			AddRow("mem-1", "sess-1", "user", "owner-1", "owner").
 			AddRow("mem-2", "sess-1", "user", "user-2", "member"))
@@ -722,23 +722,22 @@ func TestRemoveGroupMember_CleansUpInvitedAgents(t *testing.T) {
 		WillReturnRows(sqlmock.NewRows([]string{"id", "agent_type", "session_id", "inviter_user_id", "display_name"}).
 			AddRow("agent-1", "claude-code", "sess-1", "u2", "Claude"))
 
-	// Per-agent cleanup for page-0 results happens BEFORE the page-1 query.
-	// CancelTasksByAgentInstance (wrapped in auto-transaction by GORM)
+	// Per-page batched cleanup (#2102): BatchCancelTasksByAgentInstance
 	mock.ExpectBegin()
 	mock.ExpectExec(regexp.QuoteMeta(`UPDATE "pending_agent_tasks" SET`)).
 		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectCommit()
 
-	// DeleteAgentInstance (wrapped in auto-transaction by GORM)
+	// BatchDeleteAgentInstances
 	mock.ExpectBegin()
-	mock.ExpectExec(regexp.QuoteMeta(`DELETE FROM "agent_instances" WHERE id = $1`)).
+	mock.ExpectExec(regexp.QuoteMeta(`DELETE FROM "agent_instances" WHERE id IN ($1)`)).
 		WithArgs("agent-1").
 		WillReturnResult(sqlmock.NewResult(1, 1))
 	mock.ExpectCommit()
 
-	// SoftDeleteMember for agent (wrapped in auto-transaction by GORM)
+	// BatchSoftDeleteMembers for agent
 	mock.ExpectBegin()
-	mock.ExpectExec(regexp.QuoteMeta(`UPDATE "session_members" SET "left_at"=$1 WHERE session_id = $2 AND member_type = $3 AND member_id = $4 AND left_at IS NULL`)).
+	mock.ExpectExec(regexp.QuoteMeta(`UPDATE "session_members" SET "left_at"=$1 WHERE session_id = $2 AND member_type = $3 AND member_id IN ($4) AND left_at IS NULL`)).
 		WithArgs(sqlmock.AnyArg(), "sess-1", "agent_instance", "agent-1").
 		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectCommit()
@@ -881,9 +880,9 @@ func TestDissolveGroup_CleansUpAgentTasks(t *testing.T) {
 		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectCommit()
 
-	// ListActiveMembers: returns owner-1 (human) + u2 (human, has agent)
-	mock.ExpectQuery(regexp.QuoteMeta(`SELECT * FROM "session_members" WHERE`)).
-		WithArgs(sqlmock.AnyArg()).
+	// ListActiveMembers (now LIMIT 500): returns owner-1 (human) + u2 (human, has agent)
+	mock.ExpectQuery(regexp.QuoteMeta(`SELECT * FROM "session_members" WHERE session_id = $1 AND left_at IS NULL LIMIT $2`)).
+		WithArgs("sess-1", 500).
 		WillReturnRows(sqlmock.NewRows([]string{"id", "session_id", "member_type", "member_id", "role"}).
 			AddRow("mem-1", "sess-1", "user", "owner-1", "owner").
 			AddRow("mem-2", "sess-1", "user", "u2", "member"))
@@ -899,22 +898,22 @@ func TestDissolveGroup_CleansUpAgentTasks(t *testing.T) {
 		WillReturnRows(sqlmock.NewRows([]string{"id", "agent_type", "session_id", "inviter_user_id", "display_name"}).
 			AddRow("agent-1", "claude-code", "sess-1", "u2", "Claude"))
 
-	// Agent cleanup: CancelTasksByAgentInstance
+	// Agent cleanup (batched per #2102): BatchCancelTasksByAgentInstance
 	mock.ExpectBegin()
 	mock.ExpectExec(regexp.QuoteMeta(`UPDATE "pending_agent_tasks" SET`)).
 		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectCommit()
 
-	// Agent cleanup: DeleteAgentInstance
+	// Agent cleanup (batched): BatchDeleteAgentInstances
 	mock.ExpectBegin()
-	mock.ExpectExec(regexp.QuoteMeta(`DELETE FROM "agent_instances" WHERE id = $1`)).
+	mock.ExpectExec(regexp.QuoteMeta(`DELETE FROM "agent_instances" WHERE id IN ($1)`)).
 		WithArgs("agent-1").
 		WillReturnResult(sqlmock.NewResult(1, 1))
 	mock.ExpectCommit()
 
-	// Agent cleanup: SoftDeleteMember for agent
+	// Agent cleanup (batched): BatchSoftDeleteMembers
 	mock.ExpectBegin()
-	mock.ExpectExec(regexp.QuoteMeta(`UPDATE "session_members" SET "left_at"=$1 WHERE session_id = $2 AND member_type = $3 AND member_id = $4 AND left_at IS NULL`)).
+	mock.ExpectExec(regexp.QuoteMeta(`UPDATE "session_members" SET "left_at"=$1 WHERE session_id = $2 AND member_type = $3 AND member_id IN ($4) AND left_at IS NULL`)).
 		WithArgs(sqlmock.AnyArg(), "sess-1", "agent_instance", "agent-1").
 		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectCommit()

@@ -74,20 +74,20 @@ func UpsertFriendship(db *gorm.DB, f *model.Friendship) error {
 func ListReceivedRequests(db *gorm.DB, userID string) ([]model.Friendship, error) {
 	var requests []model.Friendship
 	err := db.Where("friend_id = ? AND status = ?", userID, model.StatusPending).
-		Order("created_at DESC").Find(&requests).Error
+		Order("created_at DESC").Limit(500).Find(&requests).Error
 	return requests, err
 }
 
 func ListSentRequests(db *gorm.DB, userID string) ([]model.Friendship, error) {
 	var requests []model.Friendship
 	err := db.Where("user_id = ? AND status = ?", userID, model.StatusPending).
-		Order("created_at DESC").Find(&requests).Error
+		Order("created_at DESC").Limit(500).Find(&requests).Error
 	return requests, err
 }
 
 func ListAcceptedFriends(db *gorm.DB, userID string) ([]model.Friendship, error) {
 	var friends []model.Friendship
-	err := db.Where("user_id = ? AND status = ?", userID, model.StatusAccepted).Find(&friends).Error
+	err := db.Where("user_id = ? AND status = ?", userID, model.StatusAccepted).Limit(500).Find(&friends).Error
 	return friends, err
 }
 
