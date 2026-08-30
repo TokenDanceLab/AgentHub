@@ -15,6 +15,7 @@
  "edge-server/tests/hub_e2e_test.go": 4,
  "hub-server/internal/app/background_test.go": 2,
  "hub-server/internal/bus/bus_test.go": 1,
+ "hub-server/internal/bus/publish_close_stress_test.go": 3,
  "hub-server/internal/cache/client_test.go": 2,
  "hub-server/internal/middleware/rate_limit_test.go": 1,
  "hub-server/internal/middleware/timeout_test.go": 3,
