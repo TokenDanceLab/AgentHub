@@ -308,6 +308,9 @@ func (a *App) startServer(ctx context.Context) error {
 	// Periodic metrics collection
 	a.startMetricsCollector(a.bg.Ctx())
 
+	// JWT key rotation scheduler (opt-in via AGENTHUB_JWT_ROTATION_ENABLED).
+	a.maybeStartJWTRotation(a.bg.Ctx())
+
 	// Wait for shutdown signal
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)

@@ -220,6 +220,17 @@
    { "ms": 50, "kind": "simulated_slow" }
   ]
  },
+ "hub-server/internal/jwtutil/scheduler_test.go": {
+  "count": 1,
+  "total_ms": 20,
+  "max_ms": 20,
+  "owner": "DeliciousBuding",
+  "review": "2026-08-30",
+  "reason": "TestScheduler_RunsImmediatelyAndOnTick: 20ms grace for the immediate-rotation pass before cancel; one-shot, not per-iteration (#2089 JWT rotation scheduler).",
+  "sleeps": [
+   { "ms": 20, "kind": "grace_window" }
+  ]
+ },
  "hub-server/internal/middleware/rate_limit_test.go": {
   "count": 1,
   "total_ms": 100,
