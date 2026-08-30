@@ -1,5 +1,7 @@
 # AGENTS.md - AgentHub 项目总规则
 
+> 最后更新：2026-08-29
+
 本文件是 AgentHub 的**项目总规则唯一入口**。Claude Code、Codex 和其他 Agent 都读本文件；本仓库不再维护 `CLAUDE.md` 或第二套根级规则。
 
 ## 0. 事实源优先级
@@ -68,6 +70,17 @@ Mobile 主线是 Expo + React Native development build。旧 Tauri Mobile 不再
 - Web 只能通过 Hub/Web adapter 访问远端能力，不能直连 Local Edge 或 runtime。
 - Mobile（Expo/RN）同样 **Hub-only**：只走 Hub 合同与 shared hubClient；不得直连 Local Edge、raw runtime 或 Desktop host。详见 `app/mobile-rn/README.md`。
 - Desktop renderer 不获得 raw process execution 权限；本地执行由 Local Edge 和 Tauri host typed API 承担。
+
+## 2.5 宏观工程设计基线
+
+设计判据 SSOT：`docs/architecture/10-macro-engineering-design.md`（双平面、协议分层、事件一致性、最小代理权、可观测）。
+
+- Hub 是控制面，不执行模型 Turn；任务调度是确定性 supervisor，LLM 只能提建议，不能改路由/授权/审批状态机。
+- Hub/Edge 自有 REST/WS 是产品契约 SSOT；MCP/A2A/AG-UI 只做 capability mapping，不并行引入三套内部协议。
+- Hub→Edge 交付必须 at-least-once：稳定 event/delivery id + 幂等 consumer + 可审计重试；outbox 同事务、event version 与 snapshot 要能审计，禁止 fire-and-forget。
+- 授权走最小代理权：task-scoped 凭据 + per-action 授权；secret 不进 agent context/sandbox；能力流量经 typed platform contract / gateway。
+- Run/tool/model/token/cost 观测按 OTel GenAI conventions；证据等级与 `real_tested` 继续是真实性唯一口径。
+- 改动授权、审批、远程执行、可观测或引入新 agent 协议前，先读该文档的差距矩阵与 anti-goals。
 
 ## 3. 产品术语
 
@@ -249,6 +262,8 @@ UI 工作流变更必须有行为断言，不只截图：共享 unit/contract + 
 3. 开发、测试、端到端验收其次。
 4. 完成后更新 GitHub issue/PR、验收证据和归档计划。
 5. 专项完成后，把专项 SPEC 与证据外迁到 `docs/history.md` 指向的外部归档，并更新历史索引。
+
+- 大型 agent 任务以 Issue 为 spec：必须含 Summary/Scope/Files/Interfaces/Invariants/Acceptance/Negative Constraints/Dependencies/File Ownership；缺项先补 spec 再派发。
 
 短任务（单文件修复、typo、小改动）不需要完整 SPEC，但仍必须遵守本文件的范围、隐私和验证规则。
 
