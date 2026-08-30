@@ -165,6 +165,46 @@ func (m *Manager) PushToUser(userID string, frame Frame) FanoutResult {
 	return res
 }
 
+// PushToDevice delivers a frame to the single connection currently registered
+// for the given deviceID (see Manager.byDevice). Unlike PushToUser, which fans
+// out to every connection of a user, this targets exactly one edge device so
+// relay commands reach the intended runtime instead of being silently dropped
+// on a userID-keyed lookup. Returns an empty FanoutResult when no connection
+// is registered for the device.
+func (m *Manager) PushToDevice(deviceID string, frame Frame) FanoutResult {
+	if deviceID == "" {
+		return FanoutResult{}
+	}
+	m.mu.RLock()
+	connID, ok := m.byDevice[deviceID]
+	m.mu.RUnlock()
+	if !ok {
+		return FanoutResult{}
+	}
+	r := m.PushToConn(connID, frame)
+	res := FanoutResult{Conns: 1}
+	switch r.Status {
+	case DeliveryStatusQueued:
+		res.Queued = 1
+	case DeliveryStatusBufferFull:
+		res.Dropped = 1
+		if shouldLogDrop(r.ConnDrops) {
+			res.LogSampled = true
+		}
+	default:
+		res.Failed = 1
+	}
+	if res.LogSampled {
+		slog.Warn("ws push to device dropped frames: send buffer full",
+			"device_id", deviceID,
+			"frame_type", frame.Type,
+			"queued", res.Queued,
+			"dropped", res.Dropped,
+		)
+	}
+	return res
+}
+
 // PushToSession fans a frame out to every member of a session and aggregates
 // the delivery results across members. Aggregate drop logging follows the same
 // per-connection sampling as PushToUser.

@@ -71,7 +71,7 @@ func (s *Service) CreateCommand(ctx context.Context, targetEdgeID, commandType s
 		"command_type":     commandType,
 		"payload":          string(payload),
 	})
-	fanout := s.mgr.PushToUser(targetEdgeID, frame)
+	fanout := s.mgr.PushToDevice(targetEdgeID, frame)
 
 	if metrics.RelayCommandsCreated != nil {
 		metrics.RelayCommandsCreated.Inc()
