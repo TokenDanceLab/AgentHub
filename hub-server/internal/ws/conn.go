@@ -68,6 +68,7 @@ var (
 	ErrDeliveryMarshalError = errors.New("websocket frame marshal failed")
 	ErrDeliveryBufferFull   = errors.New("websocket send buffer full")
 	ErrPerUserCapReached    = errors.New("websocket per-user connection cap reached")
+	ErrShutdownInProgress   = errors.New("websocket manager shutdown in progress")
 )
 
 func (c *Conn) SetAuth(userID, deviceType, deviceID string) {
