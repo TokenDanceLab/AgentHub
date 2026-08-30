@@ -47,3 +47,44 @@ describe('Desktop settings i18n locales', () => {
     }
   });
 });
+
+// #2072 P1: error.startConversation + devices.pingOk/pingFailed must exist in
+// both locales so t() never falls back to the raw key name on screen.
+const errorUxP1Keys = [
+  'error.startConversation',
+  'error.cancelRunFailed',
+  'devices.pingOk',
+  'devices.pingFailed',
+  'error.code.auth_invalid_token',
+  'error.code.auth_token_expired',
+  'error.code.workspace_not_allowed',
+  'error.code.agent_offline',
+  'error.code.target_not_routable',
+];
+
+describe('Desktop error UX P1 i18n keys (#2072)', () => {
+  it('defines every P1 error key in zh and en', () => {
+    const zhKeys = new Set(Object.keys(zh));
+    const enKeys = new Set(Object.keys(en));
+    expect(errorUxP1Keys.filter((k) => !zhKeys.has(k))).toEqual([]);
+    expect(errorUxP1Keys.filter((k) => !enKeys.has(k))).toEqual([]);
+  });
+
+  it('does not render P1 error keys as their own fallback text', () => {
+    for (const key of errorUxP1Keys) {
+      expect(zh[key as keyof typeof zh], `zh ${key}`).toBeTruthy();
+      expect(en[key as keyof typeof en], `en ${key}`).toBeTruthy();
+      expect(zh[key as keyof typeof zh], `zh ${key}`).not.toBe(key);
+      expect(en[key as keyof typeof en], `en ${key}`).not.toBe(key);
+    }
+  });
+
+  it('keeps zh copy free of raw English technical strings', () => {
+    // Guard against accidentally pasting backend English into zh locale.
+    const technicalEnglish = /\b(HTTP|proxy|stack|TypeError|ReferenceError|node:|fetch|abort)\b/i;
+    for (const key of errorUxP1Keys) {
+      const value = zh[key as keyof typeof zh];
+      expect(value, `zh ${key} contains technical English`).not.toMatch(technicalEnglish);
+    }
+  });
+});
