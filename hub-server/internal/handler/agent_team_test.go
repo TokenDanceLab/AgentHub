@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/agenthub/hub-server/internal/model"
+	"github.com/agenthub/hub-server/internal/service/agentteam"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -198,29 +199,32 @@ func TestAgentTeamHandler_DecideApproval(t *testing.T) {
 }
 
 type mockAgentTeamService struct {
-	createTeam          func(ctx context.Context, userID, name, description string) (*model.AgentTeam, error)
-	listTeams           func(ctx context.Context, userID string) ([]model.AgentTeam, error)
-	getTeamWithMembers  func(ctx context.Context, userID, teamID string) (*model.TeamDetail, error)
-	addTeamMember       func(ctx context.Context, userID, teamID, agentProfileID, role string) error
-	updateTeam          func(ctx context.Context, userID, teamID, name, description string) error
-	deleteTeam          func(ctx context.Context, userID, teamID string) error
-	removeTeamMember    func(ctx context.Context, userID, teamID, memberID string) error
-	startTeamRun        func(ctx context.Context, userID, teamID, triggerMessage, targetID string) (*model.AgentTeamRun, error)
-	listTeamRuns        func(ctx context.Context, userID, teamID string) ([]model.AgentTeamRun, error)
-	getTeamRun          func(ctx context.Context, userID, teamID, runID string) (*model.AgentTeamRun, error)
-	getTeamRunState     func(ctx context.Context, userID, teamID, runID string) (*model.TeamRunState, error)
-	createAssignment    func(ctx context.Context, userID, teamRunID, fromMemberID, toMemberID, aType, taskPrompt, contextStr string) (*model.AgentTeamAssignment, error)
-	dispatchAssignment  func(ctx context.Context, userID, assignmentID string) error
-	completeAssignment  func(ctx context.Context, userID, assignmentID string, result string) error
-	failAssignment      func(ctx context.Context, userID, assignmentID string, reason string) error
-	listAssignments     func(ctx context.Context, userID, teamRunID string) ([]model.AgentTeamAssignment, error)
-	handleRouteDecision func(ctx context.Context, userID, teamID, runID string, decision model.CoordinatorRouteDecision) (*model.AgentTeamAssignment, error)
-	listTeamTasks       func(ctx context.Context, userID, teamID, runID string) ([]model.AgentTeamTask, error)
-	listTeamEvents      func(ctx context.Context, userID, teamID, runID string) ([]model.AgentTeamEvent, error)
-	resolveConflict     func(ctx context.Context, userID, teamID, runID string, resolution model.TeamConflictResolution) (*model.TeamConflictState, error)
-	decideApproval      func(ctx context.Context, userID, teamID, runID, approvalID string, decision model.TeamApprovalDecision) (*model.TeamApprovalState, error)
-	competeSummary      func(ctx context.Context, userID, runID string, req model.CompeteSummaryRequest) (*model.CompeteSummaryResponse, error)
-	reviewDagPlan       func(ctx context.Context, userID, runID string, decision model.HumanReviewDecision) (*model.HumanReviewState, error)
+	createTeam                  func(ctx context.Context, userID, name, description string) (*model.AgentTeam, error)
+	listTeams                   func(ctx context.Context, userID string) ([]model.AgentTeam, error)
+	getTeamWithMembers          func(ctx context.Context, userID, teamID string) (*model.TeamDetail, error)
+	addTeamMember               func(ctx context.Context, userID, teamID, agentProfileID, role string) error
+	updateTeam                  func(ctx context.Context, userID, teamID, name, description string) error
+	deleteTeam                  func(ctx context.Context, userID, teamID string) error
+	removeTeamMember            func(ctx context.Context, userID, teamID, memberID string) error
+	startTeamRun                func(ctx context.Context, userID, teamID, triggerMessage, targetID string) (*model.AgentTeamRun, error)
+	listTeamRuns                func(ctx context.Context, userID, teamID string) ([]model.AgentTeamRun, error)
+	getTeamRun                  func(ctx context.Context, userID, teamID, runID string) (*model.AgentTeamRun, error)
+	getTeamRunState             func(ctx context.Context, userID, teamID, runID string) (*model.TeamRunState, error)
+	createAssignment            func(ctx context.Context, userID, teamRunID, fromMemberID, toMemberID, aType, taskPrompt, contextStr string) (*model.AgentTeamAssignment, error)
+	dispatchAssignment          func(ctx context.Context, userID, assignmentID string) error
+	completeAssignment          func(ctx context.Context, userID, assignmentID string, result string) error
+	failAssignment              func(ctx context.Context, userID, assignmentID string, reason string) error
+	listAssignments             func(ctx context.Context, userID, teamRunID string) ([]model.AgentTeamAssignment, error)
+	handleRouteDecision         func(ctx context.Context, userID, teamID, runID string, decision model.CoordinatorRouteDecision) (*model.AgentTeamAssignment, error)
+	listTeamTasks               func(ctx context.Context, userID, teamID, runID string) ([]model.AgentTeamTask, error)
+	listTeamEvents              func(ctx context.Context, userID, teamID, runID string) ([]model.AgentTeamEvent, error)
+	resolveConflict             func(ctx context.Context, userID, teamID, runID string, resolution model.TeamConflictResolution) (*model.TeamConflictState, error)
+	decideApproval              func(ctx context.Context, userID, teamID, runID, approvalID string, decision model.TeamApprovalDecision) (*model.TeamApprovalState, error)
+	competeSummary              func(ctx context.Context, userID, runID string, req model.CompeteSummaryRequest) (*model.CompeteSummaryResponse, error)
+	reviewDagPlan               func(ctx context.Context, userID, runID string, decision model.HumanReviewDecision) (*model.HumanReviewState, error)
+	checkTeamAccess             func(ctx context.Context, userID, teamID string, minRole agentteam.TeamRole) error
+	resolveTeamIDFromRun        func(ctx context.Context, runID string) (string, error)
+	resolveTeamIDFromAssignment func(ctx context.Context, assignmentID string) (string, error)
 }
 
 func (m *mockAgentTeamService) CreateTeam(ctx context.Context, userID, name, description string) (*model.AgentTeam, error) {
@@ -386,6 +390,27 @@ func (m *mockAgentTeamService) ReviewDagPlan(ctx context.Context, userID, runID 
 		return nil, nil
 	}
 	return m.reviewDagPlan(ctx, userID, runID, decision)
+}
+
+func (m *mockAgentTeamService) CheckTeamAccess(ctx context.Context, userID, teamID string, minRole agentteam.TeamRole) error {
+	if m.checkTeamAccess == nil {
+		return nil
+	}
+	return m.checkTeamAccess(ctx, userID, teamID, minRole)
+}
+
+func (m *mockAgentTeamService) ResolveTeamIDFromRun(ctx context.Context, runID string) (string, error) {
+	if m.resolveTeamIDFromRun == nil {
+		return "", nil
+	}
+	return m.resolveTeamIDFromRun(ctx, runID)
+}
+
+func (m *mockAgentTeamService) ResolveTeamIDFromAssignment(ctx context.Context, assignmentID string) (string, error) {
+	if m.resolveTeamIDFromAssignment == nil {
+		return "", nil
+	}
+	return m.resolveTeamIDFromAssignment(ctx, assignmentID)
 }
 func TestAgentTeamHandler_CreateTeam(t *testing.T) {
 	gin.SetMode(gin.TestMode)
