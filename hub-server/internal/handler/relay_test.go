@@ -13,19 +13,19 @@ import (
 
 func TestRelayHandlerCreateCommandAcceptsTargetIDAlias(t *testing.T) {
 	svc := &mockRelayService{
-		createFn: func(ctx context.Context, targetEdgeID, commandType string, payload json.RawMessage, createdBy string) (*relay.CommandData, error) {
+		createFn: func(ctx context.Context, targetEdgeID, commandType string, payload json.RawMessage, createdBy string) (*relay.CreateResult, error) {
 			require.Equal(t, "edge-1", targetEdgeID)
 			require.Equal(t, "run.cancel", commandType)
 			require.JSONEq(t, `{"run_id":"run-1"}`, string(payload))
 			require.Equal(t, "user-1", createdBy)
-			return &relay.CommandData{
+			return &relay.CreateResult{Command: &relay.CommandData{
 				ID:           "relay-1",
 				TargetEdgeID: targetEdgeID,
 				CommandType:  commandType,
 				Payload:      payload,
 				Status:       "pending",
 				CreatedBy:    createdBy,
-			}, nil
+			}}, nil
 		},
 	}
 	h := handler.NewRelayHandler(svc)
@@ -81,17 +81,17 @@ func TestRelayHandlerCreateCommandRejectsMissingTargetOrPayload(t *testing.T) {
 
 type mockRelayService struct {
 	createCalled bool
-	createFn     func(ctx context.Context, targetEdgeID, commandType string, payload json.RawMessage, createdBy string) (*relay.CommandData, error)
+	createFn     func(ctx context.Context, targetEdgeID, commandType string, payload json.RawMessage, createdBy string) (*relay.CreateResult, error)
 	getFn        func(ctx context.Context, id string, userID string) (*relay.CommandData, error)
 	ackFn        func(ctx context.Context, id string, userID string) error
 }
 
-func (m *mockRelayService) CreateCommand(ctx context.Context, targetEdgeID, commandType string, payload json.RawMessage, createdBy string) (*relay.CommandData, error) {
+func (m *mockRelayService) CreateCommand(ctx context.Context, targetEdgeID, commandType string, payload json.RawMessage, createdBy string) (*relay.CreateResult, error) {
 	m.createCalled = true
 	if m.createFn != nil {
 		return m.createFn(ctx, targetEdgeID, commandType, payload, createdBy)
 	}
-	return nil, nil
+	return &relay.CreateResult{Command: &relay.CommandData{}}, nil
 }
 
 func (m *mockRelayService) GetCommand(ctx context.Context, id string, userID string) (*relay.CommandData, error) {

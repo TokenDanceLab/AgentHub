@@ -279,19 +279,34 @@ func (s *DispatchService) dispatchUnboundInviterDesktop(ctx context.Context, tas
 }
 
 // dispatchRouteHubRelay sends the task through the relay service; failures
-// fall back to the offline target queue.
+// fall back to the offline target queue. When the WS push does not reach an
+// active connection the task stays queued so the outbox retry loop can
+// redeliver; only a confirmed live push marks the delivery sent (#2073).
 func (s *DispatchService) dispatchRouteHubRelay(ctx context.Context, task *model.PendingAgentTask, ai *model.AgentInstance, payload []byte, deliveryID string, cacheClient dispatchCache) {
-	err := s.relay.CreateCommand(ctx, ai.InviterUserID, dispatch.AgentDispatchRelayCommand, json.RawMessage(payload), ai.InviterUserID)
+	pushReached, err := s.relay.CreateCommand(ctx, ai.InviterUserID, dispatch.AgentDispatchRelayCommand, json.RawMessage(payload), ai.InviterUserID)
 	if !dispatch.HubRelayCreateSucceeded(err) {
 		slog.Error(dispatch.DispatchLogRelayCreateFailed, "task_id", task.ID, "user_id", ai.InviterUserID, "error", err)
 		s.pushPendingTargetTaskOffline(ctx, task, ai, payload, cacheClient)
 		return
 	}
+	if !pushReached {
+		// Command persisted in Redis but no active WS connection received it.
+		// Leave the task queued and the outbox row pending so the existing
+		// retry→dead-letter path can redeliver when the edge reconnects.
+		slog.Info("relay push did not reach active connection; leaving task queued for outbox retry",
+			"task_id", task.ID, "user_id", ai.InviterUserID)
+		if metrics.RelayPushNoConn != nil {
+			metrics.RelayPushNoConn.Inc()
+		}
+		return
+	}
 	if err := repository.UpdatePendingTaskDispatched(s.db, task.ID, task.EdgeDeviceID); !dispatch.RepoUpdateSucceeded(err) {
 		slog.Error(dispatch.DispatchLogMarkHubRelayDispatched, "task_id", task.ID, "user_id", ai.InviterUserID, "error", err)
 	}
-	// Hub-relay success marks the delivery sent with the relay result ("live");
-	// the original code intentionally ignored the mark error here.
+	// Hub-relay live push confirmed: mark the delivery sent.
+	if metrics.RelayPushDelivered != nil {
+		metrics.RelayPushDelivered.Inc()
+	}
 	if dispatch.PlanLiveDispatchMark(deliveryID) {
 		_ = s.markDeliverySent(ctx, deliveryID)
 	}
