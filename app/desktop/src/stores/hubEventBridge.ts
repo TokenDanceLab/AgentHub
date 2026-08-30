@@ -148,6 +148,18 @@ function onSessionDissolved(qc: QueryClient, payload: unknown) {
     invalidateQuery(qc, hubQueryKeys.threads.messages(sessionId));
   }
   invalidateAllWithPrefix(qc, hubQueryKeys.threads.root);
+
+  // Surface a user-visible toast so "session dissolved" is not silently
+  // swallowed as a cache invalidation (#2072 P2-⑰).
+  try {
+    const i18n = getI18n();
+    const message = i18n?.isInitialized
+      ? i18n.t('hub.toast.sessionDissolved', 'This session has been dissolved')
+      : 'This session has been dissolved';
+    useToastStore.getState().addToast({ type: 'info', message });
+  } catch {
+    // i18n or toast store unavailable — non-fatal
+  }
 }
 
 function onSessionMemberJoined(qc: QueryClient, payload: unknown) {
