@@ -25,7 +25,7 @@ import (
 // - Active members (left_at IS NULL) are counted
 // - Left members (left_at NOT NULL) are NOT counted
 // - Sessions with no members return member_count = 0
-// This test uses a temporary PG database to validate the LATERAL rewrite (#2102 F1).
+// This test uses a temporary PG database to validate the correlated scalar subquery rewrite (#2102 F1).
 func TestSessionMemberCountBehavior(t *testing.T) {
 	db, cleanup := setupTempPG(t)
 	defer cleanup()
@@ -126,8 +126,8 @@ func TestSessionMemberCountBehavior(t *testing.T) {
 }
 
 // TestSessionMemberCountPlanNoFullTableAggregate verifies that the query plan
-// for ListUserSessions does not contain a full-table HashAggregate on session_members.
-// This is the core performance fix for #2102 F1.
+// for ListUserSessions uses index scans (not full-table Seq Scan) on session_members
+// for the correlated scalar subquery. This is the core performance fix for #2102 F1.
 func TestSessionMemberCountPlanNoFullTableAggregate(t *testing.T) {
 	db, cleanup := setupTempPG(t)
 	defer cleanup()
@@ -135,12 +135,11 @@ func TestSessionMemberCountPlanNoFullTableAggregate(t *testing.T) {
 	sqlDB, err := db.DB()
 	require.NoError(t, err)
 
-	// EXPLAIN the ListUserSessions query pattern
+	// EXPLAIN the ListUserSessions query pattern (correlated scalar subquery form)
 	explainSQL := `EXPLAIN SELECT s.*, sm.role, sm.pinned, sm.archived, sm.muted, sm.last_read_seq,
-		COALESCE(mc.member_count, 0) as member_count
+		(SELECT COUNT(*) FROM session_members sm2 WHERE sm2.session_id = s.id AND sm2.left_at IS NULL) as member_count
 	FROM sessions s
 	INNER JOIN session_members sm ON sm.session_id = s.id AND sm.member_id = $1 AND sm.left_at IS NULL
-	LEFT JOIN LATERAL (SELECT COUNT(*) as member_count FROM session_members WHERE session_id = s.id AND left_at IS NULL) mc ON true
 	WHERE s.dissolved = false
 	ORDER BY sm.pinned DESC, COALESCE(s.last_message_at, s.created_at) DESC
 	LIMIT 500`
@@ -162,9 +161,8 @@ func TestSessionMemberCountPlanNoFullTableAggregate(t *testing.T) {
 		planText += l + "\n"
 	}
 
-	// The old plan had "HashAggregate" + "Seq Scan on session_members" for the subquery.
-	// The new plan should use Index Scan (via idx_session_members_unique or idx_session_members_session_left).
-	// We assert absence of the problematic pattern.
+	// The correlated scalar subquery should use idx_session_members_session_left
+	// for an Index Only Scan / Index Scan, avoiding any Seq Scan on session_members.
 	require.NotContains(t, planText, "Seq Scan on session_members",
 		"Plan should not contain Seq Scan on session_members (full table scan). Plan:\n%s", planText)
 
