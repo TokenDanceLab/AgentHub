@@ -110,6 +110,7 @@ function MobileAppContent({ preview }: { preview: PreviewOptions }): React.React
   // account surface once the auth assembly is mounted. `missing` so the demo
   // never claims a live session before one exists.
   const [hubSessionStatus, setHubSessionStatus] = useState<Extract<HubSessionSnapshot['status'], 'active' | 'missing'>>('missing');
+  const [sessionRestoreError, setSessionRestoreError] = useState<string | undefined>();
   const [authHandle, setAuthHandle] = useState<CreateExpoMobileAuthSessionResult | undefined>();
   const [authPhase, setAuthPhase] = useState<'idle' | 'signing_in' | 'signing_out'>('idle');
   const [launchSheetMode, setLaunchSheetMode] = useState<MobileInspectorSheetMode | undefined>();
@@ -205,9 +206,11 @@ function MobileAppContent({ preview }: { preview: PreviewOptions }): React.React
           setPushPermission(result.status);
         }
       })
-      .catch(() => {
+      .catch((pushError: unknown) => {
         if (!cancelled) {
           setPushPermission('unavailable');
+          // eslint-disable-next-line no-console -- push registration failure is user-visible via account status
+          console.warn("[mobile] push registration failed:", pushError);
         }
       });
     return () => {
@@ -282,17 +285,21 @@ function MobileAppContent({ preview }: { preview: PreviewOptions }): React.React
               }
             });
           })
-          .catch(() => {
+          .catch((restoreError: unknown) => {
             /* notifications module unavailable in this runtime — skip */
           })
           .then(() => assembly.authSession.restore())
           .then((snapshot) => {
             if (!cancelled) {
               setHubSessionStatus(snapshot.status === 'active' ? 'active' : 'missing');
+              setSessionRestoreError(undefined);
             }
           })
-          .catch(() => {
-            /* restore failure surfaces as missing; fixture stays the fallback */
+          .catch((restoreError: unknown) => {
+            if (!cancelled) {
+              const raw = restoreError instanceof Error ? restoreError.message : String(restoreError);
+              setSessionRestoreError(raw || t.sessionRestoreFailedDescription);
+            }
           });
       })
       .catch(() => {
@@ -518,6 +525,7 @@ function MobileAppContent({ preview }: { preview: PreviewOptions }): React.React
         onSignIn={handleSignIn}
         onSignOut={handleSignOut}
         authBusy={authPhase !== 'idle'}
+        sessionRestoreError={sessionRestoreError}
       />
     ),
   } satisfies Record<MobileTab, React.ReactNode>;
@@ -1333,8 +1341,8 @@ export default function App(): React.ReactElement {
             >
               <EmptyState
                 icon="danger"
-                title="Something went wrong"
-                description="An unexpected error occurred while rendering this section."
+                title={t.errorBoundaryTitle}
+                description={t.errorBoundaryDescription}
                 action={{ label: t.retry, onPress: retry }}
               />
             </View>

@@ -1,12 +1,14 @@
 import React from 'react';
 
+import { useStrings } from '@/i18n/strings';
+
 import { ErrorNotice } from './ErrorNotice';
 
 interface Props {
   children: React.ReactNode;
   /**
    * Optional custom fallback renderer. Receives a retry callback that clears
-   * the error state and re-renders children. Defaults to ErrorNotice.
+   * the error state and re-renders children. Defaults to DefaultErrorFallback.
    */
   fallback?: (retry: () => void) => React.ReactNode;
 }
@@ -14,6 +16,21 @@ interface Props {
 interface State {
   hasError: boolean;
   error: Error | null;
+}
+
+/**
+ * Localized default fallback for ErrorBoundary. Extracted as a function
+ * component so it can use the useStrings hook (class components cannot).
+ */
+export function DefaultErrorFallback({ onRetry }: { onRetry: () => void }): React.ReactElement {
+  const t = useStrings();
+  return (
+    <ErrorNotice
+      title={t.errorBoundaryTitle}
+      description={t.errorBoundaryDescription}
+      onRetry={onRetry}
+    />
+  );
 }
 
 /** Simple error boundary for mobile surfaces. */
@@ -42,13 +59,7 @@ export class ErrorBoundary extends React.Component<Props, State> {
       if (this.props.fallback) {
         return this.props.fallback(this.handleRetry);
       }
-      return (
-        <ErrorNotice
-          title="Something went wrong"
-          description="An unexpected error occurred while rendering this section."
-          onRetry={this.handleRetry}
-        />
-      );
+      return <DefaultErrorFallback onRetry={this.handleRetry} />;
     }
     return this.props.children;
   }
