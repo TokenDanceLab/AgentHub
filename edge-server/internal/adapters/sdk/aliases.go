@@ -34,4 +34,5 @@ const (
 	BusEventThinking            = orchestration.BusEventThinking
 	BusEventToolCall            = orchestration.BusEventToolCall
 	BusEventToolResult          = orchestration.BusEventToolResult
+	BusEventSessionMetrics      = orchestration.BusEventSessionMetrics
 )

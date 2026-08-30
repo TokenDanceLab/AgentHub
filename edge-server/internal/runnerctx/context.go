@@ -17,6 +17,10 @@ type RunProcessContext struct {
 	// Hub callback bridging
 	HubTaskID string // Hub agent task ID (for Edge→Hub direct callbacks)
 
+	// TraceID correlates this run with the originating Hub dispatch trace.
+	// Populated from the dispatch payload; empty on legacy payloads is safe.
+	TraceID string
+
 	// Session continuity
 	SessionID    string // Specific session to resume
 	ContinueLast bool   // Resume most recent session

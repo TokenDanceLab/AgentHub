@@ -19,6 +19,7 @@ package lifecycle
 import (
 	"fmt"
 	"io"
+	"log/slog"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -96,6 +97,13 @@ func DefaultDecisionLoopConfig() DecisionLoopConfig {
 //  4. Expose loop state for API progress reporting.
 //
 // All exported methods are safe for concurrent use.
+// ApprovalMetricsRecorder abstracts the edge_approval_decisions_total counter
+// so lifecycle stays decoupled from the concrete metrics package (testable with
+// a stub). Nil receivers are safe — Record is a no-op.
+type ApprovalMetricsRecorder interface {
+	RecordApprovalDecision(decision string)
+}
+
 type DecisionLoop struct {
 	cfg DecisionLoopConfig
 
@@ -118,6 +126,10 @@ type DecisionLoop struct {
 	endTimeMu sync.Mutex
 	err       error
 	errMu     sync.Mutex
+
+	// approvalMetrics is optional; when set, ApproveTool/DenyTool increment
+	// edge_approval_decisions_total{decision}. Nil-safe.
+	approvalMetrics ApprovalMetricsRecorder
 }
 
 // NewDecisionLoop creates a new DecisionLoop wrapping the given event stream.
@@ -220,6 +232,10 @@ func (dl *DecisionLoop) ApproveTool(toolCallID string) bool {
 	if ok {
 		ch <- true
 		close(ch)
+		if dl.approvalMetrics != nil {
+			dl.approvalMetrics.RecordApprovalDecision("approve")
+		}
+		slog.Info("approval: tool approved", "tool_call_id", toolCallID, "decision", "approve")
 	}
 	return ok
 }
@@ -236,6 +252,10 @@ func (dl *DecisionLoop) DenyTool(toolCallID string) bool {
 	if ok {
 		ch <- false
 		close(ch)
+		if dl.approvalMetrics != nil {
+			dl.approvalMetrics.RecordApprovalDecision("deny")
+		}
+		slog.Info("approval: tool denied", "tool_call_id", toolCallID, "decision", "deny")
 	}
 	return ok
 }
@@ -250,6 +270,12 @@ func (dl *DecisionLoop) PendingApprovals() []string {
 		ids = append(ids, id)
 	}
 	return ids
+}
+
+// SetApprovalMetrics wires an optional metrics recorder for approval decisions.
+// Safe to call with nil; existing tests that don't set it keep working.
+func (dl *DecisionLoop) SetApprovalMetrics(r ApprovalMetricsRecorder) {
+	dl.approvalMetrics = r
 }
 
 // ── Force Finish ────────────────────────────────────────────────────────────
