@@ -767,6 +767,8 @@ func TestSessionRepo_TouchLastMessage(t *testing.T) {
 }
 
 func TestSessionRepo_ListUserSessions(t *testing.T) {
+	// member_count uses a correlated scalar subquery compatible with both PG and SQLite.
+	// Plan-level assertions are in session_member_count_test.go (PG-only EXPLAIN).
 	db := setupSQLite(t)
 
 	s := &model.Session{Type: model.SessionTypeGroup, Name: "ListGroup"}
