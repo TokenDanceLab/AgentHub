@@ -110,6 +110,9 @@ func (c *Config) Validate() error {
 	if err := c.validateServerEnv(); err != nil {
 		return err
 	}
+	if err := c.validateProdGuard(); err != nil {
+		return err
+	}
 	if err := c.validateDB(); err != nil {
 		return err
 	}
