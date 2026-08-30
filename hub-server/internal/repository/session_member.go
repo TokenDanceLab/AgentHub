@@ -33,7 +33,7 @@ func GetActiveMember(db *gorm.DB, sessionID, memberType, memberID string) (*mode
 
 func ListActiveMembers(db *gorm.DB, sessionID string) ([]*model.SessionMember, error) {
 	var members []*model.SessionMember
-	err := db.Where("session_id = ? AND left_at IS NULL", sessionID).Find(&members).Error
+	err := db.Where("session_id = ? AND left_at IS NULL", sessionID).Limit(500).Find(&members).Error
 	return members, err
 }
 
