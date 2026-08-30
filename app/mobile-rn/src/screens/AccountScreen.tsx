@@ -1,7 +1,7 @@
 import { Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 
 import { AgentHubIcon, type AgentHubIconName } from '@/components/icons';
-import { Badge, Button, MotionPressable } from '@/components/primitives';
+import { Badge, Button, ErrorNotice, MotionPressable } from '@/components/primitives';
 import { useStrings } from '@/i18n/strings';
 import { useNativeCapabilities } from '@/integrations/useNativeCapabilities';
 import { useAgentHubTheme } from '@/theme';
@@ -18,6 +18,8 @@ interface AccountScreenProps {
   onSignOut?: () => void;
   /** True while a login/logout round trip is in flight. */
   authBusy?: boolean;
+  /** When set, displays a session restore failure notice at the top of the account panel. */
+  sessionRestoreError?: string | undefined;
 }
 
 interface AccountMenuItem {
@@ -42,6 +44,7 @@ export function AccountScreen({
   onSignIn,
   onSignOut,
   authBusy = false,
+  sessionRestoreError,
 }: AccountScreenProps): React.ReactElement {
   const { tokens } = useAgentHubTheme();
   const { width } = useWindowDimensions();
@@ -129,6 +132,13 @@ export function AccountScreen({
         }}
       >
         <View style={{ gap: tokens.space.sm }}>
+          {sessionRestoreError ? (
+            <ErrorNotice
+              title={t.sessionRestoreFailedTitle}
+              description={sessionRestoreError}
+              {...(onSignIn ? { onRetry: onSignIn } : {})}
+            />
+          ) : null}
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: tokens.space.md }}>
             <AccountHeroAvatar />
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: tokens.space.xs }}>
