@@ -409,6 +409,7 @@ describe('workbenchTranscriptChromeActionMappers', () => {
       sessionId: 'sess-1',
       successMessage: 'toast.pinUpdated',
       failureMessage: 'toast.pinFailed',
+      failureFallbackKey: 'toast.pinFailed',
     });
     expect(pin.some((e) => e.type === 'toast')).toBe(false);
     expect(pin.some((e) => e.type === 'pulse')).toBe(true);
@@ -420,6 +421,7 @@ describe('workbenchTranscriptChromeActionMappers', () => {
       sessionId: 'sess-1',
       successMessage: 'toast.unpinned',
       failureMessage: 'toast.unpinFailed',
+      failureFallbackKey: 'toast.unpinFailed',
     });
 
     const recall = planContextAction({ action: 'recall', blockId: 'b1', transcript, t, sessionId: 'sess-1' });
@@ -428,6 +430,7 @@ describe('workbenchTranscriptChromeActionMappers', () => {
       messageId: 'b1',
       successMessage: 'toast.recalled',
       failureMessage: 'toast.recallFailed',
+      failureFallbackKey: 'toast.recallFailed',
     });
 
     const react = planContextAction({ action: 'react', blockId: 'b1', transcript, t, sessionId: 'sess-1' });
@@ -438,6 +441,7 @@ describe('workbenchTranscriptChromeActionMappers', () => {
       emoji: '👍',
       successMessage: 'toast.reactionAdded',
       failureMessage: 'toast.reactionFailed',
+      failureFallbackKey: 'toast.reactionFailed',
     });
   });
 
@@ -458,6 +462,7 @@ describe('workbenchTranscriptChromeActionMappers', () => {
       emoji: '🔥',
       successMessage: 'toast.reactionAdded',
       failureMessage: 'toast.reactionFailed',
+      failureFallbackKey: 'toast.reactionFailed',
     });
     expect(picked.some((e) => e.type === 'toast')).toBe(false);
 
@@ -517,6 +522,7 @@ describe('workbenchTranscriptChromeActionMappers', () => {
       targetSessionIds: ['s9', 's10'],
       successMessage: 'toast.forwardQueued',
       failureMessage: 'toast.forwardFailed',
+      failureFallbackKey: 'toast.forwardFailed',
     });
     expect(picked.some((e) => e.type === 'pulse')).toBe(true);
     expect(picked.some((e) => e.type === 'toast')).toBe(false);
@@ -539,6 +545,7 @@ describe('workbenchTranscriptChromeActionMappers', () => {
       targetSessionIds: ids,
       successMessage: 'toast.forwardQueued',
       failureMessage: 'toast.forwardFailed',
+      failureFallbackKey: 'toast.forwardFailed',
     });
   });
 
@@ -776,6 +783,7 @@ describe('workbenchTranscriptChromeActionMappers', () => {
       targetSessionIds: [],
       successMessage: 'toast.forwardQueued',
       failureMessage: 'toast.forwardFailed',
+      failureFallbackKey: 'toast.forwardFailed',
     });
     expect(effects.some((e) => e.type === 'toast')).toBe(false);
   });
