@@ -325,3 +325,43 @@ export function extractCreatedRunId(value: unknown): string {
 }
 
 export const FINAL_OUTPUT_MAX_CHARS = 32_000;
+
+/**
+ * Result of parsing a potential relay command frame.
+ * - `isRelay`: true when the frame carries a relay_command_id
+ * - `data`: the unwrapped dispatch payload (parsed from inner `payload` string for relay frames, or the raw frame for direct dispatches)
+ * - `relayCommandId`: the relay command id when isRelay is true
+ */
+export interface RelayFrameParseResult {
+  isRelay: boolean;
+  data: Record<string, unknown>;
+  relayCommandId: string | null;
+}
+
+/**
+ * Parse an agent.dispatch WS frame that may be a relay command wrapper.
+ * Returns null when the frame is structurally invalid (missing task_id after unwrap).
+ *
+ * Relay frames have shape: { relay_command_id, command_type, payload: "<json-string>" }
+ * Direct dispatches have shape: { task_id, target_id, edge_device_id, ... }
+ */
+export function parseDispatchFrame(raw: Record<string, unknown>): RelayFrameParseResult | null {
+  const relayCommandId = typeof raw.relay_command_id === 'string' ? raw.relay_command_id : null;
+
+  let data: Record<string, unknown>;
+  if (relayCommandId) {
+    const innerPayload = typeof raw.payload === 'string' ? raw.payload : null;
+    if (!innerPayload) return null;
+    try {
+      data = JSON.parse(innerPayload) as Record<string, unknown>;
+    } catch {
+      return null;
+    }
+  } else {
+    data = raw;
+  }
+
+  if (typeof data.task_id !== 'string' || !data.task_id) return null;
+
+  return { isRelay: !!relayCommandId, data, relayCommandId };
+}

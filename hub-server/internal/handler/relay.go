@@ -17,6 +17,7 @@ type RelayService interface {
 	CreateCommand(ctx context.Context, targetEdgeID, commandType string, payload json.RawMessage, createdBy string) (*relay.CreateResult, error)
 	GetCommand(ctx context.Context, id string, userID string) (*relay.CommandData, error)
 	AckCommand(ctx context.Context, id string, userID string) error
+	DeviceAckCommand(ctx context.Context, id string, deviceID string) error
 }
 
 // RelayHandler handles HTTP requests for relay commands between Hub and Edge.
@@ -96,11 +97,37 @@ func (h *RelayHandler) GetCommand(c *gin.Context) {
 	OK(c, cmd)
 }
 
-// AckCommand handles POST /web/relay/commands/:id/ack — acknowledges a relay command.
+// AckCommand handles POST /web/relay/commands/:id/ack — acknowledges a relay command (admin).
 func (h *RelayHandler) AckCommand(c *gin.Context) {
 	id := c.Param("id")
 	userID := c.GetString("user_id")
 	if err := h.service.AckCommand(c.Request.Context(), id, userID); err != nil {
+		var e *errcode.Error
+		if errors.As(err, &e) {
+			Fail(c, e)
+			return
+		}
+		Fail(c, errcode.ErrInternal)
+		return
+	}
+	OK(c, nil)
+}
+
+type deviceAckRelayReq struct {
+	DeviceID string `json:"device_id"`
+}
+
+// DeviceAckCommand handles POST /v1/relay/commands/:id/ack — acknowledges a relay
+// command using device identity. Requires Hub session; body must contain device_id
+// matching the command's target. Idempotent: repeating returns 200.
+func (h *RelayHandler) DeviceAckCommand(c *gin.Context) {
+	id := c.Param("id")
+	var req deviceAckRelayReq
+	if err := c.ShouldBindJSON(&req); err != nil || strings.TrimSpace(req.DeviceID) == "" {
+		Fail(c, errcode.ErrBadRequest)
+		return
+	}
+	if err := h.service.DeviceAckCommand(c.Request.Context(), id, strings.TrimSpace(req.DeviceID)); err != nil {
 		var e *errcode.Error
 		if errors.As(err, &e) {
 			Fail(c, e)

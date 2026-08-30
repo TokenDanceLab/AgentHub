@@ -232,8 +232,8 @@ export function createHubClient(opts: HubClientOptions = {}) {
       invokePathInitRequest((path, init) => request<HubRelayCommand>(path, init), hubPayload.buildCreateRelayCommandRequest(body)),
     getRelayCommand: (id: string) =>
       request<HubRelayCommand>(hubPayload.buildRelayCommandPath(id)),
-    ackRelayCommand: (id: string) =>
-      invokePathInitRequest((path, init) => request<void>(path, init), hubPayload.buildAckRelayCommandRequest(id)),
+    ackRelayCommand: (id: string, deviceId: string) =>
+      invokePathInitRequest((path, init) => request<void>(path, init), hubPayload.buildAckRelayCommandRequest(id, deviceId)),
 
     listCustomAgents: () => request<HubCustomAgent[]>(hubPayload.buildCustomAgentsPath()),
     createCustomAgent: (body: HubCustomAgentRequest) =>
