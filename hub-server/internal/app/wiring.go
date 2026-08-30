@@ -285,6 +285,9 @@ func (a *App) startServer(ctx context.Context) error {
 		// the retention window on a 24h cadence (#1212 — previously
 		// CleanupOldDeliveries was test-only and the outbox grew unbounded).
 		a.AgentService.StartDeliveryCleanupLoop(a.bg.Ctx())
+		// Macro baseline §5 goal 5 (#2070): bound agent_run_events growth —
+		// purge terminal-task events past retention, keep per-task tail snapshot.
+		agent.StartRunEventRetentionLoop(a.bg.Ctx(), a.DB, agent.DefaultRetentionConfig())
 	}
 
 	// Admin server (observability always, debug capabilities fail-closed).
