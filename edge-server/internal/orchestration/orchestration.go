@@ -49,8 +49,8 @@ type PlanApprovalConfig struct {
 	Enabled bool `json:"enabled"`
 
 	// AutoApproveTimeout is the duration after which a pending plan is
-	// automatically approved if no user decision arrives. Zero means
-	// wait indefinitely (not recommended). Default: 60 seconds.
+	// denied if no user decision arrives (timeout = deny, not approve).
+	// Zero means wait indefinitely (not recommended). Default: 60 seconds.
 	AutoApproveTimeout time.Duration `json:"autoApproveTimeout"`
 }
 
