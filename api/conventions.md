@@ -166,3 +166,22 @@ Hub 额外扩展必须与 middleware 对齐：`x-agenthub-role: admin` 对应 `R
 - 删除字段、改字段类型、改错误码是破坏性变更。
 - Event `type` 一旦发布，不复用旧名字表达新语义。
 - 远期字段可先用对象占位，但必须说明语义和 owner。
+
+## seq 字段对照表（Hub `seq_id` vs Edge `seq`）
+
+两个字段名字相近、语义完全不同。**切勿混用**。服务端出处见下方「源码锚点」。
+
+| 维度 | Hub `seq_id` | Edge `seq` |
+|---|---|---|
+| 所属协议 | Hub `/client/ws` Frame（`{type, seq_id?, payload?}`） | Edge EventEnvelope（`{version, id, seq, type, scope, ...}`） |
+| 作用域 | **单连接**（per-connection） | **单 Bus / 持久 stream**（per-bus，跨连接稳定） |
+| 生成点 | `Manager.PushToConn` → `c.seq.Add(1)`（`hub-server/internal/ws/fanout.go:91`） | `Bus.Publish` → `atomic.AddInt64(&b.seq, 1)`（`edge-server/internal/events/bus.go:159`） |
+| 重连行为 | **重置**：新连接从 1 重新计数；旧连接的 seq_id 在新连接上无意义 | **延续**：单调递增不随客户端断线重置；客户端持 cursor 续读（`Bus.Subscribe(cursor)` bus.go:335） |
+| 客户端合法用法 | 仅用于**同连接内**丢帧检测（收到 seq_id < 上次 → gap） | 用作 replay cursor、去重水位（`seq <= lastSeq` 丢弃）、gap 检测 |
+| 禁止用法 | ❌ 当跨连接幂等键 / 持久 cursor / 业务去重键；❌ 写入请求帧 | ❌ 当 per-conn 丢帧计数器；❌ 假定重连会重置 |
+| 业务幂等键 | 由具体 frame type 决定（见下表「幂等键」列），**不是 seq_id** | 由 `EventEnvelope.id` + payload 业务 id 决定，**不是 seq** |
+| 源码锚点 | `hub-server/internal/ws/frame.go:7-14`（定义）+ `fanout.go:91`（stamp） | `edge-server/internal/events/types.go:28-38`（定义）+ `bus.go:159`（stamp） |
+
+> ⚠️ **给未来维护者的警戒**：在 hubWS / eventClient / hubEvents 任一处看到 `seq` 或 `seq_id` 时，先确认是哪一侧的字段。把 Hub `seq_id` 当 cursor 续读、或把 Edge `seq` 当 per-conn 丢帧计数，都会导致静默丢事件或重复 apply。#2101 G5。
+>
+> 📌 **hubWS.ts 注记**：本节只覆盖 eventClient.ts / hubEvents.ts 的客户端警戒注释；hubWS.ts 的 gap 检测与 seq_id 处理已在 #2117 落地，对应 JSDoc 可后续补齐。
