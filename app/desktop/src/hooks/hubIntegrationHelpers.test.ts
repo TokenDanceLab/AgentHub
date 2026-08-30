@@ -25,6 +25,7 @@ import {
   routeDecisionFromRuntimePayload,
   routeDecisionKey,
   validateDispatchTarget,
+  parseDispatchFrame,
 } from './hubIntegrationMappers';
 import type { AgentTask } from '@/stores/taskBridgeStore';
 
@@ -311,5 +312,52 @@ describe('hubIntegrationMappers', () => {
     expect(isTerminalBridgeTask(makeTask({ status: 'done' }))).toBe(true);
     expect(isTerminalBridgeTask(makeTask({ status: 'failed' }))).toBe(true);
     expect(isTerminalBridgeTask(makeTask({ status: 'running' }))).toBe(false);
+  });
+});
+
+describe('parseDispatchFrame', () => {
+
+  it('parses direct dispatch frame (no relay_command_id)', () => {
+    const result = parseDispatchFrame({ task_id: 't1', target_id: 'u1', edge_device_id: 'd1' });
+    expect(result).not.toBeNull();
+    expect(result!.isRelay).toBe(false);
+    expect(result!.relayCommandId).toBeNull();
+    expect(result!.data.task_id).toBe('t1');
+  });
+
+  it('parses relay-wrapped dispatch frame with stringified payload', () => {
+    const innerPayload = JSON.stringify({ task_id: 't2', target_id: 'u2', edge_device_id: 'd2', prompt: 'hello' });
+    const result = parseDispatchFrame({
+      relay_command_id: 'relay_abc',
+      command_type: 'agent_dispatch',
+      payload: innerPayload,
+    });
+    expect(result).not.toBeNull();
+    expect(result!.isRelay).toBe(true);
+    expect(result!.relayCommandId).toBe('relay_abc');
+    expect(result!.data.task_id).toBe('t2');
+    expect(result!.data.prompt).toBe('hello');
+  });
+
+  it('returns null for relay frame with missing inner payload', () => {
+    const result = parseDispatchFrame({ relay_command_id: 'relay_xyz' });
+    expect(result).toBeNull();
+  });
+
+  it('returns null for relay frame with invalid JSON inner payload', () => {
+    const result = parseDispatchFrame({ relay_command_id: 'relay_bad', payload: 'not-json' });
+    expect(result).toBeNull();
+  });
+
+  it('returns null when unwrapped data has no task_id', () => {
+    const innerPayload = JSON.stringify({ prompt: 'no task id' });
+    const result = parseDispatchFrame({ relay_command_id: 'relay_notask', payload: innerPayload });
+    expect(result).toBeNull();
+  });
+
+  it('returns null for empty or non-object input', () => {
+    expect(parseDispatchFrame({})).toBeNull();
+    expect(parseDispatchFrame({ task_id: '' })).toBeNull();
+    expect(parseDispatchFrame({ task_id: 123 as unknown as string })).toBeNull();
   });
 });

@@ -329,7 +329,7 @@ describe('hubClientPayloadPaths (#822 / #833 / #901 / #913)', () => {
       '/web/audit-events?pageSize=50&pageCursor=p2',
     );
     expect(buildRelayCommandPath('cmd/1')).toBe('/web/relay/commands/cmd%2F1');
-    expect(buildAckRelayCommandPath('cmd/1')).toBe('/web/relay/commands/cmd%2F1/ack');
+    expect(buildAckRelayCommandPath('cmd/1')).toBe('/web/relay/commands/cmd%2F1/device-ack');
   });
 
   it('builds custom agent and public catalog paths with forced is_public (#901)', () => {
