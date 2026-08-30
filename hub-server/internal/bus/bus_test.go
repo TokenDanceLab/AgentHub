@@ -261,8 +261,11 @@ func TestRunningCounter_NonzeroWhileHandlerBlocked(t *testing.T) {
 	// defer (Pending) by a short worker-purge window, so poll for the settle
 	// instead of asserting an instantaneous zero (drainBus now gates on
 	// Pending only — see its doc comment).
+	// 10s ceiling: Windows CI runners can exceed the ants worker-purge window
+	// by far more than 2s under load; Eventually polls at 1ms so fast runners
+	// still settle immediately.
 	require.Eventually(t, func() bool { return b.Running() == 0 },
-		2*time.Second, time.Millisecond,
+		10*time.Second, time.Millisecond,
 		"Running must return to 0 after handler completes")
 }
 
