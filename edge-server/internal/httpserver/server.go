@@ -20,6 +20,7 @@ import (
 	"github.com/agenthub/edge-server/internal/agents"
 	"github.com/agenthub/edge-server/internal/api"
 	"github.com/agenthub/edge-server/internal/ccswitch"
+	"github.com/agenthub/edge-server/internal/deliverydedup"
 	"github.com/agenthub/edge-server/internal/edgehttp"
 	"github.com/agenthub/edge-server/internal/edgeidentity"
 	"github.com/agenthub/edge-server/internal/events"
@@ -485,6 +486,7 @@ func newHandlerFromConfig(cfg Config) (*api.Handler, error) {
 		HubJWTSecret:       cfg.HubJWTSecret,
 		EdgeDeviceID:       cfg.EdgeDeviceID,
 		CallbackClient:     hubCallbackClient,
+		DeliveryDedup:      deliverydedup.New(deliverydedup.DefaultCapacity, deliverydedup.DefaultTTL),
 		ShutdownHooks:      cfg.ShutdownHooks,
 	}
 
