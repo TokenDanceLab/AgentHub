@@ -272,8 +272,10 @@ export function createHubClient(options: CreateHubClientOptions): HubClient {
       let sessionsOk = true;
       try {
         sessions = await shared.listSessions();
-      } catch {
+      } catch (listSessionsError) {
         sessionsOk = false;
+        // eslint-disable-next-line no-console -- session list failure is surfaced via offline account state
+        console.warn("[mobile] listSessions failed:", listSessionsError);
       }
 
       return mapSessionsToMobileFixture(sessions, sessionsOk);
