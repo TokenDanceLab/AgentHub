@@ -19,7 +19,7 @@ interface AccountScreenProps {
   /** True while a login/logout round trip is in flight. */
   authBusy?: boolean;
   /** When set, displays a session restore failure notice at the top of the account panel. */
-  sessionRestoreError?: string;
+  sessionRestoreError?: string | undefined;
 }
 
 interface AccountMenuItem {
@@ -136,7 +136,7 @@ export function AccountScreen({
             <ErrorNotice
               title={t.sessionRestoreFailedTitle}
               description={sessionRestoreError}
-              onRetry={onSignIn}
+              {...(onSignIn ? { onRetry: onSignIn } : {})}
             />
           ) : null}
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: tokens.space.md }}>

@@ -111,6 +111,7 @@ function MobileAppContent({ preview }: { preview: PreviewOptions }): React.React
   // never claims a live session before one exists.
   const [hubSessionStatus, setHubSessionStatus] = useState<Extract<HubSessionSnapshot['status'], 'active' | 'missing'>>('missing');
   const [sessionRestoreError, setSessionRestoreError] = useState<string | undefined>();
+  const t = useStrings();
   const [authHandle, setAuthHandle] = useState<CreateExpoMobileAuthSessionResult | undefined>();
   const [authPhase, setAuthPhase] = useState<'idle' | 'signing_in' | 'signing_out'>('idle');
   const [launchSheetMode, setLaunchSheetMode] = useState<MobileInspectorSheetMode | undefined>();
