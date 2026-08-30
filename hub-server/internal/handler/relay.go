@@ -14,7 +14,7 @@ import (
 
 // RelayService is the subset of *relay.Service used by RelayHandler.
 type RelayService interface {
-	CreateCommand(ctx context.Context, targetEdgeID, commandType string, payload json.RawMessage, createdBy string) (*relay.CommandData, error)
+	CreateCommand(ctx context.Context, targetEdgeID, commandType string, payload json.RawMessage, createdBy string) (*relay.CreateResult, error)
 	GetCommand(ctx context.Context, id string, userID string) (*relay.CommandData, error)
 	AckCommand(ctx context.Context, id string, userID string) error
 }
@@ -66,7 +66,7 @@ func (h *RelayHandler) CreateCommand(c *gin.Context) {
 		return
 	}
 	userID := c.GetString("user_id")
-	cmd, err := h.service.CreateCommand(c.Request.Context(), targetEdgeID, strings.TrimSpace(req.CommandType), req.Payload, userID)
+	res, err := h.service.CreateCommand(c.Request.Context(), targetEdgeID, strings.TrimSpace(req.CommandType), req.Payload, userID)
 	if err != nil {
 		var e *errcode.Error
 		if errors.As(err, &e) {
@@ -76,7 +76,7 @@ func (h *RelayHandler) CreateCommand(c *gin.Context) {
 		Fail(c, errcode.ErrInternal)
 		return
 	}
-	OK(c, cmd)
+	OK(c, res.Command)
 }
 
 // GetCommand handles GET /web/relay/commands/:id — retrieves a relay command.
