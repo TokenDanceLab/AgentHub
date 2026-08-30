@@ -12,7 +12,21 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gorm.io/gorm"
 )
+
+// authzTestDB creates an in-memory DB with user-1 owning team-1 for legacy tests.
+func authzTestDB(t *testing.T) *gorm.DB {
+	t.Helper()
+	db := setupAuthzTestDB(t)
+	require.NoError(t, db.Exec(`INSERT INTO agent_teams (id, owner_id, name) VALUES ('team-1', 'user-1', 'T')`).Error)
+	require.NoError(t, db.Exec(`INSERT INTO custom_agents (id, owner_user_id, name, agent_type) VALUES ('agent-1', 'user-1', 'A', 'codex')`).Error)
+	require.NoError(t, db.Exec(`INSERT INTO agent_team_members (id, team_id, agent_profile_id, role) VALUES ('mem-1', 'team-1', 'agent-1', 'executor')`).Error)
+	require.NoError(t, db.Exec(`INSERT INTO agent_team_runs (id, team_id, trigger_user_id, status) VALUES ('run-1', 'team-1', 'user-1', 'running')`).Error)
+	require.NoError(t, db.Exec(`INSERT INTO agent_team_assignments (id, team_run_id, from_member_id, to_member_id, task_prompt, status) VALUES ('asgn-1', 'run-1', 'mem-1', 'mem-1', 'x', 'pending')`).Error)
+	require.NoError(t, db.Exec(`INSERT INTO agent_team_assignments (id, team_run_id, from_member_id, to_member_id, task_prompt, status) VALUES ('assign-1', 'run-1', 'mem-1', 'mem-1', 'x', 'pending')`).Error)
+	return db
+}
 
 func TestAgentTeamHandler_UpdateTeam(t *testing.T) {
 	gin.SetMode(gin.TestMode)
@@ -27,7 +41,7 @@ func TestAgentTeamHandler_UpdateTeam(t *testing.T) {
 			return nil
 		},
 	}
-	h := NewAgentTeamHandler(svc)
+	h := NewAgentTeamHandler(svc, authzTestDB(t))
 
 	r := gin.New()
 	r.PUT("/web/agent-teams/:id", func(c *gin.Context) {
@@ -48,7 +62,7 @@ func TestAgentTeamHandler_UpdateTeam(t *testing.T) {
 func TestAgentTeamHandler_UpdateTeamBadRequest(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	svc := &mockAgentTeamService{}
-	h := NewAgentTeamHandler(svc)
+	h := NewAgentTeamHandler(svc, authzTestDB(t))
 
 	r := gin.New()
 	r.PUT("/web/agent-teams/:id", func(c *gin.Context) {
@@ -75,7 +89,7 @@ func TestAgentTeamHandler_DeleteTeam(t *testing.T) {
 			return nil
 		},
 	}
-	h := NewAgentTeamHandler(svc)
+	h := NewAgentTeamHandler(svc, authzTestDB(t))
 
 	r := gin.New()
 	r.DELETE("/web/agent-teams/:id", func(c *gin.Context) {
@@ -98,7 +112,7 @@ func TestAgentTeamHandler_DeleteTeamNotFound(t *testing.T) {
 			return errcode.AgentNotFound
 		},
 	}
-	h := NewAgentTeamHandler(svc)
+	h := NewAgentTeamHandler(svc, authzTestDB(t))
 
 	r := gin.New()
 	r.DELETE("/web/agent-teams/:id", func(c *gin.Context) {
@@ -126,7 +140,7 @@ func TestAgentTeamHandler_RemoveMember(t *testing.T) {
 			return nil
 		},
 	}
-	h := NewAgentTeamHandler(svc)
+	h := NewAgentTeamHandler(svc, authzTestDB(t))
 
 	r := gin.New()
 	r.DELETE("/web/agent-teams/:id/members/:member_id", func(c *gin.Context) {
@@ -154,7 +168,7 @@ func TestAgentTeamHandler_ListRuns(t *testing.T) {
 			return []model.AgentTeamRun{{ID: "run-1", TeamID: teamID, Status: "running"}}, nil
 		},
 	}
-	h := NewAgentTeamHandler(svc)
+	h := NewAgentTeamHandler(svc, authzTestDB(t))
 
 	r := gin.New()
 	r.GET("/web/agent-teams/:id/runs", func(c *gin.Context) {
@@ -184,7 +198,7 @@ func TestAgentTeamHandler_GetRun(t *testing.T) {
 			return &model.AgentTeamRun{ID: runID, TeamID: teamID, Status: "running"}, nil
 		},
 	}
-	h := NewAgentTeamHandler(svc)
+	h := NewAgentTeamHandler(svc, authzTestDB(t))
 
 	r := gin.New()
 	r.GET("/web/agent-teams/:id/runs/:run_id", func(c *gin.Context) {
@@ -214,7 +228,7 @@ func TestAgentTeamHandler_GetRunState(t *testing.T) {
 			return &model.TeamRunState{RunID: runID, TeamID: teamID, Status: "running"}, nil
 		},
 	}
-	h := NewAgentTeamHandler(svc)
+	h := NewAgentTeamHandler(svc, authzTestDB(t))
 
 	r := gin.New()
 	r.GET("/web/agent-teams/:id/runs/:run_id/state", func(c *gin.Context) {
@@ -244,7 +258,7 @@ func TestAgentTeamHandler_CreateAssignment(t *testing.T) {
 			return &model.AgentTeamAssignment{ID: "assign-1", TeamRunID: teamRunID, TaskPrompt: taskPrompt}, nil
 		},
 	}
-	h := NewAgentTeamHandler(svc)
+	h := NewAgentTeamHandler(svc, authzTestDB(t))
 
 	r := gin.New()
 	r.POST("/web/agent-teams/:id/runs/:run_id/assignments", func(c *gin.Context) {
@@ -275,7 +289,7 @@ func TestAgentTeamHandler_DispatchAssignment(t *testing.T) {
 			return nil
 		},
 	}
-	h := NewAgentTeamHandler(svc)
+	h := NewAgentTeamHandler(svc, authzTestDB(t))
 
 	r := gin.New()
 	r.POST("/web/agent-teams/:id/runs/:run_id/assignments/:assignment_id/dispatch", func(c *gin.Context) {
@@ -306,7 +320,7 @@ func TestAgentTeamHandler_CompleteAssignment(t *testing.T) {
 			return nil
 		},
 	}
-	h := NewAgentTeamHandler(svc)
+	h := NewAgentTeamHandler(svc, authzTestDB(t))
 
 	r := gin.New()
 	r.POST("/web/agent-teams/:id/runs/:run_id/assignments/:assignment_id/complete", func(c *gin.Context) {
@@ -339,7 +353,7 @@ func TestAgentTeamHandler_FailAssignment(t *testing.T) {
 			return nil
 		},
 	}
-	h := NewAgentTeamHandler(svc)
+	h := NewAgentTeamHandler(svc, authzTestDB(t))
 
 	r := gin.New()
 	r.POST("/web/agent-teams/:id/runs/:run_id/assignments/:assignment_id/fail", func(c *gin.Context) {
@@ -371,7 +385,7 @@ func TestAgentTeamHandler_ListAssignments(t *testing.T) {
 			return []model.AgentTeamAssignment{{ID: "assign-1", TeamRunID: teamRunID}}, nil
 		},
 	}
-	h := NewAgentTeamHandler(svc)
+	h := NewAgentTeamHandler(svc, authzTestDB(t))
 
 	r := gin.New()
 	r.GET("/web/agent-teams/:id/runs/:run_id/assignments", func(c *gin.Context) {
