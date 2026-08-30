@@ -225,7 +225,7 @@ func (m *AuthMiddleware) validateToken(c *gin.Context, tokenStr string) {
 	// as a 500/403). The nil verifier means "RS256 path unavailable" —
 	// fall through to local HS256 instead.
 	if m.tdVerifier != nil && m.cfg.TokenDanceID.IssuerURL != "" && m.cfg.TokenDanceID.ClientID != "" {
-		if claims, err := m.tdVerifier.ParseJWT(tokenStr, m.cfg.TokenDanceID.IssuerURL, m.cfg.TokenDanceID.ClientID); err == nil {
+		if claims, err := m.tdVerifier.ParseJWT(c.Request.Context(), tokenStr, m.cfg.TokenDanceID.IssuerURL, m.cfg.TokenDanceID.ClientID); err == nil {
 			c.Set("user_id", claims.Subject)
 			c.Set("device_type", "tokendance_bearer")
 			c.Set("device_id", "")

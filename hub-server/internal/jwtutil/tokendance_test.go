@@ -2,12 +2,14 @@
 package jwtutil
 
 import (
+	"context"
 	"crypto/rand"
 	"crypto/rsa"
 	"encoding/base64"
 	"math/big"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -30,7 +32,7 @@ func TestParseTokenDanceJWTRequiresExpectedIssuerAndAudience(t *testing.T) {
 
 	token := signTokenDanceTestToken(t, priv, "https://issuer.example", "agenthub-client")
 
-	claims, err := v.ParseJWT(token, "https://issuer.example", "agenthub-client")
+	claims, err := v.ParseJWT(context.Background(), token, "https://issuer.example", "agenthub-client")
 	if err != nil {
 		t.Fatalf("ParseJWT valid token failed: %v", err)
 	}
@@ -38,10 +40,10 @@ func TestParseTokenDanceJWTRequiresExpectedIssuerAndAudience(t *testing.T) {
 		t.Fatalf("subject = %q, want user-1", claims.Subject)
 	}
 
-	if _, err := v.ParseJWT(token, "https://other-issuer.example", "agenthub-client"); err == nil {
+	if _, err := v.ParseJWT(context.Background(), token, "https://other-issuer.example", "agenthub-client"); err == nil {
 		t.Fatal("expected wrong issuer to be rejected")
 	}
-	if _, err := v.ParseJWT(token, "https://issuer.example", "other-client"); err == nil {
+	if _, err := v.ParseJWT(context.Background(), token, "https://issuer.example", "other-client"); err == nil {
 		t.Fatal("expected wrong audience to be rejected")
 	}
 }
@@ -85,10 +87,10 @@ func TestTokenDanceVerifierInstancesIndependent(t *testing.T) {
 	// Force A's cache to populate first (it fetches B's server URL — no,
 	// A points at srvA which serves jwksA; the token needs B's key, so A
 	// must reject and B must accept).
-	if _, err := vA.ParseJWT(tokenB, "https://issuer.example", "agenthub-client"); err == nil {
+	if _, err := vA.ParseJWT(context.Background(), tokenB, "https://issuer.example", "agenthub-client"); err == nil {
 		t.Fatal("verifier A must reject a token signed with B's key")
 	}
-	claims, err := vB.ParseJWT(tokenB, "https://issuer.example", "agenthub-client")
+	claims, err := vB.ParseJWT(context.Background(), tokenB, "https://issuer.example", "agenthub-client")
 	if err != nil {
 		t.Fatalf("verifier B must accept: %v", err)
 	}
@@ -128,7 +130,7 @@ func TestParseJWTRejectsRS384TokenSignedWithSameKey(t *testing.T) {
 	if err != nil {
 		t.Fatalf("sign RS384 token: %v", err)
 	}
-	if _, err := v.ParseJWT(signed, "https://issuer.example", "agenthub-client"); err == nil {
+	if _, err := v.ParseJWT(context.Background(), signed, "https://issuer.example", "agenthub-client"); err == nil {
 		t.Fatal("expected RS384 token to be rejected (only RS256 is allowed)")
 	}
 }
@@ -155,7 +157,7 @@ func TestParseJWTRejectsJWKSPublishedWithRS384Alg(t *testing.T) {
 	v := NewTokenDanceVerifier(server.URL, VerifierConfig{})
 
 	token := signTokenDanceTestToken(t, priv, "https://issuer.example", "agenthub-client")
-	if _, err := v.ParseJWT(token, "https://issuer.example", "agenthub-client"); err == nil {
+	if _, err := v.ParseJWT(context.Background(), token, "https://issuer.example", "agenthub-client"); err == nil {
 		t.Fatal("expected token to be rejected when JWKS only publishes an RS384 key")
 	}
 }
@@ -181,7 +183,34 @@ func TestParseJWTRejectsJWKSMissingAlg(t *testing.T) {
 	v := NewTokenDanceVerifier(server.URL, VerifierConfig{})
 
 	token := signTokenDanceTestToken(t, priv, "https://issuer.example", "agenthub-client")
-	if _, err := v.ParseJWT(token, "https://issuer.example", "agenthub-client"); err == nil {
+	if _, err := v.ParseJWT(context.Background(), token, "https://issuer.example", "agenthub-client"); err == nil {
 		t.Fatal("expected token to be rejected when JWKS entry omits alg")
+	}
+}
+
+// TestParseJWKSCtxCancellation verifies that JWKS fetch honors the caller's
+// context: when ctx is cancelled before the HTTP round-trip completes, the
+// fetch must fail with the context error rather than blocking on the
+// client-level timeout (#2064 item ②).
+func TestParseJWKSCtxCancellation(t *testing.T) {
+	// Slow server: blocks until the request context is done, then returns.
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		<-r.Context().Done()
+		w.WriteHeader(http.StatusOK)
+	}))
+	t.Cleanup(srv.Close)
+
+	v := NewTokenDanceVerifier(srv.URL, VerifierConfig{})
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel() // cancel immediately
+
+	_, err := v.ParseJWT(ctx, "dummy.token.here", "https://issuer.example", "agenthub-client")
+	if err == nil {
+		t.Fatal("ParseJWT with cancelled ctx must fail")
+	}
+	// The error should mention context cancellation, not a timeout.
+	if !strings.Contains(err.Error(), "context canceled") && !strings.Contains(err.Error(), "jwks fetch failed") {
+		t.Fatalf("expected context-related error, got: %v", err)
 	}
 }
