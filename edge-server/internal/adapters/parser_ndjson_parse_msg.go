@@ -123,5 +123,10 @@ func (p *NDJSONStreamParser) parseResult(scope map[string]any, msg *claudeSDKMes
 	if msg.SessionID != "" {
 		payload["sessionId"] = msg.SessionID
 	}
+	// Emit session metrics (tokens/cost) for Hub Prometheus consumption.
+	// Pure helper keeps the decision testable without parser state.
+	if mp, ok := SessionMetricsPayload(msg); ok {
+		p.emit(scope, BusEventSessionMetrics, mp)
+	}
 	p.emit(scope, BusEventResult, payload)
 }

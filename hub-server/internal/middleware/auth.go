@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"context"
+	"github.com/agenthub/pkg/reqlog"
 	"log/slog"
 	"os"
 	"strings"
@@ -474,6 +475,23 @@ func (m *AuthMiddleware) auditPermission(c *gin.Context, userID string, decision
 		// 未认证请求（如 WS 401）没有身份可审计；audit_events.user_id 是
 		// NOT NULL uuid，空串会让 PostgreSQL 报 22P02 并污染错误日志。
 		return
+	}
+	// Observability (slice A step 7): enrich audit details with correlation fields
+	// when available. These are best-effort; missing values are simply omitted.
+	if details == nil {
+		details = make(map[string]interface{})
+	}
+	if rid := reqlog.GetRequestID(c.Request.Context()); rid != "" {
+		details["request_id"] = rid
+	}
+	if tid := c.GetString("task_id"); tid != "" {
+		details["task_id"] = tid
+	}
+	if sid := c.GetString("session_id"); sid != "" {
+		details["session_id"] = sid
+	}
+	if traceID := c.GetHeader("X-AgentHub-Trace-ID"); traceID != "" {
+		details["trace_id"] = traceID
 	}
 	m.deps.PermissionAudit(c.Request.Context(), userID, decision, allowed, details, clientIP)
 }

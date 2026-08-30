@@ -263,5 +263,11 @@ func SurfaceAndEmit(bus *events.Bus, writer store.Writer, snapshot *WorkdirSnaps
 		case surfacingKindArtifact:
 			emitSurfacedArtifact(bus, writer, scope, run, sf, snapshot)
 		}
+		// Observability (slice A step 6): log + counter per surfaced artifact.
+		slog.Info("surfacing: artifact surfaced",
+			"run_id", run.ID, "artifact_kind", string(sf.Kind), "path", sf.RelPath)
+		if artifactSurfacedRecorder != nil {
+			artifactSurfacedRecorder.RecordArtifactSurfaced(string(sf.Kind))
+		}
 	}
 }
