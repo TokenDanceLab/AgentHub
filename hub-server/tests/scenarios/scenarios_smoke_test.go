@@ -161,6 +161,7 @@ func scenarioTestDB(t *testing.T) *gorm.DB {
 			edge_device_id TEXT DEFAULT '',
 			edge_run_id TEXT DEFAULT '',
 			error_msg TEXT DEFAULT '',
+			model_params TEXT DEFAULT '{}',
 			expire_at DATETIME,
 			created_at DATETIME,
 			finished_at DATETIME

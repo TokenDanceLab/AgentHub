@@ -2265,6 +2265,7 @@ func setupAgentTeamStateSQLiteDSN(t *testing.T, dsn string, maxOpenConns int) *g
 			edge_run_id TEXT DEFAULT '',
 			edge_device_id TEXT,
 			error_message TEXT,
+			model_params TEXT DEFAULT '{}',
 			created_at DATETIME,
 			dispatched_at DATETIME,
 			finished_at DATETIME,

@@ -28,6 +28,7 @@ type PendingAgentTask struct {
 	EdgeRunID         string     `gorm:"type:varchar(128);default:null" json:"edge_run_id,omitempty"`
 	EdgeDeviceID      string     `gorm:"type:uuid;default:null" json:"edge_device_id,omitempty"`
 	ErrorMessage      string     `gorm:"type:text" json:"error_message,omitempty"`
+	ModelParams       string     `gorm:"type:jsonb;default:'{}'" json:"model_params,omitempty"`
 	CreatedAt         time.Time  `gorm:"autoCreateTime" json:"created_at"`
 	DispatchedAt      *time.Time `gorm:"type:timestamptz" json:"dispatched_at,omitempty"`
 	FinishedAt        *time.Time `gorm:"type:timestamptz" json:"finished_at,omitempty"`

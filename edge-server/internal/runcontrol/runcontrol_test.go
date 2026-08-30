@@ -243,3 +243,65 @@ func TestCreateSerializesConcurrentCreates(t *testing.T) {
 		t.Fatalf("executor starts = %d, want exactly 1", got)
 	}
 }
+
+func TestCreateHubTaskIDDedup(t *testing.T) {
+	repo := newTestRepo(t)
+	bus := events.NewBus(100)
+	executor := &recordingExecutor{}
+	workDir := t.TempDir()
+
+	params := baseParams(workDir)
+	params.HubTaskID = "hub-task-001"
+
+	// First create should succeed
+	run1, err := Create(repo, executor, bus, params)
+	if err != nil {
+		t.Fatalf("first create: %v", err)
+	}
+	if run1.ID == "" {
+		t.Fatal("first create returned empty run ID")
+	}
+	if run1.HubTaskID != "hub-task-001" {
+		t.Fatalf("first create HubTaskID = %q, want %q", run1.HubTaskID, "hub-task-001")
+	}
+
+	// Second create with same HubTaskID should return existing run
+	run2, err := Create(repo, executor, bus, params)
+	if err != nil {
+		t.Fatalf("second create (dedup): %v", err)
+	}
+	if run2.ID != run1.ID {
+		t.Fatalf("dedup returned different run ID: got %q, want %q", run2.ID, run1.ID)
+	}
+
+	// Executor should only have been started once
+	if executor.startCount() != 1 {
+		t.Fatalf("executor start count = %d, want 1", executor.startCount())
+	}
+}
+
+func TestCreateEmptyHubTaskIDNoDedup(t *testing.T) {
+	repo := newTestRepo(t)
+	bus := events.NewBus(100)
+	executor := &recordingExecutor{}
+	workDir := t.TempDir()
+
+	params := baseParams(workDir)
+	// Empty HubTaskID — should NOT dedup
+
+	run1, err := Create(repo, executor, bus, params)
+	if err != nil {
+		t.Fatalf("first create: %v", err)
+	}
+
+	// Need to finish/cancel first run before creating another on same thread
+	repo.SetRunStatus(run1.ID, "finished")
+
+	run2, err := Create(repo, executor, bus, params)
+	if err != nil {
+		t.Fatalf("second create: %v", err)
+	}
+	if run2.ID == run1.ID {
+		t.Fatal("empty HubTaskID should not dedup; got same run ID")
+	}
+}

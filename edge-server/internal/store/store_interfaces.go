@@ -9,6 +9,7 @@ type Reader interface {
 	ListThreads(projectID string) []Thread
 	GetRun(id string) (Run, bool)
 	ListRuns(threadID string) []Run
+	GetRunByHubTaskID(hubTaskID string) (Run, bool)
 	GetRunCheckpoint(runID string) (RunCheckpoint, bool)
 	GetItem(id string) (Item, bool)
 	ListThreadItems(threadID string) []Item
@@ -50,6 +51,7 @@ type Writer interface {
 	SetRunEvidenceGate(id, result string) (Run, bool)
 	SetRunRetryCount(id string, count int) (Run, bool)
 	SetRunWorkDir(id, workDir string) (Run, bool)
+	SetRunHubTaskID(id, hubTaskID string) (Run, bool)
 }
 
 type Repository interface {
@@ -64,6 +66,7 @@ type RunLifecycleStore interface {
 	SetRunEvidenceGate(id, result string) (Run, bool)
 	SetRunRetryCount(id string, count int) (Run, bool)
 	SetRunWorkDir(id, workDir string) (Run, bool)
+	SetRunHubTaskID(id, hubTaskID string) (Run, bool)
 	UpsertRunCheckpoint(cp RunCheckpoint) (RunCheckpoint, error)
 }
 
