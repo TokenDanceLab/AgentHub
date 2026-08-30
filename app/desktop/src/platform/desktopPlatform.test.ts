@@ -420,3 +420,22 @@ describe('createDesktopPlatform', () => {
     }
   });
 });
+
+describe('Desktop SurfaceCapabilities new domains', () => {
+  it('declares approval, runtimeEvidence, and sandbox as true via Local Edge backing', () => {
+    const platform = createDesktopPlatform();
+
+    expect(platform.capabilities.approval).toBe(true);
+    expect(platform.capabilities.runtimeEvidence).toBe(true);
+    expect(platform.capabilities.sandbox).toBe(true);
+  });
+
+  it('keeps remoteExecution un-declared until a cloud/remote target is wired', () => {
+    const platform = createDesktopPlatform();
+
+    // Undefined/false both satisfy "UI hides"; current fact narrative has no
+    // remote target channel on Desktop host, so we assert falsy rather than
+    // a specific boolean to keep the contract honest.
+    expect(Boolean(platform.capabilities.remoteExecution)).toBe(false);
+  });
+});

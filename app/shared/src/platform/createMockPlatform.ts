@@ -76,6 +76,12 @@ const defaultCapabilities: SurfaceCapabilities = {
   localFiles: false,
   browserPreview: false,
   localTerminal: false,
+  // New capability domains default to false on the mock surface so tests
+  // must explicitly opt in — mirrors the "un-declared = UI hidden" contract.
+  approval: false,
+  runtimeEvidence: false,
+  remoteExecution: false,
+  sandbox: false,
 };
 
 export function createMockTerminalPort(seedSessions: TerminalSession[] = []): MockTerminalPort {

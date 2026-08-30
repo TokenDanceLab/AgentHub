@@ -1127,3 +1127,21 @@ describe('webPlatform messageActions port (Hub REST wiring)', () => {
     );
   });
 });
+
+describe('webPlatform SurfaceCapabilities new domains', () => {
+  it('declares approval true via Hub approval endpoints and keeps runtimeEvidence/sandbox un-declared', () => {
+    const platform = createWebPlatform();
+
+    expect(platform.capabilities.approval).toBe(true);
+    // Hub data plane is metadata-only for evidence & has no sandbox boundary;
+    // un-declared (undefined/false) keeps the UI honest.
+    expect(Boolean(platform.capabilities.runtimeEvidence)).toBe(false);
+    expect(Boolean(platform.capabilities.sandbox)).toBe(false);
+  });
+
+  it('keeps remoteExecution un-declared on Web until a cloud dispatch channel lands', () => {
+    const platform = createWebPlatform();
+
+    expect(Boolean(platform.capabilities.remoteExecution)).toBe(false);
+  });
+});

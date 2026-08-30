@@ -163,6 +163,12 @@ export function createDesktopPlatform(options: DesktopPlatformOptions = {}): Des
       // Foundation (#1174) + in-memory TerminalPort host (#1193).
       // Real PTY / Tauri adapter is still out of scope; UI gates on this flag + port.
       localTerminal,
+      // Desktop Local Edge backs approval flows, runtime evidence content,
+      // and a local sandbox boundary. Remote execution stays un-declared
+      // until a cloud/remote target is wired through the Desktop host.
+      approval: true,
+      runtimeEvidence: true,
+      sandbox: true,
     },
     host: {
       edgeHostReadiness: options.getEdgeHostReadiness ?? readEdgeHostReadiness,
