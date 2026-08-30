@@ -72,7 +72,7 @@ function categoryLabel(category: string): string {
  *  the toast body; the traceId is surfaced separately by the caller. */
 export function friendlyErrorMessage(raw: string | undefined, fallback: string): string {
   if (!raw) return fallback;
-  const technical = /HTTP\s+\d{3}|proxy|stack|at\s+[^\s]+\s+\(|node:|TypeError|ReferenceError/i.test(raw);
+  const technical = /HTTP\s+\d{3}|proxy|stack|at\s+[^\s]+\s+\(|node:|TypeError|ReferenceError|SyntaxError/i.test(raw);
   return technical ? fallback : raw;
 }
 
