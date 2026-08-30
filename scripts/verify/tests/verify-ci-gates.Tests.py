@@ -403,6 +403,54 @@ def readd_go_hub_lint_continue_on_error_comment(text: str) -> str:
     ) + text[end:]
 
 
+
+def delete_ui_required_needs_lane(text):
+    """从 ui-required 的 needs 里删掉 web-e2e-stubbed，模拟第二批 UI lane 悄悄掉出 required 聚合（防回退）。"""
+    anchor = "needs: [changes, visual-qa-shell, visual-qa-desktop, web-e2e-stubbed, design-css]"
+    if text.count(anchor) != 1:
+        raise AssertionError(f"expected exactly one ui-required needs line, found {text.count(anchor)}")
+    return text.replace(anchor, "needs: [changes, visual-qa-shell, visual-qa-desktop, design-css]", 1)
+
+
+def flip_ui_required_changes_fail_closed(text):
+    """把 ui-required 的 changes 失败 fail-closed 条件翻转，模拟 false green（防回退）。"""
+    marker = "  ui-required:"
+    idx = text.find(marker)
+    if idx < 0:
+        raise AssertionError("ui-required job not found")
+    anchor = '"$CHANGES_STATUS" != "success"'
+    sub = text[idx:]
+    j = sub.find(anchor)
+    if j < 0:
+        raise AssertionError("ui-required CHANGES_STATUS guard not found")
+    pos = idx + j
+    return text[:pos] + '"$CHANGES_STATUS" == "success"' + text[pos + len(anchor):]
+
+
+def restore_ui_required_path_filter(text):
+    """把 ui-required 的 if: always() 改回路径筛选，模拟 required check 重新可被跳过（防回退）。"""
+    marker = "  ui-required:"
+    idx = text.find(marker)
+    if idx < 0:
+        raise AssertionError("ui-required job not found")
+    always = "    if: always()"
+    sub = text[idx:]
+    j = sub.find(always)
+    if j < 0:
+        raise AssertionError("ui-required always() if not found")
+    pos = idx + j
+    return text[:pos] + "    if: github.event_name == 'workflow_dispatch'" + text[pos + len(always):]
+
+
+def delete_ui_required_job(text):
+    """删除整个 ui-required job，模拟第二批门禁聚合悄悄退出 CI（防回退）。"""
+    pattern = re.compile(r"(?ms)^  ui-required:\r?\n.*?(?=^  [A-Za-z0-9_-]+:\r?\n|\Z)")
+    mutated, count = pattern.subn("", text)
+    if count != 1:
+        raise AssertionError(f"expected exactly one ui-required job block, removed {count}")
+    return mutated
+
+
 class VerifyCiGatesMutationTests(unittest.TestCase):
     def assert_mutation_fails(self, mutated_text: str, case_name: str) -> None:
         exit_code, output = run_verifier(mutated_text)
@@ -589,6 +637,35 @@ class VerifyCiGatesMutationTests(unittest.TestCase):
         self.assert_mutation_fails(
             delete_shared_trio_step(read_workflow(), SHARED_TRIO_SELF_TEST_STEP, "shared trio self-test"),
             "deleted shared trio self-test step",
+        )
+
+
+    def test_delete_ui_required_needs_lane_fails(self):
+        """ui-required 聚合丢失 web-e2e-stubbed lane 时，校验器必须非零退出（防回退）。"""
+        self.assert_mutation_fails(
+            delete_ui_required_needs_lane(read_workflow()),
+            "deleted ui-required needs lane",
+        )
+
+    def test_flip_ui_required_changes_fail_closed_fails(self):
+        """ui-required changes 失败 fail-closed 被翻转时，校验器必须非零退出（防 false green）。"""
+        self.assert_mutation_fails(
+            flip_ui_required_changes_fail_closed(read_workflow()),
+            "flipped ui-required changes fail-closed",
+        )
+
+    def test_restore_ui_required_path_filter_fails(self):
+        """ui-required 被改回路径筛选时，校验器必须非零退出（防 required check 可跳过）。"""
+        self.assert_mutation_fails(
+            restore_ui_required_path_filter(read_workflow()),
+            "restored ui-required path filter",
+        )
+
+    def test_delete_ui_required_job_fails(self):
+        """ui-required job 被删除时，校验器必须非零退出（第二批门禁聚合理由防回退）。"""
+        self.assert_mutation_fails(
+            delete_ui_required_job(read_workflow()),
+            "deleted ui-required job",
         )
 
 

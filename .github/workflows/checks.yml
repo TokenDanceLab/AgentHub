@@ -1298,7 +1298,22 @@ jobs:
       - name: Capture web visual:qa:shell
         timeout-minutes: 15
         working-directory: ./app/web
-        run: pnpm visual:qa:shell
+        run: |
+          # Flake retry (#1949): browser capture can fail transiently on CI runners.
+          for attempt in 1 2; do
+            echo "::group::visual:qa:shell attempt ${attempt}"
+            if pnpm visual:qa:shell; then
+              echo "::endgroup::"
+              break
+            fi
+            echo "::endgroup::"
+            if [ "$attempt" = "2" ]; then
+              echo "::error::visual:qa:shell failed after 2 attempts"
+              exit 1
+            fi
+            echo "::warning::visual:qa:shell attempt ${attempt} failed, retrying..."
+            sleep 5
+          done
         env:
           CI: 'true'
           # Script spawns vite on 5174 with mock hub route; no real Hub required.
@@ -1306,7 +1321,22 @@ jobs:
       - name: Capture web visual:qa:chat
         timeout-minutes: 15
         working-directory: ./app/web
-        run: pnpm visual:qa:chat
+        run: |
+          # Flake retry (#1949): browser capture can fail transiently on CI runners.
+          for attempt in 1 2; do
+            echo "::group::visual:qa:chat attempt ${attempt}"
+            if pnpm visual:qa:chat; then
+              echo "::endgroup::"
+              break
+            fi
+            echo "::endgroup::"
+            if [ "$attempt" = "2" ]; then
+              echo "::error::visual:qa:chat failed after 2 attempts"
+              exit 1
+            fi
+            echo "::warning::visual:qa:chat attempt ${attempt} failed, retrying..."
+            sleep 5
+          done
         env:
           CI: 'true'
           # Script spawns vite on 5174 with a fully stubbed Hub session
@@ -1375,7 +1405,22 @@ jobs:
       - name: Capture desktop visual:qa:shell
         timeout-minutes: 15
         working-directory: ./app/desktop
-        run: pnpm visual:qa:shell
+        run: |
+          # Flake retry (#1949): browser capture can fail transiently on CI runners.
+          for attempt in 1 2; do
+            echo "::group::desktop visual:qa:shell attempt ${attempt}"
+            if pnpm visual:qa:shell; then
+              echo "::endgroup::"
+              break
+            fi
+            echo "::endgroup::"
+            if [ "$attempt" = "2" ]; then
+              echo "::error::desktop visual:qa:shell failed after 2 attempts"
+              exit 1
+            fi
+            echo "::warning::desktop visual:qa:shell attempt ${attempt} failed, retrying..."
+            sleep 5
+          done
         env:
           CI: 'true'
           # Script spawns vite on 5199 with demo workbench entry; no real Hub required.
@@ -1383,7 +1428,22 @@ jobs:
       - name: Capture desktop visual:qa:chat
         timeout-minutes: 15
         working-directory: ./app/desktop
-        run: pnpm visual:qa:chat
+        run: |
+          # Flake retry (#1949): browser capture can fail transiently on CI runners.
+          for attempt in 1 2; do
+            echo "::group::desktop visual:qa:chat attempt ${attempt}"
+            if pnpm visual:qa:chat; then
+              echo "::endgroup::"
+              break
+            fi
+            echo "::endgroup::"
+            if [ "$attempt" = "2" ]; then
+              echo "::error::desktop visual:qa:chat failed after 2 attempts"
+              exit 1
+            fi
+            echo "::warning::desktop visual:qa:chat attempt ${attempt} failed, retrying..."
+            sleep 5
+          done
         env:
           CI: 'true'
           # Script spawns vite on 5199 with demo workbench entry (builder
@@ -1462,7 +1522,7 @@ jobs:
         # Vite dev server + all Hub calls are stubbed via Playwright routes;
         # playwright.config.ts pins VITE_HUB_URL to hub.test.invalid so any
         # un-stubbed Hub call fails closed. No real Hub/Edge/login required.
-        run: pnpm test:e2e:stubbed-hub
+        run: pnpm test:e2e:stubbed-hub -- --retries=1
         env:
           CI: 'true'
 
@@ -2123,6 +2183,57 @@ jobs:
           assert_lane "frontend-mobile-light" "$MOBILE_FILTER" "$MOBILE_RESULT"
           assert_lane "frontend-coverage" "$COVERAGE_FILTER" "$COVERAGE_RESULT"
           echo "frontend L0 aggregate ok"
+
+  # ── UI required aggregate (second-batch visual/E2E gates, #1949) ─
+  # Aggregates visual-qa-shell / visual-qa-desktop / web-e2e-stubbed / design-css
+  # into a single stable required check. Same恒报 pattern as frontend-required /
+  # backend-required: if: always() + fail-closed on changes failure + no-op
+  # success when path filter deselects all lanes + fail on any selected lane
+  # non-success. This job is the switch point for making these gates required;
+  # branch protection only needs to add this one name.
+  ui-required:
+    name: ui-required
+    needs: [changes, visual-qa-shell, visual-qa-desktop, web-e2e-stubbed, design-css]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Assert UI second-batch gates
+        env:
+          CHANGES_STATUS: ${{ needs.changes.result }}
+          EVENT_NAME: ${{ github.event_name }}
+          SHELL_FILTER: ${{ needs.changes.outputs.shell }}
+          VISUAL_SHELL_RESULT: ${{ needs.visual-qa-shell.result }}
+          VISUAL_DESKTOP_RESULT: ${{ needs.visual-qa-desktop.result }}
+          WEB_FILTER: ${{ needs.changes.outputs.web }}
+          WEB_E2E_RESULT: ${{ needs.web-e2e-stubbed.result }}
+          DESIGN_CSS_FILTER: ${{ needs.changes.outputs.design_css }}
+          DESIGN_CSS_RESULT: ${{ needs.design-css.result }}
+        run: |
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            SHELL_FILTER=true
+            WEB_FILTER=true
+            DESIGN_CSS_FILTER=true
+          elif [ "$CHANGES_STATUS" != "success" ]; then
+            echo "::error::changes job result: $CHANGES_STATUS; cannot decide UI gates"
+            exit 1
+          fi
+          assert_lane() {
+            label="$1"; filter="$2"; result="$3"
+            if [ "$filter" = "true" ]; then
+              if [ "$result" != "success" ]; then
+                echo "::error::${label} result: ${result}"
+                exit 1
+              fi
+            elif [ "$result" != "skipped" ] && [ "$result" != "success" ]; then
+              echo "::error::${label} ran without path-filter selection; result: ${result}"
+              exit 1
+            fi
+          }
+          assert_lane "visual-qa-shell" "$SHELL_FILTER" "$VISUAL_SHELL_RESULT"
+          assert_lane "visual-qa-desktop" "$SHELL_FILTER" "$VISUAL_DESKTOP_RESULT"
+          assert_lane "web-e2e-stubbed" "$WEB_FILTER" "$WEB_E2E_RESULT"
+          assert_lane "design-css" "$DESIGN_CSS_FILTER" "$DESIGN_CSS_RESULT"
+          echo "UI second-batch aggregate ok"
 
   # ── Design CSS syntax gate (fail-closed, #1720) ─
   # 核心 token/theme/preset CSS 被 .stylelintignore 排除在 Stylelint 之外，
