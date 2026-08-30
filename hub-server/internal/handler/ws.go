@@ -102,9 +102,16 @@ func (h *WebSocketHandler) ServeWS(c *gin.Context) {
 	// of the legacy sendFrame bypass unifies seq_id stamping so clients can
 	// detect loss via seq gaps (G12 fix); subsequent data frames start at
 	// seq_id=2 because auth.ok now consumes seq_id=1.
-	go h.writeLoop(conn)
+	// Track connection-scoped goroutines so Manager.Shutdown can wait for
+	// them to converge. Add(2) covers writeLoop + readLoop; each defers Done.
+	h.manager.GoroutineAdd(2)
+	go func() {
+		defer h.manager.GoroutineDone()
+		h.writeLoop(conn)
+	}()
 	h.manager.PushToConn(conn.ID, ws.NewFrame(ws.TypeAuthOK, nil))
 	safego.SafeGo("ws.readLoop", func() {
+		defer h.manager.GoroutineDone()
 		h.authenticatedReadLoop(conn)
 	})
 }

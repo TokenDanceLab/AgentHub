@@ -4,6 +4,7 @@ import (
 	"context"
 	"log/slog"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/agenthub/hub-server/internal/config"
@@ -34,6 +35,15 @@ type Manager struct {
 	// pingHook is a test-only seam replacing pingAll's body (heartbeat
 	// lifecycle tests count ticks without needing real connections).
 	pingHook func()
+
+	// goroutines tracks in-flight connection-scoped goroutines (writeLoop +
+	// readLoop). Add before launch, Done on exit. Shutdown waits on this with
+	// a bounded timeout so process exit does not race with in-flight frames.
+	goroutines sync.WaitGroup
+
+	// shutdown is set atomically at the start of Shutdown so Register and
+	// Push paths can short-circuit without acquiring mu.
+	shutdown atomic.Bool
 }
 
 func NewManager() *Manager {
@@ -68,6 +78,25 @@ func (m *Manager) SendBufferSize() int {
 	return m.sendBufferSize
 }
 
+// GoroutineAdd increments the in-flight connection-goroutine counter by n.
+// Callers MUST pair every Add with a corresponding Done (typically deferred
+// in the goroutine body). This is intentionally exported so handler/ws can
+// track writeLoop/readLoop lifetimes without reaching into Manager internals.
+func (m *Manager) GoroutineAdd(n int) {
+	m.goroutines.Add(n)
+}
+
+// GoroutineDone decrements the in-flight connection-goroutine counter.
+func (m *Manager) GoroutineDone() {
+	m.goroutines.Done()
+}
+
+// IsShutdown reports whether Shutdown has been initiated. Push/Register paths
+// use this as a fast-path short-circuit before acquiring mu.
+func (m *Manager) IsShutdown() bool {
+	return m.shutdown.Load()
+}
+
 func (m *Manager) Count() int {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
@@ -83,6 +112,12 @@ func (m *Manager) Count() int {
 // For connections that authenticate after registration (the common path), the
 // cap is enforced in SetAuth instead.
 func (m *Manager) Register(c *Conn) error {
+	// Fast-path: reject new registrations once shutdown has begun so no new
+	// connection goroutines are spawned while we are draining existing ones.
+	if m.shutdown.Load() {
+		return ErrShutdownInProgress
+	}
+
 	id, err := uuidv7.New()
 	if err != nil {
 		return err
@@ -285,14 +320,32 @@ func (m *Manager) StartHeartbeatWithInterval(ctx context.Context, interval time.
 	}()
 }
 
-// Shutdown closes all WebSocket connections and cleans up internal state.
-// It closes each connection's Send channel first (unblocking writeLoop
-// goroutines), then closes the WebSocket connection (unblocking readLoop
-// goroutines), and finally clears the registry maps.  This ensures that
-// all connection-scoped goroutines will eventually exit rather than leak.
+// shutdownDrainTimeout is the maximum time Shutdown waits for in-flight
+// connection goroutines (writeLoop + readLoop) to exit after signaling
+// closure. 2 s is chosen to be well above typical TCP close RTT (~100 ms)
+// yet short enough to keep process-shutdown latency bounded; exceeding it
+// indicates a stuck goroutine and is logged as a warning, not a fatal.
+const shutdownDrainTimeout = 2 * time.Second
+
+// Shutdown closes all WebSocket connections and waits (with a bounded
+// timeout) for connection-scoped goroutines to converge.
+//
+// Sequence:
+//  1. Set the shutdown flag so Register/Push short-circuit immediately.
+//  2. Under mu: closeSend + Close every connection, clear registry maps.
+//  3. Release mu and wait up to shutdownDrainTimeout for the goroutine
+//     WaitGroup to reach zero.
+//  4. If the timeout elapses, log a Warn with the outstanding count and
+//     return — do NOT block process exit indefinitely.
+//
+// The shutdown flag is sticky; subsequent calls to Shutdown are no-ops.
 func (m *Manager) Shutdown() {
+	if !m.shutdown.CompareAndSwap(false, true) {
+		return // already shutting down
+	}
+
 	m.mu.Lock()
-	defer m.mu.Unlock()
+	pending := len(m.conns)
 	for id, c := range m.conns {
 		c.closeSend() // Unblock writeLoop goroutine (blocks on <-c.Send)
 		c.Close()     // Unblock readLoop goroutine (blocks on Read)
@@ -300,6 +353,27 @@ func (m *Manager) Shutdown() {
 	}
 	m.byUser = make(map[string]map[string]string)
 	m.userConnCount = make(map[string]int)
+	m.mu.Unlock()
+
+	// Wait for in-flight goroutines outside the lock so they can complete
+	// their deferred Unregister/cleanup without deadlocking on mu.
+	done := make(chan struct{})
+	go func() {
+		m.goroutines.Wait()
+		close(done)
+	}()
+
+	select {
+	case <-done:
+		slog.Info("ws shutdown: all connection goroutines converged",
+			"connections_closed", pending)
+	case <-time.After(shutdownDrainTimeout):
+		// We cannot cheaply read the outstanding WG count without an
+		// auxiliary atomic; log what we know at entry and warn.
+		slog.Warn("ws shutdown: timed out waiting for connection goroutines",
+			"timeout", shutdownDrainTimeout,
+			"connections_closed_at_entry", pending)
+	}
 }
 
 func (m *Manager) pingAll() {
