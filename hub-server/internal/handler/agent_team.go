@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/agenthub/hub-server/internal/model"
+	"gorm.io/gorm"
 )
 
 // AgentTeamService is the subset of *service.AgentTeamService used by AgentTeamHandler.
@@ -42,10 +43,11 @@ type AgentTeamService interface {
 
 type AgentTeamHandler struct {
 	service AgentTeamService
+	db      *gorm.DB
 }
 
-func NewAgentTeamHandler(s AgentTeamService) *AgentTeamHandler {
-	return &AgentTeamHandler{service: s}
+func NewAgentTeamHandler(s AgentTeamService, db *gorm.DB) *AgentTeamHandler {
+	return &AgentTeamHandler{service: s, db: db}
 }
 
 // --- Request types ---

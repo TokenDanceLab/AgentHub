@@ -228,7 +228,7 @@ func (a *App) initServices(ctx context.Context) error {
 	})
 	a.AgentTeamService.SetBus(a.bus)
 	a.AgentTeamService.SetHumanReviewEnabled(a.Config.AgentTeam.HumanReviewEnabled)
-	a.AgentTeamHandler = handler.NewAgentTeamHandler(a.AgentTeamService)
+	a.AgentTeamHandler = handler.NewAgentTeamHandler(a.AgentTeamService, a.DB)
 	// Document service
 	a.DocumentService = document.NewService(a.DB)
 	a.DocumentHandler = handler.NewDocumentHandler(a.DocumentService)

@@ -127,6 +127,9 @@ func (h *AgentTeamHandler) ListTeamEvents(c *gin.Context) {
 
 // HandleRouteDecision POST /web/agent-teams/:id/runs/:run_id/route-decisions
 func (h *AgentTeamHandler) HandleRouteDecision(c *gin.Context) {
+	if err := checkTeamAccess(c, h.db, c.Param("id"), TeamRoleOwner); err != nil {
+		return
+	}
 	var req model.CoordinatorRouteDecision
 	if err := c.ShouldBindJSON(&req); err != nil {
 		Fail(c, errcode.ErrBadRequest)
@@ -174,6 +177,9 @@ func (h *AgentTeamHandler) CompeteSummary(c *gin.Context) {
 
 // ReviewDecision POST /client/team-runs/:id/review-decision
 func (h *AgentTeamHandler) ReviewDecision(c *gin.Context) {
+	if err := resolveTeamIDFromRun(c, h.db, c.Param("id"), TeamRoleMember); err != nil {
+		return
+	}
 	var req model.HumanReviewDecision
 	if err := c.ShouldBindJSON(&req); err != nil {
 		Fail(c, errcode.ErrBadRequest)
