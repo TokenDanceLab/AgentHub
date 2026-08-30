@@ -15,5 +15,5 @@ func TestResolveAuthCacheUsesNoopForTypedNilClient(t *testing.T) {
 
 	resolved := resolveAuthCache(typedNil)
 	require.IsType(t, cache.NoOpCache{}, resolved)
-	require.NoError(t, resolved.Invalidate(ctx, "user:profile:user-1"))
+	require.NoError(t, resolved.Invalidate(ctx, "test:key"))
 }
