@@ -396,3 +396,99 @@ describe('WebSocketTransport protocol carriage', () => {
     transport.close();
   });
 });
+
+// ── #2101 G1: seq_id gap detection + duplicate drop ───────────────
+
+describe('hubWS seq_id gap detection (#2101 G1)', () => {
+  let t: MockTransport;
+  let h: HubWSHandle;
+
+  function init() {
+    t = mockTransport();
+    h = createHubWS({ url: 'ws://h', getToken: token(), transport: t });
+    t.connect();
+    // Complete auth handshake so subsequent frames are dispatched.
+    t._deliverMessage({ type: HUB_EVENTS.AUTH_OK, payload: null, seq_id: 0 });
+  }
+
+  it('does not fire gap event for consecutive seq_ids', () => {
+    init();
+    const gaps: unknown[] = [];
+    h.onGap((p) => gaps.push(p));
+    t._deliverMessage({ type: 'message.new', payload: {}, seq_id: 1 });
+    t._deliverMessage({ type: 'message.new', payload: {}, seq_id: 2 });
+    t._deliverMessage({ type: 'message.new', payload: {}, seq_id: 3 });
+    expect(gaps).toHaveLength(0);
+    expect(h.getLastSeq()).toBe(3);
+  });
+
+  it('fires gap event when seq_id jumps and updates lastSeq', () => {
+    init();
+    const gaps: Array<{ lastSeq: number; receivedSeq: number; gapSize: number }> = [];
+    h.onGap((p) => gaps.push(p));
+    t._deliverMessage({ type: 'message.new', payload: {}, seq_id: 1 });
+    // Gap: 2..4 missing, next is 5
+    t._deliverMessage({ type: 'message.new', payload: {}, seq_id: 5 });
+    expect(gaps).toEqual([{ lastSeq: 1, receivedSeq: 5, gapSize: 3 }]);
+    expect(h.getLastSeq()).toBe(5);
+    // Subsequent consecutive frame should NOT re-fire gap
+    t._deliverMessage({ type: 'message.new', payload: {}, seq_id: 6 });
+    expect(gaps).toHaveLength(1);
+    expect(h.getLastSeq()).toBe(6);
+  });
+
+  it('drops duplicate frames (seq_id <= lastSeq) without dispatch', () => {
+    init();
+    const received: string[] = [];
+    h.on('message.new' as never, () => received.push('x'));
+    t._deliverMessage({ type: 'message.new', payload: {}, seq_id: 1 });
+    t._deliverMessage({ type: 'message.new', payload: {}, seq_id: 1 }); // dup
+    t._deliverMessage({ type: 'message.new', payload: {}, seq_id: 0 }); // old dup
+    expect(received).toHaveLength(1);
+    expect(h.getLastSeq()).toBe(1);
+  });
+
+  it('resets lastSeq on reconnect (new connection)', () => {
+    init();
+    t._deliverMessage({ type: 'message.new', payload: {}, seq_id: 5 });
+    expect(h.getLastSeq()).toBe(5);
+    // Simulate reconnect: transport status cycles through connected again
+    t._setStatus('disconnected');
+    t._setStatus('connecting');
+    t._setStatus('connected');
+    expect(h.getLastSeq()).toBe(-1);
+    // Re-auth with new seq baseline
+    t._deliverMessage({ type: HUB_EVENTS.AUTH_OK, payload: null, seq_id: 0 });
+    expect(h.getLastSeq()).toBe(0);
+    // Frame seq=1 is consecutive from new baseline — no gap
+    const gaps: unknown[] = [];
+    h.onGap((p) => gaps.push(p));
+    t._deliverMessage({ type: 'message.new', payload: {}, seq_id: 1 });
+    expect(gaps).toHaveLength(0);
+  });
+
+  it('ignores frames without seq_id for gap tracking', () => {
+    init();
+    const gaps: unknown[] = [];
+    h.onGap((p) => gaps.push(p));
+    // No seq_id — should not move lastSeq or trigger gap
+    t._deliverMessage({ type: 'message.new', payload: {} });
+    expect(h.getLastSeq()).toBe(0); // still at auth.ok's seq
+    expect(gaps).toHaveLength(0);
+    // Next seq-bearing frame at 1 is consecutive from 0
+    t._deliverMessage({ type: 'message.new', payload: {}, seq_id: 1 });
+    expect(gaps).toHaveLength(0);
+    expect(h.getLastSeq()).toBe(1);
+  });
+
+  it('onGap unsub stops notifications', () => {
+    init();
+    let count = 0;
+    const unsub = h.onGap(() => { count++; });
+    t._deliverMessage({ type: 'message.new', payload: {}, seq_id: 5 });
+    expect(count).toBe(1);
+    unsub();
+    t._deliverMessage({ type: 'message.new', payload: {}, seq_id: 10 });
+    expect(count).toBe(1);
+  });
+});

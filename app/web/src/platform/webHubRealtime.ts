@@ -301,11 +301,21 @@ export function useWebHubRealtime({
       }
     });
 
+    // #2101 G1: seq_id gap → invalidate threads-family queries so the next
+    // render refetches sessions/messages and recovers any frames lost between
+    // lastSeq and receivedSeq. Other families deferred to a follow-up slice.
+    const unsubscribeGap = socket.onGap?.(() => {
+      void queryClient.invalidateQueries({ queryKey: ['web-v4', 'hub-sessions'] });
+      void queryClient.invalidateQueries({ queryKey: ['web-v4', 'hub-messages'] });
+      void queryClient.invalidateQueries({ queryKey: ['hub', 'threads'] });
+    });
+
     socket.connect();
     return () => {
       unsubscribe();
       unsubscribeStatus();
       unsubscribeDeviceKicked();
+      unsubscribeGap?.();
       liveBatcher.dispose();
       if (liveBatcherRef.current === liveBatcher) {
         liveBatcherRef.current = null;
