@@ -91,6 +91,7 @@ def main() -> int:
     backend_fixture = get_job_block(workflow, "backend-e2e-fixture")
     backend_required = get_job_block(workflow, "backend-required")
     frontend_required = get_job_block(workflow, "frontend-required")
+    ui_required = get_job_block(workflow, "ui-required")
     # CI5: backend-focused-subset job removed (redundant with go-edge/go-hub
     # full `go test ./...` runs that already cover the focused packages).
     desktop = get_job_block(workflow, "frontend-desktop")
@@ -244,6 +245,22 @@ def main() -> int:
     assert_contains(frontend_required, re.escape('assert_lane "frontend-web" "$WEB_FILTER" "$WEB_RESULT"'), "frontend-required must enforce the frontend-web lane")
     assert_contains(frontend_required, re.escape('assert_lane "frontend-mobile-light" "$MOBILE_FILTER" "$MOBILE_RESULT"'), "frontend-required must enforce the frontend-mobile-light lane")
     assert_contains(frontend_required, re.escape('assert_lane "frontend-coverage" "$COVERAGE_FILTER" "$COVERAGE_RESULT"'), "frontend-required must enforce the frontend-coverage lane")
+
+    # #1949: ui-required 恒报聚合（第二批视觉/E2E 门禁）：对偶 frontend-required /
+    # backend-required 模式。聚合 visual-qa-shell / visual-qa-desktop /
+    # web-e2e-stubbed / design-css，使这批门禁从 advisory 转为 required。
+    # changes 失败 fail-closed；路径未选中 success no-op；选中 lane 非 success 即失败。
+    assert_contains(ui_required, re.escape("needs: [changes, visual-qa-shell, visual-qa-desktop, web-e2e-stubbed, design-css]"), "ui-required must aggregate all second-batch UI lanes")
+    assert_contains(ui_required, re.escape("if: always()"), "ui-required must report a stable result when its lanes are path-filtered")
+    assert_contains(ui_required, re.escape("CHANGES_STATUS: ${{ needs.changes.result }}"), "ui-required must bind the changes result for fail-closed aggregation")
+    assert_contains(ui_required, re.escape("SHELL_FILTER: ${{ needs.changes.outputs.shell }}"), "ui-required must bind the shell path-filter output")
+    assert_contains(ui_required, re.escape("WEB_FILTER: ${{ needs.changes.outputs.web }}"), "ui-required must bind the web path-filter output")
+    assert_contains(ui_required, re.escape("DESIGN_CSS_FILTER: ${{ needs.changes.outputs.design_css }}"), "ui-required must bind the design_css path-filter output")
+    assert_contains(ui_required, re.escape('CHANGES_STATUS" != "success"'), "ui-required must fail closed when the changes job fails")
+    assert_contains(ui_required, re.escape('assert_lane "visual-qa-shell" "$SHELL_FILTER" "$VISUAL_SHELL_RESULT"'), "ui-required must enforce the visual-qa-shell lane")
+    assert_contains(ui_required, re.escape('assert_lane "visual-qa-desktop" "$SHELL_FILTER" "$VISUAL_DESKTOP_RESULT"'), "ui-required must enforce the visual-qa-desktop lane")
+    assert_contains(ui_required, re.escape('assert_lane "web-e2e-stubbed" "$WEB_FILTER" "$WEB_E2E_RESULT"'), "ui-required must enforce the web-e2e-stubbed lane")
+    assert_contains(ui_required, re.escape('assert_lane "design-css" "$DESIGN_CSS_FILTER" "$DESIGN_CSS_RESULT"'), "ui-required must enforce the design-css lane")
 
     assert_contains(backend_fixture, r"working-directory:\s+hub-server", "backend-e2e-fixture must run from hub-server")
     assert_contains(backend_fixture, r"TeamRun fixture E2E", "backend-e2e-fixture must name the TeamRun fixture step")
