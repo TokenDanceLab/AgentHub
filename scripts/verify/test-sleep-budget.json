@@ -195,6 +195,19 @@
    { "ms": 1, "kind": "poll_deadline" }
   ]
  },
+ "hub-server/internal/bus/publish_close_stress_test.go": {
+  "count": 3,
+  "total_ms": 70.05,
+  "max_ms": 50,
+  "owner": "DeliciousBuding",
+  "review": "2026-08-30",
+  "reason": "Publish/Close stress characterization (#2071 S1, benign): 50us simulated slow handler, 50ms pre-round settle, 20ms post-drain before pending assert. Bounded rounds (5x3s), deadline-guarded.",
+  "sleeps": [
+   { "ms": 0.05, "kind": "simulated_slow" },
+   { "ms": 50, "kind": "grace_window" },
+   { "ms": 20, "kind": "grace_window" }
+  ]
+ },
  "hub-server/internal/cache/client_test.go": {
   "count": 2,
   "total_ms": 150,
