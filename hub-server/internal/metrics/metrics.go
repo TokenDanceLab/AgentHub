@@ -124,6 +124,10 @@ var (
 	AuditFinalFailures    prometheus.Counter
 	AuditFileSinkFailures prometheus.Counter
 
+	// HubTaskApprovalDecisionsTotal counts task approval decisions made via
+	// RunEventService.DecideTaskApproval. Label: decision (approve|deny).
+	HubTaskApprovalDecisionsTotal *prometheus.CounterVec
+
 	// ClientPendingDropped counts offline pending tasks evicted by the
 	// pending_tasks Redis queue cap (LTRIM at 256 entries). Incremented by
 	// app/events.go pushPendingTasks requeue path via the
@@ -563,6 +567,15 @@ func Register() {
 		prometheus.MustRegister(AgentHeartbeatFailures)
 		prometheus.MustRegister(SessionTouchFailures)
 		prometheus.MustRegister(AuditQueueDrops)
+
+		HubTaskApprovalDecisionsTotal = prometheus.NewCounterVec(
+			prometheus.CounterOpts{
+				Name: "hub_task_approval_decisions_total",
+				Help: "Total task approval decisions (approve/deny) via DecideTaskApproval.",
+			},
+			[]string{"decision"},
+		)
+		prometheus.MustRegister(HubTaskApprovalDecisionsTotal)
 		prometheus.MustRegister(AuditQueueDepth)
 		prometheus.MustRegister(AuditRetries)
 		prometheus.MustRegister(AuditFinalFailures)

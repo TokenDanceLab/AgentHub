@@ -1,6 +1,10 @@
 package dispatch
 
-import "encoding/json"
+import (
+	"encoding/json"
+
+	"github.com/agenthub/pkg/otelids"
+)
 
 // AssemblePayloadInput is the pure surface used to build a dispatch Payload
 // before outbox recording. History slices are supplied by the caller after IO.
@@ -39,6 +43,9 @@ func AssembleDispatchPayload(in AssemblePayloadInput) Payload {
 	ApplyTeamContext(&dp, in.Team)
 	dp.Messages = in.Messages
 	dp.PinnedMessages = in.PinnedMessages
+	if dp.TraceID == "" {
+		dp.TraceID = otelids.NewTraceID()
+	}
 	return dp
 }
 

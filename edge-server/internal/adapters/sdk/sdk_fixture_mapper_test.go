@@ -559,6 +559,7 @@ func TestSDKFixtureMapperProviderNeutralReplayContract(t *testing.T) {
 		BusEventToolResult,
 		BusEventContextUsage,
 		BusEventResult,
+		BusEventSessionMetrics, // slice A step 4: usage event now also emits session_metrics
 		BusEventResult,
 		BusEventResult,
 	}
@@ -591,11 +592,15 @@ func TestSDKFixtureMapperProviderNeutralReplayContract(t *testing.T) {
 	if mapped[6].Payload["terminalReason"] != "completed" || mapped[6].Payload["success"] != true {
 		t.Fatalf("terminal result payload = %#v", mapped[6].Payload)
 	}
-	if mapped[7].Payload["terminalReason"] != "error" || mapped[7].Payload["success"] != false {
-		t.Fatalf("error result payload = %#v", mapped[7].Payload)
+	// mapped[7] is now the session_metrics event inserted by slice A step 4.
+	if mapped[7].Type != BusEventSessionMetrics {
+		t.Fatalf("mapped[7] type = %s, want %s", mapped[7].Type, BusEventSessionMetrics)
 	}
-	if mapped[8].Payload["terminalReason"] != "cancelled" || mapped[8].Payload["cancelled"] != true {
-		t.Fatalf("cancel result payload = %#v", mapped[8].Payload)
+	if mapped[8].Payload["terminalReason"] != "error" || mapped[8].Payload["success"] != false {
+		t.Fatalf("error result payload = %#v", mapped[8].Payload)
+	}
+	if mapped[9].Payload["terminalReason"] != "cancelled" || mapped[9].Payload["cancelled"] != true {
+		t.Fatalf("cancel result payload = %#v", mapped[9].Payload)
 	}
 
 	hubReplay := marshalSDKFixtureJSON(t, mapSDKEventsForHubReplay(mapped))
