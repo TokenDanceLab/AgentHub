@@ -132,6 +132,8 @@ export interface ErrorReport {
   count: number;
   stack?: string;
   context?: Record<string, unknown>;
+  /** AppError.code when available; enables errcode-specific toast copy (#2072). */
+  code?: string;
 }
 
 function categorizeError(error: Error | AppError): ErrorCategory {
@@ -203,6 +205,7 @@ export class ErrorReporter {
       timestamp: Date.now(),
       count: 1,
       ...(error.stack != null && { stack: error.stack }),
+      ...(error instanceof AppError && { code: error.code }),
       ...(context != null && { context }),
     };
     this.errors.set(key, report);

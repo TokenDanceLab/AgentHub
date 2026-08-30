@@ -2178,5 +2178,14 @@
   "workspace.settings.title": "工作区设置",
   "workspace.share": "复制工作区上下文",
   "workspace.teamRunsActive": "{{count}} 个 TeamRun 活跃",
-  "workspace.teamRunsWithBlocks": "{{count}} 个 TeamRun 阻塞"
+  "workspace.teamRunsWithBlocks": "{{count}} 个 TeamRun 阻塞",
+  "error.startConversation": "新建会话失败，请检查网络连接后重试。",
+  "devices.pingOk": "目标可达，已刷新健康状态",
+  "devices.pingFailed": "Ping 失败：{{detail}}",
+  "error.cancelRunFailed": "取消运行失败：{{detail}}",
+  "error.code.auth_invalid_token": "登录已失效，请重新登录。",
+  "error.code.auth_token_expired": "登录已过期，请重新登录后继续。",
+  "error.code.workspace_not_allowed": "当前工作区路径不在允许列表中，请检查配置。",
+  "error.code.agent_offline": "Agent 当前离线，请等待重连或选择其他执行目标。",
+  "error.code.target_not_routable": "所选执行目标不可用，请选择其他目标。"
 }

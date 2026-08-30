@@ -21,6 +21,7 @@ import {
   type HubRuntimeEventTranscriptInput,
 } from '@shared/transcript';
 import { useToastStore } from '@shared/ui/toast';
+import { friendlyErrorMessage } from '@shared/errorReporting';
 import { createHubClient, type Session } from '@/api/hubClient';
 import {
   useHubExecutionTargets,
@@ -500,7 +501,12 @@ export function useWebWorkbenchModel(selectedConversationId?: string, selectedPr
       onError: (err) => {
         useToastStore.getState().showToast(
           'error',
-          t('devices.pingFailed', { detail: err instanceof Error ? err.message : String(err) }),
+          t('devices.pingFailed', {
+            detail: friendlyErrorMessage(
+              err instanceof Error ? err.message : undefined,
+              t('error.network'),
+            ),
+          }),
         );
       },
     });
@@ -596,7 +602,12 @@ export function useWebWorkbenchModel(selectedConversationId?: string, selectedPr
     void cancelAgentTaskMut.mutateAsync(taskId).catch((error: unknown) => {
       useToastStore.getState().showToast(
         'error',
-        error instanceof Error && error.message ? error.message : t('toast.cancelFailed'),
+        t('toast.cancelFailed', {
+          detail: friendlyErrorMessage(
+            error instanceof Error ? error.message : undefined,
+            t('error.unknown'),
+          ),
+        }),
       );
     });
   }, [activeAgentTask.data?.taskId, cancelAgentTaskMut, t]);
