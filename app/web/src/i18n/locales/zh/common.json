@@ -383,5 +383,13 @@
   "errorBoundary.stackTrace": "调用堆栈",
   "errorBoundary.timeoutDesc": "服务响应超时，请重试。",
   "errorBoundary.timeoutTitle": "服务超时",
-  "errorBoundary.title": "出了点问题"
+  "errorBoundary.title": "出了点问题",
+  "devices.pingOk": "目标可达，已刷新健康状态",
+  "devices.pingFailed": "Ping 失败：{{detail}}",
+  "toast.cancelFailed": "取消任务失败：{{detail}}",
+  "error.code.auth_invalid_token": "登录已失效，请重新登录。",
+  "error.code.auth_token_expired": "登录已过期，请重新登录后继续。",
+  "error.code.workspace_not_allowed": "当前工作区路径不在允许列表中，请检查配置。",
+  "error.code.agent_offline": "Agent 当前离线，请等待重连或选择其他执行目标。",
+  "error.code.target_not_routable": "所选执行目标不可用，请选择其他目标。"
 }
