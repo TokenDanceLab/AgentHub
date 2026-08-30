@@ -133,6 +133,9 @@ func (c *Client) PendingTaskCount(ctx context.Context, userID string) (int64, er
 
 // PushPendingTargetTask pushes a task JSON to a target/device-specific offline
 // queue so target-bound dispatch cannot be replayed to a different desktop.
+// Both the per-target task list and the device-level order list are capped at
+// pendingTaskQueueMaxLen entries (newest retained) to bound Redis growth when
+// a target stays offline indefinitely.
 func (c *Client) PushPendingTargetTask(ctx context.Context, userID, targetID, deviceID, taskJSON string) error {
 	indexKey := pendingTargetTaskIndexKey(userID, deviceID)
 	orderKey := pendingTargetTaskOrderKey(userID, deviceID)
@@ -145,8 +148,14 @@ func (c *Client) PushPendingTargetTask(ctx context.Context, userID, targetID, de
 	pipe.SAdd(ctx, indexKey, targetID)
 	pipe.Expire(ctx, indexKey, config.PendingTaskTTL)
 	pipe.RPush(ctx, taskKey, taskJSON)
+	// Cap per-target queue to pendingTaskQueueMaxLen (keeping newest via RPush
+	// + LTrim tail). Mirrors PushPendingTask backpressure; Ack path is LRem
+	// by value so trimming oldest entries does not affect consumption semantics.
+	pipe.LTrim(ctx, taskKey, int64(-pendingTaskQueueMaxLen), -1)
 	pipe.Expire(ctx, taskKey, config.PendingTaskTTL)
 	pipe.RPush(ctx, orderKey, orderEntry)
+	// Same cap for the order queue so it cannot outgrow the per-target queue.
+	pipe.LTrim(ctx, orderKey, int64(-pendingTaskQueueMaxLen), -1)
 	pipe.Expire(ctx, orderKey, config.PendingTaskTTL)
 	_, err = pipe.Exec(ctx)
 	return err

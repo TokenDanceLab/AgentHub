@@ -1218,3 +1218,87 @@ func TestConcurrentGetOrLoad(t *testing.T) {
 		assert.Equal(t, 1, v, "all goroutines should get the same cached result")
 	}
 }
+
+// TestPushPendingTargetTask_CapsAtMaxLen proves the #2119 P1 fix: both the
+// per-target task list and the device-level order list are capped at
+// pendingTaskQueueMaxLen entries (newest retained) so an offline target cannot
+// grow Redis without bound. Ack semantics are unaffected (LRem by value).
+func TestPushPendingTargetTask_CapsAtMaxLen(t *testing.T) {
+	c, _ := testClient(t)
+	ctx := context.Background()
+
+	const userID = "user-cap"
+	const targetID = "target-cap"
+	const deviceID = "dev-cap"
+
+	// Push more than the cap.
+	total := pendingTaskQueueMaxLen + 10
+	for i := 0; i < total; i++ {
+		payload := fmt.Sprintf(`{"seq":%d}`, i)
+		require.NoError(t, c.PushPendingTargetTask(ctx, userID, targetID, deviceID, payload))
+	}
+
+	// Per-target task list must be capped.
+	taskKey := pendingTargetTaskKey(userID, targetID, deviceID)
+	taskLen, err := c.rdb.LLen(ctx, taskKey).Result()
+	require.NoError(t, err)
+	require.Equal(t, int64(pendingTaskQueueMaxLen), taskLen, "per-target queue exceeded cap")
+
+	// Order list must be capped identically.
+	orderKey := pendingTargetTaskOrderKey(userID, deviceID)
+	orderLen, err := c.rdb.LLen(ctx, orderKey).Result()
+	require.NoError(t, err)
+	require.Equal(t, int64(pendingTaskQueueMaxLen), orderLen, "order queue exceeded cap")
+
+	// Newest entries must survive (RPush + LTrim(-max,-1) keeps tail).
+	tasks, err := c.ListPendingTargetTasksForDevice(ctx, userID, deviceID)
+	require.NoError(t, err)
+	require.Len(t, tasks, pendingTaskQueueMaxLen)
+	// First surviving entry should be seq=10 (oldest evicted 0..9).
+	require.JSONEq(t, `{"seq":10}`, tasks[0].Payload)
+	// Last surviving entry should be the most recent push.
+	require.JSONEq(t, fmt.Sprintf(`{"seq":%d}`, total-1), tasks[len(tasks)-1].Payload)
+}
+
+// TestPushPendingTargetTask_AckAfterCap proves that Ack still works correctly
+// after the queue has been trimmed: LRem removes by value regardless of cap.
+func TestPushPendingTargetTask_AckAfterCap(t *testing.T) {
+	c, _ := testClient(t)
+	ctx := context.Background()
+
+	const userID = "user-ack-cap"
+	const targetID = "target-ack"
+	const deviceID = "dev-ack"
+
+	// Fill past cap so trimming occurs.
+	for i := 0; i < pendingTaskQueueMaxLen+5; i++ {
+		require.NoError(t, c.PushPendingTargetTask(ctx, userID, targetID, deviceID, fmt.Sprintf(`{"seq":%d}`, i)))
+	}
+
+	// Ack a surviving entry (seq=5 is within the kept window [5..260]).
+	survivor := `{"seq":5}`
+	require.NoError(t, c.AckPendingTargetTask(ctx, userID, targetID, deviceID, survivor))
+
+	taskKey := pendingTargetTaskKey(userID, targetID, deviceID)
+	taskLen, err := c.rdb.LLen(ctx, taskKey).Result()
+	require.NoError(t, err)
+	require.Equal(t, int64(pendingTaskQueueMaxLen-1), taskLen, "ack did not reduce length")
+
+	orderKey := pendingTargetTaskOrderKey(userID, deviceID)
+	orderLen, err := c.rdb.LLen(ctx, orderKey).Result()
+	require.NoError(t, err)
+	require.Equal(t, int64(pendingTaskQueueMaxLen-1), orderLen, "ack did not reduce order length")
+}
+
+// TestPushPendingTargetTask_EmptyQueueShortCircuit proves no panic or error
+// when listing/acking on an empty queue after cap-related pushes.
+func TestPushPendingTargetTask_EmptyQueueShortCircuit(t *testing.T) {
+	c, _ := testClient(t)
+	ctx := context.Background()
+
+	tasks, err := c.ListPendingTargetTasksForDevice(ctx, "user-empty", "dev-empty")
+	require.NoError(t, err)
+	require.Empty(t, tasks)
+
+	require.NoError(t, c.AckPendingTargetTask(ctx, "user-empty", "t", "dev-empty", `{"x":1}`))
+}
