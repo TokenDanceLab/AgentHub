@@ -23,7 +23,6 @@ import (
 	"github.com/redis/go-redis/v9"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"gorm.io/gorm"
 
 	"github.com/agenthub/hub-server/internal/cache"
 	"github.com/agenthub/hub-server/internal/errcode"
@@ -80,11 +79,13 @@ func runRefreshFailClosedCase(t *testing.T, failClosedEnv string, blacklisted bo
 		mock.ExpectExec(sqlRevokeByDevice).
 			WithArgs(true, "user-uuid", "dev-1").
 			WillReturnResult(sqlmock.NewResult(0, 1))
+		// UpsertRefreshToken: atomic upsert + re-fetch
+		mock.ExpectExec(sqlInsertRT).
+			WillReturnResult(sqlmock.NewResult(0, 1))
 		mock.ExpectQuery(sqlRTByUserDevice).
 			WithArgs("user-uuid", "desktop", "dev-1", 1).
-			WillReturnError(gorm.ErrRecordNotFound)
-		mock.ExpectExec(sqlInsertRT).
-			WillReturnResult(sqlmock.NewResult(2, 1))
+			WillReturnRows(sqlmock.NewRows([]string{"id", "user_id", "device_type", "device_id", "token_hash", "revoked", "expires_at"}).
+				AddRow("rt-new", "user-uuid", "desktop", "dev-1", "newhash", false, time.Now().Add(24*time.Hour)))
 	}
 
 	cacheClient, mr := outageCacheClient(t)
@@ -174,11 +175,14 @@ func TestRefreshBlacklistCheckErrorsCounter(t *testing.T) {
 	mock.ExpectExec(sqlRevokeByDevice).
 		WithArgs(true, "user-uuid", "dev-1").
 		WillReturnResult(sqlmock.NewResult(0, 1))
+	// UpsertRefreshToken: atomic upsert + re-fetch (same adaptation as the
+	// matrix cases above; the old SELECT-then-INSERT flow is gone).
+	mock.ExpectExec(sqlInsertRT).
+		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectQuery(sqlRTByUserDevice).
 		WithArgs("user-uuid", "desktop", "dev-1", 1).
-		WillReturnError(gorm.ErrRecordNotFound)
-	mock.ExpectExec(sqlInsertRT).
-		WillReturnResult(sqlmock.NewResult(2, 1))
+		WillReturnRows(sqlmock.NewRows([]string{"id", "user_id", "device_type", "device_id", "token_hash", "revoked", "expires_at"}).
+			AddRow("rt-new", "user-uuid", "desktop", "dev-1", "newhash", false, time.Now().Add(24*time.Hour)))
 
 	cacheClient, mr := outageCacheClient(t)
 	mr.Close() // Redis outage → triggers error path in enforceRefreshBlacklist

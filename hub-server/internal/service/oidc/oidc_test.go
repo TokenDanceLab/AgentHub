@@ -54,7 +54,7 @@ func setupOIDCDB(t *testing.T) *gorm.DB {
 			created_at DATETIME,
 			updated_at DATETIME
 		)`,
-		`CREATE UNIQUE INDEX idx_users_tokendance_sub ON users(tokendance_sub) WHERE tokendance_sub IS NOT NULL AND tokendance_sub != ''`,
+		`CREATE UNIQUE INDEX idx_users_tokendance_sub ON users(tokendance_sub)`,
 		`CREATE TABLE devices (
 			id TEXT PRIMARY KEY,
 			user_id TEXT NOT NULL,
@@ -75,6 +75,7 @@ func setupOIDCDB(t *testing.T) *gorm.DB {
 			revoked INTEGER NOT NULL DEFAULT 0,
 			created_at DATETIME
 		)`,
+		`CREATE UNIQUE INDEX idx_rt_user_device ON refresh_tokens(user_id, device_type, device_id)`,
 	}
 	for _, ddl := range tables {
 		require.NoError(t, db.Exec(ddl).Error, "DDL: %s", ddl[:60])
