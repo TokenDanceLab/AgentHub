@@ -278,6 +278,18 @@ func (f *FileStore) SetRunWorkDir(id, workDir string) (Run, bool) {
 	return run, ok
 }
 
+func (f *FileStore) GetRunByHubTaskID(hubTaskID string) (Run, bool) {
+	return f.store.GetRunByHubTaskID(hubTaskID)
+}
+
+func (f *FileStore) SetRunHubTaskID(id, hubTaskID string) (Run, bool) {
+	run, ok := f.store.SetRunHubTaskID(id, hubTaskID)
+	if ok {
+		f.schedulePersist()
+	}
+	return run, ok
+}
+
 func (f *FileStore) CreateItem(item Item) (Item, error) {
 	created, err := f.store.CreateItem(item)
 	if err != nil {

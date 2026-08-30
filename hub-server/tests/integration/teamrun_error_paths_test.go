@@ -243,6 +243,7 @@ func errPathTeamDB(t *testing.T) *gorm.DB {
 			edge_run_id TEXT DEFAULT '',
 			target_id TEXT DEFAULT '',
 			status TEXT NOT NULL DEFAULT '',
+			model_params TEXT DEFAULT '{}',
 			created_at DATETIME,
 			updated_at DATETIME
 		)`,

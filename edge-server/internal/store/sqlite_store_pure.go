@@ -149,11 +149,11 @@ ON CONFLICT(workspace_id) DO UPDATE SET owner_id = excluded.owner_id, local_path
 				return nil
 			}
 			_, err = tx.Exec(
-				`INSERT INTO edge_runs (run_id, owner_id, workspace_id, thread_id, status, created_at, started_at, finished_at, metadata_json)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, '{}')
-ON CONFLICT(run_id) DO UPDATE SET owner_id = excluded.owner_id, workspace_id = excluded.workspace_id, thread_id = excluded.thread_id, status = excluded.status, created_at = excluded.created_at, started_at = excluded.started_at, finished_at = excluded.finished_at, metadata_json = excluded.metadata_json`,
+				`INSERT INTO edge_runs (run_id, owner_id, workspace_id, thread_id, status, created_at, started_at, finished_at, hub_task_id, metadata_json)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, '{}')
+ON CONFLICT(run_id) DO UPDATE SET owner_id = excluded.owner_id, workspace_id = excluded.workspace_id, thread_id = excluded.thread_id, status = excluded.status, created_at = excluded.created_at, started_at = excluded.started_at, finished_at = excluded.finished_at, hub_task_id = excluded.hub_task_id, metadata_json = excluded.metadata_json`,
 				write.RunID, sqliteProjectionOwnerID, write.WorkspaceID, write.ThreadID,
-				write.Status, write.CreatedAt, write.StartedAt, write.FinishedAt,
+				write.Status, write.CreatedAt, write.StartedAt, write.FinishedAt, write.HubTaskID,
 			)
 			return err
 		},

@@ -74,6 +74,7 @@ func newOutboxDB(t *testing.T) *gorm.DB {
 			edge_run_id TEXT DEFAULT '',
 			edge_device_id TEXT DEFAULT '',
 			error_message TEXT DEFAULT '',
+			model_params TEXT DEFAULT '{}',
 			created_at DATETIME,
 			dispatched_at DATETIME,
 			finished_at DATETIME,

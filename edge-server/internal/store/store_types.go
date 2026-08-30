@@ -38,6 +38,7 @@ type Run struct {
 	FinishedAt         string `json:"finishedAt,omitempty"`
 	EvidenceGateResult string `json:"evidenceGateResult,omitempty"`
 	WorkDir            string `json:"workDir,omitempty"`
+	HubTaskID          string `json:"hubTaskId,omitempty"`
 }
 
 type RunDiffFile struct {

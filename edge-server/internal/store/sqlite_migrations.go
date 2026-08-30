@@ -170,6 +170,17 @@ var sqliteMigrations = []sqliteMigration{
 			`DROP TABLE IF EXISTS agenthub_store_rows`,
 		},
 	},
+	{
+		version: 5,
+		name:    "edge_runs_hub_task_id",
+		up: []string{
+			`ALTER TABLE edge_runs ADD COLUMN hub_task_id TEXT DEFAULT ''`,
+			`CREATE INDEX IF NOT EXISTS idx_edge_runs_hub_task_id ON edge_runs(hub_task_id) WHERE hub_task_id != ''`,
+		},
+		down: []string{
+			`DROP INDEX IF EXISTS idx_edge_runs_hub_task_id`,
+		},
+	},
 }
 
 func runSQLiteMigrations(db *sql.DB) error {

@@ -404,3 +404,30 @@ func ListAgentRunEventsByTaskIDs(db *gorm.DB, taskIDs []string) ([]model.AgentRu
 		Find(&events).Error
 	return events, err
 }
+
+// ClaimOrphanedTasks atomically finds queued tasks older than the grace period
+// that have no delivery_outbox row (orphaned by crash or semaphore backoff) and
+// claims up to limit of them by transitioning status to 'dispatched'. The CAS
+// UPDATE prevents concurrent sweepers from double-claiming. Returns the claimed
+// task IDs.
+func ClaimOrphanedTasks(db *gorm.DB, grace time.Time, limit int) ([]string, error) {
+	if limit <= 0 {
+		limit = 10
+	}
+	var ids []string
+	err := db.Raw(`
+		UPDATE pending_agent_tasks
+		SET status = 'dispatched'
+		WHERE id IN (
+			SELECT t.id FROM pending_agent_tasks t
+			WHERE t.status = 'queued'
+			  AND t.created_at < ?
+			  AND NOT EXISTS (
+				  SELECT 1 FROM delivery_outbox d WHERE d.task_id = t.id
+			  )
+			LIMIT ?
+		)
+		RETURNING id
+	`, grace, limit).Scan(&ids).Error
+	return ids, err
+}

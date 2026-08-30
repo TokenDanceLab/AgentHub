@@ -321,3 +321,32 @@ func (s *Store) UpsertSettings(patch map[string]string) (UserSettings, error) {
 	s.settings, s.settingsMtime, view = upsertSettingsInMaps(s.settings, patch, nowString())
 	return view, nil
 }
+
+// GetRunByHubTaskID returns the run with the given non-empty HubTaskID.
+// Returns zero Run and false when hubTaskID is empty or no match exists.
+func (s *Store) GetRunByHubTaskID(hubTaskID string) (Run, bool) {
+	if hubTaskID == "" {
+		return Run{}, false
+	}
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	for _, run := range s.runs {
+		if run.HubTaskID == hubTaskID {
+			return run, true
+		}
+	}
+	return Run{}, false
+}
+
+// SetRunHubTaskID stamps the HubTaskID on an existing run.
+func (s *Store) SetRunHubTaskID(id, hubTaskID string) (Run, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	run, ok := s.runs[id]
+	if !ok {
+		return Run{}, false
+	}
+	run.HubTaskID = hubTaskID
+	s.runs[id] = run
+	return run, true
+}

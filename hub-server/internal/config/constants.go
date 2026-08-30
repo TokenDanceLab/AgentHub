@@ -225,3 +225,13 @@ const MaxGroupNameLength = 64
 
 // MaxTeamNameLength is the maximum agent team name length.
 const MaxTeamNameLength = 100
+
+// ── Orphan task recovery ─────────────────────────────────────────────────────
+
+// OrphanTaskGracePeriod is the minimum age a queued task must reach before the
+// orphan sweeper considers it eligible for recovery. Tasks younger than this
+// window are still in the normal dispatch pipeline and must not be reclaimed.
+const OrphanTaskGracePeriod = 120 * time.Second
+
+// OrphanTaskScanInterval controls how often the orphan task sweeper runs.
+const OrphanTaskScanInterval = 30 * time.Second
