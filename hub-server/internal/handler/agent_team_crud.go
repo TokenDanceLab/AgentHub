@@ -70,7 +70,7 @@ func (h *AgentTeamHandler) GetTeam(c *gin.Context) {
 
 // UpdateTeam PUT /web/agent-teams/:id
 func (h *AgentTeamHandler) UpdateTeam(c *gin.Context) {
-	if err := checkTeamAccess(c, h.db, c.Param("id"), TeamRoleOwner); err != nil {
+	if err := checkTeamAccess(c, h.service, c.Param("id"), TeamRoleOwner); err != nil {
 		return
 	}
 	var req updateTeamReq
@@ -94,7 +94,7 @@ func (h *AgentTeamHandler) UpdateTeam(c *gin.Context) {
 
 // DeleteTeam DELETE /web/agent-teams/:id
 func (h *AgentTeamHandler) DeleteTeam(c *gin.Context) {
-	if err := checkTeamAccess(c, h.db, c.Param("id"), TeamRoleOwner); err != nil {
+	if err := checkTeamAccess(c, h.service, c.Param("id"), TeamRoleOwner); err != nil {
 		return
 	}
 	userID := c.GetString("user_id")
@@ -113,7 +113,7 @@ func (h *AgentTeamHandler) DeleteTeam(c *gin.Context) {
 
 // AddMember POST /web/agent-teams/:id/members
 func (h *AgentTeamHandler) AddMember(c *gin.Context) {
-	if err := checkTeamAccess(c, h.db, c.Param("id"), TeamRoleOwner); err != nil {
+	if err := checkTeamAccess(c, h.service, c.Param("id"), TeamRoleOwner); err != nil {
 		return
 	}
 	var req addMemberReq
@@ -137,7 +137,7 @@ func (h *AgentTeamHandler) AddMember(c *gin.Context) {
 
 // RemoveMember DELETE /web/agent-teams/:id/members/:member_id
 func (h *AgentTeamHandler) RemoveMember(c *gin.Context) {
-	if err := checkTeamAccess(c, h.db, c.Param("id"), TeamRoleOwner); err != nil {
+	if err := checkTeamAccess(c, h.service, c.Param("id"), TeamRoleOwner); err != nil {
 		return
 	}
 	userID := c.GetString("user_id")

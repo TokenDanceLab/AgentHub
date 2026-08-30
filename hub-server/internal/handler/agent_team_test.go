@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/agenthub/hub-server/internal/model"
+	"github.com/agenthub/hub-server/internal/service/agentteam"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -29,7 +30,7 @@ func TestAgentTeamHandler_HandleRouteDecision(t *testing.T) {
 			return &model.AgentTeamAssignment{ID: "assignment-1", TeamRunID: runID}, nil
 		},
 	}
-	h := NewAgentTeamHandler(svc, authzTestDB(t))
+	h := NewAgentTeamHandler(svc)
 
 	r := gin.New()
 	r.POST("/web/agent-teams/:id/runs/:run_id/route-decisions", func(c *gin.Context) {
@@ -61,7 +62,7 @@ func TestAgentTeamHandler_ListTeamEvents(t *testing.T) {
 			return []model.AgentTeamEvent{{ID: "event-1", TeamRunID: runID, Type: model.TeamEventRouteRejected}}, nil
 		},
 	}
-	h := NewAgentTeamHandler(svc, authzTestDB(t))
+	h := NewAgentTeamHandler(svc)
 
 	r := gin.New()
 	r.GET("/web/agent-teams/:id/runs/:run_id/events", func(c *gin.Context) {
@@ -91,7 +92,7 @@ func TestAgentTeamHandler_ListTeamTasks(t *testing.T) {
 			return []model.AgentTeamTask{{ID: "task-1", TeamRunID: runID, Objective: "Build task board"}}, nil
 		},
 	}
-	h := NewAgentTeamHandler(svc, authzTestDB(t))
+	h := NewAgentTeamHandler(svc)
 
 	r := gin.New()
 	r.GET("/web/agent-teams/:id/runs/:run_id/tasks", func(c *gin.Context) {
@@ -131,7 +132,7 @@ func TestAgentTeamHandler_ResolveConflict(t *testing.T) {
 			}, nil
 		},
 	}
-	h := NewAgentTeamHandler(svc, authzTestDB(t))
+	h := NewAgentTeamHandler(svc)
 
 	r := gin.New()
 	r.POST("/web/agent-teams/:id/runs/:run_id/conflicts/:conflict_id/resolve", func(c *gin.Context) {
@@ -177,7 +178,7 @@ func TestAgentTeamHandler_DecideApproval(t *testing.T) {
 			}, nil
 		},
 	}
-	h := NewAgentTeamHandler(svc, authzTestDB(t))
+	h := NewAgentTeamHandler(svc)
 
 	r := gin.New()
 	r.POST("/web/agent-teams/:id/runs/:run_id/approvals/:approval_id/decide", func(c *gin.Context) {
@@ -198,29 +199,32 @@ func TestAgentTeamHandler_DecideApproval(t *testing.T) {
 }
 
 type mockAgentTeamService struct {
-	createTeam          func(ctx context.Context, userID, name, description string) (*model.AgentTeam, error)
-	listTeams           func(ctx context.Context, userID string) ([]model.AgentTeam, error)
-	getTeamWithMembers  func(ctx context.Context, userID, teamID string) (*model.TeamDetail, error)
-	addTeamMember       func(ctx context.Context, userID, teamID, agentProfileID, role string) error
-	updateTeam          func(ctx context.Context, userID, teamID, name, description string) error
-	deleteTeam          func(ctx context.Context, userID, teamID string) error
-	removeTeamMember    func(ctx context.Context, userID, teamID, memberID string) error
-	startTeamRun        func(ctx context.Context, userID, teamID, triggerMessage, targetID string) (*model.AgentTeamRun, error)
-	listTeamRuns        func(ctx context.Context, userID, teamID string) ([]model.AgentTeamRun, error)
-	getTeamRun          func(ctx context.Context, userID, teamID, runID string) (*model.AgentTeamRun, error)
-	getTeamRunState     func(ctx context.Context, userID, teamID, runID string) (*model.TeamRunState, error)
-	createAssignment    func(ctx context.Context, userID, teamRunID, fromMemberID, toMemberID, aType, taskPrompt, contextStr string) (*model.AgentTeamAssignment, error)
-	dispatchAssignment  func(ctx context.Context, userID, assignmentID string) error
-	completeAssignment  func(ctx context.Context, userID, assignmentID string, result string) error
-	failAssignment      func(ctx context.Context, userID, assignmentID string, reason string) error
-	listAssignments     func(ctx context.Context, userID, teamRunID string) ([]model.AgentTeamAssignment, error)
-	handleRouteDecision func(ctx context.Context, userID, teamID, runID string, decision model.CoordinatorRouteDecision) (*model.AgentTeamAssignment, error)
-	listTeamTasks       func(ctx context.Context, userID, teamID, runID string) ([]model.AgentTeamTask, error)
-	listTeamEvents      func(ctx context.Context, userID, teamID, runID string) ([]model.AgentTeamEvent, error)
-	resolveConflict     func(ctx context.Context, userID, teamID, runID string, resolution model.TeamConflictResolution) (*model.TeamConflictState, error)
-	decideApproval      func(ctx context.Context, userID, teamID, runID, approvalID string, decision model.TeamApprovalDecision) (*model.TeamApprovalState, error)
-	competeSummary      func(ctx context.Context, userID, runID string, req model.CompeteSummaryRequest) (*model.CompeteSummaryResponse, error)
-	reviewDagPlan       func(ctx context.Context, userID, runID string, decision model.HumanReviewDecision) (*model.HumanReviewState, error)
+	createTeam                  func(ctx context.Context, userID, name, description string) (*model.AgentTeam, error)
+	listTeams                   func(ctx context.Context, userID string) ([]model.AgentTeam, error)
+	getTeamWithMembers          func(ctx context.Context, userID, teamID string) (*model.TeamDetail, error)
+	addTeamMember               func(ctx context.Context, userID, teamID, agentProfileID, role string) error
+	updateTeam                  func(ctx context.Context, userID, teamID, name, description string) error
+	deleteTeam                  func(ctx context.Context, userID, teamID string) error
+	removeTeamMember            func(ctx context.Context, userID, teamID, memberID string) error
+	startTeamRun                func(ctx context.Context, userID, teamID, triggerMessage, targetID string) (*model.AgentTeamRun, error)
+	listTeamRuns                func(ctx context.Context, userID, teamID string) ([]model.AgentTeamRun, error)
+	getTeamRun                  func(ctx context.Context, userID, teamID, runID string) (*model.AgentTeamRun, error)
+	getTeamRunState             func(ctx context.Context, userID, teamID, runID string) (*model.TeamRunState, error)
+	createAssignment            func(ctx context.Context, userID, teamRunID, fromMemberID, toMemberID, aType, taskPrompt, contextStr string) (*model.AgentTeamAssignment, error)
+	dispatchAssignment          func(ctx context.Context, userID, assignmentID string) error
+	completeAssignment          func(ctx context.Context, userID, assignmentID string, result string) error
+	failAssignment              func(ctx context.Context, userID, assignmentID string, reason string) error
+	listAssignments             func(ctx context.Context, userID, teamRunID string) ([]model.AgentTeamAssignment, error)
+	handleRouteDecision         func(ctx context.Context, userID, teamID, runID string, decision model.CoordinatorRouteDecision) (*model.AgentTeamAssignment, error)
+	listTeamTasks               func(ctx context.Context, userID, teamID, runID string) ([]model.AgentTeamTask, error)
+	listTeamEvents              func(ctx context.Context, userID, teamID, runID string) ([]model.AgentTeamEvent, error)
+	resolveConflict             func(ctx context.Context, userID, teamID, runID string, resolution model.TeamConflictResolution) (*model.TeamConflictState, error)
+	decideApproval              func(ctx context.Context, userID, teamID, runID, approvalID string, decision model.TeamApprovalDecision) (*model.TeamApprovalState, error)
+	competeSummary              func(ctx context.Context, userID, runID string, req model.CompeteSummaryRequest) (*model.CompeteSummaryResponse, error)
+	reviewDagPlan               func(ctx context.Context, userID, runID string, decision model.HumanReviewDecision) (*model.HumanReviewState, error)
+	checkTeamAccess             func(ctx context.Context, userID, teamID string, minRole agentteam.TeamRole) error
+	resolveTeamIDFromRun        func(ctx context.Context, runID string) (string, error)
+	resolveTeamIDFromAssignment func(ctx context.Context, assignmentID string) (string, error)
 }
 
 func (m *mockAgentTeamService) CreateTeam(ctx context.Context, userID, name, description string) (*model.AgentTeam, error) {
@@ -387,6 +391,27 @@ func (m *mockAgentTeamService) ReviewDagPlan(ctx context.Context, userID, runID 
 	}
 	return m.reviewDagPlan(ctx, userID, runID, decision)
 }
+
+func (m *mockAgentTeamService) CheckTeamAccess(ctx context.Context, userID, teamID string, minRole agentteam.TeamRole) error {
+	if m.checkTeamAccess == nil {
+		return nil
+	}
+	return m.checkTeamAccess(ctx, userID, teamID, minRole)
+}
+
+func (m *mockAgentTeamService) ResolveTeamIDFromRun(ctx context.Context, runID string) (string, error) {
+	if m.resolveTeamIDFromRun == nil {
+		return "", nil
+	}
+	return m.resolveTeamIDFromRun(ctx, runID)
+}
+
+func (m *mockAgentTeamService) ResolveTeamIDFromAssignment(ctx context.Context, assignmentID string) (string, error) {
+	if m.resolveTeamIDFromAssignment == nil {
+		return "", nil
+	}
+	return m.resolveTeamIDFromAssignment(ctx, assignmentID)
+}
 func TestAgentTeamHandler_CreateTeam(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
@@ -401,7 +426,7 @@ func TestAgentTeamHandler_CreateTeam(t *testing.T) {
 				return &model.AgentTeam{ID: "team-1", Name: name, Description: description}, nil
 			},
 		}
-		h := NewAgentTeamHandler(svc, authzTestDB(t))
+		h := NewAgentTeamHandler(svc)
 
 		r := gin.New()
 		r.POST("/web/agent-teams", func(c *gin.Context) {
@@ -423,7 +448,7 @@ func TestAgentTeamHandler_CreateTeam(t *testing.T) {
 
 	t.Run("empty name fails", func(t *testing.T) {
 		svc := &mockAgentTeamService{}
-		h := NewAgentTeamHandler(svc, authzTestDB(t))
+		h := NewAgentTeamHandler(svc)
 
 		r := gin.New()
 		r.POST("/web/agent-teams", func(c *gin.Context) {
@@ -456,7 +481,7 @@ func TestAgentTeamHandler_ListTeams(t *testing.T) {
 			}, nil
 		},
 	}
-	h := NewAgentTeamHandler(svc, authzTestDB(t))
+	h := NewAgentTeamHandler(svc)
 
 	r := gin.New()
 	r.GET("/web/agent-teams", func(c *gin.Context) {
@@ -490,7 +515,7 @@ func TestAgentTeamHandler_GetTeam(t *testing.T) {
 			}, nil
 		},
 	}
-	h := NewAgentTeamHandler(svc, authzTestDB(t))
+	h := NewAgentTeamHandler(svc)
 
 	r := gin.New()
 	r.GET("/web/agent-teams/:id", func(c *gin.Context) {
@@ -522,7 +547,7 @@ func TestAgentTeamHandler_AddMember(t *testing.T) {
 			return nil
 		},
 	}
-	h := NewAgentTeamHandler(svc, authzTestDB(t))
+	h := NewAgentTeamHandler(svc)
 
 	r := gin.New()
 	r.POST("/web/agent-teams/:id/members", func(c *gin.Context) {
@@ -554,7 +579,7 @@ func TestAgentTeamHandler_StartRun(t *testing.T) {
 			return &model.AgentTeamRun{ID: "run-1", TeamID: teamID, TriggerMessage: triggerMessage, TargetID: &targetID, Status: "queued"}, nil
 		},
 	}
-	h := NewAgentTeamHandler(svc, authzTestDB(t))
+	h := NewAgentTeamHandler(svc)
 
 	r := gin.New()
 	r.POST("/web/agent-teams/:id/runs", func(c *gin.Context) {

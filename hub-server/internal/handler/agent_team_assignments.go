@@ -13,7 +13,7 @@ import (
 
 // CreateAssignment POST /web/agent-teams/:id/runs/:run_id/assignments
 func (h *AgentTeamHandler) CreateAssignment(c *gin.Context) {
-	if err := resolveTeamIDFromRun(c, h.db, c.Param("run_id"), TeamRoleMember); err != nil {
+	if err := resolveTeamIDFromRun(c, h.service, c.Param("run_id"), TeamRoleMember); err != nil {
 		return
 	}
 	var req createAssignmentReq
@@ -38,7 +38,7 @@ func (h *AgentTeamHandler) CreateAssignment(c *gin.Context) {
 
 // DispatchAssignment POST /web/agent-teams/:id/runs/:run_id/assignments/:assignment_id/dispatch
 func (h *AgentTeamHandler) DispatchAssignment(c *gin.Context) {
-	if err := resolveTeamIDFromAssignment(c, h.db, c.Param("assignment_id"), TeamRoleMember); err != nil {
+	if err := resolveTeamIDFromAssignment(c, h.service, c.Param("assignment_id"), TeamRoleMember); err != nil {
 		return
 	}
 	userID := c.GetString("user_id")
@@ -57,7 +57,7 @@ func (h *AgentTeamHandler) DispatchAssignment(c *gin.Context) {
 
 // CompleteAssignment POST /web/agent-teams/:id/runs/:run_id/assignments/:assignment_id/complete
 func (h *AgentTeamHandler) CompleteAssignment(c *gin.Context) {
-	if err := resolveTeamIDFromAssignment(c, h.db, c.Param("assignment_id"), TeamRoleMember); err != nil {
+	if err := resolveTeamIDFromAssignment(c, h.service, c.Param("assignment_id"), TeamRoleMember); err != nil {
 		return
 	}
 	var req completeAssignmentReq
@@ -81,7 +81,7 @@ func (h *AgentTeamHandler) CompleteAssignment(c *gin.Context) {
 
 // FailAssignment POST /web/agent-teams/:id/runs/:run_id/assignments/:assignment_id/fail
 func (h *AgentTeamHandler) FailAssignment(c *gin.Context) {
-	if err := resolveTeamIDFromAssignment(c, h.db, c.Param("assignment_id"), TeamRoleMember); err != nil {
+	if err := resolveTeamIDFromAssignment(c, h.service, c.Param("assignment_id"), TeamRoleMember); err != nil {
 		return
 	}
 	var req failAssignmentReq
@@ -125,7 +125,7 @@ func (h *AgentTeamHandler) ListAssignments(c *gin.Context) {
 
 // ResolveConflict POST /web/agent-teams/:id/runs/:run_id/conflicts/:conflict_id/resolve
 func (h *AgentTeamHandler) ResolveConflict(c *gin.Context) {
-	if err := checkTeamAccess(c, h.db, c.Param("id"), TeamRoleOwner); err != nil {
+	if err := checkTeamAccess(c, h.service, c.Param("id"), TeamRoleOwner); err != nil {
 		return
 	}
 	var req resolveConflictReq
@@ -157,7 +157,7 @@ func (h *AgentTeamHandler) ResolveConflict(c *gin.Context) {
 
 // DecideApproval POST /web/agent-teams/:id/runs/:run_id/approvals/:approval_id/decide
 func (h *AgentTeamHandler) DecideApproval(c *gin.Context) {
-	if err := checkTeamAccess(c, h.db, c.Param("id"), TeamRoleOwner); err != nil {
+	if err := checkTeamAccess(c, h.service, c.Param("id"), TeamRoleOwner); err != nil {
 		return
 	}
 	var req decideApprovalReq
