@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/agenthub/hub-server/internal/model"
+	"github.com/agenthub/hub-server/internal/service/agentteam"
 )
 
 // AgentTeamService is the subset of *service.AgentTeamService used by AgentTeamHandler.
@@ -38,6 +39,11 @@ type AgentTeamService interface {
 
 	// Human review gate
 	ReviewDagPlan(ctx context.Context, userID, runID string, decision model.HumanReviewDecision) (*model.HumanReviewState, error)
+
+	// Authorization (layering: handler delegates to service, no repository import)
+	CheckTeamAccess(ctx context.Context, userID, teamID string, minRole agentteam.TeamRole) error
+	ResolveTeamIDFromRun(ctx context.Context, runID string) (string, error)
+	ResolveTeamIDFromAssignment(ctx context.Context, assignmentID string) (string, error)
 }
 
 type AgentTeamHandler struct {
