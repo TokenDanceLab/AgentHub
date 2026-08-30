@@ -85,22 +85,17 @@ func (s *Service) CreateCommand(ctx context.Context, targetEdgeID, commandType s
 
 // GetCommand retrieves a relay command by ID from Redis, verifying it belongs to userID.
 func (s *Service) GetCommand(ctx context.Context, id string, userID string) (*CommandData, error) {
-	key := "relay:cmd:" + id
-	data, err := s.cache.GetRDB().Get(ctx, key).Result()
+	cmd, err := s.getCommand(ctx, id)
 	if err != nil {
-		return nil, errcode.UserNotFound.WithMessage("relay command not found")
-	}
-	var cmd CommandData
-	if err := json.Unmarshal([]byte(data), &cmd); err != nil {
-		return nil, fmt.Errorf("parse relay command: %w", err)
+		return nil, err
 	}
 	if cmd.CreatedBy != userID {
 		return nil, errcode.UserNotFound.WithMessage("relay command not found")
 	}
-	return &cmd, nil
+	return cmd, nil
 }
 
-// AckCommand marks a relay command as acknowledged by the Edge device, verifying it belongs to userID.
+// AckCommand marks a relay command as acknowledged by the creator, verifying it belongs to userID.
 func (s *Service) AckCommand(ctx context.Context, id string, userID string) error {
 	cmd, err := s.GetCommand(ctx, id, userID)
 	if err != nil {
@@ -112,6 +107,43 @@ func (s *Service) AckCommand(ctx context.Context, id string, userID string) erro
 	data, _ := json.Marshal(cmd)
 	key := "relay:cmd:" + id
 	return s.cache.GetRDB().Set(ctx, key, string(data), 24*time.Hour).Err()
+}
+
+// getCommand retrieves a relay command by ID from Redis without ownership check.
+func (s *Service) getCommand(ctx context.Context, id string) (*CommandData, error) {
+	key := "relay:cmd:" + id
+	data, err := s.cache.GetRDB().Get(ctx, key).Result()
+	if err != nil {
+		return nil, errcode.UserNotFound.WithMessage("relay command not found")
+	}
+	var cmd CommandData
+	if err := json.Unmarshal([]byte(data), &cmd); err != nil {
+		return nil, fmt.Errorf("parse relay command: %w", err)
+	}
+	return &cmd, nil
+}
+
+// DeviceAckCommand acknowledges a relay command using device identity.
+// It verifies that deviceID matches the command's TargetEdgeID and is idempotent:
+// repeating an ack on an already-acked command returns success without mutating state.
+func (s *Service) DeviceAckCommand(ctx context.Context, id string, deviceID string) error {
+	cmd, err := s.getCommand(ctx, id)
+	if err != nil {
+		return err
+	}
+	if cmd.TargetEdgeID != deviceID {
+		return errcode.ErrForbidden.WithMessage("device does not own this relay command")
+	}
+	// Idempotent: already acked → success without rewrite.
+	if cmd.Status == "acked" {
+		return nil
+	}
+	now := time.Now()
+	cmd.Status = "acked"
+	cmd.AckedAt = &now
+	raw, _ := json.Marshal(cmd)
+	key := "relay:cmd:" + id
+	return s.cache.GetRDB().Set(ctx, key, string(raw), 24*time.Hour).Err()
 }
 
 func generateRelayID() string {

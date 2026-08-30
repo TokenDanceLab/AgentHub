@@ -249,14 +249,14 @@ describe('hubClient helpers', () => {
       items: [{ id: 'audit-1' }],
     });
     await expect(client.createRelayCommand({ target_id: 'target-1', payload: { op: 'ping' } })).resolves.toMatchObject({ id: 'relay-1' });
-    await expect(client.ackRelayCommand('relay-1')).resolves.toBeUndefined();
+    await expect(client.ackRelayCommand('relay-1', 'device-1')).resolves.toBeUndefined();
 
     expect(fetchMock.mock.calls.map(([url]) => url)).toEqual([
       'http://hub.local/client/auth/oidc/authorize',
       'http://hub.local/web/execution-targets',
       'http://hub.local/web/audit-events?pageSize=5',
       'http://hub.local/web/relay/commands',
-      'http://hub.local/web/relay/commands/relay-1/ack',
+      'http://hub.local/web/relay/commands/relay-1/device-ack',
     ]);
   });
 

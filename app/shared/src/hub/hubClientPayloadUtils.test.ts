@@ -490,7 +490,7 @@ describe('hubClientPayloadUtils (#810 / #822 / #833 / #901 / #913 / #978)', () =
       '/web/audit-events?pageCursor=c%2F1',
     );
     expect(buildRelayCommandPath('cmd/1')).toBe('/web/relay/commands/cmd%2F1');
-    expect(buildAckRelayCommandPath('cmd/1')).toBe('/web/relay/commands/cmd%2F1/ack');
+    expect(buildAckRelayCommandPath('cmd/1')).toBe('/web/relay/commands/cmd%2F1/device-ack');
     expect(buildCustomAgentPath('agent/1')).toBe('/web/custom-agents/agent%2F1');
 
     expect(buildListPublicSkillsPath({ q: 'x' })).toBe('/web/skills?is_public=true&q=x');
@@ -791,9 +791,9 @@ describe('hubClientPayloadUtils (#810 / #822 / #833 / #901 / #913 / #978)', () =
       path: '/web/relay/commands',
       init: { method: 'POST', body: JSON.stringify({ command: 'ping' }) },
     });
-    expect(buildAckRelayCommandRequest('cmd/1')).toEqual({
-      path: '/web/relay/commands/cmd%2F1/ack',
-      init: { method: 'POST' },
+    expect(buildAckRelayCommandRequest('cmd/1', 'dev-1')).toEqual({
+      path: '/web/relay/commands/cmd%2F1/device-ack',
+      init: { method: 'POST', body: JSON.stringify({ device_id: 'dev-1' }) },
     });
     expect(buildCreateCustomAgentRequest({ name: 'a' })).toEqual({
       path: '/web/custom-agents',

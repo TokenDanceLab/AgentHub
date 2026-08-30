@@ -316,6 +316,7 @@ func SetupRoutes(r *gin.Engine, cfg *config.Config, authMW *middleware.AuthMiddl
 			web.POST("/relay/commands", authMW.RequireAdmin(), relayHandler.CreateCommand)
 			web.GET("/relay/commands/:id", authMW.RequireAdmin(), relayHandler.GetCommand)
 			web.POST("/relay/commands/:id/ack", authMW.RequireAdmin(), relayHandler.AckCommand)
+			web.POST("/relay/commands/:id/device-ack", relayHandler.DeviceAckCommand)
 		}
 
 		// Devices

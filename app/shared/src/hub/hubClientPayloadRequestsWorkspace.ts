@@ -193,13 +193,13 @@ export function buildDeleteExecutionTargetRequest(id: string): {
   };
 }
 
-export function buildAckRelayCommandRequest(id: string): {
+export function buildAckRelayCommandRequest(id: string, deviceId: string): {
   path: string;
-  init: { method: 'POST' };
+  init: { method: 'POST'; body: string };
 } {
   return {
     path: buildAckRelayCommandPath(id),
-    init: buildPostInit(),
+    init: buildJsonPostInit({ device_id: deviceId }),
   };
 }
 
