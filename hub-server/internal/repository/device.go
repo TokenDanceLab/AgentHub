@@ -46,7 +46,7 @@ func GetDeviceByID(db *gorm.DB, deviceID string) (*model.Device, error) {
 
 func ListDevicesByUser(db *gorm.DB, userID string) ([]model.Device, error) {
 	var devices []model.Device
-	err := db.Where("user_id = ?", userID).Order("last_active_at DESC").Find(&devices).Error
+	err := db.Where("user_id = ?", userID).Order("last_active_at DESC").Limit(100).Find(&devices).Error
 	return devices, err
 }
 

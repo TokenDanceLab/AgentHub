@@ -21,6 +21,7 @@ func ListReactionsByMessage(db *gorm.DB, sessionID, messageID string) ([]model.M
 	err := db.
 		Where("session_id = ? AND message_id = ?", sessionID, messageID).
 		Order("created_at ASC, id ASC").
+		Limit(500).
 		Find(&reactions).Error
 	return reactions, err
 }
