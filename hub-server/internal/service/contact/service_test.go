@@ -109,8 +109,8 @@ const (
 	sqlcFriendshipBetween = `FROM "friendships" WHERE (user_id`
 	sqlcFriendshipByID    = `FROM "friendships" WHERE id =`
 	sqlcFriendshipByUF    = `FROM "friendships" WHERE user_id = $1 AND friend_id = $2`
-	sqlcFriendshipsByUser = `FROM "friendships" WHERE user_id = $1 AND status = $2`
-	sqlcPendingReqs       = `FROM "friendships" WHERE friend_id = $1 AND status = $2`
+	sqlcFriendshipsByUser = `FROM "friendships" WHERE user_id = $1 AND status = $2 LIMIT`
+	sqlcPendingReqs       = `FROM "friendships" WHERE friend_id = $1 AND status = $2 ORDER BY created_at DESC LIMIT`
 	sqlcInsertFriend      = `INSERT INTO "friendships"`
 	sqlcUpdateFriend      = `UPDATE "friendships" SET`
 	sqlcDeleteFriend      = `DELETE FROM "friendships" WHERE`
@@ -700,7 +700,7 @@ func TestListContacts_Empty(t *testing.T) {
 	defer sqlDB.Close()
 
 	mock.ExpectQuery(sqlcFriendshipsByUser).
-		WithArgs("user-1", model.StatusAccepted).
+		WithArgs("user-1", model.StatusAccepted, 500).
 		WillReturnRows(sqlmock.NewRows([]string{"id", "user_id", "friend_id", "status", "remark"}))
 
 	svc := NewService(db, nil, testCacheClient(t))
@@ -715,7 +715,7 @@ func TestListContacts_WithFriends(t *testing.T) {
 	defer sqlDB.Close()
 
 	mock.ExpectQuery(sqlcFriendshipsByUser).
-		WithArgs("user-1", model.StatusAccepted).
+		WithArgs("user-1", model.StatusAccepted, 500).
 		WillReturnRows(sqlmock.NewRows([]string{"id", "user_id", "friend_id", "status", "remark"}).
 			AddRow("f-1", "user-1", "friend-a", model.StatusAccepted, "Buddy").
 			AddRow("f-2", "user-1", "friend-b", model.StatusAccepted, ""))
@@ -743,7 +743,7 @@ func TestListContacts_NilCacheMarksOffline(t *testing.T) {
 	defer sqlDB.Close()
 
 	mock.ExpectQuery(sqlcFriendshipsByUser).
-		WithArgs("user-1", model.StatusAccepted).
+		WithArgs("user-1", model.StatusAccepted, 500).
 		WillReturnRows(sqlmock.NewRows([]string{"id", "user_id", "friend_id", "status", "remark"}).
 			AddRow("f-1", "user-1", "friend-a", model.StatusAccepted, "Buddy").
 			AddRow("f-2", "user-1", "friend-b", model.StatusAccepted, ""))
@@ -768,7 +768,7 @@ func TestListContacts_BatchesFriendUserLookup(t *testing.T) {
 	defer sqlDB.Close()
 
 	mock.ExpectQuery(sqlcFriendshipsByUser).
-		WithArgs("user-1", model.StatusAccepted).
+		WithArgs("user-1", model.StatusAccepted, 500).
 		WillReturnRows(sqlmock.NewRows([]string{"id", "user_id", "friend_id", "status", "remark"}).
 			AddRow("f-1", "user-1", "friend-a", model.StatusAccepted, "A").
 			AddRow("f-2", "user-1", "friend-b", model.StatusAccepted, "B").
@@ -812,7 +812,7 @@ func TestListFriendRequests_Empty(t *testing.T) {
 	defer sqlDB.Close()
 
 	mock.ExpectQuery(sqlcPendingReqs).
-		WithArgs("user-1", model.StatusPending).
+		WithArgs("user-1", model.StatusPending, 500).
 		WillReturnRows(sqlmock.NewRows([]string{"id", "user_id", "friend_id", "status", "request_message", "created_at"}))
 
 	svc := NewService(db, nil, nil)
@@ -828,7 +828,7 @@ func TestListFriendRequests_WithRequests(t *testing.T) {
 
 	now := time.Now()
 	mock.ExpectQuery(sqlcPendingReqs).
-		WithArgs("user-1", model.StatusPending).
+		WithArgs("user-1", model.StatusPending, 500).
 		WillReturnRows(sqlmock.NewRows([]string{"id", "user_id", "friend_id", "status", "request_message", "created_at"}).
 			AddRow("req-1", "sender-a", "user-1", model.StatusPending, "Hi, let's connect!", now))
 
@@ -854,7 +854,7 @@ func TestListFriendRequests_BatchesSenderLookupAndSkipsMissingSender(t *testing.
 
 	now := time.Now()
 	mock.ExpectQuery(sqlcPendingReqs).
-		WithArgs("user-1", model.StatusPending).
+		WithArgs("user-1", model.StatusPending, 500).
 		WillReturnRows(sqlmock.NewRows([]string{"id", "user_id", "friend_id", "status", "request_message", "created_at"}).
 			AddRow("req-1", "sender-a", "user-1", model.StatusPending, "first", now).
 			AddRow("req-2", "sender-b", "user-1", model.StatusPending, "second", now).
