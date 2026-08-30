@@ -229,7 +229,8 @@ describe('Web app root', () => {
     expect(onPinMessage).toHaveBeenCalledWith('1', 'hub-session-1');
     // The workbench toast surfaces the rejection reason (role=status chrome
     // toast), not the optimistic success copy.
-    await screen.findByText('pin failed');
+    // Test env renders i18n keys raw (no resources loaded); runtime shows 'Pin failed, please retry'.
+    await screen.findByText('toast.pinFailed');
   });
 
   // #1821: a failed regenerate must keep the message visible and surface an
@@ -260,7 +261,8 @@ describe('Web app root', () => {
     const regenerateItem = await screen.findByRole('menuitem', { name: 'context.regenerate' });
     fireEvent.click(regenerateItem);
 
-    await screen.findByText('regenerate failed');
+    // Test env renders i18n keys raw; runtime shows 'Regenerate failed, please retry'.
+    await screen.findByText('toast.regenerateFailed');
     // The failed regenerate must not hide the original message.
     expect(screen.getByText('Agent 的回复内容')).toBeInTheDocument();
   });
