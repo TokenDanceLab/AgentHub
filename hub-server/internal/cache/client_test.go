@@ -1302,3 +1302,59 @@ func TestPushPendingTargetTask_EmptyQueueShortCircuit(t *testing.T) {
 
 	require.NoError(t, c.AckPendingTargetTask(ctx, "user-empty", "t", "dev-empty", `{"x":1}`))
 }
+
+// ==================== P2 Audit #2119: Empty Hash Cleanup ====================
+
+func TestDeleteRoute_RemovesEmptyHash(t *testing.T) {
+	c, mr := testClient(t)
+	ctx := context.Background()
+
+	// Single field: deleting it should remove the entire key
+	require.NoError(t, c.SetRoute(ctx, "user-single", "desktop", "conn-1"))
+	key := "device_route:user-single"
+	assert.True(t, mr.Exists(key), "key should exist after SetRoute")
+
+	require.NoError(t, c.DeleteRoute(ctx, "user-single", "desktop"))
+	assert.False(t, mr.Exists(key), "empty hash key should be removed after last HDel")
+
+	// IsOnline should report false without scanning residual keys
+	online, err := c.IsOnline(ctx, "user-single")
+	require.NoError(t, err)
+	assert.False(t, online)
+}
+
+func TestDeleteRoute_KeepsHashWithRemainingFields(t *testing.T) {
+	c, mr := testClient(t)
+	ctx := context.Background()
+
+	// Two fields: deleting one should keep the key
+	require.NoError(t, c.SetRoute(ctx, "user-multi", "desktop", "dc-1"))
+	require.NoError(t, c.SetRoute(ctx, "user-multi", "mobile", "mc-1"))
+	key := "device_route:user-multi"
+
+	require.NoError(t, c.DeleteRoute(ctx, "user-multi", "desktop"))
+	assert.True(t, mr.Exists(key), "hash should remain when fields are left")
+
+	// Remaining field is still accessible
+	conn, err := c.GetRoute(ctx, "user-multi", "mobile")
+	require.NoError(t, err)
+	assert.Equal(t, "mc-1", conn)
+
+	// Delete last field → key gone
+	require.NoError(t, c.DeleteRoute(ctx, "user-multi", "mobile"))
+	assert.False(t, mr.Exists(key), "empty hash key should be removed after last HDel")
+}
+
+func TestDeleteRoute_NonExistentFieldIsNoOp(t *testing.T) {
+	c, mr := testClient(t)
+	ctx := context.Background()
+
+	// Delete on non-existent key should not error and not create anything
+	require.NoError(t, c.DeleteRoute(ctx, "user-ghost", "desktop"))
+	assert.False(t, mr.Exists("device_route:user-ghost"))
+
+	// Delete non-existent field on existing hash should not remove the key
+	require.NoError(t, c.SetRoute(ctx, "user-partial", "mobile", "mc-1"))
+	require.NoError(t, c.DeleteRoute(ctx, "user-partial", "desktop"))
+	assert.True(t, mr.Exists("device_route:user-partial"), "key should survive deleting a missing field")
+}
