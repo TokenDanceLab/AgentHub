@@ -40,6 +40,7 @@ type AgentTeamService struct {
 	competeAggregator  CompeteAggregator
 	competeMaxAgents   int
 	humanReviewEnabled bool
+	audit              PrivilegedActionAuditor
 }
 
 type AgentTeamGuardrails struct {
@@ -112,6 +113,14 @@ func (s *AgentTeamService) SetBus(bus *bus.Bus) {
 }
 
 // SetCompeteMaxAgents sets the maximum number of parallel agents in compete mode.
+
+// SetAuditService injects the privileged-action auditor (#2067). nil disables recording.
+func (s *AgentTeamService) SetAuditService(a PrivilegedActionAuditor) {
+	if s == nil {
+		return
+	}
+	s.audit = a
+}
 func (s *AgentTeamService) SetCompeteMaxAgents(n int) {
 	if n > 0 {
 		s.competeMaxAgents = n
