@@ -773,3 +773,36 @@ func TestExecutionTargetUpsertLocalEdgeForDesktopDeviceIgnoresForgedForeignBindi
 	require.NoError(t, db.Model(&model.ExecutionTarget{}).Where("device_id = ?", deviceID).Count(&count).Error)
 	require.Equal(t, int64(2), count)
 }
+
+// TestExecutionTargetUpdateIsOwnerScoped ensures PATCH by a non-owner returns
+// AuthDeviceMismatch (403) and does not mutate the row (#2100 P1 audit).
+func TestExecutionTargetUpdateIsOwnerScoped(t *testing.T) {
+	db := newExecutionTargetTestDB(t)
+	seedExecutionTarget(t, db, "target-1", "owner-1")
+	svc := newExecutionTargetSvc(t, db)
+
+	newName := "renamed-by-other"
+	_, err := svc.Update(context.Background(), "target-1", "other-owner", &model.ExecutionTargetPatch{
+		Name: model.Patch(newName),
+	})
+	require.ErrorIs(t, err, errcode.AuthDeviceMismatch)
+
+	var target model.ExecutionTarget
+	require.NoError(t, db.Where("id = ?", "target-1").First(&target).Error)
+	require.Equal(t, "Owner target", target.Name, "name must not be mutated by non-owner")
+}
+
+// TestExecutionTargetDeleteIsOwnerScoped ensures DELETE by a non-owner returns
+// AuthDeviceMismatch (403) and leaves the row intact (#2100 P1 audit).
+func TestExecutionTargetDeleteIsOwnerScoped(t *testing.T) {
+	db := newExecutionTargetTestDB(t)
+	seedExecutionTarget(t, db, "target-1", "owner-1")
+	svc := newExecutionTargetSvc(t, db)
+
+	err := svc.Delete(context.Background(), "target-1", "other-owner")
+	require.ErrorIs(t, err, errcode.AuthDeviceMismatch)
+
+	var count int64
+	require.NoError(t, db.Model(&model.ExecutionTarget{}).Where("id = ? AND deleted_at IS NULL", "target-1").Count(&count).Error)
+	require.Equal(t, int64(1), count, "target must not be soft-deleted by non-owner")
+}
