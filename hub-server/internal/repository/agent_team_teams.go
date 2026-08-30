@@ -66,7 +66,7 @@ func RemoveTeamMember(db *gorm.DB, memberID string) error {
 
 func ListTeamMembers(db *gorm.DB, teamID string) ([]model.AgentTeamMember, error) {
 	var members []model.AgentTeamMember
-	err := db.Where("team_id = ?", teamID).Order("position ASC, created_at ASC").Find(&members).Error
+	err := db.Where("team_id = ?", teamID).Order("position ASC, created_at ASC").Limit(200).Find(&members).Error
 	return members, err
 }
 
