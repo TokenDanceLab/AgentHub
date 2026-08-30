@@ -35,13 +35,39 @@ func TestScheduler_RunsImmediatelyAndOnTick(t *testing.T) {
 		GracePeriod: cfg.GracePeriod,
 	}, obs)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 180*time.Millisecond)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	sched.Run(ctx)
+	done := make(chan struct{})
+	go func() { sched.Run(ctx); close(done) }()
+
+	// Poll instead of a fixed observation window: slow CI runners (Windows)
+	// may not fit ≥2 ticks into a 180ms window. The interval is still 50ms, so
+	// the second rotation lands quickly once the ticker goroutine is scheduled.
+	deadline := time.After(4 * time.Second)
+	for {
+		mu.Lock()
+		got := successes >= 2
+		mu.Unlock()
+		if got {
+			break
+		}
+		select {
+		case <-deadline:
+			mu.Lock()
+			s := successes
+			mu.Unlock()
+			cancel()
+			<-done
+			t.Fatalf("timed out waiting for >=2 rotations, got %d", s)
+		case <-time.After(5 * time.Millisecond):
+		}
+	}
+	cancel()
+	<-done
 
 	mu.Lock()
 	defer mu.Unlock()
-	// Expect ≥2 rotations (immediate + at least one tick in 180ms with 50ms interval).
+	// Expect ≥2 rotations (immediate + at least one tick).
 	if successes < 2 {
 		t.Errorf("successes = %d, want >= 2", successes)
 	}
@@ -62,9 +88,12 @@ func TestScheduler_ObserverContract(t *testing.T) {
 	km := newTestKM(t)
 	r := NewRotator(km, RealClock{}, DefaultRotationConfig())
 
+	var calledMu sync.Mutex
 	called := false
 	obs := func(ok bool, pending int, err error) {
+		calledMu.Lock()
 		called = true
+		calledMu.Unlock()
 		if !ok || err != nil {
 			t.Errorf("expected success observation; got ok=%v err=%v", ok, err)
 		}
@@ -74,16 +103,34 @@ func TestScheduler_ObserverContract(t *testing.T) {
 	}
 	sched := NewScheduler(r, SchedulerConfig{Interval: time.Hour}, obs)
 
-	// Run once manually via unexported method isn't possible; instead use
-	// a very short-lived context — Run does immediate rotation before first tick.
+	// Run in a goroutine; poll for the immediate-rotation observation instead
+	// of a fixed sleep so slow runners stay green.
 	ctx, cancel := context.WithCancel(context.Background())
-	go func() {
-		// Give Run time to do the immediate rotation then cancel.
-		time.Sleep(20 * time.Millisecond)
-		cancel()
-	}()
-	sched.Run(ctx)
+	defer cancel()
+	done := make(chan struct{})
+	go func() { sched.Run(ctx); close(done) }()
 
+	deadline := time.After(2 * time.Second)
+	for {
+		calledMu.Lock()
+		seen := called
+		calledMu.Unlock()
+		if seen {
+			break
+		}
+		select {
+		case <-deadline:
+			cancel()
+			<-done
+			t.Fatal("timed out waiting for observer call")
+		case <-time.After(5 * time.Millisecond):
+		}
+	}
+	cancel()
+	<-done
+
+	calledMu.Lock()
+	defer calledMu.Unlock()
 	if !called {
 		t.Error("observer was not called")
 	}
