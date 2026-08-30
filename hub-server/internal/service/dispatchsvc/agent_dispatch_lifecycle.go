@@ -18,6 +18,7 @@ func (s *DispatchService) CancelTask(ctx context.Context, userID, taskID string)
 		return err
 	}
 	if err := dispatch.TaskNotFoundIfNotOwner(task.TriggeredByUserID, userID); err != nil {
+		s.recordDispatchAudit(ctx, auditActionTaskCancel, taskID, userID, auditOutcomeDenied, "not task owner")
 		return err
 	}
 	if err := dispatch.CancelTaskTerminalError(task.Status); err != nil {
@@ -46,6 +47,7 @@ func (s *DispatchService) CancelTask(ctx context.Context, userID, taskID string)
 		TriggeredBy: task.TriggeredByUserID,
 	}})
 
+	s.recordDispatchAudit(ctx, auditActionTaskCancel, taskID, userID, auditOutcomeSuccess, "")
 	return nil
 }
 
@@ -58,6 +60,7 @@ func (s *DispatchService) RegenerateAgentTask(ctx context.Context, userID, taskI
 		return nil, err
 	}
 	if err := dispatch.TaskNotFoundIfNotOwner(original.TriggeredByUserID, userID); err != nil {
+		s.recordDispatchAudit(ctx, auditActionTaskRegenerate, taskID, userID, auditOutcomeDenied, "not task owner")
 		return nil, err
 	}
 
@@ -84,6 +87,7 @@ func (s *DispatchService) RegenerateAgentTask(ctx context.Context, userID, taskI
 		TriggerMessageID: original.TriggerMessageID,
 	}})
 
+	s.recordDispatchAudit(ctx, auditActionTaskRegenerate, taskID, userID, auditOutcomeSuccess, "")
 	return newTask, nil
 }
 
