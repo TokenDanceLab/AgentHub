@@ -83,18 +83,18 @@ func (s *Service) GetCommand(ctx context.Context, id string, userID string) (*Co
 	return &cmd, nil
 }
 
-// AckCommand marks a relay command as acknowledged by the Edge device, verifying it belongs to userID.
+// AckCommand acknowledges a relay command and removes it from Redis. The
+// command lifecycle is complete once acked; retaining the key until TTL expiry
+// wastes memory and pollutes scans (P2 audit #2119). Ownership is verified
+// via GetCommand before deletion to prevent unauthorized cleanup.
 func (s *Service) AckCommand(ctx context.Context, id string, userID string) error {
-	cmd, err := s.GetCommand(ctx, id, userID)
-	if err != nil {
+	// Verify ownership before deleting; GetCommand returns an error if the
+	// command doesn't exist or doesn't belong to userID.
+	if _, err := s.GetCommand(ctx, id, userID); err != nil {
 		return err
 	}
-	now := time.Now()
-	cmd.Status = "acked"
-	cmd.AckedAt = &now
-	data, _ := json.Marshal(cmd)
 	key := "relay:cmd:" + id
-	return s.cache.GetRDB().Set(ctx, key, string(data), 24*time.Hour).Err()
+	return s.cache.GetRDB().Del(ctx, key).Err()
 }
 
 func generateRelayID() string {

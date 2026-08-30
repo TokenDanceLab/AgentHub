@@ -29,9 +29,29 @@ func (c *Client) SetRoute(ctx context.Context, userID, deviceType, connID string
 	return nil
 }
 
-// DeleteRoute removes the route entry for a user device.
+// DeleteRoute removes the route entry for a user device. If the hash becomes
+// empty after deletion, the entire key is removed to avoid residual empty
+// hashes that linger until TTL expiry (P2 audit #2119).
 func (c *Client) DeleteRoute(ctx context.Context, userID, deviceType string) error {
-	return c.rdb.HDel(ctx, routeKey(userID), deviceType).Err()
+	key := routeKey(userID)
+	removed, err := c.rdb.HDel(ctx, key, deviceType).Result()
+	if err != nil {
+		return err
+	}
+	if removed == 0 {
+		return nil // field didn't exist; nothing to clean up
+	}
+	// Best-effort cleanup: if the hash is now empty, DEL the key.
+	// A race where another goroutine adds a field between HDel and HLen is
+	// benign — we simply skip the DEL and the next DeleteRoute will retry.
+	n, err := c.rdb.HLen(ctx, key).Result()
+	if err != nil {
+		return nil // swallow; the hash still has fields or is gone
+	}
+	if n == 0 {
+		_ = c.rdb.Del(ctx, key).Err()
+	}
+	return nil
 }
 
 // GetRoute returns the connection ID for a user device.
