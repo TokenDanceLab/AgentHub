@@ -122,6 +122,10 @@ export function createWebPlatform(options: WebPlatformOptions = {}): AgentHubPla
       localFiles: false,
       browserPreview: true,
       localTerminal: false,
+      // Hub exposes approval endpoints; Web can drive accept/reject via Hub.
+      // Runtime evidence content & sandbox are metadata-only / absent on the
+      // Hub data plane — left un-declared so UI hides those affordances.
+      approval: true,
     },
     conversations: {
       async list(): Promise<WorkbenchConversation[]> {
