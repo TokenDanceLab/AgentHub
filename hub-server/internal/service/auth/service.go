@@ -218,7 +218,6 @@ func (s *Service) UpdateProfile(ctx context.Context, userID, nickname, avatarURL
 	if err := repository.UpdateUser(s.db, user); err != nil {
 		return nil, err
 	}
-	_ = resolveAuthCache(s.cacheClient).Invalidate(ctx, "user:profile:"+userID)
 	return user, nil
 }
 

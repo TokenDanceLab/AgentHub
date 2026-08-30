@@ -78,7 +78,7 @@ func TestService_ResolveCacheUsesNoopForTypedNilClient(t *testing.T) {
 	online, err := resolved.IsOnline(ctx, "user-1")
 	require.NoError(t, err)
 	require.False(t, online)
-	require.NoError(t, resolved.Invalidate(ctx, "user:friends:user-1"))
+	require.NoError(t, resolved.Invalidate(ctx, "test:key"))
 }
 
 func TestService_NilBusPublishIsNoop(t *testing.T) {

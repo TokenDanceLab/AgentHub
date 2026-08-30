@@ -183,7 +183,7 @@ func (s *Service) TransferGroupOwnership(ctx context.Context, currentUserID, ses
 	if err := repository.TransferOwnership(s.db, sessionID, currentUserID, newOwnerID); err != nil {
 		return err
 	}
-	_ = resolveCache(s.cacheClient).Invalidate(ctx, SessionMembersCacheKey(sessionID), SessionMetaCacheKey(sessionID))
+	_ = resolveCache(s.cacheClient).Invalidate(ctx, SessionMembersCacheKey(sessionID))
 	return nil
 }
 
@@ -249,7 +249,7 @@ func (s *Service) DissolveGroup(ctx context.Context, currentUserID, sessionID st
 			}
 		}
 	}
-	_ = resolveCache(s.cacheClient).Invalidate(ctx, SessionMembersCacheKey(sessionID), SessionMetaCacheKey(sessionID))
+	_ = resolveCache(s.cacheClient).Invalidate(ctx, SessionMembersCacheKey(sessionID))
 
 	slog.Info("dissolve group: session dissolved",
 		"session_id", sessionID, "dissolved_by", currentUserID,
@@ -281,7 +281,6 @@ func (s *Service) UpdateGroupInfo(ctx context.Context, currentUserID, sessionID 
 	if err := repository.UpdateSession(s.db, session); err != nil {
 		return err
 	}
-	_ = resolveCache(s.cacheClient).Invalidate(ctx, SessionMetaCacheKey(sessionID))
 	s.publishEvent(ctx, EventTypeSessionInfoUpdated, SessionInfoUpdatedPayload(sessionID, changes))
 	return nil
 }
