@@ -185,7 +185,7 @@ func Run(cfg Config) error {
 	<-stop
 	slog.Info("shutting down...")
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), shutdownTotalBudget)
 	defer cancel()
 
 	// Cancel in-flight agent runs BEFORE srv.Shutdown so child processes are
@@ -204,10 +204,8 @@ func Run(cfg Config) error {
 	// newHandlerFromConfig appends internal stops (result aggregator, token
 	// provider) to the same slice header that main.go pre-populated with
 	// mcpSyncer.Stop, so handler.ShutdownHooks is the single source of truth.
-	for _, hook := range handler.ShutdownHooks {
-		hook()
-	}
-	if err := handler.Bus.Close(); err != nil {
+	runShutdownHooks(handler.ShutdownHooks)
+	if err := closeBusWithTimeout(handler.Bus.Close, shutdownBusCloseBudget); err != nil {
 		slog.Error("failed to close event bus event log", "error", err)
 	}
 	return nil
