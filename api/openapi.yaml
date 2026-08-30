@@ -5416,6 +5416,9 @@ paths:
     put:
       tags: [HubSyncRelay]
       operationId: hubUpdateAgentTeam
+      x-agenthub-role: team-owner
+      description: |
+        Requires team owner; not satisfied by global admin alone.
       summary: Update agent team name and description.
       x-agenthub-status: implemented
       x-agenthub-owner: Hub
@@ -5448,6 +5451,9 @@ paths:
     delete:
       tags: [HubSyncRelay]
       operationId: hubDeleteAgentTeam
+      x-agenthub-role: team-owner
+      description: |
+        Requires team owner; not satisfied by global admin alone.
       summary: Delete an agent team.
       x-agenthub-status: implemented
       x-agenthub-owner: Hub
@@ -5476,6 +5482,9 @@ paths:
     post:
       tags: [HubSyncRelay]
       operationId: hubAddTeamMember
+      x-agenthub-role: team-owner
+      description: |
+        Requires team owner; not satisfied by global admin alone.
       summary: Add an agent profile to a team.
       x-agenthub-status: implemented
       x-agenthub-owner: Hub
@@ -5523,6 +5532,9 @@ paths:
     delete:
       tags: [HubSyncRelay]
       operationId: hubRemoveTeamMember
+      x-agenthub-role: team-owner
+      description: |
+        Requires team owner; not satisfied by global admin alone.
       summary: Remove a member from a team.
       x-agenthub-status: implemented
       x-agenthub-owner: Hub
@@ -5752,6 +5764,9 @@ paths:
     post:
       tags: [HubSyncRelay]
       operationId: hubHandleTeamRouteDecision
+      x-agenthub-role: team-owner
+      description: |
+        Requires team owner; not satisfied by global admin alone.
       summary: Consume a typed supervisor route decision and record accepted or rejected TeamEvent audit entries.
       description: Applies schema validation plus task-count, active-subagent, and repeated-route guardrails before creating TeamAssignment and TeamTask rows.
       x-agenthub-status: implemented
@@ -5795,6 +5810,9 @@ paths:
     post:
       tags: [HubSyncRelay]
       operationId: hubDecideTeamApproval
+      x-agenthub-role: team-owner
+      description: |
+        Requires team owner; not satisfied by global admin alone.
       summary: Record a TeamRun approval decision and deliver the Edge control payload.
       description: Validates that the approval is still pending and tied to an exact Edge device, appends a team.approval.decided TeamEvent, returns the Edge control payload, and pushes or queues an agent.control permission.decide frame for the owning Desktop/Edge device. Hub rejects decisions that cannot be mapped to a recorded edge_device_id so approvals cannot silently fall back to another desktop.
       x-agenthub-status: implemented
@@ -5838,6 +5856,9 @@ paths:
     post:
       tags: [HubSyncRelay]
       operationId: hubResolveTeamConflict
+      x-agenthub-role: team-owner
+      description: |
+        Requires team owner; not satisfied by global admin alone.
       summary: Resolve a projected TeamRun file conflict and append an auditable TeamEvent.
       description: Validates that the conflict still exists in the replayed TeamRunState, records the human decision as team.conflict.resolved, and marks the conflict resolved on subsequent state replay.
       x-agenthub-status: implemented
@@ -5877,6 +5898,9 @@ paths:
     post:
       tags: [HubSyncRelay]
       operationId: hubCreateTeamAssignment
+      x-agenthub-role: team-member
+      description: |
+        Requires team member (owner or agent-profile owner installed in the team); not satisfied by global admin alone.
       summary: Create a team assignment (delegation) from a supervisor to an executor.
       x-agenthub-status: implemented
       x-agenthub-owner: Hub
@@ -5955,6 +5979,9 @@ paths:
     post:
       tags: [HubSyncRelay]
       operationId: hubDispatchTeamAssignment
+      x-agenthub-role: team-member
+      description: |
+        Requires team member (owner or agent-profile owner installed in the team); not satisfied by global admin alone.
       summary: Dispatch a pending assignment through Hub agent task routing and bind TeamTask state.
       x-agenthub-status: implemented
       x-agenthub-owner: Hub
@@ -5991,6 +6018,9 @@ paths:
     post:
       tags: [HubSyncRelay]
       operationId: hubCompleteTeamAssignment
+      x-agenthub-role: team-member
+      description: |
+        Requires team member (owner or agent-profile owner installed in the team); not satisfied by global admin alone.
       summary: Mark a running assignment as completed with result.
       x-agenthub-status: implemented
       x-agenthub-owner: Hub
@@ -6037,6 +6067,9 @@ paths:
     post:
       tags: [HubSyncRelay]
       operationId: hubFailTeamAssignment
+      x-agenthub-role: team-member
+      description: |
+        Requires team member (owner or agent-profile owner installed in the team); not satisfied by global admin alone.
       summary: Mark an assignment as failed with a reason.
       x-agenthub-status: implemented
       x-agenthub-owner: Hub
@@ -6117,6 +6150,9 @@ paths:
     post:
       tags: [HubSyncRelay]
       operationId: hubTeamRunReviewDecision
+      x-agenthub-role: team-member
+      description: |
+        Requires team member (owner or agent-profile owner installed in the team); not satisfied by global admin alone.
       summary: Record a human review decision on a team run DAG plan (ADR-008).
       description: Applies the reviewer's approve/discuss/modify decision to the pending review gate and returns the recorded review state.
       x-agenthub-status: implemented
