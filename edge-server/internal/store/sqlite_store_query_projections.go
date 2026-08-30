@@ -280,6 +280,7 @@ type runProjectionWrite struct {
 	CreatedAt   string
 	StartedAt   any
 	FinishedAt  any
+	HubTaskID   any
 }
 
 // prepareRunProjectionWrite decodes a run payload into projection columns.
@@ -303,6 +304,7 @@ func prepareRunProjectionWrite(payload string, projects map[string]Project, now 
 		CreatedAt:   firstNonEmpty(run.CreatedAt, now),
 		StartedAt:   nullString(run.StartedAt),
 		FinishedAt:  nullString(run.FinishedAt),
+		HubTaskID:   nullString(run.HubTaskID),
 	}, false, nil
 }
 

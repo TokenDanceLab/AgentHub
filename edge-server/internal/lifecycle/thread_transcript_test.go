@@ -81,6 +81,9 @@ func (w *stubTranscriptWriter) SetRunRetryCount(id string, count int) (store.Run
 func (w *stubTranscriptWriter) SetRunWorkDir(id, workDir string) (store.Run, bool) {
 	return store.Run{}, false
 }
+func (w *stubTranscriptWriter) SetRunHubTaskID(id, hubTaskID string) (store.Run, bool) {
+	return store.Run{}, false
+}
 func (w *stubTranscriptWriter) UpsertRunCheckpoint(cp store.RunCheckpoint) (store.RunCheckpoint, error) {
 	return store.RunCheckpoint{}, store.ErrNotFound
 }
@@ -165,6 +168,9 @@ func (n *nonWriterLifecycle) SetRunRetryCount(id string, count int) (store.Run, 
 	return store.Run{}, false
 }
 func (n *nonWriterLifecycle) SetRunWorkDir(id, workDir string) (store.Run, bool) {
+	return store.Run{}, false
+}
+func (n *nonWriterLifecycle) SetRunHubTaskID(id, hubTaskID string) (store.Run, bool) {
 	return store.Run{}, false
 }
 func (n *nonWriterLifecycle) UpsertRunCheckpoint(cp store.RunCheckpoint) (store.RunCheckpoint, error) {

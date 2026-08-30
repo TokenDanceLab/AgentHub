@@ -127,3 +127,10 @@ func (s *Service) CleanupOldDeliveries(ctx context.Context, olderThan time.Durat
 func (s *Service) GetDeliveryStats(ctx context.Context) (map[string]int64, error) {
 	return s.deliveryOutboxService().GetDeliveryStats(ctx)
 }
+
+// StartOrphanRecoveryLoop starts a background goroutine that periodically
+// scans for queued tasks with no delivery_outbox row (orphaned by crash or
+// semaphore backoff) and redelivers them through DispatchTask.
+func (s *Service) StartOrphanRecoveryLoop(ctx context.Context) {
+	s.dispatchService().StartOrphanRecoveryLoop(ctx)
+}

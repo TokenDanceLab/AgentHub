@@ -64,6 +64,7 @@ func newAgentRunEventTestDB(t *testing.T) *gorm.DB {
 			edge_run_id TEXT,
 			edge_device_id TEXT,
 			error_message TEXT,
+			model_params TEXT DEFAULT '{}',
 			created_at DATETIME,
 			dispatched_at DATETIME,
 			finished_at DATETIME,

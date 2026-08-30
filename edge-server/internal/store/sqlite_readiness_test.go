@@ -110,8 +110,8 @@ func TestSQLiteStoreReadinessRestoresAfterEachDurableWrite(t *testing.T) {
 	if report.IntegrityCheck != "ok" {
 		t.Fatalf("IntegrityCheck = %q, want ok", report.IntegrityCheck)
 	}
-	if report.LatestMigrationVersion != 4 {
-		t.Fatalf("LatestMigrationVersion = %d, want 4", report.LatestMigrationVersion)
+	if report.LatestMigrationVersion != 5 {
+		t.Fatalf("LatestMigrationVersion = %d, want 5", report.LatestMigrationVersion)
 	}
 	if got := report.RowCounts["diff"]; got != 1 {
 		t.Fatalf("diff row count = %d, want 1", got)
@@ -132,8 +132,8 @@ func TestSQLiteStoreReadinessRestoresAfterEachDurableWrite(t *testing.T) {
 	if manifest.Status != "ready" || manifest.MigrationStatus != "current" {
 		t.Fatalf("manifest status = %q migration = %q, want ready/current", manifest.Status, manifest.MigrationStatus)
 	}
-	if manifest.ExpectedMigrationVersion != LatestSQLiteMigrationVersion() || manifest.ExpectedMigrationVersion != 4 {
-		t.Fatalf("manifest expected migration = %d, want latest 4", manifest.ExpectedMigrationVersion)
+	if manifest.ExpectedMigrationVersion != LatestSQLiteMigrationVersion() || manifest.ExpectedMigrationVersion != 5 {
+		t.Fatalf("manifest expected migration = %d, want latest 5", manifest.ExpectedMigrationVersion)
 	}
 	if len(manifest.MissingMigrationVersions) != 0 || len(manifest.UnknownMigrationVersions) != 0 {
 		t.Fatalf("manifest missing=%v unknown=%v, want none", manifest.MissingMigrationVersions, manifest.UnknownMigrationVersions)
