@@ -20,6 +20,20 @@ describe('Mobile platform contract', () => {
     });
   });
 
+  it('keeps new capability domains un-declared on Mobile until Hub exposes matching contracts', () => {
+    const platform = createMobilePlatform({
+      hubBaseUrl: 'http://127.0.0.1:8088',
+      dataMode: 'mock',
+    });
+
+    // Un-declared (undefined) is the honest contract — UI must hide approval/
+    // evidence/remote/sandbox affordances rather than pretend support.
+    expect(platform.capabilities.approval).toBeUndefined();
+    expect(platform.capabilities.runtimeEvidence).toBeUndefined();
+    expect(platform.capabilities.remoteExecution).toBeUndefined();
+    expect(platform.capabilities.sandbox).toBeUndefined();
+  });
+
   it('resolves token-backed default mode to observed instead of claiming approved-real', () => {
     expect(resolveMobileDataMode(undefined, true)).toBe('observed');
     expect(resolveMobileDataMode('approved-real', false)).toBe('approved-real');

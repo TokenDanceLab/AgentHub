@@ -23,6 +23,10 @@ const mobileCapabilities: SurfaceCapabilities = {
   localFiles: false,
   browserPreview: false,
   localTerminal: false,
+  // New capability domains intentionally un-declared on Mobile: Hub client
+  // currently exposes no approval/runtimeEvidence/sandbox contract, and
+  // remote execution is not wired. UI must hide related affordances until
+  // a Mobile-specific Hub channel lands. See BLOCKED.md for revisit trigger.
 };
 
 function mapFixtureToConversations(fixture: MobileAppFixture): WorkbenchConversation[] {
