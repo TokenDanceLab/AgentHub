@@ -20,6 +20,7 @@ func (s *AgentTeamService) DecideApproval(ctx context.Context, userID, teamID, r
 		return nil, errcode.ErrBadRequest
 	}
 	if _, err := s.requireTeamOwner(ctx, userID, teamID); err != nil {
+		s.recordTeamAudit(ctx, auditActionApprovalDecide, runID, userID, auditOutcomeDenied, "not team owner")
 		return nil, err
 	}
 
@@ -123,6 +124,7 @@ func (s *AgentTeamService) DecideApproval(ctx context.Context, userID, teamID, r
 	decidedAt := recorded.DecidedAt
 	decided.DecidedAt = &decidedAt
 	decided.EdgeControl = recorded.EdgeControl
+	s.recordTeamAudit(ctx, auditActionApprovalDecide, runID, userID, auditOutcomeSuccess, "")
 	return &decided, nil
 }
 

@@ -28,6 +28,7 @@ func (s *AgentTeamService) ReviewDagPlan(ctx context.Context, userID, runID stri
 		return nil, err
 	}
 	if run.TriggerUserID != userID {
+		s.recordTeamAudit(ctx, auditActionReviewDecide, runID, userID, auditOutcomeDenied, "not trigger user")
 		return nil, errcode.AgentTaskNotFound
 	}
 	if run.Status != model.TeamRunStatusPendingReview {
@@ -91,6 +92,7 @@ func (s *AgentTeamService) ReviewDagPlan(ctx context.Context, userID, runID stri
 		return nil, err
 	}
 
+	s.recordTeamAudit(ctx, auditActionReviewDecide, runID, userID, auditOutcomeSuccess, "")
 	return state, nil
 }
 

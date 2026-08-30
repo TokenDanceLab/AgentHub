@@ -25,6 +25,7 @@ func (s *Service) AddGroupMembers(ctx context.Context, currentUserID, sessionID 
 		return err
 	}
 	if member.Role != model.MemberRoleOwner {
+		s.recordMemberAudit(ctx, auditActionMemberAdd, sessionID, currentUserID, auditOutcomeDenied, "not owner")
 		return errcode.GroupNotOwner
 	}
 
@@ -72,6 +73,7 @@ func (s *Service) AddGroupMembers(ctx context.Context, currentUserID, sessionID 
 	for _, m := range joinedMembers {
 		s.publishEvent(ctx, EventTypeSessionMemberJoined, MemberJoinedPayload(sessionID, m.MemberID, m.MemberType))
 	}
+	s.recordMemberAudit(ctx, auditActionMemberAdd, sessionID, currentUserID, auditOutcomeSuccess, "")
 	return nil
 }
 
@@ -89,6 +91,7 @@ func (s *Service) RemoveGroupMember(ctx context.Context, currentUserID, sessionI
 		return err
 	}
 	if member.Role != model.MemberRoleOwner {
+		s.recordMemberAudit(ctx, auditActionMemberRemove, sessionID, currentUserID, auditOutcomeDenied, "not owner")
 		return errcode.GroupNotOwner
 	}
 
@@ -115,6 +118,7 @@ func (s *Service) RemoveGroupMember(ctx context.Context, currentUserID, sessionI
 	}
 	_ = resolveCache(s.cacheClient).Invalidate(ctx, SessionMembersCacheKey(sessionID))
 	s.publishEvent(ctx, EventTypeSessionMemberLeft, MemberLeftPayload(sessionID, targetUserID))
+	s.recordMemberAudit(ctx, auditActionMemberRemove, sessionID, currentUserID, auditOutcomeSuccess, "")
 	return nil
 }
 

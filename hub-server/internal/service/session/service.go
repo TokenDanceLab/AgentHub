@@ -29,6 +29,27 @@ type Cache interface {
 	InitSeqIfAbsent(ctx context.Context, sessionID string, seq int64) error
 }
 
+// PrivilegedActionAuditor is the subset of *audit.Service used by session
+// Service to record per-action audit trails (#2067). Defined as a local port
+// so this package stays decoupled from service/audit and tests can inject a
+// spy without importing the concrete type.
+type PrivilegedActionAuditor interface {
+	RecordPrivilegedAction(ctx context.Context, in PrivilegedActionAuditInput)
+}
+
+// PrivilegedActionAuditInput mirrors audit.PrivilegedActionInput. Kept as a
+// local struct so callers don't need to import service/audit just to spell
+// the input; the wiring layer adapts between the two.
+type PrivilegedActionAuditInput struct {
+	ActorUserID  string
+	Action       string
+	ResourceType string
+	ResourceID   string
+	Outcome      string
+	AuthBasis    string
+	Reason       string
+}
+
 // Service owns IM session lifecycle orchestration: private/group create,
 // list/search, member join/leave/remove, ownership transfer, dissolve, group
 // info, per-member settings, delete-for-me, and invited-agent cleanup.
@@ -41,6 +62,7 @@ type Service struct {
 	db          *gorm.DB
 	cacheClient Cache
 	bus         Bus
+	audit       PrivilegedActionAuditor
 }
 
 // NewService constructs a session service.
@@ -68,6 +90,15 @@ func (s *Service) SetCache(cacheClient Cache) {
 		return
 	}
 	s.cacheClient = resolveCache(cacheClient)
+}
+
+// SetAuditService injects (or replaces) the privileged-action auditor (#2067).
+// nil disables audit recording; existing call sites stay no-op safe.
+func (s *Service) SetAuditService(a PrivilegedActionAuditor) {
+	if s == nil {
+		return
+	}
+	s.audit = a
 }
 
 // resolveCache returns c, falling back to cache.NoOpCache when c is nil or a

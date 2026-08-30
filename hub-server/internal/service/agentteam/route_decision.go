@@ -17,6 +17,7 @@ import (
 // the accepted or rejected route in the TeamEvent log.
 func (s *AgentTeamService) HandleRouteDecision(ctx context.Context, userID, teamID, runID string, decision model.CoordinatorRouteDecision) (*model.AgentTeamAssignment, error) {
 	if _, err := s.requireTeamOwner(ctx, userID, teamID); err != nil {
+		s.recordTeamAudit(ctx, auditActionRouteDecide, runID, userID, auditOutcomeDenied, "not team owner")
 		return nil, err
 	}
 	run, err := repository.GetTeamRunByID(s.db, runID)
@@ -95,6 +96,7 @@ func (s *AgentTeamService) HandleRouteDecision(ctx context.Context, userID, team
 		}
 	}
 
+	s.recordTeamAudit(ctx, auditActionRouteDecide, runID, userID, auditOutcomeSuccess, "")
 	return assignment, nil
 }
 

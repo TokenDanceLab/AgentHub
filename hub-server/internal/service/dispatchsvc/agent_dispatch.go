@@ -91,6 +91,7 @@ func (s *DispatchService) TriggerAgentTask(ctx context.Context, userID, triggerM
 	// check for active member — a lookup failure must surface, not read as inactive.
 	active, err := repository.IsMemberActive(s.db, ai.SessionID, model.MemberTypeUser, userID)
 	if err := dispatch.TriggerMemberActiveError(err, active); err != nil {
+		s.recordDispatchAudit(ctx, auditActionTaskDispatch, "", userID, auditOutcomeDenied, "member not active")
 		return nil, err
 	}
 
@@ -130,6 +131,7 @@ func (s *DispatchService) TriggerAgentTask(ctx context.Context, userID, triggerM
 	// TTL/redispatch path instead of spawning an unbounded goroutine.
 	s.launchDispatchTask(context.WithoutCancel(ctx), task, ai, dispatch.PromptFromMessage(msg), modelParams, targetType, customAgent)
 
+	s.recordDispatchAudit(ctx, auditActionTaskDispatch, task.ID, userID, auditOutcomeSuccess, "")
 	return task, nil
 }
 

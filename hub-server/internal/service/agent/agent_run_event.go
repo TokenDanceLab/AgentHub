@@ -27,12 +27,21 @@ type runEventControl interface {
 type RunEventService struct {
 	db         *gorm.DB
 	controlSvc runEventControl
+	audit      PrivilegedActionAuditor
 }
 
 // NewRunEventService constructs a RunEventService. controlSvc may be nil when
 // approval decisions do not need desktop/edge delivery (read-only paths).
 func NewRunEventService(db *gorm.DB, controlSvc runEventControl) *RunEventService {
 	return &RunEventService{db: db, controlSvc: controlSvc}
+}
+
+// SetAuditService injects the privileged-action auditor (#2067). nil disables recording.
+func (s *RunEventService) SetAuditService(a PrivilegedActionAuditor) {
+	if s == nil {
+		return
+	}
+	s.audit = a
 }
 
 // SetControlService injects (or replaces) the control delivery port.
@@ -100,6 +109,7 @@ func (s *RunEventService) DecideTaskApproval(ctx context.Context, userID, taskID
 
 	task, events, err := s.taskRunEventsForOwner(userID, taskID)
 	if err != nil {
+		s.recordApprovalAudit(ctx, taskID, userID, auditOutcomeDenied, "not task owner")
 		return nil, err
 	}
 	projection := agentevent.ProjectTaskApprovals(task, events)
@@ -171,6 +181,7 @@ func (s *RunEventService) DecideTaskApproval(ctx context.Context, userID, taskID
 	decided.TargetID = strings.TrimSpace(task.TargetID)
 	decided.EdgeDeviceID = strings.TrimSpace(task.EdgeDeviceID)
 	decided.EdgeControl = edgeControl
+	s.recordApprovalAudit(ctx, taskID, userID, auditOutcomeSuccess, "")
 	return &decided, nil
 }
 

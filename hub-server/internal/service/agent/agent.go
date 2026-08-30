@@ -74,8 +74,43 @@ type Service struct {
 	// reach the edge HTTP path.
 	edgeClient *http.Client
 	jwtSecret  string
+	audit      PrivilegedActionAuditor
 }
 
+// SetAuditService injects the privileged-action auditor (#2067) and propagates
+// it to composed sub-services (RunEventService, DispatchService). Each sub-
+// service defines its own local port type; we adapt between them here so the
+// caller only needs to satisfy this package's port.
+func (s *Service) SetAuditService(a PrivilegedActionAuditor) {
+	if s == nil {
+		return
+	}
+	s.audit = a
+	if s.runEvents != nil {
+		s.runEvents.SetAuditService(a)
+	}
+	if s.dispatch != nil {
+		s.dispatch.SetAuditService(dispatchAuditAdapter{a: a})
+	}
+}
+
+// dispatchAuditAdapter adapts this package's PrivilegedActionAuditor to the
+// dispatchsvc-local port type.
+type dispatchAuditAdapter struct {
+	a PrivilegedActionAuditor
+}
+
+func (d dispatchAuditAdapter) RecordPrivilegedAction(ctx context.Context, in dispatchsvc.PrivilegedActionAuditInput) {
+	d.a.RecordPrivilegedAction(ctx, PrivilegedActionAuditInput{
+		ActorUserID:  in.ActorUserID,
+		Action:       in.Action,
+		ResourceType: in.ResourceType,
+		ResourceID:   in.ResourceID,
+		Outcome:      in.Outcome,
+		AuthBasis:    in.AuthBasis,
+		Reason:       in.Reason,
+	})
+}
 func NewService(db *gorm.DB, bus *bus.Bus, mgr *ws.Manager, cacheClient *cache.Client, relay relayDispatcher, edgeCfg config.EdgeDispatchConfig, edgeClient *http.Client, jwtSecret string) *Service {
 	s := &Service{db: db, bus: bus, mgr: mgr, cacheClient: resolveAgentCache(cacheClient), relay: relay, edgeCfg: edgeCfg, edgeClient: edgeClient, jwtSecret: jwtSecret, seqAlloc: seqalloc.New(cacheClient, db)}
 	s.runEvents = NewRunEventService(db, agentcontrol.NewService(cacheClient, mgr))
