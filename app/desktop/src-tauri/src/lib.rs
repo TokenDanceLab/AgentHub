@@ -2,11 +2,9 @@ mod commands;
 mod edge_health;
 mod edge_manager;
 mod host;
-mod notifications;
 mod oidc_server;
 mod secure_store;
 mod tray;
-mod updater;
 
 use edge_manager::{resolve_edge_path, EdgeManager};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -44,35 +42,15 @@ pub fn run() {
         .manage(QuittingState(quitting.clone()))
         .invoke_handler(tauri::generate_handler![
             // host::edge
-            crate::host::edge::get_edge_status,
             crate::host::edge::get_edge_host_readiness,
             crate::host::edge::get_local_edge_diagnostics,
             crate::host::edge::get_local_cli_discovery,
             crate::host::edge::get_edge_auth_token,
-            crate::host::edge::get_packaged_login_readiness,
-            crate::host::edge::start_edge,
-            crate::host::edge::stop_edge,
             // host::fs
             crate::host::fs::read_dir_tree,
-            crate::host::fs::create_file,
-            crate::host::fs::create_folder,
-            crate::host::fs::rename_entry,
-            crate::host::fs::copy_entry,
-            crate::host::fs::delete_entry,
             crate::host::fs::read_file,
-            crate::host::fs::write_file,
-            crate::host::fs::git_status,
-            crate::host::fs::git_diff_unstaged,
-            crate::host::fs::git_diff_staged,
-            crate::host::fs::git_diff_file,
-            crate::host::fs::read_workspace_store,
-            crate::host::fs::write_workspace_store,
-            crate::host::fs::choose_workspace_root,
-            crate::host::fs::validate_allowlist,
-            crate::host::fs::search_workspace_content,
             // oidc_server (direct — tauri::command proc-macro is module-local)
             oidc_server::start_oidc_callback_server,
-            oidc_server::stop_oidc_callback_server,
             oidc_server::proxy_http_post,
             // secure_store (direct)
             secure_store::clear_hub_refresh_token,
@@ -82,16 +60,10 @@ pub fn run() {
             secure_store::read_hub_access_token,
             secure_store::store_hub_access_token,
             // notifications (direct)
-            notifications::notify_run_completed,
-            notifications::notify_run_failed,
             // host::window
-            crate::host::window::get_close_to_tray,
-            crate::host::window::set_close_to_tray,
             // tray (direct — has #[tauri::command] proc-macro)
             tray::set_tray_labels,
             // updater (direct)
-            updater::check_for_update,
-            updater::install_update,
         ])
         .setup(move |app| {
             let handle = app.handle().clone();
