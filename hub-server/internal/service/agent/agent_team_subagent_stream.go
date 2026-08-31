@@ -299,20 +299,6 @@ func (s *EdgeCallbackService) cachedTeamRunContext(
 	return tctx, true
 }
 
-// InvalidateTeamRunContext drops the cached team-run context for a task.
-// Terminal-state invalidation (CompleteAssignment/FailAssignment) is deferred
-// to a later phase: the agentteam subpackage cannot import the parent service
-// package without forming a cycle, and wiring a bus hook for pure hygiene is
-// not worth the surface. The cache is bounded (LRU, 1024 entries), so memory
-// is capped regardless; and task IDs are UUIDs that are never reused, so a
-// stale entry would still attribute events correctly. Exposed now so a future
-// phase can wire it through a port that does not introduce a cycle.
-func (s *EdgeCallbackService) InvalidateTeamRunContext(taskID string) {
-	if c := s.teamCtxCache(); c != nil {
-		c.invalidate(taskID)
-	}
-}
-
 // teamCtxCache lazily allocates the LRU so tests that construct
 // EdgeCallbackService via struct literals still get caching. The allocation
 // is guarded by sync.Once so concurrent first-callers cannot both observe a

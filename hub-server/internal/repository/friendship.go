@@ -25,12 +25,6 @@ func GetFriendshipByID(db *gorm.DB, id string) (*model.Friendship, error) {
 	return &f, err
 }
 
-func UpdateFriendshipStatus(db *gorm.DB, userID, friendID, status string) error {
-	return db.Model(&model.Friendship{}).
-		Where("user_id = ? AND friend_id = ?", userID, friendID).
-		Update("status", status).Error
-}
-
 func UpdateFriendshipByID(db *gorm.DB, id, status string) error {
 	return db.Model(&model.Friendship{}).
 		Where("id = ?", id).

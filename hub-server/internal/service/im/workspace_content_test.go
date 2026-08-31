@@ -11,22 +11,22 @@ import (
 )
 
 func TestNormalizeStructuredTextContent(t *testing.T) {
-	got, ok, err := NormalizeStructuredTextContent(`{"text":"hello","metadata":{"k":"v"}}`)
+	got, ok, err := normalizeStructuredTextContent(`{"text":"hello","metadata":{"k":"v"}}`)
 	require.NoError(t, err)
 	assert.True(t, ok)
 	var payload map[string]any
 	require.NoError(t, json.Unmarshal([]byte(got), &payload))
 	assert.Equal(t, "hello", payload["text"])
 
-	_, ok, err = NormalizeStructuredTextContent("plain text")
+	_, ok, err = normalizeStructuredTextContent("plain text")
 	require.NoError(t, err)
 	assert.False(t, ok)
 
-	_, ok, err = NormalizeStructuredTextContent(`{"text":"  "}`)
+	_, ok, err = normalizeStructuredTextContent(`{"text":"  "}`)
 	require.Error(t, err)
 	assert.True(t, ok)
 
-	_, ok, err = NormalizeStructuredTextContent(`{"text":"hi","metadata":[]}`)
+	_, ok, err = normalizeStructuredTextContent(`{"text":"hi","metadata":[]}`)
 	require.Error(t, err)
 	assert.True(t, ok)
 }

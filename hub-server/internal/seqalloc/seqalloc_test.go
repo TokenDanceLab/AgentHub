@@ -166,3 +166,23 @@ func TestAllocateConcurrentSameSessionSerializes(t *testing.T) {
 	require.Len(t, seen, n)
 	require.NoError(t, mock.ExpectationsWereMet())
 }
+
+// TestLockTableGarbageCollected verifies the per-session lock table is
+// bounded: once an allocation completes, the entry is swept so the table
+// tracks concurrent sessions instead of every session ever seen.
+func TestLockTableGarbageCollected(t *testing.T) {
+	db, mock, sqlDB := newMockDB(t)
+	defer sqlDB.Close()
+
+	mock.ExpectExec(`UPDATE "sessions" SET "next_seq"`).
+		WithArgs(int64(1), "sess-1", int64(1)).
+		WillReturnResult(sqlmock.NewResult(0, 1))
+
+	alloc := New(&mockCache{}, db)
+	_, err := alloc.Allocate(context.Background(), "sess-1")
+	require.NoError(t, err)
+
+	alloc.mu.Lock()
+	require.Empty(t, alloc.locks, "lock entry should be swept after refcount drains")
+	alloc.mu.Unlock()
+}

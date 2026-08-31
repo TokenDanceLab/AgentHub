@@ -123,7 +123,9 @@ func constantTimeEqual(got, want string) bool {
 //     middleware but leaves LocalAuthToken empty: previously debugAuthFunc
 //     returned nil, which exposed pprof/config/state to any caller even
 //     though Hub-JWT mode is a production-grade deployment.
-//  4. Neither configured → nil (dev-equivalent open mode).
+//  4. Neither configured → deny-all (fail-closed). In the normal Run()
+//     flow this branch is unreachable: when neither token is configured,
+//     startup auto-generates a local token, which satisfies layer 2.
 //
 // The Hub-JWT fallback reuses the same jwtutil.ValidateHubToken trust chain
 // as localAuthMiddleware, so a Hub-issued Edge-scoped HS256 JWT accepted on
