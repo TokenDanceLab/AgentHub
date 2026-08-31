@@ -48,11 +48,6 @@ func NewSecurityHook() *SecurityHook {
 	return &SecurityHook{Mode: ApprovalAuto}
 }
 
-// NewSecurityHookWithMode creates a SecurityHook with the given approval mode.
-func NewSecurityHookWithMode(mode ApprovalMode) *SecurityHook {
-	return &SecurityHook{Mode: mode}
-}
-
 // NewSecurityHookWithSkillInspector creates a SecurityHook with a SkillInspector
 // callback for skill-aware risk classification. When the Skill tool is invoked,
 // the inspector is called with the skill name to determine the actual risk level.

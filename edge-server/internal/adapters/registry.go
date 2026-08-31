@@ -5,40 +5,6 @@ import (
 	"sync"
 )
 
-var cliAdapterIDs = map[string]struct{}{
-	"claude-code":   {},
-	"codex":         {},
-	"codex-acp":     {}, // official @agentclientprotocol/codex-acp (ACP migration, first target)
-	"opencode":      {},
-	"opencode-acp":  {}, // native `opencode acp` subcommand (ACP migration, second target)
-	"claude-acp":    {}, // official @agentclientprotocol/claude-agent-acp (ACP migration, third target)
-	"anthropic-sdk": {},
-	"openai-sdk":    {},
-}
-
-// sdkAdapterIDs tracks adapters that use direct HTTP API calls instead of CLI subprocesses.
-var sdkAdapterIDs = map[string]struct{}{
-	"anthropic-sdk": {},
-	"openai-sdk":    {},
-}
-
-// IsSDKAdapter reports whether an adapter ID belongs to an SDK adapter that
-// uses direct HTTP calls rather than spawning a CLI subprocess.
-func IsSDKAdapter(id string) bool {
-	_, ok := sdkAdapterIDs[id]
-	return ok
-}
-
-// ValidateCLIAdapterID checks the runtime IDs that Edge may expose as real CLI
-// adapter targets. The mock runner and orchestrator are separate execution
-// modes, not direct CLI adapter IDs for real CLI smoke readiness.
-func ValidateCLIAdapterID(id string) error {
-	if _, ok := cliAdapterIDs[id]; ok {
-		return nil
-	}
-	return fmt.Errorf("unsupported CLI adapter %q; supported values: claude-code, codex, codex-acp, opencode, opencode-acp, claude-acp, anthropic-sdk, openai-sdk", id)
-}
-
 // Registry manages available agent adapters.
 type Registry struct {
 	mu       sync.RWMutex
