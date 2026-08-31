@@ -13,6 +13,7 @@ import { hubQueryKeys } from '@shared/stores/queryKeys';
 import { getPinMapStore } from '@shared/transcript';
 import { useToastStore } from '@shared/ui/toast';
 import { getI18n } from 'react-i18next';
+import type { HubWSGapPayload } from '@shared/hub/hubWS';
 import type {
   HubAgentDispatchPayload,
   HubAgentDonePayload,
@@ -408,6 +409,8 @@ export interface DesktopHubEventBridgeHandle {
 /** Minimal on/off interface matching what desktop Hub WS provides. */
 export interface DesktopHubWSLike {
   on: (type: HubEventType, handler: (payload: unknown) => void) => () => void;
+  /** Optional gap subscription (#2101 G1). Absent in test stubs. */
+  onGap?: (handler: (payload: HubWSGapPayload) => void) => () => void;
 }
 
 /**
@@ -432,6 +435,17 @@ export function createDesktopHubEventBridge(
       }
     });
     unsubFns.push(unsub);
+  }
+
+  // #2101 G1: On seq_id gap, invalidate the entire threads query family so
+  // the next render refetches messages/detail/pins and recovers any frames
+  // lost between lastSeq and receivedSeq. Other families are deferred to a
+  // follow-up slice (see lane PROGRESS.md).
+  if (hubWS.onGap) {
+    const gapUnsub = hubWS.onGap(() => {
+      invalidateAllWithPrefix(queryClient, hubQueryKeys.threads.root);
+    });
+    unsubFns.push(gapUnsub);
   }
 
   return {

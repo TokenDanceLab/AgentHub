@@ -1,7 +1,8 @@
 // Shared Hub WebSocket client for AgentHub renderers (web + desktop).
-// Manages auth-frame handshake, typed event routing, and reconnection
-// via the shared Transport abstraction. Platforms inject their configured
-// WS endpoint via HubWSOptions.url — there is no platform config import here.
+// Manages auth-frame handshake, typed event routing, per-connection seq_id
+// gap detection (#2101 G1), and reconnection via the shared Transport
+// abstraction. Platforms inject their configured WS endpoint via
+// HubWSOptions.url — there is no platform config import here.
 //
 // Protocol (matching hub-server/internal/router/router.go + ws/frame.go):
 //   1. WebSocket connects to ws://host/client/ws
@@ -11,12 +12,15 @@
 //   2. Hub validates the Hub-issued token during HTTP upgrade (WSAuthMiddleware).
 //   3. Server responds after upgrade: {"type":"auth.ok","payload":null}
 //      or rejects the upgrade before a WebSocket is established.
-//   4. After auth, bidirectional events flow with {type, payload} framing.
+//   4. After auth, bidirectional events flow with {type, payload, seq_id?} framing.
+//      seq_id is a per-connection monotonic counter (omitempty on wire). Clients
+//      detect lost frames as gaps when seq_id jumps; duplicates (seq_id <= last)
+//      are dropped silently. See #2101 G1.
 //
 // Reconnection: The underlying Transport handles exponential-backoff
 // reconnection (max 10 retries). On every reconnect, the auth handshake
-// is re-executed automatically. Typed event subscriptions survive
-// across reconnects.
+// is re-executed automatically and lastSeq resets (server-side seq is
+// per-connection). Typed event subscriptions survive across reconnects.
 
 import { WebSocketTransport, type Transport, type TransportStatus } from '../transport';
 import type { HubEventType } from '../hubEvents';
@@ -41,6 +45,24 @@ export interface HubWSOptions {
   useQueryTokenFallback?: boolean;
 }
 
+/** Payload emitted on HUB_WS_GAP_EVENT when a seq_id discontinuity is observed. */
+export interface HubWSGapPayload {
+  /** Last successfully processed seq_id on this connection. */
+  lastSeq: number;
+  /** The seq_id that arrived and revealed the gap. */
+  receivedSeq: number;
+  /** Number of missing frames (receivedSeq - lastSeq - 1). Always >= 1. */
+  gapSize: number;
+}
+
+/**
+ * Internal-only event name for seq_id gap detection. Not part of HUB_EVENTS
+ * because it has no server-side producer; it is synthesized client-side by
+ * hubWS when per-connection seq_id is discontinuous. Subscribe via
+ * HubWSHandle.onGap(). See #2101 G1.
+ */
+export const HUB_WS_GAP_EVENT = 'hub.ws.gap';
+
 export interface HubWSHandle {
   /** Open the WebSocket connection and initiate auth handshake. */
   connect: () => void;
@@ -52,6 +74,12 @@ export interface HubWSHandle {
   on: (type: HubEventType, handler: (payload: unknown) => void) => () => void;
   /** Subscribe to ALL events (after auth). Returns unsubscribe fn. */
   onAny: (handler: (type: string, payload: unknown) => void) => () => void;
+  /**
+   * Subscribe to per-connection seq_id gap events (#2101 G1). Fires when an
+   * authenticated frame arrives with seq_id > lastSeq + 1. Duplicates
+   * (seq_id <= lastSeq) are dropped silently and do NOT trigger this.
+   */
+  onGap: (handler: (payload: HubWSGapPayload) => void) => () => void;
   /** Subscribe to transport-level connection status changes. */
   onStatus: (handler: (status: TransportStatus) => void) => () => void;
   /** Close the connection permanently (no reconnect). */
@@ -62,6 +90,8 @@ export interface HubWSHandle {
   getStatus: () => TransportStatus;
   /** Whether the connection is currently authenticated. */
   isAuthenticated: () => boolean;
+  /** Test-only: current per-connection lastSeq (-1 when no seq seen yet). */
+  getLastSeq: () => number;
 }
 
 // ── Auth carriage helpers ─────────────────────────
@@ -118,14 +148,20 @@ export function createHubWS(opts: HubWSOptions): HubWSHandle {
 
   const typedHandlers = new Map<string, Set<(payload: unknown) => void>>();
   const anyHandlers = new Set<(type: string, payload: unknown) => void>();
+  const gapHandlers = new Set<(payload: HubWSGapPayload) => void>();
 
   let authenticated = false;
+  // Per-connection last observed seq_id. -1 means no seq-bearing frame yet on
+  // this connection. Reset on every transport 'connected' transition because
+  // the server-side seq counter is per-connection (conn.go:41-45).
+  let lastSeq = -1;
 
-  // ── Auth on every (re)connect ────────────────────
+  // ── Auth + seq reset on every (re)connect ───────
 
   transport.on('status', (status: TransportStatus) => {
     if (status === 'connected') {
       authenticated = false;
+      lastSeq = -1;
     }
     if (status === 'disconnected') {
       authenticated = false;
@@ -152,9 +188,19 @@ export function createHubWS(opts: HubWSOptions): HubWSHandle {
     const frameType = typeof msg.type === 'string' ? msg.type : '';
     const payload = 'payload' in msg ? msg.payload : undefined;
 
+    // seq_id is omitempty on the wire; only frames stamped by Manager.PushToConn
+    // carry it. Frames without seq_id do not participate in gap detection.
+    const seqRaw = msg.seq_id;
+    const hasSeq = typeof seqRaw === 'number' && Number.isFinite(seqRaw);
+    const seq = hasSeq ? (seqRaw as number) : null;
+
     // ── Auth responses ──────────────────────────
     if (frameType === HUB_EVENTS.AUTH_OK) {
       authenticated = true;
+      // auth.ok may itself carry seq_id (first frame); seed lastSeq if so.
+      if (seq !== null) {
+        lastSeq = seq;
+      }
       opts.onAuthSuccess?.();
       return;
     }
@@ -168,6 +214,36 @@ export function createHubWS(opts: HubWSOptions): HubWSHandle {
       authenticated = false;
       transport.close();
       return;
+    }
+
+    // ── Seq gap / duplicate detection (#2101 G1) ──
+    // Only applies to seq-bearing frames after auth. Duplicate frames
+    // (seq <= lastSeq) are dropped silently. A gap (seq > lastSeq + 1)
+    // fires the internal gap event and updates lastSeq to the received
+    // value so subsequent frames continue from the new baseline.
+    if (seq !== null) {
+      if (lastSeq !== -1 && seq <= lastSeq) {
+        // Duplicate / out-of-order replay — drop without dispatch.
+        return;
+      }
+      if (lastSeq !== -1 && seq > lastSeq + 1) {
+        const gapPayload: HubWSGapPayload = {
+          lastSeq,
+          receivedSeq: seq,
+          gapSize: seq - lastSeq - 1,
+        };
+        console.warn(
+          `[HubWS] seq gap detected: lastSeq=${lastSeq} received=${seq} missing=${gapPayload.gapSize}`,
+        );
+        for (const fn of gapHandlers) {
+          try {
+            fn(gapPayload);
+          } catch (e) {
+            console.error('[HubWS] gap handler error:', e);
+          }
+        }
+      }
+      lastSeq = seq;
     }
 
     // Route to typed handlers
@@ -226,19 +302,29 @@ export function createHubWS(opts: HubWSOptions): HubWSHandle {
       };
     },
 
+    onGap(handler: (payload: HubWSGapPayload) => void): () => void {
+      gapHandlers.add(handler);
+      return () => {
+        gapHandlers.delete(handler);
+      };
+    },
+
     onStatus(handler: (status: TransportStatus) => void): () => void {
       return transport.on('status', handler);
     },
 
     close(): void {
       authenticated = false;
+      lastSeq = -1;
       transport.close();
       typedHandlers.clear();
       anyHandlers.clear();
+      gapHandlers.clear();
     },
 
     reconnect(): void {
       authenticated = false;
+      lastSeq = -1;
       if (transport.reconnect) {
         transport.reconnect(connectURL());
         return;
@@ -252,6 +338,10 @@ export function createHubWS(opts: HubWSOptions): HubWSHandle {
 
     isAuthenticated(): boolean {
       return authenticated;
+    },
+
+    getLastSeq(): number {
+      return lastSeq;
     },
   };
 }
