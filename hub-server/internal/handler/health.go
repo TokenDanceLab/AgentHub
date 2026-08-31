@@ -1,6 +1,8 @@
 package handler
 
 import (
+	"github.com/agenthub/hub-server/internal/errcode"
+
 	"net/http"
 	"sync"
 	"time"
@@ -72,7 +74,7 @@ func (h *HealthHandler) Ready(c *gin.Context) {
 	}
 
 	c.JSON(statusCode, Response{
-		Code: "OK",
+		Code: errcode.OK.Code,
 		Data: report,
 	})
 }

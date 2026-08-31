@@ -242,7 +242,7 @@ func decodeJSON[T any](t *testing.T, resp *http.Response) T {
 // the envelope is present, otherwise returns the body unchanged (backward
 // compatible with raw/non-envelope responses such as error bodies).
 func unwrapSuccess(body map[string]any) map[string]any {
-	if body["code"] == "OK" {
+	if body["code"] == "ok" || body["code"] == "OK" {
 		if data, ok := body["data"].(map[string]any); ok {
 			return data
 		}

@@ -51,11 +51,12 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 	resputil.WriteJSON(w, status, v)
 }
 
-// writeSuccess writes a unified success envelope: {"code":"OK","data":...}
-// This aligns Edge Server success responses with the Hub Server format.
+// writeSuccess writes a unified success envelope: {"code":"ok","data":...}.
+// The code casing matches the Hub envelope contract (errcode.OK.Code, always
+// lowercase "ok"); clients accept both cases for backward compatibility.
 func writeSuccess(w http.ResponseWriter, status int, data any) {
 	writeJSON(w, status, map[string]any{
-		"code": "OK",
+		"code": "ok",
 		"data": data,
 	})
 }

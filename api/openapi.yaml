@@ -137,7 +137,7 @@ paths:
         - name: cursor
           in: query
           required: false
-          schema: { type: string }
+          schema: { type: integer, format: int64 }
           description: >
             Numeric event-sequence cursor for replay. Alias for `pageCursor`;
             `cursor` takes precedence when both are present. The Edge handler
@@ -839,6 +839,48 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/RunDiffResponse"
+        "404":
+          $ref: "#/components/responses/Error"
+
+  /v1/runs/{runId}/checkpoint:
+    get:
+      tags: [ExecutionRunner]
+      operationId: getRunCheckpoint
+      summary: Get run checkpoint metadata and inventory.
+      x-agenthub-phase: P0
+      x-agenthub-status: implemented
+      x-agenthub-owner: Edge
+      parameters:
+        - $ref: "#/components/parameters/RunId"
+      responses:
+        "200":
+          description: Checkpoint metadata plus file inventory for a persisted run.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        "404":
+          $ref: "#/components/responses/Error"
+
+  /v1/runs/{runId}/checkpoint/file:
+    get:
+      tags: [ExecutionRunner]
+      operationId: getRunCheckpointFile
+      summary: Get a single checkpoint file preview.
+      x-agenthub-phase: P0
+      x-agenthub-status: implemented
+      x-agenthub-owner: Edge
+      parameters:
+        - $ref: "#/components/parameters/RunId"
+      responses:
+        "200":
+          description: Checkpoint file preview.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
         "404":
           $ref: "#/components/responses/Error"
 
@@ -1990,6 +2032,14 @@ paths:
           in: path
           required: true
           schema: { type: string }
+        - name: before_seq
+          in: query
+          required: false
+          schema: { type: integer, format: int64 }
+        - name: limit
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1 }
       responses:
         "200":
           description: Messages list (bare array of Message). Handler returns []MessageResponse; openapi aligned to Message schema.
@@ -3247,10 +3297,17 @@ paths:
           multipart/form-data:
             schema:
               type: object
+              required: [file, hash, original_name]
               properties:
                 file:
                   type: string
                   format: binary
+                hash:
+                  type: string
+                  description: SHA-256 content hash of the upload.
+                original_name:
+                  type: string
+                  description: Original file name preserved for display.
       responses:
         "201":
           $ref: "#/components/responses/Created"
@@ -3944,14 +4001,15 @@ paths:
     get:
       tags: [HubSyncRelay]
       operationId: hubSearchContacts
-      summary: Search contacts by keyword.
+      summary: Search contacts by user id.
       x-agenthub-status: implemented
       x-agenthub-owner: Hub
       security: [{ bearerAuth: [] }]
       parameters:
-        - name: q
+        - name: id
           in: query
           required: true
+          description: Target user id (implementation and frontend SSOT use id, not q).
           schema: { type: string }
       responses:
         "200":
@@ -4152,10 +4210,11 @@ paths:
           in: path
           required: true
           schema: { type: string }
-        - name: cursor
+        - name: after_seq
           in: query
           required: false
-          schema: { type: string }
+          description: Incremental sync cursor (messages.seq_id, matches api/events.md).
+          schema: { type: integer, format: int64 }
         - name: limit
           in: query
           required: false
@@ -4608,6 +4667,13 @@ paths:
       x-agenthub-status: implemented
       x-agenthub-owner: Hub
       security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: "#/components/parameters/PageSize"
+        - $ref: "#/components/parameters/PageCursor"
+        - name: target_type
+          in: query
+          required: false
+          schema: { type: string }
       responses:
         "200":
           $ref: "#/components/responses/List"
@@ -5176,6 +5242,22 @@ paths:
       parameters:
         - $ref: "#/components/parameters/PageSize"
         - $ref: "#/components/parameters/PageCursor"
+        - name: event_type
+          in: query
+          required: false
+          schema: { type: string }
+        - name: severity
+          in: query
+          required: false
+          schema: { type: string }
+        - name: since
+          in: query
+          required: false
+          schema: { type: string }
+        - name: until
+          in: query
+          required: false
+          schema: { type: string }
       responses:
         "200":
           $ref: "#/components/responses/List"
@@ -6752,6 +6834,18 @@ paths:
       parameters:
         - $ref: "#/components/parameters/PageSize"
         - $ref: "#/components/parameters/PageCursor"
+        - name: q
+          in: query
+          required: false
+          schema: { type: string }
+        - name: skill_type
+          in: query
+          required: false
+          schema: { type: string }
+        - name: is_public
+          in: query
+          required: false
+          schema: { type: boolean }
       responses:
         "200":
           $ref: "#/components/responses/List"
@@ -6930,6 +7024,18 @@ paths:
       parameters:
         - $ref: "#/components/parameters/PageSize"
         - $ref: "#/components/parameters/PageCursor"
+        - name: q
+          in: query
+          required: false
+          schema: { type: string }
+        - name: transport
+          in: query
+          required: false
+          schema: { type: string }
+        - name: is_public
+          in: query
+          required: false
+          schema: { type: boolean }
       responses:
         "200":
           $ref: "#/components/responses/List"
@@ -7221,6 +7327,14 @@ paths:
           required: false
           schema: { type: string }
           description: Search keyword for profile name or description.
+        - name: runtime_id
+          in: query
+          required: false
+          schema: { type: string }
+        - name: sort_by
+          in: query
+          required: false
+          schema: { type: string, enum: [recent, install_count, rating] }
       responses:
         "200":
           $ref: "#/components/responses/List"
@@ -7965,9 +8079,8 @@ components:
         event_type:
           type: string
         payload:
-          type: object
-          additionalProperties: true
-          description: Runtime payload persisted by Hub. Encoded JSON is capped at 1 MiB on stream ingest.
+          type: string
+          description: JSON-encoded runtime payload persisted by Hub; capped at 1 MiB on stream ingest.
         created_at:
           type: string
           format: date-time
