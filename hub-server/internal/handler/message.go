@@ -27,7 +27,7 @@ type MessageService interface {
 	ListPinnedMessages(ctx context.Context, userID, sessionID string) ([]message.MessageResponse, error)
 	ForwardMessage(ctx context.Context, userID, msgID string, targetSessionIDs []string) error
 	MarkRead(ctx context.Context, userID, sessionID string, lastReadSeq int64) error
-	SearchMessages(ctx context.Context, userID, q, sessionID, contentType, from, to string) ([]message.MessageResponse, error)
+	SearchMessages(ctx context.Context, userID, q, sessionID, contentType, from, to, cursor string, pageSize int) (*message.MessageSearchPage, error)
 	AddMessageReaction(ctx context.Context, userID, sessionID, msgID, reaction string) (*messagereaction.MessageReactionResponse, error)
 	RemoveMessageReaction(ctx context.Context, userID, sessionID, msgID, reaction string) (*messagereaction.MessageReactionResponse, error)
 	ListMessageReactions(ctx context.Context, userID, sessionID, msgID string) ([]messagereaction.MessageReactionResponse, error)
@@ -405,6 +405,20 @@ func (h *MessageHandler) MarkRead(c *gin.Context) {
 	OK(c, nil)
 }
 
+// parseMessageSearchPage parses pageCursor/pageSize for message search
+// endpoints (#2136 P2). Message search keeps the legacy MaxMessagePageLimit
+// cap (100) instead of MaxPageLimit to preserve payload-size invariants.
+func parseMessageSearchPage(c *gin.Context) (cursor string, pageSize int) {
+	pageSize, _ = strconv.Atoi(c.DefaultQuery("pageSize", strconv.Itoa(config.DefaultPaginationLimit)))
+	if pageSize <= 0 {
+		pageSize = config.DefaultPaginationLimit
+	}
+	if pageSize > config.MaxMessagePageLimit {
+		pageSize = config.MaxMessagePageLimit
+	}
+	return c.Query("pageCursor"), pageSize
+}
+
 func (h *MessageHandler) SearchMessages(c *gin.Context) {
 	userID := c.GetString("user_id")
 	q := c.Query("q")
@@ -418,7 +432,8 @@ func (h *MessageHandler) SearchMessages(c *gin.Context) {
 	from := c.Query("from")
 	to := c.Query("to")
 
-	result, err := h.service.SearchMessages(c.Request.Context(), userID, q, sessionID, contentType, from, to)
+	cursor, pageSize := parseMessageSearchPage(c)
+	result, err := h.service.SearchMessages(c.Request.Context(), userID, q, sessionID, contentType, from, to, cursor, pageSize)
 	if err != nil {
 		var e *errcode.Error
 		if errors.As(err, &e) {
@@ -428,7 +443,10 @@ func (h *MessageHandler) SearchMessages(c *gin.Context) {
 		Fail(c, errcode.ErrInternal)
 		return
 	}
-	OK(c, result)
+	OK(c, gin.H{
+		"items": result.Items,
+		"page":  gin.H{"nextCursor": result.NextCursor, "hasMore": result.HasMore},
+	})
 }
 
 func (h *MessageHandler) SearchSessionMessages(c *gin.Context) {
@@ -444,7 +462,8 @@ func (h *MessageHandler) SearchSessionMessages(c *gin.Context) {
 	from := c.Query("from")
 	to := c.Query("to")
 
-	result, err := h.service.SearchMessages(c.Request.Context(), userID, q, sessionID, contentType, from, to)
+	cursor, pageSize := parseMessageSearchPage(c)
+	result, err := h.service.SearchMessages(c.Request.Context(), userID, q, sessionID, contentType, from, to, cursor, pageSize)
 	if err != nil {
 		var e *errcode.Error
 		if errors.As(err, &e) {
@@ -454,5 +473,8 @@ func (h *MessageHandler) SearchSessionMessages(c *gin.Context) {
 		Fail(c, errcode.ErrInternal)
 		return
 	}
-	OK(c, result)
+	OK(c, gin.H{
+		"items": result.Items,
+		"page":  gin.H{"nextCursor": result.NextCursor, "hasMore": result.HasMore},
+	})
 }

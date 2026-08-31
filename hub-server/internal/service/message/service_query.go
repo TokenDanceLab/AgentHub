@@ -2,6 +2,7 @@ package message
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/agenthub/hub-server/internal/bus"
 	"github.com/agenthub/hub-server/internal/errcode"
@@ -111,22 +112,48 @@ func (s *Service) MarkRead(ctx context.Context, userID, sessionID string, lastRe
 	return nil
 }
 
-func (s *Service) SearchMessages(ctx context.Context, userID, q, sessionID, contentType, from, to string) ([]MessageResponse, error) {
+// MessageSearchPage is one page of message-search results (#2136 P2). The
+// cursor is opaque to clients: session-scoped searches encode "<seq>|<id>",
+// cross-session searches "<createdAtUnixNano>|<id>".
+type MessageSearchPage struct {
+	Items      []MessageResponse `json:"items"`
+	NextCursor string            `json:"nextCursor"`
+	HasMore    bool              `json:"hasMore"`
+}
+
+// SearchMessages searches messages matching q either inside a single session
+// (sessionID non-empty, ordered by seq_id DESC) or across all sessions the
+// user is a member of (ordered by created_at DESC). cursor is the opaque
+// nextCursor of a previous page; empty starts from the first page.
+func (s *Service) SearchMessages(ctx context.Context, userID, q, sessionID, contentType, from, to, cursor string, pageSize int) (*MessageSearchPage, error) {
+	page := &MessageSearchPage{}
 	if sessionID != "" {
 		active, err := repository.IsMemberActive(s.db, sessionID, model.MemberTypeUser, userID)
 		if err != nil || !active {
 			return nil, errcode.SessionNotMember
 		}
-		msgs, err := repository.SearchMessages(s.db, q, sessionID, contentType, from, to)
+		msgs, hasMore, err := repository.SearchMessages(s.db, q, sessionID, contentType, from, to, cursor, pageSize)
 		if err != nil {
 			return nil, err
 		}
-		return s.toMessageResponses(msgs), nil
+		page.HasMore = hasMore
+		if hasMore && len(msgs) > 0 {
+			last := msgs[len(msgs)-1]
+			page.NextCursor = fmt.Sprintf("%d|%s", last.SeqID, last.ID)
+		}
+		page.Items = s.toMessageResponses(msgs)
+		return page, nil
 	}
 
-	msgs, err := repository.SearchAllMessages(s.db, userID, q, contentType, from, to)
+	msgs, hasMore, err := repository.SearchAllMessages(s.db, userID, q, contentType, from, to, cursor, pageSize)
 	if err != nil {
 		return nil, err
 	}
-	return s.toMessageResponses(msgs), nil
+	page.HasMore = hasMore
+	if hasMore && len(msgs) > 0 {
+		last := msgs[len(msgs)-1]
+		page.NextCursor = fmt.Sprintf("%d|%s", last.CreatedAt.UnixNano(), last.ID)
+	}
+	page.Items = s.toMessageResponses(msgs)
+	return page, nil
 }
