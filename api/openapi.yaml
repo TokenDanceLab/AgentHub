@@ -6184,6 +6184,7 @@ paths:
       summary: Login.
       x-agenthub-phase: P2
       x-agenthub-owner: Hub
+      x-agenthub-status: planned
       responses:
         "200":
           $ref: "#/components/responses/Ok"
@@ -6195,6 +6196,7 @@ paths:
       summary: Logout.
       x-agenthub-phase: P2
       x-agenthub-owner: Hub
+      x-agenthub-status: planned
       responses:
         "204":
           description: Logged out.
@@ -6206,6 +6208,7 @@ paths:
       summary: Get current user.
       x-agenthub-phase: P2
       x-agenthub-owner: Hub
+      x-agenthub-status: planned
       responses:
         "200":
           $ref: "#/components/responses/Ok"
@@ -6215,6 +6218,7 @@ paths:
       summary: Update current user.
       x-agenthub-phase: P2
       x-agenthub-owner: Hub
+      x-agenthub-status: planned
       responses:
         "200":
           $ref: "#/components/responses/Ok"
@@ -6226,6 +6230,7 @@ paths:
       summary: List contacts.
       x-agenthub-phase: P4
       x-agenthub-owner: Hub
+      x-agenthub-status: planned
       responses:
         "200":
           $ref: "#/components/responses/List"
@@ -6237,6 +6242,7 @@ paths:
       summary: Send contact request.
       x-agenthub-phase: P4
       x-agenthub-owner: Hub
+      x-agenthub-status: planned
       responses:
         "202":
           $ref: "#/components/responses/Accepted"
@@ -6248,6 +6254,7 @@ paths:
       summary: Accept contact request.
       x-agenthub-phase: P4
       x-agenthub-owner: Hub
+      x-agenthub-status: planned
       parameters:
         - $ref: "#/components/parameters/UserId"
       responses:
@@ -6261,6 +6268,7 @@ paths:
       summary: Delete contact.
       x-agenthub-phase: P4
       x-agenthub-owner: Hub
+      x-agenthub-status: planned
       parameters:
         - $ref: "#/components/parameters/UserId"
       responses:
@@ -6274,6 +6282,7 @@ paths:
       summary: List groups.
       x-agenthub-phase: P4
       x-agenthub-owner: Hub
+      x-agenthub-status: planned
       responses:
         "200":
           $ref: "#/components/responses/List"
@@ -6283,6 +6292,7 @@ paths:
       summary: Create group.
       x-agenthub-phase: P4
       x-agenthub-owner: Hub
+      x-agenthub-status: planned
       responses:
         "201":
           $ref: "#/components/responses/Created"
@@ -6294,6 +6304,7 @@ paths:
       summary: Get group.
       x-agenthub-phase: P4
       x-agenthub-owner: Hub
+      x-agenthub-status: planned
       parameters:
         - $ref: "#/components/parameters/GroupId"
       responses:
@@ -6305,6 +6316,7 @@ paths:
       summary: Update group.
       x-agenthub-phase: P4
       x-agenthub-owner: Hub
+      x-agenthub-status: planned
       parameters:
         - $ref: "#/components/parameters/GroupId"
       responses:
@@ -6318,6 +6330,7 @@ paths:
       summary: List devices.
       x-agenthub-phase: P2
       x-agenthub-owner: Hub
+      x-agenthub-status: planned
       responses:
         "200":
           $ref: "#/components/responses/List"
@@ -6329,6 +6342,7 @@ paths:
       summary: Register device.
       x-agenthub-phase: P2
       x-agenthub-owner: Hub
+      x-agenthub-status: planned
       responses:
         "201":
           $ref: "#/components/responses/Created"
@@ -6340,6 +6354,7 @@ paths:
       summary: Delete device.
       x-agenthub-phase: P2
       x-agenthub-owner: Hub
+      x-agenthub-status: planned
       parameters:
         - $ref: "#/components/parameters/DeviceId"
       responses:
@@ -6353,6 +6368,7 @@ paths:
       summary: List Edge nodes.
       x-agenthub-phase: P2
       x-agenthub-owner: Hub
+      x-agenthub-status: planned
       responses:
         "200":
           $ref: "#/components/responses/List"
@@ -6364,6 +6380,7 @@ paths:
       summary: Register Edge node.
       x-agenthub-phase: P2
       x-agenthub-owner: Hub
+      x-agenthub-status: planned
       responses:
         "201":
           $ref: "#/components/responses/Created"
@@ -6375,6 +6392,7 @@ paths:
       summary: Get Edge node.
       x-agenthub-phase: P2
       x-agenthub-owner: Hub
+      x-agenthub-status: planned
       parameters:
         - $ref: "#/components/parameters/EdgeId"
       responses:
@@ -6386,6 +6404,7 @@ paths:
       summary: Update Edge node.
       x-agenthub-phase: P2
       x-agenthub-owner: Hub
+      x-agenthub-status: planned
       parameters:
         - $ref: "#/components/parameters/EdgeId"
       responses:
@@ -6399,6 +6418,7 @@ paths:
       summary: Send Edge heartbeat.
       x-agenthub-phase: P2
       x-agenthub-owner: Hub
+      x-agenthub-status: planned
       parameters:
         - $ref: "#/components/parameters/EdgeId"
       responses:
@@ -6412,6 +6432,7 @@ paths:
       summary: Upload Edge events.
       x-agenthub-phase: P2
       x-agenthub-owner: Hub
+      x-agenthub-status: planned
       responses:
         "202":
           $ref: "#/components/responses/Accepted"
@@ -6423,6 +6444,7 @@ paths:
       summary: List sync events.
       x-agenthub-phase: P2
       x-agenthub-owner: Hub
+      x-agenthub-status: planned
       parameters:
         - $ref: "#/components/parameters/PageCursor"
       responses:
@@ -6436,6 +6458,7 @@ paths:
       summary: Acknowledge sync cursor.
       x-agenthub-phase: P2
       x-agenthub-owner: Hub
+      x-agenthub-status: planned
       responses:
         "202":
           $ref: "#/components/responses/Accepted"
@@ -6447,6 +6470,7 @@ paths:
       summary: Get sync state.
       x-agenthub-phase: P2
       x-agenthub-owner: Hub
+      x-agenthub-status: planned
       responses:
         "200":
           $ref: "#/components/responses/Ok"
@@ -6458,6 +6482,7 @@ paths:
       summary: Create relay command.
       x-agenthub-phase: P3
       x-agenthub-owner: Hub
+      x-agenthub-status: planned
       responses:
         "202":
           $ref: "#/components/responses/Accepted"
@@ -6469,6 +6494,7 @@ paths:
       summary: Get relay command.
       x-agenthub-phase: P3
       x-agenthub-owner: Hub
+      x-agenthub-status: planned
       parameters:
         - $ref: "#/components/parameters/CommandId"
       responses:
@@ -6482,6 +6508,7 @@ paths:
       summary: Acknowledge relay command.
       x-agenthub-phase: P3
       x-agenthub-owner: Hub
+      x-agenthub-status: planned
       parameters:
         - $ref: "#/components/parameters/CommandId"
       responses:
@@ -6495,6 +6522,7 @@ paths:
       summary: Open reverse WebSocket relay for Edge.
       x-agenthub-phase: P3
       x-agenthub-owner: Hub
+      x-agenthub-status: planned
       parameters:
         - $ref: "#/components/parameters/EdgeId"
       responses:
@@ -6508,6 +6536,7 @@ paths:
       summary: List Cloud Edge nodes.
       x-agenthub-phase: P3
       x-agenthub-owner: Hub
+      x-agenthub-status: planned
       responses:
         "200":
           $ref: "#/components/responses/List"
@@ -6517,6 +6546,7 @@ paths:
       summary: Create Cloud Edge node.
       x-agenthub-phase: P3
       x-agenthub-owner: Hub
+      x-agenthub-status: planned
       responses:
         "202":
           $ref: "#/components/responses/Accepted"
@@ -6528,6 +6558,7 @@ paths:
       summary: Allocate Cloud Runner.
       x-agenthub-phase: P3
       x-agenthub-owner: Hub
+      x-agenthub-status: planned
       responses:
         "202":
           $ref: "#/components/responses/Accepted"
@@ -6539,6 +6570,7 @@ paths:
       summary: Release Cloud Runner.
       x-agenthub-phase: P3
       x-agenthub-owner: Hub
+      x-agenthub-status: planned
       parameters:
         - $ref: "#/components/parameters/RunnerId"
       responses:
