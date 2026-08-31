@@ -78,7 +78,7 @@
   "auth.error.oidc.startFailed": "Failed to start OIDC login: {{detail}}",
   "auth.error.oidc.stateMismatch": "OIDC state mismatch — possible CSRF attack. Please try again.",
   "auth.error.oidc.timeout": "Login timed out — no callback received within 5 minutes.",
-  "auth.error.oidc.tokenExchangeFailed": "Token exchange failed: {{detail}}",
+  "auth.error.oidc.tokenExchangeFailed": "Token exchange failed. Please check your network and try signing in again.",
   "auth.error.oidc.unknownError": "OIDC login error.",
   "auth.error.passwordMin": "Password must be at least 8 characters",
   "auth.error.passwordMismatch": "Passwords do not match",
