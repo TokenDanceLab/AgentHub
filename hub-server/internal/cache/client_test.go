@@ -1412,3 +1412,19 @@ func TestPopPendingTasks_AtomicDrainAndClear(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, []string{t2}, next)
 }
+
+// CheckRateLimit must attach a TTL even on the very first call: the
+// INCR+EXPIRE pair runs inside one Lua script, so a crash cannot strand a
+// permanent ratelimit key (which would rate-limit the caller forever).
+func TestCheckRateLimit_SetsTTLAtomically(t *testing.T) {
+	c, mr := testClient(t)
+	ctx := context.Background()
+
+	_, exceeded, err := c.CheckRateLimit(ctx, "rl-ttl", 10)
+	require.NoError(t, err)
+	assert.False(t, exceeded)
+
+	ttl := mr.TTL("ratelimit:rl-ttl")
+	assert.Greater(t, ttl, time.Duration(0), "ratelimit key must carry a TTL after the first call")
+	assert.LessOrEqual(t, ttl, 60*time.Second)
+}

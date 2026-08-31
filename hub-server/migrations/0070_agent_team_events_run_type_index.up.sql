@@ -1,4 +1,4 @@
--- 0069_agent_team_events_run_type_index.up.sql
+-- 0070_agent_team_events_run_type_index.up.sql
 -- Lane lane-zz-jsonb-count (#2102 F14): CountTeamRouteDecisionsByActionWorkerInstructions
 -- does COUNT(*) WHERE team_run_id=? AND type=? AND JSONB payload filters.
 -- Baseline EXPLAIN on dev DB (5000 events/run, no matching rows) shows a full
