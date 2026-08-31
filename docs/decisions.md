@@ -1,6 +1,6 @@
 # AgentHub Decisions
 
-最后更新：2026-08-29
+最后更新：2026-09-01
 
 本文件是当前架构决策摘要。旧 ADR 全文已外迁到 `docs/history.md` 指向的 TokenDance docs archive；旧正文只作追溯，不覆盖 `AGENTS.md`、`docs/architecture.md`、`docs/architecture/`、`api/` 或当前源码事实。
 
@@ -28,6 +28,7 @@
 | A-V3 | Accepted 2026-08-03；landed 2026-08-03 (#1525) | `@agenthub/shared` 拆分裁决：**驳回全量 hub/edge 三分**（churn 高一个数量级、收益被既有 14 层边界门禁吃掉、mobile-rn 作为 hub-only 客户端仍需 hubClient）；采纳两个 quick-win——剔除零消费的 `apiClient.ts` 死表面、`workspace:*` 显式依赖声明；edge 表面隔离门禁 `verify-shared-edge-surface-isolation.py` 硬化（web/mobile 禁 import edge 表面）。正文已外迁（见 history.md）。 | Frontend boundary | 是 |
 | ADR-019 | Accepted 2026-08-09 | bus/ws 单源：WebSocket 事件流走单一 bus 抽象，禁止前端/Edge 各自分叉 event 解析与重放；reconnect 补数据、dispatch 语义、停机广播、jitter、CAS 由 bus 统一承担。 | Frontend / Edge / API | 是 |
 | ADR-020 | Accepted 2026-08-09 | execution target `target_type` 对齐：DB CHECK 枚举与 service/route 层 `target_type` 取值集合保持同名同序，service 校验与 DB 兜底不得漂移；组合约束（local_edge/hub_relay 需 route/device，remote_* 需 host）留 service 层。 | Hub / Edge | 是 |
+| ADR-021 | Accepted 2026-09-01 | OTel GenAI tracing 裁决（#2111）：span 族为 `agenthub.run`/`agenthub.run.lifecycle`/`gen_ai.chat`(CLIENT)/`gen_ai.tool_call`(sibling, draft)/`agenthub.approval`/`agenthub.artifact.surface`/`agenthub.dispatch.callback`；属性按 semconv v1.36 stable + v1.37 draft；不为 WS 帧、DB/Redis 建 GenAI span；导出管道与 Hub REST 侧迁移另开切片。正文见 #2111。 | Observability | 是 |
 | ADR-021 | Accepted 2026-08-09 | 安全门禁四修（AH-SR-051）：迁移触发器双炸弹修复链、Go toolchain 1.26.5（stdlib vuln GO-2026-5037/5038/5039）、i18n callsites ratchet 接线、文档版本对齐。 | Security / CI | 是 |
 | ADR-022 | Accepted 2026-08-09 | 迁移触发器修复原则：已发布迁移不可变（不改 0040/0058.up/0060.up/0016.up），新建后续迁移（0061/0064）以 `DISABLE/ENABLE TRIGGER USER` 或 `NOT VALID` 方式旁路 0040 append-only 触发器；down 链同样补外包。legacy 行 backfill 留给计数器列通道，不在此轮。 | Hub migrations | 是 |
 | ADR-023 | Accepted 2026-08-09 | Tauri 安全加固：sidecar 重启策略、command 门控（最小权限 capability）、SSRF 防护（出站 URL allowlist + 私网拦截）。正文见 Tauri 通道交付。 | Desktop / Security | 是 |
