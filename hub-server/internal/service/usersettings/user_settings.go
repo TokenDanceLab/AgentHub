@@ -6,6 +6,7 @@ import (
 
 	"github.com/agenthub/hub-server/internal/model"
 	"github.com/agenthub/hub-server/internal/repository"
+	"github.com/agenthub/pkg/errcode"
 )
 
 // Service provides business logic for user settings.
@@ -41,15 +42,15 @@ func (s *Service) UpsertSettings(userID string, values map[string]string) (map[s
 			continue
 		}
 		if len(k) > 128 {
-			return nil, fmt.Errorf("setting key too long: %s", k)
+			return nil, errcode.ErrValidation.WithMessage("setting key too long: " + k)
 		}
 		if len(value) > 4096 {
-			return nil, fmt.Errorf("setting value too long for key: %s", k)
+			return nil, errcode.ErrValidation.WithMessage("setting value too long for key: " + k)
 		}
 		cleaned[k] = value
 	}
 	if len(cleaned) == 0 {
-		return nil, fmt.Errorf("no valid settings to upsert")
+		return nil, errcode.ErrValidation.WithMessage("no valid settings to upsert")
 	}
 
 	_, err := s.repo.UpsertSettings(userID, cleaned)
