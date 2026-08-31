@@ -327,95 +327,9 @@ pub async fn read_dir_tree(
 
 /// Create a new file at the given path. Parent directories must exist.
 /// If content is None, an empty file is created.
-#[tauri::command]
-pub async fn create_file(
-    path: String,
-    content: Option<String>,
-    _allowed_dirs: Option<Vec<String>>,
-    access: State<'_, WorkspaceFileAccessState>,
-) -> Result<(), String> {
-    let p = Path::new(&path);
-    let p = validate_state_path(p, &access)?;
-    if p.exists() {
-        return Err(format!("File already exists: {}", path));
-    }
-    if let Some(parent) = p.parent() {
-        fs::create_dir_all(parent).map_err(|e| format!("Failed to create parent dirs: {}", e))?;
-    }
-    let data = content.unwrap_or_default();
-    fs::write(&p, data).map_err(|e| format!("Failed to write file: {}", e))
-}
-
 /// Create a new directory at the given path. Creates parents as needed.
-#[tauri::command]
-pub async fn create_folder(
-    path: String,
-    _allowed_dirs: Option<Vec<String>>,
-    access: State<'_, WorkspaceFileAccessState>,
-) -> Result<(), String> {
-    let p = Path::new(&path);
-    let p = validate_state_path(p, &access)?;
-    if p.exists() {
-        return Err(format!("Path already exists: {}", path));
-    }
-    fs::create_dir_all(&p).map_err(|e| format!("Failed to create folder: {}", e))
-}
-
 /// Rename/move a file or directory from old_path to new_path.
-#[tauri::command]
-pub async fn rename_entry(
-    old_path: String,
-    new_path: String,
-    _allowed_dirs: Option<Vec<String>>,
-    access: State<'_, WorkspaceFileAccessState>,
-) -> Result<(), String> {
-    let src = Path::new(&old_path);
-    let dst = Path::new(&new_path);
-    let src = validate_state_path(src, &access)?;
-    let dst = validate_state_path(dst, &access)?;
-    if !src.exists() {
-        return Err(format!("Source does not exist: {}", old_path));
-    }
-    if dst.exists() {
-        return Err(format!("Destination already exists: {}", new_path));
-    }
-    if let Some(parent) = dst.parent() {
-        fs::create_dir_all(parent).map_err(|e| format!("Failed to create parent dirs: {}", e))?;
-    }
-    fs::rename(&src, &dst).map_err(|e| format!("Failed to rename: {}", e))
-}
-
 /// Copy a file. Directories are copied recursively.
-#[tauri::command]
-pub async fn copy_entry(
-    src_path: String,
-    dst_path: String,
-    _allowed_dirs: Option<Vec<String>>,
-    access: State<'_, WorkspaceFileAccessState>,
-) -> Result<(), String> {
-    let src = Path::new(&src_path);
-    let dst = Path::new(&dst_path);
-    let roots = access.allowed_roots()?;
-    let src = validate_path(src, &roots)?;
-    let dst = validate_path(dst, &roots)?;
-    if !src.exists() {
-        return Err(format!("Source does not exist: {}", src_path));
-    }
-    if dst.exists() {
-        return Err(format!("Destination already exists: {}", dst_path));
-    }
-    if let Some(parent) = dst.parent() {
-        fs::create_dir_all(parent).map_err(|e| format!("Failed to create parent dirs: {}", e))?;
-    }
-    if src.is_dir() {
-        copy_dir_recursive(&src, &dst, &roots)
-            .map_err(|e| format!("Failed to copy directory: {}", e))
-    } else {
-        fs::copy(&src, &dst).map_err(|e| format!("Failed to copy file: {}", e))?;
-        Ok(())
-    }
-}
-
 fn copy_dir_recursive(src: &Path, dst: &Path, allowlist: &[PathBuf]) -> std::io::Result<()> {
     fs::create_dir_all(dst)?;
     for entry in fs::read_dir(src)? {
@@ -441,24 +355,6 @@ fn copy_dir_recursive(src: &Path, dst: &Path, allowlist: &[PathBuf]) -> std::io:
 }
 
 /// Delete a file or directory. Directories are removed recursively.
-#[tauri::command]
-pub async fn delete_entry(
-    path: String,
-    _allowed_dirs: Option<Vec<String>>,
-    access: State<'_, WorkspaceFileAccessState>,
-) -> Result<(), String> {
-    let p = Path::new(&path);
-    let p = validate_state_path(p, &access)?;
-    if !p.exists() {
-        return Err(format!("Path does not exist: {}", path));
-    }
-    if p.is_dir() {
-        fs::remove_dir_all(&p).map_err(|e| format!("Failed to delete directory: {}", e))
-    } else {
-        fs::remove_file(&p).map_err(|e| format!("Failed to delete file: {}", e))
-    }
-}
-
 /// Read the full contents of a file as a UTF-8 string.
 #[tauri::command]
 pub async fn read_file(
@@ -479,95 +375,10 @@ pub async fn read_file(
 
 /// Write content to a file, creating it if it does not exist or overwriting if it does.
 /// Parent directories are created as needed.
-#[tauri::command]
-pub async fn write_file(
-    path: String,
-    content: String,
-    _allowed_dirs: Option<Vec<String>>,
-    access: State<'_, WorkspaceFileAccessState>,
-) -> Result<(), String> {
-    let p = Path::new(&path);
-    let p = validate_state_path(p, &access)?;
-    if p.is_dir() {
-        return Err(format!("Path is a directory: {}", path));
-    }
-    if let Some(parent) = p.parent() {
-        fs::create_dir_all(parent).map_err(|e| format!("Failed to create parent dirs: {}", e))?;
-    }
-    fs::write(&p, &content).map_err(|e| format!("Failed to write file: {}", e))
-}
-
 // ── Git Integration ──
 
 /// Run `git status --porcelain -b` in the given directory and return
 /// structured data about the branch and changed files.
-#[tauri::command]
-pub async fn git_status(
-    dir: String,
-    access: State<'_, WorkspaceFileAccessState>,
-) -> Result<GitStatus, String> {
-    let work_dir = Path::new(&dir);
-    let work_dir = validate_state_path(work_dir, &access)?;
-
-    let output = Command::new("git")
-        .args(["status", "--porcelain", "-b"])
-        .current_dir(&work_dir)
-        .output()
-        .map_err(|e| format!("Failed to run git: {}", e))?;
-
-    if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        return Err(format!("git status failed: {}", stderr.trim()));
-    }
-
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    let lines: Vec<&str> = stdout.lines().collect();
-
-    let (branch, ahead, behind) =
-        parse_branch_line(lines.first().copied().unwrap_or("## (no branch)"));
-
-    let files: Vec<GitFileStatus> = lines
-        .iter()
-        .skip(1)
-        .filter_map(|line| parse_porcelain_line(line))
-        .collect();
-
-    Ok(GitStatus {
-        branch,
-        ahead,
-        behind,
-        files,
-    })
-}
-
-#[tauri::command]
-pub async fn git_diff_unstaged(
-    dir: String,
-    access: State<'_, WorkspaceFileAccessState>,
-) -> Result<String, String> {
-    run_git_diff(&dir, &["diff"], &access)
-}
-
-#[tauri::command]
-pub async fn git_diff_staged(
-    dir: String,
-    access: State<'_, WorkspaceFileAccessState>,
-) -> Result<String, String> {
-    run_git_diff(&dir, &["diff", "--cached"], &access)
-}
-
-#[tauri::command]
-pub async fn git_diff_file(
-    dir: String,
-    file_path: String,
-    access: State<'_, WorkspaceFileAccessState>,
-) -> Result<String, String> {
-    let work_dir = validate_state_path(Path::new(&dir), &access)?;
-    let target = work_dir.join(&file_path);
-    validate_state_path(&target, &access)?;
-    run_git_diff_path(&work_dir, &["diff", "--", &file_path])
-}
-
 fn run_git_diff(
     dir: &str,
     args: &[&str],
@@ -675,60 +486,6 @@ fn parse_porcelain_line(line: &str) -> Option<GitFileStatus> {
 
 /// Validate whether a file path is covered by any entry in the allowlist.
 /// Returns true if the path is allowed by at least one entry.
-#[tauri::command]
-pub fn validate_allowlist(path: String, allowlist: Vec<AllowlistEntry>) -> bool {
-    let target = Path::new(&path);
-
-    let target_abs = match std::fs::canonicalize(target) {
-        Ok(p) => p,
-        Err(_) => {
-            if let Some(parent) = target.parent() {
-                match std::fs::canonicalize(parent) {
-                    Ok(parent_abs) => parent_abs.join(target.file_name().unwrap_or_default()),
-                    Err(_) => return false,
-                }
-            } else {
-                return false;
-            }
-        }
-    };
-
-    for entry in &allowlist {
-        let entry_base = Path::new(&entry.path);
-        let entry_abs = match std::fs::canonicalize(entry_base) {
-            Ok(p) => p,
-            Err(_) => continue,
-        };
-
-        if !target_abs.starts_with(&entry_abs) {
-            continue;
-        }
-
-        let rel = match target_abs.strip_prefix(&entry_abs) {
-            Ok(r) => r,
-            Err(_) => continue,
-        };
-
-        let rel_str = rel.to_string_lossy().replace('\\', "/");
-
-        if entry.globs.is_empty() {
-            return true;
-        }
-
-        for glob in &entry.globs {
-            let pattern = glob.trim();
-            if pattern.is_empty() || pattern == "**/*" || pattern == "**" {
-                return true;
-            }
-            if glob_match(rel_str.as_str(), pattern) {
-                return true;
-            }
-        }
-    }
-
-    false
-}
-
 /// Simple glob matching for allowlist validation.
 /// Supports *, ?, **, and character classes.
 fn glob_match(path: &str, pattern: &str) -> bool {
@@ -813,179 +570,11 @@ pub fn seed_workspace_file_access_from_store(
     replace_workspace_roots_from_trusted_store(access, &data)
 }
 
-#[tauri::command]
-pub async fn read_workspace_store(
-    app: tauri::AppHandle,
-    access: State<'_, WorkspaceFileAccessState>,
-) -> Result<WorkspaceStoreData, String> {
-    let path = workspace_store_path(&app);
-    if !path.exists() {
-        access.replace_roots(Vec::new())?;
-        return Ok(WorkspaceStoreData::default());
-    }
-    let content =
-        fs::read_to_string(&path).map_err(|e| format!("Failed to read workspace store: {}", e))?;
-    let data: WorkspaceStoreData = serde_json::from_str(&content)
-        .map_err(|e| format!("Failed to parse workspace store: {}", e))?;
-    replace_workspace_roots_from_trusted_store(&access, &data)?;
-    Ok(data)
-}
-
-#[tauri::command]
-pub async fn write_workspace_store(
-    app: tauri::AppHandle,
-    data: WorkspaceStoreData,
-    access: State<'_, WorkspaceFileAccessState>,
-) -> Result<(), String> {
-    let roots = authorized_workspace_roots_from_store_data(&access, &data)?;
-    let path = workspace_store_path(&app);
-    if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent).map_err(|e| format!("Failed to create app data dir: {}", e))?;
-    }
-    let content = serde_json::to_string_pretty(&data)
-        .map_err(|e| format!("Failed to serialize workspace store: {}", e))?;
-    fs::write(&path, &content).map_err(|e| format!("Failed to write workspace store: {}", e))?;
-    access.replace_roots(roots)
-}
-
-#[tauri::command]
-pub async fn choose_workspace_root(
-    app: tauri::AppHandle,
-    access: State<'_, WorkspaceFileAccessState>,
-) -> Result<Option<WorkspaceStoreEntry>, String> {
-    let selected = app
-        .dialog()
-        .file()
-        .set_title("Choose workspace folder")
-        .blocking_pick_folder();
-    let Some(selected) = selected else {
-        return Ok(None);
-    };
-    let path = selected
-        .into_path()
-        .map_err(|e| format!("Failed to resolve selected workspace folder: {}", e))?;
-    let canonical = authorize_workspace_root_from_host_path(path, &access)?;
-    let entry = workspace_store_entry_for_authorized_root(canonical);
-    let store_path = workspace_store_path(&app);
-    let existing = if store_path.exists() {
-        let content = fs::read_to_string(&store_path)
-            .map_err(|e| format!("Failed to read workspace store: {}", e))?;
-        serde_json::from_str(&content)
-            .map_err(|e| format!("Failed to parse workspace store: {}", e))?
-    } else {
-        WorkspaceStoreData::default()
-    };
-    let next = upsert_workspace_store_entry(existing, entry.clone());
-    if let Some(parent) = store_path.parent() {
-        fs::create_dir_all(parent).map_err(|e| format!("Failed to create app data dir: {}", e))?;
-    }
-    let content = serde_json::to_string_pretty(&next)
-        .map_err(|e| format!("Failed to serialize workspace store: {}", e))?;
-    fs::write(&store_path, &content)
-        .map_err(|e| format!("Failed to write workspace store: {}", e))?;
-    Ok(Some(entry))
-}
-
 // ── Workspace Content Search ──
 
 /// Search file contents in a workspace directory using ripgrep (`rg`).
 /// Falls back to system `grep` when `rg` is not available.
 /// Results are grouped by file, sorted by match count descending.
-#[tauri::command]
-pub async fn search_workspace_content(
-    dir: String,
-    query: String,
-    access: State<'_, WorkspaceFileAccessState>,
-) -> Result<Vec<FileGrepMatch>, String> {
-    let work_dir = Path::new(&dir);
-    let work_dir = validate_state_path(work_dir, &access)?;
-    if !work_dir.is_dir() {
-        return Err(format!("Not a directory: {}", dir));
-    }
-
-    let output = Command::new("rg")
-        .args([
-            "-n",
-            "-i",
-            "--no-heading",
-            "--color",
-            "never",
-            "-e",
-            &query,
-            ".",
-        ])
-        .current_dir(&work_dir)
-        .output();
-
-    let output = match output {
-        Ok(o) if o.status.success() => o,
-        _ => {
-            Command::new("grep")
-                .args(["-rn", "-i", "--color=never", "-e", &query, "."])
-                .current_dir(&work_dir)
-                .output()
-                .map_err(|e| format!("Neither rg nor grep is available: {}", e))?
-        }
-    };
-
-    let stdout = String::from_utf8_lossy(&output.stdout);
-
-    let mut file_matches: BTreeMap<String, Vec<(u32, String)>> = BTreeMap::new();
-
-    for line in stdout.lines() {
-        if line.is_empty() {
-            continue;
-        }
-        let colon1 = match line.find(':') {
-            Some(pos) => pos,
-            None => continue,
-        };
-        let file_path = line[..colon1].to_string();
-        let rest = &line[colon1 + 1..];
-
-        let colon2 = match rest.find(':') {
-            Some(pos) => pos,
-            None => continue,
-        };
-        let line_num: u32 = rest[..colon2].parse().unwrap_or(0);
-        let text = rest[colon2 + 1..].trim().to_string();
-
-        file_matches
-            .entry(file_path)
-            .or_insert_with(Vec::new)
-            .push((line_num, text));
-    }
-
-    let mut results: Vec<FileGrepMatch> = file_matches
-        .into_iter()
-        .map(|(file_path, matches)| {
-            let match_count = matches.len() as u32;
-            let first = matches.first().cloned().unwrap_or((0, String::new()));
-            let file_name = file_path
-                .rsplit(['/', '\\'])
-                .next()
-                .unwrap_or(&file_path)
-                .to_string();
-
-            FileGrepMatch {
-                file_path,
-                file_name,
-                match_count,
-                first_match_line: first.0,
-                first_match_preview: first.1,
-            }
-        })
-        .collect();
-
-    results.sort_by(|a, b| {
-        b.match_count
-            .cmp(&a.match_count)
-            .then_with(|| a.file_path.cmp(&b.file_path))
-    });
-
-    Ok(results)
-}
-
 // ── Internal Helpers ──
 
 fn load_gitignore(root: &Path) -> Vec<String> {
@@ -1208,8 +797,8 @@ mod tests {
         let dir = TestDir::new("inside");
         let file = dir.path.join("nested").join("deeper").join("notes.txt");
 
-        let resolved =
-            validate_path(&file, &[dir.path.clone()]).expect("child under allowed workspace should pass");
+        let resolved = validate_path(&file, &[dir.path.clone()])
+            .expect("child under allowed workspace should pass");
 
         assert!(resolved.starts_with(dir.path.canonicalize().unwrap()));
     }
@@ -1445,7 +1034,8 @@ mod tests {
         fs::create_dir_all(&src).expect("source directory should be created");
         let outside_file = outside.path.join("secret.txt");
         fs::write(&outside_file, "outside").expect("outside file should be created");
-        if std::os::windows::fs::symlink_file(&outside_file, src.join("linked-secret.txt")).is_err() {
+        if std::os::windows::fs::symlink_file(&outside_file, src.join("linked-secret.txt")).is_err()
+        {
             return;
         }
 

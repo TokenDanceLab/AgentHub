@@ -238,11 +238,18 @@ impl EdgeManager {
             let token_path = store_path.parent().map(|p| p.join(EDGE_AUTH_TOKEN_FILE));
             if let Some(ref p) = token_path {
                 let _ = std::fs::write(p, &auth_token);
+                #[cfg(unix)]
+                {
+                    use std::os::unix::fs::PermissionsExt;
+                    let _ = std::fs::set_permissions(p, std::fs::Permissions::from_mode(0o600));
+                }
             }
         }
-        // Env-var token for the child process (release path). EDGE_AUTH_TOKEN
-        // is consumed by the Edge Server when AGENTHUB_DEV is not set; in dev
-        // mode the token is informational only. Either way, no plaintext on disk.
+        // Env-var token for the child process. The Edge Server reads
+        // AGENTHUB_EDGE_AUTH_TOKEN as its local bearer token; the Desktop
+        // frontend fetches the same token via the get_edge_auth_token command
+        // and attaches it as Authorization. We never set AGENTHUB_DEV: the
+        // Edge keeps its fail-closed auth model even when launched by Desktop.
         let edge_auth_token_env = auth_token.clone();
 
         // ── Try sidecar first (release / bundled builds) ─────────────────
@@ -260,10 +267,10 @@ impl EdgeManager {
         if let Ok(sidecar_cmd) = sidecar_result {
             let mut cmd = sidecar_cmd.args(&args);
 
-            // Always run Edge in dev mode — bound to 127.0.0.1 so auth token is unnecessary.
-            cmd = cmd.env("AGENTHUB_DEV", "1");
-            // Pass auth token via env (release path — never written to disk).
-            cmd = cmd.env("EDGE_AUTH_TOKEN", &edge_auth_token_env);
+            // Edge stays in its default fail-closed mode: the generated local
+            // auth token authenticates the Desktop frontend, and the Edge is
+            // still bound to 127.0.0.1 (see edge_launch_args).
+            cmd = cmd.env("AGENTHUB_EDGE_AUTH_TOKEN", &edge_auth_token_env);
 
             match cmd.spawn() {
                 Ok((mut rx, child)) => {
@@ -335,8 +342,7 @@ impl EdgeManager {
         // ── Fallback: tokio::process::Command (dev mode) ─────────────────
         let mut command = Command::new(&self.edge_path);
         command.args(&args);
-        command.env("AGENTHUB_DEV", "1");
-        command.env("EDGE_AUTH_TOKEN", &edge_auth_token_env);
+        command.env("AGENTHUB_EDGE_AUTH_TOKEN", &edge_auth_token_env);
 
         let mut child = command
             .stdout(Stdio::piped())
@@ -376,7 +382,10 @@ impl EdgeManager {
     pub async fn stop(&mut self) -> Result<(), String> {
         // Clean up the persisted auth token file on stop.
         {
-            let token_path = self.store_path.parent().map(|p| p.join(EDGE_AUTH_TOKEN_FILE));
+            let token_path = self
+                .store_path
+                .parent()
+                .map(|p| p.join(EDGE_AUTH_TOKEN_FILE));
             if let Some(ref p) = token_path {
                 let _ = std::fs::remove_file(p);
             }
@@ -546,9 +555,7 @@ pub(crate) fn schedule_edge_restart<R: Runtime>(app_handle: tauri::AppHandle<R>)
         let edge: SharedEdgeManager = match app_handle.try_state::<SharedEdgeManager>() {
             Some(state) => state.inner().clone(),
             None => {
-                log::error!(
-                    "[edge] cannot restart: SharedEdgeManager not found in app state"
-                );
+                log::error!("[edge] cannot restart: SharedEdgeManager not found in app state");
                 return;
             }
         };
@@ -566,9 +573,7 @@ pub(crate) fn schedule_edge_restart<R: Runtime>(app_handle: tauri::AppHandle<R>)
         }
 
         let backoff = edge_restart_backoff_secs(count);
-        log::warn!(
-            "[edge] scheduling restart attempt {count}/{max} after {backoff}s backoff"
-        );
+        log::warn!("[edge] scheduling restart attempt {count}/{max} after {backoff}s backoff");
         tokio::time::sleep(std::time::Duration::from_secs(backoff)).await;
 
         // Phase 2: attempt restart. If start() fails, recursively schedule
@@ -647,7 +652,11 @@ fn edge_binary_candidates() -> Vec<PathBuf> {
     candidates
 }
 
-fn edge_launch_args(store_path: &str, addr: &str, workspace_allowlist: Option<&str>) -> Vec<String> {
+fn edge_launch_args(
+    store_path: &str,
+    addr: &str,
+    workspace_allowlist: Option<&str>,
+) -> Vec<String> {
     let mut args = vec![
         "--store-backend".to_string(),
         "sqlite".to_string(),
@@ -685,7 +694,9 @@ fn is_edge_port_occupied(port: u16) -> bool {
     use std::net::TcpStream;
     let addr = edge_bind_addr(port);
     TcpStream::connect_timeout(
-        &addr.parse().unwrap_or_else(|_| "127.0.0.1:3210".parse().unwrap()),
+        &addr
+            .parse()
+            .unwrap_or_else(|_| "127.0.0.1:3210".parse().unwrap()),
         std::time::Duration::from_millis(500),
     )
     .is_ok()
@@ -899,7 +910,11 @@ mod tests {
 
     #[test]
     fn edge_launch_args_keep_runtime_behind_local_edge() {
-        let args = edge_launch_args("fixtures/app-data/agenthub-edge.sqlite", "127.0.0.1:3210", None);
+        let args = edge_launch_args(
+            "fixtures/app-data/agenthub-edge.sqlite",
+            "127.0.0.1:3210",
+            None,
+        );
 
         assert_eq!(
             args,

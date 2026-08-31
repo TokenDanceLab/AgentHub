@@ -6,10 +6,10 @@
 // This is necessary because the frontend (browser webview) cannot create
 // TCP servers directly — the Rust backend handles it.
 
+use serde::Serialize;
 use std::io::{BufRead, BufReader, Write};
 use std::net::TcpListener;
 use std::sync::atomic::{AtomicBool, Ordering};
-use serde::Serialize;
 use tauri::{Emitter, Manager};
 
 static OIDC_STOPPED: AtomicBool = AtomicBool::new(false);
@@ -44,7 +44,9 @@ pub fn check_loopback_callback_readiness() -> LoopbackReadiness {
                 bind_host,
                 port: None,
                 redirect_uri: None,
-                error: Some(format!("failed to inspect loopback callback address: {err}")),
+                error: Some(format!(
+                    "failed to inspect loopback callback address: {err}"
+                )),
             },
         },
         Err(err) => LoopbackReadiness {
@@ -78,7 +80,9 @@ pub async fn start_oidc_callback_server(app: tauri::AppHandle) -> Result<u16, St
     // Spawn background thread to accept connections
     std::thread::spawn(move || {
         if let Err(e) = listener.set_nonblocking(true) {
-            log::error!("set_nonblocking on callback listener failed: {e}. Falling back to blocking mode.");
+            log::error!(
+                "set_nonblocking on callback listener failed: {e}. Falling back to blocking mode."
+            );
         }
 
         let start = std::time::Instant::now();
@@ -280,13 +284,6 @@ pub async fn start_oidc_callback_server(app: tauri::AppHandle) -> Result<u16, St
     Ok(port)
 }
 
-/// Stop the OIDC callback server (for cancellation).
-#[tauri::command]
-pub async fn stop_oidc_callback_server() -> Result<(), String> {
-    OIDC_STOPPED.store(true, Ordering::Relaxed);
-    Ok(())
-}
-
 /// Parsed components of a URL string, extracted without the `url` crate.
 #[derive(Debug)]
 struct ParsedProxyUrl {
@@ -329,7 +326,10 @@ fn parse_proxy_url(raw: &str) -> Result<ParsedProxyUrl, String> {
     let host_end = rest
         .find(|c: char| c == '/' || c == '?' || c == '#' || c == ':')
         .unwrap_or(rest.len());
-    let host = rest[..host_end].trim_start_matches('[').trim_end_matches(']').to_lowercase();
+    let host = rest[..host_end]
+        .trim_start_matches('[')
+        .trim_end_matches(']')
+        .to_lowercase();
     if host.is_empty() {
         return Err(format!("invalid URL: empty host in {raw:?}"));
     }
@@ -369,7 +369,7 @@ fn is_blocked_private_host(host: &str) -> bool {
             || (a == 192 && b == 168)                // 192.168.0.0/16
             || (a == 169 && b == 254)                // 169.254.0.0/16 (link-local + cloud metadata)
             || a == 0                                // 0.0.0.0/8
-            || (a == 127 && host != "127.0.0.1");    // 127.0.0.0/8 except the exact loopback addr
+            || (a == 127 && host != "127.0.0.1"); // 127.0.0.0/8 except the exact loopback addr
     }
     // IPv6 link-local / unique-local / loopback.
     if host == "::1" {
@@ -422,8 +422,7 @@ fn validate_proxy_url(raw: &str) -> Result<ParsedProxyUrl, String> {
             // business endpoint and mirrors the SSRF exfiltration risk.
             if parsed.host == "127.0.0.1" {
                 let port = parsed.port.ok_or_else(|| {
-                    "SSRF guard: https to 127.0.0.1 without an explicit port is blocked"
-                        .to_string()
+                    "SSRF guard: https to 127.0.0.1 without an explicit port is blocked".to_string()
                 })?;
                 if !ALLOWED_LOOPBACK_PORTS.contains(&port) {
                     return Err(format!(
@@ -479,7 +478,11 @@ pub async fn proxy_http_post(
     // services, cloud metadata endpoints, or non-loopback private hosts.
     let _validated = validate_proxy_url(&url)?;
 
+    // Redirects are disabled so an allowlisted URL cannot bounce the proxy to
+    // an arbitrary target (e.g. 302 → http://169.254.169.254). Callers that
+    // need to follow redirects must validate each hop themselves.
     let client = reqwest::Client::builder()
+        .redirect(reqwest::redirect::Policy::none())
         .timeout(std::time::Duration::from_secs(30))
         .build()
         .map_err(|e| format!("failed to build HTTP client: {e}"))?;
@@ -505,6 +508,16 @@ pub async fn proxy_http_post(
     })?;
 
     let status = resp.status().as_u16();
+    if resp.status().is_redirection() {
+        let location = resp
+            .headers()
+            .get(reqwest::header::LOCATION)
+            .and_then(|v| v.to_str().ok())
+            .unwrap_or("<none>");
+        return Err(format!(
+            "redirect refused by SSRF guard (status {status}, location {location}); re-validate the target URL"
+        ));
+    }
     let resp_headers: std::collections::HashMap<String, String> = resp
         .headers()
         .iter()

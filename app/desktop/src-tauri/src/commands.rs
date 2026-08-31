@@ -26,7 +26,10 @@ pub fn validate_command_origin(window: &tauri::WebviewWindow) -> Result<(), Stri
     let origin_str = origin.as_str();
 
     // Exact match against the allowlist.
-    if ALLOWED_COMMAND_ORIGINS.iter().any(|allowed| *allowed == origin_str) {
+    if ALLOWED_COMMAND_ORIGINS
+        .iter()
+        .any(|allowed| *allowed == origin_str)
+    {
         return Ok(());
     }
 
@@ -39,13 +42,14 @@ pub fn validate_command_origin(window: &tauri::WebviewWindow) -> Result<(), Stri
     } else {
         origin_str
     };
-    if ALLOWED_COMMAND_ORIGINS.iter().any(|allowed| *allowed == prefix) {
+    if ALLOWED_COMMAND_ORIGINS
+        .iter()
+        .any(|allowed| *allowed == prefix)
+    {
         return Ok(());
     }
 
-    log::warn!(
-        "[security] command invoked from untrusted origin: {origin_str}"
-    );
+    log::warn!("[security] command invoked from untrusted origin: {origin_str}");
     Err(format!(
         "command rejected: untrusted webview origin {origin_str:?}"
     ))
