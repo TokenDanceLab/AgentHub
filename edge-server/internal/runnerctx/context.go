@@ -15,7 +15,8 @@ type RunProcessContext struct {
 	WorkDir string // Working directory
 
 	// Hub callback bridging
-	HubTaskID string // Hub agent task ID (for Edge→Hub direct callbacks)
+	HubTaskID  string // Hub agent task ID (for Edge→Hub direct callbacks)
+	DeliveryID string // Hub delivery_id for dual-channel dedup (#2101 G2)
 
 	// TraceID correlates this run with the originating Hub dispatch trace.
 	// Populated from the dispatch payload; empty on legacy payloads is safe.
