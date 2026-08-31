@@ -842,6 +842,28 @@ func TestAllocateSeq_Concurrent(t *testing.T) {
 	assert.Equal(t, int64(20), seq)
 }
 
+// TestPushPendingTask_CapKeepsNewestEvictsOldest guards the LTRIM direction
+// regression: the old `LTRIM -max -1` kept the tail (oldest) and silently
+// dropped freshly pushed tasks once the queue reached 256 entries.
+func TestPushPendingTask_CapKeepsNewestEvictsOldest(t *testing.T) {
+	c, _ := testClient(t)
+	ctx := context.Background()
+
+	for i := 0; i < 260; i++ {
+		require.NoError(t, c.PushPendingTask(ctx, "user-cap", fmt.Sprintf(`{"i":%d}`, i)))
+	}
+
+	count, err := c.PendingTaskCount(ctx, "user-cap")
+	require.NoError(t, err)
+	assert.Equal(t, int64(256), count, "queue must cap at 256")
+
+	tasks, err := c.PopPendingTasks(ctx, "user-cap")
+	require.NoError(t, err)
+	assert.Len(t, tasks, 256)
+	assert.Equal(t, `{"i":259}`, tasks[0], "newest task must be retained at the head")
+	assert.Equal(t, `{"i":4}`, tasks[255], "only the oldest 4 entries (0..3) may be evicted")
+}
+
 // ==================== Rate Limiting ====================
 
 func TestCheckRateLimit_UnderLimit(t *testing.T) {

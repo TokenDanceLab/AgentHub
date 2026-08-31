@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"strconv"
 
 	"gorm.io/gorm"
 
@@ -277,10 +278,16 @@ func (s *Service) SearchMarket(ctx context.Context, runtimeID, q, sortBy, cursor
 	}
 	var nextCursor string
 	if hasMore && len(profiles) > 0 {
-		if sortBy == "" || sortBy == "recent" {
-			nextCursor = profiles[len(profiles)-1].ID
-		} else {
-			nextCursor = fmt.Sprintf("%d", profiles[len(profiles)-1].InstallCount)
+		last := profiles[len(profiles)-1]
+		switch sortBy {
+		case "install_count":
+			// Composite cursor: sort value + tie-break id. The repo compares
+			// `install_count < sortValue OR (= sortValue AND id > lastID)`.
+			nextCursor = fmt.Sprintf("%d|%s", last.InstallCount, last.ID)
+		case "rating":
+			nextCursor = fmt.Sprintf("%s|%s", strconv.FormatFloat(last.RatingAvg, 'f', -1, 64), last.ID)
+		default: // "recent"
+			nextCursor = last.ID
 		}
 	}
 	return &ListResult{Items: profiles, HasMore: hasMore, Cursor: nextCursor}, nil
