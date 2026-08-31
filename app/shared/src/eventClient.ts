@@ -12,6 +12,18 @@
 //   - application-level ping/pong heartbeat with latency tracking
 //   - exponential backoff with jitter on reconnect
 
+/**
+ * ⚠️ seq 字段契约警戒（#2101 G5）：
+ * 本文件处理的 `envelope.seq` 是 **Edge EventEnvelope.seq** —— per-bus 持久单调序号，
+ * 由 `edge-server/internal/events/bus.go:159` 在 `Bus.Publish` 内 stamp，跨连接稳定，
+ * 用作 replay cursor 与去重水位（详见 api/events.md「seq 字段对照表」）。
+ *
+ * 这 **不是** Hub Frame 的 `seq_id`（per-connection 投递序，重连重置，仅用于同连丢帧检测；
+ * 定义于 `hub-server/internal/ws/frame.go:7-14`，由 `fanout.go:91` stamp）。
+ * 把这里的 `seq` 当作 per-conn 计数器、或把 Hub `seq_id` 当 cursor 续读，都会导致
+ * 静默丢事件或重复 apply。改本文件前请先确认你操作的是哪一侧的序号。
+ */
+
 import type { EventEnvelope } from './events';
 import { reportApiError } from './errors';
 import type { Transport, TransportStatus } from './transport';
@@ -176,6 +188,11 @@ export function createEventStream(
     }
 
     const envelope = data as unknown as EventEnvelope;
+    // ⚠️ Edge EventEnvelope.seq 处理（#2101 G5；对照表见 api/events.md）：
+    // 此 `envelope.seq` 是 Edge Bus 的持久单调序号（bus.go:159），**不是** Hub Frame
+    // 的 per-connection `seq_id`（frame.go:14 / fanout.go:91）。两者作用域与重连语义
+    // 完全不同，切勿互换使用。
+    //
     // system.gap events carry a synthetic seq that must NOT pollute the
     // replay cursor — doing so resets replay to seq 0 and triggers a full
     // backfill storm on the next reconnect. Non-gap events with a numeric
