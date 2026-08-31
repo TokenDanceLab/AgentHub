@@ -3,13 +3,12 @@ package repository
 import (
 	"crypto/sha256"
 	"encoding/hex"
-	"errors"
-	"log/slog"
 	"strings"
 	"time"
 
 	"github.com/agenthub/hub-server/internal/model"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 func CreateUser(db *gorm.DB, user *model.User) error {
@@ -81,58 +80,48 @@ func FindByTokenDanceSub(db *gorm.DB, sub string) (*model.User, error) {
 	return &user, nil
 }
 
-// FindOrCreateByTokenDanceSub looks up an existing user by TokenDance ID sub,
-// or creates a new Hub user account linked to the sub on first login.
-// name and picture come from the TokenDance ID token claims (GitHub profile).
-// On each login the nickname and avatar are refreshed if non-empty claims are provided.
+// FindOrCreateByTokenDanceSub atomically finds or creates a Hub user linked to
+// a TokenDance ID sub. On conflict (existing user), nickname and avatar are
+// refreshed from the provided claims. Uses a single INSERT … ON CONFLICT
+// statement to avoid TOCTOU races on concurrent first-logins (#2102 F13).
 func FindOrCreateByTokenDanceSub(db *gorm.DB, sub, name, picture string) (*model.User, error) {
-	// Try to find existing user
-	user, err := FindByTokenDanceSub(db, sub)
-	if err == nil {
-		// Refresh profile from TokenDance ID on each login
-		updated := false
-		if name != "" && user.Nickname != name {
-			user.Nickname = name
-			updated = true
-		}
-		if picture != "" && user.AvatarURL != picture {
-			user.AvatarURL = picture
-			updated = true
-		}
-		if updated {
-			if saveErr := db.Model(user).Updates(map[string]interface{}{
-				"nickname":   user.Nickname,
-				"avatar_url": user.AvatarURL,
-			}).Error; saveErr != nil {
-				slog.Warn("refresh tokendance profile failed", "user_id", user.ID, "error", saveErr)
-			}
-		}
-		return user, nil
-	}
-	if !errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, err
-	}
-
-	// First login — auto-create a Hub user linked to this TokenDance ID sub.
-	// Username is derived from a readable prefix plus a hash suffix so long
-	// TokenDance subjects cannot collide after truncation.
 	username := tokenDanceUsername(sub)
 	now := time.Now()
 	nickname := name
 	if nickname == "" {
 		nickname = tokenDanceNickname(sub)
 	}
-	user = &model.User{
+
+	user := &model.User{
 		Username:              username,
 		Nickname:              nickname,
 		AvatarURL:             picture,
 		TokenDanceSub:         &sub,
 		TokenDanceSubLinkedAt: &now,
 	}
-	if err := CreateUser(db, user); err != nil {
+
+	// Upsert: on conflict update nickname + avatar only when incoming values
+	// are non-empty. We use COALESCE-like logic via SQL expressions so empty
+	// claims don't wipe existing profile data.
+	err := db.Clauses(clause.OnConflict{
+		Columns: []clause.Column{{Name: "tokendance_sub"}},
+		DoUpdates: clause.Assignments(map[string]interface{}{
+			"nickname":   gorm.Expr("CASE WHEN ? <> '' THEN ? ELSE nickname END", name, name),
+			"avatar_url": gorm.Expr("CASE WHEN ? <> '' THEN ? ELSE avatar_url END", picture, picture),
+		}),
+	}).Create(user).Error
+	if err != nil {
 		return nil, err
 	}
-	return user, nil
+
+	// After upsert, re-fetch to get the canonical row (ID, timestamps, and
+	// any DB-applied defaults). This also ensures the returned struct reflects
+	// the post-conflict state rather than the input struct.
+	result, err := FindByTokenDanceSub(db, sub)
+	if err != nil {
+		return nil, err
+	}
+	return result, nil
 }
 
 func tokenDanceUsername(sub string) string {
