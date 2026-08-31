@@ -12,21 +12,28 @@ import (
 	"github.com/agenthub/hub-server/internal/service/dispatch"
 )
 
-// StartOrphanRecoveryLoop runs a periodic sweeper that reclaims queued tasks
-// with no delivery_outbox row (orphaned by process crash or semaphore backoff).
-// Claimed tasks are redelivered through the existing DispatchTask path. The
-// loop exits when ctx is cancelled.
+// StartOrphanRecoveryLoop starts a background sweeper that reclaims queued
+// tasks with no delivery_outbox row (orphaned by process crash or semaphore
+// backoff). Claimed tasks are redelivered through the existing DispatchTask
+// path. The sweeper exits when ctx is cancelled.
+//
+// The sweeper runs in its own goroutine and this method returns immediately:
+// it is wired into startServer on the main goroutine, so a blocking loop here
+// prevents the HTTP server from ever starting (observed after #2074's
+// regression shipped — hub stuck before "server starting").
 func (s *DispatchService) StartOrphanRecoveryLoop(ctx context.Context) {
-	ticker := time.NewTicker(config.OrphanTaskScanInterval)
-	defer ticker.Stop()
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-ticker.C:
-			s.recoverOrphanedTasks(ctx)
+	go func() {
+		ticker := time.NewTicker(config.OrphanTaskScanInterval)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				s.recoverOrphanedTasks(ctx)
+			}
 		}
-	}
+	}()
 }
 
 // recoverOrphanedTasks performs one sweep cycle: claim orphans, rebuild

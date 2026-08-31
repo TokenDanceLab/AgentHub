@@ -1,6 +1,7 @@
 package dispatchsvc
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -156,4 +157,28 @@ func claimOrphanedTasksForTest(db *gorm.DB, grace time.Time, limit int) ([]strin
 		RETURNING id
 	`, grace, limit).Scan(&ids).Error
 	return ids, err
+}
+
+// TestStartOrphanRecoveryLoopDoesNotBlockCaller guards the #2074 regression
+// where StartOrphanRecoveryLoop ran its select loop on the caller's goroutine:
+// wired into startServer on the main goroutine, it made hub-server hang after
+// "health check passed" and never reach "server starting" / ListenAndServe.
+func TestStartOrphanRecoveryLoopDoesNotBlockCaller(t *testing.T) {
+	db := newOrphanTestDB(t)
+	svc := &DispatchService{db: db}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	returned := make(chan struct{})
+	go func() {
+		svc.StartOrphanRecoveryLoop(ctx)
+		close(returned)
+	}()
+
+	select {
+	case <-returned:
+		// Caller must return immediately; the sweeper runs in background.
+	case <-time.After(3 * time.Second):
+		t.Fatal("StartOrphanRecoveryLoop blocks the caller — hub startup would hang")
+	}
+	cancel()
 }
