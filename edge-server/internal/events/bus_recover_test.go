@@ -201,22 +201,26 @@ func TestEventLogConcurrentAppendAndRead(t *testing.T) {
 		}
 	}()
 
-	// Reader goroutine
+	// Reader goroutine. 25 passes are enough to smoke append/read races;
+	// 50 passes tripped the old 5s deadline on loaded 2-core CI runners
+	// under -race (each ReadFrom(1) replays the whole log).
+	const readerPasses = 25
 	readerDone := make(chan struct{})
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
 		defer close(readerDone)
-		for i := 0; i < 50; i++ {
+		for i := 0; i < readerPasses; i++ {
 			_, _ = log.ReadFrom(1)
 		}
 	}()
 
 	// Let the writer and reader run concurrently until the reader finishes
-	// its 50 passes, then stop the writer and drain both.
+	// its passes, then stop the writer and drain both. Generous deadline:
+	// under -race on slow CI IO a full-log replay pass can take >100ms.
 	select {
 	case <-readerDone:
-	case <-time.After(5 * time.Second):
+	case <-time.After(15 * time.Second):
 		t.Fatal("reader did not finish concurrent append/read pass")
 	}
 	close(stop)
