@@ -47,8 +47,39 @@ for path, node in paths.items():
 print(json.dumps(sorted(out)))
 '''
 
+OPENAPI_SCHEMA_HELPER = r"""
+import json, pathlib, sys
+import yaml
+spec = yaml.safe_load(pathlib.Path(sys.argv[1]).read_text(encoding="utf-8"))
+out = []
+paths = spec.get("paths", {}) if isinstance(spec, dict) else {}
+for path, node in paths.items():
+    if not isinstance(node, dict):
+        continue
+    for method, op in node.items():
+        if method not in ("get", "post", "put", "delete", "patch", "head", "options"):
+            continue
+        if not isinstance(op, dict):
+            continue
+        owner = op.get("x-agenthub-owner") or node.get("x-agenthub-owner")
+        status = op.get("x-agenthub-status") or node.get("x-agenthub-status")
+        if owner != "Hub" or status != "implemented":
+            continue
+        for code in ("200", "201", "202"):
+            response = (op.get("responses") or {}).get(code)
+            if isinstance(response, dict) and "content" not in response and "$ref" not in response:
+                out.append(method.upper() + " " + path + " " + code)
+print(json.dumps(sorted(out)))
+"""
+
 # Admin/debug/health 子路由 allowlist（与 ps1 一致；真实 API 路由必须进 OpenAPI）
 ALLOWLIST = ["GET /debug/panic", "GET /health/live", "GET /health/ready"]
+
+# Baseline of known description-only 2xx responses among Hub-implemented ops.
+# The gate is fail-closed for NEW violations; fixed entries must be pruned here.
+OPENAPI_SCHEMA_BASELINE = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), "openapi-schema-baseline.json"
+)
 
 GROUP_PATTERN = re.compile(r"(\w+)\s*:=\s*(\w+)\.Group\(\"([^\"]*)\"", re.IGNORECASE)
 ROUTE_PATTERN = re.compile(r'(\w+)\.(GET|POST|PUT|DELETE|PATCH)\("([^"]*)"')
@@ -100,6 +131,35 @@ def extract_openapi_routes(openapi_path: str) -> list:
                 return json.loads(result.stdout)
         fail(
             f"python OpenAPI extraction failed (exit {last_exit}). "
+            "Ensure PyYAML is installed: python -m pip install PyYAML"
+        )
+    finally:
+        os.unlink(tmp_path)
+
+
+
+def extract_openapi_schema_violations(openapi_path: str) -> list:
+    """经 subprocess 跑 PyYAML helper，返回 Hub-implemented 2xx 缺 schema 清单。
+
+    description-only 的 200/201/202（既无 content 也无 $ref）是契约空洞：
+    客户端无法知道成功响应形状。204 天然无 body，不在此列。
+    """
+    ensure_pyyaml()
+    fd, tmp_path = tempfile.mkstemp(prefix="agenthub-openapi-schema-", suffix=".py")
+    os.close(fd)
+    try:
+        with open(tmp_path, "w", encoding="utf-8") as handle:
+            handle.write(OPENAPI_SCHEMA_HELPER)
+        last_exit = None
+        for exe in ("python", "python3"):
+            result = run_python(exe, [tmp_path, openapi_path])
+            if result is None:
+                continue
+            last_exit = result.returncode
+            if result.returncode == 0:
+                return json.loads(result.stdout)
+        fail(
+            f"python OpenAPI schema extraction failed (exit {last_exit}). "
             "Ensure PyYAML is installed: python -m pip install PyYAML"
         )
     finally:
@@ -211,10 +271,39 @@ def main() -> int:
         )
         return 1
 
+    schema_violations = extract_openapi_schema_violations(openapi_path)
+    baseline: list = []
+    if os.path.exists(OPENAPI_SCHEMA_BASELINE):
+        with open(OPENAPI_SCHEMA_BASELINE, encoding="utf-8") as handle:
+            baseline = json.load(handle)
+    baseline_set = set(baseline)
+    new_violations = [v for v in schema_violations if v not in baseline_set]
+    stale_baseline = [b for b in baseline if b not in schema_violations]
+
+    if new_violations:
+        print("OpenAPI 2xx schema coverage drift detected (fail-closed):")
+        print(f"  Hub-implemented 2xx responses without content schema: {len(schema_violations)}")
+        print(f"  NEW violations not in baseline: {len(new_violations)}")
+        print()
+        for v in new_violations:
+            print(f"  + {v}")
+        print()
+        print(
+            "Fix: give each Hub-implemented 200/201/202 response either a content schema "
+            "or a $ref to components/responses. Deliberate exceptions go in "
+            "scripts/verify/openapi-schema-baseline.json."
+        )
+        return 1
+    if stale_baseline:
+        print(f"note: {len(stale_baseline)} baseline entries are now covered (prune them from openapi-schema-baseline.json)")
+        for v in stale_baseline:
+            print(f"  ~ {v}")
+
     print("openapi<->hub router contract ok")
     print(f"  OpenAPI Hub-implemented routes: {len(openapi_n)}")
     print(f"  Router routes: {len(router_n)}")
     print(f"  Allowlisted (admin/debug only): {len(allow_n)}")
+    print(f"  2xx schema coverage violations: {len(schema_violations)} (new: 0)")
     return 0
 
 
