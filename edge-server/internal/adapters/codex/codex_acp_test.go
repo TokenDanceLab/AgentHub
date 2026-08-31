@@ -332,12 +332,6 @@ func TestCodexACPadapterRegistryRegistration(t *testing.T) {
 	}
 }
 
-func TestValidateCLIAdapterIDAcceptsCodexACPadapter(t *testing.T) {
-	if err := adapters.ValidateCLIAdapterID("codex-acp"); err != nil {
-		t.Fatalf("ValidateCLIAdapterID(codex-acp) = %v, want nil", err)
-	}
-}
-
 // TestCodexACPadapterParseStreamWithMockACPPeer drives the full adapter path
 // — adapter.ParseStream → runACPSession → SDK client ↔ fake ACP agent over
 // real JSON-RPC wire — and asserts the streamed updates surface as

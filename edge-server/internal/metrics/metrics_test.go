@@ -7,7 +7,7 @@ import (
 )
 
 func TestMetricsRegistrationAndIncrement(t *testing.T) {
-	m := New(func() float64 { return 42 })
+	m := NewWithBusStats(func() float64 { return 42 }, nil)
 
 	// Verify metrics can be incremented without panic
 	m.RecordRunStart("claude-code")
@@ -28,7 +28,7 @@ func TestMetricsRegistrationAndIncrement(t *testing.T) {
 }
 
 func TestMetricsWithoutBusDepth(t *testing.T) {
-	m := New(nil)
+	m := NewWithBusStats(nil, nil)
 
 	// Should not panic
 	m.RecordRunStart("none")
@@ -57,7 +57,7 @@ func TestMetricsExposeEventBusDroppedTotal(t *testing.T) {
 }
 
 func TestMetricsMultipleRuns(t *testing.T) {
-	m := New(func() float64 { return 100 })
+	m := NewWithBusStats(func() float64 { return 100 }, nil)
 
 	// Simulate 3 concurrent runs
 	m.RecordRunStart("claude-code")

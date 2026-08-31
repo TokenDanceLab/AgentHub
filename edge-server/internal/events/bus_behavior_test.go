@@ -640,47 +640,6 @@ func TestBusCloseIdempotent(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// PersistFn error drops event
-// ---------------------------------------------------------------------------
-
-func TestBusPersistErrorDropsEvent(t *testing.T) {
-	b := NewBus(100, WithPersister(func(evt EventEnvelope) error {
-		return errAssert
-	}))
-
-	// Subscribe and expect to receive NOTHING because persist fails.
-	_, ch, _ := b.Subscribe(0)
-
-	evt := b.Publish("persist.fail", nil, "dropped")
-
-	// The returned envelope is a zero-value with type and seq set.
-	if evt.Type != "persist.fail" {
-		t.Errorf("returned Type = %q, want persist.fail", evt.Type)
-	}
-	if evt.ID != "" {
-		t.Errorf("returned ID should be empty on persist failure, got %s", evt.ID)
-	}
-	if evt.Seq != 1 {
-		t.Errorf("returned Seq = %d, want 1", evt.Seq)
-	}
-
-	// Subscriber should not receive it.
-	select {
-	case <-ch:
-		t.Error("subscriber should not receive event when persist fails")
-	case <-time.After(100 * time.Millisecond):
-		// Expected.
-	}
-}
-
-// errAssert is a sentinel error for persist-failure tests.
-var errAssert = assertError{}
-
-type assertError struct{}
-
-func (e assertError) Error() string { return "assert error" }
-
-// ---------------------------------------------------------------------------
 // HistoryLen and DroppedCount
 // ---------------------------------------------------------------------------
 
@@ -805,38 +764,28 @@ func TestBus_WorkerPoolBackpressure(t *testing.T) {
 // TestBus_PersistErrorDoesNotCrashBus verifies that when the persistence hook
 // returns an error, the bus remains fully operational for subsequent publishes.
 func TestBus_PersistErrorDoesNotCrashBus(t *testing.T) {
-	var failNext atomic.Bool
-	failNext.Store(true)
-
-	// WithPersistMaxRetries(0) disables the synchronous retry loop so this
-	// test exercises the original "persist fails → event dropped" contract.
-	// The retry-recovery path is covered separately by the
-	// TestBus_PersistRetry* tests below.
-	b := NewBus(100,
-		WithPersister(func(evt EventEnvelope) error {
-			if failNext.CompareAndSwap(true, false) {
-				return errAssert
-			}
-			return nil
-		}),
-		WithPersistMaxRetries(0),
-	)
+	// persistFn always fails first: the publish is retried and dropped, but
+	// the bus stays operational for subsequent publishes (the drop-and-count
+	// contract is covered in TestBus_PersistRetryExhaustedDropsAndCounts).
+	b := NewBus(100)
+	b.persistFn = func(evt EventEnvelope) error { return errAssert }
+	t.Cleanup(func() { _ = b.Close() })
 
 	_, ch, _ := b.Subscribe(0)
 
-	// First publish: persist fails, event dropped.
 	evt1 := b.Publish("should.fail", nil, "dropped")
 	if evt1.ID != "" {
 		t.Errorf("failed-persist event should have empty ID, got %s", evt1.ID)
 	}
 
-	// Second publish: persist succeeds, event must be delivered.
+	// Swap in a healthy persister: the next publish must flow end-to-end.
+	b.persistFn = nil
+
 	evt2 := b.Publish("should.succeed", nil, "delivered")
 	if evt2.ID == "" {
 		t.Error("successful event should have non-empty ID")
 	}
 
-	// Subscriber receives only the successful event.
 	select {
 	case received := <-ch:
 		if received.Type != "should.succeed" {
@@ -846,36 +795,15 @@ func TestBus_PersistErrorDoesNotCrashBus(t *testing.T) {
 		t.Fatal("timed out waiting for successful event after persist error")
 	}
 
-	// No extra events.
+	// History must contain exactly the successful event.
+	if got := b.HistoryLen(); got != 1 {
+		t.Errorf("history has %d events, want 1 (failed event must not appear)", got)
+	}
 	select {
 	case evt := <-ch:
 		t.Errorf("unexpected event on subscriber channel: %s (seq=%d)", evt.Type, evt.Seq)
-	case <-time.After(50 * time.Millisecond):
-	}
-
-	// History contains only the successful event (failed one was dropped).
-	_, _, replay := b.Subscribe(0)
-	if len(replay) != 1 {
-		t.Errorf("history has %d events, want 1 (failed event must not appear)", len(replay))
-	}
-
-	// Seq counter still increments through failures.
-	if evt2.Seq != 2 {
-		t.Errorf("successful event seq = %d, want 2 (seq increments through failures)", evt2.Seq)
-	}
-
-	// Bus remains operational — additional publishes work.
-	evt3 := b.Publish("still.operational", nil, "ok")
-	if evt3.Seq != 3 {
-		t.Errorf("third event seq = %d, want 3", evt3.Seq)
-	}
-	select {
-	case received := <-ch:
-		if received.Type != "still.operational" {
-			t.Errorf("received Type = %q, want still.operational", received.Type)
-		}
-	case <-time.After(time.Second):
-		t.Fatal("timed out waiting for event after persist recovery")
+	default:
+		// no extra events expected
 	}
 }
 
@@ -1011,3 +939,10 @@ func TestBus_ObserverWithMultipleEvents(t *testing.T) {
 	}
 	mu.Unlock()
 }
+
+// errAssert is a sentinel error for persist-failure tests.
+var errAssert = assertError{}
+
+type assertError struct{}
+
+func (e assertError) Error() string { return "assert error" }

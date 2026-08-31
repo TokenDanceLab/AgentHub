@@ -61,20 +61,14 @@ type Bus struct {
 	// persistFn is called before an event is broadcast. If non-nil and it
 	// returns an error, the event is dropped without being appended to
 	// history or fanned out to subscribers. Persist failures are retried
-	// synchronously up to persistMaxRetries times with exponential backoff;
-	// only after all retries fail is the event dropped and
+	// synchronously up to persistDefaultMaxRetries times with exponential
+	// backoff; only after all retries fail is the event dropped and
 	// persistFailures incremented.
 	persistFn PersistFn
 
-	// persistMaxRetries bounds the number of synchronous retry attempts
-	// after a persistFn failure. -1 (the zero/unset value) means use
-	// persistDefaultMaxRetries; 0 means no retries (original attempt only);
-	// any positive N means original + N retries. Set via WithPersistMaxRetries.
-	persistMaxRetries int
-
 	// persistFailures counts events that exhausted all persist retry
-	// attempts and were dropped. Exposed for Prometheus as
-	// edge_event_persist_failures_total.
+	// attempts and were dropped. Exposed via PersistFailures() for
+	// operators that wire their own observability.
 	persistFailures atomic.Int64
 
 	// gaps counts subscriber-channel-full / replay-predates-log gap events
@@ -91,10 +85,6 @@ type Bus struct {
 	// WithEventLogMaxSize. Applied when WithEventLogPath opens the log;
 	// 0 means use defaultEventLogMaxSize.
 	eventLogMaxSize int64
-
-	// persistOutputBatch controls whether run.output.batch events go through
-	// the persistence hook. Default true.
-	persistOutputBatch bool
 
 	// Observer worker pool — fixed goroutines with channel-based dispatch.
 	// stopCh is closed when the bus is shut down, signalling workers to exit.
@@ -123,12 +113,10 @@ func NewBus(maxHistory int, opts ...BusOption) *Bus {
 	}
 
 	b := &Bus{
-		history:            make([]EventEnvelope, 0, maxHistory),
-		maxHistory:         maxHistory,
-		persistOutputBatch: true,
-		persistMaxRetries:  -1, // -1 sentinel: use persistDefaultMaxRetries until WithPersistMaxRetries overrides
-		stopCh:             make(chan struct{}),
-		jobs:               make(chan observerJob, observerJobBufferSize),
+		history:    make([]EventEnvelope, 0, maxHistory),
+		maxHistory: maxHistory,
+		stopCh:     make(chan struct{}),
+		jobs:       make(chan observerJob, observerJobBufferSize),
 	}
 
 	// Start fixed-size observer worker pool.
@@ -181,7 +169,7 @@ func (b *Bus) Publish(eventType string, scope map[string]any, payload any) Event
 	// dropped — observers and subscribers never see it, and persistFailures
 	// is incremented so the edge_event_persist_failures_total metric surfaces
 	// the data loss.
-	if b.persistFn != nil && b.shouldPersist(eventType) {
+	if b.persistFn != nil {
 		if err := b.persistWithRetry(evt); err != nil {
 			b.persistFailures.Add(1)
 			slog.Error("event bus persist failed after retries, dropping event",
@@ -298,16 +286,6 @@ func (b *Bus) runWorker() {
 			return
 		}
 	}
-}
-
-// shouldPersist reports whether the given event type should go through the
-// persistence hook. run.output.batch events are high-frequency and may be
-// excluded via WithPersistOutputBatch(false).
-func (b *Bus) shouldPersist(eventType string) bool {
-	if eventType == "run.output.batch" {
-		return b.persistOutputBatch
-	}
-	return true
 }
 
 // AddObserver registers a synchronous observer that receives every published

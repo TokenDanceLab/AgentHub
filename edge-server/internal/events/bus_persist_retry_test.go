@@ -6,6 +6,16 @@ import (
 	"time"
 )
 
+// newBusWithPersistForTest returns a Bus whose persistFn hook is set directly.
+// The exported WithPersister option was removed (no production caller); the
+// hook is still how WithEventLogPath wires durable persistence, so the retry
+// machinery below is exercised through the same field.
+func newBusWithPersistForTest(fn PersistFn) *Bus {
+	b := NewBus(100)
+	b.persistFn = fn
+	return b
+}
+
 // TestBus_PersistRetryRecoversTransientFailure verifies that the synchronous
 // retry loop recovers a persistFn failure that succeeds on a later attempt:
 // the event is persisted, appended to history, and broadcast to subscribers
@@ -15,13 +25,13 @@ func TestBus_PersistRetryRecoversTransientFailure(t *testing.T) {
 	var failUntil atomic.Int64
 	failUntil.Store(2) // fail attempts 0 and 1, succeed from attempt 2 onward
 
-	b := NewBus(100, WithPersister(func(evt EventEnvelope) error {
+	b := newBusWithPersistForTest(func(evt EventEnvelope) error {
 		n := attempts.Add(1)
 		if n <= failUntil.Load() {
 			return errAssert
 		}
 		return nil
-	}))
+	})
 	// Default retry budget (3) is enough to reach the 3rd attempt.
 	t.Cleanup(func() { _ = b.Close() })
 
@@ -51,13 +61,10 @@ func TestBus_PersistRetryRecoversTransientFailure(t *testing.T) {
 // persistFailures counter is incremented exactly once.
 func TestBus_PersistRetryExhaustedDropsAndCounts(t *testing.T) {
 	var attempts atomic.Int64
-	b := NewBus(100,
-		WithPersister(func(evt EventEnvelope) error {
-			attempts.Add(1)
-			return errAssert // always fails
-		}),
-		WithPersistMaxRetries(2), // original + 2 retries = 3 attempts
-	)
+	b := newBusWithPersistForTest(func(evt EventEnvelope) error {
+		attempts.Add(1)
+		return errAssert // always fails
+	})
 	t.Cleanup(func() { _ = b.Close() })
 
 	_, ch, _ := b.Subscribe(0)
@@ -77,40 +84,17 @@ func TestBus_PersistRetryExhaustedDropsAndCounts(t *testing.T) {
 	if got := b.PersistFailures(); got != 1 {
 		t.Fatalf("expected PersistFailures=1, got %d", got)
 	}
-	// 3 attempts total (original + 2 retries).
-	if got := attempts.Load(); got != 3 {
-		t.Fatalf("expected 3 persist attempts (1 original + 2 retries), got %d", got)
-	}
-}
-
-// TestBus_PersistRetryZeroDisablesRetry verifies WithPersistMaxRetries(0)
-// makes Publish call persistFn exactly once with no retry backoff.
-func TestBus_PersistRetryZeroDisablesRetry(t *testing.T) {
-	var attempts atomic.Int64
-	b := NewBus(100,
-		WithPersister(func(evt EventEnvelope) error {
-			attempts.Add(1)
-			return errAssert
-		}),
-		WithPersistMaxRetries(0),
-	)
-	t.Cleanup(func() { _ = b.Close() })
-	_ = b.Publish("no.retry", nil, "x")
-	if got := attempts.Load(); got != 1 {
-		t.Fatalf("expected exactly 1 persist attempt with retries disabled, got %d", got)
-	}
-	if got := b.PersistFailures(); got != 1 {
-		t.Fatalf("expected PersistFailures=1, got %d", got)
+	// Default budget: 1 original + 3 retries = 4 attempts.
+	if got := attempts.Load(); got != int64(persistDefaultMaxRetries+1) {
+		t.Fatalf("expected %d persist attempts (1 original + %d retries), got %d",
+			persistDefaultMaxRetries+1, persistDefaultMaxRetries, got)
 	}
 }
 
 // TestBus_PersistFailuresAccumulatesAcrossDrops verifies the counter
 // accumulates across multiple dropped events.
 func TestBus_PersistFailuresAccumulatesAcrossDrops(t *testing.T) {
-	b := NewBus(100,
-		WithPersister(func(evt EventEnvelope) error { return errAssert }),
-		WithPersistMaxRetries(0),
-	)
+	b := newBusWithPersistForTest(func(evt EventEnvelope) error { return errAssert })
 	t.Cleanup(func() { _ = b.Close() })
 
 	for i := 0; i < 4; i++ {

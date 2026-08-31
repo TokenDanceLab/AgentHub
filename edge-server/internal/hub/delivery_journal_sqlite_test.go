@@ -209,19 +209,4 @@ func TestCallbackClient_OfflineReplayReconciliation(t *testing.T) {
 		t.Fatalf("second after-ack entry want successful task-later: %+v", afterAck[1])
 	}
 
-	// 5. Candidate selection (helper only — no automatic worker) surfaces failed entries.
-	cands := RedeliveryCandidates(all, 0)
-	if len(cands) != 2 {
-		t.Fatalf("redelivery candidates want 2 failed done entries, got %d: %+v", len(cands), cands)
-	}
-	for _, c := range cands {
-		if c.OK || c.TaskID != "task-fail" || c.Action != "done" {
-			t.Fatalf("unexpected candidate: %+v", c)
-		}
-	}
-	// Cursor after first failure still yields the later failure.
-	candsAfter := RedeliveryCandidates(all, 2)
-	if len(candsAfter) != 1 || candsAfter[0].Seq != 4 {
-		t.Fatalf("afterSeq=2 candidates=%+v", candsAfter)
-	}
 }

@@ -339,12 +339,6 @@ func TestClaudeACPAdapterRegistryRegistration(t *testing.T) {
 	}
 }
 
-func TestValidateCLIAdapterIDAcceptsClaudeACPAdapter(t *testing.T) {
-	if err := adapters.ValidateCLIAdapterID("claude-acp"); err != nil {
-		t.Fatalf("ValidateCLIAdapterID(claude-acp) = %v, want nil", err)
-	}
-}
-
 // TestClaudeACPAdapterParseStreamWithMockACPPeer drives the full adapter path
 // — adapter.ParseStream → runACPSession → SDK client ↔ fake ACP agent over
 // real JSON-RPC wire — and asserts the streamed updates surface as

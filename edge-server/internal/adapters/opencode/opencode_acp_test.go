@@ -333,12 +333,6 @@ func TestOpenCodeACPAdapterRegistryRegistration(t *testing.T) {
 	}
 }
 
-func TestValidateCLIAdapterIDAcceptsOpenCodeACPAdapter(t *testing.T) {
-	if err := adapters.ValidateCLIAdapterID("opencode-acp"); err != nil {
-		t.Fatalf("ValidateCLIAdapterID(opencode-acp) = %v, want nil", err)
-	}
-}
-
 // TestOpenCodeACPAdapterParseStreamWithMockACPPeer drives the full adapter
 // path — adapter.ParseStream → runACPSession → SDK client ↔ fake ACP agent
 // over real JSON-RPC wire — and asserts the streamed updates surface as

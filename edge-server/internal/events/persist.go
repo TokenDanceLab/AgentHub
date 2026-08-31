@@ -22,42 +22,10 @@ type PersistFn func(EventEnvelope) error
 // BusOption configures a Bus.
 type BusOption func(*Bus)
 
-// WithPersister sets the persistence hook called before every event broadcast.
-// If the hook returns an error, Publish() does NOT fan out the event.
-func WithPersister(fn PersistFn) BusOption {
-	return func(b *Bus) { b.persistFn = fn }
-}
-
-// WithPersistOutputBatch controls whether run.output.batch events are
-// persisted before broadcast. Defaults to true (persist) for crash safety.
-// Set to false to accept a tradeoff: output batch events exist only in the
-// in-memory ring buffer and may be lost on crash, trading durability for
-// throughput on high-frequency stdout events.
-func WithPersistOutputBatch(persist bool) BusOption {
-	return func(b *Bus) { b.persistOutputBatch = persist }
-}
-
-// WithPersistMaxRetries overrides the number of synchronous retry attempts a
-// Publish call makes when persistFn returns an error before declaring the
-// event lost. n must be >= 0; 0 disables retries (original-attempt-only),
-// negative values are ignored (default applies). This is primarily a test
-// seam for forcing fast failure in tests that assert the persist-failure path,
-// but also lets operators tune the retry budget.
-func WithPersistMaxRetries(n int) BusOption {
-	return func(b *Bus) {
-		if n >= 0 {
-			b.persistMaxRetries = n
-		}
-	}
-}
-
-// maxPersistRetries returns the effective persist retry count for the bus,
-// falling back to persistDefaultMaxRetries when no override is set (the -1
-// sentinel left by the zero value / unset state).
+// maxPersistRetries returns the persist retry count for the bus. The
+// override seam was removed with the unused WithPersistMaxRetries option, so
+// this is always the compile-time default.
 func (b *Bus) maxPersistRetries() int {
-	if b.persistMaxRetries >= 0 {
-		return b.persistMaxRetries
-	}
 	return persistDefaultMaxRetries
 }
 
