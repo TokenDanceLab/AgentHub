@@ -1,6 +1,8 @@
 package lifecycle
 
 import (
+	"bytes"
+	"log/slog"
 	"strings"
 	"testing"
 
@@ -51,5 +53,60 @@ func TestEnvForRun_NilProfileUsesSanitizedBase(t *testing.T) {
 	}
 	if !strings.HasPrefix(got["AGENTHUB_RUN_ID"], "run_") {
 		t.Fatalf("AGENTHUB_RUN_ID = %q", got["AGENTHUB_RUN_ID"])
+	}
+}
+
+func TestEnvForAdapterOrProfile_WarnsSensitiveExtraEnvKeys(t *testing.T) {
+	t.Parallel()
+
+	var logs bytes.Buffer
+	previousLogger := slog.Default()
+	slog.SetDefault(slog.New(slog.NewJSONHandler(&logs, &slog.HandlerOptions{Level: slog.LevelDebug})))
+	t.Cleanup(func() {
+		slog.SetDefault(previousLogger)
+	})
+
+	run := store.Run{ID: "run_warn", ProjectID: "p", ThreadID: "t"}
+	extraEnv := []string{"ANTHROPIC_API_KEY=sk-secret", "SAFE_VAR=ok", "OPENAI_API_KEY=sk-also-secret"}
+	_ = envForAdapterOrProfile(run, true, nil, extraEnv)
+
+	logText := logs.String()
+	// Must warn for each sensitive key (only key name, never value).
+	for _, key := range []string{"ANTHROPIC_API_KEY", "OPENAI_API_KEY"} {
+		if !strings.Contains(logText, `"key":"`+key+`"`) {
+			t.Fatalf("expected warn for sensitive key %q in log: %s", key, logText)
+		}
+	}
+	// Must NOT leak secret values.
+	for _, secret := range []string{"sk-secret", "sk-also-secret"} {
+		if strings.Contains(logText, secret) {
+			t.Fatalf("log leaked sensitive value %q: %s", secret, logText)
+		}
+	}
+	// Non-sensitive key must not trigger warn.
+	if strings.Contains(logText, `"key":"SAFE_VAR"`) {
+		t.Fatalf("non-sensitive key SAFE_VAR should not trigger warn: %s", logText)
+	}
+}
+
+func TestEnvForAdapterOrProfile_NoWarnInProfileMode(t *testing.T) {
+	t.Parallel()
+
+	var logs bytes.Buffer
+	previousLogger := slog.Default()
+	slog.SetDefault(slog.New(slog.NewJSONHandler(&logs, &slog.HandlerOptions{Level: slog.LevelDebug})))
+	t.Cleanup(func() {
+		slog.SetDefault(previousLogger)
+	})
+
+	run := store.Run{ID: "run_profile", ProjectID: "p", ThreadID: "t"}
+	profileEnv := []string{"FOO=bar"}
+	extraEnv := []string{"ANTHROPIC_API_KEY=sk-secret"}
+	_ = envForAdapterOrProfile(run, false, profileEnv, extraEnv)
+
+	logText := logs.String()
+	// Profile mode does not run the adapter-extraEnv warning path.
+	if strings.Contains(logText, "adapter extra environment") {
+		t.Fatalf("profile mode should not emit adapter extraEnv warn: %s", logText)
 	}
 }

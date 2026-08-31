@@ -8269,8 +8269,10 @@ components:
         permissionMode:
           type: string
           description: >
-            Claude Code permission mode: default, acceptEdits, bypassPermissions, plan, dontAsk.
-            Also mapped to Codex --sandbox level.
+            Runtime permission policy hint. Only the claude adapter honours this
+            field (mapped to Claude Code --permission-mode: default, acceptEdits,
+            bypassPermissions, plan, dontAsk). All other adapters ignore it; Codex
+            sandbox level is controlled separately via its own configuration.
         workDir:
           type: string
           description: Working directory override for this run. Defaults to the Edge process profile workdir.
@@ -8332,7 +8334,9 @@ components:
           description: Reasoning effort hint for a Hub AgentProfile-backed entry.
         permissionMode:
           type: string
-          description: Runtime permission policy hint for a Hub AgentProfile-backed entry.
+          description: >
+            Runtime permission policy hint for a Hub AgentProfile-backed entry.
+            Only the claude adapter acts on this value; other adapters ignore it.
         toolAllowlist:
           type: array
           items:

@@ -233,6 +233,10 @@ func (a *AnthropicSDKAdapter) ParseStream(ctx context.Context, stdout io.Reader,
 	// MCP tool definitions: convert MCPConfig JSON to Anthropic tools parameter.
 	// The MCPConfig field contains a JSON string of MCP server definitions.
 	// When AllowedTools is set, those tools are converted to Anthropic tool schemas.
+	// NOTE: AllowedTools here is an API-level tool allowlist passed to the model
+	// provider (Anthropic). It restricts which tools the model may invoke via the
+	// API request; it is NOT enforced by an edge-side hook or runtime interceptor.
+	// Edge-side enforcement (e.g. tool_allowlist_hook) is a separate mechanism.
 	if len(runCtx.AllowedTools) > 0 {
 		tools := make([]anthropicTool, 0, len(runCtx.AllowedTools))
 		for _, toolName := range runCtx.AllowedTools {
