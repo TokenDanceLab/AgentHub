@@ -60,6 +60,7 @@ type runRequest struct {
 	Ephemeral               bool                                 `json:"ephemeral"`
 	HubTaskID               string                               `json:"hubTaskId"`          // Edge-to-Hub direct callback task ID
 	TraceID                 string                               `json:"trace_id,omitempty"` // Hub dispatch trace correlation id
+	DeliveryID              string                               `json:"deliveryId"`         // Hub delivery_id for dual-channel dedup (#2101 G2)
 	Messages                []runnerctx.Message                  `json:"messages,omitempty"`
 	PinnedMessages          []runnerctx.Message                  `json:"pinnedMessages,omitempty"`
 }
@@ -257,8 +258,10 @@ func (h *Handler) buildRunContext(run store.Run, req *runRequest) lifecycle.RunP
 		Ephemeral:              req.Ephemeral,
 		HubTaskID:              req.HubTaskID,
 		TraceID:                req.TraceID,
-		Messages:               req.Messages,
-		PinnedMessages:         req.PinnedMessages,
+
+		DeliveryID:     req.DeliveryID,
+		Messages:       req.Messages,
+		PinnedMessages: req.PinnedMessages,
 	}
 	// Inject Skills directory context (SKILL.md discovery) into the system prompt.
 	// The SkillRegistry is shared across runs and lazily lists name+description.
@@ -298,6 +301,11 @@ func (h *Handler) PostRuns(w http.ResponseWriter, r *http.Request) {
 	req, decodeErr := decodeRunRequest(r)
 	if decodeErr != nil {
 		writeJSON(w, http.StatusBadRequest, errcode.ErrorBody(decodeErr))
+		return
+	}
+
+	// #2101 G2: short-circuit duplicate deliveries before any run side-effects.
+	if h.handleDeliveryDedup(w, req.DeliveryID, req.HubTaskID, req.ThreadID) {
 		return
 	}
 
@@ -476,3 +484,28 @@ func (h *Handler) GetMetrics(w http.ResponseWriter, r *http.Request) {
 // ---------------------------------------------------------------------------
 // GET /v1/events  (WebSocket)
 // ---------------------------------------------------------------------------
+
+// handleDeliveryDedup short-circuits POST /v1/runs when the request carries a
+// delivery_id that was already seen within the TTL window (#2101 G2). Returns
+// true when the response has been written and the caller must return; false
+// means the request should continue normal processing. Empty delivery_id or a
+// nil dedup cache bypass dedup so legacy payloads keep working.
+func (h *Handler) handleDeliveryDedup(w http.ResponseWriter, deliveryID, hubTaskID, threadID string) bool {
+	if h.DeliveryDedup == nil || deliveryID == "" {
+		return false
+	}
+	if h.DeliveryDedup.Seen(deliveryID) {
+		slog.Info("run.create.dedup",
+			"deliveryId", deliveryID,
+			"hubTaskId", hubTaskID,
+			"threadId", threadID,
+			"result", "duplicate_skipped")
+		writeSuccess(w, http.StatusAccepted, map[string]any{
+			"deduplicated": true,
+			"deliveryId":   deliveryID,
+		})
+		return true
+	}
+	h.DeliveryDedup.Record(deliveryID)
+	return false
+}

@@ -17,6 +17,7 @@ import (
 	"github.com/agenthub/edge-server/internal/adapters"
 	"github.com/agenthub/edge-server/internal/adapters/claude"
 	"github.com/agenthub/edge-server/internal/agents"
+	"github.com/agenthub/edge-server/internal/deliverydedup"
 	"github.com/agenthub/edge-server/internal/edgeidentity"
 	"github.com/agenthub/edge-server/internal/errcode"
 	"github.com/agenthub/edge-server/internal/events"
@@ -41,10 +42,11 @@ func newTestHandler() *Handler {
 		Status: "online",
 	})
 	return &Handler{
-		Bus:      bus,
-		Registry: reg,
-		Store:    s,
-		Executor: lifecycle.NewMockExecutor(bus, s),
+		DeliveryDedup: deliverydedup.New(deliverydedup.DefaultCapacity, deliverydedup.DefaultTTL),
+		Bus:           bus,
+		Registry:      reg,
+		Store:         s,
+		Executor:      lifecycle.NewMockExecutor(bus, s),
 	}
 }
 

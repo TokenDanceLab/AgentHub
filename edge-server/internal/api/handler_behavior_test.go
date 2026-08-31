@@ -624,3 +624,85 @@ func TestPostRunsWithStructuredBody(t *testing.T) {
 		t.Errorf("projectId = %v", resp["projectId"])
 	}
 }
+
+// ── POST /v1/runs delivery_id dedup (#2101 G2) ────────────────────────────────
+
+func TestPostRuns_DeliveryIDDedup_SkipsDuplicate(t *testing.T) {
+	server, h := newTestServer(t)
+	defer server.Close()
+	if h.DeliveryDedup == nil {
+		t.Fatal("expected DeliveryDedup to be non-nil for dedup tests")
+	}
+	wd := testRunWorkDir(t, h)
+
+	var first map[string]any
+	code := postJSON(t, server.URL+"/v1/runs",
+		fmt.Sprintf(`{"prompt":"once","workDir":%q,"deliveryId":"del-1"}`, wd), &first)
+	if code != http.StatusAccepted {
+		t.Fatalf("first POST: expected 202, got %d: %v", code, first)
+	}
+
+	// Second POST with same delivery_id must be deduplicated.
+	var dup map[string]any
+	code = postJSON(t, server.URL+"/v1/runs",
+		fmt.Sprintf(`{"prompt":"twice","workDir":%q,"deliveryId":"del-1"}`, wd), &dup)
+	if code != http.StatusAccepted {
+		t.Fatalf("duplicate POST: expected 202, got %d: %v", code, dup)
+	}
+	data, _ := dup["data"].(map[string]any)
+	if data == nil {
+		t.Fatalf("expected data wrapper in response, got %#v", dup)
+	}
+	if v, _ := data["deduplicated"].(bool); !v {
+		t.Fatalf("expected deduplicated=true, got %#v", data)
+	}
+}
+
+func TestPostRuns_DeliveryIDDedup_DistinctIDsBothProcessed(t *testing.T) {
+	server, h := newTestServer(t)
+	defer server.Close()
+	if h.DeliveryDedup == nil {
+		t.Fatal("expected DeliveryDedup to be non-nil")
+	}
+	wd := testRunWorkDir(t, h)
+	// Create a second thread so the active-run guard does not block the
+	// second delivery on the same thread fixture.
+	if _, err := h.Store.CreateThread("thread-B", "proj_local", "Thread B", "direct", "", ""); err != nil {
+		t.Fatalf("create thread-B: %v", err)
+	}
+
+	var r1, r2 map[string]any
+	code1 := postJSON(t, server.URL+"/v1/runs",
+		fmt.Sprintf(`{"prompt":"a","workDir":%q,"deliveryId":"del-A"}`, wd), &r1)
+	if code1 != http.StatusAccepted {
+		t.Fatalf("first: expected 202, got %d: %v", code1, r1)
+	}
+	code2 := postJSON(t, server.URL+"/v1/runs",
+		fmt.Sprintf(`{"prompt":"b","workDir":%q,"threadId":"thread-B","deliveryId":"del-B"}`, wd), &r2)
+	if code2 != http.StatusAccepted {
+		t.Fatalf("second: expected 202, got %d: %v", code2, r2)
+	}
+	data, _ := r2["data"].(map[string]any)
+	if v, _ := data["deduplicated"].(bool); v {
+		t.Fatalf("distinct deliveryId must NOT be deduplicated, got %#v", r2)
+	}
+}
+
+func TestPostRuns_EmptyDeliveryID_BypassesDedup(t *testing.T) {
+	server, h := newTestServer(t)
+	defer server.Close()
+	if h.DeliveryDedup == nil {
+		t.Fatal("expected DeliveryDedup to be non-nil")
+	}
+	wd := testRunWorkDir(t, h)
+
+	var body map[string]any
+	code := postJSON(t, server.URL+"/v1/runs",
+		fmt.Sprintf(`{"prompt":"legacy","workDir":%q}`, wd), &body)
+	if code != http.StatusAccepted {
+		t.Fatalf("expected 202 for legacy (no deliveryId), got %d: %v", code, body)
+	}
+	if _, ok := body["deduplicated"]; ok {
+		t.Fatalf("legacy payload should not carry deduplicated flag, got %#v", body)
+	}
+}

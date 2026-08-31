@@ -30,6 +30,15 @@ Hub/Edge 实时面均为 **at-least-once**：重连、离线队列、outbox、�
 
 > **`seq_id`（Hub WS per-conn）vs `seq`（Edge per-bus）**：Hub `seq_id` 是 `PushToConn` 在单连接上单调递增的投递序号，重连从 1 计、跨连接不可比；Edge `EventEnvelope.seq` 是事件总线上的 stream 单调序号，与持久化 `agent_run_events.event_seq` / `messages.seq_id` 对齐。REST 增量同步接口（`GET .../messages/sync?after_seq=`、`GET .../events?after_seq=`）的 `after_seq` 一律指**持久化表的内部 seq**（`messages.seq_id` 或 `agent_run_events.event_seq`），**不是** WS 帧的 `seq_id`。客户端不得用 WS `seq_id` 作为 REST 游标。
 
+### Hub→Edge `delivery_id` 去重契约（#2101 G2）
+
+Hub 向 Edge 投递任务有两条并行通道：WS `PushToConn(agent.dispatch)` 与 outbox redispatch HTTP POST `/v1/runs`。两者共享同一个 `delivery_id`（UUID，由 Hub dispatch/outbox 生成并附在 payload 顶层 `delivery_id` / `deliveryId`）。Edge **必须**在消费入口（POST `/v1/runs`）按 `delivery_id` 做进程内去重：
+
+- **键**：`delivery_id` 字符串；空值视为遗留载荷，跳过 dedup 直接处理。
+- **存储**：进程内 LRU + TTL（参考实现 `edge-server/internal/deliverydedup`，默认 4096 条 / 5 分钟）。不持久化；崩溃后重复投递的最坏后果是幂等重放一次，可接受。
+- **语义**：TTL 窗口内同 `delivery_id` → 跳过 run 创建、返回成功（HTTP 202 + `{deduplicated:true}`），附带日志/指标；不同 `delivery_id` 正常处理。
+- **责任划分**：Hub 保证同一逻辑投递在所有通道使用相同 `delivery_id`；Edge 保证消费端幂等。任一侧失守都会产生重复 run。
+
 标签：**UPSERT by id**（稳定 id 合并，禁止第二行）；**idempotent on apply**（再应用不变）；**水位 / watermark**（只前进 `max`）；**ephemeral**（可丢可重，不写持久态）；**非幂等**（须自备去重或 REST）。
 
 ## Edge EventEnvelope
