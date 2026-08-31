@@ -28,6 +28,8 @@ Hub/Edge 实时面均为 **at-least-once**：重连、离线队列、outbox、�
 | Edge `EventEnvelope.seq` / `id` | stream 单调 `seq` + 事件 `id`；断线用 cursor / 最后 id | 不能回放则 `system.gap`/`error`，客户端 REST snapshot |
 | 业务幂等键 | 下表「幂等键 / 重复投递语义」 | apply 必须按业务键，不能只靠 `seq_id` |
 
+> **`seq_id`（Hub WS per-conn）vs `seq`（Edge per-bus）**：Hub `seq_id` 是 `PushToConn` 在单连接上单调递增的投递序号，重连从 1 计、跨连接不可比；Edge `EventEnvelope.seq` 是事件总线上的 stream 单调序号，与持久化 `agent_run_events.event_seq` / `messages.seq_id` 对齐。REST 增量同步接口（`GET .../messages/sync?after_seq=`、`GET .../events?after_seq=`）的 `after_seq` 一律指**持久化表的内部 seq**（`messages.seq_id` 或 `agent_run_events.event_seq`），**不是** WS 帧的 `seq_id`。客户端不得用 WS `seq_id` 作为 REST 游标。
+
 标签：**UPSERT by id**（稳定 id 合并，禁止第二行）；**idempotent on apply**（再应用不变）；**水位 / watermark**（只前进 `max`）；**ephemeral**（可丢可重，不写持久态）；**非幂等**（须自备去重或 REST）。
 
 ## Edge EventEnvelope
