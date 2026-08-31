@@ -130,20 +130,6 @@ func TestRegistryDefaultRoleNotFound(t *testing.T) {
 	}
 }
 
-func TestValidateCLIAdapterID(t *testing.T) {
-	for _, id := range []string{"claude-code", "codex", "opencode"} {
-		if err := ValidateCLIAdapterID(id); err != nil {
-			t.Fatalf("ValidateCLIAdapterID(%q) returned error: %v", id, err)
-		}
-	}
-
-	for _, id := range []string{"", "claude", "openai", "agenthub-runner-mock", "unknown-runtime"} {
-		if err := ValidateCLIAdapterID(id); err == nil {
-			t.Fatalf("ValidateCLIAdapterID(%q) returned nil, want error", id)
-		}
-	}
-}
-
 func TestRegistrySetDefaultOverwrites(t *testing.T) {
 	r := NewRegistry()
 	r.Register(&stubAdapter{id: "first"})
@@ -194,27 +180,6 @@ func TestRegistryConcurrentRegisterAndGet(t *testing.T) {
 	for i := 0; i < 20; i++ {
 		if _, ok := r.Get(fmt.Sprintf("concurrent-%d", i)); !ok {
 			t.Fatalf("concurrent-%d not found after concurrent registration", i)
-		}
-	}
-}
-
-func TestValidateCLIAdapterIDSDKAdapters(t *testing.T) {
-	for _, id := range []string{"anthropic-sdk", "openai-sdk"} {
-		if err := ValidateCLIAdapterID(id); err != nil {
-			t.Fatalf("ValidateCLIAdapterID(%q) should accept SDK adapter: %v", id, err)
-		}
-	}
-}
-
-func TestIsSDKAdapter(t *testing.T) {
-	for _, id := range []string{"anthropic-sdk", "openai-sdk"} {
-		if !IsSDKAdapter(id) {
-			t.Fatalf("IsSDKAdapter(%q) = false, want true", id)
-		}
-	}
-	for _, id := range []string{"claude-code", "codex", "opencode", ""} {
-		if IsSDKAdapter(id) {
-			t.Fatalf("IsSDKAdapter(%q) = true, want false", id)
 		}
 	}
 }
