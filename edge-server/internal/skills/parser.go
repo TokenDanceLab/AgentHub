@@ -59,56 +59,6 @@ func ParseFrontmatter(path string) (*Skill, error) {
 	}, nil
 }
 
-// ParseBody reads only the markdown body (content after the closing "---"
-// delimiter) from a SKILL.md file.
-func ParseBody(path string) (string, error) {
-	// #nosec G304 -- skill paths come from the configured skills dir (operator)
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return "", fmt.Errorf("skills: read %s: %w", path, err)
-	}
-
-	content := string(data)
-	// Find the second "---" delimiter that closes the frontmatter.
-	// The frontmatter starts at the first "---" on line 1.
-	idx := strings.Index(content, "---")
-	if idx != 0 {
-		// Frontmatter may not start at column 0 (e.g. BOM). Find the first line.
-		lines := strings.SplitN(content, "\n", 2)
-		if len(lines) > 0 && strings.TrimSpace(lines[0]) == "---" {
-			// Continue with the rest.
-		} else {
-			return "", fmt.Errorf("skills: missing frontmatter opening in %s", path)
-		}
-	}
-
-	// Find the closing "---": search from after the first line.
-	rest := content
-	if idx == 0 {
-		nl := strings.Index(rest, "\n")
-		if nl < 0 {
-			return "", fmt.Errorf("skills: malformed frontmatter in %s", path)
-		}
-		rest = rest[nl+1:]
-	}
-
-	endIdx := strings.Index(rest, "\n---")
-	if endIdx < 0 {
-		// Maybe there's no body at all.
-		return "", nil
-	}
-
-	bodyStart := endIdx + 4 // skip "\n---"
-	if bodyStart >= len(rest) {
-		return "", nil
-	}
-
-	body := rest[bodyStart:]
-	// Strip leading newline if present.
-	body = strings.TrimPrefix(body, "\n")
-	return body, nil
-}
-
 // parseFrontmatterLine parses a single "key: value" line from YAML frontmatter.
 // Handles quoted strings and bare values.
 func parseFrontmatterLine(line string) (key, value string) {
@@ -166,19 +116,4 @@ func parseTriggersValue(value string) []string {
 		return result
 	}
 	return []string{strings.ToLower(value)}
-}
-
-// ParseFull reads and parses the entire SKILL.md file at path into a Skill
-// with both frontmatter and body populated.
-func ParseFull(path string) (*Skill, error) {
-	s, err := ParseFrontmatter(path)
-	if err != nil {
-		return nil, err
-	}
-	body, err := ParseBody(path)
-	if err != nil {
-		return nil, err
-	}
-	s.Body = body
-	return s, nil
 }

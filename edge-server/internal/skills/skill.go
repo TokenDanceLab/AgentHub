@@ -1,5 +1,5 @@
-// Package skills provides SKILL.md discovery, parsing, progressive loading,
-// trigger-word matching, and hot reload via filesystem watch (fsnotify).
+// Package skills provides SKILL.md discovery, parsing, and system-prompt
+// injection for Edge runs.
 //
 // SKILL.md files follow the Codex CLI standard with YAML frontmatter:
 //
@@ -12,81 +12,39 @@
 //	---
 //	# Markdown body
 //
-// The SkillRegistry supports lazy loading: Discover loads only name+description;
-// LoadBody reads the full markdown body on demand, typically triggered by
-// explicit invocation ($skill-name) or trigger-word matching.
+// Discover loads name + description + triggers from the frontmatter only
+// (lightweight); SystemPromptContext injects the "Available skills:" block
+// into the agent system prompt during run creation (handlers_runs.go).
 //
-// Hot reload watches the skills directory tree for SKILL.md changes (create,
-// modify, rename, delete) and updates the registry in real time without a full
-// rescan. The watch is recursive on top-level subdirectories and uses a 500ms
-// debounce to coalesce rapid successive events.
+// Historical trigger-word matching and fsnotify hot reload were removed:
+// they had zero production callers, and restoring them from git history is
+// straightforward if a future feature needs them (#2154).
 package skills
 
 import (
-	"regexp"
+	"strings"
 	"sync"
-	"time"
-
-	"github.com/fsnotify/fsnotify"
 )
 
-// Skill represents a parsed SKILL.md file.
-// All fields except Body are populated by Discover/ParseFrontmatter.
-// Body is loaded lazily via LoadBody to keep startup fast with progressive loading.
+// Skill represents a parsed SKILL.md file frontmatter.
 type Skill struct {
 	Name        string   // from YAML frontmatter "name"
 	Description string   // from YAML frontmatter "description"
-	Triggers    []string // from YAML frontmatter "triggers" (comma-separated or list); case-insensitive matching
-	Body        string   // full markdown body (after frontmatter); empty until LoadBody is called
+	Triggers    []string // from YAML frontmatter "triggers" (comma-separated or list); case-insensitive
 	Path        string   // absolute file path to the SKILL.md
-
-	// compiledTriggers caches pre-compiled regexp for word-boundary matching.
-	// Populated by compileTriggers() during Discover or reloadSkill.
-	// Each regexp is (?i)\b + regexp.QuoteMeta(trigger) + \b, safe from ReDoS
-	// because regexp.QuoteMeta escapes all metacharacters.
-	compiledTriggers []*regexp.Regexp
 }
 
-// SkillSummary is the lightweight view of a skill (name + description only).
-// It is produced by Discover without reading the full markdown body,
-// enabling fast startup with progressive loading.
-type SkillSummary struct {
-	Name        string
-	Description string
-	Path        string
-}
-
-// SkillRegistry holds discovered skills and supports name lookup, body loading,
-// trigger-word matching, and hot reload via filesystem watch.
-//
-// Thread-safety: all exported methods acquire the appropriate lock (RWMutex).
-// Internal methods (matchTriggerWordBoundaryLocked) require the caller to hold
-// at least a read lock.
+// SkillRegistry holds discovered skills and supports name lookup and
+// system-prompt injection. Thread-safe: all methods take the registry lock.
 type SkillRegistry struct {
 	mu     sync.RWMutex
 	skills map[string]*Skill // name -> skill
 	dirs   []string          // search directories passed to NewSkillRegistry
-	loaded bool              // true after Discover ran at least once
-
-	// UseWordBoundary toggles word-boundary matching in MatchTrigger.
-	// When false (default), triggers are matched via case-insensitive substring.
-	// When true, triggers are matched as whole words using pre-compiled regexp (\b).
-	UseWordBoundary bool
-
-	// Hot reload fields. Managed by StartWatch/StopWatch; accessed under
-	// debounceMu for coordination and r.mu for registry mutations.
-	watcher       *fsnotify.Watcher
-	stopCh        chan struct{}
-	pendingPaths  map[string]struct{} // paths queued for reload (accessed under debounceMu)
-	debounceTimer *time.Timer
-	debounceMu    sync.Mutex
-	watchStarted  bool // true after StartWatch succeeds
 }
 
 // NewSkillRegistry creates a registry that scans the given directories
 // for SKILL.md files. Directories are resolved to absolute paths during
-// Discover. Call Discover() after construction to populate skills, then
-// optionally StartWatch() for hot reload.
+// Discover. Call Discover() after construction to populate skills.
 func NewSkillRegistry(dirs []string) *SkillRegistry {
 	return &SkillRegistry{
 		skills: make(map[string]*Skill),
@@ -95,10 +53,8 @@ func NewSkillRegistry(dirs []string) *SkillRegistry {
 }
 
 // Discover scans all configured directories and populates the registry
-// with Skill objects containing name + description (lightweight).
-// It does NOT read the full body — use LoadBody for that.
+// with Skill objects containing frontmatter fields (lightweight, no body).
 // Existing entries with the same name are overwritten (last wins).
-// Word-boundary regexp are compiled eagerly for each skill during this call.
 func (r *SkillRegistry) Discover() error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -113,34 +69,40 @@ func (r *SkillRegistry) Discover() error {
 			if err != nil {
 				continue // skip unparseable files
 			}
-			skill.compileTriggers()
 			r.skills[skill.Name] = skill
 		}
 	}
-	r.loaded = true
 	return nil
 }
 
-// Get returns a skill by name (may or may not have body loaded).
-func (r *SkillRegistry) Get(name string) (*Skill, bool) {
+// Count returns the number of discovered skills. Used for the startup log.
+func (r *SkillRegistry) Count() int {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
-	s, ok := r.skills[name]
-	return s, ok
+	return len(r.skills)
 }
 
-// List returns all discovered skill summaries.
-func (r *SkillRegistry) List() []SkillSummary {
+// SystemPromptContext builds the "Available skills:" block for injection
+// into the agent system prompt. Only includes name + description
+// (lightweight). Returns an empty string when no skills are loaded.
+func (r *SkillRegistry) SystemPromptContext() string {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
-	out := make([]SkillSummary, 0, len(r.skills))
-	for _, s := range r.skills {
-		out = append(out, SkillSummary{
-			Name:        s.Name,
-			Description: s.Description,
-			Path:        s.Path,
-		})
+	if len(r.skills) == 0 {
+		return ""
 	}
-	return out
+
+	var b strings.Builder
+	b.WriteString("Available skills:\n")
+	for _, s := range r.skills {
+		b.WriteString("- ")
+		b.WriteString(s.Name)
+		if s.Description != "" {
+			b.WriteString(": ")
+			b.WriteString(s.Description)
+		}
+		b.WriteString("\n")
+	}
+	return b.String()
 }
