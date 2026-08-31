@@ -6,7 +6,7 @@
 
 ## 设计边界
 
-前端分三层：`app shell（Desktop/Web/Mobile） -> platform adapter -> @agenthub/workbench shell + app/shared chatview -> transcript normalizer + renderer`。
+前端分三层：`app shell（Desktop/Web） -> platform adapter -> @agenthub/workbench shell + app/shared chatview -> transcript normalizer + renderer`。Mobile 当前是独立 RN fixture/边界验证 lane：不复用 workbench/chatview 渲染，数据走 MobileAppFixture/mock-hub（非 release candidate）。
 
 规则：
 
@@ -58,7 +58,7 @@ UI 可以根据 `capabilities` 隐藏或禁用动作，但不能 fork 另一套�
 
 ## 全局状态栏合同（F5 #1994）
 
-- `WorkbenchFrame` 将 `MainchainStatusStrip` 渲染为全局底部状态栏（shell 第 3 行、rail 右侧），所有 rail 页面可见；全局段 = 连接态 + F6 注意力 chips + F14 usage chip（与 rail/sidebar 同源推导），会话段（证据链 + 导出）仅聊天页且 `showMainchainStatus` 开启时渲染。
+- `WorkbenchFrame` 将 `MainchainStatusStrip` 渲染为全局底部状态栏（shell 第 3 行、rail 右侧），所有 rail 页面可见；全局段 = 连接态 + F6 注意力 chips + F14 usage chip（与 rail/sidebar 同源推导），会话段（证据链 + 导出）仅聊天页且 `showMainchainStatus` 开启时渲染；当前 web/desktop 两 shell 均传 `false`，会话段实际关闭（开启需 shell 接线决策）。
 - 诚实合同：无数据不渲染；作用域计数带标注；awaiting chip 在聊天页发一次性 `agenthub:approval-jump` 做 transcript 内高亮，其他页面先回聊天并选中首个等待会话。
 
 ## 会话目标横幅合同（F8 #1998）
