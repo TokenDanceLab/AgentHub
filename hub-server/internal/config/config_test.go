@@ -2,6 +2,7 @@
 package config
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -1227,5 +1228,174 @@ func TestEdgeDispatchTimeoutDefault(t *testing.T) {
 	}
 	if cfg.Edge.Timeout != 10*time.Second {
 		t.Errorf("Edge.Timeout = %v, want default 10s", cfg.Edge.Timeout)
+	}
+}
+
+// ── #2124 P1 scheme-b: production guard tests ────────────────────────────────
+
+// prodGuardYAML is a minimal valid config for production-guard tests.
+// server.env is set via yaml; AGENTHUB_JWT_SECRET and AGENTHUB_AUTH_FAIL_CLOSED
+// are set via t.Setenv per test case.
+const prodGuardYAML = `
+server:
+  port: 8080
+  env: %s
+db:
+  host: localhost
+  port: 5432
+  user: agenthub
+  password: secret
+  name: agenthub
+  sslmode: %s
+redis:
+  host: localhost
+  port: 6379
+jwt:
+  access_ttl: 15m
+  refresh_ttl: 720h
+upload:
+  dir: ""
+  max_size: 10485760
+`
+
+func writeProdGuardConfig(t *testing.T, env, sslmode string) string {
+	t.Helper()
+	return writeTempConfig(t, fmt.Sprintf(prodGuardYAML, env, sslmode))
+}
+
+// TestProdGuardRejectsMissingAuthFailClosed verifies that production env
+// refuses to start when AGENTHUB_AUTH_FAIL_CLOSED is not explicitly set.
+func TestProdGuardRejectsMissingAuthFailClosed(t *testing.T) {
+	path := writeProdGuardConfig(t, "production", "require")
+	t.Setenv("AGENTHUB_JWT_SECRET", "prod-guard-test-secret-padded-to-32-chars!!")
+	// Deliberately NOT setting AGENTHUB_AUTH_FAIL_CLOSED.
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	err = cfg.Validate()
+	if err == nil {
+		t.Fatal("expected Validate() to reject production without AGENTHUB_AUTH_FAIL_CLOSED, got nil")
+	}
+	if !strings.Contains(err.Error(), "AGENTHUB_AUTH_FAIL_CLOSED") {
+		t.Errorf("error should mention AGENTHUB_AUTH_FAIL_CLOSED, got: %v", err)
+	}
+}
+
+// TestProdGuardRejectsSSLModeDisable verifies that production env rejects
+// db.sslmode=disable even when all other production guards are satisfied.
+func TestProdGuardRejectsSSLModeDisable(t *testing.T) {
+	path := writeProdGuardConfig(t, "prod", "disable")
+	t.Setenv("AGENTHUB_JWT_SECRET", "prod-guard-test-secret-padded-to-32-chars!!")
+	t.Setenv("AGENTHUB_AUTH_FAIL_CLOSED", "true")
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	err = cfg.Validate()
+	if err == nil {
+		t.Fatal("expected Validate() to reject production with db.sslmode=disable, got nil")
+	}
+	if !strings.Contains(err.Error(), "db.sslmode") {
+		t.Errorf("error should mention db.sslmode, got: %v", err)
+	}
+}
+
+// TestProdGuardPassesWhenFullyConfigured verifies that production env starts
+// successfully when all required explicit settings are present.
+func TestProdGuardPassesWhenFullyConfigured(t *testing.T) {
+	for _, env := range []string{"production", "prod", "release"} {
+		t.Run(env, func(t *testing.T) {
+			path := writeProdGuardConfig(t, env, "verify-full")
+			t.Setenv("AGENTHUB_JWT_SECRET", "prod-guard-test-secret-padded-to-32-chars!!")
+			t.Setenv("AGENTHUB_AUTH_FAIL_CLOSED", "true")
+			cfg, err := Load(path)
+			if err != nil {
+				t.Fatalf("Load() error = %v", err)
+			}
+			if err := cfg.Validate(); err != nil {
+				t.Fatalf("Validate() should pass for fully-configured %q, got: %v", env, err)
+			}
+		})
+	}
+}
+
+// TestProdGuardAcceptsAuthFailClosedExplicitFalse verifies that production
+// accepts AGENTHUB_AUTH_FAIL_CLOSED=false — the guard requires the env var
+// to be SET (explicit choice), not necessarily true.
+func TestProdGuardAcceptsAuthFailClosedExplicitFalse(t *testing.T) {
+	path := writeProdGuardConfig(t, "production", "require")
+	t.Setenv("AGENTHUB_JWT_SECRET", "prod-guard-test-secret-padded-to-32-chars!!")
+	t.Setenv("AGENTHUB_AUTH_FAIL_CLOSED", "false") // explicit but false
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	if err := cfg.Validate(); err != nil {
+		t.Fatalf("Validate() should accept explicit AGENTHUB_AUTH_FAIL_CLOSED=false, got: %v", err)
+	}
+}
+
+// TestNonProdEnvSkipsProdGuard verifies that dev/test/staging environments
+// (and empty/unset env) do NOT trigger production guards. This is the
+// regression protection ensuring zero-friction local development.
+func TestNonProdEnvSkipsProdGuard(t *testing.T) {
+	for _, env := range []string{"", "development", "dev", "staging", "test", "debug"} {
+		t.Run("env="+env, func(t *testing.T) {
+			sslmode := "disable" // would fail prod guard
+			yaml := fmt.Sprintf(`
+server:
+  port: 8080
+  env: "%s"
+db:
+  host: localhost
+  port: 5432
+  user: agenthub
+  password: secret
+  name: agenthub
+  sslmode: %s
+redis:
+  host: localhost
+  port: 6379
+jwt:
+  access_ttl: 15m
+  refresh_ttl: 720h
+upload:
+  dir: ""
+  max_size: 10485760
+`, env, sslmode)
+			path := writeTempConfig(t, yaml)
+			t.Setenv("AGENTHUB_JWT_SECRET", "nonprod-guard-secret-padded-to-32-chars!!")
+			// Deliberately NOT setting AGENTHUB_AUTH_FAIL_CLOSED.
+			cfg, err := Load(path)
+			if err != nil {
+				t.Fatalf("Load() error = %v", err)
+			}
+			if err := cfg.Validate(); err != nil {
+				t.Fatalf("Validate() should skip prod guard for env=%q, got: %v", env, err)
+			}
+		})
+	}
+}
+
+// TestProdGuardErrorMessageIsActionable verifies that the rejection message
+// tells the operator exactly what to set, not just "invalid config".
+func TestProdGuardErrorMessageIsActionable(t *testing.T) {
+	path := writeProdGuardConfig(t, "production", "require")
+	t.Setenv("AGENTHUB_JWT_SECRET", "prod-guard-test-secret-padded-to-32-chars!!")
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	err = cfg.Validate()
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	msg := err.Error()
+	// Must tell operator which env var to set and suggest a value.
+	for _, want := range []string{"AGENTHUB_AUTH_FAIL_CLOSED", "production"} {
+		if !strings.Contains(msg, want) {
+			t.Errorf("error message should contain %q for actionability, got: %s", want, msg)
+		}
 	}
 }

@@ -193,5 +193,4 @@ func TestApplyGroupInfoChangesAndCacheKeys(t *testing.T) {
 	assert.Equal(t, map[string]interface{}{}, ApplyGroupInfoChanges(nil, &onlyName, nil, nil))
 
 	assert.Equal(t, "session:members:s1", SessionMembersCacheKey("s1"))
-	assert.Equal(t, "session:meta:s1", SessionMetaCacheKey("s1"))
 }

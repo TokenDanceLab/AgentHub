@@ -142,6 +142,33 @@ Hub 侧 code 交换端点固定为 `POST /client/auth/oidc/callback`，桌面/We
 
 迁移自动执行意味着：升级到带新 `.up.sql` 的镜像时，容器一起新迁移。`hub-server/migrations/0062`、`0063` 等使用普通 `CREATE INDEX`/`CREATE UNIQUE INDEX`（非 `CONCURRENTLY`），在已堆积数据的表上会取 `ACCESS EXCLUSIVE` 锁；大表升级应在维护窗口执行（停服 → 跑迁移 → 起服），不要在流量高峰直接 `compose up`。详见 [../../CHANGELOG.md](../../CHANGELOG.md) Unreleased 的升级注意段。
 
+## 迁移回滚约定
+
+> 来源：#2125 审计切片 A/C。本节定义 down 语义与操作纪律，不替代具体迁移文件的注释。
+
+### Down 语义
+
+- **DROP TABLE / DROP COLUMN = 数据丢失**。down 迁移不会保留被删列或表的数据；回滚后这些数据不可恢复。
+- **回滚前必须备份**。生产环境执行任何 `.down.sql` 前，先 `pg_dump` 完整库快照（或至少受影响表的 `COPY TO`）。
+- **外键与占位行**。部分 down 会重建 FK 约束（如 0016 的 `fk_workspaces_device`），要求被引用表中存在对应行。若目标库缺少占位行，down 会因 NOT NULL / FK 校验失败。**ON CONFLICT DO NOTHING 不抑制 NOT NULL 违规**——PostgreSQL 在检查 conflict 前先验证 NOT NULL。
+- **dirty 状态**。down 中途失败会把 `schema_migrations.dirty` 置为 true，阻断后续所有迁移。恢复步骤：①修复导致失败的根因（补占位行、修数据）；②`UPDATE schema_migrations SET dirty = false`；③重试 down 或 force 到安全版本。
+
+### 早期迁移禁止重跑
+
+- **0001–0068 中多数 up 迁移非幂等**（使用 `CREATE TABLE` 而非 `CREATE TABLE IF NOT EXISTS`，`ALTER TABLE ADD COLUMN` 而非 `ADD COLUMN IF NOT EXISTS`）。对已应用的库重跑 up 会报 "already exists" 错误。
+- **dirty 恢复走备份还原**，不要尝试手动重跑早期 up。若 `schema_migrations.dirty=true` 且无法通过修补数据解决，从备份恢复到上一个干净版本是最安全路径。
+- **新迁移（0069+）应使用幂等语法**（`IF NOT EXISTS`、`DO $$ ... END $$` 守卫），使 up/down 可安全重跑。这是 #2125 切片 B 的建议方向，但不对历史迁移追溯改造。
+
+### 操作清单（回滚前）
+
+1. `pg_dump -Fc -f backup_$(date +%Y%m%d_%H%M%S).dump agenthub` — 完整备份
+2. `SELECT version, dirty FROM schema_migrations;` — 确认当前版本与干净状态
+3. 阅读目标 `.down.sql` 全文，识别 FK/NOT NULL/占位行依赖
+4. 预置所需占位行（如零 UUID users/devices）
+5. 在维护窗口执行 down（停服 → down → 验证 → 起服）
+6. 验证 `schema_migrations` 版本与 dirty=false
+7. 应用层冒烟测试确认 schema 符合预期
+
 ## 相关文档
 
 - [01-hub-server.md](01-hub-server.md) — Hub Server 架构

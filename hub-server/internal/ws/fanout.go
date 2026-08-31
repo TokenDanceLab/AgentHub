@@ -63,6 +63,16 @@ func shouldLogDrop(n int64) bool {
 // frame to other connections. Dropped (buffer-full) and marshal-failed frames
 // consume a seq too: the resulting gap is the client-side loss signal.
 func (m *Manager) PushToConn(connID string, frame Frame) DeliveryResult {
+	// Fast-path: once shutdown has begun, reject all pushes so no new frames
+	// enter the drain window. This is cheaper than acquiring mu and avoids
+	// racing with map-clear in Shutdown.
+	if m.shutdown.Load() {
+		if metrics.WSDeliveryFailures != nil {
+			metrics.WSDeliveryFailures.WithLabelValues("shutdown").Inc()
+		}
+		return DeliveryResult{Status: DeliveryStatusConnClosed, Err: ErrShutdownInProgress}
+	}
+
 	m.mu.RLock()
 	c, ok := m.conns[connID]
 	m.mu.RUnlock()

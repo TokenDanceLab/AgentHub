@@ -29,8 +29,3 @@ func ApplyGroupInfoChanges(session *model.Session, name, avatarURL, announcement
 func SessionMembersCacheKey(sessionID string) string {
 	return "session:members:" + sessionID
 }
-
-// SessionMetaCacheKey is the Redis/cache key for session metadata.
-func SessionMetaCacheKey(sessionID string) string {
-	return "session:meta:" + sessionID
-}
