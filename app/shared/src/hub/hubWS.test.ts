@@ -492,3 +492,95 @@ describe('hubWS seq_id gap detection (#2101 G1)', () => {
     expect(count).toBe(1);
   });
 });
+
+// ── #2101 G4-②: onReconnected notification ────────────────────────
+
+describe('hubWS onReconnected (#2101 G4-②)', () => {
+  let t: MockTransport;
+  let h: HubWSHandle;
+
+  function init() {
+    t = mockTransport();
+    h = createHubWS({
+      transport: t as unknown as Transport,
+      getToken: token(true),
+      url: 'ws://hub.example/client/ws',
+    });
+  }
+
+  it('does NOT fire onReconnected on first auth.ok', () => {
+    init();
+    const reconnCalls: number[] = [];
+    h.onReconnected(() => reconnCalls.push(Date.now()));
+    h.connect();
+    t._deliverMessage({ type: HUB_EVENTS.AUTH_OK, payload: null });
+    expect(reconnCalls).toHaveLength(0);
+  });
+
+  it('fires onReconnected on second auth.ok (reconnect)', () => {
+    init();
+    const reconnCalls: number[] = [];
+    h.onReconnected(() => reconnCalls.push(Date.now()));
+    h.connect();
+    // First auth
+    t._deliverMessage({ type: HUB_EVENTS.AUTH_OK, payload: null });
+    expect(reconnCalls).toHaveLength(0);
+
+    // Simulate reconnect: transport status cycles through connected again
+    t._setStatus('disconnected');
+    t._setStatus('connecting');
+    t._setStatus('connected');
+    // Second auth.ok after reconnect
+    t._deliverMessage({ type: HUB_EVENTS.AUTH_OK, payload: null });
+    expect(reconnCalls).toHaveLength(1);
+  });
+
+  it('fires onReconnected for each auth.ok after first', () => {
+    init();
+    let count = 0;
+    h.onReconnected(() => { count++; });
+    h.connect();
+    t._deliverMessage({ type: HUB_EVENTS.AUTH_OK, payload: null });
+    expect(count).toBe(0);
+
+    // Reconnect cycle
+    t._setStatus('disconnected');
+    t._setStatus('connected');
+    t._deliverMessage({ type: HUB_EVENTS.AUTH_OK, payload: null });
+    expect(count).toBe(1);
+
+    // In practice, auth.ok arrives exactly once per connection. If the server
+    // were to send it again (e.g. token refresh), onReconnected would fire
+    // again — this is acceptable because resync is idempotent.
+  });
+
+  it('unsubscribe stops reconnected notifications', () => {
+    init();
+    let count = 0;
+    const unsub = h.onReconnected(() => { count++; });
+    h.connect();
+    t._deliverMessage({ type: HUB_EVENTS.AUTH_OK, payload: null });
+
+    unsub();
+    // Reconnect after unsubscribe
+    t._setStatus('disconnected');
+    t._setStatus('connected');
+    t._deliverMessage({ type: HUB_EVENTS.AUTH_OK, payload: null });
+    expect(count).toBe(0);
+  });
+
+  it('close clears reconnected handlers', () => {
+    init();
+    let count = 0;
+    h.onReconnected(() => { count++; });
+    h.connect();
+    t._deliverMessage({ type: HUB_EVENTS.AUTH_OK, payload: null });
+
+    h.close();
+    // After close, a new connect + auth should not fire old handler
+    // (close clears all handlers)
+    t._setStatus('connected');
+    t._deliverMessage({ type: HUB_EVENTS.AUTH_OK, payload: null });
+    expect(count).toBe(0);
+  });
+});

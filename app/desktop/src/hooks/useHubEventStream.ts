@@ -22,6 +22,8 @@ import {
   type DesktopHubEventBridgeHandle,
 } from '@/stores/hubEventBridge';
 import { queryClient } from '@/api/queryClient';
+import { createHubClient } from '@/api/hubClient';
+import { getAccessToken } from '@/hooks/useAuth';
 import { hubQueryKeys } from '@shared/stores/queryKeys';
 
 // ── Public types ─────────────────────────────────
@@ -132,7 +134,12 @@ export function useHubEventStream(
             /* non-fatal */
           });
         if (!bridgeHandleRef.current) {
-          bridgeHandleRef.current = createDesktopHubEventBridge(handle, queryClient);
+          // #2101 G4-②: pass hubClient so the bridge can do incremental
+          // message resync on reconnect/gap instead of full invalidation.
+          const hubClientForResync = createHubClient({ getToken: getAccessToken });
+          bridgeHandleRef.current = createDesktopHubEventBridge(handle, queryClient, {
+            hubClient: hubClientForResync,
+          });
         }
       } else if (wsStatus === 'disconnected') {
         bridgeHandleRef.current?.destroy();

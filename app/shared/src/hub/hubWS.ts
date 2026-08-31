@@ -63,6 +63,14 @@ export interface HubWSGapPayload {
  */
 export const HUB_WS_GAP_EVENT = 'hub.ws.gap';
 
+/**
+ * Internal-only event name for post-reconnect auth completion. Synthesized
+ * client-side when auth.ok arrives on a connection that has previously been
+ * authenticated (i.e. a reconnect, not the first connect). Subscribe via
+ * HubWSHandle.onReconnected(). See #2101 G4-②.
+ */
+export const HUB_WS_RECONNECTED_EVENT = 'hub.ws.reconnected';
+
 export interface HubWSHandle {
   /** Open the WebSocket connection and initiate auth handshake. */
   connect: () => void;
@@ -80,6 +88,13 @@ export interface HubWSHandle {
    * (seq_id <= lastSeq) are dropped silently and do NOT trigger this.
    */
   onGap: (handler: (payload: HubWSGapPayload) => void) => () => void;
+  /**
+   * Subscribe to post-reconnect auth completion events (#2101 G4-②). Fires
+   * once per reconnect cycle when auth.ok arrives on a previously-connected
+   * socket. Does NOT fire on the initial connect. Use this to trigger
+   * incremental resync of message families missed during disconnect.
+   */
+  onReconnected: (handler: () => void) => () => void;
   /** Subscribe to transport-level connection status changes. */
   onStatus: (handler: (status: TransportStatus) => void) => () => void;
   /** Close the connection permanently (no reconnect). */
@@ -149,12 +164,17 @@ export function createHubWS(opts: HubWSOptions): HubWSHandle {
   const typedHandlers = new Map<string, Set<(payload: unknown) => void>>();
   const anyHandlers = new Set<(type: string, payload: unknown) => void>();
   const gapHandlers = new Set<(payload: HubWSGapPayload) => void>();
+  const reconnectedHandlers = new Set<() => void>();
 
   let authenticated = false;
   // Per-connection last observed seq_id. -1 means no seq-bearing frame yet on
   // this connection. Reset on every transport 'connected' transition because
   // the server-side seq counter is per-connection (conn.go:41-45).
   let lastSeq = -1;
+  // Tracks whether auth.ok has ever completed on this handle instance.
+  // Used to distinguish first-connect auth from reconnect-auth so
+  // onReconnected only fires on true reconnects (#2101 G4-②).
+  let hasEverAuthenticated = false;
 
   // ── Auth + seq reset on every (re)connect ───────
 
@@ -201,6 +221,19 @@ export function createHubWS(opts: HubWSOptions): HubWSHandle {
       if (seq !== null) {
         lastSeq = seq;
       }
+      // #2101 G4-②: fire reconnected notification on reconnect (not first connect).
+      // Platforms use this to trigger incremental message resync for frames
+      // missed during the disconnect window.
+      if (hasEverAuthenticated) {
+        for (const fn of reconnectedHandlers) {
+          try {
+            fn();
+          } catch (e) {
+            console.error('[HubWS] reconnected handler error:', e);
+          }
+        }
+      }
+      hasEverAuthenticated = true;
       opts.onAuthSuccess?.();
       return;
     }
@@ -309,6 +342,13 @@ export function createHubWS(opts: HubWSOptions): HubWSHandle {
       };
     },
 
+    onReconnected(handler: () => void): () => void {
+      reconnectedHandlers.add(handler);
+      return () => {
+        reconnectedHandlers.delete(handler);
+      };
+    },
+
     onStatus(handler: (status: TransportStatus) => void): () => void {
       return transport.on('status', handler);
     },
@@ -320,6 +360,7 @@ export function createHubWS(opts: HubWSOptions): HubWSHandle {
       typedHandlers.clear();
       anyHandlers.clear();
       gapHandlers.clear();
+    reconnectedHandlers.clear();
     },
 
     reconnect(): void {
