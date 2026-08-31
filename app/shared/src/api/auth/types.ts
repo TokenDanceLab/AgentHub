@@ -74,3 +74,42 @@ export class OidcError extends Error {
     if (detail) this.detail = detail;
   }
 }
+
+/**
+ * Backend OIDC error codes — SSOT mirror of the OIDC section in
+ * `hub-server/internal/errcode/codes.go` (#2123 P1-2).
+ *
+ * Contract: every code emitted by the Hub OIDC handlers must exist here,
+ * and every entry here must exist on the backend. CI enforces the mirror via
+ * `scripts/verify/verify-oidc-code-ssot.py`; adding an OIDC code on only one
+ * side fails the validate job.
+ */
+export const OidcBackendErrorCodes = {
+  invalidState: 'oidc_invalid_state',
+  codeExchangeFailed: 'oidc_code_exchange_failed',
+  idTokenInvalid: 'oidc_id_token_invalid',
+  subNotFound: 'oidc_sub_not_found',
+} as const;
+
+export type OidcBackendErrorCode =
+  (typeof OidcBackendErrorCodes)[keyof typeof OidcBackendErrorCodes];
+
+const oidcBackendCodeValues = new Set<string>(
+  Object.values(OidcBackendErrorCodes),
+);
+
+/** True when `value` is one of the backend OIDC error codes. */
+export function isOidcBackendErrorCode(value: unknown): value is OidcBackendErrorCode {
+  return typeof value === 'string' && oidcBackendCodeValues.has(value);
+}
+
+/**
+ * Single bridge table from backend OIDC codes to the frontend i18n suffix
+ * used by OidcError (`auth.error.oidc.<code>` locale keys).
+ */
+export const oidcBackendCodeToI18nCode: Record<OidcBackendErrorCode, string> = {
+  oidc_invalid_state: 'stateMismatch',
+  oidc_code_exchange_failed: 'tokenExchangeFailed',
+  oidc_id_token_invalid: 'tokenExchangeFailed',
+  oidc_sub_not_found: 'tokenExchangeFailed',
+};
