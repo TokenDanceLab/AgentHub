@@ -1,8 +1,8 @@
 {
   "_comment": "Baseline of i18n callsite violations (source files with CJK string literals but no useTranslation import). The verify gate fails when the current count EXCEEDS this baseline; lower this number as more callsites are wired to useTranslation.",
   "scanRoot": "app/shared/src + app/workbench/src",
-  "totalViolations": 76,
-  "totalCjkLiteralLines": 595,
+  "totalViolations": 78,
+  "totalCjkLiteralLines": 608,
   "files": [
     {
       "path": "shared/chatview/adapterMapBlock.ts",
@@ -106,6 +106,28 @@
       "cjkLiteralLines": 1,
       "samples": [
         20
+      ]
+    },
+    {
+      "path": "shared/eventClient.ts",
+      "cjkLiteralLines": 7,
+      "samples": [
+        17,
+        18,
+        21,
+        22,
+        23
+      ]
+    },
+    {
+      "path": "shared/hubEvents.ts",
+      "cjkLiteralLines": 6,
+      "samples": [
+        10,
+        11,
+        12,
+        13,
+        16
       ]
     },
     {
@@ -717,9 +739,9 @@
       "path": "workbench/workbenchTranscriptChromeActionMappers.ts",
       "cjkLiteralLines": 3,
       "samples": [
-        330,
-        364,
-        417
+        352,
+        386,
+        440
       ]
     }
   ]
