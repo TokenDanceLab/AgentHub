@@ -156,16 +156,14 @@ func shouldApplyTrackedClose(planned, found bool) bool {
 
 // structuredEmitterWrapPlan is the pure emitter-wrapper plan for publishStructuredOutput.
 type structuredEmitterWrapPlan struct {
-	ApplyBudget      bool
-	WrapDecisionLoop bool
+	ApplyBudget bool
 }
 
-// planStructuredEmitterWraps maps budget/decision-loop presence into wrap flags.
+// planStructuredEmitterWraps maps budget presence into wrap flags.
 // Actual Wrap construction stays in the executor.
-func planStructuredEmitterWraps(hasBudget, hasDecisionLoop bool) structuredEmitterWrapPlan {
+func planStructuredEmitterWraps(hasBudget bool) structuredEmitterWrapPlan {
 	return structuredEmitterWrapPlan{
-		ApplyBudget:      shouldApplyBudgetAwareEmitter(hasBudget),
-		WrapDecisionLoop: shouldWrapDecisionLoopEmitter(hasDecisionLoop),
+		ApplyBudget: shouldApplyBudgetAwareEmitter(hasBudget),
 	}
 }
 
@@ -175,12 +173,6 @@ func coalesceEmitter(current, next adapters.EventEmitter) adapters.EventEmitter 
 		return next
 	}
 	return current
-}
-
-// shouldWrapDecisionLoopEmitter reports whether the decision-loop factory should
-// wrap the structured-output emitter.
-func shouldWrapDecisionLoopEmitter(hasFactory bool) bool {
-	return hasFactory
 }
 
 // shouldFlushTranscriptEmitter reports whether a transcript emitter should flush
