@@ -408,6 +408,13 @@ def main() -> int:
     assert_contains(doc_ssot_step, r"scripts/verify/verify-doc-ssot\.py", "doc SSOT step must call scripts/verify/verify-doc-ssot.py")
     assert_step_continue_on_error(validate, "Verify doc SSOT", False)
 
+    oidc_ssot_step = get_step_block(validate, "Verify OIDC code SSOT (backend ↔ frontend)")
+    assert_contains(oidc_ssot_step, r"scripts/verify/verify-oidc-code-ssot\.py", "OIDC code SSOT step must call its verifier")
+    assert_step_continue_on_error(validate, "Verify OIDC code SSOT (backend ↔ frontend)", False)
+    oidc_ssot_self_test_step = get_step_block(validate, "Self-test OIDC code SSOT (negative)")
+    assert_contains(oidc_ssot_self_test_step, r"verify-oidc-code-ssot\.Tests\.py", "OIDC SSOT self-test step must call its test script")
+    assert_step_continue_on_error(validate, "Self-test OIDC code SSOT (negative)", False)
+
     doc_entrypoint_self_test_step = get_step_block(validate, "Self-test doc entrypoint SSOT")
     assert_contains(doc_entrypoint_self_test_step, r"scripts/verify/tests/verify-doc-entrypoints\.Tests\.py", "doc entrypoint self-test step must call its test script")
     assert_step_continue_on_error(validate, "Self-test doc entrypoint SSOT", False)

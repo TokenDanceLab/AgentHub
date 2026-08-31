@@ -394,6 +394,35 @@ describe('browser OIDC callback handling', () => {
     expect(err).toMatchObject({ code: 'tokenExchangeFailed', detail: 'hub down' });
     expect(ports.callbackChannel.leaveCallbackRoute).toHaveBeenCalled();
   });
+
+  it('maps backend OIDC codes through the SSOT bridge table (#2123 P1-2)', async () => {
+    const { ports } = createFakePorts();
+    ports.pendingStorage.save(makePending('state-1'));
+    pushBrowserCallback('code-1', 'state-1');
+
+    // Transport errors carry the Hub envelope code in AppError.code.
+    const client = createFakeClient({
+      oidcCallback: vi.fn().mockRejectedValue(
+        Object.assign(new Error('state expired'), { code: 'oidc_invalid_state' }),
+      ),
+    });
+    const { auth } = createAuth(ports, client);
+    const err = await auth.tryAutoLogin().catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(OidcError);
+    expect(err).toMatchObject({ code: 'stateMismatch' });
+
+    const { ports: ports2 } = createFakePorts();
+    ports2.pendingStorage.save(makePending('state-2'));
+    pushBrowserCallback('code-2', 'state-2');
+    const client2 = createFakeClient({
+      oidcCallback: vi.fn().mockRejectedValue(
+        Object.assign(new Error('no sub claim'), { code: 'oidc_sub_not_found' }),
+      ),
+    });
+    const { auth: auth2 } = createAuth(ports2, client2);
+    const err2 = await auth2.tryAutoLogin().catch((e: unknown) => e);
+    expect(err2).toMatchObject({ code: 'tokenExchangeFailed', detail: 'no sub claim' });
+  });
 });
 
 // ── loginWithTokenDance (local-callback-server mode) ─

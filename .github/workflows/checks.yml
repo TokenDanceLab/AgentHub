@@ -1943,6 +1943,12 @@ jobs:
       - name: Verify doc SSOT
         run: python scripts/verify/verify-doc-ssot.py
 
+      - name: Verify OIDC code SSOT (backend ↔ frontend)
+        run: python scripts/verify/verify-oidc-code-ssot.py
+
+      - name: Self-test OIDC code SSOT (negative)
+        run: python scripts/verify/tests/verify-oidc-code-ssot.Tests.py
+
       - name: Self-test doc entrypoint SSOT
         run: python scripts/verify/tests/verify-doc-entrypoints.Tests.py
 

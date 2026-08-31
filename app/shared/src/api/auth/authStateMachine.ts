@@ -16,7 +16,25 @@
 import type { HubClient } from '../../hub/hubClient';
 import { computeCodeChallenge, generateCodeVerifier } from './pkce';
 import type { HubClientFactory, HubAuthPorts } from './ports';
-import { OidcError } from './types';
+import {
+  isOidcBackendErrorCode,
+  oidcBackendCodeToI18nCode,
+  OidcError,
+} from './types';
+
+/**
+ * Builds an OidcError for an upstream exchange failure. When the thrown
+ * transport error carries a backend OIDC code (AppError.code from the Hub
+ * envelope), the single bridge table oidcBackendCodeToI18nCode maps it to the
+ * i18n suffix (#2123 P1-2); unknown shapes fall back to the generic code.
+ */
+function oidcErrorFromExchangeFailure(err: unknown, detail: string): OidcError {
+  const backendCode = (err as { code?: unknown } | null | undefined)?.code;
+  const code = isOidcBackendErrorCode(backendCode)
+    ? oidcBackendCodeToI18nCode[backendCode]
+    : 'tokenExchangeFailed';
+  return new OidcError(code, `Token exchange failed: ${detail}`, detail);
+}
 import type {
   BrowserOIDCPending,
   HubAuth,
@@ -204,7 +222,7 @@ export function createHubAuthCore(ports: HubAuthPorts, options: HubAuthCoreOptio
     } catch (err) {
       callbackChannel.leaveCallbackRoute();
       const detail = err instanceof Error ? err.message : 'Unknown error';
-      throw new OidcError('tokenExchangeFailed', `Token exchange failed: ${detail}`, detail);
+      throw oidcErrorFromExchangeFailure(err, detail);
     }
   }
 
@@ -292,7 +310,7 @@ export function createHubAuthCore(ports: HubAuthPorts, options: HubAuthCoreOptio
         );
       } catch (err) {
         const detail = err instanceof Error ? err.message : 'Unknown error';
-        const oidcErr = new OidcError('tokenExchangeFailed', `Token exchange failed: ${detail}`, detail);
+        const oidcErr = oidcErrorFromExchangeFailure(err, detail);
         oidcErr.cause = err;
         throw oidcErr;
       }
