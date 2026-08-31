@@ -462,9 +462,9 @@ func TestWebSocketManagerShutdownFullLifecycle(t *testing.T) {
 }
 
 func TestWSReadTimeoutConstant(t *testing.T) {
-	expected := 2 * 30 * time.Second
+	expected := 2*config.WSHeartbeatInterval + config.WSPingTimeout
 	if WSReadTimeout != expected {
-		t.Fatalf("WSReadTimeout = %v, want %v (2x 30s heartbeat)", WSReadTimeout, expected)
+		t.Fatalf("WSReadTimeout = %v, want %v (2x heartbeat + ping timeout)", WSReadTimeout, expected)
 	}
 }
 
