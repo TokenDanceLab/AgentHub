@@ -3,6 +3,7 @@ package config
 import (
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"slices"
 	"strings"
@@ -181,5 +182,55 @@ func (c *Config) validateTokenDanceID() error {
 			return errors.New("tokendance_id.client_secret must be a strong, non-default value; the seed SQL default and documented dev placeholders are rejected")
 		}
 	}
+	return nil
+}
+
+// isProductionEnv reports whether the given server.env value denotes a
+// production deployment. The comparison is case-insensitive and tolerates
+// surrounding whitespace so operators cannot accidentally bypass the guard
+// with "Production" or " prod ". Empty string is NOT production — that is
+// the unset/dev default and must remain zero-friction.
+func isProductionEnv(env string) bool {
+	switch strings.ToLower(strings.TrimSpace(env)) {
+	case "production", "prod", "release":
+		return true
+	}
+	return false
+}
+
+// validateProdGuard enforces #2124 P1 scheme-b hardening: when running in
+// production (server.env ∈ {production, prod, release}), safety-critical
+// settings MUST be explicitly configured. Dev/test environments are
+// unaffected so local development stays zero-friction.
+//
+// Checks:
+//  1. AGENTHUB_AUTH_FAIL_CLOSED must be explicitly set (any value). Without
+//     it the auth middleware fails open on Redis errors, letting revoked JWTs
+//     back in after logout.
+//  2. db.sslmode must not be "disable". Plaintext DB traffic in production
+//     exposes credentials and query data to network observers.
+//  3. Rate-limit fail-open is warned (not rejected) because blocking startup
+//     on this knob has historically caused unnecessary outages; the warning
+//     makes the risk visible in production logs.
+func (c *Config) validateProdGuard() error {
+	if !isProductionEnv(c.Server.Env) {
+		return nil
+	}
+
+	// 1. AUTH_FAIL_CLOSED must be explicitly set.
+	if _, ok := os.LookupEnv("AGENTHUB_AUTH_FAIL_CLOSED"); !ok {
+		return errors.New("production environment requires AGENTHUB_AUTH_FAIL_CLOSED to be explicitly set (true recommended); without it, auth fails open on Redis errors and revoked JWTs may be accepted — set AGENTHUB_AUTH_FAIL_CLOSED=true to harden")
+	}
+
+	// 2. db.sslmode must not be disable.
+	if strings.ToLower(strings.TrimSpace(c.DB.SSLMode)) == "disable" {
+		return errors.New("production environment forbids db.sslmode=disable; use require, verify-ca, or verify-full to encrypt database traffic")
+	}
+
+	// 3. Rate-limit fail-open: warn but do not block.
+	if RateLimitFailOpen() {
+		slog.Warn("production environment: rate limiter is fail-open (AGENTHUB_RATE_LIMIT_FAIL_OPEN defaults to true); non-auth API requests will be allowed through during Redis outages — set AGENTHUB_RATE_LIMIT_FAIL_OPEN=false to fail closed")
+	}
+
 	return nil
 }

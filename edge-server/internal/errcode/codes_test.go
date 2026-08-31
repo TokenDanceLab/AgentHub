@@ -103,7 +103,7 @@ func TestDomainErrorCodes(t *testing.T) {
 
 		// Agent discovery
 		{ErrInvalidAgentID, "invalid_agent_id", "unknown agent adapter", http.StatusBadRequest},
-		{ErrAgentRegistryNotConfigured, "agent_registry_not_configured", "agent registry not configured", http.StatusNotFound},
+		{ErrAgentRegistryNotConfigured, "agent_registry_not_configured", "agent registry not configured", http.StatusServiceUnavailable},
 		{ErrAgentInstanceNotFound, "agent_instance_not_found", "agent instance not found", http.StatusNotFound},
 
 		// Permissions
