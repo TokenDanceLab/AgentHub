@@ -23,7 +23,7 @@ type mockMessageService struct {
 	listPinsFn       func(ctx context.Context, userID, sessionID string) ([]message.MessageResponse, error)
 	forwardFn        func(ctx context.Context, userID, msgID string, targetSessionIDs []string) error
 	markReadFn       func(ctx context.Context, userID, sessionID string, lastReadSeq int64) error
-	searchFn         func(ctx context.Context, userID, q, sessionID, contentType, from, to string) ([]message.MessageResponse, error)
+	searchFn         func(ctx context.Context, userID, q, sessionID, contentType, from, to, cursor string, pageSize int) (*message.MessageSearchPage, error)
 	editFn           func(ctx context.Context, msgID, userID string, req message.EditMessageRequest) (*message.EditMessageResponse, error)
 	addReactionFn    func(ctx context.Context, userID, sessionID, msgID, reaction string) (*messagereaction.MessageReactionResponse, error)
 	removeReactionFn func(ctx context.Context, userID, sessionID, msgID, reaction string) (*messagereaction.MessageReactionResponse, error)
@@ -57,8 +57,8 @@ func (m *mockMessageService) ForwardMessage(ctx context.Context, userID, msgID s
 func (m *mockMessageService) MarkRead(ctx context.Context, userID, sessionID string, lastReadSeq int64) error {
 	return m.markReadFn(ctx, userID, sessionID, lastReadSeq)
 }
-func (m *mockMessageService) SearchMessages(ctx context.Context, userID, q, sessionID, contentType, from, to string) ([]message.MessageResponse, error) {
-	return m.searchFn(ctx, userID, q, sessionID, contentType, from, to)
+func (m *mockMessageService) SearchMessages(ctx context.Context, userID, q, sessionID, contentType, from, to, cursor string, pageSize int) (*message.MessageSearchPage, error) {
+	return m.searchFn(ctx, userID, q, sessionID, contentType, from, to, cursor, pageSize)
 }
 func (m *mockMessageService) EditMessage(ctx context.Context, msgID, userID string, req message.EditMessageRequest) (*message.EditMessageResponse, error) {
 	return m.editFn(ctx, msgID, userID, req)
@@ -461,8 +461,8 @@ func TestMessageHandler_MarkRead_BadRequest(t *testing.T) {
 
 func TestMessageHandler_SearchMessages_Success(t *testing.T) {
 	svc := &mockMessageService{
-		searchFn: func(ctx context.Context, userID, q, sessionID, contentType, from, to string) ([]message.MessageResponse, error) {
-			return []message.MessageResponse{}, nil
+		searchFn: func(ctx context.Context, userID, q, sessionID, contentType, from, to, cursor string, pageSize int) (*message.MessageSearchPage, error) {
+			return &message.MessageSearchPage{}, nil
 		},
 	}
 	h := handler.NewMessageHandler(svc)
@@ -492,10 +492,10 @@ func TestMessageHandler_SearchMessages_EmptyQuery(t *testing.T) {
 
 func TestMessageHandler_SearchSessionMessages_Success(t *testing.T) {
 	svc := &mockMessageService{
-		searchFn: func(ctx context.Context, userID, q, sessionID, contentType, from, to string) ([]message.MessageResponse, error) {
-			return []message.MessageResponse{
+		searchFn: func(ctx context.Context, userID, q, sessionID, contentType, from, to, cursor string, pageSize int) (*message.MessageSearchPage, error) {
+			return &message.MessageSearchPage{Items: []message.MessageResponse{
 				{ID: "m1", SessionID: sessionID, ContentType: "text", Content: "hello"},
-			}, nil
+			}}, nil
 		},
 	}
 	h := handler.NewMessageHandler(svc)
@@ -525,7 +525,7 @@ func TestMessageHandler_SearchSessionMessages_EmptyQuery(t *testing.T) {
 
 func TestMessageHandler_SearchMessages_WithFilters(t *testing.T) {
 	svc := &mockMessageService{
-		searchFn: func(ctx context.Context, userID, q, sessionID, contentType, from, to string) ([]message.MessageResponse, error) {
+		searchFn: func(ctx context.Context, userID, q, sessionID, contentType, from, to, cursor string, pageSize int) (*message.MessageSearchPage, error) {
 			if contentType != "image" {
 				t.Errorf("expected content_type=image, got %s", contentType)
 			}
@@ -535,7 +535,7 @@ func TestMessageHandler_SearchMessages_WithFilters(t *testing.T) {
 			if to != "2026-06-01" {
 				t.Errorf("expected to=2026-06-01, got %s", to)
 			}
-			return []message.MessageResponse{}, nil
+			return &message.MessageSearchPage{}, nil
 		},
 	}
 	h := handler.NewMessageHandler(svc)
@@ -551,11 +551,11 @@ func TestMessageHandler_SearchMessages_WithFilters(t *testing.T) {
 
 func TestMessageHandler_SearchSessionMessages_WithFilters(t *testing.T) {
 	svc := &mockMessageService{
-		searchFn: func(ctx context.Context, userID, q, sessionID, contentType, from, to string) ([]message.MessageResponse, error) {
+		searchFn: func(ctx context.Context, userID, q, sessionID, contentType, from, to, cursor string, pageSize int) (*message.MessageSearchPage, error) {
 			if sessionID != "s1" {
 				t.Errorf("expected sessionID=s1, got %s", sessionID)
 			}
-			return []message.MessageResponse{}, nil
+			return &message.MessageSearchPage{}, nil
 		},
 	}
 	h := handler.NewMessageHandler(svc)

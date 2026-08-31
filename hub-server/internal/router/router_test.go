@@ -173,7 +173,7 @@ func (routerMessageServiceStub) ForwardMessage(ctx context.Context, userID, msgI
 func (routerMessageServiceStub) MarkRead(ctx context.Context, userID, sessionID string, lastReadSeq int64) error {
 	return nil
 }
-func (routerMessageServiceStub) SearchMessages(ctx context.Context, userID, q, sessionID, contentType, from, to string) ([]message.MessageResponse, error) {
+func (routerMessageServiceStub) SearchMessages(ctx context.Context, userID, q, sessionID, contentType, from, to, cursor string, pageSize int) (*message.MessageSearchPage, error) {
 	return nil, nil
 }
 func (routerMessageServiceStub) AddMessageReaction(ctx context.Context, userID, sessionID, msgID, reaction string) (*messagereaction.MessageReactionResponse, error) {

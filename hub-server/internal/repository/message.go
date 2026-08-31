@@ -3,6 +3,7 @@ package repository
 import (
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -196,7 +197,14 @@ func sqliteMessageTextExpression(tableAlias string) string {
 	return "json_extract(" + tableAlias + ".content, '$.text')"
 }
 
-func SearchMessages(db *gorm.DB, q, sessionID, contentType, from, to string) ([]model.Message, error) {
+// SearchMessages returns a page of messages matching q within sessionID,
+// ordered by seq_id DESC (id DESC as the tie-break so keyset pagination is
+// stable). cursor encodes "<seq>|<id>" from the previous page's last row;
+// pageSize is clamped by the caller. Malformed/legacy cursors are treated as
+// a fresh first page (same convention as the market profiles cursor).
+// Returns (messages, hasMore): the caller asks for pageSize+1 rows and trims
+// when hasMore is true.
+func SearchMessages(db *gorm.DB, q, sessionID, contentType, from, to, cursor string, pageSize int) ([]model.Message, bool, error) {
 	var msgs []model.Message
 	searchCondition, searchArgs := messageSearchCondition(db, "", q)
 	query := db.Where("session_id = ?", sessionID).
@@ -211,8 +219,20 @@ func SearchMessages(db *gorm.DB, q, sessionID, contentType, from, to string) ([]
 	if to != "" {
 		query = query.Where("created_at <= ?", to)
 	}
-	err := query.Order("seq_id DESC").Limit(config.MaxMessagePageLimit).Find(&msgs).Error
-	return msgs, err
+	if parts := strings.SplitN(cursor, "|", 2); len(parts) == 2 {
+		if seq, err := strconv.ParseInt(parts[0], 10, 64); err == nil {
+			query = query.Where("(seq_id < ? OR (seq_id = ? AND id < ?))", seq, seq, parts[1])
+		}
+	}
+	query = query.Order("seq_id DESC, id DESC")
+	if err := query.Limit(pageSize + 1).Find(&msgs).Error; err != nil {
+		return nil, false, err
+	}
+	hasMore := len(msgs) > pageSize
+	if hasMore {
+		msgs = msgs[:pageSize]
+	}
+	return msgs, hasMore, nil
 }
 
 // SearchAllMessages searches messages across all sessions where the given user is
@@ -224,7 +244,12 @@ func SearchMessages(db *gorm.DB, q, sessionID, contentType, from, to string) ([]
 // a hardcoded trusted literal from within this function, never from user input.
 // User-provided values (q, contentType, from, to) are always passed as
 // parameterized placeholders (?) and never interpolated into the SQL string.
-func SearchAllMessages(db *gorm.DB, userID, q, contentType, from, to string) ([]model.Message, error) {
+// SearchAllMessages returns a page of messages matching q across every session
+// where the given user is an active member, ordered by created_at DESC
+// (id DESC tie-break). cursor encodes "<createdAtUnixNano>|<id>" from the
+// previous page's last row; a malformed/legacy cursor starts a fresh page.
+// Returns (messages, hasMore) with the pageSize+1 probing convention.
+func SearchAllMessages(db *gorm.DB, userID, q, contentType, from, to, cursor string, pageSize int) ([]model.Message, bool, error) {
 	var msgs []model.Message
 	searchCondition, searchArgs := messageSearchCondition(db, "m", q)
 
@@ -240,7 +265,6 @@ func SearchAllMessages(db *gorm.DB, userID, q, contentType, from, to string) ([]
 	if to != "" {
 		args = append(args, to)
 	}
-	args = append(args, config.MaxMessagePageLimit)
 
 	sql := fmt.Sprintf(
 		`SELECT m.* FROM messages m
@@ -260,8 +284,22 @@ func SearchAllMessages(db *gorm.DB, userID, q, contentType, from, to string) ([]
 	if to != "" {
 		sql += " AND m.created_at <= ?"
 	}
-	sql += " ORDER BY m.created_at DESC LIMIT ?"
+	if parts := strings.SplitN(cursor, "|", 2); len(parts) == 2 {
+		if nanos, err := strconv.ParseInt(parts[0], 10, 64); err == nil {
+			cursorTime := time.Unix(0, nanos)
+			args = append(args, cursorTime, cursorTime, parts[1])
+			sql += " AND (m.created_at < ? OR (m.created_at = ? AND m.id < ?))"
+		}
+	}
+	args = append(args, pageSize+1)
+	sql += " ORDER BY m.created_at DESC, m.id DESC LIMIT ?"
 
-	err := db.Raw(sql, args...).Scan(&msgs).Error
-	return msgs, err
+	if err := db.Raw(sql, args...).Scan(&msgs).Error; err != nil {
+		return nil, false, err
+	}
+	hasMore := len(msgs) > pageSize
+	if hasMore {
+		msgs = msgs[:pageSize]
+	}
+	return msgs, hasMore, nil
 }

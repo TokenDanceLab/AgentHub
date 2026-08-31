@@ -11,12 +11,36 @@ import (
 	"github.com/agenthub/hub-server/internal/repository"
 )
 
-func (s *Service) SearchSessions(ctx context.Context, userID, q string) ([]SessionListItem, error) {
-	sessions, err := repository.SearchSessions(s.db, userID, q)
+// SessionSearchPage is one page of session-search results (#2136 P2). The
+// cursor encodes "<activityUnixNano>|<id>" of the last row's activity
+// timestamp (last_message_at, falling back to created_at).
+type SessionSearchPage struct {
+	Items      []SessionListItem `json:"items"`
+	NextCursor string            `json:"nextCursor"`
+	HasMore    bool              `json:"hasMore"`
+}
+
+// SearchSessions searches sessions the user belongs to by name, ordered by
+// most recent activity. cursor is the opaque nextCursor of a previous page;
+// empty starts from the first page.
+func (s *Service) SearchSessions(ctx context.Context, userID, q, cursor string, pageSize int) (*SessionSearchPage, error) {
+	sessions, hasMore, err := repository.SearchSessions(s.db, userID, q, cursor, pageSize)
 	if err != nil {
 		return nil, err
 	}
-	return MapSessionListItems(sessions), nil
+	page := &SessionSearchPage{
+		Items:   MapSessionListItems(sessions),
+		HasMore: hasMore,
+	}
+	if hasMore && len(sessions) > 0 {
+		last := sessions[len(sessions)-1]
+		activity := last.CreatedAt
+		if last.LastMessageAt != nil {
+			activity = *last.LastMessageAt
+		}
+		page.NextCursor = fmt.Sprintf("%d|%s", activity.UnixNano(), last.ID)
+	}
+	return page, nil
 }
 
 // ListActiveMembers returns all active (non-left) members of a session. Thin wrapper over repository.ListActiveMembers.
