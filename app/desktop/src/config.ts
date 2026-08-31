@@ -80,11 +80,17 @@ function envOrDev(key: string, devDefault: string): string {
   return devDefault;
 }
 
-export const HUB_URL = envOrDev('VITE_HUB_URL', 'https://api.hub.vectorcontrol.tech');
-export const HUB_WS_URL = envOrDev('VITE_HUB_WS_URL', 'wss://api.hub.vectorcontrol.tech/client/ws');
+// Dev defaults point at the local dev stack, matching web/src/config.ts;
+// production deployments must set VITE_HUB_URL / VITE_HUB_WS_URL explicitly.
+export const HUB_URL = envOrDev('VITE_HUB_URL', 'http://127.0.0.1:8080');
+export const HUB_WS_URL = envOrDev('VITE_HUB_WS_URL', 'ws://127.0.0.1:8080/client/ws');
 export const TOKENDANCE_LOGIN_URL = import.meta.env.VITE_TOKENDANCE_LOGIN_URL || '';
 
 export const HEALTH_POLL_MS = 30_000;
 export const RUNNERS_POLL_MS = 30_000;
 export const EVENT_LOG_MAX = 1000;
-export const APP_VERSION = '0.4.1';
+// Injected at build time from desktop/package.json (vite define); the
+// fallback keeps vitest (no define) working and matches the current version.
+declare const __APP_VERSION__: string | undefined;
+export const APP_VERSION =
+  typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '0.6.1';

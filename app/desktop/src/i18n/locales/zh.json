@@ -78,7 +78,7 @@
   "auth.error.oidc.startFailed": "无法启动 OIDC 登录: {{detail}}",
   "auth.error.oidc.stateMismatch": "OIDC state 不匹配——可能存在 CSRF 攻击，请重试。",
   "auth.error.oidc.timeout": "登录超时——5 分钟内未收到回调。",
-  "auth.error.oidc.tokenExchangeFailed": "Token 交换失败: {{detail}}",
+  "auth.error.oidc.tokenExchangeFailed": "令牌交换失败，请重新发起登录。",
   "auth.error.oidc.unknownError": "OIDC 登录错误。",
   "auth.error.passwordMin": "密码至少需要 8 个字符",
   "auth.error.passwordMismatch": "两次输入的密码不一致",

@@ -97,7 +97,7 @@ pub async fn get_edge_auth_token(state: State<'_, SharedEdgeManager>) -> Result<
 fn build_local_cli_discovery() -> LocalCliDiscoveryManifest {
     LocalCliDiscoveryManifest {
         mode: "no-spend-discovery".to_string(),
-        readiness_manifest: "docs/audit/p0-edge-cli-real-readiness.md".to_string(),
+        readiness_manifest: "docs/governance/README.md".to_string(),
         readiness_script: "scripts/verify/verify-edge-cli-real-readiness.py".to_string(),
         generated_at: None,
         items: vec![
@@ -319,7 +319,7 @@ mod tests {
         assert_eq!(manifest.mode, "no-spend-discovery");
         assert_eq!(
             manifest.readiness_manifest,
-            "docs/audit/p0-edge-cli-real-readiness.md"
+            "docs/governance/README.md"
         );
         assert_eq!(
             manifest.readiness_script,
