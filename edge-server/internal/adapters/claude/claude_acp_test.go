@@ -294,7 +294,7 @@ func TestClaudeACPAdapterVersionPin(t *testing.T) {
 // fails before spawn.
 func TestClaudeACPAdapterPreflightFailsFast(t *testing.T) {
 	a := &ACPAdapter{
-		AcpAdapter: acp.NewAcpAdapterWithID(claudeACPAdapterID, "", nil, "Claude Code (ACP)"),
+		AcpAdapter: acp.NewAcpAdapterConfig(acp.AcpAdapterConfig{ID: claudeACPAdapterID, DisplayName: "Claude Code (ACP)"}),
 	}
 	if a.Available() {
 		t.Fatal("empty binary must not be available")
@@ -331,7 +331,7 @@ func TestClaudeACPAdapterRegistryRegistration(t *testing.T) {
 	if _, ok := reg.Get("acp"); ok {
 		t.Error("generic acp adapter unexpectedly registered")
 	}
-	if err := reg.Register(acp.NewAcpAdapter("fake-agent", nil, "Fake")); err != nil {
+	if err := reg.Register(acp.NewAcpAdapterConfig(acp.AcpAdapterConfig{ID: "acp", Binary: "fake-agent", DisplayName: "Fake"})); err != nil {
 		t.Errorf("generic acp registration should coexist with claude-acp: %v", err)
 	}
 	if !containsString(reg.ListIDs(), "claude-acp") {

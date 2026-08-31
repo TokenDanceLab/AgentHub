@@ -1214,7 +1214,7 @@ func TestAcpBinaryAvailable(t *testing.T) {
 // non-empty metadata（#1760 acp 增量：随 acp 家族从根包
 // TestAdapterMetadataIsNotEmpty 迁入，逻辑未改）。
 func TestAcpAdapterMetadataIsNotEmpty(t *testing.T) {
-	metadata := NewAcpAdapter("acp", nil, "ACP experimental").Metadata()
+	metadata := NewAcpAdapterConfig(AcpAdapterConfig{ID: "acp", Binary: "acp", DisplayName: "ACP experimental"}).Metadata()
 	if metadata.ID == "" {
 		t.Fatal("ACP adapter ID is empty")
 	}
