@@ -316,6 +316,18 @@ func (b *Bus) AddObserver(fn func(EventEnvelope)) func() {
 // Subscribe registers a new subscriber. If cursor is non-zero, all
 // events with seq > cursor are replayed before the channel is returned.
 func (b *Bus) Subscribe(cursor int64) (int64, <-chan EventEnvelope, []EventEnvelope) {
+	// Read the on-disk gap-filler BEFORE taking b.mu. ReadFrom does file I/O
+	// + per-line unmarshal (a reconnect with an old cursor can replay tens of
+	// MiB); holding b.mu across it would stall every Publish fanout for the
+	// whole replay duration (#2154 perf-lane F15). The event log pointer is
+	// fixed at construction, so this is race-free.
+	var logEvents []EventEnvelope
+	var logHasGap bool
+	logRead := b.eventLog != nil && cursor > 0
+	if logRead {
+		logEvents, logHasGap = b.eventLog.ReadFrom(cursor)
+	}
+
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
@@ -338,37 +350,52 @@ func (b *Bus) Subscribe(cursor int64) (int64, <-chan EventEnvelope, []EventEnvel
 	// oldest surviving log event, a GapPayload is injected so the subscriber
 	// knows events were lost to truncation and must resync.
 	replay, seenSeqs := b.replayFromHistory(cursor)
-	if b.eventLog != nil && cursor > 0 {
-		logEvents, hasGap := b.eventLog.ReadFrom(cursor)
-		if hasGap {
-			replay = append(replay, EventEnvelope{
-				Version: "v1",
-				ID:      genID("gap"),
-				Seq:     0,
-				Type:    GapEventType,
-				Scope:   map[string]any{},
-				SentAt:  time.Now().UTC().Format(time.RFC3339),
-				Payload: &GapPayload{
-					FirstDroppedSeq: cursor,
-					LastDroppedSeq:  0,
-					DroppedCount:    0,
-				},
-			})
-		}
-		for _, evt := range logEvents {
-			if evt.Seq >= cursor && !seenSeqs[evt.Seq] {
-				replay = append(replay, evt)
-				seenSeqs[evt.Seq] = true
-			}
-		}
-		// Merge-order: sort the combined slice by seq so the subscriber sees a
-		// monotonic replay regardless of source ordering. The gap event (seq=0)
-		// sorts to the front, ahead of any real events, so the subscriber
-		// resyncs before processing replayed events.
-		sort.Slice(replay, func(i, j int) bool { return replay[i].Seq < replay[j].Seq })
+	if logRead {
+		replay = mergeReplayWithLog(replay, seenSeqs, logEvents, logHasGap, cursor)
 	}
 
 	return id, ch, replay
+}
+
+// mergeReplayWithLog merges on-disk log events into the in-memory replay.
+// History takes priority (seenSeqs dedup, freshest copy wins); a gap payload
+// (seq=0) is injected when the cursor predates the oldest surviving log event.
+// Pure function extracted from Subscribe so the replay contract is unit-tested
+// independently of the lock reordering (#2154 perf-lane F15).
+func mergeReplayWithLog(
+	replay []EventEnvelope,
+	seenSeqs map[int64]bool,
+	logEvents []EventEnvelope,
+	hasGap bool,
+	cursor int64,
+) []EventEnvelope {
+	if hasGap {
+		replay = append(replay, EventEnvelope{
+			Version: "v1",
+			ID:      genID("gap"),
+			Seq:     0,
+			Type:    GapEventType,
+			Scope:   map[string]any{},
+			SentAt:  time.Now().UTC().Format(time.RFC3339),
+			Payload: &GapPayload{
+				FirstDroppedSeq: cursor,
+				LastDroppedSeq:  0,
+				DroppedCount:    0,
+			},
+		})
+	}
+	for _, evt := range logEvents {
+		if evt.Seq >= cursor && !seenSeqs[evt.Seq] {
+			replay = append(replay, evt)
+			seenSeqs[evt.Seq] = true
+		}
+	}
+	// Merge-order: sort the combined slice by seq so the subscriber sees a
+	// monotonic replay regardless of source ordering. The gap event (seq=0)
+	// sorts to the front, ahead of any real events, so the subscriber
+	// resyncs before processing replayed events.
+	sort.Slice(replay, func(i, j int) bool { return replay[i].Seq < replay[j].Seq })
+	return replay
 }
 
 // replayFromHistory returns the in-memory history slice filtered to seq >=
