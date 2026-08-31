@@ -94,6 +94,9 @@ var (
 	WsAuthTimeout = New("ws_auth_timeout", "ws authentication timeout", http.StatusUnauthorized)
 	WsAuthFailed  = New("ws_auth_failed", "ws authentication failed", http.StatusUnauthorized)
 
+	// OIDC 错误码与前端 SSOT 同步（#2123 P1-2）：本节每增删一个 oidc_* code，
+	// 必须同步 app/shared/src/api/auth/types.ts 的 OidcBackendErrorCodes；
+	// CI `scripts/verify/verify-oidc-code-ssot.py` 校验两侧集合一致。
 	OIDCInvalidState       = New("oidc_invalid_state", "state is invalid or expired", http.StatusBadRequest)
 	OIDCCodeExchangeFailed = New("oidc_code_exchange_failed", "failed to exchange authorization code", http.StatusBadRequest)
 	OIDCIDTokenInvalid     = New("oidc_id_token_invalid", "id token validation failed", http.StatusBadRequest)
