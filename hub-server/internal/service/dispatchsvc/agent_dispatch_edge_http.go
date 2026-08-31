@@ -105,7 +105,7 @@ func (s *DispatchService) dispatchToEdgeHTTP(ctx context.Context, task *model.Pe
 	respBody, _ := io.ReadAll(io.LimitReader(resp.Body, dispatch.EdgeHTTPResponseBodyLimit))
 	plan := dispatch.PlanEdgeHTTPClientResponse(resp.StatusCode, respBody)
 	if plan.NonSuccess {
-		slog.Warn(plan.LogMessage, "task_id", task.ID, "status", resp.StatusCode, "body", string(respBody))
+		slog.Warn(plan.LogMessage, "task_id", task.ID, "status", resp.StatusCode, "body_summary", SummarizeBodyForLog(respBody))
 		if metrics.AgentDispatchEdgeHTTPFailures != nil {
 			metrics.AgentDispatchEdgeHTTPFailures.WithLabelValues("non_success").Inc()
 		}

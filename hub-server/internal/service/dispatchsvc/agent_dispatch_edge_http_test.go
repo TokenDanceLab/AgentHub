@@ -6,9 +6,12 @@ package dispatchsvc
 // shorter than the configured client timeout.
 
 import (
+	"bytes"
 	"context"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -99,4 +102,46 @@ func TestDispatchToEdgeHTTP_CallerDeadlineCancels(t *testing.T) {
 	assert.Equal(t, "", runID, "cancelled request must not dispatch")
 	require.Less(t, elapsed, 9*time.Second,
 		"caller deadline must win over the 10s client timeout (took %v)", elapsed)
+}
+
+// TestDispatchToEdgeHTTP_NonSuccessLogUsesSummaryNotRawBody pins the #2120
+// slice-1 security contract: when Edge returns a non-success status, the warn
+// log must contain a body_summary field (length + sanitized prefix) and must
+// NOT contain the raw response body as a string value. A long, unique sentinel
+// embedded in the response proves the raw text does not leak through slog.
+func TestDispatchToEdgeHTTP_NonSuccessLogUsesSummaryNotRawBody(t *testing.T) {
+	const sentinel = "UNIQUE-SENTINEL-DO-NOT-LOG-9f3b8a2e7c1d"
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusBadRequest)
+		// Body is well past the summary prefix cap so the sentinel cannot
+		// appear even accidentally via prefix leakage.
+		_, _ = w.Write([]byte(strings.Repeat("x", defaultBodySummaryPrefixBytes+64) + sentinel))
+	}))
+	defer srv.Close()
+
+	var logBuf bytes.Buffer
+	prev := slog.Default()
+	slog.SetDefault(slog.New(slog.NewJSONHandler(&logBuf, &slog.HandlerOptions{Level: slog.LevelDebug})))
+	t.Cleanup(func() { slog.SetDefault(prev) })
+
+	ds := NewDispatchService(nil, nil, nil, nil, nil, nil, config.EdgeDispatchConfig{
+		URL:     srv.URL,
+		Timeout: 5 * time.Second,
+	}, outboundhttp.NewClient(5*time.Second), "")
+
+	task := &model.PendingAgentTask{ID: "task-log", AgentInstanceID: "ai-log"}
+	dp := dispatchPayload{
+		TaskID: "task-log", AgentInstanceID: "ai-log", AgentType: "codex",
+		SessionID: "sess-log", TriggerMessageID: "msg-log", TriggerUserID: "user-log",
+		Prompt: "hello", DisplayName: "agent",
+	}
+	runID := ds.dispatchToEdgeHTTP(context.Background(), task, &dp)
+
+	assert.Equal(t, "", runID, "non-success dispatch must return empty run id")
+	logged := logBuf.String()
+	assert.Contains(t, logged, `"body_summary":"len=`)
+	assert.NotContains(t, logged, sentinel,
+		"raw body sentinel must not appear in logs (leak surface)")
+	// Also ensure we did not accidentally keep the old "body" key with raw text.
+	assert.NotContains(t, logged, `,"body":"`)
 }
