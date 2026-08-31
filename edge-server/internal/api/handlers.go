@@ -13,6 +13,7 @@ import (
 	"github.com/agenthub/edge-server/internal/adapters/orchestrator"
 	"github.com/agenthub/edge-server/internal/agents"
 	"github.com/agenthub/edge-server/internal/ccswitch"
+	"github.com/agenthub/edge-server/internal/deliverydedup"
 	"github.com/agenthub/edge-server/internal/errcode"
 	"github.com/agenthub/edge-server/internal/events"
 	"github.com/agenthub/edge-server/internal/hub"
@@ -54,6 +55,11 @@ type Handler struct {
 	CallbackClient interface {
 		DurableSnapshot(afterSeq uint64) ([]hub.DeliveryJournalEntry, error)
 	}
+
+	// DeliveryDedup is the in-process delivery_id dedup cache that closes
+	// #2101 G2 (Hub outbox redispatch + WS PushToConn dual-channel). Nil
+	// disables dedup (legacy/test behavior).
+	DeliveryDedup *deliverydedup.Deduper
 
 	PermissionRegistry *permission.PermissionRegistry
 	PermissionBroker   *adapters.PermissionDecisionBroker
