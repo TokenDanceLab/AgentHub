@@ -337,10 +337,10 @@ async function main() {
   console.log(`Android emulator base URL: http://10.0.2.2:${actualPort}`);
   // /v1/mobile/snapshot is the mobile preview snapshot producer consumed by
   // the preview lane (src/App.tsx → src/api/hubClient.ts getPreviewSnapshot).
-  // /v1/threads and /v1/events are legacy mock-only routes (no producer in
-  // hub-server, see #1422); real Hub routes are /client/sessions + /client/ws.
-  console.log('REST: GET /health, GET /v1/mobile/snapshot, GET /v1/threads, GET /client/sessions, GET /client/contacts');
-  console.log('WS:   GET /v1/events, GET /client/ws');
+  // /v1/threads + /v1/events were legacy mock-only routes with no consumer and
+  // no hub-server producer (#1422); real Hub routes are /client/sessions + /client/ws.
+  console.log('REST: GET /health, GET /v1/mobile/snapshot, GET /client/sessions, GET /client/contacts');
+  console.log('WS:   GET /client/ws');
 }
 
 function handleRequest(request, response) {
@@ -365,11 +365,6 @@ function handleRequest(request, response) {
 
   if (request.method === 'GET' && url.pathname === '/v1/mobile/snapshot') {
     writeJson(response, 200, snapshot);
-    return;
-  }
-
-  if (request.method === 'GET' && url.pathname === '/v1/threads') {
-    writeJson(response, 200, { threads: snapshot.threads });
     return;
   }
 
@@ -400,7 +395,7 @@ function handleRequest(request, response) {
 function handleUpgrade(request, socket) {
   const url = new URL(request.url ?? '/', `http://${request.headers.host ?? `${host}:${requestedPort}`}`);
 
-  if (url.pathname !== '/v1/events' && url.pathname !== '/client/ws') {
+  if (url.pathname !== '/client/ws') {
     socket.destroy();
     return;
   }
