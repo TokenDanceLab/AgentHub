@@ -115,12 +115,13 @@ func TestRefreshToken_Success(t *testing.T) {
 		WithArgs(true, "user-uuid", "dev-1").
 		WillReturnResult(sqlmock.NewResult(0, 1))
 
-	// UpsertRefreshToken: lookup then create new
+	// UpsertRefreshToken: atomic upsert + re-fetch
+	mock.ExpectExec(sqlInsertRT).
+		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectQuery(sqlRTByUserDevice).
 		WithArgs("user-uuid", "desktop", "dev-1", 1).
-		WillReturnError(gorm.ErrRecordNotFound)
-	mock.ExpectExec(sqlInsertRT).
-		WillReturnResult(sqlmock.NewResult(2, 1))
+		WillReturnRows(sqlmock.NewRows([]string{"id", "user_id", "device_type", "device_id", "token_hash", "revoked", "expires_at"}).
+			AddRow("rt-new", "user-uuid", "desktop", "dev-1", "newhash", false, expiry))
 
 	svc := NewService(db, jwtCfg(), nil)
 	resp, err := svc.RefreshToken(context.Background(), "valid-refresh-token")
@@ -148,11 +149,13 @@ func TestRefreshToken_RotatesWithCache(t *testing.T) {
 		WithArgs(true, "user-uuid", "dev-web").
 		WillReturnResult(sqlmock.NewResult(0, 1))
 
+	// UpsertRefreshToken: atomic upsert + re-fetch
+	mock.ExpectExec(sqlInsertRT).
+		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectQuery(sqlRTByUserDevice).
 		WithArgs("user-uuid", "web", "dev-web", 1).
-		WillReturnError(gorm.ErrRecordNotFound)
-	mock.ExpectExec(sqlInsertRT).
-		WillReturnResult(sqlmock.NewResult(2, 1))
+		WillReturnRows(sqlmock.NewRows([]string{"id", "user_id", "device_type", "device_id", "token_hash", "revoked", "expires_at"}).
+			AddRow("rt-new", "user-uuid", "web", "dev-web", "newhash", false, expiry))
 
 	svc := NewService(db, jwtCfg(), testCacheClient(t))
 	resp, err := svc.RefreshToken(context.Background(), "some-refresh-token")
