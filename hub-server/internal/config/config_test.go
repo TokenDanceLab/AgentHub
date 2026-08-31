@@ -1399,3 +1399,46 @@ func TestProdGuardErrorMessageIsActionable(t *testing.T) {
 		}
 	}
 }
+
+func TestServerLogLevelEnvCanonicalWinsOverLegacy(t *testing.T) {
+	path := writeTempConfig(t, validJWTYAML)
+	t.Setenv("AGENTHUB_JWT_SECRET", "canonical-log-level-secret-padded-to-min-32")
+	t.Setenv("AGENTHUB_LOG_LEVEL", "debug")
+	t.Setenv("AGENTHUB_SERVER_LOG_LEVEL", "warn")
+
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	if cfg.Server.LogLevel != "debug" {
+		t.Fatalf("Server.LogLevel = %q, want canonical AGENTHUB_LOG_LEVEL value", cfg.Server.LogLevel)
+	}
+}
+
+func TestServerLogLevelEnvLegacyFallback(t *testing.T) {
+	path := writeTempConfig(t, validJWTYAML)
+	t.Setenv("AGENTHUB_JWT_SECRET", "legacy-log-level-secret-padded-to-min-32")
+	t.Setenv("AGENTHUB_SERVER_LOG_LEVEL", "error")
+
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	if cfg.Server.LogLevel != "error" {
+		t.Fatalf("Server.LogLevel = %q, want legacy alias value", cfg.Server.LogLevel)
+	}
+}
+
+func TestEdgeDispatchAuthTokenAlias(t *testing.T) {
+	path := writeTempConfig(t, validJWTYAML)
+	t.Setenv("AGENTHUB_JWT_SECRET", "edge-alias-secret-padded-to-minimum-32")
+	t.Setenv("AGENTHUB_EDGE_DISPATCH_AUTH_TOKEN", "alias-edge-token")
+
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	if cfg.Edge.AuthToken != "alias-edge-token" {
+		t.Fatalf("Edge.AuthToken = %q, want canonical alias value", cfg.Edge.AuthToken)
+	}
+}
