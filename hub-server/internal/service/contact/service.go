@@ -193,7 +193,6 @@ func (s *Service) SendFriendRequest(ctx context.Context, userID, friendID, messa
 		return err
 	}
 
-	_ = resolveCache(s.cacheClient).Invalidate(ctx, "user:friends:"+userID, "user:friends:"+friendID)
 	s.publish(ctx, bus.Event{Type: bus.EventTypeFriendRequest, Payload: map[string]interface{}{
 		"request_id":   f.ID,
 		"from_user_id": userID,
@@ -268,7 +267,6 @@ func (s *Service) AcceptFriendRequest(ctx context.Context, userID, requestID str
 		return err
 	}
 
-	_ = resolveCache(s.cacheClient).Invalidate(ctx, "user:friends:"+userID, "user:friends:"+r.UserID)
 	s.publish(ctx, bus.Event{Type: "friend.accepted", Payload: map[string]interface{}{
 		"friendship_id": r.ID,
 		"user_id":       r.UserID,
@@ -288,7 +286,6 @@ func (s *Service) RejectFriendRequest(ctx context.Context, userID, requestID str
 	if err := repository.DeleteFriendship(s.db, r); err != nil {
 		return err
 	}
-	_ = resolveCache(s.cacheClient).Invalidate(ctx, "user:friends:"+userID, "user:friends:"+r.UserID)
 	return nil
 }
 
@@ -341,7 +338,6 @@ func (s *Service) RemoveContact(ctx context.Context, currentUserID, friendUserID
 	if err := repository.DeleteFriendshipPair(s.db, currentUserID, friendUserID); err != nil {
 		return err
 	}
-	_ = resolveCache(s.cacheClient).Invalidate(ctx, "user:friends:"+currentUserID, "user:friends:"+friendUserID)
 	return nil
 }
 
@@ -363,7 +359,6 @@ func (s *Service) BlockContact(ctx context.Context, currentUserID, targetUserID 
 	}); err != nil {
 		return err
 	}
-	_ = resolveCache(s.cacheClient).Invalidate(ctx, "user:friends:"+currentUserID, "user:friends:"+targetUserID)
 	return nil
 }
 
@@ -375,7 +370,6 @@ func (s *Service) UnblockContact(ctx context.Context, currentUserID, targetUserI
 	if err := repository.DeleteFriendship(s.db, f); err != nil {
 		return err
 	}
-	_ = resolveCache(s.cacheClient).Invalidate(ctx, "user:friends:"+currentUserID, "user:friends:"+targetUserID)
 	return nil
 }
 

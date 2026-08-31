@@ -58,7 +58,7 @@ func (h *Handler) GetAgentInstance(w http.ResponseWriter, r *http.Request, insta
 		return
 	}
 	if h.AgentRegistry == nil {
-		writeJSON(w, http.StatusNotFound, errcode.ErrorBody(errcode.ErrAgentRegistryNotConfigured))
+		writeJSON(w, http.StatusServiceUnavailable, errcode.ErrorBody(errcode.ErrAgentRegistryNotConfigured))
 		return
 	}
 	inst, ok := h.AgentRegistry.Get(instanceID)

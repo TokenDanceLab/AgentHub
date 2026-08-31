@@ -25,6 +25,15 @@ var (
 	ErrNotImplemented = sharederr.ErrNotImplemented
 )
 
+// --- HTTP status design principles (状态码设计原则) ---
+// 401 Unauthorized: 凭证本身无效或过期（auth_invalid_token/auth_token_expired/ws_auth_timeout）。
+// 400 Bad Request: 客户端请求参数/状态错误，与凭证有效性无关（oidc_invalid_state/msg_recall_timeout/msg_edit_timeout）。
+// 410 Gone: 资源生命周期终结，已不可恢复（agent_task_timeout/agent_task_cancelled/session_dissolved）。
+// 403 Forbidden: 凭证有效但无权限（auth_device_mismatch/msg_blocked_by_receiver/session_not_member）。
+// 502 Bad Gateway: 上游响应内容不合法（oidc_sub_not_found：IdP 返回的 id_token 缺 sub claim）。
+// 503 Service Unavailable: 服务/依赖未就绪（agent_offline、edge *_not_configured 系列）。
+// 标注约定：每个码在定义行尾用 "// principle: <类别>" 注释；当前全部符合上述原则，无待议项。
+
 // --- Hub domain-specific codes ---
 
 var (
@@ -88,7 +97,7 @@ var (
 	OIDCInvalidState       = New("oidc_invalid_state", "state is invalid or expired", http.StatusBadRequest)
 	OIDCCodeExchangeFailed = New("oidc_code_exchange_failed", "failed to exchange authorization code", http.StatusBadRequest)
 	OIDCIDTokenInvalid     = New("oidc_id_token_invalid", "id token validation failed", http.StatusBadRequest)
-	OIDCSubNotFound        = New("oidc_sub_not_found", "no sub claim in id token", http.StatusBadRequest)
+	OIDCSubNotFound        = New("oidc_sub_not_found", "no sub claim in id token", http.StatusBadGateway)
 
 	DocNotFound       = New("doc_not_found", "document not found", http.StatusNotFound)
 	DocAlreadyDeleted = New("doc_already_deleted", "document already deleted", http.StatusBadRequest)

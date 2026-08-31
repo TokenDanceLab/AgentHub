@@ -59,7 +59,7 @@ var (
 
 	// Agent discovery
 	ErrInvalidAgentID             = New("invalid_agent_id", "unknown agent adapter", http.StatusBadRequest)
-	ErrAgentRegistryNotConfigured = New("agent_registry_not_configured", "agent registry not configured", http.StatusNotFound)
+	ErrAgentRegistryNotConfigured = New("agent_registry_not_configured", "agent registry not configured", http.StatusServiceUnavailable)
 	ErrAgentInstanceNotFound      = New("agent_instance_not_found", "agent instance not found", http.StatusNotFound)
 
 	// Permissions

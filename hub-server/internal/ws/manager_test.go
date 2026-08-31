@@ -2,6 +2,7 @@ package ws
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -895,4 +896,119 @@ func TestPingAll_ClosesStaleConnection(t *testing.T) {
 	// close driven by this test).
 	require.Equal(t, metricBefore+1, testutil.ToFloat64(metrics.WSStaleClose),
 		"WSStaleClose must increment by exactly 1 for the single stale close")
+}
+
+// ---------------------------------------------------------------------------
+// Shutdown drain & shutdown-flag behavior tests (#2129 High-1)
+// ---------------------------------------------------------------------------
+
+func TestShutdown_WaitsForGoroutineConvergence(t *testing.T) {
+	m := NewManager()
+
+	const n = 8
+	exited := make(chan struct{}, n)
+	m.GoroutineAdd(n)
+	for i := 0; i < n; i++ {
+		go func() {
+			defer m.GoroutineDone()
+			exited <- struct{}{}
+		}()
+	}
+
+	// Also register a fake conn so Shutdown has something to close.
+	c := &Conn{ID: "drain-c", Send: make(chan []byte, 1)}
+	m.mu.Lock()
+	m.conns[c.ID] = c
+	m.mu.Unlock()
+
+	m.Shutdown()
+
+	// All goroutines must have exited; Shutdown blocks until WG hits zero.
+	for i := 0; i < n; i++ {
+		select {
+		case <-exited:
+		case <-time.After(5 * time.Second):
+			t.Fatalf("goroutine %d did not exit after Shutdown returned", i)
+		}
+	}
+}
+
+func TestShutdown_ReturnsAfterTimeoutWhenGoroutinesStuck(t *testing.T) {
+	m := NewManager()
+
+	// Spawn goroutines that will NOT exit until we release them after
+	// Shutdown returns — this exercises the timeout path.
+	blocker := make(chan struct{})
+	const stuck = 3
+	m.GoroutineAdd(stuck)
+	for i := 0; i < stuck; i++ {
+		go func() {
+			defer m.GoroutineDone()
+			<-blocker // intentionally blocks past the drain timeout
+		}()
+	}
+
+	c := &Conn{ID: "stuck-c", Send: make(chan []byte, 1)}
+	m.mu.Lock()
+	m.conns[c.ID] = c
+	m.mu.Unlock()
+
+	start := time.Now()
+	m.Shutdown()
+	elapsed := time.Since(start)
+
+	// Shutdown must return at or just above the drain timeout, not hang.
+	if elapsed < shutdownDrainTimeout {
+		t.Fatalf("Shutdown returned in %v, expected >= %v (timeout path)", elapsed, shutdownDrainTimeout)
+	}
+	if elapsed > shutdownDrainTimeout+2*time.Second {
+		t.Fatalf("Shutdown took %v, expected ~%v (timeout + small margin)", elapsed, shutdownDrainTimeout)
+	}
+
+	// Release stuck goroutines so the test process can exit cleanly.
+	close(blocker)
+}
+
+func TestShutdown_Idempotent(t *testing.T) {
+	m := NewManager()
+	c := &Conn{ID: "idem-c", Send: make(chan []byte, 1)}
+	m.mu.Lock()
+	m.conns[c.ID] = c
+	m.mu.Unlock()
+
+	m.Shutdown()
+	// Second call must not panic, deadlock, or re-close channels.
+	m.Shutdown()
+}
+
+func TestRegister_RejectedAfterShutdown(t *testing.T) {
+	m := NewManager()
+	m.Shutdown()
+
+	c := &Conn{Send: make(chan []byte, 1)}
+	err := m.Register(c)
+	if err == nil {
+		t.Fatal("Register after Shutdown should fail")
+	}
+	if !errors.Is(err, ErrShutdownInProgress) {
+		t.Fatalf("Register error = %v, want ErrShutdownInProgress", err)
+	}
+}
+
+func TestPushToConn_RejectedAfterShutdown(t *testing.T) {
+	m := NewManager()
+	c := &Conn{ID: "push-shut", Send: make(chan []byte, 4)}
+	m.mu.Lock()
+	m.conns[c.ID] = c
+	m.mu.Unlock()
+
+	m.Shutdown()
+
+	res := m.PushToConn(c.ID, NewFrame(TypeMessageNew, map[string]string{"k": "v"}))
+	if res.Status != DeliveryStatusConnClosed {
+		t.Fatalf("PushToConn status = %v, want %v", res.Status, DeliveryStatusConnClosed)
+	}
+	if !errors.Is(res.Err, ErrShutdownInProgress) {
+		t.Fatalf("PushToConn err = %v, want ErrShutdownInProgress", res.Err)
+	}
 }
