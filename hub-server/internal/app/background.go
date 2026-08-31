@@ -13,6 +13,7 @@ import (
 
 	"github.com/agenthub/hub-server/internal/bus"
 	"github.com/agenthub/hub-server/internal/config"
+	"github.com/agenthub/hub-server/internal/middleware"
 	"github.com/agenthub/hub-server/internal/model"
 )
 
@@ -113,6 +114,9 @@ func (a *App) shutdown(ctx context.Context) error {
 	if a.mgr != nil {
 		a.mgr.Shutdown()
 	}
+
+	// 7.5 Stop the process-wide WS rate limiter cleanup goroutine.
+	middleware.StopWSIPRateLimiter()
 
 	// 8. Close database connection pool.
 	if a.DB != nil {

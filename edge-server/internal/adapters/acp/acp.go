@@ -25,20 +25,15 @@ import (
 	"github.com/agenthub/edge-server/internal/store"
 )
 
-// acpAdapterID is the registry identifier for the experimental ACP adapter.
-const acpAdapterID = "acp"
-
 // acpExperimentalVersion is the Metadata.Version surfaced by the generic
 // experimental AcpAdapter (no concrete agent pin).
 const acpExperimentalVersion = "acp-experimental"
 
 // AcpAdapterConfig fully describes a concrete ACP agent configuration. It is
 // the single entry point for registering an ACP-backed agent (codex-acp,
-// claude-acp, opencode-acp, …): the generic NewAcpAdapter/NewAcpAdapterWithID
-// constructors are retained for the experimental "acp" entry and tests, but
-// concrete agent configs should go through NewAcpAdapterConfig so the env
-// passthrough, version label, and preflight messaging are sourced from one
-// place instead of being re-implemented per wrapper.
+// claude-acp, opencode-acp, …), so env passthrough, version label, and
+// preflight messaging are sourced from one place instead of being
+// re-implemented per wrapper.
 type AcpAdapterConfig struct {
 	// ID is the registry identifier (e.g. "codex-acp", "claude-acp").
 	ID string
@@ -96,8 +91,8 @@ type AcpAdapterConfig struct {
 // Reference: #1404, ACP spike analysis, ACP Go migration (option C').
 type AcpAdapter struct {
 	// id is the registry identifier for this adapter instance. The generic
-	// NewAcpAdapter uses "acp"; concrete agent configs (e.g. codex-acp) use
-	// their own IDs so multiple ACP agents can coexist in the registry.
+	// "acp" entry and concrete agent configs (e.g. codex-acp) each use their
+	// own IDs so multiple ACP agents can coexist in the registry.
 	id string
 
 	// agentBinary is the path or command name of the ACP agent executable.
@@ -130,24 +125,6 @@ type AcpAdapter struct {
 	permissionBroker *adapters.PermissionDecisionBroker
 }
 
-// NewAcpAdapter creates an experimental ACP adapter for the given agent binary.
-//
-// agentBinary must be an executable on PATH (or an absolute path to an
-// ACP-compatible executable). agentArgs are appended after the ACP protocol
-// flag. displayName is shown in agent listings. The adapter registers under
-// the generic "acp" ID; use NewAcpAdapterWithID for concrete agent configs.
-func NewAcpAdapter(agentBinary string, agentArgs []string, displayName string) *AcpAdapter {
-	return newAcpAdapter(acpAdapterID, agentBinary, agentArgs, displayName)
-}
-
-// NewAcpAdapterWithID is like NewAcpAdapter but with an explicit registry ID,
-// so a concrete ACP agent configuration (e.g. "codex-acp" backed by
-// `npx -y @agentclientprotocol/codex-acp`) can be registered alongside the
-// generic "acp" adapter.
-func NewAcpAdapterWithID(id, agentBinary string, agentArgs []string, displayName string) *AcpAdapter {
-	return newAcpAdapter(id, agentBinary, agentArgs, displayName)
-}
-
 // NewAcpAdapterConfig builds an AcpAdapter from a fully-specified concrete
 // agent configuration. This is the preferred entry point for codex-acp,
 // claude-acp, opencode-acp, …: env passthrough, version label, and preflight
@@ -171,21 +148,6 @@ func NewAcpAdapterConfig(cfg AcpAdapterConfig) *AcpAdapter {
 			ID:          cfg.ID,
 			Name:        cfg.DisplayName,
 			Version:     version,
-			Description: "ACP agent (experimental — JSON-RPC 2.0 over stdio)",
-		},
-	}
-}
-
-func newAcpAdapter(id, agentBinary string, agentArgs []string, displayName string) *AcpAdapter {
-	return &AcpAdapter{
-		id:               id,
-		agentBinary:      agentBinary,
-		agentArgs:        agentArgs,
-		permissionBroker: nil,
-		metadata: AdapterMetadata{
-			ID:          id,
-			Name:        displayName,
-			Version:     acpExperimentalVersion,
 			Description: "ACP agent (experimental — JSON-RPC 2.0 over stdio)",
 		},
 	}

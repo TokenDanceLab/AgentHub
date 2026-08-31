@@ -324,7 +324,7 @@ func TestCodexACPadapterRegistryRegistration(t *testing.T) {
 	if _, ok := reg.Get("acp"); ok {
 		t.Error("generic acp adapter unexpectedly registered")
 	}
-	if err := reg.Register(acp.NewAcpAdapter("fake-agent", nil, "Fake")); err != nil {
+	if err := reg.Register(acp.NewAcpAdapterConfig(acp.AcpAdapterConfig{ID: "acp", Binary: "fake-agent", DisplayName: "Fake"})); err != nil {
 		t.Errorf("generic acp registration should coexist with codex-acp: %v", err)
 	}
 	if !containsString(reg.ListIDs(), "codex-acp") {
