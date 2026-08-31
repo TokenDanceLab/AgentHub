@@ -250,6 +250,7 @@ paths:
       tags: [IMProject]
       operationId: listConversations
       summary: List conversations.
+      x-agenthub-superseded-by: "GET /client/sessions"
       x-agenthub-phase: P1
       x-agenthub-status: planned
       x-agenthub-owner: Hub
@@ -260,6 +261,7 @@ paths:
       tags: [IMProject]
       operationId: createConversation
       summary: Create conversation.
+      x-agenthub-superseded-by: "POST /client/sessions"
       x-agenthub-phase: P1
       x-agenthub-status: planned
       x-agenthub-owner: Hub
@@ -1844,6 +1846,10 @@ paths:
       responses:
         "200":
           description: Public stats.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Resource"
 
         "500":
           $ref: "#/components/responses/Error"
@@ -1858,6 +1864,10 @@ paths:
       responses:
         "200":
           description: User profile.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HubUser"
 
         "400":
           $ref: "#/components/responses/Error"
@@ -1951,6 +1961,10 @@ paths:
       responses:
         "200":
           description: Session created.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionCreate"
 
         "400":
           $ref: "#/components/responses/Error"
@@ -1979,6 +1993,10 @@ paths:
       responses:
         "201":
           description: Session created.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionCreate"
 
         "400":
           $ref: "#/components/responses/Error"
@@ -2008,6 +2026,10 @@ paths:
       responses:
         "201":
           description: Group created.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionCreate"
 
         "400":
           $ref: "#/components/responses/Error"
@@ -2082,6 +2104,10 @@ paths:
       responses:
         "201":
           description: Message sent.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Message"
 
         "400":
           $ref: "#/components/responses/Error"
@@ -2172,6 +2198,10 @@ paths:
       responses:
         "200":
           description: Task dispatched.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HubPendingAgentTask"
         "409":
           description: Turn in progress — the agent instance already has a non-terminal (queued/dispatched/running) task. The trigger message itself is already persisted and is not rolled back. The web client treats this as a recoverable condition (keep draft / optimistic message, show an info toast) rather than a hard error. Granularity is per `agent_instance_id`, not per session; a different agent instance in the same session is not blocked.
           content:
@@ -2441,6 +2471,10 @@ paths:
       responses:
         "200":
           description: Task marked running.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Resource"
 
         "400":
           $ref: "#/components/responses/Error"
@@ -2472,6 +2506,10 @@ paths:
       responses:
         "200":
           description: Chunk recorded.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Resource"
 
         "400":
           $ref: "#/components/responses/Error"
@@ -2503,6 +2541,10 @@ paths:
       responses:
         "200":
           description: Task marked done.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Resource"
 
         "400":
           $ref: "#/components/responses/Error"
@@ -2534,6 +2576,10 @@ paths:
       responses:
         "200":
           description: Task marked failed.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Resource"
 
         "400":
           $ref: "#/components/responses/Error"
@@ -2755,6 +2801,7 @@ paths:
       operationId: hubListFriendRequests
       summary: Legacy friend-request listing shape.
       x-deprecated: true
+      x-agenthub-superseded-by: "GET /client/contacts/friend-requests"
       description: No corresponding Hub router path exists. Use `GET /client/contacts/friend-requests`.
       x-agenthub-status: planned
       x-agenthub-owner: Hub
@@ -2769,6 +2816,7 @@ paths:
       operationId: hubListSentFriendRequests
       summary: Legacy sent friend-request listing shape.
       x-deprecated: true
+      x-agenthub-superseded-by: "GET /client/contacts/friend-requests"
       description: No corresponding Hub router path exists.
       x-agenthub-status: planned
       x-agenthub-owner: Hub
@@ -3001,6 +3049,7 @@ paths:
       operationId: hubUpdateMemberSettingsLegacy
       summary: Legacy member settings shape.
       x-deprecated: true
+      x-agenthub-superseded-by: "PUT /client/sessions/{id}/settings"
       description: No corresponding Hub router path exists. Use `PUT /client/sessions/{id}/settings`.
       x-agenthub-status: planned
       x-agenthub-owner: Hub
@@ -3122,6 +3171,7 @@ paths:
       operationId: hubRecallMessage
       summary: Recall (delete) a message.
       x-deprecated: true
+      x-agenthub-superseded-by: "POST /client/messages/{id}/recall"
       description: Deprecated session-scoped path. Use `POST /client/messages/{id}/recall` instead.
       x-agenthub-status: planned
       x-agenthub-owner: Hub
@@ -3142,6 +3192,7 @@ paths:
       operationId: hubPinMessage
       summary: Pin a message.
       x-deprecated: true
+      x-agenthub-superseded-by: "POST /client/messages/{id}/pin"
       description: Deprecated session-scoped path. Use `POST /client/messages/{id}/pin` instead.
       x-agenthub-status: planned
       x-agenthub-owner: Hub
@@ -3162,6 +3213,7 @@ paths:
       operationId: hubUnpinMessage
       summary: Unpin a message.
       x-deprecated: true
+      x-agenthub-superseded-by: "DELETE /client/messages/{id}/pin"
       description: Deprecated session-scoped path. Use `DELETE /client/messages/{id}/pin` instead.
       x-agenthub-status: planned
       x-agenthub-owner: Hub
@@ -3182,6 +3234,7 @@ paths:
       operationId: hubMarkMessageRead
       summary: Mark a message as read.
       x-deprecated: true
+      x-agenthub-superseded-by: "POST /client/sessions/{id}/read"
       description: Deprecated. No corresponding route exists in Hub router.
       x-agenthub-status: planned
       x-agenthub-owner: Hub
@@ -3229,6 +3282,7 @@ paths:
       operationId: hubForwardMessages
       summary: Legacy batch-forward shape.
       x-deprecated: true
+      x-agenthub-superseded-by: "POST /client/messages/{id}/forward"
       description: No corresponding Hub router path exists. Use `POST /client/messages/{id}/forward`.
       x-agenthub-status: planned
       x-agenthub-owner: Hub
@@ -3272,6 +3326,10 @@ paths:
       responses:
         "200":
           description: Attachment metadata if present; null if absent.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Attachment"
 
         "400":
           $ref: "#/components/responses/Error"
@@ -3340,6 +3398,10 @@ paths:
       responses:
         "200":
           description: Attachment file (binary).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Attachment"
         "404":
           $ref: "#/components/responses/Error"
 
@@ -3931,6 +3993,10 @@ paths:
       responses:
         "200":
           description: New JWT token pair.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthRefreshResponse"
 
         "400":
           $ref: "#/components/responses/Error"
@@ -4222,6 +4288,12 @@ paths:
       responses:
         "200":
           description: Incremental message batch.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Message"
 
         "400":
           $ref: "#/components/responses/Error"
@@ -4415,6 +4487,10 @@ paths:
       responses:
         "200":
           description: Message recalled (null data).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Resource"
         "400":
           $ref: "#/components/responses/Error"
         "401":
@@ -4446,6 +4522,10 @@ paths:
       responses:
         "200":
           description: Message pinned (null data).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Resource"
         "400":
           $ref: "#/components/responses/Error"
         "401":
@@ -4473,6 +4553,10 @@ paths:
       responses:
         "200":
           description: Message unpinned (null data).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Resource"
         "400":
           $ref: "#/components/responses/Error"
         "401":
@@ -5465,7 +5549,11 @@ paths:
                   type: string
       responses:
         "200":
-          $ref: "#/components/responses/Ok"
+          description: OK.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AgentTeam"
         "400":
           $ref: "#/components/responses/Error"
         "401":
@@ -6296,6 +6384,7 @@ paths:
       tags: [HubSyncRelay]
       operationId: login
       summary: Login.
+      x-agenthub-superseded-by: "GET /client/auth/oidc/authorize"
       x-agenthub-phase: P2
       x-agenthub-owner: Hub
       x-agenthub-status: planned
@@ -6308,6 +6397,7 @@ paths:
       tags: [HubSyncRelay]
       operationId: logout
       summary: Logout.
+      x-agenthub-superseded-by: "POST /client/auth/logout"
       x-agenthub-phase: P2
       x-agenthub-owner: Hub
       x-agenthub-status: planned
@@ -6320,6 +6410,7 @@ paths:
       tags: [HubSyncRelay]
       operationId: getMe
       summary: Get current user.
+      x-agenthub-superseded-by: "GET /client/auth/me"
       x-agenthub-phase: P2
       x-agenthub-owner: Hub
       x-agenthub-status: planned
@@ -6330,6 +6421,7 @@ paths:
       tags: [HubSyncRelay]
       operationId: updateMe
       summary: Update current user.
+      x-agenthub-superseded-by: "PUT /client/auth/profile"
       x-agenthub-phase: P2
       x-agenthub-owner: Hub
       x-agenthub-status: planned
@@ -6342,6 +6434,7 @@ paths:
       tags: [HubSyncRelay]
       operationId: listContacts
       summary: List contacts.
+      x-agenthub-superseded-by: "GET /client/contacts"
       x-agenthub-phase: P4
       x-agenthub-owner: Hub
       x-agenthub-status: planned
@@ -6354,6 +6447,7 @@ paths:
       tags: [HubSyncRelay]
       operationId: requestContact
       summary: Send contact request.
+      x-agenthub-superseded-by: "POST /client/contacts/friend-requests"
       x-agenthub-phase: P4
       x-agenthub-owner: Hub
       x-agenthub-status: planned
@@ -6366,6 +6460,7 @@ paths:
       tags: [HubSyncRelay]
       operationId: acceptContact
       summary: Accept contact request.
+      x-agenthub-superseded-by: "POST /client/contacts/friend-requests/{id}/accept"
       x-agenthub-phase: P4
       x-agenthub-owner: Hub
       x-agenthub-status: planned
@@ -6380,6 +6475,7 @@ paths:
       tags: [HubSyncRelay]
       operationId: deleteContact
       summary: Delete contact.
+      x-agenthub-superseded-by: "DELETE /client/contacts/{user_id}"
       x-agenthub-phase: P4
       x-agenthub-owner: Hub
       x-agenthub-status: planned
@@ -6394,6 +6490,7 @@ paths:
       tags: [HubSyncRelay]
       operationId: listGroups
       summary: List groups.
+      x-agenthub-superseded-by: "GET /client/sessions"
       x-agenthub-phase: P4
       x-agenthub-owner: Hub
       x-agenthub-status: planned
@@ -6404,6 +6501,7 @@ paths:
       tags: [HubSyncRelay]
       operationId: createGroup
       summary: Create group.
+      x-agenthub-superseded-by: "POST /client/sessions"
       x-agenthub-phase: P4
       x-agenthub-owner: Hub
       x-agenthub-status: planned
@@ -6442,6 +6540,7 @@ paths:
       tags: [HubSyncRelay]
       operationId: listDevices
       summary: List devices.
+      x-agenthub-superseded-by: "GET /web/devices"
       x-agenthub-phase: P2
       x-agenthub-owner: Hub
       x-agenthub-status: planned
@@ -7600,6 +7699,37 @@ components:
       schema:
         type: string
   schemas:
+    SessionCreate:
+      type: object
+      required: [session_id, type, created]
+      properties:
+        session_id: { type: string, format: uuid }
+        type:
+          type: string
+          enum: [private, group]
+        created: { type: boolean }
+
+    HubUser:
+      type: object
+      required: [id, username, nickname, created_at, updated_at]
+      properties:
+        id: { type: string, format: uuid }
+        username: { type: string }
+        nickname: { type: string }
+        avatar_url: { type: string }
+        tokendance_sub: { type: string, nullable: true }
+        tokendance_sub_linked_at: { type: string, format: date-time, nullable: true }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    AuthRefreshResponse:
+      type: object
+      required: [access_token, refresh_token, expires_in]
+      properties:
+        access_token: { type: string }
+        refresh_token: { type: string }
+        expires_in: { type: integer, format: int64 }
+
     Resource:
       type: object
       additionalProperties: true
