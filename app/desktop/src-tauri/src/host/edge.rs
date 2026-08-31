@@ -46,12 +46,6 @@ pub struct LocalCliDiscoveryManifest {
 }
 
 #[tauri::command]
-pub async fn get_edge_status(state: State<'_, SharedEdgeManager>) -> Result<EdgeStatus, String> {
-    let mgr = state.lock().await;
-    Ok(mgr.status())
-}
-
-#[tauri::command]
 pub async fn get_edge_host_readiness(
     app: tauri::AppHandle,
     state: State<'_, SharedEdgeManager>,
@@ -89,7 +83,14 @@ pub async fn get_local_cli_discovery() -> Result<LocalCliDiscoveryManifest, Stri
 }
 
 #[tauri::command]
-pub async fn get_edge_auth_token(state: State<'_, SharedEdgeManager>) -> Result<String, String> {
+pub async fn get_edge_auth_token(
+    window: tauri::WebviewWindow,
+    state: State<'_, SharedEdgeManager>,
+) -> Result<String, String> {
+    // The local Edge bearer token is a credential for the local Edge API:
+    // require the same trusted-origin guard as the other sensitive commands
+    // (secure_store, proxy_http_post) before handing it out.
+    crate::commands::validate_command_origin(&window)?;
     let mgr = state.lock().await;
     mgr.local_auth_token().map(str::to_string)
 }
@@ -108,12 +109,7 @@ fn build_local_cli_discovery() -> LocalCliDiscoveryManifest {
                 "claude",
                 "AGENTHUB_CLAUDE_CODE_PATH",
             ),
-            discover_cli(
-                "opencode",
-                "OpenCode",
-                "opencode",
-                "AGENTHUB_OPENCODE_PATH",
-            ),
+            discover_cli("opencode", "OpenCode", "opencode", "AGENTHUB_OPENCODE_PATH"),
         ],
     }
 }
@@ -205,11 +201,6 @@ fn read_cli_version(path: &str) -> Option<String> {
     Some("version probe timed out".to_string())
 }
 
-#[tauri::command]
-pub async fn get_packaged_login_readiness() -> Result<PackagedLoginReadiness, String> {
-    Ok(build_packaged_login_readiness())
-}
-
 fn read_log_tail(path: &str, max_lines: usize) -> Vec<String> {
     if max_lines == 0 || path.starts_with("<app-data>") {
         return Vec::new();
@@ -226,23 +217,6 @@ fn read_log_tail(path: &str, max_lines: usize) -> Vec<String> {
         tail.push_back(line.to_string());
     }
     tail.into_iter().collect()
-}
-
-#[tauri::command]
-pub async fn start_edge(
-    app: tauri::AppHandle,
-    state: State<'_, SharedEdgeManager>,
-) -> Result<EdgeStatus, String> {
-    let mut mgr = state.lock().await;
-    mgr.start(&app).await?;
-    Ok(mgr.status())
-}
-
-#[tauri::command]
-pub async fn stop_edge(state: State<'_, SharedEdgeManager>) -> Result<EdgeStatus, String> {
-    let mut mgr = state.lock().await;
-    mgr.stop().await?;
-    Ok(mgr.status())
 }
 
 #[cfg(test)]
@@ -317,10 +291,7 @@ mod tests {
         let manifest = build_local_cli_discovery();
 
         assert_eq!(manifest.mode, "no-spend-discovery");
-        assert_eq!(
-            manifest.readiness_manifest,
-            "docs/governance/README.md"
-        );
+        assert_eq!(manifest.readiness_manifest, "docs/governance/README.md");
         assert_eq!(
             manifest.readiness_script,
             "scripts/verify/verify-edge-cli-real-readiness.py"
