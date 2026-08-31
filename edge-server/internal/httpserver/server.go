@@ -67,7 +67,10 @@ type Config struct {
 	EventLogPath           string                   // optional append-only event log path for crash recovery and replay; empty = no persistence (events exist only in-memory)
 	EventLogMaxSize        int64                    // event log truncation threshold in bytes; 0 = default (50 MiB)
 	MCPConfigStore         *adapters.MCPConfigStore // optional Hub-synced MCP server configs for injection into runs
-	ShutdownHooks          []func()                 // called in order during graceful shutdown, before bus.Close()
+	// ShutdownTimeout overrides the overall graceful-shutdown budget
+	// (default shutdownTotalBudget). <=0 means use the default (#2129 L6).
+	ShutdownTimeout time.Duration
+	ShutdownHooks   []func() // called in order during graceful shutdown, before bus.Close()
 }
 
 const defaultRESTRequestTimeout = 30 * time.Second
@@ -187,7 +190,11 @@ func Run(cfg Config) error {
 	<-stop
 	slog.Info("shutting down...")
 
-	ctx, cancel := context.WithTimeout(context.Background(), shutdownTotalBudget)
+	budget := shutdownTotalBudget
+	if cfg.ShutdownTimeout > 0 {
+		budget = cfg.ShutdownTimeout
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), budget)
 	defer cancel()
 
 	// Cancel in-flight agent runs BEFORE srv.Shutdown so child processes are

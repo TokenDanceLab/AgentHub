@@ -3,7 +3,6 @@ package handler
 import (
 	"context"
 	"log/slog"
-	"net/http"
 	"os"
 	"strings"
 	"time"
@@ -14,6 +13,7 @@ import (
 	"github.com/agenthub/hub-server/internal/metrics"
 	"github.com/agenthub/hub-server/internal/middleware"
 	"github.com/agenthub/hub-server/internal/ws"
+	"github.com/agenthub/pkg/errcode"
 	"github.com/agenthub/pkg/safego"
 )
 
@@ -52,7 +52,9 @@ func (h *WebSocketHandler) ServeWS(c *gin.Context) {
 	// back to an in-band token frame that bypasses blacklist/session gates.
 	userID := c.GetString("user_id")
 	if userID == "" {
-		c.AbortWithStatus(http.StatusUnauthorized)
+		// Envelope + traceId like the rest of the API surface (#2123 P3-7):
+		// a bare AbortWithStatus left WS clients with an empty body.
+		Fail(c, errcode.ErrInvalidToken)
 		return
 	}
 

@@ -57,6 +57,10 @@ type Writer interface {
 type Repository interface {
 	Reader
 	Writer
+	// Close releases backend resources (sqlite file handles / journal WAL).
+	// Memory-backed stores are no-ops. Called from the shutdown hook chain so
+	// WAL checkpoint and file flushes complete before process exit (#2129 M5).
+	Close()
 }
 
 type RunLifecycleStore interface {

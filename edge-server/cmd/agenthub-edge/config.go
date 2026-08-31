@@ -33,6 +33,8 @@ type config struct {
 	AllowedOrigins     repeatedString
 	Dev                bool // disable auto-generated local auth token for development
 
+	ShutdownTimeout string // overall graceful-shutdown budget (default 10s)
+
 	// Hub callback configuration (Edge→Hub direct bridge)
 	HubURL                 string // Hub server base URL for Edge callback reporting
 	HubToken               string // JWT bearer token for authenticating with Hub
@@ -164,6 +166,7 @@ func buildConfig(args []string) (config, error) {
 	cfg.WorkspaceAllowlist = append(cfg.WorkspaceAllowlist, splitPathList(getEnv("AGENTHUB_WORKSPACE_ALLOWLIST", ""))...)
 	fs.Var(&cfg.WorkspaceAllowlist, "workspace-allowlist", "workspace root allowed for request workDir; may be repeated; env AGENTHUB_WORKSPACE_ALLOWLIST uses OS path-list separators")
 	fs.StringVar(&cfg.LocalAuthToken, "local-auth-token", getEnv("AGENTHUB_EDGE_AUTH_TOKEN", ""), "optional local bearer token required for Edge APIs other than /v1/health")
+	fs.StringVar(&cfg.ShutdownTimeout, "shutdown-timeout", getEnv("AGENTHUB_EDGE_SHUTDOWN_TIMEOUT", "10s"), "overall graceful-shutdown budget for hooks and bus close")
 	fs.StringVar(&cfg.HubJWTSecret, "hub-jwt-secret", getEnv("AGENTHUB_HUB_JWT_SECRET", ""), "shared secret for validating Hub-issued HS256 JWTs (enables TokenDance trust chain)")
 	fs.StringVar(&cfg.EdgeDeviceID, "edge-device-id", getEnv("AGENTHUB_EDGE_DEVICE_ID", ""), "local Edge device ID expected in Edge-scoped Hub JWTs; required with --hub-jwt-secret")
 	fs.StringVar(&cfg.HubURL, "hub-url", getEnv("AGENTHUB_HUB_URL", ""), "Hub server base URL for Edge→Hub direct callback reporting (e.g. https://hub.example.com)")

@@ -44,6 +44,11 @@ func New() *Store {
 	return newEmptyStore()
 }
 
+// Close is a no-op for the in-memory store; it exists to satisfy the
+// Repository interface so the shutdown hook chain can treat all backends
+// uniformly (#2129 M5).
+func (s *Store) Close() {}
+
 func (s *Store) snapshot() fileSnapshot {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
