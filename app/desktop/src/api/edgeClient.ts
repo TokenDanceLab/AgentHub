@@ -139,7 +139,7 @@ async function edgeFetch(url: string, init?: RequestInit): Promise<Response> {
 }
 
 /**
- * Extracts the .data field from a unified {@code {"code":"OK","data":...}} envelope.
+ * Extracts the .data field from a unified {@code {"code":"ok","data":...}} envelope (older Edge builds sent "OK", so both casings are accepted).
  * Returns the raw input unchanged when no envelope is present, preserving backward
  * compatibility with Edge Servers that have not yet adopted the envelope format.
  */
@@ -149,7 +149,7 @@ function unwrapEdgeResponse(raw: unknown): unknown {
     typeof raw === 'object' &&
     'code' in raw &&
     'data' in raw &&
-    (raw as Record<string, unknown>).code === 'OK'
+    ((raw as Record<string, unknown>).code === 'ok' || (raw as Record<string, unknown>).code === 'OK')
   ) {
     return (raw as Record<string, unknown>).data;
   }

@@ -72,7 +72,7 @@ def normalize_client_path(raw: str):
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Hub client <-> Hub router REST contract verifier (#1467)")
-    parser.add_argument("--client-src-dir", default="app/shared/src", help="client source directory (default: app/shared/src)")
+    parser.add_argument("--client-src-dir", default="app/shared/src/hub", help="client source directory (default: app/shared/src/hub)")
     parser.add_argument("--router-path", default="hub-server/internal/router/router.go", help="router source path (default: hub-server/internal/router/router.go)")
     args = parser.parse_args()
 
@@ -128,6 +128,12 @@ def main() -> int:
         name for name in os.listdir(client_dir)
         if name.startswith("hubClient") and name.endswith(".ts") and not name.endswith(".test.ts")
     )
+    if not client_files:
+        fail_check(
+            f"no hubClient*.ts files under {args.client_src_dir}; "
+            "the shared client moved to app/shared/src/hub — a 0-path scan must FAIL, not pass"
+        )
+        return 1
 
     raw_paths = []
     for file_name in client_files:
