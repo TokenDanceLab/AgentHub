@@ -99,6 +99,9 @@ export type ContactProfile =
     };
 
 export interface ContactsPageProps {
+  /** Hub contacts request failure (#1821) — when set, the page renders an
+   *  explicit error state instead of the empty/mock contact list. */
+  error?: string | undefined;
   /** Currently active nav pane */
   activePane: ContactsPane;
   /** Called when user clicks a nav item */

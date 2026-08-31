@@ -91,6 +91,7 @@ function DocTableRow({
 export function DocTable({
   rows,
   documentsLoading,
+  documentsError,
   profiles,
   onDocClick,
   onDeleteDoc,
@@ -98,6 +99,9 @@ export function DocTable({
 }: {
   rows: DocRow[];
   documentsLoading?: boolean;
+  /** Hub documents request failure (#1821) — show an explicit error state
+   *  instead of collapsing into the empty list. */
+  documentsError?: string | undefined;
   profiles?: WorkbenchProfileSource[] | undefined;
   onDocClick?: ((doc: DocRow) => void) | undefined;
   onDeleteDoc?: ((documentId: string) => Promise<unknown> | void) | undefined;
@@ -138,6 +142,26 @@ export function DocTable({
               <span className={styles.docMore} />
             </div>
           ))}
+        </div>
+      ) : documentsError && rows.length === 0 ? (
+        <div className={styles.docError} role="alert">
+          <EmptyState
+            title={t('docs.error.title')}
+            description={documentsError}
+            titleLevel={3}
+            {...(styles['docs-empty-compact']
+              ? { className: styles['docs-empty-compact'] }
+              : {})}
+            {...(styles['docs-empty-compact-content']
+              ? { contentClassName: styles['docs-empty-compact-content'] }
+              : {})}
+            {...(styles['docs-empty-compact-title']
+              ? { titleClassName: styles['docs-empty-compact-title'] }
+              : {})}
+            {...(styles['docs-empty-compact-description']
+              ? { descriptionClassName: styles['docs-empty-compact-description'] }
+              : {})}
+          />
         </div>
       ) : rows.length === 0 ? (
         <EmptyState

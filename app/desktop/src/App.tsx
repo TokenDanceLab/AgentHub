@@ -190,7 +190,7 @@ export function DesktopWorkbenchApp({ onLogout }: DesktopWorkbenchAppProps = {})
     enabled: liveEdgeEnabled && Boolean(workbench.activeThreadId),
   });
   const { data: currentUser } = useCurrentUser(edgeOnline);
-  const { data: documentListData } = useDocumentList(undefined, { enabled: liveEdgeEnabled });
+  const { data: documentListData, error: documentListError } = useDocumentList(undefined, { enabled: liveEdgeEnabled });
   const createDocumentMutation = useCreateDocument();
 
   // Fetch public Skills for the Skill Market tab
@@ -258,6 +258,12 @@ export function DesktopWorkbenchApp({ onLogout }: DesktopWorkbenchAppProps = {})
   const documents = useMemo<DocRow[] | undefined>(
     () => (liveEdgeEnabled && documentListData?.items ? documentListData.items.map(hubDocToDocRow) : undefined),
     [liveEdgeEnabled, documentListData],
+  );
+  const documentsError = useMemo(
+    () => (liveEdgeEnabled && documentListError
+      ? (documentListError instanceof Error ? documentListError.message : String(documentListError))
+      : undefined),
+    [liveEdgeEnabled, documentListError],
   );
   const documentsActions = useMemo(() => ({
     onCreateDoc: liveEdgeEnabled ? async () => { await createDocumentMutation.mutateAsync({ title: t('doc.untitled') }); } : undefined,
@@ -651,8 +657,10 @@ export function DesktopWorkbenchApp({ onLogout }: DesktopWorkbenchAppProps = {})
         agents={agents}
         agentProfilesStatus={agentProfilesStatus}
         contacts={workbench.contacts}
+        contactsError={workbench.contactsError}
         contactsActions={workbench.contactsActions}
         documents={documents}
+        documentsError={documentsError}
         documentsActions={documentsActions}
         conversations={workbench.conversations}
         onActiveConversationChange={setSelectedConversationId}

@@ -4,6 +4,7 @@ import type { DocsPageProps } from './pages/DocsPage';
 import type { ProjectsPageProps } from './pages/ProjectsPage';
 import type { SettingsPageProps } from './pages/SettingsPage';
 import type { WorkbenchProfileSource } from './profileRegistry';
+import { hubEmptyContacts } from './hubDataMapping';
 import type { WorkbenchContactsRoute } from './useWorkbenchContactsRoute';
 import type { WorkbenchDocsRoute } from './useWorkbenchDocsRoute';
 import type { WorkbenchProjectsRoute } from './useWorkbenchProjectsRoute';
@@ -36,9 +37,10 @@ export function assignDefined<T extends object, K extends keyof T>(
 export function buildContactsPageProps(
   contactsRoute: WorkbenchContactsRoute,
 ): ContactsPageProps {
-  const data = contactsRoute.contactsData;
+  const data = contactsRoute.contactsData ?? hubEmptyContacts;
   const actions = contactsRoute.contactsActions;
   const props: ContactsPageProps = {
+    error: contactsRoute.contactsError,
     activePane: contactsRoute.contactsPane,
     onPaneChange: contactsRoute.setContactsPane,
     orgName: data.orgName ?? DEFAULT_ORG_NAME,
@@ -86,6 +88,8 @@ export function buildDocsPageProps(
     rows: docsRoute.rows,
     documentsLoading: docsRoute.documentsLoading,
   };
+
+  assignDefined(props, 'documentsError', docsRoute.documentsError);
 
   assignDefined(props, 'onCreateDoc', docsRoute.documentsActions?.onCreateDoc);
   assignDefined(props, 'onDeleteDoc', docsRoute.documentsActions?.onDeleteDoc);

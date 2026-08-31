@@ -5,6 +5,7 @@ import type {
   TerminalSessionId,
 } from '@shared/platform/types';
 import { DESIGN_NAV_GLYPH_STROKE_WIDTH, DesignNavIcon } from '../designIcons';
+import { friendlyErrorMessage } from '@shared/errorReporting';
 import { Tooltip } from '@shared/ui/Tooltip';
 import styles from './TerminalPanel.module.css';
 
@@ -430,7 +431,7 @@ export const TerminalPanel: React.FC<TerminalPanelProps> = ({
 
       {error ? (
         <div className={styles.error} role="alert" data-terminal-error>
-          {error}
+          {friendlyErrorMessage(error, 'Terminal error')}
         </div>
       ) : null}
 

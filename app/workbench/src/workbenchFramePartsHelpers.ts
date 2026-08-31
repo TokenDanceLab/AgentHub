@@ -236,7 +236,9 @@ export function buildWorkbenchRoutesProps(
   assignIfDefined(routesProps, 'agentProfilesStatus', props.agentProfilesStatus);
   assignIfDefined(routesProps, 'dataMode', props.dataMode);
   assignIfDefined(routesProps, 'contacts', props.contacts);
+  assignIfDefined(routesProps, 'contactsError', props.contactsError);
   assignIfDefined(routesProps, 'documents', props.documents);
+  assignIfDefined(routesProps, 'documentsError', props.documentsError);
   assignIfDefined(routesProps, 'focusedAgentId', props.focusedAgentId);
   assignIfDefined(routesProps, 'projects', props.projects);
   assignIfDefined(routesProps, 'activeProjectId', props.activeProjectId);

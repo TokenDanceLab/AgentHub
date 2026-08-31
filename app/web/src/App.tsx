@@ -280,6 +280,7 @@ function WebWorkbenchRoot() {
         connectionStatus={realMode ? connectionStatus : undefined}
         agentProfilesStatus={agentProfilesStatus}
         contacts={workbench.contacts}
+        contactsError={workbench.contactsError}
         contactsActions={workbench.contactsActions}
         conversations={workbench.conversations}
         activeProjectId={selectedProjectId}
