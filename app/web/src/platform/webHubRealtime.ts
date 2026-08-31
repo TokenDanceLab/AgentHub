@@ -8,6 +8,7 @@ import { getAgentActivityStore } from '@shared/transcript/agentActivity';
 import { getMessageDelegationStore, getSubagentStreamStore } from '@agenthub/workbench';
 import { handleIncomingTyping } from '@shared/chatview/typingPresence';
 import { buildWSAuthProtocols, createHubWS, type HubWSHandle, type HubWSOptions } from '@shared/hub/hubWS';
+import { resyncMessagesAfterReconnect } from '@shared/hub/hubMessagesResync';
 import { WebSocketTransport, type Transport, type TransportStatus } from '@/api/transport';
 import { HUB_WS_URL } from '@/config';
 import { createHubClient } from '@/api/hubClient';
@@ -301,13 +302,27 @@ export function useWebHubRealtime({
       }
     });
 
-    // #2101 G1: seq_id gap → invalidate threads-family queries so the next
-    // render refetches sessions/messages and recovers any frames lost between
-    // lastSeq and receivedSeq. Other families deferred to a follow-up slice.
+    // #2101 G4-②: shared resync trigger for gap and reconnect events.
+    // Uses incremental syncMessages(after_seq) per cached session when possible;
+    // falls back to full invalidation of threads family otherwise.
+    const hubClientForResync = createHubClient({ getToken });
+    const triggerWebResync = (): void => {
+      void resyncMessagesAfterReconnect({
+        queryClient,
+        hubClient: hubClientForResync,
+      }).catch((err) => {
+        console.error('[webHubRealtime] resync failed:', err);
+      });
+    };
+
+    // #2101 G1: seq_id gap → trigger message resync.
     const unsubscribeGap = socket.onGap?.(() => {
-      void queryClient.invalidateQueries({ queryKey: ['web-v4', 'hub-sessions'] });
-      void queryClient.invalidateQueries({ queryKey: ['web-v4', 'hub-messages'] });
-      void queryClient.invalidateQueries({ queryKey: ['hub', 'threads'] });
+      triggerWebResync();
+    });
+
+    // #2101 G4-②: reconnect auth completion → trigger message resync.
+    const unsubscribeReconnected = socket.onReconnected?.(() => {
+      triggerWebResync();
     });
 
     socket.connect();
@@ -316,6 +331,7 @@ export function useWebHubRealtime({
       unsubscribeStatus();
       unsubscribeDeviceKicked();
       unsubscribeGap?.();
+      unsubscribeReconnected?.();
       liveBatcher.dispose();
       if (liveBatcherRef.current === liveBatcher) {
         liveBatcherRef.current = null;

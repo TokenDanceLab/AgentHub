@@ -14,6 +14,7 @@ import { getPinMapStore } from '@shared/transcript';
 import { useToastStore } from '@shared/ui/toast';
 import { getI18n } from 'react-i18next';
 import type { HubWSGapPayload } from '@shared/hub/hubWS';
+import { resyncMessagesAfterReconnect, type MessagesResyncHubClient } from '@shared/hub/hubMessagesResync';
 import type {
   HubAgentDispatchPayload,
   HubAgentDonePayload,
@@ -411,15 +412,23 @@ export interface DesktopHubWSLike {
   on: (type: HubEventType, handler: (payload: unknown) => void) => () => void;
   /** Optional gap subscription (#2101 G1). Absent in test stubs. */
   onGap?: (handler: (payload: HubWSGapPayload) => void) => () => void;
+  /** Optional reconnect subscription (#2101 G4-②). Absent in test stubs. */
+  onReconnected?: (handler: () => void) => () => void;
 }
 
 /**
  * Wire Desktop Hub WS events to React Query cache invalidation and
  * Zustand store updates. Returns a handle with a `destroy()` method.
  */
+export interface DesktopHubEventBridgeOptions {
+  /** hubClient for incremental message resync on reconnect/gap (#2101 G4-②). */
+  hubClient?: MessagesResyncHubClient;
+}
+
 export function createDesktopHubEventBridge(
   hubWS: DesktopHubWSLike,
   queryClient: QueryClient,
+  options?: DesktopHubEventBridgeOptions,
 ): DesktopHubEventBridgeHandle {
   const unsubFns: Array<() => void> = [];
 
@@ -437,15 +446,36 @@ export function createDesktopHubEventBridge(
     unsubFns.push(unsub);
   }
 
-  // #2101 G1: On seq_id gap, invalidate the entire threads query family so
-  // the next render refetches messages/detail/pins and recovers any frames
-  // lost between lastSeq and receivedSeq. Other families are deferred to a
-  // follow-up slice (see lane PROGRESS.md).
+  // #2101 G4-②: shared resync trigger for both gap and reconnect events.
+  // When hubClient is provided, performs incremental syncMessages(after_seq)
+  // per cached session. Falls back to full threads invalidation otherwise.
+  const triggerResync = (): void => {
+    if (options?.hubClient) {
+      void resyncMessagesAfterReconnect({
+        queryClient,
+        hubClient: options.hubClient,
+      }).catch((err) => {
+        console.error('[desktopHubEventBridge] resync failed:', err);
+      });
+    } else {
+      invalidateAllWithPrefix(queryClient, hubQueryKeys.threads.root);
+    }
+  };
+
+  // #2101 G1: On seq_id gap, trigger message resync (incremental or fallback).
   if (hubWS.onGap) {
     const gapUnsub = hubWS.onGap(() => {
-      invalidateAllWithPrefix(queryClient, hubQueryKeys.threads.root);
+      triggerResync();
     });
     unsubFns.push(gapUnsub);
+  }
+
+  // #2101 G4-②: On reconnect auth completion, trigger message resync.
+  if (hubWS.onReconnected) {
+    const reconnUnsub = hubWS.onReconnected(() => {
+      triggerResync();
+    });
+    unsubFns.push(reconnUnsub);
   }
 
   return {
