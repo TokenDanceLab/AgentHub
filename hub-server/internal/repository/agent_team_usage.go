@@ -27,29 +27,6 @@ func IncrementTeamRunTokenUsage(db *gorm.DB, teamRunID string, delta int64) erro
 	).Error
 }
 
-// BackfillTeamRunTokenUsage is an offline skeleton that populates
-// token_usage_total for a single historical run from the existing event
-// projection (agent run events → total tokens). It is the per-run primitive a
-// future cmd/backfill command would invoke for every existing run row; it is
-// NOT called from the hot path and is safe to run idempotently (the SET uses
-// the projection total, not an increment, so re-running with the same events
-// is a no-op). Returns the value written.
-//
-// Uses raw db.Exec for the same -> field-permission reason as
-// IncrementTeamRunTokenUsage.
-//
-// This skeleton lives in the repository layer (in-lane) rather than a
-// hub-server/cmd binary because the bounds of this lane do not include the
-// cmd/ tree; a follow-up can wire a thin main that iterates ListTeamRunsByTeam
-// and calls this per run.
-func BackfillTeamRunTokenUsage(db *gorm.DB, teamRunID string, projectedTotal int64) (int64, error) {
-	res := db.Exec(
-		"UPDATE agent_team_runs SET token_usage_total = ? WHERE id = ?",
-		projectedTotal, teamRunID,
-	)
-	return res.RowsAffected, res.Error
-}
-
 // CountTeamRouteDecisionsByActionWorkerInstructions counts prior accepted
 // route decisions (event type team.route.decided) whose payload matches the
 // given action / next_worker / instructions triple using the SAME

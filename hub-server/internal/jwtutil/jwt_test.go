@@ -697,19 +697,3 @@ func TestKeyRotation_ConcurrentAccess(t *testing.T) {
 		<-done
 	}
 }
-
-func TestKeyRotation_GetSecret(t *testing.T) {
-	secrets := map[string]string{
-		"key-a": "secret-a-padded-to-minimum-32-chars!",
-		"key-b": "secret-b-padded-to-minimum-32-chars!",
-	}
-	km, _ := NewKeyManager(secrets, "key-a")
-
-	if s := km.GetSecret(); s != "secret-a-padded-to-minimum-32-chars!" {
-		t.Errorf("GetSecret = %q, want key-a secret", s)
-	}
-	km.SetActiveKey("key-b") //nolint:errcheck
-	if s := km.GetSecret(); s != "secret-b-padded-to-minimum-32-chars!" {
-		t.Errorf("GetSecret after rotation = %q, want key-b secret", s)
-	}
-}

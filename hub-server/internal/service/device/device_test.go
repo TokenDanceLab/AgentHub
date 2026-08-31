@@ -31,10 +31,10 @@ func TestDeviceRegisterMapsOwnershipMismatchToBadRequest(t *testing.T) {
 	svc := NewService(db, nil)
 	deviceID := "44444444-4444-4444-8444-444444444444"
 
-	_, err = svc.Register(deviceID, "user-a", "desktop", "1.0.0", []string{"tasks"})
+	_, err = svc.Register(context.Background(), deviceID, "user-a", "desktop", "1.0.0", []string{"tasks"})
 	require.NoError(t, err)
 
-	_, err = svc.Register(deviceID, "user-b", "desktop", "1.0.1", []string{"tasks"})
+	_, err = svc.Register(context.Background(), deviceID, "user-b", "desktop", "1.0.1", []string{"tasks"})
 	require.ErrorIs(t, err, errcode.ErrBadRequest)
 }
 
@@ -73,7 +73,7 @@ func TestDeviceRegisterUpsertsDesktopLocalEdgeTargetAfterSuccessfulRegister(t *t
 	svc := NewService(db, registrar)
 
 	deviceID := "55555555-5555-4555-8555-555555555555"
-	device, err := svc.Register(deviceID, "user-a", "desktop", "1.0.0", []string{"local_edge", "agent.dispatch"})
+	device, err := svc.Register(context.Background(), deviceID, "user-a", "desktop", "1.0.0", []string{"local_edge", "agent.dispatch"})
 	require.NoError(t, err)
 	require.Equal(t, deviceID, device.ID)
 	require.Equal(t, 1, registrar.calls)
@@ -103,11 +103,11 @@ func TestDeviceRegisterDoesNotUpsertTargetAfterOwnershipMismatch(t *testing.T) {
 	svc := NewService(db, registrar)
 
 	deviceID := "66666666-6666-4666-8666-666666666666"
-	_, err = svc.Register(deviceID, "user-a", "desktop", "1.0.0", []string{"local_edge"})
+	_, err = svc.Register(context.Background(), deviceID, "user-a", "desktop", "1.0.0", []string{"local_edge"})
 	require.NoError(t, err)
 	require.Equal(t, 1, registrar.calls)
 
-	_, err = svc.Register(deviceID, "user-b", "desktop", "1.0.1", []string{"local_edge"})
+	_, err = svc.Register(context.Background(), deviceID, "user-b", "desktop", "1.0.1", []string{"local_edge"})
 	require.ErrorIs(t, err, errcode.ErrBadRequest)
 	require.Equal(t, 1, registrar.calls)
 }

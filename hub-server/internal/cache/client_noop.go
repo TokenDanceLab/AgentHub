@@ -8,9 +8,12 @@ import (
 
 // Residual pure-helper peel #1123: NoOpCache interface stubs.
 
-// NoOpCache is a safe no-op implementation of all cache interfaces used by
-// services. Tests and offline paths can use this explicitly. Production
-// constructors MUST receive a real *Client — passing nil will panic.
+// NoOpCache is a fail-closed cache stub: mutation/read methods return
+// ErrCacheUnavailable and the offline-queue methods surface that error to
+// callers instead of silently succeeding. Bookkeeping methods (Invalidate,
+// seq mirror setters, IsOnline) succeed as no-ops. Tests and offline paths
+// can use this explicitly. Production constructors MUST receive a real
+// *Client — passing nil will panic.
 type NoOpCache struct{}
 
 func (NoOpCache) Invalidate(ctx context.Context, keys ...string) error                   { return nil }

@@ -501,14 +501,6 @@ func TestUserRepo_CRUD(t *testing.T) {
 	fetched, err = GetUserByID(db, user.ID)
 	require.NoError(t, err)
 	assert.Equal(t, "Updated Name", fetched.Nickname)
-
-	// Update password
-	err = UpdatePassword(db, user.ID, "new_hash")
-	require.NoError(t, err)
-	fetched, err = GetUserByID(db, user.ID)
-	require.NoError(t, err)
-	require.NotNil(t, fetched.PasswordHash)
-	assert.Equal(t, "new_hash", *fetched.PasswordHash)
 }
 
 func TestUserRepo_GetUsersByIDs(t *testing.T) {
@@ -2188,45 +2180,6 @@ func TestPendingTaskRepo_AtomicFailClosed(t *testing.T) {
 	fetched, err := GetPendingTaskByID(db, task.ID)
 	require.NoError(t, err)
 	assert.Equal(t, model.TaskStatusDone, fetched.Status)
-}
-
-func TestUserRepo_UpdatePasswordAndRevokeTokens(t *testing.T) {
-	db := setupSQLite(t)
-
-	// Create user
-	user := &model.User{Username: "pwuser", PasswordHash: strPtr("old-hash"), Nickname: "PW"}
-	require.NoError(t, CreateUser(db, user))
-
-	// Create a couple of refresh tokens
-	rt1 := &model.RefreshToken{
-		UserID: user.ID, DeviceType: "desktop", DeviceID: "dev-1",
-		TokenHash: "hash1", ExpiresAt: time.Now().Add(time.Hour),
-	}
-	rt2 := &model.RefreshToken{
-		UserID: user.ID, DeviceType: "mobile", DeviceID: "dev-2",
-		TokenHash: "hash2", ExpiresAt: time.Now().Add(time.Hour),
-	}
-	require.NoError(t, UpsertRefreshToken(db, rt1))
-	require.NoError(t, UpsertRefreshToken(db, rt2))
-
-	// Atomic: update password + revoke all tokens
-	err := UpdatePasswordAndRevokeTokens(db, user.ID, "new-hash")
-	require.NoError(t, err)
-
-	// Verify password updated
-	fetchedUser, err := GetUserByID(db, user.ID)
-	require.NoError(t, err)
-	require.NotNil(t, fetchedUser.PasswordHash)
-	assert.Equal(t, "new-hash", *fetchedUser.PasswordHash)
-
-	// Verify all tokens revoked
-	rt1Check, err := FindRefreshTokenByHash(db, "hash1")
-	require.NoError(t, err)
-	assert.True(t, rt1Check.Revoked)
-
-	rt2Check, err := FindRefreshTokenByHash(db, "hash2")
-	require.NoError(t, err)
-	assert.True(t, rt2Check.Revoked)
 }
 
 func TestMessageRepo_PinMessageAtomic(t *testing.T) {

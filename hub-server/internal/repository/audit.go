@@ -69,16 +69,6 @@ func createAuditEventOnce(db *gorm.DB, event *model.AuditEvent) error {
 	})
 }
 
-// GetAuditEventByID returns an audit event by its ID.
-func GetAuditEventByID(db *gorm.DB, id string) (*model.AuditEvent, error) {
-	var e model.AuditEvent
-	err := db.Where("id = ?", id).First(&e).Error
-	if err != nil {
-		return nil, err
-	}
-	return &e, nil
-}
-
 // ListAuditEvents returns audit events with optional filters and cursor-based pagination.
 // When userID is empty, queries across all users (admin). When non-empty, filters to that user.
 // Cursor-based pagination uses descending order (newest first): WHERE id < cursor.
@@ -117,23 +107,6 @@ func ListAuditEvents(db *gorm.DB, userID, eventType, severity string, since, unt
 		events = events[:pageSize]
 	}
 	return events, hasMore, nil
-}
-
-// GetLatestAuditEvent returns the most recent audit event for hash-chain
-// computation, or nil if no events exist.
-func GetLatestAuditEvent(db *gorm.DB) (*model.AuditEvent, error) {
-	var e model.AuditEvent
-	err := db.Model(&model.AuditEvent{}).
-		Order("created_at DESC, id DESC").
-		Limit(1).
-		First(&e).Error
-	if err == gorm.ErrRecordNotFound {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, err
-	}
-	return &e, nil
 }
 
 // VerifyAuditChain verifies the integrity of up to limit audit events

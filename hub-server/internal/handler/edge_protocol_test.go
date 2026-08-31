@@ -41,7 +41,7 @@ func TestEdgeHubProtocol_FullCallbackChain(t *testing.T) {
 
 	// ── Mock device service ──────────────────────────────────────────
 	deviceSvc := &mockDeviceService{
-		registerFn: func(deviceID, userID, deviceType, appVersion string, capabilities []string) (*model.Device, error) {
+		registerFn: func(ctx context.Context, deviceID, userID, deviceType, appVersion string, capabilities []string) (*model.Device, error) {
 			mu.Lock()
 			deviceRegistered = true
 			mu.Unlock()
@@ -277,7 +277,7 @@ func TestEdgeHubProtocol_RegisterRequired(t *testing.T) {
 
 	t.Run("MissingDeviceID", func(t *testing.T) {
 		svc := &mockDeviceService{
-			registerFn: func(deviceID, userID, deviceType, appVersion string, capabilities []string) (*model.Device, error) {
+			registerFn: func(ctx context.Context, deviceID, userID, deviceType, appVersion string, capabilities []string) (*model.Device, error) {
 				return nil, nil
 			},
 		}

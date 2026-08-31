@@ -137,12 +137,6 @@ func (s *AgentTeamService) setRunPendingReview(runID string, latestDecision mode
 	})
 }
 
-// GetHumanReviewEnabled exposes the human review flag for use in tests and
-// external inspection.
-func (s *AgentTeamService) GetHumanReviewEnabled() bool {
-	return s.humanReviewEnabled
-}
-
 // replayReviewEvents populates the Reviews slice in TeamRunState from stored
 // TeamEvent entries of type team.review.pending and team.review.decided.
 func replayReviewEvents(events []model.AgentTeamEvent, state *model.TeamRunState) {

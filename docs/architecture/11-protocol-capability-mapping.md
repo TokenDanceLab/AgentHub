@@ -1,9 +1,6 @@
 # 协议能力映射：自有契约 / MCP / A2A / AG-UI（宏观 §3 P1）
 
-> 主索引：[architecture.md](../architecture.md)。本文件是 AgentHub 自有 REST/WS
-> 契约与三个外部协议（MCP / A2A / AG-UI）的能力对照、引入红线与评估结论 SSOT。
-> 上游基线：`docs/architecture/10-macro-engineering-design.md`（#2065 待合入；合入后改为相对链接） §3
-> 协议分层表 + §9 差距路线 P1「MCP/A2A/AG-UI capability mapping — 未成文」。
+> 主索引：[architecture.md](../architecture.md)。本文件是 AgentHub 自有 REST/WS 契约与三个外部协议（MCP / A2A / AG-UI）的能力对照、引入红线与评估结论 SSOT。上游基线：`docs/architecture/10-macro-engineering-design.md`（#2065，已合入）§3 协议分层表 + §9 差距路线 P1「MCP/A2A/AG-UI capability mapping — 未成文」。
 
 ## 0. 阅读约定
 
@@ -76,8 +73,7 @@ Deprecated unprefixed aliases（`list_projects` 等）仅在 discovery 中标记
 
 ### 2.5 外部来源
 
-- MCP spec（Streamable HTTP `2025-06-18`）：<https://modelcontextprotocol.io/specification/2025-06-18>
-- MCP spec（旧 session-based `2024-11-05`，已废弃）：<https://modelcontextprotocol.io/specification/2024-11-05>
+- MCP spec：Streamable HTTP `2025-06-18` <https://modelcontextprotocol.io/specification/2025-06-18>；旧 session-based `2024-11-05`（已废弃）<https://modelcontextprotocol.io/specification/2024-11-05>
 
 ## 3. A2A：远程/跨设备协作场景界定
 
@@ -128,8 +124,7 @@ Deprecated unprefixed aliases（`list_projects` 等）仅在 discovery 中标记
 
 ### 3.6 外部来源
 
-- A2A v1.0 spec：<https://google.github.io/A2A/>
-- A2A GitHub：<https://github.com/google/A2A>
+- A2A v1.0 spec <https://google.github.io/A2A/>；GitHub <https://github.com/google/A2A>
 
 ## 4. AG-UI：capability mapping 兼容评估
 
@@ -202,4 +197,4 @@ Deprecated unprefixed aliases（`list_projects` 等）仅在 discovery 中标记
 
 - 本文件是协议能力映射 SSOT；新增外部协议或变更引入判定须更新本文件。
 - 协议实现的源码 owner 在各模块 README；本文件只记录能力对照与红线。
-- 与本文件冲突时以本文件为准；若宏观基线更新，先更新 `docs/architecture/10-macro-engineering-design.md`（#2065 待合入；合入后改为相对链接） 再同步本文件。
+- 与本文件冲突时以本文件为准；若宏观基线更新，先更新 `docs/architecture/10-macro-engineering-design.md`（#2065，已合入） 再同步本文件。
