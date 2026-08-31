@@ -289,12 +289,20 @@ def check_max_lines() -> None:
         "docs/architecture/08-outbound-http.md": 150,
         "docs/architecture/09-dev-server-topology.md": 80,
         "docs/architecture/github-actions-ci-cd-policy.md": 120,
+        "docs/architecture/10-macro-engineering-design.md": 150,
+        "docs/architecture/11-protocol-capability-mapping.md": 200,
         "docs/architecture/README.md": 40,
+        "docs/component-acceptance.md": 130,
+        "docs/component-acceptance/ui-core.md": 320,
+        "docs/component-acceptance/pages.md": 80,
+        "docs/component-acceptance/chatview.md": 40,
         "docs/api-reference.md": 80,
         "docs/reference/README.md": 80,
         "docs/reference/sdk-agent-strategy.md": 120,
         "docs/reference/agent-protocol-compat.md": 100,
         "docs/governance/verifier-map.md": 120,
+        "docs/governance/known-flaky.md": 120,
+        "docs/reference/ux-benchmark-2026-08.md": 160,
     }
     for path, limit in limits.items():
         if exists(path) and line_count(path) > limit:

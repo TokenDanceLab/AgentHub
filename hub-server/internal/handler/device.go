@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"time"
@@ -14,7 +15,7 @@ import (
 
 // DeviceService is the subset of *device.Service used by DeviceHandler.
 type DeviceService interface {
-	Register(deviceID, userID, deviceType, appVersion string, capabilities []string) (*model.Device, error)
+	Register(ctx context.Context, deviceID, userID, deviceType, appVersion string, capabilities []string) (*model.Device, error)
 	ListDevices(userID string) ([]model.Device, error)
 }
 
@@ -74,7 +75,7 @@ func (h *DeviceHandler) Register(c *gin.Context) {
 		return
 	}
 
-	device, err := h.deviceService.Register(req.DeviceID, userID, deviceType, req.AppVersion, req.Capabilities)
+	device, err := h.deviceService.Register(c.Request.Context(), req.DeviceID, userID, deviceType, req.AppVersion, req.Capabilities)
 	if err != nil {
 		var e *errcode.Error
 		if errors.As(err, &e) {
@@ -167,7 +168,7 @@ func (h *DeviceHandler) CloudEdgeRegister(c *gin.Context) {
 
 	userID := c.GetString("user_id")
 
-	device, err := h.deviceService.Register(deviceID, userID, "cloud_edge", req.AppVersion, req.Capabilities)
+	device, err := h.deviceService.Register(c.Request.Context(), deviceID, userID, "cloud_edge", req.AppVersion, req.Capabilities)
 	if err != nil {
 		var e *errcode.Error
 		if errors.As(err, &e) {

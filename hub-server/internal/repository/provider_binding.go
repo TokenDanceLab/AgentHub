@@ -49,12 +49,3 @@ func ListProviderBindings(db *gorm.DB, ownerID, cursor string, pageSize int) ([]
 	}
 	return bindings, hasMore, nil
 }
-
-func FindProviderBindingByOwnerAndName(db *gorm.DB, ownerID, name string) (*model.ProviderBinding, error) {
-	var pb model.ProviderBinding
-	err := db.Where("owner_id = ? AND binding_name = ?", ownerID, name).First(&pb).Error
-	if err != nil {
-		return nil, err
-	}
-	return &pb, nil
-}

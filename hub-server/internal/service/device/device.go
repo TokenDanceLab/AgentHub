@@ -32,7 +32,7 @@ func NewService(db *gorm.DB, registrar desktopTargetRegistrar) *Service {
 // Register creates or updates a device record for the given user and returns it.
 // The handler layer should not construct model.Device directly — all DB logic
 // lives here.
-func (s *Service) Register(deviceID, userID, deviceType, appVersion string, capabilities []string) (*model.Device, error) {
+func (s *Service) Register(ctx context.Context, deviceID, userID, deviceType, appVersion string, capabilities []string) (*model.Device, error) {
 	capsBytes, _ := json.Marshal(capabilities)
 
 	device := &model.Device{
@@ -52,7 +52,7 @@ func (s *Service) Register(deviceID, userID, deviceType, appVersion string, capa
 	}
 
 	if device.DeviceType == "desktop" && s.desktopTargetRegistrar != nil {
-		if _, err := s.desktopTargetRegistrar.UpsertLocalEdgeForDesktopDevice(context.Background(), device); err != nil {
+		if _, err := s.desktopTargetRegistrar.UpsertLocalEdgeForDesktopDevice(ctx, device); err != nil {
 			return nil, err
 		}
 	}
