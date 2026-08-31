@@ -60,6 +60,9 @@ export interface AgentHubWorkbenchProps {
   workbenchStatus?: AgentHubWorkbenchStatus | undefined;
   agentProfilesStatus?: WorkbenchAgentProfilesStatus | undefined;
   contacts?: WorkbenchContactsData | undefined;
+  /** Hub contacts request failure (#1821) — the contacts page must render an
+   *  explicit error state instead of collapsing into an empty list. */
+  contactsError?: string | undefined;
   projects?: ProjectInfo[] | undefined;
   activeProjectId?: string | undefined;
   projectsStatus?: AgentHubWorkbenchProjectsStatus | undefined;
@@ -92,6 +95,9 @@ export interface AgentHubWorkbenchProps {
   contactsActions?: WorkbenchContactsActions | undefined;
   /** Document rows for DocsPage (real data first, mock fallback). */
   documents?: DocRow[] | undefined;
+  /** Hub documents request failure (#1821) — the docs page must render an
+   *  explicit error state instead of collapsing into an empty list. */
+  documentsError?: string | undefined;
   /** Document mutation actions wired to Hub Documents API. */
   documentsActions?: WorkbenchDocumentsActions | undefined;
   /** Model catalog items from Edge API. When provided, the Agents page

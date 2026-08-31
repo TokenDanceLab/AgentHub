@@ -249,6 +249,7 @@ export function buildWorkbenchFrameProps(
   assignDefined(frameProps, 'workbenchStatus', props.workbenchStatus);
   assignDefined(frameProps, 'agentProfilesStatus', props.agentProfilesStatus);
   assignDefined(frameProps, 'contacts', props.contacts);
+  assignDefined(frameProps, 'contactsError', props.contactsError);
   assignDefined(frameProps, 'projects', props.projects);
   assignDefined(frameProps, 'activeProjectId', props.activeProjectId);
   assignDefined(frameProps, 'projectsStatus', props.projectsStatus);
@@ -267,6 +268,7 @@ export function buildWorkbenchFrameProps(
   assignDefined(frameProps, 'onStartNewConversation', props.onStartNewConversation);
   assignDefined(frameProps, 'contactsActions', props.contactsActions);
   assignDefined(frameProps, 'documents', props.documents);
+  assignDefined(frameProps, 'documentsError', props.documentsError);
   assignDefined(frameProps, 'documentsActions', props.documentsActions);
   assignDefined(frameProps, 'modelCatalog', props.modelCatalog);
   assignDefined(frameProps, 'ccSwitchStatus', props.ccSwitchStatus);
