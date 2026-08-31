@@ -75,10 +75,11 @@ func (c *Client) PushPendingTask(ctx context.Context, userID, taskJSON string) e
 	key := pendingTaskKey(userID)
 	pipe := c.rdb.TxPipeline()
 	pipe.LPush(ctx, key, taskJSON)
-	// Cap the list to the most recent pendingTaskQueueMaxLen entries. LTRIM
-	// with start = -maxLen and stop = -1 keeps only the tail of the list
-	// (the most recently pushed items, since LPush prepends).
-	pipe.LTrim(ctx, key, int64(-pendingTaskQueueMaxLen), -1)
+	// LPUSH prepends, so the newest entry sits at index 0 and the oldest at
+	// the tail. Keep the HEAD [0, maxLen-1]: newest retained, oldest evicted.
+	// (The previous LTRIM -maxLen -1 kept the tail = oldest — inverted the
+	// documented direction and silently dropped freshly pushed tasks.)
+	pipe.LTrim(ctx, key, 0, int64(pendingTaskQueueMaxLen-1))
 	pipe.Expire(ctx, key, config.PendingTaskTTL)
 	_, err := pipe.Exec(ctx)
 	return err
@@ -96,7 +97,7 @@ func (c *Client) PushPendingTaskWithEviction(ctx context.Context, userID, taskJS
 	// Exec time; the LPush length is the post-push, pre-trim count, so when
 	// it exceeds the cap, LTRIM evicted at least one older entry.
 	pushedLenCmd := pipe.LPush(ctx, key, taskJSON)
-	pipe.LTrim(ctx, key, int64(-pendingTaskQueueMaxLen), -1)
+	pipe.LTrim(ctx, key, 0, int64(pendingTaskQueueMaxLen-1))
 	pipe.Expire(ctx, key, config.PendingTaskTTL)
 	_, err := pipe.Exec(ctx)
 	if err != nil {
