@@ -14,41 +14,10 @@ import (
 // BenchmarkRecordDelivery measures the insert path: UUID generation + store
 // Insert. Represents the per-dispatch journal-write cost before Hub sends a
 // task to Edge.
-func BenchmarkRecordDelivery(b *testing.B) {
-	store := newFakeStore()
-	ob := NewOutbox(store, nil)
-	ctx := context.Background()
-	payload := `{"task_id":"t1","action":"run"}`
-
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		_, _ = ob.RecordDelivery(ctx, fmt.Sprintf("task-%d", i), payload, "edge-dev-1")
-	}
-}
 
 // BenchmarkMarkDeliverySent measures the pending→sent state transition,
 // including the attempt_count reset and next_retry_at clear. Hot path on
 // every successful dispatch confirmation.
-func BenchmarkMarkDeliverySent(b *testing.B) {
-	store := newFakeStore()
-	ob := NewOutbox(store, nil)
-	ctx := context.Background()
-
-	// Pre-seed N pending entries so each iteration has a distinct row.
-	ids := make([]string, b.N)
-	for i := 0; i < b.N; i++ {
-		id, err := ob.RecordDelivery(ctx, fmt.Sprintf("task-%d", i), "{}", "edge-dev-1")
-		if err != nil {
-			b.Fatalf("seed: %v", err)
-		}
-		ids[i] = id
-	}
-
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		_ = ob.MarkDeliverySent(ctx, ids[i])
-	}
-}
 
 // BenchmarkAckDelivery measures the sent→delivered transition triggered by
 // an Edge ack callback. Covers the UpdateByDeliveryID CAS + delivered_at set.

@@ -35,10 +35,6 @@ type ProcessExecutor struct {
 	messageQueue  *agents.Queue     // inter-agent message queue for result delivery; may be nil
 	resultAgg     *ResultAggregator // tracks sub-agent completion and emits sub_agents_complete; may be nil
 
-	// Decision loop step tracking (optional). When configured, the emitter in
-	// publishStructuredOutput is wrapped with step-counting and max-steps enforcement.
-	decisionLoopFactory *DecisionLoopEmitterFactory
-
 	// Configurable timeouts for run lifecycle and graceful shutdown.
 	runTimeout           time.Duration
 	shutdownGracePeriod  time.Duration

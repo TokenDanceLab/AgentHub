@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 
+	"github.com/redis/go-redis/v9"
+
 	"github.com/agenthub/hub-server/internal/config"
 )
 
@@ -107,15 +109,26 @@ func (c *Client) PushPendingTaskWithEviction(ctx context.Context, userID, taskJS
 	return pushedLen > pendingTaskQueueMaxLen, nil
 }
 
+// popAllScript drains and deletes a Redis list in one atomic step, so a task
+// pushed concurrently lands on the fresh post-pop key instead of being wiped
+// by a read-then-delete pair (the previous LRange+Del could delete a just-
+// pushed entry, silently losing a queued task).
+var popAllScript = redis.NewScript(`
+local items = redis.call('LRANGE', KEYS[1], 0, -1)
+redis.call('DEL', KEYS[1])
+return items
+`)
+
+// popAll atomically returns all list elements for key and clears the key.
+func (c *Client) popAll(ctx context.Context, key string) ([]string, error) {
+	return popAllScript.Run(ctx, c.rdb, []string{key}).StringSlice()
+}
+
 // PopPendingTasks pops all pending tasks for a user and clears the queue.
 func (c *Client) PopPendingTasks(ctx context.Context, userID string) ([]string, error) {
-	key := pendingTaskKey(userID)
-	tasks, err := c.rdb.LRange(ctx, key, 0, -1).Result()
+	tasks, err := c.popAll(ctx, pendingTaskKey(userID))
 	if err != nil {
 		return nil, err
-	}
-	if len(tasks) > 0 {
-		c.rdb.Del(ctx, key)
 	}
 	result := make([]string, 0, len(tasks))
 	for _, t := range tasks {
@@ -366,13 +379,9 @@ func (c *Client) AckPendingAgentControl(ctx context.Context, userID, deviceID, c
 // PopPendingAgentControlsForDevice pops all queued controls for one device and
 // clears only that device's control queue.
 func (c *Client) PopPendingAgentControlsForDevice(ctx context.Context, userID, deviceID string) ([]string, error) {
-	key := pendingAgentControlKey(userID, deviceID)
-	controls, err := c.rdb.LRange(ctx, key, 0, -1).Result()
+	controls, err := c.popAll(ctx, pendingAgentControlKey(userID, deviceID))
 	if err != nil {
 		return nil, err
-	}
-	if len(controls) > 0 {
-		c.rdb.Del(ctx, key)
 	}
 	result := make([]string, 0, len(controls))
 	for _, control := range controls {

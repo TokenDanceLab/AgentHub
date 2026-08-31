@@ -111,17 +111,6 @@
    { "ms": 2000, "kind": "simulated_slow" }
   ]
  },
- "edge-server/internal/lifecycle/decision_loop_test.go": {
-  "count": 1,
-  "total_ms": 10,
-  "max_ms": 10,
-  "owner": "DeliciousBuding",
-  "review": "2026-11-02",
-  "reason": "Simulated slow async approval in goroutine so the loop observes the decision after a scheduling gap.",
-  "sleeps": [
-   { "ms": 10, "kind": "simulated_slow" }
-  ]
- },
  "edge-server/internal/lifecycle/process_executor_hub_callback_test.go": {
   "count": 1,
   "total_ms": 10,

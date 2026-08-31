@@ -256,8 +256,12 @@ func (s *Service) Install(ctx context.Context, id, installerID string) (*model.A
 	if src.OwnerID == installerID {
 		return nil, errcode.ErrBadRequest.WithMessage("cannot install your own profile")
 	}
-	// Check if already installed
-	existing, _ := repository.FindProfileByOwnerAndName(s.db, installerID, src.Name)
+	// Check if already installed. Propagate the lookup error instead of
+	// masking it: a DB blip must not let a duplicate install slip through.
+	existing, err := repository.FindProfileByOwnerAndName(s.db, installerID, src.Name)
+	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, err
+	}
 	if existing != nil {
 		return nil, errcode.GroupAlreadyMember.WithMessage("already installed") // reuse conflict code
 	}

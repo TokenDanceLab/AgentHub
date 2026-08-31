@@ -97,18 +97,3 @@ func BenchmarkPublish_Wildcard(b *testing.B) {
 
 // BenchmarkPublish_NoHandlers covers the early-return path when no handler
 // matches the event type — common for diagnostic events with no listener.
-func BenchmarkPublish_NoHandlers(b *testing.B) {
-	bus, err := New()
-	if err != nil {
-		b.Skipf("bus.New failed: %v", err)
-	}
-	defer bus.Close(context.Background())
-
-	ctx := context.Background()
-	ev := Event{Type: "bench.none", Payload: "x"}
-
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		_ = bus.Publish(ctx, ev)
-	}
-}

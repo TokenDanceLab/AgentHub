@@ -886,9 +886,6 @@ func TestPublishAndSpawnPredicates(t *testing.T) {
 	if !shouldStoreSubAgentAggregatorResult(true) || shouldStoreSubAgentAggregatorResult(false) {
 		t.Fatal("aggregator")
 	}
-	if !shouldWrapDecisionLoopEmitter(true) || shouldWrapDecisionLoopEmitter(false) {
-		t.Fatal("decision loop")
-	}
 	if !shouldFlushTranscriptEmitter(true) || shouldFlushTranscriptEmitter(false) {
 		t.Fatal("flush transcript")
 	}
@@ -1688,12 +1685,12 @@ func TestResidualPlanPureHelpers1011(t *testing.T) {
 	}
 
 	// structured emitter wraps
-	wrap := planStructuredEmitterWraps(false, false)
-	if wrap.ApplyBudget || wrap.WrapDecisionLoop {
+	wrap := planStructuredEmitterWraps(false)
+	if wrap.ApplyBudget {
 		t.Fatalf("none %#v", wrap)
 	}
-	wrap = planStructuredEmitterWraps(true, true)
-	if !wrap.ApplyBudget || !wrap.WrapDecisionLoop {
+	wrap = planStructuredEmitterWraps(true)
+	if !wrap.ApplyBudget {
 		t.Fatalf("both %#v", wrap)
 	}
 

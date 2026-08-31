@@ -1380,3 +1380,35 @@ func TestDeleteRoute_NonExistentFieldIsNoOp(t *testing.T) {
 	require.NoError(t, c.DeleteRoute(ctx, "user-partial", "desktop"))
 	assert.True(t, mr.Exists("device_route:user-partial"), "key should survive deleting a missing field")
 }
+
+// TestPopPendingTasks_AtomicDrainAndClear documents the pop contract after the
+// LRange+Del race fix (#2136 P3-5): the drain and clear run as one server-side
+// EVAL, so a task pushed by a concurrent writer lands on the fresh post-pop
+// key instead of being silently deleted. The deterministic client-visible
+// invariant: after a pop the queue is empty, and a push that arrives after the
+// pop survives for the next pop.
+func TestPopPendingTasks_AtomicDrainAndClear(t *testing.T) {
+	c, _ := testClient(t)
+	ctx := context.Background()
+
+	t1 := `{"id":"t1"}`
+	t2 := `{"id":"t2"}`
+	require.NoError(t, c.PushPendingTask(ctx, "user-atomic", t1))
+	require.NoError(t, c.PushPendingTask(ctx, "user-atomic", t2))
+
+	popped, err := c.PopPendingTasks(ctx, "user-atomic")
+	require.NoError(t, err)
+	// LPush keeps newest at head, so the drain returns t2 then t1.
+	require.Equal(t, []string{t2, t1}, popped)
+
+	// Queue is cleared by the pop itself (no follow-up Del needed).
+	again, err := c.PopPendingTasks(ctx, "user-atomic")
+	require.NoError(t, err)
+	require.Empty(t, again)
+
+	// A push landing right after the pop starts a fresh queue and is kept.
+	require.NoError(t, c.PushPendingTask(ctx, "user-atomic", t2))
+	next, err := c.PopPendingTasks(ctx, "user-atomic")
+	require.NoError(t, err)
+	require.Equal(t, []string{t2}, next)
+}
