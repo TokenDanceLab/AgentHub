@@ -300,8 +300,6 @@
   "chat.result.success": "Done — {{input}} in / {{output}} out tokens",
   "chat.result.failed": "Failed: {{error}}",
   "chat.retry": "Retry",
-  "toast.copied": "Copied to clipboard",
-  "toast.error": "Copy failed",
   "welcome.title": "Welcome",
   "welcome.eyebrow": "GET STARTED",
   "welcome.headline": "AgentHub",

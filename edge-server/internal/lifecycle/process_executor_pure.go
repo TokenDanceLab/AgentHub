@@ -210,19 +210,6 @@ func (e *ProcessExecutor) WithResultAggregator(ra *ResultAggregator) *ProcessExe
 	return e
 }
 
-// WithDecisionLoop attaches a DecisionLoopEmitterFactory that wraps the
-// adapter event stream with step counting, max-steps enforcement, and
-// tool-approval gating. This enables multi-step execution visibility for
-// agents that otherwise run as opaque single-shot processes.
-//
-// When set, the factory is applied in publishStructuredOutput to wrap the
-// raw adapter emitter. The DecisionLoop state (currentStep, phase, etc.)
-// is accessible via the factory's Loop() method for API progress reporting.
-func (e *ProcessExecutor) WithDecisionLoop(factory *DecisionLoopEmitterFactory) *ProcessExecutor {
-	e.decisionLoopFactory = factory
-	return e
-}
-
 // SetHubCallback configures the Edge→Hub direct callback client.
 // When set, run lifecycle transitions (started, finished, failed, cancelled)
 // are reported to the Hub server. Callbacks are fire-and-forget: errors are

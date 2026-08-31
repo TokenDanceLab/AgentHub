@@ -140,8 +140,8 @@ func (e *ProcessExecutor) buildAndStartProcess(
 		safeGo("watchRunProcess", func() { e.watchRunProcess(ctx, run.ID, cmd.Process, watchStop) })
 	}
 
-	// Eager-close stdin when adapter/decision-loop do not need the pipe.
-	stdinPlan := planEagerStdinClose(stdin != nil, planStdinPipeOpen(adapter).Open, e.decisionLoopFactory != nil)
+	// Eager-close stdin when the adapter does not need the pipe.
+	stdinPlan := planEagerStdinClose(stdin != nil, planStdinPipeOpen(adapter).Open, false)
 	if stdinPlan.ClosePipe {
 		_ = stdin.Close()
 	}
