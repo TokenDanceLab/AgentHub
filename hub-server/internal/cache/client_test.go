@@ -113,6 +113,14 @@ func TestGetOrLoad_SingleflightDedup(t *testing.T) {
 	var wg sync.WaitGroup
 	results := make([]int, 10)
 
+	// Windows flake 修复：原实现用 100ms loader sleep 作为 flight 窗口，
+	// Windows runner 调度抖动可超过该窗口，迟到 goroutine 错过 flight 触发
+	// 第二次加载。改为阻塞式 loader：释放时机由测试掌握，flight 窗口不再
+	// 依赖墙钟——释放前所有 goroutine 必然并入同一 flight。
+	release := make(chan struct{})
+	var started atomic.Int64
+	var arrived atomic.Int64
+
 	// Phase 1: release all goroutines simultaneously.
 	barrier := make(chan struct{})
 	var start sync.WaitGroup
@@ -131,8 +139,10 @@ func TestGetOrLoad_SingleflightDedup(t *testing.T) {
 
 			ready.Done()
 			ready.Wait() // all goroutines now calling GetOrLoad together
+			arrived.Add(1)
 			v, err := GetOrLoad(c, ctx, "sf-key", 30*time.Second, func(ctx context.Context) (int, error) {
-				time.Sleep(100 * time.Millisecond) // keep sf.Do open for others to join
+				started.Add(1)
+				<-release
 				lc.inc()
 				return 42, nil
 			})
@@ -142,6 +152,20 @@ func TestGetOrLoad_SingleflightDedup(t *testing.T) {
 	}
 	start.Wait()
 	close(barrier)
+
+	// flight 启动后即被 release 阻塞，缓存必然为空；等全部 goroutine
+	// 进入 GetOrLoad 后再释放，保证所有调用并入同一 flight。
+	require.Eventually(t, func() bool { return started.Load() >= 1 },
+		5*time.Second, 5*time.Millisecond, "singleflight loader should have started")
+	require.Eventually(t, func() bool { return arrived.Load() == 10 },
+		5*time.Second, 5*time.Millisecond, "all goroutines should have entered GetOrLoad")
+	// settle 窗口：arrived 只保证进入 GetOrLoad，GET 本身可能还在飞；等一个
+	// 有界窗口让所有 GET 在 flight 存活期间落地（miss→并入），再释放。
+	settle := time.Now()
+	require.Eventually(t, func() bool { return time.Since(settle) >= 200*time.Millisecond },
+		2*time.Second, 10*time.Millisecond, "in-flight GETs should settle before release")
+	close(release)
+
 	wg.Wait()
 
 	assert.Equal(t, 1, lc.count, "singleflight: loader should be called exactly once")
@@ -1136,23 +1160,34 @@ func TestConcurrentGetOrLoad(t *testing.T) {
 
 	lc := &loadCount{}
 
+	// Windows flake 修复：原实现用 50ms loader sleep 作为 flight 窗口，
+	// Windows runner 调度抖动可超过该窗口，迟到 goroutine 错过 flight 触发
+	// 第二次加载（CI run 33346274196）。改为阻塞式 loader：释放时机由测试
+	// 掌握，缓存写入前所有 goroutine 必然并入同一 flight。
+	release := make(chan struct{})
+	var started atomic.Int64
+	var arrived atomic.Int64
+
+	const goroutines = 30
 	var wg sync.WaitGroup
-	results := make(chan int, 30)
+	results := make(chan int, goroutines)
 
 	// Release all goroutines at once
 	barrier := make(chan struct{})
 	var ready sync.WaitGroup
-	ready.Add(30)
+	ready.Add(goroutines)
 
-	for i := 0; i < 30; i++ {
+	for i := 0; i < goroutines; i++ {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
 			<-barrier
 			ready.Done()
 			ready.Wait()
+			arrived.Add(1)
 			v, err := GetOrLoad(c, ctx, "sf-conc-key", 30*time.Second, func(ctx context.Context) (int, error) {
-				time.Sleep(50 * time.Millisecond)
+				started.Add(1)
+				<-release
 				return lc.inc(), nil
 			})
 			require.NoError(t, err)
@@ -1160,6 +1195,21 @@ func TestConcurrentGetOrLoad(t *testing.T) {
 		}()
 	}
 	close(barrier)
+
+	// flight 启动后即被 release 阻塞，缓存必然为空；等全部 goroutine
+	// 进入 GetOrLoad 后再释放，保证所有调用要么并入同一 flight，要么
+	// （极端迟到者）读到 flight 写入的缓存——loader 至多一次。
+	require.Eventually(t, func() bool { return started.Load() >= 1 },
+		5*time.Second, 5*time.Millisecond, "singleflight loader should have started")
+	require.Eventually(t, func() bool { return arrived.Load() == goroutines },
+		5*time.Second, 5*time.Millisecond, "all goroutines should have entered GetOrLoad")
+	// settle 窗口：arrived 只保证进入 GetOrLoad，GET 本身可能还在飞；等一个
+	// 有界窗口让所有 GET 在 flight 存活期间落地（miss→并入），再释放。
+	settle := time.Now()
+	require.Eventually(t, func() bool { return time.Since(settle) >= 200*time.Millisecond },
+		2*time.Second, 10*time.Millisecond, "in-flight GETs should settle before release")
+	close(release)
+
 	wg.Wait()
 	close(results)
 
