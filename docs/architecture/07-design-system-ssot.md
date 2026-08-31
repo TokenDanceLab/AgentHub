@@ -1,7 +1,7 @@
 # Design system SSOT map
 
 最后更新：2026-08-24
-Issue: #466 (P9.1 SSOT map) · residual hardcode closed via #879 / #910 / #1021 · open residual ModelDropdown + IM rgba chrome · **#1197 frosted-glass material layer**
+Issue: #466 (P9.1 SSOT map) · residual hardcode closed via #879 / #910 / #1021 · ModelDropdown residual closed (component removed) · **#1197 frosted-glass material layer**
 
 > 权威入口：本文件是 **design tokens / theme runtime / surface CSS ownership** 的 SSOT map。Design token SSOT 由 `app/shared/src/styles/`（CSS 值）与 `app/shared/src/designTokens.ts`（跨平台 alias / surface rules）共同组成；后者不是第二份颜色值表。
 > 可选审计清单（design-token-usage-audit.md）已外迁，见 `docs/history.md`。
@@ -58,7 +58,7 @@ Entry CSS load: desktop/web `main.tsx` imports surface `styles/{tokens,themes,pr
 | `--td-*` fallback drift | **Closed #1820** — radius-control / text-sm/xs / dur-normal / wb-gap-2xs / r-full 双值统一为 SSOT；`white`/`#eee`、`--bg-3`/`--mono`/`--wb-gap-3xl`/`--ah-border-subtle` 死链清除 | — |
 | EntryGate / FileExplorer hardcode | **Closed #879** — desktop modules map to design-token SSOT | — |
 | Ghost `var(--color-*)` product consumers | **Closed #910 / #1021** — product modules use semantic SSOT; `--color-*` remains legacy/preset-private | — |
-| ModelDropdown + IM rgba chrome | **Open residual** — `ModelDropdown.module.css` (~22 hex/rgba); IM panels retain local rgba chrome | Hardcode pass to semantic / glass tokens |
+| ModelDropdown + IM rgba chrome | **Closed** — ModelDropdown component/CSS no longer exists under app/ (component removed); IM panels retain local rgba chrome | Hardcode pass to semantic / glass tokens |
 | Syntax-highlight binding pair (`#282c34` bg / `#abb2bf` ink) | **Intentional (2026-08-23)** — react-syntax-highlighter `oneDark` theme binding, theme-*independent* (code blocks render oneDark in both app themes → no theme token pair exists or should exist; a `--td-syntax-*` group would be fake identical pairs and still not own the library's 30+ inline-style colors). Sites: `CodeBlock.tsx` fallbackStyle + `Markdown.module.css` fade-out gradient `rgba(40,44,52,.85)`. Both carry cross-reference comments. | Re-check both sites in one commit if the pinned `oneDark` palette changes on library upgrade |
 | Chatview parallel spacing / density | **Partial in #491** — chatview `--chat-sp-md` aliases base compat `--space-md` (12px，非 v4 `--sp-md` 16px); lg/xl = 16/24（P76 有意密度；v4 为 16/24/32）. **#518 residual inventory** — radius / type / dark remain intentional forks; **#607 reconfirmed hold** | Full merge + dark palette needs deliberate redesign |
 | Workbench raw `px` spacing | **Partial in #480** — fully-mappable spacing → `--sp-*` / compat `--space-md|3xl`; odd steps remain raw | Optional: scale extension or redesign normalize |
@@ -72,7 +72,7 @@ Entry CSS load: desktop/web `main.tsx` imports surface `styles/{tokens,themes,pr
 - Added `app/shared/src/themePresets.ts` with `THEME_PRESETS`, `THEME_PRESET_META`, storage key, get/persist/apply helpers.
 - Re-exported from `app/shared/src/theme.ts` (`@shared/theme` package export already exists).
 - Desktop `ThemeContext` no longer owns preset list/meta/storage/DOM apply; imports shared helpers.
-- Web `ThemeContext` remains mode-only but documents shared ownership for future presets.
+- Web `ThemeContext` 保留 mode-only 骨架；preset API 由 shared `themePresets` 提供，Web preset switcher 已落地（§3 Closed #1820）。
 
 ### Fix B — kill stale status-token fallbacks
 

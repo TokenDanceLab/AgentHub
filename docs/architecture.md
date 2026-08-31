@@ -29,7 +29,7 @@ Web shared workbench
   -> Edge Server
   -> Agent Runtime adapter
 
-Mobile shared workbench (viewer / limited control)
+Mobile (fixture/boundary lane, independent RN rendering)
   -> Mobile platform adapter
   -> Hub Server
   -> Edge routing / relay (via Hub)
@@ -41,7 +41,7 @@ Mobile shared workbench (viewer / limited control)
 | Workbench | `app/workbench/` | 端级工作台 shell（`@agenthub/workbench`，依赖方向 workbench → shared 单向，#1759） |
 | Desktop | `app/desktop/` | Tauri shell、Desktop adapter、Local Edge、本机能力 |
 | Web | `app/web/` | Hub session、Web adapter、远程审批和查看 |
-| Mobile | `app/mobile-rn/` | RN shell、Mobile adapter、Hub viewer surface |
+| Mobile | `app/mobile-rn/` | RN shell、Mobile adapter、Hub viewer surface（fixture/边界验证 lane，独立渲染，非 release candidate） |
 | Edge | `edge-server/` | 本地项目、Thread、Run lifecycle、Runtime adapter、Artifact index |
 | Hub | `hub-server/` | TokenDance ID relying party、Hub session、IM、AgentTeam、同步、中继、审计 |
 | API | `api/` | REST API 和 WebSocket event 契约 |
