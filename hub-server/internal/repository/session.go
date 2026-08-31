@@ -1,6 +1,8 @@
 package repository
 
 import (
+	"strconv"
+	"strings"
 	"time"
 
 	"gorm.io/gorm"
@@ -60,18 +62,38 @@ func SyncSessionSeq(db *gorm.DB, sessionID string, seq int64) error {
 		Update("next_seq", seq).Error
 }
 
-func SearchSessions(db *gorm.DB, userID, q string) ([]SessionWithMeta, error) {
+// SearchSessions returns a page of sessions matching q for the given member,
+// ordered by most recent activity (COALESCE(last_message_at, created_at)
+// DESC, id DESC tie-break). cursor encodes "<activityUnixNano>|<id>" from the
+// previous page's last row; malformed/legacy cursors start a fresh page.
+// Returns (sessions, hasMore) with the pageSize+1 probing convention.
+func SearchSessions(db *gorm.DB, userID, q, cursor string, pageSize int) ([]SessionWithMeta, bool, error) {
 	var result []SessionWithMeta
-	err := db.Raw(`
+	args := []interface{}{userID, "%" + q + "%"}
+	sql := `
 		SELECT s.*, sm.role, sm.pinned, sm.archived, sm.muted, sm.last_read_seq,
 			(SELECT COUNT(*) FROM session_members sm2 WHERE sm2.session_id = s.id AND sm2.left_at IS NULL) as member_count
 		FROM sessions s
 		INNER JOIN session_members sm ON sm.session_id = s.id AND sm.member_id = ? AND sm.left_at IS NULL
-		WHERE s.dissolved = false AND (s.type = 'group' OR (s.type = 'private')) AND s.name LIKE ?
-		ORDER BY s.last_message_at DESC NULLS LAST, s.created_at DESC
-		LIMIT 20
-	`, userID, "%"+q+"%").Scan(&result).Error
-	return result, err
+		WHERE s.dissolved = false AND (s.type = 'group' OR (s.type = 'private')) AND s.name LIKE ?`
+	if parts := strings.SplitN(cursor, "|", 2); len(parts) == 2 {
+		if nanos, err := strconv.ParseInt(parts[0], 10, 64); err == nil {
+			cursorTime := time.Unix(0, nanos)
+			args = append(args, cursorTime, cursorTime, parts[1])
+			sql += " AND (COALESCE(s.last_message_at, s.created_at) < ? OR (COALESCE(s.last_message_at, s.created_at) = ? AND s.id < ?))"
+		}
+	}
+	args = append(args, pageSize+1)
+	sql += " ORDER BY COALESCE(s.last_message_at, s.created_at) DESC, s.id DESC LIMIT ?"
+
+	if err := db.Raw(sql, args...).Scan(&result).Error; err != nil {
+		return nil, false, err
+	}
+	hasMore := len(result) > pageSize
+	if hasMore {
+		result = result[:pageSize]
+	}
+	return result, hasMore, nil
 }
 
 func ListUserSessions(db *gorm.DB, userID string) ([]SessionWithMeta, error) {

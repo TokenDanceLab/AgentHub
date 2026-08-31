@@ -12,8 +12,14 @@ export function buildSearchUserPath(targetUserId: string): string {
   return `/client/contacts/search?id=${encodeURIComponent(targetUserId)}`;
 }
 
-export function buildSearchSessionsPath(q: string): string {
-  return `/client/sessions/search?q=${encodeURIComponent(q)}`;
+export function buildSearchSessionsPath(
+  q: string,
+  params?: { pageCursor?: string; pageSize?: number },
+): string {
+  // q is the only pre-existing param and keeps its historical %XX encoding
+  // (encodeURIComponent); pagination params append via the shared qs helper.
+  const extra = qs(params ?? {});
+  return `/client/sessions/search?q=${encodeURIComponent(q)}${extra ? `&${extra.slice(1)}` : ''}`;
 }
 
 export function buildListMessageReactionsPath(messageId: string, sessionId: string): string {
@@ -105,7 +111,7 @@ export function buildSyncMessagesPath(
 
 export function buildSearchSessionMessagesPath(
   sessionId: string,
-  params: { q: string; content_type?: string; from?: string; to?: string },
+  params: { q: string; content_type?: string; from?: string; to?: string; pageCursor?: string; pageSize?: number },
 ): string {
   return `/client/sessions/${encodeURIComponent(sessionId)}/messages/search${qs(params)}`;
 }
@@ -221,6 +227,8 @@ export function buildSearchMessagesPath(params: {
   content_type?: string;
   from?: string;
   to?: string;
+  pageCursor?: string;
+  pageSize?: number;
 }): string {
   return `/client/messages/search${qs(params)}`;
 }
