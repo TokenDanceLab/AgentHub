@@ -46,12 +46,17 @@ export interface UseWorkbenchContactsRouteOptions {
   contacts?: WorkbenchContactsData | undefined;
   contactsActions?: WorkbenchContactsActions | undefined;
   onStartConversation?: ((target: { name: string; id: string; kind: 'dm' | 'group' }) => void) | undefined;
+  /** Hub contacts request failure (#1821) — renders an explicit error state
+   *  instead of collapsing into the mock/empty contact list. */
+  contactsError?: string | undefined;
 }
 
 export interface WorkbenchContactsRoute {
   contactsPane: ContactsPane;
   setContactsPane: (pane: ContactsPane) => void;
-  contactsData: WorkbenchContactsData;
+  contactsData: WorkbenchContactsData | undefined;
+  /** Hub contacts request failure (#1821), surfaced to the page error state. */
+  contactsError: string | undefined;
   handleMemberClick: ((member: ContactMember) => void) | undefined;
   contactsActions: WorkbenchContactsActions | undefined;
   /**
@@ -85,6 +90,7 @@ export function useWorkbenchContactsRoute({
   contacts,
   contactsActions,
   onStartConversation,
+  contactsError,
 }: UseWorkbenchContactsRouteOptions): WorkbenchContactsRoute {
   const [contactsPane, setContactsPane] = useState<ContactsPane>('internal');
   const handleMemberClick = onStartConversation
@@ -143,7 +149,10 @@ export function useWorkbenchContactsRoute({
   // Pagination only drives the internal members list; external/starred panes
   // are small static slices, so expose the flags only for the internal pane.
   const membersPaneActive = contactsPane === 'internal';
-  const contactsData = useMemo<WorkbenchContactsData>(() => {
+  const contactsData = useMemo<WorkbenchContactsData | undefined>(() => {
+    // #1821: an errored request must not collapse into the mock/empty list —
+    // the page renders its explicit error state instead.
+    if (contactsError) return undefined;
     if (contacts) return resolveContactsData(contacts);
     return {
       members,
@@ -162,6 +171,7 @@ export function useWorkbenchContactsRoute({
     contactsPane,
     setContactsPane,
     contactsData,
+    contactsError,
     handleMemberClick,
     contactsActions,
     hasMore: mockPaginationEnabled && membersPaneActive ? hasMore : false,

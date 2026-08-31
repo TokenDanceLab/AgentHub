@@ -146,7 +146,7 @@ const WorkbenchProjectsRouteGate = React.memo(function WorkbenchProjectsRouteGat
 
 type WorkbenchDocsRouteGateProps = Pick<
   WorkbenchRoutesProps,
-  'documents' | 'documentsActions'
+  'documents' | 'documentsError' | 'documentsActions'
 > & {
   active: boolean;
   realDataMode: boolean;
@@ -157,11 +157,13 @@ const WorkbenchDocsRouteGate = React.memo(function WorkbenchDocsRouteGate({
   active,
   profiles,
   documents,
+  documentsError,
   documentsActions,
   realDataMode,
 }: WorkbenchDocsRouteGateProps): React.ReactElement | null {
   const docsRoute = useWorkbenchDocsRoute({
     documents,
+    documentsError,
     documentsActions,
     realDataMode,
   });
@@ -179,7 +181,9 @@ export function WorkbenchRoutes({
   agentProfilesStatus,
   dataMode,
   contacts,
+  contactsError,
   documents,
+  documentsError,
   focusedAgentId,
   projects,
   activeProjectId,
@@ -248,6 +252,7 @@ export function WorkbenchRoutes({
 
   const contactsRoute = useWorkbenchContactsRoute({
     contacts,
+    contactsError,
     contactsActions,
     onStartConversation,
   });
@@ -255,9 +260,9 @@ export function WorkbenchRoutes({
   const profileSources = useMemo(
     () => buildWorkbenchProfileSources(
       agentsRoute.agentConfigs,
-      contactsRoute.contactsData.members,
+      contactsRoute.contactsData?.members ?? [],
     ),
-    [agentsRoute.agentConfigs, contactsRoute.contactsData.members],
+    [agentsRoute.agentConfigs, contactsRoute.contactsData?.members],
   );
 
   const handleOpenAgentConfig = useCallback(() => {
@@ -356,6 +361,7 @@ export function WorkbenchRoutes({
       <WorkbenchDocsRouteGate
         active={activePage === 'docs'}
         documents={documents}
+        documentsError={documentsError}
         documentsActions={documentsActions}
         realDataMode={realDataMode}
         profiles={profileSources}

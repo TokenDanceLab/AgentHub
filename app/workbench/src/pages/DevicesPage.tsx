@@ -1,6 +1,7 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { CHATVIEW_I18N_NAMESPACE } from '@shared/chatview/i18n/resources';
+import { friendlyErrorMessage } from '@shared/errorReporting';
 import styles from './DevicesPage.module.css';
 
 /* ═══════════════════════════════════════════════════════════════════════
@@ -127,7 +128,7 @@ export function DevicesPage({
       <div className={styles.page} data-testid="devices-page">
         <div className={styles.placeholder} role="alert">
           <h2 className={styles.placeholderTitle}>{t('devices.error.title')}</h2>
-          <p className={styles.placeholderBody}>{error}</p>
+          <p className={styles.placeholderBody}>{friendlyErrorMessage(error, t('devices.error.title'))}</p>
           {onRetry ? (
             <button
               className={styles.retryButton}

@@ -66,6 +66,7 @@ export interface DesktopWorkbenchModel {
   agents: WorkbenchAgent[];
   conversations: WorkbenchConversation[];
   contacts?: WorkbenchContactsData;
+  contactsError?: string;
   contactsActions?: WorkbenchContactsActions;
   chatActions?: DesktopChatActions;
   dataMode: string;
@@ -403,8 +404,11 @@ export function useDesktopWorkbenchModel(
       contactsQuery.data as HubContactLike[] | undefined,
       hubReady,
       dataMode,
+      contactsQuery.error
+        ? (contactsQuery.error instanceof Error ? contactsQuery.error.message : String(contactsQuery.error))
+        : undefined,
     ),
-    [contactsQuery.data, hubReady, dataMode],
+    [contactsQuery.data, contactsQuery.error, hubReady, dataMode],
   );
 
   // Resolve Hub workspace projects for the workbench projects page.
@@ -486,6 +490,9 @@ export function useDesktopWorkbenchModel(
     ...(activeThread?.threadId ? { activeThreadId: activeThread.threadId } : {}),
     agents: [],
     ...(resolvedContacts != null ? { contacts: resolvedContacts } : {}),
+    ...(contactsQuery.error
+      ? { contactsError: contactsQuery.error instanceof Error ? contactsQuery.error.message : String(contactsQuery.error) }
+      : {}),
     ...(resolvedContactsActions != null ? { contactsActions: resolvedContactsActions } : {}),
     ...(resolvedChatActions != null ? { chatActions: resolvedChatActions } : {}),
     conversations,

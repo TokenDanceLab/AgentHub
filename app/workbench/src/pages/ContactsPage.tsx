@@ -1,4 +1,6 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
+import { SHARED_WORKBENCH_I18N_NAMESPACE } from '@shared/i18n';
 import styles from './ContactsPage.module.css';
 import {
   AddContactModal,
@@ -33,12 +35,27 @@ export type {
 // ── Main component ──
 
 export function ContactsPage(props: ContactsPageProps): React.ReactElement {
+  const { t } = useTranslation(SHARED_WORKBENCH_I18N_NAMESPACE);
   const {
     modalOpen = false,
     onModalClose,
     onCopyInvite,
     onSendPhoneInvite,
+    error,
   } = props;
+
+  // #1821: a failed contacts request must render an explicit error state
+  // instead of collapsing into the empty list.
+  if (error) {
+    return (
+      <section className={`${styles.page} workbench contacts-page`}>
+        <div role="alert">
+          <h2>{t('contacts.error.title')}</h2>
+          <p>{error}</p>
+        </div>
+      </section>
+    );
+  }
 
   return (
     <section className={`${styles.page} workbench contacts-page`}>

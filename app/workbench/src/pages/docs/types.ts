@@ -27,6 +27,10 @@ export interface DocsPageNavItem {
 }
 
 export interface DocsPageProps {
+  /** Error message when the Hub documents request failed (#1821). Present
+   *  only in real-data mode; the page must render an error state instead of
+   *  collapsing into the empty list. */
+  documentsError?: string | undefined;
   /** Currently active nav item id */
   activeNav: string;
   /** Called when user clicks a nav item */
