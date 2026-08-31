@@ -1915,7 +1915,7 @@ func contains(items []string, want string) bool {
 }
 
 func unwrapSuccess(body map[string]any) map[string]any {
-	if body["code"] == "OK" {
+	if body["code"] == "ok" || body["code"] == "OK" {
 		if data, ok := body["data"].(map[string]any); ok {
 			return data
 		}

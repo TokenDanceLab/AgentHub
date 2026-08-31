@@ -37,7 +37,7 @@ func TestGetRuntimeSessionsList(t *testing.T) {
 	if code != http.StatusOK {
 		t.Fatalf("status %d body=%v", code, body)
 	}
-	if body["code"] != "OK" {
+	if body["code"] != "ok" {
 		t.Fatalf("envelope %v", body)
 	}
 	data, _ := body["data"].(map[string]any)

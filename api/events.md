@@ -11,7 +11,7 @@ WebSocket 事件合同入口：协议边界、源码 owner、**重复投递/幂�
 | Edge envelope | `app/shared/src/events.ts` | 前端 `EventEnvelope` |
 | Edge event bus | `edge-server/internal/events/` | 发布、订阅、背压、gap |
 | Runtime event names | `edge-server/internal/orchestration/contracts.go` | `run.agent.*` 常量（adapters 包通过 `contract_aliases.go` 别名重导出） |
-| Hub WS frame | `hub-server/internal/ws/frame.go` | `{type, seq_id?, payload?}` + 30 常量 |
+| Hub WS frame | `hub-server/internal/ws/frame.go` | `{type, seq_id?, payload?}` + 31 常量 |
 | Hub client constants | `app/shared/src/hubEvents.ts` | 与 `frame.go` 1:1 |
 | Hub runtime replay | `hub-server/internal/service/agent_edge_callback.go` | `agent.stream` / 聊天投影 |
 | Transcript normalization | `app/shared/src/transcript/` | Edge/Hub → 聊天流 |
