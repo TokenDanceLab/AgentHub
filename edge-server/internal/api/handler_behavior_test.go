@@ -481,8 +481,8 @@ func TestResponseEnvelope(t *testing.T) {
 	if code != http.StatusOK {
 		t.Fatalf("expected 200, got %d", code)
 	}
-	if body["code"] != "OK" {
-		t.Errorf("expected code=OK in envelope, got %v", body["code"])
+	if body["code"] != "ok" {
+		t.Errorf("expected code=ok in envelope, got %v", body["code"])
 	}
 	data, ok := body["data"].(map[string]any)
 	if !ok {

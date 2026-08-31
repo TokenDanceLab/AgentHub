@@ -3121,11 +3121,12 @@ func assertErrorCode(t *testing.T, body string, want string) {
 	}
 }
 
-// unwrapSuccess extracts data from the unified {"code":"OK","data":...} envelope.
+// unwrapSuccess extracts data from the unified {"code":"ok","data":...} envelope
+// (older builds emitted "OK"; both casings are accepted).
 // Returns the inner data map when an envelope is present, or body unchanged for
 // backward compatibility with raw/non-envelope responses (e.g. error responses).
 func unwrapSuccess(body map[string]any) map[string]any {
-	if body["code"] == "OK" {
+	if body["code"] == "ok" || body["code"] == "OK" {
 		if data, ok := body["data"].(map[string]any); ok {
 			return data
 		}
