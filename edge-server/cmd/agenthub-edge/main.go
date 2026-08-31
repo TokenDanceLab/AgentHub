@@ -91,6 +91,7 @@ func main() {
 		WorkspaceAllowlist: append([]string(nil), cfg.WorkspaceAllowlist...),
 		SkillsDirs:         append([]string(nil), cfg.SkillsDirs...),
 		EventLogPath:       cfg.EventLogPath,
+		EventLogMaxSize:    cfg.EventLogMaxSize,
 		MCPConfigStore:     mcpConfigStore,
 	}
 	if cfg.HubCallbackMaxAttempts != "" {

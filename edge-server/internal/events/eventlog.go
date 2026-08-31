@@ -47,6 +47,20 @@ type EventLog struct {
 
 const defaultEventLogMaxSize = 50 * 1024 * 1024 // 50 MiB
 
+// SetMaxSize overrides the maximum file size (in bytes) before truncation.
+// 0 means unlimited. Values <= 0 are ignored (default preserved). This is
+// intended to be called via WithEventLogMaxSize before any Append; calling
+// it after writes have landed is safe but may trigger an immediate truncate
+// on the next Append if the current file already exceeds the new limit.
+func (l *EventLog) SetMaxSize(bytes int64) {
+	if l == nil || bytes <= 0 {
+		return
+	}
+	l.mu.Lock()
+	l.maxSize = bytes
+	l.mu.Unlock()
+}
+
 // NewEventLog opens or creates the append-only event log at the given path.
 // The parent directory is created if it does not exist. The file is opened
 // read+write so the log can serve replay reads in addition to appends. The

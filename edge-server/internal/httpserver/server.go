@@ -64,6 +64,7 @@ type Config struct {
 	WorkspaceAllowlist     []string                 // optional roots allowed for request workDir
 	SkillsDirs             []string                 // optional SKILL.md search dirs; empty = use defaults
 	EventLogPath           string                   // optional append-only event log path for crash recovery and replay; empty = no persistence (events exist only in-memory)
+	EventLogMaxSize        int64                    // event log truncation threshold in bytes; 0 = default (50 MiB)
 	MCPConfigStore         *adapters.MCPConfigStore // optional Hub-synced MCP server configs for injection into runs
 	ShutdownHooks          []func()                 // called in order during graceful shutdown, before bus.Close()
 }
@@ -219,6 +220,9 @@ func buildEventBusAndMetrics(cfg Config) (*events.Bus, *metrics.EdgeMetrics) {
 	busOpts := []events.BusOption{}
 	if cfg.EventLogPath != "" {
 		busOpts = append(busOpts, events.WithEventLogPath(cfg.EventLogPath))
+	}
+	if cfg.EventLogMaxSize > 0 {
+		busOpts = append(busOpts, events.WithEventLogMaxSize(cfg.EventLogMaxSize))
 	}
 	bus := events.NewBus(10000, busOpts...)
 

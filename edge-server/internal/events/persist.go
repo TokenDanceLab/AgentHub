@@ -113,8 +113,27 @@ func WithEventLogPath(path string) BusOption {
 			return
 		}
 		b.eventLog = log
+		if b.eventLogMaxSize > 0 {
+			log.SetMaxSize(b.eventLogMaxSize)
+		}
 		b.persistFn = func(evt EventEnvelope) error {
 			return log.Append(evt)
+		}
+	}
+}
+
+// WithEventLogMaxSize overrides the event log truncation threshold (bytes).
+// Must be > 0 to take effect; <= 0 is ignored and the default 50 MiB applies.
+// This option is order-independent with WithEventLogPath: whichever runs
+// second applies the size to the already-opened or yet-to-be-opened log.
+func WithEventLogMaxSize(bytes int64) BusOption {
+	return func(b *Bus) {
+		if bytes <= 0 {
+			return
+		}
+		b.eventLogMaxSize = bytes
+		if b.eventLog != nil {
+			b.eventLog.SetMaxSize(bytes)
 		}
 	}
 }
