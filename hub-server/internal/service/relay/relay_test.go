@@ -44,12 +44,13 @@ func TestCreateCommand_NoConnection_PushReachedFalse(t *testing.T) {
 func TestCreateCommand_WithActiveConnection_PushReachedTrue(t *testing.T) {
 	svc, _ := newTestService(t)
 
-	// Register a fake WS connection for the target user so PushToUser queues.
+	// Register a fake WS connection whose DeviceID matches the relay target so
+	// PushToDevice (byDevice index) queues the frame (#2101 G6 routing).
 	conn := &ws.Conn{
 		ID:         "conn-1",
-		UserID:     "edge-online",
+		UserID:     "owner-1",
 		DeviceType: "desktop",
-		DeviceID:   "dev-1",
+		DeviceID:   "edge-online",
 		Send:       make(chan []byte, 8),
 	}
 	require.NoError(t, svc.mgr.Register(conn))

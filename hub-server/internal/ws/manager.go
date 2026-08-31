@@ -18,9 +18,10 @@ type Manager struct {
 	OnRouteDel     func(userID, deviceType, deviceID, connID string)
 	ResolveMembers func(sessionID string) []string
 
-	mu     sync.RWMutex
-	conns  map[string]*Conn
-	byUser map[string]map[string]string
+	mu       sync.RWMutex
+	conns    map[string]*Conn
+	byUser   map[string]map[string]string
+	byDevice map[string]string // deviceID -> connID (only for conns with non-empty DeviceID)
 
 	// userConnCount tracks the number of active connections per user.
 	// Updated atomically with byUser under mu.
@@ -40,6 +41,7 @@ func NewManager() *Manager {
 	return &Manager{
 		conns:          make(map[string]*Conn),
 		byUser:         make(map[string]map[string]string),
+		byDevice:       make(map[string]string),
 		userConnCount:  make(map[string]int),
 		sendBufferSize: config.WSSendBufferSize,
 	}
@@ -111,6 +113,12 @@ func (m *Manager) Register(c *Conn) error {
 		m.byUser[c.UserID][c.ID] = c.ID
 		m.userConnCount[c.UserID]++
 	}
+	// Mirror the SetAuth byDevice indexing for pre-authenticated connections
+	// (UserID/DeviceID pre-set by upgrade middleware); without this, relay
+	// PushToDevice cannot reach devices registered via this path (#2101 G6).
+	if c.DeviceID != "" {
+		m.byDevice[c.DeviceID] = c.ID
+	}
 	m.mu.Unlock()
 
 	slog.Info("ws connected", "conn_id", c.ID)
@@ -177,6 +185,13 @@ func (m *Manager) SetAuth(connID string, userID, deviceType, deviceID string) {
 	c.DeviceID = deviceID
 	c.mu.Unlock()
 
+	// Maintain byDevice index: when deviceID is provided, map it to this conn.
+	// A reconnect with the same deviceID overwrites the previous entry; the old
+	// conn remains in conns/byUser but PushToDevice will target the newest.
+	if deviceID != "" {
+		m.byDevice[deviceID] = connID
+	}
+
 	m.mu.Unlock()
 
 	if oldConnID != "" {
@@ -210,6 +225,13 @@ func (m *Manager) Unregister(connID string) {
 			if len(devs) == 0 {
 				delete(m.byUser, c.UserID)
 			}
+		}
+	}
+	if c.DeviceID != "" {
+		// Only delete if the index still points to this conn (a newer conn may
+		// have overwritten it on reconnect).
+		if m.byDevice[c.DeviceID] == c.ID {
+			delete(m.byDevice, c.DeviceID)
 		}
 	}
 
@@ -299,6 +321,7 @@ func (m *Manager) Shutdown() {
 		delete(m.conns, id)
 	}
 	m.byUser = make(map[string]map[string]string)
+	m.byDevice = make(map[string]string)
 	m.userConnCount = make(map[string]int)
 }
 
