@@ -80,6 +80,16 @@ func (c *Conn) SetAuth(userID, deviceType, deviceID string) {
 	c.DeviceID = deviceID
 }
 
+// Auth returns the authenticated identity snapshot under c.mu. Hot paths that
+// only log identity (e.g. fanout drop logging) must read through this getter:
+// SetAuth and Manager.SetAuth write the fields under c.mu, so unlocked reads
+// are a data race.
+func (c *Conn) Auth() (userID, deviceType string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.UserID, c.DeviceType
+}
+
 // Close closes the underlying WebSocket connection. It is safe to call
 // multiple times and tolerates a nil *websocket.Conn (useful in tests).
 func (c *Conn) Close() {

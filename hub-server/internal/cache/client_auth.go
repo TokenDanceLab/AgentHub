@@ -5,6 +5,8 @@ import (
 	"log/slog"
 	"strconv"
 	"time"
+
+	"github.com/redis/go-redis/v9"
 )
 
 // Residual pure-helper peel #1123: sequence numbers, token blacklist, rate limit.
@@ -100,26 +102,30 @@ func (c *Client) IsAccessTokenBlacklisted(ctx context.Context, jti string) (bool
 	return n > 0, nil
 }
 
+// rateLimitScript atomically INCRs the rate-limit counter and refreshes the TTL
+// on every call (sliding-window semantics). A non-atomic INCR+EXPIRE pair would
+// leave a TTL-less key behind if the process crashed between the two commands,
+// permanently rate-limiting that caller until an external key cleanup.
+var rateLimitScript = redis.NewScript(`
+local count = redis.call('INCR', KEYS[1])
+redis.call('EXPIRE', KEYS[1], ARGV[1])
+return count
+`)
+
 // CheckRateLimit implements a rate-limit counter with sliding-window semantics.
 // It atomically increments the counter for key and always refreshes the TTL to
-// 60 seconds on every request. This means the window slides forward with each
-// request: a trickle of 1 request every 59 seconds keeps the counter alive
-// indefinitely (though the counter still accumulates and eventually exceeds the
-// limit). This differs from strict fixed-window semantics where the TTL is set
-// only on the first request, creating a clean 60-second window from that point.
-//
-// The unconditional Expire prevents permanent key residue after a crash.
-//
-// If strict fixed-window semantics are required, use an atomic Lua script:
-//
-//	EVAL "local c = redis.call('INCR', KEYS[1]); if c == 1 then redis.call('EXPIRE', KEYS[1], ARGV[1]) end; return c" 1 key ttl
+// 60 seconds on every request (INCR+EXPIRE run inside one Lua script, so a
+// crash cannot strand a permanent key). This means the window slides forward
+// with each request: a trickle of 1 request every 59 seconds keeps the counter
+// alive indefinitely (though the counter still accumulates and eventually
+// exceeds the limit). This differs from strict fixed-window semantics where the
+// TTL is set only on the first request, creating a clean 60-second window from
+// that point.
 func (c *Client) CheckRateLimit(ctx context.Context, key string, limit int64) (count int64, exceeded bool, err error) {
-	count, err = c.rdb.Incr(ctx, "ratelimit:"+key).Result()
+	count, err = rateLimitScript.Run(ctx, c.rdb, []string{"ratelimit:" + key}, 60).Int64()
 	if err != nil {
 		return 0, false, err
 	}
-	// Always refresh TTL (sliding-window semantics; see function doc).
-	_ = c.rdb.Expire(ctx, "ratelimit:"+key, 60*time.Second).Err()
 	exceeded = count > limit
 	return
 }
