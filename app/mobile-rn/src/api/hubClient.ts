@@ -37,13 +37,11 @@ export { HubApiError, HubNetworkError, type HubErrorDetails };
 // ── WebSocket event types (aligned with hub-server WS frames) ──
 // Includes legacy mobile-only types for UI layer backward compatibility.
 
-/** Legacy mobile-only event types (referenced by App.tsx UI layer). */
+/** Preview-lane event types emitted by scripts/mock-hub.mjs (Expo Web preview
+ * data plane). Never emitted by hub-server — see #1362/#1422 dead-surface ban. */
 export type HubWsLegacyEventType =
   | 'snapshot.updated'
-  | 'thread.updated'
-  | 'run.updated'
-  | 'approval.updated'
-  | 'presence.updated';
+  | 'run.updated';
 
 // Real Hub server event names derive from @agenthub/shared/hubEvents
 // (SSOT mirroring hub-server/internal/ws/frame.go) — no parallel copy here.

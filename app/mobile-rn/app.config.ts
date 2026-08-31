@@ -4,7 +4,7 @@ const env = (globalThis as typeof globalThis & {
   process?: { env?: Record<string, string | undefined> };
 }).process?.env;
 
-function resolveDefaultHubBaseUrl(): string {
+export function resolveDefaultHubBaseUrl(): string {
   if (env?.EXPO_PUBLIC_AGENTHUB_HUB_URL) {
     return env.EXPO_PUBLIC_AGENTHUB_HUB_URL;
   }
@@ -70,7 +70,10 @@ const config = {
   ],
   extra: {
     hubBaseUrl: resolveDefaultHubBaseUrl(),
-    oidcIssuer: env?.EXPO_PUBLIC_TOKENDANCE_ID_ISSUER ?? 'https://id.example.com',
+    // Empty by default: publishing a build without EXPO_PUBLIC_TOKENDANCE_ID_ISSUER
+    // must fail loudly at runtime (login disabled) instead of shipping a
+    // placeholder issuer that can never succeed.
+    oidcIssuer: env?.EXPO_PUBLIC_TOKENDANCE_ID_ISSUER ?? '',
   },
 } as ExpoConfig;
 

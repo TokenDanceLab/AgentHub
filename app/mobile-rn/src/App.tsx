@@ -31,6 +31,7 @@ import {
   getUnreadThreadCount,
 } from '@/data/mobileFixtures';
 import { useStrings } from '@/i18n/strings';
+import { resolveDefaultHubBaseUrl } from '../app.config';
 import { AccountScreen, ChatScreen, TasksScreen, ThreadsScreen, WorkbenchSurfaceScreen } from '@/screens';
 import { AgentHubThemeProvider, useAgentHubTheme } from '@/theme';
 import type {
@@ -169,12 +170,7 @@ function MobileAppContent({ preview }: { preview: PreviewOptions }): React.React
         baseUrl: localPreviewBaseUrl,
         createWebSocket,
         onEvent(event) {
-          if (
-            event.type === 'snapshot.updated'
-            || event.type === 'thread.updated'
-            || event.type === 'run.updated'
-            || event.type === 'approval.updated'
-          ) {
+          if (event.type === 'snapshot.updated' || event.type === 'run.updated') {
             loadSnapshot();
           }
         },
@@ -253,7 +249,7 @@ function MobileAppContent({ preview }: { preview: PreviewOptions }): React.React
     let cancelled = false;
     let deepLinkBridge: AgentHubDeepLinkBridge | undefined;
     let notificationBridge: AgentHubNotificationBridge | undefined;
-    const baseUrl = resolveAppHubBaseUrl();
+    const baseUrl = resolveDefaultHubBaseUrl();
 
     createExpoMobileAuthSession(baseUrl)
       .then((assembly) => {
@@ -286,7 +282,7 @@ function MobileAppContent({ preview }: { preview: PreviewOptions }): React.React
               }
             });
           })
-          .catch((restoreError: unknown) => {
+          .catch(() => {
             /* notifications module unavailable in this runtime — skip */
           })
           .then(() => assembly.authSession.restore())
@@ -1204,22 +1200,7 @@ function getLocalPreviewHubBaseUrl(): string {
   }).location;
   const paramValue = new URLSearchParams(location?.search ?? '').get('hubBaseUrl')?.trim();
 
-  return paramValue || resolveAppHubBaseUrl();
-}
-
-function resolveAppHubBaseUrl(): string {
-  const env = (globalThis as typeof globalThis & {
-    process?: { env?: Record<string, string | undefined> };
-  }).process?.env;
-
-  if (env?.EXPO_PUBLIC_AGENTHUB_HUB_URL) {
-    return env.EXPO_PUBLIC_AGENTHUB_HUB_URL;
-  }
-  if (env?.AGENTHUB_MOBILE_NATIVE_TARGET === 'android-emulator') {
-    return 'http://10.0.2.2:8088';
-  }
-
-  return 'http://127.0.0.1:8088';
+  return paramValue || resolveDefaultHubBaseUrl();
 }
 
 function isBrowserPreviewRuntime(): boolean {
