@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/alicebob/miniredis/v2"
 	"github.com/glebarez/sqlite"
@@ -116,5 +117,47 @@ func TestSyncLegacySeqsOneTimeMarker(t *testing.T) {
 	a.syncLegacySeqs(ctx)
 	if mr.Exists("session:seq:" + sessionID) {
 		t.Fatal("second run re-synced sessions: one-time marker was not honored")
+	}
+}
+
+// TestSyncLegacySeqsMarkerHasTTL proves the #2119 P1 fix: the one-time marker
+// must carry a 30-day TTL so it does not permanently leak in Redis when the
+// deployment is decommissioned without explicit cleanup. Expiry triggers a
+// harmless idempotent re-scan (InitSeqIfAbsent is SetNX; runtime self-healing
+// covers lost seq keys).
+func TestSyncLegacySeqsMarkerHasTTL(t *testing.T) {
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	if err != nil {
+		t.Fatalf("open sqlite: %v", err)
+	}
+	if err := db.Exec("CREATE TABLE sessions (id TEXT PRIMARY KEY, next_seq BIGINT NOT NULL DEFAULT 0, created_at DATETIME)").Error; err != nil {
+		t.Fatalf("create sessions: %v", err)
+	}
+
+	mr, err := miniredis.Run()
+	if err != nil {
+		t.Fatalf("miniredis: %v", err)
+	}
+	t.Cleanup(mr.Close)
+	rdb := redis.NewClient(&redis.Options{Addr: mr.Addr()})
+	t.Cleanup(func() { rdb.Close() })
+
+	a := &App{
+		Config:      &config.Config{},
+		DB:          db,
+		CacheClient: cache.NewClient(rdb),
+		bg:          newBackgroundGroup(context.Background()),
+	}
+	ctx := context.Background()
+
+	a.syncLegacySeqs(ctx)
+
+	ttl := mr.TTL(legacySeqSyncMarkerKey)
+	if ttl <= 0 {
+		t.Fatalf("marker has no TTL (got %v); expected ~30 days", ttl)
+	}
+	const thirtyDays = 30 * 24 * time.Hour
+	if ttl > thirtyDays || ttl < thirtyDays-time.Minute {
+		t.Fatalf("marker TTL %v not near 30 days", ttl)
 	}
 }
