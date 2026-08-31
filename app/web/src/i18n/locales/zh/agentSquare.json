@@ -81,5 +81,5 @@
   "source.catalogMock": "Catalog fallback",
   "source.catalogFallbackDetail": "Hub 未返回 CustomAgent，因此显示带明确标签的 catalog fallback。",
   "source.loginRequiredDetail": "当前没有 Web Hub 会话。显示带明确标签的 catalog fallback。",
-  "source.errorDetail": "Hub CustomAgent 不可用：{{error}}。显示带明确标签的 catalog fallback。"
+  "source.errorDetail": "Hub CustomAgent 不可用：{{error}}。显示带明确标签的 目录兜底。"
 }

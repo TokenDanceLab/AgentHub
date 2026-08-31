@@ -50,10 +50,6 @@ type EdgeMetrics struct {
 	// not install a default recover for connected-request handlers).
 	EdgeHTTPPanicRecoveries prometheus.Counter
 
-	// EdgeApprovalDecisionsTotal counts tool approval decisions made by
-	// DecisionLoop.ApproveTool/DenyTool. Label: decision (approve|deny).
-	EdgeApprovalDecisionsTotal *prometheus.CounterVec
-
 	// EdgeArtifactsSurfacedTotal counts artifacts surfaced at run finish.
 	// Label: kind (artifact|preview|image|deploy).
 	EdgeArtifactsSurfacedTotal *prometheus.CounterVec
@@ -140,11 +136,6 @@ func newWithHooks(
 		Name: "edge_http_panic_recoveries_total",
 		Help: "Total number of Edge HTTP handler panics recovered by recoveryHTTPHandler.",
 	})
-
-	m.EdgeApprovalDecisionsTotal = factory.NewCounterVec(prometheus.CounterOpts{
-		Name: "edge_approval_decisions_total",
-		Help: "Total tool approval decisions (approve/deny) made by DecisionLoop.",
-	}, []string{"decision"})
 
 	m.EdgeArtifactsSurfacedTotal = factory.NewCounterVec(prometheus.CounterOpts{
 		Name: "edge_artifacts_surfaced_total",

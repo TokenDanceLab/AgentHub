@@ -26,16 +26,9 @@ func (e *ProcessExecutor) publishStructuredOutput(wg *sync.WaitGroup, run store.
 	// Wrap emitter with budget monitoring: emits run.agent.context_warning
 	// when token usage exceeds the auto-compaction threshold (85%).
 	budget, hasBudget := budgetFromParserContext(ctx)
-	wrapPlan := planStructuredEmitterWraps(hasBudget, e.decisionLoopFactory != nil)
+	wrapPlan := planStructuredEmitterWraps(hasBudget)
 	if wrapPlan.ApplyBudget {
 		emitter = adapters.NewBudgetAwareEmitter(emitter, budget, scope)
-	}
-
-	// Wrap emitter with decision-loop step tracking and max-steps enforcement.
-	// When configured, tool_call events increment a step counter and force-finish
-	// is triggered when maxSteps is exceeded.
-	if wrapPlan.WrapDecisionLoop {
-		emitter = e.decisionLoopFactory.Wrap(stdin, emitter, run)
 	}
 
 	// Build the security hook chain. The tool allowlist hook runs first (before
