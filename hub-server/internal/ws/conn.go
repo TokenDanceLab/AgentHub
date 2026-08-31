@@ -13,10 +13,11 @@ import (
 )
 
 // WSReadTimeout is the maximum time to wait for a single WebSocket message
-// read before the connection is considered stale.  Set at 2x the heartbeat
-// interval so idle connections are detected and closed cleanly without
-// interfering with normal heartbeat pings.
-const WSReadTimeout = 2 * config.WSHeartbeatInterval
+// read before the connection is considered stale. Set at 2x heartbeat + the
+// ping timeout (65s with defaults) so the pong-miss detector (2 missed pongs
+// + ping timeout) fires BEFORE the read deadline: the miss path records
+// metrics instead of the read path silently closing (#2135 F4).
+const WSReadTimeout = 2*config.WSHeartbeatInterval + config.WSPingTimeout
 
 // Conn represents a single WebSocket connection tracked by the Manager.
 type Conn struct {

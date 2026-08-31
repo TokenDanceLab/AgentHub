@@ -48,8 +48,10 @@ type TokenProvider struct {
 }
 
 // tokenRefreshLead is how far before expiry the rotation kicks in. Must stay
-// comfortably above the Hub refresh round-trip plus clock skew.
-const tokenRefreshLead = time.Minute
+// comfortably above the Hub refresh round-trip plus clock skew. 2 minutes
+// covers the worst-case NTP offset between Edge local clock and Hub issuance
+// clock (#2135 F3).
+const tokenRefreshLead = 2 * time.Minute
 
 // tokenRefreshRetryInterval is the retry cadence after a failed rotation.
 const tokenRefreshRetryInterval = 30 * time.Second

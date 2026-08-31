@@ -70,7 +70,8 @@ func TestGenerateAccessToken_MintsUniqueJTI(t *testing.T) {
 
 func TestParseToken_Expired(t *testing.T) {
 	secret := "test-secret"
-	token, err := GenerateAccessToken("user-1", "desktop", "dev-1", secret, -1*time.Second)
+	// -31s stays beyond the 30s leeway (#2135 F1): still rejected.
+	token, err := GenerateAccessToken("user-1", "desktop", "dev-1", secret, -31*time.Second)
 	if err != nil {
 		t.Fatalf("GenerateAccessToken failed: %v", err)
 	}
@@ -78,6 +79,24 @@ func TestParseToken_Expired(t *testing.T) {
 	_, err = ParseToken(token, secret)
 	if err == nil {
 		t.Fatal("expected error for expired token")
+	}
+}
+
+func TestParseToken_WithinLeewayAccepted(t *testing.T) {
+	secret := "test-secret"
+	// -10s expires slightly in the past but within the 30s clock-skew leeway:
+	// aligned with capability/edge validation (#2135 F1).
+	token, err := GenerateAccessToken("user-1", "desktop", "dev-1", secret, -10*time.Second)
+	if err != nil {
+		t.Fatalf("GenerateAccessToken failed: %v", err)
+	}
+
+	claims, err := ParseToken(token, secret)
+	if err != nil {
+		t.Fatalf("ParseToken within leeway failed: %v", err)
+	}
+	if claims == nil || claims.UserID != "user-1" {
+		t.Fatalf("claims = %+v, want user-1", claims)
 	}
 }
 

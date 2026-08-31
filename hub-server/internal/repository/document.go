@@ -3,6 +3,7 @@ package repository
 import (
 	"gorm.io/gorm"
 
+	"github.com/agenthub/hub-server/internal/config"
 	"github.com/agenthub/hub-server/internal/model"
 )
 
@@ -27,8 +28,10 @@ func ListDocumentsByOwner(db *gorm.DB, ownerID string, filter model.DocumentFilt
 	if filter.Limit <= 0 {
 		filter.Limit = 50
 	}
-	if filter.Limit > 200 {
-		filter.Limit = 200
+	if filter.Limit > config.MaxPageLimit {
+		// #2136 P1: repo cap was 200 while the API layer accepts up to
+		// MaxPageLimit=500; align so the declared contract holds.
+		filter.Limit = config.MaxPageLimit
 	}
 
 	q := db.Where("owner_id = ? AND status = ?", ownerID, model.DocumentStatusActive)
