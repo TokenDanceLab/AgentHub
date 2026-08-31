@@ -53,16 +53,15 @@ export interface HubEventStream {
 // Event types matching hub-server/internal/ws/frame.go and shared/src/hubEvents.ts.
 // Derived from the HUB_EVENTS SSOT (no manual copy) so the accepted set can
 // never drift from the server frame constants.
-// Plus legacy mobile-only types for backward compatibility.
+// Plus preview-lane event types from scripts/mock-hub.mjs (Expo Web preview
+// data plane). These have a real producer/consumer pair; do not add more types
+// without one (#1362/#1422 dead-surface ban).
 const knownEventTypes = new Set<HubWsEventType>([
   // Real Hub server events (from HUB_EVENTS)
   ...(Object.values(HUB_EVENTS) as HubWsEventType[]),
-  // Legacy mobile-only event types
+  // Mobile mock-hub preview events
   'snapshot.updated',
-  'thread.updated',
   'run.updated',
-  'approval.updated',
-  'presence.updated',
 ]);
 
 export function createHubEventStream(options: CreateHubEventStreamOptions): HubEventStream {
