@@ -4,20 +4,8 @@ import { SHARED_WORKBENCH_I18N_NAMESPACE, sharedWorkbenchResources } from '@shar
 import { CHATVIEW_I18N_NAMESPACE, chatviewResources } from '@shared/chatview/i18n/resources';
 
 import zhCommon from './locales/zh/common.json';
-import zhStatus from './locales/zh/status.json';
-import zhWorkbench from './locales/zh/workbench.json';
-import zhAgentSquare from './locales/zh/agentSquare.json';
-import zhPrivateChats from './locales/zh/privateChats.json';
-import zhGroupWorkspace from './locales/zh/groupWorkspace.json';
-import zhProject from './locales/zh/project.json';
 
 import enCommon from './locales/en/common.json';
-import enStatus from './locales/en/status.json';
-import enWorkbench from './locales/en/workbench.json';
-import enAgentSquare from './locales/en/agentSquare.json';
-import enPrivateChats from './locales/en/privateChats.json';
-import enGroupWorkspace from './locales/en/groupWorkspace.json';
-import enProject from './locales/en/project.json';
 
 export type AppLanguage = 'en' | 'zh';
 
@@ -64,28 +52,28 @@ i18n.use(initReactI18next).init({
   resources: {
     zh: {
       common: zhCommon,
-      status: zhStatus,
-      workbench: zhWorkbench,
+
+
       [SHARED_WORKBENCH_I18N_NAMESPACE]: sharedWorkbenchResources.zh,
-      agentSquare: zhAgentSquare,
-      privateChats: zhPrivateChats,
-      groupWorkspace: zhGroupWorkspace,
-      project: zhProject,
+
+
+
+
       [CHATVIEW_I18N_NAMESPACE]: chatviewResources.zh,
     },
     en: {
       common: enCommon,
-      status: enStatus,
-      workbench: enWorkbench,
+
+
       [SHARED_WORKBENCH_I18N_NAMESPACE]: sharedWorkbenchResources.en,
-      agentSquare: enAgentSquare,
-      privateChats: enPrivateChats,
-      groupWorkspace: enGroupWorkspace,
-      project: enProject,
+
+
+
+
       [CHATVIEW_I18N_NAMESPACE]: chatviewResources.en,
     },
   },
-  ns: ['common', 'status', 'workbench', SHARED_WORKBENCH_I18N_NAMESPACE, 'agentSquare', 'privateChats', 'groupWorkspace', 'project', CHATVIEW_I18N_NAMESPACE],
+  ns: ['common', SHARED_WORKBENCH_I18N_NAMESPACE, CHATVIEW_I18N_NAMESPACE],
   defaultNS: 'common',
   lng: getInitialLanguage(),
   fallbackLng: 'en',
