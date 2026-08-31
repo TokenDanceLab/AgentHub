@@ -438,14 +438,16 @@ func TestSessionService_SearchSessions(t *testing.T) {
 	_, err = svc.CreateGroupSession(context.Background(), owner, "Project Beta", []string{})
 	require.NoError(t, err)
 
-	results, err := svc.SearchSessions(context.Background(), owner, "Alpha")
+	page, err := svc.SearchSessions(context.Background(), owner, "Alpha", "", 50)
 	require.NoError(t, err)
-	require.Len(t, results, 1)
-	assert.Equal(t, "Project Alpha", results[0].Name)
+	require.Len(t, page.Items, 1)
+	assert.Equal(t, "Project Alpha", page.Items[0].Name)
+	assert.False(t, page.HasMore)
+	assert.Empty(t, page.NextCursor)
 
-	results, err = svc.SearchSessions(context.Background(), owner, "Nope")
+	page, err = svc.SearchSessions(context.Background(), owner, "Nope", "", 50)
 	require.NoError(t, err)
-	assert.Empty(t, results)
+	assert.Empty(t, page.Items)
 }
 
 // TestSessionService_DeleteForMe verifies soft-delete.

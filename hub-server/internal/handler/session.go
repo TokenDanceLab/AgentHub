@@ -3,9 +3,11 @@ package handler
 import (
 	"context"
 	"errors"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
 
+	"github.com/agenthub/hub-server/internal/config"
 	"github.com/agenthub/hub-server/internal/errcode"
 	"github.com/agenthub/hub-server/internal/service/session"
 )
@@ -24,7 +26,7 @@ type SessionService interface {
 	UpdateGroupInfo(ctx context.Context, currentUserID, sessionID string, name, avatarURL, announcement *string) error
 	UpdateMemberSettings(ctx context.Context, currentUserID, sessionID string, pinned, archived, muted *bool) error
 	DeleteForMe(ctx context.Context, currentUserID, sessionID string) error
-	SearchSessions(ctx context.Context, userID, q string) ([]session.SessionListItem, error)
+	SearchSessions(ctx context.Context, userID, q, cursor string, pageSize int) (*session.SessionSearchPage, error)
 }
 
 type SessionHandler struct {
@@ -336,7 +338,16 @@ func (h *SessionHandler) SearchSessions(c *gin.Context) {
 		return
 	}
 
-	result, err := h.service.SearchSessions(c.Request.Context(), userID, q)
+	cursor := c.Query("pageCursor")
+	pageSize, _ := strconv.Atoi(c.DefaultQuery("pageSize", strconv.Itoa(config.DefaultPaginationLimit)))
+	if pageSize <= 0 {
+		pageSize = config.DefaultPaginationLimit
+	}
+	if pageSize > config.MaxPageLimit {
+		pageSize = config.MaxPageLimit
+	}
+
+	result, err := h.service.SearchSessions(c.Request.Context(), userID, q, cursor, pageSize)
 	if err != nil {
 		var e *errcode.Error
 		if errors.As(err, &e) {
@@ -346,5 +357,8 @@ func (h *SessionHandler) SearchSessions(c *gin.Context) {
 		Fail(c, errcode.ErrInternal)
 		return
 	}
-	OK(c, result)
+	OK(c, gin.H{
+		"items": result.Items,
+		"page":  gin.H{"nextCursor": result.NextCursor, "hasMore": result.HasMore},
+	})
 }

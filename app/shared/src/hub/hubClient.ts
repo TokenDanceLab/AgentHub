@@ -99,8 +99,8 @@ export function createHubClient(opts: HubClientOptions = {}) {
       invokePathInitRequest((path, init) => request<void>(path, init), hubPayload.buildUpdateContactRemarkRequest(friendUserId, remark)),
 
     listSessions: () => request<HubSession[]>(hubPayload.buildListSessionsPath()),
-    searchSessions: (q: string) =>
-      request<HubSession[]>(hubPayload.buildSearchSessionsPath(q)),
+    searchSessions: (q: string, params?: { pageCursor?: string; pageSize?: number }) =>
+      request<HubListResponse<HubSession>>(hubPayload.buildSearchSessionsPath(q, params)),
     createPrivateSession: (body: HubCreatePrivateSessionRequest) =>
       invokePathInitRequest((path, init) => request<HubCreateSessionResponse>(path, init), hubPayload.buildCreatePrivateSessionRequest(body)),
     createGroupSession: (body: HubCreateGroupSessionRequest) =>
@@ -150,12 +150,14 @@ export function createHubClient(opts: HubClientOptions = {}) {
       content_type?: string;
       from?: string;
       to?: string;
-    }) => request<HubMessage[]>(hubPayload.buildSearchMessagesPath(params)),
+      pageCursor?: string;
+      pageSize?: number;
+    }) => request<HubListResponse<HubMessage>>(hubPayload.buildSearchMessagesPath(params)),
     searchSessionMessages: (
       sessionId: string,
-      params: { q: string; content_type?: string; from?: string; to?: string },
+      params: { q: string; content_type?: string; from?: string; to?: string; pageCursor?: string; pageSize?: number },
     ) =>
-      request<HubMessage[]>(hubPayload.buildSearchSessionMessagesPath(sessionId, params)),
+      request<HubListResponse<HubMessage>>(hubPayload.buildSearchSessionMessagesPath(sessionId, params)),
 
     listNotifications: (params?: {
       unread_only?: boolean;

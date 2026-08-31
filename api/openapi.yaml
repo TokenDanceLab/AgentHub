@@ -2993,6 +2993,18 @@ paths:
           in: query
           required: true
           schema: { type: string }
+        - name: content_type
+          in: query
+          required: false
+          schema: { type: string }
+        - name: from
+          in: query
+          required: false
+          schema: { type: string }
+        - name: to
+          in: query
+          required: false
+          schema: { type: string }
         - $ref: "#/components/parameters/PageSize"
         - $ref: "#/components/parameters/PageCursor"
       responses:
@@ -3022,6 +3034,24 @@ paths:
           in: query
           required: true
           schema: { type: string }
+        - name: session_id
+          in: query
+          required: false
+          schema: { type: string }
+        - name: content_type
+          in: query
+          required: false
+          schema: { type: string }
+        - name: from
+          in: query
+          required: false
+          schema: { type: string }
+        - name: to
+          in: query
+          required: false
+          schema: { type: string }
+        - $ref: "#/components/parameters/PageSize"
+        - $ref: "#/components/parameters/PageCursor"
       responses:
         "200":
           $ref: "#/components/responses/List"
@@ -4238,6 +4268,8 @@ paths:
           in: query
           required: true
           schema: { type: string }
+        - $ref: "#/components/parameters/PageSize"
+        - $ref: "#/components/parameters/PageCursor"
       responses:
         "200":
           $ref: "#/components/responses/List"

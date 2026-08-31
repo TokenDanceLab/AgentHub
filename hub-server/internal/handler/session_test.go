@@ -24,7 +24,7 @@ type mockSessionService struct {
 	updateGroupInfoFn      func(ctx context.Context, currentUserID, sessionID string, name, avatarURL, announcement *string) error
 	updateMemberSettingsFn func(ctx context.Context, currentUserID, sessionID string, pinned, archived, muted *bool) error
 	deleteForMeFn          func(ctx context.Context, currentUserID, sessionID string) error
-	searchFn               func(ctx context.Context, userID, q string) ([]session.SessionListItem, error)
+	searchFn               func(ctx context.Context, userID, q, cursor string, pageSize int) (*session.SessionSearchPage, error)
 }
 
 func (m *mockSessionService) CreatePrivateSession(ctx context.Context, currentUserID, targetUserID string) (*session.CreateSessionResponse, error) {
@@ -60,8 +60,8 @@ func (m *mockSessionService) UpdateMemberSettings(ctx context.Context, currentUs
 func (m *mockSessionService) DeleteForMe(ctx context.Context, currentUserID, sessionID string) error {
 	return m.deleteForMeFn(ctx, currentUserID, sessionID)
 }
-func (m *mockSessionService) SearchSessions(ctx context.Context, userID, q string) ([]session.SessionListItem, error) {
-	return m.searchFn(ctx, userID, q)
+func (m *mockSessionService) SearchSessions(ctx context.Context, userID, q, cursor string, pageSize int) (*session.SessionSearchPage, error) {
+	return m.searchFn(ctx, userID, q, cursor, pageSize)
 }
 
 // ── CreatePrivate ───────────────────────────────────────────────────
@@ -395,10 +395,10 @@ func TestSessionHandler_DeleteForMe_Success(t *testing.T) {
 
 func TestSessionHandler_SearchSessions_Success(t *testing.T) {
 	svc := &mockSessionService{
-		searchFn: func(ctx context.Context, userID, q string) ([]session.SessionListItem, error) {
-			return []session.SessionListItem{
+		searchFn: func(ctx context.Context, userID, q, cursor string, pageSize int) (*session.SessionSearchPage, error) {
+			return &session.SessionSearchPage{Items: []session.SessionListItem{
 				{SessionID: "s1", Type: "group", Name: "Test"},
-			}, nil
+			}}, nil
 		},
 	}
 	h := handler.NewSessionHandler(svc)

@@ -25,7 +25,8 @@ func TestSearchMessagesPostgresUsesTsvectorWithILikeFallback(t *testing.T) {
 	mock.ExpectQuery("message search tsvector").
 		WillReturnRows(messageSearchRows())
 
-	msgs, err := SearchMessages(db, "needle", "session-1", "", "", "")
+	msgs, hasMore, err := SearchMessages(db, "needle", "session-1", "", "", "", "", 100)
+	_ = hasMore
 	require.NoError(t, err)
 	require.Empty(t, msgs)
 	require.NoError(t, mock.ExpectationsWereMet())
@@ -43,7 +44,8 @@ func TestSearchAllMessagesPostgresUsesTsvectorWithILikeFallback(t *testing.T) {
 	mock.ExpectQuery("message search tsvector").
 		WillReturnRows(messageSearchRows())
 
-	msgs, err := SearchAllMessages(db, "user-1", "needle", "", "", "")
+	msgs, hasMore, err := SearchAllMessages(db, "user-1", "needle", "", "", "", "", 100)
+	_ = hasMore
 	require.NoError(t, err)
 	require.Empty(t, msgs)
 	require.NoError(t, mock.ExpectationsWereMet())
@@ -72,7 +74,8 @@ func TestSearchMessagesSQLiteUsesCompatibleTextFallback(t *testing.T) {
 		Content:     `{"text":"Beta only"}`,
 	}))
 
-	msgs, err := SearchMessages(db, "needle", session.ID, "", "", "")
+	msgs, hasMore, err := SearchMessages(db, "needle", session.ID, "", "", "", "", 100)
+	_ = hasMore
 	require.NoError(t, err)
 	require.Len(t, msgs, 1)
 	require.Equal(t, "search-sqlite-1", msgs[0].ClientMsgID)
@@ -98,7 +101,8 @@ func TestSearchAllMessagesSQLiteUsesCompatibleTextFallback(t *testing.T) {
 		Content:     `{"text":"Shared needle"}`,
 	}))
 
-	msgs, err := SearchAllMessages(db, "user-1", "needle", "", "", "")
+	msgs, hasMore, err := SearchAllMessages(db, "user-1", "needle", "", "", "", "", 100)
+	_ = hasMore
 	require.NoError(t, err)
 	require.Len(t, msgs, 1)
 	require.Equal(t, "search-all-sqlite-1", msgs[0].ClientMsgID)
