@@ -57,6 +57,10 @@ go run ./edge-server/cmd/agenthub-edge --addr 127.0.0.1:3210 --runner-profile op
 | `--claude-code-path` / `AGENTHUB_CLAUDE_CODE_PATH` | claude 二进制路径（orchestrator inner + legacy 回退） |
 | `--anthropic-sdk-path` / `AGENTHUB_ANTHROPIC_SDK_PATH` | 启用 anthropic-sdk 直连适配器（API key 或 `env`） |
 | `--openai-sdk-path` / `AGENTHUB_OPENAI_SDK_PATH` | 启用 openai-sdk 直连适配器（API key 或 `env`） |
+| `--shutdown-timeout` / `AGENTHUB_EDGE_SHUTDOWN_TIMEOUT` | 优雅停机总预算（默认 `10s`，#2129） |
+| `AGENTHUB_EVENT_WORKERS` | 事件总线 worker 数（默认 4） |
+| `AGENTHUB_DELIVERY_JOURNAL_DB` | durable delivery journal 开关（默认关） |
+| `AGENTHUB_EVIDENCE_GATE_ENABLED` / `AGENTHUB_FAULT_ESCALATION_ENABLED` | 证据门禁（默认开）/ 故障升级开关（详见 05-deployment.md 配置面索引） |
 | `--workspace-allowlist` / `AGENTHUB_WORKSPACE_ALLOWLIST` | Allowed workspace roots for `/v1/runs` `workDir` |
 | `--local-auth-token` / `AGENTHUB_EDGE_AUTH_TOKEN` | Optional local Edge API token |
 | `--hub-jwt-secret` / `AGENTHUB_HUB_JWT_SECRET` | Hub-issued Edge JWT verification secret |

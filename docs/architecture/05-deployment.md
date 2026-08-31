@@ -142,6 +142,28 @@ Hub 侧 code 交换端点固定为 `POST /client/auth/oidc/callback`，桌面/We
 
 迁移自动执行意味着：升级到带新 `.up.sql` 的镜像时，容器一起新迁移。`hub-server/migrations/0062`、`0063` 等使用普通 `CREATE INDEX`/`CREATE UNIQUE INDEX`（非 `CONCURRENTLY`），在已堆积数据的表上会取 `ACCESS EXCLUSIVE` 锁；大表升级应在维护窗口执行（停服 → 跑迁移 → 起服），不要在流量高峰直接 `compose up`。详见 [../../CHANGELOG.md](../../CHANGELOG.md) Unreleased 的升级注意段。
 
+## 配置面索引（#2124 文档缺口补齐）
+
+以下为「存在且有行为影响、但此前未文档」的配置项（必填/强校验变量见上表）。
+### Hub
+
+| 环境变量 | 默认 | 语义 |
+|---|---|---|
+| `AGENTHUB_PPROF_USER`/`PASS`、`AGENTHUB_CORS_ORIGINS`、`AGENTHUB_ADMIN_USERS` | 空/硬编码默认 | debug 门禁（未配=404 fail-closed）、CORS 白名单覆盖、管理端点用户白名单 |
+| `AGENTHUB_AGENT_TEAM_*`（9 字段） | 见 `config_agent_team.go` | delegation_depth / active_subagents / route_repeats / tasks_per_team_run / assignment_timeout / budget_tokens / budget_usage_pct / compete_max_agents / human_review_enabled |
+| `AGENTHUB_EGRESS_*` | 见 `config.yaml` egress 节 | allow_cidrs / allow_hostnames / allow_plain_http / timeout（行为见 08-outbound-http.md） |
+| `AGENTHUB_UPLOAD_*` / `AGENTHUB_S3_*`（+裸 `S3_*` legacy） | 见 `config_jwt_upload.go` / `config_s3.go` | 上传目录/大小/MIME；对象存储后端，legacy 前缀兼容期 |
+| `AGENTHUB_TOKENDANCE_ID_HTTP_TIMEOUT` / `AGENTHUB_TOKENDANCE_ID_MAX_RESPONSE_BODY_BYTES` | 见 `config_tokendance.go` | TDID OIDC 客户端超时与响应体上限 |
+
+### Edge
+
+| 环境变量 | 默认 | 语义 |
+|---|---|---|
+| `AGENTHUB_EVIDENCE_GATE_ENABLED`、`AGENTHUB_FAULT_ESCALATION_ENABLED`/`_TIMEOUT` | `true` / 见 `fault_escalation.go` | 证据门禁与故障升级开关 |
+| `AGENTHUB_EVENT_WORKERS`、`AGENTHUB_DELIVERY_JOURNAL_DB` | `4` / 空（关闭） | 事件总线 worker 数、durable journal 开关 |
+| `AGENTHUB_DEPLOY_HOST`/`_PATH`/`AGENTHUB_PAGES_DOMAIN` | 占位默认 | Pages 部署目标 |
+| `AGENTHUB_EDGE_SHUTDOWN_TIMEOUT`、`AGENTHUB_HUB_MCP_SYNC_URL`/`_INTERVAL` | `10s` / 空（关闭） | 优雅停机总预算（#2129 L6）、Hub MCP 配置同步 |
+
 ## 迁移回滚约定
 
 > 来源：#2125 审计切片 A/C。本节定义 down 语义与操作纪律，不替代具体迁移文件的注释。
