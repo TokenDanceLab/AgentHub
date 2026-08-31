@@ -108,3 +108,22 @@ func TestWSUserConnLimiter_ReleaseIdempotent(t *testing.T) {
 	limiter.Release("u1", "conn-1")
 	limiter.Release("u1", "conn-1")
 }
+
+// TestStopWSIPRateLimiterIdempotent covers the process-wide singleton stop
+// wired into App.Shutdown (#2154): it no-ops when the limiter was never
+// initialized and stops the cleanup goroutine once initialized, without
+// panicking on repeat calls.
+func TestStopWSIPRateLimiterIdempotent(t *testing.T) {
+	// Never-initialized singleton: must be a safe no-op.
+	StopWSIPRateLimiter()
+	StopWSIPRateLimiter()
+
+	// Initialize the singleton the same way the production middleware does,
+	// then stop it; repeat stops must stay safe.
+	limiter := newDefaultWSIPRateLimiter()
+	if limiter == nil {
+		t.Fatal("newDefaultWSIPRateLimiter returned nil")
+	}
+	StopWSIPRateLimiter()
+	StopWSIPRateLimiter()
+}
