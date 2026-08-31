@@ -2,6 +2,7 @@ package repository
 
 import (
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/agenthub/hub-server/internal/errcode"
@@ -125,10 +126,20 @@ func ListPublicProfiles(db *gorm.DB, runtimeID, q, sortBy, cursor string, pageSi
 	}
 	if cursor != "" {
 		switch sortBy {
-		case "install_count":
-			qry = qry.Where("install_count < ? OR (install_count = ? AND id > ?)", cursor, cursor, cursor)
-		case "rating":
-			qry = qry.Where("rating_avg < ? OR (rating_avg = ? AND id > ?)", cursor, cursor, cursor)
+		case "install_count", "rating":
+			// Composite cursor "<sortValue>|<lastID>" from the service layer.
+			// sortValue stays a numeric literal (the column is numeric, so
+			// PostgreSQL coerces it); comparing it against uuid id would 500.
+			parts := strings.SplitN(cursor, "|", 2)
+			if len(parts) != 2 {
+				break // malformed/legacy cursor: treat as fresh page
+			}
+			sortVal, lastID := parts[0], parts[1]
+			if sortBy == "install_count" {
+				qry = qry.Where("install_count < ? OR (install_count = ? AND id > ?)", sortVal, sortVal, lastID)
+			} else {
+				qry = qry.Where("rating_avg < ? OR (rating_avg = ? AND id > ?)", sortVal, sortVal, lastID)
+			}
 		default: // "recent"
 			qry = qry.Where("id < ?", cursor)
 		}

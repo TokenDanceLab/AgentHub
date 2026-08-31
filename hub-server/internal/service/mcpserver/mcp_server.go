@@ -3,7 +3,6 @@ package mcpserver
 import (
 	"context"
 	"errors"
-	"fmt"
 
 	"gorm.io/gorm"
 
@@ -169,7 +168,11 @@ func (s *Service) SearchPublic(ctx context.Context, q, transport, cursor string,
 	}
 	var nextCursor string
 	if hasMore && len(servers) > 0 {
-		nextCursor = fmt.Sprintf("%d", servers[len(servers)-1].InstallCount)
+		// Repo filters `id < cursor` with ORDER BY id DESC — the cursor must
+		// be the last row's ID, not InstallCount (string "37" would be
+		// compared against a uuid column and 500 on PostgreSQL, #2135? no —
+		// exploratory audit P0-2).
+		nextCursor = servers[len(servers)-1].ID
 	}
 	return &ListResult{Items: servers, HasMore: hasMore, Cursor: nextCursor}, nil
 }
