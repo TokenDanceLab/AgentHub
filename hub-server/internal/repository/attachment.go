@@ -35,12 +35,3 @@ func GetAttachmentByID(db *gorm.DB, id string) (*model.Attachment, error) {
 	}
 	return &a, nil
 }
-
-func GetAttachmentByUploaderAndID(db *gorm.DB, uploaderUserID, id string) (*model.Attachment, error) {
-	var a model.Attachment
-	err := db.Where("uploader_user_id = ? AND id = ?", uploaderUserID, id).First(&a).Error
-	if err != nil {
-		return nil, err
-	}
-	return &a, nil
-}

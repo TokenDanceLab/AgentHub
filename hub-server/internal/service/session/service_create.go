@@ -129,6 +129,15 @@ func (s *Service) requireMember(ctx context.Context, sessionID, userID string) (
 	if !active {
 		return nil, errcode.SessionNotMember
 	}
-	member, _ := repository.GetActiveMember(s.db, sessionID, model.MemberTypeUser, userID)
+	member, err := repository.GetActiveMember(s.db, sessionID, model.MemberTypeUser, userID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			// IsMemberActive saw the member but the row disappeared before the
+			// read: report not-a-member instead of masking the DB error or
+			// leaking a zero-value member.Role to permission checks.
+			return nil, errcode.SessionNotMember
+		}
+		return nil, err
+	}
 	return member, nil
 }

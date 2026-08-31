@@ -81,11 +81,11 @@ func (m *mockEdgeAgentService) RegenerateAgentTask(ctx context.Context, userID, 
 
 // mockEdgeDeviceService implements handler.DeviceService.
 type mockEdgeDeviceService struct {
-	registerFn func(deviceID, userID, deviceType, appVersion string, capabilities []string) (*model.Device, error)
+	registerFn func(ctx context.Context, deviceID, userID, deviceType, appVersion string, capabilities []string) (*model.Device, error)
 }
 
-func (m *mockEdgeDeviceService) Register(deviceID, userID, deviceType, appVersion string, capabilities []string) (*model.Device, error) {
-	return m.registerFn(deviceID, userID, deviceType, appVersion, capabilities)
+func (m *mockEdgeDeviceService) Register(ctx context.Context, deviceID, userID, deviceType, appVersion string, capabilities []string) (*model.Device, error) {
+	return m.registerFn(ctx, deviceID, userID, deviceType, appVersion, capabilities)
 }
 
 func (m *mockEdgeDeviceService) ListDevices(userID string) ([]model.Device, error) {
@@ -131,7 +131,7 @@ func TestEdgeDeviceRegister(t *testing.T) {
 		capabilities []string
 	}
 	svc := &mockEdgeDeviceService{
-		registerFn: func(deviceID, userID, deviceType, appVersion string, capabilities []string) (*model.Device, error) {
+		registerFn: func(ctx context.Context, deviceID, userID, deviceType, appVersion string, capabilities []string) (*model.Device, error) {
 			captured.deviceID = deviceID
 			captured.userID = userID
 			captured.deviceType = deviceType
@@ -183,7 +183,7 @@ func TestEdgeDeviceRegister(t *testing.T) {
 
 func TestEdgeDeviceRegisterBadRequest(t *testing.T) {
 	svc := &mockEdgeDeviceService{
-		registerFn: func(deviceID, userID, deviceType, appVersion string, capabilities []string) (*model.Device, error) {
+		registerFn: func(ctx context.Context, deviceID, userID, deviceType, appVersion string, capabilities []string) (*model.Device, error) {
 			return nil, errcode.ErrInternal
 		},
 	}
@@ -202,7 +202,7 @@ func TestEdgeDeviceRegisterBadRequest(t *testing.T) {
 
 func TestEdgeDeviceRegisterInternalError(t *testing.T) {
 	svc := &mockEdgeDeviceService{
-		registerFn: func(deviceID, userID, deviceType, appVersion string, capabilities []string) (*model.Device, error) {
+		registerFn: func(ctx context.Context, deviceID, userID, deviceType, appVersion string, capabilities []string) (*model.Device, error) {
 			return nil, context.DeadlineExceeded
 		},
 	}

@@ -13,11 +13,11 @@ import (
 )
 
 type mockDeviceService struct {
-	registerFn func(deviceID, userID, deviceType, appVersion string, capabilities []string) (*model.Device, error)
+	registerFn func(ctx context.Context, deviceID, userID, deviceType, appVersion string, capabilities []string) (*model.Device, error)
 }
 
-func (m *mockDeviceService) Register(deviceID, userID, deviceType, appVersion string, capabilities []string) (*model.Device, error) {
-	return m.registerFn(deviceID, userID, deviceType, appVersion, capabilities)
+func (m *mockDeviceService) Register(ctx context.Context, deviceID, userID, deviceType, appVersion string, capabilities []string) (*model.Device, error) {
+	return m.registerFn(ctx, deviceID, userID, deviceType, appVersion, capabilities)
 }
 
 func (m *mockDeviceService) ListDevices(userID string) ([]model.Device, error) {
@@ -26,7 +26,7 @@ func (m *mockDeviceService) ListDevices(userID string) ([]model.Device, error) {
 
 func TestDeviceHandler_Register_Success(t *testing.T) {
 	svc := &mockDeviceService{
-		registerFn: func(deviceID, userID, deviceType, appVersion string, capabilities []string) (*model.Device, error) {
+		registerFn: func(ctx context.Context, deviceID, userID, deviceType, appVersion string, capabilities []string) (*model.Device, error) {
 			return &model.Device{
 				ID:           deviceID,
 				UserID:       userID,
@@ -73,7 +73,7 @@ func TestDeviceHandler_Register_Success(t *testing.T) {
 func TestDeviceHandler_Register_InvalidDeviceID(t *testing.T) {
 	called := false
 	svc := &mockDeviceService{
-		registerFn: func(deviceID, userID, deviceType, appVersion string, capabilities []string) (*model.Device, error) {
+		registerFn: func(ctx context.Context, deviceID, userID, deviceType, appVersion string, capabilities []string) (*model.Device, error) {
 			called = true
 			return nil, errcode.ErrInternal
 		},
@@ -109,7 +109,7 @@ func TestDeviceHandler_Register_InvalidDeviceID(t *testing.T) {
 }
 
 func TestDeviceHandler_Register_BadRequest(t *testing.T) {
-	svc := &mockDeviceService{registerFn: func(deviceID, userID, deviceType, appVersion string, capabilities []string) (*model.Device, error) {
+	svc := &mockDeviceService{registerFn: func(ctx context.Context, deviceID, userID, deviceType, appVersion string, capabilities []string) (*model.Device, error) {
 		return nil, errcode.ErrInternal
 	}}
 	h := handler.NewDeviceHandler(svc)
@@ -124,7 +124,7 @@ func TestDeviceHandler_Register_BadRequest(t *testing.T) {
 
 func TestDeviceHandler_Register_InternalError(t *testing.T) {
 	svc := &mockDeviceService{
-		registerFn: func(deviceID, userID, deviceType, appVersion string, capabilities []string) (*model.Device, error) {
+		registerFn: func(ctx context.Context, deviceID, userID, deviceType, appVersion string, capabilities []string) (*model.Device, error) {
 			return nil, context.DeadlineExceeded
 		},
 	}
@@ -143,7 +143,7 @@ func TestDeviceHandler_Register_InternalError(t *testing.T) {
 func TestDeviceHandler_RegisterRejectsMismatchedJWTDeviceID(t *testing.T) {
 	called := false
 	svc := &mockDeviceService{
-		registerFn: func(deviceID, userID, deviceType, appVersion string, capabilities []string) (*model.Device, error) {
+		registerFn: func(ctx context.Context, deviceID, userID, deviceType, appVersion string, capabilities []string) (*model.Device, error) {
 			called = true
 			return nil, errcode.ErrInternal
 		},
@@ -177,7 +177,7 @@ func TestDeviceHandler_RegisterRejectsMismatchedJWTDeviceID(t *testing.T) {
 func TestDeviceHandler_CloudEdgeRegisterAllowsDifferentCallerDeviceAndIssuesEdgeScopedJWT(t *testing.T) {
 	called := false
 	svc := &mockDeviceService{
-		registerFn: func(deviceID, userID, deviceType, appVersion string, capabilities []string) (*model.Device, error) {
+		registerFn: func(ctx context.Context, deviceID, userID, deviceType, appVersion string, capabilities []string) (*model.Device, error) {
 			called = true
 			if deviceID != testDeviceID {
 				t.Fatalf("deviceID = %q, want %s", deviceID, testDeviceID)

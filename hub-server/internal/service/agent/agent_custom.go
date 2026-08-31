@@ -29,21 +29,6 @@ func (s *Service) CreateCustomAgent(ctx context.Context, ownerID, name, avatarUR
 	return ca, nil
 }
 
-// GetCustomAgent returns a custom agent by ID, verifying ownership.
-func (s *Service) GetCustomAgent(ctx context.Context, ownerID, id string) (*model.CustomAgent, error) {
-	ca, err := repository.GetCustomAgentByID(s.db, id)
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, errcode.AgentNotFound
-		}
-		return nil, err
-	}
-	if ca.OwnerUserID != ownerID {
-		return nil, errcode.AgentNotFound
-	}
-	return ca, nil
-}
-
 // ListCustomAgents returns all custom agents owned by the given user.
 func (s *Service) ListCustomAgents(ctx context.Context, ownerID string) ([]model.CustomAgent, error) {
 	return repository.ListCustomAgentsByOwner(s.db, ownerID)

@@ -412,14 +412,6 @@ func (km *KeyManager) JWKS() *SymmetricJWKS {
 	return &SymmetricJWKS{Keys: keys}
 }
 
-// GetSecret returns the active key's raw secret for backward compatibility
-// with code that still uses a single secret string.
-func (km *KeyManager) GetSecret() string {
-	km.mu.RLock()
-	defer km.mu.RUnlock()
-	return string(km.keys[km.activeKeyID])
-}
-
 // KeyCount returns the number of registered keys.
 func (km *KeyManager) KeyCount() int {
 	km.mu.RLock()

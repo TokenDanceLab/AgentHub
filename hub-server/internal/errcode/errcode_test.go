@@ -28,16 +28,16 @@ func TestNewError(t *testing.T) {
 func TestAllErrorsHaveNonEmptyCode(t *testing.T) {
 	all := []*Error{
 		OK, ErrInternal, ErrBadRequest, ErrTimeout,
-		AuthInvalidToken, AuthInvalidCredentials, AuthTokenExpired, AuthDeviceMismatch, AuthRefreshInvalid,
+		AuthInvalidToken, AuthTokenExpired, AuthDeviceMismatch, AuthRefreshInvalid,
 		MsgNotFound, MsgRecallTimeout, MsgPinLimitExceeded, MsgBlockedByReceiver,
 		SessionNotFound, SessionDissolved, SessionNotMember,
-		AgentNotFound, AgentOffline, AgentTaskNotFound, AgentTaskCancelled, AgentTaskTimeout, TurnInProgress, TargetNotFound, TargetNotRoutable,
+		AgentNotFound, AgentTaskNotFound, AgentTaskCancelled, AgentTaskTimeout, TurnInProgress, TargetNotFound, TargetNotRoutable,
 		GroupNotOwner, GroupOwnerCannotLeave, GroupAlreadyMember,
 		UserNotFound, UserUsernameTaken, UserInvalidParam,
 		FriendAlready, FriendBlocked, FriendRequestNotFound, FriendRemarkNoRow, FriendNotFriend,
 		AttachNotFound, AttachTooLarge, AttachHashMismatch, AttachTypeNotAllowed,
 		NotifNotFound,
-		WsAuthTimeout, WsAuthFailed,
+
 		OIDCInvalidState, OIDCCodeExchangeFailed, OIDCIDTokenInvalid, OIDCSubNotFound,
 		ErrNotImplemented,
 	}

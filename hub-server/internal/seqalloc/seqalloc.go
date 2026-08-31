@@ -32,21 +32,56 @@ type Allocator struct {
 	cache Cache
 	db    *gorm.DB
 
-	locks sync.Map // sessionID -> *sync.Mutex
+	mu    sync.Mutex
+	locks map[string]*sessionLock // sessionID -> ref-counted mutex
+}
+
+type sessionLock struct {
+	mu   sync.Mutex
+	refs int
 }
 
 // New constructs an Allocator over the given cache port and DB.
 func New(cache Cache, db *gorm.DB) *Allocator {
-	return &Allocator{cache: cache, db: db}
+	return &Allocator{cache: cache, db: db, locks: make(map[string]*sessionLock)}
 }
 
 // lockFor returns the per-session mutex. Redis INCR is atomic, but the DB
 // mirror (SyncSessionSeq) and the DB fallback (AllocateSeqID) both touch
 // sessions.next_seq; without serialization the two sources can interleave and
 // hand out duplicate sequences (#1533). Different sessions stay parallel.
+//
+// The lock table is ref-counted: acquire pins the entry so the release-side
+// sweep can never delete a mutex another goroutine is still holding or about
+// to lock. Entries are removed once the refcount drains, bounding the table
+// by the number of concurrently allocating sessions instead of the total
+// number of sessions ever seen.
 func (a *Allocator) lockFor(sessionID string) *sync.Mutex {
-	v, _ := a.locks.LoadOrStore(sessionID, &sync.Mutex{})
-	return v.(*sync.Mutex)
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	sl, ok := a.locks[sessionID]
+	if !ok {
+		sl = &sessionLock{}
+		a.locks[sessionID] = sl
+	}
+	sl.refs++
+	return &sl.mu
+}
+
+// releaseSessionLock drops the acquired reference and deletes the entry once
+// no goroutine holds one. Must be called exactly once per lockFor after the
+// returned mutex is unlocked.
+func (a *Allocator) releaseSessionLock(sessionID string) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	sl := a.locks[sessionID]
+	if sl == nil {
+		return
+	}
+	sl.refs--
+	if sl.refs == 0 {
+		delete(a.locks, sessionID)
+	}
 }
 
 // Allocate returns the next sequence number for a session. It tries Redis INCR
@@ -56,7 +91,10 @@ func (a *Allocator) lockFor(sessionID string) *sync.Mutex {
 func (a *Allocator) Allocate(ctx context.Context, sessionID string) (int64, error) {
 	mu := a.lockFor(sessionID)
 	mu.Lock()
-	defer mu.Unlock()
+	defer func() {
+		mu.Unlock()
+		a.releaseSessionLock(sessionID)
+	}()
 
 	seq, err := a.cache.AllocateSeq(ctx, sessionID)
 	if err == nil {

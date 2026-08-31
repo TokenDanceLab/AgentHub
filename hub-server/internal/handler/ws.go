@@ -100,7 +100,7 @@ func (h *WebSocketHandler) ServeWS(c *gin.Context) {
 	h.userLimiter.Acquire(userID, conn.ID)
 	// writeLoop must start before PushToConn so the stamped auth.ok frame has a
 	// draining goroutine ready to take it off conn.Send (writeLoop is launched
-	// above on its own goroutine). Routing auth.ok through PushToConn instead
+	// below on its own goroutine). Routing auth.ok through PushToConn instead
 	// of the legacy sendFrame bypass unifies seq_id stamping so clients can
 	// detect loss via seq gaps (G12 fix); subsequent data frames start at
 	// seq_id=2 because auth.ok now consumes seq_id=1.
@@ -244,8 +244,9 @@ func (h *WebSocketHandler) canTypeInSession(userID, sessionID string) (ok bool) 
 
 // sendFrame writes a frame directly to conn.Send, bypassing Manager.PushToConn
 // and therefore the per-connection seq_id stamping contract documented at
-// manager.go:362-369 ("every delivery attempt that reaches the connection is
-// stamped with the connection's monotonic seq_id"). Frames sent here reach the
+// internal/ws/fanout.go (PushToConn: "every delivery attempt that reaches the
+// connection is stamped with the connection's monotonic seq_id"). Frames sent
+// here reach the
 // wire with SeqID=0, which frame.go's json "omitempty" tag drops entirely, so
 // clients cannot detect loss of these frames via seq_id gaps.
 //

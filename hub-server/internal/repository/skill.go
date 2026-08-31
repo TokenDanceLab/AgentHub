@@ -90,12 +90,6 @@ func ListPublicSkills(db *gorm.DB, q, skillType, cursor string, pageSize int) ([
 	return skills, hasMore, nil
 }
 
-// IncrementSkillInstallCount atomically increases install_count.
-func IncrementSkillInstallCount(db *gorm.DB, id string) error {
-	return db.Model(&model.Skill{}).Where("id = ?", id).
-		UpdateColumn("install_count", gorm.Expr("install_count + 1")).Error
-}
-
 // FindSkillByOwnerAndName checks for duplicate skill names.
 func FindSkillByOwnerAndName(db *gorm.DB, ownerID, name string) (*model.Skill, error) {
 	var s model.Skill

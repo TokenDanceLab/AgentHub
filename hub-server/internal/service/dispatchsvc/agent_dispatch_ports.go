@@ -205,22 +205,6 @@ func (s *DispatchService) SetCache(cacheClient dispatchCache) {
 	s.cacheClient = resolveDispatchCache(cacheClient)
 }
 
-// SetManager injects (or replaces) the WebSocket manager port.
-func (s *DispatchService) SetManager(mgr ManagerPort) {
-	if !dispatch.ServiceReceiverAvailable(s != nil) {
-		return
-	}
-	s.mgr = mgr
-}
-
-// SetRelay injects (or replaces) the hub_relay command dispatcher port.
-func (s *DispatchService) SetRelay(relay RelayPort) {
-	if !dispatch.ServiceReceiverAvailable(s != nil) {
-		return
-	}
-	s.relay = relay
-}
-
 // publish is a nil-safe wrapper over the bus port (cancel/regenerate events).
 func (s *DispatchService) publish(ctx context.Context, event bus.Event) {
 	if !dispatch.BusPortAvailable(s != nil, s != nil && s.bus != nil) {

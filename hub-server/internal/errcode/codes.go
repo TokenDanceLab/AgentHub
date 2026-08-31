@@ -26,22 +26,23 @@ var (
 )
 
 // --- HTTP status design principles (状态码设计原则) ---
-// 401 Unauthorized: 凭证本身无效或过期（auth_invalid_token/auth_token_expired/ws_auth_timeout）。
+// 401 Unauthorized: 凭证本身无效或过期（auth_invalid_token/auth_token_expired）。
 // 400 Bad Request: 客户端请求参数/状态错误，与凭证有效性无关（oidc_invalid_state/msg_recall_timeout/msg_edit_timeout）。
 // 410 Gone: 资源生命周期终结，已不可恢复（agent_task_timeout/agent_task_cancelled/session_dissolved）。
 // 403 Forbidden: 凭证有效但无权限（auth_device_mismatch/msg_blocked_by_receiver/session_not_member）。
 // 502 Bad Gateway: 上游响应内容不合法（oidc_sub_not_found：IdP 返回的 id_token 缺 sub claim）。
-// 503 Service Unavailable: 服务/依赖未就绪（agent_offline、edge *_not_configured 系列）。
-// 标注约定：每个码在定义行尾用 "// principle: <类别>" 注释；当前全部符合上述原则，无待议项。
+// 503 Service Unavailable: 服务/依赖未就绪（agent_offline）。
+// 新码归属到上面的对应类别；不在任何 HTTP 请求中产生的码不注册于此。
 
 // --- Hub domain-specific codes ---
 
 var (
-	AuthInvalidToken       = New("auth_invalid_token", "token is invalid or expired", http.StatusUnauthorized)
-	AuthInvalidCredentials = New("auth_invalid_credentials", "invalid username or password", http.StatusUnauthorized)
-	AuthTokenExpired       = New("auth_token_expired", "token has expired", http.StatusUnauthorized)
-	AuthDeviceMismatch     = New("auth_device_mismatch", "device type not allowed for this endpoint", http.StatusForbidden)
-	AuthRefreshInvalid     = New("auth_refresh_invalid", "refresh token is invalid or revoked", http.StatusUnauthorized)
+	AuthInvalidToken = New("auth_invalid_token", "token is invalid or expired", http.StatusUnauthorized)
+	// AuthTokenExpired 当前无 Go 生产路径产生，但客户端错误上报契约仍映射该码
+	// （app/shared/src/errorReporting.ts），保留以保证契约可追溯。
+	AuthTokenExpired   = New("auth_token_expired", "token has expired", http.StatusUnauthorized)
+	AuthDeviceMismatch = New("auth_device_mismatch", "device type not allowed for this endpoint", http.StatusForbidden)
+	AuthRefreshInvalid = New("auth_refresh_invalid", "refresh token is invalid or revoked", http.StatusUnauthorized)
 
 	MsgNotFound          = New("msg_not_found", "message not found", http.StatusNotFound)
 	MsgRecallTimeout     = New("msg_recall_timeout", "recall window has expired", http.StatusBadRequest)
@@ -55,7 +56,6 @@ var (
 	SessionNotMember = New("session_not_member", "you are not a member of this session", http.StatusForbidden)
 
 	AgentNotFound      = New("agent_not_found", "agent not found", http.StatusNotFound)
-	AgentOffline       = New("agent_offline", "agent runner is offline", http.StatusServiceUnavailable)
 	AgentTaskNotFound  = New("agent_task_not_found", "agent task not found", http.StatusNotFound)
 	AgentTaskCancelled = New("agent_task_cancelled", "task has been cancelled", http.StatusGone)
 	AgentTaskTimeout   = New("agent_task_timeout", "task has timed out", http.StatusGone)
@@ -90,9 +90,6 @@ var (
 	AttachTypeNotAllowed = New("attach_type_not_allowed", "file type is not allowed", http.StatusUnsupportedMediaType)
 
 	NotifNotFound = New("notif_not_found", "notification not found", http.StatusNotFound)
-
-	WsAuthTimeout = New("ws_auth_timeout", "ws authentication timeout", http.StatusUnauthorized)
-	WsAuthFailed  = New("ws_auth_failed", "ws authentication failed", http.StatusUnauthorized)
 
 	// OIDC 错误码与前端 SSOT 同步（#2123 P1-2）：本节每增删一个 oidc_* code，
 	// 必须同步 app/shared/src/api/auth/types.ts 的 OidcBackendErrorCodes；

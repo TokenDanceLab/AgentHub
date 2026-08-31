@@ -133,15 +133,6 @@ func (l *wsIPLimiter) Stop() {
 	}
 }
 
-// StopWSIPRateLimiter stops the background cleanup goroutine for the global
-// WebSocket IP rate limiter. Call during graceful shutdown so the goroutine
-// does not outlive the process.
-func StopWSIPRateLimiter() {
-	if wsIPRL != nil {
-		wsIPRL.Stop()
-	}
-}
-
 // WSIPRateLimit is a Gin middleware that enforces per-IP rate limiting for
 // WebSocket upgrade requests using the process-wide default limiter. It must
 // be placed BEFORE the WS handler in the middleware chain so that HTTP 429 is
