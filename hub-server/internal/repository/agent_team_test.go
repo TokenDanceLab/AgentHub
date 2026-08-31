@@ -91,6 +91,35 @@ func TestAgentTeamRepo_MemberCRUD(t *testing.T) {
 	assert.Len(t, members, 0)
 }
 
+func TestAgentTeamRepo_RemoveTeamMembersByTeamBatch(t *testing.T) {
+	db := setupSQLite(t)
+
+	teamA := &model.AgentTeam{Name: "A", OwnerID: "u1"}
+	require.NoError(t, CreateTeam(db, teamA))
+	teamB := &model.AgentTeam{Name: "B", OwnerID: "u1"}
+	require.NoError(t, CreateTeam(db, teamB))
+
+	add := func(teamID, id string) {
+		require.NoError(t, AddTeamMember(db, &model.AgentTeamMember{
+			TeamID: teamID, AgentProfileID: &id, Role: model.TeamMemberRoleExecutor,
+		}))
+	}
+	for i, id := range []string{"a1", "a2", "a3"} {
+		add(teamA.ID, id)
+		_ = i
+	}
+	add(teamB.ID, "b1")
+
+	require.NoError(t, RemoveTeamMembersByTeam(db, teamA.ID))
+
+	membersA, err := ListTeamMembers(db, teamA.ID)
+	require.NoError(t, err)
+	assert.Empty(t, membersA)
+	membersB, err := ListTeamMembers(db, teamB.ID)
+	require.NoError(t, err)
+	assert.Len(t, membersB, 1, "other team's members must survive")
+}
+
 func TestAgentTeamRepo_RunCRUD(t *testing.T) {
 	db := setupSQLite(t)
 

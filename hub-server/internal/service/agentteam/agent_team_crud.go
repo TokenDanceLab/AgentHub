@@ -124,15 +124,11 @@ func (s *AgentTeamService) DeleteTeam(ctx context.Context, userID, teamID string
 
 	// Remove members first (member rows reference the team) inside a
 	// transaction so a member-delete failure cannot leave a half-deleted team.
+	// Batch delete in one statement (#2102 F10): the previous List + per-member
+	// RemoveTeamMember loop was an N+1 on large teams.
 	return s.db.Transaction(func(tx *gorm.DB) error {
-		members, err := repository.ListTeamMembers(tx, teamID)
-		if err != nil {
+		if err := repository.RemoveTeamMembersByTeam(tx, teamID); err != nil {
 			return err
-		}
-		for _, member := range members {
-			if err := repository.RemoveTeamMember(tx, member.ID); err != nil {
-				return err
-			}
 		}
 		return repository.DeleteTeam(tx, teamID)
 	})

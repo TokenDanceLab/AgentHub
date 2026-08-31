@@ -223,10 +223,10 @@ func TestAgentTeamService_DeleteTeam(t *testing.T) {
 	mock.ExpectQuery(`SELECT * FROM "agent_team_runs" WHERE team_id`).
 		WillReturnRows(sqlmock.NewRows([]string{"id", "team_id", "session_id", "trigger_user_id", "trigger_message", "mode", "status", "created_at", "updated_at"}))
 
-	// Transaction: list members (none) + delete team.
+	// Transaction: batch-delete members in one statement (#2102 F10) + delete team.
 	mock.ExpectBegin()
-	mock.ExpectQuery(`SELECT * FROM "agent_team_members" WHERE team_id`).
-		WillReturnRows(sqlmock.NewRows([]string{"id", "team_id", "agent_profile_id", "role", "position", "created_at"}))
+	mock.ExpectExec(`DELETE FROM "agent_team_members" WHERE team_id`).
+		WillReturnResult(sqlmock.NewResult(0, 0))
 	mock.ExpectExec(`DELETE FROM "agent_teams"`).
 		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectCommit()
