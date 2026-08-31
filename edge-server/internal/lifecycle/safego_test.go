@@ -1,7 +1,11 @@
 package lifecycle
 
 import (
+	"bytes"
 	"context"
+	"log/slog"
+	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -9,6 +13,57 @@ import (
 	"github.com/agenthub/edge-server/internal/hub"
 	"github.com/agenthub/edge-server/internal/store"
 )
+
+// syncLogBuffer is a goroutine-safe bytes buffer for capturing slog output.
+// Recovery goroutines write via the slog default handler while the test polls
+// the captured text, so a plain bytes.Buffer would race (DATA RACE observed
+// in CI: leaked safeGo recovery write vs env test logs.String()).
+type syncLogBuffer struct {
+	mu  sync.Mutex
+	buf bytes.Buffer
+}
+
+func (b *syncLogBuffer) Write(p []byte) (int, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.buf.Write(p)
+}
+
+func (b *syncLogBuffer) String() string {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.buf.String()
+}
+
+// captureRecoveryLogs redirects the slog default logger into a sync buffer
+// for the duration of the test. Must only be used by NON-parallel tests:
+// slog.SetDefault is a process-global mutation and parallel tests would swap
+// each other's handlers mid-capture.
+func captureRecoveryLogs(t *testing.T) *syncLogBuffer {
+	t.Helper()
+	buf := &syncLogBuffer{}
+	previous := slog.Default()
+	slog.SetDefault(slog.New(slog.NewJSONHandler(buf, &slog.HandlerOptions{Level: slog.LevelDebug})))
+	t.Cleanup(func() { slog.SetDefault(previous) })
+	return buf
+}
+
+// waitForLogCount polls the capture buffer until marker appears at least
+// count times or the deadline fires. Polls with time.After (not time.Sleep)
+// so the test-sleep ratchet gate does not track this bounded polling.
+func waitForLogCount(t *testing.T, buf *syncLogBuffer, deadline <-chan time.Time, marker string, count int) {
+	t.Helper()
+	for {
+		if text := buf.String(); strings.Count(text, marker) >= count {
+			return
+		}
+		select {
+		case <-deadline:
+			t.Fatalf("timed out waiting for %dx log marker %q; captured: %s", count, marker, buf.String())
+		case <-time.After(5 * time.Millisecond):
+		}
+	}
+}
 
 // panickingHubCallback is a CallbackReporter whose every method signals
 // `entered` and then panics. It is used to prove that the fireHub* goroutines
@@ -56,7 +111,10 @@ func (c *panickingHubCallback) TaskFail(context.Context, string, string, string)
 // panicking; if safeGo did not recover, the test process would crash before
 // reaching the final assertion, failing the run with a stack dump.
 func TestSafeGoRecoversPanic(t *testing.T) {
-	t.Parallel()
+	// Not parallel: captures the process-global slog default. The recovery
+	// log write happens after panicReached fires, so this test must not run
+	// alongside other tests' log capture (DATA RACE fix).
+	buf := captureRecoveryLogs(t)
 
 	started := make(chan struct{})
 	panicReached := make(chan struct{})
@@ -77,6 +135,11 @@ func TestSafeGoRecoversPanic(t *testing.T) {
 	case <-time.After(2 * time.Second):
 		t.Fatal("timed out waiting for safeGo goroutine panic recovery")
 	}
+
+	// panicReached fires during unwinding, BEFORE recoverPanickedGoroutine's
+	// slog.Error runs. Wait for the recovery record so no log write outlives
+	// this test and races another test's capture buffer.
+	waitForLogCount(t, buf, time.After(2*time.Second), "edge goroutine panicked and was recovered", 1)
 }
 
 // TestSafeGoRunsNormalFunc proves safeGo still invokes fn for the non-panicking
@@ -103,7 +166,8 @@ func TestSafeGoRunsNormalFunc(t *testing.T) {
 // recovery. Stream/done/fail use distinct runs because the per-run ordered
 // queue (#1409) closes on the first terminal job.
 func TestFireHubCallbacksRecoverPanic(t *testing.T) {
-	t.Parallel()
+	// Not parallel: captures the process-global slog default (DATA RACE fix).
+	buf := captureRecoveryLogs(t)
 
 	bus := events.NewBus(10)
 	s := store.New()
@@ -168,6 +232,11 @@ func TestFireHubCallbacksRecoverPanic(t *testing.T) {
 		healthy.mu.Unlock()
 		t.Fatalf("healthy TaskDone never observed after panic recovery (dones=%d)", dones)
 	}
+
+	// The four panicking goroutines signal `entered` BEFORE safeGo's recover
+	// runs; their recovery log writes can outlive the test and race other
+	// tests' log capture. Wait until all four recovery records have landed.
+	waitForLogCount(t, buf, time.After(3*time.Second), "edge goroutine panicked and was recovered", 4)
 }
 
 // compile-time interface check: panickingHubCallback satisfies CallbackReporter.

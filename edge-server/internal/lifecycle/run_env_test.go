@@ -57,7 +57,8 @@ func TestEnvForRun_NilProfileUsesSanitizedBase(t *testing.T) {
 }
 
 func TestEnvForAdapterOrProfile_WarnsSensitiveExtraEnvKeys(t *testing.T) {
-	t.Parallel()
+	// Not parallel: captures the process-global slog default; parallel
+	// capture tests swap each other's handlers and race leaked writers.
 
 	var logs bytes.Buffer
 	previousLogger := slog.Default()
@@ -90,7 +91,8 @@ func TestEnvForAdapterOrProfile_WarnsSensitiveExtraEnvKeys(t *testing.T) {
 }
 
 func TestEnvForAdapterOrProfile_NoWarnInProfileMode(t *testing.T) {
-	t.Parallel()
+	// Not parallel: captures the process-global slog default; parallel
+	// capture tests swap each other's handlers and race leaked writers.
 
 	var logs bytes.Buffer
 	previousLogger := slog.Default()
