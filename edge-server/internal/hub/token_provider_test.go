@@ -51,11 +51,12 @@ func TestTokenProviderAccessTokenAndSetTokens(t *testing.T) {
 }
 
 func TestTokenProviderNextRefreshDelay(t *testing.T) {
-	soon := time.Now().Add(2 * time.Minute).Unix()
+	// exp = now+3m, lead = 2m => refresh in ~1m (#2135 F3).
+	soon := time.Now().Add(3 * time.Minute).Unix()
 	p := NewTokenProvider("http://hub", makeTestJWT(soon), "rt", http.DefaultClient)
 	delay := p.nextRefreshDelay()
 	if delay < time.Minute-tokenRefreshLead || delay > time.Minute+5*time.Second {
-		t.Fatalf("nextRefreshDelay = %v, want ~1m (exp-2m minus lead)", delay)
+		t.Fatalf("nextRefreshDelay = %v, want ~1m (exp-3m minus 2m lead)", delay)
 	}
 
 	expired := time.Now().Add(-time.Minute).Unix()

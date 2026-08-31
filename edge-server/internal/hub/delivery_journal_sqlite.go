@@ -275,9 +275,12 @@ func (j *SQLiteDeliveryJournal) runRetentionOnce() {
 }
 
 // DefaultJournalRetention is how long a journal row is kept before retention
-// purges it. 7 days balances the Edge reconciliation window (DurableSnapshot
-// replay after a restart) against unbounded disk growth.
-const DefaultJournalRetention = 7 * 24 * time.Hour
+// purges it. Aligned with runcontrol.DefaultRunCleanupTerminalTTL (24h): the
+// journal is derived data of a run, so it must not outlive the run it
+// references — otherwise reconciliation can replay orphan journal rows into
+// invalid retries (#2135 F2). 24h still covers the DurableSnapshot replay
+// window (restarts happen within minutes-hours, not days).
+const DefaultJournalRetention = 24 * time.Hour
 
 // JournalRetentionInterval is how often the retention loop fires. 24h keeps
 // the purge off the hot path; the retention window (not the cadence) governs

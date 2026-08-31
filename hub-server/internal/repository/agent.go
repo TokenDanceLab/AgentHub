@@ -8,6 +8,7 @@ import (
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 
+	"github.com/agenthub/hub-server/internal/config"
 	"github.com/agenthub/hub-server/internal/model"
 )
 
@@ -71,7 +72,10 @@ func GetCustomAgentByID(db *gorm.DB, id string) (*model.CustomAgent, error) {
 
 func ListCustomAgentsByOwner(db *gorm.DB, ownerID string) ([]model.CustomAgent, error) {
 	var agents []model.CustomAgent
-	err := db.Where("owner_user_id = ? AND deleted_at IS NULL", ownerID).Find(&agents).Error
+	err := db.Where("owner_user_id = ? AND deleted_at IS NULL", ownerID).
+		Order("created_at DESC").
+		Limit(config.MaxPageLimit). // #2136 P0: was unbounded
+		Find(&agents).Error
 	return agents, err
 }
 
