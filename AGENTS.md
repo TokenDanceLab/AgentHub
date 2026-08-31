@@ -230,6 +230,8 @@ subagent 提示必须包含：目标、允许修改路径、禁改路径、必�
 
 需要示例配置时只提交 `.env.example`，值用占位符。新增本地生成目录、缓存、数据库、日志或私钥目录前，先更新 `.gitignore`。
 
+日志纪律（#2120）：结构化日志只打标识符不打本体；字段名含 token/secret/authorization/api_key 等敏感语义时用 `pkg/logmask.Attr(key, value)` 统一脱敏（新打点必须走该约定）。
+
 ## 9.5 规则 → 机器验证映射
 
 机器验证的完整映射（规则 → 验证脚本/负向自测 → CI job）在 `docs/governance/verifier-map.md`（SSOT，脚本与 CI 路径由 `verify-doc-ssot.py` 校验存在性）；本节不复制长表。
