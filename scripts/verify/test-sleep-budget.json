@@ -208,18 +208,6 @@
    { "ms": 20, "kind": "grace_window" }
   ]
  },
- "hub-server/internal/cache/client_test.go": {
-  "count": 2,
-  "total_ms": 150,
-  "max_ms": 100,
-  "owner": "DeliciousBuding",
-  "review": "2026-11-02",
-  "reason": "Simulated slow loader inside singleflight (100ms keeps sf.Do open for joiners; 50ms in 30-goroutine contention test). Barrier already used; loader must stay slow to prove single-flight.",
-  "sleeps": [
-   { "ms": 100, "kind": "simulated_slow" },
-   { "ms": 50, "kind": "simulated_slow" }
-  ]
- },
  "hub-server/internal/middleware/rate_limit_test.go": {
   "count": 1,
   "total_ms": 100,
