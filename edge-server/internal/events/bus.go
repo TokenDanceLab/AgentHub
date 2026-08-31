@@ -87,6 +87,11 @@ type Bus struct {
 	// It is closed when Bus.Close() is called.
 	eventLog *EventLog
 
+	// eventLogMaxSize is the pending truncation threshold set by
+	// WithEventLogMaxSize. Applied when WithEventLogPath opens the log;
+	// 0 means use defaultEventLogMaxSize.
+	eventLogMaxSize int64
+
 	// persistOutputBatch controls whether run.output.batch events go through
 	// the persistence hook. Default true.
 	persistOutputBatch bool

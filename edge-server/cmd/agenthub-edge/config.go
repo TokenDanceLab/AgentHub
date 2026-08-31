@@ -62,7 +62,8 @@ type config struct {
 	SkillsDirs repeatedString // additional dirs to search for SKILL.md files
 
 	// Event log persistence for crash recovery and replay
-	EventLogPath string // append-only JSON-lines event log path; empty = no persistence
+	EventLogPath    string // append-only JSON-lines event log path; empty = no persistence
+	EventLogMaxSize int64  // event log truncation threshold in bytes; 0 = default (50 MiB)
 
 	// MCP Hub sync: periodically fetch MCP server configs from Hub's /web/mcp-servers endpoint
 	HubMCPSyncURL      string // Hub URL for MCP config sync; empty = no sync
@@ -97,6 +98,15 @@ func getEnv(key, defaultVal string) string {
 func parseIntEnv(key string, defaultVal int) int {
 	if v := os.Getenv(key); v != "" {
 		if n, err := strconv.Atoi(v); err == nil {
+			return n
+		}
+	}
+	return defaultVal
+}
+
+func parseInt64Env(key string, defaultVal int64) int64 {
+	if v := os.Getenv(key); v != "" {
+		if n, err := strconv.ParseInt(v, 10, 64); err == nil {
 			return n
 		}
 	}
@@ -187,6 +197,7 @@ func buildConfig(args []string) (config, error) {
 	fs.Var(&cfg.SkillsDirs, "skills-dir", "directory containing SKILL.md subdirectories; may be repeated; defaults to .agents/skills and .codex/skills")
 
 	fs.StringVar(&cfg.EventLogPath, "event-log-path", getEnv("AGENTHUB_EVENT_LOG_PATH", ""), "append-only JSON-lines event log path for crash recovery and replay; empty = no persistence")
+	fs.Int64Var(&cfg.EventLogMaxSize, "event-log-max-size", parseInt64Env("AGENTHUB_EVENT_LOG_MAX_SIZE", 0), "event log truncation threshold in bytes; 0 = default 50 MiB")
 
 	fs.StringVar(&cfg.HubMCPSyncURL, "hub-mcp-sync-url", getEnv("AGENTHUB_HUB_MCP_SYNC_URL", ""), "Hub URL for periodic MCP server config sync; empty = no sync")
 	fs.StringVar(&cfg.HubMCPSyncInterval, "hub-mcp-sync-interval", getEnv("AGENTHUB_HUB_MCP_SYNC_INTERVAL", "5m"), "interval for MCP config sync from Hub (e.g. 5m, 30s)")
