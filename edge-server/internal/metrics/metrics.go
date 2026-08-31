@@ -64,41 +64,13 @@ type EdgeMetrics struct {
 	Outbound *outboundmetrics.Recorder
 }
 
-// New creates and auto-registers all Edge Prometheus metrics in an isolated
-// registry. busDepthFn is a callback that returns the current event bus
-// history depth; it may be nil, in which case edge_event_bus_depth is skipped.
-func New(busDepthFn func() float64) *EdgeMetrics {
-	return NewWithBusStats(busDepthFn, nil)
-}
-
 // NewWithBusStats creates metrics with optional event bus callbacks.
 func NewWithBusStats(busDepthFn func() float64, busDroppedFn func() float64) *EdgeMetrics {
-	return newWithHooks(busDepthFn, busDroppedFn, nil, nil, nil, nil)
-}
-
-// NewWithPersistFailures creates metrics with optional event bus callbacks
-// plus a persist-failures callback that backs edge_event_persist_failures_total.
-// persistFailuresFn may be nil, in which case the metric is skipped (the events
-// package still counts internally and exposes the value via Bus.PersistFailures).
-func NewWithPersistFailures(busDepthFn, busDroppedFn, persistFailuresFn func() float64) *EdgeMetrics {
-	return newWithHooks(busDepthFn, busDroppedFn, persistFailuresFn, nil, nil, nil)
-}
-
-// NewWithEventLogStats creates metrics with optional event bus callbacks plus
-// event-log truncation/failure/gap callbacks that back
-// edge_event_log_truncations_total / edge_event_log_truncate_failures_total /
-// edge_event_log_gaps_total. Any nil callback skips the corresponding metric;
-// the events package still counts internally and exposes the values via
-// Bus.EventLogTruncations / EventLogTruncateFailures / EventLogGaps.
-func NewWithEventLogStats(
-	busDepthFn, busDroppedFn, persistFailuresFn func() float64,
-	truncationsFn, truncateFailuresFn, gapsFn func() float64,
-) *EdgeMetrics {
-	return newWithHooks(busDepthFn, busDroppedFn, persistFailuresFn, truncationsFn, truncateFailuresFn, gapsFn)
+	return newWithHooks(busDepthFn, busDroppedFn, nil, nil, nil)
 }
 
 func newWithHooks(
-	busDepthFn, busDroppedFn, persistFailuresFn,
+	busDepthFn, busDroppedFn,
 	truncationsFn, truncateFailuresFn, gapsFn func() float64,
 ) *EdgeMetrics {
 	reg := prometheus.NewRegistry()
@@ -137,13 +109,6 @@ func newWithHooks(
 			Name: "edge_event_bus_dropped_total",
 			Help: "Total number of event bus fanout deliveries dropped because subscriber channels were full.",
 		}, busDroppedFn)
-	}
-
-	if persistFailuresFn != nil {
-		m.EdgeEventPersistFailures = factory.NewCounterFunc(prometheus.CounterOpts{
-			Name: "edge_event_persist_failures_total",
-			Help: "Total number of event bus events dropped after exhausting all persist retry attempts.",
-		}, persistFailuresFn)
 	}
 
 	if truncationsFn != nil {
@@ -231,5 +196,5 @@ func (m *EdgeMetrics) RecordWSDisconnect() {
 // unit tests that need to exercise metric increment paths without wiring a
 // real event bus. The registry is isolated so parallel tests don't collide.
 func NewTestEdgeMetrics() *EdgeMetrics {
-	return newWithHooks(nil, nil, nil, nil, nil, nil)
+	return newWithHooks(nil, nil, nil, nil, nil)
 }

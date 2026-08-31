@@ -1,7 +1,17 @@
 {
-  "_comment": "Edge golangci-lint finding fingerprint baseline (#1840). Regenerated 2026-08-22 with golangci-lint v2.12.2. All 6 entries are revive exported-stutter findings on types whose rename crosses package boundaries; local (single-package) stutters, the gocyclo main, the unparam threadID, and all gofmt drift were repaid in the same PR. Each entry carries a reason; --UpdateBaseline preserves reasons of surviving fingerprints.",
+  "_comment": "Edge golangci-lint finding fingerprint baseline (#1840). Regenerated 2026-08-31 with golangci-lint v2.12.2.",
   "linter_version": "v2.12.2",
   "findings": [
+    {
+      "linter": "gocyclo",
+      "file": "internal/lifecycle/process_executor_build.go",
+      "message": "cyclomatic complexity 22 of func `(*ProcessExecutor).buildAndStartProcess` is high (> 20)"
+    },
+    {
+      "linter": "gocyclo",
+      "file": "internal/runcontrol/runcontrol.go",
+      "message": "cyclomatic complexity 24 of func `Create` is high (> 20)"
+    },
     {
       "linter": "revive",
       "file": "internal/adapters/acp/acp.go",
@@ -37,6 +47,11 @@
       "file": "internal/permission/permission.go",
       "message": "exported: type name will be used as permission.PermissionRegistry by other packages, and that stutters; consider calling this Registry",
       "reason": "referenced by api handlers, httpserver, and mcp server (3 consumer packages); rename is mechanical but cross-package, deferred to a dedicated refactor"
+    },
+    {
+      "linter": "whitespace",
+      "file": "internal/hub/delivery_journal_sqlite_test.go",
+      "message": "unnecessary trailing newline"
     }
   ]
 }
