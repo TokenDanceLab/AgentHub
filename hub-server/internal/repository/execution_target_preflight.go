@@ -9,42 +9,51 @@ type ActiveLocalEdgeDeviceDuplicate struct {
 }
 
 func FindActiveLocalEdgeDeviceDuplicates(db *gorm.DB) ([]ActiveLocalEdgeDeviceDuplicate, error) {
-	type duplicateKey struct {
+	// Single query + in-Go grouping (#2102 item 14): the previous version
+	// issued one Pluck per duplicate key — an N+1 pattern that grows with the
+	// number of conflicted (owner, device) groups. One round-trip now fetches
+	// every active local_edge row and grouping happens in memory; duplicate
+	// groups are expected to be rare, so the memory cost is negligible.
+	type targetRow struct {
+		ID       string `gorm:"column:id"`
 		OwnerID  string `gorm:"column:owner_id"`
 		DeviceID string `gorm:"column:device_id"`
 	}
-
-	var keys []duplicateKey
-	if err := db.Raw(`
-		SELECT owner_id, device_id
-		FROM execution_targets
-		WHERE deleted_at IS NULL
-		  AND target_type = ?
-		  AND device_id IS NOT NULL
-		GROUP BY owner_id, device_id
-		HAVING COUNT(*) > 1
-		ORDER BY owner_id ASC, device_id ASC
-	`, "local_edge").Scan(&keys).Error; err != nil {
+	var rows []targetRow
+	if err := db.Table("execution_targets").
+		Select("id, owner_id, device_id").
+		Where("deleted_at IS NULL").
+		Where("target_type = ?", "local_edge").
+		Where("device_id IS NOT NULL").
+		Order("owner_id ASC, device_id ASC, id ASC").
+		Scan(&rows).Error; err != nil {
 		return nil, err
 	}
 
-	duplicates := make([]ActiveLocalEdgeDeviceDuplicate, 0, len(keys))
-	for _, key := range keys {
-		var targetIDs []string
-		if err := db.Table("execution_targets").
-			Where("deleted_at IS NULL").
-			Where("target_type = ?", "local_edge").
-			Where("owner_id = ? AND device_id = ?", key.OwnerID, key.DeviceID).
-			Order("id ASC").
-			Pluck("id", &targetIDs).Error; err != nil {
-			return nil, err
+	type groupKey struct{ ownerID, deviceID string }
+	idsByGroup := make(map[groupKey][]string, len(rows))
+	var order []groupKey
+	seen := make(map[groupKey]bool, len(rows))
+	for _, r := range rows {
+		k := groupKey{r.OwnerID, r.DeviceID}
+		idsByGroup[k] = append(idsByGroup[k], r.ID)
+		if !seen[k] {
+			seen[k] = true
+			order = append(order, k)
 		}
-		duplicates = append(duplicates, ActiveLocalEdgeDeviceDuplicate{
-			OwnerID:   key.OwnerID,
-			DeviceID:  key.DeviceID,
-			TargetIDs: targetIDs,
-		})
 	}
 
+	duplicates := make([]ActiveLocalEdgeDeviceDuplicate, 0)
+	for _, k := range order {
+		ids := idsByGroup[k]
+		if len(ids) < 2 {
+			continue
+		}
+		duplicates = append(duplicates, ActiveLocalEdgeDeviceDuplicate{
+			OwnerID:   k.ownerID,
+			DeviceID:  k.deviceID,
+			TargetIDs: ids,
+		})
+	}
 	return duplicates, nil
 }

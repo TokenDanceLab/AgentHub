@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"errors"
 	"log/slog"
 
 	"github.com/agenthub/hub-server/internal/errcode"
@@ -65,6 +66,11 @@ func (h *UserSettingsHandler) PatchSettings(c *gin.Context) {
 
 	settings, err := h.settingsService.UpsertSettings(userID, req.Values)
 	if err != nil {
+		var e *errcode.Error
+		if errors.As(err, &e) {
+			Fail(c, e)
+			return
+		}
 		slog.Error("PatchSettings failed", "error", err)
 		Fail(c, errcode.ErrInternal)
 		return

@@ -6,6 +6,8 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/require"
 )
 
 // TestPublishCloseRace_Stress is the stress probe for issue #2071 S1.
@@ -84,7 +86,13 @@ func TestPublishCloseRace_Stress(t *testing.T) {
 		close(stopCh)
 		wgPub.Wait()
 
-		time.Sleep(20 * time.Millisecond)
+		// Abandoned handlers still finish on their own goroutines, so a cold
+		// Windows -race runner may need more than a fixed 20ms for pending to
+		// drain (round 0 flake: CI run 33395435975). A true leak never drains;
+		// a slow drain reaches zero within the bound below.
+		require.Eventually(t, func() bool { return b.Pending() == 0 },
+			5*time.Second, 10*time.Millisecond,
+			"pending handlers should drain to zero after Close")
 		postPend := b.Pending()
 
 		results[r] = roundResult{
