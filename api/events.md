@@ -41,6 +41,8 @@ Hub 向 Edge 投递任务有两条并行通道：WS `PushToConn(agent.dispatch)`
 
 标签：**UPSERT by id**（稳定 id 合并，禁止第二行）；**idempotent on apply**（再应用不变）；**水位 / watermark**（只前进 `max`）；**ephemeral**（可丢可重，不写持久态）；**非幂等**（须自备去重或 REST）。
 
+> ⚠️ **seq 字段契约**：Hub `seq_id`（per-conn 投递序号）与 Edge `seq`（per-bus stream 序号）语义完全不同，切勿混用，更不能互当 cursor / 幂等键。对照表、合法/禁止用法与源码锚点见 `api/conventions.md`「seq 字段对照表」。
+
 ## Edge EventEnvelope
 
 ```json
