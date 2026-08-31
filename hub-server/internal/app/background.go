@@ -208,8 +208,12 @@ func (a *App) startWebSocketCleanup(ctx context.Context) {
 
 // legacySeqSyncMarkerKey marks the legacy session-seq warm-up as completed.
 // syncLegacySeqs is an explicit one-time migration (#1675): the first run
-// sets this marker in Redis, every later startup skips the DB scan. Delete
-// the key to force a re-run (e.g. after a Redis flush that lost seq keys).
+// sets this marker in Redis with a 30-day TTL, every later startup skips the
+// DB scan while the marker lives. The TTL prevents permanent key residue if
+// the deployment is decommissioned without explicit cleanup; expiry triggers
+// a harmless idempotent re-scan because InitSeqIfAbsent is SetNX and runtime
+// self-healing (seqalloc.recoverFromDB) covers any lost seq keys. Delete the
+// key to force an immediate re-run (e.g. after a Redis flush).
 const legacySeqSyncMarkerKey = "migration:legacy-seq-sync:v1"
 
 // syncLegacySeqs copies existing session next_seq values from DB into Redis
@@ -232,7 +236,7 @@ func (a *App) syncLegacySeqs(ctx context.Context) {
 		slog.Warn("legacy session seq sync skipped: redis client unavailable")
 		return
 	}
-	claimed, err := rdb.SetNX(ctx, legacySeqSyncMarkerKey, time.Now().UTC().Format(time.RFC3339), 0).Result()
+	claimed, err := rdb.SetNX(ctx, legacySeqSyncMarkerKey, time.Now().UTC().Format(time.RFC3339), 30*24*time.Hour).Result()
 	if err != nil {
 		slog.Warn("failed to check legacy seq sync marker", "error", err)
 		return
