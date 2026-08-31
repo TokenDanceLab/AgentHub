@@ -60,6 +60,7 @@ func main() {
 	// and stores them in an in-memory MCPConfigStore for injection into runs.
 	var mcpConfigStore *adapters.MCPConfigStore
 	var mcpSyncer *adapters.HubMCPSyncer
+	var mcpCancel context.CancelFunc
 	if cfg.HubMCPSyncURL != "" {
 		mcpConfigStore = adapters.NewMCPConfigStore()
 		syncInterval := parseDurationOrDefault(cfg.HubMCPSyncInterval, 5*time.Minute)
@@ -68,7 +69,12 @@ func main() {
 		// edgehttp.NewClient refuses redirects so the Hub MCP config endpoint
 		// is answered at the exact configured URL.
 		mcpSyncer = adapters.NewHubMCPSyncer(cfg.HubMCPSyncURL, cfg.HubToken, mcpConfigStore, edgehttp.NewClient(15*time.Second))
-		go mcpSyncer.Run(context.Background(), syncInterval)
+		// Stop-derived context (#2129 M3): the syncer previously ran on
+		// context.Background() and depended solely on the Stop hook waking it;
+		// the shutdown chain now owns its lifecycle explicitly.
+		mcpCtx, cancel := context.WithCancel(context.Background())
+		mcpCancel = cancel
+		go mcpSyncer.Run(mcpCtx, syncInterval)
 		slog.Info("mcp hub sync enabled", "url", cfg.HubMCPSyncURL, "interval", syncInterval)
 	}
 
@@ -93,6 +99,7 @@ func main() {
 		EventLogPath:       cfg.EventLogPath,
 		EventLogMaxSize:    cfg.EventLogMaxSize,
 		MCPConfigStore:     mcpConfigStore,
+		ShutdownTimeout:    parseDurationOrDefault(cfg.ShutdownTimeout, 10*time.Second),
 	}
 	if cfg.HubCallbackMaxAttempts != "" {
 		if n, err := strconv.Atoi(strings.TrimSpace(cfg.HubCallbackMaxAttempts)); err == nil && n > 0 {
@@ -105,8 +112,14 @@ func main() {
 		}
 	}
 	if mcpSyncer != nil {
-		serverConfig.ShutdownHooks = append(serverConfig.ShutdownHooks, mcpSyncer.Stop)
+		serverConfig.ShutdownHooks = append(serverConfig.ShutdownHooks, func() {
+			mcpCancel()
+			mcpSyncer.Stop() // idempotent; also cancels Run's internal ctx
+		})
 	}
+	// Store teardown (#2129 M5): sqlite/file backends flush WAL and close
+	// handles on shutdown instead of relying on process exit.
+	serverConfig.ShutdownHooks = append(serverConfig.ShutdownHooks, repository.Close)
 	if cfg.RunnerCommand != "" {
 		serverConfig.ProcessExecutor = lifecycle.ProcessExecutorConfig{
 			Command:  cfg.RunnerCommand,
