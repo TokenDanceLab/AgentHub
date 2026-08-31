@@ -344,28 +344,31 @@ def main() -> int:
     assert_contains(repo_root, "edge-server\\internal\\adapters\\registry.go", "ValidateCLIAdapterID", "ValidateCLIAdapterID exists")
     assert_contains(repo_root, "edge-server\\internal\\adapters\\registry_test.go", "TestValidateCLIAdapterID", "supported/unsupported runtime ids are unit-tested")
     assert_contains(repo_root, "edge-server\\internal\\adapters\\registry_test.go", "agenthub-runner-mock", "mock runner is excluded from real CLI adapter ids")
-    assert_contains(repo_root, "edge-server\\cmd\\agenthub-edge\\main.go", "runnerProfileCodex", "Edge config supports codex runtime profile")
-    assert_contains(repo_root, "edge-server\\cmd\\agenthub-edge\\main.go", "runnerProfileClaudeCode", "Edge config supports claude-code runtime profile")
-    assert_contains(repo_root, "edge-server\\cmd\\agenthub-edge\\main.go", "runnerProfileOpenCode", "Edge config supports opencode runtime profile")
-    assert_contains(repo_root, "edge-server\\cmd\\agenthub-edge\\main.go", "AGENTHUB_CODEX_PATH", "Codex runtime path env is named")
-    assert_contains(repo_root, "edge-server\\cmd\\agenthub-edge\\main.go", "AGENTHUB_CLAUDE_CODE_PATH", "Claude Code runtime path env is named")
-    assert_contains(repo_root, "edge-server\\cmd\\agenthub-edge\\main.go", "AGENTHUB_OPENCODE_PATH", "OpenCode runtime path env is named")
+    assert_contains(repo_root, "edge-server\\cmd\\agenthub-edge\\adapter_registry.go", "runnerProfileCodex", "Edge config supports codex runtime profile")
+    assert_contains(repo_root, "edge-server\\cmd\\agenthub-edge\\adapter_registry.go", "runnerProfileClaudeCode", "Edge config supports claude-code runtime profile")
+    assert_contains(repo_root, "edge-server\\cmd\\agenthub-edge\\adapter_registry.go", "runnerProfileOpenCode", "Edge config supports opencode runtime profile")
+    assert_contains(repo_root, "edge-server\\cmd\\agenthub-edge\\config.go", "AGENTHUB_CODEX_ACP_PATH", "Codex ACP launcher path env is named")
+    assert_contains(repo_root, "edge-server\\cmd\\agenthub-edge\\config.go", "AGENTHUB_CLAUDE_ACP_PATH", "Claude ACP launcher path env is named")
+    assert_contains(repo_root, "edge-server\\cmd\\agenthub-edge\\config.go", "AGENTHUB_OPENCODE_ACP_PATH", "OpenCode ACP path env is named")
 
     step("explicit unknown runtime no-fallback evidence")
     assert_contains(repo_root, "edge-server\\internal\\adapters\\registry.go", r"agent adapter %q not found", "registry resolves explicit unknown adapter as an error")
-    assert_contains(repo_root, "edge-server\\internal\\lifecycle\\process_executor.go", r"adapterReg.Resolve\(runCtx.AgentID\)", "process executor resolves explicit run agent id through registry")
+    assert_contains(repo_root, "edge-server\\internal\\lifecycle\\process_executor_run.go", r"adapterReg.Resolve\(runCtx.AgentID\)", "process executor resolves explicit run agent id through registry")
     assert_contains(repo_root, "edge-server\\internal\\lifecycle\\process_executor_test.go", "TestProcessExecutorFailsUnknownExplicitAdapterWithoutDefaultFallback", "lifecycle test covers explicit unknown runtime")
     assert_contains(repo_root, "edge-server\\internal\\lifecycle\\process_executor_test.go", "unknown-runtime", "lifecycle test uses explicit unknown-runtime id")
     assert_contains(repo_root, "edge-server\\internal\\lifecycle\\process_executor_test.go", "default adapter was invoked for unknown runtime", "lifecycle test proves no default fallback")
-    assert_contains(repo_root, "docs\\governance\\governance-execution.md", r"unknown runtime.*fallback|agentId.*adapter registry.*fallback", "governance docs require no fallback for unknown runtimes")
-
+    # governance-execution.md 已外迁 TokenDance docs archive（#1807）；仓库内
+    # 治理指针收敛到 docs/governance/README.md。unknown-runtime fallback 事实
+    # 由上面的代码级断言保证，不再依赖已删文档。
     step("proposal/readiness artifact")
-    assert_contains(repo_root, "docs\\governance\\governance-execution.md", "No real CLI/model run", "governance doc records no real CLI/model run")
-    assert_contains(repo_root, "docs\\governance\\governance-execution.md", "operator approval", "governance doc records operator approval prerequisite")
-    assert_contains(repo_root, "docs\\governance\\governance-execution.md", "runtime path/env", "governance doc records runtime path/env prerequisite")
-    assert_contains(repo_root, "docs\\governance\\governance-execution.md", "budget/redaction", "governance doc records budget/redaction prerequisite")
-    assert_contains(repo_root, "docs\\governance\\governance-execution.md", "artifact root", "governance doc records artifact root prerequisite")
-    assert_contains(repo_root, "docs\\governance\\governance-execution.md", "evidence mode", "governance doc records evidence mode prerequisite")
+    gov = "docs\\governance\\README.md"
+    assert_contains(repo_root, gov, "Edge CLI real-readiness", "governance doc still points at the readiness gate")
+    assert_contains(repo_root, gov, "proposal-only", "governance doc records proposal-only scope")
+    assert_contains(repo_root, gov, "真实运行", "governance doc records no real CLI/model run")
+    assert_contains(repo_root, gov, "operator 审批", "governance doc records operator approval prerequisite")
+    assert_contains(repo_root, gov, "预算/脱敏策略", "governance doc records budget/redaction prerequisite")
+    assert_contains(repo_root, gov, "artifact root", "governance doc records artifact root prerequisite")
+    assert_contains(repo_root, gov, "证据模式", "governance doc records evidence mode prerequisite")
 
     forbidden_primitive_pattern = "|".join(
         [

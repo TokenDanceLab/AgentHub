@@ -34,16 +34,14 @@ func applyRunnerProfile(cfg *config) error {
 			cfg.AgentDefault = "claude-acp"
 		}
 	case runnerProfileCodex:
-		if strings.TrimSpace(cfg.RunnerCommand) == "" {
-			cfg.RunnerCommand = cfg.ClaudeCodePath
-		}
+		// ACP-only profile: never point the legacy process path at the claude
+		// binary (copy-paste regression from the ACP cutover). AgentDefault
+		// alone selects codex-acp.
 		if cfg.AgentDefault == "" {
 			cfg.AgentDefault = "codex-acp"
 		}
 	case runnerProfileOpenCode:
-		if strings.TrimSpace(cfg.RunnerCommand) == "" {
-			cfg.RunnerCommand = cfg.ClaudeCodePath
-		}
+		// ACP-only profile; see codex comment above.
 		if cfg.AgentDefault == "" {
 			cfg.AgentDefault = "opencode-acp"
 		}

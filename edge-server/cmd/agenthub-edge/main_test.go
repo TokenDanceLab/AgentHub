@@ -845,8 +845,8 @@ func TestBuildConfigRunnerProfileAppliesCodexPreset(t *testing.T) {
 		t.Fatalf("buildConfig returned error: %v", err)
 	}
 
-	if cfg.RunnerCommand != "claude" {
-		t.Fatalf("RunnerCommand = %q, want claude (bootstrap)", cfg.RunnerCommand)
+	if cfg.RunnerCommand != "" {
+		t.Fatalf("RunnerCommand = %q, want empty (codex is ACP-only, must not run the claude binary)", cfg.RunnerCommand)
 	}
 	if cfg.AgentDefault != "codex-acp" {
 		t.Fatalf("AgentDefault = %q, want codex-acp", cfg.AgentDefault)
@@ -859,8 +859,8 @@ func TestBuildConfigRunnerProfileAppliesOpenCodePreset(t *testing.T) {
 		t.Fatalf("buildConfig returned error: %v", err)
 	}
 
-	if cfg.RunnerCommand != "claude" {
-		t.Fatalf("RunnerCommand = %q, want claude (bootstrap)", cfg.RunnerCommand)
+	if cfg.RunnerCommand != "" {
+		t.Fatalf("RunnerCommand = %q, want empty (opencode is ACP-only, must not run the claude binary)", cfg.RunnerCommand)
 	}
 	if cfg.AgentDefault != "opencode-acp" {
 		t.Fatalf("AgentDefault = %q, want opencode-acp", cfg.AgentDefault)

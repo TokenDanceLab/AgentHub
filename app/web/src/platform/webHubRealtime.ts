@@ -253,7 +253,6 @@ export function useWebHubRealtime({
         // (UPSERT by agent_task_id + event_seq) and is consumed by a store
         // that handles ordering independently from the chat transcript.
         getSubagentStreamStore().push(payload);
-        console.log('[team.subagent.stream]', payload);
       } else {
         // A terminal/session/etc. event stays immediate, but pending stream
         // frames must reach both consumers first to preserve wire ordering.
