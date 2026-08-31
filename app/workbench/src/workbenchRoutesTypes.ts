@@ -35,7 +35,11 @@ export interface WorkbenchRoutesProps {
   agentProfilesStatus?: WorkbenchAgentProfilesStatus | undefined;
   dataMode?: string | undefined;
   contacts?: WorkbenchContactsData | undefined;
+  /** Hub contacts request failure (#1821) — renders an explicit error state. */
+  contactsError?: string | undefined;
   documents?: DocRow[] | undefined;
+  /** Hub documents request failure (#1821) — renders an explicit error state. */
+  documentsError?: string | undefined;
   focusedAgentId?: string | undefined;
   projects?: ProjectInfo[] | undefined;
   activeProjectId?: string | undefined;

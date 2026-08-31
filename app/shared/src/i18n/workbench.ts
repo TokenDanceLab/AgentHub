@@ -250,6 +250,10 @@ export const sharedWorkbenchResources = {
       },
     },
     contacts: {
+      error: {
+        title: '通讯录加载失败',
+        description: '请稍后重试；如持续失败请检查 Hub 连接。',
+      },
       nav: { internal: '组织内联系人', external: '外部联系人', newFriend: '新的朋友' },
       search: { placeholder: '搜索联系人' },
       section: {
@@ -289,6 +293,10 @@ export const sharedWorkbenchResources = {
       noPermission: {
         title: '无权限访问文档',
         description: '你没有查看此文档的权限，请联系文档所有者。',
+      },
+      error: {
+        title: '文档列表加载失败',
+        description: '请稍后重试；如持续失败请检查 Hub 连接。',
       },
     },
     agents: {
@@ -926,6 +934,10 @@ export const sharedWorkbenchResources = {
       },
     },
     contacts: {
+      error: {
+        title: 'Failed to load contacts',
+        description: 'Please retry later; check the Hub connection if this persists.',
+      },
       nav: { internal: 'Internal contacts', external: 'External contacts', newFriend: 'New friends' },
       search: { placeholder: 'Search contacts' },
       section: {
@@ -965,6 +977,10 @@ export const sharedWorkbenchResources = {
       noPermission: {
         title: 'No permission to access document',
         description: 'You don\'t have permission to view this document. Contact the document owner.',
+      },
+      error: {
+        title: 'Failed to load documents',
+        description: 'Please retry later; check the Hub connection if this persists.',
       },
     },
     agents: {

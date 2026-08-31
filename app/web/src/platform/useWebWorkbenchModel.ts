@@ -675,7 +675,17 @@ export function useWebWorkbenchModel(selectedConversationId?: string, selectedPr
     // is showing placeholder rows the transcript hides), the shell renders an
     // honest loading state instead of "no messages" (#5 session-switch item).
     transcriptLoading: Boolean(activeHubSessionId) && (messages.isPlaceholderData || messages.isLoading),
-    contacts: resolveHubContacts(contacts.data as HubContactLike[] | undefined, hubReady, dataMode),
+    contacts: resolveHubContacts(
+      contacts.data as HubContactLike[] | undefined,
+      hubReady,
+      dataMode,
+      contacts.isError
+        ? (contacts.error instanceof Error ? contacts.error.message : String(contacts.error))
+        : undefined,
+    ),
+    contactsError: contacts.isError
+      ? (contacts.error instanceof Error ? contacts.error.message : String(contacts.error))
+      : undefined,
     contactsActions: hubReady ? {
       onSearchUser: (query: string) => searchUser.mutateAsync(query),
       onSendFriendRequest: (userId: string, message?: string) => sendFriendRequest.mutateAsync({ userId, ...(message != null ? { message } : {}) }),

@@ -75,7 +75,9 @@ export function WorkbenchFrame({
   onNavigateToConversation,
   onStartNewConversation,
   contactsActions,
+  contactsError,
   documents,
+  documentsError,
   documentsActions,
   modelCatalog,
   ccSwitchStatus,
@@ -412,7 +414,9 @@ export function WorkbenchFrame({
             agentProfilesStatus={agentProfilesStatus}
             dataMode={workbenchStatus?.dataMode}
             contacts={contacts}
+            contactsError={contactsError}
             documents={documents}
+            documentsError={documentsError}
             focusedAgentId={focusedAgentId}
             projects={projects}
             activeProjectId={activeProjectId}
