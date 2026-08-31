@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { AppError, HubApiError, HubNetworkError } from '@agenthub/shared/errors';
+import { AppError, HubNetworkError } from '@agenthub/shared/errors';
 
 import {
   categorizeMobileError,
