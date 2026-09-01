@@ -257,7 +257,7 @@ export const SlideshowPreview: React.FC<SlideshowPreviewProps> = ({
       {loading && (
         <div className={styles.loading}>
           <div className={styles.spinner} />
-          <span>{t('preview.parsing')}</span>
+          <span>{t('preview.parsingSlideshow')}</span>
         </div>
       )}
 

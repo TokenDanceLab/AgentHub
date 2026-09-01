@@ -372,7 +372,7 @@ export const TablePreview: React.FC<TablePreviewProps> = ({
       {loading && (
         <div className={styles.loading}>
           <div className={styles.spinner} />
-          <span>{t('preview.parsing')}</span>
+          <span>{t('preview.parsingTable')}</span>
         </div>
       )}
 

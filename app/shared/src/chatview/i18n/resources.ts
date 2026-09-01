@@ -851,6 +851,8 @@ export const chatviewResources = {
 
   // ── Shared UI preview surfaces (#2154 UIUX lane i18n pass) ──
   'preview.parsing': '正在解析文档...',
+  'preview.parsingSlideshow': '正在解析演示文稿...',
+  'preview.parsingTable': '正在解析表格...',
   'preview.retry': '重试',
   'preview.blankSlide': '空白幻灯片',
   'preview.emptySheet': '空工作表',
@@ -1704,6 +1706,8 @@ export const chatviewResources = {
     'oidc.loginSuccess.closeHint': 'You may close this page and return to the AgentHub desktop app.',
   // ── Shared UI preview surfaces (#2154 UIUX lane i18n pass) ──
   'preview.parsing': 'Parsing document...',
+  'preview.parsingSlideshow': 'Parsing slideshow...',
+  'preview.parsingTable': 'Parsing spreadsheet...',
   'preview.retry': 'Retry',
   'preview.blankSlide': 'Blank slide',
   'preview.emptySheet': 'Empty sheet',
