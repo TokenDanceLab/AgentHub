@@ -15,7 +15,6 @@ export {
   paneTitle,
   buildViewModes,
   StatCard,
-  TaskNavMenu,
 } from './shared';
 
 export type {

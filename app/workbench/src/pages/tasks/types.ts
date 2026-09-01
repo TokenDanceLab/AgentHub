@@ -106,8 +106,6 @@ export interface TasksPageProps {
   selectedTask?: TaskItem | null | undefined;
   /** Current lightweight feedback/status message for task operations */
   taskActionLabel?: string | undefined;
-  /** Whether the nav "more" menu is open */
-  navMenuOpen?: boolean | undefined;
   /** Current row being edited */
   editingTaskId?: string | null | undefined;
   /** Draft values for the editing row */
@@ -131,8 +129,6 @@ export interface TasksPageProps {
 
   /** Called when "create task" is clicked */
   onCreateTask?: (() => void) | undefined;
-  /** Called when "more" in nav is clicked */
-  onNavMore?: (() => void) | undefined;
   /** Called when "new group" is clicked */
   onNewGroup?: (() => void) | undefined;
   /** Called when "task list" is clicked */

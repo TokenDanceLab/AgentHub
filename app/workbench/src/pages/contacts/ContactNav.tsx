@@ -60,9 +60,6 @@ export function ContactNav({
       <div className={styles.orgRow}>
         <div className={styles.orgLogo}>{orgInitials}</div>
         <span className={styles.orgName}>{orgName}</span>
-        <button type="button" className={styles.orgAction}>
-          {t('contacts.manage')}
-        </button>
       </div>
 
       {navItems.map((item) => (

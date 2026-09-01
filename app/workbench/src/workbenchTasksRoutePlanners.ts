@@ -53,7 +53,6 @@ export interface TaskSelectionReset {
 
 export interface TaskPaneChangePlan extends TaskSelectionReset {
   tasksPane: TasksPane;
-  taskNavMenuOpen: false;
   taskActionLabel: string;
 }
 
@@ -77,7 +76,6 @@ export interface NewTaskGroupPlan {
 export interface TaskListResetPlan {
   taskViewMode: 'list';
   taskGroupMode: 'custom';
-  taskNavMenuOpen: false;
   taskActionLabel: string;
 }
 
@@ -163,7 +161,6 @@ export function planTaskPaneChange(t: TasksTranslator, pane: TasksPane): TaskPan
     selectedTaskId: null,
     editingTaskId: null,
     editingTaskDraft: null,
-    taskNavMenuOpen: false,
     taskActionLabel: buildTaskPaneChangeLabel(t, pane),
   };
 }
@@ -184,7 +181,6 @@ export function planTaskListReset(t: TasksTranslator): TaskListResetPlan {
   return {
     taskViewMode: 'list',
     taskGroupMode: 'custom',
-    taskNavMenuOpen: false,
     taskActionLabel: t('tasks.action.backToList'),
   };
 }

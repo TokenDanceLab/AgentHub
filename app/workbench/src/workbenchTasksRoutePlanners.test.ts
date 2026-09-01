@@ -69,7 +69,6 @@ describe('workbenchTasksRoutePlanners', () => {
       selectedTaskId: null,
       editingTaskId: null,
       editingTaskDraft: null,
-      taskNavMenuOpen: false,
       taskActionLabel: '已切换到我负责的',
     });
     expect(buildTaskPaneChangeLabel(tZh, 'watching')).toBe('已切换到我关注的');
@@ -80,7 +79,6 @@ describe('workbenchTasksRoutePlanners', () => {
     expect(planTaskListReset(tZh, )).toEqual({
       taskViewMode: 'list',
       taskGroupMode: 'custom',
-      taskNavMenuOpen: false,
       taskActionLabel: '已回到任务清单',
     });
 

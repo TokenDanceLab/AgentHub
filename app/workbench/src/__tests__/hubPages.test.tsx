@@ -616,12 +616,6 @@ describe('AgentHubWorkbench', () => {
     expect(within(page).getByRole('button', { name: /筛选 1/ })).toBeInTheDocument();
     expect(within(page).queryAllByText('选择一条任务后可快速调整状态、负责人和分组。')).toHaveLength(0);
 
-    fireEvent.click(within(page).getByRole('button', { name: '任务更多操作' }));
-    const taskMenu = within(page).getByRole('menu', { name: '任务更多操作菜单' });
-    expect(within(taskMenu).getByRole('menuitem', { name: '导入任务' })).toBeInTheDocument();
-    expect(within(taskMenu).getByRole('menuitem', { name: '导出当前视图' })).toBeInTheDocument();
-    expect(within(taskMenu).getByRole('menuitem', { name: '管理任务字段' })).toBeInTheDocument();
-
     fireEvent.click(within(page).getByRole('button', { name: '我关注的' }));
     expect(within(page).getByRole('heading', { name: '我关注的' })).toBeInTheDocument();
     // Tasks in default fixture may vary; verify the page renders content

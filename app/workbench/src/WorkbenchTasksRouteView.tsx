@@ -120,7 +120,6 @@ export function WorkbenchTasksRouteView({
         reviewMergePort={reviewMergePort}
         editingDraft={tasksRoute.editingTaskDraft}
         editingTaskId={tasksRoute.editingTaskId}
-        navMenuOpen={tasksRoute.taskNavMenuOpen}
         incompleteCount={model.incompleteCount}
         hasMore={tasksRoute.hasMore}
         loadingMore={tasksRoute.loadingMore}
@@ -136,7 +135,6 @@ export function WorkbenchTasksRouteView({
         onFilterBySelectedTaskAssignee={tasksRoute.handleFilterBySelectedTaskAssignee}
         onGroupBySelectedTaskProject={tasksRoute.handleGroupBySelectedTaskProject}
         onNewGroup={realDataMode ? undefined : tasksRoute.handleNewTaskGroup}
-        onNavMore={tasksRoute.handleNavMore}
         onPaneChange={tasksRoute.handleTaskPaneChange}
         onTaskClick={tasksRoute.handleTaskClick}
         onSaveTaskEdit={tasksRoute.handleSaveTaskEdit}
