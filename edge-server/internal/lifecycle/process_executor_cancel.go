@@ -35,18 +35,25 @@ func (e *ProcessExecutor) Cancel(runID string) CancelResult {
 	// then send SIGTERM (process group on Unix), wait force timeout, and escalate
 	// to SIGKILL as last resort. Register cancelDone BEFORE cancel() so the
 	// context-timeout watcher defers to this path and does not force-kill early.
+	// Idempotency guard (#2154): check-and-register cancelDone under one lock
+	// hold. A repeat or racing Cancel must not overwrite the tracked channel;
+	// overwriting orphans the previous grace goroutine because finish() only
+	// closes the newest entry.
 	e.mu.Lock()
 	proc := e.processes[runID]
+	_, alreadyArmed := e.cancelDone[runID]
+	plan := planCancelGraceArm(proc, alreadyArmed)
+	var done chan struct{}
+	if plan.Arm {
+		done = make(chan struct{})
+		e.cancelDone[runID] = done
+	}
 	e.mu.Unlock()
-	if planCancelGraceArm(proc).Arm {
+	if plan.Arm {
 		// Graceful shutdown: run in a goroutine so Cancel() returns
 		// immediately and does not block the HTTP response. The goroutine
 		// is tracked via cancelDone so finish() can abort it early if the
 		// process exits on its own before the grace periods elapse.
-		done := make(chan struct{})
-		e.mu.Lock()
-		e.cancelDone[runID] = done
-		e.mu.Unlock()
 		safeGo("cancelGrace", func() {
 			select {
 			case <-done:
