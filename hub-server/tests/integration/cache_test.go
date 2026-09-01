@@ -278,19 +278,29 @@ func TestSearchSessions(t *testing.T) {
 	sr := parse(get("/client/sessions/search?q=SearchTest", alice.Token))
 	mustOK(t, sr, "search sessions")
 
-	var results []map[string]interface{}
-	json.Unmarshal(sr.Data, &results)
-	if len(results) == 0 {
+	// Response is the {items, page} cursor-pagination envelope (#2176 family);
+	// the earlier bare-array unmarshal silently failed and masked this test.
+	var found struct {
+		Items []map[string]interface{} `json:"items"`
+	}
+	if err := json.Unmarshal(sr.Data, &found); err != nil {
+		t.Fatalf("unmarshal search envelope: %v (raw: %s)", err, string(sr.Data))
+	}
+	if len(found.Items) == 0 {
 		t.Fatal("expected to find SearchTestGroup")
 	}
 
 	// Search for something non-existent
 	sr2 := parse(get("/client/sessions/search?q=NonExistentGroupXYZ", alice.Token))
 	mustOK(t, sr2, "search non-existent sessions")
-	var empty []map[string]interface{}
-	json.Unmarshal(sr2.Data, &empty)
-	if len(empty) != 0 {
-		t.Fatalf("expected empty results, got %d", len(empty))
+	var empty struct {
+		Items []map[string]interface{} `json:"items"`
+	}
+	if err := json.Unmarshal(sr2.Data, &empty); err != nil {
+		t.Fatalf("unmarshal empty-search envelope: %v (raw: %s)", err, string(sr2.Data))
+	}
+	if len(empty.Items) != 0 {
+		t.Fatalf("expected empty results, got %d", len(empty.Items))
 	}
 }
 

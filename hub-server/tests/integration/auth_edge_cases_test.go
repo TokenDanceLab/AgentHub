@@ -21,13 +21,16 @@ func TestAuthExpiredToken(t *testing.T) {
 
 	u := register(t, "texpired_user", "pass1234", "ExpiredUser")
 
-	// Generate a token that is already expired (negative TTL).
+	// Generate a token that is already expired BEYOND the 30s clock-skew
+	// leeway (jwt.go WithLeeway, #2135 F1; jwt_test.go pins the contract:
+	// -31s rejected, within-leeway accepted). A -1s TTL used to sit inside
+	// the leeway, so the test exercised acceptance, not rejection.
 	expiredToken, err := jwtutil.GenerateAccessToken(
 		u.ID,
 		"web",
 		testDeviceID(u.Username, "web"),
 		testJWT.Secret,
-		-1*time.Second, // already expired
+		-2*time.Minute, // expired beyond leeway
 	)
 	if err != nil {
 		t.Fatalf("generate expired token: %v", err)
@@ -56,12 +59,13 @@ func TestAuthExpiredAccessTokenOnProtectedEndpoint(t *testing.T) {
 
 	u := register(t, "texpired2", "pass1234", "Expired2")
 
+	// -2min: beyond the 30s clock-skew leeway (see TestAuthExpiredToken).
 	expiredToken, err := jwtutil.GenerateAccessToken(
 		u.ID,
 		"desktop",
 		testDeviceID(u.Username, "desktop"),
 		testJWT.Secret,
-		-1*time.Second,
+		-2*time.Minute,
 	)
 	if err != nil {
 		t.Fatalf("generate expired token: %v", err)

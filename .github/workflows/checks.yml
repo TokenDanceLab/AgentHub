@@ -441,10 +441,16 @@ jobs:
           fi
           go test $SHARD_PKGS -count=1 -short -race -coverpkg=./... \
             -coverprofile=shard-${{ matrix.shard }}.out -covermode=atomic -v 2>&1 | tee unit-test-shard.log
+          GO_EXIT=${PIPESTATUS[0]}
           PASS_COUNT=$(grep -c "^--- PASS" unit-test-shard.log || true)
           echo "unit lane PASS count (shard ${{ matrix.shard }}/2): ${PASS_COUNT}"
           if [ "${PASS_COUNT}" -lt 1 ]; then
             echo "::error::unit lane shard executed 0 tests — hub-server/tests must not hide behind a package-wide -short exit"
+            tail -50 unit-test-shard.log
+            exit 1
+          fi
+          if [ "${GO_EXIT}" -ne 0 ]; then
+            echo "::error::unit lane go test exit ${GO_EXIT} — failures were previously masked by the tee pipe (#2154)"
             tail -50 unit-test-shard.log
             exit 1
           fi
@@ -682,10 +688,16 @@ jobs:
       - name: Edge→Hub callback smoke
         run: |
           go test ./tests/ -count=1 -run '^TestHubE2E_' -v -timeout 120s 2>&1 | tee edge-e2e.log
+          GO_EXIT=${PIPESTATUS[0]}
           PASS_COUNT=$(grep -c "^--- PASS" edge-e2e.log || true)
           echo "edge e2e lane PASS count: ${PASS_COUNT}"
           if [ "${PASS_COUNT}" -lt 1 ]; then
             echo "::error::edge e2e lane executed 0 tests — lane must prove non-zero execution"
+            tail -50 edge-e2e.log
+            exit 1
+          fi
+          if [ "${GO_EXIT}" -ne 0 ]; then
+            echo "::error::edge e2e lane go test exit ${GO_EXIT} — failures were previously masked by the tee pipe (#2154)"
             tail -50 edge-e2e.log
             exit 1
           fi
@@ -771,10 +783,16 @@ jobs:
         working-directory: hub-server
         run: |
           go test -tags integration ./tests/integration/ -count=1 -timeout=20m -v 2>&1 | tee integration-test.log
+          GO_EXIT=${PIPESTATUS[0]}
           PASS_COUNT=$(grep -c "^--- PASS" integration-test.log || true)
           echo "integration lane PASS count: ${PASS_COUNT}"
           if [ "${PASS_COUNT}" -lt 1 ]; then
             echo "::error::integration lane executed 0 tests — lane must prove non-zero execution"
+            tail -50 integration-test.log
+            exit 1
+          fi
+          if [ "${GO_EXIT}" -ne 0 ]; then
+            echo "::error::integration lane go test exit ${GO_EXIT} — failures were previously masked by the tee pipe (#2154)"
             tail -50 integration-test.log
             exit 1
           fi
@@ -783,10 +801,16 @@ jobs:
         working-directory: hub-server
         run: |
           go test ./internal/repository/ -run 'TestMigration0040' -count=1 -v -timeout=120s 2>&1 | tee migration-test.log
+          GO_EXIT=${PIPESTATUS[0]}
           PASS_COUNT=$(grep -c "^--- PASS" migration-test.log || true)
           echo "migration lane PASS count: ${PASS_COUNT}"
           if [ "${PASS_COUNT}" -lt 1 ]; then
             echo "::error::migration lane executed 0 tests — lane must prove non-zero execution"
+            tail -50 migration-test.log
+            exit 1
+          fi
+          if [ "${GO_EXIT}" -ne 0 ]; then
+            echo "::error::migration lane go test exit ${GO_EXIT} — failures were previously masked by the tee pipe (#2154)"
             tail -50 migration-test.log
             exit 1
           fi
@@ -2317,7 +2341,9 @@ jobs:
       - name: pnpm audit --prod (fail-closed, #1534)
         shell: bash
         run: |
-          # GHA bash 默认自带 -o pipefail：pnpm audit 发现漏洞时返回非零，
+          # 注意：GHA 默认 shell（bash -e {0}）并不带 -o pipefail（#2154 已核实，
+          # 本文件 4 个 tee lane 曾因此吞掉 go test 退出码）；此处在下方显式 set。
+          # pnpm audit 发现漏洞时返回非零，
           # 会传播为管道失败，即使 verifier 已按例外登记判定通过。改为先
           # 落盘再喂给 verifier，verifier 退出码是唯一判定；pnpm 自身失败
           # （网络/错误 JSON/空输出）仍被 verifier 按 fail-closed 拒绝。
