@@ -46,7 +46,6 @@ export function useWorkbenchTasksRoute({
   const [taskGroupMode, setTaskGroupMode] = useState<TaskGroupMode>('custom');
   const [taskShowCreator, setTaskShowCreator] = useState(true);
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
-  const [taskNavMenuOpen, setTaskNavMenuOpen] = useState(false);
   const [taskActionLabel, setTaskActionLabel] = useState(() => t('tasks.action.filterEnabled'));
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
   const [editingTaskDraft, setEditingTaskDraft] = useState<TaskEditDraft | null>(null);
@@ -174,7 +173,6 @@ export function useWorkbenchTasksRoute({
     setTaskGroupMode,
     setTaskShowCreator,
     setSelectedTaskId,
-    setTaskNavMenuOpen,
     setTaskActionLabel,
     setEditingTaskId,
     setEditingTaskDraft,
@@ -189,7 +187,6 @@ export function useWorkbenchTasksRoute({
     taskGroupMode,
     taskShowCreator,
     selectedTaskId,
-    taskNavMenuOpen,
     taskActionLabel,
     editingTaskId,
     editingTaskDraft,

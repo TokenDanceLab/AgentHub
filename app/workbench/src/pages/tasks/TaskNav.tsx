@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════════════════════════
-   Tasks left-nav shell — more menu, primary/quick panes, list shortcuts.
+   Tasks left-nav shell — primary/quick panes, list shortcuts.
 
    Extracted from TasksPage as Phase 20 residual thin #596.
    CSS remains on shared TasksPage.module.css.
@@ -8,17 +8,14 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { SHARED_WORKBENCH_I18N_NAMESPACE } from '@shared/i18n';
-import { DesignNavIcon } from '../../designIcons';
 import styles from '../TasksPage.module.css';
-import { buildNavPrimary, buildNavQuick, NavGlyph, TaskNavMenu } from './shared';
+import { buildNavPrimary, buildNavQuick, NavGlyph } from './shared';
 import type { TasksPageProps } from './types';
 
 export type TaskNavProps = Pick<
   TasksPageProps,
   | 'activePane'
   | 'onPaneChange'
-  | 'navMenuOpen'
-  | 'onNavMore'
   | 'onTaskList'
   | 'onNewGroup'
 >;
@@ -26,8 +23,6 @@ export type TaskNavProps = Pick<
 export function TaskNav({
   activePane,
   onPaneChange,
-  navMenuOpen = false,
-  onNavMore,
   onTaskList,
   onNewGroup,
 }: TaskNavProps): React.ReactElement {
@@ -38,17 +33,6 @@ export function TaskNav({
   return (
     <aside className={`${styles.nav} workbench-nav`}>
       <div className={`${styles.navTitle} workbench-title`}>{t('tasks.navTasks')}</div>
-
-      <button
-        type="button"
-        className={`${styles.navMore} ${navMenuOpen ? styles.navMoreActive : ''}`}
-        aria-label={t("aria.taskMoreActions")}
-        aria-expanded={navMenuOpen}
-        onClick={onNavMore}
-      >
-        <DesignNavIcon name="more" size={16} />
-      </button>
-      <TaskNavMenu open={navMenuOpen} />
 
       {/* Primary nav: 我负责的 / 我关注的 / 动态 */}
       {navPrimary.map((item) => (
