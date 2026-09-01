@@ -16,8 +16,11 @@ import (
 // *Client — passing nil will panic.
 type NoOpCache struct{}
 
-func (NoOpCache) Invalidate(ctx context.Context, keys ...string) error                   { return nil }
-func (NoOpCache) IsOnline(ctx context.Context, userID string) (bool, error)              { return false, nil }
+func (NoOpCache) Invalidate(ctx context.Context, keys ...string) error      { return nil }
+func (NoOpCache) IsOnline(ctx context.Context, userID string) (bool, error) { return false, nil }
+func (NoOpCache) AreOnline(ctx context.Context, userIDs []string) (map[string]bool, error) {
+	return map[string]bool{}, nil
+}
 func (NoOpCache) InitSeqIfAbsent(ctx context.Context, sessionID string, seq int64) error { return nil }
 func (NoOpCache) SetSeq(ctx context.Context, sessionID string, seq int64) error          { return nil }
 func (NoOpCache) AllocateSeq(ctx context.Context, sessionID string) (int64, error) {

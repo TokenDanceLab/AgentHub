@@ -18,6 +18,7 @@ import (
 
 	"github.com/agenthub/hub-server/internal/cache"
 	"github.com/agenthub/hub-server/internal/config"
+	"github.com/agenthub/hub-server/internal/service/contact"
 	"github.com/agenthub/hub-server/internal/service/session"
 	"github.com/agenthub/hub-server/internal/ws"
 )
@@ -158,5 +159,62 @@ func TestHandleTypingFrameRejectsNonMember(t *testing.T) {
 	require.Empty(t, member.Send, "outsider typing frame must not fan out")
 	require.Empty(t, outsider.Send, "outsider must not receive its own frame")
 	require.EqualValues(t, 1, queryCount.Load(), "admission check resolves members once")
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+// TestBroadcastOnlineStatusUsesBatchedPresence proves the online/offline
+// fanout resolves friend presence with one pipelined AreOnline call instead
+// of one IsOnline round trip per friend (#2154 perf lane).
+func TestBroadcastOnlineStatusUsesBatchedPresence(t *testing.T) {
+	sqlDB, mock, err := sqlmock.New()
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = sqlDB.Close() })
+
+	gormDB, err := gorm.Open(postgres.New(postgres.Config{
+		Conn:                 sqlDB,
+		PreferSimpleProtocol: true,
+	}), &gorm.Config{
+		DisableAutomaticPing: true,
+		Logger:               gormlogger.Default.LogMode(gormlogger.Silent),
+	})
+	require.NoError(t, err)
+
+	rows := sqlmock.NewRows([]string{"friend_id"}).
+		AddRow("friend-online").
+		AddRow("friend-offline")
+	mock.ExpectQuery(`FROM "friendships"`).WillReturnRows(rows)
+
+	mr := miniredis.RunT(t)
+	rdb := redis.NewClient(&redis.Options{Addr: mr.Addr()})
+	t.Cleanup(func() { _ = rdb.Close() })
+	cacheClient := cache.NewClient(rdb)
+
+	ctx := context.Background()
+	require.NoError(t, cacheClient.SetRoute(ctx, "friend-online", "desktop", "conn-x"))
+
+	mgr := ws.NewManager()
+	onlinePeer := &ws.Conn{Send: make(chan []byte, 4)}
+	require.NoError(t, mgr.Register(onlinePeer))
+	mgr.SetAuth(onlinePeer.ID, "friend-online", "desktop", "dev-on")
+	offlinePeer := &ws.Conn{Send: make(chan []byte, 4)}
+	require.NoError(t, mgr.Register(offlinePeer))
+	mgr.SetAuth(offlinePeer.ID, "friend-offline", "desktop", "dev-off")
+
+	a := &App{
+		CacheClient:    cacheClient,
+		ContactService: contact.NewService(gormDB, nil, cacheClient),
+		mgr:            mgr,
+	}
+	a.broadcastOnlineStatus(ctx, "user-1", true)
+
+	select {
+	case raw := <-onlinePeer.Send:
+		var f ws.Frame
+		require.NoError(t, json.Unmarshal(raw, &f))
+		require.Equal(t, ws.TypeDeviceOnline, f.Type)
+	case <-time.After(time.Second):
+		t.Fatal("expected the online friend to receive the presence frame")
+	}
+	require.Empty(t, offlinePeer.Send, "offline friend must not receive the presence frame")
 	require.NoError(t, mock.ExpectationsWereMet())
 }

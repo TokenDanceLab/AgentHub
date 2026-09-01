@@ -93,6 +93,38 @@ func (c *Client) IsOnline(ctx context.Context, userID string) (bool, error) {
 	return n > 0, nil
 }
 
+// AreOnline reports, for every given user, whether at least one active
+// device route exists. The per-user HLEN commands are bundled into a single
+// Redis pipeline round trip instead of N sequential ones — ListContacts and
+// online-status fanout previously paid one round trip per friend (#2154
+// perf lane). Users missing from the result map are offline; a pipeline
+// error is returned to the caller (callers today ignore it and treat the
+// batch as offline, matching the per-item IsOnline convention).
+func (c *Client) AreOnline(ctx context.Context, userIDs []string) (map[string]bool, error) {
+	online := make(map[string]bool, len(userIDs))
+	if len(userIDs) == 0 {
+		return online, nil
+	}
+	pipe := c.rdb.Pipeline()
+	cmds := make([]*redis.IntCmd, 0, len(userIDs))
+	ids := make([]string, 0, len(userIDs))
+	for _, userID := range userIDs {
+		if _, dup := online[userID]; dup {
+			continue
+		}
+		online[userID] = false
+		cmds = append(cmds, pipe.HLen(ctx, routeKey(userID)))
+		ids = append(ids, userID)
+	}
+	if _, err := pipe.Exec(ctx); err != nil && err != redis.Nil {
+		return nil, err
+	}
+	for i, cmd := range cmds {
+		online[ids[i]] = cmd.Val() > 0
+	}
+	return online, nil
+}
+
 // GetAllRoutes returns all device routes for a user.
 func (c *Client) GetAllRoutes(ctx context.Context, userID string) (map[string]string, error) {
 	return c.rdb.HGetAll(ctx, routeKey(userID)).Result()
