@@ -1,7 +1,9 @@
 package orchestrator
 
 import (
+	"context"
 	"fmt"
+	"io"
 	"strings"
 	"testing"
 	"time"
@@ -422,7 +424,8 @@ func TestAdapter_E2EDispatchFlow(t *testing.T) {
 	orch.WithSpawner(spawner)
 	orch.WithDepth(0)
 
-	// Build a command — this triggers model capture.
+	// Build a command (model capture moved to per-run parser context,
+	// covered by TestAdapter_ParseStreamModelFromContext / the race test).
 	_, _, _, _ = orch.BuildCommand(RunProcessContext{
 		Run:     run,
 		AgentID: "orchestrator",
@@ -437,11 +440,6 @@ func TestAdapter_E2EDispatchFlow(t *testing.T) {
 	c := orch.Capabilities()
 	if !c.SubAgentSpawn {
 		t.Fatal("SubAgentSpawn should be enabled")
-	}
-
-	// Verify parent model was captured from BuildCommand.
-	if orch.parentModel != "claude-sonnet-4-6" {
-		t.Fatalf("parentModel = %q, want claude-sonnet-4-6", orch.parentModel)
 	}
 
 	// Verify bus has no unexpected events (no ParseStream call yet).
@@ -471,16 +469,28 @@ func TestAdapter_BuildCommandInjectSystemPrompt(t *testing.T) {
 	}
 }
 
-func TestAdapter_BuildCommandCapturesModel(t *testing.T) {
-	orch := NewOrchestratorAdapter(&fakeAgentExecutor{}, "prompt")
+func TestAdapter_ParseStreamModelFromContext(t *testing.T) {
+	orch := NewOrchestratorAdapter(&dispatchingExecutor{}, "prompt")
+	spawner := &recordingSpawner{}
+	orch.WithAgentRegistry(agents.NewRegistry())
+	orch.WithMessageQueue(agents.NewQueue())
+	orch.WithSpawner(spawner)
 
-	orch.BuildCommand(RunProcessContext{
-		Run:   store.Run{ID: "r1", ProjectID: "p1", ThreadID: "t1"},
-		Model: "deepseek-v4",
-	})
+	run := store.Run{ID: "r1", ProjectID: "p1", ThreadID: "t1"}
+	// The lifecycle executor injects the per-run model into the parser
+	// context (withParserContextValues); ParseStream must resolve it for
+	// sub-agent dispatch instead of reading shared Adapter state.
+	ctx := context.WithValue(context.Background(), CtxModelKey, "deepseek-v4")
+	if err := orch.ParseStream(ctx, strings.NewReader(""), io.Discard, &stubEmitter{}, run); err != nil {
+		t.Fatalf("ParseStream: %v", err)
+	}
 
-	if orch.parentModel != "deepseek-v4" {
-		t.Fatalf("parentModel = %q, want deepseek-v4", orch.parentModel)
+	call := spawner.lastCall()
+	if call == nil {
+		t.Fatal("expected a spawn call")
+	}
+	if call.task.Model != "deepseek-v4" {
+		t.Fatalf("sub-agent model = %q, want deepseek-v4", call.task.Model)
 	}
 }
 
