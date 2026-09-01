@@ -1,3 +1,4 @@
+import type { TFunction } from 'i18next';
 import type { ComposerAttachment, ComposerMention } from '@shared/composer';
 import { formatComposerAttachmentSize } from '@shared/composer';
 import {
@@ -16,33 +17,45 @@ import {
    no intentional UX change.
    ═══════════════════════════════════════════════════════════════════════ */
 
-export function formatReplyToLabel(replyTo: {
-  author: string;
-  preview: string;
-}): string {
-  return `回复至 ${replyTo.author}: ${replyTo.preview}`;
+export function formatReplyToLabel(
+  replyTo: {
+    author: string;
+    preview: string;
+  },
+  t?: TFunction,
+): string {
+  return t?.('composer.replyTo', { author: replyTo.author, preview: replyTo.preview })
+    ?? `回复至 ${replyTo.author}: ${replyTo.preview}`;
 }
 
 export function formatMentionChipLabel(mention: ComposerMention): string {
   return `@${mention.label}`;
 }
 
-export function formatMainchainAgentLabel(selectedAgentLabel: string): string {
+export function formatMainchainAgentLabel(selectedAgentLabel: string, t?: TFunction): string {
   const label = selectedAgentLabel.trim();
-  if (!label) return 'Agent 未选';
-  return label.startsWith('@') ? `Agent ${label}` : `Agent @${label}`;
+  if (!label) return t?.('composer.mainchain.agentUnselected') ?? 'Agent 未选';
+  return label.startsWith('@')
+    ? (t?.('composer.mainchain.agentPlain', { label }) ?? `Agent ${label}`)
+    : (t?.('composer.mainchain.agentAt', { label }) ?? `Agent @${label}`);
 }
 
 export function formatMainchainTargetLabel(
   selectedTargetLabel: string | undefined,
+  t?: TFunction,
 ): string {
-  return selectedTargetLabel ? `目标 ${selectedTargetLabel}` : '目标未选';
+  return selectedTargetLabel
+    ? (t?.('composer.mainchain.targetSelected', { label: selectedTargetLabel }) ?? `目标 ${selectedTargetLabel}`)
+    : (t?.('composer.mainchain.targetUnselected') ?? '目标未选');
 }
 
 export function formatMainchainTaskLabel(
   mainchainTask: 'ready' | 'draft required',
+  t?: TFunction,
 ): string {
-  return mainchainTask === 'ready' ? '任务就绪' : '需填写内容';
+  return mainchainTask === 'ready'
+    ? (t?.('composer.mainchain.taskReady') ?? '任务就绪')
+    : (t?.('composer.mainchain.taskDraftRequired') ?? '需填写内容');
 }
 
 export function mainchainDataState(
@@ -53,8 +66,11 @@ export function mainchainDataState(
 
 export function agentPickerPlaceholder(
   availableCount: number,
+  t?: TFunction,
 ): string {
-  return availableCount > 0 ? '选择 Agent' : '已全部提及';
+  return availableCount > 0
+    ? (t?.('composer.agentPicker.available') ?? '选择 Agent')
+    : (t?.('composer.agentPicker.exhausted') ?? '已全部提及');
 }
 
 export function formatAgentOptionLabel(agent: ComposerMention): string {
@@ -63,8 +79,11 @@ export function formatAgentOptionLabel(agent: ComposerMention): string {
 
 export function targetPickerPlaceholder(
   availableCount: number,
+  t?: TFunction,
 ): string {
-  return availableCount > 0 ? '选择执行目标' : '无在线目标';
+  return availableCount > 0
+    ? (t?.('composer.targetPicker.available') ?? '选择执行目标')
+    : (t?.('composer.targetPicker.exhausted') ?? '无在线目标');
 }
 
 export interface ComposerAttachmentChipViewModel {

@@ -50,8 +50,8 @@ export function SettingsNav({
       ))}
       <div className={styles.navCaption}>{t('settings.currentSpace')}</div>
       <SettingsScopeRow title={spaceTitle} meta={spaceMeta} />
-      <SettingsScopeRow title="TokenDance" meta="组织空间" />
-      <SettingsScopeRow title={currentUserDisplayName ?? '未登录'} meta="当前用户" />
+      <SettingsScopeRow title="TokenDance" meta={t('settings.scope.orgMeta')} />
+      <SettingsScopeRow title={currentUserDisplayName ?? t('settings.scope.userFallback')} meta={t('settings.scope.userMeta')} />
     </aside>
   );
 }

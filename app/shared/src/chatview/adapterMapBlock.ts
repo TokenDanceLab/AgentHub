@@ -69,7 +69,9 @@ export function resolveAttachmentKind(
  * Uses statusNorm and deployStatusNorm for canonical
  * EvidenceRefStatus -> RowItem status conversion.
  */
-export function mapBlock(b: TranscriptBlock): RowItem | null {
+export type ChatviewTranslate = (key: string) => string;
+
+export function mapBlock(b: TranscriptBlock, translate?: ChatviewTranslate): RowItem | null {
   switch (b.kind) {
     case 'thinking': {
       const t = b as ThinkingTranscriptBlock
@@ -309,7 +311,7 @@ export function mapBlock(b: TranscriptBlock): RowItem | null {
         label: '',
         status: 'fail',
         collapsible: true,
-        content: f.reason || f.title || '运行失败',
+        content: f.reason || f.title || translate?.('adapter.runFailed') || '运行失败',
       } as RowItem
     }
 

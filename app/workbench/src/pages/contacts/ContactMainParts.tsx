@@ -123,14 +123,14 @@ export function ContactListPage({
         ref={sentinelRef}
         className={styles.sentinel}
         role="status"
-        aria-label={loadingMore ? '加载中…' : undefined}
+        aria-label={loadingMore ? t('contacts.loading') : undefined}
       />
       {loadingMore ? (
         <StatusNotice
           icon={<DesignNavIcon name="running" size={14} />}
           role="status"
         >
-          加载中…
+          {t('contacts.loading')}
         </StatusNotice>
       ) : null}
     </main>
@@ -216,7 +216,7 @@ export function ContactGroupsPane({
       <ContactMainHead
         title={t("contacts.section.myGroups.title")}
         subtitle={t("contacts.section.myGroups.subtitle")}
-        actionLabel="创建群组"
+        actionLabel={t('contacts.createGroup')}
         onAction={onCreateGroup}
       />
       <div className={styles.sectionTitle}>{t('contacts.tokenDanceGroups')}</div>

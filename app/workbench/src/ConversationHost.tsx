@@ -640,7 +640,7 @@ export const ConversationHost = React.memo(function ConversationHost({
             // Upload failed: mark the chip failed and abort the send — shipping
             // the message without the file would silently lose it (#1821).
             setUploadProgresses((prev) => ({ ...prev, [a.id]: { percent: 100, phase: 'failed' } }));
-            throw new Error(`附件「${a.name}」上传失败，请重试或移除后发送`);
+            throw new Error(t('conversationHost.attachmentUploadFailedLong', { name: a.name }));
           }
         }
       }
@@ -728,7 +728,7 @@ export const ConversationHost = React.memo(function ConversationHost({
       dispatchComposer({ type: 'setAttachmentRef', attachmentId, attachmentRef: ref });
     } catch {
       setUploadProgresses((prev) => ({ ...prev, [attachmentId]: { percent: 100, phase: 'failed' } }));
-      onToast(`附件「${attachment.name}」上传失败，请重试`);
+      onToast(t('conversationHost.attachmentUploadFailed', { name: attachment.name }));
     }
   }, [composer.attachments, platform, dispatchComposer, onToast]);
 

@@ -329,7 +329,7 @@ export const SlideshowPreview: React.FC<SlideshowPreviewProps> = ({
               type="button"
               className={`${styles.thumbnail} ${i === currentSlide ? styles.thumbnailActive : ''}`}
               onClick={() => setCurrentSlide(i)}
-              aria-label={`幻灯片 ${i + 1}`}
+              aria-label={t('preview.slideThumbAria', { index: i + 1 })}
               aria-current={i === currentSlide ? 'true' : undefined}
             >
               <span className={styles.thumbnailNumber}>{i + 1}</span>

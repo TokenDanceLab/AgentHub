@@ -457,9 +457,9 @@ export const TablePreview: React.FC<TablePreviewProps> = ({
       {/* ── Footer ── */}
       {!loading && !error && (
         <div className={styles.footer}>
-          <span>{rows.length} 行</span>
-          {headers.length > 0 && <span>{headers.length} 列</span>}
-          {sheetNames.length > 1 && <span>{sheetNames.length} 个工作表</span>}
+          <span>{t('preview.rowCount', { count: rows.length })}</span>
+          {headers.length > 0 && <span>{t('preview.colCount', { count: headers.length })}</span>}
+          {sheetNames.length > 1 && <span>{t('preview.sheetCount', { count: sheetNames.length })}</span>}
         </div>
       )}
     </section>

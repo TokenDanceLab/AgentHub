@@ -62,13 +62,14 @@ export function MarkdownPreview({ content }: { content: string }): React.ReactEl
 }
 
 export function PdfPreview({ filename }: { filename: string }): React.ReactElement {
+  const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE);
   // Browser-native PDF rendering via iframe. The filename is used as a hint;
   // in a real integration, the actual file URL would be passed instead.
   // When content is a data URI or blob URL, it can be loaded directly.
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
       <iframe
-        title={`PDF 预览 ${filename}`}
+        title={t('filePreview.pdfTitle', { filename })}
         style={{ flex: 1, border: 0, minHeight: 0 }}
         src={`data:application/pdf;base64,`}
         role="document"
@@ -78,9 +79,10 @@ export function PdfPreview({ filename }: { filename: string }): React.ReactEleme
 }
 
 export function HtmlPreview({ content }: { content: string }): React.ReactElement {
+  const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE);
   return (
     <iframe
-      title="HTML 预览"
+      title={t('filePreview.htmlTitle')}
       style={{ flex: 1, border: 0, minHeight: 0 }}
       srcDoc={content}
       sandbox={PREVIEW_SANDBOX_SRCDOC}
@@ -112,7 +114,7 @@ export function ImagePreview({ filename }: { filename: string }): React.ReactEle
         font: '400 0.75rem var(--td-font)',
       }}>
         <DesignFileIcon className={styles.fileIcon} name={filename} />
-        <span>图片预览: {filename}</span>
+        <span>{t('filePreview.imageTitle', { filename })}</span>
         <span style={{ fontSize: '0.6875rem' }}>{t('filePreview.imageViaFileUrl')}</span>
       </div>
     </div>

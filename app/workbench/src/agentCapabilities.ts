@@ -1,3 +1,4 @@
+import type { TFunction } from 'i18next';
 import type { AgentConfig } from './pages/AgentsPage';
 
 export type AgentCapabilityStatus = 'enabled' | 'disabled' | 'missing';
@@ -75,7 +76,7 @@ export function buildAgentCapabilityContractFromConfig(agent: AgentConfig): Agen
   };
 }
 
-export function buildAgentCapabilitySummary(contract: AgentCapabilityContract): AgentCapabilitySummary {
+export function buildAgentCapabilitySummary(contract: AgentCapabilityContract, t?: TFunction): AgentCapabilitySummary {
   const issues = [
     ...capabilityIssues('agents-md', [contract.agentsMd]),
     ...capabilityIssues('avatar', [contract.avatar]),
@@ -85,15 +86,23 @@ export function buildAgentCapabilitySummary(contract: AgentCapabilityContract): 
     ...(contract.toolAllowlist.length === 0 ? ['tools:empty'] : []),
   ];
 
+  const tk = t;
   return {
-    agentsMd: contract.agentsMd.status === 'enabled' ? '工作区说明已配置' : '工作区说明未配置',
-    avatar: contract.avatar.status === 'enabled' ? contract.avatar.id : '使用生成首字母',
+    agentsMd: contract.agentsMd.status === 'enabled'
+      ? (tk?.('agents.capabilitySummary.agentsMdConfigured') ?? '工作区说明已配置')
+      : (tk?.('agents.capabilitySummary.agentsMdUnconfigured') ?? '工作区说明未配置'),
+    avatar: contract.avatar.status === 'enabled'
+      ? contract.avatar.id
+      : (tk?.('agents.capabilitySummary.avatarGenerated') ?? '使用生成首字母'),
     memory: isMemoryDisabled(contract.memoryPolicy)
-      ? '记忆未启用'
-      : contract.memoryPolicy.summary || `${contract.memoryPolicy.sources.length} 个记忆源`,
-    mcp: countEnabled(contract.mcpServers, 'MCP'),
-    skills: countEnabled(contract.skills, '技能'),
-    tools: contract.toolAllowlist.length === 0 ? '未开放工具' : `已开放 ${contract.toolAllowlist.length} 个工具`,
+      ? (tk?.('agents.capabilitySummary.memoryDisabled') ?? '记忆未启用')
+      : contract.memoryPolicy.summary
+        || (tk?.('agents.capabilitySummary.memorySources', { count: contract.memoryPolicy.sources.length }) ?? `${contract.memoryPolicy.sources.length} 个记忆源`),
+    mcp: countEnabled(contract.mcpServers, tk?.('agents.capabilitySummary.mcp') ?? 'MCP', tk),
+    skills: countEnabled(contract.skills, tk?.('agents.capabilitySummary.skills') ?? '技能', tk),
+    tools: contract.toolAllowlist.length === 0
+      ? (tk?.('agents.capabilitySummary.toolsClosed') ?? '未开放工具')
+      : (tk?.('agents.capabilitySummary.toolsOpen', { count: contract.toolAllowlist.length }) ?? `已开放 ${contract.toolAllowlist.length} 个工具`),
     readiness: readinessFromIssues(issues),
     issues,
   };
@@ -122,9 +131,10 @@ function isMemoryDisabled(memoryPolicy: AgentMemoryPolicy): boolean {
     || memoryPolicy.sources.length === 0;
 }
 
-function countEnabled(refs: AgentCapabilityRef[], label: string): string {
+function countEnabled(refs: AgentCapabilityRef[], label: string, t?: TFunction): string {
   const enabled = refs.filter((item) => item.status === 'enabled').length;
-  return `${enabled}/${refs.length} ${label} 已启用`;
+  return t?.('agents.capabilitySummary.enabledCount', { enabled, total: refs.length, label })
+    ?? `${enabled}/${refs.length} ${label} 已启用`;
 }
 
 function capabilityIssues(prefix: string, refs: AgentCapabilityRef[]): string[] {

@@ -1,4 +1,6 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
+import { SHARED_WORKBENCH_I18N_NAMESPACE } from '@shared/i18n';
 import { DesignNavIcon } from '../../designIcons';
 import { buildAgentCapabilityContractFromConfig, buildAgentCapabilitySummary } from '../../agentCapabilities';
 import { StatusNotice } from '@shared/ui';
@@ -42,8 +44,10 @@ export const AgentEditPanel: React.FC<AgentEditPanelProps> = ({
   onAgentProfileOpen, onAgentSkillToggle, onToolPermissionSet, onFieldChange,
   recentEvents,
 }) => {
+  const { t } = useTranslation(SHARED_WORKBENCH_I18N_NAMESPACE);
   const capabilitySummary = buildAgentCapabilitySummary(
     buildAgentCapabilityContractFromConfig(agent),
+    t,
   );
 
   return (

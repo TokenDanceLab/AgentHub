@@ -56,7 +56,10 @@ export { SEP }
  * @param blocks - Array of upstream transcript blocks.
  * @returns Array of generic transcript items (user messages + agent blocks).
  */
-export function blocksToTranscriptItems(blocks: TranscriptBlock[]): TranscriptItem[] {
+export function blocksToTranscriptItems(
+  blocks: TranscriptBlock[],
+  translate?: (key: string) => string,
+): TranscriptItem[] {
   const items: TranscriptItem[] = []
   let currentAgent: TranscriptAgentItem | null = null
 
@@ -70,7 +73,7 @@ export function blocksToTranscriptItems(blocks: TranscriptBlock[]): TranscriptIt
     if (role === 'human' && (block.kind === 'text' || block.kind === 'attachment')) {
       if (currentAgent) { items.push(currentAgent); currentAgent = null }
       if (block.kind === 'attachment') {
-        const row = mapBlock(block)
+        const row = mapBlock(block, translate)
         if (row) {
           items.push({
             type: 'user', id: block.id, name: block.author?.name, time: timeStr(block.createdAt), text: '',
@@ -149,7 +152,7 @@ export function blocksToTranscriptItems(blocks: TranscriptBlock[]): TranscriptIt
       if (g.children && Array.isArray(g.children)) {
         const childRows: RowItem[] = []
         for (const child of g.children) {
-          const childRow = mapBlock({ ...child, author: block.author })
+          const childRow = mapBlock({ ...child, author: block.author }, translate)
           if (!childRow) continue
           childRows.push(childRow)
         }
@@ -178,7 +181,7 @@ export function blocksToTranscriptItems(blocks: TranscriptBlock[]): TranscriptIt
 
     // ── Structured → rows ──
     if (role === 'agent' || role === 'system') {
-      const row = mapBlock(block)
+      const row = mapBlock(block, translate)
       if (!row) continue
       if (!currentAgent || currentAgent.groupId !== groupId) {
         if (currentAgent) items.push(currentAgent)
