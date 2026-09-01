@@ -162,10 +162,18 @@ func TestProcessExecutorConcurrentCancelArmsGraceOnce(t *testing.T) {
 		}
 	}
 
-	// Let any armed grace goroutines park on their grace timer, then count.
-	time.Sleep(100 * time.Millisecond)
-	if n := countCancelGraceGoroutines(t); n != 1 {
-		t.Fatalf("live cancelGrace goroutines = %d, want exactly 1 (repeat Cancel armed %d extra)", n, n-1)
+	// Poll until the armed grace goroutine parks on its grace timer, then
+	// assert exactly one survived (#1550/#1948 sleep-ratchet: deadline polling
+	// instead of a fixed sleep).
+	live := 0
+	testkit.Eventually(t, processTrackedWaitTimeout, func() bool {
+		live = countCancelGraceGoroutines(t)
+		return live >= 1
+	}, "one cancelGrace goroutine should be armed", func() string {
+		return fmt.Sprintf("live cancelGrace goroutines=%d", live)
+	})
+	if live != 1 {
+		t.Fatalf("live cancelGrace goroutines = %d, want exactly 1 (repeat Cancel armed %d extra)", live, live-1)
 	}
 
 	// Teardown: the single armed path must still escalate and cancel the run.
