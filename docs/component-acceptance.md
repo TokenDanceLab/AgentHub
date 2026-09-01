@@ -83,7 +83,7 @@
 | Button | [component-acceptance/ui-core.md](component-acceptance/ui-core.md) |
 | Modal | [component-acceptance/ui-core.md](component-acceptance/ui-core.md) |
 | ToastStack | [component-acceptance/ui-core.md](component-acceptance/ui-core.md) |
-| 表单组件族：FormField / Input / Textarea / Checkbox / Switch / Radio | [component-acceptance/ui-core.md](component-acceptance/ui-core.md) |
+| 表单组件族：Input / Switch | [component-acceptance/ui-core.md](component-acceptance/ui-core.md) |
 | AgentStreamingBar | [component-acceptance/ui-core.md](component-acceptance/ui-core.md) |
 | CodeBlock | [component-acceptance/ui-core.md](component-acceptance/ui-core.md) |
 | DagTree | [component-acceptance/ui-core.md](component-acceptance/ui-core.md) |

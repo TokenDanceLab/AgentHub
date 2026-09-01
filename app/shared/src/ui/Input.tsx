@@ -7,8 +7,7 @@ import styles from './Input.module.css';
 export interface InputProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 'size'> {
   /**
    * Unified error state (semantic + visual): `aria-invalid` on the input
-   * plus a `--td-danger` border. FormField sets this automatically from
-   * its own `error` prop — use directly only for standalone fields.
+   * plus a `--td-danger` border.
    */
   invalid?: boolean;
   /** sm: compact field (8px/12px padding, 13px) for URL/token entry. */
