@@ -435,3 +435,17 @@ func ClaimOrphanedTasks(db *gorm.DB, grace time.Time, limit int) ([]string, erro
 	`, grace, limit).Scan(&ids).Error
 	return ids, err
 }
+
+// RequeueClaimedOrphanTask rolls a claimed orphan task from 'dispatched' back
+// to 'queued' when redelivery-context rebuild fails, so the next sweep can
+// re-claim it. The CAS predicate only touches a task still in the claimed
+// state — a task that moved on (running/done/failed) is never clobbered.
+// Returns whether the rollback was applied.
+func RequeueClaimedOrphanTask(db *gorm.DB, taskID string) (bool, error) {
+	res := db.Exec(`
+		UPDATE pending_agent_tasks
+		SET status = ?
+		WHERE id = ? AND status = ?
+	`, model.TaskStatusQueued, taskID, model.TaskStatusDispatched)
+	return res.RowsAffected > 0, res.Error
+}
