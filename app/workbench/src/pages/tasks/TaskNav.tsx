@@ -100,14 +100,16 @@ export function TaskNav({
         <small className={styles.navBadgePlus}>+</small>
       </button>
 
-      <button
-        type="button"
-        className={`${styles.navRow} ${styles.navRowSlim}`}
-        onClick={onNewGroup}
-      >
-        <NavGlyph name="plus" />
-        {t('tasks.newGroup')}
-      </button>
+      {onNewGroup && (
+        <button
+          type="button"
+          className={`${styles.navRow} ${styles.navRowSlim}`}
+          onClick={onNewGroup}
+        >
+          <NavGlyph name="plus" />
+          {t('tasks.newGroup')}
+        </button>
+      )}
     </aside>
   );
 }
