@@ -20,11 +20,16 @@ export interface ThreadTranscriptItemInput {
 const MESSAGE_TYPES = new Set(['message', 'user_message', 'agent_message', 'assistant_message', 'text_message']);
 const SKIPPED_TYPES = new Set(['run']);
 
-export function normalizeThreadItemsToTranscript(items: ThreadTranscriptItemInput[] | undefined): TranscriptBlock[] {
+export type NormalizeThreadTranslate = (key: string) => string;
+
+export function normalizeThreadItemsToTranscript(
+  items: ThreadTranscriptItemInput[] | undefined,
+  translate?: NormalizeThreadTranslate,
+): TranscriptBlock[] {
   if (!items?.length) return [];
 
   return items
-    .map((item, index) => ({ block: normalizeThreadItem(item), index, timestamp: timestampMs(item) }))
+    .map((item, index) => ({ block: normalizeThreadItem(item, translate), index, timestamp: timestampMs(item) }))
     .filter((entry): entry is { block: TranscriptBlock; index: number; timestamp: number } => Boolean(entry.block))
     .sort((a, b) => {
       if (a.timestamp !== b.timestamp) return a.timestamp - b.timestamp;
@@ -33,7 +38,7 @@ export function normalizeThreadItemsToTranscript(items: ThreadTranscriptItemInpu
     .map((entry) => entry.block);
 }
 
-function normalizeThreadItem(item: ThreadTranscriptItemInput): TranscriptBlock | null {
+function normalizeThreadItem(item: ThreadTranscriptItemInput, translate?: NormalizeThreadTranslate): TranscriptBlock | null {
   const id = item.itemId ?? item.id;
   if (!id) return null;
 
@@ -41,7 +46,7 @@ function normalizeThreadItem(item: ThreadTranscriptItemInput): TranscriptBlock |
   if (!content) return null;
   if (isRuntimeDiagnosticText(content)) return null;
 
-  const author = normalizeAuthor(item.role, item.senderName);
+  const author = normalizeAuthor(item.role, item.senderName, translate);
   if (!author) return null;
 
   const itemType = normalizeItemType(item.type ?? item.kind);
@@ -94,11 +99,11 @@ function normalizeThreadItem(item: ThreadTranscriptItemInput): TranscriptBlock |
   };
 }
 
-function normalizeAuthor(role: string | undefined, senderName?: string): TranscriptAuthor | null {
+function normalizeAuthor(role: string | undefined, senderName?: string, translate?: NormalizeThreadTranslate): TranscriptAuthor | null {
   switch (role?.trim()) {
     case 'user':
     case 'human':
-      return { id: 'user', name: senderName?.trim() || '用户', role: 'human' };
+      return { id: 'user', name: senderName?.trim() || translate?.('transcript.userFallback') || '用户', role: 'human' };
     case 'agent':
     case 'assistant':
       return { id: senderName?.trim() || 'agent', name: senderName?.trim() || 'Agent', role: 'agent' };

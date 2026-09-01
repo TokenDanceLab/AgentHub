@@ -36,7 +36,7 @@ export function ComposerReplyBar({
   return (
     <div className={styles.replyToBar}>
       <span className={styles.replyToLabel}>
-        {formatReplyToLabel(replyTo)}
+        {formatReplyToLabel(replyTo, t)}
       </span>
       <button
         aria-label={t('aria.cancelReply')}
@@ -148,12 +148,12 @@ export function ComposerMainchainStrip({
   const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE);
   return (
     <div className={styles.composerMainchain} aria-label={t('aria.agentMainChain')}>
-      <span data-state="selected">{formatMainchainAgentLabel(selectedAgentLabel)}</span>
+      <span data-state="selected">{formatMainchainAgentLabel(selectedAgentLabel, t)}</span>
       <span data-state={mainchainDataState(targetSelected)}>
-        {formatMainchainTargetLabel(selectedTargetLabel)}
+        {formatMainchainTargetLabel(selectedTargetLabel, t)}
       </span>
       <span data-state={mainchainDataState(mainchainTask === 'ready')}>
-        {formatMainchainTaskLabel(mainchainTask)}
+        {formatMainchainTaskLabel(mainchainTask, t)}
       </span>
     </div>
   );

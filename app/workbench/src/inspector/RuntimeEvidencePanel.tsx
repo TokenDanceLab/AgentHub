@@ -49,7 +49,7 @@ export function RuntimeEvidencePanel({
   previewPort,
 }: RuntimeEvidencePanelProps): React.ReactElement {
   const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE);
-  const evidenceModel = buildRuntimeEvidenceInspectorModel(runtimeEvidence);
+  const evidenceModel = buildRuntimeEvidenceInspectorModel(runtimeEvidence, t);
   const diffSummary = evidenceModel.channels.find((channel) => channel.channel === 'diff');
   const artifactSummary = evidenceModel.channels.find((channel) => channel.channel === 'artifacts');
   const previewSummary = evidenceModel.channels.find((channel) => channel.channel === 'previews');

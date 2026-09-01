@@ -40,7 +40,7 @@ export function WorkspaceHeader({
   const hasModel = Boolean(activeConversation?.model);
   const runtimeLabel = activeConversation?.runtimeLabel ?? activeConversation?.subtitle;
   const threadLabel = activeConversation?.threadLabel
-    ?? (activeConversation?.kind === 'group' ? '协作群' : '私聊');
+    ?? (activeConversation?.kind === 'group' ? t('workspaceHeader.kindGroup') : t('workspaceHeader.kindDirect'));
 
   const closeSplitMenu = useCallback((): void => setSplitMenu(null), []);
 
@@ -165,7 +165,7 @@ export function WorkspaceHeader({
             <DesignNavIcon name="search" />
           </button>
         </Tooltip>
-        <Tooltip label={inspectorCollapsed ? '展开右侧概览' : '收起右侧概览'}>
+        <Tooltip label={inspectorCollapsed ? t('aria.expandInspector') : t('aria.collapseInspector')}>
           <button
             aria-label={inspectorCollapsed ? t('aria.expandInspector') : t('aria.collapseInspector')}
             className={`${styles.iconButton} ${styles.inspectorToggleBtn}`}

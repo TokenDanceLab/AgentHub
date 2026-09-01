@@ -77,7 +77,7 @@ describe('ConversationSidebar actions (#1508)', () => {
         onPinConversation: vi.fn(),
       });
       openContextMenu('First chat');
-      expect(screen.getByRole('menuitem', { name: '置顶' })).toBeInTheDocument();
+      expect(screen.getByRole('menuitem', { name: 'Pin' })).toBeInTheDocument();
       expect(screen.queryByRole('menuitem', { name: 'Rename' })).not.toBeInTheDocument();
       expect(screen.queryByRole('menuitem', { name: 'Copy link' })).not.toBeInTheDocument();
       expect(screen.queryByRole('menuitem', { name: 'Delete' })).not.toBeInTheDocument();
@@ -226,7 +226,7 @@ describe('ConversationSidebar interaction structure (#1715)', () => {
       onSelectConversation: vi.fn(),
     });
     const firstRow = conversationRows()[0]!;
-    await user.click(within(firstRow).getByRole('button', { name: '置顶' }));
+    await user.click(within(firstRow).getByRole('button', { name: 'Pin' }));
     expect(props.onPinConversation).toHaveBeenCalledWith('c1', true);
     expect(props.onSelectConversation).not.toHaveBeenCalled();
   });

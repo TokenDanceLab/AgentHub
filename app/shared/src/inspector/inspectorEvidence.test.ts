@@ -1,4 +1,11 @@
-import { describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
+import { getI18n } from 'react-i18next';
+import { CHATVIEW_I18N_NAMESPACE } from '../chatview/i18n/resources';
+import { useTestI18nLanguage } from '../testing/i18n';
+
+beforeAll(async () => {
+  await useTestI18nLanguage('zh');
+});
 import {
   buildInspectorEvidenceModel,
   buildDiffProposalEvidenceManifest,
@@ -140,14 +147,16 @@ describe('buildInspectorEvidenceModel', () => {
   });
 
   it('formats v4 inspector status labels in Chinese', () => {
-    expect(evidenceStatusLabel('pending')).toBe('等待');
-    expect(evidenceStatusLabel('running')).toBe('运行中');
-    expect(evidenceStatusLabel('completed')).toBe('完成');
-    expect(evidenceStatusLabel('failed')).toBe('失败');
-    expect(evidenceStatusLabel(undefined)).toBe('记录');
+    const t = getI18n()!.getFixedT('zh', CHATVIEW_I18N_NAMESPACE);
+    expect(evidenceStatusLabel(t, 'pending')).toBe('等待');
+    expect(evidenceStatusLabel(t, 'running')).toBe('运行中');
+    expect(evidenceStatusLabel(t, 'completed')).toBe('完成');
+    expect(evidenceStatusLabel(t, 'failed')).toBe('失败');
+    expect(evidenceStatusLabel(t, undefined)).toBe('记录');
   });
 
   it('summarizes runtime evidence state for the right inspector', () => {
+    const t = getI18n()!.getFixedT('zh', CHATVIEW_I18N_NAMESPACE);
     const model = buildRuntimeEvidenceInspectorModel({
       runId: 'run-edge-1',
       diffs: [{
@@ -170,7 +179,7 @@ describe('buildInspectorEvidenceModel', () => {
       loading: { previews: true },
       errors: { diff: true },
       sources: { diff: 'event', artifacts: 'edge', previews: 'none' },
-    });
+    }, t);
 
     expect(model.runLabel).toBe('Run run-edge-1');
     expect(model.hasEvidence).toBe(true);
@@ -190,12 +199,13 @@ describe('buildInspectorEvidenceModel', () => {
   });
 
   it('keeps an explicit empty runtime evidence detail', () => {
+    const t = getI18n()!.getFixedT('zh', CHATVIEW_I18N_NAMESPACE);
     const model = buildRuntimeEvidenceInspectorModel({
       diffs: [],
       artifacts: [],
       previews: [],
       sources: { diff: 'none', artifacts: 'none', previews: 'none' },
-    });
+    }, t);
 
     expect(model.hasEvidence).toBe(false);
     expect(model.emptyTitle).toBe('暂无运行证据');

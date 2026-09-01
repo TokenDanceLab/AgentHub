@@ -10,10 +10,10 @@ export type { TaskMainProps } from './TaskMainViews';
 
 export {
   NavGlyph,
-  NAV_PRIMARY,
-  NAV_QUICK,
-  PANE_TITLES,
-  VIEW_MODES,
+  buildNavPrimary,
+  buildNavQuick,
+  paneTitle,
+  buildViewModes,
   StatCard,
   TaskNavMenu,
 } from './shared';
