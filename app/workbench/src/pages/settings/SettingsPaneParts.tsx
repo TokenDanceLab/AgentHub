@@ -188,16 +188,16 @@ export function AgentConfigLink({
 /* ── State preview grid ── */
 
 export function StatePreviewSection(): React.ReactElement {
-  const { t: tw } = useTranslation(SHARED_WORKBENCH_I18N_NAMESPACE);
+  const { t } = useTranslation(SHARED_WORKBENCH_I18N_NAMESPACE);
   return (
     <section className={`${styles.stateSystem} state-system settings-state-system`}>
       <div className={`${styles.sectionTitleRow} section-title-row`}>
-        <h2>状态组件预览</h2>
+        <h2>{t('settings.statusPreview')}</h2>
         <span>Design System</span>
       </div>
       {/* Sample panels only demonstrate state styling; their action buttons
           are disabled because no real action is wired (#1818). */}
-      <p className={styles.statePreviewNote}>{tw('settings.statePreviewNote')}</p>
+      <p className={styles.statePreviewNote}>{t('settings.statePreviewNote')}</p>
       <div className={`${styles.stateGrid} state-grid`}>
         {STATE_PREVIEW_SPECS.map((spec) => (
           <StatePanel

@@ -196,7 +196,7 @@ export function TaskMain({
             )}
           </div>
           <p className={styles.headSubcopy}>
-            跨项目任务中心；项目页只展示当前项目内任务和运行。
+            {t('tasks.taskCenter')}
           </p>
         </div>
         <div className={styles.headActions}>
@@ -290,7 +290,7 @@ export function TaskMain({
           onClick={onToolbarFilter}
         >
           <DesignNavIcon name="filter" size={15} />
-          筛选{activeFilterCount > 0 ? ` ${activeFilterCount}` : ''}
+          {t('tasks.filter')}{activeFilterCount > 0 ? ` ${activeFilterCount}` : ''}
         </button>
         <button
           type="button"
@@ -375,7 +375,7 @@ export function TaskMain({
               IntersectionObserver) ── */}
       {hasMore && !loadingMore ? (
         <button type="button" className={styles.loadMoreBtn} onClick={onLoadMore}>
-          加载更多
+          {t('tasks.loadMore')}
         </button>
       ) : null}
       <div

@@ -41,9 +41,9 @@ function QRPanel() {
           <b className={styles.qrCenter}>TD</b>
         </div>
       </div>
-      <h3 className={styles.qrTitle}>TokenDance 企业二维码</h3>
+      <h3 className={styles.qrTitle}>{t('addContact.qrTitle')}</h3>
       <p className={styles.qrCopy}>
-        对方扫码后可申请加入企业，管理员确认后出现在组织内联系人。
+        {t('addContact.qrDescription')}
       </p>
       <span className={styles.qrExpire}>{expireLabel}</span>
     </div>
@@ -51,10 +51,11 @@ function QRPanel() {
 }
 
 function LinkPanel({ onCopy }: { onCopy?: (() => void) | undefined }) {
+  const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE);
   const linkInputId = React.useId();
   return (
     <div className={styles.linkPanel}>
-      <label className={styles.linkLabel} htmlFor={linkInputId}>邀请链接</label>
+      <label className={styles.linkLabel} htmlFor={linkInputId}>{t('addContact.inviteLink')}</label>
       <div className={styles.linkCopyRow}>
         <input
           id={linkInputId}
@@ -63,25 +64,26 @@ function LinkPanel({ onCopy }: { onCopy?: (() => void) | undefined }) {
           value="https://hub.example.com/invite/TD-2026"
         />
         <button type="button" className={styles.linkCopyBtn} onClick={onCopy}>
-          复制链接
+          {t('addContact.copyLink')}
         </button>
       </div>
       <p className={styles.linkHint}>
-        适合发给已在 TokenDance 协作空间内的同事。
+        {t('addContact.inviteLinkDescription')}
       </p>
     </div>
   );
 }
 
 function CodePanel({ onCopy }: { onCopy?: (() => void) | undefined }) {
+  const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE);
   return (
     <div className={styles.codePanel}>
       <span className={styles.codeValue}>TD-86K2-2026</span>
       <p className={styles.linkHint}>
-        企业邀请码 24 小时内有效，可通过 IM 或邮件发送。
+        {t('addContact.inviteCodeHint')}
       </p>
       <button type="button" className={styles.codeBtn} onClick={onCopy}>
-        复制邀请码
+        {t('addContact.copyInviteCode')}
       </button>
     </div>
   );
@@ -92,6 +94,7 @@ function PhonePanel({
 }: {
   onSend?: ((countryCode: string, phone: string, note: string) => void) | undefined;
 }) {
+  const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE);
   const [countryCode, setCountryCode] = useState('+86');
   const [phone, setPhone] = useState('');
   const [note, setNote] = useState('');
@@ -111,7 +114,7 @@ function PhonePanel({
         handleSend();
       }}
     >
-      <label className={styles.phoneLabel} htmlFor={phoneInputId}>手机号</label>
+      <label className={styles.phoneLabel} htmlFor={phoneInputId}>{t('addContact.phone')}</label>
       <div className={styles.phoneRow}>
         <Select
           ariaLabel="区号"
@@ -123,12 +126,12 @@ function PhonePanel({
         <input
           id={phoneInputId}
           className={styles.phoneInput}
-          placeholder="输入手机号"
+          placeholder={t('addContact.phonePlaceholder')}
           value={phone}
           onChange={(e) => setPhone(e.target.value)}
         />
       </div>
-      <label className={styles.phoneLabel} htmlFor={noteInputId}>备注</label>
+      <label className={styles.phoneLabel} htmlFor={noteInputId}>{t('addContact.remark')}</label>
       <input
         id={noteInputId}
         className={styles.phoneInput}
@@ -137,7 +140,7 @@ function PhonePanel({
         onChange={(e) => setNote(e.target.value)}
       />
       <button type="button" className={styles.phoneSendBtn} onClick={handleSend}>
-        发送邀请
+        {t('addContact.sendInvite')}
       </button>
     </form>
   );
@@ -244,10 +247,10 @@ export function AddContactModal({
 
         <div className={styles.modalHead}>
           <h2 className={styles.modalTitle} id="addContactTitle">
-            添加联系人
+            {t('addContact.title')}
           </h2>
           <p className={styles.modalDesc}>
-            邀请企业成员加入 TokenDance，或添加外部联系人用于项目协作。
+            {t('addContact.subtitle')}
           </p>
         </div>
 

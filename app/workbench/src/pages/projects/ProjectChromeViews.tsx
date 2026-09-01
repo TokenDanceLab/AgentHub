@@ -132,7 +132,7 @@ export function ProjectEditor({
     >
       <div className={styles.editorGrid}>
         <label className={styles.editorField}>
-          <span>项目名称</span>
+          <span>{t('projects.projectName')}</span>
           <input
             value={draft.name}
             onChange={(event) => onDraftChange({ ...draft, name: event.target.value })}
@@ -140,7 +140,7 @@ export function ProjectEditor({
           />
         </label>
         <label className={styles.editorField}>
-          <span>项目描述</span>
+          <span>{t('projects.projectDescription')}</span>
           <input
             value={draft.description}
             onChange={(event) => onDraftChange({ ...draft, description: event.target.value })}
@@ -149,7 +149,7 @@ export function ProjectEditor({
         </label>
       </div>
       <fieldset className={styles.editorThemeColor}>
-        <legend className={styles.editorThemeColorLegend}>主题色</legend>
+        <legend className={styles.editorThemeColorLegend}>{t('projects.themeColor')}</legend>
         <div className={styles.themeSwatchRow} role="radiogroup" aria-label={t("aria.themeColor")}>
           {FOLDER_THEME_COLORS.map((color) => {
             const meta = FOLDER_THEME_COLOR_META[color];
@@ -182,10 +182,10 @@ export function ProjectEditor({
       {error ? <div className={styles.editorError} role="alert">{error}</div> : null}
       <div className={styles.editorActions}>
         <button type="button" className={styles.editorCancelBtn} onClick={onCancel} disabled={saving}>
-          取消
+          {t('projects.cancel')}
         </button>
         <button type="submit" className={styles.newProjectBtn} disabled={saving || !draft.name.trim()}>
-          {saving ? '保存中' : submitLabel}
+          {saving ? t('projects.saving') : submitLabel}
         </button>
       </div>
     </form>

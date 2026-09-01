@@ -71,8 +71,8 @@ function DocTableRow({
       <span className={styles.docMore}>
         {confirming ? (
           <>
-            <button type="button" className={styles.confirmDeleteBtn} onClick={handleDelete}>确认删除</button>
-            <button type="button" className={styles.cancelDeleteBtn} onClick={handleCancelDelete}>取消</button>
+            <button type="button" className={styles.confirmDeleteBtn} onClick={handleDelete}>{t('docs.deleteConfirm')}</button>
+            <button type="button" className={styles.cancelDeleteBtn} onClick={handleCancelDelete}>{t('docs.cancel')}</button>
           </>
         ) : onDelete ? (
           <Tooltip label={t("aria.deleteDoc")}>
@@ -112,10 +112,10 @@ export function DocTable({
   return (
     <div className={`${styles.docTable} doc-table`}>
       <div className={`${styles.docTableHead} doc-table-head`}>
-        <span>标题</span>
-        <span>位置</span>
-        <span>所有者</span>
-        <span>打开时间</span>
+        <span>{t('docs.colTitle')}</span>
+        <span>{t('docs.colLocation')}</span>
+        <span>{t('docs.colOwner')}</span>
+        <span>{t('docs.colOpenedAt')}</span>
         <span />
       </div>
       {documentsLoading && rows.length === 0 ? (
@@ -209,6 +209,7 @@ export function DocPreviewPanel({
   activePreview: WorkbenchDocumentPreview;
   onClosePreview?: (() => void) | undefined;
 }) {
+  const { t } = useTranslation(SHARED_WORKBENCH_I18N_NAMESPACE);
   return (
     <section className={`${styles.previewPanel} doc-preview-panel`} data-card-surface>
       <div className={styles.previewHead}>
@@ -216,7 +217,7 @@ export function DocPreviewPanel({
           <span>{activePreview.sourceLabel}</span>
           <strong>{activePreview.name}</strong>
         </div>
-        <em>轻量文档预览</em>
+        <em>{t('docs.lightPreview')}</em>
       </div>
       <FilePreview
         filename={activePreview.name}

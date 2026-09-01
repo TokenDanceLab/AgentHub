@@ -35,7 +35,7 @@ export function TaskNav({
 
   return (
     <aside className={`${styles.nav} workbench-nav`}>
-      <div className={`${styles.navTitle} workbench-title`}>任务</div>
+      <div className={`${styles.navTitle} workbench-title`}>{t('tasks.navTasks')}</div>
 
       <button
         type="button"
@@ -69,7 +69,7 @@ export function TaskNav({
       <div className={styles.navDivider} />
 
       {/* Quick access: 全部 / 我创建的 / 我分配的 / 已完成 */}
-      <div className={styles.navCaption}>快速访问</div>
+      <div className={styles.navCaption}>{t('tasks.quickAccess')}</div>
       {NAV_QUICK.map((item) => (
         <button
           key={item.id}
@@ -104,7 +104,7 @@ export function TaskNav({
         onClick={onNewGroup}
       >
         <NavGlyph name="plus" />
-        新建分组
+        {t('tasks.newGroup')}
       </button>
     </aside>
   );

@@ -86,7 +86,7 @@ export function TaskSelectionStrip({
       aria-label={taskSelectionAriaLabel(task.title)}
     >
       <div className={styles.selectionMeta}>
-        <span className={styles.selectionKicker}>当前选中</span>
+        <span className={styles.selectionKicker}>{t('tasks.currentSelection')}</span>
         <strong>{task.title}</strong>
         <em>{task.status}</em>
       </div>
@@ -120,12 +120,12 @@ export function TaskSelectionStrip({
             </button>
           </span>
         )}
-        <button type="button" onClick={onCycleStatus}>推进状态</button>
-        <button type="button" onClick={onAssignToMe}>指派给我</button>
-        <button type="button" onClick={onGroupByProject}>按项目分组</button>
-        <button type="button" onClick={onFilterByAssignee}>看负责人任务</button>
-        <button type="button" onClick={onEdit}>编辑</button>
-        <button type="button" className={styles.dangerAction} onClick={onDelete}>删除</button>
+        <button type="button" onClick={onCycleStatus}>{t('tasks.statusFilter')}</button>
+        <button type="button" onClick={onAssignToMe}>{t('tasks.assignedToMe')}</button>
+        <button type="button" onClick={onGroupByProject}>{t('tasks.groupByProject')}</button>
+        <button type="button" onClick={onFilterByAssignee}>{t('tasks.viewAssigneeTasks')}</button>
+        <button type="button" onClick={onEdit}>{t('tasks.edit')}</button>
+        <button type="button" className={styles.dangerAction} onClick={onDelete}>{t('tasks.delete')}</button>
       </div>
     </div>
   );
@@ -167,6 +167,7 @@ function TaskEditFields({
   onSaveEdit?: (() => void) | undefined;
   onCancelEdit?: (() => void) | undefined;
 }) {
+  const { t } = useTranslation(SHARED_WORKBENCH_I18N_NAMESPACE);
   return (
     <>
       {TASK_EDIT_FIELD_CONFIGS.map((field) => (
@@ -180,8 +181,8 @@ function TaskEditFields({
         </label>
       ))}
       <span className={styles.editActions}>
-        <button type="button" onClick={onSaveEdit}>保存</button>
-        <button type="button" onClick={onCancelEdit}>取消</button>
+        <button type="button" onClick={onSaveEdit}>{t('tasks.save')}</button>
+        <button type="button" onClick={onCancelEdit}>{t('tasks.cancel')}</button>
       </span>
     </>
   );
@@ -262,14 +263,15 @@ export function TaskRow({
 }
 
 export function TaskTableHead({ showCreatorColumn }: { showCreatorColumn: boolean }) {
+  const { t } = useTranslation(SHARED_WORKBENCH_I18N_NAMESPACE);
   return (
     <div className={`${styles.tableHead} task-table-head`}>
-      <span>任务标题</span>
-      <span>所属项目</span>
-      <span>负责人</span>
-      <span>开始时间</span>
-      <span>截止时间</span>
-      {showCreatorColumn && <span>创建人</span>}
+      <span>{t('tasks.taskTitle')}</span>
+      <span>{t('tasks.project')}</span>
+      <span>{t('tasks.assignee')}</span>
+      <span>{t('tasks.startAt')}</span>
+      <span>{t('tasks.dueAt')}</span>
+      {showCreatorColumn && <span>{t('tasks.creator')}</span>}
     </div>
   );
 }

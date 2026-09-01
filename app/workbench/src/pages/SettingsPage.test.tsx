@@ -1,7 +1,12 @@
 import React from 'react';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeAll, describe, expect, it, vi } from 'vitest';
+import { useTestI18nLanguage } from '@shared/testing/i18n';
 import { render, screen } from '../__tests__/setup';
 import { SettingsPage, type SettingsPageProps } from './SettingsPage';
+
+beforeAll(async () => {
+  await useTestI18nLanguage('zh');
+});
 
 const BASE_PROPS: SettingsPageProps = {
   activePane: 'appearance',
@@ -64,7 +69,7 @@ describe('SettingsPage load/error UX', () => {
       />,
     );
 
-    expect(screen.getByRole('alert', { name: 'settings.loadFailed' })).toBeInTheDocument();
+    expect(screen.getByRole('alert', { name: '设置加载失败' })).toBeInTheDocument();
     expect(screen.getByText('backend down')).toBeInTheDocument();
 
     screen.getByRole('button', { name: '重试加载' }).click();

@@ -57,7 +57,7 @@ export function RuntimeEvidencePanel({
   return (
     <div className={styles.runtimeEvidence}>
       <div className={styles.runtimeEvidenceHead}>
-        <strong>运行证据</strong>
+        <strong>{t('inspector.runtimeEvidence')}</strong>
         <span>{evidenceModel.runLabel}</span>
       </div>
 

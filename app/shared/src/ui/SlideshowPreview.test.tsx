@@ -1,4 +1,5 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeAll } from 'vitest';
+import { useTestI18nLanguage } from '../testing/i18n';
 import { render, fireEvent } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import React from 'react';
@@ -24,6 +25,10 @@ import React from 'react';
    thumbnail button would both contain the identical string and
    `findByText` would throw on a multiple-match.
    ═══════════════════════════════════════════════════════════════════════ */
+
+beforeAll(async () => {
+  await useTestI18nLanguage('zh');
+});
 
 const mockSlideContents: Record<string, string> = {
   'ppt/slides/slide1.xml':
@@ -125,15 +130,15 @@ describe('SlideshowPreview', () => {
     const onClose = vi.fn();
     const { findByRole } = renderSlideshow({ onClose });
     // The shared test i18n instance runs in key-echo mode, so
-    // t('aria.closePreview') returns 'aria.closePreview'.
-    const closeButton = await findByRole('button', { name: 'aria.closePreview' });
+    // Real zh copy for the close-preview control (#2154 UIUX lane i18n pass).
+    const closeButton = await findByRole('button', { name: '关闭预览' });
     expect(closeButton).toBeInTheDocument();
   });
 
   it('shows prev/next buttons with key-echo aria-labels', async () => {
     const { findByRole } = renderSlideshow();
-    const prevButton = await findByRole('button', { name: 'aria.previousImage' });
-    const nextButton = await findByRole('button', { name: 'aria.nextImage' });
+    const prevButton = await findByRole('button', { name: '上一张' });
+    const nextButton = await findByRole('button', { name: '下一张' });
     expect(prevButton).toBeInTheDocument();
     expect(nextButton).toBeInTheDocument();
   });
@@ -141,7 +146,7 @@ describe('SlideshowPreview', () => {
   it('calls onClose when close button is clicked', async () => {
     const onClose = vi.fn();
     const { findByRole } = renderSlideshow({ onClose });
-    const closeButton = await findByRole('button', { name: 'aria.closePreview' });
+    const closeButton = await findByRole('button', { name: '关闭预览' });
     fireEvent.click(closeButton);
     expect(onClose).toHaveBeenCalledTimes(1);
   });
@@ -150,7 +155,7 @@ describe('SlideshowPreview', () => {
     const { findByRole, findByText, getByText } = renderSlideshow();
     // Wait for slide 1 to be rendered before interacting.
     await findByText('First Slide Heading Text');
-    const nextButton = await findByRole('button', { name: 'aria.nextImage' });
+    const nextButton = await findByRole('button', { name: '下一张' });
     fireEvent.click(nextButton);
     // Slide 2 heading now renders in the slide canvas.
     expect(await findByText('Second Slide Heading Text')).toBeInTheDocument();
@@ -159,7 +164,7 @@ describe('SlideshowPreview', () => {
 
   it('disables prev button on the first slide', async () => {
     const { findByRole } = renderSlideshow();
-    const prevButton = await findByRole('button', { name: 'aria.previousImage' });
+    const prevButton = await findByRole('button', { name: '上一张' });
     expect(prevButton).toBeDisabled();
   });
 

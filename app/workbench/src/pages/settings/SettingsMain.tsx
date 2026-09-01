@@ -73,7 +73,7 @@ export function SettingsMain(props: SettingsMainProps): React.ReactElement {
                       className={styles.statusAction}
                       onClick={onDismissSettingsError}
                     >
-                      关闭
+                      {tw('settings.close')}
                     </button>
                   ),
                 }
