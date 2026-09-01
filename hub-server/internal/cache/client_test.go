@@ -377,6 +377,37 @@ func TestIsOnline(t *testing.T) {
 	assert.False(t, online)
 }
 
+// TestAreOnline covers the batched presence lookup (#2154 perf lane):
+// one pipelined round trip replaces one HLEN per user.
+func TestAreOnline(t *testing.T) {
+	c, _ := testClient(t)
+	ctx := context.Background()
+
+	// Empty input returns an empty map.
+	onlineSet, err := c.AreOnline(ctx, nil)
+	require.NoError(t, err)
+	assert.Empty(t, onlineSet)
+
+	// friend-a has a route (online), friend-b has none (offline).
+	require.NoError(t, c.SetRoute(ctx, "friend-a", "desktop", "conn-1"))
+	onlineSet, err = c.AreOnline(ctx, []string{"friend-a", "friend-b"})
+	require.NoError(t, err)
+	assert.True(t, onlineSet["friend-a"])
+	assert.False(t, onlineSet["friend-b"])
+
+	// Duplicate IDs are deduplicated.
+	onlineSet, err = c.AreOnline(ctx, []string{"friend-a", "friend-a"})
+	require.NoError(t, err)
+	assert.Len(t, onlineSet, 1)
+	assert.True(t, onlineSet["friend-a"])
+
+	// Route removal flips presence back to offline.
+	require.NoError(t, c.DeleteRoute(ctx, "friend-a", "desktop"))
+	onlineSet, err = c.AreOnline(ctx, []string{"friend-a"})
+	require.NoError(t, err)
+	assert.False(t, onlineSet["friend-a"])
+}
+
 func TestGetAllRoutes(t *testing.T) {
 	c, _ := testClient(t)
 	ctx := context.Background()

@@ -24,8 +24,10 @@ import (
 
 // mockContactCache implements Cache for testing.
 type mockContactCache struct {
-	invalidated []string
-	online      map[string]bool
+	invalidated    []string
+	online         map[string]bool
+	isOnlineCalls  int
+	areOnlineCalls [][]string
 }
 
 func (m *mockContactCache) Invalidate(ctx context.Context, keys ...string) error {
@@ -34,10 +36,22 @@ func (m *mockContactCache) Invalidate(ctx context.Context, keys ...string) error
 }
 
 func (m *mockContactCache) IsOnline(ctx context.Context, userID string) (bool, error) {
+	m.isOnlineCalls++
 	if m.online == nil {
 		return false, nil
 	}
 	return m.online[userID], nil
+}
+
+func (m *mockContactCache) AreOnline(ctx context.Context, userIDs []string) (map[string]bool, error) {
+	m.areOnlineCalls = append(m.areOnlineCalls, append([]string(nil), userIDs...))
+	out := make(map[string]bool, len(userIDs))
+	for _, id := range userIDs {
+		if m.online != nil {
+			out[id] = m.online[id]
+		}
+	}
+	return out, nil
 }
 
 // recordingContactBus is a Bus test double that records Publish calls.
@@ -786,6 +800,42 @@ func TestListContacts_BatchesFriendUserLookup(t *testing.T) {
 	require.NoError(t, err)
 	assert.Len(t, contacts, 3)
 	assert.Equal(t, "friend-c", contacts[2].UserID)
+	assert.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestListContacts_BatchesPresenceLookups(t *testing.T) {
+	db, mock, sqlDB := newMockDBContact(t)
+	defer sqlDB.Close()
+
+	mock.ExpectQuery(sqlcFriendshipsByUser).
+		WithArgs("user-1", model.StatusAccepted, 500).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "user_id", "friend_id", "status", "remark"}).
+			AddRow("f-1", "user-1", "friend-a", model.StatusAccepted, "A").
+			AddRow("f-2", "user-1", "friend-b", model.StatusAccepted, "B").
+			AddRow("f-3", "user-1", "friend-c", model.StatusAccepted, "C"))
+
+	mock.ExpectQuery(sqlcUsersByIDs).
+		WithArgs("friend-a", "friend-b", "friend-c").
+		WillReturnRows(sqlmock.NewRows([]string{"id", "username", "password_hash", "nickname", "avatar_url"}).
+			AddRow("friend-a", "friendA", "hash-a", "Friend A", "").
+			AddRow("friend-b", "friendB", "hash-b", "Friend B", "").
+			AddRow("friend-c", "friendC", "hash-c", "Friend C", ""))
+
+	mc := &mockContactCache{online: map[string]bool{"friend-b": true}}
+	svc := NewService(db, nil, mc)
+	contacts, err := svc.ListContacts(context.Background(), "user-1")
+	require.NoError(t, err)
+	require.Len(t, contacts, 3)
+
+	// Presence resolves in exactly one batched call covering all friends; the
+	// per-user IsOnline path must not be used anymore (#2154 perf lane).
+	require.Len(t, mc.areOnlineCalls, 1)
+	assert.ElementsMatch(t, []string{"friend-a", "friend-b", "friend-c"}, mc.areOnlineCalls[0])
+	assert.Zero(t, mc.isOnlineCalls)
+
+	assert.False(t, contacts[0].Online)
+	assert.True(t, contacts[1].Online)
+	assert.False(t, contacts[2].Online)
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
 

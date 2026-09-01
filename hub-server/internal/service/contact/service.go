@@ -24,6 +24,8 @@ type Bus interface {
 type Cache interface {
 	Invalidate(ctx context.Context, keys ...string) error
 	IsOnline(ctx context.Context, userID string) (bool, error)
+	// AreOnline batches presence lookups in one round trip (#2154 perf lane).
+	AreOnline(ctx context.Context, userIDs []string) (map[string]bool, error)
 }
 
 // Service owns contact/friendship orchestration: user search, friend request
@@ -310,13 +312,18 @@ func (s *Service) ListContacts(ctx context.Context, userID string) ([]ContactInf
 		return nil, err
 	}
 
+	// Presence in one pipelined round trip instead of one per friend (#2154
+	// perf lane); errors degrade to all-offline, matching the previous
+	// per-item error swallowing.
+	onlineSet, _ := resolveCache(s.cacheClient).AreOnline(ctx, friendIDs)
+
 	result := make([]ContactInfo, 0, len(friends))
 	for _, f := range friends {
 		friend, ok := users[f.FriendID]
 		if !ok {
 			continue
 		}
-		online, _ := resolveCache(s.cacheClient).IsOnline(ctx, friend.ID)
+		online := onlineSet[friend.ID]
 		result = append(result, ContactInfo{
 			UserID:    friend.ID,
 			Username:  friend.Username,
