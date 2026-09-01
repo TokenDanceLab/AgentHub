@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import type { Meta, StoryObj } from '@storybook/react';
 import { Input } from './Input';
-import { FormField } from './FormField';
 
 const meta: Meta<typeof Input> = {
   title: 'UI/Form/Input',
@@ -33,15 +32,13 @@ export const Invalid: Story = { args: { placeholder: 'Bad value', invalid: true 
 
 export const Disabled: Story = { args: { placeholder: 'Disabled', disabled: true } };
 
-export const InFormField: Story = {
+export const WithLabel: Story = {
   render: () => (
-    <div style={{ width: 280 }}>
-      <FormField label="Hub URL" hint="REST endpoint" required>
+    <div style={{ width: 280, display: 'grid', gap: 12 }}>
+      <label style={{ display: 'grid', gap: 4 }}>
+        Hub URL
         <Input placeholder="http://localhost:8080" size="sm" mono />
-      </FormField>
-      <FormField label="API key" error="Invalid key format">
-        <Input defaultValue="sk-x" size="sm" mono />
-      </FormField>
+      </label>
     </div>
   ),
 };
