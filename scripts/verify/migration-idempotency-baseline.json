@@ -1,0 +1,173 @@
+{
+ "0001_users.up.sql": [
+  "index:idx_users_username",
+  "table:users"
+ ],
+ "0002_friendships.up.sql": [
+  "index:idx_friendships_user_friend",
+  "index:idx_friendships_user_status",
+  "table:friendships"
+ ],
+ "0003_devices.up.sql": [
+  "index:idx_devices_user_type",
+  "table:devices"
+ ],
+ "0004_sessions.up.sql": [
+  "table:sessions"
+ ],
+ "0005_session_members.up.sql": [
+  "index:idx_session_members_member",
+  "index:idx_session_members_unique",
+  "table:session_members"
+ ],
+ "0006_messages.up.sql": [
+  "index:idx_messages_session_client_msg",
+  "index:idx_messages_session_created",
+  "index:idx_messages_session_seq",
+  "table:messages"
+ ],
+ "0007_message_reads.up.sql": [
+  "table:message_reads"
+ ],
+ "0008_message_pins.up.sql": [
+  "table:message_pins"
+ ],
+ "0009_workspaces.up.sql": [
+  "table:workspaces"
+ ],
+ "0010_custom_agents.up.sql": [
+  "table:custom_agents"
+ ],
+ "0011_agent_instances.up.sql": [
+  "index:idx_agent_instances_inviter",
+  "index:idx_agent_instances_session",
+  "table:agent_instances"
+ ],
+ "0012_pending_agent_tasks.up.sql": [
+  "index:idx_pending_tasks_expire",
+  "index:idx_pending_tasks_user_status",
+  "table:pending_agent_tasks"
+ ],
+ "0013_notifications.up.sql": [
+  "index:idx_notifications_user_read_created",
+  "table:notifications"
+ ],
+ "0014_attachments.up.sql": [
+  "index:idx_attachments_hash",
+  "table:attachments"
+ ],
+ "0015_refresh_tokens.up.sql": [
+  "index:idx_refresh_tokens_hash",
+  "index:idx_refresh_tokens_user_device",
+  "table:refresh_tokens"
+ ],
+ "0017_devices_unique.up.sql": [
+  "index:idx_devices_user_type"
+ ],
+ "0018_pending_agent_task_edge_run_id.up.sql": [
+  "column:edge_run_id",
+  "index:idx_pending_tasks_edge_run_id"
+ ],
+ "0019_pending_agent_task_edge_device_id.up.sql": [
+  "column:edge_device_id",
+  "index:idx_pending_tasks_edge_device_id"
+ ],
+ "0021_devices_allow_multiple_same_type.up.sql": [
+  "index:idx_devices_user_type"
+ ],
+ "0022_agent_profiles.up.sql": [
+  "index:idx_agent_profiles_owner",
+  "index:idx_agent_profiles_public",
+  "index:idx_agent_profiles_runtime",
+  "table:agent_profiles"
+ ],
+ "0023_execution_targets.up.sql": [
+  "index:idx_execution_targets_device",
+  "index:idx_execution_targets_owner",
+  "table:execution_targets"
+ ],
+ "0024_message_attachments.up.sql": [
+  "index:idx_message_attachments_attachment_id",
+  "index:idx_message_attachments_session_attachment",
+  "table:message_attachments"
+ ],
+ "0025_skills.up.sql": [
+  "index:idx_skills_owner",
+  "index:idx_skills_public",
+  "table:skills"
+ ],
+ "0026_mcp_servers.up.sql": [
+  "index:idx_mcp_servers_owner",
+  "index:idx_mcp_servers_public",
+  "table:mcp_servers"
+ ],
+ "0027_provider_bindings.up.sql": [
+  "index:idx_provider_bindings_owner",
+  "table:provider_bindings"
+ ],
+ "0028_audit_events.up.sql": [
+  "index:idx_audit_events_created",
+  "index:idx_audit_events_severity",
+  "index:idx_audit_events_type",
+  "index:idx_audit_events_user",
+  "table:audit_events"
+ ],
+ "0033_agent_team.up.sql": [
+  "table:agent_team_members",
+  "table:agent_team_runs",
+  "table:agent_teams"
+ ],
+ "0034_agent_team_assignments.up.sql": [
+  "index:idx_agent_team_assignments_from_member_id",
+  "index:idx_agent_team_assignments_status",
+  "index:idx_agent_team_assignments_team_run_id",
+  "index:idx_agent_team_assignments_to_member_id",
+  "table:agent_team_assignments"
+ ],
+ "0036_agent_team_events.up.sql": [
+  "index:idx_agent_team_events_run_id",
+  "index:idx_agent_team_events_run_seq",
+  "table:agent_team_events"
+ ],
+ "0037_agent_team_tasks.up.sql": [
+  "index:idx_agent_team_tasks_assignee_member_id",
+  "index:idx_agent_team_tasks_assignment_id",
+  "index:idx_agent_team_tasks_parent_task_id",
+  "index:idx_agent_team_tasks_status",
+  "index:idx_agent_team_tasks_team_run_id",
+  "table:agent_team_tasks"
+ ],
+ "0038_agent_team_artifacts.up.sql": [
+  "index:idx_agent_team_artifacts_agent_task",
+  "index:idx_agent_team_artifacts_assignment",
+  "index:idx_agent_team_artifacts_conflict",
+  "index:idx_agent_team_artifacts_member",
+  "index:idx_agent_team_artifacts_run_path",
+  "index:idx_agent_team_artifacts_source_event",
+  "index:idx_agent_team_artifacts_team_run",
+  "index:idx_agent_team_artifacts_team_task",
+  "table:agent_team_artifacts"
+ ],
+ "0043_attachments_metadata.up.sql": [
+  "column:metadata"
+ ],
+ "0049_user_settings.up.sql": [
+  "index:idx_user_settings_user_id",
+  "table:user_settings"
+ ],
+ "0052_delivery_outbox.up.sql": [
+  "index:idx_delivery_outbox_delivery_id",
+  "index:idx_delivery_outbox_status_nr",
+  "index:idx_delivery_outbox_task_id",
+  "table:delivery_outbox"
+ ],
+ "0055_custom_agent_output_schema.up.sql": [
+  "column:output_schema"
+ ],
+ "0059_execution_target_evidence.up.sql": [
+  "index:idx_execution_target_evidence_observed"
+ ],
+ "0066_agent_team_runs_token_usage.up.sql": [
+  "column:token_usage_total"
+ ]
+}
