@@ -292,8 +292,11 @@ type cancelGraceArmPlan struct {
 
 // planCancelGraceArm reports whether Cancel should register cancelDone and start
 // the interrupt→SIGTERM→kill escalation goroutine for a tracked process.
-func planCancelGraceArm(proc *os.Process) cancelGraceArmPlan {
-	return cancelGraceArmPlan{Arm: shouldStartGracefulProcessShutdown(proc)}
+// alreadyArmed is true when a previous Cancel already registered cancelDone;
+// re-arming would overwrite the tracked done channel and orphan the previous
+// grace goroutine, so repeat Cancel stays idempotent (#2154).
+func planCancelGraceArm(proc *os.Process, alreadyArmed bool) cancelGraceArmPlan {
+	return cancelGraceArmPlan{Arm: shouldStartGracefulProcessShutdown(proc) && !alreadyArmed}
 }
 
 // processWaitLogPlan is the pure log gate for post-kill Wait errors in Cancel grace.

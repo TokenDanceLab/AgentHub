@@ -1736,8 +1736,11 @@ func TestResidualPlanPureHelpers1011(t *testing.T) {
 	if planAdapterResolve(false, "a", false).Resolve || !planAdapterResolve(true, "a", false).Resolve {
 		t.Fatal("adapter resolve")
 	}
-	if planCancelGraceArm(nil).Arm || !planCancelGraceArm(&os.Process{}).Arm {
+	if planCancelGraceArm(nil, false).Arm || !planCancelGraceArm(&os.Process{}, false).Arm {
 		t.Fatal("cancel grace arm")
+	}
+	if planCancelGraceArm(&os.Process{}, true).Arm {
+		t.Fatal("cancel grace arm must be idempotent once armed (#2154)")
 	}
 	if planEvidenceRun(false).RunGate || !planEvidenceRun(true).RunGate {
 		t.Fatal("evidence run")
