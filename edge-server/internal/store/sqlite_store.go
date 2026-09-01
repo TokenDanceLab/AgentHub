@@ -30,15 +30,22 @@ const (
 	sqliteRowKindPreview      = "preview"
 	sqliteRowKindUserProfile  = "user_profile"
 	sqliteRowKindAgentProfile = "agent_profile"
+	sqliteRowKindSettings     = "settings"
+	sqliteRowKindCheckpoint   = "checkpoint"
 )
 
 type SQLiteStore struct {
-	db             *sql.DB
-	store          *Store
-	persistMu      sync.Mutex
-	closeOnce      sync.Once
-	lastErr        error
-	lastSnapshot   fileSnapshot
+	db           *sql.DB
+	store        *Store
+	persistMu    sync.Mutex
+	closeOnce    sync.Once
+	lastErr      error
+	lastSnapshot fileSnapshot
+	// rowsSeeded marks agenthub_store_rows as the durable source of truth:
+	// once set, syncPersist skips the legacy full-store payload UPSERT
+	// (write amplification — the payload is only the pre-rows fallback and
+	// is kept fresh until the first commit that durably seeds the rows).
+	rowsSeeded     bool
 	stopCheckpoint chan struct{} // closed to stop periodic WAL checkpoint
 }
 
@@ -155,7 +162,20 @@ func (s *SQLiteStore) load() error {
 		return err
 	}
 	if planSQLiteLoadSource(ok).UseRows {
+		if rowSnapshot.Settings == nil {
+			// Legacy DB: the rows table predates the settings/checkpoint row
+			// kinds. Adopt those fields from the legacy payload (last written
+			// before this upgrade); the first persist rewrites them as rows
+			// and completes the migration. The settings row doubles as the
+			// migrated marker — once present, adoption never runs again.
+			if legacy, found := s.readLegacySnapshotPayload(); found {
+				rowSnapshot.Settings = legacy.Settings
+				rowSnapshot.SettingsMtime = legacy.SettingsMtime
+				rowSnapshot.Checkpoints = legacy.Checkpoints
+			}
+		}
 		s.store.applySnapshot(rowSnapshot)
+		s.rowsSeeded = true
 		return nil
 	}
 
@@ -180,34 +200,61 @@ func (s *SQLiteStore) load() error {
 	return nil
 }
 
+// readLegacySnapshotPayload decodes the agenthub_store_snapshots payload for
+// best-effort adoption of fields that older rows layers did not persist
+// (settings/checkpoints). Missing rows, blank payloads, and decode errors all
+// degrade to "not found" — the rows table remains the source of truth.
+func (s *SQLiteStore) readLegacySnapshotPayload() (fileSnapshot, bool) {
+	var payload string
+	err := s.db.QueryRow(
+		`SELECT payload FROM agenthub_store_snapshots WHERE key = ?`,
+		sqliteSnapshotKey,
+	).Scan(&payload)
+	if err != nil || isBlankSQLiteSnapshotPayload(payload) {
+		return fileSnapshot{}, false
+	}
+	snapshot, err := decodeSQLiteSnapshotPayload(payload)
+	if err != nil {
+		slog.Warn("sqlite store: legacy snapshot payload unreadable during settings adoption", "error", err)
+		return fileSnapshot{}, false
+	}
+	return snapshot, true
+}
+
 func (s *SQLiteStore) syncPersist() error {
 	s.persistMu.Lock()
 	defer s.persistMu.Unlock()
 
 	snapshot := s.store.snapshot()
-	payload, err := encodeSQLiteSnapshotPayload(snapshot)
-	if err != nil {
-		s.lastErr = fmt.Errorf("encode sqlite store snapshot: %w", err)
-		return s.lastErr
-	}
-
 	tx, err := s.db.Begin()
 	if err != nil {
 		s.lastErr = fmt.Errorf("begin sqlite store persist: %w", err)
 		return s.lastErr
 	}
-	_, err = tx.Exec(
-		`INSERT INTO agenthub_store_snapshots (key, payload, updated_at)
+	// Legacy full-store payload UPSERT: pure write amplification once
+	// agenthub_store_rows is the durable source of truth (load prefers rows,
+	// and both durability suites recover from rows alone). Keep writing it
+	// only until the rows table has been durably seeded.
+	if !s.rowsSeeded {
+		payload, encodeErr := encodeSQLiteSnapshotPayload(snapshot)
+		if encodeErr != nil {
+			_ = tx.Rollback()
+			s.lastErr = fmt.Errorf("encode sqlite store snapshot: %w", encodeErr)
+			return s.lastErr
+		}
+		_, err = tx.Exec(
+			`INSERT INTO agenthub_store_snapshots (key, payload, updated_at)
 	VALUES (?, ?, ?)
 	ON CONFLICT(key) DO UPDATE SET payload = excluded.payload, updated_at = excluded.updated_at`,
-		sqliteSnapshotKey,
-		string(payload),
-		nowString(),
-	)
-	if err != nil {
-		_ = tx.Rollback()
-		s.lastErr = fmt.Errorf("write sqlite store snapshot: %w", err)
-		return s.lastErr
+			sqliteSnapshotKey,
+			string(payload),
+			nowString(),
+		)
+		if err != nil {
+			_ = tx.Rollback()
+			s.lastErr = fmt.Errorf("write sqlite store snapshot: %w", err)
+			return s.lastErr
+		}
 	}
 	if err := deltaSQLiteRows(tx, s.lastSnapshot, snapshot); err != nil {
 		_ = tx.Rollback()
@@ -224,8 +271,29 @@ func (s *SQLiteStore) syncPersist() error {
 		return s.lastErr
 	}
 	s.lastSnapshot = cloneFileSnapshot(snapshot)
+	// The commit above durably carries the rows delta in the same transaction
+	// as the payload. Once the snapshot has content, the rows table holds the
+	// full store (delta chains start from the zero lastSnapshot that load
+	// left behind), so the legacy payload is no longer needed as a fallback.
+	// Empty stores never flip: their persists stay cheap either way and no
+	// stale fallback can be stranded.
+	if sqliteSnapshotHasContent(snapshot) {
+		s.rowsSeeded = true
+	}
 	s.lastErr = nil
 	return nil
+}
+
+// sqliteSnapshotHasContent reports whether any durable collection carries at
+// least one entry (settings-only state counts via the settings row written
+// by deltaSQLiteSettingsRow and is intentionally not part of this check:
+// settings cannot exist without a persist that also seeds entity rows).
+func sqliteSnapshotHasContent(snap fileSnapshot) bool {
+	return len(snap.Projects) > 0 || len(snap.Threads) > 0 || len(snap.Runs) > 0 ||
+		len(snap.Items) > 0 || len(snap.Pins) > 0 || len(snap.Diffs) > 0 ||
+		len(snap.Artifacts) > 0 || len(snap.Previews) > 0 ||
+		len(snap.AgentProfiles) > 0 || len(snap.UserProfiles) > 0 ||
+		len(snap.Checkpoints) > 0
 }
 
 // ── Row load, delta, relational-projection, and filesystem helpers ──

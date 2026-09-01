@@ -41,9 +41,33 @@ func applySQLiteRow(snapshot *fileSnapshot, kind, id, payload string) error {
 		return applySQLiteEntityRow(&snapshot.AgentProfiles, &snapshot.AgentProfileOrder, id, payload, "agent_profile")
 	case sqliteRowKindUserProfile:
 		return applySQLiteEntityRow(&snapshot.UserProfiles, &snapshot.UserProfileOrder, id, payload, "user_profile")
+	case sqliteRowKindSettings:
+		var row sqliteSettingsRow
+		if err := decodeSQLiteRowPayload(payload, &row); err != nil {
+			return fmt.Errorf("decode sqlite settings row %s: %w", id, err)
+		}
+		if row.Values == nil {
+			row.Values = map[string]string{}
+		}
+		snapshot.Settings = row.Values
+		snapshot.SettingsMtime = row.Mtime
+		return nil
+	case sqliteRowKindCheckpoint:
+		// Checkpoints are an unordered map; the row-order list is discarded.
+		var discardedOrder []string
+		return applySQLiteEntityRow(&snapshot.Checkpoints, &discardedOrder, id, payload, "checkpoint")
 	default:
 		return fmt.Errorf("unknown sqlite store row kind %s", kind)
 	}
+}
+
+// sqliteSettingsRow is the single-row encoding of user settings in
+// agenthub_store_rows (kind "settings", row_id sqliteSnapshotKey). The row is
+// always kept once written — even for empty settings — so its presence can
+// serve as the "rows layer is post-migration" marker during load.
+type sqliteSettingsRow struct {
+	Values map[string]string `json:"values"`
+	Mtime  string            `json:"mtime"`
 }
 
 // applySQLiteEntityRow decodes one row payload, upserts it into the snapshot map,
