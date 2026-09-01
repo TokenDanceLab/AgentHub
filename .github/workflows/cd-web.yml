@@ -95,6 +95,3 @@ jobs:
             $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
             ${{ env.IMAGE_NAME }}:sha-${{ github.sha }}-amd64 \
             ${{ env.IMAGE_NAME }}:sha-${{ github.sha }}-arm64
-
-      - name: Inspect image
-        run: docker buildx imagetools inspect ${{ env.IMAGE_NAME }}:sha-${{ github.sha }}
