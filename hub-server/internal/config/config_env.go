@@ -1,7 +1,9 @@
 package config
 
 import (
+	"log/slog"
 	"os"
+	"strconv"
 	"strings"
 )
 
@@ -104,4 +106,23 @@ func AuthFailClosed() bool {
 	default:
 		return AuthFailClosedDefault // false
 	}
+}
+
+// MaxCloudEdgeDevicesPerUser returns the per-user cap on cloud_edge device
+// registrations enforced by the device service. Controlled by the
+// AGENTHUB_MAX_CLOUD_EDGE_DEVICES environment variable; unset, empty, or
+// unparsable values fall back to DefaultMaxCloudEdgeDevicesPerUser (with a
+// warning log for unparsable values). A value <= 0 disables the cap.
+func MaxCloudEdgeDevicesPerUser() int {
+	value := strings.TrimSpace(os.Getenv("AGENTHUB_MAX_CLOUD_EDGE_DEVICES"))
+	if value == "" {
+		return DefaultMaxCloudEdgeDevicesPerUser
+	}
+	n, err := strconv.Atoi(value)
+	if err != nil {
+		slog.Warn("invalid AGENTHUB_MAX_CLOUD_EDGE_DEVICES, using default",
+			"value", value, "default", DefaultMaxCloudEdgeDevicesPerUser)
+		return DefaultMaxCloudEdgeDevicesPerUser
+	}
+	return n
 }

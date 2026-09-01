@@ -102,6 +102,15 @@ var (
 	DocNotFound       = New("doc_not_found", "document not found", http.StatusNotFound)
 	DocAlreadyDeleted = New("doc_already_deleted", "document already deleted", http.StatusBadRequest)
 
+	// DeviceLimitExceeded is returned when an authenticated user already owns
+	// the maximum number of cloud_edge devices (config.MaxCloudEdgeDevicesPerUser)
+	// and tries to register a brand-new device_id. Re-registering an owned
+	// device_id (upsert refresh) is NOT blocked. HTTP 403, not 429: this is a
+	// stored-quota denial for a valid credential, not a time-based rate limit,
+	// so Retry-After would be meaningless (api/conventions.md reserves 429 for
+	// rate_limited / ws_rate_limited).
+	DeviceLimitExceeded = New("device_limit_exceeded", "cloud edge device limit exceeded for this user", http.StatusForbidden)
+
 	ErrUnauthorized = sharederr.ErrUnauthorized
 	ErrForbidden    = sharederr.ErrForbidden
 )

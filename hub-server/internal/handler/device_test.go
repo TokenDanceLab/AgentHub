@@ -279,3 +279,66 @@ func containsClaimString(values jwt.ClaimStrings, want string) bool {
 	}
 	return false
 }
+
+// TestDeviceHandler_Register_DeviceLimitExceeded verifies the service-layer
+// cloud_edge quota error surfaces unchanged through the handler: HTTP 403
+// (stored-quota denial for a valid credential, not a time-based 429) with
+// envelope code device_limit_exceeded.
+func TestDeviceHandler_Register_DeviceLimitExceeded(t *testing.T) {
+	svc := &mockDeviceService{registerFn: func(ctx context.Context, deviceID, userID, deviceType, appVersion string, capabilities []string) (*model.Device, error) {
+		return nil, errcode.DeviceLimitExceeded
+	}}
+	h := handler.NewDeviceHandler(svc)
+
+	c, w := newGinCtx("POST", "/edge/devices/register", map[string]any{
+		"device_id":   testDeviceID,
+		"app_version": "1.0.0",
+	}, "user_id", "u1", "device_type", "desktop")
+	h.Register(c)
+
+	if w.Code != 403 {
+		t.Fatalf("expected 403, got %d: %s", w.Code, w.Body.String())
+	}
+	var resp struct {
+		Error struct {
+			Code    string `json:"code"`
+			Message string `json:"message"`
+		} `json:"error"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+	if resp.Error.Code != "device_limit_exceeded" {
+		t.Fatalf("expected device_limit_exceeded, got %s", resp.Error.Code)
+	}
+}
+
+func TestDeviceHandler_CloudEdgeRegister_DeviceLimitExceeded(t *testing.T) {
+	svc := &mockDeviceService{registerFn: func(ctx context.Context, deviceID, userID, deviceType, appVersion string, capabilities []string) (*model.Device, error) {
+		return nil, errcode.DeviceLimitExceeded
+	}}
+	h := handler.NewDeviceHandler(svc)
+	h.SetJWTConfig("test-secret-for-cloud-edge-jwt-signing", time.Hour)
+
+	c, w := newGinCtx("POST", "/cloud/edge/register", map[string]any{
+		"device_id":   testDeviceID,
+		"app_version": "1.0.0",
+	}, "user_id", "u1", "device_type", "web")
+	h.CloudEdgeRegister(c)
+
+	if w.Code != 403 {
+		t.Fatalf("expected 403, got %d: %s", w.Code, w.Body.String())
+	}
+	var resp struct {
+		Error struct {
+			Code    string `json:"code"`
+			Message string `json:"message"`
+		} `json:"error"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+	if resp.Error.Code != "device_limit_exceeded" {
+		t.Fatalf("expected device_limit_exceeded, got %s", resp.Error.Code)
+	}
+}

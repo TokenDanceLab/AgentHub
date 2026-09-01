@@ -211,8 +211,10 @@ func SetupRoutes(r *gin.Engine, cfg *config.Config, authMW *middleware.AuthMiddl
 	// Per-IP frequency limit: AuthRegisterRateLimit (3) requests per
 	// AuthRateLimitWindow, keyed by client IP — same shape as /client/auth
 	// login/register limits. Non-auth path semantics apply on Redis outage:
-	// AGENTHUB_RATE_LIMIT_FAIL_OPEN (default fail-open). Per-user device
-	// count cap is NOT enforced here (tracked as follow-up).
+	// AGENTHUB_RATE_LIMIT_FAIL_OPEN (default fail-open). The per-user device
+	// count cap is enforced in the device service (cloud_edge quota,
+	// AGENTHUB_MAX_CLOUD_EDGE_DEVICES) and rejects new device_ids with 403
+	// device_limit_exceeded once the cap is reached.
 	cloud := r.Group("/cloud")
 	cloud.Use(authMW.Handler())
 	cloud.Use(authMW.RequireHubSession())
