@@ -76,6 +76,9 @@ func runRefreshFailClosedCase(t *testing.T, failClosedEnv string, blacklisted bo
 	// policy. Revoke the old row, then upsert the new refresh token.
 	expectedRotation := (!outage && !blacklisted) || (outage && failClosedEnv == "")
 	if expectedRotation {
+		mock.ExpectExec(sqlClaimRT).
+			WithArgs(true, tokenHash, false).
+			WillReturnResult(sqlmock.NewResult(0, 1))
 		mock.ExpectExec(sqlRevokeByDevice).
 			WithArgs(true, "user-uuid", "dev-1").
 			WillReturnResult(sqlmock.NewResult(0, 1))
@@ -172,6 +175,9 @@ func TestRefreshBlacklistCheckErrorsCounter(t *testing.T) {
 			AddRow("rt-1", "user-uuid", "desktop", "dev-1", tokenHash, false, expiry))
 
 	// Expect rotation (fail-open default).
+	mock.ExpectExec(sqlClaimRT).
+		WithArgs(true, tokenHash, false).
+		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectExec(sqlRevokeByDevice).
 		WithArgs(true, "user-uuid", "dev-1").
 		WillReturnResult(sqlmock.NewResult(0, 1))

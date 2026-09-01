@@ -18,6 +18,9 @@ import (
 
 	"github.com/agenthub/hub-server/internal/cache"
 	"github.com/agenthub/hub-server/internal/config"
+	"github.com/agenthub/hub-server/internal/errcode"
+	"github.com/agenthub/hub-server/internal/metrics"
+	"github.com/prometheus/client_golang/prometheus/testutil"
 )
 
 func newMockDB(t *testing.T) (*gorm.DB, sqlmock.Sqlmock, *sql.DB) {
@@ -64,7 +67,8 @@ const (
 	sqlRTByUserDevice = `FROM "refresh_tokens" WHERE user_id`
 	sqlRTByHash       = `FROM "refresh_tokens" WHERE token_hash`
 	sqlInsertRT       = `INSERT INTO "refresh_tokens"`
-	sqlRevokeByDevice = `UPDATE "refresh_tokens" SET "revoked"` // + WHERE user_id ... AND device_id
+	sqlRevokeByDevice = `UPDATE "refresh_tokens" SET "revoked"=$1 WHERE user_id`    // device-wide revoke (Logout / rotation step 2)
+	sqlClaimRT        = `UPDATE "refresh_tokens" SET "revoked"=$1 WHERE token_hash` // rotation step 1 atomic claim (#2154)
 	sqlUpdateUser     = `UPDATE "users" SET`
 )
 
@@ -110,6 +114,11 @@ func TestRefreshToken_Success(t *testing.T) {
 		WillReturnRows(sqlmock.NewRows([]string{"id", "user_id", "device_type", "device_id", "token_hash", "revoked", "expires_at"}).
 			AddRow("rt-1", "user-uuid", "desktop", "dev-1", "hash", false, expiry))
 
+	// Rotation step 1: atomic claim on the presented row (#2154).
+	mock.ExpectExec(sqlClaimRT).
+		WithArgs(true, sqlmock.AnyArg(), false).
+		WillReturnResult(sqlmock.NewResult(0, 1))
+
 	// Revoke old token
 	mock.ExpectExec(sqlRevokeByDevice).
 		WithArgs(true, "user-uuid", "dev-1").
@@ -144,6 +153,10 @@ func TestRefreshToken_RotatesWithCache(t *testing.T) {
 		WithArgs(sqlmock.AnyArg(), 1).
 		WillReturnRows(sqlmock.NewRows([]string{"id", "user_id", "device_type", "device_id", "token_hash", "revoked", "expires_at"}).
 			AddRow("rt-1", "user-uuid", "web", "dev-web", "oldhash", false, expiry))
+
+	mock.ExpectExec(sqlClaimRT).
+		WithArgs(true, sqlmock.AnyArg(), false).
+		WillReturnResult(sqlmock.NewResult(0, 1))
 
 	mock.ExpectExec(sqlRevokeByDevice).
 		WithArgs(true, "user-uuid", "dev-web").
@@ -415,5 +428,38 @@ func TestUpdateProfile_NilCacheDoesNotPanic(t *testing.T) {
 	user, err := svc.UpdateProfile(context.Background(), "user-uuid", "New Name", "https://img.com/a.png")
 	require.NoError(t, err)
 	assert.Equal(t, "New Name", user.Nickname)
+	assert.NoError(t, mock.ExpectationsWereMet())
+}
+
+// TestRefreshToken_ConcurrentRotationLosesClaim proves the #2154 atomic-claim
+// gate at the SQL level: when the conditional claim UPDATE affects 0 rows (a
+// concurrent presenter already rotated this hash), the refresh is rejected as
+// reuse, the F2 counter increments, and NO device-wide revoke/upsert SQL runs
+// (exhausted expectations below).
+func TestRefreshToken_ConcurrentRotationLosesClaim(t *testing.T) {
+	metrics.Register()
+
+	db, mock, sqlDB := newMockDB(t)
+	defer sqlDB.Close()
+
+	expiry := time.Now().Add(24 * time.Hour)
+	mock.ExpectQuery(sqlRTByHash).
+		WithArgs(sqlmock.AnyArg(), 1).
+		WillReturnRows(sqlmock.NewRows([]string{"id", "user_id", "device_type", "device_id", "token_hash", "revoked", "expires_at"}).
+			AddRow("rt-1", "user-uuid", "desktop", "dev-1", "hash", false, expiry))
+
+	// Claim loses the race: RowsAffected = 0.
+	mock.ExpectExec(sqlClaimRT).
+		WithArgs(true, sqlmock.AnyArg(), false).
+		WillReturnResult(sqlmock.NewResult(0, 0))
+
+	before := testutil.ToFloat64(metrics.RefreshTokenReuseTotal)
+
+	svc := NewService(db, jwtCfg(), nil)
+	resp, err := svc.RefreshToken(context.Background(), "raced-refresh-token")
+	assert.Nil(t, resp)
+	assert.ErrorIs(t, err, errcode.AuthRefreshInvalid)
+	assert.InDelta(t, 1, testutil.ToFloat64(metrics.RefreshTokenReuseTotal)-before, 0,
+		"a lost claim race must count as refresh-token reuse")
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
