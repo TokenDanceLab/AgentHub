@@ -67,6 +67,7 @@ export type {
   HubAgentTeamAssignment,
   HubAgentTeamTask,
   HubAgentTeamEvent,
+  HubTeamEventsPage,
   HubTeamMemberState,
   HubTeamTaskState,
   HubTeamAssignmentState,

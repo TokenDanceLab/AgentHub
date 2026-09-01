@@ -99,8 +99,46 @@ func AppendTeamEvent(db *gorm.DB, event *model.AgentTeamEvent) error {
 // team runs (1000 events = ~1-2 MB payload).
 const maxTeamEventsPerRun = 10000
 
-func ListTeamEventsByRun(db *gorm.DB, teamRunID string) ([]model.AgentTeamEvent, error) {
+// TeamEventsPage is one cursor-paginated window over a run's append-only
+// events (#2154 perf lane). The cursor is the run-local event seq; pass
+// NextSeq back as afterSeq to fetch the following window.
+type TeamEventsPage struct {
+	Items   []model.AgentTeamEvent
+	NextSeq int
+	HasMore bool
+}
+
+// ListTeamEventsByRunPage returns events with seq > afterSeq ordered by
+// (seq, created_at), bounded by limit. It fetches limit+1 rows to compute
+// HasMore without a second COUNT query; limit is capped at
+// maxTeamEventsPerRun.
+func ListTeamEventsByRunPage(db *gorm.DB, teamRunID string, afterSeq, limit int) (TeamEventsPage, error) {
+	if limit <= 0 {
+		limit = maxTeamEventsPerRun
+	}
+	if limit > maxTeamEventsPerRun {
+		limit = maxTeamEventsPerRun
+	}
 	var events []model.AgentTeamEvent
-	err := db.Where("team_run_id = ?", teamRunID).Order("seq ASC, created_at ASC").Limit(maxTeamEventsPerRun).Find(&events).Error
-	return events, err
+	err := db.Where("team_run_id = ? AND seq > ?", teamRunID, afterSeq).
+		Order("seq ASC, created_at ASC").
+		Limit(limit + 1).
+		Find(&events).Error
+	if err != nil {
+		return TeamEventsPage{}, err
+	}
+	page := TeamEventsPage{Items: events}
+	if len(events) > limit {
+		page.HasMore = true
+		page.Items = events[:limit]
+	}
+	if len(page.Items) > 0 {
+		page.NextSeq = page.Items[len(page.Items)-1].Seq
+	}
+	return page, nil
+}
+
+func ListTeamEventsByRun(db *gorm.DB, teamRunID string) ([]model.AgentTeamEvent, error) {
+	page, err := ListTeamEventsByRunPage(db, teamRunID, 0, maxTeamEventsPerRun)
+	return page.Items, err
 }

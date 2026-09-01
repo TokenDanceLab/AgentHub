@@ -2,9 +2,11 @@ package handler
 
 import (
 	"errors"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
 
+	"github.com/agenthub/hub-server/internal/config"
 	"github.com/agenthub/hub-server/internal/errcode"
 	"github.com/agenthub/hub-server/internal/model"
 )
@@ -108,11 +110,26 @@ func (h *AgentTeamHandler) ListTeamTasks(c *gin.Context) {
 }
 
 // ListTeamEvents GET /web/agent-teams/:id/runs/:run_id/events
+// Cursor pagination (#2154 perf lane): afterSeq is the seq of the last seen
+// event; the response page.nextCursor carries the seq to pass next.
 func (h *AgentTeamHandler) ListTeamEvents(c *gin.Context) {
 	userID := c.GetString("user_id")
 	teamID := c.Param("id")
 	runID := c.Param("run_id")
-	events, err := h.service.ListTeamEvents(c.Request.Context(), userID, teamID, runID)
+
+	afterSeq, _ := strconv.Atoi(c.DefaultQuery("afterSeq", "0"))
+	if afterSeq < 0 {
+		afterSeq = 0
+	}
+	pageSize, _ := strconv.Atoi(c.DefaultQuery("pageSize", strconv.Itoa(config.DefaultPaginationLimit)))
+	if pageSize <= 0 {
+		pageSize = config.DefaultPaginationLimit
+	}
+	if pageSize > config.MaxPageLimit {
+		pageSize = config.MaxPageLimit
+	}
+
+	page, err := h.service.ListTeamEvents(c.Request.Context(), userID, teamID, runID, afterSeq, pageSize)
 	if err != nil {
 		var e *errcode.Error
 		if errors.As(err, &e) {
@@ -122,7 +139,10 @@ func (h *AgentTeamHandler) ListTeamEvents(c *gin.Context) {
 		Fail(c, errcode.ErrInternal)
 		return
 	}
-	OK(c, events)
+	OK(c, gin.H{
+		"items": page.Items,
+		"page":  gin.H{"nextCursor": strconv.Itoa(page.NextSeq), "hasMore": page.HasMore},
+	})
 }
 
 // HandleRouteDecision POST /web/agent-teams/:id/runs/:run_id/route-decisions
