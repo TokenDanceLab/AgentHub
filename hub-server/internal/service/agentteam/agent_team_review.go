@@ -55,33 +55,40 @@ func (s *AgentTeamService) ReviewDagPlan(ctx context.Context, userID, runID stri
 		state.Changes = []model.HumanReviewChange{}
 	}
 
+	// Atomically claim the pending_review run before any side effects. The
+	// conditional status write folds the :status-check + status-write into one
+	// CAS, so concurrent or repeated decisions cannot both pass the guard
+	// above and then double-cancel assignments / double-append the
+	// review-decided event. The loser sees the same ErrBadRequest as the
+	// stale-status guard above.
+	claimed, err := repository.UpdateTeamRunStatusIf(s.db, runID,
+		model.TeamRunStatusPendingReview, model.TeamRunStatusRunning)
+	if err != nil {
+		return nil, err
+	}
+	if claimed == 0 {
+		return nil, errcode.ErrBadRequest
+	}
+
 	switch decision.Action {
 	case model.ReviewActionApprove:
-		// Accept the plan: set run back to running so dispatch can proceed.
-		if err := repository.UpdateTeamRunStatus(s.db, runID, model.TeamRunStatusRunning); err != nil {
-			return nil, err
-		}
+		// Accept the plan: run already claimed back to running above.
 		state.Comment = firstNonEmptyString(state.Comment, "approved")
 
 	case model.ReviewActionDiscuss:
-		// Reject for discussion: cancel pending assignments, set run back to
-		// running so the supervisor can generate a new plan with the feedback.
+		// Reject for discussion: cancel pending assignments so the supervisor
+		// can generate a new plan with the feedback.
 		if err := s.cancelPendingAssignmentsForReview(runID, decision.Comment); err != nil {
-			return nil, err
-		}
-		if err := repository.UpdateTeamRunStatus(s.db, runID, model.TeamRunStatusRunning); err != nil {
+			s.releaseReviewClaim(runID)
 			return nil, err
 		}
 		state.Comment = firstNonEmptyString(state.Comment, "returned for discussion")
 
 	case model.ReviewActionModify:
-		// Reject with modification notes: cancel pending assignments, set run
-		// back to running. The supervisor should incorporate the changes into
-		// a new route decision.
+		// Reject with modification notes: cancel pending assignments; the
+		// supervisor should incorporate the changes into a new route decision.
 		if err := s.cancelPendingAssignmentsForReview(runID, decision.Comment); err != nil {
-			return nil, err
-		}
-		if err := repository.UpdateTeamRunStatus(s.db, runID, model.TeamRunStatusRunning); err != nil {
+			s.releaseReviewClaim(runID)
 			return nil, err
 		}
 		state.Comment = firstNonEmptyString(state.Comment, "returned with modifications")
@@ -94,6 +101,16 @@ func (s *AgentTeamService) ReviewDagPlan(ctx context.Context, userID, runID stri
 
 	s.recordTeamAudit(ctx, auditActionReviewDecide, runID, userID, auditOutcomeSuccess, "")
 	return state, nil
+}
+
+// releaseReviewClaim returns a claimed run from running back to pending_review
+// when post-claim side effects fail, preserving the pre-CAS retry semantics
+// (the reviewer can try again). The conditional write never clobbers a run
+// that has since moved on (e.g. reached a terminal status); failures are
+// swallowed because the caller is already returning the primary error.
+func (s *AgentTeamService) releaseReviewClaim(runID string) {
+	_, _ = repository.UpdateTeamRunStatusIf(s.db, runID,
+		model.TeamRunStatusRunning, model.TeamRunStatusPendingReview)
 }
 
 // cancelPendingAssignmentsForReview marks all pending assignments for a run as
