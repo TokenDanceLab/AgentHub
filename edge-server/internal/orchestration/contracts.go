@@ -196,3 +196,8 @@ type ctxKey string
 
 // CtxBudgetKey is the context key for a *runnerctx.ContextBudget.
 const CtxBudgetKey ctxKey = "agenthub-budget"
+
+// CtxModelKey is the context key for the per-run model override (string).
+// The lifecycle executor injects it into the parser context so adapters
+// (orchestrator) read the model of their own run instead of shared state.
+const CtxModelKey ctxKey = "agenthub-model"

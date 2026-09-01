@@ -29,6 +29,7 @@ type SubAgentSpawner = orchestration.SubAgentSpawner
 type RunProcessContext = orchestration.RunProcessContext
 
 const CtxBudgetKey = orchestration.CtxBudgetKey
+const CtxModelKey = orchestration.CtxModelKey
 
 // Bus event type strings（与 orchestration 完全一致，防双 SSOT）。
 const (
