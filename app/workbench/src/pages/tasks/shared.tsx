@@ -12,10 +12,7 @@ import {
 } from '../../designIcons';
 import styles from '../TasksPage.module.css';
 import type { TasksPane, ViewMode } from './types';
-import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
-import { CHATVIEW_I18N_NAMESPACE } from '@shared/chatview/i18n/resources';
-import { SHARED_WORKBENCH_I18N_NAMESPACE } from '@shared/i18n';
 
 // ── Nav definitions ──
 
@@ -87,28 +84,5 @@ export function StatCard({ label, value }: { label: string; value: number }) {
       <span className={styles.statLabel}>{label}</span>
       <strong className={styles.statValue}>{value}</strong>
     </article>
-  );
-}
-
-export function TaskNavMenu({ open }: { open: boolean }) {
-  const { t } = useTranslation(SHARED_WORKBENCH_I18N_NAMESPACE);
-  const { t: tc } = useTranslation(CHATVIEW_I18N_NAMESPACE);
-  if (!open) return null;
-
-  return (
-    <div className={styles.navMenu} role="menu" aria-label={tc("aria.taskMoreMenu")}>
-      <button type="button" role="menuitem">
-        <DesignNavIcon name="fileText" size={14} />
-        {t('tasks.importTasks')}
-      </button>
-      <button type="button" role="menuitem">
-        <DesignNavIcon name="folder" size={14} />
-        {t('tasks.exportView')}
-      </button>
-      <button type="button" role="menuitem">
-        <DesignNavIcon name="settings" size={14} />
-        {t('tasks.manageFields')}
-      </button>
-    </div>
   );
 }
