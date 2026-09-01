@@ -144,6 +144,17 @@ const RateLimitFailOpenDefault = true
 // (post-logout) back into the product APIs.
 const AuthFailClosedDefault = false
 
+// ── Device quotas ────────────────────────────────────────────────────────────
+
+// DefaultMaxCloudEdgeDevicesPerUser caps how many cloud_edge device rows a
+// single user may own. Route-level rate limiting (#2185) bounds request
+// frequency; this quota bounds stored device rows, since callers choose their
+// own device_id UUIDs and could otherwise register unbounded cloud_edge
+// devices. Re-registering an already-owned device_id (upsert refresh) is not
+// blocked by the cap. Override with AGENTHUB_MAX_CLOUD_EDGE_DEVICES; a value
+// <= 0 disables the cap.
+const DefaultMaxCloudEdgeDevicesPerUser = 50
+
 // ── Messaging ────────────────────────────────────────────────────────────────
 
 // MessageRecallWindow is the non-owner recall window for messages.

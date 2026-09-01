@@ -345,3 +345,80 @@ func TestCloudEdgeRegisterRateLimitedByIP(t *testing.T) {
 		t.Fatalf("different IP = %d, want %d; body=%q", w.Code, http.StatusOK, w.Body.String())
 	}
 }
+
+// TestEdgeDeviceRegisterRateLimitedByIP verifies the round-44 follow-up to
+// #2185: POST /edge/devices/register sits behind middleware.RateLimit keyed
+// by client IP (AuthRegisterRateLimit per AuthRateLimitWindow), matching the
+// /cloud/edge/register shape. The route chain is authMW → RequireHubSession →
+// DeviceTypeCheck("desktop") → limiter → handler, so the test mints a real
+// desktop JWT whose device_id claim matches the request body (handler
+// cross-validates them). Requests 1–3 must reach the stub service (200), the
+// 4th within the window must get 429 + Retry-After, and a different client IP
+// must still pass (rate-limit key is the IP dimension).
+func TestEdgeDeviceRegisterRateLimitedByIP(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	mr, err := miniredis.Run()
+	if err != nil {
+		t.Fatalf("miniredis: %v", err)
+	}
+	t.Cleanup(mr.Close)
+	metrics.Register()
+
+	// #nosec G101 -- 测试专用固定 JWT secret（非真实凭据）
+	const jwtSecret = "router-edge-rl-test-secret"
+	cfg := &config.Config{JWT: config.JWTConfig{Secret: jwtSecret}}
+
+	deviceHandler := handler.NewDeviceHandler(routerDeviceServiceStub{})
+
+	r := gin.New()
+	if err := SetupRoutes(
+		r,
+		cfg,
+		middleware.NewAuthMiddleware(cfg, middleware.AuthDependencies{}, nil),
+		jwtSecret,
+		cache.NewClient(redis.NewClient(&redis.Options{Addr: mr.Addr()})),
+		nil, nil,
+		deviceHandler,
+		nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil,
+	); err != nil {
+		t.Fatal(err)
+	}
+
+	// device_type=desktop passes DeviceTypeCheck; device_id claim must equal
+	// the body device_id or the handler rejects with 400 before the service.
+	const deviceID = "7b1f9c62-4e8a-4d37-9c1e-5f2a8b6d0e42"
+	token, err := jwtutil.GenerateAccessToken("user-1", "desktop", deviceID, jwtSecret, time.Hour)
+	if err != nil {
+		t.Fatalf("mint hub-local token: %v", err)
+	}
+	body := `{"device_id":"` + deviceID + `","app_version":"9.9.9"}`
+
+	doRegister := func(remoteAddr string) *httptest.ResponseRecorder {
+		req := httptest.NewRequest(http.MethodPost, "/edge/devices/register", strings.NewReader(body))
+		req.RemoteAddr = remoteAddr
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Authorization", "Bearer "+token)
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+		return w
+	}
+
+	for i := 1; i <= config.AuthRegisterRateLimit; i++ {
+		w := doRegister("10.41.0.1:3333")
+		if w.Code != http.StatusOK {
+			t.Fatalf("request %d/%d = %d, want %d; body=%q", i, config.AuthRegisterRateLimit, w.Code, http.StatusOK, w.Body.String())
+		}
+	}
+
+	w := doRegister("10.41.0.1:3333")
+	if w.Code != http.StatusTooManyRequests {
+		t.Fatalf("request %d = %d, want %d; body=%q", config.AuthRegisterRateLimit+1, w.Code, http.StatusTooManyRequests, w.Body.String())
+	}
+	if ra := w.Header().Get("Retry-After"); ra == "" {
+		t.Fatal("429 response missing Retry-After header")
+	}
+
+	if w := doRegister("10.41.0.2:3333"); w.Code != http.StatusOK {
+		t.Fatalf("different IP = %d, want %d; body=%q", w.Code, http.StatusOK, w.Body.String())
+	}
+}
