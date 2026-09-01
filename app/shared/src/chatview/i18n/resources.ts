@@ -561,7 +561,7 @@ export const chatviewResources = {
     'profile.type': '类型',
 
     // ═══ Navigation ═══
-    'nav.chat': '对话',
+    'nav.chat': '会话',
     'nav.contacts': '联系人',
     'nav.docs': '云文档',
     'nav.tasks': '任务',
@@ -671,7 +671,7 @@ export const chatviewResources = {
     'shortcut.group.workspace': '工作区',
     'shortcut.newThread': '新建当前 Runtime 会话',
     'shortcut.newThread.detail': '创建真实 Edge thread 并绑定当前 Runtime',
-    'shortcut.quickChat': '快速新建对话',
+    'shortcut.quickChat': '快速新建会话',
     'shortcut.quickChat.detail': '新建会话并聚焦输入框',
     'shortcut.search': '搜索消息',
     'shortcut.search.detail': '打开消息和会话搜索',
