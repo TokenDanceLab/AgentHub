@@ -3847,6 +3847,8 @@ paths:
                     $ref: "#/components/schemas/Device"
         "400":
           $ref: "#/components/responses/Error"
+        "429":
+          $ref: "#/components/responses/Error"
 
   /cloud/edge/register:
     post:
@@ -3860,7 +3862,11 @@ paths:
         as `cloud_edge` under the authenticated Hub user and returns an
         Edge-scoped JWT with `iss=agenthub-hub`, `aud=agenthub-edge`,
         `purpose=edge-api`, `device_type=edge`, and the registered `device_id`
-        for Edge API authentication.
+        for Edge API authentication. Per-user quota: once the authenticated
+        user owns AGENTHUB_MAX_CLOUD_EDGE_DEVICES (default 50) cloud_edge
+        devices, registering a brand-new device_id fails with 403
+        `device_limit_exceeded`; re-registering an already-owned device_id
+        (upsert refresh) is not blocked.
       x-agenthub-status: implemented
       x-agenthub-owner: Hub
       security: [{ bearerAuth: [] }]
@@ -3910,6 +3916,10 @@ paths:
         "400":
           $ref: "#/components/responses/Error"
         "401":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "429":
           $ref: "#/components/responses/Error"
 
   /web/agent-tasks/{id}/cancel:

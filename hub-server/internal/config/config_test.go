@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -1186,6 +1187,37 @@ func TestAuthFailClosed(t *testing.T) {
 			t.Setenv("AGENTHUB_AUTH_FAIL_CLOSED", v)
 			if AuthFailClosed() {
 				t.Errorf("AuthFailClosed() = true for env value %q, want false", v)
+			}
+		}
+	})
+}
+
+func TestMaxCloudEdgeDevicesPerUser(t *testing.T) {
+	t.Run("defaults when env not set", func(t *testing.T) {
+		t.Setenv("AGENTHUB_MAX_CLOUD_EDGE_DEVICES", "")
+		if got := MaxCloudEdgeDevicesPerUser(); got != DefaultMaxCloudEdgeDevicesPerUser {
+			t.Errorf("MaxCloudEdgeDevicesPerUser() = %d, want default %d", got, DefaultMaxCloudEdgeDevicesPerUser)
+		}
+	})
+
+	t.Run("parses valid integers", func(t *testing.T) {
+		for _, v := range []string{"1", "7", "50", " 12 ", "0", "-1"} {
+			t.Setenv("AGENTHUB_MAX_CLOUD_EDGE_DEVICES", v)
+			want, err := strconv.Atoi(strings.TrimSpace(v))
+			if err != nil {
+				t.Fatalf("test input %q must parse: %v", v, err)
+			}
+			if got := MaxCloudEdgeDevicesPerUser(); got != want {
+				t.Errorf("MaxCloudEdgeDevicesPerUser() = %d for env %q, want %d", got, v, want)
+			}
+		}
+	})
+
+	t.Run("falls back to default for unparsable values", func(t *testing.T) {
+		for _, v := range []string{"abc", "12.5", "99999999999999999999"} {
+			t.Setenv("AGENTHUB_MAX_CLOUD_EDGE_DEVICES", v)
+			if got := MaxCloudEdgeDevicesPerUser(); got != DefaultMaxCloudEdgeDevicesPerUser {
+				t.Errorf("MaxCloudEdgeDevicesPerUser() = %d for env %q, want default %d", got, v, DefaultMaxCloudEdgeDevicesPerUser)
 			}
 		}
 	})

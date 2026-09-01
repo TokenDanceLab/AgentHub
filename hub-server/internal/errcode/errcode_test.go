@@ -39,6 +39,7 @@ func TestAllErrorsHaveNonEmptyCode(t *testing.T) {
 		NotifNotFound,
 
 		OIDCInvalidState, OIDCCodeExchangeFailed, OIDCIDTokenInvalid, OIDCSubNotFound,
+		DeviceLimitExceeded,
 		ErrNotImplemented,
 	}
 	for _, e := range all {

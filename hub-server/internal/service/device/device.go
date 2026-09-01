@@ -8,10 +8,15 @@ import (
 
 	"gorm.io/gorm"
 
+	"github.com/agenthub/hub-server/internal/config"
 	"github.com/agenthub/hub-server/internal/errcode"
 	"github.com/agenthub/hub-server/internal/model"
 	"github.com/agenthub/hub-server/internal/repository"
 )
+
+// deviceTypeCloudEdge is the device type registered via POST /cloud/edge/register
+// and subject to the per-user device quota.
+const deviceTypeCloudEdge = "cloud_edge"
 
 // Service encapsulates device business logic, keeping DB access
 // out of the HTTP handler layer.
@@ -33,6 +38,10 @@ func NewService(db *gorm.DB, registrar desktopTargetRegistrar) *Service {
 // The handler layer should not construct model.Device directly — all DB logic
 // lives here.
 func (s *Service) Register(ctx context.Context, deviceID, userID, deviceType, appVersion string, capabilities []string) (*model.Device, error) {
+	if err := s.enforceCloudEdgeQuota(deviceID, userID, deviceType); err != nil {
+		return nil, err
+	}
+
 	capsBytes, _ := json.Marshal(capabilities)
 
 	device := &model.Device{
@@ -58,6 +67,37 @@ func (s *Service) Register(ctx context.Context, deviceID, userID, deviceType, ap
 	}
 
 	return device, nil
+}
+
+// enforceCloudEdgeQuota gates cloud_edge registrations by the per-user cap
+// (config.MaxCloudEdgeDevicesPerUser, AGENTHUB_MAX_CLOUD_EDGE_DEVICES).
+// A value <= 0 disables the cap. Re-registering an already-owned device_id
+// (upsert refresh) is never blocked — only brand-new device rows count
+// against the cap. Frequency abuse is handled separately by the route-level
+// rate limiter (#2185 / round-44).
+func (s *Service) enforceCloudEdgeQuota(deviceID, userID, deviceType string) error {
+	if deviceType != deviceTypeCloudEdge {
+		return nil
+	}
+	limit := config.MaxCloudEdgeDevicesPerUser()
+	if limit <= 0 {
+		return nil
+	}
+	exists, err := repository.DeviceExistsForUser(s.db, deviceID, userID, deviceType)
+	if err != nil {
+		return err
+	}
+	if exists {
+		return nil // upsert refresh of an owned device, not a new registration
+	}
+	count, err := repository.CountDevicesByUserAndType(s.db, userID, deviceType)
+	if err != nil {
+		return err
+	}
+	if count >= int64(limit) {
+		return errcode.DeviceLimitExceeded
+	}
+	return nil
 }
 
 // Get returns a single device by its ID.
