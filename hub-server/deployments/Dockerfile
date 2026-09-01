@@ -8,7 +8,8 @@
 # ═══════════════════════════════════════════════
 # Stage 1: Build
 # ═══════════════════════════════════════════════
-FROM golang:1.26.5-alpine AS builder
+FROM --platform=$BUILDPLATFORM golang:1.26.5-alpine AS builder
+ARG TARGETOS TARGETARCH
 WORKDIR /app
 
 # Layer 1a: Go module cache — workspace config + all go.mod / go.sum
@@ -27,7 +28,7 @@ COPY hub-server ./hub-server
 
 # Build: CGO disabled for fully static binary; -trimpath for
 # reproducible builds; -s -w strips debug info & symbol table.
-RUN cd hub-server && CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o server-hub ./cmd/server-hub
+RUN cd hub-server && CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -trimpath -ldflags="-s -w" -o server-hub ./cmd/server-hub
 
 # ═══════════════════════════════════════════════
 # Stage 2: Runtime
