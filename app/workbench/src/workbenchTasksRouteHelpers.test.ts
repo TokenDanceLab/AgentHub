@@ -53,7 +53,6 @@ describe('workbenchTasksRouteHelpers handlers', () => {
     let taskSortMode: 'custom' | 'due' = 'custom';
     let taskGroupMode: 'custom' | 'project' | 'status' = 'custom';
     let taskShowCreator = true;
-    let taskNavMenuOpen = false;
 
     const access: WorkbenchTasksRouteStateAccessors = {
       translator: t,
@@ -90,9 +89,6 @@ describe('workbenchTasksRouteHelpers handlers', () => {
       setSelectedTaskId: (value) => {
         selectedTaskId = typeof value === 'function' ? value(selectedTaskId) : value;
       },
-      setTaskNavMenuOpen: (value) => {
-        taskNavMenuOpen = typeof value === 'function' ? value(taskNavMenuOpen) : value;
-      },
       setTaskActionLabel: (value) => {
         taskActionLabel = typeof value === 'function' ? value(taskActionLabel) : value;
       },
@@ -128,7 +124,6 @@ describe('workbenchTasksRouteHelpers handlers', () => {
 
     handlers.handleTaskPaneChange('done');
     expect(tasksPane).toBe('done');
-    expect(taskNavMenuOpen).toBe(false);
     expect(taskActionLabel).toBe('已切换到已完成');
 
     handlers.handleTaskSort();
@@ -161,7 +156,6 @@ interface TasksHarnessState {
   taskSortMode: TaskSortMode;
   taskGroupMode: TaskGroupMode;
   taskShowCreator: boolean;
-  taskNavMenuOpen: boolean;
   taskActionLabel: string;
 }
 
@@ -181,7 +175,6 @@ function createTasksHarness(
     taskSortMode: 'custom',
     taskGroupMode: 'custom',
     taskShowCreator: true,
-    taskNavMenuOpen: false,
     taskActionLabel: '',
     ...initial,
   };
@@ -209,7 +202,6 @@ function createTasksHarness(
       setTaskGroupMode: (value) => { state.taskGroupMode = typeof value === 'function' ? value(state.taskGroupMode) : value; },
       setTaskShowCreator: (value) => { state.taskShowCreator = typeof value === 'function' ? value(state.taskShowCreator) : value; },
       setSelectedTaskId: (value) => { state.selectedTaskId = typeof value === 'function' ? value(state.selectedTaskId) : value; },
-      setTaskNavMenuOpen: (value) => { state.taskNavMenuOpen = typeof value === 'function' ? value(state.taskNavMenuOpen) : value; },
       setTaskActionLabel: (value) => { state.taskActionLabel = typeof value === 'function' ? value(state.taskActionLabel) : value; },
       setEditingTaskId: (value) => { state.editingTaskId = typeof value === 'function' ? value(state.editingTaskId) : value; },
       setEditingTaskDraft: (value) => { state.editingTaskDraft = typeof value === 'function' ? value(state.editingTaskDraft) : value; },
@@ -390,15 +382,4 @@ describe('workbenchTasksRouteHandlers — selection plans and chrome', () => {
     expect(state.editingTaskDraft).toBeNull();
   });
 
-  it('handleNavMore toggles the overflow menu and labels it', () => {
-    const { state, build } = createTasksHarness();
-    const handlers = build();
-
-    handlers.handleNavMore();
-    expect(state.taskNavMenuOpen).toBe(true);
-    expect(state.taskActionLabel).toBe('任务更多操作');
-
-    handlers.handleNavMore();
-    expect(state.taskNavMenuOpen).toBe(false);
-  });
 });

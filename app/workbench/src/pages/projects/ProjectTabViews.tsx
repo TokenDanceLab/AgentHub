@@ -10,9 +10,6 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { SHARED_WORKBENCH_I18N_NAMESPACE } from '@shared/i18n';
-import {
-  DesignFileIcon,
-} from '../../designIcons';
 import type { WorkbenchDocumentPreview } from '../../documentPreview';
 import type { WorkbenchProfileSource } from '../../profileRegistry';
 import styles from '../ProjectsPage.module.css';
@@ -126,17 +123,6 @@ export function ArchiveTab({ project }: { project: ProjectInfo }) {
             <em>{item.status}</em>
           </div>
         ))}
-      </section>
-      <section className={`${styles.detailPanel} project-detail-panel`} data-card-surface>
-        <ProjectSectionHead icon="package" title={t("projects.section.archivePackage")} meta="Draft" />
-        <button type="button" className={`${styles.artifactRow} project-artifact`} data-card-surface>
-          <DesignFileIcon className={styles.fileIcon} name={`${project.id}-handoff.md`} type="md" />
-          <span className={styles.artifactName}>{project.id}-handoff.md</span>
-        </button>
-        <button type="button" className={`${styles.artifactRow} project-artifact`} data-card-surface>
-          <DesignFileIcon className={styles.fileIcon} name={`${project.id}-manifest.xlsx`} type="xlsx" />
-          <span className={styles.artifactName}>{project.id}-manifest.xlsx</span>
-        </button>
       </section>
       <ProjectFeedPanel feed={project.feed} />
     </div>

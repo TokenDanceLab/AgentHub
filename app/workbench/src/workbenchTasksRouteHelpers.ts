@@ -116,7 +116,6 @@ export interface WorkbenchTasksRoute {
   taskGroupMode: TaskGroupMode;
   taskShowCreator: boolean;
   selectedTaskId: string | null;
-  taskNavMenuOpen: boolean;
   taskActionLabel: string;
   editingTaskId: string | null;
   editingTaskDraft: TaskEditDraft | null;
@@ -150,7 +149,6 @@ export interface WorkbenchTasksRoute {
   handleGroupBySelectedTaskProject: () => void;
   handleFilterBySelectedTaskAssignee: () => void;
   handleTaskClick: (task: TaskItem) => void;
-  handleNavMore: () => void;
   handleToolbarFieldConfig: () => void;
   handleToolbarFilter: () => void;
 }
@@ -176,7 +174,6 @@ export interface WorkbenchTasksRouteStateAccessors {
   setTaskGroupMode: TasksRouteSetState<TaskGroupMode>;
   setTaskShowCreator: TasksRouteSetState<boolean>;
   setSelectedTaskId: TasksRouteSetState<string | null>;
-  setTaskNavMenuOpen: TasksRouteSetState<boolean>;
   setTaskActionLabel: TasksRouteSetState<string>;
   setEditingTaskId: TasksRouteSetState<string | null>;
   setEditingTaskDraft: TasksRouteSetState<TaskEditDraft | null>;
@@ -201,7 +198,6 @@ export type WorkbenchTasksRouteHandlers = Pick<
   | 'handleGroupBySelectedTaskProject'
   | 'handleFilterBySelectedTaskAssignee'
   | 'handleTaskClick'
-  | 'handleNavMore'
   | 'handleToolbarFieldConfig'
   | 'handleToolbarFilter'
 >;
@@ -227,7 +223,6 @@ export function buildWorkbenchTasksRouteHandlers(
     setTaskGroupMode,
     setTaskShowCreator,
     setSelectedTaskId,
-    setTaskNavMenuOpen,
     setTaskActionLabel,
     setEditingTaskId,
     setEditingTaskDraft,
@@ -241,7 +236,6 @@ export function buildWorkbenchTasksRouteHandlers(
       setSelectedTaskId(plan.selectedTaskId);
       setEditingTaskId(plan.editingTaskId);
       setEditingTaskDraft(plan.editingTaskDraft);
-      setTaskNavMenuOpen(plan.taskNavMenuOpen);
       setTaskActionLabel(plan.taskActionLabel);
     },
     handleCreateTask() {
@@ -266,7 +260,6 @@ export function buildWorkbenchTasksRouteHandlers(
       const plan = planTaskListReset(translator, );
       setTaskViewMode(plan.taskViewMode);
       setTaskGroupMode(plan.taskGroupMode);
-      setTaskNavMenuOpen(plan.taskNavMenuOpen);
       setTaskActionLabel(plan.taskActionLabel);
     },
     handleTaskSort() {
@@ -370,10 +363,6 @@ export function buildWorkbenchTasksRouteHandlers(
         setEditingTaskDraft(null);
       }
       setTaskActionLabel(plan.taskActionLabel);
-    },
-    handleNavMore() {
-      setTaskNavMenuOpen((current) => !current);
-      setTaskActionLabel(translator('tasks.action.navMore'));
     },
     handleToolbarFieldConfig() {
       setTaskShowCreator((current) => {

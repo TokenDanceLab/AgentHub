@@ -64,15 +64,6 @@
   font: 500 0.875rem var(--td-font);
 }
 
-.orgAction {
-  border: 0;
-  background: transparent;
-  color: var(--td-plum);
-  font: 500 0.75rem var(--td-font);
-  cursor: pointer;
-  transition: color var(--td-dur-normal) var(--td-ease);
-}
-
 /* ── Nav rows ── */
 .navRow {
   width: 100%;
@@ -1011,7 +1002,6 @@
 
 @media (prefers-reduced-motion: reduce) {
   .search,
-  .orgAction,
   .navRow,
   .navShortcut,
   .addBtn,
