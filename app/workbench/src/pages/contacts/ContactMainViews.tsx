@@ -241,7 +241,7 @@ export function ContactMain({
         return (
           <ContactListPage
             title={t("contacts.section.internal.title")}
-            subtitle="TokenDance 成员和外部联系人统一从这里添加、确认和发起对话。"
+            subtitle="TokenDance 成员和外部联系人统一从这里添加、确认和发起会话。"
             actionLabel="添加联系人"
             rows={members}
             sectionTitle="TokenDance"

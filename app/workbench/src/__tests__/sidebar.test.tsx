@@ -88,7 +88,7 @@ describe('AgentHubWorkbench', () => {
     expect(shell).toHaveStyle({ '--sidebar-w': '360px' });
     expect(resizer).toHaveAttribute('aria-valuenow', '360');
 
-    fireEvent.click(screen.getByRole('button', { name: '对话' }));
+    fireEvent.click(screen.getByRole('button', { name: '会话' }));
     expect(shell).toHaveAttribute('data-sidebar-collapsed', 'false');
 
     for (let index = 0; index < 5; index += 1) {

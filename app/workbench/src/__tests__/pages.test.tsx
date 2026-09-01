@@ -241,7 +241,7 @@ describe('AgentHubWorkbench', () => {
       />,
     );
 
-    const chatButton = screen.getByRole('button', { name: '对话' });
+    const chatButton = screen.getByRole('button', { name: '会话' });
     const contactsButton = screen.getByRole('button', { name: '联系人' });
     const settingsButton = screen.getByRole('button', { name: '设置' });
     const themeButton = screen.getByRole('button', { name: '切换主题' });
