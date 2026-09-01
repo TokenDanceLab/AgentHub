@@ -44,6 +44,23 @@ func FindRefreshTokenByHash(db *gorm.DB, hash string) (*model.RefreshToken, erro
 	return &rt, nil
 }
 
+// ClaimRefreshTokenForRotation atomically flips the presented token row from
+// live to revoked and reports whether THIS caller won the claim
+// (RowsAffected > 0). Concurrent presentations of the same hash race on this
+// conditional UPDATE: exactly one winner proceeds with rotation; losers get
+// false and must reject as reuse (#2154 database/security lanes). The claim
+// precedes RevokeRefreshTokensByUserDevice/UpsertRefreshToken so the
+// rotation window has no check-then-write gap.
+func ClaimRefreshTokenForRotation(db *gorm.DB, tokenHash string) (bool, error) {
+	result := db.Model(&model.RefreshToken{}).
+		Where("token_hash = ? AND revoked = ?", tokenHash, false).
+		Update("revoked", true)
+	if result.Error != nil {
+		return false, result.Error
+	}
+	return result.RowsAffected > 0, nil
+}
+
 func RevokeRefreshTokensByUserDevice(db *gorm.DB, userID, deviceID string) error {
 	return db.Model(&model.RefreshToken{}).
 		Where("user_id = ? AND device_id = ?", userID, deviceID).
