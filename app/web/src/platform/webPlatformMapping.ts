@@ -42,11 +42,15 @@ export function resolveWebWorkbenchAgents(
   return mapped.length > 0 ? mapped : webAgents;
 }
 
-export function hubSessionToWorkbenchConversation(session: Session): WorkbenchConversation | null {
+type WebTranslate = (key: string, options?: any) => string;
+
+export function hubSessionToWorkbenchConversation(session: Session, t?: WebTranslate): WorkbenchConversation | null {
   const id = session.id ?? session.session_id;
   if (!id) return null;
   const isPrivate = session.type === 'private';
-  const fallbackTitle = isPrivate ? 'Hub 私聊' : 'Hub 群聊';
+  const fallbackTitle = isPrivate
+    ? (t?.('conversations.hubPrivate') ?? 'Hub 私聊')
+    : (t?.('conversations.hubGroup') ?? 'Hub 群聊');
 
   return {
     id,
@@ -86,10 +90,11 @@ export function resolveWebWorkbenchConversations(
   sessions: Session[] | undefined,
   hubAuthenticated: boolean,
   dataMode: WorkbenchDataMode = normalizeWorkbenchDataMode(undefined),
+  t?: WebTranslate,
 ): WorkbenchConversation[] {
   const mapped = hubAuthenticated
     ? (sessions
-        ?.map(hubSessionToWorkbenchConversation)
+        ?.map((session) => hubSessionToWorkbenchConversation(session, t))
         .filter((conversation): conversation is WorkbenchConversation => Boolean(conversation)) ?? [])
     : [];
 

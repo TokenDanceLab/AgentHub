@@ -228,7 +228,7 @@ export function DesktopWorkbenchApp({ onLogout }: DesktopWorkbenchAppProps = {})
   // Narrow domain port for workbench project data (#1546); the shared UI never
   // sees the concrete HubClient. Injected only in live mode — parent-managed
   // projects keep the port dormant while demo mode falls back to mock fixtures.
-  const desktopProjectsPort = useMemo(() => createDesktopWorkbenchProjectsPort(), []);
+  const desktopProjectsPort = useMemo(() => createDesktopWorkbenchProjectsPort(tIm), [tIm]);
   const skillMarketQuery = useQuery({
     queryKey: ['desktop', 'public-skills', hubReady],
     queryFn: () => hubClient.listPublicSkills(),
@@ -256,7 +256,7 @@ export function DesktopWorkbenchApp({ onLogout }: DesktopWorkbenchAppProps = {})
   );
 
   const documents = useMemo<DocRow[] | undefined>(
-    () => (liveEdgeEnabled && documentListData?.items ? documentListData.items.map(hubDocToDocRow) : undefined),
+    () => (liveEdgeEnabled && documentListData?.items ? documentListData.items.map((doc) => hubDocToDocRow(doc, tIm)) : undefined),
     [liveEdgeEnabled, documentListData],
   );
   const documentsError = useMemo(
@@ -623,7 +623,7 @@ export function DesktopWorkbenchApp({ onLogout }: DesktopWorkbenchAppProps = {})
   // query error (aligned with the Web RecoveryPanel contract) and make retry
   // a real refetch instead of a no-op.
   const agentLoadError = liveEdgeEnabled
-    ? agentProfileErrorMessage(profileError ?? hubProfileError)
+    ? agentProfileErrorMessage(profileError ?? hubProfileError, tIm)
     : undefined;
   const agentProfilesStatus = useMemo(() => ({
     loading: liveEdgeEnabled && profileFetching && profileData?.items === undefined,
@@ -720,12 +720,12 @@ export function DesktopWorkbenchApp({ onLogout }: DesktopWorkbenchAppProps = {})
         skillMarketItems={skillMarketItems}
         skillMarketLoading={hubReady && skillMarketQuery.isFetching}
         {...(hubReady && skillMarketQuery.error
-          ? { skillMarketError: desktopMarketErrorMessage(skillMarketQuery.error, 'Skill 市场加载失败') }
+          ? { skillMarketError: desktopMarketErrorMessage(skillMarketQuery.error, tIm('market.skillLoadFailed')) }
           : {})}
         mcpMarketItems={mcpMarketItems}
         mcpMarketLoading={hubReady && mcpMarketQuery.isFetching}
         {...(hubReady && mcpMarketQuery.error
-          ? { mcpMarketError: desktopMarketErrorMessage(mcpMarketQuery.error, 'MCP 市场加载失败') }
+          ? { mcpMarketError: desktopMarketErrorMessage(mcpMarketQuery.error, tIm('market.mcpLoadFailed')) }
           : {})}
         devicesTargets={devicesTargets}
         devicesLoading={devicesTargetsQuery.isFetching && !devicesTargetsQuery.data}
@@ -752,10 +752,10 @@ export function DesktopWorkbenchApp({ onLogout }: DesktopWorkbenchAppProps = {})
 }
 
 /** Extract a user-facing message from an agent-profile query error (#1821). */
-function agentProfileErrorMessage(error: unknown): string | undefined {
+function agentProfileErrorMessage(error: unknown, t?: (key: string) => string): string | undefined {
   if (!error) return undefined;
   if (error instanceof Error && error.message.trim()) return error.message;
-  return 'Agent 配置加载失败';
+  return t?.('agentConfigLoadFailed') ?? 'Agent 配置加载失败';
 }
 
 /** Extract a user-facing message from a market query error (#1821). */

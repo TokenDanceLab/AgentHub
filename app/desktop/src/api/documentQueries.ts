@@ -39,30 +39,34 @@ export function useCreateDocument() {
 
 // ── Mapping ──────────────────────────────────────────────────────
 
-export function hubDocToDocRow(doc: HubDocumentListItem): DocRow {
+type AppTranslate = (key: string, options?: any) => string;
+
+export function hubDocToDocRow(doc: HubDocumentListItem, t?: AppTranslate): DocRow {
   const tag = doc.tag?.trim();
   return {
     id: doc.id,
-    title: doc.title?.trim() || '未命名文档',
+    title: doc.title?.trim() || t?.('documents.unnamed') || '未命名文档',
     ...(tag ? { tag } : {}),
-    location: doc.location?.trim() || '我的文档库',
+    location: doc.location?.trim() || t?.('documents.myLibrary') || '我的文档库',
     owner: doc.owner_id?.trim() || 'Hub',
-    time: formatDocTime(doc.updated_at ?? doc.created_at),
+    time: formatDocTime(doc.updated_at ?? doc.created_at, t),
   };
 }
 
-function formatDocTime(value: string | undefined): string {
+function formatDocTime(value: string | undefined, t?: AppTranslate): string {
   if (!value) return 'Hub';
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
   const now = new Date();
   const diffMs = now.getTime() - date.getTime();
   const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+  const time = `${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
   if (diffDays === 0) {
-    return `今天 ${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
+    return t?.('documents.time.today', { time }) ?? `今天 ${time}`;
   }
   if (diffDays === 1) {
-    return `昨天 ${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
+    return t?.('documents.time.yesterday', { time }) ?? `昨天 ${time}`;
   }
-  return `${date.getMonth() + 1}月${date.getDate()}日 ${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
+  return t?.('documents.time.date', { month: date.getMonth() + 1, day: date.getDate(), time })
+    ?? `${date.getMonth() + 1}月${date.getDate()}日 ${time}`;
 }
