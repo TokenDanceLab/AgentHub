@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { CHATVIEW_I18N_NAMESPACE } from '@shared/chatview/i18n/resources';
+import { SHARED_WORKBENCH_I18N_NAMESPACE } from '@shared/i18n';
 import type { WorkbenchProfileSource } from './profileRegistry';
 import { DesignNavIcon } from './designIcons';
 import { TasksPage } from './pages/TasksPage';
@@ -39,8 +40,10 @@ export function WorkbenchTasksRouteView({
   reviewMergePort,
 }: WorkbenchTasksRouteViewProps): React.ReactElement {
   const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE);
+  const { t: tw } = useTranslation(SHARED_WORKBENCH_I18N_NAMESPACE);
   const model = useMemo(
     () => buildTasksPageDerivedModel({
+      t: tw,
       realDataMode,
       taskFilterActive: tasksRoute.taskFilterActive,
       taskGroupMode: tasksRoute.taskGroupMode,

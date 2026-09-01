@@ -321,7 +321,7 @@ export function ConversationSidebar({
     if (onAvatarClick) {
       items.push({
         icon: 'user',
-        label: '查看资料',
+        label: t('sidebar.viewProfile'),
         onClick: () => {
           const anchor = menuAnchorRef.current;
           if (anchor) onAvatarClick(conversation, anchor);
@@ -331,7 +331,7 @@ export function ConversationSidebar({
     if (onPinConversation) {
       items.push({
         icon: 'pin',
-        label: isPinned ? '取消置顶' : '置顶',
+        label: isPinned ? t('sidebar.unpin') : t('sidebar.pin'),
         onClick: () => onPinConversation(conversation.id, !isPinned),
       });
     }
@@ -422,7 +422,7 @@ export function ConversationSidebar({
         </div>
       )}
       <select
-        aria-label={t('aria.sortConversations') ?? '排序方式'}
+        aria-label={t('aria.sortConversations')}
         className={styles.sidebarSort}
         value={sortBy}
         onChange={(event) => setSortBy(event.target.value as SortBy)}
@@ -628,7 +628,7 @@ export function ConversationSidebar({
                           />
                         )}
                         <span
-                          aria-label={`${conversation.title} 资料卡`}
+                          aria-label={t('sidebar.profileCardAria', { title: conversation.title })}
                           className={`${styles.conversationAvatar} ${onAvatarClick ? styles.conversationAvatarClickable : ''}`}
                           style={{
                             background: conversation.avatarUrl ? undefined : (conversation.avatarColor ?? 'var(--td-plum)'),
@@ -689,9 +689,9 @@ export function ConversationSidebar({
                           (#1715): no button may nest inside the row button. */}
                       <span className={styles.conversationActions} onClick={(event) => event.stopPropagation()}>
                         {onPinConversation && (
-                          <Tooltip label={isPinned ? '取消置顶' : '置顶'}>
+                          <Tooltip label={isPinned ? t('sidebar.unpin') : t('sidebar.pin')}>
                             <button type="button"
-                              aria-label={isPinned ? '取消置顶' : '置顶'}
+                              aria-label={isPinned ? t('sidebar.unpin') : t('sidebar.pin')}
                               className={styles.conversationActionBtn}
                               data-active={isPinned ? 'true' : undefined}
                               onClick={() => onPinConversation(conversation.id, !isPinned)}

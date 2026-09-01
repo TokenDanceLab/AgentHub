@@ -13,7 +13,7 @@ import { StatusNotice } from '@shared/ui';
 import { DesignNavIcon } from '../../designIcons';
 import styles from '../TasksPage.module.css';
 import { TaskSelectionStrip, TaskTable } from './TaskTableViews';
-import { PANE_TITLES, StatCard, VIEW_MODES } from './shared';
+import { buildViewModes, paneTitle, StatCard } from './shared';
 import type { TasksPageProps } from './types';
 import { needsHubOnlyMergeNotice } from '../../workbenchBoardColumns';
 
@@ -85,9 +85,9 @@ export function TaskMain({
   dueTodayCount,
   crossProjectCount,
   activeFilterCount = 0,
-  sortLabel = '排序：拖拽自定义',
-  groupLabel = '分组：自定义分组',
-  fieldConfigLabel = '字段配置',
+  sortLabel = '',
+  groupLabel = '',
+  fieldConfigLabel = '',
   sortActive = false,
   groupActive = false,
   fieldConfigActive = false,
@@ -114,7 +114,7 @@ export function TaskMain({
   onCancelTaskEdit,
 }: TaskMainProps): React.ReactElement {
   const { t } = useTranslation(SHARED_WORKBENCH_I18N_NAMESPACE);
-  const title = PANE_TITLES[activePane] ?? '我负责的';
+  const title = paneTitle(t, activePane);
 
   // ── Roving tabindex for the view-mode tablist (#1823) ────────────────
   // One Tab stop for the strip; Arrow/Home/End move focus between the
@@ -222,9 +222,9 @@ export function TaskMain({
 
       {/* Stats */}
       <div className={styles.stats}>
-        <StatCard label="未完成" value={incompleteCount} />
-        <StatCard label="今天截止" value={dueTodayCount} />
-        <StatCard label="跨项目" value={crossProjectCount} />
+        <StatCard label={t('tasks.stat.incomplete')} value={incompleteCount} />
+        <StatCard label={t('tasks.stat.dueToday')} value={dueTodayCount} />
+        <StatCard label={t('tasks.stat.crossProject')} value={crossProjectCount} />
       </div>
 
       {/* View tabs */}
@@ -234,7 +234,7 @@ export function TaskMain({
         ref={viewTabsRef}
         onKeyDown={handleViewTabsKeyDown}
       >
-        {VIEW_MODES.map((mode) => {
+        {buildViewModes(t).map((mode) => {
           const selected = viewMode === mode.id;
           const isTabStop = mode.id === (rovingViewId ?? viewMode);
           return (
@@ -319,7 +319,7 @@ export function TaskMain({
         >
           {fieldConfigLabel}
         </button>
-        {!selectedTask && taskActionLabel && taskActionLabel !== '筛选已启用' && (
+        {!selectedTask && taskActionLabel && (
           <span className={styles.toolbarStatus} role="status">{taskActionLabel}</span>
         )}
       </div>
@@ -382,14 +382,14 @@ export function TaskMain({
         ref={sentinelRef}
         className={styles.sentinel}
         role="status"
-        aria-label={loadingMore ? '加载中…' : undefined}
+        aria-label={loadingMore ? t('tasks.loading') : undefined}
       />
       {loadingMore ? (
         <StatusNotice
           icon={<DesignNavIcon name="running" size={14} />}
           role="status"
         >
-          加载中…
+          {t('tasks.loading')}
         </StatusNotice>
       ) : null}
       </div>

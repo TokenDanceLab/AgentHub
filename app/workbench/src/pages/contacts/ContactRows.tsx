@@ -30,6 +30,7 @@ export function MemberRow({
   onAvatarClick?: ((member: ContactMember, anchor: HTMLElement) => void) | undefined;
   avatarExpanded?: boolean;
 }) {
+  const { t } = useTranslation(SHARED_WORKBENCH_I18N_NAMESPACE);
   const handleClick = useCallback(() => {
     onClick?.(member);
   }, [member, onClick]);
@@ -57,7 +58,7 @@ export function MemberRow({
       <div
         aria-expanded={avatarExpanded}
         aria-haspopup="dialog"
-        aria-label={`查看 ${member.name} 资料`}
+        aria-label={t('contacts.viewProfileAria', { name: member.name })}
         className={styles.memberAv}
         data-profile={member.id}
         onClick={handleAvatarClick}
@@ -103,6 +104,7 @@ export function FriendRequestCard({ request, direction, onAccept, onReject, load
   onReject?: ((requestId: string) => void) | undefined;
   loading?: boolean;
 }): React.ReactElement {
+  const { t } = useTranslation(SHARED_WORKBENCH_I18N_NAMESPACE);
   const initials = (request.nickname || request.username).slice(0, 2).toUpperCase();
   const displayName = request.nickname || request.username;
   const timeLabel = request.created_at
@@ -115,13 +117,13 @@ export function FriendRequestCard({ request, direction, onAccept, onReject, load
         <span className={styles.requestName}>{displayName}</span>
         {request.message && <span className={styles.requestMsg}>{request.message}</span>}
         <span className={styles.requestMeta}>
-          {direction === 'received' ? '收到请求' : '已发送'} {timeLabel && `· ${timeLabel}`}
+          {direction === 'received' ? t('contacts.requestReceived') : t('contacts.requestSent')} {timeLabel && `· ${timeLabel}`}
         </span>
       </div>
       {direction === 'received' && (
         <div className={styles.requestActions}>
-          <button type="button" className={styles.acceptBtn} disabled={loading} onClick={() => onAccept?.(request.request_id)}>接受</button>
-          <button type="button" className={styles.rejectBtn} disabled={loading} onClick={() => onReject?.(request.request_id)}>拒绝</button>
+          <button type="button" className={styles.acceptBtn} disabled={loading} onClick={() => onAccept?.(request.request_id)}>{t('contacts.accept')}</button>
+          <button type="button" className={styles.rejectBtn} disabled={loading} onClick={() => onReject?.(request.request_id)}>{t('contacts.reject')}</button>
         </div>
       )}
     </div>
@@ -135,15 +137,16 @@ export function SearchUserCard({ result, onSendRequest, loading }: {
   onSendRequest?: ((userId: string) => void) | undefined;
   loading?: boolean;
 }): React.ReactElement {
+  const { t } = useTranslation(SHARED_WORKBENCH_I18N_NAMESPACE);
   const initials = (result.nickname || result.username).slice(0, 2).toUpperCase();
   const displayName = result.nickname || result.username;
   const relationshipLabel = (): string => {
     switch (result.relationship) {
-      case 'friend': return '已是好友';
-      case 'pending_sent': return '已发送请求';
-      case 'pending_received': return '收到对方请求';
-      case 'blocked': return '已屏蔽';
-      default: return '陌生人';
+      case 'friend': return t('contacts.relationship.friend');
+      case 'pending_sent': return t('contacts.relationship.pendingSent');
+      case 'pending_received': return t('contacts.relationship.pendingReceived');
+      case 'blocked': return t('contacts.relationship.blocked');
+      default: return t('contacts.relationship.stranger');
     }
   };
   return (
@@ -154,7 +157,7 @@ export function SearchUserCard({ result, onSendRequest, loading }: {
         <span className={styles.requestMeta}>@{result.username} · {relationshipLabel()}</span>
       </div>
       {result.relationship === 'stranger' && (
-        <button type="button" className={styles.acceptBtn} disabled={loading} onClick={() => onSendRequest?.(result.user_id)}>添加好友</button>
+        <button type="button" className={styles.acceptBtn} disabled={loading} onClick={() => onSendRequest?.(result.user_id)}>{t('contacts.addFriend')}</button>
       )}
     </div>
   );
@@ -194,7 +197,7 @@ export function GroupRow({
       <div
         aria-expanded={avatarExpanded}
         aria-haspopup="dialog"
-        aria-label={`查看 ${group.name} 资料`}
+        aria-label={t('contacts.viewProfileAria', { name: group.name })}
         className={styles.memberAv}
         data-profile={group.id}
         onClick={handleAvatarClick}
@@ -248,7 +251,7 @@ export function ServiceCardRow({
       <div
         aria-expanded={avatarExpanded}
         aria-haspopup="dialog"
-        aria-label={`查看 ${desk.name} 资料`}
+        aria-label={t('contacts.viewProfileAria', { name: desk.name })}
         className={styles.memberAv}
         data-profile={desk.id}
         onClick={handleAvatarClick}
@@ -274,14 +277,15 @@ export function QuickActionGrid({
   onAddContact?: (() => void) | undefined;
   variant?: 'directory' | 'invite';
 }) {
+  const { t } = useTranslation(SHARED_WORKBENCH_I18N_NAMESPACE);
   const first =
     variant === 'invite'
-      ? { label: '邀请企业成员', desc: '生成二维码、链接、邀请码或手机号邀请。' }
-      : { label: '企业成员', desc: '通过二维码、链接或手机号邀请同事加入 TokenDance' };
+      ? { label: t('contacts.quick.inviteTitle'), desc: t('contacts.quick.inviteDesc') }
+      : { label: t('contacts.quick.memberTitle'), desc: t('contacts.quick.memberDesc') };
   const second =
     variant === 'invite'
-      ? { label: '添加外部联系人', desc: '适合客户、合作方和临时项目协作者。' }
-      : { label: '外部联系人', desc: '添加客户、合作方或临时协作者到通讯录' };
+      ? { label: t('contacts.quick.addExternalTitle'), desc: t('contacts.quick.addExternalDesc') }
+      : { label: t('contacts.quick.externalTitle'), desc: t('contacts.quick.externalDesc') };
 
   return (
     <div className={styles.quickGrid}>

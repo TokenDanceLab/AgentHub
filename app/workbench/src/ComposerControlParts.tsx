@@ -47,7 +47,7 @@ export function ComposerAgentPicker({
         value=""
       >
         <option value="">
-          {agentPickerPlaceholder(availableMentionOptions.length)}
+          {agentPickerPlaceholder(availableMentionOptions.length, t)}
         </option>
         {availableMentionOptions.map((agent) => (
           <option key={agent.id} value={agent.id}>
@@ -82,7 +82,7 @@ export function ComposerTargetPicker({
         value={executionTargetId}
       >
         <option value="">
-          {targetPickerPlaceholder(executionTargets.length)}
+          {targetPickerPlaceholder(executionTargets.length, t)}
         </option>
         {executionTargets.map((target) => (
           <option key={target.id} value={target.id}>

@@ -9,12 +9,12 @@ import {
   ComposerStatusStrip,
 } from './ComposerContextParts';
 
-// These assertions use the en chatview literals; opt into the en bundle of
+// These assertions use the zh chatview literals; opt into the zh bundle of
 // the shared test i18next instance (Issue #1717).
 import { useTestI18nLanguage } from '@shared/testing/i18n';
 
 beforeAll(async () => {
-  await useTestI18nLanguage('en');
+  await useTestI18nLanguage('zh');
 });
 
 describe('ComposerContextParts', () => {
@@ -28,7 +28,7 @@ describe('ComposerContextParts', () => {
       />,
     );
     expect(screen.getByText('回复至 Ada: hi there')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Cancel reply' }));
+    fireEvent.click(screen.getByRole('button', { name: '取消回复' }));
     expect(onCancel).toHaveBeenCalledTimes(1);
   });
 
@@ -55,7 +55,7 @@ describe('ComposerContextParts', () => {
     expect(screen.getByText('@Builder')).toBeInTheDocument();
     // The en resource uses a single-brace placeholder ({label}), which real
     // i18next does not interpolate, so the rendered aria-label keeps it.
-    fireEvent.click(screen.getByRole('button', { name: 'Remove @{label}' }));
+    fireEvent.click(screen.getByRole('button', { name: '移除 @{label}' }));
     expect(onRemove).toHaveBeenCalledWith('profile-builder');
   });
 

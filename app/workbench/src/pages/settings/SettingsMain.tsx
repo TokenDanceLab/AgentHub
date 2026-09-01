@@ -54,7 +54,7 @@ export function SettingsMain(props: SettingsMainProps): React.ReactElement {
             icon={<DesignNavIcon name="running" size={14} />}
             role="status"
           >
-            正在加载设置…
+            {tw('settings.loadingNotice')}
           </StatusNotice>
         </div>
       ) : null}
@@ -79,7 +79,7 @@ export function SettingsMain(props: SettingsMainProps): React.ReactElement {
                 }
               : {})}
           >
-            设置未能保存：{settingsError}
+            {tw('settings.writeFailed', { error: settingsError })}
           </StatusNotice>
         </div>
       ) : null}
@@ -91,11 +91,11 @@ export function SettingsMain(props: SettingsMainProps): React.ReactElement {
             icon={<DesignNavIcon name="error404" size={18} />}
             eyebrow="Settings recovery"
             title={tw("settings.loadFailed")}
-            description="无法从当前平台适配器读取已保存的设置。页面会暂时使用默认值，重试后可恢复远端偏好。"
+            description={tw('settings.recoveryDescription')}
             meta={settingsError}
             primaryAction={{
-              label: '重试加载',
-              busyLabel: '重试中…',
+              label: tw('settings.retryLoad'),
+              busyLabel: tw('settings.retrying'),
               busy: settingsLoading,
               icon: <DesignNavIcon name="refresh" size={14} />,
               onClick: () => {
@@ -106,7 +106,7 @@ export function SettingsMain(props: SettingsMainProps): React.ReactElement {
             {...(onDismissSettingsError
               ? {
                   secondaryAction: {
-                    label: '继续使用默认值',
+                    label: tw('settings.continueDefaults'),
                     onClick: onDismissSettingsError,
                   },
                 }

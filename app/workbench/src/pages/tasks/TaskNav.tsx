@@ -10,7 +10,7 @@ import { useTranslation } from 'react-i18next';
 import { SHARED_WORKBENCH_I18N_NAMESPACE } from '@shared/i18n';
 import { DesignNavIcon } from '../../designIcons';
 import styles from '../TasksPage.module.css';
-import { NAV_PRIMARY, NAV_QUICK, NavGlyph, TaskNavMenu } from './shared';
+import { buildNavPrimary, buildNavQuick, NavGlyph, TaskNavMenu } from './shared';
 import type { TasksPageProps } from './types';
 
 export type TaskNavProps = Pick<
@@ -32,6 +32,8 @@ export function TaskNav({
   onNewGroup,
 }: TaskNavProps): React.ReactElement {
   const { t } = useTranslation(SHARED_WORKBENCH_I18N_NAMESPACE);
+  const navPrimary = buildNavPrimary(t);
+  const navQuick = buildNavQuick(t);
 
   return (
     <aside className={`${styles.nav} workbench-nav`}>
@@ -49,7 +51,7 @@ export function TaskNav({
       <TaskNavMenu open={navMenuOpen} />
 
       {/* Primary nav: 我负责的 / 我关注的 / 动态 */}
-      {NAV_PRIMARY.map((item) => (
+      {navPrimary.map((item) => (
         <button
           key={item.id}
           type="button"
@@ -70,7 +72,7 @@ export function TaskNav({
 
       {/* Quick access: 全部 / 我创建的 / 我分配的 / 已完成 */}
       <div className={styles.navCaption}>{t('tasks.quickAccess')}</div>
-      {NAV_QUICK.map((item) => (
+      {navQuick.map((item) => (
         <button
           key={item.id}
           type="button"
@@ -94,7 +96,7 @@ export function TaskNav({
         onClick={onTaskList}
       >
         <NavGlyph name="fileText" />
-        {t('nav.tasks')}清单
+        {t('tasks.navTaskList')}
         <small className={styles.navBadgePlus}>+</small>
       </button>
 

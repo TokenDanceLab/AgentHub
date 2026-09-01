@@ -1,4 +1,6 @@
 import React, { useCallback, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
+import { CHATVIEW_I18N_NAMESPACE } from '@shared/chatview/i18n/resources';
 import { WorkbenchAgentsRouteView } from './WorkbenchAgentsRouteView';
 import { WorkbenchContactsRouteView } from './WorkbenchContactsRouteView';
 import { WorkbenchDevicesRouteView } from './WorkbenchDevicesRouteView';
@@ -231,6 +233,7 @@ export function WorkbenchRoutes({
   usageError,
   onUsageRetry,
 }: WorkbenchRoutesProps): React.ReactElement {
+  const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE);
   const settingsRoute = useWorkbenchSettingsRoute({
     settingsService,
     dataMode,
@@ -368,7 +371,7 @@ export function WorkbenchRoutes({
       />
       {!isKnownPage && (
         <div className={styles.routeMissing} role="status">
-          路由未配置：{activePage}
+          {t('routes.unconfigured', { page: activePage })}
         </div>
       )}
     </>

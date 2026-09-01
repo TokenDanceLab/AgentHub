@@ -1,7 +1,12 @@
 import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeAll, describe, expect, it, vi } from 'vitest';
+import { useTestI18nLanguage } from '@shared/testing/i18n';
 import { TaskMain } from './TaskMainViews';
+
+beforeAll(async () => {
+  await useTestI18nLanguage('zh');
+});
 import type { TasksPageProps } from './types';
 
 const noop = (): void => {};
