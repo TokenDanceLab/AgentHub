@@ -2005,6 +2005,9 @@ jobs:
       - name: Verify web/desktop i18n dead-key gate
         run: python ./scripts/verify/verify-i18n-deadkeys.py
 
+      - name: Verify zh terminology convergence (对话→会话 ratchet)
+        run: python ./scripts/verify/verify-i18n-terminology.py
+
       # ── Architecture boundary gates (audit-A gate-ifiable candidates) ──
       # Shared workbench/chatview/ui must stay free of Edge client imports;
       # shared barrel must not leak Edge exports to platform apps; handler
