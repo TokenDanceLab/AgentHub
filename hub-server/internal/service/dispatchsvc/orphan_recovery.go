@@ -58,13 +58,16 @@ func (s *DispatchService) recoverOrphanedTasks(ctx context.Context) {
 }
 
 // redeliverOrphanedTask rebuilds the dispatch context for a claimed orphan and
-// feeds it back through DispatchTask. Errors are logged but do not halt the
-// sweep — the task stays in dispatched status and will eventually expire via
-// the existing TTL scanner.
+// feeds it back through DispatchTask. If the context rebuild fails the claim
+// is rolled back (dispatched → queued) so the next sweep can re-claim the
+// task; without the rollback the task would sit in dispatched with no outbox
+// row until the TTL scanner expires it, silently dropping the work. Errors are
+// logged but do not halt the sweep.
 func (s *DispatchService) redeliverOrphanedTask(ctx context.Context, taskID string) {
 	task, err := repository.GetPendingTaskByID(s.db, taskID)
 	if err != nil {
 		slog.Error("orphan_recovery: load task failed", "task_id", taskID, "error", err)
+		s.rollbackOrphanClaim(taskID)
 		return
 	}
 
@@ -72,6 +75,7 @@ func (s *DispatchService) redeliverOrphanedTask(ctx context.Context, taskID stri
 	msg, err := repository.GetMessageByID(s.db, task.TriggerMessageID)
 	if err != nil {
 		slog.Error("orphan_recovery: load trigger message failed", "task_id", taskID, "error", err)
+		s.rollbackOrphanClaim(taskID)
 		return
 	}
 	prompt := dispatch.PromptFromMessage(msg)
@@ -80,6 +84,7 @@ func (s *DispatchService) redeliverOrphanedTask(ctx context.Context, taskID stri
 	ai, err := repository.GetAgentInstanceByID(s.db, task.AgentInstanceID)
 	if err != nil {
 		slog.Error("orphan_recovery: load agent instance failed", "task_id", taskID, "error", err)
+		s.rollbackOrphanClaim(taskID)
 		return
 	}
 
@@ -111,5 +116,23 @@ func (s *DispatchService) redeliverOrphanedTask(ctx context.Context, taskID stri
 	s.DispatchTask(ctx, task, ai, prompt, task.ModelParams, targetType, customAgent)
 	if metrics.DispatchOrphanRedelivered != nil {
 		metrics.DispatchOrphanRedelivered.Inc()
+	}
+}
+
+// rollbackOrphanClaim returns a claimed orphan task from dispatched back to
+// queued so a later sweep can re-claim it. The repository-layer CAS guard only
+// touches tasks still in the claimed state; failures are logged, never fatal.
+func (s *DispatchService) rollbackOrphanClaim(taskID string) {
+	rolledBack, err := repository.RequeueClaimedOrphanTask(s.db, taskID)
+	if err != nil {
+		slog.Error("orphan_recovery: claim rollback failed", "task_id", taskID, "error", err)
+		return
+	}
+	if !rolledBack {
+		return
+	}
+	slog.Warn("orphan_recovery: claim rolled back to queued", "task_id", taskID)
+	if metrics.DispatchOrphanClaimRolledBack != nil {
+		metrics.DispatchOrphanClaimRolledBack.Inc()
 	}
 }
