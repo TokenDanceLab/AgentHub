@@ -3,6 +3,7 @@ package handler
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -442,4 +443,55 @@ func TestMCPServerHandler_UnpublishMCPServer(t *testing.T) {
 
 		assert.Equal(t, http.StatusNotFound, w.Code)
 	})
+}
+
+// Public market results must never expose author-side secrets (env_vars /
+// auth_config), even if the stored record contains them (#2154 security lane).
+func TestMCPServerHandler_ListMCPServersPublicMarketMasksSecrets(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	svc := &mockMCPService{
+		searchPublic: func(ctx context.Context, q, transport, cursor string, pageSize int) (*mcpserver.ListResult, error) {
+			return &mcpserver.ListResult{
+				Items: []model.MCPServer{{
+					ID:         "mcp-1",
+					Name:       "leaky",
+					EnvVars:    `{"API_KEY":"sk-secret-123"}`,
+					AuthConfig: `{"client_secret":"cs-secret"}`,
+				}},
+				Cursor:  "next",
+				HasMore: true,
+			}, nil
+		},
+	}
+	h := NewMCPServerHandler(svc)
+
+	r := gin.New()
+	r.GET("/web/mcp-servers", func(c *gin.Context) {
+		c.Set("user_id", "user-1")
+		h.ListMCPServers(c)
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/web/mcp-servers?is_public=true", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	require.Equal(t, http.StatusOK, w.Code)
+	assert.NotContains(t, w.Body.String(), "sk-secret-123")
+	assert.NotContains(t, w.Body.String(), "cs-secret")
+
+	var body struct {
+		Data struct {
+			Items []struct {
+				ID         string `json:"id"`
+				EnvVars    string `json:"env_vars"`
+				AuthConfig string `json:"auth_config"`
+			} `json:"items"`
+		} `json:"data"`
+	}
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &body))
+	require.Len(t, body.Data.Items, 1)
+	assert.Equal(t, "mcp-1", body.Data.Items[0].ID)
+	assert.Empty(t, body.Data.Items[0].EnvVars)
+	assert.Empty(t, body.Data.Items[0].AuthConfig)
 }
