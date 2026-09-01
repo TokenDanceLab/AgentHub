@@ -34,6 +34,11 @@ export default defineConfig({
     // 与 shared/desktop 配置一致的 worker 上限：全量测试时默认全核并发
     // 会导致 forks worker 启动/回收超时，限制并发后 coverage 全量运行稳定。
     maxWorkers: 4,
+    // FLK-003：全量并行负载下 jsdom 渲染变慢，渲染重型用例（如
+    // sidebar.test.tsx 的 App 级 harness）偶发超过 vitest 默认 5s 测试
+    // 超时；与 edge-real-ci 先例对齐显式放宽（重试预算仍为 0）。
+    testTimeout: 30_000,
+    hookTimeout: 30_000,
     include: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
     exclude: ['**/node_modules/**', '**/dist/**', '**/.worktrees/**', '**/reference/**'],
     setupFiles: ['./src/__tests__/setup.ts'],

@@ -3,7 +3,7 @@
 > Owner：本文件是 AgentHub「flake 登记、重试预算与 CI annotation 约定」的 SSOT。其他文档涉及 flaky 处置时以本文件为准，不复制规则。
 > 相关：规则 → 机器验证映射见 [verifier-map](verifier-map.md)。本登记表暂无机器门禁，靠到期复审纪律与评审执行。
 
-最后更新：2026-08-28（FLK-001、FLK-002 根因修复并归档）
+最后更新：2026-09-01（FLK-003、FLK-004 根因修复并归档）
 
 ## 为什么需要登记表
 
@@ -60,7 +60,7 @@ Flaky 测试侵蚀门禁可信度：一旦「偶发红、重跑转绿」成为�
 
 ## 活跃登记
 
-（当前无活跃登记项；FLK-001/FLK-002 均已修复，见下方已归档登记。）
+（当前无活跃登记项；FLK-001～FLK-004 均已修复，见下方已归档登记。）
 
 ## 已归档登记
 
@@ -111,6 +111,48 @@ Flaky 测试侵蚀门禁可信度：一旦「偶发红、重跑转绿」成为�
 |---|---|---|
 | 2026-08-25 | CI 偶发红（#1981），本机复跑 2/2 绿，执行 `gh run rerun --failed` | 转绿；当日回填本登记条目，根因待压测复现 |
 | 2026-08-28 | 根因确认并修复：`GET /client/sessions` 水合完成前 composer 停在幻影 default 会话，真实会话落地触发 `setConversationId` 全量重置，擦除已输入文本且发送按钮保持禁用（CI 签名）；修复为进入会话后先等水合 heading 再驱动 composer，并新增 `sessionListDelayMs` 旋钮本地确定性复现 CI 水合延迟 | 修复版 `--repeat-each=30` 60/60 零失败；负向对照（去掉等待 + 700ms 延迟）5/5 复现失败；状态转已修复（归档） |
+
+### FLK-003 workbench sidebar round-trip 用例全量并行负载下偶发超时
+
+| 字段 | 值 |
+|---|---|
+| 编号 | FLK-003 |
+| 测试标识 | `app/workbench/src/__tests__/sidebar.test.tsx` › "round-trips task-052 from c1 and restores c1 after an external switch to c2" |
+| 车道 | `make fe-test`（pnpm -r test → workbench `vitest.config.ts`）；CI workbench 车道同源配置，ubuntu-latest |
+| Owner | workbench 车道维护者 |
+| 首现日期 | 2026-09-01 |
+| 复现命令 | `cd app/workbench && pnpm exec vitest run`（全量并行下偶发；窄化单文件 `vitest run src/__tests__/sidebar.test.tsx` 稳定绿） |
+| 到期复审日 | 2026-09-29 |
+| 状态 | 已修复（归档） |
+
+**根因与修复**：vitest 默认单测超时 5s；该用例渲染 App 级 harness 且多段 `waitFor`，全量并行（jsdom 变慢）下偶发 "Test timed out in 5000ms"，非功能 flake。修复：`app/workbench/vitest.config.ts` 显式 `testTimeout: 30_000 / hookTimeout: 30_000`（对齐 `vitest.edge-real-ci.config.ts` 先例；重试预算仍为 0）。
+
+**处置记录**：
+
+| 日期 | 动作 | 结果 |
+|---|---|---|
+| 2026-09-01 | round-31 `make fe-test` 全量跑偶发红（5s 超时）；单文件重跑 15/15 绿 | 当日登记；同 PR 提高超时并全量复跑验证 |
+
+### FLK-004 desktop App.v4 渲染用例全量并行负载下偶发超时
+
+| 字段 | 值 |
+|---|---|
+| 编号 | FLK-004 |
+| 测试标识 | `app/desktop/src/__tests__/App.v4.test.tsx` › "enters a clean Desktop demo workbench from the login card"（其余渲染重型用例同签名） |
+| 车道 | desktop 本地全量（`app/desktop/vitest.config.ts`）与 CI `frontend-desktop` 车道（`vitest.desktop-ci` / `vitest.desktop-tsx-ci`），ubuntu-latest |
+| Owner | desktop 车道维护者 |
+| 首现日期 | 2026-09-01 |
+| 复现命令 | `cd app/desktop && pnpm exec vitest run`（desktop+shared+workbench 全量并行下偶发；窄化单文件 `vitest run src/__tests__/App.v4.test.tsx` 稳定绿） |
+| 到期复审日 | 2026-09-29 |
+| 状态 | 已修复（归档） |
+
+**根因与修复**：与 FLK-003 同型——默认 5s 单测超时对渲染重型 .tsx 用例（完整 `<App />` + 十余 mock hooks + 多段 `waitFor`）在全量并行负载下预算不足；非功能 flake。修复：desktop 本地 + `desktop-ci` + `desktop-tsx-ci` 三个配置显式 `testTimeout: 30_000 / hookTimeout: 30_000`（重试预算仍为 0）。
+
+**处置记录**：
+
+| 日期 | 动作 | 结果 |
+|---|---|---|
+| 2026-09-01 | round-34 desktop 全量跑偶发红（唯一失败项）；单文件重跑 14/14 绿 | 当日登记；同 PR 提高超时并全量复跑验证 |
 
 ## 维护规则
 
