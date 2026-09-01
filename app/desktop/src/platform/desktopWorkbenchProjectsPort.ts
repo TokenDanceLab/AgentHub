@@ -10,7 +10,9 @@ import { getHubClient } from '@/api/hubQueries';
  * port (#1546). Wraps the HubClient transport; the shared UI only ever sees
  * the narrow `WorkbenchProjectsPort` contract.
  */
-export function createDesktopWorkbenchProjectsPort(): WorkbenchProjectsPort {
+type AppTranslate = (key: string, options?: any) => string;
+
+export function createDesktopWorkbenchProjectsPort(t?: AppTranslate): WorkbenchProjectsPort {
   const hubClient = getHubClient();
 
   return {
@@ -24,14 +26,14 @@ export function createDesktopWorkbenchProjectsPort(): WorkbenchProjectsPort {
     },
     async createProject(draft) {
       const created = await hubClient.createWorkspaceProject({
-        name: draft.name.trim() || '未命名项目',
+        name: draft.name.trim() || t?.('projects.unnamed') || '未命名项目',
         description: draft.description.trim(),
       });
       return workspaceProjectToProjectInfo(created);
     },
     async updateProject(projectId, draft) {
       const updated = await hubClient.updateWorkspaceProject(projectId, {
-        name: draft.name.trim() || '未命名项目',
+        name: draft.name.trim() || t?.('projects.unnamed') || '未命名项目',
         description: draft.description.trim(),
       });
       return workspaceProjectToProjectInfo(updated);

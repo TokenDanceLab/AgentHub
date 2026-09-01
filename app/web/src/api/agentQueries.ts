@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { createHubClient } from './hubClient';
 import type { AgentProfile, CreateAgentProfileRequest, UpdateAgentProfileRequest } from './hubClient';
 import { getAccessToken } from '@/hooks/useAuth';
@@ -236,7 +237,7 @@ export function mapHubAgentProfileToAgentInfo(profile: AgentProfile): AgentInfo 
   };
 }
 
-export function agentConfigToCreateAgentProfileRequest(agent: AgentConfig): CreateAgentProfileRequest {
+export function agentConfigToCreateAgentProfileRequest(agent: AgentConfig, t?: (key: string, options?: any) => string): CreateAgentProfileRequest {
   const model = splitModelLabel(agent.model);
   const description = persistableAgentDescription(agent.role);
   const reasoningEffort = reasoningEffortFromMode(agent.mode);
@@ -250,7 +251,7 @@ export function agentConfigToCreateAgentProfileRequest(agent: AgentConfig): Crea
   const approvalPolicy = agentApprovalPolicy(agent);
   const targetPreferences = agentTargetPreferences(agent);
   return {
-    name: agent.name.trim() || '未命名 Agent',
+    name: agent.name.trim() || t?.('agents.unnamed') || '未命名 Agent',
     ...(description ? { description } : {}),
     runtime_id: normalizeRuntimeInput(agent.engine),
     ...model,
@@ -264,7 +265,7 @@ export function agentConfigToCreateAgentProfileRequest(agent: AgentConfig): Crea
   };
 }
 
-export function agentConfigToUpdateAgentProfileRequest(agent: AgentConfig): UpdateAgentProfileRequest {
+export function agentConfigToUpdateAgentProfileRequest(agent: AgentConfig, t?: (key: string, options?: any) => string): UpdateAgentProfileRequest {
   const model = splitModelLabel(agent.model);
   const description = persistableAgentDescription(agent.role);
   const runtimeID = optionalRuntimeInput(agent.engine);
@@ -280,7 +281,7 @@ export function agentConfigToUpdateAgentProfileRequest(agent: AgentConfig): Upda
   const approvalPolicy = agentApprovalPolicy(agent);
   const targetPreferences = agentTargetPreferences(agent);
   return {
-    name: agent.name.trim() || '未命名 Agent',
+    name: agent.name.trim() || t?.('agents.unnamed') || '未命名 Agent',
     ...(description ? { description } : {}),
     ...(runtimeID ? { runtime_id: runtimeID } : {}),
     ...model,
@@ -294,9 +295,9 @@ export function agentConfigToUpdateAgentProfileRequest(agent: AgentConfig): Upda
   };
 }
 
-export function createDefaultAgentProfileRequest(index: number): CreateAgentProfileRequest {
+export function createDefaultAgentProfileRequest(index: number, t?: (key: string, options?: any) => string): CreateAgentProfileRequest {
   return {
-    name: `新 Agent ${index}`,
+    name: t?.('agents.newDefault', { index }) ?? `新 Agent ${index}`,
     runtime_id: 'codex',
     model: 'gpt-5-codex',
     provider: 'codex',
@@ -337,10 +338,11 @@ export function useAgentList(enabled: boolean) {
 }
 
 export function useCreateAgentProfile() {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (agent: AgentConfig) =>
-      hubClient.createAgentProfile(agentConfigToCreateAgentProfileRequest(agent)),
+      hubClient.createAgentProfile(agentConfigToCreateAgentProfileRequest(agent, t)),
     onSettled: () => {
       void queryClient.invalidateQueries({ queryKey: hubQueryKeys.agents.root });
     },
@@ -348,10 +350,11 @@ export function useCreateAgentProfile() {
 }
 
 export function useUpdateAgentProfile() {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ agent }: { agent: AgentConfig }) =>
-      hubClient.updateAgentProfile(agent.id, agentConfigToUpdateAgentProfileRequest(agent)),
+      hubClient.updateAgentProfile(agent.id, agentConfigToUpdateAgentProfileRequest(agent, t)),
     onSettled: () => {
       void queryClient.invalidateQueries({ queryKey: hubQueryKeys.agents.root });
     },

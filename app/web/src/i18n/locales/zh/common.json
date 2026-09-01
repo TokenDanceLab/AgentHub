@@ -93,5 +93,13 @@
   "error.code.auth_token_expired": "登录已过期，请重新登录后继续。",
   "error.code.workspace_not_allowed": "当前工作区路径不在允许列表中，请检查配置。",
   "error.code.agent_offline": "Agent 当前离线，请等待重连或选择其他执行目标。",
-  "error.code.target_not_routable": "所选执行目标不可用，请选择其他目标。"
+  "error.code.target_not_routable": "所选执行目标不可用，请选择其他目标。",
+  "agents.unnamed": "未命名 Agent",
+  "agents.newDefault": "新 Agent {{index}}",
+  "conversations.hubPrivate": "Hub 私聊",
+  "conversations.hubGroup": "Hub 群聊",
+  "projects.unnamed": "未命名项目",
+  "projects.hubLoadFailed": "Hub Projects 加载失败",
+  "projects.hubDetailLoadFailed": "Hub Project 详情加载失败",
+  "projects.hubGroupLoadFailed": "Hub Project Group 加载失败"
 }
