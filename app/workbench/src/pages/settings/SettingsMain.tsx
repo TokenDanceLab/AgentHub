@@ -13,13 +13,11 @@ import { PANE_RENDERERS } from './SettingsPanes';
 import { PANE_META } from './types';
 import type { SettingsPageProps } from './types';
 import { useTranslation } from 'react-i18next';
-import { CHATVIEW_I18N_NAMESPACE } from '@shared/chatview/i18n/resources';
 import { SHARED_WORKBENCH_I18N_NAMESPACE } from '@shared/i18n';
 
 export type SettingsMainProps = SettingsPageProps;
 
 export function SettingsMain(props: SettingsMainProps): React.ReactElement {
-  const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE);
   const { t: tw } = useTranslation(SHARED_WORKBENCH_I18N_NAMESPACE);
   const {
     activePane,
@@ -42,9 +40,6 @@ export function SettingsMain(props: SettingsMainProps): React.ReactElement {
           <h1 className={styles.headTitle}>{meta.title}</h1>
           <p className={styles.headSubcopy}>{meta.description}</p>
         </div>
-        <button className={`${styles.iconAction} icon-action`} type="button" aria-label={t("aria.settingsMore")}>
-          <DesignNavIcon name="settings" size={16} />
-        </button>
       </div>
 
       {showLoadingNotice ? (
