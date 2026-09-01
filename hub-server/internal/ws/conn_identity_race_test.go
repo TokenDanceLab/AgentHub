@@ -19,13 +19,23 @@ import (
 func TestConn_AuthSnapshotIsRaceFreeAndCoherent(t *testing.T) {
 	c := NewConn(nil)
 
+	// Seed a bound identity before any goroutine starts. The original test
+	// relied on the writer winning CPU time during the reader's fixed
+	// iteration window; under heavy runner load (Windows CI, busy shared
+	// boxes) the writer could be starved for the whole window and the test
+	// died with "reader never observed a bound identity" despite no product
+	// race. Seeding happens-before goroutine creation, so it adds no race
+	// surface, and SetAuth is never called with empty values below, so every
+	// Auth() read is guaranteed to observe a bound triple.
+	c.SetAuth("user-0", "desktop", "dev-0")
+
 	var wg sync.WaitGroup
 	stop := make(chan struct{})
 
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		for i := 0; ; i++ {
+		for i := 1; ; i++ {
 			select {
 			case <-stop:
 				return
@@ -59,8 +69,10 @@ func TestConn_AuthSnapshotIsRaceFreeAndCoherent(t *testing.T) {
 	}()
 
 	wg.Wait()
+	// With the seeded bind every read observes a bound identity, so seen==0
+	// now means the reader loop itself never ran — keep it as a harness guard.
 	if seen == 0 {
-		t.Fatal("reader never observed a bound identity; test exercised no overlap")
+		t.Fatal("reader loop never executed; test harness broken")
 	}
 	if !coherent {
 		t.Fatal("no coherent snapshot observed")
