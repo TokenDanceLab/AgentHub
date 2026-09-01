@@ -116,17 +116,17 @@ export function RunSummaryPanel({ project }: { project: ProjectInfo }) {
       <div className={styles.summaryRows}>
         <div className={styles.summaryRow}>
           <span className={`${styles.stateDot} ${styles.stateRunning}`} />
-          <strong>活跃运行</strong>
+          <strong>{t('projects.activeRuns')}</strong>
           <em>{running}</em>
         </div>
         <div className={styles.summaryRow}>
           <span className={`${styles.stateDot} ${styles.stateCompleted}`} />
-          <strong>已完成</strong>
+          <strong>{t('projects.completed')}</strong>
           <em>{completed}</em>
         </div>
         <div className={styles.summaryRow}>
           <span className={`${styles.stateDot} ${styles.stateWaiting}`} />
-          <strong>等待队列</strong>
+          <strong>{t('projects.queue')}</strong>
           <em>{waiting}</em>
         </div>
       </div>
@@ -184,6 +184,7 @@ export function ProjectPreviewPanel({
   preview?: WorkbenchDocumentPreview | null | undefined;
   onClosePreview?: (() => void) | undefined;
 }) {
+  const { t } = useTranslation(SHARED_WORKBENCH_I18N_NAMESPACE);
   if (!preview) return null;
 
   return (
@@ -193,7 +194,7 @@ export function ProjectPreviewPanel({
           <span>{preview.sourceLabel}</span>
           <strong>{preview.name}</strong>
         </div>
-        <em>项目产物预览</em>
+        <em>{t('projects.artifactsPreview')}</em>
       </div>
       <FilePreview
         filename={preview.name}

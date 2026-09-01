@@ -61,7 +61,7 @@ export function ContactNav({
         <div className={styles.orgLogo}>{orgInitials}</div>
         <span className={styles.orgName}>{orgName}</span>
         <button type="button" className={styles.orgAction}>
-          管理
+          {t('contacts.manage')}
         </button>
       </div>
 
@@ -82,7 +82,7 @@ export function ContactNav({
         </button>
       ))}
 
-      <div className={styles.navCaption}>最近联系人</div>
+      <div className={styles.navCaption}>{t('contacts.recentContacts')}</div>
       {recentShortcuts.map((name) => (
         <div key={name} className={styles.navShortcut}>
           {name}

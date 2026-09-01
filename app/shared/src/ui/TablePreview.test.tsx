@@ -1,9 +1,14 @@
 import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, beforeAll } from 'vitest';
+import { useTestI18nLanguage } from '../testing/i18n';
 import * as XLSX from 'xlsx';
 import { MAX_PREVIEW_FILE_BYTES, TablePreview } from './TablePreview';
+
+beforeAll(async () => {
+  await useTestI18nLanguage('zh');
+});
 
 /* Size guard tests — defense-in-depth retained after the xlsx migration to
    the official SheetJS source 0.20.3 (issue #1358). Oversized payloads must

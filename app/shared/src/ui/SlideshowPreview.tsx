@@ -257,7 +257,7 @@ export const SlideshowPreview: React.FC<SlideshowPreviewProps> = ({
       {loading && (
         <div className={styles.loading}>
           <div className={styles.spinner} />
-          <span>正在解析演示文稿...</span>
+          <span>{t('preview.parsingSlideshow')}</span>
         </div>
       )}
 
@@ -268,7 +268,7 @@ export const SlideshowPreview: React.FC<SlideshowPreviewProps> = ({
           <span className={styles.errorMessage}>{error}</span>
           <button className={styles.retryBtn} onClick={loadPptx} type="button">
             <RotateCcw size={14} />
-            <span>重试</span>
+            <span>{t('preview.retry')}</span>
           </button>
         </div>
       )}
@@ -301,7 +301,7 @@ export const SlideshowPreview: React.FC<SlideshowPreviewProps> = ({
                 </div>
               )}
               {currentSlideData.text.length === 0 && currentSlideData.images.length === 0 && (
-                <div className={styles.slideEmpty}>空白幻灯片</div>
+                <div className={styles.slideEmpty}>{t('preview.blankSlide')}</div>
               )}
             </div>
           </div>

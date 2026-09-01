@@ -119,7 +119,7 @@ export const DocxPreview: React.FC<DocxPreviewProps> = ({
       {loading && (
         <div className={styles.loading}>
           <div className={styles.spinner} />
-          <span>正在解析文档...</span>
+          <span>{t('preview.parsing')}</span>
         </div>
       )}
 
@@ -129,7 +129,7 @@ export const DocxPreview: React.FC<DocxPreviewProps> = ({
           <span className={styles.errorMessage}>{error}</span>
           <button className={styles.retryBtn} onClick={loadDocx} type="button">
             <RotateCcw size={14} />
-            <span>重试</span>
+            <span>{t('preview.retry')}</span>
           </button>
         </div>
       )}

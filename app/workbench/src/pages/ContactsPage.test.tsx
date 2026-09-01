@@ -1,7 +1,12 @@
 import React from 'react';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeAll, describe, expect, it, vi } from 'vitest';
+import { useTestI18nLanguage } from '@shared/testing/i18n';
 import { fireEvent, render, screen } from '../__tests__/setup';
 import { ContactsPage } from './ContactsPage';
+
+beforeAll(async () => {
+  await useTestI18nLanguage('zh');
+});
 
 describe('ContactsPage empty states', () => {
   it('uses shared EmptyState for the new-contacts primary empty path', () => {
