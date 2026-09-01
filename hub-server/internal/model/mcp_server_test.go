@@ -111,6 +111,24 @@ func TestMCPServerValidate(t *testing.T) {
 			wantErr: false,
 		},
 		{
+			name:    "ftp scheme → error",
+			server:  MCPServer{Name: "test", Transport: "sse", URL: "ftp://example.com/api"},
+			wantErr: true,
+			errMsg:  "url must be http or https",
+		},
+		{
+			name:    "no host → error",
+			server:  MCPServer{Name: "test", Transport: "sse", URL: "https:///missing-host"},
+			wantErr: true,
+			errMsg:  "url must include a host",
+		},
+		{
+			name:    "bare hostname (no scheme) → error",
+			server:  MCPServer{Name: "test", Transport: "sse", URL: "example.com/api"},
+			wantErr: true,
+			errMsg:  "url must be http or https",
+		},
+		{
 			name:    "env_vars not object → error",
 			server:  MCPServer{Name: "test", Transport: "stdio", Command: "node", EnvVars: `"not-an-object"`},
 			wantErr: true,
