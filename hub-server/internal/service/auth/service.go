@@ -53,7 +53,20 @@ func (s *Service) RefreshToken(ctx context.Context, rawRefreshToken string) (*Lo
 	if err != nil {
 		return nil, errcode.AuthRefreshInvalid
 	}
-	if rt.Revoked || time.Now().After(rt.ExpiresAt) {
+	if rt.Revoked {
+		// Reuse of a revoked refresh-token row — e.g. a stolen token presented
+		// after logout. #2154 F2 step ①: signal-only slice. The response code
+		// stays AuthRefreshInvalid and NO cascade revocation happens here
+		// (cascade is a separate decision item). The raw token and its hash
+		// are never logged; only non-secret dimensions are (#134 logging rule).
+		slog.Warn("refresh token reuse: revoked token presented",
+			"user_id", rt.UserID, "device_type", rt.DeviceType)
+		if metrics.RefreshTokenReuseTotal != nil {
+			metrics.RefreshTokenReuseTotal.Inc()
+		}
+		return nil, errcode.AuthRefreshInvalid
+	}
+	if time.Now().After(rt.ExpiresAt) {
 		return nil, errcode.AuthRefreshInvalid
 	}
 

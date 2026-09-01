@@ -81,6 +81,9 @@ func TestRegisterDoesNotPanic(t *testing.T) {
 	if RefreshBlacklistCheckErrors == nil {
 		t.Error("RefreshBlacklistCheckErrors 在 Register() 后不应为 nil")
 	}
+	if RefreshTokenReuseTotal == nil {
+		t.Error("RefreshTokenReuseTotal 在 Register() 后不应为 nil")
+	}
 }
 
 // TestRegisterIdempotent 验证：第二次调用 Register 不会 panic。
@@ -141,6 +144,8 @@ func TestRegisteredMetricsAccessible(t *testing.T) {
 		"delivery_outbox_scan_failures_total",
 		// G9 plain Counter
 		"jti_blacklist_check_errors_total",
+		// #2154 F2 step ① plain Counter
+		"refresh_token_reuse_total",
 	}
 	for _, name := range expectedNames {
 		if !names[name] {

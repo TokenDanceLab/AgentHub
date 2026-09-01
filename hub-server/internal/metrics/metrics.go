@@ -65,6 +65,14 @@ var (
 	JTIBlacklistCheckErrors     prometheus.Counter
 	RefreshBlacklistCheckErrors prometheus.Counter
 
+	// RefreshTokenReuseTotal counts refresh attempts that presented an
+	// already-revoked refresh-token row (#2154 F2 step ①). Signal-only:
+	// the response stays AuthRefreshInvalid and no cascade revocation
+	// happens. Reuse of a rotated-away token is structurally undetectable
+	// in the DB (UpsertRefreshToken ON CONFLICT overwrites the old hash),
+	// so this signal covers logout-revoked rows only.
+	RefreshTokenReuseTotal prometheus.Counter
+
 	// G1 — WS non-buffer-full delivery failures (marshal / conn closed / conn not found).
 	WSDeliveryFailures *prometheus.CounterVec
 
@@ -336,6 +344,16 @@ func Register() {
 			},
 		)
 
+		// #2154 F2 step ①: revoked refresh-token row reuse signal. Observability
+		// only — no control-flow change (wired in service/auth RefreshToken);
+		// never logs the token or its hash, only user_id/device_type dimensions.
+		RefreshTokenReuseTotal = prometheus.NewCounter(
+			prometheus.CounterOpts{
+				Name: "refresh_token_reuse_total",
+				Help: "Total number of refresh attempts presenting an already-revoked refresh token row (#2154 F2 step ①; signal-only, no cascade revocation).",
+			},
+		)
+
 		// G1 — WS non-buffer-full delivery failures by reason.
 		WSDeliveryFailures = prometheus.NewCounterVec(
 			prometheus.CounterOpts{
@@ -549,6 +567,7 @@ func Register() {
 		prometheus.MustRegister(WSAuthFailures)
 		prometheus.MustRegister(JTIBlacklistCheckErrors)
 		prometheus.MustRegister(RefreshBlacklistCheckErrors)
+		prometheus.MustRegister(RefreshTokenReuseTotal)
 		prometheus.MustRegister(WSDeliveryFailures)
 		prometheus.MustRegister(WSDisconnects)
 		prometheus.MustRegister(WSReconnects)
