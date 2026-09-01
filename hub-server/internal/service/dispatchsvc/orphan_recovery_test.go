@@ -10,6 +10,7 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/agenthub/hub-server/internal/model"
+	"github.com/agenthub/hub-server/internal/repository"
 )
 
 // newOrphanTestDB creates an in-memory SQLite DB with the minimal schema
@@ -181,4 +182,75 @@ func TestStartOrphanRecoveryLoopDoesNotBlockCaller(t *testing.T) {
 		t.Fatal("StartOrphanRecoveryLoop blocks the caller — hub startup would hang")
 	}
 	cancel()
+}
+
+func insertOrphanTaskRow(t *testing.T, db *gorm.DB, id, status string) {
+	t.Helper()
+	require.NoError(t, db.Exec(`INSERT INTO pending_agent_tasks (id, agent_instance_id, triggered_by_user_id, trigger_message_id, status, created_at, expire_at)
+		VALUES (?, 'ai-1', 'user-1', 'msg-1', ?, ?, ?)`,
+		id, status, time.Now().Add(-10*time.Minute), time.Now().Add(24*time.Hour)).Error)
+}
+
+func TestRequeueClaimedOrphanTask_Dispatched_RolledBackToQueued(t *testing.T) {
+	db := newOrphanTestDB(t)
+	insertOrphanTaskRow(t, db, "task-rb", model.TaskStatusDispatched)
+
+	ok, err := repository.RequeueClaimedOrphanTask(db, "task-rb")
+	require.NoError(t, err)
+	require.True(t, ok)
+
+	var updated model.PendingAgentTask
+	require.NoError(t, db.First(&updated, "id = ?", "task-rb").Error)
+	require.Equal(t, model.TaskStatusQueued, updated.Status)
+}
+
+func TestRequeueClaimedOrphanTask_NonDispatched_NotClobbered(t *testing.T) {
+	db := newOrphanTestDB(t)
+	for _, status := range []string{model.TaskStatusQueued, model.TaskStatusRunning, model.TaskStatusDone, model.TaskStatusFailed} {
+		id := "task-" + status
+		insertOrphanTaskRow(t, db, id, status)
+
+		ok, err := repository.RequeueClaimedOrphanTask(db, id)
+		require.NoError(t, err)
+		require.False(t, ok, "status %s must not be touched", status)
+
+		var updated model.PendingAgentTask
+		require.NoError(t, db.First(&updated, "id = ?", id).Error)
+		require.Equal(t, status, updated.Status)
+	}
+}
+
+func TestRequeueClaimedOrphanTask_MissingRow_NoError(t *testing.T) {
+	db := newOrphanTestDB(t)
+	ok, err := repository.RequeueClaimedOrphanTask(db, "task-ghost")
+	require.NoError(t, err)
+	require.False(t, ok)
+}
+
+// TestRedeliverOrphanedTask_TriggerMessageMissing_RollsBackClaim is the
+// regression test for the stuck-claim defect: before the rollback fix, a
+// claimed orphan whose trigger message could not be loaded stayed dispatched
+// with no outbox row — unreachable by the claim predicate (status='queued')
+// until TTL expiry, silently dropping the work.
+func TestRedeliverOrphanedTask_TriggerMessageMissing_RollsBackClaim(t *testing.T) {
+	db := newOrphanTestDB(t)
+	require.NoError(t, db.Exec(`CREATE TABLE messages (id TEXT PRIMARY KEY)`).Error)
+	grace := time.Now().Add(-5 * time.Minute)
+	insertOrphanTaskRow(t, db, "task-lost-msg", model.TaskStatusQueued)
+
+	ids, err := claimOrphanedTasksForTest(db, grace, 10)
+	require.NoError(t, err)
+	require.Equal(t, []string{"task-lost-msg"}, ids)
+
+	svc := &DispatchService{db: db}
+	svc.redeliverOrphanedTask(context.Background(), "task-lost-msg")
+
+	// Claim must be rolled back to queued so the next sweep can re-claim.
+	var updated model.PendingAgentTask
+	require.NoError(t, db.First(&updated, "id = ?", "task-lost-msg").Error)
+	require.Equal(t, model.TaskStatusQueued, updated.Status)
+
+	ids2, err := claimOrphanedTasksForTest(db, grace, 10)
+	require.NoError(t, err)
+	require.Equal(t, []string{"task-lost-msg"}, ids2)
 }

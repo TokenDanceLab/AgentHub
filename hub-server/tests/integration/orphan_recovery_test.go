@@ -86,3 +86,42 @@ func insertOrphanTask(t *testing.T, label, status string, createdAt time.Time) s
 	require.NoError(t, err, "insert orphan task %s", label)
 	return id
 }
+
+// TestOrphanRecovery_RequeueClaim_DispatchedRolledBack verifies that a task
+// stuck in dispatched by a failed redelivery rebuild is returned to queued by
+// RequeueClaimedOrphanTask, making it re-claimable by the next sweep.
+func TestOrphanRecovery_RequeueClaim_DispatchedRolledBack(t *testing.T) {
+	t.Cleanup(func() { CleanDB(t, db) })
+
+	taskID := insertOrphanTask(t, "requeue", model.TaskStatusDispatched, time.Now().Add(-10*time.Minute))
+
+	ok, err := repository.RequeueClaimedOrphanTask(db, taskID)
+	require.NoError(t, err)
+	require.True(t, ok, "dispatched claim must be rolled back")
+
+	task, err := repository.GetPendingTaskByID(db, taskID)
+	require.NoError(t, err)
+	require.Equal(t, model.TaskStatusQueued, task.Status)
+
+	// Re-claimable by the next sweep.
+	grace := time.Now().Add(-5 * time.Minute)
+	ids, err := repository.ClaimOrphanedTasks(db, grace, 10)
+	require.NoError(t, err)
+	require.Contains(t, ids, taskID, "rolled-back task must be re-claimable")
+}
+
+// TestOrphanRecovery_RequeueClaim_RunningNotClobbered verifies the CAS guard:
+// a task that moved on to running is never rolled back.
+func TestOrphanRecovery_RequeueClaim_RunningNotClobbered(t *testing.T) {
+	t.Cleanup(func() { CleanDB(t, db) })
+
+	taskID := insertOrphanTask(t, "running", model.TaskStatusRunning, time.Now().Add(-10*time.Minute))
+
+	ok, err := repository.RequeueClaimedOrphanTask(db, taskID)
+	require.NoError(t, err)
+	require.False(t, ok, "running task must not be touched")
+
+	task, err := repository.GetPendingTaskByID(db, taskID)
+	require.NoError(t, err)
+	require.Equal(t, model.TaskStatusRunning, task.Status)
+}
