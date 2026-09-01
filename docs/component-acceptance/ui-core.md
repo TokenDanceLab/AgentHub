@@ -98,17 +98,6 @@
 | a11y | 可访问名、焦点环、语义角色 | ✅ | `role="status"`，活动期 `aria-live="off"`（#1823），AgentStreamingBar.test.tsx 断言 |
 | 响应式 | 无横向滚动、文案适配 | ⚠️ | 宽度自适应；窄宽未单独验证（随 Overview 面板覆盖） |
 
-### ArtifactVersionTimeline（`app/shared/src/ui/ArtifactVersionTimeline.tsx`，#1820 补 stories，三件套齐全）
-
-| 维度 | 必选项 | 状态 | 备注 |
-|---|---|---|---|
-| 视觉 | token 化结构/状态色 | ✅ | ArtifactVersionTimeline.module.css `--td-*` 24 处，无硬编码色 |
-| 视觉 | light/dark 对比度 | ✅ | 随 ArtifactVersionTimeline.stories.tsx 巡检 |
-| 交互 | 展开/收起行为断言 | ✅ | ArtifactVersionTimeline.test.tsx 覆盖展开切换与 actions 渲染 |
-| 键盘 | Tab 聚焦、Enter/Space 触发 | ✅ | 展开头为原生 button |
-| a11y | 可访问名、焦点环 | ⚠️ | 版本号+时间文本构成可访问名；展开态未暴露 `aria-expanded`，记 debt |
-| 响应式 | 长标题适配、无横向滚动 | ⚠️ | 未单独验证 |
-
 ### CodeBlock（`app/shared/src/ui/CodeBlock.tsx`，#1820 补 stories，三件套齐全）
 
 | 维度 | 必选项 | 状态 | 备注 |
