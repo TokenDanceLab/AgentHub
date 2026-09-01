@@ -265,6 +265,7 @@ func TestExecutionTargetPingRefusedWithoutEgressAllowlist(t *testing.T) {
 	err = svc.Ping(context.Background(), "target-cloud", "owner-1")
 	require.ErrorIs(t, err, errcode.TargetNotRoutable)
 	require.Contains(t, err.Error(), "not allowed", "error must name the egress policy denial")
+	require.NotContains(t, err.Error(), edgeURL.Hostname(), "ping error must not echo the resolved target address (#2154 F17)")
 
 	var target model.ExecutionTarget
 	require.NoError(t, db.Where("id = ?", "target-cloud").First(&target).Error)
