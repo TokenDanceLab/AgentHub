@@ -18,12 +18,21 @@ env:
   IMAGE_NAME: ghcr.io/tokendancelab/agenthub-hub-server
 
 jobs:
-  build-and-push:
-    name: Build and push Hub Server
-    runs-on: ubuntu-latest
+  build:
+    name: Build (${{ matrix.suffix }})
+    runs-on: ${{ matrix.runner }}
     permissions:
       contents: read
       packages: write
+    strategy:
+      matrix:
+        include:
+          - platform: linux/amd64
+            suffix: amd64
+            runner: ubuntu-latest
+          - platform: linux/arm64
+            suffix: arm64
+            runner: ubuntu-24.04-arm
 
     steps:
       - name: Checkout
@@ -32,9 +41,33 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
 
-      - name: Set up QEMU (binfmt for multi-arch)
-        run: docker run --privileged --rm tonistiigi/binfmt:latest --install all
+      - name: Login to GHCR
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Build and push (${{ matrix.platform }})
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: hub-server/deployments/Dockerfile
+          push: true
+          platforms: ${{ matrix.platform }}
+          tags: ${{ env.IMAGE_NAME }}:sha-${{ github.sha }}-${{ matrix.suffix }}
+          cache-from: type=gha,scope=hub-server-${{ matrix.suffix }}
+          cache-to: type=gha,mode=max,scope=hub-server-${{ matrix.suffix }}
+
+  merge:
+    name: Merge multi-arch manifest
+    runs-on: ubuntu-latest
+    needs: build
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
       - name: Login to GHCR
         uses: docker/login-action@v4
         with:
@@ -54,14 +87,9 @@ jobs:
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
 
-      - name: Build and push
-        uses: docker/build-push-action@v7
-        with:
-          context: .
-          file: hub-server/deployments/Dockerfile
-          push: true
-          platforms: linux/amd64,linux/arm64
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+      - name: Create multi-arch manifest and push
+        run: |
+          docker buildx imagetools create \
+            $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
+            ${{ env.IMAGE_NAME }}:sha-${{ github.sha }}-amd64 \
+            ${{ env.IMAGE_NAME }}:sha-${{ github.sha }}-arm64
