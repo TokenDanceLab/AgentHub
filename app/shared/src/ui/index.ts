@@ -97,8 +97,6 @@ export { CodeBlock } from './CodeBlock';
 export { Icon } from './Icon';
 export { SkeletonBar } from './SkeletonBar';
 export type { SkeletonBarProps, SkeletonBarVariant } from './SkeletonBar';
-export { ArtifactVersionTimeline } from './ArtifactVersionTimeline';
-export type { ArtifactVersion, ArtifactVersionTimelineProps } from './ArtifactVersionTimeline';
 
 // ── #1863 恢复：PermissionModePicker（#1860 按孤儿删除；现由 #1863 审批模式选择器消费）──
 export { PermissionModePicker } from './PermissionModePicker';
