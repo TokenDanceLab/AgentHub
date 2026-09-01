@@ -34,7 +34,7 @@ func TestPurgeReadNotifications_OldReadDeleted(t *testing.T) {
 
 	var remaining []model.Notification
 	require.NoError(t, db.Order("id").Find(&remaining).Error)
-	var ids []string
+	ids := make([]string, 0, len(remaining))
 	for _, n := range remaining {
 		ids = append(ids, n.ID)
 	}
