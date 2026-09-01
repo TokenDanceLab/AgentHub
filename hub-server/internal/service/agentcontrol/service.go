@@ -66,7 +66,11 @@ func (s *Service) DeliverToDesktopDevice(ctx context.Context, userID, deviceID s
 		return queueControl("route unavailable", err)
 	}
 	conn := s.mgr.FindByConnID(connID)
-	if conn == nil || conn.UserID != userID || conn.DeviceType != "desktop" || conn.DeviceID != deviceID {
+	if conn == nil {
+		return queueControl("connection mismatch", nil)
+	}
+	connUser, connDeviceType, connDeviceID := conn.Auth()
+	if connUser != userID || connDeviceType != "desktop" || connDeviceID != deviceID {
 		return queueControl("connection mismatch", nil)
 	}
 	result := s.mgr.PushToConn(connID, ws.NewFrame(ws.TypeAgentControl, json.RawMessage(payloadJSON)))

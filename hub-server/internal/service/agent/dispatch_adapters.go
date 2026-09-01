@@ -26,11 +26,12 @@ func (a wsManagerAdapter) FindByConnID(connID string) *dispatchsvc.ConnPort {
 	if conn == nil {
 		return nil
 	}
+	connUser, connDeviceType, connDeviceID := conn.Auth()
 	return &dispatchsvc.ConnPort{
 		ID:         conn.ID,
-		UserID:     conn.UserID,
-		DeviceType: conn.DeviceType,
-		DeviceID:   conn.DeviceID,
+		UserID:     connUser,
+		DeviceType: connDeviceType,
+		DeviceID:   connDeviceID,
 	}
 }
 
