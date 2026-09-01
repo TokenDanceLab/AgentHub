@@ -9,18 +9,10 @@ export type { CheckpointPreviewOverlayProps, CheckpointPreviewLabels } from './C
 export type { RunReviewOverlayProps } from './RunReviewOverlay';
 export { Select } from './Select';
 export type { SelectProps, SelectOption } from './Select';
-export { FormField } from './FormField';
-export type { FormFieldProps } from './FormField';
 export { Input } from './Input';
 export type { InputProps } from './Input';
-export { Textarea } from './Textarea';
-export type { TextareaProps } from './Textarea';
-export { Checkbox } from './Checkbox';
-export type { CheckboxProps } from './Checkbox';
 export { Switch } from './Switch';
 export type { SwitchProps } from './Switch';
-export { Radio } from './Radio';
-export type { RadioProps } from './Radio';
 export { EmptyState } from './EmptyState';
 export { EMPTY_STATE_KINDS, resolveEmptyStateCopy } from './EmptyState';
 export type {
