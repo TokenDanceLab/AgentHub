@@ -2,9 +2,11 @@ package store
 
 import (
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 )
 
 // sqlite_store_pure.go holds package-level helper functions peeled from
@@ -69,6 +71,57 @@ func deltaSQLiteRows(tx *sql.Tx, oldSnapshot, newSnapshot fileSnapshot) error {
 	}
 	if err := deltaRowsOfKind(tx, sqliteRowKindUserProfile, oldSnapshot.UserProfileOrder, oldSnapshot.UserProfiles, newSnapshot.UserProfileOrder, newSnapshot.UserProfiles, now); err != nil {
 		return err
+	}
+	if err := deltaSQLiteCheckpointRows(tx, oldSnapshot.Checkpoints, newSnapshot.Checkpoints, now); err != nil {
+		return err
+	}
+	return deltaSQLiteSettingsRow(tx, oldSnapshot, newSnapshot)
+}
+
+// deltaSQLiteCheckpointRows diffs the unordered checkpoint map by sorting IDs
+// deterministically (fileSnapshot keeps no checkpoint order list).
+func deltaSQLiteCheckpointRows(tx *sql.Tx, oldCheckpoints, newCheckpoints map[string]RunCheckpoint, now string) error {
+	return deltaRowsOfKind(tx, sqliteRowKindCheckpoint, sortedKeys(oldCheckpoints), oldCheckpoints, sortedKeys(newCheckpoints), newCheckpoints, now)
+}
+
+func sortedKeys[V any](m map[string]V) []string {
+	keys := make([]string, 0, len(m))
+	for key := range m {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	return keys
+}
+
+// deltaSQLiteSettingsRow keeps the single settings row current. It is written
+// whenever the encoded value changes and never deleted, so its presence marks
+// a post-migration rows layer.
+func deltaSQLiteSettingsRow(tx *sql.Tx, oldSnapshot, newSnapshot fileSnapshot) error {
+	oldRow := sqliteSettingsRow{Values: oldSnapshot.Settings, Mtime: oldSnapshot.SettingsMtime}
+	newRow := sqliteSettingsRow{Values: newSnapshot.Settings, Mtime: newSnapshot.SettingsMtime}
+	oldPayload, err := json.Marshal(oldRow)
+	if err != nil {
+		return fmt.Errorf("encode old settings row: %w", err)
+	}
+	newPayload, err := json.Marshal(newRow)
+	if err != nil {
+		return fmt.Errorf("encode new settings row: %w", err)
+	}
+	if string(oldPayload) == string(newPayload) {
+		return nil
+	}
+	_, err = tx.Exec(
+		`INSERT INTO agenthub_store_rows (row_kind, row_id, payload, order_index, updated_at)
+VALUES (?, ?, ?, ?, ?)
+	ON CONFLICT(row_kind, row_id) DO UPDATE SET payload = excluded.payload, order_index = excluded.order_index, updated_at = excluded.updated_at`,
+		sqliteRowKindSettings,
+		sqliteSnapshotKey,
+		string(newPayload),
+		0,
+		nowString(),
+	)
+	if err != nil {
+		return fmt.Errorf("write settings row: %w", err)
 	}
 	return nil
 }
