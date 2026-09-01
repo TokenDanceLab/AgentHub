@@ -80,19 +80,18 @@ async function waitForServer(url: string, maxRetries = 60, delayMs = 500): Promi
 }
 
 /**
- * Unwraps the {@code {"code":"OK","data":...}} envelope used by Edge Server's
- * writeSuccess helper, returning the inner data payload. Returns the raw
- * input unchanged when no envelope is detected (backward compatibility).
+ * Unwraps the {@code {"code":"ok","data":...}} envelope used by Edge Server's
+ * writeSuccess helper, returning the inner data payload. Older Edge builds
+ * sent "OK"; the production edgeClient accepts both casings, so this test
+ * mirror must too (edge-real runs against the real binary, which writes "ok").
+ * Returns the raw input unchanged when no envelope is detected.
  */
 function unwrapEdgeResponse(raw: unknown): unknown {
-  if (
-    raw &&
-    typeof raw === 'object' &&
-    'code' in raw &&
-    'data' in raw &&
-    (raw as Record<string, unknown>).code === 'OK'
-  ) {
-    return (raw as Record<string, unknown>).data;
+  if (raw && typeof raw === 'object' && 'code' in raw && 'data' in raw) {
+    const code = (raw as Record<string, unknown>).code;
+    if (code === 'OK' || code === 'ok') {
+      return (raw as Record<string, unknown>).data;
+    }
   }
   return raw;
 }
@@ -713,10 +712,10 @@ describeReal('Real Edge Server E2E', () => {
       const raw = await res.json();
 
       // The real client (edgeClient.fetchHealth) calls unwrapEdgeResponse
-      // which extracts the .data field from the unified {"code":"OK","data":{...}}
+      // which extracts the .data field from the unified {"code":"ok","data":{...}}
       // envelope. The test mirrors this to verify the shape the client actually
       // processes.
-      const body = raw?.code === 'OK' && raw?.data ? raw.data : raw;
+      const body = unwrapEdgeResponse(raw);
 
       expect(body).toHaveProperty('status');
       expect(body).toHaveProperty('version');
