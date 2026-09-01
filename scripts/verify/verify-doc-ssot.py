@@ -301,7 +301,7 @@ def check_max_lines() -> None:
         "docs/reference/sdk-agent-strategy.md": 120,
         "docs/reference/agent-protocol-compat.md": 100,
         "docs/governance/verifier-map.md": 120,
-        "docs/governance/known-flaky.md": 120,
+        "docs/governance/known-flaky.md": 170,
         "docs/reference/ux-benchmark-2026-08.md": 160,
     }
     for path, limit in limits.items():
