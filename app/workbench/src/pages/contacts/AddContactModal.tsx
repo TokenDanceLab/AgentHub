@@ -25,8 +25,12 @@ function QRPanel() {
   const expireLabel = React.useMemo(() => {
     const date = new Date();
     date.setDate(date.getDate() + 30);
-    return `有效期至 ${date.getFullYear()}年${date.getMonth() + 1}月${date.getDate()}日`;
-  }, []);
+    return t('addContact.qrExpire', {
+      year: date.getFullYear(),
+      month: date.getMonth() + 1,
+      day: date.getDate(),
+    });
+  }, [t]);
 
   return (
     <div className={styles.qrPanel}>
@@ -117,7 +121,7 @@ function PhonePanel({
       <label className={styles.phoneLabel} htmlFor={phoneInputId}>{t('addContact.phone')}</label>
       <div className={styles.phoneRow}>
         <Select
-          ariaLabel="区号"
+          ariaLabel={t('addContact.areaCode')}
           className={styles.phoneSelect ?? ''}
           value={countryCode}
           options={['+86', '+852', '+1'].map((code) => [code, code])}
@@ -135,7 +139,7 @@ function PhonePanel({
       <input
         id={noteInputId}
         className={styles.phoneInput}
-        placeholder="例如：合作方 PM / 新同事"
+        placeholder={t('addContact.remarkPlaceholder')}
         value={note}
         onChange={(e) => setNote(e.target.value)}
       />

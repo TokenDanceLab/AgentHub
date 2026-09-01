@@ -1,4 +1,7 @@
-import { describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
+import { getI18n } from 'react-i18next';
+import { SHARED_WORKBENCH_I18N_NAMESPACE } from '@shared/i18n';
+import { useTestI18nLanguage } from '@shared/testing/i18n';
 import type { TaskItem } from './pages';
 import {
   buildTaskFieldConfigLabel,
@@ -43,17 +46,22 @@ const TASKS: TaskItem[] = [
   },
 ];
 
+beforeAll(async () => {
+  await useTestI18nLanguage('zh');
+});
+
 describe('workbenchTasksPageModel', () => {
   it('builds toolbar labels from view/group/sort modes', () => {
-    expect(buildTaskGroupLabel('board', 'custom')).toBe('分组：状态看板');
-    expect(buildTaskGroupLabel('dashboard', 'custom')).toBe('分组：项目仪表盘');
-    expect(buildTaskGroupLabel('list', 'project')).toBe('分组：所属项目');
-    expect(buildTaskGroupLabel('list', 'status')).toBe('分组：任务状态');
-    expect(buildTaskGroupLabel('list', 'custom')).toBe('分组：自定义分组');
-    expect(buildTaskSortLabel('custom')).toBe('排序：拖拽自定义');
-    expect(buildTaskSortLabel('due')).toBe('排序：截止时间');
-    expect(buildTaskFieldConfigLabel(true)).toBe('字段配置');
-    expect(buildTaskFieldConfigLabel(false)).toBe('字段配置 5/6');
+    const t = getI18n()!.getFixedT('zh', SHARED_WORKBENCH_I18N_NAMESPACE);
+    expect(buildTaskGroupLabel(t, 'board', 'custom')).toBe('分组：状态看板');
+    expect(buildTaskGroupLabel(t, 'dashboard', 'custom')).toBe('分组：项目仪表盘');
+    expect(buildTaskGroupLabel(t, 'list', 'project')).toBe('分组：所属项目');
+    expect(buildTaskGroupLabel(t, 'list', 'status')).toBe('分组：任务状态');
+    expect(buildTaskGroupLabel(t, 'list', 'custom')).toBe('分组：自定义分组');
+    expect(buildTaskSortLabel(t, 'custom')).toBe('排序：拖拽自定义');
+    expect(buildTaskSortLabel(t, 'due')).toBe('排序：截止时间');
+    expect(buildTaskFieldConfigLabel(t, true)).toBe('字段配置');
+    expect(buildTaskFieldConfigLabel(t, false)).toBe('字段配置 5/6');
   });
 
   it('counts task stats', () => {
@@ -63,7 +71,9 @@ describe('workbenchTasksPageModel', () => {
   });
 
   it('assembles derived TasksPage model', () => {
+    const t = getI18n()!.getFixedT('zh', SHARED_WORKBENCH_I18N_NAMESPACE);
     const model = buildTasksPageDerivedModel({
+      t,
       realDataMode: true,
       taskFilterActive: true,
       taskGroupMode: 'project',
@@ -91,6 +101,7 @@ describe('workbenchTasksPageModel', () => {
     // Real mode without any tasks renders the honest coming-soon empty
     // state (#1818).
     const realEmpty = buildTasksPageDerivedModel({
+      t,
       realDataMode: true,
       taskFilterActive: false,
       taskGroupMode: 'custom',
@@ -102,6 +113,7 @@ describe('workbenchTasksPageModel', () => {
     expect(realEmpty.tasksComingSoon).toBe(true);
 
     const demo = buildTasksPageDerivedModel({
+      t,
       realDataMode: false,
       taskFilterActive: false,
       taskGroupMode: 'custom',

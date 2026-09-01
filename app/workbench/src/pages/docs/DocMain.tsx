@@ -86,7 +86,7 @@ export function DocMain({
           <span className={`${styles.docActionIcon} ${styles.actionIconOrange}`}>
             <DesignNavIcon name="upload" size={16} />
           </span>
-          上传
+          {t('docs.upload')}
         </button>
         <button
           type="button"
@@ -96,7 +96,7 @@ export function DocMain({
           <span className={`${styles.docActionIcon} ${styles.actionIconMulti}`}>
             <DesignNavIcon name="template" size={16} />
           </span>
-          模板库
+          {t('docs.templateLibrary')}
         </button>
       </div>
 

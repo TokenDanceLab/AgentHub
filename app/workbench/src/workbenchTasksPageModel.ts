@@ -1,3 +1,4 @@
+import type { TFunction } from 'i18next';
 import type { TaskItem, ViewMode } from './pages';
 import type { TaskGroupMode, TaskSortMode } from './workbenchTaskGroups';
 
@@ -20,22 +21,23 @@ export interface TasksPageDerivedModel {
 }
 
 export function buildTaskGroupLabel(
+  t: TFunction,
   viewMode: ViewMode,
   groupMode: TaskGroupMode,
 ): string {
-  if (viewMode === 'board') return '分组：状态看板';
-  if (viewMode === 'dashboard') return '分组：项目仪表盘';
-  if (groupMode === 'project') return '分组：所属项目';
-  if (groupMode === 'status') return '分组：任务状态';
-  return '分组：自定义分组';
+  if (viewMode === 'board') return t('tasks.group.boardStatus');
+  if (viewMode === 'dashboard') return t('tasks.group.projectDashboard');
+  if (groupMode === 'project') return t('tasks.group.byProject');
+  if (groupMode === 'status') return t('tasks.group.byStatus');
+  return t('tasks.group.custom');
 }
 
-export function buildTaskSortLabel(sortMode: TaskSortMode): string {
-  return sortMode === 'custom' ? '排序：拖拽自定义' : '排序：截止时间';
+export function buildTaskSortLabel(t: TFunction, sortMode: TaskSortMode): string {
+  return sortMode === 'custom' ? t('tasks.sort.custom') : t('tasks.sort.dueDate');
 }
 
-export function buildTaskFieldConfigLabel(showCreator: boolean): string {
-  return showCreator ? '字段配置' : '字段配置 5/6';
+export function buildTaskFieldConfigLabel(t: TFunction, showCreator: boolean): string {
+  return showCreator ? t('tasks.fieldConfig.basic') : t('tasks.fieldConfig.short');
 }
 
 export function countDueTodayTasks(tasks: TaskItem[]): number {
@@ -52,6 +54,7 @@ export function countCrossProjectTasks(tasks: TaskItem[]): number {
 
 /** Pure derived TasksPage toolbar/stat fields assembled from route state. */
 export function buildTasksPageDerivedModel(input: {
+  t: TFunction;
   realDataMode: boolean;
   taskFilterActive: boolean;
   taskGroupMode: TaskGroupMode;
@@ -61,6 +64,7 @@ export function buildTasksPageDerivedModel(input: {
   visibleTasks: TaskItem[];
 }): TasksPageDerivedModel {
   const {
+    t,
     realDataMode,
     taskFilterActive,
     taskGroupMode,
@@ -76,11 +80,11 @@ export function buildTasksPageDerivedModel(input: {
     dueTodayCount: countDueTodayTasks(visibleTasks),
     tasksComingSoon: realDataMode && visibleTasks.length === 0,
     fieldConfigActive: !taskShowCreator,
-    fieldConfigLabel: buildTaskFieldConfigLabel(taskShowCreator),
+    fieldConfigLabel: buildTaskFieldConfigLabel(t, taskShowCreator),
     groupActive: taskGroupMode !== 'custom' || taskViewMode !== 'list',
-    groupLabel: buildTaskGroupLabel(taskViewMode, taskGroupMode),
+    groupLabel: buildTaskGroupLabel(t, taskViewMode, taskGroupMode),
     incompleteCount: countIncompleteTasks(visibleTasks),
     sortActive: taskSortMode !== 'custom',
-    sortLabel: buildTaskSortLabel(taskSortMode),
+    sortLabel: buildTaskSortLabel(t, taskSortMode),
   };
 }

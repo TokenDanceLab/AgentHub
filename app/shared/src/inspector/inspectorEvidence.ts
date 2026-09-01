@@ -264,18 +264,20 @@ function diffProposalEvidenceGuardReasons(input: {
   return reasons;
 }
 
-export function evidenceStatusLabel(status: EvidenceRefStatus | undefined): string {
+export type InspectorTranslate = (key: string | string[], options?: any) => string;
+
+export function evidenceStatusLabel(t: InspectorTranslate, status: EvidenceRefStatus | undefined): string {
   switch (status) {
     case 'pending':
-      return '等待';
+      return t('inspector.status.pending');
     case 'running':
-      return '运行中';
+      return t('inspector.status.running');
     case 'completed':
-      return '完成';
+      return t('inspector.status.completed');
     case 'failed':
-      return '失败';
+      return t('inspector.status.failed');
     default:
-      return '记录';
+      return t('inspector.status.default');
   }
 }
 
@@ -294,8 +296,9 @@ function normalizeDiffProposalReviewStatus(status: string | undefined): DiffProp
   }
 }
 
-export function buildRuntimeEvidenceInspectorModel(
+export function buildRuntimeEvidenceInspectorModel<Ns extends string>(
   evidence: RuntimeEvidenceSnapshot,
+  t: InspectorTranslate,
 ): RuntimeEvidenceInspectorModel {
   const channels: RuntimeEvidenceChannelSummary[] = [
     runtimeEvidenceChannelSummary({
@@ -323,20 +326,20 @@ export function buildRuntimeEvidenceInspectorModel(
       error: evidence.errors?.previews,
     }),
   ];
-  const stateItems = channels.flatMap(runtimeEvidenceStateItems);
+  const stateItems = channels.flatMap((channel) => runtimeEvidenceStateItems(channel, t));
   const sourceSummary = channels
     .map((channel) => `${channel.title}: ${channel.sourceLabel}`)
     .join(' / ');
 
   return {
-    runLabel: evidence.runId ? `Run ${evidence.runId}` : '当前 Run',
+    runLabel: evidence.runId ? `Run ${evidence.runId}` : t('inspector.currentRun'),
     hasEvidence: channels.some((channel) => channel.count > 0),
     channels,
     stateItems,
     loadingItems: stateItems.filter((item) => item.kind === 'loading'),
     errorItems: stateItems.filter((item) => item.kind === 'error'),
-    emptyTitle: '暂无运行证据',
-    emptyDetail: `Edge 已返回空 diff、artifact 和 preview snapshot。来源：${sourceSummary}`,
+    emptyTitle: t('inspector.emptyTitle'),
+    emptyDetail: t('inspector.emptyDetail', { source: sourceSummary }),
   };
 }
 
@@ -360,20 +363,20 @@ function runtimeEvidenceChannelSummary(input: {
   };
 }
 
-function runtimeEvidenceStateItems(summary: RuntimeEvidenceChannelSummary): RuntimeEvidenceStateItem[] {
+function runtimeEvidenceStateItems(summary: RuntimeEvidenceChannelSummary, t: InspectorTranslate): RuntimeEvidenceStateItem[] {
   const items: RuntimeEvidenceStateItem[] = [];
   if (summary.loading) {
     items.push({
       channel: summary.channel,
       kind: 'loading',
-      label: `正在读取 ${runtimeEvidenceChannelLabel(summary.channel)}`,
+      label: t('inspector.channelLoading', { channel: runtimeEvidenceChannelLabel(summary.channel) }),
     });
   }
   if (summary.error) {
     items.push({
       channel: summary.channel,
       kind: 'error',
-      label: `${runtimeEvidenceChannelTitle(summary.channel)} 读取失败`,
+      label: t('inspector.channelLoadFailed', { channel: runtimeEvidenceChannelTitle(summary.channel) }),
     });
   }
   return items;

@@ -13,6 +13,7 @@ import {
 import styles from '../TasksPage.module.css';
 import type { TasksPane, ViewMode } from './types';
 import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 import { CHATVIEW_I18N_NAMESPACE } from '@shared/chatview/i18n/resources';
 import { SHARED_WORKBENCH_I18N_NAMESPACE } from '@shared/i18n';
 
@@ -47,34 +48,36 @@ export function NavGlyph({ name }: { name: DesignNavIconName }) {
 
 // ── Nav items ──
 
-export const NAV_PRIMARY: NavPrimaryItem[] = [
-  { id: 'owned', label: '我负责的', icon: 'users', badge: 3 },
-  { id: 'watching', label: '我关注的', icon: 'star' },
-  { id: 'activity', label: '动态', icon: 'running' },
-];
+// #2154 P3 i18n：模块级常量 label 改为渲染期经 t() 求值（language live）。
 
-export const NAV_QUICK: NavQuickItem[] = [
-  { id: 'all', label: '全部任务', icon: 'folder' },
-  { id: 'created', label: '我创建的', icon: 'folder' },
-  { id: 'assigned', label: '我分配的', icon: 'folder' },
-  { id: 'done', label: '已完成', icon: 'done' },
-];
+export function buildNavPrimary(t: TFunction): NavPrimaryItem[] {
+  return [
+    { id: 'owned', label: t('tasks.nav.owned'), icon: 'users', badge: 3 },
+    { id: 'watching', label: t('tasks.nav.watching'), icon: 'star' },
+    { id: 'activity', label: t('tasks.nav.activity'), icon: 'running' },
+  ];
+}
 
-export const PANE_TITLES: Record<TasksPane, string> = {
-  owned: '我负责的',
-  watching: '我关注的',
-  activity: '动态',
-  all: '全部任务',
-  created: '我创建的',
-  assigned: '我分配的',
-  done: '已完成',
-};
+export function buildNavQuick(t: TFunction): NavQuickItem[] {
+  return [
+    { id: 'all', label: t('tasks.nav.all'), icon: 'folder' },
+    { id: 'created', label: t('tasks.nav.created'), icon: 'folder' },
+    { id: 'assigned', label: t('tasks.nav.assigned'), icon: 'folder' },
+    { id: 'done', label: t('tasks.nav.done'), icon: 'done' },
+  ];
+}
 
-export const VIEW_MODES: { id: ViewMode; label: string }[] = [
-  { id: 'list', label: '列表' },
-  { id: 'board', label: '看板' },
-  { id: 'dashboard', label: '仪表盘' },
-];
+export function paneTitle(t: TFunction, pane: TasksPane): string {
+  return t(`tasks.nav.${pane}`);
+}
+
+export function buildViewModes(t: TFunction): { id: ViewMode; label: string }[] {
+  return [
+    { id: 'list', label: t('tasks.view.list') },
+    { id: 'board', label: t('tasks.view.board') },
+    { id: 'dashboard', label: t('tasks.view.dashboard') },
+  ];
+}
 
 // ── Small chrome helpers ──
 

@@ -196,14 +196,15 @@ const visuallyHiddenStyle: React.CSSProperties = {
  * i18n resolved via react-i18next (chatview namespace), co-existing with the consumer's root provider.
  */
 export const ChatViewTranscript = memo(function ChatViewTranscript({ transcript, sessionId, chatMode = 'group', onAgentClick, onBlockContextMenu, onBlockSelect, onBlockAction, onReviewFile, onArtifactClick, onCheckpointClick, onDeploySubmit, previewExternalOpenEnabled, selectedBlockIds, selectionMode, softHiddenBlockIds, actionedBlockIds, highlightedBlockId, onHighlightEnd, pinnedAnnouncement, typingUserNames, renderUserFooter, unreadDivider, transcriptLoading }: Props) {
+  const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE)
   const items = useMemo(() => {
     try {
-      return blocksToTranscriptItems(transcript)
+      return blocksToTranscriptItems(transcript, t)
     } catch (err) {
       console.error('[ChatViewTranscript] blocksToTranscriptItems failed:', err)
       return []
     }
-  }, [transcript])
+  }, [transcript, t])
   // Resolve the block-level anchor to an item index (agent groups merge
   // blocks, so the divider must sit above the containing item, not inside it).
   const resolvedUnreadDivider = useMemo(() => {
@@ -224,7 +225,6 @@ export const ChatViewTranscript = memo(function ChatViewTranscript({ transcript,
     () => resolveCompactDividerIndices(transcript),
     [transcript],
   )
-  const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE)
 
   // a11y (#1503): approval-arrival announcements. Waiting approval cards live
   // inside the Transcript's role=log region and are unmounted under
