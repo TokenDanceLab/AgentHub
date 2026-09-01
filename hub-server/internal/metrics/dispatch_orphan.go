@@ -18,6 +18,9 @@ var (
 	DispatchOrphanDiscovered prometheus.Counter
 	// DispatchOrphanRedelivered counts tasks successfully redelivered.
 	DispatchOrphanRedelivered prometheus.Counter
+	// DispatchOrphanClaimRolledBack counts claims returned to queued after a
+	// failed redelivery-context rebuild.
+	DispatchOrphanClaimRolledBack prometheus.Counter
 )
 
 // RegisterOrphanMetrics initializes and registers orphan recovery metrics.
@@ -36,7 +39,14 @@ func RegisterOrphanMetrics() {
 			Name:      "orphan_redelivered_total",
 			Help:      "Total number of orphaned tasks successfully redelivered.",
 		})
+		DispatchOrphanClaimRolledBack = prometheus.NewCounter(prometheus.CounterOpts{
+			Namespace: "agenthub",
+			Subsystem: "dispatch",
+			Name:      "orphan_claim_rolled_back_total",
+			Help:      "Total number of orphan claims rolled back to queued after rebuild failure.",
+		})
 		prometheus.MustRegister(DispatchOrphanDiscovered)
 		prometheus.MustRegister(DispatchOrphanRedelivered)
+		prometheus.MustRegister(DispatchOrphanClaimRolledBack)
 	})
 }
