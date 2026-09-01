@@ -670,8 +670,14 @@ func (a *App) broadcastOnlineStatus(ctx context.Context, userID string, online b
 	}
 
 	frame := ws.NewFrame(eventType, map[string]string{"user_id": userID})
+	// One pipelined presence round trip for all friends instead of one per
+	// friend (#2154 perf lane); errors degrade to no fanout.
+	onlineSet, err := a.CacheClient.AreOnline(ctx, friendIDs)
+	if err != nil {
+		return
+	}
 	for _, friendID := range friendIDs {
-		if online, _ := a.CacheClient.IsOnline(ctx, friendID); online {
+		if onlineSet[friendID] {
 			a.mgr.PushToUser(friendID, frame)
 		}
 	}
