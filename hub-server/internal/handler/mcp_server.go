@@ -115,6 +115,15 @@ func (h *MCPServerHandler) ListMCPServers(c *gin.Context) {
 			Fail(c, errcode.ErrInternal)
 			return
 		}
+		// #2154 security lane: market results must never expose author-side
+		// secrets. env_vars commonly holds API keys and auth_config can hold
+		// client secrets; write-time masking only guards auth_config, so both
+		// fields are blanked here for every market consumer (the owner's own
+		// full record remains available via the owner-scoped list).
+		for i := range result.Items {
+			result.Items[i].EnvVars = ""
+			result.Items[i].AuthConfig = ""
+		}
 		OK(c, gin.H{
 			"items": result.Items,
 			"page":  gin.H{"nextCursor": result.Cursor, "hasMore": result.HasMore},
