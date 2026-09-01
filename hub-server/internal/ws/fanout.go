@@ -117,7 +117,7 @@ func (m *Manager) PushToConn(connID string, frame Frame) DeliveryResult {
 		drops := c.droppedFrames.Add(1)
 		if shouldLogDrop(drops) {
 			sessionID := extractSessionID(frame.Payload)
-			userID, deviceType := c.Auth()
+			userID, deviceType, _ := c.Auth()
 			slog.Warn("ws frame dropped: send buffer full",
 				"conn_id", connID,
 				"user_id", userID,

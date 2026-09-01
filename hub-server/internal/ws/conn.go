@@ -80,14 +80,16 @@ func (c *Conn) SetAuth(userID, deviceType, deviceID string) {
 	c.DeviceID = deviceID
 }
 
-// Auth returns the authenticated identity snapshot under c.mu. Hot paths that
-// only log identity (e.g. fanout drop logging) must read through this getter:
-// SetAuth and Manager.SetAuth write the fields under c.mu, so unlocked reads
-// are a data race.
-func (c *Conn) Auth() (userID, deviceType string) {
+// Auth returns the authenticated identity snapshot under c.mu. Every identity
+// read outside the ws package (dispatch marking, target-bound checks, event
+// replay, fanout drop logging) must read through this getter: SetAuth and
+// Manager.SetAuth write the fields under c.mu, so unlocked reads are a data
+// race (#2162 getter, extended to the full triple for the #2154 Wegener
+// residuals in agentcontrol/dispatchsvc/agent/app).
+func (c *Conn) Auth() (userID, deviceType, deviceID string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	return c.UserID, c.DeviceType
+	return c.UserID, c.DeviceType, c.DeviceID
 }
 
 // Close closes the underlying WebSocket connection. It is safe to call

@@ -551,7 +551,7 @@ func (a *App) pushPendingTasks(ctx context.Context, userID, connID string) {
 	conn := a.mgr.FindByConnID(connID)
 	edgeDeviceID := ""
 	if conn != nil {
-		edgeDeviceID = conn.DeviceID
+		_, _, edgeDeviceID = conn.Auth()
 	}
 	failedTasks := make([]string, 0)
 	for _, taskJSON := range tasks {
