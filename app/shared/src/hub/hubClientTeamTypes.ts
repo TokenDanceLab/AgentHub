@@ -142,6 +142,14 @@ export interface HubAgentTeamEvent {
   created_at?: string;
 }
 
+export interface HubTeamEventsPage {
+  items: HubAgentTeamEvent[];
+  page: {
+    nextCursor: string;
+    hasMore: boolean;
+  };
+}
+
 export interface HubTeamMemberState {
   member_id: string;
   agent_profile_id?: string;

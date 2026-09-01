@@ -139,8 +139,12 @@ export function buildGetTeamRunStatePath(teamId: string, runId: string): string 
   return `/web/agent-teams/${encodeURIComponent(teamId)}/runs/${encodeURIComponent(runId)}/state`;
 }
 
-export function buildListTeamEventsPath(teamId: string, runId: string): string {
-  return `/web/agent-teams/${encodeURIComponent(teamId)}/runs/${encodeURIComponent(runId)}/events`;
+export function buildListTeamEventsPath(
+  teamId: string,
+  runId: string,
+  params?: { afterSeq?: number; pageSize?: number },
+): string {
+  return `/web/agent-teams/${encodeURIComponent(teamId)}/runs/${encodeURIComponent(runId)}/events${qs(params ?? {})}`;
 }
 
 export function buildListTeamTasksPath(teamId: string, runId: string): string {

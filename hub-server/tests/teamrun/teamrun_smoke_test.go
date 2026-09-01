@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -27,6 +28,15 @@ import (
 
 // apiResp is the shared Hub response envelope (internal/testkit.APIResponse).
 type apiResp = testkit.APIResponse
+
+// teamEventsPage mirrors the Hub ListTeamEvents response envelope (#2154).
+type teamEventsPage struct {
+	Items []model.AgentTeamEvent `json:"items"`
+	Page  struct {
+		NextCursor string `json:"nextCursor"`
+		HasMore    bool   `json:"hasMore"`
+	} `json:"page"`
+}
 
 func ptrStr(s string) *string { return &s }
 
@@ -563,10 +573,13 @@ func TestTeamRunSmoke(t *testing.T) {
 		r := parse(resp)
 		assertCode(t, r, "ok", "list team events")
 
-		// Parse the event list.
-		var events []model.AgentTeamEvent
-		require.NoError(t, json.Unmarshal(r.Data, &events), "unmarshal events")
+		// Parse the paginated event envelope (#2154).
+		var page teamEventsPage
+		require.NoError(t, json.Unmarshal(r.Data, &page), "unmarshal events")
+		events := page.Items
 		assert.NotEmpty(t, events, "should have at least one event")
+		assert.False(t, page.Page.HasMore, "full default page must fit in one window")
+		assert.NotEmpty(t, page.Page.NextCursor, "nextCursor carries the last seen seq")
 
 		// Verify we have expected event types.
 		eventTypes := make(map[string]bool)
@@ -585,6 +598,18 @@ func TestTeamRunSmoke(t *testing.T) {
 			assert.GreaterOrEqual(t, events[i].Seq, events[i-1].Seq,
 				"events must be in seq order at index %d", i)
 		}
+
+		// Cursor pagination (#2154): pageSize=1 returns one event and a
+		// nextCursor equal to that event's seq.
+		pagedResp := get("/web/agent-teams/" + teamID + "/runs/" + runID + "/events?pageSize=1")
+		pr := parse(pagedResp)
+		assertCode(t, pr, "ok", "first events page")
+		var firstPage teamEventsPage
+		require.NoError(t, json.Unmarshal(pr.Data, &firstPage), "unmarshal first events page")
+		require.Len(t, firstPage.Items, 1, "pageSize=1 must return exactly one event")
+		assert.True(t, firstPage.Page.HasMore, "more events must follow the first page")
+		assert.Equal(t, strconv.Itoa(firstPage.Items[0].Seq), firstPage.Page.NextCursor,
+			"nextCursor must be the seq of the last item")
 	})
 
 	// ── 6. Verify TeamTasks ─────────────────────────────────────────────
@@ -729,9 +754,10 @@ func TestTeamRunSmoke(t *testing.T) {
 		r := parse(resp)
 		assertCode(t, r, "ok", "list all events")
 
-		var events []model.AgentTeamEvent
-		require.NoError(t, json.Unmarshal(r.Data, &events))
+		var page teamEventsPage
+		require.NoError(t, json.Unmarshal(r.Data, &page), "unmarshal events page")
 
+		events := page.Items
 		eventTypes := make(map[string]int)
 		for _, evt := range events {
 			eventTypes[evt.Type]++

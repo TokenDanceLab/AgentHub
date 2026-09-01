@@ -12,10 +12,10 @@ import type {
   HubAgentTeamDetail,
   HubAgentTeamRun,
   HubAgentTeamTask,
-  HubAgentTeamEvent,
   HubTeamApprovalState,
   HubTeamConflictState,
   HubTeamRunState,
+  HubTeamEventsPage,
   HubTeamApprovalDecisionRequest,
   HubTeamConflictResolutionRequest,
   HubCreateAgentTeamRequest,
@@ -156,8 +156,8 @@ export function createHubClientExtendedApi(deps: HubClientExtendedApiDeps) {
     getTeamRunState: (teamId: string, runId: string) =>
       request<HubTeamRunState>(hubPayload.buildGetTeamRunStatePath(teamId, runId)),
 
-    listTeamEvents: (teamId: string, runId: string) =>
-      request<HubAgentTeamEvent[]>(hubPayload.buildListTeamEventsPath(teamId, runId)),
+    listTeamEvents: (teamId: string, runId: string, params?: { afterSeq?: number; pageSize?: number }) =>
+      request<HubTeamEventsPage>(hubPayload.buildListTeamEventsPath(teamId, runId, params)),
 
     listTeamTasks: (teamId: string, runId: string) =>
       request<HubAgentTeamTask[]>(hubPayload.buildListTeamTasksPath(teamId, runId)),

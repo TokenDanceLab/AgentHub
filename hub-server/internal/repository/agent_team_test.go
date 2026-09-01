@@ -323,3 +323,63 @@ func TestAgentTeamRepo_AppendAndListTeamEvents(t *testing.T) {
 	assert.Equal(t, 1, events[0].Seq)
 	assert.Equal(t, 2, events[1].Seq)
 }
+
+func TestAgentTeamRepo_ListTeamEventsByRunPage(t *testing.T) {
+	db := setupSQLite(t)
+
+	team := &model.AgentTeam{OwnerID: "user-1", Name: "Page Team"}
+	require.NoError(t, CreateTeam(db, team))
+
+	run := &model.AgentTeamRun{
+		TeamID:         team.ID,
+		TriggerUserID:  "user-1",
+		TriggerMessage: "test",
+		Status:         model.TeamRunStatusRunning,
+	}
+	require.NoError(t, CreateTeamRun(db, run))
+
+	for i := 0; i < 3; i++ {
+		ev := &model.AgentTeamEvent{TeamRunID: run.ID, Type: model.TeamEventRunStarted, Payload: `{}`}
+		require.NoError(t, AppendTeamEvent(db, ev))
+	}
+
+	// First window: 1 item, cursor advances to its seq.
+	p1, err := ListTeamEventsByRunPage(db, run.ID, 0, 1)
+	require.NoError(t, err)
+	require.Len(t, p1.Items, 1)
+	assert.Equal(t, 1, p1.Items[0].Seq)
+	assert.Equal(t, 1, p1.NextSeq)
+	assert.True(t, p1.HasMore)
+
+	// Second window from the cursor.
+	p2, err := ListTeamEventsByRunPage(db, run.ID, p1.NextSeq, 1)
+	require.NoError(t, err)
+	require.Len(t, p2.Items, 1)
+	assert.Equal(t, 2, p2.Items[0].Seq)
+	assert.Equal(t, 2, p2.NextSeq)
+	assert.True(t, p2.HasMore)
+
+	// Final window has no more.
+	p3, err := ListTeamEventsByRunPage(db, run.ID, p2.NextSeq, 1)
+	require.NoError(t, err)
+	require.Len(t, p3.Items, 1)
+	assert.Equal(t, 3, p3.Items[0].Seq)
+	assert.False(t, p3.HasMore)
+
+	// Cursor past the last seq returns an empty page.
+	p4, err := ListTeamEventsByRunPage(db, run.ID, 3, 1)
+	require.NoError(t, err)
+	require.Empty(t, p4.Items)
+	assert.False(t, p4.HasMore)
+	assert.Equal(t, 0, p4.NextSeq)
+
+	// Invalid limits are clamped to the cap and still return everything.
+	p5, err := ListTeamEventsByRunPage(db, run.ID, 0, -5)
+	require.NoError(t, err)
+	assert.Len(t, p5.Items, 3)
+	assert.False(t, p5.HasMore)
+	p6, err := ListTeamEventsByRunPage(db, run.ID, 0, maxTeamEventsPerRun+1)
+	require.NoError(t, err)
+	assert.Len(t, p6.Items, 3)
+	assert.False(t, p6.HasMore)
+}
