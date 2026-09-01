@@ -4,7 +4,7 @@
 # tsc typecheck is handled by CI (cd-pr-check.yml); Docker build
 # runs only vite build for production optimised output.
 
-FROM node:22-alpine AS builder
+FROM --platform=$BUILDPLATFORM node:22-alpine AS builder
 RUN corepack enable && corepack prepare pnpm@10 --activate
 WORKDIR /app
 
