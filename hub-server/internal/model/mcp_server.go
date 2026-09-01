@@ -3,6 +3,8 @@ package model
 import (
 	"encoding/json"
 	"fmt"
+	"net/url"
+	"strings"
 	"time"
 
 	"gorm.io/gorm"
@@ -93,7 +95,10 @@ func (m *MCPServer) validateAuthConfigSecrets() error {
 	return nil
 }
 
-// validateURLHasNoCredentials rejects URLs carrying embedded credentials.
+// validateURLHasNoCredentials rejects URLs carrying embedded credentials and
+// non-http(s) schemes (#2154 security lane F12: the previous substring checks
+// accepted e.g. ftp://host or a bare hostname that edge-side clients would
+// then consume).
 func (m *MCPServer) validateURLHasNoCredentials() error {
 	if m.URL == "" {
 		return nil
@@ -102,6 +107,16 @@ func (m *MCPServer) validateURLHasNoCredentials() error {
 		if contains(m.URL, pattern) {
 			return fmt.Errorf("url must not contain credentials")
 		}
+	}
+	u, err := url.Parse(m.URL)
+	if err != nil {
+		return fmt.Errorf("url must be a valid http(s) URL")
+	}
+	if !strings.EqualFold(u.Scheme, "http") && !strings.EqualFold(u.Scheme, "https") {
+		return fmt.Errorf("url must be http or https")
+	}
+	if u.Host == "" {
+		return fmt.Errorf("url must include a host")
 	}
 	return nil
 }
