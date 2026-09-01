@@ -43,31 +43,37 @@ func (a *App) setupWSManager() {
 
 	// WebSocket handler (created once here; reused by routes)
 	a.WebSocketHandler = handler.NewWebSocketHandler(a.mgr, a.Config.Server.Env)
-	a.WebSocketHandler.SetOnTyping(func(userID, sessionID string) {
-		frame := ws.NewFrame(ws.TypeTyping, map[string]interface{}{
-			"user_id":    userID,
-			"session_id": sessionID,
-		})
-		members, err := a.SessionService.ListActiveMembers(sessionID)
-		if err != nil {
-			return
-		}
-		senderIsMember := false
-		for _, member := range members {
-			if member.MemberID == userID {
-				senderIsMember = true
-				break
-			}
-		}
-		if !senderIsMember {
-			return
-		}
-		for _, member := range members {
-			if member.MemberID != userID {
-				a.mgr.PushToUser(member.MemberID, frame)
-			}
-		}
+	a.WebSocketHandler.SetOnTyping(a.handleTypingFrame)
+}
+
+// handleTypingFrame fans a typing indicator out to the sender's session
+// peers. Member resolution goes through mgr.ResolveMembers — the same
+// cache.GetOrLoad path (session:members:<id>, TTL 5min, singleflight) that
+// canTypeInSession and PushToSession already use — instead of a fresh
+// ListActiveMembers DB query per frame: typing frames arrive continuously
+// while a user types, and the previous per-frame query was the only
+// uncached member lookup on the hot path (#2154 perf lane).
+func (a *App) handleTypingFrame(userID, sessionID string) {
+	frame := ws.NewFrame(ws.TypeTyping, map[string]interface{}{
+		"user_id":    userID,
+		"session_id": sessionID,
 	})
+	memberIDs := a.mgr.ResolveMembers(sessionID)
+	senderIsMember := false
+	for _, memberID := range memberIDs {
+		if memberID == userID {
+			senderIsMember = true
+			break
+		}
+	}
+	if !senderIsMember {
+		return
+	}
+	for _, memberID := range memberIDs {
+		if memberID != userID {
+			a.mgr.PushToUser(memberID, frame)
+		}
+	}
 }
 
 // startEventSubscriptions subscribes to all bus events for WebSocket push.
