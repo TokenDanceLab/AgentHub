@@ -192,7 +192,15 @@ func SetupRoutes(r *gin.Engine, cfg *config.Config, authMW *middleware.AuthMiddl
 	edge.Use(authMW.RequireHubSession())
 	edge.Use(middleware.DeviceTypeCheck("desktop"))
 	{
-		edge.POST("/devices/register", deviceHandler.Register)
+		// Desktop device registration (authenticated, desktop device type only).
+		// Per-IP frequency limit: AuthRegisterRateLimit (3) requests per
+		// AuthRateLimitWindow, keyed by client IP — same shape as
+		// /cloud/edge/register (#2185). The route is session-authenticated, so
+		// this bounds per-IP re-registration churn, not identity. Non-auth path
+		// semantics apply on Redis outage (/edge/* is outside /client/auth/):
+		// AGENTHUB_RATE_LIMIT_FAIL_OPEN (default fail-open). Re-registering an
+		// existing device_id still counts against the frequency window.
+		edge.POST("/devices/register", middleware.RateLimit(cacheClient, config.AuthRegisterRateLimit, config.AuthRateLimitWindow, middleware.IPKey), deviceHandler.Register)
 		edge.POST("/agent-tasks/:id/ack", agentHandler.TaskAck)
 		edge.POST("/agent-tasks/:id/stream", agentHandler.TaskStream)
 		edge.POST("/agent-tasks/:id/done", agentHandler.TaskDone)
@@ -203,8 +211,10 @@ func SetupRoutes(r *gin.Engine, cfg *config.Config, authMW *middleware.AuthMiddl
 	// Per-IP frequency limit: AuthRegisterRateLimit (3) requests per
 	// AuthRateLimitWindow, keyed by client IP — same shape as /client/auth
 	// login/register limits. Non-auth path semantics apply on Redis outage:
-	// AGENTHUB_RATE_LIMIT_FAIL_OPEN (default fail-open). Per-user device
-	// count cap is NOT enforced here (tracked as follow-up).
+	// AGENTHUB_RATE_LIMIT_FAIL_OPEN (default fail-open). The per-user device
+	// count cap is enforced in the device service (cloud_edge quota,
+	// AGENTHUB_MAX_CLOUD_EDGE_DEVICES) and rejects new device_ids with 403
+	// device_limit_exceeded once the cap is reached.
 	cloud := r.Group("/cloud")
 	cloud.Use(authMW.Handler())
 	cloud.Use(authMW.RequireHubSession())

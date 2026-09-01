@@ -1,8 +1,7 @@
 # Deployment
 
 > 子文档 | 主索引：[architecture.md](../architecture.md)
->
-> 最后更新：2026-08-09
+> 最后更新：2026-09-02（配置面索引新增 AGENTHUB_MAX_CLOUD_EDGE_DEVICES）
 
 本文件只记录仓库内可维护的部署结构和证据边界。Live host、DNS、TLS、secret、机器路径、发布状态和生产回滚记录由 TokenDance server SSOT 维护，不在本仓库复制。
 
@@ -154,6 +153,7 @@ Hub 侧 code 交换端点固定为 `POST /client/auth/oidc/callback`，桌面/We
 | `AGENTHUB_EGRESS_*` | 见 `config.yaml` egress 节 | allow_cidrs / allow_hostnames / allow_plain_http / timeout（行为见 08-outbound-http.md） |
 | `AGENTHUB_UPLOAD_*` / `AGENTHUB_S3_*`（+裸 `S3_*` legacy） | 见 `config_jwt_upload.go` / `config_s3.go` | 上传目录/大小/MIME；对象存储后端，legacy 前缀兼容期 |
 | `AGENTHUB_TOKENDANCE_ID_HTTP_TIMEOUT` / `AGENTHUB_TOKENDANCE_ID_MAX_RESPONSE_BODY_BYTES` | 见 `config_tokendance.go` | TDID OIDC 客户端超时与响应体上限 |
+| `AGENTHUB_MAX_CLOUD_EDGE_DEVICES` | `50`（`DefaultMaxCloudEdgeDevicesPerUser`） | 每用户 `cloud_edge` 设备行数上限（`device.Register` 在 UpsertDevice 前判定）；达上限后新 `device_id` 注册返回 403 `device_limit_exceeded`，已有 `device_id` 的 upsert 刷新不受限。未设/非法回默认；`<= 0` 关闭上限。 |
 
 ### Edge
 

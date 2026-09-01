@@ -35,6 +35,28 @@ func UpsertDevice(db *gorm.DB, device *model.Device) error {
 	return nil
 }
 
+// CountDevicesByUserAndType returns how many devices of the given type the
+// user currently owns. Used to enforce the per-user cloud_edge quota.
+func CountDevicesByUserAndType(db *gorm.DB, userID, deviceType string) (int64, error) {
+	var count int64
+	err := db.Model(&model.Device{}).
+		Where("user_id = ? AND device_type = ?", userID, deviceType).
+		Count(&count).Error
+	return count, err
+}
+
+// DeviceExistsForUser reports whether deviceID is currently owned by the
+// given (userID, deviceType) pair. Used to distinguish an upsert refresh of
+// an already-owned device from a brand-new registration when enforcing the
+// per-user cloud_edge quota (updates must not be blocked by the cap).
+func DeviceExistsForUser(db *gorm.DB, deviceID, userID, deviceType string) (bool, error) {
+	var count int64
+	err := db.Model(&model.Device{}).
+		Where("id = ? AND user_id = ? AND device_type = ?", deviceID, userID, deviceType).
+		Count(&count).Error
+	return count > 0, err
+}
+
 func GetDeviceByID(db *gorm.DB, deviceID string) (*model.Device, error) {
 	var device model.Device
 	err := db.Where("id = ?", deviceID).First(&device).Error
