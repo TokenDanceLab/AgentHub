@@ -200,39 +200,6 @@
   margin: 0;
 }
 
-.iconAction {
-  width: 36px;
-  height: 36px;
-  padding: 0;
-  border: 1px solid var(--td-line);
-  border-radius: var(--r-md);
-  background: var(--td-surface);
-  color: var(--td-ink-muted);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition:
-    background var(--td-dur-normal) var(--td-ease),
-    border-color var(--td-dur-normal) var(--td-ease),
-    color var(--td-dur-normal) var(--td-ease);
-}
-
-.iconAction:hover {
-  background: var(--td-tint);
-  border-color: var(--td-plum);
-  color: var(--td-plum);
-}
-
-.iconAction svg {
-  width: 16px;
-  height: 16px;
-  fill: none;
-  stroke: currentcolor;
-  stroke-width: 1.9;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
 
 /* ── Sections ── */
 .section {

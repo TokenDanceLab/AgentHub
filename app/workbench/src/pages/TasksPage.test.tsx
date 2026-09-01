@@ -111,3 +111,22 @@ describe('TasksPage infinite scroll (T14 skeleton)', () => {
     expect(screen.getByText('加载中…')).toBeInTheDocument();
   });
 });
+
+describe('TasksPage nav action gating', () => {
+  it('hides the new-group nav button when onNewGroup is not provided (real data mode)', () => {
+    render(<TasksPage {...BASE_PROPS} />);
+
+    expect(
+      screen.queryByRole('button', { name: '新建分组' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('renders the new-group nav button and fires onNewGroup when provided', () => {
+    const onNewGroup = vi.fn();
+    render(<TasksPage {...BASE_PROPS} onNewGroup={onNewGroup} />);
+
+    const button = screen.getByRole('button', { name: '新建分组' });
+    fireEvent.click(button);
+    expect(onNewGroup).toHaveBeenCalledTimes(1);
+  });
+});
