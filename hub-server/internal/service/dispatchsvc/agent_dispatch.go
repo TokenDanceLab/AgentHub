@@ -283,7 +283,17 @@ func (s *DispatchService) dispatchUnboundInviterDesktop(ctx context.Context, tas
 // active connection the task stays queued so the outbox retry loop can
 // redeliver; only a confirmed live push marks the delivery sent (#2073).
 func (s *DispatchService) dispatchRouteHubRelay(ctx context.Context, task *model.PendingAgentTask, ai *model.AgentInstance, payload []byte, deliveryID string, cacheClient dispatchCache) {
-	pushReached, err := s.relay.CreateCommand(ctx, ai.InviterUserID, dispatch.AgentDispatchRelayCommand, json.RawMessage(payload), ai.InviterUserID)
+	// Target the bound device, not the inviter: relay.PushToDevice is keyed by
+	// device_id (the edge WS connection registers with its device UUID from
+	// JWT claims). Passing the user id here made the hub_relay live push
+	// silently miss on every dispatch (#2154 security lane F15 — functional,
+	// not a security issue). Fall back to the inviter id only for legacy
+	// unbound rows so the old behavior is preserved instead of an empty key.
+	targetEdgeID := task.EdgeDeviceID
+	if targetEdgeID == "" {
+		targetEdgeID = ai.InviterUserID
+	}
+	pushReached, err := s.relay.CreateCommand(ctx, targetEdgeID, dispatch.AgentDispatchRelayCommand, json.RawMessage(payload), ai.InviterUserID)
 	if !dispatch.HubRelayCreateSucceeded(err) {
 		slog.Error(dispatch.DispatchLogRelayCreateFailed, "task_id", task.ID, "user_id", ai.InviterUserID, "error", err)
 		s.pushPendingTargetTaskOffline(ctx, task, ai, payload, cacheClient)
