@@ -283,6 +283,9 @@ function WebWorkbenchRoot() {
         contacts={workbench.contacts}
         contactsError={workbench.contactsError}
         contactsActions={workbench.contactsActions}
+        documents={workbench.documents}
+        documentsError={workbench.documentsError}
+        documentsActions={workbench.documentsActions}
         conversations={workbench.conversations}
         activeProjectId={selectedProjectId}
         projects={workbench.projects}

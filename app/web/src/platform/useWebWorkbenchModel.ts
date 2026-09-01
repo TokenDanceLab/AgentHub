@@ -2,17 +2,20 @@ import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { CHATVIEW_I18N_NAMESPACE } from '@shared/chatview/i18n/resources';
-import type { ProjectDraft } from '@agenthub/workbench';
+import type { DocRow, ProjectDraft } from '@agenthub/workbench';
 import { resolveFailedToastKey } from '@shared/chatview/failedToastKey';
 import {
   getWorkbenchDataModeContract,
   getWorkbenchDataModeOverrideSnapshot,
   resolveWorkbenchDataMode,
   subscribeWorkbenchDataModeOverride,
+  type WorkbenchDataMode,
 } from '@shared/demo';
 import {
   resolveHubContacts,
+  resolveHubDocuments,
   type HubContactLike,
+  type HubDocumentLike,
 } from '@agenthub/workbench/hubDataMapping';
 import {
   getAgentActivityStore,
@@ -23,7 +26,7 @@ import {
 } from '@shared/transcript';
 import { useToastStore } from '@shared/ui/toast';
 import { friendlyErrorMessage } from '@shared/errorReporting';
-import { createHubClient, type Session } from '@/api/hubClient';
+import { createHubClient, type HubCreateDocumentRequest, type Session } from '@/api/hubClient';
 import {
   useHubExecutionTargets,
   usePingHubExecutionTarget,
@@ -97,6 +100,29 @@ const hubClient = createHubClient({ getToken: getAccessToken });
  * which leaves the hub-messages/pins/agent-task queries permanently
  * disabled and the transcript stuck on the preview/empty fallback.
  */
+/**
+ * Web Documents wiring contract (#2154): derive the frame props from the
+ * Hub documents query state. A failed request in real mode must surface
+ * `documentsError` and keep `documents` undefined (the page shows its error
+ * state instead of collapsing into an empty list — #1821 semantics, shared
+ * resolveHubDocuments). Not hub-ready → no error is surfaced.
+ */
+export function resolveWebDocumentsProps(params: {
+  items: HubDocumentLike[] | undefined;
+  hubReady: boolean;
+  dataMode: WorkbenchDataMode;
+  isError: boolean;
+  error: unknown;
+}): { documents: DocRow[] | undefined; documentsError: string | undefined } {
+  const documentsError = params.hubReady && params.isError
+    ? (params.error instanceof Error ? params.error.message : String(params.error))
+    : undefined;
+  return {
+    documents: resolveHubDocuments(params.items, params.hubReady, params.dataMode, documentsError),
+    documentsError,
+  };
+}
+
 export function resolveWebActiveHubSessionId(
   hubReady: boolean,
   sessions: Session[] | undefined,
@@ -290,6 +316,24 @@ export function useWebWorkbenchModel(selectedConversationId?: string, selectedPr
     enabled: hubReady,
     staleTime: 10_000,
     placeholderData: (previous) => previous,
+  });
+
+  // Hub Documents (#2154 Web Documents honest wiring): the web shell never
+  // fed the workbench frame any documents, so the Docs page silently fell
+  // back to mock rows in real mode. Mirrors desktop semantics; mapping goes
+  // through the shared workbench contract (resolveHubDocuments).
+  const documentsQuery = useQuery({
+    queryKey: ['web-v4', 'hub-documents', hubReady],
+    queryFn: () => hubClient.listDocuments(),
+    enabled: hubReady,
+    staleTime: 10_000,
+    placeholderData: (previous) => previous,
+  });
+  const createDocumentMutation = useMutation({
+    mutationFn: (data: HubCreateDocumentRequest) => hubClient.createDocument(data),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['web-v4', 'hub-documents'] });
+    },
   });
 
   const projects = useHubWorkspaceProjects({ enabled: hubReady, getToken: getAccessToken });
@@ -668,6 +712,27 @@ export function useWebWorkbenchModel(selectedConversationId?: string, selectedPr
     ],
   );
 
+  const { documents, documentsError } = useMemo(
+    () => resolveWebDocumentsProps({
+      items: documentsQuery.data?.items as HubDocumentLike[] | undefined,
+      hubReady,
+      dataMode,
+      isError: documentsQuery.isError,
+      error: documentsQuery.error,
+    }),
+    [documentsQuery.data, documentsQuery.isError, documentsQuery.error, hubReady, dataMode],
+  );
+  const documentsActions = useMemo(
+    () => (hubReady
+      ? {
+        onCreateDoc: async () => {
+          await createDocumentMutation.mutateAsync({ title: t('doc.untitled') });
+        },
+      }
+      : undefined),
+    [hubReady, createDocumentMutation, t],
+  );
+
   return {
     activeConversationId,
     isAgentRunning,
@@ -698,6 +763,9 @@ export function useWebWorkbenchModel(selectedConversationId?: string, selectedPr
       onUpdateRemark: (userId: string, remark: string) => updateContactRemark.mutateAsync({ userId, remark }),
       onCreateGroup: (name: string, memberIds: string[]) => createGroupSession.mutateAsync({ name, memberIds }),
     } : undefined,
+    documents,
+    documentsError,
+    documentsActions,
     chatActions: hubReady ? {
       onRecallMessage: (messageId: string) => recallMessageMut.mutateAsync(messageId),
       onEditMessage: (messageId: string, content: string) => editMessageMut.mutateAsync({ messageId, content }),
