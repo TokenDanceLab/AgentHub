@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -17,8 +18,10 @@ import (
 	"github.com/agenthub/hub-server/internal/cache"
 	"github.com/agenthub/hub-server/internal/config"
 	"github.com/agenthub/hub-server/internal/handler"
+	"github.com/agenthub/hub-server/internal/jwtutil"
 	"github.com/agenthub/hub-server/internal/metrics"
 	"github.com/agenthub/hub-server/internal/middleware"
+	"github.com/agenthub/hub-server/internal/model"
 	"github.com/agenthub/hub-server/internal/service/message"
 	"github.com/agenthub/hub-server/internal/service/messagereaction"
 )
@@ -260,5 +263,85 @@ func TestClientMessageReactionRoutesAreRegistered(t *testing.T) {
 				t.Fatalf("%s %s was not registered; status=%d body=%q", tt.method, tt.path, w.Code, w.Body.String())
 			}
 		})
+	}
+}
+
+type routerDeviceServiceStub struct{}
+
+func (routerDeviceServiceStub) Register(_ context.Context, deviceID, userID, deviceType, appVersion string, _ []string) (*model.Device, error) {
+	return &model.Device{ID: deviceID, UserID: userID, DeviceType: deviceType, AppVersion: appVersion}, nil
+}
+
+func (routerDeviceServiceStub) ListDevices(string) ([]model.Device, error) { return nil, nil }
+
+// TestCloudEdgeRegisterRateLimitedByIP verifies the #2154-F16 wiring:
+// POST /cloud/edge/register sits behind middleware.RateLimit keyed by client
+// IP, reusing AuthRegisterRateLimit per AuthRateLimitWindow. Requests 1–3
+// must traverse auth → limiter → handler (200 via stub service), the 4th
+// within the window must get 429 + Retry-After, and a different client IP
+// must still pass (rate-limit key is the IP dimension).
+func TestCloudEdgeRegisterRateLimitedByIP(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	mr, err := miniredis.Run()
+	if err != nil {
+		t.Fatalf("miniredis: %v", err)
+	}
+	t.Cleanup(mr.Close)
+	metrics.Register()
+
+	// #nosec G101 -- 测试专用固定 JWT secret（非真实凭据）
+	const jwtSecret = "router-rl-test-secret"
+	cfg := &config.Config{JWT: config.JWTConfig{Secret: jwtSecret}}
+
+	deviceHandler := handler.NewDeviceHandler(routerDeviceServiceStub{})
+	deviceHandler.SetJWTConfig(jwtSecret, time.Hour)
+
+	r := gin.New()
+	if err := SetupRoutes(
+		r,
+		cfg,
+		middleware.NewAuthMiddleware(cfg, middleware.AuthDependencies{}, nil),
+		jwtSecret,
+		cache.NewClient(redis.NewClient(&redis.Options{Addr: mr.Addr()})),
+		nil, nil,
+		deviceHandler,
+		nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil,
+	); err != nil {
+		t.Fatal(err)
+	}
+
+	token, err := jwtutil.GenerateAccessToken("user-1", "desktop", "dev-1", jwtSecret, time.Hour)
+	if err != nil {
+		t.Fatalf("mint hub-local token: %v", err)
+	}
+	body := `{"device_id":"3f2c1a4e-9b7d-4c21-8e5f-0a6b7c8d9e10","app_version":"9.9.9"}`
+
+	doRegister := func(remoteAddr string) *httptest.ResponseRecorder {
+		req := httptest.NewRequest(http.MethodPost, "/cloud/edge/register", strings.NewReader(body))
+		req.RemoteAddr = remoteAddr
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Authorization", "Bearer "+token)
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+		return w
+	}
+
+	for i := 1; i <= config.AuthRegisterRateLimit; i++ {
+		w := doRegister("10.40.0.1:3333")
+		if w.Code != http.StatusOK {
+			t.Fatalf("request %d/%d = %d, want %d; body=%q", i, config.AuthRegisterRateLimit, w.Code, http.StatusOK, w.Body.String())
+		}
+	}
+
+	w := doRegister("10.40.0.1:3333")
+	if w.Code != http.StatusTooManyRequests {
+		t.Fatalf("request %d = %d, want %d; body=%q", config.AuthRegisterRateLimit+1, w.Code, http.StatusTooManyRequests, w.Body.String())
+	}
+	if ra := w.Header().Get("Retry-After"); ra == "" {
+		t.Fatal("429 response missing Retry-After header")
+	}
+
+	if w := doRegister("10.40.0.2:3333"); w.Code != http.StatusOK {
+		t.Fatalf("different IP = %d, want %d; body=%q", w.Code, http.StatusOK, w.Body.String())
 	}
 }
