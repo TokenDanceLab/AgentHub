@@ -37,50 +37,32 @@
 | a11y | 自动消失提供可见时间或可暂停（成功态可放宽） | ✅ | hover/focus 触发 `pauseAutoDismiss`（ToastStack.tsx + toastStore.ts）满足「可暂停」分支；结论见下方 debt 台账 |
 | 响应式 | 窄宽下堆叠不遮挡主操作、可滚动查看 | ✅ | |
 
-### 表单组件族：FormField / Input / Textarea / Checkbox / Switch / Radio（#1827）
+### 表单组件族：Input / Switch（#1827；Select 验收并入本段）
 
-迁移背景（动机）：19 个文件裸 `<input>/<textarea>`、error 态各自手写；AuthPage `.input` desktop/web 双份分叉（web 带边框 10px radius、desktop 无边框 10px radius，同约定不同值）；SettingsPage 自造 `.switch`。本族为表单输入的唯一实现，error 态统一为 **语义（`aria-invalid` + `aria-describedby` 接线）与 token（`--td-danger`）**。三件套齐全（`.test.tsx` + `.stories.tsx` + 本表）。
+迁移背景（动机）：19 个文件裸 `<input>/<textarea>`、error 态各自手写；AuthPage `.input` desktop/web 双份分叉；SettingsPage 自造 `.switch`。#1827 建族 6 原语，实际仅 Input（web/desktop AuthPage）与 Switch（workbench SettingSwitch）被采用；FormField/Textarea/Checkbox/Radio 四原语始终零消费，已于 round-42 删除（#2154 候选 A）。产品面仍有约 22 处裸 `<input>` + 1 处裸 `<textarea>`（workbench/web 若干弹层），登记为 adoption debt（#2154 跟踪）。error 态统一约定为 **语义（`aria-invalid` + `aria-describedby` 接线）与 token（`--td-danger`）**。
 
 | 组件 | 维度 | 必选项 | 状态 | 备注 |
 |---|---|---|---|---|
-| FormField（`shared/src/ui/FormField.tsx`） | 视觉 | token 化 label/hint/error | ✅ | `--td-ink-muted`/`--td-ink-faint`/`--td-danger`/`--td-text-xs` |
-| FormField | 交互 | label↔control 绑定（htmlFor/auto-id） | ✅ | FormField.test.tsx：`getByLabelText` 断言显式 id 与自动 id 两条路径 |
-| FormField | 交互 | error 态语义接线可见 | ✅ | `aria-invalid` + `aria-describedby` 指向 error 文本；hint 冲突时让位 |
-| FormField | 键盘 | label Tab 聚焦原生 | ✅ | 原生 `<label htmlFor>` |
-| FormField | a11y | error 文本参与名称/描述 | ✅ | `aria-describedby`；必选标记 `aria-hidden` 星号 |
-| FormField | 响应式 | 长字段文案不横向溢出 | ✅ | `min-width: 0` + 纵向 gap 布局 |
 | Input（`shared/src/ui/Input.tsx`） | 视觉 | token 化（`--td-*` 优先，glass 材质延续 auth 卡） | ✅ | `--glass-border`/`--glass-bg-light`/`--td-ink`/`--td-focus`/`--td-danger`/`--td-radius-control`；无组件级硬编码调色板 |
 | Input | 视觉 | light/dark 对比度、hover/focus/disabled/invalid 可区分且无布局位移 | ✅ | 状态均由 border/box-shadow/bg 表达；stories 巡检 |
 | Input | 交互 | 输入主路径行为断言 | ✅ | Input.test.tsx：typing/value/change |
 | Input | 交互 | disabled 禁止交互 | ✅ | 原生 disabled + 0.5 opacity（disabled token 族属 #1827 token lane，缺 token 记 debt） |
 | Input | 键盘 | Tab/`focus-visible` 环（2.4.7） | ✅ | `:focus-visible` 用 `--focus-ring` |
-| Input | a11y | invalid 低配置访问名名称 | ✅ | `aria-invalid` 由 prop/FormField 注入 |
+| Input | a11y | invalid 低配置访问名名称 | ✅ | `aria-invalid` 由 prop 注入 |
 | Input | 响应式 | 窄宽触控 ≥44px | ✅ | `@media (max-width:760px) min-height: var(--touch-target-min)`（原 web AuthPage 每页 44px 规则收敛进族） |
-| Textarea（`shared/src/ui/Textarea.tsx`） | 视觉 | 同 Input token 体系 | ✅ | 仅垂直 resize，横向永不变形 |
-| Textarea | 交互 | 多行输入行为断言 | ✅ | Textarea.test.tsx：typing |
-| Textarea | 键盘/a11y | 同 Input | ✅ | 原生 textarea + 同族 focus/invalid 规则 |
-| Textarea | 响应式 | 窄宽触控、无横向滚动 | ✅ | 同 Input |
-| Checkbox（`shared/src/ui/Checkbox.tsx`） | 视觉 | token 化（`--td-plum`/`--td-line-strong`/`--td-danger`/`--td-ink-on-plum`） | ✅ | 原生 input 隐藏、表层叠视觉盒；checked=plum 底 + 白勾 |
-| Checkbox | 交互 | 点击/键盘切换、label 关联 | ✅ | Checkbox.test.tsx：label 名查询、click 触发 |
-| Checkbox | 键盘 | Space 切换（原生）+ `focus-visible` 环 | ✅ | 环在视觉盒上（`+ .box`），input 本体隐藏 |
-| Checkbox | a11y | 原生 checkbox 语义 | ✅ | `role="checkbox"` + 原生状态；invalid 带 `aria-invalid` |
-| Checkbox | 响应式 | 标签长文案换行、无横向溢出 | ✅ | inline-flex + label text 参与文本流 |
 | Switch（`shared/src/ui/Switch.tsx`） | 视觉 | 与旧 SettingsPage `.switch` 逐 token 等价 | ✅ | 42×24 药丸、`--td-surface-3`/`--td-line`/`--td-plum`/`--td-shadow-sm`；迁移视觉不变 |
 | Switch | 交互 | 切换回调、disabled 保持状态可见 | ✅ | Switch.test.tsx：false/true/disabled 三路 |
 | Switch | 键盘 | Tab + Space/Enter 切换 + `focus-visible` 环 | ✅ | 新族补上了旧实现缺失的焦点环 |
 | Switch | a11y | `role="switch"` + `aria-checked`，可访问名 | ✅ | `aria-label` 透传；#1818 disabled 语义保留 |
 | Switch | 响应式 | 尺寸固定不随状态变化 | ✅ | width/height 固定，thumb 位移仅 transform |
-| Radio（`shared/src/ui/Radio.tsx`） | 视觉 | token 化（同 Checkbox 家族） | ✅ | 16px 圆环 + 8px `--td-plum` 内点 |
-| Radio | 交互 | name 分组、切换回调 | ✅ | Radio.test.tsx：grouping/click |
-| Radio | 键盘 | 方向键组内移动（原生 radio）+ 焦点环 | ✅ | 原生语义 |
-| Radio | a11y | 原生 radio 语义 + invalid 接线 | ✅ | |
-| Radio | 响应式 | 同 Checkbox | ✅ | |
 | Select（`shared/src/ui/Select.tsx`，既有组件可见行为改动 #1827） | 视觉 | error 态 token 化 | ✅ | `--td-danger` 触发沿；focus 时焦点环优先（a11y） |
 | Select | 交互 | disabled option 不可选/不可 hover/不可导航 | ✅ | Select.test.tsx：Arrow 跳跃、Enter/click 拒选、Home/End 跳过 |
 | Select | 交互 | resize 重定位（翻转方向 + 锚点） | ✅ | open 期间 window `resize` 重算 top/bottom/width；测试 mock rect + innerHeight |
 | Select | 键盘 | disabled option 不落入 `aria-activedescendant` | ✅ | 导航 helper 只落在 enabled option |
 | Select | a11y | error 态 `aria-invalid` 于 trigger | ✅ | |
 | Select | 响应式 | 面板 max-height 内滚（不变） | ✅ | |
+迁移背景（动机）：19 个文件裸 `<input>/<textarea>`、error 态各自手写；AuthPage `.input` desktop/web 双份分叉（web 带边框 10px radius、desktop 无边框 10px radius，同约定不同值）；SettingsPage 自造 `.switch`。本族为表单输入的唯一实现，error 态统一为 **语义（`aria-invalid` + `aria-describedby` 接线）与 token（`--td-danger`）**。三件套齐全（`.test.tsx` + `.stories.tsx` + 本表）。
+
 
 产物与证据：
 - 迁移：web/desktop `AuthPage.tsx` 的 hub/dev URL 输入 → `<Input size="sm" mono>`（web 视觉等价；desktop 从 11px 透明底收敛到家族 13px glass 字段——11px 低于 CJK 可读下限，双份 `.input/.error` 手写分叉块已删除）；workbench `SettingSwitch` → 共享 `<Switch>`（视觉逐 token 等价，新增焦点环）。
