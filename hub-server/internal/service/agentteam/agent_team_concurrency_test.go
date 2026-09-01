@@ -474,3 +474,79 @@ func assertAssignmentAndTaskCounts(t *testing.T, db *gorm.DB, runID string, want
 	require.NoError(t, db.Model(&model.AgentTeamTask{}).Where("team_run_id = ?", runID).Count(&tasks).Error)
 	assert.Equal(t, wantTasks, tasks)
 }
+
+// TestAgentTeamService_ReviewDagPlanConcurrentDecisionsFirstWins is the race
+// regression: before the CAS claim, concurrent ReviewDagPlan calls all passed
+// the pending_review status read and each applied its side effects (double
+// assignment cancels, duplicate review-decided events). With the conditional
+// claim exactly one decision wins; the losers get the same ErrBadRequest as a
+// stale-status call.
+func TestAgentTeamService_ReviewDagPlanConcurrentDecisionsFirstWins(t *testing.T) {
+	db := setupAgentTeamConcurrentSQLite(t)
+	svc := NewAgentTeamService(db, nil, nil)
+	svc.SetHumanReviewEnabled(true)
+	team, _, executor, run := seedAgentTeamRun(t, db)
+
+	_, err := svc.HandleRouteDecision(context.Background(), "user-1", team.ID, run.ID, model.CoordinatorRouteDecision{
+		Action:       "delegate",
+		NextWorker:   executor.ID,
+		Instructions: "Do the thing",
+	})
+	require.NoError(t, err)
+
+	gotRun, err := repository.GetTeamRunByID(db, run.ID)
+	require.NoError(t, err)
+	require.Equal(t, model.TeamRunStatusPendingReview, gotRun.Status, "seed must reach pending_review")
+
+	start := make(chan struct{})
+	actions := []string{
+		model.ReviewActionApprove,
+		model.ReviewActionDiscuss,
+		model.ReviewActionModify,
+		model.ReviewActionApprove,
+	}
+	results := make(chan error, len(actions))
+	for _, action := range actions {
+		action := action
+		go func() {
+			<-start
+			_, err := svc.ReviewDagPlan(context.Background(), "user-1", run.ID, model.HumanReviewDecision{
+				Action:  action,
+				Comment: "racing decision",
+			})
+			results <- err
+		}()
+	}
+	close(start)
+
+	winners, conflicts := 0, 0
+	for range actions {
+		err := <-results
+		if err == nil {
+			winners++
+			continue
+		}
+		if errors.Is(err, errcode.ErrBadRequest) {
+			conflicts++
+			continue
+		}
+		require.NoError(t, err)
+	}
+	require.Equal(t, 1, winners, "exactly one concurrent decision may win")
+	assert.Equal(t, len(actions)-1, conflicts)
+
+	// Exactly one review-decided event despite four racing decisions.
+	events, err := repository.ListTeamEventsByRun(db, run.ID)
+	require.NoError(t, err)
+	decided := 0
+	for _, e := range events {
+		if e.Type == model.TeamEventReviewDecided {
+			decided++
+		}
+	}
+	assert.Equal(t, 1, decided, "racing decisions must not duplicate review-decided events")
+
+	finalRun, err := repository.GetTeamRunByID(db, run.ID)
+	require.NoError(t, err)
+	assert.Equal(t, model.TeamRunStatusRunning, finalRun.Status)
+}
