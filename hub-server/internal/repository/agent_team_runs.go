@@ -60,6 +60,19 @@ func UpdateTeamRunStatus(db *gorm.DB, runID, status string) error {
 	return db.Model(&model.AgentTeamRun{}).Where("id = ?", runID).Update("status", status).Error
 }
 
+// UpdateTeamRunStatusIf transitions a run's status only when the current
+// status equals fromStatus. The conditional WHERE makes the check-and-write
+// atomic so racing callers cannot both claim the same state (e.g. two
+// concurrent ReviewDagPlan decisions on one pending_review run). Returns the
+// number of rows updated (0 when the run was already claimed, has moved on,
+// or does not exist).
+func UpdateTeamRunStatusIf(db *gorm.DB, runID, fromStatus, toStatus string) (int64, error) {
+	res := db.Model(&model.AgentTeamRun{}).
+		Where("id = ? AND status = ?", runID, fromStatus).
+		Update("status", toStatus)
+	return res.RowsAffected, res.Error
+}
+
 // UpdateTeamRunStatusIfNotTerminal transitions a run's status only when the
 // current status is not terminal (completed/failed/cancelled). The conditional
 // WHERE makes the check-and-write atomic so a repeated or racing finish cannot
