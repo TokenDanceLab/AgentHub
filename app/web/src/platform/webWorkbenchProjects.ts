@@ -44,9 +44,12 @@ export interface ParsedProjectThreadMessageContent {
   } | undefined;
 }
 
+type WebTranslate = (key: string, options?: any) => string;
+
 export function workspaceProjectToProjectInfo(
   project: WorkspaceProject,
   group?: WorkspaceProjectGroupProjection,
+  t?: WebTranslate,
 ): ProjectInfo {
   const description = project.description?.trim() || 'Hub workspace project';
   const threads = projectGroupItems(group?.threads);
@@ -69,7 +72,7 @@ export function workspaceProjectToProjectInfo(
   ];
   return {
     id: project.id,
-    name: project.name?.trim() || '未命名项目',
+    name: project.name?.trim() || t?.('projects.unnamed') || '未命名项目',
     description,
     status: group ? 'Hub group' : 'Hub',
     meta: group
@@ -221,9 +224,9 @@ export function mergeWorkspaceProjectDetail(
   return found ? merged : [detail, ...current];
 }
 
-export function projectDraftToHubRequest(draft: ProjectDraft): { name: string; description: string } {
+export function projectDraftToHubRequest(draft: ProjectDraft, t?: WebTranslate): { name: string; description: string } {
   return {
-    name: draft.name.trim() || '未命名项目',
+    name: draft.name.trim() || t?.('projects.unnamed') || '未命名项目',
     description: draft.description.trim(),
   };
 }
@@ -237,6 +240,7 @@ export function resolveWebProjectsStatus(
   saving = false,
   selectedProject: { isFetching: boolean; error?: unknown } = { isFetching: false },
   projectGroups: { isFetching: boolean; error?: unknown } = { isFetching: false },
+  t?: WebTranslate,
 ): { loading: boolean; error?: string | undefined; actionError?: string | undefined; saving: boolean } {
   const realMode = isWorkbenchRealDataMode(dataMode);
   const effectiveRealMode = hubReady || realMode;
@@ -246,11 +250,11 @@ export function resolveWebProjectsStatus(
     error: signedOutRealMode
       ? 'Sign in to Hub to load workspace projects.'
       : effectiveRealMode && projects.error
-        ? errorMessage(projects.error, 'Hub Projects 加载失败')
+        ? errorMessage(projects.error, t?.('projects.hubLoadFailed') ?? 'Hub Projects 加载失败')
         : effectiveRealMode && selectedProject.error
-          ? errorMessage(selectedProject.error, 'Hub Project 详情加载失败')
+          ? errorMessage(selectedProject.error, t?.('projects.hubDetailLoadFailed') ?? 'Hub Project 详情加载失败')
           : effectiveRealMode && projectGroups.error
-            ? errorMessage(projectGroups.error, 'Hub Project Group 加载失败')
+            ? errorMessage(projectGroups.error, t?.('projects.hubGroupLoadFailed') ?? 'Hub Project Group 加载失败')
         : undefined,
     actionError: effectiveRealMode ? errorMessage(createError ?? updateError, '') || undefined : undefined,
     saving,

@@ -12,7 +12,9 @@ import { projectDraftToHubRequest } from './webWorkbenchProjects';
  * (#1546). Wraps the HubClient transport; the shared UI only ever sees the
  * narrow `WorkbenchProjectsPort` contract.
  */
-export function createWebWorkbenchProjectsPort(): WorkbenchProjectsPort {
+type WebTranslate = (key: string, options?: any) => string;
+
+export function createWebWorkbenchProjectsPort(t?: WebTranslate): WorkbenchProjectsPort {
   const hubClient = createHubClient({ getToken: getAccessToken });
 
   return {
@@ -25,11 +27,11 @@ export function createWebWorkbenchProjectsPort(): WorkbenchProjectsPort {
       };
     },
     async createProject(draft) {
-      const created = await hubClient.createWorkspaceProject(projectDraftToHubRequest(draft));
+      const created = await hubClient.createWorkspaceProject(projectDraftToHubRequest(draft, t));
       return workspaceProjectToProjectInfo(created);
     },
     async updateProject(projectId, draft) {
-      const updated = await hubClient.updateWorkspaceProject(projectId, projectDraftToHubRequest(draft));
+      const updated = await hubClient.updateWorkspaceProject(projectId, projectDraftToHubRequest(draft, t));
       return workspaceProjectToProjectInfo(updated);
     },
   };

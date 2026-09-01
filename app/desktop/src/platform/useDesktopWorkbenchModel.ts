@@ -164,6 +164,7 @@ function hubSessionMatchId(session: { id?: string; session_id?: string }): strin
 export function useDesktopWorkbenchModel(
   selectedConversationId?: string,
   t?: (key: string) => string,
+  tApp?: (key: string, options?: any) => string,
 ): DesktopWorkbenchModel {
   const dataModeOverride = useSyncExternalStore(
     subscribeWorkbenchDataModeOverride,
@@ -306,6 +307,7 @@ export function useDesktopWorkbenchModel(
         threadToConversation(
           thread,
           thread.threadId === activeThread?.threadId ? threadPins : undefined,
+          tApp,
         ),
       );
       const selectedDemoConversation = selectedConversationId && edgeConversations.some((c) => c.id === selectedConversationId)
@@ -313,7 +315,7 @@ export function useDesktopWorkbenchModel(
         : edgeConversations[0]?.id ?? DESKTOP_DEMO_DEFAULT_CONVERSATION_ID;
       // Use the already-fetched threadItems from the active thread query.
       const items = threadItems ?? [];
-      const edgeTranscript = normalizeThreadItemsToTranscript(items);
+      const edgeTranscript = normalizeThreadItemsToTranscript(items, t);
       return {
         activeConversationId: selectedDemoConversation,
         agents: demoWorkbenchAgents,
@@ -327,8 +329,8 @@ export function useDesktopWorkbenchModel(
         ...(activeThread?.threadId ? { activeThreadId: activeThread.threadId } : {}),
         threadsLoading: threadsQuery.isLoading,
         itemsLoading: threadItemsQuery.isLoading,
-        ...(threadsQuery.error ? { threadsError: errorMessage(threadsQuery.error, 'Threads 加载失败') } : {}),
-        ...(threadItemsQuery.error ? { itemsError: errorMessage(threadItemsQuery.error, '消息加载失败') } : {}),
+        ...(threadsQuery.error ? { threadsError: errorMessage(threadsQuery.error, tApp?.('threads.loadFailed') ?? 'Threads 加载失败') } : {}),
+        ...(threadItemsQuery.error ? { itemsError: errorMessage(threadItemsQuery.error, tApp?.('items.loadFailed') ?? '消息加载失败') } : {}),
       };
     }
     // Fallback: JS mock store when Edge is unavailable.
@@ -346,8 +348,8 @@ export function useDesktopWorkbenchModel(
       agentActivity,
       threadsLoading: false,
       itemsLoading: false,
-      ...(threadsQuery.error ? { threadsError: errorMessage(threadsQuery.error, 'Threads 加载失败') } : {}),
-      ...(threadItemsQuery.error ? { itemsError: errorMessage(threadItemsQuery.error, '消息加载失败') } : {}),
+      ...(threadsQuery.error ? { threadsError: errorMessage(threadsQuery.error, tApp?.('threads.loadFailed') ?? 'Threads 加载失败') } : {}),
+      ...(threadItemsQuery.error ? { itemsError: errorMessage(threadItemsQuery.error, tApp?.('items.loadFailed') ?? '消息加载失败') } : {}),
     };
   }, [dataModeContract.statusLabel, demoSnapshot, selectedConversationId, useEdgeDemoData, threads, activeThread, threadPins, threadItems, threadItemsQuery.error, threadItemsQuery.isLoading, threadsQuery.error, threadsQuery.isLoading, agentActivity]);
 
@@ -360,6 +362,7 @@ export function useDesktopWorkbenchModel(
       threadToConversation(
         thread,
         thread.threadId === activeThread?.threadId ? threadPins : undefined,
+        tApp,
       ),
     );
     // Hub sessions first (IM/social), then Edge threads (execution).
@@ -380,7 +383,7 @@ export function useDesktopWorkbenchModel(
     }
     // Otherwise, use the Edge thread transcript path.
     const items = threadItems ?? [];
-    const persistedTranscript = normalizeThreadItemsToTranscript(items);
+    const persistedTranscript = normalizeThreadItemsToTranscript(items, t);
     if (persistedTranscript.length > 0 || liveTranscript.length > 0) {
       return orderTranscriptBlocks([...persistedTranscript, ...liveTranscript]);
     }
@@ -417,34 +420,34 @@ export function useDesktopWorkbenchModel(
       projectsQuery.data?.items,
       hubReady,
       dataMode,
-      workspaceProjectToProjectInfo,
+      (project) => workspaceProjectToProjectInfo(project, tApp),
     ),
-    [projectsQuery.data?.items, hubReady, dataMode],
+    [projectsQuery.data?.items, hubReady, dataMode, tApp],
   );
 
   const resolvedProjectsStatus = hubReady ? {
     loading: projectsQuery.isFetching,
-    ...(projectsQuery.error ? { error: errorMessage(projectsQuery.error, 'Hub Projects 加载失败') } : {}),
+    ...(projectsQuery.error ? { error: errorMessage(projectsQuery.error, tApp?.('projects.hubLoadFailed') ?? 'Hub Projects 加载失败') } : {}),
     saving: createProjectMutation.isPending || updateProjectMutation.isPending,
   } : undefined;
 
   const resolvedProjectsActions = hubReady ? {
     create: async (draft: ProjectDraft): Promise<ProjectInfo> => {
       const result = await createProjectMutation.mutateAsync({
-        name: draft.name.trim() || '未命名项目',
+        name: draft.name.trim() || tApp?.('projects.unnamed') || '未命名项目',
         description: draft.description.trim(),
       });
-      return workspaceProjectToProjectInfo(result);
+      return workspaceProjectToProjectInfo(result, tApp);
     },
     update: async (projectId: string, draft: ProjectDraft): Promise<ProjectInfo> => {
       const result = await updateProjectMutation.mutateAsync({
         id: projectId,
         data: {
-          name: draft.name.trim() || '未命名项目',
+          name: draft.name.trim() || tApp?.('projects.unnamed') || '未命名项目',
           description: draft.description.trim(),
         },
       });
-      return workspaceProjectToProjectInfo(result);
+      return workspaceProjectToProjectInfo(result, tApp);
     },
   } : undefined;
 
@@ -511,7 +514,7 @@ export function useDesktopWorkbenchModel(
       ? {
           threadsError: errorMessage(
             threadsQuery.error ?? hubSessionsQuery.error,
-            threadsQuery.error ? 'Threads 加载失败' : 'Hub sessions 加载失败',
+            threadsQuery.error ? (tApp?.('threads.loadFailed') ?? 'Threads 加载失败') : (tApp?.('sessions.loadFailed') ?? 'Hub sessions 加载失败'),
           ),
         }
       : {}),
@@ -519,7 +522,7 @@ export function useDesktopWorkbenchModel(
       ? {
           itemsError: errorMessage(
             threadItemsQuery.error ?? hubMessagesQuery.error,
-            threadItemsQuery.error ? '消息加载失败' : 'Hub 消息加载失败',
+            threadItemsQuery.error ? (tApp?.('items.loadFailed') ?? '消息加载失败') : (tApp?.('hubItems.loadFailed') ?? 'Hub 消息加载失败'),
           ),
         }
       : {}),
@@ -532,12 +535,12 @@ function getWorkbenchDataMode(override: WorkbenchDataMode | undefined): Workbenc
   return resolveWorkbenchDataMode(import.meta.env.VITE_AGENTHUB_DATA_MODE, override);
 }
 
-function threadToConversation(thread: ThreadInfo, pins?: ThreadPinInfo[]): WorkbenchConversation {
+function threadToConversation(thread: ThreadInfo, pins?: ThreadPinInfo[], tApp?: (key: string, options?: any) => string): WorkbenchConversation {
   const updatedLabel = thread.updatedAt ? formatTimestamp(thread.updatedAt) : undefined;
 
   const conversation: WorkbenchConversation = {
     id: thread.threadId,
-    title: thread.title?.trim() || '未命名会话',
+    title: thread.title?.trim() || tApp?.('conversation.unnamed') || '未命名会话',
     kind: (thread.kind === 'direct' || thread.kind === 'group') ? thread.kind : 'group',
     subtitle: threadSubtitle(thread),
     updatedLabel,
@@ -595,11 +598,12 @@ function formatPinTime(timestamp: string): string | undefined {
 
 function workspaceProjectToProjectInfo(
   project: { id: string; name?: string; description?: string; created_at?: string; updated_at?: string },
+  tApp?: (key: string, options?: any) => string,
 ): ProjectInfo {
   const description = project.description?.trim() || 'Hub workspace project';
   return {
     id: project.id,
-    name: project.name?.trim() || '未命名项目',
+    name: project.name?.trim() || tApp?.('projects.unnamed') || '未命名项目',
     description,
     status: 'Hub',
     meta: '0 runs',

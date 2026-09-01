@@ -1,5 +1,6 @@
 import { invoke } from '@tauri-apps/api/core';
 import { open } from '@tauri-apps/plugin-dialog';
+import { getI18n } from 'react-i18next';
 import {
   desktopPathsToComposerAttachments,
   type ComposerAttachment,
@@ -9,7 +10,7 @@ export async function pickDesktopComposerAttachments(): Promise<ComposerAttachme
   const selected = await open({
     directory: false,
     multiple: true,
-    title: '选择附件',
+    title: getI18n()?.t('attachments.pickTitle') ?? '选择附件',
   });
   const paths = Array.isArray(selected) ? selected : selected ? [selected] : [];
 
