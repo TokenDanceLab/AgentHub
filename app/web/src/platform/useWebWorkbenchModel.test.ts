@@ -21,6 +21,7 @@ import {
 } from './webWorkbenchProjects';
 import {
   resolveWebActiveHubSessionId,
+  resolveWebDocumentsProps,
   resolveWebSessionLastReadSeq,
   resolveWebWorkbenchContacts,
   useWebSessionAutoMarkRead,
@@ -1009,6 +1010,60 @@ describe('useWebWorkbenchModel helpers', () => {
       expect.objectContaining({ id: 'evt-replay-1', payload: { content: 'from replay' } }),
       expect.objectContaining({ id: 'evt-terminal', payload: { content: 'fresh terminal', success: true } }),
     ]);
+  });
+});
+
+describe('resolveWebDocumentsProps (#2154 web documents honest wiring)', () => {
+  const items = [
+    { id: 'd-1', title: 'Live doc', location: 'L' },
+    { id: 'd-2', title: 'Trashed', location: 'L', status: 'deleted' },
+  ];
+
+  it('maps live documents and drops deleted rows in real mode', () => {
+    const result = resolveWebDocumentsProps({
+      items,
+      hubReady: true,
+      dataMode: 'approved-real',
+      isError: false,
+      error: null,
+    });
+    expect(result.documentsError).toBeUndefined();
+    expect(result.documents?.map((d) => d.id)).toEqual(['d-1']);
+  });
+
+  it('surfaces the error and keeps documents undefined instead of an empty list', () => {
+    const result = resolveWebDocumentsProps({
+      items: undefined,
+      hubReady: true,
+      dataMode: 'approved-real',
+      isError: true,
+      error: new Error('hub exploded'),
+    });
+    expect(result.documentsError).toBe('hub exploded');
+    expect(result.documents).toBeUndefined();
+  });
+
+  it('does not surface errors when the hub is not ready', () => {
+    const result = resolveWebDocumentsProps({
+      items: undefined,
+      hubReady: false,
+      dataMode: 'approved-real',
+      isError: true,
+      error: new Error('signed out'),
+    });
+    expect(result.documentsError).toBeUndefined();
+    expect(result.documents).toEqual([]);
+  });
+
+  it('keeps the fixture-mode mock fallback (undefined) when hub is not ready', () => {
+    const result = resolveWebDocumentsProps({
+      items: undefined,
+      hubReady: false,
+      dataMode: 'fixture',
+      isError: false,
+      error: null,
+    });
+    expect(result.documents).toBeUndefined();
   });
 });
 
