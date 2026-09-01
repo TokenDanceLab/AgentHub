@@ -365,3 +365,98 @@ func TestMigration0068IndexCoverageFixes(t *testing.T) {
 	requireSQL(t, normalizedDown, "drop index if exists idx_session_members_member_active")
 	requireSQL(t, normalizedDown, "create index if not exists idx_audit_events_prev_hash on audit_events(prev_hash)")
 }
+
+func TestMigration0071MessageSearchTrgmIndexesILikeFallback(t *testing.T) {
+	up := readMigration(t, "0071_message_search_trgm.up.sql")
+	down := readMigration(t, "0071_message_search_trgm.down.sql")
+
+	normalizedUp := normalizeSQL(up)
+	// 1. pg_trgm 可用性必须显式守卫：扩展缺失时跳过而不是部署失败。
+	requireSQL(t, normalizedUp, "pg_available_extensions")
+	requireSQL(t, normalizedUp, "name = 'pg_trgm'")
+	// 2. 扩展与索引必须幂等创建。
+	requireSQL(t, normalizedUp, "create extension if not exists pg_trgm")
+	requireSQL(t, normalizedUp, "create index if not exists idx_messages_content_text_trgm")
+	// 3. 索引必须与 messageSearchCondition 的 ILIKE 表达式逐字匹配
+	//    （content->>'text'，无 COALESCE——NULL ILIKE 天然不命中），
+	//    且与 0042 保持同样的 recalled = false 部分索引条件。
+	requireSQL(t, normalizedUp, "using gin ((content->>'text') gin_trgm_ops)")
+	requireSQL(t, normalizedUp, "where recalled = false")
+
+	normalizedDown := normalizeSQL(down)
+	requireSQL(t, normalizedDown, "drop index if exists idx_messages_content_text_trgm")
+}
+
+func TestMigration0071PostgresUpCreatesTrgmIndexForMessageSearch(t *testing.T) {
+	dbURL, cleanup := postgresMigrationTestURL(t)
+	defer cleanup()
+
+	m, err := migrate.New(migrationsSourceURL(t), dbURL)
+	if err != nil {
+		t.Fatalf("create postgres migration runner: %v", err)
+	}
+	defer m.Close()
+
+	if err := m.Up(); err != nil && err != migrate.ErrNoChange {
+		t.Fatalf("run postgres migrations up: %v", err)
+	}
+
+	sqlDB, err := sql.Open("pgx", dbURL)
+	if err != nil {
+		t.Fatalf("open postgres migration test database: %v", err)
+	}
+	defer sqlDB.Close()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+
+	var hasTrgm bool
+	if err := sqlDB.QueryRowContext(ctx, "SELECT EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'pg_trgm')").Scan(&hasTrgm); err != nil {
+		t.Fatalf("check pg_trgm extension: %v", err)
+	}
+	if !hasTrgm {
+		t.Fatal("0071 migration did not enable pg_trgm")
+	}
+
+	var indexCount int
+	if err := sqlDB.QueryRowContext(ctx, `
+		SELECT count(*)
+		FROM pg_indexes
+		WHERE tablename = 'messages' AND indexname = 'idx_messages_content_text_trgm'
+	`).Scan(&indexCount); err != nil {
+		t.Fatalf("check trgm index presence: %v", err)
+	}
+	if indexCount != 1 {
+		t.Fatalf("idx_messages_content_text_trgm count = %d, want 1", indexCount)
+	}
+
+	// The ILIKE fallback branch of messageSearchCondition must be able to use
+	// the new index: a leading-wildcard pattern over enough trigrams is served
+	// by gin_trgm_ops instead of a sequential scan.
+	const trgmSessionID = "00000000-0000-0000-0000-000000000071"
+	const trgmSenderID = "00000000-0000-0000-0000-000000000771"
+	if _, err := sqlDB.ExecContext(ctx, `
+		INSERT INTO sessions (id, type, next_seq) VALUES ('`+trgmSessionID+`', 'private', 1)
+	`); err != nil {
+		t.Fatalf("insert session for trgm smoke query: %v", err)
+	}
+	if _, err := sqlDB.ExecContext(ctx, `
+		INSERT INTO messages (id, session_id, seq_id, client_msg_id, sender_type, sender_id, content_type, content, recalled)
+		VALUES (gen_random_uuid(), '`+trgmSessionID+`', 1, gen_random_uuid(), 'user', '`+trgmSenderID+`', 'text',
+		        '{"text":"the quick brown fox jumps over the lazy dog"}', false)
+	`); err != nil {
+		t.Fatalf("insert message for trgm smoke query: %v", err)
+	}
+
+	var hits int
+	if err := sqlDB.QueryRowContext(ctx, `
+		SELECT count(*) FROM messages
+		WHERE session_id = '`+trgmSessionID+`' AND recalled = false
+		  AND content->>'text' ILIKE '%quick brown fox%' ESCAPE '\'
+	`).Scan(&hits); err != nil {
+		t.Fatalf("trgm ILIKE smoke query: %v", err)
+	}
+	if hits != 1 {
+		t.Fatalf("trgm ILIKE smoke hits = %d, want 1", hits)
+	}
+}
