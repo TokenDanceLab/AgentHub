@@ -38,7 +38,6 @@ type Adapter struct {
 	messageQueue        *agents.Queue
 	spawner             SubAgentSpawner
 	depth               int
-	parentModel         string
 	dispatchConcurrency int
 
 	// Plan approval gate (P0 #3): when non-nil, the orchestrator pauses after
@@ -118,7 +117,6 @@ func (a *Adapter) Capabilities() AgentCapabilities {
 
 func (a *Adapter) BuildCommand(ctx RunProcessContext) (string, []string, []string, string) {
 	cmdPath, args, env, workDir := a.inner.BuildCommand(ctx)
-	a.parentModel = ctx.Model
 	// Use --append-system-prompt (not --system-prompt) to avoid silently
 	// discarding the agent profile's system prompt. Claude Code concatenates
 	// multiple --append-system-prompt values, so both the agent's profile
@@ -130,6 +128,10 @@ func (a *Adapter) BuildCommand(ctx RunProcessContext) (string, []string, []strin
 }
 
 func (a *Adapter) ParseStream(ctx context.Context, stdout io.Reader, stdin io.Writer, emitter EventEmitter, run store.Run) error {
+	// Per-run model comes from the parser context (injected by the lifecycle
+	// executor), never from shared Adapter state: one Adapter serves all
+	// concurrent runs of its agent (#2154 data-race fix).
+	parentModel, _ := ctx.Value(CtxModelKey).(string)
 	effectiveEmitter := emitter
 	if a.agentRegistry != nil || a.spawner != nil {
 		if a.messageQueue != nil {
@@ -144,7 +146,7 @@ func (a *Adapter) ParseStream(ctx context.Context, stdout io.Reader, stdin io.Wr
 			parentRun:       run,
 			depth:           a.depth,
 			threadID:        run.ThreadID,
-			model:           a.parentModel,
+			model:           parentModel,
 			maxConcurrency:  a.dispatchConcurrency,
 			ctx:             ctx,
 			dispatched:      make(map[string]dispatchEvent),

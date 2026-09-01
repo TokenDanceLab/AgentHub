@@ -20,6 +20,9 @@ func withParserContextValues(ctx context.Context, runCtx RunProcessContext) cont
 	if runCtx.WorkDir != "" {
 		parserCtx = context.WithValue(parserCtx, adapters.CtxWorkDir, runCtx.WorkDir)
 	}
+	if runCtx.Model != "" {
+		parserCtx = context.WithValue(parserCtx, adapters.CtxModelKey, runCtx.Model)
+	}
 	return adapters.SDKAdapterContext(parserCtx, runCtx)
 }
 
