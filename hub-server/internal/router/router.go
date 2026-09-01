@@ -199,12 +199,17 @@ func SetupRoutes(r *gin.Engine, cfg *config.Config, authMW *middleware.AuthMiddl
 		edge.POST("/agent-tasks/:id/fail", agentHandler.TaskFail)
 	}
 
-	// Cloud Edge registration (authenticated, no device type restriction)
+	// Cloud Edge registration (authenticated, no device type restriction).
+	// Per-IP frequency limit: AuthRegisterRateLimit (3) requests per
+	// AuthRateLimitWindow, keyed by client IP — same shape as /client/auth
+	// login/register limits. Non-auth path semantics apply on Redis outage:
+	// AGENTHUB_RATE_LIMIT_FAIL_OPEN (default fail-open). Per-user device
+	// count cap is NOT enforced here (tracked as follow-up).
 	cloud := r.Group("/cloud")
 	cloud.Use(authMW.Handler())
 	cloud.Use(authMW.RequireHubSession())
 	{
-		cloud.POST("/edge/register", deviceHandler.CloudEdgeRegister)
+		cloud.POST("/edge/register", middleware.RateLimit(cacheClient, config.AuthRegisterRateLimit, config.AuthRateLimitWindow, middleware.IPKey), deviceHandler.CloudEdgeRegister)
 	}
 
 	web := r.Group("/web")
