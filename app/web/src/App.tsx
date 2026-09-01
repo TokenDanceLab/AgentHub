@@ -50,6 +50,7 @@ export default function App() {
 
 function WebWorkbenchRoot() {
   const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE);
+  const { t: tCommon } = useTranslation();
   const [selectedConversationId, setSelectedConversationId] = useState<string | undefined>();
   const [selectedProjectId, setSelectedProjectId] = useState<string | undefined>();
   const [agentActionError, setAgentActionError] = useState<string | undefined>();
@@ -111,7 +112,7 @@ function WebWorkbenchRoot() {
   // Narrow domain port for workbench project data (#1546); the shared UI never
   // sees the concrete HubClient. Injected only in real mode — parent-managed
   // projects keep the port dormant while demo mode falls back to mock fixtures.
-  const webProjectsPort = useMemo(() => createWebWorkbenchProjectsPort(), []);
+  const webProjectsPort = useMemo(() => createWebWorkbenchProjectsPort(tCommon), [tCommon]);
   const hubReady = !realMode ? false : Boolean(getAccessToken());
 
   // Fetch public Skills for the Skill Market tab

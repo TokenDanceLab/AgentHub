@@ -1,5 +1,6 @@
 // React Query hooks for Edge Agent Profiles — CRUD operations.
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import type { AgentConfig } from '@agenthub/workbench';
 import {
   fetchAgentProfiles,
@@ -23,10 +24,11 @@ export function useAgentProfileList(enabled: boolean) {
 }
 
 export function useCreateAgentProfile() {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (agent: AgentConfig) =>
-      createAgentProfile(agentConfigToEdgeProfile(agent)),
+      createAgentProfile(agentConfigToEdgeProfile(agent, t)),
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ['agent-profiles'] });
     },
@@ -34,10 +36,11 @@ export function useCreateAgentProfile() {
 }
 
 export function useUpdateAgentProfile() {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ id, agent }: { id: string; agent: AgentConfig }) =>
-      updateAgentProfile(id, agentConfigToEdgePatch(agent)),
+      updateAgentProfile(id, agentConfigToEdgePatch(agent, t)),
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ['agent-profiles'] });
     },
@@ -55,14 +58,16 @@ export function useDeleteAgentProfile() {
 }
 
 /** Map AgentConfig (from AgentsPage edit panel) to Edge creation payload. */
-function agentConfigToEdgeProfile(agent: AgentConfig): Record<string, unknown> {
+type AppTranslate = (key: string, options?: any) => string;
+
+function agentConfigToEdgeProfile(agent: AgentConfig, t?: AppTranslate): Record<string, unknown> {
   const modelParts = (agent.model ?? '').split('/').map((s) => s.trim()).filter(Boolean);
   const allowedTools = Object.entries(agent.tools ?? {})
     .filter(([, v]) => v === '允许')
     .map(([tool]) => tool)
     .filter(Boolean);
   const result: Record<string, unknown> = {
-    name: agent.name.trim() || '未命名 Agent',
+    name: agent.name.trim() || t?.('agentProfile.unnamed') || '未命名 Agent',
     adapterId: agent.runtimeId ?? agent.engine ?? 'codex',
   };
   if (agent.role?.trim()) result.description = agent.role.trim();
@@ -82,8 +87,8 @@ function agentConfigToEdgeProfile(agent: AgentConfig): Record<string, unknown> {
 }
 
 /** Map AgentConfig to a partial update payload. */
-function agentConfigToEdgePatch(agent: AgentConfig): Partial<EdgeAgentProfile> {
-  const profile = agentConfigToEdgeProfile(agent);
+function agentConfigToEdgePatch(agent: AgentConfig, t?: AppTranslate): Partial<EdgeAgentProfile> {
+  const profile = agentConfigToEdgeProfile(agent, t);
   // Remove undefined values — PATCH should only include changed fields
   const patch: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(profile)) {

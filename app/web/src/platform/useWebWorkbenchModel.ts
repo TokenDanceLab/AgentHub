@@ -111,6 +111,7 @@ export function resolveWebActiveHubSessionId(
 
 export function useWebWorkbenchModel(selectedConversationId?: string, selectedProjectId?: string) {
   const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE);
+  const { t: tCommon } = useTranslation();
   const dataModeOverride = useSyncExternalStore(
     subscribeWorkbenchDataModeOverride,
     getWorkbenchDataModeOverrideSnapshot,
@@ -149,8 +150,8 @@ export function useWebWorkbenchModel(selectedConversationId?: string, selectedPr
   });
 
   const conversations = useMemo(
-    () => resolveWebWorkbenchConversations(sessions.data, hubReady, dataMode),
-    [sessions.data, hubReady, dataMode],
+    () => resolveWebWorkbenchConversations(sessions.data, hubReady, dataMode, tCommon),
+    [sessions.data, hubReady, dataMode, tCommon],
   );
   // Prefer explicit selection. Fall back to first conversation only when none selected.
   // Keep a parent-provided id even if it is temporarily absent from the list (#1010).
@@ -752,16 +753,17 @@ export function useWebWorkbenchModel(selectedConversationId?: string, selectedPr
         isFetching: selectedProjectThreads.isFetching || selectedProjectThreadMessages.isFetching,
         error: selectedProjectThreads.error ?? selectedProjectThreadMessages.error,
       },
+      tCommon,
     ),
     projectsActions: hubReady ? {
       create: async (draft: ProjectDraft) => (
-        workspaceProjectToProjectInfo(await createProject.mutateAsync(projectDraftToHubRequest(draft)))
+        workspaceProjectToProjectInfo(await createProject.mutateAsync(projectDraftToHubRequest(draft, tCommon)), undefined, tCommon)
       ),
       update: async (projectId: string, draft: ProjectDraft) => (
         workspaceProjectToProjectInfo(await updateProject.mutateAsync({
           projectId,
-          draft: projectDraftToHubRequest(draft),
-        }))
+          draft: projectDraftToHubRequest(draft, tCommon),
+        }), undefined, tCommon)
       ),
     } : undefined,
     onApprovalDecision: hubReady
