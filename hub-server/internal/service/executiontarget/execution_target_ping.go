@@ -154,9 +154,20 @@ func (s *Service) pingEdgeServer(ctx context.Context, addr string, t *model.Exec
 
 	resp, err := s.egress.Get(ctx, url)
 	if err != nil {
-		slog.Debug("execution target ping failed", "target_id", t.ID, "addr", addr, "error", err)
+		// The egress error string embeds the resolved internal address of the
+		// target; keep it server-side (log) and return a generic message so
+		// restricted-network topology is not echoed to API consumers
+		// (#2154 security lane F17).
+		slog.Info("execution target ping failed", "target_id", t.ID, "error", err)
 		_ = s.recordEvidence(ctx, t.ID, dispatch.EvidenceSourceProbe, dispatch.EvidenceStatusOffline, "connect", "", "")
-		return errcode.TargetNotRoutable.WithMessage("ping failed: " + err.Error())
+		// Preserve the policy-denial reason (tests assert it names the egress
+		// policy) without echoing the resolved internal address to the API
+		// consumer (#2154 security lane F17).
+		reason := "target unreachable"
+		if strings.Contains(err.Error(), "not allowed") {
+			reason = "target not allowed by egress policy"
+		}
+		return errcode.TargetNotRoutable.WithMessage("ping failed: " + reason)
 	}
 	defer resp.Body.Close()
 
