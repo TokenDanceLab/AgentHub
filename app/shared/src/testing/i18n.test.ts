@@ -141,7 +141,7 @@ describe('createTestI18n resources', () => {
       string
     >;
 
-    expect(bundle['nav.chat']).toBe('对话');
+    expect(bundle['nav.chat']).toBe('会话');
     expect(bundle['contacts.empty.title']).toBe('暂无联系人');
   });
 
@@ -163,7 +163,7 @@ describe('createTestI18n resources', () => {
     const zh = createTestI18n({ lng: 'zh' });
     const en = createTestI18n({ lng: 'en' });
 
-    expect(zh.t('nav.chat', { ns: 'sharedWorkbench' })).toBe('对话');
+    expect(zh.t('nav.chat', { ns: 'sharedWorkbench' })).toBe('会话');
     expect(en.t('nav.chat', { ns: 'sharedWorkbench' })).toBe('Chats');
     expect(zh.t('contacts.empty.title', { ns: 'sharedWorkbench' })).toBe('暂无联系人');
     expect(en.t('contacts.empty.title', { ns: 'sharedWorkbench' })).toBe('No contacts yet');

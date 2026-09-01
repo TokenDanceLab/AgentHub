@@ -5,7 +5,7 @@ export const SHARED_WORKBENCH_I18N_NAMESPACE = 'sharedWorkbench';
 export const sharedWorkbenchResources = {
   zh: {
     nav: {
-      chat: '对话',
+      chat: '会话',
       contacts: '通讯录',
       docs: '云文档',
       agents: 'Agent',
@@ -316,7 +316,7 @@ export const sharedWorkbenchResources = {
       search: { placeholder: '搜索联系人' },
       section: {
         external: { title: '外部联系人', subtitle: '客户、合作方和临时项目协作者，不进入 TokenDance 组织架构。' },
-        starred: { title: '星标联系人', subtitle: '常用联系人会固定在这里，便于快速发起对话和项目协作。' },
+        starred: { title: '星标联系人', subtitle: '常用联系人会固定在这里，便于快速发起会话和项目协作。' },
         internal: { title: '组织内联系人' },
         myGroups: { title: '我的群组', subtitle: '项目群、评审群和协作群统一管理，按最新消息排序。' },
         helpDesk: { title: '服务台', subtitle: '把账号、Agent 运行和云文档问题转给对应支持入口。' },

@@ -130,7 +130,7 @@ test.describe('Threads interaction tests', () => {
     await page.waitForTimeout(500);
 
     // New entry sheet should show options
-    const newChatOption = page.getByText(/Start AgentHub chat|发起 AgentHub 对话/).first();
+    const newChatOption = page.getByText(/Start AgentHub chat|发起 AgentHub 会话/).first();
     const reviewThreadOption = page.getByText(/Create review thread|创建审查会话/).first();
 
     const anyVisible = await newChatOption.isVisible().catch(() => false)

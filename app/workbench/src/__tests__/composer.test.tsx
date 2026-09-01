@@ -385,7 +385,7 @@ describe('AgentHubWorkbench', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Ctrl+Enter 发送' }));
     expect(window.localStorage.getItem('agenthub.workbench.composerSubmitBehavior')).toBe('ctrl-enter-send');
 
-    fireEvent.click(screen.getByRole('button', { name: '对话' }));
+    fireEvent.click(screen.getByRole('button', { name: '会话' }));
     const input = screen.getByRole('textbox', { name: '输入框' });
     fireEvent.change(input, { target: { value: '需要快捷键发送' } });
     fireEvent.keyDown(input, { key: 'Enter' });
