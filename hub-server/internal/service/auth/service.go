@@ -90,7 +90,25 @@ func (s *Service) RefreshToken(ctx context.Context, rawRefreshToken string) (*Lo
 		}
 	}
 
-	// Rotate: revoke the old refresh token.
+	// Rotate step 1 — atomic claim: flip THIS row to revoked with a
+	// conditional UPDATE. Concurrent presentations of the same token race
+	// here; only the winner proceeds, losers are rejected as reuse and feed
+	// the F2 signal (#2154: pre-fix the check-then-write gap let every racer
+	// obtain a fresh token pair — double-spend, proven under real PG).
+	claimed, err := repository.ClaimRefreshTokenForRotation(s.db, tokenHash)
+	if err != nil {
+		return nil, err
+	}
+	if !claimed {
+		slog.Warn("refresh token reuse: concurrent rotation lost the claim",
+			"user_id", rt.UserID, "device_type", rt.DeviceType)
+		if metrics.RefreshTokenReuseTotal != nil {
+			metrics.RefreshTokenReuseTotal.Inc()
+		}
+		return nil, errcode.AuthRefreshInvalid
+	}
+
+	// Rotate step 2 — revoke any remaining tokens on the device.
 	if err := repository.RevokeRefreshTokensByUserDevice(s.db, rt.UserID, rt.DeviceID); err != nil {
 		return nil, err
 	}
