@@ -56,7 +56,7 @@ export function DocsNav({
         </button>
       ))}
 
-      <div className={styles.navCaption}>我的文档库</div>
+      <div className={styles.navCaption}>{t('docs.myLibrary')}</div>
       {shortcuts.map((name) => (
         <div
           key={name}

@@ -137,7 +137,7 @@ export const AgentToolPermissions: React.FC<{
         <h3>{t('agents.detail.tools')}</h3>
         {/* Legend mirrors the ToolPermission enum identifiers rendered below
             (data-plane direct display; cross-surface enum decision #2015). */}
-        <span>允许 / 需确认 / 禁止</span>
+        <span>{t('agents.allowConfirmDeny')}</span>
       </div>
       {allTools.map((tool) => (
         <div key={tool} className={`${styles['scope-row']} ${styles.editable}`}>

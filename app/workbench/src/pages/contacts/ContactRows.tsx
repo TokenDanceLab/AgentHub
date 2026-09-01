@@ -1,6 +1,7 @@
 import React, { useCallback } from 'react';
 import { appDateLocaleTag } from '@shared/i18n/locale';
-import { getI18n } from 'react-i18next';
+import { getI18n, useTranslation } from 'react-i18next';
+import { SHARED_WORKBENCH_I18N_NAMESPACE } from '@shared/i18n';
 import styles from '../ContactsPage.module.css';
 import { capabilityColor } from './shared';
 import type {
@@ -170,6 +171,7 @@ export function GroupRow({
   onAvatarClick?: ((group: ContactGroup, anchor: HTMLElement) => void) | undefined;
   avatarExpanded?: boolean;
 }) {
+  const { t } = useTranslation(SHARED_WORKBENCH_I18N_NAMESPACE);
   const handleClick = useCallback(() => {
     onClick?.(group);
   }, [group, onClick]);
@@ -207,7 +209,7 @@ export function GroupRow({
       <span className={`${styles.memberOrg} ${styles.groupMemberOrg}`}>
         {group.latestMessage}
       </span>
-      <span className={styles.memberStatus}>打开群聊</span>
+      <span className={styles.memberStatus}>{t('contacts.openGroupChat')}</span>
     </button>
   );
 }
@@ -223,6 +225,7 @@ export function ServiceCardRow({
   onAvatarClick?: ((desk: ServiceDesk, anchor: HTMLElement) => void) | undefined;
   avatarExpanded?: boolean;
 }) {
+  const { t } = useTranslation(SHARED_WORKBENCH_I18N_NAMESPACE);
   const handleClick = useCallback(() => {
     onClick?.(desk);
   }, [desk, onClick]);
@@ -259,7 +262,7 @@ export function ServiceCardRow({
         <strong className={styles.serviceCardName}>{desk.name}</strong>
         <span className={styles.serviceCardDesc}>{desk.description}</span>
       </div>
-      <em className={styles.serviceCardAction}>进入</em>
+      <em className={styles.serviceCardAction}>{t('contacts.enter')}</em>
     </button>
   );
 }

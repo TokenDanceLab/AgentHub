@@ -67,6 +67,7 @@ export function ContactListPage({
   onMemberClick?: ((member: ContactMember) => void) | undefined;
   onAvatarClick?: ((member: ContactMember, anchor: HTMLElement) => void) | undefined;
 }): React.ReactElement {
+  const { t } = useTranslation(SHARED_WORKBENCH_I18N_NAMESPACE);
   // ── Infinite-scroll sentinel (T14 pattern; wired to the mock data-layer
   //    cursor pagination, #1510) ──
   const sentinelRef = useRef<HTMLDivElement>(null);
@@ -115,7 +116,7 @@ export function ContactListPage({
               IntersectionObserver) ── */}
       {hasMore && !loadingMore ? (
         <button type="button" className={styles.loadMoreBtn} onClick={onLoadMore}>
-          加载更多
+          {t('contacts.loadMore')}
         </button>
       ) : null}
       <div
@@ -218,7 +219,7 @@ export function ContactGroupsPane({
         actionLabel="创建群组"
         onAction={onCreateGroup}
       />
-      <div className={styles.sectionTitle}>TokenDance 群组</div>
+      <div className={styles.sectionTitle}>{t('contacts.tokenDanceGroups')}</div>
       <ContactGroupListSection
         groups={groups}
         activeGroupId={activeGroupId}
@@ -248,7 +249,7 @@ export function ContactServicePane({
       <ContactMainHead
         title={t("contacts.section.helpDesk.title")}
         subtitle={t("contacts.section.helpDesk.subtitle")}
-        actionLabel="新建工单"
+        actionLabel={t('contacts.newTicket')}
         onAction={onNewTicket}
       />
       <ContactServiceGridSection
