@@ -242,6 +242,9 @@ describe('hubClientPayloadPaths (#822 / #833 / #901 / #913)', () => {
     expect(buildListTeamEventsPath('t/1', 'r/2')).toBe(
       '/web/agent-teams/t%2F1/runs/r%2F2/events',
     );
+    expect(buildListTeamEventsPath('t/1', 'r/2', { afterSeq: 3, pageSize: 25 })).toBe(
+      '/web/agent-teams/t%2F1/runs/r%2F2/events?afterSeq=3&pageSize=25',
+    );
     expect(buildListTeamTasksPath('t/1', 'r/2')).toBe(
       '/web/agent-teams/t%2F1/runs/r%2F2/tasks',
     );

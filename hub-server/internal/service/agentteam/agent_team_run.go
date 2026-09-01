@@ -557,29 +557,41 @@ func (s *AgentTeamService) ListTeamTasks(ctx context.Context, userID, teamID, ru
 	return tasks, nil
 }
 
-// ListTeamEvents returns append-only events for a team run after owner checks.
-func (s *AgentTeamService) ListTeamEvents(ctx context.Context, userID, teamID, runID string) ([]model.AgentTeamEvent, error) {
+// TeamEventsPage is a cursor-paginated window over a team run's append-only
+// events. NextSeq is the afterSeq value for the next page; HasMore=false marks
+// the final window.
+type TeamEventsPage struct {
+	Items   []model.AgentTeamEvent
+	NextSeq int
+	HasMore bool
+}
+
+// ListTeamEvents returns a page of append-only events for a team run after
+// owner checks. afterSeq is the inclusive-lower-bound cursor (seq of the last
+// event already seen); limit is capped by the handler at config.MaxPageLimit.
+func (s *AgentTeamService) ListTeamEvents(ctx context.Context, userID, teamID, runID string, afterSeq, limit int) (TeamEventsPage, error) {
 	if _, err := s.getTeamForRead(ctx, userID, teamID); err != nil {
-		return nil, err
+		return TeamEventsPage{}, err
 	}
 	run, err := repository.GetTeamRunByID(s.db, runID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, errcode.AgentTaskNotFound
+			return TeamEventsPage{}, errcode.AgentTaskNotFound
 		}
-		return nil, err
+		return TeamEventsPage{}, err
 	}
 	if run.TeamID != teamID {
-		return nil, errcode.AgentTaskNotFound
+		return TeamEventsPage{}, errcode.AgentTaskNotFound
 	}
-	events, err := repository.ListTeamEventsByRun(s.db, runID)
+	repoPage, err := repository.ListTeamEventsByRunPage(s.db, runID, afterSeq, limit)
 	if err != nil {
-		return nil, err
+		return TeamEventsPage{}, err
 	}
-	if events == nil {
-		events = []model.AgentTeamEvent{}
+	page := TeamEventsPage{Items: repoPage.Items, NextSeq: repoPage.NextSeq, HasMore: repoPage.HasMore}
+	if page.Items == nil {
+		page.Items = []model.AgentTeamEvent{}
 	}
-	return events, nil
+	return page, nil
 }
 
 func optionalTeamRunTargetID(targetID string) *string {

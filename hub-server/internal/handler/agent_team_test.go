@@ -54,12 +54,18 @@ func TestAgentTeamHandler_ListTeamEvents(t *testing.T) {
 
 	called := false
 	svc := &mockAgentTeamService{
-		listTeamEvents: func(ctx context.Context, userID, teamID, runID string) ([]model.AgentTeamEvent, error) {
+		listTeamEvents: func(ctx context.Context, userID, teamID, runID string, afterSeq, limit int) (agentteam.TeamEventsPage, error) {
 			called = true
 			assert.Equal(t, "user-1", userID)
 			assert.Equal(t, "team-1", teamID)
 			assert.Equal(t, "run-1", runID)
-			return []model.AgentTeamEvent{{ID: "event-1", TeamRunID: runID, Type: model.TeamEventRouteRejected}}, nil
+			assert.Equal(t, 2, afterSeq)
+			assert.Equal(t, 25, limit)
+			return agentteam.TeamEventsPage{
+				Items:   []model.AgentTeamEvent{{ID: "event-1", TeamRunID: runID, Seq: 3, Type: model.TeamEventRouteRejected}},
+				NextSeq: 3,
+				HasMore: true,
+			}, nil
 		},
 	}
 	h := NewAgentTeamHandler(svc)
@@ -70,13 +76,15 @@ func TestAgentTeamHandler_ListTeamEvents(t *testing.T) {
 		h.ListTeamEvents(c)
 	})
 
-	req := httptest.NewRequest(http.MethodGet, "/web/agent-teams/team-1/runs/run-1/events", nil)
+	req := httptest.NewRequest(http.MethodGet, "/web/agent-teams/team-1/runs/run-1/events?afterSeq=2&pageSize=25", nil)
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 
 	require.True(t, called)
 	assert.Equal(t, http.StatusOK, w.Code)
 	assert.Contains(t, w.Body.String(), "event-1")
+	assert.Contains(t, w.Body.String(), `"nextCursor":"3"`)
+	assert.Contains(t, w.Body.String(), `"hasMore":true`)
 }
 
 func TestAgentTeamHandler_ListTeamTasks(t *testing.T) {
@@ -217,7 +225,7 @@ type mockAgentTeamService struct {
 	listAssignments             func(ctx context.Context, userID, teamRunID string) ([]model.AgentTeamAssignment, error)
 	handleRouteDecision         func(ctx context.Context, userID, teamID, runID string, decision model.CoordinatorRouteDecision) (*model.AgentTeamAssignment, error)
 	listTeamTasks               func(ctx context.Context, userID, teamID, runID string) ([]model.AgentTeamTask, error)
-	listTeamEvents              func(ctx context.Context, userID, teamID, runID string) ([]model.AgentTeamEvent, error)
+	listTeamEvents              func(ctx context.Context, userID, teamID, runID string, afterSeq, limit int) (agentteam.TeamEventsPage, error)
 	resolveConflict             func(ctx context.Context, userID, teamID, runID string, resolution model.TeamConflictResolution) (*model.TeamConflictState, error)
 	decideApproval              func(ctx context.Context, userID, teamID, runID, approvalID string, decision model.TeamApprovalDecision) (*model.TeamApprovalState, error)
 	competeSummary              func(ctx context.Context, userID, runID string, req model.CompeteSummaryRequest) (*model.CompeteSummaryResponse, error)
@@ -350,11 +358,11 @@ func (m *mockAgentTeamService) HandleRouteDecision(ctx context.Context, userID, 
 	return m.handleRouteDecision(ctx, userID, teamID, runID, decision)
 }
 
-func (m *mockAgentTeamService) ListTeamEvents(ctx context.Context, userID, teamID, runID string) ([]model.AgentTeamEvent, error) {
+func (m *mockAgentTeamService) ListTeamEvents(ctx context.Context, userID, teamID, runID string, afterSeq, limit int) (agentteam.TeamEventsPage, error) {
 	if m.listTeamEvents == nil {
-		return nil, nil
+		return agentteam.TeamEventsPage{}, nil
 	}
-	return m.listTeamEvents(ctx, userID, teamID, runID)
+	return m.listTeamEvents(ctx, userID, teamID, runID, afterSeq, limit)
 }
 
 func (m *mockAgentTeamService) ListTeamTasks(ctx context.Context, userID, teamID, runID string) ([]model.AgentTeamTask, error) {

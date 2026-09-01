@@ -2078,12 +2078,14 @@ func TestAgentTeamService_ListTeamEventsIsOwnerScoped(t *testing.T) {
 		Payload:   `{"reason":"invalid action"}`,
 	}))
 
-	events, err := svc.ListTeamEvents(context.Background(), "user-1", team.ID, run.ID)
+	page, err := svc.ListTeamEvents(context.Background(), "user-1", team.ID, run.ID, 0, 50)
 	require.NoError(t, err)
-	require.Len(t, events, 1)
-	assert.Equal(t, model.TeamEventRouteRejected, events[0].Type)
+	require.Len(t, page.Items, 1)
+	assert.Equal(t, model.TeamEventRouteRejected, page.Items[0].Type)
+	assert.False(t, page.HasMore)
+	assert.Equal(t, 1, page.NextSeq)
 
-	_, err = svc.ListTeamEvents(context.Background(), "other-user", team.ID, run.ID)
+	_, err = svc.ListTeamEvents(context.Background(), "other-user", team.ID, run.ID, 0, 50)
 	require.Error(t, err)
 	assert.Equal(t, errcode.AgentNotFound, err)
 }

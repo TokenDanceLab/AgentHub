@@ -5899,6 +5899,16 @@ paths:
         in: path
         required: true
         schema: { type: string, format: uuid }
+      - name: afterSeq
+        in: query
+        required: false
+        schema: { type: integer, minimum: 0, default: 0 }
+        description: Return events with run-local seq greater than this cursor.
+      - name: pageSize
+        in: query
+        required: false
+        schema: { type: integer, minimum: 1, maximum: 500, default: 50 }
+        description: Page size; values above 500 are clamped.
     get:
       tags: [HubSyncRelay]
       operationId: hubListTeamEvents
