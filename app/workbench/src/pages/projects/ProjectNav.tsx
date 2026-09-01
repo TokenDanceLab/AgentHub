@@ -128,7 +128,7 @@ export function ProjectNav({
           onSelect={onProjectSelect}
         />
       ))}
-      <div className={styles.navCaption}>视图</div>
+      <div className={styles.navCaption}>{t('projects.view')}</div>
       <FilterList activeFilter={activeFilter} onFilterChange={onFilterChange} />
       {/* Infinite-scroll sentinel: triggers loadMore when within 200px of viewport. */}
       <div

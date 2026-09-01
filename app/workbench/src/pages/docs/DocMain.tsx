@@ -55,7 +55,7 @@ export function DocMain({
     <main className={`${styles.main} workbench-main`}>
       {/* Head */}
       <div className={`${styles.head} workbench-head`}>
-        <h1 className={styles.headTitle}>主页</h1>
+        <h1 className={styles.headTitle}>{t('docs.home')}</h1>
         <button
           type="button"
           className={`${styles.iconAction} icon-action`}
@@ -76,7 +76,7 @@ export function DocMain({
           <span className={`${styles.docActionIcon} ${styles.actionIconBlue}`}>
             <DesignNavIcon name="plus" size={16} />
           </span>
-          新建
+          {t('docs.create')}
         </button>
         <button
           type="button"

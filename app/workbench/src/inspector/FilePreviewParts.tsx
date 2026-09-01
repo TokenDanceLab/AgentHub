@@ -90,6 +90,7 @@ export function HtmlPreview({ content }: { content: string }): React.ReactElemen
 }
 
 export function ImagePreview({ filename }: { filename: string }): React.ReactElement {
+  const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE);
   // Image preview — the actual image URL would be resolved by the parent.
   // Shows a placeholder when only filename is available.
   return (
@@ -112,7 +113,7 @@ export function ImagePreview({ filename }: { filename: string }): React.ReactEle
       }}>
         <DesignFileIcon className={styles.fileIcon} name={filename} />
         <span>图片预览: {filename}</span>
-        <span style={{ fontSize: '0.6875rem' }}>图片内容将通过文件 URL 加载</span>
+        <span style={{ fontSize: '0.6875rem' }}>{t('filePreview.imageViaFileUrl')}</span>
       </div>
     </div>
   );

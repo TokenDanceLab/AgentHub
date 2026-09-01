@@ -372,7 +372,7 @@ export const TablePreview: React.FC<TablePreviewProps> = ({
       {loading && (
         <div className={styles.loading}>
           <div className={styles.spinner} />
-          <span>正在解析表格...</span>
+          <span>{t('preview.parsingTable')}</span>
         </div>
       )}
 
@@ -383,7 +383,7 @@ export const TablePreview: React.FC<TablePreviewProps> = ({
           <span className={styles.errorMessage}>{error}</span>
           <button className={styles.retryBtn} onClick={loadFile} type="button">
             <RotateCcw size={14} />
-            <span>重试</span>
+            <span>{t('preview.retry')}</span>
           </button>
         </div>
       )}
@@ -448,7 +448,7 @@ export const TablePreview: React.FC<TablePreviewProps> = ({
             /* #1851 review: multi-sheet empty workbooks still mount the
              controlled tabpanel so the tabs' aria-controls resolves. */
             <div className={styles.emptySheet}>
-              <span>空工作表</span>
+              <span>{t('preview.emptySheet')}</span>
             </div>
           )}
         </div>
