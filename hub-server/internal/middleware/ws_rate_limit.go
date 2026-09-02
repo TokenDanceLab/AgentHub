@@ -27,6 +27,7 @@ type wsIPLimiter struct {
 	mu       sync.Mutex
 	limiters map[string]*ipEntry
 	stopCh   chan struct{}
+	stopOnce sync.Once
 }
 
 type ipEntry struct {
@@ -125,12 +126,9 @@ func (l *wsIPLimiter) cleanup() {
 // times (only the first call closes the channel). If not called, the goroutine
 // runs for the lifetime of the process.
 func (l *wsIPLimiter) Stop() {
-	select {
-	case <-l.stopCh:
-		// Already closed.
-	default:
-		close(l.stopCh)
-	}
+	// sync.Once: the previous check-then-close select could double-close
+	// stopCh when two callers raced (double-close panics, #2154).
+	l.stopOnce.Do(func() { close(l.stopCh) })
 }
 
 // StopWSIPRateLimiter stops the cleanup goroutine of the process-wide default
