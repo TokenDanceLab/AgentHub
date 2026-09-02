@@ -79,8 +79,69 @@ func ListCustomAgentsByOwner(db *gorm.DB, ownerID string) ([]model.CustomAgent, 
 	return agents, err
 }
 
+// UpdateCustomAgent persists the columns that PUT /web/custom-agents/:id can
+// actually change, and only those.
+//
+// There is deliberately no whole-row update for custom agents, for the same
+// reason UpdateSessionColumns exists for sessions (#2233). handler.Update builds
+// its model.CustomAgent from updateCustomAgentReq, which carries neither
+// output_schema nor deleted_at, so the previous `db.Save(ca)` wrote NULL over
+// both on every rename — and Save writes ALL columns, which this repo already
+// documents on UpdateAgentProfile's `Select("*") + Updates(p)`.
+//
+//   - output_schema is live: service/dispatch/payload.go copies it into the edge
+//     dispatch payload as structured_output_schema, so editing an agent's name
+//     silently switched structured output off for that agent (#2253). HTTP 200,
+//     no signal anywhere.
+//   - deleted_at has an independent narrow writer, SoftDeleteCustomAgent below.
+//     model.CustomAgent.DeletedAt is *time.Time, not gorm.DeletedAt, so there is
+//     no soft-delete scope to catch it: a delete landing between the service's
+//     GetCustomAgentByID read and this write was undone and the row came back.
+//     Save also falls back to Create-with-OnConflict when its UPDATE matches
+//     zero rows, so updating a nonexistent id used to insert a fresh agent.
+//
+// The column list is exactly updateCustomAgentReq's field set — name,
+// avatar_url, agent_type, system_prompt, capability_tags, tool_whitelist,
+// model_params — i.e. every field the request can change and nothing it cannot.
+// Columns deliberately NOT written: id (the key), owner_user_id (the service
+// verifies ownership, it never reassigns it), created_at (immutable), and
+// output_schema / deleted_at (above). updated_at is not listed either: GORM
+// appends autoUpdateTime fields to the SET clause even when they are absent from
+// Select (callbacks.ConvertToAssignments), pinned by
+// TestUpdateCustomAgent_RefreshesUpdatedAtAndMatchesUnchangedRows.
+//
+// The not-deleted check is part of the statement, not a separate read, so a row
+// soft-deleted after the caller's read matches zero rows. RowsAffected counts
+// matched rows on both PostgreSQL and SQLite, so 0 can only mean "no such live
+// row" and is reported as gorm.ErrRecordNotFound — the service maps that to
+// errcode.AgentNotFound (HTTP 404) exactly like the read path does.
+//
+// db.Model(ca) rather than db.Model(&model.CustomAgent{}) so that
+// Statement.Model == Statement.Dest: GORM then runs model.CustomAgent's
+// BeforeSave hook against the caller's struct and ConvertToAssignments reads the
+// hook's normalized jsonb values, preserving the compaction and validation that
+// `db.Save(ca)` used to perform. An empty model instance would run the hook
+// against zero values instead.
 func UpdateCustomAgent(db *gorm.DB, ca *model.CustomAgent) error {
-	return db.Save(ca).Error
+	result := db.Model(ca).
+		Where("id = ? AND deleted_at IS NULL", ca.ID).
+		Select(
+			"name",
+			"avatar_url",
+			"agent_type",
+			"system_prompt",
+			"capability_tags",
+			"tool_whitelist",
+			"model_params",
+		).
+		Updates(ca)
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+	return nil
 }
 
 func SoftDeleteCustomAgent(db *gorm.DB, id string) error {

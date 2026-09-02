@@ -3,6 +3,7 @@ package repository
 import (
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -19,12 +20,24 @@ import (
 // for concurrent access from multiple goroutines. Unlike :memory: which gives
 // each connection a private database, file::memory:?cache=shared allows all
 // connections in the process to see the same data.
+// sharedSQLiteFixtureSeq numbers each setupSharedSQLite call (#2260).
+var sharedSQLiteFixtureSeq atomic.Uint64
+
 func setupSharedSQLite(t *testing.T) *gorm.DB {
 	t.Helper()
-	db, err := gorm.Open(sqlite.Open("file::memory:?cache=shared&_journal_mode=WAL"), &gorm.Config{
+	// Unique name + close-on-cleanup: `file::memory:?cache=shared` is ONE
+	// process-global database, so every invocation used to share rows with every
+	// other invocation and with the previous -count round. These assertions
+	// tolerate the leftovers today, which is exactly how the same pattern stayed
+	// hidden in agent_23505_test.go until it did not (#2260).
+	dsn := fmt.Sprintf("file:upsert_toctou_%d?mode=memory&cache=shared&_journal_mode=WAL", sharedSQLiteFixtureSeq.Add(1))
+	db, err := gorm.Open(sqlite.Open(dsn), &gorm.Config{
 		Logger: gormlogger.Default.LogMode(gormlogger.Silent),
 	})
 	require.NoError(t, err)
+	sqlDB, err := db.DB()
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = sqlDB.Close() })
 
 	// Reuse the same schema as setupSQLite. We extract the table definitions
 	// by calling setupSQLite's raw SQL directly.
