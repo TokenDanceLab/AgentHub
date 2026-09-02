@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -68,10 +69,14 @@ func TestReadRetentionWindow_ShorterFileIsNotAnError(t *testing.T) {
 
 // TestTruncateLocked_KeepsNewestEventsEndToEnd is the regression pin on the real
 // path: after a truncation the surviving window must still contain the newest
-// events, and the rebuilt index must find them. It is green before and after the
-// short-read fix (a local ext4 read of this size does not come back short), so it
-// is a pin, not red evidence — the red evidence is the injected short reader
-// above.
+// events, the rebuilt index must find them, and the truncation must have
+// *succeeded* rather than merely been attempted.
+//
+// For the short-read fix it is a pin, not red evidence: a local ext4 read of this
+// size does not come back short, so the injected short reader above is what
+// proves that half. For the Windows O_APPEND defect it IS red evidence — it
+// failed on the Native Windows CI job with "log grew to 45692 bytes with maxSize
+// 4096" while passing on Linux.
 func TestTruncateLocked_KeepsNewestEventsEndToEnd(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "events.jsonl")
@@ -95,8 +100,16 @@ func TestTruncateLocked_KeepsNewestEventsEndToEnd(t *testing.T) {
 	if err != nil {
 		t.Fatalf("stat: %v", err)
 	}
+	// No platform skip here on purpose. This assertion is what exposed the
+	// Windows defect: l.f is an O_APPEND handle and Windows denies SetEndOfFile
+	// on one, so every truncation failed with "Access is denied" and the log of
+	// every shipped Windows Edge grew without bound. Linux passed, so the bug was
+	// invisible until the size was asserted on the Native Windows CI job.
 	if fi.Size() > 4096 {
-		t.Fatalf("log grew to %d bytes with maxSize 4096: truncation never ran", fi.Size())
+		t.Fatalf("log grew to %d bytes with maxSize 4096: truncation never succeeded on %s", fi.Size(), runtime.GOOS)
+	}
+	if failures := log.truncateFailures.Load(); failures != 0 {
+		t.Fatalf("truncateFailures = %d, want 0: truncation must succeed, not just be attempted", failures)
 	}
 	if got := log.MaxSeq(); got != lastSeq {
 		t.Fatalf("MaxSeq() = %d, want %d: truncation dropped the newest events", got, lastSeq)

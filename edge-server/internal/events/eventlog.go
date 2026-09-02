@@ -324,14 +324,37 @@ func (l *EventLog) truncateLocked() {
 			break
 		}
 	}
-	// Truncate and rewrite.
-	if truncErr := l.f.Truncate(0); truncErr != nil {
+	// Rewrite through a *separate* O_RDWR handle, not through l.f.
+	//
+	// l.f is opened O_APPEND, and Windows denies SetEndOfFile on an append-mode
+	// handle: every truncation failed with "Access is denied", so the event log
+	// of every shipped Windows Edge (the desktop installer's
+	// agenthub-edge-x86_64-pc-windows-msvc sidecar, and the portable build)
+	// grew without bound, with only an error line per Append and
+	// edge_event_log_truncate_failures_total to show for it. Linux accepted the
+	// same call, which is why the defect was invisible until a test asserted on
+	// the resulting file size on the Native Windows CI job.
+	//
+	// A second handle keeps the append handle's semantics untouched: Go opens
+	// files with FILE_SHARE_READ|WRITE|DELETE, the rewrite is inside l.mu like
+	// every other mutation, and the O_APPEND handle needs no repositioning
+	// (rebuildIndexLocked below still seeks it to EOF for replay reads).
+	rw, openErr := os.OpenFile(l.path, os.O_RDWR, 0o600)
+	if openErr != nil {
+		l.truncateFailures.Add(1)
+		slog.Error("event log truncate reopen failed",
+			"path", l.path, "error", openErr)
+		return
+	}
+	if truncErr := rw.Truncate(0); truncErr != nil {
+		_ = rw.Close()
 		l.truncateFailures.Add(1)
 		slog.Error("event log truncate Truncate(0) failed",
 			"path", l.path, "error", truncErr)
 		return
 	}
-	if _, seekErr := l.f.Seek(0, 0); seekErr != nil {
+	if _, seekErr := rw.Seek(0, 0); seekErr != nil {
+		_ = rw.Close()
 		l.truncateFailures.Add(1)
 		slog.Error("event log truncate seek-to-start failed",
 			"path", l.path, "error", seekErr)
@@ -340,11 +363,16 @@ func (l *EventLog) truncateLocked() {
 	if start < n {
 		// Best-effort rewrite: the log truncation path degrades silently on
 		// write failure rather than failing the enclosing Append call.
-		if written, writeErr := l.f.Write(buf[start:n]); writeErr != nil || written != n-start {
+		if written, writeErr := rw.Write(buf[start:n]); writeErr != nil || written != n-start {
 			l.truncateFailures.Add(1)
 			slog.Error("event log truncate rewrite failed",
 				"path", l.path, "written", written, "want", n-start, "error", writeErr)
 		}
+	}
+	if closeErr := rw.Close(); closeErr != nil {
+		l.truncateFailures.Add(1)
+		slog.Error("event log truncate close failed",
+			"path", l.path, "error", closeErr)
 	}
 	// Rebuild the index so replay offsets reflect the truncated file. A
 	// rebuild failure also counts as a truncate failure (the log is now in a
