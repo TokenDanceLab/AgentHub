@@ -295,7 +295,7 @@ func TestCreateBackup_CreatesBakWithContent(t *testing.T) {
 	if err := os.WriteFile(path, content, 0o644); err != nil {
 		t.Fatalf("write fixture: %v", err)
 	}
-	if err := createBackup(path, content); err != nil {
+	if err := createBackup(dir, path, content); err != nil {
 		t.Fatalf("createBackup: %v", err)
 	}
 	got, err := os.ReadFile(path + ".bak")
@@ -318,7 +318,7 @@ func TestCreateBackup_DoesNotOverwriteExisting(t *testing.T) {
 	if err := os.WriteFile(path+".bak", backupContent, 0o644); err != nil {
 		t.Fatalf("write backup fixture: %v", err)
 	}
-	if err := createBackup(path, original); err != nil {
+	if err := createBackup(dir, path, original); err != nil {
 		t.Fatalf("createBackup: %v", err)
 	}
 	got, err := os.ReadFile(path + ".bak")

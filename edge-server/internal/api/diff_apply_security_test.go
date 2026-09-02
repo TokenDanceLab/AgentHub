@@ -244,3 +244,197 @@ func TestPostApplyRunDiffLocalSingleTenantUnaffected(t *testing.T) {
 		t.Fatalf("local single-tenant apply status = %d, want 200; body=%s", rec.Code, rec.Body.String())
 	}
 }
+
+// ---------------------------------------------------------------------------
+// P1-1 — symlink containment on the write path
+// ---------------------------------------------------------------------------
+
+// assertNotWrittenOutside fails when the workspace-external file was touched.
+func assertNotWrittenOutside(t *testing.T, path, want string) {
+	t.Helper()
+	got, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read %s: %v", path, err)
+	}
+	if string(got) != want {
+		t.Fatalf("ESCAPE: %s outside the workspace allowlist was rewritten to %q", path, got)
+	}
+	if _, err := os.Lstat(path + ".bak"); !os.IsNotExist(err) {
+		t.Fatalf("ESCAPE: backup %s.bak was created outside the workspace allowlist (stat err = %v)", path, err)
+	}
+}
+
+// applyRejectedAssert pins the current mapping for a containment refusal: the
+// handler surfaces applyHunkToFile errors as 500 internal_error, exactly like
+// the pre-existing "file path escapes workdir" error
+// (TestPostApplyRunDiffPropagatesApplyErrors).
+func applyRejectedAssert(t *testing.T, rec *httptest.ResponseRecorder) {
+	t.Helper()
+	if rec.Code == http.StatusOK {
+		t.Fatalf("status = 200, want refusal; body=%s", rec.Body.String())
+	}
+	if rec.Code != http.StatusInternalServerError {
+		t.Fatalf("status = %d, want 500 for a containment refusal; body=%s", rec.Code, rec.Body.String())
+	}
+	assertErrorCode(t, rec.Body.String(), "internal_error")
+}
+
+// TestPostApplyRunDiffRejectsSymlinkedParentDirectory is the report's scenario:
+// a git repository may legally carry a symlink, so "docs" inside the allowlisted
+// workdir points at a directory outside it. The lexical isPathWithin check
+// passes "docs/authorized_keys", and os.WriteFile follows the symlink.
+func TestPostApplyRunDiffRejectsSymlinkedParentDirectory(t *testing.T) {
+	h := newTestHandler()
+	workDir := allowTestWorkspace(t, h)
+
+	outside := t.TempDir() // never added to the allowlist
+	vault := filepath.Join(outside, "vault")
+	if err := os.MkdirAll(vault, 0o700); err != nil {
+		t.Fatalf("mkdir vault: %v", err)
+	}
+	victim := filepath.Join(vault, "authorized_keys")
+	if err := os.WriteFile(victim, []byte(applyTestOriginal), 0o600); err != nil {
+		t.Fatalf("write victim: %v", err)
+	}
+	if err := os.Symlink(vault, filepath.Join(workDir, "docs")); err != nil {
+		t.Fatalf("symlink docs: %v", err)
+	}
+
+	seedOwnedApplyRun(t, h.Store, "symdir", "run-symdir", "", "finished", "docs/authorized_keys", applyTestDiff)
+	body := fmt.Sprintf(`{"file_path":"docs/authorized_keys","hunk_index":0,"accepted":true,"workDir":%q}`, workDir)
+	rec := doApplyRunDiff(h, "run-symdir", http.MethodPost, body)
+
+	assertNotWrittenOutside(t, victim, applyTestOriginal)
+	applyRejectedAssert(t, rec)
+}
+
+// TestPostApplyRunDiffRejectsSymlinkedTargetFile covers the case a
+// "resolve the parent directory only" fix would miss: the final path component
+// itself is a symlink leaving the workspace.
+func TestPostApplyRunDiffRejectsSymlinkedTargetFile(t *testing.T) {
+	h := newTestHandler()
+	workDir := allowTestWorkspace(t, h)
+
+	outside := t.TempDir()
+	victim := filepath.Join(outside, "host_env")
+	if err := os.WriteFile(victim, []byte(applyTestOriginal), 0o600); err != nil {
+		t.Fatalf("write victim: %v", err)
+	}
+	if err := os.Symlink(victim, filepath.Join(workDir, "link.txt")); err != nil {
+		t.Fatalf("symlink link.txt: %v", err)
+	}
+
+	seedOwnedApplyRun(t, h.Store, "symfile", "run-symfile", "", "finished", "link.txt", applyTestDiff)
+	body := fmt.Sprintf(`{"file_path":"link.txt","hunk_index":0,"accepted":true,"workDir":%q}`, workDir)
+	rec := doApplyRunDiff(h, "run-symfile", http.MethodPost, body)
+
+	assertNotWrittenOutside(t, victim, applyTestOriginal)
+	applyRejectedAssert(t, rec)
+}
+
+// TestPostApplyRunDiffRejectsDanglingSymlinkCreation covers the new-file branch:
+// a dangling symlink makes os.ReadFile report IsNotExist, so
+// createNewFileFromHunk creates the symlink's target — anywhere on the host.
+func TestPostApplyRunDiffRejectsDanglingSymlinkCreation(t *testing.T) {
+	h := newTestHandler()
+	workDir := allowTestWorkspace(t, h)
+
+	outside := t.TempDir()
+	created := filepath.Join(outside, "pwned.service") // must never appear
+	if err := os.Symlink(created, filepath.Join(workDir, "ghost.txt")); err != nil {
+		t.Fatalf("symlink ghost.txt: %v", err)
+	}
+
+	seedOwnedApplyRun(t, h.Store, "symdangling", "run-symdangling", "", "finished", "ghost.txt", applyTestDiff)
+	body := fmt.Sprintf(`{"file_path":"ghost.txt","hunk_index":0,"accepted":true,"workDir":%q}`, workDir)
+	rec := doApplyRunDiff(h, "run-symdangling", http.MethodPost, body)
+
+	if _, err := os.Lstat(created); !os.IsNotExist(err) {
+		t.Fatalf("ESCAPE: %s was created outside the workspace allowlist (stat err = %v)", created, err)
+	}
+	applyRejectedAssert(t, rec)
+}
+
+// TestPostApplyAllRunDiffsRejectsSymlinkEscape pins that the batch entry point
+// shares the same containment as the single-hunk endpoint.
+func TestPostApplyAllRunDiffsRejectsSymlinkEscape(t *testing.T) {
+	h := newTestHandler()
+	workDir := allowTestWorkspace(t, h)
+
+	outside := t.TempDir()
+	vault := filepath.Join(outside, "vault")
+	if err := os.MkdirAll(vault, 0o700); err != nil {
+		t.Fatalf("mkdir vault: %v", err)
+	}
+	victim := filepath.Join(vault, "authorized_keys")
+	if err := os.WriteFile(victim, []byte(applyTestOriginal), 0o600); err != nil {
+		t.Fatalf("write victim: %v", err)
+	}
+	if err := os.Symlink(vault, filepath.Join(workDir, "docs")); err != nil {
+		t.Fatalf("symlink docs: %v", err)
+	}
+
+	seedOwnedApplyRun(t, h.Store, "symall", "run-symall", "", "finished", "docs/authorized_keys", applyTestDiff)
+	body := fmt.Sprintf(`{"decisions":[{"file_path":"docs/authorized_keys","hunk_index":0,"accepted":true}],"workDir":%q}`, workDir)
+	rec := doApplyAllRunDiffs(h, "run-symall", http.MethodPost, body)
+
+	assertNotWrittenOutside(t, victim, applyTestOriginal)
+	applyRejectedAssert(t, rec)
+}
+
+// TestPostApplyRunDiffStillAppliesRegularNestedFile is the positive control for
+// the containment check: an ordinary nested file inside the workdir still
+// applies, and its backup stays inside the workdir.
+func TestPostApplyRunDiffStillAppliesRegularNestedFile(t *testing.T) {
+	h := newTestHandler()
+	workDir := allowTestWorkspace(t, h)
+	nested := filepath.Join(workDir, "src", "pkg")
+	if err := os.MkdirAll(nested, 0o750); err != nil {
+		t.Fatalf("mkdir nested: %v", err)
+	}
+	target := filepath.Join(nested, "a.txt")
+	if err := os.WriteFile(target, []byte(applyTestOriginal), 0o600); err != nil {
+		t.Fatalf("write fixture: %v", err)
+	}
+	seedOwnedApplyRun(t, h.Store, "nested", "run-nested", "", "finished", "src/pkg/a.txt", applyTestDiff)
+
+	body := fmt.Sprintf(`{"file_path":"src/pkg/a.txt","hunk_index":0,"accepted":true,"workDir":%q}`, workDir)
+	rec := doApplyRunDiff(h, "run-nested", http.MethodPost, body)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200 for a regular nested file; body=%s", rec.Code, rec.Body.String())
+	}
+	got, err := os.ReadFile(target)
+	if err != nil {
+		t.Fatalf("read target: %v", err)
+	}
+	if string(got) != applyTestModified {
+		t.Errorf("nested file content = %q, want %q", got, applyTestModified)
+	}
+	if _, err := os.Lstat(target + ".bak"); err != nil {
+		t.Errorf("backup missing inside workdir: %v", err)
+	}
+}
+
+// TestPostApplyRunDiffStillCreatesMissingNestedFile is the positive control for
+// the new-file branch: trailing path components that do not exist yet must stay
+// creatable, otherwise the containment check would break "accept" on any added
+// file in a new directory.
+func TestPostApplyRunDiffStillCreatesMissingNestedFile(t *testing.T) {
+	h := newTestHandler()
+	workDir := allowTestWorkspace(t, h)
+	seedOwnedApplyRun(t, h.Store, "newnested", "run-newnested", "", "finished", "src/new/deep.txt", applyTestDiff)
+
+	body := fmt.Sprintf(`{"file_path":"src/new/deep.txt","hunk_index":0,"accepted":true,"workDir":%q}`, workDir)
+	rec := doApplyRunDiff(h, "run-newnested", http.MethodPost, body)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200 when creating a new nested file; body=%s", rec.Code, rec.Body.String())
+	}
+	target := filepath.Join(workDir, "src", "new", "deep.txt")
+	got, err := os.ReadFile(target)
+	if err != nil {
+		t.Fatalf("read created file: %v", err)
+	}
+	if string(got) != "line2-modified\n" {
+		t.Errorf("created file content = %q", got)
+	}
+}

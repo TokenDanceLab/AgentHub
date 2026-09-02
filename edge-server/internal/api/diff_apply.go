@@ -210,9 +210,11 @@ func (h *Handler) applyHunkToFile(workDir, filePath string, hunk unifiedHunk) er
 	}
 	targetPath := filepath.Join(absWorkDir, filepath.FromSlash(filePath))
 	targetPath = filepath.Clean(targetPath)
-
-	if !isPathWithin(absWorkDir, targetPath) {
-		return fmt.Errorf("file path %q escapes workdir %q", filePath, workDir)
+	// Containment has to be proven on what the kernel will actually open, not on
+	// the lexical join: a git repository may legally carry symlinks and every
+	// os.* call below follows them.
+	if err := validateContainedWritePath(absWorkDir, targetPath); err != nil {
+		return fmt.Errorf("file path %q rejected for workdir %q: %w", filePath, workDir, err)
 	}
 
 	// Read the original file content.
@@ -227,7 +229,7 @@ func (h *Handler) applyHunkToFile(workDir, filePath string, hunk unifiedHunk) er
 	original := string(originalBytes)
 
 	// Create a backup before modifying.
-	if err := createBackup(targetPath, originalBytes); err != nil {
+	if err := createBackup(absWorkDir, targetPath, originalBytes); err != nil {
 		return fmt.Errorf("failed to create backup: %w", err)
 	}
 
@@ -440,19 +442,88 @@ func applyHunkToContent(original string, hunk unifiedHunk) string {
 	return strings.Join(result, "")
 }
 
-// createBackup creates a .bak copy of the file before modification.
-func createBackup(targetPath string, content []byte) error {
-	backupPath := targetPath + ".bak"
-	// Don't overwrite an existing backup.
-	if _, err := os.Stat(backupPath); err == nil {
-		return nil // backup already exists
+// validateContainedWritePath proves that targetPath is a safe os.WriteFile /
+// os.ReadFile target inside the symlink-resolved workspace root absWorkDir.
+//
+// Callers pass a filepath.Clean'ed path; this adds the part a lexical prefix
+// check cannot see. A git repository may legally carry symlinks and every os.*
+// call on the apply path follows them, so "docs/authorized_keys" inside an
+// allowlisted workdir can land on /root/.ssh/authorized_keys. Each existing
+// path component is therefore Lstat'ed and symlinks are rejected outright — the
+// same fail-closed rule the deploy archive path already applies to symlinked
+// artifacts (#2210). Trailing components that do not exist yet stay allowed so
+// "accept" can still create a new file in a new directory.
+func validateContainedWritePath(absWorkDir, targetPath string) error {
+	if !isPathWithin(absWorkDir, targetPath) {
+		return fmt.Errorf("path %q escapes workdir %q", targetPath, absWorkDir)
 	}
+	rel, err := filepath.Rel(absWorkDir, targetPath)
+	if err != nil {
+		return fmt.Errorf("path %q is not relative to workdir %q: %w", targetPath, absWorkDir, err)
+	}
+
+	existing := absWorkDir
+	for _, segment := range strings.Split(rel, string(filepath.Separator)) {
+		if segment == "" || segment == "." {
+			continue
+		}
+		next := filepath.Join(existing, segment)
+		info, err := os.Lstat(next)
+		if err != nil {
+			if os.IsNotExist(err) {
+				break // the remaining components are created by the write itself
+			}
+			return fmt.Errorf("cannot inspect path component %q: %w", next, err)
+		}
+		if info.Mode()&os.ModeSymlink != 0 {
+			return fmt.Errorf("path component %q is a symlink; refusing to write through it", next)
+		}
+		existing = next
+	}
+
+	// Defense in depth: the symlink-free prefix must still resolve inside the
+	// resolved workdir, so a component that is not a symlink but still points
+	// elsewhere cannot smuggle the write out.
+	realExisting, err := normalizedRealPath(existing)
+	if err != nil {
+		return fmt.Errorf("cannot resolve %q: %w", existing, err)
+	}
+	if !isPathWithin(absWorkDir, realExisting) {
+		return fmt.Errorf("resolved path %q escapes workdir %q", realExisting, absWorkDir)
+	}
+	return nil
+}
+
+// createBackup creates a .bak copy of the file before modification.
+//
+// The backup is a second write, so it re-proves containment instead of trusting
+// the caller: targetPath+".bak" is a distinct path and a caller bug (or a
+// symlink swapped in between) must not turn the rollback copy into an
+// out-of-workspace write.
+func createBackup(absWorkDir, targetPath string, content []byte) error {
+	backupPath := filepath.Clean(targetPath + ".bak")
+	if err := validateContainedWritePath(absWorkDir, backupPath); err != nil {
+		return fmt.Errorf("backup path rejected: %w", err)
+	}
+	// O_EXCL makes "never overwrite an existing backup" atomic: the previous
+	// Stat-then-WriteFile pair left a window where a concurrent apply could
+	// clobber the only rollback copy.
 	// Backups may contain source code or credentials. Keep them readable by the
 	// Edge process for rollback without exposing them to other users. A zero
 	// mode is ignored on Windows but creates an unreadable file on Unix.
-	// #nosec G703 -- backupPath = targetPath+".bak"; targetPath already passed
-	// isPathWithin(absWorkDir, ...) in applyHunkToFile, so it cannot escape workdir.
-	return os.WriteFile(backupPath, content, 0o600)
+	f, err := os.OpenFile(backupPath, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
+	if err != nil {
+		if os.IsExist(err) {
+			return nil // backup already exists
+		}
+		return err
+	}
+	_, writeErr := f.Write(content)
+	closeErr := f.Close()
+	if writeErr != nil {
+		return writeErr
+	}
+	return closeErr
 }
 
 // decodeApplyJSON decodes the JSON request body for apply endpoints.
