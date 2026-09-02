@@ -69,13 +69,13 @@ func SyncSessionSeq(db *gorm.DB, sessionID string, seq int64) error {
 // Returns (sessions, hasMore) with the pageSize+1 probing convention.
 func SearchSessions(db *gorm.DB, userID, q, cursor string, pageSize int) ([]SessionWithMeta, bool, error) {
 	var result []SessionWithMeta
-	args := []interface{}{userID, "%" + q + "%"}
+	args := []interface{}{userID, "%" + escapeILIKE(q) + "%"}
 	sql := `
 		SELECT s.*, sm.role, sm.pinned, sm.archived, sm.muted, sm.last_read_seq,
 			(SELECT COUNT(*) FROM session_members sm2 WHERE sm2.session_id = s.id AND sm2.left_at IS NULL) as member_count
 		FROM sessions s
 		INNER JOIN session_members sm ON sm.session_id = s.id AND sm.member_id = ? AND sm.left_at IS NULL
-		WHERE s.dissolved = false AND (s.type = 'group' OR (s.type = 'private')) AND s.name LIKE ?`
+		WHERE s.dissolved = false AND (s.type = 'group' OR (s.type = 'private')) AND s.name LIKE ? ESCAPE '\'`
 	if parts := strings.SplitN(cursor, "|", 2); len(parts) == 2 {
 		if nanos, err := strconv.ParseInt(parts[0], 10, 64); err == nil {
 			cursorTime := time.Unix(0, nanos)
