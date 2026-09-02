@@ -307,7 +307,7 @@ describe('workbenchTranscriptChromeActionMappers', () => {
       t,
       onAction,
       onEnterSelection: vi.fn(),
-      hubMessageActions: true,
+      capabilities: { recall: true },
     });
     const recallItem = userMenu.flat().find((i) => i.label === 'context.recall');
     expect(recallItem).toBeDefined();
@@ -321,12 +321,12 @@ describe('workbenchTranscriptChromeActionMappers', () => {
       t,
       onAction: vi.fn(),
       onEnterSelection: vi.fn(),
-      hubMessageActions: true,
+      capabilities: { recall: true },
     });
     expect(agentMenu.flat().map((i) => i.label)).not.toContain('context.recall');
   });
 
-  it('omits recall/pin/react menu entries without Hub message actions (#1818)', () => {
+  it('omits recall/pin/react menu entries without declared capabilities (#1818, #2154)', () => {
     const userBlock = textBlock({ id: 'u', author: { id: 'u', role: 'human', name: 'You' } });
     const menu = buildTranscriptContextMenuGroups({
       blockId: 'u',
@@ -353,7 +353,7 @@ describe('workbenchTranscriptChromeActionMappers', () => {
       t,
       onAction: vi.fn(),
       onEnterSelection: vi.fn(),
-      hubMessageActions: true,
+      capabilities: { pin: true },
     });
     expect(userMenu.flat().map((i) => i.label)).toContain('context.pinMessage');
     const agentMenu = buildTranscriptContextMenuGroups({
@@ -362,7 +362,7 @@ describe('workbenchTranscriptChromeActionMappers', () => {
       t,
       onAction: vi.fn(),
       onEnterSelection: vi.fn(),
-      hubMessageActions: true,
+      capabilities: { pin: true },
     });
     expect(agentMenu.flat().map((i) => i.label)).toContain('context.pinMessage');
     const pinOnAction = vi.fn();
@@ -372,7 +372,7 @@ describe('workbenchTranscriptChromeActionMappers', () => {
       t,
       onAction: pinOnAction,
       onEnterSelection: vi.fn(),
-      hubMessageActions: true,
+      capabilities: { pin: true },
     });
     pinCapture.flat().find((i) => i.label === 'context.pinMessage')?.onClick?.();
     expect(pinOnAction).toHaveBeenCalledWith('pin', 'u');
@@ -384,7 +384,7 @@ describe('workbenchTranscriptChromeActionMappers', () => {
       t,
       onAction: vi.fn(),
       onEnterSelection: vi.fn(),
-      hubMessageActions: true,
+      capabilities: { unpin: true },
     });
     const labels = pinnedMenu.flat().map((i) => i.label);
     expect(labels).toContain('context.unpin');
@@ -396,7 +396,7 @@ describe('workbenchTranscriptChromeActionMappers', () => {
       t,
       onAction: unpinOnAction,
       onEnterSelection: vi.fn(),
-      hubMessageActions: true,
+      capabilities: { unpin: true },
     });
     unpinCapture.flat().find((i) => i.label === 'context.unpin')?.onClick?.();
     expect(unpinOnAction).toHaveBeenCalledWith('unpin', 'p');
@@ -485,7 +485,7 @@ describe('workbenchTranscriptChromeActionMappers', () => {
       t,
       onAction,
       onEnterSelection: vi.fn(),
-      hubMessageActions: true,
+      capabilities: { pin: true, recall: true },
     });
     const labels = groups.flat().map((i) => i.label);
     expect(labels).not.toContain('context.react');
@@ -567,6 +567,7 @@ describe('workbenchTranscriptChromeActionMappers', () => {
       onAction,
       onEnterSelection: vi.fn(),
       conversations,
+      capabilities: { forward: true },
     });
     const forwardItem = groups[0]?.find((item) => item.label === 'context.forward');
     expect(forwardItem?.chevron).toBe(true);
@@ -592,6 +593,9 @@ describe('workbenchTranscriptChromeActionMappers', () => {
       t,
       onAction,
       onEnterSelection: vi.fn(),
+      // #2154: the port is declared, so what hides the entry here is the
+      // missing conversation list, not the capability gate.
+      capabilities: { forward: true },
     });
     // A plain forward without a target picker only ever produced a
     // placeholder toast, so shells without conversations get no entry.
@@ -609,6 +613,7 @@ describe('workbenchTranscriptChromeActionMappers', () => {
       onAction,
       onEnterSelection: vi.fn(),
       conversations: [],
+      capabilities: { forward: true },
     });
     const forwardItem = groups[0]?.find((item) => item.label === 'context.forward');
     const close = vi.fn();
@@ -811,7 +816,7 @@ describe('workbenchTranscriptChromeActionMappers', () => {
       onAction,
       onEnterSelection,
       conversations,
-      hubMessageActions: true,
+      capabilities: { pin: true, forward: true, regenerate: true },
     });
     const items = groups.flat();
     const click = (label: string) => items.find((item) => item.label === label)?.onClick?.();

@@ -220,6 +220,9 @@ describe('workbenchTranscriptChromeHelpers', () => {
       t,
       onAction,
       onEnterSelection,
+      // #2154: the regenerate entry is gated on the port being wired; this
+      // test is about the author/kind conditionals, so declare it.
+      capabilities: { regenerate: true },
     });
     const labels = agentGroups.flat().map((item) => item.label);
     expect(labels).toContain('context.quote');
@@ -235,6 +238,7 @@ describe('workbenchTranscriptChromeHelpers', () => {
       t,
       onAction,
       onEnterSelection,
+      capabilities: { regenerate: true },
     });
     const userLabels = userGroups.flat().map((item) => item.label);
     expect(userLabels).toContain('context.quote');
@@ -1062,6 +1066,10 @@ describe('workbenchTranscriptChromeHelpers', () => {
       t,
       dispatchComposer: vi.fn(),
       composerInputRef: { current: null },
+      // #2154: the forward entry is gated on the port being wired, so this
+      // picker test declares one (the assertions below are about the
+      // conversations list reaching the builder, not about the port).
+      onForwardMessage: vi.fn(),
     });
 
     // Without conversations there is no real forward path, so the entry is
