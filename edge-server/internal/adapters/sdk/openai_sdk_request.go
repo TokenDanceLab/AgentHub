@@ -34,6 +34,7 @@ import (
 // Pattern matches anthropic_sdk.go doRequestWithRetry.
 func (a *OpenAISDKAdapter) doRequestWithRetry(ctx context.Context, body []byte, emitter EventEmitter, scope map[string]any) (*http.Response, error) {
 	var lastErr error
+	var retryAfterHint string
 
 	for attempt := 0; attempt <= openaiMaxRetries; attempt++ {
 		if attempt > 0 {
@@ -43,6 +44,8 @@ func (a *OpenAISDKAdapter) doRequestWithRetry(ctx context.Context, body []byte, 
 			delay := openaiRetryBaseDelay * time.Duration(math.Pow(2, float64(attempt-1)))
 			// #nosec G404 -- retry backoff jitter only; randomness is not used for security
 			delay += time.Duration(rand.Int63n(int64(delay / 4)))
+			delay = retryDelayWithHint(delay, retryAfterHint)
+			retryAfterHint = ""
 			slog.Info("openai-sdk: retrying request",
 				"attempt", attempt,
 				"delay", delay,
@@ -80,12 +83,14 @@ func (a *OpenAISDKAdapter) doRequestWithRetry(ctx context.Context, body []byte, 
 		case resp.StatusCode == http.StatusOK:
 			return resp, nil
 		case resp.StatusCode == http.StatusTooManyRequests:
-			// Rate limited -- always retry
+			// Rate limited -- always retry; carry the throttle hint.
+			retryAfterHint = resp.Header.Get("Retry-After")
 			_ = resp.Body.Close()
 			lastErr = fmt.Errorf("rate limited (429)")
 			continue
 		case resp.StatusCode >= 500:
-			// Server error -- retry
+			// Server error -- retry; 503 may carry a throttle hint too.
+			retryAfterHint = resp.Header.Get("Retry-After")
 			_ = resp.Body.Close()
 			lastErr = fmt.Errorf("server error (%d)", resp.StatusCode)
 			continue
