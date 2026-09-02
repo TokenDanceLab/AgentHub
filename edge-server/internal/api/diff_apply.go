@@ -39,6 +39,19 @@ type applyAllRequest struct {
 	WorkDir   string          `json:"workDir"`
 }
 
+// maxApplyDecisions caps one apply-all batch.
+//
+// Why 500: it matches the only other per-request limit in this package
+// (GetRuntimeSessions rejects limit > 500) and Hub's config.MaxPageLimit, and it
+// bounds both batch amplifiers — one hunk parse plus (when accepted) one backup
+// and one file write per decision, and one `files` array per result, i.e. a
+// response that is O(decisions x diff files) because every result embeds the
+// run's diff snapshot. decodeApplyJSON caps the body at 1 MiB, which admits
+// ~17k minimal decision objects, so before this cap a single request could fan
+// out into ~17k iterations inside the 30s REST budget
+// (httpserver.defaultRESTRequestTimeout).
+const maxApplyDecisions = 500
+
 // PostApplyRunDiff applies a single accepted hunk to the filesystem.
 // POST /v1/runs/{runId}/apply
 func (h *Handler) PostApplyRunDiff(w http.ResponseWriter, r *http.Request, runID string) {
@@ -48,8 +61,14 @@ func (h *Handler) PostApplyRunDiff(w http.ResponseWriter, r *http.Request, runID
 	}
 
 	repository := ensureStore(h)
+	// Ownership gate, identical in shape to GetRunDiff (handlers_projects.go):
+	// a run that exists but belongs to another Hub user is reported as 404, so
+	// this write endpoint is not a runId existence oracle. Without it any
+	// Edge-authenticated caller could apply hunks of somebody else's run and
+	// receive that run's full diff text back (applySingleHunk embeds it).
+	userID := h.ownerUserID(r)
 	run, ok := repository.GetRun(runID)
-	if !ok {
+	if !ok || !isRunOwnedBy(repository, runID, userID) {
 		writeJSON(w, http.StatusNotFound, errcode.ErrorBody(errcode.ErrNotFound.WithMessage("run not found")))
 		return
 	}
@@ -92,8 +111,14 @@ func (h *Handler) PostApplyAllRunDiffs(w http.ResponseWriter, r *http.Request, r
 	}
 
 	repository := ensureStore(h)
+	// Ownership gate, identical in shape to GetRunDiff (handlers_projects.go):
+	// a run that exists but belongs to another Hub user is reported as 404, so
+	// this write endpoint is not a runId existence oracle. Without it any
+	// Edge-authenticated caller could apply hunks of somebody else's run and
+	// receive that run's full diff text back (applySingleHunk embeds it).
+	userID := h.ownerUserID(r)
 	run, ok := repository.GetRun(runID)
-	if !ok {
+	if !ok || !isRunOwnedBy(repository, runID, userID) {
 		writeJSON(w, http.StatusNotFound, errcode.ErrorBody(errcode.ErrNotFound.WithMessage("run not found")))
 		return
 	}
@@ -111,24 +136,44 @@ func (h *Handler) PostApplyAllRunDiffs(w http.ResponseWriter, r *http.Request, r
 		writeJSON(w, http.StatusBadRequest, errcode.ErrorBody(errcode.ErrBadRequest.WithMessage("decisions must not be empty")))
 		return
 	}
+	if len(req.Decisions) > maxApplyDecisions {
+		writeJSON(w, http.StatusBadRequest, errcode.ErrorBody(errcode.ErrBadRequest.WithMessagef("decisions must not exceed %d entries per request", maxApplyDecisions)))
+		return
+	}
 	if err := h.validateWorkDirAllowed(req.WorkDir); err != nil {
 		slog.Error("workdir not allowed", "workDir", req.WorkDir, "error", err)
 		writeJSON(w, http.StatusForbidden, errcode.ErrorBody(errcode.ErrWorkspaceNotAllowed))
 		return
 	}
 
+	// One diff snapshot per request instead of two per decision: applying a hunk
+	// never mutates the stored diffs, so every result reports the same snapshot
+	// the request started with.
+	diffFiles := repository.ListRunDiffFiles(runID)
+	filesResponse := runDiffFilesResponse(diffFiles)
+
 	results := make([]map[string]any, 0, len(req.Decisions))
-	for _, decision := range req.Decisions {
+	for i, decision := range req.Decisions {
+		// restTimeoutMiddleware wraps REST routes in http.TimeoutHandler, which
+		// cancels this context when the 30s budget expires (a client disconnect
+		// does the same). Without this check the loop kept parsing hunks and
+		// writing files after the client had already been answered.
+		if err := r.Context().Err(); err != nil {
+			slog.Warn("diff batch apply aborted: request context ended",
+				"runId", runID, "applied", len(results), "remaining", len(req.Decisions)-i, "error", err)
+			writeJSON(w, http.StatusInternalServerError, errcode.ErrorBody(errcode.ErrInternal.WithMessage("batch apply aborted: request context ended")))
+			return
+		}
 		if decision.FilePath == "" {
 			writeJSON(w, http.StatusBadRequest, errcode.ErrorBody(errcode.ErrBadRequest.WithMessage("file_path is required for each decision")))
 			return
 		}
-		result, err := h.applySingleHunk(repository, runID, applyRequest{
+		result, err := h.applyHunkDecision(runID, applyRequest{
 			FilePath:  decision.FilePath,
 			HunkIndex: decision.HunkIndex,
 			Accepted:  decision.Accepted,
 			WorkDir:   req.WorkDir,
-		})
+		}, diffFiles, filesResponse)
 		if err != nil {
 			slog.Error("diff batch apply failed", "runId", runID, "filePath", decision.FilePath, "hunkIndex", decision.HunkIndex, "error", err)
 			writeJSON(w, http.StatusInternalServerError, errcode.ErrorBody(errcode.ErrInternal))
@@ -146,8 +191,16 @@ func (h *Handler) PostApplyAllRunDiffs(w http.ResponseWriter, r *http.Request, r
 
 // applySingleHunk applies one hunk decision and returns the updated diff state.
 func (h *Handler) applySingleHunk(repository store.Repository, runID string, req applyRequest) (map[string]any, error) {
-	// Find the diff file for this run and path.
 	diffFiles := repository.ListRunDiffFiles(runID)
+	return h.applyHunkDecision(runID, req, diffFiles, runDiffFilesResponse(diffFiles))
+}
+
+// applyHunkDecision applies one decision against a diff snapshot the caller has
+// already loaded, so a batch cannot turn into one full-store scan per decision.
+// filesResponse is the serialized form of that same snapshot and is shared by
+// every result of a batch.
+func (h *Handler) applyHunkDecision(runID string, req applyRequest, diffFiles []store.RunDiffFile, filesResponse []map[string]any) (map[string]any, error) {
+	// Find the diff file for this run and path.
 	var targetDiff *store.RunDiffFile
 	for i := range diffFiles {
 		if diffFiles[i].Path == req.FilePath {
@@ -177,15 +230,14 @@ func (h *Handler) applySingleHunk(repository store.Repository, runID string, req
 		}
 	}
 
-	// Build response with updated diff state.
-	allDiffFiles := repository.ListRunDiffFiles(runID)
+	// Build response with the diff state snapshot loaded for this request.
 	return map[string]any{
 		"runId":     runID,
 		"filePath":  req.FilePath,
 		"hunkIndex": req.HunkIndex,
 		"accepted":  req.Accepted,
 		"applied":   req.Accepted,
-		"files":     runDiffFilesResponse(allDiffFiles),
+		"files":     filesResponse,
 	}, nil
 }
 
@@ -198,9 +250,11 @@ func (h *Handler) applyHunkToFile(workDir, filePath string, hunk unifiedHunk) er
 	}
 	targetPath := filepath.Join(absWorkDir, filepath.FromSlash(filePath))
 	targetPath = filepath.Clean(targetPath)
-
-	if !isPathWithin(absWorkDir, targetPath) {
-		return fmt.Errorf("file path %q escapes workdir %q", filePath, workDir)
+	// Containment has to be proven on what the kernel will actually open, not on
+	// the lexical join: a git repository may legally carry symlinks and every
+	// os.* call below follows them.
+	if err := validateContainedWritePath(absWorkDir, targetPath); err != nil {
+		return fmt.Errorf("file path %q rejected for workdir %q: %w", filePath, workDir, err)
 	}
 
 	// Read the original file content.
@@ -215,15 +269,19 @@ func (h *Handler) applyHunkToFile(workDir, filePath string, hunk unifiedHunk) er
 	original := string(originalBytes)
 
 	// Create a backup before modifying.
-	if err := createBackup(targetPath, originalBytes); err != nil {
+	if err := createBackup(absWorkDir, targetPath, originalBytes); err != nil {
 		return fmt.Errorf("failed to create backup: %w", err)
 	}
 
 	// Apply the hunk to the original content.
 	modified := applyHunkToContent(original, hunk)
 
-	// Write the modified content back.
-	if err := os.WriteFile(targetPath, []byte(modified), 0); err != nil {
+	// Write the modified content back. The mode only takes effect if the file
+	// has to be created — normally it exists (we just read it) and the current
+	// mode is preserved — but a 0 literal would create a mode-0000 file on Unix
+	// if the path disappeared between the read and this write (the workdir is a
+	// live agent workspace), so it is spelled out like every other write here.
+	if err := os.WriteFile(targetPath, []byte(modified), 0o600); err != nil {
 		return fmt.Errorf("failed to write file %s: %w", targetPath, err)
 	}
 
@@ -428,19 +486,95 @@ func applyHunkToContent(original string, hunk unifiedHunk) string {
 	return strings.Join(result, "")
 }
 
-// createBackup creates a .bak copy of the file before modification.
-func createBackup(targetPath string, content []byte) error {
-	backupPath := targetPath + ".bak"
-	// Don't overwrite an existing backup.
-	if _, err := os.Stat(backupPath); err == nil {
-		return nil // backup already exists
+// validateContainedWritePath proves that targetPath is a safe os.WriteFile /
+// os.ReadFile target inside the symlink-resolved workspace root absWorkDir.
+//
+// Callers pass a filepath.Clean'ed path; this adds the part a lexical prefix
+// check cannot see. A git repository may legally carry symlinks and every os.*
+// call on the apply path follows them, so "docs/authorized_keys" inside an
+// allowlisted workdir can land on /root/.ssh/authorized_keys. Each existing
+// path component is therefore Lstat'ed and symlinks are rejected outright — the
+// same fail-closed rule the deploy archive path already applies to symlinked
+// artifacts (#2210). Trailing components that do not exist yet stay allowed so
+// "accept" can still create a new file in a new directory.
+func validateContainedWritePath(absWorkDir, targetPath string) error {
+	if !isPathWithin(absWorkDir, targetPath) {
+		return fmt.Errorf("path %q escapes workdir %q", targetPath, absWorkDir)
 	}
+	rel, err := filepath.Rel(absWorkDir, targetPath)
+	if err != nil {
+		return fmt.Errorf("path %q is not relative to workdir %q: %w", targetPath, absWorkDir, err)
+	}
+
+	existing := absWorkDir
+	for _, segment := range strings.Split(rel, string(filepath.Separator)) {
+		if segment == "" || segment == "." {
+			continue
+		}
+		next := filepath.Join(existing, segment)
+		info, err := os.Lstat(next)
+		if err != nil {
+			if os.IsNotExist(err) {
+				break // the remaining components are created by the write itself
+			}
+			return fmt.Errorf("cannot inspect path component %q: %w", next, err)
+		}
+		if info.Mode()&os.ModeSymlink != 0 {
+			return fmt.Errorf("path component %q is a symlink; refusing to write through it", next)
+		}
+		existing = next
+	}
+
+	// Defense in depth: the symlink-free prefix must still resolve inside the
+	// resolved workdir, so a component that is not a symlink but still points
+	// elsewhere cannot smuggle the write out. Both sides are resolved before the
+	// comparison — on Windows a caller may hand in an 8.3 short-name root
+	// (C:\Users\RUNNER~1\...) while EvalSymlinks returns the long name, and
+	// comparing the two spellings would reject every legitimate write.
+	realWorkDir, err := normalizedRealPath(absWorkDir)
+	if err != nil {
+		return fmt.Errorf("cannot resolve workdir %q: %w", absWorkDir, err)
+	}
+	realExisting, err := normalizedRealPath(existing)
+	if err != nil {
+		return fmt.Errorf("cannot resolve %q: %w", existing, err)
+	}
+	if !isPathWithin(realWorkDir, realExisting) {
+		return fmt.Errorf("resolved path %q escapes workdir %q", realExisting, realWorkDir)
+	}
+	return nil
+}
+
+// createBackup creates a .bak copy of the file before modification.
+//
+// The backup is a second write, so it re-proves containment instead of trusting
+// the caller: targetPath+".bak" is a distinct path and a caller bug (or a
+// symlink swapped in between) must not turn the rollback copy into an
+// out-of-workspace write.
+func createBackup(absWorkDir, targetPath string, content []byte) error {
+	backupPath := filepath.Clean(targetPath + ".bak")
+	if err := validateContainedWritePath(absWorkDir, backupPath); err != nil {
+		return fmt.Errorf("backup path rejected: %w", err)
+	}
+	// O_EXCL makes "never overwrite an existing backup" atomic: the previous
+	// Stat-then-WriteFile pair left a window where a concurrent apply could
+	// clobber the only rollback copy.
 	// Backups may contain source code or credentials. Keep them readable by the
 	// Edge process for rollback without exposing them to other users. A zero
 	// mode is ignored on Windows but creates an unreadable file on Unix.
-	// #nosec G703 -- backupPath = targetPath+".bak"; targetPath already passed
-	// isPathWithin(absWorkDir, ...) in applyHunkToFile, so it cannot escape workdir.
-	return os.WriteFile(backupPath, content, 0o600)
+	f, err := os.OpenFile(backupPath, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
+	if err != nil {
+		if os.IsExist(err) {
+			return nil // backup already exists
+		}
+		return err
+	}
+	_, writeErr := f.Write(content)
+	closeErr := f.Close()
+	if writeErr != nil {
+		return writeErr
+	}
+	return closeErr
 }
 
 // decodeApplyJSON decodes the JSON request body for apply endpoints.
