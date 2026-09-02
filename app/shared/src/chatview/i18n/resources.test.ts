@@ -217,3 +217,33 @@ describe('interpolation placeholder consistency', () => {
     expect(mismatches).toEqual([]);
   });
 });
+
+// #2241: `UNAVAILABLE_ACTION_TOAST_KEY` ('toast.actionUnavailable') is the copy
+// the transcript effect dispatcher announces when a shell never wired the port
+// behind a planned action. Before this key existed the dispatcher fell back to
+// each effect's own failure copy ("置顶失败，请重试"), which promises a retry
+// that can never succeed on that client. These assertions pin the dedicated
+// copy in both locales: the wording *is* the deliverable here, so it is
+// asserted literally (the dispatcher-side behaviour is covered by
+// app/workbench/src/__tests__/unavailableActionToastI18n.test.ts).
+describe('toast.actionUnavailable (#2241)', () => {
+  const KEY = 'toast.actionUnavailable';
+
+  it('ships the dedicated unwired-action copy in zh and en', () => {
+    expect(chatviewResources.zh[KEY]).toBe('该操作在当前端未接入');
+    expect(chatviewResources.en[KEY]).toBe('This action is not wired in this client');
+  });
+
+  it('does not promise a retry the client can never honour', () => {
+    expect(chatviewResources.zh[KEY]).not.toContain('重试');
+    expect(chatviewResources.en[KEY]).not.toMatch(/retry|again/i);
+  });
+
+  it('is reachable through the chatview namespace the dispatcher translates in', () => {
+    // The dispatcher's `t` comes from useTranslation(CHATVIEW_I18N_NAMESPACE),
+    // so the key must live in this bundle (not the sharedWorkbench one).
+    expect(CHATVIEW_I18N_NAMESPACE).toBe('chatview');
+    expect(Object.keys(chatviewResources.zh)).toContain(KEY);
+    expect(Object.keys(chatviewResources.en)).toContain(KEY);
+  });
+});
