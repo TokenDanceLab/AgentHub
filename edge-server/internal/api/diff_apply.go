@@ -48,8 +48,14 @@ func (h *Handler) PostApplyRunDiff(w http.ResponseWriter, r *http.Request, runID
 	}
 
 	repository := ensureStore(h)
+	// Ownership gate, identical in shape to GetRunDiff (handlers_projects.go):
+	// a run that exists but belongs to another Hub user is reported as 404, so
+	// this write endpoint is not a runId existence oracle. Without it any
+	// Edge-authenticated caller could apply hunks of somebody else's run and
+	// receive that run's full diff text back (applySingleHunk embeds it).
+	userID := h.ownerUserID(r)
 	run, ok := repository.GetRun(runID)
-	if !ok {
+	if !ok || !isRunOwnedBy(repository, runID, userID) {
 		writeJSON(w, http.StatusNotFound, errcode.ErrorBody(errcode.ErrNotFound.WithMessage("run not found")))
 		return
 	}
@@ -92,8 +98,14 @@ func (h *Handler) PostApplyAllRunDiffs(w http.ResponseWriter, r *http.Request, r
 	}
 
 	repository := ensureStore(h)
+	// Ownership gate, identical in shape to GetRunDiff (handlers_projects.go):
+	// a run that exists but belongs to another Hub user is reported as 404, so
+	// this write endpoint is not a runId existence oracle. Without it any
+	// Edge-authenticated caller could apply hunks of somebody else's run and
+	// receive that run's full diff text back (applySingleHunk embeds it).
+	userID := h.ownerUserID(r)
 	run, ok := repository.GetRun(runID)
-	if !ok {
+	if !ok || !isRunOwnedBy(repository, runID, userID) {
 		writeJSON(w, http.StatusNotFound, errcode.ErrorBody(errcode.ErrNotFound.WithMessage("run not found")))
 		return
 	}
