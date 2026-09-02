@@ -3,7 +3,7 @@
 > Owner：本文件是 AgentHub「flake 登记、重试预算与 CI annotation 约定」的 SSOT。其他文档涉及 flaky 处置时以本文件为准，不复制规则。
 > 相关：规则 → 机器验证映射见 [verifier-map](verifier-map.md)。本登记表暂无机器门禁，靠到期复审纪律与评审执行。
 
-最后更新：2026-09-01（FLK-003、FLK-004 根因修复并归档）
+最后更新：2026-09-03（重试预算表的 Go 车道 job ID 对齐 #2251 拆分后的 checks.yml 实况）
 
 ## 为什么需要登记表
 
@@ -43,7 +43,13 @@ Flaky 测试侵蚀门禁可信度：一旦「偶发红、重跑转绿」成为�
 | Web E2E（stubbed-hub） | Playwright（`app/web/playwright.config.ts`） | 0 |
 | Desktop E2E | Playwright（`app/desktop/playwright.config.ts`） | 0 |
 | Mobile E2E（light） | Playwright（`app/mobile-rn/playwright.config.ts`） | 1 |
-| Go 单元（go-edge / go-hub / windows-go-test 等） | `go test`（checks.yml） | 无运行时重试；容错动作 = 重跑失败 job，且必须当日登记 |
+| Go 单元（go-edge-test / go-hub-test / windows-go-test） | `go test`（checks.yml） | 无运行时重试；容错动作 = 重跑失败 job，且必须当日登记 |
+
+Go 车道 job ID 分工（登记「车道」字段时按此写，勿再写聚合 job）：
+
+- `go-edge-test` / `go-hub-test`：实际执行 2-shard `go test` 的 job，flaky 登记写这两个。
+- `go-edge-static` / `go-hub-static`：lint / gosec / vet / staticcheck，与 shard 并行，不跑 `go test`。
+- `go-edge` / `go-hub`：覆盖率门禁 + 对上面两条 lane 的 fail-closed 聚合（required check 名），自身不跑 `go test`。
 
 预算变更规则：
 
