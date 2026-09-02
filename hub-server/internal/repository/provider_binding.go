@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"github.com/agenthub/hub-server/internal/config"
 	"github.com/agenthub/hub-server/internal/model"
 	"gorm.io/gorm"
 )
@@ -29,9 +30,7 @@ func DeleteProviderBinding(db *gorm.DB, id, ownerID string) error {
 }
 
 func ListProviderBindings(db *gorm.DB, ownerID, cursor string, pageSize int) ([]model.ProviderBinding, bool, error) {
-	if pageSize <= 0 || pageSize > 200 {
-		pageSize = defaultProviderBindingPageSize
-	}
+	pageSize = config.ClampPageSize(pageSize, config.MaxListPageSize, defaultProviderBindingPageSize)
 
 	qry := db.Where("owner_id = ?", ownerID)
 	if cursor != "" {

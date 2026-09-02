@@ -17,6 +17,13 @@ const MaxMessagePageLimit = 100
 // MaxMessagePageLimit because sync clients often fetch larger batches.
 const MaxIncrementalMessageLimit = 500
 
+// MaxListPageSize is the maximum page size for the generic list endpoints
+// (workspaces, skills, agent profiles, execution targets, provider bindings,
+// MCP servers, audit events). It is the value api/openapi.yaml declares for the
+// shared PageSize parameter, so it is the bound those endpoints must actually
+// enforce; it was previously a bare `200` literal repeated in ten places.
+const MaxListPageSize = 200
+
 // MaxPageLimit is the maximum allowed page size (pageSize / limit) for list
 // endpoints across all Hub handlers. Handlers MUST clamp user-supplied values
 // to this ceiling to prevent unbounded query resource usage.
