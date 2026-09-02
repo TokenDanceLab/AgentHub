@@ -1,19 +1,26 @@
 import { expect, test, type Page } from '@playwright/test';
 import {
   DESKTOP_WORKSPACE_VIEWPORT,
-  evaluateSidebarVsTerminalDock,
+  isListSignalInViewport,
   type GeometryRect,
 } from '../../../shared/src/testing/geometrySmoke';
 import { assertFontGuardHermetic, blockExternalFonts } from '../../../e2e/fontBlocker';
 
 /**
- * Desktop geometry smoke (#1284) — mock/demo workbench with localTerminal dock.
- * Asserts conversation sidebar does not intersect the terminal dock.
+ * Desktop geometry smoke (#1284) — mock/demo workbench layout contract.
+ *
+ * #2154 P1-7: Desktop no longer declares `capabilities.localTerminal` (the only
+ * host was the in-memory #1193 mock: no output, no close affordance), so the
+ * terminal dock renders on no surface. The original sidebar-vs-dock
+ * intersection check has no dock left to measure — this spec now pins the
+ * honest capability (dock absent) and keeps the conversation sidebar inside the
+ * 1440x810 workspace viewport. When a real PTY host lands, restore the
+ * sidebar-vs-dock assertion with `evaluateSidebarVsTerminalDock`.
  */
 test.describe('Desktop geometry smoke (#1284)', () => {
   test.describe.configure({ timeout: 60_000 });
 
-  test('keeps conversation sidebar clear of the terminal dock', async ({ page }) => {
+  test('renders no terminal dock and keeps the conversation sidebar in viewport', async ({ page }) => {
     collectPageDiagnostics(page);
     await blockLiveBackends(page);
     // #2014: blockLiveBackends continues every non-listed host, so external
@@ -26,8 +33,8 @@ test.describe('Desktop geometry smoke (#1284)', () => {
     await expect(page.getByTestId('agenthub-workbench')).toBeVisible();
     await expect(page.getByTestId('agenthub-workbench')).toHaveAttribute('data-page', 'chat');
 
-    const dock = page.getByTestId('workbench-terminal-dock');
-    await expect(dock).toBeVisible({ timeout: 15_000 });
+    // #2154 P1-7: capability is false, so the dock must never mount.
+    await expect(page.getByTestId('workbench-terminal-dock')).toHaveCount(0);
 
     const sidebar = page
       .getByRole('complementary', { name: /conversation sidebar|会话|对话/i })
@@ -38,15 +45,15 @@ test.describe('Desktop geometry smoke (#1284)', () => {
     await page.waitForTimeout(300);
 
     const sidebarBox = await toGeometryRect(sidebar);
-    const dockBox = await toGeometryRect(dock);
     expect(sidebarBox, 'sidebar bounding box').not.toBeNull();
-    expect(dockBox, 'terminal dock bounding box').not.toBeNull();
-    if (sidebarBox === null || dockBox === null) {
-      throw new Error('sidebar/dock bounding boxes were null after assertion');
+    if (sidebarBox === null) {
+      throw new Error('sidebar bounding box was null after assertion');
     }
 
-    const result = evaluateSidebarVsTerminalDock(sidebarBox, dockBox);
-    expect(result, result.reason ?? 'sidebar vs terminal dock geometry').toMatchObject({ ok: true });
+    expect(
+      isListSignalInViewport(sidebarBox, DESKTOP_WORKSPACE_VIEWPORT.height),
+      'conversation sidebar must stay inside the workspace viewport',
+    ).toBe(true);
 
     // #2014: fonts must be intercepted by the guard. id/gateway hosts are not
     // covered by blockLiveBackends' list and would reach the network, so they

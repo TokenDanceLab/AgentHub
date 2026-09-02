@@ -23,7 +23,11 @@ export {
   artifactTypeLabel,
   runCount,
   projectSubmitErrorMessage,
+  filterProjectsByStatus,
+  projectStatusBucket,
+  resolveAvailableProjectFilters,
 } from './shared';
+export type { ProjectStatusBucket } from './shared';
 
 export { DEFAULT_PROJECTS, FILTER_ITEMS, TAB_ITEMS } from './types';
 

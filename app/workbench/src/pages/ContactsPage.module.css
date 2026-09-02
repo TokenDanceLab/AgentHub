@@ -36,6 +36,14 @@
   box-shadow: var(--focus-ring);
 }
 
+/* #2154 P1-1: an unwired search box renders disabled — make that visible
+   instead of leaving an editable-looking input that drops every keystroke. */
+.search:disabled {
+  color: var(--td-ink-subtle);
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
 /* ── Org row ── */
 .orgRow {
   height: 46px;

@@ -2,7 +2,7 @@
 import { act, renderHook } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import type { DocRow } from './pages';
-import { WORKBENCH_MOCK_DOC_ROWS } from './mockData';
+import { WORKBENCH_MOCK_DOC_ROWS, WORKBENCH_MOCK_DOC_SHORTCUTS } from './mockData';
 import { useWorkbenchDocsRoute } from './useWorkbenchDocsRoute';
 
 /* ═══════════════════════════════════════════════════════════════════════
@@ -137,6 +137,8 @@ describe('useWorkbenchDocsRoute — real data mode', () => {
 
     expect(result.current.documentsLoading).toBe(false);
     expect(result.current.rows).toEqual(supplied);
+    // #2154 P2-2(b): real data mode never injects the mock library shortcuts.
+    expect(result.current.shortcuts).toEqual([]);
   });
 
   it('never loads in demo mode, even when documents is undefined', () => {
@@ -144,5 +146,23 @@ describe('useWorkbenchDocsRoute — real data mode', () => {
 
     expect(result.current.documentsLoading).toBe(false);
     expect(result.current.rows).toEqual(WORKBENCH_MOCK_DOC_ROWS);
+  });
+});
+
+describe('useWorkbenchDocsRoute — library shortcuts (#2154 P2-2b)', () => {
+  it('surfaces the mock shortcut list only in demo mode', () => {
+    const { result } = renderHook(() => useWorkbenchDocsRoute({ realDataMode: false }));
+
+    expect(result.current.shortcuts).toEqual(WORKBENCH_MOCK_DOC_SHORTCUTS);
+  });
+
+  it('stays empty while real mode is loading or errored', () => {
+    const { result: loading } = renderHook(() => useWorkbenchDocsRoute({ realDataMode: true }));
+    expect(loading.current.shortcuts).toEqual([]);
+
+    const { result: errored } = renderHook(() => useWorkbenchDocsRoute({
+      documentsError: 'GET /documents 500',
+    }));
+    expect(errored.current.shortcuts).toEqual([]);
   });
 });

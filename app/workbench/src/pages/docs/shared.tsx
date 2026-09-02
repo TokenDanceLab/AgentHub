@@ -13,16 +13,13 @@ import {
 import styles from '../DocsPage.module.css';
 import type { DocsPane, DocsPageNavItem } from './types';
 
-// ── Defaults ──
-
-export const DEFAULT_SHORTCUTS: string[] = [
-  'NewAPI注册和导入CC-switch',
-  '知识问答',
-  'AgentHub 设计评审',
-  '白盒方向调研报告',
-];
-
 // ── Design icons ──
+//
+// #2154 P2-2(b): DEFAULT_SHORTCUTS used to live here and was injected as the
+// DocsPage default, which leaked repository-internal document names into real
+// data mode. The demo-only list now lives in mockData.ts
+// (WORKBENCH_MOCK_DOC_SHORTCUTS) and reaches the page through the docs route,
+// so real mode renders no shortcut block at all.
 
 export function NavGlyph({ name }: { name: DesignNavIconName }) {
   return (
@@ -51,7 +48,10 @@ export const DEFAULT_NAV_ITEMS: DocsPageNavItem[] = [
   { id: 'drive', label: '云盘', icon: 'drive' },
   { id: 'library', label: '知识库', icon: 'library' },
   { id: 'notes', label: '智能纪要', icon: 'notes' },
-  { id: 'download', label: '离线', icon: 'download', trailing: '下载中...' },
+  // #2154 P2-2(b): the '下载中...' trailing badge was permanent fiction — no
+  // download pipeline exists, so the nav no longer claims one is in progress.
+  // `trailing` stays supported for real, data-provided badges.
+  { id: 'download', label: '离线', icon: 'download' },
 ];
 
 // ── Tab definitions ──

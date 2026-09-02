@@ -258,6 +258,10 @@ export const AuditFilterChip: React.FC<{
   <button
     className={`${active ? styles.active : ''}`}
     type="button"
+    // #2154 P2-16: no handler = no clickable chip. The audit filters are not
+    // wired by any shell today, so they render disabled instead of looking
+    // interactive and doing nothing (same gate as the market install buttons).
+    disabled={!onAuditFilterChange}
     onClick={() => onAuditFilterChange?.(filter)}
   >
     {label}
@@ -266,14 +270,35 @@ export const AuditFilterChip: React.FC<{
 
 export const AuditEntryRow: React.FC<{
   entry: AuditEntry;
-}> = ({ entry }) => (
-  <button className={styles['audit-row']} type="button">
-    <time>{entry.time}</time>
-    <strong>{entry.agent}</strong>
-    <span>{entry.tool}</span>
-    <em className={styles[permissionClass(entry.result)]}>
-      {entry.result}
-    </em>
-    <small>{entry.target}</small>
-  </button>
-);
+  /** Row activation handler. Absent = the row is read-only content. */
+  onAuditRowClick?: ((entry: AuditEntry) => void) | undefined;
+}> = ({ entry, onAuditRowClick }) => {
+  const cells = (
+    <>
+      <time>{entry.time}</time>
+      <strong>{entry.agent}</strong>
+      <span>{entry.tool}</span>
+      <em className={styles[permissionClass(entry.result)]}>
+        {entry.result}
+      </em>
+      <small>{entry.target}</small>
+    </>
+  );
+
+  // #2154 P2-16: this row used to be a focusable <button> with hover styling
+  // and no onClick at all — a "looks clickable, does nothing" element next to
+  // an export button that correctly hides when unwired. Without a handler it is
+  // plain content now; with one it keeps the button semantics.
+  if (!onAuditRowClick) {
+    return <div className={styles['audit-row']}>{cells}</div>;
+  }
+  return (
+    <button
+      className={styles['audit-row']}
+      type="button"
+      onClick={() => onAuditRowClick(entry)}
+    >
+      {cells}
+    </button>
+  );
+};

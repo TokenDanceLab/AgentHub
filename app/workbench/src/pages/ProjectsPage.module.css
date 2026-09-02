@@ -192,10 +192,18 @@
     color var(--td-dur-fast) var(--td-ease);
 }
 
-.filterBtn:hover,
+.filterBtn:hover:not(:disabled),
 .filterBtnActive {
   background: var(--td-surface);
   color: var(--td-plum);
+}
+
+/* #2154 P2-3: a filter the data source cannot satisfy is disabled and must
+   look disabled (same treatment as .skill-chip / .audit-filter-bar button). */
+.filterBtn:disabled {
+  color: var(--td-ink-subtle);
+  cursor: not-allowed;
+  opacity: 0.55;
 }
 
 .filterBtnIcon {

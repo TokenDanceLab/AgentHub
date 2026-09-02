@@ -1,6 +1,7 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { CHATVIEW_I18N_NAMESPACE } from '@shared/chatview/i18n/resources';
+import { formatTokens } from '@shared/context/breakdown';
 import styles from './TokenUsagePage.module.css';
 
 /* ═══════════════════════════════════════════════════════════════════════
@@ -56,12 +57,10 @@ export function hasRecordedTokens(teams: TokenUsagePageTeam[]): boolean {
   return teams.some((team) => team.runs.some((run) => typeof run.tokenUsageTotal === 'number'));
 }
 
-/** Compact token count for summary tiles (12.4k style). */
-export function formatTokenCount(count: number): string {
-  if (count < 1000) return String(count);
-  if (count < 1_000_000) return `${(count / 1000).toFixed(1)}k`;
-  return `${(count / 1_000_000).toFixed(2)}M`;
-}
+// #2154 P3-3: formatTokenCount (12.3k / 2.50M) is gone. The board and the
+// bottom status strip both format through shared formatTokens (12.3K / 2.5M),
+// the same helper the inspector overview already used, so one screen can no
+// longer show two unit conventions for the same counters.
 
 /** Deterministic created-at label: locale string when parseable, raw otherwise. */
 export function formatUsageTimestamp(iso: string | undefined): string {
@@ -152,7 +151,7 @@ export function TokenUsagePage({
         <div className={styles.totalTile} data-testid="usage-total">
           <span className={styles.totalLabel}>{t('usage.total')}</span>
           <span className={styles.totalValue} title={anyRecorded ? String(total) : undefined}>
-            {anyRecorded ? formatTokenCount(total) : '—'}
+            {anyRecorded ? formatTokens(total) : '—'}
           </span>
         </div>
       </header>

@@ -119,6 +119,7 @@ describe('buildDocsPageProps', () => {
       setDocsTab: vi.fn(),
       docsPreview: null,
       rows: [{ id: 'd1', title: 'Spec', location: '/', owner: 'A', time: 'now' }],
+      shortcuts: ['Spec shortcut'],
       openDocPreview,
       closeDocPreview,
       documentsActions: { onCreateDoc },
@@ -131,6 +132,9 @@ describe('buildDocsPageProps', () => {
     expect(props.navItems).toEqual([]);
     expect(props.profiles).toBe(profiles);
     expect(props.rows).toHaveLength(1);
+    // #2154 P2-2(b): shortcuts come from the route (demo-only), never from a
+    // page-level default injection.
+    expect(props.shortcuts).toEqual(['Spec shortcut']);
     expect(props.onDocClick).toBe(openDocPreview);
     expect(props.onClosePreview).toBe(closeDocPreview);
     expect(props.onCreateDoc).toBe(onCreateDoc);
@@ -170,6 +174,86 @@ describe('buildProjectsPageProps', () => {
     expect(props.loadingMore).toBe(false);
     // loadMore is undefined when hubClient is not active, so onLoadMore is not assigned.
     expect(Object.prototype.hasOwnProperty.call(props, 'onLoadMore')).toBe(false);
+  });
+
+  it('renders the status-filtered list instead of the raw source list (#2154 P2-3)', () => {
+    const source = [{ id: 'p1', status: 'Active' }, { id: 'p2', status: '已归档' }];
+    const route = {
+      sourceProjects: source,
+      visibleProjects: [source[1]],
+      effectiveProjectsStatus: undefined,
+      canMutateProject: false,
+      projectId: 'p2',
+      projectFilter: 'archived',
+      setProjectFilter: vi.fn(),
+      projectTab: 'overview',
+      setProjectTab: vi.fn(),
+      projectPreview: null,
+      setProjectPreview: vi.fn(),
+      selectProject: vi.fn(),
+      handleProjectCreate: vi.fn(),
+      handleProjectUpdate: vi.fn(),
+      openArtifactPreview: vi.fn(),
+      loadMore: undefined,
+      hasMore: false,
+      loadingMore: false,
+    } as unknown as WorkbenchProjectsRoute;
+
+    const props = buildProjectsPageProps(route, []);
+    expect(props.activeFilter).toBe('archived');
+    expect(props.projects).toEqual([source[1]]);
+  });
+
+  it('forwards the available filters so unsatisfiable chips render disabled (#2154 P2-3)', () => {
+    const route = {
+      sourceProjects: [{ id: 'p1', status: 'Active' }],
+      visibleProjects: [{ id: 'p1', status: 'Active' }],
+      availableProjectFilters: ['all', 'running'],
+      effectiveProjectsStatus: undefined,
+      canMutateProject: false,
+      projectId: 'p1',
+      projectFilter: 'all',
+      setProjectFilter: vi.fn(),
+      projectTab: 'overview',
+      setProjectTab: vi.fn(),
+      projectPreview: null,
+      setProjectPreview: vi.fn(),
+      selectProject: vi.fn(),
+      handleProjectCreate: vi.fn(),
+      handleProjectUpdate: vi.fn(),
+      openArtifactPreview: vi.fn(),
+      loadMore: undefined,
+      hasMore: false,
+      loadingMore: false,
+    } as unknown as WorkbenchProjectsRoute;
+
+    const props = buildProjectsPageProps(route, []);
+    expect(props.availableFilters).toEqual(['all', 'running']);
+  });
+
+  it('omits availableFilters for partial route fixtures that predate it', () => {
+    const route = {
+      sourceProjects: [{ id: 'p1' }],
+      effectiveProjectsStatus: undefined,
+      canMutateProject: false,
+      projectId: 'p1',
+      projectFilter: 'all',
+      setProjectFilter: vi.fn(),
+      projectTab: 'overview',
+      setProjectTab: vi.fn(),
+      projectPreview: null,
+      setProjectPreview: vi.fn(),
+      selectProject: vi.fn(),
+      handleProjectCreate: vi.fn(),
+      handleProjectUpdate: vi.fn(),
+      openArtifactPreview: vi.fn(),
+      loadMore: undefined,
+      hasMore: false,
+      loadingMore: false,
+    } as unknown as WorkbenchProjectsRoute;
+
+    const props = buildProjectsPageProps(route, []);
+    expect(Object.prototype.hasOwnProperty.call(props, 'availableFilters')).toBe(false);
   });
 
   it('includes mutate handlers and clears preview via onClosePreview', () => {

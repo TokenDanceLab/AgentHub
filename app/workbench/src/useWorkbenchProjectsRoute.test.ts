@@ -294,3 +294,108 @@ describe('useWorkbenchProjectsRoute — port-driven mode', () => {
     expect(listProjects).toHaveBeenCalledTimes(2);
   });
 });
+
+describe('useWorkbenchProjectsRoute — status filter (#2154 P2-3)', () => {
+  it('filters the rendered list while leaving sourceProjects untouched', async () => {
+    const port = createPort();
+    const { result } = renderHook(() => useWorkbenchProjectsRoute({
+      projectsPort: port,
+      realDataMode: true,
+    }));
+    await waitFor(() => {
+      expect(result.current.sourceProjects).toHaveLength(2);
+    });
+
+    // 'all' is a pass-through, including projects whose status we cannot
+    // classify (they must never be dropped by filtering).
+    expect(result.current.visibleProjects).toEqual(result.current.sourceProjects);
+    // The port fixtures carry status 'Active' → only running is satisfiable.
+    expect(result.current.availableProjectFilters).toEqual(['all', 'running']);
+
+    act(() => {
+      result.current.setProjectFilter('running');
+    });
+    expect(result.current.projectFilter).toBe('running');
+    expect(result.current.visibleProjects.map((p) => p.id)).toEqual(['p1', 'p2']);
+    // Selection/paging keep reading the unfiltered source list.
+    expect(result.current.sourceProjects).toHaveLength(2);
+    expect(result.current.projectId).toBe('p1');
+
+    // A bucket this data source cannot satisfy is not selectable: the route
+    // falls straight back to 'all' instead of parking on a list that is empty
+    // by construction (#2154 P2-3 — no enabled-but-always-empty chip).
+    act(() => {
+      result.current.setProjectFilter('archived');
+    });
+    expect(result.current.projectFilter).toBe('all');
+    expect(result.current.visibleProjects).toEqual(result.current.sourceProjects);
+  });
+
+  it('publishes which filters the loaded projects can satisfy (#2154 P2-3)', () => {
+    const { result, rerender } = renderHook(
+      ({ projects }: { projects: ProjectInfo[] }) =>
+        useWorkbenchProjectsRoute({ projects, realDataMode: true }),
+      {
+        initialProps: {
+          projects: [{ ...project('m1'), status: 'Active' }, { ...project('m2'), status: '已归档' }],
+        },
+      },
+    );
+
+    expect(result.current.availableProjectFilters).toEqual(['all', 'running', 'archived']);
+
+    // Data refresh drops every archived project → the bucket disappears.
+    rerender({ projects: [{ ...project('m1'), status: 'Active' }] });
+    expect(result.current.availableProjectFilters).toEqual(['all', 'running']);
+  });
+
+  it('falls back to "all" when the selected bucket stops being available', () => {
+    const { result, rerender } = renderHook(
+      ({ projects }: { projects: ProjectInfo[] }) =>
+        useWorkbenchProjectsRoute({ projects, realDataMode: true }),
+      {
+        initialProps: {
+          projects: [{ ...project('m1'), status: 'Active' }, { ...project('m2'), status: '已归档' }],
+        },
+      },
+    );
+
+    act(() => {
+      result.current.setProjectFilter('archived');
+    });
+    expect(result.current.projectFilter).toBe('archived');
+    expect(result.current.visibleProjects.map((p) => p.id)).toEqual(['m2']);
+
+    // The archived project disappears (delete / reload / paging): parking the
+    // user on an empty list is exactly the false fact this gate removes.
+    rerender({ projects: [{ ...project('m1'), status: 'Active' }] });
+
+    expect(result.current.projectFilter).toBe('all');
+    expect(result.current.visibleProjects.map((p) => p.id)).toEqual(['m1']);
+    // Selection still reads the unfiltered source list.
+    expect(result.current.sourceProjects.map((p) => p.id)).toEqual(['m1']);
+  });
+
+  it('keeps parent-managed projects with an unknown status under "all" only', () => {
+    const managed = [
+      { ...project('m1'), status: 'Hub group' },
+      { ...project('m2'), status: '已归档' },
+    ];
+    const { result } = renderHook(() => useWorkbenchProjectsRoute({
+      projects: managed,
+      realDataMode: true,
+    }));
+
+    expect(result.current.visibleProjects).toHaveLength(2);
+
+    act(() => {
+      result.current.setProjectFilter('archived');
+    });
+    expect(result.current.visibleProjects.map((p) => p.id)).toEqual(['m2']);
+
+    act(() => {
+      result.current.setProjectFilter('all');
+    });
+    expect(result.current.visibleProjects.map((p) => p.id)).toEqual(['m1', 'm2']);
+  });
+});

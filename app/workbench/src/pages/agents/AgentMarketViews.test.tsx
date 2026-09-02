@@ -9,7 +9,7 @@
 
 import React from 'react';
 import { beforeAll, describe, expect, it } from 'vitest';
-import { render, screen } from '../../__tests__/setup';
+import { fireEvent, render, screen } from '../../__tests__/setup';
 import { MCPMarketView, SkillMarketView } from './AgentMarketViews';
 import type { AgentsPageProps } from './types';
 
@@ -106,5 +106,42 @@ describe('Skill/MCP market install unavailable (#1872)', () => {
       mcpMarketLoading: false,
     })} />);
     expect(screen.getByRole('button', { name: '安装' })).toBeDisabled();
+  });
+});
+
+/* #2154 P1-1: the three market toolbars share MarketFilterToolbar, and the
+   shells never pass a search handler — the box looked editable and dropped
+   every keystroke. Same gate as the install buttons above (#1872). */
+describe('Market toolbar search gate (#2154 P1-1)', () => {
+  it('disables the Skill market search box when no search handler is wired', () => {
+    render(<SkillMarketView {...baseProps({ skillMarketLoading: false })} />);
+
+    const input = screen.getByPlaceholderText('搜索 Skill 名称或描述');
+    expect(input).toBeDisabled();
+    expect(input).toHaveAttribute('title', '该搜索框还没有接入数据源，暂时不可用。');
+  });
+
+  it('enables the Skill market search box and forwards keystrokes once wired', () => {
+    const onSkillMarketSearchChange = vi.fn();
+    render(<SkillMarketView {...baseProps({
+      skillMarketLoading: false,
+      onSkillMarketSearchChange,
+    })} />);
+
+    const input = screen.getByPlaceholderText('搜索 Skill 名称或描述');
+    expect(input).toBeEnabled();
+    expect(input).not.toHaveAttribute('title');
+
+    fireEvent.change(input, { target: { value: 'review' } });
+    expect(onSkillMarketSearchChange).toHaveBeenCalledWith('review');
+  });
+
+  it('disables the MCP market search box through the same shared toolbar', () => {
+    render(<MCPMarketView {...baseProps({
+      activePane: 'mcpMarket',
+      mcpMarketLoading: false,
+    })} />);
+
+    expect(screen.getByPlaceholderText('搜索 MCP Server 名称或描述')).toBeDisabled();
   });
 });

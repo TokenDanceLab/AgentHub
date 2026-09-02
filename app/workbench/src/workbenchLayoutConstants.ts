@@ -21,8 +21,19 @@ export const WORKSPACE_MOUNT_COLLAPSE_INSPECTOR_WIDTH = 880;
 export const INSPECTOR_WIDTH_STORAGE_KEY = 'agenthub.workbench.inspectorWidth';
 /** localStorage key for the persisted inspector collapsed state ('true'/'false'). */
 export const INSPECTOR_COLLAPSED_STORAGE_KEY = 'agenthub.workbench.inspectorCollapsed';
-/** Window CustomEvent: settings (inspectorVisible=false) ask the inspector to start collapsed. */
+/**
+ * Window CustomEvent: the `inspectorVisible` setting asks the layout to apply
+ * its stored default. `detail.collapse === true` collapses the inspector;
+ * `detail.collapse === false` asks to expand it again, which the layout honours
+ * only when the current collapse was caused by this same setting (#2154 P2-6).
+ * A dispatch without detail (legacy shape) still means "collapse".
+ */
 export const INSPECTOR_DEFAULT_COLLAPSE_EVENT = 'agenthub:inspector-default-collapse';
+
+/** Payload of INSPECTOR_DEFAULT_COLLAPSE_EVENT (#2154 P2-6). */
+export interface InspectorDefaultCollapseDetail {
+  collapse: boolean;
+}
 
 /** localStorage key for the persisted split-view layout tree blob (#1997). */
 export const SPLIT_LAYOUT_STORAGE_KEY = 'agenthub.workbench.splitLayout';
