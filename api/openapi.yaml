@@ -1319,6 +1319,12 @@ paths:
       tags: [ExecutionRunner]
       operationId: decidePermission
       summary: Approve or deny a pending permission request.
+      description: >
+        Resolves a pending tool-permission request of a run. Under Hub JWT /
+        multi-user mode the run must be owned by the caller; a run owned by
+        another Hub user and a nonexistent run are reported identically (404),
+        so this endpoint is not a runId existence oracle. A caller without a Hub
+        identity fails closed. Local single-tenant mode is unaffected.
       x-agenthub-status: implemented
       x-agenthub-owner: Edge
       requestBody:
@@ -1339,7 +1345,10 @@ paths:
         "400":
           description: Invalid decision payload.
         "404":
-          description: Pending permission request not found.
+          description: >
+            Pending permission request not found. The same response is returned
+            when the run belongs to another Hub user, so a foreign runId and a
+            nonexistent runId are indistinguishable.
 
   /v1/plans/decide:
     post:
@@ -1351,6 +1360,11 @@ paths:
         run via the PlanApprovalBroker. The resolved plan_approved /
         plan_rejected event is emitted by the dispatch interceptor once the
         broker decision resolves; this endpoint only records the decision.
+        Under Hub JWT / multi-user mode the run must be owned by the caller; a
+        run owned by another Hub user and a nonexistent run are reported
+        identically (404), so this endpoint is not a runId existence oracle. A
+        caller without a Hub identity fails closed. Local single-tenant mode is
+        unaffected.
       x-agenthub-phase: P0
       x-agenthub-status: implemented
       x-agenthub-owner: Edge
@@ -1382,7 +1396,10 @@ paths:
       summary: List pending orchestrator plans awaiting approval.
       description: >
         Returns pending plans registered with the PlanApprovalBroker. When no
-        broker is configured an empty list is returned.
+        broker is configured an empty list is returned. Under Hub JWT /
+        multi-user mode, plans are filtered to runs owned by the caller and a
+        caller without a Hub identity gets an empty list; local single-tenant
+        mode sees all rows.
       x-agenthub-phase: P0
       x-agenthub-status: implemented
       x-agenthub-owner: Edge
@@ -1828,6 +1845,14 @@ paths:
       tags: [HubSyncRelay]
       operationId: hubHealth
       summary: Hub health check (DB + Redis + migrations).
+      description: >
+        Aggregate health probe. Answers 200 with the component report while the
+        health wiring is live, including when a dependency is degraded (the body
+        carries status/ready so callers can tell those apart). Answers 503 with
+        status "unavailable" and ready false only when no health reporting is
+        wired into the process at all, so a probe can never read "ok" from a
+        build that verified nothing. Use /health/live for liveness: it stays 200
+        in both cases.
       x-agenthub-status: implemented
       x-agenthub-owner: Hub
       responses:
@@ -1835,6 +1860,9 @@ paths:
           $ref: "#/components/responses/Ok"
 
         "500":
+          $ref: "#/components/responses/Error"
+
+        "503":
           $ref: "#/components/responses/Error"
   /api/public/stats:
     get:
