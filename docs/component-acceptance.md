@@ -1,6 +1,6 @@
 # AgentHub 组件验收标准（component-acceptance）
 
-最后更新：2026-08-24（自 TokenDanceLab/docs 迁入本仓库，本文件为 AgentHub 单仓 SSOT；#1672 迁移状态见 §1）
+最后更新：2026-09-02（自 TokenDanceLab/docs 迁入本仓库，本文件为 AgentHub 单仓 SSOT；#1672 迁移状态见 §1）
 
 本文是 AgentHub shared 组件的**验收标准 SSOT**：任何 `app/shared/src/ui/` 下的新组件（或对既有组件做可见行为改动）必须对照本文件的 5 维验收标准，并带 `.test.tsx` + `.stories.tsx` + 本文件验收表对照记录。它与跨产品设计契约（`tokendance-design` 仓库 [design-system.md](https://github.com/TokenDanceLab/tokendance-design/blob/master/docs/design/design-system.md) 管 token 收敛、[design-playbook.md](https://github.com/TokenDanceLab/tokendance-design/blob/master/docs/design/design-playbook.md) 管实现流程、[visual-qa-matrix.md](https://github.com/TokenDanceLab/tokendance-design/blob/master/docs/design/visual-qa-matrix.md) 管产品级截图证据）互补：本文管**单组件验收**，矩阵管**产品级视觉证据**。
 
@@ -69,14 +69,9 @@
 | 必选 | 固定尺寸控件（按钮、输入、工具条）标签/图标/加载态不改变尺寸 |
 | 可选 | 提供窄宽（≤760px）或移动（390px）下的渲染证据或明确的“桌面专用”例外说明 |
 
-## 范本表
-
-以下组件为仓库验收范本（按组件族拆分子文档：共享 UI 原语见 `component-acceptance/ui-core.md`，页面级见 `pages.md`，chatview 族见 `chatview.md`），作为新组件对照格式示例（勾选状态以各组件最近一次验收记录为准，验收记录应随 PR 更新）。
-
-
 ## 范本索引
 
-范本表正文按组件族拆分（#2092 文档卫生）：共享 UI 原语在 `ui-core.md`，页面级组件在 `pages.md`，chatview 族在 `chatview.md`。修改组件后更新对应子文档的范本表，本索引不重复勾选状态。
+以下组件为仓库验收范本，作为新组件对照格式示例（勾选状态以各组件最近一次验收记录为准，验收记录应随 PR 更新）。范本表正文按组件族拆分（#2092 文档卫生）：共享 UI 原语在 `component-acceptance/ui-core.md`，页面级组件在 `pages.md`，chatview 族在 `chatview.md`。修改组件后更新对应子文档的范本表，本索引不重复勾选状态。
 
 | 组件 | 范本表位置 |
 |---|---|
