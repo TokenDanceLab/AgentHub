@@ -45,8 +45,18 @@ func gatherHTTPPathLabels(t *testing.T, method, status string) map[string]float6
 }
 
 func newCardinalityRouter() *gin.Engine {
+	return newCardinalityRouterWithMethodNotAllowed(false)
+}
+
+// newCardinalityRouterWithMethodNotAllowed mirrors the production router's two
+// possible method-mismatch shapes. The production router enables gin's
+// HandleMethodNotAllowed (#2154 F-a), so a wrong-method request is served by
+// NoMethod as 405; with the flag off the same request falls through to NoRoute
+// as 404. Both shapes leave c.FullPath() empty, so both must be cardinality-safe.
+func newCardinalityRouterWithMethodNotAllowed(methodNotAllowed bool) *gin.Engine {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
+	r.HandleMethodNotAllowed = methodNotAllowed
 	r.Use(PrometheusMiddleware())
 	r.GET("/api/v1/sessions/:id", func(c *gin.Context) { c.Status(http.StatusOK) })
 	r.NoRoute(func(c *gin.Context) { c.String(http.StatusNotFound, "not found") })
@@ -111,14 +121,30 @@ func TestPrometheusMiddlewareMatchedRouteKeepsPathTemplate(t *testing.T) {
 }
 
 // TestPrometheusMiddlewareMethodMismatchStaysBounded covers requests whose
-// method matches no route. Note the router never sets
-// gin's HandleMethodNotAllowed, so these fall through to NoRoute and answer 404
-// rather than 405 (registered separately in #2154 as dead r.NoMethod wiring);
-// the assertion here is only that distinct method+path combinations still
+// method matches no route, in both router shapes: falling through to NoRoute
+// (404, gin's HandleMethodNotAllowed off) and being served by NoMethod (405,
+// the flag on, which is what the production router now does per #2154 F-a).
+// The assertion in both cases is that distinct method+path combinations still
 // collapse onto the one bounded label instead of minting per-path series.
 func TestPrometheusMiddlewareMethodMismatchStaysBounded(t *testing.T) {
+	for _, tt := range []struct {
+		name             string
+		methodNotAllowed bool
+		wantStatus       int
+	}{
+		{name: "falls_through_to_NoRoute_404", methodNotAllowed: false, wantStatus: http.StatusNotFound},
+		{name: "served_by_NoMethod_405", methodNotAllowed: true, wantStatus: http.StatusMethodNotAllowed},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			assertMethodMismatchStaysBounded(t, tt.methodNotAllowed, tt.wantStatus)
+		})
+	}
+}
+
+func assertMethodMismatchStaysBounded(t *testing.T, methodNotAllowed bool, wantStatus int) {
+	t.Helper()
 	metrics.Register()
-	r := newCardinalityRouter()
+	r := newCardinalityRouterWithMethodNotAllowed(methodNotAllowed)
 
 	const probes = 5
 	statuses := make([]string, 0, probes)
@@ -136,6 +162,8 @@ func TestPrometheusMiddlewareMethodMismatchStaysBounded(t *testing.T) {
 	for _, s := range statuses {
 		require.Equal(t, statuses[0], s, "method mismatch must answer uniformly")
 	}
+	require.Equal(t, fmt.Sprintf("%d", wantStatus), statuses[0],
+		"router shape must actually produce the status this case claims to cover")
 	after := gatherHTTPPathLabels(t, http.MethodDelete, statuses[0])
 
 	require.InDelta(t, before[unmatchedPathLabel]+float64(probes-1), after[unmatchedPathLabel], 0.001)
