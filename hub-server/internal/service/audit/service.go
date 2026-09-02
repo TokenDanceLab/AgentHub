@@ -14,6 +14,7 @@ import (
 	"github.com/agenthub/hub-server/internal/metrics"
 	"github.com/agenthub/hub-server/internal/model"
 	"github.com/agenthub/hub-server/internal/repository"
+	"github.com/agenthub/pkg/safego"
 )
 
 // auditFileSink handles writing audit chain entries to a JSONL file with
@@ -128,7 +129,7 @@ func NewService(db *gorm.DB, cfg *Config) *Service {
 
 	if bufSize > 0 {
 		svc.wg.Add(1)
-		go svc.retryLoop()
+		safego.SafeGo("audit.retry_loop", svc.retryLoop)
 	}
 
 	return svc
@@ -237,7 +238,7 @@ func (s *Service) Shutdown(ctx context.Context) {
 		// Bounded wait: the retry loop exits by itself once the drain hits
 		// the deadline (persistWithRetry aborts on ctx cancellation).
 		done := make(chan struct{})
-		go func() { s.wg.Wait(); close(done) }()
+		safego.SafeGo("audit.shutdown_waiter", func() { s.wg.Wait(); close(done) })
 		select {
 		case <-done:
 		case <-ctx.Done():

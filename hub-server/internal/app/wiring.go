@@ -42,6 +42,7 @@ import (
 	"github.com/agenthub/hub-server/internal/service/skill"
 	"github.com/agenthub/hub-server/internal/service/usersettings"
 	"github.com/agenthub/hub-server/internal/service/workspace"
+	"github.com/agenthub/pkg/safego"
 )
 
 type messageServiceWithReactions struct {
@@ -332,6 +333,7 @@ func (a *App) startServer(ctx context.Context) error {
 	}
 
 	go func() {
+		defer safego.Recover("app.http_serve")
 		slog.Info("server starting", "port", a.Config.Server.Port)
 		if err := a.HTTPServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			slog.Error("server failed", "error", err)
