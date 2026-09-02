@@ -154,10 +154,14 @@ const mcpSyncMaxResponseBodyBytes = 64 * 1024
 // HubMCPSyncer periodically fetches MCP server configs from the Hub server's
 // /web/mcp-servers endpoint and updates the local MCPConfigStore.
 type HubMCPSyncer struct {
-	hubURL     string
-	authToken  string
-	store      *MCPConfigStore
-	client     *http.Client
+	hubURL    string
+	authToken string
+	store     *MCPConfigStore
+	client    *http.Client
+
+	// mu guards cancelFunc: Run assigns it from its own goroutine while
+	// Stop reads it from the shutdown-hook goroutine (#2154).
+	mu         sync.Mutex
 	cancelFunc context.CancelFunc
 }
 
@@ -182,7 +186,9 @@ func NewHubMCPSyncer(hubURL, authToken string, store *MCPConfigStore, client *ht
 // The first sync happens immediately; subsequent syncs happen every syncInterval.
 func (s *HubMCPSyncer) Run(ctx context.Context, syncInterval time.Duration) {
 	ctx, cancel := context.WithCancel(ctx)
+	s.mu.Lock()
 	s.cancelFunc = cancel
+	s.mu.Unlock()
 	defer cancel()
 
 	// Initial sync
@@ -203,8 +209,11 @@ func (s *HubMCPSyncer) Run(ctx context.Context, syncInterval time.Duration) {
 
 // Stop cancels the sync loop. Safe to call multiple times.
 func (s *HubMCPSyncer) Stop() {
-	if s.cancelFunc != nil {
-		s.cancelFunc()
+	s.mu.Lock()
+	cancel := s.cancelFunc
+	s.mu.Unlock()
+	if cancel != nil {
+		cancel()
 	}
 }
 

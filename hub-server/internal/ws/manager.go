@@ -72,11 +72,15 @@ func (m *Manager) SetSendBufferSize(n int) {
 	if n <= 0 {
 		n = config.WSSendBufferSize
 	}
+	m.mu.Lock()
 	m.sendBufferSize = n
+	m.mu.Unlock()
 }
 
 // SendBufferSize returns the send-buffer capacity used for new connections.
 func (m *Manager) SendBufferSize() int {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
 	return m.sendBufferSize
 }
 
