@@ -8,7 +8,6 @@ export type { DocMainProps } from './DocMain';
 export {
   NavGlyph,
   NAV_ICONS,
-  DEFAULT_SHORTCUTS,
   DEFAULT_NAV_ITEMS,
   DOC_TABS,
 } from './shared';

@@ -90,6 +90,9 @@ export function buildDocsPageProps(
   };
 
   assignDefined(props, 'documentsError', docsRoute.documentsError);
+  // #2154 P2-2(b): demo-only shortcut list; real data mode passes [] and the
+  // nav renders no shortcut block.
+  assignDefined(props, 'shortcuts', docsRoute.shortcuts);
 
   assignDefined(props, 'onCreateDoc', docsRoute.documentsActions?.onCreateDoc);
   assignDefined(props, 'onDeleteDoc', docsRoute.documentsActions?.onDeleteDoc);

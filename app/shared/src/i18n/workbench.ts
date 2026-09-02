@@ -20,6 +20,10 @@ export const sharedWorkbenchResources = {
       expandInspector: '展开概览',
       search: '搜索',
     },
+    search: {
+      unavailable: '搜索尚未接入',
+      unavailableHint: '该搜索框还没有接入数据源，暂时不可用。',
+    },
     inspector: {
       overview: '概览',
       browser: '浏览器',
@@ -810,6 +814,10 @@ export const sharedWorkbenchResources = {
       collapseInspector: 'Collapse overview',
       expandInspector: 'Expand overview',
       search: 'Search',
+    },
+    search: {
+      unavailable: 'Search not wired up yet',
+      unavailableHint: 'This search box is not connected to a data source yet, so it stays disabled.',
     },
     inspector: {
       overview: 'Overview',

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import type { DocRow, DocsPane } from './pages';
 import type { WorkbenchDocumentPreview } from './documentPreview';
-import { WORKBENCH_MOCK_DOC_ROWS } from './mockData';
+import { WORKBENCH_MOCK_DOC_ROWS, WORKBENCH_MOCK_DOC_SHORTCUTS } from './mockData';
 import { createDocPreview } from './workbenchDocPreview';
 
 /** Document mutation callbacks wired to Hub Documents API. */
@@ -33,6 +33,12 @@ export interface WorkbenchDocsRoute {
   setDocsTab: (tab: DocsPane) => void;
   docsPreview: WorkbenchDocumentPreview | null;
   rows: DocRow[];
+  /**
+   * "我的文档库" shortcut names. Demo mode only — real data mode is always
+   * empty so the page renders no shortcut block instead of injecting
+   * repository-internal document names (#2154 P2-2b).
+   */
+  shortcuts: string[];
   /** True while real-mode documents are loading (undefined input). */
   documentsLoading: boolean;
   /** Present when the Hub documents request failed (#1821). */
@@ -57,6 +63,12 @@ export function useWorkbenchDocsRoute({
   // #1821: an errored request renders neither mock rows nor a skeleton — it
   // stays empty so the page can show its error state.
   const rows = documents ?? (documentsLoading || documentsError ? [] : WORKBENCH_MOCK_DOC_ROWS);
+  // #2154 P2-2(b): shortcuts come from the mock data source, never from a
+  // page-level default. Real data mode (and loading/error) renders none, so
+  // the caption + list disappear instead of showing internal document names.
+  const shortcuts = realDataMode || documentsLoading || documentsError
+    ? []
+    : WORKBENCH_MOCK_DOC_SHORTCUTS;
 
   function openDocPreview(doc: DocRow): void {
     setDocsPreview(createDocPreview(doc));
@@ -73,6 +85,7 @@ export function useWorkbenchDocsRoute({
     setDocsTab,
     docsPreview,
     rows,
+    shortcuts,
     documentsLoading,
     documentsError,
     openDocPreview,

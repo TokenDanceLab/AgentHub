@@ -119,6 +119,7 @@ describe('buildDocsPageProps', () => {
       setDocsTab: vi.fn(),
       docsPreview: null,
       rows: [{ id: 'd1', title: 'Spec', location: '/', owner: 'A', time: 'now' }],
+      shortcuts: ['Spec shortcut'],
       openDocPreview,
       closeDocPreview,
       documentsActions: { onCreateDoc },
@@ -131,6 +132,9 @@ describe('buildDocsPageProps', () => {
     expect(props.navItems).toEqual([]);
     expect(props.profiles).toBe(profiles);
     expect(props.rows).toHaveLength(1);
+    // #2154 P2-2(b): shortcuts come from the route (demo-only), never from a
+    // page-level default injection.
+    expect(props.shortcuts).toEqual(['Spec shortcut']);
     expect(props.onDocClick).toBe(openDocPreview);
     expect(props.onClosePreview).toBe(closeDocPreview);
     expect(props.onCreateDoc).toBe(onCreateDoc);
