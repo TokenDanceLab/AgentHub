@@ -132,9 +132,15 @@ func NewBus(maxHistory int, opts ...BusOption) *Bus {
 	// seq in the log so a restarted Bus does not re-issue seqs that already
 	// exist on disk (which would duplicate replay entries and break the
 	// #130 idempotent dedup contract). The EventLog index is built in NewEventLog
-	// (called by WithEventLogPath), so orderedSeq is already populated here.
-	if b.eventLog != nil && len(b.eventLog.orderedSeq) > 0 {
-		b.seq = b.eventLog.orderedSeq[len(b.eventLog.orderedSeq)-1]
+	// (called by WithEventLogPath), so MaxSeq is already accurate here.
+	//
+	// MaxSeq — not "the seq of the last line in the file": the log is in append
+	// order and concurrent Publish reaches Append out of seq order, so the last
+	// line is not reliably the largest seq. Seeding from it let a restarted Bus
+	// hand out seqs that were already on disk. atomic.StoreInt64 keeps the seed
+	// write consistent with the atomic.AddInt64 in Publish.
+	if b.eventLog != nil {
+		atomic.StoreInt64(&b.seq, b.eventLog.MaxSeq())
 	}
 	return b
 }

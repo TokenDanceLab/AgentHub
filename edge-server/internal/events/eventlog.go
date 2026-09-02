@@ -277,6 +277,23 @@ func (l *EventLog) truncateLocked() {
 	}
 }
 
+// MaxSeq returns the largest seq currently indexed in the log, or 0 when the
+// log is empty or nil. Bus uses it to seed its seq counter on restart.
+//
+// Callers must use this instead of reading orderedSeq directly: the slice is
+// guarded by l.mu.
+func (l *EventLog) MaxSeq() int64 {
+	if l == nil {
+		return 0
+	}
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if len(l.orderedSeq) == 0 {
+		return 0
+	}
+	return l.orderedSeq[len(l.orderedSeq)-1]
+}
+
 // EventLogTruncations returns the total number of truncateLocked invocations
 // (truncations attempted because the log exceeded maxSize). Exposed for the
 // edge_event_log_truncations_total Prometheus metric.
