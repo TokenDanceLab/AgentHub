@@ -136,7 +136,8 @@ func setupSQLite(t *testing.T) *gorm.DB {
 			created_at DATETIME,
 			updated_at DATETIME
 		)`,
-		`CREATE UNIQUE INDEX idx_users_tokendance_sub ON users(tokendance_sub)`,
+		`CREATE UNIQUE INDEX idx_users_tokendance_sub ON users(tokendance_sub)
+			WHERE tokendance_sub IS NOT NULL AND tokendance_sub != ''`,
 		`CREATE TABLE devices (
 			id TEXT PRIMARY KEY,
 			user_id TEXT NOT NULL,
