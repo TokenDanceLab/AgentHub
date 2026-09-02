@@ -32,6 +32,7 @@ import (
 const (
 	deployStubEnvDir  = "AGENTHUB_DEPLOY_STUB_DIR"
 	deployStubEnvFail = "AGENTHUB_DEPLOY_STUB_FAIL"
+	deployStubEnvHang = "AGENTHUB_DEPLOY_STUB_HANG"
 	deployStubLogName = "calls.log"
 )
 
@@ -54,6 +55,11 @@ func runDeployStubProcess(dir string) {
 	if f, err := os.OpenFile(filepath.Join(dir, deployStubLogName), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600); err == nil {
 		_, _ = f.WriteString(line)
 		_ = f.Close()
+	}
+	if os.Getenv(deployStubEnvHang) != "" {
+		// Simulate an unreachable host (no RST): block until the parent
+		// context kills the process.
+		select {}
 	}
 	if fail := os.Getenv(deployStubEnvFail); fail != "" {
 		for _, arg := range os.Args[1:] {
@@ -295,10 +301,10 @@ func TestPostDeploymentsDeploysArchiveOverStubbedSSH(t *testing.T) {
 	// The stub records the full remote chain: dir prep, upload, extract.
 	calls := readDeployStubLog(t, stubDir)
 	for _, want := range []string{
-		"ssh\tstub-host\tsudo\tmkdir\t-p\t/srv/pages/my-slug",
+		"ssh\t-o\tConnectTimeout=5\t-o\tBatchMode=yes\t-o\tServerAliveInterval=5\t-o\tServerAliveCountMax=3\tstub-host\tsudo\tmkdir\t-p\t/srv/pages/my-slug",
 		"scp\t-q\t",
 		"stub-host:/srv/pages/my-slug/deploy.tar.gz",
-		"ssh\tstub-host\tsudo\ttar\t-xzf\t/srv/pages/my-slug/deploy.tar.gz\t-C\t/srv/pages/my-slug",
+		"ssh\t-o\tConnectTimeout=5\t-o\tBatchMode=yes\t-o\tServerAliveInterval=5\t-o\tServerAliveCountMax=3\tstub-host\tsudo\ttar\t-xzf\t/srv/pages/my-slug/deploy.tar.gz\t-C\t/srv/pages/my-slug",
 	} {
 		if !strings.Contains(calls, want) {
 			t.Errorf("stub call log missing %q; log:\n%s", want, calls)
