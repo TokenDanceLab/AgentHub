@@ -16,7 +16,7 @@ Edge Server 的 adapter 层负责将不同 Agent Runtime 的协议统一为内�
 
 | Adapter | 注册 ID | 文件 | 功能 |
 |---------|---------|------|------|
-| Claude Code (ACP) | `claude-acp` | `claude/claude_acp.go` | 官方 `@agentclientprotocol/claude-agent-acp` 0.62.0 二进制 + `ANTHROPIC_API_KEY`，embed `AcpAdapter`（coder/acp-go-sdk） |
+| Claude Code (ACP) | `claude-acp` | `claude/claude_acp.go` | 官方 `@agentclientprotocol/claude-agent-acp` 0.67.0 二进制 + `ANTHROPIC_API_KEY`，embed `AcpAdapter`（coder/acp-go-sdk） |
 | Codex (ACP) | `codex-acp` | `codex/codex_acp.go` | 官方 `codex-acp` 1.1.7 二进制 + `OPENAI_API_KEY`，embed `AcpAdapter` |
 | OpenCode (ACP) | `opencode-acp` | `opencode/opencode_acp.go` | 原生 ACP 模式 `opencode acp` + 4 provider key passthrough，embed `AcpAdapter` |
 | Claude Code (legacy) | `claude-code` | `claude/claude_code.go` ⚠️ DEPRECATED | 旧手写 stream-json parser，仅保留作 orchestrator inner；Phase B 移除 |

@@ -97,6 +97,7 @@ Mobile (fixture/boundary lane, independent RN rendering)
 | Outbound HTTP | [architecture/08-outbound-http.md](architecture/08-outbound-http.md) |
 | Dev server topology | [architecture/09-dev-server-topology.md](architecture/09-dev-server-topology.md) |
 | Macro engineering baseline | [architecture/10-macro-engineering-design.md](architecture/10-macro-engineering-design.md) |
+| Protocol & capability mapping | [architecture/11-protocol-capability-mapping.md](architecture/11-protocol-capability-mapping.md) |
 | CI/CD policy | [architecture/github-actions-ci-cd-policy.md](architecture/github-actions-ci-cd-policy.md) |
 | Architecture decisions | [decisions.md](decisions.md) |
 

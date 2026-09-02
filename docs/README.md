@@ -24,7 +24,8 @@ docs/
 ├── architecture.md                    ← 架构概览（→ architecture/ 模块详情）
 ├── architecture/                      ← 模块化架构文档
 ├── archives/                          ← 已关闭程序快照（analysis/plan/handoff）与历史文档归档
-├── component-acceptance.md            ← shared 组件验收标准
+├── component-acceptance.md            ← shared 组件验收标准（→ component-acceptance/ 各组件明细）
+├── component-acceptance/              ← 组件验收明细（chatview/pages/ui-core，#2092 拆分）
 ├── decisions.md                       ← 当前架构决策摘要
 ├── governance/                        ← 治理：机器验证映射 + 指针（内部治理正文在私有 docs）
 ├── history.md                         ← 历史归档索引（外部 TokenDance docs）

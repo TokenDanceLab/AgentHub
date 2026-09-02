@@ -22,6 +22,8 @@
 | `reqlog/` | gin / net/http 请求日志中间件 + trace 辅助 |
 | `testkit/` | 确定性测试 helper（`Eventually`/`WaitFor`、`oidcfixture`，见 #1550） |
 | `outboundmetrics/` | 可复用出站 HTTP 指标 |
+| `logmask/` | 日志脱敏 helper（机密字段统一 [REDACTED]） |
+| `otelids/` | OTel trace/span ID 原语（ADR-027 配套） |
 | `debug/` | 调试辅助 |
 
 ## 权威指针

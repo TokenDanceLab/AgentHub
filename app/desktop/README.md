@@ -32,7 +32,7 @@ Desktop UI -> Local Edge Server -> Agent Runtime adapter -> Claude Code / Codex 
 Start Local Edge when testing online local execution:
 
 ```powershell
-go run ./edge-server/cmd/agenthub-edge --addr 127.0.0.1:3210 --agent-default claude-code
+go run ./edge-server/cmd/agenthub-edge --addr 127.0.0.1:3210 --agent-default claude-acp
 ```
 
 Start Desktop renderer:
