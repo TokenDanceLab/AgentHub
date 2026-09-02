@@ -151,6 +151,9 @@ vi.mock('@/api/sessionQueries', () => ({
   useHubEditMessage: vi.fn(() => ({ mutateAsync: vi.fn() })),
   useHubPinMessage: vi.fn(() => ({ mutateAsync: vi.fn() })),
   useHubUnpinMessage: vi.fn(() => ({ mutateAsync: vi.fn() })),
+  // #2241: App.tsx now imports the forward hook too; this mock is an explicit
+  // export list, so the fixture needs the entry (no assertion changed).
+  useHubForwardMessage: vi.fn(() => ({ mutateAsync: vi.fn() })),
   useHubMarkRead: vi.fn(() => ({ mutateAsync: vi.fn() })),
   useHubPinnedMessages: vi.fn(() => ({ data: undefined })),
 }));
