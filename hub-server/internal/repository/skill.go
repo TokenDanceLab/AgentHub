@@ -43,7 +43,7 @@ func ListSkills(db *gorm.DB, ownerID, q, skillType, cursor string, pageSize int)
 		qry = qry.Where("skill_type = ?", skillType)
 	}
 	if q != "" {
-		qry = qry.Where("(name ILIKE ? OR description ILIKE ?)", "%"+q+"%", "%"+q+"%")
+		qry = qry.Where("(name ILIKE ? ESCAPE '\\' OR description ILIKE ? ESCAPE '\\')", "%"+escapeILIKE(q)+"%", "%"+escapeILIKE(q)+"%")
 	}
 	if cursor != "" {
 		qry = qry.Where("id > ?", cursor)
@@ -72,7 +72,7 @@ func ListPublicSkills(db *gorm.DB, q, skillType, cursor string, pageSize int) ([
 		qry = qry.Where("skill_type = ?", skillType)
 	}
 	if q != "" {
-		qry = qry.Where("(name ILIKE ? OR description ILIKE ?)", "%"+q+"%", "%"+q+"%")
+		qry = qry.Where("(name ILIKE ? ESCAPE '\\' OR description ILIKE ? ESCAPE '\\')", "%"+escapeILIKE(q)+"%", "%"+escapeILIKE(q)+"%")
 	}
 	if cursor != "" {
 		qry = qry.Where("id > ?", cursor)
