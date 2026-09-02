@@ -14,6 +14,14 @@ func ListNotifications(db *gorm.DB, userID string, unreadOnly bool, limit, offse
 	if limit <= 0 || limit > config.MaxMessagePageLimit {
 		limit = config.DefaultPaginationLimit
 	}
+	// Defense in depth: clamp offset at the repository choke point too
+	// (handler already clamps; other callers must not bypass, #2154).
+	if offset < 0 {
+		offset = 0
+	}
+	if offset > config.MaxPaginationOffset {
+		offset = config.MaxPaginationOffset
+	}
 	var notifs []model.Notification
 	query := db.Where("user_id = ?", userID)
 	if unreadOnly {
