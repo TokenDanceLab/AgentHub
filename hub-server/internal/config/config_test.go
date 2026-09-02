@@ -897,6 +897,12 @@ func TestLoadYAMLEmptyFile(t *testing.T) {
 	if cfg.JWT.Secret != "empty-file-secret-padded-to-minimum-32-chars.." {
 		t.Errorf("JWT.Secret = %q, want empty-file-secret", cfg.JWT.Secret)
 	}
+	// DB pool defaults must be the sized-for-concurrency values, not the
+	// historical 2/1 that starved every consumer (#2154 Gauss P1-1).
+	if cfg.DB.MaxOpenConns != DefaultDBMaxOpenConns || cfg.DB.MaxIdleConns != DefaultDBMaxIdleConns {
+		t.Errorf("DB pool defaults = %d/%d, want %d/%d",
+			cfg.DB.MaxOpenConns, cfg.DB.MaxIdleConns, DefaultDBMaxOpenConns, DefaultDBMaxIdleConns)
+	}
 }
 
 func TestLoadYAMLBareMinimum(t *testing.T) {
