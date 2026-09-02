@@ -12,7 +12,26 @@ import (
 	"github.com/agenthub/edge-server/internal/events"
 	"github.com/agenthub/edge-server/internal/hub"
 	"github.com/agenthub/edge-server/internal/store"
+	"github.com/agenthub/pkg/safego"
 )
+
+// Panic recovery for the Edge run lifecycle (#2154).
+//
+// The launcher itself lives in pkg/safego and is unit-tested there; what this
+// file pins is the two properties that belong to *this* package:
+//
+//  1. every goroutine the lifecycle spawns really does route through it, so a
+//     panicking Hub callback cannot crash the Edge process
+//     (TestFireHubCallbacksRecoverPanic drives all four fireHub* paths and then
+//     proves the executor is still usable);
+//  2. a recovered panic is *observable*, not just logged — it must reach
+//     safego's PanicObserver, which is where EdgeMetrics hangs
+//     edge_goroutine_panic_recoveries_total
+//     (TestLifecycleGoroutinePanicReachesPanicObserver).
+//
+// Property 2 is the one that was broken while this package kept a private copy
+// of the launcher: the copy logged and returned, never dispatched to the
+// observer, and Edge — unlike Hub — registered no observer at all.
 
 // syncLogBuffer is a goroutine-safe bytes buffer for capturing slog output.
 // Recovery goroutines write via the slog default handler while the test polls
@@ -67,7 +86,7 @@ func waitForLogCount(t *testing.T, buf *syncLogBuffer, deadline <-chan time.Time
 
 // panickingHubCallback is a CallbackReporter whose every method signals
 // `entered` and then panics. It is used to prove that the fireHub* goroutines
-// route through safeGo: an unrecovered panic in a goroutine crashes the whole
+// route through safego.SafeGo: an unrecovered panic in a goroutine crashes the whole
 // process, so the test surviving (and the healthy callback firing afterwards)
 // is positive proof that recovery worked.
 type panickingHubCallback struct {
@@ -106,61 +125,9 @@ func (c *panickingHubCallback) TaskFail(context.Context, string, string, string)
 	return nil
 }
 
-// TestSafeGoRecoversPanic proves safeGo recovers a panicking goroutine instead
-// of crashing the process. The goroutine signals `started` immediately before
-// panicking; if safeGo did not recover, the test process would crash before
-// reaching the final assertion, failing the run with a stack dump.
-func TestSafeGoRecoversPanic(t *testing.T) {
-	// Not parallel: captures the process-global slog default. The recovery
-	// log write happens after panicReached fires, so this test must not run
-	// alongside other tests' log capture (DATA RACE fix).
-	buf := captureRecoveryLogs(t)
-
-	started := make(chan struct{})
-	panicReached := make(chan struct{})
-	safeGo("testPanic", func() {
-		// The deferred close fires during panic unwinding, right before
-		// safeGo's recover runs on the same goroutine stack — so observing it
-		// means the panic has left fn and recovery is about to complete.
-		defer close(panicReached)
-		close(started)
-		panic("induced panic for recovery test")
-	})
-
-	select {
-	case <-panicReached:
-		// goroutine panicked and the unwinding defer fired; reaching here
-		// means the process did not crash at the panic site (safeGo's
-		// defer/recover held) and recovery has completed.
-	case <-time.After(2 * time.Second):
-		t.Fatal("timed out waiting for safeGo goroutine panic recovery")
-	}
-
-	// panicReached fires during unwinding, BEFORE recoverPanickedGoroutine's
-	// slog.Error runs. Wait for the recovery record so no log write outlives
-	// this test and races another test's capture buffer.
-	waitForLogCount(t, buf, time.After(2*time.Second), "edge goroutine panicked and was recovered", 1)
-}
-
-// TestSafeGoRunsNormalFunc proves safeGo still invokes fn for the non-panicking
-// case, so the recovery wrapper does not silently swallow normal execution.
-func TestSafeGoRunsNormalFunc(t *testing.T) {
-	t.Parallel()
-
-	done := make(chan struct{})
-	safeGo("testNormal", func() {
-		close(done)
-	})
-	select {
-	case <-done:
-	case <-time.After(2 * time.Second):
-		t.Fatal("safeGo did not run the supplied function")
-	}
-}
-
 // TestFireHubCallbacksRecoverPanic exercises the actual fireHubAck /
 // fireHubStream / fireHubDone / fireHubFail goroutine paths with a panicking
-// CallbackReporter. Each path routes through safeGo (P1: edge 裸 goroutine 无
+// CallbackReporter. Each path routes through safego.SafeGo (P1: edge 裸 goroutine 无
 // recover), so the test process survives the four panics and a subsequent
 // healthy callback still fires — positive proof the executor is usable after
 // recovery. Stream/done/fail use distinct runs because the per-run ordered
@@ -192,7 +159,7 @@ func TestFireHubCallbacksRecoverPanic(t *testing.T) {
 	bindRun(doneRun)
 	bindRun(failRun)
 
-	// Drive all four fireHub* paths. Each spawns a safeGo goroutine that enters
+	// Drive all four fireHub* paths. Each spawns a safego.SafeGo goroutine that enters
 	// the panicking callback method and then panics. Without recovery the test
 	// process would crash here.
 	executor.fireHubAck(ackRun)
@@ -203,7 +170,7 @@ func TestFireHubCallbacksRecoverPanic(t *testing.T) {
 	// Wait until each panicking method has been entered (the goroutine reached
 	// the panic site). Four entries => four goroutines spawned and recovered.
 	// Each entered signal fires from inside the panicking method, right before
-	// panic unwinding runs safeGo's recover on the same goroutine stack — so
+	// panic unwinding runs the safego recover on the same goroutine stack — so
 	// once all four are observed, recovery is complete and no in-flight panic
 	// recovery can race the healthy callback handoff below.
 	deadline := time.After(3 * time.Second)
@@ -233,11 +200,67 @@ func TestFireHubCallbacksRecoverPanic(t *testing.T) {
 		t.Fatalf("healthy TaskDone never observed after panic recovery (dones=%d)", dones)
 	}
 
-	// The four panicking goroutines signal `entered` BEFORE safeGo's recover
+	// The four panicking goroutines signal `entered` BEFORE the safego recover
 	// runs; their recovery log writes can outlive the test and race other
 	// tests' log capture. Wait until all four recovery records have landed.
-	waitForLogCount(t, buf, time.After(3*time.Second), "edge goroutine panicked and was recovered", 4)
+	waitForLogCount(t, buf, time.After(3*time.Second), "goroutine panic recovered", 4)
 }
 
 // compile-time interface check: panickingHubCallback satisfies CallbackReporter.
 var _ CallbackReporter = (*panickingHubCallback)(nil)
+
+// TestLifecycleGoroutinePanicReachesPanicObserver pins the *observability* half
+// of the recovery contract: a recovered panic in an Edge lifecycle goroutine
+// must reach pkg/safego's process-wide PanicObserver, which is where a server
+// hangs its panic counter and therefore its alerting.
+//
+// While this package kept its own private copy of the launcher, its panics were
+// logged and nothing else — the copy never dispatched to the observer, so the
+// goroutines that carry the run lifecycle (run / hubAck / hubStream /
+// hubDoneEnqueue / hubFailEnqueue / hubCallbackQueue / resultAggregator /
+// resultAggregatorTimeout / watchRunProcess / cancelGrace) could panic
+// invisibly to any alert built against the shared contract. Hub registered an
+// observer from the day pkg/safego landed; Edge registered nothing.
+func TestLifecycleGoroutinePanicReachesPanicObserver(t *testing.T) {
+	// Not parallel: mutates two process globals (slog default logger and the
+	// safego panic observer).
+	buf := captureRecoveryLogs(t)
+
+	observed := make(chan string, 4)
+	safego.SetPanicObserver(func(name string, _ any, _ string) {
+		observed <- name
+	})
+	t.Cleanup(func() { safego.SetPanicObserver(nil) })
+
+	bus := events.NewBus(10)
+	s := store.New()
+	executor := newTestProcessExecutor(t, bus, s, "success")
+	executor.callbackSem = make(chan struct{}, 8)
+
+	panicker := newPanickingHubCallback()
+	executor.WithHubCallback(panicker)
+
+	const runID = "run-panic-observable"
+	executor.mu.Lock()
+	executor.hubTasks[runID] = "task-" + runID
+	executor.hubOutputs[runID] = newHubOutputCollector(hubCallbackFinalMaxBytes)
+	executor.mu.Unlock()
+
+	// fireHubAck spawns the lifecycle goroutine that enters the panicking
+	// callback. Recovery happens on that same goroutine, so the observer fires
+	// exactly once with the launcher's label for this call site.
+	executor.fireHubAck(runID)
+
+	select {
+	case name := <-observed:
+		if name != "hubAck" {
+			t.Fatalf("PanicObserver goroutine label = %q, want %q: the label is the only attribution an alert has", name, "hubAck")
+		}
+	case <-time.After(3 * time.Second):
+		t.Fatal("a recovered lifecycle panic never reached safego's PanicObserver — Edge goroutine panics are invisible to metrics and alerting")
+	}
+
+	// Let the recovery log write land before the test releases the captured
+	// logger, so it cannot race another test's log capture.
+	waitForLogCount(t, buf, time.After(3*time.Second), "goroutine panic recovered", 1)
+}

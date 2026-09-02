@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/agenthub/edge-server/internal/adapters"
+	"github.com/agenthub/pkg/safego"
 )
 
 func (e *ProcessExecutor) Cancel(runID string) CancelResult {
@@ -54,7 +55,7 @@ func (e *ProcessExecutor) Cancel(runID string) CancelResult {
 		// immediately and does not block the HTTP response. The goroutine
 		// is tracked via cancelDone so finish() can abort it early if the
 		// process exits on its own before the grace periods elapse.
-		safeGo("cancelGrace", func() {
+		safego.SafeGo("cancelGrace", func() {
 			select {
 			case <-done:
 				return

@@ -4,11 +4,25 @@
 // so a single misbehaving readLoop / launch goroutine cannot take down the
 // server.
 //
-// Both servers previously kept near-identical copies (hub internal/safego,
-// edge internal/api.safeGo) whose behavior had already diverged: only the Hub
-// copy incremented a panic counter for alerting. This shared package unifies
-// the recovery path; servers register an optional PanicObserver to attach
-// their own metrics/alerting without pkg/safego depending on either server.
+// Both servers previously kept their own copies, and the copies had already
+// diverged: hub internal/safego incremented a panic counter for alerting,
+// edge internal/api.safeGo did not. This package is the single recovery path.
+//
+// Unification is a property of the call sites, not of this file, so it is worth
+// recording what it took: edge internal/api.safeGo was replaced when this
+// package landed, but edge internal/lifecycle kept a third private copy
+// (safeGo/recoverPanickedGoroutine) guarding the ten goroutines that carry the
+// run lifecycle — run, hubAck, hubStream, hubDoneEnqueue, hubFailEnqueue,
+// hubCallbackQueue, resultAggregator, resultAggregatorTimeout,
+// watchRunProcess, cancelGrace. It logged and returned, never dispatched to a
+// PanicObserver, and Edge registered no observer at all, so those panics were
+// invisible to every dashboard while Hub's equivalent ones were counted. That
+// copy is gone (#2154); both servers now launch through here and both install
+// an observer (hub internal/metrics init, edge EdgeMetrics.InstallPanicObserver).
+//
+// Servers register an optional PanicObserver to attach their own
+// metrics/alerting without pkg/safego depending on either server. The hook is
+// process-global and exactly one: installing it twice replaces the first.
 //
 // Two defer-able entry points: Recover for fire-and-forget goroutines (log and
 // move on) and RecoverInto for goroutines whose caller needs the panic as an

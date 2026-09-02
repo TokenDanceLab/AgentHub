@@ -11,6 +11,7 @@ import (
 	"github.com/agenthub/edge-server/internal/adapters"
 	"github.com/agenthub/edge-server/internal/runnerctx"
 	"github.com/agenthub/edge-server/internal/store"
+	"github.com/agenthub/pkg/safego"
 )
 
 // startedProcess holds the state of a successfully launched subprocess attempt.
@@ -137,7 +138,7 @@ func (e *ProcessExecutor) buildAndStartProcess(
 		e.mu.Lock()
 		e.processes[run.ID] = cmd.Process
 		e.mu.Unlock()
-		safeGo("watchRunProcess", func() { e.watchRunProcess(ctx, run.ID, cmd.Process, watchStop) })
+		safego.SafeGo("watchRunProcess", func() { e.watchRunProcess(ctx, run.ID, cmd.Process, watchStop) })
 	}
 
 	// Eager-close stdin when the adapter does not need the pipe.
@@ -243,7 +244,7 @@ func (e *ProcessExecutor) collectAndWaitOutput(
 	var wg sync.WaitGroup
 	outputLimiter := newRunOutputLimiter(e.maxRunOutputBytes)
 	wg.Add(1)
-	safeGo("publishOutput.stderr", func() { e.publishOutput(&wg, run, outStore, outputLimiter, "stderr", proc.stderr) })
+	safego.SafeGo("publishOutput.stderr", func() { e.publishOutput(&wg, run, outStore, outputLimiter, "stderr", proc.stderr) })
 
 	// Inject context budget for token tracking in stream parsers.
 	// Also inject RunProcessContext unconditionally — SDK adapters
@@ -253,11 +254,11 @@ func (e *ProcessExecutor) collectAndWaitOutput(
 
 	if proc.buildPlan.UseStructuredParser {
 		wg.Add(1)
-		safeGo("publishStructuredOutput", func() { e.publishStructuredOutput(&wg, run, proc.stdout, proc.stdin, adapter, parserCtx, &parseErr) })
+		safego.SafeGo("publishStructuredOutput", func() { e.publishStructuredOutput(&wg, run, proc.stdout, proc.stdin, adapter, parserCtx, &parseErr) })
 	} else {
 		// Raw capture: stdout goes to run.output.batch events
 		wg.Add(1)
-		safeGo("publishOutput.stdout", func() { e.publishOutput(&wg, run, outStore, outputLimiter, "stdout", proc.stdout) })
+		safego.SafeGo("publishOutput.stdout", func() { e.publishOutput(&wg, run, outStore, outputLimiter, "stdout", proc.stdout) })
 	}
 
 	// StdoutPipe/StderrPipe readers must finish before Wait closes the pipe
@@ -481,7 +482,7 @@ func (e *ProcessExecutor) handleFaultEscalation(
 	e.bus.Publish("run.fault_escalation.retry", runScope(*run),
 		faultEscalationRetryPayload(run.ID, newCount, e.faultEscalationCfg.MaxRetries))
 	slog.Warn("process: fault escalation auto-retry", "runId", run.ID, "retryCount", newCount, "maxRetries", e.faultEscalationCfg.MaxRetries)
-	safeGo("run.faultEscalation", func() { e.run(newCtx, *run, runCtx) })
+	safego.SafeGo("run.faultEscalation", func() { e.run(newCtx, *run, runCtx) })
 	return true
 }
 

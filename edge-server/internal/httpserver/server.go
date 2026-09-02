@@ -237,6 +237,9 @@ func buildEventBusAndMetrics(cfg Config) (*events.Bus, *metrics.EdgeMetrics) {
 		func() float64 { return float64(bus.HistoryLen()) },
 		func() float64 { return float64(bus.DroppedCount()) },
 	)
+	// Make recovered goroutine panics observable, not just logged. Installed
+	// before any run can start, so no safego.SafeGo launch predates the hook.
+	edgeMetrics.InstallPanicObserver()
 	return bus, edgeMetrics
 }
 

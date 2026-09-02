@@ -12,6 +12,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
 	"github.com/agenthub/pkg/outboundmetrics"
+	"github.com/agenthub/pkg/safego"
 )
 
 // EdgeMetrics holds all Prometheus metrics for the Edge server.
@@ -53,6 +54,18 @@ type EdgeMetrics struct {
 	// EdgeArtifactsSurfacedTotal counts artifacts surfaced at run finish.
 	// Label: kind (artifact|preview|image|deploy).
 	EdgeArtifactsSurfacedTotal *prometheus.CounterVec
+
+	// EdgeGoroutinePanicRecoveries counts panics recovered by pkg/safego inside
+	// Edge's spawned goroutines, partitioned by the launcher label ("run",
+	// "hubAck", "watchRunProcess", …). It is the goroutine counterpart of
+	// EdgeHTTPPanicRecoveries — which only covers the request path — and mirrors
+	// the Hub's goroutine_panic_recoveries, so an operator can alert on either
+	// server the same way. Without it a panic in the run lifecycle was log-only:
+	// visible in a journal nobody greps, absent from every dashboard.
+	//
+	// The label must stay a static call-site literal (pkg/safego's contract for
+	// `name`); a dynamic label would make the series unbounded.
+	EdgeGoroutinePanicRecoveries *prometheus.CounterVec
 
 	// Outbound is the unified outbound HTTP metrics contract (#1595):
 	// outbound_requests_total / outbound_request_duration_seconds with
@@ -142,6 +155,11 @@ func newWithHooks(
 		Help: "Total artifacts surfaced at run finish, partitioned by kind.",
 	}, []string{"kind"})
 
+	m.EdgeGoroutinePanicRecoveries = factory.NewCounterVec(prometheus.CounterOpts{
+		Name: "edge_goroutine_panic_recoveries_total",
+		Help: "Total number of Edge goroutine panics recovered by pkg/safego, partitioned by launcher label.",
+	}, []string{"goroutine"})
+
 	// Go runtime + process collectors on the isolated registry so the Edge
 	// /metrics endpoint exposes go_* and process_* alongside edge_* metrics.
 	// Previously only the Hub registered these on the default registry; the
@@ -150,6 +168,29 @@ func newWithHooks(
 	reg.MustRegister(collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}))
 
 	return m
+}
+
+// InstallPanicObserver wires pkg/safego's process-wide panic hook to this
+// instance's goroutine panic counter, so a recovered panic in an Edge goroutine
+// increments edge_goroutine_panic_recoveries_total{goroutine=<label>} instead of
+// only writing a log line.
+//
+// Call it once at startup, after the metrics are built and before the first
+// safego.SafeGo launch. The hook is process-global (pkg/safego keeps exactly
+// one), so a second install replaces the first; Edge builds its metrics once per
+// process. A nil receiver or a nil counter is a no-op, which keeps test builds
+// that never register safe.
+func (m *EdgeMetrics) InstallPanicObserver() {
+	if m == nil || m.EdgeGoroutinePanicRecoveries == nil {
+		return
+	}
+	counter := m.EdgeGoroutinePanicRecoveries
+	safego.SetPanicObserver(func(name string, _ any, _ string) {
+		if name == "" {
+			name = "unknown"
+		}
+		counter.WithLabelValues(name).Inc()
+	})
 }
 
 // Handler returns an http.Handler that serves Prometheus text metrics from the
