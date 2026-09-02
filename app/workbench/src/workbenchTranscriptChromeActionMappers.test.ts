@@ -990,6 +990,24 @@ describe('workbenchTranscriptChromeActionMappers', () => {
     }
   });
 
+  it('falls back to the effect failure copy when the dispatcher gets no translate function (#2154)', () => {
+    const handlers = {
+      copyText: vi.fn(),
+      softHideBlocks: vi.fn(),
+      dispatchComposer: vi.fn(),
+      focusComposer: vi.fn(),
+      pulseBlock: vi.fn(),
+      showWorkbenchToast: vi.fn(),
+      exitSelection: vi.fn(),
+    };
+    // `t` is optional on the dispatcher — the announcement must stay honest
+    // (and non-silent) without it.
+    applyTranscriptChromeSideEffects([
+      { type: 'pin', messageId: 'm1', sessionId: 's1', successMessage: 'pin-ok', failureMessage: 'pin-fail' },
+    ], handlers);
+    expect(handlers.showWorkbenchToast).toHaveBeenCalledWith('pin-fail');
+  });
+
   it('prefers the dedicated unwired-action copy once the locale bundle resolves it (#2154)', () => {
     const resolvingT = (key: string): string => (
       key === UNAVAILABLE_ACTION_TOAST_KEY ? 'RESOLVED-UNAVAILABLE' : key
