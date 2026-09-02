@@ -35,6 +35,19 @@ func (s *Service) ListCustomAgents(ctx context.Context, ownerID string) ([]model
 }
 
 // UpdateCustomAgent updates an existing custom agent, verifying ownership.
+//
+// repository.UpdateCustomAgent writes only the columns updateCustomAgentReq can
+// carry (#2253), so this method no longer reconstructs a row and must not try
+// to: output_schema, deleted_at, created_at and owner_user_id are not written at
+// all, which is why the old `ca.OwnerUserID = ownerID` / `ca.CreatedAt =
+// existing.CreatedAt` assignments are gone — they fed a whole-row db.Save that
+// needed them, and keeping them here would imply columns the write never
+// touches.
+//
+// What is still backfilled are the three jsonb columns whose request contract is
+// "absent means unchanged": handler.updateCustomAgentReq binds capability_tags,
+// tool_whitelist and model_params with omitempty, so an omitted value must not
+// be flattened to "" by a write that does include those columns.
 func (s *Service) UpdateCustomAgent(ctx context.Context, ownerID string, ca *model.CustomAgent) error {
 	existing, err := repository.GetCustomAgentByID(s.db, ca.ID)
 	if err != nil {
@@ -46,7 +59,6 @@ func (s *Service) UpdateCustomAgent(ctx context.Context, ownerID string, ca *mod
 	if existing.OwnerUserID != ownerID {
 		return errcode.AgentNotFound
 	}
-	ca.OwnerUserID = ownerID
 	if ca.CapabilityTags == "" {
 		ca.CapabilityTags = existing.CapabilityTags
 	}
@@ -56,8 +68,11 @@ func (s *Service) UpdateCustomAgent(ctx context.Context, ownerID string, ca *mod
 	if ca.ModelParams == "" {
 		ca.ModelParams = existing.ModelParams
 	}
-	ca.CreatedAt = existing.CreatedAt
-	return repository.UpdateCustomAgent(s.db, ca)
+	// The row can be soft-deleted between the read above and the write below.
+	// repository.UpdateCustomAgent puts the not-deleted guard inside the UPDATE
+	// and reports zero matched rows as ErrRecordNotFound, so that race surfaces
+	// as the same 404 the read path returns instead of resurrecting the row.
+	return repository.WrapNotFound(repository.UpdateCustomAgent(s.db, ca), errcode.AgentNotFound)
 }
 
 // DeleteCustomAgent soft-deletes a custom agent, verifying ownership.

@@ -85,6 +85,16 @@ func (h *CustomAgentHandler) List(c *gin.Context) {
 	OK(c, agents)
 }
 
+// updateCustomAgentReq is the whole body of PUT /web/custom-agents/:id.
+//
+// Do NOT add output_schema here. This struct is the contract for what an update
+// request may change, and repository.UpdateCustomAgent derives its narrow column
+// list from exactly these fields. Making the client echo output_schema back would
+// outsource row integrity to the frontend: any client that does not know the
+// field (every client today) would still send nothing, and the column is
+// consumed by service/dispatch/payload.go as the edge's
+// structured_output_schema. Columns the request cannot carry are left out of the
+// UPDATE instead of round-tripped through it (#2253).
 type updateCustomAgentReq struct {
 	Name           string `json:"name" binding:"required"`
 	AvatarURL      string `json:"avatar_url,omitempty"`
