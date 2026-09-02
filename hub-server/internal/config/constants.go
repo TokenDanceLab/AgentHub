@@ -22,6 +22,13 @@ const MaxIncrementalMessageLimit = 500
 // to this ceiling to prevent unbounded query resource usage.
 const MaxPageLimit = 500
 
+// MaxPaginationOffset caps client-controlled OFFSET values on list endpoints.
+// An unbounded offset forces PG to scan-and-discard arbitrarily many rows per
+// request (single-request DoS amplifier, #2154 Gauss P2-1); 10000 pages far
+// beyond any real UI depth (limit<=500 => 5M rows reachable) while keeping
+// legitimate pagination intact. Keyset cursors remain the long-term shape.
+const MaxPaginationOffset = 10000
+
 // ── HTTP server timeouts ─────────────────────────────────────────────────────
 
 // DefaultReadHeaderTimeout is applied to both the main HTTP server and the
