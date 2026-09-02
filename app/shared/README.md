@@ -28,7 +28,7 @@ Desktop 和 Web 通过路径别名导入：
 import type { AgentInfo, HealthResponse, RunInfo } from '@shared/types';
 import type { EventEnvelope } from '@shared/events';
 import { parseError } from '@shared/errors';
-import { Button, Card, Pill } from '@shared/ui';
+import { Button, StatusBadge } from '@shared/ui';
 import { ChatViewTranscript } from '@shared/chatview';
 ```
 

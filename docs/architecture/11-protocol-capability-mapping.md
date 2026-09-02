@@ -85,9 +85,9 @@ Deprecated unprefixed aliases（`list_projects` 等）仅在 discovery 中标记
 
 | 自有机制 | 源码位置 | 职责 |
 |---|---|---|
-| Agent Teams | [`hub-server/internal/router/router.go:326-340`](../../hub-server/internal/router/router.go) | team CRUD、member 管理、team run/task/event/route-decision/approval |
-| Relay commands | [`hub-server/internal/router/router.go:316-318`](../../hub-server/internal/router/router.go) | admin relay command create/get/ack（远程 edge 指令下发） |
-| Execution Target routing | `hub-server/internal/handler/target_handler.go` | Local/Remote/Cloud/Hub Relay target 健康与路由 |
+| Agent Teams | [`hub-server/internal/router/router.go`](../../hub-server/internal/router/router.go)（Agent Teams 路由组） | team CRUD、member 管理、team run/task/event/route-decision/approval |
+| Relay commands | [`hub-server/internal/router/router.go`](../../hub-server/internal/router/router.go)（relay command 路由组） | admin relay command create/get/ack（远程 edge 指令下发） |
+| Execution Target routing | `hub-server/internal/handler/execution_target.go` | Local/Remote/Cloud/Hub Relay target 健康与路由 |
 
 ### 3.2 ACP 已并入 A2A 的事实
 

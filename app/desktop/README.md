@@ -1,6 +1,6 @@
 # AgentHub Desktop
 
-最后更新：2026-08-16
+最后更新：2026-09-02
 
 `app/desktop/` 是 AgentHub Tauri 桌面端入口，负责本地工作台、Hub 登录、多端 IM、设置、Agent/Profile 管理、Diff/Preview/Approval 和 Local Edge 可见状态。旧长版 README 见 [../../docs/history.md](../../docs/history.md)。
 
@@ -20,9 +20,9 @@ Desktop UI -> Local Edge Server -> Agent Runtime adapter -> Claude Code / Codex 
 
 | Area | Owner |
 |---|---|
-| Desktop shell | `src/layouts/DesktopLayout.tsx` |
+| Desktop shell | `src/AppShell.tsx` -> `src/App.tsx`（挂载 `@agenthub/workbench` 的 `AgentHubWorkbench`） |
 | Platform adapter / diagnostics | `src/components/`, `src/api/` |
-| Views and slots | `src/views/` |
+| Views and slots | 视图由共享工作台 `../workbench/src/`（`WorkbenchRoutes.tsx` 各 route view）承担；本包无 `src/views/` |
 | State/hooks | `src/stores/`, `src/hooks/` |
 | Tauri host | `src-tauri/` |
 | Shared UI/workbench/chat | `../shared/src/ui/`, `../workbench/src/`, `../shared/src/chatview/` |
