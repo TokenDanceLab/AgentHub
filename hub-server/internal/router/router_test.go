@@ -422,3 +422,51 @@ func TestEdgeDeviceRegisterRateLimitedByIP(t *testing.T) {
 		t.Fatalf("different IP = %d, want %d; body=%q", w.Code, http.StatusOK, w.Body.String())
 	}
 }
+
+// setupTestRouter builds the full route table against miniredis for route
+// registration assertions. Unlike TestNoRouteReturnsNotFound it never serves
+// a request, so metrics.Register() is intentionally not called here.
+func setupTestRouter(t *testing.T) *gin.Engine {
+	t.Helper()
+	gin.SetMode(gin.TestMode)
+	mr, err := miniredis.Run()
+	if err != nil {
+		t.Fatalf("miniredis: %v", err)
+	}
+	t.Cleanup(mr.Close)
+
+	r := gin.New()
+	if err := SetupRoutes(
+		r,
+		&config.Config{},
+		middleware.NewAuthMiddleware(&config.Config{}, middleware.AuthDependencies{}, nil),
+		"",
+		cache.NewClient(redis.NewClient(&redis.Options{Addr: mr.Addr()})),
+		nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil,
+	); err != nil {
+		t.Fatal(err)
+	}
+	return r
+}
+
+// TestAttachmentRoutesRegisteredStandalone pins the attachments route table:
+// the group moved out of /client to carry upload-specific guards, so its
+// paths must remain exactly /client/attachments* after the rewiring.
+func TestAttachmentRoutesRegisteredStandalone(t *testing.T) {
+	r := setupTestRouter(t)
+
+	want := []string{
+		"POST /client/attachments",
+		"POST /client/attachments/probe",
+		"GET /client/attachments/:id",
+	}
+	found := map[string]bool{}
+	for _, ri := range r.Routes() {
+		found[ri.Method+" "+ri.Path] = true
+	}
+	for _, key := range want {
+		if !found[key] {
+			t.Fatalf("route %q not registered; routes=%v", key, r.Routes())
+		}
+	}
+}
