@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -297,7 +298,7 @@ func TestPostApplyRunDiffRejectsSymlinkedParentDirectory(t *testing.T) {
 		t.Fatalf("write victim: %v", err)
 	}
 	if err := os.Symlink(vault, filepath.Join(workDir, "docs")); err != nil {
-		t.Fatalf("symlink docs: %v", err)
+		t.Skipf("symlink creation unavailable in this environment: %v", err)
 	}
 
 	seedOwnedApplyRun(t, h.Store, "symdir", "run-symdir", "", "finished", "docs/authorized_keys", applyTestDiff)
@@ -321,7 +322,7 @@ func TestPostApplyRunDiffRejectsSymlinkedTargetFile(t *testing.T) {
 		t.Fatalf("write victim: %v", err)
 	}
 	if err := os.Symlink(victim, filepath.Join(workDir, "link.txt")); err != nil {
-		t.Fatalf("symlink link.txt: %v", err)
+		t.Skipf("symlink creation unavailable in this environment: %v", err)
 	}
 
 	seedOwnedApplyRun(t, h.Store, "symfile", "run-symfile", "", "finished", "link.txt", applyTestDiff)
@@ -342,7 +343,7 @@ func TestPostApplyRunDiffRejectsDanglingSymlinkCreation(t *testing.T) {
 	outside := t.TempDir()
 	created := filepath.Join(outside, "pwned.service") // must never appear
 	if err := os.Symlink(created, filepath.Join(workDir, "ghost.txt")); err != nil {
-		t.Fatalf("symlink ghost.txt: %v", err)
+		t.Skipf("symlink creation unavailable in this environment: %v", err)
 	}
 
 	seedOwnedApplyRun(t, h.Store, "symdangling", "run-symdangling", "", "finished", "ghost.txt", applyTestDiff)
@@ -371,7 +372,7 @@ func TestPostApplyAllRunDiffsRejectsSymlinkEscape(t *testing.T) {
 		t.Fatalf("write victim: %v", err)
 	}
 	if err := os.Symlink(vault, filepath.Join(workDir, "docs")); err != nil {
-		t.Fatalf("symlink docs: %v", err)
+		t.Skipf("symlink creation unavailable in this environment: %v", err)
 	}
 
 	seedOwnedApplyRun(t, h.Store, "symall", "run-symall", "", "finished", "docs/authorized_keys", applyTestDiff)
@@ -598,6 +599,11 @@ func TestPostApplyAllRunDiffsStopsOnCanceledContext(t *testing.T) {
 // observable defect is the `0` mode literal on the *overwrite* path, not on
 // file creation.
 func TestPostApplyRunDiffCreatesNewFileWith0600(t *testing.T) {
+	// Unix permission bits do not exist on Windows: os.Stat reports 0666 for
+	// every writable regular file there, so the mode contract is Unix-only.
+	if runtime.GOOS == "windows" {
+		t.Skip("Unix permission bits are not observable on Windows")
+	}
 	h := newTestHandler()
 	workDir := allowTestWorkspace(t, h)
 	seedOwnedApplyRun(t, h.Store, "modenew", "run-modenew", "", "finished", "fresh.txt", applyTestDiff)
@@ -622,6 +628,11 @@ func TestPostApplyRunDiffCreatesNewFileWith0600(t *testing.T) {
 // file's mode survives the rewrite. The literal is still wrong — any future
 // branch that reaches it with a missing file would create a 0000 file.
 func TestPostApplyRunDiffOverwriteKeepsExistingMode(t *testing.T) {
+	// Unix permission bits do not exist on Windows: os.Stat reports 0666 for
+	// every writable regular file there, so the mode contract is Unix-only.
+	if runtime.GOOS == "windows" {
+		t.Skip("Unix permission bits are not observable on Windows")
+	}
 	h := newTestHandler()
 	workDir := allowTestWorkspace(t, h)
 	target := filepath.Join(workDir, "a.txt")
@@ -653,6 +664,11 @@ func TestPostApplyRunDiffOverwriteKeepsExistingMode(t *testing.T) {
 // TestCreateBackupWritesBackupWith0600 pins the rollback copy's mode: backups
 // can contain source or credentials, so they must not be world-readable.
 func TestCreateBackupWritesBackupWith0600(t *testing.T) {
+	// Unix permission bits do not exist on Windows: os.Stat reports 0666 for
+	// every writable regular file there, so the mode contract is Unix-only.
+	if runtime.GOOS == "windows" {
+		t.Skip("Unix permission bits are not observable on Windows")
+	}
 	h := newTestHandler()
 	workDir := allowTestWorkspace(t, h)
 	target := filepath.Join(workDir, "a.txt")
