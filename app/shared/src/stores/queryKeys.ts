@@ -128,6 +128,46 @@ export const hubQueryKeys = {
   },
 } as const;
 
+// ── Hub transcript key family (#2252) ────────────────────────────
+//
+// `resyncMessagesAfterReconnect` must be able to find every cached transcript
+// without hardcoding one key shape: Desktop caches transcripts under the SSOT
+// threads family above, Web under its app-scoped `web-v4` namespace
+// (app/web/src/platform/webPlatformMessageHelpers.ts). A family bundles the
+// three things any transcript-cache consumer needs — the broad prefix to
+// invalidate, the exact per-session key, and the reverse matcher that recovers
+// the session id from a key found in the cache.
+//
+// Adding another transcript cache? Export a family next to the key factory
+// that produces it and hand it to the resync helper. Do NOT teach the helper
+// about literal key shapes: that is how #2101 G1/G4-② stayed a silent no-op on
+// both platforms while every test using the literal shape passed.
+export interface HubMessagesKeyFamily {
+  /** Broad prefix covering every session's transcript — invalidation target. */
+  readonly root: readonly unknown[];
+  /** Exact query key holding one session's transcript array. */
+  readonly of: (sessionId: string) => readonly unknown[];
+  /** Session id a cached key holds a transcript for; null for any other key. */
+  readonly sessionIdOf: (key: readonly unknown[]) => string | null;
+}
+
+/**
+ * SSOT threads family: `['hub', 'threads', <sessionId>, 'messages']`.
+ * Desktop's `useHubMessages` caches here and this is the resync default.
+ */
+export const hubThreadsMessagesFamily: HubMessagesKeyFamily = {
+  root: hubQueryKeys.threads.root,
+  of: (sessionId) => hubQueryKeys.threads.messages(sessionId),
+  sessionIdOf: (key) =>
+    key.length === 4 &&
+    key[0] === 'hub' &&
+    key[1] === 'threads' &&
+    key[3] === 'messages' &&
+    typeof key[2] === 'string'
+      ? key[2]
+      : null,
+};
+
 // ── Edge (local desktop) query key factory ─────────────────────────
 
 export const edgeQueryKeys = {

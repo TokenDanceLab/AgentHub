@@ -1,9 +1,41 @@
 // React Query hooks for Hub sessions, messages, and notifications.
 // Thin wrappers around hubClient methods.
 
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient, type QueryClient } from '@tanstack/react-query';
+import { hubQueryKeys } from '@shared/stores/queryKeys';
 import { createHubClient } from '@/api/hubClient';
 import { getAccessToken } from '@/hooks/useAuth';
+
+// ── Cache keys (#2252) ───────────────────────────────────────────
+//
+// Transcripts live in the shared SSOT threads family
+// (`hubQueryKeys.threads.messages`), which is what `hubEventBridge` invalidates
+// on every MESSAGE_* frame and what `resyncMessagesAfterReconnect` scans after
+// a reconnect/gap. They used to live under the `['hub','sessions']` prefix
+// below, so all six bridge invalidations and the resync discovery missed them
+// — peer messages never refreshed and reconnect resync was a silent no-op.
+//
+// `hubSessionsListKey` is the *session list* only (`useHubSessions`); it is not
+// a transcript key and no longer covers transcripts by prefix.
+const hubSessionsListKey = ['hub', 'sessions'] as const;
+
+/**
+ * Broad invalidation for the message-mutating wrappers below. They only know a
+ * messageId (recall/edit) or a set of *target* sessions (forward), so they
+ * cannot build a per-session transcript key. One prefix no longer covers both
+ * caches: the session list (unread counts, ordering) lives under
+ * `hubSessionsListKey` while transcripts live under `hubQueryKeys.threads.root`
+ * — invalidating only the former would leave the transcript stale after the
+ * user's own recall/edit/pin/forward.
+ */
+function invalidateSessionsAndTranscripts(queryClient: QueryClient): void {
+  void queryClient.invalidateQueries({ queryKey: hubSessionsListKey }).catch(() => {
+    /* non-fatal */
+  });
+  void queryClient.invalidateQueries({ queryKey: hubQueryKeys.threads.root }).catch(() => {
+    /* non-fatal */
+  });
+}
 
 // Lazy singleton — avoids creating the client on module load when Hub is not needed.
 let _hubClient: ReturnType<typeof createHubClient> | null = null;
@@ -16,7 +48,7 @@ function getHubClient() {
 
 export function useHubSessions(opts?: { enabled?: boolean }) {
   return useQuery({
-    queryKey: ['hub', 'sessions'],
+    queryKey: hubSessionsListKey,
     queryFn: () => getHubClient().listSessions(),
     enabled: opts?.enabled ?? false,
   });
@@ -26,7 +58,9 @@ export function useHubSessions(opts?: { enabled?: boolean }) {
 
 export function useHubMessages(sessionId: string, opts?: { enabled?: boolean }) {
   return useQuery({
-    queryKey: ['hub', 'sessions', sessionId, 'messages'],
+    // SSOT key (#2252): matches hubEventBridge's MESSAGE_* invalidations, the
+    // useHubEventStream reconnect backfill and the shared resync discovery.
+    queryKey: hubQueryKeys.threads.messages(sessionId),
     queryFn: () => getHubClient().getMessages(sessionId),
     enabled: opts?.enabled ?? false,
   });
@@ -58,7 +92,9 @@ export function useHubSendMessage() {
       data: Parameters<ReturnType<typeof getHubClient>['sendMessage']>[1];
     }) => getHubClient().sendMessage(sessionId, data),
     onSuccess: (_result, { sessionId }) => {
-      void queryClient.invalidateQueries({ queryKey: ['hub', 'sessions', sessionId, 'messages'] });
+      void queryClient.invalidateQueries({
+        queryKey: hubQueryKeys.threads.messages(sessionId),
+      });
     },
   });
 }
@@ -69,7 +105,7 @@ export function useHubMarkRead() {
     mutationFn: ({ sessionId, lastReadSeq }: { sessionId: string; lastReadSeq: number }) =>
       getHubClient().markRead(sessionId, lastReadSeq),
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['hub', 'sessions'] });
+      invalidateSessionsAndTranscripts(queryClient);
     },
   });
 }
@@ -79,7 +115,7 @@ export function useHubRecallMessage() {
   return useMutation({
     mutationFn: (messageId: string) => getHubClient().recallMessage(messageId),
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['hub', 'sessions'] });
+      invalidateSessionsAndTranscripts(queryClient);
     },
   });
 }
@@ -95,7 +131,7 @@ export function useHubEditMessage() {
       data: Parameters<ReturnType<typeof getHubClient>['editMessage']>[1];
     }) => getHubClient().editMessage(messageId, data),
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['hub', 'sessions'] });
+      invalidateSessionsAndTranscripts(queryClient);
     },
   });
 }
@@ -106,7 +142,7 @@ export function useHubPinMessage() {
     mutationFn: ({ messageId, sessionId }: { messageId: string; sessionId: string }) =>
       getHubClient().pinMessage(messageId, sessionId),
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['hub', 'sessions'] });
+      invalidateSessionsAndTranscripts(queryClient);
     },
   });
 }
@@ -117,7 +153,7 @@ export function useHubUnpinMessage() {
     mutationFn: ({ messageId, sessionId }: { messageId: string; sessionId: string }) =>
       getHubClient().unpinMessage(messageId, sessionId),
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['hub', 'sessions'] });
+      invalidateSessionsAndTranscripts(queryClient);
     },
   });
 }
@@ -143,7 +179,7 @@ export function useHubForwardMessage() {
     mutationFn: ({ messageId, targetSessionIds }: { messageId: string; targetSessionIds: string[] }) =>
       getHubClient().forwardMessage(messageId, targetSessionIds),
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['hub', 'sessions'] });
+      invalidateSessionsAndTranscripts(queryClient);
     },
   });
 }
