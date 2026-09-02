@@ -8,6 +8,7 @@ import (
 	"github.com/agenthub/edge-server/internal/adapters"
 	"github.com/agenthub/edge-server/internal/agents"
 	"github.com/agenthub/edge-server/internal/events"
+	"github.com/agenthub/pkg/safego"
 )
 
 // ── ResultAggregator ──────────────────────────────────────────────────────
@@ -122,7 +123,7 @@ func (ra *ResultAggregator) Start() (stop func()) {
 	ra.subID = subID
 
 	done := make(chan struct{})
-	safeGo("resultAggregator", func() {
+	safego.SafeGo("resultAggregator", func() {
 		defer close(done)
 		for evt := range ch {
 			ra.handleEvent(evt)
@@ -136,7 +137,7 @@ func (ra *ResultAggregator) Start() (stop func()) {
 	var timeoutDone chan struct{}
 	if ra.collector != nil {
 		timeoutDone = make(chan struct{})
-		safeGo("resultAggregatorTimeout", func() { ra.runTimeoutCheck(timeoutDone) })
+		safego.SafeGo("resultAggregatorTimeout", func() { ra.runTimeoutCheck(timeoutDone) })
 	}
 
 	return func() {
