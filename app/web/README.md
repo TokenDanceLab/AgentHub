@@ -1,6 +1,6 @@
 # AgentHub Web
 
-最后更新：2026-07-26
+最后更新：2026-09-02
 
 `app/web/` 是 AgentHub 浏览器端工作台。它负责 Hub 登录后的远程查看、审批、IM、项目视图、Agent/Profile 展示和 Web 预览；真实执行仍由 Edge Server 完成。旧长版 README 见 [../../docs/history.md](../../docs/history.md)。
 
@@ -21,25 +21,21 @@ Web UI -> Hub Server -> Edge relay / sync -> Edge Server -> Agent Runtime adapte
 
 | Area | Owner |
 |---|---|
-| App entry | `src/App.tsx` -> `src/layouts/WebLayout.tsx` |
-| Shell slots | `src/viewRegistryConfig.ts`, `src/views/viewRegistry.tsx` |
-| Hub client | `src/api/hubClient.ts`, `src/api/` |
+| App entry | `src/main.tsx` -> `src/App.tsx`（挂载 `@agenthub/workbench` 的 `AgentHubWorkbench`） |
+| Platform adapter / workbench ports | `src/platform/`（`webPlatform.ts`、`useWebWorkbenchModel.ts`、`webWorkbenchProjectsPort.ts` 等） |
+| Hub client / queries | `src/api/`（`hubClient.ts`、`hubAuth.ts`、各 `*Queries.ts`） |
+| Auth/UI components | `src/components/`（`AuthPage`、`StartConversationModal` 等） |
+| State/hooks | `src/stores/`, `src/hooks/` |
 | i18n | `src/i18n/`, `src/i18n/README.md` |
 | Shared UI/workbench/chat | `../shared/src/ui/`, `../workbench/src/`, `../shared/src/chatview/` |
-| Legacy route bridge | `src/router.tsx`, `src/pages/*` -> `App` |
 
 Shared components must come from `app/shared/`; do not copy Desktop/shared UI locally in Web.
 
 ## Current Routes
 
-| Route | Current behavior |
-|---|---|
-| `/` | Desktop-aligned Workbench shell |
-| `/chats` | Messages/IM shell |
-| `/settings` | Settings shell |
-| `/agent-square`, `/group/:id`, `/project/:id` | Legacy public URLs bridged into `WebLayout` route context |
+Web 没有 react-router 路由表：`App.tsx` 只渲染 `AgentHubWorkbench`，页面/分区切换由工作台内部状态驱动（`../workbench/src/WorkbenchRoutes.tsx`：chats、agents、contacts、devices、docs、projects、settings、tasks、usage 等视图）。`/chats`、`/settings`、`/agent-square` 等 URL 路由与旧页面桥接（`src/router.tsx`、`src/pages/*`、`src/views/`、`src/layouts/`）均已删除。
 
-If Agent Square, Private Chats, Group Workspace, or Project features return, migrate them into the shell/slot architecture instead of reviving standalone decorative page prototypes.
+If Agent Square, Private Chats, Group Workspace, or Project features return, migrate them into the workbench shell instead of reviving standalone decorative page prototypes.
 
 ## Local Preview
 
