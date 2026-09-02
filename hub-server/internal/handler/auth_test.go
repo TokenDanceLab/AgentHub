@@ -163,8 +163,11 @@ func TestAuthHandler_Logout_Success(t *testing.T) {
 	}
 }
 
-// #149: Logout with device_type query parameter.
-func TestAuthHandler_Logout_WithDeviceType(t *testing.T) {
+// Logout scope must come from the authenticated token's claim-derived
+// device_type (set by AuthMiddleware), never from the client query: the old
+// #149 query knob let a client write a blacklist key the refresh path never
+// checks (session-revival window, #2154 Lorentz P3-2).
+func TestAuthHandler_Logout_DeviceTypeFromClaims(t *testing.T) {
 	capturedDeviceType := ""
 	svc := &mockAuthService{
 		logoutFn: func(ctx context.Context, userID, deviceID, deviceType, accessJTI string) error {
@@ -174,15 +177,16 @@ func TestAuthHandler_Logout_WithDeviceType(t *testing.T) {
 	}
 	h := handler.NewAuthHandler(svc)
 
-	c, w := newGinCtxWithQuery("POST", "/client/auth/logout", "device_type=desktop", nil,
-		"user_id", "u1", "device_id", "d1")
+	// Claim-derived context value wins; a conflicting query value is ignored.
+	c, w := newGinCtxWithQuery("POST", "/client/auth/logout", "device_type=attacker", nil,
+		"user_id", "u1", "device_id", "d1", "device_type", "desktop")
 	h.Logout(c)
 
 	if w.Code != 200 {
 		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
 	}
 	if capturedDeviceType != "desktop" {
-		t.Fatalf("expected device_type=desktop, got %q", capturedDeviceType)
+		t.Fatalf("expected claim-derived device_type=desktop, got %q", capturedDeviceType)
 	}
 }
 
