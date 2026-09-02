@@ -19,6 +19,7 @@
 | [09-dev-server-topology.md](09-dev-server-topology.md) | 远程 dev 服务器拓扑（L3 真实测试面）：端口矩阵、运行模型、身份链、重建步骤、证据纪律 |
 | [10-macro-engineering-design.md](10-macro-engineering-design.md) | 宏观工程设计基线：双平面、协议分层、事件一致性、最小代理权、可观测与差距路线 |
 | [11-protocol-capability-mapping.md](11-protocol-capability-mapping.md) | 自有 REST/WS 契约与 MCP/A2A/AG-UI 能力对照、引入红线、评估结论（宏观 §3 P1） |
+| [github-actions-ci-cd-policy.md](github-actions-ci-cd-policy.md) | GitHub-hosted runner 测试链路政策：Ubuntu/Windows 分工、路径过滤、矩阵并行、缓存与免费额度策略（无编号，主索引 [architecture.md](../architecture.md) 同样登记） |
 
 ## 约定
 
