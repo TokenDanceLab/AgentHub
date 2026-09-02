@@ -681,6 +681,44 @@ export function DesktopWorkbenchApp({ onLogout }: DesktopWorkbenchAppProps = {})
               }
             : undefined
         }
+        /* #2154: Desktop already owns these Hub mutations
+           (useDesktopWorkbenchModel → DesktopChatActions) but never forwarded
+           them, while the shared menu gate only checked the session id —
+           `activeConversationId` doubles as one — so Desktop rendered
+           pin/unpin/recall entries whose clicks the effect dispatcher dropped
+           without a word. Forwarding the ports makes those entries real.
+           forward/regenerate/reaction stay undefined: Desktop has no mutation
+           for them, and the menu is now fail-closed per handler, so the
+           entries stay hidden instead of offering a dead click. */
+        onPinMessage={
+          chatActions
+            ? async (messageId: string, sessionId: string) => {
+                await chatActions.pinMessage(
+                  messageId.replace(/^hub-message-/, ''),
+                  sessionId,
+                );
+              }
+            : undefined
+        }
+        onUnpinMessage={
+          chatActions
+            ? async (messageId: string, sessionId: string) => {
+                await chatActions.unpinMessage(
+                  messageId.replace(/^hub-message-/, ''),
+                  sessionId,
+                );
+              }
+            : undefined
+        }
+        onRecallMessage={
+          chatActions
+            ? async (messageId: string) => {
+                await chatActions.recallMessage(
+                  messageId.replace(/^hub-message-/, ''),
+                );
+              }
+            : undefined
+        }
         onProjectCreate={workbench.projectsActions?.create}
         onProjectUpdate={workbench.projectsActions?.update}
         projectsPort={hubReady ? desktopProjectsPort : undefined}
