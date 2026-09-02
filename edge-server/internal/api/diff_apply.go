@@ -276,8 +276,12 @@ func (h *Handler) applyHunkToFile(workDir, filePath string, hunk unifiedHunk) er
 	// Apply the hunk to the original content.
 	modified := applyHunkToContent(original, hunk)
 
-	// Write the modified content back.
-	if err := os.WriteFile(targetPath, []byte(modified), 0); err != nil {
+	// Write the modified content back. The mode only takes effect if the file
+	// has to be created — normally it exists (we just read it) and the current
+	// mode is preserved — but a 0 literal would create a mode-0000 file on Unix
+	// if the path disappeared between the read and this write (the workdir is a
+	// live agent workspace), so it is spelled out like every other write here.
+	if err := os.WriteFile(targetPath, []byte(modified), 0o600); err != nil {
 		return fmt.Errorf("failed to write file %s: %w", targetPath, err)
 	}
 

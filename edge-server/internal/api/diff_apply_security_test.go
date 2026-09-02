@@ -587,3 +587,89 @@ func TestPostApplyAllRunDiffsStopsOnCanceledContext(t *testing.T) {
 	}
 	assertErrorCode(t, rec.Body.String(), "internal_error")
 }
+
+// ---------------------------------------------------------------------------
+// P3-14 — file modes on the write path
+// ---------------------------------------------------------------------------
+
+// TestPostApplyRunDiffCreatesNewFileWith0600 checks the brief's premise for
+// P3-14 ("a newly created file does not get 0600"). createNewFileFromHunk
+// already writes with 0o600, so this passed before the slice landed: the
+// observable defect is the `0` mode literal on the *overwrite* path, not on
+// file creation.
+func TestPostApplyRunDiffCreatesNewFileWith0600(t *testing.T) {
+	h := newTestHandler()
+	workDir := allowTestWorkspace(t, h)
+	seedOwnedApplyRun(t, h.Store, "modenew", "run-modenew", "", "finished", "fresh.txt", applyTestDiff)
+
+	body := fmt.Sprintf(`{"file_path":"fresh.txt","hunk_index":0,"accepted":true,"workDir":%q}`, workDir)
+	rec := doApplyRunDiff(h, "run-modenew", http.MethodPost, body)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200; body=%.200s", rec.Code, rec.Body.String())
+	}
+	info, err := os.Stat(filepath.Join(workDir, "fresh.txt"))
+	if err != nil {
+		t.Fatalf("stat created file: %v", err)
+	}
+	if perm := info.Mode().Perm(); perm != 0o600 {
+		t.Fatalf("created file mode = %o, want 600", perm)
+	}
+}
+
+// TestPostApplyRunDiffOverwriteKeepsExistingMode documents why the `0` mode
+// literal on the overwrite path is latent rather than exploitable: os.WriteFile
+// only applies its perm argument when it creates the file, so an existing
+// file's mode survives the rewrite. The literal is still wrong — any future
+// branch that reaches it with a missing file would create a 0000 file.
+func TestPostApplyRunDiffOverwriteKeepsExistingMode(t *testing.T) {
+	h := newTestHandler()
+	workDir := allowTestWorkspace(t, h)
+	target := filepath.Join(workDir, "a.txt")
+	if err := os.WriteFile(target, []byte(applyTestOriginal), 0o640); err != nil {
+		t.Fatalf("write fixture: %v", err)
+	}
+	seedOwnedApplyRun(t, h.Store, "modekeep", "run-modekeep", "", "finished", "a.txt", applyTestDiff)
+
+	rec := doApplyRunDiff(h, "run-modekeep", http.MethodPost, applyBodyWithWorkDir(workDir))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200; body=%.200s", rec.Code, rec.Body.String())
+	}
+	info, err := os.Stat(target)
+	if err != nil {
+		t.Fatalf("stat target: %v", err)
+	}
+	if perm := info.Mode().Perm(); perm != 0o640 {
+		t.Fatalf("overwritten file mode = %o, want the pre-existing 640", perm)
+	}
+	got, err := os.ReadFile(target)
+	if err != nil {
+		t.Fatalf("read target: %v", err)
+	}
+	if string(got) != applyTestModified {
+		t.Errorf("content = %q, want the hunk applied", got)
+	}
+}
+
+// TestCreateBackupWritesBackupWith0600 pins the rollback copy's mode: backups
+// can contain source or credentials, so they must not be world-readable.
+func TestCreateBackupWritesBackupWith0600(t *testing.T) {
+	h := newTestHandler()
+	workDir := allowTestWorkspace(t, h)
+	target := filepath.Join(workDir, "a.txt")
+	if err := os.WriteFile(target, []byte(applyTestOriginal), 0o640); err != nil {
+		t.Fatalf("write fixture: %v", err)
+	}
+	seedOwnedApplyRun(t, h.Store, "modebak", "run-modebak", "", "finished", "a.txt", applyTestDiff)
+
+	rec := doApplyRunDiff(h, "run-modebak", http.MethodPost, applyBodyWithWorkDir(workDir))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200; body=%.200s", rec.Code, rec.Body.String())
+	}
+	info, err := os.Stat(target + ".bak")
+	if err != nil {
+		t.Fatalf("stat backup: %v", err)
+	}
+	if perm := info.Mode().Perm(); perm != 0o600 {
+		t.Fatalf("backup mode = %o, want 600", perm)
+	}
+}
