@@ -23,8 +23,31 @@ func GetSessionByID(db *gorm.DB, id string) (*model.Session, error) {
 	return &s, nil
 }
 
-func UpdateSession(db *gorm.DB, session *model.Session) error {
-	return db.Save(session).Error
+// UpdateSessionColumns persists the named columns of a session row, and only
+// those. columns are database column names ("dissolved", "name", …); an empty
+// list writes nothing.
+//
+// There is deliberately no whole-row update for sessions. Two of its columns
+// have other writers that run concurrently with any load-modify-save:
+//
+//   - next_seq: message.go's
+//     `UPDATE sessions SET next_seq = next_seq + 1, last_message_at = …
+//     RETURNING next_seq`, and SyncSessionSeq — the mirror seqalloc re-seeds
+//     Redis from after a restart / FLUSH / key expiry (#1533 seq continuity);
+//   - last_message_at: the same statement plus TouchSessionLastMessage, and it
+//     is the conversation-list sort key.
+//
+// Both callers (DissolveGroup, UpdateGroupInfo) load the row, change one or two
+// fields and persist, so a `db.Save(session)` rewound whatever those writers had
+// done in between. A rewound next_seq is not cosmetic: seqalloc reads the mirror
+// back into Redis, so the sequence can repeat and unread counts
+// (next_seq − last_read_seq) go wrong. Writing only the columns the caller
+// actually owns makes the rewind structurally impossible instead of unlikely.
+func UpdateSessionColumns(db *gorm.DB, session *model.Session, columns ...string) error {
+	if len(columns) == 0 {
+		return nil
+	}
+	return db.Select(columns).Save(session).Error
 }
 
 func FindPrivateSessionBetween(db *gorm.DB, userA, userB string) (*model.Session, error) {
