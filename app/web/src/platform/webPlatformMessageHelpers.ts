@@ -1,4 +1,5 @@
 import type { QueryClient } from '@tanstack/react-query';
+import { isQueryKeyPrefix, type HubMessagesKeyFamily } from '@shared/stores/queryKeys';
 import type { AttachmentRef, ComposerAttachment, ComposerIntent } from '@shared/composer';
 import type { HubContentType } from '@shared/hub/hubClient';
 import type { MessageResponse, SendMessageResponse } from '@/api/hubClient';
@@ -143,9 +144,39 @@ export function optimisticHubMessageFromIntent(
   };
 }
 
+/**
+ * Broad prefix covering every cached Web transcript (#2252).
+ *
+ * Web keeps transcripts in its app-scoped `web-v4` cache-version namespace
+ * rather than the shared `hubQueryKeys.threads` family: `['hub','threads']` is
+ * already Web's *session list* key (`contactQueries.sessionsQueryKey`, also
+ * refetched wholesale by `useWebAuth`), and three local cache writers below
+ * (`upsertHubMessage` / `confirmOptimisticHubMessage` /
+ * `removeOptimisticHubMessage`) `setQueryData` straight into this shape.
+ *
+ * Because the shape is Web-only, it is exported as a `HubMessagesKeyFamily` so
+ * shared consumers (notably `resyncMessagesAfterReconnect`) match it instead of
+ * guessing — a hardcoded threads-shape matcher is what made the #2101
+ * reconnect/gap resync a silent no-op here.
+ */
+export const hubMessagesQueryRoot = ['web-v4', 'hub-messages'] as const;
+
+/** Exact query key holding one session's Web transcript. */
 export function hubMessagesQueryKey(sessionId: string): [string, string, string] {
   return ['web-v4', 'hub-messages', sessionId];
 }
+
+/** Web's transcript key family — pass to `resyncMessagesAfterReconnect`. */
+export const webHubMessagesFamily: HubMessagesKeyFamily = {
+  root: hubMessagesQueryRoot,
+  of: (sessionId) => hubMessagesQueryKey(sessionId),
+  sessionIdOf: (key) =>
+    key.length === 3 &&
+    isQueryKeyPrefix(key, hubMessagesQueryRoot) &&
+    typeof key[2] === 'string'
+      ? key[2]
+      : null,
+};
 
 export function upsertHubMessage(
   queryClient: QueryClient | undefined,
