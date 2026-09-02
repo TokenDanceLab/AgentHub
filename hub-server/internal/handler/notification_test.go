@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/agenthub/hub-server/internal/config"
 	"github.com/agenthub/hub-server/internal/model"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
@@ -163,4 +164,43 @@ func TestNotificationHandler_ReadAll(t *testing.T) {
 
 	require.True(t, called)
 	assert.Equal(t, http.StatusOK, w.Code)
+}
+
+// TestNotificationHandler_ListNotifications_OffsetClamped pins the offset
+// clamp (#2154): client-supplied offsets are capped at MaxPaginationOffset
+// and negatives normalize to 0 before reaching the service.
+func TestNotificationHandler_ListNotifications_OffsetClamped(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	cases := []struct {
+		query      string
+		wantOffset int
+	}{
+		{"?offset=1000000", config.MaxPaginationOffset},
+		{"?offset=-5", 0},
+		{"?offset=abc", 0},
+		{"?offset=42", 42},
+	}
+	for _, tc := range cases {
+		t.Run(tc.query, func(t *testing.T) {
+			gotOffset := -1
+			svc := &mockNotificationService{
+				listNotifications: func(ctx context.Context, userID string, unreadOnly bool, limit, offset int) ([]model.Notification, error) {
+					gotOffset = offset
+					return nil, nil
+				},
+			}
+			h := NewNotificationHandler(svc)
+			r := gin.New()
+			r.GET("/web/notifications", func(c *gin.Context) {
+				c.Set("user_id", "user-1")
+				h.ListNotifications(c)
+			})
+			req := httptest.NewRequest(http.MethodGet, "/web/notifications"+tc.query, nil)
+			w := httptest.NewRecorder()
+			r.ServeHTTP(w, req)
+			require.Equal(t, http.StatusOK, w.Code)
+			assert.Equal(t, tc.wantOffset, gotOffset)
+		})
+	}
 }
