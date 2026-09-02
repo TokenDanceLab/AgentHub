@@ -19,8 +19,13 @@
 ## 处置流程
 
 - 安全风险分级、状态与发布门禁以 TokenDance 私有治理文档 `security-risk-register`（SSOT，见 TokenDanceLab/docs `governance/agenthub/`）为准；本文件保留发布门禁状态摘要（下表）与处理规则。
-- 已修复漏洞会在 release notes（`BREAKING CHANGE` / security 分组）中披露。
-- 依赖漏洞由 CI 持续扫描：`govulncheck`（Go）、`pnpm audit --prod`（JS）、`cargo audit`（Rust），均 fail-closed。
+- 已修复漏洞在 release notes 中披露，但**没有独立的 security 分组可用**：release notes 由 git-cliff 按 Conventional Commits 类型分组（`cliff.toml`），而提交类型白名单是 `feat|fix|docs|refactor|chore|test|perf|ci|revert`（`scripts/verify/verify-commit-messages.sh`，不含 `security`），所以安全修复实际落在 `fix`/`feat` 等分组里；只有 `!:` 或正文含 `BREAKING CHANGE` 的提交会进破坏性变更分组。
+- 依赖漏洞由 `.github/workflows/checks.yml` 的三个 `vuln-scan-*` job 扫描，判定统一交给 `scripts/verify/verify-vulnerability-gates.sh`（fail-closed：扫描工具故障、输出不可解析、存在漏洞都判红；唯一豁免通道是 `scripts/verify/vulnerability-exceptions.json`）：
+  - **Go**（`vuln-scan-go`）：`govulncheck`，按 `hub-server` / `edge-server` 矩阵各跑一次。
+  - **JS**（`vuln-scan-js`）：`pnpm audit --prod` **和** 全量 `pnpm audit` 两条都跑，互不替代——`--prod` 只覆盖随产物发布的依赖，dev/lint/build 链的通告对它完全不可见（该盲区曾让两枚 brace-expansion high 在门禁全绿下钉在 lockfile 里，#2154 F-d）。
+  - **Rust**（`vuln-scan-rust`）：门禁是 `scripts/verify/verify-rust-advisories.sh`（内部调用 cargo-audit），**不是裸 `cargo audit`**——裸 `cargo audit` 会把 unsound 类通告当非失败警告放行，该脚本把这类也纳入判定，allowlist 每条带硬性复审到期日，过期即红。同 job 的 `cargo clippy` 是 `continue-on-error` advisory，不阻断。
+- 上述三个 job 都经 `changes` job 的路径过滤触发（分别对应 go / frontend / desktop 改动面），`workflow_dispatch` 时无条件跑；因此不是「每次 push 全量扫描」。
+- Go 静态安全扫描另由 `gosec` 承担（`go-edge` / `go-hub` job，输出经 `scripts/verify/verify-gosec-gates.sh` fail-closed 判定），与依赖漏洞扫描是两件事。
 
 ## 发布门禁风险状态
 
