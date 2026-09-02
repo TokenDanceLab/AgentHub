@@ -16,7 +16,7 @@ AgentHub 的产品控制面 SSOT 由两份契约文件承载，所有端（Web/D
 
 | 契约 | 入口文件 | 职责 | 备注 |
 |---|---|---|---|
-| REST JSON API | [`api/openapi.yaml`](../../api/openapi.yaml) | Hub + Edge 全量命令/查询端点；状态标签 `x-agenthub-status: implemented/planned` | Hub success envelope `{"code":"ok","data":...}`（见 [`api/conventions.md`](../../api/conventions.md)） |
+| REST JSON API | [`api/openapi.yaml`](../../api/openapi.yaml) | Hub + Edge 全量命令/查询端点；状态标签 `x-agenthub-status: implemented/planned/contract`（contract = 契约已定、实现留白） | Hub success envelope `{"code":"ok","data":...}`（见 [`api/conventions.md`](../../api/conventions.md)） |
 | WebSocket typed events | [`api/events.md`](../../api/events.md) | Hub/Edge 实时事件合同；at-least-once 投递、幂等语义、seq_id 语义 | SSOT 三角：`hub-server/internal/ws/frame.go` ↔ `app/shared/src/hubEvents.ts` ↔ OpenAPI `HubWebSocketFrame.type` |
 | Edge EventEnvelope | [`api/events.md`](../../api/events.md) §Edge EventEnvelope | Edge stream 单调 seq + 事件 id；断线 cursor 回放 | payload 进 transcript 前脱敏 |
 | Hub Frame | [`api/events.md`](../../api/events.md) §Hub Frame | `{type, seq_id?, payload?}` + 31 常量 | `/client/ws` 仅 Hub-issued HS256 token |
