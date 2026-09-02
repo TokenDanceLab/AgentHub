@@ -32,6 +32,7 @@ import { useCreateRun, useCancelRun, useRuns, useDecideEdgePermission, findActiv
 import { resolveEdgePermissionRunId } from '@/platform/edgeApprovalRouting';
 import { useConnectionStore } from '@/stores/connectionStore';
 import { useCreateThread, useCurrentUser, useThreads } from '@/api/threadQueries';
+import { useHubForwardMessage } from '@/api/sessionQueries';
 import { DesktopChrome } from '@/components/DesktopChrome';
 import { DesktopEntryGate } from '@/components/DesktopEntryGate';
 import DesktopHubTaskBridge from '@/components/DesktopHubTaskBridge';
@@ -148,6 +149,11 @@ export function DesktopWorkbenchApp({ onLogout }: DesktopWorkbenchAppProps = {})
   const submitRunRef = useRef(false);
   const agentsRef = useRef<WorkbenchAgent[] | undefined>(undefined);
   const showToast = useToastStore((s) => s.showToast);
+  // #2241: Desktop's forward port. The shared hubClient.forwardMessage existed
+  // all along; only this query wrapper was missing, so the workbench forward
+  // entry had to stay hidden (#2154 fail-closed). Wiring it makes the entry
+  // render again *and* really dispatch.
+  const forwardMessageMutation = useHubForwardMessage();
 
   // Desktop workbench state — the shared AgentHubWorkbench owns the global
   // keyboard dispatcher (#1822), so the former desktop-only
@@ -687,9 +693,13 @@ export function DesktopWorkbenchApp({ onLogout }: DesktopWorkbenchAppProps = {})
            `activeConversationId` doubles as one — so Desktop rendered
            pin/unpin/recall entries whose clicks the effect dispatcher dropped
            without a word. Forwarding the ports makes those entries real.
-           forward/regenerate/reaction stay undefined: Desktop has no mutation
-           for them, and the menu is now fail-closed per handler, so the
-           entries stay hidden instead of offering a dead click. */
+           #2241: forward is wired too — `useHubForwardMessage` above wraps the
+           shared hubClient.forwardMessage, so the forward entry renders again
+           and dispatches for real. regenerate/reaction stay undefined: Desktop
+           has no verified port for them (`regenerateAgentTask` semantics under
+           the DesktopHubTaskBridge path are unproven, and no reaction port
+           exists), and the menu is fail-closed per handler, so those entries
+           stay hidden instead of offering a dead click. */
         onPinMessage={
           chatActions
             ? async (messageId: string, sessionId: string) => {
@@ -716,6 +726,21 @@ export function DesktopWorkbenchApp({ onLogout }: DesktopWorkbenchAppProps = {})
                 await chatActions.recallMessage(
                   messageId.replace(/^hub-message-/, ''),
                 );
+              }
+            : undefined
+        }
+        onForwardMessage={
+          chatActions
+            ? async (messageId: string, targetSessionIds: string[]) => {
+                // Identical contract to pin/unpin/recall above: the chrome
+                // hands over the raw transcript block id (`hub-message-<uuid>`)
+                // and the Hub REST port takes the bare message id. Gated on
+                // chatActions like the other three so demo / Hub-not-ready
+                // shells keep the entry hidden (#2154 fail-closed).
+                await forwardMessageMutation.mutateAsync({
+                  messageId: messageId.replace(/^hub-message-/, ''),
+                  targetSessionIds,
+                });
               }
             : undefined
         }

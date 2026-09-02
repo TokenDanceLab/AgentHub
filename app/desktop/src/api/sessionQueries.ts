@@ -121,3 +121,29 @@ export function useHubUnpinMessage() {
     },
   });
 }
+
+/**
+ * Forward a message into other Hub sessions (#2241).
+ *
+ * Thin wrapper over the shared `hubClient.forwardMessage(messageId,
+ * targetSessionIds)` — the REST call already existed, only the Desktop query
+ * wrapper was missing, which is why the transcript menu's forward entry had to
+ * stay hidden after #2154 made the menu fail-closed per handler.
+ *
+ * Same shape as the pin/unpin/recall wrappers above: the caller passes the
+ * bare Hub message id (App.tsx strips the `hub-message-` transcript block
+ * prefix) and success invalidates the session list so the forwarded message
+ * shows up in the target conversations. Web does the same through its own
+ * mutation (`useWebWorkbenchModel.forwardMessageMut`) — one shared REST
+ * contract, no per-client fork.
+ */
+export function useHubForwardMessage() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ messageId, targetSessionIds }: { messageId: string; targetSessionIds: string[] }) =>
+      getHubClient().forwardMessage(messageId, targetSessionIds),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['hub', 'sessions'] });
+    },
+  });
+}
