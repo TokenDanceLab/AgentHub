@@ -68,7 +68,7 @@ func TestDarkCheckInjectedVersionIsServedOnRealSocket(t *testing.T) {
 				"the -X injected symbol must be served verbatim on %s", path)
 			t.Logf("DARKCHECK link-time symbol %q reached %s (real socket %s)", Version, path, baseURL)
 		} else {
-			t.Logf("DARKCHECK not injected: %s served the honest fallback %q", path, served)
+			t.Logf("DARKCHECK not injected: %s served the resolved fallback %q", path, served)
 		}
 	}
 }

@@ -184,9 +184,11 @@ func resolveVersion(explicit string) string {
 // buildInfoVersion reads the VCS stamping the go command embeds in every module
 // build made inside a VCS tree: vcs.version when the checkout sits on a tag,
 // otherwise the short vcs.revision, suffixed "-dirty" when the tree had
-// uncommitted changes. This is the fallback that keeps builds honest when
-// whoever built the binary forgot to pass -X — local dev builds and plain
-// `docker build` included.
+// uncommitted changes. This is the fallback that keeps ordinary-clone builds
+// honest when whoever built the binary forgot to pass -X — a plain
+// `docker build` from a real checkout included. It does NOT cover linked
+// worktrees: see the "Honest limit" paragraph on resolveVersion, where the
+// same stamping names the main checkout's commit instead of the worktree's.
 //
 // It returns "" only when the binary carries no stamping at all, which is what
 // makes resolveVersion fall back instead of reporting an empty version.
