@@ -703,6 +703,43 @@ describe('useWorkbenchSessionChrome', () => {
       url: 'https://preview.example/focus',
     });
     expect(showWorkbenchToast).toHaveBeenCalledWith('toast.deployPreviewOpened');
+    // #2154 P2-15: the success copy must not be paired with the warning copy.
+    expect(showWorkbenchToast).not.toHaveBeenCalledWith('toast.deployPreviewUnavailable');
+  });
+
+  it('warns instead of claiming success when the run has no preview URL (#2154 P2-15)', () => {
+    const { result, openInspector, showWorkbenchToast } = renderSessionChrome({
+      transcript: [{
+        id: 'deploy-no-url',
+        kind: 'deploy',
+        createdAt: '2026-08-24T08:00:00.000Z',
+        author: { id: 'builder', name: 'Builder', role: 'agent' },
+        runId: 'run-1',
+        status: 'deployed',
+      }],
+    });
+
+    act(() => {
+      result.current.handleDeploySubmit('deploy-no-url');
+    });
+
+    // No focus request was emitted, so no preview opened.
+    expect(result.current.inspectorBrowserFocusRequest).toBeNull();
+    expect(showWorkbenchToast).toHaveBeenCalledWith('toast.deployPreviewUnavailable');
+    expect(showWorkbenchToast).not.toHaveBeenCalledWith('toast.deployPreviewOpened');
+    // The inspector still opens so the run's other evidence stays reachable.
+    expect(openInspector).toHaveBeenCalledTimes(1);
+  });
+
+  it('warns for an unknown deploy block id instead of reporting success (#2154 P2-15)', () => {
+    const { result, showWorkbenchToast } = renderSessionChrome({ transcript: [] });
+
+    act(() => {
+      result.current.handleDeploySubmit('missing-block');
+    });
+
+    expect(result.current.inspectorBrowserFocusRequest).toBeNull();
+    expect(showWorkbenchToast).toHaveBeenCalledWith('toast.deployPreviewUnavailable');
   });
 
   it('toasts instead of copying when there is no evidence to export', () => {

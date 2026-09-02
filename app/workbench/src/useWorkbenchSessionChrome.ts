@@ -364,8 +364,16 @@ export function useWorkbenchSessionChrome({
         sequence: browserFocusSequenceRef.current,
         url: deployBlock.url,
       });
+      // #2154 P2-15: the success toast belongs to the branch that really
+      // requested a preview. It used to fire unconditionally, so a run without
+      // a deployable URL showed "opened deploy preview" next to a blank pane.
+      showWorkbenchToastRef.current(t('toast.deployPreviewOpened'));
+      return;
     }
-    showWorkbenchToastRef.current(t('toast.deployPreviewOpened'));
+    // No preview URL on this run (or the block is not a deploy block): say so
+    // instead of claiming success. The inspector is still opened above so the
+    // user can see the run's other evidence.
+    showWorkbenchToastRef.current(t('toast.deployPreviewUnavailable'));
   }, [openInspector, t]);
 
   // Stable: evidence/mainchainSummary are memoized above (identity changes
