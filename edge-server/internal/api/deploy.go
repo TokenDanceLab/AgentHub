@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/agenthub/edge-server/internal/errcode"
+	"github.com/agenthub/edge-server/internal/security"
 	"github.com/agenthub/edge-server/internal/store"
 )
 
@@ -110,6 +111,15 @@ func (h *Handler) PostDeployments(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Ownership gate (multi-user Hub JWT mode): publishing packages files
+	// from the run workspace onto a public URL, so a foreign run must fail
+	// closed. 404 (not 403) to avoid leaking run existence; local
+	// single-tenant mode passes via the documented ownership bypass.
+	if !isRunOwnedBy(repository, req.RunID, h.ownerUserID(r)) {
+		writeJSON(w, http.StatusNotFound, errcode.ErrorBody(errcode.ErrNotFound.WithMessage("run not found")))
+		return
+	}
+
 	// Collect artifacts for this run.
 	artifacts := repository.ListArtifacts(req.RunID)
 	if len(artifacts) == 0 {
@@ -128,7 +138,7 @@ func (h *Handler) PostDeployments(w http.ResponseWriter, r *http.Request) {
 	tmpPath := tmpFile.Name()
 	defer os.Remove(tmpPath)
 
-	if err := buildArtifactArchive(artifacts, tmpFile); err != nil {
+	if err := buildArtifactArchive(run.WorkDir, artifacts, tmpFile); err != nil {
 		slog.Error("deploy: failed to build archive", "error", err)
 		writeJSON(w, http.StatusInternalServerError, errcode.ErrorBody(errcode.ErrInternal.WithMessage("failed to build archive: "+err.Error())))
 		return
@@ -187,8 +197,8 @@ func (h *Handler) PostDeployments(w http.ResponseWriter, r *http.Request) {
 
 // buildArtifactArchive creates a tar.gz archive from the artifacts' content source paths.
 // For artifacts with workspace_relative content sources, it reads the actual files from
-// the workspace. For others, it creates placeholder entries.
-func buildArtifactArchive(artifacts []store.Artifact, w io.Writer) error {
+// the run workspace (confined to workDir). For others, it creates placeholder entries.
+func buildArtifactArchive(workDir string, artifacts []store.Artifact, w io.Writer) error {
 	gw := gzip.NewWriter(w)
 	defer gw.Close()
 	tw := tar.NewWriter(gw)
@@ -212,36 +222,49 @@ func buildArtifactArchive(artifacts []store.Artifact, w io.Writer) error {
 			continue
 		}
 
-		// Read the file from the content source path.
+		// Read the file from the content source path, confined to the run
+		// workspace: content sources are workspace-relative paths recorded from
+		// agent events; resolving them against the process CWD would let a
+		// hostile path (".codex/auth.json") package arbitrary host files into
+		// the public deployment.
 		sourcePath := artifact.ContentSource.Path
 		if sourcePath == "" {
 			continue
 		}
-
-		// #nosec G304 -- artifact content source is a path recorded by the edge
-		// itself from the run workspace; deploy packages the user's own artifacts.
-		f, err := os.Open(sourcePath)
-		if err != nil {
-			slog.Warn("deploy: skipping artifact file (not readable)", "path", sourcePath, "error", err)
+		resolved, ok := deployWorkspacePath(workDir, sourcePath)
+		if !ok {
+			slog.Warn("deploy: skipping artifact outside run workspace", "path", sourcePath)
 			continue
 		}
-		info, err := f.Stat()
+		info, err := os.Lstat(resolved)
 		if err != nil {
-			_ = f.Close()
+			slog.Warn("deploy: skipping artifact (missing)", "path", sourcePath, "error", err)
 			continue
 		}
-
 		if info.IsDir() {
-			// If it's a directory, walk and add all files.
-			_ = f.Close()
-			if err := addDirToArchive(tw, sourcePath); err != nil {
+			// Walk and add all regular files; the walk skips symlinks.
+			if err := addDirToArchive(tw, resolved); err != nil {
 				slog.Warn("deploy: failed to add directory", "path", sourcePath, "error", err)
 			}
 			continue
 		}
+		if !info.Mode().IsRegular() {
+			// Regular files only: a symlink would pull its target's content
+			// (potentially outside the workspace) into the public archive.
+			slog.Warn("deploy: skipping artifact file (not a regular file)", "path", sourcePath)
+			continue
+		}
+
+		// #nosec G304 -- resolved is confined to the run workspace by
+		// deployWorkspacePath before the open.
+		f, err := os.Open(resolved)
+		if err != nil {
+			slog.Warn("deploy: skipping artifact file (not readable)", "path", sourcePath, "error", err)
+			continue
+		}
 
 		hdr := &tar.Header{
-			Name: filepath.Base(sourcePath),
+			Name: filepath.Base(resolved),
 			Mode: 0644,
 			Size: info.Size(),
 		}
@@ -258,6 +281,27 @@ func buildArtifactArchive(artifacts []store.Artifact, w io.Writer) error {
 	return nil
 }
 
+// deployWorkspacePath resolves an artifact content-source path against the
+// run workspace and fails closed unless the result stays inside it. Absolute
+// paths, dot-prefixed top-level entries (hidden config is never legitimate
+// pages content) and anything escaping workDir are rejected.
+func deployWorkspacePath(workDir, sourcePath string) (string, bool) {
+	// Reject absolute paths on every platform: filepath.IsAbs is false for
+	// Unix-style "/etc/passwd" on Windows, so the separator prefix is
+	// checked explicitly.
+	if workDir == "" || filepath.IsAbs(sourcePath) || strings.HasPrefix(sourcePath, "/") || strings.HasPrefix(sourcePath, "\\") {
+		return "", false
+	}
+	if first, _, _ := strings.Cut(sourcePath, string(filepath.Separator)); strings.HasPrefix(first, ".") {
+		return "", false
+	}
+	resolved := filepath.Join(workDir, sourcePath)
+	if !security.IsPathWithin(workDir, resolved) {
+		return "", false
+	}
+	return resolved, true
+}
+
 // addDirToArchive recursively adds all files in a directory to the tar archive.
 func addDirToArchive(tw *tar.Writer, dirPath string) error {
 	// #nosec G122,G304 -- walk reads the user's own workspace artifact dir for
@@ -266,7 +310,10 @@ func addDirToArchive(tw *tar.Writer, dirPath string) error {
 		if err != nil {
 			return nil // skip errors
 		}
-		if info.IsDir() {
+		// Regular files only: Walk uses Lstat, so a symlink entry would
+		// otherwise package its target's content (possibly outside the
+		// workspace) into the public archive.
+		if !info.Mode().IsRegular() {
 			return nil
 		}
 		rel, err := filepath.Rel(dirPath, path)
