@@ -14,6 +14,12 @@ import (
 	"github.com/agenthub/pkg/reqlog"
 )
 
+// uploadMultipartHeadroom is added on top of Upload.MaxSize for the
+// attachments upload body limit: multipart framing, the hash/original_name
+// form fields and boundary markers sit on top of the raw file bytes, so a
+// file at exactly MaxSize would exceed a body limit of exactly MaxSize.
+const uploadMultipartHeadroom int64 = 1 << 20 // 1 MiB
+
 func SetupRoutes(r *gin.Engine, cfg *config.Config, authMW *middleware.AuthMiddleware, jwtSecret string, cacheClient *cache.Client, authHandler *handler.AuthHandler, wsHandler *handler.WebSocketHandler, deviceHandler *handler.DeviceHandler, contactHandler *handler.ContactHandler, sessionHandler *handler.SessionHandler, messageHandler *handler.MessageHandler, agentHandler *handler.AgentHandler, customAgentHandler *handler.CustomAgentHandler, attachmentHandler *handler.AttachmentHandler, notificationHandler *handler.NotificationHandler, healthHandler *handler.HealthHandler, publicHandler *handler.PublicHandler, oidcHandler *handler.OIDCHandler, agentProfileHandler *handler.AgentProfileHandler, skillHandler *handler.SkillHandler, mcpHandler *handler.MCPServerHandler, marketHandler *handler.MarketHandler, pbHandler *handler.ProviderBindingHandler, targetHandler *handler.ExecutionTargetHandler, auditHandler *handler.AuditHandler, relayHandler *handler.RelayHandler, agentTeamHandler *handler.AgentTeamHandler, documentHandler *handler.DocumentHandler, settingsHandler *handler.UserSettingsHandler, workspaceHandlers ...*handler.WorkspaceHandler) error {
 	var workspaceHandler *handler.WorkspaceHandler
 	if len(workspaceHandlers) > 0 {
@@ -25,12 +31,14 @@ func SetupRoutes(r *gin.Engine, cfg *config.Config, authMW *middleware.AuthMiddl
 	}
 	r.Use(corsMiddleware)
 	r.Use(middleware.APIVersion())
-	r.Use(middleware.BodyLimit(config.DefaultRequestBodyLimit))
+	// BodyLimit and Timeout are mounted per top-level group below instead of
+	// engine-wide: /client/attachments needs its own upload-sized body limit
+	// plus a longer/streaming timeout, and engine-level middleware would be
+	// inherited by every route with no way to exempt a single group.
 	r.Use(middleware.GlobalRateLimit(cacheClient))
 	r.Use(middleware.RequestID())
 	r.Use(reqlog.AccessLogGin())
 	r.Use(middleware.PrometheusMiddleware())
-	r.Use(middleware.Timeout(config.DefaultRequestTimeout))
 	r.NoRoute(func(c *gin.Context) {
 		handler.Fail(c, sharederr.ErrNotFound)
 	})
@@ -38,25 +46,30 @@ func SetupRoutes(r *gin.Engine, cfg *config.Config, authMW *middleware.AuthMiddl
 		handler.Fail(c, sharederr.ErrMethodNotAllowed)
 	})
 
+	// Default request guards for every top-level group; /client/attachments
+	// is registered separately below with upload-specific limits.
+	guardBody := middleware.BodyLimit(config.DefaultRequestBodyLimit)
+	guardTimeout := middleware.Timeout(config.DefaultRequestTimeout)
+
 	if healthHandler != nil {
-		r.GET("/health", healthHandler.Check)
-		r.GET("/health/live", healthHandler.Live)
-		r.GET("/health/ready", healthHandler.Ready)
+		r.GET("/health", guardBody, guardTimeout, healthHandler.Check)
+		r.GET("/health/live", guardBody, guardTimeout, healthHandler.Live)
+		r.GET("/health/ready", guardBody, guardTimeout, healthHandler.Ready)
 	} else {
 		healthOK := func(c *gin.Context) {
 			handler.OK(c, gin.H{"status": "ok", "live": true, "ready": true})
 		}
-		r.GET("/health", healthOK)
-		r.GET("/health/live", func(c *gin.Context) {
+		r.GET("/health", guardBody, guardTimeout, healthOK)
+		r.GET("/health/live", guardBody, guardTimeout, func(c *gin.Context) {
 			handler.OK(c, gin.H{"status": "ok", "live": true})
 		})
-		r.GET("/health/ready", healthOK)
+		r.GET("/health/ready", guardBody, guardTimeout, healthOK)
 	}
 
 	// Dev-only debug endpoint — returns an intentional 500 to verify error handling.
 	// Enabled only when log_level is "debug".
 	if cfg.Server.LogLevel == "debug" {
-		r.GET("/debug/panic", func(c *gin.Context) {
+		r.GET("/debug/panic", guardBody, guardTimeout, func(c *gin.Context) {
 			handler.Fail(c, sharederr.ErrInternal.WithMessage("deliberate test error from /debug/panic"))
 		})
 	}
@@ -64,12 +77,14 @@ func SetupRoutes(r *gin.Engine, cfg *config.Config, authMW *middleware.AuthMiddl
 	// Public API — no auth required (official website hub.vectorcontrol.tech)
 	if publicHandler != nil {
 		public := r.Group("/api/public")
+		public.Use(guardBody, guardTimeout)
 		{
 			public.GET("/stats", publicHandler.Stats)
 		}
 	}
 
 	client := r.Group("/client")
+	client.Use(guardBody, guardTimeout)
 	{
 		// WS upgrade: IP rate limit + JWT parse + shared hub-session purpose/device gate
 		// (WSAuthMiddleware embeds RequireHubSession policy; chain is belt-and-suspenders).
@@ -157,15 +172,6 @@ func SetupRoutes(r *gin.Engine, cfg *config.Config, authMW *middleware.AuthMiddl
 			messages.GET("/search", messageHandler.SearchMessages)
 		}
 
-		attachments := client.Group("/attachments")
-		attachments.Use(authMW.Handler())
-		attachments.Use(authMW.RequireHubSession())
-		{
-			attachments.POST("/probe", attachmentHandler.Probe)
-			attachments.POST("", middleware.Timeout(config.UploadRequestTimeout), attachmentHandler.Upload)
-			attachments.GET("/:id", attachmentHandler.Download)
-		}
-
 		notifications := client.Group("/notifications")
 		notifications.Use(authMW.Handler())
 		notifications.Use(authMW.RequireHubSession())
@@ -187,7 +193,27 @@ func SetupRoutes(r *gin.Engine, cfg *config.Config, authMW *middleware.AuthMiddl
 		}
 	}
 
+	// Attachments are registered on a standalone group (not under the /client
+	// group above) so they do not inherit the default guards: uploads need the
+	// upload-sized body limit and the longer UploadRequestTimeout; downloads
+	// use TimeoutStream so large files are streamed instead of being buffered
+	// in memory by the timeout middleware. Probe is a small JSON preflight and
+	// keeps the default guards.
+	uploadMaxSize := cfg.Upload.MaxSize
+	if uploadMaxSize <= 0 {
+		uploadMaxSize = config.DefaultMaxUploadSize
+	}
+	attachments := r.Group("/client/attachments")
+	attachments.Use(authMW.Handler())
+	attachments.Use(authMW.RequireHubSession())
+	{
+		attachments.POST("/probe", guardBody, guardTimeout, attachmentHandler.Probe)
+		attachments.POST("", middleware.BodyLimit(uploadMaxSize+uploadMultipartHeadroom), middleware.Timeout(config.UploadRequestTimeout), attachmentHandler.Upload)
+		attachments.GET("/:id", middleware.TimeoutStream(config.UploadRequestTimeout), attachmentHandler.Download)
+	}
+
 	edge := r.Group("/edge")
+	edge.Use(guardBody, guardTimeout)
 	edge.Use(authMW.Handler())
 	edge.Use(authMW.RequireHubSession())
 	edge.Use(middleware.DeviceTypeCheck("desktop"))
@@ -216,6 +242,7 @@ func SetupRoutes(r *gin.Engine, cfg *config.Config, authMW *middleware.AuthMiddl
 	// AGENTHUB_MAX_CLOUD_EDGE_DEVICES) and rejects new device_ids with 403
 	// device_limit_exceeded once the cap is reached.
 	cloud := r.Group("/cloud")
+	cloud.Use(guardBody, guardTimeout)
 	cloud.Use(authMW.Handler())
 	cloud.Use(authMW.RequireHubSession())
 	{
@@ -223,6 +250,7 @@ func SetupRoutes(r *gin.Engine, cfg *config.Config, authMW *middleware.AuthMiddl
 	}
 
 	web := r.Group("/web")
+	web.Use(guardBody, guardTimeout)
 	web.Use(authMW.Handler())
 	web.Use(authMW.RequireHubSession())
 	web.Use(middleware.DeviceTypeCheck("web", "mobile"))
