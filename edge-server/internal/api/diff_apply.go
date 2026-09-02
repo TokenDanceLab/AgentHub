@@ -39,6 +39,19 @@ type applyAllRequest struct {
 	WorkDir   string          `json:"workDir"`
 }
 
+// maxApplyDecisions caps one apply-all batch.
+//
+// Why 500: it matches the only other per-request limit in this package
+// (GetRuntimeSessions rejects limit > 500) and Hub's config.MaxPageLimit, and it
+// bounds both batch amplifiers — one hunk parse plus (when accepted) one backup
+// and one file write per decision, and one `files` array per result, i.e. a
+// response that is O(decisions x diff files) because every result embeds the
+// run's diff snapshot. decodeApplyJSON caps the body at 1 MiB, which admits
+// ~17k minimal decision objects, so before this cap a single request could fan
+// out into ~17k iterations inside the 30s REST budget
+// (httpserver.defaultRESTRequestTimeout).
+const maxApplyDecisions = 500
+
 // PostApplyRunDiff applies a single accepted hunk to the filesystem.
 // POST /v1/runs/{runId}/apply
 func (h *Handler) PostApplyRunDiff(w http.ResponseWriter, r *http.Request, runID string) {
@@ -123,24 +136,44 @@ func (h *Handler) PostApplyAllRunDiffs(w http.ResponseWriter, r *http.Request, r
 		writeJSON(w, http.StatusBadRequest, errcode.ErrorBody(errcode.ErrBadRequest.WithMessage("decisions must not be empty")))
 		return
 	}
+	if len(req.Decisions) > maxApplyDecisions {
+		writeJSON(w, http.StatusBadRequest, errcode.ErrorBody(errcode.ErrBadRequest.WithMessagef("decisions must not exceed %d entries per request", maxApplyDecisions)))
+		return
+	}
 	if err := h.validateWorkDirAllowed(req.WorkDir); err != nil {
 		slog.Error("workdir not allowed", "workDir", req.WorkDir, "error", err)
 		writeJSON(w, http.StatusForbidden, errcode.ErrorBody(errcode.ErrWorkspaceNotAllowed))
 		return
 	}
 
+	// One diff snapshot per request instead of two per decision: applying a hunk
+	// never mutates the stored diffs, so every result reports the same snapshot
+	// the request started with.
+	diffFiles := repository.ListRunDiffFiles(runID)
+	filesResponse := runDiffFilesResponse(diffFiles)
+
 	results := make([]map[string]any, 0, len(req.Decisions))
-	for _, decision := range req.Decisions {
+	for i, decision := range req.Decisions {
+		// restTimeoutMiddleware wraps REST routes in http.TimeoutHandler, which
+		// cancels this context when the 30s budget expires (a client disconnect
+		// does the same). Without this check the loop kept parsing hunks and
+		// writing files after the client had already been answered.
+		if err := r.Context().Err(); err != nil {
+			slog.Warn("diff batch apply aborted: request context ended",
+				"runId", runID, "applied", len(results), "remaining", len(req.Decisions)-i, "error", err)
+			writeJSON(w, http.StatusInternalServerError, errcode.ErrorBody(errcode.ErrInternal.WithMessage("batch apply aborted: request context ended")))
+			return
+		}
 		if decision.FilePath == "" {
 			writeJSON(w, http.StatusBadRequest, errcode.ErrorBody(errcode.ErrBadRequest.WithMessage("file_path is required for each decision")))
 			return
 		}
-		result, err := h.applySingleHunk(repository, runID, applyRequest{
+		result, err := h.applyHunkDecision(runID, applyRequest{
 			FilePath:  decision.FilePath,
 			HunkIndex: decision.HunkIndex,
 			Accepted:  decision.Accepted,
 			WorkDir:   req.WorkDir,
-		})
+		}, diffFiles, filesResponse)
 		if err != nil {
 			slog.Error("diff batch apply failed", "runId", runID, "filePath", decision.FilePath, "hunkIndex", decision.HunkIndex, "error", err)
 			writeJSON(w, http.StatusInternalServerError, errcode.ErrorBody(errcode.ErrInternal))
@@ -158,8 +191,16 @@ func (h *Handler) PostApplyAllRunDiffs(w http.ResponseWriter, r *http.Request, r
 
 // applySingleHunk applies one hunk decision and returns the updated diff state.
 func (h *Handler) applySingleHunk(repository store.Repository, runID string, req applyRequest) (map[string]any, error) {
-	// Find the diff file for this run and path.
 	diffFiles := repository.ListRunDiffFiles(runID)
+	return h.applyHunkDecision(runID, req, diffFiles, runDiffFilesResponse(diffFiles))
+}
+
+// applyHunkDecision applies one decision against a diff snapshot the caller has
+// already loaded, so a batch cannot turn into one full-store scan per decision.
+// filesResponse is the serialized form of that same snapshot and is shared by
+// every result of a batch.
+func (h *Handler) applyHunkDecision(runID string, req applyRequest, diffFiles []store.RunDiffFile, filesResponse []map[string]any) (map[string]any, error) {
+	// Find the diff file for this run and path.
 	var targetDiff *store.RunDiffFile
 	for i := range diffFiles {
 		if diffFiles[i].Path == req.FilePath {
@@ -189,15 +230,14 @@ func (h *Handler) applySingleHunk(repository store.Repository, runID string, req
 		}
 	}
 
-	// Build response with updated diff state.
-	allDiffFiles := repository.ListRunDiffFiles(runID)
+	// Build response with the diff state snapshot loaded for this request.
 	return map[string]any{
 		"runId":     runID,
 		"filePath":  req.FilePath,
 		"hunkIndex": req.HunkIndex,
 		"accepted":  req.Accepted,
 		"applied":   req.Accepted,
-		"files":     runDiffFilesResponse(allDiffFiles),
+		"files":     filesResponse,
 	}, nil
 }
 

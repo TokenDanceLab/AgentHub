@@ -438,3 +438,152 @@ func TestPostApplyRunDiffStillCreatesMissingNestedFile(t *testing.T) {
 		t.Errorf("created file content = %q", got)
 	}
 }
+
+// ---------------------------------------------------------------------------
+// P2-7 — apply-all amplification: decision cap, one diff snapshot, ctx cancel
+// ---------------------------------------------------------------------------
+
+// diffListCountingRepository counts ListRunDiffFiles calls so a batch's store
+// amplification is observable.
+type diffListCountingRepository struct {
+	store.Repository
+	listCalls int
+}
+
+func (r *diffListCountingRepository) ListRunDiffFiles(runID string) []store.RunDiffFile {
+	r.listCalls++
+	return r.Repository.ListRunDiffFiles(runID)
+}
+
+// decisionsBody builds an apply-all body with n reject decisions for one path.
+func decisionsBody(n int, filePath, workDir string) string {
+	var sb strings.Builder
+	sb.WriteString(`{"decisions":[`)
+	for i := 0; i < n; i++ {
+		if i > 0 {
+			sb.WriteByte(',')
+		}
+		fmt.Fprintf(&sb, `{"file_path":%q,"hunk_index":0,"accepted":false}`, filePath)
+	}
+	fmt.Fprintf(&sb, `],"workDir":%q}`, workDir)
+	return sb.String()
+}
+
+// TestPostApplyAllRunDiffsRejectsTooManyDecisions pins the explicit batch cap:
+// the 1 MiB body limit in decodeApplyJSON admits ~17k minimal decisions, and
+// every decision used to cost a hunk parse plus a `files` array in the
+// response, so one request could amplify without bound.
+func TestPostApplyAllRunDiffsRejectsTooManyDecisions(t *testing.T) {
+	h := newTestHandler()
+	workDir := allowTestWorkspace(t, h)
+	seedOwnedApplyRun(t, h.Store, "cap", "run-cap", "", "finished", "a.txt", applyTestDiff)
+
+	rec := doApplyAllRunDiffs(h, "run-cap", http.MethodPost, decisionsBody(maxApplyDecisions+1, "a.txt", workDir))
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want 400 for %d decisions; body=%.200s", rec.Code, maxApplyDecisions+1, rec.Body.String())
+	}
+	assertErrorCode(t, rec.Body.String(), "bad_request")
+	if !strings.Contains(rec.Body.String(), fmt.Sprint(maxApplyDecisions)) {
+		t.Errorf("400 body does not state the cap (%d): %s", maxApplyDecisions, rec.Body.String())
+	}
+}
+
+// TestPostApplyAllRunDiffsAcceptsDecisionCapBoundary guards the cap from being
+// tightened below the documented limit: exactly maxApplyDecisions is served.
+func TestPostApplyAllRunDiffsAcceptsDecisionCapBoundary(t *testing.T) {
+	h := newTestHandler()
+	workDir := allowTestWorkspace(t, h)
+	seedOwnedApplyRun(t, h.Store, "capedge", "run-capedge", "", "finished", "a.txt", applyTestDiff)
+
+	rec := doApplyAllRunDiffs(h, "run-capedge", http.MethodPost, decisionsBody(maxApplyDecisions, "a.txt", workDir))
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200 at the cap boundary; body=%.200s", rec.Code, rec.Body.String())
+	}
+	data := decodeApplyEnvelope(t, rec)
+	if applied, ok := data["applied"].(float64); !ok || int(applied) != maxApplyDecisions {
+		t.Errorf("applied = %#v, want %d", data["applied"], maxApplyDecisions)
+	}
+}
+
+// TestPostApplyAllRunDiffsReadsRunDiffFilesOnce pins the hoisted diff snapshot:
+// applySingleHunk used to call ListRunDiffFiles twice per decision, so an
+// N-decision batch materialised the run's full diff text 2N times.
+func TestPostApplyAllRunDiffsReadsRunDiffFilesOnce(t *testing.T) {
+	h := newTestHandler()
+	counting := &diffListCountingRepository{Repository: h.Store}
+	h.Store = counting
+	workDir := allowTestWorkspace(t, h)
+	seedOwnedApplyRun(t, h.Store, "scan", "run-scan", "", "finished", "a.txt", applyTestDiff)
+	counting.listCalls = 0 // ignore seeding
+
+	rec := doApplyAllRunDiffs(h, "run-scan", http.MethodPost, decisionsBody(3, "a.txt", workDir))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200; body=%.200s", rec.Code, rec.Body.String())
+	}
+	if counting.listCalls != 1 {
+		t.Fatalf("ListRunDiffFiles calls for a 3-decision batch = %d, want 1", counting.listCalls)
+	}
+}
+
+// TestPostApplyRunDiffReadsRunDiffFilesOnce is the single-hunk counterpart: one
+// request, one snapshot.
+func TestPostApplyRunDiffReadsRunDiffFilesOnce(t *testing.T) {
+	h := newTestHandler()
+	counting := &diffListCountingRepository{Repository: h.Store}
+	h.Store = counting
+	workDir := allowTestWorkspace(t, h)
+	seedOwnedApplyRun(t, h.Store, "scan1", "run-scan1", "", "finished", "a.txt", applyTestDiff)
+	counting.listCalls = 0
+
+	rec := doApplyRunDiff(h, "run-scan1", http.MethodPost, fmt.Sprintf(`{"file_path":"a.txt","hunk_index":0,"accepted":false,"workDir":%q}`, workDir))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200; body=%.200s", rec.Code, rec.Body.String())
+	}
+	if counting.listCalls != 1 {
+		t.Fatalf("ListRunDiffFiles calls for one apply = %d, want 1", counting.listCalls)
+	}
+}
+
+// TestPostApplyAllRunDiffsStopsOnCanceledContext pins that the batch loop
+// respects the request context. restTimeoutMiddleware wraps REST routes in
+// http.TimeoutHandler with a 30s budget; when it fires (or the client
+// disconnects) the context is canceled and the loop must stop instead of
+// continuing to parse hunks and write files nobody will hear about.
+func TestPostApplyAllRunDiffsStopsOnCanceledContext(t *testing.T) {
+	h := newTestHandler()
+	workDir := allowTestWorkspace(t, h)
+	target := filepath.Join(workDir, "a.txt")
+	if err := os.WriteFile(target, []byte(applyTestOriginal), 0o600); err != nil {
+		t.Fatalf("write fixture: %v", err)
+	}
+	seedOwnedApplyRun(t, h.Store, "canceled", "run-canceled", "", "finished", "a.txt", applyTestDiff)
+
+	body := fmt.Sprintf(`{"decisions":[{"file_path":"a.txt","hunk_index":0,"accepted":true},{"file_path":"a.txt","hunk_index":0,"accepted":true},{"file_path":"a.txt","hunk_index":0,"accepted":true}],"workDir":%q}`, workDir)
+	req := httptest.NewRequest(http.MethodPost, "/v1/runs/run-canceled/apply-all", strings.NewReader(body))
+	ctx, cancel := context.WithCancel(req.Context())
+	cancel() // deadline already blown when the loop starts
+	req = req.WithContext(ctx)
+	rec := httptest.NewRecorder()
+	h.PostApplyAllRunDiffs(rec, req, "run-canceled")
+
+	got, err := os.ReadFile(target)
+	if err != nil {
+		t.Fatalf("read target: %v", err)
+	}
+	if string(got) != applyTestOriginal {
+		t.Fatalf("canceled request still wrote the workdir: %q", got)
+	}
+	// The batch is aborted mid-flight, so the handler must not report success.
+	// It surfaces through the existing generic failure mapping (500
+	// internal_error); on the real server http.TimeoutHandler has already
+	// answered the client with 503 by then.
+	if rec.Code == http.StatusOK {
+		t.Fatalf("status = 200 for a canceled batch; body=%.200s", rec.Body.String())
+	}
+	if rec.Code != http.StatusInternalServerError {
+		t.Fatalf("status = %d, want 500 for an aborted batch; body=%.200s", rec.Code, rec.Body.String())
+	}
+	assertErrorCode(t, rec.Body.String(), "internal_error")
+}
