@@ -36,8 +36,35 @@ var hubStreamChunkSeq sync.Map // runID -> *atomic.Int64
 // nextHubStreamChunkIdx returns the next monotonic chunk index for runID,
 // lazily allocating the atomic counter on first use.
 func nextHubStreamChunkIdx(runID string) int64 {
+	// Load fast path: sync.Map.LoadOrStore always evaluates its second
+	// argument, so the plain form allocated a counter on every chunk only to
+	// discard it. A miss still falls back to LoadOrStore, keeping the benign
+	// "both goroutines build one, only one is stored" race at once per run.
+	if actual, ok := hubStreamChunkSeq.Load(runID); ok {
+		return actual.(*atomic.Int64).Add(1)
+	}
 	actual, _ := hubStreamChunkSeq.LoadOrStore(runID, new(atomic.Int64))
 	return actual.(*atomic.Int64).Add(1)
+}
+
+// loadOrInitHubCallbackQueue returns runID's queue state, allocating it on
+// first use.
+//
+// The Load fast path is the whole point: a run emits thousands of stream
+// chunks, and sync.Map.LoadOrStore evaluates its second argument before the
+// lookup, so the plain form built a fresh hubCallbackQueueState — including a
+// 128-slot buffered channel of ~13 KiB — on every single chunk and threw it
+// away when the state already existed. At 20 concurrent runs that is ~54 MB/s
+// of immediately-dead allocation, which drives GC triggering for the entire
+// edge process and inflates tail latency on every locked path (event log
+// append, SQLite persist). Misses still fall back to LoadOrStore so allocation
+// stays exactly once per run.
+func loadOrInitHubCallbackQueue(runID string) *hubCallbackQueueState {
+	if stateAny, ok := hubCallbackQueues.Load(runID); ok {
+		return stateAny.(*hubCallbackQueueState)
+	}
+	stateAny, _ := hubCallbackQueues.LoadOrStore(runID, newHubCallbackQueueState(runID))
+	return stateAny.(*hubCallbackQueueState)
 }
 
 // hubStreamClientMsgID derives a deterministic UUIDv5 from (runID, chunkIdx)
@@ -267,8 +294,7 @@ func (s *hubCallbackQueueState) close() {
 // blocking. Returns false when the queue is full (chunk dropped) or already
 // closed (terminal callback decided the run's delivery).
 func (e *ProcessExecutor) enqueueHubStreamJob(runID string, job hubCallbackJob) bool {
-	stateAny, _ := hubCallbackQueues.LoadOrStore(runID, newHubCallbackQueueState(runID))
-	state := stateAny.(*hubCallbackQueueState)
+	state := loadOrInitHubCallbackQueue(runID)
 
 	state.mu.Lock()
 	defer state.mu.Unlock()
@@ -288,8 +314,7 @@ func (e *ProcessExecutor) enqueueHubStreamJob(runID string, job hubCallbackJob) 
 // closes the queue so the consumer drains remaining jobs (including this one)
 // and exits. Late stream enqueues observe the closed flag and drop.
 func (e *ProcessExecutor) enqueueTerminalHubJob(runID string, job hubCallbackJob) {
-	stateAny, _ := hubCallbackQueues.LoadOrStore(runID, newHubCallbackQueueState(runID))
-	state := stateAny.(*hubCallbackQueueState)
+	state := loadOrInitHubCallbackQueue(runID)
 
 	state.mu.Lock()
 	defer state.mu.Unlock()
