@@ -25,14 +25,16 @@ api/
 
 ## 产品术语
 
-接口命名必须区分四个概念（术语定义 SSOT：`AGENTS.md` 的“产品术语”）：
+接口命名必须区分四个概念。概念定义与取值域的 SSOT 是根 `AGENTS.md` 的「产品术语」，本表只给 API 字段映射，不复制含义（旧副本曾把 Execution Target 的四类具名 target 抄丢，读者只能从字段名反推取值域）：
 
-| 概念 | API 含义 | 示例字段 |
-|---|---|---|
-| Agent Runtime | 能启动并解析某类 Agent CLI/SDK 的 adapter。Runtime 不是用户配置好的业务 Agent。 | `runtimeId`, `adapterId`, `capabilities` |
-| Agent Profile | 用户可管理的 Agent 实体：Runtime + Model/Provider + 配置 + Target。 | `profileId`, `agentId`, `customAgentId` |
-| Agent Configuration | Profile 的配置集合：`AGENTS.md`、memory、上下文、聊天记录、工作目录、Skill、MCP、模型参数、审批策略。 | `model`, `reasoningEffort`, `permissionMode`, `skillIds`, `mcpServerIds` |
-| Execution Target | 一次 Run 的实际运行位置。 | `targetId`, `edgeId`, `workspaceId`, `relayCommandId` |
+| 概念 | 示例字段 |
+|---|---|
+| Agent Runtime | `runtimeId`, `adapterId`, `capabilities` |
+| Agent Profile | `profileId`, `agentId`, `customAgentId` |
+| Agent Configuration | `model`, `reasoningEffort`, `permissionMode`, `skillIds`, `mcpServerIds` |
+| Execution Target | `targetId`, `edgeId`, `workspaceId`, `relayCommandId` |
+
+其中 Agent Runtime 是 adapter，不是用户配置好的业务 Agent（后者是 Agent Profile）。
 
 现有 `agentId` 在部分 P0 接口中仍指 Edge adapter ID；新增接口应优先显式使用 `runtimeId` 或 `profileId`，避免继续扩大歧义。
 
