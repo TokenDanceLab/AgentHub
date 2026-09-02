@@ -72,6 +72,12 @@ func (h *Handler) PostPreview(w http.ResponseWriter, r *http.Request) {
 	}
 
 	repository := ensureStore(h)
+	// Ownership gate (multi-user Hub JWT mode): starting a preview record for
+	// a foreign run must fail closed; 404 keeps run existence unobservable.
+	if !isRunOwnedBy(repository, req.RunID, h.ownerUserID(r)) {
+		writeJSON(w, http.StatusNotFound, errcode.ErrorBody(errcode.ErrNotFound.WithMessage("run not found")))
+		return
+	}
 	preview, err := ensurePreviewRunner(h, repository).StartPreview(lifecycle.PreviewStartRequest{
 		PreviewID: req.PreviewID,
 		RunID:     req.RunID,
@@ -112,6 +118,12 @@ func (h *Handler) PostPreviewStop(w http.ResponseWriter, r *http.Request, previe
 	repository := ensureStore(h)
 	preview, ok := repository.GetPreview(previewID)
 	if !ok {
+		writeJSON(w, http.StatusNotFound, errcode.ErrorBody(errcode.ErrNotFound.WithMessage("preview not found")))
+		return
+	}
+	// Ownership gate mirrors GetPreview: a foreign preview must not be
+	// stoppable under multi-user mode.
+	if !isPreviewOwnedBy(repository, preview.ID, h.ownerUserID(r)) {
 		writeJSON(w, http.StatusNotFound, errcode.ErrorBody(errcode.ErrNotFound.WithMessage("preview not found")))
 		return
 	}
