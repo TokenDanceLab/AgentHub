@@ -14,6 +14,7 @@ import (
 	"github.com/agenthub/hub-server/internal/model"
 	"github.com/agenthub/hub-server/internal/repository"
 	"github.com/agenthub/hub-server/internal/uuidv7"
+	"github.com/agenthub/pkg/safego"
 	"gorm.io/gorm"
 )
 
@@ -339,6 +340,19 @@ func (s *AgentTeamService) ListTeamRuns(ctx context.Context, userID, teamID stri
 // glebarez/sqlite is imported exclusively from *_test.go.
 const teamRunStateReadConcurrency = 4
 
+// Panic-attribution labels for the six parallel projection reads in
+// GetTeamRunState. They land in the recovered-panic log line, in the
+// process-wide panic counter and in the error the endpoint returns, so they
+// must stay stable.
+const (
+	teamRunReadMembers     = "teamRunState.members"
+	teamRunReadAssignments = "teamRunState.assignments"
+	teamRunReadTasks       = "teamRunState.tasks"
+	teamRunReadTeamEvents  = "teamRunState.teamEvents"
+	teamRunReadPendingTask = "teamRunState.pendingTask"
+	teamRunReadRunEvents   = "teamRunState.runEvents"
+)
+
 // GetTeamRunState returns a replayable projection of a team run.
 func (s *AgentTeamService) GetTeamRunState(ctx context.Context, userID, teamID, runID string) (*model.TeamRunState, error) {
 	if _, err := s.getTeamForRead(ctx, userID, teamID); err != nil {
@@ -378,6 +392,16 @@ func (s *AgentTeamService) GetTeamRunState(ctx context.Context, userID, teamID, 
 	// overwrite an earlier slot's real error with context.Canceled. gctx still
 	// propagates the *request's* cancellation and deadline into every query via
 	// s.db.WithContext, which the serial version did not do at all.
+	//
+	// Panic safety: each closure defers safego.RecoverInto into its own error
+	// slot. errgroup.Go spawns a real goroutine and recovers nothing, and gin's
+	// recovery middleware only covers the request goroutine — so a panic in one
+	// of these reads, which the serial version surfaced as a 500 through that
+	// middleware, would otherwise take the whole Hub process down on the
+	// endpoint the team-run UI polls every 1-3 s. RecoverInto records the panic
+	// as that read's error (only if the slot is still empty), so the panic
+	// follows the existing error path and the priority order below: a 500 that
+	// names the read, never a silently half-populated projection.
 	gctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	db := s.db.WithContext(gctx)
@@ -395,11 +419,28 @@ func (s *AgentTeamService) GetTeamRunState(ctx context.Context, userID, teamID, 
 	)
 	var layer1 errgroup.Group
 	layer1.SetLimit(teamRunStateReadConcurrency)
-	layer1.Go(func() error { members, membersErr = repository.ListTeamMembers(db, teamID); return nil })
-	layer1.Go(func() error { assignments, assignmentsErr = repository.ListAssignmentsByTeamRun(db, runID); return nil })
-	layer1.Go(func() error { tasks, tasksErr = repository.ListTeamTasksByRun(db, runID); return nil })
-	layer1.Go(func() error { events, eventsErr = repository.ListTeamEventsByRun(db, runID); return nil })
-	// Always nil (every goroutine returns nil); Wait is the join point.
+	layer1.Go(func() error {
+		defer safego.RecoverInto(teamRunReadMembers, &membersErr)
+		members, membersErr = repository.ListTeamMembers(db, teamID)
+		return nil
+	})
+	layer1.Go(func() error {
+		defer safego.RecoverInto(teamRunReadAssignments, &assignmentsErr)
+		assignments, assignmentsErr = repository.ListAssignmentsByTeamRun(db, runID)
+		return nil
+	})
+	layer1.Go(func() error {
+		defer safego.RecoverInto(teamRunReadTasks, &tasksErr)
+		tasks, tasksErr = repository.ListTeamTasksByRun(db, runID)
+		return nil
+	})
+	layer1.Go(func() error {
+		defer safego.RecoverInto(teamRunReadTeamEvents, &eventsErr)
+		events, eventsErr = repository.ListTeamEventsByRun(db, runID)
+		return nil
+	})
+	// Always nil (every goroutine returns nil; a panic lands in its own slot
+	// variable via RecoverInto); Wait is the join point.
 	_ = layer1.Wait()
 	if membersErr != nil {
 		return nil, membersErr
@@ -422,10 +463,12 @@ func (s *AgentTeamService) GetTeamRunState(ctx context.Context, userID, teamID, 
 	var layer2 errgroup.Group
 	layer2.SetLimit(teamRunStateReadConcurrency)
 	layer2.Go(func() error {
+		defer safego.RecoverInto(teamRunReadPendingTask, &pendingTaskErr)
 		pendingTaskByID, pendingTaskErr = s.pendingTaskSnapshotByID(db, assignments, tasks)
 		return nil
 	})
 	layer2.Go(func() error {
+		defer safego.RecoverInto(teamRunReadRunEvents, &runEventsErr)
 		runEvents, runEventsErr = repository.ListAgentRunEventsByTaskIDs(db, agentTaskIDs)
 		return nil
 	})
