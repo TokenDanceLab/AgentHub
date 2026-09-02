@@ -188,18 +188,26 @@ func (a *App) hubStateDumper() debugpkg.StateDumper {
 	}
 }
 
+// runtimeMetricsPrev carries the cumulative-counter baselines needed to
+// report per-tick deltas (G11 pattern).
+type runtimeMetricsPrev struct {
+	redisPoolHits uint32
+	dbWaitCount   int64
+	dbWaitNanos   int64
+}
+
 // startMetricsCollector periodically reports DB pool, WS connections, Redis hits, and bus queue length.
 func (a *App) startMetricsCollector(ctx context.Context) {
 	a.bg.Go(func() error {
 		ticker := time.NewTicker(config.MetricsCollectionInterval)
 		defer ticker.Stop()
-		// G11: redis.PoolStats().Hits is a cumulative monotonic counter; we track
-		// the delta per tick and Add() to the Counter (was incorrectly Set on a Gauge).
-		var prevRedisPoolHits uint32
+		// G11: cumulative monotonic counters (redis hits, sql.DBStats waits) are
+		// tracked as per-tick deltas and Add()ed to Counters.
+		var prev runtimeMetricsPrev
 		for {
 			select {
 			case <-ticker.C:
-				prevRedisPoolHits = a.collectRuntimeMetrics(prevRedisPoolHits)
+				prev = a.collectRuntimeMetrics(prev)
 			case <-ctx.Done():
 				return nil
 			}
@@ -211,7 +219,7 @@ func (a *App) startMetricsCollector(ctx context.Context) {
 // queue length for one metrics tick, returning the latest Redis hits counter
 // so the caller can compute the next-tick delta. All sources stay optional:
 // runtime-nil components are skipped exactly as before.
-func (a *App) collectRuntimeMetrics(prevRedisPoolHits uint32) uint32 {
+func (a *App) collectRuntimeMetrics(prev runtimeMetricsPrev) runtimeMetricsPrev {
 	if sqlDB, err := a.DB.DB(); err == nil {
 		stats := sqlDB.Stats()
 		metrics.DBPoolInUse.Set(float64(stats.InUse))
@@ -219,23 +227,35 @@ func (a *App) collectRuntimeMetrics(prevRedisPoolHits uint32) uint32 {
 		if metrics.DBPoolIdle != nil {
 			metrics.DBPoolIdle.Set(float64(stats.Idle))
 		}
+		// Pool exhaustion signal: cumulative WaitCount/WaitDuration deltas.
+		if metrics.DBPoolWaitTotal != nil && stats.WaitCount > prev.dbWaitCount {
+			metrics.DBPoolWaitTotal.Add(float64(stats.WaitCount - prev.dbWaitCount))
+		}
+		prev.dbWaitCount = stats.WaitCount
+		if metrics.DBPoolWaitSecondsTotal != nil {
+			waitNanos := stats.WaitDuration.Nanoseconds()
+			if waitNanos > prev.dbWaitNanos {
+				metrics.DBPoolWaitSecondsTotal.Add(float64(waitNanos-prev.dbWaitNanos) / 1e9)
+			}
+			prev.dbWaitNanos = waitNanos
+		}
 	}
 	if a.mgr != nil {
 		metrics.WSConnections.Set(float64(a.mgr.Count()))
 	}
 	if a.CacheClient != nil {
 		hits := a.CacheClient.PoolStats().Hits
-		if delta := hits - prevRedisPoolHits; delta > 0 {
+		if delta := hits - prev.redisPoolHits; delta > 0 {
 			if metrics.RedisPoolHitsTotal != nil {
 				metrics.RedisPoolHitsTotal.Add(float64(delta))
 			}
 		}
-		prevRedisPoolHits = hits
+		prev.redisPoolHits = hits
 	}
 	if a.bus != nil {
 		metrics.EventBusQueueLen.Set(float64(a.bus.Running()))
 	}
-	return prevRedisPoolHits
+	return prev
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────

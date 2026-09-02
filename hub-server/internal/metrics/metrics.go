@@ -109,6 +109,13 @@ var (
 	// concept); only db_pool_idle is exposed for the DB pool.
 	DBPoolIdle prometheus.Gauge
 
+	// DB pool exhaustion observability (#2154 Gauss P1-1): cumulative
+	// WaitCount / WaitDuration deltas per collector tick. A nonzero wait
+	// rate means callers blocked on pool exhaustion — the signal that the
+	// old 2-connection default hid completely.
+	DBPoolWaitTotal        prometheus.Counter
+	DBPoolWaitSecondsTotal prometheus.Counter
+
 	// Audit-D (2026-07-29) — Swallowed-error observability for the three
 	// error-swallowing sites flagged by Audit-D §1.1: dead-letter move,
 	// notification delivery, running-task heartbeat, and session touch.
@@ -453,6 +460,18 @@ func Register() {
 				Help: "Number of idle database connections in the pool.",
 			},
 		)
+		DBPoolWaitTotal = prometheus.NewCounter(
+			prometheus.CounterOpts{
+				Name: "db_pool_wait_total",
+				Help: "Total number of connections waited for (sql.DBStats.WaitCount deltas).",
+			},
+		)
+		DBPoolWaitSecondsTotal = prometheus.NewCounter(
+			prometheus.CounterOpts{
+				Name: "db_pool_wait_seconds_total",
+				Help: "Total time blocked waiting for a pool connection, seconds (sql.DBStats.WaitDuration deltas).",
+			},
+		)
 
 		// Audit-D — Swallowed-error counters for dead-letter move, notification
 		// delivery, running-task heartbeat, and session touch failures.
@@ -581,6 +600,8 @@ func Register() {
 		prometheus.MustRegister(DBErrors)
 		prometheus.MustRegister(DBSlowQueries)
 		prometheus.MustRegister(DBPoolIdle)
+		prometheus.MustRegister(DBPoolWaitTotal)
+		prometheus.MustRegister(DBPoolWaitSecondsTotal)
 		prometheus.MustRegister(DispatchDeadLetterMoveFailures)
 		prometheus.MustRegister(NotificationDeliveryFailures)
 		prometheus.MustRegister(AgentHeartbeatFailures)
