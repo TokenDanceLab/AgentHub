@@ -41,16 +41,22 @@ env:
   PNPM_VERSION: "10.32.1"
 
 jobs:
-  # ── Go: Edge Server ──────────────────────────
-  # CI5 wave2 (#1689): test execution lives in go-edge-test (2-shard matrix,
-  # each shard on its own 4-core runner). This job keeps lint / static
-  # analysis / coverage gates in one place and merges the shard text
-  # profiles with scripts/verify/merge-coverprofiles.py (repo-local).
-  go-edge:
-    needs: [changes, go-edge-test]
-    # Required check: always report a result so a path-filtered skip cannot
-    # block branch protection. Real gates below run only for Go changes.
-    if: ${{ !cancelled() }}
+  # ── Go: Edge static gates (parallel) ─────────
+  # #2251 slice 1: none of the gates below consumes the shard coverage
+  # artifacts, so they no longer queue behind go-edge-test (measured
+  # 1m34s of serial tail on run 33674961074). This job starts together
+  # with the test shards; the stable required check go-edge aggregates its
+  # result. Step-level path filters are kept verbatim from the pre-split job so
+  # the move stays a pure move (redundant with the job-level if, zero cost).
+  go-edge-static:
+    needs: changes
+    # Job-level path filter — the same expression the real gates below carry.
+    # When Go is deselected this job is skipped; go-edge still reports its
+    # controlled no-op success because its lane assertions share this filter,
+    # so a skipped static lane can never redden a Go-less PR.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      needs.changes.outputs.go == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -100,6 +106,115 @@ jobs:
         working-directory: .
         run: python ./scripts/verify/tests/verify-edge-lint-ratchet.Tests.py
 
+      # CI7: staticcheck hard-blocking — edge-server findings zero-baselined;
+      # version pinned to prevent new-check drift from breaking CI.
+      # Binary cached across runs (gha cache keyed on pinned versions).
+      # Restore must precede both gosec and staticcheck steps.
+      - name: Cache static-analysis binaries (staticcheck + gosec)
+        id: sa-cache
+        if: github.event_name == 'workflow_dispatch' || needs.changes.outputs.go == 'true'
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/go/bin/staticcheck
+            ~/go/bin/gosec
+          key: sa-tools-2026-08
+
+      - name: Security scan (gosec)
+        if: github.event_name == 'workflow_dispatch' || needs.changes.outputs.go == 'true'
+        # #1574: hard fail (findings zero-baselined). Fail-closed wrapper
+        # verify-gosec-gates.sh rejects empty/unparseable output (no false green).
+        run: |
+          if [ ! -x ~/go/bin/gosec ]; then
+            go install github.com/securego/gosec/v2/cmd/gosec@v2.28.0
+          fi
+          ~/go/bin/gosec -fmt=json ./... 2>/dev/null | bash ../scripts/verify/verify-gosec-gates.sh
+      - name: Vet
+        if: github.event_name == 'workflow_dispatch' || needs.changes.outputs.go == 'true'
+        run: go vet ./...
+
+      - name: staticcheck
+        if: github.event_name == 'workflow_dispatch' || needs.changes.outputs.go == 'true'
+        run: |
+          if [ ! -x ~/go/bin/staticcheck ]; then
+            go install honnef.co/go/tools/cmd/staticcheck@2026.1
+          fi
+          staticcheck ./... 2>&1
+
+      # #1566: orchestrator 依赖方向门禁（A-V1 Step 2）。叶子包
+      # internal/adapters/orchestrator 不得 import 根实现包；
+      # internal/orchestration 不得 import 任何 adapters。此前该脚本只在
+      # 本地跑、CI 未接线——治理声明与执行不一致，现接进 go-edge-static
+      # （已 setup-go；#2251 slice 1 起与 shard 测试并行，不再排在其后）。
+      - name: Verify orchestrator dependency direction (#1566)
+        if: github.event_name == 'workflow_dispatch' || needs.changes.outputs.go == 'true'
+        working-directory: .
+        run: python scripts/verify/verify-orchestrator-deps.py
+
+      - name: Self-test orchestrator dependency direction gate
+        if: github.event_name == 'workflow_dispatch' || needs.changes.outputs.go == 'true'
+        working-directory: .
+        run: python scripts/verify/tests/verify-orchestrator-deps.Tests.py
+
+  # ── Go: Edge Server (required check) ─────────
+  # CI5 wave2 (#1689): test execution lives in go-edge-test (2-shard matrix,
+  # each shard on its own 4-core runner). #2251 slice 1: lint and the rest of
+  # the static analysis moved to go-edge-static so they run in parallel with
+  # the shards instead of serialising behind them. What stays here genuinely
+  # needs the shard artifacts — download + merge with
+  # scripts/verify/merge-coverprofiles.py (repo-local) and the coverage gates —
+  # plus fail-closed assertions on both upstream lanes, so a static or test
+  # failure still reddens this required check (and through it backend-required,
+  # whose needs list therefore stays unchanged).
+  go-edge:
+    needs: [changes, go-edge-test, go-edge-static]
+    # Required check: always report a result so a path-filtered skip cannot
+    # block branch protection. Real gates below run only for Go changes.
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: edge-server
+    steps:
+      - if: github.event_name == 'workflow_dispatch' || needs.changes.outputs.go == 'true'
+        uses: actions/checkout@v7
+
+      - if: github.event_name == 'workflow_dispatch' || needs.changes.outputs.go == 'true'
+        uses: actions/setup-go@v7
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+          cache-dependency-path: edge-server/go.sum
+
+      # #2251 slice 1: this job aggregates two parallel upstream lanes instead
+      # of running the static gates itself, so both verdicts are bound and
+      # asserted fail-closed (same convention as windows-go / backend-required):
+      # any lane that is not `success` — including a `skipped` static lane on a
+      # Go-selected PR — reddens the required check instead of reporting a false
+      # green. Static-gate failures reach branch protection through go-edge,
+      # which is why backend-required needs no new entry.
+      - name: Assert Edge static gate lane result (go-edge-static)
+        if: github.event_name == 'workflow_dispatch' || needs.changes.outputs.go == 'true'
+        working-directory: .
+        env:
+          STATIC_RESULT: ${{ needs.go-edge-static.result }}
+        run: |
+          if [ "$STATIC_RESULT" != "success" ]; then
+            echo "::error::go-edge-static result: $STATIC_RESULT; lint / ratchet / gosec / vet / staticcheck / orchestrator-deps did not pass"
+            exit 1
+          fi
+
+      - name: Assert Edge unit test lane result (go-edge-test)
+        if: github.event_name == 'workflow_dispatch' || needs.changes.outputs.go == 'true'
+        working-directory: .
+        env:
+          TEST_RESULT: ${{ needs.go-edge-test.result }}
+        run: |
+          if [ "$TEST_RESULT" != "success" ]; then
+            echo "::error::go-edge-test result: $TEST_RESULT; shard unit tests did not pass"
+            exit 1
+          fi
+
       - name: Download shard coverage data
         if: github.event_name == 'workflow_dispatch' || needs.changes.outputs.go == 'true'
         uses: actions/download-artifact@v7
@@ -143,55 +258,6 @@ jobs:
           check_pkg "edge-server/internal/lifecycle/" 60 "lifecycle" || FAILED=1
           check_pkg "edge-server/internal/adapters/" 55 "adapters" || FAILED=1
           exit $FAILED
-
-      # CI7: staticcheck hard-blocking — edge-server findings zero-baselined;
-      # version pinned to prevent new-check drift from breaking CI.
-      # Binary cached across runs (gha cache keyed on pinned versions).
-      # Restore must precede both gosec and staticcheck steps.
-      - name: Cache static-analysis binaries (staticcheck + gosec)
-        id: sa-cache
-        if: github.event_name == 'workflow_dispatch' || needs.changes.outputs.go == 'true'
-        uses: actions/cache@v5
-        with:
-          path: |
-            ~/go/bin/staticcheck
-            ~/go/bin/gosec
-          key: sa-tools-2026-08
-
-      - name: Security scan (gosec)
-        if: github.event_name == 'workflow_dispatch' || needs.changes.outputs.go == 'true'
-        # #1574: hard fail (findings zero-baselined). Fail-closed wrapper
-        # verify-gosec-gates.sh rejects empty/unparseable output (no false green).
-        run: |
-          if [ ! -x ~/go/bin/gosec ]; then
-            go install github.com/securego/gosec/v2/cmd/gosec@v2.28.0
-          fi
-          ~/go/bin/gosec -fmt=json ./... 2>/dev/null | bash ../scripts/verify/verify-gosec-gates.sh
-      - name: Vet
-        if: github.event_name == 'workflow_dispatch' || needs.changes.outputs.go == 'true'
-        run: go vet ./...
-
-      - name: staticcheck
-        if: github.event_name == 'workflow_dispatch' || needs.changes.outputs.go == 'true'
-        run: |
-          if [ ! -x ~/go/bin/staticcheck ]; then
-            go install honnef.co/go/tools/cmd/staticcheck@2026.1
-          fi
-          staticcheck ./... 2>&1
-
-      # #1566: orchestrator 依赖方向门禁（A-V1 Step 2）。叶子包
-      # internal/adapters/orchestrator 不得 import 根实现包；
-      # internal/orchestration 不得 import 任何 adapters。此前该脚本只在
-      # 本地跑、CI 未接线——治理声明与执行不一致，现接进 go-edge（已 setup-go）。
-      - name: Verify orchestrator dependency direction (#1566)
-        if: github.event_name == 'workflow_dispatch' || needs.changes.outputs.go == 'true'
-        working-directory: .
-        run: python scripts/verify/verify-orchestrator-deps.py
-
-      - name: Self-test orchestrator dependency direction gate
-        if: github.event_name == 'workflow_dispatch' || needs.changes.outputs.go == 'true'
-        working-directory: .
-        run: python scripts/verify/tests/verify-orchestrator-deps.Tests.py
 
       # Fallback: keep the required check reported even when the Go path
       # filter deselects this job (skipped jobs never satisfy branch
@@ -266,12 +332,22 @@ jobs:
           path: edge-server/shard-${{ matrix.shard }}.out
           retention-days: 1
 
-  # ── Go: Hub Server ──────────────────────────
-  go-hub:
-    needs: [changes, go-hub-test]
-    # Required check: always report a result so a path-filtered skip cannot
-    # block branch protection. Real gates below run only for Go changes.
-    if: ${{ !cancelled() }}
+  # ── Go: Hub static gates (parallel) ──────────
+  # #2251 slice 1: none of the gates below consumes the shard coverage
+  # artifacts, so they no longer queue behind go-hub-test (measured
+  # 2m45s of serial tail on run 33674961074). This job starts together
+  # with the test shards; the stable required check go-hub aggregates its
+  # result. Step-level path filters are kept verbatim from the pre-split job so
+  # the move stays a pure move (redundant with the job-level if, zero cost).
+  go-hub-static:
+    needs: changes
+    # Job-level path filter — the same expression the real gates below carry.
+    # When Go is deselected this job is skipped; go-hub still reports its
+    # controlled no-op success because its lane assertions share this filter,
+    # so a skipped static lane can never redden a Go-less PR.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      needs.changes.outputs.go == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -316,36 +392,6 @@ jobs:
         working-directory: .
         run: python ./scripts/verify/tests/verify-hub-lint-ratchet.Tests.py
 
-      # CI5 wave2 (#1689): test execution lives in go-hub-test (2-shard
-      # matrix). This job merges the shard text profiles with
-      # scripts/verify/merge-coverprofiles.py and keeps the overall >=40%
-      # gate hard-blocking.
-      - name: Download shard coverage data
-        if: github.event_name == 'workflow_dispatch' || needs.changes.outputs.go == 'true'
-        uses: actions/download-artifact@v7
-        with:
-          pattern: go-hub-coverage-shard-*
-          path: hub-server/cov-shards
-
-      - name: Merge shard coverage (coverprofile text)
-        if: github.event_name == 'workflow_dispatch' || needs.changes.outputs.go == 'true'
-        run: |
-          python ../scripts/verify/merge-coverprofiles.py \
-            cov-shards/go-hub-coverage-shard-1/shard-1.out \
-            cov-shards/go-hub-coverage-shard-2/shard-2.out \
-            -o coverage.out
-
-      - name: Coverage check (overall >= 40%)
-        if: github.event_name == 'workflow_dispatch' || needs.changes.outputs.go == 'true'
-        run: |
-          COVERAGE=$(go tool cover -func=coverage.out | grep total | awk '{print $3}' | sed 's/%//')
-          THRESHOLD=40
-          echo "Overall coverage: ${COVERAGE}% (threshold: ${THRESHOLD}%)"
-          if (( $(echo "$COVERAGE < $THRESHOLD" | bc -l) )); then
-            echo "::error::Coverage ${COVERAGE}% below ${THRESHOLD}% threshold"
-            exit 1
-          fi
-
       # CI7: staticcheck hard-blocking — hub-server findings zero-baselined;
       # version pinned to prevent new-check drift from breaking CI.
       # Binary cached across runs (gha cache keyed on pinned versions).
@@ -380,6 +426,95 @@ jobs:
             go install honnef.co/go/tools/cmd/staticcheck@2026.1
           fi
           staticcheck ./... 2>&1
+
+  # ── Go: Hub Server (required check) ──────────
+  # CI5 wave2 (#1689): test execution lives in go-hub-test (2-shard matrix,
+  # each shard on its own 4-core runner). #2251 slice 1: lint and the rest of
+  # the static analysis moved to go-hub-static so they run in parallel with
+  # the shards instead of serialising behind them. What stays here genuinely
+  # needs the shard artifacts — download + merge with
+  # scripts/verify/merge-coverprofiles.py (repo-local) and the coverage gates —
+  # plus fail-closed assertions on both upstream lanes, so a static or test
+  # failure still reddens this required check (and through it backend-required,
+  # whose needs list therefore stays unchanged).
+  go-hub:
+    needs: [changes, go-hub-test, go-hub-static]
+    # Required check: always report a result so a path-filtered skip cannot
+    # block branch protection. Real gates below run only for Go changes.
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: hub-server
+    steps:
+      - if: github.event_name == 'workflow_dispatch' || needs.changes.outputs.go == 'true'
+        uses: actions/checkout@v7
+
+      - if: github.event_name == 'workflow_dispatch' || needs.changes.outputs.go == 'true'
+        uses: actions/setup-go@v7
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+          cache-dependency-path: hub-server/go.sum
+
+      # #2251 slice 1: this job aggregates two parallel upstream lanes instead
+      # of running the static gates itself, so both verdicts are bound and
+      # asserted fail-closed (same convention as windows-go / backend-required):
+      # any lane that is not `success` — including a `skipped` static lane on a
+      # Go-selected PR — reddens the required check instead of reporting a false
+      # green. Static-gate failures reach branch protection through go-hub,
+      # which is why backend-required needs no new entry.
+      - name: Assert Hub static gate lane result (go-hub-static)
+        if: github.event_name == 'workflow_dispatch' || needs.changes.outputs.go == 'true'
+        working-directory: .
+        env:
+          STATIC_RESULT: ${{ needs.go-hub-static.result }}
+        run: |
+          if [ "$STATIC_RESULT" != "success" ]; then
+            echo "::error::go-hub-static result: $STATIC_RESULT; lint / ratchet / gosec / vet / staticcheck did not pass"
+            exit 1
+          fi
+
+      - name: Assert Hub unit test lane result (go-hub-test)
+        if: github.event_name == 'workflow_dispatch' || needs.changes.outputs.go == 'true'
+        working-directory: .
+        env:
+          TEST_RESULT: ${{ needs.go-hub-test.result }}
+        run: |
+          if [ "$TEST_RESULT" != "success" ]; then
+            echo "::error::go-hub-test result: $TEST_RESULT; shard unit tests did not pass"
+            exit 1
+          fi
+
+      # CI5 wave2 (#1689): test execution lives in go-hub-test (2-shard
+      # matrix). This job merges the shard text profiles with
+      # scripts/verify/merge-coverprofiles.py and keeps the overall >=40%
+      # gate hard-blocking.
+      - name: Download shard coverage data
+        if: github.event_name == 'workflow_dispatch' || needs.changes.outputs.go == 'true'
+        uses: actions/download-artifact@v7
+        with:
+          pattern: go-hub-coverage-shard-*
+          path: hub-server/cov-shards
+
+      - name: Merge shard coverage (coverprofile text)
+        if: github.event_name == 'workflow_dispatch' || needs.changes.outputs.go == 'true'
+        run: |
+          python ../scripts/verify/merge-coverprofiles.py \
+            cov-shards/go-hub-coverage-shard-1/shard-1.out \
+            cov-shards/go-hub-coverage-shard-2/shard-2.out \
+            -o coverage.out
+
+      - name: Coverage check (overall >= 40%)
+        if: github.event_name == 'workflow_dispatch' || needs.changes.outputs.go == 'true'
+        run: |
+          COVERAGE=$(go tool cover -func=coverage.out | grep total | awk '{print $3}' | sed 's/%//')
+          THRESHOLD=40
+          echo "Overall coverage: ${COVERAGE}% (threshold: ${THRESHOLD}%)"
+          if (( $(echo "$COVERAGE < $THRESHOLD" | bc -l) )); then
+            echo "::error::Coverage ${COVERAGE}% below ${THRESHOLD}% threshold"
+            exit 1
+          fi
 
       # Fallback: keep the required check reported even when the Go path
       # filter deselects this job (skipped jobs never satisfy branch

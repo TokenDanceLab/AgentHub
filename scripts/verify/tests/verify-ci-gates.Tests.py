@@ -15,10 +15,10 @@ one surgical text mutation, and asserts the CI policy verifier exits non-zero:
 9. delete the go-hub no-Go-changes fallback step → job has no success path when filtered
 10. remove the changes.result=='success' guard from both Go fallbacks → changes failure reports green again
 11. delete the go-hub changes-failure fail-closed step → required check false-green again
-12. re-add continue-on-error to the go-hub Lint step → debt-clear hard gate back to warning-only
-13. re-add only-new-issues to the go-hub Lint step → full-repo lint gate back to patch-only
-14. re-add a truthy-expression continue-on-error to the go-hub Lint step → hard gate softened by an expression
-15. re-add an inline-comment `continue-on-error: true` to the go-hub Lint step → hard gate softened by a commented true
+12. re-add continue-on-error to the go-hub-static Lint step → debt-clear hard gate back to warning-only
+13. re-add only-new-issues to the go-hub-static Lint step → full-repo lint gate back to patch-only
+14. re-add a truthy-expression continue-on-error to the go-hub-static Lint step → hard gate softened by an expression
+15. re-add an inline-comment `continue-on-error: true` to the go-hub-static Lint step → hard gate softened by a commented true
 16. delete the visual-qa-desktop job → desktop visual QA half silently drops out of CI
 17. delete the desktop assert step → desktop screenshots no longer verified non-blank
 18. delete frontend-coverage from frontend-required needs → L0 lane silently drops out of required aggregate
@@ -29,6 +29,10 @@ one surgical text mutation, and asserts the CI policy verifier exits non-zero:
 23. delete the shared-trio negative self-test step → false-green tripwire silently exits CI
 24. delete the fixture-connection-pinning verifier step → #2154 F-e gate silently exits CI
 25. delete its negative self-test step → the gate's own false-green tripwire exits CI
+26. delete the go-hub STATIC_RESULT binding → a static-lane failure no longer reddens the required check
+27. delete go-hub-static from the go-hub needs list → the static lane drops out of the required aggregate
+28. delete the go-hub-static job → the parallel static lane silently exits CI
+29. delete the go-edge STATIC_RESULT binding → same regression on the edge half
 
 The unmutated copy must exit 0, proving the policy test only reddens on
 actual policy violations (fail-closed, no false green).
@@ -199,6 +203,16 @@ def get_go_hub_body(text: str) -> tuple:
     return match.start("body"), match.end("body"), match.group("body")
 
 
+def get_go_hub_static_body(text: str) -> tuple:
+    """提取 go-hub-static job 块边界与正文（#2251 slice 1：静态门禁搬到并行 job 后，
+    Lint 系列变异用例改在块内定点修改）。"""
+    block = re.compile(r"(?ms)^  go-hub-static:\r?\n(?P<body>.*?)(?=^  [A-Za-z0-9_-]+:\r?\n)")
+    match = block.search(text)
+    if not match:
+        raise AssertionError("go-hub-static job block not found")
+    return match.start("body"), match.end("body"), match.group("body")
+
+
 def restore_go_hub_job_path_filter(text: str) -> str:
     """把 go-hub 的恒报 if 还原成路径筛选，模拟 required check 重新可被跳过（防回退）。"""
     start, end, body = get_go_hub_body(text)
@@ -265,6 +279,33 @@ def delete_go_hub_changes_fail_step(text: str) -> str:
     if GO_HUB_CHANGES_FAIL_STEP_TEXT not in body:
         raise AssertionError("go-hub changes-fail step text not found")
     return text[:start] + body.replace(GO_HUB_CHANGES_FAIL_STEP_TEXT, "", 1) + text[end:]
+
+
+def delete_static_result_binding(text: str, side: str) -> str:
+    """删除 go-{side} 的 STATIC_RESULT 绑定，模拟静态 lane 失败不再染红 required
+    check（#2251 slice 1 聚合契约的 false green 防回退）。"""
+    pattern = re.compile(r"(?m)^\s*STATIC_RESULT: \$\{\{ needs\.go-%s-static\.result \}\}\r?\n" % side)
+    mutated, count = pattern.subn("", text)
+    if count != 1:
+        raise AssertionError(f"expected exactly one go-{side} STATIC_RESULT binding, removed {count}")
+    return mutated
+
+
+def delete_go_hub_static_needs_lane(text: str) -> str:
+    """从 go-hub 的 needs 里删掉 go-hub-static，模拟静态 lane 掉出 required 聚合（防回退）。"""
+    anchor = "needs: [changes, go-hub-test, go-hub-static]"
+    if text.count(anchor) != 1:
+        raise AssertionError(f"expected exactly one go-hub needs line, found {text.count(anchor)}")
+    return text.replace(anchor, "needs: [changes, go-hub-test]", 1)
+
+
+def delete_go_hub_static_job(text: str) -> str:
+    """删除整个 go-hub-static job，模拟并行静态门禁 lane 悄悄退出 CI（防回退）。"""
+    pattern = re.compile(r"(?ms)^  go-hub-static:\r?\n.*?(?=^  [A-Za-z0-9_-]+:\r?\n|\Z)")
+    mutated, count = pattern.subn("", text)
+    if count != 1:
+        raise AssertionError(f"expected exactly one go-hub-static job block, removed {count}")
+    return mutated
 
 
 def readd_secret_guard_continue_on_error(text: str) -> str:
@@ -379,32 +420,32 @@ def delete_test_sleep_budget_self_test_step(text):
 
 
 def readd_go_hub_lint_continue_on_error(text: str) -> str:
-    """在 go-hub Lint step 重新加上 continue-on-error，模拟债清后硬门禁被改回
+    """在 go-hub-static Lint step 重新加上 continue-on-error，模拟债清后硬门禁被改回
     warning-only（防回退）。"""
-    start, end, body = get_go_hub_body(text)
+    start, end, body = get_go_hub_static_body(text)
     anchor = "        uses: golangci/golangci-lint-action@v9\n"
     if body.count(anchor) != 1:
-        raise AssertionError(f"expected exactly one golangci-lint-action use in go-hub, found {body.count(anchor)}")
+        raise AssertionError(f"expected exactly one golangci-lint-action use in go-hub-static, found {body.count(anchor)}")
     return text[:start] + body.replace(anchor, "        continue-on-error: true\n" + anchor, 1) + text[end:]
 
 
 def readd_go_hub_lint_only_new_issues(text: str) -> str:
-    """在 go-hub Lint step 重新加上 only-new-issues，模拟债清后全量硬 fail 被改回
+    """在 go-hub-static Lint step 重新加上 only-new-issues，模拟债清后全量硬 fail 被改回
     patch-only（防回退）。"""
-    start, end, body = get_go_hub_body(text)
+    start, end, body = get_go_hub_static_body(text)
     anchor = "          args: --timeout=5m --output.json.path=${{ runner.temp }}/hub-lint-report.json\n"
     if body.count(anchor) != 1:
-        raise AssertionError(f"expected exactly one hub-lint-report.json args line in go-hub, found {body.count(anchor)}")
+        raise AssertionError(f"expected exactly one hub-lint-report.json args line in go-hub-static, found {body.count(anchor)}")
     return text[:start] + body.replace(anchor, anchor + "          only-new-issues: true\n", 1) + text[end:]
 
 
 def readd_go_hub_lint_continue_on_error_expression(text: str) -> str:
     """在 go-hub Lint step 加上 truthy 表达式形式的 continue-on-error，模拟硬
     门禁被表达式软化的回归（校验器必须拒绝非字面量值）。"""
-    start, end, body = get_go_hub_body(text)
+    start, end, body = get_go_hub_static_body(text)
     anchor = "        uses: golangci/golangci-lint-action@v9\n"
     if body.count(anchor) != 1:
-        raise AssertionError(f"expected exactly one golangci-lint-action use in go-hub, found {body.count(anchor)}")
+        raise AssertionError(f"expected exactly one golangci-lint-action use in go-hub-static, found {body.count(anchor)}")
     return text[:start] + body.replace(
         anchor, "        continue-on-error: ${{ github.event_name == 'workflow_dispatch' }}\n" + anchor, 1
     ) + text[end:]
@@ -413,10 +454,10 @@ def readd_go_hub_lint_continue_on_error_expression(text: str) -> str:
 def readd_go_hub_lint_continue_on_error_comment(text: str) -> str:
     """在 go-hub Lint step 加上带行内注释的 continue-on-error: true，模拟旧正则
     漏判 `true # comment` 的回归（校验器必须拒绝）。"""
-    start, end, body = get_go_hub_body(text)
+    start, end, body = get_go_hub_static_body(text)
     anchor = "        uses: golangci/golangci-lint-action@v9\n"
     if body.count(anchor) != 1:
-        raise AssertionError(f"expected exactly one golangci-lint-action use in go-hub, found {body.count(anchor)}")
+        raise AssertionError(f"expected exactly one golangci-lint-action use in go-hub-static, found {body.count(anchor)}")
     return text[:start] + body.replace(
         anchor, "        continue-on-error: true  # soft gate\n" + anchor, 1
     ) + text[end:]
@@ -551,10 +592,38 @@ class VerifyCiGatesMutationTests(unittest.TestCase):
         )
 
     def test_readd_go_hub_lint_continue_on_error_fails(self):
-        """债清后 go-hub Lint 被改回 continue-on-error 时，校验器必须非零退出（防回退）。"""
+        """债清后 go-hub-static Lint 被改回 continue-on-error 时，校验器必须非零退出（防回退）。"""
         self.assert_mutation_fails(
             readd_go_hub_lint_continue_on_error(read_workflow()),
-            "re-added go-hub Lint continue-on-error",
+            "re-added go-hub-static Lint continue-on-error",
+        )
+
+    def test_delete_go_hub_static_result_binding_fails(self):
+        """go-hub 丢失 STATIC_RESULT 绑定时，校验器必须非零退出（#2251 聚合契约防回退）。"""
+        self.assert_mutation_fails(
+            delete_static_result_binding(read_workflow(), "hub"),
+            "deleted the go-hub STATIC_RESULT binding",
+        )
+
+    def test_delete_go_edge_static_result_binding_fails(self):
+        """go-edge 丢失 STATIC_RESULT 绑定时，校验器必须非零退出（#2251 聚合契约防回退）。"""
+        self.assert_mutation_fails(
+            delete_static_result_binding(read_workflow(), "edge"),
+            "deleted the go-edge STATIC_RESULT binding",
+        )
+
+    def test_delete_go_hub_static_needs_lane_fails(self):
+        """go-hub-static 掉出 go-hub needs 时，校验器必须非零退出（防回退）。"""
+        self.assert_mutation_fails(
+            delete_go_hub_static_needs_lane(read_workflow()),
+            "deleted go-hub-static from the go-hub needs list",
+        )
+
+    def test_delete_go_hub_static_job_fails(self):
+        """go-hub-static job 被整体删除时，校验器必须非零退出（防回退）。"""
+        self.assert_mutation_fails(
+            delete_go_hub_static_job(read_workflow()),
+            "deleted the go-hub-static job",
         )
 
     def test_readd_secret_guard_continue_on_error_fails(self):
@@ -593,24 +662,24 @@ class VerifyCiGatesMutationTests(unittest.TestCase):
         )
 
     def test_readd_go_hub_lint_only_new_issues_fails(self):
-        """债清后 go-hub Lint 被改回 only-new-issues 时，校验器必须非零退出（防回退）。"""
+        """债清后 go-hub-static Lint 被改回 only-new-issues 时，校验器必须非零退出（防回退）。"""
         self.assert_mutation_fails(
             readd_go_hub_lint_only_new_issues(read_workflow()),
-            "re-added go-hub Lint only-new-issues",
+            "re-added go-hub-static Lint only-new-issues",
         )
 
     def test_readd_go_hub_lint_continue_on_error_expression_fails(self):
-        """go-hub Lint 用 truthy 表达式 continue-on-error 软化时，校验器必须非零退出（防回退）。"""
+        """go-hub-static Lint 用 truthy 表达式 continue-on-error 软化时，校验器必须非零退出（防回退）。"""
         self.assert_mutation_fails(
             readd_go_hub_lint_continue_on_error_expression(read_workflow()),
-            "re-added go-hub Lint truthy-expression continue-on-error",
+            "re-added go-hub-static Lint truthy-expression continue-on-error",
         )
 
     def test_readd_go_hub_lint_continue_on_error_comment_fails(self):
-        """go-hub Lint 用带行内注释的 continue-on-error: true 软化时，校验器必须非零退出（防回退）。"""
+        """go-hub-static Lint 用带行内注释的 continue-on-error: true 软化时，校验器必须非零退出（防回退）。"""
         self.assert_mutation_fails(
             readd_go_hub_lint_continue_on_error_comment(read_workflow()),
-            "re-added go-hub Lint inline-comment continue-on-error",
+            "re-added go-hub-static Lint inline-comment continue-on-error",
         )
 
     def test_delete_visual_qa_desktop_job_fails(self):

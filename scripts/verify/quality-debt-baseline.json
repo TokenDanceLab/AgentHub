@@ -1,9 +1,9 @@
 {
   "soft_gates": [
     {
-      "location": "go-edge: Lint",
+      "location": "go-edge-static: Lint",
       "kind": "continue-on-error",
-      "reason": "lint 硬门禁已移到 fingerprint ratchet step（#1840，对偶 #1573）；Lint step 因 golangci-lint-action 退出码不读 baseline 且 >300 文件 PR 全量回退，保持 report-only",
+      "reason": "lint 硬门禁已移到 fingerprint ratchet step（#1840，对偶 #1573）；Lint step 因 golangci-lint-action 退出码不读 baseline 且 >300 文件 PR 全量回退，保持 report-only（#2251 slice 1：随静态门禁整体搬到并行 job go-edge-static，soft gate 语义/owner/review_by 未变）",
       "issue": 1840,
       "owner": "edge-owners",
       "introduced_at": "2026-08-11",
