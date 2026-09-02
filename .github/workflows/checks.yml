@@ -2313,7 +2313,7 @@ jobs:
 
   # ── Vuln Scan: JS (pnpm audit --prod) ─────────
   vuln-scan-js:
-    name: Vuln scan (pnpm audit --prod)
+    name: Vuln scan (pnpm audit prod+full)
     needs: changes
     if: >-
       github.event_name == 'workflow_dispatch' ||
@@ -2348,7 +2348,20 @@ jobs:
           # 落盘再喂给 verifier，verifier 退出码是唯一判定；pnpm 自身失败
           # （网络/错误 JSON/空输出）仍被 verifier 按 fail-closed 拒绝。
           pnpm audit --prod --json 2>&1 > /tmp/pnpm-audit.json || true
-          bash ../scripts/verify/verify-vulnerability-gates.sh pnpm-audit < /tmp/pnpm-audit.json
+          bash ../scripts/verify/verify-vulnerability-gates.sh pnpm-audit prod < /tmp/pnpm-audit.json
+
+      - name: pnpm audit full — dev chain too (fail-closed, #2154 F-d)
+        shell: bash
+        run: |
+          # --prod 只覆盖随产物发布的依赖，dev/lint/build 链的通告对它完全不可见：
+          # brace-expansion 的两枚 high（GHSA-mh99-v99m-4gvg / GHSA-rgw5-rvv9-x895，
+          # 路径 .>eslint-plugin-import>minimatch>brace-expansion）就曾在 --prod 门禁
+          # 全绿的情况下把漏洞版 1.1.16 钉在 lockfile 里，直到 #2224 才修掉。
+          # 全量审计复用同一份 vulnerability-exceptions.json 例外机制（判据不变：
+          # 仅上游无修复版本者可登记，且必须挂 tracking issue），所以这一步不会
+          # 把 #1663 的 image-size 变成红灯——它只会拦住「有修复版本却没升级」。
+          pnpm audit --json 2>&1 > /tmp/pnpm-audit-full.json || true
+          bash ../scripts/verify/verify-vulnerability-gates.sh pnpm-audit full < /tmp/pnpm-audit-full.json
 
 
   # ── Vuln Scan: Go (govulncheck) ───────────────
