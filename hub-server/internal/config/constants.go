@@ -67,6 +67,18 @@ const DefaultMaxHeaderBytes = 1 << 20
 // DefaultRequestBodyLimit caps ordinary API request bodies.
 const DefaultRequestBodyLimit int64 = 10 << 20
 
+// DefaultDBMaxOpenConns / DefaultDBMaxIdleConns size the PG pool for the
+// concurrent roles the hub actually runs (edge-callback transactions, seq
+// allocation, audit advisory-lock writes, sweepers, outbox tickers, metrics,
+// interactive API). The historical 2/1 starved every consumer whenever one
+// slow transaction held a connection (#2154 Gauss P1-1). Both are tunable
+// per instance via AGENTHUB_DB_MAX_OPEN_CONNS / AGENTHUB_DB_MAX_IDLE_CONNS
+// (viper AutomaticEnv).
+const (
+	DefaultDBMaxOpenConns = 20
+	DefaultDBMaxIdleConns = 10
+)
+
 // DefaultRequestTimeout is the normal API request deadline.
 const DefaultRequestTimeout = 15 * time.Second
 
