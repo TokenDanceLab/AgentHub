@@ -8,6 +8,7 @@ import (
 
 	"gorm.io/gorm"
 
+	"github.com/agenthub/hub-server/internal/config"
 	"github.com/agenthub/hub-server/internal/errcode"
 	"github.com/agenthub/hub-server/internal/model"
 	"github.com/agenthub/hub-server/internal/repository"
@@ -280,9 +281,7 @@ func (s *Service) ListThreadMessages(ctx context.Context, projectID, threadID, o
 	if err != nil {
 		return nil, err
 	}
-	if limit <= 0 || limit > 100 {
-		limit = 50
-	}
+	limit = config.ClampPageSize(limit, config.MaxMessagePageLimit, config.DefaultPaginationLimit)
 	msgs, err := repository.GetMessagesBySession(s.db, threadID, 0, limit)
 	if err != nil {
 		return nil, err

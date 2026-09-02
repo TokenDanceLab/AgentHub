@@ -3,6 +3,7 @@ package repository
 import (
 	"time"
 
+	"github.com/agenthub/hub-server/internal/config"
 	"github.com/agenthub/hub-server/internal/model"
 	"gorm.io/gorm"
 )
@@ -34,9 +35,7 @@ func SoftDeleteSkill(db *gorm.DB, id, ownerID string) error {
 
 // ListSkills returns skills for an owner with optional filters and cursor pagination.
 func ListSkills(db *gorm.DB, ownerID, q, skillType, cursor string, pageSize int) ([]model.Skill, bool, error) {
-	if pageSize <= 0 || pageSize > 200 {
-		pageSize = defaultSkillPageSize
-	}
+	pageSize = config.ClampPageSize(pageSize, config.MaxListPageSize, defaultSkillPageSize)
 
 	qry := db.Where("owner_id = ? AND deleted_at IS NULL", ownerID)
 	if skillType != "" {
@@ -63,9 +62,7 @@ func ListSkills(db *gorm.DB, ownerID, q, skillType, cursor string, pageSize int)
 
 // ListPublicSkills returns published skills for the market.
 func ListPublicSkills(db *gorm.DB, q, skillType, cursor string, pageSize int) ([]model.Skill, bool, error) {
-	if pageSize <= 0 || pageSize > 200 {
-		pageSize = defaultSkillPageSize
-	}
+	pageSize = config.ClampPageSize(pageSize, config.MaxListPageSize, defaultSkillPageSize)
 
 	qry := db.Where("is_public = TRUE AND deleted_at IS NULL")
 	if skillType != "" {
