@@ -8,6 +8,8 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/agenthub/pkg/safego"
 )
 
 // EventLogGaps returns the total number of replay/ fanout gaps detected
@@ -439,11 +441,16 @@ func (b *Bus) runWorker() {
 				return
 			}
 			func() {
-				defer func() {
-					if recovered := recover(); recovered != nil {
-						slog.Error("event bus observer panic", "panic", recovered)
-					}
-				}()
+				// Observers are callbacks registered from outside this package
+				// (AddObserver), so one panicking observer must not take down the
+				// worker goroutine and with it every later job on this bus.
+				// pkg/safego is the single recovery path (#2246): it logs the name
+				// plus a full stack and dispatches to the Edge PanicObserver
+				// (EdgeMetrics.InstallPanicObserver), which counts it as
+				// edge_goroutine_panic_recoveries_total{goroutine="events.bus_observer"}.
+				// The previous inline recover did neither — an observer panic was
+				// a bare log line, invisible to every dashboard.
+				defer safego.Recover("events.bus_observer")
 				job.fn(job.evt)
 			}()
 		case <-b.stopCh:
