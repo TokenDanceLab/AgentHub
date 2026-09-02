@@ -12,8 +12,8 @@ db:
   password: ""  # set via AGENTHUB_DB_PASSWORD env var for non-localhost DB
   name: agenthub
   application_name: agenthub
-  max_open_conns: 2
-  max_idle_conns: 1
+  max_open_conns: 20
+  max_idle_conns: 10
   conn_max_lifetime: 30m
   conn_max_idle_time: 5m
 redis:

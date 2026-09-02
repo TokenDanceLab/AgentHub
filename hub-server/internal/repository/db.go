@@ -143,8 +143,23 @@ func InitDB(cfg *config.DBConfig) (*gorm.DB, error) {
 		return nil, fmt.Errorf("failed to get underlying sql.DB: %w", err)
 	}
 
-	sqlDB.SetMaxIdleConns(cfg.MaxIdleConns)
-	sqlDB.SetMaxOpenConns(cfg.MaxOpenConns)
+	// Floor guard: a zeroed/absent pool config must not fall back to
+	// database/sql's unlimited-open + 2-idle defaults nor to a starved
+	// 2-connection pool; non-positive values get the documented defaults
+	// and idle never exceeds open.
+	maxOpen := cfg.MaxOpenConns
+	if maxOpen <= 0 {
+		maxOpen = config.DefaultDBMaxOpenConns
+	}
+	maxIdle := cfg.MaxIdleConns
+	if maxIdle <= 0 {
+		maxIdle = config.DefaultDBMaxIdleConns
+	}
+	if maxIdle > maxOpen {
+		maxIdle = maxOpen
+	}
+	sqlDB.SetMaxIdleConns(maxIdle)
+	sqlDB.SetMaxOpenConns(maxOpen)
 	sqlDB.SetConnMaxLifetime(cfg.ConnMaxLifetime)
 	sqlDB.SetConnMaxIdleTime(cfg.ConnMaxIdleTime)
 
@@ -157,8 +172,8 @@ func InitDB(cfg *config.DBConfig) (*gorm.DB, error) {
 		"port", cfg.Port,
 		"name", cfg.Name,
 		"application_name", cfg.ApplicationName,
-		"max_open_conns", cfg.MaxOpenConns,
-		"max_idle_conns", cfg.MaxIdleConns,
+		"max_open_conns", maxOpen,
+		"max_idle_conns", maxIdle,
 	)
 	return db, nil
 }
