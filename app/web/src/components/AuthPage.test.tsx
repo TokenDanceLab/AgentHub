@@ -49,20 +49,42 @@ describe('LoginForm', () => {
     });
   });
 
-  it('shows TokenDance errors from the auth hook and falls back for empty rejections', async () => {
+  // #2154 P2-10: the banner must carry localized copy, never err.message. The
+  // web test i18next instance echoes keys / honors defaultValue, so the
+  // assertions pin the resolved key instead of the raw transport string.
+  it('localizes OidcError codes instead of echoing the transport message', async () => {
+    const { OidcError } = await import('@/api/hubAuth');
+    mockLoginWithTokenDance.mockRejectedValueOnce(
+      new OidcError('startFailed', 'Failed to start OIDC login: fetch failed', 'fetch failed'),
+    );
+    render(<LoginForm onSuccess={onSuccess} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'auth.tokenDanceLogin' }));
+
+    await waitFor(() => {
+      const alert = screen.getByRole('alert');
+      expect(alert).toHaveTextContent('auth.error.oidc');
+      expect(alert.textContent).not.toContain('fetch failed');
+      expect(alert.textContent).not.toContain('Failed to start OIDC login');
+    });
+  });
+
+  it('falls back to the localized generic failure for non-OIDC and empty rejections', async () => {
     mockLoginWithTokenDance.mockRejectedValueOnce(new Error('Hub login unavailable'));
     render(<LoginForm onSuccess={onSuccess} />);
 
     fireEvent.click(screen.getByRole('button', { name: 'auth.tokenDanceLogin' }));
 
     await waitFor(() => {
-      expect(screen.getByRole('alert')).toHaveTextContent('Hub login unavailable');
+      const alert = screen.getByRole('alert');
+      expect(alert).toHaveTextContent('auth.error.oidc.default');
+      expect(alert.textContent).not.toContain('Hub login unavailable');
     });
 
     mockLoginWithTokenDance.mockRejectedValueOnce({});
     fireEvent.click(screen.getByRole('button', { name: 'auth.tokenDanceLogin' }));
     await waitFor(() => {
-      expect(screen.getByRole('alert')).toHaveTextContent('auth.error.tokenDanceUnavailable');
+      expect(screen.getByRole('alert')).toHaveTextContent('auth.error.oidc.default');
     });
   });
 

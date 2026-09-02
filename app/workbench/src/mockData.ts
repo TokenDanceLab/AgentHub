@@ -112,6 +112,19 @@ export const WORKBENCH_MOCK_DOC_ROWS: DocRow[] = [
   { id: 'deep-research', title: 'AgentHub 开源项目深度研究', tag: '外部', location: '我的文档库', owner: 'Trump', time: '6月2日 19:42' },
 ];
 
+/**
+ * Demo-only "我的文档库" shortcut names (#2154 P2-2b). These used to be the
+ * DocsPage default, which rendered repository-internal document titles in real
+ * data mode. They now belong to the mock data source: useWorkbenchDocsRoute
+ * only surfaces them when the shell is NOT in real data mode.
+ */
+export const WORKBENCH_MOCK_DOC_SHORTCUTS: string[] = [
+  'NewAPI注册和导入CC-switch',
+  '知识问答',
+  'AgentHub 设计评审',
+  '白盒方向调研报告',
+];
+
 export const WORKBENCH_MOCK_TASK_GROUPS: TaskGroup[] = [
   {
     label: '默认分组',

@@ -5,7 +5,9 @@ import styles from './AgentHubWorkbench.module.css';
 import { connectionStatusLabel, type ConnectionStatusKind } from './GlobalRail';
 import type { MainchainSummary } from './mainchain';
 import type { WorkbenchAttentionCounts } from './workbenchAttentionModel';
-import { formatTokenCount } from './pages/TokenUsagePage';
+// #2154 P3-3: shared token formatter (same units as the usage board and the
+// inspector overview) instead of the page-local formatTokenCount.
+import { formatTokens } from '@shared/context/breakdown';
 
 /**
  * Workbench global bottom status bar (#1994, UX F5).
@@ -115,9 +117,9 @@ export function MainchainStatusStrip({
           {usageTokenTotal !== undefined && renderAttentionChip({
             handler: onOpenUsage,
             kind: 'usage',
-            label: t('sharedWorkbench:usage.chip', { count: formatTokenCount(usageTokenTotal) }),
+            label: t('sharedWorkbench:usage.chip', { count: formatTokens(usageTokenTotal) }),
             ariaLabel: chipAria(
-              t('sharedWorkbench:usage.chip', { count: formatTokenCount(usageTokenTotal) }),
+              t('sharedWorkbench:usage.chip', { count: formatTokens(usageTokenTotal) }),
               t('sharedWorkbench:usage.openBoard'),
               undefined,
             ),

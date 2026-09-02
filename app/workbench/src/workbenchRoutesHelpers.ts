@@ -90,6 +90,9 @@ export function buildDocsPageProps(
   };
 
   assignDefined(props, 'documentsError', docsRoute.documentsError);
+  // #2154 P2-2(b): demo-only shortcut list; real data mode passes [] and the
+  // nav renders no shortcut block.
+  assignDefined(props, 'shortcuts', docsRoute.shortcuts);
 
   assignDefined(props, 'onCreateDoc', docsRoute.documentsActions?.onCreateDoc);
   assignDefined(props, 'onDeleteDoc', docsRoute.documentsActions?.onDeleteDoc);
@@ -113,8 +116,13 @@ export function buildProjectsPageProps(
     onClosePreview: () => projectsRoute.setProjectPreview(null),
     onProjectSelect: projectsRoute.selectProject,
     onTabChange: projectsRoute.setProjectTab,
-    projects: projectsRoute.sourceProjects,
+    // #2154 P2-3: render the status-filtered list; fall back to the source
+    // list only for partial route fixtures that predate `visibleProjects`.
+    projects: projectsRoute.visibleProjects ?? projectsRoute.sourceProjects,
   };
+
+  // #2154 P2-3: chips the data source cannot satisfy render disabled.
+  assignDefined(props, 'availableFilters', projectsRoute.availableProjectFilters);
 
   if (projectsRoute.canMutateProject) {
     props.onProjectCreate = projectsRoute.handleProjectCreate;

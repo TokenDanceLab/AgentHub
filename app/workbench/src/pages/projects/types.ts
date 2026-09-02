@@ -99,6 +99,13 @@ export interface ProjectsPageProps {
   activeFilter: ProjectFilter;
   /** Called when user clicks a filter button */
   onFilterChange: (filter: ProjectFilter) => void;
+  /**
+   * Filters the current data source can actually satisfy (#2154 P2-3). Chips
+   * outside this list render disabled with an explanation instead of offering a
+   * click whose only possible outcome is an empty list. Absent = every filter
+   * is treated as available (presentational callers / fixtures).
+   */
+  availableFilters?: readonly ProjectFilter[] | undefined;
 
   /** Active tab in the detail view */
   activeTab: ProjectTab;

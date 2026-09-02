@@ -274,11 +274,18 @@ function formatKeys(keys: string[]): string {
   return keys.join(' + ');
 }
 
-function shortcutConflictId(group: KeyboardShortcutGroup, shortcutId: string): string | null {
+/**
+ * Label key of the shortcut that collides with `shortcutId` in this group.
+ * #2154 P3-6: returns the labelKey (not the raw shortcut id) so the conflict
+ * copy can name the other binding the way the rest of the pane does — the id
+ * ('send', 'toggle-sidebar') is an internal identifier and means nothing to
+ * the user.
+ */
+function shortcutConflictLabelKey(group: KeyboardShortcutGroup, shortcutId: string): string | null {
   const shortcut = group.shortcuts.find((s) => s.id === shortcutId);
   if (!shortcut) return null;
   const conflict = checkConflicts(shortcut.keys, shortcutId);
-  return conflict ? conflict.id : null;
+  return conflict ? conflict.labelKey : null;
 }
 
 export function ShortcutsPane(_props: SettingsPageProps): React.ReactElement {
@@ -292,9 +299,11 @@ export function ShortcutsPane(_props: SettingsPageProps): React.ReactElement {
   // dispatcher reads resolved groups, so remaps take effect immediately.
   const [groups, setGroups] = useState<KeyboardShortcutGroup[]>(getResolvedShortcutGroups);
   const [recordingId, setRecordingId] = useState<string | null>(null);
-  // #1853 review: keep BOTH ids — the shortcut being recorded (whose row
-  // shows the rejection) and the shortcut it collided with (message context).
-  const [conflictState, setConflictState] = useState<{ recordedId: string; conflictingId: string } | null>(null);
+  // #1853 review: keep BOTH sides — the shortcut being recorded (whose row
+  // shows the rejection) and the label of the shortcut it collided with
+  // (message context). #2154 P3-6: the colliding side is stored as a labelKey
+  // so the copy renders a localized name instead of an internal id.
+  const [conflictState, setConflictState] = useState<{ recordedId: string; conflictingLabelKey: string } | null>(null);
   const hasCustom = useMemo(() => hasCustomKeybindings(), [groups]);
 
   useEffect(() => {
@@ -317,7 +326,7 @@ export function ShortcutsPane(_props: SettingsPageProps): React.ReactElement {
       // conflict badge would otherwise show two rows sharing one combo.
       const conflict = checkConflicts(keys, capturedId);
       if (conflict) {
-        setConflictState({ recordedId: capturedId, conflictingId: conflict.id });
+        setConflictState({ recordedId: capturedId, conflictingLabelKey: conflict.labelKey });
         setRecordingId(null);
         return;
       }
@@ -334,6 +343,15 @@ export function ShortcutsPane(_props: SettingsPageProps): React.ReactElement {
     document.addEventListener('keydown', handleRecord, true);
     return () => document.removeEventListener('keydown', handleRecord, true);
   }, [recordingId]);
+
+  // #2154 P3-6: one shared, localized conflict sentence for both paths — the
+  // rejected recording and the (defensive) already-conflicting row. Recording
+  // refuses collisions before saving, so the second path only fires for
+  // bindings stored before that guard existed.
+  const conflictCopy = (labelKey: string): string => tw('settings.shortcuts.conflict', {
+    defaultValue: '该组合与「{{name}}」冲突，未保存',
+    name: tc(labelKey),
+  });
 
   return (
     <>
@@ -357,8 +375,8 @@ export function ShortcutsPane(_props: SettingsPageProps): React.ReactElement {
       {groups.map((group) => (
         <SettingsSection key={group.id} title={tc(group.labelKey)}>
           {group.shortcuts.map((shortcut) => {
-            const conflictIdNow = shortcutConflictId(group, shortcut.id);
-            const hasConflict = conflictIdNow !== null;
+            const conflictLabelKeyNow = shortcutConflictLabelKey(group, shortcut.id);
+            const hasConflict = conflictLabelKeyNow !== null;
             // #1853 review: the rejection belongs to the RECORDED shortcut —
             // not to the colliding one and not to every row.
             const recordedConflict = conflictState?.recordedId === shortcut.id;
@@ -372,12 +390,9 @@ export function ShortcutsPane(_props: SettingsPageProps): React.ReactElement {
                     : recordingId === shortcut.id
                       ? tw('settings.shortcuts.recording', { defaultValue: '按下新的按键组合…（Esc 取消）' })
                       : recordedConflict
-                        ? tw('settings.shortcuts.conflict', {
-                          defaultValue: '该组合与「{{id}}」冲突，未保存',
-                          id: conflictState.conflictingId,
-                        })
-                        : hasConflict
-                          ? `冲突: 与 "${conflictIdNow}" 按键相同`
+                        ? conflictCopy(conflictState.conflictingLabelKey)
+                        : conflictLabelKeyNow !== null
+                          ? conflictCopy(conflictLabelKeyNow)
                           : (shortcut.detailKey ? tc(shortcut.detailKey) : '')
                 }
               >

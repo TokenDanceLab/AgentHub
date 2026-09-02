@@ -1,9 +1,9 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { useTestI18nLanguage } from '@shared/testing/i18n';
+import { formatTokens } from '@shared/context/breakdown';
 import {
   TokenUsagePage,
-  formatTokenCount,
   formatUsageTimestamp,
   hasRecordedTokens,
   sumRecordedTokens,
@@ -63,8 +63,9 @@ describe('TokenUsagePage', () => {
 
     expect(screen.getByTestId('usage-team-team-1')).toBeInTheDocument();
     expect(screen.getByTestId('usage-team-team-2')).toBeInTheDocument();
-    // Total tile shows only recorded counters (128_400 → 128.4k).
-    expect(screen.getByTestId('usage-total')).toHaveTextContent('128.4k');
+    // Total tile shows only recorded counters, formatted through the shared
+    // token formatter (128_400 → 128.4K) — #2154 P3-3.
+    expect(screen.getByTestId('usage-total')).toHaveTextContent('128.4K');
     expect(screen.getByTestId('usage-run-tokens-run-1')).toHaveTextContent('128,400');
     // Unrecorded counter renders an honest em dash.
     expect(screen.getByTestId('usage-run-tokens-run-2')).toHaveTextContent('—');
@@ -99,10 +100,12 @@ describe('usage helpers', () => {
     expect(hasRecordedTokens([{ id: 't', name: 'T', runs: [{ id: 'r', status: 'failed' }] }])).toBe(false);
   });
 
-  it('compacts token counts for tiles', () => {
-    expect(formatTokenCount(999)).toBe('999');
-    expect(formatTokenCount(12_345)).toBe('12.3k');
-    expect(formatTokenCount(2_500_000)).toBe('2.50M');
+  it('compacts token counts with the shared formatter (#2154 P3-3)', () => {
+    // The page-local formatTokenCount is deleted: tiles and the status strip
+    // must share one unit convention (uppercase K/M, one decimal).
+    expect(formatTokens(999)).toBe('999');
+    expect(formatTokens(12_345)).toBe('12.3K');
+    expect(formatTokens(2_500_000)).toBe('2.5M');
   });
 
   it('formats timestamps defensively', () => {

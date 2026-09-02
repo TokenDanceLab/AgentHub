@@ -36,6 +36,10 @@ export function DocsNav({
         className={`${styles.search} workbench-search`}
         placeholder={t('header.search')}
         value={searchQuery}
+        // #2154 P1-1: no onSearchChange = frozen input. Disabled + title keep
+        // the surface honest until the docs search is actually wired.
+        disabled={!onSearchChange}
+        title={onSearchChange ? undefined : t('search.unavailableHint')}
         onChange={(e) => onSearchChange?.(e.target.value)}
       />
 
@@ -56,24 +60,31 @@ export function DocsNav({
         </button>
       ))}
 
-      <div className={styles.navCaption}>{t('docs.myLibrary')}</div>
-      {shortcuts.map((name) => (
-        <div
-          key={name}
-          className={styles.navShortcut}
-          onClick={() => onShortcutClick?.(name)}
-          role="button"
-          tabIndex={0}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
-              e.preventDefault();
-              onShortcutClick?.(name);
-            }
-          }}
-        >
-          {name}
-        </div>
-      ))}
+      {/* #2154 P2-2(b): the caption + shortcut list only render when there is
+          real shortcut data. With none, the whole block disappears instead of
+          advertising an empty "我的文档库" section. */}
+      {shortcuts.length > 0 && (
+        <>
+          <div className={styles.navCaption}>{t('docs.myLibrary')}</div>
+          {shortcuts.map((name) => (
+            <div
+              key={name}
+              className={styles.navShortcut}
+              onClick={() => onShortcutClick?.(name)}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  onShortcutClick?.(name);
+                }
+              }}
+            >
+              {name}
+            </div>
+          ))}
+        </>
+      )}
     </aside>
   );
 }
