@@ -3,6 +3,7 @@ package repository
 import (
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"testing"
 
 	"github.com/agenthub/hub-server/internal/model"
@@ -43,15 +44,26 @@ func TestIsDuplicateKeyError(t *testing.T) {
 // so the 23505 idempotent path can be exercised. The shared setupSQLite
 // helper does not include this unique index, so a local helper is used to
 // avoid changing the shared test schema (which other tests depend on).
+// eventSeqFixtureSeq numbers each setupSQLiteWithUniqueEventSeq call (#2260).
+var eventSeqFixtureSeq atomic.Uint64
+
 func setupSQLiteWithUniqueEventSeq(t *testing.T) *gorm.DB {
 	t.Helper()
-	db, err := gorm.Open(sqlite.Open("file::memory:?cache=shared"), &gorm.Config{})
+	// The DSN must be unique per invocation: `file::memory:?cache=shared` names
+	// ONE process-global database, so with -count=2 the second round reused
+	// round one's rows and the "exactly one row per caller" invariant counted
+	// 50 instead of 25 — deterministically red, and invisible to CI because it
+	// runs -count=1 (#2260). Closing the handle on cleanup destroys the
+	// shared-cache database instead of leaving it resident for the next round.
+	dsn := fmt.Sprintf("file:agent23505_%d?mode=memory&cache=shared", eventSeqFixtureSeq.Add(1))
+	db, err := gorm.Open(sqlite.Open(dsn), &gorm.Config{})
 	require.NoError(t, err)
 	// Force a single shared connection so all goroutines see the same
 	// in-memory database (otherwise :memory: creates a per-connection DB
 	// and concurrent transactions hit "no such table").
 	sqlDB, err := db.DB()
 	require.NoError(t, err)
+	t.Cleanup(func() { _ = sqlDB.Close() })
 	sqlDB.SetMaxOpenConns(1)
 	require.NoError(t, db.Exec(`CREATE TABLE IF NOT EXISTS agent_run_events (
 		id TEXT PRIMARY KEY,
