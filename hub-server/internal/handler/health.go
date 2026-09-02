@@ -39,7 +39,7 @@ const migrationCacheTTL = 30 * time.Second
 
 // NewHealthHandler creates a HealthHandler tied to the running app instance.
 // startTime should be the moment App.Run was called; version is the build
-// version (defaults to "dev").
+// version resolved by the caller (app.New: -X value, then VCS stamping, then "dev").
 func NewHealthHandler(db *gorm.DB, cacheClient *cache.Client, dbConfig *config.DBConfig, startTime time.Time, version string) *HealthHandler {
 	if version == "" {
 		version = "dev"

@@ -119,10 +119,12 @@ const (
 	CloseCodeEventGap = 4001
 )
 
-// denyRemoteHubSharedConfig blocks multi-user / Hub JWT callers from reading
-// Edge-local shared configuration surfaces that have no per-user owner binding
-// (AH-SR-045 / #878). Local single-tenant mode (no Hub JWT secret configured)
-// remains allowed; empty userID under multi-user mode fails closed.
+// denyRemoteHubSharedConfig blocks multi-user / Hub JWT callers from reading or
+// writing Edge-local shared configuration surfaces that have no per-user owner
+// binding (AH-SR-045 / #878). Local single-tenant mode (no Hub JWT secret
+// configured) remains allowed; empty userID under multi-user mode fails closed.
+// Denials are 404 with the generic not-found body so a blocked caller cannot
+// distinguish "not yours" from "does not exist".
 func (h *Handler) denyRemoteHubSharedConfig(w http.ResponseWriter, r *http.Request) bool {
 	if isLocalSingleTenant(h.ownerUserID(r)) {
 		return false

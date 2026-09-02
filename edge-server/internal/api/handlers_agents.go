@@ -58,6 +58,11 @@ func (h *Handler) GetAgentProfiles(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) PostAgentProfiles(w http.ResponseWriter, r *http.Request) {
+	// Agent profiles are Edge-local shared config (no OwnerID): fail closed under
+	// Hub JWT / multi-user, before the request body is decoded.
+	if h.denyRemoteHubSharedConfig(w, r) {
+		return
+	}
 	var body struct {
 		Name              string   `json:"name"`
 		Description       string   `json:"description"`
@@ -118,6 +123,11 @@ func (h *Handler) GetAgentProfile(w http.ResponseWriter, r *http.Request, profil
 }
 
 func (h *Handler) PatchAgentProfile(w http.ResponseWriter, r *http.Request, profileID string) {
+	// Same shared-config gate as the read paths above; a denied caller must not
+	// reach decodeOptionalJSON (shared 1MB body limit, #2154).
+	if h.denyRemoteHubSharedConfig(w, r) {
+		return
+	}
 	var patch map[string]any
 	if err := decodeOptionalJSON(r, &patch); err != nil {
 		slog.Error("agent profile patch decode failed", "profileId", profileID, "error", err)
@@ -138,6 +148,10 @@ func (h *Handler) PatchAgentProfile(w http.ResponseWriter, r *http.Request, prof
 }
 
 func (h *Handler) DeleteAgentProfile(w http.ResponseWriter, r *http.Request, profileID string) {
+	// Deleting a profile every local run resolves through is a shared-config write.
+	if h.denyRemoteHubSharedConfig(w, r) {
+		return
+	}
 	if err := ensureStore(h).DeleteAgentProfile(profileID); err != nil {
 		if errors.Is(err, store.ErrNotFound) {
 			writeJSON(w, http.StatusNotFound, errcode.ErrorBody(errcode.ErrNotFound))

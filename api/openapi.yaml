@@ -1500,6 +1500,12 @@ paths:
       tags: [ExecutionRunner]
       operationId: createEdgeAgentProfile
       summary: Create an Edge-local agent profile.
+      description: >
+        Creates an Edge-local agent profile. Agent profiles are node-level
+        shared configuration with no per-user owner binding, so under Hub JWT /
+        multi-user mode this route is not writable and fails closed with 404
+        whose body is indistinguishable from a missing resource (AH-SR-045);
+        local single-tenant mode keeps write access.
       x-agenthub-phase: P0
       x-agenthub-status: implemented
       x-agenthub-owner: Edge
@@ -1563,7 +1569,12 @@ paths:
       tags: [ExecutionRunner]
       operationId: updateEdgeAgentProfile
       summary: Update an Edge-local agent profile.
-      description: Partial update of an Edge-local agent profile by id.
+      description: >
+        Partial update of an Edge-local agent profile by id. Agent profiles are
+        node-level shared configuration with no per-user owner binding, so under
+        Hub JWT / multi-user mode this route is not writable and fails closed
+        with 404 whose body is indistinguishable from a missing resource
+        (AH-SR-045); local single-tenant mode keeps write access.
       x-agenthub-phase: P0
       x-agenthub-status: implemented
       x-agenthub-owner: Edge
@@ -1592,6 +1603,12 @@ paths:
       tags: [ExecutionRunner]
       operationId: deleteEdgeAgentProfile
       summary: Delete an Edge-local agent profile.
+      description: >
+        Deletes an Edge-local agent profile by id. Agent profiles are
+        node-level shared configuration with no per-user owner binding, so
+        under Hub JWT / multi-user mode this route is not writable and fails
+        closed with 404 whose body is indistinguishable from a missing
+        resource (AH-SR-045); local single-tenant mode keeps write access.
       x-agenthub-phase: P0
       x-agenthub-status: implemented
       x-agenthub-owner: Edge
@@ -1631,7 +1648,12 @@ paths:
       description: >
         Merges a string-keyed patch into Edge-local settings. An empty patch
         is rejected. Persist failures are reported as 500 so callers do not
-        mistake them for success.
+        mistake them for success. Edge-local settings are node-level shared
+        configuration with no per-user owner binding, so under Hub JWT /
+        multi-user mode this route is not writable and fails closed with 404
+        whose body is indistinguishable from a missing resource (AH-SR-045);
+        local single-tenant mode keeps write access. The gate runs before the
+        request body is decoded.
       x-agenthub-phase: P0
       x-agenthub-status: implemented
       x-agenthub-owner: Edge
