@@ -216,3 +216,25 @@ func TestNoRetryOnServerError(t *testing.T) {
 		t.Fatalf("server hits = %d, want exactly 1 (no retry)", got)
 	}
 }
+
+// TestNewClientCarriesOwnTransportWithWideIdlePool pins the connection-churn
+// fix (#2154): clients must not share the process-global DefaultTransport
+// (MaxIdleConnsPerHost=2) — each gets its own cloned transport with a wider
+// per-host idle pool.
+func TestNewClientCarriesOwnTransportWithWideIdlePool(t *testing.T) {
+	client := NewClient(time.Second)
+	tr, ok := client.Transport.(*http.Transport)
+	if !ok {
+		t.Fatalf("Transport = %T, want *http.Transport", client.Transport)
+	}
+	if tr.MaxIdleConnsPerHost != DefaultMaxIdleConnsPerHost {
+		t.Errorf("MaxIdleConnsPerHost = %d, want %d", tr.MaxIdleConnsPerHost, DefaultMaxIdleConnsPerHost)
+	}
+	if tr == http.DefaultTransport.(*http.Transport) {
+		t.Error("NewClient must not reuse the process-global DefaultTransport")
+	}
+	other, _ := NewClient(time.Second).Transport.(*http.Transport)
+	if other == tr {
+		t.Error("each NewClient must clone a fresh transport (isolated pools)")
+	}
+}
