@@ -9,9 +9,14 @@
 // copy incremented a panic counter for alerting. This shared package unifies
 // the recovery path; servers register an optional PanicObserver to attach
 // their own metrics/alerting without pkg/safego depending on either server.
+//
+// Two defer-able entry points: Recover for fire-and-forget goroutines (log and
+// move on) and RecoverInto for goroutines whose caller needs the panic as an
+// error (see RecoverInto for why that distinction matters on request paths).
 package safego
 
 import (
+	"fmt"
 	"log/slog"
 	"runtime/debug"
 	"sync/atomic"
@@ -59,15 +64,51 @@ func SafeGo(name string, fn func()) {
 //		...
 //	}()
 func Recover(name string) {
-	if r := recover(); r != nil {
-		stack := string(debug.Stack())
-		slog.Error("goroutine panic recovered",
-			"goroutine", name,
-			"panic", r,
-			"stack", stack,
-		)
-		if fn, ok := observer.Load().(PanicObserver); ok && fn != nil {
-			fn(name, r, stack)
-		}
+	report(name, recover(), nil)
+}
+
+// RecoverInto is Recover for a goroutine whose panic must also reach its caller
+// as an error. Logging and PanicObserver dispatch are identical to Recover; in
+// addition the recovered panic is stored into *errSlot when — and only when —
+// that slot is still nil, so a real error produced before the panic is never
+// overwritten by the panic label.
+//
+// Use this wherever a goroutine is spawned on a request path that used to run
+// inline: an HTTP middleware recover only covers the request goroutine, so a
+// panic in a spawned reader that recovers nothing escalates from a 500 to a
+// process crash. Recording it in the caller's error slot restores the 500.
+//
+//	name := "projection.members"
+//	g.Go(func() error {
+//		defer safego.RecoverInto(name, &membersErr)
+//		members, membersErr = repository.ListTeamMembers(db, teamID)
+//		return nil
+//	})
+//
+// Like Recover it must be deferred directly (recover() only reports a panic to
+// the function that was itself deferred), and errSlot must be the same variable
+// the goroutine body writes its error to.
+func RecoverInto(name string, errSlot *error) {
+	report(name, recover(), errSlot)
+}
+
+// report is the shared recovery path. r is the value recover() returned in the
+// deferred function (nil when there was no panic); it is passed in because
+// recover() only reports to the function that was itself deferred.
+func report(name string, r any, errSlot *error) {
+	if r == nil {
+		return
+	}
+	stack := string(debug.Stack())
+	slog.Error("goroutine panic recovered",
+		"goroutine", name,
+		"panic", r,
+		"stack", stack,
+	)
+	if fn, ok := observer.Load().(PanicObserver); ok && fn != nil {
+		fn(name, r, stack)
+	}
+	if errSlot != nil && *errSlot == nil {
+		*errSlot = fmt.Errorf("%s: recovered panic: %v", name, r)
 	}
 }

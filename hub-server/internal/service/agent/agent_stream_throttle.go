@@ -23,8 +23,17 @@ import (
 // migration and would add a write to save a write.
 //
 // Shared invariants:
-//   - Bounded: fixed capacity with FIFO eviction, so a long-lived Hub process
-//     cannot grow them without limit.
+//   - Bounded *by construction*: the map is the only backing store and every
+//     mutator enforces len(map) <= max before returning, so the live-entry
+//     count and the retained memory are the same number and neither can drift.
+//     The first version of this file kept a second structure — a FIFO slice of
+//     insertion order — and reclaimed it only from a head index that just the
+//     over-capacity eviction path advanced. Under the normal path (add on the
+//     first chunk, remove on done/fail) that index never moved, so the slice
+//     retained one slot per task forever while len(map) stayed at 0 and every
+//     test that asserted len() passed. Order is now a sequence number stored
+//     in the map value, which is what makes the bound structural instead of a
+//     property of a reclamation path being reached.
 //   - Fail-open: losing an entry (eviction or process restart) always degrades
 //     towards "do the work", never towards "skip work that was needed".
 //   - Terminal cleanup: entries are dropped when the task reaches a terminal
@@ -49,18 +58,19 @@ const defaultStreamStateCapacity = 4096
 // transient DB failure leaves the task unrecorded and the next chunk retries —
 // the same recovery the pre-throttle per-chunk call gave for free.
 type ackedTaskSet struct {
-	mu   sync.Mutex
-	max  int
-	seen map[string]struct{}
-	fifo []string // insertion order; fifo[head] is the oldest live key
-	head int
+	mu  sync.Mutex
+	max int
+	// seen maps task ID → insertion sequence (1-based, monotonic). The sequence
+	// is the eviction order, so no separate ordering structure is needed.
+	seen map[string]uint64
+	seq  uint64
 }
 
 func newAckedTaskSet(max int) *ackedTaskSet {
 	if max <= 0 {
 		max = defaultStreamStateCapacity
 	}
-	return &ackedTaskSet{max: max, seen: make(map[string]struct{}, max)}
+	return &ackedTaskSet{max: max, seen: make(map[string]uint64, max)}
 }
 
 // addIfAbsent records id and reports whether it was newly recorded. A false
@@ -77,15 +87,16 @@ func (b *ackedTaskSet) addIfAbsent(id string) bool {
 	if _, ok := b.seen[id]; ok {
 		return false
 	}
-	b.seen[id] = struct{}{}
-	b.fifo = append(b.fifo, id)
+	b.seq++
+	b.seen[id] = b.seq
 	for len(b.seen) > b.max {
-		b.evictOldest()
+		b.evictOldestLocked()
 	}
 	return true
 }
 
-// remove forgets id (terminal-state cleanup).
+// remove forgets id (terminal-state cleanup). Deleting the map entry is the
+// whole operation: there is no ordering structure left to reclaim.
 func (b *ackedTaskSet) remove(id string) {
 	if id == "" {
 		return
@@ -93,7 +104,6 @@ func (b *ackedTaskSet) remove(id string) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	delete(b.seen, id)
-	b.compactLocked()
 }
 
 // len reports the live entry count. Test/observability helper.
@@ -103,40 +113,39 @@ func (b *ackedTaskSet) len() int {
 	return len(b.seen)
 }
 
-// evictOldest drops the oldest live key. Caller holds mu.
-func (b *ackedTaskSet) evictOldest() {
-	for b.head < len(b.fifo) {
-		id := b.fifo[b.head]
-		b.fifo[b.head] = "" // release the string reference
-		b.head++
-		if _, ok := b.seen[id]; ok {
-			delete(b.seen, id)
-			return
-		}
-	}
+// retainedSlots reports how many key slots the structure holds, live or not.
+// The map being the only backing store is what makes this equal to len(); the
+// accessor exists so the invariant stays assertable (and stays broken loudly)
+// if an ordering structure is ever reintroduced here.
+func (b *ackedTaskSet) retainedSlots() int {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return len(b.seen)
 }
 
-// compactLocked reclaims the consumed fifo prefix once every entry in it is
-// dead, keeping the slice bounded by max instead of growing forever.
-func (b *ackedTaskSet) compactLocked() {
-	if b.head == 0 {
+// evictOldestLocked drops the entry with the smallest insertion sequence, i.e.
+// the oldest live key — the same FIFO order the previous slice-based version
+// promised. Caller holds mu.
+//
+// Cost: an O(max) scan of the map. It runs only when a *new* key arrives while
+// the set is already at capacity, so once per task (never per chunk), and a
+// task lives for seconds — tens of microseconds against that is noise. Keeping
+// the order inside the map is what makes the bound unconditional, which is the
+// trade this file already got wrong once.
+func (b *ackedTaskSet) evictOldestLocked() {
+	var (
+		oldestID  string
+		oldestSeq uint64
+	)
+	for id, seq := range b.seen {
+		if oldestSeq == 0 || seq < oldestSeq {
+			oldestID, oldestSeq = id, seq
+		}
+	}
+	if oldestSeq == 0 {
 		return
 	}
-	if b.head >= len(b.fifo) {
-		b.fifo = b.fifo[:0]
-		b.head = 0
-		return
-	}
-	// Only compact when the dead prefix is large enough to be worth the copy.
-	if b.head < len(b.fifo)/2 {
-		return
-	}
-	n := copy(b.fifo, b.fifo[b.head:])
-	for i := n; i < len(b.fifo); i++ {
-		b.fifo[i] = ""
-	}
-	b.fifo = b.fifo[:n]
-	b.head = 0
+	delete(b.seen, oldestID)
 }
 
 // sessionTouchThrottle limits session.last_message_at writes to at most one per
@@ -154,14 +163,24 @@ func (b *ackedTaskSet) compactLocked() {
 // always exact.
 //
 // Fail-open like ackedTaskSet: an evicted or forgotten session simply performs
-// the next touch immediately.
+// the next touch immediately. Bounded by the same argument — see ackedTaskSet
+// for why the order lives in the map value.
 type sessionTouchThrottle struct {
 	mu       sync.Mutex
 	max      int
 	interval time.Duration
-	last     map[string]time.Time
-	fifo     []string
-	head     int
+	last     map[string]sessionTouch
+	seq      uint64
+}
+
+// sessionTouch is one throttle entry: when the session was last written, and
+// the insertion sequence that decides eviction order. The sequence is set once,
+// on first sight of the session, so eviction stays FIFO-by-insertion exactly as
+// the previous version behaved — re-touching a session refreshes its timestamp
+// but not its place in the eviction order.
+type sessionTouch struct {
+	at  time.Time
+	seq uint64
 }
 
 func newSessionTouchThrottle(max int, interval time.Duration) *sessionTouchThrottle {
@@ -174,7 +193,7 @@ func newSessionTouchThrottle(max int, interval time.Duration) *sessionTouchThrot
 	return &sessionTouchThrottle{
 		max:      max,
 		interval: interval,
-		last:     make(map[string]time.Time, max),
+		last:     make(map[string]sessionTouch, max),
 	}
 }
 
@@ -188,17 +207,18 @@ func (t *sessionTouchThrottle) allow(sessionID string, now time.Time) bool {
 	}
 	t.mu.Lock()
 	defer t.mu.Unlock()
-	if last, ok := t.last[sessionID]; ok {
-		if now.Sub(last) < t.interval {
+	if entry, ok := t.last[sessionID]; ok {
+		if now.Sub(entry.at) < t.interval {
 			return false
 		}
-		t.last[sessionID] = now
+		entry.at = now
+		t.last[sessionID] = entry
 		return true
 	}
-	t.last[sessionID] = now
-	t.fifo = append(t.fifo, sessionID)
+	t.seq++
+	t.last[sessionID] = sessionTouch{at: now, seq: t.seq}
 	for len(t.last) > t.max {
-		t.evictOldest()
+		t.evictOldestLocked()
 	}
 	return true
 }
@@ -212,7 +232,6 @@ func (t *sessionTouchThrottle) reset(sessionID string) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	delete(t.last, sessionID)
-	t.compactLocked()
 }
 
 // len reports the live entry count. Test/observability helper.
@@ -222,34 +241,28 @@ func (t *sessionTouchThrottle) len() int {
 	return len(t.last)
 }
 
-func (t *sessionTouchThrottle) evictOldest() {
-	for t.head < len(t.fifo) {
-		id := t.fifo[t.head]
-		t.fifo[t.head] = ""
-		t.head++
-		if _, ok := t.last[id]; ok {
-			delete(t.last, id)
-			return
-		}
-	}
+// retainedSlots reports how many key slots the structure holds, live or not.
+// See ackedTaskSet.retainedSlots.
+func (t *sessionTouchThrottle) retainedSlots() int {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	return len(t.last)
 }
 
-func (t *sessionTouchThrottle) compactLocked() {
-	if t.head == 0 {
+// evictOldestLocked drops the oldest-inserted live session. Caller holds mu.
+// Cost and rationale as in ackedTaskSet.evictOldestLocked.
+func (t *sessionTouchThrottle) evictOldestLocked() {
+	var (
+		oldestID  string
+		oldestSeq uint64
+	)
+	for id, entry := range t.last {
+		if oldestSeq == 0 || entry.seq < oldestSeq {
+			oldestID, oldestSeq = id, entry.seq
+		}
+	}
+	if oldestSeq == 0 {
 		return
 	}
-	if t.head >= len(t.fifo) {
-		t.fifo = t.fifo[:0]
-		t.head = 0
-		return
-	}
-	if t.head < len(t.fifo)/2 {
-		return
-	}
-	n := copy(t.fifo, t.fifo[t.head:])
-	for i := n; i < len(t.fifo); i++ {
-		t.fifo[i] = ""
-	}
-	t.fifo = t.fifo[:n]
-	t.head = 0
+	delete(t.last, oldestID)
 }
