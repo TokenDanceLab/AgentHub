@@ -31,7 +31,7 @@
 | 维度 | 必选项 | 状态 | 备注 |
 |---|---|---|---|
 | 视觉 | token 化状态色（success/warning/danger）、堆叠间距 | ✅ | 随 ToastStack.stories.tsx 巡检 |
-| 交互 | 入列/出列/自动消失/手动关闭行为断言 | ✅ | `toast/__tests__/Toast.test.tsx` + `toast/__tests__/toastStore.test.ts`（2026-08-23 复核存在） |
+| 交互 | 入列/出列/自动消失/手动关闭行为断言 | ✅ | `toast/__tests__/ToastStack.test.tsx` + `toast/__tests__/toastStore.test.ts` |
 | 键盘 | 关闭按钮可聚焦 | ✅ | |
 | a11y | `role="status"`/`role="alert"` 按消息重要性区分 | ✅ | |
 | a11y | 自动消失提供可见时间或可暂停（成功态可放宽） | ✅ | hover/focus 触发 `pauseAutoDismiss`（ToastStack.tsx + toastStore.ts）满足「可暂停」分支；结论见下方 debt 台账 |
@@ -39,7 +39,7 @@
 
 ### 表单组件族：Input / Switch（#1827；Select 验收并入本段）
 
-迁移背景（动机）：19 个文件裸 `<input>/<textarea>`、error 态各自手写；AuthPage `.input` desktop/web 双份分叉；SettingsPage 自造 `.switch`。#1827 建族 6 原语，实际仅 Input（web/desktop AuthPage）与 Switch（workbench SettingSwitch）被采用；FormField/Textarea/Checkbox/Radio 四原语始终零消费，已于 round-42 删除（#2154 候选 A）。产品面仍有约 22 处裸 `<input>` + 1 处裸 `<textarea>`（workbench/web 若干弹层），登记为 adoption debt（#2154 跟踪）。error 态统一约定为 **语义（`aria-invalid` + `aria-describedby` 接线）与 token（`--td-danger`）**。
+迁移背景（动机）：19 个文件裸 `<input>/<textarea>`、error 态各自手写；AuthPage `.input` desktop/web 双份分叉（web 带边框 10px radius、desktop 无边框 10px radius，同约定不同值）；SettingsPage 自造 `.switch`。#1827 建族 6 原语，实际仅 Input（web/desktop AuthPage）与 Switch（workbench SettingSwitch）被采用；FormField/Textarea/Checkbox/Radio 四原语始终零消费，已于 round-42 删除（#2154 候选 A）。产品面仍有约 22 处裸 `<input>` + 1 处裸 `<textarea>`（workbench/web 若干弹层），登记为 adoption debt（#2154 跟踪）。error 态统一约定为 **语义（`aria-invalid` + `aria-describedby` 接线）与 token（`--td-danger`）**。组件三件套齐全（`.test.tsx` + `.stories.tsx` + 本表）。
 
 | 组件 | 维度 | 必选项 | 状态 | 备注 |
 |---|---|---|---|---|
@@ -61,7 +61,6 @@
 | Select | 键盘 | disabled option 不落入 `aria-activedescendant` | ✅ | 导航 helper 只落在 enabled option |
 | Select | a11y | error 态 `aria-invalid` 于 trigger | ✅ | |
 | Select | 响应式 | 面板 max-height 内滚（不变） | ✅ | |
-迁移背景（动机）：19 个文件裸 `<input>/<textarea>`、error 态各自手写；AuthPage `.input` desktop/web 双份分叉（web 带边框 10px radius、desktop 无边框 10px radius，同约定不同值）；SettingsPage 自造 `.switch`。本族为表单输入的唯一实现，error 态统一为 **语义（`aria-invalid` + `aria-describedby` 接线）与 token（`--td-danger`）**。三件套齐全（`.test.tsx` + `.stories.tsx` + 本表）。
 
 
 产物与证据：

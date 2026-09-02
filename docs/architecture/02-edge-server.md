@@ -2,7 +2,7 @@
 
 > 子文档 | 主索引：[architecture.md](../architecture.md)
 >
-> 最后更新：2026-08-20
+> 最后更新：2026-09-02
 
 ## 职责
 
@@ -53,7 +53,7 @@ Web shared workbench
 | 组件 | 文件 | 职责 |
 |---|---|---|
 | ProcessExecutor | `internal/lifecycle/process_executor.go` | 启动 agent CLI 子进程、管理 stdin/stdout pipe、超时与优雅关闭 |
-| DecisionLoop | `internal/lifecycle/decision_loop.go` | 包装 adapter 事件流，step 计数、maxSteps 强制、工具审批门控 |
+| DecisionLoop | `internal/lifecycle/process_executor_pure_adapter.go`（`process_executor_pure_*.go` 族） | 原 `decision_loop.go` 已删除，决策循环逻辑并入 ProcessExecutor pure-helper 族；现存证据为 stdin gating（control protocol / DecisionLoop 强制结束判断）与 interrupt 路径 |
 | EvidenceGate | `internal/lifecycle/evidence_gate.go` | 运行前/后证据验证门 |
 | FaultEscalation | `internal/lifecycle/fault_escalation.go` | 故障自动重试链：失败后按 `MaxRetries` 自动重试，错误 review 与 replan 交由 agent in-context 自纠错 |
 | EnvSanitizer | `internal/lifecycle/env_sanitizer.go` | 运行环境变量脱敏 |
@@ -94,7 +94,7 @@ ProcessExecutor 配置 `RunTimeout`（默认 30 分钟）、`ShutdownGracePeriod
 | OpenCode | `internal/adapters/opencode/` | 原生 ACP `ACPAdapter`（`opencode-acp`） |
 | Orchestrator | `internal/adapters/orchestrator/` | 群聊编排 `OrchestratorAdapter`（`orchestrator`）+ dispatch interceptor 各子层（纯叶子，不依赖根包） |
 | SDK | `internal/adapters/sdk/` | HTTP `AnthropicSDKAdapter`（`anthropic-sdk`）、`OpenAISDKAdapter`（`openai-sdk`） |
-| Test fixtures | `internal/adapters/testdata/` | 测试共享 JSON fixtures（`sdk_fixture_mapper/`）；mapper 代码在根包 `sdk_fixture_mapper.go` |
+| Test fixtures | `internal/adapters/sdk/testdata/` | 测试共享 JSON fixtures（`sdk_fixture_mapper/`）；mapper 代码在根包 `sdk_fixture_mapper.go` |
 
 纯包门禁：`orchestrator` 叶子包经 `scripts/verify/verify-orchestrator-deps.py` 机器门禁（断言：叶子不 import 根、`internal/orchestration` 不 import adapters、根不 import 叶子），`TestLeafDoesNotImportRootAdapters` 保证依赖方向单向。共享 ACP 运行时（`acp.go` `AcpAdapter`）与各家族子包共置于根包平铺区（残留平铺文件含 `acp*.go`/`parser_ndjson*.go`/`registry.go`/`sdk_fixture_mapper.go` 等）。
 

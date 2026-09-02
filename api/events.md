@@ -1,6 +1,6 @@
 # WebSocket Events
 
-最后更新：2026-07-27
+最后更新：2026-09-02
 
 WebSocket 事件合同入口：协议边界、源码 owner、**重复投递/幂等语义**、验收命令。旧长版见 [../docs/history.md](../docs/history.md)。
 
@@ -13,7 +13,7 @@ WebSocket 事件合同入口：协议边界、源码 owner、**重复投递/幂�
 | Runtime event names | `edge-server/internal/orchestration/contracts.go` | `run.agent.*` 常量（adapters 包通过 `contract_aliases.go` 别名重导出） |
 | Hub WS frame | `hub-server/internal/ws/frame.go` | `{type, seq_id?, payload?}` + 31 常量 |
 | Hub client constants | `app/shared/src/hubEvents.ts` | 与 `frame.go` 1:1 |
-| Hub runtime replay | `hub-server/internal/service/agent_edge_callback.go` | `agent.stream` / 聊天投影 |
+| Hub runtime replay | `hub-server/internal/service/agent/agent_edge_callback.go` | `agent.stream` / 聊天投影 |
 | Transcript normalization | `app/shared/src/transcript/` | Edge/Hub → 聊天流 |
 
 改事件：先改源码 owner，再同步本文件语义表、`api/openapi.yaml` WS schema、normalizer/tests。
