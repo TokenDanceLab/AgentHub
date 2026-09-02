@@ -3,6 +3,7 @@ package api
 import (
 	"archive/tar"
 	"compress/gzip"
+	"context"
 	"fmt"
 	"io"
 	"log/slog"
@@ -12,6 +13,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/agenthub/edge-server/internal/errcode"
 	"github.com/agenthub/edge-server/internal/store"
@@ -293,21 +295,62 @@ func addDirToArchive(tw *tar.Writer, dirPath string) error {
 	})
 }
 
-// runSSHCommand executes a command on a remote host via SSH.
-// #nosec G204 -- deploy feature launches ssh to an operator-configured host
-func runSSHCommand(host string, args ...string) error {
-	sshArgs := append([]string{host}, args...)
-	cmd := exec.Command("ssh", sshArgs...)
-	cmd.Stdout = nil
-	cmd.Stderr = nil
-	return cmd.Run()
+// Deploy subprocess timeouts: the REST timeout middleware answers the client
+// (503) but cannot kill child processes, so unbounded ssh/scp against an
+// unreachable host (no RST) would leak the subprocess and handler goroutine
+// until the kernel TCP retransmission cap. Vars so tests can shrink them.
+var (
+	deploySSHTimeout = 30 * time.Second
+	deploySCPTimeout = 120 * time.Second
+)
+
+// sshHardeningFlags make ssh/scp fail promptly instead of hanging: no
+// interactive prompts, bounded connect, and liveness probes that kill a
+// half-dead connection (peer vanished without RST).
+var sshHardeningFlags = []string{
+	"-o", "ConnectTimeout=5",
+	"-o", "BatchMode=yes",
+	"-o", "ServerAliveInterval=5",
+	"-o", "ServerAliveCountMax=3",
 }
 
-// runSCP copies a local file to a remote host via SCP.
+// runSSHCommand executes a command on a remote host via SSH under
+// deploySSHTimeout.
+// #nosec G204 -- deploy feature launches ssh to an operator-configured host
+func runSSHCommand(host string, args ...string) error {
+	sshArgs := make([]string, 0, len(sshHardeningFlags)+1+len(args))
+	sshArgs = append(sshArgs, sshHardeningFlags...)
+	sshArgs = append(sshArgs, host)
+	sshArgs = append(sshArgs, args...)
+	return runDeployCmd(deploySSHTimeout, "ssh", sshArgs...)
+}
+
+// runSCP copies a local file to a remote host via SCP under
+// deploySCPTimeout (transfers dominate, so the cap is wider).
 // #nosec G204 -- deploy feature launches scp to an operator-configured host
 func runSCP(localPath, remoteDest string) error {
-	cmd := exec.Command("scp", "-q", localPath, remoteDest)
+	scpArgs := make([]string, 0, len(sshHardeningFlags)+3)
+	scpArgs = append(scpArgs, "-q")
+	scpArgs = append(scpArgs, sshHardeningFlags...)
+	scpArgs = append(scpArgs, localPath, remoteDest)
+	return runDeployCmd(deploySCPTimeout, "scp", scpArgs...)
+}
+
+// runDeployCmd runs a deploy subprocess with a hard context timeout so a
+// stalled target cannot hang the handler past the cap.
+func runDeployCmd(timeout time.Duration, name string, args ...string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+	// #nosec G204 -- only invoked with the fixed binaries "ssh"/"scp" from
+	// runSSHCommand/runSCP; argv is constructed separately from data.
+	cmd := exec.CommandContext(ctx, name, args...)
 	cmd.Stdout = nil
 	cmd.Stderr = nil
-	return cmd.Run()
+	if err := cmd.Run(); err != nil {
+		if ctx.Err() == context.DeadlineExceeded {
+			return fmt.Errorf("%s timed out after %s: %w", name, timeout, err)
+		}
+		return err
+	}
+	return nil
 }
