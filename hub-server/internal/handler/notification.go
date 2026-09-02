@@ -51,6 +51,14 @@ func (h *NotificationHandler) ListNotifications(c *gin.Context) {
 			offset = v
 		}
 	}
+	// Clamp the client-controlled offset: unbounded values force scan-and-
+	// discard DoS; negatives cancel the offset in GORM (#2154).
+	if offset < 0 {
+		offset = 0
+	}
+	if offset > config.MaxPaginationOffset {
+		offset = config.MaxPaginationOffset
+	}
 
 	result, err := h.service.ListNotifications(c.Request.Context(), userID, unreadOnly, limit, offset)
 	if err != nil {
