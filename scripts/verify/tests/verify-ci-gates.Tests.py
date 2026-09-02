@@ -27,6 +27,8 @@ one surgical text mutation, and asserts the CI policy verifier exits non-zero:
 21. delete the test-sleep value budget negative self-test step → budget gate loses its regression tripwire
 22. delete the shared-trio real verifier step → component debt gate silently exits CI
 23. delete the shared-trio negative self-test step → false-green tripwire silently exits CI
+24. delete the fixture-connection-pinning verifier step → #2154 F-e gate silently exits CI
+25. delete its negative self-test step → the gate's own false-green tripwire exits CI
 
 The unmutated copy must exit 0, proving the policy test only reddens on
 actual policy violations (fail-closed, no false green).
@@ -61,6 +63,23 @@ SHARED_TRIO_SELF_TEST_STEP = (
     "      - name: Self-test shared component trio ratchet (negative)\n"
     "        run: python scripts/verify/tests/verify-shared-trio-ratchet.Tests.py\n"
 )
+
+
+FIXTURE_PIN_VERIFY_STEP = (
+    "      - name: Verify fixture connection pinning (#2154)\n"
+    "        run: python ./scripts/verify/verify-fixture-connection-pinning.py\n"
+)
+FIXTURE_PIN_SELF_TEST_STEP = (
+    "      - name: Self-test fixture connection pinning gate (negative)\n"
+    "        run: python scripts/verify/tests/verify-fixture-connection-pinning.Tests.py\n"
+)
+
+
+def delete_exact_step(text: str, step: str, label: str) -> str:
+    """删除一段逐字匹配的 step，模拟该门禁悄悄退出 CI（防回退）。"""
+    if step not in text:
+        raise AssertionError(f"{label} step text not found in workflow")
+    return text.replace(step, "", 1)
 
 
 def delete_visual_qa_desktop_job(text: str) -> str:
@@ -458,6 +477,18 @@ class VerifyCiGatesMutationTests(unittest.TestCase):
             exit_code,
             1,
             "%s must FAIL the CI policy verifier (exit 1) but got %s\n%s" % (case_name, exit_code, output),
+        )
+
+    def test_delete_fixture_pinning_verifier_step_fails(self):
+        self.assert_mutation_fails(
+            delete_exact_step(read_workflow(), FIXTURE_PIN_VERIFY_STEP, "fixture connection pinning verifier"),
+            "deleted the fixture connection pinning verifier step",
+        )
+
+    def test_delete_fixture_pinning_self_test_step_fails(self):
+        self.assert_mutation_fails(
+            delete_exact_step(read_workflow(), FIXTURE_PIN_SELF_TEST_STEP, "fixture connection pinning self-test"),
+            "deleted the fixture connection pinning negative self-test step",
         )
 
     def test_unmutated_workflow_passes(self):
