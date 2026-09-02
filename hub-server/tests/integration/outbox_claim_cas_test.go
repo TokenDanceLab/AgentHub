@@ -29,12 +29,12 @@ import (
 // the same invariant holds when multiple goroutines hit a real PG backend
 // simultaneously, which is the production deployment model (multi-replica hub).
 
-// openTempOutboxDB creates an ephemeral PostgreSQL database, runs all
+// openTempMigratedDB creates an ephemeral PostgreSQL database, runs all
 // migrations against it, and returns a *gorm.DB connected to that database
 // plus a cleanup function that drops the database. The caller must invoke
 // cleanup (typically via t.Cleanup). This avoids touching the shared
 // integration "agenthub" database.
-func openTempOutboxDB(t *testing.T) (*gorm.DB, func()) {
+func openTempMigratedDB(t *testing.T) (*gorm.DB, func()) {
 	t.Helper()
 
 	password := os.Getenv("AGENTHUB_DB_PASSWORD")
@@ -144,7 +144,7 @@ func claimIntPtr(i int) *int       { return &i }
 // which uses a fakeStore mutex. Here we prove the SQL CAS holds under true
 // PostgreSQL row-level locking.
 func TestOutboxClaimRetry_RealPG_ExactlyOneWinner(t *testing.T) {
-	tempDB, cleanup := openTempOutboxDB(t)
+	tempDB, cleanup := openTempMigratedDB(t)
 	t.Cleanup(cleanup)
 
 	store := service.NewDeliveryOutboxStore(tempDB)
@@ -228,7 +228,7 @@ func TestOutboxClaimRetry_RealPG_ExactlyOneWinner(t *testing.T) {
 // the expectedAttempt matches. This is the negative case proving the status IN
 // filter works correctly under real PG.
 func TestOutboxClaimRetry_RealPG_TerminalRowsRejectClaim(t *testing.T) {
-	tempDB, cleanup := openTempOutboxDB(t)
+	tempDB, cleanup := openTempMigratedDB(t)
 	t.Cleanup(cleanup)
 
 	store := service.NewDeliveryOutboxStore(tempDB)
