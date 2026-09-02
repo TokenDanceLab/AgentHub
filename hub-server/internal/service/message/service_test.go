@@ -97,17 +97,22 @@ func TestService_SetBusAndSetCachePorts(t *testing.T) {
 
 // SQL substrings used for matching (QueryMatcherFunc with strings.Contains from newMockDB)
 const (
-	sqlmSessionMember  = `FROM "session_members" WHERE`
-	sqlmSessionByID    = `FROM "sessions" WHERE id =`
-	sqlmMessage        = `FROM "messages" WHERE`
-	sqlmPin            = `FROM "message_pins" WHERE`
-	sqlmInsertMsg      = `INSERT INTO "messages"`
-	sqlmInsertPin      = `INSERT INTO "message_pins"`
-	sqlmUpdateMsg      = `UPDATE "messages" SET`
-	sqlmUpdateSession  = `UPDATE "sessions" SET`
-	sqlmUpdateMember   = `UPDATE "session_members" SET`
-	sqlmDeletePin      = `DELETE FROM "message_pins"`
-	sqlmSeqFallbackMsg = `UPDATE sessions SET next_seq`
+	sqlmSessionMember = `FROM "session_members" WHERE`
+	sqlmSessionByID   = `FROM "sessions" WHERE id =`
+	sqlmMessage       = `FROM "messages" WHERE`
+	sqlmPin           = `FROM "message_pins" WHERE`
+	sqlmInsertMsg     = `INSERT INTO "messages"`
+	sqlmInsertPin     = `INSERT INTO "message_pins"`
+	sqlmUpdateMsg     = `UPDATE "messages" SET`
+	sqlmUpdateSession = `UPDATE "sessions" SET`
+	// Column-specific variants so a test can tell the seqalloc next_seq mirror
+	// apart from the last_message_at activity touch (#2154 P2-8 asserts the
+	// latter happens exactly once per send, inside the persist transaction).
+	sqlmUpdateSessionNextSeq     = `UPDATE "sessions" SET "next_seq"`
+	sqlmUpdateSessionLastMessage = `UPDATE "sessions" SET "last_message_at"`
+	sqlmUpdateMember             = `UPDATE "session_members" SET`
+	sqlmDeletePin                = `DELETE FROM "message_pins"`
+	sqlmSeqFallbackMsg           = `UPDATE sessions SET next_seq`
 )
 
 // ==================== SendMessage ====================
@@ -300,16 +305,18 @@ func TestSendMessage_Success(t *testing.T) {
 		WithArgs("sess-1", "msg-1", 1).
 		WillReturnError(gorm.ErrRecordNotFound)
 
-	// #154: allocateSeq now touches last_message_at after Redis success
-	mock.ExpectExec(sqlmUpdateSession).
-		WithArgs(sqlmock.AnyArg(), "sess-1").
+	// seqalloc.Allocate mirrors the Redis seq into sessions.next_seq. This is
+	// the ONLY sessions UPDATE outside the persist transaction: allocateSeq no
+	// longer touches last_message_at (#2154 P2-8 removed the duplicate write).
+	mock.ExpectExec(sqlmUpdateSessionNextSeq).
+		WithArgs(sqlmock.AnyArg(), "sess-1", sqlmock.AnyArg()).
 		WillReturnResult(sqlmock.NewResult(0, 1))
 
 	// db.Transaction wraps InsertMessage + TouchSessionLastMessage
 	mock.ExpectBegin()
 	mock.ExpectExec(sqlmInsertMsg).
 		WillReturnResult(sqlmock.NewResult(1, 1))
-	mock.ExpectExec(sqlmUpdateSession).
+	mock.ExpectExec(sqlmUpdateSessionLastMessage).
 		WithArgs(sqlmock.AnyArg(), "sess-1").
 		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectCommit()
@@ -343,16 +350,16 @@ func TestSendMessage_SuccessNonText(t *testing.T) {
 		WithArgs("sess-1", "msg-c", 1).
 		WillReturnError(gorm.ErrRecordNotFound)
 
-	// #154: allocateSeq now touches last_message_at after Redis success
-	mock.ExpectExec(sqlmUpdateSession).
-		WithArgs(sqlmock.AnyArg(), "sess-1").
+	// seqalloc seq mirror only — see TestSendMessage_Success (#2154 P2-8).
+	mock.ExpectExec(sqlmUpdateSessionNextSeq).
+		WithArgs(sqlmock.AnyArg(), "sess-1", sqlmock.AnyArg()).
 		WillReturnResult(sqlmock.NewResult(0, 1))
 
 	// db.Transaction wraps InsertMessage + TouchSessionLastMessage
 	mock.ExpectBegin()
 	mock.ExpectExec(sqlmInsertMsg).
 		WillReturnResult(sqlmock.NewResult(1, 1))
-	mock.ExpectExec(sqlmUpdateSession).
+	mock.ExpectExec(sqlmUpdateSessionLastMessage).
 		WithArgs(sqlmock.AnyArg(), "sess-1").
 		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectCommit()

@@ -7,6 +7,8 @@ import (
 	"log/slog"
 	"strings"
 
+	"golang.org/x/sync/errgroup"
+
 	"github.com/agenthub/hub-server/internal/bus"
 	"github.com/agenthub/hub-server/internal/errcode"
 	"github.com/agenthub/hub-server/internal/model"
@@ -318,6 +320,25 @@ func (s *AgentTeamService) ListTeamRuns(ctx context.Context, userID, teamID stri
 	return repository.ListTeamRunsByTeam(s.db, teamID)
 }
 
+// teamRunStateReadConcurrency caps how many of GetTeamRunState's independent
+// reads run at once. Four keeps the fan-out inside the PG connection pool the
+// Hub already sizes for request traffic (#2154 P2-11) instead of letting one
+// polled endpoint take six connections per in-flight request.
+//
+// Fanning out means each read takes its own pooled connection, which is only
+// correct when every connection in the pool sees the same catalog. Postgres —
+// the one dialector hub-server opens in production (repository/db.go:
+// gorm.Open(postgres.Open(cfg.DSN()))) — always satisfies that. The sqlite
+// fixtures this repo uses for zero-dependency tests do NOT satisfy it by
+// default: a private `:memory:` DSN gives each new connection its own empty
+// database, so a fanned-out read would land on "no such table" instead of the
+// fixture. That is a fixture property, not a read-path property, so it is fixed
+// in the fixtures (SetMaxOpenConns(1) — all reads then share one connection and
+// one catalog, overlapping in Go and only queueing inside the driver) rather
+// than by sniffing the dialect here. sqlite is never a runtime dialector:
+// glebarez/sqlite is imported exclusively from *_test.go.
+const teamRunStateReadConcurrency = 4
+
 // GetTeamRunState returns a replayable projection of a team run.
 func (s *AgentTeamService) GetTeamRunState(ctx context.Context, userID, teamID, runID string) (*model.TeamRunState, error) {
 	if _, err := s.getTeamForRead(ctx, userID, teamID); err != nil {
@@ -334,30 +355,89 @@ func (s *AgentTeamService) GetTeamRunState(ctx context.Context, userID, teamID, 
 		return nil, errcode.AgentTaskNotFound
 	}
 
-	members, err := repository.ListTeamMembers(s.db, teamID)
-	if err != nil {
-		return nil, err
+	// #2154 P2-11: the projection reads six independent collections and used to
+	// issue them strictly one after another (2-10 ms of serialized round trips
+	// on the endpoint the team-run UI polls every 1-3 s). Only two of them
+	// actually depend on the first four, so the reads are now two parallel
+	// layers:
+	//
+	//	layer 1  members | assignments | tasks | team events
+	//	layer 2  pendingTaskSnapshot(assignments, tasks) | runEvents(agentTaskIDs)
+	//
+	// Error semantics are preserved exactly. Each goroutine stores its own
+	// error instead of returning it, and the checks below run in the original
+	// source order (members → assignments → tasks → pendingTask → runEvents →
+	// team events), so the error this endpoint surfaces — and therefore the
+	// errcode the handler maps it to, AgentTaskNotFound included — is the same
+	// one the serial version returned. Returning errors from the goroutines
+	// instead would let errgroup's first-*completed* error win, which is
+	// completion-order dependent and would make the API error code racy.
+	//
+	// Sibling cancellation is deliberately not used for the same reason: an
+	// errgroup.WithContext ctx is canceled by the first failure, which would
+	// overwrite an earlier slot's real error with context.Canceled. gctx still
+	// propagates the *request's* cancellation and deadline into every query via
+	// s.db.WithContext, which the serial version did not do at all.
+	gctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	db := s.db.WithContext(gctx)
+
+	var (
+		members     []model.AgentTeamMember
+		assignments []model.AgentTeamAssignment
+		tasks       []model.AgentTeamTask
+		events      []model.AgentTeamEvent
+
+		membersErr     error
+		assignmentsErr error
+		tasksErr       error
+		eventsErr      error
+	)
+	var layer1 errgroup.Group
+	layer1.SetLimit(teamRunStateReadConcurrency)
+	layer1.Go(func() error { members, membersErr = repository.ListTeamMembers(db, teamID); return nil })
+	layer1.Go(func() error { assignments, assignmentsErr = repository.ListAssignmentsByTeamRun(db, runID); return nil })
+	layer1.Go(func() error { tasks, tasksErr = repository.ListTeamTasksByRun(db, runID); return nil })
+	layer1.Go(func() error { events, eventsErr = repository.ListTeamEventsByRun(db, runID); return nil })
+	// Always nil (every goroutine returns nil); Wait is the join point.
+	_ = layer1.Wait()
+	if membersErr != nil {
+		return nil, membersErr
 	}
-	assignments, err := repository.ListAssignmentsByTeamRun(s.db, runID)
-	if err != nil {
-		return nil, err
+	if assignmentsErr != nil {
+		return nil, assignmentsErr
 	}
-	tasks, err := repository.ListTeamTasksByRun(s.db, runID)
-	if err != nil {
-		return nil, err
+	if tasksErr != nil {
+		return nil, tasksErr
 	}
+
 	agentTaskIDs := teamAgentTaskIDs(assignments, tasks)
-	pendingTaskByID, err := s.pendingTaskSnapshotByID(assignments, tasks)
-	if err != nil {
-		return nil, err
+	var (
+		pendingTaskByID map[string]model.PendingAgentTask
+		runEvents       []model.AgentRunEvent
+
+		pendingTaskErr error
+		runEventsErr   error
+	)
+	var layer2 errgroup.Group
+	layer2.SetLimit(teamRunStateReadConcurrency)
+	layer2.Go(func() error {
+		pendingTaskByID, pendingTaskErr = s.pendingTaskSnapshotByID(db, assignments, tasks)
+		return nil
+	})
+	layer2.Go(func() error {
+		runEvents, runEventsErr = repository.ListAgentRunEventsByTaskIDs(db, agentTaskIDs)
+		return nil
+	})
+	_ = layer2.Wait()
+	if pendingTaskErr != nil {
+		return nil, pendingTaskErr
 	}
-	runEvents, err := repository.ListAgentRunEventsByTaskIDs(s.db, agentTaskIDs)
-	if err != nil {
-		return nil, err
+	if runEventsErr != nil {
+		return nil, runEventsErr
 	}
-	events, err := repository.ListTeamEventsByRun(s.db, runID)
-	if err != nil {
-		return nil, err
+	if eventsErr != nil {
+		return nil, eventsErr
 	}
 
 	state := &model.TeamRunState{
@@ -519,12 +599,17 @@ func (s *AgentTeamService) projectTeamRunEvents(state *model.TeamRunState, runEv
 	}
 }
 
-func (s *AgentTeamService) pendingTaskSnapshotByID(assignments []model.AgentTeamAssignment, tasks []model.AgentTeamTask) (map[string]model.PendingAgentTask, error) {
+// pendingTaskSnapshotByID loads the pending-task rows referenced by a run's
+// assignments/tasks. db is injected (rather than read from s.db) so the caller
+// can hand in a request-scoped s.db.WithContext(gctx) handle and keep
+// cancellation propagation while the read runs in parallel with its siblings
+// (#2154 P2-11).
+func (s *AgentTeamService) pendingTaskSnapshotByID(db *gorm.DB, assignments []model.AgentTeamAssignment, tasks []model.AgentTeamTask) (map[string]model.PendingAgentTask, error) {
 	ids := teamAgentTaskIDs(assignments, tasks)
 	if len(ids) == 0 {
 		return map[string]model.PendingAgentTask{}, nil
 	}
-	pendingTasks, err := repository.ListPendingTasksByIDs(s.db, ids)
+	pendingTasks, err := repository.ListPendingTasksByIDs(db, ids)
 	if err != nil {
 		return nil, err
 	}
