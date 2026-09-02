@@ -175,12 +175,16 @@ func TestCustomAgentUpdateNeverWritesColumnsTheRequestCannotCarry(t *testing.T) 
 	u := register(t, "tca2253c", "pass1234", "CA2253C")
 
 	r := parse(postAuth("/web/custom-agents", u.Token, map[string]interface{}{
-		"name":            "Column Agent",
-		"agent_type":      "claude-code",
-		"system_prompt":   "Original prompt.",
-		"capability_tags": []string{"code"},
-		"tool_whitelist":  []string{"read"},
-		"model_params":    map[string]string{"model": "claude-sonnet-4-6"},
+		"name":          "Column Agent",
+		"agent_type":    "claude-code",
+		"system_prompt": "Original prompt.",
+		// These three are JSON *text* on the wire: createCustomAgentReq /
+		// updateCustomAgentReq declare them `string` and model.CustomAgent stores
+		// them into jsonb columns, so sending an array/object is a bind error
+		// (bad_request) rather than a value the server would ever store.
+		"capability_tags": `["code"]`,
+		"tool_whitelist":  `["read"]`,
+		"model_params":    `{"model":"claude-sonnet-4-6"}`,
 	}))
 	mustOK(t, r, "create")
 	id := extract(r.Data, "id")
@@ -191,20 +195,29 @@ func TestCustomAgentUpdateNeverWritesColumnsTheRequestCannotCarry(t *testing.T) 
 		"name":            "Renamed Column Agent",
 		"agent_type":      "codex",
 		"system_prompt":   "Renamed prompt.",
-		"capability_tags": []string{"code", "review"},
-		"tool_whitelist":  []string{"read", "exec"},
-		"model_params":    map[string]string{"model": "gpt-5"},
+		"capability_tags": `["code","review"]`,
+		"tool_whitelist":  `["read","exec"]`,
+		"model_params":    `{"model":"gpt-5"}`,
 	})), "update")
 
 	// Every request-writable column did change — the narrow write must not be so
 	// narrow that it drops a field the request CAN carry.
+	//
+	// output_schema is deliberately not in this projection. The three jsonb
+	// columns the model stores as `string` need ::text so the driver hands back
+	// a Go string, but model.CustomAgent.OutputSchema is *json.RawMessage: a
+	// ::text cast would hand it a string and the scan fails with "unsupported
+	// Scan, storing driver.Value type string into type *json.RawMessage" — a
+	// fixture artefact of mixing two different Go representations in one
+	// projection, not a product defect. The column is asserted twice below
+	// instead, and through the production repository + dispatch path in
+	// TestCustomAgentUpdatePreservesOutputSchema.
 	var ca model.CustomAgent
 	require.NoError(t, db.Raw(
 		`SELECT id, owner_user_id, name, agent_type, system_prompt,
 		        capability_tags::text AS capability_tags,
 		        tool_whitelist::text AS tool_whitelist,
-		        model_params::text AS model_params,
-		        output_schema::text AS output_schema
+		        model_params::text AS model_params
 		 FROM custom_agents WHERE id = ?`, id).Scan(&ca).Error)
 	assert.Equal(t, "Renamed Column Agent", ca.Name)
 	assert.Equal(t, "codex", ca.AgentType)
@@ -214,12 +227,20 @@ func TestCustomAgentUpdateNeverWritesColumnsTheRequestCannotCarry(t *testing.T) 
 	assert.JSONEq(t, `{"model":"gpt-5"}`, ca.ModelParams)
 	assert.Equal(t, u.ID, ca.OwnerUserID)
 
-	// And the column the request cannot carry is untouched.
-	require.NotNil(t, ca.OutputSchema)
-	assert.JSONEq(t, customAgent2253Schema, string(*ca.OutputSchema))
-
-	var raw json.RawMessage
-	require.NoError(t, db.Raw(`SELECT output_schema FROM custom_agents WHERE id = ?`, id).Scan(&raw).Error)
-	require.NotNil(t, raw)
-	assert.JSONEq(t, customAgent2253Schema, string(raw))
+	// And the column the request cannot carry is untouched — read as the jsonb
+	// it is, into the same *json.RawMessage representation production uses, so
+	// "the column survived" is proven against jsonb storage rather than against
+	// a text cast.
+	//
+	// Scanned through a struct field of the very type production uses
+	// (*json.RawMessage) rather than into a bare json.RawMessage: gorm's Scan
+	// reads a non-struct slice destination as a *row set*, so `Scan(&raw)` asks
+	// the driver to convert the whole jsonb document to one uint8 element.
+	var stored struct {
+		OutputSchema *json.RawMessage
+	}
+	require.NoError(t, db.Raw(`SELECT output_schema FROM custom_agents WHERE id = ?`, id).Scan(&stored).Error)
+	require.NotNil(t, stored.OutputSchema, "output_schema column must still be non-NULL jsonb after the update")
+	assert.JSONEq(t, customAgent2253Schema, string(*stored.OutputSchema),
+		"the request cannot carry output_schema, so the narrow write must leave it byte-equivalent (#2253)")
 }
