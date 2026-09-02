@@ -22,7 +22,9 @@ function resolveEdgeUrl(): string {
       const stored = window.localStorage.getItem('agenthub_edge_url');
       if (stored) return stored.replace(/\/+$/, '');
     }
-  } catch { /* localStorage unavailable */ }
+  } catch {
+    /* localStorage unavailable */
+  }
   // 3. Build-time env var
   const envUrl = import.meta.env.VITE_EDGE_URL;
   if (envUrl) return envUrl.replace(/\/+$/, '');
@@ -45,33 +47,13 @@ function resolveWsUrl(): string {
   }
 }
 
-export function getEdgeBaseUrl(): string { return resolveEdgeUrl(); }
-export function getEdgeWsUrl(): string { return resolveWsUrl(); }
-
-// Update the persisted edge URL (call from settings UI).
-export function setPersistedEdgeUrl(url: string): void {
-  try {
-    if (typeof window !== 'undefined') {
-      if (url) {
-        window.localStorage.setItem('agenthub_edge_url', url.replace(/\/+$/, ''));
-      } else {
-        window.localStorage.removeItem('agenthub_edge_url');
-      }
-    }
-  } catch { /* localStorage unavailable */ }
+export function getEdgeBaseUrl(): string {
+  return resolveEdgeUrl();
+}
+export function getEdgeWsUrl(): string {
+  return resolveWsUrl();
 }
 
-export function getPersistedEdgeUrl(): string {
-  try {
-    if (typeof window !== 'undefined') {
-      return window.localStorage.getItem('agenthub_edge_url') || '';
-    }
-  } catch { /* localStorage unavailable */ }
-  return '';
-}
-
-export const EDGE_URL = resolveEdgeUrl();
-export const WS_URL = resolveWsUrl();
 export const EDGE_AUTH_TOKEN = import.meta.env.VITE_EDGE_AUTH_TOKEN || '';
 
 function envOrDev(key: string, devDefault: string): string {
@@ -84,13 +66,10 @@ function envOrDev(key: string, devDefault: string): string {
 // production deployments must set VITE_HUB_URL / VITE_HUB_WS_URL explicitly.
 export const HUB_URL = envOrDev('VITE_HUB_URL', 'http://127.0.0.1:8080');
 export const HUB_WS_URL = envOrDev('VITE_HUB_WS_URL', 'ws://127.0.0.1:8080/client/ws');
-export const TOKENDANCE_LOGIN_URL = import.meta.env.VITE_TOKENDANCE_LOGIN_URL || '';
 
 export const HEALTH_POLL_MS = 30_000;
 export const RUNNERS_POLL_MS = 30_000;
-export const EVENT_LOG_MAX = 1000;
 // Injected at build time from desktop/package.json (vite define); the
 // fallback keeps vitest (no define) working and matches the current version.
 declare const __APP_VERSION__: string | undefined;
-export const APP_VERSION =
-  typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '0.6.1';
+export const APP_VERSION = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '0.6.1';
