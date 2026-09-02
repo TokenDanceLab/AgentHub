@@ -3,6 +3,8 @@ package events
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"io"
 	"log/slog"
 	"os"
@@ -205,7 +207,13 @@ func (l *EventLog) Append(evt EventEnvelope) error {
 
 	data, err := json.Marshal(evt)
 	if err != nil {
-		return err
+		// Permanent, not transient: the same envelope fails to marshal every
+		// time (a chan/func/NaN in the payload), so the retry ladder in
+		// persistWithRetry can only add latency. Tagged so the retry loop can
+		// fail fast — and since the wire gate (#2154) makes a slow persist a
+		// bus-wide delay rather than this publisher's problem, that latency is
+		// everybody's.
+		return fmt.Errorf("%w: %v", errUnpersistableEvent, err)
 	}
 	data = append(data, '\n')
 	_, err = l.f.Write(data)
@@ -232,6 +240,44 @@ func (l *EventLog) Append(evt EventEnvelope) error {
 		}
 	}
 	return err
+}
+
+// readRetentionWindow reads the trailing keepBytes window that truncateLocked is
+// about to rewrite, tolerating short reads, and returns the buffer, how many
+// bytes of it are valid, and any real error.
+//
+// Looping is not defensive padding, it is the whole point. read(2) on a regular
+// file may legally return fewer bytes than requested — large reads, a signal
+// interrupting the call, network or overlay filesystems — and os.File.Read maps
+// exactly one syscall to one call. keepBytes here is maxSize*3/4, i.e. 37.5 MiB
+// at the 50 MiB default, so this is one of the largest reads the process does.
+// The single Read this replaces meant that whenever the kernel came back short,
+// truncateLocked rewrote only what it happened to get and Truncate(0) had
+// already destroyed the rest: the unread tail is the *newest, highest-seq* part
+// of the log, so a truncation could silently drop the most recent events and
+// then rebuild an index that no longer mentions them. Injected short reads of 1,
+// 3, 7 and 64 bytes per call are what TestReadRetentionWindow_ToleratesShortReads
+// uses to pin this.
+//
+// A file shorter than the window (it shrank under us — an external truncation)
+// is not an error: io.EOF / io.ErrUnexpectedEOF return what exists, and the
+// caller rewrites that. Only a genuine read failure is reported, and the caller
+// counts it as a truncate failure. errors.Is replaces the previous
+// `err.Error() != "EOF"` string comparison, which missed any wrapped EOF.
+func readRetentionWindow(r io.Reader, keepBytes int64) ([]byte, int, error) {
+	buf := make([]byte, keepBytes)
+	total := 0
+	for int64(total) < keepBytes {
+		n, err := r.Read(buf[total:])
+		total += n
+		if err != nil {
+			if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
+				return buf, total, nil
+			}
+			return buf, total, err
+		}
+	}
+	return buf, total, nil
 }
 
 // appendSorted inserts seq into the sorted slice maintaining order. Used by
@@ -263,9 +309,8 @@ func (l *EventLog) truncateLocked() {
 			"path", l.path, "keepBytes", keepBytes, "error", seekErr)
 		return
 	}
-	buf := make([]byte, keepBytes)
-	n, readErr := l.f.Read(buf)
-	if readErr != nil && readErr.Error() != "EOF" {
+	buf, n, readErr := readRetentionWindow(l.f, keepBytes)
+	if readErr != nil {
 		l.truncateFailures.Add(1)
 		slog.Error("event log truncate read failed",
 			"path", l.path, "keepBytes", keepBytes, "error", readErr)
@@ -279,14 +324,37 @@ func (l *EventLog) truncateLocked() {
 			break
 		}
 	}
-	// Truncate and rewrite.
-	if truncErr := l.f.Truncate(0); truncErr != nil {
+	// Rewrite through a *separate* O_RDWR handle, not through l.f.
+	//
+	// l.f is opened O_APPEND, and Windows denies SetEndOfFile on an append-mode
+	// handle: every truncation failed with "Access is denied", so the event log
+	// of every shipped Windows Edge (the desktop installer's
+	// agenthub-edge-x86_64-pc-windows-msvc sidecar, and the portable build)
+	// grew without bound, with only an error line per Append and
+	// edge_event_log_truncate_failures_total to show for it. Linux accepted the
+	// same call, which is why the defect was invisible until a test asserted on
+	// the resulting file size on the Native Windows CI job.
+	//
+	// A second handle keeps the append handle's semantics untouched: Go opens
+	// files with FILE_SHARE_READ|WRITE|DELETE, the rewrite is inside l.mu like
+	// every other mutation, and the O_APPEND handle needs no repositioning
+	// (rebuildIndexLocked below still seeks it to EOF for replay reads).
+	rw, openErr := os.OpenFile(l.path, os.O_RDWR, 0o600)
+	if openErr != nil {
+		l.truncateFailures.Add(1)
+		slog.Error("event log truncate reopen failed",
+			"path", l.path, "error", openErr)
+		return
+	}
+	if truncErr := rw.Truncate(0); truncErr != nil {
+		_ = rw.Close()
 		l.truncateFailures.Add(1)
 		slog.Error("event log truncate Truncate(0) failed",
 			"path", l.path, "error", truncErr)
 		return
 	}
-	if _, seekErr := l.f.Seek(0, 0); seekErr != nil {
+	if _, seekErr := rw.Seek(0, 0); seekErr != nil {
+		_ = rw.Close()
 		l.truncateFailures.Add(1)
 		slog.Error("event log truncate seek-to-start failed",
 			"path", l.path, "error", seekErr)
@@ -295,11 +363,16 @@ func (l *EventLog) truncateLocked() {
 	if start < n {
 		// Best-effort rewrite: the log truncation path degrades silently on
 		// write failure rather than failing the enclosing Append call.
-		if written, writeErr := l.f.Write(buf[start:n]); writeErr != nil || written != n-start {
+		if written, writeErr := rw.Write(buf[start:n]); writeErr != nil || written != n-start {
 			l.truncateFailures.Add(1)
 			slog.Error("event log truncate rewrite failed",
 				"path", l.path, "written", written, "want", n-start, "error", writeErr)
 		}
+	}
+	if closeErr := rw.Close(); closeErr != nil {
+		l.truncateFailures.Add(1)
+		slog.Error("event log truncate close failed",
+			"path", l.path, "error", closeErr)
 	}
 	// Rebuild the index so replay offsets reflect the truncated file. A
 	// rebuild failure also counts as a truncate failure (the log is now in a

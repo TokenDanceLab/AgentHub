@@ -1,9 +1,18 @@
 package events
 
 import (
+	"errors"
 	"log/slog"
 	"time"
 )
+
+// errUnpersistableEvent marks a persist failure that cannot succeed on retry —
+// today only EventLog.Append's json.Marshal rejection of an unencodable payload
+// (a chan, func, or NaN in it). persistWithRetry fails fast on it instead of
+// burning the backoff ladder, because every attempt is guaranteed to fail
+// identically and, with the wire gate in place, that ladder is a bus-wide stall
+// rather than one publisher's delay.
+var errUnpersistableEvent = errors.New("event cannot be persisted")
 
 // persistDefaultMaxRetries bounds how many times persistWithRetry retries a
 // persistFn call that returned an error before declaring the event lost.
@@ -44,6 +53,11 @@ func (b *Bus) persistWithRetry(evt EventEnvelope) error {
 			return nil
 		}
 		lastErr = err
+		if errors.Is(err, errUnpersistableEvent) {
+			// Deterministic failure: retrying re-marshals the same envelope and
+			// gets the same answer, so return without sleeping.
+			return err
+		}
 		if attempt < maxRetries {
 			// Exponential backoff: 2ms, 4ms, 8ms, … capped at 50ms so the
 			// synchronous retry path cannot stall Publish for too long.
