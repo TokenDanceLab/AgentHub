@@ -56,7 +56,7 @@ UI Workbench（chat timeline + command center）
 
 已有资产（源码级已核实）：
 
-- `hub-server/internal/service/deliveryoutbox/`：`RecordDelivery` / `MarkSent` / `AckDelivery` / CAS claim / 指数退避 / dead-letter / 7 天 purge。
+- `hub-server/internal/service/deliveryoutbox/`：`RecordDelivery` / `MarkDeliverySent` / `AckDelivery` / CAS claim / 指数退避 / dead-letter / 7 天 purge。
 - `hub-server/internal/service/agent/agent_edge_callback.go`：`client_msg_id` 幂等去重；stream+seq 写入走事务。
 - `api/events.md`：at-least-once、`EventEnvelope.seq/id`、UPSERT / idempotent / watermark / ephemeral 标签、`agent.dispatch` 带 `task_id + delivery_id`。
 

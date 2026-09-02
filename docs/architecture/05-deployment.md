@@ -103,8 +103,8 @@ TokenDance ID（TDID）OIDC 回调有三条浏览器/原生回跳地址，外加
 
 | 回调 URI | 用途 |
 |---|---|
-| `https://hub.tokendancelab.com/api/auth/callback` | 首页 SPA 回调页（nginx `/api/auth/` 反代到 `:3001` 静态站） |
-| `https://hub.tokendancelab.com/workbench/auth/tokendance/callback` | 工作台 `app/web`（`BASE_URL=/workbench/`） |
+| `https://hub.vectorcontrol.tech/api/auth/callback` | 首页 SPA 回调页（nginx `/api/auth/` 反代到 `:3001` 静态站） |
+| `https://hub.vectorcontrol.tech/workbench/auth/tokendance/callback` | 工作台 `app/web`（`BASE_URL=/workbench/`） |
 | `http://127.0.0.1/callback` | 桌面 Tauri loopback（RFC 8252 端口宽松匹配，用于桌面客户端） |
 
 Hub 侧 code 交换端点固定为 `POST /client/auth/oidc/callback`，桌面/Web/CLI 共用，**不是**浏览器回跳地址。
@@ -134,7 +134,7 @@ Hub 侧 code 交换端点固定为 `POST /client/auth/oidc/callback`，桌面/We
 | `AGENTHUB_JWT_SECRET` | 是 | entrypoint + `config.Validate`（≥32 字符，且不在弱密钥 blocklist） | JWT 签名密钥。`change-me-production*` / `dev-secret-change-in-production*` 前缀被 `weakSecretPrefixes` 拒绝，即使长度达标。 |
 | `AGENTHUB_TOKENDANCE_ID_CLIENT_ID` | 配置 OIDC 即必填 | `config.Validate`（client_id 设了则 issuer_url/client_secret/redirect_uri 都必填） | TDID OIDC client。留空=未启用 OIDC。 |
 | `AGENTHUB_TOKENDANCE_ID_CLIENT_SECRET` | 配置 OIDC 即必填 | 同上 | TDID client secret，由 TDID 管理，不入仓库。 |
-| `AGENTHUB_TOKENDANCE_ID_REDIRECT_URI` | 配置 OIDC 即必填 | 同上 | 默认 `https://hub.tokendancelab.com/api/auth/callback`，必须是 allowed 集合成员。 |
+| `AGENTHUB_TOKENDANCE_ID_REDIRECT_URI` | 配置 OIDC 即必填 | 同上 | 默认 `https://hub.vectorcontrol.tech/api/auth/callback`，必须是 allowed 集合成员。 |
 | `AGENTHUB_TOKENDANCE_ID_ALLOWED_REDIRECT_URIS` | 否（有默认三条） | — | 浏览器/原生回跳白名单，逗号分隔。改回调集合时必须与 TDID 侧 `oauth_clients.redirect_uris` 同步。 |
 | `AGENTHUB_AUTH_FAIL_CLOSED` | 否（生产建议 `true`） | `AuthFailClosed()` | 见 §安全配置。 |
 | `AGENTHUB_RATE_LIMIT_FAIL_OPEN` | 否（生产建议 `false`） | `RateLimitFailOpen()` | 见 §安全配置。 |

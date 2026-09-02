@@ -36,7 +36,7 @@ Entry CSS load: desktop/web `main.tsx` imports surface `styles/{tokens,themes,pr
 3. **Surface shells** import re-export CSS under `app/{desktop,web}/src/styles/*`. Never fork full token tables in product modules.
 4. **`designTokens.ts`** is an **alias + surface-rules registry** for mobile/web naming. It is **not** a second color SSOT.
 5. **Brand icon hex** in brand assets (e.g. `designIcons.tsx`) is brand-literal OK. Product chrome (status, surfaces, text) must use theme tokens.
-6. **CSS fallbacks** on tokens (`var(--td-*, 字面量)` 等) 若写则必须与 SSOT 一致——不得残留与 tokens/themes 定义冲突的开/闭区间字面量（否则 dark mode 或预设下渲染漂移）。当前 app CSS 仍有 110+ 处 `var(--td-*, 字面量)` fallback 与 SSOT 值矛盾（#1827 token 契约部分清理中）；新代码优先裸 `var(--token)`。
+6. **CSS fallbacks** on tokens (`var(--td-*, 字面量)` 等) 若写则必须与 SSOT 一致——不得残留与 tokens/themes 定义冲突的开/闭区间字面量（否则 dark mode 或预设下渲染漂移）。当前 app CSS 残留少量 `var(--td-*, 字面量)` fallback（2026-09-02 实测 18 行、与 SSOT 真冲突个位数），以 `scripts/verify/verify-design-token-ssot.py` 为门禁（#1827 token 契约清理后）；新代码优先裸 `var(--token)`。
 7. **Product CSS** uses semantic tokens `--success` / `--danger` / `--primary` / `--bdr` (and related surface tokens). **`--color-*` is legacy alias / preset-private only** — not for new product module consumers (#910 / #1021 closed ghost product usage).
 8. **Design token gate**：修改 `app/shared/src/styles/` 或 `app/shared/src/designTokens.ts` 后，必须运行 `python scripts/verify/verify-design-token-ssot.py`，且 `app/shared/src/designTokens.test.ts`、`app/shared/src/styles/tokens-base.test.ts` 全绿。
 9. **Shared component acceptance**：`app/shared/src/ui/` 下的新组件必须同时提供 `<组件>.test.tsx`、`<组件>.stories.tsx`，并逐项勾选 [component-acceptance.md](../component-acceptance.md)；缺件不得合入。
@@ -47,7 +47,7 @@ Entry CSS load: desktop/web `main.tsx` imports surface `styles/{tokens,themes,pr
 |---|---|
 | Desktop vs Web `presets.css` 差异 | 已消解——两者均为 `presets-base.css` + `presets-folder-colors.css` 的纯 re-export，无本地覆盖（旧「opaque vs glass borders」表述不实：实际属性为 `data-theme-preset`，且无 tokendance 预设；若新增差异仅允许薄表面覆盖） |
 | Chatview `.chatview` scoped tokens | Isolation from host theme; document drift risk; merge is a follow-up |
-| Desktop ThemeContext exposes presets; Web does not | Product choice; both must use shared preset SSOT when/if Web adds UI | **Closed #1820** — Web preset API + AuthPage preset switcher landed on shared `themePresets` |
+| Desktop ThemeContext exposes presets; Web does not | Product choice; both must use shared preset SSOT when/if Web adds UI. **Closed #1820** — Web preset API + AuthPage preset switcher landed on shared `themePresets` |
 
 ## 4. Known forks / residual (follow-ups)
 
