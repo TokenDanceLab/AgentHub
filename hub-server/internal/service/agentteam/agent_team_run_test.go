@@ -8,7 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/glebarez/sqlite"
 	"github.com/stretchr/testify/require"
 	"gorm.io/gorm"
 
@@ -24,11 +23,13 @@ import (
 //
 //  1. the reads really do overlap (otherwise the change bought nothing);
 // The fixtures use setupAgentTeamStateSQLite, i.e. sqlite pinned to a single
-// connection: that is the shape teamRunStateReadFanout allows the fan-out on,
-// and the barrier hooks run before gorm takes a connection, so they observe the
-// reads being issued concurrently even though the driver serializes their
-// execution. Production (Postgres) gets the same fan-out with real connection
-// parallelism.
+// connection (SetMaxOpenConns(1)): every read then shares one connection and
+// one catalog, so the fan-out is safe, and the barrier hooks run before gorm
+// takes a connection — they observe the reads being issued concurrently even
+// though the driver serializes their execution. Production (Postgres) gets the
+// same fan-out with real connection parallelism; an *uncapped* private
+// ":memory:" fixture would not be safe and must pin itself the same way (see
+// teamRunStateReadConcurrency).
 //
 //  2. the error the endpoint returns is still the first one in the *original
 //     source order* — members → assignments → tasks → pendingTaskSnapshot →
@@ -311,33 +312,4 @@ func TestGetTeamRunState_ProjectionUnchangedByParallelReads(t *testing.T) {
 	// The replay of team events still runs after the parallel reads, so the
 	// run-started event must be reflected exactly as in the serial version.
 	require.NotEmpty(t, state.Status)
-}
-
-// TestTeamRunStateReadFanout pins the safety gate itself: the fan-out is only
-// enabled where every pooled connection is guaranteed to see the same catalog.
-func TestTeamRunStateReadFanout(t *testing.T) {
-	t.Run("sqlite with an uncapped pool stays serial", func(t *testing.T) {
-		// A private ":memory:" DSN gives each new connection its own empty DB,
-		// which is exactly the shape hub-server/tests/teamrun uses.
-		db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
-		require.NoError(t, err)
-		sqlDB, err := db.DB()
-		require.NoError(t, err)
-		t.Cleanup(func() { _ = sqlDB.Close() })
-		require.Equal(t, 1, teamRunStateReadFanout(db))
-	})
-
-	t.Run("sqlite pinned to one connection fans out", func(t *testing.T) {
-		db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
-		require.NoError(t, err)
-		sqlDB, err := db.DB()
-		require.NoError(t, err)
-		t.Cleanup(func() { _ = sqlDB.Close() })
-		sqlDB.SetMaxOpenConns(1)
-		require.Equal(t, teamRunStateReadConcurrency, teamRunStateReadFanout(db))
-	})
-
-	t.Run("nil db stays serial", func(t *testing.T) {
-		require.Equal(t, 1, teamRunStateReadFanout(nil))
-	})
 }

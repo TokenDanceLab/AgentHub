@@ -324,52 +324,20 @@ func (s *AgentTeamService) ListTeamRuns(ctx context.Context, userID, teamID stri
 // reads run at once. Four keeps the fan-out inside the PG connection pool the
 // Hub already sizes for request traffic (#2154 P2-11) instead of letting one
 // polled endpoint take six connections per in-flight request.
+//
+// Fanning out means each read takes its own pooled connection, which is only
+// correct when every connection in the pool sees the same catalog. Postgres —
+// the one dialector hub-server opens in production (repository/db.go:
+// gorm.Open(postgres.Open(cfg.DSN()))) — always satisfies that. The sqlite
+// fixtures this repo uses for zero-dependency tests do NOT satisfy it by
+// default: a private `:memory:` DSN gives each new connection its own empty
+// database, so a fanned-out read would land on "no such table" instead of the
+// fixture. That is a fixture property, not a read-path property, so it is fixed
+// in the fixtures (SetMaxOpenConns(1) — all reads then share one connection and
+// one catalog, overlapping in Go and only queueing inside the driver) rather
+// than by sniffing the dialect here. sqlite is never a runtime dialector:
+// glebarez/sqlite is imported exclusively from *_test.go.
 const teamRunStateReadConcurrency = 4
-
-// sqliteDialectName is gorm's name for the sqlite dialector (glebarez/sqlite,
-// the pure-Go driver this repo uses for zero-dependency fixtures).
-const sqliteDialectName = "sqlite"
-
-// teamRunStateReadFanout returns the errgroup limit GetTeamRunState may use on
-// db: teamRunStateReadConcurrency when the reads may safely overlap, 1 when
-// they must stay strictly serial.
-//
-// Each parallel read takes its own pooled connection, so the fan-out is only
-// correct when every connection in the pool sees the same catalog.
-//
-//   - Postgres — production and the PG16 integration lane — always satisfies
-//     that, so it gets the full fan-out.
-//   - sqlite does not, in general: a private `:memory:` DSN gives *each new
-//     connection its own empty database*. The repo's zero-dependency fixtures
-//     rely on that shape (hub-server/tests/teamrun opens `sqlite.Open(
-//     ":memory:")` with no connection cap), so a fanned-out read there lands on
-//     "no such table" instead of the fixture. Those fixtures are outside this
-//     package's write scope, so the read path adapts instead.
-//   - sqlite pinned to a single connection (`SetMaxOpenConns(1)`, which several
-//     package fixtures do) is safe: every read shares that one connection and
-//     therefore that one catalog. The reads still overlap in Go — they only
-//     queue inside the driver — so the fan-out is kept.
-//
-// Returning 1 makes errgroup.Group.Go block until the previous read finished,
-// which reproduces the pre-#2154 strictly-serial order exactly.
-func teamRunStateReadFanout(db *gorm.DB) int {
-	if db == nil || db.Dialector == nil {
-		return 1
-	}
-	// db.Name() is the promoted Dialector method (guarded by the nil check
-	// above); staticcheck QF1008 rejects the spelled-out selector.
-	if db.Name() != sqliteDialectName {
-		return teamRunStateReadConcurrency
-	}
-	sqlDB, err := db.DB()
-	if err != nil || sqlDB == nil {
-		return 1
-	}
-	if sqlDB.Stats().MaxOpenConnections != 1 {
-		return 1
-	}
-	return teamRunStateReadConcurrency
-}
 
 // GetTeamRunState returns a replayable projection of a team run.
 func (s *AgentTeamService) GetTeamRunState(ctx context.Context, userID, teamID, runID string) (*model.TeamRunState, error) {
@@ -413,7 +381,6 @@ func (s *AgentTeamService) GetTeamRunState(ctx context.Context, userID, teamID, 
 	gctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	db := s.db.WithContext(gctx)
-	readFanout := teamRunStateReadFanout(s.db)
 
 	var (
 		members     []model.AgentTeamMember
@@ -427,7 +394,7 @@ func (s *AgentTeamService) GetTeamRunState(ctx context.Context, userID, teamID, 
 		eventsErr      error
 	)
 	var layer1 errgroup.Group
-	layer1.SetLimit(readFanout)
+	layer1.SetLimit(teamRunStateReadConcurrency)
 	layer1.Go(func() error { members, membersErr = repository.ListTeamMembers(db, teamID); return nil })
 	layer1.Go(func() error { assignments, assignmentsErr = repository.ListAssignmentsByTeamRun(db, runID); return nil })
 	layer1.Go(func() error { tasks, tasksErr = repository.ListTeamTasksByRun(db, runID); return nil })
@@ -453,7 +420,7 @@ func (s *AgentTeamService) GetTeamRunState(ctx context.Context, userID, teamID, 
 		runEventsErr   error
 	)
 	var layer2 errgroup.Group
-	layer2.SetLimit(readFanout)
+	layer2.SetLimit(teamRunStateReadConcurrency)
 	layer2.Go(func() error {
 		pendingTaskByID, pendingTaskErr = s.pendingTaskSnapshotByID(db, assignments, tasks)
 		return nil
