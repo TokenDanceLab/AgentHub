@@ -10,6 +10,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/agenthub/pkg/safego"
 )
 
 var _ Repository = (*FileStore)(nil)
@@ -57,6 +59,12 @@ type FileStore struct {
 	persistCh chan struct{}
 	done      chan struct{}
 	closeOnce sync.Once
+
+	// persistChMu + closed guard schedulePersist against Close: sending on
+	// a closed channel panics even inside a select, so the check-and-send
+	// must be atomic with the close (#2154 F2).
+	persistChMu sync.RWMutex
+	closed      bool
 }
 
 const debounceInterval = 50 * time.Millisecond
@@ -81,7 +89,7 @@ func NewFile(path string) (*FileStore, error) {
 		persistCh: make(chan struct{}, 1),
 		done:      make(chan struct{}),
 	}
-	go f.persistLoop()
+	safego.SafeGo("store.file_persist_loop", f.persistLoop)
 
 	// Initial persist to verify write path works.
 	if err := f.syncPersist(); err != nil {
@@ -92,9 +100,14 @@ func NewFile(path string) (*FileStore, error) {
 }
 
 // Close stops the background persist goroutine and flushes pending writes.
+// Concurrent schedulePersist callers are fenced by persistChMu: after Close
+// returns, further writes are accepted in memory but no longer scheduled.
 func (f *FileStore) Close() {
 	f.closeOnce.Do(func() {
+		f.persistChMu.Lock()
+		f.closed = true
 		close(f.persistCh)
+		f.persistChMu.Unlock()
 		<-f.done
 	})
 }
@@ -116,7 +129,15 @@ func (f *FileStore) LastPersistError() error {
 }
 
 // schedulePersist signals the background loop to persist. Non-blocking.
+// The closed-check and the send happen under persistChMu.RLock so they can
+// never race Close's channel shutdown (send-on-closed panics even in a
+// select). Post-close calls are no-ops; Flush remains available.
 func (f *FileStore) schedulePersist() {
+	f.persistChMu.RLock()
+	defer f.persistChMu.RUnlock()
+	if f.closed {
+		return
+	}
 	select {
 	case f.persistCh <- struct{}{}:
 	default:
