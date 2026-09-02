@@ -201,3 +201,35 @@ func TestTokenProviderStopIdempotent(t *testing.T) {
 	p.Stop()
 	p.Stop() // second call must not panic
 }
+
+// TestTokenProviderLogRefreshFailureCountAndReset locks in the post-fix
+// contract of the failure voice: failures are recorded in LastError, the
+// consecutive-failure streak counts up (driving the Warn cadence), and a
+// fresh token pair (SetTokens) clears both the error and the streak so the
+// next outage's first failure warns again.
+func TestTokenProviderLogRefreshFailureCountAndReset(t *testing.T) {
+	p := NewTokenProvider("http://hub", "a", "r", http.DefaultClient)
+
+	p.logRefreshFailure("refresh status 500")
+	if got := p.LastError(); got != "refresh status 500" {
+		t.Fatalf("LastError = %q, want refresh status 500", got)
+	}
+	if n := p.refreshFails.Load(); n != 1 {
+		t.Fatalf("refreshFails = %d, want 1", n)
+	}
+
+	for i := 0; i < tokenRefreshLogEvery; i++ {
+		p.logRefreshFailure("refresh status 500")
+	}
+	if n := p.refreshFails.Load(); n != int64(tokenRefreshLogEvery)+1 {
+		t.Fatalf("refreshFails = %d, want %d", n, tokenRefreshLogEvery+1)
+	}
+
+	p.SetTokens("new-access", "new-refresh")
+	if got := p.LastError(); got != "" {
+		t.Fatalf("LastError after SetTokens = %q, want empty", got)
+	}
+	if n := p.refreshFails.Load(); n != 0 {
+		t.Fatalf("refreshFails after SetTokens = %d, want 0", n)
+	}
+}
