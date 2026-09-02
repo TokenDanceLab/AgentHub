@@ -107,7 +107,8 @@ describe('MainchainStatusStrip usage chip (#1990, UX F14)', () => {
   it('renders the compact usage total and routes to the usage page on click', () => {
     const onOpenUsage = vi.fn();
     render(<MainchainStatusStrip usageTokenTotal={12400} onOpenUsage={onOpenUsage} />);
-    const chip = screen.getByRole('button', { name: '12.4k tokens used · Open the usage board' });
+    // #2154 P3-3: shared formatTokens units (12.4K), matching the usage board.
+    const chip = screen.getByRole('button', { name: '12.4K tokens used · Open the usage board' });
     expect(chip).toHaveAttribute('data-attention-kind', 'usage');
     fireEvent.click(chip);
     expect(onOpenUsage).toHaveBeenCalledTimes(1);

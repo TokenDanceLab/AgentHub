@@ -138,7 +138,12 @@ describe('ShortcutsPane (#1822 custom keybindings)', () => {
     // conflict instead of overwriting the send shortcut.
     fireEvent.keyDown(document, { key: 'Enter' });
 
-    expect(screen.getByText('该组合与「send」冲突，未保存')).toBeInTheDocument();
+    // #2154 P3-6: the copy names the colliding shortcut through its labelKey.
+    // This suite runs in the key-echo test language, so tc() echoes
+    // 'shortcut.send'; SettingsPanes.shortcutsConflict.test.tsx pins the
+    // localized zh label. What must never appear is the bare internal id.
+    expect(screen.getByText('该组合与「shortcut.send」冲突，未保存')).toBeInTheDocument();
+    expect(screen.queryByText('该组合与「send」冲突，未保存')).not.toBeInTheDocument();
     expect(getResolvedBinding('search')).toEqual(['Ctrl/⌘', 'K']);
     expect(hasCustomKeybindings()).toBe(false);
   });
@@ -183,8 +188,8 @@ describe('ShortcutsPane (#1822 custom keybindings)', () => {
     fireEvent.keyDown(document, { key: 'Enter' });
 
     // The recorded row (search) carries the rejection message naming the
-    // colliding shortcut (send) — not the send row.
-    expect(screen.getByText('该组合与「send」冲突，未保存')).toBeInTheDocument();
+    // colliding shortcut by its label key — not the send row (#2154 P3-6).
+    expect(screen.getByText('该组合与「shortcut.send」冲突，未保存')).toBeInTheDocument();
     expect(remapButton('Ctrl/⌘ + K')).toBeInTheDocument();
     expect(remapButton('Enter')).toBeInTheDocument();
   });

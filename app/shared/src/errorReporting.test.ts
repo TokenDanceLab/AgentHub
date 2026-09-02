@@ -322,3 +322,65 @@ describe('event stream error filtering (#2072 P2-⑯)', () => {
     }
   });
 });
+
+/* #2154 P3-8: the network toast's recovery action reloads the document — it
+   does not re-send the failed request. The label used to read "重试 / Retry",
+   so clicking it silently threw away the composer draft, the session/panel
+   state and any in-flight run view. */
+describe('network recovery action honesty (#2154 P3-8)', () => {
+  beforeEach(() => {
+    globalErrorReporter.clear();
+  });
+
+  afterEach(() => {
+    setToastHandler(null);
+    globalErrorReporter.clear();
+  });
+
+  it('labels the action as a reload and reloads the page on click', () => {
+    const captured: ToastConfig[] = [];
+    setToastHandler((cfg) => captured.push(cfg));
+
+    const reload = vi.fn();
+    const realLocation = window.location;
+    // jsdom's location.reload is unforgeable; replace the whole object the way
+    // web/src/api/hubAuth.test.ts does and restore it afterwards.
+    Object.defineProperty(window, 'location', {
+      configurable: true,
+      value: {
+        href: realLocation.href,
+        origin: realLocation.origin,
+        pathname: realLocation.pathname,
+        assign: vi.fn(),
+        replace: vi.fn(),
+        reload,
+      },
+    });
+
+    const { unmount } = renderHook(() => useErrorReporter());
+    try {
+      act(() => {
+        globalErrorReporter.report(new HubNetworkError());
+      });
+
+      expect(captured).toHaveLength(1);
+      const action = captured[0].action;
+      expect(action).toBeDefined();
+      // Resolved through the global i18n instance; the shared test instance has
+      // no web/desktop common bundle, so the English fallback is asserted. The
+      // contract that matters is "not Retry".
+      expect(action?.label).toBe('Reload');
+      expect(action?.label).not.toBe('Retry');
+
+      action?.onClick();
+      expect(reload).toHaveBeenCalledTimes(1);
+    } finally {
+      Object.defineProperty(window, 'location', {
+        configurable: true,
+        writable: true,
+        value: realLocation,
+      });
+      unmount();
+    }
+  });
+});
