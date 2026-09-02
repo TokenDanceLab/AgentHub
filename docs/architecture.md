@@ -69,12 +69,10 @@ Mobile (fixture/boundary lane, independent RN rendering)
 
 ## 产品模型
 
+Agent Runtime / Agent Profile / Agent Configuration / Execution Target 四个概念的定义与权威位置只在根 `AGENTS.md` 的「产品术语」维护，本表不复制其含义（复制即分岔：本表旧副本曾把 Execution Target 的取值域从四类具名 target 退化成小写泛称）。这里只补架构侧新增的三个概念：
+
 | 概念 | 含义 | Owner |
 |---|---|---|
-| Agent Runtime | 能启动和解析某类 Agent CLI/SDK 的执行适配器 | Edge adapter registry |
-| Agent Profile | 用户选择的 Agent 实体 | Hub profile store / Edge local profile |
-| Agent Configuration | Profile 的上下文、Skill、MCP、模型、审批策略 | Edge Context Builder + Hub store |
-| Execution Target | 一次 Run 的执行位置：local、remote、cloud、relay | Edge registration + Hub routing |
 | Conversation | 用户可见 IM 会话：私聊、群聊、项目会话 | Hub/Edge conversation store |
 | Run Session | 一次执行生命周期和事件序列 | Edge lifecycle + EventStore |
 | Artifact | Agent 产物索引、预览、应用和版本 | Edge artifact index + workspace |
