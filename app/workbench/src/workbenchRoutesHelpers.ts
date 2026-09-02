@@ -121,6 +121,9 @@ export function buildProjectsPageProps(
     projects: projectsRoute.visibleProjects ?? projectsRoute.sourceProjects,
   };
 
+  // #2154 P2-3: chips the data source cannot satisfy render disabled.
+  assignDefined(props, 'availableFilters', projectsRoute.availableProjectFilters);
+
   if (projectsRoute.canMutateProject) {
     props.onProjectCreate = projectsRoute.handleProjectCreate;
     props.onProjectUpdate = projectsRoute.handleProjectUpdate;

@@ -204,6 +204,58 @@ describe('buildProjectsPageProps', () => {
     expect(props.projects).toEqual([source[1]]);
   });
 
+  it('forwards the available filters so unsatisfiable chips render disabled (#2154 P2-3)', () => {
+    const route = {
+      sourceProjects: [{ id: 'p1', status: 'Active' }],
+      visibleProjects: [{ id: 'p1', status: 'Active' }],
+      availableProjectFilters: ['all', 'running'],
+      effectiveProjectsStatus: undefined,
+      canMutateProject: false,
+      projectId: 'p1',
+      projectFilter: 'all',
+      setProjectFilter: vi.fn(),
+      projectTab: 'overview',
+      setProjectTab: vi.fn(),
+      projectPreview: null,
+      setProjectPreview: vi.fn(),
+      selectProject: vi.fn(),
+      handleProjectCreate: vi.fn(),
+      handleProjectUpdate: vi.fn(),
+      openArtifactPreview: vi.fn(),
+      loadMore: undefined,
+      hasMore: false,
+      loadingMore: false,
+    } as unknown as WorkbenchProjectsRoute;
+
+    const props = buildProjectsPageProps(route, []);
+    expect(props.availableFilters).toEqual(['all', 'running']);
+  });
+
+  it('omits availableFilters for partial route fixtures that predate it', () => {
+    const route = {
+      sourceProjects: [{ id: 'p1' }],
+      effectiveProjectsStatus: undefined,
+      canMutateProject: false,
+      projectId: 'p1',
+      projectFilter: 'all',
+      setProjectFilter: vi.fn(),
+      projectTab: 'overview',
+      setProjectTab: vi.fn(),
+      projectPreview: null,
+      setProjectPreview: vi.fn(),
+      selectProject: vi.fn(),
+      handleProjectCreate: vi.fn(),
+      handleProjectUpdate: vi.fn(),
+      openArtifactPreview: vi.fn(),
+      loadMore: undefined,
+      hasMore: false,
+      loadingMore: false,
+    } as unknown as WorkbenchProjectsRoute;
+
+    const props = buildProjectsPageProps(route, []);
+    expect(Object.prototype.hasOwnProperty.call(props, 'availableFilters')).toBe(false);
+  });
+
   it('includes mutate handlers and clears preview via onClosePreview', () => {
     const setProjectPreview = vi.fn();
     const handleProjectCreate = vi.fn();

@@ -1,7 +1,11 @@
 // real_tested=true
 import { describe, expect, it } from 'vitest';
 import type { ProjectInfo } from './types';
-import { filterProjectsByStatus, projectStatusBucket } from './shared';
+import {
+  filterProjectsByStatus,
+  projectStatusBucket,
+  resolveAvailableProjectFilters,
+} from './shared';
 
 /* ═══════════════════════════════════════════════════════════════════════
    Project status filtering (#2154 P2-3) — the nav filter chips used to be
@@ -78,5 +82,49 @@ describe('filterProjectsByStatus', () => {
 
   it('returns an empty list when nothing matches', () => {
     expect(filterProjectsByStatus([project('run', 'Active')], 'archived')).toEqual([]);
+  });
+});
+
+/* #2154 P2-3 second half: an enabled chip that can only produce an empty list
+   is a worse lie than the decorative chip it replaced, so the route publishes
+   which buckets the loaded projects can actually be classified into. */
+describe('resolveAvailableProjectFilters', () => {
+  it('always keeps "all" available, even with no projects at all', () => {
+    expect(resolveAvailableProjectFilters([])).toEqual(['all']);
+  });
+
+  it('offers nothing but "all" for the web projection labels', () => {
+    const projects = [project('w1', 'Hub'), project('w2', 'Hub group')];
+    expect(resolveAvailableProjectFilters(projects)).toEqual(['all']);
+  });
+
+  it('offers only running for the Active-only port/desktop projection', () => {
+    const projects = [project('a1', 'Active'), project('a2', 'Active')];
+    expect(resolveAvailableProjectFilters(projects)).toEqual(['all', 'running']);
+  });
+
+  it('offers every lifecycle chip when the data really spans all buckets', () => {
+    const projects = [
+      project('m1', '研究中'),
+      project('m2', '已完成'),
+      project('m3', '已归档'),
+      project('m4', 'Hub group'),
+    ];
+    expect(resolveAvailableProjectFilters(projects)).toEqual([
+      'all',
+      'running',
+      'completed',
+      'archived',
+    ]);
+  });
+
+  it('keeps FILTER_ITEMS order and never lists a bucket without a match', () => {
+    const projects = [project('x1', '已归档'), project('x2', 'Hub')];
+    const available = resolveAvailableProjectFilters(projects);
+    expect(available).toEqual(['all', 'archived']);
+    for (const filter of available) {
+      if (filter === 'all') continue;
+      expect(filterProjectsByStatus(projects, filter).length).toBeGreaterThan(0);
+    }
   });
 });

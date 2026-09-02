@@ -25,6 +25,7 @@ export {
   projectSubmitErrorMessage,
   filterProjectsByStatus,
   projectStatusBucket,
+  resolveAvailableProjectFilters,
 } from './shared';
 export type { ProjectStatusBucket } from './shared';
 

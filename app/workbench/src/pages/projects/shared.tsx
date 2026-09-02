@@ -4,6 +4,7 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import styles from '../ProjectsPage.module.css';
+import { FILTER_ITEMS } from './types';
 import type { ProjectFilter, ProjectInfo, ProjectRun, ProjectRunStatus } from './types';
 
 export function stateDotClass(status: ProjectRunStatus): string {
@@ -134,4 +135,25 @@ export function filterProjectsByStatus(
 ): ProjectInfo[] {
   if (filter === 'all') return projects;
   return projects.filter((project) => projectStatusBucket(project.status) === filter);
+}
+
+/**
+ * Which filter chips the current data source can actually satisfy (#2154 P2-3).
+ *
+ * A lifecycle chip that is clickable but can only ever produce an empty list is
+ * a worse lie than the decorative chip it replaced: the user reads the empty
+ * result as a fact about their data ("I have no completed projects"). So the
+ * route publishes the buckets the loaded projects really classify into, and the
+ * nav disables every lifecycle chip outside that set. `all` is always
+ * available — it never filters anything out.
+ */
+export function resolveAvailableProjectFilters(projects: ProjectInfo[]): ProjectFilter[] {
+  const buckets = new Set<ProjectStatusBucket>();
+  for (const project of projects) {
+    const bucket = projectStatusBucket(project.status);
+    if (bucket !== null) buckets.add(bucket);
+  }
+  return FILTER_ITEMS
+    .map((item) => item.id)
+    .filter((id) => id === 'all' || buckets.has(id as ProjectStatusBucket));
 }
