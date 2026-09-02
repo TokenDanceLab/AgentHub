@@ -3,6 +3,7 @@ package api
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -48,6 +49,12 @@ func shrinkDeployTimeouts(t *testing.T) {
 // within deploySSHTimeout instead of blocking until the kernel TCP
 // retransmission cap. Without the context kill this test times out.
 func TestRunSSHCommand_HangingHostHitsTimeout(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		// The re-exec'd hang stub does not reproduce Linux process-kill
+		// semantics on Windows (exits early instead of blocking), so the
+		// context-kill contract is only asserted on the server platform.
+		t.Skip("hang stub behavior is platform-dependent")
+	}
 	installDeploySSHStubs(t)
 	t.Setenv(deployStubEnvHang, "1")
 	shrinkDeployTimeouts(t)
@@ -70,6 +77,9 @@ func TestRunSSHCommand_HangingHostHitsTimeout(t *testing.T) {
 // TestRunSCP_HangingHostHitsTimeout is the scp counterpart: archive transfer
 // against a stalled peer must also hit the context cap.
 func TestRunSCP_HangingHostHitsTimeout(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("hang stub behavior is platform-dependent")
+	}
 	installDeploySSHStubs(t)
 	t.Setenv(deployStubEnvHang, "1")
 	shrinkDeployTimeouts(t)
