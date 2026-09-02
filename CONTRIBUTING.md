@@ -30,11 +30,12 @@ Common scopes: `client|edge|api|docs|desktop|web|hub|shared|ci`.
 
 ## Build / Test / Lint
 
-完整命令速查见 [docs/developer-quickstart.md](docs/developer-quickstart.md) §测试速查（SSOT）。常用入口：
+完整命令速查见 [docs/developer-quickstart.md](docs/developer-quickstart.md) §测试速查（SSOT）。
+每个 `make` 目标实际跑什么以根 `Makefile` 为准，本文件只列目标名不复述其内容（防漂移）。常用入口：
 
 ```bash
-make test          # Go 单元测试（L0，-short）+ 前端 vitest
-make fe-test       # 前端 vitest
+make test          # L0 后端单元（Makefile `test` 目标闭包，不含前端）
+make fe-test       # L0 前端单元（Makefile `fe-test` 目标）
 cd hub-server && go test ./... -short -count=1   # Hub 单元
 cd edge-server && go test ./... -short -count=1  # Edge 单元
 make test-hub-integration                         # L1 集成（先 scripts/dev/dev-up.sh 起 PG/Redis）

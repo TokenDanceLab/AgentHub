@@ -134,7 +134,7 @@ Mobile 主线是 Expo + React Native development build。旧 Tauri Mobile 不再
 
 | 层 | 内容 | 入口 | CI job |
 |---|---|---|---|
-| L0 单元 | Go `-short`（零依赖）+ 前端 vitest | `make test` / `make fe-test` | `go-edge-test`/`go-hub-test`（2-shard 包轮转）+ `go-edge`/`go-hub`（lint/覆盖率门禁）+ `frontend-*`（checks.yml，经 `frontend-required` 稳定 required-check 聚合）+ Windows 原生合同（`windows-go-test`/`windows-frontend-test` 执行矩阵 → `windows-go`/`windows-frontend` 稳定 required-check 聚合，见 `docs/architecture/github-actions-ci-cd-policy.md`） |
+| L0 单元 | Go `-short`（零依赖）+ 前端 vitest | `make test`（Go）/ `make fe-test`（前端） | `go-edge-test`/`go-hub-test`（2-shard 包轮转）+ `go-edge`/`go-hub`（lint/覆盖率门禁）+ `frontend-*`（checks.yml，经 `frontend-required` 稳定 required-check 聚合）+ Windows 原生合同（`windows-go-test`/`windows-frontend-test` 执行矩阵 → `windows-go`/`windows-frontend` 稳定 required-check 聚合，见 `docs/architecture/github-actions-ci-cd-policy.md`） |
 | L1 集成 | Go 集成（真实 PG16+Redis7，OIDC mock，`-tags integration`） | `make test-hub-integration`（先 `scripts/dev/dev-up.sh` 起容器） | `backend-integration`（service 容器；由 `backend-required` 聚合） |
 | L2 回调 E2E | Edge→Hub 回调链路（进程内 mock hub / fixture smoke） | `make test-edge-e2e` / `make e2e-local` | `backend-edge-e2e` / `backend-e2e-fixture`（由 `backend-required` 聚合） |
 | L3 真实 E2E | Playwright 真实登录/聊天流（真实 ID+Hub+Edge 栈） | 远程 dev 服务器：`scripts/dev/devserver.sh test|integration`（见 #1681） | 无阻塞 CI；`real-e2e-stack` dispatch-only（`checks.yml`）；常规入口 `scripts/dev/devserver.sh`（#1681），WSL 本机 `scripts/e2e/wsl-full-stack-e2e.sh` |
@@ -234,11 +234,7 @@ subagent 提示必须包含：目标、允许修改路径、禁改路径、必�
 
 ## 9.5 规则 → 机器验证映射
 
-机器验证的完整映射（规则 → 验证脚本/负向自测 → CI job）在 `docs/governance/verifier-map.md`（SSOT，脚本与 CI 路径由 `verify-doc-ssot.py` 校验存在性）；本节不复制长表。
-
-- 何时读：给规则配新机器门禁、改 CI job、核对负向自测、或审计某条规则有没有机器管时。
-- 里面有什么：全表三列（规则/验证脚本/CI job）+ 维护规则；`无` 表示暂无机器验证，靠人工自觉，规则本身不因此失效。
-- 权威范围：映射只描述“有没有机器管”，规则本身的权威仍是本文件；两者冲突时以本文件为准，并更新映射表。
+机器验证的完整映射（规则 → 验证脚本/负向自测 → CI job）在 `docs/governance/verifier-map.md`（SSOT，脚本与 CI 路径由 `verify-doc-ssot.py` 校验存在性）；本节不复制长表。何时读：给规则配新机器门禁、改 CI job、核对负向自测、或审计某条规则有没有机器管时。
 
 ## 10. 验证纪律
 
@@ -276,6 +272,8 @@ UI 工作流变更必须有行为断言，不只截图：共享 unit/contract + 
 版本号递增纪律（1.0 之前，0.x 阶段）：默认升 patch（如 0.6.0 → 0.6.1）；升 minor（v0.(x+1).0）需产品级理由（新平台、破坏性变更或对外里程碑）；RC 走 `vX.Y.Z-rc.N`（prerelease，不覆盖稳定 tag）；三端版本同步（desktop 必须与 tag 一致，web/mobile 落后在 release notes 注明，不单独打 tag）。**禁止**：同一 minor 反复 bump、24 小时内重打同 minor（patch 除外）、1.0 前打 `v1.x`。
 
 平台策略（Windows 唯一桌面目标、NSIS+portable、`RELEASE_MOBILE_ENABLED`/`RELEASE_UNSIGNED_OK`/`RELEASE_SIGNING_APPROVED` 门控）与产物命名/双语 release notes 见 `docs/developer-quickstart.md` §发布 tag SOP 步骤 4；发布后产物核对见步骤 5，release job 失败按步骤 6 重发。
+
+变更记录 owner：commit 级用户可见变更由 git-cliff 从 tag 区间生成到 GitHub Release 正文（`cliff.toml` + `.github/workflows/release.yml`），任何文档不手写；`CHANGELOG.md` 只保留已发布版本的 longform 破坏性变更/升级注意，不维护 Unreleased 清单。
 
 ## 13. 依赖更新（Renovate）
 
