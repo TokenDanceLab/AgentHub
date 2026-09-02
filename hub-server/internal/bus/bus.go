@@ -159,8 +159,16 @@ func (b *Bus) Publish(ctx context.Context, event Event) error {
 			// already logged and counted the panic by the time Pending() drops,
 			// so a Close()/drain that observes Pending()==0 cannot race ahead of
 			// the metric. The reversed order makes the panic observable only
-			// after the bus looks idle.
-			// TestPublish_HandlerPanic_RecoverRunsBeforePendingDecrement pins it.
+			// after the bus looks idle, and a drain-then-read caller then sees
+			// eventbus_panics_total not yet incremented. Two tests pin it:
+			// TestPublish_HandlerPanic_RecoverRunsBeforePendingDecrement (the
+			// observer still sees Pending()==1) and
+			// TestPublish_HandlerPanic_CountedByHubObserverNotByBus (the counter
+			// has already moved by the time the drain returns). Both go red when
+			// the defers are swapped; TestPublish_HandlerPanic_PendingReturnsToZero
+			// stays green either way, because a defer registered during unwinding
+			// still runs to completion — the count never leaks, only its ordering
+			// against the metric does.
 			defer func() { b.pending.Add(-1) }()
 			// pkg/safego is the single recovery path: it logs the goroutine name
 			// plus a full stack and dispatches to the process-wide PanicObserver.
