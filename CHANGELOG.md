@@ -1,10 +1,14 @@
 # Changelog
 
-所有值得发布的用户可见变化、兼容性变化和 release gate 结论记录在这里。2026-06-27 前的完整历史 changelog 见 [docs/history.md](docs/history.md)。
+已发布版本的 longform 记录（破坏性变更、升级注意、release gate 结论）在这里；commit 级的用户可见变更明细不手写，由 git-cliff 生成到 GitHub Release 正文（SSOT 声明见下方 Unreleased 节）。2026-06-27 前的完整历史 changelog 见 [docs/history.md](docs/history.md)。
 
 ## [Unreleased]
 
-暂无未发布变更。
+本节**不维护手写清单**，也不代表「没有未发布变更」。SSOT 与生成方式：
+
+- **逐版本用户可见变更的 SSOT 是 GitHub Release 正文**：由 git-cliff 按 Conventional Commits 从 tag 区间自动生成（模板 `cliff.toml`，生成与发布步骤在 `.github/workflows/release.yml` 的 `Generate release notes with git-cliff` / `Create GitHub Release`）。已发布列表见 [GitHub Releases](https://github.com/TokenDanceLab/AgentHub/releases)。
+- **本文件是不可变历史**：只保留已发布版本的 longform 破坏性变更/升级注意，`scripts/verify/verify-doc-ssot.py` 也按此对待本文件（不做活跃文档扫描）并施加行数预算。手写 Unreleased 列表既必然落后于 master，又会挤占该预算，所以明确不做。
+- 打新 tag 发布时，按需在此追加一节 longform（破坏性变更 + 升级注意）；commit 级明细去 Release 正文看，不复制进本文件。
 
 ## v0.6.1 (2026-08-12)
 

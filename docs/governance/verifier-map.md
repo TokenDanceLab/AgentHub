@@ -3,7 +3,7 @@
 > Owner：本文件是 AgentHub「规则 → 机器验证」映射的 SSOT。`AGENTS.md` 的“规则 → 机器验证映射”只保留指针，不复制本表。
 > 机器门禁：`scripts/verify/verify-doc-ssot.py` 校验本表验证脚本路径与 CI 文件存在性。
 
-最后更新：2026-08-29（新增宏观工程设计基线四条规则，机器门禁为“无”；其余保持 2026-08-25 变更）
+最后更新：2026-09-03（补齐 12 条「已接线但此前未登记」的门禁行：三个 vuln-scan job、质量债棘轮、auth 依赖所有权、migration 幂等、i18n dead-key、OIDC 码 SSOT、orchestrator 依赖方向、夹具连接钉死、devserver 合同、L3 artifact 脱敏、覆盖率 profile 合并；并修好宏观四行因空行脱离表格的渲染缺陷。上一轮 2026-08-29 新增宏观工程设计基线四条规则）
 
 ## 映射表
 
@@ -57,17 +57,28 @@
 | 提交格式 `type(scope): 中文摘要`（PR 时） | `scripts/verify/verify-commit-messages.sh` | checks.yml → validate |
 | UI Visual QA 行为证明（shell + chat 内容面，1440x810 light/dark，非空白 + 几何合同，禁 pixel golden；chat 半边的代码块场景走 web 端 stubbed-hub 回放） | `app/{desktop,web}/scripts/visual-qa-shell.mjs` + `app/{desktop,web}/scripts/visual-qa-chat.mjs`（assert：`assert-visual-qa-{shell,chat}.mjs`） | checks.yml → visual-qa-shell / visual-qa-desktop |
 | Web stubbed-hub 浏览器行为兜底（mock hub + 真 chromium 的 chat flow / replay smoke / task 合同；不是真实登录，`real_tested=false`） | `app/web/src/__e2e__/{chat-flow-contract,web-stubbed-hub-replay-smoke,task-contract}.spec.ts`（入口 `pnpm test:e2e:stubbed-hub`） | checks.yml → web-e2e-stubbed |
-| 真实登录/OIDC e2e 链路（需真实服务与凭据，`scripts/verify/verify-oidc-flow.py` 等 gate 保留在 `scripts/verify/`） | 无 | 无 |
+| 真实登录/OIDC e2e 链路（需真实服务与凭据）：lane 入口已接线为 dispatch-only job，不阻塞 PR；但 `scripts/verify/verify-oidc-flow.py`、`scripts/verify/verify-login-fixture-topology.py`、`scripts/verify/verify-approved-real-preflight.py` 等 readiness gate 仍未被任何 workflow 调用 | `scripts/e2e/run-real-e2e-lane.sh`（内部调用 `scripts/verify/verify-real-e2e-lane-manifest.py` 做六字段合同自检） | checks.yml → real-e2e-stack（仅 `workflow_dispatch`） |
 | 交互型 UI/UX 验收（Type/Motion/Empty 等跨组件行为） | 无 | 无 |
 | 配置组合安全（fail-closed 默认/env 全覆盖） | `hub-server/internal/config/config_validate.go`（校验入口）+ `hub-server/internal/config/constants.go`（`AuthFailClosedDefault`、`RateLimitFailOpenDefault`：auth 路径恒 fail-closed，非 auth 路径可 fail-open） | 无 |
 | edge debug 端点鉴权（Dev→nil / LocalAuthToken→Bearer / HubJWTSecret→hub-JWT 校验） | `edge-server/internal/httpserver/server_auth.go`（`debugAuthFunc` 分层鉴权，pprof/config/state 端点） | 无 |
 | 域 SSOT（CSP / Desktop 默认 URL / compose 回调域 三方一致） | `app/desktop/src-tauri/tauri.conf.json`（CSP + 默认 URL）；compose 回调域见 `deployments/production/.env.example`；专用 verifier 暂未建 | 无 |
 | flake 登记与处置（登记字段合同、到期移除纪律、重试预算与 CI annotation 约定，#1950） | `docs/governance/known-flaky.md`（流程 SSOT；暂无机器门禁，靠到期复审与评审执行） | 无 |
-
 | 宏观协议分层（MCP/A2A/AG-UI 仅 mapping，不替换自有 REST/WS） | 无 | 无 |
 | 事件一致性（outbox 同事务、event version、幂等 consumer、snapshot） | 无 | 无 |
 | 最小代理权（task-scoped 凭据 + per-action 授权） | 无 | 无 |
 | OTel GenAI 可观测（run/tool/model/token/cost trace） | 无 | 无 |
+| 依赖漏洞扫描 fail-closed 判定（#1534 假绿修复 + #2154 F-d dev-chain 盲区：扫描工具故障、输出不可解析、存在漏洞一律判红；JS 侧 `pnpm audit --prod` 与全量 `pnpm audit` 双跑且互不替代；唯一豁免通道是例外表，且须有 tracking issue） | `scripts/verify/verify-vulnerability-gates.sh`（负向自测 `scripts/verify/tests/verify-vulnerability-gates.Tests.sh`，例外表 `scripts/verify/vulnerability-exceptions.json`） | checks.yml → vuln-scan-js / vuln-scan-go（自测 → validate） |
+| Rust advisory 门禁（#1578：裸 `cargo audit` 把 unsound 类当非失败警告放行，本门禁把该类同样纳入判定；allowlist 每条带硬性复审到期日，过期即红；`unmaintained` 仅作 notice） | `scripts/verify/verify-rust-advisories.sh`（负向自测 `scripts/verify/tests/verify-rust-advisories.Tests.sh`） | checks.yml → vuln-scan-rust |
+| 质量债双向棘轮（#1536：checks.yml 每个 `continue-on-error` 与 `.golangci.yml` exclusion 必须登记进 baseline 且 reason/issue/owner/日期齐全；僵尸登记、预算扩大、复审到期日无 extension_reason 延长均 fail） | `scripts/verify/verify-quality-debt-ratchet.py`（负向自测 `scripts/verify/tests/verify-quality-debt-ratchet.Tests.py`，baseline `scripts/verify/quality-debt-baseline.json`） | checks.yml → validate |
+| auth 依赖所有权（#1551：`hub-server/internal/middleware` 与 `internal/jwtutil` 不得新增包级可变服务依赖，防同进程多 App 互相覆盖安全配置；allowlist 只缩不增） | `scripts/verify/verify-auth-dep-ownership.py` | checks.yml → validate |
+| migration DDL 幂等棘轮（#2125 follow-up：新增裸 `CREATE TABLE`/`ADD COLUMN`/`CREATE INDEX` 无 `IF NOT EXISTS` 即红；存量登记在 baseline，已修条目提示 prune） | `scripts/verify/verify-migration-idempotency.py`（baseline `scripts/verify/migration-idempotency-baseline.json`） | checks.yml → validate |
+| i18n dead-key 棘轮（web/desktop locale bundle 不得新增死键；判据保守——字面量在全仓源码含 tests/e2e 均未出现且无动态前缀覆盖才算死；例外登记 baseline） | `scripts/verify/verify-i18n-deadkeys.py`（baseline `scripts/verify/i18n-deadkeys-baseline.json`） | checks.yml → validate |
+| OIDC 授权码 SSOT（backend ↔ frontend 不分叉授权码流实现） | `scripts/verify/verify-oidc-code-ssot.py`（负向自测 `scripts/verify/tests/verify-oidc-code-ssot.Tests.py`） | checks.yml → validate |
+| Edge orchestrator 依赖方向（A-V1：`internal/orchestration` 中立契约 ← `internal/adapters/orchestrator` 叶子实现 ← composition root 注入，禁止反向依赖） | `scripts/verify/verify-orchestrator-deps.py`（负向自测 `scripts/verify/tests/verify-orchestrator-deps.Tests.py`） | checks.yml → go-edge |
+| 夹具连接钉死（#2154 F-e：并行读夹具必须钉住连接数——私有 `:memory:` 给每条新连接一个独立空库，未钉连接的 fan-out 读会落到非确定性 `no such table`） | `scripts/verify/verify-fixture-connection-pinning.py`（负向自测 `scripts/verify/tests/verify-fixture-connection-pinning.Tests.py`） | checks.yml → validate |
+| 远程 devserver 隐私/可移植合同（公开仓的 devserver 入口脚本与说明不得含内部主机别名、私有路径或不可移植写法） | `scripts/verify/verify-devserver-contract.py`（校验 `scripts/dev/devserver.sh` + `scripts/dev/README.md`） | checks.yml → validate |
+| L3 raw artifact 脱敏（#1873 Slice D：上传前扫 Playwright JSON/HTML report、trace.zip、失败截图，命中私有信息即非零退出；与 lane manifest 复用同一份 private_info 正则 SSOT） | `scripts/verify/verify-real-e2e-artifacts.py` | checks.yml → real-e2e-stack（仅 `workflow_dispatch`） |
+| Go 覆盖率 profile 合并（2-shard matrix 各 shard 的 `-coverprofile` 按位置块求和后再判阈值；repo-local 实现，不引第三方合并工具） | `scripts/verify/merge-coverprofiles.py` | checks.yml → go-edge / go-hub |
 
 ## 维护规则
 
