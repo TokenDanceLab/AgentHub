@@ -55,7 +55,12 @@ import {
   transcriptBlockIds,
   writeClipboardText,
 } from './workbenchTranscriptChromeHelpers';
-import type { DeleteConfirmRequest } from './workbenchTranscriptChromeHelpers';
+import type {
+  DeleteConfirmRequest,
+  TranscriptChromeControllerDeps,
+  TranscriptChromeStateWriters,
+} from './workbenchTranscriptChromeHelpers';
+import { forwardActionForTargets } from './workbenchTranscriptChromeActionMappers';
 
 const t = (key: string, options?: Record<string, unknown>) =>
   options?.count !== undefined ? `${key}:${options.count}` : key;
@@ -86,6 +91,52 @@ function permissionBlock(
     createdAt: '2026-01-01T00:00:00.000Z',
     ...overrides,
   };
+}
+
+
+/**
+ * #2154: minimal refs/writers/transcript fixture for controller-level menu
+ * tests. Transcript covers the three gating shapes: an agent text block
+ * (regenerate), a user text block (pin/recall) and a pinned block (unpin).
+ */
+function createChromeFixture(overrides: Partial<TranscriptChromeControllerDeps> = {}): {
+  deps: TranscriptChromeControllerDeps;
+  writers: TranscriptChromeStateWriters;
+} {
+  const writers: TranscriptChromeStateWriters = {
+    setContextMenu: vi.fn(),
+    setSelectionMode: vi.fn(),
+    setSelectedBlockIds: vi.fn(),
+    setActionedBlockIds: vi.fn(),
+    setSoftHiddenBlockIds: vi.fn(),
+    setSelectBarRect: vi.fn(),
+    setToastMessage: vi.fn(),
+    setToastVisible: vi.fn(),
+    setDeleteConfirmPending: vi.fn(),
+  };
+  const deps: TranscriptChromeControllerDeps = {
+    refs: {
+      selectionModeRef: { current: false },
+      selectionHoldRef: { current: null },
+      suppressSelectionPointerUpRef: { current: false },
+      runMultiActionRef: { current: null },
+      toastTimerRef: { current: null },
+      pulseTimersRef: { current: new Map<string, number>() },
+      deleteConfirmRef: { current: null },
+    },
+    writers,
+    getTranscript: () => [
+      textBlock({ id: 'a1', text: 'Alpha' }),
+      textBlock({ id: 'u1', text: 'Mine', author: { id: 'u', role: 'human', name: 'You' } }),
+      textBlock({ id: 'p1', text: 'Pinned', pinned: true }),
+    ],
+    getSelectedBlockIds: () => [],
+    t,
+    dispatchComposer: vi.fn(),
+    composerInputRef: { current: null },
+    ...overrides,
+  };
+  return { deps, writers };
 }
 
 describe('workbenchTranscriptChromeHelpers', () => {
@@ -1027,5 +1078,76 @@ describe('workbenchTranscriptChromeHelpers', () => {
     const forwardItem = withPicker[0]?.find((item) => item.label === 'context.forward');
     expect(forwardItem?.chevron).toBe(true);
     expect(typeof forwardItem?.submenu).toBe('function');
+  });
+
+  /* ── #2154 P1-A：controller 级 fail-closed 菜单 + 真实派发 ────────────── */
+
+  it('omits handler-backed menu entries when no handler is wired, even with a session id (#2154)', () => {
+    // The Desktop shell before #2154: `activeConversationId` doubles as the
+    // session id, so `hubMessageActions: Boolean(sessionId)` rendered
+    // pin/unpin/recall (and regenerate/forward) with no port handler behind
+    // them — the click reached the dispatcher and was dropped silently.
+    const { deps } = createChromeFixture({ sessionId: 'sess-1' });
+    const controller = createTranscriptChromeController(deps);
+    const conversations: Array<{ id: string; title: string; kind: 'direct' | 'group' }> = [
+      { id: 's2', title: 'Target', kind: 'direct' },
+    ];
+    const labelsOf = (blockId: string) => (
+      controller.contextMenuGroups(blockId, conversations).flat().map((item) => item.label)
+    );
+
+    const agentLabels = labelsOf('a1');
+    expect(agentLabels).not.toContain('context.regenerate');
+    expect(agentLabels).not.toContain('context.forward');
+    expect(agentLabels).not.toContain('context.pinMessage');
+    // Handler-independent entries stay.
+    expect(agentLabels).toContain('context.copy');
+    expect(agentLabels).toContain('context.copyLink');
+
+    const userLabels = labelsOf('u1');
+    expect(userLabels).not.toContain('context.recall');
+    expect(userLabels).not.toContain('context.pinMessage');
+
+    expect(labelsOf('p1')).not.toContain('context.unpin');
+  });
+
+  it('renders each wired action and dispatches the click to its handler (#2154)', () => {
+    const onPinMessage = vi.fn();
+    const onUnpinMessage = vi.fn();
+    const onRecallMessage = vi.fn();
+    const onForwardMessage = vi.fn();
+    const onRegenerate = vi.fn();
+    const { deps } = createChromeFixture({
+      sessionId: 'sess-1',
+      onPinMessage,
+      onUnpinMessage,
+      onRecallMessage,
+      onForwardMessage,
+      onRegenerate,
+    });
+    const controller = createTranscriptChromeController(deps);
+    const conversations: Array<{ id: string; title: string; kind: 'direct' | 'group' }> = [
+      { id: 's2', title: 'Target', kind: 'direct' },
+    ];
+    const click = (blockId: string, label: string): void => {
+      const item = controller.contextMenuGroups(blockId, conversations)
+        .flat()
+        .find((entry) => entry.label === label);
+      expect(item, `${label} on ${blockId}`).toBeDefined();
+      item?.onClick?.();
+    };
+
+    click('u1', 'context.pinMessage');
+    expect(onPinMessage).toHaveBeenCalledWith('u1', 'sess-1');
+    click('p1', 'context.unpin');
+    expect(onUnpinMessage).toHaveBeenCalledWith('p1', 'sess-1');
+    click('u1', 'context.recall');
+    expect(onRecallMessage).toHaveBeenCalledWith('u1');
+    click('a1', 'context.regenerate');
+    expect(onRegenerate).toHaveBeenCalledWith('a1');
+
+    // Forward rides the picker's encoded action string (#1385).
+    controller.runContextAction(forwardActionForTargets(['s2']), 'u1');
+    expect(onForwardMessage).toHaveBeenCalledWith('u1', ['s2']);
   });
 });

@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import { fireEvent, render } from '@testing-library/react';
 import type { TranscriptBlock } from '@shared/transcript';
 import {
+  UNAVAILABLE_ACTION_TOAST_KEY,
   applyTranscriptChromeSideEffects,
   buildTranscriptContextMenuGroups,
   buildTranscriptMultiSelectActions,
@@ -12,6 +13,10 @@ import {
   planConfirmMultiDelete,
   planMultiAction,
   planTranscriptBlockAction,
+} from './workbenchTranscriptChromeActionMappers';
+import type {
+  TranscriptChromeSideEffect,
+  TranscriptMenuActionCapabilities,
 } from './workbenchTranscriptChromeActionMappers';
 
 const t = (key: string, options?: Record<string, unknown>) => (
@@ -730,7 +735,7 @@ describe('workbenchTranscriptChromeActionMappers', () => {
     expect(syncRegenerateHandlers.showWorkbenchToast).toHaveBeenCalledWith('regen-ok');
   });
 
-  it('is a no-op for Hub REST side effects when handlers are not wired', () => {
+  it('announces Hub REST side effects when handlers are not wired (#2154)', () => {
     const handlers = createTranscriptChromeEffectHandlers({
       copyText: vi.fn(),
       softHideBlocks: vi.fn(),
@@ -743,12 +748,15 @@ describe('workbenchTranscriptChromeActionMappers', () => {
     expect(() => applyTranscriptChromeSideEffects([
       { type: 'pin', messageId: 'm1', sessionId: 's1', successMessage: 'pin-ok', failureMessage: 'pin-fail' },
       { type: 'recall', messageId: 'm2', successMessage: 'recall-ok', failureMessage: 'recall-fail' },
-    ], handlers)).not.toThrow();
+    ], handlers, t)).not.toThrow();
     // #1821: without a handler there is no real effect, so no success toast.
-    expect(handlers.showWorkbenchToast).not.toHaveBeenCalled();
+    // #2154: …but the drop must not be silent either — one announcement each.
+    expect(handlers.showWorkbenchToast).toHaveBeenCalledTimes(2);
+    expect(handlers.showWorkbenchToast).toHaveBeenNthCalledWith(1, 'pin-fail');
+    expect(handlers.showWorkbenchToast).toHaveBeenNthCalledWith(2, 'recall-fail');
   });
 
-  it('ignores approval effects when no decision handler is wired (#1821)', () => {
+  it('announces approval effects when no decision handler is wired (#1821, #2154)', () => {
     const handlers = {
       copyText: vi.fn(),
       softHideBlocks: vi.fn(),
@@ -765,8 +773,10 @@ describe('workbenchTranscriptChromeActionMappers', () => {
         successMessage: 'ok',
         failureMessage: 'nope',
       },
-    ], handlers)).not.toThrow();
-    expect(handlers.showWorkbenchToast).not.toHaveBeenCalled();
+    ], handlers, t)).not.toThrow();
+    // #2154: an unwired approval decision is announced, never swallowed.
+    expect(handlers.showWorkbenchToast).toHaveBeenCalledWith('nope');
+    expect(handlers.showWorkbenchToast).not.toHaveBeenCalledWith('ok');
   });
 
   it('plans an empty target list for a forward action with an empty payload', () => {
@@ -833,5 +843,165 @@ describe('workbenchTranscriptChromeActionMappers', () => {
     });
     groups.flat().find((item) => item.label === 'context.edit')?.onClick?.();
     expect(onAction).toHaveBeenCalledWith('edit', 'u1');
+  });
+
+  /* ── #2154 P1-A：菜单按 handler 存在性 fail-closed + 派发器不再静默丢弃 ── */
+
+  it('renders handler-backed menu entries only when the capability is declared (#2154)', () => {
+    const agentBlock = textBlock({ id: 'a1' });
+    const userBlock = textBlock({ id: 'u1', author: { id: 'u', role: 'human', name: 'You' } });
+    const pinnedBlock = textBlock({ id: 'p1', pinned: true });
+    const conversations: Array<{ id: string; title: string; kind: 'direct' | 'group' }> = [
+      { id: 's2', title: 'Target', kind: 'direct' },
+    ];
+    const labelsFor = (
+      block: TranscriptBlock,
+      capabilities?: TranscriptMenuActionCapabilities,
+      withConversations = true,
+    ): string[] => buildTranscriptContextMenuGroups({
+      blockId: block.id,
+      transcript: [block],
+      t,
+      onAction: vi.fn(),
+      onEnterSelection: vi.fn(),
+      ...(withConversations ? { conversations } : {}),
+      ...(capabilities ? { capabilities } : {}),
+    }).flat().map((item) => item.label);
+
+    // Desktop before #2154: a session id alone rendered pin/unpin/recall even
+    // though no port handler was wired, so every click was dropped silently.
+    const bareAgent = labelsFor(agentBlock);
+    expect(bareAgent).not.toContain('context.regenerate');
+    expect(bareAgent).not.toContain('context.forward');
+    expect(bareAgent).not.toContain('context.pinMessage');
+    const bareUser = labelsFor(userBlock);
+    expect(bareUser).not.toContain('context.recall');
+    expect(bareUser).not.toContain('context.pinMessage');
+
+    // A declared capability renders exactly its own entry.
+    expect(labelsFor(agentBlock, { regenerate: true })).toContain('context.regenerate');
+    expect(labelsFor(agentBlock, { forward: true })).toContain('context.forward');
+    expect(labelsFor(userBlock, { recall: true })).toContain('context.recall');
+    expect(labelsFor(userBlock, { pin: true })).toContain('context.pinMessage');
+    expect(labelsFor(pinnedBlock, { unpin: true })).toContain('context.unpin');
+
+    // Fail-closed per branch: the pin entry toggles off block.pinned, so a
+    // pinned block must not offer unpin unless the unpin port is wired (and
+    // vice versa) — otherwise the toggle renders the dead half.
+    expect(labelsFor(pinnedBlock, { pin: true })).not.toContain('context.unpin');
+    expect(labelsFor(userBlock, { unpin: true })).not.toContain('context.pinMessage');
+    // Author gating survives the capability gate (recall is user-only).
+    expect(labelsFor(agentBlock, { recall: true })).not.toContain('context.recall');
+    // Forward still needs the picker's conversation list (#1385).
+    expect(labelsFor(agentBlock, { forward: true }, false)).not.toContain('context.forward');
+  });
+
+  it('dispatches a declared menu entry to its action string (#2154)', () => {
+    const onAction = vi.fn();
+    const groups = buildTranscriptContextMenuGroups({
+      blockId: 'u1',
+      transcript: [textBlock({ id: 'u1', author: { id: 'u', role: 'human', name: 'You' } })],
+      t,
+      onAction,
+      onEnterSelection: vi.fn(),
+      capabilities: { pin: true, recall: true },
+    });
+    groups.flat().find((item) => item.label === 'context.pinMessage')?.onClick?.();
+    expect(onAction).toHaveBeenLastCalledWith('pin', 'u1');
+    groups.flat().find((item) => item.label === 'context.recall')?.onClick?.();
+    expect(onAction).toHaveBeenLastCalledWith('recall', 'u1');
+  });
+
+  const unwiredEffectCases: Array<{
+    name: string;
+    effects: TranscriptChromeSideEffect[];
+    /** The per-effect failure copy — the honest fallback while the dedicated
+     *  `toast.actionUnavailable` key is not in the locale bundle yet. */
+    announced: string;
+  }> = [
+    {
+      name: 'pin',
+      effects: [{ type: 'pin', messageId: 'm1', sessionId: 's1', successMessage: 'pin-ok', failureMessage: 'pin-fail' }],
+      announced: 'pin-fail',
+    },
+    {
+      name: 'unpin',
+      effects: [{ type: 'unpin', messageId: 'm1', sessionId: 's1', successMessage: 'unpin-ok', failureMessage: 'unpin-fail' }],
+      announced: 'unpin-fail',
+    },
+    {
+      name: 'forward',
+      effects: [{ type: 'forward', messageId: 'm1', targetSessionIds: ['s2'], successMessage: 'forward-ok', failureMessage: 'forward-fail' }],
+      announced: 'forward-fail',
+    },
+    {
+      name: 'recall',
+      effects: [{ type: 'recall', messageId: 'm1', successMessage: 'recall-ok', failureMessage: 'recall-fail' }],
+      announced: 'recall-fail',
+    },
+    {
+      name: 'react',
+      effects: [{ type: 'react', messageId: 'm1', sessionId: 's1', emoji: '🔥', successMessage: 'react-ok', failureMessage: 'react-fail' }],
+      announced: 'react-fail',
+    },
+    {
+      name: 'regenerate',
+      effects: [{ type: 'regenerate', blockId: 'b1', successMessage: 'regen-ok', failureMessage: 'regen-fail' }],
+      announced: 'regen-fail',
+    },
+    {
+      name: 'approval',
+      effects: [{
+        type: 'approval',
+        decision: { approvalId: 'req-1', decision: 'allow' },
+        successMessage: 'approval-ok',
+        failureMessage: 'approval-fail',
+      }],
+      announced: 'approval-fail',
+    },
+  ];
+
+  it('announces every unwired action exactly once instead of dropping it silently (#2154)', () => {
+    for (const testCase of unwiredEffectCases) {
+      const handlers = {
+        copyText: vi.fn(),
+        softHideBlocks: vi.fn(),
+        dispatchComposer: vi.fn(),
+        focusComposer: vi.fn(),
+        pulseBlock: vi.fn(),
+        showWorkbenchToast: vi.fn(),
+        exitSelection: vi.fn(),
+      };
+      // The suite's key-echo `t` cannot resolve the dedicated key, so the
+      // announcement falls back to the effect's own failure copy.
+      expect(() => applyTranscriptChromeSideEffects(testCase.effects, handlers, t)).not.toThrow();
+      // One perceivable signal — never zero (silent break), never the success copy.
+      expect(handlers.showWorkbenchToast, testCase.name).toHaveBeenCalledTimes(1);
+      expect(handlers.showWorkbenchToast, testCase.name).toHaveBeenCalledWith(testCase.announced);
+      // And no fake effect: nothing is hidden, pulsed or dispatched.
+      expect(handlers.softHideBlocks, testCase.name).not.toHaveBeenCalled();
+      expect(handlers.pulseBlock, testCase.name).not.toHaveBeenCalled();
+      expect(handlers.dispatchComposer, testCase.name).not.toHaveBeenCalled();
+    }
+  });
+
+  it('prefers the dedicated unwired-action copy once the locale bundle resolves it (#2154)', () => {
+    const resolvingT = (key: string): string => (
+      key === UNAVAILABLE_ACTION_TOAST_KEY ? 'RESOLVED-UNAVAILABLE' : key
+    );
+    const handlers = {
+      copyText: vi.fn(),
+      softHideBlocks: vi.fn(),
+      dispatchComposer: vi.fn(),
+      focusComposer: vi.fn(),
+      pulseBlock: vi.fn(),
+      showWorkbenchToast: vi.fn(),
+      exitSelection: vi.fn(),
+    };
+    applyTranscriptChromeSideEffects([
+      { type: 'recall', messageId: 'm1', successMessage: 'recall-ok', failureMessage: 'recall-fail' },
+    ], handlers, resolvingT);
+    expect(handlers.showWorkbenchToast).toHaveBeenCalledWith('RESOLVED-UNAVAILABLE');
+    expect(handlers.showWorkbenchToast).not.toHaveBeenCalledWith('recall-ok');
   });
 });
