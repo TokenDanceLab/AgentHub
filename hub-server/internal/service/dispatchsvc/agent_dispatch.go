@@ -317,9 +317,10 @@ func (s *DispatchService) dispatchRouteHubRelay(ctx context.Context, task *model
 	if metrics.RelayPushDelivered != nil {
 		metrics.RelayPushDelivered.Inc()
 	}
-	if dispatch.PlanLiveDispatchMark(deliveryID) {
-		_ = s.markDeliverySent(ctx, deliveryID)
-	}
+	// Route through the plan helper so a failed mark warns instead of being
+	// swallowed: an unmarked delivery stays pending and the outbox retry loop
+	// would redeliver — the Warn is the only signal of that double-send risk.
+	s.markDeliverySentPlan(ctx, dispatch.PlanLiveDispatchMark(deliveryID), deliveryID, task.ID)
 }
 
 // pushPendingTargetTaskOffline best-effort queues the payload on the target

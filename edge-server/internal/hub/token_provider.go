@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -45,6 +46,10 @@ type TokenProvider struct {
 	stopWG sync.WaitGroup
 	// lastErr mirrors the most recent rotation error for diagnostics.
 	lastErr string
+	// refreshFails counts consecutive failed rotations so logRefreshFailure can
+	// warn on the first failure and every tokenRefreshLogEvery-th one without
+	// flooding logs on the 30s retry cadence during a sustained Hub outage.
+	refreshFails atomic.Int64
 }
 
 // tokenRefreshLead is how far before expiry the rotation kicks in. Must stay
@@ -55,6 +60,11 @@ const tokenRefreshLead = 2 * time.Minute
 
 // tokenRefreshRetryInterval is the retry cadence after a failed rotation.
 const tokenRefreshRetryInterval = 30 * time.Second
+
+// tokenRefreshLogEvery bounds Warn cadence during sustained failures: the
+// first failure and every 20th consecutive one (~10 minutes at the 30s retry
+// cadence) log at Warn; intermediate attempts are still recorded in LastError.
+const tokenRefreshLogEvery = 20
 
 // refreshEndpoint is the Hub client-auth refresh route (desktop/web session
 // tokens rotate through the same endpoint).
@@ -93,6 +103,27 @@ func (p *TokenProvider) SetTokens(accessToken, refreshToken string) {
 	p.accessToken = accessToken
 	p.refreshToken = refreshToken
 	p.lastErr = ""
+	// A fresh pair (from the Hub or pushed by the Desktop) resets the failure
+	// streak so the next outage's first failure warns again.
+	p.refreshFails.Store(0)
+}
+
+// logRefreshFailure records a rotation failure with streak context. The
+// previous per-attempt Warn flooded logs during sustained Hub outages (one
+// line per 30s retry); this keeps the first failure and every
+// tokenRefreshLogEvery-th consecutive failure (~10 minutes) at Warn, demotes
+// the rest to Debug, and attaches consecutive_failures so a reader can tell
+// a transient blip from a multi-hour outage. LastError keeps the latest cause.
+func (p *TokenProvider) logRefreshFailure(reason string) {
+	p.mu.Lock()
+	p.lastErr = reason
+	p.mu.Unlock()
+	n := p.refreshFails.Add(1)
+	if n == 1 || n%tokenRefreshLogEvery == 0 {
+		slog.Warn("hub token refresh failed", "reason", reason, "consecutive_failures", n)
+		return
+	}
+	slog.Debug("hub token refresh failed", "reason", reason, "consecutive_failures", n)
 }
 
 // LastError returns the most recent rotation error ("" when healthy).
@@ -186,17 +217,17 @@ func (p *TokenProvider) refresh() bool {
 
 	resp, err := p.client.Do(req)
 	if err != nil {
-		p.setLastErr(err.Error())
+		p.logRefreshFailure(err.Error())
 		return false
 	}
 	defer resp.Body.Close()
 	respBody, err := io.ReadAll(io.LimitReader(resp.Body, 64*1024))
 	if err != nil {
-		p.setLastErr(err.Error())
+		p.logRefreshFailure(err.Error())
 		return false
 	}
 	if resp.StatusCode != http.StatusOK {
-		p.setLastErr("refresh status " + resp.Status)
+		p.logRefreshFailure("refresh status " + resp.Status)
 		return false
 	}
 	var payload struct {
@@ -207,11 +238,11 @@ func (p *TokenProvider) refresh() bool {
 		} `json:"data"`
 	}
 	if err := json.Unmarshal(respBody, &payload); err != nil {
-		p.setLastErr("refresh decode: " + err.Error())
+		p.logRefreshFailure("refresh decode: " + err.Error())
 		return false
 	}
 	if payload.Data.AccessToken == "" {
-		p.setLastErr("refresh response missing access_token")
+		p.logRefreshFailure("refresh response missing access_token")
 		return false
 	}
 	p.SetTokens(payload.Data.AccessToken, payload.Data.RefreshToken)
@@ -234,13 +265,6 @@ func (p *TokenProvider) expiresIn() time.Duration {
 		return 0
 	}
 	return remaining
-}
-
-func (p *TokenProvider) setLastErr(msg string) {
-	p.mu.Lock()
-	p.lastErr = msg
-	p.mu.Unlock()
-	slog.Warn("hub token refresh failed", "error", msg)
 }
 
 // jwtExpirySeconds extracts the exp claim (unix seconds) from an unsigned JWT
