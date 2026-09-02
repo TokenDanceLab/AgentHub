@@ -25,8 +25,9 @@ import (
 // plans and approve them, i.e. make the victim's agent perform the file writes
 // and command executions in that plan. The paradigm asserted here is the one
 // the package already uses for run-scoped writes (PostPreview, PostApplyRunDiff):
-// 404 "run not found" for both "missing" and "not yours" so the endpoints are
-// not a runId existence oracle, list endpoints filter instead of rejecting, the
+// 404 with the endpoint's own not-found errcode for both "missing" and "not
+// yours" (byte-identical bodies) so the endpoints are not a runId existence
+// oracle, list endpoints filter instead of rejecting, the
 // documented local single-tenant sentinel keeps seeing everything, and an empty
 // principal under Hub JWT fails closed (AH-SR-045).
 
@@ -153,7 +154,7 @@ func TestPostPlanDecideRejectsNonOwnerRun(t *testing.T) {
 	if rec.Code != http.StatusNotFound {
 		t.Fatalf("non-owner plan decide status = %d, want 404; body=%s", rec.Code, rec.Body.String())
 	}
-	assertErrorCode(t, rec.Body.String(), errcode.ErrNotFound.Code)
+	assertErrorCode(t, rec.Body.String(), errcode.ErrPlanNotFound.Code)
 	if _, ok := broker.GetPending("run-plan-victim"); !ok {
 		t.Error("ESCAPE: the non-owner decision consumed the victim's pending plan")
 	}
@@ -199,7 +200,7 @@ func TestPostPlanDecideFailsClosedWithoutHubIdentity(t *testing.T) {
 	if rec.Code != http.StatusNotFound {
 		t.Fatalf("status = %d, want 404 without Hub identity; body=%s", rec.Code, rec.Body.String())
 	}
-	assertErrorCode(t, rec.Body.String(), errcode.ErrNotFound.Code)
+	assertErrorCode(t, rec.Body.String(), errcode.ErrPlanNotFound.Code)
 	if _, ok := broker.GetPending("run-plan-noid"); !ok {
 		t.Error("ESCAPE: an identity-less request consumed the pending plan")
 	}
@@ -359,7 +360,7 @@ func TestPostPermissionDecideRejectsNonOwnerRun(t *testing.T) {
 	if rec.Code != http.StatusNotFound {
 		t.Fatalf("non-owner permission decide status = %d, want 404; body=%s", rec.Code, rec.Body.String())
 	}
-	assertErrorCode(t, rec.Body.String(), errcode.ErrNotFound.Code)
+	assertErrorCode(t, rec.Body.String(), errcode.ErrPermissionRequestNotFound.Code)
 	if got := h.Bus.HistoryLen(); got != 0 {
 		t.Errorf("ESCAPE: non-owner decision published %d bus events, want 0", got)
 	}
@@ -367,6 +368,39 @@ func TestPostPermissionDecideRejectsNonOwnerRun(t *testing.T) {
 	if ownerRec.Code != http.StatusOK {
 		t.Fatalf("owner decide after a blocked non-owner attempt = %d, want 200 (pending request was consumed); body=%s",
 			ownerRec.Code, ownerRec.Body.String())
+	}
+}
+
+// TestPostPermissionDecideNonOwnerIsNotAnExistenceOracle pins that "not your
+// run" and "no such run" produce byte-identical 404 envelopes, so probing
+// runIds through the permission gate leaks nothing.
+func TestPostPermissionDecideNonOwnerIsNotAnExistenceOracle(t *testing.T) {
+	h := newTestHandler()
+	h.HubJWTSecret = "test-secret"
+	seedOwnedApplyRun(t, h.Store, "permoracle", "run-perm-oracle", "user-a", "queued", "", "")
+	h.ensurePermissionRegistry().Register(permission.PendingPermission{
+		RunID:     "run-perm-oracle",
+		RequestID: "req_1",
+		ToolName:  "Bash",
+		ToolUseID: "tool_1",
+	})
+
+	notOwned := doPermissionDecideAsUser(h, "user-b", `{"runId":"run-perm-oracle","requestId":"req_1","decision":"allow"}`)
+	missing := doPermissionDecideAsUser(h, "user-b", `{"runId":"run-perm-does-not-exist","requestId":"req_1","decision":"allow"}`)
+
+	if notOwned.Code != missing.Code {
+		t.Fatalf("status differs: not-owned=%d missing=%d (runId existence oracle)", notOwned.Code, missing.Code)
+	}
+	if stripTraceID(notOwned.Body.String()) != stripTraceID(missing.Body.String()) {
+		t.Fatalf("body differs:\n not-owned=%s\n missing  =%s", notOwned.Body.String(), missing.Body.String())
+	}
+	assertErrorCode(t, notOwned.Body.String(), errcode.ErrPermissionRequestNotFound.Code)
+	if got := h.Bus.HistoryLen(); got != 0 {
+		t.Errorf("ESCAPE: the oracle probes published %d bus events, want 0", got)
+	}
+	ownerRec := doPermissionDecideAsUser(h, "user-a", `{"runId":"run-perm-oracle","requestId":"req_1","decision":"allow"}`)
+	if ownerRec.Code != http.StatusOK {
+		t.Fatalf("owner decide after the blocked probes = %d, want 200; body=%s", ownerRec.Code, ownerRec.Body.String())
 	}
 }
 
@@ -388,7 +422,7 @@ func TestPostPermissionDecideFailsClosedWithoutHubIdentity(t *testing.T) {
 	if rec.Code != http.StatusNotFound {
 		t.Fatalf("status = %d, want 404 without Hub identity; body=%s", rec.Code, rec.Body.String())
 	}
-	assertErrorCode(t, rec.Body.String(), errcode.ErrNotFound.Code)
+	assertErrorCode(t, rec.Body.String(), errcode.ErrPermissionRequestNotFound.Code)
 	if got := h.Bus.HistoryLen(); got != 0 {
 		t.Errorf("ESCAPE: identity-less decision published %d bus events, want 0", got)
 	}
