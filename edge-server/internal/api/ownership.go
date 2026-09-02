@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/agenthub/edge-server/internal/adapters/orchestrator"
 	"github.com/agenthub/edge-server/internal/edgeidentity"
 	"github.com/agenthub/edge-server/internal/events"
 	"github.com/agenthub/edge-server/internal/store"
@@ -137,6 +138,28 @@ func filterPreviewsByOwner(previews []store.Preview, repo store.Reader, userID s
 	}
 	filtered := make([]store.Preview, 0, len(previews))
 	for _, p := range previews {
+		if isRunOwnedBy(repo, p.RunID, userID) {
+			filtered = append(filtered, p)
+		}
+	}
+	return filtered
+}
+
+// filterPendingPlansByOwner filters pending orchestrator plans to those whose run
+// is owned by the given user. Local single-tenant bypass skips filtering. Empty
+// userID fails closed (returns none).
+// Plans are broker entries rather than store rows, so this walks the same
+// isRunOwnedBy anchor as filterArtifactsByOwner/filterPreviewsByOwner: under Hub
+// JWT a plan whose run is unknown, or whose project is unowned, is hidden.
+func filterPendingPlansByOwner(plans []orchestrator.PendingPlan, repo store.Reader, userID string) []orchestrator.PendingPlan {
+	if isLocalSingleTenant(userID) {
+		return plans
+	}
+	if userID == "" {
+		return []orchestrator.PendingPlan{}
+	}
+	filtered := make([]orchestrator.PendingPlan, 0, len(plans))
+	for _, p := range plans {
 		if isRunOwnedBy(repo, p.RunID, userID) {
 			filtered = append(filtered, p)
 		}
