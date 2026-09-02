@@ -44,19 +44,30 @@ func SetPanicObserver(fn PanicObserver) {
 // "ws.readLoop", "dispatch.launch"). It must not contain newlines.
 func SafeGo(name string, fn func()) {
 	go func() {
-		defer func() {
-			if r := recover(); r != nil {
-				stack := string(debug.Stack())
-				slog.Error("goroutine panic recovered",
-					"goroutine", name,
-					"panic", r,
-					"stack", stack,
-				)
-				if fn, ok := observer.Load().(PanicObserver); ok && fn != nil {
-					fn(name, r, stack)
-				}
-			}
-		}()
+		defer Recover(name)
 		fn()
 	}()
+}
+
+// Recover is the defer-able form of SafeGo's panic guard, for goroutine
+// bodies that cannot use the launcher shape (existing `go func(){...}()`
+// sites). It must be deferred inside the panicking goroutine; the stack
+// report and PanicObserver dispatch are identical to SafeGo.
+//
+//	go func() {
+//		defer safego.Recover("name")
+//		...
+//	}()
+func Recover(name string) {
+	if r := recover(); r != nil {
+		stack := string(debug.Stack())
+		slog.Error("goroutine panic recovered",
+			"goroutine", name,
+			"panic", r,
+			"stack", stack,
+		)
+		if fn, ok := observer.Load().(PanicObserver); ok && fn != nil {
+			fn(name, r, stack)
+		}
+	}
 }

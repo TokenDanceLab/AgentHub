@@ -15,6 +15,7 @@ import (
 	"github.com/agenthub/hub-server/internal/config"
 	"github.com/agenthub/hub-server/internal/middleware"
 	"github.com/agenthub/hub-server/internal/model"
+	"github.com/agenthub/pkg/safego"
 )
 
 // BackgroundGroup supervises long-lived goroutines (#1542). Every background
@@ -48,7 +49,7 @@ func (g *BackgroundGroup) Cancel() { g.cancel() }
 // Returns the first task error, or ctx.Err on deadline.
 func (g *BackgroundGroup) Wait(ctx context.Context) error {
 	done := make(chan error, 1)
-	go func() { done <- g.eg.Wait() }()
+	safego.SafeGo("background.wait_observer", func() { done <- g.eg.Wait() })
 	select {
 	case err := <-done:
 		return err
