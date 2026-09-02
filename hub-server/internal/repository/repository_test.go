@@ -697,7 +697,7 @@ func TestSessionRepo_CRUD(t *testing.T) {
 
 	// Update
 	fetched.Name = "Updated Session"
-	err = UpdateSession(db, fetched)
+	err = UpdateSessionColumns(db, fetched, "name")
 	require.NoError(t, err)
 
 	fetched2, err := GetSessionByID(db, session.ID)

@@ -226,7 +226,9 @@ func (s *Service) DissolveGroup(ctx context.Context, currentUserID, sessionID st
 	// Mark the session dissolved first so it is immediately unavailable even if
 	// agent cleanup fails partially. Agent cleanup runs best-effort after.
 	session.Dissolved = true
-	if err := repository.UpdateSession(s.db, session); err != nil {
+	// Column-scoped: a whole-row writeback would rewind next_seq /
+	// last_message_at behind the message path and the seqalloc mirror.
+	if err := repository.UpdateSessionColumns(s.db, session, "dissolved"); err != nil {
 		return err
 	}
 
@@ -282,8 +284,18 @@ func (s *Service) UpdateGroupInfo(ctx context.Context, currentUserID, sessionID 
 	}
 
 	changes := ApplyGroupInfoChanges(session, name, avatarURL, announcement)
-	if err := repository.UpdateSession(s.db, session); err != nil {
-		return err
+	// ApplyGroupInfoChanges mutates the struct and reports what it touched keyed
+	// by *database column name*, which is exactly the allowlist the narrow
+	// update needs (TestApplyGroupInfoChanges_KeysAreSessionColumns pins that).
+	// No changed columns means nothing to write.
+	if len(changes) > 0 {
+		columns := make([]string, 0, len(changes))
+		for column := range changes {
+			columns = append(columns, column)
+		}
+		if err := repository.UpdateSessionColumns(s.db, session, columns...); err != nil {
+			return err
+		}
 	}
 	s.publishEvent(ctx, EventTypeSessionInfoUpdated, SessionInfoUpdatedPayload(sessionID, changes))
 	return nil
