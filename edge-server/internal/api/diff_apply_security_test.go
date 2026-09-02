@@ -673,3 +673,31 @@ func TestCreateBackupWritesBackupWith0600(t *testing.T) {
 		t.Fatalf("backup mode = %o, want 600", perm)
 	}
 }
+
+// TestCreateBackupAcceptsAliasWorkDirRoot reproduces on any platform the
+// Windows failure CI caught (job "Native Windows Go (edge-server)"): the caller
+// hands createBackup a workdir spelling that EvalSymlinks resolves to a
+// different string — on the runner it was the 8.3 short name
+// C:\Users\RUNNER~1\... vs the long name C:\Users\runneradmin\... Comparing a
+// resolved path against an unresolved root rejected every legitimate backup, so
+// both sides of the defense-in-depth containment check are resolved now.
+func TestCreateBackupAcceptsAliasWorkDirRoot(t *testing.T) {
+	realDir := t.TempDir()
+	aliasParent := t.TempDir()
+	alias := filepath.Join(aliasParent, "workdir-alias")
+	if err := os.Symlink(realDir, alias); err != nil {
+		t.Skipf("symlink creation unavailable in this environment: %v", err)
+	}
+	content := []byte("package main\n")
+	target := filepath.Join(alias, "file.go") // spelled through the alias root
+	if err := os.WriteFile(target, content, 0o600); err != nil {
+		t.Fatalf("write fixture: %v", err)
+	}
+
+	if err := createBackup(alias, target, content); err != nil {
+		t.Fatalf("createBackup with an aliased workdir root: %v", err)
+	}
+	if _, err := os.Lstat(filepath.Join(realDir, "file.go.bak")); err != nil {
+		t.Fatalf("backup did not land inside the resolved workdir: %v", err)
+	}
+}

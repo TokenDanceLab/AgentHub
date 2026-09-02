@@ -527,13 +527,20 @@ func validateContainedWritePath(absWorkDir, targetPath string) error {
 
 	// Defense in depth: the symlink-free prefix must still resolve inside the
 	// resolved workdir, so a component that is not a symlink but still points
-	// elsewhere cannot smuggle the write out.
+	// elsewhere cannot smuggle the write out. Both sides are resolved before the
+	// comparison — on Windows a caller may hand in an 8.3 short-name root
+	// (C:\Users\RUNNER~1\...) while EvalSymlinks returns the long name, and
+	// comparing the two spellings would reject every legitimate write.
+	realWorkDir, err := normalizedRealPath(absWorkDir)
+	if err != nil {
+		return fmt.Errorf("cannot resolve workdir %q: %w", absWorkDir, err)
+	}
 	realExisting, err := normalizedRealPath(existing)
 	if err != nil {
 		return fmt.Errorf("cannot resolve %q: %w", existing, err)
 	}
-	if !isPathWithin(absWorkDir, realExisting) {
-		return fmt.Errorf("resolved path %q escapes workdir %q", realExisting, absWorkDir)
+	if !isPathWithin(realWorkDir, realExisting) {
+		return fmt.Errorf("resolved path %q escapes workdir %q", realExisting, realWorkDir)
 	}
 	return nil
 }
