@@ -77,7 +77,9 @@ func (s *AgentTeamService) StartTeamRun(ctx context.Context, userID, teamID, tri
 	// Trigger the task. This dispatches asynchronously.
 	if _, err := s.agentSvc.TriggerAgentTask(ctx, userID, triggerMessageID, supervisorAIID, "", "", supervisorRouteModelParams(), teamRunTargetID(run)); err != nil {
 		slog.Error("failed to trigger supervisor agent task for team run", "run_id", run.ID, "team_id", teamID, "error", err)
-		_ = repository.UpdateTeamRunStatus(s.db, run.ID, model.TeamRunStatusFailed)
+		if wbErr := repository.UpdateTeamRunStatus(s.db, run.ID, model.TeamRunStatusFailed); wbErr != nil {
+			slog.Error("failed to mark team run failed after trigger error", "run_id", run.ID, "team_id", teamID, "error", wbErr)
+		}
 		return run, err
 	}
 	// Persist durable TeamEvent so GetTeamRunState replay can derive running
