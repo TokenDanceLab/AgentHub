@@ -216,6 +216,43 @@ func Timeout(d time.Duration) gin.HandlerFunc {
 	}
 }
 
+// TimeoutStream enforces a request deadline without buffering the response.
+//
+// The buffered Timeout middleware swaps c.Writer for a timeoutWriter that
+// holds the entire response in memory until the handler returns. That is
+// correct for small JSON responses but wrong for attachment downloads, where
+// it would buffer the whole file (up to the upload max size) per concurrent
+// request and delay the first byte until the read completes.
+//
+// TimeoutStream only derives a context deadline. If the deadline fires
+// before anything has been written, the client receives the standard timeout
+// error; once writing has started, the stream is left to finish naturally (a
+// partially written response cannot be rewritten to a timeout error).
+// Handlers are expected to respect c.Request.Context() so reads stop at the
+// deadline. WebSocket upgrades pass through unchanged, mirroring Timeout.
+func TimeoutStream(d time.Duration) gin.HandlerFunc {
+	if d <= 0 {
+		// No deadline — pass through unchanged.
+		return func(c *gin.Context) { c.Next() }
+	}
+	return func(c *gin.Context) {
+		if isWebSocketUpgrade(c) {
+			c.Next()
+			return
+		}
+
+		ctx, cancel := context.WithTimeout(c.Request.Context(), d)
+		defer cancel()
+		c.Request = c.Request.WithContext(ctx)
+
+		c.Next()
+
+		if ctx.Err() == context.DeadlineExceeded && !c.Writer.Written() {
+			writeTimeout(c.Writer)
+		}
+	}
+}
+
 // isWebSocketUpgrade reports whether the request is a WebSocket upgrade.
 func isWebSocketUpgrade(c *gin.Context) bool {
 	if !strings.EqualFold(c.GetHeader("Upgrade"), "websocket") {
