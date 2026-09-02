@@ -163,6 +163,14 @@ const shortRevisionLen = 12
 // It never returns an empty string. An empty version is worse than "dev": it
 // vanishes from JSON payloads, so an operator cannot even tell that the field
 // was meant to carry a build identity.
+//
+// Honest limit: in a git *linked worktree* the stamping track can name the wrong
+// commit — cmd/go/internal/vcs/vcs.go requires the root marker to satisfy
+// {filename: ".git", isDir: true} via isVCSRoot()'s fi.IsDir() check, but a
+// worktree's .git is a *file*, so go stamps the main checkout's HEAD (measured:
+// worktree HEAD 106e9819 → e77808bf, vcs.modified false while dirty). Trust it
+// only for clones / CI checkouts; in a worktree inject -X …app.Version=
+// $(git rev-parse --short=12 HEAD); a plausible wrong commit misleads worse than "dev".
 func resolveVersion(explicit string) string {
 	if v := strings.TrimSpace(explicit); v != "" {
 		return v
