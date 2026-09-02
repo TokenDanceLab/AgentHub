@@ -15,6 +15,7 @@ import (
 	"github.com/agenthub/hub-server/internal/metrics"
 	"github.com/agenthub/hub-server/internal/middleware"
 	debugpkg "github.com/agenthub/pkg/debug"
+	"github.com/agenthub/pkg/safego"
 )
 
 // startAdminServer starts the admin HTTP server (#1547). Capability split:
@@ -102,6 +103,7 @@ func (a *App) startAdminServer() error {
 		metrics.AdminServerUp.Set(1)
 	}
 	go func() {
+		defer safego.Recover("admin.serve")
 		defer close(serveDone)
 		defer func() {
 			if metrics.AdminServerUp != nil {

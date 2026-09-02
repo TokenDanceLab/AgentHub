@@ -9,12 +9,14 @@ import (
 	"time"
 
 	"github.com/agenthub/hub-server/internal/metrics"
+	"github.com/agenthub/pkg/safego"
 )
 
 // StartDeliveryRetryLoop starts a background goroutine that periodically scans
 // for retryable deliveries and re-dispatches them.
 func (o *Outbox) StartDeliveryRetryLoop(ctx context.Context) {
 	go func() {
+		defer safego.Recover("outbox.retry_loop")
 		ticker := time.NewTicker(RetryScanInterval)
 		defer ticker.Stop()
 		for {
@@ -126,6 +128,7 @@ func (o *Outbox) refreshBacklogGauge(ctx context.Context) {
 // context so shutdown cancels both.
 func (o *Outbox) StartDeliveryCleanupLoop(ctx context.Context) {
 	go func() {
+		defer safego.Recover("outbox.cleanup_loop")
 		// 24h cadence: cleanup is a maintenance task, not a scan. The retention
 		// window (Retention) is applied inside CleanupOldDeliveries.
 		ticker := time.NewTicker(CleanupInterval)

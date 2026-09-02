@@ -10,6 +10,7 @@ import (
 	"github.com/agenthub/hub-server/internal/model"
 	"github.com/agenthub/hub-server/internal/repository"
 	"github.com/agenthub/hub-server/internal/service/dispatch"
+	"github.com/agenthub/pkg/safego"
 )
 
 // StartOrphanRecoveryLoop starts a background sweeper that reclaims queued
@@ -23,6 +24,7 @@ import (
 // regression shipped — hub stuck before "server starting").
 func (s *DispatchService) StartOrphanRecoveryLoop(ctx context.Context) {
 	go func() {
+		defer safego.Recover("dispatch.orphan_recovery_loop")
 		ticker := time.NewTicker(config.OrphanTaskScanInterval)
 		defer ticker.Stop()
 		for {

@@ -3,6 +3,7 @@ package safego
 import (
 	"sync/atomic"
 	"testing"
+	"time"
 )
 
 // TestSafeGoRecoversPanic verifies the panic-recovering goroutine launcher:
@@ -60,5 +61,28 @@ func TestSafeGoForwardsPanicToObserver(t *testing.T) {
 	}
 	if name, _ := seenName.Load().(string); name != "test.observed" {
 		t.Fatalf("observer name = %q, want test.observed", name)
+	}
+}
+
+// TestRecoverCatchesPanicAndReports pins the defer-able guard: a panicking
+// body must be recovered (not crash the process) and reported to the
+// PanicObserver with its registered name.
+func TestRecoverCatchesPanicAndReports(t *testing.T) {
+	observed := make(chan string, 1)
+	SetPanicObserver(func(name string, _ any, _ string) { observed <- name })
+	t.Cleanup(func() { SetPanicObserver(nil) })
+
+	func() {
+		defer Recover("test.deferred")
+		panic("boom")
+	}() // must not crash the test process
+
+	select {
+	case name := <-observed:
+		if name != "test.deferred" {
+			t.Fatalf("observer name = %q, want test.deferred", name)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("PanicObserver was not called")
 	}
 }

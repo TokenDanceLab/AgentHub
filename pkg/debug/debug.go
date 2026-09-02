@@ -3,6 +3,7 @@ package debug
 import (
 	"context"
 	"encoding/json"
+	"github.com/agenthub/pkg/safego"
 	"log/slog"
 	"net/http"
 	"net/http/pprof"
@@ -154,6 +155,7 @@ func healthHandler(cfg MuxConfig) http.HandlerFunc {
 		for name, checker := range cfg.HealthCheckers {
 			wg.Add(1)
 			go func(name string, checker HealthChecker) {
+				defer safego.Recover("debug.health_check")
 				defer wg.Done()
 				if err := checker(ctx); err != nil {
 					mu.Lock()

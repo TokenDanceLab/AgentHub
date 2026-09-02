@@ -10,6 +10,7 @@ import (
 	"github.com/agenthub/hub-server/internal/config"
 	"github.com/agenthub/hub-server/internal/metrics"
 	"github.com/agenthub/hub-server/internal/uuidv7"
+	"github.com/agenthub/pkg/safego"
 )
 
 // Manager is the global WebSocket connection registry. It tracks connections
@@ -333,6 +334,7 @@ func (m *Manager) StartHeartbeatWithInterval(ctx context.Context, interval time.
 		interval = config.WSHeartbeatInterval
 	}
 	go func() {
+		defer safego.Recover("ws.heartbeat_loop")
 		ticker := time.NewTicker(interval)
 		defer ticker.Stop()
 		for {
@@ -386,6 +388,7 @@ func (m *Manager) Shutdown() {
 	// their deferred Unregister/cleanup without deadlocking on mu.
 	done := make(chan struct{})
 	go func() {
+		defer safego.Recover("ws.shutdown_observer")
 		m.goroutines.Wait()
 		close(done)
 	}()
@@ -438,6 +441,7 @@ func (m *Manager) pingAll() {
 	for i := 0; i < workers; i++ {
 		wg.Add(1)
 		go func() {
+			defer safego.Recover("ws.ping_worker")
 			defer wg.Done()
 			for c := range jobs {
 				ctx, cancel := context.WithTimeout(context.Background(), config.WSPingTimeout)
