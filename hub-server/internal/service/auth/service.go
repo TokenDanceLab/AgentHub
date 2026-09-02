@@ -188,7 +188,10 @@ func (s *Service) enforceRefreshBlacklist(ctx context.Context, key string) error
 
 // Logout revokes all refresh tokens for the given user and device,
 // both in the database and in the Redis blacklist (#66).
-// If deviceType is non-empty, the Redis blacklist is scoped by device_type (#149).
+// If deviceType is non-empty, the Redis blacklist is scoped by device_type;
+// callers must pass the authenticated token's claim-derived device_type so
+// the written key matches the one the refresh path checks (#2154 Lorentz
+// P3-2; supersedes the #149 client-supplied query knob).
 // When accessJTI is non-empty, the access token jti is also blacklisted until
 // AccessTTL elapses so middleware rejects the token immediately (#888).
 func (s *Service) Logout(ctx context.Context, userID, deviceID, deviceType, accessJTI string) error {
