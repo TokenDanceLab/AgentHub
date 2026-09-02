@@ -13,6 +13,7 @@ import (
 
 	"gorm.io/gorm"
 
+	"github.com/agenthub/hub-server/internal/egress"
 	"github.com/agenthub/hub-server/internal/errcode"
 	"github.com/agenthub/hub-server/internal/model"
 	"github.com/agenthub/hub-server/internal/repository"
@@ -163,11 +164,7 @@ func (s *Service) pingEdgeServer(ctx context.Context, addr string, t *model.Exec
 		// Preserve the policy-denial reason (tests assert it names the egress
 		// policy) without echoing the resolved internal address to the API
 		// consumer (#2154 security lane F17).
-		reason := "target unreachable"
-		if strings.Contains(err.Error(), "not allowed") {
-			reason = "target not allowed by egress policy"
-		}
-		return errcode.TargetNotRoutable.WithMessage("ping failed: " + reason)
+		return errcode.TargetNotRoutable.WithMessage("ping failed: " + pingFailureReason(err))
 	}
 	defer resp.Body.Close()
 
@@ -183,6 +180,42 @@ func (s *Service) pingEdgeServer(ctx context.Context, addr string, t *model.Exec
 
 	_ = s.recordEvidence(ctx, t.ID, dispatch.EvidenceSourceProbe, dispatch.EvidenceStatusOffline, fmt.Sprintf("http_%d", resp.StatusCode), "", "")
 	return errcode.TargetNotRoutable.WithMessage(fmt.Sprintf("ping returned HTTP %d", resp.StatusCode))
+}
+
+// pingFailureReason maps an egress ping failure onto an API-safe reason string.
+//
+// Classification uses errors.Is against egress's typed sentinels, as that
+// package explicitly requires (egress.go:40-42: "Callers should use errors.Is
+// to distinguish policy refusals from transient network failures without
+// relying on error message text"). The previous strings.Contains(err.Error(),
+// "not allowed") test violated that contract: egress.ErrUnsupportedScheme reads
+// "egress: unsupported URL scheme (https required, or http with AllowPlainHTTP)"
+// and contains no "not allowed", so a scheme refused by policy was reported to
+// API consumers as "ping failed: target unreachable" — sending operators after
+// the network instead of after the target configuration.
+//
+// Every returned reason is a constant: the egress error text embeds the
+// resolved internal address and must never reach API consumers (#2154 security
+// lane F17); the full error stays in the slog line above. The wording of the
+// restricted-address branch is load-bearing — execution_target_test.go:267
+// asserts the surfaced error contains "not allowed".
+//
+// Extracted from pingEdgeServer so it is testable: Service.egress is the
+// concrete *egress.Client (execution_target.go:26) and Scheme() only ever
+// yields http/https, so the scheme and plain-http sentinels cannot be produced
+// through the ping path to be observed end-to-end.
+func pingFailureReason(err error) string {
+	switch {
+	case errors.Is(err, egress.ErrRestrictedAddress):
+		return "target not allowed by egress policy"
+	case errors.Is(err, egress.ErrPlainHTTPDenied):
+		return "plain http not allowed by egress policy"
+	case errors.Is(err, egress.ErrUnsupportedScheme):
+		return "target URL scheme not allowed by egress policy"
+	default:
+		// Transient network / DNS / timeout failures: not a policy statement.
+		return "target unreachable"
+	}
 }
 
 func observedTargetIDFromHealthBody(body []byte) string {
