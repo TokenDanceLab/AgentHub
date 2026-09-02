@@ -291,13 +291,47 @@ func CreatePendingTaskUnlessActive(db *gorm.DB, task *model.PendingAgentTask) (*
 	return task, nil
 }
 
-// BumpRunningTaskExpireAt extends the expire_at timestamp for a running task,
+// BumpRunningTaskExpireAt refreshes the expire_at deadline of a running task,
 // keeping it alive while activity (stream callbacks) continues.
 // #132: running tasks that stop receiving activity will be expired by the scheduler.
+//
+// #2154 P2-9: the write short-circuits *in SQL* instead of in Go. The callback
+// fires once per streamed chunk (per token, in practice), and every one of
+// those used to issue an UPDATE that rewrote expire_at to a value within a few
+// hundred milliseconds of the one already stored — a guaranteed-no-op write
+// that still burned a row lock and produced a dead tuple per chunk. The
+// predicate now only lets the UPDATE reach the row when the stored deadline
+// differs meaningfully from the one being written.
+//
+// Skip window and why it cannot change the liveness verdict:
+//
+//		skip  ⟺  newExpire - ttl/4 <= expire_at <= newExpire
+//		write ⟺  expire_at < newExpire - ttl/4  OR  expire_at > newExpire
+//
+//	  - The upper branch (expire_at > newExpire) is load-bearing, not defensive:
+//	    a task is created with expire_at = now + config.PendingTaskTTL (24h,
+//	    dispatchsvc/agent_dispatch.go) and nothing narrows it until the first
+//	    stream callback. A one-sided "only write when extending" predicate would
+//	    therefore skip that first bump forever and silently disable the #132
+//	    inactivity timeout for every running task.
+//	  - The lower bound means a skipped write leaves expire_at at most ttl/4
+//	    *earlier* than an unconditional bump would have, never later. So the
+//	    scheduler (ScanExpiredTasks: expire_at < now) can only expire a task
+//	    sooner-or-equal, never later, than before: the inactivity timeout is
+//	    preserved (effective window ttl - ttl/4 .. ttl) and no task is kept alive
+//	    longer than the old code kept it.
+//	  - Consequence: at most one UPDATE per ttl/4 per task (2.5 min at the
+//	    default RunningTaskHeartbeatTTL of 10 min) instead of one per chunk.
+//
+// A 0-row result is not an error — it is the intended short-circuit (and also
+// what a non-running or unknown task produced before). No Go-side per-task
+// timestamp map is kept, so this adds no memory-growth surface to the Hub.
 func BumpRunningTaskExpireAt(db *gorm.DB, id string, ttl time.Duration) error {
 	newExpire := time.Now().Add(ttl)
+	skipFloor := newExpire.Add(-ttl / 4)
 	return db.Model(&model.PendingAgentTask{}).
-		Where("id = ? AND status = ?", id, model.TaskStatusRunning).
+		Where("id = ? AND status = ? AND (expire_at < ? OR expire_at > ?)",
+			id, model.TaskStatusRunning, skipFloor, newExpire).
 		Update("expire_at", newExpire).Error
 }
 

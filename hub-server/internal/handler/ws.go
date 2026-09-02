@@ -18,9 +18,14 @@ import (
 )
 
 type WebSocketHandler struct {
-	manager     *ws.Manager
-	env         string
-	onTyping    func(userID, sessionID string)
+	manager *ws.Manager
+	env     string
+	// onTyping receives the typing fan-out callback. memberIDs is the session
+	// membership that canTypeInSession already resolved while admitting the
+	// frame, handed downstream so the fan-out does not resolve it a second
+	// time (#2154 P2-10: typing frames arrive continuously while a user types,
+	// and each resolution is a cache.GetOrLoad round trip).
+	onTyping    func(userID, sessionID string, memberIDs []string)
 	userLimiter *middleware.WSUserConnLimiter
 }
 
@@ -42,7 +47,10 @@ func NewWebSocketHandler(manager *ws.Manager, env string) *WebSocketHandler {
 	}
 }
 
-func (h *WebSocketHandler) SetOnTyping(fn func(userID, sessionID string)) {
+// SetOnTyping installs the typing fan-out callback. The callback is only ever
+// invoked for a frame whose sender was admitted as a session member, and it
+// receives the membership list that admission already resolved.
+func (h *WebSocketHandler) SetOnTyping(fn func(userID, sessionID string, memberIDs []string)) {
 	h.onTyping = fn
 }
 
@@ -192,17 +200,24 @@ func (h *WebSocketHandler) cleanupConn(conn *ws.Conn) {
 	h.manager.Unregister(conn.ID)
 }
 
+// handleTyping admits a typing frame and hands it to the fan-out callback.
+//
+// Admission is unchanged (#2154 P2-10 only removed the *second* member
+// resolution): an empty session id, a missing ResolveMembers hook, a panicking
+// hook and a non-member sender are all still dropped here, with the same warn
+// log, and the callback is never reached for them.
 func (h *WebSocketHandler) handleTyping(conn *ws.Conn, frame *ws.Frame) {
 	sessionID := typingSessionID(frame.Payload)
 	if sessionID == "" {
 		return
 	}
-	if !h.canTypeInSession(conn.UserID, sessionID) {
+	memberIDs, ok := h.canTypeInSession(conn.UserID, sessionID)
+	if !ok {
 		slog.Warn("ws typing rejected: user is not a session member", "user_id", conn.UserID, "session_id", sessionID)
 		return
 	}
 	if h.onTyping != nil {
-		h.onTyping(conn.UserID, sessionID)
+		h.onTyping(conn.UserID, sessionID, memberIDs)
 	}
 }
 
@@ -223,23 +238,35 @@ func typingSessionID(payload any) string {
 	return ""
 }
 
-func (h *WebSocketHandler) canTypeInSession(userID, sessionID string) (ok bool) {
+// canTypeInSession reports whether userID is an active member of sessionID and,
+// when it is, returns the membership list it resolved to reach that verdict.
+//
+// Returning the list is what lets the typing path resolve session members
+// exactly once per frame instead of twice (#2154 P2-10) — the fan-out callback
+// used to re-resolve the same sessionID and re-run the same senderIsMember
+// scan. The admission verdict itself is byte-for-byte the old one: empty ids or
+// a missing ResolveMembers hook deny, a panicking hook denies (recovered and
+// error-logged as before), and a sender absent from the resolved list denies.
+// On denial the returned list is nil so a caller can never fan out from it.
+func (h *WebSocketHandler) canTypeInSession(userID, sessionID string) (memberIDs []string, ok bool) {
 	if userID == "" || sessionID == "" || h.manager.ResolveMembers == nil {
-		return false
+		return nil, false
 	}
 	defer func() {
 		if r := recover(); r != nil {
 			slog.Error("ws canTypeInSession panic recovered in ResolveMembers callback",
 				"user_id", userID, "session_id", sessionID, "panic", r)
+			memberIDs = nil
 			ok = false
 		}
 	}()
-	for _, memberID := range h.manager.ResolveMembers(sessionID) {
+	resolved := h.manager.ResolveMembers(sessionID)
+	for _, memberID := range resolved {
 		if memberID == userID {
-			return true
+			return resolved, true
 		}
 	}
-	return false
+	return nil, false
 }
 
 // sendFrame writes a frame directly to conn.Send, bypassing Manager.PushToConn

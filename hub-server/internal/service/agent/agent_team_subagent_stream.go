@@ -51,12 +51,18 @@ type TeamSubagentStreamPayload struct {
 // team run it belongs to and which assignment/team-task/member it maps to. It
 // is resolved once per task (cached) and reused for every stream event of
 // that task.
+//
+// isTeam distinguishes a cached positive entry from a cached *negative* entry
+// (this task's session has no team run). Caching the negative is what keeps the
+// non-team majority off the database: without it every stream chunk re-runs the
+// team-run SELECT and always gets ErrRecordNotFound (#2154 P1-4).
 type teamRunContext struct {
 	teamRunID    string
 	teamID       string
 	assignmentID string
 	teamTaskID   string
 	memberID     string
+	isTeam       bool
 }
 
 // teamRunContextCache is a small bounded LRU keyed by pending task ID. A team
@@ -64,6 +70,14 @@ type teamRunContext struct {
 // a cache each event would re-run three DB lookups. task IDs are UUIDs and are
 // never reused, so cache entries stay correct for the task's lifetime —
 // invalidation is memory hygiene, not correctness (#1478 Phase A risk note).
+//
+// The same argument makes *negative* entries (isTeam=false) equally safe: a
+// task ID is minted once (uuidv7, see the note above) and its session's
+// team-run binding is established before the first stream chunk, so "no team
+// run for this task" cannot later become "team run for this task" within the
+// task's lifetime. Negative entries share the identical bounded LRU, so they
+// cost the same capped memory and are evicted by the same LRU policy — the
+// non-team majority cannot grow the cache beyond max.
 //
 // Eviction is LRU by access. The cache is goroutine-safe.
 type teamRunContextCache struct {
@@ -115,6 +129,14 @@ func (c *teamRunContextCache) put(taskID string, ctx teamRunContext) {
 	if len(c.order) > c.max {
 		c.evictTail()
 	}
+}
+
+// len reports the live entry count (positive and negative entries share the
+// bound). Used by the capacity tests and for observability.
+func (c *teamRunContextCache) len() int {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return len(c.order)
 }
 
 // invalidate removes the cached context for taskID, if present.
@@ -171,11 +193,32 @@ func (c *teamRunContextCache) evictTail() {
 	delete(c.order, n.key)
 }
 
+// teamRunLookupOutcome classifies a lookupTeamRunContext result so the caller
+// can tell a *definitive* negative answer from a transient failure.
+//
+// The distinction is required for negative caching: a definitive "this session
+// has no team run" may be cached for the task's lifetime, but a DB blip must
+// never be cached — otherwise one failed query would silently disable the
+// team.subagent.stream fan-out (and the route-decision auto-parse) for every
+// remaining chunk of that task.
+type teamRunLookupOutcome int
+
+const (
+	// teamRunLookupTransient is an inconclusive result (query error). The
+	// caller must not cache it and must retry on the next event.
+	teamRunLookupTransient teamRunLookupOutcome = iota
+	// teamRunLookupNoTeam is a definitive "no team run owns this session".
+	// Safe to negative-cache.
+	teamRunLookupNoTeam
+	// teamRunLookupTeam is a definitive resolved ownership. Safe to cache.
+	teamRunLookupTeam
+)
+
 // subagentStreamLookup is the DB-backed port that resolves a pending task's
 // team-run ownership. It is a distinct interface so tests can substitute an
 // in-memory lookup without touching gorm.
 type subagentStreamLookup interface {
-	lookupTeamRunContext(ctx context.Context, sessionID, taskID string) (teamRunContext, bool)
+	lookupTeamRunContext(ctx context.Context, sessionID, taskID string) (teamRunContext, teamRunLookupOutcome)
 }
 
 // dbTeamRunLookup resolves team-run ownership via repository queries.
@@ -183,19 +226,24 @@ type dbTeamRunLookup struct {
 	db *gorm.DB
 }
 
-func (l *dbTeamRunLookup) lookupTeamRunContext(ctx context.Context, sessionID, taskID string) (teamRunContext, bool) {
+func (l *dbTeamRunLookup) lookupTeamRunContext(ctx context.Context, sessionID, taskID string) (teamRunContext, teamRunLookupOutcome) {
 	if sessionID == "" || taskID == "" {
-		return teamRunContext{}, false
+		// Without identifiers there is definitively nothing to resolve. The
+		// caller skips caching for an empty task ID, so this cannot poison the
+		// cache with a "" key.
+		return teamRunContext{}, teamRunLookupNoTeam
 	}
 	run, err := repository.GetTeamRunBySessionID(l.db, sessionID)
 	if err != nil {
-		if !errors.Is(err, gorm.ErrRecordNotFound) {
-			slog.Warn("team.subagent.stream: team run lookup failed",
-				"session_id", sessionID, "task_id", taskID, "error", err)
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			// Definitive negative: cacheable (see teamRunContextCache doc).
+			return teamRunContext{}, teamRunLookupNoTeam
 		}
-		return teamRunContext{}, false
+		slog.Warn("team.subagent.stream: team run lookup failed",
+			"session_id", sessionID, "task_id", taskID, "error", err)
+		return teamRunContext{}, teamRunLookupTransient
 	}
-	out := teamRunContext{teamRunID: run.ID, teamID: run.TeamID}
+	out := teamRunContext{teamRunID: run.ID, teamID: run.TeamID, isTeam: true}
 
 	// An assignment binds the pending task via RunID (the pending task ID set
 	// by BindClaimedAssignmentDispatch). Find the assignment whose RunID points
@@ -204,7 +252,7 @@ func (l *dbTeamRunLookup) lookupTeamRunContext(ctx context.Context, sessionID, t
 	if err != nil {
 		slog.Warn("team.subagent.stream: assignments lookup failed",
 			"team_run_id", run.ID, "task_id", taskID, "error", err)
-		return teamRunContext{}, false
+		return teamRunContext{}, teamRunLookupTransient
 	}
 	for i := range assignments {
 		if assignments[i].RunID != nil && *assignments[i].RunID == taskID {
@@ -220,7 +268,7 @@ func (l *dbTeamRunLookup) lookupTeamRunContext(ctx context.Context, sessionID, t
 	if err != nil {
 		slog.Warn("team.subagent.stream: team tasks lookup failed",
 			"team_run_id", run.ID, "task_id", taskID, "error", err)
-		return teamRunContext{}, false
+		return teamRunContext{}, teamRunLookupTransient
 	}
 	for i := range tasks {
 		if tasks[i].RunID != nil && *tasks[i].RunID == taskID {
@@ -231,7 +279,7 @@ func (l *dbTeamRunLookup) lookupTeamRunContext(ctx context.Context, sessionID, t
 			break
 		}
 	}
-	return out, true
+	return out, teamRunLookupTeam
 }
 
 // publishTeamSubagentStream resolves the team-run context for a run event and,
@@ -251,8 +299,11 @@ func (s *EdgeCallbackService) publishTeamSubagentStream(
 	if lookup == nil {
 		return
 	}
-	tctx, ok := s.cachedTeamRunContext(ctx, lookup, runEvent.SessionID, taskID)
-	if !ok {
+	tctx, outcome := s.cachedTeamRunContext(ctx, lookup, runEvent.SessionID, taskID)
+	if outcome != teamRunLookupTeam {
+		// No team run for this task (definitive, possibly cached) or an
+		// inconclusive lookup — either way there is no ownership to fan out
+		// with, and the chat-side agent.stream publish already succeeded.
 		return
 	}
 	if err := s.bus.Publish(ctx, bus.Event{
@@ -277,26 +328,51 @@ func (s *EdgeCallbackService) publishTeamSubagentStream(
 	}
 }
 
-// cachedTeamRunContext returns the team-run context for (sessionID, taskID),
-// using the per-service LRU cache to avoid three DB lookups per stream event.
+// cachedTeamRunContext returns the team-run context for (sessionID, taskID)
+// plus a three-valued outcome, using the per-service bounded LRU to avoid three
+// DB lookups per stream event.
+//
+// The outcome (not a bool) is what lets the two callers stay exactly as
+// conservative as they were before caching:
+//
+//   - teamRunLookupTeam     — resolved ownership; fan the event out.
+//   - teamRunLookupNoTeam   — *definitive* "no team run owns this session".
+//     Cached (#2154 P1-4): non-team traffic is the majority and previously
+//     re-ran the team-run SELECT on every chunk only to get ErrRecordNotFound.
+//   - teamRunLookupTransient — inconclusive (query error). Never cached, so the
+//     next chunk retries, and callers that have their own way of answering the
+//     question (tryAutoParseRouteDecision re-reads the team run for its status
+//     check anyway) fall back to it instead of silently dropping the event.
 func (s *EdgeCallbackService) cachedTeamRunContext(
 	ctx context.Context,
 	lookup subagentStreamLookup,
 	sessionID, taskID string,
-) (teamRunContext, bool) {
-	if c := s.teamCtxCache(); c != nil {
-		if tctx, ok := c.get(taskID); ok {
-			return tctx, true
+) (teamRunContext, teamRunLookupOutcome) {
+	c := s.teamCtxCache()
+	if c != nil {
+		if tctx, hit := c.get(taskID); hit {
+			if tctx.isTeam {
+				return tctx, teamRunLookupTeam
+			}
+			return teamRunContext{}, teamRunLookupNoTeam
 		}
 	}
-	tctx, ok := lookup.lookupTeamRunContext(ctx, sessionID, taskID)
-	if !ok {
-		return teamRunContext{}, false
+	tctx, outcome := lookup.lookupTeamRunContext(ctx, sessionID, taskID)
+	if outcome == teamRunLookupTransient {
+		// Retry on the next event; never cache an inconclusive answer.
+		return teamRunContext{}, teamRunLookupTransient
 	}
-	if c := s.teamCtxCache(); c != nil {
+	if outcome == teamRunLookupTeam {
+		tctx.isTeam = true
+	} else {
+		tctx = teamRunContext{} // negative entry: isTeam=false
+	}
+	// An empty task ID cannot be keyed; skip the cache write (also keeps a
+	// "" entry from occupying an LRU slot).
+	if c != nil && taskID != "" {
 		c.put(taskID, tctx)
 	}
-	return tctx, true
+	return tctx, outcome
 }
 
 // teamCtxCache lazily allocates the LRU so tests that construct
