@@ -3,6 +3,7 @@ package errcode
 import (
 	"net/http"
 
+	"github.com/agenthub/edge-server/internal/resputil"
 	sharederr "github.com/agenthub/pkg/errcode"
 )
 
@@ -107,4 +108,22 @@ func ErrorBody(e *Error) map[string]any {
 			"traceId": NewTraceID(),
 		},
 	}
+}
+
+// Write sends e as the standard error envelope, taking the HTTP status from
+// e.HTTPStatus. It is the single place where an Edge error response's status is
+// decided: the signature deliberately has no status parameter, so a call site
+// cannot disagree with the code it is sending.
+//
+// Before this helper, ~160 call sites hand-copied the status next to
+// ErrorBody(e), and two of them drifted into mutually exclusive responses —
+// handlers_delivery_journal.go answered 503 with code bad_request (status says
+// "server side not configured", code says "your request is illegal") and 500
+// with code bad_request. Clients branching on status retried and alerted;
+// clients branching on code treated the call as invalid.
+//
+// Wire behavior is byte-identical to writeJSON(w, e.HTTPStatus, ErrorBody(e)):
+// internal/api's writeJSON is itself a thin delegate to resputil.WriteJSON.
+func Write(w http.ResponseWriter, e *Error) {
+	resputil.WriteJSON(w, e.HTTPStatus, ErrorBody(e))
 }
