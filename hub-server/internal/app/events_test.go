@@ -107,11 +107,49 @@ func readFrameType(t *testing.T, conn *ws.Conn) string {
 	}
 }
 
+// countResolveMembers wraps mgr.ResolveMembers with an invocation counter and
+// returns the counter. Resolution count is the metric #2154 P2-10 halves: the
+// typing frame used to resolve the same session twice (once to admit the
+// sender, once to fan out).
+func countResolveMembers(a *App) *atomic.Int64 {
+	var calls atomic.Int64
+	base := a.mgr.ResolveMembers
+	a.mgr.ResolveMembers = func(sessionID string) []string {
+		calls.Add(1)
+		return base(sessionID)
+	}
+	return &calls
+}
+
+// admitTypingFrame mirrors the production composition for one typing frame:
+// handler.WebSocketHandler.canTypeInSession resolves the session membership and
+// admits the sender (returning the list it resolved), then app.handleTypingFrame
+// fans that same list out. handleTypingFrame must not resolve again — that is
+// the round trip #2154 P2-10 removed. Returns whether the sender was admitted.
+func admitTypingFrame(a *App, userID, sessionID string) bool {
+	memberIDs := a.mgr.ResolveMembers(sessionID)
+	admitted := false
+	for _, memberID := range memberIDs {
+		if memberID == userID {
+			admitted = true
+			break
+		}
+	}
+	if !admitted {
+		// canTypeInSession denies here and never invokes the callback.
+		return false
+	}
+	a.handleTypingFrame(userID, sessionID, memberIDs)
+	return true
+}
+
 // TestHandleTypingFrameUsesCachedMemberResolution proves the #2154 fix:
 // sustained typing frames resolve session members through the shared
-// cache.GetOrLoad path instead of one ListActiveMembers DB query per frame.
+// cache.GetOrLoad path instead of one ListActiveMembers DB query per frame, and
+// each frame resolves the membership exactly once instead of twice.
 func TestHandleTypingFrameUsesCachedMemberResolution(t *testing.T) {
 	a, mock, mr, queryCount := newTypingTestApp(t)
+	resolveCalls := countResolveMembers(a)
 
 	const sessionID = "sess-typing-cache"
 	expectActiveMembers(mock, sessionID, "user-sender", "user-peer-1", "user-peer-2")
@@ -124,19 +162,22 @@ func TestHandleTypingFrameUsesCachedMemberResolution(t *testing.T) {
 	require.False(t, mr.Exists(cacheKey), "member cache must start cold")
 
 	// First frame: cold cache → exactly one DB query, then cached.
-	a.handleTypingFrame("user-sender", sessionID)
+	require.True(t, admitTypingFrame(a, "user-sender", sessionID))
 	require.EqualValues(t, 1, queryCount.Load(), "cold cache must load members once")
+	require.EqualValues(t, 1, resolveCalls.Load(), "one frame must resolve members exactly once (#2154 P2-10)")
 	require.True(t, mr.Exists(cacheKey), "member list must be cached after first frame")
 
 	require.Equal(t, ws.TypeTyping, readFrameType(t, peer1))
 	require.Equal(t, ws.TypeTyping, readFrameType(t, peer2))
 	require.Empty(t, sender.Send, "sender must not receive its own typing frame")
 
-	// Sustained typing: N more frames must not add a single DB query.
+	// Sustained typing: N more frames must not add a single DB query, and must
+	// still resolve exactly once per frame.
 	for i := 0; i < 5; i++ {
-		a.handleTypingFrame("user-sender", sessionID)
+		require.True(t, admitTypingFrame(a, "user-sender", sessionID))
 	}
 	require.EqualValues(t, 1, queryCount.Load(), "warm cache must serve all follow-up frames")
+	require.EqualValues(t, 6, resolveCalls.Load(), "6 frames must resolve 6 times, not 12")
 	require.Equal(t, ws.TypeTyping, readFrameType(t, peer1))
 	require.Equal(t, ws.TypeTyping, readFrameType(t, peer2))
 
@@ -144,9 +185,12 @@ func TestHandleTypingFrameUsesCachedMemberResolution(t *testing.T) {
 }
 
 // TestHandleTypingFrameRejectsNonMember keeps the pre-fix admission rule:
-// only session members may broadcast typing frames.
+// only session members may broadcast typing frames. Admission happens once, in
+// handler.canTypeInSession; a denied sender never reaches handleTypingFrame, so
+// nothing is fanned out and the membership is still resolved exactly once.
 func TestHandleTypingFrameRejectsNonMember(t *testing.T) {
 	a, mock, _, queryCount := newTypingTestApp(t)
+	resolveCalls := countResolveMembers(a)
 
 	const sessionID = "sess-typing-admission"
 	expectActiveMembers(mock, sessionID, "user-member")
@@ -154,12 +198,37 @@ func TestHandleTypingFrameRejectsNonMember(t *testing.T) {
 	member := registerTestConn(t, a.mgr, "user-member", "dev-member")
 	outsider := registerTestConn(t, a.mgr, "user-outsider", "dev-outsider")
 
-	a.handleTypingFrame("user-outsider", sessionID)
+	require.False(t, admitTypingFrame(a, "user-outsider", sessionID))
 
 	require.Empty(t, member.Send, "outsider typing frame must not fan out")
 	require.Empty(t, outsider.Send, "outsider must not receive its own frame")
 	require.EqualValues(t, 1, queryCount.Load(), "admission check resolves members once")
+	require.EqualValues(t, 1, resolveCalls.Load(), "a denied frame must not resolve twice")
 	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+// TestHandleTypingFrameFansOutToHandedMembership locks the new contract of the
+// callback itself: it pushes to every member it was handed except the sender,
+// and it performs no member resolution of its own.
+func TestHandleTypingFrameFansOutToHandedMembership(t *testing.T) {
+	a, _, _, _ := newTypingTestApp(t)
+	resolveCalls := countResolveMembers(a)
+
+	peer1 := registerTestConn(t, a.mgr, "user-peer-1", "dev-peer-1")
+	peer2 := registerTestConn(t, a.mgr, "user-peer-2", "dev-peer-2")
+	sender := registerTestConn(t, a.mgr, "user-sender", "dev-sender")
+
+	a.handleTypingFrame("user-sender", "sess-explicit", []string{"user-sender", "user-peer-1", "user-peer-2"})
+
+	require.Equal(t, ws.TypeTyping, readFrameType(t, peer1))
+	require.Equal(t, ws.TypeTyping, readFrameType(t, peer2))
+	require.Empty(t, sender.Send, "sender must not receive its own typing frame")
+	require.EqualValues(t, 0, resolveCalls.Load(), "fan-out must not resolve members itself")
+
+	// An empty membership (a session that lost all members between admission
+	// and fan-out) is a silent no-op, not a panic.
+	a.handleTypingFrame("user-sender", "sess-explicit", nil)
+	require.Empty(t, peer1.Send)
 }
 
 // TestBroadcastOnlineStatusUsesBatchedPresence proves the online/offline
