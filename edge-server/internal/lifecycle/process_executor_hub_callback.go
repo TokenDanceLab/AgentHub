@@ -12,6 +12,7 @@ import (
 
 	"github.com/agenthub/edge-server/internal/adapters"
 	"github.com/agenthub/edge-server/internal/hub"
+	"github.com/agenthub/pkg/safego"
 )
 
 // CallbackReporter is the Edge→Hub delivery port used by ProcessExecutor.
@@ -89,7 +90,7 @@ func (e *ProcessExecutor) fireHubAck(runID string) {
 	if !shouldFireHubCallback(e.hubCallback != nil, taskID) {
 		return
 	}
-	safeGo("hubAck", func() {
+	safego.SafeGo("hubAck", func() {
 		if !e.acquireHubCallbackSlot() {
 			// Should not happen with a buffered sem; defensive.
 			return
@@ -148,7 +149,7 @@ func (e *ProcessExecutor) hubFinalContent(runID string) string {
 //
 // Delivery is ordered per run: chunks are queued to a per-run FIFO consumed by
 // a single goroutine, so the Hub receives stream chunks in emission order
-// (concurrent safeGo sends previously raced and could deliver a later chunk
+// (concurrent safego.SafeGo sends previously raced and could deliver a later chunk
 // first). Backpressure is non-blocking: when the queue is full the chunk is
 // dropped rather than stalling the run lifecycle (#987). FinalContent
 // collection via recordHubOutput is independent of stream send success.
@@ -197,7 +198,7 @@ func (e *ProcessExecutor) fireHubDone(runID string, _ map[string]any) {
 		return
 	}
 	content := e.hubFinalContent(runID)
-	safeGo("hubDoneEnqueue", func() {
+	safego.SafeGo("hubDoneEnqueue", func() {
 		e.enqueueTerminalHubJob(runID, hubCallbackJob{
 			kind:   hubJobDone,
 			taskID: taskID,
@@ -217,7 +218,7 @@ func (e *ProcessExecutor) fireHubFail(runID string, reason string) {
 		hubStreamChunkSeq.Delete(runID)
 		return
 	}
-	safeGo("hubFailEnqueue", func() {
+	safego.SafeGo("hubFailEnqueue", func() {
 		e.enqueueTerminalHubJob(runID, hubCallbackJob{
 			kind:    hubJobFail,
 			taskID:  taskID,
@@ -336,7 +337,7 @@ func (e *ProcessExecutor) startHubCallbackQueue(state *hubCallbackQueueState) {
 	if !state.started.CompareAndSwap(false, true) {
 		return
 	}
-	safeGo("hubCallbackQueue", func() {
+	safego.SafeGo("hubCallbackQueue", func() {
 		defer func() {
 			// Consumer owns per-run cleanup: the queue map entry and the
 			// chunk-seq counter go away only after the queue drains.
