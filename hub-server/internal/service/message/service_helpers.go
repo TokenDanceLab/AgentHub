@@ -27,16 +27,25 @@ func (s *Service) publish(ctx context.Context, event bus.Event) {
 }
 
 // allocateSeq allocates the next sequence number via the shared seqalloc
-// allocator (Redis INCR → DB mirror → DB fallback), then touches
-// last_message_at so the session appears in recent conversations (#154).
+// allocator (Redis INCR → DB mirror → DB fallback).
+//
+// It deliberately does NOT touch sessions.last_message_at. It used to (#154),
+// which made every SendMessage / ForwardMessage issue two UPDATEs against the
+// same `sessions` row in one request: one here, outside any transaction, and
+// one inside the caller's persist transaction (#2154 P2-8). Only the in-
+// transaction touch survives — it is atomic with the message insert, so a
+// rolled-back insert can no longer leave the session looking freshly active,
+// and the hot `sessions` row is written once instead of twice.
+//
+// Both callers in this package already touch inside their transaction
+// (persistSendMessageTx for SendMessage, forwardOne for ForwardMessage), so no
+// path lost its #154 behavior; TestSendMessage_TouchesSessionLastMessageOnce
+// locks that. The agent-service allocateSeq (service/agent/agent.go) is a
+// separate method that never touched here, and the Edge stream callback path
+// touches through its own throttled writer (service/agent
+// touchSessionLastMessageThrottled), so no agent path is affected either.
 func (s *Service) allocateSeq(ctx context.Context, sessionID string) (int64, error) {
-	seq, err := s.seqAllocator().Allocate(ctx, sessionID)
-	if err == nil {
-		if touchErr := repository.TouchSessionLastMessage(s.db, sessionID); touchErr != nil {
-			slog.Warn("failed to touch session last_message_at after seq alloc", "session_id", sessionID, "error", touchErr)
-		}
-	}
-	return seq, err
+	return s.seqAllocator().Allocate(ctx, sessionID)
 }
 
 // seqAllocator returns the configured allocator, lazily constructing one from
