@@ -17,7 +17,7 @@ func (h *Handler) GetDeliveryJournal(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if h.CallbackClient == nil {
-		writeJSON(w, http.StatusServiceUnavailable, errcode.ErrorBody(errcode.ErrBadRequest.WithMessage("delivery journal not configured")))
+		errcode.Write(w, errcode.ErrNotConfigured.WithMessage("delivery journal not configured"))
 		return
 	}
 	var afterSeq uint64
@@ -31,7 +31,7 @@ func (h *Handler) GetDeliveryJournal(w http.ResponseWriter, r *http.Request) {
 	}
 	entries, err := h.CallbackClient.DurableSnapshot(afterSeq)
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, errcode.ErrorBody(errcode.ErrBadRequest.WithMessagef("journal snapshot: %v", err)))
+		errcode.Write(w, errcode.ErrInternal.WithMessagef("journal snapshot: %v", err))
 		return
 	}
 	userID := h.ownerUserID(r)

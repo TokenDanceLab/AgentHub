@@ -26,6 +26,13 @@ func (h *Handler) GetSettings(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) PatchSettings(w http.ResponseWriter, r *http.Request) {
+	// Settings are Edge-local shared config with no per-user owner binding, so the
+	// write side fails closed exactly like the read side above (AH-SR-045). The gate
+	// runs before decodeOptionalJSON: an unauthorized caller must not be able to make
+	// the Edge parse a body at all.
+	if h.denyRemoteHubSharedConfig(w, r) {
+		return
+	}
 	var patch map[string]string
 	// decodeOptionalJSON applies the shared 1MB body limit; this was the only
 	// JSON decode point bypassing it (memory exhaustion, #2154 security scan).
