@@ -258,18 +258,16 @@ func (s *Service) CreateThreadMessage(ctx context.Context, projectID, threadID, 
 		Content:     content,
 	}
 	err = s.db.Transaction(func(tx *gorm.DB) error {
-		var current model.Session
-		if err := tx.Where("id = ?", threadID).First(&current).Error; err != nil {
+		// AllocateSeqID atomically reserves the next sequence with a row lock
+		// (UPDATE ... RETURNING). The previous read-modify-write raced: two
+		// concurrent messages in the same thread both read N and both inserted
+		// seq N+1, tripping the (session_id, seq_id) unique index (#2154).
+		seq, err := repository.AllocateSeqID(tx, threadID)
+		if err != nil {
 			return err
 		}
-		msg.SeqID = current.NextSeq + 1
-		if err := repository.InsertMessage(tx, msg); err != nil {
-			return err
-		}
-		return tx.Model(&model.Session{}).Where("id = ?", threadID).Updates(map[string]any{
-			"next_seq":        msg.SeqID,
-			"last_message_at": time.Now(),
-		}).Error
+		msg.SeqID = seq
+		return repository.InsertMessage(tx, msg)
 	})
 	if err != nil {
 		return nil, err
