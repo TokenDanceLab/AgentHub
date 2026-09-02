@@ -114,6 +114,7 @@ func New(cfg Config) (*Client, error) {
 		DialContext:           c.dialContext,
 		ForceAttemptHTTP2:     true,
 		MaxIdleConns:          10,
+		MaxIdleConnsPerHost:   10,
 		IdleConnTimeout:       60 * time.Second,
 		TLSHandshakeTimeout:   5 * time.Second,
 		ExpectContinueTimeout: 1 * time.Second,
