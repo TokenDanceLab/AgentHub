@@ -22,15 +22,21 @@ import (
 // and client errors (400) are not retried.
 func (a *AnthropicSDKAdapter) doRequestWithRetry(ctx context.Context, body []byte, emitter EventEmitter, scope map[string]any) (*http.Response, error) {
 	var lastErr error
+	var retryAfterHint string
 
 	for attempt := 0; attempt <= anthropicMaxRetries; attempt++ {
 		if attempt > 0 {
 			// Exponential backoff with jitter: 1s, 2s, 4s (±25%).
 			// Jitter prevents thundering herd when multiple sub-agents
-			// retry simultaneously after a provider-wide outage.
+			// retry simultaneously after a provider-wide outage. A
+			// Retry-After hint from the previous 429/5xx takes the larger
+			// of hint and backoff (capped) so retries stop colliding with
+			// provider throttle windows.
 			delay := anthropicRetryBaseDelay * time.Duration(math.Pow(2, float64(attempt-1)))
 			// #nosec G404 -- retry backoff jitter only; randomness is not used for security
 			delay += time.Duration(rand.Int63n(int64(delay / 4)))
+			delay = retryDelayWithHint(delay, retryAfterHint)
+			retryAfterHint = ""
 			slog.Info("anthropic-sdk: retrying request",
 				"attempt", attempt,
 				"delay", delay,
@@ -69,12 +75,14 @@ func (a *AnthropicSDKAdapter) doRequestWithRetry(ctx context.Context, body []byt
 		case resp.StatusCode == http.StatusOK:
 			return resp, nil
 		case resp.StatusCode == http.StatusTooManyRequests:
-			// Rate limited -- always retry
+			// Rate limited -- always retry; carry the throttle hint.
+			retryAfterHint = resp.Header.Get("Retry-After")
 			_ = resp.Body.Close()
 			lastErr = fmt.Errorf("rate limited (429)")
 			continue
 		case resp.StatusCode >= 500:
-			// Server error -- retry
+			// Server error -- retry; 503 may carry a throttle hint too.
+			retryAfterHint = resp.Header.Get("Retry-After")
 			_ = resp.Body.Close()
 			lastErr = fmt.Errorf("server error (%d)", resp.StatusCode)
 			continue
