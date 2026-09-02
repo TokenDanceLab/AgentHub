@@ -14,6 +14,12 @@ func AccessLogGin() gin.HandlerFunc {
 		start := time.Now()
 		c.Next()
 
+		// Unmatched routes (404/405) have no FullPath template, so the raw URL
+		// path is logged as-is. That is intentional and must not be "fixed" by
+		// borrowing the bounded "unmatched" label from the metrics middleware:
+		// a log line is per-request and rotated, while a Prometheus series is
+		// permanent and unbounded cardinality there is an OOM vector. Debugging
+		// a 404 requires the path that was actually requested.
 		path := c.FullPath()
 		if path == "" {
 			path = c.Request.URL.Path

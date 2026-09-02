@@ -72,20 +72,26 @@ func applyRunEventToSummary(summary *model.AgentRunEventSummary, approvalStates 
 		summary.StepCount++
 	}
 
-	payload := map[string]any{}
-	_ = json.Unmarshal([]byte(event.Payload), &payload)
+	// Switch on the event type first and decode the payload only in the
+	// branches that actually read it. text_delta and every other unlisted type
+	// used to pay a full json.Unmarshal (plus a []byte copy of a payload that
+	// can be KB-scale) whose result was then discarded; on a 2,000-event task
+	// the payload-consuming types are a handful. tool_call / file_change only
+	// bump counters, so they now decode nothing at all.
 	switch event.EventType {
 	case model.RunEventTypeOutputBatch:
-		summary.OutputBytes += OutputBytesFromPayload(payload)
+		summary.OutputBytes += OutputBytesFromPayload(runtimePayload(event.Payload))
 	case "run.agent.tool_call":
 		summary.ToolCallCount++
 	case "run.agent.permission_requested":
+		payload := runtimePayload(event.Payload)
 		key := FirstRuntimeString(payload, "requestId", "request_id", "toolUseId", "tool_use_id")
 		if key == "" {
 			key = event.ID
 		}
 		approvalStates[key] = FirstNonEmpty(FirstRuntimeString(payload, "status"), "pending")
 	case "run.agent.permission_decided":
+		payload := runtimePayload(event.Payload)
 		key := FirstRuntimeString(payload, "requestId", "request_id", "toolUseId", "tool_use_id")
 		if key == "" {
 			key = event.ID
@@ -94,10 +100,34 @@ func applyRunEventToSummary(summary *model.AgentRunEventSummary, approvalStates 
 	case "run.agent.file_change":
 		summary.ArtifactCount++
 	case "run.agent.result", "run.agent.context_usage":
-		inputTokens, outputTokens := TokenUsageFromPayload(payload)
+		inputTokens, outputTokens := TokenUsageFromPayload(runtimePayload(event.Payload))
 		summary.InputTokens += inputTokens
 		summary.OutputTokens += outputTokens
 	}
+}
+
+// runtimePayload decodes a run-event payload for projection, returning an empty
+// (non-nil) map when the payload is absent or is not valid JSON.
+//
+// Undecodable payloads are deliberately non-fatal here: the summary fold still
+// counts the event (EventTypeCounts / StepCount ran before the switch), which
+// preserves the long-standing behaviour of discarding the unmarshal error and
+// switching against an empty map. Projections that must skip such an event
+// entirely use runtimePayloadStrict instead.
+func runtimePayload(raw string) map[string]any {
+	payload := map[string]any{}
+	_ = json.Unmarshal([]byte(raw), &payload)
+	return payload
+}
+
+// runtimePayloadStrict decodes a run-event payload and reports whether it was
+// valid JSON, so callers can keep their existing "skip this event" semantics.
+func runtimePayloadStrict(raw string) (map[string]any, bool) {
+	var payload map[string]any
+	if err := json.Unmarshal([]byte(raw), &payload); err != nil {
+		return nil, false
+	}
+	return payload, true
 }
 
 // ProjectTaskApprovals builds pending/decided approval projections from run events.
@@ -124,14 +154,22 @@ func ProjectTaskApprovals(task *model.PendingAgentTask, events []model.AgentRunE
 		if result.SessionID == "" {
 			result.SessionID = event.SessionID
 		}
-		var payload map[string]any
-		if err := json.Unmarshal([]byte(event.Payload), &payload); err != nil {
-			continue
-		}
+		// Decode only for the two approval-bearing types. They are typically a
+		// handful per task, while the loop used to unmarshal all 2,000 events
+		// (repository.maxAgentEventsPerQuery) including KB-scale text_delta
+		// payloads, and throw every result away.
 		switch event.EventType {
 		case "run.agent.permission_requested":
+			payload, ok := runtimePayloadStrict(event.Payload)
+			if !ok {
+				continue
+			}
 			projector.requested(event, payload)
 		case "run.agent.permission_decided":
+			payload, ok := runtimePayloadStrict(event.Payload)
+			if !ok {
+				continue
+			}
 			projector.decided(event, payload)
 		}
 	}
@@ -298,12 +336,13 @@ func ProjectTaskArtifacts(task *model.PendingAgentTask, events []model.AgentRunE
 		if result.SessionID == "" {
 			result.SessionID = event.SessionID
 		}
-		var payload map[string]any
-		if err := json.Unmarshal([]byte(event.Payload), &payload); err != nil {
-			continue
-		}
+		// Same shape as ProjectTaskApprovals: filter on type, then decode.
 		switch event.EventType {
 		case "run.agent.file_change":
+			payload, ok := runtimePayloadStrict(event.Payload)
+			if !ok {
+				continue
+			}
 			edgeRunID := FirstNonEmptyString(event.EdgeRunID, task.EdgeRunID)
 			paths := TaskArtifactPaths(payload)
 			for _, path := range paths {
@@ -327,6 +366,10 @@ func ProjectTaskArtifacts(task *model.PendingAgentTask, events []model.AgentRunE
 				})
 			}
 		case "artifact.created":
+			payload, ok := runtimePayloadStrict(event.Payload)
+			if !ok {
+				continue
+			}
 			edgeRunID := FirstNonEmptyString(event.EdgeRunID, task.EdgeRunID)
 			path := FirstJSONString(payload, "path", "filePath", "file_path", "uri")
 			if path == "" {
