@@ -526,3 +526,20 @@ func TestDialTimeoutDefaultAndConfigurable(t *testing.T) {
 		t.Fatalf("custom dialer.Timeout = %v, want 10s", c2.dialer.Timeout)
 	}
 }
+
+// TestNewTransportIdlePoolBounds pins the egress pool shape: ping targets
+// are admin-configured and low-volume, so the pool stays small but the
+// per-host cap is explicit and never exceeds the total cap.
+func TestNewTransportIdlePoolBounds(t *testing.T) {
+	c, err := New(Config{AllowCIDRs: []string{"127.0.0.0/8"}})
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	tr, ok := c.hc.Transport.(*http.Transport)
+	if !ok {
+		t.Fatalf("Transport = %T, want *http.Transport", c.hc.Transport)
+	}
+	if tr.MaxIdleConnsPerHost > tr.MaxIdleConns {
+		t.Errorf("MaxIdleConnsPerHost = %d exceeds MaxIdleConns = %d", tr.MaxIdleConnsPerHost, tr.MaxIdleConns)
+	}
+}
