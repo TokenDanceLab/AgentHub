@@ -315,9 +315,22 @@ func (o *Outbox) GetDeliveryStats(ctx context.Context) (map[string]int64, error)
 // entries for a task as delivered. Exported so the flat service package can
 // name it in the edgeCallbackOutbox port (edge callback no longer mutates the
 // outbox row directly).
-func (o *Outbox) AutoAckDeliveriesForTask(ctx context.Context, taskID string) {
+//
+// The returned error lets the caller decide whether the ack actually landed.
+// The Edge stream callback dedupes this call per task in process memory
+// (#2154 P2-9) and must only record the dedupe entry on success, so a
+// transient store failure leaves the next chunk free to retry instead of
+// silently dropping the SentTimeout redispatch guard for the task's lifetime.
+// The warn log is kept here so observability is unchanged for callers that
+// ignore the return value.
+//
+// The operation is idempotent: UpdateByTaskID only matches ActiveStatuses()
+// (pending/sent/retrying), so a repeat call — after a process restart cleared
+// the caller's dedupe set, or for a task with no outbox row at all — matches 0
+// rows, returns (nil error, no state change) and is a pure no-op.
+func (o *Outbox) AutoAckDeliveriesForTask(ctx context.Context, taskID string) error {
 	if o == nil || o.store == nil {
-		return
+		return nil
 	}
 	now := time.Now()
 	rows, err := o.store.UpdateByTaskID(ctx, taskID, ActiveStatuses(), Patch{
@@ -326,11 +339,12 @@ func (o *Outbox) AutoAckDeliveriesForTask(ctx context.Context, taskID string) {
 	})
 	if err != nil {
 		slog.Warn("failed to auto-ack deliveries for task", "task_id", taskID, "error", err)
-		return
+		return fmt.Errorf("auto-ack deliveries for task: %w", err)
 	}
 	if rows > 0 {
 		slog.Debug("auto-acked deliveries for task", "task_id", taskID, "count", rows)
 	}
+	return nil
 }
 
 func strPtr(s string) *string { return &s }

@@ -235,8 +235,12 @@ func TestWebSocketTypingAllowsSessionMemberCallback(t *testing.T) {
 	wsURL := newConfiguredMiddlewareWebSocketTestServer(t, manager, &config.Config{
 		JWT: config.JWTConfig{Secret: testWSSecret},
 	}, func(h *handler.WebSocketHandler) {
-		h.SetOnTyping(func(userID, sessionID string) {
-			called <- map[string]string{"user_id": userID, "session_id": sessionID}
+		h.SetOnTyping(func(userID, sessionID string, memberIDs []string) {
+			called <- map[string]string{
+				"user_id":    userID,
+				"session_id": sessionID,
+				"members":    strings.Join(memberIDs, ","),
+			}
 		})
 	}, nil)
 	conn := dialWebSocketWithBearer(t, wsURL, token)
@@ -251,6 +255,11 @@ func TestWebSocketTypingAllowsSessionMemberCallback(t *testing.T) {
 	case got := <-called:
 		if got["user_id"] != "user-ws-typing" || got["session_id"] != "sess-typing" {
 			t.Fatalf("typing callback = %#v", got)
+		}
+		// #2154 P2-10: the admission check hands its resolved membership to the
+		// callback so the fan-out does not resolve the same session twice.
+		if got["members"] != "user-ws-typing,peer-ws-typing" {
+			t.Fatalf("typing callback members = %q, want the admitted membership", got["members"])
 		}
 	case <-time.After(time.Second):
 		t.Fatal("expected typing callback for active session member")
@@ -274,7 +283,7 @@ func TestWebSocketTypingRejectsNonMemberBeforeCallback(t *testing.T) {
 	wsURL := newConfiguredMiddlewareWebSocketTestServer(t, manager, &config.Config{
 		JWT: config.JWTConfig{Secret: testWSSecret},
 	}, func(h *handler.WebSocketHandler) {
-		h.SetOnTyping(func(userID, sessionID string) {
+		h.SetOnTyping(func(userID, sessionID string, memberIDs []string) {
 			called <- struct{}{}
 		})
 	}, nil)

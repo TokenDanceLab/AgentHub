@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"strings"
 	"sync"
+	"time"
 
 	"gorm.io/gorm"
 
@@ -35,8 +36,12 @@ type edgeCallbackSeq interface {
 
 // edgeCallbackOutbox auto-acks delivery journal rows when Edge proves receipt
 // (ack, first authorized stream, or done). Implemented solely by *deliveryoutbox.Outbox.
+//
+// The error result is what lets the stream path dedupe this call per task
+// (#2154 P2-9): only a successful ack is recorded, so a transient store
+// failure leaves the next chunk free to retry.
 type edgeCallbackOutbox interface {
-	AutoAckDeliveriesForTask(ctx context.Context, taskID string)
+	AutoAckDeliveriesForTask(ctx context.Context, taskID string) error
 }
 
 // seqAllocatorFunc adapts a function to edgeCallbackSeq.
@@ -78,6 +83,22 @@ type EdgeCallbackService struct {
 	// ctxLookupOnce serializes the lazy allocation of ctxLookup for the same
 	// reason as ctxCacheOnce.
 	ctxLookupOnce sync.Once
+	// ackedTasks dedupes the per-chunk delivery-outbox auto-ack down to one
+	// attempt per task (#2154 P2-9). Bounded, fail-open, cleared on terminal
+	// callbacks — see ackedTaskSet. Lazily allocated.
+	ackedTasks *ackedTaskSet
+	// ackedOnce serializes the lazy allocation of ackedTasks so concurrent
+	// first-callers cannot both observe nil and double-allocate.
+	ackedOnce sync.Once
+	// touchThrottle caps session.last_message_at writes at one per session per
+	// second on the stream path (#2154 P2-9). Bounded and fail-open — see
+	// sessionTouchThrottle. Lazily allocated.
+	touchThrottle *sessionTouchThrottle
+	// touchOnce serializes the lazy allocation of touchThrottle.
+	touchOnce sync.Once
+	// clock overrides time.Now for the throttle window. Nil in production;
+	// tests set it to drive the window deterministically without sleeping.
+	clock func() time.Time
 }
 
 // NewEdgeCallbackService constructs an EdgeCallbackService.
@@ -160,11 +181,84 @@ func (s *EdgeCallbackService) HandleTaskAck(ctx context.Context, edgeUserID, edg
 	return nil
 }
 
+// autoAck acks the task's delivery-outbox rows unconditionally. Used by the
+// once-per-task callbacks (ack / done) where the round-trip is already O(1)
+// per task and where a late-created active row must still be picked up.
 func (s *EdgeCallbackService) autoAck(ctx context.Context, taskID string) {
 	if s.outbox == nil {
 		return
 	}
-	s.outbox.AutoAckDeliveriesForTask(ctx, taskID)
+	// The error is already warn-logged inside the outbox; swallowing it here
+	// keeps the callback contract (never fail the Edge call on a journal
+	// maintenance write) unchanged.
+	_ = s.outbox.AutoAckDeliveriesForTask(ctx, taskID)
+}
+
+// autoAckOnce is the per-chunk variant used by HandleTaskStream.
+//
+// #1000's contract is that the *first* authorized stream proves Edge received
+// the task, so the ack only has to happen once per task; running it on every
+// chunk (per token, in practice) meant one UPDATE that matched 0 rows forever
+// after the first (#2154 P2-9). The dedupe lives in bounded process memory
+// rather than a new DB column.
+//
+// Skipping is safe in both directions:
+//   - the ack itself is idempotent (Store.UpdateByTaskID only matches
+//     ActiveStatuses(), so a repeat matches 0 rows and changes nothing) —
+//     which is also why a process restart emptying ackedTasks can only cause a
+//     redundant 0-row UPDATE, never a missed or duplicated state change;
+//   - the entry is recorded only after the outbox call returned no error, so a
+//     transient failure is retried by the next chunk exactly as before.
+func (s *EdgeCallbackService) autoAckOnce(ctx context.Context, taskID string) {
+	if s.outbox == nil {
+		return
+	}
+	if !s.ackedSet().addIfAbsent(taskID) {
+		return
+	}
+	if err := s.outbox.AutoAckDeliveriesForTask(ctx, taskID); err != nil {
+		// Un-record so the next chunk retries; the outbox already warn-logged.
+		s.ackedSet().remove(taskID)
+	}
+}
+
+// ackedSet lazily allocates the per-task ack dedupe set (sync.Once for the same
+// race-safety reason as teamCtxCache).
+func (s *EdgeCallbackService) ackedSet() *ackedTaskSet {
+	s.ackedOnce.Do(func() {
+		if s.ackedTasks == nil {
+			s.ackedTasks = newAckedTaskSet(defaultStreamStateCapacity)
+		}
+	})
+	return s.ackedTasks
+}
+
+// touchThrottler lazily allocates the per-session touch throttle.
+func (s *EdgeCallbackService) touchThrottler() *sessionTouchThrottle {
+	s.touchOnce.Do(func() {
+		if s.touchThrottle == nil {
+			s.touchThrottle = newSessionTouchThrottle(defaultStreamStateCapacity, time.Second)
+		}
+	})
+	return s.touchThrottle
+}
+
+// now returns the current time, honoring an injected test clock.
+func (s *EdgeCallbackService) now() time.Time {
+	if s.clock != nil {
+		return s.clock()
+	}
+	return time.Now()
+}
+
+// forgetTaskStreamState drops the per-task / per-session hot-path state once a
+// task reaches a terminal state. task IDs are never reused, so this is memory
+// hygiene rather than correctness; the session throttle entry is reset too so
+// the *next* task on the same session touches last_message_at immediately
+// instead of inheriting the finished task's window.
+func (s *EdgeCallbackService) forgetTaskStreamState(taskID, sessionID string) {
+	s.ackedSet().remove(taskID)
+	s.touchThrottler().reset(sessionID)
 }
 
 // HandleTaskStream records a typed runtime event and keeps the existing
@@ -254,16 +348,20 @@ func (s *EdgeCallbackService) HandleTaskStream(ctx context.Context, edgeUserID, 
 		return err
 	}
 
-	// #154: update session last_message_at when agent stream creates a message
-	s.touchSessionLastMessage(ai.SessionID)
+	// #154: update session last_message_at when agent stream creates a message.
+	// Throttled to one write per session per second (#2154 P2-9) — the column
+	// is only the conversation-list sort key, and HandleTaskDone force-touches
+	// so the settled value is exact. See sessionTouchThrottle.
+	s.touchSessionLastMessageThrottled(ai.SessionID)
 
 	// #1000: first authorized stream proves Edge received the task — ack outbox
 	// so SentTimeout does not redispatch while Edge is already executing.
 	// After successful persist only (matches HandleTaskAck post-transition ack).
-	s.autoAck(ctx, taskID)
+	// Deduped to the first successful ack per task (#2154 P2-9).
+	s.autoAckOnce(ctx, taskID)
 
 	s.publishStreamEvents(ctx, ai, taskID, msg, runEvent)
-	s.tryAutoParseRouteDecision(ctx, ai.SessionID, runEvent.Payload)
+	s.tryAutoParseRouteDecision(ctx, ai.SessionID, taskID, eventType, runEvent.Payload)
 
 	return nil
 }
@@ -331,10 +429,15 @@ func (s *EdgeCallbackService) publishStreamEvents(ctx context.Context, ai *model
 	s.publishTeamSubagentStream(ctx, runEvent, taskID)
 }
 
-// touchSessionLastMessage updates session.last_message_at when an agent
-// callback creates a message. Best-effort: a failure warns + increments the
-// metric but does not fail the callback path.
+// touchSessionLastMessage updates session.last_message_at unconditionally and
+// clears the throttle window for that session. Used by the terminal callbacks,
+// where the write happens once per task and the final value must be exact.
+// Best-effort: a failure warns + increments the metric but does not fail the
+// callback path.
 func (s *EdgeCallbackService) touchSessionLastMessage(sessionID string) {
+	// Clear first so a failed write does not leave the session suppressed for
+	// the rest of the interval: the next callback is free to retry.
+	s.touchThrottler().reset(sessionID)
 	if err := repository.TouchSessionLastMessage(s.db, sessionID); err != nil {
 		slog.Warn("failed to touch session last_message_at",
 			"session_id", sessionID,
@@ -346,11 +449,84 @@ func (s *EdgeCallbackService) touchSessionLastMessage(sessionID string) {
 	}
 }
 
-func (s *EdgeCallbackService) tryAutoParseRouteDecision(ctx context.Context, sessionID string, payload string) {
+// touchSessionLastMessageThrottled is the per-chunk variant: at most one
+// session.last_message_at write per session per second (#2154 P2-9). The
+// column only feeds the conversation-list ORDER BY
+// (repository/session.go: COALESCE(last_message_at, created_at) DESC), so
+// second-level precision is indistinguishable to users, while the unthrottled
+// per-token write made `sessions` a dead-tuple generator and the hottest row
+// lock on the stream path. See sessionTouchThrottle for the bounding and
+// fail-open guarantees.
+func (s *EdgeCallbackService) touchSessionLastMessageThrottled(sessionID string) {
+	if !s.touchThrottler().allow(sessionID, s.now()) {
+		return
+	}
+	if err := repository.TouchSessionLastMessage(s.db, sessionID); err != nil {
+		slog.Warn("failed to touch session last_message_at",
+			"session_id", sessionID,
+			"error", err,
+		)
+		if metrics.SessionTouchFailures != nil {
+			metrics.SessionTouchFailures.Inc()
+		}
+		// Do not leave a failed write suppressed for the rest of the window.
+		s.touchThrottler().reset(sessionID)
+	}
+}
+
+// tryAutoParseRouteDecision re-publishes a supervisor's flat
+// {"action": ...} stream payload as the agent.route_decision bus event that
+// web/mobile clients subscribe to (app/events.go). It is a pure side channel:
+// it never fails the stream callback and it is not the authoritative routing
+// path (that is POST /teams/:id/runs/:run_id/route-decision).
+//
+// #2154 P1-4 removed two per-chunk round-trips from this function without
+// changing what it publishes:
+//
+//  1. A sound payload pre-filter. CoordinatorRouteDecision is only ever acted
+//     on when Action normalizes into model.ValidActions(), and encoding/json
+//     can only fill Action from a JSON key `action` (matched case-
+//     insensitively). A payload that does not contain that key therefore
+//     cannot produce a decision, so both the team-run SELECT and the
+//     json.Unmarshal are skipped. payloadHasActionKey is the case-insensitive
+//     scan that makes this exact rather than heuristic.
+//
+//     NOTE on event-type gating: the perf report suggested skipping whole event
+//     types (text_delta / run.output.batch). That cannot be done without
+//     changing behavior — the Edge callback client
+//     (edge-server/internal/hub/callback.go TaskStream) sends only `content`,
+//     so NormalizeRunEventInput falls back to run.output.batch for *every*
+//     untyped chunk, including the supervisor's flat JSON decision that this
+//     function exists to catch. Denying run.output.batch would silently drop
+//     agent.route_decision frames, so the gate is placed on the payload key
+//     (provably equivalent) instead of on the event type.
+//
+//  2. Reuse of the team-run context that publishStreamEvents already resolved
+//     one line earlier. cachedTeamRunContext negative-caches "this task's
+//     session has no team run" per task ID (UUIDv7, never reused), so the
+//     non-team majority now costs one mutex lookup instead of one
+//     GetTeamRunBySessionID per chunk. The remaining lookup for team sessions
+//     is deliberately *not* cached: it re-reads run.Status, and freezing the
+//     status for a task's lifetime would keep emitting route decisions after
+//     the run left `running`.
+func (s *EdgeCallbackService) tryAutoParseRouteDecision(ctx context.Context, sessionID, taskID, eventType, payload string) {
+	if !payloadHasActionKey(payload) {
+		return
+	}
+	// Reuse the (negative-)cached team-run verdict for this task. Only a
+	// *definitive* "no team run" short-circuits: an inconclusive lookup falls
+	// through to the direct read below, exactly as before caching existed, so a
+	// transient DB error can never suppress a route decision.
+	if lookup := s.subagentLookup(); lookup != nil {
+		if _, outcome := s.cachedTeamRunContext(ctx, lookup, sessionID, taskID); outcome == teamRunLookupNoTeam {
+			return
+		}
+	}
 	run, err := repository.GetTeamRunBySessionID(s.db, sessionID)
 	if err != nil {
 		if !errors.Is(err, gorm.ErrRecordNotFound) {
-			slog.Warn("route decision team run lookup failed", "session_id", sessionID, "error", err)
+			slog.Warn("route decision team run lookup failed",
+				"session_id", sessionID, "task_id", taskID, "event_type", eventType, "error", err)
 		}
 		return
 	}
@@ -360,6 +536,8 @@ func (s *EdgeCallbackService) tryAutoParseRouteDecision(ctx context.Context, ses
 
 	var decision model.CoordinatorRouteDecision
 	if err := json.Unmarshal([]byte(payload), &decision); err != nil {
+		slog.Debug("route decision payload did not parse",
+			"session_id", sessionID, "task_id", taskID, "event_type", eventType, "error", err)
 		return
 	}
 	decision.Action = strings.ToLower(strings.TrimSpace(decision.Action))
@@ -376,6 +554,68 @@ func (s *EdgeCallbackService) tryAutoParseRouteDecision(ctx context.Context, ses
 			Decision: decision,
 		},
 	}, "failed to publish agent route decision event", "run_id", run.ID)
+}
+
+// routeDecisionActionKey is the JSON key that encoding/json must find before
+// CoordinatorRouteDecision.Action can be non-empty.
+const routeDecisionActionKey = `"action"`
+
+// payloadHasActionKey reports whether payload contains the JSON key "action"
+// in any ASCII casing.
+//
+// This is a *sound* pre-filter for tryAutoParseRouteDecision, not a heuristic:
+// the only field the auto-parse acts on is Decision.Action (it must normalize
+// into model.ValidActions()), and encoding/json can only populate it from a key
+// that equals "action" under Go's case-insensitive fallback matching. A payload
+// without such a key can never produce a decision, so skipping the team-run
+// SELECT and the json.Unmarshal for it is exactly equivalent to running them
+// and discarding the result (#2154 P1-4).
+//
+// The scan is case-insensitive because encoding/json's fallback matching is;
+// it is written by hand instead of using strings.Contains(strings.ToLower(...))
+// because a stream payload may be up to model.RunEventPayloadMaxBytes and
+// lowering it would allocate a full copy on the hottest path in the Hub.
+// Quote characters are compared exactly (case has no meaning for '"'), and only
+// the six ASCII letters between them are folded.
+func payloadHasActionKey(payload string) bool {
+	const needle = routeDecisionActionKey
+	n := len(needle)
+	for i := 0; i < len(payload); {
+		// Jump to the next possible key opening quote instead of scanning
+		// every byte: strings.IndexByte is SIMD-accelerated in the stdlib.
+		idx := strings.IndexByte(payload[i:], '"')
+		if idx < 0 {
+			return false
+		}
+		start := i + idx
+		if start+n <= len(payload) && asciiEqualFold(payload[start:start+n], needle) {
+			return true
+		}
+		i = start + 1
+	}
+	return false
+}
+
+// asciiEqualFold reports whether a and b are equal after ASCII case folding.
+// Both must already be the same length. Non-ASCII bytes are compared exactly,
+// which is what encoding/json does too (its fold is defined over ASCII).
+func asciiEqualFold(a, b string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := 0; i < len(a); i++ {
+		ca, cb := a[i], b[i]
+		if ca >= 'A' && ca <= 'Z' {
+			ca += 'a' - 'A'
+		}
+		if cb >= 'A' && cb <= 'Z' {
+			cb += 'a' - 'A'
+		}
+		if ca != cb {
+			return false
+		}
+	}
+	return true
 }
 
 func (s *EdgeCallbackService) transitionDispatchedTaskToRunning(taskID string) error {
@@ -524,7 +764,12 @@ func (s *EdgeCallbackService) publishTaskDoneEvents(ctx context.Context, ai *mod
 		}
 	}
 	// #1000: done also acks outbox (covers Edge paths that skip stream/ack).
+	// Unconditional (not autoAckOnce): this is the terminal callback, it runs
+	// once per task, and it must still pick up an active row that a transient
+	// failure left un-acked during streaming.
 	s.autoAck(ctx, taskID)
+	// Terminal state: drop the per-task/per-session hot-path caches.
+	s.forgetTaskStreamState(taskID, ai.SessionID)
 
 	if s.bus != nil {
 		s.publishToBus(ctx, bus.Event{Type: bus.EventTypeAgentDone, Payload: bus.AgentTaskPayload{
@@ -580,6 +825,11 @@ func (s *EdgeCallbackService) HandleTaskFail(ctx context.Context, edgeUserID, ed
 			Error: errMsg,
 		}}, "failed to publish agent-failed event", "task_id", taskID)
 	}
+
+	// Terminal state: drop the per-task/per-session hot-path caches (#2154
+	// P2-9). HandleTaskFail writes neither the outbox ack nor last_message_at,
+	// so this is pure memory hygiene.
+	s.forgetTaskStreamState(taskID, ai.SessionID)
 
 	return nil
 }

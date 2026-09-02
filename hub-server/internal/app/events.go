@@ -47,29 +47,28 @@ func (a *App) setupWSManager() {
 	a.WebSocketHandler.SetOnTyping(a.handleTypingFrame)
 }
 
-// handleTypingFrame fans a typing indicator out to the sender's session
-// peers. Member resolution goes through mgr.ResolveMembers — the same
-// cache.GetOrLoad path (session:members:<id>, TTL 5min, singleflight) that
-// canTypeInSession and PushToSession already use — instead of a fresh
-// ListActiveMembers DB query per frame: typing frames arrive continuously
-// while a user types, and the previous per-frame query was the only
-// uncached member lookup on the hot path (#2154 perf lane).
-func (a *App) handleTypingFrame(userID, sessionID string) {
+// handleTypingFrame fans a typing indicator out to the sender's session peers.
+//
+// memberIDs is the membership that handler.WebSocketHandler.canTypeInSession
+// already resolved while admitting the frame (#2154 P2-10). Resolution goes
+// through mgr.ResolveMembers — the shared cache.GetOrLoad path
+// (session:members:<id>, TTL 5min, singleflight) — and this callback used to
+// run it a *second* time per frame plus repeat the senderIsMember scan, i.e.
+// two cache round trips per typing frame on the WS read loop. Both are gone.
+//
+// Authorization is unchanged: this callback is installed via SetOnTyping and is
+// only ever invoked after canTypeInSession admitted the sender as a member of
+// sessionID (empty session id, missing ResolveMembers, panicking ResolveMembers
+// and non-member senders are all rejected upstream with the original warn log
+// and never reach this function). Re-checking membership here would only
+// re-introduce the round trip this change removes, and the previous re-check
+// was itself a TOCTOU against a list that could have changed between the two
+// resolutions. The sender is still excluded from its own fan-out.
+func (a *App) handleTypingFrame(userID, sessionID string, memberIDs []string) {
 	frame := ws.NewFrame(ws.TypeTyping, map[string]interface{}{
 		"user_id":    userID,
 		"session_id": sessionID,
 	})
-	memberIDs := a.mgr.ResolveMembers(sessionID)
-	senderIsMember := false
-	for _, memberID := range memberIDs {
-		if memberID == userID {
-			senderIsMember = true
-			break
-		}
-	}
-	if !senderIsMember {
-		return
-	}
 	for _, memberID := range memberIDs {
 		if memberID != userID {
 			a.mgr.PushToUser(memberID, frame)

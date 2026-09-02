@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"reflect"
+	"strconv"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -282,11 +283,25 @@ func TestHandleTaskStream_NonTeamRun_PublishesOnlyAgentStream(t *testing.T) {
 // assert the cache + publish path without touching gorm.
 type stubTeamRunLookup struct {
 	known map[string]teamRunContext
+	// transient makes every lookup report an inconclusive (query-error) result
+	// so tests can assert a transient failure is never cached.
+	transient bool
+	// calls counts lookups that actually reached the port, which is how the
+	// positive and negative cache assertions are made.
+	calls atomic.Int32
 }
 
-func (s *stubTeamRunLookup) lookupTeamRunContext(ctx context.Context, sessionID, taskID string) (teamRunContext, bool) {
+func (s *stubTeamRunLookup) lookupTeamRunContext(ctx context.Context, sessionID, taskID string) (teamRunContext, teamRunLookupOutcome) {
+	s.calls.Add(1)
+	if s.transient {
+		return teamRunContext{}, teamRunLookupTransient
+	}
 	c, ok := s.known[taskID]
-	return c, ok
+	if !ok {
+		return teamRunContext{}, teamRunLookupNoTeam
+	}
+	c.isTeam = true
+	return c, teamRunLookupTeam
 }
 
 func TestSubagentStreamLookup_IsInjectable(t *testing.T) {
@@ -496,4 +511,145 @@ func canonicalType(t string) string {
 	default:
 		return t
 	}
+}
+
+// ── Negative caching (#2154 P1-4) ─────────────────────────────────────────
+//
+// Non-team traffic is the majority of stream chunks, and before negative
+// caching every chunk re-ran the team-run SELECT purely to get
+// ErrRecordNotFound. These tests lock the three properties that make the
+// negative entry safe: it short-circuits the lookup, it is bounded by the same
+// LRU as positive entries, and an *inconclusive* lookup is never cached.
+
+func TestCachedTeamRunContext_NegativeCachesDefinitiveNoTeam(t *testing.T) {
+	lookup := &stubTeamRunLookup{known: map[string]teamRunContext{}}
+	svc := &EdgeCallbackService{db: nil, bus: nil}
+	svc.SetSubagentStreamLookup(lookup)
+
+	for i := 0; i < 5; i++ {
+		tctx, outcome := svc.cachedTeamRunContext(context.Background(), lookup, "sess-1", "task-neg")
+		require.Equal(t, teamRunLookupNoTeam, outcome, "a non-team task must stay non-team")
+		require.False(t, tctx.isTeam)
+		require.Empty(t, tctx.teamRunID)
+	}
+	require.EqualValues(t, 1, lookup.calls.Load(),
+		"a definitive negative must be cached: 5 chunks, 1 lookup (was 5 before #2154 P1-4)")
+}
+
+func TestCachedTeamRunContext_PositiveCacheStillWorks(t *testing.T) {
+	lookup := &stubTeamRunLookup{known: map[string]teamRunContext{
+		"task-pos": {teamRunID: "run-pos", teamID: "team-pos", assignmentID: "asg-pos"},
+	}}
+	svc := &EdgeCallbackService{}
+	svc.SetSubagentStreamLookup(lookup)
+
+	for i := 0; i < 3; i++ {
+		tctx, outcome := svc.cachedTeamRunContext(context.Background(), lookup, "sess-1", "task-pos")
+		require.Equal(t, teamRunLookupTeam, outcome)
+		require.True(t, tctx.isTeam)
+		require.Equal(t, "run-pos", tctx.teamRunID)
+	}
+	require.EqualValues(t, 1, lookup.calls.Load())
+}
+
+func TestCachedTeamRunContext_TransientLookupIsNeverCached(t *testing.T) {
+	lookup := &stubTeamRunLookup{transient: true}
+	svc := &EdgeCallbackService{}
+	svc.SetSubagentStreamLookup(lookup)
+
+	for i := 0; i < 3; i++ {
+		tctx, outcome := svc.cachedTeamRunContext(context.Background(), lookup, "sess-1", "task-flaky")
+		require.Equal(t, teamRunLookupTransient, outcome,
+			"a query error must stay inconclusive so the next chunk retries")
+		require.False(t, tctx.isTeam)
+	}
+	require.EqualValues(t, 3, lookup.calls.Load(),
+		"caching a transient failure would disable team fan-out for the task's lifetime")
+}
+
+func TestCachedTeamRunContext_EmptyTaskIDIsNotCached(t *testing.T) {
+	lookup := &stubTeamRunLookup{known: map[string]teamRunContext{}}
+	svc := &EdgeCallbackService{}
+	svc.SetSubagentStreamLookup(lookup)
+
+	for i := 0; i < 3; i++ {
+		_, outcome := svc.cachedTeamRunContext(context.Background(), lookup, "sess-1", "")
+		require.Equal(t, teamRunLookupNoTeam, outcome)
+	}
+	require.EqualValues(t, 3, lookup.calls.Load(),
+		"an empty task ID must not occupy (or be served from) a cache slot")
+}
+
+func TestTeamRunContextCache_NegativeEntriesShareTheSameBound(t *testing.T) {
+	const max = 8
+	c := newTeamRunContextCache(max)
+	for i := 0; i < max*4; i++ {
+		// Negative entries are the zero value with isTeam=false.
+		c.put("task-"+strconv.Itoa(i), teamRunContext{})
+	}
+	require.LessOrEqual(t, c.len(), max,
+		"negative entries must be bounded by the same LRU cap as positive ones")
+
+	// The oldest entries are gone, the newest survive.
+	_, ok := c.get("task-0")
+	require.False(t, ok)
+	got, ok := c.get("task-" + strconv.Itoa(max*4-1))
+	require.True(t, ok)
+	require.False(t, got.isTeam)
+}
+
+// TestPublishTeamSubagentStream_NegativeCacheSurvivesTeamRunAppearing is the
+// DB-backed counterpart: the first chunk on a session with no team run caches
+// the negative, and a later chunk does not re-query — proven by inserting the
+// team run *after* the first chunk and observing that the fan-out still stays
+// silent. Mirrors TestPublishTeamSubagentStream_UsesCacheOnSecondEvent, which
+// proves the same property for the positive direction.
+func TestPublishTeamSubagentStream_NegativeCacheSurvivesTeamRunAppearing(t *testing.T) {
+	db := newSubagentStreamTestDB(t)
+	b := newTestBus(t)
+	var got atomic.Bool
+	b.Subscribe(bus.EventTypeTeamSubagentStream, func(ctx context.Context, e bus.Event) {
+		got.Store(true)
+	})
+
+	svc := &EdgeCallbackService{db: db, bus: b}
+	runEvent := &model.AgentRunEvent{
+		TaskID: "task-1", SessionID: "sess-1", AgentInstanceID: "agent-1",
+		EventType: "run.agent.text_delta", Payload: "{}",
+	}
+
+	// Chunk 1: no team run → definitive negative, cached.
+	svc.publishTeamSubagentStream(context.Background(), runEvent, "task-1")
+	testkit.Eventually(t, 3*time.Second, func() bool {
+		return b.Running() == 0 && b.Pending() == 0
+	}, "bus did not drain", nil)
+	require.False(t, got.Load())
+
+	// A team run now exists for the session. A cached negative means chunk 2
+	// still does not query, so nothing is published — the documented trade-off
+	// (task IDs are never reused and the binding predates the first chunk).
+	seedSubagentTeamRun(t, db, model.TeamRunStatusRunning)
+	runEvent.EventSeq = 2
+	svc.publishTeamSubagentStream(context.Background(), runEvent, "task-1")
+	testkit.Eventually(t, 3*time.Second, func() bool {
+		return b.Running() == 0 && b.Pending() == 0
+	}, "bus did not drain", nil)
+	require.False(t, got.Load(), "chunk 2 must be served from the negative cache without a re-query")
+
+	// A *different* task on the same session is a different cache key, so it
+	// resolves freshly and does fan out — the negative is per task, not global.
+	var gotOther atomic.Bool
+	b.Subscribe(bus.EventTypeTeamSubagentStream, func(ctx context.Context, e bus.Event) {
+		gotOther.Store(true)
+	})
+	require.NoError(t, db.Exec(`INSERT INTO pending_agent_tasks (id, agent_instance_id, triggered_by_user_id, trigger_message_id, target_id, status, edge_run_id, edge_device_id, created_at, expire_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		"task-2", "agent-1", "user-1", "msg-1", "target-1", model.TaskStatusRunning, "run-1", "dev-1", time.Now(), time.Now().Add(time.Hour)).Error)
+	require.NoError(t, db.Exec(`UPDATE agent_team_assignments SET run_id = ? WHERE id = ?`, "task-2", "asg-1").Error)
+	svc.publishTeamSubagentStream(context.Background(), &model.AgentRunEvent{
+		TaskID: "task-2", SessionID: "sess-1", AgentInstanceID: "agent-1",
+		EventType: "run.agent.text_delta", Payload: "{}",
+	}, "task-2")
+	testkit.Eventually(t, 3*time.Second, func() bool {
+		return gotOther.Load()
+	}, "a fresh task on the same session must resolve the now-present team run", nil)
 }

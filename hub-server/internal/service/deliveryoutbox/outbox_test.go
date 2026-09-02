@@ -1108,3 +1108,99 @@ func TestOutbox_ConcurrentMarkDeliveryRetryingOnlyOneClaim(t *testing.T) {
 	assert.Equal(t, 1, rec2.AttemptCount)
 	assert.Equal(t, StatusRetrying, rec2.Status)
 }
+
+// ── AutoAckDeliveriesForTask (#2154 P2-9) ─────────────────────────────────
+//
+// The Edge stream callback now dedupes this call per task in process memory, so
+// the operation's idempotency is what makes the dedupe (and a process restart
+// that empties it) safe. These tests pin that idempotency plus the error
+// propagation the caller uses to decide whether to record the dedupe entry.
+
+// failingTaskUpdateStore injects a Store failure for UpdateByTaskID only.
+type failingTaskUpdateStore struct {
+	*fakeStore
+	err   error
+	calls atomic.Int32
+}
+
+func (s *failingTaskUpdateStore) UpdateByTaskID(ctx context.Context, taskID string, statusIn []string, patch Patch) (int64, error) {
+	s.calls.Add(1)
+	if s.err != nil {
+		return 0, s.err
+	}
+	return s.fakeStore.UpdateByTaskID(ctx, taskID, statusIn, patch)
+}
+
+func seedAutoAckEntries(store *fakeStore, taskID string) {
+	now := time.Now()
+	store.putEntry(Entry{DeliveryID: "del-pending", TaskID: taskID, Status: StatusPending, CreatedAt: now, UpdatedAt: now})
+	store.putEntry(Entry{DeliveryID: "del-sent", TaskID: taskID, Status: StatusSent, CreatedAt: now, UpdatedAt: now})
+	store.putEntry(Entry{DeliveryID: "del-retrying", TaskID: taskID, Status: StatusRetrying, CreatedAt: now, UpdatedAt: now})
+	store.putEntry(Entry{DeliveryID: "del-dead", TaskID: taskID, Status: StatusDead, CreatedAt: now, UpdatedAt: now})
+	store.putEntry(Entry{DeliveryID: "del-other-task", TaskID: "task-other", Status: StatusSent, CreatedAt: now, UpdatedAt: now})
+}
+
+func TestAutoAckDeliveriesForTask_AcksActiveRowsOnly(t *testing.T) {
+	store := newFakeStore()
+	seedAutoAckEntries(store, "task-1")
+	outbox := NewOutbox(store, nil)
+
+	require.NoError(t, outbox.AutoAckDeliveriesForTask(context.Background(), "task-1"))
+
+	for _, deliveryID := range []string{"del-pending", "del-sent", "del-retrying"} {
+		e, ok := store.getEntry(deliveryID)
+		require.True(t, ok)
+		assert.Equal(t, StatusDelivered, e.Status, "%s must be acked", deliveryID)
+		assert.NotNil(t, e.DeliveredAt, "%s must stamp delivered_at", deliveryID)
+	}
+	e, _ := store.getEntry("del-dead")
+	assert.Equal(t, StatusDead, e.Status, "a terminal row is not active and must not be resurrected")
+	e, _ = store.getEntry("del-other-task")
+	assert.Equal(t, StatusSent, e.Status, "another task's rows must be untouched")
+}
+
+// TestAutoAckDeliveriesForTask_IsIdempotent is the property the per-task dedupe
+// in service/agent relies on: repeating the ack — after a Hub restart emptied
+// its in-process set, or for a task with no outbox row at all — matches 0 rows
+// and changes nothing.
+func TestAutoAckDeliveriesForTask_IsIdempotent(t *testing.T) {
+	store := newFakeStore()
+	seedAutoAckEntries(store, "task-1")
+	outbox := NewOutbox(store, nil)
+
+	require.NoError(t, outbox.AutoAckDeliveriesForTask(context.Background(), "task-1"))
+	first, _ := store.getEntry("del-sent")
+
+	require.NoError(t, outbox.AutoAckDeliveriesForTask(context.Background(), "task-1"))
+	require.NoError(t, outbox.AutoAckDeliveriesForTask(context.Background(), "task-1"))
+
+	second, _ := store.getEntry("del-sent")
+	assert.Equal(t, first.Status, second.Status)
+	assert.Equal(t, first.DeliveredAt, second.DeliveredAt,
+		"a repeated ack must not move delivered_at — 0 active rows match")
+
+	// A task with no rows at all is likewise a clean no-op, not an error.
+	require.NoError(t, outbox.AutoAckDeliveriesForTask(context.Background(), "task-unknown"))
+}
+
+func TestAutoAckDeliveriesForTask_PropagatesStoreError(t *testing.T) {
+	base := newFakeStore()
+	store := &failingTaskUpdateStore{fakeStore: base, err: errors.New("store unavailable")}
+	outbox := NewOutbox(store, nil)
+
+	err := outbox.AutoAckDeliveriesForTask(context.Background(), "task-1")
+	require.Error(t, err, "the caller must be able to tell a failed ack from a successful one")
+	assert.Contains(t, err.Error(), "auto-ack deliveries for task")
+
+	store.err = nil
+	require.NoError(t, outbox.AutoAckDeliveriesForTask(context.Background(), "task-1"))
+	assert.EqualValues(t, 2, store.calls.Load())
+}
+
+func TestAutoAckDeliveriesForTask_NilOutboxIsNoop(t *testing.T) {
+	var outbox *Outbox
+	require.NoError(t, outbox.AutoAckDeliveriesForTask(context.Background(), "task-1"))
+
+	empty := &Outbox{}
+	require.NoError(t, empty.AutoAckDeliveriesForTask(context.Background(), "task-1"))
+}
