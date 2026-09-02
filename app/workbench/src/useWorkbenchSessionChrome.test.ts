@@ -622,10 +622,12 @@ describe('useWorkbenchSessionChrome', () => {
     expect(result.current.settingsService?.initialized).toBe(true);
     expect(result.current.settingsService?.readAll().inspectorVisible).toBe(false);
     expect(collapseListener).toHaveBeenCalledTimes(1);
+    // #2154 P2-6: the payload tells the layout which direction was requested.
+    expect((collapseListener.mock.calls[0]?.[0] as CustomEvent).detail).toEqual({ collapse: true });
     window.removeEventListener(INSPECTOR_DEFAULT_COLLAPSE_EVENT, collapseListener);
   });
 
-  it('never force-opens the inspector from settings', async () => {
+  it('asks the layout to expand again when inspectorVisible is true (#2154 P2-6)', async () => {
     const collapseListener = vi.fn();
     window.addEventListener(INSPECTOR_DEFAULT_COLLAPSE_EVENT, collapseListener);
     const readSettings = vi.fn().mockResolvedValue({ inspectorVisible: 'true' });
@@ -634,11 +636,16 @@ describe('useWorkbenchSessionChrome', () => {
       platform: makePlatform({ settings: { readSettings, writeSettings } }),
     });
 
+    expect(collapseListener).not.toHaveBeenCalled();
     await act(async () => {
       await result.current.settingsService!.init();
     });
     expect(result.current.settingsService?.readAll().inspectorVisible).toBe(true);
-    expect(collapseListener).not.toHaveBeenCalled();
+    // The switch is symmetric now: turning it on dispatches an expand intent.
+    // Whether that expands is the layout hook's call — it only undoes a
+    // collapse the setting itself caused, so a manual collapse still wins.
+    expect(collapseListener).toHaveBeenCalledTimes(1);
+    expect((collapseListener.mock.calls[0]?.[0] as CustomEvent).detail).toEqual({ collapse: false });
     window.removeEventListener(INSPECTOR_DEFAULT_COLLAPSE_EVENT, collapseListener);
   });
 

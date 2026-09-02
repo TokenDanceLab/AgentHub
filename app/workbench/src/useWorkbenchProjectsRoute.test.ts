@@ -294,3 +294,58 @@ describe('useWorkbenchProjectsRoute — port-driven mode', () => {
     expect(listProjects).toHaveBeenCalledTimes(2);
   });
 });
+
+describe('useWorkbenchProjectsRoute — status filter (#2154 P2-3)', () => {
+  it('filters the rendered list while leaving sourceProjects untouched', async () => {
+    const port = createPort();
+    const { result } = renderHook(() => useWorkbenchProjectsRoute({
+      projectsPort: port,
+      realDataMode: true,
+    }));
+    await waitFor(() => {
+      expect(result.current.sourceProjects).toHaveLength(2);
+    });
+
+    // 'all' is a pass-through, including projects whose status we cannot
+    // classify (they must never be dropped by filtering).
+    expect(result.current.visibleProjects).toEqual(result.current.sourceProjects);
+
+    act(() => {
+      result.current.setProjectFilter('archived');
+    });
+    expect(result.current.projectFilter).toBe('archived');
+    expect(result.current.visibleProjects).toEqual([]);
+    // Selection/paging keep reading the unfiltered source list.
+    expect(result.current.sourceProjects).toHaveLength(2);
+    expect(result.current.projectId).toBe('p1');
+
+    act(() => {
+      result.current.setProjectFilter('running');
+    });
+    // The port fixtures carry status 'Active' → running bucket.
+    expect(result.current.visibleProjects.map((p) => p.id)).toEqual(['p1', 'p2']);
+  });
+
+  it('keeps parent-managed projects with an unknown status under "all" only', () => {
+    const managed = [
+      { ...project('m1'), status: 'Hub group' },
+      { ...project('m2'), status: '已归档' },
+    ];
+    const { result } = renderHook(() => useWorkbenchProjectsRoute({
+      projects: managed,
+      realDataMode: true,
+    }));
+
+    expect(result.current.visibleProjects).toHaveLength(2);
+
+    act(() => {
+      result.current.setProjectFilter('archived');
+    });
+    expect(result.current.visibleProjects.map((p) => p.id)).toEqual(['m2']);
+
+    act(() => {
+      result.current.setProjectFilter('all');
+    });
+    expect(result.current.visibleProjects.map((p) => p.id)).toEqual(['m1', 'm2']);
+  });
+});

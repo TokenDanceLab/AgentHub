@@ -116,7 +116,9 @@ export function buildProjectsPageProps(
     onClosePreview: () => projectsRoute.setProjectPreview(null),
     onProjectSelect: projectsRoute.selectProject,
     onTabChange: projectsRoute.setProjectTab,
-    projects: projectsRoute.sourceProjects,
+    // #2154 P2-3: render the status-filtered list; fall back to the source
+    // list only for partial route fixtures that predate `visibleProjects`.
+    projects: projectsRoute.visibleProjects ?? projectsRoute.sourceProjects,
   };
 
   if (projectsRoute.canMutateProject) {

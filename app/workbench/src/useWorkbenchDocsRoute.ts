@@ -34,9 +34,9 @@ export interface WorkbenchDocsRoute {
   docsPreview: WorkbenchDocumentPreview | null;
   rows: DocRow[];
   /**
-   * "我的文档库" shortcut names. Demo mode only — real data mode is always
-   * empty so the page renders no shortcut block instead of injecting
-   * repository-internal document names (#2154 P2-2b).
+   * Shortcut names for the docs.myLibrary nav section. Demo mode only — real
+   * data mode is always empty so the page renders no shortcut block instead of
+   * injecting repository-internal document names (#2154 P2-2b).
    */
   shortcuts: string[];
   /** True while real-mode documents are loading (undefined input). */
@@ -64,8 +64,9 @@ export function useWorkbenchDocsRoute({
   // stays empty so the page can show its error state.
   const rows = documents ?? (documentsLoading || documentsError ? [] : WORKBENCH_MOCK_DOC_ROWS);
   // #2154 P2-2(b): shortcuts come from the mock data source, never from a
-  // page-level default. Real data mode (and loading/error) renders none, so
-  // the caption + list disappear instead of showing internal document names.
+  // page-level default. Real data mode (and loading/error) renders none, so the
+  // docs.myLibrary caption and list disappear instead of showing
+  // repository-internal document names.
   const shortcuts = realDataMode || documentsLoading || documentsError
     ? []
     : WORKBENCH_MOCK_DOC_SHORTCUTS;

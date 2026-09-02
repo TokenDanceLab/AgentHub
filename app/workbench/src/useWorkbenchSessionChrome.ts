@@ -19,7 +19,10 @@ import { buildMainchainSummary } from './mainchain';
 import type { FileItem } from './inspector';
 import { WORKBENCH_MOCK_SETTINGS_DEFAULTS } from './mockData';
 import { createSettingsService, type SettingsService } from './settingsService';
-import { INSPECTOR_DEFAULT_COLLAPSE_EVENT } from './workbenchLayoutConstants';
+import {
+  INSPECTOR_DEFAULT_COLLAPSE_EVENT,
+  type InspectorDefaultCollapseDetail,
+} from './workbenchLayoutConstants';
 import {
   LOCAL_CLI_DISCOVERY_FALLBACK,
   buildInspectorTranscriptViews,
@@ -93,17 +96,30 @@ export function useWorkbenchSessionChrome({
 
   // Settings gate: inspectorVisible=false means the inspector starts collapsed
   // (default hidden). Re-runs on every snapshot change, so toggling 右侧概览 off
-  // in Settings collapses the inspector immediately; toggling it on never
-  // force-opens — manual/last-session state wins for expansion. The layout
-  // hook listens for INSPECTOR_DEFAULT_COLLAPSE_EVENT to apply the collapse.
+  // in Settings collapses the inspector immediately.
+  //
+  // #2154 P2-6: the switch is now symmetric — turning it back on dispatches the
+  // same event with `collapse: false`. Whether that actually expands is decided
+  // by the layout hook, which only undoes a collapse this setting caused, so a
+  // manually collapsed inspector (and the persisted last-session state) still
+  // wins over the default.
   useEffect(() => {
     if (!settingsService) return undefined;
     const service = settingsService;
 
     function applyInspectorVisibleDefault(): void {
       if (!service.initialized) return;
-      if (service.readAll()['inspectorVisible'] === false) {
-        window.dispatchEvent(new CustomEvent(INSPECTOR_DEFAULT_COLLAPSE_EVENT));
+      const inspectorVisible = service.readAll()['inspectorVisible'];
+      if (inspectorVisible === false) {
+        window.dispatchEvent(new CustomEvent<InspectorDefaultCollapseDetail>(
+          INSPECTOR_DEFAULT_COLLAPSE_EVENT,
+          { detail: { collapse: true } },
+        ));
+      } else if (inspectorVisible === true) {
+        window.dispatchEvent(new CustomEvent<InspectorDefaultCollapseDetail>(
+          INSPECTOR_DEFAULT_COLLAPSE_EVENT,
+          { detail: { collapse: false } },
+        ));
       }
     }
 
