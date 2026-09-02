@@ -357,6 +357,10 @@ func TestNodeConfigGateWriteAndReadDenialsAreByteIdentical(t *testing.T) {
 	seedNodeConfigSettings(t, h, map[string]string{"theme": "dark"})
 	stubNodeConfigRuntimeSessions(t)
 
+	// The read gate is the reference shape: it has been in production since
+	// AH-SR-045, so every write denial must reproduce it exactly.
+	readRec := doNodeConfigGetAgentProfile(h, "profile_oracle", "user-a")
+
 	bodies := map[string]string{
 		// write paths
 		"POST /v1/agent-profiles":                  stripTraceID(doNodeConfigPostAgentProfiles(h, "user-a", `{"name":"x","adapterId":"codex"}`).Body.String()),
@@ -373,25 +377,18 @@ func TestNodeConfigGateWriteAndReadDenialsAreByteIdentical(t *testing.T) {
 		"GET /v1/runtime-sessions":              stripTraceID(doNodeConfigGetRuntimeSessions(h, "user-a").Body.String()),
 	}
 
-	want := bodies["GET /v1/agent-profiles/profile_oracle"]
+	want := stripTraceID(readRec.Body.String())
 	if want == "" {
 		t.Fatalf("read-gate body is empty; bodies = %#v", bodies)
 	}
+	assertNodeConfigDenied(t, readRec, "GET /v1/agent-profiles/{profileId} as Hub user")
 	for name, body := range bodies {
 		if body != want {
 			t.Errorf("%s denial body differs from the read gate (profileId/settings existence oracle):\n got  = %s\n read = %s", name, body, want)
 		}
 	}
-	assertNodeConfigDenialMessage(t, want, "read gate")
 	if _, ok := ensureStore(h).GetAgentProfile("profile_oracle"); !ok {
 		t.Error("ESCAPE: the oracle probes deleted the profile")
-	}
-}
-
-func assertNodeConfigDenialMessage(t *testing.T, body, what string) {
-	t.Helper()
-	if msg := nodeConfigErrorObject(t, body)["message"]; msg != "not found" {
-		t.Fatalf("%s: error.message = %#v, want %q", what, msg, "not found")
 	}
 }
 
