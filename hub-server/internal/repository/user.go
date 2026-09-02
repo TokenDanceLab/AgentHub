@@ -63,6 +63,20 @@ func FindByTokenDanceSub(db *gorm.DB, sub string) (*model.User, error) {
 	return &user, nil
 }
 
+// tokenDanceSubIndexPredicate is the index predicate of the partial unique
+// index on users(tokendance_sub). Three places must carry the same text and
+// must not drift, because PostgreSQL matches an ON CONFLICT arbiter against the
+// index definition syntactically:
+//
+//  1. migrations/0020_token_dance_sub.up.sql — CREATE UNIQUE INDEX … WHERE …
+//  2. model.User's gorm tag — uniqueIndex:idx_users_tokendance_sub,where:…
+//  3. this package's ON CONFLICT clause — TargetWhere below
+//
+// TestTokenDanceSubPredicateSSOT reads 1. and 2. from disk and fails if either
+// stops containing this constant, which is the drift that silently breaks OIDC
+// login on PostgreSQL while every SQLite fixture stays green.
+const tokenDanceSubIndexPredicate = "tokendance_sub IS NOT NULL AND tokendance_sub != ''"
+
 // FindOrCreateByTokenDanceSub atomically finds or creates a Hub user linked to
 // a TokenDance ID sub. On conflict (existing user), nickname and avatar are
 // refreshed from the provided claims. Uses a single INSERT … ON CONFLICT
@@ -88,9 +102,22 @@ func FindOrCreateByTokenDanceSub(db *gorm.DB, sub, name, picture string) (*model
 	// claims don't wipe existing profile data.
 	err := db.Clauses(clause.OnConflict{
 		Columns: []clause.Column{{Name: "tokendance_sub"}},
+		// The arbiter index is *partial*, so PostgreSQL only infers it when the
+		// index predicate is restated here. Without TargetWhere the statement
+		// never reaches execution: it fails at plan time with 42P10 ("there is
+		// no unique or exclusion constraint matching the ON CONFLICT
+		// specification"). The predicate text is shared with migration 0020 and
+		// the model.User gorm tag — see tokenDanceSubIndexPredicate.
+		TargetWhere: clause.Where{Exprs: []clause.Expression{
+			clause.Expr{SQL: tokenDanceSubIndexPredicate},
+		}},
 		DoUpdates: clause.Assignments(map[string]interface{}{
-			"nickname":   gorm.Expr("CASE WHEN ? <> '' THEN ? ELSE nickname END", name, name),
-			"avatar_url": gorm.Expr("CASE WHEN ? <> '' THEN ? ELSE avatar_url END", picture, picture),
+			// Table-qualified on purpose: inside DO UPDATE both the target
+			// table and the EXCLUDED pseudo-row carry these columns, so a bare
+			// `nickname` is ambiguous and PostgreSQL rejects the statement with
+			// 42702. Same convention as UpsertExecutionTargetEvidence.
+			"nickname":   gorm.Expr("CASE WHEN ? <> '' THEN ? ELSE users.nickname END", name, name),
+			"avatar_url": gorm.Expr("CASE WHEN ? <> '' THEN ? ELSE users.avatar_url END", picture, picture),
 		}),
 	}).Create(user).Error
 	if err != nil {
