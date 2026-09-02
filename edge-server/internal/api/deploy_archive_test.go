@@ -51,7 +51,7 @@ func TestBuildArtifactArchive_PlaceholderNilContentSource(t *testing.T) {
 		{ID: "art-1", Path: "/workspace/out/index.html"},
 	}
 	var buf bytes.Buffer
-	if err := buildArtifactArchive(artifacts, &buf); err != nil {
+	if err := buildArtifactArchive("", artifacts, &buf); err != nil {
 		t.Fatalf("buildArtifactArchive: %v", err)
 	}
 	entries := readTarGz(t, buf.Bytes())
@@ -76,7 +76,7 @@ func TestBuildArtifactArchive_PlaceholderNotReadable(t *testing.T) {
 		},
 	}}
 	var buf bytes.Buffer
-	if err := buildArtifactArchive(artifacts, &buf); err != nil {
+	if err := buildArtifactArchive("", artifacts, &buf); err != nil {
 		t.Fatalf("buildArtifactArchive: %v", err)
 	}
 	entries := readTarGz(t, buf.Bytes())
@@ -91,7 +91,7 @@ func TestBuildArtifactArchive_PlaceholderNotReadable(t *testing.T) {
 func TestBuildArtifactArchive_PlaceholderEmptyPathUsesID(t *testing.T) {
 	artifacts := []store.Artifact{{ID: "art-empty"}}
 	var buf bytes.Buffer
-	if err := buildArtifactArchive(artifacts, &buf); err != nil {
+	if err := buildArtifactArchive("", artifacts, &buf); err != nil {
 		t.Fatalf("buildArtifactArchive: %v", err)
 	}
 	entries := readTarGz(t, buf.Bytes())
@@ -109,13 +109,13 @@ func TestBuildArtifactArchive_RealFile(t *testing.T) {
 	}
 	artifacts := []store.Artifact{{
 		ID:   "art-3",
-		Path: "/whatever/page.html",
+		Path: "page.html",
 		ContentSource: &store.ArtifactContentSource{
-			Kind: "workspace_relative", Path: path, Readable: true,
+			Kind: "workspace_relative", Path: "page.html", Readable: true,
 		},
 	}}
 	var buf bytes.Buffer
-	if err := buildArtifactArchive(artifacts, &buf); err != nil {
+	if err := buildArtifactArchive(dir, artifacts, &buf); err != nil {
 		t.Fatalf("buildArtifactArchive: %v", err)
 	}
 	entries := readTarGz(t, buf.Bytes())
@@ -132,26 +132,26 @@ func TestBuildArtifactArchive_DirectoryWalk(t *testing.T) {
 			t.Fatalf("mkdir %s: %v", p, err)
 		}
 	}
-	mustMkdirAll(filepath.Join(dir, "sub", "nested"))
+	mustMkdirAll(filepath.Join(dir, "dist", "sub", "nested"))
 	for rel, content := range map[string]string{
 		"index.html":          "<h1>hi</h1>",
 		"sub/app.js":          "console.log(1)",
 		"sub/nested/deep.txt": "deep",
 	} {
-		p := filepath.Join(dir, filepath.FromSlash(rel))
+		p := filepath.Join(dir, "dist", filepath.FromSlash(rel))
 		if err := os.WriteFile(p, []byte(content), 0o644); err != nil {
 			t.Fatalf("write %s: %v", rel, err)
 		}
 	}
 	artifacts := []store.Artifact{{
 		ID:   "art-4",
-		Path: dir,
+		Path: "dist",
 		ContentSource: &store.ArtifactContentSource{
-			Kind: "workspace_relative", Path: dir, Readable: true,
+			Kind: "workspace_relative", Path: "dist", Readable: true,
 		},
 	}}
 	var buf bytes.Buffer
-	if err := buildArtifactArchive(artifacts, &buf); err != nil {
+	if err := buildArtifactArchive(dir, artifacts, &buf); err != nil {
 		t.Fatalf("buildArtifactArchive: %v", err)
 	}
 	entries := readTarGz(t, buf.Bytes())
@@ -178,11 +178,11 @@ func TestBuildArtifactArchive_MissingSourceFileSkipped(t *testing.T) {
 		ID:   "art-5",
 		Path: "nope.txt",
 		ContentSource: &store.ArtifactContentSource{
-			Kind: "workspace_relative", Path: filepath.Join(dir, "nope.txt"), Readable: true,
+			Kind: "workspace_relative", Path: "nope.txt", Readable: true,
 		},
 	}}
 	var buf bytes.Buffer
-	if err := buildArtifactArchive(artifacts, &buf); err != nil {
+	if err := buildArtifactArchive(dir, artifacts, &buf); err != nil {
 		t.Fatalf("buildArtifactArchive: %v", err)
 	}
 	entries := readTarGz(t, buf.Bytes())
@@ -200,7 +200,7 @@ func TestBuildArtifactArchive_EmptySourcePathSkipped(t *testing.T) {
 		},
 	}}
 	var buf bytes.Buffer
-	if err := buildArtifactArchive(artifacts, &buf); err != nil {
+	if err := buildArtifactArchive("", artifacts, &buf); err != nil {
 		t.Fatalf("buildArtifactArchive: %v", err)
 	}
 	entries := readTarGz(t, buf.Bytes())
@@ -212,7 +212,7 @@ func TestBuildArtifactArchive_EmptySourcePathSkipped(t *testing.T) {
 func TestBuildArtifactArchive_OutputIsGzip(t *testing.T) {
 	artifacts := []store.Artifact{{ID: "art-7", Path: "/out/a.txt"}}
 	var buf bytes.Buffer
-	if err := buildArtifactArchive(artifacts, &buf); err != nil {
+	if err := buildArtifactArchive("", artifacts, &buf); err != nil {
 		t.Fatalf("buildArtifactArchive: %v", err)
 	}
 	data := buf.Bytes()
