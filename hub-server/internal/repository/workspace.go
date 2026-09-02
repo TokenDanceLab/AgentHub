@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"github.com/agenthub/hub-server/internal/config"
 	"github.com/agenthub/hub-server/internal/model"
 	"gorm.io/gorm"
 )
@@ -24,9 +25,7 @@ func UpdateWorkspace(db *gorm.DB, w *model.Workspace) error {
 }
 
 func ListWorkspaces(db *gorm.DB, ownerID, q, cursor string, pageSize int) ([]model.Workspace, bool, error) {
-	if pageSize <= 0 || pageSize > 200 {
-		pageSize = defaultWorkspacePageSize
-	}
+	pageSize = config.ClampPageSize(pageSize, config.MaxListPageSize, defaultWorkspacePageSize)
 
 	query := db.Where("owner_id = ?", ownerID)
 	if q != "" {

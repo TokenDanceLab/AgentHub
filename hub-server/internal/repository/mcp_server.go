@@ -3,6 +3,7 @@ package repository
 import (
 	"time"
 
+	"github.com/agenthub/hub-server/internal/config"
 	"github.com/agenthub/hub-server/internal/model"
 	"gorm.io/gorm"
 )
@@ -38,9 +39,7 @@ func SoftDeleteMCPServer(db *gorm.DB, id, ownerID string) error {
 
 // ListMCPServers returns MCP servers for an owner with optional filters and cursor pagination.
 func ListMCPServers(db *gorm.DB, ownerID, q, transport, cursor string, pageSize int) ([]model.MCPServer, bool, error) {
-	if pageSize <= 0 || pageSize > 200 {
-		pageSize = defaultMCPServerPageSize
-	}
+	pageSize = config.ClampPageSize(pageSize, config.MaxListPageSize, defaultMCPServerPageSize)
 
 	qry := db.Where("owner_id = ? AND deleted_at IS NULL", ownerID)
 	if transport != "" {
@@ -67,9 +66,7 @@ func ListMCPServers(db *gorm.DB, ownerID, q, transport, cursor string, pageSize 
 
 // ListPublicMCPServers returns published MCP servers for the public market.
 func ListPublicMCPServers(db *gorm.DB, q, transport, cursor string, pageSize int) ([]model.MCPServer, bool, error) {
-	if pageSize <= 0 || pageSize > 200 {
-		pageSize = defaultMCPServerPageSize
-	}
+	pageSize = config.ClampPageSize(pageSize, config.MaxListPageSize, defaultMCPServerPageSize)
 
 	qry := db.Where("is_public = TRUE AND deleted_at IS NULL")
 	if transport != "" {

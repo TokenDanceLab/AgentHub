@@ -5,6 +5,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/agenthub/hub-server/internal/config"
 	"github.com/agenthub/hub-server/internal/errcode"
 	"github.com/agenthub/hub-server/internal/model"
 	"gorm.io/gorm"
@@ -84,9 +85,7 @@ func SoftDeleteAgentProfile(db *gorm.DB, id, ownerID string) error {
 // If q is non-empty, filters by name/description ILIKE match.
 // If runtimeID is non-empty, filters by runtime_id.
 func ListAgentProfiles(db *gorm.DB, ownerID, runtimeID, q, cursor string, pageSize int) ([]model.AgentProfile, bool, error) {
-	if pageSize <= 0 || pageSize > 200 {
-		pageSize = defaultProfilePageSize
-	}
+	pageSize = config.ClampPageSize(pageSize, config.MaxListPageSize, defaultProfilePageSize)
 
 	qry := db.Where("owner_id = ? AND deleted_at IS NULL", ownerID)
 	if runtimeID != "" {
@@ -113,9 +112,7 @@ func ListAgentProfiles(db *gorm.DB, ownerID, runtimeID, q, cursor string, pageSi
 
 // ListPublicProfiles returns published profiles for the agent market.
 func ListPublicProfiles(db *gorm.DB, runtimeID, q, sortBy, cursor string, pageSize int) ([]model.AgentProfile, bool, error) {
-	if pageSize <= 0 || pageSize > 200 {
-		pageSize = defaultProfilePageSize
-	}
+	pageSize = config.ClampPageSize(pageSize, config.MaxListPageSize, defaultProfilePageSize)
 
 	qry := db.Where("is_public = TRUE AND deleted_at IS NULL")
 	if runtimeID != "" {
