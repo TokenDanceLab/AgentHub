@@ -56,8 +56,13 @@ func (h *AuthHandler) Refresh(c *gin.Context) {
 func (h *AuthHandler) Logout(c *gin.Context) {
 	userID := c.GetString("user_id")
 	deviceID := c.GetString("device_id")
-	// Scope revocation by device_type if provided as a query parameter (#149).
-	deviceType := c.Query("device_type")
+	// Scope revocation by the authenticated token's OWN device_type
+	// (claim-derived, injected by AuthMiddleware), never by a client-supplied
+	// query parameter: a mismatched client value produced a blacklist key the
+	// refresh path never checks, leaving a session-revival window in the
+	// pre-commit race the Redis blacklist exists to close (#2154 Lorentz
+	// P3-2; supersedes the #149 query knob).
+	deviceType := c.GetString("device_type")
 	// access_jti is set by AuthMiddleware after ParseToken (#888).
 	accessJTI := c.GetString("access_jti")
 	if err := h.service.Logout(c.Request.Context(), userID, deviceID, deviceType, accessJTI); err != nil {
