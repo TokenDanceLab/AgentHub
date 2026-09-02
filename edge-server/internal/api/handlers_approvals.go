@@ -43,6 +43,20 @@ func (h *Handler) PostPermissionDecide(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Ownership gate, resolved before any state change (broker decide / registry
+	// consume / event publish): without it any caller past the Edge's coarse auth
+	// could allow or deny a live tool call of somebody else's run, i.e. make the
+	// victim's agent perform the call. The 404 body is byte-identical to the
+	// "no such request" path below (same errcode, no distinguishing message) so a
+	// foreign runId and a nonexistent runId stay indistinguishable — this endpoint
+	// must not become a runId existence oracle. Local single-tenant mode resolves
+	// to the documented bypass sentinel and is unaffected; an empty principal under
+	// Hub JWT fails closed (AH-SR-045).
+	if !isRunOwnedBy(ensureStore(h), req.RunID, h.ownerUserID(r)) {
+		writeJSON(w, http.StatusNotFound, errcode.ErrorBody(errcode.ErrPermissionRequestNotFound))
+		return
+	}
+
 	registry := h.ensurePermissionRegistry()
 	permission, ok := pendingPermissionFromBroker(h.ensurePermissionBroker(), req.RunID, req.RequestID, req.Decision, req.Reason)
 	if ok {
@@ -123,6 +137,17 @@ func (h *Handler) PostPlanDecide(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Ownership gate, resolved before broker.Decide mutates the pending plan:
+	// approving or rejecting a plan drives the victim's agent dispatches, so a
+	// non-owner must never reach the broker. The 404 body is byte-identical to the
+	// "no pending plan" paths below (same errcode, no distinguishing message) so a
+	// foreign runId and a nonexistent runId stay indistinguishable. Local
+	// single-tenant mode is unaffected; an empty principal fails closed.
+	if !isRunOwnedBy(ensureStore(h), req.RunID, h.ownerUserID(r)) {
+		writeJSON(w, http.StatusNotFound, errcode.ErrorBody(errcode.ErrPlanNotFound))
+		return
+	}
+
 	broker := h.PlanApprovalBroker
 	if broker == nil {
 		writeJSON(w, http.StatusNotFound, errcode.ErrorBody(errcode.ErrPlanNotFound))
@@ -163,7 +188,12 @@ func (h *Handler) GetPlansPending(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	plans := broker.ListPending()
+	// List endpoints filter instead of rejecting (same shape as GetArtifacts /
+	// GetPreviews / GetDeliveryJournal): a Hub user sees only the plans of runs
+	// they own, the local single-tenant sentinel sees all of them, and an empty
+	// principal under Hub JWT sees an empty list (fail closed, AH-SR-045). A 404
+	// here would be a behaviour regression for the Desktop poller.
+	plans := filterPendingPlansByOwner(broker.ListPending(), ensureStore(h), h.ownerUserID(r))
 	writeSuccess(w, http.StatusOK, plans)
 }
 

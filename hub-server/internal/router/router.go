@@ -2,6 +2,7 @@ package router
 
 import (
 	"fmt"
+	"net/http"
 
 	"github.com/gin-gonic/gin"
 
@@ -9,6 +10,7 @@ import (
 
 	"github.com/agenthub/hub-server/internal/cache"
 	"github.com/agenthub/hub-server/internal/config"
+	"github.com/agenthub/hub-server/internal/errcode"
 	"github.com/agenthub/hub-server/internal/handler"
 	"github.com/agenthub/hub-server/internal/middleware"
 	"github.com/agenthub/pkg/reqlog"
@@ -64,14 +66,32 @@ func SetupRoutes(r *gin.Engine, cfg *config.Config, authMW *middleware.AuthMiddl
 		r.GET("/health/live", guardBody, guardTimeout, healthHandler.Live)
 		r.GET("/health/ready", guardBody, guardTimeout, healthHandler.Ready)
 	} else {
-		healthOK := func(c *gin.Context) {
-			handler.OK(c, gin.H{"status": "ok", "live": true, "ready": true})
+		// Probes must not claim more than this process verified. With no
+		// HealthHandler wired there is no dependency probe behind /health or
+		// /health/ready at all, so answering 200/ready:true would let
+		// orchestrators, compose healthchecks and CI gates send traffic to a
+		// process whose DB/Redis/migration state nobody checked. Both answer
+		// 503/unavailable, mirroring the envelope the wired HealthHandler.Ready
+		// uses for its own degraded answer.
+		//
+		// This fallback is unreachable in a real deployment: App.Run wires
+		// HealthHandler unconditionally before the listener starts
+		// (internal/app/wiring.go), so live probes always reach the wired
+		// handler, which keeps answering 200 on /health even when degraded.
+		healthUnavailable := func(c *gin.Context) {
+			c.JSON(http.StatusServiceUnavailable, handler.Response{
+				Code: errcode.OK.Code,
+				Data: gin.H{"status": "unavailable", "ready": false, "live": true},
+			})
 		}
-		r.GET("/health", guardBody, guardTimeout, healthOK)
+		r.GET("/health", guardBody, guardTimeout, healthUnavailable)
+		// /health/live stays 200/live:true: the process answering the probe is
+		// itself the liveness proof, and a 503 here would get orchestrators to
+		// restart a process that is merely missing its health wiring.
 		r.GET("/health/live", guardBody, guardTimeout, func(c *gin.Context) {
 			handler.OK(c, gin.H{"status": "ok", "live": true})
 		})
-		r.GET("/health/ready", guardBody, guardTimeout, healthOK)
+		r.GET("/health/ready", guardBody, guardTimeout, healthUnavailable)
 	}
 
 	// Dev-only debug endpoint — returns an intentional 500 to verify error handling.
