@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/agenthub/edge-server/internal/store"
+	"github.com/agenthub/pkg/safego"
 )
 
 func (e *ProcessExecutor) Start(run store.Run, runCtx RunProcessContext) error {
@@ -25,7 +26,7 @@ func (e *ProcessExecutor) Start(run store.Run, runCtx RunProcessContext) error {
 	// instead of crashing the whole Edge process. run()'s deferred finish()
 	// still runs during panic unwinding before recover catches, so terminal
 	// state and package-level sync.Map hygiene are preserved.
-	safeGo("run", func() { e.run(ctx, run, bindRunProcessContext(runCtx, run)) })
+	safego.SafeGo("run", func() { e.run(ctx, run, bindRunProcessContext(runCtx, run)) })
 	return nil
 }
 
