@@ -15,6 +15,7 @@ import (
 	"github.com/agenthub/hub-server/internal/service/dispatch"
 	"github.com/agenthub/hub-server/internal/service/messagereaction"
 	"github.com/agenthub/hub-server/internal/ws"
+	"github.com/agenthub/pkg/safego"
 )
 
 // setupWSManager creates the WebSocket manager and configures callbacks.
@@ -449,15 +450,15 @@ func (a *App) onRouteSet(userID, deviceType, deviceID, connID, oldConnID string,
 		// route lookups would miss. Pending-task pushes use connID directly
 		// and are not affected by the route table, so they still proceed.
 	} else if wasOffline {
-		go a.broadcastOnlineStatus(ctx, userID, true)
+		safego.SafeGo("events.broadcast_online", func() { a.broadcastOnlineStatus(ctx, userID, true) })
 	}
 
 	if deviceType == "desktop" {
 		if deviceID != "" {
-			go a.pushPendingTargetTasks(ctx, userID, deviceID, connID)
-			go a.pushPendingAgentControls(ctx, userID, deviceID, connID)
+			safego.SafeGo("events.push_pending_target_tasks", func() { a.pushPendingTargetTasks(ctx, userID, deviceID, connID) })
+			safego.SafeGo("events.push_pending_agent_controls", func() { a.pushPendingAgentControls(ctx, userID, deviceID, connID) })
 		}
-		go a.pushPendingTasks(ctx, userID, connID)
+		safego.SafeGo("events.push_pending_tasks", func() { a.pushPendingTasks(ctx, userID, connID) })
 	}
 }
 
@@ -651,7 +652,7 @@ func (a *App) onRouteDel(userID, deviceType, deviceID, connID string) {
 		_ = a.CacheClient.DeleteRoute(ctx, userID, routeField)
 		online, _ := a.CacheClient.IsOnline(ctx, userID)
 		if !online {
-			go a.broadcastOnlineStatus(ctx, userID, false)
+			safego.SafeGo("events.broadcast_offline", func() { a.broadcastOnlineStatus(ctx, userID, false) })
 		}
 	}
 }

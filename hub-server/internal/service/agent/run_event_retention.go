@@ -8,6 +8,7 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/agenthub/hub-server/internal/repository"
+	"github.com/agenthub/pkg/safego"
 )
 
 const (
@@ -73,6 +74,7 @@ func RunEventsRetentionPass(ctx context.Context, db *gorm.DB, cfg RetentionConfi
 // RunEventsRetentionPass directly from an existing maintenance tick.
 func StartRunEventRetentionLoop(ctx context.Context, db *gorm.DB, cfg RetentionConfig) {
 	go func() {
+		defer safego.Recover("agent.run_event_retention_loop")
 		ticker := time.NewTicker(CleanupInterval)
 		defer ticker.Stop()
 		runOnce := func() {

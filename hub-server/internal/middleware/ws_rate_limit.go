@@ -13,6 +13,7 @@ import (
 	"github.com/agenthub/hub-server/internal/config"
 	"github.com/agenthub/hub-server/internal/errcode"
 	sharederr "github.com/agenthub/pkg/errcode"
+	"github.com/agenthub/pkg/safego"
 )
 
 // wsIPLimiter tracks per-IP rate limiters for WebSocket connection attempts.
@@ -61,7 +62,7 @@ func newWSIPRateLimiter() *wsIPLimiter {
 		limiters: make(map[string]*ipEntry),
 		stopCh:   make(chan struct{}),
 	}
-	go l.cleanup()
+	safego.SafeGo("ws_rate_limit.cleanup", l.cleanup)
 	return l
 }
 
@@ -216,7 +217,7 @@ func (l *WSUserConnLimiter) Acquire(userID, connID string) {
 		)
 		if l.kickFn != nil {
 			// Kick outside the lock to avoid deadlock.
-			go l.kickFn(oldestConnID)
+			safego.SafeGo("ws_rate_limit.kick", func() { l.kickFn(oldestConnID) })
 		}
 	}
 
