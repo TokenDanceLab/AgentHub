@@ -19,6 +19,28 @@ const captured = vi.hoisted(() => ({
   props: undefined as Record<string, unknown> | undefined,
 }));
 
+// #2241: the forward port has to reach the *real* Hub REST call, so only the
+// client boundary is stubbed — `@/api/sessionQueries` stays real and the new
+// `useHubForwardMessage` mutation runs for real inside the QueryClientProvider
+// below. Any other hubClient method resolves to an inert noop (App's render
+// path touches a few), so nothing here fakes the thing under test.
+const hubForward = vi.hoisted(() => ({
+  forwardMessage: vi.fn(() => Promise.resolve(undefined)),
+}));
+
+vi.mock('@/api/hubClient', async (importOriginal) => {
+  const actual = await importOriginal<Record<string, unknown>>();
+  const client = new Proxy(
+    { forwardMessage: hubForward.forwardMessage } as Record<string, unknown>,
+    {
+      get(target, prop: string) {
+        return prop in target ? target[prop] : () => Promise.resolve(undefined);
+      },
+    },
+  );
+  return { ...actual, createHubClient: () => client };
+});
+
 vi.mock('@agenthub/workbench', async (importOriginal) => {
   const actual = await importOriginal<Record<string, unknown>>();
   return {
@@ -228,16 +250,37 @@ describe('Desktop App message action ports (#2154)', () => {
     expect(recallMessage).toHaveBeenCalledWith('m1');
   });
 
+  it('wires the Hub forward port and dispatches the confirmed targets for real (#2241)', async () => {
+    mockedModel.mockReturnValue(modelFixture(hubChatActions()));
+    renderWorkbench();
+
+    const props = workbenchProps();
+    const onForwardMessage = props.onForwardMessage as
+      | ((messageId: string, targetSessionIds: string[]) => Promise<void> | void)
+      | undefined;
+    expect(onForwardMessage, 'onForwardMessage must reach the workbench deps').toBeTypeOf('function');
+
+    // Real useHubForwardMessage mutation → real shared hubClient.forwardMessage:
+    // the `hub-message-` block-id prefix is stripped exactly like
+    // pin/unpin/recall, and the picker's target session ids pass through.
+    await onForwardMessage?.('hub-message-m1', ['sess-2', 'sess-3']);
+    expect(hubForward.forwardMessage).toHaveBeenCalledTimes(1);
+    expect(hubForward.forwardMessage).toHaveBeenCalledWith('m1', ['sess-2', 'sess-3']);
+    // Not a noop dressed up as a port: the bare id must reach the REST call.
+    expect(hubForward.forwardMessage).not.toHaveBeenCalledWith('hub-message-m1', ['sess-2', 'sess-3']);
+  });
+
   it('leaves the ports Desktop cannot back undefined so the menu hides them', () => {
     mockedModel.mockReturnValue(modelFixture(hubChatActions()));
     renderWorkbench();
 
     const props = workbenchProps();
-    // No Desktop mutation exists for these three (forward needs a
-    // useHubForwardMessage port, regenerate a Hub task port, react a reaction
-    // port). Undefined props keep the entries out of the menu (#2154
-    // fail-closed) instead of rendering a click the dispatcher would drop.
-    expect(props.onForwardMessage).toBeUndefined();
+    // #2241: forward left this list — Desktop now owns a real
+    // `useHubForwardMessage` mutation (see the positive test above), so the
+    // menu entry renders again. regenerate still has no *verified* Desktop port
+    // (`regenerateAgentTask` under the DesktopHubTaskBridge path is unproven)
+    // and reaction has no port at all; undefined props keep those entries out
+    // of the menu (#2154 fail-closed) instead of rendering a dead click.
     expect(props.onRegenerate).toBeUndefined();
     expect(props.onAddMessageReaction).toBeUndefined();
   });
@@ -251,5 +294,10 @@ describe('Desktop App message action ports (#2154)', () => {
     expect(props.onUnpinMessage).toBeUndefined();
     expect(props.onRecallMessage).toBeUndefined();
     expect(props.onEditMessage).toBeUndefined();
+    // #2241: forward is gated on `chatActions` exactly like pin/unpin/recall,
+    // so demo / Hub-not-ready shells keep the entry hidden (fail-closed) even
+    // though the mutation hook itself exists.
+    expect(props.onForwardMessage).toBeUndefined();
+    expect(hubForward.forwardMessage).not.toHaveBeenCalled();
   });
 });

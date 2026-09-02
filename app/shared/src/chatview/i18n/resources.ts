@@ -310,6 +310,11 @@ export const chatviewResources = {
     'toast.regenerateFailed': '重新生成失败，请重试',
     'toast.cancelFailed': '取消任务失败，请重试',
     'toast.artifactDownloadFailed': '产物下载失败，请重试',
+    // #2241: dedicated copy for "this client never wired that port"
+    // (UNAVAILABLE_ACTION_TOAST_KEY in workbenchTranscriptChromeActionMappers).
+    // Deliberately NOT a "请重试" flavour: on a shell without the port a retry
+    // can never succeed, so the honest wording says the action is not wired.
+    'toast.actionUnavailable': '该操作在当前端未接入',
     // #2072 P3: errcode-specific failure messages for chatview actions.
     'toast.editFailed.timeout': '已超过编辑时限，无法编辑',
     'toast.editFailed.notEditable': '该消息不支持编辑',
@@ -1206,6 +1211,9 @@ export const chatviewResources = {
     'toast.regenerateFailed': 'Regenerate failed, please retry',
     'toast.cancelFailed': 'Cancel failed, please retry',
     'toast.artifactDownloadFailed': 'Artifact download failed, please retry',
+    // #2241: dedicated copy for "this client never wired that port"
+    // (UNAVAILABLE_ACTION_TOAST_KEY). Retry-flavoured copy would be a lie here.
+    'toast.actionUnavailable': 'This action is not wired in this client',
     // #2072 P3: errcode-specific failure messages for chatview actions.
     'toast.editFailed.timeout': 'Edit window has expired',
     'toast.editFailed.notEditable': 'This message cannot be edited',
