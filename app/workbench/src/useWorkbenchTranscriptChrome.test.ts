@@ -189,10 +189,14 @@ describe('useWorkbenchTranscriptChrome', () => {
 
   it('builds context menu groups shaped for agent and user blocks', () => {
     // A session id enables the Hub REST entries (recall et al.), so the
-    // agent/user shape assertions below run with one (#1818).
+    // agent/user shape assertions below run with one (#1818). #2154: the
+    // entries are additionally gated on the port handler being wired — the
+    // shape assertions here are about author/kind, so declare both ports.
     const { result } = renderTranscriptChrome({
       transcript: [textBlock(), userTextBlock()],
       sessionId: 'sess-1',
+      onRegenerate: vi.fn(),
+      onRecallMessage: vi.fn(),
     });
 
     const agentGroups = result.current.contextMenuGroups('b1');

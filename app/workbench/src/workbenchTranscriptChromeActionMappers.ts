@@ -535,6 +535,38 @@ function announceSettledAction(
   );
 }
 
+/**
+ * #2154: i18n key for the "this shell never wired that action" announcement.
+ * The key is not in the locale bundle yet (i18n resources are owned outside
+ * this change and the missing key is only registered in the PR) —
+ * `announceUnavailableAction` falls back to the effect's own failure copy
+ * until it lands, so the feedback is never a raw key and never silence.
+ */
+export const UNAVAILABLE_ACTION_TOAST_KEY = 'toast.actionUnavailable';
+
+/**
+ * Announce a planned action whose port handler is not wired (#2154).
+ *
+ * Every handler gate in the dispatcher below used to `break` silently: the
+ * menu entry was visible (it gated on the session id, not on the handler) and
+ * the click evaporated. The menu is fail-closed now, so this is a defensive
+ * path — but it stays loud by contract: exactly one toast, never the success
+ * copy, and no fake side effect.
+ */
+function announceUnavailableAction(
+  effect: { failureMessage: string },
+  handlers: Pick<TranscriptChromeEffectHandlers, 'showWorkbenchToast'>,
+  t?: TranscriptChromeTranslate,
+): void {
+  const resolved = t ? t(UNAVAILABLE_ACTION_TOAST_KEY) : '';
+  // A translate function that cannot resolve the key echoes it back (i18next
+  // returns the key itself for a missing entry) — prefer the effect's own
+  // localized failure copy over surfacing a raw key.
+  handlers.showWorkbenchToast(
+    resolved && resolved !== UNAVAILABLE_ACTION_TOAST_KEY ? resolved : effect.failureMessage,
+  );
+}
+
 export function createTranscriptChromeEffectHandlers(
   handlers: TranscriptChromeEffectHandlers,
 ): TranscriptChromeEffectHandlers {
@@ -589,7 +621,10 @@ export function applyTranscriptChromeSideEffects(
         // toast wait for resolution and a rejection keeps the block visible
         // with the failure toast (no fake "regenerating" empty state).
         const regenerateHandler = handlers.onRegenerate;
-        if (!regenerateHandler) break;
+        if (!regenerateHandler) {
+          announceUnavailableAction(effect, handlers, t);
+          break;
+        }
         const outcome = regenerateHandler(effect.blockId);
         if (isThenable(outcome)) {
           void Promise.resolve(outcome).then(
@@ -621,7 +656,10 @@ export function applyTranscriptChromeSideEffects(
         // the success toast only fires after it resolves; a rejection shows
         // the failure message so a failed approval is never silent.
         const handler = handlers.onApprovalDecision;
-        if (!handler) break;
+        if (!handler) {
+          announceUnavailableAction(effect, handlers, t);
+          break;
+        }
         void Promise.resolve(handler(effect.decision)).then(
           () => handlers.showWorkbenchToast(effect.successMessage),
           (err: unknown) => {
@@ -651,7 +689,10 @@ export function applyTranscriptChromeSideEffects(
         break;
       case 'pin': {
         const handler = handlers.onPinMessage;
-        if (!handler) break;
+        if (!handler) {
+          announceUnavailableAction(effect, handlers, t);
+          break;
+        }
         announceSettledAction(
           handler(effect.messageId, effect.sessionId),
           effect.successMessage,
@@ -664,7 +705,10 @@ export function applyTranscriptChromeSideEffects(
       }
       case 'unpin': {
         const handler = handlers.onUnpinMessage;
-        if (!handler) break;
+        if (!handler) {
+          announceUnavailableAction(effect, handlers, t);
+          break;
+        }
         announceSettledAction(
           handler(effect.messageId, effect.sessionId),
           effect.successMessage,
@@ -677,7 +721,10 @@ export function applyTranscriptChromeSideEffects(
       }
       case 'forward': {
         const handler = handlers.onForwardMessage;
-        if (!handler) break;
+        if (!handler) {
+          announceUnavailableAction(effect, handlers, t);
+          break;
+        }
         announceSettledAction(
           handler(effect.messageId, effect.targetSessionIds),
           effect.successMessage,
@@ -690,7 +737,10 @@ export function applyTranscriptChromeSideEffects(
       }
       case 'recall': {
         const handler = handlers.onRecallMessage;
-        if (!handler) break;
+        if (!handler) {
+          announceUnavailableAction(effect, handlers, t);
+          break;
+        }
         announceSettledAction(
           handler(effect.messageId),
           effect.successMessage,
@@ -703,7 +753,10 @@ export function applyTranscriptChromeSideEffects(
       }
       case 'react': {
         const handler = handlers.onAddMessageReaction;
-        if (!handler) break;
+        if (!handler) {
+          announceUnavailableAction(effect, handlers, t);
+          break;
+        }
         announceSettledAction(
           handler(effect.messageId, effect.sessionId, effect.emoji),
           effect.successMessage,
@@ -734,11 +787,33 @@ export interface BuildTranscriptContextMenuGroupsOptions {
    */
   conversations?: WorkbenchConversation[] | undefined;
   /**
-   * Hub REST message actions are available (#1383). Desktop/demo shells
-   * have no session, so react/pin/unpin/recall entries are omitted there
-   * instead of planning placeholder toasts (#1818).
+   * Handler-backed entries this shell can actually run (#2154). Every field
+   * defaults to `false`, so an entry renders only when the port behind it is
+   * wired — the previous session-id-only gate rendered pin/unpin/recall on
+   * Desktop (session id present, no Hub message ports) and the dispatcher then
+   * dropped each click without a word.
    */
-  hubMessageActions?: boolean | undefined;
+  capabilities?: TranscriptMenuActionCapabilities | undefined;
+}
+
+/**
+ * Per-action render gates for the transcript context menu (#2154).
+ *
+ * Fail-closed by construction: an unset field means "do not render". Pin and
+ * unpin are separate capabilities because the entry toggles off `block.pinned`
+ * — a shell that wired only one direction must not render the dead half.
+ */
+export interface TranscriptMenuActionCapabilities {
+  /** Pin entry on an unpinned block — requires `onPinMessage`. */
+  pin?: boolean | undefined;
+  /** Unpin entry on a pinned block — requires `onUnpinMessage`. */
+  unpin?: boolean | undefined;
+  /** Recall entry on the user's own message — requires `onRecallMessage`. */
+  recall?: boolean | undefined;
+  /** Forward entry — requires `onForwardMessage` *and* `conversations`. */
+  forward?: boolean | undefined;
+  /** Regenerate entry on an agent text block — requires `onRegenerate`. */
+  regenerate?: boolean | undefined;
 }
 
 export function buildTranscriptContextMenuGroups({
@@ -748,8 +823,9 @@ export function buildTranscriptContextMenuGroups({
   onAction,
   onEnterSelection,
   conversations,
-  hubMessageActions = false,
+  capabilities,
 }: BuildTranscriptContextMenuGroupsOptions): Array<Array<ContextMenuItem>> {
+  const caps = capabilities ?? {};
   const block = transcript.find((item) => item.id === blockId);
   const isAgentText = block?.kind === 'text' && block.author.role === 'agent';
   const isUserText = block?.kind === 'text' && block.author.role === 'human';
@@ -768,9 +844,10 @@ export function buildTranscriptContextMenuGroups({
       { label: t('context.reply'), icon: 'notes', onClick: () => onAction('reply', blockId) },
       ...(isTextBlock ? [{ label: t('context.quote'), icon: 'copy' as const, onClick: () => onAction('quote', blockId) }] : []),
       ...(isUserText ? [{ label: t('context.edit'), icon: 'edit' as const, onClick: () => onAction('edit', blockId) }] : []),
-      // Forward only renders with the target picker submenu (#1385); without
-      // a conversation list there is no real forward path, so no entry (#1818).
-      ...(conversations !== undefined
+      // Forward only renders with the target picker submenu (#1385) *and* a
+      // wired forward port (#2154); without either there is no real forward
+      // path, so no entry (#1818).
+      ...(conversations !== undefined && caps.forward === true
         ? [{
             label: t('context.forward'),
             icon: 'external' as const,
@@ -799,8 +876,10 @@ export function buildTranscriptContextMenuGroups({
       // (`context.unpin` i18n + effect + toast + pulse). `block.pinned` is
       // written by the adapter from message-level pin state, which the
       // pinMap store provides (getPinMapStore → withPinnedState merged in
-      // web/desktop workbench model, see pinMap.ts). Hub-only (#1818).
-      ...(hubMessageActions
+      // web/desktop workbench model, see pinMap.ts).
+      // #2154: gated per half of the toggle — only the direction whose port is
+      // actually wired renders, so no shell offers a click it cannot run.
+      ...((block?.pinned ? caps.unpin : caps.pin) === true
         ? [{
             label: block?.pinned ? t('context.unpin') : t('context.pinMessage'),
             icon: 'bell' as const,
@@ -810,11 +889,16 @@ export function buildTranscriptContextMenuGroups({
       { label: t('context.copyLink'), icon: 'external', onClick: () => onAction('link', blockId) },
     ],
     [
-      ...(isAgentText ? [{ label: t('context.regenerate'), icon: 'refresh' as const, onClick: () => onAction('regenerate', blockId) }] : []),
+      // #2154: regenerate needs the shell's regenerate port — Desktop has
+      // none, so the entry stays hidden instead of doing nothing on click.
+      ...(isAgentText && caps.regenerate === true
+        ? [{ label: t('context.regenerate'), icon: 'refresh' as const, onClick: () => onAction('regenerate', blockId) }]
+        : []),
       // Recall (#1383) only makes sense for the user's own messages — the
       // Hub REST planner already supports it; the menu entry was missing.
-      // Danger-styled like delete. Hub-only (#1818).
-      ...(isUserMessage && hubMessageActions
+      // Danger-styled like delete. Renders only with a wired recall port
+      // (#2154; was Hub-only #1818).
+      ...(isUserMessage && caps.recall === true
         ? [{ label: t('context.recall'), icon: 'back' as const, danger: true, onClick: () => onAction('recall', blockId) }]
         : []),
       { label: t('context.delete'), icon: 'archive', danger: true, onClick: () => onAction('delete', blockId) },
