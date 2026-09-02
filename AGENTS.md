@@ -134,7 +134,7 @@ Mobile 主线是 Expo + React Native development build。旧 Tauri Mobile 不再
 
 | 层 | 内容 | 入口 | CI job |
 |---|---|---|---|
-| L0 单元 | Go `-short`（零依赖）+ 前端 vitest | `make test`（Go）/ `make fe-test`（前端） | `go-edge-test`/`go-hub-test`（2-shard 包轮转）+ `go-edge`/`go-hub`（lint/覆盖率门禁）+ `frontend-*`（checks.yml，经 `frontend-required` 稳定 required-check 聚合）+ Windows 原生合同（`windows-go-test`/`windows-frontend-test` 执行矩阵 → `windows-go`/`windows-frontend` 稳定 required-check 聚合，见 `docs/architecture/github-actions-ci-cd-policy.md`） |
+| L0 单元 | Go `-short`（零依赖）+ 前端 vitest | `make test`（Go）/ `make fe-test`（前端） | `go-edge-test`/`go-hub-test`（2-shard 包轮转）+ `go-edge-static`/`go-hub-static`（lint/gosec/vet/staticcheck，与 shard 并行）+ `go-edge`/`go-hub`（覆盖率门禁 + 双 lane fail-closed 聚合）+ `frontend-*`（checks.yml，经 `frontend-required` 稳定 required-check 聚合）+ Windows 原生合同（`windows-go-test`/`windows-frontend-test` 执行矩阵 → `windows-go`/`windows-frontend` 稳定 required-check 聚合，见 `docs/architecture/github-actions-ci-cd-policy.md`） |
 | L1 集成 | Go 集成（真实 PG16+Redis7，OIDC mock，`-tags integration`） | `make test-hub-integration`（先 `scripts/dev/dev-up.sh` 起容器） | `backend-integration`（service 容器；由 `backend-required` 聚合） |
 | L2 回调 E2E | Edge→Hub 回调链路（进程内 mock hub / fixture smoke） | `make test-edge-e2e` / `make e2e-local` | `backend-edge-e2e` / `backend-e2e-fixture`（由 `backend-required` 聚合） |
 | L3 真实 E2E | Playwright 真实登录/聊天流（真实 ID+Hub+Edge 栈） | 远程 dev 服务器：`scripts/dev/devserver.sh test|integration`（见 #1681） | 无阻塞 CI；`real-e2e-stack` dispatch-only（`checks.yml`）；常规入口 `scripts/dev/devserver.sh`（#1681），WSL 本机 `scripts/e2e/wsl-full-stack-e2e.sh` |
