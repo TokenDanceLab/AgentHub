@@ -133,15 +133,26 @@ func startClientReadLoop(conn *websocket.Conn, done <-chan struct{}, readDone ch
 	})
 }
 
+// wsWriteTimeout bounds each websocket write: a peer that stops draining its
+// TCP receive buffer would otherwise block the write loop until the kernel
+// gives up on retransmission (minutes), keeping the subscriber goroutines
+// alive as zombies. Mirrors the Hub writeLoop per-write deadline
+// (hub-server/internal/handler/ws.go). Declared as a var so tests can shrink
+// it.
+var wsWriteTimeout = 10 * time.Second
+
 // writeEventsLoop is the WebSocket write loop: it pushes live events, control
-// responses, and heartbeats until the connection is done. Write failures are
-// logged with their specific message before the error is returned.
+// responses, and heartbeats until the connection is done. Every write runs
+// under wsWriteTimeout so a stalled peer cannot hang the loop. Write
+// failures are logged with their specific message before the error is
+// returned.
 func writeEventsLoop(conn *websocket.Conn, repo store.Repository, ch <-chan events.EventEnvelope, clientControl <-chan map[string]any, heartbeat *time.Ticker, readDone <-chan struct{}, subID int64, userID string) error {
 	for {
 		select {
 		case <-readDone:
 			return nil
 		case response := <-clientControl:
+			_ = conn.SetWriteDeadline(time.Now().Add(wsWriteTimeout))
 			if err := conn.WriteJSON(response); err != nil {
 				slog.Info("websocket control write error", "error", err)
 				return err
@@ -155,17 +166,20 @@ func writeEventsLoop(conn *websocket.Conn, repo store.Repository, ch <-chan even
 					"subscriber", subID)
 				closeMsg := websocket.FormatCloseMessage(CloseCodeEventGap,
 					"event gap: dropped events detected, reconnect to resync")
+				_ = conn.SetWriteDeadline(time.Now().Add(wsWriteTimeout))
 				_ = conn.WriteMessage(websocket.CloseMessage, closeMsg)
 				return nil
 			}
 			if !eventVisibleToUser(repo, evt, userID) {
 				continue
 			}
+			_ = conn.SetWriteDeadline(time.Now().Add(wsWriteTimeout))
 			if err := conn.WriteJSON(evt); err != nil {
 				slog.Info("websocket write error", "error", err)
 				return err
 			}
 		case <-heartbeat.C:
+			_ = conn.SetWriteDeadline(time.Now().Add(wsWriteTimeout))
 			if err := conn.WriteMessage(websocket.PingMessage, nil); err != nil {
 				slog.Info("websocket heartbeat error", "error", err)
 				return err
