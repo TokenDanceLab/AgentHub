@@ -4,6 +4,7 @@ import (
 	"context"
 	"net"
 	"net/http"
+	"runtime/debug"
 	"strings"
 	"sync"
 	"time"
@@ -55,7 +56,10 @@ type App struct {
 	bus       *bus.Bus
 	startTime time.Time
 
-	// Version is the build version, settable via -ldflags. Defaults to "dev".
+	// Version is the build version this instance reports on /health,
+	// /health/live and the admin endpoint. New resolves it once per App from the
+	// package-level Version symbol (the one -ldflags -X writes to) with VCS
+	// stamping and "dev" fallbacks, so it is never empty.
 	Version string
 
 	// Service layer
@@ -125,8 +129,84 @@ func New(cfg *config.Config, db *gorm.DB, cacheClient *cache.Client) *App {
 		Config:      cfg,
 		DB:          db,
 		CacheClient: cacheClient,
+		Version:     resolveVersion(Version),
 		bg:          newBackgroundGroup(context.Background()),
 	}
+}
+
+// Version carries the build version stamped into the binary at link time:
+//
+//	go build -ldflags "-X github.com/agenthub/hub-server/internal/app.Version=v0.6.1"
+//
+// This is a package-level string variable because that is the only thing the Go
+// linker can assign to: while the version lived solely as the App.Version struct
+// field, no -X flag could ever reach it, so every build — release, CI, local —
+// reported "dev" and an incident could not be traced back to a commit.
+//
+// Write-once by contract: the linker sets it before main runs and nothing in
+// this package assigns to it afterwards. Resolution is a pure function of its
+// argument (resolveVersion), so tests pass explicit values instead of mutating
+// package state and parallel tests cannot pollute each other.
+var Version string
+
+// versionFallback is reported when neither -X nor VCS stamping produced a value.
+const versionFallback = "dev"
+
+// shortRevisionLen is the vcs.revision prefix reported when a build carries no
+// tag: long enough to stay unique, short enough to read inside a JSON payload.
+const shortRevisionLen = 12
+
+// resolveVersion picks the version to report, most specific first: an explicit
+// value (link-time -X, or one supplied by a caller), then the VCS stamping the
+// go command embeds in module builds, then versionFallback.
+//
+// It never returns an empty string. An empty version is worse than "dev": it
+// vanishes from JSON payloads, so an operator cannot even tell that the field
+// was meant to carry a build identity.
+func resolveVersion(explicit string) string {
+	if v := strings.TrimSpace(explicit); v != "" {
+		return v
+	}
+	if v := buildInfoVersion(); v != "" {
+		return v
+	}
+	return versionFallback
+}
+
+// buildInfoVersion reads the VCS stamping the go command embeds in every module
+// build made inside a VCS tree: vcs.version when the checkout sits on a tag,
+// otherwise the short vcs.revision, suffixed "-dirty" when the tree had
+// uncommitted changes. This is the fallback that keeps builds honest when
+// whoever built the binary forgot to pass -X — local dev builds and plain
+// `docker build` included.
+//
+// It returns "" only when the binary carries no stamping at all, which is what
+// makes resolveVersion fall back instead of reporting an empty version.
+func buildInfoVersion() string {
+	info, ok := debug.ReadBuildInfo()
+	if !ok || info == nil {
+		return ""
+	}
+
+	settings := make(map[string]string, len(info.Settings))
+	for _, setting := range info.Settings {
+		settings[setting.Key] = setting.Value
+	}
+
+	version := settings["vcs.version"]
+	if version == "" {
+		version = settings["vcs.revision"]
+		if len(version) > shortRevisionLen {
+			version = version[:shortRevisionLen]
+		}
+	}
+	if version == "" {
+		return ""
+	}
+	if settings["vcs.modified"] == "true" {
+		version += "-dirty"
+	}
+	return version
 }
 
 // tdVerifier returns the instance-owned TokenDance ID JWKS verifier (#1551),
