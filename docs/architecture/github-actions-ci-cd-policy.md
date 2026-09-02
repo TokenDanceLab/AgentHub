@@ -1,6 +1,6 @@
 # GitHub Actions CI/CD policy
 
-最后更新：2026-08-24
+最后更新：2026-09-03
 
 本文档定义 AgentHub 的免费 GitHub-hosted runner 测试链路。它描述职责和触发边界；具体 job、版本和脚本以 `.github/workflows/checks.yml`、`release-readiness.yml`、`release.yml` 及仓库内 verifier 为准。
 
@@ -26,7 +26,7 @@ AgentHub 使用 Ubuntu 和 Windows 原生 runner 验证不同类别的问题：
 
 `master` 分支保护使用 `strict=true`，PR 必须先与目标分支保持 up-to-date。仓库要求的稳定 required-check 契约是 `validate`、`go-hub`、`go-edge`、`windows-go`、`windows-frontend`、`backend-required`、`frontend-required`。
 
-- `go-edge` / `go-hub` 在无 Go 变更时用受控 no-op 恒报，真实单元执行在 `go-edge-test` / `go-hub-test` 的两分片矩阵。
+- `go-edge` / `go-hub` 在无 Go 变更时用受控 no-op 恒报，真实单元执行在 `go-edge-test` / `go-hub-test` 的两分片矩阵；lint、lint fingerprint ratchet、gosec、vet、staticcheck（edge 另含 orchestrator 依赖方向门）在与分片并行的 `go-edge-static` / `go-hub-static`（#2251：这些门禁不消费覆盖率产物，不再串行排在测试之后）。两个恒报 job 只保留覆盖率合并与门禁，并对两条上游 lane 做 fail-closed 结果断言。`go-*-static` 本身不是 required check：它被路径过滤跳过时恒报 job 仍按既有语义报绿 no-op，它失败时经恒报 job 染红。
 - `windows-go` / `windows-frontend` 只聚合执行矩阵结果，不自己跑测试。
 - `backend-required` 聚合后端 L0/L1/L2；`frontend-required` 聚合前端 L0；`real-e2e-stack` 是 dispatch-only L3，不属于 required checks。
 
@@ -34,7 +34,7 @@ AgentHub 使用 Ubuntu 和 Windows 原生 runner 验证不同类别的问题：
 
 1. `concurrency.cancel-in-progress` 取消同一 PR 的旧运行，连续 push 不排队浪费分钟。
 2. `changes` 是统一路径过滤器。Go、前端、移动端、设计 CSS 和视觉 shell 只在相关变更时启动；手动 dispatch 默认运行完整选择面。
-3. Ubuntu Go unit 使用两个不重叠 package shard；Hub 和 Edge 各自先并行执行 shard，再由 lint/coverage job 合并证据。
+3. Ubuntu Go unit 使用两个不重叠 package shard；Hub 和 Edge 各自的 shard 测试与静态门禁 job 同时起跑，恒报 job 在两者结束后才合并覆盖率证据并断言 lane 结果（关键路径 = max(最慢 shard, 静态 job) + 覆盖率合并，而非两段相加）。
 4. 前端 coverage 按 package matrix 并行；Windows 前端按 Desktop/Web matrix 并行。矩阵 `fail-fast: false` 保留所有失败根因，避免一个平台取消另一个平台的诊断。
 5. `actions/setup-go`、`actions/setup-node` 的依赖缓存、pnpm store、Rust cache 和 Docker Buildx GHA cache 复用稳定输入；lockfile 或版本变化自然生成新缓存键。
 6. 浏览器安装、Expo export、Playwright、Docker 服务、Rust/Tauri 和 benchmark 是慢路径，不偷偷塞入 Fast PR。
@@ -43,9 +43,9 @@ AgentHub 使用 Ubuntu 和 Windows 原生 runner 验证不同类别的问题：
 
 ### Ubuntu
 
-- Go：`go-edge-test`、`go-hub-test` 的 race/shard 是主单元门禁；`go-edge`、`go-hub` 负责 lint、gosec、staticcheck 和 coverage。
+- Go：`go-edge-test`、`go-hub-test` 的 race/shard 是主单元门禁；`go-edge-static`、`go-hub-static` 负责 lint、lint fingerprint ratchet、gosec、vet、staticcheck（edge 另含 orchestrator 依赖方向门）；`go-edge`、`go-hub` 是稳定 required check，负责 coverage 合并与门禁并 fail-closed 聚合上述两条 lane。
 - 服务行为：fixture E2E、Edge->Hub callback、PostgreSQL + Redis integration。
-- `backend-required` 是后端 L0/L1/L2 的稳定 required-check 聚合：`needs` 聚合 `go-edge`/`go-hub`/`backend-integration`/`backend-edge-e2e`/`backend-e2e-fixture`，`if: always()` 恒报；Go 无变化时退出 `success` 作为有意 no-op，`changes` 失败时 fail-closed，Go 变化时任一 lane 非 `success` 即失败。
+- `backend-required` 是后端 L0/L1/L2 的稳定 required-check 聚合：`needs` 聚合 `go-edge`/`go-hub`/`backend-integration`/`backend-edge-e2e`/`backend-e2e-fixture`，`if: always()` 恒报；Go 无变化时退出 `success` 作为有意 no-op，`changes` 失败时 fail-closed，Go 变化时任一 lane 非 `success` 即失败。`needs` 不含 `go-*-static`：静态 lane 的失败已由 `go-edge`/`go-hub` 传导，避免聚合图重复。
 - `frontend-required` 是前端 L0 的稳定 required-check 聚合：`needs` 聚合 `frontend-desktop`/`frontend-web`/`frontend-mobile-light`/`frontend-coverage`，`if: always()` 恒报；路径未选中时退出 `success` 作为有意 no-op，`changes` 失败时 fail-closed，任一选中 lane 非 `success` 即失败（AGENTS「测试分层」L0 是 PR merge 门禁）。
 - 前端其余面：Visual QA shell、stubbed-hub Playwright、CSS syntax、vulnerability gate 按路径执行，当前仍是 advisory（非 required check）。
 

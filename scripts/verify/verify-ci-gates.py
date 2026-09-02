@@ -88,6 +88,15 @@ def main() -> int:
         workflow = handle.read()
     edge = get_job_block(workflow, "go-edge")
     hub = get_job_block(workflow, "go-hub")
+    # #2251 slice 1: lint / fingerprint ratchet / gosec / vet / staticcheck (plus
+    # edge's orchestrator dependency direction gate) never consumed the shard
+    # coverage artifacts, so they moved to go-edge-static / go-hub-static and now
+    # start in parallel with the shard matrix instead of serialising behind it.
+    # go-edge / go-hub stay the stable required checks: coverage merge + gates
+    # plus fail-closed assertions on both upstream lanes. The assertions below
+    # follow the steps to their new home; none is dropped or relaxed.
+    edge_static = get_job_block(workflow, "go-edge-static")
+    hub_static = get_job_block(workflow, "go-hub-static")
     backend_fixture = get_job_block(workflow, "backend-e2e-fixture")
     backend_required = get_job_block(workflow, "backend-required")
     frontend_required = get_job_block(workflow, "frontend-required")
@@ -151,7 +160,33 @@ def main() -> int:
         assert_contains(fail_step, r"needs\.changes\.result != 'success'", f"{job_name} must fail closed when the changes job fails")
         assert_contains(fail_step, r"exit 1", f"{job_name} changes-failure step must exit 1")
 
-    # #1840: go-edge Lint is report-only (advisory) — the action's raw exit
+    # #2251 slice 1: the split itself is a gate. Moving steps between jobs must
+    # not be a way to drop one, so the static lanes are pinned to "static only"
+    # (path-filtered, no shard artifact consumption, no upstream job dependency)
+    # and the required checks must aggregate both lanes fail-closed — the same
+    # bind-result-and-assert convention windows-go / backend-required already use.
+    for job_name, job_body in (("go-edge-static", edge_static), ("go-hub-static", hub_static)):
+        assert_contains(job_body, r"(?m)^\s+needs:\s+changes\s*$", f"{job_name} must depend on the unified changes job only, so it starts together with the shard matrix")
+        assert_not_contains(job_body, r"(?m)^\s+needs:\s+\[", f"{job_name} must not serialise behind any upstream job")
+        assert_contains(job_body, r"github\.event_name == 'workflow_dispatch' \|\|\s+needs\.changes\.outputs\.go == 'true'", f"{job_name} must keep the Go path filter")
+        assert_contains(job_body, r"(?m)^\s+- name: Vet\s*$", f"{job_name} must keep go vet")
+        assert_contains(job_body, r"(?m)^\s+- name: staticcheck\s*$", f"{job_name} must keep staticcheck")
+        assert_contains(job_body, r"Cache static-analysis binaries", f"{job_name} must restore the pinned static-analysis binaries before gosec and staticcheck")
+        assert_not_contains(job_body, r"download-artifact", f"{job_name} must not consume shard coverage artifacts (they belong to the required check)")
+        assert_not_contains(job_body, r"Commit message check", f"commit-message policy must not live in the path-filtered {job_name} job")
+    assert_contains(edge_static, r"verify-orchestrator-deps\.py", "go-edge-static must keep the #1566 orchestrator dependency direction gate")
+    assert_contains(edge_static, r"tests/verify-orchestrator-deps\.Tests\.py", "go-edge-static must keep the orchestrator dependency direction self-test")
+    assert_contains(edge_static, r"verify-edge-lint-ratchet\.py", "go-edge-static must keep the #1840 edge lint fingerprint ratchet")
+    assert_contains(hub_static, r"verify-hub-lint-ratchet\.py", "go-hub-static must keep the #1573 hub lint fingerprint ratchet")
+    assert_not_contains(hub_static, r"verify-orchestrator-deps", "the orchestrator dependency direction gate is an edge-server contract and must stay in go-edge-static")
+    for job_name, job_body, side in (("go-edge", edge, "edge"), ("go-hub", hub, "hub")):
+        assert_contains(job_body, re.escape(f"needs: [changes, go-{side}-test, go-{side}-static]"), f"{job_name} must aggregate both the shard matrix and the static lane")
+        assert_contains(job_body, re.escape(f"STATIC_RESULT: ${{{{ needs.go-{side}-static.result }}}}"), f"{job_name} must bind the static lane result for fail-closed aggregation")
+        assert_contains(job_body, re.escape('STATIC_RESULT" != "success"'), f"{job_name} must fail when the static lane did not succeed (a skipped lane is not a pass)")
+        assert_contains(job_body, re.escape(f"TEST_RESULT: ${{{{ needs.go-{side}-test.result }}}}"), f"{job_name} must bind the shard matrix result for fail-closed aggregation")
+        assert_contains(job_body, re.escape('TEST_RESULT" != "success"'), f"{job_name} must fail when the shard matrix did not succeed")
+
+    # #1840: go-edge-static Lint is report-only (advisory) — the action's raw exit
     # code cannot consult the baseline, and >300-file PR diffs fall back to a
     # full-repo lint that would hard-fail debt-clean large PRs on the 6
     # baseline-registered exported-stutter findings. The hard gate lives in
@@ -159,27 +194,27 @@ def main() -> int:
     # findings in both patch and full-lint mode. The step must keep the
     # pinned golangci-lint action (no placeholder commands) and
     # only-new-issues so small PRs keep a new-findings report.
-    assert_step_continue_on_error(edge, "Lint", True)
-    edge_lint_step = get_step_block(edge, "Lint")
-    assert_contains(edge_lint_step, r"golangci/golangci-lint-action@v9", "go-edge Lint must keep the pinned golangci-lint action (no placeholder commands)")
-    assert_contains(edge_lint_step, r"only-new-issues:\s*true", "go-edge Lint must keep only-new-issues so patch-mode reports stay scoped to new findings")
-    assert_step_continue_on_error(edge, "Verify Edge lint fingerprint ratchet (#1840)", False)
-    # #1812: go-hub Lint is hard-blocking — the 17 baseline-registered
+    assert_step_continue_on_error(edge_static, "Lint", True)
+    edge_lint_step = get_step_block(edge_static, "Lint")
+    assert_contains(edge_lint_step, r"golangci/golangci-lint-action@v9", "go-edge-static Lint must keep the pinned golangci-lint action (no placeholder commands)")
+    assert_contains(edge_lint_step, r"only-new-issues:\s*true", "go-edge-static Lint must keep only-new-issues so patch-mode reports stay scoped to new findings")
+    assert_step_continue_on_error(edge_static, "Verify Edge lint fingerprint ratchet (#1840)", False)
+    # #1812: go-hub-static Lint is hard-blocking — the 17 baseline-registered
     # complexity findings (#1573) are repaid and hub-lint-baseline.json is
     # empty, so a full-repo lint failure is a genuine regression. The
     # fingerprint ratchet step below stays hard-blocking as the second line of
     # defence. The step must keep the pinned golangci-lint action and must NOT
     # set only-new-issues (full-repo lint is the gate now the debt is cleared).
-    assert_step_continue_on_error(hub, "Lint", False)
-    hub_lint_step = get_step_block(hub, "Lint")
-    assert_contains(hub_lint_step, r"golangci/golangci-lint-action@v9", "go-hub Lint must keep the pinned golangci-lint action (no placeholder commands)")
-    assert_not_contains(hub_lint_step, r"only-new-issues", "go-hub Lint must not use only-new-issues after the #1812 debt repay (full-repo lint is the gate)")
-    assert_step_continue_on_error(hub, "Verify Hub lint fingerprint ratchet (#1573)", False)
+    assert_step_continue_on_error(hub_static, "Lint", False)
+    hub_lint_step = get_step_block(hub_static, "Lint")
+    assert_contains(hub_lint_step, r"golangci/golangci-lint-action@v9", "go-hub-static Lint must keep the pinned golangci-lint action (no placeholder commands)")
+    assert_not_contains(hub_lint_step, r"only-new-issues", "go-hub-static Lint must not use only-new-issues after the #1812 debt repay (full-repo lint is the gate)")
+    assert_step_continue_on_error(hub_static, "Verify Hub lint fingerprint ratchet (#1573)", False)
     # #1574: gosec findings triaged and cleared in both servers; the gosec
-    # security scan steps are hard-blocking (no continue-on-error) and run
+    # security scan steps (go-edge-static / go-hub-static) are hard-blocking (no continue-on-error) and run
     # through the fail-closed verify-gosec-gates.sh wrapper.
-    assert_step_continue_on_error(edge, "Security scan (gosec)", False)
-    assert_step_continue_on_error(hub, "Security scan (gosec)", False)
+    assert_step_continue_on_error(edge_static, "Security scan (gosec)", False)
+    assert_step_continue_on_error(hub_static, "Security scan (gosec)", False)
     assert_step_continue_on_error(edge, "Coverage per-package minimums", False)
     assert_not_contains(edge, r"Commit message check", "commit-message policy must not live in the path-filtered go-edge job")
 

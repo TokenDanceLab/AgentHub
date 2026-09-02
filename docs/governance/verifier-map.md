@@ -11,10 +11,10 @@
 
 | 规则 | 验证脚本 | CI job |
 |---|---|---|
-| CI 路径筛选与 job 结构（统一 `changes` job；design-css fail-closed 变异测试；go-edge/go-hub、backend-required 与 frontend-required 恒报 report 防 required check 跳过阻塞（backend-required 聚合后端 L0/L1/L2；frontend-required 聚合前端 L0：desktop/web/mobile-light/coverage）） | `scripts/verify/verify-ci-gates.py`（负向自测 `scripts/verify/tests/verify-ci-gates.Tests.py`） | checks.yml → validate |
+| CI 路径筛选与 job 结构（统一 `changes` job；design-css fail-closed 变异测试；go-edge-static/go-hub-static 承载静态门禁并与 shard 矩阵并行（#2251），go-edge/go-hub 只留覆盖率合并 + 对 test/static 双 lane 的 fail-closed 断言；go-edge/go-hub、backend-required 与 frontend-required 恒报 report 防 required check 跳过阻塞（backend-required 聚合后端 L0/L1/L2；frontend-required 聚合前端 L0：desktop/web/mobile-light/coverage）） | `scripts/verify/verify-ci-gates.py`（负向自测 `scripts/verify/tests/verify-ci-gates.Tests.py`） | checks.yml → validate |
 | action runtime 只允许 node24（防 Node-20 major 回退，#1580） | `scripts/verify/verify-action-runtimes.py`（负向自测 `scripts/verify/tests/verify-action-runtimes.Tests.py`） | checks.yml → validate |
-| Hub lint finding fingerprint ratchet（防新增/替换，#1573；go-hub 硬门禁，全量 lint 回退模式对 baseline 存量豁免） | `scripts/verify/verify-hub-lint-ratchet.py`（负向自测 `scripts/verify/tests/verify-hub-lint-ratchet.Tests.py`，baseline `scripts/verify/hub-lint-baseline.json`） | checks.yml → go-hub |
-| Edge lint finding fingerprint ratchet（防新增/替换，#1840 对偶 #1573；go-edge 硬门禁，全量 lint 回退模式对 baseline 存量豁免） | `scripts/verify/verify-edge-lint-ratchet.py`（负向自测 `scripts/verify/tests/verify-edge-lint-ratchet.Tests.py`，baseline `scripts/verify/edge-lint-baseline.json`） | checks.yml → go-edge |
+| Hub lint finding fingerprint ratchet（防新增/替换，#1573；go-hub-static 硬门禁，全量 lint 回退模式对 baseline 存量豁免） | `scripts/verify/verify-hub-lint-ratchet.py`（负向自测 `scripts/verify/tests/verify-hub-lint-ratchet.Tests.py`，baseline `scripts/verify/hub-lint-baseline.json`） | checks.yml → go-hub-static |
+| Edge lint finding fingerprint ratchet（防新增/替换，#1840 对偶 #1573；go-edge-static 硬门禁（Lint step 本身仍 report-only，硬门在本 ratchet），全量 lint 回退模式对 baseline 存量豁免） | `scripts/verify/verify-edge-lint-ratchet.py`（负向自测 `scripts/verify/tests/verify-edge-lint-ratchet.Tests.py`，baseline `scripts/verify/edge-lint-baseline.json`） | checks.yml → go-edge-static |
 | test-sleep 门禁（#1550 计数棘轮只缩不增；#1565/#1948 值预算：预算文件存在、预算内路径真实、count/total_ms/max_ms/逐值与源码一致、非常量表达式 fail-closed、改 sleep 值不更预算即红） | `scripts/verify/verify-test-sleep-ratchet.py`（负向自测 `scripts/verify/tests/verify-test-sleep-budget.Tests.py`，值预算 `scripts/verify/test-sleep-budget.json`，计数基线 `scripts/verify/test-sleep-baseline.json`） | checks.yml → validate |
 | skill 白名单只提交 active skill | `scripts/verify/verify-project-skills.py` | checks.yml → validate |
 | 文档与 Agent 入口 SSOT：根级入口/路径/行数/标记/映射表保鲜；引用 AGENTS 规则必须写主题名、禁止章节编号 | `scripts/verify/verify-doc-ssot.py`（负向自测 `scripts/verify/tests/verify-doc-entrypoints.Tests.py`） | checks.yml → validate |
@@ -42,7 +42,7 @@
 | 前端覆盖率基线不回退 | `scripts/verify/verify-coverage-baseline.py` | checks.yml → frontend-coverage |
 | shared edge 表面不被 web/mobile-rn import（A-V3 门禁） | `scripts/verify/verify-shared-edge-surface-isolation.py` | checks.yml → validate |
 | v4 旧 UI 组件/路由不得复活 | `scripts/verify/verify-v4-old-ui-active-paths.py` | checks.yml → validate |
-| Hub/Edge gosec SAST 告警清零（#1574：hard fail——Security scan (gosec) 已移除 continue-on-error，并经 `verify-gosec-gates.sh` fail-closed 校验） | `scripts/verify/verify-gosec-gates.sh`（负向自测 `scripts/verify/tests/verify-gosec-gates.Tests.sh`） | checks.yml → go-edge / go-hub |
+| Hub/Edge gosec SAST 告警清零（#1574：hard fail——Security scan (gosec) 已移除 continue-on-error，并经 `verify-gosec-gates.sh` fail-closed 校验） | `scripts/verify/verify-gosec-gates.sh`（负向自测 `scripts/verify/tests/verify-gosec-gates.Tests.sh`） | checks.yml → go-edge-static / go-hub-static |
 | OIDC 配置形状与边界（issuer/redirect/无 secret） | 旧 OIDC readiness 检查器已退役（2026-08-07，#1653：断言旧服务/测试名）；配置形状与证据等级见 `docs/architecture/05-deployment.md` 部署证据等级表（OIDC 行）；WSL 全栈 E2E 覆盖真实 OIDC 流 | — |
 | P0 remote-control fixture 就绪 | `scripts/verify/verify-p0-remote-control-fixture.py` | checks.yml → backend-e2e-fixture |
 | 后端 perf/leak 门禁（手动触发） | `scripts/verify/verify-backend-perf-leak-gates.py` | checks.yml → backend-perf-leak-gates |
@@ -74,7 +74,7 @@
 | migration DDL 幂等棘轮（#2125 follow-up：新增裸 `CREATE TABLE`/`ADD COLUMN`/`CREATE INDEX` 无 `IF NOT EXISTS` 即红；存量登记在 baseline，已修条目提示 prune） | `scripts/verify/verify-migration-idempotency.py`（baseline `scripts/verify/migration-idempotency-baseline.json`） | checks.yml → validate |
 | i18n dead-key 棘轮（web/desktop locale bundle 不得新增死键；判据保守——字面量在全仓源码含 tests/e2e 均未出现且无动态前缀覆盖才算死；例外登记 baseline） | `scripts/verify/verify-i18n-deadkeys.py`（baseline `scripts/verify/i18n-deadkeys-baseline.json`） | checks.yml → validate |
 | OIDC 授权码 SSOT（backend ↔ frontend 不分叉授权码流实现） | `scripts/verify/verify-oidc-code-ssot.py`（负向自测 `scripts/verify/tests/verify-oidc-code-ssot.Tests.py`） | checks.yml → validate |
-| Edge orchestrator 依赖方向（A-V1：`internal/orchestration` 中立契约 ← `internal/adapters/orchestrator` 叶子实现 ← composition root 注入，禁止反向依赖） | `scripts/verify/verify-orchestrator-deps.py`（负向自测 `scripts/verify/tests/verify-orchestrator-deps.Tests.py`） | checks.yml → go-edge |
+| Edge orchestrator 依赖方向（A-V1：`internal/orchestration` 中立契约 ← `internal/adapters/orchestrator` 叶子实现 ← composition root 注入，禁止反向依赖） | `scripts/verify/verify-orchestrator-deps.py`（负向自测 `scripts/verify/tests/verify-orchestrator-deps.Tests.py`） | checks.yml → go-edge-static |
 | 夹具连接钉死（#2154 F-e：并行读夹具必须钉住连接数——私有 `:memory:` 给每条新连接一个独立空库，未钉连接的 fan-out 读会落到非确定性 `no such table`） | `scripts/verify/verify-fixture-connection-pinning.py`（负向自测 `scripts/verify/tests/verify-fixture-connection-pinning.Tests.py`） | checks.yml → validate |
 | 远程 devserver 隐私/可移植合同（公开仓的 devserver 入口脚本与说明不得含内部主机别名、私有路径或不可移植写法） | `scripts/verify/verify-devserver-contract.py`（校验 `scripts/dev/devserver.sh` + `scripts/dev/README.md`） | checks.yml → validate |
 | L3 raw artifact 脱敏（#1873 Slice D：上传前扫 Playwright JSON/HTML report、trace.zip、失败截图，命中私有信息即非零退出；与 lane manifest 复用同一份 private_info 正则 SSOT） | `scripts/verify/verify-real-e2e-artifacts.py` | checks.yml → real-e2e-stack（仅 `workflow_dispatch`） |
