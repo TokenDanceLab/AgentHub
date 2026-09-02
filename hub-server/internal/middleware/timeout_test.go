@@ -209,3 +209,102 @@ func TestTimeout_HandlerPanicReturns500(t *testing.T) {
 		t.Fatalf("response body = %q, want JSON envelope with internal_error code", body)
 	}
 }
+
+func TestTimeoutStream_ReturnsTimeoutWhenNothingWritten(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	r.Use(TimeoutStream(50 * time.Millisecond))
+	r.GET("/slow", func(c *gin.Context) {
+		// Block until the deadline fires and return without writing anything:
+		// the client must still receive the timeout error.
+		<-c.Request.Context().Done()
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/slow", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusGatewayTimeout {
+		t.Fatalf("status = %d, want %d", w.Code, http.StatusGatewayTimeout)
+	}
+	body := w.Body.String()
+	if !strings.Contains(body, `"code":"request_timeout"`) {
+		t.Fatalf("body = %q, want request_timeout envelope", body)
+	}
+}
+
+func TestTimeoutStream_NormalResponsePasses(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	r.Use(TimeoutStream(5 * time.Second))
+	r.GET("/ok", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{"msg": "ok"})
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/ok", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", w.Code, http.StatusOK)
+	}
+	if !strings.Contains(w.Body.String(), `"msg":"ok"`) {
+		t.Fatalf("body = %q, want unbuffered normal response", w.Body.String())
+	}
+}
+
+func TestTimeoutStream_KeepsResponseOnceWritten(t *testing.T) {
+	// Once the handler has written a response, a fired deadline cannot
+	// rewrite it to a timeout error — the stream is left to finish.
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	r.Use(TimeoutStream(50 * time.Millisecond))
+	r.GET("/written", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{"msg": "early"})
+		<-c.Request.Context().Done()
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/written", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d (written response must survive the deadline)", w.Code, http.StatusOK)
+	}
+}
+
+func TestTimeoutStream_ZeroDurationPassthrough(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	r.Use(TimeoutStream(0))
+	r.GET("/zero", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{"msg": "ok"})
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/zero", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", w.Code, http.StatusOK)
+	}
+}
+
+func TestTimeoutStream_WebSocketUpgradeBypass(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	r.Use(TimeoutStream(10 * time.Millisecond))
+	r.GET("/ws", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{"msg": "upgrade-passed"})
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/ws", nil)
+	req.Header.Set("Connection", "Upgrade")
+	req.Header.Set("Upgrade", "websocket")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d (upgrade request must bypass timeout)", w.Code, http.StatusOK)
+	}
+}
