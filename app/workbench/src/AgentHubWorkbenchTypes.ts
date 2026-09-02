@@ -165,9 +165,27 @@ export interface AgentHubWorkbenchProps {
   /**
    * Hub REST message actions (#1383). `activeConversationId` is reused as the
    * session id. All handlers receive the raw block id (`hub-message-<uuid>`);
-   * parents strip the prefix before calling the Hub API. Optional — Desktop/demo
-   * shells omit them and pin/unpin/recall/react stay hidden (#1818). Returned
-   * Promises are awaited by the chrome so failures surface a toast (#1821).
+   * parents strip the prefix before calling the Hub API.
+   *
+   * Optional per action — and since #2154 the transcript context menu is
+   * fail-closed per action too: `workbenchTranscriptChromeHelpers`
+   * `.contextMenuGroups` derives one capability per entry, so an omitted port
+   * hides exactly that entry instead of rendering a click the effect
+   * dispatcher would drop. The gates are: pin/unpin/recall need a session id
+   * *and* their handler (the planner cannot build the effect without a session
+   * id, #1818); forward needs its handler *and* a conversation list (the
+   * picker submenu is the only real forward path, #1385); regenerate needs its
+   * handler.
+   *
+   * Desktop is therefore NOT a shell that omits them: it sets
+   * `activeConversationId` and wires pin/unpin/recall (#2154) plus forward
+   * (#2241). Only demo shells — and any shell whose Hub chat actions are not
+   * ready — leave these ports undefined today. `onAddMessageReaction` has no
+   * transcript-menu entry at all right now: the react submenu was removed as
+   * write-only (#1822), so no capability gates on it.
+   *
+   * Returned Promises are awaited by the chrome so failures surface a toast
+   * (#1821).
    */
   onPinMessage?: ((messageId: string, sessionId: string) => Promise<void> | void) | undefined;
   onUnpinMessage?: ((messageId: string, sessionId: string) => Promise<void> | void) | undefined;
