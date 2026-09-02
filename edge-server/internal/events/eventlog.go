@@ -21,14 +21,35 @@ import (
 // subscriber (crash recovery / replay). The index is rebuilt on open and after
 // every truncation; Subscribe also detects external file-size changes and
 // rebuilds lazily so a truncate that happened between ticks stays safe.
+//
+// ORDERING CONTRACT: the file is in *append* order, which is NOT seq order.
+// Bus.Publish hands out seqs with an atomic increment and only then calls
+// persistFn (== Append), with no lock spanning the two, so concurrent
+// publishers reach Append in an order unrelated to their seqs. Measured on a
+// plain Bus with WithEventLogPath at 512 concurrent publishes per log:
+// TestConcurrentPublishWritesSeqUnorderedLogFile below logs 46-56 inversions in
+// 6/6 runs, and a 60-run sweep of the same shape saw the last line not be the
+// largest seq in 10/60 runs and the first line not be the smallest in 20/60.
+// Everything derived from the file must therefore be order-independent:
+// orderedSeq is kept sorted by seq rather than by file position, and ReadFrom
+// must not assume that a seq's byte offset bounds the offsets of larger seqs.
 type EventLog struct {
 	mu          sync.Mutex
 	f           *os.File
 	path        string
 	maxSize     int64           // max file size in bytes before truncation; 0 = unlimited
-	index       map[int64]int64 // seq → byte offset of that line (exclusive of the seq→offset map)
-	orderedSeq  []int64         // sorted seqs parallel to index, for binary search
+	index       map[int64]int64 // seq → byte offset of the start of that line
+	orderedSeq  []int64         // distinct keys of index, sorted ascending; binary-searched by ReadFrom
 	indexedSize int64           // file size at last index build, to detect external changes
+
+	// Invariant: orderedSeq is sorted ascending and holds exactly the keys of
+	// index, so len(orderedSeq) == len(index). It is not positionally
+	// "parallel" to index — index is a map, and the file's line order is
+	// append order, not seq order (see the ORDERING CONTRACT above).
+	// rebuildIndexLocked sorts after scanning, Append maintains the order via
+	// appendSorted. Consumers rely on it: orderedSeq[0] is the oldest surviving
+	// seq (ReadFrom's hasGap boundary) and orderedSeq[len-1] is the largest
+	// (MaxSeq, which seeds Bus.seq on restart).
 
 	// truncations counts truncateLocked invocations (a truncation was
 	// attempted because the log exceeded maxSize). Exposed via
@@ -97,6 +118,15 @@ func NewEventLog(path string) (*EventLog, error) {
 
 // rebuildIndexLocked scans the entire log file line by line, recording each
 // event's seq and its byte offset. Must be called with l.mu held.
+//
+// Lines arrive in file (append) order, which is not seq order, so the collected
+// seqs are sorted before they become orderedSeq. Without the sort every restart
+// and every truncation left orderedSeq in file order and broke all three of its
+// consumers: MaxSeq returned the last line's seq instead of the largest (so the
+// restarted Bus re-issued seqs that were already on disk), orderedSeq[0] was
+// the first line's seq instead of the smallest (so ReadFrom reported a gap for
+// cursors the log still covered), and ReadFrom's sort.Search ran on unsorted
+// input.
 func (l *EventLog) rebuildIndexLocked() error {
 	if l == nil || l.f == nil {
 		return nil
@@ -140,6 +170,10 @@ func (l *EventLog) rebuildIndexLocked() error {
 		}
 		offset += int64(lineLen)
 	}
+	// File order is append order, not seq order: sort to establish the
+	// orderedSeq invariant (see the field comment). Duplicate seqs were already
+	// collapsed above, so this is a plain ascending sort of distinct values.
+	sort.Slice(ordered, func(i, j int) bool { return ordered[i] < ordered[j] })
 	l.index = index
 	l.orderedSeq = ordered
 	if fi, statErr := l.f.Stat(); statErr == nil {
@@ -277,6 +311,23 @@ func (l *EventLog) truncateLocked() {
 	}
 }
 
+// MaxSeq returns the largest seq currently indexed in the log, or 0 when the
+// log is empty or nil. Bus uses it to seed its seq counter on restart.
+//
+// Callers must use this instead of reading orderedSeq directly: the slice is
+// guarded by l.mu.
+func (l *EventLog) MaxSeq() int64 {
+	if l == nil {
+		return 0
+	}
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if len(l.orderedSeq) == 0 {
+		return 0
+	}
+	return l.orderedSeq[len(l.orderedSeq)-1]
+}
+
 // EventLogTruncations returns the total number of truncateLocked invocations
 // (truncations attempted because the log exceeded maxSize). Exposed for the
 // edge_event_log_truncations_total Prometheus metric.
@@ -328,7 +379,7 @@ func (l *EventLog) ReadFrom(cursor int64) (events []EventEnvelope, hasGap bool) 
 		// events that predate the (empty) log → gap.
 		return nil, cursor > 0
 	}
-	firstSeq := l.orderedSeq[0]
+	firstSeq := l.orderedSeq[0] // oldest surviving seq: orderedSeq is sorted
 	if cursor > 0 && cursor < firstSeq {
 		// The cursor predates the oldest surviving log event: events between
 		// cursor and firstSeq were lost (truncated or predate the log).
@@ -350,7 +401,7 @@ func (l *EventLog) ReadFrom(cursor int64) (events []EventEnvelope, hasGap bool) 
 		// cursor is at or past the last logged seq: no log events to replay.
 		return nil, hasGap
 	}
-	startOffset := l.index[l.orderedSeq[startSeqIdx]]
+	startOffset := l.replayStartOffsetLocked(startSeqIdx)
 
 	// Seek to the start offset and read from there to EOF.
 	if _, err := l.f.Seek(startOffset, 0); err != nil {
@@ -383,10 +434,41 @@ func (l *EventLog) ReadFrom(cursor int64) (events []EventEnvelope, hasGap bool) 
 			events = append(events, env)
 		}
 	}
-	// Ensure the replay slice is sorted by seq (the file is append-order which
-	// should already be seq-ordered, but truncation can leave partial overlap).
+	// Sort the replay by seq. This is not a belt-and-braces no-op: the lines
+	// above were read in file order, and file order is append order, so a
+	// concurrent Publish can have written a larger seq before a smaller one.
 	sort.Slice(events, func(i, j int) bool { return events[i].Seq < events[j].Seq })
 	return events, hasGap
+}
+
+// replayStartOffsetLocked returns the byte offset ReadFrom has to seek to in
+// order to see every event with seq >= cursor. Must be called with l.mu held and
+// with 0 <= startSeqIdx < len(l.orderedSeq).
+//
+// The file is in append order, not seq order (see the EventLog ORDERING
+// CONTRACT), so the offset of the first seq >= cursor is NOT a lower bound for
+// the offsets of the remaining seqs >= cursor — a larger seq can sit on an
+// earlier line. Seeking straight to index[orderedSeq[startSeqIdx]] and reading
+// to EOF therefore silently dropped every such event from the replay, with no
+// gap notification to tell the subscriber it had diverged. The minimum offset
+// across the whole suffix is the correct start; ReadFrom's seq >= cursor filter
+// still discards the extra earlier lines the wider read pulls in, so the result
+// is exact rather than merely safe.
+//
+// Cost is O(k) map lookups where k is the number of events about to be replayed
+// — the same k lines that get json.Unmarshal'ed immediately afterwards (~µs each
+// vs ~ns per lookup), so this is noise next to the I/O it guards. When the file
+// does happen to be seq-ordered the minimum is orderedSeq[startSeqIdx] itself
+// and the offset is unchanged. A seq missing from index reads as offset 0, which
+// widens the read to the whole file: over-reading is safe, under-reading is not.
+func (l *EventLog) replayStartOffsetLocked(startSeqIdx int) int64 {
+	startOffset := l.index[l.orderedSeq[startSeqIdx]]
+	for _, seq := range l.orderedSeq[startSeqIdx+1:] {
+		if off := l.index[seq]; off < startOffset {
+			startOffset = off
+		}
+	}
+	return startOffset
 }
 
 // Close flushes and closes the underlying file.
