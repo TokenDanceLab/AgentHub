@@ -35,6 +35,7 @@
 | 前端包依赖方向：shared 不得 import workbench，workbench 只依赖 shared（#1759） | `scripts/verify/verify-frontend-package-boundary.py`（负向自测 `scripts/verify/tests/verify-frontend-package-boundary.Tests.py`）+ app/eslint.config.mjs `no-restricted-imports` | checks.yml → validate |
 | shared barrel 不泄漏 Edge 导出 | `scripts/verify/verify-shared-barrel.py` | checks.yml → validate |
 | Hub handler 不直连 repository | `scripts/verify/verify-hub-layering.py` | checks.yml → validate |
+| pkg/safego 是两台服务唯一的 panic 恢复路径（#2246 切片 1）：hub-server/edge-server/pkg 下非 `_test.go` 的裸 `recover()` 只允许出现在白名单里；白名单键 = 文件路径 + 允许命中次数（不是行号），匹配前先剥 Go 注释与字符串字面量；扫描根缺失/部分树/空树/文件不可读不可解析/白名单条目指向已消失文件/「白名单期望 N 处却扫到 0 处」的瞎扫描器哨兵一律 fail-closed | `scripts/verify/verify-safego-convergence.py`（负向自测 `scripts/verify/tests/verify-safego-convergence.Tests.py`） | checks.yml → validate |
 | router 方法必须在 conventions.md 文档化 | `scripts/verify/verify-conventions.py` | checks.yml → validate |
 | 出站 client 卫生：service/jwtutil/edge-hub 范围内禁裸 client、禁 request-path env 读取、外部响应必须有 body limit、retry 必须有预算；allowlist 只缩且带 issue（#1549/#1564） | `scripts/verify/verify-outbound-client-hygiene.py`（负向自测 `scripts/verify/tests/verify-outbound-client-hygiene.Tests.py`） | checks.yml → validate |
 | shared REST contract 与 Hub router 一致 | `scripts/verify/verify-shared-rest-contract.py` | checks.yml → validate |
