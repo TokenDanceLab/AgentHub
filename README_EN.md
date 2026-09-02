@@ -48,10 +48,12 @@ AgentHub lets you collaborate with human teammates and AI agents in the same gro
 | `app/desktop` | Tauri Desktop workbench |
 | `app/mobile-rn` | Expo / React Native Mobile |
 | `app/shared` | Shared UI components, types, transcript logic |
+| `app/workbench` | Platform workbench shell (`@agenthub/workbench`; one-way dependency workbench → shared) |
 | `hub-server` | Hub API: identity, sessions, projects, tasks, messages, approvals |
 | `edge-server` | Local execution node: CLI adapters, SQLite, event replay |
+| `pkg` | Go packages shared by Hub/Edge (errcode, jwtutil, logmask, testkit, ...; separate module joined via the root `go.work`) |
 | `api` | OpenAPI and WebSocket event contracts |
-| `docs` | Architecture, roadmap, design docs |
+| `docs` | Architecture, governance, and design docs (progress and roadmap live in GitHub issues, not `docs/`) |
 
 ## Quick Start
 
@@ -62,7 +64,7 @@ cp .env.example .env && secret="$(openssl rand -hex 32)" && sed -i.bak "s/^AGENT
 docker compose up -d postgres redis         # 2. Start infra (PG16 + Redis7, 127.0.0.1 only)
 cd hub-server && go run ./cmd/server-hub    # 3. Start Hub Server (auto-migrates; API on :8080)
 cd ../app && corepack pnpm install          # 4. Install frontend deps
-pnpm dev                                    # 5. Start Desktop Vite (:5173); web uses pnpm dev:web
+corepack pnpm dev                           # 5. Start Desktop Vite (:5173); web uses corepack pnpm dev:web
 ```
 
 `.env.example` does not ship a reusable JWT secret. See [docs/developer-quickstart.md](docs/developer-quickstart.md) for the Windows PowerShell command, full bootstrap, OIDC setup, and Edge Server debugging. Production deployment and required vars: [docs/architecture/05-deployment.md](docs/architecture/05-deployment.md).
