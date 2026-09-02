@@ -45,6 +45,7 @@ export function ProjectsPage({
   onSearchChange,
   activeFilter,
   onFilterChange,
+  availableFilters,
   activeTab,
   onTabChange,
   onNewProject,
@@ -107,6 +108,7 @@ export function ProjectsPage({
         onSearchChange={onSearchChange}
         activeFilter={activeFilter}
         onFilterChange={onFilterChange}
+        {...(availableFilters ? { availableFilters } : {})}
         canCreateProject={canCreateProject}
         onStartCreate={startProjectCreate}
         hasMore={hasMore}

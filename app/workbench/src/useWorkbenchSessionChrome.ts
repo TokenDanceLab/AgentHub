@@ -19,7 +19,10 @@ import { buildMainchainSummary } from './mainchain';
 import type { FileItem } from './inspector';
 import { WORKBENCH_MOCK_SETTINGS_DEFAULTS } from './mockData';
 import { createSettingsService, type SettingsService } from './settingsService';
-import { INSPECTOR_DEFAULT_COLLAPSE_EVENT } from './workbenchLayoutConstants';
+import {
+  INSPECTOR_DEFAULT_COLLAPSE_EVENT,
+  type InspectorDefaultCollapseDetail,
+} from './workbenchLayoutConstants';
 import {
   LOCAL_CLI_DISCOVERY_FALLBACK,
   buildInspectorTranscriptViews,
@@ -93,17 +96,30 @@ export function useWorkbenchSessionChrome({
 
   // Settings gate: inspectorVisible=false means the inspector starts collapsed
   // (default hidden). Re-runs on every snapshot change, so toggling 右侧概览 off
-  // in Settings collapses the inspector immediately; toggling it on never
-  // force-opens — manual/last-session state wins for expansion. The layout
-  // hook listens for INSPECTOR_DEFAULT_COLLAPSE_EVENT to apply the collapse.
+  // in Settings collapses the inspector immediately.
+  //
+  // #2154 P2-6: the switch is now symmetric — turning it back on dispatches the
+  // same event with `collapse: false`. Whether that actually expands is decided
+  // by the layout hook, which only undoes a collapse this setting caused, so a
+  // manually collapsed inspector (and the persisted last-session state) still
+  // wins over the default.
   useEffect(() => {
     if (!settingsService) return undefined;
     const service = settingsService;
 
     function applyInspectorVisibleDefault(): void {
       if (!service.initialized) return;
-      if (service.readAll()['inspectorVisible'] === false) {
-        window.dispatchEvent(new CustomEvent(INSPECTOR_DEFAULT_COLLAPSE_EVENT));
+      const inspectorVisible = service.readAll()['inspectorVisible'];
+      if (inspectorVisible === false) {
+        window.dispatchEvent(new CustomEvent<InspectorDefaultCollapseDetail>(
+          INSPECTOR_DEFAULT_COLLAPSE_EVENT,
+          { detail: { collapse: true } },
+        ));
+      } else if (inspectorVisible === true) {
+        window.dispatchEvent(new CustomEvent<InspectorDefaultCollapseDetail>(
+          INSPECTOR_DEFAULT_COLLAPSE_EVENT,
+          { detail: { collapse: false } },
+        ));
       }
     }
 
@@ -348,8 +364,16 @@ export function useWorkbenchSessionChrome({
         sequence: browserFocusSequenceRef.current,
         url: deployBlock.url,
       });
+      // #2154 P2-15: the success toast belongs to the branch that really
+      // requested a preview. It used to fire unconditionally, so a run without
+      // a deployable URL showed "opened deploy preview" next to a blank pane.
+      showWorkbenchToastRef.current(t('toast.deployPreviewOpened'));
+      return;
     }
-    showWorkbenchToastRef.current(t('toast.deployPreviewOpened'));
+    // No preview URL on this run (or the block is not a deploy block): say so
+    // instead of claiming success. The inspector is still opened above so the
+    // user can see the run's other evidence.
+    showWorkbenchToastRef.current(t('toast.deployPreviewUnavailable'));
   }, [openInspector, t]);
 
   // Stable: evidence/mainchainSummary are memoized above (identity changes

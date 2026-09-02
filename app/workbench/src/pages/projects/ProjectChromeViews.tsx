@@ -54,26 +54,45 @@ export function ProjectNavRow({
 export function FilterList({
   activeFilter,
   onFilterChange,
+  availableFilters,
 }: {
   activeFilter: ProjectFilter;
   onFilterChange: (filter: ProjectFilter) => void;
+  /** Filters the current data source can satisfy; absent = all available. */
+  availableFilters?: readonly ProjectFilter[] | undefined;
 }) {
   const { t } = useTranslation(SHARED_WORKBENCH_I18N_NAMESPACE);
   return (
     <div className={styles.filterList}>
-      {FILTER_ITEMS.map((item) => (
-        <button
-          key={item.id}
-          type="button"
-          className={`${styles.filterBtn} ${activeFilter === item.id ? styles.filterBtnActive : ''}`}
-          onClick={() => onFilterChange(item.id)}
-        >
-          <span className={styles.filterBtnIcon}>
-            <DesignNavIcon name={item.icon} size={15} />
-          </span>
-          {t(item.labelKey)}
-        </button>
-      ))}
+      {FILTER_ITEMS.map((item) => {
+        // #2154 P2-3: `all` never filters anything out, so it stays clickable.
+        // A lifecycle chip is clickable only when at least one loaded project
+        // classifies into that bucket — an enabled chip whose click can only
+        // yield an empty list would replace the old decorative chip with a
+        // fresh false fact about the user's data. Hub exposes no project
+        // lifecycle field today (the web projection labels every project
+        // 'Hub'/'Hub group'), so on real web data all three render disabled
+        // with the reason in the title.
+        const available = item.id === 'all'
+          || availableFilters === undefined
+          || availableFilters.includes(item.id);
+        return (
+          <button
+            key={item.id}
+            type="button"
+            data-filter-id={item.id}
+            className={`${styles.filterBtn} ${activeFilter === item.id ? styles.filterBtnActive : ''}`}
+            disabled={!available}
+            title={available ? undefined : t('projects.nav.filterUnavailable')}
+            onClick={() => onFilterChange(item.id)}
+          >
+            <span className={styles.filterBtnIcon}>
+              <DesignNavIcon name={item.icon} size={15} />
+            </span>
+            {t(item.labelKey)}
+          </button>
+        );
+      })}
     </div>
   );
 }

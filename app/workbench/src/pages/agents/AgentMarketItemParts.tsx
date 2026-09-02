@@ -59,6 +59,11 @@ export function MarketFilterToolbar<T extends string>({
         type="search"
         placeholder={searchPlaceholder}
         value={searchQuery}
+        // #2154 P1-1: the three market toolbars are assembled without
+        // onSearchChange today, which made this a frozen input. Disable it (and
+        // say why) instead of rendering an editable box that ignores keystrokes.
+        disabled={!onSearchChange}
+        title={onSearchChange ? undefined : t('search.unavailableHint')}
         onChange={(e) => onSearchChange?.(e.target.value)}
       />
       <div className={styles['market-cats']}>

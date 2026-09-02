@@ -234,7 +234,10 @@ export const AuditFilterBar: React.FC<{
 
 export const AuditEntriesSection: React.FC<{
   auditEntries: AuditEntry[];
-}> = ({ auditEntries }) => {
+  /** Optional row activation handler; rows stay non-interactive without it
+   *  (#2154 P2-16). */
+  onAuditRowClick?: ((entry: AuditEntry) => void) | undefined;
+}> = ({ auditEntries, onAuditRowClick }) => {
   const { t } = useTranslation(SHARED_WORKBENCH_I18N_NAMESPACE);
   return (
   <section className={`${styles['agent-section']} ${styles['audit-section']}`}>
@@ -246,7 +249,11 @@ export const AuditEntriesSection: React.FC<{
       <span>{t('agents.ops.audit.headTarget')}</span>
     </div>
     {auditEntries.map((entry, i) => (
-      <AuditEntryRow key={auditEntryKey(entry, i)} entry={entry} />
+      <AuditEntryRow
+        key={auditEntryKey(entry, i)}
+        entry={entry}
+        {...(onAuditRowClick ? { onAuditRowClick } : {})}
+      />
     ))}
   </section>
   );

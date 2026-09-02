@@ -1,7 +1,6 @@
 import React from 'react';
 import styles from './DocsPage.module.css';
 import {
-  DEFAULT_SHORTCUTS,
   DocMain,
   DocsNav,
 } from './docs';
@@ -32,7 +31,9 @@ export function DocsPage({
   searchQuery = '',
   onSearchChange,
   navItems,
-  shortcuts = DEFAULT_SHORTCUTS,
+  // #2154 P2-2(b): no default injection — an absent/empty list renders no
+  // shortcut block. Demo mode passes WORKBENCH_MOCK_DOC_SHORTCUTS explicitly.
+  shortcuts = [],
   activeTab,
   onTabChange,
   rows,

@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type SetStateAction } from 'react';
 import { DESKTOP_TOGGLE_SIDEBAR_EVENT } from './desktopChromeEvents';
 import type { GlobalRailPage } from './GlobalRail';
 import {
   INSPECTOR_COLLAPSED_STORAGE_KEY,
   INSPECTOR_DEFAULT_COLLAPSE_EVENT,
+  type InspectorDefaultCollapseDetail,
   INSPECTOR_DEFAULT_WIDTH,
   INSPECTOR_WIDTH_STORAGE_KEY,
   SIDEBAR_DEFAULT_WIDTH,
@@ -147,6 +148,19 @@ export function useWorkbenchPanelLayout({
   const sidebarShouldCollapseRef = useRef(false);
   const sidebarCollapsedRef = useRef(false);
   const isChatPageRef = useRef(isChatPage);
+  // #2154 P2-6: provenance marker for the inspector collapse. True only while
+  // the current collapse was caused by the `inspectorVisible` setting, so
+  // turning that setting back on can undo its own collapse without overriding
+  // a collapse the user made by hand.
+  const inspectorCollapsedBySettingRef = useRef(false);
+
+  /** Collapse/expand from any non-settings path (user toggle, resize snap,
+   *  narrow-window mount): clears the settings marker so a later
+   *  `inspectorVisible=true` never force-opens a panel the user closed. */
+  const setInspectorCollapsedByUser = useCallback((next: SetStateAction<boolean>): void => {
+    inspectorCollapsedBySettingRef.current = false;
+    setInspectorCollapsed(next);
+  }, []);
 
   useEffect(() => {
     inspectorWidthRef.current = inspectorWidth;
@@ -173,11 +187,24 @@ export function useWorkbenchPanelLayout({
     storeInspectorCollapsed(inspectorCollapsed);
   }, [inspectorCollapsed]);
 
-  // Settings gate (inspectorVisible=false): collapse the inspector by default.
-  // Dispatched by useWorkbenchSessionChrome once settings load / on toggle-off.
+  // Settings gate (inspectorVisible): collapse the inspector by default, and
+  // — since #2154 P2-6 — expand it again when the setting is switched back on.
+  // Dispatched by useWorkbenchSessionChrome once settings load / on toggle.
+  // Expansion is conditional on the collapse provenance marker above so a
+  // manually collapsed inspector stays collapsed.
   useEffect(() => {
-    function handleInspectorDefaultCollapse(): void {
-      setInspectorCollapsed(true);
+    function handleInspectorDefaultCollapse(event: Event): void {
+      const detail = (event as CustomEvent<InspectorDefaultCollapseDetail | undefined>).detail;
+      // Legacy dispatches carried no detail and always meant "collapse".
+      if (detail?.collapse !== false) {
+        inspectorCollapsedBySettingRef.current = true;
+        setInspectorCollapsed(true);
+        return;
+      }
+      if (inspectorCollapsedBySettingRef.current) {
+        inspectorCollapsedBySettingRef.current = false;
+        setInspectorCollapsed(false);
+      }
     }
 
     window.addEventListener(INSPECTOR_DEFAULT_COLLAPSE_EVENT, handleInspectorDefaultCollapse);
@@ -203,12 +230,12 @@ export function useWorkbenchPanelLayout({
 
   const openInspector = useCallback((width = INSPECTOR_DEFAULT_WIDTH): void => {
     restoreInspectorWidth(width);
-    setInspectorCollapsed(false);
-  }, [restoreInspectorWidth]);
+    setInspectorCollapsedByUser(false);
+  }, [restoreInspectorWidth, setInspectorCollapsedByUser]);
 
   const closeInspector = useCallback((): void => {
-    setInspectorCollapsed(true);
-  }, []);
+    setInspectorCollapsedByUser(true);
+  }, [setInspectorCollapsedByUser]);
 
   const collapseSidebarForWorkspacePressure = useCallback((nextInspectorWidth: number): void => {
     maybeCollapseSidebarForWorkspacePressure({
@@ -252,10 +279,10 @@ export function useWorkbenchPanelLayout({
       }),
       setSyncedInspectorWidth,
       setInspectorResizing,
-      setInspectorCollapsed,
+      setInspectorCollapsed: setInspectorCollapsedByUser,
       collapseSidebarForWorkspacePressure,
     });
-  }, [collapseSidebarForWorkspacePressure, setSyncedInspectorWidth]);
+  }, [collapseSidebarForWorkspacePressure, setInspectorCollapsedByUser, setSyncedInspectorWidth]);
 
   const updateSidebarWidthFromClientX = useCallback((clientX: number): void => {
     applySidebarClientXPlan({
@@ -282,11 +309,11 @@ export function useWorkbenchPanelLayout({
   const resizeInspectorBy = useCallback((delta: number): void => {
     applyInspectorResizeByPlan({
       plan: planInspectorResizeBy({ inspectorWidth, delta }),
-      setInspectorCollapsed,
+      setInspectorCollapsed: setInspectorCollapsedByUser,
       setSyncedInspectorWidth,
       collapseSidebarForWorkspacePressure,
     });
-  }, [collapseSidebarForWorkspacePressure, inspectorWidth, setSyncedInspectorWidth]);
+  }, [collapseSidebarForWorkspacePressure, inspectorWidth, setInspectorCollapsedByUser, setSyncedInspectorWidth]);
 
   const resizeSidebarBy = useCallback((delta: number): void => {
     applySidebarResizeByPlan({
@@ -297,11 +324,11 @@ export function useWorkbenchPanelLayout({
   }, [setSyncedSidebarWidth, sidebarWidth]);
 
   const toggleInspector = useCallback((): void => {
-    setInspectorCollapsed((collapsed) => applyToggleCollapsedPlan(
+    setInspectorCollapsedByUser((collapsed) => applyToggleCollapsedPlan(
       planToggleInspector({ collapsed, inspectorWidth }),
       setInspectorWidth,
     ));
-  }, [inspectorWidth]);
+  }, [inspectorWidth, setInspectorCollapsedByUser]);
 
   useEffect(() => {
     if (platformSurface !== 'desktop' || activePage !== 'chat') return undefined;
@@ -334,7 +361,7 @@ export function useWorkbenchPanelLayout({
     // still crushes the chat main area after the sidebar collapses. Collapse it
     // on mount as well (one-directional + idempotent); the user can re-open it.
     if (window.innerWidth < WORKSPACE_MOUNT_COLLAPSE_INSPECTOR_WIDTH) {
-      setInspectorCollapsed(true);
+      setInspectorCollapsedByUser(true);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -387,10 +414,10 @@ export function useWorkbenchPanelLayout({
       onStop: () => stopInspectorPointerResize({
         currentWidth: inspectorWidthRef.current,
         setInspectorResizing,
-        setInspectorCollapsed,
+        setInspectorCollapsed: setInspectorCollapsedByUser,
       }),
     });
-  }, [inspectorResizing, updateInspectorWidthFromClientX]);
+  }, [inspectorResizing, setInspectorCollapsedByUser, updateInspectorWidthFromClientX]);
 
   useEffect(() => {
     if (!sidebarResizing) return;

@@ -143,9 +143,15 @@ export interface DesktopPlatform extends AgentHubPlatform {
 }
 
 export function createDesktopPlatform(options: DesktopPlatformOptions = {}): DesktopPlatform {
-  // In-memory mock only (#1193): lets TerminalPanel list/spawn/close without a real PTY.
-  // Real Tauri host adapter remains out of scope; renderer still has no raw process access.
-  const localTerminal = true;
+  // #2154 P1-7: the Desktop terminal host is still the in-memory mock from
+  // #1193 — write() only appends to an array and never produces output, and the
+  // dock has no close affordance, so declaring the capability rendered a
+  // permanently "host port connected" panel that could never do anything.
+  // Declare it false (same as webPlatform) until a real Tauri PTY adapter
+  // exists. createMockTerminalPort stays importable for tests/dev surfaces but
+  // is no longer injected into the production platform. The renderer has no raw
+  // process access either way.
+  const localTerminal: boolean = false;
   const terminal = localTerminal ? createMockTerminalPort() : undefined;
 
   // #1938: let the shared transcript reach the desktop attachment-image
@@ -160,8 +166,10 @@ export function createDesktopPlatform(options: DesktopPlatformOptions = {}): Des
       localEdge: true,
       localFiles: true,
       browserPreview: true,
-      // Foundation (#1174) + in-memory TerminalPort host (#1193).
-      // Real PTY / Tauri adapter is still out of scope; UI gates on this flag + port.
+      // #2154 P1-7: no real PTY / Tauri host adapter yet (#1174 foundation +
+      // #1193 mock only). Declared false so the terminal dock stays hidden
+      // instead of advertising a mock host as connected; UI gates on this flag
+      // plus the presence of a port.
       localTerminal,
       // Desktop Local Edge backs approval flows, runtime evidence content,
       // and a local sandbox boundary. Remote execution stays un-declared

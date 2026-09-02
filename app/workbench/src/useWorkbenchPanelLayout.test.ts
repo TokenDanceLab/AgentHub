@@ -472,8 +472,79 @@ describe('useWorkbenchPanelLayout', () => {
   it('collapses the inspector when the settings default-collapse event fires', () => {
     const { result } = renderPanelLayout();
 
+    // Legacy shape (no detail) still means "collapse".
     act(() => {
       window.dispatchEvent(new Event(INSPECTOR_DEFAULT_COLLAPSE_EVENT));
+    });
+    expect(result.current.inspectorCollapsed).toBe(true);
+
+    act(() => {
+      window.dispatchEvent(new CustomEvent(INSPECTOR_DEFAULT_COLLAPSE_EVENT, {
+        detail: { collapse: true },
+      }));
+    });
+    expect(result.current.inspectorCollapsed).toBe(true);
+  });
+
+  it('expands the inspector again when the setting is switched back on (#2154 P2-6)', () => {
+    const { result } = renderPanelLayout();
+
+    act(() => {
+      window.dispatchEvent(new CustomEvent(INSPECTOR_DEFAULT_COLLAPSE_EVENT, {
+        detail: { collapse: true },
+      }));
+    });
+    expect(result.current.inspectorCollapsed).toBe(true);
+
+    act(() => {
+      window.dispatchEvent(new CustomEvent(INSPECTOR_DEFAULT_COLLAPSE_EVENT, {
+        detail: { collapse: false },
+      }));
+    });
+    expect(result.current.inspectorCollapsed).toBe(false);
+  });
+
+  it('never expands an inspector the user collapsed by hand (#2154 P2-6)', () => {
+    const { result } = renderPanelLayout();
+
+    act(() => {
+      result.current.closeInspector();
+    });
+    expect(result.current.inspectorCollapsed).toBe(true);
+
+    act(() => {
+      window.dispatchEvent(new CustomEvent(INSPECTOR_DEFAULT_COLLAPSE_EVENT, {
+        detail: { collapse: false },
+      }));
+    });
+    expect(result.current.inspectorCollapsed).toBe(true);
+  });
+
+  it('drops the settings marker once the user reopens the panel (#2154 P2-6)', () => {
+    const { result } = renderPanelLayout();
+
+    act(() => {
+      window.dispatchEvent(new CustomEvent(INSPECTOR_DEFAULT_COLLAPSE_EVENT, {
+        detail: { collapse: true },
+      }));
+    });
+    expect(result.current.inspectorCollapsed).toBe(true);
+
+    // Manual reopen wins over the persisted default …
+    act(() => {
+      result.current.openInspector();
+    });
+    expect(result.current.inspectorCollapsed).toBe(false);
+
+    // … and a manual collapse afterwards is not undone by the setting either.
+    act(() => {
+      result.current.toggleInspector();
+    });
+    expect(result.current.inspectorCollapsed).toBe(true);
+    act(() => {
+      window.dispatchEvent(new CustomEvent(INSPECTOR_DEFAULT_COLLAPSE_EVENT, {
+        detail: { collapse: false },
+      }));
     });
     expect(result.current.inspectorCollapsed).toBe(true);
   });

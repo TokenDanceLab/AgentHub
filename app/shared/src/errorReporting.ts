@@ -5,9 +5,18 @@ import { globalErrorReporter, type ErrorReport } from './errors';
 export type ToastSeverity = 'error' | 'warning' | 'info';
 
 export interface ToastAction {
-  /** Localized label shown on the action button. */
+  /**
+   * Localized label shown on the action button. It must describe what
+   * `onClick` actually does (#2154 P3-8): a full page reload is labeled
+   * "reload", never "retry", because reloading discards composer input and
+   * resets session/panel state.
+   */
   label: string;
-  /** Invoked when the user clicks the action (e.g. retry the failed request). */
+  /**
+   * Invoked when the user clicks the action (e.g. retry the failed request).
+   * Callers that own a real retry callback pass it here; this module's own
+   * network-recovery action can only reload the page, so it says so.
+   */
   onClick: () => void;
 }
 
@@ -122,22 +131,29 @@ const errorReporterListener = (report: ErrorReport) => {
     // traceId is surfaced separately so the user can quote it to support.
     message: errcodeCopy ?? friendlyErrorMessage(report.message, fallback),
     ...(traceId !== undefined && { traceId }),
-    // Network errors are recoverable — offer a Retry affordance if a handler
-    // is wired (the toast host owns the actual retry callback).
+    // Network errors are recoverable by reloading — and reloading is exactly
+    // what this action does, so the label says "reload" (#2154 P3-8). Calling
+    // it "retry" promised a re-sent request while actually throwing away the
+    // composer draft, the session/panel state and any in-flight run view.
+    // Callers that can retry the real request build their own ToastAction with
+    // a matching label and callback.
     ...(report.category === 'network' && {
-      action: { label: getRetryLabel(), onClick: () => window.location.reload() },
+      action: { label: getReloadLabel(), onClick: () => window.location.reload() },
     }),
   });
 };
 
-function getRetryLabel(): string {
+/** Label for the network recovery action. The action reloads the document, so
+ *  it resolves `errorBoundary.reload` (already shipped in the web/desktop
+ *  common bundles: zh 重新加载 / en Reload Page) rather than `error.retry`. */
+function getReloadLabel(): string {
   try {
     const i18n = getI18n();
-    if (i18n?.isInitialized) return i18n.t('error.retry', 'Retry');
+    if (i18n?.isInitialized) return i18n.t('errorBoundary.reload', 'Reload');
   } catch {
     // i18n not ready
   }
-  return 'Retry';
+  return 'Reload';
 }
 
 /** Aggregates the reporter's recent errors into the stats snapshot consumed

@@ -1,21 +1,32 @@
 import { describe, expect, it, vi } from 'vitest';
 import { WORKBENCH_DATA_MODE_STORAGE_KEY } from '@shared/demo';
+import { createMockTerminalPort } from '@shared/platform';
 import { createDesktopPlatform } from './desktopPlatform';
 
 describe('createDesktopPlatform', () => {
-  it('declares local terminal capability and attaches an in-memory TerminalPort', async () => {
+  it('keeps the local terminal capability off and injects no port (#2154 P1-7)', () => {
     const platform = createDesktopPlatform();
 
-    expect(platform.capabilities.localTerminal).toBe(true);
-    expect(platform.terminal).toBeDefined();
+    // The only Desktop terminal host is the in-memory mock from #1193: write()
+    // never produces output and the dock has no close affordance, so declaring
+    // the capability rendered a permanently "host port connected" panel. It is
+    // now false (aligned with webPlatform) and no port is injected; the dock
+    // gate (shouldRenderTerminalDock) keeps the panel hidden until a real
+    // Tauri PTY adapter exists.
+    expect(platform.capabilities.localTerminal).toBe(false);
+    expect(platform.terminal).toBeUndefined();
+  });
 
-    // In-memory mock only (#1193) — no Tauri PTY / process spawn.
-    const session = await platform.terminal!.spawn({ title: 'Desktop mock' });
+  it('keeps the mock TerminalPort builder usable for tests/dev surfaces (#1193)', async () => {
+    const terminal = createMockTerminalPort();
+
+    // In-memory mock only — no Tauri PTY / process spawn.
+    const session = await terminal.spawn({ title: 'Desktop mock' });
     expect(session.id).toMatch(/^mock-term-/);
     expect(session.title).toBe('Desktop mock');
     expect(session.status).toBe('running');
 
-    await expect(platform.terminal!.list()).resolves.toEqual([
+    await expect(terminal.list()).resolves.toEqual([
       expect.objectContaining({ id: session.id }),
     ]);
   });

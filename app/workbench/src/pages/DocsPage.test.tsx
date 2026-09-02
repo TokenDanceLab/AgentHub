@@ -42,6 +42,23 @@ describe('DocsPage empty state', () => {
     expect(within(emptyState).queryByRole('button', { name: '新建文档' })).not.toBeInTheDocument();
   });
 
+  it('injects no library shortcuts by default (#2154 P2-2b)', () => {
+    render(<DocsPage {...BASE_PROPS} />);
+
+    // The caption + shortcut rows used to come from a page-level default list
+    // of repository-internal document names; with no data the block is gone.
+    expect(screen.queryByText('我的文档库')).not.toBeInTheDocument();
+    expect(screen.queryByText('NewAPI注册和导入CC-switch')).not.toBeInTheDocument();
+    expect(screen.queryByText('白盒方向调研报告')).not.toBeInTheDocument();
+  });
+
+  it('renders the library block only when shortcuts are supplied', () => {
+    render(<DocsPage {...BASE_PROPS} shortcuts={['示例文档']} />);
+
+    expect(screen.getByText('我的文档库')).toBeInTheDocument();
+    expect(screen.getByText('示例文档')).toBeInTheDocument();
+  });
+
   it('does not render EmptyState when documents are present', () => {
     render(
       <DocsPage

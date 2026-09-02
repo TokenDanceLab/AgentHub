@@ -24,6 +24,8 @@ export type ProjectNavProps = {
   onSearchChange?: ((query: string) => void) | undefined;
   activeFilter: ProjectFilter;
   onFilterChange: (filter: ProjectFilter) => void;
+  /** Filters the loaded projects can satisfy; others render disabled (#2154 P2-3). */
+  availableFilters?: readonly ProjectFilter[] | undefined;
   canCreateProject: boolean;
   onStartCreate: () => void;
   /** Whether more projects are available via pagination. */
@@ -46,6 +48,7 @@ export function ProjectNav({
   onSearchChange,
   activeFilter,
   onFilterChange,
+  availableFilters,
   canCreateProject,
   onStartCreate,
   hasMore,
@@ -129,7 +132,11 @@ export function ProjectNav({
         />
       ))}
       <div className={styles.navCaption}>{t('projects.view')}</div>
-      <FilterList activeFilter={activeFilter} onFilterChange={onFilterChange} />
+      <FilterList
+        activeFilter={activeFilter}
+        onFilterChange={onFilterChange}
+        {...(availableFilters ? { availableFilters } : {})}
+      />
       {/* Infinite-scroll sentinel: triggers loadMore when within 200px of viewport. */}
       <div
         ref={sentinelRef}
