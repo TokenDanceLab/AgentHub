@@ -59,15 +59,21 @@ type Bus struct {
 	// b.mu across the persist I/O. 0 means "no baseline yet"; it is set from the
 	// first seq actually assigned, so a Bus whose counter was seeded (restart
 	// recovery, or a test setting b.seq directly) cannot wedge the gate.
-	wireNext   int64
-	wireCond   *sync.Cond
-	dropped    atomic.Int64
-	history    []EventEnvelope
-	subs       []subscriber
-	observers  []observer
-	nextSubID  int64
-	nextObsID  int64
-	maxHistory int
+	wireNext int64
+	wireCond *sync.Cond
+	// wireAbandoned holds seqs whose publisher was handed a turn but never
+	// reached the gate — a panic or runtime.Goexit between the seq assignment
+	// and deliverInSeqOrder that a safego launcher above Publish recovered. The
+	// gate skips them when it arrives and deletes them as it does, so the map is
+	// bounded by abandonments nobody has walked past yet.
+	wireAbandoned map[int64]struct{}
+	dropped       atomic.Int64
+	history       []EventEnvelope
+	subs          []subscriber
+	observers     []observer
+	nextSubID     int64
+	nextObsID     int64
+	maxHistory    int
 
 	// persistFn is called before an event is broadcast. If non-nil and it
 	// returns an error, the event is dropped without being appended to
@@ -224,6 +230,26 @@ func (b *Bus) Publish(eventType string, scope map[string]any, payload any) Event
 	}
 	b.mu.Unlock()
 
+	// This goroutine now owns the gate turn for seq. Everything between here and
+	// deliverInSeqOrder runs outside any recovery of its own, and Publish is
+	// reached from safego-guarded goroutines (orchestrator dispatch, the
+	// lifecycle callback queue), so a panic there is recovered *above* Publish
+	// and the process keeps running. Without this guard the abandoned turn would
+	// leave wireNext below seq forever and park every later publisher in
+	// sync.Cond.Wait with nobody left to broadcast: one dropped event becomes
+	// total, silent event loss until restart. gateOwned is set once
+	// deliverInSeqOrder is entered, because from there its own defer is the one
+	// that advances the gate (and it advances even on panic or Goexit).
+	gateOwned := false
+	defer func() {
+		if gateOwned {
+			return
+		}
+		b.mu.Lock()
+		b.abandonGateTurnLocked(seq)
+		b.mu.Unlock()
+	}()
+
 	// Persist before fanout: if a persistence hook is configured and the
 	// event type is eligible, write to durable store before in-memory append.
 	// On failure, the event is retried synchronously up to persistMaxRetries
@@ -241,6 +267,7 @@ func (b *Bus) Publish(eventType string, scope map[string]any, payload any) Event
 		}
 	}
 
+	gateOwned = true
 	observers := b.deliverInSeqOrder(seq, evt, deliver)
 	if !deliver {
 		// Return a minimal envelope so callers can detect the failure.
@@ -265,6 +292,45 @@ func (b *Bus) Publish(eventType string, scope map[string]any, payload any) Event
 	return evt
 }
 
+// advanceGateLocked hands the wire turn past seq and then over every abandoned
+// seq immediately behind it, and wakes the waiters. Caller holds b.mu.
+//
+// Skipping abandoned seqs here (rather than making the abandoning publisher wait
+// for its turn) is what keeps the recovery path allocation- and block-free: a
+// defer running during panic unwinding must not park on a condition variable.
+func (b *Bus) advanceGateLocked(seq int64) {
+	if b.wireNext == seq {
+		b.wireNext = seq + 1
+	}
+	for {
+		if _, ok := b.wireAbandoned[b.wireNext]; !ok {
+			break
+		}
+		delete(b.wireAbandoned, b.wireNext)
+		b.wireNext++
+	}
+	// Broadcast on *every* advance, including the common path with nothing
+	// abandoned: waiters park in `for b.wireNext < seq { Wait() }`, so a missing
+	// signal here wedges the bus exactly the way an unconsumed turn does. (The
+	// first version of this helper returned from inside the loop and skipped it;
+	// TestBusConcurrentPublishSubscriberIntegrity hung and caught it.)
+	b.wireCond.Broadcast()
+}
+
+// abandonGateTurnLocked records that seq's publisher will never reach the gate.
+// If the gate already sits at seq the turn is consumed at once; otherwise the seq
+// is remembered and skipped when the gate arrives. Caller holds b.mu.
+func (b *Bus) abandonGateTurnLocked(seq int64) {
+	if b.wireNext == seq {
+		b.advanceGateLocked(seq)
+		return
+	}
+	if b.wireAbandoned == nil {
+		b.wireAbandoned = make(map[int64]struct{})
+	}
+	b.wireAbandoned[seq] = struct{}{}
+}
+
 // deliverInSeqOrder waits for seq's turn at the wire gate and then, when deliver
 // is true, appends evt to history and fans it out to every subscriber. It returns
 // the observer list copied under the lock so the caller can dispatch to the worker
@@ -280,8 +346,7 @@ func (b *Bus) Publish(eventType string, scope map[string]any, payload any) Event
 func (b *Bus) deliverInSeqOrder(seq int64, evt EventEnvelope, deliver bool) []observer {
 	b.mu.Lock()
 	defer func() {
-		b.wireNext = seq + 1
-		b.wireCond.Broadcast()
+		b.advanceGateLocked(seq)
 		b.mu.Unlock()
 	}()
 
