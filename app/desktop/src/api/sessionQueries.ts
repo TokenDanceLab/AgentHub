@@ -50,8 +50,13 @@ export function useHubPinnedMessages(sessionId: string, opts?: { enabled?: boole
 export function useHubSendMessage() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ sessionId, data }: { sessionId: string; data: Parameters<ReturnType<typeof getHubClient>['sendMessage']>[1] }) =>
-      getHubClient().sendMessage(sessionId, data),
+    mutationFn: ({
+      sessionId,
+      data,
+    }: {
+      sessionId: string;
+      data: Parameters<ReturnType<typeof getHubClient>['sendMessage']>[1];
+    }) => getHubClient().sendMessage(sessionId, data),
     onSuccess: (_result, { sessionId }) => {
       void queryClient.invalidateQueries({ queryKey: ['hub', 'sessions', sessionId, 'messages'] });
     },
@@ -82,8 +87,13 @@ export function useHubRecallMessage() {
 export function useHubEditMessage() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ messageId, data }: { messageId: string; data: Parameters<ReturnType<typeof getHubClient>['editMessage']>[1] }) =>
-      getHubClient().editMessage(messageId, data),
+    mutationFn: ({
+      messageId,
+      data,
+    }: {
+      messageId: string;
+      data: Parameters<ReturnType<typeof getHubClient>['editMessage']>[1];
+    }) => getHubClient().editMessage(messageId, data),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['hub', 'sessions'] });
     },

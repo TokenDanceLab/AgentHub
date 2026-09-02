@@ -25,8 +25,7 @@ export function useThreads(projectId?: string, options: { enabled?: boolean } = 
 export function useCreateThread() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (request: CreateThreadRequest | undefined) =>
-      createThread(request),
+    mutationFn: (request: CreateThreadRequest | undefined) => createThread(request),
     onSettled: () => {
       qc.invalidateQueries({ queryKey: edgeQueryKeys.threads.root });
     },

@@ -22,7 +22,9 @@ function resolveEdgeUrl(): string {
       const stored = window.localStorage.getItem('agenthub_edge_url');
       if (stored) return stored.replace(/\/+$/, '');
     }
-  } catch { /* localStorage unavailable */ }
+  } catch {
+    /* localStorage unavailable */
+  }
   // 3. Build-time env var
   const envUrl = import.meta.env.VITE_EDGE_URL;
   if (envUrl) return envUrl.replace(/\/+$/, '');
@@ -45,8 +47,12 @@ function resolveWsUrl(): string {
   }
 }
 
-export function getEdgeBaseUrl(): string { return resolveEdgeUrl(); }
-export function getEdgeWsUrl(): string { return resolveWsUrl(); }
+export function getEdgeBaseUrl(): string {
+  return resolveEdgeUrl();
+}
+export function getEdgeWsUrl(): string {
+  return resolveWsUrl();
+}
 
 export const EDGE_AUTH_TOKEN = import.meta.env.VITE_EDGE_AUTH_TOKEN || '';
 
@@ -66,5 +72,4 @@ export const RUNNERS_POLL_MS = 30_000;
 // Injected at build time from desktop/package.json (vite define); the
 // fallback keeps vitest (no define) working and matches the current version.
 declare const __APP_VERSION__: string | undefined;
-export const APP_VERSION =
-  typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '0.6.1';
+export const APP_VERSION = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '0.6.1';

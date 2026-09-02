@@ -5,7 +5,9 @@ import type { TokenUsagePageTeam } from '@agenthub/workbench';
 import { createHubClient } from './hubClient';
 import type { TeamApprovalDecisionRequest } from './hubClient';
 
-export function useDecideTeamApproval(options: { getToken?: () => string | null; baseUrl?: string } = {}) {
+export function useDecideTeamApproval(
+  options: { getToken?: () => string | null; baseUrl?: string } = {},
+) {
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -18,7 +20,9 @@ export function useDecideTeamApproval(options: { getToken?: () => string | null;
       const token = (options.getToken ?? getAccessToken)();
       if (!token) throw new Error('Hub session is required');
       const client = createHubClient(
-        options.baseUrl ? { baseUrl: options.baseUrl, getToken: () => token } : { getToken: () => token },
+        options.baseUrl
+          ? { baseUrl: options.baseUrl, getToken: () => token }
+          : { getToken: () => token },
       );
       return client.decideTeamApproval(input.teamId, input.runId, input.approvalId, input.decision);
     },
@@ -38,7 +42,9 @@ export function useTokenUsageBoard(
       const token = (opts?.getToken ?? getAccessToken)();
       if (!token) throw new Error('Hub session is required');
       const client = createHubClient(
-        opts?.baseUrl ? { baseUrl: opts.baseUrl, getToken: () => token } : { getToken: () => token },
+        opts?.baseUrl
+          ? { baseUrl: opts.baseUrl, getToken: () => token }
+          : { getToken: () => token },
       );
       const teams = await client.listAgentTeams();
       return Promise.all(
