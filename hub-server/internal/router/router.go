@@ -39,6 +39,14 @@ func SetupRoutes(r *gin.Engine, cfg *config.Config, authMW *middleware.AuthMiddl
 	r.Use(middleware.RequestID())
 	r.Use(reqlog.AccessLogGin())
 	r.Use(middleware.PrometheusMiddleware())
+	// A method mismatch must answer 405 (with an Allow header), not 404.
+	// Without this flag gin ignores the NoMethod handler registered below and
+	// routes every wrong-method request to NoRoute, which both hides the fact
+	// that the path exists under another method and diverges from edge-server,
+	// which already answers 405 for the same class of request (#2154 F-a).
+	// CORS preflight is unaffected: OPTIONS is aborted by the CORS middleware,
+	// which gin also chains in front of the 405 handler.
+	r.HandleMethodNotAllowed = true
 	r.NoRoute(func(c *gin.Context) {
 		handler.Fail(c, sharederr.ErrNotFound)
 	})
