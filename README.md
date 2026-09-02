@@ -48,10 +48,12 @@ AgentHub 让你像在 IM 群聊里协作一样，把真人好友、Builder、Rev
 | `app/desktop` | Tauri Desktop 工作台 |
 | `app/mobile-rn` | Expo / React Native Mobile |
 | `app/shared` | 共享 UI 组件、类型、transcript 逻辑 |
+| `app/workbench` | 端级工作台壳（`@agenthub/workbench`，依赖方向 workbench → shared 单向） |
 | `hub-server` | Hub API：身份、会话、项目、任务、消息、审批 |
 | `edge-server` | 本地执行节点：CLI Adapter、SQLite、事件回放 |
+| `pkg` | Hub/Edge 共享的 Go 包（errcode、jwtutil、logmask、testkit 等；独立 module，经根 `go.work` 联编） |
 | `api` | OpenAPI 与 WebSocket 事件合同 |
-| `docs` | 架构、路线图、设计文档 |
+| `docs` | 架构、治理与设计文档（进度与路线图在 GitHub issues，不在 `docs/`） |
 
 ## 快速开始
 
