@@ -9,6 +9,7 @@ import { getMessageDelegationStore, getSubagentStreamStore } from '@agenthub/wor
 import { handleIncomingTyping } from '@shared/chatview/typingPresence';
 import { buildWSAuthProtocols, createHubWS, type HubWSHandle, type HubWSOptions } from '@shared/hub/hubWS';
 import { resyncMessagesAfterReconnect } from '@shared/hub/hubMessagesResync';
+import { webHubMessagesFamily } from '@/platform/webPlatformMessageHelpers';
 import { WebSocketTransport, type Transport, type TransportStatus } from '@/api/transport';
 import { HUB_WS_URL } from '@/config';
 import { createHubClient } from '@/api/hubClient';
@@ -303,12 +304,15 @@ export function useWebHubRealtime({
 
     // #2101 G4-②: shared resync trigger for gap and reconnect events.
     // Uses incremental syncMessages(after_seq) per cached session when possible;
-    // falls back to full invalidation of threads family otherwise.
+    // falls back to full invalidation of the transcript family otherwise.
+    // #2252: Web transcripts are cached under ['web-v4','hub-messages',<id>],
+    // so the shared helper needs Web's family to discover them at all.
     const hubClientForResync = createHubClient({ getToken });
     const triggerWebResync = (): void => {
       void resyncMessagesAfterReconnect({
         queryClient,
         hubClient: hubClientForResync,
+        messageKeys: webHubMessagesFamily,
       }).catch((err) => {
         console.error('[webHubRealtime] resync failed:', err);
       });

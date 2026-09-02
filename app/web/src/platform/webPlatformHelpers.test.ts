@@ -19,8 +19,10 @@ import {
   buildHubComposerPrompt,
   firstUploadedAttachment,
   hubMessagesQueryKey,
+  hubMessagesQueryRoot,
   optimisticHubMessageFromIntent,
   resolveComposerMessageContent,
+  webHubMessagesFamily,
 } from './webPlatformMessageHelpers';
 import {
   formatHubPinTime,
@@ -261,5 +263,30 @@ describe('webPlatformDispatchHelpers pure helpers', () => {
       mentions: [{ id: 'p1', label: 'Builder', runtime_id: 'claude-code', model: 'glm-5.1' }],
       attachments: [{ id: 'a1', name: 'notes.md', source: 'browser', kind: 'file', mime: 'text/markdown', truncated: true }],
     });
+  });
+});
+
+// #2252: Web's transcript key family is what the shared reconnect/gap resync
+// matches against. If `of` and `sessionIdOf` ever drift apart (or from the key
+// the transcript query and the optimistic cache writers use), resync silently
+// degrades to a no-op again — that is exactly the defect these assertions pin.
+describe('webHubMessagesFamily (#2252)', () => {
+  it('round-trips the real transcript key', () => {
+    const key = hubMessagesQueryKey('hub-session-1');
+    expect(webHubMessagesFamily.of('hub-session-1')).toEqual(key);
+    expect(webHubMessagesFamily.sessionIdOf(key)).toBe('hub-session-1');
+    expect(webHubMessagesFamily.root).toEqual(hubMessagesQueryRoot);
+  });
+
+  it('is a prefix-compatible root so broad invalidation still covers every session', () => {
+    expect(hubMessagesQueryKey('hub-session-1').slice(0, 2)).toEqual([...hubMessagesQueryRoot]);
+    expect(hubMessagesQueryKey('hub-session-2').slice(0, 2)).toEqual([...hubMessagesQueryRoot]);
+  });
+
+  it('rejects keys that are not a Web transcript cache', () => {
+    expect(webHubMessagesFamily.sessionIdOf(['web-v4', 'hub-sessions'])).toBeNull();
+    expect(webHubMessagesFamily.sessionIdOf(['web-v4', 'hub-pins', 'hub-session-1'])).toBeNull();
+    expect(webHubMessagesFamily.sessionIdOf(['hub', 'threads', 'hub-session-1', 'messages'])).toBeNull();
+    expect(webHubMessagesFamily.sessionIdOf(['web-v4', 'hub-messages', 42])).toBeNull();
   });
 });

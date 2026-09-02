@@ -7,14 +7,24 @@
 // fetch only missed frames. Results are merged back into the cache via the
 // existing query key so downstream consumers see a seamless update.
 //
+// Key family (#2252): transcripts are not cached under one shape on every
+// platform, so the caller declares which family it writes with via
+// `messageKeys`. The helper never matches a literal shape of its own — that
+// hardcoded `['hub','threads',<id>,'messages']` matcher is exactly what made
+// this module a silent no-op on Desktop (real key
+// `['hub','sessions',<id>,'messages']`) and on Web (real key
+// `['web-v4','hub-messages',<id>]`): `discoverCachedSessionIds` returned [],
+// the per-session loop body never ran, so `syncMessages` was never called and
+// `degraded`/`errors` never accumulated anything worth logging.
+//
 // Degradation: if no cached messages exist for a session (e.g. first load
 // happened during disconnect), we cannot compute after_seq. In that case we
-// invalidate the entire threads family so the next render does a full refetch.
+// invalidate the family root so the next render does a full refetch.
 // This is logged as a degraded resync for observability.
 
 import type { QueryClient } from '@tanstack/react-query';
 import type { HubMessage } from './hubClientDomainTypes';
-import { hubQueryKeys } from '../stores/queryKeys';
+import { hubThreadsMessagesFamily, type HubMessagesKeyFamily } from '../stores/queryKeys';
 
 /** Minimal hubClient surface needed for message resync. */
 export interface MessagesResyncHubClient {
@@ -29,6 +39,13 @@ export interface ResyncMessagesOptions {
   hubClient: MessagesResyncHubClient;
   /** Optional logger override (defaults to console). */
   logger?: Pick<typeof console, 'warn' | 'error'>;
+  /**
+   * Key family the calling platform actually stores transcripts under.
+   * Defaults to the SSOT threads family (`hubQueryKeys.threads.messages`),
+   * which is what Desktop caches. Web must pass its own
+   * `webHubMessagesFamily` (`['web-v4','hub-messages',<sessionId>]`).
+   */
+  messageKeys?: HubMessagesKeyFamily;
 }
 
 export interface ResyncMessagesResult {
@@ -64,33 +81,30 @@ export function extractMaxSeq(cached: unknown): number {
 }
 
 /**
- * Discover all session IDs currently cached under the threads.messages prefix.
- * Query keys follow the shape ['hub', 'threads', <sessionId>, 'messages'].
+ * Discover every session id whose transcript is currently cached under
+ * `family`. The family owns both the scan prefix and the reverse matcher, so
+ * a platform whose keys have a different arity or namespace is discovered too.
  */
-function discoverCachedSessionIds(qc: QueryClient): string[] {
-  const cache = qc.getQueriesData({ queryKey: hubQueryKeys.threads.root });
+function discoverCachedSessionIds(
+  qc: QueryClient,
+  family: HubMessagesKeyFamily,
+): string[] {
+  const cache = qc.getQueriesData({ queryKey: family.root });
   const ids = new Set<string>();
   for (const [key] of cache) {
-    // Match ['hub', 'threads', <sessionId>, 'messages']
-    if (
-      Array.isArray(key) &&
-      key.length === 4 &&
-      key[0] === 'hub' &&
-      key[1] === 'threads' &&
-      key[3] === 'messages' &&
-      typeof key[2] === 'string'
-    ) {
-      ids.add(key[2]);
-    }
+    if (!Array.isArray(key)) continue;
+    const sessionId = family.sessionIdOf(key);
+    if (sessionId) ids.add(sessionId);
   }
   return Array.from(ids);
 }
 
 /**
  * Incremental message resync after hubWS reconnect or gap detection.
- * Scans cached message queries, computes per-session after_seq watermarks,
- * and fetches missed frames via syncMessages. Falls back to full threads
- * invalidation when no watermark is available.
+ * Scans cached message queries of the caller's key family, computes
+ * per-session after_seq watermarks, and fetches missed frames via
+ * syncMessages. Falls back to invalidating the whole family when no watermark
+ * is available.
  *
  * Idempotent: syncMessages results are merged into existing cache entries;
  * duplicate messages are harmless because downstream consumers use UPSERT
@@ -100,21 +114,23 @@ export async function resyncMessagesAfterReconnect(
   opts: ResyncMessagesOptions,
 ): Promise<ResyncMessagesResult> {
   const { queryClient, hubClient, logger = console } = opts;
+  const messageKeys = opts.messageKeys ?? hubThreadsMessagesFamily;
   const result: ResyncMessagesResult = { synced: [], degraded: [], errors: [] };
 
-  const sessionIds = discoverCachedSessionIds(queryClient);
+  const sessionIds = discoverCachedSessionIds(queryClient, messageKeys);
 
   for (const sessionId of sessionIds) {
-    const cached = queryClient.getQueryData(hubQueryKeys.threads.messages(sessionId));
+    const messagesKey = messageKeys.of(sessionId);
+    const cached = queryClient.getQueryData(messagesKey);
     const maxSeq = extractMaxSeq(cached);
 
     if (maxSeq < 0) {
-      // No watermark — degrade to full invalidation of this session's threads.
+      // No watermark — degrade to full invalidation of the transcript family.
       result.degraded.push(sessionId);
       logger.warn(
-        `[hubMessagesResync] no cached watermark for session ${sessionId}; invalidating threads family`,
+        `[hubMessagesResync] no cached watermark for session ${sessionId}; invalidating transcript family`,
       );
-      void queryClient.invalidateQueries({ queryKey: hubQueryKeys.threads.root }).catch(() => {
+      void queryClient.invalidateQueries({ queryKey: messageKeys.root }).catch(() => {
         /* non-fatal */
       });
       continue;
@@ -125,7 +141,7 @@ export async function resyncMessagesAfterReconnect(
       if (missed.length > 0) {
         // Merge into existing cache. We append and deduplicate by id so the
         // cache stays sorted-ish and idempotent.
-        const existing = (queryClient.getQueryData(hubQueryKeys.threads.messages(sessionId)) as HubMessage[] | undefined) ?? [];
+        const existing = (queryClient.getQueryData(messagesKey) as HubMessage[] | undefined) ?? [];
         const seen = new Set(existing.map((m) => m.id));
         const merged = [...existing];
         for (const msg of missed) {
@@ -134,14 +150,14 @@ export async function resyncMessagesAfterReconnect(
             seen.add(msg.id);
           }
         }
-        queryClient.setQueryData(hubQueryKeys.threads.messages(sessionId), merged);
+        queryClient.setQueryData(messagesKey, merged);
       }
       result.synced.push(sessionId);
     } catch (err) {
       result.errors.push({ sessionId, error: err });
       logger.error(`[hubMessagesResync] syncMessages failed for ${sessionId}:`, err);
       // On error, fall back to invalidation so the next render recovers.
-      void queryClient.invalidateQueries({ queryKey: hubQueryKeys.threads.messages(sessionId) }).catch(() => {
+      void queryClient.invalidateQueries({ queryKey: messagesKey }).catch(() => {
         /* non-fatal */
       });
     }
