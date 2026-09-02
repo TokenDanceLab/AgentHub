@@ -2,6 +2,7 @@ package workspace
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/glebarez/sqlite"
@@ -16,6 +17,23 @@ func newWorkspaceTestDB(t *testing.T) *gorm.DB {
 	t.Helper()
 	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
 	require.NoError(t, err)
+	createWorkspaceTestSchema(t, db)
+	return db
+}
+
+// newWorkspaceSharedTestDB opens a shared-cache in-memory database so
+// concurrent callers see one database (plain ":memory:" gives each
+// connection a private database). busy_timeout absorbs write contention.
+func newWorkspaceSharedTestDB(t *testing.T) *gorm.DB {
+	t.Helper()
+	db, err := gorm.Open(sqlite.Open("file:workspace-seq-race?mode=memory&cache=shared&_pragma=busy_timeout(10000)"), &gorm.Config{})
+	require.NoError(t, err)
+	createWorkspaceTestSchema(t, db)
+	return db
+}
+
+func createWorkspaceTestSchema(t *testing.T, db *gorm.DB) {
+	t.Helper()
 	require.NoError(t, db.Exec(`
 		CREATE TABLE workspaces (
 			id TEXT PRIMARY KEY,
@@ -74,7 +92,6 @@ func newWorkspaceTestDB(t *testing.T) *gorm.DB {
 			created_at DATETIME
 		)
 	`).Error)
-	return db
 }
 
 func seedWorkspace(t *testing.T, db *gorm.DB, id, ownerID, name string) {
@@ -270,4 +287,44 @@ func TestWorkspaceProjectThreadsAreOwnerAndProjectScoped(t *testing.T) {
 		Content:     "wrong project",
 	})
 	require.ErrorIs(t, err, errcode.SessionNotFound)
+}
+
+// TestWorkspaceThreadMessageSeqAllocatesWithoutRace pins the seq-allocation
+// fix (#2154): concurrent sends in one thread must all succeed with a
+// contiguous duplicate-free sequence (the old read-modify-write collided on
+// the (session_id, seq_id) unique index under concurrency).
+func TestWorkspaceThreadMessageSeqAllocatesWithoutRace(t *testing.T) {
+	db := newWorkspaceSharedTestDB(t)
+	seedWorkspace(t, db, "workspace-1", "owner-1", "AgentHub")
+	svc := NewService(db)
+
+	thread, err := svc.CreateThread(context.Background(), "workspace-1", "owner-1", &CreateWorkspaceThreadRequest{Name: "并发群"})
+	require.NoError(t, err)
+
+	const senders = 8
+	errCh := make(chan error, senders)
+	for i := 0; i < senders; i++ {
+		go func(n int) {
+			_, err := svc.CreateThreadMessage(context.Background(), "workspace-1", thread.ID, "owner-1", SendWorkspaceThreadMessageRequest{
+				ClientMsgID: fmt.Sprintf("race-%d", n),
+				Content:     "concurrent message",
+			})
+			errCh <- err
+		}(i)
+	}
+	for i := 0; i < senders; i++ {
+		require.NoError(t, <-errCh)
+	}
+
+	messages, err := svc.ListThreadMessages(context.Background(), "workspace-1", thread.ID, "owner-1", 100)
+	require.NoError(t, err)
+	require.Len(t, messages, senders)
+	seen := map[int64]bool{}
+	for _, m := range messages {
+		require.False(t, seen[m.SeqID], "duplicate seq %d", m.SeqID)
+		seen[m.SeqID] = true
+	}
+	for i := int64(1); i <= senders; i++ {
+		require.True(t, seen[i], "missing seq %d (want contiguous 1..%d)", i, senders)
+	}
 }
