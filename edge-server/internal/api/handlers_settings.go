@@ -1,7 +1,6 @@
 package api
 
 import (
-	"encoding/json"
 	"log/slog"
 	"net/http"
 	"sort"
@@ -28,7 +27,9 @@ func (h *Handler) GetSettings(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) PatchSettings(w http.ResponseWriter, r *http.Request) {
 	var patch map[string]string
-	if err := json.NewDecoder(r.Body).Decode(&patch); err != nil {
+	// decodeOptionalJSON applies the shared 1MB body limit; this was the only
+	// JSON decode point bypassing it (memory exhaustion, #2154 security scan).
+	if err := decodeOptionalJSON(r, &patch); err != nil {
 		writeJSON(w, http.StatusBadRequest, errcode.ErrorBody(errcode.ErrBadRequest.WithMessage("invalid json body")))
 		return
 	}
