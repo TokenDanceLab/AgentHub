@@ -3,6 +3,7 @@ package repository
 import (
 	"time"
 
+	"github.com/agenthub/hub-server/internal/config"
 	"github.com/agenthub/hub-server/internal/model"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -73,9 +74,7 @@ func createAuditEventOnce(db *gorm.DB, event *model.AuditEvent) error {
 // When userID is empty, queries across all users (admin). When non-empty, filters to that user.
 // Cursor-based pagination uses descending order (newest first): WHERE id < cursor.
 func ListAuditEvents(db *gorm.DB, userID, eventType, severity string, since, until *time.Time, cursor string, pageSize int) ([]model.AuditEvent, bool, error) {
-	if pageSize <= 0 || pageSize > 200 {
-		pageSize = defaultAuditPageSize
-	}
+	pageSize = config.ClampPageSize(pageSize, config.MaxListPageSize, defaultAuditPageSize)
 
 	qry := db.Model(&model.AuditEvent{})
 	if userID != "" {

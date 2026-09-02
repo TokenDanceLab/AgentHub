@@ -3,6 +3,7 @@ package repository
 import (
 	"time"
 
+	"github.com/agenthub/hub-server/internal/config"
 	"github.com/agenthub/hub-server/internal/model"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -42,9 +43,7 @@ func SoftDeleteExecutionTarget(db *gorm.DB, id, ownerID string) error {
 }
 
 func ListExecutionTargets(db *gorm.DB, ownerID, targetType, cursor string, pageSize int) ([]model.ExecutionTarget, bool, error) {
-	if pageSize <= 0 || pageSize > 200 {
-		pageSize = defaultTargetPageSize
-	}
+	pageSize = config.ClampPageSize(pageSize, config.MaxListPageSize, defaultTargetPageSize)
 
 	qry := db.Where("owner_id = ? AND deleted_at IS NULL", ownerID)
 	if targetType != "" {

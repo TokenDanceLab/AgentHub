@@ -11,9 +11,7 @@ func CreateNotification(db *gorm.DB, n *model.Notification) error {
 }
 
 func ListNotifications(db *gorm.DB, userID string, unreadOnly bool, limit, offset int) ([]model.Notification, error) {
-	if limit <= 0 || limit > config.MaxMessagePageLimit {
-		limit = config.DefaultPaginationLimit
-	}
+	limit = config.ClampPageSize(limit, config.MaxMessagePageLimit, config.DefaultPaginationLimit)
 	// Defense in depth: clamp offset at the repository choke point too
 	// (handler already clamps; other callers must not bypass, #2154).
 	if offset < 0 {

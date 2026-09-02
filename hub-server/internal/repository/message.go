@@ -32,9 +32,7 @@ func GetMessageBySessionAndID(db *gorm.DB, sessionID, id string) (*model.Message
 }
 
 func GetMessagesBySession(db *gorm.DB, sessionID string, beforeSeq int64, limit int) ([]model.Message, error) {
-	if limit <= 0 || limit > config.MaxMessagePageLimit {
-		limit = config.DefaultPaginationLimit
-	}
+	limit = config.ClampPageSize(limit, config.MaxMessagePageLimit, config.DefaultPaginationLimit)
 	var msgs []model.Message
 	query := db.Where("session_id = ?", sessionID)
 	if beforeSeq > 0 {
