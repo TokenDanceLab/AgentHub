@@ -40,7 +40,7 @@ func ListDocumentsByOwner(db *gorm.DB, ownerID string, filter model.DocumentFilt
 		q = q.Where("source = ?", filter.Source)
 	}
 	if filter.Search != "" {
-		q = q.Where("title ILIKE ?", "%"+filter.Search+"%")
+		q = q.Where("title ILIKE ? ESCAPE '\\'", "%"+escapeILIKE(filter.Search)+"%")
 	}
 	if filter.After != "" {
 		q = q.Where("created_at < ?", filter.After)

@@ -47,7 +47,7 @@ func ListMCPServers(db *gorm.DB, ownerID, q, transport, cursor string, pageSize 
 		qry = qry.Where("transport = ?", transport)
 	}
 	if q != "" {
-		qry = qry.Where("(name ILIKE ? OR command ILIKE ?)", "%"+q+"%", "%"+q+"%")
+		qry = qry.Where("(name ILIKE ? ESCAPE '\\' OR command ILIKE ? ESCAPE '\\')", "%"+escapeILIKE(q)+"%", "%"+escapeILIKE(q)+"%")
 	}
 	if cursor != "" {
 		qry = qry.Where("id > ?", cursor)
@@ -76,7 +76,7 @@ func ListPublicMCPServers(db *gorm.DB, q, transport, cursor string, pageSize int
 		qry = qry.Where("transport = ?", transport)
 	}
 	if q != "" {
-		qry = qry.Where("(name ILIKE ? OR command ILIKE ?)", "%"+q+"%", "%"+q+"%")
+		qry = qry.Where("(name ILIKE ? ESCAPE '\\' OR command ILIKE ? ESCAPE '\\')", "%"+escapeILIKE(q)+"%", "%"+escapeILIKE(q)+"%")
 	}
 	if cursor != "" {
 		qry = qry.Where("id < ?", cursor)
