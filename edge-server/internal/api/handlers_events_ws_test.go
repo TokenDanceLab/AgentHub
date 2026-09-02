@@ -3,6 +3,7 @@ package api
 import (
 	"net/http"
 	"net/http/httptest"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -18,6 +19,13 @@ import (
 // (minutes). With per-write deadlines the loop fails and returns promptly.
 // Without the fix this test times out.
 func TestWriteEventsLoop_ZombiePeerHitsWriteDeadline(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		// Whether the zombie scenario triggers depends on OS loopback socket
+		// buffering (Windows autotuning absorbs far more than Linux), making
+		// the assertion platform-dependent; the deadline behavior itself is
+		// covered on Linux, the server platform.
+		t.Skip("zombie peer socket-buffer behavior is platform-dependent")
+	}
 	orig := wsWriteTimeout
 	wsWriteTimeout = 500 * time.Millisecond
 	t.Cleanup(func() { wsWriteTimeout = orig })
