@@ -30,8 +30,10 @@ func ListWorkspaces(db *gorm.DB, ownerID, q, cursor string, pageSize int) ([]mod
 
 	query := db.Where("owner_id = ?", ownerID)
 	if q != "" {
-		like := "%" + q + "%"
-		query = query.Where("name LIKE ? OR description LIKE ?", like, like)
+		// LIKE wildcards in user input are escaped so % and _ match
+		// literally (message.go escapeILIKE sample, #2154).
+		like := "%" + escapeILIKE(q) + "%"
+		query = query.Where("name LIKE ? ESCAPE '\\' OR description LIKE ? ESCAPE '\\'", like, like)
 	}
 	if cursor != "" {
 		query = query.Where("id > ?", cursor)
