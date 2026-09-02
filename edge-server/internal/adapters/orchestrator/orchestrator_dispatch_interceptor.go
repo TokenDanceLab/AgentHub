@@ -4,6 +4,8 @@ import (
 	"log/slog"
 	"strings"
 	"sync"
+
+	"github.com/agenthub/pkg/safego"
 )
 
 // Residual pure-helper peel of dispatchInterceptor scan/rule/fan-out methods (#1111).
@@ -174,12 +176,19 @@ func (d *dispatchInterceptor) fanOutDispatches(events []dispatchEvent, scope map
 
 	for i := range events {
 		wg.Add(1)
-		go func(evt dispatchEvent) {
-			defer wg.Done()
-			sem <- struct{}{}
-			defer func() { <-sem }()
-			d.handleDispatch(evt, scope)
-		}(events[i])
+		// SafeGo wraps the worker in a panic recover: handleDispatch drives the
+		// full spawn-agent/start-run chain, and an unguarded panic there would
+		// crash the whole edge process and every in-flight run with it. The
+		// deferred wg.Done/sem release inside fn run before SafeGo's recover,
+		// so a panicked worker still frees its slot and lets wg.Wait return.
+		safego.SafeGo("orchestrator.dispatch", func(evt dispatchEvent) func() {
+			return func() {
+				defer wg.Done()
+				sem <- struct{}{}
+				defer func() { <-sem }()
+				d.handleDispatch(evt, scope)
+			}
+		}(events[i]))
 	}
 	wg.Wait()
 }
