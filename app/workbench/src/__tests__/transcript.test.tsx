@@ -204,10 +204,13 @@ describe('AgentHubWorkbench', () => {
     expect(menu).toBeInTheDocument();
     // Honest menu (#1818): no fake entries (创建话题/添加任务/导出) and no
     // Hub-only entries (表情回复/置顶/撤回) without a session id.
-    expect(within(menu).getAllByRole('menuitem')).toHaveLength(6);
+    // #2154: this shell wires no message ports at all, so the forward entry is
+    // gone too — it used to render off the conversation list alone and the
+    // dispatcher then dropped the confirmed forward silently.
+    expect(within(menu).getAllByRole('menuitem')).toHaveLength(5);
     expect(within(menu).getByText('复制')).toBeInTheDocument();
     expect(within(menu).getByRole('menuitem', { name: /回复/ })).toBeInTheDocument();
-    expect(within(menu).getByRole('menuitem', { name: /转发/ })).toBeInTheDocument();
+    expect(within(menu).queryByRole('menuitem', { name: /转发/ })).not.toBeInTheDocument();
     expect(within(menu).getByRole('menuitem', { name: /复制消息链接/ })).toBeInTheDocument();
     expect(within(menu).getByRole('menuitem', { name: /删除/ })).toBeInTheDocument();
     expect(within(menu).queryByRole('menuitem', { name: /表情回复/ })).not.toBeInTheDocument();
