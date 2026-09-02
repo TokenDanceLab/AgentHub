@@ -1,6 +1,6 @@
 # Design system SSOT map
 
-最后更新：2026-08-24
+最后更新：2026-09-02
 Issue: #466 (P9.1 SSOT map) · residual hardcode closed via #879 / #910 / #1021 · ModelDropdown residual closed (component removed) · **#1197 frosted-glass material layer**
 
 > 权威入口：本文件是 **design tokens / theme runtime / surface CSS ownership** 的 SSOT map。Design token SSOT 由 `app/shared/src/styles/`（CSS 值）与 `app/shared/src/designTokens.ts`（跨平台 alias / surface rules）共同组成；后者不是第二份颜色值表。
@@ -96,10 +96,9 @@ Entry CSS load: desktop/web `main.tsx` imports surface `styles/{tokens,themes,pr
 | `--glass-blur-*` / `--glass-saturate` / `--glass-backdrop-filter` | base + theme pairs | Card/panel material blur recipe |
 | `--glass-elev-1..3` / `--glass-card-*` | base + theme pairs | Elevation scale + card recipe |
 | `--elevated-card-*` | aliases to glass elev scale | Existing elevated surface consumers keep working |
-| `Card` `variant="glass"\|"elevated"` | `ui/Card.module.css` | Consumes glass/elev tokens only |
 | Alias registry | `designTokens.ts` `--td-glass-blur/card/elev` | Cross-surface naming; CSS remains value SSOT |
 
-Consumer rule: new frosted surfaces use `var(--glass-*)` / Card glass variant; do not invent local `backdrop-filter` or rgba glass fills.
+Consumer rule: new frosted surfaces use `var(--glass-*)`; do not invent local `backdrop-filter` or rgba glass fills.（原 `Card` 组件及 `variant="glass"|"elevated"` 已随 ed846d2 删除，glass/elev token 由消费面直接引用。）
 
 ## 8. Workbench density + micro-motion (#1198)
 
@@ -112,7 +111,7 @@ Consumer rule: new frosted surfaces use `var(--glass-*)` / Card glass variant; d
 | `--motion-hover/press/panel` | duration+ease recipes | chrome transitions |
 | `.ah-glass-press` | soft hover lift + press scale | optional utility class |
 
-Applied first to AuxPanel, TerminalPanel, Card glass/elevated. Respect `prefers-reduced-motion`.
+Applied first to AuxPanel, TerminalPanel（原列的 Card glass/elevated 组件已随 ed846d2 删除）. Respect `prefers-reduced-motion`.
 
 ## 9. Visual QA gate (#1199 / #1286 / #1308)
 
