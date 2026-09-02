@@ -198,9 +198,11 @@ export interface TranscriptChromeControllerDeps {
   onRegenerate?: ((blockId: string) => Promise<void> | void) | undefined;
   onApprovalDecision?: ((decision: ApprovalDecisionAction) => Promise<void> | void) | undefined;
   /**
-   * Hub session id for REST message actions (#1383). Absent on Desktop/demo
-   * shells — the react/pin/unpin/recall menu entries are omitted there and
-   * their planners return no effects (#1818).
+   * Hub session id for REST message actions (#1383). Web *and* Desktop set it
+   * (activeConversationId doubles as the session id); demo shells do not. It
+   * is necessary but not sufficient for the pin/unpin/recall entries — those
+   * also need their port handler wired below, and their planners return no
+   * effects without a session id (#1818, #2154).
    */
   sessionId?: string | null | undefined;
   onPinMessage?: ((messageId: string, sessionId: string) => Promise<void> | void) | undefined;
@@ -513,9 +515,20 @@ export function createTranscriptChromeController(
       t,
       onAction: runContextAction,
       onEnterSelection: enterSelection,
-      // Hub REST message entries (react/pin/unpin/recall) render only with
-      // a session; Desktop/demo shells get an honest, shorter menu (#1818).
-      hubMessageActions: Boolean(deps.sessionId),
+      // #2154: fail-closed per action — an entry renders only when this shell
+      // wired the port that runs it. The previous session-id-only gate
+      // rendered pin/unpin/recall on Desktop (session id present, no Hub
+      // message ports) and the dispatcher dropped every click silently.
+      // sessionId stays part of the pin/unpin/recall gates because their
+      // planner cannot build the effect without it (#1818); forward and
+      // regenerate do not need one.
+      capabilities: {
+        pin: Boolean(deps.sessionId) && deps.onPinMessage !== undefined,
+        unpin: Boolean(deps.sessionId) && deps.onUnpinMessage !== undefined,
+        recall: Boolean(deps.sessionId) && deps.onRecallMessage !== undefined,
+        forward: deps.onForwardMessage !== undefined,
+        regenerate: deps.onRegenerate !== undefined,
+      },
       ...(conversations !== undefined ? { conversations } : {}),
     }),
     multiSelectActions: () => buildTranscriptMultiSelectActions({
