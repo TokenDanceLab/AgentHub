@@ -3,6 +3,7 @@ package workspace
 import (
 	"context"
 	"fmt"
+	"sync/atomic"
 	"testing"
 
 	"github.com/glebarez/sqlite"
@@ -24,10 +25,22 @@ func newWorkspaceTestDB(t *testing.T) *gorm.DB {
 // newWorkspaceSharedTestDB opens a shared-cache in-memory database so
 // concurrent callers see one database (plain ":memory:" gives each
 // connection a private database). busy_timeout absorbs write contention.
+// workspaceSharedFixtureSeq numbers each newWorkspaceSharedTestDB call (#2260).
+var workspaceSharedFixtureSeq atomic.Uint64
+
 func newWorkspaceSharedTestDB(t *testing.T) *gorm.DB {
 	t.Helper()
-	db, err := gorm.Open(sqlite.Open("file:workspace-seq-race?mode=memory&cache=shared&_pragma=busy_timeout(10000)"), &gorm.Config{})
+	// The fixed name made this ONE process-global database: createWorkspaceTestSchema
+	// runs plain CREATE TABLE, so the second -count round (and the second test in
+	// this package) died on "table workspaces already exists" (#2260). A unique
+	// name per call plus close-on-cleanup keeps the shared-cache semantics the
+	// concurrent callers need without leaking schema or rows across rounds.
+	dsn := fmt.Sprintf("file:workspace-seq-race-%d?mode=memory&cache=shared&_pragma=busy_timeout(10000)", workspaceSharedFixtureSeq.Add(1))
+	db, err := gorm.Open(sqlite.Open(dsn), &gorm.Config{})
 	require.NoError(t, err)
+	sqlDB, err := db.DB()
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = sqlDB.Close() })
 	createWorkspaceTestSchema(t, db)
 	return db
 }
