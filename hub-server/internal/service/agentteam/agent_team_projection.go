@@ -19,103 +19,158 @@ type teamRuntimeTaskRef struct {
 	MemberID     string
 }
 
+// teamRuntimeProjection accumulates the approval / artifact state of one team
+// run. The per-event-type branches live on this type so projectTeamRuntimeSummaries
+// stays a flat dispatch loop — the folded branches together exceed the gocognit
+// gate (> 30) when inlined.
+type teamRuntimeProjection struct {
+	approvals     []model.TeamApprovalState
+	artifacts     []model.TeamArtifactState
+	approvalIndex map[string]int
+	taskRefs      map[string]teamRuntimeTaskRef
+}
+
 func projectTeamRuntimeSummaries(runEvents []model.AgentRunEvent, taskRefs map[string]teamRuntimeTaskRef) ([]model.TeamApprovalState, []model.TeamArtifactState) {
-	approvals := []model.TeamApprovalState{}
-	artifacts := []model.TeamArtifactState{}
-	approvalIndex := map[string]int{}
+	p := &teamRuntimeProjection{
+		approvals:     []model.TeamApprovalState{},
+		artifacts:     []model.TeamArtifactState{},
+		approvalIndex: map[string]int{},
+		taskRefs:      taskRefs,
+	}
 	for _, event := range runEvents {
-		var payload map[string]any
-		if err := json.Unmarshal([]byte(event.Payload), &payload); err != nil {
-			continue
-		}
+		// Dispatch on the event type first: only the three branches below decode
+		// the payload. A team run's event batch is capped at 50,000 rows
+		// (repository.maxAgentRunEventsPerBatch) and is dominated by
+		// text_delta / output_batch, whose payloads this loop used to unmarshal
+		// in full and then discard (#2154 perf lane P2-5).
 		switch event.EventType {
 		case "run.agent.permission_requested":
-			requestID := firstJSONString(payload, "requestId", "request_id")
-			toolUseID := firstJSONString(payload, "toolUseId", "tool_use_id")
-			key := firstNonEmptyString(requestID, toolUseID)
-			if key == "" {
-				continue
-			}
-			ref := taskRefs[event.TaskID]
-			status := firstNonEmptyString(firstJSONString(payload, "status"), "pending")
-			approvalIndex[key] = len(approvals)
-			approvals = append(approvals, model.TeamApprovalState{
-				ApprovalID:   approvalIDFor(requestID, toolUseID),
-				AgentTaskID:  event.TaskID,
-				TeamTaskID:   ref.TeamTaskID,
-				AssignmentID: ref.AssignmentID,
-				MemberID:     ref.MemberID,
-				EdgeRunID:    event.EdgeRunID,
-				RequestID:    requestID,
-				ToolName:     firstJSONString(payload, "toolName", "tool_name"),
-				ToolUseID:    toolUseID,
-				Status:       status,
-				CreatedAt:    event.CreatedAt,
-			})
+			p.applyApprovalRequested(event)
 		case "run.agent.permission_decided":
-			requestID := firstJSONString(payload, "requestId", "request_id")
-			toolUseID := firstJSONString(payload, "toolUseId", "tool_use_id")
-			key := firstNonEmptyString(requestID, toolUseID)
-			if key == "" {
-				continue
-			}
-			decision := firstNonEmptyString(firstJSONString(payload, "decision", "status"), "decided")
-			decidedAt := event.CreatedAt
-			if idx, ok := approvalIndex[key]; ok {
-				approvals[idx].Status = decision
-				approvals[idx].Reason = firstJSONString(payload, "reason")
-				approvals[idx].DecidedAt = &decidedAt
-				if approvals[idx].RequestID == "" {
-					approvals[idx].RequestID = requestID
-				}
-				if approvals[idx].ToolUseID == "" {
-					approvals[idx].ToolUseID = toolUseID
-				}
-				if approvals[idx].ToolName == "" {
-					approvals[idx].ToolName = firstJSONString(payload, "toolName", "tool_name")
-				}
-				continue
-			}
-			approvalIndex[key] = len(approvals)
-			ref := taskRefs[event.TaskID]
-			approvals = append(approvals, model.TeamApprovalState{
-				ApprovalID:   approvalIDFor(requestID, toolUseID),
-				AgentTaskID:  event.TaskID,
-				TeamTaskID:   ref.TeamTaskID,
-				AssignmentID: ref.AssignmentID,
-				MemberID:     ref.MemberID,
-				EdgeRunID:    event.EdgeRunID,
-				RequestID:    requestID,
-				ToolName:     firstJSONString(payload, "toolName", "tool_name"),
-				ToolUseID:    toolUseID,
-				Status:       decision,
-				Reason:       firstJSONString(payload, "reason"),
-				CreatedAt:    event.CreatedAt,
-				DecidedAt:    &decidedAt,
-			})
+			p.applyApprovalDecided(event)
 		case "run.agent.file_change":
-			path := firstJSONString(payload, "path", "filePath", "file_path")
-			if path == "" {
-				continue
-			}
-			ref := taskRefs[event.TaskID]
-			artifacts = append(artifacts, model.TeamArtifactState{
-				AgentTaskID:   event.TaskID,
-				TeamTaskID:    ref.TeamTaskID,
-				AssignmentID:  ref.AssignmentID,
-				MemberID:      ref.MemberID,
-				EdgeRunID:     event.EdgeRunID,
-				SourceEventID: event.ID,
-				EventSeq:      event.EventSeq,
-				Path:          path,
-				Action:        firstJSONString(payload, "action"),
-				ToolName:      firstJSONString(payload, "toolName", "tool_name"),
-				Status:        firstJSONString(payload, "status"),
-				CreatedAt:     event.CreatedAt,
-			})
+			p.applyFileChange(event)
 		}
 	}
-	return approvals, artifacts
+	return p.approvals, p.artifacts
+}
+
+// applyApprovalRequested records a pending approval, keyed by request/tool-use id.
+func (p *teamRuntimeProjection) applyApprovalRequested(event model.AgentRunEvent) {
+	payload, ok := teamEventPayload(event.Payload)
+	if !ok {
+		return
+	}
+	requestID := firstJSONString(payload, "requestId", "request_id")
+	toolUseID := firstJSONString(payload, "toolUseId", "tool_use_id")
+	key := firstNonEmptyString(requestID, toolUseID)
+	if key == "" {
+		return
+	}
+	ref := p.taskRefs[event.TaskID]
+	status := firstNonEmptyString(firstJSONString(payload, "status"), "pending")
+	p.approvalIndex[key] = len(p.approvals)
+	p.approvals = append(p.approvals, model.TeamApprovalState{
+		ApprovalID:   approvalIDFor(requestID, toolUseID),
+		AgentTaskID:  event.TaskID,
+		TeamTaskID:   ref.TeamTaskID,
+		AssignmentID: ref.AssignmentID,
+		MemberID:     ref.MemberID,
+		EdgeRunID:    event.EdgeRunID,
+		RequestID:    requestID,
+		ToolName:     firstJSONString(payload, "toolName", "tool_name"),
+		ToolUseID:    toolUseID,
+		Status:       status,
+		CreatedAt:    event.CreatedAt,
+	})
+}
+
+// applyApprovalDecided folds a decision into the matching pending approval, or
+// records a standalone decided approval when the request event was never seen
+// (e.g. it fell out of the 50,000-row event window).
+func (p *teamRuntimeProjection) applyApprovalDecided(event model.AgentRunEvent) {
+	payload, ok := teamEventPayload(event.Payload)
+	if !ok {
+		return
+	}
+	requestID := firstJSONString(payload, "requestId", "request_id")
+	toolUseID := firstJSONString(payload, "toolUseId", "tool_use_id")
+	key := firstNonEmptyString(requestID, toolUseID)
+	if key == "" {
+		return
+	}
+	decision := firstNonEmptyString(firstJSONString(payload, "decision", "status"), "decided")
+	decidedAt := event.CreatedAt
+	if idx, seen := p.approvalIndex[key]; seen {
+		p.approvals[idx].Status = decision
+		p.approvals[idx].Reason = firstJSONString(payload, "reason")
+		p.approvals[idx].DecidedAt = &decidedAt
+		if p.approvals[idx].RequestID == "" {
+			p.approvals[idx].RequestID = requestID
+		}
+		if p.approvals[idx].ToolUseID == "" {
+			p.approvals[idx].ToolUseID = toolUseID
+		}
+		if p.approvals[idx].ToolName == "" {
+			p.approvals[idx].ToolName = firstJSONString(payload, "toolName", "tool_name")
+		}
+		return
+	}
+	p.approvalIndex[key] = len(p.approvals)
+	ref := p.taskRefs[event.TaskID]
+	p.approvals = append(p.approvals, model.TeamApprovalState{
+		ApprovalID:   approvalIDFor(requestID, toolUseID),
+		AgentTaskID:  event.TaskID,
+		TeamTaskID:   ref.TeamTaskID,
+		AssignmentID: ref.AssignmentID,
+		MemberID:     ref.MemberID,
+		EdgeRunID:    event.EdgeRunID,
+		RequestID:    requestID,
+		ToolName:     firstJSONString(payload, "toolName", "tool_name"),
+		ToolUseID:    toolUseID,
+		Status:       decision,
+		Reason:       firstJSONString(payload, "reason"),
+		CreatedAt:    event.CreatedAt,
+		DecidedAt:    &decidedAt,
+	})
+}
+
+// applyFileChange records one artifact per file_change event carrying a path.
+func (p *teamRuntimeProjection) applyFileChange(event model.AgentRunEvent) {
+	payload, ok := teamEventPayload(event.Payload)
+	if !ok {
+		return
+	}
+	path := firstJSONString(payload, "path", "filePath", "file_path")
+	if path == "" {
+		return
+	}
+	ref := p.taskRefs[event.TaskID]
+	p.artifacts = append(p.artifacts, model.TeamArtifactState{
+		AgentTaskID:   event.TaskID,
+		TeamTaskID:    ref.TeamTaskID,
+		AssignmentID:  ref.AssignmentID,
+		MemberID:      ref.MemberID,
+		EdgeRunID:     event.EdgeRunID,
+		SourceEventID: event.ID,
+		EventSeq:      event.EventSeq,
+		Path:          path,
+		Action:        firstJSONString(payload, "action"),
+		ToolName:      firstJSONString(payload, "toolName", "tool_name"),
+		Status:        firstJSONString(payload, "status"),
+		CreatedAt:     event.CreatedAt,
+	})
+}
+
+// teamEventPayload decodes a run-event payload for team projection and reports
+// whether it was valid JSON, so callers can keep the pre-existing "skip this
+// event entirely" behaviour. See #2154 perf lane P2-5.
+func teamEventPayload(raw string) (map[string]any, bool) {
+	var payload map[string]any
+	if err := json.Unmarshal([]byte(raw), &payload); err != nil {
+		return nil, false
+	}
+	return payload, true
 }
 
 func approvalIDFor(requestID, toolUseID string) string {
@@ -241,8 +296,12 @@ func projectTeamBudget(runEvents []model.AgentRunEvent, runCount int) *model.Tea
 	observedTokensByTask := map[string]int64{}
 	limitByTask := map[string]int64{}
 	for _, event := range runEvents {
-		var payload map[string]any
-		if err := json.Unmarshal([]byte(event.Payload), &payload); err != nil {
+		// Unlike projectTeamRuntimeSummaries, every event contributes token
+		// usage below the switch, so the payload is decoded unconditionally
+		// here; the helper only keeps the skip-on-invalid-JSON semantics and
+		// the []byte copy in one place.
+		payload, ok := teamEventPayload(event.Payload)
+		if !ok {
 			continue
 		}
 		switch event.EventType {

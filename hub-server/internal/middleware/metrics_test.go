@@ -38,7 +38,10 @@ func TestPrometheusMiddlewareRecordsMetrics(t *testing.T) {
 	assert.Equal(t, http.StatusCreated, w.Code)
 }
 
-func TestPrometheusMiddlewareSetsFallbackPath(t *testing.T) {
+// TestPrometheusMiddlewareUnmatchedRouteUsesBoundedLabel asserts the label
+// chosen when gin has no route template for the request. It used to be the raw
+// (attacker-controlled, unbounded) URL path; see metrics_cardinality_test.go.
+func TestPrometheusMiddlewareUnmatchedRouteUsesBoundedLabel(t *testing.T) {
 	metrics.Register()
 
 	gin.SetMode(gin.TestMode)
@@ -54,6 +57,10 @@ func TestPrometheusMiddlewareSetsFallbackPath(t *testing.T) {
 	r.ServeHTTP(w, req)
 
 	assert.Equal(t, http.StatusNotFound, w.Code)
+
+	labels := gatherHTTPPathLabels(t, http.MethodGet, "404")
+	assert.NotContains(t, labels, "/unknown/route", "raw URL path must not become a metric label")
+	assert.Contains(t, labels, "unmatched", "unmatched requests must be labelled \"unmatched\"")
 }
 
 func TestGlobalRateLimitExceededConfig(t *testing.T) {

@@ -1,6 +1,7 @@
 package events
 
 import (
+	"bytes"
 	"encoding/json"
 	"io"
 	"log/slog"
@@ -114,7 +115,7 @@ func (l *EventLog) rebuildIndexLocked() error {
 	}
 	offset := int64(0)
 	for len(raw) > 0 {
-		nl := indexByte(raw, '\n')
+		nl := bytes.IndexByte(raw, '\n')
 		var line []byte
 		var lineLen int
 		if nl < 0 {
@@ -147,16 +148,6 @@ func (l *EventLog) rebuildIndexLocked() error {
 	// Restore the write cursor to the end so the next Append writes at EOF.
 	_, _ = l.f.Seek(0, 2)
 	return nil
-}
-
-// indexByte returns the index of the first occurrence of b in s, or -1.
-func indexByte(s []byte, b byte) int {
-	for i, c := range s {
-		if c == b {
-			return i
-		}
-	}
-	return -1
 }
 
 // Append writes an event to the log as a single JSON line followed by a newline.
@@ -375,7 +366,7 @@ func (l *EventLog) ReadFrom(cursor int64) (events []EventEnvelope, hasGap bool) 
 	_, _ = l.f.Seek(0, 2)
 
 	for len(raw) > 0 {
-		nl := indexByte(raw, '\n')
+		nl := bytes.IndexByte(raw, '\n')
 		var line []byte
 		if nl < 0 {
 			line = raw
