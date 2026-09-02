@@ -48,8 +48,19 @@ func (b *Bus) EventLogTruncateFailures() int64 {
 // Bus is an in-memory event bus with monotonic sequence numbers and
 // support for cursor-based replay.
 type Bus struct {
-	mu         sync.Mutex
-	seq        int64
+	mu sync.Mutex
+	// seq is the last handed-out sequence number. Stamped under b.mu together
+	// with the wireNext baseline so the two can never disagree (see Publish).
+	seq int64
+	// wireNext is the seq whose turn it is to reach the subscriber channels;
+	// wireCond signals advance. A publisher that has finished persisting waits
+	// at the gate in deliverInSeqOrder until every lower seq has been delivered
+	// or consumed. This is what makes wire order equal seq order without holding
+	// b.mu across the persist I/O. 0 means "no baseline yet"; it is set from the
+	// first seq actually assigned, so a Bus whose counter was seeded (restart
+	// recovery, or a test setting b.seq directly) cannot wedge the gate.
+	wireNext   int64
+	wireCond   *sync.Cond
 	dropped    atomic.Int64
 	history    []EventEnvelope
 	subs       []subscriber
@@ -118,6 +129,7 @@ func NewBus(maxHistory int, opts ...BusOption) *Bus {
 		stopCh:     make(chan struct{}),
 		jobs:       make(chan observerJob, observerJobBufferSize),
 	}
+	b.wireCond = sync.NewCond(&b.mu)
 
 	// Start fixed-size observer worker pool.
 	for i := 0; i < workerCount; i++ {
@@ -132,9 +144,18 @@ func NewBus(maxHistory int, opts ...BusOption) *Bus {
 	// seq in the log so a restarted Bus does not re-issue seqs that already
 	// exist on disk (which would duplicate replay entries and break the
 	// #130 idempotent dedup contract). The EventLog index is built in NewEventLog
-	// (called by WithEventLogPath), so orderedSeq is already populated here.
-	if b.eventLog != nil && len(b.eventLog.orderedSeq) > 0 {
-		b.seq = b.eventLog.orderedSeq[len(b.eventLog.orderedSeq)-1]
+	// (called by WithEventLogPath), so MaxSeq is already accurate here.
+	//
+	// MaxSeq — not "the seq of the last line in the file": the log is in append
+	// order and concurrent Publish reaches Append out of seq order, so the last
+	// line is not reliably the largest seq. Seeding from it let a restarted Bus
+	// hand out seqs that were already on disk. Plain store: b is not observable
+	// by any other goroutine until NewBus returns, and from then on seq is only
+	// ever written under b.mu. wireNext stays 0 here on purpose — Publish derives
+	// the gate baseline from the first seq it actually assigns, so a seeded
+	// counter cannot wedge the gate.
+	if b.eventLog != nil {
+		b.seq = b.eventLog.MaxSeq()
 	}
 	return b
 }
@@ -143,16 +164,45 @@ func NewBus(maxHistory int, opts ...BusOption) *Bus {
 // configured and the event type is eligible), appends the event to history, and
 // fans it out to all subscribers. The event ID and seq are set by the bus.
 //
+// WIRE ORDER == SEQ ORDER. Subscribers dedup on seq —
+// app/shared/src/eventClient.ts:202 is `if (envelope.seq <= lastSeq) return;` —
+// and api/events.md:67 promises "`seq` 同 stream 单调", so an envelope that
+// reaches the wire after a larger seq is discarded permanently by the client as
+// a "replay duplicate", with no system.gap to tell it that a state change was
+// lost. Handing the seq out with a lock-free atomic and then running an unlocked
+// persist left a preemption window in which exactly that happened: measured at
+// 87-92 inversions per 1000 concurrently published events, both with and without
+// an event log configured. hub-server/internal/ws/fanout.go:92-101 enforces the
+// same contract for Hub frames.
+//
+// The ordering is enforced by a gate (wireNext/wireCond), NOT by holding b.mu
+// across the persist. Holding the lock across persistFn was measured and
+// rejected: EventLog truncation is linear in maxSize at ~16.7ms/MiB — 130ms at an
+// 8 MiB log, ~835ms extrapolated at the 50 MiB default, once per ~25k events —
+// and persistWithRetry's backoff ladder is ~14.5ms for a publish that fails all
+// attempts. Inside b.mu those would freeze Subscribe, Unsubscribe, AddObserver
+// and HistoryLen (a Prometheus scrape) bus-wide, and overflow the 256-slot
+// subscriber channels into a gap storm. The gate keeps that I/O off b.mu: the
+// blast radius of a slow persist stays exactly what it is today (publishers
+// serialise on EventLog.mu), while delivery becomes ordered instead of racy.
+//
+// Cost: head-of-line blocking. A publisher waits at the gate until every lower
+// seq has been delivered or consumed, so Publish latency now includes the
+// slowest in-flight lower-seq persist. That is bounded by the same persist path
+// that already serialises publishers today — it converts out-of-order delivery
+// (silent client-side loss) into delayed delivery.
+//
 // If a persistence hook is configured and it returns an error, the event is
 // NOT appended to history and NOT broadcast to subscribers. The caller receives
 // a zero-value EventEnvelope with the event type populated so it can detect the
-// failure.
+// failure. The seq is still consumed at the gate so a dropped event cannot wedge
+// the wire order for everyone behind it.
 func (b *Bus) Publish(eventType string, scope map[string]any, payload any) EventEnvelope {
-	seq := atomic.AddInt64(&b.seq, 1)
+	// Build everything that does not depend on the seq before taking b.mu: genID
+	// is a crypto/rand read and the RFC3339 timestamp is a few hundred ns.
 	evt := EventEnvelope{
 		Version: "v1",
 		ID:      genID("evt"),
-		Seq:     seq,
 		Type:    eventType,
 		Scope:   scope,
 		SentAt:  time.Now().UTC().Format(time.RFC3339),
@@ -162,6 +212,18 @@ func (b *Bus) Publish(eventType string, scope map[string]any, payload any) Event
 		evt.Scope = map[string]any{}
 	}
 
+	b.mu.Lock()
+	b.seq++
+	seq := b.seq
+	evt.Seq = seq
+	if b.wireNext == 0 {
+		// First seq assigned on this Bus defines the gate baseline. Deriving it
+		// from the first seq to ARRIVE at the gate instead would be wrong: that
+		// publisher is not necessarily the lowest seq.
+		b.wireNext = seq
+	}
+	b.mu.Unlock()
+
 	// Persist before fanout: if a persistence hook is configured and the
 	// event type is eligible, write to durable store before in-memory append.
 	// On failure, the event is retried synchronously up to persistMaxRetries
@@ -169,17 +231,71 @@ func (b *Bus) Publish(eventType string, scope map[string]any, payload any) Event
 	// dropped — observers and subscribers never see it, and persistFailures
 	// is incremented so the edge_event_persist_failures_total metric surfaces
 	// the data loss.
+	deliver := true
 	if b.persistFn != nil {
 		if err := b.persistWithRetry(evt); err != nil {
 			b.persistFailures.Add(1)
 			slog.Error("event bus persist failed after retries, dropping event",
 				"type", eventType, "seq", seq, "retries", b.maxPersistRetries(), "error", err)
-			// Return a minimal envelope so callers can detect the failure.
-			return EventEnvelope{Version: "v1", Type: eventType, Seq: seq}
+			deliver = false
 		}
 	}
 
+	observers := b.deliverInSeqOrder(seq, evt, deliver)
+	if !deliver {
+		// Return a minimal envelope so callers can detect the failure.
+		return EventEnvelope{Version: "v1", Type: eventType, Seq: seq}
+	}
+
+	// Dispatch to observer worker pool — no per-event goroutine creation.
+	// Each observer function is submitted as a job to the fixed-size pool.
+	// Jobs are dropped non-blockingly when the pool is saturated to avoid
+	// back-pressuring Publish().
+	if len(observers) > 0 {
+		for _, obs := range observers {
+			job := observerJob{fn: obs.fn, evt: evt}
+			select {
+			case b.jobs <- job:
+			default:
+				// Worker pool saturated; drop this observer notification.
+			}
+		}
+	}
+
+	return evt
+}
+
+// deliverInSeqOrder waits for seq's turn at the wire gate and then, when deliver
+// is true, appends evt to history and fans it out to every subscriber. It returns
+// the observer list copied under the lock so the caller can dispatch to the worker
+// pool after the gate is released.
+//
+// The gate advance runs in a defer: a seq that is assigned but never consumed
+// would wedge every publisher behind it forever, so a panic or runtime.Goexit
+// anywhere below must still hand the turn to the next seq.
+//
+// Wait releases b.mu, so Subscribe / Unsubscribe / HistoryLen stay responsive
+// while a publisher is waiting for a slow lower-seq persist. That is the whole
+// point of gating instead of holding b.mu across persistFn — see Publish.
+func (b *Bus) deliverInSeqOrder(seq int64, evt EventEnvelope, deliver bool) []observer {
 	b.mu.Lock()
+	defer func() {
+		b.wireNext = seq + 1
+		b.wireCond.Broadcast()
+		b.mu.Unlock()
+	}()
+
+	for b.wireNext < seq {
+		b.wireCond.Wait()
+	}
+
+	if !deliver {
+		// Persist failed and the event is dropped, but its seq is still consumed
+		// so the wire stays contiguous for everyone behind it. The resulting hole
+		// is the client-side loss signal — the same choice
+		// hub-server/internal/ws/fanout.go documents for dropped frames.
+		return nil
+	}
 
 	// Store in history, trimming if needed.
 	b.history = append(b.history, evt)
@@ -244,24 +360,7 @@ func (b *Bus) Publish(eventType string, scope map[string]any, payload any) Event
 		}
 	}
 
-	b.mu.Unlock()
-
-	// Dispatch to observer worker pool — no per-event goroutine creation.
-	// Each observer function is submitted as a job to the fixed-size pool.
-	// Jobs are dropped non-blockingly when the pool is saturated to avoid
-	// back-pressuring Publish().
-	if len(observers) > 0 {
-		for _, obs := range observers {
-			job := observerJob{fn: obs.fn, evt: evt}
-			select {
-			case b.jobs <- job:
-			default:
-				// Worker pool saturated; drop this observer notification.
-			}
-		}
-	}
-
-	return evt
+	return observers
 }
 
 // runWorker is a long-lived goroutine that processes observer jobs from the
@@ -401,8 +500,17 @@ func mergeReplayWithLog(
 // replayFromHistory returns the in-memory history slice filtered to seq >=
 // cursor, plus the set of seen seqs so the caller can dedup against the event
 // log. History takes priority (freshest copy wins).
+//
+// The result is sorted by seq unconditionally. b.history is filled in gate order,
+// which is seq order, so this is normally a no-op on an already-ordered slice
+// (pdqsort detects the run in O(n)) — but Subscribe only routes through
+// mergeReplayWithLog (which sorts the merged result) when an event log is
+// configured AND cursor > 0. A cursor=0 subscribe, i.e. the initial full-replay
+// connect, and any bus without an event log therefore used to get history order
+// raw, which handed the client a non-monotonic replay. Sorting here makes the
+// contract independent of how history happened to be filled.
 func (b *Bus) replayFromHistory(cursor int64) ([]EventEnvelope, map[int64]bool) {
-	var replay []EventEnvelope
+	replay := make([]EventEnvelope, 0, len(b.history))
 	seenSeqs := make(map[int64]bool, len(b.history))
 	for _, evt := range b.history {
 		if evt.Seq >= cursor {
@@ -410,6 +518,7 @@ func (b *Bus) replayFromHistory(cursor int64) ([]EventEnvelope, map[int64]bool) 
 			seenSeqs[evt.Seq] = true
 		}
 	}
+	sort.Slice(replay, func(i, j int) bool { return replay[i].Seq < replay[j].Seq })
 	return replay, seenSeqs
 }
 
