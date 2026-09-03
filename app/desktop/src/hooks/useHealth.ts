@@ -5,14 +5,14 @@ import { fetchHealth } from '@/api/edgeClient';
 import type { HealthResponse } from '@shared/types';
 import { HEALTH_POLL_MS } from '@/config';
 
-export interface HealthState {
+interface HealthState {
   online: boolean;
   health: HealthResponse | null;
   lastError: string | null;
   refetch: () => void;
 }
 
-export interface UseHealthOptions {
+interface UseHealthOptions {
   enabled?: boolean;
 }
 

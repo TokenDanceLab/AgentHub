@@ -289,7 +289,6 @@ export interface CreateExecutionTargetRequest {
   auth_method?: 'none' | 'ssh_tunnel' | 'tailscale_mtls' | 'hub_jwt' | string;
 }
 
-export type UpdateExecutionTargetRequest = Partial<CreateExecutionTargetRequest>;
 
 export interface ExecutionTargetListResponse {
   items: ExecutionTarget[];

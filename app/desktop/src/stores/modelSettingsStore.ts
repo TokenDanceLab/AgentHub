@@ -1,11 +1,11 @@
 import { create } from 'zustand';
 import { persist, subscribeWithSelector } from 'zustand/middleware';
 
-export type ReasoningEffortPreference = 'low' | 'medium' | 'high' | 'max';
-export type ProviderHealth = 'ready' | 'degraded' | 'disabled';
-export type CredentialTestResult = 'idle' | 'connecting' | 'success' | 'error';
+type ReasoningEffortPreference = 'low' | 'medium' | 'high' | 'max';
+type ProviderHealth = 'ready' | 'degraded' | 'disabled';
+type CredentialTestResult = 'idle' | 'connecting' | 'success' | 'error';
 
-export interface ModelAliasMapping {
+interface ModelAliasMapping {
   alias: string;
   model: string;
   provider: string;
@@ -13,7 +13,7 @@ export interface ModelAliasMapping {
   enabled: boolean;
 }
 
-export interface CcSwitchProvider {
+interface CcSwitchProvider {
   id: string;
   name: string;
   health: ProviderHealth;
@@ -21,7 +21,7 @@ export interface CcSwitchProvider {
   notes: string;
 }
 
-export interface ProviderCredential {
+interface ProviderCredential {
   providerId: string;
   apiKey: string;
   enabled: boolean;
@@ -30,7 +30,6 @@ export interface ProviderCredential {
   testError: string;
 }
 
-const CREDENTIAL_SALT = 'ah-creds-v1';
 
 interface ModelSettingsState {
   defaultModel: string;
@@ -57,14 +56,14 @@ interface ModelSettingsState {
   reset: () => void;
 }
 
-export interface RunModelSettingsInput {
+interface RunModelSettingsInput {
   model?: string;
   provider?: string;
   modelAlias?: string;
   reasoningEffort?: string;
 }
 
-export interface ResolvedRunModelSettings {
+interface ResolvedRunModelSettings {
   model?: string;
   provider?: string;
   reasoningEffort?: string;
@@ -164,34 +163,8 @@ const cloneAliases = () => DEFAULT_ALIASES.map((item) => ({ ...item }));
 const cloneCcSwitchProviders = () => DEFAULT_CC_SWITCH_PROVIDERS.map((item) => ({ ...item }));
 const cloneCredentials = () => DEFAULT_CREDENTIALS.map((item) => ({ ...item }));
 
-function obscureApiKey(raw: string): string {
-  if (!raw) return '';
-  try {
-    const salted = CREDENTIAL_SALT + raw;
-    return btoa(salted);
-  } catch {
-    return '';
-  }
-}
 
-function revealApiKey(obscured: string): string {
-  if (!obscured) return '';
-  try {
-    const decoded = atob(obscured);
-    if (decoded.startsWith(CREDENTIAL_SALT)) {
-      return decoded.slice(CREDENTIAL_SALT.length);
-    }
-    return decoded;
-  } catch {
-    return obscured;
-  }
-}
 
-function maskApiKey(raw: string): string {
-  if (!raw) return '';
-  if (raw.length <= 8) return '*'.repeat(raw.length);
-  return raw.slice(0, 4) + '*'.repeat(Math.max(raw.length - 8, 4)) + raw.slice(-4);
-}
 
 function migrateProviderId(provider: string | undefined): string | undefined {
   return provider === LEGACY_TOKENDANCE_RELAY_PROVIDER_ID ? TOKENDANCE_GATEWAY_PROVIDER_ID : provider;
@@ -321,8 +294,3 @@ export const useModelSettingsStore = create<ModelSettingsState>()(
     ),
   ),
 );
-
-export const DEFAULT_MODEL_ALIASES = DEFAULT_ALIASES;
-export const DEFAULT_CC_SWITCH_PROVIDER_STATUS = DEFAULT_CC_SWITCH_PROVIDERS;
-
-export { obscureApiKey, revealApiKey, maskApiKey };

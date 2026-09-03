@@ -14,7 +14,7 @@ import { useHubStore } from '@/stores/hubStore';
 import { useToastStore } from '@shared/ui/toast';
 
 /** Minimal translator surface for the kicked feedback copy. */
-export type DeviceKickedTranslator = (key: 'webChat.deviceKicked' | 'webChat.deviceKicked.signIn') => string;
+type DeviceKickedTranslator = (key: 'webChat.deviceKicked' | 'webChat.deviceKicked.signIn') => string;
 
 /** True when a raw WebSocket frame is the Hub device.kicked frame. */
 export function isDeviceKickedFrame(raw: unknown): boolean {

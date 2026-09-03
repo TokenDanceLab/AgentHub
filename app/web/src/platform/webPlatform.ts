@@ -82,7 +82,7 @@ interface SessionAgentInstanceBinding {
   agentInstance: AgentInstance;
 }
 
-export interface WebPlatformOptions {
+interface WebPlatformOptions {
   hubClient?: WebRunHubClient;
   queryClient?: QueryClient;
   createClientMessageId?: () => string;
@@ -269,7 +269,7 @@ export function createWebPlatform(options: WebPlatformOptions = {}): AgentHubPla
   };
 }
 
-export interface SubmitWebComposerIntentOptions {
+interface SubmitWebComposerIntentOptions {
   queryClient?: QueryClient;
   now?: () => string;
 }
@@ -310,7 +310,7 @@ async function uploadPendingAttachments(intent: ComposerIntent): Promise<Compose
   }));
 }
 
-export async function submitWebComposerIntent(
+async function submitWebComposerIntent(
   hubClient: WebRunHubClient,
   createClientMessageId: () => string,
   intent: ComposerIntent,
@@ -392,7 +392,7 @@ export async function submitWebComposerIntent(
  * A recoverable 409 turn_in_progress is surfaced as `{ turnInProgress: true }`
  * so the queue can requeue (bounded) instead of dropping the dispatch.
  */
-export async function redispatchWebTask(
+async function redispatchWebTask(
   hubClient: WebRunHubClient,
   messageId: string,
   intent: ComposerIntent,

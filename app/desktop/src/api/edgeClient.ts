@@ -257,23 +257,7 @@ export async function fetchThreadPins(threadId: string): Promise<ListResponse<Th
   return safeParse<ListResponse<ThreadPinInfo>>(listResponseSchema(ThreadPinInfoSchema), unwrapEdgeResponse(await res.json()), 'threadPins');
 }
 
-export async function pinThreadItem(threadId: string, itemId: string, pinnedBy?: string): Promise<ThreadPinInfo> {
-  const res = await edgeFetch(`${BASE}/v1/threads/${encodeURIComponent(threadId)}/pins`, {
-    method: 'POST',
-    ...edgeDevRequestInit({}, { 'Content-Type': 'application/json' }),
-    body: JSON.stringify({ itemId, pinnedBy }),
-  });
-  if (!res.ok) throw await parseError(res);
-  return safeParse<ThreadPinInfo>(ThreadPinInfoSchema, unwrapEdgeResponse(await res.json()), 'pinThreadItem');
-}
 
-export async function deleteThreadPin(threadId: string, itemId: string): Promise<void> {
-  const res = await edgeFetch(`${BASE}/v1/threads/${encodeURIComponent(threadId)}/pins?itemId=${encodeURIComponent(itemId)}`, {
-    method: 'DELETE',
-    ...edgeDevRequestInit(),
-  });
-  if (!res.ok) throw await parseError(res);
-}
 
 export async function fetchRuns(projectId?: string, threadId?: string): Promise<ListResponse<RunInfo>> {
   const params = new URLSearchParams();
@@ -312,14 +296,14 @@ export async function fetchRunDiff(runId: string): Promise<RunDiff> {
   return safeParse<RunDiff>(RunDiffSchema, unwrapEdgeResponse(await res.json()), 'runDiff');
 }
 
-export interface ApplyRunDiffRequest {
+interface ApplyRunDiffRequest {
   filePath: string;
   hunkIndex: number;
   accepted: boolean;
   workDir: string;
 }
 
-export interface ApplyRunDiffResponse {
+interface ApplyRunDiffResponse {
   runId: string;
   filePath: string;
   hunkIndex: number;
@@ -327,12 +311,12 @@ export interface ApplyRunDiffResponse {
   applied: boolean;
 }
 
-export interface ApplyAllRunDiffsRequest {
+interface ApplyAllRunDiffsRequest {
   decisions: Array<Pick<ApplyRunDiffRequest, 'filePath' | 'hunkIndex' | 'accepted'>>;
   workDir: string;
 }
 
-export interface ApplyAllRunDiffsResponse {
+interface ApplyAllRunDiffsResponse {
   runId: string;
   applied: number;
 }

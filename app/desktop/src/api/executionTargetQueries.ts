@@ -38,7 +38,7 @@ export interface ExecutionTargetInventorySummary {
   byType: Record<ExecutionTargetType, number>;
 }
 
-export interface SyncLocalEdgeExecutionTargetInput {
+interface SyncLocalEdgeExecutionTargetInput {
   deviceId: string;
   localEdgeTarget: DesktopExecutionTarget;
   registeredTargetId?: string;

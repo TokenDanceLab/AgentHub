@@ -3,10 +3,7 @@ import { formatComposerPromptWithContext } from '@shared/composer';
 import type { AttachmentRef, ComposerIntent, ComposerSubmitResult } from '@shared/composer';
 import { computeFileHash } from '@shared/composer';
 import {
-  WORKBENCH_DEMO_FALLBACK_CONVERSATION_ID,
-  demoWorkbenchAgents,
   isWorkbenchFixtureDataMode,
-  resolveDemoWorkbenchTranscript,
   resolveWorkbenchDataMode,
   workbenchDemoRuntimeStore,
 } from '@shared/demo';
@@ -17,11 +14,9 @@ import {
   type AgentHubPlatform,
   type LocalCliDiscoveryManifest,
   type RuntimeSessionSummary,
-  type WorkbenchAgent,
   type WorkbenchConversation,
 } from '@shared/platform';
 import type { EvidenceRef } from '@shared/transcript';
-import type { TranscriptBlock } from '@shared/transcript';
 import type { RunInfo, StartRunRequest } from '@shared/types';
 import { createHubClient } from '@/api/hubClient';
 import { applyAllRunDiffs, applyRunDiff, fetchRunCheckpoint, fetchRunCheckpointFile } from '@/api/edgeClient';
@@ -42,19 +37,9 @@ import {
 import { resolveDesktopTargetPreference, type DesktopTargetPreference } from './targetPreference';
 import { createDesktopSettingsAdapter } from './desktopSettingsAdapter';
 
-export const DESKTOP_FALLBACK_CONVERSATION_ID = WORKBENCH_DEMO_FALLBACK_CONVERSATION_ID;
-export const desktopConversations: WorkbenchConversation[] =
-  workbenchDemoRuntimeStore.getSnapshot().conversations;
-export const desktopAgents: WorkbenchAgent[] = demoWorkbenchAgents;
-export const desktopTranscript: TranscriptBlock[] = resolveDemoWorkbenchTranscript(
-  DESKTOP_FALLBACK_CONVERSATION_ID,
-);
 
-export function resolveDesktopPreviewTranscript(conversationId: string): TranscriptBlock[] {
-  return workbenchDemoRuntimeStore.resolveTranscript(conversationId);
-}
 
-export interface DesktopPlatformOptions {
+interface DesktopPlatformOptions {
   activeProjectId?: string;
   getEdgeHostReadiness?: () => Promise<DesktopEdgeHostReadiness>;
   getLocalEdgeDiagnostics?: () => Promise<DesktopLocalEdgeDiagnostics>;
@@ -66,7 +51,7 @@ export interface DesktopPlatformOptions {
   demoRuntimeFallback?: boolean;
 }
 
-export interface DesktopEdgeHostReadiness {
+interface DesktopEdgeHostReadiness {
   running: boolean;
   pid: number | null;
   port: number;
@@ -95,7 +80,7 @@ export interface DesktopEdgeHostReadiness {
   direct_cli_spawn: false;
 }
 
-export interface DesktopLocalEdgeDiagnostics {
+interface DesktopLocalEdgeDiagnostics {
   readiness: DesktopEdgeHostReadiness;
   status: {
     running: boolean;
@@ -130,7 +115,7 @@ export interface DesktopLocalEdgeDiagnostics {
   };
 }
 
-export interface DesktopHostPort {
+interface DesktopHostPort {
   executionTargetPreference(): DesktopTargetPreference;
   edgeHostReadiness(): Promise<DesktopEdgeHostReadiness>;
   localEdgeDiagnostics(): Promise<DesktopLocalEdgeDiagnostics>;
@@ -138,7 +123,7 @@ export interface DesktopHostPort {
   listRuntimeSessions(limit?: number): Promise<RuntimeSessionSummary[]>;
 }
 
-export interface DesktopPlatform extends AgentHubPlatform {
+interface DesktopPlatform extends AgentHubPlatform {
   host: DesktopHostPort;
 }
 
@@ -287,16 +272,16 @@ function readEdgeHostReadiness(): Promise<DesktopEdgeHostReadiness> {
   return invoke<DesktopEdgeHostReadiness>('get_edge_host_readiness');
 }
 
-export function readLocalEdgeDiagnostics(): Promise<DesktopLocalEdgeDiagnostics> {
+function readLocalEdgeDiagnostics(): Promise<DesktopLocalEdgeDiagnostics> {
   return invoke<DesktopLocalEdgeDiagnostics>('get_local_edge_diagnostics');
 }
 
-export function readLocalCliDiscovery(): Promise<LocalCliDiscoveryManifest> {
+function readLocalCliDiscovery(): Promise<LocalCliDiscoveryManifest> {
   return invoke<LocalCliDiscoveryManifest>('get_local_cli_discovery');
 }
 
 /** Desktop host: Edge GET /v1/runtime-sessions via typed fetch (no foreign store). */
-export async function readRuntimeSessions(limit = 50): Promise<RuntimeSessionSummary[]> {
+async function readRuntimeSessions(limit = 50): Promise<RuntimeSessionSummary[]> {
   // Data-mode gate (#1995): the workbench chrome calls this port on mount
   // (entry preflight). Pinned mock/fixture surfaces must not contact the
   // Local Edge, so they receive an honest empty import list instead of a

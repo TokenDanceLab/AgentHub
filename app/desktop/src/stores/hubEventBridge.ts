@@ -420,7 +420,7 @@ export interface DesktopHubWSLike {
  * Wire Desktop Hub WS events to React Query cache invalidation and
  * Zustand store updates. Returns a handle with a `destroy()` method.
  */
-export interface DesktopHubEventBridgeOptions {
+interface DesktopHubEventBridgeOptions {
   /** hubClient for incremental message resync on reconnect/gap (#2101 G4-②). */
   hubClient?: MessagesResyncHubClient;
 }

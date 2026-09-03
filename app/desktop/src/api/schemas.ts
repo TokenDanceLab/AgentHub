@@ -31,7 +31,7 @@ export const RunnerSchema = z.object({
 
 // ── Agent ───────────────────────────────────────
 
-export const AgentCapabilitiesSchema = z.object({
+const AgentCapabilitiesSchema = z.object({
   streaming: z.boolean(),
   toolCalls: z.boolean(),
   fileChanges: z.boolean(),
@@ -63,7 +63,7 @@ export const AgentInfoSchema = z.object({
 
 // ── Model catalog ───────────────────────────────
 
-export const ModelCatalogItemSchema = z.object({
+const ModelCatalogItemSchema = z.object({
   id: z.string(),
   value: z.string(),
   label: z.string(),
@@ -79,7 +79,7 @@ export const ModelCatalogItemSchema = z.object({
   default: z.boolean().optional(),
 });
 
-export const ModelCatalogSourceSchema = z.object({
+const ModelCatalogSourceSchema = z.object({
   id: z.string(),
   label: z.string(),
   status: z.enum(['ready', 'configured', 'unavailable']).or(z.string()),
@@ -93,7 +93,7 @@ export const ModelCatalogResponseSchema = z.object({
 
 // ── Page / List ─────────────────────────────────
 
-export const PageInfoSchema = z.object({
+const PageInfoSchema = z.object({
   nextCursor: z.string().optional(),
   hasMore: z.boolean(),
 });
@@ -162,7 +162,7 @@ export const RunInfoSchema = z.object({
  * Parse an API response with a Zod schema. On failure, logs a warning
  * and returns the raw data (never throws), so schema drift cannot white-screen the UI.
  */
-export const RunDiffFileSchema = z.object({
+const RunDiffFileSchema = z.object({
   path: z.string(),
   diff: z.string(),
   status: z.enum(['added', 'modified', 'deleted']),
@@ -190,7 +190,7 @@ export const ApplyAllRunDiffsResponseSchema = z.object({
 
 // GET /v1/runs/{runId}/checkpoint — pre-run checkpoint inventory (#1968).
 // Read-only evidence; no content and no restore/write-back surface.
-export const RunCheckpointFileEntrySchema = z.object({
+const RunCheckpointFileEntrySchema = z.object({
   path: z.string(),
   sizeBytes: z.number(),
   hash: z.string(),
