@@ -139,7 +139,7 @@ Hub 侧 code 交换端点固定为 `POST /client/auth/oidc/callback`，桌面/We
 | `AGENTHUB_AUTH_FAIL_CLOSED` | 否（生产建议 `true`） | `AuthFailClosed()` | 见 §安全配置。 |
 | `AGENTHUB_RATE_LIMIT_FAIL_OPEN` | 否（生产建议 `false`） | `RateLimitFailOpen()` | 见 §安全配置。 |
 
-迁移自动执行意味着：升级到带新 `.up.sql` 的镜像时，容器一起新迁移。`hub-server/migrations/0062`、`0063` 等使用普通 `CREATE INDEX`/`CREATE UNIQUE INDEX`（非 `CONCURRENTLY`），在已堆积数据的表上会取 `ACCESS EXCLUSIVE` 锁；大表升级应在维护窗口执行（停服 → 跑迁移 → 起服），不要在流量高峰直接 `compose up`。详见 [../../CHANGELOG.md](../../CHANGELOG.md) v0.6.1 节的升级注意段。
+迁移自动执行意味着：升级到带新 `.up.sql` 的镜像时，容器一起新迁移。`hub-server/migrations/` 下的 `0062_agent_team_runs_indexes.up.sql`、`0063_agent_run_events_unique_seq.up.sql` 使用普通 `CREATE INDEX`/`CREATE UNIQUE INDEX`（非 `CONCURRENTLY`），在已堆积数据的表上会取 `ACCESS EXCLUSIVE` 锁；大表升级应在维护窗口执行（停服 → 跑迁移 → 起服），不要在流量高峰直接 `compose up`。详见 [../../CHANGELOG.md](../../CHANGELOG.md) v0.6.1 节的升级注意段。
 
 ## 配置面索引（#2124 文档缺口补齐）
 

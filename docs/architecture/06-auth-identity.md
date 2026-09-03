@@ -75,7 +75,7 @@ Desktop Tauri keyring/session
   -> Hub REST API Authorization: Bearer <token>
 ```
 
-所有 Desktop 的 Hub API 查询（`hubQueries.ts`、`sessionQueries.ts`、`documentQueries.ts`、`projectQueries.ts`）统一通过 `getToken` 回调注入 auth token，不硬编码 token 值。
+所有 Desktop 的 Hub API 查询（`hubQueries.ts`、`sessionQueries.ts`、`documentQueries.ts`）统一通过 `getToken` 回调注入 auth token，不硬编码 token 值；`projectQueries.ts` 是 `app/web` 侧查询。
 
 ## 安全边界
 
