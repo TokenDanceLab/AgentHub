@@ -184,6 +184,9 @@ func runPanickingWriteLoop(t *testing.T) *panickedWriteLoop {
 	require.NoError(t, err, "listen for the websocket upgrade")
 
 	srv := &http.Server{
+		// gosec G112 (Slowloris): every http.Server in the tree sets a read
+		// header timeout, test servers included (internal/app/admin_test.go).
+		ReadHeaderTimeout: time.Second,
 		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			accepted, acceptErr := websocket.Accept(w, r, nil)
 			if acceptErr != nil {
