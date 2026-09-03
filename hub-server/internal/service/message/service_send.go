@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"strings"
 	"time"
 
 	"golang.org/x/sync/errgroup"
@@ -92,7 +91,14 @@ func (s *Service) SendMessage(ctx context.Context, sessionID, senderUserID strin
 
 	err = s.persistSendMessageTx(msg, sessionID, attachmentIDs)
 	if err != nil {
-		if isDuplicateKeyError(err) {
+		// Single source of truth for the classification (#2244 slice 1). The
+		// package-private isDuplicateKeyError this used to call did NOT
+		// lower-case its input, so SQLite's upper-case "UNIQUE constraint
+		// failed: messages.client_msg_id" — the wording every unit test here
+		// produces, and the wording the repository copy had already been fixed
+		// to accept — fell through to `return nil, err`: a client retrying a
+		// send that had already landed got a 500 instead of its own message.
+		if repository.IsUniqueViolation(err) {
 			if existing, lookupErr := repository.GetMessageByClientMsgID(s.db, sessionID, clientMsgID); lookupErr == nil && existing != nil {
 				return sendMessageResponseFromModel(existing), nil
 			}
@@ -283,7 +289,39 @@ func (s *Service) PinMessage(ctx context.Context, userID, sessionID, msgID strin
 		if errors.Is(err, repository.ErrPinLimitExceeded) {
 			return errcode.MsgPinLimitExceeded
 		}
-		if strings.Contains(err.Error(), "duplicate key") {
+		// Idempotent success, and deliberately NO publish.
+		//
+		// Why not publishing is correct here: message_pins' only uniqueness is
+		// its composite PRIMARY KEY (session_id, message_id)
+		// (migrations/0008_message_pins.up.sql, mirrored by the two
+		// `gorm:"primaryKey"` tags on model.MessagePin). The only INSERT
+		// PinMessageAtomic performs is tx.Create(pin) of exactly those
+		// columns, and the table's only other constraint is the
+		// (session_id, message_id) -> messages(session_id, id) foreign key
+		// (migrations/0039), which Postgres reports as 23503 and this
+		// classifier does NOT match. So a unique violation from this call can
+		// only mean: this message is already pinned in this session. The pin
+		// set did not change, there is no state transition to broadcast, and
+		// re-publishing would make every message.pin subscriber
+		// (internal/app/events.go -> ws.TypeMessagePin) re-render a pin list
+		// identical to the one it already holds.
+		//
+		// Residual gap, recorded rather than papered over: s.publish is
+		// best-effort (service_helpers.go logs and swallows a failed Publish),
+		// so "the row exists" does not strictly prove "a message.pin event was
+		// once delivered". A first attempt whose INSERT committed but whose
+		// Publish failed leaves that pin permanently un-broadcast, and this
+		// branch will never retry it. Closing that gap means changing publish
+		// semantics, which is out of scope for #2244 slice 1; the current
+		// contract is pinned by TestPinMessage_DuplicatePublishesNothing and
+		// TestPinMessage_SuccessPublishesPinEventOnce.
+		//
+		// The classification itself used to be an inline case-sensitive check
+		// for the literal "duplicate key" — the narrowest of the five copies in
+		// the repo, and blind to SQLite's "UNIQUE constraint failed" wording
+		// entirely, so an already-pinned message surfaced as a hard error
+		// instead of as success.
+		if repository.IsUniqueViolation(err) {
 			return nil
 		}
 		return err
