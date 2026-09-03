@@ -172,4 +172,3 @@ export const motion = {
 export function shouldReduceMotion(accessibilityReduceMotion: boolean | null | undefined): boolean {
   return accessibilityReduceMotion === true;
 }
-
