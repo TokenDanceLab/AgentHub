@@ -29,7 +29,7 @@ ACP 协议层**禁止手写 JSON-RPC loop**，必须用官方 Wrapper/适配层�
 
 - **协议边界**：100% 官方 adapter 二进制（claude-agent-acp / codex-acp / opencode 原生 ACP），Go runtime 用 `coder/acp-go-sdk` v0.13.5（Coder/Windsurf 厂维护，官方收录，从官方 schema 生成类型 + 自带 JSON-RPC 连接层）
 - **runtime 共享层**：`acp/acp.go` `AcpAdapter`（SDK `acp.Client` 接口 9 方法自动分发）+ `acp/acp_events.go`（typed 映射 `acp.SessionUpdate` → `run.agent.*`）+ `acp/acp_client.go`（client skeleton）
-- **审批链**：`request_permission` → `Responder` → `PermissionDecisionBroker`（复用既有 broker，零新协议）
+- **审批链**：`session/request_permission` → `PermissionDecisionBroker`（`RequestPermission` 桥接，复用既有 broker，零新协议）
 - **默认注册**：`claude-acp` / `codex-acp` / `opencode-acp` 默认注册（空 launcher 回退平台原生 `npx`/`opencode`）；`--agent-default` 与 `--runner-profile` 默认 cutover 到 `*-acp`。真跑验证需 `ANTHROPIC_API_KEY`/`OPENAI_API_KEY` + npx registry 网络。进度与剩余项见 GitHub issues（ACP migration 跟踪）。
 
 ### CLI 执行模式
@@ -54,7 +54,7 @@ ACP 协议层**禁止手写 JSON-RPC loop**，必须用官方 Wrapper/适配层�
 - API key 通过环境变量注入（flag 值为 `env` 或空时从环境变量读取，否则直接使用 flag 值作为 key）
 - 无外部 SDK 依赖，纯 `net/http`
 - Key 缺失时 `Available=false`，不阻塞 Edge 启动
-- 属于 `sdkAdapterIDs`，`IsSDKAdapter()` 返回 true
+- 注册 ID 为 `anthropic-sdk` / `openai-sdk`，由 `cmd/agenthub-edge` 的 `registerSDKAdapters` 按 `--anthropic-sdk-path` / `--openai-sdk-path` 注册
 - 重试机制：指数退避 + jitter（最大 3 次，1s/2s/4s (±25%)），匹配 `anthropic_sdk.go` 的 `doRequestWithRetry` 模式（v0.5.2+）
 
 ## Orchestrator Adapter
