@@ -3,6 +3,7 @@ package lifecycle
 import (
 	"strings"
 	"testing"
+	"unicode/utf8"
 )
 
 func TestExtractHubCallbackText(t *testing.T) {
@@ -80,5 +81,22 @@ func TestHubOutputCollectorBoundsAndFallback(t *testing.T) {
 	c3 := newHubOutputCollector(0)
 	if c3.maxBytes != hubCallbackFinalMaxBytes {
 		t.Fatalf("maxBytes = %d, want %d", c3.maxBytes, hubCallbackFinalMaxBytes)
+	}
+}
+
+func TestSplitHubCallbackTextPreservesUTF8(t *testing.T) {
+	text := "ab你好cd"
+
+	chunks := splitHubCallbackText(text, 4)
+	if len(chunks) < 2 {
+		t.Fatalf("chunks = %#v, want multiple chunks", chunks)
+	}
+	for i, chunk := range chunks {
+		if !utf8.ValidString(chunk) {
+			t.Fatalf("chunk %d = %q is not valid UTF-8", i, chunk)
+		}
+	}
+	if got := strings.Join(chunks, ""); got != text {
+		t.Fatalf("joined chunks = %q, want %q", got, text)
 	}
 }

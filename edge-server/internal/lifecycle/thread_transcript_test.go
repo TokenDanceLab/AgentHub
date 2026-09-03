@@ -257,3 +257,35 @@ func TestThreadTranscriptEmitter_ResultFallback(t *testing.T) {
 		t.Fatalf("Content = %q, want only-result", writer.items[0].Content)
 	}
 }
+
+func TestThreadTranscriptEmitterPersistsAssistantMessage(t *testing.T) {
+	s := store.New()
+	run := newExecutorTestRun(t, s)
+	inner := &recordingLifecycleEmitter{}
+	emitter := newThreadTranscriptEmitter(s, run, inner)
+	if emitter == nil {
+		t.Fatal("newThreadTranscriptEmitter returned nil")
+	}
+
+	emitter.Emit(adapters.BusEventTextDelta, nil, map[string]any{"content": "OK"})
+	emitter.Emit(adapters.BusEventTextBlock, nil, map[string]any{"content": "-OUTPUT"})
+	emitter.Flush()
+	emitter.Flush()
+
+	items := s.ListThreadItems(run.ThreadID)
+	var assistantItems []store.Item
+	for _, item := range items {
+		if item.Type == "agent_message" {
+			assistantItems = append(assistantItems, item)
+		}
+	}
+	if len(assistantItems) != 1 {
+		t.Fatalf("assistant items = %#v, want exactly one persisted assistant message", assistantItems)
+	}
+	if assistantItems[0].Role != "agent" || assistantItems[0].RunID != run.ID || assistantItems[0].Content != "OK-OUTPUT" {
+		t.Fatalf("assistant item = %#v, want persisted agent transcript", assistantItems[0])
+	}
+	if len(inner.events) != 2 {
+		t.Fatalf("inner events = %#v, want passthrough events", inner.events)
+	}
+}
