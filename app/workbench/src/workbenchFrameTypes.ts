@@ -25,7 +25,6 @@ import type { WorkbenchPanelLayout } from './useWorkbenchPanelLayout';
 import type { WorkbenchSessionChrome } from './useWorkbenchSessionChrome';
 import type { WorkbenchTranscriptChrome } from './useWorkbenchTranscriptChrome';
 import type { WorkbenchProfileChrome } from './useWorkbenchProfileChrome';
-import type { WorkbenchProjectsPort } from './workbenchProjectsPort';
 import type {
   ConversationLiveStatus,
   WorkbenchAttentionCounts,
@@ -201,7 +200,6 @@ export interface WorkbenchRoutesFrameProps {
     projectId: string,
     draft: ProjectDraft,
   ) => Promise<ProjectInfo | void> | ProjectInfo | void) | undefined;
-  projectsPort?: WorkbenchProjectsPort | undefined;
   onAgentCreate?: ((agent: AgentConfig) => Promise<void> | void) | undefined;
   onAgentUpdate?: ((agent: AgentConfig) => Promise<void> | void) | undefined;
   onAgentDelete?: ((agentId: string) => Promise<void> | void) | undefined;

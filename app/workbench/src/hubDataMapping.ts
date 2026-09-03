@@ -152,18 +152,6 @@ export function resolveHubProjects<TProject extends HubWorkspaceProjectLike>(
   return (projects ?? []).map(mapFn);
 }
 
-/**
- * Convenience wrapper: resolve Hub workspace projects using the default mapping.
- */
-export function resolveHubProjectsDefault(
-  projects: HubWorkspaceProjectLike[] | undefined,
-  hubReady: boolean,
-  dataMode: WorkbenchDataMode,
-  loadError?: string | undefined,
-): ProjectInfo[] | undefined {
-  return resolveHubProjects(projects, hubReady, dataMode, workspaceProjectToProjectInfo, loadError);
-}
-
 // ── Document mapping ────────────────────────────────────────────────
 
 /**

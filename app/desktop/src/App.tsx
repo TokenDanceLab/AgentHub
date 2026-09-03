@@ -43,7 +43,6 @@ import { useHubStore } from '@/stores/hubStore';
 import { createDesktopPlatform } from '@/platform/desktopPlatform';
 import { mapEdgeAgentsToWorkbenchAgents } from '@/platform/edgeCapabilityMapper';
 import { useDesktopWorkbenchModel } from '@/platform/useDesktopWorkbenchModel';
-import { createDesktopWorkbenchProjectsPort } from '@/platform/desktopWorkbenchProjectsPort';
 import {
   useAgentProfileList,
   useCreateAgentProfile,
@@ -231,10 +230,6 @@ export function DesktopWorkbenchApp({ onLogout }: DesktopWorkbenchAppProps = {})
     () => (hubReady ? usageBoard.data ?? [] : undefined),
     [hubReady, usageBoard.data],
   );
-  // Narrow domain port for workbench project data (#1546); the shared UI never
-  // sees the concrete HubClient. Injected only in live mode — parent-managed
-  // projects keep the port dormant while demo mode falls back to mock fixtures.
-  const desktopProjectsPort = useMemo(() => createDesktopWorkbenchProjectsPort(tIm), [tIm]);
   const skillMarketQuery = useQuery({
     queryKey: ['desktop', 'public-skills', hubReady],
     queryFn: () => hubClient.listPublicSkills(),
@@ -746,7 +741,6 @@ export function DesktopWorkbenchApp({ onLogout }: DesktopWorkbenchAppProps = {})
         }
         onProjectCreate={workbench.projectsActions?.create}
         onProjectUpdate={workbench.projectsActions?.update}
-        projectsPort={hubReady ? desktopProjectsPort : undefined}
         onApprovalDecision={handleApprovalDecision}
         isAgentRunning={isAgentRunning}
         onCancelRun={liveEdgeEnabled ? handleCancelRun : undefined}
