@@ -74,7 +74,7 @@ func (s *Service) Register(ctx context.Context, deviceID, userID, deviceType, ap
 // A value <= 0 disables the cap. Re-registering an already-owned device_id
 // (upsert refresh) is never blocked — only brand-new device rows count
 // against the cap. Frequency abuse is handled separately by the route-level
-// rate limiter (#2185 / round-44).
+// rate limiter (#2185).
 func (s *Service) enforceCloudEdgeQuota(deviceID, userID, deviceType string) error {
 	if deviceType != deviceTypeCloudEdge {
 		return nil
