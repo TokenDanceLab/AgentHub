@@ -237,7 +237,7 @@ export function mapHubAgentProfileToAgentInfo(profile: AgentProfile): AgentInfo 
   };
 }
 
-export function agentConfigToCreateAgentProfileRequest(agent: AgentConfig, t?: (key: string, options?: any) => string): CreateAgentProfileRequest {
+export function agentConfigToCreateAgentProfileRequest(agent: AgentConfig, t?: (key: string) => string): CreateAgentProfileRequest {
   const model = splitModelLabel(agent.model);
   const description = persistableAgentDescription(agent.role);
   const reasoningEffort = reasoningEffortFromMode(agent.mode);
@@ -265,7 +265,7 @@ export function agentConfigToCreateAgentProfileRequest(agent: AgentConfig, t?: (
   };
 }
 
-export function agentConfigToUpdateAgentProfileRequest(agent: AgentConfig, t?: (key: string, options?: any) => string): UpdateAgentProfileRequest {
+export function agentConfigToUpdateAgentProfileRequest(agent: AgentConfig, t?: (key: string) => string): UpdateAgentProfileRequest {
   const model = splitModelLabel(agent.model);
   const description = persistableAgentDescription(agent.role);
   const runtimeID = optionalRuntimeInput(agent.engine);
@@ -295,7 +295,22 @@ export function agentConfigToUpdateAgentProfileRequest(agent: AgentConfig, t?: (
   };
 }
 
-export function createDefaultAgentProfileRequest(index: number, t?: (key: string, options?: any) => string): CreateAgentProfileRequest {
+export function createDefaultAgentProfileRequest(
+  index: number,
+  // The only web mapper callback that actually interpolates — it calls
+  // t('agents.newDefault', { index }) — so it is the only one that keeps an
+  // options bag, and it is typed rather than `any` (which is what
+  // `eslint --max-warnings 0` in the web lint gate rejects).
+  //
+  // The other five web copies of this signature declared the same parameter and
+  // never passed anything, so they dropped it. Do not "re-symmetrise" this with
+  // desktop: desktop's six copies keep `options?: any` on purpose, because their
+  // callers hand in i18next's own `TFunction`, which is only assignable to a
+  // callback whose options parameter is `any` — narrowing it there fails
+  // typecheck with TS2345 at App.tsx:265 (measured, not guessed). desktop's
+  // eslint config does not enable no-explicit-any, so nothing flags it.
+  t?: (key: string, options?: Record<string, unknown>) => string,
+): CreateAgentProfileRequest {
   return {
     name: t?.('agents.newDefault', { index }) ?? `新 Agent ${index}`,
     runtime_id: 'codex',
