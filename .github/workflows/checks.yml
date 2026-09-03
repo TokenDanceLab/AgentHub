@@ -2187,6 +2187,18 @@ jobs:
       - name: Verify Hub handler layering
         run: python ./scripts/verify/verify-hub-layering.py
 
+      # #2246 slice 1: pkg/safego 是两台服务唯一的 panic 恢复路径。收敛一次很容易，
+      # 不再漂回去才需要门禁 —— 白名单外任何裸 recover() 都意味着一处 panic 可能
+      # 无 stack、无 metric、无 observer（正是 pkg/safego 包注释描述的那个故障模式）。
+      # 纯 Python 静态扫描，先于且不依赖编译器（回退态即使编译不过也照样红），
+      # 所以挂在 validate 而不是 go-*-static。白名单键是「文件路径 + 允许命中次数」，
+      # 不是行号；匹配前先剥 Go 注释与字符串字面量，改注释不会顶破白名单。
+      - name: Verify safego single recovery path (#2246)
+        run: python ./scripts/verify/verify-safego-convergence.py
+
+      - name: Self-test safego convergence gate (negative)
+        run: python scripts/verify/tests/verify-safego-convergence.Tests.py
+
       # #2154 F-e: GetTeamRunState 的并行读要求池里每条连接看到同一个 catalog；私有
       # ":memory:" 给每条**新连接**一个独立空库，未钉连接数的夹具会让 fan-out 读落到
       # "no such table"，且失败可能非确定性（低竞争时侥幸复用同一连接而通过）。
