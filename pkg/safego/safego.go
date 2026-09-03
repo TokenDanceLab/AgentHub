@@ -29,6 +29,19 @@
 // reintroduced one closure at a time; the fourth had its own private counter
 // and its own debug.Stack(). All four are now `defer Recover(name)` (#2246).
 //
+// A fifth site had the same disease but not the same excuse: hub
+// internal/handler/ws.go writeLoop, a per-connection goroutine started by a
+// bare `go func(){}` five lines above a SafeGo("ws.readLoop", ...) call, and
+// guarded by a log-only recover with no stack, no counter and no observer. The
+// first slice left it allow-listed as a convergence candidate rather than an
+// exemption; it is converged now (#2246 follow-up). writeLoop itself defers
+// `RecoverInto("ws.writeLoop", &err)`, which keeps the stack, the counter and
+// the observer dispatch while leaving a second defer free to log the panic with
+// conn_id — a per-connection id has no business riding inside a metric label,
+// and the error slot is what buys both. The goroutine is launched by SafeGo
+// because writeLoop's first-registered `defer conn.W.Close(...)` runs last, so
+// a panic raised by that close is not recoverable from inside writeLoop.
+//
 // So the accurate statement is: both servers recover through here, and both
 // install an observer (hub internal/metrics.InstallPanicObserver, called from
 // that package's init; edge EdgeMetrics.InstallPanicObserver, called from
@@ -50,15 +63,14 @@
 // wrapper in internal/httpserver/server_middleware.go, and the timeout
 // middleware's handler goroutine in internal/middleware/timeout.go, which owns
 // the buffered response), or assign named results so the caller gets a typed
-// denial (hub internal/handler/ws.go canTypeInSession returns ok=false).
+// denial (hub internal/handler/ws.go canTypeInSession returns ok=false). Those
+// five, plus this file's own Recover and RecoverInto, are the whole allow-list:
+// nothing in either server recovers a goroutine panic by hand any more.
 //
-// The sixth does not fit that rationale and is recorded here so the allow-list
-// is not read as a clean bill of health: hub internal/handler/ws.go writeLoop,
-// a per-connection goroutine launched by a bare `go func(){}` five lines above
-// a safego.SafeGo("ws.readLoop", ...) call, guarded by a log-only recover with
-// no stack, no counter and no observer. It is the same shape as the four sites
-// #2246 just converged; it stays allow-listed only because it was out of that
-// slice's scope, and it is a convergence candidate, not an exemption.
+// The gate is two-sided on purpose. An extra bare `recover()` goes red, and so
+// does an exemption the code no longer uses — which is how writeLoop's entry
+// shrank from two permitted hits to one when it converged, instead of quietly
+// becoming a licence for the next hand-written guard in that file.
 //
 // Servers register an optional PanicObserver to attach their own
 // metrics/alerting without pkg/safego depending on either server. The hook is
