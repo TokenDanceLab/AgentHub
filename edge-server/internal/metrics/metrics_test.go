@@ -11,7 +11,7 @@ import (
 )
 
 func TestMetricsRegistrationAndIncrement(t *testing.T) {
-	m := NewWithBusStats(func() float64 { return 42 }, nil)
+	m := NewWithBusHooks(BusHooks{BusDepth: func() float64 { return 42 }})
 
 	// Verify metrics can be incremented without panic
 	m.RecordRunStart("claude-code")
@@ -32,7 +32,7 @@ func TestMetricsRegistrationAndIncrement(t *testing.T) {
 }
 
 func TestMetricsWithoutBusDepth(t *testing.T) {
-	m := NewWithBusStats(nil, nil)
+	m := NewWithBusHooks(BusHooks{})
 
 	// Should not panic
 	m.RecordRunStart("none")
@@ -45,10 +45,10 @@ func TestMetricsWithoutBusDepth(t *testing.T) {
 }
 
 func TestMetricsExposeEventBusDroppedTotal(t *testing.T) {
-	m := NewWithBusStats(
-		func() float64 { return 42 },
-		func() float64 { return 7 },
-	)
+	m := NewWithBusHooks(BusHooks{
+		BusDepth:   func() float64 { return 42 },
+		BusDropped: func() float64 { return 7 },
+	})
 
 	req := httptest.NewRequest("GET", "/metrics", nil)
 	rec := httptest.NewRecorder()
@@ -61,7 +61,7 @@ func TestMetricsExposeEventBusDroppedTotal(t *testing.T) {
 }
 
 func TestMetricsMultipleRuns(t *testing.T) {
-	m := NewWithBusStats(func() float64 { return 100 }, nil)
+	m := NewWithBusHooks(BusHooks{BusDepth: func() float64 { return 100 }})
 
 	// Simulate 3 concurrent runs
 	m.RecordRunStart("claude-code")
@@ -126,4 +126,77 @@ func TestInstallPanicObserver_NilSafe(t *testing.T) {
 
 	bare := &EdgeMetrics{}
 	bare.InstallPanicObserver() // counter never built: must not panic
+}
+
+// TestMetricsWithoutHooksRegistersNoPullSeries pins the per-hook optionality
+// that #2304 turned on: a nil hook means the series is not registered at all,
+// so it is absent from the scrape rather than served as a constant zero. That
+// distinction is the whole defect — three event-log series were absent from a
+// live Edge's /v1/metrics while their counters and accessors existed, and an
+// absent series is invisible to an alert rule in a way a zero series is not.
+func TestMetricsWithoutHooksRegistersNoPullSeries(t *testing.T) {
+	m := NewWithBusHooks(BusHooks{})
+
+	for _, field := range []struct {
+		name string
+		nil  bool
+	}{
+		{"EdgeEventBusDepth", m.EdgeEventBusDepth == nil},
+		{"EdgeEventBusDropped", m.EdgeEventBusDropped == nil},
+		{"EdgeEventLogTruncations", m.EdgeEventLogTruncations == nil},
+		{"EdgeEventLogTruncateFailures", m.EdgeEventLogTruncateFailures == nil},
+		{"EdgeEventLogGaps", m.EdgeEventLogGaps == nil},
+		{"EdgeEventLogTruncateDuration", m.EdgeEventLogTruncateDuration == nil},
+		{"EdgeEventLogTruncateLastDuration", m.EdgeEventLogTruncateLastDuration == nil},
+	} {
+		if !field.nil {
+			t.Errorf("%s was registered from an empty BusHooks, want nil", field.name)
+		}
+	}
+
+	rec := httptest.NewRecorder()
+	m.Handler().ServeHTTP(rec, httptest.NewRequest("GET", "/metrics", nil))
+	body := rec.Body.String()
+	for _, series := range []string{
+		"edge_event_bus_depth",
+		"edge_event_bus_dropped_total",
+		"edge_event_log_truncations_total",
+		"edge_event_log_truncate_failures_total",
+		"edge_event_log_gaps_total",
+		"edge_event_log_truncate_duration_seconds_total",
+		"edge_event_log_truncate_last_duration_seconds",
+	} {
+		if strings.Contains(body, series) {
+			t.Errorf("empty BusHooks still served %s, want the series absent", series)
+		}
+	}
+}
+
+// TestMetricsExposeEventLogSeries asserts the five event-log series are served
+// with the values their hooks return, i.e. the registration blocks read the
+// hooks they claim to.
+func TestMetricsExposeEventLogSeries(t *testing.T) {
+	m := NewWithBusHooks(BusHooks{
+		EventLogTruncations:         func() float64 { return 3 },
+		EventLogTruncateFailures:    func() float64 { return 1 },
+		EventLogGaps:                func() float64 { return 7 },
+		EventLogTruncateSeconds:     func() float64 { return 2.5 },
+		EventLogTruncateLastSeconds: func() float64 { return 0.75 },
+	})
+
+	rec := httptest.NewRecorder()
+	m.Handler().ServeHTTP(rec, httptest.NewRequest("GET", "/metrics", nil))
+	body := rec.Body.String()
+
+	for _, want := range []string{
+		"edge_event_log_truncations_total 3",
+		"edge_event_log_truncate_failures_total 1",
+		"edge_event_log_gaps_total 7",
+		"edge_event_log_truncate_duration_seconds_total 2.5",
+		"edge_event_log_truncate_last_duration_seconds 0.75",
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("metrics output missing %q", want)
+		}
+	}
 }

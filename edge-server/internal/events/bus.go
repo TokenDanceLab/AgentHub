@@ -47,6 +47,28 @@ func (b *Bus) EventLogTruncateFailures() int64 {
 	return b.eventLog.EventLogTruncateFailures()
 }
 
+// EventLogTruncateDurationSeconds returns the cumulative wall time spent
+// inside truncateLocked, in seconds, delegating to the event log when one is
+// configured. Exposed for the
+// edge_event_log_truncate_duration_seconds_total Prometheus metric.
+func (b *Bus) EventLogTruncateDurationSeconds() float64 {
+	if b == nil || b.eventLog == nil {
+		return 0
+	}
+	return float64(b.eventLog.EventLogTruncateDurationNanos()) / float64(time.Second)
+}
+
+// EventLogTruncateLastDurationSeconds returns the wall time of the most recent
+// truncateLocked call, in seconds (0 if none yet), delegating to the event log
+// when one is configured. Exposed for the
+// edge_event_log_truncate_last_duration_seconds Prometheus metric.
+func (b *Bus) EventLogTruncateLastDurationSeconds() float64 {
+	if b == nil || b.eventLog == nil {
+		return 0
+	}
+	return float64(b.eventLog.EventLogTruncateLastDurationNanos()) / float64(time.Second)
+}
+
 // Bus is an in-memory event bus with monotonic sequence numbers and
 // support for cursor-based replay.
 type Bus struct {
