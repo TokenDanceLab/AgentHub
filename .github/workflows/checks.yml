@@ -1134,6 +1134,13 @@ jobs:
       - name: Type check
         run: pnpm typecheck
 
+      # Still advisory, and the reason is measured rather than habitual: this
+      # step runs `eslint src --max-warnings 0`, and desktop currently reports
+      # 0 errors but **4 `react-hooks/exhaustive-deps` warnings** (missing `t` /
+      # `tApp` in useMemo dependency arrays). Fixing those means changing
+      # memoization dependencies, which is a behaviour change, not a lint
+      # cleanup — so it needs its own reviewed slice. Removing
+      # continue-on-error before that would hard-fail every desktop PR (#2274).
       - name: Lint
         continue-on-error: true
         run: pnpm lint --max-warnings 0
@@ -1252,8 +1259,12 @@ jobs:
       - name: Install
         run: pnpm install --frozen-lockfile
 
+      # #2274: was `continue-on-error: true`, i.e. structurally incapable of
+      # failing — which is how six `no-explicit-any` errors lived on master
+      # unnoticed (all the same hand-copied `options?: any` translate signature).
+      # They are fixed in this PR, so the step is a real gate now: web's lint
+      # script is `eslint src --max-warnings 0` and reports 0 problems.
       - name: Lint Web
-        continue-on-error: true
         run: pnpm lint
 
       - name: Build Web
@@ -1319,8 +1330,10 @@ jobs:
       - name: Type check (mobile)
         run: pnpm --filter agenthub-mobile-rn typecheck
 
+      # #2274: was `continue-on-error: true` (advisory). The exact CI command
+      # reports 0 errors / 1 react-hooks warning, and the mobile lint script does
+      # not pass --max-warnings, so this is a real gate now.
       - name: Lint (mobile rules)
-        continue-on-error: true
         run: pnpm --filter agenthub-mobile-rn lint
 
       # ── Hardened: Test with coverage reporting ──

@@ -42,7 +42,7 @@ export function resolveWebWorkbenchAgents(
   return mapped.length > 0 ? mapped : webAgents;
 }
 
-type WebTranslate = (key: string, options?: any) => string;
+type WebTranslate = (key: string) => string;
 
 export function hubSessionToWorkbenchConversation(session: Session, t?: WebTranslate): WorkbenchConversation | null {
   const id = session.id ?? session.session_id;
