@@ -27,7 +27,7 @@ func TestTokenDanceSubPredicateSSOT(t *testing.T) {
 		{"model.User gorm tag", "../model/user.go"},
 		// SQLite fixtures. If any of these drops the predicate it silently
 		// re-masks the inference requirement above.
-		{"fixture repository_test.go", "repository_test.go"},
+		{"fixture helpers_test.go", "helpers_test.go"},
 		{"fixture upsert_toctou_test.go", "upsert_toctou_test.go"},
 		{"fixture service/oidc/oidc_test.go", "../service/oidc/oidc_test.go"},
 		{"fixture tests/integration/tokendance_oidc_e2e_test.go", "../../tests/integration/tokendance_oidc_e2e_test.go"},
