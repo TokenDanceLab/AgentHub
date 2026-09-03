@@ -37,7 +37,7 @@ VERIFIER = os.path.join(REPO_ROOT, "scripts", "verify", "verify-safego-convergen
 # duplicated on purpose so that if the two ever drift, case (a) fails loudly
 # instead of the fixture silently becoming a negative case.
 ALLOWLIST_SKELETON = {
-    "hub-server/internal/handler/ws.go": 2,
+    "hub-server/internal/handler/ws.go": 1,
     "hub-server/internal/middleware/recovery.go": 2,
     "hub-server/internal/middleware/timeout.go": 1,
     "edge-server/internal/httpserver/server_middleware.go": 1,
@@ -232,7 +232,7 @@ class VerifySafegoConvergenceTests(unittest.TestCase):
         """(g') The reverse sentinel: allow-list files with zero real hits must go red.
 
         If the stripper ever starts eating code, the scan finds nothing and the
-        gate would report a clean tree. The allow-list expects 8 sites, so a
+        gate would report a clean tree. The allow-list expects 7 sites, so a
         tree whose listed files only mention recover() in comments must fail.
         """
         for rel in ALLOWLIST_SKELETON:

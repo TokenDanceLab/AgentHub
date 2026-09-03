@@ -11,10 +11,17 @@ import (
 	"github.com/agenthub/hub-server/internal/model"
 )
 
-// This file is the thin facade. Logic split into:
-//   agent_team_crud.go, agent_team_member.go, agent_team_routing.go,
-//   agent_team_approval.go, agent_team_guard.go, agent_team_run.go,
-//   agent_team_projection.go (pure TeamRunState projection helpers).
+// This file is the thin facade: AgentTeamService's dependency interfaces,
+// construction and wiring. The behaviour lives in this package's sibling
+// files, split by responsibility — team CRUD, membership, approvals,
+// guardrails, the TeamRun lifecycle, supervisor route decisions and their pure
+// helpers, pure TeamRunState projection, assignment lifecycle, replay, review,
+// compete aggregation, audit and authz.
+//
+// The split is deliberately described instead of enumerated: this comment used
+// to list file names, and the list had already rotted — it named a routing file
+// that does not exist and had never heard of six that do. The package directory
+// is the only file list that stays true (#2246).
 
 type agentTeamAgentSvc interface {
 	AddAgentToSession(ctx context.Context, userID, sessionID, agentType, customAgentID, displayName string) (*model.AgentInstance, error)
