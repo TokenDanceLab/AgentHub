@@ -155,11 +155,14 @@ func TestClaudeCodeAdapterNeedsStdin(t *testing.T) {
 	}
 }
 
-func TestAvailableAdapterReportsTrue(t *testing.T) {
+// TestAvailableDoesNotPanicWithoutClaudeBinary — the name used to be
+// TestAvailableAdapterReportsTrue, but nothing here ever asserted true:
+// Available() probes for the claude binary, which CI runners and most dev boxes
+// do not have, so the only honest claim is "probing a missing binary does not
+// panic". Renamed rather than given a fake assertion, because asserting true
+// would require shipping a claude binary to the test.
+func TestAvailableDoesNotPanicWithoutClaudeBinary(t *testing.T) {
 	a := NewClaudeCodeAdapter("claude", "sonnet", "")
-	// Claude adapter checks binary existence; on a dev machine without
-	// Claude CLI, Available() may return false. We just verify it does not
-	// panic.
 	_ = a.Available()
 }
 
