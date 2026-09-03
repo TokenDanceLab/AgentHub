@@ -75,7 +75,7 @@ export function useHubMessages(sessionId: string, opts?: { enabled?: boolean }) 
  */
 export function useHubPinnedMessages(sessionId: string, opts?: { enabled?: boolean }) {
   return useQuery({
-    queryKey: ['hub', 'threads', sessionId, 'pins'],
+    queryKey: hubQueryKeys.threads.pins(sessionId),
     queryFn: () => getHubClient().listPinnedMessages(sessionId),
     enabled: opts?.enabled ?? false,
   });
