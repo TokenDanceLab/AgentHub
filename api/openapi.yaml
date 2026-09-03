@@ -1198,7 +1198,7 @@ paths:
       summary: Get workspace.
       x-agenthub-phase: P0
       x-agenthub-status: planned
-      x-agenthub-owner: Runner
+      x-agenthub-owner: Hub
       parameters:
         - $ref: "#/components/parameters/WorkspaceId"
       responses:
@@ -1212,7 +1212,7 @@ paths:
       summary: List workspace files.
       x-agenthub-phase: P0
       x-agenthub-status: planned
-      x-agenthub-owner: Runner
+      x-agenthub-owner: Hub
       parameters:
         - $ref: "#/components/parameters/WorkspaceId"
       responses:
@@ -1227,7 +1227,7 @@ paths:
       description: File path is passed in the JSON body so slash-containing paths do not become ambiguous URL segments.
       x-agenthub-phase: P0
       x-agenthub-status: planned
-      x-agenthub-owner: Runner
+      x-agenthub-owner: Hub
       parameters:
         - $ref: "#/components/parameters/WorkspaceId"
       responses:
@@ -1241,7 +1241,7 @@ paths:
       summary: Search workspace files.
       x-agenthub-phase: P1
       x-agenthub-status: planned
-      x-agenthub-owner: Runner
+      x-agenthub-owner: Hub
       parameters:
         - $ref: "#/components/parameters/WorkspaceId"
       responses:
@@ -7656,6 +7656,17 @@ components:
       name: pageSize
       in: query
       required: false
+      # Over-ceiling is clamped, not rejected: a request above the maximum the
+      # endpoint declares comes back with `maximum` items, HTTP 200 and the
+      # usual page.nextCursor / page.hasMore, so the rest of the collection is
+      # reached by following the cursor (limit/offset endpoints: by advancing
+      # offset). It never falls back to `default`, which would shorten the page
+      # a second time. See api/conventions.md §Pagination and
+      # hub-server/internal/config/paging.go (ADR-031 / #2243).
+      description: >-
+        Page size. Defaults to 50. Values above the endpoint's declared maximum
+        are clamped to that maximum (not rejected, and not reduced to the
+        default); follow page.nextCursor to read the rest.
       schema:
         type: integer
         minimum: 1

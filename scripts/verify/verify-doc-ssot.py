@@ -397,7 +397,7 @@ def check_readme_parity() -> None:
     Each pair below must appear in both READMEs or in neither.
     """
     pairs = [
-        ("Mobile 装配中", "Mobile in assembly"),
+        ("Mobile 是装配中的", "Mobile is an in-assembly"),
         ("Desktop/Web 主线", "Desktop/Web are the mainline"),
     ]
     readme_zh = read_text("README.md")

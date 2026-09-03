@@ -202,10 +202,10 @@ class VerifyDocEntrypointsTests(unittest.TestCase):
         with open(readme_path, "rb") as handle:
             original_bytes = handle.read()
         original_text = original_bytes.decode("utf-8")
-        if "Mobile 装配中" not in original_text:
+        if "Mobile 是装配中的" not in original_text:
             self.fail("README fixture precondition missing zh maturity marker")
         try:
-            mutated = original_text.replace("Mobile 装配中", "Mobile 已就绪", 1)
+            mutated = original_text.replace("Mobile 是装配中的", "Mobile 是已就绪的", 1)
             with open(readme_path, "w", encoding="utf-8", newline="\n") as handle:
                 handle.write(mutated)
             self.assert_failure_code("DOC-README-PARITY", "README zh-only maturity change")

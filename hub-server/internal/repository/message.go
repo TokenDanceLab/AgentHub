@@ -43,9 +43,14 @@ func GetMessagesBySession(db *gorm.DB, sessionID string, beforeSeq int64, limit 
 }
 
 func GetMessagesIncrement(db *gorm.DB, sessionID string, afterSeq int64, limit int) ([]model.Message, error) {
-	if limit <= 0 || limit > config.MaxIncrementalMessageLimit {
-		limit = config.MaxIncrementalMessageLimit
-	}
+	// 0 on this endpoint means "no explicit limit" rather than "give me the
+	// default page", so the requested value is passed as the default too — the
+	// escape hatch config.ClampPageSize documents (same shape as
+	// handler/agent.go's runEventFilterFromQuery). Behaviour is identical to the
+	// hand-written branch this replaces (<=0 and >max both land on the maximum);
+	// routing it through the shared helper is what removes the last hand-written
+	// clamp on the pagination path (#2243).
+	limit = config.ClampPageSize(limit, config.MaxIncrementalMessageLimit, config.MaxIncrementalMessageLimit)
 	var msgs []model.Message
 	err := db.Where("session_id = ? AND seq_id > ?", sessionID, afterSeq).
 		Order("seq_id ASC").Limit(limit).Find(&msgs).Error
