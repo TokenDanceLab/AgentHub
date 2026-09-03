@@ -159,7 +159,7 @@ Hub 侧 code 交换端点固定为 `POST /client/auth/oidc/callback`，桌面/We
 
 | 环境变量 | 默认 | 语义 |
 |---|---|---|
-| `AGENTHUB_EVIDENCE_GATE_ENABLED`、`AGENTHUB_FAULT_ESCALATION_ENABLED`/`_TIMEOUT` | `true` / 见 `fault_escalation.go` | 证据门禁与故障升级开关 |
+| `AGENTHUB_EVIDENCE_GATE_ENABLED`、`AGENTHUB_FAULT_ESCALATION_ENABLED`、`AGENTHUB_ESCALATION_TIMEOUT` | `true` / 见 `fault_escalation.go` | 证据门禁与故障升级开关 |
 | `AGENTHUB_EVENT_WORKERS`、`AGENTHUB_DELIVERY_JOURNAL_DB` | `4` / 空（关闭） | 事件总线 worker 数、durable journal 开关 |
 | `AGENTHUB_DEPLOY_HOST`/`_PATH`/`AGENTHUB_PAGES_DOMAIN` | 占位默认 | Pages 部署目标 |
 | `AGENTHUB_EDGE_SHUTDOWN_TIMEOUT`、`AGENTHUB_HUB_MCP_SYNC_URL`/`_INTERVAL` | `10s` / 空（关闭） | 优雅停机总预算（#2129 L6）、Hub MCP 配置同步 |
