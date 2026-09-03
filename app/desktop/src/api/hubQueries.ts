@@ -4,6 +4,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { createHubClient } from '@/api/hubClient';
 import { getAccessToken } from '@/hooks/useAuth';
+import { fetchAllPages } from '@shared/hub/paginate';
 import { hubQueryKeys } from '@shared/stores/queryKeys';
 
 // Lazy singleton — avoids creating the client on module load when Hub is not needed.
@@ -116,39 +117,12 @@ export function useHubCreateContactGroup() {
 type WorkspaceProjectListResponse =
   Awaited<ReturnType<ReturnType<typeof getHubClient>['listWorkspaceProjects']>>;
 
-// Cursor pagination for the workspace projects list (#2290), mirroring
-// web/src/api/projectQueries.ts and both shells' fetchExecutionTargets: the
-// endpoint supports pageSize (ceiling 200) + pageCursor and returns
-// page.nextCursor / page.hasMore, but this call site passed no pageSize at all
-// (so it got the server default of 50) and never advanced the cursor. Both
-// shells therefore hid every project past the first page.
-//
-// Walking pages up to a cap and propagating hasMore keeps a truncated list
-// distinguishable from a complete one; the cap is a stated ceiling, not a
-// silent one.
-const workspaceProjectPageSize = 200;
-const maxWorkspaceProjectPages = 5;
-
 export async function fetchWorkspaceProjects(): Promise<WorkspaceProjectListResponse> {
-  const client = getHubClient();
-  const items: WorkspaceProjectListResponse['items'] = [];
-  let page: WorkspaceProjectListResponse['page'] = { hasMore: false };
-  let pageCursor: string | undefined;
-
-  for (let i = 0; i < maxWorkspaceProjectPages; i += 1) {
-    const res = await client.listWorkspaceProjects({
-      pageSize: workspaceProjectPageSize,
-      ...(pageCursor ? { pageCursor } : {}),
-    });
-    items.push(...res.items);
-    page = res.page ?? { hasMore: false };
-    if (!page.hasMore || !page.nextCursor) {
-      return { items, page };
-    }
-    pageCursor = page.nextCursor;
-  }
-
-  return { items, page: { ...page, hasMore: true } };
+  // Canonical Hub list contract (pageSize 200 x 5 pages, cap reported via
+  // hasMore) — see @shared/hub/paginate (#2290). Desktop used to call
+  // listWorkspaceProjects() with no parameters at all, so it got the server
+  // default of 50 and dropped the cursor.
+  return fetchAllPages(getHubClient().listWorkspaceProjects);
 }
 
 export function useHubWorkspaceProjects(opts?: { enabled?: boolean }) {

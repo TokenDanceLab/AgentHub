@@ -9,6 +9,7 @@ import {
   deleteAgentProfile,
   type EdgeAgentProfile,
 } from './edgeClient';
+import { fetchAllPages } from '@shared/hub/paginate';
 import type { ListResponse } from '@shared/types';
 
 export { type EdgeAgentProfile } from './edgeClient';
@@ -142,8 +143,12 @@ export function useHubAgentProfiles(opts?: { enabled?: boolean }) {
   return useQuery<HubAgentProfile[]>({
     queryKey: ['hub', 'agent-profiles'],
     queryFn: async () => {
-      const res = await getHubClient().listAgentProfiles();
-      return res.items ?? [];
+      // Was a parameterless first-page fetch with `page` thrown away, so agent
+      // profiles past the server's default page size never reached the desktop
+      // agent list (#2290 defect class). The hook's items-only contract is
+      // unchanged; only the walk is new.
+      const res = await fetchAllPages(getHubClient().listAgentProfiles);
+      return res.items;
     },
     enabled: opts?.enabled ?? false,
   });
