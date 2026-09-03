@@ -44,7 +44,7 @@ export interface ParsedProjectThreadMessageContent {
   } | undefined;
 }
 
-type WebTranslate = (key: string, options?: any) => string;
+type WebTranslate = (key: string) => string;
 
 export function workspaceProjectToProjectInfo(
   project: WorkspaceProject,

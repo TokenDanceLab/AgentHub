@@ -12,7 +12,7 @@ import { projectDraftToHubRequest } from './webWorkbenchProjects';
  * (#1546). Wraps the HubClient transport; the shared UI only ever sees the
  * narrow `WorkbenchProjectsPort` contract.
  */
-type WebTranslate = (key: string, options?: any) => string;
+type WebTranslate = (key: string) => string;
 
 export function createWebWorkbenchProjectsPort(t?: WebTranslate): WorkbenchProjectsPort {
   const hubClient = createHubClient({ getToken: getAccessToken });
