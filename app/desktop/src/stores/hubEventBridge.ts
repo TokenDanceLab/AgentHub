@@ -74,7 +74,9 @@ function onMessageNew(qc: QueryClient, payload: unknown) {
   const sessionId = str(msg?.session_id || msg?.id);
   if (sessionId) {
     invalidateQuery(qc, hubQueryKeys.threads.messages(sessionId));
-    invalidateQuery(qc, hubQueryKeys.threads.detail(sessionId));
+    // The session list carries this thread's last-message preview and unread
+    // count; there is no thread-detail cache to refresh (ADR-029).
+    invalidateQuery(qc, hubQueryKeys.threads.list);
   }
 }
 
@@ -91,7 +93,6 @@ function onMessagePin(qc: QueryClient, payload: unknown) {
   const sessionId = str(data?.session_id);
   if (sessionId) {
     invalidateQuery(qc, hubQueryKeys.threads.pins(sessionId));
-    invalidateQuery(qc, hubQueryKeys.threads.detail(sessionId));
     // Feed the pinMap store (session-scoped): the active session bucket is
     // set by loadPinnedForSession in useDesktopWorkbenchModel; frames landing
     // before any seed are dropped by the store (no active session yet).
@@ -104,7 +105,6 @@ function onMessageUnpin(qc: QueryClient, payload: unknown) {
   const sessionId = str(data?.session_id);
   if (sessionId) {
     invalidateQuery(qc, hubQueryKeys.threads.pins(sessionId));
-    invalidateQuery(qc, hubQueryKeys.threads.detail(sessionId));
     getPinMapStore().handleFrame(HUB_EVENTS.MESSAGE_UNPIN, payload);
   }
 }
@@ -127,11 +127,14 @@ function onMessageReactionRemoved(qc: QueryClient, payload: unknown) {
 }
 
 function onMessageRead(qc: QueryClient, payload: unknown) {
-  // read receipts affect thread-level unread_count → invalidate thread detail
+  // Read receipts move the thread-level unread_count, which lives on the
+  // session list. This used to invalidate a `threads.detail` key that no query
+  // ever registered, so on desktop a read receipt refreshed nothing at all and
+  // the unread badge stayed stale (#2261).
   const data = payload as { session_id?: string; user_id?: string; last_read_seq?: number };
   const sessionId = str(data?.session_id);
   if (sessionId) {
-    invalidateQuery(qc, hubQueryKeys.threads.detail(sessionId));
+    invalidateQuery(qc, hubQueryKeys.threads.list);
   }
 }
 
@@ -146,7 +149,6 @@ function onSessionDissolved(qc: QueryClient, payload: unknown) {
   const data = payload as { session_id?: string };
   const sessionId = str(data?.session_id);
   if (sessionId) {
-    invalidateQuery(qc, hubQueryKeys.threads.detail(sessionId));
     invalidateQuery(qc, hubQueryKeys.threads.messages(sessionId));
   }
   invalidateAllWithPrefix(qc, hubQueryKeys.threads.root);
@@ -168,7 +170,7 @@ function onSessionMemberJoined(qc: QueryClient, payload: unknown) {
   const data = payload as { session_id?: string; member_id?: string; member_type?: string };
   const sessionId = str(data?.session_id);
   if (sessionId) {
-    invalidateQuery(qc, hubQueryKeys.threads.detail(sessionId));
+    invalidateQuery(qc, hubQueryKeys.threads.list);
   }
 }
 
@@ -176,7 +178,7 @@ function onSessionMemberLeft(qc: QueryClient, payload: unknown) {
   const data = payload as { session_id?: string; member_id?: string; member_type?: string };
   const sessionId = str(data?.session_id);
   if (sessionId) {
-    invalidateQuery(qc, hubQueryKeys.threads.detail(sessionId));
+    invalidateQuery(qc, hubQueryKeys.threads.list);
   }
 }
 
@@ -184,7 +186,7 @@ function onSessionInfoUpdated(qc: QueryClient, payload: unknown) {
   const data = payload as Partial<HubSession> & { session_id: string };
   const sessionId = str(data?.session_id);
   if (sessionId) {
-    invalidateQuery(qc, hubQueryKeys.threads.detail(sessionId));
+    invalidateQuery(qc, hubQueryKeys.threads.list);
   }
 }
 
@@ -233,7 +235,6 @@ function onAgentDone(qc: QueryClient, payload: unknown) {
     : undefined;
   const threadId = task?.threadId;
   if (threadId) {
-    invalidateQuery(qc, hubQueryKeys.threads.detail(threadId));
     invalidateQuery(qc, hubQueryKeys.threads.messages(threadId));
   }
 

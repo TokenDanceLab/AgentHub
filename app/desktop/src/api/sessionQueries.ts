@@ -17,7 +17,7 @@ import { getAccessToken } from '@/hooks/useAuth';
 //
 // `hubSessionsListKey` is the *session list* only (`useHubSessions`); it is not
 // a transcript key and no longer covers transcripts by prefix.
-const hubSessionsListKey = ['hub', 'sessions'] as const;
+const hubSessionsListKey = hubQueryKeys.threads.list;
 
 /**
  * Broad invalidation for the message-mutating wrappers below. They only know a

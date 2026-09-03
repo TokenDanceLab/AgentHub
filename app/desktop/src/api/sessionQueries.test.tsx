@@ -41,7 +41,7 @@ vi.mock('@/hooks/useAuth', () => ({ getAccessToken: vi.fn(() => 'fixture-token')
 
 const SESSION_PROBE = '__key-shape-probe__';
 /** Sessions-list prefix (`useHubSessions`) — not a transcript key. */
-const SESSIONS_LIST_KEY = ['hub', 'sessions'] as const;
+const SESSIONS_LIST_KEY = hubQueryKeys.threads.list;
 
 const client = {
   listSessions: vi.fn(),
