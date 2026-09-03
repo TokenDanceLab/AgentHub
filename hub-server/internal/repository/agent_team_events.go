@@ -4,6 +4,7 @@ import (
 	"errors"
 	"strings"
 
+	"github.com/jackc/pgx/v5/pgconn"
 	"gorm.io/gorm"
 
 	"github.com/agenthub/hub-server/internal/model"
@@ -18,20 +19,62 @@ import (
 // that bypassed the parent row lock and for other dialects.
 const appendTeamEventMaxAttempts = 5
 
+// pgUniqueViolationSQLState is the PostgreSQL SQLSTATE for a unique-constraint
+// violation. It is the only SQLSTATE this package treats as a benign, retryable
+// duplicate.
+//
+// 42P10 is deliberately excluded. Its message is `there is no unique or
+// exclusion constraint matching the ON CONFLICT specification` — a mis-written
+// ON CONFLICT clause, i.e. a programming error, not a concurrent-insert
+// collision. That message contains the substring "unique" but never "unique
+// constraint" ("or exclusion" sits in between), which is exactly why the
+// text tier below matches on "unique constraint" and not on "unique": the wide
+// form classified 42P10 as a benign duplicate and swallowed it as success
+// (#2244).
+const pgUniqueViolationSQLState = "23505"
+
 // isUniqueViolation reports whether err is a unique-constraint violation.
-// Postgres surfaces SQLSTATE 23505 as "duplicate key value violates unique
-// constraint"; SQLite (unit tests) reports "UNIQUE constraint failed". The
-// substring match follows the existing isDuplicateKeyError convention in
-// service/message.
+//
+// This is the single implementation for the whole repository. It used to exist
+// five times over — here, as the exported IsUniqueViolation forwarder in
+// execution_target_evidence.go, as isDuplicateKeyError in agent.go, as a
+// case-SENSITIVE isDuplicateKeyError in service/message/builders.go, and as an
+// inline strings.Contains(err.Error(), "duplicate key") in
+// service/message/service_send.go — and the copies had already drifted: the
+// agent.go one lower-cased its input so SQLite's upper-case "UNIQUE constraint
+// failed" was recognised, while the builders.go copy it claimed to mirror never
+// did, and the PinMessage copy matched only "duplicate key" and so missed
+// SQLite entirely. Same question, three different answers, in one binary.
+//
+// Callers must go through the exported IsUniqueViolation; do not add another
+// copy. The tiers are ordered strongest signal first:
+//
+//  1. SQLSTATE 23505 on the Postgres wire error (pgx is this server's only
+//     Postgres driver, so *pgconn.PgError is the shape that actually arrives).
+//     No text has to be guessed at, and errors.As reaches it through whatever
+//     the caller wrapped it in.
+//  2. gorm.ErrDuplicatedKey, GORM's dialect-translated sentinel. It is only
+//     populated when gorm.Config.TranslateError is enabled — this codebase does
+//     not enable it today — so the tier is defensive, but it is cheap and it is
+//     the contract GORM documents.
+//  3. Text, last resort, for drivers and hand-built errors that carry no
+//     structured signal (SQLite in tests reports "UNIQUE constraint failed:
+//     ..."). Lower-cased first, then matched against "duplicate key" and
+//     "unique constraint" — narrowed from a bare "unique" so 42P10 stops
+//     matching.
 func isUniqueViolation(err error) bool {
 	if err == nil {
 		return false
+	}
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) && pgErr.Code == pgUniqueViolationSQLState {
+		return true
 	}
 	if errors.Is(err, gorm.ErrDuplicatedKey) {
 		return true
 	}
 	msg := strings.ToLower(err.Error())
-	return strings.Contains(msg, "duplicate key") || strings.Contains(msg, "unique")
+	return strings.Contains(msg, "duplicate key") || strings.Contains(msg, "unique constraint")
 }
 
 // lockTeamRunForEventAppend serializes event sequence allocation for one run
