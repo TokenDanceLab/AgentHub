@@ -122,12 +122,17 @@ func TestFailHelper(t *testing.T) {
 		assert.Contains(t, w.Body.String(), "session_not_found")
 	})
 
-	t.Run("defaults to 500 when status is 0", func(t *testing.T) {
+	t.Run("zero status is normalized by errcode.New, not clamped by fail", func(t *testing.T) {
 		w := httptest.NewRecorder()
 		c, _ := gin.CreateTestContext(w)
 		c.Request = httptest.NewRequest(http.MethodGet, "/api/test", nil)
 
 		e := errcode.New("custom", "some message", 0)
+		// #2243: the invariant is established once, at construction. fail() no
+		// longer clamps, so a regression here would reach the wire as
+		// WriteHeader(0) — which net/http renders as a silent 200.
+		assert.Equal(t, http.StatusInternalServerError, e.HTTPStatus)
+
 		fail(c, e)
 
 		assert.True(t, c.IsAborted())
