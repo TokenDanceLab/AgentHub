@@ -423,7 +423,7 @@ describe('AgentHubWorkbench', () => {
       {
         id: 'user-subtask-prompt',
         kind: 'text',
-        author: { id: 'user', name: 'Ding', role: 'human' },
+        author: { id: 'user', name: 'Alice', role: 'human' },
         text: '继续修复聊天流。',
       },
       {

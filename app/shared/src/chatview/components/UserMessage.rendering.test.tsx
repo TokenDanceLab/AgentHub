@@ -13,7 +13,7 @@ describe('UserMessage rendering', () => {
   it('renders user markdown tables through the shared markdown renderer', () => {
     const item: TranscriptUserItem = {
       type: 'user',
-      name: 'Ding',
+      name: 'Alice',
       text: '| Scope | Status |\n| --- | --- |\n| Desktop/Web | aligned |',
     };
 
@@ -27,7 +27,7 @@ describe('UserMessage rendering', () => {
   it('renders Hub message display metadata on user input cards', () => {
     const item: TranscriptUserItem = {
       type: 'user',
-      name: 'Ding',
+      name: 'Alice',
       text: '@Reviewer 帮我复核这个改动',
       displayTitle: 'Group @Agent',
       displayDetail: 'IM project_group · mentions @Reviewer · task task-reviewer-1',
@@ -50,7 +50,7 @@ describe('UserMessage rendering', () => {
     const item: TranscriptUserItem = {
       type: 'user',
       id: 'hub-message-1',
-      name: 'Ding',
+      name: 'Alice',
       text: '来自 Hub 的消息',
     };
     const onContextMenu = vi.fn();
@@ -121,7 +121,7 @@ describe('UserMessage attachments (#1957)', () => {
   it('renders an image attachment thumbnail through the shared platform port', async () => {
     unregister = registerAttachmentImageUrlResolver(async () => 'blob:user-upload');
     const item: TranscriptUserItem = {
-      type: 'user', id: 'u1', name: 'Ding', text: '', attachments: [imageRow()],
+      type: 'user', id: 'u1', name: 'Alice', text: '', attachments: [imageRow()],
     };
 
     const { container } = render(<UserMessage item={item} chatMode="dm" />);
@@ -146,7 +146,7 @@ describe('UserMessage attachments (#1957)', () => {
   it('degrades to the chip notice when no surface registered a resolver', async () => {
     expect(getAttachmentImageUrlResolver()).toBeUndefined();
     const item: TranscriptUserItem = {
-      type: 'user', id: 'u1', name: 'Ding', text: '', attachments: [imageRow()],
+      type: 'user', id: 'u1', name: 'Alice', text: '', attachments: [imageRow()],
     };
 
     render(<UserMessage item={item} chatMode="dm" />);
@@ -159,7 +159,7 @@ describe('UserMessage attachments (#1957)', () => {
   it('renders non-image attachments as file chips without touching the port', () => {
     expect(getAttachmentImageUrlResolver()).toBeUndefined();
     const item: TranscriptUserItem = {
-      type: 'user', id: 'u1', name: 'Ding', text: '', attachments: [fileRow()],
+      type: 'user', id: 'u1', name: 'Alice', text: '', attachments: [fileRow()],
     };
 
     const { container } = render(<UserMessage item={item} chatMode="group" />);
@@ -173,7 +173,7 @@ describe('UserMessage attachments (#1957)', () => {
   it('renders text and attachments together when both are present', async () => {
     unregister = registerAttachmentImageUrlResolver(async () => 'blob:user-upload');
     const item: TranscriptUserItem = {
-      type: 'user', id: 'u1', name: 'Ding', text: 'here is the screenshot',
+      type: 'user', id: 'u1', name: 'Alice', text: 'here is the screenshot',
       attachments: [imageRow()],
     };
 

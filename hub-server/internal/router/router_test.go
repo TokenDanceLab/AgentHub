@@ -346,7 +346,7 @@ func TestCloudEdgeRegisterRateLimitedByIP(t *testing.T) {
 	}
 }
 
-// TestEdgeDeviceRegisterRateLimitedByIP verifies the round-44 follow-up to
+// TestEdgeDeviceRegisterRateLimitedByIP verifies the follow-up to
 // #2185: POST /edge/devices/register sits behind middleware.RateLimit keyed
 // by client IP (AuthRegisterRateLimit per AuthRateLimitWindow), matching the
 // /cloud/edge/register shape. The route chain is authMW → RequireHubSession →
