@@ -46,7 +46,7 @@ describe('web project queries', () => {
   it('lists Hub workspace projects through /web/projects when a Hub session token is available', async () => {
     vi.mocked(getAccessToken).mockReturnValue('hub-access');
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-      expect(String(input)).toBe('http://localhost:8080/web/projects?pageSize=50');
+      expect(String(input)).toBe('http://localhost:8080/web/projects?pageSize=200');
       expect(getHeader(init, 'Authorization')).toBe('Bearer hub-access');
       return new Response(
         JSON.stringify({
@@ -75,6 +75,78 @@ describe('web project queries', () => {
         name: 'AgentHub Web',
       }),
     ]);
+  });
+
+  // #2290: the endpoint has always supported pageCursor and always returned
+  // page.nextCursor, but this call site asked for one page and dropped the
+  // cursor, so every project past the first page was silently invisible. These
+  // two pin the walk and the honest cap; the shape mirrors
+  // executionTargetQueries.test.ts so the front end keeps one paging idiom.
+  it('walks cursor pages so projects past the first page are visible', async () => {
+    vi.mocked(getAccessToken).mockReturnValue('hub-access');
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(
+        JSON.stringify({
+          code: 'ok',
+          data: {
+            items: [{
+              id: '00000000-0000-0000-0000-00000000p101',
+              name: 'Page 1 Project',
+            }],
+            page: { hasMore: true, nextCursor: 'cur-1' },
+          },
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      ))
+      .mockResolvedValueOnce(new Response(
+        JSON.stringify({
+          code: 'ok',
+          data: {
+            items: [{
+              id: '00000000-0000-0000-0000-00000000p102',
+              name: 'Page 2 Project',
+            }],
+            page: { hasMore: false },
+          },
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      ));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const res = await fetchWorkspaceProjects(true);
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(String(fetchMock.mock.calls[0]?.[0])).toBe('http://localhost:8080/web/projects?pageSize=200');
+    expect(String(fetchMock.mock.calls[1]?.[0]))
+      .toBe('http://localhost:8080/web/projects?pageSize=200&pageCursor=cur-1');
+    expect(res.items.map((item) => item.name)).toEqual(['Page 1 Project', 'Page 2 Project']);
+    expect(res.page.hasMore).toBe(false);
+  });
+
+  it('reports hasMore=true after exhausting the maximum cursor pages', async () => {
+    vi.mocked(getAccessToken).mockReturnValue('hub-access');
+    const fetchMock = vi.fn(async () => new Response(
+      JSON.stringify({
+        code: 'ok',
+        data: {
+          items: [{
+            id: '00000000-0000-0000-0000-00000000p301',
+            name: 'Always More',
+          }],
+          page: { hasMore: true, nextCursor: 'cur-next' },
+        },
+      }),
+      { status: 200, headers: { 'Content-Type': 'application/json' } },
+    ));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const res = await fetchWorkspaceProjects(true);
+
+    // The cap is a stated ceiling, not a silent one: the caller can still tell
+    // that the list was truncated.
+    expect(fetchMock).toHaveBeenCalledTimes(5);
+    expect(res.items).toHaveLength(5);
+    expect(res.page.hasMore).toBe(true);
   });
 
   it('does not fall back to static project previews when Hub auth is missing', async () => {
