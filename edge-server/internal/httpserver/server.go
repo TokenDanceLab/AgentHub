@@ -232,11 +232,20 @@ func buildEventBusAndMetrics(cfg Config) (*events.Bus, *metrics.EdgeMetrics) {
 	}
 	bus := events.NewBus(10000, busOpts...)
 
-	// Prometheus metrics wired to bus depth
-	edgeMetrics := metrics.NewWithBusStats(
-		func() float64 { return float64(bus.HistoryLen()) },
-		func() float64 { return float64(bus.DroppedCount()) },
-	)
+	// Prometheus metrics wired to bus depth and to every event-log counter.
+	// All hooks are filled on purpose: a nil hook means the series is not
+	// registered at all, which is exactly how the three edge_event_log_* series
+	// went missing from /v1/metrics while their counters, Bus accessors and
+	// "Exposed for the …" comments all existed (#2304).
+	edgeMetrics := metrics.NewWithBusHooks(metrics.BusHooks{
+		BusDepth:                    func() float64 { return float64(bus.HistoryLen()) },
+		BusDropped:                  func() float64 { return float64(bus.DroppedCount()) },
+		EventLogTruncations:         func() float64 { return float64(bus.EventLogTruncations()) },
+		EventLogTruncateFailures:    func() float64 { return float64(bus.EventLogTruncateFailures()) },
+		EventLogGaps:                func() float64 { return float64(bus.EventLogGaps()) },
+		EventLogTruncateSeconds:     bus.EventLogTruncateDurationSeconds,
+		EventLogTruncateLastSeconds: bus.EventLogTruncateLastDurationSeconds,
+	})
 	// Make recovered goroutine panics observable, not just logged. Installed
 	// before any run can start, so no safego.SafeGo launch predates the hook.
 	edgeMetrics.InstallPanicObserver()

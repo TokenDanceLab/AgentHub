@@ -44,6 +44,22 @@ type EdgeMetrics struct {
 	// (edge_event_log_gaps_total): cursor predating the log or subscriber
 	// channel full. Backed by Bus.EventLogGaps.
 	EdgeEventLogGaps prometheus.CounterFunc
+	// EdgeEventLogTruncateDuration accumulates the wall time spent inside
+	// truncateLocked (edge_event_log_truncate_duration_seconds_total), which
+	// holds the event-log mutex and therefore freezes the whole bus for its
+	// duration. Backed by Bus.EventLogTruncateDurationSeconds.
+	// EdgeEventLogTruncations alone says how *often* truncation happens; this
+	// says how long the bus was frozen, so rate(duration)/rate(truncations) is
+	// the mean freeze and rate(duration) is the fraction of wall time lost to
+	// it (#2304: measured ~26 ms per retained MiB, ≈0.97 s at the 50 MiB
+	// default).
+	EdgeEventLogTruncateDuration prometheus.CounterFunc
+	// EdgeEventLogTruncateLastDuration is the most recent single truncation's
+	// wall time in seconds (edge_event_log_truncate_last_duration_seconds). A
+	// cumulative counter spreads one ~1 s stall across a rate() window; this
+	// makes the freeze readable in one scrape. Backed by
+	// Bus.EventLogTruncateLastDurationSeconds.
+	EdgeEventLogTruncateLastDuration prometheus.GaugeFunc
 
 	// EdgeHTTPPanicRecoveries counts panics recovered by the Edge HTTP
 	// recoveryHTTPHandler wrapping the mux. A non-zero rate signals a handler
@@ -73,15 +89,38 @@ type EdgeMetrics struct {
 	Outbound *outboundmetrics.Recorder
 }
 
-// NewWithBusStats creates metrics with optional event bus callbacks.
-func NewWithBusStats(busDepthFn func() float64, busDroppedFn func() float64) *EdgeMetrics {
-	return newWithHooks(busDepthFn, busDroppedFn, nil, nil, nil)
+// BusHooks are the pull-based callbacks EdgeMetrics exposes as CounterFunc /
+// GaugeFunc series. The events package owns the actual atomics; this package
+// stays a read-only view of them. A nil field means the series is not
+// registered at all.
+//
+// This used to be a positional parameter list, and the only production
+// constructor (NewWithBusStats) took the two bus callbacks and hard-coded nil
+// for the three event-log ones. The consequence was that
+// edge_event_log_truncations_total, edge_event_log_truncate_failures_total and
+// edge_event_log_gaps_total existed as struct fields, registration blocks, Bus
+// accessors and code comments, and were never served: a live Edge's
+// GET /v1/metrics returned edge_event_bus_depth and edge_event_bus_dropped_total
+// and zero edge_event_log_* series (#2304). Named fields make an unfilled hook
+// visible at the call site instead of hiding it behind positional nils, and
+// TestBuildEventBusAndMetricsServesEventLogSeries asserts the production wiring
+// really serves them.
+type BusHooks struct {
+	BusDepth                    func() float64
+	BusDropped                  func() float64
+	EventLogTruncations         func() float64
+	EventLogTruncateFailures    func() float64
+	EventLogGaps                func() float64
+	EventLogTruncateSeconds     func() float64
+	EventLogTruncateLastSeconds func() float64
 }
 
-func newWithHooks(
-	busDepthFn, busDroppedFn,
-	truncationsFn, truncateFailuresFn, gapsFn func() float64,
-) *EdgeMetrics {
+// NewWithBusHooks creates metrics with optional event bus / event log callbacks.
+func NewWithBusHooks(hooks BusHooks) *EdgeMetrics {
+	busDepthFn, busDroppedFn := hooks.BusDepth, hooks.BusDropped
+	truncationsFn, truncateFailuresFn, gapsFn := hooks.EventLogTruncations, hooks.EventLogTruncateFailures, hooks.EventLogGaps
+	truncateSecondsFn, truncateLastSecondsFn := hooks.EventLogTruncateSeconds, hooks.EventLogTruncateLastSeconds
+
 	reg := prometheus.NewRegistry()
 	factory := promauto.With(reg)
 
@@ -137,6 +176,18 @@ func newWithHooks(
 			Name: "edge_event_log_gaps_total",
 			Help: "Total number of event log replay/fanout gaps detected (cursor predating the log or subscriber channel full).",
 		}, gapsFn)
+	}
+	if truncateSecondsFn != nil {
+		m.EdgeEventLogTruncateDuration = factory.NewCounterFunc(prometheus.CounterOpts{
+			Name: "edge_event_log_truncate_duration_seconds_total",
+			Help: "Total wall time spent inside event log truncation, which holds the event log mutex and freezes the bus for its duration. Divide the delta by edge_event_log_truncations_total for the mean freeze per truncation.",
+		}, truncateSecondsFn)
+	}
+	if truncateLastSecondsFn != nil {
+		m.EdgeEventLogTruncateLastDuration = factory.NewGaugeFunc(prometheus.GaugeOpts{
+			Name: "edge_event_log_truncate_last_duration_seconds",
+			Help: "Wall time of the most recent event log truncation, i.e. how long the bus was frozen the last time the log exceeded maxSize.",
+		}, truncateLastSecondsFn)
 	}
 
 	// Unified outbound metrics contract (#1595) on the isolated registry.
@@ -228,5 +279,5 @@ func (m *EdgeMetrics) RecordWSDisconnect() {
 // unit tests that need to exercise metric increment paths without wiring a
 // real event bus. The registry is isolated so parallel tests don't collide.
 func NewTestEdgeMetrics() *EdgeMetrics {
-	return newWithHooks(nil, nil, nil, nil, nil)
+	return NewWithBusHooks(BusHooks{})
 }

@@ -12,6 +12,7 @@ import (
 	"sort"
 	"sync"
 	"sync/atomic"
+	"time"
 )
 
 // EventLog is an append-only JSON-lines event log backed by a file on disk.
@@ -67,6 +68,23 @@ type EventLog struct {
 	// surviving log event (replay would lose events). Exposed via
 	// Bus.EventLogGaps for the edge_event_log_gaps_total metric.
 	gaps atomic.Int64
+	// truncateNanos accumulates the wall time spent inside truncateLocked.
+	// truncateLocked runs with l.mu held, so it stalls every publisher and
+	// every replay for its whole duration; measured cost is ~26 ms per MiB of
+	// retained window (#2304), i.e. ≈0.97 s of frozen bus per truncation at the
+	// 50 MiB default (which retains 37.5 MiB). truncations says how *often*
+	// that happens; without this the *how long* is invisible, so an operator
+	// cannot distinguish a 1 ms truncation from a 1 s bus freeze and cannot
+	// decide whether the structural fix (rotation instead of rewrite) is owed.
+	// Exposed via Bus.EventLogTruncateDurationSeconds for
+	// edge_event_log_truncate_duration_seconds_total.
+	truncateNanos atomic.Int64
+	// truncateLastNanos is the duration of the most recent truncateLocked call.
+	// A cumulative counter hides a single long stall inside a rate() window;
+	// this makes the most recent freeze directly readable in one scrape.
+	// Exposed via Bus.EventLogTruncateLastDurationSeconds for
+	// edge_event_log_truncate_last_duration_seconds.
+	truncateLastNanos atomic.Int64
 }
 
 const defaultEventLogMaxSize = 50 * 1024 * 1024 // 50 MiB
@@ -314,6 +332,16 @@ func appendSorted(sorted []int64, seq int64) []int64 {
 // slog.Error so an operator whose log is growing unbounded or losing replay
 // offsets finally gets a signal (edge_event_log_truncate_failures_total).
 func (l *EventLog) truncateLocked() {
+	// Timed because the whole body runs under l.mu: this is the bus freeze an
+	// operator needs to be able to see (#2304). Both counters are written once
+	// per truncation, not per event, so they add nothing to the Append path.
+	truncateStarted := time.Now()
+	defer func() {
+		elapsed := time.Since(truncateStarted).Nanoseconds()
+		l.truncateNanos.Add(elapsed)
+		l.truncateLastNanos.Store(elapsed)
+	}()
+
 	l.truncations.Add(1)
 	keepBytes := l.maxSize * 3 / 4 // keep last 75%
 	if _, seekErr := l.f.Seek(-keepBytes, 2); seekErr != nil {
@@ -433,6 +461,28 @@ func (l *EventLog) EventLogTruncateFailures() int64 {
 		return 0
 	}
 	return l.truncateFailures.Load()
+}
+
+// EventLogTruncateDurationNanos returns the cumulative wall time spent inside
+// truncateLocked, in nanoseconds. Exposed for the
+// edge_event_log_truncate_duration_seconds_total Prometheus metric; divided by
+// EventLogTruncations it gives the mean bus freeze per truncation, and its rate
+// gives the fraction of wall time the bus spends frozen by truncation.
+func (l *EventLog) EventLogTruncateDurationNanos() int64 {
+	if l == nil {
+		return 0
+	}
+	return l.truncateNanos.Load()
+}
+
+// EventLogTruncateLastDurationNanos returns the wall time of the most recent
+// truncateLocked call, in nanoseconds (0 if none yet). Exposed for the
+// edge_event_log_truncate_last_duration_seconds Prometheus metric.
+func (l *EventLog) EventLogTruncateLastDurationNanos() int64 {
+	if l == nil {
+		return 0
+	}
+	return l.truncateLastNanos.Load()
 }
 
 // ReadFrom returns all events with seq >= cursor from the on-disk log. It is
