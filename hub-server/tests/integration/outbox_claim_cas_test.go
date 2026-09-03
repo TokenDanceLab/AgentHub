@@ -39,7 +39,7 @@ func openTempMigratedDB(t *testing.T) (*gorm.DB, func()) {
 
 	password := os.Getenv("AGENTHUB_DB_PASSWORD")
 	if password == "" {
-		t.Fatal("AGENTHUB_DB_PASSWORD not set; source /home/.config/server-secrets/agenthub-dev.env")
+		t.Fatal("AGENTHUB_DB_PASSWORD not set; required for the PostgreSQL integration path")
 	}
 
 	host := "localhost"

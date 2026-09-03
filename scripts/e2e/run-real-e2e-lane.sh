@@ -34,7 +34,7 @@
 # 环境变量（均有默认，不设也能跑）：
 #   AGENTHUB_E2E_ID_BASE_URL / _HUB_BASE_URL / _EDGE_BASE_URL / _WEB_BASE_URL
 #   AGENTHUB_E2E_ID_CLIENT_ID / _ID_CLIENT_SECRET （直供 client 凭据，跳过 start.sh 提取）
-#   AGENTHUB_E2E_START_SH （hub OIDC 凭据提取源，默认 /root/agenthub-dev/start.sh）
+#   AGENTHUB_E2E_START_SH （hub OIDC 凭据提取源，**无默认值**；未设置时走 _ID_CLIENT_ID/SECRET 直供）
 #   AGENTHUB_E2E_ID_DB （ID sqlite，默认 /var/lib/tokendance-id/tokendance.db）
 #   AGENTHUB_E2E_SPEC_TARGET （只跑指定 spec 文件名，如 real-oidc-login.spec.ts；
 #                             不设 = 不带位置过滤，跑 playwright.real.config.ts

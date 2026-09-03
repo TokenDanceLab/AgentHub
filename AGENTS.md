@@ -236,6 +236,8 @@ subagent 提示必须包含：目标、允许修改路径、禁改路径、必�
 
 机器验证的完整映射（规则 → 验证脚本/负向自测 → CI job）在 `docs/governance/verifier-map.md`（SSOT，脚本与 CI 路径由 `verify-doc-ssot.py` 校验存在性）；本节不复制长表。何时读：给规则配新机器门禁、改 CI job、核对负向自测、或审计某条规则有没有机器管时。
 
+门禁预算（#2275）：新增门禁必须**同时**满足 ① 接进一个**每个 PR 都跑**的 CI job（`workflow_dispatch`-only 不算）② 自带负向自测，且该自测本身也被 CI 执行——`verify-doc-ssot.py` 的 `DOC-ORPHAN-SELFTEST` 会挡住没接线的自测（一个从不被执行的负向自测比没有自测更坏：它让门禁看起来已被验证过）。缺任一条，它就不是门禁，应放 `scripts/smoke/` 或 `scripts/release/` 并在 verifier-map 登记为运维脚本。**删一个才能加一个**：`scripts/` 下校验脚本的总量有预算，要加新的必须在同一个 PR 里指出退休哪一个，或说明现有那个为何覆盖不了（round-68 据此删掉 3 个入站引用为 0 的脚本、接线 3 个从未被执行的自测）。
+
 ## 10. 验证纪律
 
 所有变更的统一验证命令清单（diff/SSOT/yaml/Go/前端）见 `docs/developer-quickstart.md` §测试速查；文档/API 变更至少跑 `python scripts/verify/verify-doc-ssot.py` + openapi yaml parse。

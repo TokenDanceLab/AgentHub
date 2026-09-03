@@ -28,7 +28,7 @@ F12 边界说明：时间线卡与只读预览已落地；「恢复」动作展�
 ## 0. 方法与边界
 
 - 本产品观察仅在远程 dev 服务器完成：真实全栈（TokenDance ID / Hub / Edge / Web）+ 一次性 Playwright 脚本（chromium，1440x810，light+dark），走真实 OIDC 登录动线（镜像 `app/e2e/real-oidc-login.spec.ts`）。本机不运行任何 AgentHub UI。
-- 截图证据：本机 `tests/artifacts/ux-2026-08/`（gitignored），远程 `/root/agenthub-dev/ux-evidence/`。截图只含合成测试账号的显示名（AgentHub E2E User/Partner），无生产数据；邮箱未出现在所截表面。
+- 截图证据：`tests/artifacts/ux-2026-08/`（gitignored，不入库；本报告只登记结论与索引，截图本身留在跑测的那台机器上）。截图只含合成测试账号的显示名（AgentHub E2E User/Partner），无生产数据；邮箱未出现在所截表面。
 - 本报告不改产品源码；建议均标注优先级（P0/P1/P2）与涉及文件，供后续 issue 化。
 - 现状组件事实以 `docs/architecture/04-frontend-data-flow.md`、`docs/architecture/07-design-system-ssot.md`、`docs/component-acceptance.md` 与 `app/workbench/src/`、`app/shared/src/ui/` 源码为准。
 
@@ -138,7 +138,7 @@ F12 边界说明：时间线卡与只读预览已落地；「恢复」动作展�
 
 ## 8. 截图证据索引
 
-本机：`tests/artifacts/ux-2026-08/`（gitignored）；远程：`/root/agenthub-dev/ux-evidence/`。视口 1440x810 @2x。
+`tests/artifacts/ux-2026-08/`（gitignored，不入库）。视口 1440x810 @2x。
 
 | 文件 | 表面 | 备注 |
 |---|---|---|

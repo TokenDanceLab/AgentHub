@@ -22,7 +22,8 @@
 #   AGENTHUB_E2E_HUB_BASE_URL   hub 地址（默认 http://127.0.0.1:8080）
 #   AGENTHUB_E2E_WEB_BASE_URL   web 地址（默认 http://127.0.0.1:5174）
 #   AGENTHUB_E2E_ID_DB          ID 的 sqlite 文件（默认 /var/lib/tokendance-id/tokendance.db）
-#   AGENTHUB_E2E_START_SH       提取 hub OIDC client 凭据的启动脚本（默认 /root/agenthub-dev/start.sh）
+#   AGENTHUB_E2E_START_SH       提取 hub OIDC client 凭据的启动脚本（**无默认值**：仓库里不写
+#                               任何人的本机路径；未设置时必须改用 AGENTHUB_E2E_ID_CLIENT_ID/SECRET 直供）
 #   AGENTHUB_E2E_ID_CLIENT_ID / AGENTHUB_E2E_ID_CLIENT_SECRET
 #                               优先直接给出 client 凭据（绕过 start.sh 提取）
 #   AGENTHUB_E2E_USER_EMAIL / AGENTHUB_E2E_USER_PASSWORD
@@ -37,7 +38,7 @@ ID_BASE_URL="${AGENTHUB_E2E_ID_BASE_URL:-http://127.0.0.1:3000}"
 HUB_BASE_URL="${AGENTHUB_E2E_HUB_BASE_URL:-http://127.0.0.1:8080}"
 WEB_BASE_URL="${AGENTHUB_E2E_WEB_BASE_URL:-http://127.0.0.1:5174}"
 ID_DB="${AGENTHUB_E2E_ID_DB:-/var/lib/tokendance-id/tokendance.db}"
-START_SH="${AGENTHUB_E2E_START_SH:-/root/agenthub-dev/start.sh}"
+START_SH="${AGENTHUB_E2E_START_SH:-}"
 
 # 仓库根（本文件位于 scripts/e2e/ 下两级）
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"

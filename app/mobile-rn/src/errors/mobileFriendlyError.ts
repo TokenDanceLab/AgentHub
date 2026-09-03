@@ -3,8 +3,9 @@
  *
  * Thin local wrapper inspired by @agenthub/shared/errorReporting's
  * friendlyErrorMessage + categorizeError. Not re-exported from shared because
- * that module depends on react-i18next which mobile-rn does not use.
- * See /root/agenthub-dev/lanes/lane-gg-mobile-error-ux/BLOCKED.md for rationale.
+ * that module depends on react-i18next which mobile-rn does not use — that
+ * sentence is the whole rationale; do not point readers at notes that live
+ * outside this repository.
  */
 
 import type { ErrorCategory } from '@agenthub/shared/errors';

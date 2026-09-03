@@ -405,7 +405,7 @@ func terminalEndpointError(method string) error {
 // Prompt and workdir come from the RunProcessContext attached to ctx via
 // SDKAdapterContext (same pattern as the anthropic/openai SDK adapters).
 //
-// Verified on the DevSpace dev machine: live end-to-end runs against the
+// Verified live end-to-end on a Linux ARM64 dev host: runs against the
 // real claude-agent-acp 0.67.0 (and native opencode acp 1.18.18) — initialize
 // → session/new → session/prompt → streaming session/update → end_turn →
 // run finalized — plus the session/request_permission approval chain

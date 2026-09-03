@@ -114,7 +114,7 @@ func (a *ACPAdapter) PreflightCheck() error {
 var _ adapters.AgentAdapter = (*ACPAdapter)(nil)
 
 // Verified: end-to-end runs against the real `opencode acp` process were
-// exercised on the DevSpace dev machine (opencode 1.18.18 installed via npm,
+// exercised live on a Linux ARM64 dev host (opencode 1.18.18 installed via npm,
 // gateway provider configured in ~/.config/opencode/opencode.json →
 // initialize → session/new → session/prompt → streaming → end_turn → run
 // finalized). Provider credentials come from the opencode config file, not
