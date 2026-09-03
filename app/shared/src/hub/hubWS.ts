@@ -45,7 +45,7 @@ export interface HubWSOptions {
   useQueryTokenFallback?: boolean;
 }
 
-/** Payload emitted on HUB_WS_GAP_EVENT when a seq_id discontinuity is observed. */
+/** Payload handed to HubWSHandle.onGap when a seq_id discontinuity is observed. */
 export interface HubWSGapPayload {
   /** Last successfully processed seq_id on this connection. */
   lastSeq: number;
