@@ -22,7 +22,7 @@
 //	cd edge-server && ACP_LIVE=1 go test ./internal/adapters/codex/ \
 //	  -run TestCodexACPadapterLiveRealRun -v -count=1
 //
-// Evidence record (first run: huawei-dev, see #1743 item 3):
+// Evidence record (first live run recorded in #1743 item 3):
 //   - npm mirror serves the pinned 1.1.7 (`npx -y
 //     @agentclientprotocol/codex-acp@1.1.7 --version` exit 0), so the
 //     launcher+network preconditions hold.

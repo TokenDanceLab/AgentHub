@@ -498,6 +498,55 @@ def check_doc_internal_links() -> None:
                 fail(f"{doc_rel} links to missing target: {target}", "DOC-BROKEN-LINK")
 
 
+def check_no_orphan_selftests() -> None:
+    """scripts/verify/tests/ 下的每个负向自测必须真的被 CI 或 Makefile 执行。
+
+    一个从不被执行的自测比没有自测更坏：它让门禁看起来"已被负向验证过"，而实际上
+    门禁哑掉时不会有任何人知道。round-68 实测有 3 个自 2026-08 落地以来从未被任何
+    workflow 调用（#2275）。
+
+    扫工作树而不是 git index：本检查要在提交前就能跑，且 CI 上两者等价。
+    """
+    tests_dir = os.path.join(ROOT, "scripts", "verify", "tests")
+    if not os.path.isdir(tests_dir):
+        fail("scripts/verify/tests/ is missing — the scan is blind, refusing to report green",
+             code="DOC-ORPHAN-SELFTEST")
+    selftests = sorted(
+        f for f in os.listdir(tests_dir)
+        if re.search(r"\.Tests\.(py|sh)$", f) and os.path.isfile(os.path.join(tests_dir, f))
+    )
+    if not selftests:
+        fail("found 0 *.Tests.{py,sh} under scripts/verify/tests/ — the scan is blind",
+             code="DOC-ORPHAN-SELFTEST")
+
+    caller_texts = []
+    wf_dir = os.path.join(ROOT, ".github", "workflows")
+    if os.path.isdir(wf_dir):
+        for name in sorted(os.listdir(wf_dir)):
+            if name.endswith((".yml", ".yaml")):
+                with open(os.path.join(wf_dir, name), encoding="utf-8", errors="replace") as handle:
+                    caller_texts.append(handle.read())
+    makefile = os.path.join(ROOT, "Makefile")
+    if os.path.isfile(makefile):
+        with open(makefile, encoding="utf-8", errors="replace") as handle:
+            caller_texts.append(handle.read())
+    if not caller_texts:
+        fail("found no CI workflow and no Makefile — cannot judge self-test wiring on empty input",
+             code="DOC-ORPHAN-SELFTEST")
+
+    haystack = "\n".join(caller_texts)
+    orphans = [name for name in selftests if name not in haystack]
+    if orphans:
+        fail(
+            "self-test(s) never executed by any CI workflow or Makefile target: "
+            + ", ".join(orphans)
+            + " — wire them into a job that runs on every PR (a dispatch-only job does not count), "
+              "or delete them; an unexecuted negative self-test is a guarantee nobody has",
+            code="DOC-ORPHAN-SELFTEST",
+        )
+    print(f"self-test wiring check ok ({len(selftests)} self-tests, all executed by CI/Makefile)")
+
+
 def check_no_script_mirror() -> None:
     script_leaves = {normalize_path(f).rsplit("/", 1)[-1] for f in git_ls_files(["scripts/"])}
     test_leaves = [
@@ -527,6 +576,7 @@ def main() -> int:
     check_doc_internal_links()
     check_out_of_repo_links()
     check_no_script_mirror()
+    check_no_orphan_selftests()
     print("doc SSOT ok")
     return 0
 
