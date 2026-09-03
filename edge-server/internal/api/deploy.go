@@ -74,7 +74,7 @@ func validateSlug(slug string) error {
 // and SCPs the result to the configured deployment target.
 func (h *Handler) PostDeployments(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		writeJSON(w, http.StatusMethodNotAllowed, errcode.ErrorBody(errcode.ErrMethodNotAllowed))
+		errcode.Write(w, errcode.ErrMethodNotAllowed)
 		return
 	}
 
@@ -83,18 +83,18 @@ func (h *Handler) PostDeployments(w http.ResponseWriter, r *http.Request) {
 		Slug  string `json:"slug"`
 	}
 	if err := decodeOptionalJSON(r, &req); err != nil {
-		writeJSON(w, http.StatusBadRequest, errcode.ErrorBody(errcode.ErrInvalidJSON))
+		errcode.Write(w, errcode.ErrInvalidJSON)
 		return
 	}
 	req.RunID = strings.TrimSpace(req.RunID)
 	req.Slug = strings.TrimSpace(req.Slug)
 
 	if req.RunID == "" {
-		writeJSON(w, http.StatusBadRequest, errcode.ErrorBody(errcode.ErrRunIDRequired))
+		errcode.Write(w, errcode.ErrRunIDRequired)
 		return
 	}
 	if err := validateSlug(req.Slug); err != nil {
-		writeJSON(w, http.StatusBadRequest, errcode.ErrorBody(errcode.ErrDeployInvalidSlug.WithMessage(err.Error())))
+		errcode.Write(w, errcode.ErrDeployInvalidSlug.WithMessage(err.Error()))
 		return
 	}
 
@@ -103,11 +103,11 @@ func (h *Handler) PostDeployments(w http.ResponseWriter, r *http.Request) {
 	// Verify run exists and is in a terminal state.
 	run, ok := repository.GetRun(req.RunID)
 	if !ok {
-		writeJSON(w, http.StatusNotFound, errcode.ErrorBody(errcode.ErrNotFound.WithMessage("run not found")))
+		errcode.Write(w, errcode.ErrNotFound.WithMessage("run not found"))
 		return
 	}
 	if !isTerminalRunStatus(run.Status) {
-		writeJSON(w, http.StatusBadRequest, errcode.ErrorBody(errcode.ErrDeployRunNotFinished))
+		errcode.Write(w, errcode.ErrDeployRunNotFinished)
 		return
 	}
 
@@ -116,14 +116,14 @@ func (h *Handler) PostDeployments(w http.ResponseWriter, r *http.Request) {
 	// closed. 404 (not 403) to avoid leaking run existence; local
 	// single-tenant mode passes via the documented ownership bypass.
 	if !isRunOwnedBy(repository, req.RunID, h.ownerUserID(r)) {
-		writeJSON(w, http.StatusNotFound, errcode.ErrorBody(errcode.ErrNotFound.WithMessage("run not found")))
+		errcode.Write(w, errcode.ErrNotFound.WithMessage("run not found"))
 		return
 	}
 
 	// Collect artifacts for this run.
 	artifacts := repository.ListArtifacts(req.RunID)
 	if len(artifacts) == 0 {
-		writeJSON(w, http.StatusBadRequest, errcode.ErrorBody(errcode.ErrDeployNoArtifacts))
+		errcode.Write(w, errcode.ErrDeployNoArtifacts)
 		return
 	}
 
@@ -132,7 +132,7 @@ func (h *Handler) PostDeployments(w http.ResponseWriter, r *http.Request) {
 	tmpFile, err := os.CreateTemp("", "agenthub-deploy-*.tar.gz")
 	if err != nil {
 		slog.Error("deploy: failed to create temp file", "error", err)
-		writeJSON(w, http.StatusInternalServerError, errcode.ErrorBody(errcode.ErrInternal.WithMessage("failed to create temp archive")))
+		errcode.Write(w, errcode.ErrInternal.WithMessage("failed to create temp archive"))
 		return
 	}
 	tmpPath := tmpFile.Name()
@@ -140,7 +140,7 @@ func (h *Handler) PostDeployments(w http.ResponseWriter, r *http.Request) {
 
 	if err := buildArtifactArchive(run.WorkDir, artifacts, tmpFile); err != nil {
 		slog.Error("deploy: failed to build archive", "error", err)
-		writeJSON(w, http.StatusInternalServerError, errcode.ErrorBody(errcode.ErrInternal.WithMessage("failed to build archive: "+err.Error())))
+		errcode.Write(w, errcode.ErrInternal.WithMessage("failed to build archive: "+err.Error()))
 		return
 	}
 	_ = tmpFile.Close()
@@ -152,7 +152,7 @@ func (h *Handler) PostDeployments(w http.ResponseWriter, r *http.Request) {
 	// Ensure remote directory exists and is clean.
 	if err := runSSHCommand(targetHost, "sudo", "mkdir", "-p", remotePath); err != nil {
 		slog.Error("deploy: failed to create remote dir", "error", err, "host", targetHost, "path", remotePath)
-		writeJSON(w, http.StatusInternalServerError, errcode.ErrorBody(errcode.ErrInternal.WithMessage("failed to create remote directory")))
+		errcode.Write(w, errcode.ErrInternal.WithMessage("failed to create remote directory"))
 		return
 	}
 
@@ -165,7 +165,7 @@ func (h *Handler) PostDeployments(w http.ResponseWriter, r *http.Request) {
 	remoteTmp := remotePath + "/deploy.tar.gz"
 	if err := runSCP(tmpPath, targetHost+":"+remoteTmp); err != nil {
 		slog.Error("deploy: scp failed", "error", err, "host", targetHost)
-		writeJSON(w, http.StatusInternalServerError, errcode.ErrorBody(errcode.ErrInternal.WithMessage("failed to transfer archive")))
+		errcode.Write(w, errcode.ErrInternal.WithMessage("failed to transfer archive"))
 		return
 	}
 
@@ -173,7 +173,7 @@ func (h *Handler) PostDeployments(w http.ResponseWriter, r *http.Request) {
 	// Use separate SSH invocations instead of bash -c to avoid shell injection risk.
 	if err := runSSHCommand(targetHost, "sudo", "tar", "-xzf", remoteTmp, "-C", remotePath); err != nil {
 		slog.Error("deploy: remote extract failed", "error", err)
-		writeJSON(w, http.StatusInternalServerError, errcode.ErrorBody(errcode.ErrInternal.WithMessage("failed to extract on remote")))
+		errcode.Write(w, errcode.ErrInternal.WithMessage("failed to extract on remote"))
 		return
 	}
 	if err := runSSHCommand(targetHost, "sudo", "rm", "-f", remoteTmp); err != nil {
