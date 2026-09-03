@@ -43,10 +43,10 @@ api/
 | 模块 | 负责内容 | 主要归属 |
 |---|---|---|
 | IM / Project | Project、Conversation、Thread、Message、Item、Memory | Edge / Hub |
-| Execution / Runtime | AgentRun、Approval、Artifact、Preview、Workspace、Agent Runtime adapter | Edge |
+| Execution / Runtime | AgentRun、Approval、Artifact、Preview、Agent Runtime adapter | Edge |
 | Profile / Configuration | Agent Profile、模型映射、Skill、MCP、cc-switch provider binding、审批策略 | Hub / Edge |
 | Target / Relay | Local Edge、Remote Edge、Cloud Edge、Hub Relay command、设备状态 | Hub / Edge |
-| Hub / Sync | Auth、User、Contact、Group、Device、Sync、Cloud | Hub |
+| Hub / Sync | Auth、User、Contact、Group、Device、Sync、Cloud、Workspace（元数据与列举，以 `/web/projects*` 暴露；`owner: Runner` 已退役，见 `conventions.md` §OpenAPI Metadata） | Hub |
 
 本地执行链路 `Desktop -> Local Edge -> Agent Runtime adapter -> Agent CLI` 不依赖 Hub。云端 IM、多端同步、远程查看/审批和 Hub relay 才需要 Hub session。
 
@@ -67,6 +67,10 @@ api/
 | P2 | TokenDance ID -> Hub session、Edge-Hub 同步、Web/Mobile 远程查看和审批 |
 | P3 | Hub relay、Cloud Edge、远程执行 |
 | P4 | 完整联系人、群聊、团队空间、Skill/MCP/Profile 生态 |
+
+**适用范围**：`x-agenthub-phase` 只标注 `/v1/**` 设计面。reality-face（`/client`、`/web`、`/edge`）由 `x-agenthub-status` 治理、**不带 phase**，`/health`、`/api`、`/cloud` 属 ops/非设计面同样不带 ⇒ 「284 个 operation 里 166 个没有 phase」不是覆盖率缺陷，而是这条适用范围（实测缺失分布：`/web 91`、`/client 64`、`/edge 5`、`/v1 3`、`/health`·`/api`·`/cloud` 各 1）。ADR-030 / #2258。
+
+**已知例外 3 个（待产品定值，本轮不代拍）**：`GET /v1/metrics`、`GET /v1/agent-instances`、`POST /v1/permissions/decide` 属 `/v1/**` 却没有 phase（三者都是 `status: implemented`、原 `owner: Edge`，且都已带其他元数据）。`docs/architecture/` 全文没有给它们定过 P0~P4，同族兄弟端点的 phase 也是 P0/P1/P2/P4 混杂、无法照抄 ⇒ 本轮**只声明规则、不代产品填值**：填一个没有出处的 phase 等于制造下一条「文档与实况分岔」。补齐需要产品/架构 owner 给出取值，跟踪在 #2258。
 
 ## 使用规则
 
