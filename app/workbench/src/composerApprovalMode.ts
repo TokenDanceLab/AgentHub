@@ -14,41 +14,58 @@ import type { PermissionModeOption } from '@shared/ui';
  * The shared PermissionModePicker uses Edge permission-mode vocabulary for
  * its option values ('acceptEdits' / 'plan') so the option icons stay
  * meaningful; 'suggest' keeps a Settings glyph.
+ *
+ * The three modes used to be spelled out five separate times in this file: a
+ * `COMPOSER_APPROVAL_MODES` array that nothing consumed, plus four hand-written
+ * if/else chains that each re-listed the same mode → picker-value → label-key
+ * triple. One table is now the single source and every function below is a
+ * lookup on it, so a mode can no longer be present in one mapping and missing
+ * from another, and adding a mode is one row instead of five edits (#2274 C-2).
  */
-export const COMPOSER_APPROVAL_MODES: ApprovalMode[] = [
-  'suggest',
-  'workspace-write',
-  'read-only',
+
+interface ApprovalModeRow {
+  readonly mode: ApprovalMode;
+  /** Edge permission-mode vocabulary (see the note above). */
+  readonly pickerValue: string;
+  readonly labelKey: string;
+}
+
+const SUGGEST_ROW: ApprovalModeRow = {
+  mode: 'suggest',
+  pickerValue: 'suggest',
+  labelKey: 'composer.approvalMode.suggest',
+};
+
+const APPROVAL_MODE_ROWS: readonly ApprovalModeRow[] = [
+  SUGGEST_ROW,
+  {
+    mode: 'workspace-write',
+    pickerValue: 'acceptEdits',
+    labelKey: 'composer.approvalMode.workspaceWrite',
+  },
+  { mode: 'read-only', pickerValue: 'plan', labelKey: 'composer.approvalMode.readOnly' },
 ];
 
+/** Every mode the composer can be in, in picker order. */
+export const COMPOSER_APPROVAL_MODES: ApprovalMode[] = APPROVAL_MODE_ROWS.map((row) => row.mode);
+
 export function approvalModeToPickerValue(mode: ApprovalMode): string {
-  if (mode === 'workspace-write') return 'acceptEdits';
-  if (mode === 'read-only') return 'plan';
-  return 'suggest';
+  return (APPROVAL_MODE_ROWS.find((row) => row.mode === mode) ?? SUGGEST_ROW).pickerValue;
 }
 
 export function pickerValueToApprovalMode(value: string): ApprovalMode | null {
-  if (value === 'acceptEdits') return 'workspace-write';
-  if (value === 'plan') return 'read-only';
-  if (value === 'suggest') return 'suggest';
   // Unknown value (e.g. a future Edge mode wired by another consumer) — the
   // composer keeps its current mode instead of silently coercing.
-  return null;
+  return APPROVAL_MODE_ROWS.find((row) => row.pickerValue === value)?.mode ?? null;
 }
 
 export function buildComposerApprovalModeOptions(t: (key: string) => string): PermissionModeOption[] {
-  return [
-    { value: 'suggest', label: t('composer.approvalMode.suggest') },
-    { value: 'acceptEdits', label: t('composer.approvalMode.workspaceWrite') },
-    { value: 'plan', label: t('composer.approvalMode.readOnly') },
-  ];
+  return APPROVAL_MODE_ROWS.map((row) => ({ value: row.pickerValue, label: t(row.labelKey) }));
 }
 
 export function activeComposerApprovalModeLabel(
   mode: ApprovalMode,
   t: (key: string) => string,
 ): string {
-  if (mode === 'workspace-write') return t('composer.approvalMode.workspaceWrite');
-  if (mode === 'read-only') return t('composer.approvalMode.readOnly');
-  return t('composer.approvalMode.suggest');
+  return t((APPROVAL_MODE_ROWS.find((row) => row.mode === mode) ?? SUGGEST_ROW).labelKey);
 }

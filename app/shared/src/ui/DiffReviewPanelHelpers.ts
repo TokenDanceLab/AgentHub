@@ -123,15 +123,7 @@ export function fileActionClass(action: string): string {
   return styles.fileTabBadgeModified ?? '';
 }
 
-// ── Line / hunk key helpers ────────────────────────────────────────────
-
-export function leftLineKey(fileIndex: number, rowIndex: number): string {
-  return `L-${fileIndex}-${rowIndex}`;
-}
-
-export function rightLineKey(fileIndex: number, rowIndex: number): string {
-  return `R-${fileIndex}-${rowIndex}`;
-}
+// ── Hunk key helper ────────────────────────────────────────────────────
 
 /** Hunk state key: "filePath:hunkIndex" */
 export function hunkStateKey(filePath: string, hunkIndex: number): string {
