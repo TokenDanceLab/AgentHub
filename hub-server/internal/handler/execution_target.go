@@ -231,13 +231,11 @@ func (h *ExecutionTargetHandler) ListTargets(c *gin.Context) {
 	userID := c.GetString("user_id")
 	targetType := c.Query("target_type")
 	cursor := c.Query("pageCursor")
-	pageSize, _ := strconv.Atoi(c.DefaultQuery("pageSize", "50"))
-	if pageSize <= 0 {
-		pageSize = config.DefaultPaginationLimit
-	}
-	if pageSize > config.MaxPageLimit {
-		pageSize = config.MaxPageLimit
-	}
+	pageSize, _ := strconv.Atoi(c.DefaultQuery("pageSize", strconv.Itoa(config.DefaultPaginationLimit)))
+	// Ceiling = repository.ListExecutionTargets (MaxListPageSize), which is also
+	// the PageSize maximum api/openapi.yaml declares for GET /web/execution-targets
+	// (#2243).
+	pageSize = config.ClampPageSize(pageSize, config.MaxListPageSize, config.DefaultPaginationLimit)
 
 	result, err := h.service.List(c.Request.Context(), userID, targetType, cursor, pageSize)
 	if err != nil {

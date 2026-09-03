@@ -38,12 +38,10 @@ func (h *NotificationHandler) ListNotifications(c *gin.Context) {
 			limit = v
 		}
 	}
-	if limit <= 0 {
-		limit = config.DefaultPaginationLimit
-	}
-	if limit > config.MaxPageLimit {
-		limit = config.MaxPageLimit
-	}
+	// Ceiling = repository.ListNotifications, which clamps to MaxMessagePageLimit.
+	// This list returns a bare array with no cursor, so a page shortened below the
+	// handler is indistinguishable from the end of the collection (#2243).
+	limit = config.ClampPageSize(limit, config.MaxMessagePageLimit, config.DefaultPaginationLimit)
 
 	offset := 0
 	if o := c.Query("offset"); o != "" {

@@ -371,10 +371,14 @@ func runEventFilterFromQuery(c *gin.Context) (model.AgentRunEventFilter, error) 
 		if err != nil || limit < 0 {
 			return filter, errcode.ErrBadRequest
 		}
-		if limit > config.MaxPageLimit {
-			limit = config.MaxPageLimit
-		}
-		filter.Limit = limit
+		// Ceiling stays MaxPageLimit: api/openapi.yaml declares maximum: 500 for
+		// this endpoint's own `limit` parameter ("values above 500 are clamped by
+		// Hub"), and repository.ListAgentRunEventsByTaskIDFiltered applies no
+		// ceiling to an explicit limit — this handler is the enforcement point.
+		// def is the requested value itself so limit=0 keeps its meaning of "no
+		// explicit limit", which the repository answers with
+		// maxAgentEventsPerQuery (#2243).
+		filter.Limit = config.ClampPageSize(limit, config.MaxPageLimit, limit)
 	}
 	return filter, nil
 }

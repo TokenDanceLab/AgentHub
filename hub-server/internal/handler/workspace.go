@@ -83,13 +83,10 @@ func (h *WorkspaceHandler) GetWorkspace(c *gin.Context) {
 }
 
 func (h *WorkspaceHandler) ListWorkspaces(c *gin.Context) {
-	pageSize, _ := strconv.Atoi(c.DefaultQuery("pageSize", "50"))
-	if pageSize <= 0 {
-		pageSize = config.DefaultPaginationLimit
-	}
-	if pageSize > config.MaxPageLimit {
-		pageSize = config.MaxPageLimit
-	}
+	pageSize, _ := strconv.Atoi(c.DefaultQuery("pageSize", strconv.Itoa(config.DefaultPaginationLimit)))
+	// Ceiling = repository.ListWorkspaces (MaxListPageSize), which is also the
+	// PageSize maximum api/openapi.yaml declares for GET /web/projects (#2243).
+	pageSize = config.ClampPageSize(pageSize, config.MaxListPageSize, config.DefaultPaginationLimit)
 	result, err := h.service.List(c.Request.Context(), c.GetString("user_id"), c.Query("q"), c.Query("pageCursor"), pageSize)
 	if err != nil {
 		var e *errcode.Error
@@ -196,13 +193,14 @@ func (h *WorkspaceHandler) CreateProjectThreadMessage(c *gin.Context) {
 }
 
 func (h *WorkspaceHandler) ListProjectThreadMessages(c *gin.Context) {
-	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "50"))
-	if limit <= 0 {
-		limit = config.DefaultPaginationLimit
-	}
-	if limit > config.MaxPageLimit {
-		limit = config.MaxPageLimit
-	}
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", strconv.Itoa(config.DefaultPaginationLimit)))
+	// Ceiling = workspace.Service.ListThreadMessages, which clamps to
+	// MaxMessagePageLimit before calling repository.GetMessagesBySession (itself
+	// clamped to the same value), and = the maximum api/openapi.yaml declares for
+	// this endpoint's own `limit` parameter (100). The response is a bare array
+	// with no cursor, so a page shortened below the handler reads as "end of
+	// thread" (#2243).
+	limit = config.ClampPageSize(limit, config.MaxMessagePageLimit, config.DefaultPaginationLimit)
 	messages, err := h.service.ListThreadMessages(c.Request.Context(), c.Param("id"), c.Param("threadId"), c.GetString("user_id"), limit)
 	if err != nil {
 		var e *errcode.Error
