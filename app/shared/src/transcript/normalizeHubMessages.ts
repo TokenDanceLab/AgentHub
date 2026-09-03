@@ -77,32 +77,23 @@ const ATTACHMENT_MISSING_FILE_FALLBACK = '文件附件缺失';
 export type NormalizeHubTranslate = (key: string) => string;
 
 /**
- * pin 状态来源（已落地，2026-08-02 专项清理时确认闭环）：
+ * pin 状态来源（已落地）：
  *
- * Survey (2026-08-01, sonnet-unpin-recall 续23 → unpin menu entry):
- * - hub-server `model.Message` has no `pinned` field; pins live in the
- *   separate `message_pins` table (`model.MessagePin`), surfaced only via
- *   REST `GET /client/sessions/{id}/pins` — which the frontend has no runtime
- *   consumer for (only e2e mocks / payload path builders).
- * - WS frames `message.pin` (payload: session_id, message_id,
- *   pinned_by_user_id, pinned_at) and `message.unpin` (session_id,
- *   message_id) carry the pin events, but the consumers only refresh:
- *   web (webHubRealtime.ts) invalidates the hub-messages query — whose
- *   re-fetched payload still has no pin field — and desktop
- *   (useHubEventStream.ts / hubEventBridge.ts) just touches `lastMessage`.
- * - `hubClientDomainTypes.HubMessage.pinned` was deliberately NOT added:
- *   the REST message shape has no such field, so it would be a dead field.
- *
- * Landed store path: the web / desktop WS handlers maintain a
- * session-scoped `messageId → pinned` map (pinMap.ts, fed by the
- * MESSAGE_PIN/MESSAGE_UNPIN frames, seeded from `GET /client/sessions/{id}/pins`),
- * and the normalize callers (webWorkbenchTranscript.ts /
- * useDesktopWorkbenchModel.ts) merge the map via `withPinnedState` into
- * `HubMessageTranscriptInput.pinned` before calling this function — the
- * adapter below writes it through to `block.pinned`, and the context menu
- * toggles pin/unpin off `block.pinned`.
+ * - hub-server `model.Message` 没有 `pinned` 字段；pin 存在独立的
+ *   `message_pins` 表（`model.MessagePin`），经 REST
+ *   `GET /client/sessions/{id}/pins` 上浮。
+ * - REST 消费方两端都有：desktop `sessionQueries.useHubPinnedMessages`
+ *   （queryKey `['hub','threads',sessionId,'pins']`）；web
+ *   `useWebWorkbenchModel`（queryKey `['web-v4','hub-pins',...]`），
+ *   两者都用来给 pinMap store 做种子。
+ * - WS 帧 `message.pin` / `message.unpin` 直接驱动 pinMap store：desktop
+ *   `hubEventBridge.ts` 失效 `threads.pins`/`threads.detail` 并调用
+ *   `getPinMapStore().handleFrame`；web `webHubRealtime.ts` 同样把帧喂给
+ *   pinMap，`useWebWorkbenchModel` 订阅 pinMap 并以 REST pins 结果种子化。
+ * - `HubMessage.pinned` 仍没有加：REST message 形状确实没有该字段，pin
+ *   状态统一放在 pinMap（`messageId → pinned`），由 normalize 调用方经
+ *   `withPinnedState` 合并进输入，本文件写入 `block.pinned`。
  */
-
 export function normalizeHubMessagesToTranscript(
   messages: HubMessageTranscriptInput[] | undefined,
   t?: NormalizeHubTranslate,
