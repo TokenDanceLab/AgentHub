@@ -88,7 +88,7 @@ describe('attachment utils', () => {
     });
 
     it('extracts filename from windows path', () => {
-      expect(pathBasename('C:\\Users\\file.ts')).toBe('file.ts');
+      expect(pathBasename('C:\\Users\\Example\\file.ts')).toBe('file.ts');
     });
 
     it('returns input when no separator', () => {

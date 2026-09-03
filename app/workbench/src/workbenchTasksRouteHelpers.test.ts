@@ -324,13 +324,13 @@ describe('workbenchTasksRouteHandlers — selection plans and chrome', () => {
   it('handleAssignSelectedTaskToMe patches the assignee to the acting user', () => {
     const { state, build } = createTasksHarness(
       { selectedTaskId: 't1' },
-      { currentUserId: 'ding', userDisplayName: 'Ding' },
+      { currentUserId: 'alice', userDisplayName: 'Alice' },
     );
 
     build().handleAssignSelectedTaskToMe();
 
-    expect(state.taskGroups[0]?.tasks.find((task) => task.id === 't1')?.assignee).toBe('Ding');
-    expect(state.taskActionLabel).toContain('已指派给 Ding');
+    expect(state.taskGroups[0]?.tasks.find((task) => task.id === 't1')?.assignee).toBe('Alice');
+    expect(state.taskActionLabel).toContain('已指派给 Alice');
   });
 
   it('handleGroupBySelectedTaskProject switches to the project-grouped list view', () => {
