@@ -17,7 +17,7 @@ import (
 	"github.com/agenthub/hub-server/internal/cache"
 	"github.com/agenthub/hub-server/internal/errcode"
 	"github.com/agenthub/hub-server/internal/model"
-	"github.com/agenthub/hub-server/internal/testkit"
+	"github.com/agenthub/pkg/testkit"
 )
 
 // ── behavioral test helpers (moved with Contact package #685) ───────────────

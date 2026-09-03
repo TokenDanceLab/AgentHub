@@ -1,3 +1,7 @@
+// Package testkit holds Hub-only shared test fixtures. The generic
+// deterministic-wait helpers (WaitFor/Eventually) live in pkg/testkit (#1550);
+// this package keeps just the Hub response envelope shared by tests/integration,
+// tests/oidc, tests/scenarios and tests/teamrun.
 package testkit
 
 import (

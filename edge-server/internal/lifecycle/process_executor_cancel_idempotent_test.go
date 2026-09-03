@@ -11,7 +11,7 @@ import (
 
 	"github.com/agenthub/edge-server/internal/events"
 	"github.com/agenthub/edge-server/internal/store"
-	"github.com/agenthub/edge-server/internal/testkit"
+	"github.com/agenthub/pkg/testkit"
 )
 
 // Regression tests for #2154 (Wegener 并发探索): a repeat Cancel while the

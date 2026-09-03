@@ -17,7 +17,7 @@ import (
 	"github.com/agenthub/hub-server/internal/bus"
 	"github.com/agenthub/hub-server/internal/config"
 	"github.com/agenthub/hub-server/internal/model"
-	"github.com/agenthub/hub-server/internal/testkit"
+	"github.com/agenthub/pkg/testkit"
 )
 
 // ── Fixtures ──────────────────────────────────────────────────────────────
