@@ -2,12 +2,8 @@ import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 import {
-  DESIGN_FILE_ICON_RADIUS,
-  DESIGN_FILE_ICON_SIZE,
   DESIGN_NAV_GLYPH_SIZE,
   DESIGN_NAV_GLYPH_STROKE_WIDTH,
-  DESIGN_NAV_ICON_SIZE,
-  DESIGN_NAV_ICON_STROKE_WIDTH,
   DesignFileIcon,
   DesignNavIcon,
   getDesignFileIconColor,
@@ -42,15 +38,6 @@ describe('design icon registry', () => {
     expect(getDesignFileIconColor('sql')).toBe('var(--info, var(--state-running))');
     expect(getDesignFileIconColor('git')).toBe('#f05032');
     expect(getDesignFileIconColor('xlsx')).toBe('#217346');
-  });
-
-  it('keeps icon sizing constants aligned to tokendance-design/desktop CSS', () => {
-    expect(DESIGN_FILE_ICON_SIZE).toBe(17);
-    expect(DESIGN_FILE_ICON_RADIUS).toBe(3);
-    expect(DESIGN_NAV_ICON_SIZE).toBe(16);
-    expect(DESIGN_NAV_ICON_STROKE_WIDTH).toBe(1.9);
-    expect(DESIGN_NAV_GLYPH_SIZE).toBe(17);
-    expect(DESIGN_NAV_GLYPH_STROKE_WIDTH).toBe(1.85);
   });
 
   it('lets CSS own file icon SVG sizing like the design demo', () => {

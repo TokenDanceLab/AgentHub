@@ -249,46 +249,20 @@ describe('isAccountReady', () => {
     expect(isAccountReady(account)).toBe(true);
   });
 
-  it('returns false when hubSession is expired', () => {
+  const notReadyCases: Array<[string, Partial<MobileAccountState>]> = [
+    ['expired hubSession', { hubSession: 'expired' }],
+    ['missing hubSession', { hubSession: 'missing', hubSync: 'offline' }],
+    ['recovering tokenDanceId', { tokenDanceId: 'recovering', hubSync: 'recovering' }],
+    ['signed_out tokenDanceId', { tokenDanceId: 'signed_out' }],
+  ];
+  it.each(notReadyCases)('returns false when %s', (_, overrides) => {
     const account: MobileAccountState = {
       tokenDanceId: 'signed_in',
-      hubSession: 'expired',
-      notification: 'prompt',
-      hubSync: 'active',
-      deviceLabel: 'test',
-    };
-    expect(isAccountReady(account)).toBe(false);
-  });
-
-  it('returns false when hubSession is missing', () => {
-    const account: MobileAccountState = {
-      tokenDanceId: 'signed_in',
-      hubSession: 'missing',
-      notification: 'prompt',
-      hubSync: 'offline',
-      deviceLabel: 'test',
-    };
-    expect(isAccountReady(account)).toBe(false);
-  });
-
-  it('returns false when tokenDanceId is recovering', () => {
-    const account: MobileAccountState = {
-      tokenDanceId: 'recovering',
-      hubSession: 'active',
-      notification: 'prompt',
-      hubSync: 'recovering',
-      deviceLabel: 'test',
-    };
-    expect(isAccountReady(account)).toBe(false);
-  });
-
-  it('returns false when signed_out', () => {
-    const account: MobileAccountState = {
-      tokenDanceId: 'signed_out',
       hubSession: 'active',
       notification: 'prompt',
       hubSync: 'active',
       deviceLabel: 'test',
+      ...overrides,
     };
     expect(isAccountReady(account)).toBe(false);
   });

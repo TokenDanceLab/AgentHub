@@ -238,43 +238,26 @@ describe('web execution target queries', () => {
     });
   });
 
-  it('surfaces 404 from execution target inventory as AppError', async () => {
+  it.each([
+    ['NOT_FOUND', 404, 'Not Found', 'targets missing'],
+    ['INTERNAL_ERROR', 500, 'Internal Server Error', 'hub down'],
+  ])('surfaces %s from execution target inventory as AppError', async (code, status, statusText, message) => {
     vi.mocked(getAccessToken).mockReturnValue('hub-access');
     vi.stubGlobal(
       'fetch',
       vi.fn(
         async () =>
-          new Response(JSON.stringify({ code: 'NOT_FOUND', message: 'targets missing' }), {
-            status: 404,
-            statusText: 'Not Found',
+          new Response(JSON.stringify({ code, message }), {
+            status,
+            statusText,
             headers: { 'Content-Type': 'application/json' },
           })
       )
     );
 
     await expect(fetchExecutionTargets(true)).rejects.toMatchObject({
-      code: 'NOT_FOUND',
-      status: 404,
-    });
-  });
-
-  it('surfaces 500 from execution target inventory as AppError', async () => {
-    vi.mocked(getAccessToken).mockReturnValue('hub-access');
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(
-        async () =>
-          new Response(JSON.stringify({ code: 'INTERNAL_ERROR', message: 'hub down' }), {
-            status: 500,
-            statusText: 'Internal Server Error',
-            headers: { 'Content-Type': 'application/json' },
-          })
-      )
-    );
-
-    await expect(fetchExecutionTargets(true)).rejects.toMatchObject({
-      code: 'INTERNAL_ERROR',
-      status: 500,
+      code,
+      status,
     });
   });
 

@@ -60,24 +60,17 @@ describe('resolveDesktopEvidenceContentUrl', () => {
 });
 
 describe('resolveDesktopRuntimeEvidenceContent', () => {
-  it('maps artifact refs onto the Edge artifact content endpoint', () => {
+  it.each([
+    ['artifact', 'run-1', 'artifact-1', 'http://127.0.0.1:3210/v1/runs/run-1/artifacts/artifact-1/content'],
+    ['preview', 'run-2', 'preview-2', 'http://127.0.0.1:3210/v1/runs/run-2/previews/preview-2/content'],
+  ])('maps %s refs onto the Edge content endpoint (%s)', (kind, runId, id, expected) => {
     expect(
       resolveDesktopRuntimeEvidenceContent({
-        kind: 'artifact',
-        runId: 'run-1',
-        id: 'artifact-1',
+        kind: kind as 'artifact' | 'preview',
+        runId,
+        id,
       }),
-    ).toBe('http://127.0.0.1:3210/v1/runs/run-1/artifacts/artifact-1/content');
-  });
-
-  it('maps preview refs onto the Edge preview content endpoint', () => {
-    expect(
-      resolveDesktopRuntimeEvidenceContent({
-        kind: 'preview',
-        runId: 'run-2',
-        id: 'preview-2',
-      }),
-    ).toBe('http://127.0.0.1:3210/v1/runs/run-2/previews/preview-2/content');
+    ).toBe(expected);
   });
 });
 

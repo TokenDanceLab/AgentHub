@@ -81,31 +81,19 @@ describe('mobileFriendlyErrorMessage', () => {
       .toBe('fallback');
   });
 
-  it('replaces proxy/timeout internals with fallback', () => {
-    expect(mobileFriendlyErrorMessage('proxy connect timeout', 'fallback'))
-      .toBe('fallback');
+  it.each([
+    ['proxy connect timeout'],
+    ['at fetchData (client.ts:42:7)'],
+    ['node:internal/errors:496'],
+    ['the stack is full'],
+  ])('replaces %s with fallback', (message) => {
+    expect(mobileFriendlyErrorMessage(message, 'fallback')).toBe('fallback');
   });
 
   it('replaces JS error types with fallback', () => {
     expect(mobileFriendlyErrorMessage('TypeError: Cannot read properties of null', 'fallback'))
       .toBe('fallback');
     expect(mobileFriendlyErrorMessage('ReferenceError: x is not defined', 'fallback'))
-      .toBe('fallback');
-  });
-
-  it('replaces stack frames with fallback', () => {
-    expect(mobileFriendlyErrorMessage('at fetchData (client.ts:42:7)', 'fallback'))
-      .toBe('fallback');
-  });
-
-  it('replaces Node internals with fallback', () => {
-    expect(mobileFriendlyErrorMessage('node:internal/errors:496', 'fallback'))
-      .toBe('fallback');
-  });
-
-  it('replaces messages containing "stack" keyword (matches shared behavior)', () => {
-    // "the stack is full" is a user-facing message about a data structure
-    expect(mobileFriendlyErrorMessage('the stack is full', 'fallback'))
       .toBe('fallback');
   });
 });

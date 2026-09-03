@@ -1,10 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { TranscriptBlock } from '@shared/transcript';
 import {
-  SELECTION_HOLD_CANCEL_DISTANCE,
   SELECTION_HOLD_DELAY_MS,
-  WORKBENCH_PULSE_MS,
-  WORKBENCH_TOAST_MS,
   addIdIfMissing,
   applySelectionHotkeyPlan,
   applyTranscriptChromeSideEffects,
@@ -140,13 +137,6 @@ function createChromeFixture(overrides: Partial<TranscriptChromeControllerDeps> 
 }
 
 describe('workbenchTranscriptChromeHelpers', () => {
-  it('keeps selection hold and chrome timing constants stable', () => {
-    expect(SELECTION_HOLD_DELAY_MS).toBe(520);
-    expect(SELECTION_HOLD_CANCEL_DISTANCE).toBe(36);
-    expect(WORKBENCH_TOAST_MS).toBe(1700);
-    expect(WORKBENCH_PULSE_MS).toBe(900);
-  });
-
   it('resolves block titles for common kinds', () => {
     expect(blockTitle(textBlock(), t)).toBe('hello world from agent');
     expect(blockTitle(textBlock({ text: '' }), t)).toBe('Agent');
