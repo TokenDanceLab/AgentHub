@@ -85,7 +85,7 @@ ProcessExecutor 配置 `RunTimeout`（默认 30 分钟）、`ShutdownGracePeriod
 
 ## Adapter 家族子包（#1760）
 
-`internal/adapters/` 已从平铺大包拆分为按 Agent 家族归组的子包。依赖方向分两类：`claude`/`codex`/`opencode`/`sdk` 是依赖根包的叶子（embed 根包共享机制如 `AcpAdapter`）；`orchestrator` 是**唯一不依赖根包的纯叶子**（经机器门禁禁止 import 根 `internal/adapters` 实现，只依赖 `internal/orchestration` 合同 + 窄 ports）。根包（非测试代码）不 import 任何子包，仅保留字符串适配器 ID，注册由组合根（`cmd/agenthub-edge`、`internal/httpserver`）完成。共享机制（`AcpAdapter`、NDJSON parser、权限处理链、MCP 临时配置、registry）留在根包。
+`internal/adapters/` 已从平铺大包拆分为按 Agent 家族归组的子包。依赖方向分两类：`claude`/`codex`/`opencode`/`sdk` 是依赖根包与 `acp` 共享子包的叶子（embed `acp.AcpAdapter`）；`orchestrator` 是**唯一不依赖根包的纯叶子**（经机器门禁禁止 import 根 `internal/adapters` 实现，只依赖 `internal/orchestration` 合同 + 窄 ports）。根包（非测试代码）不 import 任何子包，仅保留字符串适配器 ID，注册由组合根（`cmd/agenthub-edge`、`internal/httpserver`）完成。共享 ACP 运行时在 `internal/adapters/acp/` 子包（#1805 下沉），根包保留 NDJSON parser、权限处理链、MCP 临时配置、registry 与字符串适配器 ID。
 
 | 家族 | 子包 | 内容 |
 |---|---|---|
@@ -94,9 +94,9 @@ ProcessExecutor 配置 `RunTimeout`（默认 30 分钟）、`ShutdownGracePeriod
 | OpenCode | `internal/adapters/opencode/` | 原生 ACP `ACPAdapter`（`opencode-acp`） |
 | Orchestrator | `internal/adapters/orchestrator/` | 群聊编排 `OrchestratorAdapter`（`orchestrator`）+ dispatch interceptor 各子层（纯叶子，不依赖根包） |
 | SDK | `internal/adapters/sdk/` | HTTP `AnthropicSDKAdapter`（`anthropic-sdk`）、`OpenAISDKAdapter`（`openai-sdk`） |
-| Test fixtures | `internal/adapters/sdk/testdata/` | 测试共享 JSON fixtures（`sdk_fixture_mapper/`）；mapper 代码在根包 `sdk_fixture_mapper.go` |
+| Test fixtures | `internal/adapters/sdk/testdata/` | 测试共享 JSON fixtures（`sdk_fixture_mapper/`）；mapper 代码在 `sdk/` 子包（`sdk_fixture_mapper.go` 等） |
 
-纯包门禁：`orchestrator` 叶子包经 `scripts/verify/verify-orchestrator-deps.py` 机器门禁（断言：叶子不 import 根、`internal/orchestration` 不 import adapters、根不 import 叶子），`TestLeafDoesNotImportRootAdapters` 保证依赖方向单向。共享 ACP 运行时（`acp.go` `AcpAdapter`）与各家族子包共置于根包平铺区（残留平铺文件含 `acp*.go`/`parser_ndjson*.go`/`registry.go`/`sdk_fixture_mapper.go` 等）。
+纯包门禁：`orchestrator` 叶子包经 `scripts/verify/verify-orchestrator-deps.py` 机器门禁（断言：叶子不 import 根、`internal/orchestration` 不 import adapters、根不 import 叶子），`TestLeafDoesNotImportRootAdapters` 保证依赖方向单向。共享 ACP 运行时在 `internal/adapters/acp/` 子包（`acp/acp.go` 的 `AcpAdapter`、`acp/acp_client.go`、`acp/acp_events.go`，#1805 自根包下沉）；根包残留平铺文件含 `parser_ndjson*.go`/`registry.go`/`mcp_config.go`/`model_config.go`/`contract_aliases.go` 等，`sdk_fixture_mapper*.go` 已在 `sdk/` 子包。
 
 ## 与 Hub 的通信
 
