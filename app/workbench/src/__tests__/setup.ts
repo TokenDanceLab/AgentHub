@@ -1,5 +1,5 @@
 import '@testing-library/jest-dom/vitest';
-import { beforeAll, vi } from 'vitest';
+import { vi } from 'vitest';
 
 // Shared test i18next instance (Issue #1717): real chatview + sharedWorkbench
 // resources, isolated per project via i18next.createInstance(). Registered
@@ -30,38 +30,20 @@ installJsdomPolyfills();
 export { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 export { default as userEvent } from '@testing-library/user-event';
 
-/* ──────────────────────────────────────────────────────────────
-   Synchronous React.lazy preload for tests
-
-   WorkbenchRoutes wraps every page component in React.lazy() +
-   Suspense. In jsdom lazy imports resolve asynchronously which
-   causes flaky "element not found" failures when tests navigate
-   between rail pages and immediately query page content.
-
-   Pre-resolving all lazy pages ensures the import Promise is
-   fulfilled before any test renders a Suspense boundary.
-   ────────────────────────────────────────────────────────────── */
-
-const WORKBENCH_PRELOAD_TIMEOUT_MS = 5_000;
-
-async function preloadWorkbenchPage(load: () => Promise<unknown>): Promise<void> {
-  let timeout: ReturnType<typeof setTimeout> | undefined;
-  await Promise.race([
-    load(),
-    new Promise<void>((resolve) => {
-      timeout = setTimeout(resolve, WORKBENCH_PRELOAD_TIMEOUT_MS);
-    }),
-  ]);
-  if (timeout) clearTimeout(timeout);
-}
-
-beforeAll(async () => {
-  await Promise.allSettled([
-    preloadWorkbenchPage(() => import('../pages/ProjectsPage')),
-    preloadWorkbenchPage(() => import('../pages/ContactsPage')),
-    preloadWorkbenchPage(() => import('../pages/DocsPage')),
-    preloadWorkbenchPage(() => import('../pages/AgentsPage')),
-    preloadWorkbenchPage(() => import('../pages/TasksPage')),
-    preloadWorkbenchPage(() => import('../pages/SettingsPage')),
-  ]);
-}, 30_000);
+// No lazy-page preload here, deliberately.
+//
+// A `beforeAll` used to race six `import('../pages/*')` calls against a 5s
+// timer so that React.lazy boundaries would already be resolved before any
+// test rendered them. Both halves of that rationale are false on this tree:
+// WorkbenchRoutes.tsx imports the pages statically (its own comment records
+// that React.lazy was removed precisely because lazy cannot resolve
+// synchronously under jsdom), and the preload never won its race anyway —
+// measured locally, all six imports hit the 5s timer arm and then rejected with
+// EnvironmentTeardownError once vitest tore the environment down. So it
+// pre-resolved nothing while adding a flat ~5s to the `beforeAll` of every one
+// of this package's ~169 test files (≈37-40% of the coverage lane's vitest
+// wall, #2251 slice 3).
+//
+// If a page ever does become lazy again, the fix belongs in the tests that
+// render it (await the content with findBy*/waitFor), not in a global timer
+// that silently stops preloading the moment an import outgrows it.
