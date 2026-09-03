@@ -1,6 +1,5 @@
 // Package adapters — AgentHook 接口定义
 // 基于 Claude Code (28 hooks) + OpenCode (19 hooks) 收敛为 6 核心 hooks
-// 参考: docs/reference/02-cross-comparison/00-synthesis.md §2.2
 
 package adapters
 
