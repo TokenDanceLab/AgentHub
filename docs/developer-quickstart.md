@@ -141,7 +141,7 @@ git diff --check
 
 GitHub Actions 的 Ubuntu/Windows 分层、路径过滤、矩阵并行、缓存和免费额度策略见 [architecture/github-actions-ci-cd-policy.md](architecture/github-actions-ci-cd-policy.md)。普通 PR 按路径运行 Windows 原生 Go/前端合同、Web/Desktop Visual QA shell 和 Web stubbed-hub Playwright；Mobile full、`e2e-smoke`、`real-e2e-stack`、backend perf/leak、benchmark 和 Linux Tauri no-bundle 只通过 `workflow_dispatch` 按需运行。
 
-E2E/Visual QA 只证明实际跑过的层级；PR 中写明证据等级（`fixture-unit`/`playwright-ui`/`visual-qa`/`stubbed-hub`/`observed-local`/`approved-real`/`backend-api`/`performance-leak`/`packaged-release`，9 级，见 `scripts/verify/verify-real-e2e-contract.py`）。
+E2E/Visual QA 只证明实际跑过的层级；PR 中写明证据等级（9 级枚举见 `scripts/verify/verify-real-e2e-contract.py`，本文件不重抄）。
 
 ## 常见问题
 

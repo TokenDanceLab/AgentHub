@@ -41,8 +41,8 @@ UI Workbench（chat timeline + command center）
 |---|---|---|---|
 | 自有 REST/WS | Hub/Edge 产品控制面 SSOT | 保持 `api/openapi.yaml` + `api/events.md` | 不替换 |
 | ACP / Agent SDK adapter | Edge <-> coding agent runtime 进程契约 | 已有 adapter family | 只属于 Edge data plane |
-| MCP | agent <-> tools/data | 已有 mcp_config；作为未来 tool surface | tool 需要 narrow capability，不当作通用业务协议 |
-| A2A | agent <-> agent | 仅远程/跨设备协作引入；ACP 已并入 A2A，不要继续投 ACP | 不替换自有 Hub/Edge 契约 |
+| MCP | agent <-> tools/data | 已有 mcp_config + Edge MCP server（8 个 canonical 工具，见 11） | tool 需要 narrow capability，不当作通用业务协议 |
+| A2A | agent <-> agent | 仅远程/跨设备协作引入；当前未引入（见 11） | 不替换自有 Hub/Edge 契约 |
 | AG-UI | agent <-> user UI | 只做 capability mapping 兼容评估 | 不替换现有 WS event contract |
 
 ## 4. 编排原则
@@ -104,7 +104,7 @@ UI Workbench（chat timeline + command center）
 | P0 | 事件一致性审计 | outbox 骨架已存在 | 业务同事务、event version、幂等、snapshot 集成测试 |
 | P0 | 权限最小面 | 身份/会话基础已有 | task-scoped + per-action 授权可审计 |
 | P0 | 审批 broker 状态机 | 事件与控制面已有 | timeout 默认拒绝、iteration cap、可回放 |
-| P1 | MCP/A2A/AG-UI capability mapping | 未成文 | mapping 文档与自有契约不冲突 |
+| P1 | MCP/A2A/AG-UI capability mapping | 已成文（docs/architecture/11-protocol-capability-mapping.md） | mapping 文档与自有契约不冲突 |
 | P1 | OTel GenAI 可观测 | 本地 cost/token 有，无 OTel span | 一条 trace 可查 run/tool/model/cost |
 | P1 | 远程执行安全契约 | 已有 egress 边界 | gateway 单入口 + session 隔离真实证据 |
 | P2 | command-center UI / capability 域补齐 | shared/workbench 已分层 | 行为断言 + Visual QA |

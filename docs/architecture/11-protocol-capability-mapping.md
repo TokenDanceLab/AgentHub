@@ -1,6 +1,6 @@
 # 协议能力映射：自有契约 / MCP / A2A / AG-UI（宏观 §3 P1）
 
-> 主索引：[architecture.md](../architecture.md)。本文件是 AgentHub 自有 REST/WS 契约与三个外部协议（MCP / A2A / AG-UI）的能力对照、引入红线与评估结论 SSOT。上游基线：`docs/architecture/10-macro-engineering-design.md`（#2065，已合入）§3 协议分层表 + §9 差距路线 P1「MCP/A2A/AG-UI capability mapping — 未成文」。
+> 主索引：[architecture.md](../architecture.md)。本文件是 AgentHub 自有 REST/WS 契约与三个外部协议（MCP / A2A / AG-UI）的能力对照、引入红线与评估结论 SSOT。上游基线：`docs/architecture/10-macro-engineering-design.md`（#2065，已合入）§3 协议分层表 + §9 差距路线 P1（本文即其产出）。
 
 ## 0. 阅读约定
 
