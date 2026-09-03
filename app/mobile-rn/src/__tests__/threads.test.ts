@@ -117,13 +117,19 @@ describe('getStatusTone', () => {
 // ---------------------------------------------------------------------------
 
 describe('getAvatarTone', () => {
-  it('returns explicit avatarTone when defined', () => {
+  const toneCases: Array<[NonNullable<MobileThread['avatarTone']>, string]> = [
+    ['success', 'success'],
+    ['danger', 'danger'],
+    ['neutral', 'neutral'],
+    ['warning', 'warning'],
+  ];
+  it.each(toneCases)('returns explicit avatarTone %s when defined', (avatarTone, expected) => {
     const thread: MobileThread = {
       id: 't1', title: 'Test', subtitle: '', initials: 'T',
-      avatarTone: 'success', unread: 0, participantKind: 'agent',
+      avatarTone, unread: 0, participantKind: 'agent',
       status: 'online', lastActivity: 'now',
     };
-    expect(getAvatarTone(thread, 'accent')).toBe('success');
+    expect(getAvatarTone(thread, 'accent')).toBe(expected);
   });
 
   it('falls back to provided fallback when avatarTone is brand or undefined', () => {
@@ -142,32 +148,6 @@ describe('getAvatarTone', () => {
     expect(getAvatarTone(thread2, 'warning')).toBe('warning');
   });
 
-  it('returns danger avatar tone', () => {
-    const thread: MobileThread = {
-      id: 't4', title: 'Test', subtitle: '', initials: 'T',
-      avatarTone: 'danger', unread: 0, participantKind: 'agent',
-      status: 'online', lastActivity: 'now',
-    };
-    expect(getAvatarTone(thread, 'accent')).toBe('danger');
-  });
-
-  it('returns neutral avatar tone', () => {
-    const thread: MobileThread = {
-      id: 't5', title: 'Test', subtitle: '', initials: 'T',
-      avatarTone: 'neutral', unread: 0, participantKind: 'agent',
-      status: 'online', lastActivity: 'now',
-    };
-    expect(getAvatarTone(thread, 'accent')).toBe('neutral');
-  });
-
-  it('returns warning avatar tone', () => {
-    const thread: MobileThread = {
-      id: 't6', title: 'Test', subtitle: '', initials: 'T',
-      avatarTone: 'warning', unread: 0, participantKind: 'agent',
-      status: 'online', lastActivity: 'now',
-    };
-    expect(getAvatarTone(thread, 'accent')).toBe('warning');
-  });
 });
 
 // ---------------------------------------------------------------------------
@@ -221,28 +201,17 @@ describe('filterThreads', () => {
 describe('getParticipantBadgeLabel', () => {
   const labels = { external: 'External', bot: 'Bot', agent: 'Agent' };
 
-  it('returns label for external participant', () => {
+  const badgeCases: Array<[MobileThread['participantKind'], string]> = [
+    ['external', 'External'],
+    ['bot', 'Bot'],
+    ['agent', 'Agent'],
+  ];
+  it.each(badgeCases)('returns label for %s participant', (participantKind, expected) => {
     const thread: MobileThread = {
       id: 't1', title: '', subtitle: '', initials: 'T',
-      unread: 0, participantKind: 'external', status: 'online', lastActivity: 'now',
+      unread: 0, participantKind, status: 'online', lastActivity: 'now',
     };
-    expect(getParticipantBadgeLabel(thread, labels)).toBe('External');
-  });
-
-  it('returns label for bot participant', () => {
-    const thread: MobileThread = {
-      id: 't1', title: '', subtitle: '', initials: 'T',
-      unread: 0, participantKind: 'bot', status: 'online', lastActivity: 'now',
-    };
-    expect(getParticipantBadgeLabel(thread, labels)).toBe('Bot');
-  });
-
-  it('returns label for agent participant', () => {
-    const thread: MobileThread = {
-      id: 't1', title: '', subtitle: '', initials: 'T',
-      unread: 0, participantKind: 'agent', status: 'online', lastActivity: 'now',
-    };
-    expect(getParticipantBadgeLabel(thread, labels)).toBe('Agent');
+    expect(getParticipantBadgeLabel(thread, labels)).toBe(expected);
   });
 
   it('returns undefined for group and human', () => {
@@ -274,18 +243,12 @@ describe('needsAttention', () => {
     expect(needsAttention(thread)).toBe(true);
   });
 
-  it('returns true for waiting status', () => {
+  it.each([['waiting'], ['failed']] as Array<[MobileThread['status']]>)(
+    'returns true for %s status',
+    (status) => {
     const thread: MobileThread = {
       id: 't1', title: '', subtitle: '', initials: 'T',
-      unread: 0, participantKind: 'group', status: 'waiting', lastActivity: 'now',
-    };
-    expect(needsAttention(thread)).toBe(true);
-  });
-
-  it('returns true for failed status', () => {
-    const thread: MobileThread = {
-      id: 't1', title: '', subtitle: '', initials: 'T',
-      unread: 0, participantKind: 'group', status: 'failed', lastActivity: 'now',
+      unread: 0, participantKind: 'group', status, lastActivity: 'now',
     };
     expect(needsAttention(thread)).toBe(true);
   });
@@ -327,18 +290,11 @@ describe('computeTaskCounts', () => {
     expect(counts).toEqual({ pending: 0, active: 0, failed: 0 });
   });
 
-  it('counts queued runs as active', () => {
+  it.each([['queued'], ['running']] as Array<[MobileRun['status']]>)(
+    'counts %s runs as active',
+    (status) => {
     const runs: MobileRun[] = [{
-      id: 'r1', threadId: 't1', title: 'Test', status: 'queued',
-      target: 'mock', updatedAt: 'now', summary: '', changedFiles: [],
-    }];
-    const counts = computeTaskCounts(runs);
-    expect(counts.active).toBe(1);
-  });
-
-  it('counts running runs as active', () => {
-    const runs: MobileRun[] = [{
-      id: 'r1', threadId: 't1', title: 'Test', status: 'running',
+      id: 'r1', threadId: 't1', title: 'Test', status,
       target: 'mock', updatedAt: 'now', summary: '', changedFiles: [],
     }];
     const counts = computeTaskCounts(runs);

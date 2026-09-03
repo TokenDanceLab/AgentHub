@@ -13,57 +13,22 @@ const agents: ComposerMention[] = [
 ];
 
 describe('detectMentionTrigger', () => {
-  it('detects a freshly typed "@" at the start of the text', () => {
-    expect(detectMentionTrigger({ text: '@', caret: 1 })).toEqual({
-      atOffset: 0,
-      query: '',
-      caret: 1,
-    });
+  it.each([
+    ['@', 1, { atOffset: 0, query: '', caret: 1 }],
+    ['hi @rev', 7, { atOffset: 3, query: 'rev', caret: 7 }],
+    ['hello\n@or', 9, { atOffset: 6, query: 'or', caret: 9 }],
+    ['@a @b', 5, { atOffset: 3, query: 'b', caret: 5 }],
+    ['@rev', 999, { atOffset: 0, query: 'rev', caret: 4 }],
+  ])('detects the trigger in %s at caret %s', (text, caret, expected) => {
+    expect(detectMentionTrigger({ text, caret })).toEqual(expected);
   });
 
-  it('detects "@" after whitespace and captures the query segment', () => {
-    expect(detectMentionTrigger({ text: 'hi @rev', caret: 7 })).toEqual({
-      atOffset: 3,
-      query: 'rev',
-      caret: 7,
-    });
-  });
-
-  it('detects "@" at the start of a line after a newline', () => {
-    expect(detectMentionTrigger({ text: 'hello\n@or', caret: 9 })).toEqual({
-      atOffset: 6,
-      query: 'or',
-      caret: 9,
-    });
-  });
-
-  it('ignores "@" that is not preceded by whitespace (e.g. an email-like token)', () => {
-    expect(detectMentionTrigger({ text: 'foo@bar', caret: 7 })).toBeNull();
-  });
-
-  it('closes the trigger once a space splits the query segment', () => {
-    expect(detectMentionTrigger({ text: 'hi @rev world', caret: 14 })).toBeNull();
-  });
-
-  it('locks onto the nearest "@" when multiple triggers exist', () => {
-    // "first @a then @b" caret at end -> nearest is the second "@".
-    expect(detectMentionTrigger({ text: '@a @b', caret: 5 })).toEqual({
-      atOffset: 3,
-      query: 'b',
-      caret: 5,
-    });
-  });
-
-  it('returns null when no "@" precedes the caret', () => {
-    expect(detectMentionTrigger({ text: 'no mention here', caret: 15 })).toBeNull();
-  });
-
-  it('clamps an out-of-range caret defensively', () => {
-    expect(detectMentionTrigger({ text: '@rev', caret: 999 })).toEqual({
-      atOffset: 0,
-      query: 'rev',
-      caret: 4,
-    });
+  it.each([
+    ['foo@bar', 7],
+    ['hi @rev world', 14],
+    ['no mention here', 15],
+  ])('returns null for %s at caret %s', (text, caret) => {
+    expect(detectMentionTrigger({ text, caret })).toBeNull();
   });
 });
 
