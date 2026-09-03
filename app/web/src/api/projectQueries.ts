@@ -26,6 +26,27 @@ const emptyWorkspaceProjects: WorkspaceProjectListResponse = {
   page: { hasMore: false },
 };
 
+// Cursor pagination for the workspace projects list (#2290).
+//
+// GET /web/projects has always accepted pageSize (default 50, ceiling 200 =
+// config.MaxListPageSize) and pageCursor, and has always answered with
+// page.nextCursor / page.hasMore. This call site asked for a single page of 50
+// and threw the cursor away, so from the 51st project onwards the workspace
+// showed a silently truncated list: no "load more", no truncation hint, no
+// error. The only client code that ever advanced this cursor was the #1546
+// WorkbenchProjectsPort chain, which was structurally unreachable in both
+// shells and has been deleted — the capability went from "implemented but never
+// executed" to "explicitly not implemented", which is what made the gap
+// visible.
+//
+// The shape deliberately mirrors fetchExecutionTargets in
+// executionTargetQueries.ts: one paging idiom in the front end, not two. Walk
+// every page up to a cap, and when the cap is what stopped us propagate
+// hasMore=true so a truncated list stays distinguishable from a complete one
+// instead of becoming a new silent ceiling.
+const workspaceProjectPageSize = 200;
+const maxWorkspaceProjectPages = 5;
+
 export async function fetchWorkspaceProjects(
   preferHub: boolean,
   getToken: () => string | null = getAccessToken,
@@ -34,7 +55,24 @@ export async function fetchWorkspaceProjects(
   if (!preferHub || !token) return emptyWorkspaceProjects;
 
   const client = createHubClient({ getToken: () => token });
-  return client.listWorkspaceProjects({ pageSize: 50 });
+  const items: WorkspaceProject[] = [];
+  let page: WorkspaceProjectListResponse['page'] = { hasMore: false };
+  let pageCursor: string | undefined;
+
+  for (let i = 0; i < maxWorkspaceProjectPages; i += 1) {
+    const res = await client.listWorkspaceProjects({
+      pageSize: workspaceProjectPageSize,
+      ...(pageCursor ? { pageCursor } : {}),
+    });
+    items.push(...res.items);
+    page = res.page ?? { hasMore: false };
+    if (!page.hasMore || !page.nextCursor) {
+      return { items, page };
+    }
+    pageCursor = page.nextCursor;
+  }
+
+  return { items, page: { ...page, hasMore: true } };
 }
 
 export async function fetchWorkspaceProject(

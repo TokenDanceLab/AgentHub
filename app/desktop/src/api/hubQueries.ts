@@ -111,10 +111,55 @@ export function useHubCreateContactGroup() {
 // ── Workspace Projects ────────────────────────────────────────────
 
 
+// Derived from the client itself so the paging loop below cannot drift from
+// what listWorkspaceProjects actually returns.
+type WorkspaceProjectListResponse =
+  Awaited<ReturnType<ReturnType<typeof getHubClient>['listWorkspaceProjects']>>;
+
+// Cursor pagination for the workspace projects list (#2290), mirroring
+// web/src/api/projectQueries.ts and both shells' fetchExecutionTargets: the
+// endpoint supports pageSize (ceiling 200) + pageCursor and returns
+// page.nextCursor / page.hasMore, but this call site passed no pageSize at all
+// (so it got the server default of 50) and never advanced the cursor. Both
+// shells therefore hid every project past the first page.
+//
+// Walking pages up to a cap and propagating hasMore keeps a truncated list
+// distinguishable from a complete one; the cap is a stated ceiling, not a
+// silent one.
+const workspaceProjectPageSize = 200;
+const maxWorkspaceProjectPages = 5;
+
+export async function fetchWorkspaceProjects(): Promise<WorkspaceProjectListResponse> {
+  const client = getHubClient();
+  const items: WorkspaceProjectListResponse['items'] = [];
+  let page: WorkspaceProjectListResponse['page'] = { hasMore: false };
+  let pageCursor: string | undefined;
+
+  for (let i = 0; i < maxWorkspaceProjectPages; i += 1) {
+    const res = await client.listWorkspaceProjects({
+      pageSize: workspaceProjectPageSize,
+      ...(pageCursor ? { pageCursor } : {}),
+    });
+    items.push(...res.items);
+    page = res.page ?? { hasMore: false };
+    if (!page.hasMore || !page.nextCursor) {
+      return { items, page };
+    }
+    pageCursor = page.nextCursor;
+  }
+
+  return { items, page: { ...page, hasMore: true } };
+}
+
 export function useHubWorkspaceProjects(opts?: { enabled?: boolean }) {
   return useQuery({
-    queryKey: hubQueryKeys.projects.root,
-    queryFn: () => getHubClient().listWorkspaceProjects(),
+    // Collection queries key off projects.list, never off the bare family root:
+    // the root is the prefix used for broad invalidation, and using it as a
+    // query key is what made the two invalidations below impossible to hit
+    // (ADR-029 / #2261). Web already keys its projects collection this way, so
+    // this also removes a two-shell divergence over the same endpoint.
+    queryKey: hubQueryKeys.projects.list('hub'),
+    queryFn: () => fetchWorkspaceProjects(),
     enabled: opts?.enabled ?? false,
   });
 }
@@ -125,7 +170,12 @@ export function useCreateHubWorkspaceProject() {
     mutationFn: (data: Parameters<ReturnType<typeof getHubClient>['createWorkspaceProject']>[0]) =>
       getHubClient().createWorkspaceProject(data),
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['hub', 'workspace-projects'] });
+      // ['hub','workspace-projects'] matched nothing: the collection is keyed
+      // ['hub','projects','hub'], so creating/updating a project left the
+      // list stale until a manual refetch. The family root is the prefix of
+      // every projects key, so it invalidates the list and any cached
+      // project detail / threads (#2290, same failure mode as #2261).
+      void queryClient.invalidateQueries({ queryKey: hubQueryKeys.projects.root });
     },
   });
 }
@@ -136,7 +186,12 @@ export function useUpdateHubWorkspaceProject() {
     mutationFn: ({ id, data }: { id: string; data: Parameters<ReturnType<typeof getHubClient>['updateWorkspaceProject']>[1] }) =>
       getHubClient().updateWorkspaceProject(id, data),
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['hub', 'workspace-projects'] });
+      // ['hub','workspace-projects'] matched nothing: the collection is keyed
+      // ['hub','projects','hub'], so creating/updating a project left the
+      // list stale until a manual refetch. The family root is the prefix of
+      // every projects key, so it invalidates the list and any cached
+      // project detail / threads (#2290, same failure mode as #2261).
+      void queryClient.invalidateQueries({ queryKey: hubQueryKeys.projects.root });
     },
   });
 }
