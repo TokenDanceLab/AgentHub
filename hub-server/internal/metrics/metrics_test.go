@@ -10,9 +10,14 @@
 package metrics
 
 import (
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/testutil"
+
+	"github.com/agenthub/pkg/safego"
 )
 
 // TestRegisterDoesNotPanic 验证：首次调用 Register 不会 panic。
@@ -273,4 +278,171 @@ func TestEventBusCounter(t *testing.T) {
 		}
 	}
 	t.Error("未找到 eventbus_panics_total 指标")
+}
+
+// ── #2246 slice 1：safego PanicObserver 按 name 分派 eventbus_panics_total ──
+//
+// 这些用例追加在 TestEventBusCounter 之后是**有意的**：TestEventBusCounter 断言
+// eventbus_panics_total 的**绝对值** == 2，而该 counter 是进程级、注册在
+// DefaultRegisterer 上的全局量。任何在它之前触发 "eventbus." 前缀 panic 的用例
+// 都会把绝对值顶高从而误伤它。本块用例自身一律用 before/after 差值断言，不依赖
+// 执行顺序，但仍必须排在其后。
+
+// recoverOnePanic 在独立 goroutine 里制造一次真实 panic 并走 pkg/safego 恢复，
+// 返回时 observer 一定已经跑完。
+//
+// 顺序是关键：`defer close(done)` 先注册、`defer safego.Recover(name)` 后注册，
+// Go 按 LIFO 展开，所以 Recover（含 observer 回调）先执行、close 后执行。
+// 反过来写就会在 observer 计数之前放行主 goroutine，断言变成竞态。
+func recoverOnePanic(t *testing.T, name string) {
+	t.Helper()
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		defer safego.Recover(name)
+		panic("induced panic for the observer dispatch test")
+	}()
+	select {
+	case <-done:
+	case <-time.After(3 * time.Second):
+		t.Fatalf("safego.Recover(%q) 未在 3s 内完成恢复", name)
+	}
+}
+
+// TestHubPanicObserver_NilCountersAreSafe 验证：未调用 Register 的构建/测试里
+// 两个 counter 都是 nil，observer 在恢复路径上不得 panic —— 恢复路径自己再
+// panic 会把 safego 刚救回来的 goroutine 二次打死。
+func TestHubPanicObserver_NilCountersAreSafe(t *testing.T) {
+	savedBus, savedGoroutine := EventBusPanics, GoroutinePanicRecoveries
+	EventBusPanics, GoroutinePanicRecoveries = nil, nil
+	defer func() { EventBusPanics, GoroutinePanicRecoveries = savedBus, savedGoroutine }()
+
+	defer func() {
+		if r := recover(); r != nil {
+			t.Fatalf("hubPanicObserver 在 counter 为 nil 时 panic 了: %v", r)
+		}
+	}()
+	hubPanicObserver("eventbus.handler", "boom", "stack")
+	hubPanicObserver("ws.push_to_session", "boom", "stack")
+	hubPanicObserver("", "boom", "stack")
+}
+
+// TestInstallPanicObserver_Idempotent 验证：init 已经装过一次，测试再显式装一次
+// 不会 panic、也不会改变分派行为。这是 bus 包借用全局 hook 后能安全还原的前提
+// （pkg/safego 只有一个槽位，装两次后者覆盖前者）。
+func TestInstallPanicObserver_Idempotent(t *testing.T) {
+	Register()
+	InstallPanicObserver()
+	InstallPanicObserver()
+
+	busBefore := testutil.ToFloat64(EventBusPanics)
+	recoverOnePanic(t, "eventbus.handler")
+	if got := testutil.ToFloat64(EventBusPanics) - busBefore; got != 1 {
+		t.Errorf("重复 InstallPanicObserver 后 eventbus_panics_total 增量 = %v, want 1", got)
+	}
+}
+
+// TestPanicObserver_EventBusNameFeedsBothCounters 验证：eventbus. 前缀的 name
+// 同时进 goroutine_panic_recoveries_total（全量）与 eventbus_panics_total
+// （总线专属）。bus 包自己那处私有 Inc 已随 #2246 删除，这两个 +1 全部来自
+// 本文件的 observer。
+func TestPanicObserver_EventBusNameFeedsBothCounters(t *testing.T) {
+	Register()
+	InstallPanicObserver()
+
+	busBefore := testutil.ToFloat64(EventBusPanics)
+	goroutineBefore := testutil.ToFloat64(GoroutinePanicRecoveries)
+
+	recoverOnePanic(t, "eventbus.handler")
+
+	if got := testutil.ToFloat64(EventBusPanics) - busBefore; got != 1 {
+		t.Errorf("eventbus_panics_total 增量 = %v, want 1（0 = counter 随私有 Inc 一起被丢了；2 = ants pool handler 对同一次 panic 重复计数）", got)
+	}
+	if got := testutil.ToFloat64(GoroutinePanicRecoveries) - goroutineBefore; got != 1 {
+		t.Errorf("goroutine_panic_recoveries_total 增量 = %v, want 1", got)
+	}
+}
+
+// TestPanicObserver_NonEventBusNameSkipsEventBusCounter 验证分派规则的另一半：
+// 前缀之外的 name 只进全量 counter。少了这条，eventbus_panics_total 就不再
+// 等于「总线上的 panic」，指标名与语义脱钩。
+func TestPanicObserver_NonEventBusNameSkipsEventBusCounter(t *testing.T) {
+	Register()
+	InstallPanicObserver()
+
+	cases := []string{
+		"ws.push_to_session",  // #2246 收敛点之一（hub ws fanout）
+		"events.bus_observer", // #2246 收敛点之一（edge events，前缀是 events. 不是 eventbus.）
+		"ndjson.parse_line",   // #2246 收敛点之一（edge adapters）
+		"ws.readLoop",         // 既有 SafeGo 名
+		"dispatch.launch",     // 既有 SafeGo 名
+		"",                    // 无名兜底
+	}
+
+	for _, name := range cases {
+		busBefore := testutil.ToFloat64(EventBusPanics)
+		goroutineBefore := testutil.ToFloat64(GoroutinePanicRecoveries)
+
+		recoverOnePanic(t, name)
+
+		if got := testutil.ToFloat64(EventBusPanics) - busBefore; got != 0 {
+			t.Errorf("name=%q: eventbus_panics_total 增量 = %v, want 0（非总线 name 不得喂总线 counter）", name, got)
+		}
+		if got := testutil.ToFloat64(GoroutinePanicRecoveries) - goroutineBefore; got != 1 {
+			t.Errorf("name=%q: goroutine_panic_recoveries_total 增量 = %v, want 1", name, got)
+		}
+	}
+}
+
+// TestPanicObserver_EventBusPrefixNotExactName 钉住「前缀而非精确名」这条决定：
+// 未来总线新增的恢复点（例如 eventbus.close_drain）自动归属总线 counter，
+// 不需要再回来改 observer。若有人把 HasPrefix 改成 ==，这条会红。
+func TestPanicObserver_EventBusPrefixNotExactName(t *testing.T) {
+	Register()
+	InstallPanicObserver()
+
+	busBefore := testutil.ToFloat64(EventBusPanics)
+	recoverOnePanic(t, "eventbus.close_drain")
+	if got := testutil.ToFloat64(EventBusPanics) - busBefore; got != 1 {
+		t.Errorf("eventbus_panics_total 增量 = %v, want 1（eventbus. 前缀必须整族命中，不是只认 eventbus.handler）", got)
+	}
+}
+
+// TestPanicObserver_ConcurrentEventBusPanicsCountEveryOne 验证分派在高并发下不丢
+// 计数（observer 在各自 goroutine 内同步执行，counter 本身是 prometheus 原子量）。
+func TestPanicObserver_ConcurrentEventBusPanicsCountEveryOne(t *testing.T) {
+	Register()
+	InstallPanicObserver()
+
+	const n = 32
+	busBefore := testutil.ToFloat64(EventBusPanics)
+
+	var wg sync.WaitGroup
+	wg.Add(n)
+	for i := 0; i < n; i++ {
+		go func() {
+			defer wg.Done()
+			defer safego.Recover("eventbus.handler")
+			panic("induced concurrent panic")
+		}()
+	}
+	waitGroupDone(t, &wg)
+
+	if got := testutil.ToFloat64(EventBusPanics) - busBefore; got != n {
+		t.Errorf("eventbus_panics_total 增量 = %v, want %d（并发下丢计数）", got, n)
+	}
+}
+
+// waitGroupDone 等待 WaitGroup 归零。不用 time.Sleep：test-sleep 棘轮
+// （scripts/verify/verify-test-sleep-ratchet.py）按文件计预算，改动既有文件的
+// sleep 计数会顶破基线。
+func waitGroupDone(t *testing.T, wg *sync.WaitGroup) {
+	t.Helper()
+	done := make(chan struct{})
+	go func() { wg.Wait(); close(done) }()
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("等待并发 panic 恢复超时")
+	}
 }

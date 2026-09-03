@@ -5,6 +5,7 @@ import (
 	"log/slog"
 
 	"github.com/agenthub/hub-server/internal/metrics"
+	"github.com/agenthub/pkg/safego"
 )
 
 type DeliveryResult struct {
@@ -223,12 +224,18 @@ func (m *Manager) PushToSession(sessionID string, frame Frame) (res FanoutResult
 	if m.ResolveMembers == nil {
 		return res
 	}
-	defer func() {
-		if r := recover(); r != nil {
-			slog.Error("ws PushToSession panic recovered in ResolveMembers callback",
-				"session_id", sessionID, "panic", r)
-		}
-	}()
+	// ResolveMembers is an injected callback, so a panic here is the embedding
+	// application's code, not this package's — but it unwinds whatever goroutine
+	// is fanning a frame out, and an unguarded panic there kills the process.
+	// pkg/safego is the single recovery path (#2246): it logs the name plus a
+	// full stack and dispatches to the Hub PanicObserver, which counts it in
+	// goroutine_panic_recoveries_total. The previous inline recover did neither,
+	// so a bad session-membership resolver was a bare log line and invisible to
+	// every dashboard.
+	//
+	// res is a named result, so the partial FanoutResult merged before the panic
+	// is still returned — identical to the previous inline recover's behaviour.
+	defer safego.Recover("ws.push_to_session")
 	memberIDs := m.ResolveMembers(sessionID)
 	for _, userID := range memberIDs {
 		res.merge(m.PushToUser(userID, frame))

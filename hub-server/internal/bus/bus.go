@@ -30,6 +30,7 @@ import (
 
 	"github.com/agenthub/hub-server/internal/config"
 	"github.com/agenthub/hub-server/internal/metrics"
+	"github.com/agenthub/pkg/safego"
 	"github.com/panjf2000/ants/v2"
 )
 
@@ -69,11 +70,24 @@ type Bus struct {
 func New() (*Bus, error) {
 	pool, err := ants.NewPool(config.EventBusPoolSize,
 		ants.WithNonblocking(false),
+		// Pool-level backstop, and one of exactly two producers of
+		// eventbus_panics_total (#2246). The other is the Hub safego
+		// PanicObserver (internal/metrics.InstallPanicObserver), which adds the
+		// same counter for every panic recovered under a safego name with the
+		// "eventbus." prefix.
+		//
+		// The two never double count one panic, because they sit on opposite
+		// sides of the closure's own defer: handler-body panics are consumed by
+		// safego.Recover inside the submitted closure (Publish below) and so
+		// never reach ants; only a panic raised *outside* that defer's reach —
+		// before it is registered (context.WithTimeout in Publish) or inside the
+		// ants worker machinery itself — lands here. This handler therefore stays
+		// a genuine last resort rather than a duplicate of the safego path.
 		ants.WithPanicHandler(func(p interface{}) {
 			if metrics.EventBusPanics != nil {
 				metrics.EventBusPanics.Inc()
 			}
-			slog.Error("eventbus panic recovered", "error", p, "stack", string(debug.Stack()))
+			slog.Error("eventbus panic recovered (ants pool handler)", "error", p, "stack", string(debug.Stack()))
 		}),
 	)
 	if err != nil {
@@ -135,15 +149,34 @@ func (b *Bus) Publish(ctx context.Context, event Event) error {
 		err := b.pool.Submit(func() {
 			handlerCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), b.handlerTimeout)
 			defer cancel()
-			defer func() {
-				if r := recover(); r != nil {
-					if metrics.EventBusPanics != nil {
-						metrics.EventBusPanics.Inc()
-					}
-					slog.Error("eventbus panic recovered", "error", r, "stack", string(debug.Stack()))
-				}
-				b.pending.Add(-1)
-			}()
+			// Two defers, and their relative order is load-bearing (#2246).
+			// Go unwinds deferred calls LIFO, so registering the pending
+			// decrement *first* makes it run *last* — after safego.Recover has
+			// already consumed the panic. The invariant this buys is not "does
+			// the decrement run" (a defer registered during unwinding runs to
+			// completion either way) but "is the panic accounted for before the
+			// bus reports itself drained": with this order the observer has
+			// already logged and counted the panic by the time Pending() drops,
+			// so a Close()/drain that observes Pending()==0 cannot race ahead of
+			// the metric. The reversed order makes the panic observable only
+			// after the bus looks idle, and a drain-then-read caller then sees
+			// eventbus_panics_total not yet incremented. Two tests pin it:
+			// TestPublish_HandlerPanic_RecoverRunsBeforePendingDecrement (the
+			// observer still sees Pending()==1) and
+			// TestPublish_HandlerPanic_CountedByHubObserverNotByBus (the counter
+			// has already moved by the time the drain returns). Both go red when
+			// the defers are swapped; TestPublish_HandlerPanic_PendingReturnsToZero
+			// stays green either way, because a defer registered during unwinding
+			// still runs to completion — the count never leaks, only its ordering
+			// against the metric does.
+			defer func() { b.pending.Add(-1) }()
+			// pkg/safego is the single recovery path: it logs the goroutine name
+			// plus a full stack and dispatches to the process-wide PanicObserver.
+			// The Hub observer increments goroutine_panic_recoveries_total for
+			// every panic and, for "eventbus." names, also eventbus_panics_total
+			// — so the bus-specific counter survives without this package
+			// reaching into metrics on the handler path.
+			defer safego.Recover("eventbus.handler")
 			h(handlerCtx, event)
 		})
 		if err != nil {

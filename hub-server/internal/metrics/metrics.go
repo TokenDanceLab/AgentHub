@@ -1,6 +1,7 @@
 package metrics
 
 import (
+	"strings"
 	"sync"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -10,16 +11,59 @@ import (
 	"github.com/agenthub/pkg/safego"
 )
 
-// init wires the shared panic-recovery launcher to the Hub's panic counter.
+// eventBusPanicNamePrefix selects which pkg/safego names also feed
+// eventbus_panics_total, the bus-specific counter that predates the #2246
+// convergence. It is a prefix rather than an exact name so a future bus-owned
+// recovery site (say "eventbus.close_drain") is attributed to the bus counter
+// without a second edit here, while unrelated names ("ws.readLoop",
+// "dispatch.launch", "events.broadcast_online") stay out of it.
+const eventBusPanicNamePrefix = "eventbus."
+
+// init wires the shared panic-recovery launcher to the Hub's panic counters.
 // pkg/safego stays server-agnostic; the Hub attaches its observability hook
 // here so a recovered goroutine panic increments goroutine_panic_recoveries
 // for alerting (nil-guarded so builds that never call Register don't panic).
 func init() {
-	safego.SetPanicObserver(func(name string, panicValue any, stack string) {
-		if GoroutinePanicRecoveries != nil {
-			GoroutinePanicRecoveries.Inc()
-		}
-	})
+	InstallPanicObserver()
+}
+
+// InstallPanicObserver installs hubPanicObserver as the process-wide pkg/safego
+// panic hook. init calls it once at package load, before any SafeGo launch.
+//
+// It is exported for the same reason Edge exports EdgeMetrics.
+// InstallPanicObserver: the hook is process-global and pkg/safego keeps exactly
+// one slot, so a test that temporarily installs its own observer must be able to
+// put the Hub's dispatch back on cleanup instead of leaving the process with a
+// nil or foreign hook. Calling it twice is idempotent.
+func InstallPanicObserver() {
+	safego.SetPanicObserver(hubPanicObserver)
+}
+
+// hubPanicObserver is the Hub's pkg/safego PanicObserver. Every recovered panic
+// counts once in goroutine_panic_recoveries_total; panics whose safego name is
+// bus-owned additionally count once in eventbus_panics_total (#2246).
+//
+// eventbus_panics_total therefore has exactly two producers, and they cannot
+// double count one panic because they sit on opposite sides of the bus
+// closure's own defer:
+//
+//   - here, via name dispatch, for panics recovered by safego.Recover inside
+//     the submitted handler closure (bus.Publish) — the handler-body path;
+//   - the ants pool-level WithPanicHandler in bus.New, for a panic that escapes
+//     that closure entirely (raised before its defers are registered, or inside
+//     the ants worker machinery).
+//
+// Before #2246 the bus closure incremented the counter itself; that private
+// Inc is gone so the metric has a single dispatch rule per path instead of
+// three undocumented ones. Both counters stay nil-guarded: builds and tests
+// that never call Register must not panic on the recovery path.
+func hubPanicObserver(name string, _ any, _ string) {
+	if GoroutinePanicRecoveries != nil {
+		GoroutinePanicRecoveries.Inc()
+	}
+	if EventBusPanics != nil && strings.HasPrefix(name, eventBusPanicNamePrefix) {
+		EventBusPanics.Inc()
+	}
 }
 
 var (
@@ -32,7 +76,7 @@ var (
 	DBPoolInUse                            prometheus.Gauge
 	RedisPoolHitsTotal                     prometheus.Counter // G11: was Gauge redis_pool_hits; PoolStats().Hits is cumulative → Counter
 	EventBusQueueLen                       prometheus.Gauge
-	EventBusPanics                         prometheus.Counter
+	EventBusPanics                         prometheus.Counter // see hubPanicObserver: fed by name dispatch + the ants pool handler, never both for one panic (#2246)
 	TeamFaultEscalationReviewEventFailures prometheus.Counter
 
 	// WSSendFrameBypass counts WebSocket frames sent via handler.sendFrame,
@@ -163,11 +207,13 @@ var (
 	// broadcast is skipped to avoid advertising a route that does not exist.
 	WSRouteSetFailures prometheus.Counter
 
-	// GoroutinePanicRecoveries counts panics recovered by the safeGo helper
-	// in long-lived / spawned goroutines (WS readLoop, dispatch launch, etc).
-	// Distinct from http_panic_recoveries_total (HTTP request goroutine) and
-	// eventbus_panics_total (bus worker) so operators can attribute panics to
-	// the goroutine that owns the bug.
+	// GoroutinePanicRecoveries counts every panic recovered by pkg/safego in
+	// long-lived / spawned goroutines and closures (WS readLoop, dispatch
+	// launch, bus handler dispatch, ws fanout, ...). Distinct from
+	// http_panic_recoveries_total (HTTP request goroutine, which the Gin
+	// recovery middleware owns) so operators can attribute panics to the
+	// goroutine that owns the bug. It is the superset counter: a bus panic
+	// lands here *and* in eventbus_panics_total, by design (#2246).
 	GoroutinePanicRecoveries prometheus.Counter
 
 	// OutboundMetrics is the unified outbound HTTP metrics contract (#1595):
