@@ -112,7 +112,7 @@ func TestRuntimeManifestAdapterFixtureFileContract(t *testing.T) {
 		t.Fatalf("capability metadata = %#v", health["capabilities"])
 	}
 
-	cmdPath, args, env, workDir := adapter.BuildCommand(RunProcessContext{Prompt: "secret prompt", WorkDir: "C:\\Users\\Ding\\private\\workspace"})
+	cmdPath, args, env, workDir := adapter.BuildCommand(RunProcessContext{Prompt: "secret prompt", WorkDir: "C:\\Users\\Example\\private\\workspace"})
 	currentExecutable, err := os.Executable()
 	if err != nil {
 		t.Fatalf("os.Executable: %v", err)
@@ -132,7 +132,7 @@ func TestRuntimeManifestAdapterFixtureFileContract(t *testing.T) {
 	if len(env) != 0 {
 		t.Fatalf("fixture-file env = %#v, want no manifest env exposure", env)
 	}
-	if workDir != "C:\\Users\\Ding\\private\\workspace" {
+	if workDir != "C:\\Users\\Example\\private\\workspace" {
 		t.Fatalf("workDir = %q", workDir)
 	}
 

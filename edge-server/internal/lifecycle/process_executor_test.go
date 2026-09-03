@@ -530,8 +530,8 @@ func TestProcessExecutorMapsFixtureProcessEventStreamContract(t *testing.T) {
 		"sk-fixture-runner-123456",
 		"Bearer runner-secret-token",
 		"D:\\private",
-		"C:\\Users\\Ding\\private",
-		"/home/ding/private",
+		"C:\\Users\\Example\\private",
+		"/home/example/private",
 	} {
 		if bytes.Contains(eventsJSON, []byte(leaked)) {
 			t.Fatalf("fixture process events leaked %q:\n%s", leaked, eventsJSON)
@@ -2117,7 +2117,7 @@ func TestProcessExecutorHelper(t *testing.T) {
 					RiskLevel: "high",
 					Reason:    "write action requires approval evidence",
 					Input: map[string]any{
-						"path":      "C:\\Users\\Ding\\private\\fixture.patch",
+						"path":      "C:\\Users\\Example\\private\\fixture.patch",
 						"api_token": "sk-fixture-runner-123456",
 						"header":    "Authorization: Bearer runner-secret-token",
 					},
@@ -2135,7 +2135,7 @@ func TestProcessExecutorHelper(t *testing.T) {
 					ID:         "runner_artifact_1",
 					Type:       "artifact",
 					ArtifactID: "artifact_runner_report",
-					Path:       "/home/ding/private/runner-report.json",
+					Path:       "/home/example/private/runner-report.json",
 					Kind:       "file",
 					SizeBytes:  256,
 					Summary:    "runner artifact summary token=sk-fixture-runner-123456",
@@ -2571,9 +2571,9 @@ func TestSanitizeSubAgentResult_FilePath(t *testing.T) {
 		input string
 	}{
 		{"Windows Code path", "reading from D:\\Code\\TokenDance\\AgentHub\\src\\main.go"},
-		{"Windows Users path", "found at C:\\Users\\Ding\\Documents\\file.txt"},
+		{"Windows Users path", "found at C:\\Users\\Example\\Documents\\file.txt"},
 		{"Windows Projects path", "opening D:\\Projects\\myapp\\config.yaml"},
-		{"Unix home path", "loading /home/ding/config/settings.json"},
+		{"Unix home path", "loading /home/example/config/settings.json"},
 		{"Unix Users path", "reading /Users/john/Documents/report.md"},
 		{"Unix tmp path", "temp file at /tmp/build/output.log"},
 		{"Windows Desktop path", "saved to C:\\Users\\Admin\\Desktop\\export.csv"},

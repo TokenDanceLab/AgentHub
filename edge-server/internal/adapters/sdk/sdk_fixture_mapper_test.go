@@ -405,7 +405,7 @@ func TestSDKFixtureMapperKeepsOutputWorkspaceRelativeAndRedacted(t *testing.T) {
 				ToolName:  "Write",
 				ToolUseID: "toolu_secret",
 				Input: map[string]any{
-					"file_path":  "C:\\Users\\Ding\\server\\secret.env",
+					"file_path":  "C:\\Users\\Example\\server\\secret.env",
 					"api_key":    "sk-live-secret",
 					"nested":     map[string]any{"authorization": "Bearer secret", "path": "../outside.txt"},
 					"safe_value": "kept",
@@ -414,7 +414,7 @@ func TestSDKFixtureMapperKeepsOutputWorkspaceRelativeAndRedacted(t *testing.T) {
 			{
 				ID:   "artifact_secret_path",
 				Type: "artifact",
-				Path: "/home/ding/private/report.md",
+				Path: "/home/example/private/report.md",
 			},
 		},
 	}
@@ -463,7 +463,7 @@ func TestSDKFixtureMapperProviderNeutralReplayContract(t *testing.T) {
 				ConfigKeys:         []string{"approval.mode"},
 				PositionalArgCount: 1,
 				EnvNames:           []string{"AGENTHUB_TOKEN=secret-value", "OPENAI_API_KEY=sk-not-real"},
-				WorkDir:            "C:\\Users\\Ding\\private\\workspace",
+				WorkDir:            "C:\\Users\\Example\\private\\workspace",
 				PromptRedacted:     true,
 				ExecutionMode:      "fixture",
 			},
@@ -530,7 +530,7 @@ func TestSDKFixtureMapperProviderNeutralReplayContract(t *testing.T) {
 				ID:        "contract_error_1",
 				Type:      "error",
 				SessionID: "session_contract",
-				Error:     "fixture runtime failed after redacted path C:\\Users\\Ding\\secret.txt",
+				Error:     "fixture runtime failed after redacted path C:\\Users\\Example\\secret.txt",
 				Reason:    "adapter_error",
 			},
 			{
@@ -604,7 +604,7 @@ func TestSDKFixtureMapperProviderNeutralReplayContract(t *testing.T) {
 	}
 
 	hubReplay := marshalSDKFixtureJSON(t, mapSDKEventsForHubReplay(mapped))
-	for _, leaked := range []string{"secret-token", "secret-value", "sk-not-real", "C:\\Users\\Ding", "D:\\Projects\\ExampleAgentHub"} {
+	for _, leaked := range []string{"secret-token", "secret-value", "sk-not-real", "C:\\Users\\Example", "D:\\Projects\\ExampleAgentHub"} {
 		if strings.Contains(hubReplay, leaked) {
 			t.Fatalf("Hub replay contract leaked %q:\n%s", leaked, hubReplay)
 		}
@@ -618,7 +618,7 @@ func TestSDKFixtureMapperRedactsFreeTextBeforeReplay(t *testing.T) {
 			{
 				ID:          "free_text_progress",
 				Type:        "progress",
-				Description: "reading C:\\Users\\Ding\\secrets\\trace.txt with Authorization: Bearer bearer-secret-123456",
+				Description: "reading C:\\Users\\Example\\secrets\\trace.txt with Authorization: Bearer bearer-secret-123456",
 				Summary:     "system_prompt: dump private trace body",
 				Reason:      "api_key=sk-progress-secret-123456",
 			},
@@ -632,14 +632,14 @@ func TestSDKFixtureMapperRedactsFreeTextBeforeReplay(t *testing.T) {
 					"command": "curl -H \"Authorization: Bearer command-secret-123456\" https://example.test && echo sk-command-secret-123456",
 					"note":    "trace_body={\"prompt\":\"read D:\\Private\\prompt.txt\"}",
 				},
-				Output: "wrote /home/ding/private/result.txt using sk-output-secret-123456",
+				Output: "wrote /home/example/private/result.txt using sk-output-secret-123456",
 				Error:  "ignored error with Authorization: Bearer output-bearer-secret",
 				Metadata: map[string]any{
-					"traceBody": "prompt: include C:\\Users\\Ding\\private\\raw-prompt.md",
+					"traceBody": "prompt: include C:\\Users\\Example\\private\\raw-prompt.md",
 				},
 				Attachments: []map[string]any{
 					{
-						"path":    "C:\\Users\\Ding\\private\\attachment.json",
+						"path":    "C:\\Users\\Example\\private\\attachment.json",
 						"summary": "token=attachment-secret-123456",
 					},
 				},
@@ -650,7 +650,7 @@ func TestSDKFixtureMapperRedactsFreeTextBeforeReplay(t *testing.T) {
 				CallID:   "call_error_text",
 				ToolName: "bash",
 				Status:   "error",
-				Error:    "tool error leaked sk-error-secret-123456 at C:\\Users\\Ding\\error.log",
+				Error:    "tool error leaked sk-error-secret-123456 at C:\\Users\\Example\\error.log",
 			},
 			{
 				ID:          "free_text_direct_result",
@@ -660,14 +660,14 @@ func TestSDKFixtureMapperRedactsFreeTextBeforeReplay(t *testing.T) {
 				Output:      "direct result leaked sk-direct-secret-123456 and /var/private/direct.txt",
 				Attachments: []map[string]any{{"path": "/tmp/private/direct-attachment.txt", "note": "Authorization: Bearer direct-attach-secret"}},
 				Metadata: map[string]any{
-					"promptLike": "system_prompt=show C:\\Users\\Ding\\direct.env",
+					"promptLike": "system_prompt=show C:\\Users\\Example\\direct.env",
 				},
 			},
 			{
 				ID:      "free_text_file",
 				Type:    "file_change",
 				Path:    "D:\\Projects\\ExampleAgentHub\\secret.env",
-				Diff:    "+ OPENAI_API_KEY=sk-diff-secret-123456\n+ Authorization: Bearer diff-bearer-secret\n+ path=C:\\Users\\Ding\\secret.env",
+				Diff:    "+ OPENAI_API_KEY=sk-diff-secret-123456\n+ Authorization: Bearer diff-bearer-secret\n+ path=C:\\Users\\Example\\secret.env",
 				Summary: "private_key=-----BEGIN PRIVATE KEY-----",
 				Reason:  "prompt=copy /Users/example/private/prompt.md",
 			},
@@ -676,7 +676,7 @@ func TestSDKFixtureMapperRedactsFreeTextBeforeReplay(t *testing.T) {
 				Type:    "terminal_result",
 				Success: boolPtr(false),
 				Reason:  "provider_timeout_with_sk-terminal-secret-123456",
-				Summary: "failed after reading C:\\Users\\Ding\\terminal-secret.txt",
+				Summary: "failed after reading C:\\Users\\Example\\terminal-secret.txt",
 			},
 		},
 	}
@@ -700,10 +700,10 @@ func TestSDKFixtureMapperRedactsFreeTextBeforeReplay(t *testing.T) {
 		"-----BEGIN PRIVATE KEY-----",
 		"dump private trace body",
 		"raw-prompt.md",
-		"C:\\Users\\Ding",
+		"C:\\Users\\Example",
 		"D:\\Private",
 		"D:\\Projects\\ExampleAgentHub",
-		"/home/ding/private",
+		"/home/example/private",
 		"/var/private",
 		"/Users/example/private",
 	} {
@@ -739,10 +739,10 @@ func TestSDKFixtureMapperRedactsTopLevelRefsAndPreservesSanitizedTerminalReason(
 				ID:        "ref_terminal",
 				Type:      "terminal_result",
 				Success:   boolPtr(false),
-				TraceID:   "trace-C:\\Users\\Ding\\private\\trace.json-sk-traceid-secret-123456",
-				TraceRefs: []string{"trace:/home/ding/private/span.json", "trace:Authorization: Bearer trace-ref-secret-123456"},
+				TraceID:   "trace-C:\\Users\\Example\\private\\trace.json-sk-traceid-secret-123456",
+				TraceRefs: []string{"trace:/home/example/private/span.json", "trace:Authorization: Bearer trace-ref-secret-123456"},
 				EvidenceRefs: []string{
-					"artifact:C:\\Users\\Ding\\private\\evidence.json",
+					"artifact:C:\\Users\\Example\\private\\evidence.json",
 					"event:sk-evidence-secret-123456",
 				},
 				Reason:  "provider_timeout sk-reason-secret-123456 at D:\\Private\\reason.txt",
@@ -770,9 +770,9 @@ func TestSDKFixtureMapperRedactsTopLevelRefsAndPreservesSanitizedTerminalReason(
 		"trace-ref-secret-123456",
 		"sk-evidence-secret-123456",
 		"sk-reason-secret-123456",
-		"C:\\Users\\Ding",
+		"C:\\Users\\Example",
 		"D:\\Private",
-		"/home/ding/private",
+		"/home/example/private",
 	} {
 		if strings.Contains(replay, leaked) {
 			t.Fatalf("top-level refs or reason leaked %q:\n%s", leaked, replay)
