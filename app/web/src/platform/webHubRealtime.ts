@@ -26,7 +26,7 @@ type CreateHubWS = (opts: HubWSOptions) => HubWSHandle;
  * directly for device.kicked frames (#1816), which the shared hubWS handle
  * swallows before app-level handlers.
  */
-export type CreateWebRealtimeTransport = (options: {
+type CreateWebRealtimeTransport = (options: {
   url: string;
   getToken: () => string | null;
 }) => Transport;
@@ -88,7 +88,7 @@ const TEAM_EVENTS = new Set<string>([
   HUB_EVENTS.TEAM_ASSIGNMENT_FAILED,
 ]);
 
-export interface WebHubRealtimeOptions {
+interface WebHubRealtimeOptions {
   enabled: boolean;
   runtimeSessionId?: string | null;
   runtimeTaskId?: string | null;
@@ -441,7 +441,7 @@ export const AGENT_STREAM_INVALIDATE_WINDOW_MS = 250;
 /** One display-frame window for live transcript commits (#1415). */
 export const AGENT_STREAM_LIVE_BATCH_WINDOW_MS = 16;
 
-export interface WebWorkbenchHubInvalidationScheduler {
+interface WebWorkbenchHubInvalidationScheduler {
   /** Route one realtime frame: AGENT_STREAM coalesced, everything else immediate. */
   notify: (eventType: string, payload: unknown) => void;
   /** Flush any pending stream invalidation and clear the timer. */
@@ -504,7 +504,7 @@ export function createWebWorkbenchHubInvalidationScheduler(
  */
 type LiveEventFlush = (events: HubRuntimeEventTranscriptInput[]) => void;
 
-export interface WebWorkbenchLiveEventBatcher {
+interface WebWorkbenchLiveEventBatcher {
   /** Queue one stream event; undefined still schedules an activity-only flush. */
   push: (event?: HubRuntimeEventTranscriptInput) => void;
   /** Flush pending work without disposing the batcher. */

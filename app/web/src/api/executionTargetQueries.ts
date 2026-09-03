@@ -53,18 +53,21 @@ const executionTargetTypes: ExecutionTargetType[] = [
 const trustLevels: ExecutionTargetTrustLevel[] = ['local', 'remote', 'cloud', 'relay'];
 const healthStates: ExecutionTargetHealthState[] = [
   'unknown',
-  'healthy',
   'online',
+  'healthy',
   'degraded',
   'offline',
-  'mismatch',
   'stale',
+  'mismatch',
+  'registered',
 ];
 
 const emptyExecutionTargets: ExecutionTargetInventoryResponse = {
   items: [],
   page: { hasMore: false },
 };
+const executionTargetPageSize = 50;
+const maxExecutionTargetPages = 10;
 
 function parseWorkspaceAllowlist(value: ExecutionTarget['workspace_allowlist']): string[] {
   if (Array.isArray(value)) {
@@ -112,10 +115,26 @@ export async function fetchExecutionTargets(
   if (!preferHub || !token) return emptyExecutionTargets;
 
   const client = createHubClient({ getToken: () => token });
-  const res = await client.listExecutionTargets({ pageSize: 50 });
+  const items: ExecutionTargetInventoryItem[] = [];
+  let page: ExecutionTargetListResponse['page'] = { hasMore: false };
+  let pageCursor: string | undefined;
+
+  for (let i = 0; i < maxExecutionTargetPages; i += 1) {
+    const res = await client.listExecutionTargets({
+      pageSize: executionTargetPageSize,
+      ...(pageCursor ? { pageCursor } : {}),
+    });
+    items.push(...res.items.map(normalizeExecutionTarget));
+    page = res.page ?? { hasMore: false };
+    if (!page.hasMore || !page.nextCursor) {
+      return { items, page };
+    }
+    pageCursor = page.nextCursor;
+  }
+
   return {
-    items: res.items.map(normalizeExecutionTarget),
-    page: res.page,
+    items,
+    page: { ...page, hasMore: true },
   };
 }
 

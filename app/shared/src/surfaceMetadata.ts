@@ -328,15 +328,6 @@ export function getSurfaceByDesktopSectionId(sectionId: string): SurfaceMetadata
   );
 }
 
-export function getSurfaceByWebRoute(route: string): SurfaceMetadata | undefined {
-  return (SURFACE_METADATA as readonly SurfaceMetadata[]).find(
-    (surface) =>
-      surface.platform === 'web' &&
-      typeof surface.webRoutePattern === 'string' &&
-      matchesRoutePattern(route, surface.webRoutePattern),
-  );
-}
-
 function matchesRoutePattern(route: string, pattern: string): boolean {
   const routeParts = trimSlashes(route).split('/').filter(Boolean);
   const patternParts = trimSlashes(pattern).split('/').filter(Boolean);

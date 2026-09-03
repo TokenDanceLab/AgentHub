@@ -885,7 +885,7 @@ export function useWebSessionAutoMarkRead(
  * Map a Hub execution-target inventory row to the Devices page entry (#1819).
  * Only forwards fields the Hub actually returned (exactOptionalPropertyTypes).
  */
-export function mapWebExecutionTargetToDeviceEntry(
+function mapWebExecutionTargetToDeviceEntry(
   target: ExecutionTargetInventoryItem,
 ): DevicesPageTarget {
   const id = String(target.id ?? '');
@@ -930,6 +930,5 @@ export {
   type WebExecutionTargetStatus,
   type WebExecutionTargetStatusState,
 } from './webWorkbenchExecutionTargets';
-export { hubEmptyContacts as webHubEmptyContacts } from '@agenthub/workbench/hubDataMapping';
 export { contactInfoToMember } from '@agenthub/workbench/hubDataMapping';
 export { resolveHubContacts as resolveWebWorkbenchContacts } from '@agenthub/workbench/hubDataMapping';

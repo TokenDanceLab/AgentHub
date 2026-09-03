@@ -163,10 +163,6 @@ export function assertE2EDataModeScenario(
   }
 }
 
-export function isE2ERequestAllowed(scenario: E2EDataModeScenario, request: E2EObservedRequest): boolean {
-  return isBoundaryAllowed(scenario, classifyE2ERequest(request.url, scenario), request);
-}
-
 export function buildE2EDataModeManifest(
   scenario: E2EDataModeScenario,
   requests: E2EObservedRequest[] = [],

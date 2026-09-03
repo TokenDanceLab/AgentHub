@@ -43,7 +43,7 @@ export interface WorkbenchSectionSourceInput {
   hasLocalDryRun?: boolean;
 }
 
-export const workbenchDataModeLabels: Record<WorkbenchCatalogMode, string> = {
+const workbenchDataModeLabels: Record<WorkbenchCatalogMode, string> = {
   loading: 'Loading catalog',
   live: 'Live',
   'offline-snapshot': 'Offline snapshot',
@@ -51,7 +51,7 @@ export const workbenchDataModeLabels: Record<WorkbenchCatalogMode, string> = {
   unavailable: 'Snapshot unavailable',
 };
 
-export const workbenchDataModeTones: Record<WorkbenchCatalogMode, WorkbenchCatalogTone> = {
+const workbenchDataModeTones: Record<WorkbenchCatalogMode, WorkbenchCatalogTone> = {
   loading: 'cyan',
   live: 'green',
   'offline-snapshot': 'purple',

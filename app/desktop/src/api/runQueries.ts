@@ -33,7 +33,7 @@ export function findActiveEdgeRun(runs: RunInfo[] | undefined): RunInfo | undefi
 
 type RunQuerySnapshot = Array<[readonly unknown[], ListResponse<RunInfo> | undefined]>;
 
-export function snapshotRunQueries(qc: QueryClient): RunQuerySnapshot {
+function snapshotRunQueries(qc: QueryClient): RunQuerySnapshot {
   return qc.getQueriesData<ListResponse<RunInfo>>({ queryKey: edgeQueryKeys.runs.root });
 }
 
@@ -50,7 +50,7 @@ export function upsertRunInQueries(qc: QueryClient, run: RunInfo) {
   });
 }
 
-export function restoreRunsSnapshot(qc: QueryClient, snapshot: RunQuerySnapshot | undefined) {
+function restoreRunsSnapshot(qc: QueryClient, snapshot: RunQuerySnapshot | undefined) {
   if (!snapshot) return;
   for (const [queryKey, value] of snapshot) {
     qc.setQueryData(queryKey, value);

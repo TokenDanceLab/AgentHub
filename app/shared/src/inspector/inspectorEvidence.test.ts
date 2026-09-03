@@ -20,7 +20,7 @@ describe('buildInspectorEvidenceModel', () => {
     const evidence: EvidenceRef[] = [
       { id: 'run-1', kind: 'run', label: 'Run 1', status: 'running' },
       { id: 'tool-rg', kind: 'tool', label: 'rg desktop', status: 'completed' },
-      { id: 'file-app', kind: 'file', label: 'app/shared/src/workbench/RightInspector.tsx' },
+      { id: 'file-app', kind: 'file', label: 'app/workbench/src/RightInspector.tsx' },
       { id: 'artifact-smoke', kind: 'artifact', label: 'visual-smoke-desktop.png', status: 'completed' },
     ];
 

@@ -21,7 +21,7 @@ import styles from './ProfilePopover.module.css';
    ProfilePopover.module.css. No intentional UX change.
    ═══════════════════════════════════════════════════════════════════════ */
 
-export function ProfileAvatarGlyph({
+function ProfileAvatarGlyph({
   avatar,
   avatarColor,
   avatarUrl,
@@ -56,7 +56,7 @@ export function ProfileAvatarGlyph({
   );
 }
 
-export function ProfileTitleRow({
+function ProfileTitleRow({
   name,
   badge,
 }: {
@@ -71,7 +71,7 @@ export function ProfileTitleRow({
   );
 }
 
-export function ProfileActionButtons({
+function ProfileActionButtons({
   actions,
   onAction,
   className,
@@ -97,7 +97,7 @@ export function ProfileActionButtons({
   );
 }
 
-export function ProfileMetaRows({
+function ProfileMetaRows({
   meta,
 }: {
   meta: ProfileMetaRow[];
@@ -115,7 +115,7 @@ export function ProfileMetaRows({
   );
 }
 
-export function AccountMenuRows({
+function AccountMenuRows({
   accountMenu,
   onAccountMenu,
 }: {

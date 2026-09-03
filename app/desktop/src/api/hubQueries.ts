@@ -110,10 +110,6 @@ export function useHubCreateContactGroup() {
 
 // ── Workspace Projects ────────────────────────────────────────────
 
-export interface WorkspaceProjectPage {
-  items: Awaited<ReturnType<ReturnType<typeof getHubClient>['listWorkspaceProjects']>>['items'];
-  nextPageCursor?: string;
-}
 
 export function useHubWorkspaceProjects(opts?: { enabled?: boolean }) {
   return useQuery({

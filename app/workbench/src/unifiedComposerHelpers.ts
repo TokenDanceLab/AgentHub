@@ -86,14 +86,14 @@ export function isTargetSelectionRequired(
   return Boolean(executionTargets) && mentions.length > 0;
 }
 
-export function isExecutionTargetSelected(
+function isExecutionTargetSelected(
   targetSelectionRequired: boolean,
   executionTargetId: string,
 ): boolean {
   return !targetSelectionRequired || executionTargetId.trim().length > 0;
 }
 
-export function resolveSelectedTargetLabel(
+function resolveSelectedTargetLabel(
   executionTargets: ComposerExecutionTarget[] | undefined,
   executionTargetId: string,
 ): string | undefined {
@@ -178,7 +178,7 @@ export function buildComposerStatusItems(params: {
   ].filter((item): item is string => Boolean(item));
 }
 
-export function isComposerSubmitDisabled(params: {
+function isComposerSubmitDisabled(params: {
   composer: ComposerState;
   isSubmitting: boolean;
   targetSelected: boolean;

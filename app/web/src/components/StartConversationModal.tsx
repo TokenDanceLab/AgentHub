@@ -18,7 +18,7 @@ import styles from './StartConversationModal.module.css';
    presentational (filter + list + busy/error display).
    ═══════════════════════════════════════════════════════════════════════ */
 
-export interface StartConversationModalProps {
+interface StartConversationModalProps {
   open: boolean;
   /** Real contact list for the current user (already resolved via Hub). */
   members: ContactMember[];

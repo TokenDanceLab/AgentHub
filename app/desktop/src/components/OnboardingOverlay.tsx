@@ -14,7 +14,7 @@ const ONBOARDING_STEPS: OnboardingStepDescriptor[] = [
   { titleKey: 'onboarding.step2.title', bodyKey: 'onboarding.step2.body' },
 ];
 
-export interface OnboardingOverlayProps {
+interface OnboardingOverlayProps {
   /** Called once when the user finishes the last step or skips. */
   onFinish: () => void;
 }

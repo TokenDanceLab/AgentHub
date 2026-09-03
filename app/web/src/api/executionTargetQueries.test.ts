@@ -59,6 +59,85 @@ describe('web execution target queries', () => {
     });
   });
 
+  it('walks cursor pages up to the shared 50x10 cap and reports hasMore honestly', async () => {
+    vi.mocked(getAccessToken).mockReturnValue('hub-access');
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(
+        JSON.stringify({
+          code: 'ok',
+          data: {
+            items: [{
+              id: '00000000-0000-0000-0000-00000000e101',
+              name: 'Page 1 Target',
+              target_type: 'local_edge',
+              workspace_allowlist: [],
+              trust_level: 'local',
+              health_state: 'online',
+              is_online: true,
+            }],
+            page: { hasMore: true, nextCursor: 'cur-1' },
+          },
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      ))
+      .mockResolvedValueOnce(new Response(
+        JSON.stringify({
+          code: 'ok',
+          data: {
+            items: [{
+              id: '00000000-0000-0000-0000-00000000e102',
+              name: 'Page 2 Target',
+              target_type: 'remote_ssh',
+              workspace_allowlist: [],
+              trust_level: 'remote',
+              health_state: 'healthy',
+              is_online: false,
+            }],
+            page: { hasMore: false },
+          },
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      ));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const res = await fetchExecutionTargets(true);
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(String(fetchMock.mock.calls[0]?.[0])).toBe('http://localhost:8080/web/execution-targets?pageSize=50');
+    expect(String(fetchMock.mock.calls[1]?.[0])).toBe('http://localhost:8080/web/execution-targets?pageSize=50&pageCursor=cur-1');
+    expect(res.items).toHaveLength(2);
+    expect(res.page.hasMore).toBe(false);
+  });
+
+  it('reports hasMore=true after exhausting the maximum cursor pages', async () => {
+    vi.mocked(getAccessToken).mockReturnValue('hub-access');
+    const fetchMock = vi.fn(async () => new Response(
+      JSON.stringify({
+        code: 'ok',
+        data: {
+          items: [{
+            id: '00000000-0000-0000-0000-00000000e201',
+            name: 'Always More',
+            target_type: 'local_edge',
+            workspace_allowlist: [],
+            trust_level: 'local',
+            health_state: 'registered',
+            is_online: false,
+          }],
+          page: { hasMore: true, nextCursor: 'cur-next' },
+        },
+      }),
+      { status: 200, headers: { 'Content-Type': 'application/json' } },
+    ));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const res = await fetchExecutionTargets(true);
+
+    expect(fetchMock).toHaveBeenCalledTimes(10);
+    expect(res.items).toHaveLength(10);
+    expect(res.page.hasMore).toBe(true);
+  });
+
   it('does not fall back to static target previews when Hub auth is missing', async () => {
     const fetchMock = vi.fn();
     vi.stubGlobal('fetch', fetchMock);
@@ -286,6 +365,39 @@ describe('web execution target queries', () => {
         is_online: false,
       },
     ]);
+  });
+
+  it('keeps registered health states in the pass-through instead of collapsing to unknown', async () => {
+    vi.mocked(getAccessToken).mockReturnValue('hub-access');
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        async () =>
+          new Response(
+            JSON.stringify({
+              code: 'ok',
+              data: {
+                items: [
+                  {
+                    id: 'registered-1',
+                    name: 'Bound but not proven live',
+                    target_type: 'local_edge',
+                    workspace_allowlist: [],
+                    trust_level: 'local',
+                    health_state: 'registered',
+                    is_online: false,
+                  },
+                ],
+                page: { hasMore: false },
+              },
+            }),
+            { status: 200, headers: { 'Content-Type': 'application/json' } }
+          )
+      )
+    );
+
+    const result = await fetchExecutionTargets(true);
+    expect(result.items[0]?.health_state).toBe('registered');
   });
 
   it('counts unknown health states and preserves zero-filled type buckets', () => {

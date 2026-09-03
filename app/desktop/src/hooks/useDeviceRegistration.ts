@@ -8,11 +8,11 @@ import { APP_VERSION } from '@/config';
 import type { HubClient } from '@/api/hubClient';
 import { getOrCreateDeviceId } from '@shared/api/deviceId';
 
-export const DESKTOP_DEVICE_CAPABILITIES = ['local_edge', 'agent.dispatch', 'agent.control'];
+const DESKTOP_DEVICE_CAPABILITIES = ['local_edge', 'agent.dispatch', 'agent.control'];
 
-export type DeviceRegistrationStatus = 'idle' | 'registering' | 'registered' | 'error';
+type DeviceRegistrationStatus = 'idle' | 'registering' | 'registered' | 'error';
 
-export interface DeviceRegistrationState {
+interface DeviceRegistrationState {
   deviceId: string | null;
   status: DeviceRegistrationStatus;
   error: string | null;

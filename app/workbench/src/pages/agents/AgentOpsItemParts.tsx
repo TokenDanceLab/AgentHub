@@ -165,7 +165,7 @@ export const CcSwitchStatusGrid: React.FC<{
   );
 };
 
-export const CcSwitchProviderCard: React.FC<{
+const CcSwitchProviderCard: React.FC<{
   provider: CCSwitchProviderInfo;
 }> = ({ provider }) => {
   const { t } = useTranslation(SHARED_WORKBENCH_I18N_NAMESPACE);

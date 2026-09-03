@@ -6,7 +6,7 @@ import type { Artifact, Preview, RunDiff } from '@shared/types';
 import type { FileDiff } from '@shared/types/chat';
 import { fetchArtifacts, fetchPreviews, fetchRunDiff } from './edgeClient';
 
-export interface RunEvidenceState {
+interface RunEvidenceState {
   diffs: FileDiff[];
   artifacts: Artifact[];
   previews: Preview[];
@@ -50,7 +50,7 @@ function fallbackDiff(file: RunDiff['files'][number]): FileDiff {
   };
 }
 
-export function toReviewDiffs(runDiff: RunDiff | undefined): FileDiff[] {
+function toReviewDiffs(runDiff: RunDiff | undefined): FileDiff[] {
   if (!runDiff) return [];
   return runDiff.files.flatMap((file) => {
     const parsed = parseUnifiedDiff(file.diff, file.path) as FileDiff[];

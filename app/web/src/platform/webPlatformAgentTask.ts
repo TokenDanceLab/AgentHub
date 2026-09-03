@@ -61,7 +61,7 @@ export function readStoredWebActiveAgentTask(sessionId: string): WebActiveAgentT
   }
 }
 
-export function writeStoredWebActiveAgentTask(sessionId: string, task: WebActiveAgentTask): void {
+function writeStoredWebActiveAgentTask(sessionId: string, task: WebActiveAgentTask): void {
   if (typeof localStorage === 'undefined') return;
   localStorage.setItem(webActiveAgentTaskStorageKey(sessionId), JSON.stringify(compactActiveAgentTask(task)));
 }

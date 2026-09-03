@@ -133,7 +133,7 @@ export default function App() {
   );
 }
 
-export interface DesktopWorkbenchAppProps {
+interface DesktopWorkbenchAppProps {
   onLogout?: (() => void) | undefined;
 }
 
