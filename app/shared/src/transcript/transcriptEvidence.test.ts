@@ -25,7 +25,7 @@ describe('collectTranscriptEvidence', () => {
         status: 'completed',
         evidenceRefs: [
           { id: 'ev-tool', kind: 'tool', label: 'rg desktop shell', status: 'completed' },
-          { id: 'ev-file', kind: 'file', label: 'app/shared/src/workbench/AgentHubWorkbench.tsx' },
+          { id: 'ev-file', kind: 'file', label: 'app/workbench/src/AgentHubWorkbench.tsx' },
         ],
       },
       {
@@ -51,7 +51,7 @@ describe('collectTranscriptEvidence', () => {
         kind: 'diff',
         author: { id: 'builder', name: 'Builder', role: 'agent' },
         title: 'Shared shell diff',
-        files: ['app/shared/src/workbench/AgentHubWorkbench.tsx'],
+        files: ['app/workbench/src/AgentHubWorkbench.tsx'],
         evidenceRefs: [{ id: 'ev-file', kind: 'file', label: 'Workbench file' }],
       },
       {

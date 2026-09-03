@@ -4,8 +4,8 @@ import { getAccessToken } from '@/hooks/useAuth';
 import { hubQueryKeys } from '@shared/stores/queryKeys';
 import type { FriendRequestInfo, SearchResult } from './hubClient';
 
-export const contactsQueryKey = hubQueryKeys.contacts.list;
-export const friendRequestsQueryKey = hubQueryKeys.contacts.friendRequests;
+const contactsQueryKey = hubQueryKeys.contacts.list;
+const friendRequestsQueryKey = hubQueryKeys.contacts.friendRequests;
 export const sessionsQueryKey = hubQueryKeys.threads.root;
 
 // ── Async helpers ──────────────────────────────────────────

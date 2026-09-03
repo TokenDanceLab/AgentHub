@@ -21,10 +21,10 @@ export const BANNED_PRODUCT_EN_META: readonly string[] = [
 ] as const;
 
 /** Count suffix that Chinese UI expects as "X 个", not "X active". */
-export const BANNED_ACTIVE_COUNT_SUFFIX = /\b\d+\s+active\b/i;
+const BANNED_ACTIVE_COUNT_SUFFIX = /\b\d+\s+active\b/i;
 
 /** Runtime/Model stuffing patterns that must not land in role/description. */
-export const BANNED_RUNTIME_MODEL_STUFFING = [
+const BANNED_RUNTIME_MODEL_STUFFING = [
   /\bRuntime\s*:/i,
   /\bModel\s*:/i,
 ] as const;

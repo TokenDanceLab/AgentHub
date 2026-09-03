@@ -10,13 +10,13 @@ import styles from './DiffReviewPanel.module.css';
 
 // ── Build side-by-side rows from a hunk ────────────────────────────────
 
-export function makeCell(lineNumber: number | undefined, content: string): SideBySideCell {
+function makeCell(lineNumber: number | undefined, content: string): SideBySideCell {
   const cell: SideBySideCell = { content };
   if (lineNumber != null) cell.lineNumber = lineNumber;
   return cell;
 }
 
-export function makeRow(
+function makeRow(
   left: SideBySideCell | null,
   right: SideBySideCell | null,
   rowType: SideBySideRow['rowType'],

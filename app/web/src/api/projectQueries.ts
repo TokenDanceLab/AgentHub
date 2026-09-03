@@ -13,7 +13,7 @@ import type {
   WorkspaceProjectThreadMessage,
 } from './hubClient';
 
-export const workspaceProjectsQueryKey = hubQueryKeys.projects.root;
+const workspaceProjectsQueryKey = hubQueryKeys.projects.root;
 // Deliberately no local threads-key alias next to the projects key above: the
 // one that used to sit here had 0 consumers and pointed at
 // `hubQueryKeys.projects.root` — the *projects* root — so any invalidation
@@ -203,36 +203,5 @@ export function useHubWorkspaceProjectThreadMessages(options: {
     enabled: options.enabled && Boolean(options.projectId) && Boolean(options.threadId),
     staleTime: 5_000,
     placeholderData: (previous) => previous,
-  });
-}
-
-export function useCreateHubWorkspaceProjectThread(options: { getToken?: () => string | null } = {}) {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: ({ projectId, draft }: { projectId: string; draft: CreateWorkspaceProjectThreadRequest }) =>
-      createWorkspaceProjectThread(projectId, draft, options.getToken ?? getAccessToken),
-    onSettled: (_data, _error, variables) => {
-      void queryClient.invalidateQueries({ queryKey: hubQueryKeys.projects.threads(variables.projectId) });
-    },
-  });
-}
-
-export function useSendHubWorkspaceProjectThreadMessage(options: { getToken?: () => string | null } = {}) {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: (
-      { projectId, threadId, draft }: {
-        projectId: string;
-        threadId: string;
-        draft: SendWorkspaceProjectThreadMessageRequest;
-      },
-    ) => sendWorkspaceProjectThreadMessage(projectId, threadId, draft, options.getToken ?? getAccessToken),
-    onSettled: (_data, _error, variables) => {
-      void queryClient.invalidateQueries({
-        queryKey: hubQueryKeys.projects.threadMessages(variables.projectId, variables.threadId),
-      });
-    },
   });
 }

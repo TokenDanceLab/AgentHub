@@ -12,7 +12,7 @@ import styles from './DesktopChrome.module.css';
 
 type WindowCommand = 'minimize' | 'toggleMaximize' | 'close';
 
-export interface DesktopChromeProps {
+interface DesktopChromeProps {
   children: ReactNode;
   showNavigationControls?: boolean | undefined;
 }

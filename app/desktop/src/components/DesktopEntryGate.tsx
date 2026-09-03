@@ -7,7 +7,7 @@ import agentHubLogo from '@/assets/agenthub-product-icon-rounded.svg';
 import tokenDanceLogo from '@/assets/tokendance-product-mark-transparent.svg';
 import styles from './DesktopEntryGate.module.css';
 
-export interface DesktopEntryGateProps {
+interface DesktopEntryGateProps {
   onLoginSuccess: () => void;
   onContinueDemo: () => void;
   onConnectEdge: () => void;

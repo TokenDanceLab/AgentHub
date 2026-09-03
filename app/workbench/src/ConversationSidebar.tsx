@@ -78,7 +78,7 @@ export interface ConversationSidebarProps {
  * workbenchProfileChromeHelpers); like those, it is a custom scheme that
  * consumers may route themselves.
  */
-export function conversationLinkFor(conversationId: string): string {
+function conversationLinkFor(conversationId: string): string {
   return `agenthub://threads/${conversationId}`;
 }
 

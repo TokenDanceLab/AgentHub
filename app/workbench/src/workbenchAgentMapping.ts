@@ -46,7 +46,7 @@ export function workbenchAgentStateToAgentState(status: WorkbenchAgent['status']
   }
 }
 
-export function toolPermissionFromAgent(agent: WorkbenchAgent): Record<string, ToolPermission> {
+function toolPermissionFromAgent(agent: WorkbenchAgent): Record<string, ToolPermission> {
   const allowedTools = new Set(agent.toolAllowlist ?? []);
   if (allowedTools.size === 0) return {};
   return Object.fromEntries(

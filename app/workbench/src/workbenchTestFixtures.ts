@@ -120,10 +120,10 @@ export const workbenchTranscript: TranscriptBlock[] = [
     id: 'diff-1',
     kind: 'diff',
     author: { id: 'builder', name: 'Builder', role: 'agent' },
-    title: 'app/shared/src/workbench/RightInspector.tsx',
-    files: ['app/shared/src/workbench/RightInspector.tsx'],
+    title: 'app/workbench/src/RightInspector.tsx',
+    files: ['app/workbench/src/RightInspector.tsx'],
     evidenceRefs: [
-      { id: 'ev-file', kind: 'file', label: 'app/shared/src/workbench/RightInspector.tsx' },
+      { id: 'ev-file', kind: 'file', label: 'app/workbench/src/RightInspector.tsx' },
     ],
   },
   {

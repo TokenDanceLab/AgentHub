@@ -28,7 +28,7 @@ import { hubQueryKeys } from '@shared/stores/queryKeys';
 
 // ── Public types ─────────────────────────────────
 
-export interface HubEventStreamState {
+interface HubEventStreamState {
   status: TransportStatus;
   lastFrame: HubFrame | null;
   lastMessage: HubMessage | null;
@@ -37,7 +37,7 @@ export interface HubEventStreamState {
   onlineUsers: string[];
 }
 
-export interface HubEventStreamHandle extends HubEventStreamState {
+interface HubEventStreamHandle extends HubEventStreamState {
   /** The underlying Hub WS handle for lower-level consumers. */
   hubWS: HubWSHandle | null;
   /** Send a typing indicator for a session. */

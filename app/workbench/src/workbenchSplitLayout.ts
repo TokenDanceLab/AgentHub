@@ -55,7 +55,7 @@ const MAX_VALIDATION_DEPTH = 32;
 let paneIdCounter = 0;
 
 /** Deterministic-enough unique pane id; explicit ids may be injected in tests. */
-export function generatePaneId(): string {
+function generatePaneId(): string {
   paneIdCounter += 1;
   return `split-pane-${Date.now().toString(36)}-${paneIdCounter}`;
 }

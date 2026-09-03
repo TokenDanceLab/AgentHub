@@ -8,9 +8,9 @@
 
 import type { HubClient } from '@/api/hubClient';
 import type { HubRuntimeEventTranscriptInput } from '@shared/transcript';
-import { useConnectionStore, type RecoveryState } from '@/stores/connectionStore';
+import { useConnectionStore } from '@/stores/connectionStore';
 
-export interface ReplayControllerOptions {
+interface ReplayControllerOptions {
   hubClient: HubClient;
   /** Currently active agent task ID (may change over time). */
   getActiveTaskId: () => string | undefined;
@@ -89,29 +89,7 @@ export async function replayMissedEvents(opts: ReplayControllerOptions): Promise
  * Create a recovery state transcript block that can be inserted
  * into the transcript to indicate where replay events were inserted.
  */
-export function replayGapBlock(
-  taskId: string,
-  replayedCount: number,
-  recovering: boolean = false,
-): HubRuntimeEventTranscriptInput {
-  return {
-    id: `replay-gap-${taskId}`,
-    task_id: taskId,
-    event_type: 'replay.gap',
-    payload: {
-      kind: 'replay_gap',
-      replayedCount,
-      taskId,
-      recovering,
-    },
-    created_at: new Date().toISOString(),
-  };
-}
 
 /**
  * Read the current recovery state from the connection store.
  */
-export function getRecoveryState(): { state: RecoveryState; error: string | null } {
-  const store = useConnectionStore.getState();
-  return { state: store.recoveryState, error: store.recoveryError };
-}
