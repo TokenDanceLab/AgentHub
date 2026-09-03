@@ -14,7 +14,7 @@ import (
 	"github.com/agenthub/edge-server/internal/permission"
 )
 
-// Ownership slice for the human approval gates (#2241 round-64 lane A):
+// Ownership slice for the human approval gates (#2241 lane A):
 //
 //	POST /v1/permissions/decide — allow/deny a live tool call of a run
 //	POST /v1/plans/decide       — approve/reject an orchestrator plan of a run

@@ -343,13 +343,13 @@ describe('buildSettingsPageProps', () => {
     const props = buildSettingsPageProps({
       settingsRoute,
       onOpenAgentConfig,
-      userDisplayName: 'Ding',
+      userDisplayName: 'Alice',
     });
 
     expect(props.theme).toBe('dark');
     expect(props.spaceTitle).toBe('AgentHub Desktop');
     expect(props.spaceMeta).toBe('桌面设计 demo');
-    expect(props.currentUserDisplayName).toBe('Ding');
+    expect(props.currentUserDisplayName).toBe('Alice');
     expect(props.onOpenAgentConfig).toBe(onOpenAgentConfig);
     expect(Object.prototype.hasOwnProperty.call(props, 'onRetrySettingsLoad')).toBe(false);
     expect(Object.prototype.hasOwnProperty.call(props, 'onDismissSettingsError')).toBe(false);

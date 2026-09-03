@@ -423,7 +423,7 @@ func TestCLIInvocationPlanRedactsPromptEnvAndPaths(t *testing.T) {
 		AgentID:        "claude-code",
 		Model:          "sonnet",
 		PermissionMode: "plan",
-		WorkDir:        "C:\\Users\\Ding\\private\\workspace",
+		WorkDir:        "C:\\Users\\Example\\private\\workspace",
 	})
 
 	if plan.AdapterID != "claude-code" {
@@ -445,7 +445,7 @@ func TestCLIInvocationPlanRedactsPromptEnvAndPaths(t *testing.T) {
 	if err != nil {
 		t.Fatalf("marshal invocation plan payload: %v", err)
 	}
-	if strings.Contains(string(encoded), "SECRET_PROMPT_SHOULD_NOT_APPEAR") || strings.Contains(string(encoded), "C:\\Users\\Ding") {
+	if strings.Contains(string(encoded), "SECRET_PROMPT_SHOULD_NOT_APPEAR") || strings.Contains(string(encoded), "C:\\Users\\Example") {
 		t.Fatalf("invocation plan leaked prompt or absolute path:\n%s", encoded)
 	}
 	if !strings.Contains(string(encoded), `"--permission-mode"`) || !strings.Contains(string(encoded), `"--model"`) {
