@@ -148,7 +148,7 @@ Deprecated unprefixed aliases（`list_projects` 等）仅在 discovery 中标记
 | Tool call / result | `run.agent.tool_call` / `run.agent.tool_result` events | ✅ 已支持 | payload schema 差异需 mapping |
 | Message delta / streaming | `message.new` + transcript normalizer | ✅ 已支持 | AG-UI 增量格式需转换层 |
 | State snapshot | REST snapshot endpoints + `system.gap` fallback | ⚠️ 部分 | AG-UI state sync 语义更丰富 |
-| Run lifecycle | `run.started` / `run.finished` / `run.error` | ✅ 已支持 | — |
+| Run lifecycle | `run.started` / `run.finished` / `run.failed` | ✅ 已支持 | — |
 | Approval / human-in-the-loop | Hub approval broker + WS approval events | ✅ 已支持 | AG-UI 无内置审批；AgentHub 更强 |
 | Multi-modal content | attachments + artifact system | ⚠️ 部分 | AG-UI content block 类型需对齐 |
 
