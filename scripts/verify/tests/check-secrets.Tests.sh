@@ -2,12 +2,17 @@
 # Self-tests for check-secrets.sh — fail-closed secret guard contract.
 #
 # Positive: placeholder values, *.env.example files, *_URL endpoint
-# assignments, absolute path literals, and userinfo-less endpoint URL values
-# without query/fragment pass.
+# assignments, absolute path literals, userinfo-less endpoint URL values
+# without query/fragment, and benign kebab-case identifiers that merely
+# contain a token prefix mid-word (e.g. "task-backfill-mis"+"match-conflict")
+# pass — literal rules require the token prefix to sit on a word boundary
+# (#2295).
 # Negative: real AWS keys, GitHub tokens, private key blocks, API keys
-# (sk-), URL DSNs with userinfo (user:pass@), URLs carrying query-string
-# credentials (?access_token=…), and real password literals in staged diffs
-# must ALL exit non-zero.
+# (sk-), Slack/Google tokens, JWTs, URL DSNs with userinfo (user:pass@), URLs
+# carrying query-string credentials (?access_token=…), and real password
+# literals in staged diffs must ALL exit non-zero — including each token shape
+# at a line start and after '"', '=', ' ', ':' and ',' (the boundary rule must
+# not widen the pass surface).
 #
 # Runs in CI validate job alongside verify-vulnerability-gates.Tests.sh.
 set -uo pipefail
@@ -194,6 +199,70 @@ JSON
 git add app/web/src/i18n/config/tokens.json
 bash "$SCRIPT" --staged >/dev/null 2>&1
 check "adjacent non-locale i18n dir not exempted" yes $?
+
+echo "=== benign kebab-case ID containing an sk- substring passes (#2295) ==="
+git reset --quiet
+# 该 ID 是全仓唯一被旧规则误判的真实案例：ta**sk-**backfill-mismatch-conflict
+# 里 `sk-` 后跟 26 个 [A-Za-z0-9_-]。片段拼写，避免本自测文件自身被判红。
+benign_id="task-backfill-mis"
+benign_id="${benign_id}match-conflict"
+printf 'package agent\n\nfunc fixtureID() string { return "%s" }\n' "$benign_id" > benign_fixture_id.go
+git add benign_fixture_id.go
+bash "$SCRIPT" --staged >/dev/null 2>&1
+check "benign kebab-case ID with an embedded sk- substring passes" no $?
+
+echo "=== word-boundary rule keeps every real token shape red ==="
+# 六种 token 形状各配一种边界位置（行首 / " / = / 空格 / : / ,）；字面量一律由
+# 低于阈值的片段拼成，本文件的新增行因此不会自己触发扫描。
+git reset --quiet
+aws_key="AKIA1234"
+aws_key="${aws_key}567890ABCDEF"
+printf '%s\n' "$aws_key" > token_at_line_start.txt
+git add token_at_line_start.txt
+bash "$SCRIPT" --staged >/dev/null 2>&1
+check "AWS access key at line start still fails" yes $?
+
+git reset --quiet
+gh_token="ghp_1234567890"
+gh_token="${gh_token}abcdefghijklmnop"
+printf '{"token": "%s"}\n' "$gh_token" > token_after_quote.json
+git add token_after_quote.json
+bash "$SCRIPT" --staged >/dev/null 2>&1
+check "GitHub token after a double quote still fails" yes $?
+
+git reset --quiet
+api_key="sk-proj-abc123"
+api_key="${api_key}def456ghi789jkl012"
+printf 'OPENAI_API_KEY=%s\n' "$api_key" > token_after_equals.txt
+git add token_after_equals.txt
+bash "$SCRIPT" --staged >/dev/null 2>&1
+check "API key after '=' still fails" yes $?
+
+git reset --quiet
+slack_token="xoxb-1234567890"
+slack_token="${slack_token}abcdefghijklmnop"
+printf 'slack: %s\n' "$slack_token" > token_after_colon_space.yaml
+git add token_after_colon_space.yaml
+bash "$SCRIPT" --staged >/dev/null 2>&1
+check "Slack token after ': ' still fails" yes $?
+
+git reset --quiet
+google_key="AIzaSyDabc123"
+google_key="${google_key}def456ghi789jkl012mnopqrst"
+printf 'key:%s\n' "$google_key" > token_after_colon.txt
+git add token_after_colon.txt
+bash "$SCRIPT" --staged >/dev/null 2>&1
+check "Google API key after ':' still fails" yes $?
+
+git reset --quiet
+jwt_head="eyJhbGciOiJIUzI1"
+jwt_head="${jwt_head}NiIsInR5cCI6IkpXVCJ9"
+jwt_body="eyJzdWIiOiIxMjM0NTY3ODkwIn0"
+jwt_sig="dozjgNryP4J3jVmNHl0w5N"
+printf 'values: ["x",%s.%s.%s]\n' "$jwt_head" "$jwt_body" "$jwt_sig" > token_after_comma.yaml
+git add token_after_comma.yaml
+bash "$SCRIPT" --staged >/dev/null 2>&1
+check "JWT after ',' still fails" yes $?
 
 echo ""
 echo "Results: $PASS passed, $FAIL failed"

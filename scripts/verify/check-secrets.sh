@@ -204,31 +204,39 @@ check_added_line() {
     return
   fi
 
+  # 字面量规则统一要求 token 前缀落在**词边界**上（行首或前一个字符不是字母数字）。
+  # 这些前缀（AKIA/ghp_/xox?-/AIza/sk-/eyJ）本身就是"凭据 token 的开头"，真凭据在
+  # 源码/配置/日志里总是出现在引号、空白、`=`、`:`、`,` 之后；无边界匹配会把良性
+  # kebab-case 标识符判成凭据——实测全仓唯一一例：
+  # `taskID := "task-backfill-mismatch-conflict"`（ta**sk-**backfill-mismatch-conflict，
+  # `sk-` 后 26 个 [A-Za-z0-9_-]）命中 sk- 规则，于是任何搬动这行的重构都被 CI 判红
+  # （#2295）。加边界后全树 15 处旧命中里 14 处不变、只少这一处误报；六种 token 形状
+  # 各在一种边界位置（行首 / " / = / 空格 / : / ,）由自测覆盖，仍全部判红。
   if [[ "$trimmed" =~ -----BEGIN[[:space:]]+.*PRIVATE[[:space:]]+KEY----- ]]; then
     report "$path" "$line_no" "private key block detected"
   fi
 
-  if [[ "$trimmed" =~ AKIA[0-9A-Z]{16} ]]; then
+  if [[ "$trimmed" =~ (^|[^A-Za-z0-9])AKIA[0-9A-Z]{16} ]]; then
     report "$path" "$line_no" "possible AWS access key detected"
   fi
 
-  if [[ "$trimmed" =~ gh[pousr]_[A-Za-z0-9_]{20,} ]]; then
+  if [[ "$trimmed" =~ (^|[^A-Za-z0-9])gh[pousr]_[A-Za-z0-9_]{20,} ]]; then
     report "$path" "$line_no" "possible GitHub token detected"
   fi
 
-  if [[ "$trimmed" =~ xox[baprs]-[A-Za-z0-9-]{20,} ]]; then
+  if [[ "$trimmed" =~ (^|[^A-Za-z0-9])xox[baprs]-[A-Za-z0-9-]{20,} ]]; then
     report "$path" "$line_no" "possible Slack token detected"
   fi
 
-  if [[ "$trimmed" =~ AIza[0-9A-Za-z_-]{35} ]]; then
+  if [[ "$trimmed" =~ (^|[^A-Za-z0-9])AIza[0-9A-Za-z_-]{35} ]]; then
     report "$path" "$line_no" "possible Google API key detected"
   fi
 
-  if [[ "$trimmed" =~ sk-[A-Za-z0-9_-]{24,} ]]; then
+  if [[ "$trimmed" =~ (^|[^A-Za-z0-9])sk-[A-Za-z0-9_-]{24,} ]]; then
     report "$path" "$line_no" "possible API key detected"
   fi
 
-  if [[ "$trimmed" =~ eyJ[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{10,} ]]; then
+  if [[ "$trimmed" =~ (^|[^A-Za-z0-9])eyJ[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{10,} ]]; then
     report "$path" "$line_no" "possible JWT detected"
   fi
 
