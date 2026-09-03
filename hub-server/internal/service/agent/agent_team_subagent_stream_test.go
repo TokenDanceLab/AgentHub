@@ -16,8 +16,8 @@ import (
 
 	"github.com/agenthub/hub-server/internal/bus"
 	"github.com/agenthub/hub-server/internal/model"
-	"github.com/agenthub/hub-server/internal/testkit"
 	"github.com/agenthub/hub-server/internal/ws"
+	"github.com/agenthub/pkg/testkit"
 )
 
 // newSubagentStreamTestDB builds an in-memory sqlite DB with the tables

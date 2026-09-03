@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/agenthub/edge-server/internal/testkit"
+	"github.com/agenthub/pkg/testkit"
 )
 
 // ---------------------------------------------------------------------------

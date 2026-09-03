@@ -4,8 +4,10 @@
 // assert a fixed delay (heartbeat, TTL, backoff) belong to clock-injectable
 // seams, not sleeps.
 //
-// eventually.go was duplicated verbatim in hub-server/internal/testkit and
-// edge-server/internal/testkit; the single definition lives here.
+// The verbatim copies in hub-server/internal/testkit and
+// edge-server/internal/testkit (and the forwarding shims that replaced them)
+// are gone: callers import this package directly. hub-server/internal/testkit
+// keeps only Hub-specific fixtures.
 package testkit
 
 import (
