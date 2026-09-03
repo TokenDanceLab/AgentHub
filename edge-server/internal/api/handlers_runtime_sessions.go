@@ -20,7 +20,7 @@ var listRuntimeSessions = sessionindex.ListRecentFromEnv
 // GET /v1/runtime-sessions?limit=50&runtime=claude-code,codex
 func (h *Handler) GetRuntimeSessions(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		writeJSON(w, http.StatusMethodNotAllowed, errcode.ErrorBody(errcode.ErrMethodNotAllowed))
+		errcode.Write(w, errcode.ErrMethodNotAllowed)
 		return
 	}
 	// Local filesystem index — shared machine surface; Hub multi-user fail closed.
@@ -32,7 +32,7 @@ func (h *Handler) GetRuntimeSessions(w http.ResponseWriter, r *http.Request) {
 	if raw := strings.TrimSpace(r.URL.Query().Get("limit")); raw != "" {
 		n, err := strconv.Atoi(raw)
 		if err != nil || n < 1 || n > 500 {
-			writeJSON(w, http.StatusBadRequest, errcode.ErrorBody(errcode.ErrBadRequest.WithMessage("limit must be 1-500")))
+			errcode.Write(w, errcode.ErrBadRequest.WithMessage("limit must be 1-500"))
 			return
 		}
 		limit = n
@@ -52,7 +52,7 @@ func (h *Handler) GetRuntimeSessions(w http.ResponseWriter, r *http.Request) {
 	items, err := listRuntimeSessions(limit, runtimes)
 	if err != nil {
 		slog.Error("runtime session list failed", "limit", limit, "error", err)
-		writeJSON(w, http.StatusInternalServerError, errcode.ErrorBody(errcode.ErrInternal))
+		errcode.Write(w, errcode.ErrInternal)
 		return
 	}
 	if items == nil {

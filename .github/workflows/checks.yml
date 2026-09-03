@@ -2199,6 +2199,18 @@ jobs:
       - name: Self-test safego convergence gate (negative)
         run: python scripts/verify/tests/verify-safego-convergence.Tests.py
 
+      # #2245 阶段 2: edge 错误响应的 HTTP status 只有一个来源（errcode.Error.HTTPStatus）。
+      # 收敛之前 167 个调用点各自手抄一遍 status，手抄不报错、只会在某天与表分岔——
+      # 已实证两批：delivery_journal 的 503/500 配 bad_request，以及 PostRuns 把
+      # not_configured（按定义 503）的运维配置错误手抄成 403 并留下「Failures are always
+      # 403」的注释。白名单键是「文件路径 + 允许命中次数 + 允许的字面量集合」，不是行号；
+      # 匹配前先剥 Go 注释与字符串字面量。成功响应与 /v1/health 的计算态 status 不在范围内。
+      - name: Verify edge error-status single source (#2245)
+        run: python ./scripts/verify/verify-edge-status-ssot.py
+
+      - name: Self-test edge error-status SSOT gate (negative)
+        run: python scripts/verify/tests/verify-edge-status-ssot.Tests.py
+
       # #2154 F-e: GetTeamRunState 的并行读要求池里每条连接看到同一个 catalog；私有
       # ":memory:" 给每条**新连接**一个独立空库，未钉连接数的夹具会让 fan-out 读落到
       # "no such table"，且失败可能非确定性（低竞争时侥幸复用同一连接而通过）。

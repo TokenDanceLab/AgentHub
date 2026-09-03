@@ -294,13 +294,13 @@ func (h *Handler) buildRunContext(run store.Run, req *runRequest) lifecycle.RunP
 
 func (h *Handler) PostRuns(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		writeJSON(w, http.StatusMethodNotAllowed, errcode.ErrorBody(errcode.ErrMethodNotAllowed))
+		errcode.Write(w, errcode.ErrMethodNotAllowed)
 		return
 	}
 
 	req, decodeErr := decodeRunRequest(r)
 	if decodeErr != nil {
-		writeJSON(w, http.StatusBadRequest, errcode.ErrorBody(decodeErr))
+		errcode.Write(w, decodeErr)
 		return
 	}
 
@@ -322,10 +322,19 @@ func (h *Handler) PostRuns(w http.ResponseWriter, r *http.Request) {
 		req.SessionID = runtimeSessionIDForThread(req.ThreadID)
 	}
 
-	// Dual-token auth (AH-SR-046): see validateCapabilityRequest for the
-	// full policy. Failures are always 403.
+	// Dual-token auth (AH-SR-046): see validateCapabilityRequest for the full
+	// policy. The status comes from the error rather than from this call site,
+	// because the policy has two different failure kinds: a missing or invalid
+	// capability token is 403 capability_token_invalid (the client's fault),
+	// while a Hub identity present alongside an empty/misconfigured HubJWTSecret
+	// is 503 not_configured (the operator's fault — validateCapabilityRequest
+	// fails closed rather than soft-skipping). This site used to hand-copy 403
+	// for both and the comment claimed "Failures are always 403", so a server
+	// misconfiguration was reported to the client as an authorization failure:
+	// status said "do not retry, your credentials are wrong" while the code said
+	// "not_configured" (#2245).
 	if err := h.validateCapabilityRequest(r, &req); err != nil {
-		writeJSON(w, http.StatusForbidden, errcode.ErrorBody(err))
+		errcode.Write(w, err)
 		return
 	}
 
@@ -397,14 +406,18 @@ func (h *Handler) PostRuns(w http.ResponseWriter, r *http.Request) {
 			// preserving the historical response body shape.
 			if errors.Is(err, errcode.ErrActiveRunExists) {
 				if active, found := runcontrol.ActiveRunForThread(repository.ListRuns(req.ThreadID)); found {
-					writeJSON(w, http.StatusConflict, activeRunExistsResponse(active))
+					// Status derived from the error, not hand-copied: the body is a
+					// richer envelope than errcode.Write produces (it carries the
+					// conflicting run's identifiers), so this goes through writeJSON —
+					// but the status still comes from the single source (#2245).
+					writeJSON(w, errcode.ErrActiveRunExists.HTTPStatus, activeRunExistsResponse(active))
 					return
 				}
 			}
-			writeJSON(w, e.HTTPStatus, errcode.ErrorBody(e))
+			errcode.Write(w, e)
 			return
 		}
-		writeJSON(w, http.StatusInternalServerError, errcode.ErrorBody(errcode.ErrInternal.WithMessagef("%v", err)))
+		errcode.Write(w, errcode.ErrInternal.WithMessagef("%v", err))
 		return
 	}
 	writeSuccess(w, http.StatusAccepted, acceptedResponse(runToResponse(run)))
@@ -416,7 +429,7 @@ func (h *Handler) PostRuns(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) PostCancelRun(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		writeJSON(w, http.StatusMethodNotAllowed, errcode.ErrorBody(errcode.ErrMethodNotAllowed))
+		errcode.Write(w, errcode.ErrMethodNotAllowed)
 		return
 	}
 	// Extract runId from path: /v1/runs/{runId}:cancel
@@ -453,7 +466,7 @@ func (h *Handler) PostCancelRun(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	writeJSON(w, http.StatusNotFound, errcode.ErrorBody(errcode.ErrNotFound.WithMessage("run not found")))
+	errcode.Write(w, errcode.ErrNotFound.WithMessage("run not found"))
 }
 
 func isTerminalRunStatus(status string) bool {
@@ -475,7 +488,7 @@ func isTerminalRunStatus(status string) bool {
 
 func (h *Handler) GetMetrics(w http.ResponseWriter, r *http.Request) {
 	if h.Metrics == nil {
-		writeJSON(w, http.StatusServiceUnavailable, errcode.ErrorBody(errcode.ErrNotConfigured.WithMessage("metrics not configured")))
+		errcode.Write(w, errcode.ErrNotConfigured.WithMessage("metrics not configured"))
 		return
 	}
 	h.Metrics.Handler().ServeHTTP(w, r)

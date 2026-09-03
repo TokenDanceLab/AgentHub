@@ -16,19 +16,19 @@ import (
 // 02-edge-server.md restore semantics).
 func (h *Handler) GetRunCheckpoint(w http.ResponseWriter, r *http.Request, runID string) {
 	if r.Method != http.MethodGet {
-		writeJSON(w, http.StatusMethodNotAllowed, errcode.ErrorBody(errcode.ErrMethodNotAllowed))
+		errcode.Write(w, errcode.ErrMethodNotAllowed)
 		return
 	}
 	repository := ensureStore(h)
 	userID := h.ownerUserID(r)
 	if _, ok := repository.GetRun(runID); !ok || !isRunOwnedBy(repository, runID, userID) {
-		writeJSON(w, http.StatusNotFound, errcode.ErrorBody(errcode.ErrNotFound.WithMessage("run not found")))
+		errcode.Write(w, errcode.ErrNotFound.WithMessage("run not found"))
 		return
 	}
 	cp, ok := repository.GetRunCheckpoint(runID)
 	if !ok {
 		// Honest absence: runs without a resolved workdir have no checkpoint.
-		writeJSON(w, http.StatusNotFound, errcode.ErrorBody(errcode.ErrNotFound.WithMessage("run has no checkpoint")))
+		errcode.Write(w, errcode.ErrNotFound.WithMessage("run has no checkpoint"))
 		return
 	}
 	files := make([]map[string]any, 0, len(cp.Files))
@@ -60,23 +60,23 @@ func (h *Handler) GetRunCheckpoint(w http.ResponseWriter, r *http.Request, runID
 // resolution, traversal, or filesystem access happens here.
 func (h *Handler) GetRunCheckpointFile(w http.ResponseWriter, r *http.Request, runID string) {
 	if r.Method != http.MethodGet {
-		writeJSON(w, http.StatusMethodNotAllowed, errcode.ErrorBody(errcode.ErrMethodNotAllowed))
+		errcode.Write(w, errcode.ErrMethodNotAllowed)
 		return
 	}
 	repository := ensureStore(h)
 	userID := h.ownerUserID(r)
 	if _, ok := repository.GetRun(runID); !ok || !isRunOwnedBy(repository, runID, userID) {
-		writeJSON(w, http.StatusNotFound, errcode.ErrorBody(errcode.ErrNotFound.WithMessage("run not found")))
+		errcode.Write(w, errcode.ErrNotFound.WithMessage("run not found"))
 		return
 	}
 	path := r.URL.Query().Get("path")
 	if path == "" {
-		writeJSON(w, http.StatusBadRequest, errcode.ErrorBody(errcode.ErrBadRequest.WithMessage("path is required")))
+		errcode.Write(w, errcode.ErrBadRequest.WithMessage("path is required"))
 		return
 	}
 	cp, ok := repository.GetRunCheckpoint(runID)
 	if !ok {
-		writeJSON(w, http.StatusNotFound, errcode.ErrorBody(errcode.ErrNotFound.WithMessage("run has no checkpoint")))
+		errcode.Write(w, errcode.ErrNotFound.WithMessage("run has no checkpoint"))
 		return
 	}
 	for _, f := range cp.Files {
@@ -91,5 +91,5 @@ func (h *Handler) GetRunCheckpointFile(w http.ResponseWriter, r *http.Request, r
 			return
 		}
 	}
-	writeJSON(w, http.StatusNotFound, errcode.ErrorBody(errcode.ErrNotFound.WithMessage("path not in checkpoint")))
+	errcode.Write(w, errcode.ErrNotFound.WithMessage("path not in checkpoint"))
 }
