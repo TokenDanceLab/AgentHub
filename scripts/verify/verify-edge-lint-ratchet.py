@@ -21,6 +21,7 @@ JSON report instead of shelling out to the linter (used by the self-tests).
 """
 
 import argparse
+import hashlib
 import json
 import os
 import subprocess
@@ -47,8 +48,14 @@ def resolve_repo_root(script_dir: str, explicit: str) -> str:
     return os.path.dirname(os.path.dirname(script_dir))
 
 
-def get_live_fingerprints(report) -> dict:
+def get_live_fingerprints(report, module_dir: str) -> tuple:
+    """Return (live fingerprints, stale-cache phantoms).
+
+    module_dir is the absolute path of the linted module (…/edge-server); the
+    phantom guard below needs it to tell a real finding from a cache artifact.
+    """
     live = {}
+    phantoms = []
     for issue in report.get("Issues", []):
         # gofmt is a formatter whose verdict drifts with the Go toolchain
         # version (CI go1.25 vs local go1.26 disagree on file sets); it is not
@@ -58,13 +65,40 @@ def get_live_fingerprints(report) -> dict:
             continue
         # Normalize absolute runner paths to repo-relative (golangci-lint-action
         # runs with --path-mode=abs, so Filename is /home/runner/work/.../edge-server/...)
-        file = (issue.get("Pos") or {}).get("Filename", "").replace("\\", "/")
+        raw = (issue.get("Pos") or {}).get("Filename", "").replace("\\", "/")
+        # Phantom guard (#2270). golangci-lint keys its cache by file content, so
+        # two worktrees holding identical files share cache entries — and a hit
+        # replays the *other* tree's path. Once that tree is deleted the finding
+        # is still reported, as a path that escapes this module directory.
+        # Observed on clean master: gosec G101 findings under
+        # ../.worktrees/int-round-66-go/edge-server/internal/jwtutil/, a directory that
+        # existed nowhere on disk, with the finding set drifting between runs as
+        # cache state changed. CI never saw it (every runner starts cold), so the
+        # same gate was red locally and green in CI — and two round-67 lanes each
+        # spent time concluding "pre-existing debt on base, unrelated to us".
+        #
+        # Reporting a phantom as new debt is worse than a red gate: the remedy
+        # this script offers is --UpdateBaseline, which would register the
+        # phantom fingerprint permanently and then mask the real finding it
+        # shadows. So phantoms are refused outright, with the one-line remedy.
+        #
+        # Relative paths that stay inside module_dir are NOT existence-checked:
+        # the self-tests drive this verifier with --LintJsonPath fixtures whose
+        # files deliberately do not exist. CI's --path-mode=abs paths are checked
+        # by the absolute branch.
+        resolved = os.path.normpath(raw if os.path.isabs(raw) else os.path.join(module_dir, raw))
+        if os.path.commonpath([resolved, module_dir]) != module_dir or (
+            os.path.isabs(raw) and not os.path.isfile(resolved)
+        ):
+            phantoms.append(raw)
+            continue
+        file = raw
         marker = "/edge-server/"
         idx = file.find(marker)
         if idx >= 0:
             file = file[idx + len(marker):]
         live[f"{issue.get('FromLinter')}|{file}|{issue.get('Text')}"] = True
-    return live
+    return live, phantoms
 
 
 def get_baseline_entries(baseline_path: str) -> list:
@@ -106,7 +140,16 @@ def main() -> int:
             "go", "run", f"github.com/golangci/golangci-lint/v2/cmd/golangci-lint@{LINT_VERSION}",
             "run", "./...", f"--output.json.path={json_path}",
         ]
-        lint_run = subprocess.run(lint_args, cwd=edge_dir, capture_output=True, text=True)
+        # Per-tree cache isolation (#2270): keying the cache directory by this
+        # module's path makes cross-worktree cache hits — and therefore phantom
+        # findings — impossible, while keeping repeat runs in the same tree warm.
+        # An operator-set GOLANGCI_LINT_CACHE is honoured as the parent directory.
+        cache_root = os.environ.get("GOLANGCI_LINT_CACHE") or os.path.expanduser("~/.cache")
+        cache_dir = os.path.join(
+            cache_root, f"golangci-lint-{hashlib.sha1(edge_dir.encode()).hexdigest()[:12]}"
+        )
+        lint_env = dict(os.environ, GOLANGCI_LINT_CACHE=cache_dir)
+        lint_run = subprocess.run(lint_args, cwd=edge_dir, capture_output=True, text=True, env=lint_env)
         # exit code 1 means findings were reported (expected); anything else is a real failure
         if lint_run.returncode > 1:
             output = lint_run.stdout + "\n" + lint_run.stderr
@@ -117,7 +160,18 @@ def main() -> int:
 
     with open(json_path, encoding="utf-8-sig") as handle:
         report = json.load(handle)
-    live = get_live_fingerprints(report)
+    live, phantoms = get_live_fingerprints(report, os.path.abspath(edge_dir))
+    if phantoms:
+        print("Lint finding(s) whose source file is not in this tree (stale cache, not debt):")
+        for phantom in sorted(set(phantoms)):
+            print(f"  {phantom}")
+        fail_verifier(
+            f"{len(set(phantoms))} stale-cache finding(s) — golangci-lint's cache holds entries "
+            "from another worktree whose files have identical content (typically one that has "
+            "since been deleted). Remedy: `golangci-lint cache clean`, then re-run. These are "
+            "refused rather than counted, and this check runs before --UpdateBaseline so a "
+            "phantom can never be registered as debt (#2270)."
+        )
 
     baseline_entries = []
     if os.path.isfile(baseline_path):

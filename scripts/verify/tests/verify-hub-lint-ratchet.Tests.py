@@ -137,11 +137,78 @@ def case_line_move(fixture: str) -> None:
     pass_case("line-number move does not reset debt (fingerprint excludes line)")
 
 
+# ── Negative 3: stale-cache phantom, relative path escaping the module ──────
+def case_stale_cache_phantom(fixture: str) -> None:
+    # The exact shape this guard exists for (#2270): golangci-lint replayed a
+    # cache entry produced while linting another worktree whose files had
+    # identical content, so the reported path escapes this module directory.
+    # Counting it as new debt would offer --UpdateBaseline as the remedy and
+    # register the phantom permanently.
+    phantom = new_issue(
+        "gosec",
+        "../.worktrees/int-round-66-go/hub-server/internal/jwtutil/jwt_test.go",
+        "G101: Potential hardcoded credentials",
+        219,
+    )
+    write_json_file(os.path.join(fixture, "scripts/verify/hub-lint-baseline.json"), {"findings": []})
+    write_json_file(os.path.join(fixture, "lint-report.json"), {"Issues": [phantom]})
+    output = invoke_verifier(fixture, os.path.join(fixture, "lint-report.json"), expect_fail=True)
+    if "stale-cache" not in output:
+        fail("phantom must be refused as stale cache, not reported as new debt")
+    if "cache clean" not in output:
+        fail("phantom failure must name the remedy (golangci-lint cache clean)")
+    if "repay" in output:
+        fail("phantom must not be offered the --UpdateBaseline/repay remedy")
+    pass_case("stale-cache phantom (path escapes module dir) refused with remedy")
+
+
+# ── Negative 4: stale-cache phantom, absolute path that does not exist ──────
+def case_stale_absolute_phantom(fixture: str) -> None:
+    # CI runs with --path-mode=abs, so a stale entry surfaces as an absolute
+    # path. It must be refused on the same grounds.
+    phantom = new_issue(
+        "gosec",
+        "/nonexistent/worktree/hub-server/internal/jwtutil/jwt_bench_test.go",
+        "G101: Potential hardcoded credentials",
+        18,
+    )
+    write_json_file(os.path.join(fixture, "scripts/verify/hub-lint-baseline.json"), {"findings": []})
+    write_json_file(os.path.join(fixture, "lint-report.json"), {"Issues": [phantom]})
+    output = invoke_verifier(fixture, os.path.join(fixture, "lint-report.json"), expect_fail=True)
+    if "stale-cache" not in output:
+        fail("absolute phantom must be refused as stale cache")
+    pass_case("stale-cache phantom (absolute path, file absent) refused")
+
+
+# ── Positive 3: absolute path INSIDE the module (CI's --path-mode=abs) ──────
+def case_absolute_path_inside_module(fixture: str) -> None:
+    # The guard must not fire on legitimate absolute paths, or CI's report would
+    # be refused wholesale. Also pins that an absolute path still normalizes to
+    # the repo-relative baseline fingerprint.
+    real = os.path.join(fixture, "hub-server", "internal", "service", "agent_dispatch.go")
+    os.makedirs(os.path.dirname(real), exist_ok=True)
+    with open(real, "w", encoding="utf-8") as handle:
+        handle.write("package service\n")
+    issue = new_issue("gocognit", real, "cognitive complexity 98 of func is high (> 30)", 42)
+    baseline = {
+        "findings": [
+            {"linter": "gocognit", "file": "internal/service/agent_dispatch.go", "message": "cognitive complexity 98 of func is high (> 30)"}
+        ]
+    }
+    write_json_file(os.path.join(fixture, "scripts/verify/hub-lint-baseline.json"), baseline)
+    write_json_file(os.path.join(fixture, "lint-report.json"), {"Issues": [issue]})
+    invoke_verifier(fixture, os.path.join(fixture, "lint-report.json"), expect_fail=False)
+    pass_case("absolute path inside the module still matches its baseline fingerprint")
+
+
 def main() -> int:
     run_case(case_positive)
     run_case(case_new_finding)
     run_case(case_replaced_finding)
     run_case(case_line_move)
+    run_case(case_stale_cache_phantom)
+    run_case(case_stale_absolute_phantom)
+    run_case(case_absolute_path_inside_module)
     print(f"Hub lint ratchet self-tests PASSED ({passed} cases).")
     return 0
 
