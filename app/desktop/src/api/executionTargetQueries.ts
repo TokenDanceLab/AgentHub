@@ -158,7 +158,7 @@ export function summarizeExecutionTargets(targets: ExecutionTargetInventoryItem[
   for (const target of targets) {
     byType[String(target.target_type) as ExecutionTargetType] = (byType[String(target.target_type) as ExecutionTargetType] ?? 0) + 1;
     if (target.is_online) online += 1;
-    if (target.health_state === 'healthy') healthy += 1;
+    if (target.health_state === 'healthy' || target.health_state === 'online') healthy += 1;
     else if (target.health_state === 'degraded') degraded += 1;
     else if (target.health_state === 'offline') offline += 1;
     else unknown += 1;

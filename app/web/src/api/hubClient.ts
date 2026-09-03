@@ -43,6 +43,6 @@ export function createHubClient(opts: HubClientOptions = {}): SharedHubClient {
 
 
 // Compatibility shims used by existing web inventory UI (historical shapes).
-export type ExecutionTargetHealthState = 'unknown' | 'healthy' | 'degraded' | 'offline' | string;
-export type ExecutionTargetTrustLevel = 'local' | 'remote' | 'cloud' | 'relay' | string;
+export type ExecutionTargetHealthState = 'unknown' | 'online' | 'healthy' | 'degraded' | 'offline' | 'stale' | 'mismatch' | 'registered';
+export type ExecutionTargetTrustLevel = 'local' | 'remote' | 'cloud' | 'relay';
 

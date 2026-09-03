@@ -53,12 +53,13 @@ const executionTargetTypes: ExecutionTargetType[] = [
 const trustLevels: ExecutionTargetTrustLevel[] = ['local', 'remote', 'cloud', 'relay'];
 const healthStates: ExecutionTargetHealthState[] = [
   'unknown',
-  'healthy',
   'online',
+  'healthy',
   'degraded',
   'offline',
-  'mismatch',
   'stale',
+  'mismatch',
+  'registered',
 ];
 
 const emptyExecutionTargets: ExecutionTargetInventoryResponse = {

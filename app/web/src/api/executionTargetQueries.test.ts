@@ -288,6 +288,39 @@ describe('web execution target queries', () => {
     ]);
   });
 
+  it('keeps registered health states in the pass-through instead of collapsing to unknown', async () => {
+    vi.mocked(getAccessToken).mockReturnValue('hub-access');
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        async () =>
+          new Response(
+            JSON.stringify({
+              code: 'ok',
+              data: {
+                items: [
+                  {
+                    id: 'registered-1',
+                    name: 'Bound but not proven live',
+                    target_type: 'local_edge',
+                    workspace_allowlist: [],
+                    trust_level: 'local',
+                    health_state: 'registered',
+                    is_online: false,
+                  },
+                ],
+                page: { hasMore: false },
+              },
+            }),
+            { status: 200, headers: { 'Content-Type': 'application/json' } }
+          )
+      )
+    );
+
+    const result = await fetchExecutionTargets(true);
+    expect(result.items[0]?.health_state).toBe('registered');
+  });
+
   it('counts unknown health states and preserves zero-filled type buckets', () => {
     expect(
       summarizeExecutionTargets([

@@ -230,7 +230,7 @@ export function createHubClient(opts: HubClientOptions = {}): SharedHubClient {
   // exactOptionalPropertyTypes forbids assigning `undefined` to optional string
   // fields, so optional top-level fields are only set when defined. The shared
   // builder serializes this object verbatim, so the wire shape is unchanged.
-  const toSharedTarget = (data: CreateExecutionTargetRequest | UpdateExecutionTargetRequest): HubExecutionTargetRequest => {
+  const toSharedTarget = (data: Partial<HubExecutionTargetRequest>): HubExecutionTargetRequest => {
     const target: HubExecutionTargetRequest = {
       name: data.name ?? '',
       type: (data.target_type as ExecutionTargetType | undefined) ?? 'local_edge',
@@ -261,9 +261,9 @@ export function createHubClient(opts: HubClientOptions = {}): SharedHubClient {
 
   return {
     ...client,
-    createExecutionTarget: (data: CreateExecutionTargetRequest) =>
+    createExecutionTarget: (data: HubExecutionTargetRequest) =>
       client.createExecutionTarget(toSharedTarget(data)),
-    updateExecutionTarget: (id: string, data: UpdateExecutionTargetRequest) =>
+    updateExecutionTarget: (id: string, data: Partial<HubExecutionTargetRequest>) =>
       client.updateExecutionTarget(id, toSharedTarget(data)),
   };
 }
@@ -272,8 +272,8 @@ export function createHubClient(opts: HubClientOptions = {}): SharedHubClient {
 // Prefer Hub* / shared types for new code. These keep existing imports compiling
 // while execution-target inventory still uses richer desktop fields.
 
-export type ExecutionTargetHealthState = 'unknown' | 'healthy' | 'degraded' | 'offline' | string;
-export type ExecutionTargetTrustLevel = 'local' | 'remote' | 'cloud' | 'relay' | string;
+export type ExecutionTargetHealthState = 'unknown' | 'online' | 'healthy' | 'degraded' | 'offline' | 'stale' | 'mismatch' | 'registered';
+export type ExecutionTargetTrustLevel = 'local' | 'remote' | 'cloud' | 'relay';
 
 export interface CreateExecutionTargetRequest {
   name: string;
