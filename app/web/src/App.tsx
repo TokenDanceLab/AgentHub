@@ -2,6 +2,7 @@ import { QueryClientProvider, useQuery, useQueryClient } from '@tanstack/react-q
 import { useCallback, useMemo, useState, useSyncExternalStore } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AgentHubWorkbench } from '@agenthub/workbench';
+import { fetchAllPages } from '@shared/hub/paginate';
 import { CHATVIEW_I18N_NAMESPACE } from '@shared/chatview/i18n/resources';
 import type { AgentConfig, ContactMember, ProjectDraft, ProjectInfo, SkillMarketItem, MCPMarketItem } from '@agenthub/workbench';
 import {
@@ -112,7 +113,11 @@ function WebWorkbenchRoot() {
   // Fetch public Skills for the Skill Market tab
   const skillMarketQuery = useQuery({
     queryKey: ['web-v4', 'public-skills', hubReady],
-    queryFn: () => hubClientForConversations.listPublicSkills(),
+    // Was a parameterless first-page fetch: the market endpoint clamps to
+    // MaxListPageSize (200) and returns page.nextCursor, which was dropped,
+    // so the 51st skill never reached the market tab
+    // (#2290 defect class). Canonical walk lives in @shared/hub/paginate.
+    queryFn: () => fetchAllPages(hubClientForConversations.listPublicSkills),
     enabled: hubReady,
     staleTime: 30_000,
     placeholderData: (previous) => previous,
@@ -121,7 +126,11 @@ function WebWorkbenchRoot() {
   // Fetch public MCP Servers for the MCP Market tab
   const mcpMarketQuery = useQuery({
     queryKey: ['web-v4', 'public-mcp-servers', hubReady],
-    queryFn: () => hubClientForConversations.listPublicMCPServers(),
+    // Was a parameterless first-page fetch: the market endpoint clamps to
+    // MaxListPageSize (200) and returns page.nextCursor, which was dropped,
+    // so the 51st server never reached the market tab
+    // (#2290 defect class). Canonical walk lives in @shared/hub/paginate.
+    queryFn: () => fetchAllPages(hubClientForConversations.listPublicMCPServers),
     enabled: hubReady,
     staleTime: 30_000,
     placeholderData: (previous) => previous,
