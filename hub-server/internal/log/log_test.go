@@ -26,6 +26,25 @@ import (
 	"github.com/agenthub/pkg/reqlog"
 )
 
+// tempLogDir 返回一个可写日志文件的临时目录。
+//
+// 这里刻意不用 t.TempDir()：Init 把 lumberjack writer 装进包全局 logger，而
+// lumberjack 会一直持有文件句柄、Init 也从不关闭上一个 writer（这是 Init 的
+// 既有行为，不是测试引入的）。t.TempDir() 的自动清理在 Windows 上会因为
+// 「文件正被另一个进程使用」而 RemoveAll 失败，进而让整个测试失败 —— 本机
+// (Linux) 能过、Native Windows Go lane 会红。所以自己建目录，并把清理做成
+// best-effort：断言的对象是文件内容，不是清理是否成功；Windows runner 是一次
+// 性环境，漏一个临时目录没有后果。
+func tempLogDir(t *testing.T) string {
+	t.Helper()
+	dir, err := os.MkdirTemp("", "agenthub-log-test")
+	if err != nil {
+		t.Fatalf("创建临时日志目录: %v", err)
+	}
+	t.Cleanup(func() { _ = os.RemoveAll(dir) })
+	return dir
+}
+
 // TestSyncWithoutInit 验证 nil logger 时 Sync 的守卫：部分接线的构建
 // （单测二进制、只 import 不调 Init 的工具）在关闭时不能崩。
 //
@@ -87,7 +106,7 @@ func TestInitLevelFallback(t *testing.T) {
 // 并且用的是 JSON encoder + ISO8601 的 "time" 键。旧版本只调 Init + Sync，
 // 从不检查文件是否产生 —— LogFile 这条分支等于完全没有覆盖。
 func TestInitWithLogFile(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "test.log")
+	path := filepath.Join(tempLogDir(t), "test.log")
 	Init(&config.ServerConfig{Port: 8080, LogLevel: "info", LogFile: path})
 
 	logger.Info("hello-logfile", zap.String("k", "v"))
@@ -115,7 +134,7 @@ func TestInitWithLogFile(t *testing.T) {
 // 落在记录里。装饰器本身的单元行为在 log_request_id_test.go 里，这里测的是
 // Init 有没有把它装上。
 func TestInitInstallsRequestIDSlogDefault(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "slog.log")
+	path := filepath.Join(tempLogDir(t), "slog.log")
 	Init(&config.ServerConfig{Port: 8080, LogLevel: "info", LogFile: path})
 
 	if _, ok := slog.Default().Handler().(*requestIDHandler); !ok {
