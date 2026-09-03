@@ -35,7 +35,7 @@ import (
 	"github.com/agenthub/edge-server/internal/lifecycle"
 	"github.com/agenthub/edge-server/internal/runners"
 	"github.com/agenthub/edge-server/internal/store"
-	"github.com/agenthub/edge-server/internal/testkit"
+	"github.com/agenthub/pkg/testkit"
 )
 
 const (

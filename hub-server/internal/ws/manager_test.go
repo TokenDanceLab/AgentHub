@@ -12,7 +12,7 @@ import (
 
 	"github.com/agenthub/hub-server/internal/config"
 	"github.com/agenthub/hub-server/internal/metrics"
-	"github.com/agenthub/hub-server/internal/testkit"
+	"github.com/agenthub/pkg/testkit"
 	"github.com/coder/websocket"
 	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/stretchr/testify/require"

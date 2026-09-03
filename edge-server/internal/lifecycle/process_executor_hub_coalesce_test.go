@@ -9,7 +9,7 @@ import (
 	"github.com/agenthub/edge-server/internal/adapters"
 	"github.com/agenthub/edge-server/internal/events"
 	"github.com/agenthub/edge-server/internal/store"
-	"github.com/agenthub/edge-server/internal/testkit"
+	"github.com/agenthub/pkg/testkit"
 )
 
 // newCoalesceTestEmitter builds a hubCallbackEmitter wired to a recording
