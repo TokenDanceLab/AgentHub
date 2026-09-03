@@ -33,6 +33,11 @@ one surgical text mutation, and asserts the CI policy verifier exits non-zero:
 27. delete go-hub-static from the go-hub needs list → the static lane drops out of the required aggregate
 28. delete the go-hub-static job → the parallel static lane silently exits CI
 29. delete the go-edge STATIC_RESULT binding → same regression on the edge half
+30. revert the go-hub-test shard split to `NR % 2` round-robin → the package that
+    is 54% of the module's measured race-test cost lands back in shard 2, which
+    was the slower shard in 14/14 measured CI runs (#2251 / ADR-032)
+31. delete the go-hub-test 0-package guard → a renamed/moved internal/repository
+    silently unbalances the shards instead of failing loudly (#2251 / ADR-032)
 
 The unmutated copy must exit 0, proving the policy test only reddens on
 actual policy violations (fail-closed, no false green).
@@ -106,6 +111,52 @@ def delete_shared_trio_step(text: str, step: str, label: str) -> str:
     if step not in text:
         raise AssertionError(f"{label} step text not found in workflow")
     return text.replace(step, "", 1)
+
+
+GO_HUB_TEST_PINNED_AWK = (
+    "          SHARD_PKGS=$(echo \"$PKG_LIST\" | awk -v s=${{ matrix.shard }} '\n"
+    "            { solo = ($1 == \"github.com/agenthub/hub-server/internal/repository\") ? 1 : 2 }\n"
+    "            solo == s { printf \"%s \", $1 }\n"
+    "          ')\n"
+)
+GO_HUB_TEST_ROUND_ROBIN_AWK = (
+    "          SHARD_PKGS=$(echo \"$PKG_LIST\" | awk -v s=${{ matrix.shard }} "
+    "'NR % 2 == s - 1 {printf \"%s \", $1}')\n"
+)
+ZERO_PACKAGE_GUARD = (
+    "          if [ -z \"$SHARD_PKGS\" ]; then\n"
+    "            echo \"::error::shard ${{ matrix.shard }} received 0 packages\"\n"
+    "            exit 1\n"
+    "          fi\n"
+)
+
+
+def revert_go_hub_test_shard_to_round_robin(text: str) -> str:
+    """把 go-hub-test 的成本感知分片退回 `NR % 2` 轮转（防回退，#2251/ADR-032）。
+
+    `internal/repository` 是 hub-server 实测 418.8s race 测试成本里的 227.7s（54.4%），
+    在 `go list` 第 15 位（奇数）⇒ 轮转把它放进 shard 2，而 shard 2 在 14/14 次实测
+    CI run 里都是慢的那一半（中位 +119s）。
+    """
+    if GO_HUB_TEST_PINNED_AWK not in text:
+        raise AssertionError("go-hub-test pinned shard awk not found in workflow")
+    return text.replace(GO_HUB_TEST_PINNED_AWK, GO_HUB_TEST_ROUND_ROBIN_AWK, 1)
+
+
+def delete_go_hub_test_zero_package_guard(text: str) -> str:
+    """删掉 go-hub-test 的 0-package 守卫（防回退，#2251/ADR-032）。
+
+    这条守卫正是「硬编码一个包路径」不会静默腐烂的原因：包被改名/移动/拆分时
+    shard 1 收到 0 个包 ⇒ 硬报错，而不是让两个 shard 悄悄失衡。
+    同一段守卫在 go-edge-test 里也有一份，所以按 hub 的 awk 定位后再删它后面那一处。
+    """
+    anchor = text.find(GO_HUB_TEST_PINNED_AWK)
+    if anchor < 0:
+        raise AssertionError("go-hub-test pinned shard awk not found in workflow")
+    guard_at = text.find(ZERO_PACKAGE_GUARD, anchor)
+    if guard_at < 0:
+        raise AssertionError("go-hub-test 0-package guard not found after its shard awk")
+    return text[:guard_at] + text[guard_at + len(ZERO_PACKAGE_GUARD):]
 
 
 def read_workflow() -> str:
@@ -766,6 +817,21 @@ class VerifyCiGatesMutationTests(unittest.TestCase):
         self.assert_mutation_fails(
             delete_ui_required_job(read_workflow()),
             "deleted ui-required job",
+        )
+
+
+    def test_revert_go_hub_test_shard_to_round_robin_fails(self):
+        """go-hub-test 退回 `NR % 2` 轮转时，校验器必须非零退出（#2251/ADR-032 防回退）。"""
+        self.assert_mutation_fails(
+            revert_go_hub_test_shard_to_round_robin(read_workflow()),
+            "reverted go-hub-test shard split to NR % 2 round-robin",
+        )
+
+    def test_delete_go_hub_test_zero_package_guard_fails(self):
+        """go-hub-test 的 0-package 守卫被删时，校验器必须非零退出（#2251/ADR-032 防回退）。"""
+        self.assert_mutation_fails(
+            delete_go_hub_test_zero_package_guard(read_workflow()),
+            "deleted the go-hub-test 0-package guard",
         )
 
 

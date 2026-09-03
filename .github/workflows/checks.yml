@@ -316,6 +316,16 @@ jobs:
         timeout-minutes: 15
         run: |
           PKG_LIST=$(go list ./...)
+          # Plain round-robin, deliberately NOT the cost-aware split go-hub-test
+          # uses (#2251 / ADR-032). Measured the same way (`go test -short -race
+          # -count=1 -p 1`): 35 packages / 143.96s total, heaviest is
+          # internal/lifecycle at 34.57s = 24.0% — no dominant package to pin.
+          # The split is still uneven (shard 1 = even NR carries 86.5s vs 57.4s,
+          # which is why CI shows edge shard 2 faster in 14/14 runs) and LPT-2
+          # would save 14.1s of load at a balanced 18/18 package count, but
+          # go-edge-test is never the pole of backend-required (2m39s vs
+          # go-hub-test 4m51s), so that saving never reaches the PR wall clock.
+          # Re-consider if go-edge-test ever becomes the backend pole.
           SHARD_PKGS=$(echo "$PKG_LIST" | awk -v s=${{ matrix.shard }} 'NR % 2 == s - 1 {printf "%s ", $1}')
           if [ -z "$SHARD_PKGS" ]; then
             echo "::error::shard ${{ matrix.shard }} received 0 packages"
@@ -539,10 +549,29 @@ jobs:
           exit 1
 
   # ── Go: Hub Server tests (shard×2) ───────────
-  # CI5 wave2 (#1689): same 2-shard package split as go-edge-test
-  # (Go has no native -shard flag; round-robin on `go list ./...`).
+  # CI5 wave2 (#1689): 2-shard package split (Go has no native -shard flag).
   # The non-zero PASS guard runs per shard, so a package-wide -short
   # escape hatch still trips a hard error.
+  #
+  # The split is NOT the `NR % 2` round-robin that go-edge-test still uses, and
+  # the reason is measured, not aesthetic (#2251 / ADR-032). Per-package
+  # `go test -short -race -count=1 -p 1` on the 52 hub packages totals 418.8s,
+  # and ONE package is 227.7s of it — `internal/repository` = 54.4%. Under
+  # `NR % 2` it sits at `go list` position 15 (odd) so it lands in shard 2,
+  # which was the slower shard in 14/14 measured CI runs (median +119s,
+  # max +177s; 18/18 in the post-#2300 window, median |Δ| 2m02s).
+  # Handing it its own shard is the load-optimal 2-way partition:
+  #   227.7s / 191.1s  (spread 36.6s)  instead of  310.5s / 108.3s (spread 202.3s)
+  # and it adds no jobs, so it costs no runner concurrency.
+  #
+  # 227.7s is also the HARD FLOOR: no package-granularity split of this module
+  # can put the worst shard below one package's own cost, so a 3rd shard buys
+  # nothing here (LPT-3 gives the same 227.7s worst shard for one more job).
+  #
+  # Rot is fail-closed, not silent: if internal/repository is ever renamed,
+  # moved or split, shard 1 receives 0 packages and the guard below hard-errors
+  # with "::error::shard 1 received 0 packages" — which is the cue to
+  # re-measure (the command is in docs/decisions.md ADR-032).
   go-hub-test:
     needs: changes
     if: >-
@@ -569,7 +598,12 @@ jobs:
         timeout-minutes: 15
         run: |
           PKG_LIST=$(go list ./...)
-          SHARD_PKGS=$(echo "$PKG_LIST" | awk -v s=${{ matrix.shard }} 'NR % 2 == s - 1 {printf "%s ", $1}')
+          # shard 1 = the one package that is 54% of this module's measured
+          # race-test cost; shard 2 = every other package. See the job comment.
+          SHARD_PKGS=$(echo "$PKG_LIST" | awk -v s=${{ matrix.shard }} '
+            { solo = ($1 == "github.com/agenthub/hub-server/internal/repository") ? 1 : 2 }
+            solo == s { printf "%s ", $1 }
+          ')
           if [ -z "$SHARD_PKGS" ]; then
             echo "::error::shard ${{ matrix.shard }} received 0 packages"
             exit 1
