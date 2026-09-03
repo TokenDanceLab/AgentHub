@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
+import { fetchAllPages } from '@shared/hub/paginate';
 import { createHubClient } from './hubClient';
 import type { AgentProfile, CreateAgentProfileRequest, UpdateAgentProfileRequest } from './hubClient';
 import { getAccessToken } from '@/hooks/useAuth';
@@ -298,7 +299,12 @@ export function agentConfigToUpdateAgentProfileRequest(agent: AgentConfig, t?: (
 
 async function fetchHubAgentProfiles(token: string): Promise<ListResponse<AgentInfo>> {
   const client = createHubClient({ getToken: () => token });
-  const res = await client.listAgentProfiles({ pageSize: 50 });
+  // Was a single `pageSize: 50` request with the cursor dropped, i.e. the 51st
+  // agent profile was silently missing from the agent list. Same defect class
+  // and same fix as the projects list (#2290): walk the canonical contract in
+  // @shared/hub/paginate. GET /web/agent-profiles clamps to MaxListPageSize
+  // (200), so the default page size is this endpoint's own ceiling.
+  const res = await fetchAllPages(client.listAgentProfiles);
   return {
     items: res.items.map(mapHubAgentProfileToAgentInfo),
     page: res.page,

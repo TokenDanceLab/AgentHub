@@ -10,6 +10,7 @@ import {
   writeWorkbenchDataModeOverride,
   workbenchDemoRuntimeStore,
 } from '@shared/demo';
+import { fetchAllPages } from '@shared/hub/paginate';
 import { CHATVIEW_I18N_NAMESPACE } from '@shared/chatview/i18n/resources';
 import type { UnreadDividerDescriptor } from '@shared/chatview';
 import { toggleAppliedAgentHubTheme } from '@shared/theme';
@@ -232,7 +233,10 @@ export function DesktopWorkbenchApp({ onLogout }: DesktopWorkbenchAppProps = {})
   );
   const skillMarketQuery = useQuery({
     queryKey: ['desktop', 'public-skills', hubReady],
-    queryFn: () => hubClient.listPublicSkills(),
+    // Parameterless first-page fetch with page.nextCursor dropped: the 51st
+    // skill never reached the market tab (#2290 defect
+    // class). Canonical walk lives in @shared/hub/paginate.
+    queryFn: () => fetchAllPages(hubClient.listPublicSkills),
     enabled: hubReady,
     staleTime: 30_000,
     placeholderData: (previous) => previous,
@@ -241,7 +245,10 @@ export function DesktopWorkbenchApp({ onLogout }: DesktopWorkbenchAppProps = {})
   // Fetch public MCP Servers for the MCP Market tab
   const mcpMarketQuery = useQuery({
     queryKey: ['desktop', 'public-mcp-servers', hubReady],
-    queryFn: () => hubClient.listPublicMCPServers(),
+    // Parameterless first-page fetch with page.nextCursor dropped: the 51st
+    // server never reached the market tab (#2290 defect
+    // class). Canonical walk lives in @shared/hub/paginate.
+    queryFn: () => fetchAllPages(hubClient.listPublicMCPServers),
     enabled: hubReady,
     staleTime: 30_000,
     placeholderData: (previous) => previous,
