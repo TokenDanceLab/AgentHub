@@ -1,14 +1,15 @@
 // Package opencode — opencode-acp: the native OpenCode ACP adapter (second
 // ACP migration target, per ACP Go migration §6).
 //
-// The existing OpenCodeAdapter (opencode.go, root package) is Phase 1/2 batch
-// mode: it spawns the opencode CLI with `opencode run --format json` and
-// hand-parses the JSON event stream — a 500+ line custom parser, no ACP
-// permission chain. This adapter replaces that hop with OpenCode's native ACP
-// subcommand (`opencode acp`, v1.18.5+), consumed by the shared
-// coder/acp-go-sdk client runtime (adapters/acp acp_client.go): streaming updates,
-// capability negotiation, and the Edge approval chain
-// (session/request_permission → PermissionDecisionBroker) come with it.
+// There is no batch-mode OpenCode adapter left to contrast against: the Phase
+// 1/2 shape — spawn the opencode CLI with `opencode run --format json` and
+// hand-parse the JSON event stream, a 500+ line custom parser with no ACP
+// permission chain — was deleted by the ACP convergence, so this adapter is the
+// only opencode hop in the tree. It drives OpenCode's native ACP subcommand
+// (`opencode acp`, v1.18.5+) through the shared coder/acp-go-sdk client runtime
+// (internal/adapters/acp/acp_client.go): streaming updates, capability
+// negotiation, and the Edge approval chain (session/request_permission →
+// PermissionDecisionBroker) come with it.
 //
 // Launch shape: `opencode acp` — native CLI subcommand on the opencode binary
 // (GitHub releases distribution). Unlike codex-acp there is NO npx wrapper:

@@ -5,10 +5,19 @@
 // backoff, and string helpers without pulling journal/repository code.
 //
 // Pure residual is closed (#514 backoff/truncate, #744 status/eligibility).
-// Flat service package keeps orchestration split across adjacent files (#801):
-//   - delivery_outbox.go — ports, journal, retry loop, redispatch adapters
-//   - delivery_outbox_model.go — GORM record, Entry DTO, redispatchTarget, repo
-//   - delivery_outbox_facade.go — status/TTL aliases, AgentService facades
+//
+// What this package holds, described by responsibility rather than by file
+// name: the outbox journal surface (record, mark sent, ack, scan, retry claim,
+// dead-letter, stats, cleanup, auto-ack), the read-only Entry view callers and
+// store implementations share, the retry/TTL constants and backoff, the journal
+// status strings, the scan-eligibility cutoffs, the Store port every
+// persistence call goes through, string truncation, and the retry/cleanup loop
+// orchestration. The GORM-backed Store implementation and the AgentService
+// facades stay in the parent service package (#801).
+//
+// No file list here on purpose: the one this comment used to carry named three
+// files, two of which do not exist anywhere in the tree and the third of which
+// lives in the parent package (#2246).
 //
 // Full model package move stays deferred (high-risk residual).
 //

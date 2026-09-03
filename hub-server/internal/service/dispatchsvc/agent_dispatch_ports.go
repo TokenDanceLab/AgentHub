@@ -36,8 +36,10 @@ type pendingTaskSnapshot = dispatch.PendingTaskSnapshot
 // outbox redispatch semantics; #1031 coordinates offline queue vs outbox ownership.
 // No OpenAPI/handler/frontend; no typed package move.
 //
-// Ports and nil-safe wrappers split into this file (#1068) to match
-// delivery_outbox.go / delivery_outbox_model.go pattern (#801).
+// Ports and nil-safe wrappers are split into this file (#1068), mirroring the
+// ports-vs-orchestration split the delivery-outbox code uses (#801). Cited by
+// responsibility rather than by file name: the two delivery-outbox files this
+// line used to point at do not exist in the tree (#2246).
 
 // dispatchOutbox records, marks, and dead-letters delivery journal rows during
 // dispatch / redispatch. Implemented by *DeliveryOutbox (AgentService facades
