@@ -41,7 +41,7 @@ export function RuntimeEvidenceEmptyState({
   );
 }
 
-export function RuntimeEvidenceSection({
+function RuntimeEvidenceSection({
   channel,
   children,
   count,
@@ -68,7 +68,7 @@ export function RuntimeEvidenceSection({
   );
 }
 
-export function ArtifactWorkspaceProjection({
+function ArtifactWorkspaceProjection({
   artifact,
   diffCount,
   evidenceSourceLabel,

@@ -99,7 +99,7 @@ function sameTaskQueue(a: readonly TaskItem[], b: readonly TaskItem[]): boolean 
 }
 
 /** Create one isolated store. Production creates exactly one per Workbench mount. */
-export function createWorkbenchTaskDeepLinkStore(): WorkbenchTaskDeepLinkStore {
+function createWorkbenchTaskDeepLinkStore(): WorkbenchTaskDeepLinkStore {
   let snapshot = createInitialSnapshot();
   let focusSeq = 0;
   const listeners = new Set<() => void>();

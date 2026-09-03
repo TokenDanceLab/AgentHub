@@ -13,7 +13,7 @@ import { useEffect, useState } from 'react';
 import type { TranscriptBlock } from '@shared/transcript';
 
 /** Bound the cache: a handful of inactive panes is the realistic maximum. */
-export const SPLIT_TRANSCRIPT_CACHE_LIMIT = 8;
+const SPLIT_TRANSCRIPT_CACHE_LIMIT = 8;
 
 /**
  * Snapshot the active conversation's transcript on every change. Returns a

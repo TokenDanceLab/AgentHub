@@ -47,9 +47,9 @@ export type ProfilePopoverPosition = {
 };
 
 export const PROFILE_POPOVER_WIDTH = 352;
-export const PROFILE_POPOVER_GAP = 10;
-export const PROFILE_POPOVER_EDGE = 12;
-export const PROFILE_POPOVER_FALLBACK_HEIGHT = 360;
+const PROFILE_POPOVER_GAP = 10;
+const PROFILE_POPOVER_EDGE = 12;
+const PROFILE_POPOVER_FALLBACK_HEIGHT = 360;
 
 /** CSS module variant class for the popover shell. */
 export function profileVariantClass(
