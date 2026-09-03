@@ -24,9 +24,10 @@ import (
 // scp(.exe) at the head of PATH. The copy detects itself in init() via
 // AGENTHUB_DEPLOY_STUB_DIR, records its arguments into calls.log and exits
 // with the injected exit code instead of running the test suite. This keeps
-// the exec path real while staying hermetic and deterministic; running
-// runSSHCommand / runSCP against a real SSH host remains covered by the
-// -ssh-integration skips in deploy_ssh_test.go.
+// the exec path real while staying hermetic and deterministic. Talking to a
+// real SSH host is deliberately uncovered — see the note at the top of
+// deploy_ssh_test.go (the -ssh-integration flag it used to point at was never
+// registered by anything, so nothing was actually skipped-pending there).
 // ---------------------------------------------------------------------------
 
 const (
