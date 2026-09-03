@@ -71,7 +71,6 @@ export function WorkbenchFrame({
   onLogout,
   onProjectCreate,
   onProjectUpdate,
-  projectsPort,
   onNavigateToConversation,
   onStartNewConversation,
   contactsActions,
@@ -424,7 +423,6 @@ export function WorkbenchFrame({
             onActiveProjectChange={onActiveProjectChange}
             onProjectCreate={onProjectCreate}
             onProjectUpdate={onProjectUpdate}
-            projectsPort={projectsPort}
             onAgentCreate={onAgentCreate}
             onAgentUpdate={onAgentUpdate}
             onAgentDelete={onAgentDelete}
