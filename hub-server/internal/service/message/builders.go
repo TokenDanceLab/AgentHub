@@ -1,7 +1,6 @@
 package message
 
 import (
-	"strings"
 	"time"
 
 	"github.com/agenthub/hub-server/internal/model"
@@ -30,14 +29,6 @@ func sendMessageResponseFromModel(m *model.Message) *SendMessageResponse {
 		SeqID:     m.SeqID,
 		CreatedAt: formatMessageTime(m.CreatedAt),
 	}
-}
-
-func isDuplicateKeyError(err error) bool {
-	if err == nil {
-		return false
-	}
-	msg := err.Error()
-	return strings.Contains(msg, "duplicate key") || strings.Contains(msg, "unique")
 }
 
 // messageAttachmentRefs builds MessageAttachment rows for a send transaction.

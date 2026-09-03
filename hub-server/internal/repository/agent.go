@@ -2,7 +2,6 @@ package repository
 
 import (
 	"errors"
-	"strings"
 	"time"
 
 	"gorm.io/gorm"
@@ -435,7 +434,9 @@ func CreateAgentRunEventWithNextSeqLimited(db *gorm.DB, event *model.AgentRunEve
 		// idempotent handling. We only treat it as idempotent when the
 		// conflicting row matches our intended (task_id, event_seq); a
 		// different conflict is surfaced as a real error.
-		if isDuplicateKeyError(err) {
+		// Single source of truth for the classification (#2244 slice 1); the
+		// copy that used to live in this file is gone.
+		if isUniqueViolation(err) {
 			var existing model.AgentRunEvent
 			if qerr := tx.Where("task_id = ? AND event_seq = ?", event.TaskID, event.EventSeq).First(&existing).Error; qerr == nil {
 				// The row already exists with the same identity — idempotent
@@ -447,22 +448,6 @@ func CreateAgentRunEventWithNextSeqLimited(db *gorm.DB, event *model.AgentRunEve
 		}
 		return err
 	})
-}
-
-// isDuplicateKeyError reports whether err is a Postgres/SQLite unique-
-// constraint violation (SQLSTATE 23500 / "duplicate key" / SQLite "UNIQUE
-// constraint failed"). Used by the CreateAgentRunEventWithNextSeqLimited
-// idempotent-retry path so a concurrent insert on (task_id, event_seq) is
-// treated as success instead of surfacing a spurious error to the caller's
-// retry. Mirrors the duplicate-key detection in service/message/builders.go
-// but made case-insensitive so SQLite's uppercase "UNIQUE constraint failed"
-// is also recognized.
-func isDuplicateKeyError(err error) bool {
-	if err == nil {
-		return false
-	}
-	msg := strings.ToLower(err.Error())
-	return strings.Contains(msg, "duplicate key") || strings.Contains(msg, "unique")
 }
 
 func ListAgentRunEventsByTaskID(db *gorm.DB, taskID string) ([]model.AgentRunEvent, error) {
