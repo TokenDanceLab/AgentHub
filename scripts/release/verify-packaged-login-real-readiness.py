@@ -106,9 +106,9 @@ def main() -> int:
     assert_contains(".env.example", "AGENTHUB_TOKENDANCE_ID_ALLOWED_REDIRECT_URIS", "example config names allowed redirect URI boundary")
 
     step("future real E2E proposal commands")
-    print("  fake/local: python .\\scripts\\verify\\verify-oidc-flow.py --LocalOnly", flush=True)
-    print("  packaged readiness: python .\\scripts\\release\\verify-tauri-package-readiness.py -RepoRoot .", flush=True)
-    print("  dry real-readiness: python .\\scripts\\release\\verify-packaged-login-real-readiness.py -RepoRoot .", flush=True)
+    print("  fake/local: python ./scripts/verify/verify-oidc-flow.py --LocalOnly", flush=True)
+    print("  packaged readiness: python ./scripts/release/verify-tauri-package-readiness.py -RepoRoot .", flush=True)
+    print("  dry real-readiness: python ./scripts/release/verify-packaged-login-real-readiness.py -RepoRoot .", flush=True)
 
     step("future real E2E blockers")
     warn_check("requires explicit operator approval to open the system browser and run a real TokenDance ID login")
