@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
+import { fetchAllPages } from '@shared/hub/paginate';
 import { CHATVIEW_I18N_NAMESPACE } from '@shared/chatview/i18n/resources';
 import type { DocRow, ProjectDraft } from '@agenthub/workbench';
 import { resolveFailedToastKey } from '@shared/chatview/failedToastKey';
@@ -324,7 +325,10 @@ export function useWebWorkbenchModel(selectedConversationId?: string, selectedPr
   // through the shared workbench contract (resolveHubDocuments).
   const documentsQuery = useQuery({
     queryKey: ['web-v4', 'hub-documents', hubReady],
-    queryFn: () => hubClient.listDocuments(),
+    // Parameterless first-page fetch with the cursor dropped (#2290 defect
+    // class): documents past the server's default page never reached the Docs
+    // page, which then looked like "there are no more documents".
+    queryFn: () => fetchAllPages(hubClient.listDocuments),
     enabled: hubReady,
     staleTime: 10_000,
     placeholderData: (previous) => previous,
