@@ -579,7 +579,6 @@ describe('WorkbenchFrameParts', () => {
           projects={undefined}
           activeProjectId={undefined}
           projectsStatus={undefined}
-          projectsPort={undefined}
           ccSwitchStatus={undefined}
           ccSwitchProviders={undefined}
           skillMarketItems={undefined}

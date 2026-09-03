@@ -159,9 +159,6 @@ describe('buildProjectsPageProps', () => {
       handleProjectCreate: vi.fn(),
       handleProjectUpdate: vi.fn(),
       openArtifactPreview: vi.fn(),
-      loadMore: undefined,
-      hasMore: false,
-      loadingMore: false,
     } as unknown as WorkbenchProjectsRoute;
 
     const props = buildProjectsPageProps(route, []);
@@ -169,11 +166,6 @@ describe('buildProjectsPageProps', () => {
     expect(props.projectsError).toBe('boom');
     expect(Object.prototype.hasOwnProperty.call(props, 'onProjectCreate')).toBe(false);
     expect(Object.prototype.hasOwnProperty.call(props, 'onProjectUpdate')).toBe(false);
-    // hasMore/loadingMore are always present (default false from the route hook).
-    expect(props.hasMore).toBe(false);
-    expect(props.loadingMore).toBe(false);
-    // loadMore is undefined when hubClient is not active, so onLoadMore is not assigned.
-    expect(Object.prototype.hasOwnProperty.call(props, 'onLoadMore')).toBe(false);
   });
 
   it('renders the status-filtered list instead of the raw source list (#2154 P2-3)', () => {
@@ -260,7 +252,6 @@ describe('buildProjectsPageProps', () => {
     const setProjectPreview = vi.fn();
     const handleProjectCreate = vi.fn();
     const handleProjectUpdate = vi.fn();
-    const loadMore = vi.fn();
     const route = {
       sourceProjects: [{ id: 'p1' }],
       effectiveProjectsStatus: { saving: true, actionError: 'nope' },
@@ -276,9 +267,6 @@ describe('buildProjectsPageProps', () => {
       handleProjectCreate,
       handleProjectUpdate,
       openArtifactPreview: vi.fn(),
-      loadMore,
-      hasMore: true,
-      loadingMore: false,
     } as unknown as WorkbenchProjectsRoute;
 
     const props = buildProjectsPageProps(route, [{ kind: 'agent', name: 'Bot' }]);
@@ -286,8 +274,6 @@ describe('buildProjectsPageProps', () => {
     expect(props.onProjectUpdate).toBe(handleProjectUpdate);
     expect(props.projectSaving).toBe(true);
     expect(props.projectActionError).toBe('nope');
-    expect(props.hasMore).toBe(true);
-    expect(props.onLoadMore).toBe(loadMore);
     props.onClosePreview?.();
     expect(setProjectPreview).toHaveBeenCalledWith(null);
   });

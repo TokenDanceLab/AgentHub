@@ -22,7 +22,7 @@ Web UI -> Hub Server -> Edge relay / sync -> Edge Server -> Agent Runtime adapte
 | Area | Owner |
 |---|---|
 | App entry | `src/main.tsx` -> `src/App.tsx`（挂载 `@agenthub/workbench` 的 `AgentHubWorkbench`） |
-| Platform adapter / workbench ports | `src/platform/`（`webPlatform.ts`、`useWebWorkbenchModel.ts`、`webWorkbenchProjectsPort.ts` 等） |
+| Platform adapter / workbench 数据映射 | `src/platform/`（`webPlatform.ts`、`useWebWorkbenchModel.ts`、`webWorkbenchProjects.ts` 等） |
 | Hub client / queries | `src/api/`（`hubClient.ts`、`hubAuth.ts`、各 `*Queries.ts`） |
 | Auth/UI components | `src/components/`（`AuthPage`、`StartConversationModal` 等） |
 | State/hooks | `src/stores/`, `src/hooks/` |

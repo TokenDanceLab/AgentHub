@@ -295,7 +295,6 @@ describe('workbenchFramePartsHelpers', () => {
       expect(props.onNavigatePage).toBe(onNavigatePage);
       expect('agents' in props).toBe(false);
       expect('dataMode' in props).toBe(false);
-      expect('projectsPort' in props).toBe(false);
       expect('skillMarketItems' in props).toBe(false);
     });
 
@@ -312,7 +311,6 @@ describe('workbenchFramePartsHelpers', () => {
         projects: [{ id: 'p1' } as any],
         activeProjectId: 'p1',
         projectsStatus: { loading: false },
-        projectsPort: { listProjects: vi.fn() } as any,
         onAgentCreate,
         skillMarketItems: [{ id: 's1' } as any],
         skillMarketLoading: true,

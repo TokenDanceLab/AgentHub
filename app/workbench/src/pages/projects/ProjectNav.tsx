@@ -5,7 +5,7 @@
    CSS remains on shared ProjectsPage.module.css.
    ═══════════════════════════════════════════════════════════════════════ */
 
-import React, { useEffect, useRef } from 'react';
+import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { SHARED_WORKBENCH_I18N_NAMESPACE } from '@shared/i18n';
 import { StatusNotice } from '@shared/ui';
@@ -28,14 +28,6 @@ export type ProjectNavProps = {
   availableFilters?: readonly ProjectFilter[] | undefined;
   canCreateProject: boolean;
   onStartCreate: () => void;
-  /** Whether more projects are available via pagination. */
-  hasMore?: boolean | undefined;
-  /** Whether a load-more page fetch is in flight. */
-  loadingMore?: boolean | undefined;
-  /** Triggered when the scroll sentinel enters the viewport. */
-  onLoadMore?: (() => void) | undefined;
-  /** Visible load-more failure (#1546). When set, pagination stopped and `onLoadMore` acts as explicit retry. */
-  loadMoreError?: string | undefined;
 };
 
 export function ProjectNav({
@@ -51,34 +43,8 @@ export function ProjectNav({
   availableFilters,
   canCreateProject,
   onStartCreate,
-  hasMore,
-  loadingMore,
-  onLoadMore,
-  loadMoreError,
 }: ProjectNavProps): React.ReactElement {
   const { t } = useTranslation(SHARED_WORKBENCH_I18N_NAMESPACE);
-
-  // ── Infinite-scroll sentinel ──
-  const sentinelRef = useRef<HTMLDivElement>(null);
-  const onLoadMoreRef = useRef(onLoadMore);
-  onLoadMoreRef.current = onLoadMore;
-
-  useEffect(() => {
-    const sentinel = sentinelRef.current;
-    if (!sentinel || !hasMore) return;
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0]?.isIntersecting) {
-          onLoadMoreRef.current?.();
-        }
-      },
-      { rootMargin: '200px' },
-    );
-
-    observer.observe(sentinel);
-    return () => observer.disconnect();
-  }, [hasMore]);
 
   return (
     <aside className={`${styles.nav} workbench-nav project-nav`}>
@@ -137,41 +103,6 @@ export function ProjectNav({
         onFilterChange={onFilterChange}
         {...(availableFilters ? { availableFilters } : {})}
       />
-      {/* Infinite-scroll sentinel: triggers loadMore when within 200px of viewport. */}
-      <div
-        ref={sentinelRef}
-        className={styles.sentinel}
-        role="status"
-        aria-label={loadingMore ? t('projects.loading') : undefined}
-      />
-      {loadingMore ? (
-        <StatusNotice
-          {...(styles.statusNotice ? { className: styles.statusNotice } : {})}
-          icon={<DesignNavIcon name="running" size={14} />}
-          role="status"
-        >
-          {t('projects.loading')}
-        </StatusNotice>
-      ) : null}
-      {loadMoreError ? (
-        <div className={styles.statusStack} role="alert">
-          <StatusNotice
-            {...(styles.statusNotice ? { className: styles.statusNotice } : {})}
-            icon={<DesignNavIcon name="error404" size={14} />}
-          >
-            {t('projects.loadMoreError', { message: loadMoreError })}
-          </StatusNotice>
-          {onLoadMore ? (
-            <button
-              type="button"
-              className={`${styles.newProjectBtn} ${styles.navNewProjectBtn} outline-action`}
-              onClick={onLoadMore}
-            >
-              {t('projects.retryLoadMore')}
-            </button>
-          ) : null}
-        </div>
-      ) : null}
     </aside>
   );
 }

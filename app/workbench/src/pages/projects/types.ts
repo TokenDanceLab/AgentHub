@@ -133,14 +133,6 @@ export interface ProjectsPageProps {
   onRunClick?: ((projectId: string, run: ProjectRun) => void) | undefined;
   /** Called when an artifact row is clicked */
   onArtifactClick?: ((projectId: string, artifact: ProjectArtifact) => void) | undefined;
-  /** Whether more projects are available via pagination. */
-  hasMore?: boolean | undefined;
-  /** Whether a load-more page fetch is in flight. */
-  loadingMore?: boolean | undefined;
-  /** Triggered when the user scrolls near the bottom of the project list. */
-  onLoadMore?: (() => void) | undefined;
-  /** Visible load-more failure (#1546). When set, pagination stopped and `onLoadMore` acts as explicit retry. */
-  loadMoreError?: string | undefined;
 }
 
 // ── Defaults / demo data ──

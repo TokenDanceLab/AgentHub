@@ -279,7 +279,6 @@ describe('AgentHubWorkbenchHelpers', () => {
     expect('contacts' in minimal).toBe(false);
     expect('projects' in minimal).toBe(false);
     expect('onAgentCreate' in minimal).toBe(false);
-    expect('projectsPort' in minimal).toBe(false);
     expect('connectionStatus' in minimal).toBe(false);
     expect('attention' in minimal).toBe(false);
     // children may be null — only assign when defined; null is defined

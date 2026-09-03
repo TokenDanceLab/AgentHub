@@ -263,7 +263,6 @@ export function buildWorkbenchFrameProps(
   assignDefined(frameProps, 'onLogout', props.onLogout);
   assignDefined(frameProps, 'onProjectCreate', props.onProjectCreate);
   assignDefined(frameProps, 'onProjectUpdate', props.onProjectUpdate);
-  assignDefined(frameProps, 'projectsPort', props.projectsPort);
   assignDefined(frameProps, 'onNavigateToConversation', props.onNavigateToConversation);
   assignDefined(frameProps, 'onStartNewConversation', props.onStartNewConversation);
   assignDefined(frameProps, 'contactsActions', props.contactsActions);
