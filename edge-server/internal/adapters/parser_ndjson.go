@@ -8,6 +8,7 @@ import (
 
 	"github.com/agenthub/edge-server/internal/runnerctx"
 	"github.com/agenthub/edge-server/internal/store"
+	"github.com/agenthub/pkg/safego"
 )
 
 // NDJSONStreamParser parses Claude Code's --output-format stream-json protocol.
@@ -54,12 +55,24 @@ func (p *NDJSONStreamParser) Parse(ctx context.Context, r io.Reader) error {
 	return ScanLines(ctx, r, func(line []byte) error {
 		p.seq++
 		func() {
-			defer func() {
-				if r := recover(); r != nil {
-					slog.Error("ndjson: panic in parseLine, recovering to keep stream alive",
-						"runId", p.run.ID, "seq", p.seq, "panic", r)
-				}
-			}()
+			// parseLine drives the emitter and hook chain over untrusted agent
+			// stdout, so a panic on one line must not abort the whole NDJSON
+			// stream — that would strand the run. pkg/safego is the single
+			// recovery path (#2246): it logs the name plus a full stack and
+			// dispatches to the Edge PanicObserver
+			// (EdgeMetrics.InstallPanicObserver), which counts it as
+			// edge_goroutine_panic_recoveries_total{goroutine="ndjson.parse_line"}.
+			// The previous inline recover did neither, so a panicking line was a
+			// bare log line, invisible to every dashboard.
+			//
+			// Trade taken on purpose: the inline recover carried runId/seq as
+			// structured fields, and safego's name must stay a low-cardinality
+			// stable label, so those two attributes now come from the stack trace
+			// (which pinpoints the parseLine frame) plus the surrounding per-line
+			// logs instead of from this record. Gaining stack+metric+observer was
+			// worth more than keeping them; widening safego's API to carry
+			// per-call attributes is a separate decision (#2246 slice follow-up).
+			defer safego.Recover("ndjson.parse_line")
 			p.parseLine(line)
 		}()
 		return nil

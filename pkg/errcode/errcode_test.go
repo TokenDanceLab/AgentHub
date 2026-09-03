@@ -185,7 +185,7 @@ func TestEnvelopeForGinWithTrace(t *testing.T) {
 
 func TestCommonCodesHaveCorrectStatus(t *testing.T) {
 	cases := []struct {
-		err *Error
+		err  *Error
 		want int
 	}{
 		{ErrInternal, http.StatusInternalServerError},

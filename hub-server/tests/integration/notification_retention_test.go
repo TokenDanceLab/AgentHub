@@ -22,9 +22,9 @@ func TestNotificationRetention_OldReadPurged(t *testing.T) {
 	require.NoError(t, db.Exec(`SET session_replication_role = 'replica'`).Error)
 	now := time.Now().UTC()
 	rows := []struct {
-		id     string
-		read   bool
-		age    time.Duration
+		id   string
+		read bool
+		age  time.Duration
 	}{
 		{"11111111-1111-1111-1111-111111111111", true, 120 * 24 * time.Hour},
 		{"22222222-2222-2222-2222-222222222222", false, 120 * 24 * time.Hour},

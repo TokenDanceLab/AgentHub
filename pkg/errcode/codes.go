@@ -33,10 +33,10 @@ var (
 	ErrTooManyRequests  = &Error{Code: "too_many_requests", Message: "rate limit exceeded", HTTPStatus: http.StatusTooManyRequests}
 
 	// --- Auth ---
-	ErrUnauthorized  = &Error{Code: "unauthorized", Message: "authentication required", HTTPStatus: http.StatusUnauthorized}
-	ErrForbidden     = &Error{Code: "forbidden", Message: "permission denied", HTTPStatus: http.StatusForbidden}
-	ErrInvalidToken  = &Error{Code: "invalid_token", Message: "token is invalid or expired", HTTPStatus: http.StatusUnauthorized}
-	ErrTokenExpired  = &Error{Code: "token_expired", Message: "token has expired", HTTPStatus: http.StatusUnauthorized}
+	ErrUnauthorized = &Error{Code: "unauthorized", Message: "authentication required", HTTPStatus: http.StatusUnauthorized}
+	ErrForbidden    = &Error{Code: "forbidden", Message: "permission denied", HTTPStatus: http.StatusForbidden}
+	ErrInvalidToken = &Error{Code: "invalid_token", Message: "token is invalid or expired", HTTPStatus: http.StatusUnauthorized}
+	ErrTokenExpired = &Error{Code: "token_expired", Message: "token has expired", HTTPStatus: http.StatusUnauthorized}
 
 	// --- Validation ---
 	ErrInvalidJSON     = &Error{Code: "invalid_json", Message: "invalid json body", HTTPStatus: http.StatusBadRequest}
