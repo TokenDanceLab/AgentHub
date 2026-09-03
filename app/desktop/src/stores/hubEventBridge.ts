@@ -4,7 +4,7 @@
 // real-time state sync.
 //
 // The Desktop has two WS connections:
-// 1. Edge local event stream (edgeEventBridge.ts) — runtime events
+// 1. Edge local event stream (platform/useDesktopEdgeEvents.ts + api/eventClient.ts, createEventStream) — runtime events
 // 2. Hub WS (this bridge) — team/agent/IM dispatch events from the Hub
 
 import type { QueryClient } from '@tanstack/react-query';
