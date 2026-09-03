@@ -8,7 +8,7 @@ TokenDance ID 登录与 live Hub dispatch 记录为 BLOCKED_WITH_EVIDENCE，
 
 迁移差异（双跑对照记录）：内部子脚本调用改为 python 执行（对应
 verify-localhost-real-stack-smoke / verify-login-e2e-readiness / client-smoke
-的 py 版本）；release 侧 tauri dry 脚本不在本批迁移范围，仍走 pwsh 调用；
+的 py 版本）；release 侧 tauri dry 脚本同样改走 python 执行（verify-tauri-package-dry.py）；
 超时进程树终止用 taskkill /T /F 对齐 Kill($true)；
 CLI 参数、退出码（0=通过 / 1=失败）与 RUN/PASS/BLOCK/FAIL/SKIP 行
 前缀格式与原 ps1 一致。
@@ -227,9 +227,6 @@ def main() -> int:
         print("FAIL: OutputPath must stay under ArtifactRoot", flush=True)
         return 1
 
-    powershell_path = get_command_path("pwsh")
-    if not powershell_path:
-        powershell_path = get_command_path("powershell")
     corepack_path = get_command_path("corepack.cmd")
     if not corepack_path:
         corepack_path = get_command_path("corepack")
@@ -322,8 +319,8 @@ def main() -> int:
     invoke_matrix_command(
         "desktop-tauri-dry-smoke",
         "tauri",
-        powershell_path,
-        ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", os.path.join(repo_root, "scripts", "release", "verify-tauri-package-dry.ps1"), "-RepoRoot", repo_root, "-ArtifactsRoot", os.path.join(artifact_root, "tauri-dry"), "-SkipInstall", "-SkipExecutableCompile"],
+        sys.executable,
+        [os.path.join(repo_root, "scripts", "release", "verify-tauri-package-dry.py"), "-RepoRoot", repo_root, "-ArtifactsRoot", os.path.join(artifact_root, "tauri-dry"), "-SkipInstall", "-SkipExecutableCompile"],
         repo_root,
         [],
         "",

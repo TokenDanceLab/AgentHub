@@ -108,7 +108,7 @@ def assert_generated_schema_clean() -> None:
 
 def assert_windows_unsigned_dev_package_contract() -> None:
     step("Windows unsigned/dev package reproducibility contract")
-    assert_file_exists("scripts\\release\\verify-tauri-package-dry.py", "Windows unsigned/dev package dry categorized script")
+    assert_file_exists("scripts/release/verify-tauri-package-dry.py", "Windows unsigned/dev package dry categorized script")
 
     dry_text = read_text("scripts/release/verify-tauri-package-dry.py")
     assert_true(
