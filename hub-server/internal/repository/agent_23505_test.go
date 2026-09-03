@@ -13,12 +13,17 @@ import (
 	"gorm.io/gorm"
 )
 
-// TestIsDuplicateKeyError covers the duplicate-key classifier used by the
-// CreateAgentRunEventWithNextSeqLimited idempotent-retry path. It must
-// recognize Postgres ("duplicate key value violates unique constraint"),
-// SQLite ("UNIQUE constraint failed: ..."), and be case-insensitive, while
-// rejecting unrelated errors and nil.
-func TestIsDuplicateKeyError(t *testing.T) {
+// TestIsUniqueViolation_AgentRunEventIdempotentPath covers the duplicate-key
+// classifier used by the CreateAgentRunEventWithNextSeqLimited idempotent-retry
+// path. It must recognize Postgres ("duplicate key value violates unique
+// constraint"), SQLite ("UNIQUE constraint failed: ..."), and be
+// case-insensitive, while rejecting unrelated errors and nil.
+//
+// Renamed from TestIsDuplicateKeyError and repointed at isUniqueViolation when
+// #2244 slice 1 deleted the package-private isDuplicateKeyError copy this test
+// used to exercise; the table below is unchanged, every `want` value included,
+// and all six cases still pass against the converged implementation.
+func TestIsUniqueViolation_AgentRunEventIdempotentPath(t *testing.T) {
 	cases := []struct {
 		name string
 		err  error
@@ -34,7 +39,7 @@ func TestIsDuplicateKeyError(t *testing.T) {
 	for _, c := range cases {
 		c := c
 		t.Run(c.name, func(t *testing.T) {
-			assert.Equal(t, c.want, isDuplicateKeyError(c.err))
+			assert.Equal(t, c.want, isUniqueViolation(c.err))
 		})
 	}
 }

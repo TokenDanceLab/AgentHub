@@ -74,8 +74,17 @@ func IsEvidenceNotFound(err error) bool {
 	return errors.Is(err, gorm.ErrRecordNotFound)
 }
 
-// IsUniqueViolation reports whether err is a unique-constraint violation
-// (exported wrapper around the package helper used by service layers).
+// IsUniqueViolation reports whether err is a unique-constraint violation.
+//
+// This is the ONLY exported door to the classification, and the only one that
+// exists: the implementation lives in isUniqueViolation (agent_team_events.go)
+// and is documented there. Every package that needs the answer — repository
+// itself, service/message, service/executiontarget — calls this. Do not add a
+// second copy in another package; #2244 slice 1 removed four of them
+// (repository/agent.go isDuplicateKeyError, service/message/builders.go
+// isDuplicateKeyError, and an inline strings.Contains in
+// service/message/service_send.go PinMessage), and two of those four had
+// already drifted into answering the same question differently.
 func IsUniqueViolation(err error) bool {
 	return isUniqueViolation(err)
 }
