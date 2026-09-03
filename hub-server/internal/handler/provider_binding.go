@@ -42,13 +42,11 @@ type createProviderBindingReq struct {
 func (h *ProviderBindingHandler) List(c *gin.Context) {
 	userID := c.GetString("user_id")
 	cursor := c.Query("pageCursor")
-	pageSize, _ := strconv.Atoi(c.DefaultQuery("pageSize", "50"))
-	if pageSize <= 0 {
-		pageSize = config.DefaultPaginationLimit
-	}
-	if pageSize > config.MaxPageLimit {
-		pageSize = config.MaxPageLimit
-	}
+	pageSize, _ := strconv.Atoi(c.DefaultQuery("pageSize", strconv.Itoa(config.DefaultPaginationLimit)))
+	// Ceiling = repository.ListProviderBindings (MaxListPageSize), which is also
+	// the PageSize maximum api/openapi.yaml declares for GET /web/provider-bindings
+	// (#2243).
+	pageSize = config.ClampPageSize(pageSize, config.MaxListPageSize, config.DefaultPaginationLimit)
 
 	result, err := h.service.List(c.Request.Context(), userID, cursor, pageSize)
 	if err != nil {
