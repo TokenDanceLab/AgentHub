@@ -27,13 +27,21 @@ vi.mock('@/api/eventClient', () => ({
   createEventStream: vi.fn(),
 }));
 
-vi.mock('@/api/threadQueries', () => ({
-  useCreateThread: vi.fn(),
-  useThreadPins: vi.fn(),
-  useThreadMessages: vi.fn(),
-  useThreads: vi.fn(),
-  useCurrentUser: vi.fn(),
-}));
+// The hooks are mocked, but `invalidateEdgeThreadTranscript` is deliberately
+// kept REAL (importOriginal): App.tsx calls it on the submit path and the whole
+// point of #2274 A-13 is which key it targets, so mocking it away would make the
+// assertion below a tautology.
+vi.mock('@/api/threadQueries', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/api/threadQueries')>();
+  return {
+    ...actual,
+    useCreateThread: vi.fn(),
+    useThreadPins: vi.fn(),
+    useThreadMessages: vi.fn(),
+    useThreads: vi.fn(),
+    useCurrentUser: vi.fn(),
+  };
+});
 
 vi.mock('@/api/agentQueries', () => ({
   useAgentList: vi.fn(),
@@ -826,6 +834,7 @@ describe('Desktop App v4 root', () => {
     } as ReturnType<typeof useThreadMessages>);
 
     renderWithProviders(<DesktopWorkbenchApp />);
+    const invalidateSpy = vi.spyOn(testQueryClient, 'invalidateQueries');
 
     fireEvent.change(getComposerInput(), {
       target: { value: '跑一下 v4 smoke' },
@@ -842,6 +851,23 @@ describe('Desktop App v4 root', () => {
       prompt: '跑一下 v4 smoke',
       threadId: 'thread-real',
     });
+
+    // #2274 A-13: the immediate transcript refresh must target the key the live
+    // useThreadMessages actually registers — ['edge','threadItems',<id>]. It used
+    // to be the bare literal ['threadItems', id], missing the 'edge' segment, so
+    // it prefix-matched no cache entry: the immediate refresh and both the 2s/4s
+    // compensations written to catch the agent's async response were all dead,
+    // and the transcript only moved on useThreadMessages' own 5s poll. Literal
+    // on purpose (ADR-029: tests pin the shape, production references factories).
+    await waitFor(() => {
+      expect(invalidateSpy).toHaveBeenCalledWith({
+        queryKey: ['edge', 'threadItems', 'thread-real'],
+      });
+    });
+    expect(invalidateSpy).not.toHaveBeenCalledWith({
+      queryKey: ['threadItems', 'thread-real'],
+    });
+    invalidateSpy.mockRestore();
     expect(getComposerInput()).toHaveValue('');
   });
 

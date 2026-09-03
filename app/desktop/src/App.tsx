@@ -32,7 +32,7 @@ import { useRunEvidence } from '@/api/runEvidenceQueries';
 import { useCreateRun, useCancelRun, useRuns, useDecideEdgePermission, findActiveEdgeRun } from '@/api/runQueries';
 import { resolveEdgePermissionRunId } from '@/platform/edgeApprovalRouting';
 import { useConnectionStore } from '@/stores/connectionStore';
-import { useCreateThread, useCurrentUser, useThreads } from '@/api/threadQueries';
+import { invalidateEdgeThreadTranscript, useCreateThread, useCurrentUser, useThreads } from '@/api/threadQueries';
 import { useHubForwardMessage } from '@/api/sessionQueries';
 import { DesktopChrome } from '@/components/DesktopChrome';
 import { DesktopEntryGate } from '@/components/DesktopEntryGate';
@@ -376,11 +376,16 @@ export function DesktopWorkbenchApp({ onLogout }: DesktopWorkbenchAppProps = {})
         }
         // Immediate invalidation — useCreateRun.onSettled also does this, but we
         // additionally schedule delayed re-fetches for the agent's async response.
+        // All three used to spell the key as the literal ['threadItems', id],
+        // which is missing the 'edge' segment of the real key
+        // (['edge','threadItems',id]) and therefore matched no cache entry: the
+        // immediate refresh and both 2s/4s compensations were dead, and the
+        // transcript only moved on useThreadMessages' own 5s poll (#2274 A-13).
         if (threadId) {
-          void queryClient.invalidateQueries({ queryKey: ['threadItems', threadId] });
+          void invalidateEdgeThreadTranscript(queryClient, threadId);
           // Follow-up invalidations at 2s and 4s to catch agent responses.
-          setTimeout(() => void queryClient.invalidateQueries({ queryKey: ['threadItems', threadId] }), 2_000);
-          setTimeout(() => void queryClient.invalidateQueries({ queryKey: ['threadItems', threadId] }), 4_000);
+          setTimeout(() => void invalidateEdgeThreadTranscript(queryClient, threadId), 2_000);
+          setTimeout(() => void invalidateEdgeThreadTranscript(queryClient, threadId), 4_000);
         }
         return run;
       } catch (err) {
