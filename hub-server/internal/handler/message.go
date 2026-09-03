@@ -99,12 +99,11 @@ func (h *MessageHandler) GetMessages(c *gin.Context) {
 		}
 		limit = parsed
 	}
-	if limit <= 0 {
-		limit = config.DefaultPaginationLimit
-	}
-	if limit > config.MaxMessagePageLimit {
-		limit = config.MaxMessagePageLimit
-	}
+	// Ceiling = repository.GetMessagesBySession → ClampPageSize(..,
+	// MaxMessagePageLimit, DefaultPaginationLimit): the same value and the same
+	// default, so this is an exact conversion of the two hand-written branches
+	// that used to sit here, not a behaviour change (#2243).
+	limit = config.ClampPageSize(limit, config.MaxMessagePageLimit, config.DefaultPaginationLimit)
 
 	result, err := h.service.GetMessages(c.Request.Context(), sessionID, userID, beforeSeq, limit)
 	if err != nil {
@@ -145,12 +144,15 @@ func (h *MessageHandler) GetIncrementalMessages(c *gin.Context) {
 		}
 		limit = parsed
 	}
-	if limit <= 0 {
-		limit = config.DefaultPaginationLimit
-	}
-	if limit > config.MaxIncrementalMessageLimit {
-		limit = config.MaxIncrementalMessageLimit
-	}
+	// Ceiling = MaxIncrementalMessageLimit (500): sync clients legitimately
+	// fetch larger batches than the interactive lists, so this endpoint does not
+	// share the 100 of its sibling above. repository.GetMessagesIncrement has
+	// its own branch (`limit <= 0 || limit > max → max`, i.e. a non-positive
+	// value becomes 500 rather than the default), but this handler never sends
+	// it a non-positive value — ClampPageSize maps those to
+	// DefaultPaginationLimit first, exactly as the two hand-written branches did
+	// before. That repository branch is tracked separately in #2243 (#2243).
+	limit = config.ClampPageSize(limit, config.MaxIncrementalMessageLimit, config.DefaultPaginationLimit)
 
 	result, err := h.service.GetMessagesIncremental(c.Request.Context(), sessionID, userID, afterSeq, limit)
 	if err != nil {
@@ -406,16 +408,19 @@ func (h *MessageHandler) MarkRead(c *gin.Context) {
 }
 
 // parseMessageSearchPage parses pageCursor/pageSize for message search
-// endpoints (#2136 P2). Message search keeps the legacy MaxMessagePageLimit
-// cap (100) instead of MaxPageLimit to preserve payload-size invariants.
+// endpoints (#2136 P2). Message search keeps the MaxMessagePageLimit cap (100)
+// instead of MaxListPageSize (200) to preserve payload-size invariants, and the
+// search queries apply no ceiling of their own (repository/message.go: "pageSize
+// is clamped by the caller"), so this handler is the enforcement point.
+//
+// Note the contract gap this deliberately does NOT paper over: both search
+// routes reference the shared PageSize parameter in api/openapi.yaml
+// (maximum: 200) while the code enforces 100 — the code is stricter than the
+// contract. Reconciling them means editing openapi, tracked in #2243. This
+// conversion only removes the hand-written branches; the value does not move.
 func parseMessageSearchPage(c *gin.Context) (cursor string, pageSize int) {
 	pageSize, _ = strconv.Atoi(c.DefaultQuery("pageSize", strconv.Itoa(config.DefaultPaginationLimit)))
-	if pageSize <= 0 {
-		pageSize = config.DefaultPaginationLimit
-	}
-	if pageSize > config.MaxMessagePageLimit {
-		pageSize = config.MaxMessagePageLimit
-	}
+	pageSize = config.ClampPageSize(pageSize, config.MaxMessagePageLimit, config.DefaultPaginationLimit)
 	return c.Query("pageCursor"), pageSize
 }
 
