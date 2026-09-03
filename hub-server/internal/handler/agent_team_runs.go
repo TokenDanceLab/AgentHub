@@ -122,12 +122,13 @@ func (h *AgentTeamHandler) ListTeamEvents(c *gin.Context) {
 		afterSeq = 0
 	}
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("pageSize", strconv.Itoa(config.DefaultPaginationLimit)))
-	if pageSize <= 0 {
-		pageSize = config.DefaultPaginationLimit
-	}
-	if pageSize > config.MaxPageLimit {
-		pageSize = config.MaxPageLimit
-	}
+	// Ceiling stays MaxPageLimit: this endpoint declares its own `pageSize`
+	// parameter with maximum: 500 in api/openapi.yaml ("values above 500 are
+	// clamped"), not the shared PageSize parameter, and the query below
+	// (repository.ListTeamEventsByRunPage) only caps at maxTeamEventsPerRun=10000.
+	// Clamping to MaxListPageSize here would serve fewer events than the contract
+	// promises (#2243).
+	pageSize = config.ClampPageSize(pageSize, config.MaxPageLimit, config.DefaultPaginationLimit)
 
 	page, err := h.service.ListTeamEvents(c.Request.Context(), userID, teamID, runID, afterSeq, pageSize)
 	if err != nil {

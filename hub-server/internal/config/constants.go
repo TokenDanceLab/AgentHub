@@ -8,8 +8,20 @@ import "time"
 // limit query parameter is specified.
 const DefaultPaginationLimit = 50
 
-// MaxMessagePageLimit is the maximum allowed page size for message list queries
-// (GetMessagesBySession) and notification list queries (ListNotifications).
+// MaxMessagePageLimit is the ceiling of the payload-size-sensitive lists:
+// message list queries (repository.GetMessagesBySession — which also backs the
+// project-thread-message list), notification list queries
+// (repository.ListNotifications), and message search (handler/message.go
+// parseMessageSearchPage, whose repository query applies no ceiling of its own).
+// Handler and query layer clamp to the same value, so what the handler forwards
+// is what the query executes.
+//
+// These endpoints are not described by the shared PageSize parameter:
+// api/openapi.yaml declares maximum: 100 for the `limit` of
+// GET /web/projects/{id}/threads/{threadId}/messages and declares no maximum at
+// all for GET /client/notifications, while the two message-search routes do
+// reference PageSize (maximum: 200) and are deliberately held at 100 to keep
+// the search payload bounded — see parseMessageSearchPage.
 const MaxMessagePageLimit = 100
 
 // MaxIncrementalMessageLimit is the maximum allowed page size for incremental
@@ -17,16 +29,50 @@ const MaxMessagePageLimit = 100
 // MaxMessagePageLimit because sync clients often fetch larger batches.
 const MaxIncrementalMessageLimit = 500
 
-// MaxListPageSize is the maximum page size for the generic list endpoints
-// (workspaces, skills, agent profiles, execution targets, provider bindings,
-// MCP servers, audit events). It is the value api/openapi.yaml declares for the
-// shared PageSize parameter, so it is the bound those endpoints must actually
+// MaxListPageSize is the maximum page size for the generic cursor-paged list
+// endpoints: projects/workspaces, skills, agent profiles, execution targets,
+// provider bindings, MCP servers, market profiles, session search and audit
+// events. It is the value api/openapi.yaml declares for the shared PageSize
+// parameter (maximum: 200), so it is the bound those endpoints must actually
 // enforce; it was previously a bare `200` literal repeated in ten places.
+//
+// Enforcement lives wherever the client-supplied value becomes a LIMIT, and
+// since #2243 that is the handler — the layer the contract is written against —
+// for projects/workspaces, skills, agent profiles, execution targets, provider
+// bindings, MCP servers, market profiles and session search, each clamping with
+// ClampPageSize(.., MaxListPageSize, ..). The repository queries beneath them
+// clamp to the same value as defence in depth, with two asymmetries worth
+// knowing: repository.SearchSessions applies no ceiling of its own, so its
+// handler is the only enforcement point, and GET /web/audit-events has no
+// handler-side clamp, so repository.ListAuditEvents is its enforcement point.
+//
+// Before #2243 every one of those handlers clamped to MaxPageLimit (500)
+// instead, so pageSize=300 reached a query that silently returned 200 rows with
+// HTTP 200 and no signal that the page had been shortened.
 const MaxListPageSize = 200
 
-// MaxPageLimit is the maximum allowed page size (pageSize / limit) for list
-// endpoints across all Hub handlers. Handlers MUST clamp user-supplied values
-// to this ceiling to prevent unbounded query resource usage.
+// MaxPageLimit is the ceiling of the endpoints whose own contract declares
+// maximum: 500 and whose query layer enforces nothing lower:
+//
+//   - GET /web/agent-tasks/{id}/events (`limit`) — repository/agent.go
+//     ListAgentRunEventsByTaskIDFiltered applies no ceiling to an explicit
+//     limit; it only substitutes maxAgentEventsPerQuery (2000) when limit is 0.
+//     The handler is therefore the enforcement point, and openapi declares
+//     maximum: 500 for this parameter.
+//   - GET /web/agent-teams/{id}/runs/{run_id}/events (`pageSize`) —
+//     repository/agent_team_events.go ListTeamEventsByRunPage caps at
+//     maxTeamEventsPerRun (10000), and openapi declares maximum: 500.
+//
+// It is also the bound two repository-side lists enforce where no client page
+// size reaches the query: the document family (repository/document.go, whose
+// openapi `limit` declares no maximum) and the custom-agents list
+// (repository/agent.go ListCustomAgentsByOwner). repository/pagination_limits_test.go
+// pins both.
+//
+// It is NOT a Hub-wide handler ceiling — that is what this comment claimed until
+// #2243, and the claim was false for every generic list endpoint, which clamp to
+// MaxListPageSize (200), and for the message/notification/thread-message
+// endpoints, which clamp to MaxMessagePageLimit (100).
 const MaxPageLimit = 500
 
 // MaxPaginationOffset caps client-controlled OFFSET values on list endpoints.
