@@ -226,18 +226,32 @@ func (l *EventLog) Append(evt EventEnvelope) error {
 			}
 			l.index[evt.Seq] = writeOffset
 		}
-		if l.maxSize > 0 {
-			if fi, statErr := l.f.Stat(); statErr == nil && fi.Size() > l.maxSize {
-				l.truncateLocked()
+		// The maxSize check and indexedSize each used to Stat the file again
+		// here — two syscalls per event, inside l.mu, on the bus's hottest
+		// lock, to learn something the arithmetic already gives us: the file is
+		// opened O_APPEND, so a successful write of len(data) bytes at
+		// writeOffset leaves it exactly writeOffset+len(data) long. Measured
+		// over 3x2000 appends of a ~660-byte envelope, dropping the two Stats
+		// takes Append from a 13.5us median to 11.8us (-13%), and the same
+		// ~11% shows up under contention because the saving is inside the
+		// critical section every publisher and every replay waits on (#2256
+		// E-P3-7).
+		//
+		// Truncation is the one path where the size is genuinely not derivable
+		// — truncateLocked rewrites the file — so that rare branch keeps a real
+		// Stat and eventlog_append_size_test.go pins it.
+		newSize := writeOffset + int64(len(data))
+		if l.maxSize > 0 && newSize > l.maxSize {
+			l.truncateLocked()
+			if fi, statErr := l.f.Stat(); statErr == nil {
+				newSize = fi.Size()
 			}
 		}
 		// Keep indexedSize in sync with the write so ReadFrom's external-change
 		// check does not perform a redundant full-file rescan for appends we
 		// made ourselves (the live index above is already correct). External
 		// writes that bypass Append still change the size and trigger a rebuild.
-		if fi, statErr := l.f.Stat(); statErr == nil {
-			l.indexedSize = fi.Size()
-		}
+		l.indexedSize = newSize
 	}
 	return err
 }
