@@ -10,6 +10,21 @@ import (
 
 func TestRegisterSessionMetricsIdempotent(t *testing.T) {
 	// Reset for test isolation: create a fresh registry and swap.
+	//
+	// The swap is restored on cleanup. Both globals are process-wide and every
+	// other test in this package reads through them, so leaking the swap made
+	// the whole binary order-dependent: under `-shuffle=on`, any order that put
+	// this test first left TestRegisteredMetricsAccessible and
+	// TestEventBusCounter gathering from a registry that holds nothing but the
+	// two session metrics ("期望指标 ... 已注册，但在 DefaultGatherer 中未找到").
+	// This test's own assertions read from reg directly, so restoring the
+	// globals changes nothing here (#2246).
+	savedRegisterer, savedGatherer := prometheus.DefaultRegisterer, prometheus.DefaultGatherer
+	t.Cleanup(func() {
+		prometheus.DefaultRegisterer = savedRegisterer
+		prometheus.DefaultGatherer = savedGatherer
+	})
+
 	reg := prometheus.NewRegistry()
 	prometheus.DefaultRegisterer = reg
 	prometheus.DefaultGatherer = reg
