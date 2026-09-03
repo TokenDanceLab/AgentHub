@@ -4,7 +4,7 @@
 //
 // Usage:
 //   import { hubQueryKeys, edgeQueryKeys } from '@agenthub/shared/stores/queryKeys';
-//   useQuery({ queryKey: hubQueryKeys.threads.all(projectId) });
+//   useQuery({ queryKey: hubQueryKeys.projects.list() });
 //   queryClient.invalidateQueries({ queryKey: hubQueryKeys.threads.root });
 
 // ── Hub query key factory ──────────────────────────────────────────
@@ -17,13 +17,23 @@ export const hubQueryKeys = {
   },
 
   // Threads (sessions)
+  // Canonical key shape (ADR-029 / #2261):
+  //   - `root` is an INVALIDATION PREFIX ONLY. It must never be the queryKey of
+  //     a live query: web used it as its session-list key while desktop used the
+  //     same prefix for transcripts, so "refresh the session list" and "refresh
+  //     one transcript" meant opposite things in the two shells.
+  //   - the collection query uses `list`; a per-thread sub-resource uses
+  //     `messages`/`pins` and always has a factory (no literal keys at call
+  //     sites);
+  //   - a factory with no consumer must not exist. `detail` was deleted for
+  //     exactly that reason: 0 useQuery consumers against 9 production
+  //     invalidation sites, and `['hub','threads','detail',id]` is not a prefix
+  //     of `['hub',id,'messages']`, so all 9 matched no cache entry at all —
+  //     the same failure mode as #2252, one key over. Do not reintroduce it
+  //     without a real thread-detail query to consume it.
   threads: {
     root: ['hub', 'threads'] as const,
-    all: (projectId?: string) =>
-      projectId
-        ? (['hub', 'threads', projectId] as const)
-        : (['hub', 'threads'] as const),
-    detail: (threadId: string) => ['hub', 'threads', 'detail', threadId] as const,
+    list: ['hub', 'threads', 'list'] as const,
     messages: (threadId: string) => ['hub', 'threads', threadId, 'messages'] as const,
     pins: (threadId: string) => ['hub', 'threads', threadId, 'pins'] as const,
   },

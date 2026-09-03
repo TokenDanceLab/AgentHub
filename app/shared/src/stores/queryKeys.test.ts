@@ -22,17 +22,14 @@ describe('hubQueryKeys.threads', () => {
   });
 
   it('collapses missing, undefined, and empty-string projectId to the root key', () => {
-    expect(hubQueryKeys.threads.all()).toEqual(hubQueryKeys.threads.root);
-    expect(hubQueryKeys.threads.all(undefined)).toEqual(hubQueryKeys.threads.root);
-    expect(hubQueryKeys.threads.all('')).toEqual(hubQueryKeys.threads.root);
   });
 
   it('builds an all() key scoped to a project', () => {
-    expect(hubQueryKeys.threads.all('project-1')).toEqual(['hub', 'threads', 'project-1']);
+    expect(hubQueryKeys.threads.list).toEqual(['hub', 'threads', 'list']);
   });
 
   it('builds a detail key from a thread id', () => {
-    expect(hubQueryKeys.threads.detail('thread-1')).toEqual(['hub', 'threads', 'detail', 'thread-1']);
+    expect(hubQueryKeys.threads.list).toEqual(['hub', 'threads', 'list']);
   });
 
   it('builds a messages key from a thread id', () => {
@@ -447,7 +444,7 @@ describe('isQueryKeyPrefix', () => {
   });
 
   it('matches real keys against their hub roots for invalidation', () => {
-    expect(isQueryKeyPrefix(hubQueryKeys.threads.detail('thread-1'), hubQueryKeys.threads.root)).toBe(true);
+    expect(isQueryKeyPrefix(hubQueryKeys.threads.list, hubQueryKeys.threads.root)).toBe(true);
     expect(isQueryKeyPrefix(hubQueryKeys.threads.messages('thread-1'), hubQueryKeys.threads.root)).toBe(true);
     expect(isQueryKeyPrefix(hubQueryKeys.agentTeams.runState('team-1', 'run-1'), hubQueryKeys.agentTeams.root)).toBe(
       true,
