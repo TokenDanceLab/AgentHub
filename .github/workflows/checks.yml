@@ -796,11 +796,19 @@ jobs:
         run: python ./scripts/verify/verify-p0-remote-control-fixture.py
 
   # ── Backend: Edge→Hub callback smoke (fixture-only) ──────────
-  # edge-server/tests TestHubE2E_ series spins up a mock Hub + in-process
-  # Edge ProcessExecutor and asserts ack/stream/done/fail direct-callback
-  # delivery. It is guarded by testing.Short(), so the go-edge -short lane
-  # skips it; this lane runs it explicitly with a non-zero PASS assertion
-  # (same pattern as backend-integration) so a 0-test lane fails.
+  # The whole edge-server/tests package is the fixture E2E suite: it spins up a
+  # mock Hub + in-process Edge ProcessExecutor and asserts ack/stream/done/fail
+  # direct-callback delivery (11 tests, ~4s locally). The parts guarded by
+  # testing.Short() are skipped by the go-edge -short unit lane, so this lane
+  # runs the package unfiltered with a non-zero PASS assertion (same pattern as
+  # backend-integration) so a 0-test lane fails.
+  #
+  # This step used to pass `-run '^TestHubE2E_'`. That filter excluded the six
+  # TestEdge* tests in the same package; four of them still ran in the -short
+  # unit lane, but TestEdgeReceivesDispatchFromHub and TestEdgeFullProtocolRoundTrip
+  # are themselves testing.Short()-guarded, so between the two lanes they were
+  # executed by no CI job at all — permanently green because permanently skipped.
+  # Dropping the filter runs them for ~0.02s extra against a 120s timeout.
   backend-edge-e2e:
     name: Backend Edge E2E (fixture-only)
     needs: changes
@@ -822,7 +830,7 @@ jobs:
 
       - name: Edge→Hub callback smoke
         run: |
-          go test ./tests/ -count=1 -run '^TestHubE2E_' -v -timeout 120s 2>&1 | tee edge-e2e.log
+          go test ./tests/ -count=1 -v -timeout 120s 2>&1 | tee edge-e2e.log
           GO_EXIT=${PIPESTATUS[0]}
           PASS_COUNT=$(grep -c "^--- PASS" edge-e2e.log || true)
           echo "edge e2e lane PASS count: ${PASS_COUNT}"

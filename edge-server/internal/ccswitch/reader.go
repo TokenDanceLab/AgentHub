@@ -174,9 +174,11 @@ func NewReaderWithPath(dbPath string) *Reader {
 	return &Reader{dbPath: dbPath}
 }
 
-// ReadProviders reads all providers from the cc-switch database, grouped by
-// app_type. Only providers that are not in the failover queue are included by
-// default. The settings_config is parsed to extract model alias mappings.
+// ReadProviders reads providers from the cc-switch database, filtered by
+// app_type (an empty appType returns every provider). Failover-queued providers
+// are returned as well — they are reported through ProviderModelMapping.InFailover
+// with IsActive=false rather than being dropped, so callers can still see the
+// queue. The settings_config is parsed to extract model alias mappings.
 func (r *Reader) ReadProviders(appType string) ([]ProviderModelMapping, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -251,8 +253,14 @@ func (r *Reader) ResolveModelAlias(alias, appType string) (string, bool) {
 		if resolved, ok := p.ModelAliases[alias]; ok {
 			return resolved, true
 		}
-		// Also check the _NAME variants (display names).
-		nameKey := alias + "_NAME"
+		// Fall back to the display-name variant. The key is alias+"_name"
+		// because parseModelAliases's aliasMap is the only producer of
+		// ModelAliases and it emits lowercase keys ("opus_name" from
+		// ANTHROPIC_DEFAULT_OPUS_MODEL_NAME). This used to read "_NAME", which
+		// no producer ever emitted, so the fallback never fired; the sibling
+		// consumer in internal/api/model_catalog_ccswitch.go already used the
+		// lowercase form.
+		nameKey := alias + "_name"
 		if resolved, ok := p.ModelAliases[nameKey]; ok {
 			return resolved, true
 		}

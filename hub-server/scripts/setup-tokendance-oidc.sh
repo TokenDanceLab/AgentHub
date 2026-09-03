@@ -40,7 +40,11 @@ CLIENT_ID="agenthub-desktop"
 CLIENT_NAME="AgentHub Desktop"
 CLIENT_SECRET="agenthub-dev-secret-change-me"
 # Pre-computed bcrypt hash for the above secret.
-# To regenerate: go run scripts/bcrypt-hash.go "your-secret"
+# To regenerate for a different secret, use the same recipe the real-e2e
+# provisioning script uses (python3 + bcrypt, already a CI prereq):
+#   python3 -c "import bcrypt,sys;print(bcrypt.hashpw(sys.argv[1].encode(),bcrypt.gensalt(rounds=10)).decode())" "your-secret"
+# See scripts/e2e/provision-real-e2e-stack.sh. (This comment used to point at
+# scripts/bcrypt-hash.go, a file that has never existed in the repo.)
 BCRYPT_HASH='$2a$10$CFRzH1R6MEUVU88nLzRSo.1qX7DtG6sPTqOrZ5HNfp1awu0ei0XpS'
 REDIRECT_URIS='["http://127.0.0.1/callback","http://localhost:5174/auth/tokendance/callback","http://127.0.0.1:5174/auth/tokendance/callback"]'
 GRANT_TYPES='["authorization_code","refresh_token"]'

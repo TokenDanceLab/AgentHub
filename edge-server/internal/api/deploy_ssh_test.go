@@ -15,24 +15,22 @@ import (
 // in-memory store.Repository plus a re-exec'd test binary standing in for
 // the ssh/scp binaries. Only the real-host gap below remains skipped here.
 
-// runSSHCommand / runSCP (deploy.go) exec the ssh/scp binaries against a real
-// SSH target host. Real-host behavior is intentionally NOT covered here:
-//   - mocking exec.Command would over-test the implementation and prove nothing
-//     about real SSH behavior;
-//   - running them for real requires an SSH host reachable from this machine.
+// runSSHCommand / runSCP (deploy.go) exec the ssh/scp binaries. Everything
+// that can be asserted without a real SSH host is asserted below and in
+// deploy_handler_test.go / diff_apply_handler_test.go: they re-exec this test
+// binary under the names ssh(.exe) / scp(.exe) at the head of PATH, so the exec
+// path, the hardening flags, the argument construction and the timeout behavior
+// are all real and hermetic.
 //
-// These placeholders keep the skip explicit. To run for real:
-//
-//	go test ./internal/api/ -run 'TestRunSSH|TestRunSCP' -ssh-integration
-//
-// and pass AGENTHUB_DEPLOY_HOST / AGENTHUB_DEPLOY_PATH to point at the target.
-func TestRunSSHCommand_RequiresSSHTarget(t *testing.T) {
-	t.Skip("requires SSH target host; run with -ssh-integration")
-}
-
-func TestRunSCP_RequiresSSHTarget(t *testing.T) {
-	t.Skip("requires SSH target host; run with -ssh-integration")
-}
+// Talking to an actual remote host is deliberately NOT covered anywhere: it
+// would prove something about that host, not about this code, and it cannot run
+// on a CI runner. Two placeholder tests used to sit here whose entire body was
+// `t.Skip("requires SSH target host; run with -ssh-integration")`. They are
+// gone because the escape hatch they advertised never existed: no -ssh-integration
+// flag is registered by this package (or anywhere in the repo), so the documented
+// command failed with "flag provided but not defined" — the tests could not be
+// un-skipped by anyone, ever. A skip that no command can lift is not a pending
+// test, it is a note; the note above is the honest form of it.
 
 func shrinkDeployTimeouts(t *testing.T) {
 	t.Helper()
