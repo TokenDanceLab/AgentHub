@@ -27,7 +27,7 @@
 | `hub-server/deployments/Caddyfile` / `Caddyfile.prod` | 旧 reverse-proxy 模板 | **已删除**（#1527 PR2 收口） |
 | `hub-server/deployments/.env.production.example` | 旧生产 env 占位模板 | **已删除**（env 说明迁至 `deployments/production/.env.example`） |
 | `hub-server/deployments/deploy.sh` / `deploy-region.sh` | 旧人工运维胶水脚本 | **已删除**（部署指引改指权威 compose，运维由 server SSOT 覆盖） |
-| `scripts/dev/devserver.sh` | 远程 dev 服务器测试平台统一入口（sync/start/stop/status/test） | 新增（#1681，拓扑见 09-dev-server-topology.md） |
+| `scripts/dev/devserver.sh` | 远程 dev 服务器测试平台统一入口（sync/start/stop/status/test/integration） | 新增（#1681，拓扑见 09-dev-server-topology.md） |
 | `scripts/verify/verify-deployment-shape.py` | 部署形状 SSOT 门禁 | CI 强制（#1527 PR1） |
 | `.github/workflows/cd-pr-check.yml` | PR 前置：compose 形状 + Dockerfile + 构建 dry run | 消费权威模板（#1527 PR1） |
 
@@ -159,7 +159,7 @@ Hub 侧 code 交换端点固定为 `POST /client/auth/oidc/callback`，桌面/We
 
 | 环境变量 | 默认 | 语义 |
 |---|---|---|
-| `AGENTHUB_EVIDENCE_GATE_ENABLED`、`AGENTHUB_FAULT_ESCALATION_ENABLED`/`_TIMEOUT` | `true` / 见 `fault_escalation.go` | 证据门禁与故障升级开关 |
+| `AGENTHUB_EVIDENCE_GATE_ENABLED`、`AGENTHUB_FAULT_ESCALATION_ENABLED`、`AGENTHUB_ESCALATION_TIMEOUT` | `true` / 见 `fault_escalation.go` | 证据门禁与故障升级开关 |
 | `AGENTHUB_EVENT_WORKERS`、`AGENTHUB_DELIVERY_JOURNAL_DB` | `4` / 空（关闭） | 事件总线 worker 数、durable journal 开关 |
 | `AGENTHUB_DEPLOY_HOST`/`_PATH`/`AGENTHUB_PAGES_DOMAIN` | 占位默认 | Pages 部署目标 |
 | `AGENTHUB_EDGE_SHUTDOWN_TIMEOUT`、`AGENTHUB_HUB_MCP_SYNC_URL`/`_INTERVAL` | `10s` / 空（关闭） | 优雅停机总预算（#2129 L6）、Hub MCP 配置同步 |
