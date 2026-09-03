@@ -8,6 +8,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"github.com/agenthub/hub-server/internal/config"
 	"github.com/agenthub/hub-server/internal/errcode"
 	"github.com/agenthub/hub-server/internal/service/audit"
 )
@@ -55,7 +56,16 @@ func (h *AuditHandler) ListAuditEvents(c *gin.Context) {
 		}
 	}
 
-	pageSize, _ := strconv.Atoi(c.DefaultQuery("pageSize", "50"))
+	pageSize, _ := strconv.Atoi(c.DefaultQuery("pageSize", strconv.Itoa(config.DefaultPaginationLimit)))
+	// Ceiling = repository.ListAuditEvents → ClampPageSize(.., MaxListPageSize,
+	// defaultAuditPageSize), which is also what the shared PageSize parameter
+	// declares (maximum: 200). This handler used to forward the raw value and
+	// the repository was the endpoint's only enforcement point, i.e. the page
+	// was shortened a layer below the contract that describes it. The
+	// conversion is exact rather than merely equivalent: defaultAuditPageSize
+	// and config.DefaultPaginationLimit are both 50, so absent/0/negative all
+	// still forward 50 and an over-ceiling value still comes back as 200 (#2243).
+	pageSize = config.ClampPageSize(pageSize, config.MaxListPageSize, config.DefaultPaginationLimit)
 
 	result, err := h.service.Query(c.Request.Context(), callerUserID, isAdmin,
 		c.Query("event_type"), c.Query("severity"),

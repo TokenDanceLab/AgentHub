@@ -15,6 +15,7 @@ import (
 	"github.com/agenthub/hub-server/internal/handler"
 	"github.com/agenthub/hub-server/internal/service/agentprofile"
 	"github.com/agenthub/hub-server/internal/service/executiontarget"
+	"github.com/agenthub/hub-server/internal/service/message"
 	"github.com/agenthub/hub-server/internal/service/session"
 	"github.com/agenthub/hub-server/internal/service/workspace"
 )
@@ -46,7 +47,15 @@ type pagingCeilingCaseExt struct {
 	absent     int
 	zero       int
 	negStatus  int
-	forward    func(t *testing.T, target string) (int, int)
+	// unparsableStatus (when non-zero) marks an endpoint that rejects an
+	// unparsable page-size parameter with that status instead of swallowing it
+	// into the default. The message endpoints parse `limit` themselves and answer
+	// 400; the DefaultQuery-based endpoints let strconv fail into 0 and then take
+	// the default branch. Both shapes are legitimate, but only one of them can be
+	// asserted by a single expectation, so the difference is declared per case
+	// rather than discovered by a reader (#2243).
+	unparsableStatus int
+	forward          func(t *testing.T, target string) (int, int)
 }
 
 func servePagingExt(t *testing.T, route string, h func(*gin.Context), target string) int {
@@ -180,6 +189,77 @@ func externalPagingCeilingCases() []pagingCeilingCaseExt {
 				return got, status
 			},
 		},
+		{
+			// The #2243 tail: these three were the last hand-written two-branch
+			// clamps in internal/handler. Their values do not move — 100 / 500 /
+			// 100 — only the shape converges on ClampPageSize, so the ceiling each
+			// endpoint enforces is now stated in exactly one idiom.
+			name:       "GET /client/sessions/{id}/messages",
+			enforcedBy: "repository.GetMessagesBySession → ClampPageSize(.., MaxMessagePageLimit, DefaultPaginationLimit): same value, same default",
+			route:      "/client/sessions/:id/messages",
+			base:       "/client/sessions/session-paging/messages",
+			param:      "limit",
+			ceiling:    config.MaxMessagePageLimit,
+			absent:     config.DefaultPaginationLimit,
+			zero:       config.DefaultPaginationLimit,
+			// This handler parses `limit` itself and answers 400 on a non-numeric
+			// value rather than falling back to the default.
+			unparsableStatus: http.StatusBadRequest,
+			forward: func(t *testing.T, target string) (int, int) {
+				got := notForwardedExt
+				h := handler.NewMessageHandler(&mockMessageService{
+					getMsgsFn: func(_ context.Context, _, _ string, _ int64, limit int) ([]message.MessageResponse, error) {
+						got = limit
+						return nil, nil
+					},
+				})
+				status := servePagingExt(t, "/client/sessions/:id/messages", h.GetMessages, target)
+				return got, status
+			},
+		},
+		{
+			name:             "GET /client/sessions/{id}/messages/sync",
+			enforcedBy:       "repository.GetMessagesIncrement → `limit <= 0 || limit > MaxIncrementalMessageLimit → 500`; this handler never forwards a non-positive value, so the 500-for-non-positive branch is unreachable from here",
+			route:            "/client/sessions/:id/messages/sync",
+			base:             "/client/sessions/session-paging/messages/sync",
+			param:            "limit",
+			ceiling:          config.MaxIncrementalMessageLimit,
+			absent:           config.DefaultPaginationLimit,
+			zero:             config.DefaultPaginationLimit,
+			unparsableStatus: http.StatusBadRequest,
+			forward: func(t *testing.T, target string) (int, int) {
+				got := notForwardedExt
+				h := handler.NewMessageHandler(&mockMessageService{
+					getMsgsIncrFn: func(_ context.Context, _, _ string, _ int64, limit int) ([]message.MessageResponse, error) {
+						got = limit
+						return nil, nil
+					},
+				})
+				status := servePagingExt(t, "/client/sessions/:id/messages/sync", h.GetIncrementalMessages, target)
+				return got, status
+			},
+		},
+		{
+			name:       "GET /client/messages/search",
+			enforcedBy: "no ceiling in either search query (repository/message.go: \"pageSize is clamped by the caller\") — this handler is the enforcement point, deliberately held at MaxMessagePageLimit, which is stricter than the shared PageSize maximum: 200 these routes reference",
+			route:      "/client/messages/search",
+			base:       "/client/messages/search?q=paging",
+			param:      "pageSize",
+			ceiling:    config.MaxMessagePageLimit,
+			absent:     config.DefaultPaginationLimit,
+			zero:       config.DefaultPaginationLimit,
+			forward: func(t *testing.T, target string) (int, int) {
+				got := notForwardedExt
+				h := handler.NewMessageHandler(&mockMessageService{
+					searchFn: func(_ context.Context, _, _, _, _, _, _ string, _ string, pageSize int) (*message.MessageSearchPage, error) {
+						got = pageSize
+						return &message.MessageSearchPage{}, nil
+					},
+				})
+				status := servePagingExt(t, "/client/messages/search", h.SearchMessages, target)
+				return got, status
+			},
+		},
 	}
 }
 
@@ -252,6 +332,13 @@ func TestHandlerPageSizeCeilingExt_UnparsablePageSizeKeepsDefault(t *testing.T) 
 	for _, tc := range externalPagingCeilingCases() {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
+			if tc.unparsableStatus != 0 {
+				got, status := tc.forward(t, pagingTargetExt(tc.base, tc.param, "not-a-number"))
+				require.Equal(t, tc.unparsableStatus, status,
+					"an unparsable %s must be rejected by an endpoint that parses it itself", tc.param)
+				require.Equal(t, notForwardedExt, got, "a rejected request must not reach the service")
+				return
+			}
 			got, status := tc.forward(t, pagingTargetExt(tc.base, tc.param, "not-a-number"))
 			require.Equal(t, http.StatusOK, status)
 			require.Equal(t, tc.zero, got, "an unparsable %s must forward the endpoint default", tc.param)
