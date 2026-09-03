@@ -3,7 +3,7 @@
 > Owner：本文件是 AgentHub「规则 → 机器验证」映射的 SSOT。`AGENTS.md` 的“规则 → 机器验证映射”只保留指针，不复制本表。
 > 机器门禁：`scripts/verify/verify-doc-ssot.py` 校验本表验证脚本路径与 CI 文件存在性。
 
-最后更新：2026-09-03（新增 edge 错误响应 HTTP status 单源门禁一行（#2245 阶段 2）；同批早些时候补齐 12 条「已接线但此前未登记」的门禁行：三个 vuln-scan job、质量债棘轮、auth 依赖所有权、migration 幂等、i18n dead-key、OIDC 码 SSOT、orchestrator 依赖方向、夹具连接钉死、devserver 合同、L3 artifact 脱敏、覆盖率 profile 合并；并修好宏观四行因空行脱离表格的渲染缺陷。上一轮 2026-08-29 新增宏观工程设计基线四条规则）
+最后更新：2026-09-03（#2275 治理面消融：删掉 3 个入站引用为 0 的脚本共 1,261 行、把 3 个自 2026-08 起从未被 CI 执行的负向自测接进 validate、给 doc-ssot 加 `DOC-ORPHAN-SELFTEST` 防止再 accum、AGENTS.md 9.5 立门禁预算三条；同批早些时候新增 edge 错误响应 HTTP status 单源门禁一行（#2245 阶段 2）与补齐 12 条未登记门禁行）
 
 ## 映射表
 
@@ -17,7 +17,7 @@
 | Edge lint finding fingerprint ratchet（防新增/替换，#1840 对偶 #1573；go-edge-static 硬门禁（Lint step 本身仍 report-only，硬门在本 ratchet），全量 lint 回退模式对 baseline 存量豁免） | `scripts/verify/verify-edge-lint-ratchet.py`（负向自测 `scripts/verify/tests/verify-edge-lint-ratchet.Tests.py`，baseline `scripts/verify/edge-lint-baseline.json`） | checks.yml → go-edge-static |
 | test-sleep 门禁（#1550 计数棘轮只缩不增；#1565/#1948 值预算：预算文件存在、预算内路径真实、count/total_ms/max_ms/逐值与源码一致、非常量表达式 fail-closed、改 sleep 值不更预算即红） | `scripts/verify/verify-test-sleep-ratchet.py`（负向自测 `scripts/verify/tests/verify-test-sleep-budget.Tests.py`，值预算 `scripts/verify/test-sleep-budget.json`，计数基线 `scripts/verify/test-sleep-baseline.json`） | checks.yml → validate |
 | skill 白名单只提交 active skill | `scripts/verify/verify-project-skills.py` | checks.yml → validate |
-| 文档与 Agent 入口 SSOT：根级入口/路径/行数/标记/映射表保鲜；引用 AGENTS 规则必须写主题名、禁止章节编号 | `scripts/verify/verify-doc-ssot.py`（负向自测 `scripts/verify/tests/verify-doc-entrypoints.Tests.py`） | checks.yml → validate |
+| 文档与 Agent 入口 SSOT：根级入口/路径/行数/标记/映射表保鲜；引用 AGENTS 规则必须写主题名、禁止章节编号；**`scripts/verify/tests/` 下每个 `*.Tests.{py,sh}` 必须被某个 workflow 或 Makefile 执行**（`DOC-ORPHAN-SELFTEST`，#2275：扫工作树不扫 index，0 命中/无 workflow/无 tests 目录一律 fail-closed） | `scripts/verify/verify-doc-ssot.py`（负向自测 `scripts/verify/tests/verify-doc-entrypoints.Tests.py`） | checks.yml → validate |
 | Web Hub-only 边界（不直连 Local Edge） | `scripts/verify/verify-web-hub-boundary.py` | checks.yml → validate |
 | Hub 纯包导入（不依赖框架包） | `scripts/verify/verify-hub-pure-packages.py` | checks.yml → validate |
 | Mobile Hub-only 边界（不直连 Local Edge/runtime） | `scripts/verify/verify-mobile-hub-boundary.py` | checks.yml → validate |
@@ -59,7 +59,7 @@
 | 提交格式 `type(scope): 中文摘要`（PR 时） | `scripts/verify/verify-commit-messages.sh` | checks.yml → validate |
 | UI Visual QA 行为证明（shell + chat 内容面，1440x810 light/dark，非空白 + 几何合同，禁 pixel golden；chat 半边的代码块场景走 web 端 stubbed-hub 回放） | `app/{desktop,web}/scripts/visual-qa-shell.mjs` + `app/{desktop,web}/scripts/visual-qa-chat.mjs`（assert：`assert-visual-qa-{shell,chat}.mjs`） | checks.yml → visual-qa-shell / visual-qa-desktop |
 | Web stubbed-hub 浏览器行为兜底（mock hub + 真 chromium 的 chat flow / replay smoke / task 合同；不是真实登录，`real_tested=false`） | `app/web/src/__e2e__/{chat-flow-contract,web-stubbed-hub-replay-smoke,task-contract}.spec.ts`（入口 `pnpm test:e2e:stubbed-hub`） | checks.yml → web-e2e-stubbed |
-| 真实登录/OIDC e2e 链路（需真实服务与凭据）：lane 入口已接线为 dispatch-only job，不阻塞 PR；但 `scripts/verify/verify-oidc-flow.py`、`scripts/verify/verify-login-fixture-topology.py`、`scripts/verify/verify-approved-real-preflight.py` 等 readiness gate 仍未被任何 workflow 调用 | `scripts/e2e/run-real-e2e-lane.sh`（内部调用 `scripts/verify/verify-real-e2e-lane-manifest.py` 做六字段合同自检） | checks.yml → real-e2e-stack（仅 `workflow_dispatch`） |
+| 真实登录/OIDC e2e 链路（需真实服务与凭据）：lane 入口已接线为 dispatch-only job，不阻塞 PR；但 `scripts/verify/verify-oidc-flow.py`（被 `scripts/release/verify-packaged-login-real-readiness.py` 调用）与 `scripts/verify/verify-login-fixture-topology.py`（被 `scripts/verify/verify-p0-remote-control-fixture.py` 调用）等 readiness 脚本仍未被任何 workflow 直接调用，属**运维手跑工具而非门禁**；原同族的 `verify-approved-real-preflight.py` 与 `verify-approved-real-demo-readiness.py` 已按 #2275 删除（全仓入站引用为 0，approved-real 的证据边界由已接线的 `verify-real-e2e-contract.py` 独家承担） | `scripts/e2e/run-real-e2e-lane.sh`（内部调用 `scripts/verify/verify-real-e2e-lane-manifest.py` 做六字段合同自检） | checks.yml → real-e2e-stack（仅 `workflow_dispatch`） |
 | 交互型 UI/UX 验收（Type/Motion/Empty 等跨组件行为） | 无 | 无 |
 | 配置组合安全（fail-closed 默认/env 全覆盖） | `hub-server/internal/config/config_validate.go`（校验入口）+ `hub-server/internal/config/constants.go`（`AuthFailClosedDefault`、`RateLimitFailOpenDefault`：auth 路径恒 fail-closed，非 auth 路径可 fail-open） | 无 |
 | edge debug 端点鉴权（Dev→nil / LocalAuthToken→Bearer / HubJWTSecret→hub-JWT 校验） | `edge-server/internal/httpserver/server_auth.go`（`debugAuthFunc` 分层鉴权，pprof/config/state 端点） | 无 |
