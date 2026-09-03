@@ -12,27 +12,9 @@
     {
       "location": "frontend-desktop: Lint",
       "kind": "continue-on-error",
-      "reason": "desktop eslint advisory while Wave 9-10 design-system refactor settles (#1575)",
-      "issue": 1575,
+      "reason": "desktop eslint advisory for a measured reason, not a habitual one (#2278): the CI step runs `pnpm lint --max-warnings 0` and desktop currently reports 0 errors but 4 `react-hooks/exhaustive-deps` warnings (useMemo dependency arrays missing `t` / `tApp` in useDesktopWorkbenchModel.ts) => exit 1. Fixing them changes memoization dependencies, i.e. a behaviour change that needs its own reviewed slice; flipping the gate before that would hard-fail every desktop PR. The two sibling soft gates (frontend-web Lint Web, frontend-mobile Lint (mobile rules)) were retired by #2278 and are tracked in #2251.",
+      "issue": 2251,
       "owner": "desktop-owners",
-      "introduced_at": "2026-08-11",
-      "review_by": "2026-10-01"
-    },
-    {
-      "location": "frontend-web: Lint Web",
-      "kind": "continue-on-error",
-      "reason": "web eslint advisory while Wave 9-10 design-system refactor settles (#1581)",
-      "issue": 1581,
-      "owner": "web-owners",
-      "introduced_at": "2026-08-11",
-      "review_by": "2026-10-01"
-    },
-    {
-      "location": "frontend-mobile: Lint (mobile rules)",
-      "kind": "continue-on-error",
-      "reason": "mobile eslint advisory while Wave 9-10 design-system refactor settles (#1575)",
-      "issue": 1573,
-      "owner": "mobile-owners",
       "introduced_at": "2026-08-11",
       "review_by": "2026-10-01"
     },
