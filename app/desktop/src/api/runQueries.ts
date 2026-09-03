@@ -7,6 +7,7 @@ import { startRun, cancelRun, fetchRuns, decidePermission } from './edgeClient';
 import type { PermissionDecideRequest } from './edgeClient';
 import { RunInfoSchema, safeParse, listResponseSchema } from './schemas';
 import { edgeQueryKeys } from '@shared/stores/queryKeys';
+import { invalidateEdgeThreadTranscript } from './threadQueries';
 import type { RunInfo, ListResponse, StartRunRequest } from '@shared/types';
 
 // Terminal Edge run statuses (edge-server lifecycle: runs settle into
@@ -113,7 +114,10 @@ export function useCreateRun() {
     },
     onSettled: () => {
       qc.invalidateQueries({ queryKey: edgeQueryKeys.runs.root });
+      // threads.root reaches the thread LIST only — the transcript lives under
+      // ['edge','threadItems',…], a prefix that root does not match (#2274 A-12).
       qc.invalidateQueries({ queryKey: edgeQueryKeys.threads.root });
+      void invalidateEdgeThreadTranscript(qc);
     },
   });
 }
@@ -136,7 +140,10 @@ export function useCancelRun() {
     },
     onSettled: () => {
       qc.invalidateQueries({ queryKey: edgeQueryKeys.runs.root });
+      // threads.root reaches the thread LIST only — the transcript lives under
+      // ['edge','threadItems',…], a prefix that root does not match (#2274 A-12).
       qc.invalidateQueries({ queryKey: edgeQueryKeys.threads.root });
+      void invalidateEdgeThreadTranscript(qc);
     },
   });
 }
@@ -152,7 +159,12 @@ export function useDecideEdgePermission() {
   return useMutation({
     mutationFn: (req: PermissionDecideRequest) => decidePermission(req),
     onSettled: () => {
+      // The doc comment above names this invalidation as the thing that "closes
+      // the replay gap when the persisted transcript is reloaded" — but
+      // threads.root cannot reach the transcript key, so it never did
+      // (#2274 A-12). The thread is not known here, hence the family-wide form.
       qc.invalidateQueries({ queryKey: edgeQueryKeys.threads.root });
+      void invalidateEdgeThreadTranscript(qc);
     },
   });
 }
