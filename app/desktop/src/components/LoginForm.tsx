@@ -30,11 +30,19 @@ export default function LoginForm({ onSuccess }: LoginFormProps) {
       await loginWithTokenDance();
       setIdentityNotice(t('auth.tokenDanceCallbackPending'));
     } catch (err: unknown) {
+      // #2154 P2-10: never render err.message. The OIDC failures are produced
+      // in English at the transport layer ("Failed to start OIDC login: fetch
+      // failed"), so echoing them put a raw technical string in a localized
+      // login screen. Same mapping as web's LoginForm: known codes resolve
+      // through auth.error.oidc.<code>, everything else falls back to the
+      // generic localized failure.
       if (err instanceof OidcError) {
-        setServerError(t(`auth.error.oidc.${err.code}` as const, { detail: err.detail ?? '', defaultValue: 'Login failed' }));
+        setServerError(t(`auth.error.oidc.${err.code}`, {
+          detail: err.detail ?? '',
+          defaultValue: t('auth.error.oidc.default'),
+        }));
       } else {
-        const message = err instanceof Error ? err.message : '';
-        setServerError(message || t('auth.error.tokenDanceUnavailable'));
+        setServerError(t('auth.error.oidc.default'));
       }
     } finally {
       setIdentityLoading(false);

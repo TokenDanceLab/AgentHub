@@ -135,7 +135,7 @@ export function TaskStatusIcon({ status }: { status: TaskStatus }) {
   return <i className={taskStatusIconClassName(status)} />;
 }
 
-export function ProfileCell({
+function ProfileCell({
   name,
   profiles = [],
 }: {

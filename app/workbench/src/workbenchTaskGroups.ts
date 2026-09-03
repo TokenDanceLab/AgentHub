@@ -24,8 +24,8 @@ export const DESIGN_DONE_TASK: TaskItem = {
   status: '已完成',
 };
 
-export const WATCHING_TASK_IDS = new Set(['embedded-docs', 'project-announcement']);
-export const ACTIVITY_TASK_IDS = new Set(['sqlite-plan', 'project-announcement', 'agent-market']);
+const WATCHING_TASK_IDS = new Set(['embedded-docs', 'project-announcement']);
+const ACTIVITY_TASK_IDS = new Set(['sqlite-plan', 'project-announcement', 'agent-market']);
 
 export function flattenTaskGroups(groups: TaskGroup[]): TaskItem[] {
   return groups.flatMap((group) => group.tasks);
@@ -50,7 +50,7 @@ export function taskMatchesPane(task: TaskItem, pane: TasksPane, currentUserId?:
   }
 }
 
-export function dueRank(label: string): number {
+function dueRank(label: string): number {
   if (label.includes('今天')) return 0;
   if (label.includes('明天')) return 1;
   const match = /(\d+)月(\d+)日/.exec(label);

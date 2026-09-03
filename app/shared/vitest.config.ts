@@ -42,13 +42,11 @@ export default defineConfig({
       //   index.ts — 纯 re-export 入口
       //   types.ts — 纯类型声明
       //   events.ts — 事件名常量（无逻辑）
-      //   mock.ts — 测试 mock 工具（不参与被测逻辑）
       //   errors.ts — 错误类型定义
       exclude: [
         'src/index.ts',
         'src/types.ts',
         'src/events.ts',
-        'src/mock.ts',
         'src/errors.ts',
       ],
     }),

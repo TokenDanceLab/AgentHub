@@ -5,10 +5,6 @@ const TABLET_SHEET_MAX_WIDTH = 640;
 const TABLET_SIDE_MARGIN = 48;
 const SHEET_MAX_HEIGHT_RATIO = 0.9;
 
-export const BOTTOM_SHEET_DRAG_DISMISS_DISTANCE = 72;
-export const BOTTOM_SHEET_DRAG_DISMISS_VELOCITY = 0.9;
-export const BOTTOM_SHEET_DRAG_EXIT_OFFSET = 96;
-
 export interface BottomSheetFrame {
   maxHeight: number;
   maxWidth?: number;

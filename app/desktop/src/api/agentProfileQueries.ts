@@ -149,37 +149,8 @@ export function useHubAgentProfiles(opts?: { enabled?: boolean }) {
   });
 }
 
-export function useHubCreateAgentProfile() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (data: import('@/api/hubClient').CreateAgentProfileRequest) =>
-      getHubClient().createAgentProfile(data),
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ['hub', 'agent-profiles'] });
-    },
-  });
-}
 
-export function useHubUpdateAgentProfile() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: ({ id, data }: { id: string; data: import('@/api/hubClient').UpdateAgentProfileRequest }) =>
-      getHubClient().updateAgentProfile(id, data),
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ['hub', 'agent-profiles'] });
-    },
-  });
-}
 
-export function useHubDeleteAgentProfile() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (id: string) => getHubClient().deleteAgentProfile(id),
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ['hub', 'agent-profiles'] });
-    },
-  });
-}
 
 /** Safely parse a JSON string field from Hub, returning undefined on failure. */
 function safeJsonParse<T>(value: string | undefined | null): T | undefined {

@@ -65,7 +65,7 @@ describe('normalizeThreadItemsToTranscript', () => {
         itemId: 'diff-1',
         type: 'diff',
         role: 'agent',
-        content: 'app/desktop/src/App.tsx\napp/shared/src/workbench/AgentHubWorkbench.tsx',
+        content: 'app/desktop/src/App.tsx\napp/workbench/src/AgentHubWorkbench.tsx',
         runId: 'run-2',
         createdAt: '2026-06-07T02:00:00Z',
       },
@@ -83,7 +83,7 @@ describe('normalizeThreadItemsToTranscript', () => {
     expect(blocks[0]).toEqual(expect.objectContaining({
       kind: 'diff',
       title: 'app/desktop/src/App.tsx',
-      files: ['app/desktop/src/App.tsx', 'app/shared/src/workbench/AgentHubWorkbench.tsx'],
+      files: ['app/desktop/src/App.tsx', 'app/workbench/src/AgentHubWorkbench.tsx'],
     }));
     expect(blocks[1]).toEqual(expect.objectContaining({
       kind: 'approval',

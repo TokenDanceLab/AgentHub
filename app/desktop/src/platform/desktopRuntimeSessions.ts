@@ -5,7 +5,7 @@ import type { RuntimeSessionImportItem } from '@agenthub/workbench';
  * The Edge REST path lives on the Desktop platform adapter only — shared
  * code consumes this data through `HostDiagnosticsPort.listRuntimeSessions`.
  */
-export type FetchDesktopRuntimeSessionsOptions = {
+type FetchDesktopRuntimeSessionsOptions = {
   edgeBaseUrl: string;
   limit?: number;
   fetchImpl?: typeof fetch;

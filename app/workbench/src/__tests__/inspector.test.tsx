@@ -336,25 +336,25 @@ describe('AgentHubWorkbench', () => {
     expect(inspector.getByText('变更文件: 1')).toBeInTheDocument();
     expect(inspector.getByText('工具调用: 1')).toBeInTheDocument();
     expect(
-      inspector.getAllByText('app/shared/src/workbench/RightInspector.tsx').length
+      inspector.getAllByText('app/workbench/src/RightInspector.tsx').length
     ).toBeGreaterThan(0);
     expect(inspector.getByText('产物')).toBeInTheDocument();
 
     fireEvent.click(
       inspector.getByRole('button', {
-        name: '打开 app/shared/src/workbench/RightInspector.tsx 只读预览',
+        name: '打开 app/workbench/src/RightInspector.tsx 只读预览',
       })
     );
     expect(screen.getByRole('tab', { name: /文件/ })).toHaveAttribute('aria-selected', 'true');
     const filePreview = screen.getByRole('region', {
-      name: 'app/shared/src/workbench/RightInspector.tsx 只读预览',
+      name: 'app/workbench/src/RightInspector.tsx 只读预览',
     });
     expect(filePreview).toBeInTheDocument();
     expect(
-      screen.getAllByText('app/shared/src/workbench/RightInspector.tsx').length
+      screen.getAllByText('app/workbench/src/RightInspector.tsx').length
     ).toBeGreaterThan(0);
     expect(filePreview).toHaveAccessibleName(
-      'app/shared/src/workbench/RightInspector.tsx 只读预览'
+      'app/workbench/src/RightInspector.tsx 只读预览'
     );
     fireEvent.click(screen.getByRole('tab', { name: 'Diff' }));
     fireEvent.click(screen.getByRole('button', { name: /打开方式/ }));
@@ -372,7 +372,7 @@ describe('AgentHubWorkbench', () => {
       expect.objectContaining({
         id: 'ev-file',
         kind: 'file',
-        label: 'app/shared/src/workbench/RightInspector.tsx',
+        label: 'app/workbench/src/RightInspector.tsx',
       })
     );
 

@@ -50,7 +50,7 @@ export { useTaskBridgeStore };
 
 // ── Options ─────────────────────────────────────────
 
-export interface HubIntegrationOptions {
+interface HubIntegrationOptions {
   /** Hub WebSocket handle (already connected & authenticated). Null disables the bridge. */
   hubWS: HubWSHandle | null;
   /** Hub REST client for reporting task progress. */
@@ -63,7 +63,7 @@ export interface HubIntegrationOptions {
   onDispatch?: (task: AgentTask) => void;
 }
 
-export interface HubIntegrationHandle {
+interface HubIntegrationHandle {
   /** All bridged tasks (queued + running + done + failed). */
   tasks: AgentTask[];
   /** Number of currently active (running) tasks. */

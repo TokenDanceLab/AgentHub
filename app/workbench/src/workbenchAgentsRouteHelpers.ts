@@ -224,7 +224,7 @@ export function withoutAgentDirty(dirtyAgentIds: string[], agentId: string): str
   return dirtyAgentIds.filter((id) => id !== agentId);
 }
 
-export function patchAgentDrafts(
+function patchAgentDrafts(
   drafts: Record<string, AgentConfig>,
   agentId: string,
   current: AgentConfig,

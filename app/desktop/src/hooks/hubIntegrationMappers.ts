@@ -14,7 +14,7 @@ import {
   parseStringRecord,
 } from './hubIntegrationParseHelpers';
 
-export interface TeamRouteContext {
+interface TeamRouteContext {
   teamId: string;
   teamRunId: string;
   teamMemberRole?: string;
@@ -32,7 +32,7 @@ export interface HubDispatchTarget {
   deviceId: string;
 }
 
-export interface DispatchTargetBindingEvidence {
+interface DispatchTargetBindingEvidence {
   expectedTargetId: string;
   observedTargetId?: string;
   expectedEdgeDeviceId: string;
@@ -332,7 +332,7 @@ export const FINAL_OUTPUT_MAX_CHARS = 32_000;
  * - `data`: the unwrapped dispatch payload (parsed from inner `payload` string for relay frames, or the raw frame for direct dispatches)
  * - `relayCommandId`: the relay command id when isRelay is true
  */
-export interface RelayFrameParseResult {
+interface RelayFrameParseResult {
   isRelay: boolean;
   data: Record<string, unknown>;
   relayCommandId: string | null;

@@ -50,7 +50,7 @@ export function MembersCard({
   );
 }
 
-export function ProjectProfilePill({
+function ProjectProfilePill({
   name,
   profiles = [],
 }: {

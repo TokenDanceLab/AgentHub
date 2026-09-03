@@ -37,7 +37,7 @@ export interface DesktopExecutionTarget {
   capabilityIds: string[];
 }
 
-export type DesktopEdgeDispatchDisabledReason =
+type DesktopEdgeDispatchDisabledReason =
   | 'signed-out'
   | 'hub-targets-loading'
   | 'hub-targets-error'
@@ -53,7 +53,7 @@ export type DesktopEdgeDispatchDisabledReason =
   | 'local-edge-health-unknown'
   | 'host-preflight-blocked';
 
-export interface DesktopEdgeRegisteredTargetSnapshot {
+interface DesktopEdgeRegisteredTargetSnapshot {
   id: string;
   name?: string;
   device_id?: string | null;
@@ -62,7 +62,7 @@ export interface DesktopEdgeRegisteredTargetSnapshot {
   is_online?: boolean;
 }
 
-export interface DesktopEdgeHostReadinessSnapshot {
+interface DesktopEdgeHostReadinessSnapshot {
   health_url?: string;
   store_db_policy?: string;
   log_paths?: {
@@ -77,7 +77,7 @@ export interface DesktopEdgeHostReadinessSnapshot {
   direct_cli_spawn?: boolean;
 }
 
-export interface DesktopEdgeDispatchReadinessInput {
+interface DesktopEdgeDispatchReadinessInput {
   hubSessionActive: boolean;
   deviceId?: string | null;
   edgeOnline: boolean;
@@ -89,7 +89,7 @@ export interface DesktopEdgeDispatchReadinessInput {
   hostReadiness?: DesktopEdgeHostReadinessSnapshot | null;
 }
 
-export interface DesktopEdgeDispatchReadiness {
+interface DesktopEdgeDispatchReadiness {
   dispatchReady: boolean;
   disabledReason: DesktopEdgeDispatchDisabledReason | null;
   dispatchTarget: { targetId: string; deviceId: string } | null;
@@ -114,7 +114,7 @@ export interface DesktopEdgeDispatchReadiness {
   directCliSpawn: false;
 }
 
-export interface DesktopEdgeTargetBindingEvidence {
+interface DesktopEdgeTargetBindingEvidence {
   expectedTargetId: string | null;
   observedTargetId: string | null;
   expectedEdgeDeviceId: string | null;

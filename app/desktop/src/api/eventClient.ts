@@ -23,7 +23,7 @@ export type {
 } from '@agenthub/shared';
 export type { EventEnvelope } from '@shared/events';
 
-export interface EventStreamLegacyOptions extends EventStreamOptions {
+interface EventStreamLegacyOptions extends EventStreamOptions {
   /**
    * When true, also append access_token to the WS URL (legacy fallback).
    * Default false — Edge rejects query access_token; prefer

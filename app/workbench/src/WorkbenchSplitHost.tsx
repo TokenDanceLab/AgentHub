@@ -18,12 +18,12 @@ import { computeRects, listLeaves, type GroupLeaf, type SplitLayoutNode, type Sp
 import styles from './AgentHubWorkbench.module.css';
 
 /** Stable React key for the pane shell that hosts the live ConversationHost. */
-export const ACTIVE_PANE_KEY = 'agenthub-split-active-pane';
+const ACTIVE_PANE_KEY = 'agenthub-split-active-pane';
 
 /** Visual gutter between panes (each pane is inset by half from its rect). */
 const SPLIT_GAP_PX = 8;
 
-export function splitPaneStyle(rect: SplitRect | undefined): React.CSSProperties {
+function splitPaneStyle(rect: SplitRect | undefined): React.CSSProperties {
   const safe = rect ?? { x: 0, y: 0, w: 1, h: 1 };
   const halfGap = SPLIT_GAP_PX / 2;
   return {
@@ -54,7 +54,7 @@ export interface WorkbenchSplitHostProps {
  * tree position across every layout change; the rest follow in document
  * order keyed by paneId.
  */
-export function orderLeavesForRender(
+function orderLeavesForRender(
   tree: SplitLayoutNode,
   activeConversationId: string,
 ): GroupLeaf[] {

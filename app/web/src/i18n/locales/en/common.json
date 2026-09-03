@@ -95,7 +95,6 @@
   "error.code.agent_offline": "The agent is currently offline. Please wait for it to reconnect or choose another target.",
   "error.code.target_not_routable": "The selected execution target is unavailable. Please choose a different target.",
   "agents.unnamed": "Unnamed agent",
-  "agents.newDefault": "New agent {{index}}",
   "conversations.hubPrivate": "Hub direct",
   "conversations.hubGroup": "Hub group",
   "projects.unnamed": "Unnamed project",

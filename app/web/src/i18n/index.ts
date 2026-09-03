@@ -7,11 +7,11 @@ import zhCommon from './locales/zh/common.json';
 
 import enCommon from './locales/en/common.json';
 
-export type AppLanguage = 'en' | 'zh';
+type AppLanguage = 'en' | 'zh';
 
 const LANGUAGE_STORAGE_KEY = 'agenthub-language';
 
-export function normalizeLanguage(value: string | null | undefined): AppLanguage {
+function normalizeLanguage(value: string | null | undefined): AppLanguage {
   return value?.toLowerCase().startsWith('zh') ? 'zh' : 'en';
 }
 
@@ -34,19 +34,10 @@ function detectBrowserLanguage(): AppLanguage {
   return normalizeLanguage(language);
 }
 
-export function getInitialLanguage(): AppLanguage {
+function getInitialLanguage(): AppLanguage {
   return readStoredLanguage() ?? detectBrowserLanguage() ?? 'en';
 }
 
-export function setLanguagePreference(language: AppLanguage): void {
-  try {
-    localStorage.setItem(LANGUAGE_STORAGE_KEY, language);
-  } catch {
-    // localStorage may be unavailable in private mode or embedded contexts.
-  }
-
-  void i18n.changeLanguage(language);
-}
 
 i18n.use(initReactI18next).init({
   resources: {

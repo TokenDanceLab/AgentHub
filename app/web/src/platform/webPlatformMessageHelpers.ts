@@ -4,7 +4,7 @@ import type { AttachmentRef, ComposerAttachment, ComposerIntent } from '@shared/
 import type { HubContentType } from '@shared/hub/hubClient';
 import type { MessageResponse, SendMessageResponse } from '@/api/hubClient';
 
-export interface ComposerMessageContent {
+interface ComposerMessageContent {
   contentType: HubContentType;
   content: string;
 }

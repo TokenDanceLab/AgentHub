@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { subscribeWithSelector } from 'zustand/middleware';
 
-export type NotificationType = 'friend_request' | 'agent_task' | 'message' | 'system';
+type NotificationType = 'friend_request' | 'agent_task' | 'message' | 'system';
 
 export interface Notification {
   id: string;
