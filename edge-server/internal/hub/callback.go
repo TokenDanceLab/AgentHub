@@ -26,11 +26,11 @@ import (
 	"log/slog"
 	"math/rand"
 	"net/http"
-	"strconv"
 	"strings"
 	"time"
 
 	"github.com/agenthub/edge-server/internal/errcode"
+	"github.com/agenthub/edge-server/internal/httputil"
 	"github.com/agenthub/pkg/outboundmetrics"
 	"github.com/agenthub/pkg/reqlog"
 )
@@ -170,26 +170,6 @@ const (
 // reconciliation.
 func callbackActionRetryable(action string) bool {
 	return action != "stream"
-}
-
-// parseRetryAfter parses an HTTP Retry-After header (delta-seconds or HTTP
-// date). ok=false when absent or unparseable — callers must not guess.
-func parseRetryAfter(value string) (time.Duration, bool) {
-	value = strings.TrimSpace(value)
-	if value == "" {
-		return 0, false
-	}
-	if n, err := strconv.Atoi(value); err == nil && n >= 0 {
-		return time.Duration(n) * time.Second, true
-	}
-	if t, err := http.ParseTime(value); err == nil {
-		delay := time.Until(t)
-		if delay < 0 {
-			delay = 0
-		}
-		return delay, true
-	}
-	return 0, false
 }
 
 // readLimitedResponse reads at most max bytes and fails closed when the
@@ -533,6 +513,16 @@ func (c *CallbackClient) doAttempt(ctx context.Context, url string, payload []by
 	}
 }
 
+// callbackRetryAfterCeiling is this path's explicit Retry-After policy: no
+// fixed cap. A server hint here is bounded by the wall-clock retry budget
+// (retryBudget, itself clamped to the caller's deadline), so an extreme hint
+// stops the sequence through the budget check instead of being silently
+// truncated. The SDK adapter makes the opposite choice — a 30s cap, because a
+// run carries its own deadline. Both now hand their ceiling to the same shared
+// parser, which makes the difference a visible argument rather than a
+// divergence between two byte-identical copies (#2244).
+const callbackRetryAfterCeiling = httputil.NoCeiling
+
 // classifyCallbackResponse maps an HTTP response to the unified outcome
 // contract: category, whether the attempt is retryable, and the Retry-After
 // delay when the server supplied one. 4xx are terminal except 429 with an
@@ -545,18 +535,18 @@ func classifyCallbackResponse(statusCode int, retryAfterHeader string) (category
 	case statusCode >= 300 && statusCode < 400:
 		return callbackCategoryRedirect, false, 0
 	case statusCode == http.StatusTooManyRequests:
-		if delay, ok := parseRetryAfter(retryAfterHeader); ok {
-			return callbackCategoryRateLimited, true, delay
+		if delay, ok := httputil.ParseRetryAfter(retryAfterHeader); ok {
+			return callbackCategoryRateLimited, true, httputil.CapHint(delay, callbackRetryAfterCeiling)
 		}
 		return callbackCategoryRateLimited, false, 0
 	case statusCode >= 400 && statusCode < 500:
 		return callbackCategoryClientError, false, 0
 	case statusCode >= 500:
-		delay, ok := parseRetryAfter(retryAfterHeader)
+		delay, ok := httputil.ParseRetryAfter(retryAfterHeader)
 		if !ok {
 			return callbackCategoryServerError, true, 0
 		}
-		return callbackCategoryServerError, true, delay
+		return callbackCategoryServerError, true, httputil.CapHint(delay, callbackRetryAfterCeiling)
 	default:
 		return callbackCategoryServerError, false, 0
 	}
