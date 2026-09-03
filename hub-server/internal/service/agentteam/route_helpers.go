@@ -10,8 +10,13 @@ import (
 	"github.com/agenthub/hub-server/internal/model"
 )
 
-// Pure route/decision/mapper helpers for agent team routing residual (#842).
-// Keep orchestration (DB, dispatch, events) in agent_team_routing.go.
+// Pure route/decision/mapper helpers for the agent team routing residual
+// (#842): supervisor schema and prompt constants plus value mapping, with no
+// DB, dispatch or event access. Orchestration — reading a supervisor decision,
+// persisting the assignment it asks for and publishing for it — belongs in the
+// service's run/decision path in this package, not here. Described by
+// responsibility on purpose: this comment used to name a file that does not
+// exist, and a package directory is the only file list that stays true (#2246).
 
 const supervisorRouteDecisionSchema = `{"type":"object","additionalProperties":false,"required":["action"],"properties":{"action":{"type":"string","enum":["delegate","review","approve","finish"]},"next_worker":{"type":"string","description":"AgentTeamMember id to receive delegate/review/approve work"},"instructions":{"type":"string","description":"Concrete task prompt for the next worker"},"reasoning":{"type":"string","description":"Why this route is appropriate"},"context":{"type":"string","description":"Additional context for the next worker"},"approved":{"type":"boolean"},"feedback":{"type":"string"},"summary":{"type":"string","description":"Final TeamRun summary for action=finish"},"blocked_reason":{"type":"string","description":"Why the TeamRun cannot continue"},"correlation_id":{"type":"string","description":"Optional id linking this route to prior work"}}}`
 
