@@ -141,16 +141,35 @@ func TestWriteErrorPreservesExistingTrace(t *testing.T) {
 	}
 }
 
-func TestWriteJSON(t *testing.T) {
-	w := httptest.NewRecorder()
-	WriteJSON(w, http.StatusCreated, map[string]string{"id": "abc"})
-
-	if w.Code != http.StatusCreated {
-		t.Fatalf("status = %d", w.Code)
+func TestNewNormalizesZeroHTTPStatus(t *testing.T) {
+	// #2243: the invariant lives in the constructor, so no write site needs a
+	// clamp. If this regresses, Fail/writeTimeout hand WriteHeader(0) to
+	// net/http and the client gets a silent 200 instead of an error.
+	if got := New("CODE", "msg", 0).HTTPStatus; got != http.StatusInternalServerError {
+		t.Fatalf("New(..., 0).HTTPStatus = %d, want %d", got, http.StatusInternalServerError)
 	}
-	ct := w.Header().Get("Content-Type")
-	if !strings.Contains(ct, "application/json") {
-		t.Fatalf("Content-Type = %q", ct)
+	// An explicitly decided status must survive untouched.
+	if got := New("CODE", "msg", http.StatusGatewayTimeout).HTTPStatus; got != http.StatusGatewayTimeout {
+		t.Fatalf("New(..., 504).HTTPStatus = %d, want 504", got)
+	}
+	// Copies must preserve the normalized status.
+	if got := New("CODE", "msg", 0).WithMessage("x").WithTrace("t_1").HTTPStatus; got != http.StatusInternalServerError {
+		t.Fatalf("copied HTTPStatus = %d, want %d", got, http.StatusInternalServerError)
+	}
+}
+
+func TestWriteErrorFailClosedForLiteralWithoutStatus(t *testing.T) {
+	// &Error{} literals bypass New(), so writeEnvelope is the last line of
+	// defence. Before it normalized the status, this path handed WriteHeader(0)
+	// to net/http and the client was told "success" for an error (#2243).
+	rec := httptest.NewRecorder()
+	WriteError(rec, &Error{Code: "custom_code", Message: "boom"})
+
+	if rec.Code != http.StatusInternalServerError {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusInternalServerError)
+	}
+	if !strings.Contains(rec.Body.String(), "custom_code") {
+		t.Fatalf("body = %q, want the code to survive", rec.Body.String())
 	}
 }
 
@@ -162,15 +181,6 @@ func TestNewTraceID(t *testing.T) {
 	}
 	if !strings.HasPrefix(id1, "trace_") {
 		t.Fatalf("trace ID = %q, want trace_ prefix", id1)
-	}
-}
-
-func TestEnvelopeForGin(t *testing.T) {
-	e := New("CODE", "msg", http.StatusBadRequest)
-	env := EnvelopeForGin(e)
-	errObj, _ := env["error"].(map[string]any)
-	if errObj["code"] != "CODE" {
-		t.Fatalf("code = %v", errObj["code"])
 	}
 }
 

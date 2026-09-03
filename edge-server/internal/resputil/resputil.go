@@ -1,10 +1,17 @@
 // Package resputil holds the single JSON response writer for the Edge
-// server's inbound transports (REST api, MCP JSON-RPC over HTTP).
+// server's inbound HTTP surface: the REST api, MCP JSON-RPC over HTTP, and
+// the httpserver middleware that rejects requests before they reach a
+// transport (CORS origin, local auth).
 //
 // Before this package, internal/api and internal/mcp each carried their own
 // writeJSON copy with drifted semantics (charset, nil handling, log text).
-// This is the converged implementation (#1675): both transports delegate
+// This is the converged implementation (#1675): every edge writer delegates
 // here so the wire behavior cannot diverge again.
+//
+// A third copy used to live in the shared pkg/errcode.WriteJSON and differed
+// exactly where it mattered — it discarded json.Encode errors instead of
+// logging them. That export is gone, so this is the only JSON writer an edge
+// request can hit (#2246).
 package resputil
 
 import (
