@@ -18,15 +18,6 @@ describe('computeTranscriptUnreadMarker (T8 desktop IM)', () => {
     expect(computeTranscriptUnreadMarker(undefined, 3)).toBeUndefined();
   });
 
-  it('anchors at the first unread message with count and read-through seq', () => {
-    const messages = [msg('m1', 1), msg('m2', 2), msg('m3', 3), msg('m4', 4), msg('m5', 5)];
-    const marker = computeTranscriptUnreadMarker(messages, 3);
-    expect(marker).toEqual({
-      anchorBlockId: 'hub-message-m3',
-      count: 3,
-      readThroughSeq: 2,
-    });
-  });
 
   it('uses client_msg_id for the anchor block id when present', () => {
     const messages = [
@@ -52,14 +43,20 @@ describe('computeTranscriptUnreadMarker (T8 desktop IM)', () => {
     });
   });
 
-  it('handles out-of-order input by sorting on seq', () => {
-    const messages = [msg('m5', 5), msg('m2', 2), msg('m3', 3), msg('m1', 1), msg('m4', 4)];
-    const marker = computeTranscriptUnreadMarker(messages, 2);
-    expect(marker).toEqual({
-      anchorBlockId: 'hub-message-m4',
-      count: 2,
-      readThroughSeq: 3,
-    });
+  it.each([
+    [
+      [msg('m1', 1), msg('m2', 2), msg('m3', 3), msg('m4', 4), msg('m5', 5)],
+      3,
+      { anchorBlockId: 'hub-message-m3', count: 3, readThroughSeq: 2 },
+    ],
+    [
+      [msg('m5', 5), msg('m2', 2), msg('m3', 3), msg('m1', 1), msg('m4', 4)],
+      2,
+      { anchorBlockId: 'hub-message-m4', count: 2, readThroughSeq: 3 },
+    ],
+  ])('computes the unread marker for input %s', (messages, unreadCount, expected) => {
+    const marker = computeTranscriptUnreadMarker(messages, unreadCount);
+    expect(marker).toEqual(expected);
   });
 
   it('omits read-through seq for the very first message', () => {
