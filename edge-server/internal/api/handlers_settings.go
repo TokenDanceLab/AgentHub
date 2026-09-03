@@ -37,11 +37,11 @@ func (h *Handler) PatchSettings(w http.ResponseWriter, r *http.Request) {
 	// decodeOptionalJSON applies the shared 1MB body limit; this was the only
 	// JSON decode point bypassing it (memory exhaustion, #2154 security scan).
 	if err := decodeOptionalJSON(r, &patch); err != nil {
-		writeJSON(w, http.StatusBadRequest, errcode.ErrorBody(errcode.ErrBadRequest.WithMessage("invalid json body")))
+		errcode.Write(w, errcode.ErrBadRequest.WithMessage("invalid json body"))
 		return
 	}
 	if len(patch) == 0 {
-		writeJSON(w, http.StatusBadRequest, errcode.ErrorBody(errcode.ErrBadRequest.WithMessage("empty patch")))
+		errcode.Write(w, errcode.ErrBadRequest.WithMessage("empty patch"))
 		return
 	}
 	settings, err := ensureStore(h).UpsertSettings(patch)
@@ -49,7 +49,7 @@ func (h *Handler) PatchSettings(w http.ResponseWriter, r *http.Request) {
 		// Persist failure must not be reported as success — the caller would
 		// otherwise believe settings survived a restart when they did not.
 		slog.Error("failed to persist settings", "error", err)
-		writeJSON(w, http.StatusInternalServerError, errcode.ErrorBody(errcode.ErrInternal.WithMessage("failed to persist settings")))
+		errcode.Write(w, errcode.ErrInternal.WithMessage("failed to persist settings"))
 		return
 	}
 	writeSuccess(w, http.StatusOK, settings)
@@ -139,7 +139,7 @@ func computeStoreReadiness(h *Handler) map[string]any {
 
 func (h *Handler) GetHealth(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		writeJSON(w, http.StatusMethodNotAllowed, errcode.ErrorBody(errcode.ErrMethodNotAllowed))
+		errcode.Write(w, errcode.ErrMethodNotAllowed)
 		return
 	}
 	status := "ok"

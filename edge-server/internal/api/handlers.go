@@ -129,7 +129,7 @@ func (h *Handler) denyRemoteHubSharedConfig(w http.ResponseWriter, r *http.Reque
 	if isLocalSingleTenant(h.ownerUserID(r)) {
 		return false
 	}
-	writeJSON(w, http.StatusNotFound, errcode.ErrorBody(errcode.ErrNotFound.WithMessage("not found")))
+	errcode.Write(w, errcode.ErrNotFound.WithMessage("not found"))
 	return true
 }
 
@@ -264,7 +264,7 @@ func (h *Handler) registerProjectRoutes(mux *http.ServeMux) {
 		case http.MethodPost:
 			h.PostProjects(w, r)
 		default:
-			writeJSON(w, http.StatusMethodNotAllowed, errcode.ErrorBody(errcode.ErrMethodNotAllowed))
+			errcode.Write(w, errcode.ErrMethodNotAllowed)
 		}
 	})
 	mux.HandleFunc("/v1/projects/", func(w http.ResponseWriter, r *http.Request) {
@@ -272,7 +272,7 @@ func (h *Handler) registerProjectRoutes(mux *http.ServeMux) {
 			h.GetProject(w, r)
 			return
 		}
-		writeJSON(w, http.StatusMethodNotAllowed, errcode.ErrorBody(errcode.ErrMethodNotAllowed))
+		errcode.Write(w, errcode.ErrMethodNotAllowed)
 	})
 }
 
@@ -286,7 +286,7 @@ func (h *Handler) registerThreadRoutes(mux *http.ServeMux) {
 		case http.MethodPost:
 			h.PostThreads(w, r)
 		default:
-			writeJSON(w, http.StatusMethodNotAllowed, errcode.ErrorBody(errcode.ErrMethodNotAllowed))
+			errcode.Write(w, errcode.ErrMethodNotAllowed)
 		}
 	})
 	mux.HandleFunc("/v1/threads/", h.handleThreadSubRoute)
@@ -309,7 +309,7 @@ func (h *Handler) handleThreadSubRoute(w http.ResponseWriter, r *http.Request) {
 		case http.MethodDelete:
 			h.DeleteThreadPin(w, r, threadID)
 		default:
-			writeJSON(w, http.StatusMethodNotAllowed, errcode.ErrorBody(errcode.ErrMethodNotAllowed))
+			errcode.Write(w, errcode.ErrMethodNotAllowed)
 		}
 		return
 	}
@@ -334,7 +334,7 @@ func (h *Handler) handleThreadSubRoute(w http.ResponseWriter, r *http.Request) {
 	case http.MethodDelete:
 		h.DeleteThread(w, r, threadID)
 	default:
-		writeJSON(w, http.StatusMethodNotAllowed, errcode.ErrorBody(errcode.ErrMethodNotAllowed))
+		errcode.Write(w, errcode.ErrMethodNotAllowed)
 	}
 }
 
@@ -345,7 +345,7 @@ func (h *Handler) registerItemRoutes(mux *http.ServeMux) {
 			h.GetItem(w, r)
 			return
 		}
-		writeJSON(w, http.StatusMethodNotAllowed, errcode.ErrorBody(errcode.ErrMethodNotAllowed))
+		errcode.Write(w, errcode.ErrMethodNotAllowed)
 	})
 }
 
@@ -359,7 +359,7 @@ func (h *Handler) registerRunRoutes(mux *http.ServeMux) {
 		case http.MethodPost:
 			h.PostRuns(w, r)
 		default:
-			writeJSON(w, http.StatusMethodNotAllowed, errcode.ErrorBody(errcode.ErrMethodNotAllowed))
+			errcode.Write(w, errcode.ErrMethodNotAllowed)
 		}
 	})
 	mux.HandleFunc("/v1/runs/", h.handleRunSubRoute)
@@ -407,16 +407,16 @@ func (h *Handler) handleRunSubRoute(w http.ResponseWriter, r *http.Request) {
 		userID := h.ownerUserID(r)
 		if run, ok := repo.GetRun(runID); ok {
 			if !isRunOwnedBy(repo, run.ID, userID) {
-				writeJSON(w, http.StatusNotFound, errcode.ErrorBody(errcode.ErrNotFound.WithMessage("run not found")))
+				errcode.Write(w, errcode.ErrNotFound.WithMessage("run not found"))
 				return
 			}
 			writeSuccess(w, http.StatusOK, runToResponse(run))
 			return
 		}
-		writeJSON(w, http.StatusNotFound, errcode.ErrorBody(errcode.ErrNotFound.WithMessage("run not found")))
+		errcode.Write(w, errcode.ErrNotFound.WithMessage("run not found"))
 		return
 	}
-	writeJSON(w, http.StatusNotFound, errcode.ErrorBody(errcode.ErrNotFound))
+	errcode.Write(w, errcode.ErrNotFound)
 }
 
 // registerArtifactRoutes wires the /v1/artifacts and /v1/artifacts/ handlers.
@@ -426,7 +426,7 @@ func (h *Handler) registerArtifactRoutes(mux *http.ServeMux) {
 			h.GetArtifacts(w, r)
 			return
 		}
-		writeJSON(w, http.StatusMethodNotAllowed, errcode.ErrorBody(errcode.ErrMethodNotAllowed))
+		errcode.Write(w, errcode.ErrMethodNotAllowed)
 	})
 	mux.HandleFunc("/v1/artifacts/", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodGet {
@@ -434,7 +434,7 @@ func (h *Handler) registerArtifactRoutes(mux *http.ServeMux) {
 			h.GetArtifact(w, r, artifactID)
 			return
 		}
-		writeJSON(w, http.StatusMethodNotAllowed, errcode.ErrorBody(errcode.ErrMethodNotAllowed))
+		errcode.Write(w, errcode.ErrMethodNotAllowed)
 	})
 }
 
@@ -447,7 +447,7 @@ func (h *Handler) registerPreviewRoutes(mux *http.ServeMux) {
 		case http.MethodPost:
 			h.PostPreview(w, r)
 		default:
-			writeJSON(w, http.StatusMethodNotAllowed, errcode.ErrorBody(errcode.ErrMethodNotAllowed))
+			errcode.Write(w, errcode.ErrMethodNotAllowed)
 		}
 	})
 	mux.HandleFunc("/v1/previews/", func(w http.ResponseWriter, r *http.Request) {
@@ -457,14 +457,14 @@ func (h *Handler) registerPreviewRoutes(mux *http.ServeMux) {
 				h.PostPreviewStop(w, r, strings.TrimSuffix(previewPath, ":stop"))
 				return
 			}
-			writeJSON(w, http.StatusMethodNotAllowed, errcode.ErrorBody(errcode.ErrMethodNotAllowed))
+			errcode.Write(w, errcode.ErrMethodNotAllowed)
 			return
 		}
 		if r.Method == http.MethodGet {
 			h.GetPreview(w, r, previewPath)
 			return
 		}
-		writeJSON(w, http.StatusMethodNotAllowed, errcode.ErrorBody(errcode.ErrMethodNotAllowed))
+		errcode.Write(w, errcode.ErrMethodNotAllowed)
 	})
 }
 
@@ -475,7 +475,7 @@ func (h *Handler) registerAgentInstanceRoutes(mux *http.ServeMux) {
 			h.GetAgentInstances(w, r)
 			return
 		}
-		writeJSON(w, http.StatusMethodNotAllowed, errcode.ErrorBody(errcode.ErrMethodNotAllowed))
+		errcode.Write(w, errcode.ErrMethodNotAllowed)
 	})
 	mux.HandleFunc("/v1/agent-instances/", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodGet {
@@ -483,7 +483,7 @@ func (h *Handler) registerAgentInstanceRoutes(mux *http.ServeMux) {
 			h.GetAgentInstance(w, r, instanceID)
 			return
 		}
-		writeJSON(w, http.StatusMethodNotAllowed, errcode.ErrorBody(errcode.ErrMethodNotAllowed))
+		errcode.Write(w, errcode.ErrMethodNotAllowed)
 	})
 }
 
@@ -495,21 +495,21 @@ func (h *Handler) registerPlanRoutes(mux *http.ServeMux) {
 			h.PostPermissionDecide(w, r)
 			return
 		}
-		writeJSON(w, http.StatusMethodNotAllowed, errcode.ErrorBody(errcode.ErrMethodNotAllowed))
+		errcode.Write(w, errcode.ErrMethodNotAllowed)
 	})
 	mux.HandleFunc("/v1/plans/decide", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodPost {
 			h.PostPlanDecide(w, r)
 			return
 		}
-		writeJSON(w, http.StatusMethodNotAllowed, errcode.ErrorBody(errcode.ErrMethodNotAllowed))
+		errcode.Write(w, errcode.ErrMethodNotAllowed)
 	})
 	mux.HandleFunc("/v1/plans/pending", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodGet {
 			h.GetPlansPending(w, r)
 			return
 		}
-		writeJSON(w, http.StatusMethodNotAllowed, errcode.ErrorBody(errcode.ErrMethodNotAllowed))
+		errcode.Write(w, errcode.ErrMethodNotAllowed)
 	})
 }
 
@@ -520,7 +520,7 @@ func (h *Handler) registerUserRoutes(mux *http.ServeMux) {
 			writeSuccess(w, http.StatusOK, listResponse(ensureStore(h).ListUserProfiles()))
 			return
 		}
-		writeJSON(w, http.StatusMethodNotAllowed, errcode.ErrorBody(errcode.ErrMethodNotAllowed))
+		errcode.Write(w, errcode.ErrMethodNotAllowed)
 	})
 	mux.HandleFunc("/v1/users/current", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodGet {
@@ -528,10 +528,10 @@ func (h *Handler) registerUserRoutes(mux *http.ServeMux) {
 				writeSuccess(w, http.StatusOK, profile)
 				return
 			}
-			writeJSON(w, http.StatusNotFound, errcode.ErrorBody(errcode.ErrNotFound.WithMessage("no current user")))
+			errcode.Write(w, errcode.ErrNotFound.WithMessage("no current user"))
 			return
 		}
-		writeJSON(w, http.StatusMethodNotAllowed, errcode.ErrorBody(errcode.ErrMethodNotAllowed))
+		errcode.Write(w, errcode.ErrMethodNotAllowed)
 	})
 }
 
@@ -544,13 +544,13 @@ func (h *Handler) registerAgentProfileRoutes(mux *http.ServeMux) {
 		case http.MethodPost:
 			h.PostAgentProfiles(w, r)
 		default:
-			writeJSON(w, http.StatusMethodNotAllowed, errcode.ErrorBody(errcode.ErrMethodNotAllowed))
+			errcode.Write(w, errcode.ErrMethodNotAllowed)
 		}
 	})
 	mux.HandleFunc("/v1/agent-profiles/", func(w http.ResponseWriter, r *http.Request) {
 		profileID := strings.TrimPrefix(r.URL.Path, "/v1/agent-profiles/")
 		if profileID == "" {
-			writeJSON(w, http.StatusBadRequest, errcode.ErrorBody(errcode.ErrBadRequest.WithMessage("profile id required")))
+			errcode.Write(w, errcode.ErrBadRequest.WithMessage("profile id required"))
 			return
 		}
 		switch r.Method {
@@ -561,7 +561,7 @@ func (h *Handler) registerAgentProfileRoutes(mux *http.ServeMux) {
 		case http.MethodDelete:
 			h.DeleteAgentProfile(w, r, profileID)
 		default:
-			writeJSON(w, http.StatusMethodNotAllowed, errcode.ErrorBody(errcode.ErrMethodNotAllowed))
+			errcode.Write(w, errcode.ErrMethodNotAllowed)
 		}
 	})
 }
@@ -576,7 +576,7 @@ func (h *Handler) registerSettingsRoutes(mux *http.ServeMux) {
 		case http.MethodPatch:
 			h.PatchSettings(w, r)
 		default:
-			writeJSON(w, http.StatusMethodNotAllowed, errcode.ErrorBody(errcode.ErrMethodNotAllowed))
+			errcode.Write(w, errcode.ErrMethodNotAllowed)
 		}
 	})
 	// Local runtime session aggregation index (read-only import discover)
@@ -594,7 +594,7 @@ func (h *Handler) registerDeploymentAndMemoryRoutes(mux *http.ServeMux) {
 			h.PostDeployments(w, r)
 			return
 		}
-		writeJSON(w, http.StatusMethodNotAllowed, errcode.ErrorBody(errcode.ErrMethodNotAllowed))
+		errcode.Write(w, errcode.ErrMethodNotAllowed)
 	})
 	// Memory
 	mux.HandleFunc("/v1/memory", func(w http.ResponseWriter, r *http.Request) {
@@ -604,7 +604,7 @@ func (h *Handler) registerDeploymentAndMemoryRoutes(mux *http.ServeMux) {
 		case http.MethodPost:
 			h.PostMemory(w, r)
 		default:
-			writeJSON(w, http.StatusMethodNotAllowed, errcode.ErrorBody(errcode.ErrMethodNotAllowed))
+			errcode.Write(w, errcode.ErrMethodNotAllowed)
 		}
 	})
 }

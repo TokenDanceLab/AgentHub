@@ -13,7 +13,7 @@ import (
 // Under Hub JWT, entries are filtered to runs owned by the caller (AH-SR-045).
 func (h *Handler) GetDeliveryJournal(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		writeJSON(w, http.StatusMethodNotAllowed, errcode.ErrorBody(errcode.ErrMethodNotAllowed))
+		errcode.Write(w, errcode.ErrMethodNotAllowed)
 		return
 	}
 	if h.CallbackClient == nil {
@@ -24,7 +24,7 @@ func (h *Handler) GetDeliveryJournal(w http.ResponseWriter, r *http.Request) {
 	if raw := strings.TrimSpace(r.URL.Query().Get("afterSeq")); raw != "" {
 		v, err := strconv.ParseUint(raw, 10, 64)
 		if err != nil {
-			writeJSON(w, http.StatusBadRequest, errcode.ErrorBody(errcode.ErrBadRequest.WithMessage("invalid afterSeq")))
+			errcode.Write(w, errcode.ErrBadRequest.WithMessage("invalid afterSeq"))
 			return
 		}
 		afterSeq = v

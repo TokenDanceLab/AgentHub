@@ -253,6 +253,17 @@ func runToResponse(run store.Run) map[string]any {
 	return lifecycle.RunResponse(run)
 }
 
+// activeRunExistsResponse builds the 409 body for "this thread already has an
+// active run".
+//
+// This is the only place in edge-server that still calls errcode.ErrorBody
+// directly instead of errcode.Write, and it is allow-listed by
+// scripts/verify/verify-edge-status-ssot.py: the response has to carry the
+// conflicting run's identifiers (runId/projectId/threadId/status) next to the
+// error envelope so the client can offer to cancel or attach to it, while
+// errcode.Write writes a fixed envelope. The status is NOT hand-copied either —
+// the caller passes errcode.ErrActiveRunExists.HTTPStatus — and the gate also
+// pins that, so the exemption cannot silently grow a second copy (#2245).
 func activeRunExistsResponse(run store.Run) map[string]any {
 	body := errcode.ErrorBody(errcode.ErrActiveRunExists)
 	body["runId"] = run.ID

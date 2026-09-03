@@ -12,7 +12,7 @@ import (
 // Handler holds dependencies for HTTP and WebSocket handlers.
 func (h *Handler) GetAgents(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		writeJSON(w, http.StatusMethodNotAllowed, errcode.ErrorBody(errcode.ErrMethodNotAllowed))
+		errcode.Write(w, errcode.ErrMethodNotAllowed)
 		return
 	}
 	if h.AdapterRegistry == nil {
@@ -81,7 +81,7 @@ func (h *Handler) PostAgentProfiles(w http.ResponseWriter, r *http.Request) {
 	}
 	if err := decodeOptionalJSON(r, &body); err != nil {
 		slog.Error("agent profile decode failed", "error", err)
-		writeJSON(w, http.StatusBadRequest, errcode.ErrorBody(errcode.ErrBadRequest))
+		errcode.Write(w, errcode.ErrBadRequest)
 		return
 	}
 	profile := store.AgentProfile{
@@ -104,7 +104,7 @@ func (h *Handler) PostAgentProfiles(w http.ResponseWriter, r *http.Request) {
 	created, err := ensureStore(h).CreateAgentProfile(profile)
 	if err != nil {
 		slog.Error("create agent profile failed", "error", err)
-		writeJSON(w, http.StatusBadRequest, errcode.ErrorBody(errcode.ErrBadRequest))
+		errcode.Write(w, errcode.ErrBadRequest)
 		return
 	}
 	writeSuccess(w, http.StatusCreated, created)
@@ -116,7 +116,7 @@ func (h *Handler) GetAgentProfile(w http.ResponseWriter, r *http.Request, profil
 	}
 	profile, ok := ensureStore(h).GetAgentProfile(profileID)
 	if !ok {
-		writeJSON(w, http.StatusNotFound, errcode.ErrorBody(errcode.ErrNotFound))
+		errcode.Write(w, errcode.ErrNotFound)
 		return
 	}
 	writeSuccess(w, http.StatusOK, profile)
@@ -131,17 +131,17 @@ func (h *Handler) PatchAgentProfile(w http.ResponseWriter, r *http.Request, prof
 	var patch map[string]any
 	if err := decodeOptionalJSON(r, &patch); err != nil {
 		slog.Error("agent profile patch decode failed", "profileId", profileID, "error", err)
-		writeJSON(w, http.StatusBadRequest, errcode.ErrorBody(errcode.ErrBadRequest))
+		errcode.Write(w, errcode.ErrBadRequest)
 		return
 	}
 	profile, err := ensureStore(h).UpdateAgentProfile(profileID, patch)
 	if err != nil {
 		if errors.Is(err, store.ErrNotFound) {
-			writeJSON(w, http.StatusNotFound, errcode.ErrorBody(errcode.ErrNotFound))
+			errcode.Write(w, errcode.ErrNotFound)
 			return
 		}
 		slog.Error("update agent profile failed", "profileId", profileID, "error", err)
-		writeJSON(w, http.StatusBadRequest, errcode.ErrorBody(errcode.ErrBadRequest))
+		errcode.Write(w, errcode.ErrBadRequest)
 		return
 	}
 	writeSuccess(w, http.StatusOK, profile)
@@ -154,11 +154,11 @@ func (h *Handler) DeleteAgentProfile(w http.ResponseWriter, r *http.Request, pro
 	}
 	if err := ensureStore(h).DeleteAgentProfile(profileID); err != nil {
 		if errors.Is(err, store.ErrNotFound) {
-			writeJSON(w, http.StatusNotFound, errcode.ErrorBody(errcode.ErrNotFound))
+			errcode.Write(w, errcode.ErrNotFound)
 			return
 		}
 		slog.Error("delete agent profile failed", "profileId", profileID, "error", err)
-		writeJSON(w, http.StatusInternalServerError, errcode.ErrorBody(errcode.ErrInternal))
+		errcode.Write(w, errcode.ErrInternal)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)

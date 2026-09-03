@@ -14,7 +14,7 @@ import (
 // Handler holds dependencies for HTTP and WebSocket handlers.
 func (h *Handler) GetAgentInstances(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		writeJSON(w, http.StatusMethodNotAllowed, errcode.ErrorBody(errcode.ErrMethodNotAllowed))
+		errcode.Write(w, errcode.ErrMethodNotAllowed)
 		return
 	}
 	if h.AgentRegistry == nil {
@@ -54,21 +54,21 @@ func (h *Handler) GetAgentInstances(w http.ResponseWriter, r *http.Request) {
 // GetAgentInstance returns a single agent instance by ID.
 func (h *Handler) GetAgentInstance(w http.ResponseWriter, r *http.Request, instanceID string) {
 	if r.Method != http.MethodGet {
-		writeJSON(w, http.StatusMethodNotAllowed, errcode.ErrorBody(errcode.ErrMethodNotAllowed))
+		errcode.Write(w, errcode.ErrMethodNotAllowed)
 		return
 	}
 	if h.AgentRegistry == nil {
-		writeJSON(w, http.StatusServiceUnavailable, errcode.ErrorBody(errcode.ErrAgentRegistryNotConfigured))
+		errcode.Write(w, errcode.ErrAgentRegistryNotConfigured)
 		return
 	}
 	inst, ok := h.AgentRegistry.Get(instanceID)
 	if !ok {
-		writeJSON(w, http.StatusNotFound, errcode.ErrorBody(errcode.ErrAgentInstanceNotFound))
+		errcode.Write(w, errcode.ErrAgentInstanceNotFound)
 		return
 	}
 	userID := h.ownerUserID(r)
 	if !agentInstanceVisibleToUser(ensureStore(h), *inst, userID) {
-		writeJSON(w, http.StatusNotFound, errcode.ErrorBody(errcode.ErrAgentInstanceNotFound))
+		errcode.Write(w, errcode.ErrAgentInstanceNotFound)
 		return
 	}
 	writeSuccess(w, http.StatusOK, inst)
@@ -99,7 +99,7 @@ func agentInstanceVisibleToUser(repo store.Reader, inst agents.AgentInstance, us
 
 func (h *Handler) GetCCSwitchStatus(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		writeJSON(w, http.StatusMethodNotAllowed, errcode.ErrorBody(errcode.ErrMethodNotAllowed))
+		errcode.Write(w, errcode.ErrMethodNotAllowed)
 		return
 	}
 	if h.CCSwitchStatus == nil {
@@ -118,7 +118,7 @@ func (h *Handler) GetCCSwitchStatus(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) GetCCSwitchProviders(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		writeJSON(w, http.StatusMethodNotAllowed, errcode.ErrorBody(errcode.ErrMethodNotAllowed))
+		errcode.Write(w, errcode.ErrMethodNotAllowed)
 		return
 	}
 	if h.CCSwitchReader == nil {
@@ -134,7 +134,7 @@ func (h *Handler) GetCCSwitchProviders(w http.ResponseWriter, r *http.Request) {
 	providers, err := h.CCSwitchReader.ReadProviders(appType)
 	if err != nil {
 		slog.Warn("cc-switch: failed to read providers", "error", err)
-		writeJSON(w, http.StatusInternalServerError, errcode.ErrorBody(errcode.ErrInternal.WithMessage("failed to read cc-switch providers")))
+		errcode.Write(w, errcode.ErrInternal.WithMessage("failed to read cc-switch providers"))
 		return
 	}
 
@@ -152,7 +152,7 @@ func (h *Handler) GetMemory(w http.ResponseWriter, r *http.Request) {
 
 	if err := h.validateWorkDirAllowed(workDir); err != nil {
 		slog.Error("workdir not allowed", "workDir", workDir, "error", err)
-		writeJSON(w, http.StatusForbidden, errcode.ErrorBody(errcode.ErrWorkspaceNotAllowed))
+		errcode.Write(w, errcode.ErrWorkspaceNotAllowed)
 		return
 	}
 
@@ -172,20 +172,20 @@ func (h *Handler) PostMemory(w http.ResponseWriter, r *http.Request) {
 		Overwrite bool     `json:"overwrite"`
 	}
 	if err := decodeOptionalJSON(r, &req); err != nil {
-		writeJSON(w, http.StatusBadRequest, errcode.ErrorBody(errcode.ErrInvalidJSON))
+		errcode.Write(w, errcode.ErrInvalidJSON)
 		return
 	}
 	if req.WorkDir == "" {
-		writeJSON(w, http.StatusBadRequest, errcode.ErrorBody(errcode.ErrBadRequest.WithMessage("workDir is required")))
+		errcode.Write(w, errcode.ErrBadRequest.WithMessage("workDir is required"))
 		return
 	}
 	if strings.TrimSpace(req.Content) == "" {
-		writeJSON(w, http.StatusBadRequest, errcode.ErrorBody(errcode.ErrBadRequest.WithMessage("content is required")))
+		errcode.Write(w, errcode.ErrBadRequest.WithMessage("content is required"))
 		return
 	}
 	if err := h.validateWorkDirAllowed(req.WorkDir); err != nil {
 		slog.Error("workdir not allowed", "workDir", req.WorkDir, "error", err)
-		writeJSON(w, http.StatusForbidden, errcode.ErrorBody(errcode.ErrWorkspaceNotAllowed))
+		errcode.Write(w, errcode.ErrWorkspaceNotAllowed)
 		return
 	}
 	if req.ID == "" {
@@ -206,7 +206,7 @@ func (h *Handler) PostMemory(w http.ResponseWriter, r *http.Request) {
 	})
 	if err != nil {
 		slog.Error("memory write failed", "workDir", req.WorkDir, "threadId", req.ThreadID, "error", err)
-		writeJSON(w, http.StatusInternalServerError, errcode.ErrorBody(errcode.ErrInternal))
+		errcode.Write(w, errcode.ErrInternal)
 		return
 	}
 	writeSuccess(w, http.StatusCreated, entry)
