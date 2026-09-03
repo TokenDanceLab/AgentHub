@@ -6,7 +6,11 @@ import type { FriendRequestInfo, SearchResult } from './hubClient';
 
 const contactsQueryKey = hubQueryKeys.contacts.list;
 const friendRequestsQueryKey = hubQueryKeys.contacts.friendRequests;
-export const sessionsQueryKey = hubQueryKeys.threads.root;
+// The session list is a COLLECTION query, so it keys off `threads.list`, not
+// the bare family root: root is the prefix used for broad invalidation, and
+// using it as a query key is what made the same prefix mean "session list"
+// here and "every transcript" on desktop (ADR-029 / #2261).
+export const sessionsQueryKey = hubQueryKeys.threads.list;
 
 // ── Async helpers ──────────────────────────────────────────
 

@@ -87,7 +87,7 @@ export type NormalizeHubTranslate = (key: string) => string;
  *   `useWebWorkbenchModel`（queryKey `['web-v4','hub-pins',...]`），
  *   两者都用来给 pinMap store 做种子。
  * - WS 帧 `message.pin` / `message.unpin` 直接驱动 pinMap store：desktop
- *   `hubEventBridge.ts` 失效 `threads.pins`/`threads.detail` 并调用
+ *   `hubEventBridge.ts` 失效 `threads.pins`/`threads.messages` 并调用
  *   `getPinMapStore().handleFrame`；web `webHubRealtime.ts` 同样把帧喂给
  *   pinMap，`useWebWorkbenchModel` 订阅 pinMap 并以 REST pins 结果种子化。
  * - `HubMessage.pinned` 仍没有加：REST message 形状确实没有该字段，pin
