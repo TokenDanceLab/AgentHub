@@ -1,6 +1,6 @@
 # AgentHub Decisions
 
-最后更新：2026-09-02
+最后更新：2026-09-04
 
 本文件是当前架构决策摘要。旧 ADR 全文已外迁到 `docs/history.md` 指向的 TokenDance docs archive；旧正文只作追溯，不覆盖 `AGENTS.md`、`docs/architecture.md`、`docs/architecture/`、`api/` 或当前源码事实。
 
@@ -35,6 +35,10 @@
 | ADR-025 | Accepted 2026-08-29（设计基线，未实施） | 双平面正式化：Hub 是控制面（不执行模型 Turn），Edge 是数据面；任务拆分/路由由确定性 supervisor 承担；证据由 Edge 产生并签名，Hub 只校验/审计。完整目标/差距矩阵见 `docs/architecture/10-macro-engineering-design.md`。 | Architecture / Hub / Edge | 是 |
 | ADR-026 | Accepted 2026-08-29（设计基线，未实施） | 协议分层与四条 P0 设计合同：自有 REST/WS 保持产品契约 SSOT，MCP/A2A/AG-UI 只做 capability mapping；事件一致性（outbox 同事务/idempotent/version/snapshot）、最小代理权（task-scoped/per-action/secret 隔离）、OTel GenAI 可观测进入实施 backlog。升级但不替代 ADR-016/ADR-017。 | Architecture / Hub / Edge / Security | 是 |
 | ADR-027 | Accepted 2026-09-01 | OTel GenAI tracing 裁决（#2111）：span 族为 `agenthub.run`/`agenthub.run.lifecycle`/`gen_ai.chat`(CLIENT)/`gen_ai.tool_call`(sibling, draft)/`agenthub.approval`/`agenthub.artifact.surface`/`agenthub.dispatch.callback`；属性按 semconv v1.36 stable + v1.37 draft；不为 WS 帧、DB/Redis 建 GenAI span；导出管道与 Hub REST 侧迁移另开切片。正文见 #2111。 | Observability | 是 |
+| ADR-028 | Accepted 2026-09-04 | secret 门禁夹具裁决（#2295）：字面量规则的**左边界**已落地（#2297，只减误报、不放宽放行面）；假凭据夹具另加 `scripts/verify/secret-fixture-allowlist.json`，条目 = 精确 `(path, literal)` + 强制非空 `owner`/`review`/`reason`，**禁止**目录/glob/包级/regex 豁免，allowlist 自身 fail-closed（字段缺失、指向不存在的路径、同 literal 换路径一律红）。目标：让脱敏测试可重构，且不让生产 secret 更容易漏过。**明确否决**「改夹具内容绕过门禁」。 | Security / Repository governance | 是 |
+| ADR-029 | Accepted 2026-09-04 | 前端服务端状态的**唯一键形状**（#2261 S1）：Hub query key 的字面量唯一来源是 `app/shared/src/stores/queryKeys.ts`，平台包不得私设 key 数组；`<family>.root` 只用于宽失效、**永不直接当某个 query 的 key**；集合查询用 `.list(...)`、单记录用 `.detail(id)`、子资源必须有工厂；**无消费者的工厂不得存在**（幽灵键 = 下一次 #2252）；失效点只准引用工厂，测试可用字面量钉形状。据此 `threads.detail`（0 消费者 / 9 个失效点）删除、desktop 私设 `['hub','sessions']` 与 `['hub','workspace-projects']` 收敛到家族工厂。 | Frontend | 是 |
+| ADR-030 | Accepted 2026-09-04 | 对外契约四条口径（#2258）：① `x-agenthub-owner ∈ {Hub, Edge}`，`Runner` 退役（`edge-server/internal/runners/` 只有 registry，workspace 实现全在 hub-server），4 个 `/v1/workspaces/**` 改 `owner: Hub` 且**必须保持 `status: planned`**（否则被拉进 router 比对而红）；workspace 元数据/列举归 Hub，将来若真需要 Edge 侧文件内容端点，届时该端点自己标 Edge，不预先在 Edge 建第二套实现。② `x-agenthub-phase` **只适用于 `/v1/**` 设计面**——声明适用范围而不是批量补 166 个标记，只补真正违反声明的 3 个 `/v1`。③ Mobile 单一口径 =「装配中的 fixture/边界验证 lane，**非 release candidate**」，证据锚点是 `release.yml` 的 `build-mobile` 受 `RELEASE_MOBILE_ENABLED` 门控默认 skipped；README 双语与 `docs/architecture.md` 统一到这句。④ 根 `AGENTS.md`（285/300 行）下沉方案 accepted、实施 deferred，触发条件 = 下次新增规则撞行数预算时在同一 PR 内下沉（不做纯 doc churn PR）。 | API / Docs / Product | 是 |
+| ADR-031 | Accepted 2026-09-04 | 分页 clamp 可观测性（#2243 残项）：**保留「夹到端点自己声明的上限」，不改 400**。实测 13 个 list handler 的信封已回传 `page.nextCursor` + `page.hasMore`（另两个 clamp 端点是 limit/offset 形态，客户端仍可推进），所以被夹短的页**可续取、不是数据丢失**；400 会把可满足的请求变成硬失败、零用户收益，并与 `repository/pagination_clamp_test.go` 钉住的 `ClampPageSize` 不变量冲突。可观测性用**文档化**补齐（`api/conventions.md` + OpenAPI `PageSize` 描述写明「超过声明上限即夹到该上限，余下部分用 nextCursor/offset 续取」），**不**新增信封字段（跨 ~16 端点的契约变更换近乎零价值）。残项：`repository/message.go GetMessagesIncrement` 的非正值分支按 `paging.go` 自己写明的「0 = no explicit limit ⇒ 把 requested 当 def 传」惯例表达，行为不变、消掉最后一处手写分支。 | Hub API | 是 |
 
 ## Archive
 
