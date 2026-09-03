@@ -191,3 +191,72 @@ describe('desktop hubEventBridge transcript cache wiring (#2252)', () => {
     bridge.destroy();
   });
 });
+
+// ── #2261: the session-list half of the bridge ──────────────────────────────
+//
+// Before this change five handlers invalidated `hubQueryKeys.threads.detail(id)`
+// — a factory with 0 useQuery consumers — and four more invalidated it next to a
+// key that already covered the same data. `invalidateQueries` matches by prefix,
+// and `['hub','threads','detail',id]` is not a prefix of anything the shells
+// actually cache, so all nine matched no cache entry: the user-visible case was
+// MESSAGE_READ, whose own comment claimed "read receipts affect thread-level
+// unread_count" while the unread badge stayed stale.
+//
+// The assertion chain here is deliberately two links, because a test that seeds a
+// key it invented proves nothing (#2252's original lesson):
+//   1. sessionQueries.test.tsx pins that the live `useHubSessions` hook registers
+//      exactly `hubQueryKeys.threads.list`;
+//   2. this suite pins that the bridge invalidates that same factory key.
+// Together they mean the frame lands on the entry the UI really reads.
+describe('desktop hubEventBridge session-list cache wiring (#2261)', () => {
+  const listFrames: Array<{ name: string; type: string }> = [
+    { name: 'MESSAGE_READ', type: HUB_EVENTS.MESSAGE_READ },
+    { name: 'MESSAGE_NEW', type: HUB_EVENTS.MESSAGE_NEW },
+    { name: 'SESSION_MEMBER_JOINED', type: HUB_EVENTS.SESSION_MEMBER_JOINED },
+    { name: 'SESSION_MEMBER_LEFT', type: HUB_EVENTS.SESSION_MEMBER_LEFT },
+    { name: 'SESSION_INFO_UPDATED', type: HUB_EVENTS.SESSION_INFO_UPDATED },
+  ];
+
+  for (const frame of listFrames) {
+    it(`invalidates the real session-list cache on ${frame.name}`, () => {
+      const queryClient = new QueryClient();
+      const key = hubQueryKeys.threads.list;
+      queryClient.setQueryData(key, []);
+      const fake = createFakeHubWS();
+      const bridge = createDesktopHubEventBridge(fake.hubWS, queryClient);
+
+      fake.emit(frame.type, {
+        session_id: 'sess-list',
+        user_id: 'user-1',
+        last_read_seq: 3,
+      });
+
+      expect(queryClient.getQueryState(key)?.isInvalidated).toBe(true);
+      bridge.destroy();
+    });
+  }
+
+  it('invalidates the real pins cache on MESSAGE_PIN', () => {
+    const queryClient = new QueryClient();
+    const key = hubQueryKeys.threads.pins('sess-pin');
+    queryClient.setQueryData(key, []);
+    const fake = createFakeHubWS();
+    const bridge = createDesktopHubEventBridge(fake.hubWS, queryClient);
+
+    fake.emit(HUB_EVENTS.MESSAGE_PIN, { session_id: 'sess-pin', message_id: 'm1' });
+
+    expect(queryClient.getQueryState(key)?.isInvalidated).toBe(true);
+    bridge.destroy();
+  });
+
+  it('keeps the ghost thread-detail factory deleted (ADR-029: no factory without a consumer)', () => {
+    // Reintroducing `detail` without a real thread-detail query is how nine
+    // invalidations silently matched nothing; this fails the day it comes back.
+    expect((hubQueryKeys.threads as Record<string, unknown>).detail).toBeUndefined();
+    expect((hubQueryKeys.threads as Record<string, unknown>).all).toBeUndefined();
+    expect(hubQueryKeys.threads.list).toEqual(['hub', 'threads', 'list']);
+    // root stays a prefix of every threads key, so broad invalidation still works
+    expect(hubQueryKeys.threads.list[0]).toBe(hubQueryKeys.threads.root[0]);
+    expect(hubQueryKeys.threads.list[1]).toBe(hubQueryKeys.threads.root[1]);
+  });
+});
