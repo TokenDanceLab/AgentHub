@@ -87,7 +87,6 @@ type AgentCapabilities struct {
 }
 
 // SubAgentTask describes a sub-agent task to be dispatched by the orchestrator.
-// Reference: docs/reference/cross-comparison/03-orchestration.md Layer 3 (Supervisor routing).
 type SubAgentTask struct {
 	TaskID      string `json:"taskId"`
 	Description string `json:"description"`

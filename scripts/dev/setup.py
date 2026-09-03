@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
 """setup — AgentHub 本地环境配置（ps1 迁移，契约见 server docs/design/ps1-to-python-migration.md）。
 
-启用 git hooks（scripts/git-hooks），可选同步 public reference 仓库
-（-Reference core|all；兼容原 setup.sh 的 --reference-core / --reference-all）。
+启用 git hooks（scripts/git-hooks）。
 
-契约：stdlib only；参数/输出行（`Git hooks enabled: scripts/git-hooks` /
+契约：stdlib only；输出行（`Git hooks enabled: scripts/git-hooks` /
 `Setup complete.`）与 ps1 一致；退出码 0=通过。
 """
 
@@ -19,16 +18,7 @@ REPO_ROOT = os.path.dirname(os.path.dirname(SCRIPT_DIR))
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--Reference", "-Reference", default="none", choices=["none", "core", "all"])
-    parser.add_argument("--reference-core", action="store_true", help="sync core reference repos (setup.sh compatibility)")
-    parser.add_argument("--reference-all", action="store_true", help="sync all reference repos (setup.sh compatibility)")
-    args = parser.parse_args()
-
-    reference = args.Reference
-    if args.reference_core:
-        reference = "core"
-    if args.reference_all:
-        reference = "all"
+    parser.parse_args()
 
     repo_root = os.path.realpath(REPO_ROOT)
     os.chdir(repo_root)
@@ -37,11 +27,6 @@ def main() -> int:
     if run.returncode != 0:
         raise RuntimeError(f"git config core.hooksPath failed with exit code {run.returncode}")
     print("Git hooks enabled: scripts/git-hooks")
-
-    if reference != "none":
-        sync_run = subprocess.run([sys.executable, os.path.join(SCRIPT_DIR, "sync-reference.py"), "--Tier", reference])
-        if sync_run.returncode != 0:
-            return sync_run.returncode
 
     print("Setup complete.")
     return 0

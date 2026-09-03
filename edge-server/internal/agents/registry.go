@@ -2,7 +2,6 @@
 // for the AgentHub Orchestrator. It tracks runtime agent instances, their
 // status, and enables communication between orchestrator and sub-agents.
 //
-// Reference: docs/reference/cross-comparison/03-orchestration.md Layer 2
 // Reference: historical codex-cli AgentTree pattern indexed by docs/history.md.
 //
 // Residual pure-helper peel #1154: Registry core API stays here; types,
