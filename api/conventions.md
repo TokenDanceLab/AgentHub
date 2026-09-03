@@ -62,7 +62,7 @@ ID 是字符串，使用语义前缀，不暴露数据库自增主键，创建�
 GET /v1/threads?projectId=proj_1&pageSize=50&pageCursor=cursor_abc
 ```
 
-响应包含 `items` 和 `page.nextCursor` / `page.hasMore`。`pageSize` 默认 `50`，最大 `200`。不要把 offset pagination 作为主方式，避免消息流和事件流错位。
+响应包含 `items` 和 `page.nextCursor` / `page.hasMore`。`pageSize` 默认 `50`，最大 `200`。不要把 offset pagination 作为主方式，避免消息流和事件流错位。**超过上限的 `pageSize` 是「夹取」而不是「报错」**（ADR-031 / #2243）：请求值大于该端点自己声明、且被查询层实际执行的上限（通用列表 `MaxListPageSize = 200`、消息/通知族 `MaxMessagePageLimit = 100`、run/team-event 与文档族 `MaxPageLimit = 500`）时，服务端返回**上限条数** + HTTP 200 + 照常的 `page.nextCursor` / `page.hasMore`，余下部分跟着游标继续取；limit/offset 形态的端点（如通知列表）则继续推进 `offset`。它**不会**回落到默认值（那会把页二次缩短），也**不会**返回 400 —— 被夹短的页是可续取的，不是数据丢失，把它变成硬失败对调用方零收益。夹取由 `hub-server/internal/config/paging.go` 的 `ClampPageSize` 单点执行，所有 handler 侧列表都走它；实测口径见 #2243（13 个 handler 回传游标，另两个 clamp 端点是 limit/offset 形态）。
 
 ### 三种列表响应形状
 
@@ -150,6 +150,8 @@ P0 本地模式可以先实现为单用户，但文档中的权限边界必须�
 权限：local / user / project.member / ...
 事件：会触发哪些 WebSocket event
 ```
+
+两个取值域是**闭合**的（ADR-030 / #2258）。`x-agenthub-owner ∈ {Hub, Edge}`：早期的 `Runner` 已退役 —— `edge-server/internal/runners/` 只剩 `registry.go`，而 workspace 的 handler/service/repository/model 全在 `hub-server`、以 `/web/projects*` 暴露，照 `Runner` 找实现的人会在 Edge 找不到 workspace 逻辑进而新起第二套实现（正是「禁止在另一层再分叉实现」要防的事）；workspace 的**元数据与列举归 Hub**，将来若真需要 Edge 侧文件内容端点，届时那个端点自己标 `owner: Edge`，不要预建。`x-agenthub-phase ∈ {P0, P1, P2, P3, P4}` **只适用于 `/v1/**` 设计面**：reality-face（`/client`、`/web`、`/edge`）由 `x-agenthub-status` 治理、不带 phase，`/health`、`/api`、`/cloud` 属 ops/非设计面同样不带。端点级 `x-agenthub-status ∈ {implemented, planned}`，schema 级另允许 `contract-draft`。
 
 `api/openapi.yaml` 使用扩展字段：
 

@@ -41,10 +41,13 @@ package config
 // larger batches than the interactive lists. An earlier revision of this comment
 // said "three legitimate maxima" and was contradicted by the fourth.
 //
-// Every handler-side list clamp now goes through this function. The one
-// hand-written branch left anywhere on this path is repository/message.go
-// GetMessagesIncrement, whose non-positive case falls to the maximum instead of
-// to def — the opposite of the rule documented above — and is tracked in #2243.
+// Every clamp on this path now goes through this function, including
+// repository/message.go GetMessagesIncrement, which used to be the one
+// hand-written branch left. Its non-positive case falls to the maximum rather
+// than to def, which looks like the opposite of the rule above but is the
+// "endpoint treats 0 as no explicit limit" escape hatch documented below: it now
+// spells that by passing the maximum as def, so the behaviour is unchanged and
+// the shape is no longer a private copy (#2243).
 //
 // A caller passes the ceiling its own endpoint declares in api/openapi.yaml and
 // its own query layer enforces; passing a higher one moves the clamp down a
