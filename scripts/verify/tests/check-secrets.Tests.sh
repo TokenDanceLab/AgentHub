@@ -14,6 +14,15 @@
 # at a line start and after '"', '=', ' ', ':' and ',' (the boundary rule must
 # not widen the pass surface).
 #
+# Fixture registry (#2295 / ADR-028): scripts/verify/secret-fixture-allowlist.json
+# may silence a literal rule only for an exact (path, literal) pair. Positive:
+# a registered fixture passes, including inside the registry file itself (which
+# has no path exemption). Negative: the same literal at another path, another
+# literal at the registered path, an unregistered credential shape on the very
+# same line, a missing/renamed path, a dead (non-credential-shaped) literal, a
+# glob path, a missing owner, entry count over maxEntries, malformed JSON and a
+# literal absent from its registered path must ALL exit non-zero.
+#
 # Runs in CI validate job alongside verify-vulnerability-gates.Tests.sh.
 set -uo pipefail
 
@@ -263,6 +272,150 @@ printf 'values: ["x",%s.%s.%s]\n' "$jwt_head" "$jwt_body" "$jwt_sig" > token_aft
 git add token_after_comma.yaml
 bash "$SCRIPT" --staged >/dev/null 2>&1
 check "JWT after ',' still fails" yes $?
+
+echo "=== fixture registry (#2295 / ADR-028): exact (path, literal) only ==="
+# 登记簿路径在 check-secrets.sh 里是常量，所以自测必须在临时仓的同一相对路径上
+# 造它。所有假凭据一律由低于阈值的片段拼成，本自测文件的新增行因此不会自己触发
+# CI 的字面量扫描（沿用本文件既有约定）。
+REG_DIR="scripts/verify"
+REG_FILE="${REG_DIR}/secret-fixture-allowlist.json"
+mkdir -p "$REG_DIR"
+
+fix_key_a="sk-proj-abc123"
+fix_key_a="${fix_key_a}def456ghi789jkl012"
+fix_key_b="sk-proj-zzz999"
+fix_key_b="${fix_key_b}yyy888xxx777www666vvv555"
+
+write_registry() {
+  # $1 = literal, $2 = path, $3 = extra entry JSON (optional), $4 = maxEntries
+  local lit="$1" reg_path="$2" extra="${3:-}" max="${4:-1}"
+  {
+    printf '{\n  "version": 1,\n  "maxEntries": %s,\n  "entries": [\n' "$max"
+    printf '    {"path": "%s", "literal": "%s", "owner": "Test", "review": "2026-09-04", "reason": "self-test fixture"}\n' "$reg_path" "$lit"
+    if [[ -n "$extra" ]]; then printf '    ,%s\n' "$extra"; fi
+    printf '  ]\n}\n'
+  } > "$REG_FILE"
+}
+
+echo "--- registered fixture passes ---"
+git reset --quiet
+rm -f fixture_a.txt fixture_b.txt fixture_copy.txt fixture_two.txt
+printf 'fixture = "%s"\n' "$fix_key_a" > fixture_a.txt
+write_registry "$fix_key_a" "fixture_a.txt"
+git add fixture_a.txt "$REG_FILE"
+bash "$SCRIPT" --staged >/dev/null 2>&1
+check "registered (path, literal) fixture passes" no $?
+
+echo "--- registry file itself is scanned, not exempted ---"
+# 上一个用例已经把含完整 literal 的登记簿文件自己 stage 了：它能过，靠的是
+# 「登记簿里的凭据形状字面量必须是已登记 literal 之一」，不是路径豁免。
+git reset --quiet
+printf '  "reason": "leaked %s inside reason"\n' "$fix_key_b" >> "$REG_FILE"
+git add fixture_a.txt "$REG_FILE"
+bash "$SCRIPT" --staged >/dev/null 2>&1
+check "unregistered credential literal inside the registry file fails" yes $?
+
+echo "--- same path, different literal fails ---"
+git reset --quiet
+write_registry "$fix_key_a" "fixture_a.txt"
+printf 'fixture = "%s"\nother = "%s"\n' "$fix_key_a" "$fix_key_b" > fixture_a.txt
+git add fixture_a.txt "$REG_FILE"
+bash "$SCRIPT" --staged >/dev/null 2>&1
+check "unregistered second literal at a registered path fails" yes $?
+
+echo "--- registered literal at another path fails ---"
+git reset --quiet
+printf 'fixture = "%s"\n' "$fix_key_a" > fixture_a.txt
+printf 'moved = "%s"\n' "$fix_key_a" > fixture_copy.txt
+write_registry "$fix_key_a" "fixture_a.txt"
+git add fixture_a.txt fixture_copy.txt "$REG_FILE"
+bash "$SCRIPT" --staged >/dev/null 2>&1
+check "registered literal moved to another path fails" yes $?
+
+echo "--- two literals on one line: registered first, unregistered second ---"
+git reset --quiet
+rm -f fixture_copy.txt
+printf 'line = "%s" + "%s"\n' "$fix_key_a" "$fix_key_b" > fixture_a.txt
+write_registry "$fix_key_a" "fixture_a.txt"
+git add fixture_a.txt "$REG_FILE"
+bash "$SCRIPT" --staged >/dev/null 2>&1
+check "unregistered literal after a registered one on the same line fails" yes $?
+
+echo "--- registry absent: default deny is unchanged ---"
+git reset --quiet
+printf 'fixture = "%s"\n' "$fix_key_a" > fixture_a.txt
+git rm --cached --quiet "$REG_FILE" 2>/dev/null
+rm -f "$REG_FILE"
+git add fixture_a.txt
+bash "$SCRIPT" --staged >/dev/null 2>&1
+check "fixture with no registry still fails" yes $?
+
+echo "--- registry integrity is fail-closed ---"
+# 每个完整性用例**只 stage 登记簿自己**，夹具文件只在磁盘上（供加载器读），
+# 这样退出码非 0 就只可能来自加载器的完整性校验，不可能来自「夹具字面量未登记」
+# 这条无关的失败路径——否则用例会因为错误的原因而绿（实测过这个坑）。
+integrity_case() {
+  # $1 = name, $2 = registry body writer (function name)
+  git reset --quiet
+  bash "$SCRIPT" --staged >/dev/null 2>&1
+  check "$1" yes $?
+}
+
+printf 'fixture = "%s"\n' "$fix_key_a" > fixture_a.txt
+
+git reset --quiet
+write_registry "$fix_key_a" "does-not-exist.txt"
+git add "$REG_FILE"
+integrity_case "entry pointing at a non-existent path fails"
+
+git reset --quiet
+write_registry "$fix_key_b" "fixture_a.txt"
+git add "$REG_FILE"
+integrity_case "registered literal absent from its path fails"
+
+git reset --quiet
+write_registry "$fix_key_a" "*_a.txt"
+git add "$REG_FILE"
+integrity_case "glob path entry fails"
+
+git reset --quiet
+write_registry "$fix_key_a" "fixture_a.txt"
+python3 - "$REG_FILE" <<'MUT'
+import json, sys
+doc = json.load(open(sys.argv[1], encoding="utf-8"))
+doc["entries"][0]["owner"] = ""
+json.dump(doc, open(sys.argv[1], "w", encoding="utf-8"), ensure_ascii=False, indent=2)
+MUT
+git add "$REG_FILE"
+integrity_case "entry with an empty owner fails"
+
+# 计数棘轮：两条**各自都合法**的条目 + maxEntries=1。两条都合法是关键——
+# 若第二条本身非法，加载器会先死在别的检查上，这个用例就会因为错误的原因而绿
+# （maxEntries=0 那种写法实测就是踩了 "maxEntries must be a positive integer"）。
+git reset --quiet
+printf 'fixture = "%s"\n' "$fix_key_b" > fixture_b.txt
+extra_entry="$(printf '{"path": "fixture_b.txt", "literal": "%s", "owner": "Test", "review": "2026-09-04", "reason": "self-test fixture"}' "$fix_key_b")"
+write_registry "$fix_key_a" "fixture_a.txt" "$extra_entry" 1
+git add "$REG_FILE"
+integrity_case "entry count over maxEntries fails"
+
+# 死条目：literal 不是任何字面量规则的完整形状。夹具文件里写入同一个字符串，
+# 好让「literal 必须出现在登记路径里」这条检查先满足，红就只能来自形状检查。
+git reset --quiet
+dead_value="not-a-credential-shaped-value"
+printf 'fixture = "%s"\n' "$dead_value" > fixture_a.txt
+write_registry "$dead_value" "fixture_a.txt"
+git add "$REG_FILE"
+integrity_case "dead entry (literal is not a credential shape) fails"
+
+git reset --quiet
+printf 'fixture = "%s"\n' "$fix_key_a" > fixture_a.txt
+printf '{ not json\n' > "$REG_FILE"
+git add "$REG_FILE"
+integrity_case "malformed registry JSON fails"
+
+git reset --quiet
+rm -f fixture_a.txt fixture_b.txt fixture_copy.txt fixture_two.txt "$REG_FILE"
 
 echo ""
 echo "Results: $PASS passed, $FAIL failed"
