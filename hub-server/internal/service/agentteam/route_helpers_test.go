@@ -264,3 +264,11 @@ func TestSupervisorRouteModelParams(t *testing.T) {
 	assert.Contains(t, params["structured_output_schema"], `"action"`)
 	assert.Contains(t, params["append_system_prompt"], "supervisor mode")
 }
+
+func TestIsTerminalTeamRunStatusIncludesCancelledWithoutCancelAPI(t *testing.T) {
+	// Documented dead write-path: cancelled is a terminal guard token only.
+	assert.True(t, isTerminalTeamRunStatus(model.TeamRunStatusCancelled))
+	assert.True(t, isTerminalTeamRunStatus(model.TeamRunStatusCompleted))
+	assert.True(t, isTerminalTeamRunStatus(model.TeamRunStatusFailed))
+	assert.False(t, isTerminalTeamRunStatus(model.TeamRunStatusRunning))
+}
