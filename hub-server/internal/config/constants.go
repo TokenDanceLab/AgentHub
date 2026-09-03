@@ -41,10 +41,13 @@ const MaxIncrementalMessageLimit = 500
 // for projects/workspaces, skills, agent profiles, execution targets, provider
 // bindings, MCP servers, market profiles and session search, each clamping with
 // ClampPageSize(.., MaxListPageSize, ..). The repository queries beneath them
-// clamp to the same value as defence in depth, with two asymmetries worth
+// clamp to the same value as defence in depth, with one asymmetry worth
 // knowing: repository.SearchSessions applies no ceiling of its own, so its
-// handler is the only enforcement point, and GET /web/audit-events has no
-// handler-side clamp, so repository.ListAuditEvents is its enforcement point.
+// handler is the only enforcement point. GET /web/audit-events used to be the
+// second one — its handler forwarded the raw pageSize and repository.ListAuditEvents
+// was the only clamp — and now clamps like the rest. No list handler in
+// internal/handler carries a hand-written two-branch clamp any more; every one
+// goes through ClampPageSize with the ceiling its own endpoint declares (#2243).
 //
 // Before #2243 every one of those handlers clamped to MaxPageLimit (500)
 // instead, so pageSize=300 reached a query that silently returned 200 rows with

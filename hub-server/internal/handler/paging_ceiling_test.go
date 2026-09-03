@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/require"
@@ -15,6 +16,7 @@ import (
 	"github.com/agenthub/hub-server/internal/model"
 	"github.com/agenthub/hub-server/internal/service/agentprofile"
 	"github.com/agenthub/hub-server/internal/service/agentteam"
+	"github.com/agenthub/hub-server/internal/service/audit"
 	"github.com/agenthub/hub-server/internal/service/mcpserver"
 	"github.com/agenthub/hub-server/internal/service/providerbinding"
 	"github.com/agenthub/hub-server/internal/service/skill"
@@ -292,6 +294,33 @@ func internalPagingCeilingCases() []pagingCeilingCase {
 					},
 				})
 				status := servePaging(t, "/web/agent-teams/:id/runs/:run_id/events", h.ListTeamEvents, target)
+				return got, status
+			},
+		},
+		{
+			// The tail of #2243: audit-events was the one list handler carrying no
+			// clamp at all — it forwarded the raw pageSize and
+			// repository.ListAuditEvents was the endpoint's only enforcement point,
+			// i.e. the page was shortened a layer below the contract that describes
+			// it. defaultAuditPageSize and DefaultPaginationLimit are both 50, so
+			// converging it changes no observable behaviour.
+			name:       "GET /web/audit-events",
+			enforcedBy: "repository.ListAuditEvents → ClampPageSize(.., MaxListPageSize, defaultAuditPageSize=50); openapi shared PageSize maximum: 200",
+			route:      "/web/audit-events",
+			base:       "/web/audit-events",
+			param:      "pageSize",
+			ceiling:    config.MaxListPageSize,
+			absent:     config.DefaultPaginationLimit,
+			zero:       config.DefaultPaginationLimit,
+			forward: func(t *testing.T, target string) (int, int) {
+				got := notForwarded
+				h := NewAuditHandler(&mockAuditService{
+					queryFn: func(_ context.Context, _ string, _ bool, _, _ string, _, _ *time.Time, _ string, pageSize int) (*audit.ListResult, error) {
+						got = pageSize
+						return &audit.ListResult{}, nil
+					},
+				})
+				status := servePaging(t, "/web/audit-events", h.ListAuditEvents, target)
 				return got, status
 			},
 		},
