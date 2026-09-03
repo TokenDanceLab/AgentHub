@@ -55,47 +55,75 @@ func (s *AgentTeamService) ReviewDagPlan(ctx context.Context, userID, runID stri
 		state.Changes = []model.HumanReviewChange{}
 	}
 
-	// Atomically claim the pending_review run before any side effects. The
-	// conditional status write folds the :status-check + status-write into one
-	// CAS, so concurrent or repeated decisions cannot both pass the guard
-	// above and then double-cancel assignments / double-append the
-	// review-decided event. The loser sees the same ErrBadRequest as the
-	// stale-status guard above.
-	claimed, err := repository.UpdateTeamRunStatusIf(s.db, runID,
-		model.TeamRunStatusPendingReview, model.TeamRunStatusRunning)
-	if err != nil {
-		return nil, err
-	}
-	if claimed == 0 {
-		return nil, errcode.ErrBadRequest
-	}
-
+	// Resolve the comment before opening the transaction: it is a pure function
+	// of the action, so keeping it here means the closure below only writes.
 	switch decision.Action {
 	case model.ReviewActionApprove:
-		// Accept the plan: run already claimed back to running above.
+		// Accept the plan: the run is claimed back to running inside the
+		// transaction below.
 		state.Comment = firstNonEmptyString(state.Comment, "approved")
 
 	case model.ReviewActionDiscuss:
 		// Reject for discussion: cancel pending assignments so the supervisor
 		// can generate a new plan with the feedback.
-		if err := s.cancelPendingAssignmentsForReview(runID, decision.Comment); err != nil {
-			s.releaseReviewClaim(runID)
-			return nil, err
-		}
 		state.Comment = firstNonEmptyString(state.Comment, "returned for discussion")
 
 	case model.ReviewActionModify:
 		// Reject with modification notes: cancel pending assignments; the
 		// supervisor should incorporate the changes into a new route decision.
-		if err := s.cancelPendingAssignmentsForReview(runID, decision.Comment); err != nil {
-			s.releaseReviewClaim(runID)
-			return nil, err
-		}
 		state.Comment = firstNonEmptyString(state.Comment, "returned with modifications")
 	}
 
-	// Record the review decision as an event.
-	if err := s.appendTeamEvent(runID, model.TeamEventReviewDecided, state); err != nil {
+	// The claim and every side effect it authorizes commit or roll back
+	// together (#2256 E-P2-5).
+	//
+	// Two invariants this restores:
+	//
+	//   - The conditional status write still folds the :status-check + the
+	//     status-write into one CAS, so concurrent or repeated decisions cannot
+	//     both pass the guard above and then double-cancel assignments or
+	//     double-append the review-decided event. The loser sees the same
+	//     ErrBadRequest as the stale-status guard above. Under READ COMMITTED
+	//     the loser's UPDATE blocks on the row lock the winner's transaction
+	//     holds, then re-evaluates its predicate against the committed
+	//     'running' row and matches zero rows.
+	//   - Cancelling N assignments writes 2N rows (one conditional UPDATE plus
+	//     one assignment_cancelled event each). Those writes used to run on
+	//     s.db with no transaction, so a failure at step k left k-1 assignments
+	//     cancelled with the k-th event permanently missing, and the caller's
+	//     only compensation was a best-effort status write that could not undo
+	//     the cancels. The team event log is the projection source for reviews
+	//     (replayReviewEvents), so a cancelled assignment without its event is
+	//     a divergence a reader can observe, not a cosmetic gap.
+	//
+	// Because the claim is now inside the transaction, the compensating
+	// running -> pending_review write it used to need is gone: a failed
+	// decision leaves the run in pending_review by rollback rather than by a
+	// second best-effort write that could itself fail and strand the run in
+	// 'running' with assignments already cancelled.
+	err = s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		claimed, err := repository.UpdateTeamRunStatusIf(tx, runID,
+			model.TeamRunStatusPendingReview, model.TeamRunStatusRunning)
+		if err != nil {
+			return err
+		}
+		if claimed == 0 {
+			return errReviewClaimLost
+		}
+
+		if decision.Action == model.ReviewActionDiscuss || decision.Action == model.ReviewActionModify {
+			if err := s.cancelPendingAssignmentsForReview(tx, runID, decision.Comment); err != nil {
+				return err
+			}
+		}
+
+		// Record the review decision as an event.
+		return s.appendTeamEventTx(tx, runID, model.TeamEventReviewDecided, state)
+	})
+	if err != nil {
+		if errors.Is(err, errReviewClaimLost) {
+			return nil, errcode.ErrBadRequest
+		}
 		return nil, err
 	}
 
@@ -103,26 +131,30 @@ func (s *AgentTeamService) ReviewDagPlan(ctx context.Context, userID, runID stri
 	return state, nil
 }
 
-// releaseReviewClaim returns a claimed run from running back to pending_review
-// when post-claim side effects fail, preserving the pre-CAS retry semantics
-// (the reviewer can try again). The conditional write never clobbers a run
-// that has since moved on (e.g. reached a terminal status); failures are
-// swallowed because the caller is already returning the primary error.
-func (s *AgentTeamService) releaseReviewClaim(runID string) {
-	_, _ = repository.UpdateTeamRunStatusIf(s.db, runID,
-		model.TeamRunStatusRunning, model.TeamRunStatusPendingReview)
-}
+// errReviewClaimLost is the in-transaction sentinel for "this run is no longer
+// in pending_review, so this decision lost the claim". It exists only to be
+// mapped back to errcode.ErrBadRequest by the caller, which keeps the loser's
+// response byte-identical to the stale-status guard; a bare ErrBadRequest
+// returned from the closure would be indistinguishable from a real write
+// failure in the error path.
+var errReviewClaimLost = errors.New("agentteam: review claim lost")
 
 // cancelPendingAssignmentsForReview marks all pending assignments for a run as
 // cancelled and records the cancellation reason.
-func (s *AgentTeamService) cancelPendingAssignmentsForReview(runID, reason string) error {
-	assignments, err := repository.ListAssignmentsByTeamRun(s.db, runID)
+//
+// tx is the caller's transaction: every write here must commit or roll back
+// with the claim that authorized it (#2256 E-P2-5). The audit trail is written
+// through appendTeamEventTx on the same handle for the same reason — a
+// cancelled assignment whose event is missing is an observable divergence,
+// because replayReviewEvents projects review state from the event log.
+func (s *AgentTeamService) cancelPendingAssignmentsForReview(tx *gorm.DB, runID, reason string) error {
+	assignments, err := repository.ListAssignmentsByTeamRun(tx, runID)
 	if err != nil {
 		return err
 	}
 	for _, a := range assignments {
 		if a.Status == model.AssignmentStatusPending || a.Status == model.AssignmentStatusDispatched {
-			updated, err := repository.UpdateAssignmentStatusIf(s.db, a.ID,
+			updated, err := repository.UpdateAssignmentStatusIf(tx, a.ID,
 				[]string{model.AssignmentStatusPending, model.AssignmentStatusDispatched},
 				model.AssignmentStatusCancelled, reason)
 			if err != nil {
@@ -131,7 +163,7 @@ func (s *AgentTeamService) cancelPendingAssignmentsForReview(runID, reason strin
 			if updated == 0 {
 				continue
 			}
-			if err := s.appendTeamEvent(runID, model.TeamEventAssignmentCancelled, map[string]string{
+			if err := s.appendTeamEventTx(tx, runID, model.TeamEventAssignmentCancelled, map[string]string{
 				"assignment_id": a.ID,
 				"reason":        reason,
 			}); err != nil {
@@ -144,13 +176,30 @@ func (s *AgentTeamService) cancelPendingAssignmentsForReview(runID, reason strin
 
 // setRunPendingReview transitions a team run into the pending_review state and
 // records a review_pending event carrying the latest route decision context.
+//
+// Both writes are one transaction for the same reason as ReviewDagPlan: the
+// event log is the projection source (replayReviewEvents marks the run as
+// awaiting review only when it sees a review_pending event), so a status write
+// that commits without its event leaves the row saying pending_review while the
+// projection says running.
+//
+// Residual, deliberately not folded in: HandleRouteDecision commits the
+// assignment + agent task in an earlier transaction and calls this afterwards
+// (route_decision.go), so a failure here still leaves a created assignment on a
+// run that never reached the review gate. Folding this into that transaction
+// would route a DB failure through resolveRouteError, which appends a
+// route_rejected event for anything that is not a rejectRoute marker — i.e. it
+// would report an infrastructure failure as a policy rejection. Tracked in
+// #2256 rather than mis-classified here.
 func (s *AgentTeamService) setRunPendingReview(runID string, latestDecision model.CoordinatorRouteDecision) error {
-	if err := repository.UpdateTeamRunStatus(s.db, runID, model.TeamRunStatusPendingReview); err != nil {
-		return err
-	}
-	return s.appendTeamEvent(runID, model.TeamEventReviewPending, map[string]any{
-		"decision":     latestDecision,
-		"submitted_at": time.Now(),
+	return s.db.Transaction(func(tx *gorm.DB) error {
+		if err := repository.UpdateTeamRunStatus(tx, runID, model.TeamRunStatusPendingReview); err != nil {
+			return err
+		}
+		return s.appendTeamEventTx(tx, runID, model.TeamEventReviewPending, map[string]any{
+			"decision":     latestDecision,
+			"submitted_at": time.Now(),
+		})
 	})
 }
 
