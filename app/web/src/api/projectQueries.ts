@@ -14,7 +14,12 @@ import type {
 } from './hubClient';
 
 export const workspaceProjectsQueryKey = hubQueryKeys.projects.root;
-export const workspaceProjectThreadsQueryKey = hubQueryKeys.projects.root;
+// Deliberately no local threads-key alias next to the projects key above: the
+// one that used to sit here had 0 consumers and pointed at
+// `hubQueryKeys.projects.root` — the *projects* root — so any invalidation
+// written against it would have refetched the project list and never the
+// threads it claimed to address (#2274 A-15). Threads are keyed by the shared
+// factory; do not reintroduce a literal alias for them.
 
 const emptyWorkspaceProjects: WorkspaceProjectListResponse = {
   items: [],
