@@ -173,13 +173,3 @@ export function shouldReduceMotion(accessibilityReduceMotion: boolean | null | u
   return accessibilityReduceMotion === true;
 }
 
-export function resolveMotionTiming(
-  timing: MotionTimingSpec,
-  accessibilityReduceMotion: boolean | null | undefined,
-): MotionTimingSpec {
-  if (shouldReduceMotion(accessibilityReduceMotion)) {
-    return { durationMs: motion.reduced.durationMs, easing: 'standard' };
-  }
-
-  return timing;
-}

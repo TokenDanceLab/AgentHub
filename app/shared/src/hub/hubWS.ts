@@ -55,22 +55,6 @@ export interface HubWSGapPayload {
   gapSize: number;
 }
 
-/**
- * Internal-only event name for seq_id gap detection. Not part of HUB_EVENTS
- * because it has no server-side producer; it is synthesized client-side by
- * hubWS when per-connection seq_id is discontinuous. Subscribe via
- * HubWSHandle.onGap(). See #2101 G1.
- */
-export const HUB_WS_GAP_EVENT = 'hub.ws.gap';
-
-/**
- * Internal-only event name for post-reconnect auth completion. Synthesized
- * client-side when auth.ok arrives on a connection that has previously been
- * authenticated (i.e. a reconnect, not the first connect). Subscribe via
- * HubWSHandle.onReconnected(). See #2101 G4-②.
- */
-export const HUB_WS_RECONNECTED_EVENT = 'hub.ws.reconnected';
-
 export interface HubWSHandle {
   /** Open the WebSocket connection and initiate auth handshake. */
   connect: () => void;

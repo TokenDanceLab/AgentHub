@@ -7,7 +7,3 @@
  * persisted state — a late event with no listener is simply dropped.
  */
 export const WORKBENCH_APPROVAL_JUMP_EVENT = 'agenthub:approval-jump';
-
-export interface ApprovalJumpDetail {
-  conversationId: string;
-}
