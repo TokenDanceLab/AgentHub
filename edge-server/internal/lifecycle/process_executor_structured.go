@@ -87,5 +87,4 @@ func (e *ProcessExecutor) publishStructuredOutput(wg *sync.WaitGroup, run store.
 // sessions.create({parentID}) pattern where sub-agents get independent sessions
 // with derived permissions and no shared context contamination.
 //
-// Reference: docs/reference/cross-comparison/03-orchestration.md Layer 3 (Supervisor routing).
 // Reference: OpenCode task.ts:145-162 (sessions.create with parentID, deriveSubagentSessionPermission).

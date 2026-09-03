@@ -16,7 +16,7 @@
 
 ## 0.5 根级目录地图
 
-【活】= 维护中的源码/文档；【产物】= 构建/临时产物（gitignored，勿提交）；【参考】= 只读副本。
+【活】= 维护中的源码/文档；【产物】= 构建/临时产物（gitignored，勿提交）。
 
 | 目录 | 分类 | 职责 |
 |---|---|---|
@@ -28,7 +28,6 @@
 | `hub-server/` | 活 | Go Hub 服务（REST/WS/OIDC/dispatch/agentteam） |
 | node_modules/ | 产物 | 依赖（gitignored） |
 | `pkg/` | 活 | Go 共享包（errcode 等） |
-| `reference/` | 参考 | 第三方源码只读副本（gitignored，INDEX.md 管理） |
 | `scripts/` | 活 | 验证/开发/发布脚本（verify/dev/e2e/git-hooks/lib/release/smoke/） |
 | `tests/` | 活 | 跨服务测试 |
 
