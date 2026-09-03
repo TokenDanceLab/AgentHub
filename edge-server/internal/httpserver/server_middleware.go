@@ -11,6 +11,7 @@ import (
 	"github.com/agenthub/edge-server/internal/edgeidentity"
 	"github.com/agenthub/edge-server/internal/errcode"
 	"github.com/agenthub/edge-server/internal/jwtutil"
+	"github.com/agenthub/edge-server/internal/resputil"
 	"github.com/agenthub/edge-server/internal/security"
 	sharederr "github.com/agenthub/pkg/errcode"
 	"github.com/prometheus/client_golang/prometheus"
@@ -21,7 +22,7 @@ func corsMiddleware(next http.Handler, remoteMode bool, allowedOrigins []string)
 		origin := r.Header.Get("Origin")
 		if origin != "" {
 			if !security.IsAllowedOrigin(origin, remoteMode, allowedOrigins) {
-				sharederr.WriteJSON(w, http.StatusForbidden, errcode.ErrorBody(sharederr.ErrForbidden.WithMessage("forbidden origin")))
+				resputil.WriteJSON(w, http.StatusForbidden, errcode.ErrorBody(sharederr.ErrForbidden.WithMessage("forbidden origin")))
 				return
 			}
 			w.Header().Set("Access-Control-Allow-Origin", origin)
@@ -81,7 +82,7 @@ func localAuthMiddleware(next http.Handler, localAuthToken string, hubJWTSecret 
 		}
 
 		w.Header().Set("WWW-Authenticate", `Bearer realm="agenthub-edge"`)
-		sharederr.WriteJSON(w, http.StatusUnauthorized, errcode.ErrorBody(sharederr.ErrUnauthorized))
+		resputil.WriteJSON(w, http.StatusUnauthorized, errcode.ErrorBody(sharederr.ErrUnauthorized))
 	})
 }
 

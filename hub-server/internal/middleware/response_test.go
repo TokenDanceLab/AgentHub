@@ -69,7 +69,9 @@ func TestFailHelper_VariousErrorCodes(t *testing.T) {
 			expectedCode:   "session_not_found",
 		},
 		{
-			name:           "custom error with zero status",
+			// #2243: errcode.New normalizes 0 to 500 at construction; fail()
+			// deliberately has no clamp of its own anymore.
+			name:           "custom error constructed with a zero status",
 			err:            errcode.New("CUSTOM_ERROR", "custom message", 0),
 			expectedStatus: http.StatusInternalServerError,
 			expectedCode:   "CUSTOM_ERROR",

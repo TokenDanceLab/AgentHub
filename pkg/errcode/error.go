@@ -65,9 +65,30 @@ func (e *Error) WithTrace(traceID string) *Error {
 	}
 }
 
+// normalizeStatus is the single definition of the fallback behind the
+// invariant "*Error always writes a usable HTTP status".
+//
+// WriteHeader(0) is not a neutral no-op: net/http logs "invalid WriteHeader
+// code 0" and then answers 200, i.e. it renders an error as a success. Two
+// callers apply this, deliberately: New() at construction, and writeEnvelope()
+// as a fail-closed guard for the &Error{} struct literals that bypass New().
+// Holding the fallback in one function is what stops the drift that three
+// per-call-site clamps produced — handler and middleware/response said 500
+// while middleware/timeout said 504 (#2243).
+func normalizeStatus(status int) int {
+	if status == 0 {
+		return http.StatusInternalServerError
+	}
+	return status
+}
+
 // New creates a new Error with the given code, message, and HTTP status.
+//
+// A zero status means the caller never decided one, so it is normalized here,
+// once, at construction. Write sites therefore use e.HTTPStatus directly and
+// must not carry a clamp of their own (#2243).
 func New(code, message string, httpStatus int) *Error {
-	return &Error{Code: code, Message: message, HTTPStatus: httpStatus}
+	return &Error{Code: code, Message: message, HTTPStatus: normalizeStatus(httpStatus)}
 }
 
 // --- Trace ID generation ---
@@ -116,47 +137,16 @@ func WriteError(w http.ResponseWriter, err error) {
 	writeEnvelope(w, http.StatusInternalServerError, errorEnvelope{Error: e})
 }
 
-// WriteErrorWithTrace writes an error with an explicit trace ID (no auto-generation).
-func WriteErrorWithTrace(w http.ResponseWriter, err error, traceID string) {
-	var e *Error
-	if errors.As(err, &e) {
-		if e.TraceID == "" {
-			e = e.WithTrace(traceID)
-		}
-		writeEnvelope(w, e.HTTPStatus, errorEnvelope{Error: e})
-		return
-	}
-	slog.Error("unexpected internal error",
-		"traceId", traceID,
-		"error", err.Error(),
-	)
-	e = ErrInternal.WithTrace(traceID)
-	writeEnvelope(w, http.StatusInternalServerError, errorEnvelope{Error: e})
-}
-
-// WriteJSON writes a successful JSON response with the given status code.
-func WriteJSON(w http.ResponseWriter, status int, v any) {
-	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	w.WriteHeader(status)
-	if v != nil {
-		json.NewEncoder(w).Encode(v)
-	}
-}
-
 func writeEnvelope(w http.ResponseWriter, status int, env errorEnvelope) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(env)
-}
-
-// EnvelopeForGin returns a map suitable for gin.Context.JSON().
-// Hub Server uses this to write errors through Gin while keeping the same envelope.
-func EnvelopeForGin(e *Error) map[string]any {
-	return map[string]any{
-		"error": map[string]any{
-			"code":    e.Code,
-			"message": e.Message,
-		},
+	w.WriteHeader(normalizeStatus(status))
+	// The envelope is three strings, so the only realistic failure is the client
+	// having gone away — by then the status is already on the wire, which makes
+	// this an operator signal rather than a caller-facing error. It is logged
+	// rather than dropped, matching the edge resputil writer this package's
+	// duplicate WriteJSON was removed in favour of (#2246).
+	if err := json.NewEncoder(w).Encode(env); err != nil {
+		slog.Error("write error envelope failed", "error", err)
 	}
 }
 

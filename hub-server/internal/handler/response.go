@@ -28,15 +28,15 @@ func OK(c *gin.Context, data interface{}) {
 //
 //	{"error": {"code": "...", "message": "...", "traceId": "..."}}
 func Fail(c *gin.Context, e *errcode.Error) {
-	status := e.HTTPStatus
-	if status == 0 {
-		status = http.StatusInternalServerError
-	}
+	// No status clamp here on purpose: errcode.New guarantees a non-zero
+	// HTTPStatus, so this write site cannot hand WriteHeader(0) to net/http
+	// (#2243). Re-clamping per call site is what let two sites drift to
+	// different fallbacks.
 	traceID := middleware.GetRequestID(c)
 	if traceID == "" {
 		traceID = sharederr.NewTraceID()
 	}
-	c.AbortWithStatusJSON(status, sharederr.EnvelopeForGinWithTrace(e.WithTrace(traceID)))
+	c.AbortWithStatusJSON(e.HTTPStatus, sharederr.EnvelopeForGinWithTrace(e.WithTrace(traceID)))
 }
 
 func FailWithMessage(c *gin.Context, e *errcode.Error, message string) {
