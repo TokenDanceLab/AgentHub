@@ -46,7 +46,7 @@ def is_active_doc(path: str) -> bool:
     p = normalize_path(path)
     if re.match(r"^docs/(archive|archives|audit|release)/", p):
         return False
-    if p in ("AGENTS.md", "CONTRIBUTING.md", "reference/INDEX.md", "README.md", "README_EN.md"):
+    if p in ("AGENTS.md", "CONTRIBUTING.md", "README.md", "README_EN.md"):
         return True
     if p in ("api/README.md", "api/events.md", "api/conventions.md"):
         return True
@@ -175,7 +175,6 @@ def check_required_markers() -> None:
         ("hub-server/README.md", "Source Map"),
         ("hub-server/deployments/README.md", "Live host"),
         ("hub-server/tests/README.md", "Integration Tests"),
-        ("reference/INDEX.md", "docs/reference/README.md"),
         ("CONTRIBUTING.md", "旧详细贡献指南见"),
         ("docs/governance/README.md", "Login fixture topology gate"),
         ("docs/governance/README.md", "已迁移至私有文档中枢"),
@@ -263,7 +262,6 @@ def check_max_lines() -> None:
         "AGENTS.md": 300,
         "CHANGELOG.md": 90,
         "CONTRIBUTING.md": 90,
-        "reference/INDEX.md": 80,
         "api/README.md": 100,
         "api/events.md": 180,
         "api/conventions.md": 190,

@@ -266,9 +266,6 @@ docs/deployment/region-*.md
 docs/deployment/*-deployment-runbook.md
 docs/deployment/*deployment*
 
-# Cloned reference repos (at repo root only)
-/reference/*
-!/reference/INDEX.md
 /chat-verify/
 
 # =============================================================================

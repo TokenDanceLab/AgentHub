@@ -85,9 +85,6 @@ app/web/pnpm-lock.yaml
 # ── Rust / Tauri (not needed for Go build) ────
 target/
 
-# ── Reference repos ───────────────────────────
-reference/
-
 # ── Local ops state ───────────────────────────
 .ops
 .tmp
