@@ -12,7 +12,7 @@ import (
 	"github.com/agenthub/edge-server/internal/store"
 )
 
-// Node-level shared configuration write gate (#2250 round-65 wave lane A):
+// Node-level shared configuration write gate (#2250 wave lane A):
 //
 //	POST   /v1/agent-profiles              — create an agent profile
 //	PATCH  /v1/agent-profiles/{profileId}  — mutate systemPrompt/allowedTools/mcpConfig/permissionMode
