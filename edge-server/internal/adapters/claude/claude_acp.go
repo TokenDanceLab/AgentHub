@@ -55,7 +55,7 @@ const claudeACPAdapterID = "claude-acp"
 // claudeACPPackage is the official ACP adapter npm package.
 const claudeACPPackage = "@agentclientprotocol/claude-agent-acp"
 
-// claudeACPVersionPin is the npm version verified end-to-end on the DevSpace
+// claudeACPVersionPin is the npm version verified end-to-end on a live
 // dev machine (initialize handshake, session/new, session/prompt, end_turn,
 // model passthrough via ANTHROPIC_MODEL). Bump discipline: update on
 // upgrades, keep the pin visible in metadata AND in the npx package spec —
@@ -128,6 +128,6 @@ var _ AgentAdapter = (*ACPAdapter)(nil)
 
 // Verified: end-to-end runs against the real `npx -y
 // @agentclientprotocol/claude-agent-acp@0.67.0` process were exercised on the
-// DevSpace dev machine (initialize → session/new → session/prompt →
+// dev host (initialize → session/new → session/prompt →
 // streaming updates → end_turn → run finalized; ANTHROPIC_MODEL passthrough
 // confirmed). The version pin must stay in sync with claudeACPVersionPin.

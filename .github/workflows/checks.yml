@@ -2226,6 +2226,21 @@ jobs:
       - name: Verify Outbound client hygiene (#1549)
         run: python ./scripts/verify/verify-outbound-client-hygiene.py
 
+      # #2275: 三个负向自测自 2026-08 落地以来从未被任何 workflow 执行过
+      # （merge-coverprofiles 只在覆盖率合并里被当工具调用、real-e2e-artifacts 的
+      # 父门禁只在 workflow_dispatch 的 job 里跑、outbound-client-hygiene 的父门禁
+      # 接线了但自测没接）。一个从不被执行的负向自测比没有自测更坏——它让门禁看
+      # 起来"被验证过"。三条一律挂在 validate，即每个 PR 都跑；此后由
+      # verify-doc-ssot.py 的 DOC-ORPHAN-SELFTEST 挡住任何新出现的孤儿自测。
+      - name: Self-test outbound client hygiene gate (negative)
+        run: python scripts/verify/tests/verify-outbound-client-hygiene.Tests.py
+
+      - name: Self-test coverage profile merge (negative)
+        run: python scripts/verify/tests/merge-coverprofiles.Tests.py
+
+      - name: Self-test real-e2e artifact redaction gate (negative)
+        run: python scripts/verify/tests/verify-real-e2e-artifacts.Tests.py
+
       # #1948: 棘轮升级为双门禁——计数棘轮（#1550，基线
       # scripts/verify/test-sleep-baseline.json）外加值预算（#1565，预算
       # scripts/verify/test-sleep-budget.json）：预算文件必须存在、预算内路径

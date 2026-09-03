@@ -240,6 +240,15 @@ class VerifyDocEntrypointsTests(unittest.TestCase):
         finally:
             self.restore_bytes(agents_path, original_bytes)
 
+    def assert_orphan_selftest(self):
+        """A self-test nobody executes must fail the gate (#2275)."""
+        rel = "scripts/verify/tests/verify-orphan-demo.Tests.py"
+        try:
+            self.write_fixture_file(rel, "# temporary negative fixture for #2275\n")
+            self.assert_failure_code("DOC-ORPHAN-SELFTEST", "orphan self-test under scripts/verify/tests/")
+        finally:
+            os.remove(os.path.join(self.fixture, *rel.split("/")))
+
     def assert_verifier_map_owner(self):
         agents_path = os.path.join(self.fixture, "AGENTS.md")
         with open(agents_path, "rb") as handle:
@@ -274,6 +283,7 @@ class VerifyDocEntrypointsTests(unittest.TestCase):
             self.assert_agents_numbered_reference()
             self.assert_agents_line_budget()
             self.assert_verifier_map_owner()
+            self.assert_orphan_selftest()
 
             exit_code, output = self.run_verifier()
             self.assertEqual(exit_code, 0, "verifier did not recover after fixture cleanup:\n%s" % output)
