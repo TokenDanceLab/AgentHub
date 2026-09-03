@@ -19,9 +19,8 @@ import (
 //	if pageSize <= 0 || pageSize > 200 { pageSize = defaultXPageSize }   // 50
 //
 // The upper branch is wrong: a request for 201 rows — which api/openapi.yaml
-// permits up to 200 and the handler layer clamps to config.MaxPageLimit=500 —
-// silently produced a **50-row** page with HTTP 200. Two consequences, of
-// different severity:
+// permits up to 200 — silently produced a **50-row** page with HTTP 200. Two
+// consequences, of different severity:
 //
 //   - cursor-paged lists (workspaces, skills, profiles, execution targets,
 //     provider bindings, MCP servers, audit events): nextCursor is still
@@ -32,8 +31,18 @@ import (
 //   - offset-paged ListNotifications and the fixed-offset thread-message list
 //     return a bare array with no cursor at all, so a short page is
 //     indistinguishable from the end of the collection: the thread panel asks
-//     for up to 500 and silently renders 50 with no way to reach the rest, and
+//     for its ceiling and silently renders 50 with no way to reach the rest, and
 //     any offset consumer that advances by the *requested* limit skips rows.
+//
+// When these tests were written the handler layer clamped every list to
+// config.MaxPageLimit=500, so an oversized pageSize really did arrive here and
+// this package's clamp was the endpoint's only bound. Since #2243 the handlers
+// clamp to the same per-endpoint ceiling the query beneath them enforces —
+// MaxListPageSize for the cursor-paged lists, MaxMessagePageLimit for
+// notifications and the thread-message list — pinned by
+// handler/paging_ceiling_test.go and handler/paging_ceiling_ext_test.go. What is
+// asserted below is therefore defence in depth for callers that bypass the
+// handlers, not the client-visible bound.
 //
 // repository/message.go:48 (GetMessagesIncrement) and
 // agent_team_assignments.go:160 already had the correct shape — clamp to the
