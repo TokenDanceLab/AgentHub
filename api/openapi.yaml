@@ -723,6 +723,17 @@ paths:
               schema:
                 $ref: "#/components/schemas/Run"
         "403":
+          # capability_token_invalid: the X-AgentHub-Capability-Token is missing,
+          # fails validation, or does not bind this user/device/project/target.
+          $ref: "#/components/responses/Error"
+        "503":
+          # not_configured: a Hub user identity reached the Edge but HubJWTSecret is
+          # empty/misconfigured. The dual-token policy fails closed rather than
+          # soft-skipping (#899), and the errcode table defines not_configured as 503
+          # — an operator fault, not a client credential fault. Declared since #2245:
+          # before that this path hand-copied 403 at the call site, so a server
+          # misconfiguration was reported to the client as "your credentials are
+          # wrong, do not retry".
           $ref: "#/components/responses/Error"
 
   /v1/runs/{runId}:

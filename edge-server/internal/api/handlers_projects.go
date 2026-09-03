@@ -22,7 +22,7 @@ func (h *Handler) PostProjects(w http.ResponseWriter, r *http.Request) {
 		Name      string `json:"name"`
 	}
 	if err := decodeOptionalJSON(r, &req); err != nil {
-		writeJSON(w, http.StatusBadRequest, errcode.ErrorBody(errcode.ErrInvalidJSON))
+		errcode.Write(w, errcode.ErrInvalidJSON)
 		return
 	}
 	if req.ProjectID == "" {
@@ -45,13 +45,13 @@ func (h *Handler) GetProject(w http.ResponseWriter, r *http.Request) {
 	userID := h.ownerUserID(r)
 	if project, ok := repo.GetProject(projectID); ok {
 		if !isProjectOwnedBy(repo, project.ID, userID) {
-			writeJSON(w, http.StatusNotFound, errcode.ErrorBody(errcode.ErrNotFound.WithMessage("project not found")))
+			errcode.Write(w, errcode.ErrNotFound.WithMessage("project not found"))
 			return
 		}
 		writeSuccess(w, http.StatusOK, project)
 		return
 	}
-	writeJSON(w, http.StatusNotFound, errcode.ErrorBody(errcode.ErrNotFound.WithMessage("project not found")))
+	errcode.Write(w, errcode.ErrNotFound.WithMessage("project not found"))
 }
 
 func (h *Handler) GetThreads(w http.ResponseWriter, r *http.Request) {
@@ -68,7 +68,7 @@ func (h *Handler) PostThreads(w http.ResponseWriter, r *http.Request) {
 		Title     string `json:"title"`
 	}
 	if err := decodeOptionalJSON(r, &req); err != nil {
-		writeJSON(w, http.StatusBadRequest, errcode.ErrorBody(errcode.ErrInvalidJSON))
+		errcode.Write(w, errcode.ErrInvalidJSON)
 		return
 	}
 	if req.ProjectID == "" {
@@ -79,7 +79,7 @@ func (h *Handler) PostThreads(w http.ResponseWriter, r *http.Request) {
 	}
 	thread, err := ensureStore(h).CreateThread(req.ThreadID, req.ProjectID, req.Title, "", "", "")
 	if err != nil {
-		writeJSON(w, http.StatusNotFound, errcode.ErrorBody(errcode.ErrNotFound.WithMessage("project not found")))
+		errcode.Write(w, errcode.ErrNotFound.WithMessage("project not found"))
 		return
 	}
 	h.Bus.Publish("thread.created", map[string]any{
@@ -95,13 +95,13 @@ func (h *Handler) GetThread(w http.ResponseWriter, r *http.Request) {
 	userID := h.ownerUserID(r)
 	if thread, ok := repo.GetThread(threadID); ok {
 		if !isThreadOwnedBy(repo, thread.ID, userID) {
-			writeJSON(w, http.StatusNotFound, errcode.ErrorBody(errcode.ErrNotFound.WithMessage("thread not found")))
+			errcode.Write(w, errcode.ErrNotFound.WithMessage("thread not found"))
 			return
 		}
 		writeSuccess(w, http.StatusOK, thread)
 		return
 	}
-	writeJSON(w, http.StatusNotFound, errcode.ErrorBody(errcode.ErrNotFound.WithMessage("thread not found")))
+	errcode.Write(w, errcode.ErrNotFound.WithMessage("thread not found"))
 }
 
 func (h *Handler) PatchThread(w http.ResponseWriter, r *http.Request, threadID string) {
@@ -110,13 +110,13 @@ func (h *Handler) PatchThread(w http.ResponseWriter, r *http.Request, threadID s
 		Status *string `json:"status"`
 	}
 	if err := decodeOptionalJSON(r, &req); err != nil {
-		writeJSON(w, http.StatusBadRequest, errcode.ErrorBody(errcode.ErrInvalidJSON))
+		errcode.Write(w, errcode.ErrInvalidJSON)
 		return
 	}
 	if req.Status != nil {
 		normalized := strings.ToLower(strings.TrimSpace(*req.Status))
 		if normalized != "active" && normalized != "archived" {
-			writeJSON(w, http.StatusBadRequest, errcode.ErrorBody(errcode.ErrBadRequest.WithMessage("status must be active or archived")))
+			errcode.Write(w, errcode.ErrBadRequest.WithMessage("status must be active or archived"))
 			return
 		}
 		req.Status = &normalized
@@ -127,7 +127,7 @@ func (h *Handler) PatchThread(w http.ResponseWriter, r *http.Request, threadID s
 	}
 	thread, ok := ensureStore(h).UpdateThread(threadID, req.Title, req.Status)
 	if !ok {
-		writeJSON(w, http.StatusNotFound, errcode.ErrorBody(errcode.ErrNotFound.WithMessage("thread not found")))
+		errcode.Write(w, errcode.ErrNotFound.WithMessage("thread not found"))
 		return
 	}
 	h.Bus.Publish("thread.updated", map[string]any{
@@ -139,7 +139,7 @@ func (h *Handler) PatchThread(w http.ResponseWriter, r *http.Request, threadID s
 
 func (h *Handler) DeleteThread(w http.ResponseWriter, r *http.Request, threadID string) {
 	if ok := ensureStore(h).DeleteThread(threadID); !ok {
-		writeJSON(w, http.StatusNotFound, errcode.ErrorBody(errcode.ErrNotFound.WithMessage("thread not found")))
+		errcode.Write(w, errcode.ErrNotFound.WithMessage("thread not found"))
 		return
 	}
 	h.Bus.Publish("thread.deleted", map[string]any{"threadId": threadID}, map[string]any{"threadId": threadID})
@@ -150,7 +150,7 @@ func (h *Handler) ArchiveThread(w http.ResponseWriter, r *http.Request, threadID
 	status := "archived"
 	thread, ok := ensureStore(h).UpdateThread(threadID, nil, &status)
 	if !ok {
-		writeJSON(w, http.StatusNotFound, errcode.ErrorBody(errcode.ErrNotFound.WithMessage("thread not found")))
+		errcode.Write(w, errcode.ErrNotFound.WithMessage("thread not found"))
 		return
 	}
 	h.Bus.Publish("thread.updated", map[string]any{
@@ -164,7 +164,7 @@ func (h *Handler) GetThreadItems(w http.ResponseWriter, r *http.Request, threadI
 	repository := ensureStore(h)
 	userID := h.ownerUserID(r)
 	if _, ok := repository.GetThread(threadID); !ok || !isThreadOwnedBy(repository, threadID, userID) {
-		writeJSON(w, http.StatusNotFound, errcode.ErrorBody(errcode.ErrNotFound.WithMessage("thread not found")))
+		errcode.Write(w, errcode.ErrNotFound.WithMessage("thread not found"))
 		return
 	}
 	writeSuccess(w, http.StatusOK, listResponse(repository.ListThreadItems(threadID)))
@@ -176,11 +176,11 @@ func (h *Handler) PostThreadMessage(w http.ResponseWriter, r *http.Request, thre
 		Role    string `json:"role"`
 	}
 	if err := decodeOptionalJSON(r, &req); err != nil {
-		writeJSON(w, http.StatusBadRequest, errcode.ErrorBody(errcode.ErrInvalidJSON))
+		errcode.Write(w, errcode.ErrInvalidJSON)
 		return
 	}
 	if strings.TrimSpace(req.Content) == "" {
-		writeJSON(w, http.StatusBadRequest, errcode.ErrorBody(errcode.ErrContentRequired))
+		errcode.Write(w, errcode.ErrContentRequired)
 		return
 	}
 
@@ -193,7 +193,7 @@ func (h *Handler) PostThreadMessage(w http.ResponseWriter, r *http.Request, thre
 	// Look up thread to get project ID for the new item.
 	thread, ok := repo.GetThread(threadID)
 	if !ok {
-		writeJSON(w, http.StatusNotFound, errcode.ErrorBody(errcode.ErrNotFound.WithMessage("thread not found")))
+		errcode.Write(w, errcode.ErrNotFound.WithMessage("thread not found"))
 		return
 	}
 
@@ -218,7 +218,7 @@ func (h *Handler) PostThreadMessage(w http.ResponseWriter, r *http.Request, thre
 		SenderName: senderName,
 	})
 	if err != nil {
-		writeJSON(w, http.StatusNotFound, errcode.ErrorBody(errcode.ErrNotFound.WithMessage("thread not found")))
+		errcode.Write(w, errcode.ErrNotFound.WithMessage("thread not found"))
 		return
 	}
 	scope := map[string]any{
@@ -235,7 +235,7 @@ func (h *Handler) GetThreadPins(w http.ResponseWriter, r *http.Request, threadID
 	repository := ensureStore(h)
 	userID := h.ownerUserID(r)
 	if _, ok := repository.GetThread(threadID); !ok || !isThreadOwnedBy(repository, threadID, userID) {
-		writeJSON(w, http.StatusNotFound, errcode.ErrorBody(errcode.ErrNotFound.WithMessage("thread not found")))
+		errcode.Write(w, errcode.ErrNotFound.WithMessage("thread not found"))
 		return
 	}
 	pins := repository.ListThreadPins(threadID)
@@ -264,17 +264,17 @@ func (h *Handler) PostThreadPin(w http.ResponseWriter, r *http.Request, threadID
 		PinnedBy string `json:"pinnedBy"`
 	}
 	if err := decodeOptionalJSON(r, &req); err != nil {
-		writeJSON(w, http.StatusBadRequest, errcode.ErrorBody(errcode.ErrInvalidJSON))
+		errcode.Write(w, errcode.ErrInvalidJSON)
 		return
 	}
 	itemID := strings.TrimSpace(req.ItemID)
 	if itemID == "" {
-		writeJSON(w, http.StatusBadRequest, errcode.ErrorBody(errcode.ErrBadRequest.WithMessage("itemId is required")))
+		errcode.Write(w, errcode.ErrBadRequest.WithMessage("itemId is required"))
 		return
 	}
 	pin, err := ensureStore(h).PinThreadItem(threadID, itemID, req.PinnedBy)
 	if err != nil {
-		writeJSON(w, http.StatusNotFound, errcode.ErrorBody(errcode.ErrNotFound.WithMessage("thread item not found")))
+		errcode.Write(w, errcode.ErrNotFound.WithMessage("thread item not found"))
 		return
 	}
 	h.Bus.Publish("thread.pin.created", map[string]any{
@@ -287,11 +287,11 @@ func (h *Handler) PostThreadPin(w http.ResponseWriter, r *http.Request, threadID
 func (h *Handler) DeleteThreadPin(w http.ResponseWriter, r *http.Request, threadID string) {
 	itemID := strings.TrimSpace(r.URL.Query().Get("itemId"))
 	if itemID == "" {
-		writeJSON(w, http.StatusBadRequest, errcode.ErrorBody(errcode.ErrBadRequest.WithMessage("itemId is required")))
+		errcode.Write(w, errcode.ErrBadRequest.WithMessage("itemId is required"))
 		return
 	}
 	if ok := ensureStore(h).DeleteThreadPin(threadID, itemID); !ok {
-		writeJSON(w, http.StatusNotFound, errcode.ErrorBody(errcode.ErrNotFound.WithMessage("thread pin not found")))
+		errcode.Write(w, errcode.ErrNotFound.WithMessage("thread pin not found"))
 		return
 	}
 	h.Bus.Publish("thread.pin.deleted", map[string]any{
@@ -307,20 +307,20 @@ func (h *Handler) GetItem(w http.ResponseWriter, r *http.Request) {
 	userID := h.ownerUserID(r)
 	if item, ok := repo.GetItem(itemID); ok {
 		if !isItemOwnedBy(repo, item.ID, userID) {
-			writeJSON(w, http.StatusNotFound, errcode.ErrorBody(errcode.ErrNotFound.WithMessage("item not found")))
+			errcode.Write(w, errcode.ErrNotFound.WithMessage("item not found"))
 			return
 		}
 		writeSuccess(w, http.StatusOK, item)
 		return
 	}
-	writeJSON(w, http.StatusNotFound, errcode.ErrorBody(errcode.ErrNotFound.WithMessage("item not found")))
+	errcode.Write(w, errcode.ErrNotFound.WithMessage("item not found"))
 }
 
 func (h *Handler) GetRunDiff(w http.ResponseWriter, r *http.Request, runID string) {
 	repository := ensureStore(h)
 	userID := h.ownerUserID(r)
 	if _, ok := repository.GetRun(runID); !ok || !isRunOwnedBy(repository, runID, userID) {
-		writeJSON(w, http.StatusNotFound, errcode.ErrorBody(errcode.ErrNotFound.WithMessage("run not found")))
+		errcode.Write(w, errcode.ErrNotFound.WithMessage("run not found"))
 		return
 	}
 	files := repository.ListRunDiffFiles(runID)

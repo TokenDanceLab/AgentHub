@@ -43,7 +43,7 @@ type modelCatalogSource struct {
 
 func (h *Handler) GetModelCatalog(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		writeJSON(w, http.StatusMethodNotAllowed, errcode.ErrorBody(errcode.ErrMethodNotAllowed))
+		errcode.Write(w, errcode.ErrMethodNotAllowed)
 		return
 	}
 	writeSuccess(w, http.StatusOK, h.buildModelCatalog())

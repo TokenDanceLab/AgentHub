@@ -25,20 +25,20 @@ func (h *Handler) GetArtifacts(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) GetArtifact(w http.ResponseWriter, r *http.Request, artifactID string) {
 	artifactID = strings.TrimSpace(artifactID)
 	if artifactID == "" || strings.Contains(artifactID, "/") {
-		writeJSON(w, http.StatusNotFound, errcode.ErrorBody(errcode.ErrNotFound.WithMessage("artifact not found")))
+		errcode.Write(w, errcode.ErrNotFound.WithMessage("artifact not found"))
 		return
 	}
 	repo := ensureStore(h)
 	userID := h.ownerUserID(r)
 	if artifact, ok := repo.GetArtifact(artifactID); ok {
 		if !isArtifactOwnedBy(repo, artifact.ID, userID) {
-			writeJSON(w, http.StatusNotFound, errcode.ErrorBody(errcode.ErrNotFound.WithMessage("artifact not found")))
+			errcode.Write(w, errcode.ErrNotFound.WithMessage("artifact not found"))
 			return
 		}
 		writeSuccess(w, http.StatusOK, artifact)
 		return
 	}
-	writeJSON(w, http.StatusNotFound, errcode.ErrorBody(errcode.ErrNotFound.WithMessage("artifact not found")))
+	errcode.Write(w, errcode.ErrNotFound.WithMessage("artifact not found"))
 }
 
 func (h *Handler) GetPreviews(w http.ResponseWriter, r *http.Request) {
@@ -59,12 +59,12 @@ func (h *Handler) PostPreview(w http.ResponseWriter, r *http.Request) {
 		ThreadID  string `json:"threadId"`
 	}
 	if err := decodeOptionalJSON(r, &req); err != nil {
-		writeJSON(w, http.StatusBadRequest, errcode.ErrorBody(errcode.ErrInvalidJSON))
+		errcode.Write(w, errcode.ErrInvalidJSON)
 		return
 	}
 	req.RunID = strings.TrimSpace(req.RunID)
 	if req.RunID == "" {
-		writeJSON(w, http.StatusBadRequest, errcode.ErrorBody(errcode.ErrBadRequest.WithMessage("runId is required")))
+		errcode.Write(w, errcode.ErrBadRequest.WithMessage("runId is required"))
 		return
 	}
 	if strings.TrimSpace(req.PreviewID) == "" {
@@ -75,7 +75,7 @@ func (h *Handler) PostPreview(w http.ResponseWriter, r *http.Request) {
 	// Ownership gate (multi-user Hub JWT mode): starting a preview record for
 	// a foreign run must fail closed; 404 keeps run existence unobservable.
 	if !isRunOwnedBy(repository, req.RunID, h.ownerUserID(r)) {
-		writeJSON(w, http.StatusNotFound, errcode.ErrorBody(errcode.ErrNotFound.WithMessage("run not found")))
+		errcode.Write(w, errcode.ErrNotFound.WithMessage("run not found"))
 		return
 	}
 	preview, err := ensurePreviewRunner(h, repository).StartPreview(lifecycle.PreviewStartRequest{
@@ -84,7 +84,7 @@ func (h *Handler) PostPreview(w http.ResponseWriter, r *http.Request) {
 		ThreadID:  req.ThreadID,
 	})
 	if err != nil {
-		writeJSON(w, http.StatusNotFound, errcode.ErrorBody(errcode.ErrNotFound.WithMessage("run not found")))
+		errcode.Write(w, errcode.ErrNotFound.WithMessage("run not found"))
 		return
 	}
 	writeSuccess(w, http.StatusAccepted, preview)
@@ -93,43 +93,43 @@ func (h *Handler) PostPreview(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) GetPreview(w http.ResponseWriter, r *http.Request, previewID string) {
 	previewID = strings.TrimSpace(previewID)
 	if previewID == "" || strings.Contains(previewID, "/") {
-		writeJSON(w, http.StatusNotFound, errcode.ErrorBody(errcode.ErrNotFound.WithMessage("preview not found")))
+		errcode.Write(w, errcode.ErrNotFound.WithMessage("preview not found"))
 		return
 	}
 	repo := ensureStore(h)
 	userID := h.ownerUserID(r)
 	if preview, ok := repo.GetPreview(previewID); ok {
 		if !isPreviewOwnedBy(repo, preview.ID, userID) {
-			writeJSON(w, http.StatusNotFound, errcode.ErrorBody(errcode.ErrNotFound.WithMessage("preview not found")))
+			errcode.Write(w, errcode.ErrNotFound.WithMessage("preview not found"))
 			return
 		}
 		writeSuccess(w, http.StatusOK, preview)
 		return
 	}
-	writeJSON(w, http.StatusNotFound, errcode.ErrorBody(errcode.ErrNotFound.WithMessage("preview not found")))
+	errcode.Write(w, errcode.ErrNotFound.WithMessage("preview not found"))
 }
 
 func (h *Handler) PostPreviewStop(w http.ResponseWriter, r *http.Request, previewID string) {
 	previewID = strings.TrimSpace(previewID)
 	if previewID == "" || strings.Contains(previewID, "/") {
-		writeJSON(w, http.StatusNotFound, errcode.ErrorBody(errcode.ErrNotFound.WithMessage("preview not found")))
+		errcode.Write(w, errcode.ErrNotFound.WithMessage("preview not found"))
 		return
 	}
 	repository := ensureStore(h)
 	preview, ok := repository.GetPreview(previewID)
 	if !ok {
-		writeJSON(w, http.StatusNotFound, errcode.ErrorBody(errcode.ErrNotFound.WithMessage("preview not found")))
+		errcode.Write(w, errcode.ErrNotFound.WithMessage("preview not found"))
 		return
 	}
 	// Ownership gate mirrors GetPreview: a foreign preview must not be
 	// stoppable under multi-user mode.
 	if !isPreviewOwnedBy(repository, preview.ID, h.ownerUserID(r)) {
-		writeJSON(w, http.StatusNotFound, errcode.ErrorBody(errcode.ErrNotFound.WithMessage("preview not found")))
+		errcode.Write(w, errcode.ErrNotFound.WithMessage("preview not found"))
 		return
 	}
 	stopped, err := ensurePreviewRunner(h, repository).StopPreview(preview.ID)
 	if err != nil {
-		writeJSON(w, http.StatusNotFound, errcode.ErrorBody(errcode.ErrNotFound.WithMessage("preview not found")))
+		errcode.Write(w, errcode.ErrNotFound.WithMessage("preview not found"))
 		return
 	}
 	writeSuccess(w, http.StatusAccepted, stopped)

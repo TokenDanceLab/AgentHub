@@ -3,7 +3,7 @@
 > Owner：本文件是 AgentHub「规则 → 机器验证」映射的 SSOT。`AGENTS.md` 的“规则 → 机器验证映射”只保留指针，不复制本表。
 > 机器门禁：`scripts/verify/verify-doc-ssot.py` 校验本表验证脚本路径与 CI 文件存在性。
 
-最后更新：2026-09-03（补齐 12 条「已接线但此前未登记」的门禁行：三个 vuln-scan job、质量债棘轮、auth 依赖所有权、migration 幂等、i18n dead-key、OIDC 码 SSOT、orchestrator 依赖方向、夹具连接钉死、devserver 合同、L3 artifact 脱敏、覆盖率 profile 合并；并修好宏观四行因空行脱离表格的渲染缺陷。上一轮 2026-08-29 新增宏观工程设计基线四条规则）
+最后更新：2026-09-03（新增 edge 错误响应 HTTP status 单源门禁一行（#2245 阶段 2）；同批早些时候补齐 12 条「已接线但此前未登记」的门禁行：三个 vuln-scan job、质量债棘轮、auth 依赖所有权、migration 幂等、i18n dead-key、OIDC 码 SSOT、orchestrator 依赖方向、夹具连接钉死、devserver 合同、L3 artifact 脱敏、覆盖率 profile 合并；并修好宏观四行因空行脱离表格的渲染缺陷。上一轮 2026-08-29 新增宏观工程设计基线四条规则）
 
 ## 映射表
 
@@ -36,6 +36,7 @@
 | shared barrel 不泄漏 Edge 导出 | `scripts/verify/verify-shared-barrel.py` | checks.yml → validate |
 | Hub handler 不直连 repository | `scripts/verify/verify-hub-layering.py` | checks.yml → validate |
 | pkg/safego 是两台服务唯一的 panic 恢复路径（#2246 切片 1）：hub-server/edge-server/pkg 下非 `_test.go` 的裸 `recover()` 只允许出现在白名单里；白名单键 = 文件路径 + 允许命中次数（不是行号），匹配前先剥 Go 注释与字符串字面量；扫描根缺失/部分树/空树/文件不可读不可解析/白名单条目指向已消失文件/「白名单期望 N 处却扫到 0 处」的瞎扫描器哨兵一律 fail-closed | `scripts/verify/verify-safego-convergence.py`（负向自测 `scripts/verify/tests/verify-safego-convergence.Tests.py`） | checks.yml → validate |
+| edge 错误响应的 HTTP status 单源（#2245 阶段 2）：`edge-server/` 下非 `_test.go` 的 `ErrorBody(` 只允许出现在白名单里（errcode 包自身的定义 + `Write`、handlers_events.go 那个必须携带冲突 run 标识的富信封），`writeJSON(w, <status>, …)` / `resputil.WriteJSON(w, <status>, …)` 的 `<status>` 不得是 `http.Status*` 字面量（白名单只放过 internal/mcp 的 3 处 JSON-RPC 传输层 200），白名单富信封 builder 的调用点必须逐字传 `<err>.HTTPStatus`，`errcode.Write` 自身必须把 `e.HTTPStatus` 交出去；白名单键 = 文件路径 + 允许命中次数 + 允许的字面量集合（不是行号），匹配前先剥 Go 注释与字符串字面量；扫描根缺失/空树/文件不可读不可解析/白名单条目指向已消失文件/「白名单期望 N 处却扫到更少」的瞎扫描器哨兵一律 fail-closed。成功响应（`writeSuccess`）与 /v1/health 的计算态 status 不在范围内；hub 侧同族不变量已由 `handler.Fail(c, e)` 从 `e.HTTPStatus` 派生，无手抄面 | `scripts/verify/verify-edge-status-ssot.py`（负向自测 `scripts/verify/tests/verify-edge-status-ssot.Tests.py`） | checks.yml → validate |
 | router 方法必须在 conventions.md 文档化 | `scripts/verify/verify-conventions.py` | checks.yml → validate |
 | 出站 client 卫生：service/jwtutil/edge-hub 范围内禁裸 client、禁 request-path env 读取、外部响应必须有 body limit、retry 必须有预算；allowlist 只缩且带 issue（#1549/#1564） | `scripts/verify/verify-outbound-client-hygiene.py`（负向自测 `scripts/verify/tests/verify-outbound-client-hygiene.Tests.py`） | checks.yml → validate |
 | shared REST contract 与 Hub router 一致 | `scripts/verify/verify-shared-rest-contract.py` | checks.yml → validate |

@@ -3364,6 +3364,14 @@ func TestRunStartDualToken_HubIdentityMissingCapabilityReturns403(t *testing.T) 
 
 func TestRunStartDualToken_HubIdentityEmptySecretFailsClosed(t *testing.T) {
 	// #899: Hub identity + empty secret → fail closed (config error), not soft-skip.
+	//
+	// The status is asserted as the literal 503, NOT as
+	// errcode.ErrNotConfigured.HTTPStatus: the point of this test is to pin the
+	// wire contract, and a derived expectation would keep passing if the code
+	// table itself drifted. 503 is a deliberate change from the historical 403 —
+	// the site used to hand-copy http.StatusForbidden while the body already said
+	// not_configured, so an operator misconfiguration was reported to the client
+	// as "your credentials are wrong, do not retry" (#2245).
 	h := newTestHandler()
 	workDir := allowTestWorkspace(t, h)
 	executor := &fakeRunExecutor{}
@@ -3381,8 +3389,8 @@ func TestRunStartDualToken_HubIdentityEmptySecretFailsClosed(t *testing.T) {
 
 	h.PostRuns(rec, req)
 
-	if rec.Code != http.StatusForbidden {
-		t.Fatalf("expected status 403 (fail closed config error), got %d body=%s", rec.Code, rec.Body.String())
+	if rec.Code != http.StatusServiceUnavailable {
+		t.Fatalf("expected status 503 (fail closed config error, not_configured), got %d body=%s", rec.Code, rec.Body.String())
 	}
 	assertErrorCode(t, rec.Body.String(), errcode.ErrNotConfigured.Code)
 	if len(executor.started) != 0 {

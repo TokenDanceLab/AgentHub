@@ -56,7 +56,7 @@ const maxApplyDecisions = 500
 // POST /v1/runs/{runId}/apply
 func (h *Handler) PostApplyRunDiff(w http.ResponseWriter, r *http.Request, runID string) {
 	if r.Method != http.MethodPost {
-		writeJSON(w, http.StatusMethodNotAllowed, errcode.ErrorBody(errcode.ErrMethodNotAllowed))
+		errcode.Write(w, errcode.ErrMethodNotAllowed)
 		return
 	}
 
@@ -69,33 +69,33 @@ func (h *Handler) PostApplyRunDiff(w http.ResponseWriter, r *http.Request, runID
 	userID := h.ownerUserID(r)
 	run, ok := repository.GetRun(runID)
 	if !ok || !isRunOwnedBy(repository, runID, userID) {
-		writeJSON(w, http.StatusNotFound, errcode.ErrorBody(errcode.ErrNotFound.WithMessage("run not found")))
+		errcode.Write(w, errcode.ErrNotFound.WithMessage("run not found"))
 		return
 	}
 	if run.Status != "finished" {
-		writeJSON(w, http.StatusBadRequest, errcode.ErrorBody(errcode.ErrBadRequest.WithMessage("can only apply diffs to finished runs")))
+		errcode.Write(w, errcode.ErrBadRequest.WithMessage("can only apply diffs to finished runs"))
 		return
 	}
 
 	var req applyRequest
 	if err := decodeApplyJSON(r, &req); err != nil {
-		writeJSON(w, http.StatusBadRequest, errcode.ErrorBody(errcode.ErrInvalidJSON))
+		errcode.Write(w, errcode.ErrInvalidJSON)
 		return
 	}
 	if req.FilePath == "" {
-		writeJSON(w, http.StatusBadRequest, errcode.ErrorBody(errcode.ErrBadRequest.WithMessage("file_path is required")))
+		errcode.Write(w, errcode.ErrBadRequest.WithMessage("file_path is required"))
 		return
 	}
 	if err := h.validateWorkDirAllowed(req.WorkDir); err != nil {
 		slog.Error("workdir not allowed", "workDir", req.WorkDir, "error", err)
-		writeJSON(w, http.StatusForbidden, errcode.ErrorBody(errcode.ErrWorkspaceNotAllowed))
+		errcode.Write(w, errcode.ErrWorkspaceNotAllowed)
 		return
 	}
 
 	result, err := h.applySingleHunk(repository, runID, req)
 	if err != nil {
 		slog.Error("diff apply failed", "runId", runID, "filePath", req.FilePath, "hunkIndex", req.HunkIndex, "error", err)
-		writeJSON(w, http.StatusInternalServerError, errcode.ErrorBody(errcode.ErrInternal))
+		errcode.Write(w, errcode.ErrInternal)
 		return
 	}
 
@@ -106,7 +106,7 @@ func (h *Handler) PostApplyRunDiff(w http.ResponseWriter, r *http.Request, runID
 // POST /v1/runs/{runId}/apply-all
 func (h *Handler) PostApplyAllRunDiffs(w http.ResponseWriter, r *http.Request, runID string) {
 	if r.Method != http.MethodPost {
-		writeJSON(w, http.StatusMethodNotAllowed, errcode.ErrorBody(errcode.ErrMethodNotAllowed))
+		errcode.Write(w, errcode.ErrMethodNotAllowed)
 		return
 	}
 
@@ -119,30 +119,30 @@ func (h *Handler) PostApplyAllRunDiffs(w http.ResponseWriter, r *http.Request, r
 	userID := h.ownerUserID(r)
 	run, ok := repository.GetRun(runID)
 	if !ok || !isRunOwnedBy(repository, runID, userID) {
-		writeJSON(w, http.StatusNotFound, errcode.ErrorBody(errcode.ErrNotFound.WithMessage("run not found")))
+		errcode.Write(w, errcode.ErrNotFound.WithMessage("run not found"))
 		return
 	}
 	if run.Status != "finished" {
-		writeJSON(w, http.StatusBadRequest, errcode.ErrorBody(errcode.ErrBadRequest.WithMessage("can only apply diffs to finished runs")))
+		errcode.Write(w, errcode.ErrBadRequest.WithMessage("can only apply diffs to finished runs"))
 		return
 	}
 
 	var req applyAllRequest
 	if err := decodeApplyJSON(r, &req); err != nil {
-		writeJSON(w, http.StatusBadRequest, errcode.ErrorBody(errcode.ErrInvalidJSON))
+		errcode.Write(w, errcode.ErrInvalidJSON)
 		return
 	}
 	if len(req.Decisions) == 0 {
-		writeJSON(w, http.StatusBadRequest, errcode.ErrorBody(errcode.ErrBadRequest.WithMessage("decisions must not be empty")))
+		errcode.Write(w, errcode.ErrBadRequest.WithMessage("decisions must not be empty"))
 		return
 	}
 	if len(req.Decisions) > maxApplyDecisions {
-		writeJSON(w, http.StatusBadRequest, errcode.ErrorBody(errcode.ErrBadRequest.WithMessagef("decisions must not exceed %d entries per request", maxApplyDecisions)))
+		errcode.Write(w, errcode.ErrBadRequest.WithMessagef("decisions must not exceed %d entries per request", maxApplyDecisions))
 		return
 	}
 	if err := h.validateWorkDirAllowed(req.WorkDir); err != nil {
 		slog.Error("workdir not allowed", "workDir", req.WorkDir, "error", err)
-		writeJSON(w, http.StatusForbidden, errcode.ErrorBody(errcode.ErrWorkspaceNotAllowed))
+		errcode.Write(w, errcode.ErrWorkspaceNotAllowed)
 		return
 	}
 
@@ -161,11 +161,11 @@ func (h *Handler) PostApplyAllRunDiffs(w http.ResponseWriter, r *http.Request, r
 		if err := r.Context().Err(); err != nil {
 			slog.Warn("diff batch apply aborted: request context ended",
 				"runId", runID, "applied", len(results), "remaining", len(req.Decisions)-i, "error", err)
-			writeJSON(w, http.StatusInternalServerError, errcode.ErrorBody(errcode.ErrInternal.WithMessage("batch apply aborted: request context ended")))
+			errcode.Write(w, errcode.ErrInternal.WithMessage("batch apply aborted: request context ended"))
 			return
 		}
 		if decision.FilePath == "" {
-			writeJSON(w, http.StatusBadRequest, errcode.ErrorBody(errcode.ErrBadRequest.WithMessage("file_path is required for each decision")))
+			errcode.Write(w, errcode.ErrBadRequest.WithMessage("file_path is required for each decision"))
 			return
 		}
 		result, err := h.applyHunkDecision(runID, applyRequest{
@@ -176,7 +176,7 @@ func (h *Handler) PostApplyAllRunDiffs(w http.ResponseWriter, r *http.Request, r
 		}, diffFiles, filesResponse)
 		if err != nil {
 			slog.Error("diff batch apply failed", "runId", runID, "filePath", decision.FilePath, "hunkIndex", decision.HunkIndex, "error", err)
-			writeJSON(w, http.StatusInternalServerError, errcode.ErrorBody(errcode.ErrInternal))
+			errcode.Write(w, errcode.ErrInternal)
 			return
 		}
 		results = append(results, result)

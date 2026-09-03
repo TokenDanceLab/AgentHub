@@ -13,7 +13,7 @@ import (
 // Handler holds dependencies for HTTP and WebSocket handlers.
 func (h *Handler) PostPermissionDecide(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		writeJSON(w, http.StatusMethodNotAllowed, errcode.ErrorBody(errcode.ErrMethodNotAllowed))
+		errcode.Write(w, errcode.ErrMethodNotAllowed)
 		return
 	}
 
@@ -24,22 +24,22 @@ func (h *Handler) PostPermissionDecide(w http.ResponseWriter, r *http.Request) {
 		Reason    string `json:"reason,omitempty"`
 	}
 	if err := decodeOptionalJSON(r, &req); err != nil {
-		writeJSON(w, http.StatusBadRequest, errcode.ErrorBody(errcode.ErrInvalidJSON))
+		errcode.Write(w, errcode.ErrInvalidJSON)
 		return
 	}
 	req.RunID = strings.TrimSpace(req.RunID)
 	req.RequestID = strings.TrimSpace(req.RequestID)
 	req.Decision = strings.TrimSpace(req.Decision)
 	if req.RunID == "" {
-		writeJSON(w, http.StatusBadRequest, errcode.ErrorBody(errcode.ErrRunIDRequired))
+		errcode.Write(w, errcode.ErrRunIDRequired)
 		return
 	}
 	if req.RequestID == "" {
-		writeJSON(w, http.StatusBadRequest, errcode.ErrorBody(errcode.ErrRequestIDRequired))
+		errcode.Write(w, errcode.ErrRequestIDRequired)
 		return
 	}
 	if req.Decision != "allow" && req.Decision != "deny" {
-		writeJSON(w, http.StatusBadRequest, errcode.ErrorBody(errcode.ErrInvalidDecision))
+		errcode.Write(w, errcode.ErrInvalidDecision)
 		return
 	}
 
@@ -53,7 +53,7 @@ func (h *Handler) PostPermissionDecide(w http.ResponseWriter, r *http.Request) {
 	// to the documented bypass sentinel and is unaffected; an empty principal under
 	// Hub JWT fails closed (AH-SR-045).
 	if !isRunOwnedBy(ensureStore(h), req.RunID, h.ownerUserID(r)) {
-		writeJSON(w, http.StatusNotFound, errcode.ErrorBody(errcode.ErrPermissionRequestNotFound))
+		errcode.Write(w, errcode.ErrPermissionRequestNotFound)
 		return
 	}
 
@@ -64,7 +64,7 @@ func (h *Handler) PostPermissionDecide(w http.ResponseWriter, r *http.Request) {
 	} else {
 		permission, ok = registry.Consume(req.RunID, req.RequestID)
 		if !ok {
-			writeJSON(w, http.StatusNotFound, errcode.ErrorBody(errcode.ErrPermissionRequestNotFound))
+			errcode.Write(w, errcode.ErrPermissionRequestNotFound)
 			return
 		}
 	}
@@ -113,7 +113,7 @@ func pendingPermissionFromBroker(broker *adapters.PermissionDecisionBroker, runI
 
 func (h *Handler) PostPlanDecide(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		writeJSON(w, http.StatusMethodNotAllowed, errcode.ErrorBody(errcode.ErrMethodNotAllowed))
+		errcode.Write(w, errcode.ErrMethodNotAllowed)
 		return
 	}
 
@@ -123,17 +123,17 @@ func (h *Handler) PostPlanDecide(w http.ResponseWriter, r *http.Request) {
 		Reason   string `json:"reason,omitempty"`
 	}
 	if err := decodeOptionalJSON(r, &req); err != nil {
-		writeJSON(w, http.StatusBadRequest, errcode.ErrorBody(errcode.ErrInvalidJSON))
+		errcode.Write(w, errcode.ErrInvalidJSON)
 		return
 	}
 	req.RunID = strings.TrimSpace(req.RunID)
 	req.Decision = strings.TrimSpace(req.Decision)
 	if req.RunID == "" {
-		writeJSON(w, http.StatusBadRequest, errcode.ErrorBody(errcode.ErrRunIDRequired))
+		errcode.Write(w, errcode.ErrRunIDRequired)
 		return
 	}
 	if req.Decision != "approve" && req.Decision != "reject" {
-		writeJSON(w, http.StatusBadRequest, errcode.ErrorBody(errcode.ErrInvalidPlanDecision))
+		errcode.Write(w, errcode.ErrInvalidPlanDecision)
 		return
 	}
 
@@ -144,13 +144,13 @@ func (h *Handler) PostPlanDecide(w http.ResponseWriter, r *http.Request) {
 	// foreign runId and a nonexistent runId stay indistinguishable. Local
 	// single-tenant mode is unaffected; an empty principal fails closed.
 	if !isRunOwnedBy(ensureStore(h), req.RunID, h.ownerUserID(r)) {
-		writeJSON(w, http.StatusNotFound, errcode.ErrorBody(errcode.ErrPlanNotFound))
+		errcode.Write(w, errcode.ErrPlanNotFound)
 		return
 	}
 
 	broker := h.PlanApprovalBroker
 	if broker == nil {
-		writeJSON(w, http.StatusNotFound, errcode.ErrorBody(errcode.ErrPlanNotFound))
+		errcode.Write(w, errcode.ErrPlanNotFound)
 		return
 	}
 
@@ -160,7 +160,7 @@ func (h *Handler) PostPlanDecide(w http.ResponseWriter, r *http.Request) {
 		Reason:   req.Reason,
 	})
 	if !ok {
-		writeJSON(w, http.StatusNotFound, errcode.ErrorBody(errcode.ErrPlanNotFound))
+		errcode.Write(w, errcode.ErrPlanNotFound)
 		return
 	}
 
@@ -178,7 +178,7 @@ func (h *Handler) PostPlanDecide(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) GetPlansPending(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		writeJSON(w, http.StatusMethodNotAllowed, errcode.ErrorBody(errcode.ErrMethodNotAllowed))
+		errcode.Write(w, errcode.ErrMethodNotAllowed)
 		return
 	}
 
