@@ -97,6 +97,10 @@ def main() -> int:
     # follow the steps to their new home; none is dropped or relaxed.
     edge_static = get_job_block(workflow, "go-edge-static")
     hub_static = get_job_block(workflow, "go-hub-static")
+    # #2251 / ADR-032: the two Go shard matrices deliberately use different
+    # package splits, so both are policy — hub pins its one dominant package,
+    # edge keeps plain round-robin.
+    hub_test = get_job_block(workflow, "go-hub-test")
     backend_fixture = get_job_block(workflow, "backend-e2e-fixture")
     backend_required = get_job_block(workflow, "backend-required")
     frontend_required = get_job_block(workflow, "frontend-required")
@@ -185,6 +189,32 @@ def main() -> int:
         assert_contains(job_body, re.escape('STATIC_RESULT" != "success"'), f"{job_name} must fail when the static lane did not succeed (a skipped lane is not a pass)")
         assert_contains(job_body, re.escape(f"TEST_RESULT: ${{{{ needs.go-{side}-test.result }}}}"), f"{job_name} must bind the shard matrix result for fail-closed aggregation")
         assert_contains(job_body, re.escape('TEST_RESULT" != "success"'), f"{job_name} must fail when the shard matrix did not succeed")
+
+    # #2251 / ADR-032: `internal/repository` is 227.7s of hub-server's measured
+    # 418.8s `go test -short -race` total (54.4%), so it is both the dominant
+    # cost and the hard floor of any package-granularity split. Under the
+    # `NR % 2` round-robin it sits at `go list` position 15 (odd) and landed in
+    # shard 2, which was the slower shard in 14/14 measured CI runs (median
+    # +119s). Pinning it to shard 1 is the load-optimal 2-way partition
+    # (227.7s/191.1s instead of 310.5s/108.3s) and adds no jobs. These three
+    # assertions keep a "simplification" back to round-robin from silently
+    # costing ~2 minutes on every Go-touching PR.
+    hub_test_step = get_step_block(hub_test, "Test (unit only + race, shard ${{ matrix.shard }}/2)")
+    assert_contains(
+        hub_test_step,
+        r"github\.com/agenthub/hub-server/internal/repository",
+        "go-hub-test must keep internal/repository pinned to shard 1 (#2251/ADR-032: 54% of the module's measured race-test cost)",
+    )
+    assert_not_contains(
+        hub_test_step,
+        r"NR % 2",
+        "go-hub-test must not revert to `NR % 2` round-robin: it put the dominant package in shard 2, which was slower in 14/14 measured runs (#2251/ADR-032)",
+    )
+    assert_contains(
+        hub_test_step,
+        r"received 0 packages",
+        "go-hub-test must keep the 0-package guard: it is what makes a renamed/moved internal/repository fail loudly instead of silently unbalancing the shards (#2251/ADR-032)",
+    )
 
     # #1840: go-edge-static Lint is report-only (advisory) — the action's raw exit
     # code cannot consult the baseline, and >300-file PR diffs fall back to a
