@@ -8,84 +8,58 @@ describe('resolveFailedToastKey', () => {
     new AppError({ error: { code, message } }, 400);
 
   describe('edit failures', () => {
-    it('returns timeout key for msg_edit_timeout', () => {
-      expect(resolveFailedToastKey(makeAppError('msg_edit_timeout'), 'toast.editFailed'))
-        .toBe('toast.editFailed.timeout');
-    });
-
-    it('returns notEditable key for msg_not_editable', () => {
-      expect(resolveFailedToastKey(makeAppError('msg_not_editable'), 'toast.editFailed'))
-        .toBe('toast.editFailed.notEditable');
-    });
-
-    it('falls back for unknown edit errcode', () => {
-      expect(resolveFailedToastKey(makeAppError('some_other_code'), 'toast.editFailed'))
-        .toBe('toast.editFailed');
+    it.each([
+      ['msg_edit_timeout', 'toast.editFailed.timeout'],
+      ['msg_not_editable', 'toast.editFailed.notEditable'],
+      ['some_other_code', 'toast.editFailed'],
+    ])('maps %s under the edit fallback', (errcode, expected) => {
+      expect(resolveFailedToastKey(makeAppError(errcode), 'toast.editFailed')).toBe(expected);
     });
   });
 
   describe('pin failures', () => {
-    it('returns limitExceeded key for msg_pin_limit_exceeded', () => {
-      expect(resolveFailedToastKey(makeAppError('msg_pin_limit_exceeded'), 'toast.pinFailed'))
-        .toBe('toast.pinFailed.limitExceeded');
-    });
-
-    it('falls back for unknown pin errcode', () => {
-      expect(resolveFailedToastKey(makeAppError('some_other_code'), 'toast.pinFailed'))
-        .toBe('toast.pinFailed');
+    it.each([
+      ['msg_pin_limit_exceeded', 'toast.pinFailed.limitExceeded'],
+      ['some_other_code', 'toast.pinFailed'],
+    ])('maps %s under the pin fallback', (errcode, expected) => {
+      expect(resolveFailedToastKey(makeAppError(errcode), 'toast.pinFailed')).toBe(expected);
     });
   });
 
   describe('recall failures', () => {
-    it('returns timeout key for msg_recall_timeout', () => {
-      expect(resolveFailedToastKey(makeAppError('msg_recall_timeout'), 'toast.recallFailed'))
-        .toBe('toast.recallFailed.timeout');
-    });
-
-    it('falls back for unknown recall errcode', () => {
-      expect(resolveFailedToastKey(makeAppError('some_other_code'), 'toast.recallFailed'))
-        .toBe('toast.recallFailed');
+    it.each([
+      ['msg_recall_timeout', 'toast.recallFailed.timeout'],
+      ['some_other_code', 'toast.recallFailed'],
+    ])('maps %s under the recall fallback', (errcode, expected) => {
+      expect(resolveFailedToastKey(makeAppError(errcode), 'toast.recallFailed')).toBe(expected);
     });
   });
 
   describe('forward failures', () => {
-    it('returns blocked key for msg_blocked_by_receiver', () => {
-      expect(resolveFailedToastKey(makeAppError('msg_blocked_by_receiver'), 'toast.forwardFailed'))
-        .toBe('toast.forwardFailed.blocked');
-    });
-
-    it('falls back for unknown forward errcode', () => {
-      expect(resolveFailedToastKey(makeAppError('some_other_code'), 'toast.forwardFailed'))
-        .toBe('toast.forwardFailed');
+    it.each([
+      ['msg_blocked_by_receiver', 'toast.forwardFailed.blocked'],
+      ['some_other_code', 'toast.forwardFailed'],
+    ])('maps %s under the forward fallback', (errcode, expected) => {
+      expect(resolveFailedToastKey(makeAppError(errcode), 'toast.forwardFailed')).toBe(expected);
     });
   });
 
   describe('regenerate failures', () => {
-    it('returns cancelled key for agent_task_cancelled', () => {
-      expect(resolveFailedToastKey(makeAppError('agent_task_cancelled'), 'toast.regenerateFailed'))
-        .toBe('toast.regenerateFailed.cancelled');
-    });
-
-    it('returns timeout key for agent_task_timeout', () => {
-      expect(resolveFailedToastKey(makeAppError('agent_task_timeout'), 'toast.regenerateFailed'))
-        .toBe('toast.regenerateFailed.timeout');
-    });
-
-    it('falls back for unknown regenerate errcode', () => {
-      expect(resolveFailedToastKey(makeAppError('some_other_code'), 'toast.regenerateFailed'))
-        .toBe('toast.regenerateFailed');
+    it.each([
+      ['agent_task_cancelled', 'toast.regenerateFailed.cancelled'],
+      ['agent_task_timeout', 'toast.regenerateFailed.timeout'],
+      ['some_other_code', 'toast.regenerateFailed'],
+    ])('maps %s under the regenerate fallback', (errcode, expected) => {
+      expect(resolveFailedToastKey(makeAppError(errcode), 'toast.regenerateFailed')).toBe(expected);
     });
   });
 
   describe('cancel failures', () => {
-    it('returns alreadyCancelled key for agent_task_cancelled', () => {
-      expect(resolveFailedToastKey(makeAppError('agent_task_cancelled'), 'toast.cancelFailed'))
-        .toBe('toast.cancelFailed.alreadyCancelled');
-    });
-
-    it('falls back for unknown cancel errcode', () => {
-      expect(resolveFailedToastKey(makeAppError('some_other_code'), 'toast.cancelFailed'))
-        .toBe('toast.cancelFailed');
+    it.each([
+      ['agent_task_cancelled', 'toast.cancelFailed.alreadyCancelled'],
+      ['some_other_code', 'toast.cancelFailed'],
+    ])('maps %s under the cancel fallback', (errcode, expected) => {
+      expect(resolveFailedToastKey(makeAppError(errcode), 'toast.cancelFailed')).toBe(expected);
     });
   });
 

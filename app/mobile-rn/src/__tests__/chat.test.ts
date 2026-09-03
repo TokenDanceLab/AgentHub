@@ -480,16 +480,13 @@ describe('formatBrowserPreviewStatus', () => {
 // ---------------------------------------------------------------------------
 
 describe('chat delivery state', () => {
-  it('returns sending when thread has sendPending previewIntent', () => {
-    const fixture = getMobileFixtureForScenario('sendPending');
+  it.each([
+    ['sendPending', 'sending'],
+    ['sendError', 'failed'],
+  ])('returns %s when thread has %s', (scenario, expected) => {
+    const fixture = getMobileFixtureForScenario(scenario as MobileFixtureScenario);
     const thread = fixture.threads[0];
-    expect(deriveDeliveryState(thread!)).toBe('sending');
-  });
-
-  it('returns failed when thread has retryAvailable', () => {
-    const fixture = getMobileFixtureForScenario('sendError');
-    const thread = fixture.threads[0];
-    expect(deriveDeliveryState(thread!)).toBe('failed');
+    expect(deriveDeliveryState(thread!)).toBe(expected);
   });
 
   it('returns idle for normal threads', () => {

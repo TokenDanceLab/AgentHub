@@ -8,70 +8,34 @@ import {
 
 describe('parseNotificationIntentPayload', () => {
   describe('nullish / invalid data', () => {
-    it('ignores null as missing_data', () => {
-      expect(parseNotificationIntentPayload(null)).toEqual({
+    it.each([[null], [undefined]])('ignores %s as missing_data', (value) => {
+      expect(parseNotificationIntentPayload(value)).toEqual({
         kind: 'ignore',
         reason: 'missing_data',
       });
     });
 
-    it('ignores undefined as missing_data', () => {
-      expect(parseNotificationIntentPayload(undefined)).toEqual({
-        kind: 'ignore',
-        reason: 'missing_data',
-      });
-    });
-
-    it('rejects strings as invalid_data', () => {
-      expect(parseNotificationIntentPayload('thread')).toEqual({
-        kind: 'error',
-        reason: 'invalid_data',
-      });
-    });
-
-    it('rejects numbers as invalid_data', () => {
-      expect(parseNotificationIntentPayload(42)).toEqual({
-        kind: 'error',
-        reason: 'invalid_data',
-      });
-    });
-
-    it('rejects booleans as invalid_data', () => {
-      expect(parseNotificationIntentPayload(true)).toEqual({
-        kind: 'error',
-        reason: 'invalid_data',
-      });
-    });
-
-    it('rejects arrays as invalid_data', () => {
-      expect(parseNotificationIntentPayload([{ intent: 'thread' }])).toEqual({
-        kind: 'error',
-        reason: 'invalid_data',
-      });
-    });
+    it.each([['thread'], [42], [true], [[{ intent: 'thread' }]]])(
+      'rejects %s as invalid_data',
+      (value) => {
+        expect(parseNotificationIntentPayload(value)).toEqual({
+          kind: 'error',
+          reason: 'invalid_data',
+        });
+      },
+    );
   });
 
   describe('intent detection', () => {
-    it('ignores an empty record as unknown_intent', () => {
-      expect(parseNotificationIntentPayload({})).toEqual({
-        kind: 'ignore',
-        reason: 'unknown_intent',
-      });
-    });
-
-    it('ignores records whose intent value is not a recognized string', () => {
-      expect(parseNotificationIntentPayload({ intent: 'message' })).toEqual({
-        kind: 'ignore',
-        reason: 'unknown_intent',
-      });
-    });
-
-    it('ignores a non-string intent value', () => {
-      expect(parseNotificationIntentPayload({ intent: 42 })).toEqual({
-        kind: 'ignore',
-        reason: 'unknown_intent',
-      });
-    });
+    it.each([[{}], [{ intent: 'message' }], [{ intent: 42 }]])(
+      'ignores %o as unknown_intent',
+      (value) => {
+        expect(parseNotificationIntentPayload(value)).toEqual({
+          kind: 'ignore',
+          reason: 'unknown_intent',
+        });
+      },
+    );
 
     it('normalizes intent case-insensitively', () => {
       expect(parseNotificationIntentPayload({ intent: 'Thread', threadId: 't-1' })).toEqual({

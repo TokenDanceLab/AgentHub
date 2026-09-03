@@ -121,40 +121,23 @@ describe('attachmentRefToComposerAttachment', () => {
 });
 
 describe('formatComposerAttachmentSize', () => {
-  it('returns undefined for undefined input', () => {
-    expect(formatComposerAttachmentSize(undefined)).toBeUndefined();
-  });
+  it.each([[undefined], [null as unknown as number | undefined]])(
+    'returns undefined for %s input',
+    (size) => {
+      expect(formatComposerAttachmentSize(size)).toBeUndefined();
+    },
+  );
 
-  it('treats null the same as undefined', () => {
-    expect(formatComposerAttachmentSize(null as unknown as number | undefined)).toBeUndefined();
-  });
-
-  it('formats zero bytes', () => {
-    expect(formatComposerAttachmentSize(0)).toBe('0 B');
-  });
-
-  it('formats sub-kilobyte sizes as raw bytes', () => {
-    expect(formatComposerAttachmentSize(1023)).toBe('1023 B');
-  });
-
-  it('formats exactly one kilobyte with one decimal', () => {
-    expect(formatComposerAttachmentSize(1024)).toBe('1.0 KB');
-  });
-
-  it('formats fractional kilobytes', () => {
-    expect(formatComposerAttachmentSize(1536)).toBe('1.5 KB');
-  });
-
-  it('formats exactly one megabyte', () => {
-    expect(formatComposerAttachmentSize(1024 * 1024)).toBe('1.0 MB');
-  });
-
-  it('rounds megabyte values to one decimal', () => {
-    expect(formatComposerAttachmentSize(5.75 * 1024 * 1024)).toBe('5.8 MB');
-  });
-
-  it('keeps negative values in the byte branch', () => {
-    expect(formatComposerAttachmentSize(-512)).toBe('-512 B');
+  it.each([
+    [0, '0 B'],
+    [1023, '1023 B'],
+    [1024, '1.0 KB'],
+    [1536, '1.5 KB'],
+    [1024 * 1024, '1.0 MB'],
+    [5.75 * 1024 * 1024, '5.8 MB'],
+    [-512, '-512 B'],
+  ])('formats %s bytes as %s', (size, expected) => {
+    expect(formatComposerAttachmentSize(size)).toBe(expected);
   });
 });
 
@@ -318,16 +301,12 @@ describe('formatComposerPromptWithAttachments', () => {
 });
 
 describe('shouldPreviewComposerFile', () => {
-  it('previews files with a text MIME type regardless of name', () => {
-    expect(shouldPreviewComposerFile(makeFile('x', 'weird.unknown', 'text/plain'))).toBe(true);
-  });
-
-  it('previews files whose name matches the pattern even with a binary MIME type', () => {
-    expect(shouldPreviewComposerFile(makeFile('x', 'notes.md', 'application/octet-stream'))).toBe(true);
-  });
-
-  it('previews files whose name matches the pattern when the type is empty', () => {
-    expect(shouldPreviewComposerFile(makeFile('x', 'notes.md', ''))).toBe(true);
+  it.each([
+    ['weird.unknown', 'text/plain'],
+    ['notes.md', 'application/octet-stream'],
+    ['notes.md', ''],
+  ])('previews %s with mime %s', (name, mime) => {
+    expect(shouldPreviewComposerFile(makeFile('x', name, mime))).toBe(true);
   });
 
   it('does not preview files with neither a text MIME nor a matching name', () => {
@@ -338,48 +317,33 @@ describe('shouldPreviewComposerFile', () => {
 });
 
 describe('shouldPreviewComposerFileName', () => {
-  it('accepts any name with a text MIME type', () => {
-    expect(shouldPreviewComposerFileName('weird.unknown', 'text/plain')).toBe(true);
+  it.each([
+    ['weird.unknown', 'text/plain'],
+    ['notes.md', undefined],
+    ['NOTES.MD', undefined],
+    ['trace.jsonl', undefined],
+    ['server.log', undefined],
+    ['data.json', 'application/octet-stream'],
+  ])('accepts %s as previewable (mime=%s)', (name, mime) => {
+    if (mime === undefined) {
+      expect(shouldPreviewComposerFileName(name)).toBe(true);
+    } else {
+      expect(shouldPreviewComposerFileName(name, mime)).toBe(true);
+    }
   });
 
-  it('matches common text extensions without a MIME type', () => {
-    expect(shouldPreviewComposerFileName('notes.md')).toBe(true);
-  });
-
-  it('matches extensions case-insensitively', () => {
-    expect(shouldPreviewComposerFileName('NOTES.MD')).toBe(true);
-  });
-
-  it('matches the jsonl extension', () => {
-    expect(shouldPreviewComposerFileName('trace.jsonl')).toBe(true);
-  });
-
-  it('matches the log extension', () => {
-    expect(shouldPreviewComposerFileName('server.log')).toBe(true);
-  });
-
-  it('matches on the name even when the MIME type is not text', () => {
-    expect(shouldPreviewComposerFileName('data.json', 'application/octet-stream')).toBe(true);
-  });
-
-  it('rejects unknown extensions without a MIME type', () => {
-    expect(shouldPreviewComposerFileName('blob.unknown')).toBe(false);
-  });
-
-  it('rejects multi-part archive extensions', () => {
-    expect(shouldPreviewComposerFileName('archive.tar.gz')).toBe(false);
-  });
-
-  it('rejects extension-less file names', () => {
-    expect(shouldPreviewComposerFileName('Dockerfile')).toBe(false);
-  });
-
-  it('rejects hidden dotfiles', () => {
-    expect(shouldPreviewComposerFileName('.env')).toBe(false);
-  });
-
-  it('rejects unknown extensions with a non-text MIME type', () => {
-    expect(shouldPreviewComposerFileName('blob.unknown', 'application/octet-stream')).toBe(false);
+  it.each([
+    ['blob.unknown', undefined],
+    ['archive.tar.gz', undefined],
+    ['Dockerfile', undefined],
+    ['.env', undefined],
+    ['blob.unknown', 'application/octet-stream'],
+  ])('rejects %s as previewable (mime=%s)', (name, mime) => {
+    if (mime === undefined) {
+      expect(shouldPreviewComposerFileName(name)).toBe(false);
+    } else {
+      expect(shouldPreviewComposerFileName(name, mime)).toBe(false);
+    }
   });
 });
 

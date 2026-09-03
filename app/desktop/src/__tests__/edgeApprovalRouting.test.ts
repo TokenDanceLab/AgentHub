@@ -76,25 +76,22 @@ describe('resolveEdgePermissionRunId', () => {
     expect(resolveEdgePermissionRunId([group], 'perm-nested')).toBe('run-nested');
   });
 
-  it('returns undefined when no block matches the requestId', () => {
-    const transcript = [
+  it.each([
+    [
+      'perm-missing',
       permissionBlock({
         requestId: 'perm-other',
         evidenceRefs: [{ id: 'run-run-1', kind: 'run', label: 'Run run-1' }],
       }),
-    ];
-
-    expect(resolveEdgePermissionRunId(transcript, 'perm-missing')).toBeUndefined();
-  });
-
-  it('returns undefined when the matching block carries no run evidence', () => {
-    const transcript = [
+    ],
+    [
+      'perm-no-run',
       permissionBlock({
         requestId: 'perm-no-run',
         evidenceRefs: [{ id: 'approval-perm-no-run', kind: 'approval', label: 'shell approval' }],
       }),
-    ];
-
-    expect(resolveEdgePermissionRunId(transcript, 'perm-no-run')).toBeUndefined();
+    ],
+  ])('returns undefined when no run evidence resolves for %s', (requestId, block) => {
+    expect(resolveEdgePermissionRunId([block], requestId)).toBeUndefined();
   });
 });

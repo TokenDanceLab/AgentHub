@@ -53,13 +53,11 @@ describe('attachment utils', () => {
   });
 
   describe('shouldPreviewBrowserFile', () => {
-    it('returns true for text/ types', () => {
-      const file = new File([''], 'a.csv', { type: 'text/csv' });
-      expect(shouldPreviewBrowserFile(file)).toBe(true);
-    });
-
-    it('returns true for known extensions', () => {
-      const file = new File([''], 'a.tsx', { type: '' });
+    it.each([
+      ['a.csv', 'text/csv'],
+      ['a.tsx', ''],
+    ])('returns true for %s', (name, type) => {
+      const file = new File([''], name, { type });
       expect(shouldPreviewBrowserFile(file)).toBe(true);
     });
 
