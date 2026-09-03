@@ -3,6 +3,7 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { createHubClient, type HubDocumentListItem } from '@/api/hubClient';
+import { fetchAllPages } from '@shared/hub/paginate';
 import { getAccessToken } from '@/hooks/useAuth';
 import type { DocRow } from '@agenthub/workbench/pages';
 
@@ -21,7 +22,12 @@ export function useDocumentList(
 ) {
   return useQuery({
     queryKey: ['hub', 'documents', params],
-    queryFn: () => getHubClient().listDocuments(params),
+    // The only caller passes `undefined`, so this was a first-page-only fetch
+    // with the cursor dropped (#2290 defect class). Caller-supplied filters
+    // (status/source/tag) are preserved and merged under the walk's own
+    // pageSize/pageCursor, so the parameterised form keeps working.
+    queryFn: () =>
+      fetchAllPages((page) => getHubClient().listDocuments({ ...params, ...page })),
     enabled: opts?.enabled ?? false,
   });
 }

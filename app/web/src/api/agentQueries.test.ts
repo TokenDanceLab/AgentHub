@@ -93,7 +93,7 @@ describe('web agent profile queries', () => {
   it('fetches real Hub agent profiles when a Hub session token is available', async () => {
     vi.mocked(getAccessToken).mockReturnValue('hub-access');
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-      expect(String(input)).toBe('http://localhost:8080/web/agent-profiles?pageSize=50');
+      expect(String(input)).toBe('http://localhost:8080/web/agent-profiles?pageSize=200');
       expect(getAuthorization(init)).toBe('Bearer hub-access');
       return new Response(
         JSON.stringify({
@@ -130,6 +130,60 @@ describe('web agent profile queries', () => {
     });
   });
 
+
+  // #2290 defect class: this call site used to ask for one page (pageSize 50)
+  // and drop page.nextCursor, so the 51st agent profile never reached the list.
+  it('walks cursor pages so agent profiles past the first page are visible', async () => {
+    vi.mocked(getAccessToken).mockReturnValue('hub-access');
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(
+        JSON.stringify({
+          code: 'ok',
+          data: {
+            items: [{
+                id: '00000000-0000-0000-0000-00000000c201',
+                name: 'Page 1 Agent',
+                description: 'paging probe',
+                runtime_id: 'codex',
+                provider: 'openai',
+                model: 'gpt-5.5',
+                version: 1,
+              }],
+            page: { hasMore: true, nextCursor: 'cur-1' },
+          },
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      ))
+      .mockResolvedValueOnce(new Response(
+        JSON.stringify({
+          code: 'ok',
+          data: {
+            items: [{
+                id: '00000000-0000-0000-0000-00000000c202',
+                name: 'Page 2 Agent',
+                description: 'paging probe',
+                runtime_id: 'codex',
+                provider: 'openai',
+                model: 'gpt-5.5',
+                version: 1,
+              }],
+            page: { hasMore: false },
+          },
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      ));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const res = await fetchAgentList(true);
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(String(fetchMock.mock.calls[0]?.[0]))
+      .toBe('http://localhost:8080/web/agent-profiles?pageSize=200');
+    expect(String(fetchMock.mock.calls[1]?.[0]))
+      .toBe('http://localhost:8080/web/agent-profiles?pageSize=200&pageCursor=cur-1');
+    expect(res.items.map((agent) => agent.name)).toEqual(['Page 1 Agent', 'Page 2 Agent']);
+    expect(res.page.hasMore).toBe(false);
+  });
   it('returns an empty list without calling Hub when there is no Hub token', async () => {
     const fetchMock = vi.fn();
     vi.stubGlobal('fetch', fetchMock);

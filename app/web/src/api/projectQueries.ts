@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { getAccessToken } from '@/hooks/useAuth';
 import { hubQueryKeys } from '@shared/stores/queryKeys';
+import { fetchAllPages } from '@shared/hub/paginate';
 import { createHubClient } from './hubClient';
 import type {
   CreateWorkspaceProjectThreadRequest,
@@ -39,14 +40,8 @@ const emptyWorkspaceProjects: WorkspaceProjectListResponse = {
 // executed" to "explicitly not implemented", which is what made the gap
 // visible.
 //
-// The shape deliberately mirrors fetchExecutionTargets in
-// executionTargetQueries.ts: one paging idiom in the front end, not two. Walk
-// every page up to a cap, and when the cap is what stopped us propagate
-// hasMore=true so a truncated list stays distinguishable from a complete one
-// instead of becoming a new silent ceiling.
-const workspaceProjectPageSize = 200;
-const maxWorkspaceProjectPages = 5;
-
+// The walk itself lives in @shared/hub/paginate so that this is not the fourth
+// hand-rolled copy of the same cursor loop in the front end.
 export async function fetchWorkspaceProjects(
   preferHub: boolean,
   getToken: () => string | null = getAccessToken,
@@ -55,24 +50,10 @@ export async function fetchWorkspaceProjects(
   if (!preferHub || !token) return emptyWorkspaceProjects;
 
   const client = createHubClient({ getToken: () => token });
-  const items: WorkspaceProject[] = [];
-  let page: WorkspaceProjectListResponse['page'] = { hasMore: false };
-  let pageCursor: string | undefined;
-
-  for (let i = 0; i < maxWorkspaceProjectPages; i += 1) {
-    const res = await client.listWorkspaceProjects({
-      pageSize: workspaceProjectPageSize,
-      ...(pageCursor ? { pageCursor } : {}),
-    });
-    items.push(...res.items);
-    page = res.page ?? { hasMore: false };
-    if (!page.hasMore || !page.nextCursor) {
-      return { items, page };
-    }
-    pageCursor = page.nextCursor;
-  }
-
-  return { items, page: { ...page, hasMore: true } };
+  // Canonical Hub list contract (pageSize 200 x 5 pages, cap reported via
+  // hasMore) — see @shared/hub/paginate for why a single page is a silent
+  // truncation and not an error (#2290).
+  return fetchAllPages(client.listWorkspaceProjects);
 }
 
 export async function fetchWorkspaceProject(
