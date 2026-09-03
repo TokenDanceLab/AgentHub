@@ -1,6 +1,8 @@
 package resputil
 
 import (
+	"bytes"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -35,12 +37,23 @@ func TestWriteJSONNilWritesHeadersOnly(t *testing.T) {
 }
 
 func TestWriteJSONEncodingErrorKeepsStatus(t *testing.T) {
-	// A channel cannot be JSON-encoded; the status must already be written
-	// and the error must not panic (it is logged by the shared writer).
+	// A channel cannot be JSON-encoded; the status must already be written and
+	// the error must not panic. The package contract also says the failure is
+	// logged, so assert that instead of merely claiming it in a comment: this
+	// is the exact behavior the deleted pkg/errcode.WriteJSON copy lacked,
+	// which is why it could not stay the edge writer (#2246).
+	var logs bytes.Buffer
+	prev := slog.Default()
+	slog.SetDefault(slog.New(slog.NewTextHandler(&logs, nil)))
+	defer slog.SetDefault(prev)
+
 	rec := httptest.NewRecorder()
 	WriteJSON(rec, http.StatusOK, make(chan int))
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d, want 200", rec.Code)
+	}
+	if !strings.Contains(logs.String(), "write json response failed") {
+		t.Fatalf("encode failure was not logged; logs = %q", logs.String())
 	}
 }

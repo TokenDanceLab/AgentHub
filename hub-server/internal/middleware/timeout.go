@@ -267,10 +267,10 @@ func isWebSocketUpgrade(c *gin.Context) bool {
 }
 
 func writeTimeout(w gin.ResponseWriter) {
+	// ErrTimeout is constructed with 504 (pkg/errcode/codes.go), and errcode.New
+	// guarantees non-zero for every other code, so no fallback is needed here.
+	// The old clamp silently disagreed with the two 500 clamps (#2243).
 	status := errcode.ErrTimeout.HTTPStatus
-	if status == 0 {
-		status = http.StatusGatewayTimeout
-	}
 	header := w.Header()
 	if header.Get("Content-Type") == "" {
 		header.Set("Content-Type", "application/json; charset=utf-8")
