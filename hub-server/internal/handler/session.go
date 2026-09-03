@@ -340,12 +340,11 @@ func (h *SessionHandler) SearchSessions(c *gin.Context) {
 
 	cursor := c.Query("pageCursor")
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("pageSize", strconv.Itoa(config.DefaultPaginationLimit)))
-	if pageSize <= 0 {
-		pageSize = config.DefaultPaginationLimit
-	}
-	if pageSize > config.MaxPageLimit {
-		pageSize = config.MaxPageLimit
-	}
+	// This handler is the enforcement point: repository.SearchSessions turns
+	// pageSize straight into `LIMIT pageSize+1` with no ceiling of its own, so
+	// before #2243 this endpoint served up to 500 rows while its openapi parameter
+	// (the shared PageSize) declares maximum: 200.
+	pageSize = config.ClampPageSize(pageSize, config.MaxListPageSize, config.DefaultPaginationLimit)
 
 	result, err := h.service.SearchSessions(c.Request.Context(), userID, q, cursor, pageSize)
 	if err != nil {

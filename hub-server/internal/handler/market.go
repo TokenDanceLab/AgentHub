@@ -42,13 +42,11 @@ func (h *MarketHandler) SearchMarketProfiles(c *gin.Context) {
 	q := c.Query("q")
 	sortBy := c.DefaultQuery("sort_by", "recent")
 	cursor := c.Query("pageCursor")
-	pageSize, _ := strconv.Atoi(c.DefaultQuery("pageSize", "50"))
-	if pageSize <= 0 {
-		pageSize = config.DefaultPaginationLimit
-	}
-	if pageSize > config.MaxPageLimit {
-		pageSize = config.MaxPageLimit
-	}
+	pageSize, _ := strconv.Atoi(c.DefaultQuery("pageSize", strconv.Itoa(config.DefaultPaginationLimit)))
+	// Ceiling = repository.ListPublicProfiles (MaxListPageSize), which is also the
+	// PageSize maximum api/openapi.yaml declares for GET /web/market/profiles
+	// (#2243).
+	pageSize = config.ClampPageSize(pageSize, config.MaxListPageSize, config.DefaultPaginationLimit)
 
 	result, err := h.service.SearchMarket(c.Request.Context(), runtimeID, q, sortBy, cursor, pageSize)
 	if err != nil {

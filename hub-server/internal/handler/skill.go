@@ -93,14 +93,14 @@ func (h *SkillHandler) ListSkills(c *gin.Context) {
 	q := c.Query("q")
 	skillType := c.Query("skill_type")
 	cursor := c.Query("pageCursor")
-	pageSize, _ := strconv.Atoi(c.DefaultQuery("pageSize", "50"))
+	pageSize, _ := strconv.Atoi(c.DefaultQuery("pageSize", strconv.Itoa(config.DefaultPaginationLimit)))
 	isPublic := c.DefaultQuery("is_public", "")
-	if pageSize <= 0 {
-		pageSize = config.DefaultPaginationLimit
-	}
-	if pageSize > config.MaxPageLimit {
-		pageSize = config.MaxPageLimit
-	}
+	// Ceiling = the one the queries below actually execute: repository.ListSkills
+	// and repository.ListPublicSkills both ClampPageSize(.., MaxListPageSize, ..),
+	// which is also what api/openapi.yaml declares for the shared PageSize
+	// parameter on GET /web/skills. The old MaxPageLimit ceiling forwarded 300 to
+	// a query that returned 200 rows with HTTP 200 and no signal (#2243).
+	pageSize = config.ClampPageSize(pageSize, config.MaxListPageSize, config.DefaultPaginationLimit)
 
 	if isPublic == "true" {
 		// Public market: return all published skills (no owner filter).

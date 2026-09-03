@@ -99,14 +99,12 @@ func (h *MCPServerHandler) ListMCPServers(c *gin.Context) {
 	q := c.Query("q")
 	transport := c.Query("transport")
 	cursor := c.Query("pageCursor")
-	pageSize, _ := strconv.Atoi(c.DefaultQuery("pageSize", "50"))
+	pageSize, _ := strconv.Atoi(c.DefaultQuery("pageSize", strconv.Itoa(config.DefaultPaginationLimit)))
 	isPublic := c.DefaultQuery("is_public", "")
-	if pageSize <= 0 {
-		pageSize = config.DefaultPaginationLimit
-	}
-	if pageSize > config.MaxPageLimit {
-		pageSize = config.MaxPageLimit
-	}
+	// Ceiling = repository.ListMCPServers / ListPublicMCPServers (both
+	// MaxListPageSize), which is also the PageSize maximum api/openapi.yaml
+	// declares for GET /web/mcp-servers (#2243).
+	pageSize = config.ClampPageSize(pageSize, config.MaxListPageSize, config.DefaultPaginationLimit)
 
 	if isPublic == "true" {
 		// Public market: return all published MCP servers (no owner filter).

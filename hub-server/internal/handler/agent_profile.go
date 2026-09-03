@@ -148,13 +148,10 @@ func (h *AgentProfileHandler) ListProfiles(c *gin.Context) {
 	runtimeID := c.Query("runtime_id")
 	q := c.Query("q")
 	cursor := c.Query("pageCursor")
-	pageSize, _ := strconv.Atoi(c.DefaultQuery("pageSize", "50"))
-	if pageSize <= 0 {
-		pageSize = config.DefaultPaginationLimit
-	}
-	if pageSize > config.MaxPageLimit {
-		pageSize = config.MaxPageLimit
-	}
+	pageSize, _ := strconv.Atoi(c.DefaultQuery("pageSize", strconv.Itoa(config.DefaultPaginationLimit)))
+	// Ceiling = repository.ListAgentProfiles (MaxListPageSize), which is also the
+	// PageSize maximum api/openapi.yaml declares for GET /web/agent-profiles (#2243).
+	pageSize = config.ClampPageSize(pageSize, config.MaxListPageSize, config.DefaultPaginationLimit)
 
 	result, err := h.service.List(c.Request.Context(), userID, runtimeID, q, cursor, pageSize)
 	if err != nil {
