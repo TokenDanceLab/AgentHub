@@ -23,7 +23,7 @@ import (
 	"github.com/agenthub/edge-server/internal/events"
 	"github.com/agenthub/edge-server/internal/runnerctx"
 	"github.com/agenthub/edge-server/internal/store"
-	"github.com/agenthub/edge-server/internal/testkit"
+	"github.com/agenthub/pkg/testkit"
 )
 
 const processExecutorHelperRunFlag = "-test.run=^TestProcessExecutorHelper$"
