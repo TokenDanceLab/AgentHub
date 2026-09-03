@@ -257,36 +257,17 @@ describe('runStatusEmphasis', () => {
 // ---------------------------------------------------------------------------
 
 describe('projectNameForRun', () => {
-  it('returns AgentHub Mobile for mobile-rn targets', () => {
+  it.each([
+    ['app/mobile-rn', 'AgentHub Mobile'],
+    ['hub-server', 'AgentHub Hub'],
+    ['mock preview', 'Workspace Preview'],
+    ['unknown-target', 'AgentHub'],
+  ])('maps target %s to %s', (target, expected) => {
     const run: MobileRun = {
       id: 'r1', threadId: 't1', title: 'Test', status: 'running',
-      target: 'app/mobile-rn', updatedAt: '', summary: '', changedFiles: [],
+      target, updatedAt: '', summary: '', changedFiles: [],
     };
-    expect(projectNameForRun(run)).toBe('AgentHub Mobile');
-  });
-
-  it('returns AgentHub Hub for hub-server targets', () => {
-    const run: MobileRun = {
-      id: 'r1', threadId: 't1', title: 'Test', status: 'running',
-      target: 'hub-server', updatedAt: '', summary: '', changedFiles: [],
-    };
-    expect(projectNameForRun(run)).toBe('AgentHub Hub');
-  });
-
-  it('returns Workspace Preview for mock targets', () => {
-    const run: MobileRun = {
-      id: 'r1', threadId: 't1', title: 'Test', status: 'running',
-      target: 'mock preview', updatedAt: '', summary: '', changedFiles: [],
-    };
-    expect(projectNameForRun(run)).toBe('Workspace Preview');
-  });
-
-  it('returns AgentHub as default', () => {
-    const run: MobileRun = {
-      id: 'r1', threadId: 't1', title: 'Test', status: 'running',
-      target: 'unknown-target', updatedAt: '', summary: '', changedFiles: [],
-    };
-    expect(projectNameForRun(run)).toBe('AgentHub');
+    expect(projectNameForRun(run)).toBe(expected);
   });
 });
 
@@ -309,22 +290,17 @@ describe('formatRisk', () => {
     expect(formatRisk(runHigh)).toBe('Blocked');
   });
 
-  it('maps medium to Needs action', () => {
+  const riskCases: Array<[Exclude<MobileRun['approvalRisk'], undefined>, string]> = [
+    ['medium', 'Needs action'],
+    ['low', 'Review approval'],
+  ];
+  it.each(riskCases)('maps %s risk to %s', (approvalRisk, expected) => {
     const run: MobileRun = {
       id: 'r1', threadId: 't1', title: 'Test', status: 'approval_required',
       target: 'mock', updatedAt: '', summary: '', changedFiles: [],
-      approvalRisk: 'medium',
+      approvalRisk,
     };
-    expect(formatRisk(run)).toBe('Needs action');
-  });
-
-  it('maps low to Review approval', () => {
-    const run: MobileRun = {
-      id: 'r1', threadId: 't1', title: 'Test', status: 'approval_required',
-      target: 'mock', updatedAt: '', summary: '', changedFiles: [],
-      approvalRisk: 'low',
-    };
-    expect(formatRisk(run)).toBe('Review approval');
+    expect(formatRisk(run)).toBe(expected);
   });
 
   it('falls back to statusDetail when no approvalRisk', () => {

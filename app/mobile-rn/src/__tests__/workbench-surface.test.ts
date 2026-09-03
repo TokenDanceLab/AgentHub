@@ -471,22 +471,16 @@ describe('surface search filtering', () => {
     expect(result[0]!.rows[0]!.meta).toBe('TokenDance');
   });
 
-  it('returns empty when no rows match', () => {
-    const sections: SurfaceSection[] = [
-      { title: 'Section A', rows: [{ icon: 'chat', title: 'Row 1', subtitle: 'A', meta: 'M1' }] },
-    ];
-
-    const result = filterSections(sections, 'ZzzzNothing');
-    expect(result).toHaveLength(0);
-  });
-
-  it('trims whitespace from query', () => {
+  it.each([
+    ['ZzzzNothing', 0],
+    ['  TokenDance  ', 1],
+  ])('filterSections with query %s yields %s sections', (query, expected) => {
     const sections: SurfaceSection[] = [
       { title: 'Section A', rows: [{ icon: 'chat', title: 'TokenDance', subtitle: 'Sub', meta: 'M1' }] },
     ];
 
-    const result = filterSections(sections, '  TokenDance  ');
-    expect(result).toHaveLength(1);
+    const result = filterSections(sections, query);
+    expect(result).toHaveLength(expected);
   });
 
   it('filters multiple sections down but preserves matching sections', () => {
