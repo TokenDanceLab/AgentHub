@@ -13,9 +13,17 @@ import (
 	"github.com/agenthub/hub-server/internal/service/audit"
 )
 
-type mockAuditService struct{}
+type mockAuditService struct {
+	// queryFn is optional. The zero value keeps the original canned response so
+	// the tests that only assert a status code are untouched; the paging-ceiling
+	// pin sets it to capture the pageSize the handler forwards (#2243).
+	queryFn func(ctx context.Context, callerUserID string, isAdmin bool, eventType, severity string, since, until *time.Time, cursor string, pageSize int) (*audit.ListResult, error)
+}
 
 func (m *mockAuditService) Query(ctx context.Context, callerUserID string, isAdmin bool, eventType, severity string, since, until *time.Time, cursor string, pageSize int) (*audit.ListResult, error) {
+	if m.queryFn != nil {
+		return m.queryFn(ctx, callerUserID, isAdmin, eventType, severity, since, until, cursor, pageSize)
+	}
 	return &audit.ListResult{Items: nil, HasMore: false}, nil
 }
 

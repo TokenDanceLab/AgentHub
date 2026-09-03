@@ -2,13 +2,16 @@
 // between the API handler, lifecycle executor, and agent adapters.
 //
 // This file holds ContextBudget, token estimation and the preflight budget
-// checks. Compaction lives here too, but only as a budget predicate
-// (ShouldCompact / CompactionThreshold): no history-rewriting compaction helper
-// was ever peeled out of it. The residual pure-helper peel #1141 moved exactly
-// one group of helpers — the message type, sanitization and context-preface
-// functions — into a single sibling file in this package (zero behavior change,
-// pure move only), not the two-file split an earlier revision of this comment
-// claimed (#2246).
+// checks, plus compaction as a budget predicate only (ShouldCompact /
+// CompactionThreshold). The residual pure-helper peel #1141 did move two groups
+// out of it, both zero-behavior-change moves: the message type, sanitization
+// and context-preface functions into one sibling file, and the history
+// compaction/summary heuristics into another. Only the first survives — the
+// compaction module was never wired to anything and was later deleted as dead
+// code — so this package has one companion file today instead of the two that
+// peel created. No sibling is named here on purpose: the earlier revision of
+// this comment named both, and one of those two names outlived its file. The
+// package directory is the only file list that stays true (#2246).
 package runnerctx
 
 import (
