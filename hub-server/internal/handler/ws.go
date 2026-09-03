@@ -115,10 +115,7 @@ func (h *WebSocketHandler) ServeWS(c *gin.Context) {
 	// Track connection-scoped goroutines so Manager.Shutdown can wait for
 	// them to converge. Add(2) covers writeLoop + readLoop; each defers Done.
 	h.manager.GoroutineAdd(2)
-	go func() {
-		defer h.manager.GoroutineDone()
-		h.writeLoop(conn)
-	}()
+	h.startWriteLoop(conn)
 	h.manager.PushToConn(conn.ID, ws.NewFrame(ws.TypeAuthOK, nil))
 	safego.SafeGo("ws.readLoop", func() {
 		defer h.manager.GoroutineDone()
@@ -126,13 +123,55 @@ func (h *WebSocketHandler) ServeWS(c *gin.Context) {
 	})
 }
 
+// startWriteLoop launches conn's write loop on its own goroutine and releases
+// the connection-goroutine slot that ServeWS's GoroutineAdd(2) reserved for it.
+//
+// SafeGo, not a bare `go func(){}`: writeLoop recovers its own body panics (see
+// writeLoop for why it keeps a RecoverInto of its own), but writeLoop's
+// first-registered `defer conn.W.Close(...)` runs *last* under LIFO, so a panic
+// raised by the close itself escapes writeLoop and only this launcher guard
+// stands between it and a process crash. Same shape as ws.readLoop above
+// (#2246 slice 1 follow-up); ws_write_loop_safego_test.go pins both guards.
+func (h *WebSocketHandler) startWriteLoop(conn *ws.Conn) {
+	safego.SafeGo("ws.writeLoop", func() {
+		defer h.manager.GoroutineDone()
+		h.writeLoop(conn)
+	})
+}
+
+// writeLoop drains conn.Send onto the socket until the channel closes or a
+// write fails.
+//
+// Recovery goes through safego.RecoverInto instead of relying on the launch
+// site's SafeGo guard because the panic log has to keep conn_id, and a safego
+// name is a metric/observer label that must stay low-cardinality and stable —
+// conn_id cannot ride along in it. RecoverInto is Recover plus an error slot
+// and both call pkg/safego's unexported report, so the stack trace, the counter
+// and the PanicObserver dispatch are identical to SafeGo's.
+//
+// Registration order is the whole trick, and Go's LIFO defer order is what
+// makes it work:
+//
+//  1. defer conn.W.Close(...)        registered first  -> runs last
+//  2. defer the conn_id log          registered second -> runs second
+//  3. defer safego.RecoverInto(...)  registered last   -> runs first
+//
+// So on a body panic: RecoverInto runs first — it stops the panic, logs the
+// stack, dispatches the observer (goroutine_panic_recoveries_total) and fills
+// recoveredErr; the log defer then sees recoveredErr and writes the conn_id
+// correlation line the bare recover used to write; and the Close defer still
+// runs afterwards, so the peer keeps getting StatusNormalClosure exactly as
+// before. A panic raised by Close itself cannot be recovered here (that defer
+// is the one panicking): it escapes to startWriteLoop's SafeGo guard (#2246).
 func (h *WebSocketHandler) writeLoop(conn *ws.Conn) {
 	defer conn.W.Close(websocket.StatusNormalClosure, "")
+	var recoveredErr error
 	defer func() {
-		if r := recover(); r != nil {
-			slog.Error("ws writeLoop panic recovered", "conn_id", conn.ID, "panic", r)
+		if recoveredErr != nil {
+			slog.Error("ws writeLoop panic recovered", "conn_id", conn.ID, "panic", recoveredErr)
 		}
 	}()
+	defer safego.RecoverInto("ws.writeLoop", &recoveredErr)
 	for data := range conn.Send {
 		// Per-write deadline: a peer that stops draining its TCP receive
 		// buffer would otherwise block this goroutine until the ~65s

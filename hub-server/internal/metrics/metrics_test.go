@@ -256,37 +256,38 @@ func TestGaugeMetrics(t *testing.T) {
 }
 
 // TestEventBusCounter 验证：EventBusPanics Counter 可以正常累加。
+//
+// 断的是 before/after **差值**，不是绝对值：eventbus_panics_total 是进程级、注册
+// 在 DefaultRegisterer 上的全局量，同一个测试二进制里任何先跑的用例（本文件后面
+// 那组 observer 分派用例，或将来任何一个触发 "eventbus." 前缀 panic 的用例）都会
+// 把它顶高。断绝对值等于给整个二进制钉一条看不见的执行顺序——实测
+// `go test ./internal/metrics/ -count=1 -shuffle=2` 就以
+// "eventbus_panics_total = 37, want 2" 红掉，`-shuffle=3` 以 "= 3" 红掉（#2246）。
+// 差值断言证明的东西一点没少（仍然证明它能累加 2），只是不再依赖全局初值。
+//
+// 读数走 testutil.ToFloat64 而不是 Gather：Gather 的结果取决于 DefaultGatherer
+// 当时指向哪个 registry，而 session_metrics_test.go 为了隔离会临时换掉它（用完
+// 还原）。「指标确实注册进了 DefaultRegisterer」由 TestRegisteredMetricsAccessible
+// 负责，不在这里重复断言。
 func TestEventBusCounter(t *testing.T) {
 	Register()
 
+	before := testutil.ToFloat64(EventBusPanics)
+
 	EventBusPanics.Inc()
 	EventBusPanics.Inc()
 
-	metricFamilies, err := prometheus.DefaultGatherer.Gather()
-	if err != nil {
-		t.Fatalf("Gather 失败: %v", err)
+	if delta := testutil.ToFloat64(EventBusPanics) - before; delta != 2 {
+		t.Errorf("eventbus_panics_total 增量 = %v, want 2（before=%v）", delta, before)
 	}
-
-	for _, mf := range metricFamilies {
-		if mf.GetName() == "eventbus_panics_total" {
-			if len(mf.GetMetric()) > 0 {
-				if v := mf.GetMetric()[0].GetCounter().GetValue(); v != 2 {
-					t.Errorf("eventbus_panics_total = %v, want 2", v)
-				}
-			}
-			return
-		}
-	}
-	t.Error("未找到 eventbus_panics_total 指标")
 }
 
 // ── #2246 slice 1：safego PanicObserver 按 name 分派 eventbus_panics_total ──
 //
-// 这些用例追加在 TestEventBusCounter 之后是**有意的**：TestEventBusCounter 断言
-// eventbus_panics_total 的**绝对值** == 2，而该 counter 是进程级、注册在
-// DefaultRegisterer 上的全局量。任何在它之前触发 "eventbus." 前缀 panic 的用例
-// 都会把绝对值顶高从而误伤它。本块用例自身一律用 before/after 差值断言，不依赖
-// 执行顺序，但仍必须排在其后。
+// 本块用例一律用 before/after 差值断言，与执行顺序无关。这里原先写着「这些用例
+// 追加在 TestEventBusCounter 之后是**有意的**……仍必须排在其后」，那条顺序约束的
+// 唯一来源是 TestEventBusCounter 断绝对值；它改成差值断言之后约束就不存在了，
+// 留着这段注释就是又一条被活代码推翻的声明，所以一并删掉（#2246）。
 
 // recoverOnePanic 在独立 goroutine 里制造一次真实 panic 并走 pkg/safego 恢复，
 // 返回时 observer 一定已经跑完。

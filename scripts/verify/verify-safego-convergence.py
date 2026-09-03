@@ -65,13 +65,15 @@ ALLOWLIST = {
     ),
     # ── 需要给调用方一个「有类型的拒绝」：panic 时必须赋命名返回值
     #    (memberIDs=nil, ok=false)，Recover 的 log-and-move-on 语义表达不了。
-    #    同文件的 writeLoop 那一处不属于这个理由，见下面第 2 条。
+    #    同文件的 writeLoop 原先也挂在这条下面（次数 2），它不是这个理由——
+    #    已按 #2246 追加批收敛到 safego.RecoverInto，次数因此降到 1。
     "hub-server/internal/handler/ws.go": (
-        2,
+        1,
         "canTypeInSession must assign named results (memberIDs=nil, ok=false) so "
-        "the caller sees a typed denial; the second hit is writeLoop, a "
-        "per-connection goroutine with a log-only guard that is a convergence "
-        "candidate rather than an exemption (#2246 follow-up)",
+        "the caller sees a typed denial, which safego's fire-and-forget Recover "
+        "cannot express; writeLoop, the file's other former recovery site, is no "
+        "longer allow-listed — it converged to safego.RecoverInto (#2246 "
+        "follow-up)",
     ),
     # ── 单一恢复路径自身的实现：Recover / RecoverInto 各一次。
     "pkg/safego/safego.go": (
