@@ -27,7 +27,7 @@
 | `hub-server/deployments/Caddyfile` / `Caddyfile.prod` | 旧 reverse-proxy 模板 | **已删除**（#1527 PR2 收口） |
 | `hub-server/deployments/.env.production.example` | 旧生产 env 占位模板 | **已删除**（env 说明迁至 `deployments/production/.env.example`） |
 | `hub-server/deployments/deploy.sh` / `deploy-region.sh` | 旧人工运维胶水脚本 | **已删除**（部署指引改指权威 compose，运维由 server SSOT 覆盖） |
-| `scripts/dev/devserver.sh` | 远程 dev 服务器测试平台统一入口（sync/start/stop/status/test） | 新增（#1681，拓扑见 09-dev-server-topology.md） |
+| `scripts/dev/devserver.sh` | 远程 dev 服务器测试平台统一入口（sync/start/stop/status/test/integration） | 新增（#1681，拓扑见 09-dev-server-topology.md） |
 | `scripts/verify/verify-deployment-shape.py` | 部署形状 SSOT 门禁 | CI 强制（#1527 PR1） |
 | `.github/workflows/cd-pr-check.yml` | PR 前置：compose 形状 + Dockerfile + 构建 dry run | 消费权威模板（#1527 PR1） |
 

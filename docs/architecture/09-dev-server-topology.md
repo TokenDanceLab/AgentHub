@@ -15,7 +15,7 @@
 | PostgreSQL 16 | 5432 | Docker 容器（compose 纳管） |
 | Redis 7 | 6379 | Docker 容器（compose 纳管） |
 
-固定端口与本地开发一致（见 `AGENTS.md` 的“项目分工和边界”默认端口表），避免两套契约。
+固定端口与本地开发一致（默认端口表 SSOT 见 [05-deployment.md](05-deployment.md)），避免两套契约。
 
 ## 运行模型
 

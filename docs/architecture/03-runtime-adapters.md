@@ -8,7 +8,7 @@
 
 Edge Server 的 adapter 层负责将不同 Agent Runtime 的协议统一为内部 `RunEvent` 流。所有 adapter 实现统一的 Go interface，Edge 不关心底层 Agent 的具体协议差异。
 
-`internal/adapters/` 已按 Agent 家族归组为叶子子包（[#1760]，见 [02-edge-server.md](02-edge-server.md) §Adapter 家族子包）：`claude/`、`codex/`、`opencode/`、`orchestrator/`、`sdk/`；共享机制（`AcpAdapter`、NDJSON parser、registry）留在根包。下表文件列给出子包内路径（未标注的仍在根包平铺区）。
+`internal/adapters/` 已按 Agent 家族归组为叶子子包（[#1760]，见 [02-edge-server.md](02-edge-server.md) §Adapter 家族子包）：`claude/`、`codex/`、`opencode/`、`orchestrator/`、`sdk/`，另有 `acp/` 共享运行时子包（`acp.AcpAdapter`，claude/codex/opencode 嵌入复用）；NDJSON parser、registry 留在根包。下表文件列给出子包内路径（未标注的仍在根包平铺区）。
 
 [#1760]: https://github.com/TokenDanceLab/AgentHub/issues/1760
 
@@ -28,7 +28,7 @@ Edge Server 的 adapter 层负责将不同 Agent Runtime 的协议统一为内�
 ACP 协议层**禁止手写 JSON-RPC loop**，必须用官方 Wrapper/适配层（对标 codeg）。三大家 CLI adapter 已接入官方 ACP 层，并成为**默认执行路径**（阶段 A 收敛完成）：
 
 - **协议边界**：100% 官方 adapter 二进制（claude-agent-acp / codex-acp / opencode 原生 ACP），Go runtime 用 `coder/acp-go-sdk` v0.13.5（Coder/Windsurf 厂维护，官方收录，从官方 schema 生成类型 + 自带 JSON-RPC 连接层）
-- **runtime 共享层**：`acp.go` `AcpAdapter`（SDK `acp.Client` 接口 9 方法自动分发）+ `acp_events.go`（typed 映射 `acp.SessionUpdate` → `run.agent.*`）+ `acp_client.go`（client skeleton）
+- **runtime 共享层**：`acp/acp.go` `AcpAdapter`（SDK `acp.Client` 接口 9 方法自动分发）+ `acp/acp_events.go`（typed 映射 `acp.SessionUpdate` → `run.agent.*`）+ `acp/acp_client.go`（client skeleton）
 - **审批链**：`request_permission` → `Responder` → `PermissionDecisionBroker`（复用既有 broker，零新协议）
 - **默认注册**：`claude-acp` / `codex-acp` / `opencode-acp` 默认注册（空 launcher 回退平台原生 `npx`/`opencode`）；`--agent-default` 与 `--runner-profile` 默认 cutover 到 `*-acp`。真跑验证需 `ANTHROPIC_API_KEY`/`OPENAI_API_KEY` + npx registry 网络。进度与剩余项见 GitHub issues（ACP migration 跟踪）。
 
@@ -91,7 +91,7 @@ Orchestrator 的 `ParseStream` 在 Claude Code 输出流上包装了 `dispatchIn
 
 | Adapter | 注册 ID | 文件 | 功能 |
 |---------|---------|------|------|
-| `RuntimeManifestAdapter` | 由 manifest JSON 定义 | `runtime_manifest.go` | 基于 JSON manifest 的自定义 fixture adapter |
+| `RuntimeManifestAdapter` | 由 manifest JSON 定义 | `sdk/runtime_manifest.go` | 基于 JSON manifest 的自定义 fixture adapter |
 
 - 通过 `--runtime-manifest` 标志注册（可重复），env `AGENTHUB_RUNTIME_MANIFESTS`
 - Manifest schema: `agenthub-runtime-manifest-v1`
