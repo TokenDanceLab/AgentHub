@@ -15,7 +15,6 @@ import type {
 import type { AgentConfig, ProjectDraft, DocRow } from './pages';
 import type { SkillMarketItem, MCPMarketItem } from './pages/AgentsPage';
 import type { ProjectInfo } from './pages/ProjectsPage';
-import type { WorkbenchProjectsPort } from './workbenchProjectsPort';
 import type { WorkbenchAttentionInput } from './workbenchAttentionModel';
 
 /* ═══════════════════════════════════════════════════════════════════════
@@ -83,8 +82,6 @@ export interface AgentHubWorkbenchProps {
     projectId: string,
     draft: ProjectDraft,
   ) => Promise<ProjectInfo | void> | ProjectInfo | void) | undefined;
-  /** Narrow domain port for project data access when onProjectCreate/Update are not provided (#1546). */
-  projectsPort?: WorkbenchProjectsPort | undefined;
   onApprovalDecision?: ((action: ApprovalDecisionAction) => Promise<void> | void) | undefined;
   /** 用户想与某个联系人/Agent 开始私聊，但当前没有已有会话时触发。上层负责创建会话并切换。 */
   onNavigateToConversation?: ((target: { name: string; id: string; kind: 'dm' | 'group' }) => void) | undefined;

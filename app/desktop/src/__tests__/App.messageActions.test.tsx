@@ -64,9 +64,6 @@ vi.mock('@/platform/edgeCapabilityMapper', () => ({
   mapEdgeAgentsToWorkbenchAgents: vi.fn(() => []),
 }));
 
-vi.mock('@/platform/desktopWorkbenchProjectsPort', () => ({
-  createDesktopWorkbenchProjectsPort: vi.fn(() => ({})),
-}));
 
 vi.mock('@/hooks/useHealth', () => ({
   useHealth: vi.fn(() => ({ online: true, health: { status: 'ok', version: 'test' }, lastError: null, refetch: vi.fn() })),

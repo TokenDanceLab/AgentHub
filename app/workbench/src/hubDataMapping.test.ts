@@ -7,15 +7,17 @@ import {
   resolveHubContacts,
   resolveHubDocuments,
   resolveHubProjects,
-  resolveHubProjectsDefault,
   workspaceProjectToProjectInfo,
 } from './hubDataMapping';
 
 /* ═══════════════════════════════════════════════════════════════════════
    hubDataMapping — Hub API types → Workbench UI types.
 
-   Both platform projects ports (#1546) and both workbench models map through
-   these shared functions, so the mapping contract is exercised here once.
+   Desktop 的 workbench model 通过这些共享函数做 Hub→UI 映射（`resolveHubProjects`
+   + `workspaceProjectToProjectInfo`），所以映射契约在这里测一次。Web 侧目前
+   走自己的副本 `app/web/src/platform/webWorkbenchProjects.ts`（分岔已登记，
+   收敛属另一批）。原 #1546 的两个 platform projects port 已删：它们在两个
+   shell 里都结构性不可达。
    ═══════════════════════════════════════════════════════════════════════ */
 
 // Deterministic helpers: formatDocTime / formatProjectDate / formatSessionTime
@@ -182,13 +184,6 @@ describe('resolveHubProjects', () => {
 
   it('returns an empty list when ready but no projects exist', () => {
     expect(resolveHubProjects(undefined, true, 'auto', mapFn)).toEqual([]);
-  });
-});
-
-describe('resolveHubProjectsDefault', () => {
-  it('delegates to the default project mapper', () => {
-    const result = resolveHubProjectsDefault([{ id: 'p1', name: 'Alpha' }], true, 'auto');
-    expect(result?.[0]).toMatchObject({ id: 'p1', name: 'Alpha' });
   });
 });
 

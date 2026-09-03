@@ -246,7 +246,6 @@ export function buildWorkbenchRoutesProps(
   assignIfDefined(routesProps, 'onActiveProjectChange', props.onActiveProjectChange);
   assignIfDefined(routesProps, 'onProjectCreate', props.onProjectCreate);
   assignIfDefined(routesProps, 'onProjectUpdate', props.onProjectUpdate);
-  assignIfDefined(routesProps, 'projectsPort', props.projectsPort);
   assignIfDefined(routesProps, 'onAgentCreate', props.onAgentCreate);
   assignIfDefined(routesProps, 'onAgentUpdate', props.onAgentUpdate);
   assignIfDefined(routesProps, 'onAgentDelete', props.onAgentDelete);

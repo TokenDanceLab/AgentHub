@@ -242,8 +242,6 @@ export const sharedWorkbenchResources = {
       newProject: '新建项目',
       projectRuns: '项目运行',
       loading: '正在加载项目…',
-      loadMoreError: '加载更多项目失败：{{message}}',
-      retryLoadMore: '重试加载更多',
       section: {
         members: '成员',
         projectRuns: '项目运行',
@@ -1037,8 +1035,6 @@ export const sharedWorkbenchResources = {
       newProject: 'New project',
       projectRuns: 'Project runs',
       loading: 'Loading projects…',
-      loadMoreError: 'Failed to load more projects: {{message}}',
-      retryLoadMore: 'Retry loading more',
       section: {
         members: 'Members',
         projectRuns: 'Project runs',
