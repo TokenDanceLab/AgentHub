@@ -18,7 +18,7 @@ export function getHubClient() {
 
 export function useHubContacts(opts?: { enabled?: boolean }) {
   return useQuery({
-    queryKey: hubQueryKeys.contacts.root,
+    queryKey: hubQueryKeys.contacts.list,
     queryFn: () => getHubClient().listContacts(),
     enabled: opts?.enabled ?? false,
   });
