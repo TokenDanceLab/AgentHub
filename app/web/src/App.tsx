@@ -3,6 +3,7 @@ import { useCallback, useMemo, useState, useSyncExternalStore } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AgentHubWorkbench } from '@agenthub/workbench';
 import { fetchAllPages } from '@shared/hub/paginate';
+import { webQueryKeys } from '@shared/stores/queryKeys';
 import { CHATVIEW_I18N_NAMESPACE } from '@shared/chatview/i18n/resources';
 import type { AgentConfig, ContactMember, ProjectDraft, ProjectInfo, SkillMarketItem, MCPMarketItem } from '@agenthub/workbench';
 import {
@@ -99,7 +100,7 @@ function WebWorkbenchRoot() {
 
   // Fetch real user profile from Hub (originates from TokenDance ID OIDC)
   const userProfile = useQuery({
-    queryKey: ['web-v4', 'auth-me'],
+    queryKey: webQueryKeys.authMe,
     queryFn: () => createHubClient({ getToken: getAccessToken }).me(),
     enabled: Boolean(getAccessToken()),
     staleTime: 60_000,
@@ -112,7 +113,7 @@ function WebWorkbenchRoot() {
 
   // Fetch public Skills for the Skill Market tab
   const skillMarketQuery = useQuery({
-    queryKey: ['web-v4', 'public-skills', hubReady],
+    queryKey: webQueryKeys.publicSkills(hubReady),
     // Was a parameterless first-page fetch: the market endpoint clamps to
     // MaxListPageSize (200) and returns page.nextCursor, which was dropped,
     // so the 51st skill never reached the market tab
@@ -125,7 +126,7 @@ function WebWorkbenchRoot() {
 
   // Fetch public MCP Servers for the MCP Market tab
   const mcpMarketQuery = useQuery({
-    queryKey: ['web-v4', 'public-mcp-servers', hubReady],
+    queryKey: webQueryKeys.publicMcpServers(hubReady),
     // Was a parameterless first-page fetch: the market endpoint clamps to
     // MaxListPageSize (200) and returns page.nextCursor, which was dropped,
     // so the 51st server never reached the market tab

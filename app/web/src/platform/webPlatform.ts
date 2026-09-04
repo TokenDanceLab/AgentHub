@@ -11,6 +11,7 @@ import type { AgentHubPlatform, RedispatchTaskResult, WorkbenchConversation } fr
 import type { AttachmentRef, ComposerAttachment, ComposerIntent, ComposerSubmitResult } from '@shared/composer';
 import { computeFileHash } from '@shared/composer';
 import { isTurnInProgressError } from '@shared/errors';
+import { webQueryKeys } from '@shared/stores/queryKeys';
 import { queryClient as defaultQueryClient } from '@/api/queryClient';
 import {
   createHubClient,
@@ -228,25 +229,25 @@ export function createWebPlatform(options: WebPlatformOptions = {}): AgentHubPla
           throw new Error('Hub pin endpoint is unavailable on this Web build.');
         }
         await hubClient.pinMessage(messageId, sessionId);
-        void queryClient.invalidateQueries({ queryKey: ['web-v4', 'hub-pins', sessionId] });
-        void queryClient.invalidateQueries({ queryKey: ['web-v4', 'hub-messages', sessionId] });
+        void queryClient.invalidateQueries({ queryKey: webQueryKeys.pins.of(sessionId) });
+        void queryClient.invalidateQueries({ queryKey: webQueryKeys.messages.of(sessionId) });
       },
       async unpinMessage(messageId: string, sessionId: string): Promise<void> {
         if (!hubClient.unpinMessage) {
           throw new Error('Hub unpin endpoint is unavailable on this Web build.');
         }
         await hubClient.unpinMessage(messageId, sessionId);
-        void queryClient.invalidateQueries({ queryKey: ['web-v4', 'hub-pins', sessionId] });
-        void queryClient.invalidateQueries({ queryKey: ['web-v4', 'hub-messages', sessionId] });
+        void queryClient.invalidateQueries({ queryKey: webQueryKeys.pins.of(sessionId) });
+        void queryClient.invalidateQueries({ queryKey: webQueryKeys.messages.of(sessionId) });
       },
       async forwardMessage(messageId: string, targetSessionIds: string[]): Promise<void> {
         if (!hubClient.forwardMessage) {
           throw new Error('Hub forward endpoint is unavailable on this Web build.');
         }
         await hubClient.forwardMessage(messageId, targetSessionIds);
-        void queryClient.invalidateQueries({ queryKey: ['web-v4', 'hub-sessions'] });
+        void queryClient.invalidateQueries({ queryKey: webQueryKeys.sessions.root });
         for (const targetSessionId of targetSessionIds) {
-          void queryClient.invalidateQueries({ queryKey: ['web-v4', 'hub-messages', targetSessionId] });
+          void queryClient.invalidateQueries({ queryKey: webQueryKeys.messages.of(targetSessionId) });
         }
       },
       async recallMessage(messageId: string): Promise<void> {
@@ -256,14 +257,14 @@ export function createWebPlatform(options: WebPlatformOptions = {}): AgentHubPla
         await hubClient.recallMessage(messageId);
         // recallMessage carries no session id, so invalidate every open
         // hub-messages query (prefix match) instead of one session.
-        void queryClient.invalidateQueries({ queryKey: ['web-v4', 'hub-messages'] });
+        void queryClient.invalidateQueries({ queryKey: webQueryKeys.messages.root });
       },
       async addMessageReaction(messageId: string, sessionId: string, reaction: { emoji: string }): Promise<void> {
         if (!hubClient.addMessageReaction) {
           throw new Error('Hub reaction endpoint is unavailable on this Web build.');
         }
         await hubClient.addMessageReaction(messageId, sessionId, reaction);
-        void queryClient.invalidateQueries({ queryKey: ['web-v4', 'hub-messages', sessionId] });
+        void queryClient.invalidateQueries({ queryKey: webQueryKeys.messages.of(sessionId) });
       },
     },
   };
@@ -453,8 +454,8 @@ async function sendComposerMessage(
   });
 }
 
-function sessionAgentBindingsQueryKey(sessionId: string): [string, string, string] {
-  return ['web-v4', 'session-agent-instances', sessionId];
+function sessionAgentBindingsQueryKey(sessionId: string): readonly [string, string, string] {
+  return webQueryKeys.sessionAgentInstances(sessionId);
 }
 
 async function ensureMentionedAgentInstance(

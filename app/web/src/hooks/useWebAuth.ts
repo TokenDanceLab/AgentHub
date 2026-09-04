@@ -5,7 +5,7 @@ import { useAuth, getAccessToken } from '@/hooks/useAuth';
 import { OidcError } from '@/api/hubAuth';
 import { useHubStore } from '@/stores/hubStore';
 import { useToastStore } from '@shared/ui/toast';
-import { hubQueryKeys } from '@shared/stores/queryKeys';
+import { hubQueryKeys, webQueryKeys } from '@shared/stores/queryKeys';
 
 /**
  * Web-specific auth orchestration hook.
@@ -28,7 +28,10 @@ export function useWebAuth() {
     void tryAutoLogin()
       .then((authenticated) => {
         if (authenticated && !cancelled) {
-          void queryClient.refetchQueries({ queryKey: hubQueryKeys.threads.root });
+          // Web's session list lives in the app-scoped namespace, so
+          // refetching `hubQueryKeys.threads.root` here matched no cache entry
+          // at all — the post-login refresh was a silent no-op (#2261).
+          void queryClient.refetchQueries({ queryKey: webQueryKeys.sessions.root });
           void queryClient.refetchQueries({ queryKey: hubQueryKeys.agents.root });
         }
       })

@@ -1,5 +1,9 @@
 import type { QueryClient } from '@tanstack/react-query';
-import { isQueryKeyPrefix, type HubMessagesKeyFamily } from '@shared/stores/queryKeys';
+import {
+  isQueryKeyPrefix,
+  webQueryKeys,
+  type HubMessagesKeyFamily,
+} from '@shared/stores/queryKeys';
 import type { AttachmentRef, ComposerAttachment, ComposerIntent } from '@shared/composer';
 import type { HubContentType } from '@shared/hub/hubClient';
 import type { MessageResponse, SendMessageResponse } from '@/api/hubClient';
@@ -148,22 +152,28 @@ export function optimisticHubMessageFromIntent(
  * Broad prefix covering every cached Web transcript (#2252).
  *
  * Web keeps transcripts in its app-scoped `web-v4` cache-version namespace
- * rather than the shared `hubQueryKeys.threads` family: `['hub','threads']` is
- * already Web's *session list* key (`contactQueries.sessionsQueryKey`, also
- * refetched wholesale by `useWebAuth`), and three local cache writers below
- * (`upsertHubMessage` / `confirmOptimisticHubMessage` /
+ * rather than the shared `hubQueryKeys.threads` family, and three local cache
+ * writers below (`upsertHubMessage` / `confirmOptimisticHubMessage` /
  * `removeOptimisticHubMessage`) `setQueryData` straight into this shape.
+ *
+ * The literal lives in `webQueryKeys.messages` — this module only re-exports it
+ * as the `HubMessagesKeyFamily` that `resyncMessagesAfterReconnect` consumes.
+ * (The comment here used to justify the split by claiming `['hub','threads']`
+ * was Web's session-list key; it is not — Web's list is
+ * `webQueryKeys.sessions.list(hubReady)`, and `hubQueryKeys.threads.list` had
+ * no Web producer at all, which is why `contactQueries` / `useWebAuth` session
+ * invalidations were silent no-ops, #2261.)
  *
  * Because the shape is Web-only, it is exported as a `HubMessagesKeyFamily` so
  * shared consumers (notably `resyncMessagesAfterReconnect`) match it instead of
  * guessing — a hardcoded threads-shape matcher is what made the #2101
  * reconnect/gap resync a silent no-op here.
  */
-export const hubMessagesQueryRoot = ['web-v4', 'hub-messages'] as const;
+export const hubMessagesQueryRoot = webQueryKeys.messages.root;
 
 /** Exact query key holding one session's Web transcript. */
-export function hubMessagesQueryKey(sessionId: string): [string, string, string] {
-  return ['web-v4', 'hub-messages', sessionId];
+export function hubMessagesQueryKey(sessionId: string): readonly unknown[] {
+  return webQueryKeys.messages.of(sessionId);
 }
 
 /** Web's transcript key family — pass to `resyncMessagesAfterReconnect`. */

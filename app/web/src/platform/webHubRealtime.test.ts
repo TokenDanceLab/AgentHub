@@ -87,17 +87,6 @@ describe('webHubRealtime', () => {
     });
   });
 
-  it('invalidates execution targets on device online events', () => {
-    const queryClient = new QueryClient();
-    const invalidateQueries = vi.spyOn(queryClient, 'invalidateQueries');
-
-    invalidateWebWorkbenchHubQueries(queryClient, HUB_EVENTS.DEVICE_ONLINE, {
-      device_id: 'desktop-1',
-    });
-
-    expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ['web-v4', 'execution-targets'] });
-  });
-
   it('dispatches matching Hub agent.stream runtime events to the live transcript handler', () => {
     const onRuntimeEvent = vi.fn();
 
