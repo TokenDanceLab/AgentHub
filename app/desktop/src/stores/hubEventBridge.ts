@@ -299,7 +299,6 @@ function onFriendRequest(qc: QueryClient, payload: unknown) {
       createdAt: new Date().toISOString(),
     });
   }
-  invalidateQuery(qc, hubQueryKeys.contacts.friendRequests);
 }
 
 function onFriendAccepted(qc: QueryClient, payload: unknown) {
@@ -315,7 +314,6 @@ function onFriendAccepted(qc: QueryClient, payload: unknown) {
     });
   }
   invalidateQuery(qc, hubQueryKeys.contacts.list);
-  invalidateQuery(qc, hubQueryKeys.contacts.friendRequests);
 }
 
 // ── Device events ──────────────────────────────────────────────
