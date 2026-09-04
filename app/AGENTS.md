@@ -13,7 +13,7 @@ pnpm dev:web                          # Web Vite (:5174)
 python scripts/verify/verify-design-token-ssot.py   # 设计 token 门禁（改 styles/designTokens 必跑）
 ```
 
-## 前端边界（速查，权威在根 AGENTS §2/§5）
+## 前端边界（速查，权威在根 AGENTS 的“架构与产品边界 / 验证与证据”）
 
 - 通用 UI 只在 `shared/src/ui/`；Desktop/Web/Mobile 从 shared 导入，禁止复制本地副本。
 - 端级 workbench shell 只在 `workbench/src/`（`@agenthub/workbench`，#1759 独立成包）；web/desktop 从 `@agenthub/workbench` 导入，mobile-rn 不依赖。依赖方向 workbench → shared 单向，shared 禁止 import workbench（eslint + `scripts/verify/verify-frontend-package-boundary.py` 双重门禁）。
@@ -31,4 +31,4 @@ python scripts/verify/verify-design-token-ssot.py   # 设计 token 门禁（改 
 
 ## 易踩坑
 
-前端 CI 易踩坑（exactOptionalPropertyTypes / noUncheckedIndexedAccess / CSS helper 类型 / DesignNavIcon / 11px CJK 下限 / changes job）见 [`../docs/architecture/04-frontend-data-flow.md`](../docs/architecture/04-frontend-data-flow.md) §前端 CI 易踩坑。测试分层 L0-L4 与 CI job 映射见根 [`../AGENTS.md`](../AGENTS.md) §5.5。
+前端 CI 易踩坑（exactOptionalPropertyTypes / noUncheckedIndexedAccess / CSS helper 类型 / DesignNavIcon / 11px CJK 下限 / changes job）见 [`../docs/architecture/04-frontend-data-flow.md`](../docs/architecture/04-frontend-data-flow.md) §前端 CI 易踩坑。测试分层 L0-L4 见根 [`../AGENTS.md`](../AGENTS.md) 的“测试分层（L0-L4）”；CI job 映射见 [`../docs/architecture/github-actions-ci-cd-policy.md`](../docs/architecture/github-actions-ci-cd-policy.md)。
