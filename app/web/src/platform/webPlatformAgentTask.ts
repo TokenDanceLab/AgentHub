@@ -1,4 +1,5 @@
 import type { QueryClient } from '@tanstack/react-query';
+import { webQueryKeys } from '@shared/stores/queryKeys';
 
 export interface WebActiveAgentTask {
   taskId: string;
@@ -11,12 +12,12 @@ export interface WebActiveAgentTask {
   status: string;
 }
 
-export function webActiveAgentTaskQueryKey(sessionId: string): [string, string, string] {
-  return ['web-v4', 'active-agent-task', sessionId];
+export function webActiveAgentTaskQueryKey(sessionId: string): readonly unknown[] {
+  return webQueryKeys.agentTask.active(sessionId);
 }
 
-export function webAgentTaskIndexQueryKey(taskId: string): [string, string, string] {
-  return ['web-v4', 'agent-task-index', taskId];
+export function webAgentTaskIndexQueryKey(taskId: string): readonly unknown[] {
+  return webQueryKeys.agentTask.index(taskId);
 }
 
 export function recordWebAgentTaskIndex(
