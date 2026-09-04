@@ -54,6 +54,16 @@ interface TranscriptBlockBase {
 export interface TextTranscriptBlock extends TranscriptBlockBase {
   kind: 'text';
   text: string;
+  /**
+   * Producing agent task id, when the source message carries one. Hub stamps
+   * `agent_task.task_id` into agent message content on both edge callback
+   * paths (stream projection + done-final) and the hub-message normalizer
+   * writes it through here (#2274 B-1). It is the only identity
+   * POST /web/agent-tasks/:id/regenerate accepts, so the transcript chrome
+   * offers "regenerate" only when this is present — absence means there is no
+   * server-truthful task to regenerate, and offering the click would be a lie.
+   */
+  agentTaskId?: string;
   displayTitle?: string;
   displayDetail?: string;
   badgeLabel?: string;

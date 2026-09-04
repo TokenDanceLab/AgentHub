@@ -248,8 +248,12 @@ describe('Web app root', () => {
           kind: 'text',
           author: { id: 'hub-agent', name: 'Builder', role: 'agent' },
           text: 'Agent 的回复内容',
+          // #2274 B-1: hub stamps the producing task id onto agent messages;
+          // the menu only offers regenerate when the block carries it.
+          agentTaskId: 'task-42',
         },
       ],
+      chatActions: {},
     });
 
     const { container } = render(<App />);
@@ -261,10 +265,67 @@ describe('Web app root', () => {
     const regenerateItem = await screen.findByRole('menuitem', { name: 'context.regenerate' });
     fireEvent.click(regenerateItem);
 
+    // #2274 B-1: the port must send the TASK id — the only identity
+    // POST /web/agent-tasks/:id/regenerate accepts (pre-fix web sent a message
+    // identifier and every live click 404'd).
+    expect(hubClientStub.regenerateAgentTask).toHaveBeenCalledWith('task-42');
+
     // Test env renders i18n keys raw; runtime shows 'Regenerate failed, please retry'.
     await screen.findByText('toast.regenerateFailed');
     // The failed regenerate must not hide the original message.
     expect(screen.getByText('Agent 的回复内容')).toBeInTheDocument();
+  });
+
+  // #2274 B-1 honesty gate, both halves: no stamped task id ⇒ nothing honest to
+  // send; no hub session (demo/unauthenticated) ⇒ the port must not exist at
+  // all, so the shared menu hides the entry instead of offering a dead click.
+  it('hides regenerate when the agent block carries no stamped task id', async () => {
+    useWebWorkbenchModelMock.mockReturnValue({
+      activeConversationId: 'hub-session-1',
+      conversations: [
+        { id: 'hub-session-1', title: '真实 Hub 会话', kind: 'group', subtitle: 'Hub group' },
+      ],
+      transcript: [
+        {
+          id: 'hub-message-1',
+          kind: 'text',
+          author: { id: 'hub-agent', name: 'Builder', role: 'agent' },
+          text: 'Agent 的回复内容',
+        },
+      ],
+      chatActions: {},
+    });
+
+    const { container } = render(<App />);
+    fireEvent.contextMenu(container.querySelector('[data-selectable-card="hub-message-1"]')!);
+    await screen.findByRole('menuitem', { name: 'context.copyLink' });
+    expect(screen.queryByRole('menuitem', { name: 'context.regenerate' })).toBeNull();
+    expect(hubClientStub.regenerateAgentTask).not.toHaveBeenCalled();
+  });
+
+  it('hides regenerate outside hubReady even when a task id is stamped (#2274 B-1)', async () => {
+    useWebWorkbenchModelMock.mockReturnValue({
+      activeConversationId: 'hub-session-1',
+      conversations: [
+        { id: 'hub-session-1', title: '真实 Hub 会话', kind: 'group', subtitle: 'Hub group' },
+      ],
+      transcript: [
+        {
+          id: 'hub-message-1',
+          kind: 'text',
+          author: { id: 'hub-agent', name: 'Builder', role: 'agent' },
+          text: 'Agent 的回复内容',
+          agentTaskId: 'task-42',
+        },
+      ],
+      // no chatActions ⇒ demo / unauthenticated shell
+    });
+
+    const { container } = render(<App />);
+    fireEvent.contextMenu(container.querySelector('[data-selectable-card="hub-message-1"]')!);
+    await screen.findByRole('menuitem', { name: 'context.copyLink' });
+    expect(screen.queryByRole('menuitem', { name: 'context.regenerate' })).toBeNull();
+    expect(hubClientStub.regenerateAgentTask).not.toHaveBeenCalled();
   });
 
   it('keeps Hub Agent Profiles available to the shared composer without legacy demo controls', () => {
