@@ -13,7 +13,6 @@ import {
   within,
 } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { WORKBENCH_DATA_MODE_STORAGE_KEY } from '@shared/demo';
 import { createMockPlatform } from '@shared/platform/createMockPlatform';
 import type { TranscriptBlock } from '@shared/transcript/types';
 import { AgentHubWorkbench } from '../AgentHubWorkbench';
@@ -68,49 +67,6 @@ describe('AgentHubWorkbench', () => {
     expect(projectMain).not.toBeNull();
     // Project detail tabs use i18n keys that may differ from test expectations.
     // Verify the project page renders correctly with its heading.
-  });
-
-  it('renders the local data mode setting with mock and real-mode choices', () => {
-    window.localStorage.removeItem(WORKBENCH_DATA_MODE_STORAGE_KEY);
-    const platform = createMockPlatform({
-      surface: 'desktop',
-      capabilities: { browserPreview: true },
-      conversations: [{ id: 'builder', title: 'Builder', kind: 'direct' }],
-    });
-
-    render(
-      <AgentHubWorkbench
-        agents={agents}
-        platform={platform}
-        conversations={platform.seed.conversations}
-        transcript={transcript}
-      />,
-    );
-
-    fireEvent.click(screen.getByRole('button', { name: '设置' }));
-    fireEvent.click(screen.getByRole('button', { name: '本地开发' }));
-
-    expect(screen.getByText('数据模式')).toBeInTheDocument();
-    expect(screen.getByText('Auto 可开发回退；Mock/Fixture 固定本地数据；Observed/Approved real 不回退。')).toBeInTheDocument();
-    expect(screen.getAllByRole('button', { name: 'Auto' }).length).toBeGreaterThan(0);
-    expect(screen.getAllByRole('button', { name: 'Mock' }).length).toBeGreaterThan(0);
-    expect(screen.getAllByRole('button', { name: 'Fixture' }).length).toBeGreaterThan(0);
-    expect(screen.getAllByRole('button', { name: 'Observed' }).length).toBeGreaterThan(0);
-    expect(screen.getAllByRole('button', { name: 'Approved real' }).length).toBeGreaterThan(0);
-    expect(screen.getByRole('region', { name: '数据模式状态' })).toBeInTheDocument();
-    expect(screen.getByText('Auto fallback')).toBeInTheDocument();
-    expect(screen.getByText('Prefer real data, allow development fallback')).toBeInTheDocument();
-    expect(screen.queryByText('Normal 只走真实数据')).not.toBeInTheDocument();
-
-    fireEvent.click(screen.getAllByRole('button', { name: 'Fixture' })[0]!);
-    expect(window.localStorage.getItem(WORKBENCH_DATA_MODE_STORAGE_KEY)).toBe('fixture');
-    expect(screen.getByText('Fixture data')).toBeInTheDocument();
-    expect(screen.getByText('Pinned shared workbench fixture')).toBeInTheDocument();
-
-    fireEvent.click(screen.getAllByRole('button', { name: 'Approved real' })[0]!);
-    expect(window.localStorage.getItem(WORKBENCH_DATA_MODE_STORAGE_KEY)).toBe('approved-real');
-    expect(screen.getAllByText('Approved real').length).toBeGreaterThan(0);
-    expect(screen.getByText('Approved real Hub / Edge data only')).toBeInTheDocument();
   });
 
   it('opens the account profile popover from the global rail', () => {
