@@ -75,7 +75,7 @@ export interface TranscriptAgentItem {
 export type TranscriptItem = TranscriptUserItem | TranscriptAgentItem
 
 /** Generic action callback from Transcript to consumer.
- *  Actions: 'copy', 'regenerate', 'pin', 'reply', 'quote', 'link', 'delete'.
+ *  Actions: 'copy', 'regenerate', 'pin', 'reply', 'quote', 'delete'.
  *  Metadata carries action-specific payload (e.g. selected text for copy). */
 export type BlockActionCallback = (
   action: string,

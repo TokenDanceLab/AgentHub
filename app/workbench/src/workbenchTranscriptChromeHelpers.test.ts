@@ -13,7 +13,6 @@ import {
   buildTranscriptContextMenuGroups,
   buildTranscriptMultiSelectActions,
   cardActionLabel,
-  cardLinkForBlock,
   clearPulseTimers,
   clearTimeoutIfSet,
   createEnterSelectionSnapshot,
@@ -178,9 +177,6 @@ describe('workbenchTranscriptChromeHelpers', () => {
     expect(cardActionLabel('unknown', 'x', t)).toBe('toast.actionRecorded');
     expect(multiActionLabel('delete', 3, t)).toBe('toast.multiDelete:3');
     expect(multiActionLabel('other', 2, t)).toBe('toast.multiProcessed:2');
-    // #1504: card links are openable web URLs, never the dead custom scheme.
-    expect(cardLinkForBlock('b9')).toMatch(/^https?:\/\//);
-    expect(cardLinkForBlock('b9')).not.toContain('agenthub://');
   });
 
   it('detects nested interactive targets inside a selectable card', () => {
@@ -1102,9 +1098,10 @@ describe('workbenchTranscriptChromeHelpers', () => {
     expect(agentLabels).not.toContain('context.regenerate');
     expect(agentLabels).not.toContain('context.forward');
     expect(agentLabels).not.toContain('context.pinMessage');
-    // Handler-independent entries stay.
+    // Handler-independent local actions stay; the old message-link entry was
+    // removed because no Web/Desktop route consumed the generated URL.
     expect(agentLabels).toContain('context.copy');
-    expect(agentLabels).toContain('context.copyLink');
+    expect(agentLabels).not.toContain('context.copyLink');
 
     const userLabels = labelsOf('u1');
     expect(userLabels).not.toContain('context.recall');

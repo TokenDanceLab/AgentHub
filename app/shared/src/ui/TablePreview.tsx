@@ -59,12 +59,12 @@ async function getXLSX(): Promise<typeof import('xlsx')> {
 
 export const MAX_PREVIEW_FILE_BYTES = 20 * 1024 * 1024; // 20 MB
 
-function assertPreviewSizeAllowed(byteLength: number): void {
-  if (byteLength > MAX_PREVIEW_FILE_BYTES) {
-    const actualMb = (byteLength / (1024 * 1024)).toFixed(1);
-    const limitMb = MAX_PREVIEW_FILE_BYTES / (1024 * 1024);
-    throw new Error(`文件过大（${actualMb} MB，上限 ${limitMb} MB），出于安全限制不预览`);
-  }
+function previewSizeErrorValues(byteLength: number): { actualMb: string; limitMb: number } | null {
+  if (byteLength <= MAX_PREVIEW_FILE_BYTES) return null;
+  return {
+    actualMb: (byteLength / (1024 * 1024)).toFixed(1),
+    limitMb: MAX_PREVIEW_FILE_BYTES / (1024 * 1024),
+  };
 }
 
 export const TablePreview: React.FC<TablePreviewProps> = ({
@@ -126,12 +126,17 @@ export const TablePreview: React.FC<TablePreviewProps> = ({
       } else {
         const response = await fetch(fileUrl);
         if (!response.ok) {
-          throw new Error(`Failed to fetch file: ${response.status} ${response.statusText}`);
+          setError(t('preview.error.fetch', { status: response.status }));
+          return;
         }
         arrayBuffer = await response.arrayBuffer();
       }
 
-      assertPreviewSizeAllowed(arrayBuffer.byteLength);
+      const sizeError = previewSizeErrorValues(arrayBuffer.byteLength);
+      if (sizeError) {
+        setError(t('preview.error.tooLarge', sizeError));
+        return;
+      }
 
       const XLSX = await getXLSX();
       const workbook = XLSX.read(arrayBuffer, { type: 'array' });
@@ -140,13 +145,13 @@ export const TablePreview: React.FC<TablePreviewProps> = ({
 
       const sheetName = names[0];
       if (!sheetName) {
-        throw new Error('No sheets found in workbook');
+        setError(t('preview.error.emptyWorkbook'));
+        return;
       }
       setActiveSheet(sheetName);
       parseSheet(workbook, sheetName);
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Unknown error parsing spreadsheet';
-      setError(message);
+    } catch {
+      setError(t('preview.error.tableParse'));
     } finally {
       setLoading(false);
     }
@@ -199,7 +204,7 @@ export const TablePreview: React.FC<TablePreviewProps> = ({
         fileBlob
           .arrayBuffer()
           .then(async (ab) => {
-            assertPreviewSizeAllowed(ab.byteLength);
+            if (previewSizeErrorValues(ab.byteLength)) return;
             const XLSX = await getXLSX();
             const wb = XLSX.read(ab, { type: 'array' });
             parseSheet(wb, sheetName);
@@ -221,7 +226,7 @@ export const TablePreview: React.FC<TablePreviewProps> = ({
             response
               .arrayBuffer()
               .then(async (ab) => {
-                assertPreviewSizeAllowed(ab.byteLength);
+                if (previewSizeErrorValues(ab.byteLength)) return;
                 const XLSX = await getXLSX();
                 const wb = XLSX.read(ab, { type: 'array' });
                 parseSheet(wb, sheetName);

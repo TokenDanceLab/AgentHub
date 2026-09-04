@@ -70,7 +70,6 @@ export {
   resolveBlockTitleById,
   cardActionLabel,
   multiActionLabel,
-  cardLinkForBlock,
   buildContextMenuState,
   resolveSelectionHotkey,
   resolveQuoteText,
