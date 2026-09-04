@@ -47,8 +47,6 @@ export default defineConfig({
       // 排除后）lines 88.22 / stmt 86.57 / fn 85.67 / br 80.95 → 每维 floor-1
       // 上修 87/85/84/79。全维度已越过 60 豁免线，不再走“提升目标非永久豁免”。
       thresholds: { lines: 87, branches: 79, functions: 84, statements: 85 },
-      // workbenchProjectsPort.ts — 纯类型契约（#1546），零运行时语句
-      exclude: ['src/workbenchProjectsPort.ts'],
     }),
   },
 });
