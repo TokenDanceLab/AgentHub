@@ -260,3 +260,48 @@ describe('desktop hubEventBridge session-list cache wiring (#2261)', () => {
     expect(hubQueryKeys.threads.list[1]).toBe(hubQueryKeys.threads.root[1]);
   });
 });
+
+// ── #2261: contacts family ────────────────────────────────────────────────
+//
+// The live Desktop contacts query is pinned separately in
+// hubQueries.contacts.test.tsx. These assertions verify that realtime frames
+// hit that same key rather than a longer prefix or a key with no producer.
+describe('desktop hubEventBridge contacts cache wiring (#2261)', () => {
+  it.each([
+    ['SESSION_CREATED', HUB_EVENTS.SESSION_CREATED],
+    ['FRIEND_ACCEPTED', HUB_EVENTS.FRIEND_ACCEPTED],
+  ])('invalidates the live contacts list on %s', (_name, type) => {
+    const queryClient = new QueryClient();
+    const key = hubQueryKeys.contacts.list;
+    queryClient.setQueryData(key, []);
+    const fake = createFakeHubWS();
+    const bridge = createDesktopHubEventBridge(fake.hubWS, queryClient);
+
+    fake.emit(type, {
+      session_id: 'sess-contacts',
+      user_id: 'peer-1',
+      nickname: 'Peer',
+    });
+
+    expect(queryClient.getQueryState(key)?.isInvalidated).toBe(true);
+    bridge.destroy();
+  });
+
+  it('does not invalidate the contacts list for a pending friend request', () => {
+    const queryClient = new QueryClient();
+    const key = hubQueryKeys.contacts.list;
+    queryClient.setQueryData(key, []);
+    const fake = createFakeHubWS();
+    const bridge = createDesktopHubEventBridge(fake.hubWS, queryClient);
+
+    fake.emit(HUB_EVENTS.FRIEND_REQUEST, {
+      user_id: 'peer-2',
+      nickname: 'Pending Peer',
+    });
+
+    // A pending request is surfaced as a notification; it does not change the
+    // accepted contacts collection and there is no friend-request query.
+    expect(queryClient.getQueryState(key)?.isInvalidated).toBe(false);
+    bridge.destroy();
+  });
+});
