@@ -6200,7 +6200,7 @@ paths:
                   format: uuid
                 type:
                   type: string
-                  enum: [delegate, review, approve, notify]
+                  enum: [delegate, review, approve, notify, compete]
                   default: delegate
                 task_prompt:
                   type: string
@@ -9756,7 +9756,7 @@ components:
         trigger_message: { type: string }
         status:
           type: string
-          enum: [queued, running, completed, failed, cancelled]
+          enum: [queued, running, pending_review, completed, failed, cancelled]
         created_at: { type: string, format: date-time }
         updated_at: { type: string, format: date-time }
 
@@ -9769,7 +9769,7 @@ components:
         to_member_id: { type: string, format: uuid }
         type:
           type: string
-          enum: [delegate, review, approve, notify]
+          enum: [delegate, review, approve, notify, compete]
         task_prompt: { type: string }
         context: { type: string }
         status:
@@ -9811,7 +9811,7 @@ components:
         team_id: { type: string, format: uuid }
         status:
           type: string
-          enum: [queued, running, completed, failed, cancelled]
+          enum: [queued, running, pending_review, completed, failed, cancelled]
         members:
           type: array
           items:
@@ -10050,7 +10050,7 @@ components:
         to_member_id: { type: string, format: uuid }
         type:
           type: string
-          enum: [delegate, review, approve, notify]
+          enum: [delegate, review, approve, notify, compete]
         status:
           type: string
           enum: [pending, dispatched, running, done, failed, cancelled]
