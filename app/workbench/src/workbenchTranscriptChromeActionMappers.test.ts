@@ -112,7 +112,7 @@ describe('workbenchTranscriptChromeActionMappers', () => {
   });
 
   it('plans permission and regenerate block actions', () => {
-    const transcript = [permissionBlock(), textBlock({ id: 'agent' })];
+    const transcript = [permissionBlock(), textBlock({ id: 'agent', agentTaskId: 'task-9' })];
     const approve = planTranscriptBlockAction({
       action: 'approve',
       blockId: 'perm-1',
@@ -127,7 +127,46 @@ describe('workbenchTranscriptChromeActionMappers', () => {
       transcript,
       t,
     });
-    expect(regenerate.some((effect) => effect.type === 'regenerate')).toBe(true);
+    // #2274 B-1: the planned effect must carry the producing task id — that is
+    // the only identity POST /web/agent-tasks/:id/regenerate accepts.
+    expect(regenerate).toContainEqual(
+      expect.objectContaining({ type: 'regenerate', blockId: 'agent', taskId: 'task-9' }),
+    );
+  });
+
+  it('plans no regenerate for agent text without a stamped task id (#2274 B-1)', () => {
+    // Honesty gate: no server-truthful task id ⇒ nothing to send ⇒ no effect,
+    // so no shell can soft-hide a message behind a request that must fail.
+    const transcript = [textBlock({ id: 'agent-no-task' })];
+    const planned = planTranscriptBlockAction({
+      action: 'regenerate',
+      blockId: 'agent-no-task',
+      transcript,
+      t,
+    });
+    expect(planned.some((effect) => effect.type === 'regenerate')).toBe(false);
+  });
+
+  it('hides the regenerate menu entry unless the block carries a task id (#2274 B-1)', () => {
+    const withTask = buildTranscriptContextMenuGroups({
+      blockId: 'b1',
+      transcript: [textBlock({ agentTaskId: 'task-9' })],
+      t,
+      onAction: vi.fn(),
+      onEnterSelection: vi.fn(),
+      capabilities: { regenerate: true },
+    });
+    expect(withTask.flat().map((item) => item.label)).toContain('context.regenerate');
+
+    const withoutTask = buildTranscriptContextMenuGroups({
+      blockId: 'b1',
+      transcript: [textBlock()],
+      t,
+      onAction: vi.fn(),
+      onEnterSelection: vi.fn(),
+      capabilities: { regenerate: true },
+    });
+    expect(withoutTask.flat().map((item) => item.label)).not.toContain('context.regenerate');
   });
 
   it('builds menu/multi view models and applies side effects', () => {
@@ -697,11 +736,13 @@ describe('workbenchTranscriptChromeActionMappers', () => {
       onRegenerate: vi.fn().mockRejectedValue(new Error('regen refused')),
     };
     applyTranscriptChromeSideEffects([
-      { type: 'regenerate', blockId: 'b1', successMessage: 'regen-ok', failureMessage: 'regen-fail' },
+      { type: 'regenerate', blockId: 'b1', taskId: 'task-1', successMessage: 'regen-ok', failureMessage: 'regen-fail' },
     ], regenerateHandlers);
     await vi.waitFor(() => {
       expect(regenerateHandlers.showWorkbenchToast).toHaveBeenCalledWith('regen refused');
     });
+    // #2274 B-1: the port receives the task id alongside the block id.
+    expect(regenerateHandlers.onRegenerate).toHaveBeenCalledWith('b1', 'task-1');
     expect(regenerateHandlers.softHideBlocks).not.toHaveBeenCalled();
     expect(regenerateHandlers.pulseBlock).not.toHaveBeenCalled();
 
@@ -715,8 +756,9 @@ describe('workbenchTranscriptChromeActionMappers', () => {
       onRegenerate: vi.fn().mockResolvedValue(undefined),
     };
     applyTranscriptChromeSideEffects([
-      { type: 'regenerate', blockId: 'b2', successMessage: 'regen-ok', failureMessage: 'regen-fail' },
+      { type: 'regenerate', blockId: 'b2', taskId: 'task-2', successMessage: 'regen-ok', failureMessage: 'regen-fail' },
     ], okRegenerateHandlers);
+    expect(okRegenerateHandlers.onRegenerate).toHaveBeenCalledWith('b2', 'task-2');
     await vi.waitFor(() => {
       expect(okRegenerateHandlers.showWorkbenchToast).toHaveBeenCalledWith('regen-ok');
     });
@@ -733,8 +775,9 @@ describe('workbenchTranscriptChromeActionMappers', () => {
       onRegenerate: vi.fn(),
     };
     applyTranscriptChromeSideEffects([
-      { type: 'regenerate', blockId: 'b3', successMessage: 'regen-ok', failureMessage: 'regen-fail' },
+      { type: 'regenerate', blockId: 'b3', taskId: 'task-3', successMessage: 'regen-ok', failureMessage: 'regen-fail' },
     ], syncRegenerateHandlers);
+    expect(syncRegenerateHandlers.onRegenerate).toHaveBeenCalledWith('b3', 'task-3');
     expect(syncRegenerateHandlers.softHideBlocks).toHaveBeenCalledWith(['b3']);
     expect(syncRegenerateHandlers.pulseBlock).toHaveBeenCalledWith('b3');
     expect(syncRegenerateHandlers.showWorkbenchToast).toHaveBeenCalledWith('regen-ok');
@@ -811,7 +854,8 @@ describe('workbenchTranscriptChromeActionMappers', () => {
     ];
     const groups = buildTranscriptContextMenuGroups({
       blockId: 'agent-1',
-      transcript: [textBlock({ id: 'agent-1' })],
+      // #2274 B-1: the regenerate entry also needs the stamped task id.
+      transcript: [textBlock({ id: 'agent-1', agentTaskId: 'task-1' })],
       t,
       onAction,
       onEnterSelection,
@@ -853,7 +897,7 @@ describe('workbenchTranscriptChromeActionMappers', () => {
   /* ── #2154 P1-A：菜单按 handler 存在性 fail-closed + 派发器不再静默丢弃 ── */
 
   it('renders handler-backed menu entries only when the capability is declared (#2154)', () => {
-    const agentBlock = textBlock({ id: 'a1' });
+    const agentBlock = textBlock({ id: 'a1', agentTaskId: 'task-1' });
     const userBlock = textBlock({ id: 'u1', author: { id: 'u', role: 'human', name: 'You' } });
     const pinnedBlock = textBlock({ id: 'p1', pinned: true });
     const conversations: Array<{ id: string; title: string; kind: 'direct' | 'group' }> = [

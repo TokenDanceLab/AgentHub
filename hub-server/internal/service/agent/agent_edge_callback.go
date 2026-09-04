@@ -287,6 +287,10 @@ func (s *EdgeCallbackService) HandleTaskStream(ctx context.Context, edgeUserID, 
 	if err != nil {
 		return err
 	}
+	// #2274 B-1: stamp the producing task id into the projected message so the
+	// transcript can offer "regenerate" with the identity the endpoint actually
+	// requires (task id), instead of the shell guessing from a message id.
+	messageContent = agentevent.StampAgentTaskRef(messageContent, taskID)
 
 	// #130: idempotent stream-to-message — skip if a message with this client_msg_id already exists
 	if stream.ClientMsgID != "" {
@@ -703,6 +707,9 @@ func (s *EdgeCallbackService) buildDoneFinalMessage(ctx context.Context, ai *mod
 	if err != nil {
 		return nil, err
 	}
+	// #2274 B-1: same task-ref stamp as the stream projection path, so both
+	// agent messages of one run carry the identity of the run that made them.
+	messageContent = agentevent.StampAgentTaskRef(messageContent, task.ID)
 	if s.seq == nil {
 		return nil, errcode.ErrInternal.WithMessage("edge callback sequence allocator not configured")
 	}

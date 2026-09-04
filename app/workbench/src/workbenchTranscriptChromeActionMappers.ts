@@ -50,6 +50,12 @@ export type TranscriptChromeSideEffect =
   | {
     type: 'regenerate';
     blockId: string;
+    /**
+     * #2274 B-1: the producing agent task id — the only identity
+     * POST /web/agent-tasks/:id/regenerate accepts. Planned only when the
+     * block actually carries it (hub-stamped `agent_task.task_id`).
+     */
+    taskId: string;
     /** Shown only after the regenerate request resolves successfully (#1821). */
     successMessage: string;
     /** Shown when the regenerate request rejects (#1821). */
@@ -236,12 +242,19 @@ export function planContextAction(options: {
     });
   }
   if (action === 'regenerate' && block && block.kind === 'text' && block.author.role === 'agent') {
+    // #2274 B-1: regenerate's identity is the producing TASK id; the endpoint
+    // answers 404 to anything else (message id / client_msg id — the pre-fix
+    // web behaviour). Without block.agentTaskId there is no server-truthful
+    // identity to send, so plan nothing: a soft-hide + success toast here
+    // would claim an effect that cannot run (#1818 / #2154 honesty rule).
+    if (!block.agentTaskId) return effects;
     // #1821: the soft-hide + success toast only land after the regenerate
     // request resolves; on rejection the block stays visible and the failure
     // toast surfaces (no fake "regenerating" state).
     effects.push({
       type: 'regenerate',
       blockId,
+      taskId: block.agentTaskId,
       successMessage: t('action.regenerating'),
       failureMessage: t('toast.regenerateFailed'),
       failureFallbackKey: 'toast.regenerateFailed',
@@ -391,12 +404,15 @@ export function planTranscriptBlockAction(options: {
   }
 
   if (action === 'retry' || action === 'regenerate') {
-    if (block.kind === 'text' && block.author.role === 'agent') {
+    // #2274 B-1: same identity gate as the context-menu path — no stamped
+    // task id means no honest regenerate to plan.
+    if (block.kind === 'text' && block.author.role === 'agent' && block.agentTaskId) {
       // #1821: same honest contract as the context-menu regenerate path — the
       // soft-hide + success toast ride the resolved request.
       effects.push({
         type: 'regenerate',
         blockId,
+        taskId: block.agentTaskId,
         successMessage: t('action.regenerating'),
         failureMessage: t('toast.regenerateFailed'),
         failureFallbackKey: 'toast.regenerateFailed',
@@ -482,7 +498,7 @@ export interface TranscriptChromeEffectHandlers {
    * soft-hide + success toast wait for resolution and a rejection surfaces
    * the failure toast instead (the block stays visible).
    */
-  onRegenerate?: ((blockId: string) => Promise<void> | void) | undefined;
+  onRegenerate?: ((blockId: string, taskId: string) => Promise<void> | void) | undefined;
   onApprovalDecision?: ((decision: ApprovalDecisionAction) => Promise<void> | void) | undefined;
   pulseBlock: (blockId: string) => void;
   showWorkbenchToast: (message: string) => void;
@@ -625,7 +641,7 @@ export function applyTranscriptChromeSideEffects(
           announceUnavailableAction(effect, handlers, t);
           break;
         }
-        const outcome = regenerateHandler(effect.blockId);
+        const outcome = regenerateHandler(effect.blockId, effect.taskId);
         if (isThenable(outcome)) {
           void Promise.resolve(outcome).then(
             () => {
@@ -891,7 +907,10 @@ export function buildTranscriptContextMenuGroups({
     [
       // #2154: regenerate needs the shell's regenerate port — Desktop has
       // none, so the entry stays hidden instead of doing nothing on click.
-      ...(isAgentText && caps.regenerate === true
+      // #2274 B-1: the entry also needs the block's stamped task id — the
+      // shell's port is necessary but not sufficient: without a task id the
+      // click can only fail (pre-fix web sent a message id and got 404).
+      ...(isAgentText && caps.regenerate === true && Boolean(block?.agentTaskId)
         ? [{ label: t('context.regenerate'), icon: 'refresh' as const, onClick: () => onAction('regenerate', blockId) }]
         : []),
       // Recall (#1383) only makes sense for the user's own messages — the

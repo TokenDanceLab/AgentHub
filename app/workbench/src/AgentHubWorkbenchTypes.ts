@@ -145,7 +145,7 @@ export interface AgentHubWorkbenchProps {
    * the block ID. May return a Promise: the chrome awaits it so a failed
    * regenerate surfaces an error toast instead of a fake success (#1821).
    */
-  onRegenerate?: ((blockId: string) => Promise<void> | void) | undefined;
+  onRegenerate?: ((blockId: string, taskId: string) => Promise<void> | void) | undefined;
   /**
    * F1/F6 attention source: the shell's existing run/approval/thread model
    * arrays. The workbench derives sidebar live dots, the rail badge and the
