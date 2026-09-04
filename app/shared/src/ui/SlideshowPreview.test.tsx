@@ -170,9 +170,9 @@ describe('SlideshowPreview', () => {
 
   it('shows error state when parsing fails', async () => {
     loadAsyncMock.mockRejectedValueOnce(new Error('parse failed'));
-    const { findByText, getByRole } = renderSlideshow();
-    // The component surfaces err.message into the error block.
-    expect(await findByText('parse failed')).toBeInTheDocument();
+    const { findByText, getByRole, queryByText } = renderSlideshow();
+    expect(await findByText('演示文稿解析失败')).toBeInTheDocument();
+    expect(queryByText('parse failed')).not.toBeInTheDocument();
     // Retry button is rendered with its visible text label.
     expect(getByRole('button', { name: '重试' })).toBeInTheDocument();
   });

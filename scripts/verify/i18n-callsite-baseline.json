@@ -1,748 +1,88 @@
 {
-  "_comment": "Baseline of i18n callsite violations (source files with CJK string literals but no useTranslation import). The verify gate fails when the current count EXCEEDS this baseline; lower this number as more callsites are wired to useTranslation.",
-  "scanRoot": "app/shared/src + app/workbench/src",
-  "totalViolations": 78,
-  "totalCjkLiteralLines": 608,
-  "files": [
-    {
-      "path": "shared/chatview/adapterMapBlock.ts",
-      "cjkLiteralLines": 1,
-      "samples": [
-        312
-      ]
-    },
-    {
-      "path": "shared/chatview/components/UnreadDivider.tsx",
-      "cjkLiteralLines": 2,
-      "samples": [
-        3,
-        4
-      ]
-    },
-    {
-      "path": "shared/chatview/design/labels.ts",
-      "cjkLiteralLines": 10,
-      "samples": [
-        167,
-        168,
-        169,
-        170,
-        174
-      ]
-    },
-    {
-      "path": "shared/chatview/types.ts",
-      "cjkLiteralLines": 2,
-      "samples": [
-        113,
-        115
-      ]
-    },
-    {
-      "path": "shared/components/index.ts",
-      "cjkLiteralLines": 1,
-      "samples": [
-        2
-      ]
-    },
-    {
-      "path": "shared/composer/types.ts",
-      "cjkLiteralLines": 2,
-      "samples": [
-        15,
-        16
-      ]
-    },
-    {
-      "path": "shared/demo/dataMode.ts",
-      "cjkLiteralLines": 3,
-      "samples": [
-        149,
-        152,
-        167
-      ]
-    },
-    {
-      "path": "shared/demo/teamrunDemo.ts",
-      "cjkLiteralLines": 4,
-      "samples": [
-        163,
-        170,
-        171,
-        172
-      ]
-    },
-    {
-      "path": "shared/demo/workbenchDemoAgents.ts",
-      "cjkLiteralLines": 19,
-      "samples": [
-        19,
-        21,
-        28,
-        30,
-        53
-      ]
-    },
-    {
-      "path": "shared/demo/workbenchDemoMessages.ts",
-      "cjkLiteralLines": 8,
-      "samples": [
-        19,
-        34,
-        50,
-        65,
-        83
-      ]
-    },
-    {
-      "path": "shared/demo/workbenchDemoTypes.ts",
-      "cjkLiteralLines": 1,
-      "samples": [
-        39
-      ]
-    },
-    {
-      "path": "shared/designTokens.ts",
-      "cjkLiteralLines": 1,
-      "samples": [
-        20
-      ]
-    },
-    {
-      "path": "shared/eventClient.ts",
-      "cjkLiteralLines": 7,
-      "samples": [
-        17,
-        18,
-        21,
-        22,
-        23
-      ]
-    },
-    {
-      "path": "shared/hubEvents.ts",
-      "cjkLiteralLines": 6,
-      "samples": [
-        10,
-        11,
-        12,
-        13,
-        16
-      ]
-    },
-    {
-      "path": "shared/inspector/inspectorEvidence.ts",
-      "cjkLiteralLines": 10,
-      "samples": [
-        270,
-        272,
-        274,
-        276,
-        278
-      ]
-    },
-    {
-      "path": "shared/transcript/edgeEventEvidence.ts",
-      "cjkLiteralLines": 4,
-      "samples": [
-        198,
-        202,
-        205,
-        208
-      ]
-    },
-    {
-      "path": "shared/transcript/normalizeHubMessages.ts",
-      "cjkLiteralLines": 4,
-      "samples": [
-        64,
-        70,
-        71,
-        242
-      ]
-    },
-    {
-      "path": "shared/transcript/normalizeThreadItems.ts",
-      "cjkLiteralLines": 1,
-      "samples": [
-        101
-      ]
-    },
-    {
-      "path": "shared/transcript/pinMap.ts",
-      "cjkLiteralLines": 3,
-      "samples": [
-        17,
-        181,
-        184
-      ]
-    },
-    {
-      "path": "shared/transcript/runChangeAggregate.ts",
-      "cjkLiteralLines": 1,
-      "samples": [
-        98
-      ]
-    },
-    {
-      "path": "shared/ui/DiffReviewPanel.stories.tsx",
-      "cjkLiteralLines": 13,
-      "samples": [
-        76,
-        77,
-        78,
-        79,
-        80
-      ]
-    },
-    {
-      "path": "shared/ui/Markdown.stories.tsx",
-      "cjkLiteralLines": 1,
-      "samples": [
-        27
-      ]
-    },
-    {
-      "path": "shared/ui/RunReviewOverlay.stories.tsx",
-      "cjkLiteralLines": 17,
-      "samples": [
-        76,
-        77,
-        78,
-        80,
-        83
-      ]
-    },
-    {
-      "path": "shared/ui/cjkRemarkPlugin.ts",
-      "cjkLiteralLines": 12,
-      "samples": [
-        29,
-        30,
-        31,
-        32,
-        33
-      ]
-    },
-    {
-      "path": "shared/ui/useCopiedFlag.ts",
-      "cjkLiteralLines": 1,
-      "samples": [
-        17
-      ]
-    },
-    {
-      "path": "workbench/ComposerPartsHelpers.ts",
-      "cjkLiteralLines": 6,
-      "samples": [
-        23,
-        32,
-        39,
-        45,
-        57
-      ]
-    },
-    {
-      "path": "workbench/WorkbenchRoutes.tsx",
-      "cjkLiteralLines": 3,
-      "samples": [
-        43,
-        45,
-        64
-      ]
-    },
-    {
-      "path": "workbench/__tests__/helpers.tsx",
-      "cjkLiteralLines": 3,
-      "samples": [
-        111,
-        112,
-        113
-      ]
-    },
-    {
-      "path": "workbench/agentCapabilities.ts",
-      "cjkLiteralLines": 7,
-      "samples": [
-        89,
-        90,
-        92,
-        93,
-        95
-      ]
-    },
-    {
-      "path": "workbench/agentProfileCatalog.ts",
-      "cjkLiteralLines": 11,
-      "samples": [
-        66,
-        67,
-        68,
-        69,
-        73
-      ]
-    },
-    {
-      "path": "workbench/agentProfileCatalogData.ts",
-      "cjkLiteralLines": 34,
-      "samples": [
-        12,
-        13,
-        16,
-        29,
-        36
-      ]
-    },
-    {
-      "path": "workbench/agentProfileCatalogHelpers.ts",
-      "cjkLiteralLines": 2,
-      "samples": [
-        92,
-        127
-      ]
-    },
-    {
-      "path": "workbench/agentsProductCopyContract.ts",
-      "cjkLiteralLines": 1,
-      "samples": [
-        23
-      ]
-    },
-    {
-      "path": "workbench/designIconsHelpers.ts",
-      "cjkLiteralLines": 16,
-      "samples": [
-        184,
-        185,
-        186,
-        187,
-        188
-      ]
-    },
-    {
-      "path": "workbench/floating/ForwardConversationPicker.tsx",
-      "cjkLiteralLines": 4,
-      "samples": [
-        40,
-        41,
-        42,
-        43
-      ]
-    },
-    {
-      "path": "workbench/floating/ProfilePopoverHelpers.ts",
-      "cjkLiteralLines": 2,
-      "samples": [
-        95,
-        103
-      ]
-    },
-    {
-      "path": "workbench/inspector/FilePreviewHelpers.ts",
-      "cjkLiteralLines": 3,
-      "samples": [
-        33,
-        95,
-        96
-      ]
-    },
-    {
-      "path": "workbench/inspector/InspectorModeBodies.tsx",
-      "cjkLiteralLines": 3,
-      "samples": [
-        60,
-        62,
-        63
-      ]
-    },
-    {
-      "path": "workbench/inspector/InspectorTabChrome.tsx",
-      "cjkLiteralLines": 1,
-      "samples": [
-        234
-      ]
-    },
-    {
-      "path": "workbench/mockData.ts",
-      "cjkLiteralLines": 102,
-      "samples": [
-        29,
-        30,
-        31,
-        35,
-        36
-      ]
-    },
-    {
-      "path": "workbench/pages/agents/AgentEditHelpers.ts",
-      "cjkLiteralLines": 2,
-      "samples": [
-        55,
-        88
-      ]
-    },
-    {
-      "path": "workbench/pages/agents/AgentMarketHelpers.ts",
-      "cjkLiteralLines": 3,
-      "samples": [
-        59,
-        60,
-        96
-      ]
-    },
-    {
-      "path": "workbench/pages/agents/AgentOpsHelpers.ts",
-      "cjkLiteralLines": 2,
-      "samples": [
-        17,
-        54
-      ]
-    },
-    {
-      "path": "workbench/pages/agents/shared.tsx",
-      "cjkLiteralLines": 4,
-      "samples": [
-        11,
-        12,
-        17,
-        18
-      ]
-    },
-    {
-      "path": "workbench/pages/agents/types.ts",
-      "cjkLiteralLines": 6,
-      "samples": [
-        19,
-        21,
-        23,
-        25,
-        27
-      ]
-    },
-    {
-      "path": "workbench/pages/contacts/ContactMainHelpers.ts",
-      "cjkLiteralLines": 2,
-      "samples": [
-        36,
-        37
-      ]
-    },
-    {
-      "path": "workbench/pages/contacts/shared.tsx",
-      "cjkLiteralLines": 10,
-      "samples": [
-        49,
-        50,
-        51,
-        52,
-        53
-      ]
-    },
-    {
-      "path": "workbench/pages/docs/shared.tsx",
-      "cjkLiteralLines": 9,
-      "samples": [
-        19,
-        20,
-        21,
-        22,
-        50
-      ]
-    },
-    {
-      "path": "workbench/pages/docs/types.ts",
-      "cjkLiteralLines": 3,
-      "samples": [
-        12,
-        25,
-        43
-      ]
-    },
-    {
-      "path": "workbench/pages/projects/ProjectAnnouncement.tsx",
-      "cjkLiteralLines": 1,
-      "samples": [
-        22
-      ]
-    },
-    {
-      "path": "workbench/pages/projects/shared.tsx",
-      "cjkLiteralLines": 10,
-      "samples": [
-        31,
-        33,
-        35,
-        37,
-        39
-      ]
-    },
-    {
-      "path": "workbench/pages/projects/types.ts",
-      "cjkLiteralLines": 24,
-      "samples": [
-        108,
-        144,
-        145,
-        146,
-        149
-      ]
-    },
-    {
-      "path": "workbench/pages/settings/SettingsNav.tsx",
-      "cjkLiteralLines": 4,
-      "samples": [
-        31,
-        35,
-        50,
-        51
-      ]
-    },
-    {
-      "path": "workbench/pages/settings/SettingsPaneHelpers.ts",
-      "cjkLiteralLines": 11,
-      "samples": [
-        84,
-        85,
-        86,
-        87,
-        92
-      ]
-    },
-    {
-      "path": "workbench/pages/settings/types.ts",
-      "cjkLiteralLines": 22,
-      "samples": [
-        110,
-        111,
-        112,
-        113,
-        114
-      ]
-    },
-    {
-      "path": "workbench/pages/tasks/TaskTableHelpers.ts",
-      "cjkLiteralLines": 10,
-      "samples": [
-        24,
-        30,
-        31,
-        82,
-        89
-      ]
-    },
-    {
-      "path": "workbench/pages/tasks/TaskTableViews.tsx",
-      "cjkLiteralLines": 1,
-      "samples": [
-        87
-      ]
-    },
-    {
-      "path": "workbench/pages/tasks/types.ts",
-      "cjkLiteralLines": 7,
-      "samples": [
-        10,
-        11,
-        12,
-        13,
-        14
-      ]
-    },
-    {
-      "path": "workbench/sessionImport/SessionImportList.tsx",
-      "cjkLiteralLines": 2,
-      "samples": [
-        13,
-        24
-      ]
-    },
-    {
-      "path": "workbench/settingsService.ts",
-      "cjkLiteralLines": 3,
-      "samples": [
-        120,
-        148,
-        167
-      ]
-    },
-    {
-      "path": "workbench/terminal/TerminalPanel.tsx",
-      "cjkLiteralLines": 12,
-      "samples": [
-        55,
-        56,
-        57,
-        58,
-        59
-      ]
-    },
-    {
-      "path": "workbench/unifiedComposerHelpers.ts",
-      "cjkLiteralLines": 12,
-      "samples": [
-        115,
-        117,
-        132,
-        134,
-        136
-      ]
-    },
-    {
-      "path": "workbench/unifiedComposerHostViewModel.ts",
-      "cjkLiteralLines": 1,
-      "samples": [
-        139
-      ]
-    },
-    {
-      "path": "workbench/useWorkbenchSessionChrome.ts",
-      "cjkLiteralLines": 1,
-      "samples": [
-        295
-      ]
-    },
-    {
-      "path": "workbench/workbenchAgentMapping.ts",
-      "cjkLiteralLines": 17,
-      "samples": [
-        11,
-        17,
-        21,
-        22,
-        23
-      ]
-    },
-    {
-      "path": "workbench/workbenchAgentsPageModel.ts",
-      "cjkLiteralLines": 4,
-      "samples": [
-        29,
-        62,
-        64,
-        90
-      ]
-    },
-    {
-      "path": "workbench/workbenchAgentsRouteHelpers.ts",
-      "cjkLiteralLines": 7,
-      "samples": [
-        109,
-        110,
-        111,
-        112,
-        242
-      ]
-    },
-    {
-      "path": "workbench/workbenchBoardColumns.ts",
-      "cjkLiteralLines": 5,
-      "samples": [
-        44,
-        45,
-        46,
-        47,
-        48
-      ]
-    },
-    {
-      "path": "workbench/workbenchDocPreview.ts",
-      "cjkLiteralLines": 11,
-      "samples": [
-        10,
-        20,
-        21,
-        22,
-        23
-      ]
-    },
-    {
-      "path": "workbench/workbenchPreferences.ts",
-      "cjkLiteralLines": 3,
-      "samples": [
-        72,
-        77,
-        78
-      ]
-    },
-    {
-      "path": "workbench/workbenchProjectPreview.ts",
-      "cjkLiteralLines": 12,
-      "samples": [
-        18,
-        29,
-        31,
-        32,
-        33
-      ]
-    },
-    {
-      "path": "workbench/workbenchRoutesHelpers.ts",
-      "cjkLiteralLines": 1,
-      "samples": [
-        23
-      ]
-    },
-    {
-      "path": "workbench/workbenchTaskDeepLinks.ts",
-      "cjkLiteralLines": 3,
-      "samples": [
-        64,
-        65,
-        66
-      ]
-    },
-    {
-      "path": "workbench/workbenchTaskGroups.ts",
-      "cjkLiteralLines": 21,
-      "samples": [
-        18,
-        19,
-        21,
-        22,
-        24
-      ]
-    },
-    {
-      "path": "workbench/workbenchTasksPageModel.ts",
-      "cjkLiteralLines": 9,
-      "samples": [
-        26,
-        27,
-        28,
-        29,
-        30
-      ]
-    },
-    {
-      "path": "workbench/workbenchTasksRouteGroupHelpers.ts",
-      "cjkLiteralLines": 5,
-      "samples": [
-        79,
-        92,
-        104,
-        109,
-        119
-      ]
-    },
-    {
-      "path": "workbench/workbenchTestFixtures.ts",
-      "cjkLiteralLines": 13,
-      "samples": [
-        14,
-        22,
-        34,
-        67,
-        76
-      ]
-    },
-    {
-      "path": "workbench/workbenchTranscriptChromeActionMappers.ts",
-      "cjkLiteralLines": 3,
-      "samples": [
-        352,
-        386,
-        440
-      ]
-    }
-  ]
+  "_comment": "Per-file production CJK literal budget; each value may only stay or decrease. New files start at zero.",
+  "budgets": {
+    "shared/chatview/adapterMapBlock.ts": 1,
+    "shared/chatview/components/ChatViewTranscript.tsx": 1,
+    "shared/chatview/design/labels.ts": 9,
+    "shared/demo/dataMode.ts": 3,
+    "shared/demo/teamrunDemo.ts": 4,
+    "shared/demo/workbenchDemoAgents.ts": 19,
+    "shared/demo/workbenchDemoMessages.ts": 8,
+    "shared/demo/workbenchDemoStore.ts": 5,
+    "shared/demo/workbenchDemoTypes.ts": 1,
+    "shared/transcript/edgeEventEvidence.ts": 4,
+    "shared/transcript/normalizeHubMessages.ts": 4,
+    "shared/transcript/normalizeThreadItems.ts": 1,
+    "shared/ui/cjkRemarkPlugin.ts": 12,
+    "workbench/ComposerAttachmentParts.tsx": 3,
+    "workbench/ComposerPartsHelpers.ts": 10,
+    "workbench/ConversationHost.tsx": 1,
+    "workbench/GlobalRail.tsx": 1,
+    "workbench/GlobalSearchDialog.tsx": 7,
+    "workbench/MessageSearchPanel.tsx": 3,
+    "workbench/UnifiedComposer.tsx": 1,
+    "workbench/agentCapabilities.ts": 9,
+    "workbench/agentProfileCatalog.ts": 11,
+    "workbench/agentProfileCatalogData.ts": 34,
+    "workbench/agentProfileCatalogHelpers.ts": 2,
+    "workbench/designIconsHelpers.ts": 16,
+    "workbench/floating/ForwardConversationPicker.tsx": 4,
+    "workbench/floating/MultiSelectBar.tsx": 1,
+    "workbench/floating/ProfilePopoverHelpers.ts": 2,
+    "workbench/inspector/FilePreviewHelpers.ts": 3,
+    "workbench/inspector/InspectorModeBodies.tsx": 3,
+    "workbench/inspector/InspectorTabChrome.tsx": 1,
+    "workbench/inspector/RuntimeEvidenceParts.tsx": 3,
+    "workbench/mockData.ts": 106,
+    "workbench/pages/agents/AgentEditHelpers.ts": 2,
+    "workbench/pages/agents/AgentInstalledParts.tsx": 9,
+    "workbench/pages/agents/AgentMarketHelpers.ts": 2,
+    "workbench/pages/agents/AgentMarketParts.tsx": 2,
+    "workbench/pages/agents/AgentMarketViews.tsx": 2,
+    "workbench/pages/agents/AgentOpsHelpers.ts": 2,
+    "workbench/pages/agents/AgentOpsParts.tsx": 4,
+    "workbench/pages/agents/AgentOpsViews.tsx": 2,
+    "workbench/pages/agents/shared.tsx": 4,
+    "workbench/pages/agents/types.ts": 5,
+    "workbench/pages/contacts/ContactMainHelpers.ts": 2,
+    "workbench/pages/contacts/ContactMainItemParts.tsx": 3,
+    "workbench/pages/contacts/ContactMainParts.tsx": 3,
+    "workbench/pages/contacts/ContactMainSections.tsx": 3,
+    "workbench/pages/contacts/ContactMainViews.tsx": 16,
+    "workbench/pages/contacts/shared.tsx": 10,
+    "workbench/pages/docs/DocTableViews.tsx": 1,
+    "workbench/pages/docs/shared.tsx": 5,
+    "workbench/pages/projects/ProjectChromeViews.tsx": 1,
+    "workbench/pages/projects/ProjectTabViews.tsx": 10,
+    "workbench/pages/projects/shared.tsx": 16,
+    "workbench/pages/projects/types.ts": 23,
+    "workbench/pages/settings/SettingsPaneHelpers.ts": 11,
+    "workbench/pages/settings/SettingsPaneParts.tsx": 4,
+    "workbench/pages/settings/SettingsPanes.tsx": 56,
+    "workbench/pages/settings/types.ts": 22,
+    "workbench/pages/tasks/TaskTableHelpers.ts": 9,
+    "workbench/pages/tasks/TaskTableViews.tsx": 1,
+    "workbench/pages/tasks/types.ts": 5,
+    "workbench/sessionImport/SessionImportList.tsx": 2,
+    "workbench/settingsService.ts": 3,
+    "workbench/team/SubagentStreamOverlay.tsx": 6,
+    "workbench/terminal/TerminalPanel.tsx": 12,
+    "workbench/unifiedComposerHelpers.ts": 17,
+    "workbench/unifiedComposerHostViewModel.ts": 1,
+    "workbench/useWorkbenchSessionChrome.ts": 1,
+    "workbench/useWorkbenchTasksRoute.ts": 1,
+    "workbench/workbenchAgentMapping.ts": 17,
+    "workbench/workbenchAgentsPageModel.ts": 4,
+    "workbench/workbenchAgentsRouteHelpers.ts": 7,
+    "workbench/workbenchBoardColumns.ts": 5,
+    "workbench/workbenchDocPreview.ts": 11,
+    "workbench/workbenchPreferences.ts": 3,
+    "workbench/workbenchProjectPreview.ts": 12,
+    "workbench/workbenchRoutesHelpers.ts": 1,
+    "workbench/workbenchTaskDeepLinks.ts": 3,
+    "workbench/workbenchTaskGroups.ts": 21,
+    "workbench/workbenchTasksPageModel.ts": 2,
+    "workbench/workbenchTasksRouteGroupHelpers.ts": 5,
+    "workbench/workbenchTranscriptChromeActionMappers.ts": 1
+  }
 }

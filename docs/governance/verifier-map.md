@@ -24,7 +24,7 @@
 | hubClient thin-shell SSOT（客户端不分叉 REST 实现） | `scripts/verify/verify-hubclient-ssot.py` | checks.yml → validate |
 | Design token SSOT（CSS 硬编码颜色禁令） | `scripts/verify/verify-design-token-ssot.py` | checks.yml → validate |
 | 核心 token/theme/preset CSS 仅 parser 语法门禁（fail-closed；Stylelint 被 ignore 排除，规则债另立，#1720） | `app/scripts/verify-design-css-syntax.mjs`（内置 `--self-test` 负向自测） | checks.yml → design-css |
-| shared UI i18n callsite ratchet（#1612；违规文件数棘轮：仅当含 CJK 字面量且未导入 `useTranslation` 的违规文件数超过 baseline 时 fail，不比较字面量行数——既有违规文件内新增 CJK 字面量行不会触发；当前 advisory：validate step 带 `continue-on-error`，存量违规文件回填低于 baseline 后转硬门禁） | `scripts/verify/verify-i18n-callsites.py` | checks.yml → validate |
+| shared/workbench i18n callsite ratchet（#1612；逐文件 CJK 字面量债务只减不增；`useTranslation` import 不豁免；新违规文件预算为 0；负向自测证明跨文件抵消也会 fail） | `scripts/verify/verify-i18n-callsites.py`（负向自测 `scripts/verify/tests/verify-i18n-callsites.Tests.py`） | checks.yml → validate |
 | zh 术语收敛棘轮（#2154；zh i18n 定义面禁用「对话」，豁免「对话框」；硬编码残留与数据域由清理轮分治） | `scripts/verify/verify-i18n-terminology.py` | checks.yml → validate |
 | shared 组件三件套棘轮（#1951：扫描 `app/shared/src/ui/**` 的 PascalCase 组件 `.tsx`；必须配对 `<组件>.test.tsx`（或 `__tests__/<组件>.test.tsx`）+ `<组件>.stories.tsx`，无关测试不得代替；验收标准见 `docs/component-acceptance.md`；存量缺件显式登记在基线、只缩不增） | `scripts/verify/verify-shared-trio-ratchet.py`（负向自测 `scripts/verify/tests/verify-shared-trio-ratchet.Tests.py`，基线 `scripts/verify/shared-trio-baseline.json`） | checks.yml → validate |
 | 演示诚实：stub/fixture 不得冒充真实登录/API | `scripts/verify/verify-real-e2e-contract.py` | checks.yml → validate |

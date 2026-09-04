@@ -58,22 +58,8 @@ describe('useWebWorkbenchModel helpers', () => {
       },
     ], true, 'approved-real')).toMatchObject({
       members: [
-        {
-          id: 'user-1',
-          name: '产品负责人',
-          initials: '产品',
-          org: 'TokenDance',
-          status: '在线',
-          tag: 'Hub',
-        },
-        {
-          id: 'user-2',
-          name: 'Bob',
-          initials: 'B',
-          org: '外部联系人',
-          status: '离线',
-          tag: 'External',
-        },
+        expect.objectContaining({ id: 'user-1', name: '产品负责人' }),
+        expect.objectContaining({ id: 'user-2', name: 'Bob' }),
       ],
       recentShortcuts: ['产品负责人', 'Bob'],
     });

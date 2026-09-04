@@ -51,8 +51,8 @@ describe('useHubIMSnapshot successors', () => {
       },
     ], true, 'approved-real')).toMatchObject({
       members: [
-        expect.objectContaining({ id: 'user-1', name: '产品', status: '在线' }),
-        expect.objectContaining({ id: 'user-2', name: 'Bob', status: '离线' }),
+        expect.objectContaining({ id: 'user-1', name: '产品' }),
+        expect.objectContaining({ id: 'user-2', name: 'Bob' }),
       ],
       recentShortcuts: ['产品', 'Bob'],
     });

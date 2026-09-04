@@ -263,40 +263,16 @@ describe('workbenchTranscriptChromeActionMappers', () => {
     });
   });
 
-  it('copies an openable http(s) link instead of the dead agenthub:// scheme (#1504)', () => {
+  it('plans no effect for the retired message-link action', () => {
     const transcript = [textBlock({ id: 'b1' })];
-
-    const effects = planContextAction({
+    expect(planContextAction({
       action: 'link',
       blockId: 'b1',
       transcript,
       t,
       sessionId: 'sess-1',
-    });
-    const copyEffect = effects.find((effect) => effect.type === 'copy');
-    expect(copyEffect?.type).toBe('copy');
-    if (copyEffect?.type === 'copy') {
-      expect(copyEffect.text).toMatch(/^https?:\/\//);
-      expect(copyEffect.text).not.toContain('agenthub://');
-      expect(copyEffect.text).toContain('#/session/sess-1?block=b1');
-    }
-
-    // The clipboard write goes through the copy effect handler.
-    const copyText = vi.fn();
-    applyTranscriptChromeSideEffects(effects, {
-      copyText,
-      softHideBlocks: vi.fn(),
-      dispatchComposer: vi.fn(),
-      focusComposer: vi.fn(),
-      pulseBlock: vi.fn(),
-      showWorkbenchToast: vi.fn(),
-      exitSelection: vi.fn(),
-    });
-    expect(copyText).toHaveBeenCalledTimes(1);
-    expect(copyText).toHaveBeenCalledWith(expect.stringMatching(/^https?:\/\//));
-    expect(copyText.mock.calls[0]?.[0]).not.toContain('agenthub://');
+    })).toEqual([]);
   });
-
   it('plans an edit action that backfills the composer and marks the message editing', () => {
     const transcript = [
       textBlock({ id: 'user-1', text: '请帮我重构', author: { id: 'u', role: 'human', name: 'You' } }),
@@ -869,8 +845,6 @@ describe('workbenchTranscriptChromeActionMappers', () => {
     expect(onAction).toHaveBeenLastCalledWith('reply', 'agent-1');
     click('context.quote');
     expect(onAction).toHaveBeenLastCalledWith('quote', 'agent-1');
-    click('context.copyLink');
-    expect(onAction).toHaveBeenLastCalledWith('link', 'agent-1');
     click('context.regenerate');
     expect(onAction).toHaveBeenLastCalledWith('regenerate', 'agent-1');
     click('context.forward');
@@ -878,7 +852,7 @@ describe('workbenchTranscriptChromeActionMappers', () => {
     click('context.multiSelect');
     // multiSelect routes through onEnterSelection, not onAction.
     expect(onEnterSelection).toHaveBeenCalledWith('agent-1');
-    expect(onAction).toHaveBeenCalledTimes(5);
+    expect(onAction).toHaveBeenCalledTimes(4);
   });
 
   it('wires the edit menu item onClick for user text blocks', () => {

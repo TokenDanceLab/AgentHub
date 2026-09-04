@@ -102,7 +102,6 @@ export function cardActionLabel(
     reply: `${t('context.reply')} ${title}`,
     forward: t('toast.forwardQueued'),
     pin: t('toast.pinUpdated'),
-    link: t('toast.linkCopied'),
     delete: t('toast.deleteQueued'),
     edit: t('toast.editStarted'),
   };
@@ -119,26 +118,6 @@ export function multiActionLabel(
     delete: t('toast.multiDelete', { count }),
   };
   return labels[action] ?? t('toast.multiProcessed', { count });
-}
-
-export function cardLinkForBlock(
-  blockId: string,
-  sessionId?: string | null,
-  baseUrl?: string,
-): string {
-  // #1504: copy a link that opens inside Web/Desktop instead of the dead
-  // `agenthub://card/<blockId>` custom scheme (no handler registered on
-  // Desktop/Web; native scheme registration is out of frontend scope).
-  // The hash route `#/session/<sessionId>?block=<blockId>` is the provisional
-  // in-app convention — the backend session route is not finalized yet.
-  // Without a session id (Desktop/demo shells) fall back to a block-level
-  // hash that still resolves within the app origin.
-  const origin = baseUrl ?? (typeof window !== 'undefined' ? window.location.origin : '');
-  const blockParam = encodeURIComponent(blockId);
-  if (sessionId) {
-    return `${origin}/#/session/${encodeURIComponent(sessionId)}?block=${blockParam}`;
-  }
-  return `${origin}/#/card/${blockParam}`;
 }
 
 export function buildContextMenuState(
