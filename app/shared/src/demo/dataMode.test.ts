@@ -7,7 +7,6 @@ import {
   normalizeWorkbenchDataMode,
   readWorkbenchDataModeOverride,
   resolveWorkbenchDataMode,
-  workbenchDataModeDisplayLabel,
   workbenchDataModeLabel,
   writeWorkbenchDataModeOverride,
 } from './dataMode';
@@ -52,60 +51,47 @@ describe('normalizeWorkbenchDataMode', () => {
     expect(workbenchDataModeLabel('approved-real')).toBe('approved-real');
   });
 
-  it('exposes a single shared contract for UI status and data-source boundaries', () => {
+  it('exposes a single shared contract for runtime and evidence boundaries', () => {
     expect(getWorkbenchDataModeContract('mock')).toMatchObject({
       mode: 'mock',
       statusLabel: 'mock',
-      displayLabel: 'Mock',
-      tone: 'amber',
       allowsMockData: true,
       allowsFixtureData: false,
       allowsDemoRuntimeFallback: true,
       allowsLocalEdgeAutoFallback: false,
       allowsHubData: false,
-      requiresHubAuthForWeb: false,
       requiresLocalEdgeForDesktop: false,
       isRealDataMode: false,
-      isStrictRealMode: false,
     });
 
     expect(getWorkbenchDataModeContract('fixture')).toMatchObject({
       mode: 'fixture',
       statusLabel: 'fixture',
-      displayLabel: 'Fixture',
-      tone: 'purple',
       allowsMockData: false,
       allowsFixtureData: true,
       allowsDemoRuntimeFallback: true,
       allowsLocalEdgeAutoFallback: false,
       allowsHubData: false,
-      requiresHubAuthForWeb: false,
       requiresLocalEdgeForDesktop: false,
       isRealDataMode: false,
-      isStrictRealMode: false,
     });
 
     expect(getWorkbenchDataModeContract('approved-real')).toMatchObject({
       mode: 'approved-real',
       statusLabel: 'approved-real',
-      displayLabel: 'Approved real',
-      tone: 'green',
       allowsMockData: false,
       allowsFixtureData: false,
       allowsDemoRuntimeFallback: false,
       allowsLocalEdgeAutoFallback: false,
       allowsHubData: true,
-      requiresHubAuthForWeb: true,
       requiresLocalEdgeForDesktop: true,
       isRealDataMode: true,
-      isStrictRealMode: true,
     });
   });
 
   it('keeps transient runtime states out of canonical data-mode labels', () => {
     expect(workbenchDataModeLabel('auto')).toBe('auto');
-    expect(workbenchDataModeDisplayLabel('auto')).toBe('Auto');
     expect(workbenchDataModeLabel('demo+edge')).toBe('auto');
-    expect(workbenchDataModeDisplayLabel('mock (auto fallback)')).toBe('Auto');
+    expect(workbenchDataModeLabel('mock (auto fallback)')).toBe('auto');
   });
 });

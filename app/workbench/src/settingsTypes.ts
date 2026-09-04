@@ -50,7 +50,6 @@ export const ALL_SETTINGS_KEYS: readonly string[] = [
 
 /** Keys that are local-only (localStorage, not sent to backend). */
 export const LOCAL_ONLY_KEYS = [
-  'dataMode',
   'composerSubmitBehavior',
   'vitePreviewUrl',
   'workspacePath',

@@ -52,8 +52,6 @@ export interface SettingsPageProps {
   permissions: Record<string, string>;
   /** Local Vite preview URL. */
   vitePreviewUrl: string;
-  /** Frontend data mode for Desktop/Web preview. */
-  dataMode: string;
   /** Composer keyboard submit behavior. */
   composerSubmitBehavior: string;
   /** Local workspace path. */
