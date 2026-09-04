@@ -298,7 +298,8 @@ describe('Web app root', () => {
 
     const { container } = render(<App />);
     fireEvent.contextMenu(container.querySelector('[data-selectable-card="hub-message-1"]')!);
-    await screen.findByRole('menuitem', { name: 'context.copyLink' });
+    await screen.findByRole('menuitem', { name: 'context.delete' });
+    expect(screen.queryByRole('menuitem', { name: 'context.copyLink' })).toBeNull();
     expect(screen.queryByRole('menuitem', { name: 'context.regenerate' })).toBeNull();
     expect(hubClientStub.regenerateAgentTask).not.toHaveBeenCalled();
   });
@@ -323,7 +324,8 @@ describe('Web app root', () => {
 
     const { container } = render(<App />);
     fireEvent.contextMenu(container.querySelector('[data-selectable-card="hub-message-1"]')!);
-    await screen.findByRole('menuitem', { name: 'context.copyLink' });
+    await screen.findByRole('menuitem', { name: 'context.delete' });
+    expect(screen.queryByRole('menuitem', { name: 'context.copyLink' })).toBeNull();
     expect(screen.queryByRole('menuitem', { name: 'context.regenerate' })).toBeNull();
     expect(hubClientStub.regenerateAgentTask).not.toHaveBeenCalled();
   });

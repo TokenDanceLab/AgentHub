@@ -17,20 +17,9 @@ export const hubQueryKeys = {
   },
 
   // Threads (sessions)
-  // Canonical key shape (ADR-029 / #2261):
-  //   - `root` is an INVALIDATION PREFIX ONLY. It must never be the queryKey of
-  //     a live query: web used it as its session-list key while desktop used the
-  //     same prefix for transcripts, so "refresh the session list" and "refresh
-  //     one transcript" meant opposite things in the two shells.
-  //   - the collection query uses `list`; a per-thread sub-resource uses
-  //     `messages`/`pins` and always has a factory (no literal keys at call
-  //     sites);
-  //   - a factory with no consumer must not exist. `detail` was deleted for
-  //     exactly that reason: 0 useQuery consumers against 9 production
-  //     invalidation sites, and `['hub','threads','detail',id]` is not a prefix
-  //     of `['hub',id,'messages']`, so all 9 matched no cache entry at all —
-  //     the same failure mode as #2252, one key over. Do not reintroduce it
-  //     without a real thread-detail query to consume it.
+  // Canonical key shape (ADR-029): `root` is invalidation-only; live
+  // collection queries use `list`, and per-thread resources use factories.
+  // Do not add a factory without a real query producer that consumes it.
   threads: {
     root: ['hub', 'threads'] as const,
     list: ['hub', 'threads', 'list'] as const,
@@ -147,17 +136,9 @@ export const hubQueryKeys = {
 // it on logout yields a different key, so signed-out UI cannot keep showing
 // signed-in data (a bare `enabled: false` would leave the old entry cached).
 //
-// Canonical rules (ADR-029 / #2261 residual, landed here):
-//   - this factory is the ONLY producer of `web-v4` literals. Call sites must
-//     not write the array by hand: a hand-written invalidation key is exactly
-//     how `['web-v4','contacts']` / `['hub','contacts','list']` / `['agent-teams']`
-//     came to invalidate caches that no query ever wrote (#2252 and #2310 are
-//     the same failure mode on other platforms).
-//   - `*.root` is an invalidation prefix only, never a live query's `queryKey`.
-//   - a member with no query producer must not exist. Web has no notifications
-//     query, no team-runs query and no `web-v4` execution-targets query, so
-//     those keys are deliberately absent — the invalidations that used to name
-//     them were dead and have been removed at the call site.
+// Canonical rules (ADR-029/ADR-035): this factory is the only producer of
+// `web-v4` literals; `*.root` is invalidation-only; and every member must have a
+// live query producer. Call sites reference factories, never literal arrays.
 /**
  * A cache pointer that is legitimately *absent* while its query is disabled
  * (no active session / no active task). It is threaded through verbatim on
@@ -229,10 +210,9 @@ export const webQueryKeys = {
 // invalidate, the exact per-session key, and the reverse matcher that recovers
 // the session id from a key found in the cache.
 //
-// Adding another transcript cache? Export a family next to the key factory
-// that produces it and hand it to the resync helper. Do NOT teach the helper
-// about literal key shapes: that is how #2101 G1/G4-② stayed a silent no-op on
-// both platforms while every test using the literal shape passed.
+// Adding another transcript cache? Export a family next to its key factory
+// and hand that family to the resync helper; do not teach consumers literal
+// key shapes.
 export interface HubMessagesKeyFamily {
   /** Broad prefix covering every session's transcript — invalidation target. */
   readonly root: readonly unknown[];
@@ -315,7 +295,7 @@ export function isQueryKeyPrefix(
 
 /** Get a broad invalidation key (root prefix) from a specific query key. */
 export function rootPrefix(key: readonly unknown[]): readonly unknown[] {
-  // Return the first 2-3 segments as a broad invalidation target
+  // Longer keys collapse to their first two segments.
   if (key.length <= 2) return key;
   return key.slice(0, 2);
 }

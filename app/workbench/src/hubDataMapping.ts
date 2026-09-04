@@ -9,6 +9,7 @@
  */
 
 import { appDateLocaleTag } from '@shared/i18n/locale';
+import { SHARED_WORKBENCH_I18N_NAMESPACE } from '@shared/i18n';
 import { getI18n } from 'react-i18next';
 import type { ContactMember, ProjectInfo } from './pages';
 import type { WorkbenchContactsData } from './WorkbenchRoutes';
@@ -18,6 +19,20 @@ import {
   isWorkbenchFixtureDataMode,
   type WorkbenchDataMode,
 } from '@shared/demo';
+
+
+function hubMappingText(
+  key: string,
+  fallback: string,
+  values: Record<string, unknown> = {},
+): string {
+  const i18n = getI18n();
+  if (!i18n?.isInitialized) return fallback;
+  return i18n.getFixedT(i18n.language, SHARED_WORKBENCH_I18N_NAMESPACE)(
+    `hubMapping.${key}`,
+    { ...values, defaultValue: fallback },
+  );
+}
 
 // ── Contact mapping ────────────────────────────────────────────────
 
@@ -53,8 +68,8 @@ export function contactInfoToMember(contact: HubContactLike): ContactMember {
     id: contact.user_id,
     name: displayName,
     initials: contactInitials(displayName),
-    org: contact.type === 'external' ? '外部联系人' : 'TokenDance',
-    status: contact.online ? '在线' : '离线',
+    org: contact.type === 'external' ? hubMappingText('externalOrg', 'External contact') : 'TokenDance',
+    status: contact.online ? hubMappingText('online', 'Online') : hubMappingText('offline', 'Offline'),
     tag: contact.type === 'external' ? 'External' : 'Hub',
   };
 }
@@ -109,14 +124,9 @@ export interface HubWorkspaceProjectLike {
   updated_at?: string;
 }
 
-// #2274 B-6: 这里曾经有一个共享的 workspaceProjectToProjectInfo，它把每个 Hub
-// 项目硬编码成 status:'Active'——一个 Hub 侧不存在的词（Hub 的 workspace/project
-// DTO、openapi、migration、live DB 都没有 status 字段）。#2291 删掉它唯一的
-// 调用者后它成为 0 消费者孤儿，却仍被 hubDataMapping.test.ts 的注释宣称
-// 「Desktop 在用」而留了下来。真正的 per-shell mapper 在
-// app/web/src/platform/webWorkbenchProjects.ts 与
-// app/desktop/src/platform/useDesktopWorkbenchModel.ts；canonical 的 L2 映射
-// 只有在 Hub 获得真 lifecycle 事实（ADR-034 的 operator 裁决）之后才应回到这里。
+// Hub workspace/project currently has no server-authoritative lifecycle/status.
+// Keep presentation mapping in the shells; introduce one canonical lifecycle
+// mapper here only after Hub exposes that fact (ADR-034).
 
 export function resolveHubProjects<TProject extends HubWorkspaceProjectLike>(
   projects: TProject[] | undefined,
@@ -156,12 +166,16 @@ export function hubDocumentToDocRow(doc: HubDocumentLike): DocRow {
   const tag = doc.tag?.trim();
   return {
     id: doc.id,
-    title: doc.title?.trim() || '未命名文档',
+    title: doc.title?.trim() || hubMappingText('untitledDocument', 'Untitled document'),
     ...(tag ? { tag } : {}),
-    location: doc.location?.trim() || '我的文档库',
+    location: doc.location?.trim() || hubMappingText('myDocuments', 'My documents'),
     owner: doc.owner_id?.trim() || 'Hub',
     time: formatDocTime(doc.updated_at ?? doc.created_at),
   };
+}
+
+function clockTime(date: Date): string {
+  return `${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
 }
 
 function formatDocTime(value: string | undefined): string {
@@ -171,13 +185,18 @@ function formatDocTime(value: string | undefined): string {
   const now = new Date();
   const diffMs = now.getTime() - date.getTime();
   const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+  const time = clockTime(date);
   if (diffDays === 0) {
-    return `今天 ${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
+    return hubMappingText('todayAt', `Today ${time}`, { time });
   }
   if (diffDays === 1) {
-    return `昨天 ${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
+    return hubMappingText('yesterdayAt', `Yesterday ${time}`, { time });
   }
-  return `${date.getMonth() + 1}月${date.getDate()}日 ${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
+  return hubMappingText('monthDayAt', `${date.getMonth() + 1}/${date.getDate()} ${time}`, {
+    month: date.getMonth() + 1,
+    day: date.getDate(),
+    time,
+  });
 }
 
 export function resolveHubDocuments(
@@ -235,7 +254,9 @@ export function hubSessionToConversation(session: HubSessionLike): WorkbenchConv
     id: sessionId,
     title,
     kind,
-    subtitle: session.member_count != null ? `${session.member_count} 人` : undefined,
+    subtitle: session.member_count != null
+      ? hubMappingText('memberCount', `${session.member_count} members`, { count: session.member_count })
+      : undefined,
     updatedLabel,
     avatarLabel: title.slice(0, 2).toUpperCase(),
     ...(session.pinned ? { pinned: true } : {}),
@@ -246,11 +267,13 @@ export function hubSessionToConversation(session: HubSessionLike): WorkbenchConv
 }
 
 function resolveSessionFallbackTitle(session: HubSessionLike): string {
-  if (session.type === 'private') return '私聊';
+  if (session.type === 'private') return hubMappingText('privateSession', 'Direct message');
   if (session.title?.trim()) return session.title.trim();
   if (session.name?.trim()) return session.name.trim();
   const sid = session.id || session.session_id || '';
-  return sid ? `群会话 ${sid.slice(0, 4)}` : '群会话';
+  return sid
+    ? hubMappingText('groupSessionWithId', `Group conversation ${sid.slice(0, 4)}`, { id: sid.slice(0, 4) })
+    : hubMappingText('groupSession', 'Group conversation');
 }
 
 function formatSessionTime(value: string | undefined): string | undefined {
