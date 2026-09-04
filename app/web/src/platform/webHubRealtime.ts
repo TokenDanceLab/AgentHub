@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { type QueryClient, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { HUB_EVENTS } from '@shared/hubEvents';
+import { hubQueryKeys, webQueryKeys } from '@shared/stores/queryKeys';
 import { hubRuntimeEventFromPayload, type HubRuntimeEventTranscriptInput } from '@shared/transcript';
 import { getPinMapStore } from '@shared/transcript';
 import { getAgentActivityStore } from '@shared/transcript/agentActivity';
@@ -75,10 +76,6 @@ const DEVICE_EVENTS = new Set<string>([
 const CONTACT_EVENTS = new Set<string>([
   HUB_EVENTS.FRIEND_REQUEST,
   HUB_EVENTS.FRIEND_ACCEPTED,
-]);
-
-const NOTIFICATION_EVENTS = new Set<string>([
-  HUB_EVENTS.NOTIFICATION_NEW,
 ]);
 
 const TEAM_EVENTS = new Set<string>([
@@ -305,7 +302,7 @@ export function useWebHubRealtime({
     // #2101 G4-②: shared resync trigger for gap and reconnect events.
     // Uses incremental syncMessages(after_seq) per cached session when possible;
     // falls back to full invalidation of the transcript family otherwise.
-    // #2252: Web transcripts are cached under ['web-v4','hub-messages',<id>],
+    // #2252: Web transcripts are cached at `webQueryKeys.messages.of(<id>)`,
     // so the shared helper needs Web's family to discover them at all.
     const hubClientForResync = createHubClient({ getToken });
     const triggerWebResync = (): void => {
@@ -382,56 +379,50 @@ export function invalidateWebWorkbenchHubQueries(
       recordRealtimeAgentTaskIndex(queryClient, eventType, payload);
     }
 
-    void queryClient.invalidateQueries({ queryKey: ['web-v4', 'hub-sessions'] });
+    void queryClient.invalidateQueries({ queryKey: webQueryKeys.sessions.root });
 
     if (MESSAGE_EVENTS.has(eventType) || AGENT_EVENTS.has(eventType)) {
       const sessionId = readSessionId(payload);
       void queryClient.invalidateQueries({
         queryKey: sessionId
-          ? ['web-v4', 'hub-messages', sessionId]
-          : ['web-v4', 'hub-messages'],
+          ? webQueryKeys.messages.of(sessionId)
+          : webQueryKeys.messages.root,
       });
     }
   }
 
   // ── Device events ──────────────────────────────
   if (DEVICE_EVENTS.has(eventType)) {
-    void queryClient.invalidateQueries({ queryKey: ['web-v4', 'execution-targets'] });
-    void queryClient.invalidateQueries({ queryKey: ['hub', 'execution-targets'] });
+    // This block used to fire an app-scoped twin of the key below that had no
+    // producer: Web caches execution targets only under
+    // `hubQueryKeys.executionTargets.list(context)`, so the family root is the
+    // one invalidation that can actually match (ADR-029: do not name a key
+    // nothing writes).
+    void queryClient.invalidateQueries({ queryKey: hubQueryKeys.executionTargets.root });
   }
 
   // ── Contact events ─────────────────────────────
   if (CONTACT_EVENTS.has(eventType)) {
-    void queryClient.invalidateQueries({ queryKey: ['web-v4', 'contacts'] });
-    void queryClient.invalidateQueries({ queryKey: ['hub', 'contacts'] });
-  }
-
-  // ── Notification events ────────────────────────
-  if (NOTIFICATION_EVENTS.has(eventType)) {
-    void queryClient.invalidateQueries({ queryKey: ['web-v4', 'notifications'] });
-    void queryClient.invalidateQueries({ queryKey: ['hub', 'notifications'] });
+    // Web's contact LIST is cached at `webQueryKeys.contacts.list(hubReady)`,
+    // but this block used to invalidate a hand-written app-scoped key missing
+    // the `hub-` segment, so it matched nothing: a friend request accepted in
+    // another tab left this one's contact list stale, and that query has no
+    // refetchInterval to paper over it. Both roots below are live —
+    // `webQueryKeys.contacts.root` covers the list, `hubQueryKeys.contacts.root`
+    // covers `useListFriendRequests`.
+    void queryClient.invalidateQueries({ queryKey: webQueryKeys.contacts.root });
+    void queryClient.invalidateQueries({ queryKey: hubQueryKeys.contacts.root });
   }
 
   // ── Team events ────────────────────────────────
   if (TEAM_EVENTS.has(eventType)) {
-    const teamId = readString(payload, 'team_id', 'teamId');
-    const teamRunId = readString(payload, 'team_run_id', 'teamRunId', 'run_id', 'runId');
-    if (teamId && teamRunId) {
-      void queryClient.invalidateQueries({
-        queryKey: ['web-v4', 'agent-teams', teamId, 'runs', teamRunId],
-      });
-      void queryClient.invalidateQueries({
-        queryKey: ['hub', 'agent-teams', teamId, 'runs', teamRunId],
-      });
-    }
-    if (teamId) {
-      void queryClient.invalidateQueries({
-        queryKey: ['web-v4', 'agent-teams', teamId, 'runs'],
-      });
-      void queryClient.invalidateQueries({ queryKey: ['hub', 'agent-teams', teamId, 'runs'] });
-    }
-    void queryClient.invalidateQueries({ queryKey: ['web-v4', 'agent-teams'] });
-    void queryClient.invalidateQueries({ queryKey: ['hub', 'agent-teams'] });
+    // Web's only team cache is `hubQueryKeys.agentTeams.usageBoard`, so the
+    // family root is the single invalidation that can match. This block used to
+    // fire five more run-scoped keys (`agentTeams.runs` / `.runDetail`, each in
+    // both namespaces); none of them has a Web query producer, so all five
+    // matched no cache entry — the `teamId`/`teamRunId` extraction existed only
+    // to build dead keys and is gone with them.
+    void queryClient.invalidateQueries({ queryKey: hubQueryKeys.agentTeams.root });
   }
 }
 
@@ -573,12 +564,12 @@ function recordRealtimeAgentTaskIndex(
     status: realtimeTaskStatus(eventType),
   };
 
-  queryClient.setQueryData(['web-v4', 'agent-task-index', taskId], task);
+  queryClient.setQueryData(webQueryKeys.agentTask.index(taskId), task);
   if (task.sessionId) {
-    queryClient.setQueryData(['web-v4', 'active-agent-task', task.sessionId], task);
+    queryClient.setQueryData(webQueryKeys.agentTask.active(task.sessionId), task);
   }
-  void queryClient.invalidateQueries({ queryKey: ['web-v4', 'agent-task-events', taskId] });
-  void queryClient.invalidateQueries({ queryKey: ['web-v4', 'agent-task-summary', taskId] });
+  void queryClient.invalidateQueries({ queryKey: webQueryKeys.agentTask.events(taskId) });
+  void queryClient.invalidateQueries({ queryKey: webQueryKeys.agentTask.summary(taskId) });
 }
 
 function realtimeTaskStatus(eventType: string): string {

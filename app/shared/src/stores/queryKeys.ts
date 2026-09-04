@@ -136,6 +136,87 @@ export const hubQueryKeys = {
         : (['hub', 'runs'] as const),
     detail: (runId: string) => ['hub', 'runs', 'detail', runId] as const,
   },
+
+} as const;
+
+// ── Web app-scoped query key factory (`web-v4` namespace) ─────────
+//
+// Web does not cache Hub collections under `hubQueryKeys`: it versions its own
+// cache namespace (`web-v4`) so a Web-only cache reset never has to touch the
+// keys Desktop shares, and so `hubReady` can live *inside* the key — flipping
+// it on logout yields a different key, so signed-out UI cannot keep showing
+// signed-in data (a bare `enabled: false` would leave the old entry cached).
+//
+// Canonical rules (ADR-029 / #2261 residual, landed here):
+//   - this factory is the ONLY producer of `web-v4` literals. Call sites must
+//     not write the array by hand: a hand-written invalidation key is exactly
+//     how `['web-v4','contacts']` / `['hub','contacts','list']` / `['agent-teams']`
+//     came to invalidate caches that no query ever wrote (#2252 and #2310 are
+//     the same failure mode on other platforms).
+//   - `*.root` is an invalidation prefix only, never a live query's `queryKey`.
+//   - a member with no query producer must not exist. Web has no notifications
+//     query, no team-runs query and no `web-v4` execution-targets query, so
+//     those keys are deliberately absent — the invalidations that used to name
+//     them were dead and have been removed at the call site.
+/**
+ * A cache pointer that is legitimately *absent* while its query is disabled
+ * (no active session / no active task). It is threaded through verbatim on
+ * purpose: normalizing it to `''` would mint a string session id that
+ * `webHubMessagesFamily.sessionIdOf` would then hand to the reconnect resync
+ * as if it were a real session (#2252).
+ */
+export type QueryKeyPointer = string | null | undefined;
+
+export const webQueryKeys = {
+  authMe: ['web-v4', 'auth-me'] as const,
+  publicSkills: (hubReady: boolean) => ['web-v4', 'public-skills', hubReady] as const,
+  publicMcpServers: (hubReady: boolean) =>
+    ['web-v4', 'public-mcp-servers', hubReady] as const,
+
+  // Sessions (Web's session *list*; transcripts live under `messages` below so
+  // that "refresh the list" and "refresh one transcript" stay distinguishable)
+  sessions: {
+    root: ['web-v4', 'hub-sessions'] as const,
+    list: (hubReady: boolean) => ['web-v4', 'hub-sessions', hubReady] as const,
+  },
+
+  // Transcripts — see `webHubMessagesFamily` below for the resync contract.
+  messages: {
+    root: ['web-v4', 'hub-messages'] as const,
+    of: (sessionId: QueryKeyPointer) => ['web-v4', 'hub-messages', sessionId] as const,
+  },
+
+  pins: {
+    root: ['web-v4', 'hub-pins'] as const,
+    of: (sessionId: QueryKeyPointer) => ['web-v4', 'hub-pins', sessionId] as const,
+  },
+
+  // Web's contact *list*. Friend requests stay under `hubQueryKeys.contacts`
+  // because that is the key `useListFriendRequests` actually caches under.
+  contacts: {
+    root: ['web-v4', 'hub-contacts'] as const,
+    list: (hubReady: boolean) => ['web-v4', 'hub-contacts', hubReady] as const,
+  },
+
+  documents: {
+    root: ['web-v4', 'hub-documents'] as const,
+    list: (hubReady: boolean) => ['web-v4', 'hub-documents', hubReady] as const,
+  },
+
+  // Agent task lifecycle. `active` is keyed by SESSION id, `index` by TASK id:
+  // they are different identity domains (ADR-033) and both are written from
+  // realtime frames, so neither may be derived from the other.
+  agentTask: {
+    active: (sessionId: QueryKeyPointer) => ['web-v4', 'active-agent-task', sessionId] as const,
+    index: (taskId: QueryKeyPointer) => ['web-v4', 'agent-task-index', taskId] as const,
+    events: (taskId: QueryKeyPointer) => ['web-v4', 'agent-task-events', taskId] as const,
+    summary: (taskId: QueryKeyPointer) => ['web-v4', 'agent-task-summary', taskId] as const,
+    approvals: (taskId: QueryKeyPointer) => ['web-v4', 'agent-task-approvals', taskId] as const,
+    artifacts: (taskId: QueryKeyPointer) => ['web-v4', 'agent-task-artifacts', taskId] as const,
+  },
+
+  sessionAgentInstances: (sessionId: string) =>
+    ['web-v4', 'session-agent-instances', sessionId] as const,
 } as const;
 
 // ── Hub transcript key family (#2252) ────────────────────────────
