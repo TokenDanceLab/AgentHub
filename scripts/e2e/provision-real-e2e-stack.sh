@@ -78,8 +78,32 @@ if [ -n "${AGENTHUB_E2E_ID_CLIENT_ID:-}" ] && [ -n "${AGENTHUB_E2E_ID_CLIENT_SEC
   CLIENT_ID="$AGENTHUB_E2E_ID_CLIENT_ID"
   CLIENT_SECRET="$AGENTHUB_E2E_ID_CLIENT_SECRET"
 elif [ -f "$START_SH" ]; then
-  CLIENT_ID="$(grep -E '^export AGENTHUB_TOKENDANCE_ID_CLIENT_ID=' "$START_SH" | head -1 | cut -d= -f2- | tr -d '"' || true)"
-  CLIENT_SECRET="$(grep -E '^export AGENTHUB_TOKENDANCE_ID_CLIENT_SECRET=' "$START_SH" | head -1 | cut -d= -f2- | tr -d '"' || true)"
+  # start.sh 的 export 行允许含 shell 展开。本机实测两行：
+  #   export AGENTHUB_TOKENDANCE_ID_CLIENT_SECRET="${AGENTHUB_OIDC_CLIENT_SECRET}"
+  #   export AGENTHUB_JWT_SECRET=$(awk -F= "/^AGENTHUB_JWT_SECRET=/{print \$2}" .env)
+  # 启动器（bash start.sh，或 restart-hub.sh 里 eval start.sh 的 export 块）注入 hub 的
+  # 是**求值后**的值；旧实现用 grep|cut|tr 取字面文本，于是把命令文本本身
+  # （"${AGENTHUB_OIDC_CLIENT_SECRET}"，30 字符）bcrypt 进 ID 的 oauth_clients.secret_hash，
+  # 而 hub 发的是求值后的 35 字符真值 ⇒ POST /oidc/token 恒 400 invalid_grant
+  # （ID 侧日志：code 正常签发、token 端点 ~346ms 后 400），真 OIDC 登录与整条
+  # L3 real lane 结构性不可用。修法：在子 shell 里按启动器同一语义求值
+  # source/export 行后读有效值——只取这两类行，start.sh 的启动命令一行都不执行。
+  resolved_creds="$(
+    cd "$(dirname "$START_SH")" 2>/dev/null || true
+    set -a
+    eval "$(grep -E '^[[:space:]]*(source|[.])[[:space:]]|^export ' "$START_SH")" >/dev/null 2>&1 || true
+    printf '%s\n%s\n' "${AGENTHUB_TOKENDANCE_ID_CLIENT_ID:-}" "${AGENTHUB_TOKENDANCE_ID_CLIENT_SECRET:-}"
+  )"
+  CLIENT_ID="$(printf '%s' "$resolved_creds" | sed -n 1p)"
+  CLIENT_SECRET="$(printf '%s' "$resolved_creds" | sed -n 2p)"
+  # fail-closed：求值后仍残留未展开的 shell 语法，说明解析口径又漂了。此时宁可
+  # 立刻 die，也绝不把命令文本当凭据 seed 进 ID 库——那只会把错误推迟成
+  # 运行期静默 invalid_grant（本次事故的原始形态）。
+  case "$CLIENT_ID$CLIENT_SECRET" in
+    *'${'*|*'$('*|*'`'*)
+      die "start.sh credential resolution left unexpanded shell syntax (got a value containing \${ / \$( / backtick); pass AGENTHUB_E2E_ID_CLIENT_ID/SECRET explicitly"
+      ;;
+  esac
 else
   die "client credentials missing: set AGENTHUB_E2E_ID_CLIENT_ID/SECRET or AGENTHUB_E2E_START_SH"
 fi
