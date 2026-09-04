@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import type { ProjectInfo } from './pages';
 import {
   contactInfoToMember,
   hubDocumentToDocRow,
@@ -7,17 +8,20 @@ import {
   resolveHubContacts,
   resolveHubDocuments,
   resolveHubProjects,
-  workspaceProjectToProjectInfo,
 } from './hubDataMapping';
 
 /* ═══════════════════════════════════════════════════════════════════════
    hubDataMapping — Hub API types → Workbench UI types.
 
-   Desktop 的 workbench model 通过这些共享函数做 Hub→UI 映射（`resolveHubProjects`
-   + `workspaceProjectToProjectInfo`），所以映射契约在这里测一次。Web 侧目前
-   走自己的副本 `app/web/src/platform/webWorkbenchProjects.ts`（分岔已登记，
-   收敛属另一批）。原 #1546 的两个 platform projects port 已删：它们在两个
-   shell 里都结构性不可达。
+   Desktop 的 workbench model 通过这里的共享**编排**函数做 Hub→UI 映射
+   （`resolveHubProjects` / `resolveHubContacts` / `resolveHubDocuments` /
+   `hubSessionToConversation`），per-shell 的 projects mapper 由 desktop 自己
+   传入（`useDesktopWorkbenchModel.ts` 的本地副本）；Web 走自己的副本
+   `app/web/src/platform/webWorkbenchProjects.ts`（分岔已登记，收敛属另一批）。
+   #2274 B-6：原先此处还有一个共享 `workspaceProjectToProjectInfo`，它把每个
+   Hub 项目硬编码成 status:'Active'（Hub 侧无 status 事实），#2291 之后 0 非测试
+   消费者；旧注释曾错误宣称 desktop 使用它，正是这句错注释让孤儿活了下来。
+   现已删除，`resolveHubProjects` 的测试改用 stub mapper（它是纯编排器）。
    ═══════════════════════════════════════════════════════════════════════ */
 
 // Deterministic helpers: formatDocTime / formatProjectDate / formatSessionTime
@@ -113,57 +117,21 @@ describe('resolveHubContacts', () => {
   });
 });
 
-describe('workspaceProjectToProjectInfo', () => {
-  it('maps id/name/description and defaults the description', () => {
-    const info = workspaceProjectToProjectInfo({
-      id: 'p1',
-      name: 'Alpha',
-      description: '  Desc  ',
-    });
-
-    expect(info).toMatchObject({
-      id: 'p1',
-      name: 'Alpha',
-      description: 'Desc',
-      status: 'Active',
-      meta: 'Hub project',
-      members: [],
-      runs: [],
-      artifacts: [],
-      feed: [],
-    });
-  });
-
-  it('trims the name and falls back to the default project name', () => {
-    const info = workspaceProjectToProjectInfo({ id: 'p2', name: '   ' });
-
-    expect(info.name).toBe('未命名项目');
-    expect(info.description).toBe('Hub workspace project');
-  });
-
-  it('surfaces the creation time in meta when present', () => {
-    const info = workspaceProjectToProjectInfo({
-      id: 'p3',
-      name: 'Gamma',
-      created_at: daysAgo(3),
-    });
-
-    expect(info.meta.startsWith('Created ')).toBe(true);
-  });
-
-  it('keeps the raw created_at in meta when the date is unparseable', () => {
-    const info = workspaceProjectToProjectInfo({
-      id: 'p4',
-      name: 'Delta',
-      created_at: 'not-a-date',
-    });
-
-    expect(info.meta).toBe('Created not-a-date');
-  });
-});
-
 describe('resolveHubProjects', () => {
-  const mapFn = workspaceProjectToProjectInfo;
+  // #2274 B-6: resolveHubProjects 是纯编排器（错误态 / hubReady / fixture 门 +
+  // map），per-shell mapper 不在共享包里，测试用 stub 表达合同即可。
+  const mapFn = (project: { id: string; name?: string }): ProjectInfo => ({
+    id: project.id,
+    name: project.name?.trim() || 'unnamed',
+    description: '',
+    status: 'unknown',
+    meta: '',
+    members: [],
+    announcement: '',
+    runs: [],
+    artifacts: [],
+    feed: [],
+  });
 
   it('returns undefined in fixture/mock mode while the hub is not ready', () => {
     expect(resolveHubProjects([], false, 'fixture', mapFn)).toBeUndefined();

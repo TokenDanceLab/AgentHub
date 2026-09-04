@@ -109,32 +109,14 @@ export interface HubWorkspaceProjectLike {
   updated_at?: string;
 }
 
-/**
- * Convert a Hub workspace project to the ProjectInfo shape consumed by ProjectsPage.
- */
-export function workspaceProjectToProjectInfo(project: HubWorkspaceProjectLike): ProjectInfo {
-  const description = project.description?.trim() || 'Hub workspace project';
-  return {
-    id: project.id,
-    name: project.name?.trim() || '未命名项目',
-    description,
-    status: 'Active',
-    meta: project.created_at
-      ? `Created ${formatProjectDate(project.created_at)}`
-      : 'Hub project',
-    members: [],
-    announcement: description,
-    runs: [],
-    artifacts: [],
-    feed: [],
-  };
-}
-
-function formatProjectDate(value: string): string {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return `${date.getMonth() + 1}/${date.getDate()}`;
-}
+// #2274 B-6: 这里曾经有一个共享的 workspaceProjectToProjectInfo，它把每个 Hub
+// 项目硬编码成 status:'Active'——一个 Hub 侧不存在的词（Hub 的 workspace/project
+// DTO、openapi、migration、live DB 都没有 status 字段）。#2291 删掉它唯一的
+// 调用者后它成为 0 消费者孤儿，却仍被 hubDataMapping.test.ts 的注释宣称
+// 「Desktop 在用」而留了下来。真正的 per-shell mapper 在
+// app/web/src/platform/webWorkbenchProjects.ts 与
+// app/desktop/src/platform/useDesktopWorkbenchModel.ts；canonical 的 L2 映射
+// 只有在 Hub 获得真 lifecycle 事实（ADR-034 的 operator 裁决）之后才应回到这里。
 
 export function resolveHubProjects<TProject extends HubWorkspaceProjectLike>(
   projects: TProject[] | undefined,
