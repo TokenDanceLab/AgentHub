@@ -173,19 +173,20 @@ export const SlideshowPreview: React.FC<SlideshowPreviewProps> = ({
       } else {
         const response = await fetch(fileUrl);
         if (!response.ok) {
-          throw new Error(`Failed to fetch file: ${response.status} ${response.statusText}`);
+          setError(t('preview.error.fetch', { status: response.status }));
+          return;
         }
         arrayBuffer = await response.arrayBuffer();
       }
 
       const parsedSlides = await parsePptx(arrayBuffer);
       if (parsedSlides.length === 0) {
-        throw new Error('No slides found in presentation');
+        setError(t('preview.error.emptySlideshow'));
+        return;
       }
       setSlides(parsedSlides);
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Unknown error parsing presentation';
-      setError(message);
+    } catch {
+      setError(t('preview.error.slideshowParse'));
     } finally {
       setLoading(false);
     }

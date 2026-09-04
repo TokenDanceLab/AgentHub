@@ -69,7 +69,8 @@ export const DocxPreview: React.FC<DocxPreviewProps> = ({
       } else {
         const response = await fetch(fileUrl);
         if (!response.ok) {
-          throw new Error(`Failed to fetch file: ${response.status} ${response.statusText}`);
+          setError(t('preview.error.fetch', { status: response.status }));
+          return;
         }
         arrayBuffer = await response.arrayBuffer();
       }
@@ -80,9 +81,8 @@ export const DocxPreview: React.FC<DocxPreviewProps> = ({
       const { default: DOMPurify } = await import('dompurify');
       const sanitized: string = DOMPurify.sanitize(result.value, purifyConfig.current);
       setHtml(sanitized);
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Unknown error parsing DOCX file';
-      setError(message);
+    } catch {
+      setError(t('preview.error.docxParse'));
     } finally {
       setLoading(false);
     }

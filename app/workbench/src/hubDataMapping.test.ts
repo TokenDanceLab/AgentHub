@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
+import { useTestI18nLanguage } from '@shared/testing/i18n';
 import type { ProjectInfo } from './pages';
 import {
   contactInfoToMember,
@@ -31,6 +32,10 @@ const now = Date.now();
 const minutesAgo = (minutes: number) => new Date(now - minutes * 60 * 1000).toISOString();
 const hoursAgo = (hours: number) => new Date(now - hours * 60 * 60 * 1000).toISOString();
 const daysAgo = (days: number) => new Date(now - days * 24 * 60 * 60 * 1000).toISOString();
+
+beforeAll(async () => {
+  await useTestI18nLanguage('zh');
+});
 
 describe('contactInfoToMember', () => {
   it('prefers remark over nickname/username and derives initials from the name', () => {

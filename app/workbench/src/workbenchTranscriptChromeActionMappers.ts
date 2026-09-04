@@ -11,7 +11,6 @@ import {
   buildPermissionApprovalDecision,
   buildQuoteComposerText,
   cardActionLabel,
-  cardLinkForBlock,
   resolveBlockTitleById,
   resolveQuoteText,
   type TranscriptChromeTranslate,
@@ -184,12 +183,6 @@ export function planContextAction(options: {
     // non-text blocks keep the short blockTitle.
     const copyText = block?.kind === 'text' ? block.text : title;
     effects.push({ type: 'copy', text: copyText });
-  }
-  if (action === 'link') {
-    // #1504: copy an in-app URL that opens on Web/Desktop (session hash
-    // route, `#/session/<sessionId>?block=<blockId>`) instead of the dead
-    // `agenthub://card/<blockId>` custom scheme; see cardLinkForBlock.
-    effects.push({ type: 'copy', text: cardLinkForBlock(blockId, sessionId) });
   }
   if (action === 'delete') {
     effects.push({ type: 'softHide', blockIds: [blockId] });
@@ -364,7 +357,7 @@ export function planContextAction(options: {
   // Known actions with real effects get a confirmation toast; unknown or
   // unwired actions plan nothing — a generic "已记录" toast would claim an
   // effect that never runs (#1818, #1821).
-  if (action === 'copy' || action === 'link' || action === 'delete') {
+  if (action === 'copy' || action === 'delete') {
     effects.push(
       { type: 'pulse', blockId },
       { type: 'toast', message: cardActionLabel(action, title, t) },
@@ -902,7 +895,6 @@ export function buildTranscriptContextMenuGroups({
             onClick: () => onAction(block?.pinned ? 'unpin' : 'pin', blockId),
           }]
         : []),
-      { label: t('context.copyLink'), icon: 'external', onClick: () => onAction('link', blockId) },
     ],
     [
       // #2154: regenerate needs the shell's regenerate port — Desktop has

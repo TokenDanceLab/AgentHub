@@ -5,7 +5,7 @@
 docs/projects/tasks/settings 页面、mainchain 状态条、terminal host、floating
 组件与 team subagent stream 等。
 
-由 `app/shared/src/workbench/` 独立而来（#1759）：`shared` 是跨端原语层，
+`workbench` 是端级 shell 层；`shared` 是跨端原语层，
 workbench 是端级巨石，两者拆包后依赖方向固定为 **workbench → shared 单向**。
 
 ## 边界

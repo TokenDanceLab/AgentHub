@@ -10,7 +10,6 @@ import {
   buildPermissionApprovalDecision,
   buildQuoteComposerText,
   cardActionLabel,
-  cardLinkForBlock,
   isNestedInteractiveTarget,
   multiActionLabel,
   resolveBlockTitleById,
@@ -63,19 +62,6 @@ describe('workbenchTranscriptChromeLabels', () => {
     expect(cardActionLabel('copy', 'title', t)).toBe('toast.cardCopied');
     expect(cardActionLabel('unknown', 'x', t)).toBe('toast.actionRecorded');
     expect(multiActionLabel('delete', 3, t)).toBe('toast.multiDelete:3');
-  });
-
-  it('builds an openable session link instead of the dead agenthub:// scheme (#1504)', () => {
-    expect(cardLinkForBlock('b9', 'sess-1', 'https://app.example.com'))
-      .toBe('https://app.example.com/#/session/sess-1?block=b9');
-    // Without a session id (Desktop/demo) fall back to a block-level hash
-    // that stays within the app origin.
-    expect(cardLinkForBlock('b9', null, 'https://app.example.com'))
-      .toBe('https://app.example.com/#/card/b9');
-    // Never the dead custom scheme, and the default origin keeps it web-openable.
-    const defaultOriginLink = cardLinkForBlock('b9');
-    expect(defaultOriginLink).not.toContain('agenthub://');
-    expect(defaultOriginLink).toMatch(/^https?:\/\//);
   });
 
   it('maps hotkeys, quote text, and permission decisions without undefined optionals', () => {

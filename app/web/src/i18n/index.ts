@@ -35,7 +35,7 @@ function detectBrowserLanguage(): AppLanguage {
 }
 
 function getInitialLanguage(): AppLanguage {
-  return readStoredLanguage() ?? detectBrowserLanguage() ?? 'en';
+  return readStoredLanguage() ?? detectBrowserLanguage();
 }
 
 
