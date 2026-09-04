@@ -4,7 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useHubStore } from '@/stores/hubStore';
 import { useToastStore } from '@shared/ui/toast';
-import { hubQueryKeys } from '@shared/stores/queryKeys';
+import { hubQueryKeys, webQueryKeys } from '@shared/stores/queryKeys';
 
 const tryAutoLoginMock = vi.hoisted(() => vi.fn());
 const getAccessTokenMock = vi.hoisted(() => vi.fn());
@@ -62,7 +62,10 @@ describe('useWebAuth', () => {
     });
 
     expect(tryAutoLoginMock).toHaveBeenCalledTimes(1);
-    expect(refetchQueries).toHaveBeenCalledWith({ queryKey: hubQueryKeys.threads.root });
+    // Web's session list lives in the app-scoped namespace, so refetching
+    // `hubQueryKeys.threads.root` after login matched no cache entry (#2261).
+    expect(refetchQueries).toHaveBeenCalledWith({ queryKey: webQueryKeys.sessions.root });
+    expect(refetchQueries).not.toHaveBeenCalledWith({ queryKey: hubQueryKeys.threads.root });
     expect(refetchQueries).toHaveBeenCalledWith({ queryKey: hubQueryKeys.agents.root });
   });
 

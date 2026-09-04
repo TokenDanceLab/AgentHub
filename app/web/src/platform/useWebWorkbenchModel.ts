@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { fetchAllPages } from '@shared/hub/paginate';
+import { hubQueryKeys, webQueryKeys } from '@shared/stores/queryKeys';
 import { CHATVIEW_I18N_NAMESPACE } from '@shared/chatview/i18n/resources';
 import type { DocRow, ProjectDraft } from '@agenthub/workbench';
 import { resolveFailedToastKey } from '@shared/chatview/failedToastKey';
@@ -169,7 +170,7 @@ export function useWebWorkbenchModel(selectedConversationId?: string, selectedPr
   );
 
   const sessions = useQuery({
-    queryKey: ['web-v4', 'hub-sessions', hubReady],
+    queryKey: webQueryKeys.sessions.list(hubReady),
     queryFn: () => hubClient.listSessions(),
     enabled: hubReady,
     refetchInterval: hubReady ? 10_000 : false,
@@ -211,7 +212,7 @@ export function useWebWorkbenchModel(selectedConversationId?: string, selectedPr
   const activeAgentTask = useQuery({
     queryKey: activeHubSessionId
       ? webActiveAgentTaskQueryKey(activeHubSessionId)
-      : ['web-v4', 'active-agent-task', 'none'],
+      : webQueryKeys.agentTask.active('none'),
     queryFn: () => {
       // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- enabled gate guarantees the value when the query runs
       return readStoredWebActiveAgentTask(activeHubSessionId!);
@@ -231,7 +232,7 @@ export function useWebWorkbenchModel(selectedConversationId?: string, selectedPr
   });
 
   const messages = useQuery({
-    queryKey: ['web-v4', 'hub-messages', activeHubSessionId],
+    queryKey: webQueryKeys.messages.of(activeHubSessionId),
     queryFn: () => {
       // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- enabled gate guarantees the value when the query runs
       return hubClient.getMessages(activeHubSessionId!, { limit: 80 });
@@ -242,7 +243,7 @@ export function useWebWorkbenchModel(selectedConversationId?: string, selectedPr
   });
 
   const replayedRuntimeEvents = useQuery({
-    queryKey: ['web-v4', 'agent-task-events', activeAgentTaskId],
+    queryKey: webQueryKeys.agentTask.events(activeAgentTaskId),
     queryFn: () => {
       // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- enabled gate guarantees the value when the query runs
       return hubClient.listTaskRunEvents(activeAgentTaskId!);
@@ -252,7 +253,7 @@ export function useWebWorkbenchModel(selectedConversationId?: string, selectedPr
     placeholderData: (previous) => previous,
   });
   const activeAgentTaskSummary = useQuery({
-    queryKey: ['web-v4', 'agent-task-summary', activeAgentTaskId],
+    queryKey: webQueryKeys.agentTask.summary(activeAgentTaskId),
     queryFn: () => {
       // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- enabled gate guarantees the value when the query runs
       return hubClient.getTaskRunEventSummary(activeAgentTaskId!);
@@ -262,7 +263,7 @@ export function useWebWorkbenchModel(selectedConversationId?: string, selectedPr
     placeholderData: (previous) => previous,
   });
   const activeAgentTaskApprovals = useQuery({
-    queryKey: ['web-v4', 'agent-task-approvals', activeAgentTaskId],
+    queryKey: webQueryKeys.agentTask.approvals(activeAgentTaskId),
     queryFn: () => {
       // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- enabled gate guarantees the value when the query runs
       return hubClient.listTaskApprovals(activeAgentTaskId!);
@@ -272,7 +273,7 @@ export function useWebWorkbenchModel(selectedConversationId?: string, selectedPr
     placeholderData: (previous) => previous,
   });
   const activeAgentTaskArtifacts = useQuery({
-    queryKey: ['web-v4', 'agent-task-artifacts', activeAgentTaskId],
+    queryKey: webQueryKeys.agentTask.artifacts(activeAgentTaskId),
     queryFn: () => {
       // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- enabled gate guarantees the value when the query runs
       return hubClient.listTaskArtifacts(activeAgentTaskId!);
@@ -283,7 +284,7 @@ export function useWebWorkbenchModel(selectedConversationId?: string, selectedPr
   });
 
   const pinnedMessages = useQuery({
-    queryKey: ['web-v4', 'hub-pins', activeHubSessionId],
+    queryKey: webQueryKeys.pins.of(activeHubSessionId),
     queryFn: () => {
       // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- enabled gate guarantees the value when the query runs
       return hubClient.listPinnedMessages(activeHubSessionId!);
@@ -312,7 +313,7 @@ export function useWebWorkbenchModel(selectedConversationId?: string, selectedPr
   }, [activeHubSessionId, pinnedMessages.data, pinnedMessages.isPlaceholderData]);
 
   const contacts = useQuery({
-    queryKey: ['web-v4', 'hub-contacts', hubReady],
+    queryKey: webQueryKeys.contacts.list(hubReady),
     queryFn: () => hubClient.listContacts(),
     enabled: hubReady,
     staleTime: 10_000,
@@ -324,7 +325,7 @@ export function useWebWorkbenchModel(selectedConversationId?: string, selectedPr
   // back to mock rows in real mode. Mirrors desktop semantics; mapping goes
   // through the shared workbench contract (resolveHubDocuments).
   const documentsQuery = useQuery({
-    queryKey: ['web-v4', 'hub-documents', hubReady],
+    queryKey: webQueryKeys.documents.list(hubReady),
     // Parameterless first-page fetch with the cursor dropped (#2290 defect
     // class): documents past the server's default page never reached the Docs
     // page, which then looked like "there are no more documents".
@@ -336,7 +337,7 @@ export function useWebWorkbenchModel(selectedConversationId?: string, selectedPr
   const createDocumentMutation = useMutation({
     mutationFn: (data: HubCreateDocumentRequest) => hubClient.createDocument(data),
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['web-v4', 'hub-documents'] });
+      void queryClient.invalidateQueries({ queryKey: webQueryKeys.documents.root });
     },
   });
 
@@ -366,12 +367,16 @@ export function useWebWorkbenchModel(selectedConversationId?: string, selectedPr
   const decideApproval = useMutation({
     mutationFn: (action: ApprovalDecisionAction) => decideWebApprovalWithHubClient(hubClient, action),
     onSettled: () => {
-      void queryClient.invalidateQueries({ queryKey: ['agent-teams'] });
+      // Was the bare literal `['agent-teams']` — no namespace, so it matched no
+      // cache entry at all (Web's team cache is
+      // `hubQueryKeys.agentTeams.usageBoard`). Retargeted rather than deleted:
+      // an approval decision really does change the runs that board aggregates.
+      void queryClient.invalidateQueries({ queryKey: hubQueryKeys.agentTeams.root });
       if (activeAgentTaskId) {
-        void queryClient.invalidateQueries({ queryKey: ['web-v4', 'agent-task-events', activeAgentTaskId] });
-        void queryClient.invalidateQueries({ queryKey: ['web-v4', 'agent-task-summary', activeAgentTaskId] });
-        void queryClient.invalidateQueries({ queryKey: ['web-v4', 'agent-task-approvals', activeAgentTaskId] });
-        void queryClient.invalidateQueries({ queryKey: ['web-v4', 'agent-task-artifacts', activeAgentTaskId] });
+        void queryClient.invalidateQueries({ queryKey: webQueryKeys.agentTask.events(activeAgentTaskId) });
+        void queryClient.invalidateQueries({ queryKey: webQueryKeys.agentTask.summary(activeAgentTaskId) });
+        void queryClient.invalidateQueries({ queryKey: webQueryKeys.agentTask.approvals(activeAgentTaskId) });
+        void queryClient.invalidateQueries({ queryKey: webQueryKeys.agentTask.artifacts(activeAgentTaskId) });
       }
     },
   });
@@ -393,8 +398,8 @@ export function useWebWorkbenchModel(selectedConversationId?: string, selectedPr
   const recallMessageMut = useMutation({
     mutationFn: (messageId: string) => hubClient.recallMessage(messageId),
     onSettled: () => {
-      void queryClient.invalidateQueries({ queryKey: ['web-v4', 'hub-messages', activeHubSessionId] });
-      void queryClient.invalidateQueries({ queryKey: ['web-v4', 'hub-sessions'] });
+      void queryClient.invalidateQueries({ queryKey: webQueryKeys.messages.of(activeHubSessionId) });
+      void queryClient.invalidateQueries({ queryKey: webQueryKeys.sessions.root });
     },
   });
 
@@ -402,7 +407,7 @@ export function useWebWorkbenchModel(selectedConversationId?: string, selectedPr
     mutationFn: ({ messageId, content }: { messageId: string; content: string }) =>
       hubClient.editMessage(messageId, { content }),
     onSettled: () => {
-      void queryClient.invalidateQueries({ queryKey: ['web-v4', 'hub-messages', activeHubSessionId] });
+      void queryClient.invalidateQueries({ queryKey: webQueryKeys.messages.of(activeHubSessionId) });
     },
   });
 
@@ -417,8 +422,8 @@ export function useWebWorkbenchModel(selectedConversationId?: string, selectedPr
         void queryClient.invalidateQueries({ queryKey: webActiveAgentTaskQueryKey(activeHubSessionId) });
       }
       if (activeAgentTaskId) {
-        void queryClient.invalidateQueries({ queryKey: ['web-v4', 'agent-task-events', activeAgentTaskId] });
-        void queryClient.invalidateQueries({ queryKey: ['web-v4', 'agent-task-summary', activeAgentTaskId] });
+        void queryClient.invalidateQueries({ queryKey: webQueryKeys.agentTask.events(activeAgentTaskId) });
+        void queryClient.invalidateQueries({ queryKey: webQueryKeys.agentTask.summary(activeAgentTaskId) });
       }
     },
   });
@@ -427,8 +432,8 @@ export function useWebWorkbenchModel(selectedConversationId?: string, selectedPr
     mutationFn: ({ messageId, sessionId }: { messageId: string; sessionId: string }) =>
       hubClient.pinMessage(messageId, sessionId),
     onSettled: () => {
-      void queryClient.invalidateQueries({ queryKey: ['web-v4', 'hub-pins', activeHubSessionId] });
-      void queryClient.invalidateQueries({ queryKey: ['web-v4', 'hub-messages', activeHubSessionId] });
+      void queryClient.invalidateQueries({ queryKey: webQueryKeys.pins.of(activeHubSessionId) });
+      void queryClient.invalidateQueries({ queryKey: webQueryKeys.messages.of(activeHubSessionId) });
     },
   });
 
@@ -436,8 +441,8 @@ export function useWebWorkbenchModel(selectedConversationId?: string, selectedPr
     mutationFn: ({ messageId, sessionId }: { messageId: string; sessionId: string }) =>
       hubClient.unpinMessage(messageId, sessionId),
     onSettled: () => {
-      void queryClient.invalidateQueries({ queryKey: ['web-v4', 'hub-pins', activeHubSessionId] });
-      void queryClient.invalidateQueries({ queryKey: ['web-v4', 'hub-messages', activeHubSessionId] });
+      void queryClient.invalidateQueries({ queryKey: webQueryKeys.pins.of(activeHubSessionId) });
+      void queryClient.invalidateQueries({ queryKey: webQueryKeys.messages.of(activeHubSessionId) });
     },
   });
 
@@ -445,7 +450,7 @@ export function useWebWorkbenchModel(selectedConversationId?: string, selectedPr
     mutationFn: ({ messageId, targetSessionIds }: { messageId: string; targetSessionIds: string[] }) =>
       hubClient.forwardMessage(messageId, targetSessionIds),
     onSettled: () => {
-      void queryClient.invalidateQueries({ queryKey: ['web-v4', 'hub-sessions'] });
+      void queryClient.invalidateQueries({ queryKey: webQueryKeys.sessions.root });
     },
   });
 
@@ -465,7 +470,7 @@ export function useWebWorkbenchModel(selectedConversationId?: string, selectedPr
     mutationFn: ({ sessionId, lastReadSeq }: { sessionId: string; lastReadSeq: number }) =>
       hubClient.markRead(sessionId, lastReadSeq),
     onSettled: () => {
-      void queryClient.invalidateQueries({ queryKey: ['web-v4', 'hub-sessions'] });
+      void queryClient.invalidateQueries({ queryKey: webQueryKeys.sessions.root });
     },
   });
 
@@ -473,7 +478,7 @@ export function useWebWorkbenchModel(selectedConversationId?: string, selectedPr
     mutationFn: ({ messageId, sessionId, emoji }: { messageId: string; sessionId: string; emoji: string }) =>
       hubClient.addMessageReaction(messageId, sessionId, { emoji }),
     onSettled: () => {
-      void queryClient.invalidateQueries({ queryKey: ['web-v4', 'hub-messages', activeHubSessionId] });
+      void queryClient.invalidateQueries({ queryKey: webQueryKeys.messages.of(activeHubSessionId) });
     },
   });
 
@@ -481,7 +486,7 @@ export function useWebWorkbenchModel(selectedConversationId?: string, selectedPr
     mutationFn: ({ messageId, sessionId, emoji }: { messageId: string; sessionId: string; emoji: string }) =>
       hubClient.removeMessageReaction(messageId, sessionId, { emoji }),
     onSettled: () => {
-      void queryClient.invalidateQueries({ queryKey: ['web-v4', 'hub-messages', activeHubSessionId] });
+      void queryClient.invalidateQueries({ queryKey: webQueryKeys.messages.of(activeHubSessionId) });
     },
   });
 
