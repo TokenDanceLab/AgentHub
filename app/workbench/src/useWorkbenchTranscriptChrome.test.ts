@@ -193,7 +193,7 @@ describe('useWorkbenchTranscriptChrome', () => {
     // entries are additionally gated on the port handler being wired — the
     // shape assertions here are about author/kind, so declare both ports.
     const { result } = renderTranscriptChrome({
-      transcript: [textBlock(), userTextBlock()],
+      transcript: [textBlock({ agentTaskId: 'task-b1' }), userTextBlock()],
       sessionId: 'sess-1',
       onRegenerate: vi.fn(),
       onRecallMessage: vi.fn(),
@@ -350,14 +350,15 @@ describe('useWorkbenchTranscriptChrome', () => {
   it('regenerates agent text and soft-hides the block', () => {
     const onRegenerate = vi.fn();
     const { result } = renderTranscriptChrome({
-      transcript: [textBlock(), userTextBlock()],
+      transcript: [textBlock({ agentTaskId: 'task-b1' }), userTextBlock()],
       onRegenerate,
     });
 
     act(() => {
       result.current.handleTranscriptBlockAction('regenerate', 'b1');
     });
-    expect(onRegenerate).toHaveBeenCalledWith('b1');
+    // #2274 B-1: the port receives (blockId, taskId).
+    expect(onRegenerate).toHaveBeenCalledWith('b1', 'task-b1');
     expect(result.current.softHiddenBlockIds).toEqual(['b1']);
     expect(result.current.toastMessage).toBe('action.regenerating');
 

@@ -37,7 +37,7 @@ export interface UseWorkbenchTranscriptChromeOptions {
    * so the success toast fires after resolution and a rejection surfaces a
    * failure toast instead of a fake optimistic success.
    */
-  onRegenerate?: ((blockId: string) => Promise<void> | void) | undefined;
+  onRegenerate?: ((blockId: string, taskId: string) => Promise<void> | void) | undefined;
   /**
    * Hub session id for REST message actions (#1383). Optional — Desktop/demo
    * shells omit it; the react/pin/unpin/recall menu entries are then hidden

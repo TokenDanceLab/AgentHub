@@ -255,13 +255,21 @@ function WebWorkbenchRoot() {
     void agentList.refetch();
   }, [agentList]);
 
-  const handleRegenerate = useCallback((blockId: string): Promise<void> => {
+  const handleRegenerate = useCallback((_blockId: string, taskId: string): Promise<void> => {
+    // #2274 B-1: the identity contract of POST /web/agent-tasks/:id/regenerate
+    // is the TASK id (hub RegenerateAgentTask looks up pending_agent_tasks by
+    // primary key). The pre-fix port stripped a `hub-message-` prefix and sent
+    // what it called a "message id" — which is in fact the message's
+    // client_msg_id, a third identifier domain — so every live click 404'd
+    // (agent_task_not_found) and unauthenticated demo mode fired real
+    // unauthenticated requests at the hub (401). The workbench chrome now
+    // offers the entry only for blocks carrying the hub-stamped task id
+    // (`agent_task.task_id` → block.agentTaskId) and passes it here.
     // #1821: return the real promise — the workbench chrome awaits it, so a
     // failed regenerate shows an error toast and keeps the message visible
     // instead of silently soft-hiding it behind a fake "regenerating" toast.
-    const messageId = blockId.replace(/^hub-message-/, '');
     return createHubClient({ getToken: getAccessToken })
-      .regenerateAgentTask(messageId)
+      .regenerateAgentTask(taskId)
       .then(() => undefined);
   }, []);
 
@@ -305,7 +313,11 @@ function WebWorkbenchRoot() {
         onApprovalDecision={workbench.onApprovalDecision}
         onNavigateToConversation={handleNavigateToConversation}
         onStartNewConversation={handleStartNewConversation}
-        onRegenerate={handleRegenerate}
+        // #2274 B-1: regenerate is a real Hub mutation, so it rides the same
+        // fail-closed gate as the other five chat actions — outside hubReady
+        // (demo / unauthenticated) the port is undefined and the shared menu
+        // hides the entry instead of offering a click that can only fail.
+        onRegenerate={chatActions ? handleRegenerate : undefined}
         isAgentRunning={workbench.isAgentRunning}
         onCancelRun={workbench.onCancelRun}
         onEditMessage={

@@ -495,3 +495,35 @@ describe('normalizeHubMessagesToTranscript attachment pass-through (#1972)', () 
     ]);
   });
 });
+
+describe('normalizeHubMessagesToTranscript producing-task projection (#2274 B-1)', () => {
+  const agentMessage = (content: unknown) => ({
+    id: 'msg-agent-1',
+    session_id: 'hub-session-1',
+    seq_id: 7,
+    sender_type: 'agent',
+    sender_id: 'agent-1',
+    sender: { nickname: 'Builder' },
+    content_type: 'text',
+    content,
+    created_at: '2026-09-04T02:03:09Z',
+  });
+
+  it('writes the hub-stamped agent_task.task_id onto the text block', () => {
+    const blocks = normalizeHubMessagesToTranscript([
+      agentMessage({ content: 'B-1 final answer', agent_task: { task_id: 'task-77' } }),
+    ]);
+
+    expect(blocks).toHaveLength(1);
+    expect(blocks[0]).toMatchObject({ kind: 'text', agentTaskId: 'task-77' });
+  });
+
+  it('leaves agentTaskId unset when the message carries no task ref', () => {
+    const blocks = normalizeHubMessagesToTranscript([agentMessage({ content: 'plain answer' })]);
+
+    expect(blocks).toHaveLength(1);
+    // exactOptional style: absent, not null — the chrome gate reads truthiness
+    // and an explicit null would still be a lie about "we know the task".
+    expect('agentTaskId' in blocks[0]!).toBe(false);
+  });
+});

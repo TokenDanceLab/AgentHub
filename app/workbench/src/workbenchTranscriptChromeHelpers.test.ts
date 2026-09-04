@@ -123,7 +123,9 @@ function createChromeFixture(overrides: Partial<TranscriptChromeControllerDeps> 
     },
     writers,
     getTranscript: () => [
-      textBlock({ id: 'a1', text: 'Alpha' }),
+      // #2274 B-1: the agent block carries the hub-stamped task id so the
+      // regenerate entry/effect has an honest identity to send.
+      textBlock({ id: 'a1', text: 'Alpha', agentTaskId: 'task-a1' }),
       textBlock({ id: 'u1', text: 'Mine', author: { id: 'u', role: 'human', name: 'You' } }),
       textBlock({ id: 'p1', text: 'Pinned', pinned: true }),
     ],
@@ -198,7 +200,7 @@ describe('workbenchTranscriptChromeHelpers', () => {
   it('builds context menu groups with quote/regenerate conditionals', () => {
     const onAction = vi.fn();
     const onEnterSelection = vi.fn();
-    const agentText = textBlock({ id: 'agent-text' });
+    const agentText = textBlock({ id: 'agent-text', agentTaskId: 'task-7' });
     const userText = textBlock({
       id: 'user-text',
       author: { id: 'user-1', role: 'human', name: 'You' },
@@ -359,7 +361,7 @@ describe('workbenchTranscriptChromeHelpers', () => {
   });
 
   it('plans context actions for copy/delete/reply/quote/regenerate', () => {
-    const agent = textBlock({ id: 'agent-1', text: 'body\nnext' });
+    const agent = textBlock({ id: 'agent-1', text: 'body\nnext', agentTaskId: 'task-9' });
     const copy = planContextAction({
       action: 'copy',
       blockId: 'agent-1',
@@ -410,6 +412,7 @@ describe('workbenchTranscriptChromeHelpers', () => {
       {
         type: 'regenerate',
         blockId: 'agent-1',
+        taskId: 'task-9',
         successMessage: 'action.regenerating',
         failureMessage: 'toast.regenerateFailed',
         failureFallbackKey: 'toast.regenerateFailed',
@@ -419,7 +422,7 @@ describe('workbenchTranscriptChromeHelpers', () => {
 
   it('plans transcript block actions for approval/retry/copy', () => {
     const perm = permissionBlock({ id: 'p1' });
-    const agent = textBlock({ id: 'a1' });
+    const agent = textBlock({ id: 'a1', agentTaskId: 'task-a1' });
     const approval = planTranscriptBlockAction({
       action: 'approve',
       blockId: 'p1',
@@ -451,6 +454,7 @@ describe('workbenchTranscriptChromeHelpers', () => {
       {
         type: 'regenerate',
         blockId: 'a1',
+        taskId: 'task-a1',
         successMessage: 'action.regenerating',
         failureMessage: 'toast.regenerateFailed',
         failureFallbackKey: 'toast.regenerateFailed',
@@ -608,7 +612,7 @@ describe('workbenchTranscriptChromeHelpers', () => {
           actions: [{ type: 'setText', text: 'hi' }],
           focusComposer: true,
         },
-        { type: 'regenerate', blockId: 'a' },
+        { type: 'regenerate', blockId: 'a', taskId: 'task-a' },
         {
           type: 'approval',
           decision: { approvalId: 'req', decision: 'allow' },
@@ -626,7 +630,7 @@ describe('workbenchTranscriptChromeHelpers', () => {
     expect(handlers.softHideBlocks).toHaveBeenCalledWith(['a']);
     expect(handlers.dispatchComposer).toHaveBeenCalledWith({ type: 'setText', text: 'hi' });
     expect(handlers.focusComposer).toHaveBeenCalledOnce();
-    expect(handlers.onRegenerate).toHaveBeenCalledWith('a');
+    expect(handlers.onRegenerate).toHaveBeenCalledWith('a', 'task-a');
     expect(handlers.onApprovalDecision).toHaveBeenCalledWith({
       approvalId: 'req',
       decision: 'allow',
@@ -1142,7 +1146,7 @@ describe('workbenchTranscriptChromeHelpers', () => {
     click('u1', 'context.recall');
     expect(onRecallMessage).toHaveBeenCalledWith('u1');
     click('a1', 'context.regenerate');
-    expect(onRegenerate).toHaveBeenCalledWith('a1');
+    expect(onRegenerate).toHaveBeenCalledWith('a1', 'task-a1');
 
     // Forward rides the picker's encoded action string (#1385).
     controller.runContextAction(forwardActionForTargets(['s2']), 'u1');
