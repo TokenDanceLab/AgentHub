@@ -101,7 +101,16 @@ func TestBackendE2E_HubEdgeCallbackContract_DBWS_NoCLI(t *testing.T) {
 	}
 
 	var finalMessage model.Message
-	if err := db.Where("session_id = ? AND sender_type = ? AND sender_id = ? AND content = ?", agent.SessionID, model.SenderTypeAgent, task.AgentInstanceID, finalContent).
+	// The lookup must not match on the whole content value. `content` is jsonb, so
+	// the comparison is semantic (whitespace and key order insensitive) but still
+	// whole-value — and since #2274 B-1 the stored value is the callback's
+	// final_content PLUS an `agent_task` ref (agentevent.StampAgentTaskRef). That
+	// extra key is the point of the change, so a whole-value match made this test
+	// fail the moment the stamp landed: it was asserting an implementation detail
+	// (content equals exactly what the edge sent) instead of the contract. The
+	// latest agent message in the session IS the final message; the semantics are
+	// asserted below.
+	if err := db.Where("session_id = ? AND sender_type = ? AND sender_id = ?", agent.SessionID, model.SenderTypeAgent, task.AgentInstanceID).
 		Order("seq_id DESC").
 		First(&finalMessage).Error; err != nil {
 		t.Fatalf("load final agent message: %v", err)
@@ -109,12 +118,32 @@ func TestBackendE2E_HubEdgeCallbackContract_DBWS_NoCLI(t *testing.T) {
 	if finalMessage.ContentType != model.ContentTypeText {
 		t.Fatalf("final message content_type = %q, want %q", finalMessage.ContentType, model.ContentTypeText)
 	}
-	var finalPayload map[string]string
+	// Content is now a mixed-shape object (string `text`, object `agent_task`),
+	// so decode into RawMessage instead of map[string]string.
+	var finalPayload map[string]json.RawMessage
 	if err := json.Unmarshal([]byte(finalMessage.Content), &finalPayload); err != nil {
 		t.Fatalf("decode final message content: %v", err)
 	}
-	if finalPayload["text"] != "Hub Edge callback contract final" {
-		t.Fatalf("final message text = %q, want Hub Edge callback contract final", finalPayload["text"])
+	var finalText string
+	if err := json.Unmarshal(finalPayload["text"], &finalText); err != nil {
+		t.Fatalf("decode final message text: %v (content=%s)", err, finalMessage.Content)
+	}
+	if finalText != "Hub Edge callback contract final" {
+		t.Fatalf("final message text = %q, want Hub Edge callback contract final", finalText)
+	}
+	// #2274 B-1: the stored message must carry its producing task, or the web
+	// shell has no server-truthful task id to regenerate with — it used to send a
+	// message identifier to an endpoint that requires a task id (live 404). This
+	// is the DB-level half of that contract; the transcript normalizer and the
+	// real Web->Hub flow are the other two.
+	var agentTaskRef struct {
+		TaskID string `json:"task_id"`
+	}
+	if err := json.Unmarshal(finalPayload["agent_task"], &agentTaskRef); err != nil {
+		t.Fatalf("decode stamped agent_task ref: %v (content=%s)", err, finalMessage.Content)
+	}
+	if agentTaskRef.TaskID != task.ID {
+		t.Fatalf("stamped agent_task.task_id = %q, want %q", agentTaskRef.TaskID, task.ID)
 	}
 }
 

@@ -208,6 +208,11 @@ function normalizeHubMessage(
     author: normalizeAuthor(message),
     ...(message.created_at ? { createdAt: message.created_at } : {}),
     ...(pinned ? { pinned: true } : {}),
+    // #2274 B-1: the producing task id is the only identity the regenerate
+    // endpoint accepts. Hub agent messages carry it as content metadata
+    // (`agent_task.task_id`, stamped by hub's edge callback paths); without
+    // writing it onto the block the shell cannot offer an honest regenerate.
+    ...(metadata?.agentTask?.task_id ? { agentTaskId: metadata.agentTask.task_id } : {}),
     kind: 'text',
     text,
     ...(visibleState.displayTitle ? { displayTitle: visibleState.displayTitle } : {}),

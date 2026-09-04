@@ -6,10 +6,12 @@ package agent
 
 import (
 	"context"
+	"encoding/json"
 	"testing"
 
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/agenthub/hub-server/internal/model"
 )
@@ -185,4 +187,31 @@ func TestCanonicalContent(t *testing.T) {
 	assert.Equal(t, "plain text", canonicalContent("plain text"))
 	// The projection wrapper {"content": X} unwraps to X.
 	assert.Equal(t, "x", canonicalContent(`{"content":"x"}`))
+}
+
+// #2274 B-1: the done-final message must carry the producing task ref, exactly
+// like the stream projection path — the transcript needs `agent_task.task_id`
+// to offer an honest regenerate (the endpoint only accepts task ids).
+func TestHandleTaskDone_StampsProducingTaskRefOnFinalMessage(t *testing.T) {
+	db := newAgentRunEventTestDB(t)
+	b := newTestBus(t)
+	svc := &Service{db: db, bus: b, cacheClient: &mockAgentCache{}}
+
+	err := svc.HandleTaskDone(context.Background(), "user-1", "dev-1", "task-1", "run-1", "FINAL ANSWER")
+	require.NoError(t, err)
+
+	var msg model.Message
+	require.NoError(t, db.Where("session_id = ? AND sender_type = ?", "sess-1", model.SenderTypeAgent).
+		Order("seq_id DESC").First(&msg).Error)
+
+	var content struct {
+		Content   string `json:"content"`
+		AgentTask *struct {
+			TaskID string `json:"task_id"`
+		} `json:"agent_task"`
+	}
+	require.NoError(t, json.Unmarshal([]byte(msg.Content), &content))
+	require.Equal(t, "FINAL ANSWER", content.Content, "visible text must survive the stamp")
+	require.NotNil(t, content.AgentTask, "done-final message must carry the producing task ref")
+	require.Equal(t, "task-1", content.AgentTask.TaskID)
 }
