@@ -8,7 +8,6 @@ import { useTranslation } from 'react-i18next';
 import { CHATVIEW_I18N_NAMESPACE } from '@shared/chatview/i18n/resources';
 import { SHARED_WORKBENCH_I18N_NAMESPACE } from '@shared/i18n';
 import {
-  DataModeControl,
   SettingPath,
   SettingSegment,
   SettingSwitch,
@@ -18,7 +17,6 @@ import {
 } from './shared';
 import {
   AgentConfigLink,
-  DataModeStatus,
   LocalCliDiscoveryStatus,
   StatePreviewSection,
 } from './SettingsPaneParts';
@@ -41,7 +39,6 @@ import type { KeyboardShortcutGroup } from '@shared/utils/keyboardShortcuts';
 import styles from './SettingsPanes.module.css';
 
 export {
-  DataModeStatus,
   LocalCliDiscoveryStatus,
   StatePanel,
   StatePreviewSection,
@@ -190,15 +187,11 @@ export function LocalDevPane(props: SettingsPageProps): React.ReactElement {
         <SettingsRow comingSoon label="热更新覆盖层" description="保留 Vite 错误 overlay，开发时能直接看到语法问题。">
           <SettingSwitch disabled active={props.hrmOverlayEnabled} onChange={(v) => props.onChangeSetting('hrmOverlayEnabled', v)} />
         </SettingsRow>
-        <SettingsRow label="数据模式" description="Auto 可开发回退；Mock/Fixture 固定本地数据；Observed/Approved real 不回退。">
-          <DataModeControl active={props.dataMode} onChange={(v) => props.onChangeSetting('dataMode', v)} />
-        </SettingsRow>
         <SettingsRow label="发送快捷键" description="默认 Enter 发送；需要换行时使用 Ctrl / Cmd + Enter。">
           <SettingSegment options={['Enter 发送', 'Ctrl+Enter 发送']} active={props.composerSubmitBehavior} onChange={(v) => props.onChangeSetting('composerSubmitBehavior', v)} />
         </SettingsRow>
       </SettingsSection>
 
-      <DataModeStatus mode={props.dataMode} />
 
       <SettingsSection title={tw("settings.section.debug")}>
         <SettingsRow label="视觉 QA" description="需要时用浏览器截图检查桌面和窄宽布局。">

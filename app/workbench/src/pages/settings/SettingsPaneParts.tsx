@@ -14,8 +14,6 @@ import {
 } from './shared';
 import {
   STATE_PREVIEW_SPECS,
-  dataModeStatusDetail,
-  dataModeStatusLabel,
   formatLocalCliItemDescription,
   formatLocalCliItemValue,
   joinClassNames,
@@ -24,50 +22,16 @@ import {
 } from './SettingsPaneHelpers';
 import type { StatePanelKind } from './types';
 import { useTranslation } from 'react-i18next';
-import { CHATVIEW_I18N_NAMESPACE } from '@shared/chatview/i18n/resources';
 import { SHARED_WORKBENCH_I18N_NAMESPACE } from '@shared/i18n';
 
 /* ═══════════════════════════════════════════════════════════════════════
    SettingsPaneParts — presentational residual slices from SettingsPanes
    (#686).
 
-   Data-mode / CLI discovery / state-panel leaves and agent-config link.
+   CLI discovery / state-panel leaves and agent-config link.
    CSS stays on SettingsPage.module.css. No intentional UX change.
    ═══════════════════════════════════════════════════════════════════════ */
 
-/* ── Data mode status ── */
-
-export function DataModeStatus({
-  mode,
-}: {
-  mode: string;
-}): React.ReactElement {
-  const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE);
-  const detail = dataModeStatusDetail(mode);
-  const label = dataModeStatusLabel(mode);
-
-  return (
-    <section className={styles.modeStatus} aria-label={t("aria.dataModeStatus")}>
-      <div className={styles.modeStatusHead}>
-        <span>{label}</span>
-        <span className={styles.modeStatusSpacer} aria-hidden="true" />
-        <em>{detail.displayLabel}</em>
-      </div>
-      <strong>{detail.title}</strong>
-      <p>{detail.description}</p>
-      <dl className={styles.modeFacts}>
-        <div>
-          <dt>Desktop</dt>
-          <dd>{detail.desktopLabel}</dd>
-        </div>
-        <div>
-          <dt>Web</dt>
-          <dd>{detail.webLabel}</dd>
-        </div>
-      </dl>
-    </section>
-  );
-}
 
 /* ── Local CLI discovery ── */
 

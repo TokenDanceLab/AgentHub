@@ -1,8 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
   STATE_PREVIEW_SPECS,
-  dataModeStatusDetail,
-  dataModeStatusLabel,
   formatLocalCliItemDescription,
   formatLocalCliItemValue,
   joinClassNames,
@@ -12,23 +10,6 @@ import {
 } from './SettingsPaneHelpers';
 
 describe('SettingsPaneHelpers', () => {
-  it('labels data-mode status heads by contract mode', () => {
-    expect(dataModeStatusLabel('auto')).toBe('Auto fallback');
-    expect(dataModeStatusLabel('approved-real')).toBe('Approved real');
-    expect(dataModeStatusLabel('real')).toBe('Approved real');
-    expect(dataModeStatusLabel('mock')).toBe('Mock data');
-    expect(dataModeStatusLabel('fixture')).toBe('Fixture data');
-    expect(dataModeStatusLabel('observed')).toBe('Observed data');
-  });
-
-  it('exposes shared data-mode contract fields for the status panel', () => {
-    expect(dataModeStatusDetail('mock')).toMatchObject({
-      mode: 'mock',
-      displayLabel: 'Mock',
-      desktopLabel: '5173: demo transcript',
-      webLabel: '5174: demo transcript',
-    });
-  });
 
   it('formats local CLI discovery row description and value', () => {
     expect(
