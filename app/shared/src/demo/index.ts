@@ -20,7 +20,6 @@ export {
   readWorkbenchDataModeOverride,
   resolveWorkbenchDataMode,
   subscribeWorkbenchDataModeOverride,
-  workbenchDataModeLabel,
   writeWorkbenchDataModeOverride,
 } from './dataMode';
 export type {

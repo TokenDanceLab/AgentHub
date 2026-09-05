@@ -677,7 +677,7 @@ export function useWebWorkbenchModel(selectedConversationId?: string, selectedPr
 
   const workbenchStatus = useMemo(
     () => ({
-      dataMode: dataModeContract.statusLabel,
+      dataMode: dataModeContract.mode,
       targetState: executionTargetStatus.state,
       targetLabel: executionTargetStatus.selectedTarget
         ? executionTargetLabel(executionTargetStatus.selectedTarget)

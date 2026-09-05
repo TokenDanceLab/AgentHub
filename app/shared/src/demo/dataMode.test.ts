@@ -7,7 +7,6 @@ import {
   normalizeWorkbenchDataMode,
   readWorkbenchDataModeOverride,
   resolveWorkbenchDataMode,
-  workbenchDataModeLabel,
   writeWorkbenchDataModeOverride,
 } from './dataMode';
 
@@ -48,13 +47,11 @@ describe('normalizeWorkbenchDataMode', () => {
     expect(isWorkbenchRealDataMode('observed')).toBe(true);
     expect(isWorkbenchRealDataMode('approved-real')).toBe(true);
     expect(isWorkbenchRealDataMode('auto')).toBe(false);
-    expect(workbenchDataModeLabel('approved-real')).toBe('approved-real');
   });
 
   it('exposes a single shared contract for runtime and evidence boundaries', () => {
     expect(getWorkbenchDataModeContract('mock')).toMatchObject({
       mode: 'mock',
-      statusLabel: 'mock',
       allowsMockData: true,
       allowsFixtureData: false,
       allowsDemoRuntimeFallback: true,
@@ -66,7 +63,6 @@ describe('normalizeWorkbenchDataMode', () => {
 
     expect(getWorkbenchDataModeContract('fixture')).toMatchObject({
       mode: 'fixture',
-      statusLabel: 'fixture',
       allowsMockData: false,
       allowsFixtureData: true,
       allowsDemoRuntimeFallback: true,
@@ -78,7 +74,6 @@ describe('normalizeWorkbenchDataMode', () => {
 
     expect(getWorkbenchDataModeContract('approved-real')).toMatchObject({
       mode: 'approved-real',
-      statusLabel: 'approved-real',
       allowsMockData: false,
       allowsFixtureData: false,
       allowsDemoRuntimeFallback: false,
@@ -90,8 +85,8 @@ describe('normalizeWorkbenchDataMode', () => {
   });
 
   it('keeps transient runtime states out of canonical data-mode labels', () => {
-    expect(workbenchDataModeLabel('auto')).toBe('auto');
-    expect(workbenchDataModeLabel('demo+edge')).toBe('auto');
-    expect(workbenchDataModeLabel('mock (auto fallback)')).toBe('auto');
+    expect(normalizeWorkbenchDataMode('auto')).toBe('auto');
+    expect(normalizeWorkbenchDataMode('demo+edge')).toBe('auto');
+    expect(normalizeWorkbenchDataMode('mock (auto fallback)')).toBe('auto');
   });
 });
