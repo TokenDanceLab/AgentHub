@@ -4,10 +4,11 @@ r"""CI gate policy verifier — ps1 迁移（契约见 server docs/design/ps1-to
 用正则解析 .github/workflows/checks.yml 的 job/step 结构并断言 CI 政策：
 覆盖门禁、gosec/vuln 扫描、backend fixture/focused 边界、前端 pnpm 缓存、
 coverage include、commit-message/quality-debt/doc-ssot 自测、mobile light、
-visual-qa-shell（web+desktop 双半边）、changes 路径筛选等。断言引用脚本名与本批迁移后 checks.yml
+visual-qa-shell（web+desktop 双半边）、changes 路径筛选、Web CD 构建输入等。断言引用脚本名与本批迁移后 checks.yml
 实际内容一致（本批脚本 .py，其余保持 .ps1）。
 
 CLI 兼容：--WorkflowPath 默认 ".github/workflows/checks.yml"（相对 cwd）；
+--WebWorkflowPath 默认 ".github/workflows/cd-web.yml"。
 通过输出 "ci gate policy ok" 且退出码 0；违例抛异常 → stderr + 退出码 1。
 """
 
@@ -78,6 +79,7 @@ def main() -> int:
     """解析 checks.yml 并断言全部 CI 门禁政策；违例即抛错退出 1（fail-closed，防回退）。"""
     parser = argparse.ArgumentParser(description="CI gate policy verifier")
     parser.add_argument("--WorkflowPath", default=".github/workflows/checks.yml")
+    parser.add_argument("--WebWorkflowPath", default=".github/workflows/cd-web.yml")
     args = parser.parse_args()
 
     workflow_path = args.WorkflowPath
@@ -609,6 +611,24 @@ def main() -> int:
     assert_not_contains(desktop_visual, r"pixel[-_ ]?golden", "visual-qa-desktop must not fail on pixel golden")
     assert_not_contains(desktop_visual, r"toHaveScreenshot", "visual-qa-desktop must not use Playwright pixel golden matchers")
     assert_not_contains(desktop_visual, r"windows-latest", "visual-qa-desktop must stay on ubuntu for cost control")
+
+    # Web CD must cover the build inputs copied by app/Dockerfile, not just
+    # app/web. Otherwise a Workbench-only merge can leave the image stale.
+    with open(args.WebWorkflowPath, encoding="utf-8-sig") as handle:
+        web_workflow = handle.read()
+    web_push = re.search(r"(?ms)^  push:\r?\n.*?(?=^  \S|\Z)", web_workflow)
+    if not web_push:
+        fail("Web CD must have a push trigger")
+    web_paths = re.search(r"(?m)^    paths:\r?\n(?:      - [^\r\n]+\r?\n)+", web_push.group())
+    if not web_paths:
+        fail("Web CD must filter push paths")
+    for path in (
+        "app/web/**", "app/shared/**", "app/workbench/**",
+        "app/package.json", "app/pnpm-lock.yaml", "app/pnpm-workspace.yaml",
+        "app/Dockerfile", ".github/workflows/cd-web.yml",
+    ):
+        assert_contains(web_paths.group(), r"(?m)^      - [\"']?" + re.escape(path) + r"[\"']?\s*$",
+                        f"Web CD must watch build input {path}")
 
     print("ci gate policy ok")
     return 0

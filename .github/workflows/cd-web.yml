@@ -6,8 +6,10 @@ on:
     paths:
       - "app/web/**"
       - "app/shared/**"
+      - "app/workbench/**"
       - "app/package.json"
       - "app/pnpm-lock.yaml"
+      - "app/pnpm-workspace.yaml"
       - "app/Dockerfile"
       - ".github/workflows/cd-web.yml"
   workflow_dispatch:

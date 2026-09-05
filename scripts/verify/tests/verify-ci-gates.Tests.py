@@ -43,6 +43,7 @@ The unmutated copy must exit 0, proving the policy test only reddens on
 actual policy violations (fail-closed, no false green).
 """
 
+import fnmatch
 import os
 import re
 import subprocess
@@ -52,6 +53,7 @@ import unittest
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 WORKFLOW_PATH = os.path.join(REPO_ROOT, ".github", "workflows", "checks.yml")
+WEB_WORKFLOW_PATH = os.path.join(REPO_ROOT, ".github", "workflows", "cd-web.yml")
 VERIFIER_PATH = os.path.join(REPO_ROOT, "scripts", "verify", "verify-ci-gates.py")
 
 DESIGN_CSS_STEP_VERIFY = "      - name: Verify design CSS syntax\n        run: pnpm test:css-syntax\n"
@@ -164,13 +166,21 @@ def read_workflow() -> str:
         return handle.read()
 
 
-def run_verifier(workflow_text: str) -> tuple:
+def read_web_workflow() -> str:
+    with open(WEB_WORKFLOW_PATH, encoding="utf-8") as handle:
+        return handle.read()
+
+
+def run_verifier(workflow_text: str, web_workflow_text: str | None = None) -> tuple:
     with tempfile.TemporaryDirectory(prefix="agenthub-ci-gates-") as tmp_dir:
         workflow_copy = os.path.join(tmp_dir, "checks.yml")
         with open(workflow_copy, "w", encoding="utf-8", newline="\n") as handle:
             handle.write(workflow_text)
+        web_copy = os.path.join(tmp_dir, "cd-web.yml")
+        with open(web_copy, "w", encoding="utf-8", newline="\n") as handle:
+            handle.write(read_web_workflow() if web_workflow_text is None else web_workflow_text)
         result = subprocess.run(
-            [sys.executable, VERIFIER_PATH, "--WorkflowPath", workflow_copy],
+            [sys.executable, VERIFIER_PATH, "--WorkflowPath", workflow_copy, "--WebWorkflowPath", web_copy],
             capture_output=True,
             text=True,
             encoding="utf-8",
@@ -582,6 +592,38 @@ class VerifyCiGatesMutationTests(unittest.TestCase):
             delete_exact_step(read_workflow(), FIXTURE_PIN_SELF_TEST_STEP, "fixture connection pinning self-test"),
             "deleted the fixture connection pinning negative self-test step",
         )
+
+    def test_web_cd_missing_build_input_fails(self):
+        web = read_web_workflow()
+        # Remove every declared input in turn; this also exercises Workbench
+        # and the workspace manifest rather than merely checking constants.
+        path_block = re.search(r"(?m)^    paths:\n(?P<paths>(?:      - .+\n)+)", web)
+        self.assertIsNotNone(path_block)
+        for entry in path_block.group("paths").splitlines(keepends=True):
+            with self.subTest(entry=entry.strip()):
+                code, output = run_verifier(read_workflow(), web.replace(entry, "", 1))
+                self.assertEqual(code, 1, output)
+
+    def test_web_cd_path_selection(self):
+        web = read_web_workflow()
+        path_block = re.search(r"(?m)^    paths:\n(?P<paths>(?:      - .+\n)+)", web)
+        self.assertIsNotNone(path_block)
+        patterns = [line.strip()[2:].strip("\"'") for line in path_block.group("paths").splitlines()]
+        # These positive literal / ** globs share fnmatch's matching behavior.
+        # Keep unrelated packages/docs out of image builds.
+        for path, selected in (
+            ("app/workbench/src/shell/Workbench.tsx", True),
+            ("app/workbench/package.json", True),
+            ("app/pnpm-workspace.yaml", True),
+            ("app/shared/src/ui/Button.tsx", True),
+            ("app/web/src/main.tsx", True),
+            ("app/desktop/src/main.tsx", False),
+            ("app/mobile-rn/src/App.tsx", False),
+            ("hub-server/main.go", False),
+            ("docs/architecture.md", False),
+        ):
+            with self.subTest(path=path):
+                self.assertEqual(any(fnmatch.fnmatchcase(path, pattern) for pattern in patterns), selected)
 
     def test_unmutated_workflow_passes(self):
         exit_code, output = run_verifier(read_workflow())
