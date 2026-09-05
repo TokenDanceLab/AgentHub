@@ -1,6 +1,6 @@
 # GitHub Actions CI/CD policy
 
-最后更新：2026-09-03
+最后更新：2026-09-05
 
 本文档定义 AgentHub 的免费 GitHub-hosted runner 测试链路。它描述职责和触发边界；具体 job、版本和脚本以 `.github/workflows/checks.yml`、`release-readiness.yml`、`release.yml` 及仓库内 verifier 为准。
 
@@ -21,6 +21,12 @@ AgentHub 使用 Ubuntu 和 Windows 原生 runner 验证不同类别的问题：
 | Extended manual | `workflow_dispatch` | Ubuntu | Mobile full、`e2e-smoke`、`real-e2e-stack` L3、backend perf/leak、benchmark、Linux Tauri no-bundle；路径型 Visual QA/stubbed-hub 也可手动重跑 | 按需获取高成本或真实栈证据，不进入 PR 阻塞门禁 |
 | Release readiness | 相关发布/桌面文件变更或手动触发 | Ubuntu + Windows（macOS 仅显式手动） | `readiness-policy`、`windows-installer-smoke-preflight`；`windows-package-dry`、`macos-unsigned-dry-policy`、`macos-package-dry` 仅显式 opt-in | 发布前验证，不替代 PR 快速门禁；不存在名为 `release-readiness` 的 job |
 | Release | semver tag | Ubuntu + Windows | release gate、跨平台 Go artifacts、Tauri 发布产物 | 只从 tag 进入发布 |
+
+## 镜像构建与发布
+
+`cd-web.yml` 按 `app/Dockerfile` 的实际输入筛选 master push：Web、Shared、Workbench 源码，以及 workspace manifest、lockfile、根 package manifest 和构建工作流。Workbench-only 改动同样必须产出新 Web 镜像；无关 Desktop、Mobile、Hub 或文档改动不触发 Web 构建。该边界由现有 `verify-ci-gates.py` 及其路径删除/选择自测保护。
+
+`cd-web.yml` / `cd-hub-server.yml` 构建并推送多架构 GHCR 镜像，支持手动 dispatch；它们不部署运行环境。构建成功只证明镜像产出，部署仍须核对所选 revision、运行镜像与实际 API/UI。
 
 ## 分支保护与稳定 required checks
 
