@@ -11,8 +11,8 @@ import { SHARED_WORKBENCH_I18N_NAMESPACE } from '@shared/i18n';
 import { StatusNotice } from '@shared/ui';
 import { DesignNavIcon } from '../../designIcons';
 import styles from '../ProjectsPage.module.css';
-import { FilterList, ProjectNavRow } from './ProjectChromeViews';
-import type { ProjectFilter, ProjectInfo } from './types';
+import { ProjectNavRow } from './ProjectChromeViews';
+import type { ProjectInfo } from './types';
 
 export type ProjectNavProps = {
   projects: ProjectInfo[];
@@ -22,10 +22,6 @@ export type ProjectNavProps = {
   onProjectSelect: (projectId: string) => void;
   searchQuery?: string | undefined;
   onSearchChange?: ((query: string) => void) | undefined;
-  activeFilter: ProjectFilter;
-  onFilterChange: (filter: ProjectFilter) => void;
-  /** Filters the loaded projects can satisfy; others render disabled (#2154 P2-3). */
-  availableFilters?: readonly ProjectFilter[] | undefined;
   canCreateProject: boolean;
   onStartCreate: () => void;
 };
@@ -38,9 +34,6 @@ export function ProjectNav({
   onProjectSelect,
   searchQuery = '',
   onSearchChange,
-  activeFilter,
-  onFilterChange,
-  availableFilters,
   canCreateProject,
   onStartCreate,
 }: ProjectNavProps): React.ReactElement {
@@ -97,12 +90,6 @@ export function ProjectNav({
           onSelect={onProjectSelect}
         />
       ))}
-      <div className={styles.navCaption}>{t('projects.view')}</div>
-      <FilterList
-        activeFilter={activeFilter}
-        onFilterChange={onFilterChange}
-        {...(availableFilters ? { availableFilters } : {})}
-      />
     </aside>
   );
 }

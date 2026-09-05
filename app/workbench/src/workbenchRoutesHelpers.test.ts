@@ -149,8 +149,6 @@ describe('buildProjectsPageProps', () => {
       effectiveProjectsStatus: { loading: true, error: 'boom' },
       canMutateProject: false,
       projectId: null,
-      projectFilter: 'all',
-      setProjectFilter: vi.fn(),
       projectTab: 'overview',
       setProjectTab: vi.fn(),
       projectPreview: null,
@@ -168,86 +166,6 @@ describe('buildProjectsPageProps', () => {
     expect(Object.prototype.hasOwnProperty.call(props, 'onProjectUpdate')).toBe(false);
   });
 
-  it('renders the status-filtered list instead of the raw source list (#2154 P2-3)', () => {
-    const source = [{ id: 'p1', status: 'Active' }, { id: 'p2', status: '已归档' }];
-    const route = {
-      sourceProjects: source,
-      visibleProjects: [source[1]],
-      effectiveProjectsStatus: undefined,
-      canMutateProject: false,
-      projectId: 'p2',
-      projectFilter: 'archived',
-      setProjectFilter: vi.fn(),
-      projectTab: 'overview',
-      setProjectTab: vi.fn(),
-      projectPreview: null,
-      setProjectPreview: vi.fn(),
-      selectProject: vi.fn(),
-      handleProjectCreate: vi.fn(),
-      handleProjectUpdate: vi.fn(),
-      openArtifactPreview: vi.fn(),
-      loadMore: undefined,
-      hasMore: false,
-      loadingMore: false,
-    } as unknown as WorkbenchProjectsRoute;
-
-    const props = buildProjectsPageProps(route, []);
-    expect(props.activeFilter).toBe('archived');
-    expect(props.projects).toEqual([source[1]]);
-  });
-
-  it('forwards the available filters so unsatisfiable chips render disabled (#2154 P2-3)', () => {
-    const route = {
-      sourceProjects: [{ id: 'p1', status: 'Active' }],
-      visibleProjects: [{ id: 'p1', status: 'Active' }],
-      availableProjectFilters: ['all', 'running'],
-      effectiveProjectsStatus: undefined,
-      canMutateProject: false,
-      projectId: 'p1',
-      projectFilter: 'all',
-      setProjectFilter: vi.fn(),
-      projectTab: 'overview',
-      setProjectTab: vi.fn(),
-      projectPreview: null,
-      setProjectPreview: vi.fn(),
-      selectProject: vi.fn(),
-      handleProjectCreate: vi.fn(),
-      handleProjectUpdate: vi.fn(),
-      openArtifactPreview: vi.fn(),
-      loadMore: undefined,
-      hasMore: false,
-      loadingMore: false,
-    } as unknown as WorkbenchProjectsRoute;
-
-    const props = buildProjectsPageProps(route, []);
-    expect(props.availableFilters).toEqual(['all', 'running']);
-  });
-
-  it('omits availableFilters for partial route fixtures that predate it', () => {
-    const route = {
-      sourceProjects: [{ id: 'p1' }],
-      effectiveProjectsStatus: undefined,
-      canMutateProject: false,
-      projectId: 'p1',
-      projectFilter: 'all',
-      setProjectFilter: vi.fn(),
-      projectTab: 'overview',
-      setProjectTab: vi.fn(),
-      projectPreview: null,
-      setProjectPreview: vi.fn(),
-      selectProject: vi.fn(),
-      handleProjectCreate: vi.fn(),
-      handleProjectUpdate: vi.fn(),
-      openArtifactPreview: vi.fn(),
-      loadMore: undefined,
-      hasMore: false,
-      loadingMore: false,
-    } as unknown as WorkbenchProjectsRoute;
-
-    const props = buildProjectsPageProps(route, []);
-    expect(Object.prototype.hasOwnProperty.call(props, 'availableFilters')).toBe(false);
-  });
-
   it('includes mutate handlers and clears preview via onClosePreview', () => {
     const setProjectPreview = vi.fn();
     const handleProjectCreate = vi.fn();
@@ -257,8 +175,6 @@ describe('buildProjectsPageProps', () => {
       effectiveProjectsStatus: { saving: true, actionError: 'nope' },
       canMutateProject: true,
       projectId: 'p1',
-      projectFilter: 'running',
-      setProjectFilter: vi.fn(),
       projectTab: 'runs',
       setProjectTab: vi.fn(),
       projectPreview: { id: 'prev' },

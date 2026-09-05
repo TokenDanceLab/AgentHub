@@ -70,8 +70,6 @@ export interface ProjectDraft {
   themeColor?: FolderThemeColor;
 }
 
-export type ProjectFilter = 'all' | 'running' | 'completed' | 'archived';
-
 export type ProjectTab = 'overview' | 'runs' | 'artifacts' | 'archive' | 'settings';
 
 export interface ProjectsPageProps {
@@ -94,18 +92,6 @@ export interface ProjectsPageProps {
   searchQuery?: string;
   /** Called when search input changes */
   onSearchChange?: ((query: string) => void) | undefined;
-
-  /** Active filter in the left nav */
-  activeFilter: ProjectFilter;
-  /** Called when user clicks a filter button */
-  onFilterChange: (filter: ProjectFilter) => void;
-  /**
-   * Filters the current data source can actually satisfy (#2154 P2-3). Chips
-   * outside this list render disabled with an explanation instead of offering a
-   * click whose only possible outcome is an empty list. Absent = every filter
-   * is treated as available (presentational callers / fixtures).
-   */
-  availableFilters?: readonly ProjectFilter[] | undefined;
 
   /** Active tab in the detail view */
   activeTab: ProjectTab;
@@ -190,13 +176,6 @@ export const DEFAULT_PROJECTS: ProjectInfo[] = [
       { id: 'f6', time: '11:36', text: 'roadmap 旧内容完成归档' },
     ],
   },
-];
-
-export const FILTER_ITEMS: { id: ProjectFilter; labelKey: string; icon: DesignNavIconName }[] = [
-  { id: 'all', labelKey: 'projects.nav.all', icon: 'grid' },
-  { id: 'running', labelKey: 'projects.nav.running', icon: 'running' },
-  { id: 'completed', labelKey: 'projects.nav.completed', icon: 'done' },
-  { id: 'archived', labelKey: 'projects.nav.archived', icon: 'archive' },
 ];
 
 export const TAB_ITEMS: { id: ProjectTab; labelKey: string; icon: DesignNavIconName }[] = [
