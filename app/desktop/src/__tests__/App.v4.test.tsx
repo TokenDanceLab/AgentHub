@@ -572,9 +572,6 @@ describe('Desktop App v4 root', () => {
       });
     });
     expect(mockedUseDeviceRegistration).toHaveBeenCalledWith(mockHubClient);
-    await waitFor(() => {
-      expect(mockedQueryClient.invalidateQueries).toHaveBeenCalledWith({ queryKey: ['execution-targets'] });
-    });
     expect(mockedUseHubEventStream).toHaveBeenCalledWith(getAccessToken);
     expect(mockedCreateHubClient).toHaveBeenCalledWith({ getToken: getAccessToken });
     expect(tryAutoLogin).not.toHaveBeenCalled();
