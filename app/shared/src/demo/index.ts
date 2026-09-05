@@ -20,14 +20,12 @@ export {
   readWorkbenchDataModeOverride,
   resolveWorkbenchDataMode,
   subscribeWorkbenchDataModeOverride,
-  workbenchDataModeDisplayLabel,
   workbenchDataModeLabel,
   writeWorkbenchDataModeOverride,
 } from './dataMode';
 export type {
   WorkbenchDataMode,
   WorkbenchDataModeContract,
-  WorkbenchDataModeTone,
 } from './dataMode';
 
 export {

@@ -1,11 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import {
-  isWorkbenchRealDataMode,
-  normalizeWorkbenchDataMode,
-  readWorkbenchDataModeOverride,
-  workbenchDataModeDisplayLabel,
-  writeWorkbenchDataModeOverride,
-} from '@shared/demo';
+import { isWorkbenchRealDataMode } from '@shared/demo';
 import {
   composerSubmitBehaviorFromLabel,
   composerSubmitBehaviorLabel,
@@ -38,13 +32,6 @@ export interface WorkbenchSettingsRoute {
   hasSettingsService: boolean;
 }
 
-function persistDataModeLabel(value: string): void {
-  writeWorkbenchDataModeOverride(normalizeWorkbenchDataMode(value));
-}
-
-function dataModeLabel(): string {
-  return workbenchDataModeDisplayLabel(readWorkbenchDataModeOverride());
-}
 
 function isRouteRealDataMode(value: string | undefined): boolean {
   return isWorkbenchRealDataMode(value);
@@ -57,7 +44,6 @@ function persistedComposerSubmitBehaviorLabel(): string {
 export function createSettingsDefaults(): WorkbenchSettingsValues {
   return {
     ...WORKBENCH_MOCK_SETTINGS_DEFAULTS,
-    dataMode: dataModeLabel(),
     composerSubmitBehavior: persistedComposerSubmitBehaviorLabel(),
   };
 }
@@ -123,9 +109,6 @@ export function useWorkbenchSettingsRoute({
   }, [settingsService, syncSettingsServiceState]);
 
   function handleSettingChange(key: string, value: string | boolean): void {
-    if (key === 'dataMode' && typeof value === 'string') {
-      persistDataModeLabel(value);
-    }
     if (key === 'composerSubmitBehavior' && typeof value === 'string') {
       writeComposerSubmitBehavior(composerSubmitBehaviorFromLabel(value));
     }

@@ -1,10 +1,6 @@
 // real_tested=true
 import { act, renderHook } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import {
-  WORKBENCH_DATA_MODE_STORAGE_KEY,
-  readWorkbenchDataModeOverride,
-} from '@shared/demo/dataMode';
 import type { SettingsPort } from '@shared/platform/types';
 import { WORKBENCH_MOCK_SETTINGS_DEFAULTS } from './mockData';
 import { createSettingsService } from './settingsService';
@@ -109,7 +105,6 @@ describe('useWorkbenchSettingsRoute without a settingsService', () => {
     expect(result.current.settingsErrorKind).toBeNull();
     expect(result.current.settings).toEqual(createSettingsDefaults());
     expect(result.current.settings.theme).toBe('浅色');
-    expect(result.current.settings.dataMode).toBe('Auto');
     expect(result.current.settings.composerSubmitBehavior).toBe('Enter 发送');
     expect(result.current.settings.permissions.Read).toBe('允许');
     expect(result.current.settings.stateStrategies.empty).toBe(true);
@@ -173,16 +168,6 @@ describe('useWorkbenchSettingsRoute without a settingsService', () => {
     expect(result.current.settings.stateStrategies.missing).toBe(true);
   });
 
-  it('persists dataMode changes to the localStorage override', () => {
-    const { result } = renderHook(() => useWorkbenchSettingsRoute({}));
-
-    act(() => {
-      result.current.handleSettingChange('dataMode', '模拟');
-    });
-    expect(result.current.settings.dataMode).toBe('模拟');
-    expect(window.localStorage.getItem(WORKBENCH_DATA_MODE_STORAGE_KEY)).toBe('mock');
-    expect(readWorkbenchDataModeOverride()).toBe('mock');
-  });
 
   it('persists composerSubmitBehavior changes to localStorage', () => {
     const { result } = renderHook(() => useWorkbenchSettingsRoute({}));
@@ -197,13 +182,11 @@ describe('useWorkbenchSettingsRoute without a settingsService', () => {
     expect(readComposerSubmitBehavior()).toBe('ctrl-enter-send');
   });
 
-  it('seeds defaults from localStorage overrides', () => {
-    window.localStorage.setItem(WORKBENCH_DATA_MODE_STORAGE_KEY, 'fixture');
+  it('seeds composer defaults from localStorage override', () => {
     window.localStorage.setItem(WORKBENCH_COMPOSER_SUBMIT_BEHAVIOR_KEY, 'ctrl-enter-send');
 
     const { result } = renderHook(() => useWorkbenchSettingsRoute({}));
 
-    expect(result.current.settings.dataMode).toBe('Fixture');
     expect(result.current.settings.composerSubmitBehavior).toBe('Ctrl+Enter 发送');
   });
 
@@ -280,17 +263,6 @@ describe('useWorkbenchSettingsRoute with a settingsService', () => {
     );
   });
 
-  it('persists dataMode to both localStorage and the service when present', () => {
-    const service = createFakeSettingsService(WORKBENCH_MOCK_SETTINGS_DEFAULTS);
-    const { result } = renderHook(() => useWorkbenchSettingsRoute({ settingsService: service }));
-
-    act(() => {
-      result.current.handleSettingChange('dataMode', '模拟');
-    });
-    expect(result.current.settings.dataMode).toBe('模拟');
-    expect(service.write).toHaveBeenCalledWith('dataMode', '模拟');
-    expect(window.localStorage.getItem(WORKBENCH_DATA_MODE_STORAGE_KEY)).toBe('mock');
-  });
 
   it('picks up external service writes via subscription', () => {
     const service = createFakeSettingsService({ density: '标准' });

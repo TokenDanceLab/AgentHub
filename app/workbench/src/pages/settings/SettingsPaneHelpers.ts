@@ -1,27 +1,14 @@
 import type { DesignNavIconName } from '../../designIcons';
-import { getWorkbenchDataModeContract } from '@shared/demo';
 import type { LocalCliDiscoveryItem } from '@shared/platform';
 import type { StatePanelKind } from './types';
 
 /* ═══════════════════════════════════════════════════════════════════════
    SettingsPaneHelpers — pure residual slices from SettingsPanes (#686).
 
-   Data-mode labels, CLI discovery meta lines, state-panel icon/class
+   CLI discovery meta lines, state-panel icon/class
    packing, and state preview specs. No React / no intentional UX change.
    ═══════════════════════════════════════════════════════════════════════ */
 
-/** Status-head label for the data-mode contract panel. */
-export function dataModeStatusLabel(mode: string): string {
-  const detail = getWorkbenchDataModeContract(mode);
-  if (detail.mode === 'auto') return 'Auto fallback';
-  if (detail.mode === 'approved-real') return 'Approved real';
-  return `${detail.displayLabel} data`;
-}
-
-/** Shared contract fields used by DataModeStatus. */
-export function dataModeStatusDetail(mode: string) {
-  return getWorkbenchDataModeContract(mode);
-}
 
 /** CLI discovery row description: version · path. */
 export function formatLocalCliItemDescription(item: Pick<LocalCliDiscoveryItem, 'version' | 'path'>): string {
