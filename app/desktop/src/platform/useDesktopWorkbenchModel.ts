@@ -320,7 +320,7 @@ export function useDesktopWorkbenchModel(
         activeConversationId: selectedDemoConversation,
         agents: demoWorkbenchAgents,
         conversations: edgeConversations,
-        dataMode: dataModeContract.statusLabel,
+        dataMode: dataModeContract.mode,
         edgeDemoData: true as const,
         isDemo: true,
         transcript: edgeTranscript.length > 0 ? edgeTranscript : EMPTY_TRANSCRIPT,
@@ -342,7 +342,7 @@ export function useDesktopWorkbenchModel(
       activeConversationId: selectedDemoConversation,
       agents: demoWorkbenchAgents,
       conversations: demoSnapshot.conversations,
-      dataMode: dataModeContract.statusLabel,
+      dataMode: dataModeContract.mode,
       isDemo: true,
       transcript: workbenchDemoRuntimeStore.resolveTranscript(selectedDemoConversation),
       agentActivity,
@@ -351,7 +351,7 @@ export function useDesktopWorkbenchModel(
       ...(threadsQuery.error ? { threadsError: errorMessage(threadsQuery.error, tApp?.('threads.loadFailed') ?? 'Threads 加载失败') } : {}),
       ...(threadItemsQuery.error ? { itemsError: errorMessage(threadItemsQuery.error, tApp?.('items.loadFailed') ?? '消息加载失败') } : {}),
     };
-  }, [dataModeContract.statusLabel, demoSnapshot, selectedConversationId, useEdgeDemoData, threads, activeThread, threadPins, threadItems, threadItemsQuery.error, threadItemsQuery.isLoading, threadsQuery.error, threadsQuery.isLoading, agentActivity]);
+  }, [dataModeContract.mode, demoSnapshot, selectedConversationId, useEdgeDemoData, threads, activeThread, threadPins, threadItems, threadItemsQuery.error, threadItemsQuery.isLoading, threadsQuery.error, threadsQuery.isLoading, agentActivity]);
 
   const conversations = useMemo(() => {
     // Merge Hub sessions + Edge threads into a unified conversation list.
@@ -499,7 +499,7 @@ export function useDesktopWorkbenchModel(
     ...(resolvedContactsActions != null ? { contactsActions: resolvedContactsActions } : {}),
     ...(resolvedChatActions != null ? { chatActions: resolvedChatActions } : {}),
     conversations,
-    dataMode: dataModeContract.statusLabel,
+    dataMode: dataModeContract.mode,
     isDemo: false,
     ...(resolvedProjects != null ? { projects: resolvedProjects } : {}),
     ...(resolvedProjectsStatus != null ? { projectsStatus: resolvedProjectsStatus } : {}),
