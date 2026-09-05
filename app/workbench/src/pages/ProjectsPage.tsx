@@ -26,7 +26,6 @@ export type {
   ProjectFeedItem,
   ProjectInfo,
   ProjectDraft,
-  ProjectFilter,
   ProjectTab,
   ProjectsPageProps,
 } from './projects';
@@ -43,9 +42,6 @@ export function ProjectsPage({
   onProjectSelect,
   searchQuery = '',
   onSearchChange,
-  activeFilter,
-  onFilterChange,
-  availableFilters,
   activeTab,
   onTabChange,
   onNewProject,
@@ -102,9 +98,6 @@ export function ProjectsPage({
         onProjectSelect={onProjectSelect}
         searchQuery={searchQuery}
         onSearchChange={onSearchChange}
-        activeFilter={activeFilter}
-        onFilterChange={onFilterChange}
-        {...(availableFilters ? { availableFilters } : {})}
         canCreateProject={canCreateProject}
         onStartCreate={startProjectCreate}
       />

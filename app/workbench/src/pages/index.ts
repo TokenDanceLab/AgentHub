@@ -40,7 +40,6 @@ export type {
   ProjectArtifact,
   ProjectFeedItem,
   ProjectRunStatus,
-  ProjectFilter,
   ProjectTab,
 } from './ProjectsPage';
 

@@ -166,7 +166,6 @@ export type {
   ProjectArtifact,
   ProjectFeedItem,
   ProjectRunStatus,
-  ProjectFilter,
   ProjectTab,
   SettingsPageProps,
   SettingsPaneId,
