@@ -265,7 +265,6 @@ export const WORKBENCH_MOCK_SETTINGS_DEFAULTS = {
   deepThinkingDisplay: '摘要',
   permissions: { Read: '允许', Write: '需确认', Shell: '需确认', Browser: '允许' },
   vitePreviewUrl: 'http://127.0.0.1:5176/desktop/',
-  dataMode: '自动',
   composerSubmitBehavior: 'Enter 发送',
   workspacePath: 'D:\\Code\\TokenDance\\tokendance-design',
   targetProjectPath: 'D:\\Code\\TokenDance\\AgentHub',

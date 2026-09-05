@@ -10,7 +10,6 @@ import {
   DESIGN_NAV_GLYPH_STROKE_WIDTH,
   type DesignNavIconName,
 } from '../../designIcons';
-import { getWorkbenchDataModeContract } from '@shared/demo';
 import { Switch } from '@shared/ui';
 import styles from '../SettingsPage.module.css';
 import { useTranslation } from 'react-i18next';
@@ -140,23 +139,6 @@ export function SettingSegment({ options, active, onChange, disabled = false }: 
   );
 }
 
-/* ── Data mode segmented control ── */
-
-interface DataModeControlProps {
-  active: string;
-  onChange: (value: string) => void;
-}
-
-export function DataModeControl({ active, onChange }: DataModeControlProps): React.ReactElement {
-  const normalized = getWorkbenchDataModeContract(active).displayLabel;
-  return (
-    <SettingSegment
-      options={['Auto', 'Mock', 'Fixture', 'Observed', 'Approved real']}
-      active={normalized}
-      onChange={onChange}
-    />
-  );
-}
 
 /* ── Switch ── */
 
