@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef } from 'react';
 import { queryClient } from '@/api/queryClient';
+import { hubQueryKeys } from '@shared/stores/queryKeys';
 import { getAccessToken, useAuth } from '@/hooks/useAuth';
 import { createHubClient } from '@/api/hubClient';
 import {
@@ -83,7 +84,7 @@ function DesktopHubTaskBridgeActive() {
 
   useEffect(() => {
     if (!deviceReady) return;
-    void queryClient.invalidateQueries({ queryKey: ['execution-targets'] });
+    void queryClient.invalidateQueries({ queryKey: hubQueryKeys.executionTargets.root });
   }, [deviceReady, deviceRegistration.deviceId]);
 
   // Mirror live connection health into the connection store so the shell can
