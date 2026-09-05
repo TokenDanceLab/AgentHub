@@ -17,7 +17,6 @@ export type WorkbenchDataMode =
 
 export interface WorkbenchDataModeContract {
   mode: WorkbenchDataMode;
-  statusLabel: WorkbenchDataMode;
   allowsMockData: boolean;
   allowsFixtureData: boolean;
   allowsDemoRuntimeFallback: boolean;
@@ -33,7 +32,6 @@ const WORKBENCH_DATA_MODE_EVENT = 'agenthub:workbench-data-mode';
 export const WORKBENCH_DATA_MODE_CONTRACTS: Record<WorkbenchDataMode, WorkbenchDataModeContract> = {
   auto: {
     mode: 'auto',
-    statusLabel: 'auto',
     allowsMockData: true,
     allowsFixtureData: true,
     allowsDemoRuntimeFallback: false,
@@ -44,7 +42,6 @@ export const WORKBENCH_DATA_MODE_CONTRACTS: Record<WorkbenchDataMode, WorkbenchD
   },
   mock: {
     mode: 'mock',
-    statusLabel: 'mock',
     allowsMockData: true,
     allowsFixtureData: false,
     allowsDemoRuntimeFallback: true,
@@ -55,7 +52,6 @@ export const WORKBENCH_DATA_MODE_CONTRACTS: Record<WorkbenchDataMode, WorkbenchD
   },
   fixture: {
     mode: 'fixture',
-    statusLabel: 'fixture',
     allowsMockData: false,
     allowsFixtureData: true,
     allowsDemoRuntimeFallback: true,
@@ -66,7 +62,6 @@ export const WORKBENCH_DATA_MODE_CONTRACTS: Record<WorkbenchDataMode, WorkbenchD
   },
   observed: {
     mode: 'observed',
-    statusLabel: 'observed',
     allowsMockData: false,
     allowsFixtureData: false,
     allowsDemoRuntimeFallback: false,
@@ -77,7 +72,6 @@ export const WORKBENCH_DATA_MODE_CONTRACTS: Record<WorkbenchDataMode, WorkbenchD
   },
   'approved-real': {
     mode: 'approved-real',
-    statusLabel: 'approved-real',
     allowsMockData: false,
     allowsFixtureData: false,
     allowsDemoRuntimeFallback: false,
@@ -127,10 +121,6 @@ export function isWorkbenchFixtureDataMode(mode: string | undefined): boolean {
 
 export function isWorkbenchRealDataMode(mode: string | undefined): boolean {
   return getWorkbenchDataModeContract(mode).isRealDataMode;
-}
-
-export function workbenchDataModeLabel(mode: string | undefined): string {
-  return getWorkbenchDataModeContract(mode).statusLabel;
 }
 
 export function readWorkbenchDataModeOverride(): WorkbenchDataMode | undefined {
