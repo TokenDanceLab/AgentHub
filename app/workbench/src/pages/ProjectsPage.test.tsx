@@ -19,8 +19,6 @@ function baseProps(overrides: Partial<ProjectsPageProps> = {}): ProjectsPageProp
     projects: [],
     activeProjectId: null,
     onProjectSelect: () => undefined,
-    activeFilter: 'all',
-    onFilterChange: () => undefined,
     activeTab: 'overview',
     onTabChange: () => undefined,
     ...overrides,

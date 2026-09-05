@@ -1,13 +1,11 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import type {
   ProjectArtifact,
   ProjectDraft,
-  ProjectFilter,
   ProjectInfo,
   ProjectTab,
 } from './pages';
 import { WORKBENCH_MOCK_PROJECTS } from './mockData';
-import { filterProjectsByStatus, resolveAvailableProjectFilters } from './pages/projects/shared';
 import type { WorkbenchDocumentPreview } from './documentPreview';
 import { createProjectArtifactPreview } from './workbenchProjectPreview';
 
@@ -33,24 +31,9 @@ export interface UseWorkbenchProjectsRouteOptions {
 
 export interface WorkbenchProjectsRoute {
   sourceProjects: ProjectInfo[];
-  /**
-   * `sourceProjects` after the nav status filter (#2154 P2-3) — this is what
-   * the projects page renders. Selection keeps reading `sourceProjects` so
-   * filtering the list cannot drop the active project.
-   */
-  visibleProjects: ProjectInfo[];
-  /**
-   * Filter chips the loaded projects can actually satisfy (#2154 P2-3). Always
-   * contains 'all'; a lifecycle bucket appears only when at least one loaded
-   * project classifies into it, so the nav never offers a click whose only
-   * possible outcome is an empty list.
-   */
-  availableProjectFilters: ProjectFilter[];
   effectiveProjectsStatus: WorkbenchProjectsStatus | undefined;
   canMutateProject: boolean;
   projectId: string | null;
-  projectFilter: ProjectFilter;
-  setProjectFilter: (filter: ProjectFilter) => void;
   projectTab: ProjectTab;
   setProjectTab: (tab: ProjectTab) => void;
   projectPreview: WorkbenchDocumentPreview | null;
@@ -89,27 +72,6 @@ export function useWorkbenchProjectsRoute({
     ? activeProjectId
     : null;
   const projectId = controlledProjectId ?? localProjectId;
-  const [projectFilter, setProjectFilter] = useState<ProjectFilter>('all');
-  // #2154 P2-3: the filter chips used to only move the highlight. `all` is a
-  // pass-through (including projects whose status we cannot classify); the
-  // other buckets match on the status label via workbenchProjectFilters.
-  const visibleProjects = useMemo(
-    () => filterProjectsByStatus(sourceProjects, projectFilter),
-    [sourceProjects, projectFilter],
-  );
-  const availableProjectFilters = useMemo(
-    () => resolveAvailableProjectFilters(sourceProjects),
-    [sourceProjects],
-  );
-
-  // The selected bucket can disappear when the data refreshes (page reload, the
-  // last archived project deleted). Fall back to `all` instead of parking the
-  // user on a list that is empty by construction (#2154 P2-3).
-  useEffect(() => {
-    if (projectFilter !== 'all' && !availableProjectFilters.includes(projectFilter)) {
-      setProjectFilter('all');
-    }
-  }, [availableProjectFilters, projectFilter]);
   const [projectTab, setProjectTab] = useState<ProjectTab>('overview');
   const [projectPreview, setProjectPreview] = useState<WorkbenchDocumentPreview | null>(null);
 
@@ -135,13 +97,9 @@ export function useWorkbenchProjectsRoute({
 
   return {
     sourceProjects,
-    visibleProjects,
-    availableProjectFilters,
     effectiveProjectsStatus,
     canMutateProject,
     projectId,
-    projectFilter,
-    setProjectFilter,
     projectTab,
     setProjectTab,
     projectPreview,

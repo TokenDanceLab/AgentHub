@@ -106,23 +106,16 @@ export function buildProjectsPageProps(
 ): ProjectsPageProps {
   const status = projectsRoute.effectiveProjectsStatus;
   const props: ProjectsPageProps = {
-    activeFilter: projectsRoute.projectFilter,
     activeProjectId: projectsRoute.projectId,
     activeTab: projectsRoute.projectTab,
     activePreview: projectsRoute.projectPreview,
-    onFilterChange: projectsRoute.setProjectFilter,
     profiles,
     onArtifactClick: projectsRoute.openArtifactPreview,
     onClosePreview: () => projectsRoute.setProjectPreview(null),
     onProjectSelect: projectsRoute.selectProject,
     onTabChange: projectsRoute.setProjectTab,
-    // #2154 P2-3: render the status-filtered list; fall back to the source
-    // list only for partial route fixtures that predate `visibleProjects`.
-    projects: projectsRoute.visibleProjects ?? projectsRoute.sourceProjects,
+    projects: projectsRoute.sourceProjects,
   };
-
-  // #2154 P2-3: chips the data source cannot satisfy render disabled.
-  assignDefined(props, 'availableFilters', projectsRoute.availableProjectFilters);
 
   if (projectsRoute.canMutateProject) {
     props.onProjectCreate = projectsRoute.handleProjectCreate;

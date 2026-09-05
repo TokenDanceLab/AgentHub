@@ -2,7 +2,6 @@
 
 export {
   ProjectNavRow,
-  FilterList,
   ProjectTabs,
   ProjectEditor,
 } from './ProjectChromeViews';
@@ -23,13 +22,8 @@ export {
   artifactTypeLabel,
   runCount,
   projectSubmitErrorMessage,
-  filterProjectsByStatus,
-  projectStatusBucket,
-  resolveAvailableProjectFilters,
 } from './shared';
-export type { ProjectStatusBucket } from './shared';
-
-export { DEFAULT_PROJECTS, FILTER_ITEMS, TAB_ITEMS } from './types';
+export { DEFAULT_PROJECTS, TAB_ITEMS } from './types';
 
 export type {
   ProjectRunStatus,
@@ -38,7 +32,6 @@ export type {
   ProjectFeedItem,
   ProjectInfo,
   ProjectDraft,
-  ProjectFilter,
   ProjectTab,
   ProjectsPageProps,
 } from './types';
