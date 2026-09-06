@@ -39,6 +39,7 @@ type SQLiteStore struct {
 	store        *Store
 	persistMu    sync.Mutex
 	closeOnce    sync.Once
+	backgroundWG sync.WaitGroup
 	lastErr      error
 	lastSnapshot fileSnapshot
 	// rowsSeeded marks agenthub_store_rows as the durable source of truth:
@@ -46,7 +47,7 @@ type SQLiteStore struct {
 	// (write amplification — the payload is only the pre-rows fallback and
 	// is kept fresh until the first commit that durably seeds the rows).
 	rowsSeeded     bool
-	stopCheckpoint chan struct{} // closed to stop periodic WAL checkpoint
+	stopCheckpoint chan struct{} // closed to stop both background loops
 }
 
 func NewSQLite(path string) (*SQLiteStore, error) {
@@ -77,11 +78,11 @@ func NewSQLite(path string) (*SQLiteStore, error) {
 	// in-memory page cache small. On Windows the Go runtime is reluctant to
 	// return freed memory to the OS, so keeping the WAL small is critical.
 	s.stopCheckpoint = make(chan struct{})
-	go s.checkpointLoop(sqliteBackgroundLoopInterval)
+	s.backgroundWG.Go(func() { s.checkpointLoop(sqliteBackgroundLoopInterval) })
 	// Periodically clean up old terminal runs to prevent unbounded Store map growth.
 	// Without this, Store maps only shrink when a new run is created,
 	// which may never happen on an idle server.
-	go s.cleanupLoop(sqliteBackgroundLoopInterval)
+	s.backgroundWG.Go(func() { s.cleanupLoop(sqliteBackgroundLoopInterval) })
 
 	return s, nil
 }
@@ -103,16 +104,27 @@ func (s *SQLiteStore) checkpointLoop(interval time.Duration) {
 	}
 }
 
-// cleanupLoop periodically removes old terminal runs to prevent unbounded
-// in-memory Store map growth. Without this, Store maps only shrink when a
-// new run is explicitly created — which may never happen on an idle server.
+// cleanupLoop periodically removes old terminal runs and persists the deletes.
+// Failed commits remain pending for the next tick, even if no new runs expire.
 func (s *SQLiteStore) cleanupLoop(interval time.Duration) {
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
+	pendingPersist := false
 	for {
 		select {
 		case <-ticker.C:
-			s.store.CleanupRuns(sqlitePeriodicCleanupOptions())
+			result := s.store.CleanupRuns(sqlitePeriodicCleanupOptions())
+			// A failed commit already removed data from memory. Retry it even
+			// when the next tick has no additional runs to remove.
+			pendingPersist = pendingPersist || shouldSyncAfterCleanup(result)
+			if !pendingPersist {
+				continue
+			}
+			if err := s.syncPersist(); err != nil {
+				slog.Warn("sqlite store: periodic cleanup persist failed", "error", err)
+				continue
+			}
+			pendingPersist = false
 		case <-s.stopCheckpoint:
 			return
 		}
@@ -122,6 +134,7 @@ func (s *SQLiteStore) cleanupLoop(interval time.Duration) {
 func (s *SQLiteStore) Close() {
 	s.closeOnce.Do(func() {
 		close(s.stopCheckpoint)
+		s.backgroundWG.Wait()
 		// Final checkpoint to shrink the WAL before close. Failures are logged
 		// (not returned) to keep the shutdown signature; LastPersistError still
 		// reflects the final persist outcome.
