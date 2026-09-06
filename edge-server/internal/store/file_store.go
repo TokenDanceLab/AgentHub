@@ -48,7 +48,8 @@ type fileSnapshot struct {
 }
 
 // FileStore wraps the in-memory store with a JSON snapshot saved asynchronously after writes.
-// Writes are debounced — rapid mutations batch into a single disk write.
+// Writes within a fixed window batch into one disk write; continuous traffic
+// cannot postpone persistence by repeatedly restarting that window.
 type FileStore struct {
 	path string
 
@@ -144,7 +145,7 @@ func (f *FileStore) schedulePersist() {
 	}
 }
 
-// persistLoop runs in the background, debouncing persist calls.
+// persistLoop coalesces writes until the first pending signal's deadline.
 func (f *FileStore) persistLoop() {
 	defer close(f.done)
 
@@ -152,6 +153,8 @@ func (f *FileStore) persistLoop() {
 	if !timer.Stop() {
 		<-timer.C
 	}
+	defer timer.Stop()
+	pending := false
 
 	for {
 		select {
@@ -161,8 +164,12 @@ func (f *FileStore) persistLoop() {
 				_ = f.syncPersist()
 				return
 			}
-			timer.Reset(debounceInterval)
+			if !pending {
+				timer.Reset(debounceInterval)
+				pending = true
+			}
 		case <-timer.C:
+			pending = false
 			// Failure is surfaced via LastPersistError, matching Flush() semantics.
 			_ = f.syncPersist()
 		}

@@ -64,7 +64,9 @@ ProcessExecutor 配置 `RunTimeout`（默认 30 分钟）、`ShutdownGracePeriod
 
 `Store`（`internal/store/store.go`）是核心内存数据结构，管理 Project、Thread、Run、Item、Pin、Diff、Artifact、Preview、UserProfile、AgentProfile、Settings 的全量 CRUD。`FileStore` 与 `SQLiteStore` 的常规 `Get*` / `List*` 委托这个内存 Store，不是直接 SQL 查询；业务读取主要经过内存锁，而不是 SQLite 连接池。
 
-`FileStore`（`internal/store/file_store.go`）对写入信号做 debounce，再保存全量 JSON 快照；显式 `Flush` 同步执行快照、编码和文件 Sync/rename。`SQLiteStore`（`internal/store/sqlite_store.go`）在写入后同步持久化快照差分到 SQLite（WAL 模式，定期 checkpoint），支持崩溃恢复。SQL 连接初始化与持久化串行化独立于普通业务读面，不能用额外 SQL 读者的争用直接代替业务读取测量。
+`FileStore`（`internal/store/file_store.go`）由首条待保存写入启动 50 ms 合批窗口，后续写入只合批、不推迟已有截止点；窗口到期后保存全量 JSON 快照，空闲时不轮询写盘。50 ms 是调度窗口，不是包含编码与文件 I/O 的完成时限；显式 `Flush` 同步执行快照、编码和文件 Sync/rename。
+
+`SQLiteStore`（`internal/store/sqlite_store.go`）在写入后同步持久化快照差分到 SQLite（WAL 模式，定期 checkpoint），支持崩溃恢复。SQL 连接初始化与持久化串行化独立于普通业务读面，不能用额外 SQL 读者的争用直接代替业务读取测量。
 
 终端状态 runs（finished/failed/cancelled/completed_with_issues）按 `TerminalTTL` 超时或 `MaxTerminalRunsPerThread` 上限自动清理，级联删除关联 diffs/artifacts/previews/items/checkpoints。Checkpoint 在 run 完成时保留，在 run 清理或所属 thread 删除时随 run 移除；这不删除工作区文件。 SQLite 后台清理有删除时同步提交；失败通过 `LastPersistError` 和日志留痕，下一周期即使没有新删除也会重试。关闭时先停止并等待后台清理/checkpoint 任务，再做最终持久化与数据库关闭。
 
