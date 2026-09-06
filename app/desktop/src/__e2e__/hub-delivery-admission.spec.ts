@@ -13,6 +13,7 @@ const RELAY = 'relay-delivery-fixture';
 const TARGET = 'target-delivery-fixture';
 const THREAD = 'thread-delivery-fixture';
 const EMPTY_LIST = { items: [], page: { hasMore: false } };
+type FixtureCallbackOwner = 'edge' | 'desktop';
 
 async function readTaskState(page: Page) {
   return page.evaluate(async () => {
@@ -23,6 +24,20 @@ async function readTaskState(page: Page) {
     return {
       tasks: state.tasks.map((task: { taskId: string; status: string; runId?: string }) => ({
         taskId: task.taskId, status: task.status, runId: task.runId ?? null,
+      })),
+      runToTask: state.runToTask,
+    };
+  });
+}
+
+async function readTaskStateWithOwner(page: Page) {
+  return page.evaluate(async () => {
+    const modulePath = '/src/stores/taskBridgeStore.ts';
+    const { useTaskBridgeStore } = await import(/* @vite-ignore */ modulePath);
+    const state = useTaskBridgeStore.getState();
+    return {
+      tasks: state.tasks.map((task: { taskId: string; status: string; runId?: string; callbackOwner?: string }) => ({
+        taskId: task.taskId, status: task.status, runId: task.runId ?? null, callbackOwner: task.callbackOwner ?? null,
       })),
       runToTask: state.runToTask,
     };
@@ -42,8 +57,10 @@ async function installDispatchFixture(page: Page, baseURL: string, theme: 'light
   const appOrigin = new URL(baseURL).origin;
   const hubSockets = new Set<WebSocketRoute>();
   const edgeSockets = new Set<WebSocketRoute>();
+  let edgeSeq = 0;
   const calls = {
     runs: [] as Record<string, unknown>[],
+    streams: [] as Record<string, unknown>[],
     acks: [] as Record<string, unknown>[],
     relayAcks: [] as Record<string, unknown>[],
     done: [] as Record<string, unknown>[],
@@ -51,6 +68,10 @@ async function installDispatchFixture(page: Page, baseURL: string, theme: 'light
     registered: 0,
     targetsRead: 0,
     rejection: { status: 503, code: 'delivery_busy' } as { status: number; code: string } | null,
+    owner: 'desktop' as FixtureCallbackOwner,
+    deduplicated: false,
+    healthSupported: true,
+    healthCalls: 0,
     pageErrors: [] as string[],
     unhandledWrites: [] as string[],
   };
@@ -109,6 +130,7 @@ async function installDispatchFixture(page: Page, baseURL: string, theme: 'light
         calls.fails.push(request.postDataJSON());
         await json({ code: 'OK' });
       } else if (url.pathname === '/edge/agent-tasks/' + TASK + '/stream') {
+        calls.streams.push(request.postDataJSON());
         await json({ code: 'OK' });
       } else if (request.method() === 'GET') {
         await list();
@@ -120,7 +142,13 @@ async function installDispatchFixture(page: Page, baseURL: string, theme: 'light
     }
     if (url.origin === 'http://127.0.0.1:3210') {
       if (url.pathname === '/v1/health') {
-        await json({ code: 'OK', data: { status: 'ok', version: 'fixture', edgeId: 'edge-fixture' } });
+        calls.healthCalls++;
+        await json({ code: 'OK', data: {
+          status: 'ok', version: 'fixture', edgeId: 'edge-fixture',
+          capabilities: calls.healthSupported
+            ? { runCallbackOwnership: true, directHubCallbacks: false }
+            : { directHubCallbacks: true },
+        } });
       } else if (url.pathname === '/v1/model-catalog') {
         await json({ code: 'OK', data: { items: [], sources: [] } });
       } else if (url.pathname === '/v1/threads' && request.method() === 'POST') {
@@ -132,7 +160,7 @@ async function installDispatchFixture(page: Page, baseURL: string, theme: 'light
             error: { code: calls.rejection.code, message: 'fixture admission rejection: ' + calls.rejection.code, traceId: 'fixture-trace' },
           } });
         } else {
-          await json({ code: 'OK', data: { runId: RUN, projectId: 'proj_local', threadId: THREAD, status: 'queued', deduplicated: calls.runs.length > 2, deliveryId: DELIVERY } }, 202);
+          await json({ code: 'OK', data: { runId: RUN, projectId: 'proj_local', threadId: THREAD, status: 'queued', deduplicated: calls.deduplicated, deliveryId: DELIVERY, callbackOwner: calls.owner } }, 202);
         }
       } else if (request.method() === 'GET') {
         await list();
@@ -179,8 +207,39 @@ async function installDispatchFixture(page: Page, baseURL: string, theme: 'light
       );
       const frame = { type: 'agent.dispatch', payload: {
         relay_command_id: RELAY, command_type: 'agent.dispatch', payload: JSON.stringify({
-          task_id: TASK, delivery_id: DELIVERY, prompt: 'Fixture task', thread_id: THREAD,
-          agent_type: 'codex', target_id: TARGET, edge_device_id: DEVICE,
+          task_id: TASK, delivery_id: DELIVERY, prompt: 'Implement the requested fixture.',
+          thread_id: THREAD, agent_type: 'codex', target_id: TARGET, edge_device_id: DEVICE,
+          system_prompt: 'Use the approved project conventions.',
+          tool_whitelist: '["Read","Grep"]',
+          model_params: JSON.stringify({
+            model: 'gpt-5.5',
+            reasoning_effort: 'high',
+            thinking_mode: 'adaptive',
+            permission_mode: 'plan',
+            work_dir: '/workspace/project',
+            include_partial: true,
+            max_thinking_tokens: 4096,
+            append_system_prompt: 'Keep output concise.',
+            config_overrides: { reasoning_summary: 'auto' },
+            ephemeral: true,
+            session_id: 'runtime-session-e2e',
+            continue: false,
+            fork: true,
+            structured_output_schema: {
+              type: 'object',
+              properties: { result: { type: 'string' } },
+              required: ['result'],
+            },
+          }),
+          messages: [
+            { role: 'user', content: 'Keep the change offline and preserve existing behavior.', timestamp: '2026-01-01T00:00:00Z' },
+            { role: 'assistant', content: 'The earlier patch uses a bounded retry policy.', timestamp: '2026-01-01T00:01:00Z' },
+          ],
+          pinned_messages: [
+            { role: 'system', content: 'Run focused tests before reporting success.', timestamp: '2026-01-01T00:00:00Z' },
+          ],
+          structured_output_schema: { type: 'array' },
+          trace_id: 'trace-e2e',
         }),
       } };
       for (const socket of hubSockets) socket.send(JSON.stringify(frame));
@@ -189,9 +248,16 @@ async function installDispatchFixture(page: Page, baseURL: string, theme: 'light
       // have been consumed, not just until the mock records the request.
       await page.evaluate(() => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));
     },
-    finish() {
+    sendEdge(type: string, payload: Record<string, unknown>) {
+      edgeSeq += 1;
       for (const socket of edgeSockets) {
-        socket.send(JSON.stringify({ version: 'v1', id: 'fixture-finished', seq: 1, type: 'run.finished', ts: new Date().toISOString(), scope: { runId: RUN, threadId: THREAD }, payload: { runId: RUN } }));
+        socket.send(JSON.stringify({ version: 'v1', id: 'fixture-' + type + '-' + edgeSeq, seq: edgeSeq, type, ts: new Date().toISOString(), scope: { runId: RUN, threadId: THREAD }, payload }));
+      }
+    },
+    finish() {
+      edgeSeq += 1;
+      for (const socket of edgeSockets) {
+        socket.send(JSON.stringify({ version: 'v1', id: 'fixture-finished-' + edgeSeq, seq: edgeSeq, type: 'run.finished', ts: new Date().toISOString(), scope: { runId: RUN, threadId: THREAD }, payload: { runId: RUN } }));
       }
     },
   };
@@ -278,5 +344,119 @@ for (const theme of ['light', 'dark'] as const) {
     expect(calls.pageErrors).toEqual([]);
     expect(calls.unhandledWrites).toEqual([]);
     await page.screenshot({ path: testInfo.outputPath('delivery-admission-' + theme + '.png') });
+  });
+}
+
+for (const theme of ['light', 'dark'] as const) {
+  test('Desktop bridge delivers full execution intent and keeps edge-owned replay local (' + theme + ')', async ({ page, baseURL }) => {
+    if (!baseURL) throw new Error('Desktop E2E baseURL is required');
+    const { calls, dispatch, sendEdge, finish } = await installDispatchFixture(page, baseURL, theme);
+    calls.rejection = null;
+    calls.owner = 'edge';
+    calls.deduplicated = true;
+
+    await dispatch();
+    await expect.poll(() => calls.runs.length).toBe(1);
+    const run = calls.runs[0];
+    if (!run) throw new Error('fixture run request was not recorded');
+    expect(run).toMatchObject({
+      agentId: 'codex',
+      model: 'gpt-5.5',
+      reasoningEffort: 'high',
+      thinkingMode: 'adaptive',
+      permissionMode: 'plan',
+      workDir: '/workspace/project',
+      includePartial: true,
+      maxThinkingTokens: 4096,
+      systemPrompt: 'Use the approved project conventions.',
+      appendSystemPrompt: 'Keep output concise.',
+      allowedTools: ['Read', 'Grep'],
+      configOverrides: { reasoning_summary: 'auto' },
+      ephemeral: true,
+      sessionId: 'runtime-session-e2e',
+      continue: false,
+      fork: true,
+      trace_id: 'trace-e2e',
+      callbackOwner: 'desktop',
+      hubTaskId: TASK,
+      deliveryId: DELIVERY,
+      targetId: TARGET,
+      edgeDeviceId: DEVICE,
+    });
+    const schema = run.structuredOutputSchema;
+    if (typeof schema !== 'string') throw new Error('fixture schema was not serialized to a string');
+    expect(JSON.parse(schema)).toEqual({
+      type: 'object',
+      properties: { result: { type: 'string' } },
+      required: ['result'],
+    });
+    expect(run.messages).toEqual([
+      { role: 'user', content: 'Keep the change offline and preserve existing behavior.', timestamp: '2026-01-01T00:00:00Z' },
+      { role: 'assistant', content: 'The earlier patch uses a bounded retry policy.', timestamp: '2026-01-01T00:01:00Z' },
+    ]);
+    expect(run.pinnedMessages).toEqual([
+      { role: 'system', content: 'Run focused tests before reporting success.', timestamp: '2026-01-01T00:00:00Z' },
+    ]);
+
+    await expect.poll(() => readTaskStateWithOwner(page)).toEqual({
+      tasks: [{ taskId: TASK, status: 'running', runId: RUN, callbackOwner: 'edge' }],
+      runToTask: { [RUN]: TASK },
+    });
+    expect(calls.acks).toHaveLength(0);
+    expect(calls.relayAcks).toHaveLength(1);
+    expect(calls.streams).toHaveLength(0);
+    expect(calls.done).toHaveLength(0);
+    expect(calls.fails).toHaveLength(0);
+
+    sendEdge('run.agent.text_delta', { runId: RUN, content: 'visible edge output' });
+    finish();
+    await expect.poll(() => readTaskStateWithOwner(page)).toEqual({
+      tasks: [{ taskId: TASK, status: 'done', runId: RUN, callbackOwner: 'edge' }],
+      runToTask: { [RUN]: TASK },
+    });
+    expect(calls.acks).toHaveLength(0);
+    expect(calls.relayAcks).toHaveLength(1);
+    expect(calls.streams).toHaveLength(0);
+    expect(calls.done).toHaveLength(0);
+    expect(calls.fails).toHaveLength(0);
+
+    calls.owner = 'desktop';
+    calls.deduplicated = true;
+    await dispatch();
+    await expect.poll(() => readTaskStateWithOwner(page)).toEqual({
+      tasks: [{ taskId: TASK, status: 'done', runId: RUN, callbackOwner: 'edge' }],
+      runToTask: { [RUN]: TASK },
+    });
+    expect(calls.acks).toHaveLength(0);
+    expect(calls.relayAcks).toHaveLength(2);
+    expect(calls.streams).toHaveLength(0);
+    expect(calls.done).toHaveLength(0);
+    expect(calls.fails).toHaveLength(0);
+    expect(calls.pageErrors).toEqual([]);
+    expect(calls.unhandledWrites).toEqual([]);
+  });
+}
+
+for (const theme of ['light', 'dark'] as const) {
+  test('Desktop bridge fails closed before POST on old Edge callback ownership (' + theme + ')', async ({ page, baseURL }) => {
+    if (!baseURL) throw new Error('Desktop E2E baseURL is required');
+    const { calls, dispatch } = await installDispatchFixture(page, baseURL, theme);
+    calls.rejection = null;
+    calls.healthSupported = false;
+
+    await dispatch();
+    await expect.poll(() => calls.healthCalls).toBeGreaterThan(0);
+    await expect.poll(() => readTaskStateWithOwner(page)).toEqual({
+      tasks: [{ taskId: TASK, status: 'queued', runId: null, callbackOwner: null }],
+      runToTask: {},
+    });
+    await expect.poll(() => readTaskError(page)).toContain('runCallbackOwnership');
+    expect(calls.runs).toHaveLength(0);
+    expect(calls.acks).toHaveLength(0);
+    expect(calls.relayAcks).toHaveLength(0);
+    expect(calls.fails).toHaveLength(0);
+    expect(calls.streams).toHaveLength(0);
+    expect(calls.pageErrors).toEqual([]);
+    expect(calls.unhandledWrites).toEqual([]);
   });
 }

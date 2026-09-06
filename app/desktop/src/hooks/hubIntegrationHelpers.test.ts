@@ -19,10 +19,12 @@ import {
   getTeamRouteContext,
   hasTaskProgressed,
   isAdmissionUncertain,
+  isEdgeOwnedTask,
   isTerminalBridgeTask,
   isTransientAdmissionRejection,
   normalizeRouteDecision,
   normalizeRuntimeAgentId,
+  parseEdgeCallbackOwner,
   parsePermissionDecisionControl,
   permissionDecisionControlKey,
   routeDecisionFromRuntimePayload,
@@ -295,6 +297,19 @@ describe('hubIntegrationMappers', () => {
     expect(Object.values(body).every((v) => v !== undefined)).toBe(true);
   });
 
+  it('parses persistent callback owner and detects edge-owned tasks', () => {
+    expect(parseEdgeCallbackOwner({ id: 'run-a', callbackOwner: 'edge' })).toBe('edge');
+    expect(
+      parseEdgeCallbackOwner({ code: 'ok', data: { runId: 'run-b', callbackOwner: 'desktop' } }),
+    ).toBe('desktop');
+    expect(parseEdgeCallbackOwner({ id: 'run-c' })).toBeUndefined();
+    expect(parseEdgeCallbackOwner({ id: 'run-d', callback_owner: 'invalid' })).toBeUndefined();
+
+    expect(isEdgeOwnedTask(makeTask({ callbackOwner: 'edge' }))).toBe(true);
+    expect(isEdgeOwnedTask(makeTask({ callbackOwner: 'desktop' }))).toBe(false);
+    expect(isEdgeOwnedTask(undefined)).toBe(false);
+  });
+
   it('extractRunOutputBatch only joins stdout chunk text', () => {
     expect(
       extractRunOutputBatch({
@@ -440,3 +455,4 @@ describe('parseDispatchFrame', () => {
     expect(parseDispatchFrame({ task_id: 123 as unknown as string })).toBeNull();
   });
 });
+

@@ -4,6 +4,8 @@
 import { create } from 'zustand';
 import { subscribeWithSelector } from 'zustand/middleware';
 
+export type TaskCallbackOwner = 'edge' | 'desktop';
+
 export interface AgentTask {
   taskId: string;
   agentId: string;
@@ -14,6 +16,8 @@ export interface AgentTask {
   dispatchPayload: Record<string, unknown>;
   /** Explicit undefined clears a previous error through updateTask. */
   error?: string | undefined;
+  /** Persistent output callback owner returned by Edge; unset until explicitly confirmed. */
+  callbackOwner?: TaskCallbackOwner;
   /** Timestamp when the dispatch was received. */
   createdAt: string;
 }

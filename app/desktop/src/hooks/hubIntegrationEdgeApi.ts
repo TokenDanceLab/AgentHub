@@ -3,6 +3,7 @@
 
 import { edgeAuthHeaders } from '@/api/edgeAuth';
 import type { EdgePermissionDecisionControl } from './hubIntegrationMappers';
+import { parseRecord } from './hubIntegrationParseHelpers';
 
 export function edgeRequestInit(init: RequestInit = {}, baseHeaders?: HeadersInit): RequestInit {
   const headers = edgeAuthHeaders(baseHeaders);
@@ -52,4 +53,57 @@ export async function ensureEdgeThread(
     const errorText = await resp.text().catch(() => 'Unknown error');
     throw new Error(`Edge POST /v1/threads returned ${resp.status}: ${errorText}`);
   }
+}
+
+export interface EdgeRunCallbackCapabilityProbe {
+  supported: boolean;
+  reason?: string;
+}
+
+/**
+ * Fail-closed capability gate for Desktop-managed callback ownership.
+ * Only a new Edge that explicitly publishes runCallbackOwnership=true is
+ * allowed to receive a Hub dispatch; unknown, missing, false, or failed
+ * health probes are treated as unusable for this route.
+ */
+export async function probeEdgeRunCallbackOwnership(
+  edgeBaseUrl: string,
+): Promise<EdgeRunCallbackCapabilityProbe> {
+  let response: Response;
+  try {
+    response = await fetch(`${edgeBaseUrl.replace(/\/$/, '')}/v1/health`);
+  } catch (error) {
+    return {
+      supported: false,
+      reason: error instanceof Error ? error.message : String(error),
+    };
+  }
+  if (!response.ok) {
+    return {
+      supported: false,
+      reason: `Edge /v1/health returned ${response.status}`,
+    };
+  }
+
+  let raw: unknown;
+  try {
+    raw = await response.json();
+  } catch (error) {
+    return {
+      supported: false,
+      reason: error instanceof Error ? error.message : 'Edge /v1/health returned non-JSON',
+    };
+  }
+
+  const root = parseRecord(raw);
+  const health = parseRecord(root.data);
+  const source = Object.keys(health).length > 0 ? health : root;
+  const capabilities = parseRecord(source.capabilities);
+  if (capabilities.runCallbackOwnership !== true) {
+    return {
+      supported: false,
+      reason: 'Edge /v1/health does not publish runCallbackOwnership=true',
+    };
+  }
+  return { supported: true };
 }

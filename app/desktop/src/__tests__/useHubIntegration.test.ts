@@ -222,19 +222,29 @@ describe('useHubIntegration', () => {
       postTeamRouteDecision: vi.fn().mockResolvedValue({ id: 'assignment-1' }),
     } as unknown as HubClient;
 
-    // Mock fetch for Edge REST calls
-    fetchMock = vi.fn().mockResolvedValue(
-      new Response(
+    // Mock fetch for Edge REST calls. Every mocked run response needs an
+    // explicit callbackOwner because Desktop now fails closed on missing owners.
+    fetchMock = vi.fn().mockImplementation(async (input: unknown) => {
+      const url = String(input);
+      if (url.endsWith('/v1/health')) return healthResponse();
+      if (url.endsWith('/v1/threads')) {
+        return new Response(JSON.stringify({ threadId: 'thread-ok' }), {
+          status: 201,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+      return new Response(
         JSON.stringify({
           id: 'run-1',
           runId: 'run-1',
           projectId: 'proj-1',
           threadId: 'sess-1',
           status: 'started',
+          callbackOwner: 'desktop',
         }),
         { status: 200, headers: { 'Content-Type': 'application/json' } },
-      ),
-    );
+      );
+    });
     globalThis.fetch = fetchMock as unknown as typeof globalThis.fetch;
   });
 
@@ -270,36 +280,22 @@ describe('useHubIntegration', () => {
     return fetchMock.mock.calls.filter(([input]) => String(input).endsWith(path)).length;
   }
 
-  function mockRunSequence(...runIds: string[]) {
-    const queue = [...runIds];
-    fetchMock.mockImplementation(async (input: unknown) => {
-      const url = String(input);
-      if (url.endsWith('/v1/threads')) {
-        return new Response(JSON.stringify({ threadId: 'thread-ok' }), {
-          status: 201,
-          headers: { 'Content-Type': 'application/json' },
-        });
-      }
-      if (url.endsWith('/v1/runs')) {
-        const runId = queue.shift() ?? 'run-1';
-        return new Response(
-          JSON.stringify({
-            id: runId,
-            runId,
-            projectId: 'proj',
-            threadId: 'sess',
-            status: 'started',
-          }),
-          { status: 200, headers: { 'Content-Type': 'application/json' } },
-        );
-      }
-      return new Response('{}', { status: 200, headers: { 'Content-Type': 'application/json' } });
-    });
+  function healthResponse(): Response {
+    return new Response(
+      JSON.stringify({
+        status: 'ok',
+        version: 'fixture',
+        edgeId: 'edge-fixture',
+        capabilities: { runCallbackOwnership: true, directHubCallbacks: false },
+      }),
+      { status: 200, headers: { 'Content-Type': 'application/json' } },
+    );
   }
 
-  function mockRunCreateResponse(body: Record<string, unknown>) {
+  function mockRunCreateResponseRaw(body: Record<string, unknown>) {
     fetchMock.mockImplementation(async (input: unknown) => {
       const url = String(input);
+      if (url.endsWith('/v1/health')) return healthResponse();
       if (url.endsWith('/v1/threads')) {
         return new Response(JSON.stringify({ threadId: 'thread-ok' }), {
           status: 201,
@@ -316,9 +312,55 @@ describe('useHubIntegration', () => {
     });
   }
 
+  function mockRunSequence(...runIds: string[]) {
+    const queue = [...runIds];
+    fetchMock.mockImplementation(async (input: unknown) => {
+      const url = String(input);
+      if (url.endsWith('/v1/health')) return healthResponse();
+      if (url.endsWith('/v1/threads')) {
+        return new Response(JSON.stringify({ threadId: 'thread-ok' }), {
+          status: 201,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+      if (url.endsWith('/v1/runs')) {
+        const runId = queue.shift() ?? 'run-1';
+        return new Response(
+          JSON.stringify({
+            id: runId,
+            runId,
+            projectId: 'proj',
+            threadId: 'sess',
+            status: 'started',
+            callbackOwner: 'desktop',
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        );
+      }
+      return new Response('{}', { status: 200, headers: { 'Content-Type': 'application/json' } });
+    });
+  }
+
+  function mockRunCreateResponse(body: Record<string, unknown>) {
+    const data = body.data;
+    const hasEnvelopeOwner =
+      data !== null &&
+      typeof data === 'object' &&
+      !Array.isArray(data) &&
+      Object.prototype.hasOwnProperty.call(data, 'callbackOwner');
+    const runBody =
+      hasEnvelopeOwner || Object.prototype.hasOwnProperty.call(body, 'callbackOwner')
+        ? body
+        : data !== null && typeof data === 'object' && !Array.isArray(data)
+          ? { ...body, data: { ...(data as Record<string, unknown>), callbackOwner: 'desktop' } }
+          : { ...body, callbackOwner: 'desktop' };
+    mockRunCreateResponseRaw(runBody);
+  }
+
   function mockRunCreateResponseWithStatus(body: Record<string, unknown>, status: number) {
     fetchMock.mockImplementation(async (input: unknown) => {
       const url = String(input);
+      if (url.endsWith('/v1/health')) return healthResponse();
       if (url.endsWith('/v1/threads')) {
         return new Response(JSON.stringify({ threadId: 'thread-ok' }), {
           status: 201,
@@ -599,7 +641,11 @@ describe('useHubIntegration', () => {
   });
 
   it('reports failure to Hub when fetch fails', async () => {
-    fetchMock.mockRejectedValueOnce(new Error('Edge unavailable'));
+    fetchMock.mockImplementation(async (input: unknown) => {
+      const url = String(input);
+      if (url.endsWith('/v1/health')) return healthResponse();
+      throw new Error('Edge unavailable');
+    });
 
     renderHook(() => useHubIntegration({ hubWS, hubClient }));
 
@@ -1074,6 +1120,264 @@ describe('useHubIntegration', () => {
     expect(hoisted.storeTasks[0]?.status).toBe('running');
     expect(hoisted.storeTasks[0]?.runId).toBe('run-1');
     expect(hubClient.failTask).not.toHaveBeenCalled();
+  });
+
+  // ── Persistent callback owner ─────────────────────────
+
+  it('persists the explicit desktop owner and keeps forwarding callbacks', async () => {
+    mockRunCreateResponse({
+      id: 'run-1',
+      runId: 'run-1',
+      projectId: 'proj',
+      threadId: 'sess',
+      status: 'started',
+      callbackOwner: 'desktop',
+    });
+
+    renderHook(() => useHubIntegration({ hubWS, hubClient }));
+
+    await act(async () => {
+      fireHubEvent(HUB_EVENTS.AGENT_DISPATCH, makeDispatchPayload());
+    });
+
+    expect(hoisted.storeTasks[0]?.callbackOwner).toBe('desktop');
+    expect(hubClient.ackTask).toHaveBeenCalledWith('task-1', 'run-1');
+
+    act(() => {
+      fireEdgeEvent(makeEvent('run.agent.text_delta', { runId: 'run-1', content: 'Hello' }));
+      fireEdgeEvent(makeEvent('run.finished', { runId: 'run-1' }));
+    });
+
+    expect(hubClient.streamTaskEvent).toHaveBeenCalledTimes(1);
+    expect(hubClient.doneTask).toHaveBeenCalledWith('task-1', 'Hello', 'run-1');
+    expect(hoisted.storeTasks[0]?.status).toBe('done');
+  });
+
+  it('persists edge owner, suppresses Desktop task callbacks, keeps relay ACK and local terminal state', async () => {
+    mockRunCreateResponse({
+      id: 'run-1',
+      runId: 'run-1',
+      projectId: 'proj',
+      threadId: 'sess',
+      status: 'started',
+      callbackOwner: 'edge',
+    });
+    const onDispatch = vi.fn();
+
+    renderHook(() =>
+      useHubIntegration({
+        hubWS,
+        hubClient,
+        onDispatch,
+        dispatchTarget: { targetId: 'target-current', deviceId: 'desktop-current' },
+      }),
+    );
+
+    const relayFrame = {
+      relay_command_id: 'relay-1',
+      command_type: 'agent.dispatch',
+      payload: JSON.stringify(
+        makeDispatchPayload({
+          target_id: 'target-current',
+          edge_device_id: 'desktop-current',
+          delivery_id: 'd1',
+        }),
+      ),
+    };
+    await act(async () => {
+      fireHubEvent(HUB_EVENTS.AGENT_DISPATCH, relayFrame);
+    });
+
+    expect(hoisted.storeTasks[0]?.callbackOwner).toBe('edge');
+    expect(hoisted.storeTasks[0]?.runId).toBe('run-1');
+    expect(hoisted.storeTasks[0]?.status).toBe('running');
+    expect(hubClient.ackTask).not.toHaveBeenCalled();
+    expect(hubClient.ackRelayCommand).toHaveBeenCalledWith('relay-1', 'desktop-current');
+    expect(onDispatch).toHaveBeenCalledWith(
+      expect.objectContaining({ taskId: 'task-1', callbackOwner: 'edge' }),
+    );
+
+    act(() => {
+      fireEdgeEvent(makeEvent('run.agent.text_delta', { runId: 'run-1', content: 'Hello' }));
+      fireEdgeEvent(makeEvent('run.finished', { runId: 'run-1' }));
+    });
+
+    expect(hubClient.streamTaskEvent).not.toHaveBeenCalled();
+    expect(hubClient.doneTask).not.toHaveBeenCalled();
+    expect(hoisted.storeTasks[0]?.status).toBe('done');
+  });
+
+  it('keeps the first callback owner and does not overwrite it on a later response', async () => {
+    mockRunCreateResponse({
+      id: 'run-1',
+      runId: 'run-1',
+      callbackOwner: 'edge',
+      status: 'started',
+    });
+    const onDispatch = vi.fn();
+
+    renderHook(() =>
+      useHubIntegration({
+        hubWS,
+        hubClient,
+        onDispatch,
+        dispatchTarget: { targetId: 'target-current', deviceId: 'desktop-current' },
+      }),
+    );
+
+    const relayFrame = {
+      relay_command_id: 'relay-1',
+      command_type: 'agent.dispatch',
+      payload: JSON.stringify(
+        makeDispatchPayload({
+          target_id: 'target-current',
+          edge_device_id: 'desktop-current',
+          delivery_id: 'd1',
+        }),
+      ),
+    };
+
+    await act(async () => {
+      fireHubEvent(HUB_EVENTS.AGENT_DISPATCH, relayFrame);
+    });
+    expect(hoisted.storeTasks[0]?.callbackOwner).toBe('edge');
+
+    mockRunCreateResponse({
+      id: 'run-1',
+      runId: 'run-1',
+      callbackOwner: 'desktop',
+      status: 'running',
+    });
+    await act(async () => {
+      fireHubEvent(HUB_EVENTS.AGENT_DISPATCH, relayFrame);
+    });
+
+    expect(hoisted.storeTasks[0]?.callbackOwner).toBe('edge');
+    expect(hubClient.ackTask).not.toHaveBeenCalled();
+    expect(hubClient.ackRelayCommand).toHaveBeenCalledTimes(2);
+    expect(onDispatch).toHaveBeenCalledTimes(1);
+  });
+
+  it('fails closed before POST when Edge does not publish runCallbackOwnership', async () => {
+    fetchMock.mockImplementation(async (input: unknown) => {
+      const url = String(input);
+      if (url.endsWith('/v1/health')) {
+        return new Response(
+          JSON.stringify({
+            status: 'ok',
+            version: 'old',
+            edgeId: 'edge-fixture',
+            capabilities: { directHubCallbacks: true },
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        );
+      }
+      return new Response('{}', { status: 200, headers: { 'Content-Type': 'application/json' } });
+    });
+
+    renderHook(() =>
+      useHubIntegration({
+        hubWS,
+        hubClient,
+        dispatchTarget: { targetId: 'target-current', deviceId: 'desktop-current' },
+      }),
+    );
+
+    const relayFrame = {
+      relay_command_id: 'relay-1',
+      command_type: 'agent.dispatch',
+      payload: JSON.stringify(
+        makeDispatchPayload({
+          target_id: 'target-current',
+          edge_device_id: 'desktop-current',
+          delivery_id: 'd1',
+        }),
+      ),
+    };
+    await act(async () => {
+      fireHubEvent(HUB_EVENTS.AGENT_DISPATCH, relayFrame);
+    });
+
+    expect(fetchCallCountEndingWith('/v1/runs')).toBe(0);
+    expect(hoisted.storeTasks[0]?.status).toBe('queued');
+    expect(hoisted.storeTasks[0]?.runId).toBeUndefined();
+    expect(hoisted.storeTasks[0]?.callbackOwner).toBeUndefined();
+    expect(hoisted.storeTasks[0]?.error).toContain('runCallbackOwnership');
+    expect(hubClient.ackTask).not.toHaveBeenCalled();
+    expect(hubClient.ackRelayCommand).not.toHaveBeenCalled();
+    expect(hubClient.failTask).not.toHaveBeenCalled();
+  });
+
+  it('fails closed when a capable Edge returns an accepted run without callbackOwner', async () => {
+    mockRunCreateResponseRaw({
+      id: 'run-1',
+      runId: 'run-1',
+      projectId: 'proj',
+      threadId: 'sess',
+      status: 'started',
+    });
+
+    renderHook(() => useHubIntegration({ hubWS, hubClient }));
+
+    await act(async () => {
+      fireHubEvent(HUB_EVENTS.AGENT_DISPATCH, makeDispatchPayload());
+    });
+
+    expect(hoisted.storeTasks[0]?.status).toBe('queued');
+    expect(hoisted.storeTasks[0]?.runId).toBeUndefined();
+    expect(hoisted.storeTasks[0]?.callbackOwner).toBeUndefined();
+    expect(hoisted.storeTasks[0]?.error).toContain('callbackOwner');
+    expect(hubClient.ackTask).not.toHaveBeenCalled();
+    expect(hubClient.failTask).not.toHaveBeenCalled();
+  });
+
+  it('does not failTask an edge-owned task on lifecycle failure, but keeps local failure state', async () => {
+    mockRunCreateResponse({
+      id: 'run-1',
+      runId: 'run-1',
+      callbackOwner: 'edge',
+      status: 'started',
+    });
+
+    renderHook(() => useHubIntegration({ hubWS, hubClient }));
+
+    await act(async () => {
+      fireHubEvent(HUB_EVENTS.AGENT_DISPATCH, makeDispatchPayload());
+    });
+
+    act(() => {
+      fireEdgeEvent(makeEvent('run.failed', { runId: 'run-1', error: 'boom' }));
+    });
+
+    expect(hubClient.failTask).not.toHaveBeenCalled();
+    expect(hoisted.storeTasks[0]?.status).toBe('failed');
+    expect(hoisted.storeTasks[0]?.error).toBe('boom');
+  });
+
+  it('does not failTask an edge-owned task on Hub cancel, but keeps local failed state', async () => {
+    mockRunCreateResponse({
+      id: 'run-1',
+      runId: 'run-1',
+      callbackOwner: 'edge',
+      status: 'started',
+    });
+
+    renderHook(() => useHubIntegration({ hubWS, hubClient }));
+
+    await act(async () => {
+      fireHubEvent(HUB_EVENTS.AGENT_DISPATCH, makeDispatchPayload());
+    });
+
+    await act(async () => {
+      fireHubEvent(HUB_EVENTS.AGENT_CANCEL, { task_id: 'task-1' });
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://127.0.0.1:3210/v1/runs/run-1:cancel',
+      expect.objectContaining({ method: 'POST' }),
+    );
+    expect(hubClient.failTask).not.toHaveBeenCalled();
+    expect(hoisted.storeTasks[0]?.status).toBe('failed');
   });
 
   // ── Edge events → Hub callbacks ──────────────────────

@@ -24,7 +24,7 @@ import { useToastStore } from '@shared/ui/toast';
 import { hubQueryKeys } from '@shared/stores/queryKeys';
 import { useTaskBridgeStore, type AgentTask } from '@/stores/taskBridgeStore';
 import { queryClient } from '@/api/queryClient';
-import { edgeRequestInit, ensureEdgeThread, postEdgePermissionDecision } from './hubIntegrationEdgeApi';
+import { edgeRequestInit, ensureEdgeThread, postEdgePermissionDecision, probeEdgeRunCallbackOwnership } from './hubIntegrationEdgeApi';
 import {
   bindDispatchPayload,
   buildDispatchTargetBinding,
@@ -32,9 +32,11 @@ import {
   parseDispatchFrame,
   extractCreatedRunId,
   extractRunOutputBatch,
+  parseEdgeCallbackOwner,
   FINAL_OUTPUT_MAX_CHARS,
   getTeamRouteContext,
   hasTaskProgressed,
+  isEdgeOwnedTask,
   isTerminalBridgeTask,
   isAdmissionUncertain,
   isTransientAdmissionRejection,
@@ -79,6 +81,10 @@ interface HubIntegrationHandle {
 }
 
 const HUB_AGENT_CONTROL_EVENT = 'agent.control';
+
+function showEdgeReviewNotice(error: string): void {
+  useToastStore.getState().showToast('warning', error, { duration: 10_000 });
+}
 
 // ── Hook ──────────────────────────────────────────────
 
@@ -145,16 +151,19 @@ export function useHubIntegration(options: HubIntegrationOptions): HubIntegratio
       if (isTerminalBridgeTask(task)) return;
 
       const taskId = task.taskId;
+      const edgeOwned = isEdgeOwnedTask(task);
 
       switch (event.type) {
         case 'run.agent.text_delta': {
           const content = typeof payload.content === 'string' ? payload.content : '';
           if (content) {
             rememberOutput(runId, content);
-            void catchHubReport(
-              `streamTaskEvent:${taskId}:${event.type}`,
-              hubClient.streamTaskEvent(taskId, event.type, payload, { runId }),
-            );
+            if (!edgeOwned) {
+              void catchHubReport(
+                `streamTaskEvent:${taskId}:${event.type}`,
+                hubClient.streamTaskEvent(taskId, event.type, payload, { runId }),
+              );
+            }
           }
           break;
         }
@@ -163,10 +172,12 @@ export function useHubIntegration(options: HubIntegrationOptions): HubIntegratio
           const content = typeof payload.content === 'string' ? payload.content : '';
           if (content) {
             rememberOutput(runId, content);
-            void catchHubReport(
-              `streamTaskEvent:${taskId}:${event.type}`,
-              hubClient.streamTaskEvent(taskId, event.type, payload, { runId }),
-            );
+            if (!edgeOwned) {
+              void catchHubReport(
+                `streamTaskEvent:${taskId}:${event.type}`,
+                hubClient.streamTaskEvent(taskId, event.type, payload, { runId }),
+              );
+            }
           }
           break;
         }
@@ -175,17 +186,19 @@ export function useHubIntegration(options: HubIntegrationOptions): HubIntegratio
           const content = extractRunOutputBatch(payload);
           if (content) {
             rememberOutput(runId, content);
-            void catchHubReport(
-              `streamTaskEvent:${taskId}:${event.type}`,
-              hubClient.streamTaskEvent(taskId, event.type, payload, { runId }),
-            );
+            if (!edgeOwned) {
+              void catchHubReport(
+                `streamTaskEvent:${taskId}:${event.type}`,
+                hubClient.streamTaskEvent(taskId, event.type, payload, { runId }),
+              );
+            }
           }
           break;
         }
 
         case 'run.agent.thinking': {
           const content = typeof payload.content === 'string' ? payload.content : '';
-          if (content) {
+          if (content && !edgeOwned) {
             void catchHubReport(
               `streamTaskEvent:${taskId}:${event.type}`,
               hubClient.streamTaskEvent(taskId, event.type, payload, { runId }),
@@ -199,44 +212,52 @@ export function useHubIntegration(options: HubIntegrationOptions): HubIntegratio
         case 'run.agent.file_change':
         case 'run.agent.permission_requested':
         case 'run.agent.permission_decided':
-          // Forward the canonical typed runtime event so Hub can persist and replay it.
-          void catchHubReport(
-            `streamTaskEvent:${taskId}:${event.type}`,
-            hubClient.streamTaskEvent(taskId, event.type, payload, { runId }),
-          );
+          // Edge-owned runs report these callbacks themselves; do not duplicate.
+          if (!edgeOwned) {
+            void catchHubReport(
+              `streamTaskEvent:${taskId}:${event.type}`,
+              hubClient.streamTaskEvent(taskId, event.type, payload, { runId }),
+            );
+          }
           break;
 
         case 'run.agent.route_decision': {
-          const decision = routeDecisionFromRuntimePayload(payload);
-          if (decision) {
-            postRouteDecision(task, decision);
+          if (!edgeOwned) {
+            const decision = routeDecisionFromRuntimePayload(payload);
+            if (decision) {
+              postRouteDecision(task, decision);
+            }
+            void catchHubReport(
+              `streamTaskEvent:${taskId}:${event.type}`,
+              hubClient.streamTaskEvent(taskId, event.type, payload, { runId }),
+            );
           }
-          void catchHubReport(
-            `streamTaskEvent:${taskId}:${event.type}`,
-            hubClient.streamTaskEvent(taskId, event.type, payload, { runId }),
-          );
           break;
         }
 
         case 'run.agent.result': {
-          const decision = routeDecisionFromRuntimePayload(payload);
-          if (decision) {
-            postRouteDecision(task, decision);
+          if (!edgeOwned) {
+            const decision = routeDecisionFromRuntimePayload(payload);
+            if (decision) {
+              postRouteDecision(task, decision);
+            }
+            void catchHubReport(
+              `streamTaskEvent:${taskId}:${event.type}`,
+              hubClient.streamTaskEvent(taskId, event.type, payload, { runId }),
+            );
           }
-          void catchHubReport(
-            `streamTaskEvent:${taskId}:${event.type}`,
-            hubClient.streamTaskEvent(taskId, event.type, payload, { runId }),
-          );
           const success = payload.success !== false;
           if (success) {
             const output =
               typeof payload.content === 'string'
                 ? payload.content
                 : outputByRunRef.current.get(runId) || JSON.stringify(payload);
-            void catchHubReport(
-              `doneTask:${taskId}`,
-              hubClient.doneTask(taskId, output, runId),
-            );
+            if (!edgeOwned) {
+              void catchHubReport(
+                `doneTask:${taskId}`,
+                hubClient.doneTask(taskId, output, runId),
+              );
+            }
             store.getState().updateTask(taskId, {
               status: 'done',
             });
@@ -244,10 +265,12 @@ export function useHubIntegration(options: HubIntegrationOptions): HubIntegratio
           } else {
             const error =
               typeof payload.error === 'string' ? payload.error : 'Agent reported failure';
-            void catchHubReport(
-              `failTask:${taskId}`,
-              hubClient.failTask(taskId, error, runId),
-            );
+            if (!edgeOwned) {
+              void catchHubReport(
+                `failTask:${taskId}`,
+                hubClient.failTask(taskId, error, runId),
+              );
+            }
             store.getState().updateTask(taskId, {
               status: 'failed',
               error,
@@ -259,11 +282,13 @@ export function useHubIntegration(options: HubIntegrationOptions): HubIntegratio
         }
 
         case 'run.finished': {
-          const output = outputByRunRef.current.get(runId) || 'Run finished';
-          void catchHubReport(
-            `doneTask:${taskId}`,
-            hubClient.doneTask(taskId, output, runId),
-          );
+          if (!edgeOwned) {
+            const output = outputByRunRef.current.get(runId) || 'Run finished';
+            void catchHubReport(
+              `doneTask:${taskId}`,
+              hubClient.doneTask(taskId, output, runId),
+            );
+          }
           store.getState().updateTask(taskId, {
             status: 'done',
           });
@@ -273,10 +298,12 @@ export function useHubIntegration(options: HubIntegrationOptions): HubIntegratio
 
         case 'run.failed': {
           const error = typeof payload.error === 'string' ? payload.error : 'Run lifecycle failure';
-          void catchHubReport(
-            `failTask:${taskId}`,
-            hubClient.failTask(taskId, error, runId),
-          );
+          if (!edgeOwned) {
+            void catchHubReport(
+              `failTask:${taskId}`,
+              hubClient.failTask(taskId, error, runId),
+            );
+          }
           store.getState().updateTask(taskId, {
             status: 'failed',
             error,
@@ -286,10 +313,12 @@ export function useHubIntegration(options: HubIntegrationOptions): HubIntegratio
         }
 
         case 'run.cancelled': {
-          void catchHubReport(
-            `failTask:${taskId}`,
-            hubClient.failTask(taskId, 'Run cancelled', runId),
-          );
+          if (!edgeOwned) {
+            void catchHubReport(
+              `failTask:${taskId}`,
+              hubClient.failTask(taskId, 'Run cancelled', runId),
+            );
+          }
           store.getState().updateTask(taskId, {
             status: 'failed',
             error: 'Run cancelled',
@@ -385,6 +414,24 @@ export function useHubIntegration(options: HubIntegrationOptions): HubIntegratio
 
       // Create Edge run
       try {
+        // Fail closed on old/unknown Edge builds before their executor can start
+        // a Desktop-mediated run without callback ownership semantics.
+        const capability = await probeEdgeRunCallbackOwnership(edgeBaseUrl);
+        if (!capability.supported) {
+          const error = [
+            'Edge callback ownership capability unavailable; upgrade Local Edge before Hub dispatch.',
+            capability.reason,
+          ].filter(Boolean).join(' ');
+          const currentTask = store.getState().tasks.find((t) => t.taskId === taskId);
+          if (!hasTaskProgressed(currentTask)) {
+            store.getState().updateTask(taskId, { error });
+            if (currentTask?.error !== error) {
+              showEdgeReviewNotice(error);
+            }
+          }
+          return;
+        }
+
         await ensureEdgeThread(
           edgeBaseUrl,
           threadId,
@@ -426,7 +473,7 @@ export function useHubIntegration(options: HubIntegrationOptions): HubIntegratio
               // The bridge has no task-error panel. Surface the need for review
               // through the existing notification UI, once per unchanged reason.
               if (currentTask?.error !== error) {
-                useToastStore.getState().showToast('warning', error, { duration: 10_000 });
+                showEdgeReviewNotice(error);
               }
             }
             return;
@@ -434,7 +481,8 @@ export function useHubIntegration(options: HubIntegrationOptions): HubIntegratio
           throw new Error('Edge POST /v1/runs returned ' + runResp.status + ': ' + errorText);
         }
 
-        const runId = extractCreatedRunId(await runResp.json());
+        const runResponse = await runResp.json();
+        const responseOwner = parseEdgeCallbackOwner(runResponse);
 
         // Re-read before update to resist an async completion race: a duplicate
         // dispatch must not downgrade a task that already reached running/done/
@@ -442,18 +490,47 @@ export function useHubIntegration(options: HubIntegrationOptions): HubIntegratio
         const existingTask = store.getState().tasks.find((t) => t.taskId === taskId);
         const taskProgressed = hasTaskProgressed(existingTask);
 
-        // Business state/mapping is only written once (first accepted instance).
-        // Also clear a stale admission_uncertain manual-review note. Existing
-        // progressed state keeps its own error untouched.
-        if (!taskProgressed) {
-          store.getState().updateTask(taskId, { runId, status: 'running', error: undefined });
+        // A new Edge must return an explicit persistent owner. Absent/invalid
+        // owner means the actual callback route is unresolved: keep queued for
+        // review and do not ACK/FAIL or relay-ACK.
+        if (!responseOwner) {
+          const error = 'Edge accepted the run without callbackOwner; callback ownership is unresolved.';
+          const currentTask = store.getState().tasks.find((t) => t.taskId === taskId);
+          if (!hasTaskProgressed(currentTask)) {
+            store.getState().updateTask(taskId, { error });
+            if (currentTask?.error !== error) {
+              showEdgeReviewNotice(error);
+            }
+          }
+          return;
         }
 
-        // Every accepted delivery (first accept AND successful replay) is
-        // idempotently acknowledged. If the first ACK was lost in transit, Hub
-        // re-dispatches and we must re-ACK so the outbox/relay can converge; a
-        // double ACK here is expected recovery, not a race defect.
-        void catchHubReport(`ackTask:${taskId}`, hubClient.ackTask(taskId, runId));
+        const runId = extractCreatedRunId(runResponse);
+
+        // Business state/mapping is only written once (first accepted instance).
+        // Also clear a stale admission_uncertain manual-review note. Existing
+        // progressed state keeps its own error untouched. The callback owner is
+        // persisted by the first accepted instance and cannot be overwritten by
+        // a later replay.
+        if (!taskProgressed) {
+          store.getState().updateTask(taskId, {
+            runId,
+            status: 'running',
+            callbackOwner: responseOwner,
+            error: undefined,
+          });
+        }
+
+        const edgeOwned = !taskProgressed
+          ? responseOwner === 'edge'
+          : isEdgeOwnedTask(existingTask);
+
+        // Desktop-owned accepted deliveries (both first accept and successful
+        // replay) are idempotently acknowledged. Edge-owned runs are
+        // acknowledged by Edge; Desktop still acknowledges the relay command.
+        if (!edgeOwned) {
+          void catchHubReport(`ackTask:${taskId}`, hubClient.ackTask(taskId, runId));
+        }
         if (relayCommandId && dispatchTarget?.deviceId) {
           void catchHubReport(
             `ackRelayCommand:${relayCommandId}`,

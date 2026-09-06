@@ -2,16 +2,19 @@
 // No React, no Hub client side effects — safe for unit tests.
 
 import type { CoordinatorRouteDecision } from '@/api/hubClient';
+import type { StartRunRequest } from '@shared/types';
 import type { AgentTask } from '@/stores/taskBridgeStore';
 import {
   boolValue,
   compactRecord,
   getFirstBoolean,
-  getFirstNumber,
+  getFirstSafeInteger,
   getFirstString,
   parseRecord,
+  parseRunnerMessages,
   parseStringArray,
   parseStringRecord,
+  serializeStructuredOutputSchema,
 } from './hubIntegrationParseHelpers';
 
 interface TeamRouteContext {
@@ -32,12 +35,30 @@ export interface HubDispatchTarget {
   deviceId: string;
 }
 
-interface DispatchTargetBindingEvidence {
+export interface DispatchTargetBindingEvidence {
   expectedTargetId: string;
   observedTargetId?: string;
   expectedEdgeDeviceId: string;
   observedEdgeDeviceId?: string;
   status: 'matched' | 'mismatch';
+}
+
+export type EdgeCallbackOwner = 'edge' | 'desktop';
+
+export interface EdgeRunRequestBody extends StartRunRequest {
+  [key: string]: unknown;
+  deliveryId?: string;
+  callbackOwner?: EdgeCallbackOwner;
+  trace_id?: string;
+  targetId?: string;
+  edgeDeviceId?: string;
+  dispatchTargetEvidence?: {
+    expectedTargetId: string;
+    observedTargetId?: string;
+    expectedEdgeDeviceId: string;
+    observedEdgeDeviceId?: string;
+    targetStatus: 'matched' | 'mismatch';
+  };
 }
 
 export function isTerminalBridgeTask(task: AgentTask): boolean {
@@ -202,7 +223,7 @@ export function buildDispatchTargetBinding(
 export function bindDispatchPayload(
   data: Record<string, unknown>,
   binding: DispatchTargetBindingEvidence | null,
-): Record<string, unknown> {
+): EdgeRunRequestBody {
   if (!binding) return data;
   return {
     ...data,
@@ -240,7 +261,7 @@ export function buildEdgeRunBody(
     parseStringArray(modelParams.allowed_tools) ??
     parseStringArray(modelParams.allowedTools);
 
-  return compactRecord<Record<string, unknown>>({
+  return compactRecord<EdgeRunRequestBody>({
     threadId,
     prompt: prompt || undefined,
     agentId: agentId || undefined,
@@ -257,7 +278,7 @@ export function buildEdgeRunBody(
       data.thinking_mode,
       data.thinkingMode,
     ),
-    maxThinkingTokens: getFirstNumber(
+    maxThinkingTokens: getFirstSafeInteger(
       modelParams.max_thinking_tokens,
       modelParams.maxThinkingTokens,
       data.max_thinking_tokens,
@@ -276,7 +297,7 @@ export function buildEdgeRunBody(
       data.include_partial,
       data.includePartial,
     ),
-    structuredOutputSchema: getFirstString(
+    structuredOutputSchema: serializeStructuredOutputSchema(
       modelParams.structured_output_schema,
       modelParams.structuredOutputSchema,
       data.structured_output_schema,
@@ -301,6 +322,15 @@ export function buildEdgeRunBody(
     ephemeral: getFirstBoolean(modelParams.ephemeral, data.ephemeral),
     hubTaskId: getFirstString(data.task_id),
     deliveryId: getFirstString(data.delivery_id, data.deliveryId),
+    sessionId: getFirstString(modelParams.session_id, modelParams.sessionId),
+    continue: getFirstBoolean(modelParams.continue, data.continue),
+    fork: getFirstBoolean(modelParams.fork, data.fork),
+    messages: parseRunnerMessages(data.messages) ?? parseRunnerMessages(modelParams.messages),
+    pinnedMessages:
+      parseRunnerMessages(data.pinned_messages) ??
+      parseRunnerMessages(data.pinnedMessages),
+    trace_id: getFirstString(data.trace_id, data.traceId),
+    callbackOwner: 'desktop',
     targetId: targetBinding?.expectedTargetId,
     edgeDeviceId: targetBinding?.expectedEdgeDeviceId,
     dispatchTargetEvidence: targetBinding
@@ -336,6 +366,19 @@ export function extractCreatedRunId(value: unknown): string {
     throw new Error(`Edge run created but no id/runId in response${isEnvelope ? ' data' : ''}`);
   }
   return runId;
+}
+
+export function parseEdgeCallbackOwner(value: unknown): EdgeCallbackOwner | undefined {
+  const root = parseRecord(value);
+  const isEnvelope =
+    typeof root.code === 'string' && Object.prototype.hasOwnProperty.call(root, 'data');
+  const run = isEnvelope ? parseRecord(root.data) : root;
+  const owner = getFirstString(run.callbackOwner, run.callback_owner)?.toLowerCase();
+  return owner === 'edge' || owner === 'desktop' ? owner : undefined;
+}
+
+export function isEdgeOwnedTask(task: AgentTask | undefined): boolean {
+  return task?.callbackOwner === 'edge';
 }
 
 /**
