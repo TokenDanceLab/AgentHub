@@ -23,7 +23,7 @@ func (s *Service) CreateCustomAgent(ctx context.Context, ownerID, name, avatarUR
 		ToolWhitelist:  toolWhitelist,
 		ModelParams:    modelParams,
 	}
-	if err := repository.CreateCustomAgent(s.db, ca); err != nil {
+	if err := repository.CreateCustomAgent(s.db.WithContext(ctx), ca); err != nil {
 		return nil, err
 	}
 	return ca, nil
@@ -31,7 +31,7 @@ func (s *Service) CreateCustomAgent(ctx context.Context, ownerID, name, avatarUR
 
 // ListCustomAgents returns all custom agents owned by the given user.
 func (s *Service) ListCustomAgents(ctx context.Context, ownerID string) ([]model.CustomAgent, error) {
-	return repository.ListCustomAgentsByOwner(s.db, ownerID)
+	return repository.ListCustomAgentsByOwner(s.db.WithContext(ctx), ownerID)
 }
 
 // UpdateCustomAgent updates an existing custom agent, verifying ownership.
@@ -49,7 +49,7 @@ func (s *Service) ListCustomAgents(ctx context.Context, ownerID string) ([]model
 // tool_whitelist and model_params with omitempty, so an omitted value must not
 // be flattened to "" by a write that does include those columns.
 func (s *Service) UpdateCustomAgent(ctx context.Context, ownerID string, ca *model.CustomAgent) error {
-	existing, err := repository.GetCustomAgentByID(s.db, ca.ID)
+	existing, err := repository.GetCustomAgentByID(s.db.WithContext(ctx), ca.ID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return errcode.AgentNotFound
@@ -72,12 +72,12 @@ func (s *Service) UpdateCustomAgent(ctx context.Context, ownerID string, ca *mod
 	// repository.UpdateCustomAgent puts the not-deleted guard inside the UPDATE
 	// and reports zero matched rows as ErrRecordNotFound, so that race surfaces
 	// as the same 404 the read path returns instead of resurrecting the row.
-	return repository.WrapNotFound(repository.UpdateCustomAgent(s.db, ca), errcode.AgentNotFound)
+	return repository.WrapNotFound(repository.UpdateCustomAgent(s.db.WithContext(ctx), ca), errcode.AgentNotFound)
 }
 
 // DeleteCustomAgent soft-deletes a custom agent, verifying ownership.
 func (s *Service) DeleteCustomAgent(ctx context.Context, ownerID, id string) error {
-	ca, err := repository.GetCustomAgentByID(s.db, id)
+	ca, err := repository.GetCustomAgentByID(s.db.WithContext(ctx), id)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return errcode.AgentNotFound
@@ -87,5 +87,5 @@ func (s *Service) DeleteCustomAgent(ctx context.Context, ownerID, id string) err
 	if ca.OwnerUserID != ownerID {
 		return errcode.AgentNotFound
 	}
-	return repository.SoftDeleteCustomAgent(s.db, id)
+	return repository.SoftDeleteCustomAgent(s.db.WithContext(ctx), id)
 }
