@@ -3,6 +3,9 @@
 
 import type { RunnerMessage } from '@shared/types';
 
+export type RunnerMessageLike = Pick<RunnerMessage, 'role' | 'content'> &
+  Partial<Pick<RunnerMessage, 'timestamp'>>;
+
 export function parseRecord(value: unknown): Record<string, unknown> {
   if (!value) return {};
   if (typeof value === 'object' && !Array.isArray(value)) return value as Record<string, unknown>;
@@ -29,7 +32,7 @@ export function getString(data: Record<string, unknown>, key: string): string {
 
 export function getFirstString(...values: unknown[]): string | undefined {
   for (const value of values) {
-    if (typeof value === 'string' && value.trim()) return value.trim();
+    if (typeof value === 'string' && value.trim()) return value;
   }
   return undefined;
 }
@@ -84,8 +87,8 @@ export function boolValue(value: unknown): boolean | undefined {
   return typeof value === 'boolean' ? value : undefined;
 }
 
-/** Parse a Hub message list, preserving role/content/timestamp exactly. */
-export function parseRunnerMessages(value: unknown): RunnerMessage[] | undefined {
+/** Parse a Hub message list, preserving role/content and an optional timestamp exactly. */
+export function parseRunnerMessages(value: unknown): RunnerMessageLike[] | undefined {
   let source = value;
   if (typeof value === 'string') {
     try {
@@ -96,13 +99,13 @@ export function parseRunnerMessages(value: unknown): RunnerMessage[] | undefined
   }
   if (!Array.isArray(source)) return undefined;
 
-  const messages = source.filter((item): item is RunnerMessage => {
+  const messages = source.filter((item): item is RunnerMessageLike => {
     if (!item || typeof item !== 'object' || Array.isArray(item)) return false;
     const record = item as Record<string, unknown>;
     return (
       typeof record.role === 'string' &&
       typeof record.content === 'string' &&
-      typeof record.timestamp === 'string'
+      (record.timestamp === undefined || typeof record.timestamp === 'string')
     );
   });
 

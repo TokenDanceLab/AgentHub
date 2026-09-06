@@ -15,6 +15,7 @@ import {
   parseStringArray,
   parseStringRecord,
   serializeStructuredOutputSchema,
+  type RunnerMessageLike,
 } from './hubIntegrationParseHelpers';
 
 interface TeamRouteContext {
@@ -45,7 +46,10 @@ export interface DispatchTargetBindingEvidence {
 
 export type EdgeCallbackOwner = 'edge' | 'desktop';
 
-export interface EdgeRunRequestBody extends StartRunRequest {
+export type EdgeRunRequestBody = Omit<
+  StartRunRequest,
+  'messages' | 'pinnedMessages'
+> & {
   [key: string]: unknown;
   deliveryId?: string;
   callbackOwner?: EdgeCallbackOwner;
@@ -59,7 +63,9 @@ export interface EdgeRunRequestBody extends StartRunRequest {
     observedEdgeDeviceId?: string;
     targetStatus: 'matched' | 'mismatch';
   };
-}
+  messages?: RunnerMessageLike[];
+  pinnedMessages?: RunnerMessageLike[];
+};
 
 export function isTerminalBridgeTask(task: AgentTask): boolean {
   return task.status === 'done' || task.status === 'failed';

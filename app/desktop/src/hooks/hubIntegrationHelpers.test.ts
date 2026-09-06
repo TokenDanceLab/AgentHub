@@ -7,6 +7,7 @@ import {
   getFirstString,
   getString,
   parseRecord,
+  parseRunnerMessages,
   parseStringArray,
   parseStringRecord,
 } from './hubIntegrationParseHelpers';
@@ -52,11 +53,28 @@ describe('hubIntegrationParseHelpers', () => {
     expect(getString({ name: 'x' }, 'name')).toBe('x');
     expect(getString({ name: 1 }, 'name')).toBe('');
     expect(getFirstString('', '  ', 'ok')).toBe('ok');
+    expect(getFirstString('   keep  ')).toBe('   keep  ');
     expect(getFirstString(null, undefined)).toBeUndefined();
     expect(getFirstBoolean(null, true, false)).toBe(true);
     expect(getFirstNumber('1', Number.NaN, 2.5)).toBe(2.5);
     expect(boolValue(false)).toBe(false);
     expect(boolValue('true')).toBeUndefined();
+  });
+
+  it('parseRunnerMessages preserves messages without a timestamp', () => {
+    expect(
+      parseRunnerMessages([
+        { role: 'user', content: 'no timestamp' },
+        { role: 'assistant', content: 'has timestamp', timestamp: '2026-01-01T00:00:00Z' },
+        { role: 'assistant', content: 'bad timestamp', timestamp: 7 },
+      ]),
+    ).toEqual([
+      { role: 'user', content: 'no timestamp' },
+      { role: 'assistant', content: 'has timestamp', timestamp: '2026-01-01T00:00:00Z' },
+    ]);
+    expect(parseRunnerMessages([{ role: 'user', content: 'missing only' }])).toEqual([
+      { role: 'user', content: 'missing only' },
+    ]);
   });
 
   it('parseStringArray and parseStringRecord filter empty values', () => {

@@ -201,10 +201,12 @@ async function installDispatchFixture(page: Page, baseURL: string, theme: 'light
 
   return {
     calls,
-    async dispatch() {
-      const response = page.waitForResponse((result) =>
-        result.url() === 'http://127.0.0.1:3210/v1/runs' && result.request().method() === 'POST',
-      );
+    async dispatch(waitForRun = true) {
+      const response = waitForRun
+        ? page.waitForResponse((result) =>
+            result.url() === 'http://127.0.0.1:3210/v1/runs' && result.request().method() === 'POST',
+          )
+        : null;
       const frame = { type: 'agent.dispatch', payload: {
         relay_command_id: RELAY, command_type: 'agent.dispatch', payload: JSON.stringify({
           task_id: TASK, delivery_id: DELIVERY, prompt: 'Implement the requested fixture.',
@@ -243,7 +245,7 @@ async function installDispatchFixture(page: Page, baseURL: string, theme: 'light
         }),
       } };
       for (const socket of hubSockets) socket.send(JSON.stringify(frame));
-      await (await response).finished();
+      if (response) await (await response).finished();
       // Negative assertions must wait until the error body and React effects
       // have been consumed, not just until the mock records the request.
       await page.evaluate(() => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));
@@ -444,7 +446,7 @@ for (const theme of ['light', 'dark'] as const) {
     calls.rejection = null;
     calls.healthSupported = false;
 
-    await dispatch();
+    await dispatch(false);
     await expect.poll(() => calls.healthCalls).toBeGreaterThan(0);
     await expect.poll(() => readTaskStateWithOwner(page)).toEqual({
       tasks: [{ taskId: TASK, status: 'queued', runId: null, callbackOwner: null }],
