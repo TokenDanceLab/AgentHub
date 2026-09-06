@@ -717,7 +717,7 @@ paths:
               $ref: "#/components/schemas/StartRunRequest"
       responses:
         "202":
-          description: Run accepted.
+          description: Run accepted. On an accepted replay this returns the original run envelope (data.runId) with additive deduplicated/deliveryId; no new run/timeline/executor is created.
           content:
             application/json:
               schema:
@@ -726,15 +726,30 @@ paths:
           # capability_token_invalid: the X-AgentHub-Capability-Token is missing,
           # fails validation, or does not bind this user/device/project/target.
           $ref: "#/components/responses/Error"
-        "503":
-          # not_configured: a Hub user identity reached the Edge but HubJWTSecret is
-          # empty/misconfigured. The dual-token policy fails closed rather than
-          # soft-skipping (#899), and the errcode table defines not_configured as 503
-          # — an operator fault, not a client credential fault. Declared since #2245:
-          # before that this path hand-copied 403 at the call site, so a server
-          # misconfiguration was reported to the client as "your credentials are
-          # wrong, do not retry".
+        "409":
+          # delivery_conflict: delivery_id binds a different Hub task or legacy
+          # project/thread scope (#2347); active_run_exists: the thread already has
+          # an active run. Client must not treat it as the same work.
           $ref: "#/components/responses/Error"
+        "404":
+          # not_found: the original run referenced by an accepted receipt was removed.
+          $ref: "#/components/responses/Error"
+        "503":
+          description: >
+            not_configured means the Edge cannot validate a Hub identity because
+            its Hub credential policy is unconfigured; it fails closed.
+            delivery_busy is temporary contention for a pending delivery or
+            admission capacity and includes Retry-After. Neither is acceptance.
+          headers:
+            Retry-After:
+              description: Delay in seconds, present for delivery_busy responses.
+              schema:
+                type: integer
+                minimum: 1
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
 
   /v1/runs/{runId}:
     get:
@@ -8605,6 +8620,12 @@ components:
         threadId:
           type: string
           description: Thread to bind the run to. Defaults to the local thread in P0 compatibility mode.
+        deliveryId:
+          type: string
+          description: Hub delivery_id for dual-channel admission dedup. Empty string bypasses dedup (legacy payload).
+        hubTaskId:
+          type: string
+          description: Hub task binding for delivery admission. When set, dedup keys to this business task across transports; legacy payloads without it bind projectId/threadId.
         prompt:
           type: string
           description: User message or task description passed to the agent.
@@ -9571,6 +9592,12 @@ components:
         finishedAt:
           type: string
           format: date-time
+        deduplicated:
+          type: boolean
+          description: True on an accepted replay of an already admitted delivery (same runId returned, no new run created).
+        deliveryId:
+          type: string
+          description: The delivery_id whose accepted receipt is being replayed; present on accepted replays.
 
     HubAuditEvent:
       type: object
