@@ -120,6 +120,10 @@ import type { HubClient } from '@/api/hubClient';
 import { HUB_EVENTS } from '@shared/hubEvents';
 import { useToastStore } from '@shared/ui/toast';
 import { useHubIntegration } from '@/hooks/useHubIntegration';
+import {
+  EDGE_HEALTH_CAPABILITY_TIMEOUT_MS,
+  probeEdgeRunCallbackOwnership,
+} from '@/hooks/hubIntegrationEdgeApi';
 
 // ── Helpers ─────────────────────────────────────────────
 
@@ -291,6 +295,54 @@ describe('useHubIntegration', () => {
       { status: 200, headers: { 'Content-Type': 'application/json' } },
     );
   }
+
+  it('fails closed when the /v1/health body read exceeds the bounded deadline', async () => {
+    const originalFetch = globalThis.fetch;
+    vi.useFakeTimers();
+    let healthSignal: AbortSignal | undefined;
+    const hangingHealthFetch = vi.fn(
+      async (_input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+        healthSignal = init?.signal ?? undefined;
+        const response = new Response('{}', {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+        return Object.assign(response, {
+          json: () =>
+            new Promise<unknown>((_resolve, reject) => {
+              if (healthSignal?.aborted) {
+                reject(new Error('Health body read aborted'));
+                return;
+              }
+              healthSignal?.addEventListener('abort', () => {
+                reject(new Error('Health body read aborted'));
+              });
+            }),
+        });
+      },
+    );
+    globalThis.fetch = hangingHealthFetch;
+
+    try {
+      const pending = probeEdgeRunCallbackOwnership('http://127.0.0.1:3210/');
+      await vi.advanceTimersByTimeAsync(0);
+      await vi.advanceTimersByTimeAsync(EDGE_HEALTH_CAPABILITY_TIMEOUT_MS + 1);
+      await expect(pending).resolves.toEqual({
+        supported: false,
+        reason: expect.stringMatching(/abort/i),
+      });
+      expect(hangingHealthFetch).toHaveBeenCalledTimes(1);
+      expect(String(hangingHealthFetch.mock.calls[0]?.[0])).toBe(
+        'http://127.0.0.1:3210/v1/health',
+      );
+      expect(hangingHealthFetch.mock.calls[0]?.[1]).toEqual(
+        expect.objectContaining({ signal: expect.any(AbortSignal) }),
+      );
+    } finally {
+      vi.useRealTimers();
+      globalThis.fetch = originalFetch;
+    }
+  });
 
   function mockRunCreateResponseRaw(body: Record<string, unknown>) {
     fetchMock.mockImplementation(async (input: unknown) => {

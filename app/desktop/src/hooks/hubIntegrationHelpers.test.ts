@@ -10,6 +10,7 @@ import {
   parseRunnerMessages,
   parseStringArray,
   parseStringRecord,
+  serializeStructuredOutputSchema,
 } from './hubIntegrationParseHelpers';
 import {
   bindDispatchPayload,
@@ -75,6 +76,18 @@ describe('hubIntegrationParseHelpers', () => {
     expect(parseRunnerMessages([{ role: 'user', content: 'missing only' }])).toEqual([
       { role: 'user', content: 'missing only' },
     ]);
+  });
+
+  it('serializes boolean and finite number schema candidates in alias order', () => {
+    expect(serializeStructuredOutputSchema(false)).toBe('false');
+    expect(serializeStructuredOutputSchema(true)).toBe('true');
+    expect(serializeStructuredOutputSchema(0)).toBe('0');
+    expect(serializeStructuredOutputSchema(-1.5)).toBe('-1.5');
+    expect(serializeStructuredOutputSchema(false, { type: 'object' })).toBe('false');
+    expect(serializeStructuredOutputSchema('', 42)).toBe('42');
+    expect(serializeStructuredOutputSchema(Number.NaN, true)).toBe('true');
+    expect(serializeStructuredOutputSchema(Infinity, false)).toBe('false');
+    expect(serializeStructuredOutputSchema(null)).toBeUndefined();
   });
 
   it('parseStringArray and parseStringRecord filter empty values', () => {
