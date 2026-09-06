@@ -8623,9 +8623,6 @@ components:
         deliveryId:
           type: string
           description: Hub delivery_id for dual-channel admission dedup. Empty string bypasses dedup (legacy payload).
-        hubTaskId:
-          type: string
-          description: Hub task binding for delivery admission. When set, dedup keys to this business task across transports; legacy payloads without it bind projectId/threadId.
         prompt:
           type: string
           description: User message or task description passed to the agent.
@@ -8693,7 +8690,11 @@ components:
           description: Request a no-persistent-session run for runtimes that support it.
         hubTaskId:
           type: string
-          description: Optional Hub task id for Edge-owned Hub callbacks. Desktop bridge usually streams callbacks itself and should avoid duplicate callback paths.
+          description: >
+            Optional Hub task identity for Edge-owned callbacks and cross-transport
+            delivery admission. When set, receipts bind to this business task;
+            without it, legacy delivery scope binds projectId/threadId. Callback
+            ownership must still avoid duplicate Edge/Desktop output bridges.
     AgentInfo:
       type: object
       required: [id, name, status]
