@@ -124,9 +124,13 @@ func listPreviewsForRun(order []string, previews map[string]Preview, runID strin
 
 // listAgentProfilesForAdapter returns agent profiles ordered by order, optionally scoped to adapterID.
 func listAgentProfilesForAdapter(order []string, profiles map[string]AgentProfile, adapterID string) []AgentProfile {
-	return filterOrdered(order, profiles, func(profile AgentProfile) bool {
+	out := filterOrdered(order, profiles, func(profile AgentProfile) bool {
 		return scopeEquals(adapterID, profile.AdapterID)
 	})
+	for i := range out {
+		out[i] = cloneAgentProfile(out[i])
+	}
+	return out
 }
 
 // listSortedThreadItems returns items for threadID sorted by CreatedAt ascending.

@@ -131,7 +131,10 @@ func TestAgentProfileSnapshotsOwnLists(t *testing.T) {
 
 func TestAgentProfileDurableIsolation(t *testing.T) {
 	t.Parallel()
-	for _, backend := range profileOwnershipBackends()[1:] {
+	for _, backend := range profileOwnershipBackends() {
+		if backend.name == "memory" {
+			continue
+		}
 		t.Run(backend.name, func(t *testing.T) {
 			path := filepath.Join(t.TempDir(), "store.data")
 			repo, err := backend.open(path)
@@ -226,6 +229,43 @@ func TestAgentProfileScopedListOwnership(t *testing.T) {
 					t.Fatalf("profile %q disappeared", profile.ID)
 				}
 				assertProfileOwnershipLists(t, stored)
+			}
+		})
+	}
+}
+
+func TestAgentProfileRejectedWritesPreserveData(t *testing.T) {
+	t.Parallel()
+	for _, backend := range profileOwnershipBackends() {
+		t.Run(backend.name, func(t *testing.T) {
+			repo, err := backend.open(filepath.Join(t.TempDir(), "store.data"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			t.Cleanup(repo.Close)
+			if _, err := repo.CreateAgentProfile(profileOwnershipFixture()); err != nil {
+				t.Fatal(err)
+			}
+			duplicate := profileOwnershipFixture()
+			mutateProfileOwnershipLists(duplicate)
+			if _, err := repo.CreateAgentProfile(duplicate); err == nil {
+				t.Fatal("duplicate profile create succeeded")
+			}
+			invalid := duplicate
+			invalid.ID, invalid.AdapterID = "invalid", ""
+			if _, err := repo.CreateAgentProfile(invalid); err == nil {
+				t.Fatal("profile create without an adapter succeeded")
+			}
+			if _, err := repo.UpdateAgentProfile("missing", map[string]any{"allowedTools": []any{"caller-tool"}}); err != ErrNotFound {
+				t.Fatalf("update missing profile error=%v, want ErrNotFound", err)
+			}
+			profiles := repo.ListAgentProfiles("")
+			if len(profiles) != 1 || profiles[0].ID != "profile" {
+				t.Fatalf("rejected writes changed profiles: %#v", profiles)
+			}
+			assertProfileOwnershipLists(t, profiles[0])
+			if missing, ok := repo.GetAgentProfile("invalid"); ok || !reflect.DeepEqual(missing, AgentProfile{}) {
+				t.Fatalf("invalid profile lookup=%#v found=%v, want zero and false", missing, ok)
 			}
 		})
 	}

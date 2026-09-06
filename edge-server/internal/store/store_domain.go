@@ -278,7 +278,8 @@ func (s *Store) CreateAgentProfile(profile AgentProfile) (AgentProfile, error) {
 func (s *Store) GetAgentProfile(id string) (AgentProfile, bool) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	return lookupByID(s.agentProfiles, id)
+	profile, ok := lookupByID(s.agentProfiles, id)
+	return cloneAgentProfile(profile), ok
 }
 
 func (s *Store) ListAgentProfiles(adapterID string) []AgentProfile {
