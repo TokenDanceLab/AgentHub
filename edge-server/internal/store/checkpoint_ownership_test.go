@@ -94,3 +94,37 @@ func TestRunCheckpointWriteOwnsFiles(t *testing.T) {
 		})
 	}
 }
+
+func TestRunCheckpointWritePreservesEmptyFileLists(t *testing.T) {
+	s := New()
+	if _, err := s.CreateProject("project", "Checkpoint", ""); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.CreateThread("thread", "project", "Checkpoint", "", "", ""); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.CreateRun("run", "project", "thread"); err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct {
+		name  string
+		files []CheckpointFile
+	}{
+		{"nil", nil},
+		{"empty", []CheckpointFile{}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			input := RunCheckpoint{
+				ID: "checkpoint", RunID: "run", WorkDir: "workspace",
+				CreatedAt: "2026-09-01T00:00:00Z", Files: tc.files,
+			}
+			saved, err := s.UpsertRunCheckpoint(input)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !reflect.DeepEqual(saved, input) {
+				t.Fatalf("upsert changed empty checkpoint metadata or list shape: got=%#v want=%#v", saved, input)
+			}
+		})
+	}
+}
