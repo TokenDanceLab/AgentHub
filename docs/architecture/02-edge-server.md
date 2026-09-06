@@ -66,7 +66,7 @@ ProcessExecutor 配置 `RunTimeout`（默认 30 分钟）、`ShutdownGracePeriod
 
 `FileStore`（`internal/store/file_store.go`）对写入信号做 debounce，再保存全量 JSON 快照；显式 `Flush` 同步执行快照、编码和文件 Sync/rename。`SQLiteStore`（`internal/store/sqlite_store.go`）在写入后同步持久化快照差分到 SQLite（WAL 模式，定期 checkpoint），支持崩溃恢复。SQL 连接初始化与持久化串行化独立于普通业务读面，不能用额外 SQL 读者的争用直接代替业务读取测量。
 
-终端状态 runs（completed/failed/cancelled/completed_with_issues）按 `TerminalTTL` 超时或 `MaxTerminalRunsPerThread` 上限自动清理，级联删除关联 diffs/artifacts/previews/items。
+终端状态 runs（finished/failed/cancelled/completed_with_issues）按 `TerminalTTL` 超时或 `MaxTerminalRunsPerThread` 上限自动清理，级联删除关联 diffs/artifacts/previews/items/checkpoints。Checkpoint 在 run 完成时保留，在 run 清理或所属 thread 删除时随 run 移除；这不删除工作区文件。
 
 `EventBus`（`internal/events/bus.go`）是基于 channel 的发布/订阅模型：4 worker 并发 observer、子 channel 缓冲（256）、gap detection（`system.gap` 事件）；通过 `PersistFn` 钩子先持久化再广播。`EventLog` 是 append-only JSON-lines 事件日志（默认 50 MiB 上限，超限截断保留尾部 75%）。
 

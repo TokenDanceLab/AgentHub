@@ -156,6 +156,7 @@ func cloneFileSnapshot(snapshot fileSnapshot) fileSnapshot {
 		Pins:              copyMap(snapshot.Pins),
 		Diffs:             copyMap(snapshot.Diffs),
 		Artifacts:         cloneArtifactMap(snapshot.Artifacts),
+		Checkpoints:       cloneCheckpointMap(snapshot.Checkpoints),
 		Previews:          copyMap(snapshot.Previews),
 		UserProfiles:      copyMap(snapshot.UserProfiles),
 		AgentProfiles:     copyMap(snapshot.AgentProfiles),

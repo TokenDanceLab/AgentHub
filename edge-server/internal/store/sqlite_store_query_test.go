@@ -262,6 +262,9 @@ func TestCloneFileSnapshot(t *testing.T) {
 		Artifacts: map[string]Artifact{
 			"a1": {ID: "a1", RunID: "r1", ContentSource: source},
 		},
+		Checkpoints: map[string]RunCheckpoint{
+			"r1": {RunID: "r1", Files: []CheckpointFile{{Path: "input.txt", Content: "original"}}},
+		},
 		ProjectOrder:  []string{"p1"},
 		ArtifactOrder: []string{"a1"},
 		Settings:      map[string]string{"theme": "dark"},
@@ -277,6 +280,15 @@ func TestCloneFileSnapshot(t *testing.T) {
 	}
 	if cloned.Artifacts["a1"].ContentSource == original.Artifacts["a1"].ContentSource {
 		t.Fatal("artifact content source pointer should be deep-cloned")
+	}
+	checkpoint, ok := cloned.Checkpoints["r1"]
+	if !ok || !reflect.DeepEqual(checkpoint, original.Checkpoints["r1"]) {
+		t.Fatal("checkpoint missing or changed in cloned snapshot")
+	}
+	checkpoint.Files[0].Content = "mutated"
+	delete(cloned.Checkpoints, "r1")
+	if got := original.Checkpoints["r1"].Files[0].Content; got != "original" {
+		t.Fatalf("checkpoint clone shares nested files: %q", got)
 	}
 	cloned.Projects["p1"] = Project{ID: "p1", Name: "mutated"}
 	cloned.ProjectOrder[0] = "mutated"
