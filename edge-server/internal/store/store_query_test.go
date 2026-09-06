@@ -1,6 +1,7 @@
 package store
 
 import (
+	"fmt"
 	"reflect"
 	"testing"
 )
@@ -53,6 +54,44 @@ func TestCollectAndFilterOrdered(t *testing.T) {
 	wantFiltered := []int{1, 3}
 	if !reflect.DeepEqual(filtered, wantFiltered) {
 		t.Fatalf("filterOrdered = %#v, want %#v", filtered, wantFiltered)
+	}
+}
+
+func TestFilterOrderedSinglePass(t *testing.T) {
+	t.Parallel()
+	if got := filterOrdered[Run](nil, nil, func(Run) bool {
+		t.Fatal("empty input must not call the predicate")
+		return false
+	}); got == nil || len(got) != 0 {
+		t.Fatalf("empty input = %#v, want non-nil empty result", got)
+	}
+	for _, matches := range []int{0, 1, 16, 17, 40} {
+		t.Run(fmt.Sprintf("matches=%d", matches), func(t *testing.T) {
+			items := make(map[string]Run)
+			order := make([]string, 0)
+			want := make([]Run, 0)
+			for i := 0; i < 2*max(matches, 20)+1; i++ {
+				id := fmt.Sprintf("run-%03d", 100-i)
+				run := Run{ID: id, ThreadID: "other"}
+				if i%2 == 1 && i < 2*matches {
+					run.ThreadID = "selected"
+					want = append(want, run)
+				}
+				items[id] = run
+				order = append(order, id)
+			}
+			var visited []string
+			got := filterOrdered(order, items, func(run Run) bool {
+				visited = append(visited, run.ID)
+				return run.ThreadID == "selected"
+			})
+			if !reflect.DeepEqual(visited, order) {
+				t.Fatalf("predicate visits = %v, want one ordered visit per row: %v", visited, order)
+			}
+			if !reflect.DeepEqual(got, want) {
+				t.Fatalf("filterOrdered = %#v, want %#v", got, want)
+			}
+		})
 	}
 }
 
@@ -109,20 +148,55 @@ func TestSortItemsAndPins(t *testing.T) {
 
 func TestListClonedArtifacts(t *testing.T) {
 	t.Parallel()
-	src := &ArtifactContentSource{Kind: ArtifactContentSourceBasename, Path: "a.txt", Readable: false}
-	items := map[string]Artifact{
-		"a1": {ID: "a1", RunID: "r1", ContentSource: src},
-		"a2": {ID: "a2", RunID: "r2"},
+	items := make(map[string]Artifact)
+	order := make([]string, 0)
+	idsByRun := make(map[string][]string)
+	for i := 0; i < 40; i++ {
+		id, runID := fmt.Sprintf("artifact-%02d", 40-i), "dense"
+		if i%4 == 1 {
+			runID = "small"
+		}
+		artifact := Artifact{ID: id, RunID: runID}
+		if i%3 != 0 {
+			artifact.ContentSource = &ArtifactContentSource{
+				Kind: ArtifactContentSourceBasename, Path: id + ".txt", Readable: true,
+			}
+		}
+		items[id] = artifact
+		order = append(order, id)
+		idsByRun[runID] = append(idsByRun[runID], id)
 	}
-	order := []string{"a1", "a2"}
-	got := listClonedArtifacts(order, items, "r1")
-	if len(got) != 1 || got[0].ID != "a1" {
-		t.Fatalf("listClonedArtifacts = %#v", got)
-	}
-	// Mutating returned content source must not affect map.
-	got[0].ContentSource.Path = "mutated"
-	if items["a1"].ContentSource.Path != "a.txt" {
-		t.Fatal("clone did not isolate ContentSource")
+	for _, scope := range []struct {
+		name, runID string
+		want        []string
+	}{
+		{"missing", "missing", []string{}},
+		{"small", "small", idsByRun["small"]},
+		{"dense", "dense", idsByRun["dense"]},
+		{"all", "", order},
+	} {
+		t.Run(scope.name, func(t *testing.T) {
+			got := listClonedArtifacts(order, items, scope.runID)
+			if got == nil || len(got) != len(scope.want) {
+				t.Fatalf("listClonedArtifacts = %#v, want non-nil with %d results", got, len(scope.want))
+			}
+			for i, id := range scope.want {
+				if got[i].ID != id {
+					t.Fatalf("result[%d].ID = %q, want %q", i, got[i].ID, id)
+				}
+				source := items[id].ContentSource
+				if !reflect.DeepEqual(got[i].ContentSource, source) {
+					t.Fatalf("result[%d] content source = %#v, want %#v", i, got[i].ContentSource, source)
+				}
+				if source != nil {
+					got[i].ContentSource.Path = "mutated"
+					got[i].ContentSource.Readable = false
+					if source.Path != id+".txt" || !source.Readable {
+						t.Fatalf("result[%d] content source aliases the store", i)
+					}
+				}
+			}
+		})
 	}
 }
 
