@@ -434,6 +434,8 @@ func blockRunAdmissionPersistence(t *testing.T, repo Repository) (func(), func()
 	switch r := repo.(type) {
 	case *FileStore:
 		return func() {
+				r.persistMu.Lock()
+				defer r.persistMu.Unlock()
 				if err := os.Remove(r.path); err != nil && !errors.Is(err, os.ErrNotExist) {
 					t.Fatalf("remove file snapshot before block: %v", err)
 				}
@@ -441,6 +443,8 @@ func blockRunAdmissionPersistence(t *testing.T, repo Repository) (func(), func()
 					t.Fatalf("mkdir snapshot path to block rename: %v", err)
 				}
 			}, func() {
+				r.persistMu.Lock()
+				defer r.persistMu.Unlock()
 				if err := os.Remove(r.path); err != nil {
 					t.Fatalf("remove snapshot path block: %v", err)
 				}

@@ -61,6 +61,20 @@ func prepareRunAdmission(repository store.Repository, executor lifecycle.RunExec
 	if params.HubTaskID != "" && params.BuildContext == nil {
 		return store.Run{}, false, errcode.ErrExecutorUnavailable.WithMessage("Hub task admission requires an executor context")
 	}
+	run, err := createRunAdmissionRecord(repository, params)
+	if err != nil {
+		return store.Run{}, false, err
+	}
+	if params.HubTaskID != "" {
+		pendingRunAdmissions[run.ID] = struct{}{}
+	}
+	return run, false, nil
+}
+
+// createRunAdmissionRecord persists pending Hub identity before Start can run.
+// A failed write retains a definite pre-execution rejection in this process;
+// this is distinct from replay authorization and execution-state decisions.
+func createRunAdmissionRecord(repository store.Repository, params CreateParams) (store.Run, *errcode.Error) {
 	runID := generateRunID()
 	var run store.Run
 	var err error
@@ -71,7 +85,7 @@ func prepareRunAdmission(repository store.Repository, executor lifecycle.RunExec
 	}
 	if err != nil {
 		if errors.Is(err, store.ErrNotFound) {
-			return store.Run{}, false, errcode.ErrNotFound.WithMessage("project or thread not found")
+			return store.Run{}, errcode.ErrNotFound.WithMessage("project or thread not found")
 		}
 		if params.HubTaskID != "" {
 			// This attempt has not called Start. Keep that definite rejection in
@@ -81,14 +95,11 @@ func prepareRunAdmission(repository store.Repository, executor lifecycle.RunExec
 				_, _ = repository.RecordRunAdmission(runID, errcode.ErrAdmissionPersistFailed.Code)
 				repository.SetRunStatusIf(runID, "failed", "queued")
 			}
-			return store.Run{}, false, errcode.ErrAdmissionPersistFailed
+			return store.Run{}, errcode.ErrAdmissionPersistFailed
 		}
-		return store.Run{}, false, errcode.ErrInternal.WithMessage("failed to create run")
+		return store.Run{}, errcode.ErrInternal.WithMessage("failed to create run")
 	}
-	if params.HubTaskID != "" {
-		pendingRunAdmissions[run.ID] = struct{}{}
-	}
-	return run, false, nil
+	return run, nil
 }
 
 func authorizeRunReplay(run store.Run, params CreateParams) *errcode.Error {
