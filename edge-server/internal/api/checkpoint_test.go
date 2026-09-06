@@ -139,3 +139,47 @@ func TestGetRunCheckpointFile(t *testing.T) {
 		t.Fatalf("POST status = %d, want 405", rec.Code)
 	}
 }
+
+func TestCheckpointPreviewRetainsSavedEvidence(t *testing.T) {
+	for _, access := range []string{"input", "result"} {
+		t.Run(access, func(t *testing.T) {
+			h := newTestHandler()
+			runID := seedCheckpointRun(t, h)
+			input, ok := h.Store.GetRunCheckpoint(runID)
+			if !ok {
+				t.Fatal("seeded checkpoint missing")
+			}
+			// Replace the checkpoint, then reuse the writer-owned file list.
+			saved, err := h.Store.UpsertRunCheckpoint(input)
+			if err != nil {
+				t.Fatal(err)
+			}
+			view := input
+			if access == "result" {
+				view = saved
+			}
+			view.Files[0].Content = "changed after save"
+			view.Files[0].Hash = "changed-hash"
+
+			req := httptest.NewRequest(http.MethodGet, "/v1/runs/"+runID+"/checkpoint/file?path=src/a.ts", nil)
+			rec := httptest.NewRecorder()
+			h.GetRunCheckpointFile(rec, req, runID)
+			if rec.Code != http.StatusOK {
+				t.Fatalf("preview status = %d, body=%s", rec.Code, rec.Body.String())
+			}
+			var envelope struct {
+				Data struct {
+					Path, Hash, Content string
+					SizeBytes           int
+				}
+			}
+			if err := json.Unmarshal(rec.Body.Bytes(), &envelope); err != nil {
+				t.Fatalf("decode preview: %v", err)
+			}
+			data := envelope.Data
+			if data.Path != "src/a.ts" || data.Content != "export {}" || data.Hash != "h-a" || data.SizeBytes != 12 {
+				t.Fatalf("caller %s changed saved preview evidence: %#v", access, data)
+			}
+		})
+	}
+}
