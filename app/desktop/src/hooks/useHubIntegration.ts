@@ -20,6 +20,7 @@ import type { CoordinatorRouteDecision, HubClient } from '@/api/hubClient';
 import { createEventStream, type StreamHandle } from '@/api/eventClient';
 import type { EventEnvelope } from '@shared/events';
 import { HUB_EVENTS } from '@shared/hubEvents';
+import { useToastStore } from '@shared/ui/toast';
 import { hubQueryKeys } from '@shared/stores/queryKeys';
 import { useTaskBridgeStore, type AgentTask } from '@/stores/taskBridgeStore';
 import { queryClient } from '@/api/queryClient';
@@ -419,9 +420,14 @@ export function useHubIntegration(options: HubIntegrationOptions): HubIntegratio
             // ACK/FAIL/relay-ACK and do not start a client-side retry.
             const currentTask = store.getState().tasks.find((t) => t.taskId === taskId);
             if (!hasTaskProgressed(currentTask)) {
-              store.getState().updateTask(taskId, {
-                error: 'Edge admission result is uncertain (HTTP ' + runResp.status + '): ' + errorText,
-              });
+              const message = getString(parseRecord(parseRecord(errorText).error), 'message') || errorText;
+              const error = 'Edge admission result is uncertain (HTTP ' + runResp.status + '): ' + message;
+              store.getState().updateTask(taskId, { error });
+              // The bridge has no task-error panel. Surface the need for review
+              // through the existing notification UI, once per unchanged reason.
+              if (currentTask?.error !== error) {
+                useToastStore.getState().showToast('warning', error, { duration: 10_000 });
+              }
             }
             return;
           }

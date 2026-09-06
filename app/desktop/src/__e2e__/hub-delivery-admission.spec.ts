@@ -233,6 +233,10 @@ for (const theme of ['light', 'dark'] as const) {
     await expect.poll(() => calls.runs.length).toBe(4);
     await expect.poll(() => readTaskState(page)).toEqual(queued);
     await expect.poll(() => readTaskError(page)).toContain('fixture admission rejection: admission_uncertain');
+    const reviewNotice = page.getByText(/Edge admission result is uncertain.*fixture admission rejection: admission_uncertain/);
+    await expect(reviewNotice).toBeVisible();
+    await expect(reviewNotice).toHaveCount(1);
+    await page.screenshot({ path: testInfo.outputPath('admission-uncertain-' + theme + '.png') });
     expect(calls.acks).toHaveLength(0);
     expect(calls.relayAcks).toHaveLength(0);
     expect(calls.fails).toHaveLength(0);

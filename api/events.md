@@ -43,7 +43,7 @@ Hub 的 WS `agent.dispatch` 与 outbox HTTP POST `/v1/runs` 共享同一 `delive
 - **Hub task 接收证据**：非空 `hubTaskId` 在启动执行器前，与 `admissionState: pending` 一起写入 run；File/SQLite 在返回前同步保存。执行器返回后只允许转为 `accepted` 或带 `admissionErrorCode` 的 `rejected`，不改写执行状态。没有 Hub task 的本地/MCP 请求保留原路径。
 - **冷重放**：进程缓存丢失或 delivery ID 改变时，按 Hub task 查最新 attempt，并复验原 run scope。`accepted` 返回原 run，不重新执行；上次最终证据保存失败时只重试保存。已接收 run 后续 `failed` 不等于接收拒绝。
 - **拒绝与未决**：429 `too_many_concurrent_runs` 是执行器持有执行权之前的容量拒绝；503 `admission_persist_failed` 是证据保存失败（执行器可能已经接收），两者都不应 ACK/FAIL，由 Hub 重投向 Edge 核对。只有明确的容量拒绝或调用 Start 之前的保存失败，才允许创建新 attempt；普通 `executor_start_failed` 保持拒绝，不伪装成功。
-- **结果不明**：同一 Hub task 的当前接收者仍在处理时返回 503 `delivery_busy`。恢复后的 `pending`、未知 admission state、无 `startedAt` 的旧 run 返回 409 `admission_uncertain`；Desktop 保持待核对错误，不 ACK/FAIL、不自动启动。旧 run 只有明确 `startedAt` 才能按原身份重放。`GET /v1/runs/{runId}` 暴露已记录的 `admissionState` / `admissionErrorCode` 供核对。
+- **结果不明**：同一 Hub task 的当前接收者仍在处理时返回 503 `delivery_busy`。恢复后的 `pending`、未知 admission state、无 `startedAt` 的旧 run 返回 409 `admission_uncertain`；Desktop 保持待核对错误并通过现有通知提示用户，同一原因不重复提示，不 ACK/FAIL、不自动启动。旧 run 只有明确 `startedAt` 才能按原身份重放。`GET /v1/runs/{runId}` 暴露已记录的 `admissionState` / `admissionErrorCode` 供核对。
 - **恢复边界**：缓存不是恢复日志；持久化接收证据证明的是是否接收，不保证进程仍在运行，也不提供自动进程恢复。`queued`/`failed` 本身不能证明没有外部副作用。未决 admission 不参与终态自动清理；原 run 因显式删除或正常 retention 消失后，不宣称永久保留 Hub task 的幂等身份。
 
 标签：**UPSERT by id**（稳定 id 合并，禁止第二行）；**idempotent on apply**（再应用不变）；**水位 / watermark**（只前进 `max`）；**ephemeral**（可丢可重，不写持久态）；**非幂等**（须自备去重或 REST）。

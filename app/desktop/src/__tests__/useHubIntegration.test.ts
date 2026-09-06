@@ -118,6 +118,7 @@ import { createServer, type IncomingMessage } from 'node:http';
 import type { HubWSHandle } from '@shared/hub/hubWS';
 import type { HubClient } from '@/api/hubClient';
 import { HUB_EVENTS } from '@shared/hubEvents';
+import { useToastStore } from '@shared/ui/toast';
 import { useHubIntegration } from '@/hooks/useHubIntegration';
 
 // ── Helpers ─────────────────────────────────────────────
@@ -776,38 +777,48 @@ describe('useHubIntegration', () => {
   });
 
   it('keeps an admission_uncertain rejection queued for manual review without acking or failing', async () => {
-    mockRunCreateResponseWithStatus({ error: { code: 'admission_uncertain', message: 'manual review', traceId: 'trace_001' } }, 409);
-    renderHook(() =>
-      useHubIntegration({
-        hubWS,
-        hubClient,
-        dispatchTarget: { targetId: 'target-current', deviceId: 'desktop-current' },
-      }),
-    );
-
-    const relayFrame = {
-      relay_command_id: 'relay-1',
-      command_type: 'agent.dispatch',
-      payload: JSON.stringify(
-        makeDispatchPayload({
-          target_id: 'target-current',
-          edge_device_id: 'desktop-current',
-          delivery_id: 'd1',
+    const notice = vi.spyOn(useToastStore.getState(), 'showToast').mockReturnValue('notice-fixture');
+    try {
+      mockRunCreateResponseWithStatus({ error: { code: 'admission_uncertain', message: 'manual review', traceId: 'trace_001' } }, 409);
+      renderHook(() =>
+        useHubIntegration({
+          hubWS,
+          hubClient,
+          dispatchTarget: { targetId: 'target-current', deviceId: 'desktop-current' },
         }),
-      ),
-    };
-    await act(async () => {
-      fireHubEvent(HUB_EVENTS.AGENT_DISPATCH, relayFrame);
-    });
+      );
 
-    expect(hoisted.storeTasks).toHaveLength(1);
-    expect(hoisted.storeTasks[0]?.status).toBe('queued');
-    expect(hoisted.storeTasks[0]?.runId).toBeUndefined();
-    expect(hoisted.storeTasks[0]?.error).toContain('Edge admission result is uncertain');
-    expect(hoisted.storeTasks[0]?.error).toContain('manual review');
-    expect(hubClient.ackTask).not.toHaveBeenCalled();
-    expect(hubClient.failTask).not.toHaveBeenCalled();
-    expect(hubClient.ackRelayCommand).not.toHaveBeenCalled();
+      const relayFrame = {
+        relay_command_id: 'relay-1',
+        command_type: 'agent.dispatch',
+        payload: JSON.stringify(
+          makeDispatchPayload({
+            target_id: 'target-current',
+            edge_device_id: 'desktop-current',
+            delivery_id: 'd1',
+          }),
+        ),
+      };
+      await act(async () => {
+        fireHubEvent(HUB_EVENTS.AGENT_DISPATCH, relayFrame);
+      });
+
+      expect(hoisted.storeTasks).toHaveLength(1);
+      expect(hoisted.storeTasks[0]?.status).toBe('queued');
+      expect(hoisted.storeTasks[0]?.runId).toBeUndefined();
+      expect(hoisted.storeTasks[0]?.error).toContain('Edge admission result is uncertain');
+      expect(hoisted.storeTasks[0]?.error).toContain('manual review');
+      expect(hubClient.ackTask).not.toHaveBeenCalled();
+      expect(hubClient.failTask).not.toHaveBeenCalled();
+      expect(hubClient.ackRelayCommand).not.toHaveBeenCalled();
+
+      mockRunCreateResponseWithStatus({ error: { code: 'admission_uncertain', message: 'manual review', traceId: 'trace_002' } }, 409);
+      await act(async () => { fireHubEvent(HUB_EVENTS.AGENT_DISPATCH, relayFrame); });
+      expect(notice).toHaveBeenCalledTimes(1);
+      expect(notice).toHaveBeenCalledWith('warning', expect.stringContaining('manual review'), { duration: 10_000 });
+    } finally {
+      notice.mockRestore();
+    }
   });
 
   it('clears a queued admission_uncertain error when the same delivery is accepted', async () => {
