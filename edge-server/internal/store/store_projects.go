@@ -75,6 +75,7 @@ func (s *Store) removePins(match func(ThreadPin) bool) {
 }
 
 func (s *Store) removeRunEvidence(runID string) {
+	delete(s.checkpoints, runID)
 	s.diffOrder, s.artifactOrder, s.previewOrder = pruneRunEvidence(
 		s.diffs, s.artifacts, s.previews,
 		s.diffOrder, s.artifactOrder, s.previewOrder,
