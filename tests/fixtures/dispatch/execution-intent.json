@@ -1,0 +1,206 @@
+{
+  "version": 1,
+  "cases": [
+    {
+      "name": "profile-and-request-snake-case",
+      "payload": {
+        "task_id": "task-intent-1",
+        "delivery_id": "delivery-intent-1",
+        "agent_type": "codex",
+        "session_id": "conversation-1",
+        "prompt": "Implement the requested patch.",
+        "system_prompt": "Use the approved project conventions.",
+        "tool_whitelist": "[\"Read\",\"Grep\"]",
+        "model_params": "{\"model\":\"model-selected\",\"reasoning_effort\":\"high\",\"thinking_mode\":\"enabled\",\"max_thinking_tokens\":4096,\"permission_mode\":\"plan\",\"work_dir\":\"/workspace/project\",\"include_partial\":true,\"append_system_prompt\":\"Do not change unrelated files.\",\"allowed_tools\":[\"Write\"],\"config_overrides\":{\"reasoning_summary\":\"auto\",\"discard_number\":3},\"ephemeral\":true,\"session_id\":\"runtime-session-1\",\"continue\":false,\"fork\":true}",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Keep the change offline and preserve existing behavior.",
+            "timestamp": "2026-01-01T00:00:00Z"
+          },
+          {
+            "role": "assistant",
+            "content": "The earlier patch uses a bounded retry policy.",
+            "timestamp": "2026-01-01T00:01:00Z"
+          }
+        ],
+        "pinned_messages": [
+          {
+            "role": "system",
+            "content": "Run focused tests before reporting success.",
+            "timestamp": "2026-01-01T00:00:00Z"
+          }
+        ],
+        "structured_output_schema": {
+          "type": "object",
+          "properties": {
+            "result": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "result"
+          ]
+        },
+        "trace_id": "trace-fixture-1"
+      },
+      "expectedIntent": {
+        "prompt": "Implement the requested patch.",
+        "agentId": "codex",
+        "model": "model-selected",
+        "reasoningEffort": "high",
+        "thinkingMode": "enabled",
+        "maxThinkingTokens": 4096,
+        "permissionMode": "plan",
+        "workDir": "/workspace/project",
+        "includePartial": true,
+        "structuredOutputSchema": "{\"type\":\"object\",\"properties\":{\"result\":{\"type\":\"string\"}},\"required\":[\"result\"]}",
+        "systemPrompt": "Use the approved project conventions.",
+        "appendSystemPrompt": "Do not change unrelated files.",
+        "allowedTools": [
+          "Read",
+          "Grep"
+        ],
+        "configOverrides": {
+          "reasoning_summary": "auto"
+        },
+        "ephemeral": true,
+        "sessionId": "runtime-session-1",
+        "continue": false,
+        "fork": true,
+        "hubTaskId": "task-intent-1",
+        "deliveryId": "delivery-intent-1",
+        "messages": [
+          {
+            "role": "user",
+            "content": "Keep the change offline and preserve existing behavior.",
+            "timestamp": "2026-01-01T00:00:00Z"
+          },
+          {
+            "role": "assistant",
+            "content": "The earlier patch uses a bounded retry policy.",
+            "timestamp": "2026-01-01T00:01:00Z"
+          }
+        ],
+        "pinnedMessages": [
+          {
+            "role": "system",
+            "content": "Run focused tests before reporting success.",
+            "timestamp": "2026-01-01T00:00:00Z"
+          }
+        ],
+        "trace_id": "trace-fixture-1"
+      }
+    },
+    {
+      "name": "camel-params-preserve-false-and-zero",
+      "payload": {
+        "task_id": "task-intent-2",
+        "agent_type": "Claude",
+        "session_id": "conversation-2",
+        "prompt": "Review without modifying files.",
+        "model_params": "{\"model\":\"review-model\",\"reasoningEffort\":\"low\",\"thinkingMode\":\"disabled\",\"maxThinkingTokens\":0,\"permissionMode\":\"plan\",\"workDir\":\"/workspace/review\",\"includePartial\":false,\"structuredOutputSchema\":\"{\\\"type\\\":\\\"object\\\"}\",\"systemPrompt\":\"Review only.\",\"appendSystemPrompt\":\"Check existing tests.\",\"allowedTools\":[\"Read\"],\"configOverrides\":{\"summary\":\"concise\"},\"ephemeral\":false,\"sessionId\":\"runtime-session-2\",\"continue\":true,\"fork\":false}"
+      },
+      "expectedIntent": {
+        "prompt": "Review without modifying files.",
+        "agentId": "claude-code",
+        "model": "review-model",
+        "reasoningEffort": "low",
+        "thinkingMode": "disabled",
+        "maxThinkingTokens": 0,
+        "permissionMode": "plan",
+        "workDir": "/workspace/review",
+        "includePartial": false,
+        "structuredOutputSchema": "{\"type\":\"object\"}",
+        "systemPrompt": "Review only.",
+        "appendSystemPrompt": "Check existing tests.",
+        "allowedTools": [
+          "Read"
+        ],
+        "configOverrides": {
+          "summary": "concise"
+        },
+        "ephemeral": false,
+        "sessionId": "runtime-session-2",
+        "continue": true,
+        "fork": false,
+        "hubTaskId": "task-intent-2"
+      }
+    },
+    {
+      "name": "legacy-absent-intent-has-no-invented-model-or-session",
+      "payload": {
+        "task_id": "task-intent-3",
+        "agent_type": "opencode",
+        "session_id": "hub-conversation-not-runtime-session",
+        "prompt": "Continue the task.",
+        "model_params": "{}",
+        "tool_whitelist": "[]",
+        "messages": [],
+        "pinned_messages": []
+      },
+      "expectedIntent": {
+        "prompt": "Continue the task.",
+        "agentId": "opencode",
+        "hubTaskId": "task-intent-3"
+      }
+    },
+    {
+      "name": "top-schema-string-with-model-override-precedence",
+      "payload": {
+        "task_id": "task-intent-4",
+        "delivery_id": "delivery-intent-4",
+        "agent_type": "codex",
+        "prompt": "Produce a structured answer.",
+        "system_prompt": "Top-level system prompt.",
+        "model_params": "{\"model\":\"model-4\",\"work_dir\":\"/workspace/project\",\"system_prompt\":\"Nested fallback.\",\"structured_output_schema\":\"{\\\"type\\\":\\\"object\\\",\\\"properties\\\":{\\\"count\\\":{\\\"type\\\":\\\"integer\\\"}}}\",\"tool_allowlist\":[\"Read\",\"Bash\"]}",
+        "structured_output_schema": "{\"type\":\"array\"}",
+        "pinned_messages": [
+          {
+            "role": "system",
+            "content": "Run focused tests before reporting success.",
+            "timestamp": "2026-01-01T00:00:00Z"
+          }
+        ]
+      },
+      "expectedIntent": {
+        "prompt": "Produce a structured answer.",
+        "agentId": "codex",
+        "model": "model-4",
+        "workDir": "/workspace/project",
+        "systemPrompt": "Top-level system prompt.",
+        "structuredOutputSchema": "{\"type\":\"object\",\"properties\":{\"count\":{\"type\":\"integer\"}}}",
+        "allowedTools": [
+          "Read",
+          "Bash"
+        ],
+        "hubTaskId": "task-intent-4",
+        "deliveryId": "delivery-intent-4",
+        "pinnedMessages": [
+          {
+            "role": "system",
+            "content": "Run focused tests before reporting success.",
+            "timestamp": "2026-01-01T00:00:00Z"
+          }
+        ]
+      }
+    },
+    {
+      "name": "malformed-model-params-do-not-invent-defaults",
+      "payload": {
+        "task_id": "task-intent-5",
+        "agent_type": "codex",
+        "prompt": "Use only explicit input.",
+        "model_params": "{bad json",
+        "tool_whitelist": "not-json",
+        "structured_output_schema": "{\"type\":\"object\"}"
+      },
+      "expectedIntent": {
+        "prompt": "Use only explicit input.",
+        "agentId": "codex",
+        "hubTaskId": "task-intent-5",
+        "structuredOutputSchema": "{\"type\":\"object\"}"
+      }
+    }
+  ]
+}
