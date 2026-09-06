@@ -6,150 +6,238 @@ import (
 	"time"
 )
 
-// fakeClock is a controllable time source for deterministic TTL tests.
-type fakeClock struct {
-	mu  sync.Mutex
-	now time.Time
+func TestAdmissionCommitsOneReceipt(t *testing.T) {
+	d := New(2, time.Minute)
+	scope := Scope{HubTaskID: "task-a", ProjectID: "project", ThreadID: "thread"}
+	first := d.Begin("delivery", scope)
+	if first.State != Claimed || first.Claim == nil {
+		t.Fatalf("first admission = %#v", first)
+	}
+	if got := d.Begin("delivery", scope); got.State != Busy || got.RunID != "" {
+		t.Fatalf("uncommitted duplicate = %#v", got)
+	}
+	if !first.Claim.Commit("run-a") {
+		t.Fatal("commit failed")
+	}
+	first.Claim.Release()
+	got := d.Begin("delivery", scope)
+	if got.State != Accepted || got.RunID != "run-a" || got.Claim != nil {
+		t.Fatalf("committed replay = %#v", got)
+	}
+	if d.Len() != 1 {
+		t.Fatalf("tracked admissions = %d", d.Len())
+	}
 }
 
-func newFakeClock(t time.Time) *fakeClock    { return &fakeClock{now: t} }
-func (c *fakeClock) Now() time.Time          { c.mu.Lock(); defer c.mu.Unlock(); return c.now }
-func (c *fakeClock) Advance(d time.Duration) { c.mu.Lock(); defer c.mu.Unlock(); c.now = c.now.Add(d) }
-
-func TestRecord_NewReturnsTrue_DuplicateReturnsFalse(t *testing.T) {
-	d := New(8, time.Minute)
-	if !d.Record("a") {
-		t.Fatal("first Record(a) should return true")
+func TestReleasedClaimCannotCommitOrReleaseItsReplacement(t *testing.T) {
+	d := New(1, time.Minute)
+	first := d.Begin("delivery", Scope{})
+	first.Claim.Release()
+	retry := d.Begin("delivery", Scope{})
+	if retry.State != Claimed || retry.Claim == nil {
+		t.Fatalf("retry = %#v", retry)
 	}
-	if d.Record("a") {
-		t.Fatal("second Record(a) should return false (duplicate)")
+	if first.Claim.Commit("stale-run") {
+		t.Fatal("stale owner committed a replacement claim")
 	}
-	if !d.Record("b") {
-		t.Fatal("Record(b) should return true")
+	first.Claim.Release()
+	if got := d.Begin("delivery", Scope{}); got.State != Busy {
+		t.Fatalf("stale release removed replacement: %#v", got)
+	}
+	if !retry.Claim.Commit("retry-run") {
+		t.Fatal("retry commit failed")
+	}
+	if got := d.Begin("delivery", Scope{}); got.RunID != "retry-run" {
+		t.Fatalf("wrong receipt: %#v", got)
 	}
 }
 
-func TestSeen_EmptyStringAlwaysFalse(t *testing.T) {
-	d := New(8, time.Minute)
-	d.Record("")
-	if d.Seen("") {
-		t.Fatal("Seen(\"\") must be false even after Record(\"\")")
+func TestInvalidReceiptDoesNotBecomeAccepted(t *testing.T) {
+	d := New(1, time.Minute)
+	attempt := d.Begin("delivery", Scope{})
+	if attempt.Claim.Commit(" ") {
+		t.Fatal("empty run id was committed")
+	}
+	if got := d.Begin("delivery", Scope{}); got.State != Busy {
+		t.Fatalf("invalid receipt was accepted: %#v", got)
+	}
+	attempt.Claim.Release()
+	if retry := d.Begin("delivery", Scope{}); retry.State != Claimed {
+		t.Fatalf("failed receipt could not retry: %#v", retry)
+	} else {
+		retry.Claim.Release()
+	}
+}
+
+func TestAdmissionBindsBusinessIdentity(t *testing.T) {
+	cases := []struct {
+		name          string
+		first, replay Scope
+		want          State
+	}{
+		{"hub channel thread aliases", Scope{HubTaskID: "task", ProjectID: "local", ThreadID: "local-thread"}, Scope{HubTaskID: "task", ProjectID: "local", ThreadID: "conversation-thread"}, Accepted},
+		{"other Hub task", Scope{HubTaskID: "task-a"}, Scope{HubTaskID: "task-b"}, Conflict},
+		{"Hub identity cannot become legacy", Scope{HubTaskID: "task"}, Scope{}, Conflict},
+		{"same legacy scope", Scope{ProjectID: "project", ThreadID: "thread"}, Scope{ProjectID: "project", ThreadID: "thread"}, Accepted},
+		{"other legacy thread", Scope{ProjectID: "project", ThreadID: "a"}, Scope{ProjectID: "project", ThreadID: "b"}, Conflict},
+		{"other legacy project", Scope{ProjectID: "a", ThreadID: "thread"}, Scope{ProjectID: "b", ThreadID: "thread"}, Conflict},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			d := New(2, time.Minute)
+			first := d.Begin("delivery", tc.first)
+			if !first.Claim.Commit("original-run") {
+				t.Fatal("commit failed")
+			}
+			got := d.Begin("delivery", tc.replay)
+			if got.State != tc.want {
+				t.Fatalf("replay = %#v, want state %v", got, tc.want)
+			}
+			if tc.want == Accepted && got.RunID != "original-run" {
+				t.Fatalf("changed original run: %#v", got)
+			}
+			if tc.want == Conflict && got.RunID != "" {
+				t.Fatalf("conflict exposed another run: %#v", got)
+			}
+		})
+	}
+}
+
+func TestConcurrentAdmissionHasOneOwner(t *testing.T) {
+	d := New(64, time.Minute)
+	start := make(chan struct{})
+	results := make(chan Admission, 32)
+	var wg sync.WaitGroup
+	for range 32 {
+		wg.Go(func() { <-start; results <- d.Begin("delivery", Scope{HubTaskID: "task"}) })
+	}
+	close(start)
+	wg.Wait()
+	close(results)
+	var owner *Claim
+	busy := 0
+	for result := range results {
+		switch result.State {
+		case Claimed:
+			if owner != nil {
+				t.Fatal("two concurrent owners")
+			}
+			owner = result.Claim
+		case Busy:
+			busy++
+		default:
+			t.Fatalf("uncommitted request returned %#v", result)
+		}
+	}
+	if owner == nil || busy != 31 {
+		t.Fatalf("owner=%v busy=%d", owner != nil, busy)
+	}
+	if !owner.Commit("run") {
+		t.Fatal("owner commit failed")
+	}
+	if got := d.Begin("delivery", Scope{HubTaskID: "task"}); got.State != Accepted || got.RunID != "run" {
+		t.Fatalf("replay = %#v", got)
+	}
+}
+
+func TestPendingClaimsAreBoundedAndNotExpiredOrEvicted(t *testing.T) {
+	now := time.Unix(1000, 0)
+	d := New(2, time.Minute).WithClock(func() time.Time { return now })
+	first := d.Begin("pending-a", Scope{})
+	second := d.Begin("pending-b", Scope{})
+	now = now.Add(10 * time.Minute)
+	if got := d.Begin("pending-a", Scope{}); got.State != Busy {
+		t.Fatalf("expired a live owner: %#v", got)
+	}
+	if got := d.Begin("other", Scope{}); got.State != Busy {
+		t.Fatalf("evicted a live owner: %#v", got)
+	}
+	if d.Len() != 2 {
+		t.Fatalf("capacity exceeded: %d", d.Len())
+	}
+	second.Claim.Release()
+	other := d.Begin("other", Scope{})
+	if other.State != Claimed {
+		t.Fatalf("release did not free capacity: %#v", other)
+	}
+	if !first.Claim.Commit("first-run") || !other.Claim.Commit("other-run") {
+		t.Fatal("live owner lost after pressure")
+	}
+}
+
+func TestAcceptedReceiptsUseLRUEviction(t *testing.T) {
+	d := New(2, time.Minute)
+	for _, id := range []string{"a", "b"} {
+		if !d.Begin(id, Scope{}).Claim.Commit("run-" + id) {
+			t.Fatal("commit failed")
+		}
+	}
+	if got := d.Begin("a", Scope{}); got.State != Accepted {
+		t.Fatal("a missing")
+	}
+	if !d.Begin("c", Scope{}).Claim.Commit("run-c") {
+		t.Fatal("c commit failed")
+	}
+	if got := d.Begin("a", Scope{}); got.State != Accepted || got.RunID != "run-a" {
+		t.Fatalf("recent receipt evicted: %#v", got)
+	}
+	if got := d.Begin("b", Scope{}); got.State != Claimed {
+		t.Fatalf("oldest receipt was not evicted: %#v", got)
+	} else {
+		got.Claim.Release()
+	}
+}
+
+func TestReplayDoesNotRenewReceiptTTL(t *testing.T) {
+	now := time.Unix(1000, 0)
+	d := New(3, time.Minute).WithClock(func() time.Time { return now })
+	if !d.Begin("a", Scope{}).Claim.Commit("run-a") {
+		t.Fatal("commit a")
+	}
+	now = now.Add(30 * time.Second)
+	if !d.Begin("b", Scope{}).Claim.Commit("run-b") {
+		t.Fatal("commit b")
+	}
+	if got := d.Begin("a", Scope{}); got.State != Accepted {
+		t.Fatal("a expired early")
+	}
+	now = now.Add(31 * time.Second)
+	if got := d.Begin("a", Scope{}); got.State != Claimed {
+		t.Fatalf("replay renewed TTL or hid an expired MRU entry: %#v", got)
+	} else {
+		got.Claim.Release()
+	}
+	if got := d.Begin("b", Scope{}); got.State != Accepted || got.RunID != "run-b" {
+		t.Fatalf("unexpired receipt lost: %#v", got)
+	}
+}
+
+func TestEmptyDeliveryDoesNotConsumeCapacity(t *testing.T) {
+	d := New(1, time.Minute)
+	for range 3 {
+		got := d.Begin("", Scope{})
+		if got.State != Claimed || got.Claim != nil || got.RunID != "" {
+			t.Fatalf("legacy admission = %#v", got)
+		}
 	}
 	if d.Len() != 0 {
-		t.Fatalf("Len after Record(\"\") = %d, want 0", d.Len())
+		t.Fatalf("legacy deliveries were cached: %d", d.Len())
 	}
 }
 
-func TestSeen_WithinTTL_True_AfterExpiry_False(t *testing.T) {
-	c := newFakeClock(time.Unix(0, 0))
-	d := New(8, 10*time.Second).WithClock(c.Now)
-	d.Record("x")
-	if !d.Seen("x") {
-		t.Fatal("Seen(x) within TTL should be true")
+func TestNewRejectsInvalidBounds(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		capacity int
+		ttl      time.Duration
+	}{{"zero capacity", 0, time.Minute}, {"negative capacity", -1, time.Minute}, {"zero TTL", 1, 0}, {"negative TTL", 1, -time.Second}} {
+		t.Run(tc.name, func(t *testing.T) {
+			defer func() {
+				if recover() == nil {
+					t.Fatal("invalid cache bounds were accepted")
+				}
+			}()
+			New(tc.capacity, tc.ttl)
+		})
 	}
-	c.Advance(9 * time.Second)
-	if !d.Seen("x") {
-		t.Fatal("Seen(x) just before expiry should still be true")
-	}
-	c.Advance(2 * time.Second) // now 11s > 10s TTL
-	if d.Seen("x") {
-		t.Fatal("Seen(x) after TTL should be false")
-	}
-}
-
-func TestCapacity_EvictsOldest_NotRecent(t *testing.T) {
-	c := newFakeClock(time.Unix(0, 0))
-	d := New(3, time.Minute).WithClock(c.Now)
-	d.Record("a")
-	c.Advance(time.Millisecond)
-	d.Record("b")
-	c.Advance(time.Millisecond)
-	d.Record("c")
-	if d.Len() != 3 {
-		t.Fatalf("Len = %d, want 3", d.Len())
-	}
-	// Adding "d" must evict "a" (oldest), not "c" (most recent).
-	d.Record("d")
-	if d.Seen("a") {
-		t.Fatal("expected a to be evicted when capacity exceeded")
-	}
-	if !d.Seen("b") || !d.Seen("c") || !d.Seen("d") {
-		t.Fatalf("recent ids must survive eviction: b=%v c=%v d=%v",
-			d.Seen("b"), d.Seen("c"), d.Seen("d"))
-	}
-	if d.Len() != 3 {
-		t.Fatalf("Len after eviction = %d, want 3", d.Len())
-	}
-}
-
-func TestCapacity_PromotionPreventsEvictionOfRefreshedID(t *testing.T) {
-	c := newFakeClock(time.Unix(0, 0))
-	d := New(3, time.Minute).WithClock(c.Now)
-	d.Record("a")
-	c.Advance(time.Millisecond)
-	d.Record("b")
-	c.Advance(time.Millisecond)
-	d.Record("c")
-	// Refresh "a" so it becomes MRU; next insert should now evict "b".
-	c.Advance(time.Millisecond)
-	d.Record("a")
-	c.Advance(time.Millisecond)
-	d.Record("d")
-	if d.Seen("b") {
-		t.Fatal("expected b to be evicted after a was promoted")
-	}
-	if !d.Seen("a") || !d.Seen("c") || !d.Seen("d") {
-		t.Fatalf("a/c/d should survive: a=%v c=%v d=%v",
-			d.Seen("a"), d.Seen("c"), d.Seen("d"))
-	}
-}
-
-func TestExpiredEntriesArePurgedOnRecord(t *testing.T) {
-	c := newFakeClock(time.Unix(0, 0))
-	d := New(4, 5*time.Second).WithClock(c.Now)
-	d.Record("old1")
-	c.Advance(time.Millisecond)
-	d.Record("old2")
-	c.Advance(6 * time.Second) // both expired
-	d.Record("fresh")
-	if d.Seen("old1") || d.Seen("old2") {
-		t.Fatal("expired entries must not appear Seen after purge")
-	}
-	if !d.Seen("fresh") {
-		t.Fatal("fresh entry must be present")
-	}
-	// Len reflects only live entries after purge-on-record.
-	if d.Len() != 1 {
-		t.Fatalf("Len = %d, want 1 after expired purge", d.Len())
-	}
-}
-
-func TestConcurrency_NoRaceUnderLoad(t *testing.T) {
-	d := New(256, time.Minute)
-	var wg sync.WaitGroup
-	for i := 0; i < 16; i++ {
-		wg.Add(1)
-		go func(base int) {
-			defer wg.Done()
-			for j := 0; j < 200; j++ {
-				id := "id-" + string(rune('A'+base%26)) + "-" + string(rune('0'+j%10))
-				d.Record(id)
-				_ = d.Seen(id)
-			}
-		}(i)
-	}
-	wg.Wait()
-	// No panic / race detector trip = pass. Len sanity check.
-	if d.Len() > 256 {
-		t.Fatalf("Len exceeded capacity: %d", d.Len())
-	}
-}
-
-func TestNew_PanicsOnInvalidArgs(t *testing.T) {
-	defer func() {
-		if r := recover(); r == nil {
-			t.Fatal("expected panic on zero capacity")
-		}
-	}()
-	New(0, time.Minute)
 }

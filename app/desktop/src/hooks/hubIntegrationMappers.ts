@@ -44,6 +44,19 @@ export function isTerminalBridgeTask(task: AgentTask): boolean {
   return task.status === 'done' || task.status === 'failed';
 }
 
+/** True once a task has been accepted by Edge (has a runId) or already reached
+ *  a running/terminal status. Used to prevent a duplicate delivery from
+ *  downgrading or failing an already-progressed task. */
+export function hasTaskProgressed(task: AgentTask | undefined): boolean {
+  return (
+    task !== undefined &&
+    (task.runId !== undefined ||
+      task.status === 'running' ||
+      task.status === 'done' ||
+      task.status === 'failed')
+  );
+}
+
 export function normalizeRouteDecision(value: unknown): CoordinatorRouteDecision | null {
   const record = parseRecord(value);
   const nested = parseRecord(record.decision);
@@ -287,6 +300,7 @@ export function buildEdgeRunBody(
       parseStringRecord(modelParams.configOverrides),
     ephemeral: getFirstBoolean(modelParams.ephemeral, data.ephemeral),
     hubTaskId: getFirstString(data.task_id),
+    deliveryId: getFirstString(data.delivery_id, data.deliveryId),
     targetId: targetBinding?.expectedTargetId,
     edgeDeviceId: targetBinding?.expectedEdgeDeviceId,
     dispatchTargetEvidence: targetBinding
@@ -322,6 +336,26 @@ export function extractCreatedRunId(value: unknown): string {
     throw new Error(`Edge run created but no id/runId in response${isEnvelope ? ' data' : ''}`);
   }
   return runId;
+}
+
+/**
+ * Classify a definite transient Edge admission rejection. Only these two codes
+ * are safe to leave queued for the Hub outbox to retry: a busy delivery slot
+ * (503 delivery_busy) and a Hub thread already occupied by an active run
+ * (409 active_run_exists). Any other non-OK response keeps the existing
+ * failure handling rather than being treated as a retryable admission.
+ *
+ * Reads the canonical Edge error envelope ({ error: { code, message, traceId } }),
+ * which may arrive either as an already-parsed object or as a raw JSON string.
+ */
+export function isTransientAdmissionRejection(status: number, body: unknown): boolean {
+  const record = parseRecord(body);
+  const error = parseRecord(record.error);
+  const code = getFirstString(error.code);
+  return (
+    (status === 503 && code === 'delivery_busy') ||
+    (status === 409 && code === 'active_run_exists')
+  );
 }
 
 export const FINAL_OUTPUT_MAX_CHARS = 32_000;

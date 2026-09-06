@@ -304,11 +304,6 @@ func (h *Handler) PostRuns(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// #2101 G2: short-circuit duplicate deliveries before any run side-effects.
-	if h.handleDeliveryDedup(w, req.DeliveryID, req.HubTaskID, req.ThreadID) {
-		return
-	}
-
 	// Merge profile defaults: profile fields fill in blanks, request fields win.
 	h.applyProfileDefaults(&req)
 
@@ -339,6 +334,13 @@ func (h *Handler) PostRuns(w http.ResponseWriter, r *http.Request) {
 	}
 
 	repository := ensureStore(h)
+	claim, handled := h.beginRunDelivery(w, r, req, repository)
+	if handled {
+		return
+	}
+	if claim != nil {
+		defer claim.Release()
+	}
 
 	// Auto-detect continue: when the thread has prior assistant messages,
 	// set ContinueLast = true so adapters can resume the conversation.
@@ -420,6 +422,10 @@ func (h *Handler) PostRuns(w http.ResponseWriter, r *http.Request) {
 		errcode.Write(w, errcode.ErrInternal.WithMessagef("%v", err))
 		return
 	}
+	if claim != nil && !claim.Commit(run.ID) {
+		errcode.Write(w, errcode.ErrInternal.WithMessage("run admission receipt could not be committed"))
+		return
+	}
 	writeSuccess(w, http.StatusAccepted, acceptedResponse(runToResponse(run)))
 }
 
@@ -492,33 +498,4 @@ func (h *Handler) GetMetrics(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	h.Metrics.Handler().ServeHTTP(w, r)
-}
-
-// ---------------------------------------------------------------------------
-// GET /v1/events  (WebSocket)
-// ---------------------------------------------------------------------------
-
-// handleDeliveryDedup short-circuits POST /v1/runs when the request carries a
-// delivery_id that was already seen within the TTL window (#2101 G2). Returns
-// true when the response has been written and the caller must return; false
-// means the request should continue normal processing. Empty delivery_id or a
-// nil dedup cache bypass dedup so legacy payloads keep working.
-func (h *Handler) handleDeliveryDedup(w http.ResponseWriter, deliveryID, hubTaskID, threadID string) bool {
-	if h.DeliveryDedup == nil || deliveryID == "" {
-		return false
-	}
-	if h.DeliveryDedup.Seen(deliveryID) {
-		slog.Info("run.create.dedup",
-			"deliveryId", deliveryID,
-			"hubTaskId", hubTaskID,
-			"threadId", threadID,
-			"result", "duplicate_skipped")
-		writeSuccess(w, http.StatusAccepted, map[string]any{
-			"deduplicated": true,
-			"deliveryId":   deliveryID,
-		})
-		return true
-	}
-	h.DeliveryDedup.Record(deliveryID)
-	return false
 }
