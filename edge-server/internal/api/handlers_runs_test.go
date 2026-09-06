@@ -1739,3 +1739,51 @@ func TestRunStartDualToken_HubIssueShape_RejectsWrongAction(t *testing.T) {
 		t.Fatalf("executor starts = %d, want 0", len(executor.started))
 	}
 }
+
+func TestPostRunsProfileToolDefaultsAreRunOwned(t *testing.T) {
+	h := newTestHandler()
+	executor := &fakeRunExecutor{}
+	h.Executor = executor
+	h.ensureDefaults()
+	workDir := allowTestWorkspace(t, h)
+	if _, err := h.Store.CreateAgentProfile(store.AgentProfile{
+		ID: "profile-owned", AdapterID: "mock-runner", AllowedTools: []string{"Read", "Grep"},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	for i := 0; i < 3; i++ {
+		threadID := fmt.Sprintf("thread-profile-%d", i)
+		if _, err := h.Store.CreateThread(threadID, "proj_local", "Profile isolation", "", "", ""); err != nil {
+			t.Fatal(err)
+		}
+		request := map[string]any{
+			"projectId": "proj_local", "threadId": threadID, "profileId": "profile-owned",
+			"prompt": "inspect generated fixture", "workDir": workDir,
+		}
+		wantTool := "Read"
+		if i == 2 {
+			request["allowedTools"] = []string{"ExplicitTool"}
+			wantTool = "ExplicitTool"
+		}
+		body, err := json.Marshal(request)
+		if err != nil {
+			t.Fatal(err)
+		}
+		rec := httptest.NewRecorder()
+		h.PostRuns(rec, httptest.NewRequest(http.MethodPost, "/v1/runs", strings.NewReader(string(body))))
+		if rec.Code != http.StatusAccepted || len(executor.contexts) != i+1 {
+			t.Fatalf("run %d: status=%d contexts=%d body=%s", i, rec.Code, len(executor.contexts), rec.Body.String())
+		}
+		tools := executor.contexts[i].AllowedTools
+		if len(tools) == 0 || tools[0] != wantTool {
+			t.Fatalf("run %d inherited tools=%v, want first tool %q", i, tools, wantTool)
+		}
+		// An executor owns its run options; changing one run must not rewrite
+		// saved defaults or the options inherited by a later run.
+		tools[0] = "run-local-tool"
+	}
+	profile, ok := h.Store.GetAgentProfile("profile-owned")
+	if !ok || len(profile.AllowedTools) != 2 || profile.AllowedTools[0] != "Read" || profile.AllowedTools[1] != "Grep" {
+		t.Fatalf("run-local options changed the saved profile: %#v", profile)
+	}
+}

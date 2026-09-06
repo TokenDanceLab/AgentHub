@@ -1,6 +1,9 @@
 package store
 
-import "sort"
+import (
+	"slices"
+	"sort"
+)
 
 func copyMap[K comparable, V any](source map[K]V) map[K]V {
 	copied := make(map[K]V, len(source))
@@ -37,6 +40,21 @@ func cloneArtifact(artifact Artifact) Artifact {
 	source := *artifact.ContentSource
 	artifact.ContentSource = &source
 	return artifact
+}
+
+// cloneAgentProfile detaches the mutable tool and skill lists from the source.
+func cloneAgentProfile(profile AgentProfile) AgentProfile {
+	profile.AllowedTools = slices.Clone(profile.AllowedTools)
+	profile.Skills = slices.Clone(profile.Skills)
+	return profile
+}
+
+func cloneAgentProfileMap(source map[string]AgentProfile) map[string]AgentProfile {
+	out := make(map[string]AgentProfile, len(source))
+	for key, profile := range source {
+		out[key] = cloneAgentProfile(profile)
+	}
+	return out
 }
 
 func normalizeOrder[V any](order []string, items map[string]V) []string {

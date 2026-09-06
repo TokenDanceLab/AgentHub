@@ -123,7 +123,8 @@ func createAgentProfileInMaps(
 ) (AgentProfile, []string, error) {
 	_, exists := profiles[profile.ID]
 	profile, created, err := resolveCreateAgentProfile(exists, profile, now)
-	return profile, putTracked(profiles, order, profile.ID, profile, created), err
+	order = putTracked(profiles, order, profile.ID, cloneAgentProfile(profile), created)
+	return cloneAgentProfile(profile), order, err
 }
 
 // updateThreadInMaps applies optional title/status when the thread exists.
@@ -185,8 +186,8 @@ func updateAgentProfileInMaps(
 	if err != nil {
 		return AgentProfile{}, err
 	}
-	profiles[id] = profile
-	return profile, nil
+	profiles[id] = cloneAgentProfile(profile)
+	return cloneAgentProfile(profile), nil
 }
 
 // upsertRunDiffFileInMaps validates, merges, and stores a run diff file.
