@@ -245,6 +245,12 @@ func RunResponse(run store.Run) map[string]any {
 	if run.WorkDir != "" {
 		payload["workDir"] = run.WorkDir
 	}
+	if run.AdmissionState != "" {
+		payload["admissionState"] = run.AdmissionState
+	}
+	if run.AdmissionErrorCode != "" {
+		payload["admissionErrorCode"] = run.AdmissionErrorCode
+	}
 	return payload
 }
 

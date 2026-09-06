@@ -18,6 +18,7 @@ import {
   extractRunOutputBatch,
   getTeamRouteContext,
   hasTaskProgressed,
+  isAdmissionUncertain,
   isTerminalBridgeTask,
   isTransientAdmissionRejection,
   normalizeRouteDecision,
@@ -341,12 +342,18 @@ describe('hubIntegrationMappers', () => {
   it('classifies transient admission rejections from the canonical Edge error envelope', () => {
     const busyEnvelope = { error: { code: 'delivery_busy', message: 'busy', traceId: 'trace_001' } };
     const activeEnvelope = { error: { code: 'active_run_exists', message: 'active', traceId: 'trace_001' } };
+    const capacityEnvelope = { error: { code: 'too_many_concurrent_runs', message: 'capacity', traceId: 'trace_001' } };
+    const persistEnvelope = { error: { code: 'admission_persist_failed', message: 'persist failed', traceId: 'trace_001' } };
 
     expect(isTransientAdmissionRejection(503, busyEnvelope)).toBe(true);
     expect(isTransientAdmissionRejection(409, activeEnvelope)).toBe(true);
+    expect(isTransientAdmissionRejection(429, capacityEnvelope)).toBe(true);
+    expect(isTransientAdmissionRejection(503, persistEnvelope)).toBe(true);
     // Raw JSON string form (what the hook passes from runResp.text()).
     expect(isTransientAdmissionRejection(503, JSON.stringify(busyEnvelope))).toBe(true);
     expect(isTransientAdmissionRejection(409, JSON.stringify(activeEnvelope))).toBe(true);
+    expect(isTransientAdmissionRejection(429, JSON.stringify(capacityEnvelope))).toBe(true);
+    expect(isTransientAdmissionRejection(503, JSON.stringify(persistEnvelope))).toBe(true);
 
     // Non-transient / non-matching envelopes keep the existing failure path.
     expect(isTransientAdmissionRejection(409, { error: { code: 'delivery_conflict', message: 'x', traceId: 't' } })).toBe(false);
@@ -354,8 +361,22 @@ describe('hubIntegrationMappers', () => {
     expect(isTransientAdmissionRejection(503, { error: { code: 'internal', message: 'x', traceId: 't' } })).toBe(false);
     expect(isTransientAdmissionRejection(503, 'not-json')).toBe(false);
     expect(isTransientAdmissionRejection(200, {})).toBe(false);
+    expect(isTransientAdmissionRejection(404, { error: { code: 'too_many_concurrent_runs' } })).toBe(false);
+    expect(isTransientAdmissionRejection(429, { error: { code: 'unknown' } })).toBe(false);
+    expect(isTransientAdmissionRejection(409, { error: { code: 'admission_uncertain', message: 'manual review', traceId: 't' } })).toBe(false);
     // A flat top-level {code} is not the canonical envelope — must not match.
     expect(isTransientAdmissionRejection(503, { code: 'delivery_busy' })).toBe(false);
+  });
+
+  it('keeps admission_uncertain separate from transient rejections', () => {
+    const uncertainEnvelope = { error: { code: 'admission_uncertain', message: 'manual review', traceId: 'trace_001' } };
+    expect(isTransientAdmissionRejection(409, uncertainEnvelope)).toBe(false);
+    expect(isTransientAdmissionRejection(409, JSON.stringify(uncertainEnvelope))).toBe(false);
+    expect(isAdmissionUncertain(409, uncertainEnvelope)).toBe(true);
+    expect(isAdmissionUncertain(409, JSON.stringify(uncertainEnvelope))).toBe(true);
+    expect(isAdmissionUncertain(503, uncertainEnvelope)).toBe(false);
+    expect(isAdmissionUncertain(409, { error: { code: 'internal', message: 'x' } })).toBe(false);
+    expect(isAdmissionUncertain(409, { code: 'admission_uncertain' })).toBe(false);
   });
 
   it('isTerminalBridgeTask detects done/failed only', () => {

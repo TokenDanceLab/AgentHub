@@ -39,6 +39,8 @@ type Run struct {
 	EvidenceGateResult string `json:"evidenceGateResult,omitempty"`
 	WorkDir            string `json:"workDir,omitempty"`
 	HubTaskID          string `json:"hubTaskId,omitempty"`
+	AdmissionState     string `json:"admissionState,omitempty"`
+	AdmissionErrorCode string `json:"admissionErrorCode,omitempty"`
 }
 
 type RunDiffFile struct {
