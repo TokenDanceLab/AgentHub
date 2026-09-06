@@ -250,6 +250,28 @@ func (f *FileStore) CreateRun(id, projectID, threadID string) (Run, error) {
 	return run, nil
 }
 
+func (f *FileStore) CreateRunAdmission(id, projectID, threadID, hubTaskID string) (Run, error) {
+	run, err := f.store.CreateRunAdmission(id, projectID, threadID, hubTaskID)
+	if err != nil {
+		return Run{}, err
+	}
+	if err := f.syncPersist(); err != nil {
+		return run, err
+	}
+	return run, nil
+}
+
+func (f *FileStore) RecordRunAdmission(id, errorCode string) (Run, error) {
+	run, err := f.store.RecordRunAdmission(id, errorCode)
+	if err != nil {
+		return run, err
+	}
+	if err := f.syncPersist(); err != nil {
+		return run, err
+	}
+	return run, nil
+}
+
 func (f *FileStore) GetRun(id string) (Run, bool) {
 	return f.store.GetRun(id)
 }

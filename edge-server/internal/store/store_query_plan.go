@@ -315,7 +315,9 @@ func buildTerminalCleanupCandidates(order []string, runs map[string]Run) []runCl
 	candidates := make([]runCleanupCandidate, 0, len(order))
 	for idx, id := range order {
 		run, ok := runs[id]
-		if !ok || !isTerminalRunStatus(run.Status) {
+		// An executor may finish before its admission receipt is committed.
+		// Pending evidence must survive retention until the outcome is known.
+		if !ok || run.AdmissionState == RunAdmissionPending || !isTerminalRunStatus(run.Status) {
 			continue
 		}
 		terminalAt, hasTime := runTerminalTime(run)
