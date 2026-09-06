@@ -3,6 +3,7 @@ package store
 // Residual pure-helper peel #1144: run/artifact/profile/settings methods. Same package; zero behavior change.
 
 import (
+	"slices"
 	"time"
 )
 
@@ -58,7 +59,10 @@ func (s *Store) UpsertRunCheckpoint(cp RunCheckpoint) (RunCheckpoint, error) {
 	if cp.CreatedAt == "" {
 		cp.CreatedAt = nowString()
 	}
+	// Neither the input nor the result may share the stored evidence.
+	cp.Files = slices.Clone(cp.Files)
 	s.checkpoints[cp.RunID] = cp
+	cp.Files = slices.Clone(cp.Files)
 	return cp, nil
 }
 
