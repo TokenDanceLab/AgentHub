@@ -335,8 +335,9 @@ func (s *Store) GetRunByHubTaskID(hubTaskID string) (Run, bool) {
 	}
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	for _, run := range s.runs {
-		if run.HubTaskID == hubTaskID {
+	for i := len(s.runOrder) - 1; i >= 0; i-- {
+		run, ok := s.runs[s.runOrder[i]]
+		if ok && run.HubTaskID == hubTaskID {
 			return run, true
 		}
 	}

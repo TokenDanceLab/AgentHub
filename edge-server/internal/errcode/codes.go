@@ -56,9 +56,11 @@ var (
 	ErrTooManyConcurrentRuns = New("too_many_concurrent_runs", "too many concurrent runs", http.StatusTooManyRequests)
 
 	// Run
-	ErrActiveRunExists  = New("active_run_exists", "thread already has an active run", http.StatusConflict)
-	ErrDeliveryBusy     = New("delivery_busy", "delivery admission is busy; retry later", http.StatusServiceUnavailable)
-	ErrDeliveryConflict = New("delivery_conflict", "delivery id belongs to another task or legacy scope", http.StatusConflict)
+	ErrActiveRunExists        = New("active_run_exists", "thread already has an active run", http.StatusConflict)
+	ErrDeliveryBusy           = New("delivery_busy", "delivery admission is busy; retry later", http.StatusServiceUnavailable)
+	ErrDeliveryConflict       = New("delivery_conflict", "delivery id belongs to another task or legacy scope", http.StatusConflict)
+	ErrAdmissionPersistFailed = New("admission_persist_failed", "run admission evidence could not be persisted; retry later", http.StatusServiceUnavailable)
+	ErrAdmissionUncertain     = New("admission_uncertain", "run admission outcome requires reconciliation; do not restart automatically", http.StatusConflict)
 
 	// Agent discovery
 	ErrInvalidAgentID             = New("invalid_agent_id", "unknown agent adapter", http.StatusBadRequest)

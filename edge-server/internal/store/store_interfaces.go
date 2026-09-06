@@ -33,6 +33,8 @@ type Writer interface {
 	UpdateThread(id string, title *string, status *string) (Thread, bool)
 	DeleteThread(id string) bool
 	CreateRun(id, projectID, threadID string) (Run, error)
+	CreateRunAdmission(id, projectID, threadID, hubTaskID string) (Run, error)
+	RecordRunAdmission(id, errorCode string) (Run, error)
 	SetRunStatus(id, status string) (Run, bool)
 	SetRunStatusIf(id, status string, allowedCurrent ...string) (Run, bool)
 	CreateItem(item Item) (Item, error)
