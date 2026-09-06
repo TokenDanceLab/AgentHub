@@ -60,5 +60,8 @@ func (h *Handler) beginRunDelivery(w http.ResponseWriter, r *http.Request, req r
 func (h *Handler) validateRunReplay(r *http.Request, req runRequest, run store.Run) *errcode.Error {
 	req.ProjectID = run.ProjectID
 	req.ThreadID = run.ThreadID
-	return h.validateCapabilityRequest(r, &req)
+	if err := h.validateCapabilityRequest(r, &req); err != nil {
+		return err
+	}
+	return validateReplayCallbackOwner(req, run)
 }

@@ -15,8 +15,8 @@ type admissionWriteFailure struct {
 	failAccepted bool
 }
 
-func (r *admissionWriteFailure) CreateRunAdmission(id, project, thread, task string) (store.Run, error) {
-	run, err := r.Repository.CreateRunAdmission(id, project, thread, task)
+func (r *admissionWriteFailure) CreateRunAdmission(id, project, thread, task, callbackOwner string) (store.Run, error) {
+	run, err := r.Repository.CreateRunAdmission(id, project, thread, task, callbackOwner)
 	if err == nil && r.failPrepare {
 		r.failPrepare = false
 		return run, errors.New("fixture pending write failure")
@@ -88,7 +88,7 @@ func TestHubAdmission_ReopenKeepsIdentityWithoutRestarting(t *testing.T) {
 					case "accepted":
 						original, err = Create(repo, executor, nil, params)
 					case "pending":
-						original, err = repo.CreateRunAdmission("run-pending", "proj_local", "thread_local", params.HubTaskID)
+						original, err = repo.CreateRunAdmission("run-pending", "proj_local", "thread_local", params.HubTaskID, "")
 					default:
 						original, err = repo.CreateRun("run-legacy", "proj_local", "thread_local")
 						if err == nil {

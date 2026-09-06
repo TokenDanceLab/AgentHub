@@ -28,7 +28,7 @@ func (w *stubTranscriptWriter) DeleteThread(id string) bool { return false }
 func (w *stubTranscriptWriter) CreateRun(id, projectID, threadID string) (store.Run, error) {
 	return store.Run{}, nil
 }
-func (w *stubTranscriptWriter) CreateRunAdmission(id, projectID, threadID, hubTaskID string) (store.Run, error) {
+func (w *stubTranscriptWriter) CreateRunAdmission(id, projectID, threadID, hubTaskID, callbackOwner string) (store.Run, error) {
 	return store.Run{}, store.ErrNotFound
 }
 func (w *stubTranscriptWriter) RecordRunAdmission(id, errorCode string) (store.Run, error) {

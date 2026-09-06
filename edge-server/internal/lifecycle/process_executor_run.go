@@ -25,7 +25,7 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 	// Edge→Hub direct callback reporting. Without the collector, recordHubOutput
 	// no-ops and fireHubDone falls back to literal "Run finished" (#987).
 	// Pure gate only; hubOutputs allocation stays here (#987 residual ownership).
-	if planHubTaskRecord(runCtx.HubTaskID).Record {
+	if run.CallbackOwner != "desktop" && planHubTaskRecord(runCtx.HubTaskID).Record {
 		e.mu.Lock()
 		e.hubTasks[run.ID] = runCtx.HubTaskID
 		e.hubOutputs[run.ID] = newHubOutputCollector(hubCallbackFinalMaxBytes)

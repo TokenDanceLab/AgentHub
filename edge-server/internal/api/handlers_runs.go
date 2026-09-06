@@ -58,6 +58,7 @@ type runRequest struct {
 	AgentDefinitions        map[string]runnerctx.AgentDefinition `json:"agentDefinitions"`
 	MCPConfig               string                               `json:"mcpConfig"`
 	Ephemeral               bool                                 `json:"ephemeral"`
+	CallbackOwner           string                               `json:"callbackOwner"`
 	HubTaskID               string                               `json:"hubTaskId"`          // Edge-to-Hub direct callback task ID
 	TraceID                 string                               `json:"trace_id,omitempty"` // Hub dispatch trace correlation id
 	DeliveryID              string                               `json:"deliveryId"`         // Hub delivery_id for dual-channel dedup (#2101 G2)
@@ -333,6 +334,10 @@ func (h *Handler) PostRuns(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if err := h.resolveRunCallbackOwner(&req); err != nil {
+		errcode.Write(w, err)
+		return
+	}
 	repository := ensureStore(h)
 	claim, handled := h.beginRunDelivery(w, r, req, repository)
 	if handled {
@@ -376,16 +381,18 @@ func (h *Handler) PostRuns(w http.ResponseWriter, r *http.Request) {
 	// contributes the timeline policy and the adapter context builder.
 	var replayRunID string
 	run, err := runcontrol.Create(repository, h.Executor, h.Bus, runcontrol.CreateParams{
-		ProjectID:      req.ProjectID,
-		ThreadID:       req.ThreadID,
-		Prompt:         req.Prompt,
-		AgentID:        req.AgentID,
-		Model:          req.Model,
-		PermissionMode: req.PermissionMode,
-		SessionID:      req.SessionID,
-		ContinueLast:   req.Continue,
-		WorkDir:        req.WorkDir,
-		HubTaskID:      req.HubTaskID,
+		ProjectID:         req.ProjectID,
+		ThreadID:          req.ThreadID,
+		Prompt:            req.Prompt,
+		AgentID:           req.AgentID,
+		Model:             req.Model,
+		PermissionMode:    req.PermissionMode,
+		SessionID:         req.SessionID,
+		ContinueLast:      req.Continue,
+		WorkDir:           req.WorkDir,
+		HubTaskID:         req.HubTaskID,
+		CallbackOwner:     req.CallbackOwner,
+		ValidateAdmission: func() *errcode.Error { return h.validateCallbackAdmission(req) },
 		AuthorizeReplay: func(existing store.Run) *errcode.Error {
 			replayRunID = existing.ID
 			return h.validateRunReplay(r, req, existing)

@@ -41,6 +41,7 @@ type Run struct {
 	HubTaskID          string `json:"hubTaskId,omitempty"`
 	AdmissionState     string `json:"admissionState,omitempty"`
 	AdmissionErrorCode string `json:"admissionErrorCode,omitempty"`
+	CallbackOwner      string `json:"callbackOwner,omitempty"`
 }
 
 type RunDiffFile struct {

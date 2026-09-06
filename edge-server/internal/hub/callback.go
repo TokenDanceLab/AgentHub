@@ -124,6 +124,12 @@ func (c *CallbackClient) currentAuthToken() string {
 	return c.authToken
 }
 
+// Configured reports whether direct task callbacks have a destination and a
+// current credential. It exposes no credential and makes no connectivity claim.
+func (c *CallbackClient) Configured() bool {
+	return c != nil && strings.TrimSpace(c.hubURL) != "" && strings.TrimSpace(c.currentAuthToken()) != ""
+}
+
 // TaskResult carries the final result of a completed task.
 type TaskResult struct {
 	RunID        string `json:"run_id"`

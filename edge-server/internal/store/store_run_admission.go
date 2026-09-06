@@ -21,7 +21,7 @@ var (
 // CreateRunAdmission creates a run and records its Hub task identity and pending
 // admission atomically under one Store lock. It reuses the existing run create
 // validation/order helper; only the non-empty HubTaskID and admission marker are new.
-func (s *Store) CreateRunAdmission(id, projectID, threadID, hubTaskID string) (Run, error) {
+func (s *Store) CreateRunAdmission(id, projectID, threadID, hubTaskID, callbackOwner string) (Run, error) {
 	if hubTaskID == "" {
 		return Run{}, ErrRunAdmissionHubTaskIDRequired
 	}
@@ -37,7 +37,7 @@ func (s *Store) CreateRunAdmission(id, projectID, threadID, hubTaskID string) (R
 		if run.AdmissionState == RunAdmissionPending &&
 			run.HubTaskID == hubTaskID &&
 			run.ProjectID == projectID &&
-			run.ThreadID == threadID {
+			run.ThreadID == threadID && run.CallbackOwner == callbackOwner {
 			return run, nil
 		}
 		return Run{}, admissionCreateConflictError(id, hubTaskID, projectID, threadID, run)
@@ -45,6 +45,7 @@ func (s *Store) CreateRunAdmission(id, projectID, threadID, hubTaskID string) (R
 
 	s.runOrder = order
 	run.HubTaskID = hubTaskID
+	run.CallbackOwner = callbackOwner
 	run.AdmissionState = RunAdmissionPending
 	run.AdmissionErrorCode = ""
 	s.runs[id] = run
