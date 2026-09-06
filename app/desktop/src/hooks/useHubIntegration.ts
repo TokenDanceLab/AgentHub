@@ -33,7 +33,9 @@ import {
   extractRunOutputBatch,
   FINAL_OUTPUT_MAX_CHARS,
   getTeamRouteContext,
+  hasTaskProgressed,
   isTerminalBridgeTask,
+  isTransientAdmissionRejection,
   normalizeRuntimeAgentId,
   parsePermissionDecisionControl,
   permissionDecisionControlKey,
@@ -339,19 +341,23 @@ export function useHubIntegration(options: HubIntegrationOptions): HubIntegratio
           console.info('[useHubIntegration] Relay command target mismatch, skipping:', relayCommandId, targetError);
           return;
         }
-        store.getState().addTask({
-          taskId,
-          agentId: normalizeRuntimeAgentId(
-            getString(data, 'agent_type') || getString(data, 'agent_id'),
-          ),
-          prompt: getString(data, 'prompt') || getString(data, 'content'),
-          threadId: getString(data, 'thread_id') || getString(data, 'session_id') || 'hub-dispatch',
-          status: 'failed',
-          dispatchPayload,
-          error: targetError,
-          createdAt: new Date().toISOString(),
-        });
-        void catchHubReport(`failTask:${taskId}`, hubClient.failTask(taskId, targetError));
+        // A duplicate delivery with a target mismatch must not corrupt an already
+        // running/terminal task. Only a not-yet-accepted task is failed here.
+        if (!hasTaskProgressed(store.getState().tasks.find((t) => t.taskId === taskId))) {
+          store.getState().addTask({
+            taskId,
+            agentId: normalizeRuntimeAgentId(
+              getString(data, 'agent_type') || getString(data, 'agent_id'),
+            ),
+            prompt: getString(data, 'prompt') || getString(data, 'content'),
+            threadId: getString(data, 'thread_id') || getString(data, 'session_id') || 'hub-dispatch',
+            status: 'failed',
+            dispatchPayload,
+            error: targetError,
+            createdAt: new Date().toISOString(),
+          });
+          void catchHubReport(`failTask:${taskId}`, hubClient.failTask(taskId, targetError));
+        }
         return;
       }
 
@@ -395,19 +401,36 @@ export function useHubIntegration(options: HubIntegrationOptions): HubIntegratio
         );
 
         if (!runResp.ok) {
+          // Classify definite transient admission rejections (delivery_busy /
+          // active_run_exists). Anything else keeps the existing permanent path.
           const errorText = await runResp.text().catch(() => 'Unknown error');
+          if (isTransientAdmissionRejection(runResp.status, errorText)) {
+            // Keep the task queued/waiting; retry ownership stays with the Hub
+            // outbox. Do NOT ackTask / failTask / ackRelayCommand, and do not
+            // invent a second retry loop here.
+            return;
+          }
           throw new Error(`Edge POST /v1/runs returned ${runResp.status}: ${errorText}`);
         }
 
         const runId = extractCreatedRunId(await runResp.json());
 
-        // Map taskId ↔ runId and mark running
-        store.getState().updateTask(taskId, { runId, status: 'running' });
+        // Re-read before update to resist an async completion race: a duplicate
+        // dispatch must not downgrade a task that already reached running/done/
+        // failed, nor clobber an existing runId/output mapping.
+        const existingTask = store.getState().tasks.find((t) => t.taskId === taskId);
+        const taskProgressed = hasTaskProgressed(existingTask);
 
-        // Acknowledge task to Hub (log failures — do not throw into dispatch handler)
+        // Business state/mapping is only written once (first accepted instance).
+        if (!taskProgressed) {
+          store.getState().updateTask(taskId, { runId, status: 'running' });
+        }
+
+        // Every accepted delivery (first accept AND successful replay) is
+        // idempotently acknowledged. If the first ACK was lost in transit, Hub
+        // re-dispatches and we must re-ACK so the outbox/relay can converge; a
+        // double ACK here is expected recovery, not a race defect.
         void catchHubReport(`ackTask:${taskId}`, hubClient.ackTask(taskId, runId));
-
-        // Ack relay command if this was a relay-dispatched task
         if (relayCommandId && dispatchTarget?.deviceId) {
           void catchHubReport(
             `ackRelayCommand:${relayCommandId}`,
@@ -415,18 +438,27 @@ export function useHubIntegration(options: HubIntegrationOptions): HubIntegratio
           );
         }
 
-        // Notify consumer
-        const updatedTask = store.getState().tasks.find((t) => t.taskId === taskId);
-        if (updatedTask) {
-          onDispatch?.(updatedTask);
+        // onDispatch is a business "newly accepted" notification — a successful
+        // replay must not re-trigger it (transport ACK != business notification).
+        if (!taskProgressed) {
+          const updatedTask = store.getState().tasks.find((t) => t.taskId === taskId);
+          if (updatedTask) {
+            onDispatch?.(updatedTask);
+          }
         }
       } catch (err) {
         const errorMsg = err instanceof Error ? err.message : String(err);
-        store.getState().updateTask(taskId, {
-          status: 'failed',
-          error: errorMsg,
-        });
-        void catchHubReport(`failTask:${taskId}`, hubClient.failTask(taskId, errorMsg));
+        // A duplicate delivery's permanent failure must not corrupt an already
+        // running/terminal task. Only a not-yet-accepted delivery is failed here
+        // (permanent errors on new queued tasks still fail).
+        const currentTask = store.getState().tasks.find((t) => t.taskId === taskId);
+        if (!hasTaskProgressed(currentTask)) {
+          store.getState().updateTask(taskId, {
+            status: 'failed',
+            error: errorMsg,
+          });
+          void catchHubReport(`failTask:${taskId}`, hubClient.failTask(taskId, errorMsg));
+        }
       }
     });
 

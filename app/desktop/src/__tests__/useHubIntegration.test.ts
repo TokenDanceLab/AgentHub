@@ -213,6 +213,7 @@ describe('useHubIntegration', () => {
       request: vi.fn(),
       registerDevice: vi.fn().mockResolvedValue({ id: 'dev-1' }),
       ackTask: vi.fn().mockResolvedValue(undefined),
+      ackRelayCommand: vi.fn().mockResolvedValue(undefined),
       streamTask: vi.fn().mockResolvedValue(undefined),
       streamTaskEvent: vi.fn().mockResolvedValue(undefined),
       doneTask: vi.fn().mockResolvedValue(undefined),
@@ -307,6 +308,25 @@ describe('useHubIntegration', () => {
       if (url.endsWith('/v1/runs')) {
         return new Response(JSON.stringify(body), {
           status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+      return new Response('{}', { status: 200, headers: { 'Content-Type': 'application/json' } });
+    });
+  }
+
+  function mockRunCreateResponseWithStatus(body: Record<string, unknown>, status: number) {
+    fetchMock.mockImplementation(async (input: unknown) => {
+      const url = String(input);
+      if (url.endsWith('/v1/threads')) {
+        return new Response(JSON.stringify({ threadId: 'thread-ok' }), {
+          status: 201,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+      if (url.endsWith('/v1/runs')) {
+        return new Response(JSON.stringify(body), {
+          status,
           headers: { 'Content-Type': 'application/json' },
         });
       }
@@ -598,6 +618,295 @@ describe('useHubIntegration', () => {
 
     expect(fetchMock).not.toHaveBeenCalled();
     expect(hubClient.ackTask).not.toHaveBeenCalled();
+  });
+
+  it('forwards Hub delivery_id into the Edge run body', async () => {
+    renderHook(() => useHubIntegration({ hubWS, hubClient }));
+
+    await act(async () => {
+      fireHubEvent(
+        HUB_EVENTS.AGENT_DISPATCH,
+        makeDispatchPayload({ delivery_id: 'delivery-snake' }),
+      );
+    });
+
+    expect(fetchBodyFor('/v1/runs').deliveryId).toBe('delivery-snake');
+  });
+
+  it('forwards Hub deliveryId (camelCase) into the Edge run body', async () => {
+    renderHook(() => useHubIntegration({ hubWS, hubClient }));
+
+    await act(async () => {
+      fireHubEvent(
+        HUB_EVENTS.AGENT_DISPATCH,
+        makeDispatchPayload({ deliveryId: 'delivery-camel' }),
+      );
+    });
+
+    expect(fetchBodyFor('/v1/runs').deliveryId).toBe('delivery-camel');
+  });
+
+  it('omits deliveryId from the Edge run body when no Hub delivery id is present (legacy)', async () => {
+    renderHook(() => useHubIntegration({ hubWS, hubClient }));
+
+    await act(async () => {
+      fireHubEvent(HUB_EVENTS.AGENT_DISPATCH, makeDispatchPayload());
+    });
+
+    const body = fetchBodyFor('/v1/runs');
+    expect('deliveryId' in body).toBe(false);
+  });
+
+  it('duplicate dispatch keeps one run mapping, does not overwrite progress, and idempotently re-acks', async () => {
+    mockRunSequence('run-1', 'run-1');
+    const onDispatch = vi.fn();
+    renderHook(() => useHubIntegration({ hubWS, hubClient, onDispatch }));
+
+    await act(async () => {
+      fireHubEvent(
+        HUB_EVENTS.AGENT_DISPATCH,
+        makeDispatchPayload({ delivery_id: 'd1' }),
+      );
+    });
+    expect(hoisted.storeTasks).toHaveLength(1);
+    expect(hoisted.storeTasks[0]?.runId).toBe('run-1');
+    expect(hoisted.storeTasks[0]?.status).toBe('running');
+    expect(hubClient.ackTask).toHaveBeenCalledTimes(1);
+    expect(onDispatch).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      fireHubEvent(
+        HUB_EVENTS.AGENT_DISPATCH,
+        makeDispatchPayload({ delivery_id: 'd1' }),
+      );
+    });
+
+    expect(hoisted.storeTasks).toHaveLength(1);
+    expect(hoisted.storeTasks[0]?.runId).toBe('run-1');
+    expect(hoisted.storeTasks[0]?.status).toBe('running');
+    expect(hoisted.storeRunToTask['run-1']).toBe('task-1');
+    expect(hubClient.ackTask).toHaveBeenCalledTimes(2);
+    expect(hubClient.failTask).not.toHaveBeenCalled();
+    expect(onDispatch).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not downgrade a terminal task on a replayed dispatch, but re-acks idempotently', async () => {
+    mockRunSequence('run-1');
+    renderHook(() => useHubIntegration({ hubWS, hubClient }));
+
+    await act(async () => {
+      fireHubEvent(
+        HUB_EVENTS.AGENT_DISPATCH,
+        makeDispatchPayload({ delivery_id: 'd1' }),
+      );
+    });
+    act(() => {
+      fireEdgeEvent(makeEvent('run.finished', { runId: 'run-1' }));
+    });
+    expect(hoisted.storeTasks[0]?.status).toBe('done');
+    expect(hubClient.ackTask).toHaveBeenCalledTimes(1);
+
+    mockRunSequence('run-1');
+    await act(async () => {
+      fireHubEvent(
+        HUB_EVENTS.AGENT_DISPATCH,
+        makeDispatchPayload({ delivery_id: 'd1' }),
+      );
+    });
+
+    expect(hoisted.storeTasks).toHaveLength(1);
+    expect(hoisted.storeTasks[0]?.status).toBe('done');
+    expect(hoisted.storeTasks[0]?.runId).toBe('run-1');
+    expect(hubClient.ackTask).toHaveBeenCalledTimes(2);
+    expect(hubClient.failTask).not.toHaveBeenCalled();
+  });
+
+  it('keeps a delivery_busy rejection queued without acking or failing', async () => {
+    mockRunCreateResponseWithStatus({ error: { code: 'delivery_busy', message: 'busy', traceId: 'trace_001' } }, 503);
+    renderHook(() => useHubIntegration({ hubWS, hubClient }));
+
+    await act(async () => {
+      fireHubEvent(
+        HUB_EVENTS.AGENT_DISPATCH,
+        makeDispatchPayload({ delivery_id: 'd1' }),
+      );
+    });
+
+    expect(hoisted.storeTasks).toHaveLength(1);
+    expect(hoisted.storeTasks[0]?.status).toBe('queued');
+    expect(hoisted.storeTasks[0]?.runId).toBeUndefined();
+    expect(hubClient.ackTask).not.toHaveBeenCalled();
+    expect(hubClient.failTask).not.toHaveBeenCalled();
+  });
+
+  it('keeps an existing active run on active_run_exists without acking or failing', async () => {
+    mockRunSequence('run-1');
+    renderHook(() => useHubIntegration({ hubWS, hubClient }));
+
+    await act(async () => {
+      fireHubEvent(
+        HUB_EVENTS.AGENT_DISPATCH,
+        makeDispatchPayload({ delivery_id: 'd1' }),
+      );
+    });
+    expect(hoisted.storeTasks[0]?.status).toBe('running');
+
+    mockRunCreateResponseWithStatus({ error: { code: 'active_run_exists', message: 'active', traceId: 'trace_001' } }, 409);
+    await act(async () => {
+      fireHubEvent(
+        HUB_EVENTS.AGENT_DISPATCH,
+        makeDispatchPayload({ delivery_id: 'd1' }),
+      );
+    });
+
+    expect(hoisted.storeTasks).toHaveLength(1);
+    expect(hoisted.storeTasks[0]?.status).toBe('running');
+    expect(hoisted.storeTasks[0]?.runId).toBe('run-1');
+    expect(hubClient.ackTask).toHaveBeenCalledTimes(1);
+    expect(hubClient.failTask).not.toHaveBeenCalled();
+  });
+
+  it('does not ack a relay command on a delivery_busy rejection', async () => {
+    mockRunCreateResponseWithStatus({ error: { code: 'delivery_busy', message: 'busy', traceId: 'trace_001' } }, 503);
+    renderHook(() =>
+      useHubIntegration({
+        hubWS,
+        hubClient,
+        dispatchTarget: { targetId: 'target-current', deviceId: 'desktop-current' },
+      }),
+    );
+
+    const relayFrame = {
+      relay_command_id: 'relay-1',
+      command_type: 'agent.dispatch',
+      payload: JSON.stringify(
+        makeDispatchPayload({
+          target_id: 'target-current',
+          edge_device_id: 'desktop-current',
+          delivery_id: 'd1',
+        }),
+      ),
+    };
+    await act(async () => {
+      fireHubEvent(HUB_EVENTS.AGENT_DISPATCH, relayFrame);
+    });
+
+    expect(hubClient.ackRelayCommand).not.toHaveBeenCalled();
+    expect(hubClient.ackTask).not.toHaveBeenCalled();
+    expect(hubClient.failTask).not.toHaveBeenCalled();
+  });
+
+  it('still fails a permanent Edge admission rejection (e.g. 500)', async () => {
+    mockRunCreateResponseWithStatus({ error: { code: 'internal_error', message: 'boom', traceId: 'trace_001' } }, 500);
+    renderHook(() => useHubIntegration({ hubWS, hubClient }));
+
+    await act(async () => {
+      fireHubEvent(
+        HUB_EVENTS.AGENT_DISPATCH,
+        makeDispatchPayload({ delivery_id: 'd1' }),
+      );
+    });
+
+    expect(hoisted.storeTasks[0]?.status).toBe('failed');
+    expect(hubClient.ackTask).not.toHaveBeenCalled();
+    expect(hubClient.failTask).toHaveBeenCalled();
+  });
+
+  it('re-acks a successful replay when the first ACK was lost in transit', async () => {
+    mockRunSequence('run-1', 'run-1');
+    const ackTaskMock = hubClient.ackTask as ReturnType<typeof vi.fn>;
+    ackTaskMock.mockRejectedValueOnce(new Error('ACK transport lost')).mockResolvedValue(undefined);
+
+    renderHook(() => useHubIntegration({ hubWS, hubClient }));
+
+    await act(async () => {
+      fireHubEvent(
+        HUB_EVENTS.AGENT_DISPATCH,
+        makeDispatchPayload({ delivery_id: 'd1' }),
+      );
+    });
+    expect(hoisted.storeTasks).toHaveLength(1);
+    expect(hoisted.storeTasks[0]?.runId).toBe('run-1');
+    expect(hoisted.storeTasks[0]?.status).toBe('running');
+    expect(ackTaskMock).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      fireHubEvent(
+        HUB_EVENTS.AGENT_DISPATCH,
+        makeDispatchPayload({ delivery_id: 'd1' }),
+      );
+    });
+
+    expect(ackTaskMock).toHaveBeenCalledTimes(2);
+    expect(hoisted.storeTasks[0]?.runId).toBe('run-1');
+    expect(hoisted.storeTasks[0]?.status).toBe('running');
+    expect(hubClient.failTask).not.toHaveBeenCalled();
+  });
+
+  it('re-acks a relay command ACK on a successful replay when the first was lost', async () => {
+    mockRunSequence('run-1', 'run-1');
+    const relayAckMock = hubClient.ackRelayCommand as ReturnType<typeof vi.fn>;
+    relayAckMock.mockRejectedValueOnce(new Error('relay ACK lost')).mockResolvedValue(undefined);
+
+    renderHook(() =>
+      useHubIntegration({
+        hubWS,
+        hubClient,
+        dispatchTarget: { targetId: 'target-current', deviceId: 'desktop-current' },
+      }),
+    );
+
+    const relayFrame = {
+      relay_command_id: 'relay-1',
+      command_type: 'agent.dispatch',
+      payload: JSON.stringify(
+        makeDispatchPayload({
+          target_id: 'target-current',
+          edge_device_id: 'desktop-current',
+          delivery_id: 'd1',
+        }),
+      ),
+    };
+    await act(async () => {
+      fireHubEvent(HUB_EVENTS.AGENT_DISPATCH, relayFrame);
+    });
+    expect(relayAckMock).toHaveBeenCalledTimes(1);
+    expect(hubClient.ackTask).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      fireHubEvent(HUB_EVENTS.AGENT_DISPATCH, relayFrame);
+    });
+
+    expect(relayAckMock).toHaveBeenCalledTimes(2);
+    expect(hubClient.ackTask).toHaveBeenCalledTimes(2);
+    expect(hubClient.failTask).not.toHaveBeenCalled();
+  });
+
+  it('does not downgrade an already-running task when a duplicate delivery fails permanently', async () => {
+    mockRunSequence('run-1');
+    renderHook(() => useHubIntegration({ hubWS, hubClient }));
+
+    await act(async () => {
+      fireHubEvent(
+        HUB_EVENTS.AGENT_DISPATCH,
+        makeDispatchPayload({ delivery_id: 'd1' }),
+      );
+    });
+    expect(hoisted.storeTasks[0]?.status).toBe('running');
+    expect(hoisted.storeTasks[0]?.runId).toBe('run-1');
+
+    mockRunCreateResponseWithStatus({ error: { code: 'internal_error', message: 'boom', traceId: 'trace_001' } }, 500);
+    await act(async () => {
+      fireHubEvent(
+        HUB_EVENTS.AGENT_DISPATCH,
+        makeDispatchPayload({ delivery_id: 'd1' }),
+      );
+    });
+
+    expect(hoisted.storeTasks).toHaveLength(1);
+    expect(hoisted.storeTasks[0]?.status).toBe('running');
+    expect(hoisted.storeTasks[0]?.runId).toBe('run-1');
+    expect(hubClient.failTask).not.toHaveBeenCalled();
   });
 
   // ── Edge events → Hub callbacks ──────────────────────

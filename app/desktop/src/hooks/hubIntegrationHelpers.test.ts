@@ -17,7 +17,9 @@ import {
   extractCreatedRunId,
   extractRunOutputBatch,
   getTeamRouteContext,
+  hasTaskProgressed,
   isTerminalBridgeTask,
+  isTransientAdmissionRejection,
   normalizeRouteDecision,
   normalizeRuntimeAgentId,
   parsePermissionDecisionControl,
@@ -308,10 +310,66 @@ describe('hubIntegrationMappers', () => {
     expect(() => extractCreatedRunId({ code: 'ok', data: {} })).toThrow(/no id\/runId/);
   });
 
+  it('buildEdgeRunBody forwards deliveryId from snake_case and camelCase aliases, omitting it for legacy', () => {
+    const base = { task_id: 'task-1' };
+    const snake = buildEdgeRunBody({ ...base, delivery_id: 'd-1' }, 't', 'p', 'a', null);
+    expect(snake.deliveryId).toBe('d-1');
+
+    const camel = buildEdgeRunBody({ ...base, deliveryId: 'd-2' }, 't', 'p', 'a', null);
+    expect(camel.deliveryId).toBe('d-2');
+
+    const legacy = buildEdgeRunBody({ ...base }, 't', 'p', 'a', null);
+    expect(legacy.deliveryId).toBeUndefined();
+    expect('deliveryId' in legacy).toBe(false);
+  });
+
+  it('extractCreatedRunId accepts a deduplicated accepted run envelope (normal replay)', () => {
+    expect(
+      extractCreatedRunId({
+        code: 'ok',
+        data: { runId: 'run-replay-1', deduplicated: true, deliveryId: 'd-1' },
+      }),
+    ).toBe('run-replay-1');
+    expect(
+      extractCreatedRunId({
+        code: 'ok',
+        data: { id: 'run-replay-2', deduplicated: true, deliveryId: 'd-2' },
+      }),
+    ).toBe('run-replay-2');
+  });
+
+  it('classifies transient admission rejections from the canonical Edge error envelope', () => {
+    const busyEnvelope = { error: { code: 'delivery_busy', message: 'busy', traceId: 'trace_001' } };
+    const activeEnvelope = { error: { code: 'active_run_exists', message: 'active', traceId: 'trace_001' } };
+
+    expect(isTransientAdmissionRejection(503, busyEnvelope)).toBe(true);
+    expect(isTransientAdmissionRejection(409, activeEnvelope)).toBe(true);
+    // Raw JSON string form (what the hook passes from runResp.text()).
+    expect(isTransientAdmissionRejection(503, JSON.stringify(busyEnvelope))).toBe(true);
+    expect(isTransientAdmissionRejection(409, JSON.stringify(activeEnvelope))).toBe(true);
+
+    // Non-transient / non-matching envelopes keep the existing failure path.
+    expect(isTransientAdmissionRejection(409, { error: { code: 'delivery_conflict', message: 'x', traceId: 't' } })).toBe(false);
+    expect(isTransientAdmissionRejection(500, busyEnvelope)).toBe(false);
+    expect(isTransientAdmissionRejection(503, { error: { code: 'internal', message: 'x', traceId: 't' } })).toBe(false);
+    expect(isTransientAdmissionRejection(503, 'not-json')).toBe(false);
+    expect(isTransientAdmissionRejection(200, {})).toBe(false);
+    // A flat top-level {code} is not the canonical envelope — must not match.
+    expect(isTransientAdmissionRejection(503, { code: 'delivery_busy' })).toBe(false);
+  });
+
   it('isTerminalBridgeTask detects done/failed only', () => {
     expect(isTerminalBridgeTask(makeTask({ status: 'done' }))).toBe(true);
     expect(isTerminalBridgeTask(makeTask({ status: 'failed' }))).toBe(true);
     expect(isTerminalBridgeTask(makeTask({ status: 'running' }))).toBe(false);
+  });
+
+  it('hasTaskProgressed is true once a task has a runId or reached running/terminal', () => {
+    expect(hasTaskProgressed(undefined)).toBe(false);
+    expect(hasTaskProgressed(makeTask({ status: 'queued' }))).toBe(false);
+    expect(hasTaskProgressed(makeTask({ status: 'running', runId: 'r1' }))).toBe(true);
+    expect(hasTaskProgressed(makeTask({ status: 'done' }))).toBe(true);
+    expect(hasTaskProgressed(makeTask({ status: 'failed' }))).toBe(true);
   });
 });
 

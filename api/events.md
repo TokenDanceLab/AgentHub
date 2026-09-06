@@ -1,6 +1,6 @@
 # WebSocket Events
 
-最后更新：2026-09-02
+最后更新：2026-09-07
 
 WebSocket 事件合同入口：协议边界、源码 owner、**重复投递/幂等语义**、验收命令。旧长版见 [../docs/history.md](../docs/history.md)。
 
@@ -30,14 +30,17 @@ Hub/Edge 实时面均为 **at-least-once**：重连、离线队列、outbox、�
 
 > **`seq_id`（Hub WS per-conn）vs `seq`（Edge per-bus）**：Hub `seq_id` 是 `PushToConn` 在单连接上单调递增的投递序号，重连从 1 计、跨连接不可比；Edge `EventEnvelope.seq` 是事件总线上的 stream 单调序号，与持久化 `agent_run_events.event_seq` / `messages.seq_id` 对齐。REST 增量同步接口（`GET .../messages/sync?after_seq=`、`GET .../events?after_seq=`）的 `after_seq` 一律指**持久化表的内部 seq**（`messages.seq_id` 或 `agent_run_events.event_seq`），**不是** WS 帧的 `seq_id`。客户端不得用 WS `seq_id` 作为 REST 游标。
 
-### Hub→Edge `delivery_id` 去重契约（#2101 G2）
+### Hub→Edge `delivery_id` admission 契约（#2101 G2 / #2347）
 
-Hub 向 Edge 投递任务有两条并行通道：WS `PushToConn(agent.dispatch)` 与 outbox redispatch HTTP POST `/v1/runs`。两者共享同一个 `delivery_id`（UUID，由 Hub dispatch/outbox 生成并附在 payload 顶层 `delivery_id` / `deliveryId`）。Edge **必须**在消费入口（POST `/v1/runs`）按 `delivery_id` 做进程内去重：
+Hub 的 WS `agent.dispatch` 与 outbox HTTP POST `/v1/runs` 共享同一 `delivery_id`。Desktop 将事件中的 `delivery_id` / `deliveryId` 转交为 Edge 请求的 `deliveryId`；空值保留既有无去重路径。
 
-- **键**：`delivery_id` 字符串；空值视为遗留载荷，跳过 dedup 直接处理。
-- **存储**：进程内 LRU + TTL（参考实现 `edge-server/internal/deliverydedup`，默认 4096 条 / 5 分钟）。不持久化；崩溃后重复投递的最坏后果是幂等重放一次，可接受。
-- **语义**：TTL 窗口内同 `delivery_id` → 跳过 run 创建、返回成功（HTTP 202 + `{deduplicated:true}`），附带日志/指标；不同 `delivery_id` 正常处理。
-- **责任划分**：Hub 保证同一逻辑投递在所有通道使用相同 `delivery_id`；Edge 保证消费端幂等。任一侧失守都会产生重复 run。
+- **原子接收**：先保留 pending claim；仅在 run 接收成功后提交含原 `runId` 的回执，失败或放弃则释放 claim，允许同 ID 重试。
+- **容量与有效期**：进程内缓存默认共容纳 4096 个 pending claim / accepted receipt。成功回执从提交起保留 5 分钟，也可因 LRU 容量压力被淘汰；重放不续期。pending claim 不因 TTL/LRU 被移除，避免首个请求未完成时重复执行。
+- **绑定**：非空 `hubTaskId` 是业务绑定。同一 Hub task 的 HTTP 本地线程与 Desktop 会话线程可以不同，但回执指向同一个原 run；无 `hubTaskId` 的遗留请求按 `projectId` / `threadId` 绑定。缓存内同 delivery ID 的不同绑定返回 409 `delivery_conflict`。
+- **成功重放**：有效回执返回原 run 的正常 202 envelope，包括 `data.runId`、`data.deduplicated: true` 和 `data.deliveryId`；不新建 run、timeline 或 executor。原 run 已删除则返回 404 `not_found`，不静默重建。每次请求先通过 capability 校验；重放还按原 run 实际 project/thread scope 复验。
+- **临时拒绝**：同 ID 正在接收，或容量被 pending claim 占满时，返回 503 `delivery_busy` + `Retry-After`（秒），而不是成功回执。409 `active_run_exists` 表示线程被其他活动 run 占用，也不能当作本次投递成功。Desktop 对这两类拒绝不 ACK、不 FAIL，由现有 Hub outbox 负责重投。
+- **ACK 与业务状态**：每次成功接收或重放都幂等重发 task / relay ACK，以修复丢失的确认；已建立的 run 映射、输出和 running/terminal 状态不因重复投递而回退，业务接收通知只触发一次。
+- **进程边界**：回执不是持久化执行日志，重启后会丢失；跨重启身份核对与执行恢复不由此缓存保证。`queued` 状态本身不能证明子进程尚未启动，不能据此自动重启旧 run。
 
 标签：**UPSERT by id**（稳定 id 合并，禁止第二行）；**idempotent on apply**（再应用不变）；**水位 / watermark**（只前进 `max`）；**ephemeral**（可丢可重，不写持久态）；**非幂等**（须自备去重或 REST）。
 
