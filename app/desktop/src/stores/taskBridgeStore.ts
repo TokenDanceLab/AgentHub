@@ -12,7 +12,8 @@ export interface AgentTask {
   runId?: string;
   status: 'queued' | 'running' | 'done' | 'failed';
   dispatchPayload: Record<string, unknown>;
-  error?: string;
+  /** Explicit undefined clears a previous error through updateTask. */
+  error?: string | undefined;
   /** Timestamp when the dispatch was received. */
   createdAt: string;
 }

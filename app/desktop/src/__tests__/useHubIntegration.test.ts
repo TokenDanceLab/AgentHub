@@ -739,6 +739,106 @@ describe('useHubIntegration', () => {
     expect(hubClient.failTask).not.toHaveBeenCalled();
   });
 
+  it('keeps a too_many_concurrent_runs rejection queued without acking or failing', async () => {
+    mockRunCreateResponseWithStatus({ error: { code: 'too_many_concurrent_runs', message: 'too many', traceId: 'trace_001' } }, 429);
+    renderHook(() => useHubIntegration({ hubWS, hubClient }));
+
+    await act(async () => {
+      fireHubEvent(
+        HUB_EVENTS.AGENT_DISPATCH,
+        makeDispatchPayload({ delivery_id: 'd1' }),
+      );
+    });
+
+    expect(hoisted.storeTasks).toHaveLength(1);
+    expect(hoisted.storeTasks[0]?.status).toBe('queued');
+    expect(hoisted.storeTasks[0]?.runId).toBeUndefined();
+    expect(hubClient.ackTask).not.toHaveBeenCalled();
+    expect(hubClient.failTask).not.toHaveBeenCalled();
+  });
+
+  it('keeps an admission_persist_failed rejection queued without acking or failing', async () => {
+    mockRunCreateResponseWithStatus({ error: { code: 'admission_persist_failed', message: 'persist failed', traceId: 'trace_001' } }, 503);
+    renderHook(() => useHubIntegration({ hubWS, hubClient }));
+
+    await act(async () => {
+      fireHubEvent(
+        HUB_EVENTS.AGENT_DISPATCH,
+        makeDispatchPayload({ delivery_id: 'd1' }),
+      );
+    });
+
+    expect(hoisted.storeTasks).toHaveLength(1);
+    expect(hoisted.storeTasks[0]?.status).toBe('queued');
+    expect(hoisted.storeTasks[0]?.runId).toBeUndefined();
+    expect(hubClient.ackTask).not.toHaveBeenCalled();
+    expect(hubClient.failTask).not.toHaveBeenCalled();
+  });
+
+  it('keeps an admission_uncertain rejection queued for manual review without acking or failing', async () => {
+    mockRunCreateResponseWithStatus({ error: { code: 'admission_uncertain', message: 'manual review', traceId: 'trace_001' } }, 409);
+    renderHook(() =>
+      useHubIntegration({
+        hubWS,
+        hubClient,
+        dispatchTarget: { targetId: 'target-current', deviceId: 'desktop-current' },
+      }),
+    );
+
+    const relayFrame = {
+      relay_command_id: 'relay-1',
+      command_type: 'agent.dispatch',
+      payload: JSON.stringify(
+        makeDispatchPayload({
+          target_id: 'target-current',
+          edge_device_id: 'desktop-current',
+          delivery_id: 'd1',
+        }),
+      ),
+    };
+    await act(async () => {
+      fireHubEvent(HUB_EVENTS.AGENT_DISPATCH, relayFrame);
+    });
+
+    expect(hoisted.storeTasks).toHaveLength(1);
+    expect(hoisted.storeTasks[0]?.status).toBe('queued');
+    expect(hoisted.storeTasks[0]?.runId).toBeUndefined();
+    expect(hoisted.storeTasks[0]?.error).toContain('Edge admission result is uncertain');
+    expect(hoisted.storeTasks[0]?.error).toContain('manual review');
+    expect(hubClient.ackTask).not.toHaveBeenCalled();
+    expect(hubClient.failTask).not.toHaveBeenCalled();
+    expect(hubClient.ackRelayCommand).not.toHaveBeenCalled();
+  });
+
+  it('clears a queued admission_uncertain error when the same delivery is accepted', async () => {
+    mockRunCreateResponseWithStatus({ error: { code: 'admission_uncertain', message: 'manual review', traceId: 'trace_001' } }, 409);
+    renderHook(() => useHubIntegration({ hubWS, hubClient }));
+
+    await act(async () => {
+      fireHubEvent(
+        HUB_EVENTS.AGENT_DISPATCH,
+        makeDispatchPayload({ delivery_id: 'd1' }),
+      );
+    });
+    expect(hoisted.storeTasks[0]?.status).toBe('queued');
+    expect(hoisted.storeTasks[0]?.error).toContain('manual review');
+
+    mockRunSequence('run-1');
+    await act(async () => {
+      fireHubEvent(
+        HUB_EVENTS.AGENT_DISPATCH,
+        makeDispatchPayload({ delivery_id: 'd1' }),
+      );
+    });
+
+    expect(hoisted.storeTasks).toHaveLength(1);
+    expect(hoisted.storeTasks[0]?.status).toBe('running');
+    expect(hoisted.storeTasks[0]?.runId).toBe('run-1');
+    expect(hoisted.storeTasks[0]?.error).toBeUndefined();
+    expect(hubClient.ackTask).toHaveBeenCalledTimes(1);
+    expect(hubClient.failTask).not.toHaveBeenCalled();
+  });
+
   it('keeps an existing active run on active_run_exists without acking or failing', async () => {
     mockRunSequence('run-1');
     renderHook(() => useHubIntegration({ hubWS, hubClient }));
@@ -763,6 +863,62 @@ describe('useHubIntegration', () => {
     expect(hoisted.storeTasks[0]?.status).toBe('running');
     expect(hoisted.storeTasks[0]?.runId).toBe('run-1');
     expect(hubClient.ackTask).toHaveBeenCalledTimes(1);
+    expect(hubClient.failTask).not.toHaveBeenCalled();
+  });
+
+  it('does not downgrade an already-running task on admission_uncertain', async () => {
+    mockRunSequence('run-1');
+    renderHook(() => useHubIntegration({ hubWS, hubClient }));
+
+    await act(async () => {
+      fireHubEvent(
+        HUB_EVENTS.AGENT_DISPATCH,
+        makeDispatchPayload({ delivery_id: 'd1' }),
+      );
+    });
+    expect(hoisted.storeTasks[0]?.status).toBe('running');
+    expect(hoisted.storeTasks[0]?.runId).toBe('run-1');
+
+    mockRunCreateResponseWithStatus({ error: { code: 'admission_uncertain', message: 'manual review', traceId: 'trace_001' } }, 409);
+    await act(async () => {
+      fireHubEvent(
+        HUB_EVENTS.AGENT_DISPATCH,
+        makeDispatchPayload({ delivery_id: 'd1' }),
+      );
+    });
+
+    expect(hoisted.storeTasks).toHaveLength(1);
+    expect(hoisted.storeTasks[0]?.status).toBe('running');
+    expect(hoisted.storeTasks[0]?.runId).toBe('run-1');
+    expect(hoisted.storeTasks[0]?.error).toBeUndefined();
+    expect(hubClient.ackTask).toHaveBeenCalledTimes(1);
+    expect(hubClient.failTask).not.toHaveBeenCalled();
+  });
+
+  it('does not clear an existing error on a progressed successful replay', async () => {
+    mockRunSequence('run-1');
+    renderHook(() => useHubIntegration({ hubWS, hubClient }));
+
+    await act(async () => {
+      fireHubEvent(
+        HUB_EVENTS.AGENT_DISPATCH,
+        makeDispatchPayload({ delivery_id: 'd1' }),
+      );
+    });
+    hoisted.getStoreState().updateTask('task-1', { error: 'existing running error' });
+
+    mockRunSequence('run-1');
+    await act(async () => {
+      fireHubEvent(
+        HUB_EVENTS.AGENT_DISPATCH,
+        makeDispatchPayload({ delivery_id: 'd1' }),
+      );
+    });
+
+    expect(hoisted.storeTasks[0]?.status).toBe('running');
+    expect(hoisted.storeTasks[0]?.runId).toBe('run-1');
+    expect(hoisted.storeTasks[0]?.error).toBe('existing running error');
+    expect(hubClient.ackTask).toHaveBeenCalledTimes(2);
     expect(hubClient.failTask).not.toHaveBeenCalled();
   });
 

@@ -29,6 +29,15 @@ async function readTaskState(page: Page) {
   });
 }
 
+async function readTaskError(page: Page) {
+  return page.evaluate(async () => {
+    const modulePath = '/src/stores/taskBridgeStore.ts';
+    const { useTaskBridgeStore } = await import(/* @vite-ignore */ modulePath);
+    const state = useTaskBridgeStore.getState();
+    return state.tasks[0]?.error ?? null;
+  });
+}
+
 async function installDispatchFixture(page: Page, baseURL: string, theme: 'light' | 'dark') {
   const appOrigin = new URL(baseURL).origin;
   const hubSockets = new Set<WebSocketRoute>();
@@ -41,7 +50,7 @@ async function installDispatchFixture(page: Page, baseURL: string, theme: 'light
     fails: [] as Record<string, unknown>[],
     registered: 0,
     targetsRead: 0,
-    rejection: 503,
+    rejection: { status: 503, code: 'delivery_busy' } as { status: number; code: string } | null,
     pageErrors: [] as string[],
     unhandledWrites: [] as string[],
   };
@@ -119,8 +128,8 @@ async function installDispatchFixture(page: Page, baseURL: string, theme: 'light
       } else if (url.pathname === '/v1/runs' && request.method() === 'POST') {
         calls.runs.push(request.postDataJSON());
         if (calls.rejection) {
-          await route.fulfill({ status: calls.rejection, headers: { 'Retry-After': '1' }, json: {
-            error: { code: calls.rejection === 503 ? 'delivery_busy' : 'internal_error', message: 'fixture admission rejection', traceId: 'fixture-trace' },
+          await route.fulfill({ status: calls.rejection.status, headers: calls.rejection.status === 503 ? { 'Retry-After': '1' } : {}, json: {
+            error: { code: calls.rejection.code, message: 'fixture admission rejection: ' + calls.rejection.code, traceId: 'fixture-trace' },
           } });
         } else {
           await json({ code: 'OK', data: { runId: RUN, projectId: 'proj_local', threadId: THREAD, status: 'queued', deduplicated: calls.runs.length > 2, deliveryId: DELIVERY } }, 202);
@@ -192,26 +201,58 @@ for (const theme of ['light', 'dark'] as const) {
   test('actual Desktop bridge retries admission and repairs lost ACKs (' + theme + ')', async ({ page, baseURL }, testInfo) => {
     if (!baseURL) throw new Error('Desktop E2E baseURL is required');
     const { calls, dispatch, finish } = await installDispatchFixture(page, baseURL, theme);
+    const queued = { tasks: [{ taskId: TASK, status: 'queued', runId: null }], runToTask: {} };
+
     await dispatch();
     await expect.poll(() => calls.runs.length).toBe(1);
-    await expect.poll(() => readTaskState(page)).toEqual({ tasks: [{ taskId: TASK, status: 'queued', runId: null }], runToTask: {} });
+    await expect.poll(() => readTaskState(page)).toEqual(queued);
     expect(calls.runs[0]).toMatchObject({ deliveryId: DELIVERY, hubTaskId: TASK, targetId: TARGET, edgeDeviceId: DEVICE });
     expect(calls.acks).toHaveLength(0);
     expect(calls.relayAcks).toHaveLength(0);
     expect(calls.fails).toHaveLength(0);
 
-    calls.rejection = 0;
+    calls.rejection = { status: 429, code: 'too_many_concurrent_runs' };
     await dispatch();
+    await expect.poll(() => calls.runs.length).toBe(2);
+    await expect.poll(() => readTaskState(page)).toEqual(queued);
+    expect(calls.acks).toHaveLength(0);
+    expect(calls.relayAcks).toHaveLength(0);
+    expect(calls.fails).toHaveLength(0);
+
+    calls.rejection = { status: 503, code: 'admission_persist_failed' };
+    await dispatch();
+    await expect.poll(() => calls.runs.length).toBe(3);
+    await expect.poll(() => readTaskState(page)).toEqual(queued);
+    expect(calls.acks).toHaveLength(0);
+    expect(calls.relayAcks).toHaveLength(0);
+    expect(calls.fails).toHaveLength(0);
+
+    // admission_uncertain is human-review territory: queued, no ACK/FAIL/relay-ACK.
+    calls.rejection = { status: 409, code: 'admission_uncertain' };
+    await dispatch();
+    await expect.poll(() => calls.runs.length).toBe(4);
+    await expect.poll(() => readTaskState(page)).toEqual(queued);
+    await expect.poll(() => readTaskError(page)).toContain('fixture admission rejection: admission_uncertain');
+    expect(calls.acks).toHaveLength(0);
+    expect(calls.relayAcks).toHaveLength(0);
+    expect(calls.fails).toHaveLength(0);
+
+    // The test drives the next dispatch after manual review; this is not an
+    // automatic client-side retry and the hook itself does not start one.
+    calls.rejection = null;
+    await dispatch();
+    await expect.poll(() => calls.runs.length).toBe(5);
     await expect.poll(() => calls.acks.length).toBe(1);
     await expect.poll(() => calls.relayAcks.length).toBe(1);
     await expect.poll(() => readTaskState(page)).toEqual({ tasks: [{ taskId: TASK, status: 'running', runId: RUN }], runToTask: { [RUN]: TASK } });
+    await expect.poll(() => readTaskError(page)).toBeNull();
 
     // Both first ACK requests failed. A successful replay must send them again.
     await dispatch();
     await expect.poll(() => calls.acks.length).toBe(2);
     await expect.poll(() => calls.relayAcks.length).toBe(2);
     expect(calls.acks).toEqual([{ run_id: RUN }, { run_id: RUN }]);
-    expect(calls.runs).toHaveLength(3);
+    expect(calls.runs).toHaveLength(6);
     expect(calls.fails).toHaveLength(0);
 
     finish();
@@ -224,9 +265,9 @@ for (const theme of ['light', 'dark'] as const) {
     await expect.poll(() => readTaskState(page)).toEqual(finished);
     expect(calls.done).toHaveLength(1);
 
-    calls.rejection = 500;
+    calls.rejection = { status: 500, code: 'internal_error' };
     await dispatch();
-    await expect.poll(() => calls.runs.length).toBe(5);
+    await expect.poll(() => calls.runs.length).toBe(8);
     await expect.poll(() => readTaskState(page)).toEqual(finished);
     expect(calls.fails).toHaveLength(0);
     expect(calls.acks).toHaveLength(3);
