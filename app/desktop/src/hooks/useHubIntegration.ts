@@ -20,6 +20,7 @@ import type { CoordinatorRouteDecision, HubClient } from '@/api/hubClient';
 import { createEventStream, type StreamHandle } from '@/api/eventClient';
 import type { EventEnvelope } from '@shared/events';
 import { HUB_EVENTS } from '@shared/hubEvents';
+import { useToastStore } from '@shared/ui/toast';
 import { hubQueryKeys } from '@shared/stores/queryKeys';
 import { useTaskBridgeStore, type AgentTask } from '@/stores/taskBridgeStore';
 import { queryClient } from '@/api/queryClient';
@@ -35,6 +36,7 @@ import {
   getTeamRouteContext,
   hasTaskProgressed,
   isTerminalBridgeTask,
+  isAdmissionUncertain,
   isTransientAdmissionRejection,
   normalizeRuntimeAgentId,
   parsePermissionDecisionControl,
@@ -401,8 +403,10 @@ export function useHubIntegration(options: HubIntegrationOptions): HubIntegratio
         );
 
         if (!runResp.ok) {
-          // Classify definite transient admission rejections (delivery_busy /
-          // active_run_exists). Anything else keeps the existing permanent path.
+          // Classify definite transient admission rejections (delivery_busy,
+          // active_run_exists, too_many_concurrent_runs, admission_persist_failed).
+          // Anything else keeps the existing permanent path unless it is an
+          // explicit admission_uncertain, which needs manual review.
           const errorText = await runResp.text().catch(() => 'Unknown error');
           if (isTransientAdmissionRejection(runResp.status, errorText)) {
             // Keep the task queued/waiting; retry ownership stays with the Hub
@@ -410,7 +414,24 @@ export function useHubIntegration(options: HubIntegrationOptions): HubIntegratio
             // invent a second retry loop here.
             return;
           }
-          throw new Error(`Edge POST /v1/runs returned ${runResp.status}: ${errorText}`);
+          if (isAdmissionUncertain(runResp.status, errorText)) {
+            // The executor did not return a definite outcome. Preserve the
+            // queued task and Edge-provided message for manual review; do not
+            // ACK/FAIL/relay-ACK and do not start a client-side retry.
+            const currentTask = store.getState().tasks.find((t) => t.taskId === taskId);
+            if (!hasTaskProgressed(currentTask)) {
+              const message = getString(parseRecord(parseRecord(errorText).error), 'message') || errorText;
+              const error = 'Edge admission result is uncertain (HTTP ' + runResp.status + '): ' + message;
+              store.getState().updateTask(taskId, { error });
+              // The bridge has no task-error panel. Surface the need for review
+              // through the existing notification UI, once per unchanged reason.
+              if (currentTask?.error !== error) {
+                useToastStore.getState().showToast('warning', error, { duration: 10_000 });
+              }
+            }
+            return;
+          }
+          throw new Error('Edge POST /v1/runs returned ' + runResp.status + ': ' + errorText);
         }
 
         const runId = extractCreatedRunId(await runResp.json());
@@ -422,8 +443,10 @@ export function useHubIntegration(options: HubIntegrationOptions): HubIntegratio
         const taskProgressed = hasTaskProgressed(existingTask);
 
         // Business state/mapping is only written once (first accepted instance).
+        // Also clear a stale admission_uncertain manual-review note. Existing
+        // progressed state keeps its own error untouched.
         if (!taskProgressed) {
-          store.getState().updateTask(taskId, { runId, status: 'running' });
+          store.getState().updateTask(taskId, { runId, status: 'running', error: undefined });
         }
 
         // Every accepted delivery (first accept AND successful replay) is

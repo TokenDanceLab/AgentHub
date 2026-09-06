@@ -39,10 +39,7 @@ func (h *Handler) beginRunDelivery(w http.ResponseWriter, r *http.Request, req r
 		// HTTP and Desktop can use different local thread representations for
 		// the same Hub task. Authorize the actual stored scope too: a capability
 		// for the incoming representation must not expose a different resource.
-		replayRequest := req
-		replayRequest.ProjectID = run.ProjectID
-		replayRequest.ThreadID = run.ThreadID
-		if err := h.validateCapabilityRequest(r, &replayRequest); err != nil {
+		if err := h.validateRunReplay(r, req, run); err != nil {
 			errcode.Write(w, err)
 			return nil, true
 		}
@@ -56,4 +53,12 @@ func (h *Handler) beginRunDelivery(w http.ResponseWriter, r *http.Request, req r
 		errcode.Write(w, errcode.ErrDeliveryBusy)
 	}
 	return nil, true
+}
+
+// Cached and durable Hub-task receipts must authorize the actual stored run,
+// not only the incoming transport's representation of its scope.
+func (h *Handler) validateRunReplay(r *http.Request, req runRequest, run store.Run) *errcode.Error {
+	req.ProjectID = run.ProjectID
+	req.ThreadID = run.ThreadID
+	return h.validateCapabilityRequest(r, &req)
 }

@@ -374,17 +374,22 @@ func (h *Handler) PostRuns(w http.ResponseWriter, r *http.Request) {
 	// active-run guarding, run record creation, run.queued publication, and
 	// the executor start/failure state machine — REST and MCP share it. REST
 	// contributes the timeline policy and the adapter context builder.
+	var replayRunID string
 	run, err := runcontrol.Create(repository, h.Executor, h.Bus, runcontrol.CreateParams{
-		ProjectID:          req.ProjectID,
-		ThreadID:           req.ThreadID,
-		Prompt:             req.Prompt,
-		AgentID:            req.AgentID,
-		Model:              req.Model,
-		PermissionMode:     req.PermissionMode,
-		SessionID:          req.SessionID,
-		ContinueLast:       req.Continue,
-		WorkDir:            req.WorkDir,
-		HubTaskID:          req.HubTaskID,
+		ProjectID:      req.ProjectID,
+		ThreadID:       req.ThreadID,
+		Prompt:         req.Prompt,
+		AgentID:        req.AgentID,
+		Model:          req.Model,
+		PermissionMode: req.PermissionMode,
+		SessionID:      req.SessionID,
+		ContinueLast:   req.Continue,
+		WorkDir:        req.WorkDir,
+		HubTaskID:      req.HubTaskID,
+		AuthorizeReplay: func(existing store.Run) *errcode.Error {
+			replayRunID = existing.ID
+			return h.validateRunReplay(r, req, existing)
+		},
 		WorkspaceAllowlist: h.WorkspaceAllowlist,
 		AgentExists: func(agentID string) bool {
 			if h.AdapterRegistry == nil {
@@ -404,6 +409,9 @@ func (h *Handler) PostRuns(w http.ResponseWriter, r *http.Request) {
 	})
 	if err != nil {
 		if e, ok := err.(*errcode.Error); ok {
+			if errors.Is(err, errcode.ErrDeliveryBusy) || errors.Is(err, errcode.ErrAdmissionPersistFailed) || errors.Is(err, errcode.ErrTooManyConcurrentRuns) {
+				w.Header().Set("Retry-After", "1")
+			}
 			// Enrich the active-run conflict with the conflicting run,
 			// preserving the historical response body shape.
 			if errors.Is(err, errcode.ErrActiveRunExists) {
@@ -426,7 +434,14 @@ func (h *Handler) PostRuns(w http.ResponseWriter, r *http.Request) {
 		errcode.Write(w, errcode.ErrInternal.WithMessage("run admission receipt could not be committed"))
 		return
 	}
-	writeSuccess(w, http.StatusAccepted, acceptedResponse(runToResponse(run)))
+	data := runToResponse(run)
+	if replayRunID == run.ID {
+		data["deduplicated"] = true
+		if req.DeliveryID != "" {
+			data["deliveryId"] = req.DeliveryID
+		}
+	}
+	writeSuccess(w, http.StatusAccepted, acceptedResponse(data))
 }
 
 // ---------------------------------------------------------------------------

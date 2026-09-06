@@ -729,8 +729,21 @@ paths:
         "409":
           # delivery_conflict: delivery_id binds a different Hub task or legacy
           # project/thread scope (#2347); active_run_exists: the thread already has
-          # an active run. Client must not treat it as the same work.
+          # an active run. admission_uncertain requires reconciliation of a retained
+          # run without proof of admission; clients must not ACK/FAIL or restart.
           $ref: "#/components/responses/Error"
+        "429":
+          description: Executor capacity rejected admission before execution; retry the same Hub task later.
+          headers:
+            Retry-After:
+              description: Delay in seconds before retrying admission.
+              schema:
+                type: integer
+                minimum: 1
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
         "404":
           # not_found: the original run referenced by an accepted receipt was removed.
           $ref: "#/components/responses/Error"
@@ -739,10 +752,12 @@ paths:
             not_configured means the Edge cannot validate a Hub identity because
             its Hub credential policy is unconfigured; it fails closed.
             delivery_busy is temporary contention for a pending delivery or
-            admission capacity and includes Retry-After. Neither is acceptance.
+            admission capacity and includes Retry-After. admission_persist_failed
+            means admission evidence could not be saved; execution may already
+            have been accepted. Retry to reconcile, not to force another start.
           headers:
             Retry-After:
-              description: Delay in seconds, present for delivery_busy responses.
+              description: Delay in seconds, present for delivery_busy and admission_persist_failed responses.
               schema:
                 type: integer
                 minimum: 1
@@ -9593,6 +9608,13 @@ components:
         finishedAt:
           type: string
           format: date-time
+        admissionState:
+          type: string
+          enum: [pending, accepted, rejected]
+          description: Hub task admission evidence, independent of execution status. Absent on legacy or non-Hub runs.
+        admissionErrorCode:
+          type: string
+          description: Public-safe rejection code recorded with rejected admission; not an execution failure reason.
         deduplicated:
           type: boolean
           description: True on an accepted replay of an already admitted delivery (same runId returned, no new run created).

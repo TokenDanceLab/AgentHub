@@ -29,8 +29,8 @@ import (
 // check-then-create sequence (no active run on the thread, then CreateRun);
 // without one shared lock, two concurrent requests — including one from REST
 // and one from MCP — could both pass the active-run check and create
-// overlapping runs. Run creation is rare and cheap, so the contention cost of
-// a process-wide lock is negligible compared to the invariant it protects.
+// overlapping runs. For Hub work this section includes the durable pending
+// identity write. Timeline publication and executor startup stay outside it.
 var runCreationMu sync.Mutex
 
 const (
@@ -73,10 +73,15 @@ type CreateParams struct {
 	// prompt and queued-marker items; MCP publishes a single user_message item.
 	Timeline func(run store.Run)
 
-	// HubTaskID is the Hub-side task ID for deduplication. When non-empty,
-	// Create returns the existing run if one with the same HubTaskID already
-	// exists (idempotent redelivery guard for orphan recovery).
+	// HubTaskID identifies one logical Hub task across delivery transports.
+	// A retained run is replayable only with admission evidence, not merely
+	// because a queued/failed record exists.
 	HubTaskID string
+
+	// AuthorizeReplay validates the actual stored scope before replaying a Hub
+	// task. Transports with capability policy must supply it. Without a policy,
+	// replay is restricted to the same project/thread as the request.
+	AuthorizeReplay func(store.Run) *errcode.Error
 
 	// BuildContext builds the RunProcessContext handed to the executor.
 	// When nil, the executor start step is skipped.
@@ -95,60 +100,17 @@ func Create(repository store.Repository, executor lifecycle.RunExecutor, bus *ev
 	}
 	params.WorkDir = strings.TrimSpace(params.WorkDir)
 
-	// The lock covers only the check-then-create section (matching the
-	// historical PostRuns lock scope): cleanup, validation, and CreateRun.
-	// Event publication, timeline hooks, and the executor start run outside
-	// the lock so slow executor starts never serialize behind each other.
 	runCreationMu.Lock()
-	if params.Cleanup {
-		cleanupRuns(repository)
-	}
-	if err := validateTarget(repository, params.ProjectID, params.ThreadID); err != nil {
-		runCreationMu.Unlock()
-		return store.Run{}, err
-	}
-	if err := validateWorkDir(params.WorkDir, params.WorkspaceAllowlist); err != nil {
-		runCreationMu.Unlock()
-		return store.Run{}, err
-	}
-	if err := validatePermissionMode(params.PermissionMode); err != nil {
-		runCreationMu.Unlock()
-		slog.Error("invalid permission mode", "permissionMode", params.PermissionMode, "error", err)
-		return store.Run{}, errcode.ErrInvalidPermissionMode
-	}
-	// HubTaskID dedup: when a non-empty HubTaskID matches an existing run,
-	// return that run idempotently instead of creating a duplicate. This
-	// guards against orphan-recovery redelivery races (issue #2066).
-	if params.HubTaskID != "" {
-		if existing, found := repository.GetRunByHubTaskID(params.HubTaskID); found {
-			runCreationMu.Unlock()
-			slog.Info("run.dedup", "hubTaskId", params.HubTaskID, "existingRunId", existing.ID)
-			return existing, nil
-		}
-	}
-	if active, ok := ActiveRunForThread(repository.ListRuns(params.ThreadID)); ok {
-		runCreationMu.Unlock()
-		return store.Run{}, errcode.ErrActiveRunExists.WithMessagef("thread already has an active run: %s", active.ID)
-	}
-	if executor == nil {
-		runCreationMu.Unlock()
-		return store.Run{}, errcode.ErrExecutorUnavailable.WithMessage("no Agent Runtime executor configured")
-	}
-	// #175: Reject unknown agentId — do not fall back to default adapter.
-	if params.AgentID != "" && params.AgentExists != nil && !params.AgentExists(params.AgentID) {
-		runCreationMu.Unlock()
-		return store.Run{}, errcode.ErrInvalidAgentID.WithMessagef("unknown agent adapter: %q", params.AgentID)
-	}
-	run, err := repository.CreateRun(generateRunID(), params.ProjectID, params.ThreadID)
-	if err == nil && params.HubTaskID != "" {
-		run, _ = repository.SetRunHubTaskID(run.ID, params.HubTaskID)
-	}
+	run, replayed, err := prepareRunAdmission(repository, executor, params)
 	runCreationMu.Unlock()
 	if err != nil {
-		if errors.Is(err, store.ErrNotFound) {
-			return store.Run{}, errcode.ErrNotFound.WithMessage("project or thread not found")
-		}
-		return store.Run{}, errcode.ErrInternal.WithMessagef("failed to create run: %v", err)
+		return store.Run{}, err
+	}
+	if replayed {
+		return run, nil
+	}
+	if params.HubTaskID != "" {
+		defer finishRunAdmission(run.ID)
 	}
 
 	scope := map[string]any{
@@ -175,12 +137,24 @@ func Create(repository store.Repository, executor lifecycle.RunExecutor, bus *ev
 					"error":  "run execution failed",
 				})
 			}
+			admissionErr := errcode.ErrExecutorStartFailed
 			if errors.Is(err, lifecycle.ErrTooManyConcurrentRuns) {
-				slog.Error("too many concurrent runs", "runId", run.ID, "error", err)
-				return store.Run{}, errcode.ErrTooManyConcurrentRuns
+				admissionErr = errcode.ErrTooManyConcurrentRuns
 			}
-			return store.Run{}, errcode.ErrExecutorStartFailed
+			if params.HubTaskID != "" {
+				if _, persistErr := repository.RecordRunAdmission(run.ID, admissionErr.Code); persistErr != nil {
+					return store.Run{}, errcode.ErrAdmissionPersistFailed
+				}
+			}
+			return store.Run{}, admissionErr
 		}
+	}
+	if params.HubTaskID != "" {
+		accepted, persistErr := repository.RecordRunAdmission(run.ID, "")
+		if persistErr != nil {
+			return store.Run{}, errcode.ErrAdmissionPersistFailed
+		}
+		return accepted, nil
 	}
 	return run, nil
 }

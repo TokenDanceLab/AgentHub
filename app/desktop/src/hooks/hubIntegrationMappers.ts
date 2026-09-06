@@ -339,23 +339,46 @@ export function extractCreatedRunId(value: unknown): string {
 }
 
 /**
- * Classify a definite transient Edge admission rejection. Only these two codes
- * are safe to leave queued for the Hub outbox to retry: a busy delivery slot
- * (503 delivery_busy) and a Hub thread already occupied by an active run
- * (409 active_run_exists). Any other non-OK response keeps the existing
- * failure handling rather than being treated as a retryable admission.
+ * Read the canonical Edge error code from `{ error: { code, message, traceId } }`.
+ * Accepts an already-parsed object or a raw JSON string.
+ */
+export function readEdgeErrorCode(body: unknown): string | undefined {
+  const record = parseRecord(body);
+  return getFirstString(parseRecord(record.error).code);
+}
+
+/**
+ * Classify admission outcomes where the Edge cannot safely confirm this
+ * delivery was accepted, so the Hub outbox must retain ownership for a retry.
  *
- * Reads the canonical Edge error envelope ({ error: { code, message, traceId } }),
- * which may arrive either as an already-parsed object or as a raw JSON string.
+ * Safe to leave queued without ACK/FAIL:
+ * - 503 delivery_busy: pending admission contention or capacity; includes Retry-After.
+ * - 409 active_run_exists: another active run owns the thread; not this delivery.
+ * - 429 too_many_concurrent_runs: executor capacity rejected before accepting; same ID may retry.
+ * - 503 admission_persist_failed: admission evidence was not persisted. The executor may
+ *   already have accepted or completed work, so do not ACK/FAIL; a replay only
+ *   re-checks Edge evidence and does not assert that execution never happened.
+ *
+ * `409 admission_uncertain` is deliberately NOT in this set: its outcome is
+ * unknown and requires manual review, so it is neither temporary nor accepted.
  */
 export function isTransientAdmissionRejection(status: number, body: unknown): boolean {
-  const record = parseRecord(body);
-  const error = parseRecord(record.error);
-  const code = getFirstString(error.code);
+  const code = readEdgeErrorCode(body);
   return (
     (status === 503 && code === 'delivery_busy') ||
-    (status === 409 && code === 'active_run_exists')
+    (status === 409 && code === 'active_run_exists') ||
+    (status === 429 && code === 'too_many_concurrent_runs') ||
+    (status === 503 && code === 'admission_persist_failed')
   );
+}
+
+/**
+ * Detect `409 admission_uncertain`, a distinct non-final admission outcome.
+ * The caller must keep the task queued with a manual-review error and must not
+ * ACK/FAIL/relay-ACK or treat it as a retryable rejection or an accepted run.
+ */
+export function isAdmissionUncertain(status: number, body: unknown): boolean {
+  return status === 409 && readEdgeErrorCode(body) === 'admission_uncertain';
 }
 
 export const FINAL_OUTPUT_MAX_CHARS = 32_000;
