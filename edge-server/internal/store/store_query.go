@@ -29,23 +29,43 @@ func collectOrdered[T any](order []string, items map[string]T) []T {
 }
 
 func filterOrdered[T any](order []string, items map[string]T, keep func(T) bool) []T {
-	out := make([]T, 0, len(order))
-	for _, id := range order {
+	// Stage small results on the stack instead of allocating for every resident
+	// row. Dense results still allocate once, without repeated slice growth or
+	// calling keep again for rows already visited.
+	var small [16]T
+	count := 0
+	for index, id := range order {
 		item := items[id]
-		if keep(item) {
-			out = append(out, item)
+		if !keep(item) {
+			continue
 		}
+		if count < len(small) {
+			small[count] = item
+			count++
+			continue
+		}
+		out := make([]T, count, len(order))
+		copy(out, small[:])
+		out = append(out, item)
+		for _, remainingID := range order[index+1:] {
+			remaining := items[remainingID]
+			if keep(remaining) {
+				out = append(out, remaining)
+			}
+		}
+		return out
 	}
+	out := make([]T, count)
+	copy(out, small[:count])
 	return out
 }
 
 func listClonedArtifacts(order []string, items map[string]Artifact, runID string) []Artifact {
-	out := make([]Artifact, 0, len(order))
-	for _, id := range order {
-		artifact := cloneArtifact(items[id])
-		if scopeEquals(runID, artifact.RunID) {
-			out = append(out, artifact)
-		}
+	out := filterOrdered(order, items, func(artifact Artifact) bool {
+		return scopeEquals(runID, artifact.RunID)
+	})
+	for i := range out {
+		out[i] = cloneArtifact(out[i])
 	}
 	return out
 }
