@@ -159,7 +159,7 @@ func cloneFileSnapshot(snapshot fileSnapshot) fileSnapshot {
 		Checkpoints:       cloneCheckpointMap(snapshot.Checkpoints),
 		Previews:          copyMap(snapshot.Previews),
 		UserProfiles:      copyMap(snapshot.UserProfiles),
-		AgentProfiles:     copyMap(snapshot.AgentProfiles),
+		AgentProfiles:     cloneAgentProfileMap(snapshot.AgentProfiles),
 		ProjectOrder:      append([]string(nil), snapshot.ProjectOrder...),
 		ThreadOrder:       append([]string(nil), snapshot.ThreadOrder...),
 		RunOrder:          append([]string(nil), snapshot.RunOrder...),
