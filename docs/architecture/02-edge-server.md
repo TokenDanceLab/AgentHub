@@ -2,7 +2,7 @@
 
 > 子文档 | 主索引：[architecture.md](../architecture.md)
 >
-> 最后更新：2026-09-02
+> 最后更新：2026-09-06
 
 ## 职责
 
@@ -62,7 +62,11 @@ ProcessExecutor 配置 `RunTimeout`（默认 30 分钟）、`ShutdownGracePeriod
 
 ## Store 与事件持久化
 
-`Store`（`internal/store/store.go`）是核心内存数据结构，管理 Project、Thread、Run、Item、Pin、Diff、Artifact、Preview、UserProfile、AgentProfile、Settings 的全量 CRUD。`SQLiteStore`（`internal/store/sqlite_store.go`）通过 snapshot 持久化到 SQLite（WAL 模式，定期 checkpoint），支持崩溃恢复。终端状态 runs（completed/failed/cancelled/completed_with_issues）按 `TerminalTTL` 超时或 `MaxTerminalRunsPerThread` 上限自动清理，级联删除关联 diffs/artifacts/previews/items。
+`Store`（`internal/store/store.go`）是核心内存数据结构，管理 Project、Thread、Run、Item、Pin、Diff、Artifact、Preview、UserProfile、AgentProfile、Settings 的全量 CRUD。`FileStore` 与 `SQLiteStore` 的常规 `Get*` / `List*` 委托这个内存 Store，不是直接 SQL 查询；业务读取主要经过内存锁，而不是 SQLite 连接池。
+
+`FileStore`（`internal/store/file_store.go`）对写入信号做 debounce，再保存全量 JSON 快照；显式 `Flush` 同步执行快照、编码和文件 Sync/rename。`SQLiteStore`（`internal/store/sqlite_store.go`）在写入后同步持久化快照差分到 SQLite（WAL 模式，定期 checkpoint），支持崩溃恢复。SQL 连接初始化与持久化串行化独立于普通业务读面，不能用额外 SQL 读者的争用直接代替业务读取测量。
+
+终端状态 runs（completed/failed/cancelled/completed_with_issues）按 `TerminalTTL` 超时或 `MaxTerminalRunsPerThread` 上限自动清理，级联删除关联 diffs/artifacts/previews/items。
 
 `EventBus`（`internal/events/bus.go`）是基于 channel 的发布/订阅模型：4 worker 并发 observer、子 channel 缓冲（256）、gap detection（`system.gap` 事件）；通过 `PersistFn` 钩子先持久化再广播。`EventLog` 是 append-only JSON-lines 事件日志（默认 50 MiB 上限，超限截断保留尾部 75%）。
 
