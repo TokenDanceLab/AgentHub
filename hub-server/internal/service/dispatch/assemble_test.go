@@ -332,10 +332,15 @@ func TestTargetBoundAndOutboxHelpers(t *testing.T) {
 }
 
 func TestEdgeHTTPPrepHelpers(t *testing.T) {
+	payload := Payload{
+		TaskID:       "task-1",
+		DeliveryID:   "del-1",
+		AgentType:    "claude-code",
+		Prompt:       "hi",
+		SystemPrompt: "sys",
+	}
 	parts, insecure, err := PrepareEdgeHTTPRequest(
-		DefaultEdgeHTTPURL, "secret",
-		"hi", "claude-code", "sys", "task-1", "del-1",
-		nil, nil, nil, "cap",
+		DefaultEdgeHTTPURL, "secret", payload, "cap",
 	)
 	require.NoError(t, err)
 	assert.False(t, insecure)
@@ -346,9 +351,7 @@ func TestEdgeHTTPPrepHelpers(t *testing.T) {
 	assert.Equal(t, time.Duration(EdgeHTTPClientTimeoutSeconds)*time.Second, parts.Timeout)
 
 	parts, insecure, err = PrepareEdgeHTTPRequest(
-		"http://example.com:3210", "",
-		"hi", "claude-code", "", "task-1", "",
-		nil, nil, nil, "",
+		"http://example.com:3210", "", Payload{}, "",
 	)
 	require.NoError(t, err)
 	assert.True(t, insecure)

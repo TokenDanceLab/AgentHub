@@ -292,9 +292,18 @@ func TestFinalizePayloadWithDelivery(t *testing.T) {
 
 func TestMarshalEdgeRunRequest(t *testing.T) {
 	schema := json.RawMessage(`{"type":"object"}`)
-	body, err := MarshalEdgeRunRequest("hi", "claude-code", "sys", "task-1", "del-1", nil, nil, &schema)
+	payload := Payload{
+		TaskID:       "task-1",
+		DeliveryID:   "del-1",
+		AgentType:    "claude-code",
+		Prompt:       "hi",
+		SystemPrompt: "sys",
+		ModelParams:  `{"model":"selected"}`,
+		OutputSchema: &schema,
+	}
+	body, err := MarshalEdgeRunRequest(payload)
 	require.NoError(t, err)
-	want, err := json.Marshal(BuildEdgeRunRequest("hi", "claude-code", "sys", "task-1", "del-1", nil, nil, &schema))
+	want, err := json.Marshal(BuildEdgeRunRequest(payload))
 	require.NoError(t, err)
 	assert.JSONEq(t, string(want), string(body))
 }

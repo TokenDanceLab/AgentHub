@@ -40,9 +40,12 @@ func (s *DispatchService) dispatchTargetBoundTask(ctx context.Context, cacheClie
 		return false
 	}
 	frame := FramePort{Type: frameTypeAgentDispatch, Payload: json.RawMessage(payload)}
-	if err := repository.UpdatePendingTaskDispatched(s.db, task.ID, deviceID); !dispatch.RepoUpdateSucceeded(err) {
-		slog.Error(dispatch.DispatchLogTargetBoundMarkFailed, "task_id", task.ID, "user_id", userID, "target_id", task.TargetID, "device_id", deviceID, "error", err)
-		return false
+	// Restoring an accepted Desktop-owned run must not downgrade a fast ACK/done.
+	if task.EdgeRunID == "" {
+		if err := repository.UpdatePendingTaskDispatched(s.db, task.ID, deviceID); !dispatch.RepoUpdateSucceeded(err) {
+			slog.Error(dispatch.DispatchLogTargetBoundMarkFailed, "task_id", task.ID, "user_id", userID, "target_id", task.TargetID, "device_id", deviceID, "error", err)
+			return false
+		}
 	}
 	result := s.mgr.PushToConn(connID, frame)
 	if !dispatch.RedeliveryWSPushSucceeded(result.Queued) {

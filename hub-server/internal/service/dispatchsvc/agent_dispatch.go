@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"log/slog"
+	"strings"
 	"time"
 
 	"gorm.io/gorm"
@@ -229,21 +230,37 @@ func (s *DispatchService) DispatchTask(ctx context.Context, task *model.PendingA
 // instance; on a miss it falls back to the inviter desktop connection or the
 // offline target queue (exactly the previous inline route branch).
 func (s *DispatchService) dispatchRouteHTTP(ctx context.Context, task *model.PendingAgentTask, ai *model.AgentInstance, dp *dispatchPayload, payload []byte, deliveryID string, cacheClient dispatchCache) {
-	if dispatch.IsHTTPEdgeDispatchSuccess(s.dispatchToEdgeHTTP(ctx, task, dp)) {
-		if err := repository.UpdatePendingTaskDispatched(s.db, task.ID, dispatch.SyntheticHTTPEdgeDeviceID); !dispatch.RepoUpdateSucceeded(err) {
+	result := s.dispatchToEdgeHTTP(ctx, task, dp)
+	if result.RunID != "" {
+		if err := repository.RecordPendingTaskDirectReceipt(s.db, task.ID, task.EdgeDeviceID, result.RunID); err != nil {
 			slog.Error(dispatch.DispatchLogHTTPMarkFailed, "task_id", task.ID, "error", err)
+			return
 		}
-		s.markDeliverySentPlan(ctx, dispatch.PlanLiveDispatchMark(deliveryID), deliveryID, task.ID)
+		task.EdgeRunID = result.RunID
+		if result.CallbackOwner == "edge" {
+			s.markDeliverySentPlan(ctx, dispatch.PlanLiveDispatchMark(deliveryID), deliveryID, task.ID)
+			return
+		}
+		// The original run belongs to Desktop. Restore only that device's
+		// bridge, never the inviter's other connected executor.
+		boundPayload, err := dispatch.MarshalPayload(*dp)
+		if err != nil {
+			slog.Error(dispatch.DispatchLogPayloadMarshalFailed, "task_id", task.ID, "error", err)
+			return
+		}
+		s.dispatchRouteTargetBound(ctx, task, ai, boundPayload, deliveryID, cacheClient)
 		return
 	}
-	// HTTP miss: fall through to inviter desktop / offline.
+	if !result.SafeToFallback {
+		return // uncertain admission retains its durable device reservation
+	}
+	// No execution was attempted and no device was reserved; normal fallback.
 	connID, err := cacheClient.GetRoute(ctx, ai.InviterUserID, dispatch.DesktopDeviceType)
 	if dispatch.IsUnboundInviterDesktopRoute(dispatch.ClassifyUnboundFallbackRoute(connID, dispatch.ManagerPortAvailable(s.mgr != nil), err)) {
 		s.dispatchUnboundInviterDesktop(ctx, task, ai, payload, deliveryID, connID, cacheClient)
 		return
 	}
 	s.pushPendingTaskOffline(ctx, ai.InviterUserID, task.ID, payload, "unbound_only", dispatch.DispatchLogOfflinePushFailed, cacheClient)
-	// Offline-only path: outbox retains ownership until Edge ack/stream (#1031).
 	s.markDeliverySentPlan(ctx, dispatch.PlanOfflineDispatchMark(deliveryID), deliveryID, task.ID)
 }
 
@@ -474,13 +491,31 @@ func (s *DispatchService) getPendingTaskForRedelivery(ctx context.Context, taskI
 // Outbox MarkDeliverySent after success remains on DeliveryOutbox RedispatchDelivery.
 func (s *DispatchService) retryDispatchToTarget(ctx context.Context, task *pendingTaskSnapshot, dp dispatchPayload, newPayload []byte, rec redispatchTarget) error {
 	minimalTask := dispatch.MinimalPendingTaskForHTTP(*task)
-	preferDevice := dispatch.RedeliveryPreferDeviceRoute(task.EdgeDeviceID)
 
-	if dispatch.ClassifyRedeliveryPrimaryRoute(task.TargetID, task.EdgeDeviceID) == dispatch.RouteHTTP {
-		if edgeRunID := s.dispatchToEdgeHTTP(ctx, minimalTask, &dp); dispatch.IsHTTPEdgeDispatchSuccess(edgeRunID) {
-			slog.Info(dispatch.RedispatchLogHTTPSucceeded,
-				"delivery_id", rec.DeliveryID, "task_id", rec.TaskID, "edge_run_id", edgeRunID)
-			return nil
+	reservedDirectDevice := task.TargetID == "" && task.EdgeDeviceID != "" && task.EdgeDeviceID == strings.TrimSpace(s.edgeCfg.DeviceID)
+	if reservedDirectDevice || dispatch.ClassifyRedeliveryPrimaryRoute(task.TargetID, task.EdgeDeviceID) == dispatch.RouteHTTP {
+		result := s.dispatchToEdgeHTTP(ctx, minimalTask, &dp)
+		task.EdgeDeviceID = minimalTask.EdgeDeviceID
+		if result.RunID != "" {
+			if err := repository.RecordPendingTaskDirectReceipt(s.db, task.ID, task.EdgeDeviceID, result.RunID); err != nil {
+				return err
+			}
+			if result.CallbackOwner == "edge" {
+				slog.Info(dispatch.RedispatchLogHTTPSucceeded,
+					"delivery_id", rec.DeliveryID, "task_id", rec.TaskID, "edge_run_id", result.RunID)
+				return nil
+			}
+		} else if !result.SafeToFallback {
+			return errors.New("direct admission is unconfirmed; preserve device binding")
+		}
+	}
+	preferDevice := dispatch.RedeliveryPreferDeviceRoute(task.EdgeDeviceID)
+	if preferDevice {
+		dp.EdgeDeviceID = task.EdgeDeviceID
+		var err error
+		newPayload, err = dispatch.MarshalPayload(dp)
+		if err != nil {
+			return err
 		}
 	}
 

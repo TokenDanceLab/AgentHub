@@ -1,7 +1,6 @@
 package dispatch
 
 import (
-	"encoding/json"
 	"net/http"
 	"time"
 )
@@ -21,19 +20,14 @@ type EdgeHTTPRequestParts struct {
 // err is set only on body marshal failure.
 func PrepareEdgeHTTPRequest(
 	edgeURL, authToken string,
-	prompt, agentType, systemPrompt, hubTaskID, deliveryID string,
-	messages, pinned []Message,
-	outputSchema *json.RawMessage,
+	payload Payload,
 	capabilityToken string,
 ) (parts EdgeHTTPRequestParts, insecure bool, err error) {
 	edgeURL = ResolveEdgeHTTPURL(edgeURL)
 	if IsInsecureNonLoopbackEdge(edgeURL) {
 		return EdgeHTTPRequestParts{EdgeURL: edgeURL}, true, nil
 	}
-	body, err := MarshalEdgeRunRequest(
-		prompt, agentType, systemPrompt, hubTaskID, deliveryID,
-		messages, pinned, outputSchema,
-	)
+	body, err := MarshalEdgeRunRequest(payload)
 	if err != nil {
 		return EdgeHTTPRequestParts{EdgeURL: edgeURL}, false, err
 	}

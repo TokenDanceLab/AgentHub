@@ -42,7 +42,7 @@ type runRequest struct {
 	ModelMappingEnabled     bool                                 `json:"modelMappingEnabled"`
 	ProviderFallbackEnabled bool                                 `json:"providerFallbackEnabled"`
 	SessionID               string                               `json:"sessionId"`
-	Continue                bool                                 `json:"continue"`
+	Continue                *bool                                `json:"continue"`
 	Fork                    bool                                 `json:"fork"`
 	ReasoningEffort         string                               `json:"reasoningEffort"`
 	ThinkingMode            string                               `json:"thinkingMode"`
@@ -241,7 +241,7 @@ func (h *Handler) buildRunContext(run store.Run, req *runRequest) lifecycle.RunP
 		AgentID:                req.AgentID,
 		Model:                  req.Model,
 		SessionID:              req.SessionID,
-		ContinueLast:           req.Continue,
+		ContinueLast:           req.Continue != nil && *req.Continue,
 		ForkSession:            req.Fork,
 		ReasoningEffort:        req.ReasoningEffort,
 		ThinkingMode:           req.ThinkingMode,
@@ -350,8 +350,9 @@ func (h *Handler) PostRuns(w http.ResponseWriter, r *http.Request) {
 	// Auto-detect continue: when the thread has prior assistant messages,
 	// set ContinueLast = true so adapters can resume the conversation.
 	// Each run creates a fresh CC conversation via --session-id.
-	if !req.Continue && threadHasAssistantHistory(repository, req.ThreadID) {
-		req.Continue = true
+	if req.Continue == nil && threadHasAssistantHistory(repository, req.ThreadID) {
+		resume := true
+		req.Continue = &resume
 	}
 	// WorkDir normalization previously happened inside validateRunCreateState;
 	// the shared core also trims, this keeps the context builder consistent.
@@ -388,7 +389,7 @@ func (h *Handler) PostRuns(w http.ResponseWriter, r *http.Request) {
 		Model:             req.Model,
 		PermissionMode:    req.PermissionMode,
 		SessionID:         req.SessionID,
-		ContinueLast:      req.Continue,
+		ContinueLast:      req.Continue != nil && *req.Continue,
 		WorkDir:           req.WorkDir,
 		HubTaskID:         req.HubTaskID,
 		CallbackOwner:     req.CallbackOwner,

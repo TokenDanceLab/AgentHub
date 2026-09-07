@@ -187,11 +187,15 @@ func (h *Handler) GetHealth(w http.ResponseWriter, r *http.Request) {
 		httpStatus = http.StatusServiceUnavailable
 	}
 
+	edgeID := h.EdgeDeviceID
+	if edgeID == "" {
+		edgeID = "local"
+	}
 	writeJSON(w, httpStatus, map[string]any{
 		"status":       status,
 		"http_status":  httpStatus,
 		"version":      "v1",
-		"edgeId":       "local",
+		"edgeId":       edgeID,
 		"checks":       checks,
 		"capabilities": h.runCallbackCapabilities(),
 	})

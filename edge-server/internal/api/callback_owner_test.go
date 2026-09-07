@@ -142,3 +142,21 @@ func TestExecutionIntentFixtureReachesEdgeAdmission(t *testing.T) {
 		})
 	}
 }
+
+func TestExecutionIntentExplicitContinueFalseSurvivesLocalHistory(t *testing.T) {
+	executor := &executionIntentRecorder{contexts: make(chan lifecycle.RunProcessContext, 1)}
+	server, h := newDeliveryTestServer(t, executor, nil)
+	defer server.Close()
+	if _, err := ensureStore(h).CreateItem(store.Item{ID: "prior-assistant", ProjectID: "proj_local", ThreadID: "thread_local", Role: "agent", Type: "agent_message", Content: "Previous local output"}); err != nil {
+		t.Fatal(err)
+	}
+	body := admissionRunBody(h.WorkspaceAllowlist[0], "continue-explicit", "continue-task", map[string]any{"callbackOwner": "desktop", "continue": false, "sessionId": "explicit-runtime-session"})
+	result := postRunsRaw(t, server.URL, body)
+	if result.status != http.StatusAccepted {
+		t.Fatalf("explicit intent rejected: %d %#v", result.status, result.body)
+	}
+	context := <-executor.contexts
+	if context.ContinueLast || context.SessionID != "explicit-runtime-session" {
+		t.Fatalf("Edge changed explicit continuation intent: %#v", context)
+	}
+}

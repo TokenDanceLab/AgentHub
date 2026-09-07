@@ -30,21 +30,9 @@ Hub/Edge 实时面均为 **at-least-once**：重连、离线队列、outbox、�
 
 > **`seq_id`（Hub WS per-conn）vs `seq`（Edge per-bus）**：Hub `seq_id` 是 `PushToConn` 在单连接上单调递增的投递序号，重连从 1 计、跨连接不可比；Edge `EventEnvelope.seq` 是事件总线上的 stream 单调序号，与持久化 `agent_run_events.event_seq` / `messages.seq_id` 对齐。REST 增量同步接口（`GET .../messages/sync?after_seq=`、`GET .../events?after_seq=`）的 `after_seq` 一律指**持久化表的内部 seq**（`messages.seq_id` 或 `agent_run_events.event_seq`），**不是** WS 帧的 `seq_id`。客户端不得用 WS `seq_id` 作为 REST 游标。
 
-### Hub→Edge `delivery_id` admission 契约（#2101 G2 / #2347）
+### Hub→Edge 任务投递
 
-Hub 的 WS `agent.dispatch` 与 outbox HTTP POST `/v1/runs` 共享同一 `delivery_id`。Desktop 将事件中的 `delivery_id` / `deliveryId` 转交为 Edge 请求的 `deliveryId`；空值保留既有无去重路径。
-
-- **原子接收**：先保留 pending claim；仅在 run 接收成功后提交含原 `runId` 的回执，失败或放弃则释放 claim，允许同 ID 重试。
-- **容量与有效期**：进程内缓存默认共容纳 4096 个 pending claim / accepted receipt。成功回执从提交起保留 5 分钟，也可因 LRU 容量压力被淘汰；重放不续期。pending claim 不因 TTL/LRU 被移除，避免首个请求未完成时重复执行。
-- **绑定**：非空 `hubTaskId` 是业务绑定。同一 Hub task 的 HTTP 本地线程与 Desktop 会话线程可以不同，但回执指向同一个原 run；无 `hubTaskId` 的遗留请求按 `projectId` / `threadId` 绑定。缓存内同 delivery ID 的不同绑定返回 409 `delivery_conflict`。
-- **成功重放**：有效回执返回原 run 的正常 202 envelope，包括 `data.runId`、`data.deduplicated: true` 和 `data.deliveryId`；不新建 run、timeline 或 executor。原 run 已删除则返回 404 `not_found`，不静默重建。每次请求先通过 capability 校验；重放还按原 run 实际 project/thread scope 复验。
-- **临时拒绝**：同 ID 正在接收，或容量被 pending claim 占满时，返回 503 `delivery_busy` + `Retry-After`（秒），而不是成功回执。409 `active_run_exists` 表示线程被其他活动 run 占用，也不能当作本次投递成功。Desktop 对这两类拒绝不 ACK、不 FAIL，由现有 Hub outbox 负责重投。
-- **ACK 与业务状态**：每次成功接收或重放都幂等重发 task / relay ACK，以修复丢失的确认；已建立的 run 映射、输出和 running/terminal 状态不因重复投递而回退，业务接收通知只触发一次。
-- **Hub task 接收证据**：非空 `hubTaskId` 在启动执行器前，与 `admissionState: pending` 一起写入 run；File/SQLite 在返回前同步保存。执行器返回后只允许转为 `accepted` 或带 `admissionErrorCode` 的 `rejected`，不改写执行状态。没有 Hub task 的本地/MCP 请求保留原路径。
-- **冷重放**：进程缓存丢失或 delivery ID 改变时，按 Hub task 查最新 attempt，并复验原 run scope。`accepted` 返回原 run，不重新执行；上次最终证据保存失败时只重试保存。已接收 run 后续 `failed` 不等于接收拒绝。
-- **拒绝与未决**：429 `too_many_concurrent_runs` 是执行器持有执行权之前的容量拒绝；503 `admission_persist_failed` 是证据保存失败（执行器可能已经接收），两者都不应 ACK/FAIL，由 Hub 重投向 Edge 核对。只有明确的容量拒绝或调用 Start 之前的保存失败，才允许创建新 attempt；普通 `executor_start_failed` 保持拒绝，不伪装成功。
-- **结果不明**：同一 Hub task 的当前接收者仍在处理时返回 503 `delivery_busy`。恢复后的 `pending`、未知 admission state、无 `startedAt` 的旧 run 返回 409 `admission_uncertain`；Desktop 保持待核对错误并通过现有通知提示用户，同一原因不重复提示，不 ACK/FAIL、不自动启动。旧 run 只有明确 `startedAt` 才能按原身份重放。`GET /v1/runs/{runId}` 暴露已记录的 `admissionState` / `admissionErrorCode` 供核对。
-- **恢复边界**：缓存不是恢复日志；持久化接收证据证明的是是否接收，不保证进程仍在运行，也不提供自动进程恢复。`queued`/`failed` 本身不能证明没有外部副作用。未决 admission 不参与终态自动清理；原 run 因显式删除或正常 retention 消失后，不宣称永久保留 Hub task 的幂等身份。
+同一任务共享 `delivery_id` / `hubTaskId`，消费端区分接收结果与执行状态，重放保留原 run 和 callback owner。执行输入、同步接收证据、能力预检与回调归属的完整合同见 [dispatch.md](dispatch.md)。
 
 标签：**UPSERT by id**（稳定 id 合并，禁止第二行）；**idempotent on apply**（再应用不变）；**水位 / watermark**（只前进 `max`）；**ephemeral**（可丢可重，不写持久态）；**非幂等**（须自备去重或 REST）。
 

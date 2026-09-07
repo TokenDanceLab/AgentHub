@@ -201,6 +201,24 @@
         "hubTaskId": "task-intent-5",
         "structuredOutputSchema": "{\"type\":\"object\"}"
       }
+    },
+    {
+      "name": "safe-integer-fallback-and-literal-schema",
+      "payload": {
+        "task_id": "task-intent-6",
+        "agent_type": "codex",
+        "prompt": "Preserve the explicit intent.",
+        "system_prompt": "  Keep this spacing.\n",
+        "model_params": "{\"max_thinking_tokens\":9007199254740992,\"maxThinkingTokens\":0,\"structured_output_schema\":false,\"structuredOutputSchema\":{\"type\":\"object\"},\"system_prompt\":\"Nested fallback.\"}"
+      },
+      "expectedIntent": {
+        "prompt": "Preserve the explicit intent.",
+        "agentId": "codex",
+        "maxThinkingTokens": 0,
+        "systemPrompt": "  Keep this spacing.\n",
+        "structuredOutputSchema": "false",
+        "hubTaskId": "task-intent-6"
+      }
     }
   ]
 }
