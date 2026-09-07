@@ -36,7 +36,6 @@ import {
   FINAL_OUTPUT_MAX_CHARS,
   getTeamRouteContext,
   hasTaskProgressed,
-  isEdgeOwnedTask,
   isTerminalBridgeTask,
   isAdmissionUncertain,
   isTransientAdmissionRejection,
@@ -151,14 +150,14 @@ export function useHubIntegration(options: HubIntegrationOptions): HubIntegratio
       if (isTerminalBridgeTask(task)) return;
 
       const taskId = task.taskId;
-      const edgeOwned = isEdgeOwnedTask(task);
+      const desktopOwned = task.callbackOwner === 'desktop';
 
       switch (event.type) {
         case 'run.agent.text_delta': {
           const content = typeof payload.content === 'string' ? payload.content : '';
           if (content) {
             rememberOutput(runId, content);
-            if (!edgeOwned) {
+            if (desktopOwned) {
               void catchHubReport(
                 `streamTaskEvent:${taskId}:${event.type}`,
                 hubClient.streamTaskEvent(taskId, event.type, payload, { runId }),
@@ -172,7 +171,7 @@ export function useHubIntegration(options: HubIntegrationOptions): HubIntegratio
           const content = typeof payload.content === 'string' ? payload.content : '';
           if (content) {
             rememberOutput(runId, content);
-            if (!edgeOwned) {
+            if (desktopOwned) {
               void catchHubReport(
                 `streamTaskEvent:${taskId}:${event.type}`,
                 hubClient.streamTaskEvent(taskId, event.type, payload, { runId }),
@@ -186,7 +185,7 @@ export function useHubIntegration(options: HubIntegrationOptions): HubIntegratio
           const content = extractRunOutputBatch(payload);
           if (content) {
             rememberOutput(runId, content);
-            if (!edgeOwned) {
+            if (desktopOwned) {
               void catchHubReport(
                 `streamTaskEvent:${taskId}:${event.type}`,
                 hubClient.streamTaskEvent(taskId, event.type, payload, { runId }),
@@ -198,7 +197,7 @@ export function useHubIntegration(options: HubIntegrationOptions): HubIntegratio
 
         case 'run.agent.thinking': {
           const content = typeof payload.content === 'string' ? payload.content : '';
-          if (content && !edgeOwned) {
+          if (content && desktopOwned) {
             void catchHubReport(
               `streamTaskEvent:${taskId}:${event.type}`,
               hubClient.streamTaskEvent(taskId, event.type, payload, { runId }),
@@ -213,7 +212,7 @@ export function useHubIntegration(options: HubIntegrationOptions): HubIntegratio
         case 'run.agent.permission_requested':
         case 'run.agent.permission_decided':
           // Edge-owned runs report these callbacks themselves; do not duplicate.
-          if (!edgeOwned) {
+          if (desktopOwned) {
             void catchHubReport(
               `streamTaskEvent:${taskId}:${event.type}`,
               hubClient.streamTaskEvent(taskId, event.type, payload, { runId }),
@@ -222,7 +221,7 @@ export function useHubIntegration(options: HubIntegrationOptions): HubIntegratio
           break;
 
         case 'run.agent.route_decision': {
-          if (!edgeOwned) {
+          if (desktopOwned) {
             const decision = routeDecisionFromRuntimePayload(payload);
             if (decision) {
               postRouteDecision(task, decision);
@@ -236,7 +235,7 @@ export function useHubIntegration(options: HubIntegrationOptions): HubIntegratio
         }
 
         case 'run.agent.result': {
-          if (!edgeOwned) {
+          if (desktopOwned) {
             const decision = routeDecisionFromRuntimePayload(payload);
             if (decision) {
               postRouteDecision(task, decision);
@@ -252,7 +251,7 @@ export function useHubIntegration(options: HubIntegrationOptions): HubIntegratio
               typeof payload.content === 'string'
                 ? payload.content
                 : outputByRunRef.current.get(runId) || JSON.stringify(payload);
-            if (!edgeOwned) {
+            if (desktopOwned) {
               void catchHubReport(
                 `doneTask:${taskId}`,
                 hubClient.doneTask(taskId, output, runId),
@@ -265,7 +264,7 @@ export function useHubIntegration(options: HubIntegrationOptions): HubIntegratio
           } else {
             const error =
               typeof payload.error === 'string' ? payload.error : 'Agent reported failure';
-            if (!edgeOwned) {
+            if (desktopOwned) {
               void catchHubReport(
                 `failTask:${taskId}`,
                 hubClient.failTask(taskId, error, runId),
@@ -282,7 +281,7 @@ export function useHubIntegration(options: HubIntegrationOptions): HubIntegratio
         }
 
         case 'run.finished': {
-          if (!edgeOwned) {
+          if (desktopOwned) {
             const output = outputByRunRef.current.get(runId) || 'Run finished';
             void catchHubReport(
               `doneTask:${taskId}`,
@@ -298,7 +297,7 @@ export function useHubIntegration(options: HubIntegrationOptions): HubIntegratio
 
         case 'run.failed': {
           const error = typeof payload.error === 'string' ? payload.error : 'Run lifecycle failure';
-          if (!edgeOwned) {
+          if (desktopOwned) {
             void catchHubReport(
               `failTask:${taskId}`,
               hubClient.failTask(taskId, error, runId),
@@ -313,7 +312,7 @@ export function useHubIntegration(options: HubIntegrationOptions): HubIntegratio
         }
 
         case 'run.cancelled': {
-          if (!edgeOwned) {
+          if (desktopOwned) {
             void catchHubReport(
               `failTask:${taskId}`,
               hubClient.failTask(taskId, 'Run cancelled', runId),
@@ -509,10 +508,35 @@ export function useHubIntegration(options: HubIntegrationOptions): HubIntegratio
 
         // Business state/mapping is only written once (first accepted instance).
         // Also clear a stale admission_uncertain manual-review note. Existing
-        // progressed state keeps its own error untouched. The callback owner is
-        // persisted by the first accepted instance and cannot be overwritten by
-        // a later replay.
-        if (!taskProgressed) {
+        // progressed state may backfill a missing persistent owner from an
+        // explicit receipt with the same runId, but cannot overwrite a different
+        // owner or runId. Conflicts stay local for review without any ACK/FAIL.
+        if (taskProgressed && existingTask) {
+          const existingRunId = existingTask.runId;
+          const existingOwner = existingTask.callbackOwner;
+          const runConflict = existingRunId !== undefined && existingRunId !== runId;
+          const ownerConflict = existingOwner !== undefined && existingOwner !== responseOwner;
+
+          if (runConflict || ownerConflict) {
+            const conflictError = [
+              'Callback ownership receipt conflicts with persisted task state.',
+              `persisted run=${existingRunId ?? 'n/a'}, owner=${existingOwner ?? 'unknown'}`,
+              `receipt run=${runId}, owner=${responseOwner}`,
+            ].join(' ');
+            store.getState().updateTask(taskId, { error: conflictError });
+            if (existingTask.error !== conflictError) {
+              showEdgeReviewNotice(conflictError);
+            }
+            return;
+          }
+
+          const updates: Partial<AgentTask> = {};
+          if (existingOwner === undefined) updates.callbackOwner = responseOwner;
+          if (existingRunId === undefined) updates.runId = runId;
+          if (Object.keys(updates).length > 0) {
+            store.getState().updateTask(taskId, updates);
+          }
+        } else if (!taskProgressed) {
           store.getState().updateTask(taskId, {
             runId,
             status: 'running',
@@ -521,14 +545,14 @@ export function useHubIntegration(options: HubIntegrationOptions): HubIntegratio
           });
         }
 
-        const edgeOwned = !taskProgressed
-          ? responseOwner === 'edge'
-          : isEdgeOwnedTask(existingTask);
+        const settledTask = store.getState().tasks.find((t) => t.taskId === taskId);
+        const desktopOwned = settledTask?.callbackOwner === 'desktop';
 
-        // Desktop-owned accepted deliveries (both first accept and successful
-        // replay) are idempotently acknowledged. Edge-owned runs are
-        // acknowledged by Edge; Desktop still acknowledges the relay command.
-        if (!edgeOwned) {
+        // Desktop callbacks and task ACK are sent only for an explicit
+        // desktop-owned receipt. Edge-owned and unresolved owners do not get
+        // duplicate Desktop task work; the relay command ACK still reports that
+        // this device handled the transport delivery.
+        if (desktopOwned) {
           void catchHubReport(`ackTask:${taskId}`, hubClient.ackTask(taskId, runId));
         }
         if (relayCommandId && dispatchTarget?.deviceId) {

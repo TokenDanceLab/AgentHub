@@ -1259,6 +1259,94 @@ describe('useHubIntegration', () => {
     expect(hoisted.storeTasks[0]?.status).toBe('done');
   });
 
+  it('does not forward Edge callbacks while callbackOwner is unresolved', () => {
+    hoisted.getStoreState().addTask({
+      taskId: 'task-unknown-owner',
+      agentId: 'codex',
+      prompt: 'p',
+      status: 'running',
+      runId: 'run-unknown-owner',
+      dispatchPayload: {},
+      createdAt: '2026-01-01T00:00:00.000Z',
+    });
+    renderHook(() => useHubIntegration({ hubWS, hubClient }));
+
+    act(() => {
+      fireEdgeEvent(
+        makeEvent('run.agent.text_delta', { runId: 'run-unknown-owner', content: 'hidden output' }),
+      );
+      fireEdgeEvent(makeEvent('run.finished', { runId: 'run-unknown-owner' }));
+    });
+
+    expect(hubClient.streamTaskEvent).not.toHaveBeenCalled();
+    expect(hubClient.doneTask).not.toHaveBeenCalled();
+    expect(hubClient.failTask).not.toHaveBeenCalled();
+    expect(hoisted.storeTasks[0]?.status).toBe('done');
+  });
+
+  it('backfills a missing owner from a same-run edge receipt without Desktop task ACK', async () => {
+    hoisted.getStoreState().addTask({
+      taskId: 'task-1',
+      agentId: 'codex',
+      prompt: 'p',
+      status: 'running',
+      runId: 'run-1',
+      dispatchPayload: {},
+      createdAt: '2026-01-01T00:00:00.000Z',
+    });
+    mockRunCreateResponse({
+      id: 'run-1',
+      runId: 'run-1',
+      projectId: 'proj',
+      threadId: 'sess',
+      status: 'started',
+      callbackOwner: 'edge',
+    });
+    const onDispatch = vi.fn();
+
+    renderHook(() =>
+      useHubIntegration({
+        hubWS,
+        hubClient,
+        onDispatch,
+        dispatchTarget: { targetId: 'target-current', deviceId: 'desktop-current' },
+      }),
+    );
+
+    const relayFrame = {
+      relay_command_id: 'relay-1',
+      command_type: 'agent.dispatch',
+      payload: JSON.stringify(
+        makeDispatchPayload({
+          target_id: 'target-current',
+          edge_device_id: 'desktop-current',
+          delivery_id: 'd1',
+        }),
+      ),
+    };
+    await act(async () => {
+      fireHubEvent(HUB_EVENTS.AGENT_DISPATCH, relayFrame);
+    });
+
+    expect(hoisted.storeTasks[0]?.callbackOwner).toBe('edge');
+    expect(hoisted.storeTasks[0]?.runId).toBe('run-1');
+    expect(hoisted.storeTasks[0]?.status).toBe('running');
+    expect(hubClient.ackTask).not.toHaveBeenCalled();
+    expect(hubClient.ackRelayCommand).toHaveBeenCalledWith('relay-1', 'desktop-current');
+    expect(hubClient.failTask).not.toHaveBeenCalled();
+    expect(onDispatch).not.toHaveBeenCalled();
+
+    act(() => {
+      fireEdgeEvent(makeEvent('run.agent.text_delta', { runId: 'run-1', content: 'edge output' }));
+      fireEdgeEvent(makeEvent('run.finished', { runId: 'run-1' }));
+    });
+
+    expect(hubClient.streamTaskEvent).not.toHaveBeenCalled();
+    expect(hubClient.doneTask).not.toHaveBeenCalled();
+    expect(hubClient.failTask).not.toHaveBeenCalled();
+    expect(hoisted.storeTasks[0]?.status).toBe('done');
+  });
+
   it('keeps the first callback owner and does not overwrite it on a later response', async () => {
     mockRunCreateResponse({
       id: 'run-1',
@@ -1305,9 +1393,63 @@ describe('useHubIntegration', () => {
     });
 
     expect(hoisted.storeTasks[0]?.callbackOwner).toBe('edge');
+    expect(hoisted.storeTasks[0]?.runId).toBe('run-1');
+    expect(hoisted.storeTasks[0]?.error).toContain('conflict');
     expect(hubClient.ackTask).not.toHaveBeenCalled();
-    expect(hubClient.ackRelayCommand).toHaveBeenCalledTimes(2);
+    expect(hubClient.ackRelayCommand).toHaveBeenCalledTimes(1);
+    expect(hubClient.failTask).not.toHaveBeenCalled();
     expect(onDispatch).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps a persisted run and suppresses ACK/relay-ACK on a different-run receipt conflict', async () => {
+    hoisted.getStoreState().addTask({
+      taskId: 'task-1',
+      agentId: 'codex',
+      prompt: 'p',
+      status: 'running',
+      runId: 'run-original',
+      callbackOwner: 'desktop',
+      dispatchPayload: {},
+      createdAt: '2026-01-01T00:00:00.000Z',
+    });
+    mockRunCreateResponse({
+      id: 'run-other',
+      runId: 'run-other',
+      projectId: 'proj',
+      threadId: 'sess',
+      status: 'started',
+      callbackOwner: 'desktop',
+    });
+
+    renderHook(() =>
+      useHubIntegration({
+        hubWS,
+        hubClient,
+        dispatchTarget: { targetId: 'target-current', deviceId: 'desktop-current' },
+      }),
+    );
+
+    const relayFrame = {
+      relay_command_id: 'relay-conflict',
+      command_type: 'agent.dispatch',
+      payload: JSON.stringify(
+        makeDispatchPayload({
+          target_id: 'target-current',
+          edge_device_id: 'desktop-current',
+          delivery_id: 'd1',
+        }),
+      ),
+    };
+    await act(async () => {
+      fireHubEvent(HUB_EVENTS.AGENT_DISPATCH, relayFrame);
+    });
+
+    expect(hoisted.storeTasks[0]?.runId).toBe('run-original');
+    expect(hoisted.storeTasks[0]?.callbackOwner).toBe('desktop');
+    expect(hoisted.storeTasks[0]?.error).toContain('conflict');
+    expect(hubClient.ackTask).not.toHaveBeenCalled();
+    expect(hubClient.ackRelayCommand).not.toHaveBeenCalled();
+    expect(hubClient.failTask).not.toHaveBeenCalled();
   });
 
   it('fails closed before POST when Edge does not publish runCallbackOwnership', async () => {
