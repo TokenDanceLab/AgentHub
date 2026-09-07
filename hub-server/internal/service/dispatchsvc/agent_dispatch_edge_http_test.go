@@ -29,19 +29,19 @@ import (
 // no longer reads process env.
 func TestDispatchToEdgeHTTP_UsesInjectedConfigNotEnv(t *testing.T) {
 	var gotPath, gotAuth string
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewServer(withDirectCallbackHealth(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		gotPath = r.URL.Path
 		gotAuth = r.Header.Get("Authorization")
 		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte(`{"success":true,"data":{"runId":"run-42"}}`))
-	}))
+		_, _ = w.Write([]byte(`{"success":true,"data":{"runId":"run-42","callbackOwner":"edge"}}`))
+	})))
 	defer srv.Close()
 
 	// Env points at a dead address and a wrong token; the injected config must win.
 	t.Setenv("AGENTHUB_EDGE_URL", "http://127.0.0.1:1")
 	t.Setenv("AGENTHUB_EDGE_AUTH_TOKEN", "env-token-must-not-be-used")
 
-	ds := NewDispatchService(nil, nil, nil, nil, nil, nil, config.EdgeDispatchConfig{
+	ds := NewDispatchService(nil, nil, nil, nil, nil, nil, config.EdgeDispatchConfig{DeviceID: "fixture-edge-device",
 		URL:       srv.URL,
 		AuthToken: "cfg-token",
 		Timeout:   5 * time.Second,
@@ -49,6 +49,7 @@ func TestDispatchToEdgeHTTP_UsesInjectedConfigNotEnv(t *testing.T) {
 
 	task := &model.PendingAgentTask{ID: "task-1", AgentInstanceID: "ai-1"}
 	dp := dispatchPayload{
+		ModelParams:      `{ "work_dir": "/workspace/fixture" }`,
 		TaskID:           "task-1",
 		AgentInstanceID:  "ai-1",
 		AgentType:        "codex",
@@ -58,9 +59,10 @@ func TestDispatchToEdgeHTTP_UsesInjectedConfigNotEnv(t *testing.T) {
 		Prompt:           "hello",
 		DisplayName:      "agent",
 	}
-	runID := ds.dispatchToEdgeHTTP(context.Background(), task, &dp)
+	ds.db = newDirectDispatchDB(t, task)
+	result := ds.dispatchToEdgeHTTP(context.Background(), task, &dp)
 
-	assert.Equal(t, "run-42", runID, "successful dispatch must return the Edge run id")
+	assert.Equal(t, "run-42", result.RunID, "successful dispatch must return the Edge run id")
 	assert.Equal(t, "/v1/runs", gotPath)
 	assert.Equal(t, "Bearer cfg-token", gotAuth, "token must come from injected config")
 }
@@ -71,16 +73,16 @@ func TestDispatchToEdgeHTTP_UsesInjectedConfigNotEnv(t *testing.T) {
 // the caller deadline).
 func TestDispatchToEdgeHTTP_CallerDeadlineCancels(t *testing.T) {
 	release := make(chan struct{})
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewServer(withDirectCallbackHealth(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Never respond; block until the client gives up or the test ends.
 		select {
 		case <-r.Context().Done():
 		case <-release:
 		}
-	}))
+	})))
 	t.Cleanup(func() { close(release); srv.Close() })
 
-	ds := NewDispatchService(nil, nil, nil, nil, nil, nil, config.EdgeDispatchConfig{
+	ds := NewDispatchService(nil, nil, nil, nil, nil, nil, config.EdgeDispatchConfig{DeviceID: "fixture-edge-device",
 		URL:     srv.URL,
 		Timeout: 10 * time.Second, // client timeout is generous
 	}, outboundhttp.NewClient(10*time.Second), "")
@@ -90,16 +92,18 @@ func TestDispatchToEdgeHTTP_CallerDeadlineCancels(t *testing.T) {
 
 	task := &model.PendingAgentTask{ID: "task-2", AgentInstanceID: "ai-2"}
 	dp := dispatchPayload{
-		TaskID: "task-2", AgentInstanceID: "ai-2", AgentType: "codex",
+		ModelParams: `{ "work_dir": "/workspace/fixture" }`,
+		TaskID:      "task-2", AgentInstanceID: "ai-2", AgentType: "codex",
 		SessionID: "sess-2", TriggerMessageID: "msg-2", TriggerUserID: "user-2",
 		Prompt: "hello", DisplayName: "agent",
 	}
 
 	start := time.Now()
-	runID := ds.dispatchToEdgeHTTP(ctx, task, &dp)
+	ds.db = newDirectDispatchDB(t, task)
+	result := ds.dispatchToEdgeHTTP(ctx, task, &dp)
 	elapsed := time.Since(start)
 
-	assert.Equal(t, "", runID, "cancelled request must not dispatch")
+	assert.Equal(t, "", result.RunID, "cancelled request must not dispatch")
 	require.Less(t, elapsed, 9*time.Second,
 		"caller deadline must win over the 10s client timeout (took %v)", elapsed)
 }
@@ -111,12 +115,12 @@ func TestDispatchToEdgeHTTP_CallerDeadlineCancels(t *testing.T) {
 // embedded in the response proves the raw text does not leak through slog.
 func TestDispatchToEdgeHTTP_NonSuccessLogUsesSummaryNotRawBody(t *testing.T) {
 	const sentinel = "UNIQUE-SENTINEL-DO-NOT-LOG-9f3b8a2e7c1d"
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewServer(withDirectCallbackHealth(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
 		// Body is well past the summary prefix cap so the sentinel cannot
 		// appear even accidentally via prefix leakage.
 		_, _ = w.Write([]byte(strings.Repeat("x", defaultBodySummaryPrefixBytes+64) + sentinel))
-	}))
+	})))
 	defer srv.Close()
 
 	var logBuf bytes.Buffer
@@ -124,24 +128,38 @@ func TestDispatchToEdgeHTTP_NonSuccessLogUsesSummaryNotRawBody(t *testing.T) {
 	slog.SetDefault(slog.New(slog.NewJSONHandler(&logBuf, &slog.HandlerOptions{Level: slog.LevelDebug})))
 	t.Cleanup(func() { slog.SetDefault(prev) })
 
-	ds := NewDispatchService(nil, nil, nil, nil, nil, nil, config.EdgeDispatchConfig{
+	ds := NewDispatchService(nil, nil, nil, nil, nil, nil, config.EdgeDispatchConfig{DeviceID: "fixture-edge-device",
 		URL:     srv.URL,
 		Timeout: 5 * time.Second,
 	}, outboundhttp.NewClient(5*time.Second), "")
 
 	task := &model.PendingAgentTask{ID: "task-log", AgentInstanceID: "ai-log"}
 	dp := dispatchPayload{
-		TaskID: "task-log", AgentInstanceID: "ai-log", AgentType: "codex",
+		ModelParams: `{ "work_dir": "/workspace/fixture" }`,
+		TaskID:      "task-log", AgentInstanceID: "ai-log", AgentType: "codex",
 		SessionID: "sess-log", TriggerMessageID: "msg-log", TriggerUserID: "user-log",
 		Prompt: "hello", DisplayName: "agent",
 	}
-	runID := ds.dispatchToEdgeHTTP(context.Background(), task, &dp)
+	ds.db = newDirectDispatchDB(t, task)
+	result := ds.dispatchToEdgeHTTP(context.Background(), task, &dp)
 
-	assert.Equal(t, "", runID, "non-success dispatch must return empty run id")
+	assert.Equal(t, "", result.RunID, "non-success dispatch must return empty run id")
 	logged := logBuf.String()
 	assert.Contains(t, logged, `"body_summary":"len=`)
 	assert.NotContains(t, logged, sentinel,
 		"raw body sentinel must not appear in logs (leak surface)")
 	// Also ensure we did not accidentally keep the old "body" key with raw text.
 	assert.NotContains(t, logged, `,"body":"`)
+}
+
+// Keep HTTP tests on the enforced ownership-aware route, not an old Edge mock.
+func withDirectCallbackHealth(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet && r.URL.Path == "/v1/health" {
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"edgeId":"fixture-edge-device","capabilities":{"runCallbackOwnership":true,"directHubCallbacks":true}}`))
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
 }

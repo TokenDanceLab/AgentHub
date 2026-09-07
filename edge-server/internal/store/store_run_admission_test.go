@@ -13,11 +13,11 @@ func TestRunAdmissionStateMachine(t *testing.T) {
 	s := New()
 	project, thread := seedRunAdmissionStore(t, s)
 
-	if _, err := s.CreateRunAdmission("admission_missing_hub", project.ID, thread.ID, ""); !errors.Is(err, ErrRunAdmissionHubTaskIDRequired) {
+	if _, err := s.CreateRunAdmission("admission_missing_hub", project.ID, thread.ID, "", ""); !errors.Is(err, ErrRunAdmissionHubTaskIDRequired) {
 		t.Fatalf("CreateRunAdmission empty HubTaskID error = %v, want ErrRunAdmissionHubTaskIDRequired", err)
 	}
 
-	run, err := s.CreateRunAdmission("admission_run_1", project.ID, thread.ID, "hub-task-1")
+	run, err := s.CreateRunAdmission("admission_run_1", project.ID, thread.ID, "hub-task-1", "")
 	if err != nil {
 		t.Fatalf("CreateRunAdmission returned error: %v", err)
 	}
@@ -66,7 +66,7 @@ func TestRunAdmissionStateMachine(t *testing.T) {
 		t.Fatalf("accepted -> rejected error = %v, want ErrRunAdmissionInvalidTransition", err)
 	}
 
-	rejected, err := s.CreateRunAdmission("admission_run_2", project.ID, thread.ID, "hub-task-2")
+	rejected, err := s.CreateRunAdmission("admission_run_2", project.ID, thread.ID, "hub-task-2", "")
 	if err != nil {
 		t.Fatalf("CreateRunAdmission second returned error: %v", err)
 	}
@@ -101,7 +101,7 @@ func TestCreateRunAdmissionDoesNotResetExistingFinalOrLegacy(t *testing.T) {
 	s := New()
 	project, thread := seedRunAdmissionStore(t, s)
 
-	accepted, err := s.CreateRunAdmission("same_admission_id", project.ID, thread.ID, "same-task")
+	accepted, err := s.CreateRunAdmission("same_admission_id", project.ID, thread.ID, "same-task", "")
 	if err != nil {
 		t.Fatalf("CreateRunAdmission accepted returned error: %v", err)
 	}
@@ -111,7 +111,7 @@ func TestCreateRunAdmissionDoesNotResetExistingFinalOrLegacy(t *testing.T) {
 	}
 
 	// Rebuilding an existing run ID must not downgrade a final admission.
-	if _, err := s.CreateRunAdmission(accepted.ID, project.ID, thread.ID, "same-task"); err == nil ||
+	if _, err := s.CreateRunAdmission(accepted.ID, project.ID, thread.ID, "same-task", ""); err == nil ||
 		(!errors.Is(err, ErrRunAdmissionInvalidTransition) && !errors.Is(err, ErrRunAdmissionExists)) {
 		t.Fatalf("CreateRunAdmission same accepted ID error = %v, want explicit admission conflict", err)
 	}
@@ -122,7 +122,7 @@ func TestCreateRunAdmissionDoesNotResetExistingFinalOrLegacy(t *testing.T) {
 	}
 
 	// A different HubTaskID must never overwrite the existing binding.
-	if _, err := s.CreateRunAdmission(accepted.ID, project.ID, thread.ID, "different-task"); err == nil ||
+	if _, err := s.CreateRunAdmission(accepted.ID, project.ID, thread.ID, "different-task", ""); err == nil ||
 		(!errors.Is(err, ErrRunAdmissionInvalidTransition) && !errors.Is(err, ErrRunAdmissionExists)) {
 		t.Fatalf("CreateRunAdmission different HubTaskID error = %v, want explicit conflict", err)
 	}
@@ -140,7 +140,7 @@ func TestCreateRunAdmissionDoesNotResetExistingFinalOrLegacy(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CreateThread other returned error: %v", err)
 	}
-	if _, err := s.CreateRunAdmission(accepted.ID, otherProject.ID, otherThread.ID, "same-task"); err == nil ||
+	if _, err := s.CreateRunAdmission(accepted.ID, otherProject.ID, otherThread.ID, "same-task", ""); err == nil ||
 		(!errors.Is(err, ErrRunAdmissionInvalidTransition) && !errors.Is(err, ErrRunAdmissionExists)) {
 		t.Fatalf("CreateRunAdmission different scope error = %v, want explicit conflict", err)
 	}
@@ -151,11 +151,11 @@ func TestCreateRunAdmissionDoesNotResetExistingFinalOrLegacy(t *testing.T) {
 	}
 
 	// A matching pending run ID is idempotent.
-	pending, err := s.CreateRunAdmission("pending_admission_id", project.ID, thread.ID, "pending-task")
+	pending, err := s.CreateRunAdmission("pending_admission_id", project.ID, thread.ID, "pending-task", "")
 	if err != nil {
 		t.Fatalf("CreateRunAdmission pending returned error: %v", err)
 	}
-	again, err := s.CreateRunAdmission(pending.ID, project.ID, thread.ID, "pending-task")
+	again, err := s.CreateRunAdmission(pending.ID, project.ID, thread.ID, "pending-task", "")
 	if err != nil {
 		t.Fatalf("CreateRunAdmission matching pending retry returned error: %v", err)
 	}
@@ -164,7 +164,7 @@ func TestCreateRunAdmissionDoesNotResetExistingFinalOrLegacy(t *testing.T) {
 	}
 
 	// New attempts keep using a new run ID and remain usable.
-	attempt, err := s.CreateRunAdmission("new_attempt_id", project.ID, thread.ID, "same-task")
+	attempt, err := s.CreateRunAdmission("new_attempt_id", project.ID, thread.ID, "same-task", "")
 	if err != nil {
 		t.Fatalf("CreateRunAdmission new attempt returned error: %v", err)
 	}
@@ -180,7 +180,7 @@ func TestCreateRunAdmissionDoesNotResetExistingFinalOrLegacy(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CreateRun legacy returned error: %v", err)
 	}
-	if _, err := s.CreateRunAdmission(legacy.ID, project.ID, thread.ID, "legacy-task"); err == nil ||
+	if _, err := s.CreateRunAdmission(legacy.ID, project.ID, thread.ID, "legacy-task", ""); err == nil ||
 		(!errors.Is(err, ErrRunAdmissionInvalidTransition) && !errors.Is(err, ErrRunAdmissionExists)) {
 		t.Fatalf("CreateRunAdmission legacy ID error = %v, want explicit conflict", err)
 	}
@@ -197,12 +197,12 @@ func TestRunAdmissionPhasesSurviveReopen(t *testing.T) {
 			first := openRunAdmissionStore(t, kind, path)
 			project, thread := seedRunAdmissionStore(t, first)
 
-			pending, err := first.CreateRunAdmission("admission_pending", project.ID, thread.ID, "task-pending")
+			pending, err := first.CreateRunAdmission("admission_pending", project.ID, thread.ID, "task-pending", "")
 			if err != nil {
 				t.Fatalf("CreateRunAdmission pending returned error: %v", err)
 			}
 			assertDurableRunAdmission(t, first, path, pending.ID, RunAdmissionPending, "task-pending", "")
-			accepted, err := first.CreateRunAdmission("admission_accepted", project.ID, thread.ID, "task-accepted")
+			accepted, err := first.CreateRunAdmission("admission_accepted", project.ID, thread.ID, "task-accepted", "")
 			if err != nil {
 				t.Fatalf("CreateRunAdmission accepted returned error: %v", err)
 			}
@@ -211,7 +211,7 @@ func TestRunAdmissionPhasesSurviveReopen(t *testing.T) {
 				t.Fatalf("RecordRunAdmission accepted returned error: %v", err)
 			}
 			assertDurableRunAdmission(t, first, path, accepted.ID, RunAdmissionAccepted, "task-accepted", "")
-			rejected, err := first.CreateRunAdmission("admission_rejected", project.ID, thread.ID, "task-rejected")
+			rejected, err := first.CreateRunAdmission("admission_rejected", project.ID, thread.ID, "task-rejected", "")
 			if err != nil {
 				t.Fatalf("CreateRunAdmission rejected returned error: %v", err)
 			}
@@ -253,18 +253,18 @@ func TestRunAdmissionLatestAttempt(t *testing.T) {
 				repo = openRunAdmissionStore(t, kind, path)
 			}
 			project, thread := seedRunAdmissionStore(t, repo)
-			first, err := repo.CreateRunAdmission("admission_latest_1", project.ID, thread.ID, "hub-task-latest")
+			first, err := repo.CreateRunAdmission("admission_latest_1", project.ID, thread.ID, "hub-task-latest", "")
 			if err != nil {
 				t.Fatalf("CreateRunAdmission first returned error: %v", err)
 			}
 			if _, err := repo.RecordRunAdmission(first.ID, "capacity"); err != nil {
 				t.Fatalf("RecordRunAdmission first returned error: %v", err)
 			}
-			second, err := repo.CreateRunAdmission("admission_latest_2", project.ID, thread.ID, "hub-task-latest")
+			second, err := repo.CreateRunAdmission("admission_latest_2", project.ID, thread.ID, "hub-task-latest", "")
 			if err != nil {
 				t.Fatalf("CreateRunAdmission second returned error: %v", err)
 			}
-			third, err := repo.CreateRunAdmission("admission_latest_3", project.ID, thread.ID, "hub-task-latest")
+			third, err := repo.CreateRunAdmission("admission_latest_3", project.ID, thread.ID, "hub-task-latest", "")
 			if err != nil {
 				t.Fatalf("CreateRunAdmission third returned error: %v", err)
 			}
@@ -298,7 +298,7 @@ func TestRunAdmissionPersistenceFailureRetry(t *testing.T) {
 			block, unblock := blockRunAdmissionPersistence(t, repo)
 
 			block()
-			run, err := repo.CreateRunAdmission("admission_persist_retry", project.ID, thread.ID, "hub-task-persist")
+			run, err := repo.CreateRunAdmission("admission_persist_retry", project.ID, thread.ID, "hub-task-persist", "")
 			if err == nil {
 				t.Fatal("CreateRunAdmission with blocked persistence returned nil error")
 			}

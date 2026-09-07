@@ -150,7 +150,7 @@ func TestHubTaskReplay_UncertainAdmissionExposesReadOnlyEvidence(t *testing.T) {
 	server, h := newDeliveryTestServer(t, executor, nil)
 	defer server.Close()
 	repository := ensureStore(h)
-	run, err := repository.CreateRunAdmission("run-needs-review", "proj_local", "thread_local", "task-needs-review")
+	run, err := repository.CreateRunAdmission("run-needs-review", "proj_local", "thread_local", "task-needs-review", "")
 	if err != nil {
 		t.Fatal(err)
 	}

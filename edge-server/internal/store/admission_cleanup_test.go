@@ -14,7 +14,7 @@ func TestCleanupRuns_RetainsPendingAdmissionAfterEarlyExecutionFinish(t *testing
 		t.Fatal(err)
 	}
 	for _, id := range []string{"pending", "accepted"} {
-		if _, err := repo.CreateRunAdmission(id, "p", "t", id); err != nil {
+		if _, err := repo.CreateRunAdmission(id, "p", "t", id, ""); err != nil {
 			t.Fatal(err)
 		}
 		repo.SetRunStatus(id, "finished")

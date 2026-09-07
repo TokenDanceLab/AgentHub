@@ -376,8 +376,8 @@ func (s *SQLiteStore) CreateRun(id, projectID, threadID string) (Run, error) {
 	return persistAfterSQLiteWrite(s, run, err)
 }
 
-func (s *SQLiteStore) CreateRunAdmission(id, projectID, threadID, hubTaskID string) (Run, error) {
-	run, err := s.store.CreateRunAdmission(id, projectID, threadID, hubTaskID)
+func (s *SQLiteStore) CreateRunAdmission(id, projectID, threadID, hubTaskID, callbackOwner string) (Run, error) {
+	run, err := s.store.CreateRunAdmission(id, projectID, threadID, hubTaskID, callbackOwner)
 	return persistAfterSQLiteWrite(s, run, err)
 }
 

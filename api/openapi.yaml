@@ -107,13 +107,23 @@ paths:
     get:
       tags: [Foundation]
       operationId: getHealth
-      summary: Health check.
+      summary: Health and run callback capabilities.
       x-agenthub-phase: P0
       x-agenthub-status: implemented
       x-agenthub-owner: Edge
       responses:
         "200":
-          $ref: "#/components/responses/Ok"
+          description: Healthy Edge with explicit callback ownership capabilities.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EdgeHealth"
+        "503":
+          description: Degraded Edge; health body retains the same schema.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EdgeHealth"
 
   /v1/events:
     get:
@@ -755,6 +765,8 @@ paths:
             admission capacity and includes Retry-After. admission_persist_failed
             means admission evidence could not be saved; execution may already
             have been accepted. Retry to reconcile, not to force another start.
+            callback_unavailable means a direct callback owner is not configured;
+            no new run is created, and device routing is required.
           headers:
             Retry-After:
               description: Delay in seconds, present for delivery_busy and admission_persist_failed responses.
@@ -8626,6 +8638,42 @@ components:
           type: string
           format: uuid
           description: Client-generated idempotency key.
+    EdgeHealth:
+      type: object
+      required: [status, version, edgeId, capabilities]
+      properties:
+        status:
+          type: string
+        http_status:
+          type: integer
+        version:
+          type: string
+        edgeId:
+          type: string
+        checks:
+          type: object
+          additionalProperties: true
+        capabilities:
+          type: object
+          required: [runCallbackOwnership, directHubCallbacks]
+          properties:
+            runCallbackOwnership:
+              type: boolean
+              description: The Edge enforces and persists per-run callback ownership.
+            directHubCallbacks:
+              type: boolean
+              description: Direct callbacks have a configured destination and current credential; no token or live reachability is exposed.
+    DispatchContextMessage:
+      type: object
+      required: [role, content]
+      properties:
+        role:
+          type: string
+        content:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
     StartRunRequest:
       type: object
       properties:
@@ -8673,11 +8721,11 @@ components:
           description: >
             Runtime permission policy hint. Only the claude adapter honours this
             field (mapped to Claude Code --permission-mode: default, acceptEdits,
-            bypassPermissions, plan, dontAsk). All other adapters ignore it; Codex
+            plan, dontAsk). All other adapters ignore it; Codex
             sandbox level is controlled separately via its own configuration.
         workDir:
           type: string
-          description: Working directory override for this run. Defaults to the Edge process profile workdir.
+          description: Explicit working directory required for a new run; must be within the Edge workspace allowlist.
         includePartial:
           type: boolean
           description: Include partial stream_event messages for real-time deltas (Claude Code --include-partial-messages).
@@ -8710,6 +8758,24 @@ components:
             delivery admission. When set, receipts bind to this business task;
             without it, legacy delivery scope binds projectId/threadId. Callback
             ownership must still avoid duplicate Edge/Desktop output bridges.
+        callbackOwner:
+          type: string
+          enum: [edge, desktop]
+          description: Required for modern Hub delivery; selects the task callback reporter on first admission. Requires hubTaskId; replay returns the stored owner without reassignment.
+        trace_id:
+          type: string
+          description: Hub dispatch trace correlation identifier.
+        messages:
+          type: array
+          items:
+            $ref: "#/components/schemas/DispatchContextMessage"
+          description: Hub conversation history forwarded unchanged to the runtime context.
+        pinnedMessages:
+          type: array
+          items:
+            $ref: "#/components/schemas/DispatchContextMessage"
+          description: Pinned Hub context forwarded unchanged to the runtime.
+
     AgentInfo:
       type: object
       required: [id, name, status]
@@ -9608,6 +9674,10 @@ components:
         finishedAt:
           type: string
           format: date-time
+        callbackOwner:
+          type: string
+          enum: [edge, desktop]
+          description: Persisted task callback reporter. Replayed receipts retain the original owner; legacy absence is not an ownership grant.
         admissionState:
           type: string
           enum: [pending, accepted, rejected]

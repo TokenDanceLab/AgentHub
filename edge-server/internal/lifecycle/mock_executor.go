@@ -245,6 +245,9 @@ func RunResponse(run store.Run) map[string]any {
 	if run.WorkDir != "" {
 		payload["workDir"] = run.WorkDir
 	}
+	if run.CallbackOwner != "" {
+		payload["callbackOwner"] = run.CallbackOwner
+	}
 	if run.AdmissionState != "" {
 		payload["admissionState"] = run.AdmissionState
 	}

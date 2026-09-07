@@ -42,9 +42,15 @@ func openTempMigratedDB(t *testing.T) (*gorm.DB, func()) {
 		t.Fatal("AGENTHUB_DB_PASSWORD not set; required for the PostgreSQL integration path")
 	}
 
-	host := "localhost"
-	port := 5432
-	user := "agenthub"
+	// Use the same config/environment as TestMain; an isolated non-default
+	// PostgreSQL must not silently fall back to another local database.
+	cfg, err := config.Load("../../configs/config.yaml")
+	if err != nil {
+		t.Fatalf("load PostgreSQL integration config: %v", err)
+	}
+	host := cfg.DB.Host
+	port := cfg.DB.Port
+	user := cfg.DB.User
 
 	// Connect to the default "postgres" database to create/drop our temp DB.
 	adminDSN := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=postgres sslmode=disable",

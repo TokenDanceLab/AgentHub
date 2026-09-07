@@ -76,7 +76,12 @@ type CreateParams struct {
 	// HubTaskID identifies one logical Hub task across delivery transports.
 	// A retained run is replayable only with admission evidence, not merely
 	// because a queued/failed record exists.
-	HubTaskID string
+	HubTaskID     string
+	CallbackOwner string
+
+	// ValidateAdmission checks transport prerequisites only for fresh work;
+	// retained receipts keep their original execution and callback owner.
+	ValidateAdmission func() *errcode.Error
 
 	// AuthorizeReplay validates the actual stored scope before replaying a Hub
 	// task. Transports with capability policy must supply it. Without a policy,
