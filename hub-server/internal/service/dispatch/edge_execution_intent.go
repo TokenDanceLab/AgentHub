@@ -76,7 +76,7 @@ func firstStringArrayValue(values ...any) []string {
 }
 
 func parseStringArrayValue(value any) []string {
-	var source any = value
+	source := value
 	if s, ok := value.(string); ok {
 		var parsed []any
 		if err := json.Unmarshal([]byte(s), &parsed); err != nil {

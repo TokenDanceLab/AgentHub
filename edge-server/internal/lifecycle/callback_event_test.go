@@ -236,7 +236,9 @@ func TestHubCallbackEmitterTypedSkipsWithoutHubBinding(t *testing.T) {
 	}
 	flusher.FlushHubStream()
 	executor.fireHubDone(runID, nil)
-	time.Sleep(100 * time.Millisecond)
+	if _, exists := hubCallbackQueues.Load(runID); exists {
+		t.Fatal("unbound run created a callback queue")
+	}
 
 	cb.mu.Lock()
 	defer cb.mu.Unlock()

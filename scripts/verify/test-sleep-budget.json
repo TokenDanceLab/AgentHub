@@ -146,17 +146,14 @@
   ]
  },
  "edge-server/tests/hub_e2e_test.go": {
-  "count": 4,
-  "total_ms": 3500,
+  "count": 1,
+  "total_ms": 2000,
   "max_ms": 2000,
   "owner": "DeliciousBuding",
-  "review": "2026-08-29",
-  "reason": "E2E lane (short-skipped in CI): 500ms x3 async callback grace windows (callbacks fire from a goroutine after the run reaches a terminal status; kept bounded); 2000ms real run completion (subprocess protocol time doubling as the negative window proving no callback fires without hubTaskId). The three former deadline-guarded run-status poll intervals (100/100/200ms) were converted to testkit.Eventually (approved 2026-08-29, #2055).",
+  "review": "2026-09-07",
+  "reason": "Fixture subprocess L2 lane: the remaining 2000ms negative observation window checks that a run without hubTaskId emits no callbacks. The three former 500ms callback grace windows were replaced with event-driven waits in #2352; the count/value budget only shrinks.",
   "sleeps": [
-   { "ms": 500, "kind": "grace_window" },
-   { "ms": 500, "kind": "grace_window" },
-   { "ms": 2000, "kind": "real_protocol" },
-   { "ms": 500, "kind": "grace_window" }
+   { "ms": 2000, "kind": "negative_window" }
   ]
  },
  "hub-server/internal/app/background_test.go": {

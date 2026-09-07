@@ -48,6 +48,16 @@ const (
 	// to reach a terminal status; the headroom covers the full ack→done
 	// callback sequence (#2055).
 	roundTripWaitTimeout = 15 * time.Second
+
+	// fixtureCallbackToken is a mock-only placeholder credential. The
+	// callback-capability gate requires a non-empty token before it admits an
+	// edge-owned run; it never reaches a real Hub in this fixture.
+	fixtureCallbackToken = "fixture-edge-callback-token"
+
+	// runOwnerEdge is the explicit direct-callback owner sent in the /v1/runs
+	// contract so the Edge records an edge-owned admission instead of guessing
+	// desktop ownership from an unconfigured callback client.
+	runOwnerEdge = "edge"
 )
 
 // isTerminalRunStatus reports whether status is a terminal run lifecycle
@@ -65,6 +75,19 @@ func runCallbackDump(runID string, h *api.Handler, mockHub *hubCallbackMock) str
 	}
 	return fmt.Sprintf("run %s status=%q (acks=%d done=%d fail=%d stream=%d)",
 		runID, status, mockHub.ackCount(), mockHub.doneCount(), mockHub.failCount(), mockHub.streamCount())
+}
+
+// requireEdgeAdmissionResponse verifies the HTTP /v1/runs response recorded an
+// edge-owned, accepted admission. This is the contract check that prevents a
+// fixture from starting a run and then patching the store to fake ownership.
+func requireEdgeAdmissionResponse(t *testing.T, data map[string]any) {
+	t.Helper()
+	if got := data["callbackOwner"]; got != runOwnerEdge {
+		t.Fatalf("response callbackOwner = %v, want %q", got, runOwnerEdge)
+	}
+	if got := data["admissionState"]; got != store.RunAdmissionAccepted {
+		t.Fatalf("response admissionState = %v, want %q", got, store.RunAdmissionAccepted)
+	}
 }
 
 // ── Hub mock with full Edge callback endpoint support ──────────────────────
@@ -201,9 +224,12 @@ func startEdgeWithHubCallbacks(t *testing.T, hubURL string) (*httptest.Server, *
 		t.Fatalf("failed to create process executor: %v", err)
 	}
 
-	// Wire Hub callback client
+	// Wire Hub callback client. The handler must see the same configured
+	// client as the executor; otherwise the direct-callback capability gate
+	// treats every hub-task request as a desktop-owned legacy run.
+	var hubClient *hub.CallbackClient
 	if hubURL != "" {
-		hubClient := newE2ECallbackClient(hubURL, "")
+		hubClient = newE2ECallbackClient(hubURL, fixtureCallbackToken)
 		processExecutor.SetHubCallback(hubClient)
 	}
 
@@ -213,6 +239,7 @@ func startEdgeWithHubCallbacks(t *testing.T, hubURL string) (*httptest.Server, *
 		Registry:           runners.NewRegistry(),
 		Store:              storeRepo,
 		Executor:           processExecutor,
+		CallbackClient:     hubClient,
 		WorkspaceAllowlist: []string{workDir},
 	}
 
@@ -246,11 +273,12 @@ func TestHubE2E_RunCompletes_FiresDoneCallback(t *testing.T) {
 
 	// Create a run with hubTaskId to trigger Edge→Hub callbacks
 	runResp := postJSON(t, edgeTS.URL+"/v1/runs", map[string]any{
-		"projectId": "proj_local",
-		"threadId":  "thread_local",
-		"prompt":    "E2E test: complete run",
-		"hubTaskId": taskID,
-		"workDir":   edgeH.WorkspaceAllowlist[0],
+		"projectId":     "proj_local",
+		"threadId":      "thread_local",
+		"prompt":        "E2E test: complete run",
+		"hubTaskId":     taskID,
+		"callbackOwner": runOwnerEdge,
+		"workDir":       edgeH.WorkspaceAllowlist[0],
 	})
 
 	if runResp.StatusCode != http.StatusAccepted {
@@ -260,10 +288,12 @@ func TestHubE2E_RunCompletes_FiresDoneCallback(t *testing.T) {
 	}
 
 	runBody := decodeJSON[map[string]any](t, runResp)
-	runID, ok := unwrapSuccess(runBody)["runId"].(string)
+	data := unwrapSuccess(runBody)
+	runID, ok := data["runId"].(string)
 	if !ok {
 		t.Fatalf("expected runId in response, got %v", runBody)
 	}
+	requireEdgeAdmissionResponse(t, data)
 	t.Logf("created run %s for task %s", runID, taskID)
 
 	// Wait for the run to finish (echo exits almost immediately)
@@ -277,8 +307,33 @@ func TestHubE2E_RunCompletes_FiresDoneCallback(t *testing.T) {
 		t.Logf("run %s final status: %s", runID, run.Status)
 	}
 
-	// Give the async callback goroutine a moment to fire
-	time.Sleep(500 * time.Millisecond)
+	// Wait for the complete callback set instead of sleeping a fixed amount;
+	// missing a callback must fail the fixture rather than being hidden by a
+	// short race window.
+	testkit.Eventually(t, runTerminalWaitTimeout, func() bool {
+		return mockHub.ackCount() >= 1 && mockHub.streamCount() >= 1 && mockHub.doneCount() >= 1
+	}, "edge-owned callbacks should reach the mock Hub", func() string {
+		return runCallbackDump(runID, edgeH, mockHub)
+	})
+
+	// Verify Hub received the ack callback and no fail callback.
+	ackCount := mockHub.ackCount()
+	if ackCount != 1 {
+		t.Fatalf("expected exactly 1 ack callback, got %d (done=%d, fail=%d, stream=%d)",
+			ackCount, mockHub.doneCount(), mockHub.failCount(), mockHub.streamCount())
+	}
+	mockHub.mu.Lock()
+	ackRecord := mockHub.ackCalls[0]
+	mockHub.mu.Unlock()
+	if ackRecord.TaskID != taskID {
+		t.Errorf("ack callback taskID = %q, want %q", ackRecord.TaskID, taskID)
+	}
+	if ackRecord.Body["run_id"] != runID {
+		t.Errorf("ack callback run_id = %q, want %q", ackRecord.Body["run_id"], runID)
+	}
+	if failCount := mockHub.failCount(); failCount != 0 {
+		t.Errorf("expected 0 fail callbacks for successful run, got %d", failCount)
+	}
 
 	// Verify Hub received a stream callback with real process stdout.
 	streamCount := mockHub.streamCount()
@@ -340,7 +395,7 @@ func TestHubE2E_RunFails_FiresFailCallback(t *testing.T) {
 		t.Fatalf("failed to create process executor: %v", err)
 	}
 
-	hubClient := newE2ECallbackClient(mockHub.URL(), "")
+	hubClient := newE2ECallbackClient(mockHub.URL(), fixtureCallbackToken)
 	processExecutor.SetHubCallback(hubClient)
 
 	workDir := t.TempDir()
@@ -349,6 +404,7 @@ func TestHubE2E_RunFails_FiresFailCallback(t *testing.T) {
 		Registry:           runners.NewRegistry(),
 		Store:              storeRepo,
 		Executor:           processExecutor,
+		CallbackClient:     hubClient,
 		WorkspaceAllowlist: []string{workDir},
 	}
 
@@ -360,11 +416,12 @@ func TestHubE2E_RunFails_FiresFailCallback(t *testing.T) {
 	taskID := "task-e2e-fail-001"
 
 	runResp := postJSON(t, edgeTS.URL+"/v1/runs", map[string]any{
-		"projectId": "proj_local",
-		"threadId":  "thread_local",
-		"prompt":    "E2E test: failing run",
-		"hubTaskId": taskID,
-		"workDir":   workDir,
+		"projectId":     "proj_local",
+		"threadId":      "thread_local",
+		"prompt":        "E2E test: failing run",
+		"hubTaskId":     taskID,
+		"callbackOwner": runOwnerEdge,
+		"workDir":       workDir,
 	})
 
 	if runResp.StatusCode != http.StatusAccepted {
@@ -374,7 +431,9 @@ func TestHubE2E_RunFails_FiresFailCallback(t *testing.T) {
 	}
 
 	runBody := decodeJSON[map[string]any](t, runResp)
-	runID, _ := unwrapSuccess(runBody)["runId"].(string)
+	data := unwrapSuccess(runBody)
+	runID, _ := data["runId"].(string)
+	requireEdgeAdmissionResponse(t, data)
 	t.Logf("created failing run %s for task %s", runID, taskID)
 
 	// Wait for run to terminate with failure
@@ -388,17 +447,31 @@ func TestHubE2E_RunFails_FiresFailCallback(t *testing.T) {
 		t.Logf("run %s status: %s", runID, run.Status)
 	}
 
-	time.Sleep(500 * time.Millisecond) // allow async callback
+	testkit.Eventually(t, runTerminalWaitTimeout, func() bool {
+		return mockHub.failCount() == 1
+	}, "edge-owned fail callback should reach the mock Hub", func() string {
+		return runCallbackDump(runID, h, mockHub)
+	})
 
-	if failCount := mockHub.failCount(); failCount >= 1 {
-		mockHub.mu.Lock()
-		failRecord := mockHub.failCalls[0]
-		mockHub.mu.Unlock()
-		t.Logf("fail callback received for task %s: error=%s", failRecord.TaskID, failRecord.Body["error"])
-	} else {
-		// It's OK if fail doesn't fire (the run might have "started" before finding the binary)
-		// The important thing is the wiring doesn't crash
-		t.Log("no fail callback (run may have failed before started status)")
+	failCount := mockHub.failCount()
+	if failCount != 1 {
+		t.Fatalf("expected exactly 1 fail callback, got %d (ack=%d, done=%d, stream=%d)",
+			failCount, mockHub.ackCount(), mockHub.doneCount(), mockHub.streamCount())
+	}
+	if doneCount := mockHub.doneCount(); doneCount != 0 {
+		t.Errorf("expected 0 done callbacks for failed run, got %d", doneCount)
+	}
+	mockHub.mu.Lock()
+	failRecord := mockHub.failCalls[0]
+	mockHub.mu.Unlock()
+	if failRecord.TaskID != taskID {
+		t.Errorf("fail callback taskID = %q, want %q", failRecord.TaskID, taskID)
+	}
+	if failRecord.Body["run_id"] != runID {
+		t.Errorf("fail callback run_id = %q, want %q", failRecord.Body["run_id"], runID)
+	}
+	if !strings.Contains(failRecord.Body["error"], "nonexistent_command_xyz_123") {
+		t.Errorf("fail callback error = %q, want command name", failRecord.Body["error"])
 	}
 }
 
@@ -522,6 +595,9 @@ func TestHubE2E_NoCallbackWhenNotConfigured(t *testing.T) {
 	if fails := mockHub.failCount(); fails > 0 {
 		t.Errorf("expected 0 fail callbacks without hubTaskId, got %d", fails)
 	}
+	if streams := mockHub.streamCount(); streams > 0 {
+		t.Errorf("expected 0 stream callbacks without hubTaskId, got %d", streams)
+	}
 }
 
 // TestHubE2E_CompleteRoundTrip verifies the full protocol:
@@ -541,11 +617,12 @@ func TestHubE2E_CompleteRoundTrip(t *testing.T) {
 	taskID := fmt.Sprintf("task-roundtrip-%d", time.Now().UnixNano())
 
 	runResp := postJSON(t, edgeTS.URL+"/v1/runs", map[string]any{
-		"projectId": "proj_local",
-		"threadId":  "thread_local",
-		"prompt":    "Complete round trip test",
-		"hubTaskId": taskID,
-		"workDir":   edgeH.WorkspaceAllowlist[0],
+		"projectId":     "proj_local",
+		"threadId":      "thread_local",
+		"prompt":        "Complete round trip test",
+		"hubTaskId":     taskID,
+		"callbackOwner": runOwnerEdge,
+		"workDir":       edgeH.WorkspaceAllowlist[0],
 	})
 
 	if runResp.StatusCode != http.StatusAccepted {
@@ -555,10 +632,12 @@ func TestHubE2E_CompleteRoundTrip(t *testing.T) {
 	}
 
 	runBody := decodeJSON[map[string]any](t, runResp)
-	runID, ok := unwrapSuccess(runBody)["runId"].(string)
+	data := unwrapSuccess(runBody)
+	runID, ok := data["runId"].(string)
 	if !ok {
 		t.Fatalf("expected runId, got %v", runBody)
 	}
+	requireEdgeAdmissionResponse(t, data)
 	t.Logf("roundtrip: run %s, task %s", runID, taskID)
 
 	// Wait for completion
@@ -568,35 +647,74 @@ func TestHubE2E_CompleteRoundTrip(t *testing.T) {
 	}, "round-trip run should reach a terminal status", func() string {
 		return runCallbackDump(runID, edgeH, mockHub)
 	})
-	time.Sleep(500 * time.Millisecond) // allow async callbacks to fire
+	testkit.Eventually(t, roundTripWaitTimeout, func() bool {
+		return mockHub.ackCount() >= 1 && mockHub.streamCount() >= 1 && mockHub.doneCount() >= 1
+	}, "complete edge-owned callback set should reach the mock Hub", func() string {
+		return runCallbackDump(runID, edgeH, mockHub)
+	})
 
-	// Verify Hub received both ack and done callbacks
+	// Verify Hub received the complete edge-owned callback set, not merely
+	// one of the possible terminal callbacks.
 	ackCount := mockHub.ackCount()
+	streamCount := mockHub.streamCount()
 	doneCount := mockHub.doneCount()
+	failCount := mockHub.failCount()
 
 	t.Logf("final callback counts: ack=%d, done=%d, fail=%d, stream=%d",
-		ackCount, doneCount, mockHub.failCount(), mockHub.streamCount())
+		ackCount, doneCount, failCount, streamCount)
 
-	if ackCount < 1 && doneCount < 1 {
-		t.Error("expected at least ack or done callback; got none")
+	if ackCount != 1 {
+		t.Errorf("expected exactly 1 ack callback, got %d", ackCount)
+	}
+	if streamCount < 1 {
+		t.Errorf("expected at least 1 stream callback, got %d", streamCount)
+	}
+	if doneCount != 1 {
+		t.Errorf("expected exactly 1 done callback, got %d", doneCount)
+	}
+	if failCount != 0 {
+		t.Errorf("expected 0 fail callbacks for successful run, got %d", failCount)
 	}
 
-	// Verify callback taskID matches
-	if ackCount >= 1 {
-		mockHub.mu.Lock()
-		if mockHub.ackCalls[0].TaskID != taskID {
-			t.Errorf("ack taskID = %q, want %q", mockHub.ackCalls[0].TaskID, taskID)
+	// Verify every callback belongs to the same hub task and run.
+	mockHub.mu.Lock()
+	var streamContent strings.Builder
+	for _, streamRecord := range mockHub.streamCalls {
+		streamContent.WriteString(streamRecord.Body["content"])
+		if streamRecord.TaskID != taskID {
+			t.Errorf("stream taskID = %q, want %q", streamRecord.TaskID, taskID)
 		}
-		mockHub.mu.Unlock()
+		if streamRecord.Body["run_id"] != runID {
+			t.Errorf("stream run_id = %q, want %q", streamRecord.Body["run_id"], runID)
+		}
 	}
-	if doneCount >= 1 {
-		mockHub.mu.Lock()
-		if mockHub.doneCalls[0].TaskID != taskID {
-			t.Errorf("done taskID = %q, want %q", mockHub.doneCalls[0].TaskID, taskID)
+	var ackRecord hubCallbackRecord
+	if ackCount > 0 {
+		ackRecord = mockHub.ackCalls[0]
+	}
+	var doneRecord hubCallbackRecord
+	if doneCount > 0 {
+		doneRecord = mockHub.doneCalls[0]
+	}
+	mockHub.mu.Unlock()
+
+	if ackCount > 0 {
+		if ackRecord.TaskID != taskID {
+			t.Errorf("ack taskID = %q, want %q", ackRecord.TaskID, taskID)
 		}
-		if mockHub.doneCalls[0].Body["run_id"] != runID {
-			t.Errorf("done run_id = %q, want %q", mockHub.doneCalls[0].Body["run_id"], runID)
+		if ackRecord.Body["run_id"] != runID {
+			t.Errorf("ack run_id = %q, want %q", ackRecord.Body["run_id"], runID)
 		}
-		mockHub.mu.Unlock()
+	}
+	if doneCount > 0 {
+		if doneRecord.TaskID != taskID {
+			t.Errorf("done taskID = %q, want %q", doneRecord.TaskID, taskID)
+		}
+		if doneRecord.Body["run_id"] != runID {
+			t.Errorf("done run_id = %q, want %q", doneRecord.Body["run_id"], runID)
+		}
+	}
+	if !strings.Contains(streamContent.String(), noopCommandOutput) {
+		t.Errorf("stream callback content = %q, want %q", streamContent.String(), noopCommandOutput)
 	}
 }
