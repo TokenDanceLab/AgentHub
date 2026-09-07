@@ -7,8 +7,10 @@ import {
   getFirstString,
   getString,
   parseRecord,
+  parseRunnerMessages,
   parseStringArray,
   parseStringRecord,
+  serializeStructuredOutputSchema,
 } from './hubIntegrationParseHelpers';
 import {
   bindDispatchPayload,
@@ -19,10 +21,12 @@ import {
   getTeamRouteContext,
   hasTaskProgressed,
   isAdmissionUncertain,
+  isEdgeOwnedTask,
   isTerminalBridgeTask,
   isTransientAdmissionRejection,
   normalizeRouteDecision,
   normalizeRuntimeAgentId,
+  parseEdgeCallbackOwner,
   parsePermissionDecisionControl,
   permissionDecisionControlKey,
   routeDecisionFromRuntimePayload,
@@ -50,11 +54,40 @@ describe('hubIntegrationParseHelpers', () => {
     expect(getString({ name: 'x' }, 'name')).toBe('x');
     expect(getString({ name: 1 }, 'name')).toBe('');
     expect(getFirstString('', '  ', 'ok')).toBe('ok');
+    expect(getFirstString('   keep  ')).toBe('   keep  ');
     expect(getFirstString(null, undefined)).toBeUndefined();
     expect(getFirstBoolean(null, true, false)).toBe(true);
     expect(getFirstNumber('1', Number.NaN, 2.5)).toBe(2.5);
     expect(boolValue(false)).toBe(false);
     expect(boolValue('true')).toBeUndefined();
+  });
+
+  it('parseRunnerMessages preserves messages without a timestamp', () => {
+    expect(
+      parseRunnerMessages([
+        { role: 'user', content: 'no timestamp' },
+        { role: 'assistant', content: 'has timestamp', timestamp: '2026-01-01T00:00:00Z' },
+        { role: 'assistant', content: 'bad timestamp', timestamp: 7 },
+      ]),
+    ).toEqual([
+      { role: 'user', content: 'no timestamp' },
+      { role: 'assistant', content: 'has timestamp', timestamp: '2026-01-01T00:00:00Z' },
+    ]);
+    expect(parseRunnerMessages([{ role: 'user', content: 'missing only' }])).toEqual([
+      { role: 'user', content: 'missing only' },
+    ]);
+  });
+
+  it('serializes boolean and finite number schema candidates in alias order', () => {
+    expect(serializeStructuredOutputSchema(false)).toBe('false');
+    expect(serializeStructuredOutputSchema(true)).toBe('true');
+    expect(serializeStructuredOutputSchema(0)).toBe('0');
+    expect(serializeStructuredOutputSchema(-1.5)).toBe('-1.5');
+    expect(serializeStructuredOutputSchema(false, { type: 'object' })).toBe('false');
+    expect(serializeStructuredOutputSchema('', 42)).toBe('42');
+    expect(serializeStructuredOutputSchema(Number.NaN, true)).toBe('true');
+    expect(serializeStructuredOutputSchema(Infinity, false)).toBe('false');
+    expect(serializeStructuredOutputSchema(null)).toBeUndefined();
   });
 
   it('parseStringArray and parseStringRecord filter empty values', () => {
@@ -293,6 +326,19 @@ describe('hubIntegrationMappers', () => {
       },
     });
     expect(Object.values(body).every((v) => v !== undefined)).toBe(true);
+  });
+
+  it('parses persistent callback owner and detects edge-owned tasks', () => {
+    expect(parseEdgeCallbackOwner({ id: 'run-a', callbackOwner: 'edge' })).toBe('edge');
+    expect(
+      parseEdgeCallbackOwner({ code: 'ok', data: { runId: 'run-b', callbackOwner: 'desktop' } }),
+    ).toBe('desktop');
+    expect(parseEdgeCallbackOwner({ id: 'run-c' })).toBeUndefined();
+    expect(parseEdgeCallbackOwner({ id: 'run-d', callback_owner: 'invalid' })).toBeUndefined();
+
+    expect(isEdgeOwnedTask(makeTask({ callbackOwner: 'edge' }))).toBe(true);
+    expect(isEdgeOwnedTask(makeTask({ callbackOwner: 'desktop' }))).toBe(false);
+    expect(isEdgeOwnedTask(undefined)).toBe(false);
   });
 
   it('extractRunOutputBatch only joins stdout chunk text', () => {

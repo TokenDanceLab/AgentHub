@@ -39,7 +39,7 @@ AgentHub 使用 Ubuntu 和 Windows 原生 runner 验证不同类别的问题：
 ## 并行与成本策略
 
 1. `concurrency.cancel-in-progress` 取消同一 PR 的旧运行，连续 push 不排队浪费分钟。
-2. `changes` 是统一路径过滤器。Go、前端、移动端、设计 CSS 和视觉 shell 只在相关变更时启动；手动 dispatch 默认运行完整选择面。
+2. `changes` 是统一路径过滤器。Go、前端、移动端、设计 CSS 和视觉 shell 只在相关变更时启动；手动 dispatch 默认运行完整选择面。共享投递样例 `tests/fixtures/dispatch/**` 同时触发 Go、Desktop 与前端聚合，避免只改样例时漏跑跨端合同。
 3. Ubuntu Go unit 使用两个不重叠 package shard；Hub 和 Edge 各自的 shard 测试与静态门禁 job 同时起跑，恒报 job 在两者结束后才合并覆盖率证据并断言 lane 结果（关键路径 = max(最慢 shard, 静态 job) + 覆盖率合并，而非两段相加）。
 4. 前端 coverage 按 package matrix 并行；Windows 前端按 Desktop/Web matrix 并行。矩阵 `fail-fast: false` 保留所有失败根因，避免一个平台取消另一个平台的诊断。
 5. `actions/setup-go`、`actions/setup-node` 的依赖缓存、pnpm store、Rust cache 和 Docker Buildx GHA cache 复用稳定输入；lockfile 或版本变化自然生成新缓存键。

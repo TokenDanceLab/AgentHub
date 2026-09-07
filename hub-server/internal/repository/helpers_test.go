@@ -176,7 +176,7 @@ func setupSQLite(t *testing.T) *gorm.DB {
 			target_id TEXT,
 			status TEXT NOT NULL,
 			edge_run_id TEXT DEFAULT '',
-			edge_device_id TEXT DEFAULT '',
+			edge_device_id TEXT DEFAULT NULL,
 			error_message TEXT DEFAULT '',
 			model_params TEXT DEFAULT '{}',
 			created_at DATETIME,
