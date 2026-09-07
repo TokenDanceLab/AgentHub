@@ -136,6 +136,16 @@ type TaskResult struct {
 	FinalContent string `json:"final_content"`
 }
 
+// taskStreamEventBody is the typed stream request body sent by
+// CallbackClient.TaskStreamEvent. Payload is embedded as a JSON object, never
+// stringified, so the Hub handler can persist and rebroadcast it structurally.
+type taskStreamEventBody struct {
+	RunID       string          `json:"run_id"`
+	EventType   string          `json:"event_type"`
+	Payload     json.RawMessage `json:"payload"`
+	ClientMsgID string          `json:"client_msg_id"`
+}
+
 func summarizeHubResponse(status int, body []byte, category string) string {
 	hash := sha256.Sum256(body)
 	return fmt.Sprintf(
@@ -281,7 +291,7 @@ func (c *CallbackClient) EnableSQLiteJournal(path string) error {
 // TaskAck sends an acknowledgement that the Edge server has received the task
 // and started a run for it. Maps taskID → runID on the Hub side.
 func (c *CallbackClient) TaskAck(ctx context.Context, taskID string, runID string) error {
-	return c.callback(ctx, taskID, "ack", map[string]string{
+	return c.callback(ctx, taskID, "ack", runID, map[string]string{
 		"run_id": runID,
 	})
 }
@@ -293,16 +303,35 @@ func (c *CallbackClient) TaskAck(ctx context.Context, taskID string, runID strin
 // (older callers that cannot derive one still work, they just lose replay
 // protection). The body carries client_msg_id alongside run_id and content.
 func (c *CallbackClient) TaskStream(ctx context.Context, taskID string, runID string, clientMsgID string, content string) error {
-	return c.callback(ctx, taskID, "stream", map[string]string{
+	return c.callback(ctx, taskID, "stream", runID, map[string]string{
 		"run_id":        runID,
 		"client_msg_id": clientMsgID,
 		"content":       content,
 	})
 }
 
+// TaskStreamEvent sends one typed Edge runtime event through the shared task
+// stream endpoint. Payload must be a JSON object; the caller supplies an
+// already sanitized RawMessage and a deterministic client_msg_id. Unlike the
+// legacy TaskStream path, typed events are retried through the shared callback
+// retry loop because their client_msg_id is stable per event and the Hub dedups
+// by that key.
+func (c *CallbackClient) TaskStreamEvent(ctx context.Context, taskID string, runID string, clientMsgID string, eventType string, payload json.RawMessage) error {
+	trimmed := bytes.TrimSpace(payload)
+	if len(trimmed) == 0 || trimmed[0] != '{' {
+		return fmt.Errorf("hub callback typed stream payload must be a JSON object")
+	}
+	return c.callbackWithRetry(ctx, taskID, "stream", runID, taskStreamEventBody{
+		RunID:       runID,
+		EventType:   eventType,
+		Payload:     trimmed,
+		ClientMsgID: clientMsgID,
+	}, true)
+}
+
 // TaskDone reports that the task has completed successfully.
 func (c *CallbackClient) TaskDone(ctx context.Context, taskID string, result TaskResult) error {
-	return c.callback(ctx, taskID, "done", map[string]string{
+	return c.callback(ctx, taskID, "done", result.RunID, map[string]string{
 		"run_id":        result.RunID,
 		"final_content": result.FinalContent,
 	})
@@ -310,7 +339,7 @@ func (c *CallbackClient) TaskDone(ctx context.Context, taskID string, result Tas
 
 // TaskFail reports that the task has failed with a reason.
 func (c *CallbackClient) TaskFail(ctx context.Context, taskID string, runID string, reason string) error {
-	return c.callback(ctx, taskID, "fail", map[string]string{
+	return c.callback(ctx, taskID, "fail", runID, map[string]string{
 		"run_id": runID,
 		"error":  reason,
 	})
@@ -333,17 +362,22 @@ func (c *CallbackClient) retryBudget(ctx context.Context) time.Duration {
 	return budget
 }
 
-// callback sends a POST request to the Hub callback endpoint.
+// callback sends a POST request to the Hub callback endpoint with the action's
+// default retry policy.
+func (c *CallbackClient) callback(ctx context.Context, taskID string, action string, runID string, body any) error {
+	return c.callbackWithRetry(ctx, taskID, action, runID, body, callbackActionRetryable(action))
+}
+
+// callbackWithRetry sends a POST request to the Hub callback endpoint.
 // It retries on transient failures under a total wall-clock budget: 5xx and
-// network errors are retried for idempotent actions, Retry-After (429/503) is
-// honored and stops the sequence when it overruns the budget, and 4xx (except
-// 429 with Retry-After) / 3xx / oversize responses are terminal.
-func (c *CallbackClient) callback(ctx context.Context, taskID string, action string, body map[string]string) error {
+// network errors are retried when the caller marks the action idempotent,
+// Retry-After (429/503) is honored and stops the sequence when it overruns the
+// budget, and 4xx (except 429 with Retry-After) / 3xx / oversize responses are
+// terminal. The body may be any JSON-marshalable value; existing string-only
+// callbacks and the typed stream request share this single serializer and
+// retry loop.
+func (c *CallbackClient) callbackWithRetry(ctx context.Context, taskID string, action string, runID string, body any, retryableAction bool) error {
 	url := fmt.Sprintf("%s/edge/agent-tasks/%s/%s", c.hubURL, taskID, action)
-	runID := ""
-	if body != nil {
-		runID = body["run_id"]
-	}
 
 	payload, err := json.Marshal(body)
 	if err != nil {
@@ -353,7 +387,6 @@ func (c *CallbackClient) callback(ctx context.Context, taskID string, action str
 
 	// The payload (taskID in the URL, runID in the body) is the callback's
 	// idempotency key: every retry re-sends byte-identical content.
-	retryableAction := callbackActionRetryable(action)
 	budget := c.retryBudget(ctx)
 	startedAt := time.Now()
 	var lastErr error

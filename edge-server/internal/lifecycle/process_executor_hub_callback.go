@@ -2,6 +2,7 @@ package lifecycle
 
 import (
 	"context"
+	"encoding/json"
 	"log/slog"
 	"strconv"
 	"strings"
@@ -23,6 +24,16 @@ type CallbackReporter interface {
 	TaskDone(ctx context.Context, taskID string, result hub.TaskResult) error
 	TaskFail(ctx context.Context, taskID string, runID string, reason string) error
 }
+
+// TaskEventReporter is an optional capability implemented by reporters that
+// can carry typed Edge runtime events. *hub.CallbackClient implements it;
+// legacy/double-recording stubs intentionally do not, so they keep receiving
+// text callbacks without being forced to know the typed shape.
+type TaskEventReporter interface {
+	TaskStreamEvent(ctx context.Context, taskID string, runID string, clientMsgID string, eventType string, payload json.RawMessage) error
+}
+
+var _ TaskEventReporter = (*hub.CallbackClient)(nil)
 
 // hubStreamChunkSeq provides a per-run monotonic chunk index for deterministic
 // client_msg_id (UUIDv5) generation in fireHubStream. Lazily populated via
@@ -240,6 +251,7 @@ type hubCallbackJobKind int
 
 const (
 	hubJobStream hubCallbackJobKind = iota
+	hubJobStreamEvent
 	hubJobDone
 	hubJobFail
 )
@@ -249,8 +261,10 @@ type hubCallbackJob struct {
 	kind        hubCallbackJobKind
 	taskID      string
 	runID       string
-	clientMsgID string // stream jobs only
+	clientMsgID string // stream/typed-event jobs only
 	content     string // stream chunk content or fail reason
+	eventType   string // typed stream event only
+	payload     json.RawMessage
 	result      hub.TaskResult
 }
 
@@ -375,6 +389,14 @@ func (e *ProcessExecutor) deliverHubCallbackJob(job hubCallbackJob) {
 		if err := e.hubCallback.TaskStream(ctx, job.taskID, job.runID, job.clientMsgID, job.content); shouldLogHubCallbackFailure(err) {
 			slog.Warn("hub callback stream failed", "taskId", job.taskID, "runId", job.runID, "error", err)
 		}
+	case hubJobStreamEvent:
+		reporter, ok := e.hubCallback.(TaskEventReporter)
+		if !ok {
+			return
+		}
+		if err := reporter.TaskStreamEvent(ctx, job.taskID, job.runID, job.clientMsgID, job.eventType, job.payload); shouldLogHubCallbackFailure(err) {
+			slog.Warn("hub callback typed event failed", "taskId", job.taskID, "runId", job.runID, "eventType", job.eventType, "error", err)
+		}
 	case hubJobDone:
 		if err := e.hubCallback.TaskDone(ctx, job.taskID, job.result); shouldLogHubCallbackFailure(err) {
 			slog.Warn("hub callback done failed", "taskId", job.taskID, "runId", job.runID, "error", err)
@@ -420,6 +442,7 @@ func newHubCallbackEmitter(executor *ProcessExecutor, runID string, inner adapte
 
 func (e *hubCallbackEmitter) Emit(eventType string, scope map[string]any, payload any) {
 	e.inner.Emit(eventType, scope, payload)
+	e.executor.fireHubTaskStreamEvent(e.runID, eventType, payload)
 	text, effect := hubCallbackTextForEvent(eventType, payload)
 	if !shouldApplyHubCallbackSideEffect(text, effect) {
 		return
