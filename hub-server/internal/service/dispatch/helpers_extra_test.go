@@ -81,29 +81,43 @@ func TestMapPinnedMessagesSkipsEmpty(t *testing.T) {
 
 func TestBuildEdgeRunRequest(t *testing.T) {
 	schema := json.RawMessage(`{"type":"object"}`)
-	req := BuildEdgeRunRequest(
-		"hello",
-		"claude-code",
-		"sys",
-		"task-1",
-		"deliv-1",
-		[]Message{{Role: "user", Content: "hi", Timestamp: "2026-01-01T00:00:00Z"}},
-		nil,
-		&schema,
-	)
+	payload := Payload{
+		TaskID:        "task-1",
+		DeliveryID:    "deliv-1",
+		AgentType:     "claude-code",
+		SessionID:     "conversation-1",
+		Prompt:        "hello",
+		SystemPrompt:  "sys",
+		ModelParams:   `{"model":"selected","work_dir":"/workspace","include_partial":false,"max_thinking_tokens":0}`,
+		ToolWhitelist: `["Read"]`,
+		Messages:      []Message{{Role: "user", Content: "hi", Timestamp: "2026-01-01T00:00:00Z"}},
+		OutputSchema:  &schema,
+	}
+	req := BuildEdgeRunRequest(payload)
 	assert.Equal(t, LocalProjectID, req.ProjectID)
 	assert.Equal(t, LocalThreadID, req.ThreadID)
+	assert.Equal(t, EdgeCallbackOwner, req.CallbackOwner)
 	assert.Equal(t, "claude-code", req.AgentID)
-	assert.Equal(t, "claude", req.Model)
+	assert.Equal(t, "selected", req.Model)
 	assert.Equal(t, "hello", req.Prompt)
 	assert.Equal(t, "sys", req.SystemPrompt)
 	assert.Equal(t, "task-1", req.HubTaskID)
 	assert.Equal(t, "deliv-1", req.DeliveryID)
 	assert.Equal(t, `{"type":"object"}`, req.StructuredOutputSchema)
+	assert.Equal(t, []string{"Read"}, req.AllowedTools)
+	assert.Equal(t, "/workspace", req.WorkDir)
+	require.NotNil(t, req.IncludePartial)
+	assert.False(t, *req.IncludePartial)
+	require.NotNil(t, req.MaxThinkingTokens)
+	assert.Equal(t, 0, *req.MaxThinkingTokens)
+	// Hub session_id is conversation identity, not the Edge runtime session.
+	assert.Equal(t, "", req.SessionID)
 	require.Len(t, req.Messages, 1)
 
-	// nil / empty schema → no structured field
-	req2 := BuildEdgeRunRequest("p", "codex", "", "t", "", nil, nil, nil)
+	// nil / empty schema → no structured field; no hardcoded model.
+	req2 := BuildEdgeRunRequest(Payload{TaskID: "t", AgentType: "codex", Prompt: "p"})
 	assert.Equal(t, "", req2.StructuredOutputSchema)
 	assert.Equal(t, "codex", req2.AgentID)
+	assert.Equal(t, "", req2.Model)
+	assert.Equal(t, EdgeCallbackOwner, req2.CallbackOwner)
 }

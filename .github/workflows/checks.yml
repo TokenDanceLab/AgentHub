@@ -1067,6 +1067,7 @@ jobs:
         with:
           filters: |
             desktop:
+              - 'tests/fixtures/dispatch/**'
               - 'app/desktop/**'
               - 'app/shared/**'
               - 'app/workbench/**'
@@ -1102,6 +1103,7 @@ jobs:
               - 'app/desktop/package.json'
               - '.github/workflows/checks.yml'
             go:
+              - 'tests/fixtures/dispatch/**'
               - 'hub-server/**'
               - 'edge-server/**'
               - 'pkg/**'
@@ -1121,6 +1123,7 @@ jobs:
             # of the unconditional validate lane so a Go-only PR no longer
             # pays for pnpm install + coverage.
             frontend:
+              - 'tests/fixtures/dispatch/**'
               - 'app/desktop/**'
               - 'app/web/**'
               - 'app/shared/**'

@@ -61,6 +61,11 @@ func prepareRunAdmission(repository store.Repository, executor lifecycle.RunExec
 	if params.HubTaskID != "" && params.BuildContext == nil {
 		return store.Run{}, false, errcode.ErrExecutorUnavailable.WithMessage("Hub task admission requires an executor context")
 	}
+	if params.ValidateAdmission != nil {
+		if err := params.ValidateAdmission(); err != nil {
+			return store.Run{}, false, err
+		}
+	}
 	run, err := createRunAdmissionRecord(repository, params)
 	if err != nil {
 		return store.Run{}, false, err
@@ -81,7 +86,7 @@ func createRunAdmissionRecord(repository store.Repository, params CreateParams) 
 	if params.HubTaskID == "" {
 		run, err = repository.CreateRun(runID, params.ProjectID, params.ThreadID)
 	} else {
-		run, err = repository.CreateRunAdmission(runID, params.ProjectID, params.ThreadID, params.HubTaskID)
+		run, err = repository.CreateRunAdmission(runID, params.ProjectID, params.ThreadID, params.HubTaskID, params.CallbackOwner)
 	}
 	if err != nil {
 		if errors.Is(err, store.ErrNotFound) {

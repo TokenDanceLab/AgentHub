@@ -11,7 +11,7 @@
  "edge-server/internal/lifecycle/process_executor_cancel_test.go": 2,
  "edge-server/internal/lifecycle/process_executor_helper_test.go": 1,
  "edge-server/internal/lifecycle/process_executor_hub_callback_test.go": 1,
- "edge-server/tests/hub_e2e_test.go": 4,
+ "edge-server/tests/hub_e2e_test.go": 1,
  "hub-server/internal/app/background_test.go": 2,
  "hub-server/internal/bus/bus_test.go": 1,
  "hub-server/internal/bus/publish_close_stress_test.go": 2,

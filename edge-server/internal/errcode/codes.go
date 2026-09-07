@@ -62,6 +62,8 @@ var (
 	ErrAdmissionPersistFailed = New("admission_persist_failed", "run admission evidence could not be persisted; retry later", http.StatusServiceUnavailable)
 	ErrAdmissionUncertain     = New("admission_uncertain", "run admission outcome requires reconciliation; do not restart automatically", http.StatusConflict)
 
+	ErrCallbackUnavailable = New("callback_unavailable", "Edge direct Hub callbacks are not configured; route through Desktop", http.StatusServiceUnavailable)
+
 	// Agent discovery
 	ErrInvalidAgentID             = New("invalid_agent_id", "unknown agent adapter", http.StatusBadRequest)
 	ErrAgentRegistryNotConfigured = New("agent_registry_not_configured", "agent registry not configured", http.StatusServiceUnavailable)
