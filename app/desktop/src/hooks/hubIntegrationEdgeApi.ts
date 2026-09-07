@@ -2,7 +2,9 @@
 // Isolated from React so permission/thread helpers stay unit-testable.
 
 import { edgeAuthHeaders } from '@/api/edgeAuth';
+import { withHubAbortTimeout } from '@shared/hub/hubClientTransportUtils';
 import type { EdgePermissionDecisionControl } from './hubIntegrationMappers';
+import { parseRecord } from './hubIntegrationParseHelpers';
 
 export function edgeRequestInit(init: RequestInit = {}, baseHeaders?: HeadersInit): RequestInit {
   const headers = edgeAuthHeaders(baseHeaders);
@@ -51,5 +53,61 @@ export async function ensureEdgeThread(
   if (!resp.ok) {
     const errorText = await resp.text().catch(() => 'Unknown error');
     throw new Error(`Edge POST /v1/threads returned ${resp.status}: ${errorText}`);
+  }
+}
+
+export interface EdgeRunCallbackCapabilityProbe {
+  supported: boolean;
+  reason?: string;
+}
+
+export const EDGE_HEALTH_CAPABILITY_TIMEOUT_MS = 5_000;
+
+/**
+ * Fail-closed capability gate for Desktop-managed callback ownership.
+ * Only a new Edge that explicitly publishes runCallbackOwnership=true is
+ * allowed to receive a Hub dispatch; unknown, missing, false, or failed
+ * health probes are treated as unusable for this route.
+ */
+export async function probeEdgeRunCallbackOwnership(
+  edgeBaseUrl: string,
+): Promise<EdgeRunCallbackCapabilityProbe> {
+  try {
+    return await withHubAbortTimeout(EDGE_HEALTH_CAPABILITY_TIMEOUT_MS, async (signal) => {
+      const response = await fetch(`${edgeBaseUrl.replace(/\/$/, '')}/v1/health`, { signal });
+      if (!response.ok) {
+        return {
+          supported: false,
+          reason: `Edge /v1/health returned ${response.status}`,
+        };
+      }
+
+      let raw: unknown;
+      try {
+        raw = await response.json();
+      } catch (error) {
+        return {
+          supported: false,
+          reason: error instanceof Error ? error.message : 'Edge /v1/health returned non-JSON',
+        };
+      }
+
+      const root = parseRecord(raw);
+      const health = parseRecord(root.data);
+      const source = Object.keys(health).length > 0 ? health : root;
+      const capabilities = parseRecord(source.capabilities);
+      if (capabilities.runCallbackOwnership !== true) {
+        return {
+          supported: false,
+          reason: 'Edge /v1/health does not publish runCallbackOwnership=true',
+        };
+      }
+      return { supported: true };
+    });
+  } catch (error) {
+    return {
+      supported: false,
+      reason: error instanceof Error ? error.message : String(error),
+    };
   }
 }
