@@ -2,7 +2,7 @@
 
 > 子文档 | 主索引：[architecture.md](../architecture.md)
 >
-> 最后更新：2026-08-20
+> 最后更新：2026-09-09
 
 ## 概述
 
@@ -156,7 +156,7 @@ cc-switch 是可选增强，不是硬依赖。数据库缺失、不可读或无�
 
 - Desktop 文件操作必须经过 allowlist 和 typed Host API
 - Edge 不直接暴露文件系统给 Hub
-- Hub -> Edge 的执行请求通过 REST callbacks，Edge 校验后才启动 runtime
+- Hub -> Edge 的执行请求通过 REST `POST /v1/runs`（admission/execution intent 合同见 `api/dispatch.md`），Edge 校验后才启动 runtime；edge-owned run 的结果再由 Edge -> Hub callbacks 回传
 
 ## 相关文档
 

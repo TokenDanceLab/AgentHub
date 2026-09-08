@@ -1373,11 +1373,19 @@ paths:
       operationId: decidePermission
       summary: Approve or deny a pending permission request.
       description: >
-        Resolves a pending tool-permission request of a run. Under Hub JWT /
-        multi-user mode the run must be owned by the caller; a run owned by
-        another Hub user and a nonexistent run are reported identically (404),
-        so this endpoint is not a runId existence oracle. A caller without a Hub
-        identity fails closed. Local single-tenant mode is unaffected.
+        Resolves a pending tool-permission request of a run. The legacy form
+        (both `controlId` and `hubTaskId` absent) keeps one-shot receiver
+        semantics. The modern form supplies both fields and is idempotent: an
+        identical retry returns the original applied receipt, a different
+        control for the same run/request or a changed payload for the same
+        control fails with 409, and a cold/evicted receipt is never invented as
+        success. The receipt cache is process-local, bounded, and non-durable;
+        capacity pressure returns 429 before applying the decision. Under Hub
+        JWT / multi-user mode the run must be owned by the caller and a modern
+        request must match the stored `hubTaskId`. A foreign run, nonexistent
+        run, wrong task, and missing pending request are reported identically
+        (404), so this endpoint is not an existence oracle. A caller without a
+        Hub identity fails closed. Local single-tenant mode is unaffected.
       x-agenthub-status: implemented
       x-agenthub-owner: Edge
       requestBody:
@@ -1388,20 +1396,53 @@ paths:
               type: object
               required: [runId, requestId, decision]
               properties:
+                controlId:
+                  type: string
+                  description: Modern idempotency identity; must be supplied with hubTaskId.
+                hubTaskId:
+                  type: string
+                  description: Exact Hub task bound to the Edge run; must be supplied with controlId.
                 runId: { type: string }
                 requestId: { type: string }
                 decision: { type: string, enum: [allow, deny] }
                 reason: { type: string }
       responses:
         "200":
-          description: Decision recorded.
+          description: >
+            Decision applied. Legacy requests return `{status: ok}`; modern
+            requests return the applied receipt and set `deduplicated` when the
+            request replayed an existing receipt.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [code, data]
+                properties:
+                  code: { type: string }
+                  data:
+                    type: object
+                    required: [status]
+                    properties:
+                      status: { type: string }
+                      controlId: { type: string }
+                      hubTaskId: { type: string }
+                      runId: { type: string }
+                      requestId: { type: string }
+                      decision: { type: string, enum: [allow, deny] }
+                      applied: { type: boolean }
+                      deduplicated: { type: boolean }
         "400":
-          description: Invalid decision payload.
+          description: Invalid decision payload or only one of controlId/hubTaskId supplied.
         "404":
           description: >
             Pending permission request not found. The same response is returned
-            when the run belongs to another Hub user, so a foreign runId and a
-            nonexistent runId are indistinguishable.
+            when the run belongs to another Hub user or the modern hubTaskId
+            does not match, so a foreign/mismatched run and a nonexistent run
+            are indistinguishable.
+        "409":
+          description: The control identity or run/request already has a conflicting decision receipt.
+        "429":
+          description: The bounded permission decision receipt cache is full; no decision was applied.
 
   /v1/plans/decide:
     post:
@@ -8655,7 +8696,7 @@ components:
           additionalProperties: true
         capabilities:
           type: object
-          required: [runCallbackOwnership, directHubCallbacks]
+          required: [runCallbackOwnership, directHubCallbacks, permissionDecisionReceipts]
           properties:
             runCallbackOwnership:
               type: boolean
@@ -8663,6 +8704,9 @@ components:
             directHubCallbacks:
               type: boolean
               description: Direct callbacks have a configured destination and current credential; no token or live reachability is exposed.
+            permissionDecisionReceipts:
+              type: boolean
+              description: The Edge supports idempotent modern permission decision receipts.
     DispatchContextMessage:
       type: object
       required: [role, content]
@@ -9690,7 +9734,7 @@ components:
           description: True on an accepted replay of an already admitted delivery (same runId returned, no new run created).
         deliveryId:
           type: string
-          description: The delivery_id whose accepted receipt is being replayed; present on accepted replays.
+          description: On an accepted replay, echoes the current request's deliveryId; a cold replay with a different deliveryId may therefore differ from the original receipt.
 
     HubAuditEvent:
       type: object

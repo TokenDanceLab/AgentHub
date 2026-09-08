@@ -1,6 +1,6 @@
 # AgentHub 架构概览
 
-最后更新：2026-08-29
+最后更新：2026-09-09
 
 本文档是架构入口，只保留当前结构、边界和 owner 链接。旧长版架构说明见 [history.md](history.md)。
 
@@ -44,7 +44,7 @@ Mobile (fixture/boundary lane, independent RN rendering)
 | Mobile | `app/mobile-rn/` | RN shell、Mobile adapter、Hub viewer surface（fixture/边界验证 lane，独立渲染，非 release candidate） |
 | Edge | `edge-server/` | 本地项目、Thread、Run lifecycle、Runtime adapter、Artifact index |
 | Hub | `hub-server/` | TokenDance ID relying party、Hub session、IM、AgentTeam、同步、中继、审计 |
-| API | `api/` | REST API 和 WebSocket event 契约 |
+| API | `api/` | REST API、WebSocket event 与 Hub→Edge dispatch 契约 |
 
 ## 核心数据流
 
