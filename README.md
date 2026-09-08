@@ -57,7 +57,7 @@ AgentHub 让你像在 IM 群聊里协作一样，把真人好友、Builder、Rev
 
 ## 快速开始
 
-最小本地启动路径（5 步）。需要 OpenSSL、Docker、Go 1.26+、Node 22+/corepack、pnpm 10+。
+最小本地启动路径（5 步）。需要 OpenSSL、Docker、Go 1.26+、Node 24+/corepack、pnpm 10+。
 
 ```bash
 cp .env.example .env && secret="$(openssl rand -hex 32)" && sed -i.bak "s/^AGENTHUB_JWT_SECRET=.*/AGENTHUB_JWT_SECRET=$secret/" .env && rm -f .env.bak && export AGENTHUB_JWT_SECRET="$secret" && unset secret  # 1. 复制配置并生成随机开发 secret
