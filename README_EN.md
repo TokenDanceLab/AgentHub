@@ -57,7 +57,7 @@ AgentHub lets you collaborate with human teammates and AI agents in the same gro
 
 ## Quick Start
 
-Minimal local bootstrap (5 steps). Requires OpenSSL, Docker, Go 1.26+, Node 22+/corepack, pnpm 10+.
+Minimal local bootstrap (5 steps). Requires OpenSSL, Docker, Go 1.26+, Node 24+/corepack, pnpm 10+.
 
 ```bash
 cp .env.example .env && secret="$(openssl rand -hex 32)" && sed -i.bak "s/^AGENTHUB_JWT_SECRET=.*/AGENTHUB_JWT_SECRET=$secret/" .env && rm -f .env.bak && export AGENTHUB_JWT_SECRET="$secret" && unset secret  # 1. Copy config and generate a random dev secret
