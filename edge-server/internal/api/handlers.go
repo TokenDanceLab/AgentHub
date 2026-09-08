@@ -64,6 +64,11 @@ type Handler struct {
 	PermissionRegistry *permission.PermissionRegistry
 	PermissionBroker   *adapters.PermissionDecisionBroker
 
+	// permissionReceipts provides bounded warm-replay receipts for modern
+	// POST /v1/permissions/decide controls. Lazy and nil-safe in production;
+	// it is process-local and never authoritative.
+	permissionReceipts *permissionReceiptCache
+
 	// PlanApprovalBroker manages pending orchestrator plans and connects
 	// them to user approval/rejection decisions (P0 #3: plan confirmation gate).
 	PlanApprovalBroker *orchestrator.PlanApprovalBroker
