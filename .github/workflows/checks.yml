@@ -37,7 +37,7 @@ concurrency:
 env:
   GO_VERSION: "1.26.5"
   GOLANGCI_LINT_VERSION: "v2.12.2"
-  NODE_VERSION: "22"
+  NODE_VERSION: "24"
   PNPM_VERSION: "10.32.1"
 
 jobs:
