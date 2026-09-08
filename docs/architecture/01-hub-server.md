@@ -2,7 +2,7 @@
 
 > 子文档 | 主索引：[architecture.md](../architecture.md)
 >
-> 最后更新：2026-08-20
+> 最后更新：2026-09-09
 
 Hub Server（`hub-server/`）是 AgentHub 的云端控制面：TokenDance ID relying party、Hub session、IM、AgentTeam、同步、中继、审计和远程控制面。它不启动本机 Agent Runtime；执行仍由 Edge Server 和 adapter 负责。
 
@@ -54,6 +54,7 @@ Hub Server（`hub-server/`）是 AgentHub 的云端控制面：TokenDance ID rel
 |---|---|
 | REST path/schema | `api/openapi.yaml` |
 | WS frame/event families | `api/events.md` |
+| Hub→Edge dispatch/admission/callback ownership | `api/dispatch.md` |
 | API conventions | `api/conventions.md` |
 | Auth/identity | [06-auth-identity.md](06-auth-identity.md) |
 | Deployment boundary | [05-deployment.md](05-deployment.md) |
