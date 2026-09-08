@@ -50,7 +50,8 @@ func validateReplayCallbackOwner(req runRequest, run store.Run) *errcode.Error {
 
 func (h *Handler) runCallbackCapabilities() map[string]bool {
 	return map[string]bool{
-		"runCallbackOwnership": true,
-		"directHubCallbacks":   h.directHubCallbacksConfigured(),
+		"runCallbackOwnership":       true,
+		"directHubCallbacks":         h.directHubCallbacksConfigured(),
+		"permissionDecisionReceipts": true,
 	}
 }
