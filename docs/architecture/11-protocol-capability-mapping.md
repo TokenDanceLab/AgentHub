@@ -1,10 +1,9 @@
 # 协议能力映射：自有契约 / MCP / A2A / AG-UI（宏观 §3 P1）
-
 > 主索引：[architecture.md](../architecture.md)。本文件是 AgentHub 自有 REST/WS 契约与三个外部协议（MCP / A2A / AG-UI）的能力对照、引入红线与评估结论 SSOT。上游基线：`docs/architecture/10-macro-engineering-design.md`（#2065，已合入）§3 协议分层表 + §9 差距路线 P1（本文即其产出）。
 
 ## 0. 阅读约定
 
-- **自有契约** = AgentHub Hub Server REST + WS 事件合同（SSOT：`api/openapi.yaml` + `api/events.md`）。
+- **自有契约** = AgentHub Hub Server REST + WS 事件合同，以及 Hub→Edge dispatch/admission 语义（SSOT：`api/openapi.yaml` + `api/events.md` + `api/dispatch.md`）。
 - **外部协议** = MCP、A2A、AG-UI；描述必须给来源链接或仓库内引用，「业界通常」不算证据。
 - **引入判定** = 每个外部协议一节判定表；满足全部"引入条件"才允许进入产品代码，否则拒绝或推迟。
 - **红线** = 不可让步的死规矩；违反即阻断合入。
@@ -12,16 +11,17 @@
 
 ## 1. 自有 REST/WS 契约清单
 
-AgentHub 的产品控制面 SSOT 由两份契约文件承载，所有端（Web/Desktop/Mobile/Edge）只消费这两份契约的派生客户端。
+AgentHub 的产品控制面 SSOT 由 REST、WS 与跨通道 dispatch 契约共同承载，所有端（Web/Desktop/Mobile/Edge）只消费这些契约的派生客户端。
 
 | 契约 | 入口文件 | 职责 | 备注 |
 |---|---|---|---|
 | REST JSON API | [`api/openapi.yaml`](../../api/openapi.yaml) | Hub + Edge 全量命令/查询端点；端点级状态标签 `x-agenthub-status: implemented/planned`；组件级另有 `contract-draft`（契约已定、实现留白，不挂在任何 operation 上） | Hub success envelope `{"code":"ok","data":...}`（见 [`api/conventions.md`](../../api/conventions.md)） |
 | WebSocket typed events | [`api/events.md`](../../api/events.md) | Hub/Edge 实时事件合同；at-least-once 投递、幂等语义、seq_id 语义 | SSOT 三角：`hub-server/internal/ws/frame.go` ↔ `app/shared/src/hubEvents.ts` ↔ OpenAPI `HubWebSocketFrame.type` |
+| Hub→Edge dispatch/admission | [`api/dispatch.md`](../../api/dispatch.md) | Hub→Edge delivery claim/receipt、execution intent、callback ownership 与重试语义 | 与 `POST /v1/runs` 和 `edge-server/internal/runcontrol/` 同源 |
 | Edge EventEnvelope | [`api/events.md`](../../api/events.md) §Edge EventEnvelope | Edge stream 单调 seq + 事件 id；断线 cursor 回放 | payload 进 transcript 前脱敏 |
 | Hub Frame | [`api/events.md`](../../api/events.md) §Hub Frame | `{type, seq_id?, payload?}` + 31 常量 | `/client/ws` 仅 Hub-issued HS256 token |
 
-**红线**：自有 REST/WS 契约是产品控制面唯一权威；任何外部协议不得替换、覆盖或绕过这两份契约（宏观 §3 红线列）。
+**红线**：自有 REST/WS 与 Hub→Edge dispatch 契约是产品控制面唯一权威；任何外部协议不得替换、覆盖或绕过这些契约（宏观 §3 红线列）。
 
 ## 2. MCP：tool surface 映射与 narrow capability 红线
 

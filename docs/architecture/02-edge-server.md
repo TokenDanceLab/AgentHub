@@ -2,7 +2,7 @@
 
 > 子文档 | 主索引：[architecture.md](../architecture.md)
 >
-> 最后更新：2026-09-06
+> 最后更新：2026-09-09
 
 ## 职责
 
@@ -68,7 +68,7 @@ ProcessExecutor 配置 `RunTimeout`（默认 30 分钟）、`ShutdownGracePeriod
 
 `SQLiteStore`（`internal/store/sqlite_store.go`）在写入后同步持久化快照差分到 SQLite（WAL 模式，定期 checkpoint），支持崩溃恢复。SQL 连接初始化与持久化串行化独立于普通业务读面，不能用额外 SQL 读者的争用直接代替业务读取测量。
 
-终端状态 runs（finished/failed/cancelled/completed_with_issues）按 `TerminalTTL` 超时或 `MaxTerminalRunsPerThread` 上限自动清理，级联删除关联 diffs/artifacts/previews/items/checkpoints。Checkpoint 在 run 完成时保留，在 run 清理或所属 thread 删除时随 run 移除；这不删除工作区文件。 SQLite 后台清理有删除时同步提交；失败通过 `LastPersistError` 和日志留痕，下一周期即使没有新删除也会重试。关闭时先停止并等待后台清理/checkpoint 任务，再做最终持久化与数据库关闭。
+终端状态 runs（finished/failed/cancelled/completed_with_issues）按 `TerminalTTL` 超时或 `MaxTerminalRunsPerThread` 上限自动清理，级联删除关联 diffs/artifacts/previews/items/checkpoints；`AdmissionState == pending` 的 run 不参与该自动清理，未决 admission 的收口语义见 `api/dispatch.md`。Checkpoint 在 run 完成时保留，在 run 清理或所属 thread 删除时随 run 移除；这不删除工作区文件。 SQLite 后台清理有删除时同步提交；失败通过 `LastPersistError` 和日志留痕，下一周期即使没有新删除也会重试。关闭时先停止并等待后台清理/checkpoint 任务，再做最终持久化与数据库关闭。
 
 `EventBus`（`internal/events/bus.go`）是基于 channel 的发布/订阅模型：4 worker 并发 observer、子 channel 缓冲（256）、gap detection（`system.gap` 事件）；通过 `PersistFn` 钩子先持久化再广播。`EventLog` 是 append-only JSON-lines 事件日志（默认 50 MiB 上限，超限截断保留尾部 75%）。
 
@@ -108,8 +108,8 @@ ProcessExecutor 配置 `RunTimeout`（默认 30 分钟）、`ShutdownGracePeriod
 
 | 方向 | 方式 |
 |---|---|
-| Hub -> Edge | REST callbacks + Hub WebSocket dispatch/relay |
-| Edge -> Hub | 同步、状态上报 |
+| Hub -> Edge | REST `POST /v1/runs` 执行 admission；WebSocket 承载适用的 relay/control frame |
+| Edge -> Hub | direct callbacks、同步与状态上报 |
 
 ## Adapter 注册表
 

@@ -2,7 +2,7 @@
 
 > 子文档 | 主索引：[architecture.md](../architecture.md)
 >
-> 最后更新：2026-08-29
+> 最后更新：2026-09-09
 >
 > 状态：设计基线（Accepted）。本文定义目标架构、协议分层、可靠性/安全/可观测合同与差距路线。**本文是设计合同，不是实现完成声明**：落地状态以 GitHub Issues/PR、`AGENTS.md` 验收门禁和源码为准。
 
@@ -39,7 +39,7 @@ UI Workbench（chat timeline + command center）
 
 | 协议 | 角色 | 现状/目标 | 红线 |
 |---|---|---|---|
-| 自有 REST/WS | Hub/Edge 产品控制面 SSOT | 保持 `api/openapi.yaml` + `api/events.md` | 不替换 |
+| 自有 REST/WS | Hub/Edge 产品控制面 SSOT | 保持 `api/openapi.yaml` + `api/events.md` + `api/dispatch.md` | 不替换 |
 | ACP / Agent SDK adapter | Edge <-> coding agent runtime 进程契约 | 已有 adapter family | 只属于 Edge data plane |
 | MCP | agent <-> tools/data | 已有 mcp_config + Edge MCP server（8 个 canonical 工具，见 11） | tool 需要 narrow capability，不当作通用业务协议 |
 | A2A | agent <-> agent | 仅远程/跨设备协作引入；当前未引入（见 11） | 不替换自有 Hub/Edge 契约 |
