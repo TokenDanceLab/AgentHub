@@ -49,7 +49,7 @@
   "dependencies": {
     "@lobehub/icons": "5.10.0",
     "diff": "^8.0.2",
-    "dompurify": "^3.4.12",
+    "dompurify": "^3.4.16",
     "jszip": "^3.10.1",
     "mammoth": "^1.12.0",
     "react-markdown": "^10.1.0",
