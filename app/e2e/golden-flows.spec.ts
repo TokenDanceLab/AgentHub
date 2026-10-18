@@ -1,5 +1,7 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { test, expect, request as pwRequest, type APIRequestContext, type Page } from '@playwright/test';
 
 /**
@@ -22,7 +24,9 @@ const ID = process.env.AGENTHUB_E2E_ID_BASE_URL || 'http://127.0.0.1:3000';
 const HUB = process.env.AGENTHUB_E2E_HUB_BASE_URL || 'http://127.0.0.1:8080';
 const WEB = process.env.AGENTHUB_E2E_WEB_BASE_URL || 'http://127.0.0.1:5174';
 const WEB_CALLBACK = `${WEB}/workbench/auth/tokendance/callback`;
-const ACCOUNT_ENV = `${process.env.AGENTHUB_E2E_ACCOUNT_ENV || '/root/agenthub-dev/AgentHub/tests/artifacts/real-e2e-account.env'}`;
+const SPEC_DIR = path.dirname(fileURLToPath(import.meta.url));
+const REPO_ROOT = path.resolve(SPEC_DIR, '..', '..');
+const ACCOUNT_ENV = process.env.AGENTHUB_E2E_ACCOUNT_ENV || path.join(REPO_ROOT, 'tests', 'artifacts', 'real-e2e-account.env');
 
 function readAccountEnv(): Record<string, string> {
   const out: Record<string, string> = {};
