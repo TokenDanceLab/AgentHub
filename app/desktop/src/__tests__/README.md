@@ -37,5 +37,5 @@
   - web 常规/CI：`playwright.config.ts`（stubbed hub，fail-closed env）；
   - web 真实栈（本地 L3）：`playwright.real.config.ts`（chat-real.spec.ts，需 live Hub+Edge）；
   - mobile E2E 仅 workflow_dispatch（成本节流，故意决策）。
-- 测试 setup：`@shared/testing/*` 为共享 mock/polyfill 单源（i18n、lobehubIcons、jsdomPolyfills），
+- 测试 setup：`@shared/testing/*` 为共享 mock/polyfill 单源（i18n、jsdomPolyfills），
   各包 `src/__tests__/setup.ts` 复用，禁止再复制一份清单。

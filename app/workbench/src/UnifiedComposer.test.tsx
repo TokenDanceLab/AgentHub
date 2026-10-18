@@ -5,16 +5,6 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vite
 import type { ComposerMention, ComposerState } from '@shared/composer';
 import { UnifiedComposer } from './UnifiedComposer';
 
-vi.mock('@lobehub/icons', () => ({
-  ClaudeCode: () => null,
-  Codex: () => null,
-  GeminiCLI: () => null,
-  ModelIcon: () => null,
-  OpenCode: () => null,
-  ProviderIcon: () => null,
-}));
-vi.mock('@lobehub/icons/es/Antigravity/components/Color.js', () => ({ default: () => null }));
-
 // Composer copy assertions use the en chatview literals; opt into the en
 // bundle of the shared test i18next instance (Issue #1717).
 import { useTestI18nLanguage } from '@shared/testing/i18n';

@@ -30,13 +30,6 @@ export default defineConfig({
     // FLK-004：渲染重型 .tsx 用例在 512MB worker 负载下偶发超过默认 5s。
     testTimeout: 30_000,
     hookTimeout: 30_000,
-    deps: {
-      optimizer: {
-        client: {
-          include: ['@lobehub/fluent-emoji'],
-        },
-      },
-    },
     coverage: createCoverage({
       // 绝对 floors（2026-08-03 实测，含全部生产源码进分母后）：
       // lines 49.29 / stmt 47.44 / fn 41.79 / br 40.96 — 每维 floor(实测)-1。

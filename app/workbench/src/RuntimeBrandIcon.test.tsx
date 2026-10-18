@@ -1,84 +1,10 @@
 import React from 'react';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { render, screen } from './__tests__/setup';
 import {
   RuntimeBrandIcon,
   resolveRuntimeBrandIcon,
 } from './RuntimeBrandIcon';
-
-vi.mock('@lobehub/icons', () => {
-  const span = (props?: Record<string, unknown>) => React.createElement('span', props ?? {});
-  const iconWithColor = (name: string) => {
-    const Icon = ({ size }: { size?: number }) => <span data-icon={name} data-size={size} data-testid={`${name}-icon`} />;
-    Icon.Color = ({ size }: { size?: number }) => <span data-icon={name} data-size={size} data-testid={`${name}-color-icon`} />;
-    return Icon;
-  };
-  return {
-    Alibaba: iconWithColor('alibaba'),
-    AlibabaCloud: iconWithColor('alibabacloud'),
-    Anthropic: iconWithColor('anthropic'),
-    Azure: iconWithColor('azure'),
-    Aws: iconWithColor('aws'),
-    Bedrock: iconWithColor('bedrock'),
-    ByteDance: iconWithColor('bytedance'),
-    Claude: iconWithColor('claude'),
-    ClaudeCode: ({ size }: { size?: number }) => <span data-size={size} data-testid="claude-code-icon" />,
-    Cohere: iconWithColor('cohere'),
-    Codex: ({ size }: { size?: number }) => <span data-size={size} data-testid="codex-icon" />,
-    DeepSeek: iconWithColor('deepseek'),
-    Doubao: iconWithColor('doubao'),
-    Gemini: iconWithColor('gemini'),
-    GeminiCLI: ({ size }: { size?: number }) => <span data-size={size} data-testid="gemini-cli-icon" />,
-    Google: iconWithColor('google'),
-    Meta: iconWithColor('meta'),
-    Mistral: iconWithColor('mistral'),
-    ModelIcon: ({ model, size }: { model: string; size?: number }) => <span data-model={model} data-size={size} data-testid="model-icon" />,
-    Moonshot: iconWithColor('moonshot'),
-    OpenCode: ({ size }: { size?: number }) => <span data-size={size} data-testid="opencode-icon" />,
-    OpenAI: iconWithColor('openai'),
-    Perplexity: iconWithColor('perplexity'),
-    ProviderIcon: ({ provider, size }: { provider: string; size?: number }) => <span data-provider={provider} data-size={size} data-testid="provider-icon" />,
-    Qwen: iconWithColor('qwen'),
-    Volcengine: iconWithColor('volcengine'),
-    Zhipu: iconWithColor('zhipu'),
-  };
-});
-
-function mkColorIcon(tag: string) {
-  const Icon = ({ size }: { size?: number }) => <span data-icon={tag} data-size={size} data-testid={`${tag}-icon`} />;
-  Icon.Color = ({ size }: { size?: number }) => <span data-icon={tag} data-size={size} data-testid={`${tag}-color-icon`} />;
-  return { default: Icon };
-}
-function mkRuntimeIcon(testid: string) {
-  return { default: ({ size }: { size?: number }) => <span data-size={size} data-testid={testid} /> };
-}
-
-vi.mock('@lobehub/icons/es/Alibaba', () => mkColorIcon('alibaba'));
-vi.mock('@lobehub/icons/es/AlibabaCloud', () => mkColorIcon('alibabacloud'));
-vi.mock('@lobehub/icons/es/Anthropic', () => mkColorIcon('anthropic'));
-vi.mock('@lobehub/icons/es/Azure', () => mkColorIcon('azure'));
-vi.mock('@lobehub/icons/es/Aws', () => mkColorIcon('aws'));
-vi.mock('@lobehub/icons/es/Bedrock', () => mkColorIcon('bedrock'));
-vi.mock('@lobehub/icons/es/ByteDance', () => mkColorIcon('bytedance'));
-vi.mock('@lobehub/icons/es/Claude', () => mkColorIcon('claude'));
-vi.mock('@lobehub/icons/es/ClaudeCode', () => mkRuntimeIcon('claude-code-icon'));
-vi.mock('@lobehub/icons/es/Codex', () => mkRuntimeIcon('codex-icon'));
-vi.mock('@lobehub/icons/es/Cohere', () => mkColorIcon('cohere'));
-vi.mock('@lobehub/icons/es/DeepSeek', () => mkColorIcon('deepseek'));
-vi.mock('@lobehub/icons/es/Doubao', () => mkColorIcon('doubao'));
-vi.mock('@lobehub/icons/es/Gemini', () => mkColorIcon('gemini'));
-vi.mock('@lobehub/icons/es/GeminiCLI', () => mkRuntimeIcon('gemini-cli-icon'));
-vi.mock('@lobehub/icons/es/Google', () => mkColorIcon('google'));
-vi.mock('@lobehub/icons/es/Meta', () => mkColorIcon('meta'));
-vi.mock('@lobehub/icons/es/Mistral', () => mkColorIcon('mistral'));
-vi.mock('@lobehub/icons/es/Moonshot', () => mkColorIcon('moonshot'));
-vi.mock('@lobehub/icons/es/OpenAI', () => mkColorIcon('openai'));
-vi.mock('@lobehub/icons/es/OpenCode', () => mkRuntimeIcon('opencode-icon'));
-vi.mock('@lobehub/icons/es/Perplexity', () => mkColorIcon('perplexity'));
-vi.mock('@lobehub/icons/es/Qwen', () => mkColorIcon('qwen'));
-vi.mock('@lobehub/icons/es/Volcengine', () => mkColorIcon('volcengine'));
-vi.mock('@lobehub/icons/es/Zhipu', () => mkColorIcon('zhipu'));
-vi.mock('@lobehub/icons/es/Antigravity/components/Color.js', () => ({ default: () => null }));
 
 describe('RuntimeBrandIcon', () => {
   it('resolves known runtimes to LobeHub runtime icons', () => {
@@ -237,10 +163,13 @@ describe('RuntimeBrandIcon', () => {
     );
 
     expect(screen.getByLabelText('Codex')).toHaveAttribute('data-runtime-brand-source', 'lobehub');
-    expect(screen.getByTestId('codex-icon')).toBeInTheDocument();
-    expect(screen.getByTestId('gemini-cli-icon')).toHaveAttribute('data-size', '24');
-    expect(screen.getByTestId('openai-color-icon')).toHaveAttribute('data-icon', 'openai');
-    expect(screen.getByTestId('openai-color-icon')).toHaveAttribute('data-size', '16');
+    expect(screen.getByLabelText('Codex').querySelector('[data-runtime-icon-asset="codex"]')).toBeInTheDocument();
+    expect(
+      screen.getByLabelText('Gemini CLI').querySelector('[data-runtime-icon-asset="gemini-cli"]'),
+    ).toHaveAttribute('data-runtime-icon-size', '24');
+    expect(
+      screen.getByLabelText('OpenAI').querySelector('[data-runtime-icon-asset="openai"]'),
+    ).toHaveAttribute('data-runtime-icon-size', '16');
     expect(screen.getByLabelText('Shell')).toHaveAttribute('data-runtime-brand-source', 'fallback');
     expect(screen.getByLabelText('Shell')).toHaveAttribute('data-runtime-brand-fallback', 'shell');
   });

@@ -12,7 +12,7 @@
     "forceConsistentCasingInFileNames": true,
     "isolatedModules": true,
     "noEmit": true,
-    "lib": ["ES2021", "DOM"],
+    "lib": ["ES2021", "ES2022.Array", "DOM"],
     "baseUrl": ".",
     "paths": {
       "@shared/*": ["../shared/src/*"],

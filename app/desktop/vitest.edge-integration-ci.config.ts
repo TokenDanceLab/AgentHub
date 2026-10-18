@@ -25,12 +25,5 @@ export default defineConfig({
     execArgv: ['--max-old-space-size=4096'],
     memoryLimit: '512MB',
     maxWorkers: 1,
-    deps: {
-      optimizer: {
-        client: {
-          include: ['@lobehub/fluent-emoji'],
-        },
-      },
-    },
   },
 });

@@ -28,5 +28,5 @@ pnpm --filter @agenthub/workbench typecheck     # tsc --noEmit
 ```
 
 图标治理：workbench 内图标一律走 `designIcons.tsx` registry
-（`icon-governance.test.ts` 机器把关，禁止直连 lucide-react/@lobehub/icons
+（`icon-governance.test.ts` 机器把关，禁止直连 lucide-react
 或裸 `<svg>`）。

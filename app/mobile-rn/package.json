@@ -65,6 +65,6 @@
     "babel-preset-expo": "56.0.14",
     "expo-doctor": "^1.18.10",
     "typescript": "~6.0.3",
-    "vitest": "^4.1.10"
+    "vitest": "^4.1.11"
   }
 }

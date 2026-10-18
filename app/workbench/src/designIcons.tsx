@@ -1,5 +1,5 @@
 import React from 'react';
-import AntigravityIcon from '@lobehub/icons/es/Antigravity/components/Color.js';
+import antigravityIconUrl from './assets/antigravity.svg';
 import {
   DESIGN_NAV_ICON_SIZE,
   DESIGN_NAV_ICON_STROKE_WIDTH,
@@ -241,7 +241,15 @@ export function DesignOpenWithIcon({
         </svg>
       );
     case 'antigravity':
-      return <AntigravityIcon className={className} size={size} />;
+      return (
+        <img
+          alt=""
+          className={imageClassName ?? className}
+          height={size}
+          src={antigravityIconUrl}
+          width={size}
+        />
+      );
     case 'defaultApp':
       return (
         <svg aria-hidden="true" className={className} viewBox="0 0 24 24">

@@ -2594,7 +2594,8 @@ jobs:
           # 全绿的情况下把漏洞版 1.1.16 钉在 lockfile 里，直到 #2224 才修掉。
           # 全量审计复用同一份 vulnerability-exceptions.json 例外机制（判据不变：
           # 仅上游无修复版本者可登记，且必须挂 tracking issue），所以这一步不会
-          # 把 #1663 的 image-size 变成红灯——它只会拦住「有修复版本却没升级」。
+          # 把 #2360 登记的 braces/node-forge/sprintf-js 变成红灯——它只会拦住
+          # 「有修复版本却没升级」。
           pnpm audit --json 2>&1 > /tmp/pnpm-audit-full.json || true
           bash ../scripts/verify/verify-vulnerability-gates.sh pnpm-audit full < /tmp/pnpm-audit-full.json
 

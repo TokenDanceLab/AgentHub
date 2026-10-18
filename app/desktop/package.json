@@ -36,7 +36,6 @@
   "dependencies": {
     "@agenthub/shared": "workspace:*",
     "@agenthub/workbench": "workspace:*",
-    "@lobehub/icons": "^5.10.0",
     "@tanstack/react-query": "^5.101.4",
     "@tauri-apps/api": "^2.11.1",
     "@tauri-apps/plugin-dialog": "2.7.2",
@@ -76,6 +75,6 @@
     "typescript": "~5.8.0",
     "typescript-eslint": "^8.59.4",
     "vite": "^6.4.3",
-    "vitest": "^4.1.10"
+    "vitest": "^4.1.11"
   }
 }

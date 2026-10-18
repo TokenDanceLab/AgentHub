@@ -6,7 +6,7 @@
 //
 // Shared vi.mock registration for the #1763 workbench shards. Must stay the
 // first import so mock factories register before the component tree (and its
-// virtua/@lobehub/icons deps) is evaluated. This shard intentionally does NOT
+// virtua dep) is evaluated. This shard intentionally does NOT
 // call installWorkbenchTestHooks(): the original suite kept the pending
 // dispatch describe outside the AgentHubWorkbench describe scope, so its
 // afterEach hooks never applied here.

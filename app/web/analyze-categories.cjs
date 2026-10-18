@@ -50,7 +50,6 @@ const mainChunk = (tree.children || []).find(c => c.name && c.name.includes('ind
 if (!mainChunk) { console.log('Main chunk not found'); process.exit(1); }
 
 const categories = {
-  '@lobehub/icons': 0,
   'react-syntax-highlighter + prismjs + refractor': 0,
   'react-markdown + unified + remark + mdast': 0,
   'chatview (components + adapter)': 0,
@@ -71,7 +70,6 @@ allLeaves.sort((a, b) => b.size - a.size);
 
 allLeaves.forEach(leaf => {
   const name = leaf.name;
-  if (name.includes('lobehub/icons')) categories['@lobehub/icons'] += leaf.size;
   else if (name.includes('react-syntax-highlighter') || name.includes('prismjs') || name.includes('refractor') || name.includes('lowlight') || name.includes('fault')) categories['react-syntax-highlighter + prismjs + refractor'] += leaf.size;
   else if (name.includes('react-markdown') || name.includes('unified') || name.includes('remark') || name.includes('mdast')) categories['react-markdown + unified + remark + mdast'] += leaf.size;
   else if (name.includes('chatview')) categories['chatview (components + adapter)'] += leaf.size;

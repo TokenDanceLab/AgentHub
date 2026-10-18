@@ -9,11 +9,6 @@ import { createElement, Fragment } from 'react';
 // NO_I18NEXT_INSTANCE warning is eliminated. No web locale namespaces are
 // loaded: no web suite asserts real translated copy for them.
 import { installTestI18n } from '@shared/testing/i18n';
-import {
-  antigravityColorIconMock,
-  lobehubIconsMock,
-  providerIconFeatureMock,
-} from '@shared/testing/lobehubIcons';
 import { installJsdomPolyfills } from '@shared/testing/jsdomPolyfills';
 
 installTestI18n();
@@ -24,26 +19,6 @@ installTestI18n();
 vi.mock('virtua', () => ({
   Virtualizer: ({ children }: { children?: unknown }) =>
     createElement(Fragment, null, children as Parameters<typeof createElement>[2]),
-}));
-
-// Single-source @lobehub/icons mocks (#1678): icon list + mocked deep paths
-// live in @shared/testing/lobehubIcons so web/desktop suites can no longer
-// drift apart.
-vi.mock('@lobehub/icons', () => lobehubIconsMock);
-vi.mock(
-  '@lobehub/icons/es/Antigravity/components/Color.js',
-  () => antigravityColorIconMock,
-);
-vi.mock('@lobehub/icons/es/features/ProviderIcon/index.js', () => providerIconFeatureMock);
-
-// Mock @lobehub/fluent-emoji (transitive peer dep of @lobehub/icons via @lobehub/ui)
-// to prevent vitest from processing its ESM directory import which Node.js cannot resolve.
-vi.mock('@lobehub/fluent-emoji', () => ({
-  default: () => null,
-  FluentEmoji: () => null,
-  getEmoji: () => undefined,
-  getEmojiNameByCharacter: () => undefined,
-  getFluentEmojiCDN: () => '',
 }));
 
 // ── Polyfills for jsdom — required once virtualization (virtua) landed ──

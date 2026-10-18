@@ -2,9 +2,8 @@
  * Shared setup for the AgentHubWorkbench integration test shards (#1763).
  *
  * Every shard MUST import this module before importing the workbench
- * component tree: the vi.mock factories below have to be registered before
- * `AgentHubWorkbench` and its transitive dependencies (virtua,
- * @lobehub/icons) are evaluated.
+ * component tree: the vi.mock factory below has to be registered before
+ * `AgentHubWorkbench` and its transitive dependencies (virtua) are evaluated.
  */
 import React from 'react';
 import { cleanup, fireEvent, screen, within } from '@testing-library/react';
@@ -29,65 +28,6 @@ vi.mock('virtua', () => ({
   Virtualizer: ({ children }: { children?: React.ReactNode }) => <>{children}</>,
 }));
 
-vi.mock('@lobehub/icons', () => {
-  const span = () => null;
-  return {
-    Alibaba: span,
-    AlibabaCloud: span,
-    Anthropic: span,
-    Azure: span,
-    Aws: span,
-    Bedrock: span,
-    ByteDance: span,
-    Claude: span,
-    ClaudeCode: span,
-    Codex: span,
-    Cohere: span,
-    DeepSeek: span,
-    Doubao: span,
-    Gemini: span,
-    GeminiCLI: span,
-    Google: span,
-    Meta: span,
-    Mistral: span,
-    ModelIcon: span,
-    Moonshot: span,
-    OpenCode: span,
-    OpenAI: span,
-    Perplexity: span,
-    ProviderIcon: span,
-    Qwen: span,
-    Volcengine: span,
-    Zhipu: span,
-  };
-});
-vi.mock('@lobehub/icons/es/Antigravity/components/Color.js', () => ({ default: () => null }));
-
-vi.mock('@lobehub/icons/es/Alibaba', () => ({ default: () => null }));
-vi.mock('@lobehub/icons/es/AlibabaCloud', () => ({ default: () => null }));
-vi.mock('@lobehub/icons/es/Anthropic', () => ({ default: () => null }));
-vi.mock('@lobehub/icons/es/Azure', () => ({ default: () => null }));
-vi.mock('@lobehub/icons/es/Aws', () => ({ default: () => null }));
-vi.mock('@lobehub/icons/es/Bedrock', () => ({ default: () => null }));
-vi.mock('@lobehub/icons/es/ByteDance', () => ({ default: () => null }));
-vi.mock('@lobehub/icons/es/Claude', () => ({ default: () => null }));
-vi.mock('@lobehub/icons/es/ClaudeCode', () => ({ default: () => null }));
-vi.mock('@lobehub/icons/es/Codex', () => ({ default: () => null }));
-vi.mock('@lobehub/icons/es/Cohere', () => ({ default: () => null }));
-vi.mock('@lobehub/icons/es/DeepSeek', () => ({ default: () => null }));
-vi.mock('@lobehub/icons/es/Doubao', () => ({ default: () => null }));
-vi.mock('@lobehub/icons/es/Gemini', () => ({ default: () => null }));
-vi.mock('@lobehub/icons/es/GeminiCLI', () => ({ default: () => null }));
-vi.mock('@lobehub/icons/es/Google', () => ({ default: () => null }));
-vi.mock('@lobehub/icons/es/Meta', () => ({ default: () => null }));
-vi.mock('@lobehub/icons/es/Mistral', () => ({ default: () => null }));
-vi.mock('@lobehub/icons/es/Moonshot', () => ({ default: () => null }));
-vi.mock('@lobehub/icons/es/OpenAI', () => ({ default: () => null }));
-vi.mock('@lobehub/icons/es/OpenCode', () => ({ default: () => null }));
-vi.mock('@lobehub/icons/es/Perplexity', () => ({ default: () => null }));
-vi.mock('@lobehub/icons/es/Qwen', () => ({ default: () => null }));
-vi.mock('@lobehub/icons/es/Volcengine', () => ({ default: () => null }));
-vi.mock('@lobehub/icons/es/Zhipu', () => ({ default: () => null }));
 
 /**
  * Suite hooks mirroring the afterEach that wrapped every AgentHubWorkbench

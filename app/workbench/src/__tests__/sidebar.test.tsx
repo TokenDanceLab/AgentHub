@@ -3,7 +3,7 @@
 // (#1763 split of AgentHubWorkbench.test.tsx).
 // Shared vi.mock registration + suite hooks for the #1763 AgentHubWorkbench
 // test shards. Must stay the first import so mock factories register before
-// the component tree (and its virtua/@lobehub/icons deps) is evaluated.
+// the component tree (and its virtua dep) is evaluated.
 import { installWorkbenchTestHooks } from './helpers';
 
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
