@@ -53,8 +53,20 @@ done
 # Upstream trackers: tauri-apps/tauri#7335, #12563 (assignee lucasfernog),
 # #14684 (GTK4 + WebKitGTK 6.0 migration PR, open).
 # Review deadline: 2026-11-30 — gate fails after this date until re-review.
+#
+# RUSTSEC-2026-0367 / -0368 / -0369 (zip 4.6.1): SUID/SGID preservation and
+# symlink-escape issues in ZIP extraction, patched in zip >= 9.0.0. Not
+# fixable on the current Tauri 2 stable stack: tauri-plugin-updater 2.10.1
+# (latest stable) pins `zip = "4"` on the Windows target, and zip 9 is a
+# breaking major the plugin has not adopted. Updater payloads come from this
+# repo's GitHub Releases and are signature-verified before extraction, so the
+# attacker-controlled-input path is bounded. Disposition owner: AgentHub
+# Desktop security review. Tracking: issue #2362. Review deadline 2026-12-31.
 DEFAULT_ALLOWLIST='
 RUSTSEC-2024-0429:2026-11-30
+RUSTSEC-2026-0367:2026-12-31
+RUSTSEC-2026-0368:2026-12-31
+RUSTSEC-2026-0369:2026-12-31
 '
 
 parse_allowlist() {
