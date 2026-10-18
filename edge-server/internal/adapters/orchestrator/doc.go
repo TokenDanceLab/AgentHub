@@ -1,19 +1,17 @@
-// Package orchestrator is the leaf implementation package for the A-V1
-// orchestrator extraction (#1526 Step 0 → #1566 Step 2).
+// Package orchestrator is the leaf implementation package for the
+// orchestrator.
 //
-// It holds the orchestrator implementation (13 orchestrator_*.go files +
-// plan_approval.go) that previously lived in the root internal/adapters god
-// package. The leaf depends only on:
+// It holds the orchestrator implementation, its dispatch helpers and
+// plan_approval.go. The leaf depends only on:
 //
 //   - internal/orchestration — neutral contract SSOT (TaskStatus, PlanTask,
-//     AgentAdapter, EventEmitter, SubAgentSpawner, BusEvent* …)
-//   - narrow ports defined in ports.go — AgentExecutor (agent execution),
-//     AdapterRegistry (adapter lookup / registry view)
+//     EventEmitter, SubAgentSpawner, BusEvent* …)
+//   - narrow ports defined in ports.go — AgentExecutor (agent execution)
 //   - external neutral packages — internal/agents, internal/store,
 //     internal/runnerctx, internal/events
 //
 // Dependency direction (machine-gated by TestLeafDoesNotImportRootAdapters
-// and scripts/verify/verify-orchestrator-deps.py):
+// and TestOrchestrationContractNeutral):
 //
 //	orchestration → adapters/orchestrator ← composition root
 //

@@ -1,4 +1,4 @@
--- P2 notifications list performance (#2154 Ampere database lane).
+-- Notifications list performance.
 --
 -- ListNotifications runs
 --   WHERE user_id = ? [AND read = false] ORDER BY created_at DESC LIMIT ? OFFSET ?

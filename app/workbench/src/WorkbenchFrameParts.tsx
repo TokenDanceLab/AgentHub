@@ -30,10 +30,9 @@ export {
 } from './WorkbenchFrameChromeParts';
 
 /* ==========================================================================
-   WorkbenchFrameParts -- presentational residual slices from WorkbenchFrame
-   (#637). Prop contracts in workbenchFrameTypes (#698). Residual builders /
-   chrome parts in workbenchFramePartsHelpers + WorkbenchFrameChromeParts
-   (#742). No intentional UX change.
+   WorkbenchFrameParts -- presentational parts used by WorkbenchFrame.
+   Prop contracts live in workbenchFrameTypes; builders and chrome parts in
+   workbenchFramePartsHelpers + WorkbenchFrameChromeParts.
    ========================================================================== */
 
 /** Conversation list + vertical sidebar resizer for chat page. */

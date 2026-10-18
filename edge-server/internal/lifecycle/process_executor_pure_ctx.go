@@ -7,9 +7,6 @@ import (
 	"github.com/agenthub/edge-server/internal/runnerctx"
 )
 
-// Residual pure-helper peel #1121: domain pure helpers extracted from
-// process_executor_pure.go. Same package lifecycle; zero behavior change.
-
 // withParserContextValues injects budget / workdir / SDK run context into the
 // parser context used by structured output adapters.
 func withParserContextValues(ctx context.Context, runCtx RunProcessContext) context.Context {
@@ -71,66 +68,4 @@ func buildProcessSecurityHooks(allowedTools []string, emitter adapters.EventEmit
 		hooks = adapters.HookChain{allowlistHook, adapters.NewSecurityHook()}
 	}
 	return hooks
-}
-
-// shouldTrackWorkDir reports whether a workdir snapshot should be retained for
-// post-finish auto-surface detection.
-func shouldTrackWorkDir(workDir string) bool {
-	return workDir != ""
-}
-
-// shouldEmitContextCompaction reports whether the run budget crossed the
-// auto-compaction threshold and should publish a compaction event.
-func shouldEmitContextCompaction(budget *runnerctx.ContextBudget) bool {
-	return budget != nil && budget.ShouldCompact()
-}
-
-// shouldApplyBudgetAwareEmitter reports whether the structured-output emitter
-// should be wrapped with budget monitoring.
-func shouldApplyBudgetAwareEmitter(hasBudget bool) bool {
-	return hasBudget
-}
-
-// contextCompactionSnapshot reads compaction diagnostics from a budget. Pure
-// relative to I/O (atomic load only).
-func contextCompactionSnapshot(budget *runnerctx.ContextBudget) (usagePct float64, tokensUsed, remaining int64) {
-	if budget == nil {
-		return 0, 0, 0
-	}
-	return budget.UsagePercent(), budget.UsedTokens.Load(), budget.Remaining()
-}
-
-// workdirTrackPlan is the pure pre-run workdir snapshot gate.
-type workdirTrackPlan struct {
-	Track bool
-}
-
-// planWorkdirTrack reports whether a workdir should be snapshotted/tracked.
-func planWorkdirTrack(workDir string) workdirTrackPlan {
-	return workdirTrackPlan{Track: shouldTrackWorkDir(workDir)}
-}
-
-// contextCompactionPlan is the pure post-stream compaction emit plan.
-type contextCompactionPlan struct {
-	Emit       bool
-	UsagePct   float64
-	TokensUsed int64
-	Remaining  int64
-	Payload    map[string]any
-}
-
-// planContextCompaction snapshots budget usage and builds the bus payload when
-// the auto-compaction threshold is crossed. Side-effects stay in the executor.
-func planContextCompaction(budget *runnerctx.ContextBudget, runID string) contextCompactionPlan {
-	if !shouldEmitContextCompaction(budget) {
-		return contextCompactionPlan{}
-	}
-	usagePct, tokensUsed, remaining := contextCompactionSnapshot(budget)
-	return contextCompactionPlan{
-		Emit:       true,
-		UsagePct:   usagePct,
-		TokensUsed: tokensUsed,
-		Remaining:  remaining,
-		Payload:    contextCompactionPayload(runID, usagePct, tokensUsed, remaining),
-	}
 }

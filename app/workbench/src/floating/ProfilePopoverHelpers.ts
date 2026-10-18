@@ -1,8 +1,8 @@
 /* ═══════════════════════════════════════════════════════════════════════
-   ProfilePopoverHelpers — pure residual slices from ProfilePopover (#743).
+   ProfilePopoverHelpers — pure helpers for ProfilePopover (#743).
 
    Variant/class resolvers, avatar/status text builders, and viewport
-   position math. No React / no intentional UX change.
+   position math. No React.
    ═══════════════════════════════════════════════════════════════════════ */
 
 export type ProfileVariant = 'default' | 'agent' | 'group' | 'account';

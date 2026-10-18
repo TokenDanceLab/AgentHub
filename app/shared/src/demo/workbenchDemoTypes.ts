@@ -1,6 +1,5 @@
 /**
  * Workbench demo store types + fallback conversation id.
- * Peel companion of workbenchDemo (#1131). Pure only; zero behavior change.
  */
 
 import type { ComposerIntent, ComposerSubmitResult } from '../composer';
@@ -36,4 +35,4 @@ export interface WorkbenchDemoRuntimeStore {
 export const WORKBENCH_DEMO_FALLBACK_CONVERSATION_ID = 'builder';
 
 export const BUILDER_PINNED_ANNOUNCEMENT =
-  '前端重构任务已置顶，Builder 正在整理 B0 SQLite 迁移方案，Reviewer 和 Deployer 后续跟进验收。';
+  '前端重构任务已置顶，Builder 正在整理 SQLite 迁移方案，Reviewer 和 Deployer 后续跟进验收。';

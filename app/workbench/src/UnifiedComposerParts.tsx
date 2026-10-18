@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════════════════════════
-   UnifiedComposer presentational subpanels — residual barrel (#706).
+   UnifiedComposer presentational subpanels — barrel module (#706).
 
    Subcomponents live in ComposerContextParts / ComposerAttachmentParts /
    ComposerControlParts. Pure helpers in ComposerPartsHelpers.

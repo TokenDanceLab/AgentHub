@@ -7,6 +7,8 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
+
+	"github.com/agenthub/hub-server/internal/cache"
 	"gorm.io/gorm"
 )
 
@@ -60,7 +62,7 @@ func TestGetTeamRunState_PanicInAnyParallelReadBecomesThatReadsError(t *testing.
 		t.Run(tc.name, func(t *testing.T) {
 			db := setupAgentTeamStateSQLite(t)
 			teamID, runID := seedTeamRunStateFixture(t, db)
-			svc := NewAgentTeamService(db, nil, nil)
+			svc := NewAgentTeamService(db, nil, cache.NoOpCache{})
 			panicReadOn(t, db, tc.dest, "injected panic in the "+tc.name+" read")
 
 			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)

@@ -10,12 +10,10 @@ import (
 
 // Bounding tests for the two in-process stream-state structures (#2154).
 //
-// The existing suite asserts len() — the *live* entry count — which stayed
-// bounded while the ordering bookkeeping behind it did not: the FIFO slice was
-// only ever reclaimed from a head index that just the eviction path advanced,
-// so the normal terminal-cleanup path (add … remove) appended one slot per task
-// and never gave any back. These tests therefore assert the whole retained
-// store, under exactly that normal path.
+// The structures keep every retained key in the map itself (eviction scans for
+// the smallest insertion sequence), so a bounded live count is a bounded
+// retained store. These tests exercise the normal terminal-cleanup path
+// (add … remove) and a stuck key, and lock the oldest-first eviction order.
 
 const throttleChurnRounds = 20000
 
@@ -30,8 +28,6 @@ func TestAckedTaskSet_RetainedSlotsBoundedUnderTerminalCleanup(t *testing.T) {
 		set.remove(id)
 	}
 	require.Equal(t, 0, set.len(), "every task terminated, so nothing is live")
-	require.LessOrEqual(t, set.retainedSlots(), max,
-		"add+remove churn must not retain a slot per task (#2154: unbounded fifo)")
 }
 
 // TestAckedTaskSet_RetainedSlotsBoundedWithOneStuckKey covers the harder case:
@@ -47,9 +43,7 @@ func TestAckedTaskSet_RetainedSlotsBoundedWithOneStuckKey(t *testing.T) {
 		require.True(t, set.addIfAbsent(id))
 		set.remove(id)
 	}
-	require.LessOrEqual(t, set.retainedSlots(), max,
-		"one never-terminating key must not let the rest of the churn accumulate")
-	require.Equal(t, 1, set.len(), "the stuck key is still live")
+	require.Equal(t, 1, set.len(), "the stuck key is still live under churn")
 }
 
 // TestAckedTaskSet_EvictsOldestInsertionFirst locks the eviction order the
@@ -76,8 +70,6 @@ func TestSessionTouchThrottle_RetainedSlotsBoundedUnderTerminalCleanup(t *testin
 		throttle.reset(id)
 	}
 	require.Equal(t, 0, throttle.len(), "every session terminated, so nothing is live")
-	require.LessOrEqual(t, throttle.retainedSlots(), max,
-		"allow+reset churn must not retain a slot per session (#2154: unbounded fifo)")
 }
 
 func TestSessionTouchThrottle_RetainedSlotsBoundedWithOneStuckKey(t *testing.T) {
@@ -90,8 +82,7 @@ func TestSessionTouchThrottle_RetainedSlotsBoundedWithOneStuckKey(t *testing.T) 
 		require.True(t, throttle.allow(id, now))
 		throttle.reset(id)
 	}
-	require.LessOrEqual(t, throttle.retainedSlots(), max,
-		"one never-terminating session must not let the rest of the churn accumulate")
+	require.Equal(t, 1, throttle.len(), "the stuck session is still live under churn")
 }
 
 func TestSessionTouchThrottle_EvictsOldestInsertionFirst(t *testing.T) {
@@ -104,4 +95,16 @@ func TestSessionTouchThrottle_EvictsOldestInsertionFirst(t *testing.T) {
 	require.Equal(t, 3, throttle.len())
 	require.True(t, throttle.allow("a", now), "a was the oldest insertion, so a is the one that went")
 	require.False(t, throttle.allow("c", now), "c must still be inside its window: eviction is oldest-first")
+}
+
+func (b *ackedTaskSet) len() int {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return len(b.seen)
+}
+
+func (t *sessionTouchThrottle) len() int {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	return len(t.last)
 }

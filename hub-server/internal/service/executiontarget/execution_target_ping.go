@@ -157,13 +157,12 @@ func (s *Service) pingEdgeServer(ctx context.Context, addr string, t *model.Exec
 	if err != nil {
 		// The egress error string embeds the resolved internal address of the
 		// target; keep it server-side (log) and return a generic message so
-		// restricted-network topology is not echoed to API consumers
-		// (#2154 security lane F17).
+		// restricted-network topology is not echoed to API consumers (#2154).
 		slog.Info("execution target ping failed", "target_id", t.ID, "error", err)
 		_ = s.recordEvidence(ctx, t.ID, dispatch.EvidenceSourceProbe, dispatch.EvidenceStatusOffline, "connect", "", "")
 		// Preserve the policy-denial reason (tests assert it names the egress
 		// policy) without echoing the resolved internal address to the API
-		// consumer (#2154 security lane F17).
+		// consumer (#2154).
 		return errcode.TargetNotRoutable.WithMessage("ping failed: " + pingFailureReason(err))
 	}
 	defer resp.Body.Close()
@@ -195,8 +194,8 @@ func (s *Service) pingEdgeServer(ctx context.Context, addr string, t *model.Exec
 // the network instead of after the target configuration.
 //
 // Every returned reason is a constant: the egress error text embeds the
-// resolved internal address and must never reach API consumers (#2154 security
-// lane F17); the full error stays in the slog line above. The wording of the
+// resolved internal address and must never reach API consumers (#2154); the
+// full error stays in the slog line above. The wording of the
 // restricted-address branch is load-bearing — execution_target_test.go:267
 // asserts the surfaced error contains "not allowed".
 //

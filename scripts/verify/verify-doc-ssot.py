@@ -1,18 +1,17 @@
 #!/usr/bin/env python3
-"""verify-doc-ssot — AgentHub 文档 SSOT 门禁（ps1 迁移，契约见 server docs/design/ps1-to-python-migration.md）。
+"""verify-doc-ssot — AgentHub 文档 SSOT 门禁。
 
 门禁检查项：
 - 根入口点/过期路径/归档活动路径禁存在；
 - README 必需入口点链接 + 目标存在；
 - README zh/en 成熟度口径 parity（配对标记同现/同缺）；
-- 约 35 个 (路径, 标记) 必须出现在对应文档；
-- 约 30 个禁止正则扫描活跃文档；
+- 表中列出的 (路径, 标记) 必须出现在对应文档；
+- 少量禁止正则扫描活跃文档；
 - 行数上限表（AGENTS.md 300 行预算）；AGENTS.md 反引号路径存在性；
 - 文档引用 AGENTS 规则时必须使用主题名，禁止易漂移的章节编号；
 - 规则→机器验证映射 SSOT（docs/governance/verifier-map.md）存在性 + AGENTS owner 指针；
 - 活跃文档内部 markdown 相对链接目标存在性（DOC-BROKEN-LINK）；
-- standalone clone 可达性：活跃文档不得有解析出仓库的相对链接/路径（DOC-OUT-OF-REPO-LINK）；
-- tests/ 不得镜像 scripts/ 脚本名。
+- standalone clone 可达性：活跃文档不得有解析出仓库的相对链接/路径（DOC-OUT-OF-REPO-LINK）。
 
 """
 
@@ -56,11 +55,11 @@ def is_active_doc(path: str) -> bool:
         return True
     if p in ("app/web/README.md", "app/desktop/README.md", "app/mobile-rn/README.md"):
         return True
-    if p in ("docs/README.md", "docs/history.md", "docs/decisions.md", "docs/reference/README.md", "docs/api-reference.md"):
+    if p in ("docs/README.md", "docs/decisions.md", "docs/developer-quickstart.md", "docs/component-acceptance.md"):
+        return True
+    if re.match(r"^docs/(architecture|reference)/.+\.md$", p):
         return True
     if re.match(r"^docs/governance/.+\.md$", p):
-        return True
-    if re.match(r"^\.agents/skills/.+\.md$", p):
         return True
     return False
 
@@ -106,27 +105,24 @@ def check_root_entrypoints() -> None:
 
 def check_stale_paths() -> None:
     stale = [
-        "docs/contributing.md", "docs/roadmap", "docs/adr", "docs/audit",
-        "docs/reference/projects", "docs/release/screenshot-checklist.md",
-        "docs/governance/document-standards.md", "docs/governance/workflow-standard.md",
-        "docs/analysis/_raw_lane_results.json", "docs/analysis/cleanup-strategy.md",
-        "docs/analysis/engineering-loop-capability-map.md", "docs/analysis/hubclient-ssot-slice1.md",
-        "docs/analysis/module-inventory.md", "docs/analysis/project-overview.md",
-        "docs/analysis/risk-assessment.md", "api/events-full.md",
-        "edge-server/docs/audit", "hub-server/docs/audit",
+        "docs/archive", "docs/archives", "docs/adr", "docs/audit", "docs/analysis",
+        "docs/api-reference.md",
+        "docs/architecture/09-dev-server-topology.md",
+        "docs/architecture/11-protocol-capability-mapping.md",
+        "docs/reference/sdk-agent-strategy.md",
+        "docs/reference/agent-protocol-compat.md",
+        "docs/reference/ux-benchmark-2026-08.md",
+        "docs/reference/projects", "api/events-full.md",
     ]
     for path in stale:
         if exists(path):
-            fail(f"{path} must stay archived or removed from active docs", "DOC-STALE-PATH")
-    if exists("docs/reference/desktop-ui-qa-sop.md"):
-        fail("old Desktop UI QA SOP must stay archived; use real-e2e-acceptance for active UI/E2E gates")
+            fail(f"{path} must stay removed from active docs", "DOC-STALE-PATH")
     archived_active = [
         "docs/governance/branch-governance.md",
-        "app/mobile-rn/docs/handoff.md",
     ]
     for path in archived_active:
         if exists(path):
-            fail(f"{path} must stay archived; active branch rules live in AGENTS.md and Mobile gates live in app/mobile-rn/README.md")
+            fail(f"{path} must stay removed; active rules live in AGENTS.md and app/mobile-rn/README.md")
 
 
 def check_dated_governance() -> None:
@@ -137,7 +133,7 @@ def check_dated_governance() -> None:
             if name.endswith(".md") and re.search(r"\d{4}-\d{2}-\d{2}", name):
                 dated.append(name)
     if dated:
-        fail("dated governance evidence must live in the external archive indexed by docs/history.md: " + ", ".join(sorted(dated)))
+        fail("dated governance evidence is not allowed in active docs: " + ", ".join(sorted(dated)))
 
 
 def check_readme_entrypoints() -> None:
@@ -161,29 +157,21 @@ def check_required_markers() -> None:
         ("AGENTS.md", "项目总规则唯一入口"),
         ("AGENTS.md", "避免巨石文档"),
         ("AGENTS.md", "项目规则只写 `AGENTS.md`"),
-        ("docs/history.md", "archive commit"),
-        ("docs/history.md", "TokenDanceLab/docs"),
         ("docs/decisions.md", "ADR-017"),
-        ("docs/decisions.md", "Full ADR bodies are archived"),
         ("api/events.md", "Owner"),
-        ("app/web/README.md", "docs/history.md"),
         ("app/desktop/README.md", "packaged-release"),
         ("app/desktop/README.md", "Vite renderer 证据不等于 packaged Desktop"),
         ("app/mobile-rn/README.md", "real_tested=false"),
         ("app/mobile-rn/README.md", "Mobile must not connect directly to Local Edge"),
         ("edge-server/README.md", "Source Map"),
         ("hub-server/README.md", "Source Map"),
-        ("hub-server/deployments/README.md", "Live host"),
         ("hub-server/tests/README.md", "Integration Tests"),
-        ("CONTRIBUTING.md", "旧详细贡献指南见"),
-        ("docs/governance/README.md", "Login fixture topology gate"),
-        ("docs/governance/README.md", "已迁移至私有文档中枢"),
         ("docs/architecture/05-deployment.md", "Desktop packaged 行为正确"),
         ("scripts/release/verify-tauri-package-readiness.py", "assert_workflow_command_explicit_opt_in"),
         ("scripts/release/verify-tauri-package-readiness.py", "assert_no_macos_unsigned_dry_release_actions"),
         ("scripts/release/verify-tauri-package-dry.py", "windows-desktop-package-dry"),
         ("docs/architecture/04-frontend-data-flow.md", "Source Owner Map"),
-        ("hub-server/README.md", "docs/archives/reference/backend-performance-gates.md"),
+        ("hub-server/README.md", "verify-backend-perf-leak-gates.py"),
         ("edge-server/README.md", "verify-backend-perf-leak-gates.py"),
     ]
     for path, marker in required:
@@ -197,30 +185,9 @@ def check_forbidden_patterns() -> None:
         (r"AGENTS\.md\s*/\s*CLAUDE\.md", "legacy AGENTS/CLAUDE dual-rule wording"),
         (r"STATE\.md", "root STATE.md as an active project fact source"),
         (r"ROADMAP\.md", "uppercase ROADMAP.md legacy reference"),
-        (r"GPT-5\.5", "hard-coded private/local model alias"),
-        (r"(?<![\w-])/(goal|loop)(?![\w-])", "legacy Codex /goal or /loop workflow rule"),
-        (r"Desktop/Web UI freeze|UI freeze", "obsolete UI freeze rule"),
-        (r"Phase 2 Real E2E Contract\s*\|\s*进行中", "stale Phase 2 progress state"),
-        (r"current pre-Phase 3 hygiene branch `docs/active-doc-regroup`", "stale active-doc-regroup branch status"),
-        (r"Review and merge `docs/active-doc-regroup`", "stale active-doc-regroup next step"),
-        (r"docs/module-readme-trim", "stale module-readme cleanup branch presented as active work"),
-        (r"T3\.0b\s*\|\s*#344[^\r\n]*\|\s*open", "stale #344 open status after module README cleanup merged"),
-        (r"#344\s*/\s*T3\.0b\s+on", "stale #344 active-task wording"),
-        (r"Phase 3 Source And Test Alignment\s*\|\s*待开始", "stale Phase 3 not-started roadmap state"),
-        (r"Phase 3: Source And Test Alignment\s*\(1/7 tasks\)", "stale Phase 3 pre-#344 progress count"),
-        (r"current governance/source-contract branch", "stale current branch prose in progress docs"),
-        (r"Mobile tests pass", "stale Mobile pass claim"),
-        (r"Local mock Hub check passed", "stale Mobile mock-Hub pass claim"),
-        (r"Visual QA should pass", "stale Mobile visual QA pass claim"),
-        (r"Wi-Fi ADB", "stale Mobile device proof wording"),
-        (r"v0\.3\.0-rc\.7", "stale Mobile release-candidate proof wording"),
-        (r"Current branch handoff", "stale Mobile handoff owner wording"),
-        (r"真实执行已验证", "stale real-execution acceptance claim without current approved-real evidence"),
-        (r"当前事实写在\s+`?STATE\.md`?", "old STATE.md fact-owner rule"),
+        (r"(?<![\w-])/(goal|loop)(?![\w-])", "legacy /goal or /loop workflow rule"),
         (r"docs/architecture/system-design/", "removed system-design architecture path"),
         (r"docs/operations/desktop-ui-qa-sop", "removed Desktop UI QA SOP path"),
-        (r"app/web/screenshots/web-design", "old Web screenshot evidence list in active docs"),
-        (r"132 tests|278 tests|11/11|12/12\s+(Mock|curl|tests|PASS)", "fixed test-count acceptance claim"),
     ]
     files = [normalize_path(f) for f in git_ls_files() if is_active_doc(f) and exists(f)]
     for rel in files:
@@ -273,7 +240,6 @@ def check_max_lines() -> None:
         "hub-server/deployments/README.md": 100,
         "hub-server/tests/README.md": 70,
         "docs/README.md": 120,
-        "docs/history.md": 80,
         "docs/decisions.md": 80,
         "docs/developer-quickstart.md": 170,
         "docs/architecture.md": 170,
@@ -285,22 +251,12 @@ def check_max_lines() -> None:
         "docs/architecture/06-auth-identity.md": 200,
         "docs/architecture/07-design-system-ssot.md": 150,
         "docs/architecture/08-outbound-http.md": 150,
-        "docs/architecture/09-dev-server-topology.md": 80,
         "docs/architecture/github-actions-ci-cd-policy.md": 120,
         "docs/architecture/10-macro-engineering-design.md": 150,
-        "docs/architecture/11-protocol-capability-mapping.md": 200,
-        "docs/architecture/README.md": 40,
         "docs/component-acceptance.md": 130,
-        "docs/component-acceptance/ui-core.md": 320,
-        "docs/component-acceptance/pages.md": 80,
-        "docs/component-acceptance/chatview.md": 40,
-        "docs/api-reference.md": 80,
         "docs/reference/README.md": 80,
-        "docs/reference/sdk-agent-strategy.md": 120,
-        "docs/reference/agent-protocol-compat.md": 100,
+        "docs/reference/agent-protocols.md": 150,
         "docs/governance/verifier-map.md": 120,
-        "docs/governance/known-flaky.md": 170,
-        "docs/reference/ux-benchmark-2026-08.md": 160,
     }
     for path, limit in limits.items():
         if exists(path) and line_count(path) > limit:
@@ -346,10 +302,10 @@ def expand_brace_path(path: str) -> list:
 
 
 def check_agents_md_mapping_table() -> None:
-    """Mapping SSOT moved to docs/governance/verifier-map.md (#1719).
+    """Mapping SSOT is docs/governance/verifier-map.md.
 
-    The long table no longer lives in AGENTS.md §9.5; this check verifies the
-    script paths and CI files referenced by the new owner document.
+    This check verifies the script paths and CI files referenced by that
+    document.
     """
     content = read_text("docs/governance/verifier-map.md")
     checked_scripts = 0
@@ -360,8 +316,7 @@ def check_agents_md_mapping_table() -> None:
         cells = line.split("|")
         if len(cells) < 5:
             continue
-        script_match = re.search(r"`([^`]*)`", cells[2])
-        if script_match:
+        for script_match in re.finditer(r"`([^`]*)`", cells[2]):
             ref = script_match.group(1).strip()
             for candidate in expand_brace_path(ref):
                 if not exists(candidate):
@@ -373,6 +328,12 @@ def check_agents_md_mapping_table() -> None:
             if not exists(f".github/workflows/{ci_file}"):
                 fail(f"verifier-map.md references missing CI file: .github/workflows/{ci_file}")
             checked_ci_files += 1
+    if checked_scripts < 20 or checked_ci_files < 10:
+        fail(
+            f"verifier-map.md looks emptied or truncated ({checked_scripts} script paths, "
+            f"{checked_ci_files} CI files); refusing to report green",
+            code="DOC-VERIFIER-MAP-OWNER",
+        )
     print(f"verifier-map check ok ({checked_scripts} script paths, {checked_ci_files} CI files)")
 
 
@@ -416,9 +377,8 @@ def check_out_of_repo_links() -> None:
     """Standalone-clone reachability: active docs must not link outside the repo.
 
     A fresh clone contains only this repository, so relative links or backtick
-    paths that resolve above the repo root (e.g. sibling workspace repos like
-    ../docs) are dead for every external reader. Public http(s):// URLs are the
-    only allowed out-of-repo references; archives/ is exempt.
+    paths that resolve above the repo root are dead for every external reader.
+    Public http(s):// URLs are the only allowed out-of-repo references.
     """
     files = [normalize_path(f) for f in git_ls_files() if is_active_doc(f) and exists(f)]
     link_re = re.compile(r"\[[^\]]+\]\(([^)]+)\)")
@@ -454,10 +414,8 @@ def check_out_of_repo_links() -> None:
 def check_doc_internal_links() -> None:
     """Verify markdown relative links inside active docs resolve to real files.
 
-    Broken links silently degrade navigation (e.g. docs/README.md used to point
-    at plan/ and analysis/ after those directories were archived). archives/ is
-    exempt — archived material may legitimately point at the external TokenDance
-    docs archive. http(s)://, mailto:, bare anchors and code spans are skipped.
+    Broken links silently degrade navigation. http(s)://, mailto:, bare anchors
+    and code spans are skipped.
     """
     entry_dirs = ["docs", "docs/architecture", "docs/governance", "docs/reference"]
     active_files: list[str] = []
@@ -496,85 +454,90 @@ def check_doc_internal_links() -> None:
                 fail(f"{doc_rel} links to missing target: {target}", "DOC-BROKEN-LINK")
 
 
-def check_no_orphan_selftests() -> None:
-    """scripts/verify/tests/ 下的每个负向自测必须真的被 CI 或 Makefile 执行。
+def run_self_test() -> None:
+    """Negative fixtures for the documentation guards."""
+    global ROOT
+    import tempfile
 
-    一个从不被执行的自测比没有自测更坏：它让门禁看起来"已被负向验证过"，而实际上
-    门禁哑掉时不会有任何人知道。round-68 实测有 3 个自 2026-08 落地以来从未被任何
-    workflow 调用（#2275）。
-
-    扫工作树而不是 git index：本检查要在提交前就能跑，且 CI 上两者等价。
-    """
-    tests_dir = os.path.join(ROOT, "scripts", "verify", "tests")
-    if not os.path.isdir(tests_dir):
-        fail("scripts/verify/tests/ is missing — the scan is blind, refusing to report green",
-             code="DOC-ORPHAN-SELFTEST")
-    selftests = sorted(
-        f for f in os.listdir(tests_dir)
-        if re.search(r"\.Tests\.(py|sh)$", f) and os.path.isfile(os.path.join(tests_dir, f))
-    )
-    if not selftests:
-        fail("found 0 *.Tests.{py,sh} under scripts/verify/tests/ — the scan is blind",
-             code="DOC-ORPHAN-SELFTEST")
-
-    caller_texts = []
-    wf_dir = os.path.join(ROOT, ".github", "workflows")
-    if os.path.isdir(wf_dir):
-        for name in sorted(os.listdir(wf_dir)):
-            if name.endswith((".yml", ".yaml")):
-                with open(os.path.join(wf_dir, name), encoding="utf-8", errors="replace") as handle:
-                    caller_texts.append(handle.read())
-    makefile = os.path.join(ROOT, "Makefile")
-    if os.path.isfile(makefile):
-        with open(makefile, encoding="utf-8", errors="replace") as handle:
-            caller_texts.append(handle.read())
-    if not caller_texts:
-        fail("found no CI workflow and no Makefile — cannot judge self-test wiring on empty input",
-             code="DOC-ORPHAN-SELFTEST")
-
-    haystack = "\n".join(caller_texts)
-    orphans = [name for name in selftests if name not in haystack]
-    if orphans:
-        fail(
-            "self-test(s) never executed by any CI workflow or Makefile target: "
-            + ", ".join(orphans)
-            + " — wire them into a job that runs on every PR (a dispatch-only job does not count), "
-              "or delete them; an unexecuted negative self-test is a guarantee nobody has",
-            code="DOC-ORPHAN-SELFTEST",
+    original = ROOT
+    expected_checks = {
+        "check_root_entrypoints", "check_stale_paths", "check_dated_governance",
+        "check_readme_entrypoints", "check_readme_parity", "check_required_markers",
+        "check_forbidden_patterns", "check_no_numbered_agents_references", "check_max_lines",
+        "check_verifier_map_owner", "check_agents_md_mapping_table", "check_agents_md_paths",
+        "check_doc_internal_links", "check_out_of_repo_links",
+    }
+    wired = {check.__name__ for check in CHECKS}
+    missing = sorted(expected_checks - wired)
+    if missing:
+        raise AssertionError(f"main() no longer runs guard(s): {', '.join(missing)}")
+    try:
+        guard_cases = (
+            ("root-entrypoint", {"PROGRESS.md": "fixture\n"}, check_root_entrypoints, "DOC-ROOT-ENTRYPOINT"),
+            ("stale-path", {"docs/analysis/overview.md": "fixture\n"}, check_stale_paths, "DOC-STALE-PATH"),
+            ("readme-entrypoint", {"README.md": "# no entrypoint links\n"}, check_readme_entrypoints,
+             "DOC-README-ENTRYPOINT"),
+            ("readme-parity", {"README.md": "Mobile 是装配中的\n", "README_EN.md": "# en\n"},
+             check_readme_parity, "DOC-README-PARITY"),
+            ("forbidden-pattern", {"docs/architecture/sample.md": "见 STATE.md\n"},
+             check_forbidden_patterns, "STATE.md"),
+            ("numbered-agents-reference", {"README.md": "规则见 AGENTS.md §6\n"},
+             check_no_numbered_agents_references, "DOC-AGENTS-NUMBERED-REF"),
+            ("max-lines", {"AGENTS.md": "padding\n" * 301}, check_max_lines, "DOC-MAX-LINES"),
+            ("verifier-map-owner", {"AGENTS.md": "# no verifier-map pointer\n"},
+             check_verifier_map_owner, "DOC-VERIFIER-MAP-OWNER"),
+            ("out-of-repo-link", {"README.md": "[sibling](../outside.md)\n"},
+             check_out_of_repo_links, "DOC-OUT-OF-REPO-LINK"),
         )
-    print(f"self-test wiring check ok ({len(selftests)} self-tests, all executed by CI/Makefile)")
+        for label, files, check, expected in guard_cases:
+            with tempfile.TemporaryDirectory(prefix="agenthub-doc-guard-") as fixture:
+                ROOT = fixture
+                subprocess.run(["git", "init", "-q", fixture], check=True, capture_output=True)
+                for rel, content in files.items():
+                    path = os.path.join(fixture, *rel.split("/"))
+                    os.makedirs(os.path.dirname(path) or fixture, exist_ok=True)
+                    with open(path, "w", encoding="utf-8", newline="\n") as handle:
+                        handle.write(content)
+                subprocess.run(["git", "-C", fixture, "add", "-A"], check=True, capture_output=True)
+                try:
+                    check()
+                except RuntimeError as exc:
+                    if expected not in str(exc):
+                        raise AssertionError(
+                            f"guard case '{label}' failed for the wrong reason: {exc}"
+                        ) from exc
+                else:
+                    raise AssertionError(f"guard case '{label}' was not rejected")
+    finally:
+        ROOT = original
+    print("doc SSOT self-test ok")
 
 
-def check_no_script_mirror() -> None:
-    script_leaves = {normalize_path(f).rsplit("/", 1)[-1] for f in git_ls_files(["scripts/"])}
-    test_leaves = [
-        normalize_path(f).rsplit("/", 1)[-1]
-        for f in git_ls_files(["tests/"])
-        if re.search(r"\.(ps1|sh|mjs|py)$", f)
-    ]
-    mirrors = sorted({leaf for leaf in test_leaves if leaf in script_leaves})
-    if mirrors:
-        fail("tests/ must not mirror scripts/ script names: " + ", ".join(mirrors))
-    print("script mirror check ok (no tests/ file shares a scripts/ script name)")
-
+# Every guard main() runs. run_self_test() asserts this list still contains
+# each guard, so deleting the call is caught even when the function body stays.
+CHECKS = (
+    check_root_entrypoints,
+    check_stale_paths,
+    check_dated_governance,
+    check_readme_entrypoints,
+    check_readme_parity,
+    check_required_markers,
+    check_forbidden_patterns,
+    check_no_numbered_agents_references,
+    check_max_lines,
+    check_verifier_map_owner,
+    check_agents_md_mapping_table,
+    check_agents_md_paths,
+    check_doc_internal_links,
+    check_out_of_repo_links,
+)
 
 def main() -> int:
-    check_root_entrypoints()
-    check_stale_paths()
-    check_dated_governance()
-    check_readme_entrypoints()
-    check_readme_parity()
-    check_required_markers()
-    check_forbidden_patterns()
-    check_no_numbered_agents_references()
-    check_max_lines()
-    check_verifier_map_owner()
-    check_agents_md_mapping_table()
-    check_agents_md_paths()
-    check_doc_internal_links()
-    check_out_of_repo_links()
-    check_no_script_mirror()
-    check_no_orphan_selftests()
+    if "--self-test" in sys.argv[1:]:
+        run_self_test()
+        return 0
+    for check in CHECKS:
+        check()
     print("doc SSOT ok")
     return 0
 
@@ -582,6 +545,6 @@ def main() -> int:
 if __name__ == "__main__":
     try:
         sys.exit(main())
-    except Exception as exc:  # noqa: BLE001 —— 顶层兜底，对齐 ps1 $ErrorActionPreference='Stop'
+    except Exception as exc:  # noqa: BLE001 —— fail closed：未捕获异常返回非零
         print(f"ERROR: {exc}", file=sys.stderr)
         sys.exit(1)

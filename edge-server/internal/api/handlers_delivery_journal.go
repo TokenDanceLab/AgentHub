@@ -8,9 +8,9 @@ import (
 	"github.com/agenthub/edge-server/internal/errcode"
 )
 
-// GetDeliveryJournal returns Edge->Hub callback journal entries for reconciliation (AH-SR-049).
+// GetDeliveryJournal returns Edge->Hub callback journal entries for reconciliation.
 // Query: afterSeq (uint64, default 0). Requires same auth as other Edge state APIs.
-// Under Hub JWT, entries are filtered to runs owned by the caller (AH-SR-045).
+// Under Hub JWT, entries are filtered to runs owned by the caller.
 func (h *Handler) GetDeliveryJournal(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		errcode.Write(w, errcode.ErrMethodNotAllowed)

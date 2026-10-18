@@ -34,10 +34,11 @@ test.describe('Web Hub task approval/artifact contract', () => {
 
     // Fail-closed external boundary: this catch-all is registered first, so
     // the Hub route below (routes match last-registered-first) still serves
-    // the stubbed Hub origin. App requests continue to the dev server, the
-    // render-blocking Google Fonts stylesheets get an empty stylesheet so the
-    // document load event can fire, and every other external host is recorded
-    // and refused — the manifest assertion then fails the test instead of an
+    // the stubbed Hub origin. App requests continue to the dev server, any
+    // external font request gets an empty stylesheet so the document load
+    // event can fire (fonts are self-hosted; this guards a reintroduced
+    // external font <link>), and every other external host is recorded and
+    // refused — the manifest assertion then fails the test instead of an
     // unexpected remote call succeeding silently.
     await page.route('**/*', async (route) => {
       const request = route.request();
@@ -292,12 +293,12 @@ test.describe('Web Hub task approval/artifact contract', () => {
     // Waiting approval cards auto-expand (RowItem), so the reason from the
     // stubbed approvals endpoint renders without a toggle.
     await expect(page.getByText('Stubbed Hub approval endpoint')).toBeVisible();
-    // F10 (#1992): artifact rows are preview triggers, not expandable rows —
+    // #1992: artifact rows are preview triggers, not expandable rows —
     // clicking one focuses the engineering Preview on that exact artifact.
     const transcript = page.getByRole('region', { name: 'Transcript' });
     await transcript.getByRole('button', { name: /reports\/contract-smoke\.md/ }).click();
     await expect(page.getByRole('region', { name: 'reports/contract-smoke.md read-only preview' })).toBeVisible();
-    // F5 (#1994): the global status bar surfaces the real pending-approval
+    // #1994: the global status bar surfaces the real pending-approval
     // count from the stubbed Hub approvals endpoint.
     await expect(page.getByRole('button', { name: /1 awaiting approval/ })).toBeVisible();
     await expect(page.getByText('reports/contract-smoke.md').first()).toBeVisible();

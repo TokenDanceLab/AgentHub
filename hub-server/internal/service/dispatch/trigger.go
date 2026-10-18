@@ -78,31 +78,6 @@ func CustomAgentIDValue(customAgentID *string) string {
 	return strings.TrimSpace(*customAgentID)
 }
 
-// NeedsCustomAgentPreload is true when TriggerAgentTask should load the custom
-// agent profile before spawning the dispatch goroutine.
-func NeedsCustomAgentPreload(customAgentID *string) bool {
-	return CustomAgentIDValue(customAgentID) != ""
-}
-
-// AcceptCustomAgentPreload is true when a custom-agent preload query succeeded
-// (historical TriggerAgentTask: err == nil then assign ca).
-func AcceptCustomAgentPreload(err error) bool {
-	return err == nil
-}
-
-// CustomAgentPreloadOrNil returns ca when preload succeeded, else nil.
-func CustomAgentPreloadOrNil(err error, ca *model.CustomAgent) *model.CustomAgent {
-	if !AcceptCustomAgentPreload(err) {
-		return nil
-	}
-	return ca
-}
-
-// HasCustomAgentBinding is true when an agent instance is bound to a custom agent.
-func HasCustomAgentBinding(customAgentID *string) bool {
-	return CustomAgentIDValue(customAgentID) != ""
-}
-
 // NewQueuedPendingTask builds a pending task row in queued status. expireAt is
 // injected by the caller (TTL / clock stay orchestration-side).
 func NewQueuedPendingTask(

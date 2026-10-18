@@ -1,4 +1,4 @@
-// Error handling per api/conventions.md §5.
+// Error handling per api/conventions.md「Errors」.
 //
 // All REST errors use:
 //   { "error": { "code": "...", "message": "...", "traceId": "...", "details": {} } }

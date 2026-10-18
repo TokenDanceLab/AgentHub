@@ -29,7 +29,7 @@ describe('design icon registry', () => {
     expect(getDesignFileIconType('unknown-kind', 'README.unknown')).toBe('file');
   });
 
-  it('keeps file icon colors aligned to tokendance-design/desktop', () => {
+  it('keeps file icon colors aligned with the shared palette', () => {
     expect(getDesignFileIconColor('md')).toBe('var(--td-ink-muted)');
     expect(getDesignFileIconColor('css')).toBe('#1572b6');
     expect(getDesignFileIconColor('html')).toBe('#e34f26');

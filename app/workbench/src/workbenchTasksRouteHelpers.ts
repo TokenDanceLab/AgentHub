@@ -34,13 +34,13 @@ import {
 } from './workbenchTasksRoutePlanners';
 
 /* ═══════════════════════════════════════════════════════════════════════
-   workbenchTasksRouteHelpers — residual handler factory + public re-export
-   barrel for tasks-route pure slices (#719, #769).
+   workbenchTasksRouteHelpers — handler factory + public re-export barrel
+   for tasks-route helpers (#719, #769).
 
    Group/draft/mode helpers live in workbenchTasksRouteGroupHelpers;
    action-plan / label builders live in workbenchTasksRoutePlanners.
    This module keeps the handler factory and stable public exports.
-   No React hooks / no intentional UX change.
+   No React hooks.
    exactOptionalPropertyTypes: only assign `?: T` fields when defined,
    unless the public field type explicitly allows `| undefined`.
    ═══════════════════════════════════════════════════════════════════════ */

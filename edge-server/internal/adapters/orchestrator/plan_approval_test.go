@@ -158,6 +158,15 @@ func TestPlanApprovalBroker_ContextCancelled(t *testing.T) {
 	}
 }
 
+func TestPlanApprovalBroker_Disabled(t *testing.T) {
+	broker := NewPlanApprovalBroker(PlanApprovalConfig{Enabled: false})
+
+	_, ok := broker.SubmitPlan(context.Background(), PendingPlan{RunID: "run-1"})
+	if ok {
+		t.Error("expected SubmitPlan to be inactive when the gate is disabled")
+	}
+}
+
 func TestPlanApprovalBroker_EmptyRunID(t *testing.T) {
 	broker := NewPlanApprovalBroker(DefaultPlanApprovalConfig())
 

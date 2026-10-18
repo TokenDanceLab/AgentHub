@@ -1,5 +1,5 @@
 /**
- * Visual QA — Web Tasks board capture (#1999, UX F13)
+ * Visual QA — Web Tasks board capture (#1999)
  * Viewport 1440x810 · themes light+dark · mock data mode (board renders in
  * fixture mode only — real mode stays on the honest coming-soon state).
  *
@@ -41,7 +41,7 @@ const REVIEW_MARKER = '[data-testid="task-review-marker"]';
 const REVIEW_MERGE_CONTROLS = '[data-testid="task-review-merge-controls"]';
 const HUB_ONLY_NOTICE = '[data-testid="tasks-hub-only-merge-notice"]';
 const hubUrlPattern =
-  /https?:\/\/(?:localhost:8080|127\.0\.0.1:8080|hub\.vectorcontrol\.tech|api\.hub\.vectorcontrol\.tech)\/.*/;
+  /https?:\/\/(?:localhost:8080|127\.0\.0\.1:8080|hub\.vectorcontrol\.tech|api\.hub\.vectorcontrol\.tech)\/.*/;
 
 function wait(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));

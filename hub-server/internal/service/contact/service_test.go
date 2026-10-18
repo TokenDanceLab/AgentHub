@@ -54,16 +54,6 @@ func (m *mockContactCache) AreOnline(ctx context.Context, userIDs []string) (map
 	return out, nil
 }
 
-// recordingContactBus is a Bus test double that records Publish calls.
-type recordingContactBus struct {
-	events []bus.Event
-}
-
-func (b *recordingContactBus) Publish(ctx context.Context, event bus.Event) error {
-	b.events = append(b.events, event)
-	return nil
-}
-
 func newTestBus(t *testing.T) *bus.Bus {
 	t.Helper()
 	b, err := bus.New()
@@ -83,37 +73,10 @@ func testCacheClient(t *testing.T) *cache.Client {
 	return cache.NewClient(rdb)
 }
 
-func TestService_ResolveCacheUsesNoopForTypedNilClient(t *testing.T) {
-	ctx := context.Background()
-	var typedNil *cache.Client
-
-	resolved := resolveCache(typedNil)
-	require.IsType(t, cache.NoOpCache{}, resolved)
-	online, err := resolved.IsOnline(ctx, "user-1")
-	require.NoError(t, err)
-	require.False(t, online)
-	require.NoError(t, resolved.Invalidate(ctx, "test:key"))
-}
-
 func TestService_NilBusPublishIsNoop(t *testing.T) {
 	svc := &Service{db: nil, bus: nil, cacheClient: &mockContactCache{}}
 	// Must not panic when b port is unset (read-only/partial construction).
 	svc.publish(context.Background(), bus.Event{Type: "friend.request", Payload: "x"})
-}
-
-func TestService_SetBusAndSetCachePorts(t *testing.T) {
-	rec := &recordingContactBus{}
-	cache := &mockContactCache{}
-	svc := NewService(nil, nil, nil)
-	require.NotNil(t, svc)
-
-	svc.SetBus(rec)
-	svc.SetCache(cache)
-	svc.publish(context.Background(), bus.Event{Type: "friend.accepted", Payload: map[string]string{"k": "v"}})
-
-	require.Len(t, rec.events, 1)
-	assert.Equal(t, "friend.accepted", rec.events[0].Type)
-	require.NotNil(t, svc.cacheClient)
 }
 
 // SQL substrings used for matching (QueryMatcherFunc with strings.Contains)
@@ -517,29 +480,6 @@ func TestAcceptFriendRequest_PublishesAcceptedEventAfterMutation(t *testing.T) {
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
-func TestAcceptFriendRequest_NilCacheDoesNotPanic(t *testing.T) {
-	db, mock, sqlDB := newMockDBContact(t)
-	defer sqlDB.Close()
-
-	mock.ExpectQuery(sqlcFriendshipByID).
-		WithArgs("req-1", 1).
-		WillReturnRows(sqlmock.NewRows([]string{"id", "user_id", "friend_id", "status"}).
-			AddRow("req-1", "sender", "user-1", model.StatusPending))
-
-	mock.ExpectBegin()
-	mock.ExpectExec(sqlcUpdateFriend).
-		WithArgs(model.StatusAccepted, sqlmock.AnyArg(), "req-1").
-		WillReturnResult(sqlmock.NewResult(0, 1))
-	mock.ExpectExec(sqlcInsertFriend).
-		WillReturnResult(sqlmock.NewResult(1, 1))
-	mock.ExpectCommit()
-
-	svc := NewService(db, nil, nil)
-	err := svc.AcceptFriendRequest(context.Background(), "user-1", "req-1")
-	assert.NoError(t, err)
-	assert.NoError(t, mock.ExpectationsWereMet())
-}
-
 // ==================== RejectFriendRequest ====================
 
 func TestRejectFriendRequest_NotFound(t *testing.T) {
@@ -752,7 +692,7 @@ func TestListContacts_WithFriends(t *testing.T) {
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
-func TestListContacts_NilCacheMarksOffline(t *testing.T) {
+func TestListContacts_NoOpCacheMarksOffline(t *testing.T) {
 	db, mock, sqlDB := newMockDBContact(t)
 	defer sqlDB.Close()
 
@@ -768,7 +708,7 @@ func TestListContacts_NilCacheMarksOffline(t *testing.T) {
 			AddRow("friend-a", "friendA", "hash1", "Friend A", "").
 			AddRow("friend-b", "friendB", "hash2", "Friend B", "https://img.url"))
 
-	svc := NewService(db, nil, nil)
+	svc := NewService(db, nil, cache.NoOpCache{})
 	contacts, err := svc.ListContacts(context.Background(), "user-1")
 	require.NoError(t, err)
 	require.Len(t, contacts, 2)
@@ -828,7 +768,7 @@ func TestListContacts_BatchesPresenceLookups(t *testing.T) {
 	require.Len(t, contacts, 3)
 
 	// Presence resolves in exactly one batched call covering all friends; the
-	// per-user IsOnline path must not be used anymore (#2154 perf lane).
+	// per-user IsOnline path must not be used anymore (#2154).
 	require.Len(t, mc.areOnlineCalls, 1)
 	assert.ElementsMatch(t, []string{"friend-a", "friend-b", "friend-c"}, mc.areOnlineCalls[0])
 	assert.Zero(t, mc.isOnlineCalls)

@@ -35,19 +35,9 @@ const pgUniqueViolationSQLState = "23505"
 
 // isUniqueViolation reports whether err is a unique-constraint violation.
 //
-// This is the single implementation for the whole repository. It used to exist
-// five times over — here, as the exported IsUniqueViolation forwarder in
-// execution_target_evidence.go, as isDuplicateKeyError in agent.go, as a
-// case-SENSITIVE isDuplicateKeyError in service/message/builders.go, and as an
-// inline strings.Contains(err.Error(), "duplicate key") in
-// service/message/service_send.go — and the copies had already drifted: the
-// agent.go one lower-cased its input so SQLite's upper-case "UNIQUE constraint
-// failed" was recognised, while the builders.go copy it claimed to mirror never
-// did, and the PinMessage copy matched only "duplicate key" and so missed
-// SQLite entirely. Same question, three different answers, in one binary.
-//
-// Callers must go through the exported IsUniqueViolation; do not add another
-// copy. The tiers are ordered strongest signal first:
+// This is the single implementation for the whole repository. Callers must go
+// through the exported IsUniqueViolation; do not add another copy. The tiers
+// are ordered strongest signal first:
 //
 //  1. SQLSTATE 23505 on the Postgres wire error (pgx is this server's only
 //     Postgres driver, so *pgconn.PgError is the shape that actually arrives).
@@ -143,7 +133,7 @@ func AppendTeamEvent(db *gorm.DB, event *model.AgentTeamEvent) error {
 const maxTeamEventsPerRun = 10000
 
 // TeamEventsPage is one cursor-paginated window over a run's append-only
-// events (#2154 perf lane). The cursor is the run-local event seq; pass
+// events (#2154). The cursor is the run-local event seq; pass
 // NextSeq back as afterSeq to fetch the following window.
 type TeamEventsPage struct {
 	Items   []model.AgentTeamEvent

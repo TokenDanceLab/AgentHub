@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import {
-  HUBCLIENT_SSOT_GAPS,
   type AuthResponse,
   type Contact,
   type EmptyHubResponse,
@@ -8,12 +7,6 @@ import {
 } from './hubClientCompatTypes';
 
 describe('hubClientCompatTypes (#799)', () => {
-  it('keeps HUBCLIENT_SSOT_GAPS arrays stable for surface parity tracking', () => {
-    expect(Array.isArray(HUBCLIENT_SSOT_GAPS.desktopAndWebNotShared)).toBe(true);
-    expect(Array.isArray(HUBCLIENT_SSOT_GAPS.desktopOnly)).toBe(true);
-    expect(Array.isArray(HUBCLIENT_SSOT_GAPS.webOnly)).toBe(true);
-  });
-
   it('preserves compatibility alias shapes', () => {
     const auth: AuthResponse = {
       access_token: 'at',

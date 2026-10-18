@@ -25,28 +25,20 @@ var slugPattern = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{0,61}[a-z0-9]$`)
 
 // Deployment configuration. These can be overridden via environment variables.
 const (
-	defaultDeployTargetHost = "remote-edge"
-	defaultDeployTargetPath = "/opt/agenthub-pages"
-	defaultPagesDomain      = "example.agenthub.dev"
-	envDeployTargetHost     = "AGENTHUB_DEPLOY_HOST"
-	envDeployTargetPath     = "AGENTHUB_DEPLOY_PATH"
-	envPagesDomain          = "AGENTHUB_PAGES_DOMAIN"
+	defaultPagesDomain  = "example.agenthub.dev"
+	envDeployTargetHost = "AGENTHUB_DEPLOY_HOST"
+	envDeployTargetPath = "AGENTHUB_DEPLOY_PATH"
+	envPagesDomain      = "AGENTHUB_PAGES_DOMAIN"
 )
 
 // DeployTargetHost returns the SSH target host for deployments.
 func DeployTargetHost() string {
-	if v := os.Getenv(envDeployTargetHost); v != "" {
-		return v
-	}
-	return defaultDeployTargetHost
+	return os.Getenv(envDeployTargetHost)
 }
 
 // DeployTargetPath returns the remote base directory for deployments.
 func DeployTargetPath() string {
-	if v := os.Getenv(envDeployTargetPath); v != "" {
-		return v
-	}
-	return defaultDeployTargetPath
+	return os.Getenv(envDeployTargetPath)
 }
 
 // PagesDomain returns the domain used for generated deployment URLs.
@@ -106,7 +98,9 @@ func (h *Handler) PostDeployments(w http.ResponseWriter, r *http.Request) {
 		errcode.Write(w, errcode.ErrNotFound.WithMessage("run not found"))
 		return
 	}
-	if !isTerminalRunStatus(run.Status) {
+	// completed_with_issues means the run's evidence gate failed; its
+	// artifacts must not be published as a successful deployment.
+	if !store.IsTerminalRunStatus(run.Status) || run.Status == "completed_with_issues" {
 		errcode.Write(w, errcode.ErrDeployRunNotFinished)
 		return
 	}
@@ -140,14 +134,22 @@ func (h *Handler) PostDeployments(w http.ResponseWriter, r *http.Request) {
 
 	if err := buildArtifactArchive(run.WorkDir, artifacts, tmpFile); err != nil {
 		slog.Error("deploy: failed to build archive", "error", err)
-		errcode.Write(w, errcode.ErrInternal.WithMessage("failed to build archive: "+err.Error()))
+		// Keep the response free of workspace paths (and the OS account name in
+		// them); the detailed error is already in the server log.
+		errcode.Write(w, errcode.ErrInternal.WithMessage("failed to build archive"))
 		return
 	}
 	_ = tmpFile.Close()
 
-	// SCP the archive to the remote host.
-	remotePath := DeployTargetPath() + "/" + req.Slug
+	// SCP the archive to the remote host. Both values are required: there is no
+	// meaningful machine-independent default for an SSH target or remote path.
+	remotePath := DeployTargetPath()
 	targetHost := DeployTargetHost()
+	if targetHost == "" || remotePath == "" {
+		errcode.Write(w, errcode.ErrInternal.WithMessage("deployment target is not configured"))
+		return
+	}
+	remotePath += "/" + req.Slug
 
 	// Ensure remote directory exists and is clean.
 	if err := runSSHCommand(targetHost, "sudo", "mkdir", "-p", remotePath); err != nil {
@@ -238,13 +240,15 @@ func buildArtifactArchive(workDir string, artifacts []store.Artifact, w io.Write
 		}
 		info, err := os.Lstat(resolved)
 		if err != nil {
+			// Artifacts are snapshots: a source deleted after the run is
+			// skipped so the remaining artifacts still deploy.
 			slog.Warn("deploy: skipping artifact (missing)", "path", sourcePath, "error", err)
 			continue
 		}
 		if info.IsDir() {
 			// Walk and add all regular files; the walk skips symlinks.
 			if err := addDirToArchive(tw, resolved); err != nil {
-				slog.Warn("deploy: failed to add directory", "path", sourcePath, "error", err)
+				return fmt.Errorf("artifact directory %q: %w", sourcePath, err)
 			}
 			continue
 		}
@@ -259,8 +263,7 @@ func buildArtifactArchive(workDir string, artifacts []store.Artifact, w io.Write
 		// deployWorkspacePath before the open.
 		f, err := os.Open(resolved)
 		if err != nil {
-			slog.Warn("deploy: skipping artifact file (not readable)", "path", sourcePath, "error", err)
-			continue
+			return fmt.Errorf("artifact %q is not readable: %w", sourcePath, err)
 		}
 
 		hdr := &tar.Header{
@@ -308,7 +311,8 @@ func addDirToArchive(tw *tar.Writer, dirPath string) error {
 	// deploy packaging; path originates from edge-recorded run content sources.
 	return filepath.Walk(dirPath, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
-			return nil // skip errors
+			// Fail closed: a partial archive would deploy incomplete run output.
+			return fmt.Errorf("unreadable artifact entry %q: %w", path, err)
 		}
 		// Regular files only: Walk uses Lstat, so a symlink entry would
 		// otherwise package its target's content (possibly outside the
@@ -318,14 +322,14 @@ func addDirToArchive(tw *tar.Writer, dirPath string) error {
 		}
 		rel, err := filepath.Rel(dirPath, path)
 		if err != nil {
-			return nil
+			return fmt.Errorf("artifact entry %q: %w", path, err)
 		}
 		// Normalize to forward slashes.
 		rel = strings.ReplaceAll(rel, "\\", "/")
 
 		f, err := os.Open(path)
 		if err != nil {
-			return nil
+			return fmt.Errorf("artifact entry %q is not readable: %w", path, err)
 		}
 		defer f.Close()
 

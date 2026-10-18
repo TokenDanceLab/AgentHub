@@ -47,7 +47,7 @@ func (s *DispatchService) dispatchToEdgeHTTP(ctx context.Context, task *model.Pe
 		s.issueRunStartCapability(dp),
 	)
 	if insecure {
-		// AH-SR-053: non-loopback cleartext rejected.
+		// non-loopback cleartext rejected.
 		slog.Error(dispatch.EdgeHTTPLogInsecureCleartext, "edge_url", parts.EdgeURL)
 		if metrics.AgentDispatchEdgeHTTPFailures != nil {
 			metrics.AgentDispatchEdgeHTTPFailures.WithLabelValues("insecure_cleartext").Inc()
@@ -104,8 +104,8 @@ func (s *DispatchService) executeDirectEdgeRequest(taskID string, httpReq *http.
 	started := time.Now()
 	resp, err := s.edgeClient.Do(httpReq)
 	if err != nil {
-		// G4: Edge unreachable is a classic silent-outage scenario; raised from
-		// Debug to Warn so production can see it (#audit-G4). Counter quantifies rate.
+		// Edge unreachable is a classic silent-outage scenario; log at Warn and
+		// count it in AgentDispatchEdgeHTTPFailures so production sees the rate.
 		slog.Warn(dispatch.EdgeHTTPLogUnreachable, "task_id", taskID, "url", httpReq.URL.String(), "error", err)
 		if metrics.AgentDispatchEdgeHTTPFailures != nil {
 			metrics.AgentDispatchEdgeHTTPFailures.WithLabelValues("unreachable").Inc()
@@ -121,9 +121,9 @@ func (s *DispatchService) executeDirectEdgeRequest(taskID string, httpReq *http.
 		s.edgeBreaker.RecordFailure()
 		return edgeHTTPDispatchResult{}
 	}
-	plan := dispatch.PlanEdgeHTTPClientResponse(resp.StatusCode, respBody)
-	if plan.NonSuccess {
-		slog.Warn(plan.LogMessage, "task_id", taskID, "status", resp.StatusCode, "body_summary", SummarizeBodyForLog(respBody))
+	runID, nonSuccess, decodeErr := dispatch.EdgeHTTPDispatchResult(resp.StatusCode, respBody)
+	if nonSuccess {
+		slog.Warn(dispatch.EdgeHTTPLogNonSuccess, "task_id", taskID, "status", resp.StatusCode, "body_summary", SummarizeBodyForLog(respBody))
 		if metrics.AgentDispatchEdgeHTTPFailures != nil {
 			metrics.AgentDispatchEdgeHTTPFailures.WithLabelValues("non_success").Inc()
 		}
@@ -131,8 +131,8 @@ func (s *DispatchService) executeDirectEdgeRequest(taskID string, httpReq *http.
 		s.edgeBreaker.RecordFailure()
 		return edgeHTTPDispatchResult{}
 	}
-	if plan.DecodeFail {
-		slog.Warn(plan.LogMessage, "task_id", taskID, "error", plan.DecodeErr)
+	if decodeErr != nil {
+		slog.Warn(dispatch.EdgeHTTPLogDecodeFailed, "task_id", taskID, "error", decodeErr)
 		if metrics.AgentDispatchEdgeHTTPFailures != nil {
 			metrics.AgentDispatchEdgeHTTPFailures.WithLabelValues("decode_fail").Inc()
 		}
@@ -142,11 +142,11 @@ func (s *DispatchService) executeDirectEdgeRequest(taskID string, httpReq *http.
 	}
 	s.edgeBreaker.RecordSuccess()
 	owner := edgeDispatchReceiptOwner(respBody)
-	if plan.RunID == "" || owner == "" {
+	if runID == "" || owner == "" {
 		return edgeHTTPDispatchResult{}
 	}
 	metrics.OutboundMetrics.Record(outboundmetrics.ProviderEdge, outboundmetrics.PurposeDispatch, outboundmetrics.CategorySuccess, outboundmetrics.StatusOK)
 	metrics.OutboundMetrics.Observe(outboundmetrics.ProviderEdge, outboundmetrics.PurposeDispatch, outboundmetrics.CategorySuccess, outboundmetrics.StatusOK, time.Since(started))
-	slog.Info(dispatch.EdgeHTTPLogDispatched, "task_id", taskID, "edge_run_id", plan.RunID, "url", httpReq.URL.String())
-	return edgeHTTPDispatchResult{RunID: plan.RunID, CallbackOwner: owner}
+	slog.Info(dispatch.EdgeHTTPLogDispatched, "task_id", taskID, "edge_run_id", runID, "url", httpReq.URL.String())
+	return edgeHTTPDispatchResult{RunID: runID, CallbackOwner: owner}
 }

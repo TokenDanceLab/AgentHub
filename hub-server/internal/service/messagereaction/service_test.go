@@ -41,12 +41,11 @@ func TestService_NilBusPublishIsNoop(t *testing.T) {
 	svc.publish(context.Background(), bus.Event{Type: "message.reaction_added", Payload: "x"})
 }
 
-func TestService_SetBusPort(t *testing.T) {
+func TestService_BusPortPublishes(t *testing.T) {
 	rec := &recordingReactionBus{}
-	svc := NewService(nil, nil)
+	svc := NewService(nil, rec)
 	require.NotNil(t, svc)
 
-	svc.SetBus(rec)
 	svc.publish(context.Background(), bus.Event{Type: "message.reaction_removed", Payload: map[string]string{"k": "v"}})
 
 	require.Len(t, rec.events, 1)

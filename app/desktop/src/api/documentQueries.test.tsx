@@ -1,5 +1,5 @@
 // #2290 defect class, documents: `useDocumentList` was called with `undefined`
-// by its only caller (desktop/src/App.tsx:198), so it fetched the first page and
+// by its only caller in desktop/src/App.tsx, so it fetched the first page and
 // dropped `page.nextCursor` — documents past the server's default page never
 // reached the Docs page, and a short list was indistinguishable from "no more
 // documents". The walk now lives in @shared/hub/paginate; caller-supplied

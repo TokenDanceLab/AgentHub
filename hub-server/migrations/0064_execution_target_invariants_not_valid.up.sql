@@ -1,23 +1,18 @@
 -- 0064_execution_target_invariants_not_valid.up.sql
--- P1 follow-up to 0060 (#1545): the original 0060 added five CHECK
--- constraints on execution_targets with plain ADD CONSTRAINT, which validates
--- every existing row at commit. On a dirty historical database 0060 fails the
--- deploy on the first violating row and leaves the constraint half-installed —
--- a deploy bomb. Per the migration-immutability rule we DO NOT modify 0060 in
--- place; instead this migration re-installs the same five constraints with
--- NOT VALID (PostgreSQL: skip table re-scan, the constraint is enforced for
--- new/updated rows but legacy rows keep their existing values), then runs a
--- per-constraint violation count. Backfill of legacy violations belongs to
--- Wave5 (budget counter columns + semantic-drift escort: cross-data channel);
--- this migration only converts 0060's deploy-bomb form into the cheapest safe
--- form that still catches new bad writes immediately.
+-- Follow-up to 0060: that migration added five CHECK constraints on
+-- execution_targets with plain ADD CONSTRAINT, which validates every existing
+-- row at commit and fails on the first violation. This migration re-installs
+-- the same constraints with NOT VALID, so legacy rows are not re-scanned while
+-- new and updated rows are checked immediately, then counts remaining
+-- violations per constraint. Backfill of legacy violations is a separate
+-- migration.
 --
 -- Why NOT VALID over plain ADD CONSTRAINT:
 --   - ADD CONSTRAINT scans the whole table at commit time and fails on any
---     violation — 0060 deploy bomb.
+--     violation.
 --   - NOT VALID skips the scan; the constraint is enforced on writes from the
 --     moment it lands. Legacy rows that already violate the predicate are left
---     exactly as they are until Wave5 backfill.
+--     exactly as they are until a later backfill runs.
 --   - Once the data is clean a later migration can VALIDATE CONSTRAINT (fast:
 --     PostgreSQL does not re-scan row-by-row for VALIDATE either, it holds a
 --     SHARE UPDATE EXCLUSIVE lock and rewrites nothing).
@@ -60,7 +55,7 @@ ALTER TABLE execution_targets
 
 -- Diagnostic: count violations per constraint. Zero violations → immediately
 -- VALIDATE CONSTRAINT (cheapest forward-only end-state). Any violations →
--- RAISE NOTICE and leave the constraint NOT VALID; Wave5 backfill will clean
+-- leave the constraint NOT VALID; a later backfill cleans
 -- the rows and a later migration VALIDATEs. This block never raises an
 -- exception (NOTICE only), so a database with dirty legacy rows still
 -- upgrades cleanly — exactly what 0060 was missing.
@@ -85,34 +80,34 @@ BEGIN
         ALTER TABLE execution_targets VALIDATE CONSTRAINT chk_execution_targets_type;
         RAISE NOTICE '0064: chk_execution_targets_type VALIDATED';
     ELSE
-        RAISE NOTICE '0064: chk_execution_targets_type left NOT VALID (%) rows to backfill in Wave5', type_violations;
+        RAISE NOTICE '0064: chk_execution_targets_type left NOT VALID (% rows to backfill)', type_violations;
     END IF;
 
     IF trust_violations = 0 THEN
         ALTER TABLE execution_targets VALIDATE CONSTRAINT chk_execution_targets_trust;
         RAISE NOTICE '0064: chk_execution_targets_trust VALIDATED';
     ELSE
-        RAISE NOTICE '0064: chk_execution_targets_trust left NOT VALID (%) rows to backfill in Wave5', trust_violations;
+        RAISE NOTICE '0064: chk_execution_targets_trust left NOT VALID (% rows to backfill)', trust_violations;
     END IF;
 
     IF health_violations = 0 THEN
         ALTER TABLE execution_targets VALIDATE CONSTRAINT chk_execution_targets_health;
         RAISE NOTICE '0064: chk_execution_targets_health VALIDATED';
     ELSE
-        RAISE NOTICE '0064: chk_execution_targets_health left NOT VALID (%) rows to backfill in Wave5', health_violations;
+        RAISE NOTICE '0064: chk_execution_targets_health left NOT VALID (% rows to backfill)', health_violations;
     END IF;
 
     IF auth_violations = 0 THEN
         ALTER TABLE execution_targets VALIDATE CONSTRAINT chk_execution_targets_auth;
         RAISE NOTICE '0064: chk_execution_targets_auth VALIDATED';
     ELSE
-        RAISE NOTICE '0064: chk_execution_targets_auth left NOT VALID (%) rows to backfill in Wave5', auth_violations;
+        RAISE NOTICE '0064: chk_execution_targets_auth left NOT VALID (% rows to backfill)', auth_violations;
     END IF;
 
     IF port_violations = 0 THEN
         ALTER TABLE execution_targets VALIDATE CONSTRAINT chk_execution_targets_port;
         RAISE NOTICE '0064: chk_execution_targets_port VALIDATED';
     ELSE
-        RAISE NOTICE '0064: chk_execution_targets_port left NOT VALID (%) rows to backfill in Wave5', port_violations;
+        RAISE NOTICE '0064: chk_execution_targets_port left NOT VALID (% rows to backfill)', port_violations;
     END IF;
 END $$;

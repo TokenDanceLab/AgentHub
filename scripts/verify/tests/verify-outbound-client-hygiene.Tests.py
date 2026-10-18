@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Negative self-tests for the outbound client hygiene gate (#1549 + #1564).
+"""Negative self-tests for the outbound client hygiene gate.
 
 Cases:
 1. positive: clean fixture (body-limited read, no env, no clients) -> 0
@@ -12,8 +12,7 @@ Cases:
 
 The verifier runs as a subprocess against an isolated fixture with explicit
 --scopes/--client-allowlist/--no-default-allowlist equivalents so the repo
-residual allowlist is never evaluated. Prefers the .py verifier and falls back
-to the .ps1 verifier while the scripts/verify migration is in flight.
+residual allowlist is never evaluated.
 """
 
 import os
@@ -27,10 +26,9 @@ REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.p
 
 
 def resolve_verifier(name):
-    for leaf in ("verify-%s.py" % name, "verify-%s.ps1" % name):
-        candidate = os.path.join(REPO_ROOT, "scripts", "verify", leaf)
-        if os.path.isfile(candidate):
-            return candidate
+    candidate = os.path.join(REPO_ROOT, "scripts", "verify", "verify-%s.py" % name)
+    if os.path.isfile(candidate):
+        return candidate
     raise AssertionError("verifier script not found for %s" % name)
 
 

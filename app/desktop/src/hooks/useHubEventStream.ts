@@ -5,7 +5,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { createHubWS, type HubWSHandle } from '@shared/hub/hubWS';
 import { HUB_WS_URL } from '@/config';
-import type { TransportStatus } from '@/api/transport';
+import type { TransportStatus } from '@shared/transport';
 import { HUB_EVENTS } from '@shared/hubEvents';
 import type { HubEventType } from '@shared/hubEvents';
 import type {
@@ -134,7 +134,7 @@ export function useHubEventStream(
             /* non-fatal */
           });
         if (!bridgeHandleRef.current) {
-          // #2101 G4-②: pass hubClient so the bridge can do incremental
+          // #2101: pass hubClient so the bridge can do incremental
           // message resync on reconnect/gap instead of full invalidation.
           const hubClientForResync = createHubClient({ getToken: getAccessToken });
           bridgeHandleRef.current = createDesktopHubEventBridge(handle, queryClient, {

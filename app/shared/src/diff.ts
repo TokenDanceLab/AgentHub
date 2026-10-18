@@ -287,9 +287,8 @@ export function parseUnifiedDiff(
 }
 
 // ── TS-side extraction / validation ─────────────
-// No Go counterpart: edge-server/internal/diff was removed in #2151
-// (zero references). Edge-server only generates unified diffs
-// (internal/adapters/surfacing_diff.go) and applies hunk decisions
+// Edge-server has no diff extraction counterpart: it only generates unified
+// diffs (internal/adapters/surfacing_diff.go) and applies hunk decisions
 // (internal/api/diff_apply.go). Field names (file/patch) mirror the wire
 // format from OpenCode diffs.ts.
 

@@ -5,8 +5,6 @@ import (
 	"strings"
 )
 
-// Residual pure-helper peel #1122: public types + stream entrypoints for SDK fixture mapping.
-
 const (
 	SDKFixtureProviderClaude                 = "claude-sdk-fixture"
 	SDKFixtureProviderOpenAI                 = "openai-agents-sdk-fixture"

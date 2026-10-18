@@ -4,10 +4,8 @@
 // assert a fixed delay (heartbeat, TTL, backoff) belong to clock-injectable
 // seams, not sleeps.
 //
-// The verbatim copies in hub-server/internal/testkit and
-// edge-server/internal/testkit (and the forwarding shims that replaced them)
-// are gone: callers import this package directly. hub-server/internal/testkit
-// keeps only Hub-specific fixtures.
+// Use this package directly; hub-server/internal/testkit keeps only
+// Hub-specific fixtures.
 package testkit
 
 import (

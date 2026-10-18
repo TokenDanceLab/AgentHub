@@ -1,6 +1,5 @@
 /**
- * Shared test helpers for adapter test splits (#adapter-split).
- * Extracted from adapter.test.ts to keep the three split files DRY.
+ * Shared helpers for the split adapter test suites.
  */
 
 export const DEFAULT_AGENT_NAME = 'TestAgent';

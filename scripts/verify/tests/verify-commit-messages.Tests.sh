@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Self-tests for verify-commit-messages.sh (#1576).
+# Self-tests for verify-commit-messages.sh.
 set -uo pipefail
 
 VERIFIER="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/verify-commit-messages.sh"

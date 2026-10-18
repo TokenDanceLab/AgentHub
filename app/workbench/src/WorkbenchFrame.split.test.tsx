@@ -10,7 +10,7 @@ import { WorkbenchFrame } from './WorkbenchFrame';
 import { useTestI18nLanguage } from '@shared/testing/i18n';
 
 /* ═══════════════════════════════════════════════════════════════════════
-   WorkbenchFrame split-view wiring (#1997, UX F3).
+   WorkbenchFrame split-view wiring (#1997).
 
    Behavior contracts under test (menu chrome itself is covered by
    WorkspaceHeader.split.test.tsx; here the split state is driven through

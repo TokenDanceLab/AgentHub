@@ -59,7 +59,7 @@ func rateLimitBenchClient(b *testing.B) *cache.Client {
 // （互斥锁 + map 查找/新建 + token bucket Allow）。IP 轮换使每次迭代都走
 // 新建桶路径；limiter map 增长上限为 min(b.N, 65536)。
 func BenchmarkWSIPRateLimitNewIP(b *testing.B) {
-	limiter := NewWSIPRateLimiter()
+	limiter := newWSIPRateLimiter()
 	b.Cleanup(limiter.Stop)
 	handler := WSIPRateLimitWithLimiter(limiter)
 

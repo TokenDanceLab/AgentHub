@@ -127,14 +127,14 @@ describe('workbenchTranscriptChromeActionMappers', () => {
       transcript,
       t,
     });
-    // #2274 B-1: the planned effect must carry the producing task id — that is
+    // #2274: the planned effect must carry the producing task id — that is
     // the only identity POST /web/agent-tasks/:id/regenerate accepts.
     expect(regenerate).toContainEqual(
       expect.objectContaining({ type: 'regenerate', blockId: 'agent', taskId: 'task-9' }),
     );
   });
 
-  it('plans no regenerate for agent text without a stamped task id (#2274 B-1)', () => {
+  it('plans no regenerate for agent text without a stamped task id (#2274)', () => {
     // Honesty gate: no server-truthful task id ⇒ nothing to send ⇒ no effect,
     // so no shell can soft-hide a message behind a request that must fail.
     const transcript = [textBlock({ id: 'agent-no-task' })];
@@ -147,7 +147,7 @@ describe('workbenchTranscriptChromeActionMappers', () => {
     expect(planned.some((effect) => effect.type === 'regenerate')).toBe(false);
   });
 
-  it('hides the regenerate menu entry unless the block carries a task id (#2274 B-1)', () => {
+  it('hides the regenerate menu entry unless the block carries a task id (#2274)', () => {
     const withTask = buildTranscriptContextMenuGroups({
       blockId: 'b1',
       transcript: [textBlock({ agentTaskId: 'task-9' })],
@@ -211,7 +211,7 @@ describe('workbenchTranscriptChromeActionMappers', () => {
     expect(handlers.exitSelection).toHaveBeenCalledOnce();
   });
 
-  it('awaits approval decisions before success and reports failures (#1821)', async () => {
+  it('awaits approval decisions before success and reports failures', async () => {
     const baseHandlers = {
       copyText: vi.fn(),
       softHideBlocks: vi.fn(),
@@ -666,7 +666,7 @@ describe('workbenchTranscriptChromeActionMappers', () => {
     expect(handlers.onAddMessageReaction).toHaveBeenCalledWith('m5', 's5', '🔥');
   });
 
-  it('awaits Hub message actions before the success toast and reports failures (#1821)', async () => {
+  it('awaits Hub message actions before the success toast and reports failures', async () => {
     const baseHandlers = {
       copyText: vi.fn(),
       softHideBlocks: vi.fn(),
@@ -717,7 +717,7 @@ describe('workbenchTranscriptChromeActionMappers', () => {
     await vi.waitFor(() => {
       expect(regenerateHandlers.showWorkbenchToast).toHaveBeenCalledWith('regen refused');
     });
-    // #2274 B-1: the port receives the task id alongside the block id.
+    // #2274: the port receives the task id alongside the block id.
     expect(regenerateHandlers.onRegenerate).toHaveBeenCalledWith('b1', 'task-1');
     expect(regenerateHandlers.softHideBlocks).not.toHaveBeenCalled();
     expect(regenerateHandlers.pulseBlock).not.toHaveBeenCalled();
@@ -830,7 +830,7 @@ describe('workbenchTranscriptChromeActionMappers', () => {
     ];
     const groups = buildTranscriptContextMenuGroups({
       blockId: 'agent-1',
-      // #2274 B-1: the regenerate entry also needs the stamped task id.
+      // #2274: the regenerate entry also needs the stamped task id.
       transcript: [textBlock({ id: 'agent-1', agentTaskId: 'task-1' })],
       t,
       onAction,
@@ -868,7 +868,7 @@ describe('workbenchTranscriptChromeActionMappers', () => {
     expect(onAction).toHaveBeenCalledWith('edit', 'u1');
   });
 
-  /* ── #2154 P1-A：菜单按 handler 存在性 fail-closed + 派发器不再静默丢弃 ── */
+  /* ── #2154 handler 存在性 fail-closed + 派发器不再静默丢弃 ── */
 
   it('renders handler-backed menu entries only when the capability is declared (#2154)', () => {
     const agentBlock = textBlock({ id: 'a1', agentTaskId: 'task-1' });
@@ -938,8 +938,8 @@ describe('workbenchTranscriptChromeActionMappers', () => {
   const unwiredEffectCases: Array<{
     name: string;
     effects: TranscriptChromeSideEffect[];
-    /** The per-effect failure copy — the honest fallback while the dedicated
-     *  `toast.actionUnavailable` key is not in the locale bundle yet. */
+    /** The per-effect failure copy, used if the dedicated
+     *  `toast.actionUnavailable` key cannot be resolved. */
     announced: string;
   }> = [
     {

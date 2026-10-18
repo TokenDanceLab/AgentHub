@@ -274,7 +274,7 @@ func (routerDeviceServiceStub) Register(_ context.Context, deviceID, userID, dev
 
 func (routerDeviceServiceStub) ListDevices(string) ([]model.Device, error) { return nil, nil }
 
-// TestCloudEdgeRegisterRateLimitedByIP verifies the #2154-F16 wiring:
+// TestCloudEdgeRegisterRateLimitedByIP verifies the rate-limit wiring:
 // POST /cloud/edge/register sits behind middleware.RateLimit keyed by client
 // IP, reusing AuthRegisterRateLimit per AuthRateLimitWindow. Requests 1–3
 // must traverse auth → limiter → handler (200 via stub service), the 4th

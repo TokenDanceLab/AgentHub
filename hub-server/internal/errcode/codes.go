@@ -91,7 +91,7 @@ var (
 
 	NotifNotFound = New("notif_not_found", "notification not found", http.StatusNotFound)
 
-	// OIDC 错误码与前端 SSOT 同步（#2123 P1-2）：本节每增删一个 oidc_* code，
+	// OIDC 错误码与前端 SSOT 同步（#2123 oidc_* code，
 	// 必须同步 app/shared/src/api/auth/types.ts 的 OidcBackendErrorCodes；
 	// CI `scripts/verify/verify-oidc-code-ssot.py` 校验两侧集合一致。
 	OIDCInvalidState       = New("oidc_invalid_state", "state is invalid or expired", http.StatusBadRequest)

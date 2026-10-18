@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Windows installer smoke preflight — ps1 迁移。
+"""Windows installer smoke preflight.
 
 Runs the baseline package readiness policy, then validates the Windows
 installer dry preflight inputs: pnpm 10 pinning, Tauri build contract,
@@ -152,6 +152,6 @@ def main() -> int:
 if __name__ == "__main__":
     try:
         sys.exit(main())
-    except Exception as exc:  # noqa: BLE001 —— 顶层兜底，对齐 ps1 $ErrorActionPreference='Stop'
+    except Exception as exc:  # noqa: BLE001 —— fail closed：未捕获异常返回非零
         print(f"ERROR: {exc}", file=sys.stderr, flush=True)
         sys.exit(1)

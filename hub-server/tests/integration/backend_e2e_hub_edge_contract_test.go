@@ -103,7 +103,7 @@ func TestBackendE2E_HubEdgeCallbackContract_DBWS_NoCLI(t *testing.T) {
 	var finalMessage model.Message
 	// The lookup must not match on the whole content value. `content` is jsonb, so
 	// the comparison is semantic (whitespace and key order insensitive) but still
-	// whole-value — and since #2274 B-1 the stored value is the callback's
+	// whole-value — and since #2274 the stored value is the callback's
 	// final_content PLUS an `agent_task` ref (agentevent.StampAgentTaskRef). That
 	// extra key is the point of the change, so a whole-value match made this test
 	// fail the moment the stamp landed: it was asserting an implementation detail
@@ -131,7 +131,7 @@ func TestBackendE2E_HubEdgeCallbackContract_DBWS_NoCLI(t *testing.T) {
 	if finalText != "Hub Edge callback contract final" {
 		t.Fatalf("final message text = %q, want Hub Edge callback contract final", finalText)
 	}
-	// #2274 B-1: the stored message must carry its producing task, or the web
+	// #2274: the stored message must carry its producing task, or the web
 	// shell has no server-truthful task id to regenerate with — it used to send a
 	// message identifier to an endpoint that requires a task id (live 404). This
 	// is the DB-level half of that contract; the transcript normalizer and the

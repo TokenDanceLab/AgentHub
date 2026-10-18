@@ -1,7 +1,5 @@
 /* ═══════════════════════════════════════════════════════════════════════
-   Projects chrome subviews — nav row, filters, tabs, editor.
-
-   Residual extract from ProjectDetailViews for Phase 22 #618.
+   Projects chrome subviews — nav row, filters, tabs, editor (#618).
    CSS remains on shared ProjectsPage.module.css.
    ═══════════════════════════════════════════════════════════════════════ */
 

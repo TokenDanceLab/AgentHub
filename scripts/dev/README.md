@@ -2,37 +2,36 @@
 
 ## devserver.sh（远程 dev 服务器测试平台，L3 真实测试面）
 
+面向维护者的远程测试入口。外部贡献者用本地 `dev-up.sh` + `make test`，或
+`scripts/e2e/wsl-full-stack-e2e.sh` 跑全栈；远程目标、仓库路径和 `.env`
+由维护者在本地配置，仓库不提供默认值。
+
 统一入口：`scripts/dev/devserver.sh <sync|start|stop|status|test|integration>`。
 
 远程服务器承载 L3 真实测试（全栈：TokenDanceID + hub + edge + web vite），
 本脚本从本地发起同步、启动、健康检查与测试报告回传。分层定义见
-根 `AGENTS.md` 的“测试分层（L0-L4）”；平台设计见 issue #1681。
+根 `AGENTS.md` 的“测试分层（L0-L4）”。
 
-### 前置配置（全部本机，仓库不存任何地址/凭据）
+### 前置配置
 
-1. 在私有运维配置中准备 SSH 目标，并通过 `AGENTHUB_DEVSERVER_SSH` 传入。
-   公开仓库不记录该目标的 alias、主机名、地址或登录用户。
+1. 通过 `AGENTHUB_DEVSERVER_SSH` 提供 SSH 目标。
 
 2. 默认调用 PATH 中的 `ssh`。若运行环境需要受控 wrapper / 独立 ssh client，可把 `AGENTHUB_DEVSERVER_SSH_BIN` 设为一个 ssh-compatible 可执行文件路径；脚本不解析任意 shell 参数字符串。
 
-3. 服务器仓库路径可通过 `AGENTHUB_DEVSERVER_ROOT` 私有覆盖；公开默认值仅为
-   `/srv/agenthub/AgentHub`，不对应任何具体机器。
+3. 服务器仓库路径必须通过 `AGENTHUB_DEVSERVER_ROOT` 显式传入。
 
 4. 服务器本地 `.env` 必须包含启动所需全部键（`AGENTHUB_DB_*`、
    `AGENTHUB_TOKENDANCE_ID_*`、`AGENTHUB_JWT_SECRET`）；缺键时 `start`
    会 fail-closed 并指出缺哪个键，值永不出服务器。
 
-5. 若真实测试服务器出站受限，Go 依赖访问沿用该环境的服务器侧运维策略。
-   `devserver.sh` 会兼容既有 `/etc/environment` / `DEVSERVER_GOPROXY` 配置；
-   私有镜像地址、账号和凭据都不要写进仓库。
+5. 若服务器出站受限，`devserver.sh` 会读取 `/etc/environment` 或 `DEVSERVER_GOPROXY`。
 
 ### 证据纪律
 
 - `sync` 只在服务器工作树干净时允许快进；脏树先处理（避免证据跑在
   未知代码上）。
 - `test` / `integration` 回传 JSON 报告到本地 `.tmp/devserver-reports/`
-  （gitignored），报告只保留 commit/branch/arch/结果等可公开测试证据，
-  **不写远端 hostname / 地址 / SSH alias**；筛选后才可附 PR/issue。
+  （gitignored），报告只保留 commit/branch/arch/结果。
 
 ### integration 命令与测试库隔离
 

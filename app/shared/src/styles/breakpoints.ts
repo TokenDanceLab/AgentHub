@@ -39,7 +39,7 @@
  * | standard | 1280 | 3-panel comfort zone starts (rail 52 + sidebar 260 +         |
  * |         |      |  inspector 400 leaves ≥560px main at 1280). desktop/App.     |
  * |         |      |  module.css clamps panels over the 1023/1279 legacy queries.  |
- * | wide    | 1440 | Design target / visual QA viewport (visual-qa-matrix).         |
+ * | wide    | 1440 | Design target / visual QA viewport.                            |
  * | xwide   | 1920 | Root type bump 16 → 17px for viewing distance (#1309/#1307).  |
  * | ultra   | 2560 | Root type bump 18px (ultrawide).                              |
  *

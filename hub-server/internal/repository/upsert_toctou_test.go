@@ -75,7 +75,7 @@ func setupSharedSQLite(t *testing.T) *gorm.DB {
 
 // TestUpsertRefreshToken_Concurrent verifies that concurrent upserts for the
 // same (user_id, device_type, device_id) triple produce exactly one row and
-// no errors (#2102 F12). This guards against TOCTOU races in the previous
+// no errors (#2102). This guards against TOCTOU races in the previous
 // SELECT-then-CREATE/SAVE implementation.
 func TestUpsertRefreshToken_Concurrent(t *testing.T) {
 	db := setupSharedSQLite(t)
@@ -115,7 +115,7 @@ func TestUpsertRefreshToken_Concurrent(t *testing.T) {
 
 // TestFindOrCreateByTokenDanceSub_Concurrent verifies that concurrent first-login
 // attempts for the same TokenDance sub produce exactly one user and no errors
-// (#2102 F13). This guards against TOCTOU races in the previous
+// (#2102). This guards against TOCTOU races in the previous
 // Find-then-Create implementation.
 func TestFindOrCreateByTokenDanceSub_Concurrent(t *testing.T) {
 	db := setupSharedSQLite(t)

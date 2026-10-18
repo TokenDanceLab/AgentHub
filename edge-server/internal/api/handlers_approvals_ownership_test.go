@@ -14,13 +14,13 @@ import (
 	"github.com/agenthub/edge-server/internal/permission"
 )
 
-// Ownership slice for the human approval gates (#2241 lane A):
+// Human approval gates (#2241):
 //
 //	POST /v1/permissions/decide — allow/deny a live tool call of a run
 //	POST /v1/plans/decide       — approve/reject an orchestrator plan of a run
 //	GET  /v1/plans/pending      — list plans waiting for a human decision
 //
-// Before this slice none of the three resolved an ownership principal, so any
+// Before the ownership gate, none of the three resolved an ownership principal, so any
 // caller past the Edge's coarse auth could list another Hub user's pending
 // plans and approve them, i.e. make the victim's agent perform the file writes
 // and command executions in that plan. The paradigm asserted here is the one
@@ -29,7 +29,7 @@ import (
 // yours" (byte-identical bodies) so the endpoints are not a runId existence
 // oracle, list endpoints filter instead of rejecting, the
 // documented local single-tenant sentinel keeps seeing everything, and an empty
-// principal under Hub JWT fails closed (AH-SR-045).
+// principal under Hub JWT fails closed.
 
 // ---------------------------------------------------------------------------
 // Fixtures — real broker/registry/store concretes, no fakes on the gated path
@@ -184,7 +184,7 @@ func TestPostPlanDecideNonOwnerIsNotAnExistenceOracle(t *testing.T) {
 	}
 }
 
-// TestPostPlanDecideFailsClosedWithoutHubIdentity mirrors AH-SR-045: under Hub
+// TestPostPlanDecideFailsClosedWithoutHubIdentity mirrors under Hub
 // JWT a request without a Hub identity has an empty principal and reaches
 // nobody's plan.
 func TestPostPlanDecideFailsClosedWithoutHubIdentity(t *testing.T) {
@@ -404,7 +404,7 @@ func TestPostPermissionDecideNonOwnerIsNotAnExistenceOracle(t *testing.T) {
 	}
 }
 
-// TestPostPermissionDecideFailsClosedWithoutHubIdentity pins AH-SR-045 for the
+// TestPostPermissionDecideFailsClosedWithoutHubIdentity pins for the
 // permission gate.
 func TestPostPermissionDecideFailsClosedWithoutHubIdentity(t *testing.T) {
 	h := newTestHandler()

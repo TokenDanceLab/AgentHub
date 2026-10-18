@@ -3,7 +3,7 @@ package dispatch
 // Historical dispatchTask / dispatchTargetBoundTask / capability slog messages.
 // Kept pure so orchestration only interpolates structured attrs.
 const (
-	DispatchLogOutboxRecordFailed = "AH-SR-049 delivery outbox record failed; dispatch continues without durable tracking"
+	DispatchLogOutboxRecordFailed = "delivery outbox record failed; dispatch continues without durable tracking"
 
 	DispatchLogHTTPMarkFailed          = "failed to mark http-dispatched task"
 	DispatchLogOfflinePushConnNil      = "failed to push agent task to offline queue (conn nil)"
@@ -24,7 +24,11 @@ const (
 	DispatchLogTargetBoundMarkFailed        = "failed to mark target-bound agent task dispatched"
 	DispatchLogTargetBoundWSNotQueued       = "target-bound agent task websocket dispatch not queued; preserving pending task"
 
-	CapabilityMintFailedLog = "AH-SR-046 failed to issue capability token"
+	CapabilityMintFailedLog = "failed to issue capability token"
 
 	DispatchLogSemaphoreFull = "dispatch semaphore at capacity; task remains queued for ttl/redispatch"
+	// DispatchLogCustomAgentUnavailable marks a bound custom agent that no
+	// longer resolves (for example after a soft delete); dispatch proceeds
+	// without custom fields.
+	DispatchLogCustomAgentUnavailable = "bound custom agent unavailable; dispatching without custom fields"
 )

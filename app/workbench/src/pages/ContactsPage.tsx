@@ -13,8 +13,8 @@ import type { ContactsPageProps } from './contacts';
    ContactsPage — pure presentational workbench page
 
    Subcomponents / types extracted under ./contacts:
-   - Phase 17 #561: types, shared, rows, AddContactModal
-   - Phase 18 #574: ContactNav + ContactMain (pane cluster / profile)
+   - Types, shared rows, and AddContactModal (#561).
+   - ContactNav + ContactMain: pane cluster and profile (#574).
    ═══════════════════════════════════════════════════════════════════════ */
 
 /* ── Public re-exports (preserve external consumers) ── */

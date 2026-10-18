@@ -38,7 +38,7 @@ import styles from './FilePreview.module.css';
 
    Mirrors the desktop demo .readonly-editor visual design using ONLY
    v4 CSS custom properties. Pure presentational — no data fetching.
-   Residual pure helpers live in FilePreviewHelpers; preview bodies in
+   Pure helpers live in FilePreviewHelpers; preview bodies in
    FilePreviewParts (#663).
    ═══════════════════════════════════════════════════════════════════════ */
 

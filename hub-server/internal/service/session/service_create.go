@@ -1,4 +1,3 @@
-// #1161: Session Service pure-helper peel — create paths extracted from service.go.
 package session
 
 import (
@@ -55,7 +54,7 @@ func (s *Service) CreatePrivateSession(ctx context.Context, currentUserID, targe
 		return nil, err
 	}
 
-	if err := resolveCache(s.cacheClient).InitSeqIfAbsent(ctx, session.ID, 0); err != nil {
+	if err := s.cacheClient.InitSeqIfAbsent(ctx, session.ID, 0); err != nil {
 		slog.Warn("failed to init seq in redis", "session_id", session.ID, "error", err)
 	}
 	s.publishEvent(ctx, EventTypeSessionCreated, PrivateSessionCreatedPayload(session.ID, currentUserID, targetUserID))
@@ -89,7 +88,7 @@ func (s *Service) CreateGroupSession(ctx context.Context, ownerUserID, name stri
 		return nil, err
 	}
 
-	if err := resolveCache(s.cacheClient).InitSeqIfAbsent(ctx, session.ID, 0); err != nil {
+	if err := s.cacheClient.InitSeqIfAbsent(ctx, session.ID, 0); err != nil {
 		slog.Warn("failed to init seq in redis", "session_id", session.ID, "error", err)
 	}
 	s.publishEvent(ctx, EventTypeSessionCreated, GroupSessionCreatedPayload(

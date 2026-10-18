@@ -15,13 +15,13 @@ import { fileURLToPath } from 'node:url';
 //
 // Included specs:
 //   - chat-real.spec.ts            Hub/Edge API + IM lifecycle (dev-secret JWT lane)
-//   - real-oidc-login.spec.ts      real browser OIDC login + chat flow (#1839 B2)
-//   - private-url-preview.spec.ts  private-URL gate real-scenario (#1922 item 4)
-//   - golden-flows.spec.ts         round-74 Golden Flows：真登录真数据 / regenerate 真
+//   - real-oidc-login.spec.ts      real browser OIDC login + chat flow
+//   - private-url-preview.spec.ts  private-URL gate real scenario
+//   - golden-flows.spec.ts         Golden Flows：真登录真数据 / regenerate 真
 //                                  task identity / demo 诚实门 / edge 回调后自动刷新
 //
-// CI status: never run in CI (e2e-smoke only runs smoke.spec.ts under
-// playwright.config.ts). Run locally with all services up:
+// CI status: not a PR check; the dispatch-only real-e2e-stack lane runs this
+// config. Run locally with all services up:
 //   pnpm test:e2e:real
 // Evidence (report/screenshots/trace) lands in <repo>/tests/artifacts/ per
 // tests/artifacts/README.md naming: report-<YYYYMMDD-HHMMSS>.json.

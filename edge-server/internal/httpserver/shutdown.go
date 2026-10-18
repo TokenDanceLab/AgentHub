@@ -9,9 +9,8 @@ import (
 
 const (
 	// shutdownTotalBudget is the overall graceful-shutdown budget. It covers
-	// CancelAll, HTTP srv.Shutdown, all ShutdownHooks, and Bus.Close. The same
-	// value was previously hardcoded in Run(); it is now a named constant so
-	// per-hook and bus-close budgets can be derived from it.
+	// CancelAll, HTTP srv.Shutdown, all ShutdownHooks, and Bus.Close. A named
+	// constant so per-hook and bus-close budgets can be derived from it.
 	shutdownTotalBudget = 10 * time.Second
 
 	// shutdownPerHookBudget is the maximum wall time any single ShutdownHook

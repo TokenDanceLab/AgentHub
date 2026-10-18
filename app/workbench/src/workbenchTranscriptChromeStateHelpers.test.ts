@@ -68,7 +68,7 @@ describe('workbenchTranscriptChromeStateHelpers', () => {
     expect(nextSelectedBlockIdsOnRange(['a'], ['b', 'c'])).toEqual(['a', 'b', 'c']);
   });
 
-  it('resolves ranges and residual selection snapshots', () => {
+  it('resolves ranges and selection snapshots', () => {
     const transcript = [textBlock({ id: 'a' }), textBlock({ id: 'b' }), textBlock({ id: 'c' })];
     expect(resolveSelectionRangeIds(transcript, ['a'], 'c')).toEqual(['a', 'b', 'c']);
     expect(transcriptBlockIds(transcript)).toEqual(['a', 'b', 'c']);
@@ -83,7 +83,7 @@ describe('workbenchTranscriptChromeStateHelpers', () => {
     });
   });
 
-  it('plans hold/pointer/select/hotkey residual flows', () => {
+  it('plans hold/pointer/select/hotkey flows', () => {
     expect(shouldCancelSelectionHold({ x: 10, y: 10 }, 50, 10)).toBe(true);
     expect(planBeginHoldSelection('b1', pointer()).type).toBe('begin');
     expect(planUpdateHoldSelection({ x: 1, y: 1 }, 1, 1)).toEqual({ type: 'noop' });

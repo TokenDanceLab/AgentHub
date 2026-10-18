@@ -30,7 +30,7 @@ export default function LoginForm({ onSuccess }: LoginFormProps) {
       await loginWithTokenDance();
       setIdentityNotice(t('auth.tokenDanceCallbackPending'));
     } catch (err: unknown) {
-      // #2154 P2-10: never render err.message. The OIDC failures are produced
+      // #2154: never render err.message. The OIDC failures are produced
       // in English at the transport layer ("Failed to start OIDC login: fetch
       // failed"), so echoing them put a raw technical string in a localized
       // login screen. Same mapping as useWebAuth's callback path: known codes

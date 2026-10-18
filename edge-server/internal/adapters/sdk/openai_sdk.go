@@ -14,10 +14,6 @@ import (
 	"github.com/agenthub/edge-server/internal/store"
 )
 
-// Residual pure-helper peel #1152: keep OpenAISDKAdapter surface + ParseStream
-// orchestration; request/SSE/types moved to companion files. Grouped into
-// package sdk (#1760).
-
 const (
 	openaiSDKAdapterID   = "openai-sdk"
 	openaiDefaultModel   = "gpt-5.5"

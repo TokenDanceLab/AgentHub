@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/agenthub/hub-server/internal/cache"
 	"github.com/agenthub/hub-server/internal/model"
 	"github.com/agenthub/hub-server/internal/repository"
 )
@@ -37,7 +38,7 @@ func (s *atAuditSpy) last() *PrivilegedActionAuditInput {
 func newATServiceWithAudit(t *testing.T) (*AgentTeamService, *atAuditSpy) {
 	t.Helper()
 	db := setupAgentTeamStateSQLite(t)
-	svc := NewAgentTeamService(db, nil, nil)
+	svc := NewAgentTeamService(db, nil, cache.NoOpCache{})
 	spy := &atAuditSpy{}
 	svc.SetAuditService(spy)
 	return svc, spy
@@ -120,7 +121,7 @@ func TestReviewDagPlan_AuditDenied_NotTriggerUser(t *testing.T) {
 
 func TestAgentTeamAudit_NilAuditor_Noop(t *testing.T) {
 	db := setupAgentTeamStateSQLite(t)
-	svc := NewAgentTeamService(db, nil, nil)
+	svc := NewAgentTeamService(db, nil, cache.NoOpCache{})
 	// Don't set audit — must not panic.
 	team := &model.AgentTeam{OwnerID: "user-1", Name: "nil-audit-team"}
 	require.NoError(t, repository.CreateTeam(db, team))

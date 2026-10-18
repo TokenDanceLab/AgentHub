@@ -13,7 +13,7 @@ import {
 } from './agentProfileCatalogHelpers';
 
 /* ═══════════════════════════════════════════════════════════════════════
-   agentProfileCatalog — thin public facade for AgentProfile fixtures (#652).
+   agentProfileCatalog — thin public facade for AgentProfile fixtures.
 
    Types → agentProfileCatalogTypes
    Static rows → agentProfileCatalogData

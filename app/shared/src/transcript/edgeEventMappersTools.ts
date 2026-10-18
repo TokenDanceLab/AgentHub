@@ -1,6 +1,5 @@
 /**
  * Edge event → transcript block mappers: tools / file changes.
- * Peel companion of edgeEventMappers (#1124). Pure only; zero behavior change.
  */
 
 import type { EventEnvelope } from '../events';
@@ -30,8 +29,8 @@ const INPUT_STRING_LIMIT = 512;
 const INPUT_ENTRY_LIMIT = 12;
 
 /**
- * Bounded scalar projection of a tool call's raw `input` arguments (#1998,
- * UX F8). Edge adapters emit the parsed tool arguments object on tool_call
+ * Bounded scalar projection of a tool call's raw `input` arguments (#1998).
+ * Edge adapters emit the parsed tool arguments object on tool_call
  * events (e.g. the Codex goal tools carry `objective` / `status` there),
  * but transcripts must stay light: only flat string / number / boolean
  * entries survive, strings are capped, and at most a handful of entries are

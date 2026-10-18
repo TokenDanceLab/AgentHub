@@ -53,8 +53,14 @@ done
 # Upstream trackers: tauri-apps/tauri#7335, #12563 (assignee lucasfernog),
 # #14684 (GTK4 + WebKitGTK 6.0 migration PR, open).
 # Review deadline: 2026-11-30 — gate fails after this date until re-review.
+# RUSTSEC-2026-0367/0368/0369: zip 4.x SUID/SGID, symlink, and permission
+# extraction issues. tauri-plugin-updater pins zip 4.x; tracking issue #2362.
+# Review deadline: 2026-12-31 — remove once the plugin ships a patched zip.
 DEFAULT_ALLOWLIST='
 RUSTSEC-2024-0429:2026-11-30
+RUSTSEC-2026-0367:2026-12-31
+RUSTSEC-2026-0368:2026-12-31
+RUSTSEC-2026-0369:2026-12-31
 '
 
 parse_allowlist() {
@@ -107,16 +113,26 @@ for id in "${ALLOWED_IDS[@]}"; do
   IGNORE_FLAGS+=(--ignore "$id")
 done
 
-RAW_OUTPUT="$("$CARGO_AUDIT_BIN" audit --file "${WORKSPACE}/Cargo.lock" "${IGNORE_FLAGS[@]}" --json 2>/dev/null)" \
+SCAN_ERR="$(mktemp)"
+RAW_JSON="$(mktemp)"
+trap 'rm -f "$SCAN_ERR" "$RAW_JSON"' EXIT
+RAW_OUTPUT="$("$CARGO_AUDIT_BIN" audit --file "${WORKSPACE}/Cargo.lock" "${IGNORE_FLAGS[@]}" --json 2>"$SCAN_ERR")" \
   || SCAN_RC=$?
+SCAN_RC="${SCAN_RC:-0}"
+# cargo-audit exit 1 = advisories found (JSON is complete); anything else
+# non-zero = crash/error and must fail closed.
+if [[ "$SCAN_RC" -ne 0 && "$SCAN_RC" -ne 1 ]]; then
+  fail "cargo audit failed (exit $SCAN_RC): $(tr '\n' ' ' <"$SCAN_ERR" | tail -c 300)"
+fi
 if [[ -z "$RAW_OUTPUT" ]]; then
   fail "cargo audit produced empty output — cannot verify (fail-closed)"
 fi
+printf '%s' "$RAW_OUTPUT" >"$RAW_JSON"
 
-VERDICT="$("$PYTHON_BIN" - "$RAW_OUTPUT" "${ALLOWED_IDS[@]}" <<'PYEOF'
-import json, sys
+VERDICT="$("$PYTHON_BIN" - "$RAW_JSON" "${ALLOWED_IDS[@]}" <<'PYEOF'
+import json, pathlib, sys
 
-raw, allowed_ids = sys.argv[1], set(sys.argv[2:])
+raw, allowed_ids = pathlib.Path(sys.argv[1]).read_text(encoding="utf-8"), set(sys.argv[2:])
 try:
     data = json.loads(raw)
 except Exception as exc:
@@ -166,6 +182,9 @@ if [[ "${VERDICT_RC:-0}" -ne 0 ]]; then
   echo "::error::verify-rust-advisories: advisory(ies) found that are not allowlisted:" >&2
   echo "$VERDICT" | sed -n 's/^blocking_advisories=//p' | tr ',' '\n' | sed 's/^/  /' >&2
   exit 1
+fi
+if [[ "$SCAN_RC" -eq 1 && "${VERDICT_RC:-0}" -eq 0 ]]; then
+  fail "cargo audit exited 1 but no blocking advisories were parsed — refusing to report clean"
 fi
 
 echo "::notice::verify-rust-advisories: verified clean ($VERDICT)"

@@ -53,7 +53,7 @@ func (e *ProcessExecutor) fireHubTaskStreamEvent(runID, eventType string, payloa
 		return
 	}
 	taskID := e.hubTaskID(runID)
-	if !shouldFireHubCallback(e.hubCallback != nil, taskID) {
+	if e.hubCallback == nil || taskID == "" {
 		return
 	}
 	if _, ok := e.hubCallback.(TaskEventReporter); !ok {

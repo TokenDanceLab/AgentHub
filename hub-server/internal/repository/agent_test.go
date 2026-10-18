@@ -11,7 +11,7 @@ import (
 	"github.com/agenthub/hub-server/internal/model"
 )
 
-// Heartbeat short-circuit tests for BumpRunningTaskExpireAt (#2154 P2-9).
+// Heartbeat short-circuit tests for BumpRunningTaskExpireAt (#2154).
 //
 // The write is issued once per streamed chunk, and the predicate now skips the
 // row unless the stored deadline differs meaningfully from the one being
@@ -440,7 +440,7 @@ func TestPendingTaskRepo_ScanExpiredTasks(t *testing.T) {
 }
 
 // =============================================================================
-// B2 data-integrity tests — atomic status, password+token, pin limit
+// data-integrity tests — atomic status, password+token, pin limit
 // =============================================================================
 
 func TestPendingTaskRepo_AtomicStatusUpdate(t *testing.T) {

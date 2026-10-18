@@ -209,19 +209,19 @@ export function highlightBlock(code: string, lang: string): string {
   }
 }
 
-// ── Word-diff HAST injection (P6 Step 3) ──────────────────────────────
+// ── Word-diff HAST injection ─────────────────────────────────
 //
 // Goal: render per-word added/removed highlights INSIDE a Prism-highlighted
 // line without dropping syntax color. We do this at the HAST layer (after
 // refractor tokenises, before hastToHtml serialises) so word-diff <span>s
 // nest inside Prism token <span>s — the two do not collide.
 //
-// P6 design report §4.3 + §8.2: this is the highest-risk step — the HAST
-// split/wrap is design-deductive, NOT prototyped in the report. Snapshot
-// tests below pin the behaviour; the pure function is defensive (falls
-// back to plain `highlightLine` on any contract violation or Prism error).
+// The HAST split/wrap cannot be derived mechanically from Prism output;
+// prismRegistry.test.ts pins the behaviour with snapshot tests, and the pure
+// function falls back to plain `highlightLine` on any contract violation or
+// Prism error.
 //
-// Reconstruction contract (from Step 1/2): the per-column token stream
+// Reconstruction contract: the per-column token stream
 // joins back to the cell's `content` (== `code`). Left cell holds
 // removed+context; right cell holds added+context. So `tokens` always
 // covers `[0, code.length)` with no gaps — which is what makes the
@@ -267,7 +267,7 @@ function computeWordDiffRanges(tokens: readonly WordDiffToken[]): WordDiffRange[
  * A single word-diff range that spans several Prism token boundaries (e.g.
  * one word covering a keyword span + a punctuation span) produces several
  * span elements, one per text-leaf segment. Same class, same color —
- * visually identical, structurally harmless (report §4.3).
+ * visually identical, structurally harmless.
  */
 function wrapTextNodeValue(
   value: string,
@@ -402,8 +402,8 @@ export function injectWordDiffIntoHast(
  * `tokens` is the per-column word-diff stream (left = removed+context,
  * right = added+context) whose `text` joins back to `code`. `null`/
  * `undefined` is accepted and falls back to plain {@link highlightLine} —
- * this is the oversized-line / guard-skipped path (report §5.1) so Step 4's
- * renderer can pass `cell.wordDiff` through unconditionally.
+ * this is the oversized-line / guard-skipped path, so `renderLineHtml` can
+ * pass `cell.wordDiff` through unconditionally.
  *
  * `wordClassFor(type)` returns the CSS class for a token type; returning `''`
  * leaves that token unwrapped (recommended for `context` — Prism color

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""verify-design-token-ssot — desktop/web surface style CSS 薄 re-export 门禁（ps1 迁移，契约见 server docs/design/ps1-to-python-migration.md）。
+"""verify-design-token-ssot — desktop/web surface style CSS 薄 re-export 门禁。
 
-A7 架构门禁候选 #7，按 docs/architecture/07-design-system-ssot.md：
+按 docs/architecture/07-design-system-ssot.md：
   - app/{desktop,web}/src/styles/{tokens,themes,presets}.css 必须是
     @shared/styles/{tokens-base,themes,presets-base}.css 的薄 @import re-export
   - 只允许有界的一小组 platform-override 声明（如 desktop 不透明边框）
@@ -35,8 +35,7 @@ SURFACE_FILES = [
     "app/web/src/styles/presets.css",
 ]
 
-# 单文件 --* 重声明上限（master f17e3b99 基线：desktop/presets 3、web/presets 6、
-# 其余 0；10 给合法平台边框胶水留余量，同时任何 :root 全表分叉必然超限）。
+# 单文件 --* 重声明上限：10 给合法平台边框胶水留余量，同时任何 :root 全表分叉必然超限。
 MAX_OVERRIDE_LINES = 10
 
 SHARED_IMPORT_RE = re.compile(r"""(?m)^\s*@import\s+['"]@shared/styles/""")
@@ -139,6 +138,6 @@ def main() -> int:
 if __name__ == "__main__":
     try:
         sys.exit(main())
-    except Exception as exc:  # noqa: BLE001 —— 顶层兜底，对齐 ps1 $ErrorActionPreference='Stop'
+    except Exception as exc:  # noqa: BLE001 —— fail closed：未捕获异常返回非零
         print(f"ERROR: {exc}", file=sys.stderr)
         sys.exit(1)

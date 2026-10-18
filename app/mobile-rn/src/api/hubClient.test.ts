@@ -44,7 +44,7 @@ describe('Mobile Hub client facade', () => {
       useQueryTokenFallback: true,
     });
     const parsed = new URL(url);
-    // Hub WSAuthMiddleware accepts access_token (or Authorization Bearer), not "token".
+    // Hub AuthMiddleware.WSHandler accepts access_token (or Authorization Bearer), not "token".
     expect(parsed.searchParams.get('access_token')).toBe('test-jwt-token');
     expect(parsed.searchParams.has('token')).toBe(false);
   });

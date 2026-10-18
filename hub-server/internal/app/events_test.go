@@ -58,7 +58,7 @@ func newTypingTestApp(t *testing.T) (*App, sqlmock.Sqlmock, *miniredis.Miniredis
 	a := &App{
 		Config:         &config.Config{},
 		CacheClient:    cacheClient,
-		SessionService: session.NewService(gormDB, cacheClient),
+		SessionService: session.NewService(gormDB, cacheClient, nil),
 		bg:             newBackgroundGroup(context.Background()),
 	}
 	a.setupWSManager()
@@ -90,7 +90,7 @@ func registerTestConn(t *testing.T, mgr *ws.Manager, userID, deviceID string) *w
 	t.Helper()
 	conn := &ws.Conn{Send: make(chan []byte, 8)}
 	require.NoError(t, mgr.Register(conn))
-	mgr.SetAuth(conn.ID, userID, "desktop", deviceID)
+	authenticate(t, mgr, conn, userID, "desktop", deviceID)
 	return conn
 }
 
@@ -108,7 +108,7 @@ func readFrameType(t *testing.T, conn *ws.Conn) string {
 }
 
 // countResolveMembers wraps mgr.ResolveMembers with an invocation counter and
-// returns the counter. Resolution count is the metric #2154 P2-10 halves: the
+// returns the counter. Resolution count is the metric #2154 halves: the
 // typing frame used to resolve the same session twice (once to admit the
 // sender, once to fan out).
 func countResolveMembers(a *App) *atomic.Int64 {
@@ -125,7 +125,7 @@ func countResolveMembers(a *App) *atomic.Int64 {
 // handler.WebSocketHandler.canTypeInSession resolves the session membership and
 // admits the sender (returning the list it resolved), then app.handleTypingFrame
 // fans that same list out. handleTypingFrame must not resolve again — that is
-// the round trip #2154 P2-10 removed. Returns whether the sender was admitted.
+// the round trip #2154 removed. Returns whether the sender was admitted.
 func admitTypingFrame(a *App, userID, sessionID string) bool {
 	memberIDs := a.mgr.ResolveMembers(sessionID)
 	admitted := false
@@ -164,7 +164,7 @@ func TestHandleTypingFrameUsesCachedMemberResolution(t *testing.T) {
 	// First frame: cold cache → exactly one DB query, then cached.
 	require.True(t, admitTypingFrame(a, "user-sender", sessionID))
 	require.EqualValues(t, 1, queryCount.Load(), "cold cache must load members once")
-	require.EqualValues(t, 1, resolveCalls.Load(), "one frame must resolve members exactly once (#2154 P2-10)")
+	require.EqualValues(t, 1, resolveCalls.Load(), "one frame must resolve members exactly once (#2154)")
 	require.True(t, mr.Exists(cacheKey), "member list must be cached after first frame")
 
 	require.Equal(t, ws.TypeTyping, readFrameType(t, peer1))
@@ -233,7 +233,7 @@ func TestHandleTypingFrameFansOutToHandedMembership(t *testing.T) {
 
 // TestBroadcastOnlineStatusUsesBatchedPresence proves the online/offline
 // fanout resolves friend presence with one pipelined AreOnline call instead
-// of one IsOnline round trip per friend (#2154 perf lane).
+// of one IsOnline round trip per friend (#2154).
 func TestBroadcastOnlineStatusUsesBatchedPresence(t *testing.T) {
 	sqlDB, mock, err := sqlmock.New()
 	require.NoError(t, err)
@@ -264,10 +264,10 @@ func TestBroadcastOnlineStatusUsesBatchedPresence(t *testing.T) {
 	mgr := ws.NewManager()
 	onlinePeer := &ws.Conn{Send: make(chan []byte, 4)}
 	require.NoError(t, mgr.Register(onlinePeer))
-	mgr.SetAuth(onlinePeer.ID, "friend-online", "desktop", "dev-on")
+	authenticate(t, mgr, onlinePeer, "friend-online", "desktop", "dev-on")
 	offlinePeer := &ws.Conn{Send: make(chan []byte, 4)}
 	require.NoError(t, mgr.Register(offlinePeer))
-	mgr.SetAuth(offlinePeer.ID, "friend-offline", "desktop", "dev-off")
+	authenticate(t, mgr, offlinePeer, "friend-offline", "desktop", "dev-off")
 
 	a := &App{
 		CacheClient:    cacheClient,

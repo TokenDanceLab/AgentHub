@@ -44,7 +44,7 @@ import (
 // asserted below is therefore defence in depth for callers that bypass the
 // handlers, not the client-visible bound.
 //
-// repository/message.go:48 (GetMessagesIncrement) and
+// repository/message.go:45 (GetMessagesIncrement) and
 // agent_team_assignments.go:160 already had the correct shape — clamp to the
 // maximum — which is the evidence that the other twelve are copy errors rather
 // than a deliberate policy.

@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/agenthub/hub-server/internal/cache"
 	"github.com/agenthub/hub-server/internal/model"
 	"github.com/agenthub/hub-server/internal/repository"
 	"github.com/agenthub/hub-server/internal/service/agentevent"
@@ -16,8 +17,8 @@ import (
 // addTokenUsageColumnToTestDB adds the token_usage_total column to the
 // agent_team_runs table for tests that exercise the budget guard fast path.
 // The shared setupAgentTeamStateSQLite fixture predates migration 0066 and
-// does not include the column; this ALTER is the minimal additive patch so
-// the existing fixture stays untouched (it is out of this lane's file scope).
+// does not include the column; this ALTER is the minimal additive patch that
+// keeps the existing fixture untouched.
 func addTokenUsageColumnToTestDB(t *testing.T, db *gorm.DB) {
 	t.Helper()
 	err := db.Exec("ALTER TABLE agent_team_runs ADD COLUMN token_usage_total BIGINT").Error
@@ -49,7 +50,7 @@ func TestTeamRunBudgetExceededDB_FastPathShortCircuitsOnCounter(t *testing.T) {
 
 	// Seed the counter to the budget cap via the same repository path the edge
 	// callback uses, so the test exercises the real increment contract.
-	svc := NewAgentTeamServiceWithGuardrails(db, nil, nil, AgentTeamGuardrails{
+	svc := NewAgentTeamServiceWithGuardrails(db, nil, cache.NoOpCache{}, AgentTeamGuardrails{
 		MaxTeamRunBudgetTokens: 1000,
 	})
 	require.NoError(t, repository.IncrementTeamRunTokenUsage(db, run.ID, 1000))
@@ -94,7 +95,7 @@ func TestTeamRunBudgetExceededDB_NilCounterFallsBackToProjection(t *testing.T) {
 		Payload:         `{"usage":{"input_tokens":600,"output_tokens":500}}`,
 	}))
 
-	svc := NewAgentTeamServiceWithGuardrails(db, nil, nil, AgentTeamGuardrails{
+	svc := NewAgentTeamServiceWithGuardrails(db, nil, cache.NoOpCache{}, AgentTeamGuardrails{
 		MaxTeamRunBudgetTokens: 1000,
 	})
 	exceeded, err := svc.teamRunBudgetExceededDB(db, run.ID)
@@ -132,7 +133,7 @@ func TestTeamRunBudgetExceededDB_TakesMaxOfCounterAndProjection(t *testing.T) {
 		Payload:         `{"usage":{"input_tokens":700,"output_tokens":500}}`,
 	}))
 
-	svc := NewAgentTeamServiceWithGuardrails(db, nil, nil, AgentTeamGuardrails{
+	svc := NewAgentTeamServiceWithGuardrails(db, nil, cache.NoOpCache{}, AgentTeamGuardrails{
 		MaxTeamRunBudgetTokens: 1000,
 	})
 	exceeded, err := svc.teamRunBudgetExceededDB(db, run.ID)

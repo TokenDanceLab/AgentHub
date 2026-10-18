@@ -10,8 +10,8 @@ import (
 	"github.com/agenthub/hub-server/internal/model"
 )
 
-// TestListPublicMCPServers_CursorIsLastID guards the exploratory-audit P0-2
-// regression: the service used InstallCount as cursor while the repo filters
+// TestListPublicMCPServers_CursorIsLastID guards the cursor regression: the
+// service used InstallCount as cursor while the repo filters
 // `id < cursor` (uuid) — page 2+ would 500 on PostgreSQL.
 func TestListPublicMCPServers_CursorIsLastID(t *testing.T) {
 	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
@@ -43,7 +43,7 @@ func TestListPublicMCPServers_CursorIsLastID(t *testing.T) {
 	require.NotEqual(t, page1[1].ID, page2[0].ID)
 }
 
-// TestListPublicProfiles_CompositeCursor guards the exploratory-audit P0-3:
+// TestListPublicProfiles_CompositeCursor guards the composite-cursor path:
 // non-recent sorts used InstallCount as cursor against rating_avg/uuid tie-break
 // columns — wrong results or PostgreSQL 500 on page 2.
 func TestListPublicProfiles_CompositeCursor(t *testing.T) {

@@ -46,7 +46,7 @@ export interface UseWorkbenchContactsRouteOptions {
   contacts?: WorkbenchContactsData | undefined;
   contactsActions?: WorkbenchContactsActions | undefined;
   onStartConversation?: ((target: { name: string; id: string; kind: 'dm' | 'group' }) => void) | undefined;
-  /** Hub contacts request failure (#1821) — renders an explicit error state
+  /** Hub contacts request failure — renders an explicit error state
    *  instead of collapsing into the mock/empty contact list. */
   contactsError?: string | undefined;
 }
@@ -55,7 +55,7 @@ export interface WorkbenchContactsRoute {
   contactsPane: ContactsPane;
   setContactsPane: (pane: ContactsPane) => void;
   contactsData: WorkbenchContactsData | undefined;
-  /** Hub contacts request failure (#1821), surfaced to the page error state. */
+  /** Hub contacts request failure, surfaced to the page error state. */
   contactsError: string | undefined;
   handleMemberClick: ((member: ContactMember) => void) | undefined;
   contactsActions: WorkbenchContactsActions | undefined;
@@ -99,7 +99,7 @@ export function useWorkbenchContactsRoute({
       }
     : undefined;
 
-  // ── Mock cursor pagination (#1510). The mock pool is larger than one page
+  // ── Mock cursor pagination. The mock pool is larger than one page
   //    so the infinite-scroll path is exercised; the first page is loaded
   //    synchronously from the pool (no flash), loadMore appends the next page
   //    with an async cursor read. When the parent supplies `contacts` the

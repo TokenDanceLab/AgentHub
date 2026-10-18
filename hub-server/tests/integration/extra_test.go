@@ -306,7 +306,7 @@ func TestWebSocketUpgrade(t *testing.T) {
 	t.Run("AuthorizedUpgradeSucceeds", func(t *testing.T) {
 		// 有效认证握手必须建立连接并收到 auth.ok 帧（happy path 硬断言）。
 		// 走 newWSTestServer + dialWS（同包已验证路径）：该 server 同样
-		// 挂 WSAuthMiddleware + ServeWS，认证/升级语义与主 server 一致。
+		// 挂 AuthMiddleware.WSHandler() + ServeWS，认证/升级语义与主 server 一致。
 		u := register(t, "wsupg_auth", "pass1234", "WsUpgAuth")
 		manager := ws.NewManager()
 		manager.StartHeartbeat(context.Background())

@@ -928,7 +928,7 @@ describe('useWebWorkbenchModel helpers', () => {
           id: 'target-local-edge-1',
           name: 'Online Desktop Edge',
           target_type: 'local_edge',
-          workspace_allowlist: ['D:\\Code\\TokenDance\\AgentHub'],
+          workspace_allowlist: ['/workspace/agenthub'],
           health_state: 'online',
           trust_level: 'local',
           is_online: true,

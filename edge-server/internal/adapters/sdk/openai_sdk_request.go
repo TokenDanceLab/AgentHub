@@ -15,9 +15,6 @@ import (
 	"github.com/agenthub/edge-server/internal/runnerctx"
 )
 
-// Residual pure-helper peel #1152: OpenAI SDK HTTP request + message build helpers.
-// Grouped into package sdk (#1760); doRequestWithRetry / buildMessages called from ParseStream.
-
 // doRequestWithRetry makes the HTTP request with automatic retry for transient
 // failures (429 rate limit, 500/502/503/504 server errors). Auth errors (401/403)
 // and client errors (400) are not retried.

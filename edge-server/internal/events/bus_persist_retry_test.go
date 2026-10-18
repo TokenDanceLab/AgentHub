@@ -7,9 +7,8 @@ import (
 )
 
 // newBusWithPersistForTest returns a Bus whose persistFn hook is set directly.
-// The exported WithPersister option was removed (no production caller); the
-// hook is still how WithEventLogPath wires durable persistence, so the retry
-// machinery below is exercised through the same field.
+// WithEventLogPath wires durable persistence through the same field, so the
+// retry machinery below runs against the same path as production.
 func newBusWithPersistForTest(fn PersistFn) *Bus {
 	b := NewBus(100)
 	b.persistFn = fn

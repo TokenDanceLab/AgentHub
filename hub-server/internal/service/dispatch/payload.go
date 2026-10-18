@@ -48,31 +48,6 @@ func ApplyTeamContextToPayload(tc TeamContext) (teamID, teamRunID, teamMemberID,
 	return tc.TeamID, tc.TeamRunID, tc.TeamMemberID, tc.TeamMemberRole
 }
 
-// TeamMemberRefsFromProfiles maps (id, role, profileID) triples into TeamMemberRef
-// rows for MatchTeamContext. Length of each slice must match; mismatched lengths
-// use the minimum common length.
-func TeamMemberRefsFromProfiles(ids, roles []string, profileIDs []*string) []TeamMemberRef {
-	n := len(ids)
-	if len(roles) < n {
-		n = len(roles)
-	}
-	if len(profileIDs) < n {
-		n = len(profileIDs)
-	}
-	if n == 0 {
-		return nil
-	}
-	refs := make([]TeamMemberRef, n)
-	for i := 0; i < n; i++ {
-		refs[i] = TeamMemberRef{
-			ID:             ids[i],
-			Role:           roles[i],
-			AgentProfileID: profileIDs[i],
-		}
-	}
-	return refs
-}
-
 // TeamMemberRefsFromMembers maps team-member rows into pure refs without building
 // intermediate id/role/profile triple slices.
 func TeamMemberRefsFromMembers(members []model.AgentTeamMember) []TeamMemberRef {

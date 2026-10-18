@@ -1,7 +1,7 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { SHARED_WORKBENCH_I18N_NAMESPACE } from '@shared/i18n';
-import { RuntimeBrandIcon } from '../../RuntimeBrandIcon';
+import { RuntimeBrandIcon } from '@shared/ui';
 import { Button, Select } from '@shared/ui';
 import styles from '../AgentsPage.module.css';
 import {
@@ -23,7 +23,7 @@ import type {
 /* ═══════════════════════════════════════════════════════════════════════════════════════
    Agent edit panel presentational sub-parts.
 
-   Extracted from AgentEditPanel as Phase 29 residual thin #695.
+   Extracted from AgentEditPanel (#695).
    CSS remains on shared AgentsPage.module.css.
    ═══════════════════════════════════════════════════════════════════════════════════════ */
 

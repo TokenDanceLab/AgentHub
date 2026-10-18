@@ -20,11 +20,10 @@ import {
 } from './inspector/RuntimeEvidencePanel';
 
 /* ═══════════════════════════════════════════════════════════════════════
-   rightInspectorHelpers — pure residual slices from RightInspector (#661).
+   rightInspectorHelpers — pure helpers for RightInspector (#661).
 
    Tab visibility planners, overview/browser selection mappers, resizer
-   handlers, and fallback-mode resolution. No React hooks / no intentional
-   UX change.
+   handlers, and fallback-mode resolution. No React hooks.
    ═══════════════════════════════════════════════════════════════════════ */
 
 export type InspectorRouteBlock =
@@ -180,7 +179,7 @@ export function planRestoreInspectorTab(
 /**
  * Auto-switch only on NEW real deploy URLs (not re-renders of the same URL).
  * Themed blank placeholders (`about:blank`) must not steal the overview tab
- * — demo fixtures use them for empty browser chrome (#1318 / rescore-9).
+ * — demo fixtures use them for empty browser chrome (#1318).
  */
 export function shouldAutoSwitchDeployPreview(
   deployPreviewUrl: string | undefined,

@@ -8,8 +8,6 @@ import (
 	"github.com/agenthub/pkg/safego"
 )
 
-// Residual pure-helper peel of dispatchInterceptor scan/rule/fan-out methods (#1111).
-
 func (d *dispatchInterceptor) Emit(eventType string, scope map[string]any, payload any) {
 	d.inner.Emit(eventType, scope, payload)
 	switch eventType {
@@ -22,7 +20,7 @@ func (d *dispatchInterceptor) Emit(eventType string, scope map[string]any, paylo
 			d.textBuffer.WriteString(text)
 		}
 		// Scan the FULL accumulated buffer to catch JSON lines split
-		// across deltas (ISSUE 3.2).
+		// across deltas.
 		d.scanTextForDispatch(d.textBuffer.String(), scope)
 	}
 }
@@ -39,9 +37,9 @@ func (d *dispatchInterceptor) scanForDispatch(payload any, scope map[string]any)
 
 // scanTextForDispatch scans pre-extracted text for dispatch events.
 // Used directly for buffered TextDelta accumulation to prevent JSON
-// lines split across deltas from being silently skipped (ISSUE 3.2).
+// lines split across deltas from being silently skipped.
 func (d *dispatchInterceptor) scanTextForDispatch(text string, scope map[string]any) {
-	// T2-A08: Rule engine pre-processing layer — intercept simple
+	// Rule engine pre-processing layer — intercept simple
 	// termination/completion signals before JSON dispatch parsing.
 	if d.applyRuleEngine(text, scope) {
 		return // rule engine consumed the decision
@@ -52,12 +50,12 @@ func (d *dispatchInterceptor) scanTextForDispatch(text string, scope map[string]
 		return
 	}
 
-	// Plan approval gate (P0 #3): pause and wait for user decision.
+	// Plan approval gate: pause and wait for user decision.
 	if !d.awaitPlanApproval(events, scope) {
 		return // plan was rejected or cancelled
 	}
 
-	// T2-A08: Apply rule engine to parsed dispatch events for
+	// Apply rule engine to parsed dispatch events for
 	// trivial routing optimization (single-finish skip, same-agent sequential).
 	events = d.ruleEnginePreprocess(events, scope)
 	if len(events) == 0 {
@@ -157,17 +155,14 @@ func (d *dispatchInterceptor) fanOutSequential(events []dispatchEvent, scope map
 
 // fanOutDispatches executes multiple dispatch events concurrently via a
 // semaphore-limited goroutine pool. Blocks until all dispatches complete.
-// Concurrency bounded by maxConcurrency (default DefaultDispatchConcurrency = 10,
-// matching OpenCode default tool concurrency).
+// Concurrency bounded by DefaultDispatchConcurrency (10, matching OpenCode
+// default tool concurrency).
 //
 // Before dispatching, each event is injected with sibling context so every
 // sub-agent knows what other agents in the same parallel batch are doing.
 // This prevents file conflicts when multiple agents work on the same workspace.
 func (d *dispatchInterceptor) fanOutDispatches(events []dispatchEvent, scope map[string]any) {
-	maxConc := d.maxConcurrency
-	if maxConc <= 0 {
-		maxConc = DefaultDispatchConcurrency
-	}
+	maxConc := DefaultDispatchConcurrency
 
 	events = attachSiblingContexts(events)
 

@@ -191,7 +191,7 @@ func (a *App) hubStateDumper() debugpkg.StateDumper {
 }
 
 // runtimeMetricsPrev carries the cumulative-counter baselines needed to
-// report per-tick deltas (G11 pattern).
+// report per-tick deltas.
 type runtimeMetricsPrev struct {
 	redisPoolHits uint32
 	dbWaitCount   int64
@@ -203,7 +203,7 @@ func (a *App) startMetricsCollector(ctx context.Context) {
 	a.bg.Go(func() error {
 		ticker := time.NewTicker(config.MetricsCollectionInterval)
 		defer ticker.Stop()
-		// G11: cumulative monotonic counters (redis hits, sql.DBStats waits) are
+		// Cumulative monotonic counters (redis hits, sql.DBStats waits) are
 		// tracked as per-tick deltas and Add()ed to Counters.
 		var prev runtimeMetricsPrev
 		for {
@@ -225,7 +225,7 @@ func (a *App) collectRuntimeMetrics(prev runtimeMetricsPrev) runtimeMetricsPrev 
 	if sqlDB, err := a.DB.DB(); err == nil {
 		stats := sqlDB.Stats()
 		metrics.DBPoolInUse.Set(float64(stats.InUse))
-		// G8: optional pool saturation gauge.
+		// Optional pool saturation gauge.
 		if metrics.DBPoolIdle != nil {
 			metrics.DBPoolIdle.Set(float64(stats.Idle))
 		}

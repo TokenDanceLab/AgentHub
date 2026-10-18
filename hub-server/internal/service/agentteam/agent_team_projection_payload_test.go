@@ -11,7 +11,7 @@ import (
 
 // Pins the semantics of the "filter on event type, then decode" reordering in
 // projectTeamRuntimeSummaries, and the fact that projectTeamBudget still
-// decodes every event (it reads token usage from all of them) — #2154 P2-5.
+// decodes every event (it reads token usage from all of them) — #2154.
 
 func teamPayloadRefs() map[string]teamRuntimeTaskRef {
 	return map[string]teamRuntimeTaskRef{

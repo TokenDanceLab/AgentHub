@@ -5,10 +5,12 @@ import (
 	"encoding/json"
 	"log/slog"
 	"net/http"
+	"reflect"
 
 	"gorm.io/gorm"
 
 	"github.com/agenthub/hub-server/internal/bus"
+	"github.com/agenthub/hub-server/internal/cache"
 	"github.com/agenthub/hub-server/internal/config"
 	"github.com/agenthub/hub-server/internal/metrics"
 	"github.com/agenthub/hub-server/internal/service/dispatch"
@@ -22,24 +24,21 @@ type dispatchPayload = dispatch.Payload
 // payload JSON tags and redispatch unmarshaling stay stable (#756).
 type dispatchMessage = dispatch.Message
 
-// Same-package aliases for pure dispatch DTOs (#768 residual).
-// Kept for signatures + redispatch unmarshal surface (#834).
+// Same-package aliases for pure dispatch DTOs; kept for signatures and
+// redispatch unmarshal stability.
 type dispatchTeamContext = dispatch.TeamContext
 type dispatchTargetSnapshot = dispatch.TargetSnapshot
 type pendingTaskSnapshot = dispatch.PendingTaskSnapshot
 
 // ── DispatchService ports + type ─────────────────────────────────────────────
 //
-// Pure residual continue (#1056) after #1033/#1012/#977/#946/#902 and the
-// #732→#834 chain. Call dispatch.* directly; DTO aliases kept for JSON/redispatch
-// stability. Orchestration + ports stay flat here. Preserve #866/#999/#1000/#1009
-// outbox redispatch semantics; #1031 coordinates offline queue vs outbox ownership.
-// No OpenAPI/handler/frontend; no typed package move.
+// Call dispatch.* directly; DTO aliases keep JSON/redispatch stable.
+// Orchestration and ports stay in this package. Outbox redispatch keeps its
+// soft-fail, running-not-retryable, atomic-claim, and offline-vs-outbox
+// ownership semantics.
 //
-// Ports and nil-safe wrappers are split into this file (#1068), mirroring the
-// ports-vs-orchestration split the delivery-outbox code uses (#801). Cited by
-// responsibility rather than by file name: the two delivery-outbox files this
-// line used to point at do not exist in the tree (#2246).
+// Ports and nil-safe wrappers live in this file, mirroring the
+// ports-vs-orchestration split used by deliveryoutbox.
 
 // dispatchOutbox records, marks, and dead-letters delivery journal rows during
 // dispatch / redispatch. Implemented by *DeliveryOutbox (AgentService facades
@@ -114,10 +113,9 @@ type RelayPort interface {
 }
 
 // DispatchService owns agent task dispatch orchestration: trigger, payload build,
-// edge HTTP / WS / offline routing, capability minting, history/pins loading, and
-// redispatch residual. DeliveryOutbox retries enter via Redispatcher; Payload DTO
-// lives in service/dispatch with a thin same-package alias. Same-package extract
-// (#563/#573/#617) + pure helpers (#732→#1056) — typed package move still deferred.
+// edge HTTP/WS/offline routing, capability minting, history/pins loading, and
+// redispatch. DeliveryOutbox retries enter via Redispatcher; the Payload DTO
+// lives in service/dispatch with a same-package alias.
 type DispatchService struct {
 	db          *gorm.DB
 	bus         dispatchBus
@@ -136,11 +134,10 @@ type DispatchService struct {
 	edgeClient *http.Client
 	// jwtSecret signs run-start capability tokens; sourced from config.JWT.
 	jwtSecret string
-	// edgeBreaker guards dispatchToEdgeHTTP against a down Edge server. A nil
-	// breaker (partial test constructions) allows all traffic; NewDispatchService
-	// wires a real breaker so production fails fast after threshold consecutive
-	// edge failures instead of blocking the dispatch semaphore for 30s each.
-	edgeBreaker *edgeCircuitBreaker
+	// edgeBreaker guards dispatchToEdgeHTTP against a down Edge server. The zero
+	// value is closed; after threshold consecutive failures it fails fast instead
+	// of blocking dispatch for the HTTP timeout.
+	edgeBreaker edgeCircuitBreaker
 	// dispatchSem bounds concurrent dispatchTask goroutines launched from
 	// TriggerAgentTask. Without it every trigger spawns an unbounded goroutine
 	// that performs DB/HTTP/WS work; a dispatch storm could exhaust goroutines
@@ -155,7 +152,7 @@ type DispatchService struct {
 
 // SetAuditService injects the privileged-action auditor (#2067). nil disables recording.
 func (s *DispatchService) SetAuditService(a PrivilegedActionAuditor) {
-	if !dispatch.ServiceReceiverAvailable(s != nil) {
+	if s == nil {
 		return
 	}
 	s.audit = a
@@ -178,38 +175,26 @@ func NewDispatchService(db *gorm.DB, bus dispatchBus, mgr ManagerPort, cacheClie
 		edgeCfg:     edgeCfg,
 		edgeClient:  edgeClient,
 		jwtSecret:   jwtSecret,
-		edgeBreaker: &edgeCircuitBreaker{},
 		dispatchSem: make(chan struct{}, dispatchSemaphoreCapacity),
 	}
 }
 
-// SetOutbox injects (or replaces) the delivery outbox port.
-func (s *DispatchService) SetOutbox(outbox dispatchOutbox) {
-	if !dispatch.ServiceReceiverAvailable(s != nil) {
-		return
+// resolveDispatchCache degrades nil and typed-nil cache ports to the
+// fail-closed NoOpCache so dispatch paths return ErrCacheUnavailable instead
+// of panicking on partial test constructions.
+func resolveDispatchCache(c dispatchCache) dispatchCache {
+	if c == nil {
+		return cache.NoOpCache{}
 	}
-	s.outbox = outbox
-}
-
-// SetBus injects (or replaces) the event bus port.
-func (s *DispatchService) SetBus(bus dispatchBus) {
-	if !dispatch.ServiceReceiverAvailable(s != nil) {
-		return
+	if value := reflect.ValueOf(c); value.Kind() == reflect.Pointer && value.IsNil() {
+		return cache.NoOpCache{}
 	}
-	s.bus = bus
-}
-
-// SetCache injects (or replaces) the route / offline-queue cache port.
-func (s *DispatchService) SetCache(cacheClient dispatchCache) {
-	if !dispatch.ServiceReceiverAvailable(s != nil) {
-		return
-	}
-	s.cacheClient = resolveDispatchCache(cacheClient)
+	return c
 }
 
 // publish is a nil-safe wrapper over the bus port (cancel/regenerate events).
 func (s *DispatchService) publish(ctx context.Context, event bus.Event) {
-	if !dispatch.BusPortAvailable(s != nil, s != nil && s.bus != nil) {
+	if s == nil || s.bus == nil {
 		return
 	}
 	if err := s.bus.Publish(ctx, event); err != nil {
@@ -217,17 +202,9 @@ func (s *DispatchService) publish(ctx context.Context, event bus.Event) {
 	}
 }
 
-// cachePort is a nil-safe accessor for the route / offline-queue cache port.
-func (s *DispatchService) cachePort() dispatchCache {
-	if !dispatch.ServiceReceiverAvailable(s != nil) {
-		return resolveDispatchCache(nil)
-	}
-	return resolveDispatchCache(s.cacheClient)
-}
-
 // recordDelivery is a nil-safe wrapper over the outbox port.
 func (s *DispatchService) recordDelivery(ctx context.Context, taskID, payload, edgeDeviceID string) (string, error) {
-	if !dispatch.OutboxPortAvailable(s != nil, s != nil && s.outbox != nil) {
+	if s == nil || s.outbox == nil {
 		return "", dispatch.ErrOutboxUnavailable()
 	}
 	return s.outbox.RecordDelivery(ctx, taskID, payload, edgeDeviceID)
@@ -235,7 +212,7 @@ func (s *DispatchService) recordDelivery(ctx context.Context, taskID, payload, e
 
 // markDeliverySent is a nil-safe wrapper over the outbox port.
 func (s *DispatchService) markDeliverySent(ctx context.Context, deliveryID string) error {
-	if !dispatch.OutboxPortAvailable(s != nil, s != nil && s.outbox != nil) {
+	if s == nil || s.outbox == nil {
 		return dispatch.ErrOutboxUnavailable()
 	}
 	return s.outbox.MarkDeliverySent(ctx, deliveryID)
@@ -243,7 +220,7 @@ func (s *DispatchService) markDeliverySent(ctx context.Context, deliveryID strin
 
 // moveDeliveryToDeadLetter is a nil-safe wrapper over the outbox port used by redispatch.
 func (s *DispatchService) moveDeliveryToDeadLetter(ctx context.Context, deliveryID, lastError string) {
-	if !dispatch.OutboxPortAvailable(s != nil, s != nil && s.outbox != nil) {
+	if s == nil || s.outbox == nil {
 		return
 	}
 	if err := s.outbox.MoveDeliveryToDeadLetter(ctx, deliveryID, lastError); err != nil {

@@ -58,7 +58,7 @@ type CreateParams struct {
 	WorkDir        string
 
 	// WorkspaceAllowlist is the request-time allowlist used to validate
-	// WorkDir (AH-SR-006 / #998). Empty = fail-closed for non-empty workDir.
+	// WorkDir (#998). Empty = fail-closed for non-empty workDir.
 	WorkspaceAllowlist []string
 
 	// AgentExists, when non-nil, rejects unknown agent IDs (#175). REST wires
@@ -201,7 +201,7 @@ func validateTarget(repository store.Repository, projectID, threadID string) *er
 }
 
 // validateWorkDir enforces a non-empty workDir for adapter runs (#854), then
-// applies the shared REST/MCP workspace allowlist policy (AH-SR-006 / #998):
+// applies the shared REST/MCP workspace allowlist policy (#998):
 // EvalSymlinks + IsPathWithin via security.ValidateWorkDirAgainstAllowlist.
 func validateWorkDir(workDir string, allowlist []string) *errcode.Error {
 	if workDir == "" {
@@ -228,7 +228,7 @@ func validatePermissionMode(mode string) error {
 	if mode == "" {
 		return nil
 	}
-	// SEC-02: Reject 'bypassPermissions' — it disables ALL security hooks at
+	// Reject 'bypassPermissions' — it disables ALL security hooks at
 	// the CLI level, giving the agent unrestricted shell access regardless
 	// of SecurityHook settings. Only the whitelist modes are allowed.
 	switch mode {

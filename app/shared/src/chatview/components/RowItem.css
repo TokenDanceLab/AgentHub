@@ -50,11 +50,11 @@
 .row-hd:hover { background:var(--td-surface-3) }
 .row-hd:focus-visible { outline:none; box-shadow:var(--focus-ring) }
 
-/* F10: artifact rows are preview triggers, not expandable empty file rows. */
+/* Artifact rows are preview triggers, not expandable empty file rows. */
 .row-item.artifact-preview-target > .row-hd { cursor:pointer }
 .row-item.artifact-preview-target > .row-hd:hover { background:color-mix(in oklch, var(--td-accent) 8%, var(--td-surface-3)) }
 
-/* ── Wave10 a11y: keyboard focus ring on the block row itself (the div is the
+/* ──  a11y: keyboard focus ring on the block row itself (the div is the
    tab stop via tabIndex=0). Only matches keyboard focus, not inner-button
    focus, so there's no double ring when the header button is focused. ── */
 .row-item:focus-visible { outline:none; box-shadow:var(--focus-ring) }
@@ -146,7 +146,7 @@
 .row-item.approval.fail > .row-bd { border-left-color:var(--td-danger) }
 .ap-reason { font:var(--chat-label); color:var(--td-ink-muted) }
 
-/* ── Approval structured preview (QW4: six-type render by request kind) ── */
+/* ── Approval structured preview (six-type render by request kind) ── */
 .ap-scroll { max-height:min(36vh, 18rem); overflow-y:auto; scrollbar-width:thin; scrollbar-color:var(--scrollbar-thumb) var(--scrollbar-track) }
 .ap-section { margin-top:var(--chat-sp-xs) }
 .ap-section:first-child { margin-top:0 }
@@ -173,7 +173,7 @@
 /* fallback JSON */
 .ap-json { font:var(--chat-label); font-family:var(--td-mono); white-space:pre-wrap; word-break:break-all; color:var(--td-ink-muted); background:var(--td-surface-2); padding:var(--chat-sp-sm) var(--chat-sp-md); border-radius:var(--chat-r-sm); border:1px solid var(--td-line); overflow-x:auto }
 
-/* Think shimmer (QW6) */
+/* Think shimmer */
 .think-shimmer { background:linear-gradient(90deg, var(--td-ink-muted) 0%, var(--td-ink) 48%, var(--td-ink-muted) 52%, var(--td-ink-muted) 100%); background-size:200% 100%; -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent; animation:thinkShimmer 2s linear infinite }
 
 @keyframes thinkShimmer { 0% { background-position: 100% center } 100% { background-position: -100% center } }
@@ -190,7 +190,7 @@
 .ap-actions.has-risk { padding-top:var(--chat-sp-2) }
 .ap-kbd-hint { font:var(--chat-label-xs); color:var(--td-ink-subtle); margin-left:auto; user-select:none; opacity:0.85 }
 
-/* ── T16: critical second-confirm — armed state on the destructive Button
+/* ── Critical second-confirm — armed state on the destructive Button
    (danger outline + pulse ring, migrated from .ap-approve.critical.confirming) ── */
 .ap-actions .confirming {
   box-shadow:0 0 0 2px var(--td-surface), 0 0 0 4px var(--td-danger);
@@ -202,7 +202,7 @@
   50% { box-shadow:0 0 0 2px var(--td-surface), 0 0 0 6px var(--td-danger) }
 }
 
-/* ── Copy→Check feedback (Fable UIUX #4) ── */
+/* ── Copy→Check feedback ── */
 .code-head .copied { color:var(--td-moss) }
 
 /* ── Fail retry (danger outline ghost) ── */
@@ -418,12 +418,11 @@
   text-overflow: ellipsis;
 }
 
-/* ── Reduced motion (#12): kill infinite/decorative loops ────────────
-   thinkShimmer / routePulse / dagPulse are infinite loops; highlightFadeOut
-   and routeSlideIn are decorative one-shots (motion tier 2 in
-   shared/src/components/README.md). apConfirmPulse is an infinite pulse
-   covered here as a bonus (same tier). row-spinner keeps its static ring
-   (informational state), row-item.soft-hidden collapses instantly. */
+/* ── Reduced motion: disable infinite and decorative loops ────────────
+   thinkShimmer / routePulse / dagPulse are infinite; highlightFadeOut,
+   routeSlideIn, and apConfirmPulse are decorative. row-spinner keeps its
+   static ring (informational state); row-item.soft-hidden collapses
+   instantly. */
 @media (prefers-reduced-motion: reduce) {
   .think-shimmer,
   .row-item.route,

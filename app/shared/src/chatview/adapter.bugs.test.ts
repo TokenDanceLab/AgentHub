@@ -4,24 +4,21 @@ import type { AgentTranscriptBlock } from './index'
 import type { TranscriptBlock } from '../transcript/types'
 import { makeAuthor, makeUser, makeTime, DEFAULT_AGENT_NAME } from './adapter-test-helpers'
 
-describe('blocksToTranscriptItems (bug hunt)', () => {
-  // BUG HUNT — failing tests for bugs found in adapter.ts
+describe('blocksToTranscriptItems (regressions)', () => {
+  // Regression tests for transcript adapter edge cases
   // ═══════════════════════════════════════════════════════════════════════
 
-  // ── BUG: tool_call with status failed shows as running ──
-  it('BUG: tool_call with status=failed should show as fail, not running', () => {
+  it('tool_call with status=failed should show as fail, not running', () => {
     const blocks: TranscriptBlock[] = [
       { id: 'tc1', kind: 'tool_call', createdAt: makeTime(1), author: makeAuthor('b1'), toolName: 'Read', status: 'failed' },
     ] as TranscriptBlock[]
     const items = blocksToTranscriptItems(blocks)
     const row = (items[0] as AgentTranscriptBlock).rows![0]!
     expect(row.type).toBe('tool')
-    // BUG: currently returns 'running', should be 'fail'
     expect(row.status).toBe('fail')
   })
 
-  // ── BUG: tool_call with status=failed but completed evidenceRef incorrectly shows as ok ──
-  it('BUG: tool_call with status=failed should stay fail even with completed evidenceRefs', () => {
+  it('tool_call with status=failed should stay fail even with completed evidenceRefs', () => {
     const blocks: TranscriptBlock[] = [
       {
         id: 'tc1', kind: 'tool_call', createdAt: makeTime(1), author: makeAuthor('b1'),
@@ -31,13 +28,11 @@ describe('blocksToTranscriptItems (bug hunt)', () => {
     ] as TranscriptBlock[]
     const items = blocksToTranscriptItems(blocks)
     const row = (items[0] as AgentTranscriptBlock).rows![0]!
-    // BUG: evidenceRefs completion overrides the explicit failed status
-    // The failed block status should take precedence over evidence refs
+    // The failed block status takes precedence over evidence refs
     expect(row.status).toBe('fail')
   })
 
-  // ── BUG: approval 'reason in a' check never falls through to title ──
-  it('BUG: approval block should use title when reason is undefined', () => {
+  it('approval block should use title when reason is undefined', () => {
     const blocks: TranscriptBlock[] = [
       {
         id: 'ap1', kind: 'approval', createdAt: makeTime(1), author: makeAuthor('b1'),
@@ -47,14 +42,11 @@ describe('blocksToTranscriptItems (bug hunt)', () => {
     ] as TranscriptBlock[]
     const items = blocksToTranscriptItems(blocks)
     const row = (items[0] as AgentTranscriptBlock).standaloneRows![0]!
-    // BUG: 'reason' in a is always true (property exists on the interface),
-    // so a.reason (undefined) is used, filtered out by Boolean, and title is never reached.
-    // apReason should contain the title as fallback
+    // With no reason set, apReason falls back to the title
     expect(row.apReason).toContain('Deploy to production')
   })
 
-  // ── BUG: agent_timeline items with status 'done' show as 'running' ──
-  it('BUG: agent_timeline item with status done should show as ok, not running', () => {
+  it('agent_timeline item with status done should show as ok, not running', () => {
     const blocks: TranscriptBlock[] = [
       {
         id: 'tl1', kind: 'agent_timeline', createdAt: makeTime(1), author: makeAuthor('b1'),
@@ -65,12 +57,10 @@ describe('blocksToTranscriptItems (bug hunt)', () => {
     ] as TranscriptBlock[]
     const items = blocksToTranscriptItems(blocks)
     const row = (items[0] as AgentTranscriptBlock).rows![0]!
-    // BUG: status 'done' falls through to default 'running'
     expect(row.status).toBe('ok')
   })
 
-  // ── BUG: agent_timeline items with status 'todo' show as 'running' ──
-  it('BUG: agent_timeline item with status todo should not show as running', () => {
+  it('agent_timeline item with status todo should not show as running', () => {
     const blocks: TranscriptBlock[] = [
       {
         id: 'tl2', kind: 'agent_timeline', createdAt: makeTime(1), author: makeAuthor('b1'),
@@ -81,34 +71,28 @@ describe('blocksToTranscriptItems (bug hunt)', () => {
     ] as TranscriptBlock[]
     const items = blocksToTranscriptItems(blocks)
     const row = (items[0] as AgentTranscriptBlock).rows![0]!
-    // BUG: status 'todo' falls through to default 'running'
-    // It should arguably be 'waiting' or some distinct state, but at minimum
+    // 'todo' should arguably be 'waiting' or some distinct state, but at minimum
     // it shouldn't be 'running' which implies in-progress work.
     // Since RowItem.status has 'running' | 'ok' | 'fail' | 'waiting',
     // 'waiting' is the best fit for 'todo'.
     expect(row.status).toBe('waiting')
   })
 
-  // ── BUG: null author on agent text block crashes ──
-  it('BUG: null author on agent text block should not crash', () => {
+  it('null author on agent text block should not crash', () => {
     const blocks = [
       { id: 't1', kind: 'text' as const, createdAt: makeTime(1), author: null as unknown as TranscriptBlock['author'], text: 'hello' },
     ] as TranscriptBlock[]
-    // BUG: newAgentBlock(block.author, ...) accesses author.name without optional chaining, throws TypeError
     expect(() => blocksToTranscriptItems(blocks)).not.toThrow()
   })
 
-  // ── BUG: null author on structured block (e.g. thinking) crashes ──
-  it('BUG: null author on thinking block should not crash', () => {
+  it('null author on thinking block should not crash', () => {
     const blocks = [
       { id: 'th1', kind: 'thinking' as const, createdAt: makeTime(1), author: null as unknown as TranscriptBlock['author'], content: 'x', isThinking: true },
     ] as TranscriptBlock[]
-    // BUG: line 516 accesses block.author.id and block.author.name without optional chaining
     expect(() => blocksToTranscriptItems(blocks)).not.toThrow()
   })
 
-  // ── BUG: user text with null author crashes on block.author.name ──
-  it('BUG: user text with null author should not crash on author.name access', () => {
+  it('user text with null author should not crash on author.name access', () => {
     // role check: block.author?.role ?? 'system' = 'system' (since author is null)
     // So this would NOT enter the user text path, but would enter the agent text path
     // and crash. However, if author had role 'human' but was somehow null (impossible by types),
@@ -120,21 +104,19 @@ describe('blocksToTranscriptItems (bug hunt)', () => {
     expect(() => blocksToTranscriptItems(blocks)).not.toThrow()
   })
 
-  // ── BUG: tool_result with running tool_call where result has failed status ──
-  it('BUG: tool_result with failed status should be reflected after merge', () => {
+  it('tool_result with failed status should be reflected after merge', () => {
     const blocks: TranscriptBlock[] = [
       { id: 'tc1', kind: 'tool_call', createdAt: makeTime(1), author: makeAuthor('b1'), toolName: 'Bash', status: 'running' },
       { id: 'tr1', kind: 'tool_result', createdAt: makeTime(2), author: makeAuthor('b1'), toolName: 'Bash', status: 'failed', summary: 'exit code 1' },
     ] as TranscriptBlock[]
     const items = blocksToTranscriptItems(blocks)
     const row = (items[0] as AgentTranscriptBlock).rows![0]!
-    // BUG: statusNorm('failed') = 'fail', which is correct. But let's verify the merge preserves it.
+    // The merge must preserve the failed status from the result.
     expect(row.status).toBe('fail')
     expect(row.isResult).toBe(true)
   })
 
-  // ── BUG: multiple tool_calls with same toolName get wrong result pairing ──
-  it('BUG: tool_result should pair with the correct tool_call when multiple share the same toolName', () => {
+  it('tool_result should pair with the correct tool_call when multiple share the same toolName', () => {
     // Two Read calls, then two Read results. The first result should pair with the first call.
     const blocks: TranscriptBlock[] = [
       { id: 'tc_read1', kind: 'tool_call', createdAt: makeTime(1), author: makeAuthor('b1'), toolName: 'Read', status: 'running', target: '/file1.ts' },
@@ -144,11 +126,7 @@ describe('blocksToTranscriptItems (bug hunt)', () => {
     ] as TranscriptBlock[]
     const items = blocksToTranscriptItems(blocks)
     const rows = (items[0] as AgentTranscriptBlock).rows!
-    // BUG: findLastIndex always matches the last tool_call with same toolName.
-    // After first merge: [Read(merged, isResult=true, content='content of file1'), Read(running)]
-    // After second merge: [Read(running), Read(merged, isResult=true, content='content of file2')]
-    // The first Read call never gets its own result — the second result overwrites it.
-    // Expected: both Read calls should be resolved with their respective results.
+    // Both Read calls must be resolved with their respective results.
     expect(rows).toHaveLength(2)
     // Both should have isResult: true since each has its own result
     expect(rows[0]!.isResult).toBe(true)
@@ -158,8 +136,7 @@ describe('blocksToTranscriptItems (bug hunt)', () => {
     expect(rows[1]!.content).toBe('content of file2')
   })
 
-  // ── BUG: statusNorm maps undefined to 'ok' silently ──
-  it('BUG: statusNorm should not silently map undefined to ok', () => {
+  it('statusNorm should not silently map undefined to ok', () => {
     // tool_result with undefined status should not default to 'ok'
     const blocks: TranscriptBlock[] = [
       {
@@ -170,14 +147,11 @@ describe('blocksToTranscriptItems (bug hunt)', () => {
     ] as TranscriptBlock[]
     const items = blocksToTranscriptItems(blocks)
     const row = (items[0] as AgentTranscriptBlock).rows![0]!
-    // BUG: undefined status falls through to 'ok' via statusNorm's default branch.
-    // An undefined/missing status is ambiguous — 'running' or leaving it undefined
-    // would be safer than falsely claiming 'ok'.
+    // An undefined/missing status is ambiguous; it must not be reported as 'ok'.
     expect(row.status).not.toBe('ok')
   })
 
-  // ── BUG: empty string content in thinking block ──
-  it('BUG: thinking block with empty content should produce empty string, not crash', () => {
+  it('thinking block with empty content should produce empty string, not crash', () => {
     const blocks: TranscriptBlock[] = [
       { id: 'th1', kind: 'thinking', createdAt: makeTime(1), author: makeAuthor('b1'), content: '', isThinking: true },
     ] as TranscriptBlock[]
@@ -187,21 +161,18 @@ describe('blocksToTranscriptItems (bug hunt)', () => {
     expect(row.content).toBe('')
   })
 
-  // ── BUG: thinking block with isThinking false but no content ──
-  it('BUG: thinking block with isThinking=false should show ok status with empty content', () => {
+  it('thinking block with isThinking=false should show ok status with empty content', () => {
     const blocks: TranscriptBlock[] = [
       { id: 'th1', kind: 'thinking', createdAt: makeTime(1), author: makeAuthor('b1'), content: undefined, isThinking: false },
     ] as TranscriptBlock[]
     const items = blocksToTranscriptItems(blocks)
     const row = (items[0] as AgentTranscriptBlock).rows![0]!
     expect(row.status).toBe('ok')
-    // BUG: content can be '' (empty string from `t.content || ''`)
-    // Actually line 159: `content: t.content || ''`, so undefined becomes '' — that's fine.
+    // Undefined content normalizes to ''.
     expect(row.content).toBe('')
   })
 
-  // ── BUG: context_usage with negative or NaN tokens ──
-  it('BUG: context_usage with NaN usagePercent should not produce NaN in ctxPct', () => {
+  it('context_usage with NaN usagePercent should not produce NaN in ctxPct', () => {
     const blocks: TranscriptBlock[] = [
       {
         id: 'cu1', kind: 'context_usage', createdAt: makeTime(1), author: makeAuthor('b1'),
@@ -210,13 +181,11 @@ describe('blocksToTranscriptItems (bug hunt)', () => {
     ] as TranscriptBlock[]
     const items = blocksToTranscriptItems(blocks)
     const row = (items[0] as AgentTranscriptBlock).standaloneRows![0]!
-    // BUG: c.usagePercent || 0 — NaN is falsy, so 0 is used. This is actually correct.
-    // But let's verify: NaN || 0 = 0. Yes, this edge case is handled.
+    // NaN is falsy, so usagePercent normalizes to 0.
     expect(row.ctxPct).toBe(0)
   })
 
-  // ── BUG: attachment with size === 0 gives '0 KB' instead of omitting ──
-  it('BUG: attachment with zero size should omit fileSize, not show "0 KB"', () => {
+  it('attachment with zero size should omit fileSize, not show "0 KB"', () => {
     const attachmentRef = { id: 'att-1', name: 'empty.txt', size: 0, mime_type: 'text/plain' }
     const blocks: TranscriptBlock[] = [
       {
@@ -231,8 +200,7 @@ describe('blocksToTranscriptItems (bug hunt)', () => {
     expect(row.fileSize).toBeUndefined()
   })
 
-  // ── BUG: diff block with patch containing only context lines ──
-  it('BUG: diff block patch with only context lines should produce all ctx type lines', () => {
+  it('diff block patch with only context lines should produce all ctx type lines', () => {
     const blocks: TranscriptBlock[] = [
       {
         id: 'd1', kind: 'diff', createdAt: makeTime(1), author: makeAuthor('b1'),
@@ -247,8 +215,7 @@ describe('blocksToTranscriptItems (bug hunt)', () => {
     expect(row.diffLines![1]!.type).toBe('ctx')
   })
 
-  // ── BUG: failure block reason is empty string (falsy) ──
-  it('BUG: failure with empty reason and empty title falls to default Chinese text', () => {
+  it('failure with empty reason and empty title falls to default Chinese text', () => {
     const blocks: TranscriptBlock[] = [
       {
         id: 'f1', kind: 'failure', createdAt: makeTime(1), author: makeAuthor('b1'),
@@ -261,8 +228,7 @@ describe('blocksToTranscriptItems (bug hunt)', () => {
     expect(row.content).toBe('运行失败')
   })
 
-  // ── BUG: run_step_group with missing author in child blocks ──
-  it('BUG: run_step_group children with their own author should use parent author for grouping', () => {
+  it('run_step_group children with their own author should use parent author for grouping', () => {
     const blocks: TranscriptBlock[] = [
       {
         id: 'rsg1', kind: 'run_step_group', createdAt: makeTime(1), author: makeAuthor('parent-agent'),
@@ -280,8 +246,7 @@ describe('blocksToTranscriptItems (bug hunt)', () => {
     expect(agent.rows).toHaveLength(1)
   })
 
-  // ── BUG: deploy with only status='failed' should show fail ──
-  it('BUG: deploy with status=failed and no extra metadata shows fail status and default meta', () => {
+  it('deploy with status=failed and no extra metadata shows fail status and default meta', () => {
     const blocks: TranscriptBlock[] = [
       {
         id: 'dp1', kind: 'deploy', createdAt: makeTime(1), author: makeAuthor('b1'),
@@ -295,8 +260,7 @@ describe('blocksToTranscriptItems (bug hunt)', () => {
     expect(row.deployMeta).toBe('failed')
   })
 
-  // ── BUG: deploy with ready status should show ok ──
-  it('BUG: deploy with ready status should map to ok', () => {
+  it('deploy with ready status should map to ok', () => {
     const blocks: TranscriptBlock[] = [
       {
         id: 'dp1', kind: 'deploy', createdAt: makeTime(1), author: makeAuthor('b1'),
@@ -309,8 +273,7 @@ describe('blocksToTranscriptItems (bug hunt)', () => {
     expect(row.status).toBe('ok')
   })
 
-  // ── BUG: subagent with undefined summary and title ──
-  it('BUG: subagent with empty title and no summary should not crash', () => {
+  it('subagent with empty title and no summary should not crash', () => {
     const blocks: TranscriptBlock[] = [
       {
         id: 'sa1', kind: 'subagent', createdAt: makeTime(1), author: makeAuthor('b1'),
@@ -326,8 +289,7 @@ describe('blocksToTranscriptItems (bug hunt)', () => {
     expect(row.content).toBe('')
   })
 
-  // ── BUG: file_change with empty path ──
-  it('BUG: file_change with empty path should produce empty content and extra', () => {
+  it('file_change with empty path should produce empty content and extra', () => {
     const blocks: TranscriptBlock[] = [
       {
         id: 'fc1', kind: 'file_change', createdAt: makeTime(1), author: makeAuthor('b1'),
@@ -343,32 +305,27 @@ describe('blocksToTranscriptItems (bug hunt)', () => {
     expect(row.extra).toBe('')
   })
 
-  // ── BUG: tool_call with undefined toolName crashes on toLowerCase ──
-  it('BUG: tool_call with undefined toolName should not crash on toLowerCase', () => {
+  it('tool_call with undefined toolName should not crash on toLowerCase', () => {
     const blocks: TranscriptBlock[] = [
       {
         id: 'tc1', kind: 'tool_call', createdAt: makeTime(1), author: makeAuthor('b1'),
         toolName: undefined as unknown as string, status: 'running',
       },
     ] as TranscriptBlock[]
-    // BUG: line 174: t.toolName.toLowerCase() — crashes if toolName is undefined
     expect(() => blocksToTranscriptItems(blocks)).not.toThrow()
   })
 
-  // ── BUG: tool_result with undefined toolName crashes on toLowerCase ──
-  it('BUG: tool_result with undefined toolName should not crash on toLowerCase', () => {
+  it('tool_result with undefined toolName should not crash on toLowerCase', () => {
     const blocks: TranscriptBlock[] = [
       {
         id: 'tr1', kind: 'tool_result', createdAt: makeTime(1), author: makeAuthor('b1'),
         toolName: undefined as unknown as string, status: 'completed', summary: 'ok',
       },
     ] as TranscriptBlock[]
-    // BUG: line 187: t.toolName.toLowerCase() — crashes if toolName is undefined
     expect(() => blocksToTranscriptItems(blocks)).not.toThrow()
   })
 
-  // ── BUG: thinking status not updated when isThinking changes mid-stream ──
-  it('BUG: thinking block with isThinking=false shows ok while earlier thinking=true showed running', () => {
+  it('thinking block with isThinking=false shows ok while earlier thinking=true showed running', () => {
     const blocks: TranscriptBlock[] = [
       { id: 'th1', kind: 'thinking', createdAt: makeTime(1), author: makeAuthor('b1'), content: 'Plan', isThinking: true },
       { id: 'th2', kind: 'thinking', createdAt: makeTime(2), author: makeAuthor('b1'), content: 'Refined plan', isThinking: false },
@@ -378,13 +335,11 @@ describe('blocksToTranscriptItems (bug hunt)', () => {
     expect(rows).toHaveLength(2)
     expect(rows[0]!.status).toBe('running')
     expect(rows[1]!.status).toBe('ok')
-    // BUG: the first thinking row is still 'running' even though thinking has completed.
-    // There is no logic to back-update earlier rows when thinking completes.
-    // This is arguably by design (historical accuracy), so we note it here.
+    // Earlier thinking rows keep their historical 'running' status; completion
+    // does not back-update them.
   })
 
-  // ── BUG: permission_request without toolName produces empty apReason start ──
-  it('BUG: permission_request without toolName or risk should still show reason', () => {
+  it('permission_request without toolName or risk should still show reason', () => {
     const blocks: TranscriptBlock[] = [
       {
         id: 'pr1', kind: 'permission_request', createdAt: makeTime(1), author: makeAuthor('b1'),
@@ -398,13 +353,11 @@ describe('blocksToTranscriptItems (bug hunt)', () => {
     // wait, risk IS an optional field on PermissionRequestTranscriptBlock)
     // 'reason' in a → true (property exists), so baseReason = a.reason (defined)
     // parts = [undefined, undefined, 'Needs to read sensitive data'] → filtered → ['Needs to read sensitive data']
-    // BUG: 'reason' in a is always true, but reason being set here makes it work.
-    // However, toolName and risk are both undefined, filtered out, so apReason = 'Needs to read sensitive data'
+    // toolName and risk are undefined here, so apReason is just the reason.
     expect(row.apReason).toBe('Needs to read sensitive data')
   })
 
-  // ── BUG: permission_result using 'reason in a' check cannot distinguish from permission_request ──
-  it('BUG: permission_result without reason should show title in apReason', () => {
+  it('permission_result without reason should show title in apReason', () => {
     const blocks: TranscriptBlock[] = [
       {
         id: 'pr2', kind: 'permission_result', createdAt: makeTime(1), author: makeAuthor('b1'),
@@ -415,15 +368,12 @@ describe('blocksToTranscriptItems (bug hunt)', () => {
     ] as TranscriptBlock[]
     const items = blocksToTranscriptItems(blocks)
     const row = (items[0] as AgentTranscriptBlock).standaloneRows![0]!
-    // BUG: 'reason' in a is true (property exists on interface), a.reason = undefined,
-    // baseReason = undefined (not title, because 'reason' in a is true!).
-    // parts = ['Write'] only. Title 'Allowed write' is lost.
+    // With no reason, apReason falls back to the title even though toolName is set.
     expect(row.apReason).toContain('Allowed write')
     expect(row.apReason).toContain('Write')
   })
 
-  // ── BUG: agent_timeline items with undefined detail ──
-  it('BUG: agent_timeline item with undefined detail should not append "undefined"', () => {
+  it('agent_timeline item with undefined detail should not append "undefined"', () => {
     const blocks: TranscriptBlock[] = [
       {
         id: 'tl1', kind: 'agent_timeline', createdAt: makeTime(1), author: makeAuthor('b1'),
@@ -435,13 +385,11 @@ describe('blocksToTranscriptItems (bug hunt)', () => {
     ] as TranscriptBlock[]
     const items = blocksToTranscriptItems(blocks)
     const row = (items[0] as AgentTranscriptBlock).rows![0]!
-    // BUG: `${ti.label}: ${ti.detail || ''}` — with undefined detail, this is 'Check: '
-    // The trailing ': ' is ugly but not a crash. The OR handles undefined.
+    // With undefined detail the OR yields 'Check: '; the trailing ': ' is cosmetic.
     expect(row.content).toBe('Check: ')
   })
 
-  // ── BUG: statusNorm with unrecognized status string (e.g. 'aborted') ──
-  it('BUG: statusNorm should not silently treat unrecognized status as ok', () => {
+  it('statusNorm should not silently treat unrecognized status as ok', () => {
     // Using tool_result as a vehicle for statusNorm
     const blocks: TranscriptBlock[] = [
       {
@@ -452,13 +400,11 @@ describe('blocksToTranscriptItems (bug hunt)', () => {
     ] as TranscriptBlock[]
     const items = blocksToTranscriptItems(blocks)
     const row = (items[0] as AgentTranscriptBlock).rows![0]!
-    // BUG: 'aborted' doesn't match any case in statusNorm, defaults to 'ok'.
-    // Unrecognized status should not be silently treated as success.
+    // Unrecognized status must not be silently treated as success.
     expect(row.status).not.toBe('ok')
   })
 
-  // ── BUG: context_usage with contextLimit=0 should omit "limit: 0k" ──
-  it('BUG: context_usage with contextLimit=0 should omit limit stat', () => {
+  it('context_usage with contextLimit=0 should omit limit stat', () => {
     const blocks: TranscriptBlock[] = [
       {
         id: 'cu1', kind: 'context_usage', createdAt: makeTime(1), author: makeAuthor('b1'),
@@ -467,14 +413,11 @@ describe('blocksToTranscriptItems (bug hunt)', () => {
     ] as TranscriptBlock[]
     const items = blocksToTranscriptItems(blocks)
     const row = (items[0] as AgentTranscriptBlock).standaloneRows![0]!
-    // BUG: c.contextLimit is 0, which is falsy, so the ternary produces '',
-    // which is filtered out by filter(Boolean). This is correct!
-    // But let's verify.
+    // contextLimit 0 is falsy, so no limit stat is emitted.
     expect(row.ctxStats).not.toContain('limit: 0k')
   })
 
-  // ── BUG: tool_result content when summary is undefined ──
-  it('BUG: tool_result with undefined summary should have undefined content', () => {
+  it('tool_result with undefined summary should have undefined content', () => {
     const blocks: TranscriptBlock[] = [
       {
         id: 'tr1', kind: 'tool_result', createdAt: makeTime(1), author: makeAuthor('b1'),
@@ -484,13 +427,11 @@ describe('blocksToTranscriptItems (bug hunt)', () => {
     ] as TranscriptBlock[]
     const items = blocksToTranscriptItems(blocks)
     const row = (items[0] as AgentTranscriptBlock).rows![0]!
-    // BUG: content: t.summary — when undefined, content is undefined.
-    // RowItem.content is optional (string | undefined), so this is fine.
+    // RowItem.content is optional, so an absent summary stays undefined.
     expect(row.content).toBeUndefined()
   })
 
-  // ── BUG: artifact with action='modified' (not 'created' or 'deleted') ──
-  it('BUG: artifact with action=modified should map to mod fileOp', () => {
+  it('artifact with action=modified should map to mod fileOp', () => {
     const blocks: TranscriptBlock[] = [
       {
         id: 'a1', kind: 'artifact', createdAt: makeTime(1), author: makeAuthor('b1'),
@@ -503,8 +444,7 @@ describe('blocksToTranscriptItems (bug hunt)', () => {
     expect(row.fileOp).toBe('mod')
   })
 
-  // ── BUG: run_session with empty tags generates empty string tags ──
-  it('BUG: run_session with no optional labels should produce empty sessionTags array', () => {
+  it('run_session with no optional labels should produce empty sessionTags array', () => {
     const blocks: TranscriptBlock[] = [
       {
         id: 'rs1', kind: 'run_session', createdAt: makeTime(1), author: makeAuthor('b1'),
@@ -518,7 +458,7 @@ describe('blocksToTranscriptItems (bug hunt)', () => {
   })
 
   // ═══════════════════════════════════════════════════════════════════════
-  // EDGE CASE TESTS — requested additions
+  // EDGE CASE TESTS
   // ═══════════════════════════════════════════════════════════════════════
 
   // ── Missing createdAt ──

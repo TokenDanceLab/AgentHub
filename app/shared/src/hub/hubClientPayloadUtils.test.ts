@@ -305,7 +305,7 @@ describe('hubClientPayloadUtils (#810 / #822 / #833 / #901 / #913 / #978)', () =
     });
   });
 
-  it('builds residual request-body object literals (#822)', () => {
+  it('builds request-body object literals (#822)', () => {
     expect(buildRefreshBody('rt-1')).toEqual({ refresh_token: 'rt-1' });
     expect(buildFriendRequestBody('u-2', 'hi')).toEqual({
       friend_id: 'u-2',
@@ -324,7 +324,7 @@ describe('hubClientPayloadUtils (#810 / #822 / #833 / #901 / #913 / #978)', () =
     });
   });
 
-  it('builds residual path/query helpers (#822)', () => {
+  it('builds path/query helpers (#822)', () => {
     expect(buildSearchUserPath('user/1')).toBe('/client/contacts/search?id=user%2F1');
     expect(buildSearchSessionsPath('hello world')).toBe(
       '/client/sessions/search?q=hello%20world',
@@ -358,7 +358,7 @@ describe('hubClientPayloadUtils (#810 / #822 / #833 / #901 / #913 / #978)', () =
     );
   });
 
-  it('builds multi-segment path residual helpers (#833)', () => {
+  it('builds multi-segment path helpers (#833)', () => {
     expect(buildRegisterDevicePaths()).toEqual([
       '/edge/devices:register',
       '/edge/devices/register',
@@ -446,7 +446,7 @@ describe('hubClientPayloadUtils (#810 / #822 / #833 / #901 / #913 / #978)', () =
     expect(formData.get('file')).toBeInstanceOf(File);
   });
 
-  it('builds residual single-id / query path helpers (#901)', () => {
+  it('builds single-id / query path helpers (#901)', () => {
     expect(buildRemoveContactPath('user/1')).toBe('/client/contacts/user%2F1');
     expect(buildSessionMembersPath('sess/1')).toBe('/client/sessions/sess%2F1/members');
     expect(buildLeaveSessionPath('sess/1')).toBe('/client/sessions/sess%2F1/leave');
@@ -540,7 +540,7 @@ describe('hubClientPayloadUtils (#810 / #822 / #833 / #901 / #913 / #978)', () =
     expect(buildDeleteInit()).toEqual({ method: 'DELETE' });
   });
 
-  it('builds static path residual helpers (#913)', () => {
+  it('builds static path helpers (#913)', () => {
     expect(buildRefreshPath()).toBe('/client/auth/refresh');
     expect(buildLogoutPath()).toBe('/client/auth/logout');
     expect(buildMePath()).toBe('/client/auth/me');
@@ -580,7 +580,7 @@ describe('hubClientPayloadUtils (#810 / #822 / #833 / #901 / #913 / #978)', () =
     });
   });
 
-  it('builds composite path+init residual helpers (#978)', () => {
+  it('builds composite path+init helpers (#978)', () => {
     expect(buildRefreshRequest('rt-1')).toEqual({
       path: '/client/auth/refresh',
       init: { method: 'POST', body: JSON.stringify({ refresh_token: 'rt-1' }) },

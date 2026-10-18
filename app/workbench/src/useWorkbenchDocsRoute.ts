@@ -19,7 +19,7 @@ export interface UseWorkbenchDocsRouteOptions {
    *  skeleton instead of falling back to mock rows. */
   realDataMode?: boolean | undefined;
   /**
-   * Error message when the Hub documents request failed (#1821). Optional —
+   * Error message when the Hub documents request failed. Optional —
    * shells pass it through so the docs route can distinguish error from
    * loading/empty instead of collapsing into an empty list.
    */
@@ -34,14 +34,13 @@ export interface WorkbenchDocsRoute {
   docsPreview: WorkbenchDocumentPreview | null;
   rows: DocRow[];
   /**
-   * Shortcut names for the docs.myLibrary nav section. Demo mode only — real
-   * data mode is always empty so the page renders no shortcut block instead of
-   * injecting repository-internal document names (#2154 P2-2b).
+   * Shortcut names for the docs.myLibrary nav section. Demo mode only; real
+   * data mode is always empty and renders no shortcut block.
    */
   shortcuts: string[];
   /** True while real-mode documents are loading (undefined input). */
   documentsLoading: boolean;
-  /** Present when the Hub documents request failed (#1821). */
+  /** Present when the Hub documents request failed. */
   documentsError: string | undefined;
   openDocPreview: (doc: DocRow) => void;
   closeDocPreview: () => void;
@@ -60,13 +59,11 @@ export function useWorkbenchDocsRoute({
   // Real mode while the Hub list is still undefined = loading; demo mode
   // (realDataMode false) keeps the mock-row fallback so demo content renders.
   const documentsLoading = Boolean(realDataMode && documents === undefined && !documentsError);
-  // #1821: an errored request renders neither mock rows nor a skeleton — it
-  // stays empty so the page can show its error state.
+  // An errored request renders neither mock rows nor a skeleton so the page
+  // can show its error state.
   const rows = documents ?? (documentsLoading || documentsError ? [] : WORKBENCH_MOCK_DOC_ROWS);
-  // #2154 P2-2(b): shortcuts come from the mock data source, never from a
-  // page-level default. Real data mode (and loading/error) renders none, so the
-  // docs.myLibrary caption and list disappear instead of showing
-  // repository-internal document names.
+  // Shortcuts come from the mock data source, never from a page-level default.
+  // Real data mode (and loading/error) renders none.
   const shortcuts = realDataMode || documentsLoading || documentsError
     ? []
     : WORKBENCH_MOCK_DOC_SHORTCUTS;

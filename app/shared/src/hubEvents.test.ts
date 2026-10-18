@@ -43,7 +43,6 @@ describe('HUB_EVENTS', () => {
         'run.agent.plan_proposed',
         'run.agent.plan_approved',
         'run.agent.plan_rejected',
-        'run.agent.plan_expired',
       ]),
     );
   });

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Negative-fixture tests for verify-real-e2e-artifacts.py (#1873 Slice D).
+"""Negative-fixture tests for verify-real-e2e-artifacts.py.
 
 Builds a synthetic loopback-only artifacts tree that must pass the scanner, then
 applies one surgical leak per case and asserts the scanner exits non-zero:
@@ -13,7 +13,8 @@ applies one surgical leak per case and asserts the scanner exits non-zero:
 7. password value in request body
 8. trace.zip with a leaked trace.network member (zip extraction path)
 
-Also proves loopback variants (127.0.0.1 / localhost) pass.
+Also proves loopback variants (127.0.0.1 / localhost) pass, that uploaded
+manifests are scanned, and that an empty artifact directory fails closed.
 """
 
 import json
@@ -79,13 +80,37 @@ class ArtifactSanitizeTests(unittest.TestCase):
             self._good_dir(tmp)
             self.assert_passes(tmp, "loopback-only artifacts tree")
 
-    def test_manifest_and_account_env_skipped(self):
-        # manifest 与凭据文件即使含会被 flag 的形态也不该被本门禁扫描
+    def test_account_env_skipped(self):
+        # Credential files are never uploaded, so their shapes are out of scope.
+        with tempfile.TemporaryDirectory(prefix="agenthub-artifacts-") as tmp:
+            self._good_dir(tmp)
+            write_report(tmp, "password=super-secret-value\n", name="real-e2e-account.env")
+            self.assert_passes(tmp, "account env must be skipped by artifact scanner")
+
+    def test_manifest_is_scanned(self):
+        # manifest-*.json is uploaded, so it gets the same value scan.
         with tempfile.TemporaryDirectory(prefix="agenthub-artifacts-") as tmp:
             self._good_dir(tmp)
             write_report(tmp, '{"baseURL":"http://internal.example.com"}', name="manifest-20260824-123456.json")
-            write_report(tmp, "password=super-secret-value\n", name="real-e2e-account.env")
-            self.assert_passes(tmp, "manifest/account-env must be skipped by artifact scanner")
+            self.assert_fails(tmp, "leaking manifest must fail the scanner")
+
+    def test_empty_dir_fails(self):
+        with tempfile.TemporaryDirectory(prefix="agenthub-artifacts-") as tmp:
+            self.assert_fails(tmp, "empty artifact dir must fail closed")
+
+    def test_utf16_artifact_is_scanned(self):
+        with tempfile.TemporaryDirectory(prefix="agenthub-artifacts-") as tmp:
+            self._good_dir(tmp)
+            with open(os.path.join(tmp, "report-utf16.json"), "wb") as handle:
+                handle.write('{"url":"https://internal.example.com"}'.encode("utf-16"))
+            self.assert_fails(tmp, "UTF-16 artifact leak must be decoded and scanned")
+
+    def test_bomless_utf16_artifact_fails_closed(self):
+        with tempfile.TemporaryDirectory(prefix="agenthub-artifacts-") as tmp:
+            self._good_dir(tmp)
+            with open(os.path.join(tmp, "report-utf16le.json"), "wb") as handle:
+                handle.write('{"url":"https://internal.example.com"}'.encode("utf-16-le"))
+            self.assert_fails(tmp, "BOM-less UTF-16 artifact must fail closed")
 
     def test_non_loopback_url_host_fails(self):
         with tempfile.TemporaryDirectory(prefix="agenthub-artifacts-") as tmp:
@@ -110,6 +135,19 @@ class ArtifactSanitizeTests(unittest.TestCase):
             self._good_dir(tmp)
             write_report(tmp, {"token": "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.dozjgNryP4J3jVmNHl0w5N_XgL0n3I9PlFUP0THsR8U"})
             self.assert_fails(tmp, "JWT token")
+
+    def test_bearer_token_fails(self):
+        with tempfile.TemporaryDirectory(prefix="agenthub-artifacts-") as tmp:
+            self._good_dir(tmp)
+            write_report(tmp, {"headers": {"Authorization": "Bearer abcdefghijklmnopqrstuvwxyz012345"}})
+            self.assert_fails(tmp, "Bearer token")
+
+    def test_runtime_credential_fails(self):
+        for token in ("cs_0123456789abcdef", "c_0123456789ab"):
+            with tempfile.TemporaryDirectory(prefix="agenthub-artifacts-") as tmp:
+                self._good_dir(tmp)
+                write_report(tmp, {"client_id": token})
+                self.assert_fails(tmp, f"runtime credential {token[:3]}_")
 
     def test_set_cookie_fails(self):
         with tempfile.TemporaryDirectory(prefix="agenthub-artifacts-") as tmp:

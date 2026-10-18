@@ -150,7 +150,7 @@ export function UnifiedComposer({
     onExecutionTargetChange?.('');
   }, [runtime.executionTargetId, executionTargets, onExecutionTargetChange]);
 
-  /* ═══════════════ @mention inline popover (T11 / UI1) ═══════════════
+  /* ═══════════════ @mention inline popover ═══════════════
      The textarea reports every text/cursor change to evaluateTrigger; an
      active '@' before the caret (preceded by whitespace, no whitespace in
      the query segment) opens the popover. The popover reuses the existing
@@ -166,7 +166,7 @@ export function UnifiedComposer({
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const listboxId = useId();
 
-  /* ═══════════════ Draft persistence (T10/UI6) ═══════════════
+  /* ═══════════════ Draft persistence ═══════════════
      Save composer draft per conversationId via requestIdleCallback
      batching, load on mount, flush on hidden, clear on submit (empty
      state). #1822: the persisted payload now also carries uploaded
@@ -226,13 +226,13 @@ export function UnifiedComposer({
 
     // Conversation switch with a draft still pending its idle-callback flush:
     // persist it for the OLD conversation before touching the new one, so
-    // switching never drops un-saved draft content (#1821).
+    // switching never drops un-saved draft content.
     const pending = pendingDraftRef.current;
     if (pending && pending.conversationId !== cid) {
       flushDraft();
     }
 
-    // ══ Phase 1: Load draft (first time per conversationId) ══
+    // ══ Load draft (first time per conversationId) ══
     if (draftLoadedRef.current !== cid) {
       draftLoadedRef.current = cid;
       // Only load when the composer is empty (fresh mount / conversation switch).
@@ -245,7 +245,7 @@ export function UnifiedComposer({
       ) {
         // #1822: same-session cache first (keeps File attachments), then
         // localStorage (cross-reload). Mentions are validated against the
-        // current roster so stale agent ids never become ghost chips (#1821).
+        // current roster so stale agent ids never become ghost chips.
         const rosterIds = new Set(runtime.mentionableAgents.map((m) => m.id));
         const memoryDraft = memoryDraftCacheRef.current.get(cid);
         const draft = memoryDraft ?? loadDraft(cid);
@@ -293,7 +293,7 @@ export function UnifiedComposer({
       }
     }
 
-    // ══ Phase 2: Save / Clear draft ══
+    // ══ Save / clear draft ══
     if (
       composer.text === '' &&
       composer.mentions.length === 0 &&
@@ -303,7 +303,7 @@ export function UnifiedComposer({
     ) {
       // Flush any draft still pending for the PREVIOUS conversation first:
       // switching conversations within the idle-callback window used to drop
-      // the old draft silently (#1821).
+      // the old draft silently.
       flushDraft();
       // Empty state after user interaction or submit → clear draft.
       clearDraft(cid);
@@ -531,13 +531,13 @@ export function UnifiedComposer({
     if (effect.kind === 'submit') event.currentTarget.form?.requestSubmit();
   }
 
-  /* ═══════════════ onPaste / onDrop attachment (T9 / UI2+UI3) ═══════════
+  /* ═══════════════ onPaste / onDrop attachment ═══════════════
      Extract File objects from clipboard paste or file drag-and-drop, convert
      to ComposerAttachment (via browserFilesToComposerAttachments for content
      preview + hash), and dispatch into the composer store. Upload is deferred
      to ConversationHost on submit.  Orthogonal to @mention popover — no
      interaction with evaluateTrigger / compositionRef.
-     Size gate (fable UIUX gap #10): files over MAX_ATTACHMENT_BYTES are
+     Size gate: files over MAX_ATTACHMENT_BYTES are
      rejected up front with a toast instead of failing mid-upload.            */
 
   async function handleAttachFiles(files: File[]): Promise<void> {

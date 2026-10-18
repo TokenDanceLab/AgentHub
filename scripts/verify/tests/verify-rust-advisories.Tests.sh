@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Self-tests for verify-rust-advisories.sh (#1578) — fail-closed contract.
+# Self-tests for verify-rust-advisories.sh — fail-closed contract.
 #
 # Positive: the real desktop lockfile (glib disposition allowlisted with a
 # future deadline) must exit 0.

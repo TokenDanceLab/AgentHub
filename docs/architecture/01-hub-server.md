@@ -2,7 +2,7 @@
 
 > 子文档 | 主索引：[architecture.md](../architecture.md)
 >
-> 最后更新：2026-09-09
+> 最后更新：2026-10-18
 
 Hub Server（`hub-server/`）是 AgentHub 的云端控制面：TokenDance ID relying party、Hub session、IM、AgentTeam、同步、中继、审计和远程控制面。它不启动本机 Agent Runtime；执行仍由 Edge Server 和 adapter 负责。
 
@@ -33,9 +33,9 @@ Hub Server（`hub-server/`）是 AgentHub 的云端控制面：TokenDance ID rel
 | Config | `hub-server/internal/config/`, `hub-server/configs/`, `.env.example` |
 | Migrations | `hub-server/migrations/` |
 
-## Service 领域子包（#1761）
+## Service 领域子包
 
-`internal/service/` 已从平铺大包拆分为按领域归组的子包，`handler -> service -> repository` 单向依赖不变；每个子包内 `Service`/`NewService` 命名，`handler` 侧保留窄接口。新增领域逻辑放入对应子包，不再回平铺包。
+`internal/service/` 按领域归组为子包，`handler -> service -> repository` 单向依赖；每个子包内 `Service`/`NewService` 命名，`handler` 侧保留窄接口。新增领域逻辑放入对应子包，不新增平铺包。
 
 | 领域族 | 子包 |
 |---|---|
@@ -46,7 +46,7 @@ Hub Server（`hub-server/`）是 AgentHub 的云端控制面：TokenDance ID rel
 | 资源 / 目录 | `attachment`, `document`, `skill`, `mcpserver`, `providerbinding`, `publicstats`, `usersettings`, `workspace` |
 | 审计 | `audit` |
 
-纯包门禁：`deliveryoutbox`（及 `dispatch`/`im`/`agentevent`）在 `scripts/verify/verify-hub-pure-packages.py` 的 PURE_DIRS 中，禁止 import gorm/cache/ws/service 树；其持久化经 `Store` 接口由 service 包的 gorm 实现注入（PURE_FILES 另含 `agentteam/route_helpers.go`）。残留平铺文件（非测试）仅 `delivery_outbox_facade.go`/`delivery_outbox_store.go`/`image_meta.go`，另有 `bench_test.go`/`catalog_ownership_test.go`/`image_meta_test.go` 三个测试文件。`agent` 子包目前仍经 `service.DeliveryOutbox`/`NewDeliveryOutboxStore` 依赖平铺根包 facade（`agent/agent.go`），平铺根包非无依赖残留；后续建议将 facade 迁入子包或改窄接口注入。
+纯包门禁：`deliveryoutbox`（及 `dispatch`/`im`/`agentevent`）在 `scripts/verify/verify-hub-pure-packages.py` 的 PURE_DIRS 中，禁止 import gorm/cache/ws/service 树；其持久化经 `Store` 接口由 service 包的 gorm 实现注入。新领域逻辑放入对应子包，不回平铺根包。
 
 ## Contract Map
 
@@ -58,7 +58,6 @@ Hub Server（`hub-server/`）是 AgentHub 的云端控制面：TokenDance ID rel
 | API conventions | `api/conventions.md` |
 | Auth/identity | [06-auth-identity.md](06-auth-identity.md) |
 | Deployment boundary | [05-deployment.md](05-deployment.md) |
-| Security risk status | [../../SECURITY.md](../../SECURITY.md)（SSOT 在 TokenDance 私有治理文档） |
 
 ## Auth 中间件链与路由分组
 
@@ -67,20 +66,20 @@ Hub 鉴权区分**身份证明**与**产品会话**：TokenDance ID RS256 JWT �
 | 中间件 | 作用 | 应用于 |
 |---|---|---|
 | `AuthMiddleware` | 解析任意 Bearer token（先试 RS256 TokenDance，fallback HS256 Hub），注入 `auth_source` | `/client/*`、`/web/*`、`/edge/*`、`/cloud/*` 受保护路由 |
-| `RequireHubSession()` | 拒绝 `auth_source != "hub_local"`，即拒绝 TokenDance bearer 直接操作产品 API | `/client/auth/me`、`/client/contacts`、`/client/sessions`、`/client/messages`、`/client/agent-tasks`、`/client/attachments`、`/client/notifications`、`/client/settings` 等 |
-| `WSAuthMiddleware` | 只接受 Hub-issued HS256 session；TokenDance bearer 不能在 WS 升级时通过 | `/client/ws` |
-| `RequireAdmin()` | `AGENTHUB_ADMIN_USERS` 逗号分隔白名单；空列表 = fail-closed | `/admin/*`、审计查询 |
-| `RequireLocalAuth()` | `RequireHubSession()` 的别名，兼容历史调用点 | 旧路由 |
+| `RequireHubSession()` | 拒绝 `auth_source != "hub_local"`，即拒绝 TokenDance bearer 直接操作产品 API | `/client` 受保护子组、`/edge/*`、`/cloud/*`、`/web/*` |
+| `AuthMiddleware.WSHandler()` | 只接受 Hub-issued HS256 session；TokenDance bearer 不能在 WS 升级时通过 | `/client/ws` |
+| `RequireAdmin()` | `AGENTHUB_ADMIN_USERS` 逗号分隔白名单；空列表 = fail-closed | `/web/*` 下的 publish、audit、relay 路由 |
 
 路由分组（`router.go`）：
 
 ```text
-/health、/api/public            → 无鉴权
+/health、/api/public      → 无鉴权
 /client/auth/oidc/*、/client/auth/refresh → 仅 rate limit（登录入口）
-/client/ws                      → WSAuthMiddleware（只接受 Hub session）
-/client/*（me、logout、profile、contacts、sessions、messages、agent-tasks、edge、attachments、notifications、settings）→ AuthMiddleware + RequireHubSession
-/edge/*、/cloud/*、/web/*       → AuthMiddleware + RequireHubSession
-/admin/*                        → AuthMiddleware + RequireAdmin
+/client/ws                → WS IP rate limit + AuthMiddleware.WSHandler()（只接受 Hub session）
+/client/* 受保护路由      → AuthMiddleware + RequireHubSession
+/edge/*                   → Auth + RequireHubSession + DeviceTypeCheck(desktop)
+/web/*                    → Auth + RequireHubSession + DeviceTypeCheck(web, mobile)
+/cloud/*                  → Auth + RequireHubSession
 ```
 
 ## Data Flow
@@ -111,11 +110,11 @@ Remote/cloud execution claims require relay/provisioning/device proof/workspace 
 | Handler/service/repository | `cd hub-server; go test ./... -short -count=1` or narrower focused package |
 | REST contract | OpenAPI YAML parse + affected handler tests |
 | WS event behavior | Hub WS tests + `api/events.md` sync |
-| Auth/session | OIDC/session tests（配置形状门禁已退役 #1653；当前映射见 `docs/governance/verifier-map.md` 的 OIDC 行，真实流验证不是 CI 静态门禁） |
-| Performance/leak path | 机器门禁 `scripts/verify/verify-backend-perf-leak-gates.py` plus behavior test for the same path（旧证据分类见 [../archives/reference/backend-performance-gates.md](../archives/reference/backend-performance-gates.md)，已归档） |
+| Auth/session | OIDC/session tests；静态一致性门禁见 `docs/governance/verifier-map.md` 的 OIDC 行，真实流验证属于 L3 证据 |
+| Performance/leak path | 机器门禁 `scripts/verify/verify-backend-perf-leak-gates.py` plus behavior test for the same path（证据等级见 [05-deployment.md](05-deployment.md) §Backend performance and leak evidence） |
 
 ## Related
 
 - [02-edge-server.md](02-edge-server.md) — Edge execution owner
 - [04-frontend-data-flow.md](04-frontend-data-flow.md) — shared client consumption
-- [../api-reference.md](../api-reference.md) — API entry
+- [../README.md](../README.md) — API entry（§API 契约）

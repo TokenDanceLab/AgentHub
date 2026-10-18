@@ -1,6 +1,6 @@
 /* ═══════════════════════════════════════════════════════════════════════
    composerMentionPopoverHelpers — pure + DOM plumbing for the @mention
-   popover (T11 / UI1): keyboard navigation plan, viewport-clamped
+   popover: keyboard navigation plan, viewport-clamped
    positioning, and best-effort caret coordinate measurement.
 
    - `planMentionPopoverKeyDown` / `clampPopoverPosition` are pure and

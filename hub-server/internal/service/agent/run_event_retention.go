@@ -69,9 +69,9 @@ func RunEventsRetentionPass(ctx context.Context, db *gorm.DB, cfg RetentionConfi
 // on an unbounded table for another full interval.
 //
 // Wiring note: this function is intentionally standalone so it can be invoked
-// from app/wiring.go alongside StartDeliveryCleanupLoop. If wiring.go is
-// currently owned by another lane, callers may instead invoke
-// RunEventsRetentionPass directly from an existing maintenance tick.
+// from app/wiring.go alongside StartDeliveryCleanupLoop. Callers that prefer a
+// different cadence can instead invoke RunEventsRetentionPass directly from an
+// existing maintenance tick.
 func StartRunEventRetentionLoop(ctx context.Context, db *gorm.DB, cfg RetentionConfig) {
 	go func() {
 		defer safego.Recover("agent.run_event_retention_loop")

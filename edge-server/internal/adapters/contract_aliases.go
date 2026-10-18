@@ -1,6 +1,6 @@
 package adapters
 
-// 合同类型唯一权威在 internal/orchestration（A-V1 Step 0, #1526；Step 2, #1566）。
+// 合同类型唯一权威在 internal/orchestration。
 // 以下 alias 保持本包所有现有调用点（其余 adapter 实现、httpserver、api、
 // lifecycle、tests）零改动；alias 不复制行为，不是双 SSOT。
 import (
@@ -9,20 +9,13 @@ import (
 
 type TaskStatus = orchestration.TaskStatus
 
-const (
-	TaskPending   = orchestration.TaskPending
-	TaskRunning   = orchestration.TaskRunning
-	TaskCompleted = orchestration.TaskCompleted
-	TaskFailed    = orchestration.TaskFailed
-)
-
 type PlanTask = orchestration.PlanTask
 type ExecutionPlan = orchestration.ExecutionPlan
 type PlanApprovalConfig = orchestration.PlanApprovalConfig
 type PendingPlan = orchestration.PendingPlan
 type PlanDecision = orchestration.PlanDecision
 
-// ── Adapter-domain contract aliases (A-V1 Step 2, #1566) ─────────────────────
+// ── Adapter-domain contract aliases ─────────────────────────────────────────
 
 // AgentAdapter / EventEmitter / AdapterMetadata / AgentCapabilities /
 // SubAgentTask / SiblingInfo / SubAgentSpawner / RunProcessContext /
@@ -56,6 +49,7 @@ const (
 	BusEventTaskProgress        = orchestration.BusEventTaskProgress
 	BusEventTaskNotification    = orchestration.BusEventTaskNotification
 	BusEventSubAgentStatus      = orchestration.BusEventSubAgentStatus
+	BusEventSubAgentsComplete   = orchestration.BusEventSubAgentsComplete
 	BusEventSessionStateChanged = orchestration.BusEventSessionStateChanged
 	BusEventHookStarted         = orchestration.BusEventHookStarted
 	BusEventHookProgress        = orchestration.BusEventHookProgress
@@ -74,6 +68,5 @@ const (
 	BusEventPlanProposed        = orchestration.BusEventPlanProposed
 	BusEventPlanApproved        = orchestration.BusEventPlanApproved
 	BusEventPlanRejected        = orchestration.BusEventPlanRejected
-	BusEventPlanExpired         = orchestration.BusEventPlanExpired
 	BusEventToolRejected        = orchestration.BusEventToolRejected
 )

@@ -7,7 +7,7 @@ import type { TranscriptBlock } from '@shared/transcript';
 import { SplitConversationPane } from './SplitConversationPane';
 import { useTestI18nLanguage } from '@shared/testing/i18n';
 
-/* SplitConversationPane — read-only inactive pane (#1997, UX F3):
+/* SplitConversationPane — read-only inactive pane (#1997):
    honest empty state, cached transcript hand-off, focus/close wiring. */
 
 beforeAll(async () => {

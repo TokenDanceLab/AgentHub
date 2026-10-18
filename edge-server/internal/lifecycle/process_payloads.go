@@ -143,10 +143,7 @@ func agentFailureItem(run store.Run, itemID, content string) store.Item {
 }
 
 // adapterMetricsLabel returns the Prometheus adapter label for a resolved adapter.
-func adapterMetricsLabel(adapterID string, hasAdapter bool) string {
-	if !hasAdapter {
-		return "none"
-	}
+func adapterMetricsLabel(adapterID string) string {
 	if adapterID == "" {
 		return "none"
 	}

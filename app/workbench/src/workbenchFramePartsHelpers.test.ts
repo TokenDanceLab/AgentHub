@@ -20,7 +20,7 @@ import type { ChatConversationHostFrameProps } from './workbenchFrameTypes';
 /* ═══════════════════════════════════════════════════════════════════════
    workbenchFramePartsHelpers unit tests (#742)
 
-   Pure prop-builder coverage for frame residual slices. The
+   Pure prop-builder coverage for the frame prop builders. The
    useBuildChatConversationHostProps hook form is exercised with a render
    probe asserting referential stability of the derived host props.
    ═══════════════════════════════════════════════════════════════════════ */

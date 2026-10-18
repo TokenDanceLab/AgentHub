@@ -24,9 +24,9 @@ export {
 /* ═══════════════════════════════════════════════════════════════════════
    RuntimeEvidencePanel — Hub-replay runtime evidence files-mode host.
 
-   Residual helpers/parts live in RuntimeEvidenceHelpers /
+   Pure helpers live in RuntimeEvidenceHelpers and the sections in
    RuntimeEvidenceParts (#733). CSS remains on shared
-   AgentHubWorkbench.module.css. No intentional UX change.
+   AgentHubWorkbench.module.css.
    ═══════════════════════════════════════════════════════════════════════ */
 
 export interface RuntimeEvidencePanelProps {

@@ -23,7 +23,7 @@ export interface WorkbenchSnapshot {
   projects?: ListResponse<Project> | Project[] | null;
   threads?: ListResponse<Thread> | Thread[] | null;
   /**
-   * Edge runner diagnostics residual for event/reducer compatibility.
+   * Edge runner diagnostics kept for event/reducer compatibility.
    * Product live catalog must not treat this as inventory SSOT.
    */
   runners?: ListResponse<Runner> | Runner[] | null;
@@ -38,7 +38,7 @@ export interface WorkbenchSnapshot {
 export interface WorkbenchState {
   projects: Project[];
   threads: Thread[];
-  /** Diagnostics residual; not product runtime inventory. */
+  /** Diagnostics data kept for event/reducer compatibility; not product runtime inventory. */
   runners: Runner[];
   runs: Run[];
   threadItems: ThreadItem[];

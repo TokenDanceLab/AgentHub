@@ -229,8 +229,8 @@ func (m RuntimeManifestV1) validate() error {
 			return fmt.Errorf("fixture.path is required for fixture-file")
 		}
 	case runtimeManifestFixtureSubprocess:
-		// The command is intentionally not looked up here; P1 treats this as a
-		// fixture contract, not observed runtime evidence.
+		// The command is intentionally not looked up here: a subprocess
+		// fixture is a contract declaration, not observed runtime evidence.
 	default:
 		return fmt.Errorf("fixture.type must be fixture-file or fixture-subprocess")
 	}

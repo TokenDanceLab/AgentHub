@@ -10,7 +10,6 @@ import (
 
 	"gorm.io/gorm"
 
-	"github.com/agenthub/hub-server/internal/cache"
 	"github.com/agenthub/hub-server/internal/config"
 	"github.com/agenthub/hub-server/internal/errcode"
 	"github.com/agenthub/hub-server/internal/jwtutil"
@@ -41,8 +40,8 @@ type Service struct {
 	cacheClient authCache
 }
 
-func NewService(db *gorm.DB, jwtCfg config.JWTConfig, cacheClient *cache.Client) *Service {
-	return &Service{db: db, jwtCfg: jwtCfg, cacheClient: resolveAuthCache(cacheClient)}
+func NewService(db *gorm.DB, jwtCfg config.JWTConfig, cacheClient authCache) *Service {
+	return &Service{db: db, jwtCfg: jwtCfg, cacheClient: cacheClient}
 }
 
 // RefreshToken validates a refresh token, issues a new access token,
@@ -55,10 +54,9 @@ func (s *Service) RefreshToken(ctx context.Context, rawRefreshToken string) (*Lo
 	}
 	if rt.Revoked {
 		// Reuse of a revoked refresh-token row — e.g. a stolen token presented
-		// after logout. #2154 F2 step ①: signal-only slice. The response code
-		// stays AuthRefreshInvalid and NO cascade revocation happens here
-		// (cascade is a separate decision item). The raw token and its hash
-		// are never logged; only non-secret dimensions are (#134 logging rule).
+		// after logout. The response stays AuthRefreshInvalid and does not
+		// cascade-revoke other sessions. The raw token and its hash are never
+		// logged; only non-secret dimensions are (#134).
 		slog.Warn("refresh token reuse: revoked token presented",
 			"user_id", rt.UserID, "device_type", rt.DeviceType)
 		if metrics.RefreshTokenReuseTotal != nil {
@@ -92,9 +90,7 @@ func (s *Service) RefreshToken(ctx context.Context, rawRefreshToken string) (*Lo
 
 	// Rotate step 1 — atomic claim: flip THIS row to revoked with a
 	// conditional UPDATE. Concurrent presentations of the same token race
-	// here; only the winner proceeds, losers are rejected as reuse and feed
-	// the F2 signal (#2154: pre-fix the check-then-write gap let every racer
-	// obtain a fresh token pair — double-spend, proven under real PG).
+	// here; only the winner proceeds and losers are rejected as reuse.
 	claimed, err := repository.ClaimRefreshTokenForRotation(s.db, tokenHash)
 	if err != nil {
 		return nil, err
@@ -116,7 +112,7 @@ func (s *Service) RefreshToken(ctx context.Context, rawRefreshToken string) (*Lo
 	// Blacklist the old token hash in Redis for the remaining TTL (#134).
 	remainingTTL := time.Until(rt.ExpiresAt)
 	if remainingTTL > 0 {
-		if err := resolveAuthCache(s.cacheClient).BlacklistRefreshToken(ctx, tokenHash, remainingTTL); err != nil {
+		if err := s.cacheClient.BlacklistRefreshToken(ctx, tokenHash, remainingTTL); err != nil {
 			slog.Warn("refresh token: failed to blacklist in Redis, fallback to DB-only", "error", err)
 		}
 	}
@@ -166,7 +162,7 @@ func (s *Service) RefreshToken(ctx context.Context, rawRefreshToken string) (*Lo
 // the refresh is rejected with AuthRefreshInvalid because revocation status
 // could not be verified.
 func (s *Service) enforceRefreshBlacklist(ctx context.Context, key string) error {
-	blacklisted, err := resolveAuthCache(s.cacheClient).IsRefreshTokenBlacklisted(ctx, key)
+	blacklisted, err := s.cacheClient.IsRefreshTokenBlacklisted(ctx, key)
 	if err != nil {
 		if metrics.RefreshBlacklistCheckErrors != nil {
 			metrics.RefreshBlacklistCheckErrors.Inc()
@@ -190,8 +186,7 @@ func (s *Service) enforceRefreshBlacklist(ctx context.Context, key string) error
 // both in the database and in the Redis blacklist (#66).
 // If deviceType is non-empty, the Redis blacklist is scoped by device_type;
 // callers must pass the authenticated token's claim-derived device_type so
-// the written key matches the one the refresh path checks (#2154 Lorentz
-// P3-2; supersedes the #149 client-supplied query knob).
+// the written key matches the one the refresh path checks.
 // When accessJTI is non-empty, the access token jti is also blacklisted until
 // AccessTTL elapses so middleware rejects the token immediately (#888).
 func (s *Service) Logout(ctx context.Context, userID, deviceID, deviceType, accessJTI string) error {
@@ -202,14 +197,14 @@ func (s *Service) Logout(ctx context.Context, userID, deviceID, deviceType, acce
 	if deviceType != "" {
 		blacklistKey = userID + ":" + deviceID + ":" + deviceType
 	}
-	if err := resolveAuthCache(s.cacheClient).BlacklistRefreshToken(ctx, blacklistKey, s.jwtCfg.RefreshTTL); err != nil {
+	if err := s.cacheClient.BlacklistRefreshToken(ctx, blacklistKey, s.jwtCfg.RefreshTTL); err != nil {
 		slog.Warn("logout: failed to blacklist in Redis, fallback to DB-only revocation", "key", blacklistKey, "error", err)
 	}
 
 	// Blacklist the current access token jti for the remaining access TTL (#888).
 	// Without this, a stolen access JWT remains valid until natural expiry.
 	if accessJTI != "" {
-		if err := resolveAuthCache(s.cacheClient).BlacklistAccessToken(ctx, accessJTI, s.jwtCfg.AccessTTL); err != nil {
+		if err := s.cacheClient.BlacklistAccessToken(ctx, accessJTI, s.jwtCfg.AccessTTL); err != nil {
 			slog.Warn("logout: failed to blacklist access jti in Redis", "jti", accessJTI, "error", err)
 		}
 	}

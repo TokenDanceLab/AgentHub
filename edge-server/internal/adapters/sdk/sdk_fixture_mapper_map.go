@@ -2,8 +2,6 @@ package sdk
 
 import "github.com/agenthub/edge-server/internal/adapters"
 
-// Residual pure-helper peel #1122: mapSDKFixtureEvent type switch body.
-
 func mapSDKFixtureEvent(event SDKFixtureEvent, provider string, scope map[string]any) []MappedEvent {
 	switch normalizeSDKFixtureType(event.Type) {
 	case "message", "assistant_message", "text_block":

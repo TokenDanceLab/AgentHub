@@ -1,14 +1,12 @@
-// Package adapters — ACP→Edge 事件词汇锁测试（#1404 Phase 2 前置）。
+// Package adapters — ACP→Edge 事件词汇锁测试。
 //
 // 本文件确保 acp_events.go 中的 ACP→Edge 翻译表引用的 run.agent.* 事件类型
 // 与 adapter.go 中定义的 BusEvent* 常量一一对应，防止实现时发生词汇漂移。
 // 当 ACP 映射增加新事件类型或 adapter.go 中常量发生变化时，本测试会报错，
-// 迫使开发者显式更新此规范表——从而实现 §3 映射的 SSOT 一致性。
+// 迫使开发者显式更新此规范表——从而保持映射表与事件常量一致。
 //
 // 输入为 coder/acp-go-sdk（v0.13.5）typed SessionUpdate/PromptResponse，
-// 见 acp_events.go。参考：ACP spike 分析 §3（翻译映射）
-//
-//	api/events.md §3.3（live-streaming 事件表）
+// 见 acp_events.go；事件族定义见 api/events.md「Event Families」。
 package acp
 
 import (
@@ -30,7 +28,7 @@ type acpEdgeMapEntry struct {
 	edgeEvents []string
 
 	// mapped 表示该 ACP 类型是否已被映射。
-	// Phase 2 前，Plan / SessionInfoUpdate / ToolCallUpdate 为 false。
+	// Plan / SessionInfoUpdate / ToolCallUpdate remain false.
 	mapped bool
 }
 
@@ -39,7 +37,7 @@ type acpEdgeMapEntry struct {
 // 修改都要求同步更新本表，否则测试失败，从而锁住词汇表。
 func acpVocabularyLock() []acpEdgeMapEntry {
 	return []acpEdgeMapEntry{
-		// ------ 已映射 (Phase 2 prep) ------
+		// ------ 已映射 ------
 		{
 			acpType:    "AgentMessageChunk",
 			edgeEvents: []string{BusEventTextDelta},
@@ -61,7 +59,7 @@ func acpVocabularyLock() []acpEdgeMapEntry {
 			mapped:     true,
 		},
 
-		// ------ 有意未映射（Phase 2 设计审批前挂起）------
+		// ------ 有意未映射 ------
 		{
 			acpType:    "Plan",
 			edgeEvents: nil,

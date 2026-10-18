@@ -1,6 +1,5 @@
 /* ═══════════════════════════════════════════════════════════════════════
-   Shared presentational helpers for TasksPage subviews.
-   Extracted for Phase 18 strangler slice #571.
+   Shared presentational helpers for TasksPage subviews (#571).
    ═══════════════════════════════════════════════════════════════════════ */
 
 import React from 'react';
@@ -45,7 +44,7 @@ export function NavGlyph({ name }: { name: DesignNavIconName }) {
 
 // ── Nav items ──
 
-// #2154 P3 i18n：模块级常量 label 改为渲染期经 t() 求值（language live）。
+// #2154 i18n：模块级常量 label 改为渲染期经 t() 求值（language live）。
 
 export function buildNavPrimary(t: TFunction): NavPrimaryItem[] {
   return [

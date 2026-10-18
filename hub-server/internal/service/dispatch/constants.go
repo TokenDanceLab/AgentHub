@@ -41,7 +41,7 @@ func ResolveEdgeHTTPURL(envURL string) string {
 
 // IsInsecureNonLoopbackEdge reports whether edgeURL is non-HTTPS and not
 // loopback — dispatch payloads would be sent in cleartext over the network
-// (AH-SR-053). Returns true when the URL should be rejected for HTTP dispatch.
+// Returns true when the URL should be rejected for HTTP dispatch.
 func IsInsecureNonLoopbackEdge(edgeURL string) bool {
 	return !strings.HasPrefix(edgeURL, "https://") && !IsLoopback(edgeURL)
 }

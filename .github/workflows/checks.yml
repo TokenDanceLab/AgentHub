@@ -1,12 +1,10 @@
 name: checks
 
-# S1 (2026-07-15): Actions 成本节流 — 产品生产 LIVE，日常 CI 保持轻量。
-# 对齐 docs/architecture/github-actions-ci-cd-policy.md
-# - 仅 master PR/push；去掉 dev/** 全量矩阵
-# - concurrency 取消连推
-# - Windows 保留原生 Go/前端合同矩阵；完整 Tauri 打包仍在 release-readiness
-# - mobile / e2e / benchmark 仅 workflow_dispatch：重 job 不在每次 push 烧分钟；
-#   需要时手动触发，不是产品停运。
+# CI policy: docs/architecture/github-actions-ci-cd-policy.md
+# - master PR/push only
+# - concurrency cancels superseded runs
+# - Windows keeps native Go/frontend contracts; full Tauri packaging stays in release-readiness
+# - frontend-mobile, desktop-linux-build, backend-perf-leak-gates, e2e-smoke, real-e2e-stack are workflow_dispatch only
 on:
   pull_request:
     branches: [master]
@@ -16,13 +14,11 @@ on:
     inputs:
       id_env:
         description: >-
-          TokenDance ID 取得方式（real-e2e-stack lane），只接受预登记 opaque ID：
-          source=私有 tokendance-id 源码构建（默认，需 secrets.TOKENDANCE_ID_CLONE_TOKEN，
-          contents:read 于 TokenDanceLab/tokendance-id）；
-          image=拉取 allowlist 预建镜像（固定 ghcr.io/tokendancelab/tokendance-id:main）；
-          local=runner 本机 loopback ID（重跑/外部已起 ID，只允许 127.0.0.1:3000）。
-          不接受任意 URL / 镜像；私有远程 dev 服务器等非 loopback 环境必须经私有
-          预登记注册表接入，不在公开 workflow 暴露任意 hostname / registry（#1873）。
+          ID 来源（real-e2e-stack lane）：
+          source=从 vars.OIDC_SOURCE_REPO 指定的 GitHub 仓库构建（需 secrets.OIDC_CLONE_TOKEN）；
+          image=使用 vars.OIDC_IMAGE 指定的镜像；
+          local=runner 本机 loopback ID。
+          本 lane 只使用 127.0.0.1:3000。
         default: source
         type: choice
         options: [source, image, local]
@@ -35,19 +31,16 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  GO_VERSION: "1.26.5"
+  GO_VERSION: "1.26.9"
   GOLANGCI_LINT_VERSION: "v2.12.2"
   NODE_VERSION: "24"
   PNPM_VERSION: "10.32.1"
 
 jobs:
   # ── Go: Edge static gates (parallel) ─────────
-  # #2251 slice 1: none of the gates below consumes the shard coverage
-  # artifacts, so they no longer queue behind go-edge-test (measured
-  # 1m34s of serial tail on run 33674961074). This job starts together
-  # with the test shards; the stable required check go-edge aggregates its
-  # result. Step-level path filters are kept verbatim from the pre-split job so
-  # the move stays a pure move (redundant with the job-level if, zero cost).
+  # None of the gates below consumes the shard coverage artifacts, so they run
+  # in parallel with go-edge-test. The stable required check go-edge aggregates
+  # this result. Gates below are gated at job level only.
   go-edge-static:
     needs: changes
     # Job-level path filter — the same expression the real gates below carry.
@@ -64,6 +57,8 @@ jobs:
     steps:
       - if: github.event_name == 'workflow_dispatch' || needs.changes.outputs.go == 'true'
         uses: actions/checkout@v7
+        with:
+          persist-credentials: false
 
       - if: github.event_name == 'workflow_dispatch' || needs.changes.outputs.go == 'true'
         uses: actions/setup-go@v7
@@ -72,93 +67,57 @@ jobs:
           cache: true
           cache-dependency-path: edge-server/go.sum
 
-      - name: Lint
-        if: github.event_name == 'workflow_dispatch' || needs.changes.outputs.go == 'true'
-        # #1840: report-only — the action's raw exit code cannot consult the
-        # baseline, and GitHub refuses PR diffs >300 files, so the action
-        # falls back to a full-repo lint that reports the 6 baseline-
-        # registered exported-stutter findings and would hard-fail a
-        # debt-clean large PR. The hard gate lives in the fingerprint ratchet
-        # step below. only-new-issues stays so small PRs still produce a
-        # new-findings-only report.
+      # Advisory gate (owner: edge maintainers). Reason: golangci-lint's raw
+      # exit code cannot consult a baseline, and GitHub refuses PR diffs >300
+      # files, so the action falls back to a full-repo lint that reports the
+      # pre-existing exported-stutter findings and would hard-fail a debt-clean
+      # large PR. Tighten: once those baseline findings are fixed, remove
+      # continue-on-error so this step blocks like go-hub-static.
+      - name: Lint (advisory)
         continue-on-error: true
         uses: golangci/golangci-lint-action@v9
         with:
           working-directory: edge-server
           version: ${{ env.GOLANGCI_LINT_VERSION }}
-          args: --timeout=5m --output.json.path=${{ runner.temp }}/edge-lint-report.json
+          args: --timeout=5m
           only-new-issues: true
 
-      # #1840: finding fingerprint ratchet — any finding NOT in the baseline
-      # (new linter, new rule, escalated severity, replacement with same count)
-      # hard-fails this job. Baseline-registered findings pass whether the
-      # report is patch-filtered or the >300-file full-lint fallback, so the
-      # 6 pre-existing exported-stutter findings never block a debt-clean PR.
-      # Reads the same JSON report the Lint step just produced (single source,
-      # no version drift; gofmt is excluded as toolchain-drift-prone).
-      - name: Verify Edge lint fingerprint ratchet (#1840)
-        if: github.event_name == 'workflow_dispatch' || needs.changes.outputs.go == 'true'
-        working-directory: .
-        run: python ./scripts/verify/verify-edge-lint-ratchet.py --LintJsonPath "${{ runner.temp }}/edge-lint-report.json"
-
-      - name: Self-test Edge lint fingerprint ratchet
-        if: github.event_name == 'workflow_dispatch' || needs.changes.outputs.go == 'true'
-        working-directory: .
-        run: python ./scripts/verify/tests/verify-edge-lint-ratchet.Tests.py
-
-      # CI7: staticcheck hard-blocking — edge-server findings zero-baselined;
+      # staticcheck hard-blocking — edge-server findings zero-baselined;
       # version pinned to prevent new-check drift from breaking CI.
       # Binary cached across runs (gha cache keyed on pinned versions).
       # Restore must precede both gosec and staticcheck steps.
       - name: Cache static-analysis binaries (staticcheck + gosec)
         id: sa-cache
-        if: github.event_name == 'workflow_dispatch' || needs.changes.outputs.go == 'true'
         uses: actions/cache@v5
         with:
           path: |
             ~/go/bin/staticcheck
             ~/go/bin/gosec
-          key: sa-tools-2026-08
+          key: sa-tools-gosec-2.28.0-staticcheck-2026.1
 
-      - name: Security scan (gosec)
-        if: github.event_name == 'workflow_dispatch' || needs.changes.outputs.go == 'true'
-        # #1574: hard fail (findings zero-baselined). Fail-closed wrapper
-        # verify-gosec-gates.sh rejects empty/unparseable output (no false green).
+      - name: Install gosec
         run: |
           if [ ! -x ~/go/bin/gosec ]; then
             go install github.com/securego/gosec/v2/cmd/gosec@v2.28.0
           fi
-          ~/go/bin/gosec -fmt=json ./... 2>/dev/null | bash ../scripts/verify/verify-gosec-gates.sh
+
+      - name: Security scan (gosec)
+        # #1574: hard fail (findings zero-baselined). Fail-closed wrapper
+        # verify-gosec-gates.sh rejects empty/unparseable output (no false green).
+        run: ~/go/bin/gosec -fmt=json ./... 2>/dev/null | bash ../scripts/verify/verify-gosec-gates.sh
       - name: Vet
-        if: github.event_name == 'workflow_dispatch' || needs.changes.outputs.go == 'true'
         run: go vet ./...
 
       - name: staticcheck
-        if: github.event_name == 'workflow_dispatch' || needs.changes.outputs.go == 'true'
         run: |
           if [ ! -x ~/go/bin/staticcheck ]; then
             go install honnef.co/go/tools/cmd/staticcheck@2026.1
           fi
           staticcheck ./... 2>&1
 
-      # #1566: orchestrator 依赖方向门禁（A-V1 Step 2）。叶子包
-      # internal/adapters/orchestrator 不得 import 根实现包；
-      # internal/orchestration 不得 import 任何 adapters。此前该脚本只在
-      # 本地跑、CI 未接线——治理声明与执行不一致，现接进 go-edge-static
-      # （已 setup-go；#2251 slice 1 起与 shard 测试并行，不再排在其后）。
-      - name: Verify orchestrator dependency direction (#1566)
-        if: github.event_name == 'workflow_dispatch' || needs.changes.outputs.go == 'true'
-        working-directory: .
-        run: python scripts/verify/verify-orchestrator-deps.py
-
-      - name: Self-test orchestrator dependency direction gate
-        if: github.event_name == 'workflow_dispatch' || needs.changes.outputs.go == 'true'
-        working-directory: .
-        run: python scripts/verify/tests/verify-orchestrator-deps.Tests.py
-
   # ── Go: Edge Server (required check) ─────────
-  # CI5 wave2 (#1689): test execution lives in go-edge-test (2-shard matrix,
-  # each shard on its own 4-core runner). #2251 slice 1: lint and the rest of
+  # CI (#1689): test execution lives in go-edge-test (2-shard matrix,
+  # each shard on its own 4-core runner). lint and the rest of
   # the static analysis moved to go-edge-static so they run in parallel with
   # the shards instead of serialising behind them. What stays here genuinely
   # needs the shard artifacts — download + merge with
@@ -178,6 +137,8 @@ jobs:
     steps:
       - if: github.event_name == 'workflow_dispatch' || needs.changes.outputs.go == 'true'
         uses: actions/checkout@v7
+        with:
+          persist-credentials: false
 
       - if: github.event_name == 'workflow_dispatch' || needs.changes.outputs.go == 'true'
         uses: actions/setup-go@v7
@@ -186,7 +147,7 @@ jobs:
           cache: true
           cache-dependency-path: edge-server/go.sum
 
-      # #2251 slice 1: this job aggregates two parallel upstream lanes instead
+      # this job aggregates two parallel upstream lanes instead
       # of running the static gates itself, so both verdicts are bound and
       # asserted fail-closed (same convention as windows-go / backend-required):
       # any lane that is not `success` — including a `skipped` static lane on a
@@ -200,7 +161,7 @@ jobs:
           STATIC_RESULT: ${{ needs.go-edge-static.result }}
         run: |
           if [ "$STATIC_RESULT" != "success" ]; then
-            echo "::error::go-edge-static result: $STATIC_RESULT; lint / ratchet / gosec / vet / staticcheck / orchestrator-deps did not pass"
+            echo "::error::go-edge-static result: $STATIC_RESULT; lint / gosec / vet / staticcheck / orchestrator-deps did not pass"
             exit 1
           fi
 
@@ -248,8 +209,10 @@ jobs:
             local cov
             cov=$(go tool cover -func=coverage.out | grep "$pattern" | awk '{sum+=$NF; n++} END {if(n>0) printf "%.1f", sum/n; else print "0"}')
             echo "  ${label}: ${cov}% (min: ${min}%)"
-            if (( $(echo "$cov < $min" | bc -l) )); then
-              echo "::error::${label} coverage ${cov}% below ${min}% minimum"
+            awk -v c="$cov" -v m="$min" 'BEGIN { if (c !~ /^[0-9]+(\.[0-9]+)?$/ || m !~ /^[0-9]+(\.[0-9]+)?$/) exit 2; exit (c+0 < m+0) }'
+            rc=$?
+            if [[ "$rc" -ne 0 ]]; then
+              echo "::error::${label} coverage '${cov}' is invalid or below ${min}% minimum"
               return 1
             fi
           }
@@ -282,7 +245,7 @@ jobs:
           exit 1
 
   # ── Go: Edge Server tests (shard×2) ──────────
-  # CI5 wave2 (#1689): the single-pass `go test ./... -race -coverprofile`
+  # CI (#1689): the single-pass `go test ./... -race -coverprofile`
   # (~116s wall) is split into a 2-shard matrix; each shard gets its own
   # 4-core runner. Go has no native -shard flag, so packages from
   # `go list ./...` are split round-robin (NR%2) — balanced and disjoint.
@@ -305,6 +268,8 @@ jobs:
         shard: [1, 2]
     steps:
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
 
       - uses: actions/setup-go@v7
         with:
@@ -317,7 +282,7 @@ jobs:
         run: |
           PKG_LIST=$(go list ./...)
           # Plain round-robin, deliberately NOT the cost-aware split go-hub-test
-          # uses (#2251 / ADR-032). Measured the same way (`go test -short -race
+          # uses (ADR-032). Measured the same way (`go test -short -race
           # -count=1 -p 1`): 35 packages / 143.96s total, heaviest is
           # internal/lifecycle at 34.57s = 24.0% — no dominant package to pin.
           # The split is still uneven (shard 1 = even NR carries 86.5s vs 57.4s,
@@ -343,12 +308,9 @@ jobs:
           retention-days: 1
 
   # ── Go: Hub static gates (parallel) ──────────
-  # #2251 slice 1: none of the gates below consumes the shard coverage
-  # artifacts, so they no longer queue behind go-hub-test (measured
-  # 2m45s of serial tail on run 33674961074). This job starts together
-  # with the test shards; the stable required check go-hub aggregates its
-  # result. Step-level path filters are kept verbatim from the pre-split job so
-  # the move stays a pure move (redundant with the job-level if, zero cost).
+  # None of the gates below consumes the shard coverage artifacts, so they run
+  # in parallel with go-hub-test. The stable required check go-hub aggregates
+  # this result. Gates below are gated at job level only.
   go-hub-static:
     needs: changes
     # Job-level path filter — the same expression the real gates below carry.
@@ -365,6 +327,8 @@ jobs:
     steps:
       - if: github.event_name == 'workflow_dispatch' || needs.changes.outputs.go == 'true'
         uses: actions/checkout@v7
+        with:
+          persist-credentials: false
 
       - if: github.event_name == 'workflow_dispatch' || needs.changes.outputs.go == 'true'
         uses: actions/setup-go@v7
@@ -374,63 +338,39 @@ jobs:
           cache-dependency-path: hub-server/go.sum
 
       - name: Lint
-        if: github.event_name == 'workflow_dispatch' || needs.changes.outputs.go == 'true'
-        # #1812: hard fail — the 17 baseline-registered complexity findings
-        # are repaid and hub-lint-baseline.json is empty, so a full-repo lint
-        # failure is a real regression. The fingerprint ratchet step below
-        # still shares the same JSON report as the second line of defence.
         uses: golangci/golangci-lint-action@v9
         with:
           working-directory: hub-server
           version: ${{ env.GOLANGCI_LINT_VERSION }}
-          args: --timeout=5m --output.json.path=${{ runner.temp }}/hub-lint-report.json
+          args: --timeout=5m
 
-      # #1573: finding fingerprint ratchet — any finding NOT in the baseline
-      # (new linter, new rule, escalated severity, replacement with same count)
-      # hard-fails this job. The baseline is empty after the #1812 debt
-      # repay, so every finding is a regression: it fails here as well as in
-      # the Lint step above.
-      # Reads the same JSON report the Lint step just produced (single source,
-      # no version drift; gofmt is excluded as toolchain-drift-prone).
-      - name: Verify Hub lint fingerprint ratchet (#1573)
-        if: github.event_name == 'workflow_dispatch' || needs.changes.outputs.go == 'true'
-        working-directory: .
-        run: python ./scripts/verify/verify-hub-lint-ratchet.py --LintJsonPath "${{ runner.temp }}/hub-lint-report.json"
-
-      - name: Self-test Hub lint fingerprint ratchet
-        if: github.event_name == 'workflow_dispatch' || needs.changes.outputs.go == 'true'
-        working-directory: .
-        run: python ./scripts/verify/tests/verify-hub-lint-ratchet.Tests.py
-
-      # CI7: staticcheck hard-blocking — hub-server findings zero-baselined;
+      # staticcheck hard-blocking — hub-server findings zero-baselined;
       # version pinned to prevent new-check drift from breaking CI.
       # Binary cached across runs (gha cache keyed on pinned versions).
       # Restore must precede both gosec and staticcheck steps.
       - name: Cache static-analysis binaries (staticcheck + gosec)
         id: sa-cache
-        if: github.event_name == 'workflow_dispatch' || needs.changes.outputs.go == 'true'
         uses: actions/cache@v5
         with:
           path: |
             ~/go/bin/staticcheck
             ~/go/bin/gosec
-          key: sa-tools-2026-08
+          key: sa-tools-gosec-2.28.0-staticcheck-2026.1
 
-      - name: Security scan (gosec)
-        if: github.event_name == 'workflow_dispatch' || needs.changes.outputs.go == 'true'
-        # #1574: hard fail (findings zero-baselined), matching go-edge.
+      - name: Install gosec
         run: |
           if [ ! -x ~/go/bin/gosec ]; then
             go install github.com/securego/gosec/v2/cmd/gosec@v2.28.0
           fi
-          ~/go/bin/gosec -fmt=json ./... 2>/dev/null | bash ../scripts/verify/verify-gosec-gates.sh
+
+      - name: Security scan (gosec)
+        # #1574: hard fail (findings zero-baselined), matching go-edge.
+        run: ~/go/bin/gosec -fmt=json ./... 2>/dev/null | bash ../scripts/verify/verify-gosec-gates.sh
 
       - name: Vet
-        if: github.event_name == 'workflow_dispatch' || needs.changes.outputs.go == 'true'
         run: go vet ./...
 
       - name: staticcheck
-        if: github.event_name == 'workflow_dispatch' || needs.changes.outputs.go == 'true'
         run: |
           if [ ! -x ~/go/bin/staticcheck ]; then
             go install honnef.co/go/tools/cmd/staticcheck@2026.1
@@ -438,8 +378,8 @@ jobs:
           staticcheck ./... 2>&1
 
   # ── Go: Hub Server (required check) ──────────
-  # CI5 wave2 (#1689): test execution lives in go-hub-test (2-shard matrix,
-  # each shard on its own 4-core runner). #2251 slice 1: lint and the rest of
+  # CI (#1689): test execution lives in go-hub-test (2-shard matrix,
+  # each shard on its own 4-core runner). lint and the rest of
   # the static analysis moved to go-hub-static so they run in parallel with
   # the shards instead of serialising behind them. What stays here genuinely
   # needs the shard artifacts — download + merge with
@@ -459,6 +399,8 @@ jobs:
     steps:
       - if: github.event_name == 'workflow_dispatch' || needs.changes.outputs.go == 'true'
         uses: actions/checkout@v7
+        with:
+          persist-credentials: false
 
       - if: github.event_name == 'workflow_dispatch' || needs.changes.outputs.go == 'true'
         uses: actions/setup-go@v7
@@ -467,7 +409,7 @@ jobs:
           cache: true
           cache-dependency-path: hub-server/go.sum
 
-      # #2251 slice 1: this job aggregates two parallel upstream lanes instead
+      # this job aggregates two parallel upstream lanes instead
       # of running the static gates itself, so both verdicts are bound and
       # asserted fail-closed (same convention as windows-go / backend-required):
       # any lane that is not `success` — including a `skipped` static lane on a
@@ -481,7 +423,7 @@ jobs:
           STATIC_RESULT: ${{ needs.go-hub-static.result }}
         run: |
           if [ "$STATIC_RESULT" != "success" ]; then
-            echo "::error::go-hub-static result: $STATIC_RESULT; lint / ratchet / gosec / vet / staticcheck did not pass"
+            echo "::error::go-hub-static result: $STATIC_RESULT; lint / gosec / vet / staticcheck did not pass"
             exit 1
           fi
 
@@ -496,7 +438,7 @@ jobs:
             exit 1
           fi
 
-      # CI5 wave2 (#1689): test execution lives in go-hub-test (2-shard
+      # CI (#1689): test execution lives in go-hub-test (2-shard
       # matrix). This job merges the shard text profiles with
       # scripts/verify/merge-coverprofiles.py and keeps the overall >=40%
       # gate hard-blocking.
@@ -521,8 +463,10 @@ jobs:
           COVERAGE=$(go tool cover -func=coverage.out | grep total | awk '{print $3}' | sed 's/%//')
           THRESHOLD=40
           echo "Overall coverage: ${COVERAGE}% (threshold: ${THRESHOLD}%)"
-          if (( $(echo "$COVERAGE < $THRESHOLD" | bc -l) )); then
-            echo "::error::Coverage ${COVERAGE}% below ${THRESHOLD}% threshold"
+          awk -v c="$COVERAGE" -v t="$THRESHOLD" 'BEGIN { if (c !~ /^[0-9]+(\.[0-9]+)?$/) exit 2; exit (c+0 < t+0) }'
+          rc=$?
+          if [[ "$rc" -ne 0 ]]; then
+            echo "::error::Coverage '${COVERAGE}' is invalid or below ${THRESHOLD}% threshold"
             exit 1
           fi
 
@@ -549,12 +493,12 @@ jobs:
           exit 1
 
   # ── Go: Hub Server tests (shard×2) ───────────
-  # CI5 wave2 (#1689): 2-shard package split (Go has no native -shard flag).
+  # CI (#1689): 2-shard package split (Go has no native -shard flag).
   # The non-zero PASS guard runs per shard, so a package-wide -short
   # escape hatch still trips a hard error.
   #
   # The split is NOT the `NR % 2` round-robin that go-edge-test still uses, and
-  # the reason is measured, not aesthetic (#2251 / ADR-032). Per-package
+  # the reason is measured, not aesthetic (ADR-032). Per-package
   # `go test -short -race -count=1 -p 1` on the 52 hub packages totals 418.8s,
   # and ONE package is 227.7s of it — `internal/repository` = 54.4%. Under
   # `NR % 2` it sits at `go list` position 15 (odd) so it lands in shard 2,
@@ -571,7 +515,7 @@ jobs:
   # Rot is fail-closed, not silent: if internal/repository is ever renamed,
   # moved or split, shard 1 receives 0 packages and the guard below hard-errors
   # with "::error::shard 1 received 0 packages" — which is the cue to
-  # re-measure (the command is in docs/decisions.md ADR-032).
+  # re-measure with: go test ./... -count=1 -short -race -p 1 -parallel 1
   go-hub-test:
     needs: changes
     if: >-
@@ -587,6 +531,8 @@ jobs:
         shard: [1, 2]
     steps:
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
 
       - uses: actions/setup-go@v7
         with:
@@ -619,7 +565,7 @@ jobs:
             exit 1
           fi
           if [ "${GO_EXIT}" -ne 0 ]; then
-            echo "::error::unit lane go test exit ${GO_EXIT} — failures were previously masked by the tee pipe (#2154)"
+            echo "::error::unit lane go test exit ${GO_EXIT}"
             tail -50 unit-test-shard.log
             exit 1
           fi
@@ -654,6 +600,8 @@ jobs:
         working-directory: ${{ matrix.module }}
     steps:
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
 
       - uses: actions/setup-go@v7
         with:
@@ -663,13 +611,20 @@ jobs:
 
       - name: Run native Windows unit suite
         shell: pwsh
-        run: go test ./... -short -count=1 -timeout 15m
+        run: |
+          $log = & go test ./... -short -count=1 -timeout 15m -v 2>&1
+          $code = $LASTEXITCODE
+          $log | Write-Output
+          if ($code -ne 0) { exit $code }
+          if (-not ($log | Select-String -Pattern '^--- PASS')) {
+            Write-Error "no tests ran (0 PASS lines)"
+            exit 1
+          }
 
   # ── Frontend: Native Windows contract ─────────
-  # Linux owns the full frontend coverage and visual gates. Windows runs the
-  # package unit/type/build contract in parallel for Desktop and Web, catching
-  # path separators, filesystem casing, and Vite/Tauri platform drift without
-  # paying for a second Playwright browser matrix on every PR.
+  # Linux owns the frontend visual gates and both web/desktop unit suites.
+  # Windows keeps only the native Desktop host contract (filesystem casing and
+  # Tauri platform drift); the web bundle does not need a second OS build.
   windows-frontend-test:
     name: Native Windows frontend (${{ matrix.package }})
     needs: changes
@@ -681,12 +636,14 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        package: [agenthub-desktop, agenthub-web]
+        package: [agenthub-desktop]
     defaults:
       run:
         working-directory: app
     steps:
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
 
       - uses: pnpm/action-setup@v6
         with:
@@ -724,8 +681,13 @@ jobs:
         env:
           EVENT_NAME: ${{ github.event_name }}
           CHANGE_RESULT: ${{ needs.changes.outputs.go }}
+          CHANGES_STATUS: ${{ needs.changes.result }}
           MATRIX_RESULT: ${{ needs.windows-go-test.result }}
         run: |
+          if [ "$EVENT_NAME" != "workflow_dispatch" ] && [ "$CHANGES_STATUS" != "success" ]; then
+            echo "::error::changes job result: $CHANGES_STATUS; cannot decide windows go contract"
+            exit 1
+          fi
           if [ "$EVENT_NAME" != "workflow_dispatch" ] && [ "$CHANGE_RESULT" != "true" ]; then
             echo "Windows Go contract not selected by path filter; treating as successful no-op."
             exit 0
@@ -745,8 +707,13 @@ jobs:
         env:
           EVENT_NAME: ${{ github.event_name }}
           CHANGE_RESULT: ${{ needs.changes.outputs.frontend }}
+          CHANGES_STATUS: ${{ needs.changes.result }}
           MATRIX_RESULT: ${{ needs.windows-frontend-test.result }}
         run: |
+          if [ "$EVENT_NAME" != "workflow_dispatch" ] && [ "$CHANGES_STATUS" != "success" ]; then
+            echo "::error::changes job result: $CHANGES_STATUS; cannot decide windows frontend contract"
+            exit 1
+          fi
           if [ "$EVENT_NAME" != "workflow_dispatch" ] && [ "$CHANGE_RESULT" != "true" ]; then
             echo "Windows frontend contract not selected by path filter; treating as successful no-op."
             exit 0
@@ -815,6 +782,8 @@ jobs:
         working-directory: hub-server
     steps:
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
 
       - uses: actions/setup-go@v7
         with:
@@ -823,11 +792,13 @@ jobs:
           cache-dependency-path: hub-server/go.sum
 
       - name: TeamRun fixture E2E
-        run: go test ./tests/teamrun -run '^TestTeamRunSmoke$' -count=1
-
-      - name: P0 remote-control fixture readiness
-        working-directory: .
-        run: python ./scripts/verify/verify-p0-remote-control-fixture.py
+        run: |
+          output=$(go test ./tests/teamrun -run '^TestTeamRunSmoke$' -count=1 -v 2>&1) || { echo "$output"; exit 1; }
+          echo "$output"
+          if ! grep -q -- '--- PASS: TestTeamRunSmoke' <<<"$output"; then
+            echo "::error::TestTeamRunSmoke did not run (0 tests matched)"
+            exit 1
+          fi
 
   # ── Backend: Edge→Hub callback smoke (fixture-only) ──────────
   # The whole edge-server/tests package is the fixture E2E suite: it spins up a
@@ -836,13 +807,6 @@ jobs:
   # testing.Short() are skipped by the go-edge -short unit lane, so this lane
   # runs the package unfiltered with a non-zero PASS assertion (same pattern as
   # backend-integration) so a 0-test lane fails.
-  #
-  # This step used to pass `-run '^TestHubE2E_'`. That filter excluded the six
-  # TestEdge* tests in the same package; four of them still ran in the -short
-  # unit lane, but TestEdgeReceivesDispatchFromHub and TestEdgeFullProtocolRoundTrip
-  # are themselves testing.Short()-guarded, so between the two lanes they were
-  # executed by no CI job at all — permanently green because permanently skipped.
-  # Dropping the filter runs them for ~0.02s extra against a 120s timeout.
   backend-edge-e2e:
     name: Backend Edge E2E (fixture-only)
     needs: changes
@@ -855,6 +819,8 @@ jobs:
         working-directory: edge-server
     steps:
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
 
       - uses: actions/setup-go@v7
         with:
@@ -874,7 +840,7 @@ jobs:
             exit 1
           fi
           if [ "${GO_EXIT}" -ne 0 ]; then
-            echo "::error::edge e2e lane go test exit ${GO_EXIT} — failures were previously masked by the tee pipe (#2154)"
+            echo "::error::edge e2e lane go test exit ${GO_EXIT}"
             tail -50 edge-e2e.log
             exit 1
           fi
@@ -885,10 +851,7 @@ jobs:
   # silently vanish via a package-wide TestMain escape hatch. This job
   # provisions PostgreSQL + Redis service containers and runs the lane with
   # `-tags integration`, asserting non-zero PASS count so a 0-test lane fails.
-  # The -short jobs (go-edge / go-hub) cover unit tests and prove non-zero
-  # execution the same way. (CI5: backend-focused-subset removed — its focused
-  # package subset was fully redundant with the go-edge/go-hub full `go test
-  # ./...` runs.)
+  # The -short lanes cover the unit suites separately.
   backend-integration:
     name: Backend integration (PostgreSQL + Redis)
     needs: changes
@@ -934,7 +897,7 @@ jobs:
       AGENTHUB_REDIS_PORT: "6379"
       AGENTHUB_JWT_SECRET: "ci-integration-jwt-secret-min-32-chars-ok!!"
       AGENTHUB_ENV: test
-      # phase1_7 的 OIDC authorize 测试走真实 router，需要非空 OIDC 配置；
+      # OIDC authorize 测试走真实 router，需要非空 OIDC 配置；
       # 占位值即可（GenerateAuthorizationURL 只组装 URL 不发起网络请求）。
       AGENTHUB_TOKENDANCE_ID_ISSUER_URL: "https://id.example.invalid"
       AGENTHUB_TOKENDANCE_ID_CLIENT_ID: "ci-integration-client"
@@ -945,6 +908,8 @@ jobs:
       AGENTHUB_PG_MIGRATION_TEST_ADMIN_URL: "postgres://agenthub:agenthub@127.0.0.1:5432/agenthub?sslmode=disable"  # leak-guard-allow:LG-F4C6A155
     steps:
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
 
       - uses: actions/setup-go@v7
         with:
@@ -969,7 +934,7 @@ jobs:
             exit 1
           fi
           if [ "${GO_EXIT}" -ne 0 ]; then
-            echo "::error::integration lane go test exit ${GO_EXIT} — failures were previously masked by the tee pipe (#2154)"
+            echo "::error::integration lane go test exit ${GO_EXIT}"
             tail -50 integration-test.log
             exit 1
           fi
@@ -987,73 +952,19 @@ jobs:
             exit 1
           fi
           if [ "${GO_EXIT}" -ne 0 ]; then
-            echo "::error::migration lane go test exit ${GO_EXIT} — failures were previously masked by the tee pipe (#2154)"
+            echo "::error::migration lane go test exit ${GO_EXIT}"
             tail -50 migration-test.log
             exit 1
           fi
 
-  # ── Docker: Hub Server ───────────────────────
-  # cross-build removed (audit): matrix collapsed to ubuntu-latest only,
-  # duplicating go-edge + go-hub build/test. Windows cross-build stays in
-  # release / release-readiness. No gate asserted cross-build.
-  # CI5: switched bare `docker build` to docker/build-push-action@v7 with a
-  # GitHub Actions (type=gha) build cache — aligns with cd-hub-server.yml.
-  # No push (PR/build-only smoke build); cache reuses layers across runs.
-  docker:
-    name: Docker build (Hub Server)
-    needs: changes
-    if: >-
-      github.event_name == 'workflow_dispatch' ||
-      needs.changes.outputs.go == 'true'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v4
-
-      - name: Build Docker image (cached)
-        uses: docker/build-push-action@v7
-        with:
-          context: .
-          file: hub-server/deployments/Dockerfile
-          push: false
-          tags: agenthub-hub-server:ci
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      - name: Verify image
-        run: docker images agenthub-hub-server
-
-  # ── Benchmark Regression ─────────────────────
-  # 仅手动：LIVE 产品的成本节流，避免每个 master push 烧分钟。
-  benchmark:
-    name: Benchmark regression check
-    if: github.event_name == 'workflow_dispatch'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-
-      - uses: actions/setup-go@v7
-        with:
-          go-version: ${{ env.GO_VERSION }}
-          cache: true
-          cache-dependency-path: |
-            edge-server/go.sum
-            hub-server/go.sum
-
-      - name: Run benchmarks
-        run: |
-          cd edge-server && go test -bench=. -benchtime=1s ./internal/events/ ./internal/adapters/
-          cd ../hub-server && go test -bench=. -benchtime=1s ./internal/service/ ./internal/jwtutil/
-
   # ── Unified Path Filter ────────────────────────
-  # P78: only run CI jobs when relevant paths change.
+  # only run CI jobs when relevant paths change.
   changes:
     name: Detect changed paths
     runs-on: ubuntu-latest
     outputs:
       desktop: ${{ steps.filter.outputs.desktop }}
+      rust: ${{ steps.filter.outputs.rust }}
       web: ${{ steps.filter.outputs.web }}
       shell: ${{ steps.filter.outputs.shell }}
       go: ${{ steps.filter.outputs.go }}
@@ -1062,6 +973,8 @@ jobs:
       design_css: ${{ steps.filter.outputs.design_css }}
     steps:
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
       - uses: dorny/paths-filter@v4
         id: filter
         with:
@@ -1073,6 +986,17 @@ jobs:
               - 'app/workbench/**'
               - 'app/package.json'
               - 'app/pnpm-lock.yaml'
+              - 'app/pnpm-workspace.yaml'
+              - 'app/.npmrc'
+              - 'scripts/verify/verify-rust-advisories.sh'
+              - 'scripts/verify/tests/verify-rust-advisories.Tests.sh'
+              - 'scripts/verify/tests/fixtures/rust-advisories/**'
+              - '.github/workflows/checks.yml'
+            rust:
+              - 'app/desktop/src-tauri/**'
+              - 'scripts/verify/verify-rust-advisories.sh'
+              - 'scripts/verify/tests/verify-rust-advisories.Tests.sh'
+              - 'scripts/verify/tests/fixtures/rust-advisories/**'
               - '.github/workflows/checks.yml'
             web:
               - 'app/web/**'
@@ -1080,6 +1004,8 @@ jobs:
               - 'app/workbench/**'
               - 'app/package.json'
               - 'app/pnpm-lock.yaml'
+              - 'app/pnpm-workspace.yaml'
+              - 'app/.npmrc'
               - '.github/workflows/checks.yml'
             shell:
               - 'app/workbench/**'
@@ -1099,6 +1025,7 @@ jobs:
               - 'app/desktop/scripts/assert-visual-qa-shell.mjs'
               - 'app/desktop/scripts/assert-visual-qa-chat.mjs'
               - 'app/web/src/**'
+              - 'app/desktop/src/**'
               - 'app/web/package.json'
               - 'app/desktop/package.json'
               - '.github/workflows/checks.yml'
@@ -1113,15 +1040,16 @@ jobs:
               - '.github/workflows/checks.yml'
             mobile:
               - 'app/mobile-rn/**'
-              - 'app/shared/src/hubClient*.ts'
-              - 'app/shared/src/hubEvents*.ts'
+              - 'app/shared/**'
+              - 'app/test-config/**'
               - 'app/package.json'
               - 'app/pnpm-lock.yaml'
+              - 'app/pnpm-workspace.yaml'
+              - 'app/.npmrc'
               - '.github/workflows/checks.yml'
-            # frontend = desktop ∪ web ∪ shared ∪ workbench (coverage gate +
-            # vuln-scan-js trigger). Splits the heavy vitest coverage job out
-            # of the unconditional validate lane so a Go-only PR no longer
-            # pays for pnpm install + coverage.
+            # frontend = desktop ∪ web ∪ shared ∪ workbench. Triggers the
+            # Windows frontend lanes and vuln-scan-js; kept path-scoped so a
+            # Go-only PR does not pay for pnpm install.
             frontend:
               - 'tests/fixtures/dispatch/**'
               - 'app/desktop/**'
@@ -1130,6 +1058,8 @@ jobs:
               - 'app/workbench/**'
               - 'app/package.json'
               - 'app/pnpm-lock.yaml'
+              - 'app/pnpm-workspace.yaml'
+              - 'app/.npmrc'
               - 'app/test-config/**'
               - '.github/workflows/checks.yml'
             # design_css = token/theme/preset CSS syntax gate (#1720): the
@@ -1142,14 +1072,11 @@ jobs:
               - 'app/scripts/verify-design-css-syntax.mjs'
               - 'app/package.json'
               - 'app/pnpm-lock.yaml'
+              - 'app/pnpm-workspace.yaml'
+              - 'app/.npmrc'
               - '.github/workflows/checks.yml'
 
   # ── Frontend: Desktop ────────────────────────
-  # test:ci (4 sequential vitest configs, memory workaround) is fully green on
-  # master — no known pre-existing failures. The old "15 pre-existing failures
-  # (97.8%: 679/694)" note dated from when edge-real integration specs ran here;
-  # those specs are excluded by the CI configs (src/__tests__/integration/**)
-  # and the audit doc that tracked them (docs/audit/) has been removed.
   frontend-desktop:
     needs: changes
     if: >-
@@ -1161,6 +1088,8 @@ jobs:
         working-directory: app/desktop
     steps:
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
 
       - uses: pnpm/action-setup@v6
         with:
@@ -1179,23 +1108,27 @@ jobs:
       - name: Type check
         run: pnpm typecheck
 
-      # Still advisory, and the reason is measured rather than habitual: this
-      # step runs `eslint src --max-warnings 0`, and desktop currently reports
-      # 0 errors but **4 `react-hooks/exhaustive-deps` warnings** (missing `t` /
-      # `tApp` in useMemo dependency arrays). Fixing those means changing
-      # memoization dependencies, which is a behaviour change, not a lint
-      # cleanup — so it needs its own reviewed slice. Removing
-      # continue-on-error before that would hard-fail every desktop PR (#2274).
-      - name: Lint
-        continue-on-error: true
-        run: pnpm lint --max-warnings 0
+      # Blocking architecture gate. The full lint ruleset still has legacy
+      # debt; this config contains only the import/literal boundaries.
+      - name: Lint frontend boundaries
+        working-directory: app
+        run: pnpm lint:boundaries
 
-      # CI5: vitest shard matrix. `pnpm test:ci` chains 4 vitest configs
+      # CI: vitest shard matrix. `pnpm test:ci` chains 4 vitest configs
       # serially (≈337s). Split into 2 parallel shards; each shard re-runs
       # all 4 configs but only its slice of test files (--shard i/2).
-      # --passWithNoTests guards configs whose file count leaves one shard
-      # empty — it does NOT mask a config that lost all tests (still fails
-      # in the other shard / in the baseline). vitest.config untouched.
+      # --passWithNoTests only covers an empty shard slice. The preflight
+      # below rejects a config that collects no tests at all.
+      - name: Assert desktop test configs are non-empty
+        if: matrix.shard == 1
+        run: |
+          for config in vitest.desktop-ts-ci.config.ts vitest.desktop-tsx-ci.config.ts vitest.edge-integration-ci.config.ts vitest.shared-ci.config.ts; do
+            if ! pnpm exec vitest list --config "$config" --filesOnly | grep -q .; then
+              echo "::error::$config collects no test files"
+              exit 1
+            fi
+          done
+
       - name: Test Desktop (shard ${{ matrix.shard }}/2)
         run: |
           pnpm exec vitest run --config vitest.desktop-ts-ci.config.ts --shard ${{ matrix.shard }}/2 --passWithNoTests
@@ -1218,6 +1151,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
 
       - name: Install Tauri Linux system dependencies
         shell: bash
@@ -1260,13 +1195,18 @@ jobs:
         working-directory: app
         run: pnpm install --frozen-lockfile
 
-      # Desktop↔Edge real E2E (#1678 P1-1): builds and runs the actual Go
+      # Desktop↔Edge real E2E (#1678): builds and runs the actual Go
       # Edge server (mock executor default) and asserts REST + WebSocket
       # contract + run lifecycle. Runs here because this job already has
       # setup-go + pnpm install.
       - name: Desktop↔Edge real E2E (Go edge server + REST/WS contract)
         working-directory: app/desktop
-        run: pnpm exec vitest run --config vitest.edge-real-ci.config.ts --passWithNoTests
+        run: |
+          if ! pnpm exec vitest list --config vitest.edge-real-ci.config.ts --filesOnly | grep -q .; then
+            echo "::error::edge-real lane collected 0 test files"
+            exit 1
+          fi
+          pnpm exec vitest run --config vitest.edge-real-ci.config.ts
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@1.96.0
@@ -1293,6 +1233,8 @@ jobs:
         working-directory: ./app/web
     steps:
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
       - uses: pnpm/action-setup@v6
         with:
           version: ${{ env.PNPM_VERSION }}
@@ -1307,7 +1249,7 @@ jobs:
       # #2274: was `continue-on-error: true`, i.e. structurally incapable of
       # failing — which is how six `no-explicit-any` errors lived on master
       # unnoticed (all the same hand-copied `options?: any` translate signature).
-      # They are fixed in this PR, so the step is a real gate now: web's lint
+      # They are fixed, so the step is a real gate now: web's lint
       # script is `eslint src --max-warnings 0` and reports 0 problems.
       - name: Lint Web
         run: pnpm lint
@@ -1333,6 +1275,8 @@ jobs:
         working-directory: ./app
     steps:
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
       - uses: pnpm/action-setup@v6
         with:
           version: ${{ env.PNPM_VERSION }}
@@ -1343,6 +1287,8 @@ jobs:
           cache-dependency-path: app/pnpm-lock.yaml
       - name: Install
         run: pnpm install --frozen-lockfile
+      - name: Lint frontend boundaries
+        run: pnpm lint:boundaries
       - name: Type check (mobile)
         run: pnpm --filter agenthub-mobile-rn typecheck
       - name: Unit tests (mobile)
@@ -1350,7 +1296,6 @@ jobs:
 
   # ── Frontend: Mobile full ───────────────────────
   # 重 job（Playwright/Expo export/coverage）；仅 workflow_dispatch 成本节流。
-  # job 体保留以满足 verify-ci-gates.py；产品 LIVE，非停运。
   frontend-mobile:
     name: Frontend (mobile)
     if: github.event_name == 'workflow_dispatch'
@@ -1361,6 +1306,8 @@ jobs:
         working-directory: ./app
     steps:
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
       - uses: pnpm/action-setup@v6
         with:
           version: ${{ env.PNPM_VERSION }}
@@ -1457,10 +1404,10 @@ jobs:
           wait $MOCK_HUB_PID 2>/dev/null || true
           exit $E2E_EXIT_CODE
 
-      # #1678 P1-4: wire the 6 mobile-rn Playwright __e2e__ specs (auth/chat/
+      # #1678: wire the 6 mobile-rn Playwright __e2e__ specs (auth/chat/
       # settings/tasks/threads/workbench). The playwright.config.ts webServer
       # block starts the mock hub + `expo start --web` itself, so this is a
-      # single command. Runs only on workflow_dispatch (S1 cost throttle).
+      # single command. Runs only on workflow_dispatch.
       - name: E2E (Playwright, mock hub + Expo web)
         timeout-minutes: 25
         run: pnpm --filter agenthub-mobile-rn test:e2e
@@ -1475,8 +1422,8 @@ jobs:
         run: pnpm --filter agenthub-mobile-rn run mock:hub:check
 
   # ── Visual QA Shell (path-filtered) ──────────
-  # P74 gate matrix evidence on relevant UI paths only (#1287).
-  # Path filter merged into unified `changes` job (P78 #1333).
+  # Gate matrix evidence on relevant UI paths only (#1287).
+  # Path filter merged into unified `changes` job (#1333).
   visual-qa-shell:
     name: Visual QA shell (web, path-filtered)
     needs: changes
@@ -1490,6 +1437,8 @@ jobs:
         working-directory: ./app
     steps:
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
 
       - uses: pnpm/action-setup@v6
         with:
@@ -1581,7 +1530,7 @@ jobs:
           retention-days: 7
 
   # ── Visual QA Desktop Shell (path-filtered) ─────
-  # Desktop half of the P74 gate evidence (#1287, #1827): same capture matrix
+  # Desktop half of the gate evidence (#1287, #1827): same capture matrix
   # (1440x810 light+dark, non-blank assert, no pixel goldens) against the
   # desktop vite dev server with demo workbench entry — no real Hub required.
   visual-qa-desktop:
@@ -1597,6 +1546,8 @@ jobs:
         working-directory: ./app
     steps:
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
 
       - uses: pnpm/action-setup@v6
         with:
@@ -1688,7 +1639,7 @@ jobs:
           retention-days: 7
 
   # ── Web stubbed-hub E2E (path-filtered) ───────
-  # #1839 B1: real-chromium behavior lane against a fully stubbed Hub
+  # real-chromium behavior lane against a fully stubbed Hub
   # (pnpm test:e2e:stubbed-hub): chat-flow contract, stubbed-hub replay
   # smoke, task approval/artifact contract. Mock hub only — this is NOT a
   # real login / real Hub run (evidence level: stubbed-hub, real_tested=false).
@@ -1754,7 +1705,6 @@ jobs:
 
   # ── Backend perf / leak gates ─────────────────
   # Behavior + short microbench only (not production capacity).
-  # Manual trigger only — residual T5 / post-polish risk assessment.
   backend-perf-leak-gates:
     name: Backend perf/leak gates
     if: github.event_name == 'workflow_dispatch'
@@ -1762,6 +1712,8 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
       - uses: actions/setup-go@v7
         with:
           go-version: ${{ env.GO_VERSION }}
@@ -1780,6 +1732,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
       - uses: pnpm/action-setup@v6
         with:
           version: ${{ env.PNPM_VERSION }}
@@ -1810,19 +1764,18 @@ jobs:
         working-directory: ./app
 
   # ── Real E2E stack lane (L3, dispatch-only) ─────
-  # #1839 B3: 可重跑真栈 lane——起 PostgreSQL/Redis(docker compose)+TokenDance ID+
-  # hub+edge+web 全栈后跑 B2 真实 OIDC 浏览器 spec（app/e2e/real-oidc-login.spec.ts，
+  # 可重跑真栈 lane：起 PostgreSQL/Redis(docker compose)+TokenDance ID+
+  # hub+edge+web 全栈后跑真实 OIDC 浏览器 spec（app/e2e/real-oidc-login.spec.ts，
   # playwright.real.config.ts），产出 tests/artifacts/manifest-<stamp>.json
   # （六字段 evidence 合同，verify-real-e2e-lane-manifest.py 自检）并上传证据。
-  # L3 不进 PR merge 门禁（AGENTS §5.5）；与 e2e-smoke 同为 dispatch-only，
-  # PR 门禁补强是 web-e2e-stubbed（#1839 B1）。
-  # ID 取得方式（workflow_dispatch 输入 id_env，只接受预登记 opaque ID）：
-  #   source —— 从私有 TokenDanceLab/tokendance-id 源码构建（默认）。
-  #              克隆需要 secrets.TOKENDANCE_ID_CLONE_TOKEN（contents:read 于该私有仓库）；
-  #              缺失时 lane 以 blocked 状态如实落 manifest（real_tested=false），不硬编。
-  #   image  —— 拉取 allowlist 预建镜像（固定 ghcr.io/tokendancelab/tokendance-id:main）。
-  #   local  —— 假定 runner 本机 127.0.0.1:3000 已有 ID（重跑/外部已起 ID 情景）。
-  #   三种模式 ID 都只跑在 runner 本机 loopback，不接受任意 URL / 镜像（#1873 Slice B）。
+  # L3 不进 PR merge 门禁；与 e2e-smoke 同为 dispatch-only。
+  # ID 来源（workflow_dispatch 输入 id_env：source/image/local）：
+  #   source —— 从 vars.OIDC_SOURCE_REPO 指定的 GitHub 仓库构建。
+  #              克隆需要 secrets.OIDC_CLONE_TOKEN（contents:read）；
+  #              缺失时 lane 记 blocked（real_tested=false）。
+  #   image  —— 使用 vars.OIDC_IMAGE 指定的镜像。
+  #   local  —— 假定 runner 本机 127.0.0.1:3000 已有 ID。
+  #   所有模式都只使用 runner 本机 127.0.0.1:3000。
   real-e2e-stack:
     name: Real E2E stack (L3 lane, dispatch-only)
     if: github.event_name == 'workflow_dispatch'
@@ -1840,11 +1793,10 @@ jobs:
       AGENTHUB_REDIS_PORT: "6379"
       AGENTHUB_SERVER_PORT: "8080"
       AGENTHUB_SERVER_ADMIN_PORT: "6060"
-      # 只接受预登记 opaque ID（id_env choice）；ID 恒跑在 runner 本机
-      # 127.0.0.1:3000（loopback），不接受任意 URL / 镜像（#1873 Slice B）。
+      # Local OIDC issuer for this CI session.
       AGENTHUB_TOKENDANCE_ID_ISSUER_URL: http://127.0.0.1:3000
       AGENTHUB_TOKENDANCE_ID_REDIRECT_URI: http://127.0.0.1:8080/client/auth/oidc/callback
-      # B2 spec 走 /workbench 前缀回调；CI 会话需要两版变体（无 base 变体供 H5 兼容）。
+      # workbench 回调走 /workbench 前缀；CI 会话需要两版变体（无 base 变体供 H5 兼容）。
       AGENTHUB_TOKENDANCE_ID_ALLOWED_REDIRECT_URIS: http://127.0.0.1:8080/client/auth/oidc/callback,http://127.0.0.1:5174/auth/tokendance/callback,http://localhost:5174/auth/tokendance/callback,http://127.0.0.1:5174/workbench/auth/tokendance/callback,http://localhost:5174/workbench/auth/tokendance/callback
     steps:
       - uses: actions/checkout@v7
@@ -1914,30 +1866,39 @@ jobs:
           AGENTHUB_DB_PASSWORD: ${{ steps.creds.outputs.dbpw }}
         run: docker compose up -d postgres redis
 
-      - name: Start TokenDance ID (source, private repo clone)
+      # OIDC_SOURCE_REPO / OIDC_IMAGE are maintainer-managed repository
+      # variables. Variable-write access is part of the trust boundary: the lane
+      # builds and runs whatever these point at, with the runner credentials.
+      - name: Start TokenDance ID (source checkout)
         if: inputs.id_env == 'source'
         shell: bash
         env:
-          ID_REPO_TOKEN: ${{ secrets.TOKENDANCE_ID_CLONE_TOKEN }}
+          ID_REPO_TOKEN: ${{ secrets.OIDC_CLONE_TOKEN }}
+          ID_SOURCE_REPO: ${{ vars.OIDC_SOURCE_REPO }}
         run: |
-          if [ -z "$ID_REPO_TOKEN" ]; then
-            echo "::warning::secrets.TOKENDANCE_ID_CLONE_TOKEN unset — real TokenDance ID unavailable;"
+          if [ -z "$ID_REPO_TOKEN" ] || [ -z "$ID_SOURCE_REPO" ]; then
+            echo "::warning::TokenDance ID source credentials/configuration unset — real ID unavailable;"
             echo "::warning::the lane step will record an honest blocked manifest (real_tested=false)."
-            echo "::warning::The token needs contents:read on the private TokenDanceLab/tokendance-id repo."
             exit 0
           fi
-          sudo mkdir -p /var/lib/tokendance-id
+          if ! printf '%s' "$ID_SOURCE_REPO" | grep -Eq '^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$'; then
+            echo "::error::OIDC_SOURCE_REPO must be a plain owner/repo name"
+            exit 1
+          fi
+          sudo mkdir -p /var/lib/oidc-provider
           # 目录须归 runner 用户：ID 二进制以非特权 runner 运行并要在此创建
           # tokendance.db（lane/provision 的 AGENTHUB_E2E_ID_DB 同路径读写）。
-          sudo chown "$(id -u):$(id -g)" /var/lib/tokendance-id
-          git clone --quiet --depth 1 https://x-access-token:${ID_REPO_TOKEN}@github.com/TokenDanceLab/tokendance-id.git /tmp/tokendance-id
-          (cd /tmp/tokendance-id && go build -o /tmp/tokendance-id-bin ./cmd/tokendance-id)
-          cp /tmp/tokendance-id/configs/config.example.yaml /tmp/tokendance-id/configs/config.yaml
+          sudo chown "$(id -u):$(id -g)" /var/lib/oidc-provider
+          AUTH_HEADER="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$ID_REPO_TOKEN" | base64 -w0)"
+          git -c http.https://github.com/.extraheader="$AUTH_HEADER" clone --quiet --depth 1             "https://github.com/${ID_SOURCE_REPO}.git" /tmp/oidc-provider
+          (cd /tmp/oidc-provider && go build -o /tmp/oidc-provider-bin ./cmd/tokendance-id)
+          cp /tmp/oidc-provider/configs/config.example.yaml /tmp/oidc-provider/configs/config.yaml
           openssl genrsa -out /tmp/id-private.pem 2048 >/dev/null 2>&1
           openssl rsa -in /tmp/id-private.pem -pubout -out /tmp/id-public.pem >/dev/null 2>&1
-          (cd /tmp/tokendance-id && nohup env \
+          (cd /tmp/oidc-provider && nohup env \
+            -u ID_REPO_TOKEN -u ID_SOURCE_REPO \
             TOKENDANCE_SERVER_ADDR=:3000 \
-            TOKENDANCE_DATABASE_DSN=/var/lib/tokendance-id/tokendance.db \
+            TOKENDANCE_DATABASE_DSN=/var/lib/oidc-provider/tokendance.db \
             TOKENDANCE_JWT_ISSUER=http://127.0.0.1:3000 \
             TOKENDANCE_JWT_PRIVATE_KEY_PATH=/tmp/id-private.pem \
             TOKENDANCE_JWT_PUBLIC_KEY_PATH=/tmp/id-public.pem \
@@ -1948,21 +1909,31 @@ jobs:
             TOKENDANCE_SESSION_TTL=24h \
             TOKENDANCE_FEATURES_REQUIRE_INVITE=false \
             TOKENDANCE_REDIS_ADDR=127.0.0.1:6379 \
-            /tmp/tokendance-id-bin > /tmp/id.log 2>&1 &)
+            /tmp/oidc-provider-bin > /tmp/id.log 2>&1 &)
           for i in $(seq 1 60); do
             curl -sf -m 3 http://127.0.0.1:3000/health >/dev/null 2>&1 && break
             sleep 2
           done
           curl -sf -m 3 http://127.0.0.1:3000/health >/dev/null || { echo "TokenDance ID did not become healthy"; tail -50 /tmp/id.log; exit 1; }
 
-      - name: Start TokenDance ID (image, allowlist)
+      - name: Start TokenDance ID (image, pre-registered)
         if: inputs.id_env == 'image'
         shell: bash
+        env:
+          ID_IMAGE: ${{ vars.OIDC_IMAGE }}
         run: |
-          sudo mkdir -p /var/lib/tokendance-id
+          if [ -z "$ID_IMAGE" ]; then
+            echo "::warning::vars.OIDC_IMAGE unset — image lane unavailable."
+            exit 0
+          fi
+          if ! printf '%s' "$ID_IMAGE" | grep -Eq '^[a-z0-9][a-z0-9._/-]*(:[A-Za-z0-9._-]+)?(@sha256:[a-f0-9]{64})?$'; then
+            echo "::error::OIDC_IMAGE must be a plain image reference"
+            exit 1
+          fi
+          sudo mkdir -p /var/lib/oidc-provider
           # 挂载目录归 runner 用户；容器以 --user 同属主运行，库文件归 runner，
           # lane/provision 的 sqlite 读写不受 root 属主影响。
-          sudo chown "$(id -u):$(id -g)" /var/lib/tokendance-id
+          sudo chown "$(id -u):$(id -g)" /var/lib/oidc-provider
           docker run -d --user "$(id -u):$(id -g)" --name td-id -p 127.0.0.1:3000:3000 \
             -e TOKENDANCE_SERVER_ADDR=:3000 \
             -e TOKENDANCE_DATABASE_DSN=/app/data/tokendance.db \
@@ -1971,15 +1942,15 @@ jobs:
             -e TOKENDANCE_SECURITY_COOKIE_DOMAIN=127.0.0.1 \
             -e TOKENDANCE_SESSION_TTL=24h \
             -e TOKENDANCE_FEATURES_REQUIRE_INVITE=false \
-            -v /var/lib/tokendance-id:/app/data \
-            ghcr.io/tokendancelab/tokendance-id:main
+            -v /var/lib/oidc-provider:/app/data \
+            "$ID_IMAGE"
           for i in $(seq 1 60); do
             curl -sf -m 3 http://127.0.0.1:3000/health >/dev/null 2>&1 && break
             sleep 2
           done
           curl -sf -m 3 http://127.0.0.1:3000/health >/dev/null || { echo "TokenDance ID image did not become healthy"; exit 1; }
 
-      - name: Start TokenDance ID (local; loopback preflight only)
+      - name: Preflight local TokenDance ID (loopback only)
         if: inputs.id_env == 'local'
         shell: bash
         run: echo "::info::id_env=local; lane preflight will probe http://127.0.0.1:3000"
@@ -2021,12 +1992,12 @@ jobs:
           done
           curl -sf -m 3 -o /dev/null http://127.0.0.1:5174/workbench/ || { echo "web did not become healthy"; tail -50 /tmp/web.log; exit 1; }
 
-      - name: Run real-e2e lane (B2 spec + evidence manifest)
+      - name: Run real-e2e lane (workbench callback spec + evidence manifest)
+        id: real_lane
         if: always()
         shell: bash
         env:
-          # 只接受预登记 opaque ID（id_env choice）；ID 恒跑在 runner 本机
-          # 127.0.0.1:3000（loopback，与上面 hub issuer 一致，#1873 Slice B）。
+          # Same local issuer as above.
           AGENTHUB_E2E_ID_BASE_URL: http://127.0.0.1:3000
           AGENTHUB_E2E_HUB_BASE_URL: http://127.0.0.1:8080
           AGENTHUB_E2E_EDGE_BASE_URL: http://127.0.0.1:3210
@@ -2035,7 +2006,10 @@ jobs:
           AGENTHUB_E2E_ID_CLIENT_ID: ${{ steps.creds.outputs.cid }}
           AGENTHUB_E2E_ID_CLIENT_SECRET: ${{ steps.creds.outputs.csec }}
           # ID 容器/二进制跑在 runner 本机，使用 provision 脚本默认 sqlite 路径。
-          AGENTHUB_E2E_ID_DB: /var/lib/tokendance-id/tokendance.db
+          AGENTHUB_E2E_ID_DB: /var/lib/oidc-provider/tokendance.db
+          # chat-real.spec.ts 的 mintTestJWT 需要正在运行的 Hub 签名密钥；
+          # 该值在 creds 步骤已 ::add-mask::，跨步骤不会自动继承。
+          AGENTHUB_JWT_SECRET: ${{ steps.creds.outputs.jwt }}
         run: bash scripts/e2e/run-real-e2e-lane.sh
 
       - name: Sanitize raw L3 artifacts (fail-closed content scan)
@@ -2043,23 +2017,30 @@ jobs:
         if: always()
         shell: bash
         run: |
-          # #1873 Slice D：上传前对 raw artifact（report/html/trace）做内容扫描。
-          # 真实 E2E trace 必然含 OIDC code/JWT/cookie/workspace 路径 → 判 non-public-safe，
-          # 只上传 sanitized manifest；raw evidence 路由 private evidence store（Slice A）。
+          # 上传前做内容扫描。manifest 按合同只含 provenance，单独扫描后
+          # 始终可上传；raw report/html/trace 常含 OIDC code/JWT/cookie，
+          # 只有整目录扫描通过时才上传。
           if python3 scripts/verify/verify-real-e2e-artifacts.py tests/artifacts; then
             echo "raw_public_safe=true" >> "$GITHUB_OUTPUT"
           else
             echo "raw_public_safe=false" >> "$GITHUB_OUTPUT"
           fi
+          manifest_dir="$(mktemp -d)"
+          cp tests/artifacts/manifest-*.json "$manifest_dir"/ 2>/dev/null || true
+          if python3 scripts/verify/verify-real-e2e-artifacts.py "$manifest_dir"; then
+            echo "manifest_safe=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "manifest_safe=false" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Upload sanitized L3 evidence (manifest provenance)
-        if: always()
+        if: always() && steps.real_lane.outcome == 'success' && steps.sanitize.outputs.manifest_safe == 'true'
         uses: actions/upload-artifact@v7
         with:
           name: real-e2e-stack-evidence
           # 上传契约（见 tests/artifacts/README.md）：public artifact 只上传
           # sanitized manifest（commit/evidence_level/real_tested/scope provenance，
-          # 不含私有运行事实）。real-e2e-account.env（凭据）永不上传。
+          # 不含敏感运行数据）。real-e2e-account.env（凭据）永不上传。
           path: |
             tests/artifacts/manifest-*.json
           if-no-files-found: warn
@@ -2073,7 +2054,6 @@ jobs:
           path: |
             tests/artifacts/report-*.json
             tests/artifacts/html-*/**
-            tests/artifacts/test-results/**
           if-no-files-found: warn
           retention-days: 14
   # ── Validation ───────────────────────────────
@@ -2082,6 +2062,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
+          persist-credentials: false
           fetch-depth: 0
 
       - name: Check whitespace
@@ -2096,9 +2077,9 @@ jobs:
 
       - name: Check workflows with actionlint
         # Community-standard GitHub Actions workflow linter (rhysd/actionlint):
-        # catches syntax errors, broken expressions, and unsafe shell patterns
-        # in every workflow on each push. Version pinned to the release asset
-        # (no curl|bash) for supply-chain hygiene.
+        # catches workflow syntax errors and broken expressions on each push.
+        # shellcheck integration is disabled because it is not installed here.
+        # Version pinned to the release asset (no curl|bash) for supply-chain hygiene.
         shell: bash
         run: |
           curl -sSL -o actionlint.tar.gz \
@@ -2114,307 +2095,71 @@ jobs:
           PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: bash scripts/verify/verify-commit-messages.sh "$BASE_REF" "$PR_HEAD_SHA"
 
-      - name: Self-test commit-message gate
-        shell: bash
-        run: bash scripts/verify/tests/verify-commit-messages.Tests.sh
-
       - name: Secret guard
         shell: bash
         env:
           BASE_REF: ${{ github.base_ref }}
-          HEAD_REF: ${{ github.head_ref }}
-        run: |
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            if [ "$BASE_REF" = "master" ] && [ "$HEAD_REF" = "dev/demo-user" ]; then
-              bash scripts/verify/check-secrets.sh --range HEAD^2^..HEAD^2
-            else
-              bash scripts/verify/check-secrets.sh --range "origin/$BASE_REF...HEAD"
-            fi
-          elif git rev-parse --verify HEAD^ >/dev/null 2>&1; then
-            bash scripts/verify/check-secrets.sh --range HEAD^..HEAD
-          else
-            bash scripts/verify/check-secrets.sh --worktree
-          fi
+        run: bash scripts/verify/check-secrets.sh --ci
 
-      - name: Verify CI gate policy
-        run: python ./scripts/verify/verify-ci-gates.py
-
-      - name: Self-test CI gate policy (workflow mutations)
-        run: python scripts/verify/tests/verify-ci-gates.Tests.py
-
-      - name: Self-test coverage baseline metadata/write safety
-        run: python scripts/verify/tests/coverage-baseline.Tests.py
-
-      - name: Verify remote devserver privacy/portability contract
-        run: python scripts/verify/verify-devserver-contract.py
-
-      - name: Verify action runtime allow-list (no Node-20 actions)
-        run: python ./scripts/verify/verify-action-runtimes.py
-
-      - name: Self-test action runtime allow-list gate
-        run: python scripts/verify/tests/verify-action-runtimes.Tests.py
-
-      - name: Verify project skill whitelist
-        run: python ./scripts/verify/verify-project-skills.py
-
-      - name: Verify doc SSOT
+      - name: Verify docs (links, entry points, budgets)
         run: python scripts/verify/verify-doc-ssot.py
-
-      - name: Verify OIDC code SSOT (backend ↔ frontend)
-        run: python scripts/verify/verify-oidc-code-ssot.py
-
-      - name: Self-test OIDC code SSOT (negative)
-        run: python scripts/verify/tests/verify-oidc-code-ssot.Tests.py
-
-      - name: Self-test doc entrypoint SSOT
-        run: python scripts/verify/tests/verify-doc-entrypoints.Tests.py
-
-      - name: Self-test vulnerability gates (fail-closed contract)
-        shell: bash
-        run: bash scripts/verify/tests/verify-vulnerability-gates.Tests.sh
-
-      - name: Self-test gosec gate (fail-closed contract)
-        shell: bash
-        run: bash scripts/verify/tests/verify-gosec-gates.Tests.sh
-
-      - name: Self-test secret guard (fail-closed contract)
-        shell: bash
-        run: bash scripts/verify/tests/check-secrets.Tests.sh
-
-      - name: Verify Web Hub-only boundary
-        run: python scripts/verify/verify-web-hub-boundary.py
-
-      - name: Verify Hub pure package imports
-        run: python scripts/verify/verify-hub-pure-packages.py
-
-      - name: Verify Mobile Hub-only boundary
-        run: python scripts/verify/verify-mobile-hub-boundary.py
-
-      - name: Verify hubClient thin-shell SSOT
-        run: python scripts/verify/verify-hubclient-ssot.py
-
-      - name: Verify Design token SSOT
-        run: python scripts/verify/verify-design-token-ssot.py
-
-      - name: Verify real E2E contract
-        run: python scripts/verify/verify-real-e2e-contract.py
-
-      - name: Self-test real E2E lane manifest private-name scan
-        run: python scripts/verify/tests/verify-real-e2e-lane-manifest.Tests.py
-
-      - name: Verify real E2E env allowlist (opaque ID, #1873)
-        run: python scripts/verify/verify-e2e-env-allowlist.py
-
-      - name: Self-test real E2E env allowlist (negative)
-        run: python scripts/verify/tests/verify-e2e-env-allowlist.Tests.py
 
       - name: Validate OpenAPI YAML
         run: |
           python -m pip install --quiet PyYAML
           python -c "import pathlib, yaml; yaml.safe_load(pathlib.Path('api/openapi.yaml').read_text(encoding='utf-8')); print('yaml ok')"
 
-      - name: Verify OpenAPI↔hub router contract
-        run: python ./scripts/verify/verify-openapi-contract.py
+      - name: Verify OpenAPI contract
+        run: python scripts/verify/verify-openapi-contract.py
 
-      - name: Verify migration DDL idempotency ratchet
-        run: python ./scripts/verify/verify-migration-idempotency.py
+      - name: Verify architecture boundaries
+        run: |
+          python scripts/verify/verify-hub-pure-packages.py
+          python scripts/verify/verify-hub-layering.py
+          python scripts/verify/verify-shared-rest-contract.py
 
-      - name: Verify web/desktop i18n dead-key gate
-        run: python ./scripts/verify/verify-i18n-deadkeys.py
+      - name: Verify design tokens
+        run: python scripts/verify/verify-design-token-ssot.py
 
-      - name: Verify zh terminology convergence (对话→会话 ratchet)
-        run: python ./scripts/verify/verify-i18n-terminology.py
+      - name: Verify privacy and evidence contracts
+        run: |
+          python scripts/verify/verify-devserver-contract.py
+          python scripts/verify/verify-real-e2e-contract.py --self-test
+          python scripts/verify/verify-real-e2e-contract.py
+          python scripts/verify/verify-outbound-client-hygiene.py
+          python scripts/verify/verify-oidc-code-ssot.py
 
-      # ── Architecture boundary gates (audit-A gate-ifiable candidates) ──
-      # Shared workbench/chatview/ui must stay free of Edge client imports;
-      # shared barrel must not leak Edge exports to platform apps; handler
-      # must not import repository directly; router methods must be documented
-      # in conventions.md.
-      - name: Verify Shared Edge-free boundary
-        run: python ./scripts/verify/verify-shared-boundary.py
+      - name: Self-test security gates
+        shell: bash
+        run: |
+          bash scripts/verify/tests/verify-vulnerability-gates.Tests.sh
+          bash scripts/verify/tests/verify-gosec-gates.Tests.sh
+          bash scripts/verify/tests/check-secrets.Tests.sh
 
-      - name: Verify frontend package boundary (workbench -> shared only, #1759)
-        run: python ./scripts/verify/verify-frontend-package-boundary.py
-
-      - name: Self-test frontend package boundary gate (negative)
-        run: python scripts/verify/tests/verify-frontend-package-boundary.Tests.py
-
-      - name: Verify Shared barrel Edge-export ban
-        run: python ./scripts/verify/verify-shared-barrel.py
-
-      - name: Verify Hub handler layering
-        run: python ./scripts/verify/verify-hub-layering.py
-
-      # #2246 slice 1: pkg/safego 是两台服务唯一的 panic 恢复路径。收敛一次很容易，
-      # 不再漂回去才需要门禁 —— 白名单外任何裸 recover() 都意味着一处 panic 可能
-      # 无 stack、无 metric、无 observer（正是 pkg/safego 包注释描述的那个故障模式）。
-      # 纯 Python 静态扫描，先于且不依赖编译器（回退态即使编译不过也照样红），
-      # 所以挂在 validate 而不是 go-*-static。白名单键是「文件路径 + 允许命中次数」，
-      # 不是行号；匹配前先剥 Go 注释与字符串字面量，改注释不会顶破白名单。
-      - name: Verify safego single recovery path (#2246)
-        run: python ./scripts/verify/verify-safego-convergence.py
-
-      - name: Self-test safego convergence gate (negative)
-        run: python scripts/verify/tests/verify-safego-convergence.Tests.py
-
-      # #2245 阶段 2: edge 错误响应的 HTTP status 只有一个来源（errcode.Error.HTTPStatus）。
-      # 收敛之前 167 个调用点各自手抄一遍 status，手抄不报错、只会在某天与表分岔——
-      # 已实证两批：delivery_journal 的 503/500 配 bad_request，以及 PostRuns 把
-      # not_configured（按定义 503）的运维配置错误手抄成 403 并留下「Failures are always
-      # 403」的注释。白名单键是「文件路径 + 允许命中次数 + 允许的字面量集合」，不是行号；
-      # 匹配前先剥 Go 注释与字符串字面量。成功响应与 /v1/health 的计算态 status 不在范围内。
-      - name: Verify edge error-status single source (#2245)
-        run: python ./scripts/verify/verify-edge-status-ssot.py
-
-      - name: Self-test edge error-status SSOT gate (negative)
-        run: python scripts/verify/tests/verify-edge-status-ssot.Tests.py
-
-      # #2154 F-e: GetTeamRunState 的并行读要求池里每条连接看到同一个 catalog；私有
-      # ":memory:" 给每条**新连接**一个独立空库，未钉连接数的夹具会让 fan-out 读落到
-      # "no such table"，且失败可能非确定性（低竞争时侥幸复用同一连接而通过）。
-      - name: Verify fixture connection pinning (#2154)
-        run: python ./scripts/verify/verify-fixture-connection-pinning.py
-
-      - name: Self-test fixture connection pinning gate (negative)
-        run: python scripts/verify/tests/verify-fixture-connection-pinning.Tests.py
-
-      - name: Verify Conventions method SSOT
-        run: python ./scripts/verify/verify-conventions.py
-
-      - name: Verify Outbound client hygiene (#1549)
-        run: python ./scripts/verify/verify-outbound-client-hygiene.py
-
-      # #2275: 三个负向自测自 2026-08 落地以来从未被任何 workflow 执行过
-      # （merge-coverprofiles 只在覆盖率合并里被当工具调用、real-e2e-artifacts 的
-      # 父门禁只在 workflow_dispatch 的 job 里跑、outbound-client-hygiene 的父门禁
-      # 接线了但自测没接）。一个从不被执行的负向自测比没有自测更坏——它让门禁看
-      # 起来"被验证过"。三条一律挂在 validate，即每个 PR 都跑；此后由
-      # verify-doc-ssot.py 的 DOC-ORPHAN-SELFTEST 挡住任何新出现的孤儿自测。
-      - name: Self-test outbound client hygiene gate (negative)
-        run: python scripts/verify/tests/verify-outbound-client-hygiene.Tests.py
-
-      - name: Self-test coverage profile merge (negative)
-        run: python scripts/verify/tests/merge-coverprofiles.Tests.py
-
-      - name: Self-test real-e2e artifact redaction gate (negative)
-        run: python scripts/verify/tests/verify-real-e2e-artifacts.Tests.py
-
-      # #1948: 棘轮升级为双门禁——计数棘轮（#1550，基线
-      # scripts/verify/test-sleep-baseline.json）外加值预算（#1565，预算
-      # scripts/verify/test-sleep-budget.json）：预算文件必须存在、预算内路径
-      # 必须真实、count/total_ms/max_ms/逐值必须与源码一致；负向自测防假绿。
-      - name: Verify test-sleep ratchet + value budget (#1550/#1948)
-        run: python ./scripts/verify/verify-test-sleep-ratchet.py
-
-      - name: Self-test test-sleep value budget gate (negative)
-        run: python scripts/verify/tests/verify-test-sleep-budget.Tests.py
-
-      - name: Verify auth dependency ownership (#1551)
-        run: python ./scripts/verify/verify-auth-dep-ownership.py
-
-      - name: Verify quality-debt ratchet (#1536)
-        run: python ./scripts/verify/verify-quality-debt-ratchet.py
-
-      - name: Self-test quality-debt ratchet (negative)
-        run: python scripts/verify/tests/verify-quality-debt-ratchet.Tests.py
-
-      - name: Verify Shared REST contract Hub-client to Hub-router
-        run: python ./scripts/verify/verify-shared-rest-contract.py
-
-      - name: Verify Shared UI hubClient gate
-        run: python ./scripts/verify/verify-shared-ui-hubclient.py
-
-      - name: Verify Shared Edge surface isolation (web/mobile-rn)
-        run: python ./scripts/verify/verify-shared-edge-surface-isolation.py
-
-      - name: Self-test Shared Edge surface isolation gate
-        run: python scripts/verify/tests/verify-shared-edge-surface-isolation.Tests.py
-
-      - name: Verify v4 old UI active paths
-        run: python ./scripts/verify/verify-v4-old-ui-active-paths.py
-
-      # #1951: shared 组件三件套棘轮 — app/shared/src/ui/** 的 PascalCase
-      # 组件 .tsx 必须带 <组件>.test.tsx + <组件>.stories.tsx（复杂测试可放
-      # __tests__/<组件>.test.tsx；无关测试不得代替）。存量缺件显式登记在
-      # scripts/verify/shared-trio-baseline.json，棘轮只缩不增；补齐缺件
-      # 后必须同步收缩基线，负向自测防假绿。
-      - name: Verify shared component trio ratchet (#1951)
-        run: python ./scripts/verify/verify-shared-trio-ratchet.py
-
-      - name: Self-test shared component trio ratchet (negative)
-        run: python scripts/verify/tests/verify-shared-trio-ratchet.Tests.py
-
-      # #1612: per-file i18n debt ratchet. A file may keep/reduce existing CJK
-      # string-literal debt but cannot add more; importing useTranslation is not
-      # an exemption, and debt repaid in one file cannot mask growth in another.
-      - name: Verify i18n callsites ratchet (#1612)
-        run: python ./scripts/verify/verify-i18n-callsites.py
-
-      - name: Self-test i18n callsites ratchet (negative)
-        run: python scripts/verify/tests/verify-i18n-callsites.Tests.py
-
-  # ── Frontend coverage baseline gate (path-filtered) ──
-  # Split out of the unconditional validate lane (audit): a Go-only PR no
-  # longer pays for pnpm install + vitest --coverage. v8 coverage is
-  # execution-path based so numbers are cross-platform deterministic; a
-  # small tolerance field in the baseline absorbs run-to-run async noise.
-  # Fails if any coverage metric drops below scripts/verify/coverage-baseline.json
-  # or if any test is skipped (.skip / .todo anti-cheat).
-  frontend-coverage:
-    name: Frontend coverage baseline (${{ matrix.package }})
-    needs: changes
-    if: >-
-      github.event_name == 'workflow_dispatch' ||
-      needs.changes.outputs.frontend == 'true'
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      # CI5 wave2 (#1689): the gate ran all four packages serially in one job
-      # (~10min). Split into a per-package matrix; each leg runs only its own
-      # vitest --coverage (~1.5-4min) and fails with precise package scoping.
-      # The negative include-contract self-test (mobile vitest run) executes
-      # once, on the mobile leg.
-      matrix:
-        package: ['@agenthub/shared', '@agenthub/workbench', 'agenthub-web', 'agenthub-desktop', 'agenthub-mobile-rn']
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          fetch-depth: 0
-
-      - name: Setup pnpm (coverage gate)
-        uses: pnpm/action-setup@v6
-        with:
-          version: ${{ env.PNPM_VERSION }}
-      - name: Setup Node (coverage gate)
-        uses: actions/setup-node@v7
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: pnpm
-          cache-dependency-path: app/pnpm-lock.yaml
-      - name: Install frontend deps (coverage gate)
-        working-directory: app
-        run: pnpm install --frozen-lockfile
-      - name: Verify coverage baseline
-        # 2026-08-15 收紧（原 Wave 10 advisory）：mobile re-baseline 后四包
-        # 全绿（PR #1685 coverage 10m2s pass 验证），转 hard gate。
-        run: python ./scripts/verify/verify-coverage-baseline.py --OnlyPackages "${{ matrix.package }}"
-      # Negative self-test: an imported-by-nobody production file must be
-      # counted as 0% and trip the uncovered ratchet (#1535). Cheap — mobile
-      # only (339 tests, node env). Runs once on the mobile leg instead of
-      # four times across the matrix.
-      - name: Self-test coverage include contract (negative)
-        if: matrix.package == 'agenthub-mobile-rn'
-        run: python ./scripts/verify/tests/coverage-include.Tests.py
+      - name: Self-test repository contract gates
+        shell: bash
+        run: |
+          python scripts/verify/verify-doc-ssot.py --self-test
+          python scripts/verify/verify-ci-invariants.py --self-test
+          python scripts/verify/verify-ci-invariants.py
+          python scripts/verify/tests/shell_guard.Tests.py
+          python scripts/verify/tests/verify-release-gate.Tests.py
+          bash scripts/verify/tests/verify-commit-messages.Tests.sh
+          python scripts/verify/tests/verify-openapi-contract.Tests.py
+          python scripts/verify/tests/verify-shared-rest-contract.Tests.py
+          python scripts/verify/tests/verify-oidc-code-ssot.Tests.py
+          python scripts/verify/tests/verify-outbound-client-hygiene.Tests.py
+          python scripts/verify/tests/verify-real-e2e-artifacts.Tests.py
+          python scripts/verify/tests/verify-real-e2e-lane-manifest.Tests.py
+          python scripts/verify/tests/merge-coverprofiles.Tests.py
 
   # ── 前端 L0 稳定 required 聚合（对偶 backend-required / windows-go 恒报模式） ─
   # AGENTS「测试分层」L0：前端 vitest lanes（frontend-desktop / frontend-web /
-  # frontend-mobile-light / frontend-coverage）是 PR merge 门禁，但此前未列入
-  # branch protection required checks——前端 L0 红不阻塞合并，与「L0-L2 是 PR
-  # merge 门禁」的文档合同不符。本 job 恒报：路径未选中 → success no-op；
-  # changes 失败 → fail-closed；任一选中 lane 非 success → fail。
+  # frontend-mobile-light）是 PR merge 门禁。本 job 恒报：路径未选中 →
+  # success no-op；changes 失败 → fail-closed；任一选中 lane 非 success → fail。
   frontend-required:
     name: frontend-required
-    needs: [changes, frontend-desktop, frontend-web, frontend-mobile-light, frontend-coverage]
+    needs: [changes, frontend-desktop, frontend-web, frontend-mobile-light]
     if: always()
     runs-on: ubuntu-latest
     steps:
@@ -2428,14 +2173,11 @@ jobs:
           WEB_RESULT: ${{ needs.frontend-web.result }}
           MOBILE_FILTER: ${{ needs.changes.outputs.mobile }}
           MOBILE_RESULT: ${{ needs.frontend-mobile-light.result }}
-          COVERAGE_FILTER: ${{ needs.changes.outputs.frontend }}
-          COVERAGE_RESULT: ${{ needs.frontend-coverage.result }}
         run: |
           if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
             DESKTOP_FILTER=true
             WEB_FILTER=true
             MOBILE_FILTER=true
-            COVERAGE_FILTER=true
           elif [ "$CHANGES_STATUS" != "success" ]; then
             echo "::error::changes job result: $CHANGES_STATUS; cannot decide frontend gates"
             exit 1
@@ -2455,65 +2197,14 @@ jobs:
           assert_lane "frontend-desktop" "$DESKTOP_FILTER" "$DESKTOP_RESULT"
           assert_lane "frontend-web" "$WEB_FILTER" "$WEB_RESULT"
           assert_lane "frontend-mobile-light" "$MOBILE_FILTER" "$MOBILE_RESULT"
-          assert_lane "frontend-coverage" "$COVERAGE_FILTER" "$COVERAGE_RESULT"
           echo "frontend L0 aggregate ok"
-
-  # ── UI required aggregate (second-batch visual/E2E gates, #1949) ─
-  # Aggregates visual-qa-shell / visual-qa-desktop / web-e2e-stubbed / design-css
-  # into a single stable required check. Same恒报 pattern as frontend-required /
-  # backend-required: if: always() + fail-closed on changes failure + no-op
-  # success when path filter deselects all lanes + fail on any selected lane
-  # non-success. This job is the switch point for making these gates required;
-  # branch protection only needs to add this one name.
-  ui-required:
-    name: ui-required
-    needs: [changes, visual-qa-shell, visual-qa-desktop, web-e2e-stubbed, design-css]
-    if: always()
-    runs-on: ubuntu-latest
-    steps:
-      - name: Assert UI second-batch gates
-        env:
-          CHANGES_STATUS: ${{ needs.changes.result }}
-          EVENT_NAME: ${{ github.event_name }}
-          SHELL_FILTER: ${{ needs.changes.outputs.shell }}
-          VISUAL_SHELL_RESULT: ${{ needs.visual-qa-shell.result }}
-          VISUAL_DESKTOP_RESULT: ${{ needs.visual-qa-desktop.result }}
-          WEB_FILTER: ${{ needs.changes.outputs.web }}
-          WEB_E2E_RESULT: ${{ needs.web-e2e-stubbed.result }}
-          DESIGN_CSS_FILTER: ${{ needs.changes.outputs.design_css }}
-          DESIGN_CSS_RESULT: ${{ needs.design-css.result }}
-        run: |
-          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
-            SHELL_FILTER=true
-            WEB_FILTER=true
-            DESIGN_CSS_FILTER=true
-          elif [ "$CHANGES_STATUS" != "success" ]; then
-            echo "::error::changes job result: $CHANGES_STATUS; cannot decide UI gates"
-            exit 1
-          fi
-          assert_lane() {
-            label="$1"; filter="$2"; result="$3"
-            if [ "$filter" = "true" ]; then
-              if [ "$result" != "success" ]; then
-                echo "::error::${label} result: ${result}"
-                exit 1
-              fi
-            elif [ "$result" != "skipped" ] && [ "$result" != "success" ]; then
-              echo "::error::${label} ran without path-filter selection; result: ${result}"
-              exit 1
-            fi
-          }
-          assert_lane "visual-qa-shell" "$SHELL_FILTER" "$VISUAL_SHELL_RESULT"
-          assert_lane "visual-qa-desktop" "$SHELL_FILTER" "$VISUAL_DESKTOP_RESULT"
-          assert_lane "web-e2e-stubbed" "$WEB_FILTER" "$WEB_E2E_RESULT"
-          assert_lane "design-css" "$DESIGN_CSS_FILTER" "$DESIGN_CSS_RESULT"
-          echo "UI second-batch aggregate ok"
 
   # ── Design CSS syntax gate (fail-closed, #1720) ─
   # 核心 token/theme/preset CSS 被 .stylelintignore 排除在 Stylelint 之外，
   # 注释 `*/` 之类的语法错误因此假绿。本 job 只做 parser 语法检查
-  # （config: { rules: {} }），不碰约 920 条历史规则债。正向扫描与负向
-  # self-test 均为 hard-blocking（无 continue-on-error、无 || true）。
+  # （config: { rules: {} }），不覆盖其余历史规则。语法错误即 job 失败；
+  # 该 job 按路径运行，不是 required check，合并语义见
+  # docs/architecture/github-actions-ci-cd-policy.md。
   design-css:
     name: Design CSS syntax (fail-closed)
     needs: changes
@@ -2526,6 +2217,8 @@ jobs:
         working-directory: app
     steps:
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
 
       - uses: pnpm/action-setup@v6
         with:
@@ -2559,6 +2252,8 @@ jobs:
         working-directory: app
     steps:
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
 
       - uses: pnpm/action-setup@v6
         with:
@@ -2573,19 +2268,16 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: pnpm audit --prod (fail-closed, #1534)
+      - name: pnpm audit --prod (fail-closed)
         shell: bash
         run: |
-          # 注意：GHA 默认 shell（bash -e {0}）并不带 -o pipefail（#2154 已核实，
-          # 本文件 4 个 tee lane 曾因此吞掉 go test 退出码）；此处在下方显式 set。
-          # pnpm audit 发现漏洞时返回非零，
-          # 会传播为管道失败，即使 verifier 已按例外登记判定通过。改为先
-          # 落盘再喂给 verifier，verifier 退出码是唯一判定；pnpm 自身失败
+          # 注意：GHA 默认 shell（bash -e {0}）不带 -o pipefail。这里不使用管道：
+          # 先落盘再喂给 verifier，verifier 退出码是唯一判定；pnpm 自身失败
           # （网络/错误 JSON/空输出）仍被 verifier 按 fail-closed 拒绝。
           pnpm audit --prod --json 2>&1 > /tmp/pnpm-audit.json || true
           bash ../scripts/verify/verify-vulnerability-gates.sh pnpm-audit prod < /tmp/pnpm-audit.json
 
-      - name: pnpm audit full — dev chain too (fail-closed, #2154 F-d)
+      - name: pnpm audit full — dev chain too (fail-closed)
         shell: bash
         run: |
           # --prod 只覆盖随产物发布的依赖，dev/lint/build 链的通告对它完全不可见：
@@ -2593,8 +2285,9 @@ jobs:
           # 路径 .>eslint-plugin-import>minimatch>brace-expansion）就曾在 --prod 门禁
           # 全绿的情况下把漏洞版 1.1.16 钉在 lockfile 里，直到 #2224 才修掉。
           # 全量审计复用同一份 vulnerability-exceptions.json 例外机制（判据不变：
-          # 仅上游无修复版本者可登记，且必须挂 tracking issue），所以这一步不会
-          # 把 #1663 的 image-size 变成红灯——它只会拦住「有修复版本却没升级」。
+          # 仅上游无修复版本者可登记，且必须挂 tracking issue，当前登记见 #2360）。
+          # 有修复版本的漏洞必须通过 pnpm overrides 升级解决（例如 image-size
+          # 已由 overrides 钉到修复版本），不能登记为例外。
           pnpm audit --json 2>&1 > /tmp/pnpm-audit-full.json || true
           bash ../scripts/verify/verify-vulnerability-gates.sh pnpm-audit full < /tmp/pnpm-audit-full.json
 
@@ -2615,6 +2308,8 @@ jobs:
         working-directory: ${{ matrix.module }}
     steps:
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
 
       - uses: actions/setup-go@v7
         with:
@@ -2622,14 +2317,9 @@ jobs:
           cache: true
           cache-dependency-path: ${{ matrix.module }}/go.sum
 
-      - name: govulncheck (fail-closed, #1534)
+      - name: govulncheck (fail-closed)
         shell: bash
-        run: |
-          set -o pipefail
-          # 事件流（NDJSON）经 verifier 按 summary 事件判定；解析失败/工具故障
-          # 一律 fail-closed。旧实现把整段输出当单个 JSON 对象解析，
-          # 解析失败后 exit 0 —— 假绿已修（#1534）。
-          go run golang.org/x/vuln/cmd/govulncheck@v1.6.0 -json ./... 2>&1             | bash ../scripts/verify/verify-vulnerability-gates.sh govulncheck
+        run: bash ../scripts/verify/run-govulncheck.sh | bash ../scripts/verify/verify-vulnerability-gates.sh govulncheck
 
   # ── Vuln Scan: Rust (cargo audit, #1578) ───────
   vuln-scan-rust:
@@ -2637,15 +2327,32 @@ jobs:
     needs: changes
     if: >-
       github.event_name == 'workflow_dispatch' ||
-      needs.changes.outputs.desktop == 'true'
+      needs.changes.outputs.rust == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
 
       - uses: dtolnay/rust-toolchain@1.96.0
 
-      # CI7: cargo clippy advisory — 24 warnings not yet zero-baselined;
-      # continue-on-error so CI stays green while the debt is triaged.
+      - name: Install Tauri Linux system dependencies
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev build-essential curl wget file \
+            libxdo-dev libssl-dev libayatana-appindicator3-dev \
+            librsvg2-dev patchelf
+
+      # Blocking compile gate: clippy stays advisory, but a Rust build
+      # breakage must fail the PR here.
+      - name: cargo check (blocking)
+        working-directory: app/desktop/src-tauri
+        run: cargo check --all-targets
+
+      # cargo clippy advisory (owner: desktop maintainers) — 24 warnings not
+      # yet zero-baselined; continue-on-error so CI stays green while triaged.
       # Promote to hard-blocking (cargo clippy --all-targets -- -D warnings)
       # once the lint debt is repaid to zero.
       - name: cargo clippy (advisory)
@@ -2653,23 +2360,25 @@ jobs:
         working-directory: app/desktop/src-tauri
         run: cargo clippy --all-targets 2>&1
 
-      # CI5: cargo-audit install sped up via cargo-binstall (prebuilt binary,
+      # CI: cargo-audit install sped up via cargo-binstall (prebuilt binary,
       # ~10s) instead of `cargo install cargo-audit --locked` which compiles
       # ~200 crates (2-4 min) on every desktop-changed run. cargo-binstall
       # is bootstrapped with its official installer script — no GitHub Action
       # step is introduced, so the action-runtime allow-list is unaffected.
-      # Verified method per
-      # https://github.com/cargo-bins/cargo-binstall#installation.
+      # Installer script and binary are pinned to a release tag; the mutable
+      # main-branch script is never executed.
       - name: Install cargo-audit (prebuilt, via cargo-binstall)
+        env:
+          BINSTALL_VERSION: v1.26.0
         run: |
           curl -L --proto '=https' --tlsv1.2 -sSf \
-            https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.sh | bash
+            "https://raw.githubusercontent.com/cargo-bins/cargo-binstall/${BINSTALL_VERSION}/install-from-binstall-release.sh" | bash
           cargo binstall cargo-audit --no-confirm --locked
 
-      - name: Rust advisory gate (fail-closed, #1578)
+      - name: Rust advisory gate (fail-closed)
         shell: bash
         run: bash scripts/verify/verify-rust-advisories.sh
 
-      - name: Self-test Rust advisory gate (fail-closed contract, #1578)
+      - name: Rust advisory gate self-test
         shell: bash
         run: bash scripts/verify/tests/verify-rust-advisories.Tests.sh

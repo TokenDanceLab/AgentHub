@@ -1,6 +1,6 @@
 /* ═══════════════════════════════════════════════════════════════════════
-   designIconsHelpers — pure types/constants/maps/type-guards from designIcons
-   residual thin (#754). No React components / no UX change.
+   designIconsHelpers — pure types, constants, maps, and type guards from
+   designIcons (#754). No React components.
    ═══════════════════════════════════════════════════════════════════════ */
 
 export const DESIGN_FILE_ICON_SIZE = 17;
@@ -79,7 +79,7 @@ export function getDesignFileIconType(
   return isDesignFileIconType(normalized) ? normalized : 'file';
 }
 
-/** Color map aligned to tokendance-design/desktop file icons. */
+/** File icon color map aligned with the shared design tokens. */
 export const DESIGN_FILE_ICON_COLORS: Record<DesignFileIconType, string> = {
   md: 'var(--td-ink-muted)',
   markdown: 'var(--td-ink-muted)',

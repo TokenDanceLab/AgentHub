@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 r"""merge-coverprofiles.py — 合并多个 go test -coverprofile 文本 profile。
 
-用途：CI 的 go test 2-shard matrix（#1689 wave2）中每个 shard 各自跑
+用途：CI 的 go test 2-shard matrix 中每个 shard 各自跑
 `go test -coverpkg=./... -coverprofile=shard-N.out`。-coverpkg=./... 保证
 每个 profile 含完整包集（未覆盖区间 count=0），合并只需按位置块求和。
 
@@ -10,7 +10,7 @@ r"""merge-coverprofiles.py — 合并多个 go test -coverprofile 文本 profile
     github.com/x/y/file.go:12.3,14.5 2 1
     （位置 语句数 计数）
 
-契约（自测 scripts/verify/tests/merge-coverprofiles.Tests.py）：
+契约：
 - 全部输入的 mode 行必须一致，否则 fail（不同 covermode 合并无意义）。
 - 位置键去重求和；numStmt 必须一致（-coverpkg 下同源文件同区间不变）。
 - 输出行按位置排序，先写 mode 行。

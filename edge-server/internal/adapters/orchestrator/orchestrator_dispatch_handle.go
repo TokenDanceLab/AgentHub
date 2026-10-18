@@ -7,20 +7,9 @@ import (
 	"github.com/agenthub/edge-server/internal/agents"
 )
 
-// Residual pure-helper peel of dispatchInterceptor.handleDispatch (#1111).
-
-// handleDispatch validates the agent name (O-01), checks the circuit breaker,
-// registers the sub-agent, spawns a run, sends a message, and emits events.
+// handleDispatch checks the circuit breaker, registers the sub-agent, spawns a
+// run, sends a message, and emits events.
 func (d *dispatchInterceptor) handleDispatch(evt dispatchEvent, scope map[string]any) {
-	if d.adapterRegistry != nil {
-		if _, ok := d.adapterRegistry.Get(evt.Agent); !ok {
-			d.inner.Emit(BusEventTaskNotification, scope, dispatchErrorPayload(
-				evt.Agent, evt.Task, "unknown agent: "+evt.Agent, evt.SubtaskID, "",
-			))
-			return
-		}
-	}
-
 	agentID := genAgentID()
 	now := time.Now().UTC()
 
@@ -119,18 +108,18 @@ func (d *dispatchInterceptor) handleDispatch(evt dispatchEvent, scope map[string
 		agentID, evt.Agent, evt.Task, inst.Role, runID, d.parentRun.ID, threadID, model, evt.SubtaskID,
 	))
 
-	// P1: Sub-agent status streaming — emit initial status on dispatch.
+	// Sub-agent status streaming — emit initial status on dispatch.
 	d.inner.Emit(BusEventSubAgentStatus, scope, subAgentStatusPayload(
 		agentID, evt.Agent, string(agents.StatusBusy), "dispatched", false, "",
 	))
 
-	// P1: Track dispatched sub-agents for progress summary and result injection.
+	// Track dispatched sub-agents for progress summary and result injection.
 	d.dispatchedMu.Lock()
 	d.dispatched[agentID] = evt
 	d.dispatchedCount++
 	d.dispatchedMu.Unlock()
 
-	// P1: Start the result listener goroutine (once) to receive sub-agent results
+	// Start the result listener goroutine (once) to receive sub-agent results
 	// and inject them back into the orchestrator's stream.
 	d.resultListenerOnce.Do(func() {
 		if d.ctx != nil && d.queue != nil {
@@ -138,6 +127,6 @@ func (d *dispatchInterceptor) handleDispatch(evt dispatchEvent, scope map[string
 		}
 	})
 
-	// P1: Emit progress summary on dispatch.
+	// Emit progress summary on dispatch.
 	d.emitProgressSummary(scope)
 }

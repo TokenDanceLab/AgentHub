@@ -48,6 +48,11 @@ echo "=== gosec: Issues is not an array ==="
 printf '%s\n' '{"GolangVersion":"go1.25","Issues":"nope"}' | bash "$VERIFIER" >/dev/null 2>&1
 check "Issues not array exits !=0" yes $?
 
+echo "=== gosec: package load errors ==="
+printf '%s\n' '{"GolangVersion":"go1.25","Issues":[],"Golang errors":{"edge-server/x":{"err":"build failed"}},"Stats":{"found":0}}' \
+  | bash "$VERIFIER" >/dev/null 2>&1
+check "package load errors exit !=0" yes $?
+
 echo ""
 echo "Passed: $PASS | Failed: $FAIL"
 [[ "$FAIL" -eq 0 ]]

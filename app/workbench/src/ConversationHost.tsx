@@ -87,7 +87,7 @@ function toastErrorCopy(
   if (error instanceof Error) {
     console.error('[ConversationHost] action failed:', error.message);
   }
-  // #2072 P3: resolve errcode-specific i18n key when available.
+  // #2072: resolve errcode-specific i18n key when available.
   return t(resolveFailedToastKey(error, fallbackKey));
 }
 
@@ -120,23 +120,23 @@ export interface ConversationHostProps {
   /** Search panel open/close control (owned by shell for Ctrl+F handler). */
   searchOpen: boolean;
   onSearchOpenChange: (open: boolean) => void;
-  /** Whether an agent run is currently active (stop button morph, #1462 CF13). */
+  /** Whether an agent run is currently active (stop button morph, #1462). */
   isAgentRunning?: boolean | undefined;
   /** Cancel the active agent run (stop button handler). */
   onCancelRun?: (() => void) | undefined;
   /**
-   * Edit an already-sent message (#1462 CF16). Receives the transcript block
+   * Edit an already-sent message (#1462). Receives the transcript block
    * id of the message being edited plus the new content. The shell strips the
    * `hub-message-` prefix and calls `editMessage` REST.
    */
   onEditMessage?: ((blockId: string, content: string) => Promise<void> | void) | undefined;
   /**
-   * Unread-messages divider descriptor (T8 desktop IM path). Passed through to
+   * Unread-messages divider descriptor (desktop IM path). Passed through to
    * the ChatView; absent for non-IM transcripts.
    */
   transcriptUnreadDivider?: UnreadDividerDescriptor | undefined;
   /**
-   * Transcript items are loading (#1821). With an empty transcript the chat
+   * Transcript items are loading. With an empty transcript the chat
    * shows an honest loading state instead of the "no messages" empty state.
    */
   transcriptLoading?: boolean | undefined;
@@ -154,7 +154,7 @@ type PendingUserBlock = TextTranscriptBlock & {
 const EMPTY_MENTIONS: ComposerMention[] = [];
 
 /**
- * Pending dispatch entry stored in the client queue (CF22). The Hub message
+ * Pending dispatch entry stored in the client queue. The Hub message
  * is already sent & confirmed — only task dispatch (triggerAgentTask) is
  * retried, never the message itself.
  */
@@ -183,7 +183,7 @@ export const ConversationHost = React.memo(function ConversationHost({
   const isSubmittingRef = useRef(false);
   const composerSubmitBehavior = useComposerSubmitBehavior();
 
-  // ── Pinned banner dismissal (#1821) ───────────────────────────────────
+  // ── Pinned banner dismissal ───────────────────────────────────
   // The shell owns the initial dismissed set; the host adds local dismissals
   // and keeps them even if the shell re-renders with the old set.
   const [dismissedPinnedLocal, setDismissedPinnedLocal] = useState<Set<string>>(
@@ -247,7 +247,7 @@ export const ConversationHost = React.memo(function ConversationHost({
     setSearchHighlightId(firstPendingApprovalId);
     onSearchOpenChange(false);
   }, [firstPendingApprovalId, onSearchOpenChange]);
-  // #1994 (UX F5): the global status bar's awaiting chip dispatches this
+  // #1994: the global status bar's awaiting chip dispatches this
   // transient intent; the host owns the transcript highlight/scroll.
   useEffect(() => {
     const handleApprovalJumpIntent = (event: Event): void => {
@@ -312,7 +312,7 @@ export const ConversationHost = React.memo(function ConversationHost({
     setCheckpointPreviewRunId(null);
   }, []);
 
-  // #1992 F10: artifact-card click is a transient focus intent only. The
+  // #1992: artifact-card click is a transient focus intent only. The
   // engineering column consumes it for the active conversation; the
   // inspector/transcript state remains untouched.
   const handleArtifactClick = useCallback((item: RowItem): void => {
@@ -354,7 +354,7 @@ export const ConversationHost = React.memo(function ConversationHost({
     setRunReviewOpen(false);
   }, [onToast, t]);
 
-  // ── Pending dispatch queue (CF22 / #1965) ─────────────────────────────
+  // ── Pending dispatch queue (#1965) ───────────────────────────────────
   // Ref-authoritative queues are isolated by conversation. The active
   // conversation's run signal can only flush its own queue; an inactive
   // conversation can neither block nor accidentally dispatch another one.
@@ -518,7 +518,7 @@ export const ConversationHost = React.memo(function ConversationHost({
     ]);
   }, [transcript, pendingUserBlocks]);
 
-  /* UX F8 (#1998): conversation goal banner — pure projection of goal tool
+  /* Conversation goal banner (#1998): pure projection of goal tool
      calls in the transcript; undefined hides the banner entirely. */
   const goalSummary = useMemo(() => deriveGoalSummary(displayTranscript), [displayTranscript]);
 
@@ -569,7 +569,7 @@ export const ConversationHost = React.memo(function ConversationHost({
     isSubmittingRef.current = true;
     dispatchComposer({ type: 'setSubmitState', submitState: 'submitting' });
 
-    // Edit-mode branch (#1462 CF16): route submit to editMessage instead of
+    // Edit-mode branch (#1462): route submit to editMessage instead of
     // sending a new message. No optimistic pending block — the server returns
     // the updated HubMessage and the shell invalidates the messages query.
     if (composer.editingMessageId && onEditMessage) {
@@ -590,7 +590,7 @@ export const ConversationHost = React.memo(function ConversationHost({
 
     let optimisticId: string | undefined;
     // Snapshot the user's draft before the optimistic clear: when the submit
-    // fails the content is restored so nothing is silently dropped (#1821).
+    // fails the content is restored so nothing is silently dropped.
     const draftSnapshot = captureComposerDraft(composer, { text: liveText.trim() });
     // Tracks upload refs written so far — the catch restores the draft with
     // them so a retry only re-uploads what actually failed.
@@ -638,7 +638,7 @@ export const ConversationHost = React.memo(function ConversationHost({
             dispatchComposer({ type: 'setAttachmentRef', attachmentId: a.id, attachmentRef: ref });
           } catch {
             // Upload failed: mark the chip failed and abort the send — shipping
-            // the message without the file would silently lose it (#1821).
+            // the message without the file would silently lose it.
             setUploadProgresses((prev) => ({ ...prev, [a.id]: { percent: 100, phase: 'failed' } }));
             throw new Error(t('conversationHost.attachmentUploadFailedLong', { name: a.name }));
           }
@@ -661,7 +661,7 @@ export const ConversationHost = React.memo(function ConversationHost({
       // already has a non-terminal task (#1430). Keep the optimistic user block
       // (the message is real), restore the composer to idle, and surface an
       // info toast rather than a hard error (#1438). With a dispatch-only
-      // retry port available (CF22), also enqueue the dispatch intent so the
+      // retry port available, also enqueue the dispatch intent so the
       // agent dispatch is retried once the run ends instead of being dropped.
       if (submitResult.turnInProgress) {
         const dispatchMention = submitPayload.mentions.find((mention) => mention.dispatchRole !== 'context');
@@ -705,7 +705,7 @@ export const ConversationHost = React.memo(function ConversationHost({
     onToast, dispatchComposer, t, transcript, onEditMessage, mutatePendingIntents, schedulePendingFlush]);
 
   /**
-   * Retry a failed attachment upload from its chip (#1821). The attachment
+   * Retry a failed attachment upload from its chip. The attachment
    * keeps its transient `file` after the failed submit, so the retry can
    * re-upload in place and write the ref back into the composer.
    */

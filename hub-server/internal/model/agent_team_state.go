@@ -248,7 +248,7 @@ const (
 	TeamEventCompeteAggregated = "team.compete.aggregated"
 )
 
-// ── Human Review Gate (ADR-008) ──────────────────────────────────
+// ── Human Review Gate ────────────────────────────────────────────
 
 // HumanReviewDecision is the request body for POST /web/team-runs/{id}/review-decision.
 type HumanReviewDecision struct {

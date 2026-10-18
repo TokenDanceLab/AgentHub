@@ -21,8 +21,8 @@ import type { AgentsPageProps } from './types';
 /* ═══════════════════════════════════════════════════════════════════════
    Ops cluster views — 运行策略 / 工具权限 / 模型配置 / 审计日志.
 
-   Extracted from AgentsPage as Phase 17 strangler slice #560.
-   Residual thin: presentational subpanels live in AgentOpsParts (#629).
+   Extracted from AgentsPage (#560).
+   Helper module: presentational subpanels live in AgentOpsParts (#629).
    CSS remains on shared AgentsPage.module.css.
    ═══════════════════════════════════════════════════════════════════════ */
 

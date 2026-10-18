@@ -1,5 +1,5 @@
 /**
- * #2072 P3: Resolve a failure toast i18n key based on the error's errcode.
+ * #2072: Resolve a failure toast i18n key based on the error's errcode.
  * Returns a specific key when the backend errcode maps to a user-meaningful
  * distinction; falls back to the generic fallbackKey otherwise.
  *

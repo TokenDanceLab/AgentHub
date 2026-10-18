@@ -29,7 +29,7 @@ vi.mock('@/api/eventClient', () => ({
 
 // The hooks are mocked, but `invalidateEdgeThreadTranscript` is deliberately
 // kept REAL (importOriginal): App.tsx calls it on the submit path and the whole
-// point of #2274 A-13 is which key it targets, so mocking it away would make the
+// point of #2274 is which key it targets, so mocking it away would make the
 // assertion below a tautology.
 vi.mock('@/api/threadQueries', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/api/threadQueries')>();
@@ -219,7 +219,7 @@ const goForwardLabel = /^(前进|Go forward|aria\.goForward)$/;
 const desktopEntryLabel = /^(Desktop entry|aria\.desktopEntry)$/;
 const globalRailLabel = /^(Global rail|aria\.globalRail)$/;
 const rightInspectorLabel = /^(Right inspector|aria\.rightInspector)$/;
-const mainChainStatusLabel = /^(Demo main chain status|aria\.mainChainStatus)$/;
+const mainChainStatusLabel = /^(Main chain status|aria\.mainChainStatus)$/;
 
 function getComposerInput(): HTMLTextAreaElement {
   return screen.getByLabelText(composerInputLabel) as HTMLTextAreaElement;
@@ -459,8 +459,7 @@ describe('Desktop App v4 root', () => {
     expect(screen.getByRole('complementary', { name: conversationSidebarLabel })).toBeInTheDocument();
     expect(screen.getByRole('main', { name: workspaceLabel })).toHaveAttribute('data-surface', 'desktop');
     expect(screen.getByRole('complementary', { name: rightInspectorLabel })).toBeInTheDocument();
-    // #1821: the legacy workspace tab row was dead chrome and was removed
-    // from WorkspaceHeader (both surfaces).
+    // WorkspaceHeader has no legacy tab row (both surfaces).
     expect(screen.queryByRole('tablist', { name: workspaceTabsLabel })).not.toBeInTheDocument();
     expect(screen.getByRole('tablist', { name: 'aria.rightWorkspace' })).toBeInTheDocument();
     expect(getComposerInput()).toBeInTheDocument();
@@ -469,7 +468,7 @@ describe('Desktop App v4 root', () => {
     expect(screen.queryByRole('button', { name: '添加本机附件' })).not.toBeInTheDocument();
     expect(screen.queryByLabelText('Approval mode')).not.toBeInTheDocument();
     expect(screen.queryByLabelText('Work directory')).not.toBeInTheDocument();
-    /* P77 #1318: themed blank demo previews must not auto-open browser tab. */
+    /* #1318: themed blank demo previews must not auto-open browser tab. */
     expect(screen.getByRole('tab', { name: overviewInspectorTabLabel })).toBeInTheDocument();
     expect(screen.queryByRole('tab', { name: browserInspectorTabLabel })).not.toBeInTheDocument();
     expect(screen.getByRole('heading')).toBeInTheDocument();
@@ -515,7 +514,7 @@ describe('Desktop App v4 root', () => {
 
   it('logs out the real Desktop session before returning to the login card', async () => {
     let authenticatedUser: { id: string; username: string } | null = {
-      id: 'user-delicious233',
+      id: 'user-demo',
       username: 'demo-user',
     };
     const logout = vi.fn(async () => {
@@ -533,7 +532,7 @@ describe('Desktop App v4 root', () => {
     }) as ReturnType<typeof useAuth>);
     mockedUseCurrentUser.mockReturnValue({
       data: {
-        userId: 'user-delicious233',
+        userId: 'user-demo',
         displayName: 'demo-user',
         avatarUrl: '',
       },
@@ -556,7 +555,7 @@ describe('Desktop App v4 root', () => {
   });
 
   it('mounts the Hub task bridge on the Desktop active path when Hub auth and Local Edge are available', async () => {
-    mockAuthSession({ id: 'user-delicious233', username: 'demo-user' } as ReturnType<typeof useAuth>['user']);
+    mockAuthSession({ id: 'user-demo', username: 'demo-user' } as ReturnType<typeof useAuth>['user']);
     window.localStorage.setItem(WORKBENCH_DATA_MODE_STORAGE_KEY, 'approved-real');
     renderWithProviders(<DesktopWorkbenchApp />);
 
@@ -578,7 +577,7 @@ describe('Desktop App v4 root', () => {
   });
 
   it('waits for Desktop device registration before accepting Hub dispatch frames', async () => {
-    mockAuthSession({ id: 'user-delicious233', username: 'demo-user' } as ReturnType<typeof useAuth>['user']);
+    mockAuthSession({ id: 'user-demo', username: 'demo-user' } as ReturnType<typeof useAuth>['user']);
     window.localStorage.setItem(WORKBENCH_DATA_MODE_STORAGE_KEY, 'approved-real');
     mockedUseDeviceRegistration.mockReturnValue({
       deviceId: '00000000-0000-4000-8000-00000000d001',
@@ -705,8 +704,6 @@ describe('Desktop App v4 root', () => {
     });
   });
 
-  // TODO: normalizeEdgeEvents rewrite (Wave 7) changed tool_call content rendering;
-  // 'rg' toolName no longer appears as standalone text — investigate label/params flow.
   it('merges live Edge events into the shared v4 transcript and evidence', async () => {
     window.localStorage.setItem(WORKBENCH_DATA_MODE_STORAGE_KEY, 'approved-real');
     mockedUseThreads.mockReturnValue({
@@ -849,7 +846,7 @@ describe('Desktop App v4 root', () => {
       threadId: 'thread-real',
     });
 
-    // #2274 A-13: the immediate transcript refresh must target the key the live
+    // #2274: the immediate transcript refresh must target the key the live
     // useThreadMessages actually registers — ['edge','threadItems',<id>]. It used
     // to be the bare literal ['threadItems', id], missing the 'edge' segment, so
     // it prefix-matched no cache entry: the immediate refresh and both the 2s/4s
@@ -868,7 +865,7 @@ describe('Desktop App v4 root', () => {
     expect(getComposerInput()).toHaveValue('');
   });
 
-  it('cancels the active Edge run through the composer stop button (#1816 W1)', async () => {
+  it('cancels the active Edge run through the composer stop button (#1816)', async () => {
     window.localStorage.setItem(WORKBENCH_DATA_MODE_STORAGE_KEY, 'approved-real');
     mockedUseThreads.mockReturnValue({
       data: {
@@ -916,7 +913,7 @@ describe('Desktop App v4 root', () => {
     expect(cancelRunMutateAsync).toHaveBeenCalledWith('run-live');
   });
 
-  it('routes local permission approvals to the Edge permission decide mutation (#1816 W1)', async () => {
+  it('routes local permission approvals to the Edge permission decide mutation (#1816)', async () => {
     window.localStorage.setItem(WORKBENCH_DATA_MODE_STORAGE_KEY, 'approved-real');
     mockedUseThreads.mockReturnValue({
       data: {

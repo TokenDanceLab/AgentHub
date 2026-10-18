@@ -495,7 +495,7 @@ func TestPostRunsRejectsWorkDirWhenWorkspaceAllowlistEmpty(t *testing.T) {
 	h.ensureDefaults()
 
 	// Empty allowlist (nil or zero-length slice) must reject all non-empty workDir values.
-	// This is the fail-closed security behavior for AH-SR-006.
+	// This is the fail-closed security behavior.
 	h.WorkspaceAllowlist = []string{} // explicitly empty; nil would behave the same
 
 	tests := []struct {
@@ -943,6 +943,28 @@ func TestPostCancelRunUsesExecutor(t *testing.T) {
 	}
 }
 
+func TestPostCancelRunReturnsOKForCompletedWithIssues(t *testing.T) {
+	h := newTestHandler()
+	h.ensureDefaults()
+	h.Executor = &fakeRunExecutor{cancel: lifecycle.CancelResult{Found: true, Status: "completed_with_issues"}}
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/runs/run_issues:cancel", nil)
+	rec := httptest.NewRecorder()
+	h.PostCancelRun(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status 200 for terminal completed_with_issues, got %d", rec.Code)
+	}
+	var body map[string]any
+	if err := json.NewDecoder(rec.Body).Decode(&body); err != nil {
+		t.Fatalf("failed to decode body: %v", err)
+	}
+	body = unwrapSuccess(body)
+	if body["status"] != "completed_with_issues" {
+		t.Fatalf("status = %#v, want completed_with_issues", body["status"])
+	}
+}
+
 func TestPostCancelRunReturnsStoredStatusWhenExecutorCannotCancel(t *testing.T) {
 	h := newTestHandler()
 	h.ensureDefaults()
@@ -1126,7 +1148,7 @@ func TestPostRunsGeneratesEvents(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// Dual-token auth tests (AH-SR-046)
+// Dual-token auth tests
 // ---------------------------------------------------------------------------
 
 const testCapSecret = "my-secret-key-for-capability-test-32" // 32+ bytes for HMAC-SHA256
@@ -1306,7 +1328,7 @@ func TestRunStartDualToken_NoSecretConfiguredSkipsCapabilityCheck(t *testing.T) 
 	executor := &fakeRunExecutor{}
 	h.Executor = executor
 	// HubJWTSecret is empty and no Hub identity — local single-tenant path
-	// still allowed without capability (AH-SR-046 / #899).
+	// still allowed without capability (#899).
 	h.HubJWTSecret = ""
 	h.EdgeDeviceID = ""
 	h.ensureDefaults()
@@ -1373,7 +1395,7 @@ func TestRunStartDualToken_HubIdentityEmptySecretFailsClosed(t *testing.T) {
 	h.ensureDefaults()
 
 	req := httptest.NewRequest(http.MethodPost, "/v1/runs", strings.NewReader(fmt.Sprintf(`{"projectId":"proj_local","threadId":"thread_local","prompt":"hub identity no secret","workDir":%q}`, workDir)))
-	// Inject Hub identity even though secret is empty (defense-in-depth residual).
+	// Inject Hub identity even though secret is empty (defense in depth).
 	ctx := context.WithValue(req.Context(), edgeidentity.HubUserIDKey, "user-hub")
 	ctx = context.WithValue(ctx, edgeidentity.HubDeviceIDKey, "test-edge-001")
 	req = req.WithContext(ctx)
@@ -1593,7 +1615,7 @@ func TestRunStartDualToken_MatchingTargetAndThreadAccepted(t *testing.T) {
 
 // issueHubShapedCapToken mirrors hub-server IssueCapabilityToken wire claims
 // (issuer/audience/nbf + action/target/thread) for PostRuns dual-token fixture
-// evidence (AH-SR-046 residual / #461). No production network.
+// evidence. No production network.
 
 func issueHubShapedCapToken(secret, userID, deviceID, projectID, purpose, action, targetID, threadID string, expiresIn time.Duration) string {
 	if purpose == "" {
@@ -1624,7 +1646,7 @@ func issueHubShapedCapToken(secret, userID, deviceID, projectID, purpose, action
 }
 
 func TestRunStartDualToken_HubIssueShape_AcceptsBoundToken(t *testing.T) {
-	// AH-SR-046 / #461 fixture: Hub-shaped issue → Edge PostRuns validate path.
+	// Hub-shaped issue → Edge PostRuns validate path.
 	h := newTestHandler()
 	workDir := allowTestWorkspace(t, h)
 	executor := &fakeRunExecutor{}

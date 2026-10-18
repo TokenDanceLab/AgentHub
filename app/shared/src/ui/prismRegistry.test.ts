@@ -1,16 +1,14 @@
 /**
- * prismRegistry HAST word-diff injector tests (P6 Step 3).
+ * prismRegistry HAST word-diff injector tests.
  *
- * Step 3 is the highest-risk point of the P6 design (report §8.2: the HAST
- * split/wrap is design-deductive, NOT prototyped). These tests pin the
- * behaviour: alignment with Prism text leaves, coexistence of word-diff
- * spans with Prism token spans, the cross-Prism-boundary split, and the
- * safe fallback paths.
+ * These tests pin the behaviour: alignment with Prism text leaves,
+ * coexistence of word-diff spans with Prism token spans, the
+ * cross-Prism-boundary split, and the safe fallback paths.
  *
  * jsdom is the test env (vitest.config.ts) but these are string-in/string-out
  * assertions — no real Prism DOM rendering is exercised (jsdom cannot render
- * Prism's CSS colors; that limitation is inherited from the existing
- * `tokens-base.css:586` 注释（#1509）and applies to word-diff colors too).
+ * Prism's CSS colors; the same limitation applies to word-diff colors and
+ * forced-colors rendering, see the forced-colors block in tokens-base.css).
  */
 import { describe, expect, it } from 'vitest';
 
@@ -41,7 +39,7 @@ function tok(oldS: string, newS: string): WordDiffToken[] {
 }
 
 describe('highlightLineWithWordDiff', () => {
-  // ── Fallback / no-op paths (report §8.2 "safe degradation") ───────────
+  // ── Fallback / no-op paths ("safe degradation") ──────────────────────
 
   it('falls back to highlightLine when tokens are null/undefined/empty', () => {
     const code = 'const x = 1;';
@@ -95,7 +93,7 @@ describe('highlightLineWithWordDiff', () => {
     );
   });
 
-  // ── English word-diff coexisting with Prism (the core value of Step 3)
+  // ── English word-diff coexisting with Prism (the core word-diff value)
 
   it('wraps removed words in wordRemoved spans AND keeps Prism token spans (left cell)', () => {
     const oldS = 'const old = true;';
@@ -144,9 +142,9 @@ describe('highlightLineWithWordDiff', () => {
     expect(html).toMatchInlineSnapshot(`"<span class="token keyword">const</span> <span class="wordRemoved">old</span> <span class="token operator">=</span> <span class="token boolean"><span class="wordRemoved">true</span></span><span class="token punctuation">;</span>"`);
   });
 
-  // ── CJK char-level diff (Step 1 diffChars fallback) ──────────────────
+  // ── CJK char-level diff (diffChars fallback) ─────────────────────────
 
-  it('wraps per-char CJK changes (char-level fallback from Step 1)', () => {
+  it('wraps per-char CJK changes (diffChars char-level fallback)', () => {
     const oldS = '修改了一处';
     const newS = '修改了两处';
     const lang = ''; // no grammar for CJK -> plain-text tree, word-diff applies
@@ -196,12 +194,12 @@ describe('highlightLineWithWordDiff', () => {
     expect(textContent(html)).toBe(oldS);
   });
 
-  // ── Oversized line: Step 1 guard returns null -> injector bails ──────
-  it('bails to highlightLine when the Step 1 size guard produced null tokens', () => {
-    // produceWordDiffTokens returns null for >2000 chars (Step 1 guard).
-    // The renderer (Step 4) passes cell.wordDiff (== null) straight through;
+  // ── Oversized line: size guard returns null -> injector bails ────────
+  it('bails to highlightLine when the size guard produced null tokens', () => {
+    // produceWordDiffTokens returns null for >2000 chars (size guard).
+    // The renderer passes cell.wordDiff (== null) straight through;
     // the injector must treat null as "no word-diff" and defer to
-    // highlightLine. This is the oversized-line path (report §5.1).
+    // highlightLine. This is the oversized-line path.
     const oldS = 'a'.repeat(2001);
     const newS = 'b';
     expect(produceWordDiffTokens(oldS, newS)).toBeNull();
@@ -212,13 +210,13 @@ describe('highlightLineWithWordDiff', () => {
 
 describe('injectWordDiffIntoHast (pure core)', () => {
   // ── Cross-boundary: one word-diff token spanning two Prism spans ────
-  // The riskiest case (report §8.2): a single token whose char range covers
+  // The riskiest case: a single token whose char range covers
   // two Prism text leaves (e.g. a word straddling a keyword + punctuation
   // boundary). The injector must split it into two wordRemoved spans — one
   // per leaf — both nested inside their respective Prism spans. Same class,
   // same color; structurally two segments, visually one highlight. This is
-  // why HAST injection beats per-token `highlightLine` (the report's
-  // rejected fallback would mis-tokenise string literals split mid-word).
+  // why HAST injection beats per-token `highlightLine` (a per-token fallback
+  // would mis-tokenise string literals split mid-word).
   it('splits a token that spans two Prism spans into nested word-diff spans', () => {
     // Synthetic tree mirroring refractor output:
     //   <span class="token keyword">foo</span><span class="token operator">bar</span>

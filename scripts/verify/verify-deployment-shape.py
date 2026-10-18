@@ -1,27 +1,25 @@
 #!/usr/bin/env python3
-r"""Deployment shape SSOT verifier (#1527 PR1) — ps1 迁移（契约见 server docs/design/ps1-to-python-migration.md）。
+"""Deployment shape SSOT verifier.
 
 Enforces that `deployments/production/docker-compose.yml` is the single
 in-repo production compose shape:
 
-1. The authoritative template must exist, parse as YAML, and declare the
-   expected services (hub-server + redis).
+1. The authoritative template must exist and declare the expected services
+   (hub-server + redis) in the shape the indentation parser below reads.
 2. The hub-server image must stay on the product image SSOT
    (`ghcr.io/tokendancelab/agenthub-hub-server`); `agenthub-hub` is a
    rejected second image name.
 3. No second hand-maintained production compose may appear under
-   `deployments/production/` (adding one must FAIL - machine proof).
-4. The legacy compose inventory under `hub-server/deployments/**` is CLOSED
-   since #1527 PR2: any compose file under that tree (the directory now holds
-   build inputs only: Dockerfile, docker-entrypoint.sh, README.md) must FAIL.
+   `deployments/production/`.
+4. Any compose file under `hub-server/deployments/**` must FAIL; that
+   directory holds build inputs only (Dockerfile, docker-entrypoint.sh,
+   README.md).
 
-This verifier never reads secrets; it only inspects file shapes.
+This verifier never reads secrets; it only inspects file shapes. Stdlib only:
+services/image/build shapes are extracted with a small indentation parser
+covering the production compose and its fixtures.
 
-stdlib only：ps1 原用 PyYAML 临时脚本抽取 services/image/build 形状，迁移后
-用内置缩进解析器（覆盖本仓 production compose 与自测 fixture 的全部结构：
-mapping/嵌套 mapping/list/block scalar/flow list/引号与注释），无第三方依赖。
-
-CLI 兼容：--RepoRootPath 默认脚本两级上级；输出行与退出码 0=PASS / 1=FAIL。
+CLI: --RepoRootPath defaults to two levels above the script; exit 0=PASS / 1=FAIL.
 """
 
 import argparse
@@ -32,6 +30,7 @@ import sys
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 
 AUTHORITATIVE_RELATIVE = "deployments/production/docker-compose.yml"
+COMPOSE_NAME = re.compile(r"(?:docker-)?compose(?:\.[\w-]+)*\.ya?ml", re.IGNORECASE)
 EXPECTED_SERVICES = ["hub-server", "redis"]
 IMAGE_SSOT_PREFIX = "ghcr.io/tokendancelab/agenthub-hub-server"
 
@@ -140,13 +139,13 @@ def extract_compose_shape_or_fail(repo_root: str, relative: str, fail_verifier_f
         with open(authoritative_path, encoding="utf-8", errors="replace") as handle:
             shape = extract_compose_shape(handle.read())
     except Exception:
-        fail_verifier_fn(f"authoritative template is not valid YAML or python extraction failed: {relative}")
+        fail_verifier_fn(f"authoritative template could not be read or shape-extracted: {relative}")
         return None
     return shape
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Deployment shape SSOT verifier (#1527 PR1)")
+    parser = argparse.ArgumentParser(description="Deployment shape SSOT verifier")
     parser.add_argument("--RepoRootPath", default=os.path.join(SCRIPT_DIR, "..", ".."))
     args = parser.parse_args()
 
@@ -170,33 +169,36 @@ def main() -> int:
 
     # ── 2. hub-server image SSOT ───────────────────────────────────────────
     image = shape.get("hub-server", {}).get("image", "")
+    if not image:
+        fail_verifier("hub-server service must declare an image from the product SSOT")
     if re.search(r"agenthub-hub\b", image) and "agenthub-hub-server" not in image:
         fail_verifier(f"hub-server image reintroduces rejected name 'agenthub-hub': {image}")
-    if image != "" and not image.startswith(IMAGE_SSOT_PREFIX):
+    if image and not image.startswith(IMAGE_SSOT_PREFIX):
         fail_verifier(f"hub-server image is off SSOT: '{image}' (want prefix '{IMAGE_SSOT_PREFIX}')")
     if failed == 0:
         pass_verifier(f"hub-server image on SSOT: {image}")
 
     # ── 3. No second hand-maintained production compose ────────────────────
-    try:
-        production_composes = sorted(
-            name for name in os.listdir(production_dir)
-            if name.startswith("docker-compose") and name.endswith(".yml") and os.path.isfile(os.path.join(production_dir, name))
-        )
-    except OSError:
-        production_composes = []
-    if len(production_composes) > 1:
-        extra = ", ".join(name for name in production_composes if name != "docker-compose.yml")
-        fail_verifier(f"second hand-maintained production compose detected under deployments/production/: {extra} (adding one must FAIL)")
+    production_composes = []
+    if os.path.isdir(production_dir):
+        for dirpath, _, filenames in os.walk(production_dir):
+            for name in sorted(filenames):
+                if COMPOSE_NAME.fullmatch(name):
+                    production_composes.append(os.path.join(dirpath, name))
+    authoritative = os.path.join(production_dir, "docker-compose.yml")
+    extras = [path for path in production_composes if os.path.normcase(path) != os.path.normcase(authoritative)]
+    if extras:
+        found = ", ".join(os.path.relpath(path, repo_root).replace("\\", "/") for path in sorted(extras))
+        fail_verifier(f"second hand-maintained production compose detected under deployments/production/: {found} (adding one must FAIL)")
     else:
         pass_verifier("no second production compose under deployments/production/")
 
-    # ── 4. Legacy compose inventory closed (PR2) ──────────────────────────
+    # ── 4. Legacy compose inventory closed ───────────────────────────────
     legacy_composes = []
     if os.path.isdir(legacy_deploy_dir):
         for dirpath, _, filenames in os.walk(legacy_deploy_dir):
             for name in sorted(filenames):
-                if name.startswith("docker-compose") and name.endswith(".yml"):
+                if COMPOSE_NAME.fullmatch(name):
                     legacy_composes.append(os.path.join(dirpath, name))
     if legacy_composes:
         found = ", ".join(os.path.relpath(path, repo_root).replace("\\", "/") for path in sorted(legacy_composes))
@@ -214,6 +216,6 @@ def main() -> int:
 if __name__ == "__main__":
     try:
         sys.exit(main())
-    except Exception as exc:  # noqa: BLE001 —— 顶层兜底，对齐 ps1 $ErrorActionPreference='Stop'
+    except Exception as exc:  # noqa: BLE001 —— fail closed：未捕获异常返回非零
         print(f"ERROR: {exc}", file=sys.stderr)
         sys.exit(1)

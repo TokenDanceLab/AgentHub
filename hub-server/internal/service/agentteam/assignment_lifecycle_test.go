@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/agenthub/hub-server/internal/bus"
+	"github.com/agenthub/hub-server/internal/cache"
 	"github.com/agenthub/hub-server/internal/errcode"
 	"github.com/agenthub/hub-server/internal/model"
 	"github.com/agenthub/hub-server/internal/repository"
@@ -15,7 +16,7 @@ import (
 
 func TestAgentTeamService_CompleteAssignmentPublishesEvent(t *testing.T) {
 	db := setupAgentTeamStateSQLite(t)
-	svc := NewAgentTeamService(db, nil, nil)
+	svc := NewAgentTeamService(db, nil, cache.NoOpCache{})
 	eventBus, err := bus.New()
 	if err != nil {
 		t.Fatal(err)
@@ -52,7 +53,7 @@ func TestAgentTeamService_CompleteAssignmentPublishesEvent(t *testing.T) {
 
 func TestAgentTeamService_FailAssignmentPublishesEvent(t *testing.T) {
 	db := setupAgentTeamStateSQLite(t)
-	svc := NewAgentTeamService(db, nil, nil)
+	svc := NewAgentTeamService(db, nil, cache.NoOpCache{})
 	eventBus, err := bus.New()
 	if err != nil {
 		t.Fatal(err)
@@ -89,7 +90,7 @@ func TestAgentTeamService_FailAssignmentPublishesEvent(t *testing.T) {
 
 func TestAgentTeamService_CreateAssignmentRejectsDelegationDepthLimit(t *testing.T) {
 	db := setupAgentTeamStateSQLite(t)
-	svc := NewAgentTeamService(db, nil, nil)
+	svc := NewAgentTeamService(db, nil, cache.NoOpCache{})
 	_, supervisor, _, run := seedAgentTeamRun(t, db)
 	supervisor2 := addTeamSupervisor(t, db, supervisor.TeamID, "profile-supervisor-2")
 	supervisor3 := addTeamSupervisor(t, db, supervisor.TeamID, "profile-supervisor-3")
@@ -132,7 +133,7 @@ func TestAgentTeamService_CreateAssignmentRejectsDelegationDepthLimit(t *testing
 
 func TestAgentTeamService_CreateAssignmentRejectsTeamRunTaskLimit(t *testing.T) {
 	db := setupAgentTeamStateSQLite(t)
-	svc := NewAgentTeamService(db, nil, nil)
+	svc := NewAgentTeamService(db, nil, cache.NoOpCache{})
 	_, supervisor, executor, run := seedAgentTeamRun(t, db)
 
 	for i := 0; i < model.MaxTasksPerTeamRun; i++ {
@@ -155,7 +156,7 @@ func TestAgentTeamService_CreateAssignmentRejectsTeamRunTaskLimit(t *testing.T) 
 
 func TestAgentTeamService_CreateAssignmentRejectsDelegationCycle(t *testing.T) {
 	db := setupAgentTeamStateSQLite(t)
-	svc := NewAgentTeamService(db, nil, nil)
+	svc := NewAgentTeamService(db, nil, cache.NoOpCache{})
 	_, supervisor, _, run := seedAgentTeamRun(t, db)
 	supervisor2 := addTeamSupervisor(t, db, supervisor.TeamID, "profile-supervisor-cycle-2")
 	supervisor3 := addTeamSupervisor(t, db, supervisor.TeamID, "profile-supervisor-cycle-3")
@@ -187,7 +188,7 @@ func TestAgentTeamService_CreateAssignmentRejectsDelegationCycle(t *testing.T) {
 
 func TestAgentTeamService_CreateAssignmentUsesConfiguredDelegationDepthLimit(t *testing.T) {
 	db := setupAgentTeamStateSQLite(t)
-	svc := NewAgentTeamServiceWithGuardrails(db, nil, nil, AgentTeamGuardrails{
+	svc := NewAgentTeamServiceWithGuardrails(db, nil, cache.NoOpCache{}, AgentTeamGuardrails{
 		MaxDelegationDepth: 1,
 	})
 	_, supervisor, _, run := seedAgentTeamRun(t, db)
@@ -212,7 +213,7 @@ func TestAgentTeamService_CreateAssignmentUsesConfiguredDelegationDepthLimit(t *
 
 func TestAgentTeamService_CreateAssignmentUsesConfiguredTeamRunTaskLimit(t *testing.T) {
 	db := setupAgentTeamStateSQLite(t)
-	svc := NewAgentTeamServiceWithGuardrails(db, nil, nil, AgentTeamGuardrails{
+	svc := NewAgentTeamServiceWithGuardrails(db, nil, cache.NoOpCache{}, AgentTeamGuardrails{
 		MaxTasksPerTeamRun: 1,
 	})
 	_, supervisor, executor, run := seedAgentTeamRun(t, db)
@@ -236,7 +237,7 @@ func TestAgentTeamService_CreateAssignmentUsesConfiguredTeamRunTaskLimit(t *test
 func TestAgentTeamService_DispatchAssignmentBindsTeamTaskToPendingAgentTask(t *testing.T) {
 	db := setupAgentTeamStateSQLite(t)
 	agentSvc := &mockAgentTeamAgentSvc{returnTaskID: "task-dispatch-1"}
-	svc := NewAgentTeamService(db, agentSvc, nil)
+	svc := NewAgentTeamService(db, agentSvc, cache.NoOpCache{})
 	team, supervisor, executor, run := seedAgentTeamRun(t, db)
 	seedTeamRunSession(t, db, run.SessionID, "user-1", executor)
 
@@ -329,7 +330,7 @@ func TestAgentTeamService_DispatchAssignmentBindsTeamTaskToPendingAgentTask(t *t
 func TestAgentTeamService_DispatchAssignmentPassesTeamRunTargetID(t *testing.T) {
 	db := setupAgentTeamStateSQLite(t)
 	agentSvc := &mockAgentTeamAgentSvc{returnTaskID: "task-dispatch-1"}
-	svc := NewAgentTeamService(db, agentSvc, nil)
+	svc := NewAgentTeamService(db, agentSvc, cache.NoOpCache{})
 	_, supervisor, executor, run := seedAgentTeamRun(t, db)
 	targetID := "target-local-edge-1"
 	run.TargetID = &targetID
@@ -367,7 +368,7 @@ func TestAgentTeamService_DispatchAssignmentPassesTeamRunTargetID(t *testing.T) 
 func TestAgentTeamService_CompleteAssignmentAcceptsDispatchedViaDispatchPath(t *testing.T) {
 	db := setupAgentTeamStateSQLite(t)
 	agentSvc := &mockAgentTeamAgentSvc{returnTaskID: "task-complete-dispatched-1"}
-	svc := NewAgentTeamService(db, agentSvc, nil)
+	svc := NewAgentTeamService(db, agentSvc, cache.NoOpCache{})
 	_, supervisor, executor, run := seedAgentTeamRun(t, db)
 	seedTeamRunSession(t, db, run.SessionID, "user-1", executor)
 
@@ -404,7 +405,7 @@ func TestAgentTeamService_CompleteAssignmentAcceptsDispatchedViaDispatchPath(t *
 // can no longer rewrite the stored result or re-trigger fault escalation.
 func TestAgentTeamService_FailAssignmentRejectsTerminalAssignment(t *testing.T) {
 	db := setupAgentTeamStateSQLite(t)
-	svc := NewAgentTeamService(db, nil, nil)
+	svc := NewAgentTeamService(db, nil, cache.NoOpCache{})
 	_, supervisor, executor, run := seedAgentTeamRun(t, db)
 
 	for _, status := range []string{
@@ -446,7 +447,7 @@ func TestAgentTeamService_FailTimedOutAssignmentsTerminatesActiveAndIsIdempotent
 	db := setupAgentTeamStateSQLite(t)
 	guardrails := DefaultAgentTeamGuardrails()
 	guardrails.AssignmentTimeout = time.Minute
-	svc := NewAgentTeamServiceWithGuardrails(db, nil, nil, guardrails)
+	svc := NewAgentTeamServiceWithGuardrails(db, nil, cache.NoOpCache{}, guardrails)
 	_, supervisor, executor, run := seedAgentTeamRun(t, db)
 
 	old := time.Now().Add(-2 * time.Hour)
@@ -496,7 +497,7 @@ func TestAgentTeamService_FailTimedOutAssignmentsTerminatesActiveAndIsIdempotent
 
 func TestAgentTeamService_CompleteAssignmentConcurrentOnlyOneWins(t *testing.T) {
 	db := setupAgentTeamConcurrentSQLite(t)
-	svc := NewAgentTeamService(db, nil, nil)
+	svc := NewAgentTeamService(db, nil, cache.NoOpCache{})
 	_, supervisor, executor, run := seedAgentTeamRun(t, db)
 	assignment := &model.AgentTeamAssignment{
 		TeamRunID: run.ID, FromMemberID: supervisor.ID, ToMemberID: executor.ID,

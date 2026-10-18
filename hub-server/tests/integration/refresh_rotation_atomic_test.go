@@ -16,12 +16,10 @@ import (
 )
 
 // TestRefreshRotationConcurrentSingleWinner proves that N concurrent
-// presentations of the SAME refresh token rotate exactly once (#2154:
-// database-lane P2-2 / security-lane finding 1 — both reports' recommended
-// item). Pre-fix, every racer passes the revoked check before any rotation
-// commits, each obtains a fresh access+refresh pair (double-spend), and the
-// F2 refresh_token_reuse_total signal never fires because the upsert
-// replaces the row in place.
+// presentations of the SAME refresh token rotate exactly once. Pre-fix, every
+// racer passes the revoked check before any rotation commits, each obtains a
+// fresh access+refresh pair (double-spend), and refresh_token_reuse_total
+// never fires because the upsert replaces the row in place.
 func TestRefreshRotationConcurrentSingleWinner(t *testing.T) {
 	CleanDB(t, db)
 

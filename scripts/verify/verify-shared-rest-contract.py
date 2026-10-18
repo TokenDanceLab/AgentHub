@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""verify-shared-rest-contract — Hub 前端 hubClient 模块 REST 契约门禁（ps1 迁移，契约见 server docs/design/ps1-to-python-migration.md）。
+"""verify-shared-rest-contract — Hub 前端 hubClient 模块 REST 契约门禁。
 
 Hub server 声明的 REST 面静态注册于 hub-server/internal/router/router.go；Hub 前端客户端在
 app/shared/src（hubClient*.ts，尤其 hubClientPayloadPaths.ts）用纯路径构造器拼调用路径。
@@ -19,7 +19,7 @@ app/shared/src（hubClient*.ts，尤其 hubClientPayloadPaths.ts）用纯路径�
 客户端<->服务端契约回归。
 
 范围说明：本门禁覆盖 Hub 前端 hubClient 模块对 Hub server 面；Edge 侧 REST 面
-（apiClient.ts，按 RFC A-V3 §4.1 已删除）是独立关注点，刻意不在范围内。
+（`apiClient.ts` 已删除）是独立关注点，刻意不在范围内。
 
 用法：
   python scripts/verify/verify-shared-rest-contract.py
@@ -150,6 +150,12 @@ def main() -> int:
         if norm is not None:
             normalized.add(norm)
 
+    if not normalized:
+        fail_check(
+            "client scan produced 0 normalized API paths — refusing to report clean "
+            "(the hubClient path-building shapes may have changed)"
+        )
+
     print("\n=== Shared REST contract (Hub client <-> Hub router) ===")
     print(f"Hub routes: {len(hub_routes)} | client path(s) scanned: {len(raw_paths)} | normalized unique: {len(normalized)}")
 
@@ -180,6 +186,6 @@ def main() -> int:
 if __name__ == "__main__":
     try:
         sys.exit(main())
-    except Exception as exc:  # noqa: BLE001 —— 顶层兜底，对齐 ps1 $ErrorActionPreference='Stop'
+    except Exception as exc:  # noqa: BLE001 —— fail closed：未捕获异常返回非零
         print(f"ERROR: {exc}", file=sys.stderr)
         sys.exit(1)

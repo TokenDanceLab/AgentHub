@@ -1,8 +1,8 @@
 # Contributing to AgentHub
 
-最后更新：2026-08-17
+最后更新：2026-10-19
 
-本文件是唯一贡献入口。旧详细贡献指南见 [docs/history.md](docs/history.md)。
+本文件是唯一贡献入口。
 
 ## Start
 
@@ -13,10 +13,7 @@
 ## Branch lifecycle
 
 - One branch owns one issue or one coherent slice. Use `feat/`, `fix/`, `refactor/`, `test/`, `ci/`, `docs/`, or `chore/` plus a short topic; do not create long-lived `dev/*` integration branches.
-- Before coding, refresh from `origin/master`; after each meaningful slice, run the narrowest local gate. Keep the branch rebased or fast-forwardable, but do not rewrite a shared branch.
-- Open the PR as soon as the slice is reviewable. The PR title and eventual squash commit use the same Conventional Commit form; the body must state the evidence level and skipped gates honestly.
-- Merge only through GitHub **Squash and merge** after the required checks pass and conversations are resolved. The protected `master` branch rejects direct pushes, force pushes, deletions, non-linear history, and unverified required checks.
-- After merge, delete the remote branch and remove the matching `.worktrees/<topic>/` directory. Do not keep merged branches as a second backlog.
+- Branch, worktree, rebase, and merge rules live in [AGENTS.md](AGENTS.md) §「Git 和 worktree」. Open the PR once the slice is reviewable; the PR title and eventual squash commit use the same Conventional Commit form.
 
 ## Commit Format
 
@@ -24,25 +21,13 @@
 type(scope): 中文摘要
 ```
 
-Allowed types (SSOT in AGENTS.md): `feat|fix|docs|refactor|chore|test|perf|ci|revert`.
+Allowed types (SSOT: `scripts/verify/verify-commit-messages.sh`): `init|feat|fix|docs|refactor|chore|test|perf|ci|revert`.
 
 Common scopes: `client|edge|api|docs|desktop|web|hub|shared|ci`.
 
 ## Build / Test / Lint
 
-完整命令速查见 [docs/developer-quickstart.md](docs/developer-quickstart.md) §测试速查（SSOT）。
-每个 `make` 目标实际跑什么以根 `Makefile` 为准，本文件只列目标名不复述其内容（防漂移）。常用入口：
-
-```bash
-make test          # L0 后端单元（Makefile `test` 目标闭包，不含前端）
-make fe-test       # L0 前端单元（Makefile `fe-test` 目标）
-cd hub-server && go test ./... -short -count=1   # Hub 单元
-cd edge-server && go test ./... -short -count=1  # Edge 单元
-make test-hub-integration                         # L1 集成（先 scripts/dev/dev-up.sh 起 PG/Redis）
-python scripts/verify/verify-doc-ssot.py          # 文档/规则一致性门禁
-```
-
-改动文件对应的最窄 gate 优先；宣称 merge-ready 前跑对应完整 gate（测试分层与 CI job 映射见 [AGENTS.md](AGENTS.md) 的“测试分层（L0-L4）”）。
+命令速查见 [docs/developer-quickstart.md](docs/developer-quickstart.md) §测试速查；目标语义以根 `Makefile` 为准。改动文件对应的最窄 gate 优先；宣称 merge-ready 前跑对应完整 gate（分层与 CI 映射见 [AGENTS.md](AGENTS.md) 的“测试分层（L0-L4）”）。
 
 ## Pull Requests
 

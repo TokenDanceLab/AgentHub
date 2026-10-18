@@ -1,9 +1,8 @@
 /* ═══════════════════════════════════════════════════════════════════════
    Projects detail tab bodies (runs / artifacts / archive / settings).
 
-   Residual extract from ProjectPanelViews for Phase 23 #626.
-   Residual thin (#696): imports refactored — Announcement / FeedPanel /
-   ProjectMembers moved to own files; inline SectionHead → shared helper.
+   Announcement, FeedPanel, and ProjectMembers have their own files;
+   SectionHead is shared via ProjectPanelHelpers (#626, #696).
    CSS remains on shared ProjectsPage.module.css.
    ═══════════════════════════════════════════════════════════════════════ */
 

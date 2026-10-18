@@ -75,7 +75,7 @@ func (s *AgentTeamService) ReviewDagPlan(ctx context.Context, userID, runID stri
 	}
 
 	// The claim and every side effect it authorizes commit or roll back
-	// together (#2256 E-P2-5).
+	// together (#2256).
 	//
 	// Two invariants this restores:
 	//
@@ -143,7 +143,7 @@ var errReviewClaimLost = errors.New("agentteam: review claim lost")
 // cancelled and records the cancellation reason.
 //
 // tx is the caller's transaction: every write here must commit or roll back
-// with the claim that authorized it (#2256 E-P2-5). The audit trail is written
+// with the claim that authorized it (#2256). The audit trail is written
 // through appendTeamEventTx on the same handle for the same reason — a
 // cancelled assignment whose event is missing is an observable divergence,
 // because replayReviewEvents projects review state from the event log.
@@ -183,7 +183,7 @@ func (s *AgentTeamService) cancelPendingAssignmentsForReview(tx *gorm.DB, runID,
 // that commits without its event leaves the row saying pending_review while the
 // projection says running.
 //
-// Residual, deliberately not folded in: HandleRouteDecision commits the
+// Deliberately not folded in: HandleRouteDecision commits the
 // assignment + agent task in an earlier transaction and calls this afterwards
 // (route_decision.go), so a failure here still leaves a created assignment on a
 // run that never reached the review gate. Folding this into that transaction

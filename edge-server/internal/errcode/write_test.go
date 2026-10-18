@@ -78,6 +78,29 @@ func TestErrCodeWriteSentinelStatusTable(t *testing.T) {
 	}
 }
 
+// TestErrCodeWriteSetsRetryAfterFor429 pins the documented contract that every
+// 429 carries Retry-After, while call sites may supply a more precise value.
+func TestErrCodeWriteSetsRetryAfterFor429(t *testing.T) {
+	rec := httptest.NewRecorder()
+	Write(rec, ErrTooManyRequests)
+	if got := rec.Header().Get("Retry-After"); got != "1" {
+		t.Fatalf("Retry-After = %q, want 1", got)
+	}
+
+	rec = httptest.NewRecorder()
+	rec.Header().Set("Retry-After", "30")
+	Write(rec, ErrTooManyRequests)
+	if got := rec.Header().Get("Retry-After"); got != "30" {
+		t.Fatalf("Retry-After = %q, want the call-site value 30", got)
+	}
+
+	rec = httptest.NewRecorder()
+	Write(rec, ErrBadRequest)
+	if got := rec.Header().Get("Retry-After"); got != "" {
+		t.Fatalf("non-429 response must not carry Retry-After, got %q", got)
+	}
+}
+
 // TestErrCodeWriteMatchesErrorBodyEnvelope proves Write is ErrorBody plus the
 // status from e.HTTPStatus and nothing else: the wire body must be identical to
 // what the ~160 existing writeJSON(w, status, ErrorBody(e)) call sites produce.

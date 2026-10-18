@@ -386,21 +386,21 @@ describe('useWorkbenchPanelLayout', () => {
     expect(result.current.sidebarCollapsed).toBe(false);
   });
 
-  it('auto-collapses the inspector on mount at a narrow viewport (#1910 follow-up)', () => {
+  it('auto-collapses the inspector on mount at a narrow viewport (#1910)', () => {
     setViewportWidth(800);
     const { result } = renderPanelLayout();
     // 800 < 880 → collapse the fixed 400px inspector so it does not crush the chat column.
     expect(result.current.inspectorCollapsed).toBe(true);
   });
 
-  it('keeps the inspector open on mount at a wider desktop viewport (#1910 follow-up)', () => {
+  it('keeps the inspector open on mount at a wider desktop viewport (#1910)', () => {
     setViewportWidth(1024);
     const { result } = renderPanelLayout();
     // 1024 >= 880 → keep the inspector open.
     expect(result.current.inspectorCollapsed).toBe(false);
   });
 
-  it('does not auto-collapse the inspector on mount on non-desktop surfaces (#1910 follow-up)', () => {
+  it('does not auto-collapse the inspector on mount on non-desktop surfaces (#1910)', () => {
     setViewportWidth(800);
     const { result } = renderPanelLayout({ platformSurface: 'web' });
     // The mount-time inspector collapse is Desktop-only.
@@ -486,7 +486,7 @@ describe('useWorkbenchPanelLayout', () => {
     expect(result.current.inspectorCollapsed).toBe(true);
   });
 
-  it('expands the inspector again when the setting is switched back on (#2154 P2-6)', () => {
+  it('expands the inspector again when the setting is switched back on (#2154)', () => {
     const { result } = renderPanelLayout();
 
     act(() => {
@@ -504,7 +504,7 @@ describe('useWorkbenchPanelLayout', () => {
     expect(result.current.inspectorCollapsed).toBe(false);
   });
 
-  it('never expands an inspector the user collapsed by hand (#2154 P2-6)', () => {
+  it('never expands an inspector the user collapsed by hand (#2154)', () => {
     const { result } = renderPanelLayout();
 
     act(() => {
@@ -520,7 +520,7 @@ describe('useWorkbenchPanelLayout', () => {
     expect(result.current.inspectorCollapsed).toBe(true);
   });
 
-  it('drops the settings marker once the user reopens the panel (#2154 P2-6)', () => {
+  it('drops the settings marker once the user reopens the panel (#2154)', () => {
     const { result } = renderPanelLayout();
 
     act(() => {

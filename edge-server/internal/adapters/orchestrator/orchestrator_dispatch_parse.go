@@ -80,7 +80,7 @@ func extractTextContent(payload any) string {
 // matchCompletion checks for known orchestrator termination signals.
 // Multi-word phrases match on short text (<= 200 chars) to prevent false
 // positives when completion phrases appear inside longer orchestrator
-// output that is not a termination signal (ISSUE 3.11).
+// output that is not a termination signal.
 // Single-word signals only match on very short text (<= 80 chars).
 func matchCompletion(textLower string) bool {
 	// Multi-word phrases — only match on reasonably short text.

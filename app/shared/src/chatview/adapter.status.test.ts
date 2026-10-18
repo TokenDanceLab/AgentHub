@@ -384,7 +384,7 @@ describe('blocksToTranscriptItems (status variants)', () => {
   })
 })
 
-describe('resolveUnreadAnchorItemIndex (T8 desktop IM unread divider)', () => {
+describe('resolveUnreadAnchorItemIndex (desktop IM unread divider)', () => {
   const text = (id: string, role: 'agent' | 'human', authorId: string, timeOffset = 0) => ({
     id,
     kind: 'text' as const,

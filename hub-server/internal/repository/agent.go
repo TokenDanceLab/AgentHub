@@ -73,7 +73,7 @@ func ListCustomAgentsByOwner(db *gorm.DB, ownerID string) ([]model.CustomAgent, 
 	var agents []model.CustomAgent
 	err := db.Where("owner_user_id = ? AND deleted_at IS NULL", ownerID).
 		Order("created_at DESC").
-		Limit(config.MaxPageLimit). // #2136 P0: was unbounded
+		Limit(config.MaxPageLimit). // #2136: was unbounded
 		Find(&agents).Error
 	return agents, err
 }
@@ -355,7 +355,7 @@ func CreatePendingTaskUnlessActive(db *gorm.DB, task *model.PendingAgentTask) (*
 // keeping it alive while activity (stream callbacks) continues.
 // #132: running tasks that stop receiving activity will be expired by the scheduler.
 //
-// #2154 P2-9: the write short-circuits *in SQL* instead of in Go. The callback
+// #2154: the write short-circuits *in SQL* instead of in Go. The callback
 // fires once per streamed chunk (per token, in practice), and every one of
 // those used to issue an UPDATE that rewrote expire_at to a value within a few
 // hundred milliseconds of the one already stored — a guaranteed-no-op write
@@ -434,7 +434,7 @@ func CreateAgentRunEventWithNextSeqLimited(db *gorm.DB, event *model.AgentRunEve
 		// idempotent handling. We only treat it as idempotent when the
 		// conflicting row matches our intended (task_id, event_seq); a
 		// different conflict is surfaced as a real error.
-		// Single source of truth for the classification (#2244 slice 1); the
+		// Single source of truth for the classification (#2244); the
 		// copy that used to live in this file is gone.
 		if isUniqueViolation(err) {
 			var existing model.AgentRunEvent

@@ -1,40 +1,41 @@
 #!/usr/bin/env bash
 # ───────────────────────────────────────────────────────────────
-# devserver.sh — 远程 dev 服务器测试平台统一入口（#1681）
+# devserver.sh — 远程 dev 服务器测试平台统一入口
 #
 # 远程服务器 = 真实测试面（L3）：全栈（TokenDanceID + hub + edge +
 # web vite）跑在服务器上，本脚本从本地发起同步/启动/测试/回传。
 #
 # 用法:
 #   scripts/dev/devserver.sh sync     # 打包本地 master 增量并推送到服务器（ff-only）
-#   scripts/dev/devserver.sh start    # 服务器全栈启动（幂等）
-#   scripts/dev/devserver.sh stop     # 停止 hub/edge/web 进程（容器保留）
+#   scripts/dev/devserver.sh start    # 依赖容器 + hub/edge 启动与健康等待（幂等）
+#   scripts/dev/devserver.sh stop     # 停止 hub/edge 进程（容器保留）
 #   scripts/dev/devserver.sh status   # 四服务健康 + git 状态
 #   scripts/dev/devserver.sh test     # 服务器跑 go test -short 并回传报告 JSON
 #   scripts/dev/devserver.sh integration  # integration lane：重建测试库 + 全量跑并回传报告
 #
-# 环境变量（均在本地配置，仓库不存任何地址/凭据）:
-#   AGENTHUB_DEVSERVER_SSH      ssh 目标（必填；具体 alias/地址只放私有运维配置）
+# 环境变量:
+#   AGENTHUB_DEVSERVER_SSH      ssh 目标（必填）
 #   AGENTHUB_DEVSERVER_SSH_BIN  ssh-compatible 可执行文件（默认 ssh；可注入受控 wrapper）
-#   AGENTHUB_DEVSERVER_ROOT     服务器仓库路径（默认 /srv/agenthub/AgentHub；可私有覆盖）
+#   AGENTHUB_DEVSERVER_ROOT     服务器仓库路径（必填）
 #
 # 安全契约：
 #   - 仓库内零硬编码地址/凭据；secret 只存在于服务器本地 .env（gitignored）。
 #   - sync 要求服务器工作树干净（git status --porcelain 为空）才允许快进，
-#     防止证据跑在脏树上（#1681 服务器证据纪律）。
+#     防止证据跑在脏树上。
 # ───────────────────────────────────────────────────────────────
 set -euo pipefail
 
 REMOTE="${AGENTHUB_DEVSERVER_SSH:-}"
 SSH_BIN="${AGENTHUB_DEVSERVER_SSH_BIN:-ssh}"
-REPO_ROOT="${AGENTHUB_DEVSERVER_ROOT:-/srv/agenthub/AgentHub}"
+REPO_ROOT="${AGENTHUB_DEVSERVER_ROOT:-}"
 LOCAL_REPO="$(cd "$(dirname "$0")/../.." && pwd)"
 
 log() { printf '[devserver] %s\n' "$*"; }
 die() { printf '[devserver] ERROR: %s\n' "$*" >&2; exit 1; }
 ssh_cmd() { "$SSH_BIN" "$@"; }
 require_remote_config() {
-  [ -n "$REMOTE" ] || die "AGENTHUB_DEVSERVER_SSH 未配置；具体远端 alias/地址必须留在私有运维配置"
+  [ -n "$REMOTE" ] || die "AGENTHUB_DEVSERVER_SSH 未配置"
+  [ -n "$REPO_ROOT" ] || die "AGENTHUB_DEVSERVER_ROOT 未配置"
 }
 remote_bash() {
   local quoted_root
@@ -53,7 +54,7 @@ resolve_report_dir() {
 remote_check() {
   require_remote_config
   ssh_cmd -o ConnectTimeout=10 "$REMOTE" "echo ok" >/dev/null 2>&1 ||
-    die "无法连接已配置的远端测试目标；请检查私有 SSH 配置（见 scripts/dev/README.md）"
+    die "无法连接远端测试目标；请检查 SSH 配置（见 scripts/dev/README.md）"
 }
 
 cmd_sync() {
@@ -105,7 +106,7 @@ if [ -z "${DEVSERVER_GOPROXY:-}" ] && [ -f /etc/environment ]; then
 fi
 [ -n "${DEVSERVER_GOPROXY:-}" ] && export GOPROXY="$DEVSERVER_GOPROXY"
 # PATH 必须在 source 之后补（/etc/environment 会整体覆盖 PATH）。
-export PATH=/usr/local/go/bin:$PATH
+export PATH="${DEVSERVER_GO_BIN_DIR:-/usr/local/go/bin}:$PATH"
 
 # 依赖容器（幂等）
 docker compose up -d postgres redis
@@ -204,7 +205,7 @@ if [ -z "${DEVSERVER_GOPROXY:-}" ] && [ -f /etc/environment ]; then
 fi
 [ -n "${DEVSERVER_GOPROXY:-}" ] && export GOPROXY="$DEVSERVER_GOPROXY"
 # PATH 必须在 source 之后补（/etc/environment 会整体覆盖 PATH）。
-export PATH=/usr/local/go/bin:$PATH
+export PATH="${DEVSERVER_GO_BIN_DIR:-/usr/local/go/bin}:$PATH"
 cd "$REPO_ROOT"
 commit="$(git rev-parse --short HEAD)"
 branch="$(git rev-parse --abbrev-ref HEAD)"
@@ -257,7 +258,7 @@ if [ -z "${DEVSERVER_GOPROXY:-}" ] && [ -f /etc/environment ]; then
   export GOPROXY="${GOPROXY:-}"
 fi
 [ -n "${DEVSERVER_GOPROXY:-}" ] && export GOPROXY="$DEVSERVER_GOPROXY"
-export PATH=/usr/local/go/bin:$PATH
+export PATH="${DEVSERVER_GO_BIN_DIR:-/usr/local/go/bin}:$PATH"
 cd "$REPO_ROOT"
 
 # 从服务器本地 .env 提取凭据/配置（值不出脚本、不回传明文）。

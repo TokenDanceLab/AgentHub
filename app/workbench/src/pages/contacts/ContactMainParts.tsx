@@ -30,8 +30,8 @@ import type {
 /* ═══════════════════════════════════════════════════════════════════════
    Contacts main-pane presentational subviews.
 
-   Residual thin from ContactMainViews (Phase 24 #640).
-   Residual thin #2 (Phase 27 #672): chrome/helpers in ContactMainSections
+   Helpers for ContactMainViews (#640).
+   Helper module #2 (#672): chrome/helpers in ContactMainSections
    + ContactMainHelpers. CSS remains on shared ContactsPage.module.css.
    ═══════════════════════════════════════════════════════════════════════ */
 
@@ -68,7 +68,7 @@ export function ContactListPage({
   onAvatarClick?: ((member: ContactMember, anchor: HTMLElement) => void) | undefined;
 }): React.ReactElement {
   const { t } = useTranslation(SHARED_WORKBENCH_I18N_NAMESPACE);
-  // ── Infinite-scroll sentinel (T14 pattern; wired to the mock data-layer
+  // ── Infinite-scroll sentinel (wired to the mock data-layer
   //    cursor pagination, #1510) ──
   const sentinelRef = useRef<HTMLDivElement>(null);
   const onLoadMoreRef = useRef(onLoadMore);

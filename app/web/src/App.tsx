@@ -81,7 +81,7 @@ function WebWorkbenchRoot() {
     () => createWebPlatform({
       ensureAuth,
       dataMode: dataModeContract.mode,
-      // AH-SR-043: only explicit mock/fixture modes may use demo runtime fallback.
+      // only explicit mock/fixture modes may use demo runtime fallback.
       // Never silent-fallback from auto/real/observed/approved-real.
       demoRuntimeFallback: allowsWorkbenchDemoRuntimeMutation({
         demoRuntimeFallback: true,
@@ -150,12 +150,13 @@ function WebWorkbenchRoot() {
     try {
       const result = await hubClientForConversations.createPrivateSession({ target_user_id: target.id });
       setSelectedConversationId(result.session_id);
-    } catch {
+    } catch (error) {
+      console.warn('[AgentHub Web] createPrivateSession failed', error);
       setSelectedConversationId(undefined);
     }
   }, [hubClientForConversations]);
 
-  // #1819: sidebar "新建会话" — the Hub has no blank-session API (sessions
+  // Sidebar "新建会话" — the Hub has no blank-session API (sessions
   // are always peer-bounded), so the direct entry opens the contact picker
   // and creates through the same real createPrivateSession chain the
   // Contacts page uses. Errors stay visible in the modal (never swallowed;
@@ -257,7 +258,7 @@ function WebWorkbenchRoot() {
   }, [agentList]);
 
   const handleRegenerate = useCallback((_blockId: string, taskId: string): Promise<void> => {
-    // #2274 B-1: the identity contract of POST /web/agent-tasks/:id/regenerate
+    // #2274: the identity contract of POST /web/agent-tasks/:id/regenerate
     // is the TASK id (hub RegenerateAgentTask looks up pending_agent_tasks by
     // primary key). The pre-fix port stripped a `hub-message-` prefix and sent
     // what it called a "message id" — which is in fact the message's
@@ -314,7 +315,7 @@ function WebWorkbenchRoot() {
         onApprovalDecision={workbench.onApprovalDecision}
         onNavigateToConversation={handleNavigateToConversation}
         onStartNewConversation={handleStartNewConversation}
-        // #2274 B-1: regenerate is a real Hub mutation, so it rides the same
+        // #2274: regenerate is a real Hub mutation, so it rides the same
         // fail-closed gate as the other five chat actions — outside hubReady
         // (demo / unauthenticated) the port is undefined and the shared menu
         // hides the entry instead of offering a click that can only fail.

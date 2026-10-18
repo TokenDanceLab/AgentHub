@@ -13,7 +13,7 @@ import (
 )
 
 // SessionService is the subset of *session.Service used by SessionHandler.
-// DTOs live in service/session (#708 fifth IM typed-service package).
+// DTOs live in service/session (#708).
 type SessionService interface {
 	CreatePrivateSession(ctx context.Context, currentUserID, targetUserID string) (*session.CreateSessionResponse, error)
 	CreateGroupSession(ctx context.Context, ownerUserID, name string, memberIDs []string) (*session.CreateSessionResponse, error)

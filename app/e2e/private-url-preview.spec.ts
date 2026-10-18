@@ -4,7 +4,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 /**
- * AgentHub 私有 URL 验证真实场景 spec — issue #1922 项4（L3，observed-local）。
+ * AgentHub 私有 URL 验证真实场景 spec — issue #1922（L3，observed-local）。
  *
  * 验证对象：现有 preview scheme+capability 门禁在真实栈上的行为
  * （`app/shared/src/ui/previewSandbox.ts` isSafeRemotePreviewUrl +
@@ -42,9 +42,9 @@ import { fileURLToPath } from 'node:url';
  *
  * ── 明确不验证 ──
  *   绝对 http(s) URL 的私有主机分类：当前门禁是 scheme 级
- *   （isSafeRemotePreviewUrl 只检查 ^https?:// 前缀）。已知带
- *   authority userinfo（user:pass@host 形状）的 URL 目前能通过
- *   scheme 门禁——主线已另开 issue 跟踪，本 spec 不对该形状做断言。
+ *   （isSafeRemotePreviewUrl 只检查 ^https?:// 前缀）。自 #1933/#1937
+ *   起该门禁也会拒绝带 authority userinfo（user:pass@host 形状）的
+ *   http(s) URL；本 spec 仍不对该形状做断言，也不做私有主机分类。
  *
  * 前置（本机全栈：TokenDance ID :3000 / hub :8080 / web :5174）：
  *   bash scripts/e2e/provision-real-e2e-stack.sh
@@ -55,7 +55,8 @@ import { fileURLToPath } from 'node:url';
  *     --project=chromium private-url-preview.spec.ts
  *
  * 证据等级：observed-local（real_tested=true 时，本地单机真栈）。
- * CI 状态：不进 CI（与 playwright.real.config.ts 同语义，仅本地真栈运行）。
+ * CI 状态：非 PR 检查；由 dispatch-only 的 real-e2e-stack lane
+ * （checks.yml → scripts/e2e/run-real-e2e-lane.sh）运行。
  */
 
 interface RealE2ECredentials {
@@ -78,7 +79,7 @@ const MOUNT_HOST_ID = 'real-e2e-private-url-preview-host';
 /**
  * 非安全 scheme 用例。protocol-relative 用例的主机名使用 RFC 保留的
  * .invalid TLD（永不可解析），且避开内网后缀（internal/local/corp/lan），
- * 保证失败信息进入报告后仍满足证据脱敏合同（#1873）。
+ * 保证失败信息进入报告后仍满足证据脱敏合同。
  */
 const UNSAFE_PREVIEW_CASES = [
   { caseId: 'unsafe-javascript', url: 'javascript:alert(1)' },
@@ -141,19 +142,16 @@ const credentials = loadCredentials();
 /**
  * 应用层已知外部依赖统一 route abort，使本 lane 网络面对栈外全封闭：
  * - challenges.cloudflare.com：本机离线环境无法加载 Turnstile CDN 脚本；
- *   abort 触发前端组件的错误分支从而允许提交。服务端 Turnstile 校验未配置
- *   secret 时恒通过（TokenDance ID 源码注释明示），不构成任何安全旁路。
+ *   abort 触发前端组件的错误分支从而允许提交。本 lane 使用的本地 ID 实例
+ *   未配置 Turnstile challenge，因此该处理只影响测试环境。
  *   （与 real-oidc-login.spec.ts 同步。）
- * - fonts.googleapis.com / fonts.gstatic.com：app/web/index.html 的设计字体
- *   （Hanken Grotesk + Material Symbols）外链——产品真实外部依赖，与预览
- *   门禁无关；abort 后浏览器自动回退系统字体，不影响本 spec 断言。
+ * app/web 的字体已自托管（/fonts/fonts.css）；外部字体 host 不在豁免清单内，
+ * 若重新引入外部字体 <link> 会作为栈外请求失败暴露。
  * 被 abort 的已知外部请求在 observeNetwork 中按「已阻断的已知外部依赖」
  * 豁免；未经阻断而成功的栈外请求仍然失败——封闭性断言不因豁免清单失效。
  */
 const KNOWN_APP_EXTERNAL_HOSTS = new Set([
   'challenges.cloudflare.com',
-  'fonts.googleapis.com',
-  'fonts.gstatic.com',
 ]);
 
 async function blockKnownAppExternals(context: BrowserContext): Promise<void> {
@@ -315,7 +313,7 @@ interface AppModuleUrls {
 /**
  * 从运行中页面的 resource timing 里发现真实 bundle 已加载模块的 URL。
  * 这些 URL 只在运行期内存中使用，不写入任何断言信息/报告（其中共享
- * 模块的 /@fs/ URL 含服务器绝对路径，属私有运行事实）。
+ * 模块的 /@fs/ URL 含服务器绝对路径，属运行环境数据）。
  */
 async function discoverAppModuleUrls(page: Page): Promise<AppModuleUrls> {
   return page.evaluate(() => {
@@ -375,7 +373,7 @@ interface MountPlan {
 /**
  * 在真实页面内用应用自己的 React/ReactDOM 与真实组件模块挂载被测表面。
  * 返回应用自身 i18next 实例里的降级文案（browserPreview.unsafeUrl），
- * 供断言 C 使用——不硬编文案（文案不是行为合同，见 AGENTS §10）。
+ * 供断言 C 使用——不硬编文案（文案不是行为合同，见 AGENTS「验证与证据」）。
  */
 async function mountPreviewSurfaces(page: Page, plan: MountPlan): Promise<{ downgradeText: string }> {
   return page.evaluate(async ({ moduleUrls, rowItemCases, browserPreviewCases }) => {
@@ -454,7 +452,7 @@ async function mountPreviewSurfaces(page: Page, plan: MountPlan): Promise<{ down
 
 // ── 测试 ──────────────────────────────────────────────────────────────
 
-test.describe('私有 URL 验证真实场景 (#1922 项4)', () => {
+test.describe('私有 URL 验证真实场景 (#1922)', () => {
   test.beforeEach(async () => {
     test.skip(!credentials, 'missing test credentials: run bash scripts/e2e/provision-real-e2e-stack.sh first');
     if (credentials && !(await stackIsUp(credentials))) {

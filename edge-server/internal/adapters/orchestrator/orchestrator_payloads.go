@@ -30,21 +30,6 @@ func attachSiblingContexts(events []dispatchEvent) []dispatchEvent {
 	return events
 }
 
-// cloneDispatchForAgent copies a dispatch event and retargets the agent.
-func cloneDispatchForAgent(orig dispatchEvent, altID string) dispatchEvent {
-	return dispatchEvent{
-		Action:      "dispatch",
-		Agent:       altID,
-		Task:        orig.Task,
-		Role:        orig.Role,
-		ThreadID:    orig.ThreadID,
-		Model:       orig.Model,
-		SubtaskID:   orig.SubtaskID,
-		TargetFiles: orig.TargetFiles,
-		DependsOn:   orig.DependsOn,
-	}
-}
-
 // defaultDispatchRole returns the role or the stable default "worker".
 func defaultDispatchRole(role string) string {
 	if role == "" {
@@ -66,17 +51,6 @@ func dispatchErrorPayload(agent, task, errMsg, subtaskID string, agentID string)
 		p["agentId"] = agentID
 	}
 	return p
-}
-
-// dispatchRejectedPayload builds a task notification payload for circuit-breaker rejects.
-func dispatchRejectedPayload(agent, task, errMsg, subtaskID string) map[string]any {
-	return map[string]any{
-		"action":    "dispatch_rejected",
-		"agent":     agent,
-		"task":      task,
-		"error":     errMsg,
-		"subtaskId": subtaskID,
-	}
 }
 
 // taskDispatchedPayload builds the BusEventTaskDispatched payload.

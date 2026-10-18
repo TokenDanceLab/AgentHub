@@ -88,7 +88,7 @@ function DesktopHubTaskBridgeActive() {
   }, [deviceReady, deviceRegistration.deviceId]);
 
   // Mirror live connection health into the connection store so the shell can
-  // surface real Edge/Hub status (workbench connection dot, #1816 W1): the
+  // surface real Edge/Hub status (workbench connection dot, #1816): the
   // Hub WS transport status and the Local Edge health poll are the two
   // desktop-side connection signals.
   const setHubConnectionStatus = useConnectionStore((s) => s.setConnectionStatus);

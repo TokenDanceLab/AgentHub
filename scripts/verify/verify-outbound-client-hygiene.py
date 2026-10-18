@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""verify-outbound-client-hygiene — 出站 HTTP / runtime-config 卫生门禁（ps1 迁移，契约见 server docs/design/ps1-to-python-migration.md）。
+"""verify-outbound-client-hygiene — 出站 HTTP / runtime-config 卫生门禁。
 
 service/verifier/callback 层不得读进程 env 或构造裸 http.Client：config 属于
 bootstrap/composition root，transport 策略属于少数专用 client（egress dialer、
@@ -14,7 +14,7 @@ dispatch client、OIDC/JWKS clients、Edge callback client）。allowlist 只缩
 5. 有 HTTP 但无 retry budget 的文件里的 for attempt := 0 循环 —— 无预算重试 FAIL；
 6. allowlist 卫生：匿名条目（无 #issue）与 stale 条目（allowlisted 文件已无违规）FAIL。
 
-CLI 参数与 ps1 兼容：--scopes、--client-allowlist（可重复/多值）、
+CLI 参数：--scopes、--client-allowlist（可重复/多值）、
 --no-default-allowlist（自测 fixture 用）。
 """
 
@@ -25,7 +25,7 @@ import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-# 检查模式（ps1 全用 -match，大小写不敏感）
+# 检查模式（大小写不敏感）
 GETENV = re.compile(r"os\.Getenv\(", re.IGNORECASE)
 BARE_CLIENT = re.compile(r"&http\.Client\{", re.IGNORECASE)
 READ_ALL = re.compile(r"io\.ReadAll\(", re.IGNORECASE)
@@ -78,7 +78,7 @@ def parse_allowlist(entries) -> tuple:
 
 def main() -> int:
     parser = argparse.ArgumentParser(
-        description="Outbound HTTP / runtime-config hygiene verifier (#1549 + #1564 phase 2)"
+        description="Outbound HTTP / runtime-config hygiene verifier (#1549, #1564)"
     )
     parser.add_argument(
         "--scopes",
@@ -95,7 +95,7 @@ def main() -> int:
     parser.add_argument(
         "--no-default-allowlist",
         action="store_true",
-        help="skip the default residual allowlist entirely (isolated fixture runs)",
+        help="skip the default allowlist entirely (isolated fixture runs)",
     )
     args = parser.parse_args()
 
@@ -213,6 +213,6 @@ def main() -> int:
 if __name__ == "__main__":
     try:
         sys.exit(main())
-    except Exception as exc:  # noqa: BLE001 —— 顶层兜底，对齐 ps1 $ErrorActionPreference='Stop'
+    except Exception as exc:  # noqa: BLE001 —— fail closed：未捕获异常返回非零
         print(f"ERROR: {exc}", file=sys.stderr)
         sys.exit(1)

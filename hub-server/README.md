@@ -1,14 +1,8 @@
 # AgentHub Hub Server
 
-最后更新：2026-08-29
+最后更新：2026-10-19
 
-Hub Server 是 AgentHub 的云端控制面：账号、IM、联系人/群聊、多端同步、设备路由、Edge 中继、Profile catalog 和审计。它不直接启动 Agent CLI；实际执行由 Edge Server 完成。
-
-旧长版说明见 [../docs/history.md](../docs/history.md)。
-
-## 职责
-
-Hub 是云端控制面：Identity（TokenDance ID OIDC → Hub session）、AuthZ（Hub-local 权限）、IM、Agent routing、Audit。完整 Boundaries 表见 [docs/architecture/01-hub-server.md](../docs/architecture/01-hub-server.md)（SSOT）。
+Hub Server 是 AgentHub 的云端控制面：TokenDance ID OIDC → Hub session、Hub-local 授权、IM、多端同步、设备路由、Edge 中继、Profile catalog 和审计。它不直接启动 Agent CLI；实际执行由 Edge Server 完成。完整 Boundaries 表见 [docs/architecture/01-hub-server.md](../docs/architecture/01-hub-server.md)（SSOT）。
 
 ## 运行
 
@@ -31,36 +25,21 @@ go run ./cmd/server-hub
 
 ```powershell
 cd hub-server
-go test ./... -short -count=1
+go test ./... -short            # 复用 Go test cache
+go test ./... -short -count=1   # 需要干净结果时
 ```
 
-涉及性能、goroutine、EventBus、outbox、scheduler、Redis TTL 或历史内存泄漏路径时，不要只跑功能测试；按 [../docs/archives/reference/backend-performance-gates.md](../docs/archives/reference/backend-performance-gates.md)（已归档：门禁矩阵由 scripts/verify/verify-backend-perf-leak-gates.py 执行）选择 behavior gate、microbenchmark、load smoke 或 pprof/leak 证据。
+涉及性能、goroutine、EventBus、outbox、scheduler、Redis TTL 或历史内存泄漏路径时，不要只跑功能测试；按 [../docs/architecture/05-deployment.md](../docs/architecture/05-deployment.md) §Backend performance and leak evidence（门禁矩阵由 `scripts/verify/verify-backend-perf-leak-gates.py` 执行）选择 behavior gate、microbenchmark、load smoke 或 pprof/leak 证据。
 
 ## Source Map
 
-| 主题 | Owner |
+| 主题 | 位置 |
 |---|---|
-| 入口装配 | `cmd/server-hub/main.go`, `internal/app/` |
-| 路由注册 | `internal/router/router.go` |
-| HTTP handler | `internal/handler/` |
-| 业务事务 | `internal/service/` |
-| 数据访问 | `internal/repository/`, `internal/model/` |
-| WebSocket | `internal/ws/`, `internal/app/events.go` |
-| 配置 | `internal/config/`, `configs/`, `.env.example` |
-| 迁移 | `migrations/` |
-| 部署资产 | `deployments/` |
-
-## Contract Map
-
-| 契约 | 位置 |
-|---|---|
-| REST API | `api/openapi.yaml` |
-| WebSocket events | `api/events.md` |
-| API conventions | `api/conventions.md` |
-| Hub 架构 | `docs/architecture/01-hub-server.md` |
-| Auth / TokenDance ID | `docs/architecture/06-auth-identity.md` |
-| Deployment boundary | `docs/architecture/05-deployment.md` |
-| Security risks | `SECURITY.md`（摘要；SSOT 在 TokenDance 私有治理文档） |
+| 入口 / 路由 / handler | `cmd/server-hub/main.go`, `internal/app/`, `internal/router/`, `internal/handler/` |
+| 业务 / 数据 / WebSocket | `internal/service/`, `internal/repository/`, `internal/model/`, `internal/ws/` |
+| 配置 / 迁移 / 部署 | `internal/config/`, `configs/`, `.env.example`, `migrations/`, `deployments/` |
+| REST / WS 契约 | `api/openapi.yaml`, `api/events.md`, `api/conventions.md` |
+| 架构 / 身份 / 部署 / 安全 | `docs/architecture/01-hub-server.md`, `docs/architecture/06-auth-identity.md`, `docs/architecture/05-deployment.md`, `SECURITY.md` |
 
 ## Auth Boundary
 
@@ -68,4 +47,4 @@ Hub session 是 AgentHub 产品授权边界。TokenDance ID bearer middleware �
 
 `/client/ws` 只接受 Hub-issued HS256 access token。新增登录、session、device、permission 或 Edge callback 行为时，同步 `api/openapi.yaml`、`api/events.md`、`docs/architecture/06-auth-identity.md` 和相关测试。
 
-access jti 黑名单的 fail-open/fail-closed 行为矩阵（Redis 可达性 × `AGENTHUB_AUTH_FAIL_CLOSED`，AH-SR-052 补偿控制）由 `internal/middleware/auth_fail_closed_redis_test.go` 按生产接线（`*cache.Client` + 进程内 miniredis，无真实网络）守护。
+access jti 黑名单的 fail-open/fail-closed 行为矩阵（Redis 可达性 × `AGENTHUB_AUTH_FAIL_CLOSED`，补偿控制）由 `internal/middleware/auth_fail_closed_redis_test.go` 按生产接线（`*cache.Client` + 进程内 miniredis，无真实网络）守护。

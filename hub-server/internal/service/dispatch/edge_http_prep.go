@@ -16,7 +16,7 @@ type EdgeHTTPRequestParts struct {
 }
 
 // PrepareEdgeHTTPRequest builds URL/body/headers/timeout for Edge HTTP dispatch.
-// insecure=true when AH-SR-053 rejects non-loopback cleartext (caller logs + aborts).
+// insecure=true when rejects non-loopback cleartext (caller logs + aborts).
 // err is set only on body marshal failure.
 func PrepareEdgeHTTPRequest(
 	edgeURL, authToken string,
@@ -54,7 +54,7 @@ func EdgeHTTPDispatchResult(statusCode int, respBody []byte) (runID string, nonS
 	return runID, false, nil
 }
 
-// Historical edge HTTP dispatch slog messages (AH-SR-053 + client side-effects).
+// Historical edge HTTP dispatch slog messages (+ client side-effects).
 const (
 	EdgeHTTPLogInsecureCleartext = "edge http dispatch: non-loopback URL without TLS, dispatch payloads sent in cleartext"
 	EdgeHTTPLogMarshalFailed     = "edge http dispatch: failed to marshal request"

@@ -29,7 +29,7 @@ import type {
 // We replicate them here to test data-level correctness.
 // ---------------------------------------------------------------------------
 
-type ChatDisplayName = 'Delicious233' | 'TokenDance' | 'AgentHub';
+type ChatDisplayName = 'Demo User' | 'TokenDance' | 'AgentHub';
 
 function formatChatCopy(value: string): string {
   return value
@@ -43,8 +43,8 @@ function formatChatCopy(value: string): string {
 function formatChatDisplayName(name: string | undefined, role?: string): ChatDisplayName {
   const normalized = name?.trim().toLowerCase() ?? '';
 
-  if (normalized.includes('delicious') || role === 'human') {
-    return 'Delicious233';
+  if (role === 'human' || normalized === 'demo user') {
+    return 'Demo User';
   }
   if (normalized.includes('tokendance')) {
     return 'TokenDance';
@@ -54,7 +54,7 @@ function formatChatDisplayName(name: string | undefined, role?: string): ChatDis
 }
 
 function getDisplayInitials(name: ChatDisplayName): string {
-  if (name === 'Delicious233') return 'D';
+  if (name === 'Demo User') return 'D';
   if (name === 'TokenDance') return 'TD';
   return 'AH';
 }
@@ -207,9 +207,9 @@ describe('formatChatCopy', () => {
 // ---------------------------------------------------------------------------
 
 describe('formatChatDisplayName', () => {
-  it('returns Delicious233 for human role or matching name', () => {
-    expect(formatChatDisplayName('Alice', 'human')).toBe('Delicious233');
-    expect(formatChatDisplayName('Delicious233')).toBe('Delicious233');
+  it('returns Demo User for human role or matching name', () => {
+    expect(formatChatDisplayName('Alice', 'human')).toBe('Demo User');
+    expect(formatChatDisplayName('Demo User')).toBe('Demo User');
   });
 
   it('returns TokenDance for matching name', () => {
@@ -230,7 +230,7 @@ describe('formatChatDisplayName', () => {
 
 describe('getDisplayInitials', () => {
   it('returns correct initials per display name', () => {
-    expect(getDisplayInitials('Delicious233')).toBe('D');
+    expect(getDisplayInitials('Demo User')).toBe('D');
     expect(getDisplayInitials('TokenDance')).toBe('TD');
     expect(getDisplayInitials('AgentHub')).toBe('AH');
   });
@@ -257,7 +257,7 @@ describe('getBlockTitle', () => {
       id: 't2', kind: 'text', author: humanAuthor,
       text: 'Hi', createdAt: '14:00',
     };
-    expect(getBlockTitle(block)).toBe('Delicious233');
+    expect(getBlockTitle(block)).toBe('Demo User');
   });
 
   it('returns title for approval blocks', () => {

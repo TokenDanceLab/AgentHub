@@ -12,8 +12,7 @@ workbench 是端级巨石，两者拆包后依赖方向固定为 **workbench →
 
 - 依赖方向：`workbench` 可以 import `shared`（深导入走 `@shared/*` 别名，
   与 web/desktop 约定一致）；**shared 永远不得 import workbench**
-  （`scripts/verify/verify-frontend-package-boundary.py` + eslint
-  `no-restricted-imports` 双重机器门禁）。
+  （`pnpm lint:boundaries` 的 `no-restricted-imports` 阻塞）。
 - 消费者：web / desktop 从 `@agenthub/workbench`（及显式子路径
   `./hubDataMapping`、`./pages`、`./designIcons`、`./desktopChromeEvents`、
   `./WorkbenchRoutes`）导入。

@@ -97,10 +97,6 @@ func TestApplyValidatedTargetAndCustomAgentIDHelpers(t *testing.T) {
 	assert.Equal(t, "", CustomAgentIDValue(&empty))
 	ca := "ca-1"
 	assert.Equal(t, "ca-1", CustomAgentIDValue(&ca))
-	assert.True(t, NeedsCustomAgentPreload(&ca))
-	assert.False(t, NeedsCustomAgentPreload(nil))
-	assert.True(t, HasCustomAgentBinding(&ca))
-	assert.False(t, HasCustomAgentBinding(nil))
 }
 
 func TestResolveCapabilityMint(t *testing.T) {

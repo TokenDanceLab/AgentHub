@@ -1,12 +1,9 @@
 // #2252 regression suite: Web reconnect/gap message resync.
 //
 // Web caches transcripts under ['web-v4','hub-messages',<sessionId>] (SSOT:
-// webPlatformMessageHelpers.hubMessagesQueryKey), but the shared
-// `resyncMessagesAfterReconnect` discovered cached sessions by matching the
-// 4-tuple ['hub','threads',<id>,'messages'] shape only. The two never met, so
-// the #2101 G1/G4-② wiring below was a 100% no-op on Web: `discoverCachedSessionIds`
-// returned [], the per-session loop body never ran, `syncMessages` was never
-// called, and nothing was logged.
+// webPlatformMessageHelpers.hubMessagesQueryKey); `resyncMessagesAfterReconnect`
+// must discover those cached sessions so the reconnect/gap resync actually
+// runs instead of matching no cache entry.
 //
 // The cache is seeded through the REAL exported key factory, not a literal, so
 // this test tracks whatever shape Web actually renders from.
@@ -17,7 +14,7 @@ import { act, renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { HUB_EVENTS } from '@shared/hubEvents';
 import { createHubWS } from '@shared/hub/hubWS';
-import type { Transport } from '@/api/transport';
+import type { Transport } from '@shared/transport';
 import { createHubClient } from '@/api/hubClient';
 import type { MessageResponse } from '@/api/hubClient';
 import { useConnectionStore } from '@/stores/connectionStore';

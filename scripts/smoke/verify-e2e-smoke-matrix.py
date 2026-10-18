@@ -1,17 +1,13 @@
 #!/usr/bin/env python3
-"""AgentHub E2E/smoke matrix runner（ps1 迁移，契约见 server docs/design/ps1-to-python-migration.md）。
+"""AgentHub E2E/smoke matrix runner.
 
 运行 CI-safe smoke 集合：Web stubbed Hub replay、Desktop renderer/Tauri
 dry gates、Local Edge/Hub service health、approval/artifact replay。真实
 TokenDance ID 登录与 live Hub dispatch 记录为 BLOCKED_WITH_EVIDENCE，
 除非单独的 approval gate 满足。
 
-迁移差异（双跑对照记录）：内部子脚本调用改为 python 执行（对应
-verify-localhost-real-stack-smoke / verify-login-e2e-readiness / client-smoke
-的 py 版本）；release 侧 tauri dry 脚本同样改走 python 执行（verify-tauri-package-dry.py）；
-超时进程树终止用 taskkill /T /F 对齐 Kill($true)；
-CLI 参数、退出码（0=通过 / 1=失败）与 RUN/PASS/BLOCK/FAIL/SKIP 行
-前缀格式与原 ps1 一致。
+子脚本通过 python 执行；CLI 参数同时接受 -Xxx 与 --Xxx；退出码 0=通过 /
+1=失败；输出行前缀为 RUN/PASS/BLOCK/FAIL/SKIP。
 
 用法：
   python scripts/smoke/verify-e2e-smoke-matrix.py
@@ -31,9 +27,72 @@ from datetime import datetime, timezone
 
 rows = []
 
+# Machine-readable scenario evidence levels, consumed by
+# scripts/verify/verify-real-e2e-contract.py. Every value must be a member of
+# that verifier's canonical EVIDENCE_LEVELS.
+SCENARIO_EVIDENCE_LEVELS = (
+    "stubbed-hub",
+    "playwright-ui",
+    "observed-local",
+    "fixture-unit",
+)
 
-def add_ps_compat(parser, *names, **kwargs):
-    """Register a parameter with both ps1-style (-Xxx) and python-style (--Xxx) names."""
+# Levels that assert a real run. A scenario may only use one of these when it
+# actually sets real_tested=True; readiness probes and dry gates stay at
+# fixture-unit.
+HIGH_EVIDENCE_LEVELS = ("approved-real", "packaged-release")
+
+# Every scenario's declared level and real_tested flag. invoke_matrix_command
+# rejects calls that drift from this table, and the contract verifier checks
+# it statically.
+SCENARIO_CONTRACT = {
+    "web-stubbed-hub-playwright": ("stubbed-hub", False),
+    "desktop-renderer-playwright": ("playwright-ui", False),
+    "localhost-services-smoke": ("observed-local", False),
+    "edge-client-smoke": ("observed-local", False),
+    "login-real-readiness-gate": ("fixture-unit", False),
+    "desktop-tauri-dry-smoke": ("fixture-unit", False),
+}
+
+# Row schema emitted into the manifest. The contract verifier checks that the
+# six canonical evidence fields are a subset of this tuple, so a prose or
+# variable-name match cannot satisfy the check.
+ROW_SCHEMA_FIELDS = (
+    "name",
+    "area",
+    "evidence_level",
+    "real_tested",
+    "status",
+    "exit_code",
+    "duration_ms",
+    "command",
+    "working_directory",
+    "claim",
+    "evidence",
+)
+
+# Top-level manifest schema. verify-real-e2e-contract.py checks that the
+# canonical six-field contract is covered by ROW_SCHEMA_FIELDS plus this tuple.
+MANIFEST_SCHEMA_FIELDS = (
+    "schema",
+    "status",
+    "real_tested",
+    "evidence_levels",
+    "planned_evidence_levels",
+    "skipped_evidence_levels",
+    "generated_at",
+    "started_at",
+    "repo_root",
+    "artifact_root",
+    "rows",
+    "blocked_count",
+    "failed_count",
+    "boundaries",
+)
+
+
+def add_arg_alias(parser, *names, **kwargs):
+    """Register both -Xxx and --Xxx spellings for one option."""
     full_names = []
     for name in names:
         full_names.append(name)
@@ -86,6 +145,17 @@ def get_free_port():
 
 
 def invoke_matrix_command(name, area, command, arguments, working_directory, blocked_exit_codes, blocked_reason, skipped, skip_reason, evidence_level, real_tested, claim, command_timeout_sec):
+    if evidence_level not in SCENARIO_EVIDENCE_LEVELS:
+        raise ValueError(f"scenario '{name}' declares unknown evidence level '{evidence_level}'")
+    if evidence_level in HIGH_EVIDENCE_LEVELS and not real_tested:
+        raise ValueError(
+            f"scenario '{name}' declares {evidence_level} without real_tested=True"
+        )
+    expected = SCENARIO_CONTRACT.get(name)
+    if expected != (evidence_level, real_tested):
+        raise ValueError(
+            f"scenario '{name}' drifted from SCENARIO_CONTRACT: {expected!r} != {(evidence_level, real_tested)!r}"
+        )
     if skipped:
         rows.append({
             "name": name,
@@ -131,6 +201,7 @@ def invoke_matrix_command(name, area, command, arguments, working_directory, blo
             env=env,
             capture_output=True,
             text=True,
+            encoding="utf-8",
             errors="replace",
             timeout=command_timeout_sec,
         )
@@ -195,19 +266,19 @@ def invoke_matrix_command(name, area, command, arguments, working_directory, blo
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="AgentHub E2E/smoke matrix runner（ps1 迁移）")
-    add_ps_compat(parser, "--RepoRoot", default=".", help="repository root")
-    add_ps_compat(parser, "--ArtifactRoot", default="", help="artifact root (defaults to .tmp under RepoRoot)")
-    add_ps_compat(parser, "--OutputPath", default="", help="matrix manifest JSON output path")
-    add_ps_compat(parser, "--CommandTimeoutSec", type=int, default=180, help="per-command timeout in seconds")
-    add_ps_compat(parser, "--SkipWebE2E", action="store_true", help="skip web stubbed-hub playwright")
-    add_ps_compat(parser, "--SkipDesktopE2E", action="store_true", help="skip desktop renderer playwright")
-    add_ps_compat(parser, "--SkipLocalStack", action="store_true", help="skip localhost services smoke")
-    add_ps_compat(parser, "--SkipEdgeClientSmoke", action="store_true", help="skip edge client smoke")
-    add_ps_compat(parser, "--SkipLoginReadiness", action="store_true", help="skip login real-readiness gate")
-    add_ps_compat(parser, "--SkipTauriDry", action="store_true", help="skip desktop tauri dry smoke")
-    add_ps_compat(parser, "--RequireHub", action="store_true", help="fail when the hub service probe is missing")
-    add_ps_compat(parser, "--RequireRealLogin", action="store_true", help="fail when real login is blocked")
+    parser = argparse.ArgumentParser(description="AgentHub E2E/smoke matrix runner")
+    add_arg_alias(parser, "--RepoRoot", default=".", help="repository root")
+    add_arg_alias(parser, "--ArtifactRoot", default="", help="artifact root (defaults to .tmp under RepoRoot)")
+    add_arg_alias(parser, "--OutputPath", default="", help="matrix manifest JSON output path")
+    add_arg_alias(parser, "--CommandTimeoutSec", type=int, default=180, help="per-command timeout in seconds")
+    add_arg_alias(parser, "--SkipWebE2E", action="store_true", help="skip web stubbed-hub playwright")
+    add_arg_alias(parser, "--SkipDesktopE2E", action="store_true", help="skip desktop renderer playwright")
+    add_arg_alias(parser, "--SkipLocalStack", action="store_true", help="skip localhost services smoke")
+    add_arg_alias(parser, "--SkipEdgeClientSmoke", action="store_true", help="skip edge client smoke")
+    add_arg_alias(parser, "--SkipLoginReadiness", action="store_true", help="skip login real-readiness gate")
+    add_arg_alias(parser, "--SkipTauriDry", action="store_true", help="skip desktop tauri dry smoke")
+    add_arg_alias(parser, "--RequireHub", action="store_true", help="fail when the hub service probe is missing")
+    add_arg_alias(parser, "--RequireRealLogin", action="store_true", help="fail when real login is blocked")
     args = parser.parse_args()
 
     repo_root = os.path.abspath(args.RepoRoot)
@@ -310,9 +381,9 @@ def main() -> int:
         "BLOCKED_WITH_EVIDENCE: real login/remote dispatch needs explicit approved test account, callback, Hub URL, artifact boundary, and operator approval metadata.",
         args.SkipLoginReadiness,
         "skipped by -SkipLoginReadiness",
-        "approved-real",
+        "fixture-unit",
         False,
-        "Readiness gate only unless approved-real login metadata is present",
+        "Readiness gate only; not real login evidence",
         args.CommandTimeoutSec,
     )
 
@@ -326,7 +397,7 @@ def main() -> int:
         "",
         args.SkipTauriDry,
         "skipped by -SkipTauriDry",
-        "packaged-release",
+        "fixture-unit",
         False,
         "Tauri packaging policy/dry gate; not installer/signing/release upload",
         args.CommandTimeoutSec,
@@ -341,18 +412,26 @@ def main() -> int:
     if args.RequireRealLogin and len(blocked) > 0:
         failed.append({"name": "real-login-required", "status": "failed"})
 
+    executed_rows = [row for row in rows if row["status"] in ("passed", "failed")]
     if len(failed) > 0:
         overall = "failed"
     elif len(blocked) > 0:
         overall = "passed_with_blockers"
+    elif not executed_rows:
+        overall = "no-evidence"
     else:
         overall = "passed"
 
     planned_evidence_levels = sorted({row["evidence_level"] for row in rows})
-    executed_rows = [row for row in rows if row["status"] != "skipped"]
+    for row in rows:
+        missing = [field for field in ROW_SCHEMA_FIELDS if field not in row]
+        if missing:
+            print(f"FAIL: row '{row.get('name')}' is missing manifest fields: {', '.join(missing)}", flush=True)
+            return 1
+
     executed_evidence_levels = sorted({row["evidence_level"] for row in executed_rows})
     skipped_evidence_levels = sorted({row["evidence_level"] for row in rows if row["status"] == "skipped"})
-    real_tested = any(row["real_tested"] for row in executed_rows)
+    real_tested = any(row["real_tested"] and row["status"] == "passed" for row in executed_rows)
 
     manifest = {
         "schema": "agenthub-e2e-smoke-matrix-v1",
@@ -377,6 +456,11 @@ def main() -> int:
         },
     }
 
+    missing = [field for field in MANIFEST_SCHEMA_FIELDS if field not in manifest]
+    if missing:
+        print(f"FAIL: manifest is missing fields: {', '.join(missing)}", flush=True)
+        return 1
+
     with open(output_path, "w", encoding="utf-8") as handle:
         handle.write(json.dumps(manifest, ensure_ascii=False, separators=(",", ":")))
 
@@ -385,7 +469,7 @@ def main() -> int:
     print(f"BlockedWithEvidence: {len(blocked)}", flush=True)
     print(f"Failed: {len(failed)}", flush=True)
 
-    if len(failed) > 0:
+    if len(failed) > 0 or overall == "no-evidence":
         return 1
     return 0
 

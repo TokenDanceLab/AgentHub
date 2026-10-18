@@ -2,11 +2,10 @@
    Shared keyboard shortcut declarations — types, canonical groups, and
    localStorage-backed custom-binding helpers.
 
-   This file lives in shared so the Settings page can render shortcut
-   groups without depending on the desktop layer.  Desktop-layer code
-   (matchesBinding, deriveKeysFromEvent, useGlobalKeyboardShortcuts)
-   imports from @/utils/keyboardShortcuts which re-exports from here
-   and adds event-specific helpers.
+   This file lives in shared so the Settings page and the workbench shell can
+   import shortcut groups without depending on a platform layer. Consumers use
+   `@shared/utils/keyboardShortcuts` for declarations, resolution, and
+   localStorage-backed custom bindings; event handling stays in the workbench.
    ═══════════════════════════════════════════════════════════════════════ */
 
 import type { KeyboardEventLike } from './keyboardUtils';

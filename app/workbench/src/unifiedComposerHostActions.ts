@@ -7,11 +7,10 @@ import type {
 import { findMentionById } from './unifiedComposerHelpers';
 
 /* ═══════════════════════════════════════════════════════════════════════
-   unifiedComposerHostActions — pure action residual slices from
-   unifiedComposerHostHelpers (#780).
+   unifiedComposerHostActions — pure action builders (#780).
 
    Mention/attachment/text/reply/quote action builders and attachment
-   dispatch helpers. No React hooks / no intentional UX change.
+   dispatch helpers. No React hooks.
    ═══════════════════════════════════════════════════════════════════════ */
 
 /** Plan mention add action from a picker selection. */
@@ -45,7 +44,7 @@ export function cancelQuoteAction(): Extract<ComposerAction, { type: 'setQuote' 
 }
 
 /**
- * Enter edit mode for an already-sent message (#1462 CF16). Carries the
+ * Enter edit mode for an already-sent message (#1462). Carries the
  * transcript block id of the message being edited.
  */
 export function setEditingMessageAction(

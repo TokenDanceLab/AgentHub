@@ -38,10 +38,6 @@ type ResultAggregator struct {
 	// configured timeout and emits partial results.
 	collector *SubAgentResultCollector
 
-	// emitter is a function that publishes events. It defaults to
-	// ra.bus.Publish but can be overridden in tests.
-	emitter func(evtType string, scope map[string]any, payload any)
-
 	// finalizeParent is invoked after all children of a parent complete, so
 	// an orchestrator parent whose terminal finish was parked
 	// (completeRunAttempt outcomeDeferred) can finalize. May be nil.
@@ -150,11 +146,7 @@ func (ra *ResultAggregator) Start() (stop func()) {
 }
 
 func (ra *ResultAggregator) publish(evtType string, scope map[string]any, payload any) {
-	if ra.emitter != nil {
-		ra.emitter(evtType, scope, payload)
-	} else {
-		ra.bus.Publish(evtType, scope, payload)
-	}
+	ra.bus.Publish(evtType, scope, payload)
 }
 
 func (ra *ResultAggregator) handleEvent(evt events.EventEnvelope) {
@@ -223,7 +215,7 @@ func (ra *ResultAggregator) handleRunComplete(evt events.EventEnvelope, status a
 
 	ra.registry.SetStatus(inst.ID, status, "")
 
-	// P1: Emit sub-agent status event on completion/error/cancellation.
+	// Emit sub-agent status event on completion/error/cancellation.
 	ra.publish(adapters.BusEventSubAgentStatus, map[string]any{
 		"runId":    runID,
 		"parentId": inst.ParentID,
@@ -279,12 +271,12 @@ func (ra *ResultAggregator) emitAggregatedResult(parentID string, partial bool) 
 				"pending", agg.Pending,
 			)
 		}
-		ra.publish("run.agent.sub_agents_complete", map[string]any{
+		ra.publish(adapters.BusEventSubAgentsComplete, map[string]any{
 			"parentId": parentID,
 		}, agg)
 	} else {
 		// Legacy path: no collector configured, emit minimal event.
-		ra.publish("run.agent.sub_agents_complete", map[string]any{
+		ra.publish(adapters.BusEventSubAgentsComplete, map[string]any{
 			"parentId": parentID,
 		}, map[string]any{
 			"parentId":    parentID,

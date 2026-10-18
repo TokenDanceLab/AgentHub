@@ -183,7 +183,7 @@ test.describe('Threads error state tests', () => {
   test('recovery banner appears when hub session is expired', async ({ page }) => {
     // The recovery banner should not appear in normal state,
     // but the threads header should be robust
-    const headerText = page.getByText(/Delicious233/).first();
+    const headerText = page.getByText(/Demo User/).first();
     await expect(headerText).toBeVisible({ timeout: 10000 });
   });
 
@@ -224,7 +224,7 @@ test.describe('Threads loading state tests', () => {
   });
 
   test('header shows user name and workspace info', async ({ page }) => {
-    const userName = page.getByText('Delicious233').first();
+    const userName = page.getByText('Demo User').first();
     await expect(userName).toBeVisible({ timeout: 10000 });
 
     const workspace = page.getByText(/TokenDance/).first();

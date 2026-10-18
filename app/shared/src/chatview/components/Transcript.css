@@ -46,7 +46,7 @@
   align-self: center;
 }
 
-/* ── Unread divider (desktop IM read watermark, T8) ──────────────── */
+/* ── Unread divider (desktop IM read watermark) ──────────────────── */
 .unread-divider {
   display: flex;
   align-items: center;
@@ -74,7 +74,7 @@
   color: var(--td-ink-muted);
 }
 
-/* ── Compact divider (context compaction boundary, T21/CF23) ───────── */
+/* ── Compact divider (context compaction boundary) ─────────────────── */
 .compact-divider {
   display: flex;
   align-items: center;
@@ -227,7 +227,7 @@
 }
 
 /* ── Row — symmetric: [avatar-l] [content flex:1] [avatar-r] ────────
-   P76 density: row rhythm uses chat density tokens (12px step), not base 20/24. */
+   Density: row rhythm uses chat density tokens (12px step), not base 20/24. */
 .grp-row {
   display:flex; gap:var(--chat-sp-sm); align-items:flex-start;
   margin-bottom:var(--chat-sp-md);
@@ -343,7 +343,7 @@
 }
 
 /* ── Bubbles ─────────────────────────────────────────────────────────
-   P76 density: tighter vertical padding, keep horizontal reading comfort. */
+   Density: tighter vertical padding, keep horizontal reading comfort. */
 .user-bubble {
   background:var(--td-plum); color:var(--td-ink-on-plum);
   border-radius:var(--chat-r-lg); padding:var(--chat-sp-xxs) var(--chat-sp-sm);

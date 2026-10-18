@@ -143,8 +143,7 @@ func writeEnvelope(w http.ResponseWriter, status int, env errorEnvelope) {
 	// The envelope is three strings, so the only realistic failure is the client
 	// having gone away — by then the status is already on the wire, which makes
 	// this an operator signal rather than a caller-facing error. It is logged
-	// rather than dropped, matching the edge resputil writer this package's
-	// duplicate WriteJSON was removed in favour of (#2246).
+	// rather than dropped, matching the edge resputil writer.
 	if err := json.NewEncoder(w).Encode(env); err != nil {
 		slog.Error("write error envelope failed", "error", err)
 	}

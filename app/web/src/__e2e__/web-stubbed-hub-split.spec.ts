@@ -1,5 +1,5 @@
 /**
- * Web stubbed-hub split view E2E (#1997, UX F3).
+ * Web stubbed-hub split view E2E (#1997).
  *
  * Mock surface: two Hub sessions behind the fail-closed route stub. Covers
  * the honest split flow end-to-end:
@@ -200,8 +200,9 @@ async function installSplitHubStub(page: Page): Promise<BackendRequestLog> {
       return;
     }
 
-    // Shared font interception (#2014): the render-blocking Google Fonts
-    // stylesheets get an empty stylesheet so the document load event can fire.
+    // Shared font interception (#2014): external font requests get an empty
+    // stylesheet so the document load event can fire. Fonts are self-hosted;
+    // this guards a reintroduced external font <link>.
     if (await fulfillExternalFontIfMatch(route)) {
       return;
     }

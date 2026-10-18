@@ -1,6 +1,6 @@
 /**
  * Workbench demo runtime store factory and transcript resolvers.
- * Peel companion of workbenchDemo (#1131). Pure residual helpers; zero behavior change.
+ * Pure helpers for workbenchDemo (#1131).
  */
 
 import type { ComposerIntent, ComposerSubmitResult } from '../composer';
@@ -128,7 +128,7 @@ export function createWorkbenchDemoRuntimeStore(initialStore: WorkbenchDemoStore
             id: userMessageId,
             kind: 'text',
             createdAt: now,
-            author: { id: 'delicious233', name: 'Delicious233', role: 'human' },
+            author: { id: 'demo', name: 'Demo User', role: 'human' },
             text: intent.text,
           },
           {
@@ -252,8 +252,8 @@ function createConversationPreviewTranscript(conversationId: string): Transcript
     {
       id: `${conversationId}-user-1`,
       kind: 'text',
-      author: { id: 'delicious233', name: 'Delicious233', role: 'human' },
-      text: `打开 ${agentName} 会话，继续按 tokendance-design v4 工作台检查当前任务。`,
+      author: { id: 'demo', name: 'Demo User', role: 'human' },
+      text: `打开 ${agentName} 会话，继续按当前工作台规范检查当前任务。`,
     },
     {
       id: `${conversationId}-reply-1`,
@@ -274,7 +274,7 @@ function createConversationPreviewTranscript(conversationId: string): Transcript
 }
 
 function isDemoHumanContact(conversationId: string): boolean {
-  return ['johnny', 'trump'].includes(conversationId);
+  return ['alice', 'bob'].includes(conversationId);
 }
 
 function formatDemoPinTime(timestamp: string): string | undefined {

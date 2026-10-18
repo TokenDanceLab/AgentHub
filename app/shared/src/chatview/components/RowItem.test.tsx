@@ -73,9 +73,9 @@ describe('RowItem waiting-approval requested-at meta (#1819)', () => {
 });
 
 // ---------------------------------------------------------------------------
-// QW6: Think card Shimmer + duration
+// Think card shimmer + duration
 // ---------------------------------------------------------------------------
-describe('RowItem think card (QW6)', () => {
+describe('RowItem think card', () => {
   it('renders shimmer label when think is running', () => {
     const item: RowItemType = {
       id: 'think-1', type: 'think', label: 'think', status: 'running',
@@ -174,9 +174,9 @@ describe('RowItem approval cards (#1821)', () => {
 });
 
 // ---------------------------------------------------------------------------
-// QW4: Approval card six-type rendering
+// Approval card six-type rendering
 // ---------------------------------------------------------------------------
-describe('RowItem approval card (QW4)', () => {
+describe('RowItem approval card', () => {
   // ── command + cwd kind ──────────────────────────────────────────
   it('renders command + cwd for command kind approval', () => {
     const item: RowItemType = {
@@ -346,11 +346,11 @@ describe('RowItem approval card (QW4)', () => {
 });
 
 // ---------------------------------------------------------------------------
-// T16: keyboard shortcuts (A/R/Esc) + critical second-confirm + risk badge
+// Keyboard shortcuts (A/R/Esc) + critical second-confirm + risk badge
 // ---------------------------------------------------------------------------
-describe('RowItem approval card (T16)', () => {
+describe('RowItem approval card (keyboard + second-confirm)', () => {
   const baseWaiting = (overrides: Partial<RowItemType> = {}): RowItemType => ({
-    id: 'ap-t16', type: 'approval', label: 'approval', status: 'waiting',
+    id: 'ap-second-confirm', type: 'approval', label: 'approval', status: 'waiting',
     collapsible: true, open: true, apReason: 'test',
     ...overrides,
   });
@@ -376,7 +376,7 @@ describe('RowItem approval card (T16)', () => {
     const { container } = render(<RowItem item={baseWaiting()} onApprove={onApprove} />);
     fireEvent.keyDown(container.querySelector('.row-item')!, { key: 'a' });
     expect(onApprove).toHaveBeenCalledTimes(1);
-    expect(onApprove).toHaveBeenCalledWith('ap-t16');
+    expect(onApprove).toHaveBeenCalledWith('ap-second-confirm');
   });
 
   it('uppercase A approves too (case-insensitive)', () => {
@@ -391,7 +391,7 @@ describe('RowItem approval card (T16)', () => {
     const { container } = render(<RowItem item={baseWaiting()} onReject={onReject} />);
     fireEvent.keyDown(container.querySelector('.row-item')!, { key: 'r' });
     expect(onReject).toHaveBeenCalledTimes(1);
-    expect(onReject).toHaveBeenCalledWith('ap-t16');
+    expect(onReject).toHaveBeenCalledWith('ap-second-confirm');
   });
 
   it('Escape collapses the approval card', () => {
@@ -435,7 +435,7 @@ describe('RowItem approval card (T16)', () => {
     // second click fires
     fireEvent.click(approveBtn);
     expect(onApprove).toHaveBeenCalledTimes(1);
-    expect(onApprove).toHaveBeenCalledWith('ap-t16');
+    expect(onApprove).toHaveBeenCalledWith('ap-second-confirm');
   });
 
   // ── critical second-confirm (keyboard) ───────────────────────
@@ -477,7 +477,7 @@ describe('RowItem approval card (T16)', () => {
     expect(btn.classList.contains('critical')).toBe(false);
     fireEvent.click(btn);
     expect(onApprove).toHaveBeenCalledTimes(1);
-    expect(onApprove).toHaveBeenCalledWith('ap-t16');
+    expect(onApprove).toHaveBeenCalledWith('ap-second-confirm');
   });
 
   // ── keyboard hint rendered ───────────────────────────────────
@@ -491,9 +491,9 @@ describe('RowItem approval card (T16)', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Fable UIUX gap #4: code copy button Copy→Check feedback
+// Code copy button Copy→Check feedback.
 // ---------------------------------------------------------------------------
-describe('RowItem code copy button (fable UIUX #4)', () => {
+describe('RowItem code copy button', () => {
   const codeItem = (overrides: Partial<RowItemType> = {}): RowItemType => ({
     id: 'code-1', type: 'tool', label: 'read', status: 'ok',
     collapsible: true, open: true,
@@ -548,10 +548,10 @@ describe('RowItem code copy button (fable UIUX #4)', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Wave10 a11y: keyboard equivalents — Enter/Space activate, Shift+F10/Menu
+// a11y: keyboard equivalents — Enter/Space activate, Shift+F10/Menu
 // opens context menu, Escape collapses. Mirrors the ConversationSidebar pattern.
 // ---------------------------------------------------------------------------
-describe('RowItem keyboard equivalents (Wave10 a11y)', () => {
+describe('RowItem keyboard equivalents (a11y)', () => {
   const toolItem = (overrides: Partial<RowItemType> = {}): RowItemType => ({
     id: 'tool-kbd', type: 'tool', label: 'read', status: 'ok',
     collapsible: true, open: true, content: 'tool body',
@@ -709,7 +709,7 @@ describe('RowItem preview card privacy (#1871)', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Deploy URL trigger keyboard accessibility (#1922 item 3 prerequisite)
+// Deploy URL trigger keyboard accessibility
 // ---------------------------------------------------------------------------
 describe('RowItem deploy URL trigger a11y (#1922)', () => {
   const deployItem = (overrides: Partial<RowItemType> = {}): RowItemType => ({
@@ -978,7 +978,7 @@ describe('RowItem checkpoint timeline card (#1968)', () => {
 
 
 // ---------------------------------------------------------------------------
-// #1992 F10: artifact card focuses engineering Preview instead of expanding
+// #1992: artifact card focuses engineering Preview instead of expanding
 // an empty file row.
 // ---------------------------------------------------------------------------
 describe('RowItem artifact Preview focus (#1992)', () => {

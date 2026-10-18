@@ -625,7 +625,7 @@ func TestPostRunsWithStructuredBody(t *testing.T) {
 	}
 }
 
-// ── POST /v1/runs delivery_id dedup (#2101 G2) ────────────────────────────────
+// ── POST /v1/runs delivery_id dedup (#2101) ────────────────────────────────
 
 func TestPostRuns_DeliveryIDDedup_SkipsDuplicate(t *testing.T) {
 	server, h := newTestServer(t)

@@ -114,7 +114,7 @@ func teamTestDB(t *testing.T) *gorm.DB {
 	// Pin the pool to a single connection. A private ":memory:" DSN gives every
 	// NEW connection its own empty database, so a read path that fans out over
 	// several pooled connections (agentteam.GetTeamRunState issues its
-	// independent reads through an errgroup, #2154 P2-11) would land on
+	// independent reads through an errgroup, #2154) would land on
 	// "no such table" instead of this fixture. With MaxOpenConns(1) every read
 	// shares this one connection and therefore this one catalog: the reads still
 	// overlap in Go, they only queue inside the driver.

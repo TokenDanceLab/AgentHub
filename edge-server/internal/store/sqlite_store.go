@@ -174,7 +174,7 @@ func (s *SQLiteStore) load() error {
 	if err != nil {
 		return err
 	}
-	if planSQLiteLoadSource(ok).UseRows {
+	if ok {
 		if rowSnapshot.Settings == nil {
 			// Legacy DB: the rows table predates the settings/checkpoint row
 			// kinds. Adopt those fields from the legacy payload (last written
@@ -197,12 +197,14 @@ func (s *SQLiteStore) load() error {
 		`SELECT payload FROM agenthub_store_snapshots WHERE key = ?`,
 		sqliteSnapshotKey,
 	).Scan(&payload)
-	plan := planLegacySnapshotLoad(errors.Is(err, sql.ErrNoRows), err, payload)
-	if plan.Skip {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil
 	}
-	if plan.Fail {
+	if err != nil {
 		return fmt.Errorf("read sqlite store snapshot: %w", err)
+	}
+	if isBlankSQLiteSnapshotPayload(payload) {
+		return nil
 	}
 
 	snapshot, err := decodeSQLiteSnapshotPayload(payload)
@@ -312,9 +314,8 @@ func sqliteSnapshotHasContent(snap fileSnapshot) bool {
 // ── Row load, delta, relational-projection, and filesystem helpers ──
 //
 // loadSQLiteRows, deltaSQLiteRows, deltaRowsOfKind,
-// deltaSQLiteRelationalProjection, and ensureSQLiteDirectory were peeled to
-// sqlite_store_pure.go (#1069). They remain package-level functions in
-// package store — no call-site changes.
+// deltaSQLiteRelationalProjection, and ensureSQLiteDirectory live in
+// sqlite_store_pure.go.
 
 func persistAfterSQLiteWrite[T any](s *SQLiteStore, value T, err error) (T, error) {
 	if err != nil {
@@ -399,9 +400,10 @@ func (s *SQLiteStore) CleanupRuns(opts RunCleanupOptions) RunCleanupResult {
 	if !shouldSyncAfterCleanup(result) {
 		return result
 	}
-	// Persist failures stay on LastPersistError. Still return the in-memory
-	// cleanup counts so callers can see what memory already dropped.
-	return finalizeSQLiteCleanupAfterPersist(result, s.syncPersist())
+	// Persist failures are recorded on LastPersistError; the in-memory counts
+	// are still returned so callers can see what memory already dropped.
+	_ = s.syncPersist()
+	return result
 }
 
 func (s *SQLiteStore) SetRunStatus(id, status string) (Run, bool) {

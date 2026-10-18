@@ -10,8 +10,8 @@ import type { TasksPageProps } from './tasks';
    TasksPage — pure presentational workbench page
 
    Subcomponents / types extracted under ./tasks:
-   - Phase 18 #571: types, shared, TaskTableViews
-   - Phase 20 #596: TaskNav + TaskMain residual shell thin
+   - Types, shared helpers, TaskTableViews (#571).
+   - TaskNav + TaskMain shell (#596).
    ═══════════════════════════════════════════════════════════════════════ */
 
 /* ── Public re-exports (preserve external consumers) ── */

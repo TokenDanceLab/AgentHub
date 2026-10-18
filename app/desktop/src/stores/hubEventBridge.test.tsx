@@ -12,7 +12,7 @@
 //
 // The reconnect/gap cases assert `syncMessages` was actually called because
 // `resyncMessagesAfterReconnect` discovered cached sessions by the threads
-// shape only, which made #2101 G1/G4-② a silent no-op on Desktop.
+// shape only, which made the #2101 resync a silent no-op on Desktop.
 
 import React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -155,7 +155,7 @@ describe('desktop hubEventBridge transcript cache wiring (#2252)', () => {
     });
   }
 
-  it('resyncs the real transcript cache after a reconnect (#2101 G4-②)', async () => {
+  it('resyncs the real transcript cache after a reconnect (#2101)', async () => {
     const queryClient = new QueryClient();
     const key = realMessagesKey('sess-reconnect');
     queryClient.setQueryData(key, [makeMsg('m1', 'sess-reconnect', 10)]);
@@ -174,7 +174,7 @@ describe('desktop hubEventBridge transcript cache wiring (#2252)', () => {
     bridge.destroy();
   });
 
-  it('resyncs the real transcript cache on a seq_id gap (#2101 G1)', async () => {
+  it('resyncs the real transcript cache on a seq_id gap (#2101)', async () => {
     const queryClient = new QueryClient();
     const key = realMessagesKey('sess-gap');
     queryClient.setQueryData(key, [makeMsg('m1', 'sess-gap', 20)]);

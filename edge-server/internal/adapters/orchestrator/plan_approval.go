@@ -9,13 +9,13 @@ import (
 )
 
 // PlanApprovalConfig / PendingPlan / PlanDecision 的唯一权威定义在
-// internal/orchestration（A-V1 Step 1, #1526）；本文件通过 contract_aliases.go
+// internal/orchestration；本文件通过 contract_aliases.go
 // 的 type alias 使用它们，broker 行为实现仍在本包。
 
 // DefaultPlanApprovalConfig returns the default plan approval configuration.
 func DefaultPlanApprovalConfig() PlanApprovalConfig {
 	return PlanApprovalConfig{
-		Enabled:            false,
+		Enabled:            true,
 		AutoApproveTimeout: 60 * time.Second,
 	}
 }
@@ -53,7 +53,7 @@ func NewPlanApprovalBroker(config PlanApprovalConfig) *PlanApprovalBroker {
 // until the user approves/rejects or the approval timeout fires (default: deny).
 // Returns nil,false if the broker is nil or the plan has no runID.
 func (b *PlanApprovalBroker) SubmitPlan(ctx context.Context, plan PendingPlan) (func(context.Context) PlanDecision, bool) {
-	if b == nil {
+	if b == nil || !b.config.Enabled {
 		return nil, false
 	}
 	plan.RunID = strings.TrimSpace(plan.RunID)

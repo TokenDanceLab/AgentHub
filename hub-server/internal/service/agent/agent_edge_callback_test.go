@@ -23,7 +23,7 @@ import (
 // ── Fixtures ──────────────────────────────────────────────────────────────
 
 // sqlRecorder captures every statement gorm sends to the driver, which is how
-// the round-trip reductions in #2154 P1-4 / P2-9 are asserted: the tests count
+// the per-chunk round-trip reductions are asserted: the tests count
 // statements per table/column instead of trusting a code reading.
 type sqlRecorder struct {
 	mu         sync.Mutex
@@ -139,7 +139,7 @@ func streamChunk(clientMsgID, payload string) model.AgentRunEventInput {
 	}
 }
 
-// ── P1-4: per-chunk SELECT + Unmarshal ────────────────────────────────────
+// ── Per-chunk SELECT + Unmarshal ──────────────────────────────────────────
 
 func TestPayloadHasActionKey(t *testing.T) {
 	tests := []struct {
@@ -206,7 +206,7 @@ func TestPayloadHasActionKeyIsSoundAgainstUnmarshal(t *testing.T) {
 }
 
 // TestHandleTaskStream_NonTeamSession_QueriesTeamRunOnceAcrossChunks is the
-// P1-4 round-trip evidence: two consecutive chunks on a session with no team
+// round-trip evidence: two consecutive chunks on a session with no team
 // run must issue exactly ONE agent_team_runs SELECT in total (before the change
 // each chunk issued two — one from the subagent-stream ownership lookup and one
 // from the route-decision auto-parse — plus a guaranteed-futile Unmarshal).
@@ -282,8 +282,8 @@ func TestHandleTaskStream_RouteDecisionStillPublishedForRunningTeamRun(t *testin
 	}
 }
 
-// TestHandleTaskStream_NonDecisionPayloadNeverReadsTeamRun proves the second
-// half of P1-4 for team traffic: on a running team run, a chunk whose payload
+// TestHandleTaskStream_NonDecisionPayloadNeverReadsTeamRun proves for team
+// traffic that on a running team run, a chunk whose payload
 // cannot carry a decision skips both the auto-parse's SELECT and its Unmarshal.
 func TestHandleTaskStream_NonDecisionPayloadNeverReadsTeamRunForRouteParse(t *testing.T) {
 	db, rec := newStreamPerfTestDB(t)
@@ -305,7 +305,7 @@ func TestHandleTaskStream_NonDecisionPayloadNeverReadsTeamRunForRouteParse(t *te
 		"a payload without an action key must not trigger the route-decision team-run read")
 }
 
-// ── P2-9: per-chunk writes ────────────────────────────────────────────────
+// ── Per-chunk writes ──────────────────────────────────────────────────────
 
 func TestHandleTaskStream_AutoAcksOutboxOncePerTask(t *testing.T) {
 	db, rec := newStreamPerfTestDB(t)
@@ -439,7 +439,7 @@ func TestForgetTaskStreamState_ClearsBothStructures(t *testing.T) {
 	require.Equal(t, 0, ecs.touchThrottler().len())
 }
 
-// ── P2-9: heartbeat short-circuit ─────────────────────────────────────────
+// ── Heartbeat short-circuit ───────────────────────────────────────────────
 
 func TestHandleTaskStream_HeartbeatShortCircuitsInSQL(t *testing.T) {
 	db, rec := newStreamPerfTestDB(t)

@@ -52,14 +52,14 @@ describe('SecureStore Hub session adapter', () => {
       status: 'active',
       accessToken: 'hub-access-TokenDance',
       refreshToken: 'hub-refresh-TokenDance',
-      userSub: 'tokendance-Delicious233',
+      userSub: 'tokendance-Demo User',
       expiresAt: '2026-06-08T10:30:00.000Z',
     });
 
     const persisted = Array.from(fakeSecureStore.values.values()).join('\n');
 
     expect(persisted).toContain('hub-access-TokenDance');
-    expect(persisted).toContain('tokendance-Delicious233');
+    expect(persisted).toContain('tokendance-Demo User');
     expect(persisted).not.toContain('id_token');
     expect(persisted).not.toContain('providerAccessToken');
     expect(persisted.toLowerCase()).not.toContain('github');

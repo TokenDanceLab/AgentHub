@@ -69,9 +69,8 @@ func main() {
 		// edgehttp.NewClient refuses redirects so the Hub MCP config endpoint
 		// is answered at the exact configured URL.
 		mcpSyncer = adapters.NewHubMCPSyncer(cfg.HubMCPSyncURL, cfg.HubToken, mcpConfigStore, edgehttp.NewClient(15*time.Second))
-		// Stop-derived context (#2129 M3): the syncer previously ran on
-		// context.Background() and depended solely on the Stop hook waking it;
-		// the shutdown chain now owns its lifecycle explicitly.
+		// Stop-derived context (#2129): the shutdown chain owns the syncer's
+		// lifecycle explicitly.
 		mcpCtx, cancel := context.WithCancel(context.Background())
 		mcpCancel = cancel
 		go mcpSyncer.Run(mcpCtx, syncInterval)
@@ -117,7 +116,7 @@ func main() {
 			mcpSyncer.Stop() // idempotent; also cancels Run's internal ctx
 		})
 	}
-	// Store teardown (#2129 M5): sqlite/file backends flush WAL and close
+	// Store teardown (#2129): sqlite/file backends flush WAL and close
 	// handles on shutdown instead of relying on process exit.
 	serverConfig.ShutdownHooks = append(serverConfig.ShutdownHooks, repository.Close)
 	if cfg.RunnerCommand != "" {

@@ -11,7 +11,7 @@ import (
 )
 
 // HubClaims carries the user identity extracted from a Hub-issued HS256 JWT.
-// Alias of the shared pkg/jwtutil.HubSessionClaims single source (#1675 P1) —
+// Alias of the shared pkg/jwtutil.HubSessionClaims single source (#1675) —
 // hub signs the same struct via its own alias, so the wire contract cannot
 // drift between signer and verifier.
 type HubClaims = sharedjwt.HubSessionClaims

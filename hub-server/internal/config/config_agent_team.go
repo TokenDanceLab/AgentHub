@@ -9,8 +9,6 @@ import (
 	"github.com/agenthub/hub-server/internal/model"
 )
 
-// Residual pure-helper peel #1134: agent team config, defaults, and validation.
-
 type AgentTeamConfig struct {
 	MaxDelegationDepth       int           `mapstructure:"max_delegation_depth"`
 	MaxActiveSubAgentsPerRun int           `mapstructure:"max_active_subagents_per_run"`
@@ -33,6 +31,7 @@ func setAgentTeamDefaults(v *viper.Viper) {
 	v.SetDefault("agent_team.max_team_run_budget_tokens", defaults.MaxTeamRunBudgetTokens)
 	v.SetDefault("agent_team.max_team_run_budget_usage_pct", defaults.MaxTeamRunBudgetUsagePct)
 	v.SetDefault("agent_team.compete_max_agents", defaults.CompeteMaxAgents)
+	v.SetDefault("agent_team.human_review_enabled", defaults.HumanReviewEnabled)
 }
 
 func DefaultAgentTeamConfig() AgentTeamConfig {

@@ -1,4 +1,4 @@
-// Contract aliases for package codex（#1760 codex/opencode 增量）。
+// Contract aliases for package codex。
 //
 // 合同类型与 BusEvent* 常量的唯一权威（SSOT）在 internal/orchestration；
 // 本文件与 adapters 根包的 contract_aliases.go、兄弟叶子包 adapters/sdk、
@@ -12,7 +12,6 @@ import "github.com/agenthub/edge-server/internal/orchestration"
 
 type EventEmitter = orchestration.EventEmitter
 type AdapterMetadata = orchestration.AdapterMetadata
-type AgentCapabilities = orchestration.AgentCapabilities
 type RunProcessContext = orchestration.RunProcessContext
 type AgentAdapter = orchestration.AgentAdapter
 

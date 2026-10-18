@@ -14,8 +14,6 @@ import (
 	"github.com/agenthub/hub-server/internal/seqalloc"
 )
 
-// Residual pure-helper peel #1153: orchestration helpers (bus, seq, attachments).
-
 // publish is a nil-safe wrapper over the bus port.
 func (s *Service) publish(ctx context.Context, event bus.Event) {
 	if s == nil || s.bus == nil {
@@ -32,7 +30,7 @@ func (s *Service) publish(ctx context.Context, event bus.Event) {
 // It deliberately does NOT touch sessions.last_message_at. It used to (#154),
 // which made every SendMessage / ForwardMessage issue two UPDATEs against the
 // same `sessions` row in one request: one here, outside any transaction, and
-// one inside the caller's persist transaction (#2154 P2-8). Only the in-
+// one inside the caller's persist transaction (#2154). Only the in-
 // transaction touch survives — it is atomic with the message insert, so a
 // rolled-back insert can no longer leave the session looking freshly active,
 // and the hot `sessions` row is written once instead of twice.
@@ -54,7 +52,7 @@ func (s *Service) seqAllocator() *seqalloc.Allocator {
 	if s.seqAlloc != nil {
 		return s.seqAlloc
 	}
-	return seqalloc.New(resolveCache(s.cacheClient), s.db)
+	return seqalloc.New(s.cacheClient, s.db)
 }
 
 func (s *Service) ensureAttachmentReferenceAllowed(userID, attachmentID string) error {
@@ -86,7 +84,9 @@ func (s *Service) toMessageResponses(msgs []model.Message) []MessageResponse {
 	var replyMessages map[string]*model.Message
 	if len(replyToIDs) > 0 {
 		fetched, err := repository.GetMessagesByIDs(s.db, replyToIDs)
-		if err == nil {
+		if err != nil {
+			slog.Warn("message: reply lookup failed", "reply_to_count", len(replyToIDs), "error", err)
+		} else {
 			replyMessages = make(map[string]*model.Message, len(fetched))
 			for i := range fetched {
 				replyMessages[fetched[i].ID] = &fetched[i]

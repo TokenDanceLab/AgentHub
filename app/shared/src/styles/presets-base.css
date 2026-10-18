@@ -1482,7 +1482,7 @@
 }
 
 /* ═══ Print stylesheet — minimal readable transcript/artifacts ═══════════
-   二轮调研 #7: 全仓零 `@media print` —— 打印时产出整个 SPA shell
+   全仓零 `@media print` —— 打印时产出整个 SPA shell
    (overflow-hidden 的 html/body/#root + 固定 4 列 grid)。本块只作用于
    print 媒体，屏幕渲染零影响。
 

@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""verify-openapi-contract — OpenAPI ↔ Hub router 路由合同门禁（ps1 迁移，契约见 server docs/design/ps1-to-python-migration.md）。
+"""verify-openapi-contract — OpenAPI ↔ Hub router 路由合同门禁。
 
 解析 api/openapi.yaml（Hub-owned, x-agenthub-status: implemented 路径）并与
 hub-server/internal/router/router.go 静态注册路由对比；(method, path) 任一方向
 漂移即 FAIL（exit 1）。参数名差异归一为 {param}，只比较路由形状。
 
-YAML 解析沿用 ps1 方案：subprocess 调用 python + PyYAML（本脚本 stdlib only，
-禁止第三方 import；PyYAML 缺失时按 ps1 同款逻辑 pip install 兜底）。
+YAML 解析通过 subprocess 调用 python + PyYAML（本脚本 stdlib only，禁止第三方
+import；PyYAML 缺失时自动 pip install）。
 """
 
 import argparse
@@ -25,7 +25,7 @@ for _ in range(4):
 else:
     raise RuntimeError("cannot locate AgentHub repository root")
 
-# ps1 内嵌的 YAML 提取 helper（原样保留：PyYAML 解析 + Hub/implemented 过滤）
+# 内嵌的 YAML 提取 helper（PyYAML 解析 + Hub/implemented 过滤）
 OPENAPI_EXTRACT_HELPER = r'''
 import json, pathlib, sys
 import yaml
@@ -40,9 +40,9 @@ for path, node in paths.items():
             continue
         if not isinstance(op, dict):
             continue
-        owner = op.get("x-agenthub-owner") or node.get("x-agenthub-owner")
-        status = op.get("x-agenthub-status") or node.get("x-agenthub-status")
-        if owner == "Hub" and status == "implemented":
+        owner = str(op.get("x-agenthub-owner") or node.get("x-agenthub-owner") or "").lower()
+        status = str(op.get("x-agenthub-status") or node.get("x-agenthub-status") or "").lower()
+        if owner == "hub" and status == "implemented":
             out.append(method.upper() + " " + path)
 print(json.dumps(sorted(out)))
 '''
@@ -61,9 +61,9 @@ for path, node in paths.items():
             continue
         if not isinstance(op, dict):
             continue
-        owner = op.get("x-agenthub-owner") or node.get("x-agenthub-owner")
-        status = op.get("x-agenthub-status") or node.get("x-agenthub-status")
-        if owner != "Hub" or status != "implemented":
+        owner = str(op.get("x-agenthub-owner") or node.get("x-agenthub-owner") or "").lower()
+        status = str(op.get("x-agenthub-status") or node.get("x-agenthub-status") or "").lower()
+        if owner != "hub" or status != "implemented":
             continue
         for code in ("200", "201", "202"):
             response = (op.get("responses") or {}).get(code)
@@ -72,7 +72,40 @@ for path, node in paths.items():
 print(json.dumps(sorted(out)))
 """
 
-# Admin/debug/health 子路由 allowlist（与 ps1 一致；真实 API 路由必须进 OpenAPI）
+OPENAPI_EDGE_SECURITY_HELPER = r"""
+import json, pathlib, sys
+import yaml
+spec = yaml.safe_load(pathlib.Path(sys.argv[1]).read_text(encoding="utf-8"))
+schemes = set(((spec.get("components") or {}).get("securitySchemes") or {}).keys())
+missing = []
+paths = spec.get("paths", {}) if isinstance(spec, dict) else {}
+for path, node in paths.items():
+    if not isinstance(node, dict):
+        continue
+    for method, op in node.items():
+        if method not in ("get", "post", "put", "delete", "patch", "head", "options"):
+            continue
+        if not isinstance(op, dict):
+            continue
+        owner = str(op.get("x-agenthub-owner") or node.get("x-agenthub-owner") or "").lower()
+        status = str(op.get("x-agenthub-status") or node.get("x-agenthub-status") or "").lower()
+        if owner != "edge" or status != "implemented" or path == "/v1/health":
+            continue
+        security = op.get("security", node.get("security"))
+        invalid = not isinstance(security, list) or not security
+        if not invalid:
+            for requirement in security:
+                if not isinstance(requirement, dict) or not requirement:
+                    invalid = True
+                    break
+                for scheme in sorted(set(requirement) - schemes):
+                    missing.append(method.upper() + " " + path + " unknown security scheme '" + scheme + "'")
+        if invalid:
+            missing.append(method.upper() + " " + path)
+print(json.dumps(sorted(missing)))
+"""
+
+# Admin/debug/health 子路由 allowlist（真实 API 路由必须进 OpenAPI）
 ALLOWLIST = ["GET /debug/panic", "GET /health/live", "GET /health/ready"]
 
 # Baseline of known description-only 2xx responses among Hub-implemented ops.
@@ -87,6 +120,59 @@ NORMALIZE_PARAM = re.compile(r":(\w+)", re.IGNORECASE)
 NORMALIZE_PLACEHOLDER = re.compile(r"\{[^}]+\}", re.IGNORECASE)
 
 
+OPENAPI_PATH_PARAM_HELPER = r"""
+import json, pathlib, sys
+import yaml
+spec = yaml.safe_load(pathlib.Path(sys.argv[1]).read_text(encoding="utf-8"))
+components = ((spec.get("components") or {}).get("parameters") or {})
+paths = spec.get("paths") or {}
+problems = []
+
+def resolve(param):
+    if isinstance(param, dict) and "$ref" in param:
+        ref = param["$ref"].rsplit("/", 1)[-1]
+        target = components.get(ref)
+        return target if isinstance(target, dict) else {"__missing_ref__": ref}
+    return param if isinstance(param, dict) else {}
+
+for path, node in paths.items():
+    if not isinstance(node, dict):
+        continue
+    template = [seg[1:-1] for seg in path.split("/") if seg.startswith("{") and seg.endswith("}")]
+    if not template:
+        continue
+    for method, op in node.items():
+        if method not in ("get", "post", "put", "delete", "patch", "head", "options"):
+            continue
+        if not isinstance(op, dict):
+            continue
+        owner = str(op.get("x-agenthub-owner") or node.get("x-agenthub-owner") or "").lower()
+        status = str(op.get("x-agenthub-status") or node.get("x-agenthub-status") or "").lower()
+        if owner not in ("hub", "edge") or status != "implemented":
+            continue
+        declared_params = []
+        for raw in (node.get("parameters") or []) + (op.get("parameters") or []):
+            param = resolve(raw)
+            if "__missing_ref__" in param:
+                problems.append(method.upper() + " " + path + " references missing parameter '" + param["__missing_ref__"] + "'")
+                continue
+            if param.get("in") != "path":
+                continue
+            name = str(param.get("name") or "")
+            if param.get("required") is not True:
+                problems.append(method.upper() + " " + path + " path parameter '" + name + "' must be required: true")
+            if "schema" not in param and "content" not in param:
+                problems.append(method.upper() + " " + path + " path parameter '" + name + "' missing schema")
+            declared_params.append(name)
+        declared = set(declared_params)
+        for name in template:
+            if name not in declared:
+                problems.append(method.upper() + " " + path + " missing path parameter '" + name + "'")
+        for name in sorted(declared - set(template)):
+            problems.append(method.upper() + " " + path + " declares unused path parameter '" + name + "'")
+print(json.dumps(sorted(problems)))
+"""
+
 def fail(message: str) -> None:
     raise RuntimeError(message)
 
@@ -99,7 +185,7 @@ def run_python(exe: str, args: list) -> subprocess.CompletedProcess | None:
 
 
 def ensure_pyyaml() -> None:
-    """镜像 ps1：import yaml 探测失败时 pip install 兜底（python → python3）。"""
+    """import yaml 探测失败时 pip install 兜底（python → python3）。"""
     for exe in ("python", "python3"):
         check = run_python(exe, ["-c", "import yaml; print('ok')"])
         if check is not None and check.returncode == 0 and "ok" in check.stdout:
@@ -166,10 +252,55 @@ def extract_openapi_schema_violations(openapi_path: str) -> list:
         os.unlink(tmp_path)
 
 
+def extract_edge_security_gaps(openapi_path: str) -> list:
+    """Return implemented Edge operations that omit a security requirement."""
+    ensure_pyyaml()
+    fd, tmp_path = tempfile.mkstemp(prefix="agenthub-openapi-edge-security-", suffix=".py")
+    os.close(fd)
+    try:
+        with open(tmp_path, "w", encoding="utf-8") as handle:
+            handle.write(OPENAPI_EDGE_SECURITY_HELPER)
+        last_exit = None
+        for exe in ("python", "python3"):
+            result = run_python(exe, [tmp_path, openapi_path])
+            if result is None:
+                continue
+            last_exit = result.returncode
+            if result.returncode == 0:
+                return json.loads(result.stdout)
+        fail(
+            f"python OpenAPI Edge security extraction failed (exit {last_exit}). "
+            "Ensure PyYAML is installed: python -m pip install PyYAML"
+        )
+    finally:
+        os.unlink(tmp_path)
+
+
+def extract_path_param_gaps(openapi_path: str) -> list:
+    """Return implemented operations whose path parameters do not match the template."""
+    ensure_pyyaml()
+    fd, tmp_path = tempfile.mkstemp(prefix="agenthub-openapi-path-params-", suffix=".py")
+    os.close(fd)
+    try:
+        with open(tmp_path, "w", encoding="utf-8") as handle:
+            handle.write(OPENAPI_PATH_PARAM_HELPER)
+        last_exit = None
+        for exe in ("python", "python3"):
+            result = run_python(exe, [tmp_path, openapi_path])
+            if result is None:
+                continue
+            last_exit = result.returncode
+            if result.returncode == 0:
+                return json.loads(result.stdout)
+        fail(
+            f"python OpenAPI path parameter extraction failed (exit {last_exit}). "
+            "Ensure PyYAML is installed: python -m pip install PyYAML"
+        )
+    finally:
+        os.unlink(tmp_path)
+
 def extract_router_routes(router_path: str) -> set:
-    """router.go 静态正则提取，镜像 ps1 语义：
-    组声明用 -match（大小写不敏感、取首个匹配），路由注册用 [regex]::Matches
-    （大小写敏感、取全部匹配）。"""
+    """router.go 静态正则提取：组声明大小写不敏感取首个匹配；路由注册大小写敏感取全部匹配。"""
     with open(router_path, encoding="utf-8", errors="replace") as handle:
         src = handle.read()
     lines = re.split(r"\r?\n", src)
@@ -217,8 +348,8 @@ def normalize_route(route: str) -> str:
     return f"{method} {path}"
 
 
-def powershell_sort_key(value: str) -> tuple:
-    """对齐 ps1 Sort-Object（当前文化、忽略大小写）的排序：标点（如 { ）权重低于字母，
+def route_sort_key(value: str) -> tuple:
+    """按大小写不敏感的字符权重排序：标点（如 {）权重低于字母，
     Python 默认 ordinal 排序会把 { 排到字母之后，导致漂移清单顺序不一致。"""
     return tuple((0 if not ch.isalnum() else 1, ch.lower()) for ch in value)
 
@@ -239,15 +370,23 @@ def main() -> int:
 
     router_routes = extract_router_routes(router_path)
     openapi_routes = extract_openapi_routes(openapi_path)
+    edge_security_gaps = extract_edge_security_gaps(openapi_path)
+    path_param_gaps = extract_path_param_gaps(openapi_path)
 
     router_n = {normalize_route(r) for r in router_routes}
     openapi_n = {normalize_route(r) for r in openapi_routes}
     allow_n = {normalize_route(a) for a in ALLOWLIST}
 
-    only_openapi = sorted(openapi_n - router_n, key=powershell_sort_key)
-    only_router = sorted((r for r in router_n if r not in openapi_n and r not in allow_n), key=powershell_sort_key)
+    only_openapi = sorted(openapi_n - router_n, key=route_sort_key)
+    only_router = sorted((r for r in router_n if r not in openapi_n and r not in allow_n), key=route_sort_key)
 
     failures = []
+    if path_param_gaps:
+        failures.append(f"Path parameters do not match the path template ({len(path_param_gaps)}):")
+        failures.extend(f"  ! {item}" for item in path_param_gaps)
+    if edge_security_gaps:
+        failures.append(f"Edge operations missing a security requirement ({len(edge_security_gaps)}):")
+        failures.extend(f"  ! {route}" for route in edge_security_gaps)
     if only_openapi:
         failures.append(f"OpenAPI documents Hub-implemented routes NOT registered in hub router ({len(only_openapi)}):")
         failures.extend(f"  + {route}" for route in only_openapi)
@@ -310,6 +449,6 @@ def main() -> int:
 if __name__ == "__main__":
     try:
         sys.exit(main())
-    except Exception as exc:  # noqa: BLE001 —— 顶层兜底，对齐 ps1 $ErrorActionPreference='Stop'
+    except Exception as exc:  # noqa: BLE001 —— fail closed：未捕获异常返回非零
         print(f"ERROR: {exc}", file=sys.stderr)
         sys.exit(1)

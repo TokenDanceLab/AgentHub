@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""verify-oidc-code-ssot — 校验 OIDC 错误码前后端 SSOT（#2123 P1-2）。
+"""verify-oidc-code-ssot — 校验 OIDC 错误码前后端 SSOT。
 
 后端 hub-server/internal/errcode/codes.go 的 oidc_* 错误码集合必须与前端
 app/shared/src/api/auth/types.ts 的 OidcBackendErrorCodes 值集合完全一致：
@@ -11,10 +11,11 @@ app/shared/src/api/auth/types.ts 的 OidcBackendErrorCodes 值集合完全一致
 """
 import re
 import sys
+from pathlib import Path
 
-ROOT = "/".join(__file__.split("/")[:-3])
-BACKEND_PATH = f"{ROOT}/hub-server/internal/errcode/codes.go"
-FRONTEND_PATH = f"{ROOT}/app/shared/src/api/auth/types.ts"
+ROOT = Path(__file__).resolve().parents[2]
+BACKEND_PATH = ROOT / "hub-server/internal/errcode/codes.go"
+FRONTEND_PATH = ROOT / "app/shared/src/api/auth/types.ts"
 
 BACKEND_RE = re.compile(r'New\("(oidc_[a-z0-9_]+)"')
 FRONTEND_RE = re.compile(r"['\"](oidc_[a-z0-9_]+)['\"]")
@@ -42,7 +43,7 @@ def main():
     missing_frontend = sorted(backend - frontend)
     missing_backend = sorted(frontend - backend)
     if missing_frontend or missing_backend:
-        print("FAIL: OIDC code SSOT drift detected (#2123 P1-2)")
+        print("FAIL: OIDC code SSOT drift detected")
         if missing_frontend:
             print(f"  backend-only (add to OidcBackendErrorCodes): {missing_frontend}")
         if missing_backend:

@@ -1,4 +1,4 @@
-// #2241 lane B task 1 — the "this client never wired that action" announcement
+// #2241 — the "this client never wired that action" announcement
 // must tell the truth in the user's language.
 //
 // `announceUnavailableAction` (workbenchTranscriptChromeActionMappers) resolves

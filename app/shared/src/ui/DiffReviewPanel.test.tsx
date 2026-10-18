@@ -296,17 +296,18 @@ describe('DiffReviewPanel', () => {
     expect(diffContent?.className).toContain('custom-diff');
   });
 
-  // ── Word-diff rendering (P6 Step 4) ─────────────────────────────────
+  // ── Word-diff rendering ────────────────────────────────────
   // modified pair in mockFileModified: 'const old = true;' -> 'const updated = false;'
   // Left column carries removed+context tokens (old, true); right column
   // carries added+context tokens (updated, false). highlightLineWithWordDiff
-  // (P6 Step 3) wraps each changed word in a scoped .wordAdded/.wordRemoved
+  // Wraps each changed word in a scoped .wordAdded/.wordRemoved
   // span nested inside Prism token spans. The test-env CSS module proxy
   // resolves every key to a scoped name containing the local name as a
   // substring (e.g. _wordAdded_<id>), so [class*="wordAdded"] queries land.
   // NOTE: this asserts span INJECTION, not colour — jsdom css:false cannot
   // render the color-mix() backgrounds or forced-colors HC mapping; those
-  // need Windows实机 visual verification (report §8.3, tokens-base.css:586).
+  // need Windows实机 visual verification (see the forced-colors block in
+  // tokens-base.css).
 
   it('renders wordRemoved spans in the left (old) column of a modified row', () => {
     const { container } = render(<DiffReviewPanel files={[mockFileModified]} />);

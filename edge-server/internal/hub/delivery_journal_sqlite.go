@@ -38,10 +38,8 @@ func OpenSQLiteDeliveryJournal(path string) (*SQLiteDeliveryJournal, error) {
 		return nil, err
 	}
 	// Auto-start the retention loop so the Edge gets bounded journal growth
-	// without needing a separate wiring call (the edge startup wiring lives
-	// in internal/httpserver/server.go which is outside the journal
-	// package's lane; self-contained startup keeps retention always-on when
-	// a durable journal is enabled). The loop stops on Close().
+	// without a separate wiring call; retention is always on when a durable
+	// journal is enabled. The loop stops on Close().
 	j.startRetentionLoop()
 	return j, nil
 }
@@ -261,10 +259,8 @@ func (j *SQLiteDeliveryJournal) runRetentionOnce() {
 	cutoff := time.Now().Add(-DefaultJournalRetention)
 	removed, err := j.CleanupOldJournal(cutoff)
 	if err != nil {
-		// Previously this used `_ = fmt.Errorf(...)` which silently discarded
-		// the error — a retention purge failure was invisible to operators
-		// and the journal could grow unbounded with no signal. Surface it
-		// via slog so /metrics and log alerts can catch a stuck purge.
+		// A retention purge failure must stay visible: surface it via slog so
+		// /metrics and log alerts can catch a stuck purge.
 		slog.Error("edge delivery journal retention purge failed", "error", err)
 		return
 	}
@@ -278,7 +274,7 @@ func (j *SQLiteDeliveryJournal) runRetentionOnce() {
 // purges it. Aligned with runcontrol.DefaultRunCleanupTerminalTTL (24h): the
 // journal is derived data of a run, so it must not outlive the run it
 // references — otherwise reconciliation can replay orphan journal rows into
-// invalid retries (#2135 F2). 24h still covers the DurableSnapshot replay
+// invalid retries (#2135). 24h still covers the DurableSnapshot replay
 // window (restarts happen within minutes-hours, not days).
 const DefaultJournalRetention = 24 * time.Hour
 

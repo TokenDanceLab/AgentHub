@@ -1,7 +1,9 @@
 package config
 
 import (
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"strings"
 	"time"
@@ -9,7 +11,6 @@ import (
 	"github.com/spf13/viper"
 )
 
-// Residual pure-helper peel #1134: Config root, Load, and Validate glue.
 // Domain sections and env helpers live in companion files.
 
 type Config struct {
@@ -55,6 +56,19 @@ func Load(configPath string) (*Config, error) {
 	v.SetEnvPrefix("AGENTHUB")
 	v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 	v.AutomaticEnv()
+	// Register env-only keys: without a config file (release binaries), Viper
+	// only binds AGENTHUB_* values for keys it already knows.
+	for _, key := range []string{
+		"server.port", "server.admin_port", "server.audit_log_file",
+		"db.host", "db.port", "db.user", "db.password", "db.name",
+		"redis.host", "redis.port", "redis.password", "redis.db",
+		"redis.pool_size", "redis.min_idle_conns", "redis.read_timeout_sec", "redis.write_timeout_sec",
+		"jwt.access_ttl", "jwt.refresh_ttl",
+		"upload.dir", "upload.max_size",
+		"egress.allow_cidrs", "egress.allow_hostnames", "egress.allow_plain_http", "egress.timeout",
+	} {
+		_ = v.BindEnv(key)
+	}
 	v.SetDefault("db.sslmode", "disable")
 	v.SetDefault("db.application_name", "agenthub")
 	v.SetDefault("db.max_open_conns", DefaultDBMaxOpenConns)
@@ -77,8 +91,15 @@ func Load(configPath string) (*Config, error) {
 	v.SetDefault("tokendance_id.max_response_body_bytes", int64(64*1024))
 	setAgentTeamDefaults(v)
 
-	if err := v.ReadInConfig(); err != nil {
-		return nil, fmt.Errorf("failed to read config file: %w", err)
+	// A missing config file is valid for env-only deployments (including the
+	// release binaries); defaults and AGENTHUB_* overrides still apply. Any
+	// other stat failure (permissions, I/O) must not silently fall back.
+	if _, statErr := os.Stat(configPath); statErr == nil {
+		if err := v.ReadInConfig(); err != nil {
+			return nil, fmt.Errorf("failed to read config file: %w", err)
+		}
+	} else if !errors.Is(statErr, fs.ErrNotExist) {
+		return nil, fmt.Errorf("failed to stat config file: %w", statErr)
 	}
 
 	var cfg Config

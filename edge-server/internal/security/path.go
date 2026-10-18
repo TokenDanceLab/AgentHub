@@ -7,7 +7,7 @@ import (
 )
 
 // Path-containment sentinels used by REST and MCP workDir allowlist checks
-// (AH-SR-006 / #998). Call sites map these to transport-specific error codes.
+// (#998). Call sites map these to transport-specific error codes.
 var (
 	// ErrWorkspaceAllowlistEmpty is returned when no allowlist roots are configured.
 	// Fail-closed: any non-empty workDir is rejected until an operator configures roots.

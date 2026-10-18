@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════════════════════════
-   UNREAD DIVIDER tests (T8 desktop IM path) — rendering + placement
+   UNREAD DIVIDER tests (desktop IM path) — rendering + placement
    ══════════════════════════════════════════════════════════════════════ */
 
 import { render } from '@testing-library/react';

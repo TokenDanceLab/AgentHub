@@ -318,7 +318,7 @@ func (o *Outbox) GetDeliveryStats(ctx context.Context) (map[string]int64, error)
 //
 // The returned error lets the caller decide whether the ack actually landed.
 // The Edge stream callback dedupes this call per task in process memory
-// (#2154 P2-9) and must only record the dedupe entry on success, so a
+// (#2154) and must only record the dedupe entry on success, so a
 // transient store failure leaves the next chunk free to retry instead of
 // silently dropping the SentTimeout redispatch guard for the task's lifetime.
 // The warn log is kept here so observability is unchanged for callers that

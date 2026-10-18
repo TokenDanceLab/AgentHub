@@ -68,7 +68,7 @@ type Config struct {
 	EventLogMaxSize        int64                    // event log truncation threshold in bytes; 0 = default (50 MiB)
 	MCPConfigStore         *adapters.MCPConfigStore // optional Hub-synced MCP server configs for injection into runs
 	// ShutdownTimeout overrides the overall graceful-shutdown budget
-	// (default shutdownTotalBudget). <=0 means use the default (#2129 L6).
+	// (default shutdownTotalBudget). <=0 means use the default (#2129).
 	ShutdownTimeout time.Duration
 	ShutdownHooks   []func() // called in order during graceful shutdown, before bus.Close()
 }
@@ -234,9 +234,8 @@ func buildEventBusAndMetrics(cfg Config) (*events.Bus, *metrics.EdgeMetrics) {
 
 	// Prometheus metrics wired to bus depth and to every event-log counter.
 	// All hooks are filled on purpose: a nil hook means the series is not
-	// registered at all, which is exactly how the three edge_event_log_* series
-	// went missing from /v1/metrics while their counters, Bus accessors and
-	// "Exposed for the …" comments all existed (#2304).
+	// registered at all. This keeps the edge_event_log_* series present in
+	// /v1/metrics.
 	edgeMetrics := metrics.NewWithBusHooks(metrics.BusHooks{
 		BusDepth:                    func() float64 { return float64(bus.HistoryLen()) },
 		BusDropped:                  func() float64 { return float64(bus.DroppedCount()) },
@@ -296,12 +295,10 @@ func wireRunEventTracker(bus *events.Bus) {
 func buildProcessExecutor(cfg Config, bus *events.Bus, agentReg *agents.Registry, msgQueue *agents.Queue, resultAgg *lifecycle.ResultAggregator, edgeMetrics *metrics.EdgeMetrics) (lifecycle.RunExecutor, *hub.CallbackClient, func(), error) {
 	hasAdapter := cfg.AdapterRegistry != nil && cfg.AgentDefault != ""
 	if cfg.ProcessExecutor.Command == "" && !hasAdapter {
-		// No runner command and no default agent adapter: fall back to the
-		// mock executor so the run lifecycle still works and the runner
-		// registry reflects a mock runner (the agenthub-runner-mock profile
-		// contract — "mock executor is the default when no runner command is
-		// specified"). Previously this returned a nil executor, leaving the
-		// edge degraded (no executor, no runners).
+		// No runner command and no default agent adapter: run the simulated
+		// lifecycle so a fresh checkout still works. The run output is clearly
+		// labeled as mock; operators who expected real execution see a warning.
+		slog.Warn("no runner command or agent adapter configured; using mock executor (simulation only)")
 		return lifecycle.NewMockExecutor(bus, cfg.Store), nil, nil, nil
 	}
 	execCfg := cfg.ProcessExecutor
@@ -359,7 +356,7 @@ func buildProcessExecutor(cfg Config, bus *events.Bus, agentReg *agents.Registry
 			hubClient.SetTokenSource(tokenProvider.AccessToken)
 			slog.Info("hub token auto-rotation enabled", "hubURL", cfg.HubURL)
 		}
-		// Optional durable journal path: AGENTHUB_DELIVERY_JOURNAL_DB (AH-SR-049 / #445).
+		// Optional durable journal path: AGENTHUB_DELIVERY_JOURNAL_DB (#445).
 		// Falls back to in-memory journal on open failure so callback path never blocks startup.
 		if journalPath := strings.TrimSpace(os.Getenv("AGENTHUB_DELIVERY_JOURNAL_DB")); journalPath != "" {
 			if err := hubClient.EnableSQLiteJournal(journalPath); err != nil {
@@ -424,6 +421,7 @@ func newHandlerFromConfig(cfg Config) (*api.Handler, error) {
 	}
 
 	bus, edgeMetrics := buildEventBusAndMetrics(cfg)
+	adapters.SetArtifactSurfacedRecorder(adapters.NewArtifactSurfacedRecorder(edgeMetrics))
 	reg := runners.NewRegistry()
 
 	agentReg := agents.NewRegistry()
@@ -469,7 +467,7 @@ func newHandlerFromConfig(cfg Config) (*api.Handler, error) {
 	configureLocalRunner(reg, cfg.ProcessExecutor, agentAdapterForRegistry(cfg.AdapterRegistry, cfg.AgentDefault), executor)
 
 	// Wire orchestrator adapter with runtime dependencies so it can spawn sub-agents.
-	// Plan approval gate (P0 #3): create broker and wire into both orchestrator and handler.
+	// Plan approval gate: create broker and wire into both orchestrator and handler.
 	planBroker := orchestrator.NewPlanApprovalBroker(orchestrator.DefaultPlanApprovalConfig())
 	wireOrchestrator(cfg.AdapterRegistry, executor, agentReg, msgQueue, planBroker)
 

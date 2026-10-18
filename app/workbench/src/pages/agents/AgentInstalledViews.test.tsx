@@ -1,8 +1,8 @@
 /* ═══════════════════════════════════════════════════════════════════════
    AgentInstalledViews — first-load skeleton + i18n empty-state copy.
 
-   Covers the #5/#6 UIUX gap: loading rows while the list is fetching and
-   translation-driven empty copy instead of hardcoded Chinese strings.
+   Covers loading rows while the list is fetching and translation-driven
+   empty copy instead of hardcoded Chinese strings.
    ═══════════════════════════════════════════════════════════════════════ */
 
 import React from 'react';

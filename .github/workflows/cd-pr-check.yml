@@ -7,8 +7,8 @@ on:
       - "deployments/**"
       - "hub-server/deployments/**"
       - "hub-server/**/Dockerfile*"
-      - "hub-server/docker-compose*"
-      - "hub-server/**.dockerignore"
+      - "hub-server/configs/config.docker.yaml"
+      - ".dockerignore"
       - ".github/workflows/cd-*.yml"
 
       - ".github/workflows/release.yml"
@@ -24,7 +24,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  GO_VERSION: "1.26.5"
+  GO_VERSION: "1.26.9"
 
 jobs:
   # ── Deployment file validation ─────────────────
@@ -74,7 +74,8 @@ jobs:
 
           # Must have HEALTHCHECK
           if ! grep -qE 'HEALTHCHECK' "$DOCKERFILE"; then
-            echo "::warning::Dockerfile is missing HEALTHCHECK instruction"
+            echo "::error::Dockerfile is missing HEALTHCHECK instruction"
+            exit 1
           fi
 
           # Must have CMD or ENTRYPOINT
@@ -150,14 +151,11 @@ jobs:
           python ./scripts/verify/verify-deployment-shape.py
           echo "::endgroup::"
 
-      - name: Run deployment shape verifier self-tests
-        run: |
-          echo "::group::Deployment shape verifier self-tests"
-          python ./scripts/verify/tests/verify-deployment-shape.Tests.py
-          echo "::endgroup::"
+      - name: Self-test deployment shape SSOT
+        run: python ./scripts/verify/tests/verify-deployment-shape.Tests.py
 
   # ── Docker build dry run ───────────────────────
-  # CI5: bare `docker build` → docker/build-push-action@v7 with type=gha
+  # CI: bare `docker build` → docker/build-push-action@v7 with type=gha
   # cache (aligns with cd-hub-server.yml). load:true keeps the image in the
   # local daemon so the subsequent Verify image contents step can `docker run`
   # it. No push — this is a PR pre-flight build only.
@@ -187,7 +185,7 @@ jobs:
           docker images agenthub-hub:pr-check
           # Check that the binary exists in the image
           docker run --rm --entrypoint /bin/sh agenthub-hub:pr-check \
-            -c 'ls -la /usr/local/bin/hub-server && /usr/local/bin/hub-server --help 2>&1 || true'
+            -c 'ls -la /app/server-hub && test -x /app/server-hub'
           echo "::endgroup::"
 
   # ── Deployment status report ───────────────────
@@ -211,11 +209,10 @@ jobs:
           if [ "$FILES_OK" = "success" ] && [ "$BUILD_OK" = "success" ]; then
             echo ""
             echo "  Status: READY FOR DEPLOYMENT"
-            echo "  This PR passes all CD pre-flight checks. Merge to master"
-            echo "  to trigger the CD Production workflow (after Release)."
+            echo "  This PR passes all CD pre-flight checks."
             echo ""
-            echo "  Post-merge flow:"
-            echo "    merge → Release workflow (tag push) → CD Production (auto)"
+            echo "  Release flow:"
+            echo "    tag push → Release workflow → CD Production (auto)"
             echo "    or: Actions → CD Production → Run workflow (manual dispatch)"
           else
             echo ""

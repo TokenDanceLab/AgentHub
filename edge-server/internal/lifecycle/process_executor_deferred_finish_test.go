@@ -17,20 +17,6 @@ func uuidLike(s string) bool {
 	return len(parts) == 5 && len(parts[0]) == 8 && len(parts[1]) == 4 && len(parts[2]) == 4 && len(parts[3]) == 4 && len(parts[4]) == 12
 }
 
-// TestPlanParentWaitChildren covers the pure orchestration-deferral gate:
-// only a parent with a registry AND at least one active child defers.
-func TestPlanParentWaitChildren(t *testing.T) {
-	if got := planParentWaitChildren(true, true).Defer; !got {
-		t.Error("registry + active children must defer")
-	}
-	if got := planParentWaitChildren(true, false).Defer; got {
-		t.Error("no active children must not defer")
-	}
-	if got := planParentWaitChildren(false, true).Defer; got {
-		t.Error("no registry must not defer")
-	}
-}
-
 // TestHasActiveChildren verifies the registry-driven child liveness check.
 func TestHasActiveChildren(t *testing.T) {
 	bus := events.NewBus(10)

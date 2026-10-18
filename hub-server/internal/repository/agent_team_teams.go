@@ -66,7 +66,7 @@ func RemoveTeamMember(db *gorm.DB, memberID string) error {
 
 // RemoveTeamMembersByTeam deletes every member of a team with a single
 // statement, replacing the per-member RemoveTeamMember N+1 loop in
-// DeleteTeam (#2102 F10).
+// DeleteTeam (#2102).
 func RemoveTeamMembersByTeam(db *gorm.DB, teamID string) error {
 	return db.Where("team_id = ?", teamID).Delete(&model.AgentTeamMember{}).Error
 }

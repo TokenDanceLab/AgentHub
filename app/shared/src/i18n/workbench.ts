@@ -327,7 +327,9 @@ export const sharedWorkbenchResources = {
         description: '请稍后重试；如持续失败请检查 Hub 连接。',
       },
       nav: { internal: '组织内联系人', external: '外部联系人', newFriend: '新的朋友' },
-      search: { placeholder: '搜索联系人' },
+      search: { placeholder: '搜索联系人', userPlaceholder: '搜索用户', loading: '加载中…' },
+      requests: { received: '收到的好友请求', sent: '已发送的请求' },
+      pending: '待处理',
       section: {
         external: { title: '外部联系人', subtitle: '客户、合作方和临时项目协作者，不进入 TokenDance 组织架构。' },
         starred: { title: '星标联系人', subtitle: '常用联系人会固定在这里，便于快速发起会话和项目协作。' },
@@ -1134,7 +1136,9 @@ export const sharedWorkbenchResources = {
         description: 'Please retry later; check the Hub connection if this persists.',
       },
       nav: { internal: 'Internal contacts', external: 'External contacts', newFriend: 'New friends' },
-      search: { placeholder: 'Search contacts' },
+      search: { placeholder: 'Search contacts', userPlaceholder: 'Search users', loading: 'Loading…' },
+      requests: { received: 'Received friend requests', sent: 'Sent requests' },
+      pending: 'Pending',
       section: {
         external: { title: 'External contacts', subtitle: 'Clients, partners and temporary collaborators, not part of the TokenDance organization.' },
         starred: { title: 'Starred contacts', subtitle: 'Frequent contacts are pinned here for quick access to conversations and projects.' },

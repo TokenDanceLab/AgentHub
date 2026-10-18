@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""verify-hub-layering — Hub handler 分层门禁（ps1 迁移，契约见 server docs/design/ps1-to-python-migration.md）。
+"""verify-hub-layering — Hub handler 分层门禁。
 
-单向流（audit-A Scope 2）：handler -> service -> repository。handler 包不得
-直接 import repository 层。已知缺陷 allowlist：health.go（非业务健康探针，
-应走 HealthService，audit-A 2.1）；新 handler 文件 import repository 即 FAIL。
+单向流：handler -> service -> repository。handler 包不得直接 import repository
+层。已知缺陷 allowlist：health.go（非业务健康探针，应走 HealthService）；新
+handler 文件 import repository 即 FAIL。
 """
 
 import argparse
@@ -21,18 +21,18 @@ else:
 
 HANDLER_DIR = "hub-server/internal/handler"
 
-# 禁止的 import（ps1 用 -match，大小写不敏感）
+# 禁止的 import（匹配大小写不敏感）
 FORBIDDEN_PATTERN = re.compile(r"^github\.com/agenthub/hub-server/internal/repository(/|$)", re.IGNORECASE)
 FORBIDDEN_LABEL = "repository layer (handler must go through service)"
 
 # 已知缺陷 allowlist：文件 + 原因
 KNOWN_DEFECTS = {
     "hub-server/internal/handler/health.go": (
-        "imports repository.VerifyMigrations for health-check migration status — non-business, route via HealthService (audit-A 2.1)"
+        "imports repository.VerifyMigrations for health-check migration status — non-business, route via HealthService"
     ),
 }
 
-# 镜像 ps1 的 [regex]::Matches（大小写敏感）
+# 大小写敏感的正则匹配
 BLOCK_IMPORT = re.compile(r"import\s*\((?P<body>.*?)\)", re.DOTALL)
 QUOTED_PATH = re.compile(r'"(?P<path>[^"]+)"')
 SINGLE_IMPORT = re.compile(r'^[ \t]*import[ \t]+(?:\S+[ \t]+)?"(?P<path>[^"]+)"', re.MULTILINE)
@@ -47,7 +47,7 @@ def known_defect(rel_path: str):
 
 
 def get_go_imports(content: str) -> list:
-    """提取 Go import 路径：块 import + 单行 import，去重保序（镜像 ps1）。"""
+    """提取 Go import 路径：块 import + 单行 import，去重保序。"""
     paths = []
 
     for match in BLOCK_IMPORT.finditer(content):
@@ -135,6 +135,6 @@ def main() -> int:
 if __name__ == "__main__":
     try:
         sys.exit(main())
-    except Exception as exc:  # noqa: BLE001 —— 顶层兜底，对齐 ps1 $ErrorActionPreference='Stop'
+    except Exception as exc:  # noqa: BLE001 —— fail closed：未捕获异常返回非零
         print(f"ERROR: {exc}", file=sys.stderr)
         sys.exit(1)

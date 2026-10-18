@@ -24,7 +24,7 @@ import {
 } from './workbenchSplitLayout';
 
 /* ═══════════════════════════════════════════════════════════════════════
-   workbenchSplitLayout — pure layout tree contract (#1997, UX F3).
+   workbenchSplitLayout — pure layout tree contract (#1997).
    Behavior-first: rect tiling, collapse normalization, split/unsplit/move
    invariants, MIN_SPLIT_RATIO clamps, and hostile-persistence rejection.
    ═══════════════════════════════════════════════════════════════════════ */

@@ -2,7 +2,7 @@ import type { ComposerMention } from '@shared/composer';
 
 /* ═══════════════════════════════════════════════════════════════════════
    composerMentionTrigger — pure @mention trigger detection for the
-   UnifiedComposer textarea (T11 / UI1).
+   UnifiedComposer textarea.
 
    Detects an active '@' trigger immediately preceding the caret, extracts
    the query segment, filters mentionable candidates, and computes the text

@@ -837,7 +837,7 @@
   stroke-linejoin: round;
 }
 
-/* ── Infinite-scroll load-more (T14 pattern: sentinel + fallback button) ── */
+/* ── Infinite-scroll load-more (sentinel + fallback button) ── */
 .sentinel {
   height: 1px;
   width: 100%;
@@ -869,7 +869,7 @@
   box-shadow: var(--focus-ring);
 }
 
-/* ── Board column SSOT chrome (#1999, UX F13) ─────────────────────────────
+/* ── Board column SSOT chrome (#1999) ─────────────────────────────
    Status tones reuse the shared semantic state palette (presets-base.css);
    no second status-color system and no hardcoded colors here. */
 

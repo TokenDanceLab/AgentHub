@@ -205,12 +205,6 @@ func (a *App) publishExpiredTaskTimeout(ctx context.Context, task model.PendingA
 	}
 }
 
-// startWebSocketCleanup starts heartbeat-based stale connection cleanup.
-// The heartbeat loop observes the group context and stops at shutdown.
-func (a *App) startWebSocketCleanup(ctx context.Context) {
-	a.mgr.StartHeartbeat(ctx)
-}
-
 // legacySeqSyncMarkerKey marks the legacy session-seq warm-up as completed.
 // syncLegacySeqs is an explicit one-time migration (#1675): the first run
 // sets this marker in Redis with a 30-day TTL, every later startup skips the

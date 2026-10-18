@@ -1,13 +1,12 @@
 #!/usr/bin/env python3
-"""prepare-tauri-sidecar-local — 本地准备 Tauri Windows Local Edge sidecar（ps1 迁移，契约见 server docs/design/ps1-to-python-migration.md）。
+"""prepare-tauri-sidecar-local — 本地准备 Tauri Windows Local Edge sidecar。
 
 按 tauri.conf.json 的 bundle.externalBin 计算 Windows target triple 路径，
 校验产物 gitignore，需要时用 GOOS=windows GOARCH=amd64 CGO_ENABLED=0 交叉编译
 edge-server 并拷贝到 Tauri external bin 位置。
 
-契约：stdlib only；参数名/退出码与 ps1 一致（0=通过/1=失败）；机器可读行
-（`PASS: `/`FAIL: `、`>>> `）与原 ps1 一致；`-DryRun` 只做 placement plan 与
-gitignore 校验不构建。失败即 exit 1（对齐 ps1 Fail 语义）。
+stdlib only；退出码 0=通过 / 1=失败；`-DryRun` 只做 placement plan 与
+gitignore 校验，不构建。
 """
 
 import argparse
@@ -185,6 +184,6 @@ def main() -> int:
 if __name__ == "__main__":
     try:
         sys.exit(main())
-    except Exception as exc:  # noqa: BLE001 —— 顶层兜底，对齐 ps1 $ErrorActionPreference='Stop'，禁止静默吞错
+    except Exception as exc:  # noqa: BLE001 —— fail closed：未捕获异常返回非零
         print(f"FAIL: {exc}")
         sys.exit(1)

@@ -37,7 +37,7 @@ test.describe('Web stubbed Hub replay smoke', () => {
     await page.goto('/');
 
     await expect(page.getByTestId('agenthub-workbench')).toHaveAttribute('data-page', 'chat');
-    // The composer status bar renders P76 Chinese product labels
+    // The composer status bar renders Chinese product labels
     // (unifiedComposerHelpers.buildComposerStatusItems) regardless of i18n.
     await expect(page.getByRole('status').filter({ hasText: '数据：真实数据' })).toBeVisible();
     await expect(page.getByText('目标：signed-out')).toBeVisible();
@@ -88,7 +88,7 @@ test.describe('Web stubbed Hub replay smoke', () => {
     await expect(approvalBlock.getByRole('button', { name: 'Approve' })).toBeVisible();
     await expect(approvalBlock.getByRole('button', { name: 'Deny' })).toBeVisible();
     await expect(page.getByText('reports/web-stubbed-replay-smoke.md').first()).toBeVisible();
-    // F5 (#1994): the frame-level global status bar renders the connection
+    // #1994: the frame-level global status bar renders the connection
     // segment on the chat page (real Hub WS state, never faked).
     await expect(page.getByText(/WebSocket/).first()).toBeVisible();
     await expect(page.getByText('运行证据').first()).toBeVisible();
@@ -103,7 +103,7 @@ test.describe('Web stubbed Hub replay smoke', () => {
       'The real task data source is not connected yet, so there are no tasks to show.',
     );
 
-    // F5 (#1994): leaving the chat page keeps the real attention chip visible
+    // #1994: leaving the chat page keeps the real attention chip visible
     // (scoped to the active conversation, no fake fleet totals).
     await expect(page.getByRole('button', { name: /1 awaiting approval/ })).toBeVisible();
 
@@ -295,11 +295,12 @@ async function installHubStub(page: Page, scenario: HubScenario = 'healthy-targe
       });
     }
 
-    // Fail-closed external boundary: only the render-blocking Google Fonts
-    // stylesheets are expected external requests (fulfilled with an empty
-    // stylesheet so the document load event can fire). Every other external
-    // host is recorded and refused, so the scenario assertion fails the test
-    // instead of letting an unexpected remote call succeed silently.
+    // Fail-closed external boundary: any external font request (fonts are
+    // self-hosted; this guards a reintroduced external font <link>) is
+    // fulfilled with an empty stylesheet so the document load event can fire.
+    // Every other external host is recorded and refused, so the scenario
+    // assertion fails the test instead of letting an unexpected remote call
+    // succeed silently.
     if (await fulfillExternalFontIfMatch(route)) {
       return;
     }

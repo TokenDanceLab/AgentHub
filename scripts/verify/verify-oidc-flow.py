@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""AgentHub TokenDance ID OIDC Full-Link Smoke Verification（ps1 迁移，契约见 server docs/design/ps1-to-python-migration.md）。
+"""AgentHub TokenDance ID OIDC Full-Link Smoke Verification。
 
 验证 Desktop → Hub → TokenDance ID 的完整 OIDC PKCE 流程。连接 live 服务。
 除需要有效凭据的 token exchange 模拟外，所有检查均为只读。
@@ -134,16 +134,16 @@ def check_packaged_desktop_readiness(root):
 
     oidc_server_path = os.path.join(root, "app", "desktop", "src-tauri", "src", "oidc_server.rs")
     secure_store_path = os.path.join(root, "app", "desktop", "src-tauri", "src", "secure_store.rs")
-    commands_path = os.path.join(root, "app", "desktop", "src-tauri", "src", "commands.rs")
-    lib_path = os.path.join(root, "app", "desktop", "src-tauri", "src", "lib.rs")
+    auth_path = os.path.join(root, "app", "desktop", "src-tauri", "src", "host", "auth.rs")
+    edge_host_path = os.path.join(root, "app", "desktop", "src-tauri", "src", "host", "edge.rs")
 
     assert_file_contains(oidc_server_path, r"pub fn check_loopback_callback_readiness\(\)", "  Desktop loopback readiness source is wired")
     assert_file_contains(oidc_server_path, r'TcpListener::bind\("127\.0\.0\.1:0"\)', "  Desktop loopback readiness uses random localhost bind")
     assert_file_contains(secure_store_path, r"pub fn check_credential_store_readiness\(\)", "  Desktop keyring readiness source is wired")
     assert_file_contains(secure_store_path, r"Entry::new\(SERVICE, HUB_REFRESH_TOKEN_USER\)", "  Desktop keyring readiness checks Hub refresh-token credential entry")
-    assert_file_contains(commands_path, r"pub async fn get_packaged_login_readiness\(\)", "  Desktop packaged login readiness command exists")
-    assert_file_contains(commands_path, r'status: "proposal_only"\.to_string\(\)', "  Real packaged login E2E remains proposal-only")
-    assert_file_contains(lib_path, r"commands::get_packaged_login_readiness", "  Desktop readiness command is registered in Tauri invoke handler")
+    assert_file_contains(auth_path, r"pub fn build_packaged_login_readiness\(\)", "  Desktop packaged login readiness builder exists")
+    assert_file_contains(auth_path, r'status: "proposal_only"\.to_string\(\)', "  Real packaged login E2E remains proposal-only")
+    assert_file_contains(edge_host_path, r"build_packaged_login_readiness\(\)", "  Desktop readiness builder is consumed by the Edge host")
 
 
 def sha256_prefix(text):
@@ -191,7 +191,7 @@ def base64_url_encode(data):
 def main() -> int:
     global PASSED, FAILED
     parser = argparse.ArgumentParser(
-        description="AgentHub TokenDance ID OIDC Full-Link Smoke Verification (ps1 migration)"
+        description="AgentHub TokenDance ID OIDC Full-Link Smoke Verification"
     )
     parser.add_argument("--LocalOnly", action="store_true", help="local fake/static gate; no live Hub/TokenDance ID calls")
     parser.add_argument("--SkipHub", action="store_true", help="skip live Hub Server phase")
@@ -288,10 +288,7 @@ def main() -> int:
     # Phase 2: Hub Server OIDC Endpoints
     # ═══════════════════════════════════════════════════
 
-    verify_state = None
     verify_auth_url = None
-    verify_code_verifier = None
-    verify_device_id = None
 
     if not args.SkipHub:
         step(f"Phase 2 — Hub Server ({args.HubUrl})")
@@ -347,10 +344,7 @@ def main() -> int:
                 assert_contains(auth_url_parsed, "code_challenge=", "    auth URL includes code_challenge")
                 assert_contains(auth_url_parsed, "code_challenge_method=S256", "    auth URL includes code_challenge_method=S256")
 
-                verify_state = auth_data["state"]
                 verify_auth_url = redact_url_query(auth_data["authorization_url"])
-                verify_code_verifier = code_verifier
-                verify_device_id = device_id
                 pass_check("  Authorization URL is well-formed OIDC PKCE request")
             else:
                 fail_check("  POST /client/auth/oidc/authorize — missing state or authorization_url")
@@ -456,14 +450,18 @@ def main() -> int:
         warn_check("  hub-server/.env not found — copy from .env.example and fill in TokenDance ID values")
 
     # 3.3 Config code validation
-    config_go_path = os.path.join(repo_root, "hub-server", "internal", "config", "config.go")
-    if os.path.isfile(config_go_path):
+    config_dir = os.path.join(repo_root, "hub-server", "internal", "config")
+    config_go = ""
+    for config_name in ("config.go", "config_validate.go"):
+        config_path = os.path.join(config_dir, config_name)
+        if not os.path.isfile(config_path):
+            continue
         try:
-            with open(config_go_path, encoding="utf-8") as handle:
-                config_go = handle.read()
+            with open(config_path, encoding="utf-8") as handle:
+                config_go += handle.read() + "\n"
         except OSError as exc:
-            warn_check(f"  config.go unreadable ({exc})")
-            config_go = ""
+            warn_check(f"  {config_name} unreadable ({exc})")
+    if config_go:
         if re.search(r"tokendance_id\.issuer_url is required when", config_go):
             pass_check("  Hub config validates interdependency (issuer_url required when client_id set)")
         else:
@@ -542,6 +540,6 @@ def main() -> int:
 if __name__ == "__main__":
     try:
         sys.exit(main())
-    except Exception as exc:  # noqa: BLE001 —— 顶层兜底，对齐 ps1 $ErrorActionPreference='Stop'
+    except Exception as exc:  # noqa: BLE001 —— fail closed：未捕获异常返回非零
         print(f"ERROR: {exc}", file=sys.stderr)
         sys.exit(1)

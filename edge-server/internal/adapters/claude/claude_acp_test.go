@@ -25,7 +25,7 @@ import (
 	"github.com/agenthub/edge-server/internal/store"
 )
 
-// ── 测试桩：自根包测试文件随 claude 家族下沉的副本（#1760 claude 增量） ──
+// ── 测试桩：自根包测试文件
 // fakeACPAgent / sessionUpdateLine / recordingEmitter / emitterAll /
 // containsString 与根包 acp_client_test.go、event_emitter_test.go、
 // adapter_test.go 中的同名声明的行为保持一致，改动需两侧同步。
@@ -212,6 +212,9 @@ func TestClaudeACPAdapterCapabilities(t *testing.T) {
 }
 
 func TestClaudeACPAdapterBuildCommand(t *testing.T) {
+	for _, key := range []string{"ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_BASE_URL", "ANTHROPIC_MODEL"} {
+		t.Setenv(key, "")
+	}
 	a := NewClaudeACPAdapter("", "")
 	cmdPath, args, env, workDir := a.BuildCommand(RunProcessContext{
 		Prompt:  "secret prompt that must NOT appear in argv",
@@ -414,7 +417,7 @@ func TestClaudeACPAdapterParseStreamWithMockACPPeer(t *testing.T) {
 }
 
 // TestCLIInvocationPlanRedactsPromptEnvAndPaths 自根包 sdk_fixture_mapper_test.go
-// 随 claude 家族迁入（#1760 claude 增量）：以 claude-code 适配器为投影主体
+//
 // 校验 BuildCLIInvocationPlan 的脱敏契约，逻辑未改。
 func TestCLIInvocationPlanRedactsPromptEnvAndPaths(t *testing.T) {
 	adapter := NewClaudeCodeAdapter("C:\\Tools\\Claude\\claude.exe", "claude-sonnet-fixture", "default")

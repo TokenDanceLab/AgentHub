@@ -3,7 +3,7 @@ import en from './locales/en.json';
 import zh from './locales/zh.json';
 
 // Product Settings SSOT is shared workbench SettingsPage (own i18n surface).
-// Desktop orphan SettingsPage + residual SectionId menu cluster were deleted
+// Desktop has no SettingsPage or SectionId menu cluster
 // (#443 / #541). Locale completeness for desktop settings remains the
 // runtime category keys that desktop still owns (no components/settings scan).
 const runtimeSettingsKeys = [
@@ -48,7 +48,7 @@ describe('Desktop settings i18n locales', () => {
   });
 });
 
-// #2072 P1: error.startConversation + devices.pingOk/pingFailed must exist in
+// #2072: error.startConversation + devices.pingOk/pingFailed must exist in
 // both locales so t() never falls back to the raw key name on screen.
 const errorUxP1Keys = [
   'error.startConversation',
@@ -62,15 +62,15 @@ const errorUxP1Keys = [
   'error.code.target_not_routable',
 ];
 
-describe('Desktop error UX P1 i18n keys (#2072)', () => {
-  it('defines every P1 error key in zh and en', () => {
+describe('Desktop error i18n keys (#2072)', () => {
+  it('defines every error key in zh and en', () => {
     const zhKeys = new Set(Object.keys(zh));
     const enKeys = new Set(Object.keys(en));
     expect(errorUxP1Keys.filter((k) => !zhKeys.has(k))).toEqual([]);
     expect(errorUxP1Keys.filter((k) => !enKeys.has(k))).toEqual([]);
   });
 
-  it('does not render P1 error keys as their own fallback text', () => {
+  it('does not render error keys as their own fallback text', () => {
     for (const key of errorUxP1Keys) {
       expect(zh[key as keyof typeof zh], `zh ${key}`).toBeTruthy();
       expect(en[key as keyof typeof en], `en ${key}`).toBeTruthy();

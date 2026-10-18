@@ -11,10 +11,7 @@ import {
 
    项目数据只有两个来源：父级（两个 shell 各自用 react-query 拉 Hub workspace
    projects 后传 `projects`/`projectsStatus`/`projectsActions`），或 fixture
-   模式下的 mock 池。曾经还有第三条——#1546 的 `projectsPort` 内部取数分支
-   （含游标分页与 load-more 重试）——但它在两个 shell 里都结构性不可达
-   （`portProjectsEnabled = Boolean(port) && !projects`，而 shell 只在
-   `hubReady` 时注入 port，此时 `projects` 必为数组），已随端口一起删除。
+   模式下的 mock 池。
    ═══════════════════════════════════════════════════════════════════════ */
 
 function project(id: string, name = `Project ${id}`): ProjectInfo {

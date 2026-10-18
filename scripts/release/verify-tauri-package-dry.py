@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Windows unsigned/dev Tauri package dry gate — ps1 迁移。
+"""Windows unsigned/dev Tauri package dry gate.
 
 Builds and verifies the unsigned Windows Tauri package reproducibility path:
 static readiness gates, the Windows Local Edge sidecar, an optional dev
@@ -351,6 +351,6 @@ def main() -> int:
 if __name__ == "__main__":
     try:
         sys.exit(main())
-    except Exception as exc:  # noqa: BLE001 —— 顶层兜底，对齐 ps1 $ErrorActionPreference='Stop'
+    except Exception as exc:  # noqa: BLE001 —— fail closed：未捕获异常返回非零
         print(f"ERROR: {exc}", file=sys.stderr, flush=True)
         sys.exit(1)

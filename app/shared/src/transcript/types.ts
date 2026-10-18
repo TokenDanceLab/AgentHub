@@ -58,7 +58,7 @@ export interface TextTranscriptBlock extends TranscriptBlockBase {
    * Producing agent task id, when the source message carries one. Hub stamps
    * `agent_task.task_id` into agent message content on both edge callback
    * paths (stream projection + done-final) and the hub-message normalizer
-   * writes it through here (#2274 B-1). It is the only identity
+   * writes it through here (#2274). It is the only identity
    * POST /web/agent-tasks/:id/regenerate accepts, so the transcript chrome
    * offers "regenerate" only when this is present — absence means there is no
    * server-truthful task to regenerate, and offering the click would be a lie.
@@ -91,7 +91,7 @@ export interface ToolCallTranscriptBlock extends TranscriptBlockBase {
   summary?: string;
   /**
    * Bounded scalar projection of the tool's invocation arguments
-   * (`payload.input`, #1998 UX F8). Only flat string (<= 512 chars) /
+   * (`payload.input`, #1998). Only flat string (<= 512 chars) /
    * number / boolean entries survive; rich payloads (patches, file
    * contents) are intentionally dropped so transcripts stay light.
    * Absent when the event carried no usable scalar arguments.

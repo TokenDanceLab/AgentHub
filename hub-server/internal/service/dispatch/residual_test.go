@@ -55,23 +55,6 @@ func TestApplyTeamContextToPayload(t *testing.T) {
 	assert.Equal(t, "", role)
 }
 
-func TestTeamMemberRefsFromProfiles(t *testing.T) {
-	p := "ca-1"
-	refs := TeamMemberRefsFromProfiles(
-		[]string{"m1", "m2"},
-		[]string{"lead", "worker"},
-		[]*string{&p, nil},
-	)
-	require.Len(t, refs, 2)
-	assert.Equal(t, "m1", refs[0].ID)
-	assert.Equal(t, "lead", refs[0].Role)
-	require.NotNil(t, refs[0].AgentProfileID)
-	assert.Equal(t, "ca-1", *refs[0].AgentProfileID)
-	assert.Nil(t, refs[1].AgentProfileID)
-
-	assert.Nil(t, TeamMemberRefsFromProfiles(nil, nil, nil))
-}
-
 func TestRoutingHelpers(t *testing.T) {
 	assert.True(t, ShouldTryHTTPDispatch(""))
 	assert.False(t, ShouldTryHTTPDispatch("t1"))

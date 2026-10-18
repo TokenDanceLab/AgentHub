@@ -1,6 +1,5 @@
 package mcp
 
-// Residual pure-helper peel: MCP tool handlers (#1104).
 // Read/write tool implementations for callTool dispatch.
 
 import (
@@ -94,7 +93,7 @@ func (s *Server) toolGetThread(args json.RawMessage) (json.RawMessage, error) {
 	runs := s.store.ListRuns(params.ThreadID)
 	var activeRun *store.Run
 	for i := range runs {
-		if runs[i].Status == "queued" || runs[i].Status == "started" {
+		if runcontrol.IsActiveRunStatus(runs[i].Status) {
 			activeRun = &runs[i]
 			break
 		}
@@ -140,14 +139,10 @@ func decodeStartRunArgs(args json.RawMessage) (startRunParams, error) {
 	return params, nil
 }
 
-// validateStartRunWorkDir and errIfActiveRunExists previously lived here; the
-// shared run-creation core (internal/runcontrol.Create) now owns workDir
-// validation and the active-run guard for both MCP and REST.
-
 // toolStartRun implements the agenthub_start_run tool.
 //
 // Requires non-empty workDir and validates it against the workspace allowlist
-// (AH-SR-006 / #854). The validation, run creation, run.queued publication,
+// (#854). The validation, run creation, run.queued publication,
 // executor start, and failure state transition are shared with POST /v1/runs
 // through internal/runcontrol.Create — MCP only decodes its own argument
 // shape and provides its timeline/context policies.
@@ -337,7 +332,8 @@ func (s *Server) toolApproveAction(args json.RawMessage) (json.RawMessage, error
 
 // toolCancelRun implements the agenthub_cancel_run tool.
 // Safe to call on any run state — returns the resulting status without error
-// if the run is already terminal (completed, failed, cancelled).
+// if the run is already terminal (finished, completed_with_issues, failed,
+// cancelled).
 func (s *Server) toolCancelRun(args json.RawMessage) (json.RawMessage, error) {
 	if s.executor == nil {
 		return nil, errcode.ErrExecutorNotConfigured

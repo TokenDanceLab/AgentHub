@@ -2,10 +2,10 @@ import type { MarketTemplate, MCPMarketItem, SkillMarketItem } from './types';
 import type { EmptyStateKind } from '@shared/ui';
 
 /* ═══════════════════════════════════════════════════════════════════════
-   AgentMarketHelpers — pure residual slices from AgentMarketParts (#671).
+   AgentMarketHelpers — pure helpers for AgentMarketParts (#671).
 
    Runtime/meta formatters, filter labels, count labels, and exactOptional-
-   PropertyTypes-safe EmptyState className packing. No React / no UX change.
+   PropertyTypes-safe EmptyState className packing. No React.
    ═══════════════════════════════════════════════════════════════════════ */
 
 function joinMetaParts(parts: Array<string | undefined | null>): string {

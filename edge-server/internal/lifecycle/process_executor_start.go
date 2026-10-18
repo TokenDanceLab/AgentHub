@@ -13,8 +13,17 @@ func (e *ProcessExecutor) Start(run store.Run, runCtx RunProcessContext) error {
 
 	current, found := e.store.GetRun(run.ID)
 	_, alreadyRunning := e.running[run.ID]
-	if err := planStartAdmission(found, current.Status, len(e.running), e.maxConcurrentRuns, alreadyRunning); err != nil {
-		return err
+	if !found {
+		return store.ErrNotFound
+	}
+	if current.Status != "queued" {
+		return ErrRunAlreadyStarted
+	}
+	if len(e.running) >= resolveMaxConcurrentRuns(e.maxConcurrentRuns) {
+		return ErrTooManyConcurrentRuns
+	}
+	if alreadyRunning {
+		return ErrRunAlreadyStarted
 	}
 	// Create context and atomically insert cancel into the map while holding
 	// the lock, so a concurrent Cancel can never miss the cancel func.
@@ -26,7 +35,10 @@ func (e *ProcessExecutor) Start(run store.Run, runCtx RunProcessContext) error {
 	// instead of crashing the whole Edge process. run()'s deferred finish()
 	// still runs during panic unwinding before recover catches, so terminal
 	// state and package-level sync.Map hygiene are preserved.
-	safego.SafeGo("run", func() { e.run(ctx, run, bindRunProcessContext(runCtx, run)) })
+	safego.SafeGo("run", func() {
+		runCtx.Run = run
+		e.run(ctx, run, runCtx)
+	})
 	return nil
 }
 

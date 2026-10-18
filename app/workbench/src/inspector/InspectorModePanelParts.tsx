@@ -25,12 +25,11 @@ import {
 } from './InspectorModePanelHelpers';
 
 /* ═══════════════════════════════════════════════════════════════════════
-   InspectorModePanelParts — presentational residual slices from
+   InspectorModePanelParts — presentational parts for
    InspectorModePanels (#731).
 
    Context usage, deploy status, browser fallback, and files panels.
    CSS remains on shared AgentHubWorkbench.module.css.
-   No intentional UX change.
    ═══════════════════════════════════════════════════════════════════════ */
 
 export function OverviewContextUsage({

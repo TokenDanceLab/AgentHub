@@ -14,8 +14,7 @@ import (
 	"github.com/agenthub/edge-server/internal/store"
 )
 
-// --- mockEventEmitter（源自根包 control_protocol_test.go，随 claude 家族
-// 下沉；根包测试符号不可跨包引用） ---
+// --- mockEventEmitter（本地测试桩；根包测试符号不可跨包引用） ---
 
 type mockEventEmitter struct {
 	mu     sync.Mutex
@@ -98,8 +97,7 @@ func TestClaudeCodeParseStreamUsesBrokeredPermissionHandler(t *testing.T) {
 	}
 }
 
-// --- 以下测试自根包 adapter_test.go 随 claude 家族迁入（#1760 claude
-// 增量），逻辑未改：根包测试不得引用 adapters/claude 符号（claude →
+// --- 以下测试自根包 adapter_test.go
 // adapters 单向依赖） ---
 
 // --- Adapter Metadata tests ---
@@ -167,8 +165,7 @@ func TestAvailableDoesNotPanicWithoutClaudeBinary(t *testing.T) {
 }
 
 // TestClaudeAdapterMetadataIsNotEmpty 校验 claude 家族内置适配器均有非空
-// metadata（根包 TestAdapterMetadataIsNotEmpty 的 claude 行随家族迁入，
-// #1760 claude 增量）。
+// metadata。
 func TestClaudeAdapterMetadataIsNotEmpty(t *testing.T) {
 	adapters := []struct {
 		name     string

@@ -1,9 +1,9 @@
 /**
- * Single-source @lobehub/icons test mocks (#1678 test-system convergence).
+ * Single-source @lobehub/icons test mocks shared by the shared/web/desktop
+ * test setups.
  *
- * Web and desktop each used to maintain their own drifted copy of this mock
- * in their `src/__tests__/setup.ts`. Both copies now import from here so the
- * icon name list and the mocked deep paths can no longer drift apart.
+ * The icon name list and the mocked deep paths live in one place so they
+ * cannot drift apart.
  *
  * Why a per-name list instead of a Proxy:
  * - vitest v4 statically validates that every consumer-visible export exists

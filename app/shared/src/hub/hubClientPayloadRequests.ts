@@ -1,8 +1,7 @@
 /**
  * Hub client pure JSON RequestInit + path+init composite builders.
- * Peel companion of hubClientPayloadUtils (#1094). Pure only; zero behavior change.
  *
- * #1101 residual peel: implementations live in domain companions; this file is the
+ * #1101 helper module: implementations live in domain companions; this file is the
  * public barrel so hubClientPayloadUtils re-exports remain stable.
  */
 

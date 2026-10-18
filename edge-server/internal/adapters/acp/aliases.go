@@ -1,4 +1,4 @@
-// Contract aliases for package acp（#1760 acp 增量）。
+// Contract aliases for package acp。
 //
 // 合同类型与 BusEvent* 常量的唯一权威（SSOT）在 internal/orchestration；
 // 本文件与 adapters 根包的 contract_aliases.go、兄弟叶子包 adapters/sdk 与

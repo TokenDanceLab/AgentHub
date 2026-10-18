@@ -145,14 +145,18 @@ func TestHubOutputCollectorAllocatedOnBind(t *testing.T) {
 	const runID = "run-bind-collector"
 	const taskID = "task-bind"
 
-	// Mirror the allocation path in ProcessExecutor.run when HubTaskID is set.
-	if !shouldRecordHubTask(taskID) {
-		t.Fatal("shouldRecordHubTask(taskID) = false, want true")
-	}
+	executor.bindHubTask(runID, taskID, "")
+
 	executor.mu.Lock()
-	executor.hubTasks[runID] = taskID
-	executor.hubOutputs[runID] = newHubOutputCollector(hubCallbackFinalMaxBytes)
+	boundTask := executor.hubTasks[runID]
+	_, collectorBound := executor.hubOutputs[runID]
 	executor.mu.Unlock()
+	if boundTask != taskID {
+		t.Fatalf("hubTasks[%q] = %q, want %q", runID, boundTask, taskID)
+	}
+	if !collectorBound {
+		t.Fatal("bindHubTask must allocate the hub output collector")
+	}
 
 	executor.recordHubOutput(runID, "hello from stream")
 	executor.recordHubOutput(runID, " more text")

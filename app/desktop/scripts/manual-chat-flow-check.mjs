@@ -12,8 +12,8 @@ const screenshot = path.join(outputDir, 'desktop-1440x810-chat-flow.png');
 fs.mkdirSync(outputDir, { recursive: true });
 
 const liveBackendHosts = new Set([
-  'api.hub.vectorcontrol.tech',
   'hub.vectorcontrol.tech',
+  'api.hub.vectorcontrol.tech',
   'id.tokendancelab.com',
   'api.vectorcontrol.tech',
   'localhost:8080',
@@ -121,7 +121,7 @@ function assertMetrics(result) {
     }
   }
   if (failures.length > 0) {
-    throw new Error(`Manual chat-flow UIUX check failed:\n- ${failures.join('\n- ')}`);
+    throw new Error(`Manual chat-flow check failed:\n- ${failures.join('\n- ')}`);
   }
 }
 

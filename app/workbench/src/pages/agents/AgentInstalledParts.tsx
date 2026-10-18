@@ -9,7 +9,7 @@ import type { AgentConfig, AgentState } from './types';
 /* ═══════════════════════════════════════════════════════════════════════
    Shared installed-view presentational parts.
 
-   Extracted from AgentInstalledViews as Phase 22 residual thin #616.
+   Extracted from AgentInstalledViews (#616).
    CSS remains on shared AgentsPage.module.css.
    ═══════════════════════════════════════════════════════════════════════ */
 

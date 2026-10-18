@@ -1,12 +1,11 @@
 /**
  * Hub client pure path / query builders.
- * Peel companion of hubClientPayloadUtils (#1094). Pure only; zero behavior change.
  */
 
 import { qs } from './hubClientRequestUtils';
 import { withPublicCatalogParams } from './hubClientPayloadBodies';
 
-// ── Pure path / query builders (#822 residual) ──────────────────────────────
+// ── Pure path and query builders (#822) ──────────────────────────────
 
 export function buildSearchUserPath(targetUserId: string): string {
   return `/client/contacts/search?id=${encodeURIComponent(targetUserId)}`;
@@ -64,7 +63,7 @@ export function buildPostTeamRouteDecisionPath(teamId: string, runId: string): s
   return `/web/agent-teams/${encodeURIComponent(teamId)}/runs/${encodeURIComponent(runId)}/route-decisions`;
 }
 
-// ── Pure path residual (#833) ────────────────────────────────────────────────
+// ── Pure path helpers (#833) ────────────────────────────────────────────────
 
 /** Colon-route first, slash fallback for requestWithFallback. */
 export function buildRegisterDevicePaths(): [string, string] {
@@ -159,7 +158,7 @@ export function buildDecideTaskApprovalPath(taskId: string, approvalId: string):
   return `/web/agent-tasks/${encodeURIComponent(taskId)}/approvals/${encodeURIComponent(approvalId)}/decide`;
 }
 
-// ── Pure path residual (#901) ────────────────────────────────────────────────
+// ── Pure path helpers (#901) ────────────────────────────────────────────────
 
 export function buildRemoveContactPath(friendUserId: string): string {
   return `/client/contacts/${encodeURIComponent(friendUserId)}`;
@@ -391,7 +390,7 @@ export function buildListTaskArtifactsPath(taskId: string): string {
   return `/web/agent-tasks/${encodeURIComponent(taskId)}/artifacts`;
 }
 
-// ── Static path residual (#913) ───────────────────────────────────────────────
+// ── Static path helpers (#913) ───────────────────────────────────────────────
 
 export function buildRefreshPath(): string {
   return '/client/auth/refresh';

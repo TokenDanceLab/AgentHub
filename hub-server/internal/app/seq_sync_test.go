@@ -120,7 +120,7 @@ func TestSyncLegacySeqsOneTimeMarker(t *testing.T) {
 	}
 }
 
-// TestSyncLegacySeqsMarkerHasTTL proves the #2119 P1 fix: the one-time marker
+// TestSyncLegacySeqsMarkerHasTTL proves the #2119 fix: the one-time marker
 // must carry a 30-day TTL so it does not permanently leak in Redis when the
 // deployment is decommissioned without explicit cleanup. Expiry triggers a
 // harmless idempotent re-scan (InitSeqIfAbsent is SetNX; runtime self-healing

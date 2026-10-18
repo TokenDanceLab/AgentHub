@@ -559,7 +559,7 @@ func TestSDKFixtureMapperProviderNeutralReplayContract(t *testing.T) {
 		BusEventToolResult,
 		BusEventContextUsage,
 		BusEventResult,
-		BusEventSessionMetrics, // slice A step 4: usage event now also emits session_metrics
+		BusEventSessionMetrics, // usage event also emits session_metrics
 		BusEventResult,
 		BusEventResult,
 	}
@@ -592,7 +592,7 @@ func TestSDKFixtureMapperProviderNeutralReplayContract(t *testing.T) {
 	if mapped[6].Payload["terminalReason"] != "completed" || mapped[6].Payload["success"] != true {
 		t.Fatalf("terminal result payload = %#v", mapped[6].Payload)
 	}
-	// mapped[7] is now the session_metrics event inserted by slice A step 4.
+	// mapped[7] is the session_metrics event.
 	if mapped[7].Type != BusEventSessionMetrics {
 		t.Fatalf("mapped[7] type = %s, want %s", mapped[7].Type, BusEventSessionMetrics)
 	}
@@ -784,7 +784,7 @@ func TestSDKFixtureMapperRedactsTopLevelRefsAndPreservesSanitizedTerminalReason(
 }
 
 // TestCLIInvocationPlanRedactsPromptEnvAndPaths 已随 claude 家族迁往
-// adapters/claude（#1760 claude 增量）：它以 claude-code 适配器为投影主体，
+// adapters/claude：它以 claude-code 适配器为投影主体，
 // 根包测试不得 import adapters/claude（claude → adapters 单向依赖）。
 
 func assertSDKFixtureGolden(t *testing.T, name string) {
@@ -878,8 +878,7 @@ func firstMappedPayloadOfType(t *testing.T, mapped []MappedEvent, eventType stri
 	return nil
 }
 
-// containsString 是根包 adapter_test.go 测试桩的本地副本（#1760 mapper
-// 增量）：mapper 家族归组后根包 _test 符号不可跨包引用，与 claude/acp
+// containsString 是根包 adapter_test.go 测试桩的本地副本：mapper 家族归组后根包 _test 符号不可跨包引用，与 claude/acp
 // 包测试内置测试桩副本的既有模式一致。
 func containsString(list []string, target string) bool {
 	for _, value := range list {

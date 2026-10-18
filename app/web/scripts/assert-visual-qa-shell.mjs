@@ -104,7 +104,7 @@ async function main() {
     if (contract.agentsPage !== true) {
       failures.push(name + ': Agents page not captured');
     }
-    // #1874 Slice 3: 三 Pane 几何合同——rail / 已安装列表 / 编辑详情必须真实
+    // #1874: 三 Pane 几何合同——rail / 已安装列表 / 编辑详情必须真实
     // 存在且宽度 > 0，避免把缺详情面板的空壳或 onboarding 误判为已捕获。
     const panes = contract.panes;
     if (!panes || !panes.rail?.exists || !panes.list?.exists || !panes.detail?.exists) {

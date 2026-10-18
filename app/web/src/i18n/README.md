@@ -5,7 +5,7 @@
 - [react-i18next](https://react.i18next.com/) + [i18next](https://www.i18next.com/)
 - 语言切换：右上角设置面板 → 中/英
 - 持久化：`localStorage` key `agenthub-language`
-- 命名空间：`common | status | workbench | agentSquare | privateChats | groupWorkspace | project`
+- 命名空间：`common`（web 自有）+ `sharedWorkbench`、`chatview`（来自 `@shared`）
 
 ## 快速上手
 
@@ -13,7 +13,7 @@
 import { useTranslation } from 'react-i18next';
 
 // 页面内
-const { t } = useTranslation('workbench');
+const { t } = useTranslation('common');
 <span>{t('header.title')}</span>
 ```
 
@@ -65,7 +65,7 @@ const { t } = useTranslation('workbench');
 ```
 Agent / Agents          AgentHub
 AgentRun                Token / Tokens
-Edge / Edge Server      Runner
+Edge / Edge Server
 Hub / Hub Server        Diff
 WebSocket / WS          MCP
 Claude Code / Codex / OpenCode
@@ -90,9 +90,8 @@ checkpoint              hunk
 
 ## 扫描漏网之鱼
 
-```powershell
-Select-String -Path "app/web/src/pages/workbench/WorkbenchPage.tsx" `
-  -Pattern '(aria-label|placeholder|title|alt)="[A-Z][a-z]'
+```bash
+rg -n '(aria-label|placeholder|title|alt)="[A-Z][a-z]' app/web/src app/shared/src
 ```
 
-匹配到的几乎都是遗漏的英文字符串。用实际页面路径替换。
+匹配到的通常是遗漏的硬编码英文。

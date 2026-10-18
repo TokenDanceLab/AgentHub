@@ -32,12 +32,12 @@ describe('workbench v4 demo data source', () => {
     // Chatview transcripts are lazy-loaded and may not be available synchronously
     // in test environments. Await the async load before asserting fixture data.
     await whenChatviewTranscriptsReady();
-    const johnnyTranscript = resolveDemoWorkbenchTranscript('johnny');
-    expect(johnnyTranscript[0]).toEqual(expect.objectContaining({
-      id: 'johnny-user-1',
+    const aliceTranscript = resolveDemoWorkbenchTranscript('alice');
+    expect(aliceTranscript[0]).toEqual(expect.objectContaining({
+      id: 'alice-user-1',
       kind: 'text',
     }));
-    expect(johnnyTranscript).toHaveLength(3);
+    expect(aliceTranscript).toHaveLength(3);
 
     // builder IS in the chatview fixtures, so it resolves to the full fixture transcript.
     const builderTranscript = resolveDemoWorkbenchTranscript('builder');

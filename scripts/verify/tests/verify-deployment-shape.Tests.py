@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Negative self-tests for verify-deployment-shape (#1527 PR1, inventory closed in PR2; ps1 迁移).
+"""Negative self-tests for verify-deployment-shape.
 
 Each case runs against an isolated minimal repository fixture. A negative
 case passes only when the verifier exits non-zero for the expected policy
@@ -10,10 +10,6 @@ reason. Cases:
 3. any compose file under hub-server/deployments/ (legacy resurrection) -> 1
 4. authoritative template missing required service -> 1
 5. hub-server image off product SSOT -> 1
-
-The verifier runs as a subprocess against the fixture; prefers
-scripts/verify/verify-deployment-shape.py and falls back to the .ps1 verifier
-while the scripts/verify migration is still in flight on master.
 """
 
 import os
@@ -27,10 +23,9 @@ REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.p
 
 
 def resolve_verifier() -> str:
-    for leaf in ("verify-deployment-shape.py", "verify-deployment-shape.ps1"):
-        candidate = os.path.join(REPO_ROOT, "scripts", "verify", leaf)
-        if os.path.isfile(candidate):
-            return candidate
+    candidate = os.path.join(REPO_ROOT, "scripts", "verify", "verify-deployment-shape.py")
+    if os.path.isfile(candidate):
+        return candidate
     raise AssertionError("verifier script not found for verify-deployment-shape")
 
 
@@ -82,6 +77,19 @@ class VerifyDeploymentShapeTests(unittest.TestCase):
         exit_code, output = self.run_verifier()
         self.assertEqual(exit_code, 0, "positive fixture unexpectedly failed:\n%s" % output)
 
+    def test_missing_hub_image_fails(self):
+        write_utf8(
+            os.path.join(self.fixture, "deployments", "production", "docker-compose.yml"),
+            """\
+services:
+  hub-server:
+    environment: {}
+  redis:
+    image: redis:7-alpine
+""",
+        )
+        self.assert_fails_with("must declare an image", "hub-server without image")
+
     def test_second_production_compose_fails_closed(self):
         write_utf8(
             os.path.join(self.fixture, "deployments", "production", "docker-compose.production.yml"),
@@ -95,6 +103,30 @@ services:
         )
         self.assert_fails_with("second hand-maintained production compose", "second production compose")
 
+    def test_standard_compose_name_fails_closed(self):
+        write_utf8(
+            os.path.join(self.fixture, "deployments", "production", "compose.yaml"),
+            """\
+services:
+  hub-server:
+    image: ghcr.io/tokendancelab/agenthub-hub-server:latest
+""",
+        )
+        self.assert_fails_with("second hand-maintained production compose", "standard compose.yaml name")
+
+    def test_nested_production_compose_fails_closed(self):
+        nested = os.path.join(self.fixture, "deployments", "production", "legacy")
+        os.makedirs(nested, exist_ok=True)
+        write_utf8(
+            os.path.join(nested, "docker-compose.yml"),
+            """\
+services:
+  hub-server:
+    image: ghcr.io/tokendancelab/agenthub-hub-server:latest
+""",
+        )
+        self.assert_fails_with("second hand-maintained production compose", "nested production compose")
+
     def test_legacy_compose_resurrection_fails_closed(self):
         legacy_dir = os.path.join(self.fixture, "hub-server", "deployments")
         os.makedirs(legacy_dir, exist_ok=True)
@@ -107,6 +139,32 @@ services:
 """,
         )
         self.assert_fails_with("legacy compose inventory closed", "compose under hub-server/deployments/")
+
+    def test_legacy_standard_compose_name_fails_closed(self):
+        legacy_dir = os.path.join(self.fixture, "hub-server", "deployments")
+        os.makedirs(legacy_dir, exist_ok=True)
+        write_utf8(
+            os.path.join(legacy_dir, "compose.yml"),
+            """\
+services:
+  hub-server:
+    image: ghcr.io/tokendancelab/agenthub-hub-server:latest
+""",
+        )
+        self.assert_fails_with("legacy compose inventory closed", "compose.yml under hub-server/deployments/")
+
+    def test_legacy_multi_suffix_compose_fails_closed(self):
+        legacy_dir = os.path.join(self.fixture, "hub-server", "deployments")
+        os.makedirs(legacy_dir, exist_ok=True)
+        write_utf8(
+            os.path.join(legacy_dir, "docker-compose.prod.eu1.yml"),
+            """\
+services:
+  hub-server:
+    image: ghcr.io/tokendancelab/agenthub-hub-server:latest
+""",
+        )
+        self.assert_fails_with("legacy compose inventory closed", "multi-suffix compose under hub-server/deployments/")
 
     def test_missing_required_service_fails(self):
         write_utf8(
@@ -131,6 +189,19 @@ services:
 """,
         )
         self.assert_fails_with("off SSOT", "hub-server image off product SSOT")
+
+    def test_hub_server_image_with_ssot_only_as_substring_fails(self):
+        write_utf8(
+            os.path.join(self.fixture, "deployments", "production", "docker-compose.yml"),
+            """\
+services:
+  hub-server:
+    image: evil.example/ghcr.io/tokendancelab/agenthub-hub-server:latest
+  redis:
+    image: redis:7-alpine
+""",
+        )
+        self.assert_fails_with("off SSOT", "hub-server image with SSOT prefix as a substring")
 
 
 if __name__ == "__main__":

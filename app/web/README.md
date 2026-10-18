@@ -1,8 +1,8 @@
 # AgentHub Web
 
-最后更新：2026-09-02
+最后更新：2026-10-19
 
-`app/web/` 是 AgentHub 浏览器端工作台。它负责 Hub 登录后的远程查看、审批、IM、项目视图、Agent/Profile 展示和 Web 预览；真实执行仍由 Edge Server 完成。旧长版 README 见 [../../docs/history.md](../../docs/history.md)。
+`app/web/` 是 AgentHub 浏览器端工作台。它负责 Hub 登录后的远程查看、审批、IM、项目视图、Agent/Profile 展示和 Web 预览；真实执行仍由 Edge Server 完成。
 
 ## Boundary
 
@@ -33,32 +33,30 @@ Shared components must come from `app/shared/`; do not copy Desktop/shared UI lo
 
 ## Current Routes
 
-Web 没有 react-router 路由表：`App.tsx` 只渲染 `AgentHubWorkbench`，页面/分区切换由工作台内部状态驱动（`../workbench/src/WorkbenchRoutes.tsx`：chats、agents、contacts、devices、docs、projects、settings、tasks、usage 等视图）。`/chats`、`/settings`、`/agent-square` 等 URL 路由与旧页面桥接（`src/router.tsx`、`src/pages/*`、`src/views/`、`src/layouts/`）均已删除。
-
-If Agent Square, Private Chats, Group Workspace, or Project features return, migrate them into the workbench shell instead of reviving standalone decorative page prototypes.
+Web 没有 react-router 路由表：`App.tsx` 只渲染 `AgentHubWorkbench`，页面/分区切换由工作台内部状态驱动（`../workbench/src/WorkbenchRoutes.tsx`：chats、agents、contacts、devices、docs、projects、settings、tasks、usage 等视图）。新增页面放进 workbench shell，不恢复独立页面原型。
 
 ## Local Preview
 
-```powershell
-corepack.cmd pnpm --dir app/web install --ignore-scripts
-corepack.cmd pnpm --dir app/web dev --host 127.0.0.1
+```bash
+corepack pnpm --dir app/web install --ignore-scripts
+corepack pnpm --dir app/web dev --host 127.0.0.1
 ```
 
 `vite.config.ts` owns strict port `5174`. Desktop/Tauri Vite uses `5173`; Mobile RN Expo Web preview uses `5177`.
 
 ## Verification
 
-```powershell
-corepack.cmd pnpm --dir app/web typecheck
-corepack.cmd pnpm --dir app/web build
-corepack.cmd pnpm --dir app/web test:e2e:stubbed-hub
-python scripts/verify/verify-web-hub-boundary.py
+```bash
+corepack pnpm --dir app/web typecheck
+corepack pnpm --dir app/web build
+corepack pnpm --dir app/web test:e2e:stubbed-hub
+corepack pnpm --dir app lint
 ```
 
 Visual QA:
 
-```powershell
-corepack.cmd pnpm --filter agenthub-web visual:qa:shell
+```bash
+corepack pnpm --dir app/web visual:qa:shell
 ```
 
 Evidence from fixture/stub/visual runs must not claim real login, real model/API execution, packaged Desktop, or production behavior. Evidence labels are enforced by `scripts/verify/verify-real-e2e-contract.py`.

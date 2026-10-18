@@ -1,7 +1,7 @@
 -- 0063_agent_run_events_unique_seq.up.sql
 -- Enforce per-task uniqueness of agent_run_events.event_seq.
 --
--- CreateAgentRunEventWithNextSeqLimited (repository/agent.go:303) computes
+-- CreateAgentRunEventWithNextSeqLimited (repository/agent.go) computes
 -- MAX(event_seq)+1 with a read-then-insert inside one transaction. Without a
 -- unique index, two concurrent writers for the same task_id that bypassed the
 -- row lock (or a future code path that forgets the lock) can commit the same

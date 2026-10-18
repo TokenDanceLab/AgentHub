@@ -46,11 +46,6 @@ func (s *RunEventService) SetAuditService(a PrivilegedActionAuditor) {
 	s.audit = a
 }
 
-// SetControlService injects (or replaces) the control delivery port.
-func (s *RunEventService) SetControlService(controlSvc runEventControl) {
-	s.controlSvc = controlSvc
-}
-
 // ListTaskRunEvents returns run events for a pending task, filtered and paginated.
 func (s *RunEventService) ListTaskRunEvents(ctx context.Context, userID, taskID string, filter model.AgentRunEventFilter) ([]model.AgentRunEvent, error) {
 	task, err := repository.GetPendingTaskByID(s.db, taskID)
@@ -161,7 +156,7 @@ func (s *RunEventService) DecideTaskApproval(ctx context.Context, userID, taskID
 		return nil, err
 	}
 
-	// Observability (slice A step 5): log + counter for every persisted decision.
+	// Observability: log + counter for every persisted decision.
 	slog.Info("approval: task approval decided",
 		"task_id", task.ID, "approval_id", approvalID, "edge_run_id", approval.EdgeRunID,
 		"decision", decision.Decision, "decided_by", userID)

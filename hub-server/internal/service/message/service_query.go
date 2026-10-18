@@ -10,8 +10,6 @@ import (
 	"github.com/agenthub/hub-server/internal/repository"
 )
 
-// Residual pure-helper peel #1153: history/search/pin-list/mark-read query paths.
-
 func (s *Service) GetMessages(ctx context.Context, sessionID, userID string, beforeSeq int64, limit int) ([]MessageResponse, error) {
 	active, err := repository.IsMemberActive(s.db, sessionID, model.MemberTypeUser, userID)
 	if err != nil {
@@ -112,7 +110,7 @@ func (s *Service) MarkRead(ctx context.Context, userID, sessionID string, lastRe
 	return nil
 }
 
-// MessageSearchPage is one page of message-search results (#2136 P2). The
+// MessageSearchPage is one page of message-search results (#2136). The
 // cursor is opaque to clients: session-scoped searches encode "<seq>|<id>",
 // cross-session searches "<createdAtUnixNano>|<id>".
 type MessageSearchPage struct {

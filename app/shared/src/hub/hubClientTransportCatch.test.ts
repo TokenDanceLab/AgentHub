@@ -10,7 +10,6 @@ import {
   applyDefaultHubRequestCatchEffects,
   applyHubRequestCatchEffects,
   applyTokenRefreshFailureReport,
-  buildTokenRefreshFailedLogPrefix,
   buildTokenRefreshReportContext,
   classifyHubRequestCatch,
   createHubAbortTimeout,
@@ -165,7 +164,6 @@ describe('hubClientTransportCatch (#1102)', () => {
       path: '/web/projects',
       context: 'token_refresh',
     });
-    expect(buildTokenRefreshFailedLogPrefix()).toBe('[HubClient] Token refresh failed');
   });
 
   it('resolves timeout catches into TIMEOUT AppError plus log and report context', () => {

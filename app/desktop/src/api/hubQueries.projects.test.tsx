@@ -5,10 +5,7 @@
 // 1. Paging — `listWorkspaceProjects()` was called with no pageSize at all, so
 //    the server applied its default of 50, and the returned page.nextCursor was
 //    dropped. Every project past the first page was silently missing from the
-//    desktop workbench: no "load more", no truncation hint, no error. The only
-//    client code that ever advanced this cursor was the #1546
-//    WorkbenchProjectsPort chain, which was structurally unreachable in both
-//    shells and has been deleted.
+//    desktop workbench: no "load more", no truncation hint, no error.
 //
 // 2. Invalidation — the create/update mutations invalidated
 //    `['hub','workspace-projects']`, a key that nothing ever registers (the

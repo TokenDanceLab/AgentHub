@@ -237,7 +237,7 @@ func runtimeInvocationFixtureStrategy(runtimeID string) string {
 // cli-json fixture adapter. The claude-code branch is injected by package
 // claude via RegisterClaudeCodeAdapterProvider；codex/opencode branches are
 // injected by packages codex and opencode via RegisterCodexACPadapterProvider /
-// RegisterOpencodeACPadapterProvider（#1760 各增量）：根包不得反向 import 子包
+// RegisterOpencodeACPadapterProvider：根包不得反向 import 子包
 // （子包 → adapters 单向依赖），故经此钩子反向注入。
 func runtimeInvocationFixtureAdapter(runtimeID string, model string) AgentAdapter {
 	switch strings.ToLower(strings.TrimSpace(runtimeID)) {
@@ -270,7 +270,7 @@ var claudeCodeAdapterProvider func(model string) AgentAdapter
 // RegisterClaudeCodeAdapterProvider installs the claude-code constructor for
 // AgentHubAgentSpec fixture projection. Called once from package claude's
 // init; exported so the claude subpackage can inject without the root
-// package importing it (import cycle avoidance, #1760).
+// package importing it (import cycle avoidance).
 func RegisterClaudeCodeAdapterProvider(provider func(model string) AgentAdapter) {
 	claudeCodeAdapterProvider = provider
 }
@@ -278,13 +278,13 @@ func RegisterClaudeCodeAdapterProvider(provider func(model string) AgentAdapter)
 // codexACPadapterProvider is registered by package codex at init time
 // (fixture_provider.go). Non-nil only in binaries/tests that link the codex
 // subpackage; root-package unit tests link it via
-// codex_opencode_fixture_link_test.go（blank import 触发 init 注入）.
+// fixture_provider_link_test.go（blank import 触发 init 注入）.
 var codexACPadapterProvider func() AgentAdapter
 
 // RegisterCodexACPadapterProvider installs the codex-acp constructor for
 // AgentHubAgentSpec fixture projection. Called once from package codex's
 // init; exported so the codex subpackage can inject without the root package
-// importing it (import cycle avoidance, #1760).
+// importing it (import cycle avoidance).
 func RegisterCodexACPadapterProvider(provider func() AgentAdapter) {
 	codexACPadapterProvider = provider
 }
@@ -292,13 +292,13 @@ func RegisterCodexACPadapterProvider(provider func() AgentAdapter) {
 // opencodeACPadapterProvider is registered by package opencode at init time
 // (fixture_provider.go). Non-nil only in binaries/tests that link the
 // opencode subpackage; root-package unit tests link it via
-// codex_opencode_fixture_link_test.go（blank import 触发 init 注入）.
+// fixture_provider_link_test.go（blank import 触发 init 注入）.
 var opencodeACPadapterProvider func() AgentAdapter
 
 // RegisterOpencodeACPadapterProvider installs the opencode-acp constructor
 // for AgentHubAgentSpec fixture projection. Called once from package
 // opencode's init; exported so the opencode subpackage can inject without
-// the root package importing it (import cycle avoidance, #1760).
+// the root package importing it (import cycle avoidance).
 func RegisterOpencodeACPadapterProvider(provider func() AgentAdapter) {
 	opencodeACPadapterProvider = provider
 }

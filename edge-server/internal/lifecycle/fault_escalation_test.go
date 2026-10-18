@@ -8,7 +8,7 @@ import (
 	"github.com/agenthub/edge-server/internal/store"
 )
 
-// TestProcessExecutorFaultEscalationRetryKeepsRunRegistered verifies #867:
+// TestProcessExecutorFaultEscalationRetryKeepsRunRegistered verifies
 // on fault-escalation auto-retry the concurrency slot remains registered for the
 // successor attempt (deferred finish must not tear it down between attempts).
 func TestProcessExecutorFaultEscalationRetryKeepsRunRegistered(t *testing.T) {

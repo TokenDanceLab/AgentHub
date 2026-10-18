@@ -106,7 +106,7 @@ export function installWorkbenchTestHooks(): void {
   });
 }
 
-/** P76: inspector tabs beyond overview open on demand via + menu. */
+/** inspector tabs beyond overview open on demand via + menu. */
 export function restoreInspectorTab(mode: 'files' | 'browser'): void {
   fireEvent.click(screen.getByRole('button', { name: '新建右侧窗口' }));
   const menu = screen.getByRole('menu', { name: '右侧窗口菜单' });

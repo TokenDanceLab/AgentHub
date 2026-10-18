@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Negative self-test for verify-oidc-code-ssot.py (#2123 P1-2).
+"""Negative self-test for verify-oidc-code-ssot.py.
 
 Proves the gate fails closed: backend-only codes, frontend-only codes, and
 empty extraction each exit non-zero. Uses temp files injected via module

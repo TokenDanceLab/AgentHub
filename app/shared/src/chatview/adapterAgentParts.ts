@@ -1,6 +1,5 @@
 /**
  * Chatview adapter agent-item mutation helpers.
- * Peel companion of adapter (#1143). Pure only; zero behavior change.
  */
 
 import type { TranscriptBlock, TextTranscriptBlock } from '../transcript/types'

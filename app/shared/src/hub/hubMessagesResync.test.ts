@@ -59,16 +59,8 @@ describe('resyncMessagesAfterReconnect', () => {
     };
   });
 
-  // #2252 note: this is the *empty cache* case, and it is unchanged by the fix
-  // (nothing cached → nothing to resync). It is called out because before #2252
-  // it was also, silently, the production case for every non-empty cache: the
-  // discovery matcher only knew ['hub','threads',<id>,'messages'] while
-  // Desktop cached ['hub','sessions',<id>,'messages'] and Web cached
-  // ['web-v4','hub-messages',<id>], so both platforms took this path with a
-  // full transcript cache and no log line. The suites that seed the keys the
-  // platforms really use are the #2252 block below plus
-  // desktop/src/stores/hubEventBridge.test.tsx and
-  // web/src/platform/webHubRealtime.resync.test.ts.
+  // Regression intent: an empty cache triggers no resync; the platform
+  // cache-key shapes are covered by the cases below.
   it('returns empty result when no sessions are cached', async () => {
     const result = await resyncMessagesAfterReconnect({ queryClient: qc, hubClient });
     expect(result.synced).toEqual([]);

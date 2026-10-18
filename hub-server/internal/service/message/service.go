@@ -1,10 +1,8 @@
-// Package message owns IM message orchestration for Hub.
-//
-// It is the sixth IM typed-service package (agentteam-style; #720), extracting
-// the message domain from the flat service package. Bus+Cache ports were
-// hardened in #585; package move only. Pure helpers remain in service/im.
-// Residual pure projection/builders live in same-package files (#813).
-// Residual domain method peel continues in companion files (#1153).
+// Package message owns IM message orchestration for Hub: send, edit, recall,
+// forward, mark-read, search, and history projection. Sequence allocation uses
+// an injected Cache with DB fallback; domain events go through Bus. Pure content
+// helpers live in service/im; projection and builder helpers live in companion
+// files.
 package message
 
 import (
@@ -16,7 +14,6 @@ import (
 	"github.com/agenthub/hub-server/internal/seqalloc"
 )
 
-// Residual pure-helper peel #1153: Service struct, ports, and constructor glue.
 // Domain send/query methods and orchestration helpers live in companion files.
 
 // Bus publishes domain events from message write/lifecycle paths.
@@ -33,13 +30,7 @@ type Cache interface {
 }
 
 // Service owns IM message orchestration: send/edit/recall, pin/unpin/list-pins,
-// forward, mark-read, search, and history projection. Seq allocation uses
-// injected Cache with DB fallback; domain events go through Bus. This package
-// is the sixth IM typed-service extract (#720) after messagereaction (#662),
-// workspace (#673), contact (#685), attachment (#697), and session (#708).
-// Ports were hardened in #585; package move only. Pure content helpers remain
-// in service/im and are not re-embedded. Pure residual projection/builders
-// were split package-locally in #813. Domain methods live in companions (#1153).
+// Service owns message orchestration and its Bus/Cache ports.
 type Service struct {
 	db          *gorm.DB
 	bus         Bus
@@ -49,29 +40,12 @@ type Service struct {
 
 // NewService constructs a message service.
 // bus may be nil for read-only/partial tests; write paths that publish no-op.
-// cacheClient may be nil and falls back to cache.NoOpCache (DB seq path).
+// cacheClient must be non-nil; tests may pass cache.NoOpCache{}.
 func NewService(db *gorm.DB, bus Bus, cacheClient Cache) *Service {
 	return &Service{
 		db:          db,
 		bus:         bus,
-		cacheClient: resolveCache(cacheClient),
-		seqAlloc:    seqalloc.New(resolveCache(cacheClient), db),
+		cacheClient: cacheClient,
+		seqAlloc:    seqalloc.New(cacheClient, db),
 	}
-}
-
-// SetBus injects (or replaces) the event bus port.
-func (s *Service) SetBus(bus Bus) {
-	if s == nil {
-		return
-	}
-	s.bus = bus
-}
-
-// SetCache injects (or replaces) the sequence cache port.
-func (s *Service) SetCache(cacheClient Cache) {
-	if s == nil {
-		return
-	}
-	s.cacheClient = resolveCache(cacheClient)
-	s.seqAlloc = seqalloc.New(s.cacheClient, s.db)
 }

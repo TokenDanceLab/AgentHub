@@ -1,6 +1,5 @@
 /**
  * Hub client pure path+init request builders (domain companion).
- * Peel of hubClientPayloadRequests (#1101). Pure only; zero behavior change.
  */
 
 import {
@@ -65,7 +64,7 @@ export function buildUploadAttachmentRequest(
   };
 }
 
-// ── Composite path+init residual (#1055) ──────────────────────────────────────
+// ── Composite path+init helpers (#1055) ──────────────────────────────────────
 
 export function buildCreateExecutionTargetRequest(body: unknown): {
   path: string;

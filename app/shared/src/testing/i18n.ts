@@ -34,10 +34,8 @@ type TestI18nInstance = ReturnType<typeof i18next.createInstance>;
  *
  * `'test'` deliberately matches no registered bundle. i18next then echoes
  * keys verbatim (`t('typing.dm')` -> `'typing.dm'`) and still honors
- * `t(key, defaultValue)` fallbacks — the exact visible behavior suites had
- * BEFORE any instance existed. Suites that were written against raw-key
- * echo (and are outside the #1717 frozen-file boundary, e.g.
- * TypingIndicator / ContactsPage) therefore keep passing unchanged, while
+ * `t(key, defaultValue)` fallbacks. Suites that assert raw-key echo (e.g.
+ * TypingIndicator / ContactsPage) keep their current behavior, while
  * `useTranslation` now resolves a real instance so the
  * `NO_I18NEXT_INSTANCE` warning can no longer appear.
  */

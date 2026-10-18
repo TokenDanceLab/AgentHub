@@ -9,8 +9,6 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-// Residual pure-helper peel #1123: sequence numbers, token blacklist, rate limit.
-
 // AllocateSeq atomically increments and returns the next seq for a session.
 func (c *Client) AllocateSeq(ctx context.Context, sessionID string) (int64, error) {
 	key := "session:seq:" + sessionID
@@ -58,7 +56,7 @@ func (c *Client) BlacklistRefreshToken(ctx context.Context, tokenHash string, tt
 // userID:deviceID[:deviceType] key) exists in the Redis refresh token
 // blacklist. Returns true if the key is present, false otherwise.
 // Redis errors are propagated to the caller (#2053, symmetric with the
-// AH-SR-052 access contract, #2040): Service.RefreshToken is the policy
+// access contract, #2040): Service.RefreshToken is the policy
 // decision point and picks fail-open vs fail-closed via
 // AGENTHUB_AUTH_FAIL_CLOSED (service/auth enforceRefreshBlacklist).
 // Swallowing errors here made that fail-closed branch unreachable in the
@@ -84,7 +82,7 @@ func (c *Client) BlacklistAccessToken(ctx context.Context, jti string, ttl time.
 }
 
 // IsAccessTokenBlacklisted reports whether an access-token jti is blacklisted.
-// Redis errors are propagated to the caller (AH-SR-052 contract, #2040): the
+// Redis errors are propagated to the caller (contract, #2040): the
 // auth middleware is the policy decision point and picks fail-open vs
 // fail-closed via AGENTHUB_AUTH_FAIL_CLOSED (middleware/auth.go
 // acceptAccessClaims). Swallowing errors here made that fail-closed branch

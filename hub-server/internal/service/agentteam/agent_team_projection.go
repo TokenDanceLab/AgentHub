@@ -42,7 +42,7 @@ func projectTeamRuntimeSummaries(runEvents []model.AgentRunEvent, taskRefs map[s
 		// the payload. A team run's event batch is capped at 50,000 rows
 		// (repository.maxAgentRunEventsPerBatch) and is dominated by
 		// text_delta / output_batch, whose payloads this loop used to unmarshal
-		// in full and then discard (#2154 perf lane P2-5).
+		// in full and then discard (#2154).
 		switch event.EventType {
 		case "run.agent.permission_requested":
 			p.applyApprovalRequested(event)
@@ -164,7 +164,7 @@ func (p *teamRuntimeProjection) applyFileChange(event model.AgentRunEvent) {
 
 // teamEventPayload decodes a run-event payload for team projection and reports
 // whether it was valid JSON, so callers can keep the pre-existing "skip this
-// event entirely" behaviour. See #2154 perf lane P2-5.
+// event entirely" behaviour. See #2154.
 func teamEventPayload(raw string) (map[string]any, bool) {
 	var payload map[string]any
 	if err := json.Unmarshal([]byte(raw), &payload); err != nil {

@@ -1,6 +1,6 @@
 /* ==========================================================================
    workbenchSplitTranscriptCache — per-conversation transcript snapshots for
-   the read-only split panes (#1997, UX F3).
+   the read-only split panes (#1997).
 
    The shell feeds the workbench exactly ONE transcript (the active
    conversation). Split view needs the last-seen content of inactive

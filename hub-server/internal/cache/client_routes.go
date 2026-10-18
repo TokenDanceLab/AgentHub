@@ -8,8 +8,6 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-// Residual pure-helper peel #1123: device route + kicked-connection helpers.
-
 func routeKey(userID string) string { return "device_route:" + userID }
 
 func routeField(deviceType, deviceID string) string {
@@ -31,7 +29,7 @@ func (c *Client) SetRoute(ctx context.Context, userID, deviceType, connID string
 
 // DeleteRoute removes the route entry for a user device. If the hash becomes
 // empty after deletion, the entire key is removed to avoid residual empty
-// hashes that linger until TTL expiry (P2 audit #2119).
+// hashes that linger until TTL expiry (#2119).
 func (c *Client) DeleteRoute(ctx context.Context, userID, deviceType string) error {
 	key := routeKey(userID)
 	removed, err := c.rdb.HDel(ctx, key, deviceType).Result()
@@ -95,9 +93,9 @@ func (c *Client) IsOnline(ctx context.Context, userID string) (bool, error) {
 
 // AreOnline reports, for every given user, whether at least one active
 // device route exists. The per-user HLEN commands are bundled into a single
-// Redis pipeline round trip instead of N sequential ones — ListContacts and
-// online-status fanout previously paid one round trip per friend (#2154
-// perf lane). Users missing from the result map are offline; a pipeline
+// Redis pipeline round trip instead of N sequential ones, so ListContacts and
+// online-status fanout pay one round trip per batch (#2154).
+// Users missing from the result map are offline; a pipeline
 // error is returned to the caller (callers today ignore it and treat the
 // batch as offline, matching the per-item IsOnline convention).
 func (c *Client) AreOnline(ctx context.Context, userIDs []string) (map[string]bool, error) {

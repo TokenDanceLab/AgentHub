@@ -8,13 +8,13 @@ import type { GlobalRailPage } from './GlobalRail';
 import { WORKBENCH_MOCK_AGENT_CONFIGS, WORKBENCH_MOCK_CONTACT_MEMBERS } from './mockData';
 
 /* ═══════════════════════════════════════════════════════════════════════
-   workbenchProfileChromeHelpers — pure residual slices from
+   workbenchProfileChromeHelpers — pure helpers for
    useWorkbenchProfileChrome (#709).
 
    Public option/return types, profile state shapes, configured catalog
    projection, agent/human/group profile resolution, conversation-avatar
    open plans, DM open plans, and profile-link builders.
-   No React hooks / no intentional UX change.
+   No React hooks.
    exactOptionalPropertyTypes: only assign `?: T` fields when defined,
    unless the public field type explicitly allows `| undefined`.
    ═══════════════════════════════════════════════════════════════════════ */

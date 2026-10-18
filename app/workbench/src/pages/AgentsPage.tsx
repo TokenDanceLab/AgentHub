@@ -30,8 +30,8 @@ import type {
                 运行策略 / 工具权限 / 模型配置 / 审计日志
    Pure presentational — no data fetching, render from props.
 
-   Market cluster extracted under ./agents for Phase 16 #552.
-   Installed + ops clusters extracted under ./agents for Phase 17 #560.
+   Market cluster lives under ./agents (#552).
+   Installed and ops clusters live under ./agents (#560).
    ═══════════════════════════════════════════════════════════════════════ */
 
 /* ── Public re-exports (preserve external consumers) ── */

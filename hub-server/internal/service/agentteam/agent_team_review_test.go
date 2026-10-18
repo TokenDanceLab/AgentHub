@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/agenthub/hub-server/internal/cache"
 	"github.com/agenthub/hub-server/internal/errcode"
 	"github.com/agenthub/hub-server/internal/model"
 	"github.com/agenthub/hub-server/internal/repository"
@@ -11,12 +12,12 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// ── Human Review Gate (ADR-008) ────────────────────────────────
+// ── Human Review Gate ──────────────────────────────────────────
 
 func TestHumanReviewGate(t *testing.T) {
 	t.Run("disabled by default rejects review API", func(t *testing.T) {
 		db := setupAgentTeamStateSQLite(t)
-		svc := NewAgentTeamService(db, nil, nil)
+		svc := NewAgentTeamService(db, nil, cache.NoOpCache{})
 		team, _, executor, run := seedAgentTeamRun(t, db)
 
 		// HandleRouteDecision should proceed normally (no pending_review).
@@ -43,7 +44,7 @@ func TestHumanReviewGate(t *testing.T) {
 
 	t.Run("enabled sets pending_review after route decision", func(t *testing.T) {
 		db := setupAgentTeamStateSQLite(t)
-		svc := NewAgentTeamService(db, nil, nil)
+		svc := NewAgentTeamService(db, nil, cache.NoOpCache{})
 		svc.SetHumanReviewEnabled(true)
 		team, _, executor, run := seedAgentTeamRun(t, db)
 
@@ -75,7 +76,7 @@ func TestHumanReviewGate(t *testing.T) {
 
 	t.Run("enabled approve transitions back to running", func(t *testing.T) {
 		db := setupAgentTeamStateSQLite(t)
-		svc := NewAgentTeamService(db, nil, nil)
+		svc := NewAgentTeamService(db, nil, cache.NoOpCache{})
 		svc.SetHumanReviewEnabled(true)
 		team, _, executor, run := seedAgentTeamRun(t, db)
 
@@ -125,7 +126,7 @@ func TestHumanReviewGate(t *testing.T) {
 	t.Run("decided review restores running in projection for discuss and modify", func(t *testing.T) {
 		for _, action := range []string{model.ReviewActionDiscuss, model.ReviewActionModify} {
 			db := setupAgentTeamStateSQLite(t)
-			svc := NewAgentTeamService(db, nil, nil)
+			svc := NewAgentTeamService(db, nil, cache.NoOpCache{})
 			svc.SetHumanReviewEnabled(true)
 			team, _, executor, run := seedAgentTeamRun(t, db)
 
@@ -152,7 +153,7 @@ func TestHumanReviewGate(t *testing.T) {
 
 	t.Run("enabled discuss cancels pending assignments", func(t *testing.T) {
 		db := setupAgentTeamStateSQLite(t)
-		svc := NewAgentTeamService(db, nil, nil)
+		svc := NewAgentTeamService(db, nil, cache.NoOpCache{})
 		svc.SetHumanReviewEnabled(true)
 		team, _, executor, run := seedAgentTeamRun(t, db)
 
@@ -191,7 +192,7 @@ func TestHumanReviewGate(t *testing.T) {
 
 	t.Run("enabled modify cancels pending assignments with changes recorded", func(t *testing.T) {
 		db := setupAgentTeamStateSQLite(t)
-		svc := NewAgentTeamService(db, nil, nil)
+		svc := NewAgentTeamService(db, nil, cache.NoOpCache{})
 		svc.SetHumanReviewEnabled(true)
 		team, _, executor, run := seedAgentTeamRun(t, db)
 
@@ -228,7 +229,7 @@ func TestHumanReviewGate(t *testing.T) {
 
 	t.Run("review rejects invalid action", func(t *testing.T) {
 		db := setupAgentTeamStateSQLite(t)
-		svc := NewAgentTeamService(db, nil, nil)
+		svc := NewAgentTeamService(db, nil, cache.NoOpCache{})
 		svc.SetHumanReviewEnabled(true)
 		team, _, executor, run := seedAgentTeamRun(t, db)
 
@@ -248,7 +249,7 @@ func TestHumanReviewGate(t *testing.T) {
 
 	t.Run("review rejects non-pending_review status", func(t *testing.T) {
 		db := setupAgentTeamStateSQLite(t)
-		svc := NewAgentTeamService(db, nil, nil)
+		svc := NewAgentTeamService(db, nil, cache.NoOpCache{})
 		svc.SetHumanReviewEnabled(true)
 		_, _, _, run := seedAgentTeamRun(t, db) // run status is "running"
 
@@ -261,7 +262,7 @@ func TestHumanReviewGate(t *testing.T) {
 
 	t.Run("review rejects non-owner user", func(t *testing.T) {
 		db := setupAgentTeamStateSQLite(t)
-		svc := NewAgentTeamService(db, nil, nil)
+		svc := NewAgentTeamService(db, nil, cache.NoOpCache{})
 		svc.SetHumanReviewEnabled(true)
 		team, _, executor, run := seedAgentTeamRun(t, db)
 

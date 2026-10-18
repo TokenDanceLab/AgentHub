@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""verify-real-e2e-lane-manifest — B3 真实 E2E lane evidence manifest 合同门禁（#1839 B3）。
+"""verify-real-e2e-lane-manifest — 真实 E2E lane evidence manifest 合同门禁。
 
-守护演示诚实（AGENTS §4）：stub/fixture 不得冒充真实登录；real_tested 不得夸大。
+守护演示诚实（AGENTS 的「生态与真实性边界」）：stub/fixture 不得冒充真实登录；real_tested 不得夸大。
 校验对象：scripts/e2e/run-real-e2e-lane.sh 产出的 tests/artifacts/manifest-<stamp>.json。
 
 检查：
@@ -13,16 +13,21 @@
     （SSOT 在那里，本文件通过 importlib 读取，不另持一份矩阵）。
   - 诚实规则：
       * status=passed ⇒ real_tested=true 且至少一个 row passed（登录证据为真）；
+        例外：整次运行只含 backend-api 行（chat-real 使用本地 Hub 签发的
+        会话 JWT）时，real_tested=false，所有 row 的 evidence_level 均为
+        backend-api 且 status=passed；
       * status=blocked/failed/no-evidence ⇒ real_tested=false（不得谎称跑过）；
       * status=no-evidence（playwright exit 0 但无通过行：全 skipped / report
-        缺失或解析失败时的降级状态）⇒ 不得有 passed row；
-      * passed row ⇒ real_tested=true（行级一致性）。
+        缺失或解析失败时的降级状态）⇒ 不得所有 row 都 passed；
+      * observed-local / approved-real 的 passed row ⇒ real_tested=true（行级一致性）；
+      * scope 声称跑完 all testMatch 且 status=passed ⇒ spec_files 必须覆盖
+        playwright.real.config.ts 的全部 testMatch spec。
   - 无 secret 泄漏：manifest 内不得出现任何非空 secret-like key
     （password/secret/token/credential 值），凭据只允许以路径/方式引用。
   - 无私有信息泄漏：所有字符串值不得含非 loopback URL host、非 loopback IP、
-    绝对文件系统路径或内网后缀 hostname（#1873）。
+    绝对文件系统路径或内网后缀 hostname。
 
-失败语义：任何违反 → 非零退出 + stderr 信息（ps1 $ErrorActionPreference='Stop' 对齐）。
+失败语义：任何违反 → 非零退出 + stderr 信息。
 
 用法：
   python3 scripts/verify/verify-real-e2e-lane-manifest.py <manifest.json>
@@ -52,12 +57,16 @@ REQUIRED_ROW_FIELDS = [
     "evidence",
 ]
 
-# #1873 Slice C: 公开 artifact 必须携带可追溯的 provenance（哪个 commit、哪个
-# scope），但不能复制私有运行事实（非 loopback endpoint/账号/绝对路径等，
+# 公开 artifact 必须携带可追溯的 provenance（哪个 commit、哪个 scope），
+# 但不能复制敏感运行数据（非 loopback endpoint/账号/绝对路径等，
 # 由 assert_no_private_names 扫描）。
 REQUIRED_PROVENANCE_FIELDS = ["commit", "scope"]
+FULL_SCOPE = "app/e2e (playwright.real.config.ts all testMatch)"
 
-SECRET_KEY_RE = re.compile(r"(password|passwd|secret|access[_-]?token|refresh[_-]?token|id[_-]?token|private_key|license|api[_-]?key)", re.IGNORECASE)
+# Only observed real runs count as login evidence; fixture/stub levels never do.
+REAL_EVIDENCE_LEVELS = ("observed-local", "approved-real")
+
+SECRET_KEY_RE = re.compile(r"(password|passwd|secret|access[_-]?token|refresh[_-]?token|id[_-]?token|authorization|cookie|session[_-]?key|jwt|private_key|license|api[_-]?key)", re.IGNORECASE)
 
 
 class ContractError(Exception):
@@ -76,7 +85,7 @@ def load_canonical_levels(repo_root):
     spec = importlib.util.spec_from_file_location("verify_real_e2e_contract", path)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
-    return {machine for _, machine in module.CANONICAL_LEVELS}
+    return set(module.EVIDENCE_LEVELS)
 
 
 def assert_no_secret_values(manifest, context="manifest"):
@@ -114,6 +123,7 @@ LOOPBACK_HOSTS = {"localhost", "127.0.0.1", "::1", "[::1]"}
 URL_RE = re.compile(r"https?://([^\s/?#]+)", re.IGNORECASE)
 IPV4_RE = re.compile(r"(?<![\d.])(?:\d{1,3}\.){3}\d{1,3}(?![\d.])")
 WINDOWS_ABS_PATH_RE = re.compile(r"\b[A-Za-z]:[\\/][^\s\"']*")
+UNC_PATH_RE = re.compile(r"\\\\[A-Za-z0-9._$-]+\\[^\s\"']+")
 UNIX_ABS_PATH_RE = re.compile(r"(?<![\w./\\])/(?![\s/])[\w.-]+(?:/[\w.-]+)+")
 INTERNAL_SUFFIX_HOST_RE = re.compile(
     r"\b[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?\.(?:internal|local|corp|lan)\b",
@@ -153,7 +163,7 @@ def private_info_violation(value, path_, label="manifest"):
     与 assert_no_private_names 共用同一份正则 SSOT（URL_RE/IPV4_RE/
     WINDOWS_ABS_PATH_RE/UNIX_ABS_PATH_RE/INTERNAL_SUFFIX_HOST_RE）。
     供 verify-real-e2e-artifacts.py 对 raw artifact（report JSON / HTML /
-    trace.network）做同口径内容扫描，避免两套阈值漂移（AGENTS §5.5）。
+    trace.network）做同口径内容扫描，避免两套阈值漂移（AGENTS 的「验证与证据」）。
     """
     if not value.strip():
         return None
@@ -165,6 +175,8 @@ def private_info_violation(value, path_, label="manifest"):
         ip = match.group(0)
         if _is_valid_ipv4(ip) and not LOOPBACK_IPV4_RE.match(ip):
             return f"{label} leaks non-loopback IPv4 '{ip}' at {path_}"
+    if UNC_PATH_RE.search(value):
+        return f"{label} leaks UNC path at {path_}: redact filesystem paths"
     if WINDOWS_ABS_PATH_RE.search(value):
         return f"{label} leaks absolute Windows path at {path_}: redact filesystem paths"
     if UNIX_ABS_PATH_RE.search(value):
@@ -174,8 +186,58 @@ def private_info_violation(value, path_, label="manifest"):
     return None
 
 
+CREDENTIAL_SHAPES = [
+    ("JWT", re.compile(r"eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}")),
+    ("Bearer token", re.compile(r"\bBearer\s+[A-Za-z0-9._~+/=-]{10,}", re.IGNORECASE)),
+    ("runtime credential", re.compile(r"\b(?:cs_[A-Fa-f0-9]{16,}|c_[A-Fa-f0-9]{12,})\b")),
+    ("password value", re.compile(r"(?i)password\s*[:=]\s*[A-Za-z0-9._~+/=-]{6,}")),
+]
+
+
+def assert_no_credential_shapes(manifest, context="manifest"):
+    """Scan every string value for credential shapes, not just secret-like keys.
+
+    A manifest is schema'd JSON, but a leak can hide under an innocent key
+    (for example note/evidence); key-only matching misses it.
+    """
+    def walk(node, path_):
+        if isinstance(node, dict):
+            for key, value in node.items():
+                walk(value, f"{path_}.{key}")
+        elif isinstance(node, list):
+            for idx, value in enumerate(node):
+                walk(value, f"{path_}[{idx}]")
+        elif isinstance(node, str):
+            for label, pattern in CREDENTIAL_SHAPES:
+                if pattern.search(node):
+                    fail(f"{context} contains a {label} at {path_}: redact credentials")
+
+    walk(manifest, context)
+
+
+def expected_testmatch(repo_root):
+    """Read the real Playwright config's testMatch spec list."""
+    config = os.path.join(repo_root, "app", "web", "playwright.real.config.ts")
+    with open(config, encoding="utf-8") as handle:
+        text = handle.read()
+    match = re.search(r"testMatch:\s*\[(.*?)\]", text, re.DOTALL)
+    if not match:
+        fail(f"cannot read testMatch from {config}")
+    return sorted(re.findall(r"['\"]([^'\"]+\.spec\.ts)['\"]", match.group(1)))
+
+
+def assert_scope_claim(manifest):
+    """A partial run must not claim that every testMatch spec passed."""
+    scope = str(manifest.get("scope", ""))
+    if scope == FULL_SCOPE:
+        return
+    claim = str(manifest.get("claim", ""))
+    if "全部 spec" in claim or "all testMatch" in claim:
+        fail(f"manifest scope '{scope}' does not cover all specs but the claim says every spec passed")
+
+
 def assert_no_private_names(manifest, context="manifest"):
-    """递归扫描所有字符串值，拦截私有信息泄漏（#1873 第一切片）。
+    """递归扫描所有字符串值，拦截私有信息泄漏。
 
     公开 Actions artifact 只应携带 sanitized manifest；以下形态 fail-closed：
       * http(s):// URL host 非 loopback/localhost（含单标签内网 host、内网 IP、IPv6）
@@ -258,22 +320,70 @@ def main():
                 fail(f"row '{row.get('name', '?')}' missing required field '{field}'")
         if row["evidence_level"] not in allowed_levels:
             fail(f"row '{row['name']}' evidence_level '{row['evidence_level']}' not in canonical set")
-        if row["status"] == "passed" and row["real_tested"] is not True:
-            fail(f"row '{row['name']}' claims passed but real_tested is not true")
+        if row["status"] == "passed" and row["real_tested"] is not True and row["evidence_level"] in REAL_EVIDENCE_LEVELS:
+            fail(f"row '{row['name']}' claims passed at {row['evidence_level']} but real_tested is not true")
         if row["status"] != "passed" and row["real_tested"] is True:
             fail(f"row '{row['name']}' real_tested=true but status is '{row['status']}'")
+        if row["real_tested"] is True and row["evidence_level"] not in REAL_EVIDENCE_LEVELS:
+            fail(f"row '{row['name']}' claims real_tested at non-real level '{row['evidence_level']}'")
 
     if status == "passed":
-        if manifest["real_tested"] is not True:
-            fail("status=passed but real_tested is not true")
-        if not any(row["status"] == "passed" and row["real_tested"] for row in rows):
-            fail("status=passed but no row actually passed with real login evidence")
+        api_only = (
+            manifest["evidence_level"] == "backend-api"
+            and bool(rows)
+            and all(
+                row["status"] == "passed"
+                and row["evidence_level"] == "backend-api"
+                and row["real_tested"] is False
+                for row in rows
+            )
+        )
+        if api_only:
+            pass
+        else:
+            if manifest["real_tested"] is not True:
+                fail("status=passed but real_tested is not true")
+            backed = any(
+                row["status"] == "passed"
+                and row["real_tested"] is True
+                and row["evidence_level"] == manifest["evidence_level"]
+                for row in rows
+            )
+            if not backed:
+                fail(
+                    "manifest evidence_level '"
+                    + str(manifest["evidence_level"])
+                    + "' is not backed by a passed row at the same level"
+                )
     if status in ("blocked", "failed", "no-evidence") and manifest["real_tested"] is True:
         fail(f"status={status} but real_tested is true (honesty violation)")
-    if status == "no-evidence" and any(row["status"] == "passed" for row in rows):
-        fail("status=no-evidence but a row claims passed (status should be passed)")
+    if status == "no-evidence":
+        if manifest["real_tested"] is True:
+            fail("status=no-evidence but real_tested is true")
+        if all(row["status"] == "passed" for row in rows):
+            fail("status=no-evidence but every row passed (status should be passed)")
+
+    spec_files = manifest.get("spec_files")
+    if spec_files is not None:
+        if not isinstance(spec_files, list) or not spec_files or not all(
+            isinstance(item, str) and item for item in spec_files
+        ):
+            fail("manifest field 'spec_files' must be a non-empty list of strings")
+    if status == "passed" and manifest["scope"] == FULL_SCOPE:
+        expected = expected_testmatch(args.repo_root)
+        if not spec_files:
+            fail("status=passed over all testMatch must record the spec_files that produced the report")
+        missing = sorted(set(expected) - set(spec_files))
+        unexpected = sorted(set(spec_files) - set(expected))
+        if missing or unexpected:
+            fail(
+                "status=passed over all testMatch but the report covered "
+                f"missing={missing} unexpected={unexpected}"
+            )
 
     assert_no_secret_values(manifest)
+    assert_no_credential_shapes(manifest)
+    assert_scope_claim(manifest)
     assert_no_private_names(manifest)
 
     print("real-e2e lane manifest contract ok")
@@ -283,6 +393,6 @@ def main():
 if __name__ == "__main__":
     try:
         sys.exit(main())
-    except Exception as exc:  # noqa: BLE001 —— 对齐 ps1 throw 语义
+    except Exception as exc:  # noqa: BLE001 —— fail closed：未捕获异常返回非零
         print(str(exc), file=sys.stderr)
         sys.exit(1)

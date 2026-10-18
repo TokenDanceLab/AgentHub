@@ -1,7 +1,7 @@
 /* ═══════════════════════════════════════════════════════════════════════
    Settings left-nav shell — sections, search, and scope rows.
 
-   Extracted from SettingsPage as Phase 21 residual thin #604.
+   Extracted from SettingsPage (#604).
    CSS remains on shared SettingsPage.module.css.
    ═══════════════════════════════════════════════════════════════════════ */
 

@@ -38,7 +38,7 @@ export interface RowItem {
   apKind?: string
   /** Risk severity for approval cards. When present, a RiskBadge renders in the
    *  actions row; critical level triggers a second-confirm on the approve
-   *  button and the approve button turns red (T16). */
+   *  button and the approve button turns red. */
   riskLevel?: 'low' | 'medium' | 'high' | 'critical'
   /**
    * ISO timestamp of when the (waiting) approval request was raised
@@ -77,7 +77,7 @@ export interface RowItem {
   checkpointFileCount?: number
   checkpointTotalBytes?: number
   /**
-   * Runtime artifact identity for the F10 transcript → engineering Preview
+   * Runtime artifact identity for the transcript → engineering Preview
    * focus intent. Absent means this is an ordinary file row and must not
    * fabricate an artifact target.
    */
@@ -99,7 +99,7 @@ export interface RowItem {
 }
 
 /**
- * Unread-messages divider descriptor (desktop IM path, T8).
+ * Unread-messages divider descriptor (desktop IM path).
  * The upstream session exposes a read watermark (Hub: next_seq − last_read_seq
  * as unread_count); the consumer resolves it to a transcript block id of the
  * first unread message plus display copy, and ChatView renders a thin divider

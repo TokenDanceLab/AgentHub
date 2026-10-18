@@ -5,8 +5,6 @@ import (
 	"time"
 )
 
-// Residual pure-helper peel #1134: TokenDance ID OIDC/OAuth2 config section.
-
 // TokenDanceIDConfig holds OIDC/OAuth2 configuration for TokenDance ID integration.
 type TokenDanceIDConfig struct {
 	// IssuerURL is the TokenDance ID issuer base URL.

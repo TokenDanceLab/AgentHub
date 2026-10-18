@@ -12,7 +12,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  GO_VERSION: "1.26.5"
+  GO_VERSION: "1.26.9"
   NODE_VERSION: "24"
   PNPM_VERSION: "10.32.1"
 
@@ -30,10 +30,20 @@ jobs:
         shell: bash
         run: |
           if ! [[ "$GITHUB_REF_NAME" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-rc\.[0-9]+)?$ ]]; then
-            echo "::error::tag '$GITHUB_REF_NAME' 不符合发布规范 ^vX.Y.Z[-rc.N]$，唯一入口见 AGENTS.md §12"
+            echo "::error::tag '$GITHUB_REF_NAME' 不符合发布规范 ^vX.Y.Z[-rc.N]$，唯一入口见 AGENTS.md 的「发布与依赖」"
             exit 1
           fi
           echo "tag format ok: $GITHUB_REF_NAME"
+
+      - name: Assert tag matches desktop version
+        shell: bash
+        run: |
+          version=$(python3 -c "import json; print(json.load(open('app/desktop/package.json'))['version'])")
+          if [ "v$version" != "$GITHUB_REF_NAME" ]; then
+            echo "::error::tag '$GITHUB_REF_NAME' does not match desktop version 'v$version'"
+            exit 1
+          fi
+          echo "tag matches desktop version: $GITHUB_REF_NAME"
 
       - name: Assert tag is on master ancestry
         shell: bash
@@ -45,20 +55,24 @@ jobs:
           fi
           echo "tag ancestry ok: $GITHUB_REF_NAME is on master"
 
-  # ── Security Gate: release readiness (risk status + signing policy) ─
-  # Hard-blocking (no continue-on-error): exact Open, rotate required, or any
-  # verification required Critical/High status blocks release; malformed or
-  # unknown Critical/High statuses fail closed.
+  # ── Release gate: signing policy and release prerequisites ─
+  # Hard-blocking (no continue-on-error): version and tag/ref checks must pass.
   # Signing policy (scripts/release/verify-release-gate.py):
   #   - RELEASE_SIGNING_APPROVED=true + signing evidence → signed release
   #   - RELEASE_UNSIGNED_OK=true → Windows unsigned release (SmartScreen
   #     warning; updater still self-signed via TAURI_SIGNING_PRIVATE_KEY)
   #   - neither → freeze (conservative default)
-  security-gate:
-    name: Security release gate
+  release-gate:
+    name: Release readiness gate
     needs: tag-guard
+    # Protect this environment with required reviewers: the tag-scoped
+    # RELEASE_RISK_REVIEWED variable records the review, and the environment
+    # approval ties the run to a human decision.
+    environment: release
     runs-on: ubuntu-latest
     env:
+      RELEASE_TAG: ${{ github.ref_name }}
+      RELEASE_RISK_REVIEWED: ${{ vars.RELEASE_RISK_REVIEWED }}
       RELEASE_SIGNING_APPROVED: ${{ vars.RELEASE_SIGNING_APPROVED }}
       RELEASE_UNSIGNED_OK: ${{ vars.RELEASE_UNSIGNED_OK }}
     steps:
@@ -69,12 +83,15 @@ jobs:
       - name: Run release gate verifier
         shell: bash
         run: |
-          python scripts/verify/tests/verify-release-gate.Tests.py
           python scripts/release/verify-release-gate.py -RepoRoot . -SkipRefCheck
+
+      - name: Self-test release gate
+        shell: bash
+        run: python scripts/verify/tests/verify-release-gate.Tests.py
 
   # ── Go: Edge Server + Hub Server ─────────────
   build-go:
-    needs: [tag-guard, security-gate]
+    needs: [tag-guard, release-gate]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -377,7 +394,7 @@ jobs:
           path: dist/
 
   # ── Expo Android APK ─────────────────────────
-  # Mobile 处于深度重构期（AGENTS.md §2），且 EAS 需要 EXPO_TOKEN + EAS 账号；
+  # Mobile 当前是 fixture/边界验证 lane（AGENTS.md「架构与产品边界」），不是 release candidate；且 EAS 需要 EXPO_TOKEN + EAS 账号；
   # 发布不硬依赖 APK。设置仓库 variable RELEASE_MOBILE_ENABLED=true 且配置
   # EXPO_TOKEN 后才参与发布；否则该 job 跳过（release job 照常发布其余产物）。
   build-mobile:

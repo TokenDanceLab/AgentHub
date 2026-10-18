@@ -12,7 +12,7 @@ import styles from '../AgentHubWorkbench.module.css';
    InspectorTabChrome — tab config, close mark, and monitor-head chrome
    for RightInspector (tablist + quick-open restore menu).
 
-   Extracted from RightInspector as Phase 19 residual thin #584.
+   Extracted from RightInspector (#584).
    CSS remains on shared AgentHubWorkbench.module.css.
    ═══════════════════════════════════════════════════════════════════════ */
 
@@ -33,7 +33,7 @@ export function getInspectorTabs(t: (key: string) => string): InspectorTabDef[] 
   ];
 }
 
-/** P76: overview is the single default primary card; browser/files open on demand. */
+/** overview is the single default primary card; browser/files open on demand. */
 export const defaultVisibleTabs = new Set<InspectorMode>(['overview']);
 
 export function getQuickOpenItems(t: (key: string) => string) {

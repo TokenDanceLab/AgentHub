@@ -117,7 +117,7 @@ check "sk- API key fails" yes $?
 echo "=== path-literal assignment passes ==="
 git reset --quiet
 cat > paths.yaml <<'YAML'
-TOKENDANCE_DATABASE_DSN=/var/lib/tokendance-id/tokendance.db
+TOKENDANCE_DATABASE_DSN=/var/lib/oidc-provider/oidc.db
 TOKENDANCE_JWT_PRIVATE_KEY_PATH=/tmp/id-private.pem
 YAML
 git add paths.yaml
@@ -132,6 +132,34 @@ YAML
 git add issuer.yaml
 bash "$SCRIPT" --staged >/dev/null 2>&1
 check "endpoint URL value assignment passes" no $?
+
+echo "=== token after a clean endpoint URL is still scanned ==="
+git reset --quiet
+FAKE_GH_TOKEN="ghp_$(printf 'a%.0s' $(seq 1 24))"
+cat > url-token.yaml <<YAML
+CALLBACK_URL=https://ok.example  # ${FAKE_GH_TOKEN}
+YAML
+git add url-token.yaml
+bash "$SCRIPT" --staged >/dev/null 2>&1
+check "token after clean endpoint URL fails" yes $?
+
+echo "=== second secret assignment after a clean URL is still scanned ==="
+git reset --quiet
+cat > url-second-secret.yaml <<'YAML'
+SERVICE_BASE_URL=https://ok.example AGENTHUB_CLIENT_SECRET=abcdef1234567890
+YAML
+git add url-second-secret.yaml
+bash "$SCRIPT" --staged >/dev/null 2>&1
+check "second assignment after endpoint URL fails" yes $?
+
+echo "=== URL fragment credential after an endpoint prefix still fails ==="
+git reset --quiet
+cat > fragment.yaml <<'YAML'
+TOKEN_URL=https://auth.svc/cb/#access_token=abcdef1234567890
+YAML
+git add fragment.yaml
+bash "$SCRIPT" --staged >/dev/null 2>&1
+check "URL fragment credential still fails" yes $?
 
 echo "=== URL with query-string credential still fails ==="
 git reset --quiet
@@ -151,10 +179,20 @@ git add dsn.yaml
 bash "$SCRIPT" --staged >/dev/null 2>&1
 check "URL DSN with userinfo still fails" yes $?
 
+echo "=== *_URL with userinfo still fails ==="
+git reset --quiet
+USERINFO='client:realpassword123'
+cat > url-userinfo.env <<ENV
+TOKEN_URL=https://${USERINFO}@id.acme.invalid/token
+ENV
+git add url-userinfo.env
+bash "$SCRIPT" --staged >/dev/null 2>&1
+check "*_URL with userinfo still fails" yes $?
+
 echo "=== real password literal still fails ==="
 git reset --quiet
 cat > pw.yaml <<'YAML'
-AGENTHUB_DB_PASSWORD=b3-lane-dev-password
+AGENTHUB_DB_PASSWORD=correct-horse-battery
 YAML
 git add pw.yaml
 bash "$SCRIPT" --staged >/dev/null 2>&1
@@ -416,6 +454,22 @@ integrity_case "malformed registry JSON fails"
 
 git reset --quiet
 rm -f fixture_a.txt fixture_b.txt fixture_copy.txt fixture_two.txt "$REG_FILE"
+
+echo "=== --ci derives its range from BASE_REF and fails closed on a bad ref ==="
+git update-ref refs/remotes/origin/main HEAD
+BASE_REF=main bash "$SCRIPT" --ci >/dev/null 2>&1
+check "--ci with an existing origin base ref exits 0" no $?
+env -u BASE_REF bash "$SCRIPT" --ci >/dev/null 2>&1
+check "--ci without BASE_REF falls back to HEAD^..HEAD" no $?
+BASE_REF=does-not-exist bash "$SCRIPT" --ci >/tmp/check-secrets-ci-bad.txt 2>&1
+check "--ci with an unresolvable base ref exits !=0" yes $?
+if grep -q "fail-closed" /tmp/check-secrets-ci-bad.txt; then
+  echo "  PASS  unresolvable --ci range reports fail-closed"
+  PASS=$((PASS + 1))
+else
+  echo "  FAIL  unresolvable --ci range did not report fail-closed"
+  FAIL=$((FAIL + 1))
+fi
 
 echo ""
 echo "Results: $PASS passed, $FAIL failed"

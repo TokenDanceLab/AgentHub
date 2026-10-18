@@ -139,7 +139,7 @@ func TestMain(m *testing.M) {
 	deviceHandler := handler.NewDeviceHandler(deviceService)
 	contactService := contact.NewService(db, eventBus, cacheClient)
 	contactHandler := handler.NewContactHandler(contactService)
-	sessionService := session.NewService(db, cacheClient)
+	sessionService := session.NewService(db, cacheClient, nil)
 	sessionHandler := handler.NewSessionHandler(sessionService)
 	messageService := message.NewService(db, eventBus, cacheClient)
 	messageReactionService := messagereaction.NewService(db, eventBus)
@@ -157,7 +157,7 @@ func TestMain(m *testing.M) {
 	healthHandler := handler.NewHealthHandler(db, cacheClient, &cfg.DB, time.Now(), "test")
 	publicHandler := handler.NewPublicHandler(publicstats.NewPublicStatsService(db), time.Now())
 
-	// Phase 1-7 handlers
+	// Handlers covered by the integration suite
 	// config.yaml ships production-empty TokenDance ID values (client_id "",
 	// redirect_uri "", allowed_redirect_uris []), which makes the OIDC
 	// authorize success path unreachable in tests. Inject a deterministic

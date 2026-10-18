@@ -12,7 +12,6 @@ import (
 	"golang.org/x/sync/singleflight"
 )
 
-// Residual pure-helper peel #1123: keep Client core surface here; routes,
 // pending queues, auth/tokens/rate-limit, and NoOpCache live in companions.
 
 // Client wraps Redis operations, replacing the package-level global RDB.

@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
-"""AgentHub release gate verifier — ps1 迁移。
+"""AgentHub release gate verifier.
 
 Verifies release readiness: ref divergence, workflow policy, version alignment,
-RC tag policy, security risk register, and artifact manifest. Writes a
-release-gate report JSON. It does not sign, notarize, staple, tag, push, or
-upload releases.
+RC tag policy. Writes a release-gate report JSON. It
+does not sign, notarize, staple, tag, push, or upload releases.
 
 Exit 0 when the gate is ready, exit 1 when blockers remain.
 """
@@ -15,6 +14,21 @@ import os
 import re
 import subprocess
 import sys
+
+import yaml
+
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "verify"))
+from shell_guard import (  # noqa: E402
+    executed_lines,
+    command_segment,
+    masks_failure,
+    script_execution,
+    short_circuited,
+    step_constructs,
+    strip_comment,
+    statically_false,
+    warning_only,
+)
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 REPO_ROOT = os.path.dirname(os.path.dirname(SCRIPT_DIR))
@@ -43,10 +57,6 @@ def warn(message: str) -> None:
     warnings.append(message)
 
 
-def add_ready(message: str) -> None:
-    ready_check(message)
-
-
 def read_text(relative_path: str) -> str:
     full_path = os.path.join(REPO_ROOT, relative_path.replace("/", os.sep))
     if not os.path.isfile(full_path):
@@ -60,13 +70,6 @@ def read_json(relative_path: str) -> object:
     full_path = os.path.join(REPO_ROOT, relative_path.replace("/", os.sep))
     with open(full_path, encoding="utf-8", errors="replace") as handle:
         return json.loads(handle.read())
-
-
-def test_pattern(text: str, pattern: str, ready_message: str, blocker_message: str) -> None:
-    if re.search(pattern, text, re.IGNORECASE):
-        add_ready(ready_message)
-    else:
-        blocker(blocker_message)
 
 
 def invoke_git(repo_root: str, arguments: list) -> tuple:
@@ -86,13 +89,13 @@ def assert_release_refs(repo_root: str, base_ref: str, dev_ref: str, skip_ref_ch
         warn("ref check skipped by caller")
         return
 
-    step("dev to master refs")
+    step("release refs")
     for ref in (base_ref, dev_ref):
         probe_exit, probe_output = invoke_git(repo_root, ["rev-parse", "--verify", ref])
         if probe_exit != 0:
             blocker(f"required ref is unavailable: {ref}")
             return
-        add_ready(f"{ref} resolves to {probe_output[0] if probe_output else ''}")
+        ready_check(f"{ref} resolves to {probe_output[0] if probe_output else ''}")
 
     behind_exit, behind_output = invoke_git(repo_root, ["rev-list", "--count", f"{dev_ref}..{base_ref}"])
     ahead_exit, ahead_output = invoke_git(repo_root, ["rev-list", "--count", f"{base_ref}..{dev_ref}"])
@@ -103,49 +106,299 @@ def assert_release_refs(repo_root: str, base_ref: str, dev_ref: str, skip_ref_ch
     behind_count = int(behind_output[0]) if behind_output and behind_output[0].isdigit() else 0
     ahead_count = int(ahead_output[0]) if ahead_output and ahead_output[0].isdigit() else 0
     if behind_count > 0:
-        blocker(f"{dev_ref} is behind {base_ref} by {behind_count} commit(s); rebase/merge current master before dev->master")
+        blocker(f"{dev_ref} is behind {base_ref} by {behind_count} commit(s); rebase or merge the current base before releasing")
     else:
-        add_ready(f"{dev_ref} is not behind {base_ref}")
+        ready_check(f"{dev_ref} is not behind {base_ref}")
 
-    add_ready(f"{dev_ref} is ahead of {base_ref} by {ahead_count} commit(s)")
+    ready_check(f"{dev_ref} is ahead of {base_ref} by {ahead_count} commit(s)")
+
+
+FORBIDDEN_COMMAND = re.compile(
+    r"(?:gh\s+release|xcrun\s+notarytool|notarytool\s+submit|xcrun\s+stapler|stapler\s+staple|codesign\b)",
+    re.IGNORECASE,
+)
+SIGNING_TOKENS = ("TAURI_SIGNING_PRIVATE_KEY", "APPLE_")
+
+
+def load_workflow(relative_path: str):
+    """Parse a workflow; a missing, empty, or unparseable file is a blocker."""
+    text = read_text(relative_path)
+    full_path = os.path.join(REPO_ROOT, relative_path.replace("/", os.sep))
+    if not os.path.isfile(full_path):
+        return None  # read_text already recorded the missing-file blocker
+    if not text.strip():
+        blocker(f"{relative_path} is empty — cannot verify its policy")
+        return None
+    try:
+        workflow = yaml.safe_load(text)
+    except yaml.YAMLError as exc:
+        blocker(f"{relative_path} is not valid YAML: {exc}")
+        return None
+    if not isinstance(workflow, dict):
+        blocker(f"{relative_path} does not parse to a workflow mapping")
+        return None
+    return workflow
+
+
+def workflow_triggers(workflow) -> dict:
+    # YAML 1.1 parses the unquoted `on:` key as boolean True.
+    triggers = workflow.get("on", workflow.get(True))
+    return triggers if isinstance(triggers, dict) else {}
+
+
+def active_jobs(workflow, triggers=frozenset(), event=None, job_outputs=None):
+    for job in (workflow.get("jobs") or {}).values():
+        if not isinstance(job, dict):
+            continue
+        if statically_false(job.get("if"), triggers, event, job_outputs) or warning_only(job):
+            continue
+        yield job
+
+
+def workflow_job_steps(workflow, triggers=frozenset(), event=None, job_outputs=None):
+    for job in active_jobs(workflow, triggers, event, job_outputs):
+        for step in job.get("steps") or []:
+            if isinstance(step, dict):
+                yield job, step
+
+
+def workflow_steps(workflow, triggers=frozenset(), event=None, job_outputs=None):
+    for _job, step in workflow_job_steps(workflow, triggers, event, job_outputs):
+        yield step
+
+
+def declared_job_outputs(workflow) -> dict:
+    return {
+        name: set(job.get("outputs") or {})
+        for name, job in (workflow.get("jobs") or {}).items()
+        if isinstance(job, dict)
+    }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+def step_runs(
+    step,
+    script: str,
+    *required_args: str,
+    triggers=frozenset(),
+    event=None,
+    job_outputs=None,
+) -> bool:
+    if statically_false(step.get("if"), triggers, event, job_outputs) or warning_only(step):
+        return False
+    if step_constructs(step.get("run", "")):
+        return False  # the invocation may be unreachable or its status masked
+    for line in executed_lines(step.get("run", "")):
+        line = strip_comment(line)
+        for match in re.finditer(re.escape(script), line):
+            index = match.start()
+            tail = re.split(r"[;&|]", line[index + len(script):], maxsplit=1)[0]
+            argv = [token.strip("'\"") for token in tail.split()]
+            if not all(arg in argv for arg in required_args):
+                continue
+            if command_segment(line, index).strip().startswith("!"):
+                continue
+            if masks_failure(line[index + len(script):]):
+                continue
+            if short_circuited(line, index):
+                continue
+            if script_execution(line, script, skip_masked=False, skip_negated=False) is None:
+                continue
+            return True
+    return False
+
+
+def workflow_has_artifact_upload(workflow, triggers=frozenset(), event=None, job_outputs=None) -> bool:
+    """A dry-gate job must upload its evidence after the gate step.
+
+    An upload step in an unrelated job (or before the dry gate) does not carry
+    the evidence this workflow claims to produce.
+    """
+    for job in active_jobs(workflow, triggers, event, job_outputs):
+        steps = [step for step in job.get("steps") or [] if isinstance(step, dict)]
+        for index, step in enumerate(steps):
+            if not step_runs(
+                step,
+                "verify-tauri-package-dry.py",
+                triggers=triggers,
+                event=event,
+                job_outputs=job_outputs,
+            ):
+                continue
+            if any(
+                str(later.get("uses", "")).startswith("actions/upload-artifact@v7")
+                and not statically_false(later.get("if"), triggers, event, job_outputs)
+                and not warning_only(later)
+                for later in steps[index + 1:]
+            ):
+                return True
+    return False
+
+
+def forbidden_line(line: str) -> bool:
+    """Quoted or split command words still name the same executable.
+
+    A line that is only a quoted string (a policy/label list entry) names a
+    capability; it does not execute it.
+    """
+    stripped = strip_comment(line).strip()
+    if re.fullmatch(r"['\"][^'\"]*['\"]\s*,?", stripped):
+        return False
+    normalized = re.sub(r"[\"'`\\]", "", stripped)
+    return FORBIDDEN_COMMAND.search(normalized) is not None
+
+
+def workflow_forbidden_surface(workflow) -> bool:
+    environments = [workflow.get("env")]
+    for job in (workflow.get("jobs") or {}).values():
+        if not isinstance(job, dict):
+            continue
+        environments.append(job.get("env"))
+        for step in job.get("steps") or []:
+            if not isinstance(step, dict):
+                continue
+            if "softprops/action-gh-release" in str(step.get("uses", "")):
+                return True
+            if any(token in json.dumps(step) for token in SIGNING_TOKENS):
+                return True
+            # Raw lines (continuations joined) include heredoc bodies: a shell
+            # fed by a heredoc runs them.
+            run_text = str(step.get("run", "")).replace("\\\r\n", " ").replace("\\\n", " ")
+            if any(forbidden_line(line) for line in run_text.splitlines()):
+                return True
+    return any(isinstance(env, dict) and any(token in json.dumps(env) for token in SIGNING_TOKENS) for env in environments)
 
 
 def assert_workflow_policy(repo_root: str) -> None:
     step("release workflow and dry gates")
-    readiness_text = read_text(".github/workflows/release-readiness.yml")
-    release_text = read_text(".github/workflows/release.yml")
+    readiness = load_workflow(".github/workflows/release-readiness.yml")
+    release = load_workflow(".github/workflows/release.yml")
 
-    test_pattern(readiness_text, "workflow_dispatch", "release readiness workflow is manually dispatchable", "release readiness workflow lacks workflow_dispatch")
-    test_pattern(readiness_text, "run_windows_package_dry", "Windows package dry gate has an explicit manual input", "Windows package dry gate input is missing")
-    test_pattern(
-        readiness_text,
-        r"verify-tauri-package-dry\.py[^\r\n]+-RunWindowsBundle[^\r\n]+-StrictToolchain",
-        "Windows dry gate delegates to verify-tauri-package-dry.py with bundle and strict toolchain checks",
-        "Windows dry gate does not call verify-tauri-package-dry.py with -RunWindowsBundle -StrictToolchain",
-    )
-    test_pattern(readiness_text, "actions/upload-artifact@v7", "release readiness dry outputs are workflow artifacts only", "release readiness workflow does not upload dry evidence artifacts")
-    test_pattern(readiness_text, "run_macos_unsigned_dry_policy", "macOS future dry policy is manual and policy-only", "macOS unsigned dry policy input is missing")
-    test_pattern(
-        readiness_text,
-        r"verify-tauri-package-dry\.py[^\r\n]+-RunMacosBundle",
-        "macOS dry gate delegates to verify-tauri-package-dry.py with -RunMacosBundle on a macOS runner",
-        "macOS dry gate does not call verify-tauri-package-dry.py with -RunMacosBundle",
-    )
-    test_pattern(readiness_text, "run_macos_package_dry", "macOS unsigned DMG dry build has an explicit manual input", "macOS package dry gate input is missing")
+    if readiness is not None:
+        triggers = workflow_triggers(readiness)
+        if "workflow_dispatch" not in triggers:
+            blocker("release readiness workflow lacks workflow_dispatch")
+            inputs = {}
+        else:
+            ready_check("release readiness workflow is manually dispatchable")
+            dispatch = triggers.get("workflow_dispatch") or {}
+            inputs = dispatch.get("inputs") if isinstance(dispatch, dict) else {}
+            inputs = inputs if isinstance(inputs, dict) else {}
+        for input_name, ready_message, missing_message in (
+            ("run_windows_package_dry", "Windows package dry gate has an explicit manual input", "Windows package dry gate input is missing"),
+            ("run_macos_unsigned_dry_policy", "macOS future dry policy is manual and policy-only", "macOS unsigned dry policy input is missing"),
+            ("run_macos_package_dry", "macOS unsigned DMG dry build has an explicit manual input", "macOS package dry gate input is missing"),
+        ):
+            if input_name in inputs:
+                ready_check(ready_message)
+            else:
+                blocker(missing_message)
+        event_names = set(triggers)
+        event = "workflow_dispatch"
+        job_outputs = declared_job_outputs(readiness)
+        if any(
+            step_runs(
+                item,
+                "verify-tauri-package-dry.py",
+                "-RunWindowsBundle",
+                "-StrictToolchain",
+                triggers=event_names,
+                event=event,
+                job_outputs=job_outputs,
+            )
+            for item in workflow_steps(readiness, event_names, event, job_outputs)
+        ):
+            ready_check("Windows dry gate delegates to verify-tauri-package-dry.py with bundle and strict toolchain checks")
+        else:
+            blocker("Windows dry gate does not call verify-tauri-package-dry.py with -RunWindowsBundle -StrictToolchain")
+        if workflow_has_artifact_upload(readiness, event_names, event, job_outputs):
+            ready_check("release readiness dry outputs are workflow artifacts only")
+        else:
+            blocker("release readiness workflow does not upload dry evidence artifacts")
+        if any(
+            step_runs(
+                item,
+                "verify-tauri-package-dry.py",
+                "-RunMacosBundle",
+                triggers=event_names,
+                event=event,
+                job_outputs=job_outputs,
+            )
+            and "macos" in str(job.get("runs-on", "")).lower()
+            for job, item in workflow_job_steps(readiness, event_names, event, job_outputs)
+        ):
+            ready_check("macOS dry gate delegates to verify-tauri-package-dry.py with -RunMacosBundle on a macOS runner")
+        else:
+            blocker("macOS dry gate does not call verify-tauri-package-dry.py with -RunMacosBundle")
+        if workflow_forbidden_surface(readiness):
+            blocker("release-readiness workflow contains release upload/signing/notarization execution surface")
+        else:
+            ready_check("release-readiness workflow does not sign, notarize, staple, tag, or upload a GitHub Release")
 
-    if re.search(r"softprops/action-gh-release|^\s*(gh\s+release|xcrun\s+notarytool|notarytool\s+submit|xcrun\s+stapler|stapler\s+staple|codesign\s|TAURI_SIGNING_PRIVATE_KEY|APPLE_)", readiness_text, re.IGNORECASE | re.MULTILINE):
-        blocker("release-readiness workflow contains release upload/signing/notarization execution surface")
-    else:
-        add_ready("release-readiness workflow does not sign, notarize, staple, tag, or upload a GitHub Release")
-
-    test_pattern(release_text, r"tags:\s*\['v\*'\]", "release workflow is tag-triggered on v* only", "release workflow tag trigger is missing or not constrained to v*")
-    test_pattern(release_text, "softprops/action-gh-release@v3", "release workflow has the real GitHub Release uploader isolated in the tag workflow", "release workflow GitHub Release uploader is missing")
-    test_pattern(
-        release_text,
-        r"prerelease:\s*\$\{\{\s*contains\(github\.ref_name,\s*'-'\)\s*\}\}",
-        "RC tags become GitHub prereleases via contains(github.ref_name, '-')",
-        "release workflow prerelease policy is not tied to hyphenated semver tags",
-    )
+    if release is not None:
+        triggers = workflow_triggers(release)
+        event = "push"
+        job_outputs = declared_job_outputs(release)
+        push = triggers.get("push")
+        tag_triggered = (
+            set(triggers) == {"push"}
+            and isinstance(push, dict)
+            and set(push) == {"tags"}
+            and push.get("tags") == ["v*"]
+        )
+        if tag_triggered:
+            ready_check("release workflow is tag-triggered on v* only")
+        else:
+            blocker("release workflow tag trigger is missing or not constrained to v*")
+        uploader_step = next(
+            (
+                item
+                for item in workflow_steps(release, set(triggers), event, job_outputs)
+                if str(item.get("uses", "")).startswith("softprops/action-gh-release@v3")
+                and not statically_false(item.get("if"), set(triggers), event, job_outputs)
+                and not warning_only(item)
+            ),
+            None,
+        )
+        if uploader_step is not None:
+            ready_check("release workflow has the real GitHub Release uploader isolated in the tag workflow")
+        else:
+            blocker("release workflow GitHub Release uploader is missing")
+        prerelease_ok = (
+            isinstance(uploader_step, dict)
+            and isinstance(uploader_step.get("with"), dict)
+            and re.fullmatch(
+                r"\$\{\{\s*contains\(\s*github\.ref_name\s*,\s*'-'\s*\)\s*\}\}",
+                str(uploader_step["with"].get("prerelease", "")).strip(),
+            )
+        )
+        if prerelease_ok:
+            ready_check("RC tags become GitHub prereleases via contains(github.ref_name, '-')")
+        else:
+            blocker("release workflow prerelease policy is not tied to hyphenated semver tags")
 
 
 def get_desktop_version(repo_root: str) -> str:
@@ -156,226 +409,29 @@ def get_desktop_version(repo_root: str) -> str:
     if package_version != tauri_version:
         blocker(f"desktop package.json version ({package_version}) does not match tauri.conf.json version ({tauri_version})")
     else:
-        add_ready(f"desktop package metadata version is aligned at {package_version}")
+        ready_check(f"desktop package metadata version is aligned at {package_version}")
     return package_version
 
 
 def assert_rc_tag_policy(version: str) -> None:
     step("RC and tag policy")
     if re.fullmatch(r"\d+\.\d+\.\d+-rc\.\d+", version):
-        add_ready(f"current desktop version is an RC semver: {version}")
-        add_ready(f"next RC tag convention: v{version}")
+        ready_check(f"current desktop version is an RC semver: {version}")
+        ready_check(f"next RC tag convention: v{version}")
     elif re.fullmatch(r"\d+\.\d+\.\d+", version):
         warn(f"current desktop version is stable semver: {version}; use only after release blockers are closed")
     else:
         blocker(f"desktop version is not an accepted stable or rc semver: {version}")
 
 
-SECURITY_GATE_HEADING = "## 发布门禁风险状态"
-KNOWN_RISK_SEVERITIES = {"critical", "high", "medium", "low"}
-NON_BLOCKING_CRITICAL_HIGH_STATUSES = {
-    "accepted",
-    "mitigated",
-    "mitigated in repo",
-    "closed",
-}
-BLOCKING_CRITICAL_HIGH_STATUS_MARKERS = (
-    "rotate required",
-    "verification required",
-)
-
-
-def normalize_risk_status(status: str) -> str:
-    return " ".join(status.split()).casefold()
-
-
-def split_markdown_table_row(line: str) -> list[str] | None:
-    stripped = line.strip()
-    if not stripped.startswith("|") or not stripped.endswith("|"):
-        return None
-    return [cell.replace(r"\|", "|").strip() for cell in re.split(r"(?<!\\)\|", stripped[1:-1])]
-
-
-def parse_security_release_risks(security_text: str) -> tuple[list, list]:
-    """Return policy blockers and fail-closed register integrity errors.
-
-    Only Critical/High rows participate in release status semantics. Exact
-    ``Open`` and statuses containing ``rotate required`` or
-    ``verification required`` are policy blockers. Known terminal/accepted
-    statuses are allowed; unknown statuses and malformed risk rows are
-    integrity failures so a damaged table cannot silently bypass the gate.
-    """
-
-    lines = security_text.splitlines()
-    heading_index = next((index for index, line in enumerate(lines) if line.strip() == SECURITY_GATE_HEADING), None)
-    if heading_index is None:
-        return [], [f"required section is missing: {SECURITY_GATE_HEADING}"]
-
-    blocking_risks = []
-    integrity_errors = []
-    for index in range(heading_index + 1, len(lines)):
-        line = lines[index]
-        if line.startswith("## "):
-            break
-        if "AH-SR-" not in line.upper():
-            continue
-
-        line_number = index + 1
-        cells = split_markdown_table_row(line)
-        if cells is None or len(cells) != 4:
-            integrity_errors.append(
-                f"line {line_number}: malformed risk row; expected exactly four pipe-delimited cells"
-            )
-            continue
-
-        risk_id, severity, status, risk = cells
-        if not re.fullmatch(r"AH-SR-\d+", risk_id, re.IGNORECASE):
-            integrity_errors.append(f"line {line_number}: malformed risk ID: {risk_id!r}")
-            continue
-
-        severity_key = severity.casefold()
-        if severity_key not in KNOWN_RISK_SEVERITIES:
-            integrity_errors.append(
-                f"line {line_number}: {risk_id} has unknown severity {severity!r}"
-            )
-            continue
-        if severity_key not in {"critical", "high"}:
-            continue
-        if not status or not risk:
-            integrity_errors.append(
-                f"line {line_number}: {risk_id}({severity}) must have non-empty Status and summary cells"
-            )
-            continue
-
-        status_key = normalize_risk_status(status)
-        gate_reason = None
-        if status_key == "open":
-            gate_reason = "status is Open"
-        else:
-            marker = next(
-                (candidate for candidate in BLOCKING_CRITICAL_HIGH_STATUS_MARKERS if candidate in status_key),
-                None,
-            )
-            if marker is not None:
-                gate_reason = f"status contains {marker}"
-
-        if gate_reason is not None:
-            blocking_risks.append(
-                {
-                    "id": risk_id,
-                    "severity": severity,
-                    "status": status,
-                    "risk": risk,
-                    "gateReason": gate_reason,
-                }
-            )
-        elif status_key not in NON_BLOCKING_CRITICAL_HIGH_STATUSES:
-            integrity_errors.append(
-                f"line {line_number}: {risk_id}({severity}) has unknown release-gate status {status!r}"
-            )
-
-    return blocking_risks, integrity_errors
-
-
-def get_blocking_high_risks(repo_root: str) -> tuple[list, list]:
-    risk_path = os.path.join(repo_root, "SECURITY.md")
-    if not os.path.isfile(risk_path):
-        return [], ["security policy is missing"]
-
-    with open(risk_path, encoding="utf-8", errors="replace") as handle:
-        return parse_security_release_risks(handle.read())
-
-
-def assert_security_release_gate(repo_root: str, allow_open_high_risks: bool) -> list:
-    step("security release gate")
-    blocking_risks, integrity_errors = get_blocking_high_risks(repo_root)
-    for error in integrity_errors:
-        blocker(f"security risk register integrity failure: {error}")
-
-    if not blocking_risks:
-        if not integrity_errors:
-            add_ready("no policy-blocking Critical/High risks in security register")
-        return blocking_risks
-
-    ids = ", ".join(
-        f"{risk['id']}({risk['severity']}: {risk['status']})" for risk in blocking_risks
-    )
-    if allow_open_high_risks:
-        warn(
-            "policy-blocking Critical/High risks are being reported but not failing "
-            f"because -AllowOpenHighRisks was set: {ids}"
-        )
-    else:
-        blocker(f"policy-blocking Critical/High risks block public release: {ids}")
-    return blocking_risks
-
-
-def assert_artifact_manifest(repo_root: str, artifacts_root: str) -> list:
-    if not artifacts_root:
-        warn("artifact manifest check skipped because -ArtifactsRoot was not provided")
-        return []
-
-    step("Windows unsigned artifact manifest")
-    artifact_root_full = artifacts_root if os.path.isabs(artifacts_root) else os.path.join(repo_root, artifacts_root)
-    if not os.path.isdir(artifact_root_full):
-        blocker(f"artifact root does not exist: {artifact_root_full}")
-        return []
-
-    manifest_path = os.path.join(artifact_root_full, "artifact-manifest.json")
-    package_report_path = os.path.join(artifact_root_full, "package-dry-report.json")
-    if not os.path.isfile(manifest_path):
-        blocker(f"artifact-manifest.json is missing from {artifact_root_full}")
-        return []
-    if not os.path.isfile(package_report_path):
-        blocker(f"package-dry-report.json is missing from {artifact_root_full}")
-
-    with open(manifest_path, encoding="utf-8", errors="replace") as handle:
-        manifest = json.loads(handle.read())
-
-    required_patterns = [
-        r"^AgentHub_\d+\.\d+\.\d+-rc\.\d+_x64-setup\.exe$",
-        r"^AgentHub_\d+\.\d+\.\d+-rc\.\d+_x64-portable\.zip$",
-        r"^agenthub-edge-windows-amd64\.exe$",
-        r"^agenthub-desktop\.exe$",
-        r"^package-dry-report\.json$",
-    ]
-    for pattern in required_patterns:
-        entry = next((e for e in manifest if re.search(pattern, str(e.get("name", "")))), None)
-        if entry is None:
-            blocker(f"artifact manifest lacks required artifact pattern: {pattern}")
-            continue
-        if int(entry.get("bytes", 0)) <= 0 or not re.fullmatch(r"[A-Fa-f0-9]{64}", str(entry.get("sha256", ""))):
-            blocker(f"artifact manifest entry is invalid for {entry.get('name')}")
-        else:
-            add_ready(f"artifact manifest includes {entry['name']} ({entry['bytes']} bytes, sha256 {entry['sha256']})")
-
-    if os.path.isfile(package_report_path):
-        with open(package_report_path, encoding="utf-8", errors="replace") as handle:
-            dry_report = json.loads(handle.read())
-        if str(dry_report.get("signing")) == "out-of-scope" and str(dry_report.get("releaseUpload")) == "out-of-scope":
-            add_ready("package dry report keeps signing and release upload out of scope")
-        else:
-            blocker("package dry report does not preserve signing/release upload boundaries")
-        if str(dry_report.get("stages", {}).get("updaterMetadata")) == "not_produced_unsigned_build":
-            warn("unsigned dry build did not produce latest.json/.sig; updater metadata remains a signing/release blocker")
-
-    return manifest
-
-
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("-RepoRoot", "--RepoRoot", default=".", help="repository root")
     parser.add_argument("-BaseRef", "--BaseRef", default="origin/master", help="base (master) git ref")
-    parser.add_argument("-DevRef", "--DevRef", default="origin/dev/demo-user", help="dev git ref")
-    parser.add_argument("-ArtifactsRoot", "--ArtifactsRoot", default="", help="artifact root for the manifest gate")
+    parser.add_argument("-DevRef", "--DevRef", default="HEAD", help="release candidate git ref")
     parser.add_argument("-ReportPath", "--ReportPath", default=".tmp/release-gate-report.json", help="release gate report output path")
-    parser.add_argument(
-        "-AllowOpenHighRisks",
-        "--AllowOpenHighRisks",
-        action="store_true",
-        help="report policy-blocking Critical/High risks without failing; malformed/unknown statuses still fail closed",
-    )
     parser.add_argument("-SkipRefCheck", "--SkipRefCheck", action="store_true", help="skip the git ref divergence check")
+    parser.add_argument("-ReleaseTag", "--ReleaseTag", default="", help="release tag the risk review must name (default: RELEASE_TAG)")
     args = parser.parse_args()
 
     global REPO_ROOT
@@ -385,10 +441,9 @@ def main() -> int:
     assert_workflow_policy(REPO_ROOT)
     version = get_desktop_version(REPO_ROOT)
     assert_rc_tag_policy(version)
-    blocking_high_risks = assert_security_release_gate(REPO_ROOT, args.AllowOpenHighRisks)
-    manifest = assert_artifact_manifest(REPO_ROOT, args.ArtifactsRoot)
 
-    step("blocking external approval slices")
+    step("blocking external approvals")
+    assert_risk_review_gate(args.ReleaseTag)
     assert_signing_approval_gate()
 
     report_full_path = os.path.normpath(args.ReportPath if os.path.isabs(args.ReportPath) else os.path.join(REPO_ROOT, args.ReportPath))
@@ -396,15 +451,11 @@ def main() -> int:
     report = {
         "mode": "agenthub-release-gate",
         "baseRef": args.BaseRef,
-        "devRef": args.DevRef,
+        "releaseRef": args.DevRef,
         "desktopVersion": version,
         "ready": ready,
         "warnings": warnings,
         "blockers": blockers,
-        "blockingCriticalHighRisks": blocking_high_risks,
-        "openCriticalHighRisks": blocking_high_risks,
-        "artifactsRoot": args.ArtifactsRoot,
-        "manifest": manifest,
     }
     with open(report_full_path, "w", encoding="utf-8") as handle:
         json.dump(report, handle, indent=2, ensure_ascii=False)
@@ -416,6 +467,27 @@ def main() -> int:
 
     print("Release gate READY.", flush=True)
     return 0
+
+
+def assert_risk_review_gate(release_tag: str = "") -> None:
+    """Release requires a security-risk review scoped to this release tag.
+
+    The gate records that a maintainer reviewed the risks for this tag; the
+    review itself stays with the maintainer release checklist. A bare "true" is rejected:
+    a repository variable is not per-release state, so it would satisfy every
+    future release after one flip.
+    """
+    step("security risk review")
+    tag = (release_tag or os.environ.get("RELEASE_TAG", "")).strip()
+    reviewed = os.environ.get("RELEASE_RISK_REVIEWED", "").strip()
+    if not tag:
+        blocker("release tag is required to scope the security risk review (set RELEASE_TAG)")
+    elif reviewed == tag:
+        ready_check(f"security risk review recorded for {tag}")
+    elif reviewed.lower() == "true":
+        blocker("RELEASE_RISK_REVIEWED=true is not release-scoped; set it to the release tag")
+    else:
+        blocker(f"security risk review not recorded for {tag}; set RELEASE_RISK_REVIEWED={tag} after maintainer review")
 
 
 def assert_signing_approval_gate() -> None:
@@ -441,8 +513,8 @@ def assert_signing_approval_gate() -> None:
     evidence_present = os.path.isfile(evidence_path)
 
     if approved and evidence_present:
-        add_ready("signing/notarization freeze lifted: RELEASE_SIGNING_APPROVED=true and signing evidence present")
-        add_ready("production updater publication approved alongside signing freeze lift")
+        ready_check("signing/notarization freeze lifted: RELEASE_SIGNING_APPROVED=true and signing evidence present")
+        ready_check("production updater publication approved alongside signing freeze lift")
         return
 
     if unsigned_ok:
@@ -459,7 +531,7 @@ def assert_signing_approval_gate() -> None:
     elif not evidence_present:
         blocker("signing/notarization approval set but signing evidence file is missing: deployments/production/signing-manifest.sha256")
     # Updater publication is gated by the same freeze; mirror the reason so the
-    # report is explicit about both blocked slices.
+    # report is explicit about both blocked items.
     if not (approved and evidence_present):
         blocker("production updater publication remains blocked until signed latest.json and installer signature are produced and approved (signing freeze not lifted)")
 
@@ -467,6 +539,6 @@ def assert_signing_approval_gate() -> None:
 if __name__ == "__main__":
     try:
         sys.exit(main())
-    except Exception as exc:  # noqa: BLE001 —— 顶层兜底，对齐 ps1 $ErrorActionPreference='Stop'
+    except Exception as exc:  # noqa: BLE001 —— fail closed：未捕获异常返回非零
         print(f"ERROR: {exc}", file=sys.stderr, flush=True)
         sys.exit(1)

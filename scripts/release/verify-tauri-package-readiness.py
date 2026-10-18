@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""AgentHub Tauri package readiness policy gate — ps1 迁移。
+"""AgentHub Tauri package readiness policy gate.
 
 Validates Tauri package metadata, version alignment, bundle configuration,
 updater policy, release workflow gates, and generated artifact ignore policy.
@@ -496,9 +496,7 @@ def main() -> int:
     release_workflow_text = read_text(".github/workflows/release.yml")
     readiness_workflow_text = read_text(".github/workflows/release-readiness.yml")
     checks_workflow_text = read_text(".github/workflows/checks.yml")
-    governance_readiness_text = read_text("docs/governance/README.md")
     dry_gate_text = read_text("scripts/release/verify-tauri-package-dry.py")
-    checker_text = read_file(os.path.abspath(__file__))
     pnpm_version_pattern = rf'PNPM_VERSION:\s*"{re.escape(pnpm_version)}"'
     for workflow_label, workflow_text in (
         ("checks", checks_workflow_text),
@@ -524,10 +522,6 @@ def main() -> int:
     assert_true(
         "RequireUpdaterMetadata" in dry_gate_text and "not_produced_unsigned_build" in dry_gate_text,
         "unsigned dry gate records updater metadata as a separate signing/release gate",
-    )
-    assert_true(
-        "assert_updater_latest_metadata" in checker_text and "latest.json" in checker_text and ".sig" in checker_text,
-        "built artifact mode checks latest.json and .sig when signing/release metadata is supplied",
     )
 
     step("Tag release policy")
@@ -610,29 +604,13 @@ def main() -> int:
         and re.search(r"production updater metadata publication", macos_unsigned_dry_block, re.IGNORECASE),
         "release readiness workflow records release upload and updater production metadata as explicit approval gates",
     )
-    assert_true(re.search(r"later approval slice", macos_unsigned_dry_block, re.IGNORECASE), "release readiness workflow keeps signing, notarization, release upload, and updater metadata as later approval slice")
+    assert_true(re.search(r"require future approval", macos_unsigned_dry_block, re.IGNORECASE), "release readiness workflow keeps signing, notarization, release upload, and updater metadata as future approval gates")
     assert_true(
         not re.search(r"pnpm\s+tauri\s+build|softprops/action-gh-release|gh release upload|TAURI_SIGNING_PRIVATE_KEY", macos_unsigned_dry_block, re.IGNORECASE),
         "macOS unsigned dry policy job does not run build, release upload, or production signing secret commands",
     )
     assert_no_macos_unsigned_dry_commands(macos_unsigned_dry_block, "macos-unsigned-dry-policy")
     assert_no_macos_unsigned_dry_release_actions(macos_unsigned_dry_block, "macos-unsigned-dry-policy")
-
-    step("Release dry topology documentation")
-    assert_true(re.search(r"D2b\. Release dry build topology", governance_readiness_text, re.IGNORECASE), "governance doc records release dry build topology")
-    assert_true(re.search(r"topology/preflight only|拓扑/预检", governance_readiness_text, re.IGNORECASE), "governance doc keeps release dry topology to topology/preflight scope")
-    assert_true(re.search(r"full Tauri build|pnpm tauri build", governance_readiness_text, re.IGNORECASE), "governance doc names full Tauri build as separate opt-in scope")
-    assert_true(not re.search(r"产出未签名 NSIS|produces unsigned NSIS", governance_readiness_text, re.IGNORECASE), "governance doc does not claim dry topology produces installer artifacts")
-    assert_true(re.search(r"Windows unsigned NSIS/portable|未签名 NSIS", governance_readiness_text, re.IGNORECASE), "governance doc keeps Windows unsigned NSIS/portable as future opt-in artifact scope")
-    assert_true(re.search(r"agenthub-edge-x86_64-pc-windows-msvc\.exe", governance_readiness_text, re.IGNORECASE), "governance doc records Windows Tauri sidecar name")
-    assert_true(re.search(r"latest\.json.*\.sig|\.sig.*latest\.json", governance_readiness_text, re.IGNORECASE), "governance doc records updater metadata artifacts")
-    assert_true(re.search(r"agenthub-edge-aarch64-apple-darwin", governance_readiness_text, re.IGNORECASE), "governance doc records macOS arm64 sidecar name")
-    assert_true(re.search(r"macOS.*unsigned|arm64 unsigned", governance_readiness_text, re.IGNORECASE), "governance doc keeps macOS validation unsigned")
-    assert_true(re.search(r"AgentHub\.app", governance_readiness_text, re.IGNORECASE) and re.search(r"AgentHub_\$\{version\}_aarch64\.dmg", governance_readiness_text, re.IGNORECASE), "governance doc records future macOS app and versioned arm64 DMG bundle boundaries")
-    assert_true(re.search(r"notarytool|notarization", governance_readiness_text, re.IGNORECASE), "governance doc names notarization as out of scope")
-    assert_true(re.search(r"approval slice|审批", governance_readiness_text, re.IGNORECASE), "governance doc keeps signing and notarization behind later approval")
-    assert_true(re.search(r"workflow artifact", governance_readiness_text, re.IGNORECASE), "governance doc keeps dry artifacts scoped to workflow artifact upload")
-    assert_true(re.search(r"GitHub Release|release asset|updater 生产 metadata", governance_readiness_text, re.IGNORECASE), "governance doc keeps release creation/upload out of dry topology")
 
     if args.RequireBuiltArtifacts:
         step("Built artifact gate")
@@ -663,6 +641,6 @@ def main() -> int:
 if __name__ == "__main__":
     try:
         sys.exit(main())
-    except Exception as exc:  # noqa: BLE001 —— 顶层兜底，对齐 ps1 $ErrorActionPreference='Stop'
+    except Exception as exc:  # noqa: BLE001 —— fail closed：未捕获异常返回非零
         print(f"ERROR: {exc}", file=sys.stderr, flush=True)
         sys.exit(1)

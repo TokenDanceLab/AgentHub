@@ -252,7 +252,7 @@ export class WebSocketTransport implements Transport {
     if (this.closed) return;
     if (this.reconnectTimer) return; // already scheduled
 
-    // P1: do not permanently give up after maxRetries. Warn and keep
+    // Do not permanently give up after maxRetries. Warn and keep
     // retrying at the capped delay so transient outages self-heal.
     if (this.retryCount >= this.maxRetries) {
       console.warn(

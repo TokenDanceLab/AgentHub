@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Negative-fixture tests for verify-real-e2e-lane-manifest.py private-name scan (#1873).
+"""Negative-fixture tests for verify-real-e2e-lane-manifest.py private-name scan.
 
 Builds a synthetic, loopback-only real-e2e lane manifest that must pass the
 verifier unchanged, then applies one surgical leak per case and asserts the
@@ -14,11 +14,16 @@ verifier exits non-zero:
 7. internal-suffix hostname (db.internal)
 
 Also proves loopback variants (127.0.0.1 / localhost / [::1]) pass.
+
+The generator tests source the lane script and feed it a synthetic
+chat-real-only report, pinning evidence_level=backend-api, real_tested=false
+and status=passed without needing a live stack.
 """
 
 import copy
 import json
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -103,10 +108,71 @@ class LaneManifestPrivateNameTests(unittest.TestCase):
     def test_loopback_only_passes(self):
         self.assert_passes(GOOD, "loopback-only manifest")
 
+    def test_backend_api_only_passed_passes(self):
+        m = copy.deepcopy(GOOD)
+        m["evidence_level"] = "backend-api"
+        m["real_tested"] = False
+        m["claim"] = "API 流程通过，不计为 OIDC 登录证据"
+        m["skipped_evidence_levels"] = ["fixture-unit", "playwright-ui"]
+        m["planned_evidence_levels"] = ["backend-api"]
+        m["rows"][0]["evidence_level"] = "backend-api"
+        m["rows"][0]["real_tested"] = False
+        m["rows"][0]["claim"] = "API 流程通过"
+        self.assert_passes(m, "backend-api-only passed manifest")
+
     def test_ipv6_loopback_url_passes(self):
         m = copy.deepcopy(GOOD)
         m["stack"]["web"]["base_url"] = "http://[::1]:5174"
         self.assert_passes(m, "IPv6 loopback URL")
+
+    def test_unc_path_fails(self):
+        m = copy.deepcopy(GOOD)
+        backslash = chr(92)
+        m["rows"][0]["evidence"] = backslash * 2 + "fileserver" + backslash + "share" + backslash + "secret.log"
+        self.assert_fails(m, "UNC path")
+
+    def test_authorization_value_fails(self):
+        m = copy.deepcopy(GOOD)
+        m["authorization"] = "Bearer " + "A" * 40
+        self.assert_fails(m, "authorization value")
+
+    def test_credential_shape_under_innocent_key_fails(self):
+        m = copy.deepcopy(GOOD)
+        m["rows"][0]["note"] = "Bearer " + "A" * 40
+        self.assert_fails(m, "credential shape under a non-secret key")
+
+    def test_secret_key_with_credential_value_fails(self):
+        m = copy.deepcopy(GOOD)
+        m["cookie"] = "A" * 40
+        self.assert_fails(m, "cookie key with a credential-shaped value")
+
+    def test_runtime_credential_shape_fails(self):
+        m = copy.deepcopy(GOOD)
+        m["rows"][0]["note"] = "cs_0123456789abcdef"
+        self.assert_fails(m, "runtime credential shape")
+
+    def test_password_value_shape_fails(self):
+        m = copy.deepcopy(GOOD)
+        m["rows"][0]["note"] = "password=hunter2secret"
+        self.assert_fails(m, "password value shape")
+
+    def test_passed_row_with_fixture_evidence_fails(self):
+        m = copy.deepcopy(GOOD)
+        m["rows"][0]["evidence_level"] = "fixture-unit"
+        self.assert_fails(m, "fixture-level row cannot back status=passed")
+
+    def test_mixed_fixture_row_fails_even_with_real_row(self):
+        m = copy.deepcopy(GOOD)
+        extra = copy.deepcopy(m["rows"][0])
+        extra["name"] = "fixture-row"
+        extra["evidence_level"] = "fixture-unit"
+        m["rows"].append(extra)
+        self.assert_fails(m, "fixture-level row cannot claim real_tested beside a real row")
+
+    def test_top_level_level_must_be_backed_by_same_level_row(self):
+        m = copy.deepcopy(GOOD)
+        m["evidence_level"] = "approved-real"
+        self.assert_fails(m, "top-level level needs a passed row at the same level")
 
     def test_non_loopback_url_host_fails(self):
         m = copy.deepcopy(GOOD)
@@ -152,6 +218,105 @@ class LaneManifestPrivateNameTests(unittest.TestCase):
         m = copy.deepcopy(GOOD)
         m["scope"] = ""
         self.assert_fails(m, "empty scope provenance")
+
+    def test_full_scope_partial_specs_fails(self):
+        m = copy.deepcopy(GOOD)
+        m["scope"] = "app/e2e (playwright.real.config.ts all testMatch)"
+        m["spec_files"] = ["real-oidc-login.spec.ts"]
+        self.assert_fails(m, "full-scope claim backed by a single spec")
+
+    def test_full_scope_all_specs_passes(self):
+        m = copy.deepcopy(GOOD)
+        m["scope"] = "app/e2e (playwright.real.config.ts all testMatch)"
+        m["spec_files"] = [
+            "chat-real.spec.ts",
+            "golden-flows.spec.ts",
+            "private-url-preview.spec.ts",
+            "real-oidc-login.spec.ts",
+        ]
+        self.assert_passes(m, "full-scope claim backed by every testMatch spec")
+
+    def test_full_scope_without_spec_files_fails(self):
+        m = copy.deepcopy(GOOD)
+        m["scope"] = "app/e2e (playwright.real.config.ts all testMatch)"
+        self.assert_fails(m, "full-scope claim without spec provenance")
+
+    def test_partial_scope_with_full_claim_fails(self):
+        m = copy.deepcopy(GOOD)
+        m["scope"] = "all testMatch NOT run; only app/e2e/one.spec.ts"
+        m["claim"] = "全部 spec 通过"
+        self.assert_fails(m, "partial scope claiming every spec")
+
+    def test_no_evidence_with_all_rows_passed_fails(self):
+        m = copy.deepcopy(GOOD)
+        m["status"] = "no-evidence"
+        m["real_tested"] = False
+        m["claim"] = "playwright exit 0 但无通过行"
+        self.assert_fails(m, "no-evidence status backed by passing rows")
+
+
+LANE_SCRIPT = os.path.join(REPO_ROOT, "scripts", "e2e", "run-real-e2e-lane.sh")
+# CreateProcess resolves a bare "bash" from System32 (WSL) before PATH on
+# Windows; resolve the PATH entry so the test runs in Git Bash there.
+BASH = shutil.which("bash") or "bash"
+
+
+def bash_path(path):
+    # Git Bash consumes backslashes in arguments; forward slashes work on
+    # Windows and are already correct elsewhere.
+    return path.replace(os.sep, "/")
+
+
+class LaneManifestGeneratorTests(unittest.TestCase):
+    """Exercise the lane's real manifest builder, not a re-implementation."""
+
+    def emit_manifest(self, spec_target):
+        tmp = tempfile.TemporaryDirectory(prefix="agenthub-lane-generator-")
+        self.addCleanup(tmp.cleanup)
+        report = {
+            "suites": [{
+                "specs": [{
+                    "title": "chat-real",
+                    "file": "app/e2e/chat-real.spec.ts",
+                    "ok": True,
+                    "tests": [{"results": [{"status": "passed", "duration": 1200}]}],
+                }],
+            }],
+        }
+        with open(os.path.join(tmp.name, "report-20260824-123456.json"), "w", encoding="utf-8", newline="\n") as handle:
+            json.dump(report, handle)
+        command = (
+            'source "%s"\n'
+            'ARTIFACT_DIR="%s"\n'
+            'SPEC_TARGET="%s"\n'
+            'SPEC_LABEL="$SPEC_TARGET"\n'
+            'RUN_STARTED_AT=0\n'
+            'ID_STATE=up; HUB_STATE=up; EDGE_STATE=up; WEB_STATE=up\n'
+            'unset AGENTHUB_E2E_PLAYWRIGHT_EXTRA_ARGS\n'
+            'emit_manifest passed\n'
+        ) % (bash_path(LANE_SCRIPT), bash_path(tmp.name), spec_target)
+        result = subprocess.run(
+            [BASH, "-c", command],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+        )
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        final_status, path = result.stdout.strip().splitlines()[-1].split("|", 1)
+        with open(path, encoding="utf-8") as handle:
+            return final_status, json.load(handle)
+
+    def test_chat_real_only_is_backend_api_not_login_evidence(self):
+        status, manifest = self.emit_manifest("chat-real.spec.ts")
+        self.assertEqual(status, "passed")
+        self.assertEqual(manifest["status"], "passed")
+        self.assertEqual(manifest["evidence_level"], "backend-api")
+        self.assertIs(manifest["real_tested"], False)
+        self.assertEqual(manifest["rows"][0]["evidence_level"], "backend-api")
+        self.assertIs(manifest["rows"][0]["real_tested"], False)
+        code, output = run_verifier(manifest)
+        self.assertEqual(code, 0, output)
 
 
 if __name__ == "__main__":

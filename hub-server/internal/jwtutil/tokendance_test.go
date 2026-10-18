@@ -191,7 +191,7 @@ func TestParseJWTRejectsJWKSMissingAlg(t *testing.T) {
 // TestParseJWKSCtxCancellation verifies that JWKS fetch honors the caller's
 // context: when ctx is cancelled before the HTTP round-trip completes, the
 // fetch must fail with the context error rather than blocking on the
-// client-level timeout (#2064 item ②).
+// client-level timeout (#2064).
 func TestParseJWKSCtxCancellation(t *testing.T) {
 	// Slow server: blocks until the request context is done, then returns.
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

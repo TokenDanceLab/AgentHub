@@ -1,4 +1,4 @@
-// InlineDelegationCard tests — #1406 Phase 3
+// InlineDelegationCard tests — #1406
 // Verifies the inline delegation card renders from MessageDelegationStore
 // entries, shows the correct per-status presentation, expands/collapses,
 // and mounts below a user message via the Transcript renderUserFooter slot.
@@ -204,7 +204,7 @@ describe('InlineDelegationCard', () => {
     expect(screen.queryByText('派单中…')).not.toBeInTheDocument();
   });
 
-  // ── Mount into the message timeline (#1406 Phase 3) ─────────────────────
+  // ── Mount into the message timeline (#1406) ─────────────────────
 
   it('mounts below a user message via the Transcript renderUserFooter slot', () => {
     act(() => feedDispatch({ task_id: 'task-1', display_name: 'Planner', trigger_message_id: 'msg-mount' }));

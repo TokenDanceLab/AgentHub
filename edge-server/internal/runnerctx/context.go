@@ -16,7 +16,7 @@ type RunProcessContext struct {
 
 	// Hub callback bridging
 	HubTaskID  string // Hub agent task ID (for Edge→Hub direct callbacks)
-	DeliveryID string // Hub delivery_id for dual-channel dedup (#2101 G2)
+	DeliveryID string // Hub delivery_id for dual-channel dedup (#2101)
 
 	// TraceID correlates this run with the originating Hub dispatch trace.
 	// Populated from the dispatch payload; empty on legacy payloads is safe.
@@ -79,7 +79,6 @@ type RunProcessContext struct {
 }
 
 // AgentDefinition mirrors Claude Code's AgentDefinitionSchema for --agents flag.
-// Ref: claude-code-source/src/entrypoints/sdk/coreSchemas.ts AgentDefinitionSchema
 type AgentDefinition struct {
 	Description string   `json:"description"`
 	Prompt      string   `json:"prompt"`

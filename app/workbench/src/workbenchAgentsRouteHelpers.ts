@@ -14,13 +14,12 @@ import {
 import { uniqueSorted } from './agentProfileCatalogHelpers';
 
 /* ═══════════════════════════════════════════════════════════════════════
-   workbenchAgentsRouteHelpers — pure residual slices from
+   workbenchAgentsRouteHelpers — pure helpers for
    useWorkbenchAgentsRoute (#730).
 
    Public option/return types, source-config resolution, draft/merge
    planners, model/skill/tool catalog mapping, selection guards, dirty
-   bookkeeping, field patches, and save-state labels. No React hooks /
-   no intentional UX change.
+   bookkeeping, field patches, and save-state labels. No React hooks.
    exactOptionalPropertyTypes: only assign `?: T` fields when defined,
    unless the public field type explicitly allows `| undefined`.
    ═══════════════════════════════════════════════════════════════════════ */

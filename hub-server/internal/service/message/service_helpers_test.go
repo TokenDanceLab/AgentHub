@@ -56,7 +56,7 @@ func (r *sessionUpdateRecorder) total() int {
 	return len(r.statements)
 }
 
-// TestAllocateSeq_DoesNotTouchSessionLastMessage locks the #2154 P2-8 removal:
+// TestAllocateSeq_DoesNotTouchSessionLastMessage locks the #2154 removal:
 // sequence allocation writes only the sessions.next_seq mirror. The
 // last_message_at activity touch belongs to the caller's persist transaction,
 // where it is atomic with the message insert.
@@ -77,13 +77,14 @@ func TestAllocateSeq_DoesNotTouchSessionLastMessage(t *testing.T) {
 	require.Equal(t, int64(42), seq)
 
 	require.Equal(t, 0, rec.countColumn("last_message_at"),
-		"allocateSeq must not touch last_message_at (#2154 P2-8)")
+		"allocateSeq must not touch last_message_at (#2154)")
 	require.Equal(t, 1, rec.countColumn("next_seq"),
 		"allocateSeq still mirrors the Redis seq forward")
 	require.NoError(t, mock.ExpectationsWereMet())
 }
 
-// TestSendMessage_TouchesSessionLastMessageOnce is the P2-8 regression guard:
+// TestSendMessage_TouchesSessionLastMessageOnce is the regression guard for
+// #2154:
 // one successful SendMessage must update sessions.last_message_at exactly once
 // — inside the persist transaction, so the touch is atomic with the insert and
 // can never survive a rollback — and must not lose the touch entirely (the
@@ -137,7 +138,7 @@ func TestSendMessage_TouchesSessionLastMessageOnce(t *testing.T) {
 	require.Equal(t, int64(7), resp.SeqID)
 
 	require.Equal(t, 1, rec.countColumn("last_message_at"),
-		"last_message_at must be written exactly once per send (was twice before #2154 P2-8)")
+		"last_message_at must be written exactly once per send (was twice before #2154)")
 	require.Equal(t, 2, rec.total(),
 		"sessions must be updated exactly twice: next_seq mirror + last_message_at")
 	require.NoError(t, mock.ExpectationsWereMet())

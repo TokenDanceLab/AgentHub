@@ -1,6 +1,6 @@
 package bus
 
-// #2246 slice 1: Publish's handler closure recovered panics with a private,
+// #2246: Publish's handler closure recovered panics with a private,
 // bare recover() that incremented metrics.EventBusPanics and logged its own
 // debug.Stack(). It is now the single recovery path, pkg/safego, and the
 // bus-specific counter is fed by the Hub's name-dispatching PanicObserver
@@ -10,10 +10,7 @@ package bus
 // broken: the pending accounting across the panic, the *order* of the two
 // defers that replaced the single one, and the counter's new producer.
 //
-// No time.Sleep in this file: the test-sleep ratchet
-// (scripts/verify/verify-test-sleep-ratchet.py) budgets sleeps per file and a
-// newly added file has no baseline entry, so every wait here is channel- or
-// ticker-driven.
+// No time.Sleep in this file; every wait is channel- or ticker-driven.
 
 import (
 	"context"

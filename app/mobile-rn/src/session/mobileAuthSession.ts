@@ -1,12 +1,11 @@
 // Mobile OIDC + SecureStore auth assembly — driven by the shared Hub auth
 // state machine (#1537, createHubAuthCore).
 //
-// Previously a hand-rolled mobile state machine (Wave6 follow-up note). Port
-// contract review (2026-08-23, lane C-1824): HubAuthPorts is stable — Web and
-// Desktop ship production adapters (webPorts.ts / desktopPorts.ts with tests)
-// and the shared core carries the refresh-fallback and session-cleanup
-// semantics. Mobile now wires the same core through Expo ports
-// (expoAuthPorts.ts): SecureStore token persistence, deep-link OIDC callback
+// HubAuthPorts is stable: Web and Desktop ship production adapters
+// (webPorts.ts / desktopPorts.ts with tests) and the shared core carries the
+// refresh-fallback and session-cleanup semantics. Mobile wires the same core
+// through Expo ports (expoAuthPorts.ts): SecureStore token persistence,
+// deep-link OIDC callback
 // channel, in-process device identity, expo-web-browser redirect opener, and
 // a no-op session UI sync (Mobile UI subscribes through this shell).
 //

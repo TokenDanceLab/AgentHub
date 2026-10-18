@@ -1,4 +1,4 @@
-// Unit tests for the ACP MCP config wiring (#1743): parseACPMcpServers and
+// Unit tests for the ACP MCP config wiring: parseACPMcpServers and
 // its per-entry mapper. Pure table-driven tests — no wire, no sleep.
 package acp
 

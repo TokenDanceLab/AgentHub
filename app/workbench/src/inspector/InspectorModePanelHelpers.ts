@@ -3,19 +3,17 @@ import type { EvidenceRef, ContextUsageTranscriptBlock } from '@shared/transcrip
 import type { PreviewFile } from './FilePreviewRouter';
 import type { TaskItem } from './OverviewPanel';
 
-/* \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
-   InspectorModePanelHelpers \u2014 pure residual slices from
-   InspectorModePanels (#731).
+/*
+   InspectorModePanelHelpers — evidence overview mappers, file-type detection,
+   openability checks, context-usage view models, and deploy-status labels.
+   No React hooks.
 
-   Evidence overview mappers, file-type detection, openability checks,
-   context-usage view models, and deploy-status labels. No React hooks /
-   no intentional UX change.
-   exactOptionalPropertyTypes: only assign `?: T` fields when defined,
-   unless the public field type explicitly allows `| undefined`.
+   exactOptionalPropertyTypes: only assign `?: T` fields when defined, unless
+   the public field type explicitly allows `| undefined`.
 
    i18n note (#2023): display labels resolve through the sharedWorkbench
    bundle via a passed-in translator.
-   \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550 */
+*/
 
 export type DeployStatus = 'pending' | 'building' | 'deploying' | 'deployed' | 'failed';
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ─────────────────────────────────────────────────────────────
-# AgentHub 真实全栈 E2E lane（issue #1839 B3）
+# AgentHub 真实全栈 E2E lane
 #
 # 职责：
 #   1. 全栈 preflight：TokenDance ID / hub / edge / web 健康探测。
@@ -8,21 +8,25 @@
 #      凭据落 tests/artifacts/real-e2e-account.env，gitignored chmod 600）。
 #   3. 跑真实栈 spec（playwright.real.config.ts chromium）——默认不带位置
 #      过滤，运行 testMatch 全部 spec（chat-real / real-oidc-login /
-#      private-url-preview）；设 AGENTHUB_E2E_SPEC_TARGET 可只跑单个 spec。
-#      真实 Authorization Code + PKCE 浏览器登录 + 聊天落 hub + 私有 URL
-#      门禁场景，无任何 stub/自签 JWT 旁路。
+#      private-url-preview / golden-flows）；设 AGENTHUB_E2E_SPEC_TARGET 可只跑单个 spec。
+#      real-oidc-login / private-url-preview / golden-flows 走真实
+#      Authorization Code + PKCE 浏览器登录与私有 URL 门禁，无 stub/自签 JWT 旁路；
+#      chat-real 使用运行中 Hub 的 AGENTHUB_JWT_SECRET 本地签发会话 JWT，
+#      属于 backend-api 证据，不计为 OIDC 登录证据。
 #   4. 输出 evidence manifest（六字段合同：evidence_level / real_tested /
 #      claim / status / skipped_evidence_levels / planned_evidence_levels）
 #      到 tests/artifacts/manifest-<YYYYMMDD-HHMMSS>.json（gitignored），
 #      并用 scripts/verify/verify-real-e2e-lane-manifest.py 做合同自检。
 #
-# 诚实边界（AGENTS §4）：
+# 诚实边界（AGENTS 的「生态与真实性边界」）：
 #   - 本 lane 只在真实栈上运行；栈缺失时以 blocked 状态落 manifest
 #     （real_tested=false），绝不编造登录证据。
 #   - playwright exit 0 但无通过行（全 spec skipped / report 缺失或
 #     解析失败）时，manifest status 降级为 no-evidence（real_tested=false），
 #     lane 以 FAIL 收口，绝不以 passed 呈现。
-#   - 证据等级为 observed-local（本地单机真栈）；approved-real /
+#   - 证据等级：成功跑完整 spec 记为 observed-local（本地单机真栈）；
+#     只有 chat-real 且仅做 backend-api 校验时，manifest 记为
+#     evidence_level=backend-api、real_tested=false。approved-real /
 #     packaged-release 不在本 lane 覆盖。
 #
 # 输出行契约（与 wsl-full-stack-e2e.sh 对齐）：
@@ -31,11 +35,13 @@
 # 用法：
 #   bash scripts/e2e/run-real-e2e-lane.sh
 #
-# 环境变量（均有默认，不设也能跑）：
+# 环境变量（除注明外均有默认，不设也能跑）：
 #   AGENTHUB_E2E_ID_BASE_URL / _HUB_BASE_URL / _EDGE_BASE_URL / _WEB_BASE_URL
-#   AGENTHUB_E2E_ID_CLIENT_ID / _ID_CLIENT_SECRET （直供 client 凭据，跳过 start.sh 提取）
+#   AGENTHUB_E2E_ID_CLIENT_ID / _ID_CLIENT_SECRET （直供 client 凭据，跳过启动器提取）
 #   AGENTHUB_E2E_START_SH （hub OIDC 凭据提取源，**无默认值**；未设置时走 _ID_CLIENT_ID/SECRET 直供）
-#   AGENTHUB_E2E_ID_DB （ID sqlite，默认 /var/lib/tokendance-id/tokendance.db）
+#   AGENTHUB_E2E_ID_DB （ID sqlite，provision 阶段必填）
+#   AGENTHUB_JWT_SECRET （运行中 Hub 的签名密钥，**无默认值**；chat-real.spec.ts
+#     的 mintTestJWT 必填，从环境读取；凭据文件不保存签名密钥）
 #   AGENTHUB_E2E_SPEC_TARGET （只跑指定 spec 文件名，如 real-oidc-login.spec.ts；
 #                             不设 = 不带位置过滤，跑 playwright.real.config.ts
 #                             testMatch 全部 spec）
@@ -68,6 +74,14 @@ fail() { echo "E2E-FAIL: $*" >&2; }
 die_blocked() { echo "E2E-FAIL: blocked|$*" >&2; echo "E2E-RESULT: BLOCKED"; exit 2; }
 die_failed()  { echo "E2E-FAIL: failed|$*" >&2; echo "E2E-RESULT: FAIL"; exit 1; }
 
+# Every emitted manifest is contract-checked before it can be uploaded.
+verify_manifest() {
+  if ! python3 "$VERIFIER" "$1"; then
+    die_failed "manifest contract check failed: $1"
+  fi
+  pass "manifest contract ok: $1"
+}
+
 probe() { curl -sf -m 4 "$1" >/dev/null 2>&1; }
 
 stack_status() {
@@ -82,14 +96,13 @@ stack_status() {
 # ── evidence manifest（六字段合同）──────────────────────────
 emit_manifest() { # 请求 status -> stdout "最终status|manifest路径"（passed 请求可能被降级为 no-evidence）
   local status="$1"
-  # #1873 Slice C: 公开 artifact 携带 commit（代码版本）+ scope（测试范围），
-  # 但不复制私有运行事实（账号/真实 endpoint 等）。
+  # 公开 artifact 携带 commit（代码版本）+ scope（测试范围），
   local commit
   commit="$(git -C "$REPO_ROOT" rev-parse HEAD 2>/dev/null || echo unknown)"
   MANIFEST_STATUS="$status" \
   MANIFEST_COMMIT="$commit" \
   MANIFEST_SCOPE="$(
-    if [ -n "$SPEC_TARGET" ]; then echo "app/web/$SPEC_TARGET"; else echo "app/web (playwright.real.config.ts all testMatch)"; fi
+    if [ -n "$SPEC_TARGET" ]; then echo "app/e2e/$SPEC_TARGET"; else echo "app/e2e (playwright.real.config.ts all testMatch)"; fi
   )" \
   MANIFEST_ARTIFACT_DIR="$ARTIFACT_DIR" \
   MANIFEST_SPEC_TARGET="$SPEC_LABEL" \
@@ -111,11 +124,16 @@ os.makedirs(root, exist_ok=True)
 stamp = time.strftime("%Y%m%d-%H%M%S", time.localtime())
 requested = os.environ["MANIFEST_STATUS"]
 status = requested
+evidence_level = "observed-local"
 run_started = float(os.environ.get("MANIFEST_RUN_STARTED_AT") or 0)
 # SPEC_TARGET sentinel：all-testMatch = 不带位置过滤跑全部 testMatch spec。
 spec_target = os.environ["MANIFEST_SPEC_TARGET"]
+extra_args = os.environ.get("AGENTHUB_E2E_PLAYWRIGHT_EXTRA_ARGS", "").strip()
 spec_command = ("playwright test --config playwright.real.config.ts --project=chromium"
-                + ("" if spec_target == "all-testMatch" else " " + spec_target))
+                + ("" if spec_target == "all-testMatch" else " " + spec_target)
+                + (" " + extra_args if extra_args else ""))
+# --grep/--shard/--last-failed narrow the run without changing SPEC_TARGET.
+narrowed = bool(extra_args)
 
 def latest(pattern):
     # tests/artifacts 跨运行持久：只取本次运行开始之后产出的证据，
@@ -135,6 +153,7 @@ traces = sorted(
 account_env = os.path.exists(os.path.join(root, "real-e2e-account.env"))
 
 rows = []
+spec_files = []
 if report_path and requested in ("passed", "failed"):
     try:
         with open(report_path, encoding="utf-8") as handle:
@@ -166,14 +185,26 @@ if report_path and requested in ("passed", "failed"):
             else:
                 outcome = "failed"
             duration_ms = sum(int(result.get("duration", 0) or 0) for result in results)
-            real_tested = outcome == "passed"
+            file_name = os.path.basename(str(spec.get("file") or ""))
+            if file_name and file_name not in spec_files:
+                spec_files.append(file_name)
+            # chat-real mints a session JWT from the running Hub secret instead
+            # of completing an OIDC login; it is API evidence, not login evidence.
+            login_spec = file_name != "chat-real.spec.ts"
+            evidence_level = "observed-local" if login_spec else "backend-api"
+            real_tested = outcome == "passed" and login_spec
+            if real_tested:
+                claim = "真实栈（本地单机真栈）上完成 OIDC 登录并通过；observed-local 证据"
+            elif outcome == "passed":
+                claim = "真实栈 API 流程通过；使用本地签发的会话 JWT，不计为 OIDC 登录证据"
+            else:
+                claim = "spec 未完成（跳过或失败），运行态无对应 L3 证据"
             rows.append({
                 "name": title,
                 "area": "web",
-                "evidence_level": "observed-local",
+                "evidence_level": evidence_level,
                 "real_tested": real_tested,
-                "claim": "真实栈（本地单机真栈）上执行并通过；observed-local 证据，非 stub/fixture" if real_tested else
-                         "spec 未完成（跳过或失败），运行态无对应 L3 证据",
+                "claim": claim,
                 "status": outcome,
                 "exit_code": 0 if outcome == "passed" else 1,
                 "duration_ms": duration_ms,
@@ -198,20 +229,48 @@ if report_path and requested in ("passed", "failed"):
 
 failed_rows = [row for row in rows if row["status"] == "failed"]
 passed_rows = [row for row in rows if row["status"] == "passed"]
+skipped_rows = [row for row in rows if row["status"] == "skipped"]
 
 if requested == "passed":
-    real_tested = len(passed_rows) > 0 and len(failed_rows) == 0
+    real_tested = (
+        any(row["real_tested"] and row["status"] == "passed" for row in rows)
+        and len(failed_rows) == 0
+        and len(skipped_rows) == 0
+    )
+    api_only = (
+        not real_tested
+        and bool(passed_rows)
+        and len(failed_rows) == 0
+        and len(skipped_rows) == 0
+        and all(row["evidence_level"] == "backend-api" for row in rows)
+    )
     if real_tested:
-        claim = ("真实全栈（PG/Redis/TokenDance ID/hub/edge/web）上 playwright.real.config.ts "
-                 "testMatch 全部 spec 全绿；evidence_level=observed-local（本地单机真栈），非 stub/自签 JWT")
+        if spec_target == "all-testMatch" and not narrowed:
+            claim = ("真实全栈（PG/Redis/TokenDance ID/hub/edge/web）上 playwright.real.config.ts "
+                     "testMatch 全部 spec 全绿，且至少一个 OIDC 登录 spec 通过；"
+                     "evidence_level=observed-local（本地单机真栈）")
+        else:
+            narrowed_note = "（含额外 Playwright 过滤参数）" if narrowed else ""
+            claim = ("真实全栈（PG/Redis/TokenDance ID/hub/edge/web）上仅 "
+                     + spec_target + " 的选中用例全绿" + narrowed_note
+                     + "；scope 不覆盖其余 testMatch spec；evidence_level=observed-local（本地单机真栈）")
+    elif api_only:
+        # backend-api 证据不是 OIDC 登录证据，但也不是 no-evidence：
+        # real_tested=false + evidence_level=backend-api 如实表达 API 流程通过。
+        status = "passed"
+        evidence_level = "backend-api"
+        claim = ("真实栈 API 流程通过；使用运行中 Hub 本地签发的会话 JWT，"
+                 "不计为 OIDC 登录证据（evidence_level=backend-api，real_tested=false）")
     else:
-        # playwright exit 0 但无通过行（全 spec skipped / report 缺失或解析失败）：
+        # playwright exit 0 但未覆盖全部 spec（skipped）或无通过行：
         # 降级 status 为 no-evidence，绝不以 passed 呈现（校验器强制该合同）。
         status = "no-evidence"
-        skipped_rows = [row for row in rows if row["status"] == "skipped"]
-        if skipped_rows and not failed_rows:
+        if skipped_rows and not failed_rows and not passed_rows:
             claim = ("playwright exit 0 但全部 spec skipped：未发生真实登录，"
                      "运行态无 L3 登录证据（降级 no-evidence，不以 passed 呈现）")
+        elif skipped_rows:
+            claim = ("playwright exit 0 但存在 skipped spec：未覆盖完整 testMatch，"
+                     "不能声明真实登录证据（降级 no-evidence）")
         else:
             claim = ("playwright exit 0 但无通过行（report 缺失或解析失败）："
                      "运行态无 L3 登录证据（降级 no-evidence，不以 passed 呈现）")
@@ -273,14 +332,15 @@ manifest = {
     "kind": "real-e2e-lane",
     "generated_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
     "commit": os.environ["MANIFEST_COMMIT"],
-    "scope": os.environ["MANIFEST_SCOPE"],
+    "scope": (os.environ["MANIFEST_SCOPE"] + ((" extra_args=" + extra_args) if extra_args else "")),
+    "spec_files": sorted(spec_files),
     # ── 六字段合同（REQUIRED_SMOKE_FIELDS，见 verify-real-e2e-contract.py）──
-    "evidence_level": "observed-local",
+    "evidence_level": evidence_level,
     "real_tested": real_tested,
     "claim": claim,
     "status": status,
-    "skipped_evidence_levels": sorted(set(canonical) - {"observed-local"}),
-    "planned_evidence_levels": ["observed-local"],
+    "skipped_evidence_levels": sorted(set(canonical) - {evidence_level} - {row["evidence_level"] for row in rows}),
+    "planned_evidence_levels": [evidence_level],
     # ── 上下文 ─────────────────────────────────────────────────
     "stack": {
         "id": {"base_url": os.environ["MANIFEST_ID_BASE_URL"], "state": os.environ["MANIFEST_ID_STATE"], "login": "real-browser-oidc-authorization-code-pkce"},
@@ -324,6 +384,7 @@ main() {
   if [ "$ID_STATE" != "up" ] || [ "$HUB_STATE" != "up" ] || [ "$EDGE_STATE" != "up" ] || [ "$WEB_STATE" != "up" ]; then
     emit_out="$(emit_manifest blocked)"
     MANIFEST_PATH="${emit_out#*|}"
+    verify_manifest "$MANIFEST_PATH"
     die_blocked "full stack incomplete (id=$ID_STATE hub=$HUB_STATE edge=$EDGE_STATE web=$WEB_STATE); manifest=$MANIFEST_PATH"
   fi
   pass "full stack healthy (id/hub/edge/web)"
@@ -344,6 +405,7 @@ main() {
   if ! bash "$REPO_ROOT/scripts/e2e/provision-real-e2e-stack.sh"; then
     emit_out="$(emit_manifest failed)"
     MANIFEST_PATH="${emit_out#*|}"
+    verify_manifest "$MANIFEST_PATH"
     die_failed "account provisioning failed (manifest=$MANIFEST_PATH); see output above"
   fi
   pass "test accounts provisioned (credentials in tests/artifacts/real-e2e-account.env, gitignored)"
@@ -352,7 +414,7 @@ main() {
   cd "$REPO_ROOT/app/web" || die_failed "app/web not found"
   # CI=true 会让 config 以 reuseExistingServer=false 重启 webServer，与已启动的
   # web 冲突；置空 CI 让其复用现有 5174（retries=0，确定性）。
-  # SPEC_TARGET 为空时不传位置过滤 → testMatch 全部 spec 都跑（#1922 项4）。
+  # SPEC_TARGET 为空时不传位置过滤 → testMatch 全部 spec 都跑。
   # shellcheck disable=SC2086
   CI= pnpm exec playwright test --config playwright.real.config.ts \
     --project=chromium ${SPEC_TARGET:+"$SPEC_TARGET"} ${AGENTHUB_E2E_PLAYWRIGHT_EXTRA_ARGS:-}
@@ -368,10 +430,7 @@ main() {
   MANIFEST_PATH="${emit_out#*|}"
   info "evidence manifest: $MANIFEST_PATH (final status: $MANIFEST_STATUS_FINAL)"
 
-  if ! python3 "$VERIFIER" "$MANIFEST_PATH"; then
-    die_failed "manifest contract check failed: $MANIFEST_PATH"
-  fi
-  pass "manifest contract ok: $MANIFEST_PATH"
+  verify_manifest "$MANIFEST_PATH"
 
   if [ "$PW_RC" -eq 0 ] && [ "$MANIFEST_STATUS_FINAL" = "passed" ]; then
     echo "E2E-RESULT: PASS"
@@ -385,4 +444,6 @@ main() {
   die_failed "real spec(s) ${SPEC_LABEL} exited with $PW_RC"
 }
 
-main
+if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+  main
+fi

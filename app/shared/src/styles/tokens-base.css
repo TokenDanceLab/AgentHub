@@ -1,6 +1,6 @@
 /* ═════════════════════════════════════════════════════════════════════
    AgentHub Design Tokens — v4 base tokens (non-theme)
-   Source of truth: tokendance-design/desktop/styles.css :root
+   Design token source of truth for this repository.
    Theme colors live in themes.css (toggled via data-theme)
    ═════════════════════════════════════════════════════════════════════ */
 
@@ -140,7 +140,7 @@
   --z-composer: 12;        /* workbench 输入底座：内容层之上、dropdown 之下 */
   --z-session-gate: 60;    /* 全屏会话门（web auth overlay；与 --z-profile-popover 同层互斥） */
 
-  /* TokenDance contract z-stacking (design-system.md §4.3) */
+  /* TokenDance contract z-stacking (docs/architecture/07-design-system-ssot.md) */
   --td-z-nav:     var(--z-sticky);
   --td-z-overlay: var(--z-overlay);
   --td-z-popover: var(--z-popover);
@@ -186,7 +186,7 @@
   --ease-standard:   var(--ease);
   --ease-emphasized: var(--ease-spring);
 
-  /* TokenDance contract motion aliases (design-system.md §4.3) */
+  /* TokenDance contract motion aliases (docs/architecture/07-design-system-ssot.md) */
   --td-dur-fast:   var(--dur-fast);
   --td-dur-normal: var(--dur-normal);
   --td-dur-slow:   var(--dur-slow);
@@ -560,20 +560,13 @@ body {
   }
 }
 
-/* ═══ Forced colors (Windows High Contrast) baseline — a11y #20 ═══════════
-   tri-scan P2/N1: 全仓零 forced-colors / prefers-contrast 媒体查询。
-   Windows 高对比模式用户无适配——玻璃 alpha 背景被系统色覆盖、品牌色不映射
-   系统语义色。本块保证 HC 模式下文字可见、边框不消失、焦点环用系统色；
-   玻璃材质降级为实体系统表面（见第 3 节，#1509）。
-   与 prefers-reduced-motion 正交（reduced-motion 已在各组件 css + dead
-   chatview/design/global.css 标注）。仅作用于 forced-colors: active 媒体，
-   屏幕渲染零影响。
+/* ═══ Forced colors (Windows High Contrast) baseline ═══════════════════════
+   高对比模式下玻璃 alpha 背景被系统色覆盖、品牌色不映射系统语义色。本块
+   保证文字可见、边框不消失、焦点环使用系统色，玻璃材质降级为实体系统表面。
+   仅作用于 forced-colors: active 媒体，屏幕渲染零影响。
 
-   选址说明: 简报指定 app/shared/src/styles/global.css，但该文件不存在；
-   仅有的 global.css (chatview/design/) 头部标注 DEAD CODE 未被任何
-   @import / JS import 引用。tokens-base.css 是 live 全局文件（经 tokens.css
-   re-export，由 desktop/web main.tsx 导入），含全局 reset + --ring +
-   --glass-* token，是简报授权的 fallback（"如不够再加 tokens-base.css"）。 */
+   本文件是经 tokens.css re-export、由 desktop/web main.tsx 导入的 live 全局
+   样式（含全局 reset + --ring + --glass-* token），因此基线放在这里。 */
 @media (forced-colors: active) {
   /* ── 1. 设计 token → 系统语义色 ─────────────────────────────────
      !important 为压过 themes.css / presets-base.css 中同 token 的主题声明

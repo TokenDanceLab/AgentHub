@@ -25,9 +25,9 @@ import {
 } from './agentProfileCatalog';
 
 export const WORKBENCH_MOCK_CONTACT_MEMBERS: ContactMember[] = [
-  { id: 'delicious', name: 'demo-user', initials: 'D', tag: '当前用户', org: 'TokenDance', status: '在线' },
-  { id: 'johnny', name: 'Johnny', initials: 'J', tag: '维护者', org: 'AgentHub Desktop', status: '刚刚活跃' },
-  { id: 'trump', name: 'Trump', initials: 'T', tag: '协作者', org: '设计评审', status: '今天 10:18' },
+  { id: 'demo-user', name: 'Demo User', initials: 'D', tag: '当前用户', org: 'TokenDance', status: '在线' },
+  { id: 'alice', name: 'Alice', initials: 'A', tag: '维护者', org: 'AgentHub Desktop', status: '刚刚活跃' },
+  { id: 'bob', name: 'Bob', initials: 'B', tag: '协作者', org: '设计评审', status: '今天 10:18' },
 ];
 
 export const WORKBENCH_MOCK_CONTACT_GROUPS: ContactGroup[] = [
@@ -37,8 +37,8 @@ export const WORKBENCH_MOCK_CONTACT_GROUPS: ContactGroup[] = [
 ];
 
 export const WORKBENCH_MOCK_CONTACT_SHORTCUTS = [
-  'Johnny',
-  'Trump',
+  'Alice',
+  'Bob',
   'AgentHub 设计评审',
   '文档重构',
 ];
@@ -103,25 +103,23 @@ export const WORKBENCH_MOCK_SERVICE_DESKS: ServiceDesk[] = [
 ];
 
 export const WORKBENCH_MOCK_DOC_ROWS: DocRow[] = [
-  { id: 'desktop-design-system', title: 'AgentHub Desktop 设计系统对齐清单', tag: '内部', location: '我的文档库', owner: 'demo-user', time: '今天 14:52' },
-  { id: 'meeting-notes', title: '智能纪要：【AgentHub 设计评审】', tag: '共享', location: '与我共享', owner: 'Johnny', time: '今天 11:08' },
-  { id: 'session-handoff', title: 'SESSION-HANDOFF-2026-06-05.md', location: '项目产物', owner: 'Codex', time: '昨天 22:40' },
-  { id: 'im-breakdown', title: 'AgentHub IM 交互拆解', tag: '内部', location: '我的文档库', owner: 'demo-user', time: '6月4日 15:18' },
-  { id: 'design-contract', title: 'TokenDance Design Contract v3', tag: '共享', location: '知识库', owner: 'Johnny', time: '6月3日 18:33' },
-  { id: 'deep-research', title: 'AgentHub 开源项目深度研究', tag: '外部', location: '我的文档库', owner: 'Trump', time: '6月2日 19:42' },
+  { id: 'desktop-design-system', title: '工作台界面规范（示例）', tag: '内部', location: '我的文档库', owner: 'demo-user', time: '今天 14:52' },
+  { id: 'meeting-notes', title: '智能纪要：【AgentHub 设计评审】', tag: '共享', location: '与我共享', owner: 'Alice', time: '今天 11:08' },
+  { id: 'session-handoff', title: '项目周报-第23周.md', location: '项目产物', owner: 'Codex', time: '昨天 22:40' },
+  { id: 'im-breakdown', title: '消息模块交互说明（示例）', tag: '内部', location: '我的文档库', owner: 'demo-user', time: '6月4日 15:18' },
+  { id: 'design-contract', title: '产品设计规范 v3', tag: '共享', location: '知识库', owner: 'Alice', time: '6月3日 18:33' },
+  { id: 'deep-research', title: '开源协作调研笔记', tag: '外部', location: '我的文档库', owner: 'Bob', time: '6月2日 19:42' },
 ];
 
 /**
- * Demo-only "我的文档库" shortcut names (#2154 P2-2b). These used to be the
- * DocsPage default, which rendered repository-internal document titles in real
- * data mode. They now belong to the mock data source: useWorkbenchDocsRoute
- * only surfaces them when the shell is NOT in real data mode.
+ * Demo-only "我的文档库" shortcut names. They belong to the mock data source:
+ * useWorkbenchDocsRoute only surfaces them outside real data mode.
  */
 export const WORKBENCH_MOCK_DOC_SHORTCUTS: string[] = [
-  'NewAPI注册和导入CC-switch',
+  '示例文档一',
   '知识问答',
   'AgentHub 设计评审',
-  '白盒方向调研报告',
+  '调研报告（示例）',
 ];
 
 export const WORKBENCH_MOCK_TASK_GROUPS: TaskGroup[] = [
@@ -130,7 +128,7 @@ export const WORKBENCH_MOCK_TASK_GROUPS: TaskGroup[] = [
     tasks: [
       {
         id: 'sqlite-plan',
-        title: 'B0 SQLite 迁移方案',
+        title: 'SQLite 迁移方案',
         project: '前端重构任务',
         assignee: 'Builder',
         startTime: '今天 14:49',
@@ -145,12 +143,12 @@ export const WORKBENCH_MOCK_TASK_GROUPS: TaskGroup[] = [
         id: 'embedded-docs',
         title: '云文档内嵌子页对齐',
         project: 'AgentHub 设计评审',
-        assignee: 'Johnny',
+        assignee: 'Alice',
         startTime: '今天 11:32',
         dueDate: '今天 22:00',
         creator: 'demo-user',
         status: '待评审',
-        conversationId: 'johnny',
+        conversationId: 'alice',
       },
       {
         id: 'project-announcement',
@@ -159,7 +157,7 @@ export const WORKBENCH_MOCK_TASK_GROUPS: TaskGroup[] = [
         assignee: 'Reviewer',
         startTime: '昨天 12:20',
         dueDate: '6月8日',
-        creator: 'Trump',
+        creator: 'Bob',
         status: '待确认',
         conversationId: 'reviewer',
       },
@@ -170,7 +168,7 @@ export const WORKBENCH_MOCK_TASK_GROUPS: TaskGroup[] = [
         assignee: 'Builder',
         startTime: '6月6日',
         dueDate: '6月9日',
-        creator: 'Johnny',
+        creator: 'Alice',
         status: '未开始',
         conversationId: 'builder',
       },
@@ -201,7 +199,7 @@ export const WORKBENCH_MOCK_PROJECTS: ProjectInfo[] = [
     status: '研究中',
     meta: '3 runs',
     themeColor: 'emerald',
-    members: ['demo-user', 'Johnny', 'Trump', 'Builder', 'Researcher'],
+    members: ['demo-user', 'Alice', 'Bob', 'Builder', 'Researcher'],
     announcement: '题材方向已收敛到二次元卡牌 Roguelite，下一步生成 prototype checklist。',
     runs: [
       { id: 'r1', name: '题材方向研究', status: 'running', owner: 'Researcher', meta: '35%' },
@@ -215,7 +213,7 @@ export const WORKBENCH_MOCK_PROJECTS: ProjectInfo[] = [
     ],
     feed: [
       { id: 'f1', time: '16:20', text: 'Researcher 更新题材方向' },
-      { id: 'f2', time: '15:42', text: 'Johnny 上传竞品矩阵' },
+      { id: 'f2', time: '15:42', text: 'Alice 上传竞品矩阵' },
       { id: 'f3', time: '14:25', text: 'Builder 完成玩法拆解' },
     ],
   },
@@ -226,15 +224,15 @@ export const WORKBENCH_MOCK_PROJECTS: ProjectInfo[] = [
     status: '待归档确认',
     meta: '12 docs',
     themeColor: 'amber',
-    members: ['demo-user', 'Johnny', 'Reviewer'],
-    announcement: 'README、roadmap、handoff 已完成，Reviewer 正在做最终归档确认。',
+    members: ['demo-user', 'Alice', 'Reviewer'],
+    announcement: 'README、roadmap、文档摘要已完成，Reviewer 正在做最终归档确认。',
     runs: [
       { id: 'r4', name: 'README 结构更新', status: 'completed', owner: 'Builder', meta: '12 files' },
-      { id: 'r5', name: 'Handoff 生成', status: 'completed', owner: 'Deployer', meta: '3 docs' },
+      { id: 'r5', name: '文档摘要生成', status: 'completed', owner: 'Deployer', meta: '3 docs' },
       { id: 'r6', name: '归档审查', status: 'running', owner: 'Reviewer', meta: '72%' },
     ],
     artifacts: [
-      { id: 'a4', type: 'md', name: 'docs-refactor-handoff.md' },
+      { id: 'a4', type: 'md', name: 'docs-refactor-summary.md' },
       { id: 'a5', type: 'md', name: 'README.md' },
       { id: 'a6', type: 'md', name: 'roadmap.md' },
     ],
@@ -266,8 +264,8 @@ export const WORKBENCH_MOCK_SETTINGS_DEFAULTS = {
   permissions: { Read: '允许', Write: '需确认', Shell: '需确认', Browser: '允许' },
   vitePreviewUrl: 'http://127.0.0.1:5176/desktop/',
   composerSubmitBehavior: 'Enter 发送',
-  workspacePath: 'D:\\Code\\TokenDance\\tokendance-design',
-  targetProjectPath: 'D:\\Code\\TokenDance\\AgentHub',
+  workspacePath: '~/projects/design-demo',
+  targetProjectPath: '~/projects/agenthub',
   hrmOverlayEnabled: true,
   visualQaMode: '按需',
   logLevel: '标准',
@@ -276,7 +274,7 @@ export const WORKBENCH_MOCK_SETTINGS_DEFAULTS = {
 };
 
 /* ═══════════════════════════════════════════════════════════════════════
-   Cursor-pagination mock data layer (#1510).
+   Cursor-pagination mock data layer.
 
    Mock pools are intentionally larger than one page (PAGE_SIZE=50) so the
    contacts/tasks infinite-scroll path can be exercised before the backend
@@ -335,16 +333,16 @@ export const WORKBENCH_MOCK_CONTACT_MEMBER_POOL: ContactMember[] = (() => {
 /** Task pool: the hand-written seeds plus generated rows (> one page). */
 const WORKBENCH_MOCK_TASK_POOL_SIZE = 63;
 const MOCK_TASK_PROJECTS = ['前端重构任务', 'AgentHub 设计评审', '文档重构', 'Agent 配置'] as const;
-const MOCK_TASK_ASSIGNEES = ['Builder', 'Johnny', 'Reviewer', 'Trump'] as const;
+const MOCK_TASK_ASSIGNEES = ['Builder', 'Alice', 'Reviewer', 'Bob'] as const;
 const MOCK_TASK_STATUSES = ['未开始', '进行中', '待评审', '待确认', '已完成'] as const;
 
 /** Demo hosting-conversation binding by assignee (#1963). Ids mirror the
- *  shared demo conversation seeds; assignees without a conversation (Trump)
- *  stay unbound and their task cards offer no conversation deep link. */
+ *  shared demo conversation seeds; every seeded assignee gets a deep link. */
 const MOCK_TASK_HOST_CONVERSATION_BY_ASSIGNEE: Record<string, string> = {
   Builder: 'builder',
-  Johnny: 'johnny',
+  Alice: 'alice',
   Reviewer: 'reviewer',
+  Bob: 'bob',
 };
 
 export const WORKBENCH_MOCK_TASK_POOL: TaskItem[] = (() => {

@@ -43,8 +43,8 @@ export function createDesktopSettingsAdapter(): SettingsPort {
         const settings = await edgeClient.fetchSettings();
         lsWrite(settings);
         return settings;
-      } catch {
-        // Edge unavailable
+      } catch (error) {
+        console.warn('[AgentHub Desktop] Edge settings read failed; trying Hub', error);
       }
 
       // Tier 2: Hub (secondary backend)
@@ -56,8 +56,8 @@ export function createDesktopSettingsAdapter(): SettingsPort {
           lsWrite(settings);
           return settings;
         }
-      } catch {
-        // Hub unavailable
+      } catch (error) {
+        console.warn('[AgentHub Desktop] Hub settings read failed; using local cache', error);
       }
 
       // Tier 3: localStorage (offline fallback)
@@ -71,8 +71,8 @@ export function createDesktopSettingsAdapter(): SettingsPort {
       // 2. Write to Edge (primary backend)
       try {
         await edgeClient.patchSettings(values);
-      } catch {
-        // Edge write failed — try Hub as fallback
+      } catch (error) {
+        console.warn('[AgentHub Desktop] Edge settings write failed; trying Hub', error);
       }
 
       // 3. Async Hub sync (fire-and-forget)
@@ -80,7 +80,9 @@ export function createDesktopSettingsAdapter(): SettingsPort {
         const token = getAccessToken();
         if (token) {
           const hub = createHubClient({ getToken: getAccessToken });
-          hub.patchSettings(values).catch(() => {});
+          hub.patchSettings(values).catch((error) => {
+          console.warn('[AgentHub Desktop] Hub settings sync failed', error);
+        });
         }
       } catch {
         // Hub client not available

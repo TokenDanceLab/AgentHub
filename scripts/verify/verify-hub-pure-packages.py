@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""verify-hub-pure-packages — Hub 纯 Go helper 包导入门禁（ps1 迁移，契约见 server docs/design/ps1-to-python-migration.md）。
+"""verify-hub-pure-packages — Hub 纯 Go helper 包导入门禁。
 
-纯包目标（A7 架构门禁候选 #5）不得导入：
+纯包目标不得导入：
   - gorm.io/*                                  (GORM ORM)
   - database/sql                               (raw SQL driver)
   - github.com/agenthub/hub-server/internal/cache (cache 层)
@@ -34,7 +34,7 @@ PURE_FILES = [
     "hub-server/internal/service/agentteam/route_helpers.go",
 ]
 
-# 与 ps1 一一对应：(锚定 import path 的正则, 输出标签)。-match 默认忽略大小写，此处同。
+# (锚定 import path 的正则, 输出标签)，匹配大小写不敏感。
 FORBIDDEN_PATTERNS = [
     (r"^gorm\.io/", "GORM ORM (gorm.io)"),
     (r"^database/sql(/|$)", "database/sql (raw SQL)"),
@@ -153,6 +153,6 @@ def main() -> int:
 if __name__ == "__main__":
     try:
         sys.exit(main())
-    except Exception as exc:  # noqa: BLE001 —— 顶层兜底，对齐 ps1 $ErrorActionPreference='Stop'
+    except Exception as exc:  # noqa: BLE001 —— fail closed：未捕获异常返回非零
         print(f"ERROR: {exc}", file=sys.stderr)
         sys.exit(1)
