@@ -27,6 +27,7 @@
 | 出站 HTTP client 收敛 | `scripts/verify/verify-outbound-client-hygiene.py` | checks.yml → validate |
 | OIDC 常量后端/前端一致 | `scripts/verify/verify-oidc-code-ssot.py` | checks.yml → validate |
 | 部署形状 SSOT | `scripts/verify/verify-deployment-shape.py` | cd-pr-check.yml → deployment-files（Enforce deployment shape SSOT #1527 step） |
+| Tauri 包配置、版本对齐、生成物忽略与已构建包验收 | `scripts/release/verify-tauri-package-readiness.py` | release-readiness.yml → readiness-policy |
 | 后端性能/泄漏行为门禁 | `scripts/verify/verify-backend-perf-leak-gates.py` | checks.yml → backend-perf-leak-gates（dispatch） |
 | 真实 E2E 产物脱敏/清单 | `scripts/verify/verify-real-e2e-artifacts.py`、`scripts/verify/verify-real-e2e-lane-manifest.py` | checks.yml → real-e2e-stack（dispatch） |
 

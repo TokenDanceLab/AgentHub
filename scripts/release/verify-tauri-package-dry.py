@@ -14,7 +14,6 @@ import argparse
 import hashlib
 import json
 import os
-import re
 import shutil
 import subprocess
 import sys
@@ -95,56 +94,6 @@ def add_artifact_manifest(root: str) -> None:
         json.dump(entries, handle, indent=2, ensure_ascii=False)
 
 
-def assert_sidecar_sqlite_policy() -> None:
-    step("Packaged Local Edge SQLite app-data policy")
-    edge_manager = read_text("app/desktop/src-tauri/src/edge_manager.rs")
-    host_edge = read_text("app/desktop/src-tauri/src/host/edge.rs")
-    lib = read_text("app/desktop/src-tauri/src/lib.rs")
-    use_health = read_text("app/desktop/src/hooks/useHealth.ts")
-    desktop_platform_test = read_text("app/desktop/src/platform/desktopPlatform.test.ts")
-
-    assert_true(re.search(r'EDGE_STORE_DB_FILE_NAME:\s*&str\s*=\s*"agenthub-edge\.sqlite"', edge_manager, re.IGNORECASE), "Edge manager pins the SQLite db filename")
-    assert_true(re.search(r"<app-data>/agenthub-edge\.sqlite", edge_manager, re.IGNORECASE), "Readiness exposes only the app-data SQLite placeholder")
-    assert_true(
-        re.search(r"--store-backend", edge_manager, re.IGNORECASE)
-        and re.search(r'"sqlite"', edge_manager, re.IGNORECASE)
-        and re.search(r"--store-db", edge_manager, re.IGNORECASE),
-        "Sidecar launch args use explicit sqlite store backend and db path",
-    )
-    assert_true(
-        re.search(r"app_data_dir\(\)", edge_manager, re.IGNORECASE) and re.search(r"edge_store_db_path", edge_manager, re.IGNORECASE),
-        "Packaged sidecar resolves store db under Tauri app data",
-    )
-    assert_true(
-        re.search(r"new_unavailable", edge_manager, re.IGNORECASE) and re.search(r"Local Edge startup is blocked", lib, re.IGNORECASE),
-        "Token generation failure keeps Local Edge fail-closed",
-    )
-    assert_true(
-        re.search(r"local-edge\.stdout\.log", edge_manager, re.IGNORECASE) and re.search(r"local-edge\.stderr\.log", edge_manager, re.IGNORECASE),
-        "Local Edge stdout/stderr log paths are exposed for diagnostics",
-    )
-    assert_true(
-        re.search(r"edge_health_url", edge_manager, re.IGNORECASE) and re.search(r"/v1/health", edge_manager, re.IGNORECASE),
-        "Local Edge health URL is included in readiness/status",
-    )
-    assert_true(
-        re.search(r"get_edge_host_readiness", lib, re.IGNORECASE)
-        and re.search(r"host_readiness_for_app", host_edge, re.IGNORECASE)
-        and re.search(r"local_auth_token\(\)\.map", host_edge, re.IGNORECASE),
-        "Tauri host commands expose readiness and fail closed on missing Edge auth token",
-    )
-    assert_true(
-        re.search(r"lastError", use_health, re.IGNORECASE) and re.search(r"Local Edge health check failed", use_health, re.IGNORECASE),
-        "Desktop health hook preserves the last Local Edge health error",
-    )
-    assert_true(
-        re.search(r"direct_cli_spawn:\s*false", desktop_platform_test, re.IGNORECASE)
-        and re.search(r"<app-data>/agenthub-edge\.sqlite", desktop_platform_test, re.IGNORECASE)
-        and re.search(r"local-edge\.stderr\.log", desktop_platform_test, re.IGNORECASE),
-        "Desktop platform test preserves no direct CLI spawn, app-data SQLite policy, and log diagnostics",
-    )
-
-
 def invoke_python_script(relative_path: str, arguments: list) -> None:
     full_path = os.path.join(REPO_ROOT, relative_path.replace("/", os.sep))
     run = subprocess.run([sys.executable, full_path, *arguments])
@@ -205,9 +154,6 @@ def main() -> int:
     )
     report["stages"]["installerSmoke"] = "passed"
 
-    assert_sidecar_sqlite_policy()
-    report["stages"]["sqliteAppDataPolicy"] = "passed"
-
     if not args.SkipInstall:
         invoke_checked(
             "Install app dependencies from lockfile",
@@ -261,7 +207,8 @@ def main() -> int:
 
     if args.RunWindowsBundle:
         invoke_checked(
-            "Build unsigned Tauri Windows NSIS package",            os.path.join(REPO_ROOT, "app", "desktop"),
+            "Build unsigned Tauri Windows NSIS package",
+            os.path.join(REPO_ROOT, "app", "desktop"),
             [shutil.which("corepack") or "corepack", "pnpm", "tauri", "build", "--no-sign"],
             {"CI": "true"},
         )

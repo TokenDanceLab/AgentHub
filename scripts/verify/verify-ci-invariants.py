@@ -71,6 +71,13 @@ POLICY = {
         "required_steps": {},
         "protected_environments": {"release-gate": "release"},
     },
+    "release-readiness.yml": {
+        "required_jobs": ("readiness-policy", "windows-package-dry", "macos-package-dry"),
+        "must_always_report": (),
+        "verifier_jobs": {"readiness-policy": "scripts/release/verify-tauri-package-readiness.py"},
+        "job_scripts": {"windows-package-dry": ("scripts/release/verify-tauri-package-dry.py",)},
+        "required_steps": {},
+    },
     "cd-pr-check.yml": {
         "required_jobs": ("deployment-files", "docker-build-dry"),
         "must_always_report": (),
@@ -202,11 +209,12 @@ def check_script_references(name, workflow, repo_root, errors):
                     )
 
 
-def verify(repo_root, checks_path, release_path, cd_pr_path):
+def verify(repo_root, checks_path, release_path, readiness_path, cd_pr_path):
     errors = []
     paths = {
         "checks.yml": checks_path,
         "release.yml": release_path,
+        "release-readiness.yml": readiness_path,
         "cd-pr-check.yml": cd_pr_path,
     }
     for name, path in paths.items():
@@ -258,13 +266,14 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--checks", default=".github/workflows/checks.yml")
     parser.add_argument("--release", default=".github/workflows/release.yml")
+    parser.add_argument("--readiness", default=".github/workflows/release-readiness.yml")
     parser.add_argument("--cd-pr", default=".github/workflows/cd-pr-check.yml")
     parser.add_argument("--self-test", action="store_true")
     args = parser.parse_args()
     if args.self_test:
         run_self_test()
         return 0
-    errors = verify(os.getcwd(), args.checks, args.release, args.cd_pr)
+    errors = verify(os.getcwd(), args.checks, args.release, args.readiness, args.cd_pr)
     if errors:
         for error in errors:
             print(f"FAIL: {error}", file=sys.stderr)
