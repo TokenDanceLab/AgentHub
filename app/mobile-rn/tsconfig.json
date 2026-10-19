@@ -18,7 +18,6 @@
     "baseUrl": ".",
     "paths": {
       "@/*": ["src/*"],
-      "@agenthub/shared": ["../shared/src/index.ts"],
       "@agenthub/shared/*": ["../shared/src/*"]
     }
   },
