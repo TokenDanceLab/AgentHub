@@ -17,7 +17,6 @@
     "test:integration:all": "pnpm test:integration:edge-mock && pnpm test:integration:edge-real",
     "test:e2e": "playwright test --config playwright.config.ts",
     "test:e2e:chat-flow": "playwright test --config playwright.config.ts --project=chromium chat-flow-ui.spec.ts",
-    "test:visual:chat-flow": "node scripts/manual-chat-flow-check.mjs",
     "visual:qa:shell": "node scripts/visual-qa-shell.mjs",
     "visual:qa:shell:2x": "node scripts/visual-qa-shell-2x.mjs",
     "visual:qa:chat": "node scripts/visual-qa-chat.mjs",
