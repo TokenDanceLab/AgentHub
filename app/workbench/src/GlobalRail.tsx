@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ProfilePopover, DemoToast } from './floating';
+import { ProfilePopover, DemoToast } from './floating/index';
 import { DesignNavIcon, type DesignNavIconName } from './designIcons';
 import { CHATVIEW_I18N_NAMESPACE } from '@shared/chatview/i18n/resources';
 import { Tooltip } from '@shared/ui/Tooltip';

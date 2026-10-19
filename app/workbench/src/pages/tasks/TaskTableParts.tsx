@@ -28,7 +28,7 @@ import {
   resolveReviewMergeDecision,
   type BoardColumnTone,
   type TaskReviewMergePort,
-} from '../../workbenchBoardColumns';
+} from '../../routes/workbenchBoardColumns';
 
 /* ═══════════════════════════════════════════════════════════════════════
    TaskTableParts — presentational parts for TaskTableViews

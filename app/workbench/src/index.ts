@@ -1,10 +1,10 @@
 export { AgentHubWorkbench } from './AgentHubWorkbench';
-export { ChatViewBridge } from './ChatViewBridge';
-export { ConversationSidebar } from './ConversationSidebar';
+export { ChatViewBridge } from './transcript/ChatViewBridge';
+export { ConversationSidebar } from './transcript/ConversationSidebar';
 export { GlobalRail } from './GlobalRail';
-export { RightInspector } from './RightInspector';
-export { UnifiedComposer } from './UnifiedComposer';
-export { WorkbenchGoalBanner } from './WorkbenchGoalBanner';
+export { RightInspector } from './inspector/RightInspector';
+export { UnifiedComposer } from './composer/UnifiedComposer';
+export { WorkbenchGoalBanner } from './transcript/WorkbenchGoalBanner';
 export { WorkbenchRoutes } from './WorkbenchRoutes';
 export { WorkspaceHeader } from './WorkspaceHeader';
 export {
@@ -22,8 +22,8 @@ export {
 export {
   buildMainchainSummary,
   runtimeEvidenceSourceSummary,
-} from './mainchain';
-export { MainchainStatusStrip } from './MainchainStatusStrip';
+} from './mainchain/index';
+export { MainchainStatusStrip } from './transcript/MainchainStatusStrip';
 export {
   buildActiveConversationAttention,
   deriveConversationLiveStatus,
@@ -31,7 +31,7 @@ export {
   isRunActive,
   summarizeWorkbenchAttention,
 } from './workbenchAttentionModel';
-export { GOAL_TOOL_NAMES, deriveGoalSummary } from './workbenchGoalSummary';
+export { GOAL_TOOL_NAMES, deriveGoalSummary } from './transcript/workbenchGoalSummary';
 export type { TranscriptContextMenuEvent, TranscriptPointerEvent } from './transcriptEventTypes';
 export {
   buildAgentCapabilityContractFromConfig,
@@ -84,18 +84,18 @@ export {
 
 /* ── Types ── */
 export type { AgentHubWorkbenchProps } from './AgentHubWorkbench';
-export type { ChatViewBridgeProps } from './ChatViewBridge';
-export type { ConversationSidebarProps } from './ConversationSidebar';
+export type { ChatViewBridgeProps } from './transcript/ChatViewBridge';
+export type { ConversationSidebarProps } from './transcript/ConversationSidebar';
 export type { GlobalRailProps, GlobalRailPage, ConnectionStatusKind } from './GlobalRail';
-export type { RightInspectorProps, RuntimeEvidenceSnapshot } from './RightInspector';
-export type { UnifiedComposerProps } from './UnifiedComposer';
+export type { RightInspectorProps, RuntimeEvidenceSnapshot } from './inspector/RightInspector';
+export type { UnifiedComposerProps } from './composer/UnifiedComposer';
 export type {
   MainchainNode,
   MainchainSummary,
   MainchainStatusKind,
   MainchainWorkbenchStatus,
-} from './mainchain';
-export type { MainchainStatusStripProps } from './MainchainStatusStrip';
+} from './mainchain/index';
+export type { MainchainStatusStripProps } from './transcript/MainchainStatusStrip';
 export type {
   ActiveConversationAttentionInput,
   ConversationLiveStatus,
@@ -103,8 +103,8 @@ export type {
   WorkbenchAttentionInput,
   WorkbenchAttentionSummary,
 } from './workbenchAttentionModel';
-export type { WorkbenchGoalBannerProps } from './WorkbenchGoalBanner';
-export type { WorkbenchGoalStatus, WorkbenchGoalSummary } from './workbenchGoalSummary';
+export type { WorkbenchGoalBannerProps } from './transcript/WorkbenchGoalBanner';
+export type { WorkbenchGoalStatus, WorkbenchGoalSummary } from './transcript/workbenchGoalSummary';
 export type {
   WorkbenchAgentProfilesStatus,
   WorkbenchContactsData,
@@ -126,7 +126,7 @@ export {
   TasksPage,
   DevicesPage,
   TokenUsagePage,
-} from './pages';
+} from './pages/index';
 export type {
   AgentsPageProps,
   AgentConfig,
@@ -170,31 +170,31 @@ export type {
   TokenUsagePageProps,
   TokenUsagePageTeam,
   TokenUsagePageRun,
-} from './pages';
+} from './pages/index';
 
 /* ═══ Inspector panels ═══ */
 export {
   OverviewPanel,
   FilePreview,
   BrowserPreview,
-} from './inspector';
+} from './inspector/index';
 export type {
   OverviewPanelProps,
   TaskItem as InspectorTaskItem,
   FileItem,
   FilePreviewProps,
   BrowserPreviewProps,
-} from './inspector';
+} from './inspector/index';
 
 /* ═══ Terminal host shell (#1174) ═══ */
 export {
   TerminalPanel,
   isLocalTerminalEnabled,
-} from './terminal';
+} from './terminal/index';
 export type {
   TerminalPanelLabels,
   TerminalPanelProps,
-} from './terminal';
+} from './terminal/index';
 
 /* ═══ Floating components ═══ */
 export {
@@ -203,7 +203,7 @@ export {
   PersonPanel,
   ProfilePopover,
   DemoToast,
-} from './floating';
+} from './floating/index';
 export type {
   ContextMenuProps,
   ContextMenuItem,
@@ -212,11 +212,11 @@ export type {
   PersonPanelProps,
   ProfilePopoverProps,
   DemoToastProps,
-} from './floating';
+} from './floating/index';
 
-export * from './auxPanel';
+export * from './auxPanel/index';
 
-export * from './sessionImport';
+export * from './sessionImport/index';
 
 /* ═══ Team subagent stream (#1478 / #1406) ═══ */
 export {
@@ -228,7 +228,7 @@ export {
   type SubagentStreamListener,
   type TeamSubagentStreamEvent,
   type SubagentStreamOverlayProps,
-} from './team';
+} from './team/index';
 
 /* ═══ Inline message delegation (#1406) ═══ */
 export {
@@ -241,4 +241,4 @@ export {
   type DelegationEntry,
   type DelegationStatus,
   type MessageDelegationListener,
-} from './team';
+} from './team/index';

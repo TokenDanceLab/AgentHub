@@ -3,8 +3,8 @@ import styles from './SettingsPage.module.css';
 import {
   SettingsMain,
   SettingsNav,
-} from './settings';
-import type { SettingsPageProps } from './settings';
+} from './settings/index';
+import type { SettingsPageProps } from './settings/index';
 
 /* ═══════════════════════════════════════════════════════════════════════
    SettingsPage — AgentHub v4
@@ -20,7 +20,7 @@ export type {
   SettingsPageProps,
   SettingsPaneId,
   StatePanelKind,
-} from './settings';
+} from './settings/index';
 
 /* ═══════════════════════════════════════════════════════════════════════
    Main export

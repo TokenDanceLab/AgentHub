@@ -5,8 +5,8 @@ import {
   ProjectMain,
   ProjectNav,
   useProjectEditor,
-} from './projects';
-import type { ProjectsPageProps } from './projects';
+} from './projects/index';
+import type { ProjectsPageProps } from './projects/index';
 
 /* ═══════════════════════════════════════════════════════════════════════
    ProjectsPage — pure presentational workbench page
@@ -26,7 +26,7 @@ export type {
   ProjectDraft,
   ProjectTab,
   ProjectsPageProps,
-} from './projects';
+} from './projects/index';
 
 // ── Main component ──
 

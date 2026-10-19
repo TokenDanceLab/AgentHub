@@ -7,7 +7,7 @@ import {
   useWorkbenchTaskDeepLinkStore,
   type WorkbenchTaskDeepLinkIntent,
   type WorkbenchTaskQueueSource,
-} from './workbenchTaskDeepLinks';
+} from './routes/workbenchTaskDeepLinks';
 
 export interface UseWorkbenchTaskDeepLinksOptions {
   setActivePage: (page: GlobalRailPage) => void;

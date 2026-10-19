@@ -23,8 +23,8 @@ import {
   UNAVAILABLE_ACTION_TOAST_KEY,
   applyTranscriptChromeSideEffects,
   type TranscriptChromeSideEffect,
-} from '../workbenchTranscriptChromeActionMappers';
-import type { TranscriptChromeTranslate } from '../workbenchTranscriptChromeLabels';
+} from '../transcript/workbenchTranscriptChromeActionMappers';
+import type { TranscriptChromeTranslate } from '../transcript/workbenchTranscriptChromeLabels';
 
 type BundleLocale = 'zh' | 'en';
 

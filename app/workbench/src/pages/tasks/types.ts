@@ -3,7 +3,7 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import type { WorkbenchProfileSource } from '../../profileRegistry';
-import type { BoardColumnTone, TaskReviewMergePort } from '../../workbenchBoardColumns';
+import type { BoardColumnTone, TaskReviewMergePort } from '../../routes/workbenchBoardColumns';
 import type { AgentHubSurface } from '@shared/platform';
 
 export type TaskStatus =

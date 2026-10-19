@@ -6,14 +6,14 @@ import type {
 } from '@shared/platform';
 import type { TranscriptBlock } from '@shared/transcript';
 import type { ConnectionStatusKind, GlobalRailPage } from './GlobalRail';
-import type { RuntimeEvidenceSnapshot } from './RightInspector';
+import type { RuntimeEvidenceSnapshot } from './inspector/RightInspector';
 import type {
   WorkbenchAgentProfilesStatus,
   WorkbenchContactsActions,
   WorkbenchContactsData,
   WorkbenchDocumentsActions,
 } from './WorkbenchRoutes';
-import type { AgentConfig, DocRow, ProjectDraft } from './pages';
+import type { AgentConfig, DocRow, ProjectDraft } from './pages/index';
 import type {
   CCSwitchStatusInfo,
   CCSwitchProviderInfo,
@@ -22,8 +22,8 @@ import type {
 } from './pages/AgentsPage';
 import type { ProjectInfo } from './pages/ProjectsPage';
 import type { WorkbenchPanelLayout } from './useWorkbenchPanelLayout';
-import type { WorkbenchSessionChrome } from './useWorkbenchSessionChrome';
-import type { WorkbenchTranscriptChrome } from './useWorkbenchTranscriptChrome';
+import type { WorkbenchSessionChrome } from './transcript/useWorkbenchSessionChrome';
+import type { WorkbenchTranscriptChrome } from './transcript/useWorkbenchTranscriptChrome';
 import type { WorkbenchProfileChrome } from './useWorkbenchProfileChrome';
 import type { ConversationLiveStatus } from './workbenchAttentionModel';
 import type {

@@ -5,14 +5,14 @@ import type {
 } from '@shared/platform';
 import type { TranscriptBlock, ApprovalDecisionAction } from '@shared/transcript';
 import type { ConnectionStatusKind } from './GlobalRail';
-import type { RuntimeEvidenceSnapshot } from './RightInspector';
+import type { RuntimeEvidenceSnapshot } from './inspector/RightInspector';
 import type {
   WorkbenchAgentProfilesStatus,
   WorkbenchContactsData,
   WorkbenchContactsActions,
   WorkbenchDocumentsActions,
 } from './WorkbenchRoutes';
-import type { AgentConfig, ProjectDraft, DocRow } from './pages';
+import type { AgentConfig, ProjectDraft, DocRow } from './pages/index';
 import type { SkillMarketItem, MCPMarketItem } from './pages/AgentsPage';
 import type { ProjectInfo } from './pages/ProjectsPage';
 import type { WorkbenchAttentionInput } from './workbenchAttentionModel';

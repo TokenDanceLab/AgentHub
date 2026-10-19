@@ -17,7 +17,7 @@ vi.mock('./WorkbenchFrameParts', () => ({
   WorkspaceLoadingState: () => <div data-testid="loading" />,
 }));
 
-vi.mock('./terminal', () => ({
+vi.mock('./terminal/index', () => ({
   TerminalPanel: (props: { localTerminal?: boolean; terminal?: unknown }) => (
     <div
       data-testid="terminal-panel-stub"

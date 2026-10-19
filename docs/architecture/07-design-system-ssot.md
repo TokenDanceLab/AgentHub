@@ -113,7 +113,7 @@ Applied first to AuxPanel and TerminalPanel. Respect `prefers-reduced-motion`.
 | HiDPI glass | `@media (min-resolution: 192dpi)` in tokens + themes | blur ~1.4×, stronger hairline borders, focus ring 3–4px |
 | Breakpoint definitions | `app/shared/src/styles/tokens-base.css` 的 `--bp-*` 变量即 SSOT，`tokens-base.test.ts` 断言取值 | minimal 420 / mobile 480 / compact 720 / narrow 768 / medium 1024 / standard 1280 / wide 1440 / xwide 1920 / ultra 2560 |
 
-响应式断点只定义在 `tokens-base.css` 的 `--bp-*`；剩余非 SSOT `@media` 仅 `app/shared/src/ui/Input.module.css` 与 `app/web/src/components/AuthPage.module.css` 的 legacy 760、`app/workbench/src/WorkbenchGoalBanner.module.css` 的 900，以及 Desktop `App.module.css` 的 1023/1279 成对窗口约定。
+响应式断点只定义在 `tokens-base.css` 的 `--bp-*`；剩余非 SSOT `@media` 仅 `app/shared/src/ui/Input.module.css` 与 `app/web/src/components/AuthPage.module.css` 的 legacy 760、`app/workbench/src/transcript/WorkbenchGoalBanner.module.css` 的 900，以及 Desktop `App.module.css` 的 1023/1279 成对窗口约定。
 
 ## 9. Acceptance mapping
 

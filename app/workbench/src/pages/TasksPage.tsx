@@ -3,8 +3,8 @@ import styles from './TasksPage.module.css';
 import {
   TaskMain,
   TaskNav,
-} from './tasks';
-import type { TasksPageProps } from './tasks';
+} from './tasks/index';
+import type { TasksPageProps } from './tasks/index';
 
 /* ═══════════════════════════════════════════════════════════════════════
    TasksPage — pure presentational workbench page
@@ -24,7 +24,7 @@ export type {
   TaskGroup,
   TaskEditDraft,
   TasksPageProps,
-} from './tasks';
+} from './tasks/index';
 
 // ── Main component ──
 

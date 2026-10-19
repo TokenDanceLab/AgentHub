@@ -14,7 +14,7 @@ beforeAll(async () => {
   await useTestI18nLanguage('en');
 });
 
-vi.mock('./ChatViewBridge', () => ({
+vi.mock('./transcript/ChatViewBridge', () => ({
   ChatViewBridge: (props: { displayTranscript: TranscriptBlock[] }) => (
     <div data-testid="read-only-transcript" data-block-count={props.displayTranscript.length} />
   ),

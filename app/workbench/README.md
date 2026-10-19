@@ -8,6 +8,23 @@ docs/projects/tasks/settings 页面、mainchain 状态条、terminal host、floa
 `workbench` 是端级 shell 层；`shared` 是跨端原语层，
 workbench 是端级巨石，两者拆包后依赖方向固定为 **workbench → shared 单向**。
 
+## 目录
+
+根目录只放 shell 与跨域件：`AgentHubWorkbench*`、`WorkbenchFrame*`、
+`WorkspaceHeader`、`GlobalRail`、`WorkbenchRoutes`、`index.ts` 入口、图标
+registry、preferences/layout、以及 `pages/`、`auxPanel/`、`terminal/`、
+`team/`、`floating/`、`mainchain/`、`sessionImport/`、`__tests__/`。
+
+| 目录 | 内容 |
+|---|---|
+| `composer/` | UnifiedComposer 与其 picker / 附件 / mention / 审批 / dispatch queue 子件、纯 helper |
+| `transcript/` | 会话转录与工程列：ConversationHost/Sidebar、ChatViewBridge、transcript chrome、goal banner、mainchain 状态条 |
+| `routes/` | 每个 route 的 view + hook + helpers/planners/model（agents、tasks、docs、projects、settings、usage） |
+| `inspector/` | 右侧 Inspector 面板、resizer、模式面板、自动展开 hook |
+
+模块与测试同目录；移动文件时改相对导入即可，包外消费者只认
+`package.json` 的 exports，不认内部路径。
+
 ## 边界
 
 - 依赖方向：`workbench` 可以 import `shared`（深导入走 `@shared/*` 别名，

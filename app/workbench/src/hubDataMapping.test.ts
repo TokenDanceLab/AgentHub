@@ -1,6 +1,6 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 import { useTestI18nLanguage } from '@shared/testing/i18n';
-import type { ProjectInfo } from './pages';
+import type { ProjectInfo } from './pages/index';
 import {
   contactInfoToMember,
   hubDocumentToDocRow,
