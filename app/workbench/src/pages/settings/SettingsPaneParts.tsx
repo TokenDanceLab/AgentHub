@@ -45,11 +45,8 @@ export function LocalCliDiscoveryStatus({
       <SettingsRow label="发现模式" description="只做 no-spend CLI 状态发现；不执行 Run、带 prompt 的命令、模型调用或 secrets。">
         <SettingValue value={discovery.mode} />
       </SettingsRow>
-      <SettingsRow label="就绪文件" description="no-spend CLI 状态发现使用的 readiness 文件。">
-        <SettingPath value={discovery.readinessManifest} />
-      </SettingsRow>
-      <SettingsRow label="就绪脚本" description="静态 gate 和 no-spend command discovery 的验证入口。">
-        <SettingPath value={discovery.readinessScript} />
+      <SettingsRow label="就绪说明" description="本地 CLI 与运行时检查的开发者入口。">
+        <SettingPath value={discovery.readinessDoc} />
       </SettingsRow>
       {discovery.items.map((item) => (
         <SettingsRow
