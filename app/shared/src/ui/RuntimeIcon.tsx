@@ -1,31 +1,30 @@
 import React, { type ComponentType } from 'react';
-// Subpath imports — avoids @lobehub/icons barrel (index.d.ts re-exports all 302 icons
-// which fails under certain tsconfig contexts like web's moduleResolution + paths setup)
+// Provider marks come from the Color variant directly: the per-provider index
+// module also re-exports Mono/Text/Avatar/Combine, which shipped ~5x the SVG
+// payload for marks this file only ever renders in colour.
+import Alibaba from '@lobehub/icons/es/Alibaba/components/Color.js';
+import AlibabaCloud from '@lobehub/icons/es/AlibabaCloud/components/Color.js';
+import Azure from '@lobehub/icons/es/Azure/components/Color.js';
+import Aws from '@lobehub/icons/es/Aws/components/Color.js';
+import Bedrock from '@lobehub/icons/es/Bedrock/components/Color.js';
+import ByteDance from '@lobehub/icons/es/ByteDance/components/Color.js';
+import Claude from '@lobehub/icons/es/Claude/components/Color.js';
+import Cohere from '@lobehub/icons/es/Cohere/components/Color.js';
+import DeepSeek from '@lobehub/icons/es/DeepSeek/components/Color.js';
+import Doubao from '@lobehub/icons/es/Doubao/components/Color.js';
+import Gemini from '@lobehub/icons/es/Gemini/components/Color.js';
+import Google from '@lobehub/icons/es/Google/components/Color.js';
+import Meta from '@lobehub/icons/es/Meta/components/Color.js';
+import Mistral from '@lobehub/icons/es/Mistral/components/Color.js';
+import Perplexity from '@lobehub/icons/es/Perplexity/components/Color.js';
+import Qwen from '@lobehub/icons/es/Qwen/components/Color.js';
+import Volcengine from '@lobehub/icons/es/Volcengine/components/Color.js';
+import Zhipu from '@lobehub/icons/es/Zhipu/components/Color.js';
+// Runtime marks keep their index default (Mono) — that is what the runtime row renders.
 import ClaudeCode from '@lobehub/icons/es/ClaudeCode';
 import Codex from '@lobehub/icons/es/Codex';
 import GeminiCLI from '@lobehub/icons/es/GeminiCLI';
 import OpenCode from '@lobehub/icons/es/OpenCode';
-import Alibaba from '@lobehub/icons/es/Alibaba';
-import AlibabaCloud from '@lobehub/icons/es/AlibabaCloud';
-import Anthropic from '@lobehub/icons/es/Anthropic';
-import Azure from '@lobehub/icons/es/Azure';
-import Aws from '@lobehub/icons/es/Aws';
-import Bedrock from '@lobehub/icons/es/Bedrock';
-import ByteDance from '@lobehub/icons/es/ByteDance';
-import Claude from '@lobehub/icons/es/Claude';
-import Cohere from '@lobehub/icons/es/Cohere';
-import DeepSeek from '@lobehub/icons/es/DeepSeek';
-import Doubao from '@lobehub/icons/es/Doubao';
-import Gemini from '@lobehub/icons/es/Gemini';
-import Google from '@lobehub/icons/es/Google';
-import Meta from '@lobehub/icons/es/Meta';
-import Mistral from '@lobehub/icons/es/Mistral';
-import Moonshot from '@lobehub/icons/es/Moonshot';
-import OpenAI from '@lobehub/icons/es/OpenAI';
-import Perplexity from '@lobehub/icons/es/Perplexity';
-import Qwen from '@lobehub/icons/es/Qwen';
-import Volcengine from '@lobehub/icons/es/Volcengine';
-import Zhipu from '@lobehub/icons/es/Zhipu';
 import { resolveRuntimeIconRegistry } from './runtimeIconRegistry';
 
 export type RuntimeIconKind = 'model' | 'provider' | 'runtime' | 'tool';
@@ -123,14 +122,11 @@ export function RuntimeIcon({
 // lobehub icon component with a .Color subcomponent.
 // ═══════════════════════════════════════════════════════════════════════
 
-type LobeIcon = ComponentType<{ size?: number }> & {
-  Color?: ComponentType<{ size?: number }>;
-};
+type LobeIcon = ComponentType<{ size?: number }>;
 
 const providerIconMap: Record<string, LobeIcon | undefined> = {
   alibaba: Alibaba,
   alibabacloud: AlibabaCloud,
-  anthropic: Anthropic,
   azure: Azure,
   aws: Aws,
   bedrock: Bedrock,
@@ -143,8 +139,6 @@ const providerIconMap: Record<string, LobeIcon | undefined> = {
   google: Google,
   meta: Meta,
   mistral: Mistral,
-  moonshot: Moonshot,
-  openai: OpenAI,
   perplexity: Perplexity,
   qwen: Qwen,
   volcengine: Volcengine,
@@ -162,12 +156,7 @@ const modelIconMap: Record<string, LobeIcon | undefined> = {
   doubao: Doubao,
   gemini: Gemini,
   glm: Zhipu,       // ChatGLM → Zhipu icon
-  gpt: OpenAI,
-  kimi: Moonshot,
   qwen: Qwen,
-  'o1': OpenAI,
-  'o3': OpenAI,
-  'o4': OpenAI,
 };
 
 function resolveModelIcon(modelName: string): LobeIcon | undefined {
@@ -182,16 +171,12 @@ function resolveModelIcon(modelName: string): LobeIcon | undefined {
 
 function renderProviderColorIcon(provider: string, size: number): React.ReactNode {
   const Icon = providerIconMap[provider.toLowerCase()];
-  const Color = Icon?.Color;
-  if (Color) return <Color size={size} />;
-  return runtimeIconFallbackSvg('provider', size);
+  return Icon ? <Icon size={size} /> : runtimeIconFallbackSvg('provider', size);
 }
 
 function renderModelColorIcon(model: string, size: number): React.ReactNode {
   const Icon = resolveModelIcon(model);
-  const Color = Icon?.Color;
-  if (Color) return <Color size={size} />;
-  return runtimeIconFallbackSvg('model', size);
+  return Icon ? <Icon size={size} /> : runtimeIconFallbackSvg('model', size);
 }
 
 function renderRuntimeIcon(resolution: RuntimeIconResolution, iconSize: number): React.ReactNode {
