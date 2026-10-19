@@ -3,7 +3,7 @@
 // Shared vi.mock registration + suite hooks for the #1763 AgentHubWorkbench
 // test shards. Must stay the first import so mock factories register before
 // the component tree (and its virtua/@lobehub/icons deps) is evaluated.
-import { installWorkbenchTestHooks } from './helpers';
+import { installWorkbenchTestHooks, openRailPage } from './helpers';
 
 import {
   fireEvent,
@@ -25,7 +25,7 @@ installWorkbenchTestHooks();
 
 describe('AgentHubWorkbench', () => {
 
-  it('routes global rail pages into the design workbench mode', () => {
+  it('routes global rail pages into the design workbench mode', async () => {
     const platform = createMockPlatform({
       surface: 'desktop',
       capabilities: { browserPreview: true },
@@ -41,7 +41,7 @@ describe('AgentHubWorkbench', () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: '联系人' }));
+    await openRailPage('联系人');
 
     expect(screen.getByTestId('agenthub-workbench')).toHaveAttribute('data-page', 'contacts');
     expect(screen.getByRole('main', { name: '工作区' })).toHaveAttribute('data-mode', 'workbench');
@@ -51,14 +51,14 @@ describe('AgentHubWorkbench', () => {
     expect(screen.queryByPlaceholderText('发消息给 Builder')).not.toBeInTheDocument();
     expect(screen.getByRole('heading', { name: '组织内联系人' })).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Agent' }));
+    await openRailPage('Agent');
 
     expect(screen.getByTestId('agenthub-workbench')).toHaveAttribute('data-page', 'agents');
     expect(screen.getAllByText('Builder').length).toBeGreaterThan(0);
     expect(screen.getAllByText('glm-5.1').length).toBeGreaterThan(0);
     expect(screen.queryByRole('button', { name: '@Agent' })).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: '项目' }));
+    await openRailPage('项目');
 
     expect(screen.getByTestId('agenthub-workbench')).toHaveAttribute('data-page', 'projects');
     expect(screen.getByRole('heading', { name: 'AI 游戏项目' })).toBeInTheDocument();
@@ -69,7 +69,7 @@ describe('AgentHubWorkbench', () => {
     // Verify the project page renders correctly with its heading.
   });
 
-  it('opens the account profile popover from the global rail', () => {
+  it('opens the account profile popover from the global rail', async () => {
     const platform = createMockPlatform({
       surface: 'desktop',
       capabilities: { browserPreview: true },
@@ -102,7 +102,7 @@ describe('AgentHubWorkbench', () => {
     expect(screen.queryByRole('dialog', { name: '用户 账号菜单' })).not.toBeInTheDocument();
   });
 
-  it('opens a human contact profile instead of an Agent config error for friend avatars', () => {
+  it('opens a human contact profile instead of an Agent config error for friend avatars', async () => {
     const platform = createMockPlatform({
       surface: 'desktop',
       capabilities: { browserPreview: true },
@@ -181,7 +181,7 @@ describe('AgentHubWorkbench', () => {
     });
   });
 
-  it('roves the global rail page buttons with arrow keys (single tab stop)', () => {
+  it('roves the global rail page buttons with arrow keys (single tab stop)', async () => {
     const platform = createMockPlatform({
       surface: 'desktop',
       capabilities: { browserPreview: false },
