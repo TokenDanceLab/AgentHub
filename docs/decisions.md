@@ -26,7 +26,7 @@
 | ADR-025 | 双平面：Hub 是控制面、不执行模型 Turn；Edge 是数据面并产生证据；详见 `docs/architecture/10-macro-engineering-design.md`。 |
 | ADR-026 | 自有 REST/WS 是产品契约 SSOT；MCP/A2A/AG-UI 只做 capability mapping；事件一致性与最小代理权进入实施合同。 |
 | ADR-027 | OTel GenAI 命名口径：GenAI span 使用 `agenthub.run*` / `gen_ai.*`；不为 WS 帧、DB/Redis 建 GenAI span。span 导出尚未落地，落地时按此口径。 |
-| ADR-028 | secret 门禁夹具只允许精确 `(path, literal)` + owner/review/reason 的 allowlist；禁止目录/glob/包级/regex 豁免。 |
+| ADR-028 | secret 门禁由 `gitleaks` 默认规则集承担，仓库只维护 `.gitleaks.toml`；夹具只允许 `condition = "AND"` 的精确 `(path, literal)` 放行，禁止目录/glob/包级豁免。 |
 | ADR-029/035 | Web 的 Query key 唯一产出点是 `app/shared/src/stores/queryKeys.ts`；键工厂必须有消费者；失效只引用工厂；Web 使用 `webQueryKeys`。Desktop 的 Hub query keys 尚未迁移，按同一规则逐步收敛。 |
 | ADR-030 | 对外契约：`x-agenthub-owner` 只用 Hub/Edge；端点级 `x-agenthub-status` 只取 implemented/planned，schema 级另允许 contract-draft；Mobile 是 fixture 边界验证，非 release candidate。 |
 | ADR-031 | 分页超过声明上限时夹到上限并回传 `nextCursor`/`hasMore`，不返回 400；被夹短的页仍可续取。 |

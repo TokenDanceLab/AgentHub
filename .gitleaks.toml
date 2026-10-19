@@ -1,0 +1,135 @@
+# Secret scanning config for `gitleaks` (https://github.com/gitleaks/gitleaks).
+#
+# The provider rules (AWS, GitHub, GitLab, Slack, Google, JWT, private keys,
+# generic API keys, ...) come from gitleaks' default ruleset via `extend`, so
+# this repo maintains no rule set of its own.
+#
+# The allowlist below keeps the ADR-028 invariant: a finding is silenced only
+# when BOTH the exact file and the exact literal match (`condition = "AND"`).
+# A new credential in one of these test files, or the same literal in another
+# file, is still reported.
+title = "AgentHub"
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Fixture literals registered for edge-server/internal/adapters/claude/claude_adapter_integration_test.go"
+condition = "AND"
+paths = ['''^edge\-server/internal/adapters/claude/claude_adapter_integration_test\.go$''']
+regexes = [
+  '''sk\-claude\-key\-456''',
+]
+
+[[allowlists]]
+description = "Fixture literals registered for edge-server/internal/adapters/sdk/sdk_fixture_mapper_test.go"
+condition = "AND"
+paths = ['''^edge\-server/internal/adapters/sdk/sdk_fixture_mapper_test\.go$''']
+regexes = [
+  '''attachment\-secret\-123456''',
+  '''sk\-direct\-secret\-123456''',
+  '''sk\-reason\-secret\-123456''',
+  '''trace\-ref\-secret\-123456''',
+]
+
+[[allowlists]]
+description = "Fixture literals registered for edge-server/internal/api/delivery_admission_test.go"
+condition = "AND"
+paths = ['''^edge\-server/internal/api/delivery_admission_test\.go$''']
+regexes = [
+  '''0123456789abcdef0123456789abcdef01234567''',
+]
+
+[[allowlists]]
+description = "Fixture literals registered for edge-server/internal/api/handlers_events_test.go"
+condition = "AND"
+paths = ['''^edge\-server/internal/api/handlers_events_test\.go$''']
+regexes = [
+  '''dGhlIHNhbXBsZSBub25jZQ==''',
+]
+
+[[allowlists]]
+description = "Fixture literals registered for edge-server/internal/api/handlers_runs_test.go"
+condition = "AND"
+paths = ['''^edge\-server/internal/api/handlers_runs_test\.go$''']
+regexes = [
+  '''my\-secret\-key\-for\-capability\-test\-32''',
+]
+
+[[allowlists]]
+description = "Fixture literals registered for edge-server/internal/api/hub_task_replay_test.go"
+condition = "AND"
+paths = ['''^edge\-server/internal/api/hub_task_replay_test\.go$''']
+regexes = [
+  '''fixture\-capability\-signing\-key\-32\-bytes''',
+]
+
+[[allowlists]]
+description = "Fixture literals registered for edge-server/internal/httpserver/server_test.go"
+condition = "AND"
+paths = ['''^edge\-server/internal/httpserver/server_test\.go$''']
+regexes = [
+  '''eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9\.''',
+]
+
+[[allowlists]]
+description = "Fixture literals registered for edge-server/internal/lifecycle/subagent_result_sanitize_test.go"
+condition = "AND"
+paths = ['''^edge\-server/internal/lifecycle/subagent_result_sanitize_test\.go$''']
+regexes = [
+  '''AIzaSyDabc123def456ghi789jkl012mno345pqr''',  # leak-guard-allow:LG-6EF0381E
+  '''AKIA1234567890ABCDEF''',  # leak-guard-allow:LG-D9119477
+  '''eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9\.eyJzdWIiOiIxMjM0NTY3ODkwIn0\.dozjgNryP4J3jVmNHl0w5N_XgL0n3I9PlFUP0THsR8U''',
+  '''ghp_abc123def456ghi789jkl012mno345pqr678''',  # leak-guard-allow:LG-D81E3E24
+  '''ghp_abc123def456ghi789jkl012mno345pqr678s''',  # leak-guard-allow:LG-D81E3E24
+  '''glpat\-abc123def456ghi789jk''',
+  '''hf_abc123def456ghi789jkl012mno345pqr678''',  # leak-guard-allow:LG-38FCBC39
+]
+
+[[allowlists]]
+description = "Fixture literals registered for hub-server/internal/config/config_test.go"
+condition = "AND"
+paths = ['''^hub\-server/internal/config/config_test\.go$''']
+regexes = [
+  '''test\-jwt\-secret\-42\-padded\-to\-32\-chars''',
+]
+
+[[allowlists]]
+description = "Fixture literals registered for hub-server/internal/handler/ws_test.go"
+condition = "AND"
+paths = ['''^hub\-server/internal/handler/ws_test\.go$''']
+regexes = [
+  '''test\-ws\-secret\-32\-characters\-long''',
+]
+
+[[allowlists]]
+description = "Fixture literals registered for hub-server/internal/middleware/timeout_test.go"
+condition = "AND"
+paths = ['''^hub\-server/internal/middleware/timeout_test\.go$''']
+regexes = [
+  '''dGhlIHNhbXBsZSBub25jZQ==''',
+]
+
+[[allowlists]]
+description = "Fixture literals registered for hub-server/tests/integration/extra_test.go"
+condition = "AND"
+paths = ['''^hub\-server/tests/integration/extra_test\.go$''']
+regexes = [
+  '''dGhlIHNhbXBsZSBub25jZQ==''',
+]
+
+[[allowlists]]
+description = "Fixture literals registered for hub-server/tests/integration/handlers_integration_test.go"
+condition = "AND"
+paths = ['''^hub\-server/tests/integration/handlers_integration_test\.go$''']
+regexes = [
+  '''sk\-very\-secret\-key\-12345''',
+]
+
+[[allowlists]]
+description = "Fixture literals registered for scripts/verify/tests/test_verify_real_e2e_artifacts.py"
+condition = "AND"
+paths = ['''^scripts/verify/tests/test_verify_real_e2e_artifacts\.py$''']
+regexes = [
+  '''eyJhbGciOiJIUzI1NiJ9\.eyJzdWIiOiIxMjM0NTY3ODkwIn0\.dozjgNryP4J3jVmNHl0w5N_XgL0n3I9PlFUP0THsR8U''',
+]
