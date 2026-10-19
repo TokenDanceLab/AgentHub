@@ -1,0 +1,23 @@
+name: Setup pnpm + Node and install app dependencies
+description: >-
+  Installs the pinned pnpm/Node toolchain with the shared pnpm cache and the
+  frozen app lockfile. Used by every frontend/QA/dependency job so the
+  versions, cache key and install flag have exactly one definition.
+
+runs:
+  using: composite
+  steps:
+    - uses: pnpm/action-setup@v6
+      with:
+        version: ${{ env.PNPM_VERSION }}
+
+    - uses: actions/setup-node@v7
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: pnpm
+        cache-dependency-path: app/pnpm-lock.yaml
+
+    - name: Install app dependencies
+      shell: bash
+      working-directory: app
+      run: pnpm install --frozen-lockfile
