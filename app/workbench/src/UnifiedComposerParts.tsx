@@ -7,7 +7,6 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 export {
-  ComposerMainchainStrip,
   ComposerMentionChips,
   ComposerQuoteBar,
   ComposerReplyBar,

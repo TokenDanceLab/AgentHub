@@ -34,7 +34,6 @@ import {
   ComposerAttachButton as ComposerAttachButtonBase,
   ComposerAttachmentBar as ComposerAttachmentBarBase,
   ComposerEditBar as ComposerEditBarBase,
-  ComposerMainchainStrip as ComposerMainchainStripBase,
   ComposerMentionChips as ComposerMentionChipsBase,
   ComposerQuoteBar as ComposerQuoteBarBase,
   ComposerReplyBar as ComposerReplyBarBase,
@@ -53,7 +52,6 @@ const ComposerReplyBar = React.memo(ComposerReplyBarBase);
 const ComposerQuoteBar = React.memo(ComposerQuoteBarBase);
 const ComposerEditBar = React.memo(ComposerEditBarBase);
 const ComposerMentionChips = React.memo(ComposerMentionChipsBase);
-const ComposerMainchainStrip = React.memo(ComposerMainchainStripBase);
 const ComposerAttachmentBar = React.memo(ComposerAttachmentBarBase);
 const ComposerTargetPicker = React.memo(ComposerTargetPickerBase);
 const ComposerSendButton = React.memo(ComposerSendButtonBase);
@@ -636,7 +634,7 @@ export function UnifiedComposer({
       onDragLeave={handleFormDragLeave}
       onDrop={handleFormDrop}
     >
-      <div className="pointer-events-auto mx-auto flex w-full max-w-3xl flex-col gap-2">
+      <div className="pointer-events-auto mx-auto flex w-full min-w-0 max-w-3xl flex-col gap-2">
       <InputGroup
         className={cn(
           'relative flex-col items-stretch rounded-2xl border-line bg-card shadow-[0_1px_2px_rgb(0_0_0/0.04),0_12px_32px_-20px_rgb(0_0_0/0.22)] transition-[border-color,box-shadow]',
@@ -655,12 +653,11 @@ export function UnifiedComposer({
           || chromeModel.quote
           || composer.editingMessageId
           || chromeModel.mentions
-          || chromeModel.mainchain
           || chromeModel.attachment
           || (view.isSubmitting && inFlightUploadSummaries.length > 0)) && (
           <InputGroupAddon
             align="block-start"
-            className="w-full cursor-default select-auto flex-col items-stretch gap-2 border-b border-line/60 px-3 pb-2.5 pt-2.5"
+            className="w-full cursor-default select-auto flex-col items-stretch gap-1.5 px-3 pb-1 pt-2.5"
           >
             {chromeModel.replyTo && (
               <ComposerReplyBar
@@ -687,14 +684,6 @@ export function UnifiedComposer({
                 isSubmitting={view.isSubmitting}
                 mentions={chromeModel.mentions}
                 onRemove={handleRemoveMention}
-              />
-            )}
-            {chromeModel.mainchain && (
-              <ComposerMainchainStrip
-                mainchainTask={chromeModel.mainchain.mainchainTask}
-                selectedAgentLabel={chromeModel.mainchain.selectedAgentLabel}
-                selectedTargetLabel={chromeModel.mainchain.selectedTargetLabel}
-                targetSelected={chromeModel.mainchain.targetSelected}
               />
             )}
             {chromeModel.attachment && (
@@ -734,7 +723,7 @@ export function UnifiedComposer({
               : undefined
           }
           data-composer-input
-          className="max-h-44 min-h-[54px] resize-none rounded-none border-0 bg-transparent px-4 pt-3.5 pb-1.5 text-[0.9375rem] leading-6 text-foreground shadow-none placeholder:text-muted-foreground/70 focus-visible:ring-0"
+          className="max-h-44 min-h-[44px] resize-none rounded-none border-0 bg-transparent px-4 pt-3 pb-1 text-[0.9375rem] leading-6 text-foreground shadow-none placeholder:text-muted-foreground/70 focus-visible:ring-0"
           ref={setTextareaRef}
           onChange={handleTextChange}
           onCompositionStart={() => {
@@ -763,10 +752,9 @@ export function UnifiedComposer({
         />
         <InputGroupAddon
           align="block-end"
-          className="flex-wrap items-center gap-0.5 border-t border-line/70 px-2 py-1.5"
+          className="flex-wrap items-center gap-0.5 px-2 pb-2 pt-0"
         >
           <ComposerAttachButton isSubmitting={view.isSubmitting} onClick={openFilePicker} />
-          <span aria-hidden="true" className="mx-0.5 h-4 w-px bg-line" />
           {chromeModel.agentOptions && (
             <ComposerAgentPicker
               availableMentionOptions={chromeModel.agentOptions}
@@ -787,10 +775,7 @@ export function UnifiedComposer({
             isSubmitting={view.isSubmitting}
             onChange={(mode) => dispatchComposer({ type: 'setApprovalMode', approvalMode: mode })}
           />
-          <div className="ml-auto flex items-center gap-2 pl-1">
-            <kbd className="hidden rounded border border-line bg-muted/60 px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground sm:inline-block">
-              Enter
-            </kbd>
+          <div className="ml-auto flex items-center pl-1">
             <ComposerSendButton
               hasMentions={view.hasMentions}
               isRunning={isRunning}
