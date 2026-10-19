@@ -13,8 +13,7 @@ import {
 
 const cliManifest: LocalCliDiscoveryManifest = {
   mode: "no-spend-discovery",
-  readinessManifest: "/tmp/agenthub/readiness.md",
-  readinessScript: "/usr/local/bin/agenthub read",
+  readinessDoc: "/tmp/agenthub/readiness.md",
   items: [
     { id: "codex", name: "Codex CLI", installed: true, version: "1.2.3", path: "/usr/bin/codex", noSpend: true },
     { id: "claude-code", name: "Claude Code", installed: false, version: null, path: "/usr/bin/claude", noSpend: false },
@@ -22,16 +21,14 @@ const cliManifest: LocalCliDiscoveryManifest = {
 };
 
 describe("SettingsPaneParts live leaves", () => {
-  it("LocalCliDiscoveryStatus renders readiness file and per-item rows", () => {
+  it("LocalCliDiscoveryStatus renders the readiness doc and per-item rows", () => {
     render(<LocalCliDiscoveryStatus discovery={cliManifest} />);
 
     expect(screen.getByText("CLI 诊断")).toBeInTheDocument();
     expect(screen.getByText("发现模式")).toBeInTheDocument();
     expect(screen.getByText("no-spend-discovery")).toBeInTheDocument();
-    expect(screen.getByText("就绪文件")).toBeInTheDocument();
+    expect(screen.getByText("就绪说明")).toBeInTheDocument();
     expect(screen.getByText("/tmp/agenthub/readiness.md")).toBeInTheDocument();
-    expect(screen.getByText("就绪脚本")).toBeInTheDocument();
-    expect(screen.getByText("/usr/local/bin/agenthub read")).toBeInTheDocument();
 
     expect(screen.getByText("Codex CLI")).toBeInTheDocument();
     expect(screen.getByText("version 1.2.3 · /usr/bin/codex")).toBeInTheDocument();
