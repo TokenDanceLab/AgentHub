@@ -8,13 +8,10 @@ import (
 
 // Data-driven payload decode helpers for team event replay.
 //
-// Audit-D §4 cluster 1 identified 10 sites across 4 files that repeated the
-// pattern `for _, event := range events { if event.Type != X { continue };
-// json.Unmarshal([]byte(event.Payload), &val) ... }`. Two of those live in
-// agent_team_projection.go (#1385 pure projection functions) and are left
-// untouched per refactor scope. The remaining 8 are deduplicated here through
-// two generic helpers plus a dispatch table that replaces the GetTeamRunState
-// replay switch.
+// Team event replay repeatedly decodes event.Payload for events of a given
+// type. The helpers below centralize that pattern through two generic
+// functions plus a dispatch table that replaces the GetTeamRunState replay
+// switch.
 
 // decodeTeamEventPayload unmarshals event.Payload into T. Returns the value
 // and true on success; on JSON error returns the zero value and false.

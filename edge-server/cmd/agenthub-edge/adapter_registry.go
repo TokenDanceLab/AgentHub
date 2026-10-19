@@ -110,7 +110,7 @@ func registerOpenCodeACPAdapter(reg *adapters.Registry, cfg config) {
 // via npx. ACP is the default claude runtime; an empty launcher falls back to
 // the platform-native npx (acp.DefaultNpxPath inside NewClaudeACPAdapter).
 // The legacy claude-code NDJSON parser stays registered as the orchestrator
-// inner and fallback (claude_code.go, marked DEPRECATED until Phase B).
+// inner and fallback (claude_code.go).
 func registerClaudeACPAdapter(reg *adapters.Registry, cfg config) {
 	a := claude.NewClaudeACPAdapter(cfg.ClaudeACPPath, cfg.AgentModel)
 	if err := reg.Register(a); err != nil {
@@ -169,7 +169,7 @@ func registerSDKAdapters(reg *adapters.Registry, cfg config) {
 // registerAdapter registers the orchestrator adapter with the
 // registered child agent IDs when a claude-code binary is configured.
 // The orchestrator leaf package gets the concrete ClaudeCodeAdapter through
-// its AgentExecutor port (composition root injects concrete deps, #1566).
+// its AgentExecutor port (composition root injects concrete deps).
 func registerAdapter(reg *adapters.Registry, cfg config) {
 	if cfg.ClaudeCodePath == "" {
 		return

@@ -104,12 +104,12 @@ func NewService(db *gorm.DB, cfg *Config) *Service {
 	}
 
 	bufSize := 1024
-	if cfg != nil && cfg.RetryBufferSize > 0 {
+	if cfg.RetryBufferSize > 0 {
 		bufSize = cfg.RetryBufferSize
 	}
 
 	lifecycle := context.Background()
-	if cfg != nil && cfg.LifecycleContext != nil {
+	if cfg.LifecycleContext != nil {
 		lifecycle = cfg.LifecycleContext
 	}
 

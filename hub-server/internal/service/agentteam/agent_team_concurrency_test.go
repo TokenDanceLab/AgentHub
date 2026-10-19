@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/agenthub/hub-server/internal/cache"
 	"github.com/agenthub/hub-server/internal/errcode"
 	"github.com/agenthub/hub-server/internal/model"
 	"github.com/agenthub/hub-server/internal/repository"
@@ -88,7 +89,7 @@ func (m *flakyAgentTeamAgentSvc) TriggerAgentTask(context.Context, string, strin
 func TestAgentTeamService_DecideApprovalConcurrentOppositeDecisionsFirstWins(t *testing.T) {
 	db := setupAgentTeamConcurrentSQLite(t)
 	controlSvc := &recordingAgentTeamControlSvc{}
-	svc := NewAgentTeamService(db, nil, nil)
+	svc := NewAgentTeamService(db, nil, cache.NoOpCache{})
 	svc.SetControlService(controlSvc)
 	team, _, executor, run := seedAgentTeamRun(t, db)
 	seedPendingApproval(t, db, run, executor, "approval-concurrent")
@@ -142,7 +143,7 @@ func TestAgentTeamService_DecideApprovalConcurrentOppositeDecisionsFirstWins(t *
 func TestAgentTeamService_DecideApprovalDeliveryFailureKeepsDecisionForRetry(t *testing.T) {
 	db := setupAgentTeamStateSQLite(t)
 	controlSvc := &recordingAgentTeamControlSvc{failCalls: 1}
-	svc := NewAgentTeamService(db, nil, nil)
+	svc := NewAgentTeamService(db, nil, cache.NoOpCache{})
 	svc.SetControlService(controlSvc)
 	team, _, executor, run := seedAgentTeamRun(t, db)
 	seedPendingApproval(t, db, run, executor, "approval-redelivery")
@@ -164,7 +165,7 @@ func TestAgentTeamService_DecideApprovalDeliveryFailureKeepsDecisionForRetry(t *
 
 func TestAgentTeamService_ResolveConflictConcurrentResolutionsFirstWins(t *testing.T) {
 	db := setupAgentTeamConcurrentSQLite(t)
-	svc := NewAgentTeamService(db, nil, nil)
+	svc := NewAgentTeamService(db, nil, cache.NoOpCache{})
 	team, _, executor, run := seedAgentTeamRun(t, db)
 	firstTaskID, secondTaskID, conflictID := seedTeamConflict(t, db, run, executor)
 
@@ -208,7 +209,7 @@ func TestAgentTeamService_ResolveConflictConcurrentResolutionsFirstWins(t *testi
 func TestAgentTeamService_DispatchAssignmentConcurrentCallsTriggerOnce(t *testing.T) {
 	db := setupAgentTeamStateSQLite(t)
 	agentSvc := &blockingAgentTeamAgentSvc{entered: make(chan struct{}), release: make(chan struct{})}
-	svc := NewAgentTeamService(db, agentSvc, nil)
+	svc := NewAgentTeamService(db, agentSvc, cache.NoOpCache{})
 	_, supervisor, executor, run := seedAgentTeamRun(t, db)
 	seedTeamRunSession(t, db, run.SessionID, "user-1", executor)
 	assignment := seedPendingAssignment(t, db, run, supervisor, executor)
@@ -249,7 +250,7 @@ func TestAgentTeamService_DispatchAssignmentConcurrentCallsTriggerOnce(t *testin
 func TestAgentTeamService_DispatchAssignmentTriggerFailureReleasesClaim(t *testing.T) {
 	db := setupAgentTeamStateSQLite(t)
 	agentSvc := &flakyAgentTeamAgentSvc{}
-	svc := NewAgentTeamService(db, agentSvc, nil)
+	svc := NewAgentTeamService(db, agentSvc, cache.NoOpCache{})
 	_, supervisor, executor, run := seedAgentTeamRun(t, db)
 	seedTeamRunSession(t, db, run.SessionID, "user-1", executor)
 	assignment := seedPendingAssignment(t, db, run, supervisor, executor)
@@ -274,7 +275,7 @@ func TestAgentTeamService_HandleRouteDecisionConcurrentGuardrailDoesNotOverflow(
 	guardrails := DefaultAgentTeamGuardrails()
 	guardrails.MaxTasksPerTeamRun = 1
 	guardrails.MaxActiveSubAgentsPerRun = 1
-	svc := NewAgentTeamServiceWithGuardrails(db, nil, nil, guardrails)
+	svc := NewAgentTeamServiceWithGuardrails(db, nil, cache.NoOpCache{}, guardrails)
 	team, _, executor, run := seedAgentTeamRun(t, db)
 	decision := model.CoordinatorRouteDecision{Action: "delegate", NextWorker: executor.ID, Instructions: "one slot only"}
 
@@ -291,7 +292,7 @@ func TestAgentTeamService_CreateAssignmentConcurrentGuardrailDoesNotOverflow(t *
 	guardrails := DefaultAgentTeamGuardrails()
 	guardrails.MaxTasksPerTeamRun = 1
 	guardrails.MaxActiveSubAgentsPerRun = 1
-	svc := NewAgentTeamServiceWithGuardrails(db, nil, nil, guardrails)
+	svc := NewAgentTeamServiceWithGuardrails(db, nil, cache.NoOpCache{}, guardrails)
 	_, supervisor, executor, run := seedAgentTeamRun(t, db)
 
 	errs := runConcurrentRouteCalls(2, func() error {
@@ -310,7 +311,7 @@ func TestAgentTeamService_HandleCompeteConcurrentBatchesStayAtomicAndWithinLimit
 	guardrails := DefaultAgentTeamGuardrails()
 	guardrails.MaxTasksPerTeamRun = 2
 	guardrails.MaxActiveSubAgentsPerRun = 2
-	svc := NewAgentTeamServiceWithGuardrails(db, nil, nil, guardrails)
+	svc := NewAgentTeamServiceWithGuardrails(db, nil, cache.NoOpCache{}, guardrails)
 	team, supervisor, first, run := seedAgentTeamRun(t, db)
 	secondProfile := "profile-second-executor"
 	second := &model.AgentTeamMember{TeamID: team.ID, AgentProfileID: &secondProfile, Role: model.TeamMemberRoleExecutor}
@@ -337,7 +338,7 @@ func TestAgentTeamService_HandleCompeteConcurrentBatchesStayAtomicAndWithinLimit
 
 func TestAgentTeamService_HandleCompeteTaskFailureRollsBackWholeBatch(t *testing.T) {
 	db := setupAgentTeamStateSQLite(t)
-	svc := NewAgentTeamService(db, nil, nil)
+	svc := NewAgentTeamService(db, nil, cache.NoOpCache{})
 	team, _, first, run := seedAgentTeamRun(t, db)
 	secondProfile := "profile-failing-executor"
 	second := &model.AgentTeamMember{TeamID: team.ID, AgentProfileID: &secondProfile, Role: model.TeamMemberRoleExecutor}
@@ -483,7 +484,7 @@ func assertAssignmentAndTaskCounts(t *testing.T, db *gorm.DB, runID string, want
 // stale-status call.
 func TestAgentTeamService_ReviewDagPlanConcurrentDecisionsFirstWins(t *testing.T) {
 	db := setupAgentTeamConcurrentSQLite(t)
-	svc := NewAgentTeamService(db, nil, nil)
+	svc := NewAgentTeamService(db, nil, cache.NoOpCache{})
 	svc.SetHumanReviewEnabled(true)
 	team, _, executor, run := seedAgentTeamRun(t, db)
 

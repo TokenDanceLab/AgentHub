@@ -25,11 +25,11 @@ import { useTranslation } from 'react-i18next';
 import { SHARED_WORKBENCH_I18N_NAMESPACE } from '@shared/i18n';
 
 /* ═══════════════════════════════════════════════════════════════════════
-   SettingsPaneParts — presentational residual slices from SettingsPanes
+   SettingsPaneParts — presentational parts for SettingsPanes
    (#686).
 
    CLI discovery / state-panel leaves and agent-config link.
-   CSS stays on SettingsPage.module.css. No intentional UX change.
+   CSS stays on SettingsPage.module.css.
    ═══════════════════════════════════════════════════════════════════════ */
 
 
@@ -45,7 +45,7 @@ export function LocalCliDiscoveryStatus({
       <SettingsRow label="发现模式" description="只做 no-spend CLI 状态发现；不执行 Run、带 prompt 的命令、模型调用或 secrets。">
         <SettingValue value={discovery.mode} />
       </SettingsRow>
-      <SettingsRow label="就绪 manifest" description="后续 approved-real 验证必须对齐的 readiness 文档。">
+      <SettingsRow label="就绪文件" description="no-spend CLI 状态发现使用的 readiness 文件。">
         <SettingPath value={discovery.readinessManifest} />
       </SettingsRow>
       <SettingsRow label="就绪脚本" description="静态 gate 和 no-spend command discovery 的验证入口。">

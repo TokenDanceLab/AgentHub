@@ -1,6 +1,5 @@
 /**
  * Chatview adapter shared helpers / constants.
- * Peel companion of adapter (#1143). Pure only; zero behavior change.
  */
 
 import type { TranscriptBlock, EvidenceRefStatus } from '../transcript/types'

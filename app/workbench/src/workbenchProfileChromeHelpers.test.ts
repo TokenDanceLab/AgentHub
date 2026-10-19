@@ -117,15 +117,15 @@ describe('workbenchProfileChromeHelpers', () => {
   it('resolves human profiles from mock contacts and conversation metadata', () => {
     const anchor = {} as HTMLElement;
     const fromContact = resolveHumanProfileByName({
-      name: 'Johnny',
+      name: 'Alice',
       conversations: [],
       t,
       anchor,
     });
     expect(fromContact).toMatchObject({
-      id: 'johnny',
-      name: 'Johnny',
-      initials: 'J',
+      id: 'alice',
+      name: 'Alice',
+      initials: 'A',
       org: 'AgentHub Desktop',
       status: '刚刚活跃',
       tag: '维护者',
@@ -277,10 +277,10 @@ describe('workbenchProfileChromeHelpers', () => {
   it('finds conversations and plans direct-message opens', () => {
     const conversations = [
       conversation({ id: 'c1', title: 'Builder' }),
-      conversation({ id: 'c2', title: 'Johnny' }),
+      conversation({ id: 'c2', title: 'Alice' }),
     ];
 
-    expect(findConversationForProfile(conversations, { id: 'x', name: 'Johnny' })?.id).toBe('c2');
+    expect(findConversationForProfile(conversations, { id: 'x', name: 'Alice' })?.id).toBe('c2');
     expect(findConversationForProfile(conversations, { id: 'missing', name: 'Nope' })).toBeUndefined();
 
     expect(planDirectMessageOpen({
@@ -312,6 +312,6 @@ describe('workbenchProfileChromeHelpers', () => {
   });
 
   it('builds human profile deep links', () => {
-    expect(buildHumanProfileLink('johnny')).toBe('agenthub://user/johnny');
+    expect(buildHumanProfileLink('alice')).toBe('agenthub://user/alice');
   });
 });

@@ -6,6 +6,7 @@ import { createHubClient, type HubDocumentListItem } from '@/api/hubClient';
 import { fetchAllPages } from '@shared/hub/paginate';
 import { getAccessToken } from '@/hooks/useAuth';
 import type { DocRow } from '@agenthub/workbench/pages';
+import type { TFunction } from 'i18next';
 
 // Lazy singleton — avoids creating the client on module load when Hub is not needed.
 let _hubClient: ReturnType<typeof createHubClient> | null = null;
@@ -45,7 +46,7 @@ export function useCreateDocument() {
 
 // ── Mapping ──────────────────────────────────────────────────────
 
-type AppTranslate = (key: string, options?: any) => string;
+type AppTranslate = TFunction;
 
 export function hubDocToDocRow(doc: HubDocumentListItem, t?: AppTranslate): DocRow {
   const tag = doc.tag?.trim();

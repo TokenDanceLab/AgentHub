@@ -11,7 +11,7 @@ import (
 // edgeValidateShape mirrors edge-server/internal/jwtutil.ValidateCapabilityToken
 // constraints (issuer/audience/alg/device bind). Kept local so this package does
 // not import edge-server/internal (Go internal rules). Wire claim tags must stay
-// aligned with edge CapabilityClaims (AH-SR-046 / #461 fixture evidence).
+// aligned with edge CapabilityClaims (#461 fixture evidence).
 func edgeValidateShape(tokenStr string, secret []byte, expectedDeviceID string) (*CapabilityClaims, error) {
 	if len(secret) == 0 {
 		return nil, ErrCapabilitySecretEmpty
@@ -84,7 +84,7 @@ func TestIssueCapabilityToken_RejectsEmptySecret(t *testing.T) {
 }
 
 func TestIssueCapabilityToken_WithBindings_EdgeValidateShape(t *testing.T) {
-	// AH-SR-046 / #461: Hub issue → Edge-shaped validate roundtrip with
+	// #461: Hub issue → Edge-shaped validate roundtrip with
 	// purpose/action/target/thread bindings (no production network).
 	secret := []byte("hub-local-secret-minimum-32-chars!!")
 	tok, err := IssueCapabilityToken(secret, "user-1", "edge-1", "proj_local", "run-start", time.Minute, CapabilityIssueOptions{

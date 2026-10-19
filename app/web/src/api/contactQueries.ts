@@ -4,16 +4,9 @@ import { getAccessToken } from '@/hooks/useAuth';
 import { hubQueryKeys, webQueryKeys } from '@shared/stores/queryKeys';
 import type { FriendRequestInfo, SearchResult } from './hubClient';
 
-// These two used to name `hubQueryKeys.contacts.list` and
-// `hubQueryKeys.threads.list` — keys NO Web query ever wrote. Web's contact
-// list is `webQueryKeys.contacts.list(hubReady)` and its session list is
-// `webQueryKeys.sessions.list(hubReady)`, so every invalidation below missed
-// the cache: accepting/rejecting a friend request, removing, blocking,
-// unblocking or editing a remark left the contact list showing the old state
-// (that query has `staleTime` but no `refetchInterval`, so nothing healed it
-// short of a window refocus), and `createGroupSession` left the new session out
-// of the list for up to one 10s poll. Both now name the family ROOT, which is a
-// prefix of the real list key whatever `hubReady` is (ADR-029 / #2261).
+// Invalidations target the `webQueryKeys.contacts.root` / `sessions.root`
+// families so they match the keys Web queries actually write, whatever the
+// `hubReady` flag is (ADR-029 / #2261).
 const contactsQueryKey = webQueryKeys.contacts.root;
 // Friend requests are the one contact sub-resource Web caches under the shared
 // `hub` namespace (`useListFriendRequests` below), so its key stays.

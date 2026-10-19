@@ -22,7 +22,7 @@
       "toolName": "edit",
       "status": "running",
       "input": {
-        "path": "docs/audit/sdk-adapter-fixture.md"
+        "path": "docs/reference/agent-protocols.md"
       },
       "metadata": {
         "title": "Edit fixture report"
@@ -36,7 +36,7 @@
       "toolName": "edit",
       "status": "completed",
       "input": {
-        "path": "docs/audit/sdk-adapter-fixture.md"
+        "path": "docs/reference/agent-protocols.md"
       },
       "output": "updated fixture report",
       "metadata": {

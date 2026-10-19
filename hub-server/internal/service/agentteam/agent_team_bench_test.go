@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/agenthub/hub-server/internal/cache"
 	"github.com/agenthub/hub-server/internal/model"
 	"github.com/agenthub/hub-server/internal/repository"
 	"github.com/glebarez/sqlite"
@@ -151,7 +152,7 @@ func seedBenchTeamRun(b *testing.B, db *gorm.DB) (*model.AgentTeam, *model.Agent
 
 func BenchmarkRouteDecisionValidation(b *testing.B) {
 	db := setupBenchDB(b)
-	svc := NewAgentTeamService(db, nil, nil)
+	svc := NewAgentTeamService(db, nil, cache.NoOpCache{})
 	_, _, executor, run := seedBenchTeamRun(b, db)
 
 	decision := model.CoordinatorRouteDecision{
@@ -164,7 +165,7 @@ func BenchmarkRouteDecisionValidation(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_, _ = svc.countMatchingRouteDecisions(run.ID, decision)
+		_, _ = svc.countMatchingRouteDecisionsDB(svc.db, run.ID, decision)
 	}
 	b.StopTimer()
 }
@@ -176,7 +177,7 @@ func BenchmarkRouteDecisionFull(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		b.StopTimer()
 		db := setupBenchDB(b)
-		svc := NewAgentTeamService(db, nil, nil)
+		svc := NewAgentTeamService(db, nil, cache.NoOpCache{})
 		_, _, executor, run := seedBenchTeamRun(b, db)
 		b.StartTimer()
 
@@ -195,7 +196,7 @@ func BenchmarkRouteDecisionFinish(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		b.StopTimer()
 		db := setupBenchDB(b)
-		svc := NewAgentTeamService(db, nil, nil)
+		svc := NewAgentTeamService(db, nil, cache.NoOpCache{})
 		_, _, _, run := seedBenchTeamRun(b, db)
 		b.StartTimer()
 
@@ -213,7 +214,7 @@ func BenchmarkRouteDecisionRejectInvalidWorker(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		b.StopTimer()
 		db := setupBenchDB(b)
-		svc := NewAgentTeamService(db, nil, nil)
+		svc := NewAgentTeamService(db, nil, cache.NoOpCache{})
 		_, _, _, run := seedBenchTeamRun(b, db)
 		b.StartTimer()
 

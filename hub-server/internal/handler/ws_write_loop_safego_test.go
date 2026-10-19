@@ -1,10 +1,10 @@
 package handler
 
-// #2246 slice 1 follow-up: writeLoop was the fifth hand-written recover() site
-// and the only one the first slice left behind — a per-connection goroutine
-// started by a bare `go func(){}` five lines above a safego.SafeGo("ws.readLoop")
-// call, guarded by a log-only recover with no stack, no counter and no
-// PanicObserver. It now recovers through pkg/safego like everything else.
+// #2246: writeLoop was the fifth hand-written recover() site — a
+// per-connection goroutine started by a bare `go func(){}` five lines above a
+// safego.SafeGo("ws.readLoop") call, guarded by a log-only recover with no
+// stack, no counter and no PanicObserver. It now recovers through pkg/safego
+// like everything else.
 //
 // What these tests pin is what that convergence could silently have broken:
 //
@@ -34,8 +34,8 @@ package handler
 // asserts on the records the panic produced, so a broken injection fails loudly
 // instead of turning the Close probe into a vacuous green.
 //
-// No time.Sleep in this file: the test-sleep ratchet budgets sleeps per file and
-// a newly added file has no baseline entry.
+// No time.Sleep in this file: the tests wait on channels instead of a fixed
+// sleep.
 
 import (
 	"context"
@@ -344,7 +344,7 @@ func TestServeWS_LaunchReleasesGoroutineSlot(t *testing.T) {
 	const userID = "user-writeloop-launch"
 	router.GET("/client/ws", func(c *gin.Context) {
 		// ServeWS fails closed without an authenticated context; the real
-		// route gets it from middleware.WSAuthMiddleware.
+		// route gets it from middleware.AuthMiddleware.WSHandler().
 		c.Set("user_id", userID)
 	}, h.ServeWS)
 

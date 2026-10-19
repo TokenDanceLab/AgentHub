@@ -147,7 +147,7 @@ function createTasksFromRuns(runs: MobileRun[], t: ReturnType<typeof useStrings>
     id: `task-${run.id}`,
     title: run.title,
     project: projectNameForRun(run),
-    assignee: index === 0 ? 'Delicious233' : 'AgentHub',
+    assignee: index === 0 ? 'Demo User' : 'AgentHub',
     creator: 'TokenDance',
     startTime: index === 0 ? '14:02' : '13:40',
     dueDate: index === 0 ? t.taskDueToday : t.taskDueTomorrow,

@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════════════════════════
-   Workbench Tasks board column SSOT (#1999, UX F13).
+   Workbench Tasks board column SSOT (#1999).
 
    Single status→column mapping table: every task status maps to exactly
    one board column (id / label / tone), and both the lifecycle sequence

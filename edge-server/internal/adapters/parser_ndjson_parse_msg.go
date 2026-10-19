@@ -1,7 +1,5 @@
 package adapters
 
-// Residual pure-helper peel #1113: assistant / stream / result parse helpers.
-
 func (p *NDJSONStreamParser) parseAssistantMessage(scope map[string]any, msg *claudeSDKMessage) {
 	if msg.Message == nil {
 		return
@@ -100,7 +98,7 @@ func (p *NDJSONStreamParser) parseResult(scope map[string]any, msg *claudeSDKMes
 	if !success {
 		payload["errors"] = msg.Errors
 	}
-	// Additional result fields from audit Section 5.10
+	// Additional result fields
 	if msg.DurationAPIMs > 0 {
 		payload["durationApi"] = msg.DurationAPIMs
 	}

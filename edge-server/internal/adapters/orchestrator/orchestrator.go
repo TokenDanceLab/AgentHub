@@ -28,19 +28,15 @@ const (
 // The underlying agent executor is injected through the AgentExecutor port
 // (composition root wires a ClaudeCodeAdapter); the leaf package never imports
 // the concrete adapter package.
-//
-// Residual pure helpers live in orchestrator_*.go companions (peel #1111).
 type Adapter struct {
-	inner               AgentExecutor
-	systemPrompt        string
-	agentRegistry       *agents.Registry
-	adapterRegistry     AdapterRegistry
-	messageQueue        *agents.Queue
-	spawner             SubAgentSpawner
-	depth               int
-	dispatchConcurrency int
+	inner         AgentExecutor
+	systemPrompt  string
+	agentRegistry *agents.Registry
+	messageQueue  *agents.Queue
+	spawner       SubAgentSpawner
+	depth         int
 
-	// Plan approval gate (P0 #3): when non-nil, the orchestrator pauses after
+	// Plan approval gate: when non-nil, the orchestrator pauses after
 	// detecting dispatch events and waits for user approval before spawning sub-agents.
 	planBroker *PlanApprovalBroker
 }
@@ -80,20 +76,7 @@ func (a *Adapter) WithDepth(d int) *Adapter {
 	return a
 }
 
-// WithDispatchConcurrency sets the max concurrent dispatch goroutines.
-// Values <= 0 use DefaultDispatchConcurrency (10, matching OpenCode default).
-func (a *Adapter) WithDispatchConcurrency(n int) *Adapter {
-	a.dispatchConcurrency = n
-	return a
-}
-
-// WithAdapterRegistry attaches the adapter registry for agent name validation (O-01).
-func (a *Adapter) WithAdapterRegistry(r AdapterRegistry) *Adapter {
-	a.adapterRegistry = r
-	return a
-}
-
-// WithPlanBroker attaches the plan approval broker for the plan confirmation gate (P0 #3).
+// WithPlanBroker attaches the plan approval broker for the plan confirmation gate.
 // When set, the orchestrator pauses after detecting dispatch events and waits for
 // user approval before spawning sub-agents.
 func (a *Adapter) WithPlanBroker(b *PlanApprovalBroker) *Adapter {
@@ -138,19 +121,17 @@ func (a *Adapter) ParseStream(ctx context.Context, stdout io.Reader, stdin io.Wr
 			a.messageQueue.EnsureAgent(run.ID, 64)
 		}
 		effectiveEmitter = &dispatchInterceptor{
-			inner:           emitter,
-			registry:        a.agentRegistry,
-			adapterRegistry: a.adapterRegistry,
-			queue:           a.messageQueue,
-			spawner:         a.spawner,
-			parentRun:       run,
-			depth:           a.depth,
-			threadID:        run.ThreadID,
-			model:           parentModel,
-			maxConcurrency:  a.dispatchConcurrency,
-			ctx:             ctx,
-			dispatched:      make(map[string]dispatchEvent),
-			planBroker:      a.planBroker,
+			inner:      emitter,
+			registry:   a.agentRegistry,
+			queue:      a.messageQueue,
+			spawner:    a.spawner,
+			parentRun:  run,
+			depth:      a.depth,
+			threadID:   run.ThreadID,
+			model:      parentModel,
+			ctx:        ctx,
+			dispatched: make(map[string]dispatchEvent),
+			planBroker: a.planBroker,
 		}
 		if budget, ok := ctx.Value(CtxBudgetKey).(*runnerctx.ContextBudget); ok {
 			effectiveEmitter.(*dispatchInterceptor).budget = budget
@@ -171,22 +152,20 @@ func (a *Adapter) Available() bool {
 
 // dispatchInterceptor wraps an EventEmitter to detect dispatch events.
 type dispatchInterceptor struct {
-	inner           EventEmitter
-	registry        *agents.Registry
-	adapterRegistry AdapterRegistry
-	queue           *agents.Queue
-	spawner         SubAgentSpawner
-	parentRun       store.Run
-	depth           int
-	threadID        string
-	model           string
-	budget          *runnerctx.ContextBudget
-	maxConcurrency  int
+	inner     EventEmitter
+	registry  *agents.Registry
+	queue     *agents.Queue
+	spawner   SubAgentSpawner
+	parentRun store.Run
+	depth     int
+	threadID  string
+	model     string
+	budget    *runnerctx.ContextBudget
 
-	// Plan approval gate (P0 #3): when planBroker is non-nil, the interceptor
+	// Plan approval gate: when planBroker is non-nil, the interceptor
 	// pauses after detecting dispatch events and emits a plan.proposed event.
 	// It then blocks until the user approves or rejects the plan, or the
-	// auto-approve timeout fires. When nil, dispatches proceed immediately.
+	// approval timeout fires (default: deny). When nil, dispatches proceed immediately.
 	planBroker *PlanApprovalBroker
 
 	// Sub-agent result injection and status tracking.
@@ -197,7 +176,7 @@ type dispatchInterceptor struct {
 	dispatched         map[string]dispatchEvent // agentID -> original dispatch event for result injection
 
 	// textBuffer accumulates streamed text deltas to prevent dispatch JSON
-	// fragmentation across BusEventTextDelta events (ISSUE 3.2).
+	// fragmentation across BusEventTextDelta events.
 	// Reset on BusEventTextBlock or after successful dispatch detection.
 	textBuffer strings.Builder
 }

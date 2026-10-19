@@ -4,18 +4,12 @@ on:
   workflow_run:
     workflows: ["Release"]
     types: [completed]
-    branches: [master]
   workflow_dispatch:
     inputs:
       version:
         description: "Version tag or ref to deploy (e.g. v1.2.3 or a commit SHA)"
         required: true
         type: string
-      skip_staging:
-        description: "Skip staging deployment (emergency only)"
-        required: false
-        default: false
-        type: boolean
 
 permissions:
   contents: read
@@ -25,46 +19,23 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  GO_VERSION: "1.26.5"
+  GO_VERSION: "1.26.9"
   REGISTRY: ghcr.io
-  # Image SSOT: ghcr.io/tokendancelab/agenthub-hub-server (see docs/analysis/image-name-ssot.md / #426).
-  # Do not reintroduce agenthub-hub as a second product image name.
+  # Image name is the single product image; do not add a second alias.
   IMAGE_NAME: tokendancelab/agenthub-hub-server
-  # ──────────────────────────────────────────────────────────────
-  # 部署真实性声明（build-only）：
-  # 本 workflow 只负责【构建 + 推送镜像 + 人工审批】，不执行真实部署。
-  # 仓库没有服务器 SSH 部署凭证（无 DEPLOY_HOST / SSH_PRIVATE_KEY 等 secret），
-  # 真实部署由人工 SSH 到服务器按权威生产 compose 执行，仓库内不做假部署。
-  # 权威生产形状：deployments/production/docker-compose.yml（见 docs/architecture/05-deployment.md）。
-  # 部署与验证指引见下方 deploy-staging / deploy-production job。
-  # 下方 deploy-staging / deploy-production / health-check 均为"人工部署指引"，
-  # 不做假部署，不伪装 CI 已真实上线。
-  # ──────────────────────────────────────────────────────────────
+  # Build and push only. Real deployment is a manual operation outside this
+  # repository; deployment shape lives in deployments/production/.
 
 jobs:
-  # ── Gate: only proceed on Release success or manual dispatch ──
-  gate:
-    runs-on: ubuntu-latest
+  # ── Build & Push Docker Image ──────────────────
+  docker-build-push:
     if: |
       github.event_name == 'workflow_dispatch' ||
       (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
-    steps:
-      - name: Gate passed
-        run: |
-          REF="${{ github.event.inputs.version || github.event.workflow_run.head_branch }}"
-          echo "Proceeding with deployment for ref: ${REF}"
-          echo "Trigger: ${{ github.event_name }}"
-
-  # ── Build & Push Docker Image ──────────────────
-  docker-build-push:
-    needs: gate
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
-    outputs:
-      image_tag: ${{ steps.meta.outputs.version }}
-      image_digest: ${{ steps.build.outputs.digest }}
     steps:
       - name: Determine checkout ref
         id: ref
@@ -107,175 +78,3 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-
-  # ── Staging 部署指引（人工 SSH 执行，本 workflow 不做真实部署）──
-  deploy-staging:
-    needs: docker-build-push
-    if: ${{ github.event.inputs.skip_staging != 'true' }}
-    runs-on: ubuntu-latest
-    environment:
-      name: staging
-    steps:
-      - uses: actions/checkout@v7
-
-      - name: Staging 部署指引（人工 SSH 执行）
-        run: |
-          echo "::group::Staging Deploy Instructions"
-          echo "Image: ${{ needs.docker-build-push.outputs.image_tag }}"
-          echo "Digest: ${{ needs.docker-build-push.outputs.image_digest }}"
-          echo "::notice::镜像已构建并推送到 GHCR。Staging 部署由人工 SSH 执行，本 job 不执行真实部署。"
-          echo ""
-          echo "在 staging 服务器上执行："
-          echo "  1. 拉取镜像: docker pull ghcr.io/tokendancelab/agenthub-hub-server:${{ needs.docker-build-push.outputs.image_tag }}"
-          echo "     （或离线模式: docker load -i <image.tar>）"
-          echo "  2. 部署: docker compose -f deployments/production/docker-compose.yml up -d --no-build"
-          echo "     （本次构建镜像: ghcr.io/tokendancelab/agenthub-hub-server:${{ needs.docker-build-push.outputs.image_tag }}）"
-          echo "  3. 验证: curl -s http://localhost:8090/health/ready （应返回 status=ok 且 ready=true）"
-          echo ""
-          echo "部署形状与指南: deployments/production/docker-compose.yml / docs/architecture/05-deployment.md"
-          echo "::endgroup::"
-
-  # ── Manual Approval Gate ───────────────────────
-  # ────────────────────────────────────────────────
-  # PRODUCTION DEPLOYMENT APPROVAL GATE
-  #
-  # This job uses a GitHub Environment named "production" to enforce
-  # manual approval before any production deployment proceeds.
-  #
-  # REPOSITORY ADMIN SETUP REQUIRED:
-  #   1. Go to: Settings → Environments → New environment
-  #   2. Name: "production"
-  #   3. Under "Required reviewers": add at least 1 reviewer
-  #   4. Optionally enable "Wait timer" (recommended: 5 minutes)
-  #   5. Save
-  #
-  # Without required reviewers configured, GitHub will auto-approve
-  # this step — defeating the purpose. SET UP REVIEWERS.
-  #
-  # When this job runs, GitHub pauses and sends a notification to
-  # every configured reviewer. A reviewer must open the deployment
-  # and click "Approve" (or "Reject") before the pipeline continues.
-  # ────────────────────────────────────────────────
-  approve-production:
-    needs: [deploy-staging, docker-build-push]
-    runs-on: ubuntu-latest
-    environment:
-      name: production
-    steps:
-      - name: Approval gate passed
-        run: |
-          echo "============================================================="
-          echo "  PRODUCTION DEPLOYMENT APPROVED"
-          echo "  Image:   ${{ needs.docker-build-push.outputs.image_tag }}"
-          echo "  Digest:  ${{ needs.docker-build-push.outputs.image_digest }}"
-          echo "  Approved by: ${{ github.actor }}"
-          echo "  Time:    $(date -u '+%Y-%m-%dT%H:%M:%SZ')"
-          echo "============================================================="
-
-  # ── Production 部署指引（人工 SSH 执行，本 workflow 不做真实部署）──
-  deploy-production:
-    needs: [approve-production, docker-build-push]
-    runs-on: ubuntu-latest
-    environment:
-      name: production
-    steps:
-      - uses: actions/checkout@v7
-
-      - name: Production 部署指引（人工 SSH 执行）
-        run: |
-          echo "::group::Production Deploy Instructions"
-          echo "Deploying image: ${{ needs.docker-build-push.outputs.image_tag }}"
-          echo "Digest:          ${{ needs.docker-build-push.outputs.image_digest }}"
-          echo "::notice::审批已通过。真实部署由人工 SSH 执行，本 job 不执行真实部署。"
-          echo ""
-          echo "在 production 服务器上执行："
-          echo "  1. 拉取镜像: docker pull ghcr.io/tokendancelab/agenthub-hub-server:${{ needs.docker-build-push.outputs.image_tag }}"
-          echo "     （或离线模式: docker load -i <image.tar>）"
-          echo "  2. 部署: docker compose -f deployments/production/docker-compose.yml up -d --no-build"
-          echo "     （本次构建镜像: ghcr.io/tokendancelab/agenthub-hub-server:${{ needs.docker-build-push.outputs.image_tag }}）"
-          echo "     compose 模板含 healthcheck；部署后人工验证见下方清单。"
-          echo "  3. 手动复核: curl -s https://api.hub.vectorcontrol.tech/health"
-          echo ""
-          echo "部署形状与指南: deployments/production/docker-compose.yml / docs/architecture/05-deployment.md"
-          echo "回滚指引见本 job 下方注释。"
-          echo "::endgroup::"
-
-      # ──────────────────────────────────────────────
-      # ROLLBACK INSTRUCTIONS
-      # ──────────────────────────────────────────────
-      # If this production deployment fails or causes a regression,
-      # use one of the following rollback procedures.
-      #
-      # --- Option A: Re-deploy a known-good version via Actions ---
-      #   1. Go to: Actions → CD Production → Run workflow
-      #   2. Enter the LAST KNOWN GOOD version tag (e.g. v1.2.2)
-      #   3. Trigger the workflow — it will rebuild + deploy that ref
-      #
-      # --- Option B: Rollback on the production server (fastest) ---
-      #   Prerequisites: SSH access to the production server.
-      #   1. SSH into the production host.
-      #   2. List available Docker images:
-      #        docker images ghcr.io/tokendancelab/agenthub-hub-server --format '{{.ID}} {{.Tag}} {{.CreatedAt}}'
-      #   3. Tag the last known-good image as the compose-pinned tag:
-      #        docker tag <safe-image-id> ghcr.io/tokendancelab/agenthub-hub-server:latest
-      #   4. Recreate the container with the rollback image:
-      #        cd /path/to/agent-hub-repo
-      #        docker compose -f deployments/production/docker-compose.yml up -d --no-build --force-recreate hub-server
-      #   5. Verify recovery:
-      #        curl -s https://<hub-host>/health | jq .
-      #        curl -sf https://<hub-host>/api/public/stats
-      #
-      # --- Option C: docker compose direct rollback ---
-      #   Use docker compose directly on the production host:
-      #   1. SSH into the production host.
-      #   2. cd /path/to/agent-hub-repo
-      #   3. Tag the previous working image as the compose-pinned tag:
-      #        docker tag ghcr.io/tokendancelab/agenthub-hub-server:<previous-tag> ghcr.io/tokendancelab/agenthub-hub-server:latest
-      #   4. Recreate the container:
-      #        docker compose -f deployments/production/docker-compose.yml \
-      #          up -d --no-build --no-deps --force-recreate hub-server
-      #   5. Follow logs until healthy:
-      #        docker compose -f deployments/production/docker-compose.yml logs -f hub-server
-      #
-      # --- Option D: Database rollback (if migrations caused issues) ---
-      #   Reference: server SSOT projects/agenthub（备份与恢复由 server 侧维护，不在本仓库）
-      #   1. Stop hub-server: systemctl stop hub-server
-      #   2. Restore DB: pg_restore -h <host> -U agenthub -d agenthub \
-      #        --clean --if-exists <backup-file>.dump
-      #   3. Deploy previous image (Option B or C above).
-      #
-      # --- Post-rollback verification checklist ---
-      #   [ ] /health returns status "ok" with all checks passing
-      #   [ ] /api/public/stats returns 200
-      #   [ ] Login flow works (TokenDance ID OIDC callback)
-      #   [ ] WebSocket connections succeed
-      #   [ ] No spike in error logs (docker compose logs --tail=200 hub-server)
-      #   [ ] Staging environment unaffected
-      # ──────────────────────────────────────────────
-
-  # ── 部署后人工验证指引（无真实 health 轮询，见 env 区声明）──
-  health-check:
-    needs: [deploy-production, docker-build-push]
-    runs-on: ubuntu-latest
-    if: always()
-    steps:
-      - name: 部署摘要与人工验证指引
-        run: |
-          echo "::group::Deployment Summary"
-          echo "Image:  ${{ needs.docker-build-push.outputs.image_tag || 'N/A' }}"
-          echo "Digest: ${{ needs.docker-build-push.outputs.image_digest || 'N/A' }}"
-          echo "Status: ${{ needs.deploy-production.result }}"
-          echo ""
-          if [ "${{ needs.deploy-production.result }}" = "success" ]; then
-            echo "部署指引已输出，真实部署由人工 SSH 执行（见 deploy-staging / deploy-production job）。"
-            echo ""
-            echo "部署后人工验证清单："
-            echo "  1. /health/ready 返回 status=ok 且 ready=true（compose healthcheck 与人工 curl 复核）"
-            echo "  2. curl -s https://api.hub.vectorcontrol.tech/health"
-            echo "  3. curl -sf https://api.hub.vectorcontrol.tech/api/public/stats"
-            echo "  4. 观察日志: docker compose -f deployments/production/docker-compose.yml logs --tail=200 hub-server"
-          else
-            echo "::warning::Production 部署指引未完成（job 失败）。"
-            echo "回滚指引见 'deploy-production' job 下方注释。"
-          fi
-          echo "::endgroup::"

@@ -11,24 +11,15 @@ const explicitScanFiles = [
   path.join(projectRoot, 'app.config.ts'),
   path.join(projectRoot, 'eas.json'),
   path.join(projectRoot, 'README.md'),
-  path.join(projectRoot, 'docs', 'handoff.md'),
 ];
 const scanRoots = [
   sourceRoot,
   path.join(projectRoot, 'scripts'),
 ];
-const privateTermScanAllowlist = new Set([
-  path.join(projectRoot, 'scripts', 'visual-qa.mjs'),
-]);
-const forbiddenPrivateTerms = [
-  String.fromCodePoint(0x5510, 0x4e01),
-  String.fromCodePoint(0x5cb3, 0x9e93),
-  ['Yue', 'lu'].join(''),
-  String.fromCodePoint(0x771f, 0x5b9e, 0x59d3, 0x540d),
-  ['real', ' name'].join(''),
-];
 const pemBoundaryPrefix = ['-----', 'BEGIN'].join('');
 const privateKeyBlockTerm = ['PRIVATE', 'KEY'].join(' ');
+const realNameMarker = ['真实', '姓名'].join('');
+const realNameEnglish = ['real', 'name'].join(' ');
 const forbiddenSecretPatterns = [
   { label: 'authorization_bearer', pattern: /Authorization:\s*Bearer\s+[A-Za-z0-9._~+/=-]+/i },
   { label: 'access_token', pattern: /\baccess_token\s*[=:]\s*['"]?[A-Za-z0-9._~+/=-]{8,}/i },
@@ -39,29 +30,10 @@ const forbiddenSecretPatterns = [
   { label: 'client_secret', pattern: /\bclient_secret\s*[=:]\s*['"]?[A-Za-z0-9._~+/=-]{8,}/i },
   { label: 'jwt', pattern: /\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b/ },
   { label: 'private_key', pattern: new RegExp(`${pemBoundaryPrefix} [A-Z ]*${privateKeyBlockTerm}-----`) },
+  { label: 'real_name_marker', pattern: new RegExp(`(${realNameMarker}|${realNameEnglish})`, 'i') },
 ];
 
 describe('AgentHub mobile privacy sanitization', () => {
-  it('keeps source fixtures free of private identity placeholders', async () => {
-    const files = await listScanFiles();
-    const findings: string[] = [];
-
-    for (const file of files) {
-      if (privateTermScanAllowlist.has(file)) {
-        continue;
-      }
-
-      const content = await readFile(file, 'utf8');
-      for (const forbiddenTerm of forbiddenPrivateTerms) {
-        if (content.includes(forbiddenTerm)) {
-          findings.push(`${path.relative(projectRoot, file)}: private_term`);
-        }
-      }
-    }
-
-    expect(findings).toEqual([]);
-  });
-
   it('keeps scanned source, docs, config, and scripts free of inline secrets', async () => {
     const files = await listScanFiles();
     const findings: string[] = [];

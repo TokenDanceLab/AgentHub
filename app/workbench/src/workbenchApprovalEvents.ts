@@ -1,5 +1,5 @@
 /**
- * Transient workbench UI intent for the global status bar (#1994, UX F5).
+ * Transient workbench UI intent for the global status bar (#1994).
  *
  * The frame-level awaiting-approval chip dispatches this intent when the
  * active conversation has a pending approval block on the chat page; the

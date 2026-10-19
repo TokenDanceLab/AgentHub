@@ -1,6 +1,5 @@
 /**
  * DiffReviewPanel pure helpers.
- * Peel companion of DiffReviewPanel (#1151). Pure only; zero behavior change.
  */
 
 import type { DiffHunk } from '../diff';
@@ -56,8 +55,8 @@ export function buildSideBySideRows(hunk: DiffHunk): SideBySideRow[] {
       const addedLine = lines[i + 1]!;
       const oldCell = makeCell(line.oldLineNumber, line.content);
       const newCell = makeCell(addedLine.newLineNumber, addedLine.content);
-      // Word-level diff for the modified pair (P6 Step 2). Per-column split
-      // (report §4.1): left cell keeps removed+context, right cell keeps
+      // Word-level diff for the modified pair. Per-column split:
+      // left cell keeps removed+context, right cell keeps
       // added+context, so each column's tokens join back to its `content`.
       // produceWordDiffTokens returns null under the size guard — then
       // wordDiff stays undefined and the renderer falls back to

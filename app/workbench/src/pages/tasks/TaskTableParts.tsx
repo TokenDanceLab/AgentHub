@@ -31,12 +31,12 @@ import {
 } from '../../workbenchBoardColumns';
 
 /* ═══════════════════════════════════════════════════════════════════════
-   TaskTableParts — presentational residual slices from TaskTableViews
+   TaskTableParts — presentational parts for TaskTableViews
    (#745).
 
    Selection strip, status icon, profile cell, task row (edit + display),
    table head, group title, empty state, and add-row button.
-   CSS stays on TasksPage.module.css. No intentional UX change.
+   CSS stays on TasksPage.module.css.
    exactOptionalPropertyTypes-safe empty-state props via helpers.
    ═══════════════════════════════════════════════════════════════════════ */
 

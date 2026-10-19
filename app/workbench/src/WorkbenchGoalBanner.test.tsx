@@ -1,4 +1,4 @@
-// Goal banner behavior contract (#1998, UX F8): honest controls and chip
+// Goal banner behavior contract (#1998): honest controls and chip
 // semantics. The stop entry must exist ONLY when onCancelRun is wired (the
 // Hub has no pause channel — never a fake pause button), and the status chip
 // must reuse the attention-model palette slots.

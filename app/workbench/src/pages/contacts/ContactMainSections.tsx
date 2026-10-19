@@ -16,10 +16,10 @@ import type {
 } from './types';
 
 /* ═══════════════════════════════════════════════════════════════════════
-   ContactMainSections — thin residual shell after extracting list /
+   ContactMainSections — thin shell for the list /
    search / request / pending / empty chrome to ContactMainItemParts and
    FriendRequestCard prop builders to ContactMainHelpers (#707 / #672).
-   CSS stays on ContactsPage.module.css. No intentional UX change.
+   CSS stays on ContactsPage.module.css.
    ═══════════════════════════════════════════════════════════════════════ */
 
 export {

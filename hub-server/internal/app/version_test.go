@@ -130,11 +130,10 @@ func TestResolveVersionPrefersBuildStampingOverLiteralFallback(t *testing.T) {
 	t.Logf("resolveVersion(\"\") = %q (buildInfoVersion = %q)", got, stamped)
 }
 
-// TestResolveVersionNeverReturnsEmptyString is the standalone guard for the
-// root cause of this slice: an empty version does not merely look wrong, it
-// disappears from the JSON payload, so an operator reading /health cannot even
-// tell that the field was meant to carry a build identity. No input may
-// produce it.
+// TestResolveVersionNeverReturnsEmptyString is the standalone guard: an empty
+// version does not merely look wrong, it disappears from the JSON payload, so
+// an operator reading /health cannot even tell that the field was meant to
+// carry a build identity. No input may produce it.
 func TestResolveVersionNeverReturnsEmptyString(t *testing.T) {
 	inputs := []string{
 		"", " ", "\t\n", "vTEST.1", "0.6.1", "e77808bf960e", "v0.6.1-dirty",

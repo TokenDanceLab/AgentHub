@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════════════════════════
-   InspectorModePanels — residual barrel for evidence overview mappers +
+   InspectorModePanels — barrel module for evidence overview mappers +
    mode-specific sub-panels used by RightInspector (#731 / #550).
 
    Pure helpers live in InspectorModePanelHelpers.

@@ -3,7 +3,7 @@
 -- 注：本 down 自 0058 引入以来从未成功执行，原因与 0061 修复的 0058.up
 -- 同源 —— 0040 在 0058 之前应用，audit_events 上挂着 trg_audit_events_no_update
 -- 等 BEFORE UPDATE 触发器，本 down 的 DO 块也用 UPDATE 重链，会被 0040 拒绝。
--- 迁移回滚路径同样是一个 deploy 炸弹。按迁移不可变原则不改 0058.up（仍保持
+-- 迁移回滚路径同样无法完成。按迁移不可变原则不改 0058.up（仍保持
 -- 原始 INSERT 阶段语义），此处对 down 加 DISABLE/ENABLE TRIGGER USER 外包，
 -- 镜像 0061.up 的修复模式：禁用 0040 的用户触发器 → 重链 → 恢复。down 从未
 -- 在任何已应用状态上成功跑过，所以本变更没有 "已应用的旧 down" 会受影响。

@@ -142,9 +142,9 @@ func TestCallbackClient_DurableSnapshotPrefersSQLite(t *testing.T) {
 	}
 }
 
-// TestCallbackClient_OfflineReplayReconciliation proves AH-SR-049 residual (#462):
+// TestCallbackClient_OfflineReplayReconciliation proves durable reconciliation:
 // DurableSnapshot + HasSuccessful drive reconciliation after process reopen.
-// Automatic redelivery worker is intentionally deferred (see risk register / analysis).
+// Automatic redelivery is intentionally deferred.
 func TestCallbackClient_OfflineReplayReconciliation(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "journal.db")

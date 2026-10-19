@@ -1,9 +1,5 @@
 package agents
 
-// Residual pure-helper peel #1154: spawn-slot reservation and diagnostic
-// CanSpawn checks extracted from registry.go. Same package agents; zero
-// behavior change.
-
 // TryReserveSlot atomically checks spawn constraints (concurrent slot limit,
 // per-parent child cap, depth limit) and, if all pass, reserves a slot by
 // incrementing childrenCount[parentID] under the same write lock.

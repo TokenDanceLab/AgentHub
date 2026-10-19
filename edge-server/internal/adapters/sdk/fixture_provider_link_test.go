@@ -1,7 +1,6 @@
 package sdk_test
 
-// Blank-import link for the codex/opencode fixture providers（#1760
-// codex/opencode 增量，随 #1760 mapper 增量迁入 sdk 包测试）。sdk 包 unit
+// Blank-import link for the codex/opencode fixture providers。sdk 包 unit
 // test（sdk_fixture_mapper_test.go 等以 "codex"/"opencode" runtime 投影 CLI
 // invocation plan 的测试）需要子包构造器可用；sdk 内部测试文件（package
 // sdk）不得 import 子包（子包 → adapters/sdk 为单向依赖，否则 import cycle

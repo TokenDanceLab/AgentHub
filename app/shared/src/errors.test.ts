@@ -38,7 +38,6 @@ describe('isTurnInProgressError', () => {
   });
 });
 
-// ── 迁入自 app/desktop/src/__tests__/errors.test.ts（11 用例，断言逐字保留）──
 // errors.ts 的 SSOT 在本包，桌面包并不拥有它（desktop/src 下没有 errors.ts）；
 // 这三个 describe 是 isErrorResponse / AppError / parseError 的**唯一**覆盖，
 // 随源码归位，覆盖没有增减，只是不再由不拥有源码的包代跑。

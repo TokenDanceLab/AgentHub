@@ -6,8 +6,6 @@ import (
 	"time"
 )
 
-// Residual pure-helper peel #1123: NoOpCache interface stubs.
-
 // NoOpCache is a fail-closed cache stub: mutation/read methods return
 // ErrCacheUnavailable and the offline-queue methods surface that error to
 // callers instead of silently succeeding. Bookkeeping methods (Invalidate,

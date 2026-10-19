@@ -3,10 +3,10 @@ import { canSubmitComposer, formatComposerAttachmentSize } from '@shared/compose
 import type { ComposerSubmitBehavior } from './workbenchPreferences';
 
 /* ═══════════════════════════════════════════════════════════════════════
-   unifiedComposerHelpers — pure residual slices from UnifiedComposer (#638).
+   unifiedComposerHelpers — pure helpers for UnifiedComposer (#638).
 
    Status/label builders, mention filtering, and submit-key planners.
-   No React hooks / no intentional UX change.
+   No React hooks.
    ═══════════════════════════════════════════════════════════════════════ */
 
 export interface AttachmentUploadState {
@@ -125,7 +125,7 @@ export function filterAvailableMentionOptions(
   return mentionableAgents.filter((agent) => !selectedMentionIds.has(agent.id));
 }
 
-/** Map internal dataMode codes to Chinese product labels (P76). */
+/** Map internal dataMode codes to Chinese product labels. */
 export function formatComposerDataModeLabel(dataMode: string): string {
   switch (dataMode) {
     case 'approved-real':
@@ -143,7 +143,7 @@ export function formatComposerDataModeLabel(dataMode: string): string {
   }
 }
 
-/** Map target readiness codes to Chinese product labels (P76). */
+/** Map target readiness codes to Chinese product labels. */
 export function formatComposerTargetStateLabel(targetState: string): string {
   switch (targetState) {
     case 'ready':

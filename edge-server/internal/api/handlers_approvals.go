@@ -62,7 +62,7 @@ func (h *Handler) PostPermissionDecide(w http.ResponseWriter, r *http.Request) {
 	// 404 body is byte-identical for a foreign runId, a missing runId, a
 	// wrong hubTaskId, and a missing pending request so this endpoint is not an
 	// existence oracle. Local single-tenant mode resolves to the documented
-	// bypass sentinel; empty principal under Hub JWT fails closed (AH-SR-045).
+	// bypass sentinel; empty principal under Hub JWT fails closed.
 	repo := ensureStore(h)
 	owner := h.ownerUserID(r)
 	if !isRunOwnedBy(repo, req.RunID, owner) {
@@ -183,7 +183,7 @@ func pendingPermissionFromBroker(broker *adapters.PermissionDecisionBroker, runI
 }
 
 // ---------------------------------------------------------------------------
-// POST /v1/plans/decide  (Plan confirmation gate - P0 #3)
+// POST /v1/plans/decide  (Plan confirmation gate)
 // ---------------------------------------------------------------------------
 
 func (h *Handler) PostPlanDecide(w http.ResponseWriter, r *http.Request) {
@@ -248,7 +248,7 @@ func (h *Handler) PostPlanDecide(w http.ResponseWriter, r *http.Request) {
 }
 
 // ---------------------------------------------------------------------------
-// GET /v1/plans/pending  (Plan confirmation gate - P0 #3)
+// GET /v1/plans/pending  (Plan confirmation gate)
 // ---------------------------------------------------------------------------
 
 func (h *Handler) GetPlansPending(w http.ResponseWriter, r *http.Request) {
@@ -266,7 +266,7 @@ func (h *Handler) GetPlansPending(w http.ResponseWriter, r *http.Request) {
 	// List endpoints filter instead of rejecting (same shape as GetArtifacts /
 	// GetPreviews / GetDeliveryJournal): a Hub user sees only the plans of runs
 	// they own, the local single-tenant sentinel sees all of them, and an empty
-	// principal under Hub JWT sees an empty list (fail closed, AH-SR-045). A 404
+	// principal under Hub JWT sees an empty list (fail closed). A 404
 	// here would be a behaviour regression for the Desktop poller.
 	plans := filterPendingPlansByOwner(broker.ListPending(), ensureStore(h), h.ownerUserID(r))
 	writeSuccess(w, http.StatusOK, plans)

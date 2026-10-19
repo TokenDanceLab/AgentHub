@@ -256,7 +256,7 @@ func TestWebSocketTypingAllowsSessionMemberCallback(t *testing.T) {
 		if got["user_id"] != "user-ws-typing" || got["session_id"] != "sess-typing" {
 			t.Fatalf("typing callback = %#v", got)
 		}
-		// #2154 P2-10: the admission check hands its resolved membership to the
+		// #2154: the admission check hands its resolved membership to the
 		// callback so the fan-out does not resolve the same session twice.
 		if got["members"] != "user-ws-typing,peer-ws-typing" {
 			t.Fatalf("typing callback members = %q, want the admitted membership", got["members"])

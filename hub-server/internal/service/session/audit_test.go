@@ -144,7 +144,7 @@ func TestRemoveGroupMember_AuditDenied_NotOwner(t *testing.T) {
 func TestSessionAudit_NilAuditor_Noop(t *testing.T) {
 	db := newBehaviorServiceDB(t)
 	cacheClient := newBehaviorServiceCache(t)
-	svc := NewService(db, cacheClient)
+	svc := NewService(db, cacheClient, nil)
 	// Don't set audit — must not panic.
 	ctx := context.Background()
 	owner := createUser(t, db, "owner-nil", "Owner")

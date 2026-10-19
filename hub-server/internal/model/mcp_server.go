@@ -96,7 +96,7 @@ func (m *MCPServer) validateAuthConfigSecrets() error {
 }
 
 // validateURLHasNoCredentials rejects URLs carrying embedded credentials and
-// non-http(s) schemes (#2154 security lane F12: the previous substring checks
+// non-http(s) schemes (#2154: the previous substring checks
 // accepted e.g. ftp://host or a bare hostname that edge-side clients would
 // then consume).
 func (m *MCPServer) validateURLHasNoCredentials() error {

@@ -1,4 +1,4 @@
-// #2241 lane B task 3 (gate side) — with a forward port wired, the transcript
+// #2241 (gate side) — with a forward port wired, the transcript
 // context menu renders the "转发" entry again and the picker's confirmed
 // targets reach that port; without the port the entry stays hidden (#2154
 // fail-closed invariant — must not regress).
@@ -16,7 +16,7 @@ import { createMockPlatform } from '@shared/platform/createMockPlatform';
 import type { WorkbenchConversation } from '@shared/platform';
 import type { TranscriptBlock } from '@shared/transcript/types';
 import { AgentHubWorkbench } from '../AgentHubWorkbench';
-import { workbenchAgents as agents } from '../workbenchTestFixtures';
+import { workbenchAgents as agents } from './fixtures/workbenchTestFixtures';
 
 installWorkbenchTestHooks();
 

@@ -1,15 +1,18 @@
-// Package adapters — ACP (Agent Client Protocol) adapter (experimental).
+// Package adapters — ACP (Agent Client Protocol) adapter.
 //
 // This adapter implements the AgentAdapter interface for ACP-compatible
-// agents (JSON-RPC 2.0 over stdio). It is part of the #1404 spike.
+// agents (JSON-RPC 2.0 over stdio). ACP is the registered default runtime:
+// the claude-acp / codex-acp / opencode-acp adapters embed AcpAdapter and
+// share this client runtime.
 //
-// Protocol layer: this file no longer contains a hand-rolled JSON-RPC loop —
-// the connection layer and typed dispatch come from the official-schema Go
-// client runtime github.com/coder/acp-go-sdk (v0.13.5, see acp_client.go).
-// Protocol boundary stays 100% official adapter binaries.
+// Protocol layer: the connection layer and typed dispatch come from the
+// official-schema Go client runtime github.com/coder/acp-go-sdk (v0.13.5,
+// see acp_client.go). The protocol boundary stays with official adapter
+// binaries.
 //
-// Once validated with a real ACP agent binary, the "experimental" tag
-// will be removed and this adapter will join the production registry.
+// The fs/terminal client endpoints remain unwired fail-closed stubs; tool
+// permission gates use session/request_permission, bridged to the Edge
+// approval chain.
 package acp
 
 import (
@@ -73,7 +76,7 @@ type AcpAdapterConfig struct {
 	// LauncherLabel is the human-facing name used in the PreflightCheck
 	// error when the binary is unresolvable (e.g. "codex-acp launcher").
 	// Empty disables PreflightCheck (returns nil) for the generic
-	// experimental adapter, preserving its prior no-preflight behavior.
+	// experimental adapter.
 	LauncherLabel string
 
 	// InstallHint is appended to the PreflightCheck error to guide the
@@ -87,8 +90,6 @@ type AcpAdapterConfig struct {
 // stdio. The adapter spawns an ACP agent binary (BuildCommand), performs the
 // initialize handshake, creates a session, prompts, and streams updates —
 // all through the coder/acp-go-sdk client runtime (acp_client.go).
-//
-// Reference: #1404, ACP spike analysis, ACP Go migration (option C').
 type AcpAdapter struct {
 	// id is the registry identifier for this adapter instance. The generic
 	// "acp" entry and concrete agent configs (e.g. codex-acp) each use their
@@ -222,7 +223,7 @@ func (a *AcpAdapter) Available() bool {
 
 // AgentBinary returns the configured ACP agent binary path/name. Exported so
 // wrapper packages (adapters/claude, adapters/codex, adapters/opencode) can
-// surface it in their own PreflightCheck messages (#1760 各增量).
+// surface it in their own PreflightCheck messages.
 func (a *AcpAdapter) AgentBinary() string {
 	return a.agentBinary
 }
@@ -232,8 +233,7 @@ func (a *AcpAdapter) AgentBinary() string {
 // LauncherLabel/InstallHint so concrete agent configs (codex-acp,
 // claude-acp, opencode-acp) share this one inherited method. When
 // LauncherLabel is empty (generic experimental "acp" adapter) the check is
-// a no-op (returns nil), preserving the prior no-preflight behavior for the
-// generic adapter. Authentication (API keys, login state) is left to the
+// a no-op (returns nil). Authentication (API keys, login state) is left to the
 // agent process itself, mirroring the legacy CLI adapters.
 func (a *AcpAdapter) PreflightCheck() error {
 	if strings.TrimSpace(a.launcherLabel) == "" {
@@ -257,7 +257,7 @@ func acpBinaryAvailable(binary string, lookPath func(string) (string, error)) bo
 
 // DefaultNpxPath returns the platform-appropriate npx launcher name. Shared
 // by the codex-acp and claude-acp configs (both spawn npx); exported for the
-// claude/codex/opencode 子包（#1760 各增量，子包 → adapters 单向依赖）。
+// claude/codex/opencode 子包（子包 → adapters 单向依赖）。
 func DefaultNpxPath() string {
 	if runtime.GOOS == "windows" {
 		return "npx.cmd"
@@ -282,10 +282,9 @@ func acpEnvPassthrough(keys []string) []string {
 // ParseStream runs one ACP turn via the coder/acp-go-sdk client runtime:
 // initialize handshake → session/new → session/prompt → session/update
 // stream → prompt response. See runACPSession in acp_client.go for the
-// full flow and the TODO list (#1743 (follow-up of #1404): fs/terminal frames, live adapter
-// verification). session/request_permission is bridged to the Edge
-// approval chain via the permission broker installed by
-// SetPermissionBroker.
+// full flow (fs/terminal frames remain unwired; live adapter verification
+// pending). session/request_permission is bridged to the Edge approval chain
+// via the permission broker installed by SetPermissionBroker.
 func (a *AcpAdapter) ParseStream(ctx context.Context, stdout io.Reader, stdin io.Writer, emitter EventEmitter, run store.Run) error {
 	return runACPSession(ctx, stdout, stdin, emitter, run, a.permissionBroker)
 }

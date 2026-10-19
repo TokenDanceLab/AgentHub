@@ -13,7 +13,7 @@ import type {
 } from './types';
 
 /* ═══════════════════════════════════════════════════════════════════════
-   Contact list rows / cards — extracted for Phase 17 strangler slice #561.
+   Contact list rows / cards (#561).
    CSS remains on shared ContactsPage.module.css.
    ═══════════════════════════════════════════════════════════════════════ */
 

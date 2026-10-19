@@ -7,7 +7,6 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/agenthub/hub-server/internal/bus"
-	"github.com/agenthub/hub-server/internal/cache"
 	"github.com/agenthub/hub-server/internal/model"
 )
 
@@ -18,10 +17,8 @@ import (
 // helpers, pure TeamRunState projection, assignment lifecycle, replay, review,
 // compete aggregation, audit and authz.
 //
-// The split is deliberately described instead of enumerated: this comment used
-// to list file names, and the list had already rotted — it named a routing file
-// that does not exist and had never heard of six that do. The package directory
-// is the only file list that stays true (#2246).
+// Files are deliberately described by responsibility rather than enumerated:
+// the package directory is the only file list that stays true (#2246).
 
 type agentTeamAgentSvc interface {
 	AddAgentToSession(ctx context.Context, userID, sessionID, agentType, customAgentID, displayName string) (*model.AgentInstance, error)
@@ -44,7 +41,6 @@ type AgentTeamService struct {
 	controlSvc         agentTeamControlSvc
 	bus                *bus.Bus
 	guardrails         AgentTeamGuardrails
-	competeAggregator  CompeteAggregator
 	competeMaxAgents   int
 	humanReviewEnabled bool
 	audit              PrivilegedActionAuditor
@@ -98,14 +94,14 @@ func (g AgentTeamGuardrails) normalized() AgentTeamGuardrails {
 	return g
 }
 
-func NewAgentTeamService(db *gorm.DB, agentSvc agentTeamAgentSvc, cacheClient *cache.Client) *AgentTeamService {
+func NewAgentTeamService(db *gorm.DB, agentSvc agentTeamAgentSvc, cacheClient agentTeamCache) *AgentTeamService {
 	return NewAgentTeamServiceWithGuardrails(db, agentSvc, cacheClient, DefaultAgentTeamGuardrails())
 }
-func NewAgentTeamServiceWithGuardrails(db *gorm.DB, agentSvc agentTeamAgentSvc, cacheClient *cache.Client, guardrails AgentTeamGuardrails) *AgentTeamService {
+func NewAgentTeamServiceWithGuardrails(db *gorm.DB, agentSvc agentTeamAgentSvc, cacheClient agentTeamCache, guardrails AgentTeamGuardrails) *AgentTeamService {
 	return &AgentTeamService{
 		db:               db,
 		agentSvc:         agentSvc,
-		cacheClient:      resolveAgentTeamCache(cacheClient),
+		cacheClient:      cacheClient,
 		guardrails:       guardrails.normalized(),
 		competeMaxAgents: model.CompeteMaxAgentsDefault,
 	}
@@ -128,6 +124,25 @@ func (s *AgentTeamService) SetAuditService(a PrivilegedActionAuditor) {
 	}
 	s.audit = a
 }
+
+// WiringSnapshot reports the optional collaborators configured on the service.
+// The composition-root test reads it to prove that wiring survives refactors.
+type WiringSnapshot struct {
+	Audit            bool
+	Control          bool
+	CompeteMaxAgents int
+	HumanReview      bool
+}
+
+// Wiring returns whether the optional collaborators are configured.
+func (s *AgentTeamService) Wiring() WiringSnapshot {
+	return WiringSnapshot{
+		Audit:            s.audit != nil,
+		Control:          s.controlSvc != nil,
+		CompeteMaxAgents: s.competeMaxAgents,
+		HumanReview:      s.humanReviewEnabled,
+	}
+}
 func (s *AgentTeamService) SetCompeteMaxAgents(n int) {
 	if n > 0 {
 		s.competeMaxAgents = n
@@ -137,11 +152,4 @@ func (s *AgentTeamService) SetCompeteMaxAgents(n int) {
 // SetHumanReviewEnabled sets whether the human review gate is active.
 func (s *AgentTeamService) SetHumanReviewEnabled(enabled bool) {
 	s.humanReviewEnabled = enabled
-}
-
-func resolveAgentTeamCache(c *cache.Client) agentTeamCache {
-	if c == nil {
-		return cache.NoOpCache{}
-	}
-	return c
 }

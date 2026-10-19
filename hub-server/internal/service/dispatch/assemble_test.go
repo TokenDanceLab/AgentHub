@@ -88,20 +88,6 @@ func TestMarshalPayload(t *testing.T) {
 	assert.Equal(t, "task", decoded.TaskID)
 }
 
-func TestHistoryAndTeamGuards(t *testing.T) {
-	assert.True(t, HistoryLoadIDs("s", "m"))
-	assert.False(t, HistoryLoadIDs("", "m"))
-	assert.False(t, HistoryLoadIDs("s", ""))
-	assert.True(t, ShouldLoadPinnedMessages("s"))
-	assert.False(t, ShouldLoadPinnedMessages(""))
-
-	ca := "ca-1"
-	assert.True(t, ShouldResolveTeamContext(&ca))
-	assert.False(t, ShouldResolveTeamContext(nil))
-	assert.True(t, TeamContextFromRun("run-1"))
-	assert.False(t, TeamContextFromRun(""))
-}
-
 func TestPreDeviceTargetValidation(t *testing.T) {
 	require.NoError(t, PreDeviceTargetValidation("u1", "u1", LocalEdgeTargetType, "online"))
 	require.ErrorIs(t, PreDeviceTargetValidation("u2", "u1", LocalEdgeTargetType, "online"), errcode.TargetNotFound)
@@ -150,11 +136,6 @@ func TestObserveRedeliveryConnAndOfflineKind(t *testing.T) {
 }
 
 func TestDeliveryMarkAndCapabilityGuards(t *testing.T) {
-	assert.True(t, DeliveryMarkAfterDispatch("del-1"))
-	assert.False(t, DeliveryMarkAfterDispatch(""))
-	assert.False(t, DeliveryMarkAfterOfflineQueue("del-1"), "offline accept must not mark sent (#1031)")
-	assert.False(t, DeliveryMarkAfterOfflineQueue(""))
-
 	assert.True(t, ShouldReplayOfflinePayload("", "sent", true), "legacy empty delivery_id replays")
 	assert.True(t, ShouldReplayOfflinePayload("del-1", "pending", true))
 	assert.True(t, ShouldReplayOfflinePayload("del-1", "retrying", true))
@@ -162,132 +143,6 @@ func TestDeliveryMarkAndCapabilityGuards(t *testing.T) {
 	assert.False(t, ShouldReplayOfflinePayload("del-1", "delivered", true))
 	assert.False(t, ShouldReplayOfflinePayload("del-1", "dead", true))
 	assert.True(t, ShouldReplayOfflinePayload("del-1", "sent", false), "lookup failure fails open")
-
-	assert.True(t, IsHTTPEdgeDispatchSuccess("run-1"))
-	assert.False(t, IsHTTPEdgeDispatchSuccess(""))
-	assert.True(t, ShouldIssueCapabilityToken(CapabilityMintResolved{Ok: true}))
-	assert.False(t, ShouldIssueCapabilityToken(CapabilityMintResolved{}))
-
-	// smoke: queued pending task still builds
-	_ = model.TaskStatusQueued
-}
-
-func TestResidual1033Helpers(t *testing.T) {
-	// Delivery-mark plans preserve #1031 offline ownership vs live mark.
-	assert.True(t, PlanLiveDispatchMark("del-1"))
-	assert.False(t, PlanLiveDispatchMark(""))
-	assert.False(t, PlanOfflineDispatchMark("del-1"))
-	assert.False(t, PlanOfflineDispatchMark(""))
-	assert.True(t, PlanTargetBoundDeliveryMark(true, "del-1"))
-	assert.False(t, PlanTargetBoundDeliveryMark(false, "del-1"), "target-bound offline keeps outbox pending")
-	assert.False(t, PlanTargetBoundDeliveryMark(true, ""))
-	assert.True(t, PlanUnboundInviterDesktopMark(true, "del-1"))
-	assert.False(t, PlanUnboundInviterDesktopMark(false, "del-1"))
-
-	// Identity extractors.
-	ca := "ca-1"
-	assert.Nil(t, CustomAgentIDFromAgentPresence(false, &ca))
-	assert.Equal(t, &ca, CustomAgentIDFromAgentPresence(true, &ca))
-	assert.Equal(t, "run-1", TeamRunIDValue(true, "run-1"))
-	assert.Equal(t, "", TeamRunIDValue(false, "run-1"))
-	assert.Equal(t, "", TaskStatusOrEmpty(nil))
-	snap := NewPendingTaskSnapshot("id", "ai", "u", "queued", "d", "r", "t")
-	assert.Equal(t, "queued", TaskStatusOrEmpty(&snap))
-
-	assert.True(t, OutboxRecordSucceeded(nil))
-	assert.False(t, OutboxRecordSucceeded(errors.New("x")))
-	assert.True(t, HubRelayCreateSucceeded(nil))
-	assert.False(t, HubRelayCreateSucceeded(errors.New("x")))
-	assert.True(t, CapabilityTokenMintSucceeded(nil))
-	assert.False(t, CapabilityTokenMintSucceeded(errors.New("x")))
-	assert.True(t, RedeliveryPreferDeviceRoute("d1"))
-	assert.False(t, RedeliveryPreferDeviceRoute(""))
-	assert.True(t, TargetBoundConnFound(true))
-	assert.False(t, TargetBoundConnFound(false))
-	assert.False(t, TargetBoundConnRejected(true, "u1", DesktopDeviceType, "d1", "u1", "d1"))
-	assert.True(t, TargetBoundConnRejected(false, "u1", DesktopDeviceType, "d1", "u1", "d1"))
-	assert.True(t, TargetBoundConnRejected(true, "u2", DesktopDeviceType, "d1", "u1", "d1"))
-
-	in := AssembleInputCore(
-		"task-1", "ai-1", "claude", "t1", "d1", "s1",
-		"m1", "u1", "hi", "Bot", "ca-1",
-		&CustomAgentFields{SystemPrompt: "sys"},
-		`{"model":"x"}`,
-		TeamContext{TeamID: "team", TeamRunID: "run"},
-		[]Message{{Role: "user", Content: "hi"}},
-		[]Message{{Role: "assistant", Content: "pin"}},
-	)
-	assert.Equal(t, "task-1", in.TaskID)
-	assert.Equal(t, "ca-1", in.CustomAgentID)
-	assert.Equal(t, "sys", in.CustomFields.SystemPrompt)
-	assert.Equal(t, "team", in.Team.TeamID)
-	require.Len(t, in.Messages, 1)
-	require.Len(t, in.PinnedMessages, 1)
-}
-
-func TestResidual1056Helpers(t *testing.T) {
-	// Team-run identity extractors (#1056).
-	teamID, runID := TeamRunIdentity(true, "team-1", "run-1")
-	assert.Equal(t, "team-1", teamID)
-	assert.Equal(t, "run-1", runID)
-	teamID, runID = TeamRunIdentity(false, "team-1", "run-1")
-	assert.Equal(t, "", teamID)
-	assert.Equal(t, "", runID)
-
-	ca := "ca-1"
-	assert.Equal(t, "ca-1", TeamMatchCustomAgentID(&ca))
-	assert.Equal(t, "", TeamMatchCustomAgentID(nil))
-
-	// Repo / offline / WS residual predicates — #1031 offline still never marks sent.
-	assert.True(t, RepoUpdateSucceeded(nil))
-	assert.False(t, RepoUpdateSucceeded(errors.New("db")))
-	assert.True(t, OfflineQueuePushSucceeded(nil))
-	assert.False(t, OfflineQueuePushSucceeded(errors.New("redis")))
-	assert.True(t, UnboundInviterDesktopWSQueued(true))
-	assert.False(t, UnboundInviterDesktopWSQueued(false))
-	assert.True(t, TargetBoundOfflinePushInfoLog(errors.New("route")))
-	assert.False(t, TargetBoundOfflinePushInfoLog(nil))
-	assert.True(t, IsUnboundInviterDesktopRoute(RouteInviterDesktop))
-	assert.False(t, IsUnboundInviterDesktopRoute(RouteOffline))
-
-	// Capability mint result plan.
-	ok := PlanCapabilityMintResult("tok", nil)
-	assert.Equal(t, "tok", ok.Token)
-	assert.False(t, ok.LogFailure)
-	fail := PlanCapabilityMintResult("tok", errors.New("mint"))
-	assert.Equal(t, "", fail.Token)
-	assert.True(t, fail.LogFailure)
-
-	// Redispatch prep gate: err → dead-letter; nil → retry path.
-	prepOK := PlanRedispatchPrepGate(nil)
-	assert.False(t, prepOK.DeadLetter)
-	prepFail := PlanRedispatchPrepGate(&PayloadPrepError{Kind: DeadLetterKindPayloadUnmarshal, Err: errors.New("bad")})
-	assert.True(t, prepFail.DeadLetter)
-	assert.Equal(t, DeadLetterKindPayloadUnmarshal, prepFail.Kind)
-	assert.Equal(t, "failed to unmarshal delivery payload for redispatch", prepFail.LogMessage)
-	require.Error(t, prepFail.Unwrap)
-
-	// Redelivery lookup mapper.
-	snap, err := MapPendingTaskRedeliveryLookup(nil, "id", "ai", "u", "queued", "d", "r", "t")
-	require.NoError(t, err)
-	require.NotNil(t, snap)
-	assert.Equal(t, "id", snap.ID)
-	assert.Equal(t, "queued", snap.Status)
-	_, err = MapPendingTaskRedeliveryLookup(errors.New("missing"), "", "", "", "", "", "", "")
-	require.Error(t, err)
-
-	// Edge HTTP client response plan.
-	plan := PlanEdgeHTTPClientResponse(http.StatusAccepted, []byte(`{"success":true,"data":{"runId":"run-9"}}`))
-	assert.Equal(t, "run-9", plan.RunID)
-	assert.False(t, plan.NonSuccess)
-	assert.False(t, plan.DecodeFail)
-	plan = PlanEdgeHTTPClientResponse(http.StatusBadRequest, []byte(`nope`))
-	assert.True(t, plan.NonSuccess)
-	assert.Equal(t, EdgeHTTPLogNonSuccess, plan.LogMessage)
-	plan = PlanEdgeHTTPClientResponse(http.StatusOK, []byte(`{`))
-	assert.True(t, plan.DecodeFail)
-	assert.Equal(t, EdgeHTTPLogDecodeFailed, plan.LogMessage)
-	require.Error(t, plan.DecodeErr)
 }
 
 func TestTriggerGuards(t *testing.T) {
@@ -372,15 +227,7 @@ func TestEdgeHTTPPrepHelpers(t *testing.T) {
 	require.Error(t, decodeErr)
 }
 
-func TestHistoryPresenceAndCancelNoRows(t *testing.T) {
-	assert.True(t, HistoryTriggerMessageLoadable(nil, true))
-	assert.False(t, HistoryTriggerMessageLoadable(errors.New("x"), true))
-	assert.False(t, HistoryTriggerMessageLoadable(nil, false))
-	assert.True(t, HistoryMessagesPresent(nil, 1))
-	assert.False(t, HistoryMessagesPresent(nil, 0))
-	assert.True(t, PinnedRowsPresent(nil, 2))
-	assert.False(t, PinnedRowsPresent(errors.New("x"), 2))
-
+func TestCancelNoRows(t *testing.T) {
 	require.ErrorIs(t, CancelTaskNoRowsError(0), errcode.ErrBadRequest)
 	require.NoError(t, CancelTaskNoRowsError(1))
 }
@@ -390,10 +237,6 @@ func TestRedispatchLogHelpers(t *testing.T) {
 	assert.Equal(t, "failed to unmarshal delivery payload for redispatch", RedispatchPrepLogMessage(DeadLetterKindPayloadUnmarshal))
 	assert.Equal(t, "redispatch: queued to offline queue", RedispatchOfflineSuccessLogMessage(true))
 	assert.Equal(t, "redispatch: queued to fallback queue", RedispatchOfflineSuccessLogMessage(false))
-	assert.True(t, RedispatchOfflineSuccessIncludesUserID(true))
-	assert.False(t, RedispatchOfflineSuccessIncludesUserID(false))
-	assert.True(t, RedeliveryWSPushSucceeded(true))
-	assert.False(t, RedeliveryWSPushSucceeded(false))
 	assert.Equal(t, "redispatch: failed to push to offline queue", RedispatchOfflinePushFailedLogMessage(true))
 	assert.Equal(t, "redispatch: failed to push to fallback queue", RedispatchOfflinePushFailedLogMessage(false))
 	assert.Equal(t, RedispatchLogTaskLookupFailed, "redispatch: task lookup failed, marking dead-letter")
@@ -420,10 +263,13 @@ func TestRedispatchLogHelpers(t *testing.T) {
 }
 
 func TestLookupErrorMappers(t *testing.T) {
-	require.ErrorIs(t, MapTriggerMessageLookupError(errors.New("x")), errcode.MsgNotFound)
-	require.NoError(t, MapTriggerMessageLookupError(nil))
-	require.ErrorIs(t, MapSessionLookupError(errors.New("x")), errcode.SessionNotFound)
-	require.NoError(t, MapSessionLookupError(nil))
+	dbErr := errors.New("db")
+	require.ErrorIs(t, MapTriggerMessageLookupError(dbErr, true), errcode.MsgNotFound)
+	require.ErrorIs(t, MapTriggerMessageLookupError(dbErr, false), dbErr)
+	require.NoError(t, MapTriggerMessageLookupError(nil, false))
+	require.ErrorIs(t, MapSessionLookupError(dbErr, true), errcode.SessionNotFound)
+	require.ErrorIs(t, MapSessionLookupError(dbErr, false), dbErr)
+	require.NoError(t, MapSessionLookupError(nil, false))
 
 	require.ErrorIs(t, MapPendingTaskLookupError(errors.New("missing"), true), errcode.AgentTaskNotFound)
 	raw := errors.New("db")
@@ -435,82 +281,6 @@ func TestLookupErrorMappers(t *testing.T) {
 	require.Error(t, MapBoundDeviceLookupError(errors.New("missing"), true))
 	assert.Contains(t, MapBoundDeviceLookupError(errors.New("missing"), true).Error(), DeviceNotRoutableErrorMessage)
 	assert.Equal(t, raw, MapBoundDeviceLookupError(raw, false))
-}
-
-func TestPortAndTeamResidualHelpers(t *testing.T) {
-	assert.True(t, OutboxPortAvailable(true, true))
-	assert.False(t, OutboxPortAvailable(true, false))
-	assert.False(t, OutboxPortAvailable(false, true))
-	assert.True(t, BusPortAvailable(true, true))
-	assert.False(t, BusPortAvailable(false, true))
-	assert.True(t, ManagerPortAvailable(true))
-	assert.False(t, ManagerPortAvailable(false))
-
-	ca := "ca-1"
-	assert.True(t, TeamContextResolutionReady(true, true, true, &ca))
-	assert.False(t, TeamContextResolutionReady(true, true, true, nil))
-	assert.False(t, TeamContextResolutionReady(false, true, true, &ca))
-	assert.True(t, TeamRunLoadable(nil, true, "run-1"))
-	assert.False(t, TeamRunLoadable(errors.New("x"), true, "run-1"))
-	assert.False(t, TeamRunLoadable(nil, false, "run-1"))
-	assert.False(t, TeamRunLoadable(nil, true, ""))
-	assert.True(t, TeamMembersPresent(nil))
-	assert.False(t, TeamMembersPresent(errors.New("x")))
-	assert.Equal(t, TeamContext{}, EmptyTeamContext())
-	assert.True(t, PinMessagesLoadable(nil))
-	assert.False(t, PinMessagesLoadable(errors.New("x")))
-
-	assert.True(t, AcceptCustomAgentPreload(nil))
-	assert.False(t, AcceptCustomAgentPreload(errors.New("x")))
-	assert.Nil(t, CustomAgentPreloadOrNil(errors.New("x"), &model.CustomAgent{ID: "ca"}))
-	got := CustomAgentPreloadOrNil(nil, &model.CustomAgent{ID: "ca"})
-	require.NotNil(t, got)
-	assert.Equal(t, "ca", got.ID)
-
-	assert.Equal(t, EdgeHTTPLogInsecureCleartext, "edge http dispatch: non-loopback URL without TLS, dispatch payloads sent in cleartext")
-	assert.Equal(t, EdgeHTTPLogMarshalFailed, "edge http dispatch: failed to marshal request")
-	assert.Equal(t, EdgeHTTPLogCreateReqFailed, "edge http dispatch: failed to create request")
-	assert.Equal(t, EdgeHTTPLogUnreachable, "edge http dispatch: edge server unreachable")
-	assert.Equal(t, EdgeHTTPLogNonSuccess, "edge http dispatch: edge returned non-success")
-	assert.Equal(t, EdgeHTTPLogDecodeFailed, "edge http dispatch: failed to decode response")
-	assert.Equal(t, EdgeHTTPLogDispatched, "edge http dispatch: task dispatched to local Edge")
-}
-
-func TestDispatchLogConstantsAndPorts(t *testing.T) {
-	assert.Equal(t, DispatchLogOutboxRecordFailed, "AH-SR-049 delivery outbox record failed; dispatch continues without durable tracking")
-	assert.Equal(t, DispatchLogHTTPMarkFailed, "failed to mark http-dispatched task")
-	assert.Equal(t, DispatchLogOfflinePushConnNil, "failed to push agent task to offline queue (conn nil)")
-	assert.Equal(t, DispatchLogMarkAgentDispatched, "failed to mark agent task dispatched")
-	assert.Equal(t, DispatchLogWSNotQueuedPreserve, "agent task websocket dispatch not queued; preserving pending task")
-	assert.Equal(t, DispatchLogPreserveAfterWSFailure, "failed to preserve agent task after websocket dispatch failure")
-	assert.Equal(t, DispatchLogOfflinePushFailed, "failed to push agent task to offline queue")
-	assert.Equal(t, DispatchLogMissingTargetEdgeDevice, "target-bound agent task missing edge device id")
-	assert.Equal(t, DispatchLogRelayCreateFailed, "failed to create relay command for hub_relay dispatch")
-	assert.Equal(t, DispatchLogRelayOfflinePushFailed, "failed to push hub_relay task to offline queue")
-	assert.Equal(t, DispatchLogMarkHubRelayDispatched, "failed to mark hub_relay task dispatched")
-	assert.Equal(t, DispatchLogTargetBoundOfflinePushFailed, "failed to push target-bound agent task to offline queue")
-	assert.Equal(t, DispatchLogTargetBoundQueued, "queued target-bound agent task")
-	assert.Equal(t, DispatchLogTargetBoundMarkFailed, "failed to mark target-bound agent task dispatched")
-	assert.Equal(t, DispatchLogTargetBoundWSNotQueued, "target-bound agent task websocket dispatch not queued; preserving pending task")
-	assert.Equal(t, DispatchLogPayloadMarshalFailed, "agent dispatch payload marshal failed; task not dispatched")
-	assert.Equal(t, DispatchLogMarkDeliverySentFailed, "failed to mark delivery sent; outbox row stays pending")
-	assert.Equal(t, CapabilityMintFailedLog, "AH-SR-046 failed to issue capability token")
-
-	assert.True(t, RelayPortAvailable(true))
-	assert.False(t, RelayPortAvailable(false))
-	assert.True(t, ServiceReceiverAvailable(true))
-	assert.False(t, ServiceReceiverAvailable(false))
-	assert.True(t, InviterDesktopConnPresent(true))
-	assert.False(t, InviterDesktopConnPresent(false))
-	assert.True(t, CapabilityPayloadPresent(true))
-	assert.False(t, CapabilityPayloadPresent(false))
-	assert.True(t, ComposedDispatchReady(true))
-	assert.False(t, ComposedDispatchReady(false))
-
-	snap := MapPendingTaskRedeliveryRow("id", "ai", "u", "queued", "d", "r", "t")
-	assert.Equal(t, "id", snap.ID)
-	assert.Equal(t, "queued", snap.Status)
-	assert.Equal(t, "t", snap.TargetID)
 }
 
 func TestPlanRedispatchTaskGate(t *testing.T) {

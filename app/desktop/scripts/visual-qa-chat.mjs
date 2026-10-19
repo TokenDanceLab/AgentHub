@@ -182,7 +182,7 @@ async function captureTheme(browser, theme) {
         typingIndicator: Boolean(document.querySelector('.typingIndicator')),
       },
       composer: measure(document.querySelector('textarea')),
-      // UX F8 (#1998): the demo builder transcript carries a goal arc
+      // #1998: the demo builder transcript carries a goal arc
       // (create_goal + update_goal complete), so the goal banner must be
       // projected in the chat header surface.
       goalBanner: measure(document.querySelector('section[data-goal-status]')),

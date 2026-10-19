@@ -15,12 +15,9 @@ import type {
 } from './hubClient';
 
 const workspaceProjectsQueryKey = hubQueryKeys.projects.root;
-// Deliberately no local threads-key alias next to the projects key above: the
-// one that used to sit here had 0 consumers and pointed at
-// `hubQueryKeys.projects.root` — the *projects* root — so any invalidation
-// written against it would have refetched the project list and never the
-// threads it claimed to address (#2274 A-15). Threads are keyed by the shared
-// factory; do not reintroduce a literal alias for them.
+// Threads are keyed by the shared `hubQueryKeys.threads` factory; do not add a
+// local threads-key alias here. The projects key above is the projects root and
+// must not be reused for thread invalidation (#2274).
 
 const emptyWorkspaceProjects: WorkspaceProjectListResponse = {
   items: [],
@@ -34,11 +31,7 @@ const emptyWorkspaceProjects: WorkspaceProjectListResponse = {
 // page.nextCursor / page.hasMore. This call site asked for a single page of 50
 // and threw the cursor away, so from the 51st project onwards the workspace
 // showed a silently truncated list: no "load more", no truncation hint, no
-// error. The only client code that ever advanced this cursor was the #1546
-// WorkbenchProjectsPort chain, which was structurally unreachable in both
-// shells and has been deleted — the capability went from "implemented but never
-// executed" to "explicitly not implemented", which is what made the gap
-// visible.
+// error.
 //
 // The walk itself lives in @shared/hub/paginate so that this is not the fourth
 // hand-rolled copy of the same cursor loop in the front end.

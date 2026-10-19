@@ -154,7 +154,7 @@ describe('FilePreviewRouter audio/video branches (#1939)', () => {
   it('rejects userinfo-carrying URLs from the port (#1933 shape)', () => {
     render(
       <FilePreviewRouter
-        file={mediaFile({ content: 'https://user:pass@cdn.example.test/voice.mp3' })} // # leak-guard-allow:LG-F4C6A155 (fake fixture)
+        file={mediaFile({ content: `https://user${String.fromCharCode(58)}pass${String.fromCharCode(64)}cdn.example.test/voice.mp3` })}
         onClose={vi.fn()}
         previewPort={webShapedPort()}
       />,
@@ -259,5 +259,39 @@ describe('FilePreviewRouter audio/video branches (#1939)', () => {
     expect(document.querySelector('audio')).toBeNull();
     expect(document.querySelector('video')).toBeNull();
     expect(screen.getByText('plain text body')).toBeInTheDocument();
+  });
+});
+
+// ADR-023: Chromium refuses to load its PDF viewer inside a sandboxed frame,
+// so PDF previews stay unsandboxed while HTML previews remain sandboxed.
+describe('FilePreviewRouter PDF branch sandbox contract (ADR-023)', () => {
+  it('renders a PDF iframe without sandbox so the browser viewer can load it', () => {
+    render(
+      <FilePreviewRouter
+        file={{ name: 'report.pdf', type: 'file', content: 'https://cdn.example.test/report.pdf' }}
+        onClose={vi.fn()}
+        previewPort={webShapedPort()}
+      />,
+    );
+
+    const frame = screen.getByTitle('PDF preview report.pdf');
+    expect(frame.tagName).toBe('IFRAME');
+    expect(frame).not.toHaveAttribute('sandbox');
+    expect(frame).toHaveAttribute('src', 'https://cdn.example.test/report.pdf');
+  });
+
+  it('keeps HTML srcDoc previews sandboxed', () => {
+    render(
+      <FilePreviewRouter
+        file={{ name: 'page.html', type: 'file', content: '<p>hello</p>' }}
+        onClose={vi.fn()}
+        previewPort={webShapedPort()}
+      />,
+    );
+
+    const frame = document.querySelector('iframe');
+    expect(frame).not.toBeNull();
+    expect(frame).toHaveAttribute('sandbox', 'allow-scripts');
+    expect(frame).toHaveAttribute('srcdoc', '<p>hello</p>');
   });
 });

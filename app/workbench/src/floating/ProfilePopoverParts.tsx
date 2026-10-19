@@ -14,11 +14,11 @@ import {
 import styles from './ProfilePopover.module.css';
 
 /* ═══════════════════════════════════════════════════════════════════════
-   ProfilePopoverParts — presentational residual slices from
+   ProfilePopoverParts — presentational parts for
    ProfilePopover (#743).
 
    Account / default body sections and shared rows. CSS remains on
-   ProfilePopover.module.css. No intentional UX change.
+   ProfilePopover.module.css.
    ═══════════════════════════════════════════════════════════════════════ */
 
 function ProfileAvatarGlyph({

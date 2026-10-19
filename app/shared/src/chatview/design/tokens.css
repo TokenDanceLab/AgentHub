@@ -21,13 +21,13 @@
   --chat-label-xs: 600 0.6875rem/1.5 var(--chat-font-sans);  /* larger than base --label-xs (0.625rem) */
   --chat-bubble-font: 400 0.875rem/1.5 var(--chat-font-sans);  /* bubble message font, distinct from --chat-body at 0.8125rem */
 
-  /* Chat density scale (intentional P76): md/lg/xl = 12/16/24
+  /* Chat density scale (intentional): md/lg/xl = 12/16/24
      Base v4 scale: md/lg/xl = 16/24/32
      Matching micro steps inherit names only: 2/4/6/8/10/14/16
      --chat-sp-md wires to base compat --space-md (12px), NOT v4 --sp-md (16px)
      Row rhythm consumes --chat-sp-md (12) not --chat-sp-lg so more turns fit 1440×810.
 
-     #1672 M7：密度阶梯使用 --chat-* 前缀（产品局部组合，值故意偏离
+     #1672：密度阶梯使用 --chat-* 前缀（产品局部组合，值故意偏离
      --td-space-* 与 --td-radius-* 契约刻度；前缀消除"平行词汇"外观）。 */
   --chat-sp-xs: 4px; --chat-sp-sm: 8px;
   --chat-sp-md: var(--space-md, 12px); /* 12px = base compat --space-md, not v4 --sp-md */
@@ -52,8 +52,8 @@
      ─────────────────────────────────────────────────────────────────── */
 
   /* Name aliases: chatview / tokens-base names → themes.css semantics
-     (migrated to --td-* intents, #1672 M2a；--primary-bg/--on-primary/
-     --guide-line/--shadow 已无消费者，M7 删除) */
+     (migrated to --td-* intents, #1672；--primary-bg/--on-primary/
+     --guide-line/--shadow 已无消费者，均已删除) */
 
   /* State: track theme status so dark/light follow themes.css.
      Role colors inherit tokens-base SSOT (--role-*) as theme-independent brand. */

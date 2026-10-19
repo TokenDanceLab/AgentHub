@@ -5,8 +5,6 @@ import (
 	"time"
 )
 
-// Residual pure-helper peel #1134: JWT and upload config sections.
-
 type JWTConfig struct {
 	Secret      string            `mapstructure:"secret"`
 	Secrets     map[string]string `mapstructure:"-"` // parsed from AGENTHUB_JWT_SECRETS env var

@@ -1,10 +1,9 @@
-// AgentHubWorkbench pending dispatch queue (#1965, UX F7; supersedes the
-// CF22 badge): 409 turn_in_progress queuing into a VISIBLE queue, undo,
-// manual retry after failure, cross-conversation isolation, retry budget
-// with a visible failed row, and honest degradation without a dispatch-only
-// retry port (#1763 split of AgentHubWorkbench.test.tsx).
+// AgentHubWorkbench pending dispatch queue: 409 turn_in_progress queuing into
+// a VISIBLE queue, undo, manual retry after failure, cross-conversation
+// isolation, retry budget with a visible failed row, and honest degradation
+// without a dispatch-only retry port.
 //
-// Shared vi.mock registration for the #1763 workbench shards. Must stay the
+// Shared vi.mock registration for workbench test shards. Must stay the
 // first import so mock factories register before the component tree (and its
 // virtua/@lobehub/icons deps) is evaluated. This shard intentionally does NOT
 // call installWorkbenchTestHooks(): the original suite kept the pending

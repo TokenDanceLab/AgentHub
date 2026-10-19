@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""AgentHub localhost real stack smoke（ps1 迁移，契约见 server docs/design/ps1-to-python-migration.md）。
+"""AgentHub localhost real stack smoke.
 
 启动或探测 observed product loop 的安全本地服务子集：Web dev server、
 Desktop/Tauri renderer bridge、Hub health、Local Edge。唯一恒尝试启动的
@@ -8,13 +8,8 @@ app workspace 依赖已就绪时启动；Hub 只探测（当前 server 入口依
 database 与 Redis）。
 
 RealTested 保持 false。不执行 TokenDanceID 登录、真实 CLI/model/API 执行、
-部署、签名、打包或 Mobile 工作。
-
-迁移差异（双跑对照记录）：失败探测行的底层错误文案随运行时环境变化
-（.NET 与 urllib 文案不同），对照时按错误文本归一化；harness 启动进程的
-清理用 taskkill /T /F 对齐 Stop-Process 的进程树终止语义；CLI 参数、
-退出码（0=通过 / 1=失败 / 2=参数非法）与 PASS/FAIL/WARN 行前缀格式
-与原 ps1 一致。
+部署、签名、打包或 Mobile 工作。CLI 参数同时接受 -Xxx 与 --Xxx；退出码
+0=通过 / 1=失败 / 2=参数非法。
 
 用法：
   python scripts/smoke/verify-localhost-real-stack-smoke.py
@@ -44,8 +39,8 @@ cleanup_status = "not_started"
 real_cli_or_model_invoked = False
 
 
-def add_ps_compat(parser, *names, **kwargs):
-    """Register a parameter with both ps1-style (-Xxx) and python-style (--Xxx) names."""
+def add_arg_alias(parser, *names, **kwargs):
+    """Register both -Xxx and --Xxx spellings for one option."""
     full_names = []
     for name in names:
         full_names.append(name)
@@ -189,13 +184,15 @@ def start_managed_process(name, file_name, arguments, working_directory):
     return process
 
 
-def test_app_dependencies(repo_root):
-    vite_cmd = os.path.join(repo_root, "app", "node_modules", ".bin", "vite.cmd")
-    vite_ps1 = os.path.join(repo_root, "app", "node_modules", ".bin", "vite.ps1")
-    return os.path.isfile(vite_cmd) or os.path.isfile(vite_ps1)
+def test_app_dependencies(app_dir):
+    bin_dir = os.path.join(app_dir, "node_modules", ".bin")
+    return any(
+        os.path.isfile(os.path.join(bin_dir, name))
+        for name in ("vite", "vite.cmd", "vite.ps1")
+    )
 
 
-def start_vite_service(name, app_dir, base_url, health_path, expected_pattern, timeout_sec):
+def start_vite_service(name, app_dir, base_url, health_path, expected_pattern, timeout_sec, repo_root):
     pre = invoke_health_probe(name, base_url, health_path, expected_pattern, 2)
     if pre["status"] == "healthy":
         pre["started_by_harness"] = False
@@ -204,19 +201,19 @@ def start_vite_service(name, app_dir, base_url, health_path, expected_pattern, t
         pass_check(f"{name} already healthy")
         return
 
-    if not test_app_dependencies(repo_root):
+    if not test_app_dependencies(app_dir):
         add_service({
             "name": name,
             "url": base_url,
             "health_url": join_url_path(base_url, health_path),
             "status": "blocked",
             "started_by_harness": False,
-            "blocker": "app workspace dependencies missing; run cd app; corepack.cmd pnpm install --frozen-lockfile",
+            "blocker": "app workspace dependencies missing; run pnpm install --frozen-lockfile in app/",
         })
         add_warning(f"{name} not started because app dependencies are missing")
         return
 
-    corepack = shutil.which("corepack.cmd")
+    corepack = shutil.which("corepack") or shutil.which("corepack.cmd")
     if not corepack:
         add_service({
             "name": name,
@@ -224,9 +221,9 @@ def start_vite_service(name, app_dir, base_url, health_path, expected_pattern, t
             "health_url": join_url_path(base_url, health_path),
             "status": "blocked",
             "started_by_harness": False,
-            "blocker": "corepack.cmd is unavailable",
+            "blocker": "corepack is unavailable",
         })
-        add_warning(f"{name} not started because corepack.cmd is unavailable")
+        add_warning(f"{name} not started because corepack is unavailable")
         return
 
     port = get_url_port(base_url)
@@ -269,7 +266,7 @@ def start_edge_service(local_edge_url, edge_health_path, edge_db_path, repo_root
     addr = f"127.0.0.1:{port}"
     start_managed_process(name, go, [
         "run",
-        ".\\cmd\\agenthub-edge",
+        "./cmd/agenthub-edge",
         "--addr", addr,
         "--store-backend", "sqlite",
         "--store-db", edge_db_path,
@@ -378,27 +375,27 @@ def stop_started_processes(keep_services):
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="AgentHub localhost real stack smoke（ps1 迁移）")
-    add_ps_compat(parser, "--RepoRoot", default=".", help="repository root")
-    add_ps_compat(parser, "--ArtifactRoot", default="", help="artifact root (defaults to .tmp under RepoRoot)")
-    add_ps_compat(parser, "--EvidencePath", default="", help="evidence JSON output path")
-    add_ps_compat(parser, "--TimeoutSec", type=int, default=60, help="probe deadline in seconds")
-    add_ps_compat(parser, "--SkipWeb", action="store_true", help="skip web start/probe")
-    add_ps_compat(parser, "--SkipDesktop", action="store_true", help="skip desktop bridge start/probe")
-    add_ps_compat(parser, "--SkipEdge", action="store_true", help="skip local edge start/probe")
-    add_ps_compat(parser, "--ProbeHub", action="store_true", help="probe hub health only")
-    add_ps_compat(parser, "--RequireWeb", action="store_true", help="fail when web is not healthy")
-    add_ps_compat(parser, "--RequireDesktop", action="store_true", help="fail when desktop bridge is not healthy")
-    add_ps_compat(parser, "--RequireHub", action="store_true", help="fail when hub probe is not healthy")
-    add_ps_compat(parser, "--KeepServices", action="store_true", help="keep harness-started services running")
-    add_ps_compat(parser, "--WebUrl", default="http://127.0.0.1:5174", help="web base URL")
-    add_ps_compat(parser, "--DesktopBridgeUrl", default="http://127.0.0.1:5173", help="desktop bridge base URL")
-    add_ps_compat(parser, "--HubUrl", default="http://127.0.0.1:8080", help="hub base URL")
-    add_ps_compat(parser, "--LocalEdgeUrl", default="http://127.0.0.1:3210", help="local edge base URL")
-    add_ps_compat(parser, "--WebHealthPath", default="/", help="web health path")
-    add_ps_compat(parser, "--DesktopHealthPath", default="/", help="desktop health path")
-    add_ps_compat(parser, "--HubHealthPath", default="/health/live", help="hub health path")
-    add_ps_compat(parser, "--EdgeHealthPath", default="/v1/health", help="local edge health path")
+    parser = argparse.ArgumentParser(description="AgentHub localhost real stack smoke")
+    add_arg_alias(parser, "--RepoRoot", default=".", help="repository root")
+    add_arg_alias(parser, "--ArtifactRoot", default="", help="artifact root (defaults to .tmp under RepoRoot)")
+    add_arg_alias(parser, "--EvidencePath", default="", help="evidence JSON output path")
+    add_arg_alias(parser, "--TimeoutSec", type=int, default=60, help="probe deadline in seconds")
+    add_arg_alias(parser, "--SkipWeb", action="store_true", help="skip web start/probe")
+    add_arg_alias(parser, "--SkipDesktop", action="store_true", help="skip desktop bridge start/probe")
+    add_arg_alias(parser, "--SkipEdge", action="store_true", help="skip local edge start/probe")
+    add_arg_alias(parser, "--ProbeHub", action="store_true", help="probe hub health only")
+    add_arg_alias(parser, "--RequireWeb", action="store_true", help="fail when web is not healthy")
+    add_arg_alias(parser, "--RequireDesktop", action="store_true", help="fail when desktop bridge is not healthy")
+    add_arg_alias(parser, "--RequireHub", action="store_true", help="fail when hub probe is not healthy")
+    add_arg_alias(parser, "--KeepServices", action="store_true", help="keep harness-started services running")
+    add_arg_alias(parser, "--WebUrl", default="http://127.0.0.1:5174", help="web base URL")
+    add_arg_alias(parser, "--DesktopBridgeUrl", default="http://127.0.0.1:5173", help="desktop bridge base URL")
+    add_arg_alias(parser, "--HubUrl", default="http://127.0.0.1:8080", help="hub base URL")
+    add_arg_alias(parser, "--LocalEdgeUrl", default="http://127.0.0.1:3210", help="local edge base URL")
+    add_arg_alias(parser, "--WebHealthPath", default="/", help="web health path")
+    add_arg_alias(parser, "--DesktopHealthPath", default="/", help="desktop health path")
+    add_arg_alias(parser, "--HubHealthPath", default="/health/live", help="hub health path")
+    add_arg_alias(parser, "--EdgeHealthPath", default="/v1/health", help="local edge health path")
     args = parser.parse_args()
 
     if args.TimeoutSec <= 0:
@@ -444,7 +441,7 @@ def main() -> int:
             if args.SkipWeb:
                 add_service({"name": "web", "url": args.WebUrl, "health_url": join_url_path(args.WebUrl, args.WebHealthPath), "status": "skipped", "started_by_harness": False})
             else:
-                start_vite_service("web", os.path.join(repo_root, "app", "web"), args.WebUrl, args.WebHealthPath, r'<div id="root"|AgentHub|agenthub', args.TimeoutSec)
+                start_vite_service("web", os.path.join(repo_root, "app", "web"), args.WebUrl, args.WebHealthPath, r'<div id="root"|AgentHub|agenthub', args.TimeoutSec, repo_root)
 
             if args.ProbeHub:
                 hub = invoke_health_probe("hub", args.HubUrl, args.HubHealthPath, r'"status"\s*:\s*"ok"|healthy|live', args.TimeoutSec)
@@ -463,7 +460,7 @@ def main() -> int:
             if args.SkipDesktop:
                 add_service({"name": "desktop", "url": args.DesktopBridgeUrl, "health_url": join_url_path(args.DesktopBridgeUrl, args.DesktopHealthPath), "status": "skipped", "started_by_harness": False})
             else:
-                start_vite_service("desktop", os.path.join(repo_root, "app", "desktop"), args.DesktopBridgeUrl, args.DesktopHealthPath, r'<div id="root"|AgentHub|agenthub', args.TimeoutSec)
+                start_vite_service("desktop", os.path.join(repo_root, "app", "desktop"), args.DesktopBridgeUrl, args.DesktopHealthPath, r'<div id="root"|AgentHub|agenthub', args.TimeoutSec, repo_root)
 
             if args.SkipEdge:
                 add_service({"name": "local-edge", "url": args.LocalEdgeUrl, "health_url": join_url_path(args.LocalEdgeUrl, args.EdgeHealthPath), "status": "skipped", "started_by_harness": False})

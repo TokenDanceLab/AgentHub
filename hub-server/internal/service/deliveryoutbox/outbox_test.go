@@ -1109,7 +1109,7 @@ func TestOutbox_ConcurrentMarkDeliveryRetryingOnlyOneClaim(t *testing.T) {
 	assert.Equal(t, StatusRetrying, rec2.Status)
 }
 
-// ── AutoAckDeliveriesForTask (#2154 P2-9) ─────────────────────────────────
+// ── AutoAckDeliveriesForTask (#2154) ─────────────────────────────────
 //
 // The Edge stream callback now dedupes this call per task in process memory, so
 // the operation's idempotency is what makes the dedupe (and a process restart

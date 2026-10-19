@@ -1,7 +1,5 @@
 package store
 
-// Residual pure-helper peel #1144: project/thread methods. Same package; zero behavior change.
-
 func (s *Store) CreateProject(id, name, ownerID string) (Project, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()

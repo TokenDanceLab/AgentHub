@@ -18,7 +18,7 @@ import {
 import styles from './AgentHubWorkbench.module.css';
 
 /* ═══════════════════════════════════════════════════════════════════════
-   WorkbenchFrameChromeParts — presentational residual slices from
+   WorkbenchFrameChromeParts — presentational parts for
    WorkbenchFrameParts (#742).
 
    Loading state, load-error recovery, sidebar resizer, and non-chat page

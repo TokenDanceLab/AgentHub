@@ -1,7 +1,5 @@
 package store
 
-// Residual pure-helper peel #1144: store interfaces. Same package; zero behavior change.
-
 type Reader interface {
 	GetProject(id string) (Project, bool)
 	ListProjects() []Project
@@ -61,7 +59,7 @@ type Repository interface {
 	Writer
 	// Close releases backend resources (sqlite file handles / journal WAL).
 	// Memory-backed stores are no-ops. Called from the shutdown hook chain so
-	// WAL checkpoint and file flushes complete before process exit (#2129 M5).
+	// WAL checkpoint and file flushes complete before process exit (#2129).
 	Close()
 }
 

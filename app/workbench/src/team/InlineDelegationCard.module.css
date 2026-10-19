@@ -1,4 +1,4 @@
-/* InlineDelegationCard — #1406 Phase 3
+/* InlineDelegationCard — #1406
    Inline (in-flow) delegation status card mounted below a user message.
    Mirrors the SubagentStreamOverlay glass-card tokens, but inline
    (no fixed positioning): the card stacks in the normal transcript flow. */

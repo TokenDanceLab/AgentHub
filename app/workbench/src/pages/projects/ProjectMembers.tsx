@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════════════════════════
-   ProjectMembers list — residual extract from ProjectPanelParts for #696.
+   ProjectMembers list (#696).
    Uses ProjectMemberChip from ProjectPanelHelpers.
    CSS remains on shared ProjectsPage.module.css.
    ═══════════════════════════════════════════════════════════════════════ */

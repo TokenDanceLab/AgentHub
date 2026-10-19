@@ -4,7 +4,7 @@ import (
 	sharedjwt "github.com/agenthub/pkg/jwtutil"
 )
 
-// The capability-token contract (AH-SR-046) is owned by pkg/jwtutil — Hub
+// The capability-token contract is owned by pkg/jwtutil — Hub
 // mints, Edge validates, one authoritative definition. This file re-exports
 // the shared symbols so edge callers keep their existing jwtutil.* imports.
 type CapabilityClaims = sharedjwt.CapabilityClaims

@@ -1,11 +1,11 @@
 import type { ApprovalDecisionAction, TranscriptBlock } from '@shared/transcript';
 
 /* ═══════════════════════════════════════════════════════════════════════
-   workbenchTranscriptChromeLabels — pure residual label / title / quote
-   slices from workbenchTranscriptChromeHelpers (#755).
+   workbenchTranscriptChromeLabels — label/title/quote helpers for the
+   transcript chrome (#755).
 
    Timing constants, block title resolution, toast label maps, quote and
-   permission decision mappers. No React hooks / no intentional UX change.
+   permission decision mappers. No React hooks.
    exactOptionalPropertyTypes: only assign optional fields when defined.
    ═══════════════════════════════════════════════════════════════════════ */
 

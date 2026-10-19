@@ -11,7 +11,7 @@ export default defineConfig({
     // 避免测试图里出现两份 React（hooks + zustand v5 store 会失效）。
     dedupe: ['react', 'react-dom'],
     alias: {
-      // workbench→shared 单向依赖（#1759）：深导入走 @shared 别名，与
+      // workbench→shared 单向依赖：深导入走 @shared 别名，与
       // web/desktop 既有约定一致；包级依赖在 package.json 声明。
       '@shared': path.resolve(__dirname, '..', 'shared', 'src'),
       // 测试套件横跨 shared 源码（@shared/testing/i18n 等）与 workbench
@@ -28,13 +28,13 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'jsdom',
-    // Flake 重试政策 SSOT：docs/governance/known-flaky.md。单元车道预算为 0
+    // Flake 重试政策 SSOT：docs/architecture/github-actions-ci-cd-policy.md。单元车道预算为 0
     //（fail-closed）；上调预算须先登记并走到期复审。
     retries: 0,
     // 与 shared/desktop 配置一致的 worker 上限：全量测试时默认全核并发
     // 会导致 forks worker 启动/回收超时，限制并发后 coverage 全量运行稳定。
     maxWorkers: 4,
-    // FLK-003：全量并行负载下 jsdom 渲染变慢，渲染重型用例（如
+    // 全量并行负载下 jsdom 渲染变慢，渲染重型用例（如
     // sidebar.test.tsx 的 App 级 harness）偶发超过 vitest 默认 5s 测试
     // 超时；与 edge-real-ci 先例对齐显式放宽（重试预算仍为 0）。
     testTimeout: 30_000,

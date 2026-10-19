@@ -12,7 +12,7 @@ export const WORKSPACE_AUTO_COLLAPSE_WIDTH = 560;
 // when the chat column would be crushed below this width. Deliberately tighter than
 // the live-resize comfort threshold above so a 1024px desktop window keeps its shell.
 export const WORKSPACE_MOUNT_COLLAPSE_WIDTH = 200;
-// Narrow-window mount threshold for the inspector (#1910 follow-up): on first
+// Narrow-window mount threshold for the inspector (#1910): on first
 // render of a Desktop chat page, collapse the inspector below this viewport width
 // so its fixed 400px column does not crush the chat main area at e.g. 800px.
 export const WORKSPACE_MOUNT_COLLAPSE_INSPECTOR_WIDTH = 880;
@@ -25,12 +25,12 @@ export const INSPECTOR_COLLAPSED_STORAGE_KEY = 'agenthub.workbench.inspectorColl
  * Window CustomEvent: the `inspectorVisible` setting asks the layout to apply
  * its stored default. `detail.collapse === true` collapses the inspector;
  * `detail.collapse === false` asks to expand it again, which the layout honours
- * only when the current collapse was caused by this same setting (#2154 P2-6).
+ * only when the current collapse was caused by this same setting (#2154).
  * A dispatch without detail (legacy shape) still means "collapse".
  */
 export const INSPECTOR_DEFAULT_COLLAPSE_EVENT = 'agenthub:inspector-default-collapse';
 
-/** Payload of INSPECTOR_DEFAULT_COLLAPSE_EVENT (#2154 P2-6). */
+/** Payload of INSPECTOR_DEFAULT_COLLAPSE_EVENT (#2154). */
 export interface InspectorDefaultCollapseDetail {
   collapse: boolean;
 }

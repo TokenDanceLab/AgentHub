@@ -30,12 +30,12 @@ function createAnchor(): HTMLElement {
   return document.createElement('div');
 }
 
-/** Fixture human profile matching the mock contact member "Johnny". */
-function johnnyProfile(anchor: HTMLElement = createAnchor()) {
+/** Fixture human profile matching the mock contact member "Alice". */
+function aliceProfile(anchor: HTMLElement = createAnchor()) {
   return {
-    id: 'johnny',
-    name: 'Johnny',
-    initials: 'J',
+    id: 'alice',
+    name: 'Alice',
+    initials: 'A',
     org: 'AgentHub Desktop',
     status: '刚刚活跃',
     tag: '维护者',
@@ -146,15 +146,15 @@ describe('useWorkbenchProfileChrome', () => {
     const { result } = renderProfileChrome();
 
     act(() => {
-      result.current.openAgentProfile('Johnny', anchor);
+      result.current.openAgentProfile('Alice', anchor);
     });
 
     expect(result.current.activeAgentProfile).toBeNull();
     expect(result.current.activeGroupProfile).toBeNull();
     expect(result.current.activeHumanProfile).toMatchObject({
-      id: 'johnny',
-      name: 'Johnny',
-      initials: 'J',
+      id: 'alice',
+      name: 'Alice',
+      initials: 'A',
       org: 'AgentHub Desktop',
       status: '刚刚活跃',
       tag: '维护者',
@@ -202,7 +202,7 @@ describe('useWorkbenchProfileChrome', () => {
     });
     act(() => {
       result.current.openConversationAvatar(
-        conversation({ id: 'g1', title: 'AI 游戏项目', kind: 'group', members: ['demo-user', 'Johnny'] }),
+        conversation({ id: 'g1', title: 'AI 游戏项目', kind: 'group', members: ['demo-user', 'Alice'] }),
         anchor,
       );
     });
@@ -212,7 +212,7 @@ describe('useWorkbenchProfileChrome', () => {
     expect(result.current.activeGroupProfile).toEqual({
       id: 'g1',
       name: 'AI 游戏项目',
-      memberNames: ['demo-user', 'Johnny'],
+      memberNames: ['demo-user', 'Alice'],
       anchor,
     });
   });
@@ -350,11 +350,11 @@ describe('useWorkbenchProfileChrome', () => {
 
   it('selects an existing conversation for a human direct message', () => {
     const { result, selectConversation, setActivePage } = renderProfileChrome({
-      conversations: [conversation({ id: 'c-j', title: 'Johnny' })],
+      conversations: [conversation({ id: 'c-j', title: 'Alice' })],
     });
 
     act(() => {
-      result.current.setActiveHumanProfile(johnnyProfile());
+      result.current.setActiveHumanProfile(aliceProfile());
     });
     act(() => {
       result.current.openHumanDirectMessage();
@@ -373,15 +373,15 @@ describe('useWorkbenchProfileChrome', () => {
     });
 
     act(() => {
-      result.current.setActiveHumanProfile(johnnyProfile());
+      result.current.setActiveHumanProfile(aliceProfile());
     });
     act(() => {
       result.current.openHumanDirectMessage();
     });
 
     expect(onNavigateToConversation).toHaveBeenCalledWith({
-      name: 'Johnny',
-      id: 'johnny',
+      name: 'Alice',
+      id: 'alice',
       kind: 'dm',
     });
     expect(selectConversation).not.toHaveBeenCalled();
@@ -393,13 +393,13 @@ describe('useWorkbenchProfileChrome', () => {
     const { result, selectConversation, setActivePage, showWorkbenchToast } = renderProfileChrome();
 
     act(() => {
-      result.current.setActiveHumanProfile(johnnyProfile());
+      result.current.setActiveHumanProfile(aliceProfile());
     });
     act(() => {
       result.current.openHumanDirectMessage();
     });
 
-    expect(showWorkbenchToast).toHaveBeenCalledWith('toast.noDmSession:Johnny');
+    expect(showWorkbenchToast).toHaveBeenCalledWith('toast.noDmSession:Alice');
     expect(selectConversation).not.toHaveBeenCalled();
     expect(setActivePage).not.toHaveBeenCalled();
     expect(result.current.activeHumanProfile).not.toBeNull();
@@ -478,13 +478,13 @@ describe('useWorkbenchProfileChrome', () => {
     expect(copyText).not.toHaveBeenCalled();
 
     act(() => {
-      result.current.setActiveHumanProfile(johnnyProfile());
+      result.current.setActiveHumanProfile(aliceProfile());
     });
     act(() => {
       result.current.copyHumanProfileLink();
     });
 
-    expect(copyText).toHaveBeenCalledWith('agenthub://user/johnny');
+    expect(copyText).toHaveBeenCalledWith('agenthub://user/alice');
     expect(showWorkbenchToast).toHaveBeenCalledWith('toast.contactLinkCopied');
   });
 });

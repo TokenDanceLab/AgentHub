@@ -110,7 +110,7 @@ func (h *AgentTeamHandler) ListTeamTasks(c *gin.Context) {
 }
 
 // ListTeamEvents GET /web/agent-teams/:id/runs/:run_id/events
-// Cursor pagination (#2154 perf lane): afterSeq is the seq of the last seen
+// Cursor pagination (#2154): afterSeq is the seq of the last seen
 // event; the response page.nextCursor carries the seq to pass next.
 func (h *AgentTeamHandler) ListTeamEvents(c *gin.Context) {
 	userID := c.GetString("user_id")

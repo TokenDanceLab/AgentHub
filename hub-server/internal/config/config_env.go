@@ -7,8 +7,6 @@ import (
 	"strings"
 )
 
-// Residual pure-helper peel #1134: env parse helpers and rate-limit fail-open.
-
 // parseJWTSecrets parses the AGENTHUB_JWT_SECRETS env var value.
 // Format: "kid1:secret1,kid2:secret2"
 // The first ':' in each pair separates the kid from the secret.

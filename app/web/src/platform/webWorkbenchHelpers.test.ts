@@ -3,7 +3,7 @@ import { errorMessage } from './webWorkbenchError';
 import { projectDraftToHubRequest } from './webWorkbenchProjects';
 import { executionTargetLabel, resolveWebExecutionTargetStatus } from './webWorkbenchExecutionTargets';
 
-describe('webWorkbench pure helpers residual seam', () => {
+describe('webWorkbench helper seam', () => {
   it('errorMessage covers non-Error objects', () => {
     expect(errorMessage({ message: 'nope' }, 'fallback')).toBe('fallback');
     expect(errorMessage('', 'fallback')).toBe('fallback');

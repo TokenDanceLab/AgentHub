@@ -10,7 +10,7 @@ import (
 )
 
 // These tests pin the semantics that the "filter on event type, then decode the
-// payload" reordering must not change (#2154 perf lane P2-5):
+// payload" reordering must not change (#2154):
 //
 //   - the summary fold stays lenient — an undecodable payload still counts the
 //     event, because EventTypeCounts / StepCount are folded before the switch;

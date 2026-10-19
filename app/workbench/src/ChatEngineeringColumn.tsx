@@ -66,7 +66,7 @@ export function resolveEngineeringPreview(
 
   // A user click is stronger than the automatic "newest evidence" rule. If
   // the requested artifact is not in the current snapshot, return null rather
-  // than silently showing a different artifact (F10 honesty contract).
+  // than silently showing a different artifact (honesty contract).
   if (focus) {
     const index = runtimeEvidence.artifacts.findIndex((artifact) => (
       artifact.id === focus.artifactId
@@ -139,7 +139,7 @@ export function ChatEngineeringColumn({
     setActiveTab(tab);
   }, [conversationId]);
 
-  // F10: transcript artifact clicks arrive as a transient, conversation-
+  // Transcript artifact clicks arrive as a transient, conversation-
   // scoped UI intent. The engineering column owns the selection and Preview
   // tab; RightInspector and transcript state are intentionally untouched.
   useEffect(() => {

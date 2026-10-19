@@ -11,10 +11,10 @@ import type { WorkbenchProjectsRoute } from './useWorkbenchProjectsRoute';
 import type { WorkbenchSettingsRoute } from './useWorkbenchSettingsRoute';
 
 /* ═══════════════════════════════════════════════════════════════════════
-   workbenchRoutesHelpers — pure residual slices from WorkbenchRoutes (#660).
+   workbenchRoutesHelpers — pure helpers for WorkbenchRoutes (#660).
 
    Page-prop builders for contacts/docs/projects/settings route shells.
-   No React hooks / no intentional UX change.
+   No React hooks.
    exactOptionalPropertyTypes: only assign `?: T` fields when defined.
    ═══════════════════════════════════════════════════════════════════════ */
 
@@ -90,7 +90,7 @@ export function buildDocsPageProps(
   };
 
   assignDefined(props, 'documentsError', docsRoute.documentsError);
-  // #2154 P2-2(b): demo-only shortcut list; real data mode passes [] and the
+  // #2154): demo-only shortcut list; real data mode passes [] and the
   // nav renders no shortcut block.
   assignDefined(props, 'shortcuts', docsRoute.shortcuts);
 

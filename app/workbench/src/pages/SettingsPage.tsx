@@ -10,8 +10,8 @@ import type { SettingsPageProps } from './settings';
    SettingsPage — AgentHub v4
 
    Left nav (sections + scope) + right main (settings rows + state preview).
-   Pane content / shared controls extracted under ./settings for Phase 18 #572.
-   Residual nav/main shell extracted for Phase 21 #604.
+   Pane content and shared controls live under ./settings (#572).
+   Nav and main shell (#604).
    ═══════════════════════════════════════════════════════════════════════ */
 
 /* ── Public re-exports (preserve external consumers) ── */

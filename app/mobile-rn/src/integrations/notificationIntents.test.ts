@@ -7,17 +7,17 @@ describe('AgentHub mobile notification intents', () => {
     expect(
       parseNotificationIntent({
         intent: 'thread',
-        threadId: 'thread-delicious233',
+        threadId: 'thread-demo',
       }),
     ).toEqual({
       kind: 'navigate',
       payload: {
         kind: 'thread',
-        threadId: 'thread-delicious233',
+        threadId: 'thread-demo',
       },
       target: {
         screen: 'thread',
-        threadId: 'thread-delicious233',
+        threadId: 'thread-demo',
       },
     });
   });
@@ -27,20 +27,20 @@ describe('AgentHub mobile notification intents', () => {
       parseNotificationIntent({
         type: 'run',
         runId: 'run-agenthub-preview',
-        threadId: 'thread-delicious233',
+        threadId: 'thread-demo',
       }),
     ).toEqual({
       kind: 'navigate',
       payload: {
         kind: 'run',
         runId: 'run-agenthub-preview',
-        threadId: 'thread-delicious233',
+        threadId: 'thread-demo',
       },
       target: {
         screen: 'tasks',
         source: 'run',
         runId: 'run-agenthub-preview',
-        threadId: 'thread-delicious233',
+        threadId: 'thread-demo',
       },
     });
   });
@@ -51,7 +51,7 @@ describe('AgentHub mobile notification intents', () => {
         kind: 'approval',
         approvalId: 'approval-agenthub',
         runId: 'run-agenthub-preview',
-        threadId: 'thread-delicious233',
+        threadId: 'thread-demo',
       }),
     ).toEqual({
       kind: 'navigate',
@@ -59,14 +59,14 @@ describe('AgentHub mobile notification intents', () => {
         kind: 'approval',
         approvalId: 'approval-agenthub',
         runId: 'run-agenthub-preview',
-        threadId: 'thread-delicious233',
+        threadId: 'thread-demo',
       },
       target: {
         screen: 'tasks',
         source: 'approval',
         approvalId: 'approval-agenthub',
         runId: 'run-agenthub-preview',
-        threadId: 'thread-delicious233',
+        threadId: 'thread-demo',
       },
     });
   });
@@ -123,6 +123,6 @@ describe('AgentHub mobile notification intents', () => {
   it('does not throw for malformed notification data from the native bridge', () => {
     expect(() => parseNotificationIntent('TokenDance')).not.toThrow();
     expect(() => parseNotificationIntent(null)).not.toThrow();
-    expect(() => parseNotificationIntent({ intent: ['thread'], threadId: 'thread-delicious233' })).not.toThrow();
+    expect(() => parseNotificationIntent({ intent: ['thread'], threadId: 'thread-demo' })).not.toThrow();
   });
 });

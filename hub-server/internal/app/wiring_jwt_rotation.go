@@ -4,7 +4,6 @@ import (
 	"context"
 	"log/slog"
 	"os"
-	"strconv"
 	"strings"
 	"time"
 
@@ -15,8 +14,7 @@ import (
 
 // maybeStartJWTRotation starts the JWT key rotation scheduler when explicitly
 // enabled via AGENTHUB_JWT_ROTATION_ENABLED=true. Default is disabled (safe
-// opt-in). See BLOCKED.md B1 for middleware migration prerequisite before
-// enabling in production.
+// opt-in).
 func (a *App) maybeStartJWTRotation(ctx context.Context) {
 	if !envBool(os.Getenv(config.JWTRotationEnabledEnvVar)) {
 		slog.Info("jwt rotation scheduler disabled (set AGENTHUB_JWT_ROTATION_ENABLED=true to enable)")
@@ -101,6 +99,7 @@ func envDuration(v string, fallback time.Duration) time.Duration {
 	}
 	d, err := time.ParseDuration(v)
 	if err != nil || d <= 0 {
+		slog.Warn("invalid duration; using fallback", "value", v, "fallback", fallback)
 		return fallback
 	}
 	return d
@@ -109,29 +108,15 @@ func envDuration(v string, fallback time.Duration) time.Duration {
 func classifyRotationError(err error) string {
 	msg := err.Error()
 	switch {
-	case contains(msg, "generate kid"):
+	case strings.Contains(msg, "generate kid"):
 		return "generate_kid"
-	case contains(msg, "generate secret"):
+	case strings.Contains(msg, "generate secret"):
 		return "generate_secret"
-	case contains(msg, "add key"):
+	case strings.Contains(msg, "add key"):
 		return "add_key"
-	case contains(msg, "set active"):
+	case strings.Contains(msg, "set active"):
 		return "set_active"
 	default:
 		return "other"
 	}
 }
-
-func contains(s, substr string) bool { return len(s) >= len(substr) && searchString(s, substr) }
-
-func searchString(s, substr string) bool {
-	for i := 0; i <= len(s)-len(substr); i++ {
-		if s[i:i+len(substr)] == substr {
-			return true
-		}
-	}
-	return false
-}
-
-// Ensure strconv import is used (for potential future parsing).
-var _ = strconv.ParseBool

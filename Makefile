@@ -8,8 +8,8 @@
 
 #        make release  (via git push tag -> release.yml, not built here)
 #        make help        (show this help)
-.PHONY: test test-all test-edge test-edge-full test-hub test-hub-full test-edge-e2e test-teamrun test-oidc test-hub-integration e2e-local lint coverage sec bench ci release clean fmt \
-        fe-install fe-dev fe-build fe-test fe-lint fe-typecheck fe-coverage-baseline help
+.PHONY: test test-ci test-all test-edge test-edge-full test-hub test-hub-full test-edge-e2e test-teamrun test-oidc test-hub-integration e2e-local lint coverage sec bench ci release clean fmt \
+        fe-install fe-dev fe-build fe-test fe-test-changed fe-lint fe-typecheck help
 
 # ── Help ───────────────────────────────────────────
 
@@ -17,7 +17,8 @@ help:
 	@echo "AgentHub Makefile targets:"
 	@echo ""
 	@echo "  Backend:"
-	@echo "    test          单元测试 (edge + hub, -short)"
+	@echo "    test          本地快速单元测试 (edge + hub, -short, 复用 Go test cache)"
+	@echo "    test-ci       同 test，但 -count=1 绕过测试缓存（CI 语义）"
 	@echo "    test-all      完整测试 (需 Redis + PG)"
 	@echo "    test-edge     Edge Server 单元测试"
 	@echo "    test-edge-e2e Edge→Hub 回调冒烟 (零外部依赖, 进程内 mock hub)"
@@ -29,7 +30,7 @@ help:
 	@echo "    lint          golangci-lint (edge + hub)"
 	@echo "    coverage      覆盖率报告 (HTML + func)"
 	@echo "    sec           gosec + govulncheck"
-	@echo "    bench         Benchmark (对齐 CI benchmark job: events+adapters / service+jwtutil)"
+	@echo "    bench         Benchmark (本地手动运行，不在 CI required check 内：events+adapters / service+jwtutil)"
 	@echo "    ci            全量 CI: test + lint + sec"
 	@echo "    clean         清理测试缓存和覆盖率文件"
 	@echo ""
@@ -37,10 +38,10 @@ help:
 	@echo "    fe-install    pnpm install"
 	@echo "    fe-dev        pnpm dev (desktop :5173)"
 	@echo "    fe-build      build web + desktop（mobile 为 Expo，无产物构建）"
-	@echo "    fe-test       pnpm -r test"
+	@echo "    fe-test       Vitest 单进程跑全部前端包（比 pnpm -r 更快）"
+	@echo "    fe-test-changed  只跑受 git 变更影响的 Vitest 用例"
 	@echo "    fe-lint       eslint + stylelint"
 	@echo "    fe-typecheck  tsc --noEmit (desktop + web)"
-	@echo "    fe-coverage-baseline  在干净且已同步的 master 重测四包并仅上调 coverage baseline"
 	@echo ""
 	@echo "  Release:"
 	@echo "    release              发布 = git push tag（触发 release.yml）"
@@ -48,18 +49,23 @@ help:
 
 # ── Unit tests (no external deps) ────────────────────
 
+# 本地默认复用 Go test cache：未变化的包直接命中缓存。
+# 需要与 CI 一致的干净结果时用 make test-ci（-count=1）。
 test: test-edge test-hub
 
+test-ci:
+	$(MAKE) test-edge test-hub GO_TEST_FLAGS=-count=1
+
 test-edge:
-	cd edge-server && go test ./... -short -count=1 -timeout 60s
+	cd edge-server && go test ./... -short $(GO_TEST_FLAGS) -timeout 60s
 
 # Edge→Hub 回调冒烟：mock hub + 进程内 edge，零外部依赖（不需 PG/Redis/真实 CLI）。
 # 覆盖 ack/stream/done/fail 直连回调链；-short 下这些用例会被跳过，故单独入口。
 test-edge-e2e:
-	cd edge-server && go test ./tests/ -count=1 -run "^TestHubE2E_" -timeout 120s
+	cd edge-server && go test ./tests/ -count=1 -timeout 120s
 
 test-hub:
-	cd hub-server && go test ./... -short -count=1 -timeout 60s
+	cd hub-server && go test ./... -short $(GO_TEST_FLAGS) -timeout 60s
 
 # 零外部依赖的 E2E smoke（in-memory sqlite，无 build tag，CI 直跑）。
 test-teamrun:
@@ -87,7 +93,7 @@ test-hub-full:
 	cd hub-server && go test ./... -count=1 -timeout 120s -race
 
 # ── Benchmarks ───────────────────────────────────
-# 范围与 checks.yml 的 benchmark job 一致（edge events+adapters、hub service+jwtutil）。
+# 本地手动运行，不在 CI required check 内。
 
 bench:
 	cd edge-server && go test -bench=. -benchmem ./internal/events/ ./internal/adapters/
@@ -125,9 +131,8 @@ ci: test lint sec
 
 # ── Release ─────────────────────────────────────
 
-# 发布入口已收敛（2026-08-02）：唯一入口 = git tag vX.Y.Z[-rc.N] → push → release.yml（AGENTS.md §12）。
-# release.ps1 已删除；本地不再上传二进制。本地 `make release` 不再假绿灯
-# （审计）：它只提醒走 release.yml 并以 exit 1 失败，避免被误当作发布成功。
+# 唯一发布入口：git tag vX.Y.Z[-rc.N] → push → release.yml。
+# 本地 make release 只提示入口并以 exit 1 失败，避免被误当作发布成功。
 release:
 	@echo "release is via git push tag -> release.yml" >&2; exit 1
 
@@ -151,18 +156,18 @@ fe-build:
 	# mobile-rn 是 Expo 开发构建（无产物 build script），只 build 有产物的 web/desktop
 	cd app && pnpm --filter agenthub-web --filter agenthub-desktop build
 
+# 单个 Vitest 进程调度全部 project，避免 pnpm -r 为每个包各起一套 worker。
 fe-test:
-	cd app && pnpm -r test
+	cd app && pnpm test
 
-# 仅用于“提高/刷新”前端 coverage baseline：脚本会拒绝非 master、脏树、
-# 未同步 origin/master、partial package 或任何自动降基线，避免写入不可追溯 SHA。
-fe-coverage-baseline:
-	python scripts/verify/verify-coverage-baseline.py --WriteBaseline
+# 本地迭代用：只跑受工作区未提交/已提交变更影响的用例。
+fe-test-changed:
+	cd app && pnpm exec vitest run --changed
 
 fe-lint:
 	cd app && pnpm -r lint
 	cd app && pnpm lint:css
 
 fe-typecheck:
-	cd app/desktop && npx tsc --noEmit
-	cd app/web && npx tsc --noEmit
+	cd app && pnpm --filter agenthub-desktop typecheck
+	cd app && pnpm --filter agenthub-web typecheck

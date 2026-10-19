@@ -19,10 +19,8 @@ import (
 // constraint"), SQLite ("UNIQUE constraint failed: ..."), and be
 // case-insensitive, while rejecting unrelated errors and nil.
 //
-// Renamed from TestIsDuplicateKeyError and repointed at isUniqueViolation when
-// #2244 slice 1 deleted the package-private isDuplicateKeyError copy this test
-// used to exercise; the table below is unchanged, every `want` value included,
-// and all six cases still pass against the converged implementation.
+// Exercises the shared isUniqueViolation classifier on the agent-run-event
+// idempotency path.
 func TestIsUniqueViolation_AgentRunEventIdempotentPath(t *testing.T) {
 	cases := []struct {
 		name string

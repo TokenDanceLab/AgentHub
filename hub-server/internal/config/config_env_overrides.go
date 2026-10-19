@@ -25,7 +25,7 @@ func applyEnvOverrides(cfg *Config) error {
 }
 
 // warnLegacyEnv emits a one-shot deprecation warning when a legacy env name
-// is set but its canonical replacement is not (#2124 N2/N3). The legacy name
+// is set but its canonical replacement is not (#2124). The legacy name
 // keeps working during the compatibility window.
 func warnLegacyEnv(legacy, canonical string) {
 	if os.Getenv(legacy) != "" && os.Getenv(canonical) == "" {
@@ -64,7 +64,7 @@ func applyJWTEnvOverrides(cfg *Config) {
 }
 
 func applyServerEnvOverrides(cfg *Config) {
-	// #2124 N1: AGENTHUB_LOG_LEVEL is canonical (aligned with Edge);
+	// #2124: AGENTHUB_LOG_LEVEL is canonical (aligned with Edge);
 	// AGENTHUB_SERVER_LOG_LEVEL remains as a working legacy alias.
 	if envLogLevel := firstEnv("AGENTHUB_LOG_LEVEL", "AGENTHUB_SERVER_LOG_LEVEL"); envLogLevel != "" {
 		cfg.Server.LogLevel = envLogLevel
@@ -77,7 +77,7 @@ func applyServerEnvOverrides(cfg *Config) {
 	if envEnv := os.Getenv("AGENTHUB_ENV"); envEnv != "" {
 		cfg.Server.Env = envEnv
 	}
-	// #2124 N5: GIN_MODE is Gin's native knob but the CORS/WS env fallbacks
+	// #2124: GIN_MODE is Gin's native knob but the CORS/WS env fallbacks
 	// consult it; GIN_MODE=debug in production silently relaxes CORS.
 	if cfg.Server.Env == "production" && strings.EqualFold(os.Getenv("GIN_MODE"), "debug") {
 		slog.Warn("GIN_MODE=debug in production relaxes CORS/env fallback; prefer AGENTHUB_ENV=production with info log level",
@@ -86,7 +86,7 @@ func applyServerEnvOverrides(cfg *Config) {
 }
 
 func applyTokenDanceIDEnvOverrides(cfg *Config) {
-	// #2124 N2: legacy AGENTHUB_TOKENDANCE_* prefix stays functional but is
+	// #2124: legacy AGENTHUB_TOKENDANCE_* prefix stays functional but is
 	// deprecated in favor of AGENTHUB_TOKENDANCE_ID_*. Pairs are written as
 	// argument lists (not map literals) because the secret-guard treats
 	// "SECRET_NAME": "VALUE" shapes in config paths as embedded secrets.
@@ -124,9 +124,9 @@ func applyTokenDanceIDEnvOverrides(cfg *Config) {
 }
 
 func applyS3EnvOverrides(cfg *Config) error {
-	// #2124 N3: bare S3_* prefix stays functional but is deprecated in
+	// #2124: bare S3_* prefix stays functional but is deprecated in
 	// favor of AGENTHUB_S3_*. Argument-list form avoids the secret-guard
-	// assignment heuristic (see N2 comment).
+	// assignment heuristic (see applyTokenDanceIDEnvOverrides).
 	warnLegacyEnv("S3_ENDPOINT", "AGENTHUB_S3_ENDPOINT")
 	warnLegacyEnv("S3_ACCESS_KEY", "AGENTHUB_S3_ACCESS_KEY")
 	warnLegacyEnv("S3_SECRET_KEY", "AGENTHUB_S3_SECRET_KEY")
@@ -159,7 +159,7 @@ func applyS3EnvOverrides(cfg *Config) error {
 }
 
 // applyEdgeDispatchEnvOverrides applies the Hub→Edge dispatch token alias
-// (#2124 N4): AGENTHUB_EDGE_DISPATCH_AUTH_TOKEN is canonical;
+// (#2124): AGENTHUB_EDGE_DISPATCH_AUTH_TOKEN is canonical;
 // AGENTHUB_EDGE_AUTH_TOKEN (shared name with the Edge-side local bearer)
 // remains a working legacy alias. Other edge.* fields keep viper
 // AutomaticEnv binding (AGENTHUB_EDGE_URL / _DEVICE_ID / _TIMEOUT).

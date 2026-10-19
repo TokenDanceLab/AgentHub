@@ -17,7 +17,7 @@ import (
 	"github.com/agenthub/hub-server/internal/repository"
 )
 
-// This file nails the two behaviors that #2244 slice 1 fixes in this package.
+// This file nails the two behaviors that #2244 fixes in this package.
 //
 // Both write paths used to own a private duplicate-key classifier:
 //
@@ -127,11 +127,10 @@ func TestPinMessage_DuplicateSQLiteUppercaseIsIdempotent(t *testing.T) {
 // (internal/app/events.go -> ws.TypeMessagePin) re-render a pin list that is
 // byte-identical to what it already has.
 //
-// The residual gap is recorded in service_send.go next to the branch and in the
-// lane report: s.publish is best-effort (service_helpers.go logs and swallows a
+// Note that s.publish is best-effort (service_helpers.go logs and swallows a
 // failed Publish), so "the row exists" does not strictly prove "an event was
-// once delivered". Closing that gap would mean changing publish semantics,
-// which the host ruled out of scope for this slice.
+// once delivered". The test pins the current publish semantics only; proving
+// delivery to subscribers would require a different mechanism.
 func TestPinMessage_DuplicatePublishesNothing(t *testing.T) {
 	db, mock, sqlDB := newMockDB(t)
 	defer sqlDB.Close()
@@ -204,7 +203,7 @@ func mockPinDuplicate(t *testing.T, mock sqlmock.Sqlmock, insertErr error) {
 
 // TestMessagePackageUsesRepositoryUniqueViolationSSOT asserts the classifier
 // this package now depends on behaves correctly for the three shapes that used
-// to diverge across the five copies (#2244 slice 1).
+// to diverge across the five copies (#2244).
 func TestMessagePackageUsesRepositoryUniqueViolationSSOT(t *testing.T) {
 	cases := []struct {
 		name string

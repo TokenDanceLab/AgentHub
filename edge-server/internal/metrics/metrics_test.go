@@ -83,11 +83,10 @@ func TestMetricsMultipleRuns(t *testing.T) {
 // TestInstallPanicObserver_CountsRecoveredGoroutinePanics proves the wiring
 // that makes an Edge goroutine panic observable: after InstallPanicObserver a
 // recovered panic increments edge_goroutine_panic_recoveries_total under the
-// launcher's label. Without it the panic is a log line and nothing else, which
-// is exactly the hole the lifecycle's private launcher copy left.
+// launcher's label. Without it the panic is a log line and nothing else.
 func TestInstallPanicObserver_CountsRecoveredGoroutinePanics(t *testing.T) {
 	// Not parallel: SetPanicObserver mutates a process-global hook.
-	m := NewTestEdgeMetrics()
+	m := NewWithBusHooks(BusHooks{})
 	m.InstallPanicObserver()
 	t.Cleanup(func() { safego.SetPanicObserver(nil) })
 

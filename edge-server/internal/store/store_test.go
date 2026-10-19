@@ -114,11 +114,11 @@ func TestStorePinsThreadItems(t *testing.T) {
 		t.Fatalf("CreateThreadMessage other returned error: %v", err)
 	}
 
-	pin, err := s.PinThreadItem(thread.ID, item.ID, "  Delicious233  ")
+	pin, err := s.PinThreadItem(thread.ID, item.ID, "  Demo User  ")
 	if err != nil {
 		t.Fatalf("PinThreadItem returned error: %v", err)
 	}
-	if pin.ThreadID != thread.ID || pin.ItemID != item.ID || pin.PinnedBy != "Delicious233" {
+	if pin.ThreadID != thread.ID || pin.ItemID != item.ID || pin.PinnedBy != "Demo User" {
 		t.Fatalf("pin = %#v, want trimmed pinned item metadata", pin)
 	}
 
@@ -230,7 +230,7 @@ func TestStoreUpdatesAndDeletesThreads(t *testing.T) {
 	if _, err := s.CreateThreadMessage("item_test", thread.ID, "user", "hello"); err != nil {
 		t.Fatalf("CreateThreadMessage returned error: %v", err)
 	}
-	if _, err := s.PinThreadItem(thread.ID, "item_test", "Delicious233"); err != nil {
+	if _, err := s.PinThreadItem(thread.ID, "item_test", "Demo User"); err != nil {
 		t.Fatalf("PinThreadItem returned error: %v", err)
 	}
 
@@ -340,10 +340,10 @@ func TestStoreCleanupRunsRemovesExpiredTerminalRunsAndItems(t *testing.T) {
 	addCleanupItem(s, "item_old", "run_old")
 	addCleanupItem(s, "item_recent", "run_recent")
 	addCleanupItem(s, "item_active", "run_active")
-	if _, err := s.PinThreadItem("thread_test", "item_old", "Delicious233"); err != nil {
+	if _, err := s.PinThreadItem("thread_test", "item_old", "Demo User"); err != nil {
 		t.Fatalf("PinThreadItem old returned error: %v", err)
 	}
-	if _, err := s.PinThreadItem("thread_test", "item_recent", "Delicious233"); err != nil {
+	if _, err := s.PinThreadItem("thread_test", "item_recent", "Demo User"); err != nil {
 		t.Fatalf("PinThreadItem recent returned error: %v", err)
 	}
 

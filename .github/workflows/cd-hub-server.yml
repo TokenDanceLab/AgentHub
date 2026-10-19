@@ -5,6 +5,9 @@ on:
     branches: [master]
     paths:
       - "hub-server/**"
+      - ".dockerignore"
+      - "edge-server/go.mod"
+      - "edge-server/go.sum"
       - "pkg/**"
       - "go.*"
       - ".github/workflows/cd-hub-server.yml"
@@ -55,6 +58,7 @@ jobs:
           file: hub-server/deployments/Dockerfile
           push: true
           platforms: ${{ matrix.platform }}
+          build-args: VERSION=${{ github.sha }}
           tags: ${{ env.IMAGE_NAME }}:sha-${{ github.sha }}-${{ matrix.suffix }}
           cache-from: type=gha,scope=hub-server-${{ matrix.suffix }}
           cache-to: type=gha,mode=max,scope=hub-server-${{ matrix.suffix }}

@@ -16,11 +16,11 @@ import {
 } from './workbenchTasksRouteGroupHelpers';
 
 /* ═══════════════════════════════════════════════════════════════════════
-   workbenchTasksRoutePlanners — pure residual action-plan / label slices
-   from workbenchTasksRouteHelpers (#769).
+   workbenchTasksRoutePlanners — action-plan and label helpers for the
+   tasks route (#769).
 
    Pane/sort/group labels, create/edit/delete/cycle/assign/filter plans,
-   toolbar toggles. No React hooks / no intentional UX change.
+   toolbar toggles. No React hooks.
 
    i18n note (#2023): action feedback labels resolve through the
    sharedWorkbench bundle via a passed-in translator (component `t`);

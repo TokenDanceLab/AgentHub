@@ -23,7 +23,6 @@ export {
   runCount,
   projectSubmitErrorMessage,
 } from './shared';
-export { DEFAULT_PROJECTS, TAB_ITEMS } from './types';
 
 export type {
   ProjectRunStatus,

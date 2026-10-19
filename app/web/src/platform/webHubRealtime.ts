@@ -11,7 +11,7 @@ import { handleIncomingTyping } from '@shared/chatview/typingPresence';
 import { buildWSAuthProtocols, createHubWS, type HubWSHandle, type HubWSOptions } from '@shared/hub/hubWS';
 import { resyncMessagesAfterReconnect } from '@shared/hub/hubMessagesResync';
 import { webHubMessagesFamily } from '@/platform/webPlatformMessageHelpers';
-import { WebSocketTransport, type Transport, type TransportStatus } from '@/api/transport';
+import { WebSocketTransport, type Transport, type TransportStatus } from '@shared/transport';
 import { HUB_WS_URL } from '@/config';
 import { createHubClient } from '@/api/hubClient';
 import { trackEventSeq, replayMissedEvents } from '@/api/runEventReplay';
@@ -245,7 +245,7 @@ export function useWebHubRealtime({
           liveBatcher.push();
         }
       } else if (type === HUB_EVENTS.TEAM_SUBAGENT_STREAM) {
-        // #1478 Phase C: route team subagent stream frames into the
+        // #1478: route team subagent stream frames into the
         // SubagentStreamStore for team-run view aggregation. No live batch
         // needed — team.subagent.stream has its own idempotency semantics
         // (UPSERT by agent_task_id + event_seq) and is consumed by a store
@@ -273,7 +273,7 @@ export function useWebHubRealtime({
           // AGENT_STREAM is synced once per batch inside the batcher.
           getAgentActivityStore().handleEvent(type, payload);
         }
-        // #1406 Phase 3: feed agent.* frames to the message-delegation
+        // #1406: feed agent.* frames to the message-delegation
         // store so inline delegation cards can subscribe by
         // trigger_message_id. The store no-ops on per-token AGENT_STREAM
         // after the first streaming transition, so direct feed is safe.
@@ -299,7 +299,7 @@ export function useWebHubRealtime({
       }
     });
 
-    // #2101 G4-②: shared resync trigger for gap and reconnect events.
+    // #2101: shared resync trigger for gap and reconnect events.
     // Uses incremental syncMessages(after_seq) per cached session when possible;
     // falls back to full invalidation of the transcript family otherwise.
     // #2252: Web transcripts are cached at `webQueryKeys.messages.of(<id>)`,
@@ -315,12 +315,12 @@ export function useWebHubRealtime({
       });
     };
 
-    // #2101 G1: seq_id gap → trigger message resync.
+    // #2101: seq_id gap → trigger message resync.
     const unsubscribeGap = socket.onGap?.(() => {
       triggerWebResync();
     });
 
-    // #2101 G4-②: reconnect auth completion → trigger message resync.
+    // #2101: reconnect auth completion → trigger message resync.
     const unsubscribeReconnected = socket.onReconnected?.(() => {
       triggerWebResync();
     });
@@ -393,23 +393,19 @@ export function invalidateWebWorkbenchHubQueries(
 
   // ── Device events ──────────────────────────────
   if (DEVICE_EVENTS.has(eventType)) {
-    // This block used to fire an app-scoped twin of the key below that had no
-    // producer: Web caches execution targets only under
+    // Web caches execution targets only under
     // `hubQueryKeys.executionTargets.list(context)`, so the family root is the
-    // one invalidation that can actually match (ADR-029: do not name a key
-    // nothing writes).
+    // invalidation that can actually match (ADR-029: do not name a key nothing
+    // writes).
     void queryClient.invalidateQueries({ queryKey: hubQueryKeys.executionTargets.root });
   }
 
   // ── Contact events ─────────────────────────────
   if (CONTACT_EVENTS.has(eventType)) {
-    // Web's contact LIST is cached at `webQueryKeys.contacts.list(hubReady)`,
-    // but this block used to invalidate a hand-written app-scoped key missing
-    // the `hub-` segment, so it matched nothing: a friend request accepted in
-    // another tab left this one's contact list stale, and that query has no
-    // refetchInterval to paper over it. Both roots below are live —
-    // `webQueryKeys.contacts.root` covers the list, `hubQueryKeys.contacts.root`
-    // covers `useListFriendRequests`.
+    // Web's contact LIST is cached at `webQueryKeys.contacts.list(hubReady)`
+    // and `useListFriendRequests` under `hubQueryKeys.contacts`. Both roots are
+    // live, so invalidate both: `webQueryKeys.contacts.root` covers the list,
+    // `hubQueryKeys.contacts.root` covers the friend requests.
     void queryClient.invalidateQueries({ queryKey: webQueryKeys.contacts.root });
     void queryClient.invalidateQueries({ queryKey: hubQueryKeys.contacts.root });
   }
@@ -417,11 +413,7 @@ export function invalidateWebWorkbenchHubQueries(
   // ── Team events ────────────────────────────────
   if (TEAM_EVENTS.has(eventType)) {
     // Web's only team cache is `hubQueryKeys.agentTeams.usageBoard`, so the
-    // family root is the single invalidation that can match. This block used to
-    // fire five more run-scoped keys (`agentTeams.runs` / `.runDetail`, each in
-    // both namespaces); none of them has a Web query producer, so all five
-    // matched no cache entry — the `teamId`/`teamRunId` extraction existed only
-    // to build dead keys and is gone with them.
+    // family root is the single invalidation that can match.
     void queryClient.invalidateQueries({ queryKey: hubQueryKeys.agentTeams.root });
   }
 }
@@ -443,8 +435,9 @@ interface WebWorkbenchHubInvalidationScheduler {
  * Query invalidation scheduler for realtime Hub frames (#1352).
  *
  * AGENT_STREAM frames arrive per token, and each invalidateWebWorkbenchHubQueries
- * call costs ~6 cache operations — api/events.md:47 requires stream output to be
- * batched instead of refreshing the UI per line. Stream frames therefore collapse
+ * call costs ~6 cache operations — api/events.md「Edge EventEnvelope」merges
+ * stdout/stderr into `run.output.batch`, so stream output must be batched
+ * instead of refreshing the UI per line. Stream frames therefore collapse
  * into one trailing flush per window (the last frame always flushes: via timer,
  * via the next non-stream frame, or via dispose). Non-stream frames invalidate
  * immediately, flushing any pending stream frame first so cache writes keep the

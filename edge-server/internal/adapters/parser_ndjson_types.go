@@ -1,7 +1,5 @@
 package adapters
 
-// Residual pure-helper peel #1113: Claude SDK message schemas used for NDJSON parsing.
-
 // --- Claude SDK message schemas (subset used for parsing) ---
 
 type claudeSDKMessage struct {

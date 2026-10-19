@@ -1,9 +1,5 @@
 package agents
 
-// Residual pure-helper peel #1154: filtered list/find/count and tree-walk
-// lookup methods extracted from registry.go. Same package agents; zero
-// behavior change.
-
 // ListByParent returns all agent instances spawned by the given parent ID.
 func (r *Registry) ListByParent(parentID string) []AgentInstance {
 	r.mu.RLock()
@@ -86,8 +82,8 @@ func (r *Registry) GetChildren(parentID string) []string {
 }
 
 // AncestorChain returns the full delegation chain for an agent instance,
-// walking parent references up to the root. Used for cycle detection
-// (Layer 2: Runtime Tracker from 03-orchestration.md).
+// walking parent references up to the root. Used for cycle detection during
+// delegation.
 func (r *Registry) AncestorChain(id string) []string {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
@@ -121,20 +117,6 @@ func (r *Registry) MaxDepth() int {
 		}
 	}
 	return max
-}
-
-// GetByRunID returns the agent instance associated with the given run ID.
-// Returns nil if no agent matches.
-func (r *Registry) GetByRunID(runID string) *AgentInstance {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
-	for _, inst := range r.agents {
-		if inst.RunID == runID {
-			cloned := *inst
-			return &cloned
-		}
-	}
-	return nil
 }
 
 // CountActiveByParent returns the number of non-terminal agents whose ParentID

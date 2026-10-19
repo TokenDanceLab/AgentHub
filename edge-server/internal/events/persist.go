@@ -31,13 +31,6 @@ type PersistFn func(EventEnvelope) error
 // BusOption configures a Bus.
 type BusOption func(*Bus)
 
-// maxPersistRetries returns the persist retry count for the bus. The
-// override seam was removed with the unused WithPersistMaxRetries option, so
-// this is always the compile-time default.
-func (b *Bus) maxPersistRetries() int {
-	return persistDefaultMaxRetries
-}
-
 // persistWithRetry calls persistFn for evt, retrying up to maxRetries times
 // with exponential backoff on error. It returns the last error if every
 // attempt failed, or nil if any attempt succeeded. The retry loop is
@@ -45,7 +38,7 @@ func (b *Bus) maxPersistRetries() int {
 // preserved: an event either lands in the durable store before it is seen by
 // subscribers, or it is dropped with persistFailures incremented.
 func (b *Bus) persistWithRetry(evt EventEnvelope) error {
-	maxRetries := b.maxPersistRetries()
+	maxRetries := persistDefaultMaxRetries
 	var lastErr error
 	for attempt := 0; attempt <= maxRetries; attempt++ {
 		err := b.persistFn(evt)

@@ -1,7 +1,7 @@
 # AgentHub Web — Dockerfile
 # Multistage build: pnpm workspace → Vite SPA → nginx
 # Build context: app/
-# tsc typecheck is handled by CI (cd-pr-check.yml); Docker build
+# tsc typecheck runs in the frontend CI lanes (checks.yml); Docker build
 # runs only vite build for production optimised output.
 
 FROM --platform=$BUILDPLATFORM node:24-alpine AS builder
@@ -21,7 +21,7 @@ COPY workbench ./workbench
 COPY web ./web
 RUN pnpm --filter agenthub-web exec vite build
 
-FROM nginx:1.27-alpine AS runner
+FROM nginx:1.30-alpine AS runner
 COPY --from=builder /app/web/dist /usr/share/nginx/html
 # Vite base=/workbench/ prefix stripping + SPA fallback (see web/nginx.conf)
 COPY web/nginx.conf /etc/nginx/conf.d/default.conf

@@ -5,13 +5,8 @@ import (
 	"time"
 )
 
-// sqlite_store_query_finalize.go holds pure finalize/plan/should helpers and
-// background cleanup constants peeled from sqlite_store_query.go.
-// No *sql.DB / *sql.Tx / IO ownership.
-
-// ── residual pure helpers (#1032) ──
-// Background intervals, load/persist finalize plans, and projection payload maps.
-// No *sql.DB / *sql.Tx / IO ownership.
+// Finalize/should helpers and background cleanup constants for SQLite queries.
+// No *sql.DB, *sql.Tx, or IO ownership.
 
 // sqliteBackgroundLoopInterval is the shared period for WAL checkpoint and
 // terminal-run cleanup loops started by NewSQLite.
@@ -34,43 +29,6 @@ func sqlitePeriodicCleanupOptions() RunCleanupOptions {
 	}
 }
 
-// sqliteLoadSourcePlan chooses between row-first and legacy snapshot load paths.
-type sqliteLoadSourcePlan struct {
-	UseRows     bool
-	UseSnapshot bool
-}
-
-// planSQLiteLoadSource maps loadSQLiteRows "ok" into the load branch to take.
-func planSQLiteLoadSource(rowsLoaded bool) sqliteLoadSourcePlan {
-	if rowsLoaded {
-		return sqliteLoadSourcePlan{UseRows: true}
-	}
-	return sqliteLoadSourcePlan{UseSnapshot: true}
-}
-
-// legacySnapshotLoadPlan decides how to treat a legacy snapshot QueryRow result.
-// isNoRows is supplied by the caller (errors.Is(err, sql.ErrNoRows)) so this
-// file stays free of database/sql.
-type legacySnapshotLoadPlan struct {
-	Skip   bool // empty DB or blank payload — treat as empty store
-	Decode bool // decode + apply payload
-	Fail   bool // surface a read error
-}
-
-// planLegacySnapshotLoad maps QueryRow outcomes into skip / decode / fail.
-func planLegacySnapshotLoad(isNoRows bool, err error, payload string) legacySnapshotLoadPlan {
-	if isNoRows {
-		return legacySnapshotLoadPlan{Skip: true}
-	}
-	if err != nil {
-		return legacySnapshotLoadPlan{Fail: true}
-	}
-	if isBlankSQLiteSnapshotPayload(payload) {
-		return legacySnapshotLoadPlan{Skip: true}
-	}
-	return legacySnapshotLoadPlan{Decode: true}
-}
-
 // shouldSkipPersistOnProjectExists preserves CreateProject soft-exists semantics:
 // ErrProjectExists is returned without attempting syncPersist.
 func shouldSkipPersistOnProjectExists(err error) bool {
@@ -81,16 +39,6 @@ func shouldSkipPersistOnProjectExists(err error) bool {
 // call syncPersist.
 func shouldSyncAfterCleanup(result RunCleanupResult) bool {
 	return result.RemovedRuns != 0 || result.RemovedItems != 0
-}
-
-// finalizeSQLiteCleanupAfterPersist maps a cleanup result + persist outcome.
-// Persist failures are recorded on the store via lastErr; the in-memory cleanup
-// counts are still returned so callers do not treat a durable failure as a no-op
-// while memory has already dropped the terminal runs. LastPersistError remains
-// the durable status signal for honesty checks.
-func finalizeSQLiteCleanupAfterPersist(result RunCleanupResult, persistErr error) RunCleanupResult {
-	_ = persistErr
-	return result
 }
 
 // finalizeSQLiteBoolWrite maps (value, ok, persistErr) for methods that return

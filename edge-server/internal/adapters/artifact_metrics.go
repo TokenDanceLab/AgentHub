@@ -15,8 +15,3 @@ var artifactSurfacedRecorder ArtifactSurfacedRecorder
 func SetArtifactSurfacedRecorder(r ArtifactSurfacedRecorder) {
 	artifactSurfacedRecorder = r
 }
-
-// ArtifactSurfacedRecorderForTest exposes the current recorder for assertions.
-func ArtifactSurfacedRecorderForTest() ArtifactSurfacedRecorder {
-	return artifactSurfacedRecorder
-}

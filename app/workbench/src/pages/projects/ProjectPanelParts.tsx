@@ -1,9 +1,8 @@
 /* ═══════════════════════════════════════════════════════════════════════
    Projects detail presentational panels.
 
-   Residual extract from ProjectPanelViews for Phase 23 #626.
-   Residual thin (#696): Announcement / FeedPanel / ProjectMembers moved
-   to their own files; SectionHead + MemberChip shared via helpers.
+   Announcement, FeedPanel, and ProjectMembers live in their own files;
+   SectionHead and MemberChip are shared via helpers (#626, #696).
    CSS remains on shared ProjectsPage.module.css.
    ═══════════════════════════════════════════════════════════════════════ */
 

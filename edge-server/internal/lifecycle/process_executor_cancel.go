@@ -12,8 +12,11 @@ import (
 
 func (e *ProcessExecutor) Cancel(runID string) CancelResult {
 	run, ok := e.store.GetRun(runID)
-	if early, proceed := cancelPrecheck(run, ok); !proceed {
-		return early
+	if !ok {
+		return CancelResult{Found: false, Status: "not_found"}
+	}
+	if !isCancellableRunStatus(run.Status) {
+		return CancelResult{Run: run, Found: true, Status: run.Status}
 	}
 
 	// Send adapter-specific interrupt via stdin before canceling context.
@@ -21,15 +24,15 @@ func (e *ProcessExecutor) Cancel(runID string) CancelResult {
 	// flush session state) rather than being killed by SIGTERM.
 	e.mu.Lock()
 	stdin, hasStdin := e.stdins[runID]
-	if planWriteInterruptStdin(hasStdin).Write {
-		if err := adapters.WriteInterrupt(stdin, interruptRequestID(runID)); planInterruptWriteLog(err).Log {
+	if hasStdin {
+		if err := adapters.WriteInterrupt(stdin, "interrupt-"+runID); err != nil {
 			slog.Debug("process: interrupt write failed", "runId", runID, "error", err)
 		}
 	}
 	cancel, ok := e.running[runID]
 	e.mu.Unlock()
-	if early, proceed := cancelRunningLookup(ok); !proceed {
-		return early
+	if !ok {
+		return CancelResult{Found: false, Status: "not_running"}
 	}
 
 	// Graceful shutdown: wait grace period for child to respond to stdin interrupt,
@@ -43,14 +46,14 @@ func (e *ProcessExecutor) Cancel(runID string) CancelResult {
 	e.mu.Lock()
 	proc := e.processes[runID]
 	_, alreadyArmed := e.cancelDone[runID]
-	plan := planCancelGraceArm(proc, alreadyArmed)
+	armGrace := proc != nil && !alreadyArmed
 	var done chan struct{}
-	if plan.Arm {
+	if armGrace {
 		done = make(chan struct{})
 		e.cancelDone[runID] = done
 	}
 	e.mu.Unlock()
-	if plan.Arm {
+	if armGrace {
 		// Graceful shutdown: run in a goroutine so Cancel() returns
 		// immediately and does not block the HTTP response. The goroutine
 		// is tracked via cancelDone so finish() can abort it early if the
@@ -61,7 +64,7 @@ func (e *ProcessExecutor) Cancel(runID string) CancelResult {
 				return
 			case <-time.After(e.shutdownGracePeriod):
 			}
-			if err := signalProcessGraceful(proc); planProcessSignalLog(err).Log {
+			if err := signalProcessGraceful(proc); err != nil {
 				slog.Debug("process: graceful signal failed", "run_id", runID, "error", err)
 			}
 			select {
@@ -69,11 +72,11 @@ func (e *ProcessExecutor) Cancel(runID string) CancelResult {
 				return
 			case <-time.After(e.shutdownForceTimeout):
 			}
-			if err := killProcessTree(proc); planProcessSignalLog(err).Log {
+			if err := killProcessTree(proc); err != nil {
 				slog.Debug("process: force kill failed", "run_id", runID, "error", err)
 			}
 			// run() also Wait()s; a second Wait is best-effort reaping only.
-			if _, err := proc.Wait(); planProcessWaitAfterKill(err).Log {
+			if _, err := proc.Wait(); err != nil {
 				slog.Warn("process wait error after kill", "run_id", runID, "error", err)
 			}
 		})
@@ -84,21 +87,20 @@ func (e *ProcessExecutor) Cancel(runID string) CancelResult {
 	cancel()
 
 	run, ok = e.store.SetRunStatusIf(runID, "cancelling", "queued", "started", "cancelling")
-	if result, needLookup := cancelTransitionResult(run, ok); !needLookup {
-		return result
+	if ok {
+		return CancelResult{Run: run, Found: true, Status: run.Status}
 	}
 	current, found := e.store.GetRun(runID)
-	return lookupCancelResult(current, found)
+	if !found {
+		return CancelResult{Found: false, Status: "not_found"}
+	}
+	return CancelResult{Run: current, Found: true, Status: current.Status}
 }
 
 // watchRunProcess terminates a child when the run context ends and Cancel has
 // not already armed a grace path. Without this, dropping CommandContext would
 // leave run-timeout processes orphaned (#988).
 func (e *ProcessExecutor) watchRunProcess(ctx context.Context, runID string, proc *os.Process, stop <-chan struct{}) {
-	// Pure nil-process gate; select/map lookup stay here (#988).
-	if !planWatchProcessEntry(proc).Watch {
-		return
-	}
 	select {
 	case <-stop:
 		return
@@ -108,10 +110,10 @@ func (e *ProcessExecutor) watchRunProcess(ctx context.Context, runID string, pro
 	e.mu.Lock()
 	_, graceActive := e.cancelDone[runID]
 	e.mu.Unlock()
-	if !planWatchProcessKill(graceActive).Kill {
+	if graceActive {
 		return
 	}
-	if err := killProcessTree(proc); planProcessSignalLog(err).Log {
+	if err := killProcessTree(proc); err != nil {
 		slog.Debug("process: timeout kill failed", "run_id", runID, "error", err)
 	}
 }

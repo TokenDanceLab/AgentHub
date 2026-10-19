@@ -37,7 +37,7 @@ describe('normalizeHubMessagesToTranscript', () => {
         seq_id: 1,
         sender_type: 'user',
         sender_id: 'user-1',
-        sender: { nickname: 'Delicious233' },
+        sender: { nickname: 'Demo User' },
         content: { text: '从 Hub session 发来的消息' },
         created_at: '2026-06-07T07:00:01Z',
       },
@@ -46,7 +46,7 @@ describe('normalizeHubMessagesToTranscript', () => {
     expect(blocks).toEqual([
       {
         id: 'hub-message-message-user',
-        author: { id: 'user-1', name: 'Delicious233', role: 'human' },
+        author: { id: 'user-1', name: 'Demo User', role: 'human' },
         createdAt: '2026-06-07T07:00:01Z',
         kind: 'text',
         text: '从 Hub session 发来的消息',
@@ -69,7 +69,7 @@ describe('normalizeHubMessagesToTranscript', () => {
         seq_id: 4,
         sender_type: 'user',
         sender_id: 'user-1',
-        sender: { nickname: 'Delicious233' },
+        sender: { nickname: 'Demo User' },
         content: { text: '置顶的消息' },
         pinned: true,
         created_at: '2026-06-07T07:00:04Z',
@@ -171,7 +171,7 @@ describe('normalizeHubMessagesToTranscript', () => {
         seq_id: 1,
         sender_type: 'user',
         sender_id: 'user-1',
-        sender: { nickname: 'Delicious233' },
+        sender: { nickname: 'Demo User' },
         content: {
           text: '请先起草项目方案',
           im_kind: 'agent_dm',
@@ -200,7 +200,7 @@ describe('normalizeHubMessagesToTranscript', () => {
         seq_id: 3,
         sender_type: 'user',
         sender_id: 'user-1',
-        sender: { nickname: 'Delicious233' },
+        sender: { nickname: 'Demo User' },
         content: {
           text: '@Reviewer 检查一下 shared transcript contract',
           im_kind: 'project_group',
@@ -496,7 +496,7 @@ describe('normalizeHubMessagesToTranscript attachment pass-through (#1972)', () 
   });
 });
 
-describe('normalizeHubMessagesToTranscript producing-task projection (#2274 B-1)', () => {
+describe('normalizeHubMessagesToTranscript producing-task projection (#2274)', () => {
   const agentMessage = (content: unknown) => ({
     id: 'msg-agent-1',
     session_id: 'hub-session-1',
@@ -511,7 +511,7 @@ describe('normalizeHubMessagesToTranscript producing-task projection (#2274 B-1)
 
   it('writes the hub-stamped agent_task.task_id onto the text block', () => {
     const blocks = normalizeHubMessagesToTranscript([
-      agentMessage({ content: 'B-1 final answer', agent_task: { task_id: 'task-77' } }),
+      agentMessage({ content: 'final answer', agent_task: { task_id: 'task-77' } }),
     ]);
 
     expect(blocks).toHaveLength(1);

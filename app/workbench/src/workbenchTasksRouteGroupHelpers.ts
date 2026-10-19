@@ -9,12 +9,11 @@ import {
 } from './workbenchTaskGroups';
 
 /* ═══════════════════════════════════════════════════════════════════════
-   workbenchTasksRouteGroupHelpers — pure residual group / draft / mode
-   slices from workbenchTasksRouteHelpers (#769).
+   workbenchTasksRouteGroupHelpers — group/draft/mode helpers for the
+   tasks route (#769).
 
    Source-group resolution, edit drafts, immutable group mutations, status
-   cycle, assignee resolution, sort/group mode toggles. No React hooks /
-   no intentional UX change.
+   cycle, assignee resolution, sort/group mode toggles. No React hooks.
    exactOptionalPropertyTypes: only assign `?: T` fields when defined,
    unless the public field type explicitly allows `| undefined`.
    ═══════════════════════════════════════════════════════════════════════ */

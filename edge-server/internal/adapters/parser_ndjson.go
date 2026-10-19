@@ -22,7 +22,7 @@ type NDJSONStreamParser struct {
 	toolNames      map[string]string        // toolUseID → toolName (for file_change detection)
 	controlHandler ControlHandler           // nil = control messages ignored
 	stdin          io.Writer                // nil = control responses not written
-	hooks          HookChain                // AgentHook middleware (P0 #1 from researcher)
+	hooks          HookChain                // AgentHook middleware
 	budget         *runnerctx.ContextBudget // nil = no budget tracking
 }
 
@@ -71,7 +71,7 @@ func (p *NDJSONStreamParser) Parse(ctx context.Context, r io.Reader) error {
 			// (which pinpoints the parseLine frame) plus the surrounding per-line
 			// logs instead of from this record. Gaining stack+metric+observer was
 			// worth more than keeping them; widening safego's API to carry
-			// per-call attributes is a separate decision (#2246 slice follow-up).
+			// per-call attributes is a separate decision.
 			defer safego.Recover("ndjson.parse_line")
 			p.parseLine(line)
 		}()

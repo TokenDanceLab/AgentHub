@@ -81,18 +81,18 @@ interface Props {
   actionedBlockIds?: Set<string>
   /**
    * Optional render slot rendered immediately below each user message.
-   * Used by #1406 Phase 3 to mount the inline delegation card below a
+   * Used by #1406 to mount the inline delegation card below a
    * dispatch-triggering user message. Returns null/undefined when no
    * footer is needed for that item.
    */
   renderUserFooter?: (item: TranscriptUserItem) => React.ReactNode
   /**
-   * Unread-messages divider (T8 desktop IM path): item index before which
+   * Unread-messages divider (desktop IM path): item index before which
    * the divider renders, plus pre-resolved copy. Absent for non-IM transcripts.
    */
   unreadDivider?: { index: number; label: string; readThrough?: string } | undefined
   /**
-   * Compact boundary dividers (T21/CF23): item indices before which compact
+   * Compact boundary dividers: item indices before which compact
    * dividers render, with optional trigger and pre-token metadata.
    */
   compactDividers?: { index: number; trigger?: string; preTokens?: number }[] | undefined
@@ -104,7 +104,7 @@ interface Props {
  * Under virtualization the target row may be off-screen and unmounted, so the
  * parent first asks the Transcript to scroll the containing segment into view
  * via {@link scrollToBlockId}, then querySelector-s the now-mounted row to add
- * the highlight class (existing interaction preserved, RFC §6.3).
+ * the highlight class (existing interaction preserved).
  */
 export interface TranscriptHandle {
   /**
@@ -282,7 +282,7 @@ function partitionWithDates(
  * indexed here: their highlight resolves to -1 and falls back to the plain
  * querySelector, which finds them when mounted. Rows come from an agent
  * item's `rows`, `standaloneRows`, and the row parts interleaved with bubbles
- * in `parts` (RFC §6.3 / §8.1).
+ * in `parts`.
  */
 function buildBlockIndexMap(segments: TranscriptSegment[]): Map<string, number> {
   const map = new Map<string, number>()
@@ -314,7 +314,7 @@ const TranscriptImpl = forwardRef<TranscriptHandle, Props>(function Transcript({
   const transcriptRef = useRef<HTMLDivElement>(null)
   /** Virtualizer handle — used for highlight/search scrollToIndex jumps. */
   const virtualizerRef = useRef<VirtualizerHandle>(null)
-  /** blockId → segment index, for virtualized highlight/search jumps (RFC §6.3). */
+  /** blockId → segment index, for virtualized highlight/search jumps. */
   const blockIndexMap = useMemo(() => buildBlockIndexMap(segments), [segments])
   /** Scroll state per session — see SessionScrollState. */
   const sessionStatesRef = useRef(new Map<string, SessionScrollState>())
@@ -343,7 +343,7 @@ const TranscriptImpl = forwardRef<TranscriptHandle, Props>(function Transcript({
       if (idx === undefined) return -1
       // Instant center-mount of the containing segment; the caller follows up
       // with a rAF + querySelector + scrollIntoView for the smooth final
-      // centering and highlight class (RFC §6.3). Smooth here would fight the
+      // centering and highlight class. Smooth here would fight the
       // subsequent scrollIntoView and is avoided per virtua guidance.
       virtualizerRef.current?.scrollToIndex(idx, { align: 'center' })
       return idx

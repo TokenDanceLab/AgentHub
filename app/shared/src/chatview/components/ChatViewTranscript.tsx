@@ -70,13 +70,13 @@ interface Props {
   typingUserNames?: string[] | undefined
   /**
    * Optional render slot rendered immediately below each user message.
-   * Used by #1406 Phase 3 to mount the inline delegation card below a
+   * Used by #1406 to mount the inline delegation card below a
    * dispatch-triggering user message. Returns null/undefined when no
    * footer is needed for that item.
    */
   renderUserFooter?: (item: TranscriptUserItem) => React.ReactNode
   /**
-   * Unread-messages divider descriptor (T8 desktop IM path). The consumer
+   * Unread-messages divider descriptor (desktop IM path). The consumer
    * (desktop Hub sessions) derives the anchor block id from the session read
    * watermark; this wrapper resolves it to an item index against the adapted
    * items (merged agent groups are treated as a unit) before passing it down.

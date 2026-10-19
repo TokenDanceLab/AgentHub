@@ -4,10 +4,10 @@ import type { TranscriptBlock } from '@shared/transcript';
 import type { TranscriptContextMenuEvent } from './transcriptEventTypes';
 
 /* ═══════════════════════════════════════════════════════════════════════
-   workbenchFrameHelpers — pure residual slices from WorkbenchFrame (#637).
+   workbenchFrameHelpers — pure helpers for WorkbenchFrame (#637).
 
    Shell attrs, resizer handlers, selection set builders, and block event
-   adapters. No React hooks / no intentional UX change.
+   adapters. No React hooks.
    ═══════════════════════════════════════════════════════════════════════ */
 
 /**

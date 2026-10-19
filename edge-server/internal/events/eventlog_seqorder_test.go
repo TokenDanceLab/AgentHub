@@ -11,7 +11,7 @@ import (
 	"testing"
 )
 
-// This file pins the EventLog ordering invariant (#2154 lane B):
+// This file pins the EventLog ordering invariant (#2154):
 //
 //	orderedSeq is sorted by seq, and no consumer may assume that the log
 //	FILE is in seq order.

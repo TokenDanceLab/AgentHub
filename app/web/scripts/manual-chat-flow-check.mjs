@@ -15,8 +15,8 @@ const taskId = 'task-web-manual-chat-flow';
 fs.mkdirSync(outputDir, { recursive: true });
 
 const blockedHosts = new Set([
-  'api.hub.vectorcontrol.tech',
   'hub.vectorcontrol.tech',
+  'api.hub.vectorcontrol.tech',
   'id.tokendancelab.com',
   'api.vectorcontrol.tech',
   'localhost:3210',
@@ -290,7 +290,7 @@ function assertMetrics(result) {
   if (!result.inspectorHasReviewer) failures.push('expected inspector to show subagent evidence');
   if (result.transcriptHasModeDebug) failures.push('expected data-mode/debug status outside main transcript');
   if (failures.length > 0) {
-    throw new Error(`Manual Web chat-flow UIUX check failed:\n- ${failures.join('\n- ')}`);
+    throw new Error(`Manual Web chat-flow check failed:\n- ${failures.join('\n- ')}`);
   }
 }
 

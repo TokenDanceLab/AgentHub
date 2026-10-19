@@ -9,7 +9,7 @@ type ActiveLocalEdgeDeviceDuplicate struct {
 }
 
 func FindActiveLocalEdgeDeviceDuplicates(db *gorm.DB) ([]ActiveLocalEdgeDeviceDuplicate, error) {
-	// Single query + in-Go grouping (#2102 item 14): the previous version
+	// Single query + in-Go grouping (#2102): the previous version
 	// issued one Pluck per duplicate key — an N+1 pattern that grows with the
 	// number of conflicted (owner, device) groups. One round-trip now fetches
 	// every active local_edge row and grouping happens in memory; duplicate

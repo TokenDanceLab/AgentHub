@@ -155,15 +155,15 @@ export const RowItem = memo(function RowItem({ item, onToggle, onApprove, onReje
   const userToggledRef = useRef(false)
   const thinkStartRef = useRef<number | null>(null)
   const [thinkDuration, setThinkDuration] = useState<number | undefined>(undefined)
-  // T16: critical approval second-confirm — first click arms, second click fires.
+  // Critical approval second-confirm — first click arms, second click fires.
   const [confirmingApprove, setConfirmingApprove] = useState(false)
-  // Fable UIUX #4: Copy→Check feedback for the code copy button.
+  // Copy→Check feedback for the code copy button.
   const [copied, markCopied] = useCopiedFlag()
   const isOpen = item.type === 'route' ? true : open
 
   // Think cards: auto-open when running, auto-collapse 1s after done
   // (once semantics: once user manually toggles, never auto-collapse)
-  // Also tracks think duration for "Thought for Ns" display (QW6).
+  // Also tracks think duration for "Thought for Ns" display.
   useEffect(() => {
     if (item.type !== 'think' || !item.collapsible) return
     if (userToggledRef.current) return
@@ -200,7 +200,7 @@ export const RowItem = memo(function RowItem({ item, onToggle, onApprove, onReje
     setOpen(true)
   }, [item.type, item.status, item.collapsible])
 
-  // T16: reset critical second-confirm whenever the approval card's status or
+  // Reset critical second-confirm whenever the approval card's status or
   // identity changes (decided → idle, or a new request replaces this card).
   useEffect(() => {
     if (item.type !== 'approval') return
@@ -249,7 +249,7 @@ export const RowItem = memo(function RowItem({ item, onToggle, onApprove, onReje
     onBlockSelect?.(interactionId, e.shiftKey)
   }
 
-  // T16: critical approvals require a second-confirm — the first click arms
+  // Critical approvals require a second-confirm — the first click arms
   // (button flips to "确认批准？" + red highlight), the second click fires.
   // Non-critical approvals fire onApprove immediately.
   const handleApproveClick = () => {
@@ -268,9 +268,9 @@ export const RowItem = memo(function RowItem({ item, onToggle, onApprove, onReje
     onReject?.(item.id)
   }
 
-  // Fable UIUX #4: copy code lines, then flip the button to Check for 1500ms.
-  // Follows the previous contract: onCopy (app-level handler, e.g. toast) takes
-  // precedence; otherwise fall back to navigator.clipboard directly.
+  // Copy code lines, then flip the button to Check for 1500ms.
+  // Contract: an app-level onCopy handler (e.g. toast) takes precedence;
+  // otherwise fall back to navigator.clipboard directly.
   const handleCodeCopy = () => {
     const text = item.codeLines?.join('\n') || ''
     if (onCopy) {
@@ -283,7 +283,7 @@ export const RowItem = memo(function RowItem({ item, onToggle, onApprove, onReje
     }
   }
 
-  // T16 + Wave10 a11y: keyboard equivalents for block rows.
+  // a11y: keyboard equivalents for block rows.
   //   - Shift+F10 or Menu key → open context menu (mirrors ConversationSidebar).
   //   - Enter/Space → activate: block-select when wired, else toggle the body.
   //   - Escape → collapse an open collapsible row (approval cards also reset
@@ -525,11 +525,10 @@ export const RowItem = memo(function RowItem({ item, onToggle, onApprove, onReje
               </div>
             )
           })()}
-          {/* a11y TODO (#1503 approval arrival): this waiting approval card lives inside the
-              Transcript's role=log region. Under virtualization the card is unmounted while
-              outside the buffer window, so its arrival is never announced to screen readers.
-              Fix: a live region OUTSIDE the virtualizer (ChatViewTranscript/consumer level)
-              fed by an approval-arrival signal — needs data flow changes, deferred. */}
+          {/* a11y limitation (#1503): this waiting approval card lives inside the
+              Transcript's role=log region. Under virtualization the card is unmounted
+              while outside the buffer window, so its arrival is not announced to
+              screen readers. */}
           {/* #1819 waiting-approval time feedback: the request has no deadline
               upstream (Edge/Hub carry nothing like expires_at), so we surface
               the honest created-time ("requested at HH:MM") instead of a fake

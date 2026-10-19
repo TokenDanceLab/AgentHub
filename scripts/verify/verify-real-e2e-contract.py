@@ -1,112 +1,175 @@
 #!/usr/bin/env python3
-"""verify-real-e2e-contract — 真实 E2E 合同门禁（ps1 迁移，契约见 server docs/design/ps1-to-python-migration.md）。
+"""Fail-closed checks for the real E2E evidence contract.
 
-守护演示诚实：stub/fixture 不得冒充真实登录/API。检查：
-  - real-e2e-acceptance skill 必须含全部 9 个证据等级（label + machine label）
-  - AGENTS.md 必须指向 skill，不得另持一份证据等级矩阵
-  - architecture.md 的 Visual QA 视口必须是 1440x810（禁陈旧 1440x920）
-  - smoke matrix 必须含 6 个 manifest 字段且 evidence_level 均在规范集合内
-
-失败语义与 ps1 对齐：异常 → 非零退出 + stderr 信息。
+A fixture, stub, or preview run must not claim real login, API, deployment, or
+process-recovery coverage. The smoke matrix declares its evidence levels in a
+machine-readable constant for every scenario; this script rejects unknown
+levels and missing manifest fields.
 """
 
 import argparse
+import importlib.util
 import os
-import re
 import sys
 
-SKILL_PATH = ".agents/skills/real-e2e-acceptance/SKILL.md"
-RULES_PATH = "AGENTS.md"
-ARCHITECTURE_PATH = "docs/architecture.md"
 SMOKE_MATRIX_PATH = "scripts/smoke/verify-e2e-smoke-matrix.py"
 
-# 与 ps1 的 [ordered] 字典一致（顺序即检查顺序）。
-CANONICAL_LEVELS = [
-    ("Fixture/unit", "fixture-unit"),
-    ("Playwright UI E2E", "playwright-ui"),
-    ("Visual QA", "visual-qa"),
-    ("Stubbed Hub", "stubbed-hub"),
-    ("Observed local", "observed-local"),
-    ("Approved real", "approved-real"),
-    ("Backend/API", "backend-api"),
-    ("Performance/leak", "performance-leak"),
-    ("Packaged release", "packaged-release"),
-]
+EVIDENCE_LEVELS = {
+    "fixture-unit",
+    "playwright-ui",
+    "visual-qa",
+    "stubbed-hub",
+    "observed-local",
+    "approved-real",
+    "backend-api",
+    "performance-leak",
+    "packaged-release",
+}
 
-REQUIRED_SMOKE_FIELDS = [
+REQUIRED_ROW_FIELDS = [
     "evidence_level",
     "real_tested",
     "claim",
     "status",
+]
+
+REQUIRED_MANIFEST_FIELDS = [
     "skipped_evidence_levels",
     "planned_evidence_levels",
 ]
 
-EVIDENCE_LEVEL_RE = re.compile(r'-EvidenceLevel\s+"([^"]+)"')
+
+def load_smoke_matrix(path):
+    """Import the smoke matrix module to read its declared contract values."""
+    spec = importlib.util.spec_from_file_location("verify_e2e_smoke_matrix", path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
 
 
-class ContractError(Exception):
-    pass
+def validate_contract(module):
+    """Return a list of contract violations for an imported smoke-matrix module."""
+    errors = []
+
+    row_fields = tuple(getattr(module, "ROW_SCHEMA_FIELDS", ()))
+    manifest_fields = tuple(getattr(module, "MANIFEST_SCHEMA_FIELDS", ()))
+    missing = [field for field in REQUIRED_ROW_FIELDS if field not in row_fields]
+    missing += [field for field in REQUIRED_MANIFEST_FIELDS if field not in manifest_fields]
+    if missing:
+        errors.append(f"smoke matrix schema is missing manifest fields: {', '.join(missing)}")
+
+    declared = set(getattr(module, "SCENARIO_EVIDENCE_LEVELS", ()))
+    if not declared:
+        errors.append("smoke matrix declares no scenario evidence levels")
+    unknown = sorted(declared - EVIDENCE_LEVELS)
+    if unknown:
+        errors.append(f"smoke matrix declares unknown evidence levels: {', '.join(unknown)}")
+
+    high = set(getattr(module, "HIGH_EVIDENCE_LEVELS", ()))
+    canonical_high = {"approved-real", "packaged-release"}
+    if high != canonical_high:
+        errors.append(
+            "smoke matrix HIGH_EVIDENCE_LEVELS must be exactly "
+            + ", ".join(sorted(canonical_high))
+        )
+    unknown_high = sorted(high - EVIDENCE_LEVELS)
+    if unknown_high:
+        errors.append(f"smoke matrix declares unknown high evidence levels: {', '.join(unknown_high)}")
+    contract = getattr(module, "SCENARIO_CONTRACT", None)
+    if not isinstance(contract, dict) or not contract:
+        errors.append("smoke matrix declares no SCENARIO_CONTRACT mapping")
+    else:
+        contract_levels = set()
+        for name, entry in contract.items():
+            if not isinstance(entry, (tuple, list)) or len(entry) != 2:
+                errors.append(f"scenario '{name}' contract entry must be (level, real_tested)")
+                continue
+            level, real = entry
+            contract_levels.add(level)
+            if level not in EVIDENCE_LEVELS:
+                errors.append(f"scenario '{name}' declares unknown level '{level}'")
+            if level in high and real is not True:
+                errors.append(f"scenario '{name}' claims {level} without real_tested=True")
+        if contract_levels != declared:
+            errors.append(
+                "SCENARIO_CONTRACT levels and SCENARIO_EVIDENCE_LEVELS disagree: "
+                f"{sorted(contract_levels)} != {sorted(declared)}"
+            )
+
+    return errors
 
 
-def fail(message):
-    raise ContractError(f"real E2E contract check failed: {message}")
+def run_self_test():
+    """Negative self-test: a non-canonical level such as 'integration' must fail."""
 
+    class FakeModule:
+        ROW_SCHEMA_FIELDS = tuple(REQUIRED_ROW_FIELDS)
+        MANIFEST_SCHEMA_FIELDS = tuple(REQUIRED_MANIFEST_FIELDS)
 
-def read_text(path):
-    # 与 ps1 一致：相对路径基于当前工作目录解析。
-    if not os.path.exists(path):
-        fail(f"missing required file: {path}")
-    with open(path, encoding="utf-8-sig", errors="replace") as handle:
-        return handle.read()
+    good = FakeModule()
+    good.SCENARIO_EVIDENCE_LEVELS = ("fixture-unit",)
+    good.HIGH_EVIDENCE_LEVELS = ("approved-real", "packaged-release")
+    good.SCENARIO_CONTRACT = {"scenario": ("fixture-unit", False)}
+    if validate_contract(good):
+        print("self-test failed: canonical module was rejected", file=sys.stderr)
+        return 1
+
+    bad = FakeModule()
+    bad.SCENARIO_EVIDENCE_LEVELS = ("integration",)
+    if not validate_contract(bad):
+        print("self-test failed: non-canonical level 'integration' was accepted", file=sys.stderr)
+        return 1
+
+    incomplete = FakeModule()
+    incomplete.SCENARIO_EVIDENCE_LEVELS = ("fixture-unit",)
+    incomplete.HIGH_EVIDENCE_LEVELS = ("approved-real", "packaged-release")
+    incomplete.SCENARIO_CONTRACT = {"scenario": ("fixture-unit", False)}
+    incomplete.ROW_SCHEMA_FIELDS = tuple(field for field in REQUIRED_ROW_FIELDS if field != "status")
+    if not validate_contract(incomplete):
+        print("self-test failed: schema missing 'status' was accepted", file=sys.stderr)
+        return 1
+
+    empty_high = FakeModule()
+    empty_high.SCENARIO_EVIDENCE_LEVELS = ("fixture-unit",)
+    empty_high.HIGH_EVIDENCE_LEVELS = ()
+    empty_high.SCENARIO_CONTRACT = {"scenario": ("fixture-unit", False)}
+    if not validate_contract(empty_high):
+        print("self-test failed: empty HIGH_EVIDENCE_LEVELS was accepted", file=sys.stderr)
+        return 1
+
+    high_not_real = FakeModule()
+    high_not_real.SCENARIO_EVIDENCE_LEVELS = ("approved-real",)
+    high_not_real.HIGH_EVIDENCE_LEVELS = ("approved-real", "packaged-release")
+    high_not_real.SCENARIO_CONTRACT = {"scenario": ("approved-real", False)}
+    if not validate_contract(high_not_real):
+        print("self-test failed: high level without real_tested=True was accepted", file=sys.stderr)
+        return 1
+
+    print("real E2E contract self-test ok")
+    return 0
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Verify the real E2E acceptance contract across skill, AGENTS, architecture, roadmap, and smoke matrix.")
-    parser.parse_args()
+    parser = argparse.ArgumentParser(description="Real E2E evidence contract gate")
+    parser.add_argument("--self-test", action="store_true", help="run negative self-tests and exit")
+    args = parser.parse_args()
 
-    skill_present = os.path.exists(SKILL_PATH)
-    rules = read_text(RULES_PATH)
-    architecture = read_text(ARCHITECTURE_PATH)
-    smoke_matrix = read_text(SMOKE_MATRIX_PATH)
+    if args.self_test:
+        return run_self_test()
 
-    if skill_present:
-        skill = read_text(SKILL_PATH)
-        for label, machine_label in CANONICAL_LEVELS:
-            if not re.search(r"\|\s*" + re.escape(label) + r"\s*\|", skill, re.IGNORECASE):
-                fail(f"canonical real-e2e skill is missing evidence level '{label}'")
-            if not re.search(re.escape(f"`{machine_label}`"), skill, re.IGNORECASE):
-                fail(f"canonical real-e2e skill is missing machine label '{machine_label}'")
+    if not os.path.exists(SMOKE_MATRIX_PATH):
+        print(f"missing required file: {SMOKE_MATRIX_PATH}", file=sys.stderr)
+        return 1
 
-        if not re.search(re.escape(SKILL_PATH), rules, re.IGNORECASE):
-            fail("AGENTS.md must point to the real-e2e-acceptance skill instead of owning another matrix")
-        if re.search(r"\|\s*Fixture/unit\s*\|", rules, re.IGNORECASE) or re.search(r"\|\s*Playwright UI\s*\|", rules, re.IGNORECASE):
-            fail(f"AGENTS.md duplicates the evidence-level matrix; keep the table only in {SKILL_PATH}")
-    else:
-        print("real-e2e-acceptance skill absent (.agents removed) — skill matrix checks skipped")
-
-    if re.search(r"1440x920", architecture, re.IGNORECASE):
-        fail("architecture Visual QA still references stale 1440x920 viewport")
-    if not re.search(r"1440x810", architecture, re.IGNORECASE):
-        fail("architecture Visual QA must name the 16:9 1440x810 desktop viewport")
-
-    for required in REQUIRED_SMOKE_FIELDS:
-        if not re.search(re.escape(required), smoke_matrix, re.IGNORECASE):
-            fail(f"smoke matrix is missing manifest field '{required}'")
-
-    declared_evidence_levels = sorted({level for level in EVIDENCE_LEVEL_RE.findall(smoke_matrix)})
-    allowed_evidence_levels = {machine_label for _, machine_label in CANONICAL_LEVELS}
-    for level in declared_evidence_levels:
-        if level not in allowed_evidence_levels:
-            fail(f"smoke matrix declares non-canonical evidence_level '{level}'")
+    errors = validate_contract(load_smoke_matrix(SMOKE_MATRIX_PATH))
+    if errors:
+        for error in errors:
+            print(error, file=sys.stderr)
+        return 1
 
     print("real E2E contract ok")
     return 0
 
 
 if __name__ == "__main__":
-    try:
-        sys.exit(main())
-    except Exception as exc:  # noqa: BLE001 —— 对齐 ps1 $ErrorActionPreference='Stop' 的 throw 语义
-        print(str(exc), file=sys.stderr)
-        sys.exit(1)
+    sys.exit(main())

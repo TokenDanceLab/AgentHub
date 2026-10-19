@@ -14,7 +14,7 @@ import (
 )
 
 // mockEmitter captures emitted events for test verification. 源自根包
-// parser_ndjson_test.go，随 claude 家族下沉（#1760 claude 增量）；根包测试
+// parser_ndjson_test.go，
 // 符号不可跨包引用，改动需两侧同步。
 type mockEmitter struct {
 	mu     sync.Mutex

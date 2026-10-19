@@ -58,7 +58,7 @@ check('SecureStore biometric permission is AgentHub scoped and bilingual', appCo
 check('Expo config reads Hub URL from EXPO_PUBLIC_AGENTHUB_HUB_URL', appConfigSource.includes('EXPO_PUBLIC_AGENTHUB_HUB_URL'));
 check('Expo config reads TokenDance ID issuer from EXPO_PUBLIC_TOKENDANCE_ID_ISSUER', appConfigSource.includes('EXPO_PUBLIC_TOKENDANCE_ID_ISSUER'));
 check('Resolved Expo config exposes Hub base URL', /^https?:\/\//.test(hubBaseUrl));
-check('Resolved Expo config exposes TokenDance ID issuer', oidcIssuer.startsWith('https://'));
+check('TokenDance ID issuer is HTTPS when configured', oidcIssuer === '' || oidcIssuer.startsWith('https://'));
 check('EAS development profile enables development client', easJson.build?.development?.developmentClient === true);
 check('EAS development Android profile builds an APK', easJson.build?.development?.android?.buildType === 'apk');
 check('EAS development iOS profile targets simulator', easJson.build?.development?.ios?.simulator === true);

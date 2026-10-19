@@ -669,7 +669,7 @@ fn edge_launch_args(
     ];
     // Default workspace allowlist: restrict to user's home directory.
     // Desktop is a local tool — allowing home and subdirectories is a
-    // reasonable default while still satisfying the fail-closed AH-SR-006
+    // reasonable default while still satisfying the fail-closed
     // security requirement.
     if let Some(dir) = workspace_allowlist {
         args.push("--workspace-allowlist".to_string());

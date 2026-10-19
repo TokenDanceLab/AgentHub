@@ -78,7 +78,7 @@ async function main() {
     if (contract.horizontalOverflow !== false) {
       failures.push('horizontal overflow captured in ' + name);
     }
-    // UX F8 (#1998): demo chat landing page must project the goal banner.
+    // #1998: demo chat landing page must project the goal banner.
     if (contract.goalBanner && contract.goalBanner.exists === true) {
       if (!(contract.goalBanner.width > 0) || !(contract.goalBanner.height > 0)) {
         failures.push(name + ': goal banner has a zero-size box');

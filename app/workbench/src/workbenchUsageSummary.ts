@@ -1,5 +1,5 @@
 /**
- * Usage-board token summary for the status-strip live chip (#1990, UX F14).
+ * Usage-board token summary for the status-strip live chip (#1990).
  *
  * Data source is the SAME real data the Usage board renders (#1819): the
  * migration-0066 `token_usage_total` counters carried by team runs through

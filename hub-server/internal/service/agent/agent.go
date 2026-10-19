@@ -8,7 +8,6 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/agenthub/hub-server/internal/bus"
-	"github.com/agenthub/hub-server/internal/cache"
 	"github.com/agenthub/hub-server/internal/config"
 	"github.com/agenthub/hub-server/internal/errcode"
 	"github.com/agenthub/hub-server/internal/model"
@@ -30,6 +29,7 @@ type agentCache interface {
 	PushPendingTargetTask(ctx context.Context, userID, targetID, deviceID, taskJSON string) error
 	AllocateSeq(ctx context.Context, sessionID string) (int64, error)
 	SetSeq(ctx context.Context, sessionID string, seq int64) error
+	PushPendingAgentControl(ctx context.Context, userID, deviceID, controlJSON string) error
 }
 
 // relayDispatcher is the subset of *relay.Service methods used by Service.
@@ -60,7 +60,7 @@ type Service struct {
 	// a lazy facade via deliveryOutboxService(). Redispatch implementation lives
 	// on DispatchService and is injected via the Redispatcher port.
 	deliveryOutbox *service.DeliveryOutbox
-	// dispatch owns trigger/dispatch/cancel/regenerate + redispatch residual.
+	// dispatch owns trigger/dispatch/cancel/regenerate and redispatch.
 	// Constructed in NewService; tests using struct literals fall back to
 	// a lazy facade via dispatchService(). DeliveryOutbox retries call into
 	// DispatchService through Redispatcher (dispatchPayload stays private).
@@ -111,11 +111,11 @@ func (d dispatchAuditAdapter) RecordPrivilegedAction(ctx context.Context, in dis
 		Reason:       in.Reason,
 	})
 }
-func NewService(db *gorm.DB, bus *bus.Bus, mgr *ws.Manager, cacheClient *cache.Client, relay relayDispatcher, edgeCfg config.EdgeDispatchConfig, edgeClient *http.Client, jwtSecret string) *Service {
-	s := &Service{db: db, bus: bus, mgr: mgr, cacheClient: resolveAgentCache(cacheClient), relay: relay, edgeCfg: edgeCfg, edgeClient: edgeClient, jwtSecret: jwtSecret, seqAlloc: seqalloc.New(cacheClient, db)}
+func NewService(db *gorm.DB, bus *bus.Bus, mgr *ws.Manager, cacheClient agentCache, relay relayDispatcher, edgeCfg config.EdgeDispatchConfig, edgeClient *http.Client, jwtSecret string) *Service {
+	s := &Service{db: db, bus: bus, mgr: mgr, cacheClient: cacheClient, relay: relay, edgeCfg: edgeCfg, edgeClient: edgeClient, jwtSecret: jwtSecret, seqAlloc: seqalloc.New(cacheClient, db)}
 	s.runEvents = NewRunEventService(db, agentcontrol.NewService(cacheClient, mgr))
-	// Construct outbox first (nil redispatcher), then inject DispatchService
-	// adapter after dispatch exists (#573 — redispatch residual on DispatchService).
+	// Construct outbox first (nil redispatcher), then inject the DispatchService
+	// adapter after dispatch exists.
 	s.deliveryOutbox = deliveryoutbox.NewOutbox(service.NewDeliveryOutboxStore(db), nil)
 	s.edgeCallbacks = NewEdgeCallbackService(
 		db,
@@ -202,7 +202,7 @@ func (s *Service) seqAllocator() *seqalloc.Allocator {
 	if s.seqAlloc != nil {
 		return s.seqAlloc
 	}
-	return seqalloc.New(resolveAgentCache(s.cacheClient), s.db)
+	return seqalloc.New(s.cacheClient, s.db)
 }
 
 // ── Thin wrappers for repository calls needed by the app layer ──────────

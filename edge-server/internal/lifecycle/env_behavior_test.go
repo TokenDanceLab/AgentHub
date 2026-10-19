@@ -565,8 +565,9 @@ func TestSanitizedEnv_Behavior_LocaleVars_PassThrough(t *testing.T) {
 	}
 }
 
-// TestSanitizedEnv_Behavior_SanitizeParentEnv_MalformedLines tests that
-// os.Environ() entries without '=' are safely skipped.
+// TestSanitizedEnv_Behavior_SanitizeParentEnv_ExtraEnvWithEqualsInValue tests
+// that extra env values may contain '=' — only the first '=' splits key from
+// value.
 func TestSanitizedEnv_Behavior_SanitizeParentEnv_ExtraEnvWithEqualsInValue(t *testing.T) {
 	// Extra env values can contain '=' — only the first '=' splits key from value.
 	extraEnv := []string{

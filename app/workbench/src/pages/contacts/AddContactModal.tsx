@@ -10,7 +10,7 @@ import { CHATVIEW_I18N_NAMESPACE } from '@shared/chatview/i18n/resources';
 
 /* ═══════════════════════════════════════════════════════════════════════
    Add-contact modal + invite panels.
-   Extracted from ContactsPage as Phase 17 strangler slice #561.
+   Extracted from ContactsPage (#561).
    CSS remains on shared ContactsPage.module.css.
    ═══════════════════════════════════════════════════════════════════════ */
 

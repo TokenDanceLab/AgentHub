@@ -2,18 +2,18 @@
  * Shared E2E hermeticity helper (#2014): intercept external font CDN requests
  * so no Playwright spec ever reaches fonts.googleapis.com / fonts.gstatic.com.
  *
- * Both app/web/index.html and app/desktop/index.html load Google Fonts via
- * render-blocking <link> tags (Material Symbols on both surfaces, plus Hanken
- * Grotesk on web). Without interception those requests hit the real network,
- * which makes specs flaky on restricted networks and breaks the "zero
+ * Both app/web/index.html and app/desktop/index.html self-host their fonts via
+ * /fonts/fonts.css; this guard is a fail-closed backstop in case an external
+ * font <link> is reintroduced. Without it such requests would hit the real
+ * network, which makes specs flaky on restricted networks and breaks the "zero
  * production/external requests" hermetic goal.
  *
  * Entry points:
  *
  * - fulfillExternalFontIfMatch(route): for specs that already own a catch-all
- *   route handler (web stubbed-hub suite). Call it where the
- *   inline font branch used to be; it fulfills font requests and returns
- *   true, otherwise changes nothing and returns false.
+ *   route handler (web stubbed-hub suite). Call it from the spec's catch-all
+ *   route handler; it fulfills font requests and returns true, otherwise
+ *   changes nothing and returns false.
  *
  * - blockExternalFonts(page): for specs without a font-aware catch-all
  *   (desktop smoke / oidc-login / geometry / chat-flow / teamrun). Register
@@ -38,7 +38,7 @@ import {
   type E2ERequestBoundary,
 } from '../shared/src/testing/e2eDataModeContract';
 
-/** External font CDN hosts loaded by index.html <link> tags. */
+/** External font CDN hosts the guard refuses if an external font <link> is reintroduced. */
 export const E2E_EXTERNAL_FONT_HOSTS: ReadonlySet<string> = new Set([
   'fonts.googleapis.com',
   'fonts.gstatic.com',

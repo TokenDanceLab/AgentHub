@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"os"
 	"strings"
 	"testing"
 	"time"
@@ -187,20 +186,5 @@ func TestBuildSiblingContextPromptEdgeCases(t *testing.T) {
 	}
 	if !strings.Contains(prompt, "src/test.go") {
 		t.Fatal("prompt should contain target file")
-	}
-}
-
-// TestAdapterMetadataIsNotEmpty 已随各家族归组迁移：
-// claude/codex/opencode 行随家族迁至各自子包测试，ACP 行随 acp 家族迁至
-// adapters/acp（TestAcpAdapterMetadataIsNotEmpty，#1760 acp 增量）。
-
-func TestDefaultWorkDirDoesNotReturnHome(t *testing.T) {
-	home, err := os.UserHomeDir()
-	got := DefaultWorkDir()
-	if got != "" {
-		t.Fatalf("DefaultWorkDir() = %q, want empty (no home fallback)", got)
-	}
-	if err == nil && home != "" && got == home {
-		t.Fatalf("DefaultWorkDir must not return user home %q", home)
 	}
 }

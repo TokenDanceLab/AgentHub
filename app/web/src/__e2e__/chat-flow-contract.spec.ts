@@ -179,15 +179,15 @@ async function enterApprovedRealHubSession(
   }, { sessionId: SESSION_ID, taskId: TASK_ID, status: options.activeTaskStatus ?? 'running' });
 
   await page.goto('/');
-  // FLK-002 root cause: before GET /client/sessions resolves, the session
-  // chrome sits on a phantom 'default' conversation. When the real session id
-  // lands, currentConversationId switches and the composer takes a full
+  // Hydration race: before GET /client/sessions resolves, the session chrome
+  // sits on a phantom 'default' conversation. When the real session id lands,
+  // currentConversationId switches and the composer takes a full
   // setConversationId reset — any text typed before the switch is wiped, and
-  // the send button stays disabled (CI signature), or a submit already in
-  // flight posts to the phantom conversation (late-click signature). Loaded
-  // CI stretched the hydration lag past the test's fill time. Wait for the
-  // hydrated session heading before driving the composer; the delay knob in
-  // installChatFlowHubStub keeps this race deterministic locally.
+  // the send button stays disabled, or a submit already in flight posts to the
+  // phantom conversation. Loaded CI can stretch the hydration lag past the
+  // test's fill time. Wait for the hydrated session heading before driving the
+  // composer; the delay knob in installChatFlowHubStub keeps this race
+  // deterministic locally.
   await expect(page.getByRole('heading', { name: 'Chat flow contract' })).toBeVisible();
 }
 
@@ -202,7 +202,7 @@ interface ChatFlowHubStubOptions {
   taskStatus?: string;
   /**
    * Delays the GET /client/sessions response to simulate loaded-CI session
-   * hydration latency (FLK-002 regression guard): entering the session must
+   * hydration latency (hydration-race regression guard): entering the session must
    * wait out the lag instead of racing it, so the composer never sits on the
    * phantom 'default' conversation while the test types.
    */
@@ -247,11 +247,12 @@ async function installChatFlowHubStub(page: Page, options: ChatFlowHubStubOption
       return;
     }
 
-    // Fail-closed external boundary: only the render-blocking Google Fonts
-    // stylesheets are expected external requests (fulfilled with an empty
-    // stylesheet so the document load event can fire). Every other external
-    // host is recorded and refused, so the scenario assertion fails the test
-    // instead of letting an unexpected remote call succeed silently.
+    // Fail-closed external boundary: any external font request (fonts are
+    // self-hosted; this guards a reintroduced external font <link>) is
+    // fulfilled with an empty stylesheet so the document load event can fire.
+    // Every other external host is recorded and refused, so the scenario
+    // assertion fails the test instead of letting an unexpected remote call
+    // succeed silently.
     if (await fulfillExternalFontIfMatch(route)) {
       return;
     }

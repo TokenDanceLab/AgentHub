@@ -7,9 +7,9 @@ export default defineConfig({
     timeout: 15000,
   },
   fullyParallel: false,
-  // Flake retry policy SSOT: docs/governance/known-flaky.md. Declared lane
-  // budget of 1 (see the retry-budget table). A retry-green test still needs
-  // a registry entry — retries never close a flake.
+  // Flake retry policy SSOT: docs/architecture/github-actions-ci-cd-policy.md. This lane
+  // declares a bounded retry budget of 1; retries absorb browser/network jitter only and
+  // a retry-green test must stay visible in the report.
   retries: 1,
   reporter: 'list',
   use: {

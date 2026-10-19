@@ -9,7 +9,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { createMockPlatform } from '@shared/platform/createMockPlatform';
 import type { TranscriptBlock } from '@shared/transcript/types';
 import { AgentHubWorkbench } from '../AgentHubWorkbench';
-import { workbenchAgents as agents } from '../workbenchTestFixtures';
+import { workbenchAgents as agents } from './fixtures/workbenchTestFixtures';
 
 installWorkbenchTestHooks();
 

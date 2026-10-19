@@ -17,7 +17,7 @@ export function isRouteFallbackError(error: unknown): boolean {
 
 /**
  * Whether requestWithFallback should try the next path after this error.
- * Pure residual of the multi-route 404/405 peel.
+ * Pure helper for multi-route 404/405 fallback.
  */
 export function shouldContinueRouteFallback(
   index: number,
@@ -28,15 +28,7 @@ export function shouldContinueRouteFallback(
 }
 
 /**
- * Final unresolved error after requestWithFallback exhausts paths.
- * Pure residual so the loop body stays a thin orchestration peel.
- */
-export function unresolvedRouteFallbackError(fallbackError: unknown): unknown {
-  return fallbackError;
-}
-
-/**
- * Pure residual of requestWithFallback catch branch (#978):
+ * Pure helper of requestWithFallback catch branch (#978):
  * continue with this error as fallback, or rethrow it.
  */
 export type RouteFallbackStep =
@@ -55,7 +47,7 @@ export function resolveRouteFallbackStep(
 }
 
 /**
- * Residual orchestration peel for requestWithFallback (#990).
+ * orchestration helper for requestWithFallback (#990).
  * Tries each path until one succeeds or a non-fallback error is thrown.
  */
 export async function runRequestWithRouteFallback<T>(
@@ -79,13 +71,13 @@ export async function runRequestWithRouteFallback<T>(
     }
   }
 
-  throw unresolvedRouteFallbackError(fallbackError);
+  throw fallbackError;
 }
 
-// ── Residual pure peels (#1023) ───────────────────────────────────────────────
+// ── Pure helpers (#1023) ───────────────────────────────────────────────
 
 /**
- * Residual path+init invoker for createHubClient methods that already build
+ * Helper for path+init invoker for createHubClient methods that already build
  * `{ path, init }` composites. Keeps method bodies one-liners.
  */
 export function invokePathInitRequest<T>(
@@ -96,7 +88,7 @@ export function invokePathInitRequest<T>(
 }
 
 /**
- * Residual path+formData invoker for multipart upload builders.
+ * Helper for path+formData invoker for multipart upload builders.
  */
 export function invokePathFormDataUpload<T>(
   upload: (path: string, formData: FormData) => Promise<T>,
@@ -106,7 +98,7 @@ export function invokePathFormDataUpload<T>(
 }
 
 /**
- * Residual dual-route invoker when path list + init are prebuilt.
+ * Helper for dual-route invoker when path list + init are prebuilt.
  * exactOptional-safe: options only forwarded when defined.
  */
 export function invokePathsInitRequest<T>(
@@ -123,10 +115,10 @@ export function invokePathsInitRequest<T>(
   return requestWithFallback(paths, init);
 }
 
-// ── Residual pure peels (#1044) ───────────────────────────────────────────────
+// ── Pure helpers (#1044) ───────────────────────────────────────────────
 
 /**
- * Residual register-device peel: normalize body then dual-route JSON POST.
+ * Helper for register-device requests: normalize body then dual-route JSON POST.
  * exactOptional-safe via invokePathsInitRequest.
  */
 export function invokeNormalizedRegisterDeviceRequest<T>(
@@ -146,7 +138,7 @@ export function invokeNormalizedRegisterDeviceRequest<T>(
 }
 
 /**
- * Residual listExecutionTargets peel: request raw list/envelope then normalize.
+ * listExecutionTargets helper: request raw list/envelope then normalize.
  */
 export async function runNormalizedExecutionTargetsListRequest(
   request: (

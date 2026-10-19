@@ -1,5 +1,5 @@
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { existsSync, readFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   buildEdgeRunBody,
@@ -19,8 +19,18 @@ interface ExecutionIntentFixture {
   cases: ExecutionIntentFixtureCase[];
 }
 
+function findRepoRoot(start: string): string {
+  let dir = start;
+  for (;;) {
+    if (existsSync(resolve(dir, 'tests', 'fixtures', 'dispatch', 'execution-intent.json'))) return dir;
+    const parent = dirname(dir);
+    if (parent === dir) throw new Error('repository root not found from ' + start);
+    dir = parent;
+  }
+}
+
 const fixture = JSON.parse(
-  readFileSync(resolve(process.cwd(), '../../tests/fixtures/dispatch/execution-intent.json'), 'utf8'),
+  readFileSync(resolve(findRepoRoot(process.cwd()), 'tests', 'fixtures', 'dispatch', 'execution-intent.json'), 'utf8'),
 ) as ExecutionIntentFixture;
 
 const binding: DispatchTargetBindingEvidence = {

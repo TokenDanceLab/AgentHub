@@ -1,6 +1,7 @@
 // React Query hooks for Edge Agent Profiles — CRUD operations.
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 import type { AgentConfig } from '@agenthub/workbench';
 import {
   fetchAgentProfiles,
@@ -59,7 +60,7 @@ export function useDeleteAgentProfile() {
 }
 
 /** Map AgentConfig (from AgentsPage edit panel) to Edge creation payload. */
-type AppTranslate = (key: string, options?: any) => string;
+type AppTranslate = TFunction;
 
 function agentConfigToEdgeProfile(agent: AgentConfig, t?: AppTranslate): Record<string, unknown> {
   const modelParts = (agent.model ?? '').split('/').map((s) => s.trim()).filter(Boolean);

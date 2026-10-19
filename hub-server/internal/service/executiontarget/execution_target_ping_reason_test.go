@@ -58,7 +58,7 @@ func TestPingFailureReasonPolicyDenialsAreNotReportedUnreachable(t *testing.T) {
 			// Existing contract: execution_target_test.go:267 requires the
 			// surfaced error to name the egress policy denial via "not allowed".
 			require.Contains(t, got, "not allowed", "policy denial reason must name the egress policy")
-			// #2154 F17: the egress error text embeds the resolved internal
+			// #2154: the egress error text embeds the resolved internal
 			// address; the API-facing reason must never carry it over.
 			require.NotContains(t, got, "10.0.0.5")
 			require.NotContains(t, got, "127.0.0.1")
@@ -113,5 +113,5 @@ func TestPingFailureReasonClassifiesBySentinelNotByText(t *testing.T) {
 		fmt.Errorf("%w: %s", egress.ErrRestrictedAddress, "169.254.169.254"))
 	require.True(t, errors.Is(deep, egress.ErrRestrictedAddress), "precondition: the wrapped sentinel must be detectable")
 	require.Equal(t, "target not allowed by egress policy", pingFailureReason(deep))
-	require.NotContains(t, pingFailureReason(deep), "169.254.169.254", "#2154 F17: resolved address must not reach API consumers")
+	require.NotContains(t, pingFailureReason(deep), "169.254.169.254", "#2154: resolved address must not reach API consumers")
 }

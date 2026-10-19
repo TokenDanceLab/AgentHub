@@ -38,7 +38,7 @@ type edgeCallbackSeq interface {
 // (ack, first authorized stream, or done). Implemented solely by *deliveryoutbox.Outbox.
 //
 // The error result is what lets the stream path dedupe this call per task
-// (#2154 P2-9): only a successful ack is recorded, so a transient store
+// (#2154): only a successful ack is recorded, so a transient store
 // failure leaves the next chunk free to retry.
 type edgeCallbackOutbox interface {
 	AutoAckDeliveriesForTask(ctx context.Context, taskID string) error
@@ -70,28 +70,28 @@ type EdgeCallbackService struct {
 	seq    edgeCallbackSeq
 	outbox edgeCallbackOutbox
 	// ctxCache memoizes team-run ownership per pending task so the
-	// team.subagent.stream fan-out (#1478 Phase A) does not re-run three DB
+	// team.subagent.stream fan-out (#1478) does not re-run three DB
 	// lookups per per-token run.agent.* event. Lazily allocated.
 	ctxCache *teamRunContextCache
 	// ctxCacheOnce serializes the lazy allocation of ctxCache so concurrent
 	// teamCtxCache callers cannot both observe nil and double-allocate (a
 	// check-then-write race detectable under -race).
 	ctxCacheOnce sync.Once
-	// ctxLookup resolves a pending task's team-run ownership; overridable in
-	// tests via SetSubagentStreamLookup. Lazily backed by dbTeamRunLookup.
+	// ctxLookup resolves a pending task's team-run ownership; lazily backed
+	// by dbTeamRunLookup.
 	ctxLookup subagentStreamLookup
 	// ctxLookupOnce serializes the lazy allocation of ctxLookup for the same
 	// reason as ctxCacheOnce.
 	ctxLookupOnce sync.Once
 	// ackedTasks dedupes the per-chunk delivery-outbox auto-ack down to one
-	// attempt per task (#2154 P2-9). Bounded, fail-open, cleared on terminal
+	// attempt per task (#2154). Bounded, fail-open, cleared on terminal
 	// callbacks — see ackedTaskSet. Lazily allocated.
 	ackedTasks *ackedTaskSet
 	// ackedOnce serializes the lazy allocation of ackedTasks so concurrent
 	// first-callers cannot both observe nil and double-allocate.
 	ackedOnce sync.Once
 	// touchThrottle caps session.last_message_at writes at one per session per
-	// second on the stream path (#2154 P2-9). Bounded and fail-open — see
+	// second on the stream path (#2154). Bounded and fail-open — see
 	// sessionTouchThrottle. Lazily allocated.
 	touchThrottle *sessionTouchThrottle
 	// touchOnce serializes the lazy allocation of touchThrottle.
@@ -108,24 +108,9 @@ func NewEdgeCallbackService(db *gorm.DB, bus edgeCallbackBus, seq edgeCallbackSe
 	return &EdgeCallbackService{db: db, bus: bus, seq: seq, outbox: outbox}
 }
 
-// SetBus injects (or replaces) the event bus port.
-func (s *EdgeCallbackService) SetBus(bus edgeCallbackBus) {
-	s.bus = bus
-}
-
-// SetSeq injects (or replaces) the sequence allocator port.
-func (s *EdgeCallbackService) SetSeq(seq edgeCallbackSeq) {
-	s.seq = seq
-}
-
-// SetOutbox injects (or replaces) the delivery outbox auto-ack port.
-func (s *EdgeCallbackService) SetOutbox(outbox edgeCallbackOutbox) {
-	s.outbox = outbox
-}
-
 // HandleTaskAck marks a task as running and optionally records the Edge run id
 // that is executing it. It also auto-acks any pending delivery outbox entries
-// for this task (AH-SR-049: outbox delivery journal).
+// for this task (outbox delivery journal).
 func (s *EdgeCallbackService) HandleTaskAck(ctx context.Context, edgeUserID, edgeDeviceID, taskID, edgeRunID string) error {
 	if err := agentevent.ValidateAgentCallbackEdgeRunID(edgeRunID); err != nil {
 		return err
@@ -199,7 +184,7 @@ func (s *EdgeCallbackService) autoAck(ctx context.Context, taskID string) {
 // #1000's contract is that the *first* authorized stream proves Edge received
 // the task, so the ack only has to happen once per task; running it on every
 // chunk (per token, in practice) meant one UPDATE that matched 0 rows forever
-// after the first (#2154 P2-9). The dedupe lives in bounded process memory
+// after the first (#2154). The dedupe lives in bounded process memory
 // rather than a new DB column.
 //
 // Skipping is safe in both directions:
@@ -287,7 +272,7 @@ func (s *EdgeCallbackService) HandleTaskStream(ctx context.Context, edgeUserID, 
 	if err != nil {
 		return err
 	}
-	// #2274 B-1: stamp the producing task id into the projected message so the
+	// #2274: stamp the producing task id into the projected message so the
 	// transcript can offer "regenerate" with the identity the endpoint actually
 	// requires (task id), instead of the shell guessing from a message id.
 	messageContent = agentevent.StampAgentTaskRef(messageContent, taskID)
@@ -353,7 +338,7 @@ func (s *EdgeCallbackService) HandleTaskStream(ctx context.Context, edgeUserID, 
 	}
 
 	// #154: update session last_message_at when agent stream creates a message.
-	// Throttled to one write per session per second (#2154 P2-9) — the column
+	// Throttled to one write per session per second (#2154) — the column
 	// is only the conversation-list sort key, and HandleTaskDone force-touches
 	// so the settled value is exact. See sessionTouchThrottle.
 	s.touchSessionLastMessageThrottled(ai.SessionID)
@@ -361,7 +346,7 @@ func (s *EdgeCallbackService) HandleTaskStream(ctx context.Context, edgeUserID, 
 	// #1000: first authorized stream proves Edge received the task — ack outbox
 	// so SentTimeout does not redispatch while Edge is already executing.
 	// After successful persist only (matches HandleTaskAck post-transition ack).
-	// Deduped to the first successful ack per task (#2154 P2-9).
+	// Deduped to the first successful ack per task (#2154).
 	s.autoAckOnce(ctx, taskID)
 
 	s.publishStreamEvents(ctx, ai, taskID, msg, runEvent)
@@ -427,7 +412,7 @@ func (s *EdgeCallbackService) publishStreamEvents(ctx context.Context, ai *model
 	}
 	s.publishToBus(ctx, bus.Event{Type: bus.EventTypeMessageNew, Payload: msg}, "failed to publish message-new event", "session_id", ai.SessionID)
 	s.publishToBus(ctx, bus.Event{Type: ws.TypeAgentStream, Payload: runEvent}, "failed to publish agent-stream event", "task_id", taskID)
-	// #1478 Phase A: fan the same run event into the team-run view when the
+	// #1478: fan the same run event into the team-run view when the
 	// run belongs to a team run. No-op when the session is not a team run;
 	// never fails the chat-side stream path that already succeeded above.
 	s.publishTeamSubagentStream(ctx, runEvent, taskID)
@@ -454,7 +439,7 @@ func (s *EdgeCallbackService) touchSessionLastMessage(sessionID string) {
 }
 
 // touchSessionLastMessageThrottled is the per-chunk variant: at most one
-// session.last_message_at write per session per second (#2154 P2-9). The
+// session.last_message_at write per session per second (#2154). The
 // column only feeds the conversation-list ORDER BY
 // (repository/session.go: COALESCE(last_message_at, created_at) DESC), so
 // second-level precision is indistinguishable to users, while the unthrottled
@@ -484,7 +469,7 @@ func (s *EdgeCallbackService) touchSessionLastMessageThrottled(sessionID string)
 // it never fails the stream callback and it is not the authoritative routing
 // path (that is POST /teams/:id/runs/:run_id/route-decision).
 //
-// #2154 P1-4 removed two per-chunk round-trips from this function without
+// #2154 removed two per-chunk round-trips from this function without
 // changing what it publishes:
 //
 //  1. A sound payload pre-filter. CoordinatorRouteDecision is only ever acted
@@ -573,7 +558,7 @@ const routeDecisionActionKey = `"action"`
 // that equals "action" under Go's case-insensitive fallback matching. A payload
 // without such a key can never produce a decision, so skipping the team-run
 // SELECT and the json.Unmarshal for it is exactly equivalent to running them
-// and discarding the result (#2154 P1-4).
+// and discarding the result (#2154).
 //
 // The scan is case-insensitive because encoding/json's fallback matching is;
 // it is written by hand instead of using strings.Contains(strings.ToLower(...))
@@ -707,7 +692,7 @@ func (s *EdgeCallbackService) buildDoneFinalMessage(ctx context.Context, ai *mod
 	if err != nil {
 		return nil, err
 	}
-	// #2274 B-1: same task-ref stamp as the stream projection path, so both
+	// #2274: same task-ref stamp as the stream projection path, so both
 	// agent messages of one run carry the identity of the run that made them.
 	messageContent = agentevent.StampAgentTaskRef(messageContent, task.ID)
 	if s.seq == nil {
@@ -833,8 +818,8 @@ func (s *EdgeCallbackService) HandleTaskFail(ctx context.Context, edgeUserID, ed
 		}}, "failed to publish agent-failed event", "task_id", taskID)
 	}
 
-	// Terminal state: drop the per-task/per-session hot-path caches (#2154
-	// P2-9). HandleTaskFail writes neither the outbox ack nor last_message_at,
+	// Terminal state: drop the per-task/per-session hot-path caches (#2154).
+	// HandleTaskFail writes neither the outbox ack nor last_message_at,
 	// so this is pure memory hygiene.
 	s.forgetTaskStreamState(taskID, ai.SessionID)
 
@@ -912,22 +897,6 @@ func canonicalContent(raw string) string {
 		return raw
 	}
 	return string(canonical)
-}
-
-// unwrapMessageContentText extracts plain text from a messages.content jsonb
-// string. Stream-path messages are stored as {"content": "..."}; any other
-// shape (or a non-JSON value) is returned as-is.
-func unwrapMessageContentText(raw string) string {
-	var wrapper struct {
-		Content string `json:"content"`
-	}
-	if err := json.Unmarshal([]byte(raw), &wrapper); err != nil {
-		return raw
-	}
-	if wrapper.Content == "" {
-		return raw
-	}
-	return wrapper.Content
 }
 
 // ── Service facade (wiring/handler stability) ───────────────────────────

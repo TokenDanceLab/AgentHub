@@ -52,7 +52,7 @@ export interface GlobalRailProps {
   /** WebSocket connection status shown as a colored dot in the rail footer. */
   connectionStatus?: ConnectionStatusKind | undefined;
   /**
-   * Global attention counts (F1/F6). When present and non-zero, the Tasks
+   * Global attention counts. When present and non-zero, the Tasks
    * entry carries a count badge; clicking it navigates to the Tasks queue.
    * Absent when the shell provides no run/approval inventory.
    */
@@ -91,9 +91,9 @@ export function GlobalRail({
     settings: t('user.settings'),
   };
 
-  // F1 rail badge = the actionable queue: failed runs + pending approvals
-  // (ux-benchmark F1: 失败运行数、待审批数). Running runs need no user
-  // action; they stay visible on the status-strip chips and sidebar dots.
+  // The rail badge counts the actionable queue: failed runs + pending
+  // approvals. Running runs need no user action; they stay visible on the
+  // status-strip chips and sidebar dots.
   const failedRunCount = attention?.failedRunCount ?? 0;
   const awaitingApprovalCount = attention?.awaitingApprovalCount ?? 0;
   const attentionTotal = failedRunCount + awaitingApprovalCount;

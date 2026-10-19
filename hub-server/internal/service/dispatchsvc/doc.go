@@ -1,6 +1,6 @@
 // Package dispatchsvc owns agent task dispatch orchestration: trigger,
 // payload assembly, route classification (HTTP / WebSocket / offline queue /
-// hub relay), capability minting, and the outbox redispatch residual.
+// hub relay), capability minting, and outbox redispatch.
 //
 // The package is transport-free: it depends on repository / cache / bus /
 // metrics / service/dispatch (pure helpers) only, and expresses its WS and
@@ -14,12 +14,12 @@
 //	                          prep, log constants, port predicates) —
 //	                          imports only errcode/model, no DB/WS/cache
 //	service/dispatchsvc       this package: orchestration + ports
-//	service/dispatch_adapters.go
-//	                          package service: adapts *ws.Manager and
+//	service/agent/dispatch_adapters.go
+//	                          package agent: adapts *ws.Manager and
 //	                          relay.Service onto the dispatchsvc ports;
 //	                          transport types never leak below this layer
-//	service/agent_dispatch_facade.go
-//	                          package service: AgentService facade methods
+//	service/agent/agent_dispatch_facade.go
+//	                          package agent: AgentService facade methods
 //	                          that delegate to DispatchService (kept
 //	                          separate to mirror delivery_outbox_facade.go)
 //

@@ -50,7 +50,7 @@ func newCardinalityRouter() *gin.Engine {
 
 // newCardinalityRouterWithMethodNotAllowed mirrors the production router's two
 // possible method-mismatch shapes. The production router enables gin's
-// HandleMethodNotAllowed (#2154 F-a), so a wrong-method request is served by
+// HandleMethodNotAllowed (#2154), so a wrong-method request is served by
 // NoMethod as 405; with the flag off the same request falls through to NoRoute
 // as 404. Both shapes leave c.FullPath() empty, so both must be cardinality-safe.
 func newCardinalityRouterWithMethodNotAllowed(methodNotAllowed bool) *gin.Engine {
@@ -123,7 +123,7 @@ func TestPrometheusMiddlewareMatchedRouteKeepsPathTemplate(t *testing.T) {
 // TestPrometheusMiddlewareMethodMismatchStaysBounded covers requests whose
 // method matches no route, in both router shapes: falling through to NoRoute
 // (404, gin's HandleMethodNotAllowed off) and being served by NoMethod (405,
-// the flag on, which is what the production router now does per #2154 F-a).
+// the flag on, which is what the production router now does per #2154).
 // The assertion in both cases is that distinct method+path combinations still
 // collapse onto the one bounded label instead of minting per-path series.
 func TestPrometheusMiddlewareMethodMismatchStaysBounded(t *testing.T) {

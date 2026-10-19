@@ -15,14 +15,6 @@ import (
 // RunProcessContext is an alias for the shared runnerctx.RunProcessContext.
 type RunProcessContext = runnerctx.RunProcessContext
 
-// DefaultWorkDir no longer invents a production workspace. Adapter runs must
-// receive an explicit workDir from the API/MCP gate (#854). Returning empty
-// keeps unit tests and defense-in-depth paths from silently expanding to the
-// user home directory (or ".") when a caller bypasses the gate.
-func DefaultWorkDir() string {
-	return ""
-}
-
 // BuildSiblingContextPrompt generates a human-readable prompt section that informs
 // a sub-agent about its sibling agents working in parallel. Returns empty string
 // when there are no siblings. The prompt warns the agent not to modify files that
@@ -61,10 +53,6 @@ func BuildSiblingContextPrompt(siblings []SiblingInfo) string {
 
 // Context keys for adapter-level context propagation.
 type ctxKey string
-
-// CtxSessionID is used to pass the session ID through context to adapters
-// so the permission handler can include it in permission events.
-const CtxSessionID ctxKey = "agenthub-session-id"
 
 // CtxWorkDir is used to pass the run workspace to stream parsers that need to
 // redact or relativize paths from CLI-native events.
@@ -144,5 +132,5 @@ type PreflightAdapter interface {
 }
 
 // _ is a compile-time assertion that the contract types stay importable
-// through this package for existing call sites (A-V1 Step 2, #1566).
+// through this package for existing call sites.
 var _ = orchestration.AgentAdapter(nil)

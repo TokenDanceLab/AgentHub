@@ -357,7 +357,7 @@ describe('useWorkbenchTranscriptChrome', () => {
     act(() => {
       result.current.handleTranscriptBlockAction('regenerate', 'b1');
     });
-    // #2274 B-1: the port receives (blockId, taskId).
+    // #2274: the port receives (blockId, taskId).
     expect(onRegenerate).toHaveBeenCalledWith('b1', 'task-b1');
     expect(result.current.softHiddenBlockIds).toEqual(['b1']);
     expect(result.current.toastMessage).toBe('action.regenerating');

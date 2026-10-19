@@ -613,7 +613,7 @@ test.describe('Web OIDC Login — Real Mode Approval Gate', () => {
   });
 
   test('rejects path traversal artifact roots', () => {
-    for (const artifactRoot of ['.tmp/../docs/audit', '.tmpx/login-e2e', 'tmp-old/login-e2e', path.resolve(process.cwd(), '.tmp-sibling/login-e2e')]) {
+    for (const artifactRoot of ['.tmp/../outside/artifacts', '.tmpx/login-e2e', 'tmp-old/login-e2e', path.resolve(process.cwd(), '.tmp-sibling/login-e2e')]) {
       expect(() => readRealLoginConfig({
         AGENTHUB_LOGIN_E2E_OAUTH_CLIENT_ID: 'agenthub-test-client',
         AGENTHUB_LOGIN_E2E_CALLBACK_URL: 'http://localhost:5174/auth/tokendance/callback',

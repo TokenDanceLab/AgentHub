@@ -1,6 +1,5 @@
 /**
  * DiffReviewPanel types / defaults.
- * Peel companion of DiffReviewPanel (#1151). Pure only; zero behavior change.
  */
 
 import type { DiffHunk } from '../diff';
@@ -8,7 +7,7 @@ import type { DiffHunk } from '../diff';
 // ── Side-by-side row types ──────────────────────────────────────────────
 
 /**
- * A single word-diff token (P6 Step 2).
+ * A single word-diff token.
  *
  * Lifted here from `diffWordTokens.ts` so it lives beside the diff-row types
  * that consume it (`SideBySideCell.wordDiff`). `diffWordTokens.ts` re-exports
@@ -27,17 +26,17 @@ export interface SideBySideCell {
   lineNumber?: number;
   content: string;
   /**
-   * Word-diff tokens for a modified row pair (P6 Step 2). Filled only on the
+   * Word-diff tokens for a modified row pair. Filled only on the
    * `modified` rowType by `buildSideBySideRows`; `undefined` on
    * added/deleted/context cells and when the size guard skips word-diff.
    *
-   * Per-column split (report §4.1): the left cell holds `removed`+`context`
+   * Per-column split: the left cell holds `removed`+`context`
    * tokens (joining reproduces `content`); the right cell holds
    * `added`+`context`. `null` is permitted because `produceWordDiffTokens`
    * may return null under its size guard.
    *
    * Consumed by the renderer via `highlightLineWithWordDiff`
-   * (prismRegistry.ts HAST word-diff injector, P6 Step 3).
+   * (prismRegistry.ts HAST word-diff injector).
    */
   wordDiff?: WordDiffToken[] | null;
 }

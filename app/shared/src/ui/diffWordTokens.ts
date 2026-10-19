@@ -1,18 +1,15 @@
 /**
- * Word-diff token producer (P6 Step 1).
+ * Word-diff token producer.
  *
  * Pure function: maps jsdiff's word/char-level diff into a flat token stream
  * for later rendering inside DiffReviewPanel modified rows. Zero React/DOM/
- * protocol coupling. Reuses the existing `diff` (jsdiff v8) dependency — no
- * new deps; `diff.ts` already imports from the same package.
+ * protocol coupling. Uses the existing `diff` (jsdiff v8) dependency.
  *
- * Step 2 lift (done): `WordDiffToken` now lives in `DiffReviewPanelTypes.ts`
- * beside the diff-row types that consume it; this module re-exports it for
- * backward compatibility with existing callers/tests. Step 3 will wire the
- * tokens into the HAST word-diff injector in `prismRegistry.ts` (rendering
- * stays untouched here).
+ * `WordDiffToken` lives in `DiffReviewPanelTypes.ts` beside the diff-row types
+ * that consume it; this module re-exports it for existing callers/tests and
+ * feeds the HAST word-diff injector in `prismRegistry.ts`.
  *
- * Boundaries (see P6 design report §5):
+ * Boundaries:
  *  - CJK-dominant lines fall back to `diffChars` (Chinese has no word
  *    separators, so `diffWords` would treat a whole sentence as one token).
  *  - Oversized lines (>800 chars or >200 words) skip word-diff entirely
@@ -84,7 +81,7 @@ function countWords(text: string): number {
  * (no word separators -> whole sentence collapses to one token), so we use
  * `diffChars` for per-character granularity — what Chinese readers expect.
  *
- * Limitation (report §5.2): mixed CJK+Latin lines pick ONE granularity for
+ * Limitation: mixed CJK+Latin lines pick ONE granularity for
  * the whole line; we don't mix word/char granularity within a line. The
  * density threshold (0.5) is a heuristic, not a tuned parameter.
  */
@@ -119,9 +116,10 @@ function toToken(change: JsDiffChange): WordDiffToken {
  *
  * Reconstruction contract: joining `removed`+`context` token text reproduces
  * `oldContent`; joining `added`+`context` reproduces `newContent`. This is
- * what lets Step 2 split tokens per column (left=removed+context,
- * right=added+context) and Step 3 align token spans to the source string
- * inside the HAST tree.
+ * what lets `buildSideBySideRows` split tokens per column
+ * (left=removed+context, right=added+context) and
+ * `highlightLineWithWordDiff` align token spans to the source string inside
+ * the HAST tree.
  */
 export function produceWordDiffTokens(
   oldContent: string,

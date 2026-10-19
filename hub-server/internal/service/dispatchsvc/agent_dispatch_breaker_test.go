@@ -7,17 +7,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// TestEdgeCircuitBreaker_NilAllowsAll pins the nil-safe passthrough contract:
-// partial test constructions that build &DispatchService{} leave edgeBreaker
-// nil, and a nil breaker must allow every dispatch (no-op).
-func TestEdgeCircuitBreaker_NilAllowsAll(t *testing.T) {
-	var nilBreaker *edgeCircuitBreaker
-	assert.True(t, nilBreaker.Allow(), "nil breaker must allow")
-	nilBreaker.RecordFailure()
-	nilBreaker.RecordSuccess()
-	assert.Equal(t, edgeBreakerClosed, nilBreaker.State(), "nil breaker reports closed")
-}
-
 // TestEdgeCircuitBreaker_OpensAfterThresholdFailures pins the core fix: after
 // edgeBreakerFailureThreshold consecutive edge failures the breaker opens and
 // fails fast so subsequent dispatches do not block for the HTTP timeout.

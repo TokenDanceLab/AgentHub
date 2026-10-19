@@ -8,15 +8,17 @@
 # ═══════════════════════════════════════════════
 # Stage 1: Build
 # ═══════════════════════════════════════════════
-FROM --platform=$BUILDPLATFORM golang:1.26.5-alpine AS builder
+FROM --platform=$BUILDPLATFORM golang:1.26.9-alpine AS builder
 ARG TARGETOS TARGETARCH
+ARG VERSION=dev
 WORKDIR /app
 
 # Layer 1a: Go module cache — workspace config + all go.mod / go.sum
 # These change rarely; Docker caches this layer aggressively.
 COPY go.work go.work.sum ./
-COPY pkg/go.mod ./pkg/go.mod
-# pkg has no external deps → no go.sum; if one appears, add it here.
+COPY pkg/go.mod pkg/go.sum ./pkg/
+# pkg is a workspace module with external deps, so both go.mod and go.sum
+# must be in the build context before go mod download.
 COPY edge-server/go.mod edge-server/go.sum ./edge-server/
 COPY hub-server/go.mod hub-server/go.sum ./hub-server/
 RUN cd hub-server && go mod download
@@ -28,7 +30,7 @@ COPY hub-server ./hub-server
 
 # Build: CGO disabled for fully static binary; -trimpath for
 # reproducible builds; -s -w strips debug info & symbol table.
-RUN cd hub-server && CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -trimpath -ldflags="-s -w" -o server-hub ./cmd/server-hub
+RUN cd hub-server && CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -trimpath -ldflags="-s -w -X github.com/agenthub/hub-server/internal/app.Version=${VERSION}" -o server-hub ./cmd/server-hub
 
 # ═══════════════════════════════════════════════
 # Stage 2: Runtime
@@ -47,11 +49,10 @@ RUN apk upgrade --no-cache \
 
 WORKDIR /app
 
-# Copy the static binary, config template, and migrations from the
-# builder stage — no Go toolchain needed at runtime.
+# Copy the static binary and config template from the builder stage.
+# Migrations are embedded in the binary.
 COPY --from=builder /app/hub-server/server-hub .
 COPY --from=builder /app/hub-server/configs/config.docker.yaml ./configs/config.yaml
-COPY --from=builder /app/hub-server/migrations ./migrations
 
 # Entrypoint is copied from the build context (not the builder).
 COPY hub-server/deployments/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh

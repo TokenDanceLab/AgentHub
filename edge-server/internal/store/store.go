@@ -1,6 +1,6 @@
 package store
 
-// In-memory Store core after residual peel #1144. Zero behavior change.
+// In-memory Store core.
 // Companions: store_types, store_interfaces, store_projects, store_domain.
 
 import (
@@ -46,7 +46,7 @@ func New() *Store {
 
 // Close is a no-op for the in-memory store; it exists to satisfy the
 // Repository interface so the shutdown hook chain can treat all backends
-// uniformly (#2129 M5).
+// uniformly (#2129).
 func (s *Store) Close() {}
 
 func (s *Store) snapshot() fileSnapshot {

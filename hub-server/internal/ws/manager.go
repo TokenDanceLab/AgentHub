@@ -34,10 +34,6 @@ type Manager struct {
 	// SetSendBufferSize overrides it for backpressure tests.
 	sendBufferSize int
 
-	// pingHook is a test-only seam replacing pingAll's body (heartbeat
-	// lifecycle tests count ticks without needing real connections).
-	pingHook func()
-
 	// goroutines tracks in-flight connection-scoped goroutines (writeLoop +
 	// readLoop). Add before launch, Done on exit. Shutdown waits on this with
 	// a bounded timeout so process exit does not race with in-flight frames.
@@ -56,14 +52,6 @@ func NewManager() *Manager {
 		userConnCount:  make(map[string]int),
 		sendBufferSize: config.WSSendBufferSize,
 	}
-}
-
-// SetPingHook installs a test-only heartbeat probe; nil restores the real
-// pingAll body.
-func (m *Manager) SetPingHook(hook func()) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	m.pingHook = hook
 }
 
 // SetSendBufferSize overrides the per-connection send-buffer capacity for
@@ -96,12 +84,6 @@ func (m *Manager) GoroutineAdd(n int) {
 // GoroutineDone decrements the in-flight connection-goroutine counter.
 func (m *Manager) GoroutineDone() {
 	m.goroutines.Done()
-}
-
-// IsShutdown reports whether Shutdown has been initiated. Push/Register paths
-// use this as a fast-path short-circuit before acquiring mu.
-func (m *Manager) IsShutdown() bool {
-	return m.shutdown.Load()
 }
 
 func (m *Manager) Count() int {
@@ -155,7 +137,7 @@ func (m *Manager) Register(c *Conn) error {
 	}
 	// Mirror the SetAuth byDevice indexing for pre-authenticated connections
 	// (UserID/DeviceID pre-set by upgrade middleware); without this, relay
-	// PushToDevice cannot reach devices registered via this path (#2101 G6).
+	// PushToDevice cannot reach devices registered via this path (#2101).
 	if c.DeviceID != "" {
 		m.byDevice[c.DeviceID] = c.ID
 	}
@@ -175,13 +157,13 @@ func (m *Manager) Register(c *Conn) error {
 // SetAuth also tracks whether the user was previously offline (wasOffline) and
 // whether a same-device-type connection already existed (oldConnID), then fires
 // the OnRouteSet callback so higher layers can react to routing changes.
-func (m *Manager) SetAuth(connID string, userID, deviceType, deviceID string) {
+func (m *Manager) SetAuth(connID string, userID, deviceType, deviceID string) bool {
 	m.mu.Lock()
 
 	c, ok := m.conns[connID]
 	if !ok {
 		m.mu.Unlock()
-		return
+		return false
 	}
 
 	// Per-user connection cap: reject new connections when the user already
@@ -198,7 +180,22 @@ func (m *Manager) SetAuth(connID string, userID, deviceType, deviceID string) {
 		)
 		c.Close()
 		m.Unregister(connID)
-		return
+		return false
+	}
+
+	// Queue auth.ok before the connection becomes reachable through byUser.
+	// Nothing can address a fresh conn by id, so this makes auth.ok the first
+	// frame (seq_id 1) even if a broadcast races with authentication; frames
+	// that arrive later start at seq_id 2.
+	c.sendMu.Lock()
+	res := enqueueLocked(c, connID, NewFrame(TypeAuthOK, nil))
+	c.sendMu.Unlock()
+	if !res.Queued {
+		m.mu.Unlock()
+		slog.Error("ws setauth could not queue auth.ok", "conn_id", connID, "status", res.Status, "error", res.Err)
+		c.Close()
+		m.Unregister(connID)
+		return false
 	}
 
 	oldConnID := ""
@@ -242,6 +239,7 @@ func (m *Manager) SetAuth(connID string, userID, deviceType, deviceID string) {
 	if m.OnRouteSet != nil {
 		m.OnRouteSet(userID, deviceType, deviceID, connID, oldConnID, wasOffline)
 	}
+	return true
 }
 
 // Unregister removes a connection from the registry and closes its Send
@@ -315,9 +313,7 @@ func (m *Manager) FindByUserDevice(userID, deviceType string) *Conn {
 	return nil
 }
 
-// StartHeartbeat runs the heartbeat pinger until ctx is cancelled (#1542:
-// the loop must be stoppable — previously it ran forever and leaked at
-// shutdown).
+// StartHeartbeat runs the heartbeat pinger until ctx is cancelled.
 func (m *Manager) StartHeartbeat(ctx context.Context) {
 	m.StartHeartbeatWithInterval(ctx, config.WSHeartbeatInterval)
 }
@@ -335,17 +331,21 @@ func (m *Manager) StartHeartbeatWithInterval(ctx context.Context, interval time.
 	}
 	go func() {
 		defer safego.Recover("ws.heartbeat_loop")
-		ticker := time.NewTicker(interval)
-		defer ticker.Stop()
-		for {
-			select {
-			case <-ticker.C:
-				m.pingAll()
-			case <-ctx.Done():
-				return
-			}
-		}
+		runHeartbeatLoop(ctx, interval, m.pingAll)
 	}()
+}
+
+func runHeartbeatLoop(ctx context.Context, interval time.Duration, ping func()) {
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ticker.C:
+			ping()
+		case <-ctx.Done():
+			return
+		}
+	}
 }
 
 // shutdownDrainTimeout is the maximum time Shutdown waits for in-flight
@@ -407,13 +407,6 @@ func (m *Manager) Shutdown() {
 }
 
 func (m *Manager) pingAll() {
-	m.mu.RLock()
-	hook := m.pingHook
-	m.mu.RUnlock()
-	if hook != nil {
-		hook()
-		return
-	}
 	m.mu.RLock()
 	conns := make([]*Conn, 0, len(m.conns))
 	for _, c := range m.conns {

@@ -7,7 +7,7 @@ export type ToastSeverity = 'error' | 'warning' | 'info';
 export interface ToastAction {
   /**
    * Localized label shown on the action button. It must describe what
-   * `onClick` actually does (#2154 P3-8): a full page reload is labeled
+   * `onClick` actually does (#2154): a full page reload is labeled
    * "reload", never "retry", because reloading discards composer input and
    * resets session/panel state.
    */
@@ -86,7 +86,7 @@ export function friendlyErrorMessage(raw: string | undefined, fallback: string):
 }
 
 
-/** Errcode-specific toast copy for high-value codes (#2072 P1). Returns the
+/** Errcode-specific toast copy for high-value codes (#2072). Returns the
  *  localized message for known codes, or undefined to fall back to the
  *  category-based title + friendlyErrorMessage body. */
 export const ERRCode_KEYS: Record<string, string> = {
@@ -121,7 +121,7 @@ const errorReporterListener = (report: ErrorReport) => {
   const traceId = typeof report.context?.traceId === 'string'
     ? (report.context.traceId as string)
     : undefined;
-  // #2072 P1: prefer errcode-specific copy for known high-value codes;
+  // #2072: prefer errcode-specific copy for known high-value codes;
   // fall back to category label + friendlyErrorMessage for everything else.
   const errcodeCopy = errcodeToastCopy(report.code);
   toastHandler({
@@ -132,7 +132,7 @@ const errorReporterListener = (report: ErrorReport) => {
     message: errcodeCopy ?? friendlyErrorMessage(report.message, fallback),
     ...(traceId !== undefined && { traceId }),
     // Network errors are recoverable by reloading — and reloading is exactly
-    // what this action does, so the label says "reload" (#2154 P3-8). Calling
+    // what this action does, so the label says "reload" (#2154). Calling
     // it "retry" promised a re-sent request while actually throwing away the
     // composer draft, the session/panel state and any in-flight run view.
     // Callers that can retry the real request build their own ToastAction with

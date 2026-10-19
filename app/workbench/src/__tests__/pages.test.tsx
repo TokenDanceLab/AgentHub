@@ -19,7 +19,7 @@ import { AgentHubWorkbench } from '../AgentHubWorkbench';
 import {
   workbenchAgents as agents,
   workbenchTranscript as transcript,
-} from '../workbenchTestFixtures';
+} from './fixtures/workbenchTestFixtures';
 
 installWorkbenchTestHooks();
 
@@ -106,13 +106,13 @@ describe('AgentHubWorkbench', () => {
     const platform = createMockPlatform({
       surface: 'desktop',
       capabilities: { browserPreview: true },
-      conversations: [{ id: 'johnny', title: 'Johnny', kind: 'direct', subtitle: '我看下项目页和私聊入口' }],
+      conversations: [{ id: 'alice', title: 'Alice', kind: 'direct', subtitle: '我看下项目页和私聊入口' }],
     });
-    const johnnyTranscript: TranscriptBlock[] = [
+    const aliceTranscript: TranscriptBlock[] = [
       {
-        id: 'johnny-msg',
+        id: 'alice-msg',
         kind: 'text',
-        author: { id: 'johnny', name: 'Johnny', role: 'human' },
+        author: { id: 'alice', name: 'Alice', role: 'human' },
         text: '我看下项目页和私聊入口',
       },
     ];
@@ -122,21 +122,21 @@ describe('AgentHubWorkbench', () => {
         agents={agents}
         platform={platform}
         conversations={platform.seed.conversations}
-        transcript={johnnyTranscript}
+        transcript={aliceTranscript}
       />,
     );
 
-    const johnnyAvatar = container.querySelector('[data-agent-profile="Johnny"] [aria-label="Johnny 资料卡"]') as HTMLElement;
-    fireEvent.click(johnnyAvatar);
+    const aliceAvatar = container.querySelector('[data-agent-profile="Alice"] [aria-label="Alice 资料卡"]') as HTMLElement;
+    fireEvent.click(aliceAvatar);
 
-    const dialog = screen.getByRole('dialog', { name: 'Johnny 资料卡' });
+    const dialog = screen.getByRole('dialog', { name: 'Alice 资料卡' });
     expect(dialog).toBeInTheDocument();
     expect(within(dialog).getAllByText('维护者').length).toBeGreaterThan(0);
     expect(within(dialog).getByText('AgentHub Desktop')).toBeInTheDocument();
     expect(within(dialog).getByRole('button', { name: '发送消息' })).toBeInTheDocument();
     expect(within(dialog).getByRole('button', { name: '复制链接' })).toBeInTheDocument();
     expect(within(dialog).queryByRole('button', { name: 'Agent 配置' })).not.toBeInTheDocument();
-    expect(screen.queryByText('未找到 Johnny 的 Agent 配置')).not.toBeInTheDocument();
+    expect(screen.queryByText('未找到 Alice 的 Agent 配置')).not.toBeInTheDocument();
   });
 
   it('opens an Agent direct conversation from the profile send action', async () => {
@@ -146,7 +146,7 @@ describe('AgentHubWorkbench', () => {
       capabilities: { browserPreview: true },
       conversations: [
         { id: 'team', title: 'Agent 协作群', kind: 'group', subtitle: 'Orchestrator 已汇总各 Agent 进度' },
-        { id: 'builder', title: 'Builder', kind: 'direct', subtitle: '正在整理 B0 SQLite 迁移方案' },
+        { id: 'builder', title: 'Builder', kind: 'direct', subtitle: '正在整理 SQLite 迁移方案' },
       ],
     });
     const teamTranscript: TranscriptBlock[] = [

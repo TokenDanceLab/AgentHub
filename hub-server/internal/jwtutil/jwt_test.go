@@ -70,7 +70,7 @@ func TestGenerateAccessToken_MintsUniqueJTI(t *testing.T) {
 
 func TestParseToken_Expired(t *testing.T) {
 	secret := "test-secret"
-	// -31s stays beyond the 30s leeway (#2135 F1): still rejected.
+	// -31s stays beyond the 30s leeway (#2135): still rejected.
 	token, err := GenerateAccessToken("user-1", "desktop", "dev-1", secret, -31*time.Second)
 	if err != nil {
 		t.Fatalf("GenerateAccessToken failed: %v", err)
@@ -85,7 +85,7 @@ func TestParseToken_Expired(t *testing.T) {
 func TestParseToken_WithinLeewayAccepted(t *testing.T) {
 	secret := "test-secret"
 	// -10s expires slightly in the past but within the 30s clock-skew leeway:
-	// aligned with capability/edge validation (#2135 F1).
+	// aligned with capability/edge validation (#2135).
 	token, err := GenerateAccessToken("user-1", "desktop", "dev-1", secret, -10*time.Second)
 	if err != nil {
 		t.Fatalf("GenerateAccessToken failed: %v", err)
@@ -325,7 +325,7 @@ func TestParseToken_AcceptsLegacyEmptyAudience(t *testing.T) {
 		DeviceType: "desktop",
 		DeviceID:   "dev-1",
 		RegisteredClaims: jwt.RegisteredClaims{
-			// No Issuer / Audience: pre-R08 product session shape.
+			// No Issuer / Audience: legacy product session shape.
 			Subject:   "user-1",
 			ExpiresAt: jwt.NewNumericDate(now.Add(15 * time.Minute)),
 			IssuedAt:  jwt.NewNumericDate(now),

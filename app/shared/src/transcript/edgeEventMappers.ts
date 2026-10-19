@@ -1,6 +1,5 @@
 /**
  * Edge event → transcript block mappers public barrel.
- * Residual pure-helper peel of edgeEventMappers (#1124). Pure only; zero behavior change.
  *
  * Implementations live in domain companions; this file re-exports so
  * normalizeEdgeEvents imports from `./edgeEventMappers` remain stable.

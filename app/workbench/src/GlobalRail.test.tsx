@@ -3,7 +3,7 @@ import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { useTestI18nLanguage } from '@shared/testing/i18n';
 import { GlobalRail } from './GlobalRail';
 
-/* F1/F6 rail attention badge: counts are derived by the frame from the
+/* Rail attention badge: counts are derived by the frame from the
    run/approval model; the rail only renders + routes the click. Badge copy
    lives in the sharedWorkbench ns — assert against the real en bundle. */
 
@@ -15,7 +15,7 @@ function renderRail(props: Partial<Parameters<typeof GlobalRail>[0]> = {}) {
   return render(<GlobalRail userDisplayName="Tester" {...props} />);
 }
 
-describe('GlobalRail attention badge (F1/F6)', () => {
+describe('GlobalRail attention badge', () => {
   it('shows failed + awaiting on the Tasks entry with the breakdown announced', () => {
     const onNavigate = vi.fn();
     const { container } = renderRail({

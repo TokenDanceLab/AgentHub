@@ -8,7 +8,7 @@ import type { ContactsPageProps } from './types';
 /* ═══════════════════════════════════════════════════════════════════════
    Contacts left-nav shell — org row, pane nav, recent shortcuts.
 
-   Extracted from ContactsPage as Phase 18 strangler slice #574.
+   Extracted from ContactsPage (#574).
    CSS remains on shared ContactsPage.module.css.
    ═══════════════════════════════════════════════════════════════════════ */
 
@@ -54,7 +54,7 @@ export function ContactNav({
         className={`${styles.search} workbench-search`}
         placeholder={t('contacts.search.placeholder')}
         value={searchQuery}
-        // #2154 P1-1: without onSearchChange this input is frozen — typing
+        // #2154: without onSearchChange this input is frozen — typing
         // does nothing. Gate it the way AgentsPage already does so the surface
         // stops promising a search it cannot run; the title states why.
         disabled={!onSearchChange}

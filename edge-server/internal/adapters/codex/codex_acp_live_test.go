@@ -1,4 +1,4 @@
-// Package codex — live ACP real-run harness (#1743 item 3).
+// Package codex — live ACP real-run harness.
 //
 // This file is the opt-in end-to-end verification for the codex-acp adapter:
 // it spawns the REAL `npx -y @agentclientprotocol/codex-acp@1.1.7` process
@@ -22,7 +22,7 @@
 //	cd edge-server && ACP_LIVE=1 go test ./internal/adapters/codex/ \
 //	  -run TestCodexACPadapterLiveRealRun -v -count=1
 //
-// Evidence record (first live run recorded in #1743 item 3):
+// Evidence record (first live run):
 //   - npm mirror serves the pinned 1.1.7 (`npx -y
 //     @agentclientprotocol/codex-acp@1.1.7 --version` exit 0), so the
 //     launcher+network preconditions hold.
@@ -72,7 +72,7 @@ func tailLines(s string, n int) string {
 }
 
 // TestCodexACPadapterLiveRealRun is the live ACP real-run verification
-// (#1743 item 3, TODO at codex_acp.go). It asserts nothing about model
+// (real-run verification, TODO at codex_acp.go). It asserts nothing about model
 // availability — it records evidence: the emitted event sequence, SDK wire
 // log, agent stderr, and ParseStream outcome. The caller classifies the
 // chain against the recorded events.

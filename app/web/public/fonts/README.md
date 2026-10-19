@@ -1,14 +1,13 @@
-# Self-hosted fonts (#2024)
+# Self-hosted fonts
 
-This folder replaces the Google Fonts `<link>` tags previously loaded by
-`app/web/index.html`. No request to fonts.googleapis.com / fonts.gstatic.com
-remains; `app/e2e/fontBlocker.ts` keeps guarding this invariant in E2E.
+All fonts are self-hosted: no request goes to fonts.googleapis.com /
+fonts.gstatic.com; `app/e2e/fontBlocker.ts` guards this invariant in E2E.
 
 ## Files
 
 | File | Family | Bytes | Source | License |
 | --- | --- | --- | --- | --- |
-| material-symbols-outlined.woff2 | Material Symbols Outlined (variable: wght 100..700, FILL 0..1, GRAD, opsz) | 1,127,988 | fonts.gstatic.com/s/materialsymbolsoutlined/v368/kJEPBvYX7BgnkSrUwT8OhrdQw4oELdPIeeII9v6oDMzBwG-RpA6RzaxHMPdY40KH8nGzv3fzfVJO1Q.woff2 | Apache-2.0 (LICENSE-ApACHE-2.0.txt) |
+| material-symbols-outlined.woff2 | Material Symbols Outlined (variable: wght 100..700, FILL 0..1, GRAD, opsz) | 1,127,988 | fonts.gstatic.com/s/materialsymbolsoutlined/v368/kJEPBvYX7BgnkSrUwT8OhrdQw4oELdPIeeII9v6oDMzBwG-RpA6RzaxHMPdY40KH8nGzv3fzfVJO1Q.woff2 | Apache-2.0 (LICENSE-APACHE-2.0.txt) |
 | hanken-grotesk-latin.woff2 | Hanken Grotesk (variable wght 400..800, latin subset) | 34,704 | fonts.gstatic.com/s/hankengrotesk/v12/ieVn2YZDLWuGJpnzaiwFXS9tYtpd59A.woff2 | SIL OFL 1.1 (LICENSE-OFL-1.1.txt) |
 | hanken-grotesk-latin-ext.woff2 | Hanken Grotesk (variable wght 400..800, latin-ext subset) | 19,588 | fonts.gstatic.com/s/hankengrotesk/v12/ieVn2YZDLWuGJpnzaiwFXS9tYtpT59CjCQ.woff2 | SIL OFL 1.1 (LICENSE-OFL-1.1.txt) |
 

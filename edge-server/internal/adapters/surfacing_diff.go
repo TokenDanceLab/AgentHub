@@ -5,8 +5,6 @@ import (
 	"strings"
 )
 
-// Residual pure-helper peel #1112: unified-diff generation helpers.
-
 // generateUnifiedDiff produces a minimal unified diff between old and new content.
 func generateUnifiedDiff(path, oldContent, newContent string) string {
 	oldLines := splitLines(oldContent)

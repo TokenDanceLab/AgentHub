@@ -34,24 +34,13 @@ const MaxIncrementalMessageLimit = 500
 // provider bindings, MCP servers, market profiles, session search and audit
 // events. It is the value api/openapi.yaml declares for the shared PageSize
 // parameter (maximum: 200), so it is the bound those endpoints must actually
-// enforce; it was previously a bare `200` literal repeated in ten places.
+// enforce.
 //
-// Enforcement lives wherever the client-supplied value becomes a LIMIT, and
-// since #2243 that is the handler — the layer the contract is written against —
-// for projects/workspaces, skills, agent profiles, execution targets, provider
-// bindings, MCP servers, market profiles and session search, each clamping with
-// ClampPageSize(.., MaxListPageSize, ..). The repository queries beneath them
-// clamp to the same value as defence in depth, with one asymmetry worth
-// knowing: repository.SearchSessions applies no ceiling of its own, so its
-// handler is the only enforcement point. GET /web/audit-events used to be the
-// second one — its handler forwarded the raw pageSize and repository.ListAuditEvents
-// was the only clamp — and now clamps like the rest. No list handler in
-// internal/handler carries a hand-written two-branch clamp any more; every one
-// goes through ClampPageSize with the ceiling its own endpoint declares (#2243).
-//
-// Before #2243 every one of those handlers clamped to MaxPageLimit (500)
-// instead, so pageSize=300 reached a query that silently returned 200 rows with
-// HTTP 200 and no signal that the page had been shortened.
+// Enforcement lives wherever the client-supplied value becomes a LIMIT. The
+// handler — the layer the contract is written against — clamps with
+// ClampPageSize(.., MaxListPageSize, ..); the repository queries beneath clamp
+// to the same value as defence in depth. One asymmetry: repository.SearchSessions
+// applies no ceiling of its own, so its handler is the only enforcement point.
 const MaxListPageSize = 200
 
 // MaxPageLimit is the ceiling of the endpoints whose own contract declares
@@ -72,15 +61,14 @@ const MaxListPageSize = 200
 // (repository/agent.go ListCustomAgentsByOwner). repository/pagination_limits_test.go
 // pins both.
 //
-// It is NOT a Hub-wide handler ceiling — that is what this comment claimed until
-// #2243, and the claim was false for every generic list endpoint, which clamp to
-// MaxListPageSize (200), and for the message/notification/thread-message
-// endpoints, which clamp to MaxMessagePageLimit (100).
+// Endpoints outside this set clamp to their own family ceiling: generic lists
+// use MaxListPageSize (200), and the message, notification and thread-message
+// lists use MaxMessagePageLimit (100).
 const MaxPageLimit = 500
 
 // MaxPaginationOffset caps client-controlled OFFSET values on list endpoints.
 // An unbounded offset forces PG to scan-and-discard arbitrarily many rows per
-// request (single-request DoS amplifier, #2154 Gauss P2-1); 10000 pages far
+// request (single-request DoS amplifier, #2154); 10000 pages far
 // beyond any real UI depth (limit<=500 => 5M rows reachable) while keeping
 // legitimate pagination intact. Keyset cursors remain the long-term shape.
 const MaxPaginationOffset = 10000
@@ -134,7 +122,7 @@ const DefaultRequestBodyLimit int64 = 10 << 20
 // concurrent roles the hub actually runs (edge-callback transactions, seq
 // allocation, audit advisory-lock writes, sweepers, outbox tickers, metrics,
 // interactive API). The historical 2/1 starved every consumer whenever one
-// slow transaction held a connection (#2154 Gauss P1-1). Both are tunable
+// slow transaction held a connection (#2154). Both are tunable
 // per instance via AGENTHUB_DB_MAX_OPEN_CONNS / AGENTHUB_DB_MAX_IDLE_CONNS
 // (viper AutomaticEnv).
 const (
@@ -296,15 +284,7 @@ const EventBusHandlerTimeout = 30 * time.Second
 // MetricsCollectionInterval controls periodic in-process metric sampling.
 const MetricsCollectionInterval = 15 * time.Second
 
-// ── Auth validation ───────────────────────────────────────────────────────────
-
-// MinPasswordLength is the minimum password length accepted by Register and
-// ChangePassword.
-const MinPasswordLength = 8
-
-// MaxPasswordLength is the maximum password length accepted by Register and
-// ChangePassword.
-const MaxPasswordLength = 64
+// ── Group validation ─────────────────────────────────────────────────────────
 
 // MaxGroupNameLength is the maximum group session display name length.
 const MaxGroupNameLength = 64

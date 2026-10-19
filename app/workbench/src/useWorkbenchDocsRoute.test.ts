@@ -81,11 +81,11 @@ describe('useWorkbenchDocsRoute — preview open/close', () => {
     const preview = result.current.docsPreview;
     expect(preview?.id).toBe('doc:desktop-design-system');
     // Title without an extension gets a `.md` filename.
-    expect(preview?.name).toBe('AgentHub Desktop 设计系统对齐清单.md');
+    expect(preview?.name).toBe('工作台界面规范（示例）.md');
     expect(preview?.type).toBe('md');
     expect(preview?.owner).toBe('demo-user');
     expect(preview?.sourceLabel).toBe('我的文档库');
-    expect(preview?.content).toContain('# AgentHub Desktop 设计系统对齐清单');
+    expect(preview?.content).toContain('# 工作台界面规范（示例）');
     expect(preview?.content).toContain('- 标签：内部');
   });
 
@@ -98,10 +98,10 @@ describe('useWorkbenchDocsRoute — preview open/close', () => {
     });
 
     const preview = result.current.docsPreview;
-    expect(preview?.name).toBe('SESSION-HANDOFF-2026-06-05.md');
+    expect(preview?.name).toBe('项目周报-第23周.md');
     expect(preview?.type).toBe('md');
     expect(preview?.content).toContain('- 标签：未标记');
-    expect(preview?.content).toContain('# SESSION-HANDOFF-2026-06-05.md');
+    expect(preview?.content).toContain('# 项目周报-第23周.md');
   });
 
   it('closes the preview', () => {
@@ -137,7 +137,7 @@ describe('useWorkbenchDocsRoute — real data mode', () => {
 
     expect(result.current.documentsLoading).toBe(false);
     expect(result.current.rows).toEqual(supplied);
-    // #2154 P2-2(b): real data mode never injects the mock library shortcuts.
+    // Real data mode never injects the mock library shortcuts.
     expect(result.current.shortcuts).toEqual([]);
   });
 
@@ -149,7 +149,7 @@ describe('useWorkbenchDocsRoute — real data mode', () => {
   });
 });
 
-describe('useWorkbenchDocsRoute — library shortcuts (#2154 P2-2b)', () => {
+describe('useWorkbenchDocsRoute — library shortcuts', () => {
   it('surfaces the mock shortcut list only in demo mode', () => {
     const { result } = renderHook(() => useWorkbenchDocsRoute({ realDataMode: false }));
 

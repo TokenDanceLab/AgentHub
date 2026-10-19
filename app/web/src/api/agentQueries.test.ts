@@ -34,7 +34,7 @@ describe('web agent profile queries', () => {
       mcp_servers: '[{"name":"github"}]',
       tool_allowlist: '["Read","Grep"]',
       memory_policy: '{"sources":["agents-md","project-memory"],"retention":"project-policy","summary":"Reads AGENTS.md and project memory"}',
-      target_preferences: '{"work_dir":"D:\\\\Code\\\\TokenDance\\\\AgentHub"}',
+      target_preferences: '{"work_dir":"/workspace/agenthub"}',
       version: 3,
     });
 
@@ -54,7 +54,7 @@ describe('web agent profile queries', () => {
       memorySources: ['agents-md', 'project-memory'],
       memoryRetention: 'project-policy',
       memorySummary: 'Reads AGENTS.md and project memory',
-      targetPreferences: { work_dir: 'D:\\Code\\TokenDance\\AgentHub' },
+      targetPreferences: { work_dir: '/workspace/agenthub' },
       description: 'Reviews risky patches',
       version: '3',
       status: 'available',

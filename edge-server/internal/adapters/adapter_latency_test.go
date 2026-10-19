@@ -9,7 +9,6 @@ import (
 
 // =============================================================================
 // Benchmark: ClassifyComplexity with various prompt sizes
-// (SDK 适配器延迟基准已随 #1760 归组迁入 internal/adapters/sdk)
 // =============================================================================
 
 // BenchmarkClassifyComplexity benchmarks the deterministic prompt complexity

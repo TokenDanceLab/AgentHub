@@ -3,7 +3,7 @@ package events
 // Append's post-write size bookkeeping (maxSize check + indexedSize) is
 // arithmetic rather than a second and third Stat of the file: the log is opened
 // O_APPEND, so a successful write of len(data) bytes at writeOffset leaves the
-// file exactly writeOffset+len(data) long (#2256 E-P3-7).
+// file exactly writeOffset+len(data) long.
 //
 // These tests pin the two ways that identity could break:
 //

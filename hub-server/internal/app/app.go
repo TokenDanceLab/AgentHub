@@ -167,8 +167,9 @@ const shortRevisionLen = 12
 // Honest limit: in a git *linked worktree* the stamping track can name the wrong
 // commit — cmd/go/internal/vcs/vcs.go requires the root marker to satisfy
 // {filename: ".git", isDir: true} via isVCSRoot()'s fi.IsDir() check, but a
-// worktree's .git is a *file*, so go stamps the main checkout's HEAD (measured:
-// worktree HEAD 106e9819 → e77808bf, vcs.modified false while dirty). Trust it
+// worktree's .git is a *file*, so go stamps the main checkout's HEAD (observed:
+// a linked worktree reports the main checkout's commit and vcs.modified=false
+// even when the worktree is dirty). Trust it
 // only for clones / CI checkouts; in a worktree inject -X …app.Version=
 // $(git rev-parse --short=12 HEAD); a plausible wrong commit misleads worse than "dev".
 func resolveVersion(explicit string) string {

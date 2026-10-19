@@ -2,10 +2,10 @@ import type { TFunction } from 'i18next';
 import type { ToolPermission } from './types';
 
 /* ═══════════════════════════════════════════════════════════════════════════════════════
-   AgentEditHelpers — pure residual slices from AgentEditPanel (#695).
+   AgentEditHelpers — pure helpers for AgentEditPanel (#695).
 
    Edit field configs, option arrays, label constants, and className
-   builders only. No React / no intentional UX change.
+   builders only. No React.
    exactOptionalPropertyTypes-safe.
 
    i18n note (#2015): display copy resolves through the sharedWorkbench

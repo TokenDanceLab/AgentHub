@@ -1,6 +1,5 @@
 /**
  * Hub client pure body / response / form builders.
- * Peel companion of hubClientPayloadUtils (#1094). Pure only; zero behavior change.
  */
 
 import type {

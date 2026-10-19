@@ -72,7 +72,7 @@ describe('buildContactsPageProps', () => {
     expect(Object.prototype.hasOwnProperty.call(props, 'onMemberClick')).toBe(false);
   });
 
-  it('wires infinite-scroll pagination from the route (#1510)', () => {
+  it('wires infinite-scroll pagination from the route ', () => {
     const onLoadMore = vi.fn();
     const route = {
       contactsPane: 'internal',
@@ -132,7 +132,7 @@ describe('buildDocsPageProps', () => {
     expect(props.navItems).toEqual([]);
     expect(props.profiles).toBe(profiles);
     expect(props.rows).toHaveLength(1);
-    // #2154 P2-2(b): shortcuts come from the route (demo-only), never from a
+    // #2154): shortcuts come from the route (demo-only), never from a
     // page-level default injection.
     expect(props.shortcuts).toEqual(['Spec shortcut']);
     expect(props.onDocClick).toBe(openDocPreview);

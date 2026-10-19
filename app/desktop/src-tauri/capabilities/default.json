@@ -12,6 +12,7 @@
     "core:window:allow-close",
     "core:window:allow-start-dragging",
     "dialog:allow-open",
+    "dialog:allow-ask",
     {
       "identifier": "shell:allow-open",
       "allow": [

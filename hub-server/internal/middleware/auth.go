@@ -106,7 +106,7 @@ func (m *AuthMiddleware) Handler() gin.HandlerFunc {
 // #nosec G101 -- constant WS subprotocol marker, not a credential
 const WSBearerSubprotocol = "agenthub.bearer.v1"
 
-// WSAuthMiddleware returns a Gin middleware that validates JWT tokens for
+// AuthMiddleware.WSHandler() returns a Gin middleware that validates JWT tokens for
 // WebSocket upgrade requests.
 //
 // Token resolution order:
@@ -122,7 +122,7 @@ func (m *AuthMiddleware) WSHandler() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		tokenStr := extractWSToken(c)
 		if tokenStr == "" {
-			// G9: WS auth path previously had no audit log and no metric.
+			// Audit the failed upgrade and count it in WSAuthFailures.
 			m.auditPermission(c, "", "auth_validate", false, map[string]interface{}{
 				"reason": "missing_token",
 				"path":   c.FullPath(),
@@ -140,7 +140,7 @@ func (m *AuthMiddleware) WSHandler() gin.HandlerFunc {
 		// handshake by authenticating at the upgrade middleware layer.
 		claims, err := jwtutil.ParseToken(tokenStr, m.cfg.JWT.Secret)
 		if err != nil {
-			// G9: WS auth path previously had no audit log and no metric.
+			// Audit the failed upgrade and count it in WSAuthFailures.
 			m.auditPermission(c, "", "auth_validate", false, map[string]interface{}{
 				"reason": "invalid_token",
 				"path":   c.FullPath(),
@@ -164,7 +164,7 @@ func (m *AuthMiddleware) WSHandler() gin.HandlerFunc {
 }
 
 // extractWSToken resolves the Hub JWT for a WebSocket upgrade request.
-// See WSAuthMiddleware for the full priority list and protocol convention.
+// See AuthMiddleware.WSHandler() for the full priority list and protocol convention.
 // Query access_token is intentionally ignored.
 func extractWSToken(c *gin.Context) string {
 	header := c.GetHeader("Authorization")
@@ -270,7 +270,7 @@ func setHubLocalClaims(c *gin.Context, claims *jwtutil.Claims) {
 }
 
 // enforceHubSession applies the post-parse Hub product-session policy shared by
-// RequireHubSession and WSAuthMiddleware. It rejects:
+// RequireHubSession and AuthMiddleware.WSHandler(). It rejects:
 //   - non-hub_local auth_source (e.g. TokenDance identity bearer)
 //   - non-empty purpose (edge-api / run-start / capability class)
 //   - edge / tokendance_bearer device_type (defense in depth)
@@ -320,7 +320,7 @@ func (m *AuthMiddleware) acceptAccessClaims(c *gin.Context, claims *jwtutil.Clai
 			"device_id", claims.DeviceID,
 			"path", c.FullPath(),
 		)
-		// G9: track legacy (non-revocable) token volume for migration monitoring.
+		// Track legacy (non-revocable) token volume for migration monitoring.
 		if metrics.JWTVerificationFailures != nil {
 			metrics.JWTVerificationFailures.WithLabelValues("legacy_no_jti").Inc()
 		}
@@ -356,7 +356,7 @@ func (m *AuthMiddleware) acceptAccessClaims(c *gin.Context, claims *jwtutil.Clai
 			return false
 		}
 		slog.Warn("access jti blacklist check error, fail-open", "jti", claims.ID, "error", err)
-		// G9: fail-open Redis error — security-relevant, must be visible in Grafana.
+		// Fail-open Redis error — security-relevant, must be visible in Grafana.
 		if metrics.JTIBlacklistCheckErrors != nil {
 			metrics.JTIBlacklistCheckErrors.Inc()
 		}
@@ -380,7 +380,7 @@ func (m *AuthMiddleware) acceptAccessClaims(c *gin.Context, claims *jwtutil.Clai
 // RequireHubSession is a middleware that requires a Hub-issued local session.
 // TokenDance ID bearer tokens prove identity only; they must not authorize Hub
 // product APIs, device routing, Web task dispatch, or user-local resources.
-// WebSocket upgrades share the same post-parse gate via WSAuthMiddleware.
+// WebSocket upgrades share the same post-parse gate via AuthMiddleware.WSHandler().
 func (m *AuthMiddleware) RequireHubSession() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		if !m.enforceHubSession(c) {
@@ -388,12 +388,6 @@ func (m *AuthMiddleware) RequireHubSession() gin.HandlerFunc {
 		}
 		c.Next()
 	}
-}
-
-// RequireLocalAuth is kept for existing call sites. Local Hub auth and Hub
-// session are the same boundary after TokenDance ID OIDC exchange.
-func (m *AuthMiddleware) RequireLocalAuth() gin.HandlerFunc {
-	return m.RequireHubSession()
 }
 
 // RequireAdmin is a middleware that restricts access to admin users.
@@ -476,7 +470,7 @@ func (m *AuthMiddleware) auditPermission(c *gin.Context, userID string, decision
 		// NOT NULL uuid，空串会让 PostgreSQL 报 22P02 并污染错误日志。
 		return
 	}
-	// Observability (slice A step 7): enrich audit details with correlation fields
+	// Observability: enrich audit details with correlation fields
 	// when available. These are best-effort; missing values are simply omitted.
 	if details == nil {
 		details = make(map[string]interface{})

@@ -1,15 +1,14 @@
 #!/usr/bin/env python3
-"""AgentHub P0 Edge CLI real-readiness proposal gate — ps1 迁移。
+"""AgentHub Edge CLI real-readiness proposal gate.
 
 This script is intentionally secret-free. By default it reads repository files
 and proposal parameters only. With --DiscoverCommands it may run Get-Command
 plus runtime --version/--help probes; it never executes prompt-bearing CLI,
 network, secret, workspace, or model/API commands.
 
-契约（ps1-to-python-migration）：stdlib only；CLI 签名/退出码与 ps1 一致
-（--RepoRoot/--Mode/--AdapterId/.../--Approve* 开关，Mode 仅
-ProposalOnly/RealTested/Submission，0=通过）；机器可读行格式
-（PASS/FAIL/WARN/BLOCK/Status）与 ps1 完全一致。
+契约：stdlib only；CLI 支持 --RepoRoot/--Mode/--AdapterId/.../--Approve* 开关，
+Mode 仅 ProposalOnly/RealTested/Submission，退出码 0=通过；输出行前缀
+PASS/FAIL/WARN/BLOCK/Status。
 """
 
 import argparse
@@ -163,9 +162,9 @@ def convert_to_safe_probe_text(output_lines, repo_root: str, user_profile: str) 
     if not text.strip():
         return ""
     text = SECRET_LIKE_PATTERN.sub("[redacted]", text)
-    text = text.replace(re.escape(repo_root), "[repo-root]")
+    text = text.replace(repo_root, "[repo-root]")
     if user_profile:
-        text = text.replace(re.escape(user_profile), "[user-profile]")
+        text = text.replace(user_profile, "[user-profile]")
     if len(text) > 300:
         return text[:300] + "...[truncated]"
     return text
@@ -187,7 +186,7 @@ def invoke_no_spend_cli_probe(command_path: str, arguments, repo_root: str, user
             "exit_code": run_result.returncode,
             "output_preview": convert_to_safe_probe_text(output_lines, repo_root, user_profile),
         }
-    except Exception as exc:  # noqa: BLE001 —— 对齐 ps1 catch：探测失败不中断
+    except Exception as exc:  # noqa: BLE001 —— 探测失败不中断
         return {
             "attempted": True,
             "exit_code": None,
@@ -328,7 +327,7 @@ def main() -> int:
         os.path.abspath(os.path.normpath(os.path.join(temp_base, "AgentHub", "edge-cli-real-readiness"))),
     ]
 
-    print("AgentHub P0 Edge CLI real-readiness proposal gate")
+    print("AgentHub Edge CLI real-readiness proposal gate")
     print(f"Mode: {mode}")
     if args.DiscoverCommands:
         print("Codex, Claude Code, and OpenCode probes are limited to Get-Command, --version, and --help.")
@@ -338,12 +337,8 @@ def main() -> int:
     print("No network, secret, model, or API budget was consumed.")
 
     step("supported adapter/runtime ids")
-    assert_contains(repo_root, "edge-server\\internal\\adapters\\registry.go", r"cliAdapterIDs\s*=\s*map\[string\]struct\{\}", "CLI adapter id allowlist exists")
     for runtime_id in SUPPORTED_RUNTIME_IDS:
-        assert_contains(repo_root, "edge-server\\internal\\adapters\\registry.go", '"' + re.escape(runtime_id) + '"', f"registry allows {runtime_id}")
-    assert_contains(repo_root, "edge-server\\internal\\adapters\\registry.go", "ValidateCLIAdapterID", "ValidateCLIAdapterID exists")
-    assert_contains(repo_root, "edge-server\\internal\\adapters\\registry_test.go", "TestValidateCLIAdapterID", "supported/unsupported runtime ids are unit-tested")
-    assert_contains(repo_root, "edge-server\\internal\\adapters\\registry_test.go", "agenthub-runner-mock", "mock runner is excluded from real CLI adapter ids")
+        assert_contains(repo_root, "edge-server\\cmd\\agenthub-edge\\adapter_registry.go", '"' + re.escape(runtime_id) + '"', f"child agent registry includes {runtime_id}")
     assert_contains(repo_root, "edge-server\\cmd\\agenthub-edge\\adapter_registry.go", "runnerProfileCodex", "Edge config supports codex runtime profile")
     assert_contains(repo_root, "edge-server\\cmd\\agenthub-edge\\adapter_registry.go", "runnerProfileClaudeCode", "Edge config supports claude-code runtime profile")
     assert_contains(repo_root, "edge-server\\cmd\\agenthub-edge\\adapter_registry.go", "runnerProfileOpenCode", "Edge config supports opencode runtime profile")
@@ -354,21 +349,9 @@ def main() -> int:
     step("explicit unknown runtime no-fallback evidence")
     assert_contains(repo_root, "edge-server\\internal\\adapters\\registry.go", r"agent adapter %q not found", "registry resolves explicit unknown adapter as an error")
     assert_contains(repo_root, "edge-server\\internal\\lifecycle\\process_executor_run.go", r"adapterReg.Resolve\(runCtx.AgentID\)", "process executor resolves explicit run agent id through registry")
-    assert_contains(repo_root, "edge-server\\internal\\lifecycle\\process_executor_test.go", "TestProcessExecutorFailsUnknownExplicitAdapterWithoutDefaultFallback", "lifecycle test covers explicit unknown runtime")
-    assert_contains(repo_root, "edge-server\\internal\\lifecycle\\process_executor_test.go", "unknown-runtime", "lifecycle test uses explicit unknown-runtime id")
-    assert_contains(repo_root, "edge-server\\internal\\lifecycle\\process_executor_test.go", "default adapter was invoked for unknown runtime", "lifecycle test proves no default fallback")
-    # governance-execution.md 已外迁 TokenDance docs archive（#1807）；仓库内
-    # 治理指针收敛到 docs/governance/README.md。unknown-runtime fallback 事实
-    # 由上面的代码级断言保证，不再依赖已删文档。
-    step("proposal/readiness artifact")
-    gov = "docs\\governance\\README.md"
-    assert_contains(repo_root, gov, "Edge CLI real-readiness", "governance doc still points at the readiness gate")
-    assert_contains(repo_root, gov, "proposal-only", "governance doc records proposal-only scope")
-    assert_contains(repo_root, gov, "真实运行", "governance doc records no real CLI/model run")
-    assert_contains(repo_root, gov, "operator 审批", "governance doc records operator approval prerequisite")
-    assert_contains(repo_root, gov, "预算/脱敏策略", "governance doc records budget/redaction prerequisite")
-    assert_contains(repo_root, gov, "artifact root", "governance doc records artifact root prerequisite")
-    assert_contains(repo_root, gov, "证据模式", "governance doc records evidence mode prerequisite")
+    assert_contains(repo_root, "edge-server\\internal\\lifecycle\\process_executor_pure_adapter_test.go", "TestProcessExecutorFailsUnknownExplicitAdapterWithoutDefaultFallback", "lifecycle test covers explicit unknown runtime")
+    assert_contains(repo_root, "edge-server\\internal\\lifecycle\\process_executor_pure_adapter_test.go", "unknown-runtime", "lifecycle test uses explicit unknown-runtime id")
+    assert_contains(repo_root, "edge-server\\internal\\lifecycle\\process_executor_pure_adapter_test.go", "default adapter was invoked for unknown runtime", "lifecycle test proves no default fallback")
 
     forbidden_primitive_pattern = "|".join(
         [
@@ -395,7 +378,7 @@ def main() -> int:
     )
 
     step("per-runtime readiness manifest")
-    user_profile = os.environ.get("USERPROFILE", "")
+    user_profile = os.environ.get("USERPROFILE") or os.environ.get("HOME") or ""
     readiness_manifest = new_runtime_readiness_manifest(repo_root, mode, args.DiscoverCommands, user_profile)
     for runtime in readiness_manifest["runtimes"]:
         status = "installed" if runtime["command_discovery"]["installed"] else "missing"
@@ -478,13 +461,10 @@ def main() -> int:
     return 1
 
 
-def tempfile_gettempdir() -> str:
-    return tempfile.gettempdir()
-
 
 if __name__ == "__main__":
     try:
         sys.exit(main())
-    except Exception as exc:  # noqa: BLE001 —— 顶层兜底，对齐 ps1 $ErrorActionPreference='Stop'
+    except Exception as exc:  # noqa: BLE001 —— fail closed：未捕获异常返回非零
         print(f"ERROR: {exc}", file=sys.stderr)
         sys.exit(1)

@@ -7,7 +7,7 @@ import (
 )
 
 // DeliveryJournal records Edge→Hub callback attempts for reconciliation.
-// Minimal in-memory implementation for AH-SR-049; not durable across restarts.
+// Minimal in-memory implementation; not durable across restarts.
 type DeliveryJournal struct {
 	mu      sync.RWMutex
 	seq     atomic.Uint64
@@ -85,5 +85,3 @@ func (j *DeliveryJournal) Len() int {
 	defer j.mu.RUnlock()
 	return len(j.entries)
 }
-
-// redeliveryKey uniquely identifies a delivery attempt group for candidate selection.

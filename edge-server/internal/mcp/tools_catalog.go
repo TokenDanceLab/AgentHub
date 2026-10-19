@@ -1,6 +1,5 @@
 package mcp
 
-// Residual pure-helper peel: MCP tools/list catalog (#1104).
 // listTools tool definitions (canonical + deprecated aliases).
 
 // listTools returns all available MCP tools for discovery.
@@ -90,7 +89,7 @@ func (s *Server) listTools() []Tool {
 		},
 		{
 			Name:        "agenthub_get_run_status",
-			Description: "Query the current status and lifecycle timestamps of an AgentHub Edge agent run. Use this to poll for completion after starting a run.\nExample: {\"name\": \"agenthub_get_run_status\", \"arguments\": {\"runId\": \"run_abc123\"}}\nOutput: JSON object with \"runId\", \"projectId\", \"threadId\", \"status\" (one of queued/started/completed/failed/cancelled), \"createdAt\", \"startedAt\", \"finishedAt\".\nErrors: Returns an error if the run is not found or runId is missing.",
+			Description: "Query the current status and lifecycle timestamps of an AgentHub Edge agent run. Use this to poll for completion after starting a run.\nExample: {\"name\": \"agenthub_get_run_status\", \"arguments\": {\"runId\": \"run_abc123\"}}\nOutput: JSON object with \"runId\", \"projectId\", \"threadId\", \"status\" (one of queued/started/cancelling/finished/completed_with_issues/failed/cancelled), \"createdAt\", \"startedAt\", \"finishedAt\".\nErrors: Returns an error if the run is not found or runId is missing.",
 			InputSchema: jsonSchema(`{
 				"type": "object",
 				"properties": {

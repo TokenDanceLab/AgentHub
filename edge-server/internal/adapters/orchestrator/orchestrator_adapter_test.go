@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-// ── Orchestrator adapter behavior tests（随实现迁移到叶子包，#1566）──────────
+// ── Orchestrator adapter behavior tests──────────
 // 原位于根包 adapter_test.go；构造函数改为注入 AgentExecutor port。
 
 func TestAdapterMetadata(t *testing.T) {

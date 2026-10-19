@@ -11,8 +11,10 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 
 	"github.com/agenthub/hub-server/internal/bus"
+	"github.com/agenthub/hub-server/internal/cache"
 	"github.com/agenthub/hub-server/internal/config"
 	"github.com/agenthub/hub-server/internal/egress"
 	"github.com/agenthub/hub-server/internal/handler"
@@ -127,6 +129,39 @@ func (a *App) initInfra(ctx context.Context) error {
 	return nil
 }
 
+// newAgentTeamService builds the AgentTeam service and attaches every optional
+// collaborator. It is a separate function so the composition test can assert
+// the wiring instead of trusting a mutable app singleton.
+func newAgentTeamService(
+	db *gorm.DB,
+	agentSvc *agent.Service,
+	cacheClient *cache.Client,
+	messageBus *bus.Bus,
+	controlSvc *agentcontrol.Service,
+	auditSvc *audit.Service,
+	teamConfig config.AgentTeamConfig,
+) *agentteam.AgentTeamService {
+	team := agentteam.NewAgentTeamServiceWithGuardrails(db, agentSvc, cacheClient, agentteam.AgentTeamGuardrails{
+		MaxDelegationDepth:       teamConfig.MaxDelegationDepth,
+		MaxActiveSubAgentsPerRun: int64(teamConfig.MaxActiveSubAgentsPerRun),
+		MaxRouteRepeats:          teamConfig.MaxRouteRepeats,
+		MaxTasksPerTeamRun:       int64(teamConfig.MaxTasksPerTeamRun),
+		AssignmentTimeout:        teamConfig.AssignmentTimeout,
+		MaxTeamRunBudgetTokens:   teamConfig.MaxTeamRunBudgetTokens,
+		MaxTeamRunBudgetUsagePct: teamConfig.MaxTeamRunBudgetUsagePct,
+	})
+	team.SetBus(messageBus)
+	if controlSvc != nil {
+		team.SetControlService(controlSvc)
+	}
+	team.SetCompeteMaxAgents(teamConfig.CompeteMaxAgents)
+	team.SetHumanReviewEnabled(teamConfig.HumanReviewEnabled)
+	if auditSvc != nil {
+		team.SetAuditService(agentTeamAuditAdapter{svc: auditSvc})
+	}
+	return team
+}
+
 // initServices constructs all service-layer components and their inline handlers.
 func (a *App) initServices(ctx context.Context) error {
 	// Service layer
@@ -214,21 +249,12 @@ func (a *App) initServices(ctx context.Context) error {
 	// Wire audit into services that record privileged actions (#2067).
 	a.SessionService.SetAuditService(sessionAuditAdapter{svc: auditSvc})
 	targetSvc.SetAuditService(executionTargetAuditAdapter{svc: auditSvc})
-	a.AgentTeamService.SetAuditService(agentTeamAuditAdapter{svc: auditSvc})
 	a.AgentService.SetAuditService(agentAuditAdapter{svc: auditSvc})
 
 	// AgentTeam service
-	a.AgentTeamService = agentteam.NewAgentTeamServiceWithGuardrails(a.DB, a.AgentService, a.CacheClient, agentteam.AgentTeamGuardrails{
-		MaxDelegationDepth:       a.Config.AgentTeam.MaxDelegationDepth,
-		MaxActiveSubAgentsPerRun: int64(a.Config.AgentTeam.MaxActiveSubAgentsPerRun),
-		MaxRouteRepeats:          a.Config.AgentTeam.MaxRouteRepeats,
-		MaxTasksPerTeamRun:       int64(a.Config.AgentTeam.MaxTasksPerTeamRun),
-		AssignmentTimeout:        a.Config.AgentTeam.AssignmentTimeout,
-		MaxTeamRunBudgetTokens:   a.Config.AgentTeam.MaxTeamRunBudgetTokens,
-		MaxTeamRunBudgetUsagePct: a.Config.AgentTeam.MaxTeamRunBudgetUsagePct,
-	})
-	a.AgentTeamService.SetBus(a.bus)
-	a.AgentTeamService.SetHumanReviewEnabled(a.Config.AgentTeam.HumanReviewEnabled)
+	a.AgentTeamService = newAgentTeamService(
+		a.DB, a.AgentService, a.CacheClient, a.bus, a.AgentControlService, auditSvc, a.Config.AgentTeam,
+	)
 	a.AgentTeamHandler = handler.NewAgentTeamHandler(a.AgentTeamService)
 	// Document service
 	a.DocumentService = document.NewService(a.DB)
@@ -284,18 +310,18 @@ func (a *App) startServer(ctx context.Context) error {
 
 	// Background goroutines
 	a.startTaskScheduler(a.bg.Ctx())
-	a.startWebSocketCleanup(a.bg.Ctx())
-	// AH-SR-049: durable Hub->Edge delivery retry loop (delivery_outbox).
+	a.mgr.StartHeartbeat(a.bg.Ctx())
+	// durable Hub->Edge delivery retry loop (delivery_outbox).
 	if a.AgentService != nil {
 		a.AgentService.StartDeliveryRetryLoop(a.bg.Ctx())
 		// Bounds outbox table growth: purge delivered/dead-letter rows past
 		// the retention window on a 24h cadence (#1212 — previously
 		// CleanupOldDeliveries was test-only and the outbox grew unbounded).
 		a.AgentService.StartDeliveryCleanupLoop(a.bg.Ctx())
-		// Macro baseline §5 goal 5 (#2070): bound agent_run_events growth —
-		// purge terminal-task events past retention, keep per-task tail snapshot.
+		// #2070: bound agent_run_events growth — purge terminal-task events
+		// past retention, keep per-task tail snapshot.
 		agent.StartRunEventRetentionLoop(a.bg.Ctx(), a.DB, agent.DefaultRetentionConfig())
-		// #2154 Ampere P2-3: bound notifications growth — purge old read rows;
+		// #2154: bound notifications growth — purge old read rows;
 		// unread rows are never touched.
 		notification.StartRetentionLoop(a.bg.Ctx(), a.DB, notification.DefaultRetentionConfig())
 		// #2066: orphan task recovery — reclaims queued tasks with no outbox row.
@@ -320,7 +346,7 @@ func (a *App) startServer(ctx context.Context) error {
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 
 	// HTTP server. A bind/serve failure must cancel the whole task group and
-	// surface as Run's error — not only a log line (#1542 must-test 9).
+	// surface as Run's error — not only a log line (#1542).
 	serveErrCh := make(chan error, 1)
 	a.HTTPServer = &http.Server{
 		Addr:              fmt.Sprintf(":%d", a.Config.Server.Port),

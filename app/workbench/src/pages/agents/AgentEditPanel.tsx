@@ -10,12 +10,11 @@ import { buildStatusNoticeClassName } from './AgentEditHelpers';
 import type { AgentConfig, AgentRecentEvent, ToolPermission } from './types';
 
 /* ═══════════════════════════════════════════════════════════════════════
-   Agent edit panel shell — residual thin after extracting sub-parts
-   to AgentEditItemParts + AgentEditHelpers (#695).
+   Agent edit panel shell; sub-parts live in AgentEditItemParts and
+   AgentEditHelpers (#695).
 
    #1280: default product detail is one primary frosted card. Capability
-   strip + edit grid already carry readiness / policy fields; the duplicate
-   AgentConfigSummary block was removed as dead code (#1872 Slice E).
+   strip + edit grid already carry readiness / policy fields.
    ═══════════════════════════════════════════════════════════════════════ */
 
 export interface AgentEditPanelProps {

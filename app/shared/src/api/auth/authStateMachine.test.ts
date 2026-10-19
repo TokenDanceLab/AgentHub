@@ -395,7 +395,7 @@ describe('browser OIDC callback handling', () => {
     expect(ports.callbackChannel.leaveCallbackRoute).toHaveBeenCalled();
   });
 
-  it('maps backend OIDC codes through the SSOT bridge table (#2123 P1-2)', async () => {
+  it('maps backend OIDC codes through the SSOT bridge table (#2123)', async () => {
     const { ports } = createFakePorts();
     ports.pendingStorage.save(makePending('state-1'));
     pushBrowserCallback('code-1', 'state-1');

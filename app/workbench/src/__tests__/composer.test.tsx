@@ -19,7 +19,7 @@ import { AgentHubWorkbench } from '../AgentHubWorkbench';
 import {
   workbenchAgents as agents,
   workbenchTranscript as transcript,
-} from '../workbenchTestFixtures';
+} from './fixtures/workbenchTestFixtures';
 
 installWorkbenchTestHooks();
 
@@ -60,7 +60,7 @@ describe('AgentHubWorkbench', () => {
     });
   });
 
-  it('restores the draft and retries when an attachment upload fails (#1821)', async () => {
+  it('restores the draft and retries when an attachment upload fails', async () => {
     const uploadAttachment = vi.fn()
       .mockRejectedValueOnce(new Error('upload exploded'))
       .mockResolvedValueOnce({
@@ -239,7 +239,7 @@ describe('AgentHubWorkbench', () => {
       />,
     );
 
-    const strip = screen.getByRole('region', { name: 'Demo 主链状态' });
+    const strip = screen.getByRole('region', { name: '主链状态' });
     expect(within(strip).getByText('Web')).toBeInTheDocument();
     expect(within(strip).getByText('Hub task')).toBeInTheDocument();
     expect(within(strip).getByText('task-v4')).toBeInTheDocument();
@@ -320,7 +320,7 @@ describe('AgentHubWorkbench', () => {
       />,
     );
 
-    const strip = screen.getByRole('region', { name: 'Demo 主链状态' });
+    const strip = screen.getByRole('region', { name: '主链状态' });
     expect(within(strip).getByText('等待 task/replay')).toBeInTheDocument();
     expect(within(strip).getByText('等待 worker route')).toBeInTheDocument();
     expect(within(strip).getByText('0 route / 0 event')).toBeInTheDocument();

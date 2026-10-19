@@ -1,7 +1,7 @@
 /* ═══════════════════════════════════════════════════════════════════════
    Docs main pane cluster — head, action buttons, tabs, table, preview.
 
-   Extracted from DocsPage as Phase 21 residual thin #605.
+   Extracted from DocsPage (#605).
    CSS remains on shared DocsPage.module.css.
    EmptyState contracts stay in DocTable (titleLevel, optional class spreads, CTA).
    ═══════════════════════════════════════════════════════════════════════ */

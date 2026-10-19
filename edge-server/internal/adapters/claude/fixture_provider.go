@@ -1,6 +1,6 @@
-// AgentHubAgentSpec fixture 投影的 claude-code 构造器注入（#1760 claude 增量）。
+// AgentHubAgentSpec fixture 投影的 claude-code 构造器注入。
 //
-// sdk 子包（agentspec_fixture.go，随 #1760 mapper 增量归组）的
+// sdk 子包（agentspec_fixture.go）的
 // CompileAgentSpecV1ToRuntimeInvocationFixture 在 runtimeID "claude-code"
 // 时需要构造 ClaudeCodeAdapter 以投影 redacted CLI invocation plan。但 sdk
 // 不得 import 本包（claude → adapters/sdk 为单向依赖），因此本包在 init 时

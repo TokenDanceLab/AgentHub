@@ -70,7 +70,7 @@ describe('ChatViewTranscript CSS contract', () => {
     expect(detailRule).toMatch(/\btext-overflow\s*:\s*ellipsis/);
   });
 
-  it('uses dense row rhythm tokens for transcript messages (P76 #1311)', () => {
+  it('uses dense row rhythm tokens for transcript messages (#1311)', () => {
     const rowRule = cssRule(css, '.grp-row');
     const contentRule = cssRule(css, '.grp-content');
 

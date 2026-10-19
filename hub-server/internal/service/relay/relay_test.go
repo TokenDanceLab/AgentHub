@@ -45,7 +45,7 @@ func TestCreateCommand_WithActiveConnection_PushReachedTrue(t *testing.T) {
 	svc, _ := newTestService(t)
 
 	// Register a fake WS connection whose DeviceID matches the relay target so
-	// PushToDevice (byDevice index) queues the frame (#2101 G6 routing).
+	// PushToDevice (byDevice index) queues the frame (#2101 routing).
 	conn := &ws.Conn{
 		ID:         "conn-1",
 		UserID:     "owner-1",
@@ -99,7 +99,7 @@ func TestGetCommand_WrongUserReturnsNotFound(t *testing.T) {
 	assert.Error(t, err, "wrong user should not be able to read the command")
 }
 
-// P2 audit #2119: AckCommand must remove the key from Redis.
+// AckCommand must remove the key from Redis (#2119).
 func TestAckCommand_DeletesKey(t *testing.T) {
 	svc, mr := newTestService(t)
 	ctx := context.Background()

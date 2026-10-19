@@ -6,7 +6,7 @@ import (
 )
 
 // store_query_plan.go holds pure in-map create/update/upsert/cleanup plan
-// helpers extracted from store_query.go. Callers own mutex/IO.
+// Callers own mutex/IO.
 
 // resolveCleanupNow fills a zero Now with the provided fallback (usually UTC now).
 func resolveCleanupNow(now, fallback time.Time) time.Time {
@@ -317,7 +317,7 @@ func buildTerminalCleanupCandidates(order []string, runs map[string]Run) []runCl
 		run, ok := runs[id]
 		// An executor may finish before its admission receipt is committed.
 		// Pending evidence must survive retention until the outcome is known.
-		if !ok || run.AdmissionState == RunAdmissionPending || !isTerminalRunStatus(run.Status) {
+		if !ok || run.AdmissionState == RunAdmissionPending || !IsTerminalRunStatus(run.Status) {
 			continue
 		}
 		terminalAt, hasTime := runTerminalTime(run)

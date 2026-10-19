@@ -18,8 +18,8 @@ import type { ProjectInfo } from './pages/ProjectsPage';
 import type { WorkbenchAttentionInput } from './workbenchAttentionModel';
 
 /* ═══════════════════════════════════════════════════════════════════════
-   AgentHubWorkbenchTypes — public props contract residual extract (#683).
-   Pure types only; no React / no intentional UX change.
+   AgentHubWorkbenchTypes — public props contract.
+   Pure types only; no React.
    ═══════════════════════════════════════════════════════════════════════ */
 
 export interface AgentHubWorkbenchStatus {
@@ -59,7 +59,7 @@ export interface AgentHubWorkbenchProps {
   workbenchStatus?: AgentHubWorkbenchStatus | undefined;
   agentProfilesStatus?: WorkbenchAgentProfilesStatus | undefined;
   contacts?: WorkbenchContactsData | undefined;
-  /** Hub contacts request failure (#1821) — the contacts page must render an
+  /** Hub contacts request failure — the contacts page must render an
    *  explicit error state instead of collapsing into an empty list. */
   contactsError?: string | undefined;
   projects?: ProjectInfo[] | undefined;
@@ -92,7 +92,7 @@ export interface AgentHubWorkbenchProps {
   contactsActions?: WorkbenchContactsActions | undefined;
   /** Document rows for DocsPage (real data first, mock fallback). */
   documents?: DocRow[] | undefined;
-  /** Hub documents request failure (#1821) — the docs page must render an
+  /** Hub documents request failure — the docs page must render an
    *  explicit error state instead of collapsing into an empty list. */
   documentsError?: string | undefined;
   /** Document mutation actions wired to Hub Documents API. */
@@ -110,7 +110,7 @@ export interface AgentHubWorkbenchProps {
   showMainchainStatus?: boolean | undefined;
   transcript: TranscriptBlock[];
   /**
-   * Optional unread-messages divider for the transcript (T8 desktop IM path).
+   * Optional unread-messages divider for the transcript (desktop IM path).
    * The IM consumer (desktop Hub sessions) derives the anchor from the read
    * watermark (unread_count = next_seq − last_read_seq); absent for execution
    * threads, demos, and the web app.
@@ -126,7 +126,7 @@ export interface AgentHubWorkbenchProps {
   /** Whether Skill market data is loading. */
   skillMarketLoading?: boolean | undefined;
   /**
-   * Skill market load error (#1821). Shown as the market's error empty state;
+   * Skill market load error. Shown as the market's error empty state;
    * absent when the query succeeded or never ran.
    */
   skillMarketError?: string | undefined;
@@ -134,7 +134,7 @@ export interface AgentHubWorkbenchProps {
   mcpMarketItems?: MCPMarketItem[] | undefined;
   /** Whether MCP Server market data is loading. */
   mcpMarketLoading?: boolean | undefined;
-  /** MCP market load error (#1821); same contract as `skillMarketError`. */
+  /** MCP market load error; same contract as `skillMarketError`. */
   mcpMarketError?: string | undefined;
   /** Block ID to highlight (e.g. from a search result click). Cleared after 3 s animation. */
   highlightedBlockId?: string | undefined;
@@ -143,21 +143,21 @@ export interface AgentHubWorkbenchProps {
   /**
    * Called when the user requests regeneration of an agent message. Receives
    * the block ID. May return a Promise: the chrome awaits it so a failed
-   * regenerate surfaces an error toast instead of a fake success (#1821).
+   * regenerate surfaces an error toast instead of a fake success.
    */
   onRegenerate?: ((blockId: string, taskId: string) => Promise<void> | void) | undefined;
   /**
-   * F1/F6 attention source: the shell's existing run/approval/thread model
+   * Attention source: the shell's existing run/approval/thread model
    * arrays. The workbench derives sidebar live dots, the rail badge and the
    * status-strip counts from this single input (workbenchAttentionModel).
    * Absent on surfaces without a run inventory — all attention chrome hides.
    */
   attention?: WorkbenchAttentionInput | undefined;
-  /** Whether an agent run is currently active (stop button morph, #1462 CF13). */
+  /** Whether an agent run is currently active (stop button morph, #1462). */
   isAgentRunning?: boolean | undefined;
   /** Cancel the active agent run (stop button handler). */
   onCancelRun?: (() => void) | undefined;
-  /** Edit an already-sent message (#1462 CF16). Receives block id + new content. */
+  /** Edit an already-sent message (#1462). Receives block id + new content. */
   onEditMessage?: ((blockId: string, content: string) => Promise<void> | void) | undefined;
   /**
    * Hub REST message actions (#1383). `activeConversationId` is reused as the
@@ -178,11 +178,9 @@ export interface AgentHubWorkbenchProps {
    * `activeConversationId` and wires pin/unpin/recall (#2154) plus forward
    * (#2241). Only demo shells — and any shell whose Hub chat actions are not
    * ready — leave these ports undefined today. `onAddMessageReaction` has no
-   * transcript-menu entry at all right now: the react submenu was removed as
-   * write-only (#1822), so no capability gates on it.
+   * transcript-menu entry at all right now, so no capability gates on it.
    *
-   * Returned Promises are awaited by the chrome so failures surface a toast
-   * (#1821).
+   * Returned Promises are awaited by the chrome so failures surface a toast.
    */
   onPinMessage?: ((messageId: string, sessionId: string) => Promise<void> | void) | undefined;
   onUnpinMessage?: ((messageId: string, sessionId: string) => Promise<void> | void) | undefined;
@@ -209,7 +207,7 @@ export interface AgentHubWorkbenchProps {
   devicesPingingId?: string | null | undefined;
   onDevicePing?: ((targetId: string) => void) | undefined;
   /* ── Token / cost usage board (#1819) ──
-     Shell composes each team's runs (token_usage_total from migration 0066).
+     Shell composes each team's run records.
      `usageTeams === undefined` means the shell is not Hub-connected. */
   usageTeams?: import('./pages/TokenUsagePage').TokenUsagePageTeam[] | undefined;
   usageLoading?: boolean | undefined;

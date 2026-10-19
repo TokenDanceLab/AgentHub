@@ -1,4 +1,4 @@
-// ComposerDispatchQueue behavior (#1965, UX F7): the visible dispatch-only
+// ComposerDispatchQueue behavior (#1965): the visible dispatch-only
 // queue for already-persisted Hub messages. Asserts order/target/preview/
 // retry-state visibility, undo/reorder/retarget/retry wiring, the disabled
 // controls around dispatching rows, and honest rendering per status.

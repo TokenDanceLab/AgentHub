@@ -1,8 +1,6 @@
-// SettingsPaneParts behavior (#shadow coverage): the data-mode status card
-// was removed in the data-mode surface shrink, which also deleted the only
-// test that mounted this file. These live leaves (CLI discovery, state
-// preview, agent deep-link) are still rendered by the settings UI, so their
-// direct behavior stays asserted here. No DataMode UI is re-added.
+// SettingsPaneParts behavior (#shadow coverage): the live leaves (CLI
+// discovery, state preview, agent deep-link) are rendered by the settings UI,
+// so their direct behavior is asserted here.
 import "@testing-library/jest-dom/vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
@@ -24,13 +22,13 @@ const cliManifest: LocalCliDiscoveryManifest = {
 };
 
 describe("SettingsPaneParts live leaves", () => {
-  it("LocalCliDiscoveryStatus renders manifest meta and per-item rows", () => {
+  it("LocalCliDiscoveryStatus renders readiness file and per-item rows", () => {
     render(<LocalCliDiscoveryStatus discovery={cliManifest} />);
 
     expect(screen.getByText("CLI 诊断")).toBeInTheDocument();
     expect(screen.getByText("发现模式")).toBeInTheDocument();
     expect(screen.getByText("no-spend-discovery")).toBeInTheDocument();
-    expect(screen.getByText("就绪 manifest")).toBeInTheDocument();
+    expect(screen.getByText("就绪文件")).toBeInTheDocument();
     expect(screen.getByText("/tmp/agenthub/readiness.md")).toBeInTheDocument();
     expect(screen.getByText("就绪脚本")).toBeInTheDocument();
     expect(screen.getByText("/usr/local/bin/agenthub read")).toBeInTheDocument();

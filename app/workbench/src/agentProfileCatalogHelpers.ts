@@ -13,8 +13,8 @@ import {
 import type { AgentProfileCatalogItem } from './agentProfileCatalogTypes';
 
 /* ═══════════════════════════════════════════════════════════════════════
-   agentProfileCatalogHelpers — residual pure mappers from agentProfileCatalog
-   (#652). Catalog/config/spec projections only; no React / no UX change.
+   agentProfileCatalogHelpers — pure mappers for the AgentProfile catalog.
+   Catalog/config/spec projections only; no React.
    ═══════════════════════════════════════════════════════════════════════ */
 
 export function agentProfileCatalogToConfig(item: AgentProfileCatalogItem): AgentConfig {

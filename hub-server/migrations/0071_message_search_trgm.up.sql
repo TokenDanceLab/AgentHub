@@ -1,4 +1,4 @@
--- P2 message-search performance (#2154 perf lane).
+-- Message-search performance.
 --
 -- messageSearchCondition builds `to_tsvector(...) @@ plainto_tsquery(...) OR
 -- content->>'text' ILIKE '%q%'` on PostgreSQL. The tsvector GIN index (0042)

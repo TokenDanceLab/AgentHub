@@ -1,5 +1,5 @@
 // HandleTaskDone final-message dedup/insert tests: shouldSkipDoneFinalInsert,
-// canonicalContent, unwrapMessageContentText, and the duplicate/distinct
+// canonicalContent and the duplicate/distinct
 // insert paths. Mirrors agent_edge_callback.go.
 
 package agent
@@ -13,7 +13,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/agenthub/hub-server/internal/cache"
 	"github.com/agenthub/hub-server/internal/model"
+	"github.com/agenthub/hub-server/internal/seqalloc"
 )
 
 func TestShouldSkipDoneFinalInsert_IdenticalLatestAgentMessage(t *testing.T) {
@@ -81,19 +83,12 @@ func TestShouldSkipDoneFinalInsert_EmptyFinalContent(t *testing.T) {
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
-func TestUnwrapMessageContentText(t *testing.T) {
-	assert.Equal(t, "plain answer", unwrapMessageContentText(`{"content":"plain answer"}`))
-	assert.Equal(t, `{"text":"user text"}`, unwrapMessageContentText(`{"text":"user text"}`))
-	assert.Equal(t, "not json at all", unwrapMessageContentText("not json at all"))
-	assert.Equal(t, `{"content":""}`, unwrapMessageContentText(`{"content":""}`))
-}
-
 func TestHandleTaskDone_SkipsDuplicateFinalMessage(t *testing.T) {
 	db, mock, sqlDB := newMockDBAgent(t)
 	defer sqlDB.Close()
 
 	b := newTestBus(t)
-	svc := &Service{db: db, bus: b}
+	svc := &Service{db: db, bus: b, cacheClient: cache.NoOpCache{}, seqAlloc: seqalloc.New(cache.NoOpCache{}, db)}
 
 	taskID := "task-done-dedup"
 	mock.ExpectQuery(sqlmTaskByID).
@@ -128,7 +123,7 @@ func TestHandleTaskDone_InsertsDistinctFinalMessage(t *testing.T) {
 	defer sqlDB.Close()
 
 	b := newTestBus(t)
-	svc := &Service{db: db, bus: b}
+	svc := &Service{db: db, bus: b, cacheClient: cache.NoOpCache{}, seqAlloc: seqalloc.New(cache.NoOpCache{}, db)}
 
 	taskID := "task-done-distinct"
 	mock.ExpectQuery(sqlmTaskByID).
@@ -189,7 +184,7 @@ func TestCanonicalContent(t *testing.T) {
 	assert.Equal(t, "x", canonicalContent(`{"content":"x"}`))
 }
 
-// #2274 B-1: the done-final message must carry the producing task ref, exactly
+// #2274: the done-final message must carry the producing task ref, exactly
 // like the stream projection path — the transcript needs `agent_task.task_id`
 // to offer an honest regenerate (the endpoint only accepts task ids).
 func TestHandleTaskDone_StampsProducingTaskRefOnFinalMessage(t *testing.T) {

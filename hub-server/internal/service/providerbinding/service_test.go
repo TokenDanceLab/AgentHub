@@ -31,7 +31,7 @@ func seedProviderBinding(t *testing.T, db *gorm.DB, id, ownerID, provider string
 }
 
 // TestProviderBindingGetIsOwnerScoped ensures a non-owner cannot read another
-// user's provider binding (#2100 P1 audit).
+// user's provider binding (#2100 audit).
 func TestProviderBindingGetIsOwnerScoped(t *testing.T) {
 	db := newProviderBindingTestDB(t)
 	seedProviderBinding(t, db, "pb-1", "owner-1", "openai")
@@ -46,7 +46,7 @@ func TestProviderBindingGetIsOwnerScoped(t *testing.T) {
 }
 
 // TestProviderBindingUpdateIsOwnerScoped ensures PUT by a non-owner returns
-// AuthDeviceMismatch and does not mutate the row (#2100 P1 audit).
+// AuthDeviceMismatch and does not mutate the row (#2100 audit).
 func TestProviderBindingUpdateIsOwnerScoped(t *testing.T) {
 	db := newProviderBindingTestDB(t)
 	seedProviderBinding(t, db, "pb-1", "owner-1", "openai")
@@ -63,7 +63,7 @@ func TestProviderBindingUpdateIsOwnerScoped(t *testing.T) {
 }
 
 // TestProviderBindingDeleteIsOwnerScoped ensures DELETE by a non-owner returns
-// AuthDeviceMismatch and leaves the row intact (#2100 P1 audit).
+// AuthDeviceMismatch and leaves the row intact (#2100 audit).
 func TestProviderBindingDeleteIsOwnerScoped(t *testing.T) {
 	db := newProviderBindingTestDB(t)
 	seedProviderBinding(t, db, "pb-1", "owner-1", "openai")

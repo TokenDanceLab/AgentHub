@@ -37,7 +37,7 @@ import (
 	"time"
 )
 
-// Sentinel errors for egress policy rejections (#2064 item ③).
+// Sentinel errors for egress policy rejections (#2064).
 // Callers should use errors.Is to distinguish policy refusals from transient
 // network failures without relying on error message text.
 var (
@@ -67,7 +67,7 @@ type Config struct {
 	AllowPlainHTTP bool
 	// Timeout for the whole request; zero means 5 seconds.
 	Timeout time.Duration
-	// DialTimeout is the TCP dial timeout; zero means 5 seconds (#2064 item ⑤).
+	// DialTimeout is the TCP dial timeout; zero means 5 seconds (#2064).
 	DialTimeout time.Duration
 }
 

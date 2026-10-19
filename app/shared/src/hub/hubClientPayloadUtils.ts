@@ -2,7 +2,7 @@
  * Hub client pure path/body/response builders used by multi-line createHubClient methods.
  * Extracted from hubClient.ts (#810, #822) — pure only; methods stay thin request(...) wrappers.
  *
- * #1094 residual peel: implementations live in companion modules; this file is the
+ * #1094 helper module: implementations live in companion modules; this file is the
  * public barrel so `import * as hubPayload from './hubClientPayloadUtils'` is unchanged.
  */
 

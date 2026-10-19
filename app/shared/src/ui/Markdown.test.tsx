@@ -199,9 +199,9 @@ describe('heading anchors (rehype-slug, #1506)', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Fable UIUX gap #3: code block copy button + long-code collapse
+// Code block copy button + long-code collapse.
 // ---------------------------------------------------------------------------
-describe('code block copy & collapse (fable UIUX #3)', () => {
+describe('code block copy & collapse', () => {
   let writeTextMock: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
@@ -277,7 +277,7 @@ describe('code block copy & collapse (fable UIUX #3)', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Fable UIUX: markdown links & images (codeg parity)
+// Markdown links & images (codeg parity).
 // ---------------------------------------------------------------------------
 describe('markdown links & images (codeg parity)', () => {
   test('renders images with loading="lazy"', () => {
@@ -306,7 +306,7 @@ describe('markdown links & images (codeg parity)', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Fable UIUX: GFM task lists + sticky table header (codeg parity)
+// GFM task lists + sticky table header (codeg parity).
 // ---------------------------------------------------------------------------
 describe('GFM task lists (codeg parity)', () => {
   test('renders checkboxes with contains-task-list / task-list-item classes', () => {

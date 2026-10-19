@@ -12,7 +12,6 @@ import {
   runNormalizedExecutionTargetsListRequest,
   runRequestWithRouteFallback,
   shouldContinueRouteFallback,
-  unresolvedRouteFallbackError,
 } from './hubClientRequestUtils';
 
 describe('hubClientRequestUtils (#799 / #935 / #957 / #978 / #990 / #1023 / #1044)', () => {
@@ -46,14 +45,7 @@ describe('hubClientRequestUtils (#799 / #935 / #957 / #978 / #990 / #1023 / #104
     expect(shouldContinueRouteFallback(0, 1, notFound)).toBe(false);
   });
 
-  it('peels unresolved route residual (#957)', () => {
-    const notFound = new AppError({ error: { code: 'x', message: 'm' } }, 404);
-
-    expect(unresolvedRouteFallbackError(notFound)).toBe(notFound);
-    expect(unresolvedRouteFallbackError(undefined)).toBeUndefined();
-  });
-
-  it('peels route-fallback continue/throw step residual (#978)', () => {
+  it('plans continue/throw for route fallback (#978)', () => {
     const notFound = new AppError({ error: { code: 'x', message: 'm' } }, 404);
     const server = new AppError({ error: { code: 'x', message: 'm' } }, 500);
     expect(resolveRouteFallbackStep(0, 2, notFound)).toEqual({
@@ -98,7 +90,7 @@ describe('hubClientRequestUtils (#799 / #935 / #957 / #978 / #990 / #1023 / #104
     });
   });
 
-  it('runs requestWithFallback route residual (#990)', async () => {
+  it('runs requestWithFallback route fallback (#990)', async () => {
     const notFound = new AppError({ error: { code: 'x', message: 'm' } }, 404);
     const server = new AppError({ error: { code: 'x', message: 'm' } }, 500);
 
@@ -135,7 +127,7 @@ describe('hubClientRequestUtils (#799 / #935 / #957 / #978 / #990 / #1023 / #104
     ).rejects.toBe(server);
   });
 
-  it('peels path+init / path+formData / paths+init invokers (#1023)', async () => {
+  it('invokes path+init / path+formData / paths+init requests (#1023)', async () => {
     const requestCalls: Array<{ path: string; method?: string }> = [];
     const value = await invokePathInitRequest(
       async (path, init) => {
@@ -195,7 +187,7 @@ describe('hubClientRequestUtils (#799 / #935 / #957 / #978 / #990 / #1023 / #104
     });
   });
 
-  it('peels register-device normalize + execution-target normalize residual (#1044)', async () => {
+  it('normalizes register-device body + execution target (#1044)', async () => {
     const calls: Array<{ paths: readonly string[]; body?: string }> = [];
     const device = await invokeNormalizedRegisterDeviceRequest(
       async (paths, options) => {

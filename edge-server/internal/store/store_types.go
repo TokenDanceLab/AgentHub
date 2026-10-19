@@ -1,7 +1,5 @@
 package store
 
-// Residual pure-helper peel #1144: domain types. Same package; zero behavior change.
-
 import (
 	"time"
 )

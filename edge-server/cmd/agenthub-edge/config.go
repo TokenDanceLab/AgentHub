@@ -99,9 +99,11 @@ func getEnv(key, defaultVal string) string {
 
 func parseIntEnv(key string, defaultVal int) int {
 	if v := os.Getenv(key); v != "" {
-		if n, err := strconv.Atoi(v); err == nil {
+		n, err := strconv.Atoi(v)
+		if err == nil {
 			return n
 		}
+		slog.Warn("invalid integer env; using default", "key", key, "value", v, "default", defaultVal)
 	}
 	return defaultVal
 }

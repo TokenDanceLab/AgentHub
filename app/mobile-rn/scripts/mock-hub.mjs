@@ -337,8 +337,7 @@ async function main() {
   console.log(`Android emulator base URL: http://10.0.2.2:${actualPort}`);
   // /v1/mobile/snapshot is the mobile preview snapshot producer consumed by
   // the preview lane (src/App.tsx → src/api/hubClient.ts getPreviewSnapshot).
-  // /v1/threads + /v1/events were legacy mock-only routes with no consumer and
-  // no hub-server producer (#1422); real Hub routes are /client/sessions + /client/ws.
+  // Real Hub routes are /client/sessions + /client/ws.
   console.log('REST: GET /health, GET /v1/mobile/snapshot, GET /client/sessions, GET /client/contacts');
   console.log('WS:   GET /client/ws');
 }

@@ -29,7 +29,7 @@ func RedispatchOfflineQueueError(err error) error {
 // success logs (device-bound path historically includes user_id).
 func RedispatchOfflineSuccessLogAttrs(preferDevice bool, deliveryID, taskID, userID string) []any {
 	attrs := []any{"delivery_id", deliveryID, "task_id", taskID}
-	if RedispatchOfflineSuccessIncludesUserID(preferDevice) {
+	if preferDevice {
 		attrs = append(attrs, "user_id", userID)
 	}
 	return attrs
@@ -85,17 +85,6 @@ func RedispatchOfflineSuccessLogMessage(preferDevice bool) string {
 		return "redispatch: queued to offline queue"
 	}
 	return "redispatch: queued to fallback queue"
-}
-
-// RedispatchOfflineSuccessIncludesUserID is true when the offline-queue success
-// log historically included user_id (device-bound path only).
-func RedispatchOfflineSuccessIncludesUserID(preferDevice bool) bool {
-	return preferDevice
-}
-
-// RedeliveryWSPushSucceeded is true when a redispatch WS push was queued.
-func RedeliveryWSPushSucceeded(queued bool) bool {
-	return queued
 }
 
 // Historical redispatchDelivery / retryDispatchToTarget slog messages.

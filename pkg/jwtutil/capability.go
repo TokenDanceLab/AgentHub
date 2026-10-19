@@ -1,9 +1,6 @@
 // Package jwtutil hosts the shared capability-token contract between Hub and
-// Edge (AH-SR-046 dual-token auth): Hub mints, Edge validates. This was
-// previously duplicated as hub-server/internal/jwtutil/capability.go (issue
-// side) and edge-server/internal/jwtutil/capability.go (validate side) with
-// divergent constant names — one authoritative definition prevents wire-contract
-// drift between the two servers.
+// Edge (dual-token auth): Hub mints, Edge validates. Both servers import this
+// single definition, so claim encoding and constant names cannot drift apart.
 package jwtutil
 
 import (
@@ -23,7 +20,7 @@ type CapabilityClaims struct {
 	DeviceID  string `json:"device_id"`
 	ProjectID string `json:"project_id"`
 	Purpose   string `json:"purpose"` // e.g. "run-start" (action family)
-	// Optional fine-grained bindings (AH-SR-046). Empty means unbound.
+	// Optional fine-grained bindings. Empty means unbound.
 	Action   string `json:"action,omitempty"`    // must equal purpose when set
 	TargetID string `json:"target_id,omitempty"` // execution target id
 	ThreadID string `json:"thread_id,omitempty"` // workspace/thread binding
@@ -49,7 +46,7 @@ var (
 )
 
 // CapabilityIssueOptions carries optional route-scoped bindings for a
-// capability grant (AH-SR-046).
+// capability grant.
 type CapabilityIssueOptions struct {
 	Action   string
 	TargetID string

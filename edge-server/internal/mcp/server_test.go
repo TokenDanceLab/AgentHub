@@ -1216,7 +1216,7 @@ func TestInvalidJSONRPCVersion(t *testing.T) {
 }
 
 func TestToolStartRunWorkspaceAllowlistPolicy(t *testing.T) {
-	// Table tests for the shared REST/MCP workDir SSOT (AH-SR-006 residual / #998).
+	// Table tests for the shared REST/MCP workDir SSOT (#998).
 	// MCP must reject symlink escapes the same way REST does (EvalSymlinks + IsPathWithin).
 	parent := t.TempDir()
 	allowedRoot := filepath.Join(parent, "allowed")

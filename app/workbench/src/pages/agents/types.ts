@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════════════════════════
-   Agents page public types — extracted for Phase 16 strangler slice #552.
+   Agents page public types (#552).
    ═══════════════════════════════════════════════════════════════════════ */
 
 export type AgentsPaneId =
@@ -288,7 +288,7 @@ export interface AgentsPageProps {
   /* ── Skill Market view ── */
   skillMarketItems?: SkillMarketItem[];
   skillMarketLoading?: boolean;
-  /** Skill market load error (#1821) — renders the error empty state. */
+  /** Skill market load error — renders the error empty state. */
   skillMarketError?: string | undefined;
   skillMarketSearchQuery?: string;
   onSkillMarketSearchChange?: ((query: string) => void) | undefined;
@@ -301,7 +301,7 @@ export interface AgentsPageProps {
   /* ── MCP Market view ── */
   mcpMarketItems?: MCPMarketItem[];
   mcpMarketLoading?: boolean;
-  /** MCP market load error (#1821) — renders the error empty state. */
+  /** MCP market load error — renders the error empty state. */
   mcpMarketError?: string | undefined;
   mcpMarketSearchQuery?: string;
   onMcpMarketSearchChange?: ((query: string) => void) | undefined;

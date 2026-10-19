@@ -1,5 +1,4 @@
 // TanStack Query hooks for thread CRUD.
-// Replaces Zustand threadStore server-state reads and setInterval polling.
 import { useQuery, useMutation, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import {
   createThread,
@@ -42,14 +41,14 @@ export function useCreateThread() {
  * `['hub','threads']` really does prefix everything. So
  * `invalidateQueries({ queryKey: edgeQueryKeys.threads.root })` refreshes the
  * thread *list* and nothing else, and every call site that also meant "the
- * transcript changed" was a silent partial no-op (#2274 A-12) — including
+ * transcript changed" was a silent partial no-op (#2274) — including
  * `useDecideEdgePermission`, whose own doc comment says the invalidation exists
  * to close the replay gap "when the persisted transcript is reloaded".
  *
  * The bare literal `['threadItems', <id>]` that App.tsx used was worse: it is
  * missing the `'edge'` segment, so it matched no cache entry at all — three
  * dead invalidations, two of which were deliberate 2s/4s compensations written
- * specifically to pick up an agent's async response (#2274 A-13). Both defects
+ * specifically to pick up an agent's async response (#2274). Both defects
  * are bounded in production by `useThreadMessages`' `refetchInterval: 5_000`,
  * which is exactly why neither was ever reported: the transcript arrived up to
  * 5s late instead of never, and the code that was supposed to make it arrive

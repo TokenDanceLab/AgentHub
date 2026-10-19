@@ -10,7 +10,6 @@ import (
 
 // =============================================================================
 // Benchmark: SDK adapter creation + request building latency
-// (随 anthropic/openai SDK 适配器归组迁入 package sdk，#1760)
 // =============================================================================
 
 // BenchmarkSDKAdapterLatency measures the wall-clock time for creating

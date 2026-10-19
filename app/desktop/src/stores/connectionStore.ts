@@ -3,7 +3,7 @@
 import { create } from 'zustand';
 import { subscribeWithSelector } from 'zustand/middleware';
 import type { HealthResponse } from '@shared/types';
-import type { TransportStatus } from '@/api/transport';
+import type { TransportStatus } from '@shared/transport';
 
 interface ConnectionState {
   online: boolean;
@@ -12,7 +12,7 @@ interface ConnectionState {
   /** Granular WebSocket transport status (connecting/reconnecting/connected/disconnected). */
   connectionStatus: TransportStatus;
   error: string | null;
-  /** WebSocket ping-pong round-trip latency in milliseconds (QW-3). */
+  /** WebSocket ping-pong round-trip latency in milliseconds. */
   wsLatency: number | null;
   /**
    * Set when the Hub reports this device session was kicked

@@ -62,19 +62,19 @@ export interface ChatViewBridgeProps {
   /** Set of conversation IDs whose pinned announcements have been dismissed. */
   dismissedPinnedIds: Set<string>;
   /**
-   * Called when the user dismisses the pinned banner (#1821). The host keeps
+   * Called when the user dismisses the pinned banner. The host keeps
    * the dismissed set so the banner stays hidden until the pin changes.
    */
   onDismissPinned?: ((conversationId: string) => void) | undefined;
   /** Called to show a toast (used for pinned announcement copy feedback). */
   onToast?: ((message: string) => void) | undefined;
   /**
-   * Unread-messages divider descriptor (T8 desktop IM path). Resolved by the
+   * Unread-messages divider descriptor (desktop IM path). Resolved by the
    * ChatView against the adapted items; absent for non-IM transcripts.
    */
   unreadDivider?: UnreadDividerDescriptor | undefined;
   /**
-   * Transcript items are loading (#1821). With an empty transcript the chat
+   * Transcript items are loading. With an empty transcript the chat
    * shows an honest loading state instead of the "no messages" empty state.
    */
   transcriptLoading?: boolean | undefined;
@@ -139,7 +139,7 @@ export const ChatViewBridge = React.memo(function ChatViewBridge({
     };
   }, [activeConversation, dismissedPinnedIds, onDismissPinned, onToast]);
 
-  // #1406 Phase 3: mount the inline delegation card below each user message.
+  // #1406: mount the inline delegation card below each user message.
   const renderUserFooter = useCallback(
     (item: TranscriptUserItem) => (
       <InlineDelegationCard {...(item.id !== undefined ? { messageId: item.id } : {})} />

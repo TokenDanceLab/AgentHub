@@ -130,7 +130,7 @@ describe('rightInspectorHelpers', () => {
     expect(shouldAutoSwitchDeployPreview('https://a.test', true, 'https://a.test')).toBe(false);
     expect(shouldAutoSwitchDeployPreview('https://a.test', true, null)).toBe(true);
     expect(shouldAutoSwitchDeployPreview('https://b.test', true, 'https://a.test')).toBe(true);
-    /* P77 #1318: themed blank demo previews must not steal overview. */
+    /* #1318: themed blank demo previews must not steal overview. */
     expect(shouldAutoSwitchDeployPreview('about:blank', true, null)).toBe(false);
     expect(shouldAutoSwitchDeployPreview(' about:blank# ', true, null)).toBe(false);
     expect(shouldAutoSwitchDeployPreview('', true, null)).toBe(false);

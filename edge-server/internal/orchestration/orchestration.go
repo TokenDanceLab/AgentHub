@@ -1,6 +1,5 @@
 // Package orchestration holds the neutral, side-effect-free contract types
-// shared between the adapters root package and the orchestrator sub-domain
-// (A-V1 Step 0, #1526).
+// shared between the adapters root package and the orchestrator sub-domain.
 //
 // Dependency direction: orchestration imports nothing from adapters;
 // adapters (and the future adapters/orchestrator leaf package) import this
@@ -16,19 +15,12 @@ import "time"
 // TaskStatus represents the execution status of a plan task.
 type TaskStatus string
 
-const (
-	TaskPending   TaskStatus = "pending"
-	TaskRunning   TaskStatus = "running"
-	TaskCompleted TaskStatus = "completed"
-	TaskFailed    TaskStatus = "failed"
-)
-
 // PlanTask represents a single task within an execution plan.
 type PlanTask struct {
 	ID             string     `json:"id"`
 	Agent          string     `json:"agent"`
 	Description    string     `json:"description"`
-	Mode           string     `json:"mode,omitempty"` // "parallel" or "sequential" execution hint for this task
+	Mode           string     `json:"mode,omitempty"` // optional execution hint for this task; not currently populated
 	TargetFiles    []string   `json:"targetFiles,omitempty"`
 	DependsOn      []string   `json:"dependsOn,omitempty"`
 	ExpectedOutput string     `json:"expectedOutput,omitempty"`
@@ -50,7 +42,7 @@ type PlanApprovalConfig struct {
 
 	// AutoApproveTimeout is the duration after which a pending plan is
 	// denied if no user decision arrives (timeout = deny, not approve).
-	// Zero means wait indefinitely (not recommended). Default: 60 seconds.
+	// Values <= 0 fall back to 60 seconds. Default: 60 seconds.
 	AutoApproveTimeout time.Duration `json:"autoApproveTimeout"`
 }
 
@@ -61,9 +53,9 @@ type PendingPlan struct {
 	ProjectID string     `json:"projectId,omitempty"`
 	ThreadID  string     `json:"threadId,omitempty"`
 	Tasks     []PlanTask `json:"tasks"`
-	Mode      string     `json:"mode"` // "parallel" or "sequential"
+	Mode      string     `json:"mode"` // "parallel" or "single"
 	CreatedAt time.Time  `json:"createdAt"`
-	Status    string     `json:"status"` // "pending", "approved", "rejected", "expired"
+	Status    string     `json:"status"` // "pending"
 }
 
 // PlanDecision is the user's decision on a proposed plan.

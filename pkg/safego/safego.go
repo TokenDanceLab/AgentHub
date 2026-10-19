@@ -1,85 +1,14 @@
-// Package safego provides SafeGo, the panic-recovering goroutine launcher
-// shared by the Hub and Edge servers. A panic in an unguarded goroutine
-// crashes the whole process; SafeGo turns it into a logged, recoverable event
-// so a single misbehaving readLoop / launch goroutine cannot take down the
-// server.
+// Package safego provides the panic-recovering goroutine launcher shared by
+// the Hub and Edge servers. A panic in an unguarded goroutine crashes the
+// whole process; SafeGo turns it into a logged event and forwards it to the
+// registered PanicObserver so it can be counted or alerted on.
 //
-// Both servers previously kept their own copies, and the copies had already
-// diverged: hub internal/safego incremented a panic counter for alerting,
-// edge internal/api.safeGo did not. This package is the single recovery path.
+// Use SafeGo for spawned goroutines, or defer Recover inside a goroutine that
+// cannot use the launcher shape. HTTP handlers are already covered by the
+// server recovery middleware. RecoverInto additionally stores the panic in the
+// caller's error slot so a request path can still return a 500.
 //
-// Unification is a property of the call sites, not of this file, so it is worth
-// recording what it took: edge internal/api.safeGo was replaced when this
-// package landed, but edge internal/lifecycle kept a third private copy
-// (safeGo/recoverPanickedGoroutine) guarding the ten goroutines that carry the
-// run lifecycle — run, hubAck, hubStream, hubDoneEnqueue, hubFailEnqueue,
-// hubCallbackQueue, resultAggregator, resultAggregatorTimeout,
-// watchRunProcess, cancelGrace. It logged and returned, never dispatched to a
-// PanicObserver, and Edge registered no observer at all, so those panics were
-// invisible to every dashboard while Hub's equivalent ones were counted. That
-// copy is gone (#2154).
-//
-// Deleting the launcher copies did not finish the job. Four recovery sites were
-// still hand-written `recover()` inside closures that cannot use the launcher
-// shape: hub internal/bus Publish's handler closure, hub internal/ws
-// PushToSession, edge internal/events runWorker's per-job observer guard, and
-// edge internal/adapters NDJSON Parse's per-line guard. Three of them wrote
-// nothing but a slog line — no stack, no counter, no PanicObserver — which is
-// the same "invisible to every dashboard" hole the lifecycle copy left,
-// reintroduced one closure at a time; the fourth had its own private counter
-// and its own debug.Stack(). All four are now `defer Recover(name)` (#2246).
-//
-// A fifth site had the same disease but not the same excuse: hub
-// internal/handler/ws.go writeLoop, a per-connection goroutine started by a
-// bare `go func(){}` five lines above a SafeGo("ws.readLoop", ...) call, and
-// guarded by a log-only recover with no stack, no counter and no observer. The
-// first slice left it allow-listed as a convergence candidate rather than an
-// exemption; it is converged now (#2246 follow-up). writeLoop itself defers
-// `RecoverInto("ws.writeLoop", &err)`, which keeps the stack, the counter and
-// the observer dispatch while leaving a second defer free to log the panic with
-// conn_id — a per-connection id has no business riding inside a metric label,
-// and the error slot is what buys both. The goroutine is launched by SafeGo
-// because writeLoop's first-registered `defer conn.W.Close(...)` runs last, so
-// a panic raised by that close is not recoverable from inside writeLoop.
-//
-// So the accurate statement is: both servers recover through here, and both
-// install an observer (hub internal/metrics.InstallPanicObserver, called from
-// that package's init; edge EdgeMetrics.InstallPanicObserver, called from
-// httpserver at startup).
-//
-// That claim is about every recovery site in two servers, which is exactly the
-// kind of claim that silently rots, so it is machine-checked rather than
-// asserted: scripts/verify/verify-safego-convergence.py fails on any bare
-// `recover()` in non-test .go under hub-server/, edge-server/ or pkg/ that is
-// not on its allow-list (negative self-test:
-// scripts/verify/tests/verify-safego-convergence.Tests.py). The allow-list is
-// keyed by file plus how many hits that file may have, never by line number, so
-// it cannot go stale when code moves.
-//
-// What the allow-list actually holds, in honesty rather than as a slogan: five
-// sites need something this package deliberately does not do — write an HTTP
-// 500 onto the request's own ResponseWriter (Gin CustomRecovery and the admin
-// net/http wrapper in hub internal/middleware/recovery.go, the Edge net/http
-// wrapper in internal/httpserver/server_middleware.go, and the timeout
-// middleware's handler goroutine in internal/middleware/timeout.go, which owns
-// the buffered response), or assign named results so the caller gets a typed
-// denial (hub internal/handler/ws.go canTypeInSession returns ok=false). Those
-// five, plus this file's own Recover and RecoverInto, are the whole allow-list:
-// nothing in either server recovers a goroutine panic by hand any more.
-//
-// The gate is two-sided on purpose. An extra bare `recover()` goes red, and so
-// does an exemption the code no longer uses — which is how writeLoop's entry
-// shrank from two permitted hits to one when it converged, instead of quietly
-// becoming a licence for the next hand-written guard in that file.
-//
-// Servers register an optional PanicObserver to attach their own
-// metrics/alerting without pkg/safego depending on either server. The hook is
-// process-global and exactly one: installing it twice replaces the first.
-//
-// Two defer-able entry points: Recover for fire-and-forget goroutines and for
-// closures that must keep running after a panic (log and move on), and
-// RecoverInto for goroutines whose caller needs the panic as an error (see
-// RecoverInto for why that distinction matters on request paths).
+// The PanicObserver hook is process-global; install it once at startup.
 package safego
 
 import (
@@ -140,10 +69,10 @@ func Recover(name string) {
 // that slot is still nil, so a real error produced before the panic is never
 // overwritten by the panic label.
 //
-// Use this wherever a goroutine is spawned on a request path that used to run
-// inline: an HTTP middleware recover only covers the request goroutine, so a
-// panic in a spawned reader that recovers nothing escalates from a 500 to a
-// process crash. Recording it in the caller's error slot restores the 500.
+// Use this wherever a goroutine is spawned on a request path: an HTTP middleware
+// recover only covers the request goroutine, so a panic in a spawned reader
+// that recovers nothing escalates from a 500 to a process crash. Recording it
+// in the caller's error slot restores the 500.
 //
 //	name := "projection.members"
 //	g.Go(func() error {

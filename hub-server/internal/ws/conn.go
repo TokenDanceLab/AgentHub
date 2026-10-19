@@ -16,7 +16,7 @@ import (
 // read before the connection is considered stale. Set at 2x heartbeat + the
 // ping timeout (65s with defaults) so the pong-miss detector (2 missed pongs
 // + ping timeout) fires BEFORE the read deadline: the miss path records
-// metrics instead of the read path silently closing (#2135 F4).
+// metrics instead of the read path silently closing (#2135).
 const WSReadTimeout = 2*config.WSHeartbeatInterval + config.WSPingTimeout
 
 // Conn represents a single WebSocket connection tracked by the Manager.
@@ -39,10 +39,10 @@ type Conn struct {
 	// token-bucket algorithm.
 	msgLimiter *rate.Limiter
 
-	// seq is the per-connection monotonic frame sequence counter. PushToConn
+	// seq is the per-connection monotonic frame sequence counter. enqueueLocked
 	// stamps every delivery attempt with seq.Add(1) inside the sendMu critical
-	// section, so wire order always equals seq order and clients can detect
-	// lost frames as gaps.
+	// section (via PushToConn, and via SetAuth for auth.ok), so wire order always
+	// equals seq order and clients can detect lost frames as gaps.
 	seq atomic.Int64
 
 	// droppedFrames counts frames dropped on this connection because the send
@@ -84,8 +84,7 @@ func (c *Conn) SetAuth(userID, deviceType, deviceID string) {
 // read outside the ws package (dispatch marking, target-bound checks, event
 // replay, fanout drop logging) must read through this getter: SetAuth and
 // Manager.SetAuth write the fields under c.mu, so unlocked reads are a data
-// race (#2162 getter, extended to the full triple for the #2154 Wegener
-// residuals in agentcontrol/dispatchsvc/agent/app).
+// race.
 func (c *Conn) Auth() (userID, deviceType, deviceID string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()

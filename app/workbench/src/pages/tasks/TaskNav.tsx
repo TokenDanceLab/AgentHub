@@ -1,7 +1,7 @@
 /* ═══════════════════════════════════════════════════════════════════════
    Tasks left-nav shell — primary/quick panes, list shortcuts.
 
-   Extracted from TasksPage as Phase 20 residual thin #596.
+   Extracted from TasksPage (#596).
    CSS remains on shared TasksPage.module.css.
    ═══════════════════════════════════════════════════════════════════════ */
 

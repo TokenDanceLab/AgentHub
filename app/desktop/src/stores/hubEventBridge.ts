@@ -128,9 +128,7 @@ function onMessageReactionRemoved(qc: QueryClient, payload: unknown) {
 
 function onMessageRead(qc: QueryClient, payload: unknown) {
   // Read receipts move the thread-level unread_count, which lives on the
-  // session list. This used to invalidate a `threads.detail` key that no query
-  // ever registered, so on desktop a read receipt refreshed nothing at all and
-  // the unread badge stayed stale (#2261).
+  // session list (#2261).
   const data = payload as { session_id?: string; user_id?: string; last_read_seq?: number };
   const sessionId = str(data?.session_id);
   if (sessionId) {
@@ -154,7 +152,7 @@ function onSessionDissolved(qc: QueryClient, payload: unknown) {
   invalidateAllWithPrefix(qc, hubQueryKeys.threads.root);
 
   // Surface a user-visible toast so "session dissolved" is not silently
-  // swallowed as a cache invalidation (#2072 P2-⑰).
+  // swallowed as a cache invalidation (#2072).
   try {
     const i18n = getI18n();
     const message = i18n?.isInitialized
@@ -409,9 +407,9 @@ export interface DesktopHubEventBridgeHandle {
 /** Minimal on/off interface matching what desktop Hub WS provides. */
 export interface DesktopHubWSLike {
   on: (type: HubEventType, handler: (payload: unknown) => void) => () => void;
-  /** Optional gap subscription (#2101 G1). Absent in test stubs. */
+  /** Optional gap subscription (#2101). Absent in test stubs. */
   onGap?: (handler: (payload: HubWSGapPayload) => void) => () => void;
-  /** Optional reconnect subscription (#2101 G4-②). Absent in test stubs. */
+  /** Optional reconnect subscription (#2101). Absent in test stubs. */
   onReconnected?: (handler: () => void) => () => void;
 }
 
@@ -420,7 +418,7 @@ export interface DesktopHubWSLike {
  * Zustand store updates. Returns a handle with a `destroy()` method.
  */
 interface DesktopHubEventBridgeOptions {
-  /** hubClient for incremental message resync on reconnect/gap (#2101 G4-②). */
+  /** hubClient for incremental message resync on reconnect/gap (#2101). */
   hubClient?: MessagesResyncHubClient;
 }
 
@@ -445,7 +443,7 @@ export function createDesktopHubEventBridge(
     unsubFns.push(unsub);
   }
 
-  // #2101 G4-②: shared resync trigger for both gap and reconnect events.
+  // #2101: shared resync trigger for both gap and reconnect events.
   // When hubClient is provided, performs incremental syncMessages(after_seq)
   // per cached session. Falls back to full threads invalidation otherwise.
   const triggerResync = (): void => {
@@ -461,7 +459,7 @@ export function createDesktopHubEventBridge(
     }
   };
 
-  // #2101 G1: On seq_id gap, trigger message resync (incremental or fallback).
+  // #2101: On seq_id gap, trigger message resync (incremental or fallback).
   if (hubWS.onGap) {
     const gapUnsub = hubWS.onGap(() => {
       triggerResync();
@@ -469,7 +467,7 @@ export function createDesktopHubEventBridge(
     unsubFns.push(gapUnsub);
   }
 
-  // #2101 G4-②: On reconnect auth completion, trigger message resync.
+  // #2101: On reconnect auth completion, trigger message resync.
   if (hubWS.onReconnected) {
     const reconnUnsub = hubWS.onReconnected(() => {
       triggerResync();

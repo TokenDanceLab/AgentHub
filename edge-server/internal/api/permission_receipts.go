@@ -89,13 +89,6 @@ func newPermissionReceiptCache(capacity int, ttl time.Duration) *permissionRecei
 	}
 }
 
-func (c *permissionReceiptCache) withClock(clock func() time.Time) *permissionReceiptCache {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	c.now = clock
-	return c
-}
-
 // apply atomically decides whether a modern request is a warm replay, a
 // conflict, a capacity rejection, or a newly pending application. The callback
 // runs while the cache lock is held so one winner performs every effect and
@@ -161,13 +154,6 @@ func (c *permissionReceiptCache) purgeExpiredLocked(now time.Time) {
 			delete(c.byRunReq, receipt.runRequestKey())
 		}
 	}
-}
-
-func (c *permissionReceiptCache) len() int {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	c.purgeExpiredLocked(c.now())
-	return len(c.byControl)
 }
 
 func (h *Handler) ensurePermissionReceipts() *permissionReceiptCache {

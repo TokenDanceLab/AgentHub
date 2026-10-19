@@ -71,38 +71,10 @@ func (m *mockSessionCache) InitSeqIfAbsent(ctx context.Context, sessionID string
 	return nil
 }
 
-// recordingSessionBus is a Bus test double that records Publish calls.
-type recordingSessionBus struct {
-	events []bus.Event
-}
-
-func (b *recordingSessionBus) Publish(ctx context.Context, event bus.Event) error {
-	b.events = append(b.events, event)
-	return nil
-}
-
 func TestService_NilBusPublishIsNoop(t *testing.T) {
 	svc := &Service{db: nil, bus: nil, cacheClient: &mockSessionCache{}}
 	// Must not panic when b port is unset (read-only/partial construction).
 	svc.publishEvent(context.Background(), "session.created", map[string]interface{}{"k": "v"})
-}
-
-func TestService_SetBusAndSetCachePorts(t *testing.T) {
-	rec := &recordingSessionBus{}
-	cachePort := &mockSessionCache{}
-	svc := NewService(nil, nil)
-	require.NotNil(t, svc)
-
-	svc.SetBus(rec)
-	svc.SetCache(cachePort)
-	svc.publishEvent(context.Background(), "session.dissolved", map[string]interface{}{"session_id": "s1"})
-	require.NoError(t, resolveCache(svc.cacheClient).Invalidate(context.Background(), "session:members:s1"))
-	require.NoError(t, resolveCache(svc.cacheClient).InitSeqIfAbsent(context.Background(), "s1", 0))
-
-	require.Len(t, rec.events, 1)
-	assert.Equal(t, "session.dissolved", rec.events[0].Type)
-	assert.Contains(t, cachePort.invalidated, "session:members:s1")
-	assert.Equal(t, int64(0), cachePort.initSeq["s1"])
 }
 
 func newMockDBSession(t *testing.T) (*gorm.DB, sqlmock.Sqlmock, *sql.DB) {
@@ -132,7 +104,7 @@ func TestCreatePrivateSession_SelfRequest(t *testing.T) {
 	db, _, sqlDB := newMockDBSession(t)
 	defer sqlDB.Close()
 
-	svc := NewService(db, nil)
+	svc := NewService(db, cache.NoOpCache{}, nil)
 	_, err := svc.CreatePrivateSession(context.Background(), "user-1", "user-1")
 	assert.Error(t, err)
 }
@@ -145,7 +117,7 @@ func TestCreatePrivateSession_TargetNotFound(t *testing.T) {
 		WithArgs("target-99", 1).
 		WillReturnError(gorm.ErrRecordNotFound)
 
-	svc := NewService(db, nil)
+	svc := NewService(db, cache.NoOpCache{}, nil)
 	_, err := svc.CreatePrivateSession(context.Background(), "user-1", "target-99")
 	assert.Error(t, err)
 	assert.NoError(t, mock.ExpectationsWereMet())
@@ -171,7 +143,7 @@ func TestCreatePrivateSession_Existing(t *testing.T) {
 		WillReturnRows(sqlmock.NewRows([]string{"id", "type"}).
 			AddRow("sess-existing", "private"))
 
-	svc := NewService(db, nil)
+	svc := NewService(db, cache.NoOpCache{}, nil)
 	resp, err := svc.CreatePrivateSession(context.Background(), "user-1", "target-1")
 	require.NoError(t, err)
 	assert.Equal(t, "sess-existing", resp.SessionID)
@@ -211,42 +183,7 @@ func TestCreatePrivateSession_Success(t *testing.T) {
 	// Transaction: COMMIT
 	mock.ExpectCommit()
 
-	svc := NewService(db, testSessionCache(t))
-	resp, err := svc.CreatePrivateSession(context.Background(), "user-1", "target-1")
-	require.NoError(t, err)
-	assert.True(t, resp.Created)
-	assert.Equal(t, "private", resp.Type)
-	assert.NotEmpty(t, resp.SessionID)
-	assert.NoError(t, mock.ExpectationsWereMet())
-}
-
-func TestCreatePrivateSession_NilCacheDoesNotPanic(t *testing.T) {
-	db, mock, sqlDB := newMockDBSession(t)
-	defer sqlDB.Close()
-
-	mock.ExpectQuery(regexp.QuoteMeta(`SELECT * FROM "users" WHERE id = $1 ORDER BY "users"."id" LIMIT $2`)).
-		WithArgs("target-1", 1).
-		WillReturnRows(sqlmock.NewRows([]string{"id", "username", "password_hash", "nickname"}).
-			AddRow("target-1", "target", "hash", "Target"))
-
-	// #122: friendship check — both users must be accepted friends.
-	mock.ExpectQuery(regexp.QuoteMeta(`SELECT * FROM "friendships" WHERE (user_id = $1 AND friend_id = $2) OR (user_id = $3 AND friend_id = $4) ORDER BY "friendships"."id" LIMIT $5`)).
-		WithArgs("user-1", "target-1", "target-1", "user-1", 1).
-		WillReturnRows(sqlmock.NewRows([]string{"id", "user_id", "friend_id", "status"}).
-			AddRow("f1", "user-1", "target-1", "accepted"))
-
-	mock.ExpectQuery(`(?s)SELECT s\.\* FROM sessions.*INNER JOIN session_members sm1`).
-		WithArgs("user-1", "target-1", "private").
-		WillReturnRows(sqlmock.NewRows([]string{"id"}))
-
-	mock.ExpectBegin()
-	mock.ExpectExec(regexp.QuoteMeta(`INSERT INTO "sessions"`)).
-		WillReturnResult(sqlmock.NewResult(1, 1))
-	mock.ExpectExec(regexp.QuoteMeta(`INSERT INTO "session_members"`)).
-		WillReturnResult(sqlmock.NewResult(2, 2))
-	mock.ExpectCommit()
-
-	svc := NewService(db, nil)
+	svc := NewService(db, testSessionCache(t), nil)
 	resp, err := svc.CreatePrivateSession(context.Background(), "user-1", "target-1")
 	require.NoError(t, err)
 	assert.True(t, resp.Created)
@@ -266,7 +203,7 @@ func TestCreateGroupSession_AllowsOwnerOnlyWorkspace(t *testing.T) {
 		WillReturnResult(sqlmock.NewResult(1, 1))
 	mock.ExpectCommit()
 
-	svc := NewService(db, testSessionCache(t))
+	svc := NewService(db, testSessionCache(t), nil)
 	resp, err := svc.CreateGroupSession(context.Background(), "owner-1", "Workspace", []string{})
 	require.NoError(t, err)
 	assert.True(t, resp.Created)
@@ -315,7 +252,7 @@ func TestDeleteForMe_SessionNotFound(t *testing.T) {
 		WithArgs("sess-99", 1).
 		WillReturnError(gorm.ErrRecordNotFound)
 
-	svc := NewService(db, nil)
+	svc := NewService(db, cache.NoOpCache{}, nil)
 	err := svc.DeleteForMe(context.Background(), "user-1", "sess-99")
 	assert.Error(t, err)
 	assert.NoError(t, mock.ExpectationsWereMet())
@@ -336,7 +273,7 @@ func TestDeleteForMe_NotMember(t *testing.T) {
 		WithArgs("sess-1", "user", "user-99").
 		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(0))
 
-	svc := NewService(db, nil)
+	svc := NewService(db, cache.NoOpCache{}, nil)
 	err := svc.DeleteForMe(context.Background(), "user-99", "sess-1")
 	assert.Error(t, err)
 	assert.NoError(t, mock.ExpectationsWereMet())
@@ -375,7 +312,7 @@ func TestDeleteForMe_Success(t *testing.T) {
 		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectCommit()
 
-	svc := NewService(db, nil)
+	svc := NewService(db, cache.NoOpCache{}, nil)
 	err := svc.DeleteForMe(context.Background(), "user-1", "sess-1")
 	assert.NoError(t, err)
 	assert.NoError(t, mock.ExpectationsWereMet())
@@ -427,7 +364,7 @@ func TestUpdateMemberSettings_SessionNotFound(t *testing.T) {
 		WithArgs("sess-99", 1).
 		WillReturnError(gorm.ErrRecordNotFound)
 
-	svc := NewService(db, nil)
+	svc := NewService(db, cache.NoOpCache{}, nil)
 	pinned := true
 	err := svc.UpdateMemberSettings(context.Background(), "user-1", "sess-99", &pinned, nil, nil)
 	assert.Error(t, err)
@@ -463,13 +400,13 @@ func TestUpdateMemberSettings_Success(t *testing.T) {
 		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectCommit()
 
-	svc := NewService(db, nil)
+	svc := NewService(db, cache.NoOpCache{}, nil)
 	err := svc.UpdateMemberSettings(context.Background(), "user-1", "sess-1", &pinned, nil, nil)
 	assert.NoError(t, err)
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
-// ==================== B5: #163 fail-closed on repo errors ====================
+// ==================== #163 fail-closed on repo errors ====================
 
 func TestAddGroupMembers_FailClosedOnIsMemberActiveError(t *testing.T) {
 	db, mock, sqlDB := newMockDBSession(t)
@@ -500,7 +437,7 @@ func TestAddGroupMembers_FailClosedOnIsMemberActiveError(t *testing.T) {
 		WithArgs("sess-1", "user", "u2").
 		WillReturnError(gorm.ErrInvalidDB)
 
-	svc := NewService(db, nil)
+	svc := NewService(db, cache.NoOpCache{}, nil)
 	err := svc.AddGroupMembers(context.Background(), "owner-1", "sess-1", []string{"u2"})
 	assert.Error(t, err)
 	assert.NoError(t, mock.ExpectationsWereMet())
@@ -530,7 +467,7 @@ func TestRemoveGroupMember_FailClosedOnIsMemberActiveError(t *testing.T) {
 		WithArgs("sess-1", "user", "u2").
 		WillReturnError(gorm.ErrInvalidDB)
 
-	svc := NewService(db, nil)
+	svc := NewService(db, cache.NoOpCache{}, nil)
 	err := svc.RemoveGroupMember(context.Background(), "owner-1", "sess-1", "u2")
 	assert.Error(t, err)
 	assert.NoError(t, mock.ExpectationsWereMet())
@@ -560,13 +497,13 @@ func TestTransferGroupOwnership_FailClosedOnIsMemberActiveError(t *testing.T) {
 		WithArgs("sess-1", "user", "u2").
 		WillReturnError(gorm.ErrInvalidDB)
 
-	svc := NewService(db, nil)
+	svc := NewService(db, cache.NoOpCache{}, nil)
 	err := svc.TransferGroupOwnership(context.Background(), "owner-1", "sess-1", "u2")
 	assert.Error(t, err)
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
-// ==================== B5: #97 prevent owner from removing themselves ====================
+// ==================== #97 prevent owner from removing themselves ====================
 
 func TestRemoveGroupMember_OwnerCannotRemoveSelf(t *testing.T) {
 	db, mock, sqlDB := newMockDBSession(t)
@@ -587,13 +524,13 @@ func TestRemoveGroupMember_OwnerCannotRemoveSelf(t *testing.T) {
 		WillReturnRows(sqlmock.NewRows([]string{"id", "session_id", "member_type", "member_id", "role"}).
 			AddRow("mem-1", "sess-1", "user", "owner-1", "owner"))
 
-	svc := NewService(db, nil)
+	svc := NewService(db, cache.NoOpCache{}, nil)
 	err := svc.RemoveGroupMember(context.Background(), "owner-1", "sess-1", "owner-1")
 	assert.Error(t, err)
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
-// ==================== B5: #112 require owner authority for group info updates ====================
+// ==================== #112 require owner authority for group info updates ====================
 
 func TestUpdateGroupInfo_NonOwnerRejected(t *testing.T) {
 	db, mock, sqlDB := newMockDBSession(t)
@@ -615,7 +552,7 @@ func TestUpdateGroupInfo_NonOwnerRejected(t *testing.T) {
 			AddRow("mem-2", "sess-1", "user", "user-2", "member"))
 
 	name := "Hacked"
-	svc := NewService(db, nil)
+	svc := NewService(db, cache.NoOpCache{}, nil)
 	err := svc.UpdateGroupInfo(context.Background(), "user-2", "sess-1", &name, nil, nil)
 	assert.Error(t, err)
 	assert.NoError(t, mock.ExpectationsWereMet())
@@ -655,7 +592,7 @@ func TestUpdateGroupInfo_PublishesInfoUpdatedEvent(t *testing.T) {
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
-// ==================== B5: #113 owner must transfer/dissolve before DeleteForMe ====================
+// ==================== #113 owner must transfer/dissolve before DeleteForMe ====================
 
 func TestDeleteForMe_OwnerWithOtherMembersRejected(t *testing.T) {
 	db, mock, sqlDB := newMockDBSession(t)
@@ -683,13 +620,13 @@ func TestDeleteForMe_OwnerWithOtherMembersRejected(t *testing.T) {
 			AddRow("mem-1", "sess-1", "user", "owner-1", "owner").
 			AddRow("mem-2", "sess-1", "user", "user-2", "member"))
 
-	svc := NewService(db, nil)
+	svc := NewService(db, cache.NoOpCache{}, nil)
 	err := svc.DeleteForMe(context.Background(), "owner-1", "sess-1")
 	assert.Error(t, err)
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
-// ==================== B5: #135 clean up agents when member removed ====================
+// ==================== #135 clean up agents when member removed ====================
 
 func TestRemoveGroupMember_CleansUpInvitedAgents(t *testing.T) {
 	db, mock, sqlDB := newMockDBSession(t)
@@ -755,13 +692,13 @@ func TestRemoveGroupMember_CleansUpInvitedAgents(t *testing.T) {
 		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectCommit()
 
-	svc := NewService(db, nil)
+	svc := NewService(db, cache.NoOpCache{}, nil)
 	err := svc.RemoveGroupMember(context.Background(), "owner-1", "sess-1", "u2")
 	assert.NoError(t, err)
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
-// ==================== B5: comprehensive lifecycle test ====================
+// ==================== comprehensive lifecycle test ====================
 
 func TestSessionLifecycle_CreateAddDissolveReject(t *testing.T) {
 	db, mock, sqlDB := newMockDBSession(t)
@@ -781,7 +718,7 @@ func TestSessionLifecycle_CreateAddDissolveReject(t *testing.T) {
 		WillReturnResult(sqlmock.NewResult(2, 2))
 	mock.ExpectCommit()
 
-	svc := NewService(db, testSessionCache(t))
+	svc := NewService(db, testSessionCache(t), nil)
 	resp, err := svc.CreateGroupSession(context.Background(), "owner-1", "Test", []string{"u2"})
 	require.NoError(t, err)
 	assert.True(t, resp.Created)
@@ -979,7 +916,7 @@ func TestAddGroupMembers_DeduplicateIDs(t *testing.T) {
 		WillReturnResult(sqlmock.NewResult(2, 2))
 	mock.ExpectCommit()
 
-	svc := NewService(db, testSessionCache(t))
+	svc := NewService(db, testSessionCache(t), nil)
 	err := svc.AddGroupMembers(context.Background(), "user-1", "sess-1", []string{"user-2", "user-2", "user-3"})
 	assert.NoError(t, err)
 	assert.NoError(t, mock.ExpectationsWereMet())

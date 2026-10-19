@@ -32,7 +32,7 @@ func seedDocument(t *testing.T, db *gorm.DB, id, ownerID, title string) {
 }
 
 // TestDocumentGetIsOwnerScoped ensures a non-owner receives DocNotFound when
-// reading another user's document (#2100 P1 audit).
+// reading another user's document (#2100 audit).
 func TestDocumentGetIsOwnerScoped(t *testing.T) {
 	db := newDocumentTestDB(t)
 	seedDocument(t, db, "doc-1", "owner-1", "Owner One Notes")
@@ -47,7 +47,7 @@ func TestDocumentGetIsOwnerScoped(t *testing.T) {
 }
 
 // TestDocumentUpdateIsOwnerScoped ensures PATCH by a non-owner returns
-// DocNotFound and does not mutate the row (#2100 P1 audit).
+// DocNotFound and does not mutate the row (#2100 audit).
 func TestDocumentUpdateIsOwnerScoped(t *testing.T) {
 	db := newDocumentTestDB(t)
 	seedDocument(t, db, "doc-1", "owner-1", "Original Title")
@@ -63,7 +63,7 @@ func TestDocumentUpdateIsOwnerScoped(t *testing.T) {
 }
 
 // TestDocumentDeleteIsOwnerScoped ensures DELETE by a non-owner returns
-// DocNotFound and leaves the row intact (#2100 P1 audit).
+// DocNotFound and leaves the row intact (#2100 audit).
 func TestDocumentDeleteIsOwnerScoped(t *testing.T) {
 	db := newDocumentTestDB(t)
 	seedDocument(t, db, "doc-1", "owner-1", "Owner One Notes")

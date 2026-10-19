@@ -15,7 +15,7 @@ import { useWorkbenchTaskDeepLinks } from './useWorkbenchTaskDeepLinks';
 function makeTask(overrides: Partial<TaskItem> = {}): TaskItem {
   return {
     id: 'sqlite-plan',
-    title: 'B0 SQLite 迁移方案',
+    title: 'SQLite 迁移方案',
     project: '前端重构任务',
     assignee: 'Builder',
     startTime: '今天 14:49',

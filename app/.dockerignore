@@ -1,0 +1,12 @@
+node_modules
+**/node_modules
+**/dist
+**/coverage
+**/test-results
+**/playwright-report
+e2e
+desktop
+mobile-rn
+.env
+.env.*
+*.log

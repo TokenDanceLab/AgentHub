@@ -23,7 +23,7 @@ import {
 } from './workbenchFrameHelpers';
 
 /* ═══════════════════════════════════════════════════════════════════════
-   workbenchFramePartsHelpers — pure residual slices from WorkbenchFrameParts
+   workbenchFramePartsHelpers — pure helpers for WorkbenchFrameParts
    (#742).
 
    Child-prop builders for sidebar / conversation host / routes / inspector

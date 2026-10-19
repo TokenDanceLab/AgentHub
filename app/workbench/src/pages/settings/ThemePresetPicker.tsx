@@ -1,4 +1,4 @@
-// ThemePresetPicker — workbench settings preset chips (#1986, UX F15).
+// ThemePresetPicker — workbench settings preset chips (#1986).
 // Surface-agnostic by construction: writes go through the shared SSOT
 // `setAgentHubThemePreset` (apply DOM attribute + persist + notify), and the
 // picker subscribes to preset changes so chips stay honest no matter which

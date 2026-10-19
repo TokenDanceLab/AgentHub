@@ -2,7 +2,6 @@ package agent
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"github.com/agenthub/hub-server/internal/service"
@@ -13,17 +12,13 @@ import (
 // ── Redispatcher adapters (implementation on DispatchService) ────────────────
 
 // dispatchRedispatcher adapts *dispatchsvc.DispatchService to the
-// deliveryoutbox.Redispatcher port without exporting dispatch payload types
-// or the outbox row to the outbox. Redispatch residual ownership moved in
-// #573; the dispatch implementation moved to service/dispatchsvc.
+// deliveryoutbox.Redispatcher port without exporting dispatch payload types or
+// the outbox row. The dispatch implementation lives in service/dispatchsvc.
 type dispatchRedispatcher struct {
 	d *dispatchsvc.DispatchService
 }
 
 func (a dispatchRedispatcher) RedispatchDelivery(ctx context.Context, taskID, deliveryID, payloadJSON, edgeDeviceID string) error {
-	if a.d == nil {
-		return fmt.Errorf("redispatch: nil dispatch service")
-	}
 	// Propagate soft-fail errors so retryDeliveries does not MarkDeliverySent
 	// after a failed offline-queue / route attempt (#999). Dead-letter paths
 	// return nil (already terminal; MarkDeliverySent is a no-op).
@@ -39,19 +34,15 @@ type lazyDispatchRedispatcher struct {
 }
 
 func (a lazyDispatchRedispatcher) RedispatchDelivery(ctx context.Context, taskID, deliveryID, payloadJSON, edgeDeviceID string) error {
-	if a.s == nil {
-		return fmt.Errorf("redispatch: nil agent service")
-	}
 	return dispatchRedispatcher{a.s.dispatchService()}.RedispatchDelivery(ctx, taskID, deliveryID, payloadJSON, edgeDeviceID)
 }
 
 // ── Service facade (wiring/handler stability) ────────────────────────────────
 //
 // Thin delegating methods that forward the Service API surface to the composed
-// deliveryoutbox.Outbox (gorm store + dispatchsvc redispatcher). Status / TTL
+// deliveryoutbox.Outbox (gorm store + dispatchsvc redispatcher). Status/TTL
 // aliases used by callers live in the flat service package; orchestration
-// lives in service/deliveryoutbox. Split residual of #801 kept here when the
-// agent family moved to service/agent (#1761).
+// lives in service/deliveryoutbox.
 
 // deliveryOutboxService returns the composed Outbox, lazily constructing
 // one from Service deps when tests use struct literals without NewService.

@@ -1,11 +1,7 @@
-// Package opencode — opencode-acp: the native OpenCode ACP adapter (second
-// ACP migration target, per ACP Go migration §6).
+// Package opencode — opencode-acp: the native OpenCode ACP adapter.
 //
-// There is no batch-mode OpenCode adapter left to contrast against: the Phase
-// 1/2 shape — spawn the opencode CLI with `opencode run --format json` and
-// hand-parse the JSON event stream, a 500+ line custom parser with no ACP
-// permission chain — was deleted by the ACP convergence, so this adapter is the
-// only opencode hop in the tree. It drives OpenCode's native ACP subcommand
+// This is the only OpenCode adapter in the tree. It drives OpenCode's native
+// ACP subcommand
 // (`opencode acp`, v1.18.5+) through the shared coder/acp-go-sdk client runtime
 // (internal/adapters/acp/acp_client.go): streaming updates, capability
 // negotiation, and the Edge approval chain (session/request_permission →
@@ -28,7 +24,7 @@
 //
 // Wrapper shape: this adapter inherits BuildCommand, Metadata, Capabilities,
 // Available, ParseStream, NeedsStdin, and SetPermissionBroker from the
-// embedded AcpAdapter (#1404 wave 2 collapse). BuildCommand reads envKeys
+// embedded AcpAdapter. BuildCommand reads envKeys
 // live from the parent env on the embedded AcpAdapter (no per-wrapper env
 // field). The PreflightCheck override is retained because the read-only
 // TestOpenCodeACPAdapterPreflightFailsFast constructs a raw wrapper without
@@ -49,7 +45,7 @@ import (
 const opencodeACPAdapterID = "opencode-acp"
 
 // opencodeACPVersionPin is the OpenCode version whose native `acp` subcommand
-// was verified for the migration spike (bump discipline: update on upgrades,
+// is verified against the Edge ACP runtime (bump discipline: update on upgrades,
 // keep the pin visible in metadata).
 const opencodeACPVersionPin = "1.18.5"
 

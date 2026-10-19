@@ -15,9 +15,7 @@ export interface SwitchProps {
 }
 
 /**
- * Switch — settings-style toggle (42x24 pill). Same visuals as the former
- * SettingsPage hand-rolled .switch so the migration is pixel-equivalent;
- * adds the a11y-critical ':focus-visible' ring.
+ * Switch — settings-style toggle (42x24 pill) with a focus-visible ring.
  */
 export function Switch({
   checked,

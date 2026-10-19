@@ -12,13 +12,10 @@ import (
 // forever and leaked a goroutine at shutdown. A ping hook counts ticks
 // without needing real WebSocket connections.
 func TestHeartbeatStopsOnContextCancel(t *testing.T) {
-	manager := NewManager()
-
 	var pings atomic.Int64
-	manager.SetPingHook(func() { pings.Add(1) })
 
 	hbCtx, hbCancel := context.WithCancel(context.Background())
-	manager.StartHeartbeatWithInterval(hbCtx, 10*time.Millisecond)
+	go runHeartbeatLoop(hbCtx, 10*time.Millisecond, func() { pings.Add(1) })
 
 	// Let a few ticks run.
 	deadline := time.Now().Add(2 * time.Second)

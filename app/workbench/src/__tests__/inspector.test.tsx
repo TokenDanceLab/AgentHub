@@ -16,7 +16,7 @@ import { DESIGN_NAV_GLYPH_STROKE_WIDTH } from '../designIcons';
 import {
   workbenchAgents as agents,
   workbenchTranscript as transcript,
-} from '../workbenchTestFixtures';
+} from './fixtures/workbenchTestFixtures';
 
 installWorkbenchTestHooks();
 
@@ -89,7 +89,7 @@ describe('AgentHubWorkbench', () => {
     expect(
       screen.getByRole('button', { name: '打开 reports/runtime.patch 只读预览' })
     ).toBeInTheDocument();
-    expect(screen.queryByText('B0 SQLite 迁移')).not.toBeInTheDocument();
+    expect(screen.queryByText('SQLite 迁移')).not.toBeInTheDocument();
     expect(screen.queryByText('sqlite-migration-plan.md')).not.toBeInTheDocument();
 
     restoreInspectorTab('files');
@@ -320,7 +320,7 @@ describe('AgentHubWorkbench', () => {
 
     const inspector = within(screen.getByRole('complementary', { name: '右侧窗口' }));
 
-    /* P76: tasks section open, files collapsed by default → one expanded section head. */
+    /* Tasks section open, files collapsed by default → one expanded section head. */
     expect(inspector.getAllByRole('button', { expanded: true }).length).toBeGreaterThanOrEqual(1);
     expect(inspector.getByRole('button', { name: '折叠 概览' })).toHaveAttribute(
       'aria-expanded',
@@ -568,7 +568,7 @@ describe('AgentHubWorkbench', () => {
     expect(browserRegion).toBeInTheDocument();
   });
 
-  it('moves focus into Preview only for a new explicit-open request (#1922 item 3)', async () => {
+  it('moves focus into Preview only for a new explicit-open request', async () => {
     const baseProps = {
       defaultBrowserUrl: 'about:blank',
       evidence: [],
@@ -606,7 +606,7 @@ describe('AgentHubWorkbench', () => {
     expect(overviewTab).toHaveAttribute('aria-selected', 'true');
   });
 
-  it('returns focus to the overview tab when the preview is closed (#1922 item 3)', () => {
+  it('returns focus to the overview tab when the preview is closed', () => {
     const platform = createMockPlatform({
       surface: 'desktop',
       capabilities: { browserPreview: true },

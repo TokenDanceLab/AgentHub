@@ -1,5 +1,5 @@
 // Pure-function contract for the client-side pending dispatch queue
-// (#1965, UX F7; supersedes the CF22 badge-era semantics). The Hub message
+// (#1965). The Hub message
 // is already persisted before these rows exist; every operation is
 // dispatch-only (never re-sends or edits the message) and only affects the
 // NEXT dispatch, never the active run. Failed rows stay visible for manual

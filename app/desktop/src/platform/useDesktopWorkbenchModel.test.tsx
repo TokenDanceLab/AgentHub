@@ -478,7 +478,7 @@ describe('useDesktopWorkbenchModel', () => {
     expect(result.current.transcript).toEqual([]);
   });
 
-  it('exposes the IM transcript unread marker from the Hub session watermark (T8)', () => {
+  it('exposes the IM transcript unread marker from the Hub session watermark', () => {
     window.localStorage.setItem(WORKBENCH_DATA_MODE_STORAGE_KEY, 'approved-real');
     mockedUseHubStore.mockReturnValue(true as never);
     mockedGetAccessToken.mockReturnValue('token');

@@ -1,8 +1,7 @@
 // Hub WebSocket wire types.
 // Canonical event type constants live in @shared/hubEvents (which mirrors
 // hub-server/internal/ws/frame.go 1:1 — the SSOT); this module re-exports
-// them and adds desktop-specific payload interfaces. The legacy per-constant
-// TYPE_* alias layer was removed in #1678 (verified zero consumers).
+// them and adds desktop-specific payload interfaces.
 
 // ── Re-export canonical constants ────────────────
 export { HUB_EVENTS } from '@shared/hubEvents';

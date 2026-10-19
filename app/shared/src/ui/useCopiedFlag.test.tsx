@@ -2,7 +2,7 @@ import { act, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useCopiedFlag } from './useCopiedFlag';
 
-describe('useCopiedFlag (fable UIUX #4)', () => {
+describe('useCopiedFlag', () => {
   beforeEach(() => {
     vi.useFakeTimers();
   });

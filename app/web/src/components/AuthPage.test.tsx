@@ -49,7 +49,7 @@ describe('LoginForm', () => {
     });
   });
 
-  // #2154 P2-10: the banner must carry localized copy, never err.message. The
+  // #2154: the banner must carry localized copy, never err.message. The
   // web test i18next instance echoes keys / honors defaultValue, so the
   // assertions pin the resolved key instead of the raw transport string.
   it('localizes OidcError codes instead of echoing the transport message', async () => {

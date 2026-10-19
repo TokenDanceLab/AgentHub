@@ -1,6 +1,5 @@
 /* ═══════════════════════════════════════════════════════════════════════
-   Shared presentational helpers for ProjectsPage subviews.
-   Extracted for Phase 17 strangler slice #562.
+   Shared presentational helpers for ProjectsPage subviews (#562).
    ═══════════════════════════════════════════════════════════════════════ */
 
 import styles from '../ProjectsPage.module.css';

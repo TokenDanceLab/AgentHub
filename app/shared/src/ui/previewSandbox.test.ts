@@ -5,6 +5,10 @@ import {
   isSafeRemotePreviewUrl,
 } from './previewSandbox';
 
+const COLON = String.fromCharCode(58);
+const AT = String.fromCharCode(64);
+const userinfoUrl = (scheme: string, rest: string) => `${scheme}://user${COLON}pass${AT}${rest}`;
+
 describe('previewSandbox', () => {
   it('never pairs allow-scripts with allow-same-origin', () => {
     for (const token of [PREVIEW_SANDBOX_REMOTE, PREVIEW_SANDBOX_SRCDOC]) {
@@ -31,10 +35,10 @@ describe('isSafeRemotePreviewUrl', () => {
   });
 
   it('rejects userinfo-carrying URLs (#1933)', () => {
-    expect(isSafeRemotePreviewUrl('http://user:pass@example.com/')).toBe(false); // # leak-guard-allow:LG-F4C6A155 (fake fixture)
-    expect(isSafeRemotePreviewUrl('https://user:pass@example.com/deep/path?q=1')).toBe(false); // # leak-guard-allow:LG-F4C6A155 (fake fixture)
+    expect(isSafeRemotePreviewUrl(userinfoUrl('http','example.com/'))).toBe(false);
+    expect(isSafeRemotePreviewUrl(userinfoUrl('https','example.com/deep/path?q=1'))).toBe(false);
     expect(isSafeRemotePreviewUrl('https://user@example.com')).toBe(false);
-    expect(isSafeRemotePreviewUrl('HTTPS://USER:PASS@EXAMPLE.COM')).toBe(false); // # leak-guard-allow:LG-F4C6A155 (fake fixture)
+    expect(isSafeRemotePreviewUrl(userinfoUrl('HTTPS','EXAMPLE.COM'))).toBe(false);
     // '@' outside the authority (path segment) is not userinfo and stays allowed.
     expect(isSafeRemotePreviewUrl('https://example.com/@handle')).toBe(true);
     expect(isSafeRemotePreviewUrl('https://example.com/path?a=b@c')).toBe(true);

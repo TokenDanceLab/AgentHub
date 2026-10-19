@@ -82,7 +82,7 @@ func TestRefreshToken_Invalid(t *testing.T) {
 		WithArgs(sqlmock.AnyArg(), 1).
 		WillReturnError(gorm.ErrRecordNotFound)
 
-	svc := NewService(db, jwtCfg(), nil)
+	svc := NewService(db, jwtCfg(), cache.NoOpCache{})
 	_, err := svc.RefreshToken(context.Background(), "invalid-refresh-token")
 	assert.Error(t, err)
 	assert.NoError(t, mock.ExpectationsWereMet())
@@ -97,7 +97,7 @@ func TestRefreshToken_Revoked(t *testing.T) {
 		WillReturnRows(sqlmock.NewRows([]string{"id", "user_id", "device_type", "device_id", "token_hash", "revoked", "expires_at"}).
 			AddRow("rt-1", "user-uuid", "desktop", "dev-1", "hash", true, time.Now().Add(24*time.Hour)))
 
-	svc := NewService(db, jwtCfg(), nil)
+	svc := NewService(db, jwtCfg(), cache.NoOpCache{})
 	_, err := svc.RefreshToken(context.Background(), "any-refresh-token")
 	assert.Error(t, err)
 	assert.NoError(t, mock.ExpectationsWereMet())
@@ -132,7 +132,7 @@ func TestRefreshToken_Success(t *testing.T) {
 		WillReturnRows(sqlmock.NewRows([]string{"id", "user_id", "device_type", "device_id", "token_hash", "revoked", "expires_at"}).
 			AddRow("rt-new", "user-uuid", "desktop", "dev-1", "newhash", false, expiry))
 
-	svc := NewService(db, jwtCfg(), nil)
+	svc := NewService(db, jwtCfg(), cache.NoOpCache{})
 	resp, err := svc.RefreshToken(context.Background(), "valid-refresh-token")
 	require.NoError(t, err)
 	assert.NotEmpty(t, resp.AccessToken)
@@ -257,7 +257,7 @@ func TestLogout(t *testing.T) {
 		WithArgs(true, "user-uuid", "dev-1").
 		WillReturnResult(sqlmock.NewResult(0, 1))
 
-	svc := NewService(db, jwtCfg(), nil)
+	svc := NewService(db, jwtCfg(), cache.NoOpCache{})
 	err := svc.Logout(context.Background(), "user-uuid", "dev-1", "", "")
 	assert.NoError(t, err)
 	assert.NoError(t, mock.ExpectationsWereMet())
@@ -367,7 +367,7 @@ func TestGetMe_NotFound(t *testing.T) {
 		WithArgs("nonexistent", 1).
 		WillReturnError(gorm.ErrRecordNotFound)
 
-	svc := NewService(db, jwtCfg(), nil)
+	svc := NewService(db, jwtCfg(), cache.NoOpCache{})
 	_, err := svc.GetMe(context.Background(), "nonexistent")
 	assert.Error(t, err)
 	assert.NoError(t, mock.ExpectationsWereMet())
@@ -382,7 +382,7 @@ func TestGetMe_Success(t *testing.T) {
 		WillReturnRows(sqlmock.NewRows([]string{"id", "username", "password_hash", "nickname", "avatar_url"}).
 			AddRow("user-uuid", "testuser", "hashed", "Test User", "https://example.com/avatar.png"))
 
-	svc := NewService(db, jwtCfg(), nil)
+	svc := NewService(db, jwtCfg(), cache.NoOpCache{})
 	user, err := svc.GetMe(context.Background(), "user-uuid")
 	require.NoError(t, err)
 	assert.Equal(t, "testuser", user.Username)
@@ -412,29 +412,10 @@ func TestUpdateProfile_Success(t *testing.T) {
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
-func TestUpdateProfile_NilCacheDoesNotPanic(t *testing.T) {
-	db, mock, sqlDB := newMockDB(t)
-	defer sqlDB.Close()
-
-	mock.ExpectQuery(sqlUserByID).
-		WithArgs("user-uuid", 1).
-		WillReturnRows(sqlmock.NewRows([]string{"id", "username", "password_hash", "nickname", "avatar_url"}).
-			AddRow("user-uuid", "testuser", "hashed", "Old Name", ""))
-
-	mock.ExpectExec(sqlUpdateUser).
-		WillReturnResult(sqlmock.NewResult(0, 1))
-
-	svc := NewService(db, jwtCfg(), nil)
-	user, err := svc.UpdateProfile(context.Background(), "user-uuid", "New Name", "https://img.com/a.png")
-	require.NoError(t, err)
-	assert.Equal(t, "New Name", user.Nickname)
-	assert.NoError(t, mock.ExpectationsWereMet())
-}
-
 // TestRefreshToken_ConcurrentRotationLosesClaim proves the #2154 atomic-claim
 // gate at the SQL level: when the conditional claim UPDATE affects 0 rows (a
 // concurrent presenter already rotated this hash), the refresh is rejected as
-// reuse, the F2 counter increments, and NO device-wide revoke/upsert SQL runs
+// reuse, the reuse counter increments, and NO device-wide revoke/upsert SQL runs
 // (exhausted expectations below).
 func TestRefreshToken_ConcurrentRotationLosesClaim(t *testing.T) {
 	metrics.Register()
@@ -455,7 +436,7 @@ func TestRefreshToken_ConcurrentRotationLosesClaim(t *testing.T) {
 
 	before := testutil.ToFloat64(metrics.RefreshTokenReuseTotal)
 
-	svc := NewService(db, jwtCfg(), nil)
+	svc := NewService(db, jwtCfg(), cache.NoOpCache{})
 	resp, err := svc.RefreshToken(context.Background(), "raced-refresh-token")
 	assert.Nil(t, resp)
 	assert.ErrorIs(t, err, errcode.AuthRefreshInvalid)

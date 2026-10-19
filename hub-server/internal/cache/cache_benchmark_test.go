@@ -4,46 +4,6 @@ import (
 	"testing"
 )
 
-// BenchmarkIsNilCache_NilInterface measures the reflect-based nil check on a
-// typed-nil pointer passed through an interface — the common "cache port not
-// wired" path in service constructors. Pure stdlib, no Redis.
-func BenchmarkIsNilCache_NilInterface(b *testing.B) {
-	var c *Client // typed-nil; when passed as any, IsNilCache returns true
-	for i := 0; i < b.N; i++ {
-		_ = IsNilCache(c)
-	}
-}
-
-// BenchmarkIsNilCache_NonNil measures the non-nil branch of IsNilCache,
-// representing the steady-state where a real Client is injected.
-func BenchmarkIsNilCache_NonNil(b *testing.B) {
-	c := &Client{} // non-nil pointer; rdb may be nil but interface is non-nil
-	for i := 0; i < b.N; i++ {
-		_ = IsNilCache(c)
-	}
-}
-
-// BenchmarkResolveCache_Hit covers the non-nil fast path where the injected
-// cache is returned unchanged. Generic instantiation cost included.
-func BenchmarkResolveCache_Hit(b *testing.B) {
-	real := NoOpCache{}
-	fallback := NoOpCache{}
-	for i := 0; i < b.N; i++ {
-		_ = ResolveCache[NoOpCache](real, fallback)
-	}
-}
-
-// BenchmarkResolveCache_Fallback covers the nil-cache fallback path that
-// returns the NoOpCache substitute. Uses a typed-nil *NoOpCache so
-// IsNilCache sees a nil pointer inside the interface.
-func BenchmarkResolveCache_Fallback(b *testing.B) {
-	var typedNil *NoOpCache
-	fallback := NoOpCache{}
-	for i := 0; i < b.N; i++ {
-		_ = ResolveCache[*NoOpCache](typedNil, &fallback)
-	}
-}
-
 // BenchmarkRouteKey measures key assembly for device route lookups. This is
 // a hot string-concat path called on every WS frame dispatch. Pure local.
 func BenchmarkRouteKey(b *testing.B) {

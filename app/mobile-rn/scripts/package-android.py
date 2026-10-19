@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""package-android — 打包 AgentHub Mobile Android APK（ps1 迁移，契约见 server docs/design/ps1-to-python-migration.md）。
+"""package-android — 打包 AgentHub Mobile Android APK。
 
 短路径 junction + pnpm virtual store 下安装依赖、expo prebuild 生成原生工程、
 gradlew 构建 Debug/Release APK、拷贝产物并写 android-package-manifest.json；
-可选 adb 安装/启动。涉及真实 Android 工具链，失败即 exit 1（对齐 ps1 Fail）。
+可选 adb 安装/启动。涉及真实 Android 工具链，失败即 exit 1。
 
-契约：stdlib only；参数名/退出码与 ps1 一致；输出行（`>>> ` / `PASS: `/`FAIL: `）
-与原 ps1 一致；manifest JSON 用 ConvertTo-Json 等价格式（2-space indent）。
+契约：stdlib only；参数见 --help；退出码 0=成功、1=失败；输出行使用
+`>>> ` / `PASS: ` / `FAIL: ` 前缀；manifest JSON 为 2-space indent。
 """
 
 import argparse
@@ -83,7 +83,7 @@ def ensure_short_repo_root(path: str, target: str) -> str:
     step("Create short repo junction")
     os.makedirs(os.path.dirname(short_full), exist_ok=True)
     # os.system 直传 cmd /c 字符串（subprocess list2cmdline 会把内嵌引号转义成
-    # \"，导致 mklink 语法错误；ps1 同样以整串传给 cmd.exe）
+    # \"，导致 mklink 语法错误）
     return_code = os.system(f'mklink /J "{short_full}" "{target_full}"')
     if return_code != 0:
         raise RuntimeError(f"mklink /J failed for {short_full} => {target_full}")
@@ -115,8 +115,14 @@ def main() -> int:
     parser.add_argument("--RepoRoot", "-RepoRoot", default="")
     parser.add_argument("--BuildType", "-BuildType", default="Release", choices=["Release", "Debug"])
     parser.add_argument("--Version", "-Version", default="")
-    parser.add_argument("--ShortRepoRoot", "-ShortRepoRoot", default=r"D:\ah\agenthub-mobile")
-    parser.add_argument("--VirtualStoreDir", "-VirtualStoreDir", default=r"D:\p\agenthub-mobile")
+    parser.add_argument(
+        "--ShortRepoRoot", "-ShortRepoRoot", default="",
+        help="Short junction path for the repo (default: <repo-drive>:\\agenthub-mobile-short)",
+    )
+    parser.add_argument(
+        "--VirtualStoreDir", "-VirtualStoreDir", default="",
+        help="pnpm virtual store on the same drive (default: agenthub-mobile-pnpm-store)",
+    )
     parser.add_argument("--ArtifactsRoot", "-ArtifactsRoot", default=r".tmp\android-package")
     parser.add_argument("--InstallSerial", "-InstallSerial", default="")
     parser.add_argument("--SkipInstall", "-SkipInstall", action="store_true")
@@ -149,15 +155,18 @@ def main() -> int:
     package_version = read_package_version(mobile_root)
     version = args.Version or package_version
 
-    short_repo_root = ensure_short_repo_root(args.ShortRepoRoot, repo_root_resolved)
+    repo_drive = os.path.splitdrive(repo_root_resolved)[0]
+    short_repo_arg = args.ShortRepoRoot or os.path.join(repo_drive + os.sep, "agenthub-mobile-short")
+    short_repo_root = ensure_short_repo_root(short_repo_arg, repo_root_resolved)
     short_app_root = os.path.join(short_repo_root, "app")
     short_mobile_root = os.path.join(short_repo_root, "app", "mobile-rn")
     short_android_root = os.path.join(short_repo_root, "app", "mobile-rn", "android")
 
-    if not os.path.isabs(args.VirtualStoreDir):
-        virtual_store_dir = os.path.join(os.path.splitdrive(short_repo_root)[0] or os.sep, args.VirtualStoreDir)
+    virtual_store_arg = args.VirtualStoreDir or "agenthub-mobile-pnpm-store"
+    if not os.path.isabs(virtual_store_arg):
+        virtual_store_dir = os.path.join((os.path.splitdrive(short_repo_root)[0] or os.sep) + os.sep, virtual_store_arg)
     else:
-        virtual_store_dir = args.VirtualStoreDir
+        virtual_store_dir = virtual_store_arg
 
     virtual_store_root = os.path.splitdrive(os.path.abspath(virtual_store_dir))[0].rstrip("\\") + "\\"
     short_repo_root_drive = os.path.splitdrive(short_repo_root)[0].rstrip("\\") + "\\"
@@ -312,6 +321,6 @@ def main() -> int:
 if __name__ == "__main__":
     try:
         sys.exit(main())
-    except Exception as exc:  # noqa: BLE001 —— 顶层兜底，对齐 ps1 $ErrorActionPreference='Stop'，禁止静默吞错
+    except Exception as exc:  # noqa: BLE001 —— 顶层兜底，禁止静默吞错
         print(f"FAIL: {exc}")
         sys.exit(1)

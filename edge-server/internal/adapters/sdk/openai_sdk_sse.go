@@ -12,9 +12,6 @@ import (
 	"github.com/agenthub/edge-server/internal/adapters"
 )
 
-// Residual pure-helper peel #1152: OpenAI SSE stream parse + event dispatch.
-// Grouped into package sdk (#1760); ParseStream continues to call parseSSEStream.
-
 // openaiSSEState accumulates cross-chunk state while parsing an SSE stream.
 type openaiSSEState struct {
 	currentText      strings.Builder

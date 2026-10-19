@@ -9,11 +9,9 @@ import (
 	"sort"
 )
 
-// sqlite_store_pure.go holds package-level helper functions peeled from
-// sqlite_store.go (#1069). These functions have no *SQLiteStore receiver
-// dependency and are called by the stateful methods that remain in
-// sqlite_store.go. DB/tx/file parameters belong to the caller; this file
-// does not own *sql.DB lifecycle.
+// Package-level helpers for SQLite persistence. These functions have no
+// *SQLiteStore receiver dependency; DB/tx/file parameters belong to the caller
+// and this file does not own *sql.DB lifecycle.
 
 func loadSQLiteRows(db *sql.DB) (fileSnapshot, bool, error) {
 	rows, err := db.Query(`SELECT row_kind, row_id, payload FROM agenthub_store_rows ORDER BY row_kind, order_index, row_id`)

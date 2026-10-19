@@ -73,11 +73,11 @@ describe('Agents ops views real-mode unavailable (#1872)', () => {
   });
 });
 
-/* #2154 P2-16: the audit page mixed three paradigms — the export button
+/* #2154: the audit page mixed three paradigms — the export button
    correctly hid itself when unwired, the filter chips looked clickable and did
    nothing, and every row was a focusable <button> with no onClick. Chips and
    rows now follow the export button's rule. */
-describe('AgentAuditView interaction honesty (#2154 P2-16)', () => {
+describe('AgentAuditView interaction honesty (#2154)', () => {
   const entry: AuditEntry = {
     time: '10:00',
     agent: 'Builder',

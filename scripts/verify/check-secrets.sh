@@ -13,10 +13,25 @@ Usage:
   scripts/verify/check-secrets.sh --staged
   scripts/verify/check-secrets.sh --worktree
   scripts/verify/check-secrets.sh --range <git-diff-range>
+  scripts/verify/check-secrets.sh --ci   # pull_request: origin/<BASE_REF>...HEAD, else HEAD^..HEAD or worktree
 
 Scans changed paths and added lines for secret-like files or values.
 USAGE
 }
+
+# --ci derives its range from the event environment so the workflow step stays
+# a single command the CI invariant checker can verify.
+if [[ "$MODE" == "--ci" ]]; then
+  if [[ -n "${BASE_REF:-}" ]]; then
+    MODE="--range"
+    RANGE="origin/${BASE_REF}...HEAD"
+  elif git rev-parse --verify HEAD^ >/dev/null 2>&1; then
+    MODE="--range"
+    RANGE="HEAD^..HEAD"
+  else
+    MODE="--worktree"
+  fi
+fi
 
 if [[ "$MODE" != "--staged" && "$MODE" != "--worktree" && "$MODE" != "--range" ]]; then
   usage
@@ -36,20 +51,19 @@ shopt -s nocasematch
 FINDINGS=0
 
 # ---------------------------------------------------------------------------
-# 假凭据夹具登记簿（#2295 / ADR-028）
+# 假凭据夹具登记簿
 #
-# 六条字面量规则对 diff 新增行无条件生效，而脱敏测试的被测对象恰恰是「真形状的
-# 假凭据」⇒ 这类测试文件此前不可搬家（#2296 因此把 13 个
-# TestSanitizeSubAgentResult_* 留在巨石文件里）。放行面收窄到精确 (path, literal)：
+# 六条字面量规则对 diff 新增行无条件生效，而脱敏测试需要「真形状的假凭据」。
+# 放行面收窄到精确 (path, literal)：
 #
 #   * 只有登记簿里那一个字面量出现在那一个路径上才不报；
 #   * 同 literal 换路径 / 同路径换 literal / 未登记的真凭据形状一律照红；
 #   * 禁止目录级、glob、包级、regex 豁免——加载器对这些形状 fail-closed；
-#   * 登记簿自身没有路径豁免：它里面出现的凭据形状字面量必须是已登记 literal
+#   * 登记簿自身没有路径豁免：其中出现的凭据形状字面量必须是已登记 literal
 #     之一（往 reason 里塞一个未登记的真凭据同样判红）。
 #
-# 只有这六条字面量规则可被登记。私钥块（含空白，而登记器禁止空白 literal）、
-# secret-like 赋值规则与敏感路径规则都不可登记 ⇒ 放行面不因本机制变宽。
+# 只有这六条字面量规则可被登记。私钥块（含空白，登记器禁止空白 literal）、
+# secret-like 赋值规则与敏感路径规则都不可登记，放行面不因本机制变宽。
 # ---------------------------------------------------------------------------
 FIXTURE_ALLOWLIST_RELPATH="scripts/verify/secret-fixture-allowlist.json"
 FIXTURE_ALLOWLIST_PATH="${ROOT}/${FIXTURE_ALLOWLIST_RELPATH}"
@@ -180,7 +194,7 @@ for index, entry in enumerate(entries):
     seen.add(key)
     rows.append(path + "\x1f" + literal)
 
-sys.stdout.write("".join(row + "\n" for row in rows))
+sys.stdout.buffer.write(("".join(row + chr(10) for row in rows)).encode("utf-8"))
 ALLOWLIST_PY
 )" || rc=$?
 
@@ -350,7 +364,7 @@ is_placeholder_value() {
 }
 
 is_path_literal() {
-  # Absolute filesystem paths (/var/lib/tokendance-id/tokendance.db,
+  # Absolute filesystem paths (/var/lib/oidc-provider/oidc.db,
   # /tmp/id-private.pem) are location config, not secret values — e.g.
   # TOKENDANCE_DATABASE_DSN=…/tokendance.db or *_KEY_PATH=/tmp/….pem.
   # Only plain path charset qualifies; URL-shaped DSNs with userinfo
@@ -384,27 +398,11 @@ check_added_line() {
   [[ -z "$trimmed" ]] && return
   [[ "$trimmed" == \#* || "$trimmed" == //* || "$trimmed" == \** || "$trimmed" == "/*"* ]] && return
 
-  # *_URL / *_URI =…://… assignments are endpoint configuration (e.g.
-  # AGENTHUB_TOKENDANCE_ID_ISSUER_URL=https://id.example.com,
-  # AGENTHUB_TOKENDANCE_ID_REDIRECT_URI=https://hub.example.com/client/auth/callback
-  # or the ${VAR:-https://…} default form in docker-compose files), not secrets.
-  # Without this, any variable name containing "token" (TOKENDANCE,
-  # TOKEN_EXCHANGE…) gets flagged for its public endpoint value.
-  if [[ "$trimmed" =~ ^[A-Za-z0-9_.-]*_URL[\"\']?[[:space:]]*[:=][[:space:]]*.*:// ]]; then
-    return
-  fi
-  if [[ "$trimmed" =~ ^[A-Za-z0-9_.-]*_URI[S]?[\"\']?[[:space:]]*[:=][[:space:]]*.*:// ]]; then
-    return
-  fi
-
-  # 字面量规则统一要求 token 前缀落在**词边界**上（行首或前一个字符不是字母数字）。
-  # 这些前缀（AKIA/ghp_/xox?-/AIza/sk-/eyJ）本身就是"凭据 token 的开头"，真凭据在
-  # 源码/配置/日志里总是出现在引号、空白、`=`、`:`、`,` 之后；无边界匹配会把良性
-  # kebab-case 标识符判成凭据——实测全仓唯一一例：
-  # `taskID := "task-backfill-mismatch-conflict"`（ta**sk-**backfill-mismatch-conflict，
-  # `sk-` 后 26 个 [A-Za-z0-9_-]）命中 sk- 规则，于是任何搬动这行的重构都被 CI 判红
-  # （#2295）。加边界后全树 15 处旧命中里 14 处不变、只少这一处误报；六种 token 形状
-  # 各在一种边界位置（行首 / " / = / 空格 / : / ,）由自测覆盖，仍全部判红。
+  # 字面量规则要求 token 前缀落在词边界上（行首或前一个字符不是字母数字）。
+  # 这些前缀（AKIA/ghp_/xox?-/AIza/sk-/eyJ）本身是凭据 token 的开头，真凭据在
+  # 源码/配置/日志里总出现在引号、空白、`=`、`:`、`,` 之后；无边界匹配会把良性
+  # kebab-case 标识符判成凭据（例如 `task-backfill-...` 中的 `sk-`）。六种 token
+  # 形状各在一种边界位置由自测覆盖。
   if [[ "$trimmed" =~ -----BEGIN[[:space:]]+.*PRIVATE[[:space:]]+KEY----- ]]; then
     report "$path" "$line_no" "private key block detected"
   fi
@@ -423,7 +421,6 @@ check_added_line() {
     '(^|[^A-Za-z0-9])eyJ[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{10,}' "$trimmed"
 
   if should_scan_secret_assignments "$path" && ! is_i18n_locale_path "$path"; then
-    local value=""
     # Go config wiring (e.g. cfg.TokenDanceID.ClientSecret = envClientSecret or
     # cfg.JWT.Secrets = map[string]string{...}): the RHS is an identifier,
     # call, or map literal — env-provided values bound to struct fields, not
@@ -431,19 +428,40 @@ check_added_line() {
     if [[ "$path" == *.go ]] && [[ "$trimmed" =~ ^[A-Za-z_][A-Za-z0-9_.]*\.[A-Za-z_][A-Za-z0-9_]*[[:space:]]*=[[:space:]]*[A-Za-z_{] ]]; then
       return
     fi
-    if [[ "$trimmed" =~ [\"\']?[A-Za-z0-9_.-]*(secret|token|password|passwd|api[_-]?key|private[_-]?key|client[_-]?secret|jwt[_-]?secret|auth[_-]?token)[A-Za-z0-9_.-]*[\"\']?[[:space:]]*[:=][[:space:]]*[\"\']?([^\"\'\#[:space:],}\)]{12,}) ]]; then
+    # Re-scan the remainder after each exempt assignment: an endpoint value
+    # can hide a fragment/query credential or a second assignment later on the
+    # same line, and the leftmost match alone would exonerate the whole line.
+    local rest="$trimmed" matched value
+    while [[ "$rest" =~ [\"\']?[A-Za-z0-9_.-]*(secret|token|password|passwd|api[_-]?key|private[_-]?key|client[_-]?secret|jwt[_-]?secret|auth[_-]?token)[A-Za-z0-9_.-]*[\"\']?[[:space:]]*[:=][[:space:]]*[\"\']?([^\"\'\#[:space:],}\)]{12,}) ]]; do
+      matched="${BASH_REMATCH[0]}"
       value="${BASH_REMATCH[2]}"
       if ! is_placeholder_value "$value" && ! is_path_literal "$value" && ! is_endpoint_url "$value"; then
         report "$path" "$line_no" "secret-like assignment detected"
+        break
       fi
-    fi
+      rest="${rest#*"$matched"}"
+      [[ "$rest" == "$trimmed" ]] && break
+    done
   fi
+  return 0
 }
+
+CHANGED_FILES_TMP="$(mktemp)"
+CHANGED_DIFF_TMP="$(mktemp)"
+trap 'rm -f "$CHANGED_FILES_TMP" "$CHANGED_DIFF_TMP"' EXIT
+if ! changed_files >"$CHANGED_FILES_TMP"; then
+  echo "secret guard: git diff --name-only failed (mode=$MODE range=${RANGE:-none}); refusing to pass (fail-closed)" >&2
+  exit 1
+fi
+if ! changed_diff >"$CHANGED_DIFF_TMP"; then
+  echo "secret guard: git diff failed (mode=$MODE range=${RANGE:-none}); refusing to pass (fail-closed)" >&2
+  exit 1
+fi
 
 while IFS= read -r path; do
   [[ -z "$path" ]] && continue
   check_sensitive_path "$path"
-done < <(changed_files)
+done <"$CHANGED_FILES_TMP"
 
 current_file=""
 current_line=0
@@ -472,7 +490,7 @@ while IFS= read -r diff_line; do
   if [[ "$diff_line" != "-"* && "$current_line" -gt 0 ]]; then
     current_line=$((current_line + 1))
   fi
-done < <(changed_diff)
+done <"$CHANGED_DIFF_TMP"
 
 if [[ "$FINDINGS" -ne 0 ]]; then
   echo ""

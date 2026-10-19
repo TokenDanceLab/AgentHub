@@ -8,7 +8,7 @@ import type { WorkbenchSplitControls } from './workbenchFrameTypes';
 import { useTestI18nLanguage } from '@shared/testing/i18n';
 
 /* ═══════════════════════════════════════════════════════════════════════
-   WorkspaceHeader split menu (#1997, UX F3): entry visibility, context-menu
+   WorkspaceHeader split menu (#1997): entry visibility, context-menu
    flow (Split Right / Split Down / Move to Group / Unsplit) and the
    header right-click shortcut.
    ═══════════════════════════════════════════════════════════════════════ */

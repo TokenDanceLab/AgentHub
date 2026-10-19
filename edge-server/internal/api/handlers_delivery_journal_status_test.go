@@ -11,7 +11,7 @@ import (
 )
 
 // failingCallbackJournal is a CallbackClient whose DurableSnapshot always fails.
-// The existing fakeCallbackJournal (handlers_test.go:3742) can only succeed and
+// The existing fakeCallbackJournal (handlers_test.go:172) can only succeed and
 // that file is read-only for this change, so the snapshot-failure path gets its
 // own fake here. It is a fake for the *dependency*, not for the code under test:
 // GetDeliveryJournal itself runs for real.

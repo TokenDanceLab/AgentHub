@@ -148,7 +148,7 @@ export function useWorkbenchPanelLayout({
   const sidebarShouldCollapseRef = useRef(false);
   const sidebarCollapsedRef = useRef(false);
   const isChatPageRef = useRef(isChatPage);
-  // #2154 P2-6: provenance marker for the inspector collapse. True only while
+  // #2154: provenance marker for the inspector collapse. True only while
   // the current collapse was caused by the `inspectorVisible` setting, so
   // turning that setting back on can undo its own collapse without overriding
   // a collapse the user made by hand.
@@ -188,7 +188,7 @@ export function useWorkbenchPanelLayout({
   }, [inspectorCollapsed]);
 
   // Settings gate (inspectorVisible): collapse the inspector by default, and
-  // — since #2154 P2-6 — expand it again when the setting is switched back on.
+  // — since #2154 — expand it again when the setting is switched back on.
   // Dispatched by useWorkbenchSessionChrome once settings load / on toggle.
   // Expansion is conditional on the collapse provenance marker above so a
   // manually collapsed inspector stays collapsed.
@@ -431,7 +431,7 @@ export function useWorkbenchPanelLayout({
     });
   }, [sidebarResizing, updateSidebarWidthFromClientX]);
 
-  // ── Split-view layout state (#1997, UX F3) ──────────────────────────────
+  // ── Split-view layout state (#1997) ──────────────────────────────
   // Stored tree + render-time placement derivation (pure). The active pane is
   // whichever leaf holds the active conversation; when the selection lands on
   // a conversation absent from the tree it is placed into the first empty

@@ -313,9 +313,9 @@ func TestSubagentStreamLookup_IsInjectable(t *testing.T) {
 		}
 	})
 	svc := &EdgeCallbackService{db: nil, bus: b}
-	svc.SetSubagentStreamLookup(&stubTeamRunLookup{known: map[string]teamRunContext{
+	svc.ctxLookup = &stubTeamRunLookup{known: map[string]teamRunContext{
 		"task-9": {teamRunID: "run-9", teamID: "team-9", assignmentID: "asg-9", memberID: "mem-9"},
-	}})
+	}}
 	svc.publishTeamSubagentStream(context.Background(), &model.AgentRunEvent{
 		TaskID: "task-9", SessionID: "sess-9", AgentInstanceID: "agent-9",
 		EventSeq: 3, EventType: "run.agent.thinking", Payload: "{}",
@@ -513,7 +513,7 @@ func canonicalType(t string) string {
 	}
 }
 
-// ── Negative caching (#2154 P1-4) ─────────────────────────────────────────
+// ── Negative caching (#2154) ─────────────────────────────────────────
 //
 // Non-team traffic is the majority of stream chunks, and before negative
 // caching every chunk re-ran the team-run SELECT purely to get
@@ -524,7 +524,7 @@ func canonicalType(t string) string {
 func TestCachedTeamRunContext_NegativeCachesDefinitiveNoTeam(t *testing.T) {
 	lookup := &stubTeamRunLookup{known: map[string]teamRunContext{}}
 	svc := &EdgeCallbackService{db: nil, bus: nil}
-	svc.SetSubagentStreamLookup(lookup)
+	svc.ctxLookup = lookup
 
 	for i := 0; i < 5; i++ {
 		tctx, outcome := svc.cachedTeamRunContext(context.Background(), lookup, "sess-1", "task-neg")
@@ -533,7 +533,7 @@ func TestCachedTeamRunContext_NegativeCachesDefinitiveNoTeam(t *testing.T) {
 		require.Empty(t, tctx.teamRunID)
 	}
 	require.EqualValues(t, 1, lookup.calls.Load(),
-		"a definitive negative must be cached: 5 chunks, 1 lookup (was 5 before #2154 P1-4)")
+		"a definitive negative must be cached: 5 chunks, 1 lookup (was 5 before #2154)")
 }
 
 func TestCachedTeamRunContext_PositiveCacheStillWorks(t *testing.T) {
@@ -541,7 +541,7 @@ func TestCachedTeamRunContext_PositiveCacheStillWorks(t *testing.T) {
 		"task-pos": {teamRunID: "run-pos", teamID: "team-pos", assignmentID: "asg-pos"},
 	}}
 	svc := &EdgeCallbackService{}
-	svc.SetSubagentStreamLookup(lookup)
+	svc.ctxLookup = lookup
 
 	for i := 0; i < 3; i++ {
 		tctx, outcome := svc.cachedTeamRunContext(context.Background(), lookup, "sess-1", "task-pos")
@@ -555,7 +555,7 @@ func TestCachedTeamRunContext_PositiveCacheStillWorks(t *testing.T) {
 func TestCachedTeamRunContext_TransientLookupIsNeverCached(t *testing.T) {
 	lookup := &stubTeamRunLookup{transient: true}
 	svc := &EdgeCallbackService{}
-	svc.SetSubagentStreamLookup(lookup)
+	svc.ctxLookup = lookup
 
 	for i := 0; i < 3; i++ {
 		tctx, outcome := svc.cachedTeamRunContext(context.Background(), lookup, "sess-1", "task-flaky")
@@ -570,7 +570,7 @@ func TestCachedTeamRunContext_TransientLookupIsNeverCached(t *testing.T) {
 func TestCachedTeamRunContext_EmptyTaskIDIsNotCached(t *testing.T) {
 	lookup := &stubTeamRunLookup{known: map[string]teamRunContext{}}
 	svc := &EdgeCallbackService{}
-	svc.SetSubagentStreamLookup(lookup)
+	svc.ctxLookup = lookup
 
 	for i := 0; i < 3; i++ {
 		_, outcome := svc.cachedTeamRunContext(context.Background(), lookup, "sess-1", "")
@@ -652,4 +652,21 @@ func TestPublishTeamSubagentStream_NegativeCacheSurvivesTeamRunAppearing(t *test
 	testkit.Eventually(t, 3*time.Second, func() bool {
 		return gotOther.Load()
 	}, "a fresh task on the same session must resolve the now-present team run", nil)
+}
+
+func (c *teamRunContextCache) len() int {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return len(c.order)
+}
+
+func (c *teamRunContextCache) invalidate(taskID string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	n, ok := c.order[taskID]
+	if !ok {
+		return
+	}
+	c.unlink(n)
+	delete(c.order, taskID)
 }

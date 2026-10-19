@@ -265,7 +265,7 @@ func TestExecutionTargetPingRefusedWithoutEgressAllowlist(t *testing.T) {
 	err = svc.Ping(context.Background(), "target-cloud", "owner-1")
 	require.ErrorIs(t, err, errcode.TargetNotRoutable)
 	require.Contains(t, err.Error(), "not allowed", "error must name the egress policy denial")
-	require.NotContains(t, err.Error(), edgeURL.Hostname(), "ping error must not echo the resolved target address (#2154 F17)")
+	require.NotContains(t, err.Error(), edgeURL.Hostname(), "ping error must not echo the resolved target address (#2154)")
 
 	var target model.ExecutionTarget
 	require.NoError(t, db.Where("id = ?", "target-cloud").First(&target).Error)
@@ -776,7 +776,7 @@ func TestExecutionTargetUpsertLocalEdgeForDesktopDeviceIgnoresForgedForeignBindi
 }
 
 // TestExecutionTargetUpdateIsOwnerScoped ensures PATCH by a non-owner returns
-// AuthDeviceMismatch (403) and does not mutate the row (#2100 P1 audit).
+// AuthDeviceMismatch (403) and does not mutate the row (#2100 audit).
 func TestExecutionTargetUpdateIsOwnerScoped(t *testing.T) {
 	db := newExecutionTargetTestDB(t)
 	seedExecutionTarget(t, db, "target-1", "owner-1")
@@ -794,7 +794,7 @@ func TestExecutionTargetUpdateIsOwnerScoped(t *testing.T) {
 }
 
 // TestExecutionTargetDeleteIsOwnerScoped ensures DELETE by a non-owner returns
-// AuthDeviceMismatch (403) and leaves the row intact (#2100 P1 audit).
+// AuthDeviceMismatch (403) and leaves the row intact (#2100 audit).
 func TestExecutionTargetDeleteIsOwnerScoped(t *testing.T) {
 	db := newExecutionTargetTestDB(t)
 	seedExecutionTarget(t, db, "target-1", "owner-1")

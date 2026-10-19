@@ -15,12 +15,12 @@ import (
 	"github.com/agenthub/edge-server/internal/store"
 )
 
-// Security slice for the diff-apply endpoints (#2154 安全面探索批 2):
+// Security tests for the diff-apply endpoints (#2154):
 //
-//	P2-6 → run ownership gate on POST /v1/runs/{runId}/apply and /apply-all
-//	P1-1 → symlink containment on the write path (workspace allowlist escape)
-//	P2-7 → apply-all decision cap, one ListRunDiffFiles per request, ctx cancel
-//	P3-14 → file mode literals on the write path
+//	run ownership gate on POST /v1/runs/{runId}/apply and /apply-all
+//	symlink containment on the write path (workspace allowlist escape)
+//	apply-all decision cap, one ListRunDiffFiles per request, ctx cancel
+//	file mode literals on the write path
 //
 // The ownership gate is asserted against the paradigm already used by
 // GetRunDiff (handlers_projects.go): 404 for both "missing" and "not yours",
@@ -86,7 +86,7 @@ func doApplyAllRunDiffsAsUser(h *Handler, runID, userID, body string) *httptest.
 }
 
 // ---------------------------------------------------------------------------
-// P2-6 — run ownership gate
+// Run ownership gate
 // ---------------------------------------------------------------------------
 
 // applyBodyWithWorkDir builds a single-hunk apply body for a.txt.
@@ -187,7 +187,7 @@ func stripTraceID(body string) string {
 	return body
 }
 
-// TestPostApplyRunDiffFailsClosedWithoutHubIdentity mirrors the AH-SR-045
+// TestPostApplyRunDiffFailsClosedWithoutHubIdentity mirrors the
 // fail-closed rule already pinned for previews: in multi-user mode a request
 // without a Hub identity has an empty ownership principal and must not reach
 // anybody's run.
@@ -247,7 +247,7 @@ func TestPostApplyRunDiffLocalSingleTenantUnaffected(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// P1-1 — symlink containment on the write path
+// Symlink containment on the write path
 // ---------------------------------------------------------------------------
 
 // assertNotWrittenOutside fails when the workspace-external file was touched.
@@ -441,7 +441,7 @@ func TestPostApplyRunDiffStillCreatesMissingNestedFile(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// P2-7 — apply-all amplification: decision cap, one diff snapshot, ctx cancel
+// Apply-all amplification: decision cap, one diff snapshot, ctx cancel
 // ---------------------------------------------------------------------------
 
 // diffListCountingRepository counts ListRunDiffFiles calls so a batch's store
@@ -590,14 +590,13 @@ func TestPostApplyAllRunDiffsStopsOnCanceledContext(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// P3-14 — file modes on the write path
+// File modes on the write path
 // ---------------------------------------------------------------------------
 
-// TestPostApplyRunDiffCreatesNewFileWith0600 checks the brief's premise for
-// P3-14 ("a newly created file does not get 0600"). createNewFileFromHunk
-// already writes with 0o600, so this passed before the slice landed: the
-// observable defect is the `0` mode literal on the *overwrite* path, not on
-// file creation.
+// TestPostApplyRunDiffCreatesNewFileWith0600 proves that a newly created file
+// gets mode 0600: createNewFileFromHunk writes with 0o600. The overwrite path
+// keeps the existing file's mode (see
+// TestPostApplyRunDiffOverwriteKeepsExistingMode).
 func TestPostApplyRunDiffCreatesNewFileWith0600(t *testing.T) {
 	// Unix permission bits do not exist on Windows: os.Stat reports 0666 for
 	// every writable regular file there, so the mode contract is Unix-only.

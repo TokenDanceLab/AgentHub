@@ -34,10 +34,10 @@ export interface WorkbenchRoutesProps {
   agentProfilesStatus?: WorkbenchAgentProfilesStatus | undefined;
   dataMode?: string | undefined;
   contacts?: WorkbenchContactsData | undefined;
-  /** Hub contacts request failure (#1821) — renders an explicit error state. */
+  /** Hub contacts request failure — renders an explicit error state. */
   contactsError?: string | undefined;
   documents?: DocRow[] | undefined;
-  /** Hub documents request failure (#1821) — renders an explicit error state. */
+  /** Hub documents request failure — renders an explicit error state. */
   documentsError?: string | undefined;
   focusedAgentId?: string | undefined;
   projects?: ProjectInfo[] | undefined;
@@ -90,13 +90,13 @@ export interface WorkbenchRoutesProps {
   skillMarketItems?: SkillMarketItem[] | undefined;
   /** Whether Skill market data is loading. */
   skillMarketLoading?: boolean | undefined;
-  /** Skill market load error (#1821) — drives the market error empty state. */
+  /** Skill market load error — drives the market error empty state. */
   skillMarketError?: string | undefined;
   /** Public MCP Server market items from Hub API. */
   mcpMarketItems?: MCPMarketItem[] | undefined;
   /** Whether MCP Server market data is loading. */
   mcpMarketLoading?: boolean | undefined;
-  /** MCP market load error (#1821) — same contract as `skillMarketError`. */
+  /** MCP market load error — same contract as `skillMarketError`. */
   mcpMarketError?: string | undefined;
   /** Called when the user navigates between workbench pages.
    *  Used by the Settings page to navigate to Agents config. */

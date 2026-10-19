@@ -16,13 +16,6 @@ import (
 	"time"
 )
 
-// ── Constants ──────────────────────────────────────────────────────────────────
-
-// DefaultMemoryTTL is the default expiration duration for memory entries.
-// Entries older than this are expired and filtered out on read.
-// Set to 30 days.
-const DefaultMemoryTTL = 30 * 24 * time.Hour
-
 // ── Types ────────────────────────────────────────────────────────────────────
 
 // MemoryEntry represents a single memory entry read from a Markdown file.

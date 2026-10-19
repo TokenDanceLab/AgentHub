@@ -10,7 +10,7 @@ const builderEvidence: RuntimeEvidenceSnapshot = {
   runId: 'run-builder-1',
   diffs: [
     makeDiff('sqlite-migration-plan.md', 'added', 14, 0, [
-      '# B0 SQLite 迁移方案',
+      '# SQLite 迁移方案',
       '## 目标',
       '- 新增 thread/message 索引，保持现有会话可回滚。',
       '- 使用 FTS5 支持本地消息搜索。',
@@ -40,7 +40,7 @@ const builderEvidence: RuntimeEvidenceSnapshot = {
     { id: 'a1', runId: 'run-builder-1', threadId: 'builder', kind: 'markdown', path: 'sqlite-migration-plan.md', sizeBytes: 520, createdAt: '2026-06-10T14:49:00Z' },
     { id: 'a2', runId: 'run-builder-1', threadId: 'builder', kind: 'sql', path: 'migrations/0007_chat_threads.sql', sizeBytes: 340, createdAt: '2026-06-10T14:49:00Z' },
     { id: 'a3', runId: 'run-builder-1', threadId: 'builder', kind: 'ts', path: 'hooks/useThreadNavigation.ts', sizeBytes: 180, createdAt: '2026-06-10T14:49:00Z' },
-    { id: 'a4', runId: 'run-builder-1', threadId: 'builder', kind: 'md', path: 'B0-SQLITE-RISKS.md', sizeBytes: 290, createdAt: '2026-06-10T14:49:00Z' },
+    { id: 'a4', runId: 'run-builder-1', threadId: 'builder', kind: 'md', path: 'SQLITE-RISKS.md', sizeBytes: 290, createdAt: '2026-06-10T14:49:00Z' },
   ],
   previews: [
     { id: 'p1', runId: 'run-builder-1', threadId: 'builder', url: 'about:blank', status: 'ready', createdAt: '2026-06-10T14:49:00Z' },
@@ -107,7 +107,7 @@ const orchestratorEvidence: RuntimeEvidenceSnapshot = {
   diffs: [
     makeDiff('plans/sprint-07.md', 'added', 30, 0, [
       '# Sprint 07 计划',
-      '- Builder: B0 SQLite 迁移',
+      '- Builder: SQLite 迁移',
       '- Reviewer: 代码审查',
       '- Deployer: 静态预览部署',
     ]),
@@ -135,14 +135,14 @@ const reviewerEvidence: RuntimeEvidenceSnapshot = {
   previews: [],
 };
 
-/* ═══ Johnny — 私聊，无 run ═══ */
+/* ═══ Alice — 私聊，无 run ═══ */
 
-/* ═══ Trump — 文档反馈，轻量 ═══ */
-const trumpEvidence: RuntimeEvidenceSnapshot = {
-  runId: 'run-trump-1',
+/* ═══ Bob — 文档反馈，轻量 ═══ */
+const bobEvidence: RuntimeEvidenceSnapshot = {
+  runId: 'run-bob-1',
   diffs: [],
   artifacts: [
-    { id: 'tr1', runId: 'run-trump-1', threadId: 'trump', kind: 'doc', path: 'docs/cloud-list-feedback.md', sizeBytes: 560, createdAt: '2026-06-10T10:18:00Z' },
+    { id: 'tr1', runId: 'run-bob-1', threadId: 'bob', kind: 'doc', path: 'docs/cloud-list-feedback.md', sizeBytes: 560, createdAt: '2026-06-10T10:18:00Z' },
   ],
   previews: [],
 };
@@ -175,13 +175,13 @@ const projectDocsEvidence: RuntimeEvidenceSnapshot = {
     makeDiff('docs/README.md', 'modified', 8, 2, [
       '更新 README 结构，新增快速入门章节',
     ]),
-    makeDiff('docs/api-reference.md', 'added', 40, 0, [
-      '新增 API 参考文档，覆盖所有公开接口',
+    makeDiff('docs/reference/agent-protocols.md', 'added', 40, 0, [
+      '新增 Agent 协议与 SDK 边界参考',
     ]),
   ],
   artifacts: [
     { id: 'wd1', runId: 'run-project-docs-1', threadId: 'project-docs', kind: 'md', path: 'docs/README.md', sizeBytes: 2400, createdAt: '2026-06-02T16:00:00Z' },
-    { id: 'wd2', runId: 'run-project-docs-1', threadId: 'project-docs', kind: 'md', path: 'docs/api-reference.md', sizeBytes: 6800, createdAt: '2026-06-02T16:00:00Z' },
+    { id: 'wd2', runId: 'run-project-docs-1', threadId: 'project-docs', kind: 'md', path: 'docs/reference/agent-protocols.md', sizeBytes: 6800, createdAt: '2026-06-02T16:00:00Z' },
   ],
   previews: [],
 };
@@ -195,7 +195,7 @@ const demoEvidenceByConversation: Record<string, RuntimeEvidenceSnapshot> = {
   deployer: deployerEvidence,
   orchestrator: orchestratorEvidence,
   reviewer: reviewerEvidence,
-  trump: trumpEvidence,
+  bob: bobEvidence,
   'project-ai': projectAiEvidence,
   'project-docs': projectDocsEvidence,
 };

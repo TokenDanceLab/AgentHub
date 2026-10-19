@@ -2,7 +2,7 @@
 
 > 子文档 | 主索引：[architecture.md](../architecture.md)
 >
-> 最后更新：2026-08-02
+> 最后更新：2026-10-18
 
 ## 概述
 
@@ -14,11 +14,12 @@ AgentHub 使用 TokenDance ID 作为统一身份提供者，Hub Server 作为 OI
 
 ```text
 用户点击登录
-  -> Hub 生成 PKCE verifier + challenge
+  -> 客户端生成 PKCE verifier + challenge
+  -> Hub 创建 state、保存 challenge，返回 authorization URL
   -> 重定向到 TokenDance ID authorization endpoint
   -> 用户在 TokenDance ID 完成认证
-  -> TokenDance ID 回调 Hub（authorization code）
-  -> Hub 用 code + PKCE verifier 换取 tokens
+  -> TokenDance ID 回调客户端（authorization code）
+  -> 客户端把 code + verifier 提交给 Hub；Hub 校验 challenge 并换取 ID token
   -> Hub 签发自己的 JWT session
 ```
 
@@ -33,12 +34,14 @@ Hub 签发 JWT
 
 ## JWT 签发
 
-Hub 签发的 JWT 包含：
+Hub 签发的 JWT 包含（`pkg/jwtutil/hub_claims.go` 的 `HubSessionClaims`）：
 
-- TokenDance ID sub（用户唯一标识）
-- Hub-local membership 信息
-- 过期时间
-- 签名（Hub 私钥）
+- `user_id`、`device_id`、`device_type`：Hub 本地用户与设备标识
+- `purpose`（可选，omitempty）：产品 session 不写入
+- 注册 claims：`iss`/`aud`/`sub`/`exp`/`iat`/`jti`（`sub` 是 Hub `user.ID`，不是 TokenDance ID sub）
+- 签名：HS256，使用 `AGENTHUB_JWT_SECRET`
+
+membership 与具体授权不进入 JWT，由 Hub 侧按用户/资源/动作解析。
 
 前端不解析 JWT 内容，只作为 Bearer token 传递给 API。
 
@@ -75,14 +78,13 @@ Desktop Tauri keyring/session
   -> Hub REST API Authorization: Bearer <token>
 ```
 
-所有 Desktop 的 Hub API 查询（`hubQueries.ts`、`sessionQueries.ts`、`documentQueries.ts`）统一通过 `getToken` 回调注入 auth token，不硬编码 token 值；`projectQueries.ts` 是 `app/web` 侧查询。
+所有 Desktop 的 Hub API 查询（`app/desktop/src/api/*Queries.ts`）统一通过 `getToken` 回调注入 auth token，不硬编码 token 值；`projectQueries.ts` 是 `app/web` 侧查询。
 
 ## 安全边界
 
-- Web 不能持有 TokenDance API key 或本机文件系统能力
-- Desktop 文件操作必须经过 allowlist 和 typed Host API
-- Hub 权限由 Hub-local membership/resource/action 决定
-- TokenDance ID 只证明身份，不授权具体操作
+- Web 不能持有 TokenDance API key 或本机文件系统能力。
+- Desktop 文件操作必须经过 allowlist 和 typed Host API。
+- TokenDance ID 只证明身份；具体操作授权由 Hub-local membership/resource/action 决定。
 
 ## 相关文档
 

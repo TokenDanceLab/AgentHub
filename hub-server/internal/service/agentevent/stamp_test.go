@@ -25,7 +25,7 @@ func stampTaskID(t *testing.T, content string) string {
 }
 
 func TestStampAgentTaskRefObjectContent(t *testing.T) {
-	out := StampAgentTaskRef(`{"content":"B-1 final answer"}`, "task-1")
+	out := StampAgentTaskRef(`{"content":"final answer"}`, "task-1")
 	if got := stampTaskID(t, out); got != "task-1" {
 		t.Fatalf("task_id = %q, want task-1", got)
 	}
@@ -34,7 +34,7 @@ func TestStampAgentTaskRefObjectContent(t *testing.T) {
 	if err := json.Unmarshal([]byte(out), &obj); err != nil {
 		t.Fatalf("unmarshal: %v", err)
 	}
-	if obj["content"] != "B-1 final answer" {
+	if obj["content"] != "final answer" {
 		t.Fatalf("content reshaped: %v", obj["content"])
 	}
 }

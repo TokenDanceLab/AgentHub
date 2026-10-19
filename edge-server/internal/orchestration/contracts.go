@@ -1,6 +1,5 @@
 // Package orchestration holds the neutral, side-effect-free contract types
-// shared between the adapters root package and the orchestrator sub-domain
-// (A-V1 Step 0, #1526; Step 2, #1566).
+// shared between the adapters root package and the orchestrator sub-domain.
 //
 // Dependency direction: orchestration imports nothing from adapters;
 // adapters (and the adapters/orchestrator leaf package) import this package.
@@ -169,23 +168,18 @@ const (
 	BusEventContextWarning      = "run.agent.context_warning"
 	BusEventContextCompaction   = "run.agent.context_compaction"
 
-	// Plan approval gate events (P0 #3: Plan confirmation gate)
+	// Plan approval gate events.
 	BusEventPlanProposed = "run.agent.plan_proposed"
 	BusEventPlanApproved = "run.agent.plan_approved"
 	BusEventPlanRejected = "run.agent.plan_rejected"
-	BusEventPlanExpired  = "run.agent.plan_expired"
 
 	// Tool allowlist enforcement events (Edge runtime)
 	BusEventToolRejected = "run.agent.tool_rejected"
 
-	// Sub-agent aggregation / dispatch outcome events (ResultAggregator,
-	// lifecycle/result_aggregator.go). The named constants centralize the
-	// literals currently published as raw strings in result_aggregator.go
-	// (Wave 2 adds them; Wave 3 will replace the raw publish call sites to
-	// reference these names). events.md / event_contract_test.go already
-	// treat these strings as the contract, so the values are frozen.
-	BusEventTaskDispatchFailed = "run.agent.task_dispatch_failed"
-	BusEventSubAgentsComplete  = "run.agent.sub_agents_complete"
+	// Sub-agent aggregation event (ResultAggregator,
+	// lifecycle/result_aggregator.go). events.md / event_contract_test.go
+	// treat this string as the contract, so the value is frozen.
+	BusEventSubAgentsComplete = "run.agent.sub_agents_complete"
 )
 
 // CtxBudgetKey is the context key for passing a *runnerctx.ContextBudget

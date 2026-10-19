@@ -16,7 +16,7 @@ import (
 // through to text. Each case below is only decidable by the tier named in it —
 // the message text is deliberately chosen so the substring tier would answer
 // differently, which is what makes the tier order observable rather than
-// decorative (#2244 slice 1).
+// decorative (#2244).
 func TestIsUniqueViolation_StructuredPriority(t *testing.T) {
 	cases := []struct {
 		name string

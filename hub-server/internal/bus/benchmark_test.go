@@ -2,8 +2,10 @@ package bus
 
 import (
 	"context"
+	"runtime"
 	"sync/atomic"
 	"testing"
+	"time"
 )
 
 // newBenchBus mirrors newTestBus but accepts *testing.B. Pool is released on
@@ -18,11 +20,17 @@ func newBenchBus(b *testing.B) *Bus {
 	return bus
 }
 
-// drainBusB waits until Pending()==0 (true completion signal per P1 note in
-// bus_test.go). No time.Sleep to satisfy verify-test-sleep-ratchet.
+// drainBusB waits until Pending()==0, failing the benchmark if the bus does
+// not drain within a generous deadline. It busy-waits on the bus's own
+// completion counter rather than on a channel.
 func drainBusB(b *testing.B, bus *Bus) {
 	b.Helper()
+	deadline := time.Now().Add(3 * time.Second)
 	for bus.Pending() > 0 {
+		if time.Now().After(deadline) {
+			b.Fatalf("Pending() = %d, want 0: the bus never drained", bus.Pending())
+		}
+		runtime.Gosched()
 	}
 }
 
@@ -45,8 +53,8 @@ func BenchmarkPublish_NoHandlers(b *testing.B) {
 // BenchmarkPublish_SingleHandler measures end-to-end dispatch of one event
 // to one synchronous handler. The handler atomically increments a counter
 // so the benchmark cannot be optimized away and we can assert delivery.
-// Drain runs outside the timed region so handler tail latency doesn't
-// inflate ns/op variance while still counting toward throughput.
+// Each iteration drains before the next, so handler latency is part of the
+// timed region rather than excluded from ns/op.
 func BenchmarkPublish_SingleHandler(b *testing.B) {
 	bus := newBenchBus(b)
 	var got atomic.Int64

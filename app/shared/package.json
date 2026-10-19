@@ -28,7 +28,6 @@
     "./diff": "./src/diff.ts",
     "./eventClient": "./src/eventClient.ts",
     "./stores/queryKeys": "./src/stores/queryKeys.ts",
-    "./components": "./src/components/index.ts",
     "./ui": "./src/ui/index.ts",
     "./ui/*": "./src/ui/*.tsx",
     "./ui/*.css": "./src/ui/*.module.css"

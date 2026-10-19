@@ -2,7 +2,7 @@
  * Hub client pure transport helpers (timeout defaults, abort/network classification, headers).
  * Extracted from hubClient.ts (#810) — pure only; control flow stays in createHubClient.
  *
- * #1102 residual peel: implementations live in companion modules; this file is the
+ * #1102 helper module: implementations live in companion modules; this file is the
  * public barrel so existing `import { ... } from './hubClientTransportUtils'` stays unchanged.
  */
 
@@ -45,7 +45,6 @@ export {
   hasTokenRefreshHandler,
   type HubRequestCatchEffects,
   planHubRequestCatchEffects,
-  buildTokenRefreshFailedLogPrefix,
   prepareHubRequestContextFromClient,
   prepareMultipartUploadContextFromClient,
   type RefreshedTokenRetryPlan,

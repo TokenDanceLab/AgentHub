@@ -83,7 +83,7 @@ describe('runQueries cache helpers', () => {
   });
 });
 
-describe('edge run status helpers (#1816 W1)', () => {
+describe('edge run status helpers (#1816)', () => {
   it('treats lifecycle-active statuses as active and settled ones as terminal', () => {
     expect(isEdgeRunStatusActive('queued')).toBe(true);
     expect(isEdgeRunStatusActive('started')).toBe(true);
@@ -104,7 +104,7 @@ describe('edge run status helpers (#1816 W1)', () => {
   });
 });
 
-describe('run control wiring (#1816 W1)', () => {
+describe('run control wiring (#1816)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });

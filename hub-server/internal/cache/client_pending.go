@@ -9,8 +9,6 @@ import (
 	"github.com/agenthub/hub-server/internal/config"
 )
 
-// Residual pure-helper peel #1123: pending offline task/control queue helpers.
-
 func pendingTaskKey(userID string) string { return "pending_tasks:" + userID }
 
 func pendingTargetTaskKey(userID, targetID, deviceID string) string {
@@ -64,9 +62,7 @@ func decodePendingTargetTaskOrderEntry(data string) (PendingTargetTask, bool) {
 // pendingTaskQueueMaxLen bounds the per-user offline pending task list so a
 // disconnected desktop cannot grow Redis without limit. Mirrors the control
 // queue cap (PendingAgentControlQueueMaxLen = 256) so both offline queues share
-// the same backpressure budget. Defined locally because the config package is
-// out of this lane's edit scope; if config ownership is later centralized,
-// move this constant next to PendingAgentControlQueueMaxLen.
+// the same backpressure budget.
 const pendingTaskQueueMaxLen = 256
 
 // PushPendingTask pushes a task JSON to the user's offline pending queue. The

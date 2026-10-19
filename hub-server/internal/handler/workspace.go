@@ -15,7 +15,7 @@ import (
 )
 
 // WorkspaceService is the subset of *workspace.Service used by WorkspaceHandler.
-// DTOs live in service/workspace (#673 second IM typed-service package).
+// DTOs live in service/workspace (#673).
 type WorkspaceService interface {
 	Create(ctx context.Context, ownerID string, req *model.Workspace) (*model.Workspace, error)
 	Get(ctx context.Context, id, ownerID string) (*model.Workspace, error)

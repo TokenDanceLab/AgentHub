@@ -29,7 +29,7 @@ const (
 // historically returned errcode.AgentNotFound for both "team does not exist"
 // and "user has no access", which conflates absence with denial and lets
 // authenticated users probe for team IDs. Returning explicit 403 at the
-// authorization boundary makes the distinction clear (#2100 P0).
+// authorization boundary makes the distinction clear (#2100).
 func (s *AgentTeamService) CheckTeamAccess(ctx context.Context, userID, teamID string, minRole TeamRole) error {
 	if userID == "" {
 		return errcode.AuthInvalidToken

@@ -16,7 +16,7 @@ import {
 function makeTask(overrides: Partial<TaskItem> = {}): TaskItem {
   return {
     id: 'task-1',
-    title: 'B0 SQLite 迁移方案',
+    title: 'SQLite 迁移方案',
     project: '前端重构任务',
     assignee: 'Builder',
     startTime: '今天 14:49',

@@ -67,7 +67,7 @@ export function resolveDesktopRuntimeEvidenceContent(
 /**
  * PreviewPort.downloadArtifactContent for Desktop (#1945). Desktop owns the
  * Local Edge connection, so it maps the neutral artifact ref onto the Edge
- * content endpoint (via `resolveDesktopEvidenceContent`'s sibling above),
+ * content endpoint (via `resolveDesktopEvidenceContentUrl`'s sibling above),
  * fetches the bytes with the Edge auth token, and hands them to the OS as a
  * real file download. The renderer never constructs the host REST path — the
  * endpoint shape lives only in `resolveDesktopRuntimeEvidenceContent`.

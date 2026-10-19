@@ -5,10 +5,9 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promauto"
 )
 
-// Agent run event retention metrics. Lives in a separate file from the
-// global metrics.go to avoid conflicting with Wave6 lane's ownership of
-// hub-server/internal/metrics/metrics.go. These are self-registering via
-// promauto so callers don't need to wire Register().
+// Agent run event retention metrics. Kept separate from
+// hub-server/internal/metrics/metrics.go; self-registering via promauto, so
+// callers do not wire Register().
 var (
 	// AgentRunEventRetentionRuns counts how many retention passes executed.
 	AgentRunEventRetentionRuns = promauto.NewCounter(prometheus.CounterOpts{

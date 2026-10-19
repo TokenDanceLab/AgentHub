@@ -1,6 +1,5 @@
 /**
  * Workbench demo message fixtures (hub loop, pins, legacy builder transcript).
- * Peel companion of workbenchDemo (#1131). Pure only; zero behavior change.
  */
 
 import type { TranscriptBlock } from '../transcript';
@@ -13,8 +12,8 @@ export const projectGroupMessageLoopHubMessages: HubMessageTranscriptInput[] = [
     session_id: 'agent-dm-session',
     seq_id: 1,
     sender_type: 'user',
-    sender_id: 'delicious233',
-    sender: { nickname: 'Delicious233' },
+    sender_id: 'demo',
+    sender: { nickname: 'Demo User' },
     content: {
       text: 'Builder，先把项目群消息闭环的 shared fixture contract 梳理出来。',
       im_kind: 'agent_dm',
@@ -44,8 +43,8 @@ export const projectGroupMessageLoopHubMessages: HubMessageTranscriptInput[] = [
     session_id: 'project-group-session',
     seq_id: 3,
     sender_type: 'user',
-    sender_id: 'delicious233',
-    sender: { nickname: 'Delicious233' },
+    sender_id: 'demo',
+    sender: { nickname: 'Demo User' },
     content: {
       text: '@Reviewer 检查 Agent-to-Agent / 项目群 / @Agent 消息线，不启动真实长连接。',
       im_kind: 'project_group',
@@ -143,7 +142,7 @@ export const demoWorkbenchPins: WorkbenchDemoMessagePin[] = [
   {
     conversationId: 'builder',
     messageId: 'builder-msg-1',
-    pinnedBy: 'Delicious233',
+    pinnedBy: 'Demo User',
     pinnedAt: '2026-06-06T14:49:00+08:00',
   },
 ];

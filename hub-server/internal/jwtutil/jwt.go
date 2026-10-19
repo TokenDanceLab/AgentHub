@@ -15,7 +15,7 @@ import (
 )
 
 // Claims is the Hub-issued HS256 session token payload. Alias of the shared
-// pkg/jwtutil.HubSessionClaims single source (#1675 P1) — edge verifies the
+// pkg/jwtutil.HubSessionClaims single source (#1675) — edge verifies the
 // same struct via its own alias, so the wire contract cannot drift.
 type Claims = sharedjwt.HubSessionClaims
 
@@ -86,7 +86,7 @@ const (
 //
 // Product acceptance rules (#853 / token-type confusion fix):
 //   - Signature + HS256 only
-//   - Issuer lenient when empty (pre-R08), else must be agenthub-hub
+//   - Issuer lenient when empty (legacy tokens), else must be agenthub-hub
 //   - Audience: empty (legacy) or must contain agenthub-api; agenthub-edge rejected
 //   - Purpose: must be empty; edge-api / run-start / any non-empty purpose rejected
 //   - device_type "edge" rejected (defense in depth)
@@ -99,7 +99,7 @@ func ParseToken(tokenString, secret string) (*Claims, error) {
 	},
 		jwt.WithValidMethods([]string{"HS256"}),
 		// 30s clock-skew leeway, aligned with capability tokens
-		// (tokendance.go) and edge-side validation (#2135 F1). Without it,
+		// (tokendance.go) and edge-side validation. Without it,
 		// product session JWTs reject earlier than capability tokens under
 		// NTP skew between Hub and clients.
 		jwt.WithLeeway(30*time.Second),
@@ -120,7 +120,7 @@ func ParseToken(tokenString, secret string) (*Claims, error) {
 // validateProductClaims enforces product-session token class after signature
 // verification. Shared by ParseToken and KeyManager.ParseToken.
 func validateProductClaims(claims *Claims) error {
-	// Lenient iss: only check when present so pre-R08 tokens still work.
+	// Lenient iss: only check when present so legacy tokens still work.
 	if claims.Issuer != "" && claims.Issuer != "agenthub-hub" {
 		return fmt.Errorf("jwt issuer mismatch: got %q, want agenthub-hub", claims.Issuer)
 	}
@@ -359,7 +359,7 @@ func (km *KeyManager) ParseToken(tokenString string) (*Claims, error) {
 		}
 		return secret, nil
 	},
-		jwt.WithLeeway(30*time.Second), // #2135 F1: align with single-key parser,
+		jwt.WithLeeway(30*time.Second), // align with the single-key parser,
 		jwt.WithValidMethods([]string{"HS256"}),
 	)
 	if err != nil {

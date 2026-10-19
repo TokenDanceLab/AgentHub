@@ -266,7 +266,7 @@ func TestProcessExecutorParentFinishCascadesCancelToChildRunIDs(t *testing.T) {
 
 	// Parent process finishes (success helper would exit immediately; here we
 	// Cancel the parent so finish() runs with a registry cascade). Using Cancel
-	// exercises the same finish() path as natural completion (#867 terminalFinish).
+	// exercises the same finish() path as natural completion.
 	if result := executor.Cancel(parent.ID); !result.Found {
 		t.Fatalf("Cancel parent result = %#v, want found", result)
 	}

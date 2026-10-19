@@ -1,6 +1,5 @@
 /**
  * Hub client pure path+init request builders (domain companion).
- * Peel of hubClientPayloadRequests (#1101). Pure only; zero behavior change.
  */
 
 import { buildOptionalJsonBody } from './hubClientPayloadBodies';
@@ -46,7 +45,7 @@ export function buildPostWithOptionalJsonBody(
   };
 }
 
-// ── Composite path+init residual (#978) ───────────────────────────────────────
+// ── Composite path+init helpers (#978) ───────────────────────────────────────
 
 export type HubJsonPathInit = {
   path: string;

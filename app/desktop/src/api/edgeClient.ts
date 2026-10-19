@@ -1,6 +1,6 @@
 // Edge REST API client — typed wrappers around fetch.
 // Uses @agenthub/shared for all response types and error handling.
-// P0-1: Zod schema validation with safeParse on all responses.
+// Responses are validated with Zod safeParse.
 
 import { getEdgeBaseUrl } from '@/config';
 import type {
@@ -94,21 +94,19 @@ function edgeRequestInit(init: RequestInit = {}, baseHeaders?: HeadersInit): Req
 }
 
 /**
- * Check if Edge is running in dev mode (AGENTHUB_DEV=1).
- * When the Tauri desktop app starts Edge, it always passes AGENTHUB_DEV=1,
- * which disables auth on the server side. In that case EDGE_AUTH_TOKEN will
- * be empty and we should not send auth headers at all.
+ * Whether the Edge client has an auth token to send.
+ * Desktop launches Edge with a generated AGENTHUB_EDGE_AUTH_TOKEN and never
+ * sets AGENTHUB_DEV, so the Edge keeps its fail-closed auth model. When no
+ * token is configured we must not send auth headers at all: an empty Bearer
+ * token would make the server attempt auth validation and fail.
  */
 function isEdgeDevMode(): boolean {
-  // If no auth token is configured, Edge was started in dev mode by Tauri
-  // and does not require authentication. Sending an empty Bearer token
-  // would cause the server to attempt auth validation and fail.
   return !getEdgeAuthToken();
 }
 
 function edgeDevRequestInit(init: RequestInit = {}, baseHeaders?: HeadersInit): RequestInit {
   if (isEdgeDevMode()) {
-    // Dev mode: no auth needed. Merge base headers only.
+    // No token: merge base headers only; an empty Bearer would fail auth.
     if (!baseHeaders) return init;
     return { ...init, headers: baseHeaders };
   }
@@ -139,7 +137,7 @@ async function edgeFetch(url: string, init?: RequestInit): Promise<Response> {
 }
 
 /**
- * Extracts the .data field from a unified {@code {"code":"ok","data":...}} envelope (older Edge builds sent "OK", so both casings are accepted).
+ * Extracts the .data field from a unified `{"code":"ok","data":...}` envelope (older Edge builds sent "OK", so both casings are accepted).
  * Returns the raw input unchanged when no envelope is present, preserving backward
  * compatibility with Edge Servers that have not yet adopted the envelope format.
  */
@@ -547,41 +545,29 @@ export interface CCSwitchProviderModelMapping {
 }
 
 export async function fetchCCSwitchStatus(): Promise<CCSwitchStatus> {
-  try {
-    const res = await edgeFetch(`${BASE}/v1/ccswitch/status`, edgeDevRequestInit());
-    if (!res.ok) throw await parseError(res);
-    return unwrapEdgeResponse(await res.json()) as CCSwitchStatus;
-  } catch {
-    return { installed: false, routingActive: false };
-  }
+  const res = await edgeFetch(`${BASE}/v1/ccswitch/status`, edgeDevRequestInit());
+  if (!res.ok) throw await parseError(res);
+  return unwrapEdgeResponse(await res.json()) as CCSwitchStatus;
 }
 
 export async function fetchCCSwitchProviders(appType?: string): Promise<CCSwitchProviderModelMapping[]> {
-  try {
-    const params = appType ? `?appType=${encodeURIComponent(appType)}` : '';
-    const res = await edgeFetch(`${BASE}/v1/ccswitch/providers${params}`, edgeDevRequestInit());
-    if (!res.ok) throw await parseError(res);
-    const data = unwrapEdgeResponse(await res.json());
-    // Response may be { items: [...] } or raw array
-    if (data && typeof data === 'object' && 'items' in data) {
-      return (data as { items: CCSwitchProviderModelMapping[] }).items;
-    }
-    return Array.isArray(data) ? data as CCSwitchProviderModelMapping[] : [];
-  } catch {
-    return [];
+  const params = appType ? `?appType=${encodeURIComponent(appType)}` : '';
+  const res = await edgeFetch(`${BASE}/v1/ccswitch/providers${params}`, edgeDevRequestInit());
+  if (!res.ok) throw await parseError(res);
+  const data = unwrapEdgeResponse(await res.json());
+  // Response may be { items: [...] } or raw array
+  if (data && typeof data === 'object' && 'items' in data) {
+    return (data as { items: CCSwitchProviderModelMapping[] }).items;
   }
+  return Array.isArray(data) ? data as CCSwitchProviderModelMapping[] : [];
 }
 
 // ── Settings ──────────────────────────────────────────────────────────
 
 export async function fetchSettings(): Promise<Record<string, string>> {
-  try {
-    const res = await edgeFetch(`${BASE}/v1/settings`, edgeDevRequestInit());
-    if (!res.ok) throw await parseError(res);
-    return unwrapEdgeResponse(await res.json()) as Record<string, string>;
-  } catch {
-    return {};
-  }
+  const res = await edgeFetch(`${BASE}/v1/settings`, edgeDevRequestInit());
+  if (!res.ok) throw await parseError(res);
+  return unwrapEdgeResponse(await res.json()) as Record<string, string>;
 }
 
 export async function patchSettings(values: Record<string, string>): Promise<Record<string, string>> {

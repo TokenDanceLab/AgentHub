@@ -2,7 +2,7 @@
 # verify-gosec-gates — fail-closed gosec SAST wrapper (#1574)
 #
 # Usage:
-#   go run github.com/securego/gosec/v2/cmd/gosec@latest -fmt=json ./... 2>&1 \
+#   go run github.com/securego/gosec/v2/cmd/gosec@v2.28.0 -fmt=json ./... 2>/dev/null \
 #     | verify-gosec-gates.sh
 #
 # Contract (fail-closed): any of the following MUST exit non-zero:
@@ -33,6 +33,10 @@ issues = data['Issues']
 if not isinstance(issues, list):
     print('SCHEMA_ERROR: Issues is not an array')
     sys.exit(4)
+golang_errors = data.get('Golang errors') or {}
+if golang_errors:
+    print(f'SCHEMA_ERROR: gosec reported package load errors: {json.dumps(golang_errors)[:500]}')
+    sys.exit(6)
 if len(issues) > 0:
     for issue in issues[:20]:
         rule = issue.get('rule_id', '?')

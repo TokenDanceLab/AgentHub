@@ -6,8 +6,8 @@
 --   bash scripts/setup-tokendance-oidc.sh
 --
 -- This SQL file is auto-generated. If you need to regenerate:
---   go run scripts/bcrypt-hash.go "your-secret" > /tmp/hash.txt
---   Then replace the bcrypt_hash value below.
+--   python3 -c "import bcrypt,sys;print(bcrypt.hashpw(sys.argv[1].encode(),bcrypt.gensalt(rounds=10)).decode())" "your-secret"
+--   Then replace the secret_hash value below.
 --
 -- Client Details:
 --   client_id:     agenthub-desktop
@@ -19,7 +19,7 @@
 --   scopes:        openid, profile, email
 --
 -- Usage (standalone):
---   sqlite3 ../tokendance-id/data/tokendance.db < scripts/seed-tokendance-client.sql
+--   sqlite3 "$TOKENDANCE_ID_DB" < scripts/seed-tokendance-client.sql
 -- ================================
 
 -- Ensure at least one user exists (owner of the OAuth client)

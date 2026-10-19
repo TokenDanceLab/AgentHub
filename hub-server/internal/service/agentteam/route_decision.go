@@ -270,22 +270,10 @@ func (s *AgentTeamService) appendTeamEventTx(tx *gorm.DB, runID, eventType strin
 	})
 }
 
-// countMatchingRouteDecisions returns the number of prior accepted route
-// decisions for a run matching the given decision's action / next_worker /
-// instructions. Used by HandleRouteDecision's MaxRouteRepeats guardrail.
-// Delegates to countMatchingRouteDecisionsDB against the live service DB.
-func (s *AgentTeamService) countMatchingRouteDecisions(runID string, decision model.CoordinatorRouteDecision) (int, error) {
-	return s.countMatchingRouteDecisionsDB(s.db, runID, decision)
-}
-
 // countMatchingRouteDecisionsDB counts matching route decisions via SQL
-// aggregation (the #842 / N7 fix). It calls
-// repository.CountTeamRouteDecisionsByActionWorkerInstructions so only the
-// integer count crosses the wire — previously this loaded up to 10000 events
-// (ListTeamEventsByRun Limit 10000) and filtered in Go, which scanned the
-// whole event log on every route decision.
-//
-// The SQL path mirrors routeDecisionMatches normalization exactly: action is
+// aggregation. It calls repository.CountTeamRouteDecisionsByActionWorkerInstructions
+// so only the integer count crosses the wire; the SQL path mirrors
+// routeDecisionMatches normalization exactly: action is
 // case-insensitively trimmed, next_worker + instructions are case-sensitively
 // trimmed, and a missing JSON key (e.g. a finish decision with no
 // next_worker) is treated as the empty string to match Go's zero-value

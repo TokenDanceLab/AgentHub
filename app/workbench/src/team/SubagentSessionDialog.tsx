@@ -1,4 +1,4 @@
-// SubagentSessionDialog — #1406 follow-up (fable UIUX gap: drill-down dialog)
+// SubagentSessionDialog — full-session drill-down dialog (#1406).
 // Full sub-session drill-down: opened from the SubagentStreamOverlay
 // delegation chip, renders the complete session transcript via the
 // existing SubagentTranscript inside the shared Modal (focus trap,

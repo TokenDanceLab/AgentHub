@@ -11,7 +11,7 @@ build:
 test:
 	go test ./... -short -count=1
 
-## test-all: run all tests including integration
+## test-all: run all hub unit tests (no -short); integration lane: make -C .. test-hub-integration
 test-all:
 	go test ./... -count=1
 

@@ -9,10 +9,10 @@ import { diffLineClass, highlightDiffLine } from './FilePreviewHelpers';
 import styles from './FilePreview.module.css';
 
 /* ═══════════════════════════════════════════════════════════════════════
-   FilePreviewParts — presentational residual slices from FilePreview (#663).
+   FilePreviewParts — presentational parts for FilePreview (#663).
 
    Code/diff/markdown/native preview bodies. CSS stays on
-   FilePreview.module.css. No intentional UX change.
+   FilePreview.module.css.
    ═══════════════════════════════════════════════════════════════════════ */
 
 export function CodePreview({ language, lines }: { language: string; lines: string[] }): React.ReactElement {

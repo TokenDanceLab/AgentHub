@@ -1,7 +1,7 @@
 /* ═══════════════════════════════════════════════════════════════════════
    Shared render helpers extracted from ProjectPanelParts for #696.
 
-   Residual thin: SectionHead deduplicates 12+ instances across
+   Helper module: SectionHead deduplicates 12+ instances across
    ProjectPanelParts + ProjectTabViews; MemberChip deduplicates the
    duplicated member-chip JSX in MembersCard + ProjectMembers.
    CSS remains on shared ProjectsPage.module.css.

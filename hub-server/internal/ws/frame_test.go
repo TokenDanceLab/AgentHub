@@ -83,8 +83,8 @@ func TestMarshalOmitempty(t *testing.T) {
 	}
 }
 
-func TestAllFrameTypes(t *testing.T) {
-	types := []string{
+func allFrameTypes() []string {
+	return []string{
 		TypeTyping, TypeAuthOK,
 		TypeMessageNew, TypeMessageRecall, TypeMessagePin, TypeMessageUnpin,
 		TypeMessageReactionAdded, TypeMessageReactionRemoved,
@@ -93,8 +93,13 @@ func TestAllFrameTypes(t *testing.T) {
 		TypeDeviceOnline, TypeDeviceOffline, TypeDeviceKicked,
 		TypeAgentDispatch, TypeAgentStream, TypeAgentDone, TypeAgentFailed, TypeAgentCancel, TypeAgentControl,
 		TypeTeamRunStarted, TypeTeamEvent, TypeTeamAssignmentDone, TypeTeamAssignmentFailed,
+		TypeTeamSubagentStream,
 		TypeNotificationNew, TypeFriendRequest, TypeFriendAccepted,
 	}
+}
+
+func TestAllFrameTypes(t *testing.T) {
+	types := allFrameTypes()
 	for _, typ := range types {
 		f := NewFrame(typ, nil)
 		data, err := f.Marshal()

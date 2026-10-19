@@ -47,7 +47,7 @@ func (h *Handler) beginRunDelivery(w http.ResponseWriter, r *http.Request, req r
 		data := runToResponse(run)
 		data["deduplicated"] = true
 		data["deliveryId"] = req.DeliveryID
-		writeSuccess(w, http.StatusAccepted, acceptedResponse(data))
+		writeSuccess(w, http.StatusAccepted, data)
 	default:
 		w.Header().Set("Retry-After", "1")
 		errcode.Write(w, errcode.ErrDeliveryBusy)
