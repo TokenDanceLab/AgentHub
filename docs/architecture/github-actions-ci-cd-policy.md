@@ -20,7 +20,7 @@
 | Release readiness | 发布/桌面文件变更或手动 | Ubuntu + Windows（macOS 仅显式手动） | `readiness-policy`、`windows-installer-smoke-preflight`；package dry 仅显式 opt-in |
 | Release | semver tag | Ubuntu + Windows | release gate、跨平台 Go artifacts、Tauri 发布产物 |
 
-`cd-web.yml` 按 `app/Dockerfile` 的实际输入筛选 master push：Web/Shared/Workbench 源码、workspace manifest、lockfile、根 package manifest 和构建工作流。Workbench-only 改动同样产出新 Web 镜像；无关变更不触发。`cd-web.yml` / `cd-hub-server.yml` 构建并推送多架构 GHCR 镜像，不部署运行环境；构建成功只证明镜像产出。
+`cd-web.yml` 按 `app/Dockerfile` 的实际输入筛选 master push：Web/Shared/Workbench 源码、workspace manifest、lockfile、根 package manifest 和构建工作流。Workbench-only 改动同样产出新 Web 镜像；无关变更不触发。`cd-web.yml` / `cd-hub-server.yml` 构建并推送多架构 GHCR 镜像，不部署运行环境；构建成功只证明镜像产出。两者只保留各自的路径过滤与镜像参数，构建/合并流水线在 `cd-image.yml`（可复用 workflow）里只有一份。
 
 ## 分支保护与 required checks
 
