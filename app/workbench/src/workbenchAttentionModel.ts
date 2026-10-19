@@ -5,7 +5,7 @@ import { countPendingApprovals } from './workbenchApprovalSummary';
 /**
  * Attention model — pure derivation of live conversation status and
  * global "running n / awaiting approval m" counts from the existing
- * run/approval/thread model shapes (see `workbenchStateTypes`). No new Hub
+ * run/approval/thread model shapes (see `app/shared/src/hub/hubClient.ts`). No new Hub
  * protocol: the shell hands over the run/approval inventory it already has;
  * this module is the single derivation source shared by the conversation
  * sidebar live dots, the rail badge and the status-strip chips.

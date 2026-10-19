@@ -104,9 +104,9 @@ Applied first to AuxPanel and TerminalPanel. Respect `prefers-reduced-motion`.
 | Fluid type | `--headline-*` / `--body-lg` / `--title-sm` | `clamp()`; `--body` / `--label` stay fixed 14/12 |
 | Root scale wide | `html` @ 1920 / 2560 | 17px / 18px for viewing distance |
 | HiDPI glass | `@media (min-resolution: 192dpi)` in tokens + themes | blur ~1.4×, stronger hairline borders, focus ring 3–4px |
-| Breakpoint definitions | `styles/breakpoints.ts` 是 JS 表；`tokens-base.css` 的 `--bp-*` 值由 `styles/breakpoints.test.ts` 全表交叉校验 | minimal 420 / mobile 480 / compact 720 / narrow 768 / medium 1024 / standard 1280 / wide 1440 / xwide 1920 / ultra 2560（`--bp-narrow: 768px` 另由 `tokens-base.test.ts` 断言） |
+| Breakpoint definitions | `app/shared/src/styles/tokens-base.css` 的 `--bp-*` 变量即 SSOT，`tokens-base.test.ts` 断言取值 | minimal 420 / mobile 480 / compact 720 / narrow 768 / medium 1024 / standard 1280 / wide 1440 / xwide 1920 / ultra 2560 |
 
-响应式断点定义在 `styles/breakpoints.ts`；剩余非 SSOT `@media` 仅 `app/shared/src/ui/Input.module.css` 与 `app/web/src/components/AuthPage.module.css` 的 legacy 760、`app/workbench/src/WorkbenchGoalBanner.module.css` 的 900，以及 Desktop `App.module.css` 的 1023/1279 成对窗口约定。
+响应式断点只定义在 `tokens-base.css` 的 `--bp-*`；剩余非 SSOT `@media` 仅 `app/shared/src/ui/Input.module.css` 与 `app/web/src/components/AuthPage.module.css` 的 legacy 760、`app/workbench/src/WorkbenchGoalBanner.module.css` 的 900，以及 Desktop `App.module.css` 的 1023/1279 成对窗口约定。
 
 ## 9. Acceptance mapping
 
