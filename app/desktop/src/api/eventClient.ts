@@ -11,7 +11,7 @@ import {
   createEventStream as createSharedEventStream,
   type EventStreamOptions,
   type StreamHandle,
-} from '@agenthub/shared';
+} from '@agenthub/shared/eventClient';
 import { getEdgeWsUrl } from '@/config';
 import { buildEdgeWSAuthProtocols, withEdgeAuthQuery } from './edgeAuth';
 
@@ -20,7 +20,7 @@ export type {
   EventStreamOptions,
   StatusHandler,
   StreamHandle,
-} from '@agenthub/shared';
+} from '@agenthub/shared/eventClient';
 export type { EventEnvelope } from '@shared/events';
 
 interface EventStreamLegacyOptions extends EventStreamOptions {
