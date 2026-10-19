@@ -345,8 +345,7 @@ export interface LocalCliDiscoveryItem {
 
 export interface LocalCliDiscoveryManifest {
   mode: 'no-spend-discovery';
-  readinessManifest: string;
-  readinessScript: string;
+  readinessDoc: string;
   generatedAt?: string | null;
   items: LocalCliDiscoveryItem[];
 }
