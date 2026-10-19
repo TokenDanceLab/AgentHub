@@ -1,5 +1,6 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
+import tailwindcss from '@tailwindcss/vite';
 import path from 'path';
 
 // Base path: VITE_BASE_PATH env var or default '/workbench/'
@@ -7,7 +8,7 @@ const basePath = process.env.VITE_BASE_PATH || '/workbench/';
 
 export default defineConfig(() => ({
   base: basePath,
-  plugins: [react()],
+  plugins: [react(), tailwindcss()],
   resolve: {
     dedupe: ['react', 'react-dom'],
     alias: {
