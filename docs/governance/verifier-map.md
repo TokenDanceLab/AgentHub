@@ -10,6 +10,7 @@
 | 规则 | 验证脚本 | CI job |
 |---|---|---|
 | 提交消息符合 Conventional Commits | `scripts/verify/verify-commit-messages.sh` | checks.yml → validate |
+| Python 脚本静态检查（ruff，配置见 `pyproject.toml`） | `pyproject.toml` | checks.yml → validate |
 | CI 安全/合同门禁保持接线 | `scripts/verify/verify-ci-invariants.py` | checks.yml → validate |
 | 仓库不得提交 secret | `scripts/verify/check-secrets.sh` | checks.yml → validate |
 | JS 依赖无未登记漏洞 | `scripts/verify/verify-vulnerability-gates.sh` | checks.yml → vuln-scan-js |

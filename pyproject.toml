@@ -1,0 +1,11 @@
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+extend-exclude = [".tmp", "app/node_modules", ".worktrees", "dist"]
+
+[tool.ruff.lint]
+# Standard correctness/modernisation set for the repo's verifier scripts.
+# Formatting rules (E501) and percent-format style (UP031) are deliberately
+# off: long literals and `%` message tables are used on purpose here.
+select = ["E", "F", "W", "I", "UP", "B"]
+ignore = ["E501", "UP031"]

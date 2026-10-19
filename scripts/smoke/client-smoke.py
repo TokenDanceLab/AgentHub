@@ -10,6 +10,7 @@ stdlib only；CLI 参数同时接受 -Xxx 与 --Xxx；退出码 0=通过 / 1=失
 """
 
 import argparse
+import base64
 import json
 import os
 import re
@@ -22,7 +23,6 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
-import base64
 
 passed = 0
 failed = 0
@@ -215,7 +215,7 @@ class WebSocketClient:
                     fragments.append(payload)
                     if fin:
                         return b"".join(fragments).decode("utf-8", errors="replace")
-        except (socket.timeout, ConnectionError, OSError):
+        except (TimeoutError, ConnectionError, OSError):
             return None
 
     def _send_frame(self, opcode: int, payload: bytes) -> None:
@@ -398,7 +398,7 @@ def main() -> int:
 
         if not args.SkipBuild:
             write_step("Build Edge Server")
-            build_run = run_native(
+            run_native(
                 ["go", "build", "-o", edge_binary, "./cmd/agenthub-edge/"],
                 cwd=os.path.join(repo_root, "edge-server"),
             )
