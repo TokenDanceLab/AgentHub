@@ -2202,7 +2202,18 @@ jobs:
         with:
           persist-credentials: false
 
+      # `components: clippy` matters: the pinned toolchain ships without it, so
+      # the old advisory clippy step was failing on "cargo-clippy is not
+      # installed" and `continue-on-error` swallowed it — clippy never ran.
       - uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: clippy
+
+      # Same cargo cache the desktop build job uses: without it every
+      # desktop-changed PR recompiles the whole dependency tree twice.
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: app/desktop/src-tauri -> target
 
       - name: Install Tauri Linux system dependencies
         shell: bash
@@ -2213,20 +2224,14 @@ jobs:
             libxdo-dev libssl-dev libayatana-appindicator3-dev \
             librsvg2-dev patchelf
 
-      # Blocking compile gate: clippy stays advisory, but a Rust build
-      # breakage must fail the PR here.
-      - name: cargo check (blocking)
+      # One compile pass, two properties. `cargo clippy` runs the same
+      # type-check as `cargo check`, so it is the blocking compile gate: it
+      # exits non-zero on compile errors. Lint warnings stay advisory because
+      # no `-D warnings` is configured (24 not yet zero-baselined); promote
+      # that flag once the lint debt is repaid.
+      - name: cargo clippy (compile gate, lint advisory)
         working-directory: app/desktop/src-tauri
-        run: cargo check --all-targets
-
-      # cargo clippy advisory (owner: desktop maintainers) — 24 warnings not
-      # yet zero-baselined; continue-on-error so CI stays green while triaged.
-      # Promote to hard-blocking (cargo clippy --all-targets -- -D warnings)
-      # once the lint debt is repaid to zero.
-      - name: cargo clippy (advisory)
-        continue-on-error: true
-        working-directory: app/desktop/src-tauri
-        run: cargo clippy --all-targets 2>&1
+        run: cargo clippy --all-targets
 
       # CI: cargo-audit install sped up via cargo-binstall (prebuilt binary,
       # ~10s) instead of `cargo install cargo-audit --locked` which compiles
