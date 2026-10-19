@@ -39,7 +39,7 @@ Entry CSS load: desktop/web `main.tsx` imports surface `styles/{tokens,themes,pr
 8. **Design token gate**：修改 `app/shared/src/styles/` 或 `app/shared/src/designTokens.ts` 后，运行 `pnpm --dir app --filter @agenthub/shared test`；`designTokens.test.ts`、`styles/tokens-base.test.ts`、`styles/surfaceStyles.test.ts` 必须全绿。
 9. **Shared component acceptance**：新组件验收见 [component-acceptance.md](../component-acceptance.md)。
 10. **New chat surfaces** use the vendored shadcn primitives (`Message`, `Bubble`, `InputGroup`, `Attachment`) plus Tailwind utilities whose colors/radii resolve from `shadcn.css`. Do not add a second palette or a component-local radius scale.
-11. **Preflight stays off during migration.** `shadcn.css` imports Tailwind theme + utilities only; enabling Preflight would reset legacy CSS-Module surfaces. Remove this exception only in the change that retires the last migrated module.
+11. **Preflight stays off during migration.** `shadcn.css` imports Tailwind theme + utilities only; enabling Preflight would reset legacy CSS-Module surfaces. Remove this exception only in the change that retires the last migrated module. The hand-rolled reset in `tokens-base.css` therefore lives inside `@layer base`: an unlayered `*, *::before, *::after { margin: 0; padding: 0 }` wins over every `@layer utilities` rule and silently kills `m-*`, `mx-auto` and `space-*`.
 12. **Flat chrome, glass overlays.** Workbench chrome (rail, sidebar, header, inspector, composer) uses flat `--background` / `--surface-dim` surfaces and 9–18% foreground hairlines. Frosted glass remains for transient overlays and previews, not for the persistent shell.
 
 ## 3. Legitimate surface glue (not forks)

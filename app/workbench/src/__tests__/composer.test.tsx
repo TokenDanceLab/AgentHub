@@ -171,13 +171,13 @@ describe('AgentHubWorkbench', () => {
     fireEvent.change(screen.getByLabelText('执行目标'), {
       target: { value: 'target-local-edge-1' },
     });
-    expect(screen.getByText('Agent @Builder')).toBeInTheDocument();
-    expect(screen.getByText('目标 Alpha Desktop')).toBeInTheDocument();
-    expect(screen.getByText('需填写内容')).toBeInTheDocument();
+    expect(screen.getByText('@Builder')).toBeInTheDocument();
+    expect(screen.getByLabelText('执行目标')).toHaveValue('target-local-edge-1');
+    expect(screen.getByRole('button', { name: '启动 Agent 任务' })).toBeDisabled();
     fireEvent.change(screen.getByRole('textbox', { name: '输入框' }), {
       target: { value: 'Start the Web main chain' },
     });
-    expect(screen.getByText('任务就绪')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '启动 Agent 任务' })).toBeEnabled();
     fireEvent.click(screen.getByRole('button', { name: '启动 Agent 任务' }));
 
     await waitFor(() => {
@@ -291,9 +291,7 @@ describe('AgentHubWorkbench', () => {
       target: { value: 'Run the remote task' },
     });
 
-    expect(screen.getByText('Agent @Builder')).toBeInTheDocument();
-    expect(screen.getByText('目标未选')).toBeInTheDocument();
-    expect(screen.getByText('需填写内容')).toBeInTheDocument();
+    expect(screen.getByLabelText('执行目标')).toHaveValue('');
     expect(screen.getAllByRole('status').find((el) => el.textContent?.includes('请先选择执行目标'))).toHaveTextContent('请先选择执行目标再开始。');
     expect(screen.getByRole('button', { name: '启动 Agent 任务' })).toBeDisabled();
     expect(platform.submittedIntents).toEqual([]);

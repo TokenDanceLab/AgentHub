@@ -4,13 +4,9 @@ import {
   agentPickerPlaceholder,
   buildAttachmentChipViewModel,
   formatAgentOptionLabel,
-  formatMainchainAgentLabel,
-  formatMainchainTargetLabel,
-  formatMainchainTaskLabel,
   formatMentionChipLabel,
   formatReplyToLabel,
   isMediaAttachment,
-  mainchainDataState,
   resolveAttachmentPreviewKind,
   resolveAttachmentUploadProgress,
   targetPickerPlaceholder,
@@ -32,18 +28,11 @@ const textAttachment: ComposerAttachment = {
 };
 
 describe('ComposerPartsHelpers', () => {
-  it('formats reply, mention, and mainchain labels without UX drift', () => {
+  it('formats reply and mention labels without UX drift', () => {
     expect(formatReplyToLabel({ author: 'Ada', preview: 'hello' })).toBe(
       '回复至 Ada: hello',
     );
     expect(formatMentionChipLabel({ id: 'a1', label: 'Builder' })).toBe('@Builder');
-    expect(formatMainchainAgentLabel('@Builder')).toBe('Agent @Builder');
-    expect(formatMainchainTargetLabel(undefined)).toBe('目标未选');
-    expect(formatMainchainTargetLabel('Desktop')).toBe('目标 Desktop');
-    expect(formatMainchainTaskLabel('ready')).toBe('任务就绪');
-    expect(formatMainchainTaskLabel('draft required')).toBe('需填写内容');
-    expect(mainchainDataState(true)).toBe('selected');
-    expect(mainchainDataState(false)).toBe('missing');
   });
 
   it('builds picker placeholders and agent option labels', () => {

@@ -9,12 +9,8 @@ import { Button } from '@shared/shadcn/ui/button';
 import { cn } from '@shared/lib/utils';
 import { DesignNavIcon } from './designIcons';
 import {
-  formatMainchainAgentLabel,
-  formatMainchainTargetLabel,
-  formatMainchainTaskLabel,
   formatMentionChipLabel,
   formatReplyToLabel,
-  mainchainDataState,
 } from './ComposerPartsHelpers';
 import { formatQuotePreview } from './unifiedComposerHelpers';
 
@@ -153,67 +149,18 @@ export function ComposerMentionChips({
   );
 }
 
-export function ComposerMainchainStrip({
-  selectedAgentLabel,
-  selectedTargetLabel,
-  targetSelected,
-  mainchainTask,
-}: {
-  selectedAgentLabel: string;
-  selectedTargetLabel: string | undefined;
-  targetSelected: boolean;
-  mainchainTask: 'ready' | 'draft required';
-}): React.ReactElement {
-  const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE);
-  return (
-    <div
-      aria-label={t('aria.agentMainChain')}
-      className="flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground"
-    >
-      <span
-        className="inline-flex items-center rounded-full border border-primary/20 bg-primary/10 px-2.5 py-1 font-medium text-foreground"
-        data-state="selected"
-      >
-        {formatMainchainAgentLabel(selectedAgentLabel, t)}
-      </span>
-      <span
-        className={cn(
-          'inline-flex items-center rounded-full border border-line bg-foreground/5 px-2.5 py-1',
-          mainchainDataState(targetSelected) === 'missing' && 'border-warning/40 bg-warning/10 text-warning',
-        )}
-        data-state={mainchainDataState(targetSelected)}
-      >
-        {formatMainchainTargetLabel(selectedTargetLabel, t)}
-      </span>
-      <span
-        className={cn(
-          'inline-flex items-center rounded-full border border-line bg-foreground/5 px-2.5 py-1',
-          mainchainDataState(mainchainTask === 'ready') === 'missing' && 'border-warning/40 bg-warning/10 text-warning',
-        )}
-        data-state={mainchainDataState(mainchainTask === 'ready')}
-      >
-        {formatMainchainTaskLabel(mainchainTask, t)}
-      </span>
-    </div>
-  );
-}
-
 export function ComposerStatusStrip({
   statusItems,
 }: {
   statusItems: string[];
 }): React.ReactElement {
   return (
-    <div
-      className="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-1 px-1 text-[11px] leading-4 text-muted-foreground/80"
+    <p
+      className="w-full min-w-0 truncate px-1 text-[11px] leading-4 text-muted-foreground/60"
       role="status"
+      title={statusItems.join(' · ')}
     >
-      {statusItems.map((item) => (
-        <span className="inline-flex min-w-0 items-center gap-1.5" key={item}>
-          <span aria-hidden="true" className="size-1 shrink-0 rounded-full bg-current opacity-50" />
-          <span className="truncate">{item}</span>
-        </span>
-      ))}
-    </div>
+      {statusItems.join(' · ')}
+    </p>
   );
 }

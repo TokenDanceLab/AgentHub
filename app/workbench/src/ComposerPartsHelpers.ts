@@ -31,38 +31,6 @@ export function formatMentionChipLabel(mention: ComposerMention): string {
   return `@${mention.label}`;
 }
 
-export function formatMainchainAgentLabel(selectedAgentLabel: string, t?: TFunction): string {
-  const label = selectedAgentLabel.trim();
-  if (!label) return t?.('composer.mainchain.agentUnselected') ?? 'Agent 未选';
-  return label.startsWith('@')
-    ? (t?.('composer.mainchain.agentPlain', { label }) ?? `Agent ${label}`)
-    : (t?.('composer.mainchain.agentAt', { label }) ?? `Agent @${label}`);
-}
-
-export function formatMainchainTargetLabel(
-  selectedTargetLabel: string | undefined,
-  t?: TFunction,
-): string {
-  return selectedTargetLabel
-    ? (t?.('composer.mainchain.targetSelected', { label: selectedTargetLabel }) ?? `目标 ${selectedTargetLabel}`)
-    : (t?.('composer.mainchain.targetUnselected') ?? '目标未选');
-}
-
-export function formatMainchainTaskLabel(
-  mainchainTask: 'ready' | 'draft required',
-  t?: TFunction,
-): string {
-  return mainchainTask === 'ready'
-    ? (t?.('composer.mainchain.taskReady') ?? '任务就绪')
-    : (t?.('composer.mainchain.taskDraftRequired') ?? '需填写内容');
-}
-
-export function mainchainDataState(
-  selected: boolean,
-): 'selected' | 'missing' {
-  return selected ? 'selected' : 'missing';
-}
-
 export function agentPickerPlaceholder(
   availableCount: number,
   t?: TFunction,

@@ -77,7 +77,6 @@ export interface ComposerChromeVisibility {
   replyBar: boolean;
   quoteBar: boolean;
   mentionChips: boolean;
-  mainchainStrip: boolean;
   attachmentBar: boolean;
   agentPicker: boolean;
   targetPicker: boolean;
@@ -90,13 +89,6 @@ export interface ComposerHostRuntimeDefaults {
   submitBehavior: ComposerSubmitBehavior;
   targetLabel: string;
   hasNativePicker: boolean;
-}
-
-export interface ComposerHostMainchainModel {
-  mainchainTask: 'ready' | 'draft required';
-  selectedAgentLabel: string;
-  selectedTargetLabel: string | undefined;
-  targetSelected: boolean;
 }
 
 export interface ComposerHostAttachmentModel {
@@ -113,7 +105,6 @@ export interface ComposerHostChromeModel {
   replyTo: ReplyToContext | null;
   quote: QuoteContext | null;
   mentions: ComposerMention[] | null;
-  mainchain: ComposerHostMainchainModel | null;
   attachment: ComposerHostAttachmentModel | null;
   agentOptions: ComposerMention[] | null;
   targetPicker: ComposerHostTargetPickerModel | null;
@@ -185,8 +176,6 @@ export function deriveComposerChromeVisibility(params: {
     replyBar: Boolean(composer.replyTo),
     quoteBar: Boolean(composer.quote),
     mentionChips: hasMentions,
-    /* Show mainchain when mentions or targets exist so Agent/目标/任务 always readable. */
-    mainchainStrip: hasMentions || hasExecutionTargets,
     attachmentBar: composer.attachments.length > 0,
     agentPicker: mentionableAgentsCount > 0,
     targetPicker: hasExecutionTargets,
@@ -219,14 +208,6 @@ export function buildComposerHostChromeModel(params: {
     replyTo: chrome.replyBar && composer.replyTo ? composer.replyTo : null,
     quote: chrome.quoteBar && composer.quote ? composer.quote : null,
     mentions: chrome.mentionChips ? composer.mentions : null,
-    mainchain: chrome.mainchainStrip
-      ? {
-          mainchainTask: derived.mainchainTask,
-          selectedAgentLabel: derived.selectedAgentLabel,
-          selectedTargetLabel: derived.selectedTargetLabel,
-          targetSelected: derived.targetSelected,
-        }
-      : null,
     attachment: chrome.attachmentBar
       ? {
           attachments: composer.attachments,
