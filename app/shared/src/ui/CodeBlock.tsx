@@ -30,9 +30,11 @@ interface HighlighterProps {
 
 const LazyHighlighter = lazy(async (): Promise<{ default: React.FC<HighlighterProps> }> => {
   await import('./prismRegistry');
-  const [{ PrismLight: SyntaxHighlighter }, { oneDark }] = await Promise.all([
-    import('react-syntax-highlighter'),
-    import('react-syntax-highlighter/dist/esm/styles/prism'),
+  // Deep entries on purpose: the package barrel also re-exports the highlight.js
+  // build, and the prism styles barrel carries all ~200 theme files.
+  const [{ default: SyntaxHighlighter }, { default: oneDark }] = await Promise.all([
+    import('react-syntax-highlighter/dist/esm/prism-light'),
+    import('react-syntax-highlighter/dist/esm/styles/prism/one-dark'),
   ]);
   const Highlighter: React.FC<HighlighterProps> = ({ language, code, customStyle }) => (
     <SyntaxHighlighter
