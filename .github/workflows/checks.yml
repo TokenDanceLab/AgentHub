@@ -1062,14 +1062,12 @@ jobs:
               - 'app/.npmrc'
               - 'app/test-config/**'
               - '.github/workflows/checks.yml'
-            # design_css = token/theme/preset CSS syntax gate (#1720): the
-            # verifier scans tokens*/themes*/presets*.css anywhere under app/
-            # (10 required paths are the minimum, new matches join the scan).
+            # design_css = CSS gate: stylelint lints all app CSS rules and parses
+            # tokens*/themes*/presets*.css, which the regular config ignores.
             design_css:
-              - 'app/**/tokens*.css'
-              - 'app/**/themes*.css'
-              - 'app/**/presets*.css'
-              - 'app/scripts/verify-design-css-syntax.mjs'
+              - 'app/**/*.css'
+              - 'app/stylelint.syntax.json'
+              - 'app/.stylelintignore-syntax'
               - 'app/package.json'
               - 'app/pnpm-lock.yaml'
               - 'app/pnpm-workspace.yaml'
@@ -2193,14 +2191,14 @@ jobs:
           assert_lane "frontend-mobile-light" "$MOBILE_FILTER" "$MOBILE_RESULT"
           echo "frontend L0 aggregate ok"
 
-  # ── Design CSS syntax gate (fail-closed, #1720) ─
-  # 核心 token/theme/preset CSS 被 .stylelintignore 排除在 Stylelint 之外，
-  # 注释 `*/` 之类的语法错误因此假绿。本 job 只做 parser 语法检查
-  # （config: { rules: {} }），不覆盖其余历史规则。语法错误即 job 失败；
-  # 该 job 按路径运行，不是 required check，合并语义见
+  # ── CSS gate (fail-closed, #1720) ─
+  # pnpm lint:css 覆盖常规规则（硬编码色值、重复 selector/属性、空 block）；
+  # 核心 token/theme/preset CSS 被 .stylelintignore 排除在常规规则外，改用
+  # stylelint.syntax.json（rules: {}）只做 parser 语法检查，避免 `*/` 之类的
+  # 语法错误假绿。该 job 按路径运行，不是 required check，合并语义见
   # docs/architecture/github-actions-ci-cd-policy.md。
   design-css:
-    name: Design CSS syntax (fail-closed)
+    name: CSS lint and syntax (fail-closed)
     needs: changes
     if: >-
       github.event_name == 'workflow_dispatch' ||
@@ -2230,8 +2228,8 @@ jobs:
       - name: Verify design CSS syntax
         run: pnpm test:css-syntax
 
-      - name: Self-test design CSS syntax gate (negative)
-        run: pnpm test:css-syntax:self-test
+      - name: Lint CSS rules
+        run: pnpm lint:css
 
   # ── Vuln Scan: JS (pnpm audit --prod) ─────────
   vuln-scan-js:

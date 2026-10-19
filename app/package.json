@@ -25,8 +25,7 @@
     "test:e2e:real": "pnpm --filter agenthub-web test:e2e:real",
     "test:smoke:matrix": "python ../scripts/smoke/verify-e2e-smoke-matrix.py -RepoRoot ..",
     "lint:css": "stylelint \"**/*.css\" --ignore-path .stylelintignore",
-    "test:css-syntax": "node scripts/verify-design-css-syntax.mjs",
-    "test:css-syntax:self-test": "node scripts/verify-design-css-syntax.mjs --self-test",
+    "test:css-syntax": "stylelint \"**/{tokens,themes,presets}*.css\" --config stylelint.syntax.json --ignore-path .stylelintignore-syntax --allow-empty-input=false",
     "test:e2e:geometry-smoke": "pnpm --filter agenthub-web test:e2e:geometry-smoke && pnpm --filter agenthub-desktop test:e2e:geometry-smoke"
   },
   "pnpm": {
@@ -52,7 +51,6 @@
     "jsdom": "^29.1.1",
     "rollup-plugin-visualizer": "^7.0.1",
     "stylelint": "^16.21.0",
-    "stylelint-config-standard": "^38.0.0",
     "typescript-eslint": "^8.59.4",
     "vitest": "^4.1.10"
   },

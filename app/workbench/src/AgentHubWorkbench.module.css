@@ -3780,7 +3780,7 @@
     width: auto !important;
     max-width: none !important;
     overflow: visible !important;
-    background: #fff !important;
+    background: white !important;
   }
 
   /* Workspace: 同样解除裁剪; ::before 玻璃染色是纯屏幕装饰。
@@ -3791,7 +3791,7 @@
     min-height: 0 !important;
     max-width: none !important;
     overflow: visible !important;
-    background: #fff !important;
+    background: white !important;
   }
 
   .workspace::before {

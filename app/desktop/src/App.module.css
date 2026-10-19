@@ -538,7 +538,7 @@
   min-height: 1.5em;
   padding: 1px 0 3px;
   font-size: 13px;
-  font-weight: 400;
+  font-weight: 500;
   line-height: 1.5;
   letter-spacing: 0;
 }
@@ -553,6 +553,7 @@
   padding: 1px 0 3px;
   text-overflow: ellipsis;
   white-space: nowrap;
+  font-weight: 500;
 }
 
 .workspaceHeaderActions {
@@ -1421,25 +1422,3 @@
   color: var(--text-strong);
 }
 
-.workspaceHeader h2 {
-  font-weight: 500;
-}
-
-.workspaceThreadTitle {
-  font-weight: 500;
-}
-
-.banner {
-  background: var(--glass-bg-medium);
-  border-bottom-color: var(--td-line);
-  color: var(--td-ink);
-}
-
-.bannerBtn {
-  border-color: var(--td-line);
-  color: var(--td-ink);
-}
-
-.bannerBtn:hover:not(:disabled) {
-  background: var(--glass-bg-medium);
-}

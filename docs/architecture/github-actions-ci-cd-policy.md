@@ -48,7 +48,7 @@
 - 服务行为：fixture E2E、Edge→Hub callback、PostgreSQL + Redis integration。
 - `backend-required` 聚合 `go-edge`/`go-hub`/`backend-integration`/`backend-edge-e2e`/`backend-e2e-fixture`，`if: always()`；Go 无变化时退出 success 作为有意 no-op，`changes` 失败时 fail-closed，任一 lane 非 success 即失败。
 - `frontend-required` 聚合 `frontend-desktop`/`frontend-web`/`frontend-mobile-light`，语义同上。
-- Visual QA shell、stubbed-hub Playwright、CSS syntax、vulnerability gate 按路径执行：job 自身 fail-closed（出错即失败，非 `continue-on-error`），但都不是 required check，不单独阻塞合并。
+- Visual QA shell、stubbed-hub Playwright、CSS lint/syntax、vulnerability gate 按路径执行：job 自身 fail-closed（出错即失败，非 `continue-on-error`），但都不是 required check，不单独阻塞合并。
 
 ### Windows
 

@@ -1,5 +1,5 @@
 /* ShortcutsPane remap controls (#1822/#1853) — design tokens only, no
-   hard-coded colors (verify-design-css-syntax gate). */
+   hard-coded colors (design-css syntax gate). */
 
 .keyButton {
   display: inline-flex;
