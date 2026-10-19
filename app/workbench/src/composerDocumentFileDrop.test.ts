@@ -230,7 +230,7 @@ describe('handleDocumentDrop', () => {
   });
 
   it('#1853 review: dispatches when the conversation stayed the same', async () => {
-    let currentConversation = 'c1';
+    const currentConversation = 'c1';
     const cb = makeCallbacks({ getCurrentConversationId: () => currentConversation });
     vi.mocked(browserFilesToComposerAttachments).mockResolvedValue([
       { id: 'a3', name: 'same.pdf', size: 2048 } as ComposerAttachment,

@@ -5,7 +5,7 @@
 // checkpoint seed (Desktop) the overlay fetches through the port; without it
 // (Web, Hub-only) the overlay degrades to the honest surface notice.
 import '@testing-library/jest-dom/vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 import React from 'react';
 

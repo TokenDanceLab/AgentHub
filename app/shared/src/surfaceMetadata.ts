@@ -327,18 +327,3 @@ export function getSurfaceByDesktopSectionId(sectionId: string): SurfaceMetadata
     (surface) => 'desktopSectionId' in surface && surface.desktopSectionId === sectionId,
   );
 }
-
-function matchesRoutePattern(route: string, pattern: string): boolean {
-  const routeParts = trimSlashes(route).split('/').filter(Boolean);
-  const patternParts = trimSlashes(pattern).split('/').filter(Boolean);
-
-  if (routeParts.length !== patternParts.length) {
-    return false;
-  }
-
-  return patternParts.every((part, index) => part.startsWith(':') || part === routeParts[index]);
-}
-
-function trimSlashes(value: string): string {
-  return value.replace(/^\/+|\/+$/g, '');
-}
