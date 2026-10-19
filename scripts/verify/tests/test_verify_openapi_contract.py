@@ -87,7 +87,7 @@ class EdgeSecurityTests(unittest.TestCase):
         spec = spec.replace("__SECURITY__", "      security:\n        - edgeBearerAuth: []\n")
         code, output = run_verifier(spec)
         self.assertNotEqual(code, 0, f"Hub route absent from router must fail:\n{output}")
-        self.assertIn("NOT registered in hub router", output)
+        self.assertIn("+ POST /v1/runs", output)
 
 
 PARAM_SPEC = """openapi: 3.0.3

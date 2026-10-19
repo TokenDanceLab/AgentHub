@@ -989,13 +989,13 @@ jobs:
               - 'app/pnpm-workspace.yaml'
               - 'app/.npmrc'
               - 'scripts/verify/verify-rust-advisories.sh'
-              - 'scripts/verify/tests/verify-rust-advisories.Tests.sh'
+              - 'scripts/verify/tests/test_verify_rust_advisories.sh'
               - 'scripts/verify/tests/fixtures/rust-advisories/**'
               - '.github/workflows/checks.yml'
             rust:
               - 'app/desktop/src-tauri/**'
               - 'scripts/verify/verify-rust-advisories.sh'
-              - 'scripts/verify/tests/verify-rust-advisories.Tests.sh'
+              - 'scripts/verify/tests/test_verify_rust_advisories.sh'
               - 'scripts/verify/tests/fixtures/rust-advisories/**'
               - '.github/workflows/checks.yml'
             web:
@@ -2127,9 +2127,9 @@ jobs:
       - name: Self-test security gates
         shell: bash
         run: |
-          bash scripts/verify/tests/verify-vulnerability-gates.Tests.sh
-          bash scripts/verify/tests/verify-gosec-gates.Tests.sh
-          bash scripts/verify/tests/check-secrets.Tests.sh
+          bash scripts/verify/tests/test_verify_vulnerability_gates.sh
+          bash scripts/verify/tests/test_verify_gosec_gates.sh
+          bash scripts/verify/tests/test_check_secrets.sh
 
       - name: Self-test repository contract gates
         shell: bash
@@ -2137,15 +2137,15 @@ jobs:
           python scripts/verify/verify-doc-ssot.py --self-test
           python scripts/verify/verify-ci-invariants.py --self-test
           python scripts/verify/verify-ci-invariants.py
-          python scripts/verify/tests/verify-release-gate.Tests.py
-          bash scripts/verify/tests/verify-commit-messages.Tests.sh
-          python scripts/verify/tests/verify-openapi-contract.Tests.py
-          python scripts/verify/tests/verify-shared-rest-contract.Tests.py
-          python scripts/verify/tests/verify-oidc-code-ssot.Tests.py
-          python scripts/verify/tests/verify-outbound-client-hygiene.Tests.py
-          python scripts/verify/tests/verify-real-e2e-artifacts.Tests.py
-          python scripts/verify/tests/verify-real-e2e-lane-manifest.Tests.py
-          python scripts/verify/tests/merge-coverprofiles.Tests.py
+          python scripts/verify/tests/test_verify_release_gate.py
+          bash scripts/verify/tests/test_verify_commit_messages.sh
+          python scripts/verify/tests/test_verify_openapi_contract.py
+          python scripts/verify/tests/test_verify_shared_rest_contract.py
+          python scripts/verify/tests/test_verify_oidc_code_ssot.py
+          python scripts/verify/tests/test_verify_outbound_client_hygiene.py
+          python scripts/verify/tests/test_verify_real_e2e_artifacts.py
+          python scripts/verify/tests/test_verify_real_e2e_lane_manifest.py
+          python scripts/verify/tests/test_merge_coverprofiles.py
 
   # ── 前端 L0 稳定 required 聚合（对偶 backend-required / windows-go 恒报模式） ─
   # AGENTS「测试分层」L0：前端 vitest lanes（frontend-desktop / frontend-web /
@@ -2375,4 +2375,4 @@ jobs:
 
       - name: Rust advisory gate self-test
         shell: bash
-        run: bash scripts/verify/tests/verify-rust-advisories.Tests.sh
+        run: bash scripts/verify/tests/test_verify_rust_advisories.sh

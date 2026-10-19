@@ -23,7 +23,7 @@
 # glob path, a missing owner, entry count over maxEntries, malformed JSON and a
 # literal absent from its registered path must ALL exit non-zero.
 #
-# Runs in CI validate job alongside verify-vulnerability-gates.Tests.sh.
+# Runs in CI validate job alongside test_verify_vulnerability_gates.sh.
 set -uo pipefail
 
 SCRIPT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/check-secrets.sh"

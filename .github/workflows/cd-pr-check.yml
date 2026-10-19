@@ -14,7 +14,7 @@ on:
       - ".github/workflows/release.yml"
       - "hub-server/scripts/generate-secrets*"
       - "scripts/verify/verify-deployment-shape.py"
-      - "scripts/verify/tests/verify-deployment-shape.Tests.py"
+      - "scripts/verify/tests/test_verify_deployment_shape.py"
 
 permissions:
   contents: read
@@ -152,7 +152,7 @@ jobs:
           echo "::endgroup::"
 
       - name: Self-test deployment shape SSOT
-        run: python ./scripts/verify/tests/verify-deployment-shape.Tests.py
+        run: python ./scripts/verify/tests/test_verify_deployment_shape.py
 
   # ── Docker build dry run ───────────────────────
   # CI: bare `docker build` → docker/build-push-action@v7 with type=gha

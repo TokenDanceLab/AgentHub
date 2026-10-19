@@ -87,7 +87,7 @@ jobs:
 
       - name: Self-test release gate
         shell: bash
-        run: python scripts/verify/tests/verify-release-gate.Tests.py
+        run: python scripts/verify/tests/test_verify_release_gate.py
 
   # ── Go: Edge Server + Hub Server ─────────────
   build-go:

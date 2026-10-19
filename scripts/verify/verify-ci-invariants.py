@@ -51,9 +51,9 @@ POLICY = {
             "validate": {
                 "Secret guard": ("check-secrets.sh",),
                 "Self-test security gates": (
-                    "verify-vulnerability-gates.Tests.sh",
-                    "verify-gosec-gates.Tests.sh",
-                    "check-secrets.Tests.sh",
+                    "test_verify_vulnerability_gates.sh",
+                    "test_verify_gosec_gates.sh",
+                    "test_check_secrets.sh",
                 ),
                 "Self-test repository contract gates": (
                     "verify-doc-ssot.py --self-test",

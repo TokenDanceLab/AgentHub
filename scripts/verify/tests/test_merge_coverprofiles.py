@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-r"""merge-coverprofiles.Tests.py — merge-coverprofiles.py 的自测（unittest）。
+r"""test_merge_coverprofiles.py — merge-coverprofiles.py 的自测（unittest）。
 
 契约：
 - 位置键求和：同一位置块在两份 profile 中的 count 相加。
