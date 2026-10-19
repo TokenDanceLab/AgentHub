@@ -36,31 +36,28 @@ export function ComposerAgentPicker({
   onSelect: (agentId: string) => void;
 }): React.ReactElement {
   const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE);
+  const placeholder = agentPickerPlaceholder(availableMentionOptions.length, t);
   return (
-    <label className="group/picker relative inline-flex h-8 min-w-0 items-center gap-1.5 rounded-full px-2.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-within:bg-muted focus-within:text-foreground has-[:disabled]:opacity-50">
-      <DesignNavIcon className="shrink-0" name="agent" size={14} />
-      <span className="sr-only">{t('composer.agentPicker')}</span>
+    <label className="group/picker relative inline-flex h-7 min-w-0 items-center gap-1.5 rounded-md px-2 text-xs text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground focus-within:bg-muted/60 focus-within:text-foreground has-[:disabled]:opacity-40">
+      <DesignNavIcon className="shrink-0" name="agent" size={13} />
+      <span aria-hidden="true" className="max-w-[9.5rem] truncate">
+        {placeholder}
+      </span>
+      <DesignNavIcon className="shrink-0 opacity-50" name="chevron" size={10} />
       <select
         aria-label={t('aria.atAgent')}
-        className="h-8 min-w-0 max-w-[9.5rem] cursor-pointer appearance-none truncate bg-transparent pr-4 text-xs font-medium text-inherit outline-none disabled:cursor-not-allowed"
+        className="absolute inset-0 size-full cursor-pointer appearance-none opacity-0 disabled:cursor-not-allowed"
         disabled={isSubmitting || availableMentionOptions.length === 0}
         onChange={(event) => onSelect(event.target.value)}
         value=""
       >
-        <option value="">
-          {agentPickerPlaceholder(availableMentionOptions.length, t)}
-        </option>
+        <option value="">{placeholder}</option>
         {availableMentionOptions.map((agent) => (
           <option key={agent.id} value={agent.id}>
             {formatAgentOptionLabel(agent)}
           </option>
         ))}
       </select>
-      <DesignNavIcon
-        className="pointer-events-none absolute right-1.5 opacity-60"
-        name="chevron"
-        size={12}
-      />
     </label>
   );
 }
@@ -77,31 +74,31 @@ export function ComposerTargetPicker({
   onChange: (executionTargetId: string) => void;
 }): React.ReactElement {
   const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE);
+  const selectedLabel = executionTargets.find(
+    (target) => target.id === executionTargetId,
+  )?.label;
+  const placeholder = selectedLabel ?? targetPickerPlaceholder(executionTargets.length, t);
   return (
-    <label className="group/picker relative inline-flex h-8 min-w-0 items-center gap-1.5 rounded-full px-2.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-within:bg-muted focus-within:text-foreground has-[:disabled]:opacity-50">
-      <DesignNavIcon className="shrink-0" name="laptop" size={14} />
-      <span className="sr-only">{t('composer.targetPicker')}</span>
+    <label className="group/picker relative inline-flex h-7 min-w-0 max-w-[14rem] items-center gap-1.5 rounded-md px-2 text-xs text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground focus-within:bg-muted/60 focus-within:text-foreground has-[:disabled]:opacity-40">
+      <DesignNavIcon className="shrink-0" name="laptop" size={13} />
+      <span aria-hidden="true" className="truncate">
+        {placeholder}
+      </span>
+      <DesignNavIcon className="shrink-0 opacity-50" name="chevron" size={10} />
       <select
         aria-label={t('aria.target')}
-        className="h-8 min-w-0 max-w-[11rem] cursor-pointer appearance-none truncate bg-transparent pr-4 text-xs font-medium text-inherit outline-none disabled:cursor-not-allowed"
+        className="absolute inset-0 size-full cursor-pointer appearance-none opacity-0 disabled:cursor-not-allowed"
         disabled={isSubmitting || executionTargets.length === 0}
         onChange={(event) => onChange(event.target.value)}
         value={executionTargetId}
       >
-        <option value="">
-          {targetPickerPlaceholder(executionTargets.length, t)}
-        </option>
+        <option value="">{targetPickerPlaceholder(executionTargets.length, t)}</option>
         {executionTargets.map((target) => (
           <option key={target.id} value={target.id}>
             {target.label}
           </option>
         ))}
       </select>
-      <DesignNavIcon
-        className="pointer-events-none absolute right-1.5 opacity-60"
-        name="chevron"
-        size={12}
-      />
     </label>
   );
 }
@@ -127,7 +124,7 @@ export function ComposerSendButton({
     return (
       <Button
         aria-label={t('action.stopRun')}
-        className="size-9 shrink-0 rounded-full shadow-sm"
+        className="size-8 shrink-0 rounded-full"
         data-running="true"
         size="icon-lg"
         type="button"
@@ -141,7 +138,7 @@ export function ComposerSendButton({
   return (
     <Button
       aria-label={hasMentions ? t('action.startAgentTask') : t('profile.sendMessage')}
-      className="size-9 shrink-0 rounded-full shadow-sm"
+      className="size-8 shrink-0 rounded-full"
       disabled={submitDisabled}
       size="icon-lg"
       type="submit"
@@ -162,7 +159,7 @@ export function ComposerAttachButton({
   return (
     <Button
       aria-label={t('aria.addAttachment')}
-      className="size-8 shrink-0 rounded-full text-muted-foreground"
+      className="size-7 shrink-0 rounded-md text-muted-foreground"
       disabled={isSubmitting}
       size="icon-sm"
       onClick={onClick}
@@ -207,7 +204,7 @@ export function ComposerApprovalModePicker({
       options={options}
       disabled={isSubmitting}
       className="shrink-0"
-      triggerClassName="max-w-[11rem] rounded-full bg-transparent! text-xs! font-medium! text-muted-foreground! hover:bg-muted! hover:text-foreground! aria-expanded:bg-muted! aria-expanded:text-foreground!"
+      triggerClassName="max-w-[11rem] rounded-md bg-transparent! text-xs! text-muted-foreground! hover:bg-muted/60! hover:text-foreground! aria-expanded:bg-muted/60! aria-expanded:text-foreground!"
       onChange={(value) => {
         const mode = pickerValueToApprovalMode(value);
         if (mode) onChange(mode);

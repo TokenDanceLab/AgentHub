@@ -2,7 +2,6 @@ import '@testing-library/jest-dom/vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 import {
-  ComposerMainchainStrip,
   ComposerMentionChips,
   ComposerQuoteBar,
   ComposerReplyBar,
@@ -59,20 +58,8 @@ describe('ComposerContextParts', () => {
     expect(onRemove).toHaveBeenCalledWith('profile-builder');
   });
 
-  it('renders mainchain and status strips', () => {
-    render(
-      <ComposerMainchainStrip
-        mainchainTask="draft required"
-        selectedAgentLabel="@Builder"
-        selectedTargetLabel={undefined}
-        targetSelected={false}
-      />,
-    );
-    expect(screen.getByText('Agent @Builder')).toBeInTheDocument();
-    expect(screen.getByText('目标未选')).toBeInTheDocument();
-    expect(screen.getByText('需填写内容')).toBeInTheDocument();
-
-    render(<ComposerStatusStrip statusItems={['数据：真实数据']} />);
-    expect(screen.getByText('数据：真实数据')).toBeInTheDocument();
+  it('renders the status strip as one quiet line', () => {
+    render(<ComposerStatusStrip statusItems={['数据：真实数据', '目标：就绪']} />);
+    expect(screen.getByRole('status')).toHaveTextContent('数据：真实数据 · 目标：就绪');
   });
 });

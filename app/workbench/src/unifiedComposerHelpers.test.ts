@@ -12,14 +12,12 @@ import {
   formatComposerDataModeLabel,
   formatComposerTargetStateLabel,
   formatQuotePreview,
-  formatSelectedAgentLabel,
   isAttachmentUploadFailed,
   isAttachmentUploadInFlight,
   isAttachmentUploading,
   isExecutionTargetStillValid,
   isImageAttachment,
   isTargetSelectionRequired,
-  mainchainTaskState,
   partitionAttachmentsBySize,
   resolveTargetStatus,
   shouldSubmitComposerKey,
@@ -145,12 +143,10 @@ describe('unifiedComposerHelpers', () => {
     })).toBe(true);
   });
 
-  it('derives composer chrome labels and task readiness', () => {
-    expect(formatSelectedAgentLabel(baseComposer.mentions)).toBe('@Builder');
+  it('derives composer status and target validity', () => {
     expect(formatQuotePreview({ author: 'Ada', text: 'x'.repeat(80) })).toBe(
       `Ada: ${'x'.repeat(60)}`,
     );
-    expect(mainchainTaskState({ composer: baseComposer, targetSelected: true })).toBe('ready');
     expect(isExecutionTargetStillValid([{ id: 't1', label: 'A' }], 't2')).toBe(false);
     expect(isImageAttachment({
       id: 'a1',
@@ -177,11 +173,9 @@ describe('unifiedComposerHelpers', () => {
     expect(derived.targetSelectionRequired).toBe(true);
     expect(derived.targetSelected).toBe(false);
     expect(derived.submitDisabled).toBe(true);
-    expect(derived.selectedAgentLabel).toBe('@Builder');
     expect(derived.availableMentionOptions).toHaveLength(1);
     expect(derived.statusItems).toContain('数据：真实数据');
     expect(derived.statusItems).toContain('请先选择执行目标再开始。');
-    expect(derived.mainchainTask).toBe('draft required');
   });
 
   describe('attachment size limit', () => {

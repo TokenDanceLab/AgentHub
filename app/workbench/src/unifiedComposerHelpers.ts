@@ -93,17 +93,6 @@ function isExecutionTargetSelected(
   return !targetSelectionRequired || executionTargetId.trim().length > 0;
 }
 
-function resolveSelectedTargetLabel(
-  executionTargets: ComposerExecutionTarget[] | undefined,
-  executionTargetId: string,
-): string | undefined {
-  return executionTargets?.find((target) => target.id === executionTargetId)?.label;
-}
-
-export function formatSelectedAgentLabel(mentions: ComposerMention[]): string {
-  return mentions.map((mention) => `@${mention.label}`).join(', ');
-}
-
 export function resolveTargetStatus(params: {
   targetSelectionRequired: boolean;
   executionTargetId: string;
@@ -185,14 +174,6 @@ function isComposerSubmitDisabled(params: {
 }): boolean {
   const { composer, isSubmitting, targetSelected } = params;
   return !canSubmitComposer(composer) || isSubmitting || !targetSelected;
-}
-
-export function mainchainTaskState(params: {
-  composer: ComposerState;
-  targetSelected: boolean;
-}): 'ready' | 'draft required' {
-  const { composer, targetSelected } = params;
-  return canSubmitComposer(composer) && targetSelected ? 'ready' : 'draft required';
 }
 
 export function isExecutionTargetStillValid(
@@ -298,12 +279,9 @@ export interface UnifiedComposerDerivedState {
   targetSelectionRequired: boolean;
   targetSelected: boolean;
   submitDisabled: boolean;
-  selectedTargetLabel: string | undefined;
-  selectedAgentLabel: string;
   targetStatus: string | undefined;
   availableMentionOptions: ComposerMention[];
   statusItems: string[];
-  mainchainTask: 'ready' | 'draft required';
 }
 
 export function deriveUnifiedComposerState(params: {
@@ -339,11 +317,8 @@ export function deriveUnifiedComposerState(params: {
       isSubmitting,
       targetSelected,
     }),
-    selectedTargetLabel: resolveSelectedTargetLabel(executionTargets, executionTargetId),
-    selectedAgentLabel: formatSelectedAgentLabel(composer.mentions),
     targetStatus,
     availableMentionOptions: filterAvailableMentionOptions(mentionableAgents, composer.mentions),
     statusItems: buildComposerStatusItems({ status, targetStatus }),
-    mainchainTask: mainchainTaskState({ composer, targetSelected }),
   };
 }

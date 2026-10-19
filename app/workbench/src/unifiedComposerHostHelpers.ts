@@ -19,7 +19,6 @@ export type {
   UnifiedComposerProps,
   ComposerChromeVisibility,
   ComposerHostRuntimeDefaults,
-  ComposerHostMainchainModel,
   ComposerHostAttachmentModel,
   ComposerHostTargetPickerModel,
   ComposerHostChromeModel,
