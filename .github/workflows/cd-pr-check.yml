@@ -23,117 +23,21 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
-env:
-  GO_VERSION: "1.26.9"
-
 jobs:
-  # ── Deployment file validation ─────────────────
+  # ── Deployment shape validation ─────────────────
+  # Only real validators run here: the repo-owned SSOT verifier, its
+  # negative self-test, and `docker compose config`, which is the
+  # authoritative schema + interpolation parser. Earlier hand-rolled
+  # greps over the Dockerfile/compose file were redundant with the
+  # docker-build-dry job below and could drift from what docker accepts.
   deployment-files:
     name: Deployment files validation
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
 
-      - name: Check required deployment files exist
-        run: |
-          echo "::group::Checking required deployment files"
-          FAILED=0
-
-          check_file() {
-            local path="$1"
-            local label="$2"
-            if [ -f "$path" ]; then
-              echo "  OK    $label ($path)"
-            else
-              echo "  MISS  $label ($path)"
-              FAILED=1
-            fi
-          }
-
-          check_file "hub-server/deployments/Dockerfile"           "Dockerfile (build input)"
-          check_file "deployments/production/docker-compose.yml"   "Authoritative production compose"
-          check_file "hub-server/deployments/README.md"            "Build-input README"
-
-          if [ "$FAILED" -eq 1 ]; then
-            echo "::error::One or more required deployment files are missing."
-            exit 1
-          fi
-          echo "::endgroup::"
-
-      - name: Validate Dockerfile syntax
-        run: |
-          echo "::group::Validating Dockerfile"
-          # Quick structural checks on the Dockerfile
-          DOCKERFILE="hub-server/deployments/Dockerfile"
-
-          # Must have FROM
-          if ! grep -qE '^FROM ' "$DOCKERFILE"; then
-            echo "::error::Dockerfile missing FROM instruction"
-            exit 1
-          fi
-
-          # Must have HEALTHCHECK
-          if ! grep -qE 'HEALTHCHECK' "$DOCKERFILE"; then
-            echo "::error::Dockerfile is missing HEALTHCHECK instruction"
-            exit 1
-          fi
-
-          # Must have CMD or ENTRYPOINT
-          if ! grep -qE '^(CMD|ENTRYPOINT) ' "$DOCKERFILE"; then
-            echo "::error::Dockerfile missing CMD or ENTRYPOINT"
-            exit 1
-          fi
-
-          # Check EXPOSE
-          if ! grep -qE '^EXPOSE ' "$DOCKERFILE"; then
-            echo "::warning::Dockerfile missing EXPOSE — consider adding it"
-          fi
-
-          echo "Dockerfile structure looks valid."
-          echo "::endgroup::"
-
-      - name: Validate authoritative production compose shape
-        run: |
-          echo "::group::Validating deployments/production/docker-compose.yml"
-          COMPOSE_FILE="deployments/production/docker-compose.yml"
-
-          python3 -c "
-          import sys, pathlib
-          try:
-              import yaml
-          except ImportError:
-              print('::warning::PyYAML not available, skipping compose YAML validation')
-              sys.exit(0)
-          try:
-              data = yaml.safe_load(pathlib.Path('${COMPOSE_FILE}').read_text(encoding='utf-8'))
-          except Exception as e:
-              print(f'::error::${COMPOSE_FILE} is not valid YAML: {e}')
-              sys.exit(1)
-
-          if not isinstance(data, dict):
-              print(f'::error::${COMPOSE_FILE} root is not a mapping')
-              sys.exit(1)
-
-          services = data.get('services', {})
-          if not services:
-              print(f'::error::${COMPOSE_FILE} has no services defined')
-              sys.exit(1)
-
-          required_services = ['hub-server', 'redis']
-          for svc in required_services:
-              if svc not in services:
-                  print(f'::error::${COMPOSE_FILE} missing required service: {svc}')
-                  sys.exit(1)
-
-          hub = services.get('hub-server', {})
-          if 'image' not in hub:
-              print('::error::hub-server service missing image key')
-              sys.exit(1)
-
-          print(f'${COMPOSE_FILE} OK — {len(services)} service(s) defined.')
-          print(f'Services: {\", \".join(sorted(services.keys()))}')
-          "
-          echo "::endgroup::"
+      - name: Enforce deployment shape SSOT (#1527)
+        run: python ./scripts/verify/verify-deployment-shape.py
 
       - name: Dry-run compose config interpolation (#1655)
         run: |
@@ -143,12 +47,6 @@ jobs:
           PG_PASSWORD=dry-run-placeholder \
           AGENTHUB_JWT_SECRET=dry-run-placeholder-min-32-chars \
             docker compose -f deployments/production/docker-compose.yml config --quiet
-          echo "::endgroup::"
-
-      - name: Enforce deployment shape SSOT (#1527)
-        run: |
-          echo "::group::Deployment shape SSOT verifier"
-          python ./scripts/verify/verify-deployment-shape.py
           echo "::endgroup::"
 
       - name: Self-test deployment shape SSOT
@@ -187,50 +85,3 @@ jobs:
           docker run --rm --entrypoint /bin/sh agenthub-hub:pr-check \
             -c 'ls -la /app/server-hub && test -x /app/server-hub'
           echo "::endgroup::"
-
-  # ── Deployment status report ───────────────────
-  deployment-status:
-    name: Deployment readiness report
-    needs: [deployment-files, docker-build-dry]
-    if: always()
-    runs-on: ubuntu-latest
-    steps:
-      - name: Compile deployment readiness status
-        run: |
-          echo "::group::Deployment Readiness Report"
-          echo ""
-
-          FILES_OK="${{ needs.deployment-files.result }}"
-          BUILD_OK="${{ needs.docker-build-dry.result }}"
-
-          echo "  Deployment files validation:  ${FILES_OK}"
-          echo "  Docker build dry run:         ${BUILD_OK}"
-
-          if [ "$FILES_OK" = "success" ] && [ "$BUILD_OK" = "success" ]; then
-            echo ""
-            echo "  Status: READY FOR DEPLOYMENT"
-            echo "  This PR passes all CD pre-flight checks."
-            echo ""
-            echo "  Release flow:"
-            echo "    tag push → Release workflow → CD Production (auto)"
-            echo "    or: Actions → CD Production → Run workflow (manual dispatch)"
-          else
-            echo ""
-            echo "  Status: NOT READY"
-            echo "  Fix the failing checks above before merging."
-            if [ "$FILES_OK" != "success" ]; then
-              echo "  - Deployment file(s) missing or invalid."
-            fi
-            if [ "$BUILD_OK" != "success" ]; then
-              echo "  - Docker build failed."
-            fi
-          fi
-          echo "::endgroup::"
-
-      - name: Set final status
-        if: |
-          needs.deployment-files.result != 'success' ||
-          needs.docker-build-dry.result != 'success'
-        run: |
-          echo "::error::CD pre-flight checks failed. Deployment is blocked."
-          exit 1
