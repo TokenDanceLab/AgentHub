@@ -52,7 +52,7 @@ func goFiles(t *testing.T, directory string) []string {
 	if err != nil {
 		t.Fatalf("read %s: %v", directory, err)
 	}
-	var files []string
+	files := make([]string, 0, len(entries))
 	for _, entry := range entries {
 		if !entry.IsDir() && strings.HasSuffix(entry.Name(), ".go") {
 			files = append(files, filepath.Join(directory, entry.Name()))
@@ -67,7 +67,7 @@ func imports(t *testing.T, file string) []string {
 	if err != nil {
 		t.Fatalf("parse imports in %s: %v", file, err)
 	}
-	var paths []string
+	paths := make([]string, 0, len(parsed.Imports))
 	for _, spec := range parsed.Imports {
 		path, err := strconv.Unquote(spec.Path.Value)
 		if err != nil {
@@ -80,7 +80,7 @@ func imports(t *testing.T, file string) []string {
 
 func TestPurePackagesStayImportClean(t *testing.T) {
 	root := hubRoot(t)
-	var files []string
+	files := make([]string, 0, len(purePackageDirs)+len(purePackageFiles))
 	for _, directory := range purePackageDirs {
 		files = append(files, goFiles(t, filepath.Join(root, filepath.FromSlash(directory)))...)
 	}
