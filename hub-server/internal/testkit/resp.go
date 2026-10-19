@@ -4,10 +4,7 @@
 // tests/oidc, tests/scenarios and tests/teamrun.
 package testkit
 
-import (
-	"encoding/json"
-	"testing"
-)
+import "encoding/json"
 
 // APIResponse is the shared Hub response envelope shape used by the smoke and
 // integration test packages (success code/data + error code/message/traceId).
@@ -41,12 +38,4 @@ func (r APIResponse) GetMsg() string {
 		return r.Error.Message
 	}
 	return r.Message
-}
-
-// AssertCode fails the test when the response code differs from want.
-func AssertCode(t *testing.T, r APIResponse, want string, ctx string) {
-	t.Helper()
-	if got := r.GetCode(); got != want {
-		t.Fatalf("%s: code = %q, want %q (msg=%q)", ctx, got, want, r.GetMsg())
-	}
 }

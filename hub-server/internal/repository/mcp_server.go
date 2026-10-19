@@ -92,12 +92,6 @@ func ListPublicMCPServers(db *gorm.DB, q, transport, cursor string, pageSize int
 	return servers, hasMore, nil
 }
 
-// IncrementMCPServerInstallCount atomically increases install_count.
-func IncrementMCPServerInstallCount(db *gorm.DB, id string) error {
-	return db.Model(&model.MCPServer{}).Where("id = ?", id).
-		UpdateColumn("install_count", gorm.Expr("install_count + 1")).Error
-}
-
 // FindMCPServerByOwnerAndName checks for duplicate MCP server names for an owner.
 func FindMCPServerByOwnerAndName(db *gorm.DB, ownerID, name string) (*model.MCPServer, error) {
 	var m model.MCPServer

@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/agenthub/hub-server/internal/model"
 	"github.com/agenthub/hub-server/internal/repository"
 	"github.com/agenthub/pkg/errcode"
 )
@@ -60,13 +59,4 @@ func (s *Service) UpsertSettings(userID string, values map[string]string) (map[s
 
 	// Return all settings after upsert
 	return s.GetSettings(userID)
-}
-
-// SettingsToMap converts a slice of UserSetting to a map.
-func SettingsToMap(settings []model.UserSetting) map[string]string {
-	result := make(map[string]string, len(settings))
-	for _, setting := range settings {
-		result[setting.Key] = setting.Value
-	}
-	return result
 }
