@@ -8,8 +8,6 @@ beforeAll(async () => {
   await useTestI18nLanguage('zh');
 });
 
-const TAB_LABELS = ['企业二维码', '企业链接', '企业邀请码', '手机号'];
-
 function renderModal(overrides: Partial<Parameters<typeof AddContactModal>[0]> = {}) {
   return render(<AddContactModal onClose={vi.fn()} {...overrides} />);
 }

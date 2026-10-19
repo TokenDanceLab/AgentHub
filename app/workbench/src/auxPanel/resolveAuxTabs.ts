@@ -1,5 +1,4 @@
 import {
-  AUX_PANEL_TAB_ORDER,
   FOLDER_SCOPED_AUX_TABS,
   type AuxPanelAvailabilityInput,
   type AuxPanelTab,

@@ -1,7 +1,8 @@
 import '@testing-library/jest-dom/vitest';
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import type { FormEvent } from 'react';
-import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';import { clearDraft, loadDraft, saveDraft } from '@shared/composer';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { loadDraft, saveDraft } from '@shared/composer';
 import type { ComposerMention, ComposerState } from '@shared/composer';
 import { UnifiedComposer } from './UnifiedComposer';
 

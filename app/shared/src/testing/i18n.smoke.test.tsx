@@ -23,7 +23,7 @@ beforeAll(async () => {
 describe('test i18next instance registration', () => {
   it('resolves real translations through useTranslation without NO_I18NEXT_INSTANCE', () => {
     const warnSpy = vi.spyOn(console, 'warn');
-    let capturedCalls: unknown[][] = [];
+    let capturedCalls: unknown[][] | undefined;
     try {
       const { result } = renderHook(() => useTranslation(CHATVIEW_I18N_NAMESPACE));
 
@@ -34,7 +34,7 @@ describe('test i18next instance registration', () => {
       warnSpy.mockRestore();
     }
 
-    const i18nWarning = capturedCalls.find((args) =>
+    const i18nWarning = capturedCalls?.find((args) =>
       (args[1] as { code?: string } | undefined)?.code === 'NO_I18NEXT_INSTANCE',
     );
     expect(i18nWarning).toBeUndefined();

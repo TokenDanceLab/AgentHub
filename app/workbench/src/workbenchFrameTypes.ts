@@ -25,10 +25,7 @@ import type { WorkbenchPanelLayout } from './useWorkbenchPanelLayout';
 import type { WorkbenchSessionChrome } from './useWorkbenchSessionChrome';
 import type { WorkbenchTranscriptChrome } from './useWorkbenchTranscriptChrome';
 import type { WorkbenchProfileChrome } from './useWorkbenchProfileChrome';
-import type {
-  ConversationLiveStatus,
-  WorkbenchAttentionCounts,
-} from './workbenchAttentionModel';
+import type { ConversationLiveStatus } from './workbenchAttentionModel';
 import type {
   AgentHubWorkbenchModelCatalogItem,
   AgentHubWorkbenchProjectsStatus,

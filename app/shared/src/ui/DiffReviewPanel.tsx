@@ -57,7 +57,7 @@ function restoreHunkStates(
 ): Record<string, HunkState> {
   const next = { ...states };
   for (const [key, value] of Object.entries(snapshot)) {
-    if (value === undefined) delete next[key];
+    if (value === undefined) Reflect.deleteProperty(next, key);
     else next[key] = value;
   }
   return next;
