@@ -23,7 +23,7 @@ import socket
 import subprocess
 import sys
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 rows = []
 
@@ -102,7 +102,7 @@ def add_arg_alias(parser, *names, **kwargs):
 
 
 def now_iso():
-    return datetime.now(timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z")
+    return datetime.now(UTC).isoformat(timespec="milliseconds").replace("+00:00", "Z")
 
 
 def test_path_under_root(path, root):

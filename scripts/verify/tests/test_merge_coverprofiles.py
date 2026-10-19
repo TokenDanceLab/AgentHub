@@ -10,7 +10,6 @@ r"""test_merge_coverprofiles.py — merge-coverprofiles.py 的自测（unittest�
 
 import importlib.util
 import os
-import sys
 import tempfile
 import unittest
 
