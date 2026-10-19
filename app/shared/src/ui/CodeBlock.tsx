@@ -1,6 +1,9 @@
 import React, { Suspense, lazy, useState, type CSSProperties } from 'react';
 import { Check, Copy } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+// Type-only: pulls in the package's ambient module declarations, which is what
+// makes the deep entries below typecheck. Erased at build time.
+import type { SyntaxHighlighterProps } from 'react-syntax-highlighter';
 import { CHATVIEW_I18N_NAMESPACE } from '../chatview/i18n/resources';
 import { useCopiedFlag } from './useCopiedFlag';
 import styles from './Markdown.module.css';
@@ -32,10 +35,14 @@ const LazyHighlighter = lazy(async (): Promise<{ default: React.FC<HighlighterPr
   await import('./prismRegistry');
   // Deep entries on purpose: the package barrel also re-exports the highlight.js
   // build, and the prism styles barrel carries all ~200 theme files.
-  const [{ default: SyntaxHighlighter }, { default: oneDark }] = await Promise.all([
+  const [highlighterModule, styleModule] = await Promise.all([
     import('react-syntax-highlighter/dist/esm/prism-light'),
     import('react-syntax-highlighter/dist/esm/styles/prism/one-dark'),
   ]);
+  const SyntaxHighlighter: React.ComponentType<SyntaxHighlighterProps> = highlighterModule.default;
+  // The ambient declaration exposes `oneDark` as a named export, but the ESM
+  // file itself only has a default export.
+  const oneDark = (styleModule as unknown as { default: Record<string, CSSProperties> }).default;
   const Highlighter: React.FC<HighlighterProps> = ({ language, code, customStyle }) => (
     <SyntaxHighlighter
       language={language || 'text'}
