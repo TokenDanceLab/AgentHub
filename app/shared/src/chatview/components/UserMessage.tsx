@@ -7,6 +7,8 @@ import { CHATVIEW_I18N_NAMESPACE } from '../i18n/resources'
 import MarkdownContent from '../../ui/Markdown'
 import { MessageDisplayMeta } from './MessageDisplayMeta'
 import { ImageAttachmentRow } from './ImageAttachment'
+import { Bubble, BubbleContent } from '../../shadcn/ui/bubble'
+import { Message, MessageAvatar, MessageContent } from '../../shadcn/ui/message'
 
 function userAvatarInitial(name: string | undefined, fallback: string): string {
   return (name?.trim() || fallback).slice(0, 1).toUpperCase()
@@ -54,7 +56,7 @@ interface Props {
 export const UserMessage = memo(function UserMessage({ item, chatMode, onContextMenu, enter }: Props) {
   const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE)
   const avatarInitial = userAvatarInitial(item.name, t('chat.you'))
-  const rowClass = enter ? 'grp-row user-row-right grp-enter' : 'grp-row user-row-right'
+  const rowClass = enter ? 'user-row-right grp-enter' : 'user-row-right'
 
   // #1821: text bubbles get the same selectable/context-menu identity tool
   // rows have — only when both an upstream block id and a handler exist.
@@ -84,9 +86,8 @@ export const UserMessage = memo(function UserMessage({ item, chatMode, onContext
 
   if (chatMode === 'dm') {
     return (
-      <div className={rowClass}>
-        <div className="dm-spacer" aria-hidden="true"><div className="ag-av">&nbsp;</div></div>
-        <div className="grp-content user-content-right">
+      <Message className={rowClass}>
+        <MessageContent className="user-content-right w-auto max-w-[78%] items-end gap-1.5">
           <MessageDisplayMeta
             align="right"
             badgeLabel={item.badgeLabel}
@@ -94,22 +95,25 @@ export const UserMessage = memo(function UserMessage({ item, chatMode, onContext
             detail={item.displayDetail}
             title={item.displayTitle}
           />
-          <div className="user-bubble" {...bubbleProps}>
-            {bubbleContent}
-          </div>
-        </div>
-        <div className="dm-avatar"><div className="ag-av user-av">{avatarInitial}</div></div>
-      </div>
+          <Bubble align="end" className="max-w-full">
+            <BubbleContent className="user-bubble" {...bubbleProps}>
+              {bubbleContent}
+            </BubbleContent>
+          </Bubble>
+        </MessageContent>
+        <MessageAvatar className="user-avatar mb-1 self-end">
+          <span className="ag-av user-av">{avatarInitial}</span>
+        </MessageAvatar>
+      </Message>
     )
   }
 
   return (
-    <div className={rowClass}>
-      <div className="dm-spacer" aria-hidden="true"><div className="ag-av">&nbsp;</div></div>
-      <div className="grp-content user-content-right">
+    <Message className={rowClass}>
+      <MessageContent className="user-content-right w-auto max-w-[78%] items-end gap-1.5">
         <div className="user-meta">
-          <span className="ag-time">{item.time}</span>
           <span className="ag-name">{item.name || t('chat.you')}</span>
+          <span className="ag-time">{item.time}</span>
         </div>
         <MessageDisplayMeta
           align="right"
@@ -118,11 +122,15 @@ export const UserMessage = memo(function UserMessage({ item, chatMode, onContext
           detail={item.displayDetail}
           title={item.displayTitle}
         />
-        <div className="user-bubble" {...bubbleProps}>
-          {bubbleContent}
-        </div>
-      </div>
-      <div className="dm-avatar"><div className="ag-av user-av">{avatarInitial}</div></div>
-    </div>
+        <Bubble align="end" className="max-w-full">
+          <BubbleContent className="user-bubble" {...bubbleProps}>
+            {bubbleContent}
+          </BubbleContent>
+        </Bubble>
+      </MessageContent>
+      <MessageAvatar className="user-avatar mb-1 self-end">
+        <span className="ag-av user-av">{avatarInitial}</span>
+      </MessageAvatar>
+    </Message>
   )
 })

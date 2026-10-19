@@ -347,19 +347,22 @@ export function useWorkbenchPanelLayout({
   // with a tighter crush threshold (not the live-resize comfort threshold); collapse
   // is one-directional + idempotent and Desktop-only.
   useEffect(() => {
-    if (typeof window === 'undefined' || platformSurface !== 'desktop') return;
-    maybeCollapseSidebarForWorkspacePressure({
-      isChatPage,
-      sidebarCollapsed,
-      viewportWidth: window.innerWidth,
-      sidebarWidth,
-      nextInspectorWidth: inspectorWidth,
-      minWorkspaceWidth: WORKSPACE_MOUNT_COLLAPSE_WIDTH,
-      setSidebarCollapsed,
-    });
-    // At a genuinely narrow Desktop window the fixed 400px inspector column
-    // still crushes the chat main area after the sidebar collapses. Collapse it
-    // on mount as well (one-directional + idempotent); the user can re-open it.
+    if (typeof window === 'undefined') return;
+    if (platformSurface === 'desktop') {
+      maybeCollapseSidebarForWorkspacePressure({
+        isChatPage,
+        sidebarCollapsed,
+        viewportWidth: window.innerWidth,
+        sidebarWidth,
+        nextInspectorWidth: inspectorWidth,
+        minWorkspaceWidth: WORKSPACE_MOUNT_COLLAPSE_WIDTH,
+        setSidebarCollapsed,
+      });
+    }
+    // At a genuinely narrow window the fixed 400px inspector column still
+    // crushes the chat main area after the sidebar collapses. This applies to
+    // Web as well as Desktop: keep one readable conversation column on mount
+    // (one-directional + idempotent); the user can re-open the inspector.
     if (window.innerWidth < WORKSPACE_MOUNT_COLLAPSE_INSPECTOR_WIDTH) {
       setInspectorCollapsedByUser(true);
     }
@@ -393,6 +396,9 @@ export function useWorkbenchPanelLayout({
     function handleViewportResize(): void {
       if (framePending) return;
       framePending = true;
+      if (window.innerWidth < WORKSPACE_MOUNT_COLLAPSE_INSPECTOR_WIDTH) {
+        setInspectorCollapsedByUser(true);
+      }
       if (typeof window.requestAnimationFrame === 'function') {
         rafId = window.requestAnimationFrame(evaluateWorkspacePressure);
       } else {

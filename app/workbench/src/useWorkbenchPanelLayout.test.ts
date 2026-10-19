@@ -400,11 +400,13 @@ describe('useWorkbenchPanelLayout', () => {
     expect(result.current.inspectorCollapsed).toBe(false);
   });
 
-  it('does not auto-collapse the inspector on mount on non-desktop surfaces (#1910)', () => {
+  it('auto-collapses the inspector on mount on narrow non-desktop surfaces', () => {
     setViewportWidth(800);
     const { result } = renderPanelLayout({ platformSurface: 'web' });
-    // The mount-time inspector collapse is Desktop-only.
-    expect(result.current.inspectorCollapsed).toBe(false);
+    // Web has no desktop shell toggle flow; a 400px inspector at 800px
+    // would leave a sub-300px conversation column. Collapse it on mount and
+    // let the header toggle re-open it when the user asks for evidence.
+    expect(result.current.inspectorCollapsed).toBe(true);
   });
 
   it('keeps the sidebar open on non-chat pages regardless of workspace pressure', () => {

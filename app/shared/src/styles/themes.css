@@ -79,7 +79,9 @@ html[data-theme-sync='true'] *::after {
   --popover: var(--surface-high);
   --popover-foreground: var(--text-1);
 
-  --primary-foreground: #f4f5ff;
+  /* Dark brand blue is a light cyan; white-on-cyan falls below AA. Use the
+     page ink for the foreground so buttons and user bubbles stay readable. */
+  --primary-foreground: #0b1b26;
   --secondary: rgba(255,255,255,0.055);
   --secondary-foreground: var(--text-1);
   --muted: rgba(255,255,255,0.042);

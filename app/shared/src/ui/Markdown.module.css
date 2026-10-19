@@ -230,7 +230,8 @@
 }
 
 .root th {
-  background: var(--td-surface-3);
+  background: var(--td-surface);
+  color: var(--td-ink-muted);
   font-weight: 500;
 
   /* Sticky header: the table is the scroll container (overflow-x: auto), so

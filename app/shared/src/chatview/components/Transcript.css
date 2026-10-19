@@ -2,7 +2,19 @@
    TRANSCRIPT — unified grp-row (DM + Group share same flex layout)
    ══════════════════════════════════════════════════════════════════════ */
 
-.transcript { display:flex; flex-direction:column; gap:0; min-width:0; flex:1; min-height:0; overflow-y:auto; scroll-behavior:smooth; scrollbar-gutter:stable; scrollbar-width:thin; padding:0 0 0 10px }
+.transcript {
+  display:flex;
+  flex-direction:column;
+  gap:0;
+  min-width:0;
+  flex:1;
+  min-height:0;
+  overflow-y:auto;
+  scroll-behavior:smooth;
+  scrollbar-gutter:stable;
+  scrollbar-width:thin;
+  padding:24px max(18px, calc((100% - 780px) / 2)) 12px;
+}
 
 /* ── Scroll-to-bottom button ────────────────────────────────────────── */
 .scroll-to-bottom-btn {
@@ -226,20 +238,24 @@
   font-weight:400;
 }
 
-/* ── Row — symmetric: [avatar-l] [content flex:1] [avatar-r] ────────
-   Density: row rhythm uses chat density tokens (12px step), not base 20/24. */
-.grp-row {
-  display:flex; gap:var(--chat-sp-sm); align-items:flex-start;
-  margin-bottom:var(--chat-sp-md);
+/* ── Rows ─────────────────────────────────────────────────────────────
+   One reading column, generous vertical rhythm, avatar-led alignment. */
+.agent-row,
+.user-row-right {
+  display:flex;
+  gap:12px;
+  align-items:flex-start;
+  margin-bottom:26px;
 }
-.grp-content { flex:1; min-width:0; display:flex; flex-direction:column; gap:var(--chat-sp-2) }
+.user-row-right { justify-content:flex-end }
+.grp-content { flex:1; min-width:0; display:flex; flex-direction:column; gap:8px }
 
 .card-stack {
   align-self:flex-start;
   display:flex;
   flex-direction:column;
-  gap:0;
-  width:min(86%, 820px);
+  gap:8px;
+  width:100%;
   max-width:100%;
   min-width:0;
 }
@@ -247,20 +263,15 @@
 /* first child aligns flush to avatar top */
 .grp-content > :first-child { margin-top:0 }
 
-/* Bubbles sit on a stable reading column; user replies still shrink right. */
-.grp-content > .agent-bubble { align-self:flex-start; max-width:72% }
-.grp-content > .user-bubble { align-self:flex-end; max-width:68% }
-
 .bubble-group {
   align-self:flex-start;
   display:flex;
   flex-direction:column;
-  gap:var(--chat-sp-xxs);
-  width:min(86%, 820px);
+  gap:6px;
+  width:100%;
   max-width:100%;
   min-width:0;
 }
-.bubble-group > .agent-bubble { width:100% }
 
 /* ── Message display metadata from Hub/Edge contracts ─────────────── */
 .message-display-meta {
@@ -343,17 +354,27 @@
 }
 
 /* ── Bubbles ─────────────────────────────────────────────────────────
-   Density: tighter vertical padding, keep horizontal reading comfort. */
+   User speech is a quiet brand bubble; assistant output is plain prose on
+   the canvas (Vercel-style), with cards carrying the structured evidence. */
 .user-bubble {
-  background:var(--td-plum); color:var(--td-ink-on-plum);
-  border-radius:var(--chat-r-lg); padding:var(--chat-sp-xxs) var(--chat-sp-sm);
-  font:var(--chat-bubble-font); line-height:1.55; word-break:break-word;
+  max-width:min(100%, 620px);
+  background:var(--td-plum);
+  color:var(--td-ink-on-plum);
+  border:0;
+  border-radius:18px 18px 6px 18px;
+  padding:10px 14px;
+  font:400 0.9375rem/1.6 var(--td-font);
+  word-break:break-word;
+  box-shadow:0 1px 1px rgb(0 0 0 / 0.04);
 }
 
 .agent-bubble {
-  background:var(--td-surface); border:1px solid var(--td-line);
-  border-radius:var(--chat-r-md); padding:var(--chat-sp-xxs) var(--chat-sp-sm);
-  font:var(--chat-body); color:var(--td-ink); line-height:1.5;
+  background:transparent;
+  border:0;
+  border-radius:0;
+  padding:0;
+  font:400 0.9375rem/1.68 var(--td-font);
+  color:var(--td-ink);
   max-width:100%;
   min-width:0;
 }
@@ -402,9 +423,10 @@
 
 /* ── Avatars ───────────────────────────────────────────────────────── */
 .ag-av {
-  width:var(--avatar-size); height:var(--avatar-size); border-radius:50%;
+  width:26px; height:26px; border-radius:50%;
   display:flex; align-items:center; justify-content:center;
-  font:600 0.75rem var(--td-font); color:var(--td-ink-on-plum); flex-shrink:0;
+  font:600 0.6875rem var(--td-font); color:var(--td-ink-on-plum); flex-shrink:0;
+  box-shadow:inset 0 0 0 1px rgb(255 255 255 / 0.12);
 }
 .ag-av.builder{background:var(--role-builder)} .ag-av.reviewer{background:var(--role-reviewer)}
 .ag-av.deployer{background:var(--role-deployer)} .ag-av.researcher{background:var(--role-researcher)}
@@ -412,29 +434,25 @@
 .ag-av.agent{background:var(--info)} .ag-av.system{background:var(--td-ink-subtle)}
 .ag-av.user-av{background:var(--td-plum)}
 
-.ag-name { font:var(--chat-label); color:var(--td-ink-muted) }
-.ag-time { font:var(--chat-label-xs); font-family:var(--td-mono); font-weight:400; color:var(--td-ink-subtle) }
+.ag-name { font:600 0.8125rem/1.3 var(--td-font); color:var(--td-ink) }
+.ag-time { font:400 0.6875rem/1.3 var(--td-mono); color:var(--td-ink-subtle) }
 
-.user-meta { display:flex; align-items:center; gap:var(--chat-sp-sm); margin-bottom:var(--chat-sp-2) }
+.user-meta { display:flex; align-items:center; gap:8px }
 
-.user-row-right { justify-content:flex-end }
 .user-content-right { align-items:flex-end }
 
-.agent-meta { display:flex; align-items:center; gap:var(--chat-sp-sm) }
+.agent-meta { display:flex; align-items:baseline; gap:8px }
 
 .dm-avatar { flex-shrink:0 }
-
-/* ── Spacer placeholder — preserves symmetric grp-row layout ──────── */
-.dm-spacer { flex-shrink:0; visibility:hidden }
-.dm-spacer .ag-av { visibility:hidden }
-
+.user-avatar { width:26px; height:26px; min-width:26px; border-radius:9999px; background:transparent }
 
 /* ── #1825: new-message entry + streaming activity ────────────────────
    grp-enter is keyed to the newest same-session append (Transcript sets the
    class once, clears it after the animation window) so virtualized remounts
    while scrolling history never replay it. transform/opacity only — layout
    height is untouched, keeping virtua measurements stable. */
-.grp-row.grp-enter { animation:grpEnter var(--chat-dur-slow) var(--td-ease) both }
+.agent-row.grp-enter,
+.user-row-right.grp-enter { animation:grpEnter var(--chat-dur-slow) var(--td-ease) both }
 
 @keyframes grpEnter {
   from { opacity:0; transform:translateY(6px) }
@@ -456,6 +474,7 @@
 @media (prefers-reduced-motion: reduce) {
   .transcript { scroll-behavior:auto }
 
-  .grp-row.grp-enter,
+  .agent-row.grp-enter,
+  .user-row-right.grp-enter,
   .bubble-group.streaming .agent-bubble::after { animation:none }
 }

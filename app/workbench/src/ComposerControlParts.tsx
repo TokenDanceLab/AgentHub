@@ -3,8 +3,8 @@ import { useTranslation } from 'react-i18next';
 import type { ApprovalMode, ComposerMention } from '@shared/composer';
 import { CHATVIEW_I18N_NAMESPACE } from '@shared/chatview/i18n/resources';
 import { PermissionModePicker } from '@shared/ui';
+import { Button } from '@shared/shadcn/ui/button';
 import { DesignNavIcon } from './designIcons';
-import styles from './AgentHubWorkbench.module.css';
 import {
   activeComposerApprovalModeLabel,
   approvalModeToPickerValue,
@@ -23,7 +23,7 @@ import type { ComposerExecutionTarget } from './unifiedComposerHelpers';
 
    Helper module for UnifiedComposerParts (#706).
    DesignNavIcon only for icon glyphs.
-   CSS remains on shared AgentHubWorkbench.module.css.
+   Visuals use shadcn Button + Tailwind classes over shared theme tokens.
    ═══════════════════════════════════════════════════════════════════════ */
 
 export function ComposerAgentPicker({
@@ -37,11 +37,12 @@ export function ComposerAgentPicker({
 }): React.ReactElement {
   const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE);
   return (
-    <label className={styles.composerAgentPicker}>
-      <span>{t('composer.agentPicker')}</span>
+    <label className="group/picker relative inline-flex h-8 min-w-0 items-center gap-1.5 rounded-full px-2.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-within:bg-muted focus-within:text-foreground has-[:disabled]:opacity-50">
+      <DesignNavIcon className="shrink-0" name="agent" size={14} />
+      <span className="sr-only">{t('composer.agentPicker')}</span>
       <select
         aria-label={t('aria.atAgent')}
-        className={styles.composerAgentSelect}
+        className="h-8 min-w-0 max-w-[9.5rem] cursor-pointer appearance-none truncate bg-transparent pr-4 text-xs font-medium text-inherit outline-none disabled:cursor-not-allowed"
         disabled={isSubmitting || availableMentionOptions.length === 0}
         onChange={(event) => onSelect(event.target.value)}
         value=""
@@ -55,6 +56,11 @@ export function ComposerAgentPicker({
           </option>
         ))}
       </select>
+      <DesignNavIcon
+        className="pointer-events-none absolute right-1.5 opacity-60"
+        name="chevron"
+        size={12}
+      />
     </label>
   );
 }
@@ -72,11 +78,12 @@ export function ComposerTargetPicker({
 }): React.ReactElement {
   const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE);
   return (
-    <label className={styles.composerTargetPicker}>
-      <span>{t('composer.targetPicker')}</span>
+    <label className="group/picker relative inline-flex h-8 min-w-0 items-center gap-1.5 rounded-full px-2.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-within:bg-muted focus-within:text-foreground has-[:disabled]:opacity-50">
+      <DesignNavIcon className="shrink-0" name="laptop" size={14} />
+      <span className="sr-only">{t('composer.targetPicker')}</span>
       <select
         aria-label={t('aria.target')}
-        className={styles.composerTargetSelect}
+        className="h-8 min-w-0 max-w-[11rem] cursor-pointer appearance-none truncate bg-transparent pr-4 text-xs font-medium text-inherit outline-none disabled:cursor-not-allowed"
         disabled={isSubmitting || executionTargets.length === 0}
         onChange={(event) => onChange(event.target.value)}
         value={executionTargetId}
@@ -90,6 +97,11 @@ export function ComposerTargetPicker({
           </option>
         ))}
       </select>
+      <DesignNavIcon
+        className="pointer-events-none absolute right-1.5 opacity-60"
+        name="chevron"
+        size={12}
+      />
     </label>
   );
 }
@@ -113,26 +125,29 @@ export function ComposerSendButton({
   const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE);
   if (isRunning && onCancel) {
     return (
-      <button
+      <Button
         aria-label={t('action.stopRun')}
-        className={styles.sendButton}
+        className="size-9 shrink-0 rounded-full shadow-sm"
         data-running="true"
+        size="icon-lg"
         type="button"
+        variant="secondary"
         onClick={onCancel}
       >
-        <DesignNavIcon name="stop" />
-      </button>
+        <DesignNavIcon name="stop" size={14} />
+      </Button>
     );
   }
   return (
-    <button
+    <Button
       aria-label={hasMentions ? t('action.startAgentTask') : t('profile.sendMessage')}
-      className={styles.sendButton}
+      className="size-9 shrink-0 rounded-full shadow-sm"
       disabled={submitDisabled}
+      size="icon-lg"
       type="submit"
     >
-      <DesignNavIcon name="send" />
-    </button>
+      <DesignNavIcon name="send" size={16} strokeWidth={2.2} />
+    </Button>
   );
 }
 
@@ -145,15 +160,17 @@ export function ComposerAttachButton({
 }): React.ReactElement {
   const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE);
   return (
-    <button
+    <Button
       aria-label={t('aria.addAttachment')}
-      className={styles.attachmentButton}
+      className="size-8 shrink-0 rounded-full text-muted-foreground"
       disabled={isSubmitting}
+      size="icon-sm"
       onClick={onClick}
       type="button"
+      variant="ghost"
     >
-      <DesignNavIcon name="paperclip" />
-    </button>
+      <DesignNavIcon name="paperclip" size={16} />
+    </Button>
   );
 }
 
@@ -189,11 +206,8 @@ export function ComposerApprovalModePicker({
       ariaLabel={translate('composer.approvalMode.aria', { mode: triggerLabel })}
       options={options}
       disabled={isSubmitting}
-      // Conditional spread: desktop's tsconfig types css-module values as
-      // possibly-undefined and compiles with exactOptionalPropertyTypes.
-      {...(styles.composerApprovalModePicker
-        ? { className: styles.composerApprovalModePicker }
-        : {})}
+      className="shrink-0"
+      triggerClassName="max-w-[11rem] rounded-full bg-transparent! text-xs! font-medium! text-muted-foreground! hover:bg-muted! hover:text-foreground! aria-expanded:bg-muted! aria-expanded:text-foreground!"
       onChange={(value) => {
         const mode = pickerValueToApprovalMode(value);
         if (mode) onChange(mode);

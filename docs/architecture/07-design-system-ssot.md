@@ -1,6 +1,6 @@
 # Design system SSOT map
 
-最后更新：2026-10-18
+最后更新：2026-10-19
 
 > 权威入口：本文件是 **design tokens / theme runtime / surface CSS ownership** 的 SSOT map。Design token SSOT 由 `app/shared/src/styles/`（CSS 值）与 `app/shared/src/designTokens.ts`（跨平台 alias / surface rules）共同组成；后者不是第二份颜色值表。
 > 主架构索引：[architecture.md](../architecture.md)。
@@ -16,6 +16,8 @@
 | **Theme preset runtime SSOT** | `app/shared/src/themePresets.ts` (re-exported from `theme.ts`) | preset list, meta, storage key, `data-theme-preset` apply |
 | **Cross-platform alias registry** | `app/shared/src/designTokens.ts` | `--td-*` ↔ web/mobile alias map + surface rules; literal fallbacks must mirror the CSS SSOT |
 | **UI primitives** | `app/shared/src/ui/**` | Shared components + module CSS |
+| **Tailwind / shadcn bridge** | `app/shared/src/styles/shadcn.css` | Maps existing theme tokens into Tailwind v4 colors, radii, fonts and the `data-theme` dark variant; does not fork token values |
+| **Vendored shadcn primitives** | `app/shared/src/shadcn/ui/**` | Upstream registry source copied into the repo. Customize through caller classes/tokens, not by editing the token SSOT |
 | **Workbench shell** | `app/workbench/src/**` | Product shell CSS/TS（独立包 `@agenthub/workbench`） |
 | **Chatview scoped fork** | `app/shared/src/chatview/design/tokens.css` | Re-declares surfaces/text/status under `.chatview` (scoped isolation; value-drift risk) |
 | **Desktop / Web re-exports** | `app/{desktop,web}/src/styles/{tokens,themes,presets}.css` | Thin `@import` of shared（presets.css 另 re-export `presets-folder-colors.css`；无本地覆盖） |
@@ -36,6 +38,9 @@ Entry CSS load: desktop/web `main.tsx` imports surface `styles/{tokens,themes,pr
 7. **Product CSS** uses semantic tokens `--success` / `--danger` / `--primary` / `--bdr` (and related surface tokens). **`--color-*` is legacy alias / preset-private only** — not for new product module consumers.
 8. **Design token gate**：修改 `app/shared/src/styles/` 或 `app/shared/src/designTokens.ts` 后，运行 `pnpm --dir app --filter @agenthub/shared test`；`designTokens.test.ts`、`styles/tokens-base.test.ts`、`styles/surfaceStyles.test.ts` 必须全绿。
 9. **Shared component acceptance**：新组件验收见 [component-acceptance.md](../component-acceptance.md)。
+10. **New chat surfaces** use the vendored shadcn primitives (`Message`, `Bubble`, `InputGroup`, `Attachment`) plus Tailwind utilities whose colors/radii resolve from `shadcn.css`. Do not add a second palette or a component-local radius scale.
+11. **Preflight stays off during migration.** `shadcn.css` imports Tailwind theme + utilities only; enabling Preflight would reset legacy CSS-Module surfaces. Remove this exception only in the change that retires the last migrated module.
+12. **Flat chrome, glass overlays.** Workbench chrome (rail, sidebar, header, inspector, composer) uses flat `--background` / `--surface-dim` surfaces and 9–18% foreground hairlines. Frosted glass remains for transient overlays and previews, not for the persistent shell.
 
 ## 3. Legitimate surface glue (not forks)
 
@@ -51,6 +56,7 @@ Entry CSS load: desktop/web `main.tsx` imports surface `styles/{tokens,themes,pr
 |---|---|---|
 | Syntax-highlight binding pair (`#282c34` bg / `#abb2bf` ink) | Pinned to react-syntax-highlighter `oneDark`, theme-independent（`CodeBlock.tsx` fallbackStyle + `Markdown.module.css` fade gradient，均带 cross-reference 注释） | 若升级改变 `oneDark` palette，两处同一 commit 重检 |
 | Chatview parallel spacing / density | `--chat-sp-md` aliases compat `--space-md` (12px)；lg/xl = 16/24 为独立密度；radius/type/dark 为独立 fork | Full merge + dark palette needs deliberate redesign |
+| Chat surface migration | Composer + message rows now use shadcn primitives; remaining CSS-Module shell rules are being retired slice by slice | Delete a module rule only in the same change that removes its last consumer |
 | Workbench raw `px` spacing | 可映射 spacing 已走 `--sp-*` / `--space-*`；odd steps remain raw | Optional: scale extension or redesign normalize |
 | Mobile RN theme deltas | Open | 保留已登记 delta：glass proxy / OLED / scrim；token 注册表从共享设计 token 派生 |
 | IM panels local rgba chrome | Open | Hardcode pass to semantic / glass tokens |
@@ -87,6 +93,7 @@ Applied first to AuxPanel and TerminalPanel. Respect `prefers-reduced-motion`.
 | Layer | SSOT |
 |---|---|
 | Capture matrix (merge gate) | `app/desktop/scripts/visual-qa-shell.mjs` + `app/web/scripts/visual-qa-shell.mjs`；两端 `package.json` 均以 `visual:qa:shell` 暴露；标准审阅矩阵为 **1440×810** light+dark · DPR **1x default** |
+| Chat path capture | `app/web/scripts/visual-qa-chat.mjs` (`visual:qa:chat`)：1440×810 light+dark 主场景 + 768×900 goal scene；断言 code block / tool card / goal banner 与横向溢出合同 |
 | Supplemental narrow captures | 同一 gate 额外生成并断言 Web **768×900**、Desktop **800×900** 的 light+dark 截图与 DOM/几何合同；这些宽度不替代 1440×810 标准审阅矩阵 |
 | CI | web：`visual-qa-shell` job；desktop：`visual-qa-desktop` job（均 path-filtered `shell`，chromium only，非空白断言 + artifact 上传，禁 pixel golden） |
 | Gate assertions | `app/{desktop,web}/scripts/assert-visual-qa-shell.mjs` · `assert:visual:qa:shell` |

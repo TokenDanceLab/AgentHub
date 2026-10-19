@@ -237,7 +237,7 @@ export const agentHubThemes = {
       warningSoft: 'rgba(212, 170, 76, 0.08)', // --warning-bg
       danger: '#e87070', // --danger（--td-danger）
       dangerSoft: 'rgba(232, 112, 112, 0.06)', // --danger-bg
-      onAccent: '#f4f5ff', // --primary-foreground（--td-ink-on-plum）
+      onAccent: '#0b1b26', // --primary-foreground（--td-ink-on-plum）
       onDanger: '#ffffff', // --destructive-foreground
       scrim: 'rgba(0, 0, 0, 0.48)', // 登记：mobile-only 遮蔽（CSS 无 --td-scrim）
     },

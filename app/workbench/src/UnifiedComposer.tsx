@@ -17,6 +17,12 @@ import {
 } from './composerMentionPopoverHelpers';
 import { ComposerMentionPopover } from './ComposerMentionPopover';
 import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupTextarea,
+} from '@shared/shadcn/ui/input-group';
+import { cn } from '@shared/lib/utils';
+import {
   buildAttachmentOversizeToast,
   filterAvailableMentionOptions,
   partitionAttachmentsBySize,
@@ -622,7 +628,7 @@ export function UnifiedComposer({
 
   return (
     <form
-      className={styles.composer}
+      className={cn(styles.composer, 'bg-transparent')}
       data-composer-form=""
       onSubmit={onSubmit}
       onDragEnter={handleFormDragEnter}
@@ -630,66 +636,95 @@ export function UnifiedComposer({
       onDragLeave={handleFormDragLeave}
       onDrop={handleFormDrop}
     >
-      {chromeModel.replyTo && (
-        <ComposerReplyBar
-          isSubmitting={view.isSubmitting}
-          onCancel={handleCancelReply}
-          replyTo={chromeModel.replyTo}
-        />
-      )}
-      {chromeModel.quote && (
-        <ComposerQuoteBar
-          isSubmitting={view.isSubmitting}
-          onCancel={handleCancelQuote}
-          quote={chromeModel.quote}
-        />
-      )}
-      {composer.editingMessageId && (
-        <ComposerEditBar
-          isSubmitting={view.isSubmitting}
-          onCancel={handleCancelEdit}
-        />
-      )}
-      {chromeModel.mentions && (
-        <ComposerMentionChips
-          isSubmitting={view.isSubmitting}
-          mentions={chromeModel.mentions}
-          onRemove={handleRemoveMention}
-        />
-      )}
-      {chromeModel.mainchain && (
-        <ComposerMainchainStrip
-          mainchainTask={chromeModel.mainchain.mainchainTask}
-          selectedAgentLabel={chromeModel.mainchain.selectedAgentLabel}
-          selectedTargetLabel={chromeModel.mainchain.selectedTargetLabel}
-          targetSelected={chromeModel.mainchain.targetSelected}
-        />
-      )}
-      {chromeModel.attachment && (
-        <ComposerAttachmentBar
-          attachments={chromeModel.attachment.attachments}
-          isSubmitting={view.isSubmitting}
-          onRemove={handleRemoveAttachment}
-          uploadProgresses={chromeModel.attachment.uploadProgresses}
-          {...(onRetryAttachmentUpload ? { onRetryUpload: onRetryAttachmentUpload } : {})}
-        />
-      )}
-      {view.isSubmitting && inFlightUploadSummaries.length > 0 && (
-        <div className={styles.composerStatus} role="status">
-          {inFlightUploadSummaries.map((summary) => (
-            <span key={summary.attachmentId}>
-              {t('composer.uploadingAttachment', {
-                name: summary.name,
-                percent: String(summary.percent),
-                defaultValue: `上传中 ${summary.name} ${summary.percent}%`,
-              })}
-            </span>
-          ))}
-        </div>
-      )}
-      <div className={styles.composerRow}>
-        {dragOver && <div className={styles.composerDragOverlay} />}
-        <textarea
+      <div className="pointer-events-auto mx-auto flex w-full max-w-3xl flex-col gap-2">
+      <InputGroup
+        className={cn(
+          'relative flex-col items-stretch rounded-2xl border-line bg-card shadow-[0_1px_2px_rgb(0_0_0/0.04),0_12px_32px_-20px_rgb(0_0_0/0.22)] transition-[border-color,box-shadow]',
+          'has-[[data-slot=input-group-control]:focus-visible]:border-primary/35 has-[[data-slot=input-group-control]:focus-visible]:ring-[3px] has-[[data-slot=input-group-control]:focus-visible]:ring-primary/10',
+          dragOver && 'border-primary/60 ring-4 ring-primary/10',
+        )}
+      >
+        {dragOver && (
+          <div
+            className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center rounded-2xl border-2 border-dashed border-primary/50 bg-primary/5 text-xs font-medium text-primary"
+          >
+            {t('composer.dropToAttach', { defaultValue: '松开鼠标以添加附件' })}
+          </div>
+        )}
+        {(chromeModel.replyTo
+          || chromeModel.quote
+          || composer.editingMessageId
+          || chromeModel.mentions
+          || chromeModel.mainchain
+          || chromeModel.attachment
+          || (view.isSubmitting && inFlightUploadSummaries.length > 0)) && (
+          <InputGroupAddon
+            align="block-start"
+            className="w-full cursor-default select-auto flex-col items-stretch gap-2 border-b border-line/60 px-3 pb-2.5 pt-2.5"
+          >
+            {chromeModel.replyTo && (
+              <ComposerReplyBar
+                isSubmitting={view.isSubmitting}
+                onCancel={handleCancelReply}
+                replyTo={chromeModel.replyTo}
+              />
+            )}
+            {chromeModel.quote && (
+              <ComposerQuoteBar
+                isSubmitting={view.isSubmitting}
+                onCancel={handleCancelQuote}
+                quote={chromeModel.quote}
+              />
+            )}
+            {composer.editingMessageId && (
+              <ComposerEditBar
+                isSubmitting={view.isSubmitting}
+                onCancel={handleCancelEdit}
+              />
+            )}
+            {chromeModel.mentions && (
+              <ComposerMentionChips
+                isSubmitting={view.isSubmitting}
+                mentions={chromeModel.mentions}
+                onRemove={handleRemoveMention}
+              />
+            )}
+            {chromeModel.mainchain && (
+              <ComposerMainchainStrip
+                mainchainTask={chromeModel.mainchain.mainchainTask}
+                selectedAgentLabel={chromeModel.mainchain.selectedAgentLabel}
+                selectedTargetLabel={chromeModel.mainchain.selectedTargetLabel}
+                targetSelected={chromeModel.mainchain.targetSelected}
+              />
+            )}
+            {chromeModel.attachment && (
+              <ComposerAttachmentBar
+                attachments={chromeModel.attachment.attachments}
+                isSubmitting={view.isSubmitting}
+                onRemove={handleRemoveAttachment}
+                uploadProgresses={chromeModel.attachment.uploadProgresses}
+                {...(onRetryAttachmentUpload ? { onRetryUpload: onRetryAttachmentUpload } : {})}
+              />
+            )}
+            {view.isSubmitting && inFlightUploadSummaries.length > 0 && (
+              <div
+                className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] leading-4 text-muted-foreground"
+                role="status"
+              >
+                {inFlightUploadSummaries.map((summary) => (
+                  <span key={summary.attachmentId}>
+                    {t('composer.uploadingAttachment', {
+                      name: summary.name,
+                      percent: String(summary.percent),
+                      defaultValue: `上传中 ${summary.name} ${summary.percent}%`,
+                    })}
+                  </span>
+                ))}
+              </div>
+            )}
+          </InputGroupAddon>
+        )}
+        <InputGroupTextarea
           aria-label={t('aria.composerInput')}
           aria-expanded={popoverOpen}
           aria-controls={popoverOpen ? listboxId : undefined}
@@ -699,7 +734,7 @@ export function UnifiedComposer({
               : undefined
           }
           data-composer-input
-          className={styles.composerInput}
+          className="max-h-44 min-h-[54px] resize-none rounded-none border-0 bg-transparent px-4 pt-3.5 pb-1.5 text-[0.9375rem] leading-6 text-foreground shadow-none placeholder:text-muted-foreground/70 focus-visible:ring-0"
           ref={setTextareaRef}
           onChange={handleTextChange}
           onCompositionStart={() => {
@@ -726,34 +761,45 @@ export function UnifiedComposer({
           tabIndex={-1}
           type="file"
         />
-        <ComposerAttachButton isSubmitting={view.isSubmitting} onClick={openFilePicker} />
-        {chromeModel.agentOptions && (
-          <ComposerAgentPicker
-            availableMentionOptions={chromeModel.agentOptions}
+        <InputGroupAddon
+          align="block-end"
+          className="flex-wrap items-center gap-0.5 border-t border-line/70 px-2 py-1.5"
+        >
+          <ComposerAttachButton isSubmitting={view.isSubmitting} onClick={openFilePicker} />
+          <span aria-hidden="true" className="mx-0.5 h-4 w-px bg-line" />
+          {chromeModel.agentOptions && (
+            <ComposerAgentPicker
+              availableMentionOptions={chromeModel.agentOptions}
+              isSubmitting={view.isSubmitting}
+              onSelect={selectMention}
+            />
+          )}
+          {chromeModel.targetPicker && (
+            <ComposerTargetPicker
+              executionTargetId={chromeModel.targetPicker.executionTargetId}
+              executionTargets={chromeModel.targetPicker.executionTargets}
+              isSubmitting={view.isSubmitting}
+              onChange={handleExecutionTargetChange}
+            />
+          )}
+          <ComposerApprovalModePicker
+            approvalMode={composer.approvalMode}
             isSubmitting={view.isSubmitting}
-            onSelect={selectMention}
+            onChange={(mode) => dispatchComposer({ type: 'setApprovalMode', approvalMode: mode })}
           />
-        )}
-        {chromeModel.targetPicker && (
-          <ComposerTargetPicker
-            executionTargetId={chromeModel.targetPicker.executionTargetId}
-            executionTargets={chromeModel.targetPicker.executionTargets}
-            isSubmitting={view.isSubmitting}
-            onChange={handleExecutionTargetChange}
-          />
-        )}
-        <ComposerApprovalModePicker
-          approvalMode={composer.approvalMode}
-          isSubmitting={view.isSubmitting}
-          onChange={(mode) => dispatchComposer({ type: 'setApprovalMode', approvalMode: mode })}
-        />
-        <ComposerSendButton
-          hasMentions={view.hasMentions}
-          isRunning={isRunning}
-          onCancel={onCancel}
-          submitDisabled={view.submitDisabled}
-        />
-      </div>
+          <div className="ml-auto flex items-center gap-2 pl-1">
+            <kbd className="hidden rounded border border-line bg-muted/60 px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground sm:inline-block">
+              Enter
+            </kbd>
+            <ComposerSendButton
+              hasMentions={view.hasMentions}
+              isRunning={isRunning}
+              onCancel={onCancel}
+              submitDisabled={view.submitDisabled}
+            />
+          </div>
+        </InputGroupAddon>
+      </InputGroup>
       {chromeModel.statusItems && (
         <ComposerStatusStrip statusItems={chromeModel.statusItems} />
       )}
@@ -767,6 +813,7 @@ export function UnifiedComposer({
           onHover={setMentionActiveIndex}
         />
       )}
+      </div>
     </form>
   );
 }

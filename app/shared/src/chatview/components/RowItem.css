@@ -5,8 +5,11 @@
 
 .row-item {
   display:flex; flex-direction:column;
-  background:var(--td-surface); border:1px solid var(--td-line); margin:0;
-  border-radius:var(--chat-r-md);
+  background:var(--td-surface);
+  border:1px solid color-mix(in oklch, var(--td-ink) 12%, transparent);
+  margin:0;
+  border-radius:12px;
+  box-shadow:0 1px 2px rgb(0 0 0 / 0.03);
   overflow:hidden;
 }
 .row-item.selected { outline: 2px solid var(--td-plum); outline-offset: -2px }
@@ -30,24 +33,22 @@
 
 .card-stack > .row-item {
   width:100%;
-  border-radius:0;
+  border-radius:12px;
 }
-.card-stack > .row-item + .row-item { border-top:none; margin-top:-1px }
-.card-stack > .row-item:first-child { border-radius:var(--chat-r-md) var(--chat-r-md) 0 0 }
-.card-stack > .row-item:last-child { border-radius:0 0 var(--chat-r-md) var(--chat-r-md) }
-.card-stack > .row-item:only-child { border-radius:var(--chat-r-md) }
+.card-stack > .row-item + .row-item { margin-top:0 }
+.card-stack > .row-item:only-child { border-radius:12px }
 .card-stack > .row-item.route { margin:0 }
 
 .row-hd {
   display:flex; align-items:center; gap:var(--chat-sp-xxs);
-  padding:var(--chat-sp-xs) var(--chat-sp-10); cursor:pointer; user-select:none;
-  font:var(--chat-label); min-height:28px; line-height:1.3;
+  padding:8px 12px; cursor:pointer; user-select:none;
+  font:500 0.78125rem/1.35 var(--td-font); min-height:34px;
   transition:background var(--chat-dur) ease;
   border-radius:inherit;
   border:none; background:none; color:inherit; text-align:inherit;
   width:100%;
 }
-.row-hd:hover { background:var(--td-surface-3) }
+.row-hd:hover { background:color-mix(in oklch, var(--td-ink) 4%, transparent) }
 .row-hd:focus-visible { outline:none; box-shadow:var(--focus-ring) }
 
 /* Artifact rows are preview triggers, not expandable empty file rows. */
@@ -65,7 +66,7 @@
 .row-item.running > .row-hd:hover,
 .row-item:not(.collapsible) > .row-hd:hover { background:transparent }
 
-.row-icon { color:var(--td-ink-muted); flex-shrink:0; width:var(--icon-size); text-align:center; font-size:0.875rem }
+.row-icon { color:var(--td-ink-muted); flex-shrink:0; width:15px; text-align:center; font-size:0.875rem }
 .row-label { font-weight:600; flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
 .row-extra { color:var(--td-ink-subtle); font:var(--chat-label-xs); flex-shrink:0 }
 .row-chevron { color:var(--td-ink-subtle); transition:transform var(--chat-dur) ease; flex-shrink:0; font-size:0.6875rem }
@@ -73,9 +74,9 @@
 .row-item:not(.collapsible) > .row-hd .row-chevron { display:none }
 
 .row-bd {
-  margin-left:19px; padding:var(--chat-sp-2) var(--chat-sp-md) var(--chat-sp-sm) var(--chat-sp-16);
-  font:var(--chat-body); color:var(--td-ink-muted); line-height:1.55;
-  border-left:1px solid var(--td-line);
+  margin-left:20px; padding:6px 14px 12px;
+  font:400 0.78125rem/1.6 var(--td-font); color:var(--td-ink-muted);
+  border-left:1px solid color-mix(in oklch, var(--td-ink) 10%, transparent);
   overflow:hidden;
   animation:rowBdExpand var(--chat-dur) var(--td-ease);
 }
