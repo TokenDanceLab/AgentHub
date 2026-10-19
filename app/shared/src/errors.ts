@@ -61,6 +61,20 @@ export function isTurnInProgressError(error: unknown): boolean {
   return error instanceof AppError && error.status === 409 && error.code === 'turn_in_progress';
 }
 
+/**
+ * Best-effort user-facing message for a caught value.
+ *
+ * Every platform had its own copy of this and one of them silently dropped the
+ * `string` case, so a thrown string surfaced as the generic fallback. This is
+ * the single definition: `Error.message`, then a non-blank thrown string, then
+ * the caller's fallback.
+ */
+export function errorMessage(error: unknown, fallback: string): string {
+  if (error instanceof Error && error.message.trim()) return error.message;
+  if (typeof error === 'string' && error.trim()) return error;
+  return fallback;
+}
+
 export async function parseError(response: Response): Promise<AppError> {
   try {
     const body = await response.json();

@@ -9,6 +9,7 @@ import {
   type WorkbenchDataMode,
 } from '@shared/demo';
 import { normalizeThreadItemsToTranscript } from '@shared/transcript';
+import { errorMessage } from '@shared/errors';
 import { appDateLocaleTag } from '@shared/i18n/locale';
 import type { TFunction } from 'i18next';
 import { getI18n } from 'react-i18next';
@@ -612,10 +613,4 @@ function workspaceProjectToProjectInfo(
     artifacts: [],
     feed: [],
   };
-}
-
-function errorMessage(error: unknown, fallback: string): string {
-  if (error instanceof Error && error.message.trim()) return error.message;
-  if (typeof error === 'string' && error.trim()) return error;
-  return fallback;
 }

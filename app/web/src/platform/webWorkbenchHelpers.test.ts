@@ -1,14 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { errorMessage } from './webWorkbenchError';
 import { projectDraftToHubRequest } from './webWorkbenchProjects';
 import { executionTargetLabel, resolveWebExecutionTargetStatus } from './webWorkbenchExecutionTargets';
 
 describe('webWorkbench helper seam', () => {
-  it('errorMessage covers non-Error objects', () => {
-    expect(errorMessage({ message: 'nope' }, 'fallback')).toBe('fallback');
-    expect(errorMessage('', 'fallback')).toBe('fallback');
-  });
-
   it('projectDraftToHubRequest falls back to default name', () => {
     expect(projectDraftToHubRequest({ name: '   ', description: 'x' })).toEqual({
       name: '未命名项目',

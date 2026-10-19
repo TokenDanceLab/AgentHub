@@ -1,11 +1,30 @@
 import { describe, expect, it } from 'vitest';
 import {
   AppError,
+  errorMessage,
   isErrorResponse,
   isTurnInProgressError,
   parseError,
   type ErrorBody,
 } from './errors';
+
+describe('errorMessage', () => {
+  it('prefers Error.message', () => {
+    expect(errorMessage(new Error('boom'), 'fallback')).toBe('boom');
+  });
+
+  it('keeps a non-blank thrown string', () => {
+    expect(errorMessage('plain failure', 'fallback')).toBe('plain failure');
+  });
+
+  it('falls back for blank, non-Error and empty values', () => {
+    expect(errorMessage('', 'fallback')).toBe('fallback');
+    expect(errorMessage('   ', 'fallback')).toBe('fallback');
+    expect(errorMessage(new Error('  '), 'fallback')).toBe('fallback');
+    expect(errorMessage({ message: 'nope' }, 'fallback')).toBe('fallback');
+    expect(errorMessage(undefined, 'fallback')).toBe('fallback');
+  });
+});
 
 describe('isTurnInProgressError', () => {
   const turnBody: ErrorBody = {
