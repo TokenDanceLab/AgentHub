@@ -4,7 +4,7 @@
 // Shared vi.mock registration + suite hooks for the #1763 AgentHubWorkbench
 // test shards. Must stay the first import so mock factories register before
 // the component tree (and its virtua/@lobehub/icons deps) is evaluated.
-import { installWorkbenchTestHooks } from './helpers';
+import { installWorkbenchTestHooks, openRailPage } from './helpers';
 
 import {
   fireEvent,
@@ -55,7 +55,7 @@ describe('AgentHubWorkbench', () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: '项目' }));
+    await openRailPage('项目');
     const projectMain = screen.getByRole('heading', { name: 'Hub 项目' }).closest('main');
     expect(projectMain).not.toBeNull();
     const projectScope = within(projectMain as HTMLElement);
@@ -105,7 +105,7 @@ describe('AgentHubWorkbench', () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: '项目' }));
+    await openRailPage('项目');
     const projectMain = screen.getByRole('heading', { name: '暂无项目' }).closest('main');
     expect(projectMain).not.toBeNull();
     const projectScope = within(projectMain as HTMLElement);
@@ -123,7 +123,7 @@ describe('AgentHubWorkbench', () => {
     });
   });
 
-  it('hides Hub Projects create affordances when project creation is unavailable', () => {
+  it('hides Hub Projects create affordances when project creation is unavailable', async () => {
     const platform = createMockPlatform({
       surface: 'web',
       capabilities: { browserPreview: true },
@@ -140,7 +140,7 @@ describe('AgentHubWorkbench', () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: '项目' }));
+    await openRailPage('项目');
 
     expect(screen.getByRole('heading', { name: '暂无项目' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '新建项目' })).not.toBeInTheDocument();
@@ -148,7 +148,7 @@ describe('AgentHubWorkbench', () => {
     expect(screen.queryByRole('button', { name: '创建项目' })).not.toBeInTheDocument();
   });
 
-  it('hides Hub Projects update affordances when project updates are unavailable', () => {
+  it('hides Hub Projects update affordances when project updates are unavailable', async () => {
     const platform = createMockPlatform({
       surface: 'web',
       capabilities: { browserPreview: true },
@@ -176,7 +176,7 @@ describe('AgentHubWorkbench', () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: '项目' }));
+    await openRailPage('项目');
 
     const projectMain = screen.getByRole('heading', { name: 'Hub 项目' }).closest('main');
     expect(projectMain).not.toBeNull();
@@ -186,7 +186,7 @@ describe('AgentHubWorkbench', () => {
     expect(projectScope.queryByRole('button', { name: '保存项目' })).not.toBeInTheDocument();
   });
 
-  it('reports selected Hub project ids to the Web adapter', () => {
+  it('reports selected Hub project ids to the Web adapter', async () => {
     const platform = createMockPlatform({
       surface: 'web',
       capabilities: { browserPreview: true },
@@ -231,7 +231,7 @@ describe('AgentHubWorkbench', () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: '项目' }));
+    await openRailPage('项目');
     fireEvent.click(screen.getByText('Hub 项目二'));
 
     expect(handleActiveProjectChange).toHaveBeenCalledWith('hub-project-2');
@@ -278,7 +278,7 @@ describe('AgentHubWorkbench', () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: '项目' }));
+    await openRailPage('项目');
     const projectMain = screen.getByRole('heading', { name: 'Hub 项目' }).closest('main');
     expect(projectMain).not.toBeNull();
     const projectScope = within(projectMain as HTMLElement);
@@ -327,7 +327,7 @@ describe('AgentHubWorkbench', () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: '项目' }));
+    await openRailPage('项目');
     const projectMain = screen.getByRole('heading', { name: 'Hub 项目' }).closest('main');
     expect(projectMain).not.toBeNull();
     const projectScope = within(projectMain as HTMLElement);
@@ -347,7 +347,7 @@ describe('AgentHubWorkbench', () => {
     expect(projectScope.getByLabelText('项目名称')).toHaveValue('失败项目');
   });
 
-  it('renders supplied Hub AgentProfiles on the Agents rail page instead of mock agents', () => {
+  it('renders supplied Hub AgentProfiles on the Agents rail page instead of mock agents', async () => {
     const platform = createMockPlatform({
       surface: 'web',
       capabilities: { browserPreview: true },
@@ -376,7 +376,7 @@ describe('AgentHubWorkbench', () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Agent' }));
+    await openRailPage('Agent');
 
     const page = screen.getByRole('heading', { name: 'Agent 管理' }).closest('main')!;
     expect(within(page).getAllByText('Hub Architect').length).toBeGreaterThan(0);
@@ -407,7 +407,7 @@ describe('AgentHubWorkbench', () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Agent' }));
+    await openRailPage('Agent');
 
     const page = screen.getByRole('heading', { name: 'Agent 管理' }).closest('main')!;
     const emptyState = within(page).getByRole('region', { name: '暂无已安装 Agent' });
@@ -427,7 +427,7 @@ describe('AgentHubWorkbench', () => {
     });
   });
 
-  it('installs a marketplace fixture into the runnable Agents page', () => {
+  it('installs a marketplace fixture into the runnable Agents page', async () => {
     const platform = createMockPlatform({
       surface: 'web',
       capabilities: { browserPreview: true },
@@ -442,7 +442,7 @@ describe('AgentHubWorkbench', () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Agent' }));
+    await openRailPage('Agent');
     fireEvent.click(screen.getByRole('button', { name: 'Agent 市场' }));
 
     fireEvent.click(screen.getAllByRole('button', { name: '安装' })[0]!);
@@ -454,7 +454,7 @@ describe('AgentHubWorkbench', () => {
     expect(within(page).getByText('记忆未启用')).toBeInTheDocument();
   });
 
-  it('does not render mock Agents, Projects, or Tasks when approved-real data is missing', () => {
+  it('does not render mock Agents, Projects, or Tasks when approved-real data is missing', async () => {
     const platform = createMockPlatform({
       surface: 'web',
       capabilities: { browserPreview: true },
@@ -472,7 +472,7 @@ describe('AgentHubWorkbench', () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Agent' }));
+    await openRailPage('Agent');
     const agentsPage = screen.getByRole('region', { name: '工作台页面' });
     const agentsAlert = within(agentsPage).getByRole('alert', { name: 'Agent 加载失败' });
     expect(agentsAlert).toHaveTextContent('Hub AgentProfiles unavailable');
@@ -480,13 +480,13 @@ describe('AgentHubWorkbench', () => {
     expect(within(agentsPage).queryByText('Browser QA')).not.toBeInTheDocument();
     expect(within(agentsPage).queryByText('DeepSeek-V4-Pro')).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: '项目' }));
+    await openRailPage('项目');
     const projectsPage = screen.getByRole('region', { name: '工作台页面' });
     expect(within(projectsPage).getByRole('alert')).toHaveTextContent('Hub Projects unavailable');
     expect(within(projectsPage).getByRole('heading', { name: '暂无项目' })).toBeInTheDocument();
     expect(within(projectsPage).queryByRole('heading', { name: 'AI 游戏项目' })).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: '任务' }));
+    await openRailPage('任务');
     const tasksPage = screen.getByRole('region', { name: '工作台页面' });
     // Real mode without a task backend shows the honest coming-soon empty
     // state instead of mock task rows (#1818).
@@ -526,7 +526,7 @@ describe('AgentHubWorkbench', () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Agent' }));
+    await openRailPage('Agent');
     const page = screen.getByRole('heading', { name: 'Agent 管理' }).closest('main')!;
 
     fireEvent.change(within(page).getByLabelText('名称'), {
@@ -543,7 +543,7 @@ describe('AgentHubWorkbench', () => {
     await waitFor(() => expect(onAgentDelete).toHaveBeenCalledWith('hub-agent-architect'));
   });
 
-  it('renders supplied Hub contacts on the Contacts rail page', () => {
+  it('renders supplied Hub contacts on the Contacts rail page', async () => {
     const platform = createMockPlatform({
       surface: 'web',
       capabilities: { browserPreview: true },
@@ -572,7 +572,7 @@ describe('AgentHubWorkbench', () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: '联系人' }));
+    await openRailPage('联系人');
 
     const contactsPage = screen.getByRole('heading', { name: '组织内联系人' }).closest('main') || document.body;
     expect(within(contactsPage).getByText('Hub 联系人')).toBeInTheDocument();
@@ -589,7 +589,7 @@ describe('AgentHubWorkbench', () => {
     expect(within(servicePage).queryByText('账号与权限')).not.toBeInTheDocument();
   });
 
-  it('keeps the Tasks rail page interactive without leaving the v4 table shell', () => {
+  it('keeps the Tasks rail page interactive without leaving the v4 table shell', async () => {
     const platform = createMockPlatform({
       surface: 'desktop',
       capabilities: { browserPreview: true },
@@ -606,7 +606,7 @@ describe('AgentHubWorkbench', () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: '任务' }));
+    await openRailPage('任务');
     const page = screen.getByRole('region', { name: '工作台页面' });
 
     expect(screen.getByTestId('agenthub-workbench')).toHaveAttribute('data-page', 'runs');
