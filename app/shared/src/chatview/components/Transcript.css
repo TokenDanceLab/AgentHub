@@ -439,7 +439,6 @@
 
 .user-meta { display:flex; align-items:center; gap:8px }
 
-.user-row-right { justify-content:flex-end }
 .user-content-right { align-items:flex-end }
 
 .agent-meta { display:flex; align-items:baseline; gap:8px }
