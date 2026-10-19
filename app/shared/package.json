@@ -28,8 +28,7 @@
     "./ui/*": "./src/ui/*.tsx",
     "./ui/*.css": "./src/ui/*.module.css",
     "./lib/utils": "./src/lib/utils.ts",
-    "./shadcn/ui/*": "./src/shadcn/ui/*.tsx",
-    "./shadcn/ai-elements/*": "./src/shadcn/ai-elements/*.tsx"
+    "./shadcn/ui/*": "./src/shadcn/ui/*.tsx"
   },
   "scripts": {
     "test": "vitest run",
