@@ -240,6 +240,9 @@ app/desktop/stats.html
 **/__pycache__/
 *.pyc
 
+# TypeScript build artifacts (tsc -b)
+*.tsbuildinfo
+
 *.local
 
 # L3 真实测试证据（scripts/e2e/run-real-e2e-lane.sh 输出）；README.md 保留
