@@ -1,5 +1,10 @@
 #!/usr/bin/env python3
-"""Self-tests for the release gate's policy checks."""
+"""Self-tests for the release gate's structural policy checks.
+
+The gate asserts workflow structure (triggers, manual dry gates, uploader
+binding, read-only readiness). Workflow syntax and shell semantics belong to
+actionlint and review, so these tests do not re-implement a shell interpreter.
+"""
 
 import importlib.util
 import os
@@ -23,9 +28,55 @@ def load_verifier():
 
 GATE = load_verifier()
 
+READINESS_HEAD = """name: readiness
+permissions:
+  contents: read
+on:
+  workflow_dispatch:
+    inputs:
+      run_windows_package_dry: {}
+      run_macos_unsigned_dry_policy: {}
+      run_macos_package_dry: {}
+jobs:
+"""
 
-def git(repo, *args):
-    subprocess.run(["git", "-C", repo, *args], check=True, capture_output=True, text=True)
+DISPATCH = "${{ github.event_name == 'workflow_dispatch' && inputs.%s == true }}"
+WINDOWS_GATE = "      - run: python scripts/release/verify-tauri-package-dry.py -RepoRoot . -RunWindowsBundle -StrictToolchain\n"
+MACOS_GATE = "      - run: python scripts/release/verify-tauri-package-dry.py -RepoRoot . -RunMacosBundle -StrictToolchain\n"
+ARTIFACT_UPLOAD = "      - uses: actions/upload-artifact@v7\n"
+
+
+def readiness(windows=None, macos=None, policy=None, head=READINESS_HEAD, extra=""):
+    """A minimal readiness workflow that satisfies every structural rule."""
+    return (
+        head
+        + "  windows-package-dry:\n    runs-on: windows-latest\n"
+        + f"    if: {DISPATCH % 'run_windows_package_dry'}\n    steps:\n"
+        + (windows if windows is not None else WINDOWS_GATE + ARTIFACT_UPLOAD)
+        + "  macos-unsigned-dry-policy:\n    runs-on: ubuntu-latest\n"
+        + f"    if: {DISPATCH % 'run_macos_unsigned_dry_policy'}\n    steps:\n"
+        + (policy if policy is not None else "      - run: echo policy only\n")
+        + "  macos-package-dry:\n    runs-on: macos-latest\n"
+        + f"    if: {DISPATCH % 'run_macos_package_dry'}\n    steps:\n"
+        + (macos if macos is not None else MACOS_GATE + ARTIFACT_UPLOAD)
+        + extra
+    )
+
+
+RELEASE = """name: release
+on:
+  push:
+    tags: ['v*']
+jobs:
+  release:
+    permissions:
+      contents: write
+    steps:
+      - uses: softprops/action-gh-release@v3
+        with:
+          tag_name: ${{ github.ref_name }}
+          prerelease: ${{ contains(github.ref_name, '-') }}
+"""
 
 
 class ReleaseGatePolicyTests(unittest.TestCase):
@@ -48,500 +99,105 @@ class ReleaseGatePolicyTests(unittest.TestCase):
                 handle.write(content)
         return root
 
-    def test_workflow_policy_accepts_tag_triggered_release(self):
+    def check(self, readiness_yaml, release_yaml):
+        GATE.REPO_ROOT = self.fixture({
+            ".github/workflows/release-readiness.yml": readiness_yaml,
+            ".github/workflows/release.yml": release_yaml,
+        })
+        GATE.assert_workflow_policy(GATE.REPO_ROOT)
+        return GATE.blockers
+
+    def assert_blocked(self, blockers, *needles):
+        text = "\n".join(blockers)
+        for needle in needles:
+            self.assertTrue(any(needle in blocker for blocker in blockers), f"{needle!r} not in {text!r}")
+
+    def test_repository_passes(self):
         GATE.REPO_ROOT = REPO_ROOT
         GATE.assert_workflow_policy(REPO_ROOT)
         self.assertEqual(GATE.blockers, [])
 
-    def test_workflow_policy_blocks_missing_release_surface(self):
-        GATE.REPO_ROOT = self.fixture({
-            ".github/workflows/release-readiness.yml": "name: readiness\n",
-            ".github/workflows/release.yml": "name: release\n",
-        })
-        GATE.assert_workflow_policy(GATE.REPO_ROOT)
-        self.assertTrue(any("tag trigger" in blocker for blocker in GATE.blockers))
-        self.assertTrue(any("workflow_dispatch" in blocker for blocker in GATE.blockers))
+    def test_minimal_fixture_passes(self):
+        self.assertEqual(self.check(readiness(), RELEASE), [])
 
-    def test_workflow_policy_ignores_commented_patterns(self):
-        GATE.REPO_ROOT = self.fixture({
-            ".github/workflows/release-readiness.yml": "name: readiness\n# workflow_dispatch\n# verify-tauri-package-dry.py -RunWindowsBundle -StrictToolchain\n",
-            ".github/workflows/release.yml": "name: release\n# tags: ['v*']\n# softprops/action-gh-release@v3\n",
-        })
-        GATE.assert_workflow_policy(GATE.REPO_ROOT)
-        self.assertTrue(any("tag trigger" in blocker for blocker in GATE.blockers))
-        self.assertTrue(any("workflow_dispatch" in blocker for blocker in GATE.blockers))
-        self.assertTrue(any("-RunWindowsBundle" in blocker for blocker in GATE.blockers))
+    def test_missing_release_surface_is_blocked(self):
+        blockers = self.check("name: readiness\n", "name: release\n")
+        self.assert_blocked(blockers, "workflow_dispatch", "tag trigger", "uploader is missing")
 
-    def test_workflow_policy_plain_scalar_apostrophe_keeps_comment_a_comment(self):
-        # An apostrophe inside a plain scalar is not a quote delimiter; the
-        # trailing comment must still be dropped rather than satisfy a gate.
-        GATE.REPO_ROOT = self.fixture({
-            ".github/workflows/release-readiness.yml": "name: Agent's Hub # workflow_dispatch\n",
-            ".github/workflows/release.yml": "name: Agent's Hub # tags: ['v*']\n",
-        })
-        GATE.assert_workflow_policy(GATE.REPO_ROOT)
-        self.assertTrue(any("workflow_dispatch" in blocker for blocker in GATE.blockers))
-        self.assertTrue(any("tag trigger" in blocker for blocker in GATE.blockers))
+    def test_release_trigger_must_be_v_tags_only(self):
+        for trigger in ("on:\n  push:\n    branches: [master]\n    tags: ['v*']\n", "on:\n  pull_request: {}\n"):
+            blockers = self.check(readiness(), RELEASE.replace("on:\n  push:\n    tags: ['v*']\n", trigger))
+            self.assert_blocked(blockers, "tag trigger")
 
-    def test_workflow_policy_requires_real_triggers_not_run_text(self):
-        # Trigger and uploader checks are structural: echoing the names inside a
-        # run step must not satisfy them.
-        GATE.REPO_ROOT = self.fixture({
-            ".github/workflows/release-readiness.yml": (
-                "name: readiness\non:\n  pull_request: {}\njobs:\n  x:\n    runs-on: ubuntu-latest\n"
-                "    steps:\n      - run: echo workflow_dispatch run_windows_package_dry\n"
-            ),
-            ".github/workflows/release.yml": (
-                "name: release\non:\n  pull_request: {}\njobs:\n  x:\n    runs-on: ubuntu-latest\n"
-                "    steps:\n      - run: |\n          echo \"tags: ['v*'] softprops/action-gh-release@v3\"\n"
-            ),
-        })
-        GATE.assert_workflow_policy(GATE.REPO_ROOT)
-        self.assertTrue(any("lacks workflow_dispatch" in blocker for blocker in GATE.blockers))
-        self.assertTrue(any("tag trigger" in blocker for blocker in GATE.blockers))
-        self.assertTrue(any("GitHub Release uploader is missing" in blocker for blocker in GATE.blockers))
+    def test_dry_gate_inputs_are_required(self):
+        head = READINESS_HEAD.replace("      run_macos_package_dry: {}\n", "")
+        blockers = self.check(readiness(head=head), RELEASE)
+        self.assert_blocked(blockers, "macOS package dry gate input is missing")
 
-    def test_workflow_policy_rejects_inert_or_disabled_dry_gates(self):
-        GATE.REPO_ROOT = self.fixture({
-            ".github/workflows/release-readiness.yml": 'name: readiness\non:\n  workflow_dispatch:\n    inputs:\n      run_windows_package_dry: {}\n      run_macos_unsigned_dry_policy: {}\n      run_macos_package_dry: {}\njobs:\n  x:\n    runs-on: ubuntu-latest\n    steps:\n      - run: true python scripts/release/verify-tauri-package-dry.py -RunWindowsBundle -StrictToolchain\n      - run: python scripts/release/verify-tauri-package-dry.py -RunMacosBundle\n        if: ${{ 1 == 2 }}\n      - uses: actions/upload-artifact@v7\n',
-            ".github/workflows/release.yml": "name: release\non:\n  push:\n    tags: ['v*']\njobs:\n  x:\n    steps:\n      - uses: softprops/action-gh-release@v3\n        with:\n          prerelease: ${{ !contains(github.ref_name, '-') }}\n",
-        })
-        GATE.assert_workflow_policy(GATE.REPO_ROOT)
-        self.assertTrue(any("-RunWindowsBundle" in blocker for blocker in GATE.blockers))
-        self.assertTrue(any("-RunMacosBundle" in blocker for blocker in GATE.blockers))
-        self.assertTrue(any("prerelease" in blocker for blocker in GATE.blockers))
-
-    def test_workflow_policy_rejects_extra_release_triggers(self):
-        GATE.REPO_ROOT = self.fixture({
-            ".github/workflows/release-readiness.yml": "name: readiness\n",
-            ".github/workflows/release.yml": "name: release\non:\n  push:\n    branches: [master]\n    tags: ['v*']\njobs:\n  x:\n    steps:\n      - uses: softprops/action-gh-release@v3\n        with:\n          prerelease: ${{ contains(github.ref_name, '-') }}\n",
-        })
-        GATE.assert_workflow_policy(GATE.REPO_ROOT)
-        self.assertTrue(any("tag trigger" in blocker for blocker in GATE.blockers))
-
-    def test_workflow_policy_detects_prefixed_signing_commands(self):
-        GATE.REPO_ROOT = self.fixture({
-            ".github/workflows/release-readiness.yml": 'name: readiness\non:\n  workflow_dispatch: {}\njobs:\n  x:\n    steps:\n      - run: sudo xcrun notarytool submit app.zip\n',
-            ".github/workflows/release.yml": "name: release\n",
-        })
-        GATE.assert_workflow_policy(GATE.REPO_ROOT)
-        self.assertTrue(any("execution surface" in blocker for blocker in GATE.blockers))
-
-    def test_workflow_policy_requires_every_dry_gate_flag(self):
-        GATE.REPO_ROOT = self.fixture({
-            ".github/workflows/release-readiness.yml": 'name: readiness\non:\n  workflow_dispatch:\n    inputs:\n      run_windows_package_dry: {}\n      run_macos_unsigned_dry_policy: {}\n      run_macos_package_dry: {}\njobs:\n  x:\n    runs-on: ubuntu-latest\n    steps:\n      - run: python scripts/release/verify-tauri-package-dry.py -RunWindowsBundle\n      - run: python scripts/release/verify-tauri-package-dry.py -RunMacosBundle\n      - uses: actions/upload-artifact@v7\n',
-            ".github/workflows/release.yml": "name: release\n",
-        })
-        GATE.assert_workflow_policy(GATE.REPO_ROOT)
-        self.assertTrue(any("-StrictToolchain" in blocker for blocker in GATE.blockers))
-
-    def test_workflow_policy_blocks_empty_workflow_file(self):
-        GATE.REPO_ROOT = self.fixture({
-            ".github/workflows/release-readiness.yml": "",
-            ".github/workflows/release.yml": "name: release\n",
-        })
-        GATE.assert_workflow_policy(GATE.REPO_ROOT)
-        self.assertTrue(any("is empty" in blocker for blocker in GATE.blockers))
-
-    def test_workflow_policy_rejects_conditionally_wrapped_dry_gate(self):
-        GATE.REPO_ROOT = self.fixture({
-            ".github/workflows/release-readiness.yml": "name: readiness\non:\n  workflow_dispatch:\n    inputs:\n      run_windows_package_dry: {}\n      run_macos_unsigned_dry_policy: {}\n      run_macos_package_dry: {}\njobs:\n  x:\n    runs-on: ubuntu-latest\n    steps:\n      - run: 'if false; then python scripts/release/verify-tauri-package-dry.py -RunWindowsBundle -StrictToolchain; fi'\n      - run: python scripts/release/verify-tauri-package-dry.py -RunMacosBundle\n      - uses: actions/upload-artifact@v7\n",
-            ".github/workflows/release.yml": "name: release\n",
-        })
-        GATE.assert_workflow_policy(GATE.REPO_ROOT)
-        self.assertTrue(any("-RunWindowsBundle" in blocker for blocker in GATE.blockers))
-
-    def test_workflow_policy_skips_disabled_or_advisory_jobs(self):
-        for readiness in ('name: readiness\non:\n  workflow_dispatch:\n    inputs:\n      run_windows_package_dry: {}\n      run_macos_unsigned_dry_policy: {}\n      run_macos_package_dry: {}\njobs:\n  x:\n    if: ${{ 1 == 2 }}\n    runs-on: ubuntu-latest\n    steps:\n      - run: python scripts/release/verify-tauri-package-dry.py -RunWindowsBundle -StrictToolchain\n      - run: python scripts/release/verify-tauri-package-dry.py -RunMacosBundle\n      - uses: actions/upload-artifact@v7\n', 'name: readiness\non:\n  workflow_dispatch:\n    inputs:\n      run_windows_package_dry: {}\n      run_macos_unsigned_dry_policy: {}\n      run_macos_package_dry: {}\njobs:\n  x:\n    continue-on-error: true\n    runs-on: ubuntu-latest\n    steps:\n      - run: python scripts/release/verify-tauri-package-dry.py -RunWindowsBundle -StrictToolchain\n      - run: python scripts/release/verify-tauri-package-dry.py -RunMacosBundle\n      - uses: actions/upload-artifact@v7\n'):
-            GATE.REPO_ROOT = self.fixture({
-                ".github/workflows/release-readiness.yml": readiness,
-                ".github/workflows/release.yml": "name: release\n",
-            })
-            GATE.blockers.clear()
-            GATE.assert_workflow_policy(GATE.REPO_ROOT)
-            self.assertTrue(any("-RunWindowsBundle" in b for b in GATE.blockers))
-
-    def test_workflow_policy_ignores_heredoc_bodies(self):
-        GATE.REPO_ROOT = self.fixture({
-            ".github/workflows/release-readiness.yml": "name: readiness\non:\n  workflow_dispatch:\n    inputs:\n      run_windows_package_dry: {}\n      run_macos_unsigned_dry_policy: {}\n      run_macos_package_dry: {}\njobs:\n  x:\n    runs-on: ubuntu-latest\n    steps:\n      - run: |\n          cat > gate.sh <<'EOF'\n          python scripts/release/verify-tauri-package-dry.py -RunWindowsBundle -StrictToolchain\n          EOF\n      - run: python scripts/release/verify-tauri-package-dry.py -RunMacosBundle\n      - uses: actions/upload-artifact@v7\n",
-            ".github/workflows/release.yml": "name: release\n",
-        })
-        GATE.assert_workflow_policy(GATE.REPO_ROOT)
-        self.assertTrue(any("-RunWindowsBundle" in b for b in GATE.blockers))
-
-    def test_workflow_policy_detects_wrapped_signing_command(self):
-        GATE.REPO_ROOT = self.fixture({
-            ".github/workflows/release-readiness.yml": 'name: readiness\non:\n  workflow_dispatch:\n    inputs:\n      run_windows_package_dry: {}\n      run_macos_unsigned_dry_policy: {}\n      run_macos_package_dry: {}\njobs:\n  x:\n    runs-on: ubuntu-latest\n    steps:\n      - run: sudo bash -c "xcrun notarytool submit app.zip"\n      - run: python scripts/release/verify-tauri-package-dry.py -RunWindowsBundle -StrictToolchain\n      - run: python scripts/release/verify-tauri-package-dry.py -RunMacosBundle\n      - uses: actions/upload-artifact@v7\n',
-            ".github/workflows/release.yml": "name: release\n",
-        })
-        GATE.assert_workflow_policy(GATE.REPO_ROOT)
-        self.assertTrue(any("execution surface" in b for b in GATE.blockers))
-
-    def test_workflow_policy_detects_operator_prefixed_signing_commands(self):
-        for command in (
-            "echo packaging && xcrun notarytool submit app.zip",
-            "sudo -E xcrun notarytool submit app.zip",
-            "/bin/bash -c 'xcrun notarytool submit app.zip'",
-            "env FOO=bar bash -c 'gh release create v1.2.3'",
-        ):
-            GATE.REPO_ROOT = self.fixture({
-                ".github/workflows/release-readiness.yml": (
-                    "name: readiness\non:\n  workflow_dispatch: {}\njobs:\n  x:\n"
-                    "    steps:\n      - run: " + command + "\n"
-                ),
-                ".github/workflows/release.yml": "name: release\n",
-            })
-            GATE.blockers.clear()
-            GATE.assert_workflow_policy(GATE.REPO_ROOT)
-            self.assertTrue(any("execution surface" in b for b in GATE.blockers), command)
-
-    def test_workflow_policy_detects_signing_environment(self):
-        for scope in ("env:\n  TAURI_SIGNING_PRIVATE_KEY: x\n",
-                      "jobs:\n  x:\n    env:\n      APPLE_ID: x\n    steps:\n      - run: echo hi\n"):
-            GATE.REPO_ROOT = self.fixture({
-                ".github/workflows/release-readiness.yml": (
-                    "name: readiness\non:\n  workflow_dispatch: {}\n" + scope
-                ),
-                ".github/workflows/release.yml": "name: release\n",
-            })
-            GATE.blockers.clear()
-            GATE.assert_workflow_policy(GATE.REPO_ROOT)
-            self.assertTrue(any("execution surface" in b for b in GATE.blockers), scope)
-
-    def test_workflow_policy_rejects_block_scalar_dead_branches(self):
-        gate = "python scripts/release/verify-tauri-package-dry.py -RunWindowsBundle -StrictToolchain"
-        head = (
-            "name: readiness\non:\n  workflow_dispatch:\n    inputs:\n"
-            "      run_windows_package_dry: {}\n"
-            "      run_macos_unsigned_dry_policy: {}\n"
-            "      run_macos_package_dry: {}\njobs:\n  x:\n    runs-on: ubuntu-latest\n    steps:\n"
+    def test_dry_gates_delegate_with_expected_flags(self):
+        blockers = self.check(
+            readiness(windows="      - run: python scripts/release/verify-tauri-package-dry.py -RunWindowsBundle\n"),
+            RELEASE,
         )
-        for windows_step in (
-            "      - run: |\n          if false; then\n            " + gate + "\n          fi\n",
-            "      - run: while false; do " + gate + "; done\n",
-            "      - run: for i in; do " + gate + "; done\n",
-        ):
-            GATE.REPO_ROOT = self.fixture({
-                ".github/workflows/release-readiness.yml": (
-                    head + windows_step
-                    + "      - run: python scripts/release/verify-tauri-package-dry.py -RunMacosBundle\n"
-                    + "      - uses: actions/upload-artifact@v7\n"
-                ),
-                ".github/workflows/release.yml": "name: release\n",
-            })
-            GATE.blockers.clear()
-            GATE.assert_workflow_policy(GATE.REPO_ROOT)
-            self.assertTrue(any("-RunWindowsBundle" in b for b in GATE.blockers), windows_step)
+        self.assert_blocked(blockers, "-StrictToolchain")
 
-    def test_workflow_policy_requires_macos_runner(self):
-        GATE.REPO_ROOT = self.fixture({
-            ".github/workflows/release-readiness.yml": 'name: readiness\non:\n  workflow_dispatch:\n    inputs:\n      run_windows_package_dry: {}\n      run_macos_unsigned_dry_policy: {}\n      run_macos_package_dry: {}\njobs:\n  windows:\n    runs-on: ubuntu-latest\n    steps:\n      - run: python scripts/release/verify-tauri-package-dry.py -RunWindowsBundle -StrictToolchain\n  macos:\n    runs-on: ubuntu-latest\n    steps:\n      - run: python scripts/release/verify-tauri-package-dry.py -RunMacosBundle\n      - uses: actions/upload-artifact@v7\n',
-            ".github/workflows/release.yml": "name: release\n",
-        })
-        GATE.assert_workflow_policy(GATE.REPO_ROOT)
-        self.assertTrue(any("-RunMacosBundle" in b for b in GATE.blockers))
+    def test_dry_gate_jobs_must_upload_after_the_gate(self):
+        blockers = self.check(readiness(windows=WINDOWS_GATE, macos=MACOS_GATE), RELEASE)
+        self.assert_blocked(blockers, "does not upload evidence after the gate")
 
-    def test_workflow_policy_ties_prerelease_to_uploader(self):
-        GATE.REPO_ROOT = self.fixture({
-            ".github/workflows/release-readiness.yml": "name: readiness\n",
-            ".github/workflows/release.yml": "name: release\non:\n  push:\n    tags: ['v*']\njobs:\n  x:\n    steps:\n      - uses: softprops/action-gh-release@v3\n        with:\n          tag_name: ${{ github.ref_name }}\n      - run: echo decoy\n        with:\n          prerelease: ${{ contains(github.ref_name, '-') }}\n",
-        })
-        GATE.assert_workflow_policy(GATE.REPO_ROOT)
-        self.assertTrue(any("prerelease" in b for b in GATE.blockers))
-
-    def test_workflow_policy_rejects_step_disabled_macos_gate(self):
-        head = (
-            "name: readiness\non:\n  workflow_dispatch:\n    inputs:\n"
-            "      run_windows_package_dry: {}\n"
-            "      run_macos_unsigned_dry_policy: {}\n"
-            "      run_macos_package_dry: {}\njobs:\n  macos:\n    runs-on: macos-latest\n    steps:\n"
+    def test_disabled_gate_steps_do_not_count(self):
+        blockers = self.check(
+            readiness(windows=WINDOWS_GATE + "        if: ${{ false }}\n" + ARTIFACT_UPLOAD),
+            RELEASE,
         )
-        for guard in ("        if: ${{ 1 == 2 }}\n", "        continue-on-error: true\n"):
-            GATE.REPO_ROOT = self.fixture({
-                ".github/workflows/release-readiness.yml": (
-                    head + "      - run: python scripts/release/verify-tauri-package-dry.py -RunMacosBundle\n"
-                    + guard
-                    + "      - run: python scripts/release/verify-tauri-package-dry.py -RunWindowsBundle -StrictToolchain\n"
-                    + "      - uses: actions/upload-artifact@v7\n"
-                ),
-                ".github/workflows/release.yml": "name: release\n",
-            })
-            GATE.blockers.clear()
-            GATE.assert_workflow_policy(GATE.REPO_ROOT)
-            self.assertTrue(any("-RunMacosBundle" in b for b in GATE.blockers), guard)
+        self.assert_blocked(blockers, "-RunWindowsBundle")
 
-    def test_workflow_policy_detects_signing_uses_and_step_env(self):
-        head = "name: readiness\non:\n  workflow_dispatch: {}\njobs:\n  x:\n    runs-on: ubuntu-latest\n    steps:\n"
+    def test_macos_gate_requires_macos_runner(self):
+        blockers = self.check(
+            readiness().replace("runs-on: macos-latest", "runs-on: ubuntu-latest"),
+            RELEASE,
+        )
+        self.assert_blocked(blockers, "does not run on a macOS runner")
+
+    def test_prerelease_must_bind_to_the_uploader(self):
+        blockers = self.check(
+            readiness(),
+            RELEASE.replace(
+                "          prerelease: ${{ contains(github.ref_name, '-') }}\n",
+                "      - run: echo decoy\n        with:\n          prerelease: ${{ contains(github.ref_name, '-') }}\n",
+            ),
+        )
+        self.assert_blocked(blockers, "prerelease")
+
+    def test_readiness_cannot_upload_a_release(self):
+        blockers = self.check(
+            readiness(extra="  release:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: softprops/action-gh-release@v3\n"),
+            RELEASE,
+        )
+        self.assert_blocked(blockers, "release uploader or signing material")
+
+    def test_readiness_cannot_grant_contents_write(self):
+        workflow_wide = readiness().replace("permissions:\n  contents: read\n", "permissions:\n  contents: write\n")
+        self.assert_blocked(self.check(workflow_wide, RELEASE), "read-only")
+
+        job_scoped = readiness(extra="  publisher:\n    runs-on: ubuntu-latest\n    permissions:\n      contents: write\n    steps:\n      - run: echo hi\n")
+        self.assert_blocked(self.check(job_scoped, RELEASE), "read-only")
+
+    def test_readiness_cannot_carry_signing_material(self):
         for step in (
-            "      - uses: softprops/action-gh-release@v3\n",
-            "      - run: echo hi\n        env:\n          TAURI_SIGNING_PRIVATE_KEY: x\n",
+            "      - uses: actions/checkout@v7\n        env:\n          TAURI_SIGNING_PRIVATE_KEY: x\n",
+            "      - run: echo hi\n        env:\n          APPLE_ID: x\n",
         ):
-            GATE.REPO_ROOT = self.fixture({
-                ".github/workflows/release-readiness.yml": head + step,
-                ".github/workflows/release.yml": "name: release\n",
-            })
-            GATE.blockers.clear()
-            GATE.assert_workflow_policy(GATE.REPO_ROOT)
-            self.assertTrue(any("execution surface" in b for b in GATE.blockers), step)
+            blockers = self.check(readiness(policy="      - run: echo policy only\n" + step), RELEASE)
+            self.assert_blocked(blockers, "release uploader or signing material")
 
-    def test_workflow_policy_blocks_invalid_yaml(self):
-        GATE.REPO_ROOT = self.fixture({
-            ".github/workflows/release-readiness.yml": "name: readiness\njobs:\n  x:\n    steps:\n      - run: [\n",
-            ".github/workflows/release.yml": "name: release\n",
-        })
-        GATE.blockers.clear()
-        GATE.assert_workflow_policy(GATE.REPO_ROOT)
-        self.assertTrue(any("is not valid YAML" in b for b in GATE.blockers))
-
-    def test_workflow_policy_requires_args_on_the_invocation(self):
-        head = (
-            "name: readiness\non:\n  workflow_dispatch:\n    inputs:\n"
-            "      run_windows_package_dry: {}\n"
-            "      run_macos_unsigned_dry_policy: {}\n"
-            "      run_macos_package_dry: {}\njobs:\n  x:\n    runs-on: ubuntu-latest\n    steps:\n"
-        )
-        GATE.REPO_ROOT = self.fixture({
-            ".github/workflows/release-readiness.yml": (
-                head + "      - run: |\n"
-                '          echo "-RunWindowsBundle -StrictToolchain"\n'
-                "          python scripts/release/verify-tauri-package-dry.py -RunWindowsBundle\n"
-                + "      - run: python scripts/release/verify-tauri-package-dry.py -RunMacosBundle\n"
-                + "      - uses: actions/upload-artifact@v7\n"
-            ),
-            ".github/workflows/release.yml": "name: release\n",
-        })
-        GATE.blockers.clear()
-        GATE.assert_workflow_policy(GATE.REPO_ROOT)
-        self.assertTrue(any("-RunWindowsBundle" in b for b in GATE.blockers))
-
-    def test_workflow_policy_detects_heredoc_and_quoted_signing(self):
-        head = "name: readiness\non:\n  workflow_dispatch: {}\njobs:\n  x:\n    runs-on: ubuntu-latest\n    steps:\n"
-        for command in (
-            "bash <<'EOF'\n          xcrun notarytool submit app.zip\n          EOF",
-            "timeout 60 gh release create v1",
-            '"gh" release create v1',
-            "g''h release create v1",
-            "gh \\\n          release create v1",
-        ):
-            GATE.REPO_ROOT = self.fixture({
-                ".github/workflows/release-readiness.yml": head + "      - run: |\n          " + command + "\n",
-                ".github/workflows/release.yml": "name: release\n",
-            })
-            GATE.blockers.clear()
-            GATE.assert_workflow_policy(GATE.REPO_ROOT)
-            self.assertTrue(any("execution surface" in b for b in GATE.blockers), command)
-
-    def test_workflow_policy_rejects_errexit_disabled_dry_gate(self):
-        head = (
-            "name: readiness\non:\n  workflow_dispatch:\n    inputs:\n"
-            "      run_windows_package_dry: {}\n"
-            "      run_macos_unsigned_dry_policy: {}\n"
-            "      run_macos_package_dry: {}\njobs:\n  x:\n    runs-on: ubuntu-latest\n    steps:\n"
-        )
-        GATE.REPO_ROOT = self.fixture({
-            ".github/workflows/release-readiness.yml": (
-                head + "      - run: |\n          set +e\n"
-                "          python scripts/release/verify-tauri-package-dry.py -RunWindowsBundle -StrictToolchain\n"
-                "          echo done\n"
-                + "      - run: python scripts/release/verify-tauri-package-dry.py -RunMacosBundle\n"
-                + "      - uses: actions/upload-artifact@v7\n"
-            ),
-            ".github/workflows/release.yml": "name: release\n",
-        })
-        GATE.blockers.clear()
-        GATE.assert_workflow_policy(GATE.REPO_ROOT)
-        self.assertTrue(any("-RunWindowsBundle" in b for b in GATE.blockers))
-
-    def test_workflow_policy_requires_an_active_artifact_upload(self):
-        for readiness in ('name: readiness\non:\n  workflow_dispatch:\n    inputs:\n      run_windows_package_dry: {}\n      run_macos_unsigned_dry_policy: {}\n      run_macos_package_dry: {}\njobs:\n  x:\n    runs-on: ubuntu-latest\n    steps:\n      - run: python scripts/release/verify-tauri-package-dry.py -RunWindowsBundle -StrictToolchain\n      - run: python scripts/release/verify-tauri-package-dry.py -RunMacosBundle\n      - uses: actions/upload-artifact@v7\n        if: ${{ 1 == 2 }}\n', 'name: readiness\non:\n  workflow_dispatch:\n    inputs:\n      run_windows_package_dry: {}\n      run_macos_unsigned_dry_policy: {}\n      run_macos_package_dry: {}\njobs:\n  x:\n    runs-on: ubuntu-latest\n    steps:\n      - run: python scripts/release/verify-tauri-package-dry.py -RunWindowsBundle -StrictToolchain\n      - run: python scripts/release/verify-tauri-package-dry.py -RunMacosBundle\n      - uses: actions/upload-artifact@v7\n        continue-on-error: true\n'):
-            GATE.REPO_ROOT = self.fixture({
-                ".github/workflows/release-readiness.yml": readiness,
-                ".github/workflows/release.yml": "name: release\n",
-            })
-            GATE.blockers.clear()
-            GATE.assert_workflow_policy(GATE.REPO_ROOT)
-            self.assertTrue(any("does not upload dry evidence" in b for b in GATE.blockers))
-
-    def test_workflow_policy_rejects_masked_dry_gate(self):
-        head = (
-            "name: readiness\non:\n  workflow_dispatch:\n    inputs:\n"
-            "      run_windows_package_dry: {}\n"
-            "      run_macos_unsigned_dry_policy: {}\n"
-            "      run_macos_package_dry: {}\njobs:\n  x:\n    runs-on: ubuntu-latest\n    steps:\n"
-        )
-        gate = "python scripts/release/verify-tauri-package-dry.py -RunWindowsBundle -StrictToolchain"
-        for suffix in (" || true", " || exit 0", "; true", " &", " | cat", "; exit 0 # done"):
-            GATE.REPO_ROOT = self.fixture({
-                ".github/workflows/release-readiness.yml": (
-                    head + "      - run: " + gate + suffix + "\n"
-                    + "      - run: python scripts/release/verify-tauri-package-dry.py -RunMacosBundle\n"
-                    + "      - uses: actions/upload-artifact@v7\n"
-                ),
-                ".github/workflows/release.yml": "name: release\n",
-            })
-            GATE.blockers.clear()
-            GATE.assert_workflow_policy(GATE.REPO_ROOT)
-            self.assertTrue(any("-RunWindowsBundle" in b for b in GATE.blockers), suffix)
-
-    def test_workflow_policy_rejects_short_circuited_dry_gate(self):
-        head = (
-            "name: readiness\non:\n  workflow_dispatch:\n    inputs:\n"
-            "      run_windows_package_dry: {}\n"
-            "      run_macos_unsigned_dry_policy: {}\n"
-            "      run_macos_package_dry: {}\njobs:\n  x:\n    runs-on: ubuntu-latest\n    steps:\n"
-        )
-        GATE.REPO_ROOT = self.fixture({
-            ".github/workflows/release-readiness.yml": (
-                head + "      - run: true || python scripts/release/verify-tauri-package-dry.py "
-                "-RunWindowsBundle -StrictToolchain\n"
-                + "      - run: python scripts/release/verify-tauri-package-dry.py -RunMacosBundle\n"
-                + "      - uses: actions/upload-artifact@v7\n"
-            ),
-            ".github/workflows/release.yml": "name: release\n",
-        })
-        GATE.blockers.clear()
-        GATE.assert_workflow_policy(GATE.REPO_ROOT)
-        self.assertTrue(any("-RunWindowsBundle" in b for b in GATE.blockers))
-
-    def test_workflow_policy_rejects_decoy_dry_gate_args(self):
-        head = (
-            "name: readiness\non:\n  workflow_dispatch:\n    inputs:\n"
-            "      run_windows_package_dry: {}\n"
-            "      run_macos_unsigned_dry_policy: {}\n"
-            "      run_macos_package_dry: {}\njobs:\n  x:\n    runs-on: ubuntu-latest\n    steps:\n"
-        )
-        GATE.REPO_ROOT = self.fixture({
-            ".github/workflows/release-readiness.yml": (
-                head + "      - run: echo -RunWindowsBundle -StrictToolchain && "
-                "python scripts/release/verify-tauri-package-dry.py\n"
-                + "      - run: python scripts/release/verify-tauri-package-dry.py -RunMacosBundle\n"
-                + "      - uses: actions/upload-artifact@v7\n"
-            ),
-            ".github/workflows/release.yml": "name: release\n",
-        })
-        GATE.blockers.clear()
-        GATE.assert_workflow_policy(GATE.REPO_ROOT)
-        self.assertTrue(any("-RunWindowsBundle" in b for b in GATE.blockers))
-
-    def test_workflow_policy_rejects_disabled_uploader_step(self):
-        for guard in ("        if: ${{ false }}\n", "        continue-on-error: true\n"):
-            GATE.REPO_ROOT = self.fixture({
-                ".github/workflows/release-readiness.yml": "name: readiness\n",
-                ".github/workflows/release.yml": (
-                    "name: release\non:\n  push:\n    tags: ['v*']\njobs:\n  x:\n    steps:\n"
-                    "      - uses: softprops/action-gh-release@v3\n"
-                    + guard
-                    + "        with:\n          prerelease: ${{ contains(github.ref_name, '-') }}\n"
-                ),
-            })
-            GATE.blockers.clear()
-            GATE.assert_workflow_policy(GATE.REPO_ROOT)
-            self.assertTrue(any("GitHub Release uploader is missing" in b for b in GATE.blockers), guard)
-
-    def test_workflow_policy_requires_upload_in_the_dry_gate_job(self):
-        head = (
-            "name: readiness\non:\n  workflow_dispatch:\n    inputs:\n"
-            "      run_windows_package_dry: {}\n"
-            "      run_macos_unsigned_dry_policy: {}\n"
-            "      run_macos_package_dry: {}\njobs:\n"
-        )
-        GATE.REPO_ROOT = self.fixture({
-            ".github/workflows/release-readiness.yml": (
-                head + "  windows:\n    runs-on: ubuntu-latest\n    steps:\n"
-                "      - run: python scripts/release/verify-tauri-package-dry.py -RunWindowsBundle -StrictToolchain\n"
-                "  macos:\n    runs-on: macos-latest\n    steps:\n"
-                "      - run: python scripts/release/verify-tauri-package-dry.py -RunMacosBundle\n"
-                "  artifacts:\n    runs-on: ubuntu-latest\n    steps:\n"
-                "      - uses: actions/upload-artifact@v7\n"
-            ),
-            ".github/workflows/release.yml": "name: release\n",
-        })
-        GATE.blockers.clear()
-        GATE.assert_workflow_policy(GATE.REPO_ROOT)
-        self.assertTrue(any("does not upload dry evidence" in b for b in GATE.blockers))
-
-    def test_workflow_policy_rejects_inline_shell_dead_branch(self):
-        head = (
-            "name: readiness\non:\n  workflow_dispatch:\n    inputs:\n"
-            "      run_windows_package_dry: {}\n"
-            "      run_macos_unsigned_dry_policy: {}\n"
-            "      run_macos_package_dry: {}\njobs:\n  x:\n    runs-on: ubuntu-latest\n    steps:\n"
-        )
-        for payload in (
-            "bash -c 'false && python scripts/release/verify-tauri-package-dry.py "
-            "-RunWindowsBundle -StrictToolchain'",
-            "bash -c 'python scripts/release/verify-tauri-package-dry.py "
-            "-RunWindowsBundle -StrictToolchain; echo done'",
-        ):
-            GATE.REPO_ROOT = self.fixture({
-                ".github/workflows/release-readiness.yml": (
-                    head + "      - run: " + payload + "\n"
-                    + "      - run: python scripts/release/verify-tauri-package-dry.py -RunMacosBundle\n"
-                    + "      - uses: actions/upload-artifact@v7\n"
-                ),
-                ".github/workflows/release.yml": "name: release\n",
-            })
-            GATE.blockers.clear()
-            GATE.assert_workflow_policy(GATE.REPO_ROOT)
-            self.assertTrue(any("-RunWindowsBundle" in b for b in GATE.blockers), payload)
-
-    def test_workflow_policy_folds_undeclared_needs_output_on_dispatch(self):
-        head = (
-            "name: readiness\non:\n  workflow_dispatch:\n    inputs:\n"
-            "      run_windows_package_dry: {}\n"
-            "      run_macos_unsigned_dry_policy: {}\n"
-            "      run_macos_package_dry: {}\njobs:\n"
-            "  changes:\n    runs-on: ubuntu-latest\n    outputs:\n"
-            "      docs: ${{ steps.x.outputs.docs }}\n    steps:\n      - run: echo\n"
-            "  x:\n    runs-on: ubuntu-latest\n    steps:\n"
-        )
-        GATE.REPO_ROOT = self.fixture({
-            ".github/workflows/release-readiness.yml": (
-                head + "      - run: python scripts/release/verify-tauri-package-dry.py -RunWindowsBundle -StrictToolchain\n"
-                "        if: ${{ needs.changes.outputs.run == 'true' }}\n"
-                + "      - run: python scripts/release/verify-tauri-package-dry.py -RunMacosBundle\n"
-                + "      - uses: actions/upload-artifact@v7\n"
-            ),
-            ".github/workflows/release.yml": "name: release\n",
-        })
-        GATE.assert_workflow_policy(GATE.REPO_ROOT)
-        self.assertTrue(any("-RunWindowsBundle" in b for b in GATE.blockers))
-
-    def test_workflow_policy_folds_reversed_event_name_on_dispatch(self):
-        head = (
-            "name: readiness\non:\n  workflow_dispatch:\n    inputs:\n"
-            "      run_windows_package_dry: {}\n"
-            "      run_macos_unsigned_dry_policy: {}\n"
-            "      run_macos_package_dry: {}\njobs:\n  x:\n    runs-on: ubuntu-latest\n    steps:\n"
-        )
-        GATE.REPO_ROOT = self.fixture({
-            ".github/workflows/release-readiness.yml": (
-                head + "      - run: python scripts/release/verify-tauri-package-dry.py -RunWindowsBundle -StrictToolchain\n"
-                "        if: ${{ 'push' == github.event_name }}\n"
-                + "      - run: python scripts/release/verify-tauri-package-dry.py -RunMacosBundle\n"
-                + "      - uses: actions/upload-artifact@v7\n"
-            ),
-            ".github/workflows/release.yml": "name: release\n",
-        })
-        GATE.assert_workflow_policy(GATE.REPO_ROOT)
-        self.assertTrue(any("-RunWindowsBundle" in b for b in GATE.blockers))
-
-    def test_workflow_policy_detects_continuation_split_signing(self):
-        GATE.REPO_ROOT = self.fixture({
-            ".github/workflows/release-readiness.yml": (
-                "name: readiness\non:\n  workflow_dispatch: {}\njobs:\n  x:\n    steps:\n"
-                "      - run: |\n          xcrun \\\n          notarytool submit app.zip\n"
-            ),
-            ".github/workflows/release.yml": "name: release\n",
-        })
-        GATE.blockers.clear()
-        GATE.assert_workflow_policy(GATE.REPO_ROOT)
-        self.assertTrue(any("execution surface" in b for b in GATE.blockers))
+    def test_empty_or_invalid_yaml_is_blocked(self):
+        self.assert_blocked(self.check("", RELEASE), "is empty")
+        self.assert_blocked(self.check("name: readiness\njobs:\n  x:\n    steps:\n      - run: [\n", RELEASE), "is not valid YAML")
 
     def test_rc_tag_policy(self):
         GATE.assert_rc_tag_policy("0.6.1-rc.1")
         self.assertEqual(GATE.blockers, [])
-        GATE.ready.clear()
         GATE.assert_rc_tag_policy("0.6.1")
         self.assertEqual(GATE.blockers, [])
         GATE.assert_rc_tag_policy("0.6")
@@ -563,6 +219,9 @@ class ReleaseGatePolicyTests(unittest.TestCase):
         self.assertEqual(GATE.blockers, [])
 
     def test_ref_divergence_blocks_behind_release_ref(self):
+        def git(repo, *args):
+            subprocess.run(["git", "-C", repo, *args], check=True, capture_output=True, text=True)
+
         with tempfile.TemporaryDirectory(prefix="agenthub-release-refs-") as repo:
             git(repo, "init", "-q")
             git(repo, "-c", "user.name=test", "-c", "user.email=test@example.com", "commit", "-q", "--allow-empty", "-m", "base")

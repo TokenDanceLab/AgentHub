@@ -161,7 +161,7 @@ jobs:
           STATIC_RESULT: ${{ needs.go-edge-static.result }}
         run: |
           if [ "$STATIC_RESULT" != "success" ]; then
-            echo "::error::go-edge-static result: $STATIC_RESULT; lint / gosec / vet / staticcheck / orchestrator-deps did not pass"
+            echo "::error::go-edge-static result: $STATIC_RESULT; lint / gosec / vet / staticcheck did not pass"
             exit 1
           fi
 
@@ -2112,14 +2112,9 @@ jobs:
       - name: Verify OpenAPI contract
         run: python scripts/verify/verify-openapi-contract.py
 
-      - name: Verify architecture boundaries
+      - name: Verify shared REST contract
         run: |
-          python scripts/verify/verify-hub-pure-packages.py
-          python scripts/verify/verify-hub-layering.py
           python scripts/verify/verify-shared-rest-contract.py
-
-      - name: Verify design tokens
-        run: python scripts/verify/verify-design-token-ssot.py
 
       - name: Verify privacy and evidence contracts
         run: |
@@ -2142,7 +2137,6 @@ jobs:
           python scripts/verify/verify-doc-ssot.py --self-test
           python scripts/verify/verify-ci-invariants.py --self-test
           python scripts/verify/verify-ci-invariants.py
-          python scripts/verify/tests/shell_guard.Tests.py
           python scripts/verify/tests/verify-release-gate.Tests.py
           bash scripts/verify/tests/verify-commit-messages.Tests.sh
           python scripts/verify/tests/verify-openapi-contract.Tests.py

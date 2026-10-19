@@ -34,7 +34,7 @@ Entry CSS load: desktop/web `main.tsx` imports surface `styles/{tokens,themes,pr
 5. **Brand icon hex** in brand assets (e.g. `designIcons.tsx`) is brand-literal OK. Product chrome (status, surfaces, text) must use theme tokens.
 6. **CSS fallbacks** on tokens (`var(--td-*, 字面量)`) 若写则必须与 SSOT 一致；不得残留与 tokens/themes 定义冲突的字面量。新代码优先裸 `var(--token)`。
 7. **Product CSS** uses semantic tokens `--success` / `--danger` / `--primary` / `--bdr` (and related surface tokens). **`--color-*` is legacy alias / preset-private only** — not for new product module consumers.
-8. **Design token gate**：修改 `app/shared/src/styles/` 或 `app/shared/src/designTokens.ts` 后，必须运行 `python scripts/verify/verify-design-token-ssot.py`，且 `app/shared/src/designTokens.test.ts`、`app/shared/src/styles/tokens-base.test.ts` 全绿。
+8. **Design token gate**：修改 `app/shared/src/styles/` 或 `app/shared/src/designTokens.ts` 后，运行 `pnpm --dir app --filter @agenthub/shared test`；`designTokens.test.ts`、`styles/tokens-base.test.ts`、`styles/surfaceStyles.test.ts` 必须全绿。
 9. **Shared component acceptance**：新组件验收见 [component-acceptance.md](../component-acceptance.md)。
 
 ## 3. Legitimate surface glue (not forks)
@@ -115,5 +115,5 @@ Applied first to AuxPanel and TerminalPanel. Respect `prefers-reduced-motion`.
 |---|---|
 | Written SSOT map | this file |
 | Surfaces load shared CSS | desktop/web `styles/*.css` remain thin re-exports |
-| Token changes verified | `verify-design-token-ssot.py` + token/theme tests |
+| Token changes verified | `surfaceStyles.test.ts` + token/theme tests |
 | Component acceptance | [component-acceptance.md](../component-acceptance.md) |

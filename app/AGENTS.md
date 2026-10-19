@@ -9,10 +9,9 @@
 ```bash
 pnpm --dir app install                # 装依赖（pnpm workspace）
 make fe-test                          # 前端 vitest（L0）
-pnpm --dir app --filter @agenthub/shared test   # shared 包单测
+pnpm --dir app --filter @agenthub/shared test   # shared 包单测（含 design-token surface gate）
 pnpm --dir app dev                    # Desktop Vite (:5173)
 pnpm --dir app dev:web                # Web Vite (:5174)
-python scripts/verify/verify-design-token-ssot.py   # 设计 token 门禁（改 styles/designTokens 必跑）
 ```
 
 ## 前端边界（速查，权威在根 AGENTS 的“架构与产品边界 / 验证与证据”）

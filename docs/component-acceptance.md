@@ -71,4 +71,4 @@
 
 在 PR 描述中复制上面 5 个维度，逐项标注 ✅ / ❌ / N/A 并写证据路径或缺口；也可在组件目录旁放同名 `.acceptance.md`。必选不满足不得合入。未达必选项必须修复或拆分；可选未做记入 issue debt（owner + 计划），不写入长期文档 backlog。
 
-修改 `app/shared/src/styles/` 或 `app/shared/src/designTokens.ts` 时，运行 `python scripts/verify/verify-design-token-ssot.py`，并保证 `app/shared/src/designTokens.test.ts`、`app/shared/src/styles/tokens-base.test.ts` 全绿。可见 UI 变化按受影响端运行 `visual:qa:shell`，视口矩阵与门禁见 `docs/architecture/07-design-system-ssot.md` §7。
+修改 `app/shared/src/styles/` 或 `app/shared/src/designTokens.ts` 时，运行 `pnpm --dir app --filter @agenthub/shared test`，并保证 `designTokens.test.ts`、`styles/tokens-base.test.ts`、`styles/surfaceStyles.test.ts` 全绿。可见 UI 变化按受影响端运行 `visual:qa:shell`，视口矩阵与门禁见 `docs/architecture/07-design-system-ssot.md` §7。

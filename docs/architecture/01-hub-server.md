@@ -46,7 +46,7 @@ Hub Server（`hub-server/`）是 AgentHub 的云端控制面：TokenDance ID rel
 | 资源 / 目录 | `attachment`, `document`, `skill`, `mcpserver`, `providerbinding`, `publicstats`, `usersettings`, `workspace` |
 | 审计 | `audit` |
 
-纯包门禁：`deliveryoutbox`（及 `dispatch`/`im`/`agentevent`）在 `scripts/verify/verify-hub-pure-packages.py` 的 PURE_DIRS 中，禁止 import gorm/cache/ws/service 树；其持久化经 `Store` 接口由 service 包的 gorm 实现注入。新领域逻辑放入对应子包，不回平铺根包。
+纯包门禁：`deliveryoutbox`（及 `dispatch`/`im`/`agentevent`）由 `hub-server/internal/architecture/architecture_test.go` 校验，禁止 import gorm/cache/ws/service 树；其持久化经 `Store` 接口由 service 包的 gorm 实现注入。新领域逻辑放入对应子包，不回平铺根包。
 
 ## Contract Map
 

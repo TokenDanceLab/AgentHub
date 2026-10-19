@@ -3,7 +3,7 @@
 > Owner：本文件是 AgentHub「规则 → 机器验证」映射的 SSOT；`AGENTS.md` 链接到这里。
 > 机器门禁：`scripts/verify/verify-doc-ssot.py` 校验本表验证脚本路径与 CI 文件存在性。
 
-最后更新：2026-10-18
+最后更新：2026-10-19
 
 ## 映射表
 
@@ -18,11 +18,10 @@
 | Go 安全扫描 fail-closed | `scripts/verify/verify-gosec-gates.sh` | checks.yml → go-*-static |
 | 文档入口、内部链接、行数预算 | `scripts/verify/verify-doc-ssot.py` | checks.yml → validate |
 | OpenAPI 与 Hub router 一致 | `scripts/verify/verify-openapi-contract.py` | checks.yml → validate |
-| Hub service 纯包不得 import gorm/cache/ws/service | `scripts/verify/verify-hub-pure-packages.py` | checks.yml → validate |
-| Hub handler 不直连 repository | `scripts/verify/verify-hub-layering.py` | checks.yml → validate |
+| Hub 纯包依赖方向与 handler 不直连 repository | `hub-server/internal/architecture/architecture_test.go` | checks.yml → go-hub-test |
 | 前端包依赖方向与 Edge 导入边界（`pnpm lint:boundaries`） | `app/eslint.boundaries.config.mjs` | checks.yml → frontend lint |
 | shared REST 客户端与 Hub router 合同一致 | `scripts/verify/verify-shared-rest-contract.py` | checks.yml → validate |
-| Design token 唯一来源 | `scripts/verify/verify-design-token-ssot.py` | checks.yml → validate |
+| Design token 唯一来源与 surface 薄 re-export | `app/shared/src/styles/surfaceStyles.test.ts` | checks.yml → frontend-desktop |
 | devserver 脚本不内嵌远端主机/凭据 | `scripts/verify/verify-devserver-contract.py` | checks.yml → validate |
 | 真实 E2E 证据等级 | `scripts/verify/verify-real-e2e-contract.py` | checks.yml → validate |
 | 出站 HTTP client 收敛 | `scripts/verify/verify-outbound-client-hygiene.py` | checks.yml → validate |
@@ -34,6 +33,6 @@
 ## 边界
 
 - 本表登记每个相关 PR 真执行的门禁，以及在 job 列显式标注的 dispatch/manual 门禁（后者不阻塞 PR）。手工脚本（`verify-oidc-flow.py`、`verify-login-e2e-readiness.py`）和发布前检查不列入常规门禁，证据记录在对应 PR 或 release 说明中。
-- `verify-ci-invariants.py` 只断言关键安全/合同门禁仍被接线（必需的 job 与步骤、verifier 调用、gosec/secret guard 保持硬阻断、引用的脚本存在），不复制完整的 CI 结构。
+- `verify-ci-invariants.py` 只做结构断言（required job/step、硬阻断、脚本存在、release environment 与 OIDC dispatch 边界）；workflow 语法和 shell 解析由 actionlint 负责，不在这里维护 workflow 解释器。
 - 覆盖率由测试 job 直接产出，不设基线 ratchet；Edge lint 为 advisory（owner：edge maintainers），已登记的 lint 债务清零后移除 `continue-on-error`，与 `go-hub-static` 一样阻塞合并。Hub lint 经 `go-hub-static` / `go-hub` 阻塞合并。
 - 新增门禁必须说明它替代了哪个旧门禁，或证明现有测试/契约检查无法覆盖；没有 CI 执行点的脚本不算门禁。

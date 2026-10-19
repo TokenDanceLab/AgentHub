@@ -7,7 +7,7 @@
 ## 目标
 
 - Ubuntu 是主验证平台：Linux Go race/shard、集成服务、前端 unit/type/build、架构门禁和 Visual QA。
-- Windows 是兼容性平台：原生 Go 单元测试，以及 Desktop/Web 的 typecheck、unit test、production build。
+- Windows 是兼容性平台：原生 Go 单元测试，以及 Desktop 的 typecheck、unit test、production build。Web 由 Linux 验证。
 - Tauri installer、NSIS、portable package 和 sidecar 组合只在 release-readiness 或 release 的明确 job 中运行，普通 PR 不编译完整安装包。
 - 真实 OIDC、真实模型、生产部署、签名和 notarization 不属于普通 CI；必须走显式证据或审批链路。
 
@@ -36,7 +36,7 @@
 1. `concurrency.cancel-in-progress` 取消同一 PR 的旧运行。
 2. `changes` 是统一路径过滤器；Go、前端、移动端、设计 CSS 和视觉 shell 只在相关变更时启动，手动 dispatch 默认运行完整选择面。`tests/fixtures/dispatch/**` 同时触发 Go、Desktop 与前端聚合。
 3. Ubuntu Go unit 使用两个不重叠 package shard；shard 测试与静态门禁同时起跑，关键路径 = max(最慢 shard, 静态 job) + 覆盖率合并。
-4. 前端 test 按 package matrix 并行；Windows 前端按 Desktop/Web matrix 并行；矩阵 `fail-fast: false` 保留所有失败根因。
+4. 前端 test 按 package matrix 并行；Windows 只跑 Desktop 原生合同；矩阵 `fail-fast: false` 保留所有失败根因。
 5. `setup-go`/`setup-node` 依赖缓存、pnpm store、Rust cache 和 Docker Buildx GHA cache 复用稳定输入。
 6. 安装器、Expo export、Rust/Tauri 打包不塞入 Fast PR；Playwright 与 Docker 服务只在路径相关的 PR lane 启动。
 
@@ -53,7 +53,7 @@
 ### Windows
 
 - `windows-go-test` 在 `windows-latest` 对 `edge-server` 和 `hub-server` 运行 `go test ./... -short`，验证路径、进程、环境变量大小写和平台 API。
-- `windows-frontend-test` 对 `agenthub-desktop` 和 `agenthub-web` 并行执行 typecheck、unit tests 和 production build。
+- `windows-frontend-test` 只对 `agenthub-desktop` 执行 typecheck、unit tests 和 production build；Web 的 typecheck、unit、build 由 Linux 执行一次。
 - `windows-go` / `windows-frontend` 用稳定名聚合矩阵；路径过滤跳过时退出 success 作为有意 no-op，只代表“未触发”，不提供测试执行证据。
 - Windows 原生合同不宣称 Tauri installer 可发布；installer 与 signing 仍由 release-readiness/release 的专门 job 负责。
 
@@ -84,9 +84,6 @@ cd app
 pnpm --filter agenthub-desktop typecheck
 pnpm --filter agenthub-desktop test
 pnpm --filter agenthub-desktop build
-pnpm --filter agenthub-web typecheck
-pnpm --filter agenthub-web test
-pnpm --filter agenthub-web build
 ```
 
 ## Flake 策略
