@@ -14,12 +14,6 @@ import {
 } from './ComposerPartsHelpers';
 import { formatQuotePreview } from './unifiedComposerHelpers';
 
-/* ═══════════════════════════════════════════════════════════════════════
-   Composer context chrome — reply / quote / mentions / mainchain / status.
-
-   Helper module for UnifiedComposerParts (#706).
-   ═══════════════════════════════════════════════════════════════════════ */
-
 const contextBarClass =
   'flex min-w-0 items-center gap-2 rounded-lg border border-line bg-muted/40 px-3 py-2 text-xs text-muted-foreground';
 const contextLabelClass = 'min-w-0 flex-1 truncate';

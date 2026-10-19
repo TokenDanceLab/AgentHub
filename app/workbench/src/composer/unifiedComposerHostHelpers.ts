@@ -1,17 +1,3 @@
-/* ═══════════════════════════════════════════════════════════════════════
-   unifiedComposerHostHelpers — stable public surface for UnifiedComposer
-   host pure helpers (#718 / helper module #780).
-
-   Implementation lives in:
-   - unifiedComposerHostViewModel
-   - unifiedComposerHostKeyDown
-   - unifiedComposerHostActions
-   - unifiedComposerHostFilePick
-
-   Re-exports keep import paths stable for UnifiedComposer and tests.
-   No React hooks.
-   ═══════════════════════════════════════════════════════════════════════ */
-
 export type {
   AttachmentUploadState,
   ComposerExecutionTarget,

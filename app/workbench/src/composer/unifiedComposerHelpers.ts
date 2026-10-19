@@ -2,13 +2,6 @@ import type { ComposerAttachment, ComposerMention, ComposerState } from '@shared
 import { canSubmitComposer, formatComposerAttachmentSize } from '@shared/composer';
 import type { ComposerSubmitBehavior } from '../workbenchPreferences';
 
-/* ═══════════════════════════════════════════════════════════════════════
-   unifiedComposerHelpers — pure helpers for UnifiedComposer (#638).
-
-   Status/label builders, mention filtering, and submit-key planners.
-   No React hooks.
-   ═══════════════════════════════════════════════════════════════════════ */
-
 export interface AttachmentUploadState {
   percent: number;
   phase: 'hashing' | 'uploading' | 'done' | 'failed';

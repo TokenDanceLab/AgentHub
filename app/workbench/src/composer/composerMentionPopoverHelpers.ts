@@ -1,18 +1,3 @@
-/* ═══════════════════════════════════════════════════════════════════════
-   composerMentionPopoverHelpers — pure + DOM plumbing for the @mention
-   popover: keyboard navigation plan, viewport-clamped
-   positioning, and best-effort caret coordinate measurement.
-
-   - `planMentionPopoverKeyDown` / `clampPopoverPosition` are pure and
-     fully unit-testable.
-   - `measureCaretCoords` is a defensive DOM measurement (mirror-div
-     technique) that returns null in environments without layout (jsdom),
-     letting the host fall back to an anchored position.
-
-   No React. The host wires these into the textarea keydown handler and
-   a layout effect that positions the popover.
-   ═══════════════════════════════════════════════════════════════════════ */
-
 /** Keyboard effect the host should apply while the mention popover is open. */
 export type MentionPopoverKeyEffect =
   | { kind: 'none' }

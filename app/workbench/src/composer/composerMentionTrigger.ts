@@ -1,19 +1,5 @@
 import type { ComposerMention } from '@shared/composer';
 
-/* ═══════════════════════════════════════════════════════════════════════
-   composerMentionTrigger — pure @mention trigger detection for the
-   UnifiedComposer textarea.
-
-   Detects an active '@' trigger immediately preceding the caret, extracts
-   the query segment, filters mentionable candidates, and computes the text
-   slice that must be removed when a candidate is inserted as a chip.
-
-   Pure + framework-agnostic: no React, no DOM. The host (UnifiedComposer)
-   wires these into textarea onChange/onSelect and the popover selection
-   handler. Mention data + dispatchRole semantics flow unchanged through
-   the existing `addMention` reducer action — see planAddMentionAction.
-   ═══════════════════════════════════════════════════════════════════════ */
-
 export interface MentionTrigger {
   /** Offset of the '@' trigger char in the composer text. */
   atOffset: number;

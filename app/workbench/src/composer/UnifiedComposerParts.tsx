@@ -1,11 +1,3 @@
-/* ═══════════════════════════════════════════════════════════════════════
-   UnifiedComposer presentational subpanels — barrel module (#706).
-
-   Subcomponents live in ComposerContextParts / ComposerAttachmentParts /
-   ComposerControlParts. Pure helpers in ComposerPartsHelpers. Visuals use the
-   shadcn/Tailwind token bridge; no composer chrome remains in the CSS module.
-   ═══════════════════════════════════════════════════════════════════════ */
-
 export {
   ComposerMentionChips,
   ComposerQuoteBar,

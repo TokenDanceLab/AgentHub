@@ -1,12 +1,5 @@
 import type { ComposerAttachment } from '@shared/composer';
 
-/* ═══════════════════════════════════════════════════════════════════════
-   unifiedComposerHostFilePick — pure file-picker planners (#780).
-
-   File-input / native-picker planners and attachment resolution.
-   No React hooks.
-   ═══════════════════════════════════════════════════════════════════════ */
-
 export type ComposerFilePickPlan =
   | { kind: 'noop' }
   | { kind: 'native' }

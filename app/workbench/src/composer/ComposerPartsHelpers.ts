@@ -10,12 +10,6 @@ import {
   isImageAttachment,
 } from './unifiedComposerHelpers';
 
-/* ═══════════════════════════════════════════════════════════════════════
-   Pure helpers for UnifiedComposerParts (#706).
-
-   Label builders and attachment chip view-model only — no React hooks.
-   ═══════════════════════════════════════════════════════════════════════ */
-
 export function formatReplyToLabel(
   replyTo: {
     author: string;

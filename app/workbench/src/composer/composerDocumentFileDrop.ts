@@ -7,16 +7,6 @@ import {
 } from './unifiedComposerHelpers';
 import { dispatchComposerAttachmentAdds } from './unifiedComposerHostHelpers';
 
-/* ═══════════════════════════════════════════════════════════════════════
-   composerDocumentFileDrop — document-level file drop routing (#1822).
-
-   Files dragged onto the transcript/sidebar/headers used to open in the
-   browser. These handlers intercept any Files drag outside the composer
-   form and route it to the composer attachment chips instead. Extracted
-   from ConversationHost so the routing decisions are unit-testable;
-   ConversationHost only owns listener registration and the dragging flag.
-   ═══════════════════════════════════════════════════════════════════════ */
-
 export interface ComposerDocumentFileDropCallbacks {
   dispatchComposer: Dispatch<ComposerAction>;
   onToast: (message: string) => void;

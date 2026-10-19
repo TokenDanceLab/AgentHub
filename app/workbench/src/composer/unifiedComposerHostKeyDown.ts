@@ -7,13 +7,6 @@ import {
 } from './unifiedComposerHelpers';
 import { setComposerTextAction } from './unifiedComposerHostActions';
 
-/* ═══════════════════════════════════════════════════════════════════════
-   unifiedComposerHostKeyDown — pure keydown planners (#780).
-
-   Keydown event field readers, submit/newline planners, and host effect
-   mappers. No React hooks.
-   ═══════════════════════════════════════════════════════════════════════ */
-
 export type ComposerHostKeyDownPlan =
   | { kind: 'none' }
   | { kind: 'insert-newline'; nextText: string; caret: number }

@@ -5,19 +5,6 @@ import { CHATVIEW_I18N_NAMESPACE } from '@shared/chatview/i18n/resources';
 import { formatMentionChipLabel } from './ComposerPartsHelpers';
 import type { MentionPopoverCoords } from './composerMentionPopoverHelpers';
 
-/* ═══════════════════════════════════════════════════════════════════════
-   ComposerMentionPopover — presentational @mention candidate list.
-
-   Rendered by UnifiedComposer when an active '@' trigger is detected in
-   the textarea. Pure: the host owns trigger/query/activeIndex/coords and
-   feeds them in. Keyboard navigation (Arrow/Enter/Esc) is handled by the
-   host's textarea keydown via planMentionPopoverKeyDown; the textarea keeps
-   focus, so option clicks use onMouseDown + preventDefault to avoid blur.
-
-   Reuses ComposerMention + dispatchRole: the host routes selection through
-   planAddMentionAction → addMention, preserving the dispatch semantics.
-   ═══════════════════════════════════════════════════════════════════════ */
-
 export interface ComposerMentionPopoverProps {
   candidates: ComposerMention[];
   activeIndex: number;

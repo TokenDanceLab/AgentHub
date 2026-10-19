@@ -22,16 +22,6 @@ import {
   type UnifiedComposerDerivedState,
 } from './unifiedComposerHelpers';
 
-/* ═══════════════════════════════════════════════════════════════════════
-   unifiedComposerHostViewModel — pure host view/chrome builders (#780).
-
-   Props types, runtime defaults, chrome visibility, chrome render model,
-   and combined host view-model builders.
-   No React hooks.
-   exactOptionalPropertyTypes: only assign `?: T` fields when defined,
-   unless the public field type explicitly allows `| undefined`.
-   ═══════════════════════════════════════════════════════════════════════ */
-
 export type {
   AttachmentUploadState,
   ComposerExecutionTarget,

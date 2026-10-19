@@ -2,22 +2,9 @@ import type { ApprovalMode } from '@shared/composer';
 import type { PermissionModeOption } from '@shared/ui';
 
 /**
- * #1816 — composer approval-mode picker mapping.
- *
- * Semantics (documented, matching both platform dispatchers):
- * - 'suggest' (default): no override — the agent applies its own permission
- *   policy. Web sends approval_mode: "suggest"; desktop's edgePermissionMode
- *   returns no permissionMode override.
- * - 'workspace-write': desktop maps to Edge permissionMode 'acceptEdits'.
- * - 'read-only': desktop maps to Edge permissionMode 'plan'.
- *
- * The shared PermissionModePicker uses Edge permission-mode vocabulary for
- * its option values ('acceptEdits' / 'plan') so the option icons stay
- * meaningful; 'suggest' keeps a Settings glyph.
- *
- * `APPROVAL_MODE_ROWS` is the single source for the mode → picker-value →
- * label-key mapping, and every function below is a lookup on it, so a mode
- * can no longer be present in one mapping and missing from another.
+ * Composer approval mode → picker value + label key. `suggest` is a no-op
+ * override; the other two reuse the Edge vocabulary (`acceptEdits` / `plan`)
+ * so the shared picker icons stay meaningful.
  */
 
 interface ApprovalModeRow {

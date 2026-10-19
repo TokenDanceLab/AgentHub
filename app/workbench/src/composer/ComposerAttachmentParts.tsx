@@ -21,15 +21,6 @@ import { DesignFileIcon, DesignNavIcon } from '../designIcons';
 import { isImageAttachment } from './unifiedComposerHelpers';
 import type { AttachmentUploadState } from './unifiedComposerHelpers';
 
-/* ═══════════════════════════════════════════════════════════════════════
-   Composer attachment bar and chip (#706).
-
-   exactOptionalPropertyTypes-safe spreads for uploadProgress.
-   In-chip previews: image object-URL thumbnail
-   (30×30, revoked on unmount), registry file icon for media, and a
-   CodePreviewCard (maxLines=3) for text/code files.
-   ═══════════════════════════════════════════════════════════════════════ */
-
 export function ComposerAttachmentBar({
   attachments,
   isSubmitting,

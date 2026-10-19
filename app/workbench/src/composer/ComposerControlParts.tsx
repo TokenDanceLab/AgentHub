@@ -18,14 +18,6 @@ import {
 } from './ComposerPartsHelpers';
 import type { ComposerExecutionTarget } from './unifiedComposerHelpers';
 
-/* ═══════════════════════════════════════════════════════════════════════
-   Composer control chrome — agent/target pickers + attach/send buttons.
-
-   Helper module for UnifiedComposerParts (#706).
-   DesignNavIcon only for icon glyphs.
-   Visuals use shadcn Button + Tailwind classes over shared theme tokens.
-   ═══════════════════════════════════════════════════════════════════════ */
-
 export function ComposerAgentPicker({
   availableMentionOptions,
   isSubmitting,

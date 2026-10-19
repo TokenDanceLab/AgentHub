@@ -378,8 +378,6 @@ describe('UnifiedComposer @mention popover', () => {
   });
 });
 
-/* ═══════════════════ Draft persistence ═══════════════════ */
-
 const draftComposer: ComposerState = {
   conversationId: 'hub-session-draft',
   text: '',

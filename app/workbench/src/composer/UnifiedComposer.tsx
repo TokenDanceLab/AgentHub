@@ -42,12 +42,7 @@ import {
   ComposerTargetPicker as ComposerTargetPickerBase,
 } from './UnifiedComposerParts';
 
-/* #21 性能：composer 状态每次击键都变（textarea 值必要更新），UnifiedComposer
-   自身每击键重渲染不可避免；但子面板的 props 在击键时大多保持稳定（数据来自
-   composer 状态的稳定引用 + useCallback 稳定的回调），包一层 React.memo 跳过
-   不必要的子树重渲染。
-   ─ ComposerAgentPicker / ComposerStatusStrip 未包：availableMentionOptions /
-     statusItems 每次渲染由纯函数重建（新引用），memo 无效。 */
+// Every keystroke re-renders the composer; memo the subpanels whose props stay stable.
 const ComposerReplyBar = React.memo(ComposerReplyBarBase);
 const ComposerQuoteBar = React.memo(ComposerQuoteBarBase);
 const ComposerEditBar = React.memo(ComposerEditBarBase);
@@ -113,8 +108,6 @@ export function UnifiedComposer({
   const { chromeModel } = view;
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  /* #21 性能：稳定回调（依赖仅 dispatchComposer —— useReducer dispatch 跨渲染
-     稳定），配合上方子组件 React.memo，跳过击键时子面板的不必要重渲染。 */
   const handleCancelReply = useCallback(() => dispatchComposer(cancelReplyAction()), [dispatchComposer]);
   const handleCancelQuote = useCallback(() => dispatchComposer(cancelQuoteAction()), [dispatchComposer]);
   const handleCancelEdit = useCallback(() => dispatchComposer(cancelEditAction()), [dispatchComposer]);
@@ -154,14 +147,6 @@ export function UnifiedComposer({
     onExecutionTargetChange?.('');
   }, [runtime.executionTargetId, executionTargets, onExecutionTargetChange]);
 
-  /* ═══════════════ @mention inline popover ═══════════════
-     The textarea reports every text/cursor change to evaluateTrigger; an
-     active '@' before the caret (preceded by whitespace, no whitespace in
-     the query segment) opens the popover. The popover reuses the existing
-     mentionableAgents data + planAddMentionAction so dispatchRole ('context'
-     vs 'dispatch') semantics flow through unchanged. IME composition is
-     guarded via compositionRef so '@' detection never fires mid-composition. */
-
   const [mentionTrigger, setMentionTrigger] = useState<MentionTrigger | null>(null);
   const [mentionActiveIndex, setMentionActiveIndex] = useState(0);
   const [popoverCoords, setPopoverCoords] = useState<MentionPopoverCoords | null>(null);
@@ -169,14 +154,6 @@ export function UnifiedComposer({
   const compositionRef = useRef(false);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const listboxId = useId();
-
-  /* ═══════════════ Draft persistence ═══════════════
-     Save composer draft per conversationId via requestIdleCallback
-     batching, load on mount, flush on hidden, clear on submit (empty
-     state). #1822: the persisted payload now also carries uploaded
-     attachment refs and the reply/quote context; in-flight attachments
-     are additionally kept in a memory cache so a same-session
-     conversation switch restores them fully.                    */
 
   const draftLoadedRef = useRef<string | null>(null);
   const pendingDraftRef = useRef<{
@@ -236,7 +213,6 @@ export function UnifiedComposer({
       flushDraft();
     }
 
-    // ══ Load draft (first time per conversationId) ══
     if (draftLoadedRef.current !== cid) {
       draftLoadedRef.current = cid;
       // Only load when the composer is empty (fresh mount / conversation switch).
@@ -297,7 +273,6 @@ export function UnifiedComposer({
       }
     }
 
-    // ══ Save / clear draft ══
     if (
       composer.text === '' &&
       composer.mentions.length === 0 &&
@@ -349,10 +324,6 @@ export function UnifiedComposer({
       flushDraft();
     };
   }, []);
-
-  /* ═══════════════ Auto-grow (#1822) ═══════════════
-     The composer textarea is rows=1; grow it to fit the content up to
-     the CSS max-height instead of scrolling forever at one line. */
 
   useEffect(() => {
     const textarea = textareaRef.current;
@@ -534,15 +505,6 @@ export function UnifiedComposer({
     }
     if (effect.kind === 'submit') event.currentTarget.form?.requestSubmit();
   }
-
-  /* ═══════════════ onPaste / onDrop attachment ═══════════════
-     Extract File objects from clipboard paste or file drag-and-drop, convert
-     to ComposerAttachment (via browserFilesToComposerAttachments for content
-     preview + hash), and dispatch into the composer store. Upload is deferred
-     to ConversationHost on submit.  Orthogonal to @mention popover — no
-     interaction with evaluateTrigger / compositionRef.
-     Size gate: files over MAX_ATTACHMENT_BYTES are
-     rejected up front with a toast instead of failing mid-upload.            */
 
   async function handleAttachFiles(files: File[]): Promise<void> {
     if (files.length === 0 || view.isSubmitting) return;

@@ -6,13 +6,6 @@ import type {
 } from '@shared/composer';
 import { findMentionById } from './unifiedComposerHelpers';
 
-/* ═══════════════════════════════════════════════════════════════════════
-   unifiedComposerHostActions — pure action builders (#780).
-
-   Mention/attachment/text/reply/quote action builders and attachment
-   dispatch helpers. No React hooks.
-   ═══════════════════════════════════════════════════════════════════════ */
-
 /** Plan mention add action from a picker selection. */
 export function planAddMentionAction(
   mentionableAgents: ComposerMention[],
