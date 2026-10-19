@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { normalizeEdgeEventsToTranscript } from '@shared/transcript';
+import { eventRunId } from '@shared/transcript/edgeEventEvidence';
 import { getAgentActivityStore, type AgentActivityStatus } from '@shared/transcript/agentActivity';
 import type { EventEnvelope } from '@shared/events';
 import type { TranscriptBlock } from '@shared/transcript';
@@ -168,10 +169,6 @@ function matchesActiveThread(
 
 function eventThreadId(event: EventEnvelope): string | undefined {
   return stringField(event.payload.threadId) ?? stringField(event.scope.threadId);
-}
-
-function eventRunId(event: EventEnvelope): string | undefined {
-  return stringField(event.payload.runId) ?? stringField(event.scope.runId);
 }
 
 function eventTimestampMs(event: EventEnvelope): number {

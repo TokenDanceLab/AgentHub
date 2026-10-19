@@ -10,7 +10,7 @@ import type {
   WorkspaceProjectThread,
   WorkspaceProjectThreadMessage,
 } from '@/api/hubClient';
-import { errorMessage } from './webWorkbenchError';
+import { errorMessage } from '@shared/errors';
 
 export function resolveWebWorkbenchProjects(
   projects: WorkspaceProject[] | undefined,
