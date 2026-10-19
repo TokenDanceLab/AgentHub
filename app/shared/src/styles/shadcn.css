@@ -28,6 +28,14 @@
 /* The app switches themes with data-theme on the root element, not a class. */
 @custom-variant dark (&:is([data-theme="dark"] *));
 
+/* Vercel-grade hairlines are slightly stronger than the legacy 4.5% border
+   token. Keep the original `--border` untouched (CSS-Module surfaces still
+   consume it) and expose one deliberate line color to Tailwind instead. */
+:root {
+  --ah-line: color-mix(in oklch, var(--foreground) 10%, transparent);
+  --ah-line-strong: color-mix(in oklch, var(--foreground) 18%, transparent);
+}
+
 @layer base {
   *,
   ::before,
@@ -55,14 +63,20 @@
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
   --color-border: var(--border);
+  --color-line: var(--ah-line);
+  --color-line-strong: var(--ah-line-strong);
   --color-input: var(--input);
   --color-ring: var(--ring);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-info: var(--info);
 
   --radius-xs: var(--r-xs);
   --radius-sm: var(--r-sm);
   --radius-md: var(--r-md);
   --radius-lg: var(--r-lg);
   --radius-xl: var(--r-xl);
+  --radius-2xl: var(--r-2xl);
 
   --font-sans: var(--font-sans);
   --font-mono: var(--font-mono);

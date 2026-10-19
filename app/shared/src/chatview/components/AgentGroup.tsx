@@ -7,6 +7,7 @@ import { roleInitial } from '../design/roles'
 import MarkdownContent from '../../ui/Markdown'
 import { MessageDisplayMeta } from './MessageDisplayMeta'
 import { isAgentItemStreaming } from './streaming'
+import { Message, MessageAvatar, MessageContent } from '../../shadcn/ui/message'
 
 const evidenceIconMap: Record<string, typeof IconFile> = {
   file: IconFile,
@@ -224,31 +225,29 @@ export const AgentGroup = memo(function AgentGroup({ item, chatMode, onAgentClic
 
   if (chatMode === 'dm') {
     return (
-      <div className={enter ? 'grp-row grp-enter' : 'grp-row'}>
-        <div
-          className="dm-avatar"
+      <Message className={enter ? 'agent-row grp-enter' : 'agent-row'}>
+        <MessageAvatar
+          className="dm-avatar self-start"
           onClick={onAgentClick ? (e) => onAgentClick(item.agent, e.currentTarget) : undefined}
           style={onAgentClick ? { cursor: 'pointer' } : undefined}
         >
           {avatar}
-        </div>
-        <div className="grp-content">{orderedBodyContent ? orderedBody : body}</div>
-        <div className="dm-spacer" aria-hidden="true"><div className="ag-av">&nbsp;</div></div>
-      </div>
+        </MessageAvatar>
+        <MessageContent className="grp-content">{orderedBodyContent ? orderedBody : body}</MessageContent>
+      </Message>
     )
   }
 
   return (
-    <div className={enter ? 'grp-row grp-enter' : 'grp-row'}>
-      <div
-        className="dm-avatar"
+    <Message className={enter ? 'agent-row grp-enter' : 'agent-row'}>
+      <MessageAvatar
+        className="dm-avatar self-start"
         onClick={onAgentClick ? (e) => onAgentClick(item.agent, e.currentTarget) : undefined}
         style={onAgentClick ? { cursor: 'pointer' } : undefined}
       >
         {avatar}
-      </div>
-      <div className="grp-content">{orderedBodyContent ? orderedBody : body}</div>
-      <div className="dm-spacer" aria-hidden="true"><div className="ag-av">&nbsp;</div></div>
-    </div>
+      </MessageAvatar>
+      <MessageContent className="grp-content">{orderedBodyContent ? orderedBody : body}</MessageContent>
+    </Message>
   )
 })
