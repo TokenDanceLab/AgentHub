@@ -34,6 +34,8 @@ import { ChatViewTranscript } from '@shared/chatview';
 
 新增通用类型、组件或工具先放这里，再由 Desktop/Web 消费。不要在 `app/desktop/` 或 `app/web/` 内复制一套本地共享组件。
 
+`@agenthub/shared` 没有根 barrel：所有消费方从具体子路径导入（Desktop/Web/Workbench 用 `@shared/*` 路径别名，Mobile 用 package `exports`），新增公开子路径时同步 `package.json` 的 `exports`。
+
 ## AgentHub 术语
 
 共享类型命名必须区分 Agent Runtime / Agent Profile / Agent Configuration / Execution Target；定义见 `../../docs/architecture.md` §产品模型，API 字段映射见 `../../api/README.md`。如果旧接口仍使用 `agentId` 表示 adapter ID，应在 shared 类型或 API client 边界处做清晰注释，避免 UI 把 Runtime 当作用户可管理 Profile 展示。
