@@ -3,7 +3,7 @@ import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, within } from '../__tests__/setup';
 import { ProjectsPage } from './ProjectsPage';
 import { WORKBENCH_MOCK_PROJECTS } from '../mockData';
-import type { ProjectInfo, ProjectsPageProps } from './projects';
+import type { ProjectInfo, ProjectsPageProps } from './projects/index';
 
 // Projects copy resolves via the sharedWorkbench namespace; opt into the zh
 // bundle of the shared test i18next instance (Issue #1717).

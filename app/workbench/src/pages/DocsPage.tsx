@@ -3,8 +3,8 @@ import styles from './DocsPage.module.css';
 import {
   DocMain,
   DocsNav,
-} from './docs';
-import type { DocsPageProps } from './docs';
+} from './docs/index';
+import type { DocsPageProps } from './docs/index';
 
 /* ═══════════════════════════════════════════════════════════════════════
    DocsPage — pure presentational workbench page
@@ -21,7 +21,7 @@ export type {
   DocsPane,
   DocsPageNavItem,
   DocsPageProps,
-} from './docs';
+} from './docs/index';
 
 // ── Main component ──
 

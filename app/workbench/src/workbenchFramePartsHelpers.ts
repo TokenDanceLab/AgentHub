@@ -1,8 +1,8 @@
 import { useMemo } from 'react';
-import type { ConversationHostProps } from './ConversationHost';
-import type { ConversationSidebarProps } from './ConversationSidebar';
-import type { RightInspectorProps } from './rightInspectorTypes';
-import type { WorkbenchRoutesProps } from './workbenchRoutesTypes';
+import type { ConversationHostProps } from './transcript/ConversationHost';
+import type { ConversationSidebarProps } from './transcript/ConversationSidebar';
+import type { RightInspectorProps } from './inspector/rightInspectorTypes';
+import type { WorkbenchRoutesProps } from './routes/workbenchRoutesTypes';
 import type {
   ChatConversationHostFrameProps,
   ChatInspectorFrameProps,

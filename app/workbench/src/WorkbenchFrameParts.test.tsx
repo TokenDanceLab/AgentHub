@@ -20,7 +20,7 @@ import {
 /** Last ConversationHost props seen by the mock (referential-stability gate). */
 const hostPropsLog = vi.hoisted(() => ({ last: null as Record<string, unknown> | null }));
 
-vi.mock('./ConversationSidebar', () => ({
+vi.mock('./transcript/ConversationSidebar', () => ({
   ConversationSidebar: (props: Record<string, unknown>) => (
     <div
       data-active-id={props.activeConversationId as string}
@@ -34,7 +34,7 @@ vi.mock('./ConversationSidebar', () => ({
   ),
 }));
 
-vi.mock('./ConversationHost', () => ({
+vi.mock('./transcript/ConversationHost', () => ({
   ConversationHost: (props: Record<string, unknown>) => {
     hostPropsLog.last = props;
     return (
@@ -47,7 +47,7 @@ vi.mock('./ConversationHost', () => ({
   },
 }));
 
-vi.mock('./RightInspector', () => ({
+vi.mock('./inspector/RightInspector', () => ({
   RightInspector: (props: Record<string, unknown>) => (
     <div
       data-testid="right-inspector"
@@ -59,7 +59,7 @@ vi.mock('./RightInspector', () => ({
   ),
 }));
 
-vi.mock('./ChatEngineeringColumn', () => ({
+vi.mock('./transcript/ChatEngineeringColumn', () => ({
   ChatEngineeringColumn: (props: Record<string, unknown>) => (
     <div
       data-testid="chat-engineering-column"

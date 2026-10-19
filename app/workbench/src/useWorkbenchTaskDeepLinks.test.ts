@@ -1,6 +1,6 @@
 import { act, renderHook } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { TaskItem } from './pages';
+import type { TaskItem } from './pages/index';
 import {
   backFromTaskDeepLink,
   getWorkbenchTaskDeepLinkSnapshot,
@@ -9,7 +9,7 @@ import {
   openTaskDetailForConversation,
   publishWorkbenchTaskQueue,
   resetWorkbenchTaskDeepLinksForTest,
-} from './workbenchTaskDeepLinks';
+} from './routes/workbenchTaskDeepLinks';
 import { useWorkbenchTaskDeepLinks } from './useWorkbenchTaskDeepLinks';
 
 function makeTask(overrides: Partial<TaskItem> = {}): TaskItem {

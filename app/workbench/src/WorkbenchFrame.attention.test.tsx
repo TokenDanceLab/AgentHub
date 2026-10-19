@@ -32,12 +32,12 @@ vi.mock('./WorkbenchFrameParts', () => ({
   WorkspaceLoadingState: () => <div data-testid="loading" />,
 }));
 
-vi.mock('./terminal', () => ({
+vi.mock('./terminal/index', () => ({
   TerminalPanel: () => <div data-testid="terminal-panel-stub" />,
 }));
 
 // The real strip would need i18n; the wiring contract is what this file pins.
-vi.mock('./MainchainStatusStrip', () => ({
+vi.mock('./transcript/MainchainStatusStrip', () => ({
   MainchainStatusStrip: (props: {
     attention?: WorkbenchAttentionCounts;
     onOpenRunningQueue?: () => void;

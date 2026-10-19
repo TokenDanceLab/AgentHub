@@ -7,21 +7,21 @@ import type { GlobalRailPage } from './GlobalRail';
 import styles from './AgentHubWorkbench.module.css';
 import { useWorkbenchPanelLayout } from './useWorkbenchPanelLayout';
 import { useWorkbenchProfileChrome } from './useWorkbenchProfileChrome';
-import { useWorkbenchSessionChrome } from './useWorkbenchSessionChrome';
-import { useWorkbenchTranscriptChrome } from './useWorkbenchTranscriptChrome';
+import { useWorkbenchSessionChrome } from './transcript/useWorkbenchSessionChrome';
+import { useWorkbenchTranscriptChrome } from './transcript/useWorkbenchTranscriptChrome';
 import { useWorkbenchGlobalShortcuts } from './useWorkbenchGlobalShortcuts';
 import { useWorkbenchTaskDeepLinks } from './useWorkbenchTaskDeepLinks';
-import { WorkbenchTaskDeepLinkProvider } from './workbenchTaskDeepLinks';
+import { WorkbenchTaskDeepLinkProvider } from './routes/workbenchTaskDeepLinks';
 import { GlobalSearchDialog } from './GlobalSearchDialog';
 import { WORKBENCH_INSPECTOR_QUICK_OPEN_EVENT } from './desktopChromeEvents';
-import { isEditableKeyboardTarget } from './workbenchSessionChromeHelpers';
+import { isEditableKeyboardTarget } from './transcript/workbenchSessionChromeHelpers';
 import { WorkbenchFrame } from './WorkbenchFrame';
 import {
   engineeringColumnActivitySignal,
   useEngineeringColumnAutoOpen,
-} from './useEngineeringColumnAutoOpen';
+} from './inspector/useEngineeringColumnAutoOpen';
 import { WorkbenchProfileOverlays } from './WorkbenchProfileOverlays';
-import { WorkbenchTranscriptOverlays } from './WorkbenchTranscriptOverlays';
+import { WorkbenchTranscriptOverlays } from './transcript/WorkbenchTranscriptOverlays';
 import {
   buildProfileChromeOptions,
   buildProfileOverlaysProps,

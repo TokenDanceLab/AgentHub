@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { SHARED_WORKBENCH_I18N_NAMESPACE } from '@shared/i18n';
 import { StatusNotice } from '@shared/ui';
 import { DesignNavIcon } from '../../designIcons';
-import { ProfilePopover } from '../../floating';
+import { ProfilePopover } from '../../floating/index';
 import styles from '../ContactsPage.module.css';
 import { QuickActionGrid } from './ContactRows';
 import {

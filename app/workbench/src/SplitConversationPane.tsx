@@ -14,7 +14,7 @@ import { useTranslation } from 'react-i18next';
 import type { WorkbenchConversation } from '@shared/platform';
 import type { TranscriptBlock } from '@shared/transcript';
 import { CHATVIEW_I18N_NAMESPACE } from '@shared/chatview/i18n/resources';
-import { ChatViewBridge } from './ChatViewBridge';
+import { ChatViewBridge } from './transcript/ChatViewBridge';
 import { DesignNavIcon } from './designIcons';
 import { ContextMenu, type ContextMenuItem } from './floating/ContextMenu';
 import type { ConversationLiveStatus } from './workbenchAttentionModel';

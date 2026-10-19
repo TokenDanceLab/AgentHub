@@ -1,5 +1,5 @@
 import React from 'react';
-import { ProfilePopover } from './floating';
+import { ProfilePopover } from './floating/index';
 import { workbenchAgentColor, workbenchProfileInitials } from './profileRegistry';
 import {
   agentStateLabel,

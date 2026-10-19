@@ -20,9 +20,9 @@ import {
   LocalCliDiscoveryStatus,
   StatePreviewSection,
 } from './SettingsPaneParts';
-import { SessionImportList } from '../../sessionImport';
+import { SessionImportList } from '../../sessionImport/index';
 import { ThemePresetPicker } from './ThemePresetPicker';
-import { writeClipboardText } from '../../workbenchTranscriptChromeStateHelpers';
+import { writeClipboardText } from '../../transcript/workbenchTranscriptChromeStateHelpers';
 import { resolvePermissionValue } from './SettingsPaneHelpers';
 import { PERMISSION_ROWS } from './types';
 import type { SettingsPageProps, SettingsPaneId } from './types';

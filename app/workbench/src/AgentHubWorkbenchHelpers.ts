@@ -2,17 +2,17 @@ import type { Dispatch, SetStateAction } from 'react';
 import type { WorkbenchConversation } from '@shared/platform';
 import type { GlobalRailPage } from './GlobalRail';
 import type { WorkbenchFrameProps } from './workbenchFrameTypes';
-import type { UseWorkbenchSessionChromeOptions, WorkbenchSessionChrome } from './workbenchSessionChromeHelpers';
+import type { UseWorkbenchSessionChromeOptions, WorkbenchSessionChrome } from './transcript/workbenchSessionChromeHelpers';
 import type {
   UseWorkbenchTranscriptChromeOptions,
   WorkbenchTranscriptChrome,
-} from './useWorkbenchTranscriptChrome';
+} from './transcript/useWorkbenchTranscriptChrome';
 import type {
   UseWorkbenchProfileChromeOptions,
   WorkbenchProfileChrome,
 } from './useWorkbenchProfileChrome';
 import type { WorkbenchPanelLayout } from './useWorkbenchPanelLayout';
-import type { WorkbenchTranscriptOverlaysProps } from './WorkbenchTranscriptOverlays';
+import type { WorkbenchTranscriptOverlaysProps } from './transcript/WorkbenchTranscriptOverlays';
 import type { WorkbenchProfileOverlaysProps } from './WorkbenchProfileOverlays';
 import type { AgentHubWorkbenchProps } from './AgentHubWorkbenchTypes';
 

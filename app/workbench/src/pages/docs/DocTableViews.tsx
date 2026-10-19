@@ -7,7 +7,7 @@ import { useTranslation } from 'react-i18next';
 import { SHARED_WORKBENCH_I18N_NAMESPACE } from '@shared/i18n';
 import { DesignNavIcon } from '../../designIcons';
 import type { WorkbenchDocumentPreview } from '../../documentPreview';
-import { FilePreview } from '../../inspector';
+import { FilePreview } from '../../inspector/index';
 import {
   resolveWorkbenchProfile,
   type WorkbenchProfileSource,

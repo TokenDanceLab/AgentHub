@@ -11,7 +11,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { createMockPlatform } from '@shared/platform/createMockPlatform';
 import type { TranscriptBlock } from '@shared/transcript/types';
 import { AgentHubWorkbench } from '../AgentHubWorkbench';
-import { RightInspector } from '../RightInspector';
+import { RightInspector } from '../inspector/RightInspector';
 import { DESIGN_NAV_GLYPH_STROKE_WIDTH } from '../designIcons';
 import {
   workbenchAgents as agents,
