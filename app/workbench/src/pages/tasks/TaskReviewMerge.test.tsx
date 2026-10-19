@@ -4,7 +4,7 @@ import { fireEvent, render, screen, within } from '../../__tests__/setup';
 import { useTestI18nLanguage } from '@shared/testing/i18n';
 import { TaskMain } from './TaskMainViews';
 import type { TasksPageProps, TaskGroup, TaskItem } from './types';
-import type { TaskReviewMergePort } from '../../workbenchBoardColumns';
+import type { TaskReviewMergePort } from '../../routes/workbenchBoardColumns';
 
 /* ═══════════════════════════════════════════════════════════════════════
    review-before-merge behavior (#1999):

@@ -5,10 +5,10 @@ import type {
   ChatSidebarFrameProps,
   WorkbenchRoutesFrameProps,
 } from './workbenchFrameTypes';
-import { ConversationHost } from './ConversationHost';
-import { ConversationSidebar } from './ConversationSidebar';
-import { RightInspector } from './RightInspector';
-import { ChatEngineeringColumn } from './ChatEngineeringColumn';
+import { ConversationHost } from './transcript/ConversationHost';
+import { ConversationSidebar } from './transcript/ConversationSidebar';
+import { RightInspector } from './inspector/RightInspector';
+import { ChatEngineeringColumn } from './transcript/ChatEngineeringColumn';
 import { WorkbenchRoutes } from './WorkbenchRoutes';
 import {
   SidebarResizer,

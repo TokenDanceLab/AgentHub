@@ -11,7 +11,7 @@
 import { appDateLocaleTag } from '@shared/i18n/locale';
 import { SHARED_WORKBENCH_I18N_NAMESPACE } from '@shared/i18n';
 import { getI18n } from 'react-i18next';
-import type { ContactMember, ProjectInfo } from './pages';
+import type { ContactMember, ProjectInfo } from './pages/index';
 import type { WorkbenchContactsData } from './WorkbenchRoutes';
 import type { DocRow } from './pages/DocsPage';
 import type { WorkbenchConversation } from '@shared/platform';

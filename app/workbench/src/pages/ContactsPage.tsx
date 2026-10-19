@@ -6,8 +6,8 @@ import {
   AddContactModal,
   ContactMain,
   ContactNav,
-} from './contacts';
-import type { ContactsPageProps } from './contacts';
+} from './contacts/index';
+import type { ContactsPageProps } from './contacts/index';
 
 /* ═══════════════════════════════════════════════════════════════════════
    ContactsPage — pure presentational workbench page
@@ -30,7 +30,7 @@ export type {
   ContactModalTab,
   ContactProfile,
   ContactsPageProps,
-} from './contacts';
+} from './contacts/index';
 
 // ── Main component ──
 

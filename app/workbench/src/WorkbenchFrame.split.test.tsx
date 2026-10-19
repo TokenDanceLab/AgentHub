@@ -36,11 +36,11 @@ vi.mock('./GlobalRail', () => ({
   GlobalRail: () => <div data-testid="global-rail" />,
 }));
 
-vi.mock('./MainchainStatusStrip', () => ({
+vi.mock('./transcript/MainchainStatusStrip', () => ({
   MainchainStatusStrip: () => <div data-testid="status-bar" />,
 }));
 
-vi.mock('./terminal', () => ({
+vi.mock('./terminal/index', () => ({
   TerminalPanel: () => <div data-testid="terminal-panel-stub" />,
 }));
 

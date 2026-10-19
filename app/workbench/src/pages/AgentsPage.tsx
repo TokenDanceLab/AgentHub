@@ -18,11 +18,11 @@ import {
   AgentModelsView,
   AgentAuditView,
   DataSourceBadge,
-} from './agents';
+} from './agents/index';
 import type {
   AgentsPaneId,
   AgentsPageProps,
-} from './agents';
+} from './agents/index';
 
 /* ═══════════════════════════════════════════════════════════════════════
    AgentsPage — AgentHub v4
@@ -61,7 +61,7 @@ export type {
   CCSwitchStatusInfo,
   CCSwitchProviderInfo,
   AgentsPageProps,
-} from './agents';
+} from './agents/index';
 
 /* ═══════════════════════════════════════════════════════════════════════
    AgentsPage

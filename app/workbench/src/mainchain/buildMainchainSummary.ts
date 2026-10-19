@@ -1,6 +1,6 @@
 import type { AgentHubPlatform } from '@shared/platform';
 import type { EvidenceRef, TranscriptBlock } from '@shared/transcript';
-import type { RuntimeEvidenceSnapshot } from '../RightInspector';
+import type { RuntimeEvidenceSnapshot } from '../inspector/RightInspector';
 import type { MainchainNode, MainchainSummary } from './types';
 
 export type MainchainWorkbenchStatus = {

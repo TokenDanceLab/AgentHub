@@ -15,7 +15,7 @@ import styles from '../TasksPage.module.css';
 import { TaskSelectionStrip, TaskTable } from './TaskTableViews';
 import { buildViewModes, paneTitle, StatCard } from './shared';
 import type { TasksPageProps } from './types';
-import { needsHubOnlyMergeNotice } from '../../workbenchBoardColumns';
+import { needsHubOnlyMergeNotice } from '../../routes/workbenchBoardColumns';
 
 export type TaskMainProps = Pick<
   TasksPageProps,

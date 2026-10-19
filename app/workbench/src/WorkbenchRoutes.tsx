@@ -1,25 +1,25 @@
 import React, { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { CHATVIEW_I18N_NAMESPACE } from '@shared/chatview/i18n/resources';
-import { WorkbenchAgentsRouteView } from './WorkbenchAgentsRouteView';
-import { WorkbenchContactsRouteView } from './WorkbenchContactsRouteView';
-import { WorkbenchDevicesRouteView } from './WorkbenchDevicesRouteView';
-import { WorkbenchDocsRouteView } from './WorkbenchDocsRouteView';
-import { WorkbenchProjectsRouteView } from './WorkbenchProjectsRouteView';
-import { WorkbenchSettingsRouteView } from './WorkbenchSettingsRouteView';
-import { WorkbenchTasksRouteView } from './WorkbenchTasksRouteView';
-import { WorkbenchUsageRouteView } from './WorkbenchUsageRouteView';
+import { WorkbenchAgentsRouteView } from './routes/WorkbenchAgentsRouteView';
+import { WorkbenchContactsRouteView } from './routes/WorkbenchContactsRouteView';
+import { WorkbenchDevicesRouteView } from './routes/WorkbenchDevicesRouteView';
+import { WorkbenchDocsRouteView } from './routes/WorkbenchDocsRouteView';
+import { WorkbenchProjectsRouteView } from './routes/WorkbenchProjectsRouteView';
+import { WorkbenchSettingsRouteView } from './routes/WorkbenchSettingsRouteView';
+import { WorkbenchTasksRouteView } from './routes/WorkbenchTasksRouteView';
+import { WorkbenchUsageRouteView } from './routes/WorkbenchUsageRouteView';
 import { PageErrorBoundary } from './PageErrorBoundary';
-import { useWorkbenchAgentsRoute } from './useWorkbenchAgentsRoute';
-import { useWorkbenchContactsRoute } from './useWorkbenchContactsRoute';
-import { useWorkbenchDocsRoute } from './useWorkbenchDocsRoute';
-import { useWorkbenchProjectsRoute } from './useWorkbenchProjectsRoute';
-import { useWorkbenchSettingsRoute } from './useWorkbenchSettingsRoute';
-import { useWorkbenchTasksRoute } from './useWorkbenchTasksRoute';
+import { useWorkbenchAgentsRoute } from './routes/useWorkbenchAgentsRoute';
+import { useWorkbenchContactsRoute } from './routes/useWorkbenchContactsRoute';
+import { useWorkbenchDocsRoute } from './routes/useWorkbenchDocsRoute';
+import { useWorkbenchProjectsRoute } from './routes/useWorkbenchProjectsRoute';
+import { useWorkbenchSettingsRoute } from './routes/useWorkbenchSettingsRoute';
+import { useWorkbenchTasksRoute } from './routes/useWorkbenchTasksRoute';
 import { resolveTaskQueueDemoSource } from './useWorkbenchTaskDeepLinks';
-import type { WorkbenchTaskQueueSource } from './workbenchTaskDeepLinks';
+import type { WorkbenchTaskQueueSource } from './routes/workbenchTaskDeepLinks';
 import { buildWorkbenchProfileSources } from './workbenchProfileSources';
-import type { WorkbenchRoutesProps } from './workbenchRoutesTypes';
+import type { WorkbenchRoutesProps } from './routes/workbenchRoutesTypes';
 import type { WorkbenchProfileSource } from './profileRegistry';
 import styles from './AgentHubWorkbench.module.css';
 
@@ -29,10 +29,10 @@ export type {
   WorkbenchAgentProfilesStatus,
   WorkbenchPage,
   WorkbenchRoutesProps,
-} from './workbenchRoutesTypes';
-export type { WorkbenchContactsActions, WorkbenchContactsData } from './useWorkbenchContactsRoute';
-export type { WorkbenchDocumentsActions } from './useWorkbenchDocsRoute';
-export type { WorkbenchProjectsStatus } from './useWorkbenchProjectsRoute';
+} from './routes/workbenchRoutesTypes';
+export type { WorkbenchContactsActions, WorkbenchContactsData } from './routes/useWorkbenchContactsRoute';
+export type { WorkbenchDocumentsActions } from './routes/useWorkbenchDocsRoute';
+export type { WorkbenchProjectsStatus } from './routes/useWorkbenchProjectsRoute';
 
 /* ═══════════════════════════════════════════════════════════════════════
    #21 性能：route hook 条件化（保留状态的最小方案）

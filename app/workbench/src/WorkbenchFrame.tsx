@@ -10,7 +10,7 @@ import {
   shouldRenderTerminalDock,
 } from './workbenchFrameHelpers';
 import type { WorkbenchFrameProps } from './workbenchFrameTypes';
-import { sumUsageTeamTokens } from './workbenchUsageSummary';
+import { sumUsageTeamTokens } from './routes/workbenchUsageSummary';
 import {
   buildActiveConversationAttention,
   findFirstAwaitingConversationId,
@@ -27,12 +27,12 @@ import {
 import { WorkbenchSplitHost } from './WorkbenchSplitHost';
 import { SplitConversationPane } from './SplitConversationPane';
 import { useSplitTranscriptCache } from './workbenchSplitTranscriptCache';
-import { findConversationById } from './workbenchSessionChromeHelpers';
+import { findConversationById } from './transcript/workbenchSessionChromeHelpers';
 import type { WorkbenchSplitControls } from './workbenchFrameTypes';
 import type { GroupLeaf } from './workbenchSplitLayout';
 import styles from './AgentHubWorkbench.module.css';
-import { TerminalPanel } from './terminal';
-import { MainchainStatusStrip } from './MainchainStatusStrip';
+import { TerminalPanel } from './terminal/index';
+import { MainchainStatusStrip } from './transcript/MainchainStatusStrip';
 import { WORKBENCH_APPROVAL_JUMP_EVENT } from './workbenchApprovalEvents';
 import { firstPendingApprovalBlockId } from './workbenchApprovalSummary';
 import { useExiting } from '@shared/ui/useExiting';

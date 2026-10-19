@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { getResolvedShortcutGroups } from '@shared/utils/keyboardShortcuts';
 import { matchesShortcut } from '@shared/utils/keyboardUtils';
-import { isEditableKeyboardTarget } from './workbenchSessionChromeHelpers';
+import { isEditableKeyboardTarget } from './transcript/workbenchSessionChromeHelpers';
 
 /* ═══════════════════════════════════════════════════════════════════════
    useWorkbenchGlobalShortcuts — shared global keyboard dispatcher (#1822).
