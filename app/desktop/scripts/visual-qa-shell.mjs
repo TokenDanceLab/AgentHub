@@ -4,7 +4,6 @@
  *
  * CURRENT GATE MATRIX (Desktop half). Pair with:
  *   app/web/scripts/visual-qa-shell.mjs
- * Optional multi-scene battery (not gate): app/web/scripts/visual-qa.mjs
  *
  * Usage (from app/desktop):
  *   node scripts/visual-qa-shell.mjs
