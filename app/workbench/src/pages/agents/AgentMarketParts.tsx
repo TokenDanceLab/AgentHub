@@ -22,8 +22,8 @@ import type {
 /* ═══════════════════════════════════════════════════════════════════════
    Market-view presentational subpanels.
 
-   Residual thin from AgentMarketViews (Phase 25 #649).
-   Further residual thin: helpers + item parts (#671).
+   Helpers for AgentMarketViews (#649).
+   Additional item parts and helpers (#671).
    CSS remains on shared AgentsPage.module.css.
    ═══════════════════════════════════════════════════════════════════════ */
 

@@ -446,7 +446,7 @@ func TestMCPServerHandler_UnpublishMCPServer(t *testing.T) {
 }
 
 // Public market results must never expose author-side secrets (env_vars /
-// auth_config), even if the stored record contains them (#2154 security lane).
+// auth_config), even if the stored record contains them (#2154).
 func TestMCPServerHandler_ListMCPServersPublicMarketMasksSecrets(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 

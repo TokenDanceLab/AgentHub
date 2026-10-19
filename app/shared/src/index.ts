@@ -114,7 +114,7 @@ export type {
   ReviewDiff,
 } from './diff';
 
-// TS-side extraction / validation (no Go counterpart — edge-server/internal/diff removed in #2151)
+// TS-side extraction / validation (no Go counterpart)
 export { isDiff, extractDiffs, isObj } from './diff';
 export type { DiffInput } from './diff';
 

@@ -72,17 +72,7 @@ func BenchmarkFrameParseEmpty(b *testing.B) {
 }
 
 func BenchmarkFrameMarshalAllTypes(b *testing.B) {
-	types := []string{
-		TypeTyping, TypeAuthOK,
-		TypeMessageNew, TypeMessageRecall, TypeMessagePin, TypeMessageUnpin,
-		TypeMessageReactionAdded, TypeMessageReactionRemoved, TypeMessageRead,
-		TypeSessionCreated, TypeSessionDissolved,
-		TypeSessionMemberJoined, TypeSessionMemberLeft, TypeSessionInfoUpdated,
-		TypeDeviceOnline, TypeDeviceOffline, TypeDeviceKicked,
-		TypeAgentDispatch, TypeAgentStream, TypeAgentDone, TypeAgentFailed, TypeAgentCancel, TypeAgentControl,
-		TypeTeamRunStarted, TypeTeamEvent, TypeTeamAssignmentDone, TypeTeamAssignmentFailed,
-		TypeNotificationNew, TypeFriendRequest, TypeFriendAccepted,
-	}
+	types := allFrameTypes()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		typ := types[i%len(types)]

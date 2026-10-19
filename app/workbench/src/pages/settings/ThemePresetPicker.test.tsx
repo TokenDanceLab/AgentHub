@@ -1,4 +1,4 @@
-// ThemePresetPicker behavior (#1986, UX F15): chip rendering, apply/persist
+// ThemePresetPicker behavior (#1986): chip rendering, apply/persist
 // on selection, clearing via the default chip, and honest reflection of
 // preset writes that originate elsewhere (subscription, not local echo).
 import '@testing-library/jest-dom/vitest';

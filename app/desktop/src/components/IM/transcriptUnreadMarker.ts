@@ -1,4 +1,4 @@
-// IM transcript unread-marker derivation (T8 desktop IM path).
+// IM transcript unread-marker derivation for the desktop IM path.
 //
 // Consumes the Hub session read watermark and the loaded message list to find
 // the first unread message, whose transcript block id anchors the unread

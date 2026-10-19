@@ -1,4 +1,4 @@
-// Domain types mirroring api/openapi.yaml schemas and P0 resource shapes.
+// Domain types mirroring api/openapi.yaml schemas.
 // Generic responses (ListResponse, PageInfo, ErrorResponse) match the OpenAPI
 // components so the API client can reuse them for every endpoint.
 

@@ -205,7 +205,7 @@ function HomeHeader({
           numberOfLines={1}
           style={{ color: tokens.color.ink, ...tokens.type.role.profileName }}
         >
-          Delicious233
+          Demo User
         </Text>
         <Text
           numberOfLines={1}

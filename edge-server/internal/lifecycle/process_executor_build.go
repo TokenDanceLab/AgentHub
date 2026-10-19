@@ -2,6 +2,7 @@ package lifecycle
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"log/slog"
 	"os/exec"
@@ -24,7 +25,7 @@ type startedProcess struct {
 	watchStop       chan struct{}
 	subprocessStart time.Time
 	workDir         string
-	buildPlan       commandBuildPlan
+	hasAdapter      bool
 }
 
 // buildAndStartProcess constructs the command, opens pipes, starts the
@@ -40,7 +41,7 @@ func (e *ProcessExecutor) buildAndStartProcess(
 	runCtx RunProcessContext,
 	adapter adapters.AgentAdapter,
 	adapterLabel string,
-	metricsPlan runMetricsPlan,
+	recordStart bool,
 	runStartTime *time.Time,
 	attempt int,
 ) (*startedProcess, error) {
@@ -48,29 +49,29 @@ func (e *ProcessExecutor) buildAndStartProcess(
 	var args, env []string
 	var workDir string
 	adapterCtx := runCtx
-	cmdPlan := planCommandBuild(adapter != nil)
+	hasAdapter := adapter != nil
 
-	if cmdPlan.UseAdapter {
+	if hasAdapter {
 		// Adapter mode: BuildCommand provides full command configuration
 		cmdPath, args, env, workDir = adapter.BuildCommand(adapterCtx)
 	} else {
 		// Profile mode: use configured command template
 		var err error
 		args, env, err = e.profile.Template.Expand(runCtx)
-		if planCommandBuildFailure(err).Fail {
+		if err != nil {
 			e.publishFailed(run, err)
 			return nil, err
 		}
 		cmdPath = e.profile.Command
 		workDir = e.profile.WorkDir
 	}
-	if cmdPlan.PublishCLIPlan {
+	if hasAdapter {
 		plan := adapters.BuildCLIInvocationPlanFromCommand(adapter, adapterCtx, cmdPath, args, env, workDir)
 		e.bus.Publish(adapters.BusEventCLIInvocationPlan, runScope(run), plan.Payload())
 	}
 
 	// Pre-run workdir snapshot for auto-surface.
-	if planWorkdirTrack(workDir).Track {
+	if workDir != "" {
 		snapshot := adapters.TakeWorkdirSnapshot(workDir)
 		e.mu.Lock()
 		e.workDirs[run.ID] = workDir
@@ -86,7 +87,7 @@ func (e *ProcessExecutor) buildAndStartProcess(
 	}
 
 	_, extraEnv, err := e.profile.ExtraEnvTemplate.Expand(runCtx)
-	if planCommandBuildFailure(err).Fail {
+	if err != nil {
 		e.publishFailed(run, err)
 		return nil, err
 	}
@@ -107,7 +108,7 @@ func (e *ProcessExecutor) buildAndStartProcess(
 	startErr := cmd.Start()
 	switch classifyCmdStartOutcome(startErr, ctx.Err()) {
 	case cmdStartCancelled:
-		if planCmdStartCancelWait(cmd.Process).Wait {
+		if cmd.Process != nil {
 			_, _ = cmd.Process.Wait()
 		}
 		e.publishCancelled(run)
@@ -118,42 +119,32 @@ func (e *ProcessExecutor) buildAndStartProcess(
 	case cmdStartOK:
 		// Process started successfully; continue to post-start setup.
 	}
-	// Post-start cancel kill/wait plan.
-	if cancelPlan := planPostStartCancel(ctx.Err(), cmd.Process); cancelPlan.Cancel {
-		if cancelPlan.Kill {
-			_ = killProcessTree(cmd.Process)
-			if cancelPlan.Wait {
-				_, _ = cmd.Process.Wait()
-			}
-		}
+	if ctxErr := ctx.Err(); ctxErr != nil {
+		_ = killProcessTree(cmd.Process)
+		_, _ = cmd.Process.Wait()
 		e.publishCancelled(run)
-		return nil, ctx.Err()
+		return nil, ctxErr
 	}
 
 	slog.Debug("executor.subprocess.started", subprocessStartedLogArgs(run.ID, cmd.Process)...)
 
 	// Track process for graceful shutdown signals.
 	watchStop := make(chan struct{})
-	if planTrackStartedProcess(cmd.Process).Track {
-		e.mu.Lock()
-		e.processes[run.ID] = cmd.Process
-		e.mu.Unlock()
-		safego.SafeGo("watchRunProcess", func() { e.watchRunProcess(ctx, run.ID, cmd.Process, watchStop) })
-	}
+	e.mu.Lock()
+	e.processes[run.ID] = cmd.Process
+	e.mu.Unlock()
+	safego.SafeGo("watchRunProcess", func() { e.watchRunProcess(ctx, run.ID, cmd.Process, watchStop) })
 
 	// Eager-close stdin when the adapter does not need the pipe.
-	stdinPlan := planEagerStdinClose(stdin != nil, planStdinPipeOpen(adapter).Open, false)
-	if stdinPlan.ClosePipe {
+	if stdin != nil && (adapter == nil || !adapter.NeedsStdin()) {
 		_ = stdin.Close()
-	}
-	if stdinPlan.ClearMap {
 		e.mu.Lock()
 		delete(e.stdins, run.ID)
 		e.mu.Unlock()
 	}
 
 	// Record metrics: run has started successfully
-	if metricsPlan.RecordStart {
+	if recordStart {
 		e.metrics.RecordRunStart(adapterLabel)
 		*runStartTime = time.Now()
 	}
@@ -167,7 +158,7 @@ func (e *ProcessExecutor) buildAndStartProcess(
 		}
 	}
 	started, ok := e.store.SetRunStatusIf(run.ID, "started", "queued")
-	if planPublishStatus(ok).Publish {
+	if ok {
 		e.bus.Publish("run.started", runScope(started), RunResponse(started))
 		e.fireHubAck(run.ID)
 	}
@@ -181,7 +172,7 @@ func (e *ProcessExecutor) buildAndStartProcess(
 		watchStop:       watchStop,
 		subprocessStart: subprocessStart,
 		workDir:         workDir,
-		buildPlan:       cmdPlan,
+		hasAdapter:      hasAdapter,
 	}, nil
 }
 
@@ -191,19 +182,19 @@ func (e *ProcessExecutor) buildAndStartProcess(
 // return from buildAndStartProcess immediately.
 func (e *ProcessExecutor) openProcessPipes(cmd *exec.Cmd, run store.Run, adapter adapters.AgentAdapter) (stdout, stderr io.ReadCloser, stdin io.WriteCloser, err error) {
 	stdout, err = cmd.StdoutPipe()
-	if planPipeFailure(err).Fail {
-		e.publishFailed(run, pipeOpenError("stdout", err))
+	if err != nil {
+		e.publishFailed(run, (pipeOpenError("stdout", err)))
 		return nil, nil, nil, err
 	}
 	stderr, err = cmd.StderrPipe()
-	if planPipeFailure(err).Fail {
-		e.publishFailed(run, pipeOpenError("stderr", err))
+	if err != nil {
+		e.publishFailed(run, (pipeOpenError("stderr", err)))
 		return nil, nil, nil, err
 	}
-	if planStdinPipeOpen(adapter).Open {
+	if adapter != nil && adapter.NeedsStdin() {
 		stdin, err = cmd.StdinPipe()
-		if planPipeFailure(err).Fail {
-			e.publishFailed(run, pipeOpenError("stdin", err))
+		if err != nil {
+			e.publishFailed(run, (pipeOpenError("stdin", err)))
 			return nil, nil, nil, err
 		}
 		e.mu.Lock()
@@ -232,10 +223,9 @@ func (e *ProcessExecutor) collectAndWaitOutput(
 ) (outStore *runnerctx.RunOutputStore, waitErr error, parseErr error) {
 	var err error
 	outStore, err = runnerctx.NewRunOutputStore(run.ID)
-	outTrack := planRunOutputStoreTrack(err)
-	if outTrack.LogFailure {
+	if err != nil {
 		slog.Warn("process: failed to create run output store", "runId", run.ID, "error", err)
-	} else if outTrack.Track {
+	} else {
 		e.mu.Lock()
 		e.runOutputs[run.ID] = outStore
 		e.mu.Unlock()
@@ -252,7 +242,7 @@ func (e *ProcessExecutor) collectAndWaitOutput(
 	// regardless of whether a WorkDir is set.
 	parserCtx := withParserContextValues(ctx, runCtx)
 
-	if proc.buildPlan.UseStructuredParser {
+	if proc.hasAdapter {
 		wg.Add(1)
 		safego.SafeGo("publishStructuredOutput", func() { e.publishStructuredOutput(&wg, run, proc.stdout, proc.stdin, adapter, parserCtx, &parseErr) })
 	} else {
@@ -271,12 +261,8 @@ func (e *ProcessExecutor) collectAndWaitOutput(
 	return
 }
 
-// completeRunAttempt finalizes a successful attempt: context compaction,
-// cancellation check, session-conflict retry decision, parse-error handling,
-// evidence gate, and the terminal finished publish.
-//
-// It reports the attempt outcome so the caller can drive the retry loop and
-// post-loop fault escalation. The returned outcome controls the caller's
+// attemptOutcome reports how a run attempt ended so the caller can drive the
+// retry loop and post-loop fault escalation. Each value controls the caller's
 // control flow:
 //
 //	*outcomeDone       — the run reached a terminal state; caller returns.
@@ -296,7 +282,11 @@ const (
 	outcomeDeferred
 )
 
-// completeRunAttempt runs Phase 3 of the attempt loop. ctx is the run context
+// completeRunAttempt finalizes a successful attempt: context compaction,
+// cancellation check, session-conflict retry decision, parse-error handling,
+// evidence gate, and the terminal finished publish.
+//
+// It runs Phase 3 of the attempt loop. ctx is the run context
 // (for cancellation checks); attempt is the current retry index; lastWaitErr
 // / parseErr / outStore / proc come from collectAndWaitOutput. It mutates
 // runCtx (session retry path rewrites runCtx in place) and returns the outcome.
@@ -317,12 +307,15 @@ func (e *ProcessExecutor) completeRunAttempt(
 	// whether the context budget exceeded the auto-compaction threshold.
 	// When triggered, we log the budget state and emit a compaction event
 	// so upstream session managers can compact the actual message history.
-	if compact := planContextCompaction(runCtx.Budget, run.ID); compact.Emit {
-		slog.Info("process: context compaction threshold reached", "runId", run.ID, "usagePercent", compact.UsagePct, "tokensUsed", compact.TokensUsed, "tokensRemaining", compact.Remaining)
-		e.bus.Publish(adapters.BusEventContextCompaction, runScope(run), compact.Payload)
+	if budget := runCtx.Budget; budget != nil && budget.ShouldCompact() {
+		usagePct := budget.UsagePercent()
+		tokensUsed := budget.UsedTokens.Load()
+		remaining := budget.Remaining()
+		slog.Info("process: context compaction threshold reached", "runId", run.ID, "usagePercent", usagePct, "tokensUsed", tokensUsed, "tokensRemaining", remaining)
+		e.bus.Publish(adapters.BusEventContextCompaction, runScope(run), contextCompactionPayload(run.ID, usagePct, tokensUsed, remaining))
 	}
 
-	if planCancelledRun(ctx.Err(), e.runStatus(run.ID)).Cancelled {
+	if ctx.Err() != nil || e.runStatus(run.ID) == "cancelling" {
 		e.publishCancelled(run)
 		e.sendSubAgentResult(run.ID, "cancelled", nil)
 		return outcomeDone
@@ -334,24 +327,23 @@ func (e *ProcessExecutor) completeRunAttempt(
 	// (stderr is read via StderrPipe in a separate goroutine and stored in
 	// outStore), so we also pass the captured stderr output.
 	var stderrCapture string
-	if planOutputStoreCapture(outStore != nil).Read {
+	if outStore != nil {
 		stderrCapture, _ = outStore.ReadAll()
 	}
-	sessionPlan := planSessionConflictRetry(lastWaitErr, stderrCapture, attempt, time.Since(proc.subprocessStart), outStore != nil)
-	if sessionPlan.Retry {
+	if shouldRetrySessionConflict(lastWaitErr, stderrCapture, attempt, time.Since(proc.subprocessStart)) {
 		newSession := newRandomSessionID()
 		slog.Warn("process: session conflict detected, retrying with fresh session ID", "runId", run.ID, "oldSessionId", runCtx.SessionID, "newSessionId", newSession, "error", lastWaitErr)
 		*runCtx = withFreshSession(*runCtx, newSession)
 		// Clean up the tracked process from this attempt before retrying.
 		e.mu.Lock()
 		delete(e.processes, run.ID)
-		if s, ok := e.runOutputs[run.ID]; shouldApplyTrackedClose(sessionPlan.CloseOutput, ok) {
+		if s, ok := e.runOutputs[run.ID]; ok {
 			_ = s.Close()
 			delete(e.runOutputs, run.ID)
 		}
 		e.mu.Unlock()
 		// Reset run status back to queued so the retry can transition to started.
-		if _, ok := e.store.SetRunStatusIf(run.ID, "queued", "started", "failed"); planSessionRetryStatus(ok).LogReset {
+		if _, ok := e.store.SetRunStatusIf(run.ID, "queued", "started", "failed"); ok {
 			slog.Debug("process: reset run status to queued for session retry", "runId", run.ID)
 		}
 		return outcomeRetry
@@ -360,19 +352,21 @@ func (e *ProcessExecutor) completeRunAttempt(
 	// Wait error is not a session-conflict retry. Leave the session-retry
 	// loop so fault-escalation can re-launch the run when configured.
 	// Terminal publishFailed happens after the escalation check below.
-	if planSessionRetryBreak(lastWaitErr).Break {
+	if lastWaitErr != nil {
 		return outcomeBreak
 	}
 	// #179: handle structured output parse errors with recoverability distinction.
 	// Non-recoverable errors (pipe broken, context cancelled) fail the run.
 	// Recoverable errors (malformed event, orphaned tool) emit a warning and
 	// allow the run to finish naturally — matching Kanna/OpenCode recovery patterns.
-	parseHandle := planStructuredParseHandleFromErr(parseErr, run.ID)
-	if parseHandle.WarnRecoverable {
+	outcome, psErr := classifyStructuredParseOutcome(parseErr)
+	switch outcome {
+	case structuredParseRecoverable:
+		msg := fmt.Sprintf("Recoverable stream parse error: %v", psErr.Unwrap())
 		slog.Warn("process: recoverable stream parse error, continuing run", "runId", run.ID, "error", parseErr)
-		e.bus.Publish(adapters.BusEventContextWarning, runScope(run), parseHandle.WarningPayload)
-	} else if parseHandle.FailFatal {
-		e.publishFailed(run, structuredOutputParseFailed(parseErr))
+		e.bus.Publish(adapters.BusEventContextWarning, runScope(run), recoverableParseWarningPayload(run.ID, msg, psErr.Error()))
+	case structuredParseFatal:
+		e.publishFailed(run, fmt.Errorf("structured output parse error: %w", parseErr))
 		e.sendSubAgentResult(run.ID, "failed", subAgentErrorPayload(parseErr))
 		return outcomeDone
 	}
@@ -381,14 +375,13 @@ func (e *ProcessExecutor) completeRunAttempt(
 	// TypeScript typecheck+test, generic file existence) against the workDir.
 	// If verification fails, the run is marked as completed_with_issues instead
 	// of finished, and the full evidence output is stored in run metadata.
-	gateAttempt := planEvidenceGateAttempt(isEvidenceGateEnabledForRun(e.evidenceGateCfg, proc.workDir))
-	finalStatus := gateAttempt.FinalStatus
-	if gateAttempt.RunGate {
+	gateEnabled := isEvidenceGateEnabledForRun(e.evidenceGateCfg, proc.workDir)
+	finalStatus := "finished"
+	if gateEnabled {
 		evidenceResult := runEvidenceGate(proc.workDir)
 		e.store.SetRunEvidenceGate(run.ID, evidenceGateResultJSON(evidenceResult))
-		evidencePlan := planEvidenceGateResult(evidenceResult.Passed)
-		finalStatus = evidencePlan.FinalStatus
-		if evidencePlan.LogFailure {
+		if !evidenceResult.Passed {
+			finalStatus = "completed_with_issues"
 			slog.Warn("process: evidence gate verification failed", "runId", run.ID, "projectType", evidenceResult.ProjectType, "summary", evidenceResult.Summary)
 		}
 	}
@@ -399,7 +392,7 @@ func (e *ProcessExecutor) completeRunAttempt(
 	// multi-agent workflow right after dispatch. Park the terminal publish;
 	// the ResultAggregator finalizes the parent via FinalizeParentRun when
 	// the last child completes (or the collector timeout fires).
-	if planParentWaitChildren(e.agentRegistry != nil, e.hasActiveChildren(run.ID)).Defer {
+	if e.agentRegistry != nil && e.hasActiveChildren(run.ID) {
 		e.mu.Lock()
 		if e.pendingParentFinish == nil {
 			e.pendingParentFinish = make(map[string]deferredParentFinish)
@@ -411,7 +404,7 @@ func (e *ProcessExecutor) completeRunAttempt(
 	}
 
 	finished, ok := e.store.SetRunStatusIf(run.ID, finalStatus, "started")
-	if planPublishStatus(ok).Publish {
+	if ok {
 		e.bus.Publish("run.finished", runScope(finished), RunResponse(finished))
 		e.sendSubAgentResult(run.ID, finalStatus, RunResponse(finished))
 		// Fire Hub TaskDone callback (Edge→Hub direct bridge)
@@ -431,50 +424,44 @@ func (e *ProcessExecutor) completeRunAttempt(
 //
 // Returns false when no handoff occurred (escalation disabled or retries
 // exhausted); the caller then publishes the terminal wait-failure itself.
-//
-// Do NOT rework #867 finish/escalation handoff beyond pure predicates.
 func (e *ProcessExecutor) handleFaultEscalation(
 	run *store.Run,
 	runCtx RunProcessContext,
 	lastWaitErr error,
 ) bool {
-	if !planFaultEscalationAttempt(lastWaitErr, e.faultEscalationCfg).Attempt {
+	if lastWaitErr == nil || !e.faultEscalationCfg.Enabled || e.faultEscalationCfg.MaxRetries <= 0 {
 		return false
 	}
 	r, ok := e.store.GetRun(run.ID)
-	if !planFaultEscalationHandoff(ok, e.faultEscalationCfg, r.RetryCount).Retry {
-		// Max retries reached — emit escalation exhausted event (#867).
-		if exhausted := planFaultEscalationExhausted(); exhausted.Publish {
-			e.bus.Publish("run.fault_escalation.exhausted", runScope(*run),
-				faultEscalationExhaustedPayload(run.ID, e.faultEscalationCfg.MaxRetries))
-			if exhausted.Log {
-				slog.Warn("process: fault escalation exhausted", "runId", run.ID)
-			}
-		}
+	if !ok || r.RetryCount >= e.faultEscalationCfg.MaxRetries {
+		// Max retries reached — emit escalation exhausted event.
+		e.bus.Publish("run.fault_escalation.exhausted", runScope(*run),
+			faultEscalationExhaustedPayload(run.ID, e.faultEscalationCfg.MaxRetries))
+		slog.Warn("process: fault escalation exhausted", "runId", run.ID)
 		return false
 	}
-	newCount := nextFaultEscalationRetryCount(r.RetryCount)
+	newCount := r.RetryCount + 1
 	e.store.SetRunRetryCount(run.ID, newCount)
 	run.RetryCount = newCount
 	// Re-queue from started (normal wait failure) or failed (defensive).
-	// Status mutation only - #867 successor handoff stays below.
-	_, requeued := e.store.SetRunStatusIf(run.ID, "queued", "started", "failed")
-	*run = applyFaultEscalationQueuedStatus(*run, requeued)
+	// Status mutation only; the successor handoff stays below.
+	if _, requeued := e.store.SetRunStatusIf(run.ID, "queued", "started", "failed"); requeued {
+		run.Status = "queued"
+	}
 	// Attempt-local cleanup only - leave concurrency slot / hub bookkeeping
 	// for the successor attempt. Terminal finish is owned by the successor.
 	e.mu.Lock()
 	delete(e.processes, run.ID)
 	s, hasOut := e.runOutputs[run.ID]
 	oldCancel, hasOldCancel := e.running[run.ID]
-	cleanup := planFaultEscalationCleanup(hasOut, hasOldCancel)
-	if cleanup.CloseOutput {
+	if hasOut {
 		_ = s.Close()
 		delete(e.runOutputs, run.ID)
 	}
 	// Re-register the cancel func before releasing the slot ownership so
 	// Cancel() and max-concurrent accounting stay consistent across handoff.
 	newCtx, cancel := context.WithTimeout(context.Background(), e.runTimeout)
-	if cleanup.InvokeOldCancel {
+	if hasOldCancel {
 		oldCancel()
 	}
 	e.running[run.ID] = cancel

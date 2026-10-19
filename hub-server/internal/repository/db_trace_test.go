@@ -13,7 +13,7 @@ import (
 	gormlogger "gorm.io/gorm/logger"
 )
 
-// TestSlogGormLoggerTraceMetrics verifies the G8 metric counters increment in
+// TestSlogGormLoggerTraceMetrics verifies the DB metric counters increment in
 // the GORM Trace error and slow-query branches — including the key decision
 // that the slow-query counter increments even when rows==0 (the slog Warn is
 // silenced for rows==0, but the metric is not).
@@ -45,7 +45,7 @@ func TestSlogGormLoggerTraceMetrics(t *testing.T) {
 	})
 
 	t.Run("slow branch with rows==0 still increments db_slow_queries_total", func(t *testing.T) {
-		// This is the core G8 decision: log is silenced when rows==0 (the
+		// This is the core decision: log is silenced when rows==0 (the
 		// slog Warn is skipped to avoid flooding), but the metric MUST still
 		// count — operators need to see slow-query rate for empty result sets.
 		before := testutil.ToFloat64(metrics.DBSlowQueries)

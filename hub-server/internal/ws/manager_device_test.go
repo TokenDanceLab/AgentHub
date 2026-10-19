@@ -7,9 +7,20 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// setAuthDrain authenticates the connection and drains the auth.ok frame that
+// SetAuth queues as the first frame (seq_id 1).
+func setAuthDrain(t *testing.T, m *Manager, c *Conn, userID, deviceType, deviceID string) {
+	t.Helper()
+	m.SetAuth(c.ID, userID, deviceType, deviceID)
+	data := <-c.Send
+	frame, err := ParseFrame(data)
+	require.NoError(t, err)
+	require.Equal(t, TypeAuthOK, frame.Type)
+}
+
 // TestPushToDevice_DeliversToTargetEdge verifies that PushToDevice routes a
 // frame to the connection registered for the target deviceID, and NOT to
-// other connections of the same user. This is the regression test for #2101 G6:
+// other connections of the same user. This is the regression test for #2101:
 // relay.CreateCommand previously called PushToUser(targetEdgeID), which keyed
 // on userID and silently dropped frames destined for edge devices.
 func TestPushToDevice_DeliversToTargetEdge(t *testing.T) {
@@ -20,8 +31,8 @@ func TestPushToDevice_DeliversToTargetEdge(t *testing.T) {
 	require.NoError(t, m.Register(target))
 	require.NoError(t, m.Register(other))
 
-	m.SetAuth(target.ID, "user-1", "edge", "edge-target")
-	m.SetAuth(other.ID, "user-1", "desktop", "desktop-other")
+	setAuthDrain(t, m, target, "user-1", "edge", "edge-target")
+	setAuthDrain(t, m, other, "user-1", "desktop", "desktop-other")
 
 	frame := NewFrame(TypeAgentDispatch, map[string]interface{}{"relay_command_id": "c1"})
 	res := m.PushToDevice("edge-target", frame)
@@ -52,8 +63,8 @@ func TestPushToDevice_NonTargetReceivesNothing(t *testing.T) {
 	require.NoError(t, m.Register(a))
 	require.NoError(t, m.Register(b))
 
-	m.SetAuth(a.ID, "user-a", "edge", "edge-a")
-	m.SetAuth(b.ID, "user-b", "edge", "edge-b")
+	setAuthDrain(t, m, a, "user-a", "edge", "edge-a")
+	setAuthDrain(t, m, b, "user-b", "edge", "edge-b")
 
 	res := m.PushToDevice("edge-a", NewFrame(TypeAgentDispatch, nil))
 	require.Equal(t, 1, res.Queued)
@@ -76,7 +87,7 @@ func TestPushToDevice_EmptyDeviceIDIsNoop(t *testing.T) {
 	m := NewManager()
 	c := &Conn{Send: make(chan []byte, 4)}
 	require.NoError(t, m.Register(c))
-	m.SetAuth(c.ID, "u", "edge", "") // empty deviceID should not be indexed
+	setAuthDrain(t, m, c, "u", "edge", "") // empty deviceID should not be indexed
 
 	res := m.PushToDevice("", NewFrame(TypeAgentDispatch, nil))
 	require.Equal(t, 0, res.Conns)
@@ -92,7 +103,7 @@ func TestPushToDevice_AfterUnregisterDoesNotPanicOrLeak(t *testing.T) {
 
 	c := &Conn{Send: make(chan []byte, 4)}
 	require.NoError(t, m.Register(c))
-	m.SetAuth(c.ID, "user-1", "edge", "edge-x")
+	setAuthDrain(t, m, c, "user-1", "edge", "edge-x")
 
 	// Sanity: delivery works before unregister.
 	res := m.PushToDevice("edge-x", NewFrame(TypeAgentDispatch, nil))
@@ -110,7 +121,7 @@ func TestPushToDevice_AfterUnregisterDoesNotPanicOrLeak(t *testing.T) {
 	// to the new conn, not the unregistered one.
 	c2 := &Conn{Send: make(chan []byte, 4)}
 	require.NoError(t, m.Register(c2))
-	m.SetAuth(c2.ID, "user-1", "edge", "edge-x")
+	setAuthDrain(t, m, c2, "user-1", "edge", "edge-x")
 
 	res = m.PushToDevice("edge-x", NewFrame(TypeAgentDispatch, nil))
 	require.Equal(t, 1, res.Queued)
@@ -130,8 +141,8 @@ func TestPushToDevice_ReconnectOverwritesIndex(t *testing.T) {
 	require.NoError(t, m.Register(old))
 	require.NoError(t, m.Register(newC))
 
-	m.SetAuth(old.ID, "user-1", "edge", "edge-r")
-	m.SetAuth(newC.ID, "user-1", "edge", "edge-r") // reconnect
+	setAuthDrain(t, m, old, "user-1", "edge", "edge-r")
+	setAuthDrain(t, m, newC, "user-1", "edge", "edge-r") // reconnect
 
 	res := m.PushToDevice("edge-r", NewFrame(TypeAgentDispatch, nil))
 	require.Equal(t, 1, res.Queued)

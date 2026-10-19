@@ -77,7 +77,7 @@ export class OidcError extends Error {
 
 /**
  * Backend OIDC error codes — SSOT mirror of the OIDC section in
- * `hub-server/internal/errcode/codes.go` (#2123 P1-2).
+ * `hub-server/internal/errcode/codes.go` (#2123).
  *
  * Contract: every code emitted by the Hub OIDC handlers must exist here,
  * and every entry here must exist on the backend. CI enforces the mirror via

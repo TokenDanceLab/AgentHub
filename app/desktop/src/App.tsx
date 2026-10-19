@@ -140,7 +140,7 @@ interface DesktopWorkbenchAppProps {
 export function DesktopWorkbenchApp({ onLogout }: DesktopWorkbenchAppProps = {}) {
   const { t } = useTranslation(CHATVIEW_I18N_NAMESPACE);
   // Default namespace — desktop locale keys (im.session.*) for the IM transcript
-  // unread divider copy (T8).
+  // unread divider copy.
   const { t: tIm } = useTranslation();
   const [selectedConversationId, setSelectedConversationId] = useState<string | undefined>();
   const workbench = useDesktopWorkbenchModel(selectedConversationId, t);
@@ -156,8 +156,7 @@ export function DesktopWorkbenchApp({ onLogout }: DesktopWorkbenchAppProps = {})
   const forwardMessageMutation = useHubForwardMessage();
 
   // Desktop workbench state — the shared AgentHubWorkbench owns the global
-  // keyboard dispatcher (#1822), so the former desktop-only
-  // useGlobalKeyboardShortcuts hook is gone.
+  // keyboard dispatcher (#1822).
 
   const liveEdgeEnabled = edgeOnline && !workbench.isDemo;
   // In auto mode with Local Edge fallback, also fetch evidence from Edge API.
@@ -191,7 +190,7 @@ export function DesktopWorkbenchApp({ onLogout }: DesktopWorkbenchAppProps = {})
   const decideTeamApproval = useDecideTeamApproval();
   const { data: threadsData } = useThreads(undefined, { enabled: liveEdgeEnabled });
   // Edge run lifecycle for the active thread — the authoritative source for
-  // the running state (composer stop button) and the cancel target (#1816 W1).
+  // the running state (composer stop button) and the cancel target (#1816).
   const runsQuery = useRuns(undefined, workbench.activeThreadId, {
     enabled: liveEdgeEnabled && Boolean(workbench.activeThreadId),
   });
@@ -282,7 +281,7 @@ export function DesktopWorkbenchApp({ onLogout }: DesktopWorkbenchAppProps = {})
     return resolveCurrentTranscriptRunId(workbench.transcript);
   }, [workbench.activeThreadId, workbench.transcript, demoEdgeEnabled]);
 
-  // IM transcript unread divider (T8): desktop-owned copy over the
+  // IM transcript unread divider: desktop-owned copy over the
   // workbench-computed read-watermark marker.
   const transcriptUnreadDivider = useMemo<UnreadDividerDescriptor | undefined>(() => {
     const marker = workbench.transcriptUnread;
@@ -376,11 +375,9 @@ export function DesktopWorkbenchApp({ onLogout }: DesktopWorkbenchAppProps = {})
         }
         // Immediate invalidation — useCreateRun.onSettled also does this, but we
         // additionally schedule delayed re-fetches for the agent's async response.
-        // All three used to spell the key as the literal ['threadItems', id],
-        // which is missing the 'edge' segment of the real key
-        // (['edge','threadItems',id]) and therefore matched no cache entry: the
-        // immediate refresh and both 2s/4s compensations were dead, and the
-        // transcript only moved on useThreadMessages' own 5s poll (#2274 A-13).
+        // All three target the real shared transcript key through
+        // invalidateEdgeThreadTranscript (`['edge','threadItems',id]`), which is
+        // the key useThreadMessages registers (#2274).
         if (threadId) {
           void invalidateEdgeThreadTranscript(queryClient, threadId);
           // Follow-up invalidations at 2s and 4s to catch agent responses.
@@ -495,7 +492,7 @@ export function DesktopWorkbenchApp({ onLogout }: DesktopWorkbenchAppProps = {})
   // An agent run is "active" while the Edge run list still holds a
   // non-terminal run for the thread, or the SSE-fed agent activity shows
   // dispatching/thinking/streaming (mirrors the web isAgentRunning contract,
-  // #1462 CF13 stop-button morph).
+  // #1462 stop-button morph).
   const isAgentRunning = useMemo(() => {
     if (!liveEdgeEnabled) return false;
     if (activeEdgeRun) return true;
@@ -541,7 +538,7 @@ export function DesktopWorkbenchApp({ onLogout }: DesktopWorkbenchAppProps = {})
     // mapper derives it from payload.runId), so teamRunId by itself must not
     // block the Local Edge route below.
     if (action.teamId || action.agentTaskId) return;
-    // Local Edge run permission (#1816 W1): the card's requestId doubles as
+    // Local Edge run permission (#1816): the card's requestId doubles as
     // the Edge permission requestId; the owning runId comes from the
     // permission_request block's run evidence, falling back to the active
     // run of the current transcript.
@@ -555,7 +552,7 @@ export function DesktopWorkbenchApp({ onLogout }: DesktopWorkbenchAppProps = {})
     });
   }, [decideTeamApproval, decideEdgePermission, liveEdgeEnabled, workbench.transcript, activeRunId]);
 
-  // Real desktop connection state for the workbench rail dot (#1816 W1):
+  // Real desktop connection state for the workbench rail dot (#1816):
   // Local Edge is the primary execution link, so Edge-down means
   // disconnected; while the Hub WS transport is still establishing we show
   // connecting. Demo mode has no real link and hides the dot.
@@ -567,7 +564,7 @@ export function DesktopWorkbenchApp({ onLogout }: DesktopWorkbenchAppProps = {})
     return 'connected';
   }, [workbench.isDemo, edgeOnline, hubWsStatus]);
 
-  // Device kicked by the Hub (#1816 W1): hubEventBridge surfaces the toast
+  // Device kicked by the Hub (#1816): hubEventBridge surfaces the toast
   // and flags the store; the shell reacts by returning to the login entry
   // with the regular logout cleanup.
   const kickedReason = useConnectionStore((state) => state.kickedReason);

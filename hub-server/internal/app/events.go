@@ -50,20 +50,12 @@ func (a *App) setupWSManager() {
 // handleTypingFrame fans a typing indicator out to the sender's session peers.
 //
 // memberIDs is the membership that handler.WebSocketHandler.canTypeInSession
-// already resolved while admitting the frame (#2154 P2-10). Resolution goes
-// through mgr.ResolveMembers — the shared cache.GetOrLoad path
-// (session:members:<id>, TTL 5min, singleflight) — and this callback used to
-// run it a *second* time per frame plus repeat the senderIsMember scan, i.e.
-// two cache round trips per typing frame on the WS read loop. Both are gone.
-//
-// Authorization is unchanged: this callback is installed via SetOnTyping and is
-// only ever invoked after canTypeInSession admitted the sender as a member of
-// sessionID (empty session id, missing ResolveMembers, panicking ResolveMembers
-// and non-member senders are all rejected upstream with the original warn log
-// and never reach this function). Re-checking membership here would only
-// re-introduce the round trip this change removes, and the previous re-check
-// was itself a TOCTOU against a list that could have changed between the two
-// resolutions. The sender is still excluded from its own fan-out.
+// already resolved while admitting the frame (#2154), via mgr.ResolveMembers —
+// the shared cache.GetOrLoad path (session:members:<id>, TTL 5min,
+// singleflight). Do not resolve membership again here: it would add a redundant
+// cache round trip per typing frame on the WS read loop, and admission has
+// already established that the sender is a member. The sender is excluded from
+// its own fan-out.
 func (a *App) handleTypingFrame(userID, sessionID string, memberIDs []string) {
 	frame := ws.NewFrame(ws.TypeTyping, map[string]interface{}{
 		"user_id":    userID,
@@ -114,17 +106,14 @@ func (a *App) subscribeMessageEvents() {
 	})
 
 	// message.edited: fan the updated message to session members so peers
-	// replace content live without a refetch (previously published but had no
-	// subscriber, so edits were silently invisible to other clients).
+	// replace content live without a refetch.
 	//
-	// Wire type is the bus constant directly: a ws.TypeMessageEdited constant
-	// is intentionally NOT added to ws/frame.go in this lane because the
-	// OpenAPI parity test (handler/device_openapi_test.go) enforces frame.go
-	// constants == api/openapi.yaml enum, and api/openapi.yaml is owned by the
-	// openapi lane. Adding the frame constant here without the OpenAPI sync
-	// breaks that gate. The openapi+frontend lanes must add the ws constant,
-	// OpenAPI enum, and hubEvents.ts entry together; until then the wire value
-	// "message.edited" still flows correctly (bus constant == wire value).
+	// The wire type is the bus constant: ws/frame.go has no
+	// TypeMessageEdited constant. The OpenAPI parity test
+	// (handler/device_openapi_test.go) requires frame.go constants to match
+	// api/openapi.yaml, so adding the frame constant requires the OpenAPI enum
+	// and hubEvents.ts entry in the same change. Until then "message.edited"
+	// still flows correctly (bus constant == wire value).
 	a.bus.Subscribe(bus.EventTypeMessageEdited, func(ctx context.Context, event bus.Event) {
 		msg, ok := event.Payload.(*model.Message)
 		if !ok {
@@ -260,9 +249,7 @@ func (a *App) subscribeAgentEvents() {
 	// published but had no subscriber, so the regenerate signal was silently
 	// invisible to other clients in the session).
 	//
-	// Wire type is the bus constant directly; see the message.edited note for
-	// why a ws.Type* constant is not added here (OpenAPI parity gate owns the
-	// ws constant + openapi enum + hubEvents.ts sync across lanes).
+	// Wire type is the bus constant directly; see the message.edited note.
 	a.bus.Subscribe(bus.EventTypeAgentRegenerate, func(ctx context.Context, event bus.Event) {
 		payload, ok := event.Payload.(bus.AgentRegeneratePayload)
 		if !ok {
@@ -278,9 +265,7 @@ func (a *App) subscribeAgentEvents() {
 	// the same live signal (previously published but had no subscriber, so the
 	// route decision was silently dropped for non-desktop clients).
 	//
-	// Wire type is the bus constant directly; see the message.edited note for
-	// why a ws.Type* constant is not added here (OpenAPI parity gate owns the
-	// ws constant + openapi enum + hubEvents.ts sync across lanes).
+	// Wire type is the bus constant directly; see the message.edited note.
 	a.bus.Subscribe(bus.EventTypeAgentRouteDecision, func(ctx context.Context, event bus.Event) {
 		payload, ok := event.Payload.(agent.RouteDecisionPayload)
 		if !ok {
@@ -671,7 +656,7 @@ func (a *App) broadcastOnlineStatus(ctx context.Context, userID string, online b
 
 	frame := ws.NewFrame(eventType, map[string]string{"user_id": userID})
 	// One pipelined presence round trip for all friends instead of one per
-	// friend (#2154 perf lane); errors degrade to no fanout.
+	// friend (#2154); errors degrade to no fanout.
 	onlineSet, err := a.CacheClient.AreOnline(ctx, friendIDs)
 	if err != nil {
 		return

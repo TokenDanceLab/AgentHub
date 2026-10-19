@@ -1,7 +1,7 @@
 /* ═══════════════════════════════════════════════════════════════════════
    Projects left-nav shell — header, search, status, rows, filters.
 
-   Extracted from ProjectsPage as Phase 20 residual thin #595.
+   Extracted from ProjectsPage (#595).
    CSS remains on shared ProjectsPage.module.css.
    ═══════════════════════════════════════════════════════════════════════ */
 

@@ -57,7 +57,7 @@ func TestIsProjectOwnedByFailClosed(t *testing.T) {
 	if isProjectOwnedBy(repo, "owned", "user-b") {
 		t.Fatal("non-owner must be denied")
 	}
-	// AH-SR-045: unowned projects fail closed under Hub JWT.
+	// unowned projects fail closed under Hub JWT.
 	if isProjectOwnedBy(repo, "unowned", "user-a") {
 		t.Fatal("unowned project must fail closed under Hub JWT")
 	}
@@ -303,9 +303,4 @@ func TestListAndAcceptedResponseShape(t *testing.T) {
 		t.Fatalf("hasMore want false, got %v", page["hasMore"])
 	}
 
-	in := map[string]any{"status": "accepted", "id": "x"}
-	out := acceptedResponse(in)
-	if out["status"] != "accepted" || out["id"] != "x" {
-		t.Fatalf("acceptedResponse should pass through: %+v", out)
-	}
 }

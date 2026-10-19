@@ -22,7 +22,7 @@ import (
 	"github.com/agenthub/hub-server/internal/service/agentteam"
 )
 
-// ==================== #2256 E-P2-5 + migration 0074 — the agent-team review
+// ==================== migration 0074 — the agent-team review
 // gate and compete mode against real PostgreSQL ====================
 //
 // Two things are being proven here, and neither is provable on SQLite:
@@ -421,7 +421,7 @@ func TestReviewDagPlanCancel_RealPG_FaultLeavesNoPartialState(t *testing.T) {
 			failCreate: func(n int) bool { return n == 1 },
 			why: "the first assignment's UPDATE had already executed; before the " +
 				"transaction this left a cancelled assignment with no event — the " +
-				"permanently missing audit trail from #2256 E-P2-5",
+				"permanently missing audit trail",
 		},
 	}
 

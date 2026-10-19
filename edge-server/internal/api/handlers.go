@@ -32,7 +32,6 @@ type Handler struct {
 	Registry           *runners.Registry
 	Store              store.Repository
 	Executor           lifecycle.RunExecutor
-	PreviewRunner      lifecycle.PreviewRunner
 	AdapterRegistry    *adapters.Registry // nil if no agent adapters configured
 	AgentRegistry      *agents.Registry   // runtime agent instance registry
 	MessageQueue       *agents.Queue      // inter-agent message queue
@@ -51,13 +50,13 @@ type Handler struct {
 	// EdgeDeviceID is the local Edge device ID used to validate Hub-issued
 	// identity JWTs and capability tokens are scoped to this device.
 	EdgeDeviceID string
-	// CallbackClient is the optional Edge→Hub callback client (AH-SR-049 journal).
+	// CallbackClient is the optional Edge→Hub callback client (journal).
 	CallbackClient interface {
 		DurableSnapshot(afterSeq uint64) ([]hub.DeliveryJournalEntry, error)
 	}
 
 	// DeliveryDedup is the in-process delivery_id dedup cache that closes
-	// #2101 G2 (Hub outbox redispatch + WS PushToConn dual-channel). Nil
+	// #2101 (Hub outbox redispatch + WS PushToConn dual-channel). Nil
 	// disables dedup (legacy/test behavior).
 	DeliveryDedup *deliverydedup.Deduper
 
@@ -70,7 +69,7 @@ type Handler struct {
 	permissionReceipts *permissionReceiptCache
 
 	// PlanApprovalBroker manages pending orchestrator plans and connects
-	// them to user approval/rejection decisions (P0 #3: plan confirmation gate).
+	// them to user approval/rejection decisions (plan confirmation gate).
 	PlanApprovalBroker *orchestrator.PlanApprovalBroker
 
 	// MCPConfigStore holds Hub-synced MCP server configs for injection into runs.
@@ -126,7 +125,7 @@ const (
 
 // denyRemoteHubSharedConfig blocks multi-user / Hub JWT callers from reading or
 // writing Edge-local shared configuration surfaces that have no per-user owner
-// binding (AH-SR-045 / #878). Local single-tenant mode (no Hub JWT secret
+// binding (#878). Local single-tenant mode (no Hub JWT secret
 // configured) remains allowed; empty userID under multi-user mode fails closed.
 // Denials are 404 with the generic not-found body so a blocked caller cannot
 // distinguish "not yours" from "does not exist".
@@ -143,7 +142,7 @@ func (h *Handler) validateWorkDirAllowed(workDir string) error {
 	if workDir == "" {
 		return nil
 	}
-	// Shared REST/MCP allowlist policy (AH-SR-006 / #998): EvalSymlinks + IsPathWithin.
+	// Shared REST/MCP allowlist policy (#998): EvalSymlinks + IsPathWithin.
 	err := security.ValidateWorkDirAgainstAllowlist(workDir, h.WorkspaceAllowlist)
 	if err == nil {
 		return nil
@@ -179,13 +178,6 @@ func ensureBus(h *Handler) *events.Bus {
 		h.Bus = events.NewBus(10000)
 	}
 	return h.Bus
-}
-
-func ensurePreviewRunner(h *Handler, repository store.Repository) lifecycle.PreviewRunner {
-	if h.PreviewRunner == nil {
-		h.PreviewRunner = lifecycle.NewFakePreviewRunner(repository)
-	}
-	return h.PreviewRunner
 }
 
 func (h *Handler) ensurePermissionRegistry() *permission.PermissionRegistry {
@@ -492,8 +484,7 @@ func (h *Handler) registerAgentInstanceRoutes(mux *http.ServeMux) {
 	})
 }
 
-// registerPlanRoutes wires the permission and plan approval endpoints
-// (P0 #3: plan confirmation gate).
+// registerPlanRoutes wires the permission and plan approval endpoints.
 func (h *Handler) registerPlanRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/v1/permissions/decide", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodPost {

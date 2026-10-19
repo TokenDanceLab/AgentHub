@@ -1,8 +1,8 @@
 # Hub Server Integration Tests
 
-最后更新：2026-08-03
+最后更新：2026-10-19
 
-`hub-server/tests/integration/` contains Hub integration tests that exercise API behavior against PostgreSQL and Redis. The old helper walkthrough is indexed in [../../docs/history.md](../../docs/history.md).
+`hub-server/tests/integration/` contains Hub integration tests that exercise API behavior against PostgreSQL and Redis.
 
 ## Commands
 
@@ -29,9 +29,6 @@ Full mode reads `hub-server/configs/config.yaml`.
 | Helper | Purpose |
 |---|---|
 | `CleanDB(t, db)` | Clear all tables in dependency order |
-| `CreateTestUser(t, client, baseURL)` | Register and login a test user |
-| `CreateTestSession(t, client, baseURL, token, targetUserID)` | Create a private chat session |
-| `AssertHTTPStatus(t, resp, status)` | Assert HTTP status |
 | `get`, `post`, `postAuth`, `put`, `del` | Package-level request helpers |
 | `parse`, `mustOK`, `mustCode` | Response parsing/assertion helpers |
 

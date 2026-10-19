@@ -12,7 +12,7 @@ import (
 
 // localSingleTenantBypass is the only documented ownership bypass for intentional
 // local single-tenant mode (local auth token / unauthenticated local-dev).
-// Empty userID is fail-closed on multi-user paths (#878 / AH-SR-045).
+// Empty userID is fail-closed on multi-user paths (#878).
 // The NUL-prefix keeps this sentinel out of real Hub user ID space.
 // #nosec G101 -- sentinel user ID constant, not a credential
 const localSingleTenantBypass = "\x00agenthub-local-single-tenant"
@@ -169,7 +169,7 @@ func filterPendingPlansByOwner(plans []orchestrator.PendingPlan, repo store.Read
 
 // isProjectOwnedBy checks if the project with the given ID is accessible to the user.
 // Local single-tenant bypass allows any project. Empty userID fails closed.
-// Under Hub JWT (real userID), unowned projects (OwnerID=="") are NOT accessible (AH-SR-045).
+// Under Hub JWT (real userID), unowned projects (OwnerID=="") are NOT accessible.
 func isProjectOwnedBy(repo store.Reader, projectID, userID string) bool {
 	if isLocalSingleTenant(userID) {
 		return true
@@ -304,7 +304,7 @@ func eventVisibleToUser(repo store.Reader, evt events.EventEnvelope, userID stri
 	if runID, ok := scopeString(scope, "runId"); ok && runID != "" {
 		return isRunOwnedBy(repo, runID, userID)
 	}
-	// Fail closed for unscoped events under Hub JWT (AH-SR-045).
+	// Fail closed for unscoped events under Hub JWT.
 	return false
 }
 

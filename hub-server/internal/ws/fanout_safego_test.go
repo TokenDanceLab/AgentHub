@@ -1,14 +1,14 @@
 package ws
 
-// #2246 slice 1: PushToSession recovered a panic from the injected
+// #2246: PushToSession recovered a panic from the injected
 // ResolveMembers callback with a private, bare recover() that only wrote a
 // slog.Error line — no stack, no counter, no PanicObserver. It now goes through
 // pkg/safego, the single recovery path. These tests pin what the convergence
 // could silently have broken: the named result still comes back, the panic is
 // attributed to a stable safego name, and the Manager keeps working afterwards.
 //
-// No time.Sleep in this file: the test-sleep ratchet budgets sleeps per file and
-// a newly added file has no baseline entry.
+// No time.Sleep in this file: the tests wait on channels instead of a fixed
+// sleep.
 
 import (
 	"testing"
@@ -54,9 +54,8 @@ func TestPushToSession_RecoversPanickingResolveMembers(t *testing.T) {
 }
 
 // TestPushToSession_PanicAttributedToStableSafegoName pins the label itself.
-// The machine gate (scripts/verify/verify-safego-convergence.py) can prove no
-// bare recover() is left, but only this can prove the replacement is attributed
-// to the name the dashboards and the eventbus dispatch rule key off.
+// This test proves the replacement is attributed to the name the dashboards
+// and the eventbus dispatch rule key off.
 func TestPushToSession_PanicAttributedToStableSafegoName(t *testing.T) {
 	metrics.Register()
 

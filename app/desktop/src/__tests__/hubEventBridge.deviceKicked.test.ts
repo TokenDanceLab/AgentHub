@@ -20,7 +20,7 @@ function createFakeHubWS() {
   };
 }
 
-describe('desktop hub event bridge — device kicked (#1816 W1)', () => {
+describe('desktop hub event bridge — device kicked (#1816)', () => {
   beforeEach(() => {
     useConnectionStore.setState({
       kickedReason: null,

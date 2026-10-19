@@ -25,7 +25,7 @@ beforeAll(async () => {
   await useTestI18nLanguage('zh');
 });
 
-describe('useWorkbenchTasksRoute mock cursor pagination (#1510)', () => {
+describe('useWorkbenchTasksRoute mock cursor pagination ', () => {
   it('loads the first page (PAGE_SIZE) and reports hasMore when the pool is larger', () => {
     const { result } = renderHook(() => useWorkbenchTasksRoute({ realDataMode: false }));
 

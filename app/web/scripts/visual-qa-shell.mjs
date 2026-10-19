@@ -1,10 +1,9 @@
 /**
- * P74 Visual QA — Web shell capture matrix (#1199 / #1219 / #1242 / #1286)
+ * Web visual QA — Web shell capture matrix (#1199 / #1219 / #1242 / #1286)
  * Viewport 1440x810 · themes light+dark · authenticated mock hub
  *
  * CURRENT GATE MATRIX (Web half). Pair with:
  *   app/desktop/scripts/visual-qa-shell.mjs
- * Score SSOT: visual-qa-scorecard
  *
  * Captures the frosted Agents page surface (glass chrome from #1226/#1235),
  * not only bare chat workbench.
@@ -17,7 +16,7 @@
  *   AGENTHUB_WEB_E2E_PORT (default 5174)
  *   WEB_QA_URL / AGENTHUB_WEB_QA_URL — skip vite spawn when set
  *
- * Optional / legacy multi-scene battery: visual-qa.mjs (NOT the P74 gate).
+ * Optional / legacy multi-scene battery: visual-qa.mjs (NOT the merge gate).
  */
 import { chromium } from '@playwright/test';
 import { spawn } from 'node:child_process';
@@ -389,7 +388,7 @@ async function captureTheme(browser, theme, vp = { width: 1440, height: 810, lab
   // prove it captured the Agents workbench (not an onboarding/blank shell) and
   // that the page has no horizontal overflow.
   const contract = await page.evaluate(() => {
-    // #1874 Slice 3: 证明三 Pane（rail / 已安装列表 / 编辑详情）都真实存在且
+    // #1874: 证明三 Pane（rail / 已安装列表 / 编辑详情）都真实存在且
     // 有正宽度，而不只是页面存在一个空壳。避免把 onboarding / blank shell
     // 或缺少详情面板的页面误判为已捕获。
     const measure = (el) => {

@@ -9,7 +9,7 @@
  * broken contract. No pixel goldens.
  *
  * Transcript source: the proven stubbed-Hub replay pattern of
- * app/web/src/__e2e__/chat-flow-contract.spec.ts (#1839) — approved-real
+ * app/web/src/__e2e__/chat-flow-contract.spec.ts — approved-real
  * data mode + a finished agent task whose replay events render one tool
  * card pair and one markdown text block with a fenced code block. Task
  * status 'done' pins the STREAMING-ENDED state: replay hydrated, composer
@@ -47,7 +47,7 @@ const CHAT_RAIL_BUTTON = 'button[data-rail-page="chat"]';
 const TRANSCRIPT_LOG = '[role="log"]';
 const SESSION_ID = 'session_web_chat';
 const TASK_ID = 'task_web_chat_qa';
-// UX F8 goal scene (#1998): a second conversation whose replay carries real
+// Goal scene (#1998): a second conversation whose replay carries real
 // create_goal tool events, proving the goal banner projection end-to-end.
 const GOAL_SESSION_ID = 'session_web_goal';
 const GOAL_TASK_ID = 'task_web_goal_qa';
@@ -542,7 +542,7 @@ async function captureTheme(browser, theme, scene, vp = { width: 1440, height: 8
         stopVisible: named(/^(?:Stop|停止)/),
       },
       composer: measure(document.querySelector('textarea')),
-      // UX F8 (#1998): goal banner geometry — exists only in the goal scene.
+      // #1998: goal banner geometry — exists only in the goal scene.
       goalBanner: measure(document.querySelector('section[data-goal-status]')),
       goalStatus: document.querySelector('section[data-goal-status]')?.getAttribute('data-goal-status') ?? '',
       horizontalOverflow:
@@ -583,7 +583,7 @@ async function main() {
     for (const theme of themes) {
       results.push(await captureTheme(browser, theme, 'main'));
     }
-    // UX F8 goal scene (#1998): real replayed create_goal events projected
+    // Goal scene (#1998): real replayed create_goal events projected
     // into the conversation goal banner, gate + narrow tiers.
     for (const vp of GOAL_VIEWPORTS) {
       for (const theme of themes) {

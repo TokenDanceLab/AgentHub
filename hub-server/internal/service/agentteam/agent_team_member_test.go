@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/DATA-DOG/go-sqlmock"
+	"github.com/agenthub/hub-server/internal/cache"
 	"github.com/agenthub/hub-server/internal/errcode"
 	"github.com/agenthub/hub-server/internal/model"
 	"github.com/stretchr/testify/assert"
@@ -14,7 +15,7 @@ import (
 
 func TestAgentTeamService_AddTeamMember(t *testing.T) {
 	db, mock := newMockAgentTeamDB(t)
-	svc := NewAgentTeamService(db, nil, nil)
+	svc := NewAgentTeamService(db, nil, cache.NoOpCache{})
 
 	// Get team
 	teamRows := sqlmock.NewRows([]string{"id", "owner_id", "name", "description", "avatar_url", "created_at", "updated_at"}).
@@ -44,7 +45,7 @@ func TestAgentTeamService_AddTeamMember(t *testing.T) {
 
 func TestAgentTeamService_AddTeamMemberDuplicate(t *testing.T) {
 	db, mock := newMockAgentTeamDB(t)
-	svc := NewAgentTeamService(db, nil, nil)
+	svc := NewAgentTeamService(db, nil, cache.NoOpCache{})
 
 	// Get team
 	teamRows := sqlmock.NewRows([]string{"id", "owner_id", "name", "description", "avatar_url", "created_at", "updated_at"}).
@@ -72,7 +73,7 @@ func TestAgentTeamService_AddTeamMemberDuplicate(t *testing.T) {
 
 func TestAgentTeamService_AddTeamMemberInvalidRole(t *testing.T) {
 	db, mock := newMockAgentTeamDB(t)
-	svc := NewAgentTeamService(db, nil, nil)
+	svc := NewAgentTeamService(db, nil, cache.NoOpCache{})
 
 	// Get team
 	teamRows := sqlmock.NewRows([]string{"id", "owner_id", "name", "description", "avatar_url", "created_at", "updated_at"}).
@@ -94,7 +95,7 @@ func TestAgentTeamService_AddTeamMemberInvalidRole(t *testing.T) {
 
 func TestAgentTeamService_RemoveTeamMember(t *testing.T) {
 	db, mock := newMockAgentTeamDB(t)
-	svc := NewAgentTeamService(db, nil, nil)
+	svc := NewAgentTeamService(db, nil, cache.NoOpCache{})
 
 	// Get team
 	teamRows := sqlmock.NewRows([]string{"id", "owner_id", "name", "description", "avatar_url", "created_at", "updated_at"}).

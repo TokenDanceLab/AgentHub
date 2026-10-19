@@ -72,7 +72,7 @@ describe('buildTree', () => {
   });
 
   it('resolves a two-node reference cycle in a single pass (first item wins root)', () => {
-    // 迁入自 app/desktop/src/__tests__/tree.test.ts：a 引用尚未出现的 b ⇒ a 成根；
+    // a 引用尚未出现的 b ⇒ a 成根；
     // b 引用已出现的 a ⇒ b 挂到 a 下。单遍契约下不会死循环，也不会两个都成根。
     const roots = buildTree([msg('a', 'b'), msg('b', 'a')]);
     expect(roots).toHaveLength(1);

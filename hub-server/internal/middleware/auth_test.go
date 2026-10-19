@@ -255,7 +255,7 @@ func TestAuthMiddlewareTokenDanceBearerDoesNotSatisfyDesktopDeviceCheck(t *testi
 	}
 }
 
-func TestWSAuthMiddlewareRejectsTokenDanceBearer(t *testing.T) {
+func TestWSHandlerRejectsTokenDanceBearer(t *testing.T) {
 	token, issuer, audience, jwks := makeTokenDanceMiddlewareToken(t)
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -281,9 +281,9 @@ func TestWSAuthMiddlewareRejectsTokenDanceBearer(t *testing.T) {
 	}
 }
 
-// TestWSAuthMiddlewareRejectsHubLocalQueryToken is the #954 fail-closed gate:
+// TestWSHandlerRejectsHubLocalQueryToken is the #954 fail-closed gate:
 // query-only access_token must no longer authenticate Hub WS upgrades.
-func TestWSAuthMiddlewareRejectsHubLocalQueryToken(t *testing.T) {
+func TestWSHandlerRejectsHubLocalQueryToken(t *testing.T) {
 	token := makeToken("user-ws", "web", "device-ws")
 	c, w := ginRequest(http.MethodGet, "/client/ws?access_token="+token, "")
 
@@ -303,9 +303,9 @@ func TestWSAuthMiddlewareRejectsHubLocalQueryToken(t *testing.T) {
 	}
 }
 
-// TestWSAuthMiddlewareAcceptsHubLocalBearerToken covers native clients that set
+// TestWSHandlerAcceptsHubLocalBearerToken covers native clients that set
 // Authorization: Bearer on the WS upgrade request.
-func TestWSAuthMiddlewareAcceptsHubLocalBearerToken(t *testing.T) {
+func TestWSHandlerAcceptsHubLocalBearerToken(t *testing.T) {
 	token := makeToken("user-ws", "desktop", "device-ws")
 	c, w := ginRequest(http.MethodGet, "/client/ws", "Bearer "+token)
 
@@ -328,10 +328,10 @@ func TestWSAuthMiddlewareAcceptsHubLocalBearerToken(t *testing.T) {
 	}
 }
 
-// TestWSAuthMiddlewareAcceptsSubprotocolBearerToken is the #921 primary browser
+// TestWSHandlerAcceptsSubprotocolBearerToken is the #921 primary browser
 // path: Sec-WebSocket-Protocol carries "agenthub.bearer.v1, <jwt>" without a
 // query access_token.
-func TestWSAuthMiddlewareAcceptsSubprotocolBearerToken(t *testing.T) {
+func TestWSHandlerAcceptsSubprotocolBearerToken(t *testing.T) {
 	token := makeToken("user-proto", "web", "device-proto")
 	c, w := ginRequest(http.MethodGet, "/client/ws", "")
 	c.Request.Header.Set("Sec-WebSocket-Protocol", WSBearerSubprotocol+", "+token)
@@ -352,9 +352,9 @@ func TestWSAuthMiddlewareAcceptsSubprotocolBearerToken(t *testing.T) {
 	}
 }
 
-// TestWSAuthMiddlewareAcceptsAccessTokenSubprotocolForm covers the alternate
+// TestWSHandlerAcceptsAccessTokenSubprotocolForm covers the alternate
 // single-token convention: access_token.<jwt>.
-func TestWSAuthMiddlewareAcceptsAccessTokenSubprotocolForm(t *testing.T) {
+func TestWSHandlerAcceptsAccessTokenSubprotocolForm(t *testing.T) {
 	token := makeToken("user-at", "web", "device-at")
 	c, w := ginRequest(http.MethodGet, "/client/ws", "")
 	c.Request.Header.Set("Sec-WebSocket-Protocol", "access_token."+token)
@@ -372,9 +372,9 @@ func TestWSAuthMiddlewareAcceptsAccessTokenSubprotocolForm(t *testing.T) {
 	}
 }
 
-// TestWSAuthMiddlewareIgnoresQueryWhenSubprotocolPresent ensures a query
+// TestWSHandlerIgnoresQueryWhenSubprotocolPresent ensures a query
 // access_token cannot override (or supply) auth when a subprotocol JWT is present.
-func TestWSAuthMiddlewareIgnoresQueryWhenSubprotocolPresent(t *testing.T) {
+func TestWSHandlerIgnoresQueryWhenSubprotocolPresent(t *testing.T) {
 	protoToken := makeToken("user-proto", "web", "device-proto")
 	queryToken := makeToken("user-query", "web", "device-query")
 	c, w := ginRequest(http.MethodGet, "/client/ws?access_token="+queryToken, "")
@@ -390,7 +390,7 @@ func TestWSAuthMiddlewareIgnoresQueryWhenSubprotocolPresent(t *testing.T) {
 	}
 }
 
-func TestWSAuthMiddlewareRejectsMissingToken(t *testing.T) {
+func TestWSHandlerRejectsMissingToken(t *testing.T) {
 	c, w := ginRequest(http.MethodGet, "/client/ws", "")
 	newTestAuthMW(testConfig(), AuthDependencies{}, nil).WSHandler()(c)
 
@@ -425,11 +425,11 @@ func TestTokenFromWSSubprotocols(t *testing.T) {
 	}
 }
 
-// TestWSAuthMiddlewareRejectsNonHubSessionPurpose is the #889 regression:
+// TestWSHandlerRejectsNonHubSessionPurpose is the #889 regression:
 // tokens with a non-empty purpose (edge-api / run-start) must not upgrade WS.
 // ParseToken rejects them at the product gate (401); the shared enforceHubSession
 // gate is defense-in-depth for the same policy on REST and WS.
-func TestWSAuthMiddlewareRejectsNonHubSessionPurpose(t *testing.T) {
+func TestWSHandlerRejectsNonHubSessionPurpose(t *testing.T) {
 	secret := testSecret()
 	cases := []struct {
 		name  string
@@ -490,7 +490,7 @@ func TestWSAuthMiddlewareRejectsNonHubSessionPurpose(t *testing.T) {
 }
 
 // TestEnforceHubSessionRejectsPurposeAndDeviceType covers the shared post-parse
-// gate used by both RequireHubSession and WSAuthMiddleware (#889).
+// gate used by both RequireHubSession and AuthMiddleware.WSHandler() (#889).
 func TestEnforceHubSessionRejectsPurposeAndDeviceType(t *testing.T) {
 	cases := []struct {
 		name       string
@@ -606,7 +606,7 @@ func TestAuthMiddlewareProductTokenStillReachesHandler(t *testing.T) {
 	}
 }
 
-func TestWSAuthMiddlewareRejectsEdgeToken(t *testing.T) {
+func TestWSHandlerRejectsEdgeToken(t *testing.T) {
 	token, err := jwtutil.GenerateEdgeToken("user-edge", "edge-dev-ws", testSecret(), time.Hour)
 	if err != nil {
 		t.Fatalf("GenerateEdgeToken: %v", err)
@@ -615,7 +615,7 @@ func TestWSAuthMiddlewareRejectsEdgeToken(t *testing.T) {
 	newTestAuthMW(testConfig(), AuthDependencies{}, nil).WSHandler()(c)
 
 	if !c.IsAborted() {
-		t.Fatal("expected edge JWT to be rejected on WSAuthMiddleware")
+		t.Fatal("expected edge JWT to be rejected on WSHandler")
 	}
 	if w.Code != http.StatusUnauthorized {
 		t.Fatalf("status = %d, want 401", w.Code)
@@ -625,7 +625,7 @@ func TestWSAuthMiddlewareRejectsEdgeToken(t *testing.T) {
 	}
 }
 
-func TestWSAuthMiddlewareRejectsCapabilityToken(t *testing.T) {
+func TestWSHandlerRejectsCapabilityToken(t *testing.T) {
 	token, err := jwtutil.IssueCapabilityToken([]byte(testSecret()), "user-1", "edge-1", "proj_1", "run-start", time.Minute)
 	if err != nil {
 		t.Fatalf("IssueCapabilityToken: %v", err)
@@ -634,7 +634,7 @@ func TestWSAuthMiddlewareRejectsCapabilityToken(t *testing.T) {
 	newTestAuthMW(testConfig(), AuthDependencies{}, nil).WSHandler()(c)
 
 	if !c.IsAborted() {
-		t.Fatal("expected capability JWT to be rejected on WSAuthMiddleware")
+		t.Fatal("expected capability JWT to be rejected on WSHandler")
 	}
 	if w.Code != http.StatusUnauthorized {
 		t.Fatalf("status = %d, want 401", w.Code)
@@ -679,7 +679,7 @@ func TestAuthMiddlewareRejectsBlacklistedAccessJTI(t *testing.T) {
 	}
 }
 
-func TestWSAuthMiddlewareRejectsBlacklistedAccessJTI(t *testing.T) {
+func TestWSHandlerRejectsBlacklistedAccessJTI(t *testing.T) {
 	token := makeToken("user-ws-bl", "web", "dev-ws-bl")
 	claims, err := jwtutil.ParseToken(token, testSecret())
 	if err != nil {
@@ -743,10 +743,10 @@ func TestAuthMiddlewareBlacklistCheckErrorFailsClosedWhenConfigured(t *testing.T
 	}
 }
 
-// TestWSAuthMiddlewareBlacklistCheckErrorFailsClosedWhenConfigured is the WS
+// TestWSHandlerBlacklistCheckErrorFailsClosedWhenConfigured is the WS
 // upgrade counterpart: the fail-closed policy applies equally to WebSocket
 // upgrades so a Redis outage cannot let a revoked access JWT upgrade.
-func TestWSAuthMiddlewareBlacklistCheckErrorFailsClosedWhenConfigured(t *testing.T) {
+func TestWSHandlerBlacklistCheckErrorFailsClosedWhenConfigured(t *testing.T) {
 	t.Setenv("AGENTHUB_AUTH_FAIL_CLOSED", "true")
 	token := makeToken("user-ws-fc", "web", "dev-ws-fc")
 	c, w := ginRequest(http.MethodGet, "/client/ws", "Bearer "+token)
@@ -970,46 +970,9 @@ func TestDeviceTypeCheckMultipleAllowedTypes(t *testing.T) {
 	}
 }
 
-// --- AccessLog tests ---
+// --- RequireHubSession tests ---
 
-func TestAccessLogCallsNext(t *testing.T) {
-	called := false
-	next := func(c *gin.Context) {
-		called = true
-		c.Status(http.StatusOK)
-	}
-
-	c, _ := ginRequest(http.MethodGet, "/v1/health", "")
-	handler := AccessLog()
-	handler(c)
-	next(c)
-
-	if !called {
-		t.Fatal("expected next handler to be called")
-	}
-}
-
-func TestAccessLogDoesNotModifyResponse(t *testing.T) {
-	// Use a Gin engine to exercise the full handler chain including c.Next().
-	gin.SetMode(gin.TestMode)
-	router := gin.New()
-	router.Use(AccessLog())
-	router.GET("/test", func(c *gin.Context) {
-		c.String(http.StatusCreated, "created")
-	})
-
-	req := httptest.NewRequest(http.MethodGet, "/test", nil)
-	w := httptest.NewRecorder()
-	router.ServeHTTP(w, req)
-
-	if w.Code != http.StatusCreated {
-		t.Fatalf("status = %d, want 201", w.Code)
-	}
-}
-
-// --- RequireHubSession / RequireLocalAuth tests ---
-
-func requireLocalAuthGinCtx(authSource string) (*gin.Context, *httptest.ResponseRecorder) {
+func requireHubSessionGinCtx(authSource string) (*gin.Context, *httptest.ResponseRecorder) {
 	w := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(w)
 	c.Request = httptest.NewRequest(http.MethodPost, "/client/auth/password", nil)
@@ -1018,7 +981,7 @@ func requireLocalAuthGinCtx(authSource string) (*gin.Context, *httptest.Response
 }
 
 func TestRequireHubSessionAllowsHubLocalAuth(t *testing.T) {
-	c, w := requireLocalAuthGinCtx("hub_local")
+	c, w := requireHubSessionGinCtx("hub_local")
 	called := false
 	next := func(c *gin.Context) { called = true }
 
@@ -1040,7 +1003,7 @@ func TestRequireHubSessionAllowsHubLocalAuth(t *testing.T) {
 }
 
 func TestRequireHubSessionBlocksTokenDanceAuth(t *testing.T) {
-	c, w := requireLocalAuthGinCtx("tokendance_id")
+	c, w := requireHubSessionGinCtx("tokendance_id")
 	called := false
 	next := func(c *gin.Context) { called = true }
 
@@ -1062,7 +1025,7 @@ func TestRequireHubSessionBlocksTokenDanceAuth(t *testing.T) {
 }
 
 func TestRequireHubSessionBlocksEmptyAuthSource(t *testing.T) {
-	c, w := requireLocalAuthGinCtx("")
+	c, w := requireHubSessionGinCtx("")
 	called := false
 	next := func(c *gin.Context) { called = true }
 
@@ -1084,7 +1047,7 @@ func TestRequireHubSessionBlocksEmptyAuthSource(t *testing.T) {
 }
 
 func TestRequireHubSessionBlocksNonEmptyPurpose(t *testing.T) {
-	c, w := requireLocalAuthGinCtx("hub_local")
+	c, w := requireHubSessionGinCtx("hub_local")
 	c.Set("purpose", "edge-api")
 	c.Set("device_type", "desktop")
 
@@ -1099,7 +1062,7 @@ func TestRequireHubSessionBlocksNonEmptyPurpose(t *testing.T) {
 }
 
 func TestRequireHubSessionBlocksEdgeDeviceType(t *testing.T) {
-	c, w := requireLocalAuthGinCtx("hub_local")
+	c, w := requireHubSessionGinCtx("hub_local")
 	c.Set("device_type", "edge")
 	c.Set("purpose", "")
 
@@ -1107,19 +1070,6 @@ func TestRequireHubSessionBlocksEdgeDeviceType(t *testing.T) {
 
 	if !c.IsAborted() {
 		t.Fatal("expected RequireHubSession to reject edge device_type")
-	}
-	if w.Code != http.StatusForbidden {
-		t.Fatalf("status = %d, want 403", w.Code)
-	}
-}
-
-func TestRequireLocalAuthDelegatesToHubSession(t *testing.T) {
-	c, w := requireLocalAuthGinCtx("tokendance_id")
-
-	newTestAuthMW(testConfig(), AuthDependencies{}, nil).RequireLocalAuth()(c)
-
-	if !c.IsAborted() {
-		t.Fatal("expected RequireLocalAuth alias to require Hub-local auth")
 	}
 	if w.Code != http.StatusForbidden {
 		t.Fatalf("status = %d, want 403", w.Code)

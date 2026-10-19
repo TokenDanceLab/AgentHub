@@ -36,7 +36,7 @@
     "payload": {
       "callId": "part_edit_report",
       "input": {
-        "path": "docs/audit/sdk-adapter-fixture.md"
+        "path": "docs/reference/agent-protocols.md"
       },
       "metadata": {
         "title": "Edit fixture report"
@@ -58,7 +58,7 @@
     "payload": {
       "callId": "part_edit_report",
       "input": {
-        "path": "docs/audit/sdk-adapter-fixture.md"
+        "path": "docs/reference/agent-protocols.md"
       },
       "metadata": {
         "api_token": "[redacted]",

@@ -5,7 +5,7 @@ import styles from './AgentHubWorkbench.module.css';
 
 /* ═══════════════════════════════════════════════════════════════════════
    RightInspectorResizer — keyboard/pointer vertical resizer chrome for
-   the right inspector shell (#661). No intentional UX change.
+   the right inspector shell (#661).
    ═══════════════════════════════════════════════════════════════════════ */
 
 export interface RightInspectorResizerProps {

@@ -76,24 +76,24 @@ describe('AgentHub mobile deep links', () => {
   });
 
   it('maps AgentHub app deep links to navigation targets', () => {
-    expect(parseAgentHubDeepLink('agenthub://thread/thread-delicious233')).toEqual({
+    expect(parseAgentHubDeepLink('agenthub://thread/thread-demo')).toEqual({
       kind: 'navigate',
       target: {
         screen: 'thread',
-        threadId: 'thread-delicious233',
+        threadId: 'thread-demo',
       },
     });
-    expect(parseAgentHubDeepLink('agenthub://run/run-agenthub?threadId=thread-delicious233')).toEqual({
+    expect(parseAgentHubDeepLink('agenthub://run/run-agenthub?threadId=thread-demo')).toEqual({
       kind: 'navigate',
       target: {
         screen: 'tasks',
         source: 'run',
         runId: 'run-agenthub',
-        threadId: 'thread-delicious233',
+        threadId: 'thread-demo',
       },
     });
     expect(
-      parseAgentHubDeepLink('agenthub://approval/approval-agenthub?runId=run-agenthub&threadId=thread-delicious233'),
+      parseAgentHubDeepLink('agenthub://approval/approval-agenthub?runId=run-agenthub&threadId=thread-demo'),
     ).toEqual({
       kind: 'navigate',
       target: {
@@ -101,7 +101,7 @@ describe('AgentHub mobile deep links', () => {
         source: 'approval',
         approvalId: 'approval-agenthub',
         runId: 'run-agenthub',
-        threadId: 'thread-delicious233',
+        threadId: 'thread-demo',
       },
     });
     expect(parseAgentHubDeepLink('agenthub://activity/activity-agenthub?runId=run-agenthub')).toEqual({
@@ -153,7 +153,7 @@ describe('AgentHub mobile deep links', () => {
     const bridge = await startAgentHubDeepLinkBridge({
       linking: {
         async getInitialURL() {
-          return 'agenthub://thread/thread-delicious233';
+          return 'agenthub://thread/thread-demo';
         },
         addEventListener(_type, nextListener) {
           listener = nextListener;
@@ -164,21 +164,21 @@ describe('AgentHub mobile deep links', () => {
       onNavigate,
     });
 
-    listener?.({ url: 'agenthub://run/run-agenthub?threadId=thread-delicious233' });
+    listener?.({ url: 'agenthub://run/run-agenthub?threadId=thread-demo' });
     listener?.({ url: 'agenthub://auth/callback?code=auth-code&state=pkce-state' });
-    listener?.({ url: 'agenthub://run/run-agenthub?threadId=thread-delicious233' });
+    listener?.({ url: 'agenthub://run/run-agenthub?threadId=thread-demo' });
     bridge.stop();
 
     expect(onNavigate).toHaveBeenCalledTimes(2);
     expect(onNavigate).toHaveBeenNthCalledWith(1, {
       screen: 'thread',
-      threadId: 'thread-delicious233',
+      threadId: 'thread-demo',
     });
     expect(onNavigate).toHaveBeenNthCalledWith(2, {
       screen: 'tasks',
       source: 'run',
       runId: 'run-agenthub',
-      threadId: 'thread-delicious233',
+      threadId: 'thread-demo',
     });
     expect(onAuthCallback).toHaveBeenCalledWith({
       kind: 'success',

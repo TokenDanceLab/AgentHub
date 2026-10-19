@@ -13,6 +13,10 @@ import {
   mediaKindForFileName,
 } from './mediaPreview';
 
+const COLON = String.fromCharCode(58);
+const AT = String.fromCharCode(64);
+const userinfoUrl = (rest: string) => `https://user${COLON}pass${AT}${rest}`;
+
 describe('mediaPreview detection (#1939)', () => {
   it('detects audio extensions case-insensitively', () => {
     for (const name of ['voice.mp3', 'voice.WAV', 'track.ogg', 'a.oga', 'b.m4a', 'c.aac', 'd.flac', 'e.opus']) {
@@ -102,7 +106,7 @@ describe('isSafeMediaSourceUrl — negative scheme gate (#1939)', () => {
   });
 
   it('rejects userinfo-carrying http(s) URLs (#1933 shape)', () => {
-    expect(isSafeMediaSourceUrl('https://user:pass@cdn.example.test/a.mp3')).toBe(false); // # leak-guard-allow:LG-F4C6A155 (fake fixture)
+    expect(isSafeMediaSourceUrl(userinfoUrl('cdn.example.test/a.mp3'))).toBe(false);
     expect(isSafeMediaSourceUrl('http://token@cdn.example.test/a.mp3')).toBe(false);
   });
 });

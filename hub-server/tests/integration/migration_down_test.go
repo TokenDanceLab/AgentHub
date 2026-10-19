@@ -20,7 +20,7 @@ import (
 
 // TestMigration0016DownRoundTrip proves that migration 0016 (workspace_refactor)
 // can be rolled back via its .down.sql and re-applied without error against the
-// real integration PostgreSQL. Regression gate for #2125 slice A.
+// real integration PostgreSQL. Regression gate for #2125.
 //
 // Strategy: from whatever version the shared DB is at (typically latest), step
 // down to 16, seed placeholder rows needed by the down, step down one more to

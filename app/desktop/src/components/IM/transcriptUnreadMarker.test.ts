@@ -5,7 +5,7 @@ function msg(id: string, seq: number, clientMsgId?: string) {
   return { id, seq_id: seq, ...(clientMsgId ? { client_msg_id: clientMsgId } : {}) };
 }
 
-describe('computeTranscriptUnreadMarker (T8 desktop IM)', () => {
+describe('computeTranscriptUnreadMarker (desktop IM)', () => {
   it('returns undefined when unread_count is absent or zero', () => {
     const messages = [msg('m1', 1), msg('m2', 2)];
     expect(computeTranscriptUnreadMarker(messages, undefined)).toBeUndefined();

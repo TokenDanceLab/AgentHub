@@ -59,6 +59,22 @@ func newBehaviorBus(t *testing.T) *bus.Bus {
 	return b
 }
 
+// authenticate registers the caller's identity and drains the auth.ok frame
+// that SetAuth queues as the first frame (seq_id 1), so tests observe only
+// business frames afterwards.
+func authenticate(t *testing.T, mgr *ws.Manager, conn *ws.Conn, userID, deviceType, deviceID string) {
+	t.Helper()
+	mgr.SetAuth(conn.ID, userID, deviceType, deviceID)
+	select {
+	case data := <-conn.Send:
+		var frame ws.Frame
+		require.NoError(t, json.Unmarshal(data, &frame))
+		require.Equal(t, ws.TypeAuthOK, frame.Type)
+	default:
+		t.Fatal("SetAuth did not queue auth.ok")
+	}
+}
+
 func newBehaviorMgr(t *testing.T) *ws.Manager {
 	t.Helper()
 	return ws.NewManager()
@@ -68,7 +84,7 @@ func newBehaviorMgr(t *testing.T) *ws.Manager {
 // gates on Pending()==0 (the bus's own completion counter) rather than
 // Running()==0: an idle ants worker does not exit immediately after a
 // handler returns, so gating on Running would add a per-publish purge wait
-// with no correctness benefit (P1: bus drain 语义).
+// with no correctness benefit.
 func waitBusDrain(t *testing.T, b *bus.Bus) {
 	t.Helper()
 	require.Eventually(t, func() bool {
@@ -115,7 +131,7 @@ func TestEventDispatch_MessageRecall(t *testing.T) {
 
 	conn := ws.NewConn(nil)
 	require.NoError(t, mgr.Register(conn))
-	mgr.SetAuth(conn.ID, "user-a", "web", "device-1")
+	authenticate(t, mgr, conn, "user-a", "web", "device-1")
 	t.Cleanup(func() { mgr.Unregister(conn.ID) })
 
 	b := newBehaviorBus(t)
@@ -147,7 +163,7 @@ func TestEventDispatch_MessageRecallIgnoresWrongPayload(t *testing.T) {
 	mgr := newBehaviorMgr(t)
 	conn := ws.NewConn(nil)
 	require.NoError(t, mgr.Register(conn))
-	mgr.SetAuth(conn.ID, "user-a", "web", "device-1")
+	authenticate(t, mgr, conn, "user-a", "web", "device-1")
 	t.Cleanup(func() { mgr.Unregister(conn.ID) })
 
 	b := newBehaviorBus(t)
@@ -175,7 +191,7 @@ func TestEventDispatch_MessagePinUnpin(t *testing.T) {
 
 	conn := ws.NewConn(nil)
 	require.NoError(t, mgr.Register(conn))
-	mgr.SetAuth(conn.ID, "user-a", "web", "device-1")
+	authenticate(t, mgr, conn, "user-a", "web", "device-1")
 	t.Cleanup(func() { mgr.Unregister(conn.ID) })
 
 	b := newBehaviorBus(t)
@@ -224,7 +240,7 @@ func TestEventDispatch_AgentDoneFailedTimeoutCancel(t *testing.T) {
 
 	conn := ws.NewConn(nil)
 	require.NoError(t, mgr.Register(conn))
-	mgr.SetAuth(conn.ID, "user-a", "web", "device-1")
+	authenticate(t, mgr, conn, "user-a", "web", "device-1")
 	t.Cleanup(func() { mgr.Unregister(conn.ID) })
 
 	b := newBehaviorBus(t)
@@ -303,7 +319,7 @@ func TestEventDispatch_AgentDoneSkipsNotificationWhenNoTask(t *testing.T) {
 
 	conn := ws.NewConn(nil)
 	require.NoError(t, mgr.Register(conn))
-	mgr.SetAuth(conn.ID, "user-a", "web", "device-1")
+	authenticate(t, mgr, conn, "user-a", "web", "device-1")
 	t.Cleanup(func() { mgr.Unregister(conn.ID) })
 
 	db := newBehaviorDB(t)
@@ -342,8 +358,8 @@ func TestEventDispatch_SessionCreatedPushesToMembers(t *testing.T) {
 	connB := ws.NewConn(nil)
 	require.NoError(t, mgr.Register(connA))
 	require.NoError(t, mgr.Register(connB))
-	mgr.SetAuth(connA.ID, "user-a", "web", "dev-a")
-	mgr.SetAuth(connB.ID, "user-b", "web", "dev-b")
+	authenticate(t, mgr, connA, "user-a", "web", "dev-a")
+	authenticate(t, mgr, connB, "user-b", "web", "dev-b")
 	t.Cleanup(func() {
 		mgr.Unregister(connA.ID)
 		mgr.Unregister(connB.ID)
@@ -383,7 +399,7 @@ func TestEventDispatch_SessionCreatedFallsBackToResolveMembers(t *testing.T) {
 
 	conn := ws.NewConn(nil)
 	require.NoError(t, mgr.Register(conn))
-	mgr.SetAuth(conn.ID, "user-x", "web", "dev-x")
+	authenticate(t, mgr, conn, "user-x", "web", "dev-x")
 	t.Cleanup(func() { mgr.Unregister(conn.ID) })
 
 	b := newBehaviorBus(t)
@@ -416,7 +432,7 @@ func TestEventDispatch_SessionMemberJoinedLeftInfoDissolved(t *testing.T) {
 
 	conn := ws.NewConn(nil)
 	require.NoError(t, mgr.Register(conn))
-	mgr.SetAuth(conn.ID, "user-a", "web", "device-1")
+	authenticate(t, mgr, conn, "user-a", "web", "device-1")
 	t.Cleanup(func() { mgr.Unregister(conn.ID) })
 
 	b := newBehaviorBus(t)
@@ -457,7 +473,7 @@ func TestEventDispatch_SessionMemberEventsSkipEmptySessionID(t *testing.T) {
 	mgr := newBehaviorMgr(t)
 	conn := ws.NewConn(nil)
 	require.NoError(t, mgr.Register(conn))
-	mgr.SetAuth(conn.ID, "user-a", "web", "device-1")
+	authenticate(t, mgr, conn, "user-a", "web", "device-1")
 	t.Cleanup(func() { mgr.Unregister(conn.ID) })
 
 	b := newBehaviorBus(t)
@@ -488,7 +504,7 @@ func TestEventDispatch_MessageReadPushesToSession(t *testing.T) {
 
 	conn := ws.NewConn(nil)
 	require.NoError(t, mgr.Register(conn))
-	mgr.SetAuth(conn.ID, "user-a", "web", "device-1")
+	authenticate(t, mgr, conn, "user-a", "web", "device-1")
 	t.Cleanup(func() { mgr.Unregister(conn.ID) })
 
 	b := newBehaviorBus(t)
@@ -520,7 +536,7 @@ func TestEventDispatch_MessageNewSkipsAgentPushesUser(t *testing.T) {
 
 	conn := ws.NewConn(nil)
 	require.NoError(t, mgr.Register(conn))
-	mgr.SetAuth(conn.ID, "user-a", "web", "device-1")
+	authenticate(t, mgr, conn, "user-a", "web", "device-1")
 	t.Cleanup(func() { mgr.Unregister(conn.ID) })
 
 	b := newBehaviorBus(t)
@@ -568,8 +584,8 @@ func TestEventDispatch_FriendAcceptedPushesToRequester(t *testing.T) {
 	connAcc := ws.NewConn(nil)
 	require.NoError(t, mgr.Register(connReq))
 	require.NoError(t, mgr.Register(connAcc))
-	mgr.SetAuth(connReq.ID, "requester-1", "web", "dev-req")
-	mgr.SetAuth(connAcc.ID, "accepter-1", "web", "dev-acc")
+	authenticate(t, mgr, connReq, "requester-1", "web", "dev-req")
+	authenticate(t, mgr, connAcc, "accepter-1", "web", "dev-acc")
 	t.Cleanup(func() {
 		mgr.Unregister(connReq.ID)
 		mgr.Unregister(connAcc.ID)
@@ -602,7 +618,7 @@ func TestEventDispatch_FriendAcceptedSkipsEmptyUserID(t *testing.T) {
 	mgr := newBehaviorMgr(t)
 	conn := ws.NewConn(nil)
 	require.NoError(t, mgr.Register(conn))
-	mgr.SetAuth(conn.ID, "user-a", "web", "device-1")
+	authenticate(t, mgr, conn, "user-a", "web", "device-1")
 	t.Cleanup(func() { mgr.Unregister(conn.ID) })
 
 	b := newBehaviorBus(t)
@@ -628,7 +644,7 @@ func TestEventDispatch_TeamRunStartedPushesToUserWhenNoSession(t *testing.T) {
 	mgr := newBehaviorMgr(t)
 	conn := ws.NewConn(nil)
 	require.NoError(t, mgr.Register(conn))
-	mgr.SetAuth(conn.ID, "user-1", "web", "device-1")
+	authenticate(t, mgr, conn, "user-1", "web", "device-1")
 	t.Cleanup(func() { mgr.Unregister(conn.ID) })
 
 	b := newBehaviorBus(t)
@@ -662,7 +678,7 @@ func TestEventDispatch_TeamEventsWithSessionPushToSession(t *testing.T) {
 
 	conn := ws.NewConn(nil)
 	require.NoError(t, mgr.Register(conn))
-	mgr.SetAuth(conn.ID, "member-1", "web", "device-1")
+	authenticate(t, mgr, conn, "member-1", "web", "device-1")
 	t.Cleanup(func() { mgr.Unregister(conn.ID) })
 
 	b := newBehaviorBus(t)
@@ -689,7 +705,7 @@ func TestEventDispatch_NonMapPayloadIsIgnored(t *testing.T) {
 	mgr := newBehaviorMgr(t)
 	conn := ws.NewConn(nil)
 	require.NoError(t, mgr.Register(conn))
-	mgr.SetAuth(conn.ID, "user-a", "web", "device-1")
+	authenticate(t, mgr, conn, "user-a", "web", "device-1")
 	t.Cleanup(func() { mgr.Unregister(conn.ID) })
 
 	b := newBehaviorBus(t)

@@ -1,7 +1,6 @@
 /**
  * Hub Client Extended API surfaces: Workspace, Teams, Profiles, Documents,
- * Attachments, Settings, Task approvals/artifacts, T3.2–T3.4 parity.
- * Extracted from hubClient.ts (#1086). Zero behavior change.
+ * attachments, settings, and task approvals/artifacts shared by desktop and web.
  */
 
 import type {
@@ -97,7 +96,7 @@ export function createHubClientExtendedApi(deps: HubClientExtendedApiDeps) {
     ) =>
       invokePathInitRequest((path, init) => request<HubWorkspaceProjectThreadMessage>(path, init), hubPayload.buildSendWorkspaceProjectThreadMessageRequest(projectId, threadId, data)),
 
-    // ── T3.2 parity: team/settings/attachments/message extras (desktop∩web) ──
+    // ── Team/settings/attachments/message extras (desktop ∩ web) ──
     editMessage: (messageId: string, body: { content: string }) =>
       invokePathInitRequest((path, init) => request<HubMessage>(path, init), hubPayload.buildEditMessageRequest(messageId, body)),
 
@@ -215,7 +214,7 @@ export function createHubClientExtendedApi(deps: HubClientExtendedApiDeps) {
     downloadAttachmentUrl: (attachmentId: string) =>
       hubPayload.buildAttachmentDownloadUrl(baseUrl, attachmentId),
 
-    // ── T3.3 desktop remainder methods ──
+    // ── Desktop-only remainder methods ──
     listDocuments: (params?: {
       status?: string;
       source?: string;
@@ -256,7 +255,7 @@ export function createHubClientExtendedApi(deps: HubClientExtendedApiDeps) {
     ) =>
       invokePathInitRequest((path, init) => request<undefined>(path, init), hubPayload.buildStreamTaskEventRequest(taskId, eventType, payload, options)),
 
-    // ── T3.4 web task approvals/artifacts ──
+    // ── Web task approvals/artifacts ──
     listTaskApprovals: (taskId: string) =>
       request<HubAgentTaskApprovalList>(hubPayload.buildListTaskApprovalsPath(taskId)),
 

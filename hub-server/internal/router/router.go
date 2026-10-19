@@ -45,7 +45,7 @@ func SetupRoutes(r *gin.Engine, cfg *config.Config, authMW *middleware.AuthMiddl
 	// Without this flag gin ignores the NoMethod handler registered below and
 	// routes every wrong-method request to NoRoute, which both hides the fact
 	// that the path exists under another method and diverges from edge-server,
-	// which already answers 405 for the same class of request (#2154 F-a).
+	// which already answers 405 for the same class of request (#2154).
 	// CORS preflight is unaffected: OPTIONS is aborted by the CORS middleware,
 	// which gin also chains in front of the 405 handler.
 	r.HandleMethodNotAllowed = true
@@ -115,7 +115,7 @@ func SetupRoutes(r *gin.Engine, cfg *config.Config, authMW *middleware.AuthMiddl
 	client.Use(guardBody, guardTimeout)
 	{
 		// WS upgrade: IP rate limit + JWT parse + shared hub-session purpose/device gate
-		// (WSAuthMiddleware embeds RequireHubSession policy; chain is belt-and-suspenders).
+		// (AuthMiddleware.WSHandler() embeds the RequireHubSession policy; chain is belt-and-suspenders).
 		client.GET("/ws", middleware.WSIPRateLimit(), authMW.WSHandler(), authMW.RequireHubSession(), wsHandler.ServeWS)
 
 		auth := client.Group("/auth")
@@ -297,7 +297,7 @@ func SetupRoutes(r *gin.Engine, cfg *config.Config, authMW *middleware.AuthMiddl
 		web.PUT("/custom-agents/:id", customAgentHandler.Update)
 		web.DELETE("/custom-agents/:id", customAgentHandler.Delete)
 
-		// Agent Profiles (Phase 2)
+		// Agent Profiles
 		if agentProfileHandler != nil {
 			web.GET("/agent-profiles", agentProfileHandler.ListProfiles)
 			web.POST("/agent-profiles", agentProfileHandler.CreateProfile)
@@ -308,7 +308,7 @@ func SetupRoutes(r *gin.Engine, cfg *config.Config, authMW *middleware.AuthMiddl
 			web.POST("/agent-profiles/:id/install", agentProfileHandler.InstallProfile)
 		}
 
-		// Skills (Phase 3)
+		// Skills
 		if skillHandler != nil {
 			web.GET("/skills", skillHandler.ListSkills)
 			web.POST("/skills", skillHandler.CreateSkill)
@@ -319,7 +319,7 @@ func SetupRoutes(r *gin.Engine, cfg *config.Config, authMW *middleware.AuthMiddl
 			web.POST("/skills/:id/unpublish", authMW.RequireAdmin(), skillHandler.UnpublishSkill)
 		}
 
-		// MCP Servers (Phase 3)
+		// MCP Servers
 		if mcpHandler != nil {
 			web.GET("/mcp-servers", mcpHandler.ListMCPServers)
 			web.POST("/mcp-servers", mcpHandler.CreateMCPServer)
@@ -330,7 +330,7 @@ func SetupRoutes(r *gin.Engine, cfg *config.Config, authMW *middleware.AuthMiddl
 			web.POST("/mcp-servers/:id/unpublish", authMW.RequireAdmin(), mcpHandler.UnpublishMCPServer)
 		}
 
-		// Market (Phase 4)
+		// Market
 		if marketHandler != nil {
 			web.GET("/market/profiles", marketHandler.SearchMarketProfiles)
 			web.GET("/market/profiles/:id", marketHandler.GetMarketProfile)
@@ -338,7 +338,7 @@ func SetupRoutes(r *gin.Engine, cfg *config.Config, authMW *middleware.AuthMiddl
 			web.POST("/market/profiles/:id/rate", marketHandler.RateMarketProfile)
 		}
 
-		// Provider Bindings (Phase 4)
+		// Provider Bindings
 		if pbHandler != nil {
 			web.GET("/provider-bindings", pbHandler.List)
 			web.POST("/provider-bindings", pbHandler.Create)
@@ -346,7 +346,7 @@ func SetupRoutes(r *gin.Engine, cfg *config.Config, authMW *middleware.AuthMiddl
 			web.DELETE("/provider-bindings/:id", pbHandler.Delete)
 		}
 
-		// Execution Targets (Phase 5)
+		// Execution Targets
 		if targetHandler != nil {
 			web.GET("/execution-targets", targetHandler.ListTargets)
 			web.POST("/execution-targets", targetHandler.CreateTarget)
@@ -377,7 +377,7 @@ func SetupRoutes(r *gin.Engine, cfg *config.Config, authMW *middleware.AuthMiddl
 			web.POST("/projects/:id/threads/:threadId/messages", workspaceHandler.CreateProjectThreadMessage)
 		}
 
-		// Audit Events (Phase 6)
+		// Audit Events
 		if auditHandler != nil {
 			web.GET("/audit-events", authMW.RequireAdmin(), auditHandler.ListAuditEvents)
 		}

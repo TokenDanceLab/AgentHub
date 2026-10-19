@@ -108,8 +108,8 @@ func TestDispatchToEdgeHTTP_CallerDeadlineCancels(t *testing.T) {
 		"caller deadline must win over the 10s client timeout (took %v)", elapsed)
 }
 
-// TestDispatchToEdgeHTTP_NonSuccessLogUsesSummaryNotRawBody pins the #2120
-// slice-1 security contract: when Edge returns a non-success status, the warn
+// TestDispatchToEdgeHTTP_NonSuccessLogUsesSummaryNotRawBody pins the
+// log-redaction contract: when Edge returns a non-success status, the warn
 // log must contain a body_summary field (length + sanitized prefix) and must
 // NOT contain the raw response body as a string value. A long, unique sentinel
 // embedded in the response proves the raw text does not leak through slog.

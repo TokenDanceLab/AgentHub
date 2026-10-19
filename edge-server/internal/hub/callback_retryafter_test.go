@@ -9,7 +9,7 @@ import (
 )
 
 // TestClassifyCallbackResponse_RetryAfterIsNotCapped pins the callback
-// client's half of the shared Retry-After contract (#2244 slice 3).
+// client's half of the shared Retry-After contract (#2244).
 //
 // The SDK adapter caps a server hint at 30s because a run carries its own
 // deadline. The callback path deliberately does not: it bounds a hint with the

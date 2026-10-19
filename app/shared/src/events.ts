@@ -26,7 +26,7 @@ export interface EventEnvelope {
   payload: Record<string, unknown>;
 }
 
-// ── IM / Project events (P0) ──────────────────
+// ── IM / Project events ───────────────────────
 
 export interface ProjectCreatedEvent extends EventEnvelope {
   type: 'project.created';
@@ -137,7 +137,7 @@ export interface ItemDeletedEvent extends EventEnvelope {
   };
 }
 
-// ── Execution / Runner events (P0) ─────────────
+// ── Execution / Runner events ─────────────────
 
 export interface RunnerOnlineEvent extends EventEnvelope {
   type: 'runner.online';
@@ -306,7 +306,7 @@ export interface PreviewStoppedEvent extends EventEnvelope {
   };
 }
 
-// ── Agent runtime events (P0) ──────────────────
+// ── Agent runtime events ──────────────────────
 
 export interface AgentTextDeltaEvent extends EventEnvelope {
   type: 'run.agent.text_delta';
@@ -410,7 +410,7 @@ export interface AgentResultEvent extends EventEnvelope {
   };
 }
 
-// ── Plan approval events (P1) ──────────────────
+// ── Plan approval events ──────────────────────
 
 export interface PlanProposedEvent extends EventEnvelope {
   type: 'run.agent.plan_proposed';
@@ -440,15 +440,6 @@ export interface PlanRejectedEvent extends EventEnvelope {
     planId: string;
     reason?: string;
     rejectedBy?: string;
-    [key: string]: unknown;
-  };
-}
-
-export interface PlanExpiredEvent extends EventEnvelope {
-  type: 'run.agent.plan_expired';
-  payload: {
-    runId: string;
-    planId: string;
     [key: string]: unknown;
   };
 }
@@ -522,7 +513,6 @@ export type AnyEvent =
   | PlanProposedEvent
   | PlanApprovedEvent
   | PlanRejectedEvent
-  | PlanExpiredEvent
   // System / infrastructure
   | SystemGapEvent
   // Common

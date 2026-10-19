@@ -16,7 +16,7 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'jsdom',
-    // Flake 重试政策 SSOT：docs/governance/known-flaky.md。单元车道预算为 0
+    // Flake 重试政策 SSOT：docs/architecture/github-actions-ci-cd-policy.md。单元车道预算为 0
     //（fail-closed）；上调预算须先登记并走到期复审。
     retries: 0,
     // 与 desktop 配置一致的 worker 上限：全量 2000+ 测试时默认全核并发

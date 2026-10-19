@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════════════════════════
-   Docs left-nav subview — extracted for Phase 19 #582.
+   Docs left-nav subview (#582).
    ═══════════════════════════════════════════════════════════════════════ */
 
 import React from 'react';
@@ -36,7 +36,7 @@ export function DocsNav({
         className={`${styles.search} workbench-search`}
         placeholder={t('header.search')}
         value={searchQuery}
-        // #2154 P1-1: no onSearchChange = frozen input. Disabled + title keep
+        // #2154: no onSearchChange = frozen input. Disabled + title keep
         // the surface honest until the docs search is actually wired.
         disabled={!onSearchChange}
         title={onSearchChange ? undefined : t('search.unavailableHint')}
@@ -60,7 +60,7 @@ export function DocsNav({
         </button>
       ))}
 
-      {/* #2154 P2-2(b): the caption + shortcut list only render when there is
+      {/* The caption + shortcut list only render when there is
           real shortcut data. With none, the whole block disappears instead of
           advertising an empty "我的文档库" section. */}
       {shortcuts.length > 0 && (

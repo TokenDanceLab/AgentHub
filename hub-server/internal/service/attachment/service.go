@@ -210,17 +210,8 @@ type Service struct {
 }
 
 // NewService constructs an attachment Service.
-// storage may be nil for metadata-only/partial tests; blob paths error or no-op.
 func NewService(db *gorm.DB, uploadCfg config.UploadConfig, storage ObjectStorage) *Service {
 	return &Service{db: db, uploadCfg: uploadCfg, storage: storage}
-}
-
-// SetStorage injects (or replaces) the attachment blob storage port.
-func (s *Service) SetStorage(storage ObjectStorage) {
-	if s == nil {
-		return
-	}
-	s.storage = storage
 }
 
 // storagePort is a nil-safe accessor for the ObjectStorage port.

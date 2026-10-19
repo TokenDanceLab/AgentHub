@@ -352,7 +352,7 @@ func (b *PermissionDecisionBroker) Decide(runID, requestID string, decision Perm
 // NormalizePermissionDecision trims and validates a decision's behavior:
 // only "allow"/"deny" survive; anything else (including empty) becomes a
 // deny with a reason message. Exported so the acp subpackage can normalize
-// broker decisions through the same SSOT path (#1760 acp 增量).
+// broker decisions through the same SSOT path.
 func NormalizePermissionDecision(decision PermissionDecision) PermissionDecision {
 	decision.Behavior = strings.TrimSpace(decision.Behavior)
 	switch decision.Behavior {
@@ -370,8 +370,7 @@ func NormalizePermissionDecision(decision PermissionDecision) PermissionDecision
 // PendingPermission reports whether a permission request is currently parked
 // for the given run/request pair. Read-only: it never resolves or recycles
 // the parked entry. Exported so the acp subpackage can assert broker
-// lifecycle (register/recycle on cancel) without white-box access (#1760
-// acp 增量).
+// lifecycle (register/recycle on cancel) without white-box access.
 func (b *PermissionDecisionBroker) PendingPermission(runID, requestID string) bool {
 	if b == nil {
 		return false

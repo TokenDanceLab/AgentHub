@@ -6,6 +6,7 @@ permissions:
 on:
   pull_request:
     paths:
+      - ".github/workflows/checks.yml"
       - ".github/workflows/release.yml"
       - ".github/workflows/release-readiness.yml"
       - "edge-server/internal/lifecycle/env_*.go"
@@ -38,7 +39,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  GO_VERSION: "1.26.5"
+  GO_VERSION: "1.26.9"
   NODE_VERSION: "24"
   PNPM_VERSION: "10.32.1"
 
@@ -159,11 +160,11 @@ jobs:
             ConvertTo-Json -Depth 6 |
             Out-File "dist/macos-unsigned-dry-policy.json" -Encoding UTF8
 
-          Write-Host "Policy/readiness only: this macOS unsigned dry slice validates future arm64 sidecar and bundle boundaries."
+          Write-Host "Policy/readiness only: this macOS unsigned dry run validates future arm64 sidecar and bundle boundaries."
           Write-Host "Future sidecar basename: app/desktop/src-tauri/binaries/agenthub-edge-aarch64-apple-darwin."
           Write-Host "Future unsigned bundle outputs: AgentHub.app and AgentHub_${version}_aarch64.dmg, scoped to workflow artifacts only."
           Write-Host "No full Tauri package build, Developer ID signing, macOS signing command, notarization command, stapling command, GitHub Release upload, or updater production metadata publication is performed here."
-          Write-Host "Apple Developer ID signing, notarization, stapling, release asset upload, and production updater metadata are a later approval slice."
+          Write-Host "Apple Developer ID signing, notarization, stapling, release asset upload, and production updater metadata require future approval."
 
       - name: Upload macOS unsigned dry policy artifact
         uses: actions/upload-artifact@v7

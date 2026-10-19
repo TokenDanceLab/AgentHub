@@ -158,16 +158,12 @@ export function optimisticHubMessageFromIntent(
  *
  * The literal lives in `webQueryKeys.messages` — this module only re-exports it
  * as the `HubMessagesKeyFamily` that `resyncMessagesAfterReconnect` consumes.
- * (The comment here used to justify the split by claiming `['hub','threads']`
- * was Web's session-list key; it is not — Web's list is
- * `webQueryKeys.sessions.list(hubReady)`, and `hubQueryKeys.threads.list` had
- * no Web producer at all, which is why `contactQueries` / `useWebAuth` session
- * invalidations were silent no-ops, #2261.)
+ * Web's session list is `webQueryKeys.sessions.list(hubReady)`; it is not this
+ * key family.
  *
  * Because the shape is Web-only, it is exported as a `HubMessagesKeyFamily` so
  * shared consumers (notably `resyncMessagesAfterReconnect`) match it instead of
- * guessing — a hardcoded threads-shape matcher is what made the #2101
- * reconnect/gap resync a silent no-op here.
+ * guessing.
  */
 export const hubMessagesQueryRoot = webQueryKeys.messages.root;
 

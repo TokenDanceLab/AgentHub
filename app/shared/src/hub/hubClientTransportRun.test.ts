@@ -2,7 +2,7 @@
 // injected fake fetch implementations (no live network). The only globals
 // touched are `fetch` (vi.stubGlobal for resolveHubClientRuntime's global
 // fallback lookup, unstubbed in afterEach) and `console.error` (spied silent
-// where the real catch/report residuals fire); the shared globalErrorReporter
+// where the real catch/report helpers fire); the shared globalErrorReporter
 // is cleared after each test.
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { AppError, globalErrorReporter } from '../errors';

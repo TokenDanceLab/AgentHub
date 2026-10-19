@@ -12,7 +12,7 @@ import (
 	"github.com/agenthub/hub-server/internal/model"
 )
 
-// TestListCustomAgentsByOwner_Capped verifies the #2136 P0 cap: the repo was
+// TestListCustomAgentsByOwner_Capped verifies the #2136 cap: the repo was
 // unbounded and could return every custom agent of an owner.
 func TestListCustomAgentsByOwner_Capped(t *testing.T) {
 	db := setupSQLite(t)
@@ -31,7 +31,7 @@ func TestListCustomAgentsByOwner_Capped(t *testing.T) {
 	require.Len(t, list, config.MaxPageLimit, "custom-agents list must be capped at MaxPageLimit")
 }
 
-// TestListDocumentsByOwner_RespectsMaxPageLimit verifies the #2136 P1
+// TestListDocumentsByOwner_RespectsMaxPageLimit verifies the #2136
 // alignment: repo cap was 200 while the API layer accepts up to 500.
 func TestListDocumentsByOwner_RespectsMaxPageLimit(t *testing.T) {
 	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})

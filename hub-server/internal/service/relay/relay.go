@@ -97,7 +97,7 @@ func (s *Service) GetCommand(ctx context.Context, id string, userID string) (*Co
 
 // AckCommand acknowledges a relay command and removes it from Redis. The
 // command lifecycle is complete once acked; retaining the key until TTL expiry
-// wastes memory and pollutes scans (P2 audit #2119). Ownership is verified
+// wastes memory and pollutes scans (#2119). Ownership is verified
 // via GetCommand before deletion to prevent unauthorized cleanup.
 func (s *Service) AckCommand(ctx context.Context, id string, userID string) error {
 	// Verify ownership before deleting; GetCommand returns an error if the

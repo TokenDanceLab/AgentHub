@@ -1,4 +1,4 @@
-/* SubagentStreamOverlay — #1406 Phase 2 */
+/* SubagentStreamOverlay — #1406 */
 
 /* Fixed corner stack of subagent stream chips/cards with glass-card tokens. */
 
@@ -129,7 +129,7 @@
   box-shadow: inset 0 0 0 2px var(--td-plum);
 }
 
-/* ── Full-session drill-down dialog (#1406 follow-up) ───────────────────── */
+/* ── Full-session drill-down dialog (#1406) ─────────────────────────────── */
 
 .sessionDialogContent {
   width: min(92vw, 760px);

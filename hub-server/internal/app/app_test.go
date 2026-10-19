@@ -204,7 +204,7 @@ func TestOIDCSmoke(t *testing.T) {
 		// Simulate what Run does for OIDC:
 		if app.Config.TokenDanceID.ClientID != "" {
 			_ = app.Config // used
-			// This is the condition in app.go:200
+			// This mirrors the guard in App.initServices (wiring.go).
 			// In production, service.NewOIDCService and handler.NewOIDCHandler would be called.
 			// Here we verify the guard itself works.
 		}
@@ -251,7 +251,7 @@ func TestStartEventSubscriptionsPushesAgentStreamToSession(t *testing.T) {
 
 	conn := ws.NewConn(nil)
 	require.NoError(t, mgr.Register(conn))
-	mgr.SetAuth(conn.ID, "user-1", "web", "device-1")
+	authenticate(t, mgr, conn, "user-1", "web", "device-1")
 	t.Cleanup(func() {
 		mgr.Unregister(conn.ID)
 	})
@@ -305,7 +305,7 @@ func TestStartEventSubscriptionsSkipsAgentMessageNewPush(t *testing.T) {
 
 	conn := ws.NewConn(nil)
 	require.NoError(t, mgr.Register(conn))
-	mgr.SetAuth(conn.ID, "user-1", "web", "device-1")
+	authenticate(t, mgr, conn, "user-1", "web", "device-1")
 	t.Cleanup(func() {
 		mgr.Unregister(conn.ID)
 	})
@@ -346,10 +346,10 @@ func TestStartEventSubscriptionsPushesFriendAcceptedToUser(t *testing.T) {
 	mgr := ws.NewManager()
 	requesterConn := ws.NewConn(nil)
 	require.NoError(t, mgr.Register(requesterConn))
-	mgr.SetAuth(requesterConn.ID, "requester-1", "web", "device-requester")
+	authenticate(t, mgr, requesterConn, "requester-1", "web", "device-requester")
 	accepterConn := ws.NewConn(nil)
 	require.NoError(t, mgr.Register(accepterConn))
-	mgr.SetAuth(accepterConn.ID, "accepter-1", "web", "device-accepter")
+	authenticate(t, mgr, accepterConn, "accepter-1", "web", "device-accepter")
 	t.Cleanup(func() {
 		mgr.Unregister(requesterConn.ID)
 		mgr.Unregister(accepterConn.ID)
@@ -397,7 +397,7 @@ func TestStartEventSubscriptionsPushesMessageReactionEventsToSession(t *testing.
 
 	conn := ws.NewConn(nil)
 	require.NoError(t, mgr.Register(conn))
-	mgr.SetAuth(conn.ID, "user-1", "web", "device-1")
+	authenticate(t, mgr, conn, "user-1", "web", "device-1")
 	t.Cleanup(func() {
 		mgr.Unregister(conn.ID)
 	})
@@ -460,7 +460,7 @@ func TestStartEventSubscriptionsPushesAgentTeamEvents(t *testing.T) {
 
 	conn := ws.NewConn(nil)
 	require.NoError(t, mgr.Register(conn))
-	mgr.SetAuth(conn.ID, "user-1", "web", "device-1")
+	authenticate(t, mgr, conn, "user-1", "web", "device-1")
 	t.Cleanup(func() {
 		mgr.Unregister(conn.ID)
 	})
@@ -545,7 +545,7 @@ func TestStartEventSubscriptionsPushesAgentTeamRunStartedToUserWithoutSession(t 
 	mgr := ws.NewManager()
 	conn := ws.NewConn(nil)
 	require.NoError(t, mgr.Register(conn))
-	mgr.SetAuth(conn.ID, "user-1", "web", "device-1")
+	authenticate(t, mgr, conn, "user-1", "web", "device-1")
 	t.Cleanup(func() {
 		mgr.Unregister(conn.ID)
 	})
@@ -587,7 +587,7 @@ func TestStartEventSubscriptionsPushesSessionLifecycleEvents(t *testing.T) {
 
 	conn := ws.NewConn(nil)
 	require.NoError(t, mgr.Register(conn))
-	mgr.SetAuth(conn.ID, "user-1", "web", "device-1")
+	authenticate(t, mgr, conn, "user-1", "web", "device-1")
 	t.Cleanup(func() {
 		mgr.Unregister(conn.ID)
 	})
@@ -685,7 +685,7 @@ func TestAppSessionServiceLifecycleEventsReachWebSocket(t *testing.T) {
 	mgr := ws.NewManager()
 	conn := ws.NewConn(nil)
 	require.NoError(t, mgr.Register(conn))
-	mgr.SetAuth(conn.ID, "owner-1", "web", "device-1")
+	authenticate(t, mgr, conn, "owner-1", "web", "device-1")
 	t.Cleanup(func() {
 		mgr.Unregister(conn.ID)
 	})
@@ -698,7 +698,7 @@ func TestAppSessionServiceLifecycleEventsReachWebSocket(t *testing.T) {
 
 	a := &App{
 		DB:             db,
-		SessionService: session.NewService(db, nil, b),
+		SessionService: session.NewService(db, cache.NoOpCache{}, b),
 		mgr:            mgr,
 		bus:            b,
 	}
@@ -798,8 +798,8 @@ func TestOnRouteSetReplaysTargetQueueOnlyForConnectedDevice(t *testing.T) {
 	connB := ws.NewConn(nil)
 	require.NoError(t, mgr.Register(connA))
 	require.NoError(t, mgr.Register(connB))
-	mgr.SetAuth(connA.ID, "user-1", "desktop", "dev-a")
-	mgr.SetAuth(connB.ID, "user-1", "desktop", "dev-b")
+	authenticate(t, mgr, connA, "user-1", "desktop", "dev-a")
+	authenticate(t, mgr, connB, "user-1", "desktop", "dev-b")
 
 	a := &App{
 		DB:           db,
@@ -867,7 +867,7 @@ func TestOnRouteSetKeepsPendingTargetQueueWhenDeliveryBufferFull(t *testing.T) {
 	mgr := ws.NewManager()
 	connB := ws.NewConn(nil)
 	require.NoError(t, mgr.Register(connB))
-	mgr.SetAuth(connB.ID, "user-1", "desktop", "dev-b")
+	authenticate(t, mgr, connB, "user-1", "desktop", "dev-b")
 	for i := 0; i < cap(connB.Send); i++ {
 		connB.Send <- []byte("already queued")
 	}
@@ -919,7 +919,7 @@ func TestOnRouteSetDoesNotReplayTargetQueueWhenDispatchStateMissing(t *testing.T
 	mgr := ws.NewManager()
 	connB := ws.NewConn(nil)
 	require.NoError(t, mgr.Register(connB))
-	mgr.SetAuth(connB.ID, "user-1", "desktop", "dev-b")
+	authenticate(t, mgr, connB, "user-1", "desktop", "dev-b")
 
 	a := &App{
 		DB:           db,
@@ -1021,8 +1021,8 @@ func TestOnRouteSetReplaysPendingAgentControlsToExactDevice(t *testing.T) {
 	connB := ws.NewConn(nil)
 	require.NoError(t, mgr.Register(connA))
 	require.NoError(t, mgr.Register(connB))
-	mgr.SetAuth(connA.ID, "user-1", "desktop", "dev-a")
-	mgr.SetAuth(connB.ID, "user-1", "desktop", "dev-b")
+	authenticate(t, mgr, connA, "user-1", "desktop", "dev-a")
+	authenticate(t, mgr, connB, "user-1", "desktop", "dev-b")
 
 	a := &App{
 		CacheClient: cacheClient,
@@ -1072,7 +1072,7 @@ func TestOnRouteSetKeepsPendingAgentControlsWhenDeliveryBufferFull(t *testing.T)
 	mgr := ws.NewManager()
 	connB := ws.NewConn(nil)
 	require.NoError(t, mgr.Register(connB))
-	mgr.SetAuth(connB.ID, "user-1", "desktop", "dev-b")
+	authenticate(t, mgr, connB, "user-1", "desktop", "dev-b")
 	for i := 0; i < cap(connB.Send); i++ {
 		connB.Send <- []byte("already queued")
 	}
@@ -1101,7 +1101,7 @@ func TestPushPendingTasksRequeuesWhenDeliveryBufferFull(t *testing.T) {
 	mgr := ws.NewManager()
 	conn := ws.NewConn(nil)
 	require.NoError(t, mgr.Register(conn))
-	mgr.SetAuth(conn.ID, "user-1", "desktop", "dev-b")
+	authenticate(t, mgr, conn, "user-1", "desktop", "dev-b")
 	for i := 0; i < cap(conn.Send); i++ {
 		conn.Send <- []byte("already queued")
 	}

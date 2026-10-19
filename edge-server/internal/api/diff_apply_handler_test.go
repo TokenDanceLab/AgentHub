@@ -84,7 +84,7 @@ func decodeApplyEnvelope(t *testing.T, rec *httptest.ResponseRecorder) map[strin
 }
 
 // ---------------------------------------------------------------------------
-// PostApplyRunDiff behavior tests (quad-scan Q8, #2056)
+// PostApplyRunDiff behavior tests (#2056)
 // ---------------------------------------------------------------------------
 
 func TestPostApplyRunDiffRejectsNonPostMethod(t *testing.T) {
@@ -271,7 +271,7 @@ func TestPostApplyRunDiffPropagatesApplyErrors(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// PostApplyAllRunDiffs behavior tests (quad-scan Q8, #2056)
+// PostApplyAllRunDiffs behavior tests (#2056)
 // ---------------------------------------------------------------------------
 
 func TestPostApplyAllRunDiffsRejectsNonPostMethod(t *testing.T) {

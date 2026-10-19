@@ -1,6 +1,6 @@
 // Shared Hub WebSocket client for AgentHub renderers (web + desktop).
 // Manages auth-frame handshake, typed event routing, per-connection seq_id
-// gap detection (#2101 G1), and reconnection via the shared Transport
+// gap detection (#2101), and reconnection via the shared Transport
 // abstraction. Platforms inject their configured WS endpoint via
 // HubWSOptions.url — there is no platform config import here.
 //
@@ -9,13 +9,13 @@
 //      Auth is carried via Sec-WebSocket-Protocol (preferred path):
 //        protocols: ["agenthub.bearer.v1", "<hub-jwt>"]
 //      Query ?access_token= is a legacy fallback only (mobile / older clients).
-//   2. Hub validates the Hub-issued token during HTTP upgrade (WSAuthMiddleware).
+//   2. Hub validates the Hub-issued token during HTTP upgrade (AuthMiddleware.WSHandler()).
 //   3. Server responds after upgrade: {"type":"auth.ok","payload":null}
 //      or rejects the upgrade before a WebSocket is established.
 //   4. After auth, bidirectional events flow with {type, payload, seq_id?} framing.
 //      seq_id is a per-connection monotonic counter (omitempty on wire). Clients
 //      detect lost frames as gaps when seq_id jumps; duplicates (seq_id <= last)
-//      are dropped silently. See #2101 G1.
+//      are dropped silently. See #2101.
 //
 // Reconnection: The underlying Transport handles exponential-backoff
 // reconnection (max 10 retries). On every reconnect, the auth handshake
@@ -67,13 +67,13 @@ export interface HubWSHandle {
   /** Subscribe to ALL events (after auth). Returns unsubscribe fn. */
   onAny: (handler: (type: string, payload: unknown) => void) => () => void;
   /**
-   * Subscribe to per-connection seq_id gap events (#2101 G1). Fires when an
+   * Subscribe to per-connection seq_id gap events (#2101). Fires when an
    * authenticated frame arrives with seq_id > lastSeq + 1. Duplicates
    * (seq_id <= lastSeq) are dropped silently and do NOT trigger this.
    */
   onGap: (handler: (payload: HubWSGapPayload) => void) => () => void;
   /**
-   * Subscribe to post-reconnect auth completion events (#2101 G4-②). Fires
+   * Subscribe to post-reconnect auth completion events (#2101). Fires
    * once per reconnect cycle when auth.ok arrives on a previously-connected
    * socket. Does NOT fire on the initial connect. Use this to trigger
    * incremental resync of message families missed during disconnect.
@@ -157,7 +157,7 @@ export function createHubWS(opts: HubWSOptions): HubWSHandle {
   let lastSeq = -1;
   // Tracks whether auth.ok has ever completed on this handle instance.
   // Used to distinguish first-connect auth from reconnect-auth so
-  // onReconnected only fires on true reconnects (#2101 G4-②).
+  // onReconnected only fires on true reconnects (#2101).
   let hasEverAuthenticated = false;
 
   // ── Auth + seq reset on every (re)connect ───────
@@ -192,8 +192,9 @@ export function createHubWS(opts: HubWSOptions): HubWSHandle {
     const frameType = typeof msg.type === 'string' ? msg.type : '';
     const payload = 'payload' in msg ? msg.payload : undefined;
 
-    // seq_id is omitempty on the wire; only frames stamped by Manager.PushToConn
-    // carry it. Frames without seq_id do not participate in gap detection.
+    // seq_id is omitempty on the wire; frames stamped by enqueueLocked (via
+    // Manager.PushToConn, and Manager.SetAuth for auth.ok) carry it. Frames
+    // without seq_id do not participate in gap detection.
     const seqRaw = msg.seq_id;
     const hasSeq = typeof seqRaw === 'number' && Number.isFinite(seqRaw);
     const seq = hasSeq ? (seqRaw as number) : null;
@@ -205,7 +206,7 @@ export function createHubWS(opts: HubWSOptions): HubWSHandle {
       if (seq !== null) {
         lastSeq = seq;
       }
-      // #2101 G4-②: fire reconnected notification on reconnect (not first connect).
+      // #2101: fire reconnected notification on reconnect (not first connect).
       // Platforms use this to trigger incremental message resync for frames
       // missed during the disconnect window.
       if (hasEverAuthenticated) {
@@ -233,7 +234,7 @@ export function createHubWS(opts: HubWSOptions): HubWSHandle {
       return;
     }
 
-    // ── Seq gap / duplicate detection (#2101 G1) ──
+    // ── Seq gap / duplicate detection (#2101) ──
     // Only applies to seq-bearing frames after auth. Duplicate frames
     // (seq <= lastSeq) are dropped silently. A gap (seq > lastSeq + 1)
     // fires the internal gap event and updates lastSeq to the received

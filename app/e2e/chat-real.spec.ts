@@ -12,10 +12,11 @@ import { test, expect } from '@playwright/test';
  *   pnpm test:e2e:real
  *   (equivalently: npx playwright test --config playwright.real.config.ts)
  *
- * CI status: This spec is excluded from CI (e2e-smoke job only runs
- * smoke.spec.ts under playwright.config.ts). These tests require live Hub +
- * Edge servers which are not available in the GitHub Actions sandbox. Run
- * locally with all services up before pushing production changes.
+ * CI status: not a PR check. The dispatch-only `real-e2e-stack` lane
+ * (checks.yml) starts a live Hub/Edge/web stack on the runner and runs this
+ * spec via playwright.real.config.ts. Locally, run `pnpm test:e2e:real` from
+ * app/web with the stack up; mintTestJWT requires AGENTHUB_JWT_SECRET from
+ * the environment.
  */
 
 test.describe('AgentHub real E2E', () => {
@@ -27,7 +28,7 @@ test.describe('AgentHub real E2E', () => {
       const resp = await request.get('http://127.0.0.1:8080/health');
       expect(resp.status()).toBe(200);
       const body = await resp.json();
-      expect(body.code).toBe('OK');
+      expect(body.code).toBe('ok');
       expect(body.data.status).toBe('ok');
       expect(body.data.live).toBe(true);
       expect(body.data.ready).toBe(true);
@@ -42,7 +43,7 @@ test.describe('AgentHub real E2E', () => {
       });
       expect(resp.status()).toBe(200);
       const body = await resp.json();
-      expect(body.code).toBe('OK');
+      expect(body.code).toBe('ok');
       expect(Array.isArray(body.data)).toBe(true);
     });
 
@@ -53,7 +54,7 @@ test.describe('AgentHub real E2E', () => {
       });
       expect(resp.status()).toBe(200);
       const body = await resp.json();
-      expect(body.code).toBe('OK');
+      expect(body.code).toBe('ok');
       expect(Array.isArray(body.data)).toBe(true);
     });
 
@@ -71,7 +72,7 @@ test.describe('AgentHub real E2E', () => {
       });
       expect([200, 201].map(String)).toContain(String(createResp.status()));
       const createBody = await createResp.json();
-      expect(createBody.code).toBe('OK');
+      expect(createBody.code).toBe('ok');
       const docId = createBody.data.id;
       expect(docId).toBeTruthy();
 
@@ -97,8 +98,7 @@ test.describe('AgentHub real E2E', () => {
       const resp = await request.get('http://127.0.0.1:3210/v1/health');
       expect(resp.status()).toBe(200);
       const body = await resp.json();
-      expect(body.code).toBe('OK');
-      expect(body.data.status).toBe('ok');
+      expect(body.status).toBe('ok');
     });
 
     test('Edge runners list is non-empty', async ({ request }) => {
@@ -133,7 +133,7 @@ test.describe('AgentHub real E2E', () => {
       });
       expect([200, 201].map(String)).toContain(String(threadResp.status()));
       const tBody = await threadResp.json();
-      expect(tBody.code).toBe('OK');
+      expect(tBody.code).toBe('ok');
 
       // Create a run
       const runResp = await request.post('http://127.0.0.1:3210/v1/runs', {
@@ -148,7 +148,7 @@ test.describe('AgentHub real E2E', () => {
       });
       expect([200, 201, 202].map(String)).toContain(String(runResp.status()));
       const rBody = await runResp.json();
-      expect(rBody.code).toBe('OK');
+      expect(rBody.code).toBe('ok');
       const runId = rBody.data.runId;
       expect(runId).toBeTruthy();
       expect(['queued', 'started']).toContain(rBody.data.status);
@@ -190,7 +190,7 @@ test.describe('AgentHub real E2E', () => {
       });
       expect([200, 201].map(String)).toContain(String(sendResp.status()));
       const sendBody = await sendResp.json();
-      expect(sendBody.code).toBe('OK');
+      expect(sendBody.code).toBe('ok');
       const msgAId = sendBody.data.message_id;
       const seqA = sendBody.data.seq_id;
       expect(msgAId).toBeTruthy();
@@ -202,7 +202,7 @@ test.describe('AgentHub real E2E', () => {
       });
       expect(getMsgsResp.status()).toBe(200);
       const getMsgsBody = await getMsgsResp.json();
-      expect(getMsgsBody.code).toBe('OK');
+      expect(getMsgsBody.code).toBe('ok');
       const foundA = (getMsgsBody.data as any[]).find((m: any) => m.id === msgAId);
       expect(foundA).toBeTruthy();
       expect(foundA.content).toBe('Hello from Playwright user A!');
@@ -299,7 +299,7 @@ test.describe('AgentHub real E2E', () => {
       });
       expect(contactsResp.status()).toBe(200);
       const contactsBody = await contactsResp.json();
-      expect(contactsBody.code).toBe('OK');
+      expect(contactsBody.code).toBe('ok');
 
       if (searchResp.status() === 200) {
         // User B exists -- run full friend flow
@@ -319,7 +319,7 @@ test.describe('AgentHub real E2E', () => {
         });
         expect(frListResp.status()).toBe(200);
         const frListBody = await frListResp.json();
-        expect(frListBody.code).toBe('OK');
+        expect(frListBody.code).toBe('ok');
         const pendingFR = (frListBody.data as any[]).find(
           (fr: any) => fr.from_user_id === '3ecadf58-012a-4fc5-9170-61976cdac5a7' && fr.status === 'pending',
         );
@@ -369,7 +369,7 @@ test.describe('AgentHub real E2E', () => {
         });
         expect([200, 201].map(String)).toContain(String(groupResp.status()));
         const groupBody = await groupResp.json();
-        expect(groupBody.code).toBe('OK');
+        expect(groupBody.code).toBe('ok');
         expect(groupBody.data.session_id).toBeTruthy();
       }
     });
@@ -394,7 +394,7 @@ test.describe('AgentHub real E2E', () => {
       });
       expect([200, 201].map(String)).toContain(String(createResp.status()));
       const createBody = await createResp.json();
-      expect(createBody.code).toBe('OK');
+      expect(createBody.code).toBe('ok');
       const agentId = createBody.data.id;
       expect(agentId).toBeTruthy();
 
@@ -404,7 +404,7 @@ test.describe('AgentHub real E2E', () => {
       });
       expect(listResp.status()).toBe(200);
       const listBody = await listResp.json();
-      expect(listBody.code).toBe('OK');
+      expect(listBody.code).toBe('ok');
       const found = (listBody.data as any[]).find((a: any) => a.id === agentId);
       expect(found).toBeTruthy();
 
@@ -441,7 +441,7 @@ test.describe('AgentHub real E2E', () => {
       });
       expect(getResp.status()).toBe(200);
       const getBody = await getResp.json();
-      expect(getBody.code).toBe('OK');
+      expect(getBody.code).toBe('ok');
 
       // Patch a setting
       const testValue = `pw_e2e_${Date.now()}`;
@@ -451,7 +451,7 @@ test.describe('AgentHub real E2E', () => {
       });
       expect([200, 201].map(String)).toContain(String(patchResp.status()));
       const patchBody = await patchResp.json();
-      expect(patchBody.code).toBe('OK');
+      expect(patchBody.code).toBe('ok');
       expect(patchBody.data.e2e_test_key).toBe(testValue);
 
       // Verify persisted
@@ -498,7 +498,7 @@ test.describe('AgentHub real E2E', () => {
       });
       expect([200, 201, 202].map(String)).toContain(String(runResp.status()));
       const rBody = await runResp.json();
-      expect(rBody.code).toBe('OK');
+      expect(rBody.code).toBe('ok');
       const runId = rBody.data.runId;
       expect(runId).toBeTruthy();
 
@@ -520,7 +520,7 @@ test.describe('AgentHub real E2E', () => {
       if (artifactsResp.status() === 200) {
         const artBody = await artifactsResp.json();
         // Just verify it responded; artifact count may vary
-        expect(artBody.code).toBe('OK');
+        expect(artBody.code).toBe('ok');
       }
 
       // Get run details for diffs/output
@@ -693,12 +693,23 @@ test.describe('AgentHub real E2E', () => {
 
 // --------------- JWT helper ---------------
 
+/** Signing secret of the running Hub. */
+function hubJwtSecret(): string {
+  return process.env.AGENTHUB_JWT_SECRET?.trim() ?? '';
+}
+
 /**
  * Mint a Hub-compatible HS256 JWT using the Web Crypto API.
  * Equivalent to hub-server/internal/jwtutil.GenerateAccessToken.
+ * Uses the running Hub's AGENTHUB_JWT_SECRET; there is no built-in key.
  */
 async function mintTestJWT(userId: string = '3ecadf58-012a-4fc5-9170-61976cdac5a7'): Promise<string> {
-  const secret = 'agenthub-local-dev-secret-key-32chars-min';
+  const secret = hubJwtSecret();
+  if (!secret) {
+    throw new Error(
+      'AGENTHUB_JWT_SECRET is not set: export the running Hub signing secret',
+    );
+  }
 
   const header = { alg: 'HS256', typ: 'JWT' };
   const now = Math.floor(Date.now() / 1000);

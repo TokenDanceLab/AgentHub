@@ -4,7 +4,7 @@ import { createMockTerminalPort } from '@shared/platform';
 import { createDesktopPlatform } from './desktopPlatform';
 
 describe('createDesktopPlatform', () => {
-  it('keeps the local terminal capability off and injects no port (#2154 P1-7)', () => {
+  it('keeps the local terminal capability off and injects no port (#2154)', () => {
     const platform = createDesktopPlatform();
 
     // The only Desktop terminal host is the in-memory mock from #1193: write()
@@ -339,7 +339,7 @@ describe('createDesktopPlatform', () => {
     const platform = createDesktopPlatform({
       getLocalCliDiscovery: vi.fn().mockResolvedValue({
         mode: 'no-spend-discovery',
-        readinessManifest: '.tmp/evidence/p0-edge-cli-real-readiness.json',
+        readinessManifest: 'docs/governance/README.md',
         readinessScript: 'scripts/verify/verify-edge-cli-real-readiness.py',
         generatedAt: null,
         items: [
@@ -367,7 +367,7 @@ describe('createDesktopPlatform', () => {
 
     expect(discovery).toEqual(expect.objectContaining({
       mode: 'no-spend-discovery',
-      readinessManifest: '.tmp/evidence/p0-edge-cli-real-readiness.json',
+      readinessManifest: 'docs/governance/README.md',
       readinessScript: 'scripts/verify/verify-edge-cli-real-readiness.py',
     }));
     expect(discovery.items[0]).toEqual(expect.objectContaining({

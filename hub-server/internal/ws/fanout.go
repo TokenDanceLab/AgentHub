@@ -92,6 +92,13 @@ func (m *Manager) PushToConn(connID string, frame Frame) DeliveryResult {
 
 	c.sendMu.Lock()
 	defer c.sendMu.Unlock()
+	return enqueueLocked(c, connID, frame)
+}
+
+// enqueueLocked stamps and enqueues a frame on c. The caller must hold
+// c.sendMu (or otherwise own the connection exclusively), so seq order always
+// equals queue order.
+func enqueueLocked(c *Conn, connID string, frame Frame) DeliveryResult {
 	if c.closed.Load() {
 		if metrics.WSDeliveryFailures != nil {
 			metrics.WSDeliveryFailures.WithLabelValues("conn_closed").Inc()

@@ -16,12 +16,12 @@ import {
 import type { SplitLayoutNode, SplitOrientation } from './workbenchSplitLayout';
 
 /* ═══════════════════════════════════════════════════════════════════════
-   workbenchPanelLayoutHelpers — pure residual slices from
+   workbenchPanelLayoutHelpers — pure helpers for
    useWorkbenchPanelLayout (#721).
 
    Public option/return types, width clamps, restore/toggle/resize plans,
    workspace-pressure collapse checks, shell CSS vars, and rAF collapse
-   scheduling. No React hooks / no intentional UX change.
+   scheduling. No React hooks.
    exactOptionalPropertyTypes: only assign `?: T` fields when defined,
    unless the public field type explicitly allows `| undefined`.
    ═══════════════════════════════════════════════════════════════════════ */
@@ -66,7 +66,7 @@ export interface WorkbenchPanelLayout {
   restoreSidebarWidth: (width?: number) => void;
   shellStyle: React.CSSProperties;
   /**
-   * Split-view layout state (#1997, UX F3). Present when the host wires the
+   * Split-view layout state (#1997). Present when the host wires the
    * chat-page split surface; `tree === null` / `active === false` means the
    * workspace renders a single conversation group.
    */

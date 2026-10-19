@@ -1,6 +1,5 @@
 /**
  * Edge event → transcript block mappers: run lifecycle / text / thinking.
- * Peel companion of edgeEventMappers (#1124). Pure only; zero behavior change.
  */
 
 import type { EventEnvelope } from '../events';

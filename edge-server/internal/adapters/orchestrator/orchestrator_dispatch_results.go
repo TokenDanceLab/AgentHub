@@ -7,8 +7,6 @@ import (
 	"github.com/agenthub/edge-server/internal/agents"
 )
 
-// Residual pure-helper peel of dispatchInterceptor result/progress/plan methods (#1111).
-
 // runResultListener reads the parent orchestrator's message queue for sub-agent
 // result/error messages. When a result arrives, it emits status updates, injects
 // the result/error as a text block into the orchestrator's stream, and emits an
@@ -68,10 +66,10 @@ func (d *dispatchInterceptor) emitSubAgentResult(scope map[string]any, agentID, 
 	}
 	injectedText := formatSubAgentResultInjectText(agentName, isError, errMsg, resultSummary)
 
-	// P1: Inject result/error into the orchestrator's text stream.
+	// Inject result/error into the orchestrator's text stream.
 	d.inner.Emit(BusEventTextBlock, scope, resultInjectPayload(injectedText, "sub_agent_result"))
 
-	// P1: Emit sub-agent status update.
+	// Emit sub-agent status update.
 	status := string(agents.StatusCompleted)
 	errStr := ""
 	if isError {
@@ -82,7 +80,7 @@ func (d *dispatchInterceptor) emitSubAgentResult(scope map[string]any, agentID, 
 		agentID, agentName, status, status, true, errStr,
 	))
 
-	// P1: Emit aggregate progress summary.
+	// Emit aggregate progress summary.
 	d.emitProgressSummary(scope)
 }
 
@@ -116,7 +114,7 @@ func (d *dispatchInterceptor) emitProgressSummary(scope map[string]any) {
 	))
 }
 
-// awaitPlanApproval implements the plan confirmation gate (P0 #3).
+// awaitPlanApproval implements the plan confirmation gate.
 // When the plan broker is configured, it builds a plan from the detected dispatch
 // events, emits a plan.proposed event, and blocks until the user approves or rejects.
 // Returns true if the plan is approved (or approval gate is disabled), false if rejected.

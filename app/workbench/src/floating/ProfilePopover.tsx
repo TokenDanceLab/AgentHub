@@ -22,9 +22,9 @@ import styles from './ProfilePopover.module.css';
 /* ═══════════════════════════════════════════════════════════════════════
    ProfilePopover — floating profile / account menu host.
 
-   Residual helpers/parts live in ProfilePopoverHelpers /
-   ProfilePopoverParts (#743). CSS remains on ProfilePopover.module.css.
-   No intentional UX change.
+   Positioning and dismissal live here; pure helpers are in
+   ProfilePopoverHelpers and the bodies are in ProfilePopoverParts (#743).
+   CSS remains on ProfilePopover.module.css.
    ═══════════════════════════════════════════════════════════════════════ */
 
 interface ProfilePopoverProps {

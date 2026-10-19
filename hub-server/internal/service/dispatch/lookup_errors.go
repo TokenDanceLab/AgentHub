@@ -2,21 +2,29 @@ package dispatch
 
 import "github.com/agenthub/hub-server/internal/errcode"
 
-// MapTriggerMessageLookupError maps a trigger-message GetByID failure to MsgNotFound
-// (historical TriggerAgentTask collapse of any lookup error).
-func MapTriggerMessageLookupError(err error) error {
-	if err != nil {
+// MapTriggerMessageLookupError maps a trigger-message lookup error. notFound is
+// true when the repository reported gorm.ErrRecordNotFound; other errors pass
+// through unchanged.
+func MapTriggerMessageLookupError(err error, notFound bool) error {
+	if err == nil {
+		return nil
+	}
+	if notFound {
 		return errcode.MsgNotFound
 	}
-	return nil
+	return err
 }
 
-// MapSessionLookupError maps a session GetByID failure to SessionNotFound.
-func MapSessionLookupError(err error) error {
-	if err != nil {
+// MapSessionLookupError maps a session lookup error. notFound → SessionNotFound;
+// other errors pass through unchanged.
+func MapSessionLookupError(err error, notFound bool) error {
+	if err == nil {
+		return nil
+	}
+	if notFound {
 		return errcode.SessionNotFound
 	}
-	return nil
+	return err
 }
 
 // MapPendingTaskLookupError maps a pending-task lookup error. notFound is true when

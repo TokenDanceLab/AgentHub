@@ -1,4 +1,3 @@
-// #1161: Session Service pure-helper peel — query/cleanup paths extracted from service.go.
 package session
 
 import (
@@ -11,7 +10,7 @@ import (
 	"github.com/agenthub/hub-server/internal/repository"
 )
 
-// SessionSearchPage is one page of session-search results (#2136 P2). The
+// SessionSearchPage is one page of session-search results (#2136). The
 // cursor encodes "<activityUnixNano>|<id>" of the last row's activity
 // timestamp (last_message_at, falling back to created_at).
 type SessionSearchPage struct {

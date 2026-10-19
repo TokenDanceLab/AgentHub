@@ -63,7 +63,7 @@ type FileStore struct {
 
 	// persistChMu + closed guard schedulePersist against Close: sending on
 	// a closed channel panics even inside a select, so the check-and-send
-	// must be atomic with the close (#2154 F2).
+	// must be atomic with the close (#2154).
 	persistChMu sync.RWMutex
 	closed      bool
 }

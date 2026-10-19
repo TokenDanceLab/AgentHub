@@ -24,7 +24,7 @@ const add = (content: string, newLineNumber: number): DiffLine => ({
   content,
 });
 
-describe('buildSideBySideRows — wordDiff fill (P6 Step 2)', () => {
+describe('buildSideBySideRows — wordDiff fill', () => {
   // ── modified pair: wordDiff is populated per column ───────────────────
   it('fills wordDiff on both cells of a modified (deleted+added) pair', () => {
     const hunk = makeHunk('@@ -1,4 +1,4 @@', [
@@ -66,7 +66,7 @@ describe('buildSideBySideRows — wordDiff fill (P6 Step 2)', () => {
     // Right column must not contain any 'removed' tokens.
     expect(right.wordDiff!.every((t) => t.type !== 'removed')).toBe(true);
 
-    // Reconstruction contract (report §4.1): each column's tokens join back
+    // Reconstruction contract: each column's tokens join back
     // to that column's `content`.
     expect(left.wordDiff!.map((t) => t.text).join('')).toBe(oldLine);
     expect(right.wordDiff!.map((t) => t.text).join('')).toBe(newLine);
@@ -138,7 +138,7 @@ describe('buildSideBySideRows — wordDiff fill (P6 Step 2)', () => {
 
     const [modifiedRow] = buildSideBySideRows(hunk);
     expect(modifiedRow!.rowType).toBe('modified');
-    // Guard fires -> wordDiff left undefined (Step 3 renderer falls back
+    // Guard fires -> wordDiff left undefined (the renderer falls back
     // to whole-line Prism highlight).
     expect(modifiedRow!.left!.wordDiff).toBeUndefined();
     expect(modifiedRow!.right!.wordDiff).toBeUndefined();

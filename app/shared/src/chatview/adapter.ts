@@ -1,6 +1,5 @@
 /**
  * Chatview adapter public surface — TranscriptBlock[] → TranscriptItem[].
- * Residual pure-helper peel of adapter (#1143). Pure only; zero behavior change.
  *
  * Implementations live in companions (adapterShared / adapterMapBlock /
  * adapterAgentParts); this file keeps the public orchestrator so consumers
@@ -227,7 +226,7 @@ export function blocksToTranscriptItems(
 
 /**
  * Resolve the transcript item index before which an unread-messages divider
- * should render (desktop IM path, T8).
+ * should render (desktop IM path).
  *
  * The consumer (session model) maps the read watermark (last_read_seq) to the
  * transcript block id of the first unread message. This helper converts that

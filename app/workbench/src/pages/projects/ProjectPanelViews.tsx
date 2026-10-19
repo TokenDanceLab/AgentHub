@@ -1,11 +1,9 @@
 /* ═══════════════════════════════════════════════════════════════════════
    Projects detail shell — ProjectDetail tab switch + overview layout.
 
-   Residual extract from ProjectDetailViews for Phase 22 #618.
-   Residual thin (Phase 23 #626): panels / tab bodies live in sibling
-   modules (ProjectPanelParts, ProjectTabViews).
-   Residual thin (#696): imports refactored — Announcement / FeedPanel
-   moved to own files.
+   Panels and tab bodies live in sibling modules (ProjectPanelParts,
+   ProjectTabViews); Announcement and FeedPanel have their own files
+   (#618, #626, #696).
    CSS remains on shared ProjectsPage.module.css.
    ═══════════════════════════════════════════════════════════════════════ */
 

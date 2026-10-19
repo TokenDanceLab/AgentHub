@@ -143,7 +143,7 @@ describe('SubagentStreamOverlay', () => {
     fireEvent.click(chipBtn);
     expect(chipBtn).toHaveAttribute('aria-expanded', 'true');
 
-    // Should show event detail (Phase 3: thinking → 思考 label via SubagentTranscript)
+    // Should show event detail (thinking → 思考 label via SubagentTranscript)
     expect(screen.getByText('思考')).toBeInTheDocument();
   });
 
@@ -163,7 +163,7 @@ describe('SubagentStreamOverlay', () => {
       }));
     });
     render(<SubagentStreamOverlay />);
-    // Phase 3: event_type renders as Chinese label via SubagentTranscript
+    // event_type renders as Chinese label via SubagentTranscript
     expect(screen.getByText('思考')).toBeInTheDocument();
     expect(screen.getByText('工具调用')).toBeInTheDocument();
     expect(screen.getByText(/Step 1 reasoning/)).toBeInTheDocument();
@@ -177,7 +177,7 @@ describe('SubagentStreamOverlay', () => {
       testStore.push(makeEvent({ agent_task_id: 'task-1', event_seq: 2, event_type: 'text_delta' }));
     });
     render(<SubagentStreamOverlay />);
-    // Should have 2 unique event entries, not 3 (Phase 3: SubagentTranscript uses [data-event-category])
+    // Should have 2 unique event entries, not 3 (SubagentTranscript uses [data-event-category])
     const eventRows = document.querySelectorAll('[data-event-category]');
     expect(eventRows.length).toBe(2);
   });
@@ -230,7 +230,7 @@ describe('SubagentStreamOverlay', () => {
     expect(region.className).not.toContain('positionRight');
   });
 
-  // ── Full-session drill-down dialog (#1406 follow-up) ──
+  // ── Full-session drill-down dialog (#1406) ──
 
   it('opens the full-session dialog from the chip drill-down button', () => {
     act(() => {

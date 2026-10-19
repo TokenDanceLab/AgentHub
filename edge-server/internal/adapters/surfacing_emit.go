@@ -11,8 +11,6 @@ import (
 	"github.com/agenthub/edge-server/internal/store"
 )
 
-// Residual pure-helper peel #1112: emit/persist helpers for auto-surfaced outputs.
-
 func emitSurfacedPreview(bus *events.Bus, writer store.Writer, scope map[string]any, run store.Run, sf SurfacedFile, _ *WorkdirSnapshot) {
 	artifactID := surfacedArtifactID(run.ID, sf.RelPath)
 

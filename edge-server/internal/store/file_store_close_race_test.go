@@ -8,7 +8,7 @@ import (
 )
 
 // TestFileStoreConcurrentWriteAndCloseNoPanic pins the close-race fix
-// (#2154 F2): writers hammering schedulePersist while Close shuts the
+// (#2154): writers hammering schedulePersist while Close shuts the
 // persist channel down must not panic (send-on-closed-channel), and writes
 // arriving after Close must be accepted as no-op schedules. Run with -race.
 func TestFileStoreConcurrentWriteAndCloseNoPanic(t *testing.T) {

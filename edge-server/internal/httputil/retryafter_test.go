@@ -80,7 +80,7 @@ func TestCapHint(t *testing.T) {
 }
 
 // TestDelayWithHintCallerPoliciesDivergeOnSameInput is the acceptance pin for
-// #2244 slice 3: one header value, two callers, two different outcomes, and
+// #2244: one header value, two callers, two different outcomes, and
 // neither outcome may come from a hidden default.
 func TestDelayWithHintCallerPoliciesDivergeOnSameInput(t *testing.T) {
 	const (

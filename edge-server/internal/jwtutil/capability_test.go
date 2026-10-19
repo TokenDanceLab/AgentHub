@@ -184,7 +184,7 @@ func TestValidateCapabilityToken_RS256Rejected(t *testing.T) {
 
 // issueHubShapedCapabilityToken mirrors hub-server/internal/jwtutil.IssueCapabilityToken
 // claim wire format (issuer/audience/purpose/action/target/thread). Kept local so this
-// package does not import hub-server/internal (Go internal rules). AH-SR-046 / #461.
+// package does not import hub-server/internal (Go internal rules).
 func issueHubShapedCapabilityToken(secret []byte, userID, deviceID, projectID, purpose string, ttl time.Duration, action, targetID, threadID string) (string, error) {
 	if purpose == "" {
 		purpose = "run-start"

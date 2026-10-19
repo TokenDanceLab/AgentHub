@@ -17,10 +17,9 @@ import type { WorkbenchProfileOverlaysProps } from './WorkbenchProfileOverlays';
 import type { AgentHubWorkbenchProps } from './AgentHubWorkbenchTypes';
 
 /* ═══════════════════════════════════════════════════════════════════════
-   AgentHubWorkbenchHelpers — pure residual slices from AgentHubWorkbench
-   (#683). Chrome option builders + frame/overlay prop planners.
-   No React hooks / no intentional UX change.
-   exactOptionalPropertyTypes: only assign `?: T` fields when defined.
+   AgentHubWorkbenchHelpers — chrome option builders + frame/overlay planners.
+   No React hooks. exactOptionalPropertyTypes: only assign `?: T` fields when
+   defined.
    ═══════════════════════════════════════════════════════════════════════ */
 
 export type WorkbenchTranslate = (key: string, options?: Record<string, unknown>) => string;

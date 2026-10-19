@@ -89,7 +89,7 @@ interface WebPlatformOptions {
   createClientMessageId?: () => string;
   demoRuntimeStore?: WorkbenchDemoRuntimeStore;
   /**
-   * Explicit product-shell opt-in for demo/fixture composer mutations (AH-SR-043).
+   * Explicit product-shell opt-in for demo/fixture composer mutations.
    * Must be paired with a mock/fixture dataMode; auto/real never succeed via demo.
    */
   demoRuntimeFallback?: boolean;
@@ -178,7 +178,7 @@ export function createWebPlatform(options: WebPlatformOptions = {}): AgentHubPla
           options.dataMode ?? import.meta.env.VITE_AGENTHUB_DATA_MODE,
         );
         const hasHubToken = Boolean(getAccessToken());
-        // AH-SR-043: demo success only via shared fail-closed gate (explicit mock/fixture opt-in).
+        // demo success only via shared fail-closed gate (explicit mock/fixture opt-in).
         // Never silent-fallback from auto/observed/approved-real, even when unsigned-out.
         // ensureAuth is for the real Hub path only; it must not block intentional fixture demos.
         const shouldUseDemoFallback = allowsWorkbenchDemoRuntimeMutation({
@@ -198,7 +198,7 @@ export function createWebPlatform(options: WebPlatformOptions = {}): AgentHubPla
         return submitWebComposerIntent(hubClient, createClientMessageId, intent, { queryClient, now });
       },
       async redispatchTask(intent: ComposerIntent, messageId: string): Promise<RedispatchTaskResult> {
-        // Same fail-closed gates as submitComposerIntent (AH-SR-043). The demo
+        // Same fail-closed gates as submitComposerIntent. The demo
         // sink never rejects a dispatch (no agent-tasks flow), so a no-op
         // result drains the client queue without simulating anything.
         const dataMode = normalizeWorkbenchDataMode(
@@ -387,7 +387,7 @@ async function submitWebComposerIntent(
 }
 
 /**
- * Dispatch-only retry for the client pending-intents queue (CF22). Unlike
+ * Dispatch-only retry for the client pending-intents queue. Unlike
  * `submitWebComposerIntent` this never sends a message — the given Hub
  * message id is the retry trigger for the existing agent-tasks dispatch.
  * A recoverable 409 turn_in_progress is surfaced as `{ turnInProgress: true }`

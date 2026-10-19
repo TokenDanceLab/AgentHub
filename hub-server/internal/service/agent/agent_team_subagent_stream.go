@@ -18,8 +18,8 @@ import (
 // BusEventTeamSubagentStream is the in-process bus event type that carries a
 // sub-agent's run.agent.* flow event aggregated into its team-run context.
 //
-// Phase A of #1478: HandleTaskStream publishes this alongside the existing
-// agent.stream event when the run's session belongs to a team run. The app
+// HandleTaskStream publishes this alongside the existing agent.stream event
+// when the run's session belongs to a team run. The app
 // layer subscribes and forwards it as the ws.TypeTeamSubagentStream frame.
 //
 // TeamSubagentStreamPayload is the wire shape of a team.subagent.stream bus
@@ -55,7 +55,7 @@ type TeamSubagentStreamPayload struct {
 // isTeam distinguishes a cached positive entry from a cached *negative* entry
 // (this task's session has no team run). Caching the negative is what keeps the
 // non-team majority off the database: without it every stream chunk re-runs the
-// team-run SELECT and always gets ErrRecordNotFound (#2154 P1-4).
+// team-run SELECT and always gets ErrRecordNotFound (#2154).
 type teamRunContext struct {
 	teamRunID    string
 	teamID       string
@@ -69,7 +69,7 @@ type teamRunContext struct {
 // run emits many run.agent.* events per task (per-token text_delta); without
 // a cache each event would re-run three DB lookups. task IDs are UUIDs and are
 // never reused, so cache entries stay correct for the task's lifetime —
-// invalidation is memory hygiene, not correctness (#1478 Phase A risk note).
+// invalidation is memory hygiene, not correctness (#1478).
 //
 // The same argument makes *negative* entries (isTeam=false) equally safe: a
 // task ID is minted once (uuidv7, see the note above) and its session's
@@ -129,26 +129,6 @@ func (c *teamRunContextCache) put(taskID string, ctx teamRunContext) {
 	if len(c.order) > c.max {
 		c.evictTail()
 	}
-}
-
-// len reports the live entry count (positive and negative entries share the
-// bound). Used by the capacity tests and for observability.
-func (c *teamRunContextCache) len() int {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	return len(c.order)
-}
-
-// invalidate removes the cached context for taskID, if present.
-func (c *teamRunContextCache) invalidate(taskID string) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	n, ok := c.order[taskID]
-	if !ok {
-		return
-	}
-	c.unlink(n)
-	delete(c.order, taskID)
 }
 
 func (c *teamRunContextCache) pushFront(n *listNode) {
@@ -337,7 +317,7 @@ func (s *EdgeCallbackService) publishTeamSubagentStream(
 //
 //   - teamRunLookupTeam     — resolved ownership; fan the event out.
 //   - teamRunLookupNoTeam   — *definitive* "no team run owns this session".
-//     Cached (#2154 P1-4): non-team traffic is the majority and previously
+//     Cached (#2154): non-team traffic is the majority and previously
 //     re-ran the team-run SELECT on every chunk only to get ErrRecordNotFound.
 //   - teamRunLookupTransient — inconclusive (query error). Never cached, so the
 //     next chunk retries, and callers that have their own way of answering the
@@ -399,10 +379,4 @@ func (s *EdgeCallbackService) subagentLookup() subagentStreamLookup {
 		}
 	})
 	return s.ctxLookup
-}
-
-// SetSubagentStreamLookup substitutes the team-run context lookup — used by
-// tests to inject an in-memory lookup without a real gorm DB.
-func (s *EdgeCallbackService) SetSubagentStreamLookup(lookup subagentStreamLookup) {
-	s.ctxLookup = lookup
 }

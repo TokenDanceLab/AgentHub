@@ -5,7 +5,7 @@ import {
 } from './dataMode';
 
 /**
- * AH-SR-043 — Web/shared demo & preview mutation inventory.
+ * Web/shared demo & preview mutation inventory.
  *
  * Only paths listed here may claim a "success" result without a real Hub/Edge
  * mutation. Product surfaces must fail closed outside explicit mock/fixture.
@@ -79,7 +79,7 @@ export interface DemoRuntimeMutationGateInput {
 }
 
 /**
- * Fail-closed gate for demo/fixture composer mutations (AH-SR-043).
+ * Fail-closed gate for demo/fixture composer mutations.
  *
  * Demo success is allowed only when:
  * 1. the product shell explicitly enables `demoRuntimeFallback`, and

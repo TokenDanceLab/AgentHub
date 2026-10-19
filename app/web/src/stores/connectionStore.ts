@@ -13,7 +13,7 @@ interface ConnectionState {
   health: HealthResponse | null;
   isConnected: boolean;
   error: string | null;
-  /** WebSocket ping-pong round-trip latency in milliseconds (QW-3). */
+  /** WebSocket ping-pong round-trip latency in milliseconds. */
   wsLatency: number | null;
   /** Whether the WebSocket transport is currently attempting reconnection. */
   reconnecting: boolean;

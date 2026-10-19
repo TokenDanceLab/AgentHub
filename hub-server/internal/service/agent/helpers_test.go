@@ -86,6 +86,14 @@ func (m *mockAgentCache) PushPendingTargetTask(ctx context.Context, userID, targ
 	return nil
 }
 
+func (m *mockAgentCache) PushPendingAgentControl(ctx context.Context, userID, deviceID, controlJSON string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.pushedUser = userID
+	m.pushedDeviceID = deviceID
+	return nil
+}
+
 func (m *mockAgentCache) snapshot() mockAgentCacheSnapshot {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -261,6 +269,10 @@ func (c *seqRecoveryCache) PushPendingTask(ctx context.Context, userID, taskJSON
 }
 
 func (c *seqRecoveryCache) PushPendingTargetTask(ctx context.Context, userID, targetID, deviceID, taskJSON string) error {
+	return nil
+}
+
+func (c *seqRecoveryCache) PushPendingAgentControl(ctx context.Context, userID, deviceID, controlJSON string) error {
 	return nil
 }
 

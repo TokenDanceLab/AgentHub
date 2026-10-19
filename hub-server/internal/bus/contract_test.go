@@ -218,7 +218,7 @@ var _ = errors.Is // keep errors import if assertions move
 // every shared wire value. A silent value split here (e.g. bus publishing
 // "team.assignment.completed" while ws clients only recognize
 // "team.assignment.done") causes events to be published but never delivered
-// — the silent-drop bug class this lane closes. The assertions below pin
+// — the silent-drop bug class this contract prevents. The assertions below pin
 // the direct-equality contract for every family that ships on both planes.
 //
 // The single documented exception is EventTypeAgentTimeout → ws.TypeAgentFailed
@@ -317,7 +317,7 @@ func TestBusWsContract_AliasAllowlistExhaustive(t *testing.T) {
 }
 
 // TestBusWsContract_TeamAssignmentNotCompleted is a regression pin for the
-// specific silent-drop bug this lane closed: bus published
+// specific silent-drop bug this contract prevents: bus published
 // "team.assignment.completed" while ws clients only recognize
 // "team.assignment.done". The value MUST stay aligned to the ws wire.
 func TestBusWsContract_TeamAssignmentNotCompleted(t *testing.T) {

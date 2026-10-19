@@ -1,4 +1,4 @@
-// ConversationHost goal banner mount contract (#1998, UX F8).
+// ConversationHost goal banner mount contract (#1998).
 // Real ConversationHost with heavy sibling chrome stubbed (checkpoint-test
 // harness pattern): the transcript carries REAL adapter-shaped goal events
 // normalized through the shared mapper. Asserts the banner appears only for

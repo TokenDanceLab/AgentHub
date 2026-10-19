@@ -25,7 +25,7 @@ import (
 // - Active members (left_at IS NULL) are counted
 // - Left members (left_at NOT NULL) are NOT counted
 // - Sessions with no members return member_count = 0
-// This test uses a temporary PG database to validate the correlated scalar subquery rewrite (#2102 F1).
+// This test uses a temporary PG database to validate the correlated scalar subquery rewrite (#2102).
 func TestSessionMemberCountBehavior(t *testing.T) {
 	db, cleanup := setupTempPG(t)
 	defer cleanup()
@@ -90,7 +90,7 @@ func TestSessionMemberCountBehavior(t *testing.T) {
 	})
 
 	t.Run("SearchSessions_member_count_excludes_left_members", func(t *testing.T) {
-		sessions, err := SearchSessions(db, userA, "group-active")
+		sessions, _, err := SearchSessions(db, userA, "group-active", "", 50)
 		require.NoError(t, err)
 		require.Len(t, sessions, 1, "should find s1 by name")
 		require.Equal(t, int64(3), sessions[0].MemberCount, "search result should have 3 active members")
@@ -127,7 +127,7 @@ func TestSessionMemberCountBehavior(t *testing.T) {
 
 // TestSessionMemberCountPlanNoFullTableAggregate verifies that the query plan
 // for ListUserSessions uses index scans (not full-table Seq Scan) on session_members
-// for the correlated scalar subquery. This is the core performance fix for #2102 F1.
+// for the correlated scalar subquery (#2102).
 func TestSessionMemberCountPlanNoFullTableAggregate(t *testing.T) {
 	db, cleanup := setupTempPG(t)
 	defer cleanup()

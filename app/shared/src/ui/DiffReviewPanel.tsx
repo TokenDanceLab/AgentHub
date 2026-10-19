@@ -1,6 +1,6 @@
 /**
  * DiffReviewPanel public surface — side-by-side diff review with hunk accept-reject.
- * Residual pure-helper peel of DiffReviewPanel (#1151).
+ * Pure helpers for DiffReviewPanel (#1151).
  *
  * Implementations live in companions (DiffReviewPanelTypes / DiffReviewPanelHelpers /
  * DiffReviewPanelParts); this file keeps the public orchestrator so consumers

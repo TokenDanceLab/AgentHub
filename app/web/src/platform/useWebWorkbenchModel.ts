@@ -411,7 +411,7 @@ export function useWebWorkbenchModel(selectedConversationId?: string, selectedPr
     },
   });
 
-  // Cancel the active agent task (#1462 CF13). The Hub broadcasts an
+  // Cancel the active agent task (#1462). The Hub broadcasts an
   // `agent.cancel` WS frame on success; the realtime layer then clears the
   // agent-activity store and flips the task status to `cancelled`, so we only
   // need to fire the REST here and refresh the task caches on settle.
@@ -638,7 +638,7 @@ export function useWebWorkbenchModel(selectedConversationId?: string, selectedPr
   );
 
   // An agent run is "active" while any tracked agent is dispatching / thinking
-  // / streaming, or the recorded task status is still `running` (#1462 CF13).
+  // / streaming, or the recorded task status is still `running` (#1462).
   // The agent-activity store is the live signal (fed by WS events); the task
   // status covers the brief window before the first activity event lands.
   const isAgentRunning =
@@ -655,8 +655,8 @@ export function useWebWorkbenchModel(selectedConversationId?: string, selectedPr
     // #1821: a failed cancel must be visible — surface the error toast
     // instead of swallowing the rejection.
     void cancelAgentTaskMut.mutateAsync(taskId).catch((error: unknown) => {
-      // #2072 P3: resolve errcode-specific i18n key when available; when the
-      // generic fallback applies, keep the #2072 P2 friendly detail behavior.
+      // #2072: resolve errcode-specific i18n key when available; when the
+      // generic fallback applies, keep the #2072 friendly detail behavior.
       const toastKey = resolveFailedToastKey(error, 'toast.cancelFailed');
       useToastStore.getState().showToast(
         'error',

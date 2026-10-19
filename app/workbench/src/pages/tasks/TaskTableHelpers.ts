@@ -3,11 +3,11 @@ import styles from '../TasksPage.module.css';
 import type { TaskEditDraft, TaskGroup, TaskStatus } from './types';
 
 /* ═══════════════════════════════════════════════════════════════════════
-   TaskTableHelpers — pure residual slices from TaskTableViews (#745).
+   TaskTableHelpers — pure helpers for TaskTableViews (#745).
 
    Status icon class packing, table/row class names, empty-state optional
    props (exactOptionalPropertyTypes-safe), edit-field configs, and group
-   task counts. No React / no intentional UX change.
+   task counts. No React.
    ═══════════════════════════════════════════════════════════════════════ */
 
 export type TaskTableCss = Record<string, string>;

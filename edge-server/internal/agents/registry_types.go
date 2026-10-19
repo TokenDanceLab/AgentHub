@@ -1,9 +1,5 @@
 package agents
 
-// Residual pure-helper peel #1154: sentinel errors, limits, Status, and
-// AgentInstance types extracted from registry.go. Same package agents;
-// zero behavior change.
-
 import (
 	"errors"
 	"time"
@@ -14,7 +10,6 @@ var (
 	ErrAgentSlotFull              = errors.New("agent slot full: max concurrent sub-agents reached for parent")
 	ErrAgentDepthExceeded         = errors.New("agent depth exceeded: max delegation depth reached")
 	ErrMaxChildrenPerAgentReached = errors.New("per-parent child limit reached: max children spawned for this parent")
-	ErrAgentNotFound              = errors.New("agent instance not found")
 )
 
 const (

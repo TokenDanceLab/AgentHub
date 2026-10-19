@@ -1,11 +1,10 @@
-// Team subagent live-stream store (#1478 Phase C).
+// Team subagent live-stream store (#1478).
 // Aggregates team.subagent.stream WS frames by agent_task_id with
 // event_seq idempotent UPSERT semantics — the same as agent.stream
 // but enriched with team-run context (team_run_id, assignment_id, etc.)
 // for the team-run view.
 //
-// Phase C: state collection only, no rendering. Consumers subscribe
-// to the store and render the event sequences when ready.
+// State collection only; the overlay renders the event sequences.
 //
 // Idempotency key: (agent_task_id, event_seq). Duplicate delivery of the
 // same (agent_task_id, event_seq) is a no-op. New seq values append.
@@ -124,8 +123,11 @@ export function createSubagentStreamStore(): SubagentStreamStore {
     // UPSERT by event_seq: skip if already present.
     if (events.some((e) => e.event_seq === eventSeq)) return;
 
-    // Keep sorted by event_seq (server sends in order, but be defensive).
-    const nextEvents = [...events, event].sort((a, b) => a.event_seq - b.event_seq);
+    // Server sends in order; only sort when an out-of-order event arrives.
+    const last = events[events.length - 1];
+    const nextEvents = !last || last.event_seq <= eventSeq
+      ? [...events, event]
+      : [...events, event].sort((a, b) => a.event_seq - b.event_seq);
     // Replace the byTaskId record (and the changed task's array) instead of
     // mutating in place: useSyncExternalStore consumers (SubagentStreamOverlay)
     // compare snapshots with Object.is, so an in-place mutation kept the

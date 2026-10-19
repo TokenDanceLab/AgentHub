@@ -14,10 +14,6 @@ import (
 	"github.com/agenthub/edge-server/internal/store"
 )
 
-// Residual pure-helper peel #1142: keep AnthropicSDKAdapter surface + ParseStream
-// orchestration; request/SSE/types moved to companion files. Grouped into
-// package sdk (#1760).
-
 const (
 	anthropicSDKAdapterID   = "anthropic-sdk"
 	anthropicDefaultModel   = "claude-sonnet-4-6"

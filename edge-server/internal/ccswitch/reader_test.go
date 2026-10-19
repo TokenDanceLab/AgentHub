@@ -29,20 +29,10 @@ func TestDetect(t *testing.T) {
 
 // ── fixture-backed DB tests ────────────────────────────────────────────────
 //
-// The three tests that used to live here (TestDetectRealDB / TestReaderRealDB /
-// TestReaderResolveModelAlias) all began with
-//
-//	if _, err := os.Stat(DBPath()); err != nil {
-//		t.Skip("cc-switch database not found on this machine")
-//	}
-//
-// CI runners never have ~/.cc-switch/cc-switch.db, so they skipped on every
-// single run since they were added, and two of the three had no assertion at
-// all (only t.Logf). They gave the impression the DB read path was covered
-// while covering nothing. Reader already exposes NewReaderWithPath and honours
-// $CC_SWITCH_HOME, so the same behaviour is testable against a real sqlite file
-// built in t.TempDir() — which is what the tests below do. Net effect: 3 tests
-// that never executed anywhere are replaced by tests that execute everywhere.
+// The tests below build a cc-switch-shaped sqlite database in t.TempDir() and
+// point $CC_SWITCH_HOME at it, so detection, reader queries, and model-alias
+// resolution run against a real database on every run — no local cc-switch
+// install required.
 
 // writeFixtureDB creates a cc-switch-shaped sqlite database at dir/cc-switch.db
 // and returns its path. The schema mirrors the four tables reader.go queries

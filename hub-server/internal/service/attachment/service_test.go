@@ -200,34 +200,21 @@ func TestAttachmentService_NilStorageBlobPathsAreSafe(t *testing.T) {
 	}
 }
 
-func TestAttachmentService_SetStoragePort(t *testing.T) {
+func TestAttachmentService_PresignStoragePort(t *testing.T) {
 	db := newAttachmentServiceTestDB(t)
 	hash := strings.Repeat("f", 64)
 	store := &recordingPresignStorage{url: "https://s3.example.test/set-storage"}
-	svc := attachment.NewService(db, config.UploadConfig{}, nil)
+	svc := attachment.NewService(db, config.UploadConfig{}, store)
 
-	// Before SetStorage: presign is a no-op.
 	url, err := svc.PresignBlobURL(context.Background(), hash, "text/plain", `attachment; filename="safe.txt"`)
 	if err != nil {
-		t.Fatalf("PresignBlobURL before SetStorage error = %v", err)
-	}
-	if url != "" {
-		t.Fatalf("PresignBlobURL before SetStorage = %q, want empty", url)
-	}
-	if store.called {
-		t.Fatal("storage should not be called before SetStorage")
-	}
-
-	svc.SetStorage(store)
-	url, err = svc.PresignBlobURL(context.Background(), hash, "text/plain", `attachment; filename="safe.txt"`)
-	if err != nil {
-		t.Fatalf("PresignBlobURL after SetStorage error = %v", err)
+		t.Fatalf("PresignBlobURL error = %v", err)
 	}
 	if url != store.url {
-		t.Fatalf("PresignBlobURL after SetStorage = %q, want %q", url, store.url)
+		t.Fatalf("PresignBlobURL = %q, want %q", url, store.url)
 	}
 	if !store.called {
-		t.Fatal("storage PresignURL should be called after SetStorage")
+		t.Fatal("storage PresignURL should be called")
 	}
 	if store.key != im.PathFromHash(hash) {
 		t.Fatalf("presign key = %q, want %q", store.key, im.PathFromHash(hash))

@@ -1,12 +1,10 @@
 #!/usr/bin/env python3
-"""dev-down — 停止 Hub Server Docker Compose 开发环境（ps1 迁移，契约见 server docs/design/ps1-to-python-migration.md）。
+"""dev-down — 停止 Hub Server Docker Compose 开发环境。
 
 停止并移除 dev-up 启动的 PostgreSQL/Redis 容器。默认保留数据卷；
---clean/-c 删除数据卷（干净重置，兼容原 dev-down.sh 语义）。
+--clean/-c 删除数据卷（干净重置）。
 
-契约：stdlib only；无参数行为/退出码与 ps1 一致（退出码跟随 docker compose
-down）；输出行（`=== Tearing down Hub Server dev environment ===` /
-`Containers stopped and removed.`）与原 ps1 一致。
+stdlib only；退出码跟随 docker compose down。
 """
 
 import argparse
@@ -48,6 +46,6 @@ def main() -> int:
 if __name__ == "__main__":
     try:
         sys.exit(main())
-    except Exception as exc:  # noqa: BLE001 —— 顶层兜底，对齐 ps1 $ErrorActionPreference='Stop'，禁止静默吞错
+    except Exception as exc:  # noqa: BLE001 —— fail closed：未捕获异常返回非零
         print(f"ERROR: {exc}", file=sys.stderr)
         sys.exit(1)

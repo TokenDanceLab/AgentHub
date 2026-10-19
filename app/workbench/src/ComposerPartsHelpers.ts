@@ -11,10 +11,9 @@ import {
 } from './unifiedComposerHelpers';
 
 /* ═══════════════════════════════════════════════════════════════════════
-   Pure residual helpers for UnifiedComposerParts (#706).
+   Pure helpers for UnifiedComposerParts (#706).
 
-   Label builders and attachment chip view-model only — no React hooks,
-   no intentional UX change.
+   Label builders and attachment chip view-model only — no React hooks.
    ═══════════════════════════════════════════════════════════════════════ */
 
 export function formatReplyToLabel(

@@ -388,3 +388,17 @@ func TestPermissionReceiptCacheExpiresAndNeverGrowsPastCapacity(t *testing.T) {
 		t.Fatalf("capacity full cache length = %d, want 1", got)
 	}
 }
+
+func (c *permissionReceiptCache) withClock(clock func() time.Time) *permissionReceiptCache {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.now = clock
+	return c
+}
+
+func (c *permissionReceiptCache) len() int {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.purgeExpiredLocked(c.now())
+	return len(c.byControl)
+}

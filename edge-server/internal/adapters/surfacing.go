@@ -3,8 +3,6 @@
 // When an agent run completes, the Surfacer scans the workdir for new or
 // modified files and emits typed events (surfaced artifact, preview, diff,
 // deploy) so the frontend can render them inline in the chat transcript.
-//
-// Residual pure helpers live in surfacing_*.go companions (peel #1112).
 package adapters
 
 import (
@@ -263,7 +261,7 @@ func SurfaceAndEmit(bus *events.Bus, writer store.Writer, snapshot *WorkdirSnaps
 		case surfacingKindArtifact:
 			emitSurfacedArtifact(bus, writer, scope, run, sf, snapshot)
 		}
-		// Observability (slice A step 6): log + counter per surfaced artifact.
+		// Observability: log + counter per surfaced artifact.
 		slog.Info("surfacing: artifact surfaced",
 			"run_id", run.ID, "artifact_kind", string(sf.Kind), "path", sf.RelPath)
 		if artifactSurfacedRecorder != nil {

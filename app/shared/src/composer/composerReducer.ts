@@ -28,7 +28,7 @@ export function composerReducer(
   switch (action.type) {
     case 'setConversationId':
       // Full reset: text/mentions/attachments are session-scoped.
-      // Draft persistence (T10) restores per-session state via localStorage
+      // Draft persistence restores per-session state via localStorage
       // when the composer comes up empty for the new conversation.
       return state.conversationId === action.conversationId
         ? state

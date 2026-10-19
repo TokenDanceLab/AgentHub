@@ -16,7 +16,8 @@ Closes #
 
 - [ ] 已运行必要检查，或说明暂时无法运行的原因
 - [ ] 已检查没有提交密钥、token、真实服务器信息、生产数据或敏感日志
-- [ ] 如改了 API/架构/分工，已同步对应 `api/`、`AGENTS.md` 或三份主文档
+- [ ] 已写明验证证据等级（unit / fixture / Playwright / Visual QA / packaged / approved-real），未跑项已标注
+- [ ] 如改了 API/架构/分工，已同步 `api/`、`AGENTS.md`、`docs/architecture.md` 或对应模块文档
 
 ## 检查命令
 

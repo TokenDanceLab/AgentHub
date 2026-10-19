@@ -196,13 +196,11 @@ func NewBus(maxHistory int, opts ...BusOption) *Bus {
 //
 // WIRE ORDER == SEQ ORDER. Subscribers dedup on seq —
 // app/shared/src/eventClient.ts:202 is `if (envelope.seq <= lastSeq) return;` —
-// and api/events.md:67 promises "`seq` 同 stream 单调", so an envelope that
+// and api/events.md:60 promises "`seq` 同 stream 单调", so an envelope that
 // reaches the wire after a larger seq is discarded permanently by the client as
 // a "replay duplicate", with no system.gap to tell it that a state change was
-// lost. Handing the seq out with a lock-free atomic and then running an unlocked
-// persist left a preemption window in which exactly that happened: measured at
-// 87-92 inversions per 1000 concurrently published events, both with and without
-// an event log configured. hub-server/internal/ws/fanout.go:92-101 enforces the
+// lost. The seq is therefore assigned under the wire gate (wireNext/wireCond)
+// before persist and fanout. hub-server/internal/ws/fanout.go:102 enforces the
 // same contract for Hub frames.
 //
 // The ordering is enforced by a gate (wireNext/wireCond), NOT by holding b.mu
@@ -276,7 +274,7 @@ func (b *Bus) Publish(eventType string, scope map[string]any, payload any) Event
 
 	// Persist before fanout: if a persistence hook is configured and the
 	// event type is eligible, write to durable store before in-memory append.
-	// On failure, the event is retried synchronously up to persistMaxRetries
+	// On failure, the event is retried synchronously up to persistDefaultMaxRetries
 	// times with exponential backoff. Only after all retries fail is the event
 	// dropped — observers and subscribers never see it, and persistFailures
 	// is incremented so the edge_event_persist_failures_total metric surfaces
@@ -286,7 +284,7 @@ func (b *Bus) Publish(eventType string, scope map[string]any, payload any) Event
 		if err := b.persistWithRetry(evt); err != nil {
 			b.persistFailures.Add(1)
 			slog.Error("event bus persist failed after retries, dropping event",
-				"type", eventType, "seq", seq, "retries", b.maxPersistRetries(), "error", err)
+				"type", eventType, "seq", seq, "retries", persistDefaultMaxRetries, "error", err)
 			deliver = false
 		}
 	}
@@ -512,7 +510,7 @@ func (b *Bus) Subscribe(cursor int64) (int64, <-chan EventEnvelope, []EventEnvel
 	// Read the on-disk gap-filler BEFORE taking b.mu. ReadFrom does file I/O
 	// + per-line unmarshal (a reconnect with an old cursor can replay tens of
 	// MiB); holding b.mu across it would stall every Publish fanout for the
-	// whole replay duration (#2154 perf-lane F15). The event log pointer is
+	// whole replay duration. The event log pointer is
 	// fixed at construction, so this is race-free.
 	var logEvents []EventEnvelope
 	var logHasGap bool
@@ -553,8 +551,8 @@ func (b *Bus) Subscribe(cursor int64) (int64, <-chan EventEnvelope, []EventEnvel
 // mergeReplayWithLog merges on-disk log events into the in-memory replay.
 // History takes priority (seenSeqs dedup, freshest copy wins); a gap payload
 // (seq=0) is injected when the cursor predates the oldest surviving log event.
-// Pure function extracted from Subscribe so the replay contract is unit-tested
-// independently of the lock reordering (#2154 perf-lane F15).
+// Kept separate from Subscribe so the replay contract is unit-tested
+// independently of the lock ordering.
 func mergeReplayWithLog(
 	replay []EventEnvelope,
 	seenSeqs map[int64]bool,

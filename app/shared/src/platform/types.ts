@@ -130,7 +130,7 @@ export interface RunPort {
   submitComposerIntent(intent: ComposerIntent): Promise<ComposerSubmitResult>;
   /**
    * Re-dispatch an agent task for an already-sent Hub message (client
-   * pending-intents queue, CF22). Never re-sends the message — the message
+   * pending-intents queue). Never re-sends the message — the message
    * id is the retry trigger for the existing agent-tasks dispatch only.
    * Optional: surfaces whose submit path has no separable dispatch step
    * (Desktop local-edge submitRun) omit it and the queue degrades to the

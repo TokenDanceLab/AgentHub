@@ -1,4 +1,4 @@
-// Desktop Hub client — thin surface over shared SSOT (#432 / T3.3).
+// Desktop Hub client — thin surface over shared SSOT (#432).
 // Method/DTO SSOT: @shared/hub/hubClient; desktop-only glue: HUB_URL + Tauri proxy.
 // Do NOT add new Hub REST methods here; add them to app/shared/src/hub/hubClient.ts first.
 
@@ -142,7 +142,7 @@ function createDesktopFetch(userFetch?: typeof fetch): typeof fetch {
   };
 }
 
-// ── 401 token refresh singleton (P0: wire onRefreshToken site-wide) ────────
+// ── 401 token refresh singleton ───────────────────────────────────────────
 // Single-flight: N concurrent 401s share one refresh promise.
 // Cache: last successful access token is served for REFRESH_CACHE_TTL_MS so
 // subsequent requests whose getToken() still reads the (stale) auth singleton

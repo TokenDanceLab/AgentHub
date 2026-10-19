@@ -17,8 +17,8 @@ import type { AgentsPageProps } from './types';
 /* ═══════════════════════════════════════════════════════════════════════
    Installed agents view — list + edit-panel shell.
 
-   Extracted from AgentsPage as Phase 17 strangler slice #560.
-   Residual thin (Phase 22 #616): edit panel / avatar / tags / helpers
+   Extracted from AgentsPage (#560).
+   Helper module (#616): edit panel / avatar / tags / helpers
    live in sibling modules. CSS remains on shared AgentsPage.module.css.
    ═══════════════════════════════════════════════════════════════════════ */
 

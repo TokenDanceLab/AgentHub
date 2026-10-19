@@ -62,7 +62,7 @@ func TestFileStoreRestoresProjectThreadRunItemAndOrder(t *testing.T) {
 	if _, err := s.CreateThreadMessage("item_a", threadA.ID, "assistant", "hello"); err != nil {
 		t.Fatalf("CreateThreadMessage returned error: %v", err)
 	}
-	if _, err := s.PinThreadItem(threadA.ID, "item_a", "Delicious233"); err != nil {
+	if _, err := s.PinThreadItem(threadA.ID, "item_a", "Demo User"); err != nil {
 		t.Fatalf("PinThreadItem returned error: %v", err)
 	}
 
@@ -96,7 +96,7 @@ func TestFileStoreRestoresProjectThreadRunItemAndOrder(t *testing.T) {
 	if got, ok := restored.GetItem("item_a"); !ok || got.Content != "hello" || got.Role != "assistant" {
 		t.Fatalf("GetItem(item_a) = %#v, %v, want restored message item", got, ok)
 	}
-	if got := restored.ListThreadPins(threadA.ID); len(got) != 1 || got[0].ItemID != "item_a" || got[0].PinnedBy != "Delicious233" {
+	if got := restored.ListThreadPins(threadA.ID); len(got) != 1 || got[0].ItemID != "item_a" || got[0].PinnedBy != "Demo User" {
 		t.Fatalf("ListThreadPins(thread_a) = %#v, want restored item_a pin", got)
 	}
 }
@@ -130,7 +130,7 @@ func TestFileStoreCleanupRunsPersistsRemovedRunsAndItems(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("CreateItem returned error: %v", err)
 	}
-	if _, err := s.PinThreadItem(thread.ID, "item_test", "Delicious233"); err != nil {
+	if _, err := s.PinThreadItem(thread.ID, "item_test", "Demo User"); err != nil {
 		t.Fatalf("PinThreadItem returned error: %v", err)
 	}
 

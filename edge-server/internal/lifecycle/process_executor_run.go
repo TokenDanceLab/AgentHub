@@ -2,9 +2,11 @@ package lifecycle
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"time"
 
+	"github.com/agenthub/edge-server/internal/adapters"
 	"github.com/agenthub/edge-server/internal/runnerctx"
 	"github.com/agenthub/edge-server/internal/store"
 )
@@ -12,11 +14,10 @@ import (
 func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProcessContext) {
 	// terminalFinish is true unless this attempt hands off to a fault-escalation
 	// successor. The deferred finish must not tear down the concurrency slot the
-	// successor just re-registered (see #867).
-	// Do NOT rework #867 finish/escalation handoff beyond pure predicates.
+	// successor just re-registered.
 	terminalFinish := true
 	defer func() {
-		if planTerminalFinish(terminalFinish).Finish {
+		if terminalFinish {
 			e.finish(run.ID)
 		}
 	}()
@@ -24,19 +25,14 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 	// Store Hub task ID and allocate a bounded final-content collector for
 	// Edge→Hub direct callback reporting. Without the collector, recordHubOutput
 	// no-ops and fireHubDone falls back to literal "Run finished" (#987).
-	// Pure gate only; hubOutputs allocation stays here (#987 residual ownership).
-	if run.CallbackOwner != "desktop" && planHubTaskRecord(runCtx.HubTaskID).Record {
-		e.mu.Lock()
-		e.hubTasks[run.ID] = runCtx.HubTaskID
-		e.hubOutputs[run.ID] = newHubOutputCollector(hubCallbackFinalMaxBytes)
-		e.mu.Unlock()
-	}
+	// hubOutputs allocation is owned here.
+	e.bindHubTask(run.ID, runCtx.HubTaskID, run.CallbackOwner)
 
 	// Resolve adapter for this run: explicit agentID first, then default
 	adapter := e.adapter
-	if planAdapterResolve(e.adapterReg != nil, runCtx.AgentID, adapter != nil).Resolve {
+	if e.adapterReg != nil && (runCtx.AgentID != "" || adapter != nil) {
 		resolved, err := e.adapterReg.Resolve(runCtx.AgentID)
-		if planAdapterResolveFailure(err).Fail {
+		if err != nil {
 			e.publishFailed(run, err)
 			return
 		}
@@ -46,33 +42,40 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 	// Preflight check: if the adapter implements PreflightAdapter, verify
 	// it is properly configured (e.g. API keys, credentials) before launching
 	// the subprocess. This prevents hangs from CLIs that block on auth prompts.
-	if preflight, ok := asPreflightAdapter(adapter); planPreflightAdapter(ok).Check {
+	if preflight, ok := adapter.(adapters.PreflightAdapter); ok {
 		err := preflight.PreflightCheck()
-		if planPreflightFailure(err).Fail {
+		if err != nil {
 			slog.Warn("process: adapter preflight check failed", "runId", run.ID, "agentId", runCtx.AgentID, "error", err)
-			e.publishFailed(run, adapterPreflightFailed(err))
+			e.publishFailed(run, (fmt.Errorf("adapter preflight failed: %w", err)))
 			return
 		}
 	}
 
 	// Resolve adapter label for Prometheus metrics
-	adapterLabel := resolveMetricsAdapterLabel(e.metrics != nil, adapter)
+	var adapterLabel string
+	if e.metrics != nil {
+		if adapter == nil {
+			adapterLabel = "none"
+		} else {
+			adapterLabel = adapterMetricsLabel(adapter.Metadata().ID)
+		}
+	}
 
-	// SEC-02: Defense-in-depth — reject 'bypassPermissions' at the executor level
+	// Defense-in-depth — reject 'bypassPermissions' at the executor level
 	// before launching the agent process. If the API validation is somehow
 	// bypassed (e.g. direct internal calls), this fallback ensures the agent
 	// never receives a permission mode that disables all security hooks.
-	if perm := planPermissionModeSanitization(runCtx); perm.Changed {
+	if runCtx.PermissionMode == "bypassPermissions" {
 		slog.Warn("process: permission mode 'bypassPermissions' is forbidden, falling back to 'default'", "runId", run.ID, "agentId", runCtx.AgentID)
-		runCtx = perm.RunCtx
+		runCtx.PermissionMode = "default"
 	}
 
 	var runStartTime time.Time
-	metricsPlan := planRunMetrics(e.metrics != nil)
-	if metricsPlan.AttachFinishDefer {
+	recordStart := e.metrics != nil
+	if recordStart {
 		defer func() {
 			r, ok := e.store.GetRun(run.ID)
-			if !planFinishMetricsRecord(runStartTime, ok).Record {
+			if runStartTime.IsZero() || !ok {
 				return // never started or missing run
 			}
 			e.metrics.RecordRunFinish(adapterLabel, r.Status, time.Since(runStartTime).Seconds())
@@ -87,7 +90,7 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 	var lastOutStore *runnerctx.RunOutputStore
 	for attempt := 0; attempt < maxSessionRetries; attempt++ {
 		// Phase 1 — Build & start the subprocess.
-		proc, err := e.buildAndStartProcess(ctx, run, runCtx, adapter, adapterLabel, metricsPlan, &runStartTime, attempt)
+		proc, err := e.buildAndStartProcess(ctx, run, runCtx, adapter, adapterLabel, recordStart, &runStartTime, attempt)
 		if err != nil {
 			return
 		}
@@ -124,14 +127,13 @@ func (e *ProcessExecutor) run(ctx context.Context, run store.Run, runCtx RunProc
 
 escalate:
 	// Exhausted session retries — attempt fault escalation if configured.
-	// Do NOT rework #867 finish/escalation handoff beyond pure predicates.
 	if e.handleFaultEscalation(&run, runCtx, lastWaitErr) {
 		// Successor attempt launched; it owns the terminal finish.
 		terminalFinish = false
 		return
 	}
 	// Report the last error (terminal failure after retries exhausted or disabled).
-	if planTerminalWaitFailure(lastWaitErr).Publish {
+	if lastWaitErr != nil {
 		e.publishFailed(run, errorWithRunOutput(lastWaitErr, lastOutStore))
 		e.sendSubAgentResult(run.ID, "failed", subAgentErrorPayload(lastWaitErr))
 	}

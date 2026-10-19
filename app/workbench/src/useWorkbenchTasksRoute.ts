@@ -52,7 +52,7 @@ export function useWorkbenchTasksRoute({
   const [localTaskCounter, setLocalTaskCounter] = useState(1);
   const [deepLinkedTask, setDeepLinkedTask] = useState<TaskItem | null>(null);
 
-  // ── Mock cursor pagination (#1510). In mock mode the task pool (larger
+  // ── Mock cursor pagination. In mock mode the task pool (larger
   //    than one page) is exposed as the "默认分组" source; the first page is
   //    loaded from the pool, loadMore appends the next page with an async
   //    cursor read. In realDataMode the parent owns taskGroups, so the

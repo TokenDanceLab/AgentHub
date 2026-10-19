@@ -31,7 +31,7 @@ const (
 
 // Queue provides per-agent message channels for asynchronous inter-agent
 // communication. It is the transport layer between orchestrator and sub-agents,
-// enabling the Supervisor pattern from 03-orchestration.md.
+// enabling the supervisor pattern.
 type Queue struct {
 	mu     sync.RWMutex
 	queues map[string]chan Message  // per-agent receive channels

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""AgentHub real login and remote-control E2E readiness verifier（ps1 迁移，契约见 server docs/design/ps1-to-python-migration.md）。
+"""AgentHub real login and remote-control E2E readiness verifier。
 
 这是一个 approval gate 与证据形状验证器。不打开浏览器、不执行
 TokenDanceID 登录、不分发 Hub 工作、不调用 live 服务。真实登录/分发仍然
@@ -17,7 +17,6 @@ import json
 import os
 import re
 import sys
-import urllib.parse
 from urllib.parse import urlparse
 
 SECRET_LIKE_PATTERN = re.compile(
@@ -42,7 +41,7 @@ MANIFEST_FIELDS = (
 
 def main() -> int:
     parser = argparse.ArgumentParser(
-        description="AgentHub real login and remote-control E2E readiness verifier (ps1 migration)"
+        description="AgentHub real login and remote-control E2E readiness verifier"
     )
     parser.add_argument("--RepoRoot", default=".", help="repository root (defaults to the current directory)")
     parser.add_argument("--Mode", default="ProposalOnly", choices=["ProposalOnly", "RealApproved", "EvidenceReview"])
@@ -409,6 +408,6 @@ def main() -> int:
 if __name__ == "__main__":
     try:
         sys.exit(main())
-    except Exception as exc:  # noqa: BLE001 —— 顶层兜底，对齐 ps1 $ErrorActionPreference='Stop'
+    except Exception as exc:  # noqa: BLE001 —— fail closed：未捕获异常返回非零
         print(f"ERROR: {exc}", file=sys.stderr)
         sys.exit(1)

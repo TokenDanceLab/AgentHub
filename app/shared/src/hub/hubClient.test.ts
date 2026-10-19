@@ -3,7 +3,6 @@ import { HUB_EVENTS } from '../hubEvents';
 import { AppError } from '../errors';
 import {
   createHubClient,
-  HUBCLIENT_SSOT_GAPS,
   HubError,
   parseHubError,
   unwrapHubResponse,
@@ -198,7 +197,7 @@ describe('hubClient helpers', () => {
     );
   });
 
-  it('falls back to dev/trump legacy Hub paths when master routes are absent', async () => {
+  it('falls back to the legacy colon-form paths when master routes are absent', async () => {
     fetchMock
       .mockResolvedValueOnce(jsonResponse({ code: 'NOT_FOUND', message: 'missing' }, { status: 404 }))
       .mockResolvedValueOnce(jsonResponse({ code: 'OK' }))
@@ -336,14 +335,14 @@ describe('hubClient helpers', () => {
     expect(error.message).toBe('Unauthorized');
   });
 
-  it('exposes T3.4 shared task approval methods (#433)', async () => {
+  it('exposes shared task approval methods (#433)', async () => {
     fetchMock.mockResolvedValueOnce(jsonResponse({ code: 'OK', data: { task_id: 't1', approvals: [] } }));
     const client = createHubClient({ baseUrl: 'http://hub.local' });
     await expect(client.listTaskApprovals('t1')).resolves.toMatchObject({ task_id: 't1', approvals: [] });
     expect(fetchMock.mock.calls[0]?.[0]).toBe('http://hub.local/web/agent-tasks/t1/approvals');
   });
 
-  it('exposes T3.2 shared team/settings methods (#431)', async () => {
+  it('exposes shared team/settings methods (#431)', async () => {
     fetchMock.mockResolvedValueOnce(jsonResponse({ code: 'OK', data: [{ id: 'team-1', name: 'T' }] }));
     fetchMock.mockResolvedValueOnce(jsonResponse({ code: 'OK', data: { theme: 'dark' } }));
     const client = createHubClient({ baseUrl: 'http://hub.local' });
@@ -355,8 +354,8 @@ describe('hubClient helpers', () => {
     ]);
   });
 
-  it('exports compatibility aliases and SSOT gap inventory for slice1 (#430)', () => {
-    // Type-level aliases must remain assignable (compile-time); runtime checks inventory shape.
+  it('exports compatibility aliases', () => {
+    // Type-level aliases must remain assignable (compile-time).
     const session: Session = { session_id: 's-alias', type: 'private' };
     const hubSession: HubSession = session;
     expect(hubSession.session_id).toBe('s-alias');
@@ -367,13 +366,6 @@ describe('hubClient helpers', () => {
       expires_in: 3600,
     };
     expect(auth.access_token).toBe('a');
-
-    expect(HUBCLIENT_SSOT_GAPS.desktopAndWebNotShared).not.toContain('listAgentTeams');
-    expect(HUBCLIENT_SSOT_GAPS.desktopAndWebNotShared).not.toContain('fetchSettings');
-    expect(Array.isArray(HUBCLIENT_SSOT_GAPS.desktopOnly)).toBe(true);
-    expect(Array.isArray(HUBCLIENT_SSOT_GAPS.webOnly)).toBe(true);
-    // Guard against accidental empty inventory during later edits.
-    expect(Array.isArray(HUBCLIENT_SSOT_GAPS.desktopAndWebNotShared)).toBe(true);
   });
 
   it('throws 401 immediately when no onRefreshToken is configured (current behavior)', async () => {

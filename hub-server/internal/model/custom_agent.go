@@ -95,11 +95,6 @@ func NormalizeJSONValue(raw string) (string, error) {
 	return string(normalized), nil
 }
 
-// Deprecated: use NormalizeJSONValue instead.
-func normalizeJSONValue(raw string) (string, error) {
-	return NormalizeJSONValue(raw)
-}
-
 func (c *CustomAgent) Validate() error {
 	return c.validateJSONB()
 }

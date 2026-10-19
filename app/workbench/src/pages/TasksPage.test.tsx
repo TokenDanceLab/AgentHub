@@ -83,7 +83,7 @@ describe('TasksPage empty state', () => {
   });
 });
 
-describe('TasksPage infinite scroll (T14 skeleton)', () => {
+describe('TasksPage infinite scroll', () => {
   it('renders no load-more affordance when pagination props are absent', () => {
     render(<TasksPage {...BASE_PROPS} />);
 

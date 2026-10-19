@@ -93,7 +93,7 @@ func (l *slogGormLogger) Trace(_ context.Context, begin time.Time, fc func() (sq
 			"error", err,
 		)
 	case elapsed > l.SlowThreshold && l.SlowThreshold > 0 && l.LogLevel >= gormlogger.Warn:
-		// G8: the slow-query metric counts EVERY slow query regardless of
+		// The slow-query metric counts EVERY slow query regardless of
 		// rows-affected. The slog.Warn below is silenced when rows==0 (early
 		// return) to avoid log flooding, but the metric is NOT silenced —
 		// operators must see slow-query rate even for empty result sets.

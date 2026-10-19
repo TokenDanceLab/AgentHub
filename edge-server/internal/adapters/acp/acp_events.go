@@ -1,15 +1,13 @@
-// Package adapters — ACP event mapping (experimental, #1404 Phase 2 prep).
+// Package adapters — ACP event mapping.
 //
 // This file hosts the pure, binary-independent translation from ACP
 // session/update events to Edge run.agent.* events. Keeping the mapper pure
-// (no I/O, no state) lets us unit-test the protocol mapping before a real
-// ACP agent binary is available for end-to-end integration (Phase 2).
+// (no I/O, no state) makes it unit-testable with a mock peer; the same
+// mapping runs under the real ACP agent binaries in end-to-end integration.
 //
 // Input types are the typed SessionUpdate/SessionNotification/PromptResponse
 // generated from the official ACP schema by github.com/coder/acp-go-sdk
 // (v0.13.5) — no hand-rolled ACP structs are decoded here.
-//
-// Reference: ACP spike analysis §3 (Translation Mapping), ACP Go migration (option C').
 package acp
 
 import (
@@ -31,7 +29,7 @@ type mappedEvent struct {
 // effects, no errors — unrecognized update variants yield no events (the
 // caller may log them).
 //
-// Mapping table (see acp-spike-phase1.md §3):
+// Mapping table:
 //
 //	AgentMessageChunk → run.agent.text_delta   (single content block)
 //	AgentThoughtChunk → run.agent.thinking     (content block, status "delta")
@@ -39,13 +37,12 @@ type mappedEvent struct {
 //	UsageUpdate       → run.agent.context_usage
 //
 // Plan / PlanUpdate / SessionInfoUpdate / ToolCallUpdate / UserMessageChunk
-// and the other variants are intentionally unmapped in Phase 2 prep — they
-// need design sign-off on the Edge-side frame model.
+// and the other variants are intentionally unmapped — they need an agreed
+// Edge-side frame model.
 //
 // NOTE on UsageUpdate semantics: the official schema reports session context
-// window usage (Used / Size), not a per-turn input/output token split. The
-// pre-SDK hand-rolled struct (input/output integers) was a misreading of the
-// protocol and is gone — payloads now carry "tokens_used" and "context_size".
+// window usage (Used / Size), not a per-turn input/output split; payloads
+// carry "tokens_used" and "context_size".
 func mapACPSessionUpdate(u acp.SessionUpdate) []mappedEvent {
 	switch {
 	case u.AgentMessageChunk != nil:
@@ -70,16 +67,15 @@ func mapACPSessionUpdate(u acp.SessionUpdate) []mappedEvent {
 
 	default:
 		// Unmapped ACP update variants (Plan, PlanUpdate, SessionInfoUpdate,
-		// ToolCallUpdate, UserMessageChunk, ...). Phase 2 will assign Edge
-		// events once the frame design is approved.
+		// ToolCallUpdate, UserMessageChunk, ...). They will map once an Edge
+		// frame model is agreed.
 		return nil
 	}
 }
 
 // mapContentBlock emits one Edge event per session/update content block.
-// ACP streams one ContentBlock per notification, so the pre-SDK array-based
-// mapper collapses to a single block; status is empty for text deltas and
-// "delta" for thinking deltas.
+// ACP streams one ContentBlock per notification, so there is a single block;
+// status is empty for text deltas and "delta" for thinking deltas.
 func mapContentBlock(block acp.ContentBlock, eventType, status string) []mappedEvent {
 	if block.Text == nil || block.Text.Text == "" {
 		// Non-text content blocks (image/audio/resource) are not emitted

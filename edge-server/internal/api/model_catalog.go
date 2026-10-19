@@ -1,10 +1,5 @@
 package api
 
-// model_catalog.go holds the model-catalog HTTP entry, adapter mapping surface,
-// and catalog builder. Residual pure-helper peel #1133 moved source-specific
-// and shared pure helpers into model_catalog_*.go companions.
-// Zero behavior change — pure move only.
-
 import (
 	"net/http"
 	"sort"

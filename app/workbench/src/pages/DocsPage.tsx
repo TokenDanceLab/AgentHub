@@ -10,8 +10,8 @@ import type { DocsPageProps } from './docs';
    DocsPage — pure presentational workbench page
 
    Subcomponents / types extracted under ./docs:
-   - Phase 19 #582: types, shared, DocsNav, DocTableViews
-   - Phase 21 #605: DocMain residual shell thin
+   - Types, shared helpers, DocsNav, DocTableViews (#582).
+   - DocMain shell (#605).
    ═══════════════════════════════════════════════════════════════════════ */
 
 /* ── Public re-exports (preserve external consumers) ── */
@@ -31,7 +31,7 @@ export function DocsPage({
   searchQuery = '',
   onSearchChange,
   navItems,
-  // #2154 P2-2(b): no default injection — an absent/empty list renders no
+  // No default injection: an absent/empty list renders no
   // shortcut block. Demo mode passes WORKBENCH_MOCK_DOC_SHORTCUTS explicitly.
   shortcuts = [],
   activeTab,

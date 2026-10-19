@@ -58,7 +58,7 @@ export interface MockPlatform extends AgentHubPlatform {
   };
   openedEvidence: EvidenceRef[];
   submittedIntents: ComposerIntent[];
-  /** Dispatch-only retries recorded by `runs.redispatchTask` (CF22 queue). */
+  /** Dispatch-only retries recorded by `runs.redispatchTask`. */
   redispatchCalls: Array<{ intent: ComposerIntent; messageId: string }>;
   /** Per-message action calls recorded by `messageActions` (Hub REST wiring). */
   messageActionCalls: Array<

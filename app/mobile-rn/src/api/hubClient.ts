@@ -1,20 +1,8 @@
-// Mobile Hub client — thin surface over shared SSOT (#1338 / T80.2).
+// Mobile Hub client — thin surface over shared SSOT (#1338).
 // - Method/DTO SSOT: @agenthub/shared/hub/hubClient
 // - Mobile-only glue: async SecureStore token cache, fixture snapshot, legacy WS types,
 //   HubApiError/HubNetworkError (test/UI compatibility)
 // Do NOT add new Hub REST methods here; add them to app/shared/src/hub/hubClient.ts first.
-//
-// Inventory (T80.1 keep vs re-export):
-// | Surface | Decision |
-// |---|---|
-// | REST methods (auth, sessions, messages, tasks, reactions, attachments, …) | re-export / Proxy → shared |
-// | DTOs (HubAgentRunEvent, HubAgentTaskApproval, HubProbeAttachmentResponse, …) | re-export from shared |
-// | createHubClient token cache + onRefreshToken | KEEP (async SecureStore) |
-// | getMobileSnapshot + mapSessionsToMobileFixture | KEEP (mobile fixture shape) |
-// | createMockHubClient | KEEP (fixture delay + mock snapshot) |
-// | HubApiError / HubNetworkError | KEEP (test + historical UI imports) |
-// | WS_BEARER_SUBPROTOCOL, buildWSAuthProtocols, createHubWsUrl, HubWs* | KEEP (RN WS layer) |
-// | Legacy HubWsEventType mobile-only names | KEEP (App/UI compatibility) |
 
 import {
   createHubClient as createSharedHubClient,
@@ -264,8 +252,8 @@ export function createHubClient(options: CreateHubClientOptions): HubClient {
     getMobileSnapshot: async () => {
       await ensureToken();
 
-      // Contacts were previously fetched and discarded — sessions are the only
-      // input the mobile fixture needs, so a single RTT is enough.
+      // Sessions are the only input the mobile fixture needs, so a single
+      // RTT is enough.
       let sessions: HubSession[] = [];
       let sessionsOk = true;
       try {

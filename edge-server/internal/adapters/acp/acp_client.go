@@ -1,13 +1,11 @@
 // Package adapters — ACP client runtime on github.com/coder/acp-go-sdk (v0.13.5).
 //
-// #1404 Phase 2 spike: replace the hand-rolled bufio+encoding/json JSON-RPC
-// loop (removed from acp.go) with the official-schema typed client runtime.
-// Protocol boundary stays 100% official — a real adapter binary (e.g.
-// `npx -y @agentclientprotocol/codex-acp`, or native `opencode acp`,
+// Protocol boundary stays with the official schema: a real adapter binary
+// (e.g. `npx -y @agentclientprotocol/codex-acp`, or native `opencode acp`,
 // `gemini --experimental-acp`) is spawned by ProcessExecutor via
 // AcpAdapter.BuildCommand; this file only talks JSON-RPC to it.
-//
-// Reference: ACP Go migration option C'.
+// session/request_permission is bridged to the Edge approval chain via
+// adapters.PermissionDecisionBroker.
 package acp
 
 import (
@@ -28,8 +26,8 @@ import (
 // against (bump discipline: update on SDK upgrades).
 const acpSDKVersion = "v0.13.5"
 
-// errACPEndpointNotWired is returned by client handler methods that the
-// spike deliberately leaves unwired (fs/terminal execution — the frame
+// errACPEndpointNotWired is returned by client handler methods that are
+// intentionally left unwired (fs/terminal execution — the frame
 // design + workspace allowlist gate already lives in acp_frames.go): the
 // agent receives a JSON-RPC error instead of a silent hang. Frame-gate
 // rejections wrap it too (unwiredFrameError), so the STUB INVENTORY
@@ -37,7 +35,7 @@ const acpSDKVersion = "v0.13.5"
 // not-wired — holds on both branches. session/request_permission no longer
 // goes through this sentinel — it is bridged to the Edge approval chain
 // via adapters.PermissionDecisionBroker.
-var errACPEndpointNotWired = errors.New("acp: endpoint not wired (TODO #1743 (follow-up of #1404): frame design)")
+var errACPEndpointNotWired = errors.New("acp: endpoint not wired (frame design pending)")
 
 // acpClientHandler is the coder/acp-go-sdk client side. The SDK dispatches
 // inbound JSON-RPC to the acp.Client interface methods:
@@ -76,7 +74,7 @@ type acpClientHandler struct {
 	runCtx context.Context
 
 	// allowlist is the workspace path gate for fs/terminal frames
-	// (acp_frames.go, #1743 item 1): built from the session workdir in
+	// (acp_frames.go, frame gate): built from the session workdir in
 	// runACPSession. Every fs/terminal stub runs its inbound request
 	// through the frame builders, so a path outside the workspace is
 	// rejected before the not-wired answer. An empty root rejects every
@@ -270,7 +268,7 @@ func firstPermissionOption(options []acp.PermissionOption, kinds ...acp.Permissi
 	return "", false
 }
 
-// ── Unwired endpoint stubs (#1404) ────────────────────────────────────────
+// ── Unwired endpoint stubs ────────────────────────────────────────────────
 //
 // STUB INVENTORY (single source of the "not wired" list — update both the
 // methods below and TestUnwiredACPEndpointsFailClosed when an endpoint is
@@ -290,7 +288,7 @@ func firstPermissionOption(options []acp.PermissionOption, kinds ...acp.Permissi
 // Every stub fails closed with errACPEndpointNotWired — a JSON-RPC error the
 // agent can surface — never a silent hang, never a fake success.
 //
-// #1743 item 1 landed the two preconditions for wiring (acp_frames.go):
+// The two preconditions for wiring are in place (acp_frames.go):
 //   - capabilities shrink: initialize no longer advertises fs/terminal
 //     (runACPSession) — advertising a capability whose endpoints can only
 //     answer with errors would invite the agent to depend on a broken
@@ -300,9 +298,8 @@ func firstPermissionOption(options []acp.PermissionOption, kinds ...acp.Permissi
 //     the session workspace is rejected even before the not-wired error
 //     (gate rejections still wrap errACPEndpointNotWired).
 //
-// What remains is real execution behind the gate (#1743 item 3, real-run
-// verification, requires approval) — until then the stubs stay fail-closed
-// as the last line of defense.
+// Real execution behind the gate is still pending; until then the stubs stay
+// fail-closed as the last line of defense.
 //
 // ReadTextFile handles fs/read_text_file.
 func (h *acpClientHandler) ReadTextFile(ctx context.Context, params acp.ReadTextFileRequest) (acp.ReadTextFileResponse, error) {
@@ -325,7 +322,7 @@ func (h *acpClientHandler) WriteTextFile(ctx context.Context, params acp.WriteTe
 // fsEndpointError is the fail-closed answer for an fs frame that passed the
 // workspace allowlist gate: the frame is valid but nothing executes it yet.
 func fsEndpointError(method, normalizedPath string) error {
-	return fmt.Errorf("acp: %s %q passed the workspace allowlist but execution is not wired (TODO #1743 item 3: real-run verification): %w",
+	return fmt.Errorf("acp: %s %q passed the workspace allowlist but execution is not wired (real-run verification pending): %w",
 		method, normalizedPath, errACPEndpointNotWired)
 }
 
@@ -388,7 +385,7 @@ func (h *acpClientHandler) WaitForTerminalExit(ctx context.Context, params acp.W
 // terminalEndpointError is the fail-closed answer for a terminal frame that
 // passed the frame gate: the frame is valid but nothing executes it yet.
 func terminalEndpointError(method string) error {
-	return fmt.Errorf("acp: %s frame accepted but execution is not wired (TODO #1743 item 3: real-run verification): %w",
+	return fmt.Errorf("acp: %s frame accepted but execution is not wired (real-run verification pending): %w",
 		method, errACPEndpointNotWired)
 }
 
@@ -427,16 +424,15 @@ func runACPSession(ctx context.Context, stdout io.Reader, stdin io.Writer, emitt
 
 	// 1. initialize handshake. No fs/terminal client capabilities are
 	// advertised: the client-side endpoints are still unwired fail-closed
-	// stubs (#1743, follow-up of #1404), and advertising a capability whose
-	// endpoints can only answer with errors would invite the agent to depend
-	// on a broken surface. Tool permission gates use
-	// session/request_permission, which is bridged to the Edge approval
-	// chain.
+	// stubs, and advertising a capability whose endpoints can only answer
+	// with errors would invite the agent to depend on a broken surface. Tool
+	// permission gates use session/request_permission, which is bridged to
+	// the Edge approval chain.
 	initResp, err := conn.Initialize(ctx, acp.InitializeRequest{
 		ProtocolVersion: acp.ProtocolVersionNumber,
 		ClientInfo: &acp.Implementation{
 			Name:    "agenthub-edge",
-			Version: "acp-spike",
+			Version: "dev",
 		},
 	})
 	if err != nil {
@@ -448,8 +444,8 @@ func runACPSession(ctx context.Context, stdout io.Reader, stdin io.Writer, emitt
 	}
 
 	// 2. session/new. The run profile's MCP config (rc.MCPConfig) is parsed
-	// into ACP McpServer entries and wired into the session (#1743). A parse
-	// failure keeps the #1740 visible degradation event (reason
+	// into ACP McpServer entries and wired into the session. A parse
+	// failure keeps the visible degradation event (reason
 	// acp_mcp_not_wired) so the user still sees *why* MCP tools are
 	// unavailable instead of a silent absence; a successful parse passes the
 	// servers through and emits no degradation.
@@ -474,7 +470,7 @@ func runACPSession(ctx context.Context, stdout io.Reader, stdin io.Writer, emitt
 
 	// 3. session/prompt. During this call the SDK dispatches all inbound
 	// session/update notifications (→ SessionUpdate → run.agent.*) and
-	// blocking requests (→ handler #1743) concurrently.
+	// blocking requests (→ handler) concurrently.
 	slog.Debug("acp: sending session/prompt", "run_id", run.ID, "session_id", sessResp.SessionId)
 	promptResp, err := conn.Prompt(ctx, acp.PromptRequest{
 		SessionId: sessResp.SessionId,

@@ -1,16 +1,15 @@
-# Self-hosted fonts (#2024)
+# Self-hosted fonts
 
-This folder replaces the Google Fonts `<link>` tags previously loaded by
-`app/desktop/index.html`, so Material Symbols ligature icons render offline
-in the packaged shell. No request to fonts.googleapis.com / fonts.gstatic.com
-remains; `app/e2e/fontBlocker.ts` keeps guarding this invariant in E2E.
+All fonts are self-hosted: no request goes to fonts.googleapis.com /
+fonts.gstatic.com, so Material Symbols ligature icons render offline in the
+packaged shell; `app/e2e/fontBlocker.ts` guards this invariant in E2E.
 Web additionally self-hosts Hanken Grotesk (see app/web/public/fonts/).
 
 ## Files
 
 | File | Family | Bytes | Source | License |
 | --- | --- | --- | --- | --- |
-| material-symbols-outlined.woff2 | Material Symbols Outlined (variable: wght 100..700, FILL 0..1, GRAD, opsz) | 1,127,988 | fonts.gstatic.com/s/materialsymbolsoutlined/v368/kJEPBvYX7BgnkSrUwT8OhrdQw4oELdPIeeII9v6oDMzBwG-RpA6RzaxHMPdY40KH8nGzv3fzfVJO1Q.woff2 | Apache-2.0 (LICENSE-ApACHE-2.0.txt) |
+| material-symbols-outlined.woff2 | Material Symbols Outlined (variable: wght 100..700, FILL 0..1, GRAD, opsz) | 1,127,988 | fonts.gstatic.com/s/materialsymbolsoutlined/v368/kJEPBvYX7BgnkSrUwT8OhrdQw4oELdPIeeII9v6oDMzBwG-RpA6RzaxHMPdY40KH8nGzv3fzfVJO1Q.woff2 | Apache-2.0 (LICENSE-APACHE-2.0.txt) |
 
 Fetched 2026-08-28 with a desktop Chrome user agent from the Google Fonts
 css2 endpoint `family=Material+Symbols+Outlined:wght,FILL@100..700,0..1`

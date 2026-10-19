@@ -323,7 +323,7 @@ func (s *AgentTeamService) ListTeamRuns(ctx context.Context, userID, teamID stri
 
 // teamRunStateReadConcurrency caps how many of GetTeamRunState's independent
 // reads run at once. Four keeps the fan-out inside the PG connection pool the
-// Hub already sizes for request traffic (#2154 P2-11) instead of letting one
+// Hub already sizes for request traffic (#2154) instead of letting one
 // polled endpoint take six connections per in-flight request.
 //
 // Fanning out means each read takes its own pooled connection, which is only
@@ -369,39 +369,16 @@ func (s *AgentTeamService) GetTeamRunState(ctx context.Context, userID, teamID, 
 		return nil, errcode.AgentTaskNotFound
 	}
 
-	// #2154 P2-11: the projection reads six independent collections and used to
-	// issue them strictly one after another (2-10 ms of serialized round trips
-	// on the endpoint the team-run UI polls every 1-3 s). Only two of them
-	// actually depend on the first four, so the reads are now two parallel
-	// layers:
+	// #2154: the projection reads six independent collections in two layers,
+	// because only pendingTaskSnapshot and runEvents depend on the first four:
 	//
 	//	layer 1  members | assignments | tasks | team events
 	//	layer 2  pendingTaskSnapshot(assignments, tasks) | runEvents(agentTaskIDs)
 	//
-	// Error semantics are preserved exactly. Each goroutine stores its own
-	// error instead of returning it, and the checks below run in the original
-	// source order (members → assignments → tasks → pendingTask → runEvents →
-	// team events), so the error this endpoint surfaces — and therefore the
-	// errcode the handler maps it to, AgentTaskNotFound included — is the same
-	// one the serial version returned. Returning errors from the goroutines
-	// instead would let errgroup's first-*completed* error win, which is
-	// completion-order dependent and would make the API error code racy.
-	//
-	// Sibling cancellation is deliberately not used for the same reason: an
-	// errgroup.WithContext ctx is canceled by the first failure, which would
-	// overwrite an earlier slot's real error with context.Canceled. gctx still
-	// propagates the *request's* cancellation and deadline into every query via
-	// s.db.WithContext, which the serial version did not do at all.
-	//
-	// Panic safety: each closure defers safego.RecoverInto into its own error
-	// slot. errgroup.Go spawns a real goroutine and recovers nothing, and gin's
-	// recovery middleware only covers the request goroutine — so a panic in one
-	// of these reads, which the serial version surfaced as a 500 through that
-	// middleware, would otherwise take the whole Hub process down on the
-	// endpoint the team-run UI polls every 1-3 s. RecoverInto records the panic
-	// as that read's error (only if the slot is still empty), so the panic
-	// follows the existing error path and the priority order below: a 500 that
-	// names the read, never a silently half-populated projection.
+	// Each goroutine writes its own error slot, and the checks below run in
+	// source order so the surfaced errcode stays deterministic. Panics are
+	// recovered into the same slot, so a failed read follows the normal error
+	// path instead of taking down the Hub process.
 	gctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	db := s.db.WithContext(gctx)
@@ -646,7 +623,7 @@ func (s *AgentTeamService) projectTeamRunEvents(state *model.TeamRunState, runEv
 // assignments/tasks. db is injected (rather than read from s.db) so the caller
 // can hand in a request-scoped s.db.WithContext(gctx) handle and keep
 // cancellation propagation while the read runs in parallel with its siblings
-// (#2154 P2-11).
+// (#2154).
 func (s *AgentTeamService) pendingTaskSnapshotByID(db *gorm.DB, assignments []model.AgentTeamAssignment, tasks []model.AgentTeamTask) (map[string]model.PendingAgentTask, error) {
 	ids := teamAgentTaskIDs(assignments, tasks)
 	if len(ids) == 0 {

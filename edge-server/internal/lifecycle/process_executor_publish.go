@@ -16,11 +16,10 @@ func (e *ProcessExecutor) publishOutput(wg *sync.WaitGroup, run store.Run, outSt
 	offset := 0
 	for {
 		n, err := reader.Read(buf)
-		readPlan := planOutputRead(n, err)
-		if readPlan.Process {
+		if n > 0 {
 			offset = e.publishOutputChunk(run, outStore, limiter, stream, buf[:n], offset)
 		}
-		if readPlan.Stop {
+		if err != nil {
 			return
 		}
 	}
@@ -32,44 +31,42 @@ func (e *ProcessExecutor) publishOutput(wg *sync.WaitGroup, run store.Run, outSt
 // updated chunk offset for the caller's next iteration.
 func (e *ProcessExecutor) publishOutputChunk(run store.Run, outStore *runnerctx.RunOutputStore, limiter *runOutputLimiter, stream string, data []byte, offset int) int {
 	allowed, truncatedNow, written, maxBytes := limiter.allow(data)
-	chunk := planOutputChunk(run.ID, stream, allowed, offset, truncatedNow, written, maxBytes, outStore != nil)
-	if !chunk.Publish {
+	if len(allowed) == 0 && !truncatedNow {
 		return offset
 	}
+	text := string(allowed)
 	// Log stderr to structured logger so CC failure diagnostics
 	// are visible in Edge server logs without subscribing to bus events.
-	if chunk.LogStderr {
-		for _, line := range stderrLogLines(chunk.Text) {
+	if stream == "stderr" && text != "" {
+		for _, line := range stderrLogLines(text) {
 			sanitizedLine, _ := recursiveSanitizeString(line)
 			slog.Error("cc stderr", "runId", run.ID, "line", sanitizedLine)
 		}
 	}
-	if chunk.WriteStore {
-		if _, err := outStore.Write(chunk.Text); planOutputStoreWriteLog(err).Log {
+	if outStore != nil && len(allowed) > 0 {
+		if _, err := outStore.Write(text); err != nil {
 			slog.Warn("process: failed to write output store", "runId", run.ID, "error", err)
 		}
 	}
-	if chunk.ForwardHub {
-		e.recordHubOutput(run.ID, chunk.Text)
-		e.fireHubStream(run.ID, chunk.Text)
+	if stream == "stdout" && text != "" {
+		e.recordHubOutput(run.ID, text)
+		e.fireHubStream(run.ID, text)
 	}
-	if chunk.LogTruncate {
+	if truncatedNow {
 		slog.Warn("process: run output truncated", "runId", run.ID, "maxBytes", maxBytes)
 	}
-	e.bus.Publish("run.output.batch", runScope(run), chunk.Payload)
-	return chunk.NextOffset
+	e.bus.Publish("run.output.batch", runScope(run), runOutputBatchPayload(run.ID, stream, text, offset, truncatedNow, written, maxBytes))
+	return offset + len(allowed)
 }
 
 func (e *ProcessExecutor) publishFailed(run store.Run, err error) {
 	slog.Debug("executor.run.failed", "runId", run.ID, "error", err)
 	failed, ok := e.store.SetRunStatusIf(run.ID, "failed", "queued", "started")
-	failPlan := planPublishFailed(ok, err)
-	if failPlan.Publish {
-		if failPlan.Persist {
-			e.persistAgentFailureMessage(failed, failPlan.Classified.Message)
-		}
-		e.bus.Publish("run.failed", runScope(failed), runFailedEventPayload(failed.ID, failed.Status, failPlan.Classified))
-		e.fireHubFail(failed.ID, failPlan.Classified.Message)
+	if ok {
+		classified := ClassifyError(err, ExitCodeFromErr(err))
+		e.persistAgentFailureMessage(failed, classified.Message)
+		e.bus.Publish("run.failed", runScope(failed), runFailedEventPayload(failed.ID, failed.Status, classified))
+		e.fireHubFail(failed.ID, classified.Message)
 	}
 	e.checkPersistError(run.ID)
 }
@@ -78,14 +75,14 @@ func (e *ProcessExecutor) persistAgentFailureMessage(run store.Run, content stri
 	content, contentOK := trimAgentFailureContent(content)
 	repository, repoOK := asAgentFailureRepository(e.store)
 	exists := false
-	if planPersistAgentFailureGate(contentOK, repoOK).ScanExists {
+	if contentOK && repoOK {
 		exists = hasAgentMessageForRun(repository.ListThreadItems(run.ThreadID), run.ID)
 	}
-	if !planPersistAgentFailure(contentOK, repoOK, exists).Proceed {
+	if !contentOK || !repoOK || exists {
 		return
 	}
 	item, err := repository.CreateItem(agentFailureItem(run, transcriptItemID(run.ID), content))
-	if planAgentFailurePersistLog(err).Log {
+	if err != nil {
 		slog.Warn("process: failed to persist run failure message", "runId", run.ID, "error", err)
 		return
 	}
@@ -96,10 +93,10 @@ func (e *ProcessExecutor) persistAgentFailureMessage(run store.Run, content stri
 
 func (e *ProcessExecutor) publishCancelled(run store.Run) {
 	cancelled, ok := e.store.SetRunStatusIf(run.ID, "cancelled", "queued", "started", "cancelling")
-	if planPublishStatus(ok).Publish {
+	if ok {
 		e.bus.Publish("run.cancelled", runScope(cancelled), RunResponse(cancelled))
 		// Fire Hub callback if configured
-		e.fireHubFail(cancelled.ID, cancelledFailReason())
+		e.fireHubFail(cancelled.ID, ("run cancelled"))
 	}
 	e.checkPersistError(run.ID)
 }
@@ -112,7 +109,7 @@ func (e *ProcessExecutor) checkPersistError(runID string) {
 	if sourceOK {
 		persistErr = pc.LastPersistError()
 	}
-	if !planPersistError(sourceOK, persistErr).Emit {
+	if !sourceOK || persistErr == nil {
 		return
 	}
 	slog.Error("file store persist failed during run status transition", "runId", runID, "error", persistErr)
@@ -122,5 +119,8 @@ func (e *ProcessExecutor) checkPersistError(runID string) {
 
 func (e *ProcessExecutor) runStatus(runID string) string {
 	run, ok := e.store.GetRun(runID)
-	return runStatusFromLookup(run, ok)
+	if !ok {
+		return ""
+	}
+	return run.Status
 }

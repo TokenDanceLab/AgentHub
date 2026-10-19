@@ -13,7 +13,7 @@
 #   2. TokenDance ID offline  → uses SQLite seed (fallback)
 #
 # Usage:
-#   bash scripts/setup-tokendance-oidc.sh
+#   bash hub-server/scripts/setup-tokendance-oidc.sh
 #
 # After running, copy the output client_secret to:
 #   AGENTHUB_TOKENDANCE_ID_CLIENT_SECRET in .env
@@ -22,7 +22,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-TD_ROOT="$REPO_ROOT/../tokendance-id"
+TD_ROOT="${TOKENDANCE_ID_SRC:-}"
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -43,8 +43,7 @@ CLIENT_SECRET="agenthub-dev-secret-change-me"
 # To regenerate for a different secret, use the same recipe the real-e2e
 # provisioning script uses (python3 + bcrypt, already a CI prereq):
 #   python3 -c "import bcrypt,sys;print(bcrypt.hashpw(sys.argv[1].encode(),bcrypt.gensalt(rounds=10)).decode())" "your-secret"
-# See scripts/e2e/provision-real-e2e-stack.sh. (This comment used to point at
-# scripts/bcrypt-hash.go, a file that has never existed in the repo.)
+# See scripts/e2e/provision-real-e2e-stack.sh.
 BCRYPT_HASH='$2a$10$CFRzH1R6MEUVU88nLzRSo.1qX7DtG6sPTqOrZ5HNfp1awu0ei0XpS'
 REDIRECT_URIS='["http://127.0.0.1/callback","http://localhost:5174/auth/tokendance/callback","http://127.0.0.1:5174/auth/tokendance/callback"]'
 GRANT_TYPES='["authorization_code","refresh_token"]'
@@ -67,7 +66,7 @@ if curl -s --max-time 2 "http://localhost:3000/.well-known/openid-configuration"
     info "TokenDance ID is running at http://localhost:3000"
 else
     warn "TokenDance ID is NOT running — will use SQLite seed mode"
-    warn "(Start TokenDance ID for API-based setup: cd ../tokendance-id && go run ./cmd/tokendance-id)"
+    warn "(Start TokenDance ID for API-based setup: cd \"$TOKENDANCE_ID_SRC\" && go run ./cmd/tokendance-id)"
 fi
 
 # ── Step 2: Register the OAuth client ─────────────
@@ -105,7 +104,11 @@ fi
 if [ "$TD_RUNNING" = false ]; then
     banner "SQLite Seed Mode"
 
-    TD_DB="$TD_ROOT/data/tokendance.db"
+    if [ -z "$TD_ROOT" ] && [ -z "${TOKENDANCE_ID_DB:-}" ]; then
+        echo "ERROR: set TOKENDANCE_ID_SRC or TOKENDANCE_ID_DB for SQLite seed mode" >&2
+        exit 1
+    fi
+    TD_DB="${TOKENDANCE_ID_DB:-$TD_ROOT/data/tokendance.db}"
     if [ ! -f "$TD_DB" ]; then
         echo -e "${RED}[!] TokenDance ID database not found at:${NC}"
         echo "    $TD_DB"

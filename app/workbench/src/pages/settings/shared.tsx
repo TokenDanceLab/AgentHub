@@ -1,6 +1,5 @@
 /* ═══════════════════════════════════════════════════════════════════════
-   Shared presentational helpers for SettingsPage subviews.
-   Extracted for Phase 18 strangler slice #572.
+   Shared presentational helpers for SettingsPage subviews (#572).
    ═══════════════════════════════════════════════════════════════════════ */
 
 import React from 'react';

@@ -11,7 +11,7 @@ import (
 )
 
 // ContactService is the subset of *contact.Service used by ContactHandler.
-// DTOs live in service/contact (#685 third IM typed-service package).
+// DTOs live in service/contact (#685).
 type ContactService interface {
 	SearchUser(ctx context.Context, currentUserID, targetID string) (*contact.SearchResult, error)
 	SendFriendRequest(ctx context.Context, userID, friendID, message string) error

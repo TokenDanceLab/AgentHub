@@ -1,7 +1,6 @@
 /* ═══════════════════════════════════════════════════════════════════════
-   TRANSCRIPT EVENT TYPES — extracted from former TranscriptView.tsx
-   Still used by AgentHubWorkbench for context menu + pointer handlers.
-   The old TranscriptView component + block renderers have been retired.
+   TRANSCRIPT EVENT TYPES — context-menu and pointer event shapes used by
+   AgentHubWorkbench.
    ══════════════════════════════════════════════════════════════════════ */
 
 export interface TranscriptContextMenuEvent {

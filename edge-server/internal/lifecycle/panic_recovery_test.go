@@ -29,9 +29,8 @@ import (
 //     edge_goroutine_panic_recoveries_total
 //     (TestLifecycleGoroutinePanicReachesPanicObserver).
 //
-// Property 2 is the one that was broken while this package kept a private copy
-// of the launcher: the copy logged and returned, never dispatched to the
-// observer, and Edge — unlike Hub — registered no observer at all.
+// Property 2 is required: a recovered panic must reach safego's PanicObserver
+// so EdgeMetrics can count it.
 
 // syncLogBuffer is a goroutine-safe bytes buffer for capturing slog output.
 // Recovery goroutines write via the slog default handler while the test polls
@@ -68,8 +67,8 @@ func captureRecoveryLogs(t *testing.T) *syncLogBuffer {
 }
 
 // waitForLogCount polls the capture buffer until marker appears at least
-// count times or the deadline fires. Polls with time.After (not time.Sleep)
-// so the test-sleep ratchet gate does not track this bounded polling.
+// count times or the deadline fires. Polls with time.After instead of a
+// fixed sleep.
 func waitForLogCount(t *testing.T, buf *syncLogBuffer, deadline <-chan time.Time, marker string, count int) {
 	t.Helper()
 	for {
@@ -127,8 +126,8 @@ func (c *panickingHubCallback) TaskFail(context.Context, string, string, string)
 
 // TestFireHubCallbacksRecoverPanic exercises the actual fireHubAck /
 // fireHubStream / fireHubDone / fireHubFail goroutine paths with a panicking
-// CallbackReporter. Each path routes through safego.SafeGo (P1: edge 裸 goroutine 无
-// recover), so the test process survives the four panics and a subsequent
+// CallbackReporter. Each path routes through safego.SafeGo, so the test
+// process survives the four panics and a subsequent
 // healthy callback still fires — positive proof the executor is usable after
 // recovery. Stream/done/fail use distinct runs because the per-run ordered
 // queue (#1409) closes on the first terminal job.
@@ -213,14 +212,6 @@ var _ CallbackReporter = (*panickingHubCallback)(nil)
 // of the recovery contract: a recovered panic in an Edge lifecycle goroutine
 // must reach pkg/safego's process-wide PanicObserver, which is where a server
 // hangs its panic counter and therefore its alerting.
-//
-// While this package kept its own private copy of the launcher, its panics were
-// logged and nothing else — the copy never dispatched to the observer, so the
-// goroutines that carry the run lifecycle (run / hubAck / hubStream /
-// hubDoneEnqueue / hubFailEnqueue / hubCallbackQueue / resultAggregator /
-// resultAggregatorTimeout / watchRunProcess / cancelGrace) could panic
-// invisibly to any alert built against the shared contract. Hub registered an
-// observer from the day pkg/safego landed; Edge registered nothing.
 func TestLifecycleGoroutinePanicReachesPanicObserver(t *testing.T) {
 	// Not parallel: mutates two process globals (slog default logger and the
 	// safego panic observer).

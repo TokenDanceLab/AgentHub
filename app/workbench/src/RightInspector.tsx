@@ -155,7 +155,7 @@ export function RightInspector({
 
   const handleFileClick = useCallback((file: FileItem) => {
     setPreviewFile(resolveFileClickTarget(overviewFiles, file));
-    /* P76: files tab is on-demand — restore it when opening a file from overview. */
+    /* Files tab is on-demand — restore it when opening a file from overview. */
     setVisibleTabs((current) => withInspectorTab(current, 'files'));
     setActiveMode('files');
   }, [overviewFiles]);
@@ -164,7 +164,7 @@ export function RightInspector({
     setPreviewFile(null);
     setBrowserUrl(null);
     setActiveMode('overview');
-    // #1922 item 3: return focus to the overview tab after closing the
+    // Return focus to the overview tab after closing the
     // preview so keyboard users are not stranded when the close button
     // unmounts. Tab selection via arrow keys already keeps focus on the tab
     // (roving-tabindex), so this only handles the explicit close path.

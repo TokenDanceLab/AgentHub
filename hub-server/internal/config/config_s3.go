@@ -6,8 +6,6 @@ import (
 	"strings"
 )
 
-// Residual pure-helper peel #1134: S3-compatible attachment storage config.
-
 // S3Config holds S3-compatible object storage settings for attachments.
 // When Endpoint/Bucket are empty, the server falls back to local filesystem storage.
 type S3Config struct {

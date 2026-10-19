@@ -32,7 +32,7 @@ func BenchmarkPublish_SingleSubscriber(b *testing.B) {
 
 	// Drain handlers so pending returns to zero before next iteration.
 	for bus.Pending() > 0 {
-		// busy spin; no sleep per lane rules.
+		// busy spin; no sleep in the drain loop.
 	}
 }
 

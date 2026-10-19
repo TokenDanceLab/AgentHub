@@ -10,9 +10,8 @@ import (
 
 // setResourceLimits applies OS-level resource limits to a child process.
 // On Windows, this sets CREATE_NEW_PROCESS_GROUP so the child starts in a
-// new process group. Graceful interrupt can then target the group; force
-// kill still uses TerminateProcess on the direct child (full Job Object
-// tree kill is residual work).
+// new process group. Graceful interrupt can then target the group; force kill
+// uses TerminateProcess on the direct child.
 func setResourceLimits(cmd *exec.Cmd) {
 	if cmd.SysProcAttr == nil {
 		cmd.SysProcAttr = &syscall.SysProcAttr{}
@@ -31,7 +30,7 @@ func signalProcessGraceful(proc *os.Process) error {
 }
 
 // killProcessTree force-terminates the direct child process. Grandchildren
-// may still require Job Object containment (residual); CREATE_NEW_PROCESS_GROUP
+// may still require Job Object containment; CREATE_NEW_PROCESS_GROUP
 // alone does not make TerminateProcess cascade.
 func killProcessTree(proc *os.Process) error {
 	if proc == nil {

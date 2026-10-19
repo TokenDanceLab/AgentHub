@@ -11,23 +11,21 @@ import (
 )
 
 // This file pins the in-memory counterpart of the EventLog ordering invariant
-// (#2154 lane B): the order in which envelopes reach a subscriber channel must
+// (#2154): the order in which envelopes reach a subscriber channel must
 // equal their seq order.
 //
 // Why it matters downstream: app/shared/src/eventClient.ts:202 does
 // `if (envelope.seq <= lastSeq) return;` — an envelope that arrives after a
 // larger seq is treated as a replay duplicate and dropped permanently, with no
-// system.gap emitted, so the client silently loses a state change. api/events.md:67
-// promises "`seq` 同 stream 单调". hub-server/internal/ws/fanout.go:92-101 is the
-// in-repo correct precedent: it stamps `frame.SeqID = c.seq.Add(1)` INSIDE the
+// system.gap emitted, so the client silently loses a state change. api/events.md:60
+// promises "`seq` 同 stream 单调". hub-server/internal/ws/fanout.go:102 is the
+// in-repo precedent: it stamps `frame.SeqID = c.seq.Add(1)` INSIDE the
 // `sendMu` critical section, and its comment states that queue order — and
 // therefore wire order — always equals seq order.
 //
-// Bus.Publish does the opposite: it hands out the seq with a lock-free
-// atomic.AddInt64, then runs persistFn (a file write, with up to 14ms of retry
-// backoff on failure), and only afterwards takes b.mu and fans out. Everything
-// between the seq stamp and the channel push is preemptible, so a larger seq can
-// reach the wire first.
+// Bus.Publish enforces the same order with its wire gate under concurrent
+// publishers; this test pins that no envelope can reach a subscriber channel
+// after a larger seq.
 
 // orderingWriters picks a publisher count that leaves at least one P for the
 // drainer goroutine. subscriberChannelBufferSize is 256, so if the publishers

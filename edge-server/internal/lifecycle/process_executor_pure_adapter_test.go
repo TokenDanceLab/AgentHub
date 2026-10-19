@@ -473,10 +473,9 @@ type needsStdinTestAdapter struct {
 }
 
 // TestProcessExecutorKeepsStdinOpenForNeedsStdinAdapter verifies that when an
-// adapter reports NeedsStdin()==true and no DecisionLoop is configured, the
-// executor does NOT close stdin after cmd.Start(). The adapter's ParseStream
-// receives a writable stdin pipe, enabling the permission gating protocol to
-// function correctly (G03 fix).
+// adapter reports NeedsStdin()==true, the executor does NOT close stdin after
+// cmd.Start(). The adapter's ParseStream receives a writable stdin pipe,
+// enabling the permission gating protocol to function correctly.
 func TestProcessExecutorKeepsStdinOpenForNeedsStdinAdapter(t *testing.T) {
 	bus := events.NewBus(100)
 	s := store.New()

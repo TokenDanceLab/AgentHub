@@ -1,8 +1,7 @@
 import type { AgentProfileCatalogItem } from './agentProfileCatalogTypes';
 
 /* ═══════════════════════════════════════════════════════════════════════
-   agentProfileCatalogData — residual fixture extract from agentProfileCatalog
-   (#652). Static AgentProfile catalog rows only.
+   agentProfileCatalogData — static AgentProfile catalog rows.
    ═══════════════════════════════════════════════════════════════════════ */
 
 export const AGENT_PROFILE_CATALOG: AgentProfileCatalogItem[] = [

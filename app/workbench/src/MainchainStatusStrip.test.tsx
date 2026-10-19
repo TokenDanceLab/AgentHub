@@ -17,7 +17,7 @@ const summary: MainchainSummary = {
   exportDetail: '',
 };
 
-describe('global status bar honesty (#1994, UX F5)', () => {
+describe('global status bar honesty (#1994)', () => {
   it('renders nothing when there is no real data to show', () => {
     const { container } = render(<MainchainStatusStrip />);
     expect(container.firstChild).toBeNull();
@@ -27,7 +27,7 @@ describe('global status bar honesty (#1994, UX F5)', () => {
     render(<MainchainStatusStrip connectionStatus="connected" />);
     const bar = screen.getByRole('region');
     expect(bar).toHaveAttribute('aria-live', 'polite');
-    expect(bar).toHaveAttribute('aria-label', 'Demo main chain status');
+    expect(bar).toHaveAttribute('aria-label', 'Main chain status');
     expect(screen.getByText('WebSocket Connected')).toBeInTheDocument();
   });
 
@@ -49,7 +49,7 @@ describe('global status bar honesty (#1994, UX F5)', () => {
   });
 });
 
-describe('MainchainStatusStrip attention chips (F6)', () => {
+describe('MainchainStatusStrip attention chips', () => {
   it('renders clickable running/awaiting chips that route to their queues', () => {
     const onOpenRunningQueue = vi.fn();
     const onOpenApprovalQueue = vi.fn();
@@ -103,11 +103,11 @@ describe('MainchainStatusStrip attention chips (F6)', () => {
   });
 });
 
-describe('MainchainStatusStrip usage chip (#1990, UX F14)', () => {
+describe('MainchainStatusStrip usage chip (#1990)', () => {
   it('renders the compact usage total and routes to the usage page on click', () => {
     const onOpenUsage = vi.fn();
     render(<MainchainStatusStrip usageTokenTotal={12400} onOpenUsage={onOpenUsage} />);
-    // #2154 P3-3: shared formatTokens units (12.4K), matching the usage board.
+    // #2154: shared formatTokens units (12.4K), matching the usage board.
     const chip = screen.getByRole('button', { name: '12.4K tokens used · Open the usage board' });
     expect(chip).toHaveAttribute('data-attention-kind', 'usage');
     fireEvent.click(chip);

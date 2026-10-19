@@ -24,7 +24,7 @@ import {
    InspectorModeBodies — overview / browser / files mode panel bodies
    for RightInspector.
 
-   Extracted from RightInspector as Phase 19 residual thin #584.
+   Extracted from RightInspector (#584).
    CSS remains on shared AgentHubWorkbench.module.css.
    ═══════════════════════════════════════════════════════════════════════ */
 

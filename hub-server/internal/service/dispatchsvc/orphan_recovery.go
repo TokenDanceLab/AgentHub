@@ -90,11 +90,14 @@ func (s *DispatchService) redeliverOrphanedTask(ctx context.Context, taskID stri
 		return
 	}
 
-	// Preload CustomAgent if needed (same logic as TriggerAgentTask).
+	// Best-effort preload: redelivery proceeds without custom fields if the
+	// lookup fails. Unlike TriggerAgentTask, no new pending task is created here,
+	// so a failure must not block recovery.
 	var customAgent *model.CustomAgent
-	if dispatch.NeedsCustomAgentPreload(ai.CustomAgentID) {
-		ca, caErr := repository.GetCustomAgentByID(s.db, dispatch.CustomAgentIDValue(ai.CustomAgentID))
-		customAgent = dispatch.CustomAgentPreloadOrNil(caErr, ca)
+	if id := dispatch.CustomAgentIDValue(ai.CustomAgentID); id != "" {
+		if ca, caErr := repository.GetCustomAgentByID(s.db, id); caErr == nil {
+			customAgent = ca
+		}
 	}
 
 	// Re-derive targetType from target_id via the same validation path.

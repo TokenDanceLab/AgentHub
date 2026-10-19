@@ -14,8 +14,8 @@ import (
 )
 
 // MessageService is the subset of *message.Service used by MessageHandler.
-// DTOs live in service/message (#720 sixth IM typed-service package).
-// Reaction methods use messagereaction DTOs (#662 first IM typed-service package).
+// DTOs live in service/message (#720).
+// Reaction methods use messagereaction DTOs (#662).
 type MessageService interface {
 	SendMessage(ctx context.Context, sessionID, senderUserID string, req message.SendMessageRequest) (*message.SendMessageResponse, error)
 	GetMessages(ctx context.Context, sessionID, userID string, beforeSeq int64, limit int) ([]message.MessageResponse, error)
@@ -99,10 +99,10 @@ func (h *MessageHandler) GetMessages(c *gin.Context) {
 		}
 		limit = parsed
 	}
-	// Ceiling = repository.GetMessagesBySession → ClampPageSize(..,
-	// MaxMessagePageLimit, DefaultPaginationLimit): the same value and the same
-	// default, so this is an exact conversion of the two hand-written branches
-	// that used to sit here, not a behaviour change (#2243).
+	// Default is DefaultPaginationLimit (50) and the ceiling is
+	// MaxMessagePageLimit (100), applied here so the API's declared limit is
+	// enforced at the handler: <=0 yields 50 and >100 yields 100, matching the
+	// same clamp in repository.GetMessagesBySession.
 	limit = config.ClampPageSize(limit, config.MaxMessagePageLimit, config.DefaultPaginationLimit)
 
 	result, err := h.service.GetMessages(c.Request.Context(), sessionID, userID, beforeSeq, limit)
@@ -150,8 +150,8 @@ func (h *MessageHandler) GetIncrementalMessages(c *gin.Context) {
 	// its own branch (`limit <= 0 || limit > max → max`, i.e. a non-positive
 	// value becomes 500 rather than the default), but this handler never sends
 	// it a non-positive value — ClampPageSize maps those to
-	// DefaultPaginationLimit first, exactly as the two hand-written branches did
-	// before. That repository branch is tracked separately in #2243 (#2243).
+	// DefaultPaginationLimit first. The branch inside GetMessagesIncrement
+	// remains as defence in depth (#2243).
 	limit = config.ClampPageSize(limit, config.MaxIncrementalMessageLimit, config.DefaultPaginationLimit)
 
 	result, err := h.service.GetMessagesIncremental(c.Request.Context(), sessionID, userID, afterSeq, limit)
@@ -408,7 +408,7 @@ func (h *MessageHandler) MarkRead(c *gin.Context) {
 }
 
 // parseMessageSearchPage parses pageCursor/pageSize for message search
-// endpoints (#2136 P2). Message search keeps the MaxMessagePageLimit cap (100)
+// endpoints (#2136). Message search keeps the MaxMessagePageLimit cap (100)
 // instead of MaxListPageSize (200) to preserve payload-size invariants, and the
 // search queries apply no ceiling of their own (repository/message.go: "pageSize
 // is clamped by the caller"), so this handler is the enforcement point.

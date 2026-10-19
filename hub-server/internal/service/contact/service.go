@@ -7,7 +7,6 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/agenthub/hub-server/internal/bus"
-	"github.com/agenthub/hub-server/internal/cache"
 	"github.com/agenthub/hub-server/internal/errcode"
 	"github.com/agenthub/hub-server/internal/model"
 	"github.com/agenthub/hub-server/internal/repository"
@@ -24,16 +23,14 @@ type Bus interface {
 type Cache interface {
 	Invalidate(ctx context.Context, keys ...string) error
 	IsOnline(ctx context.Context, userID string) (bool, error)
-	// AreOnline batches presence lookups in one round trip (#2154 perf lane).
+	// AreOnline batches presence lookups in one round trip (#2154).
 	AreOnline(ctx context.Context, userIDs []string) (map[string]bool, error)
 }
 
 // Service owns contact/friendship orchestration: user search, friend request
 // lifecycle, contact list/remove, block/unblock, remark, and friend-ID
 // projection. Friend-list invalidation and presence use injected Cache; domain
-// events go through Bus. This package is the third IM typed-service extract
-// (#685) after messagereaction (#662) and workspace (#673). Ports were
-// hardened in #594; package move only.
+// events go through Bus.
 type Service struct {
 	db          *gorm.DB
 	bus         Bus
@@ -42,25 +39,9 @@ type Service struct {
 
 // NewService constructs a contact service.
 // bus may be nil for read-only/partial tests; write paths that publish no-op.
-// cacheClient may be nil and falls back to cache.NoOpCache.
+// cacheClient must be non-nil; tests may pass cache.NoOpCache{}.
 func NewService(db *gorm.DB, bus Bus, cacheClient Cache) *Service {
-	return &Service{db: db, bus: bus, cacheClient: resolveCache(cacheClient)}
-}
-
-// SetBus injects (or replaces) the event bus port.
-func (s *Service) SetBus(bus Bus) {
-	if s == nil {
-		return
-	}
-	s.bus = bus
-}
-
-// SetCache injects (or replaces) the contact cache port.
-func (s *Service) SetCache(cacheClient Cache) {
-	if s == nil {
-		return
-	}
-	s.cacheClient = resolveCache(cacheClient)
+	return &Service{db: db, bus: bus, cacheClient: cacheClient}
 }
 
 // publish is a nil-safe wrapper over the bus port.
@@ -71,14 +52,6 @@ func (s *Service) publish(ctx context.Context, event bus.Event) {
 	if err := s.bus.Publish(ctx, event); err != nil {
 		slog.Warn("failed to publish contact event", "event_type", event.Type, "error", err)
 	}
-}
-
-// resolveCache returns c, falling back to cache.NoOpCache when c is nil or a
-// typed-nil cache port. Thin type-bridge over cache.ResolveCache so call sites
-// stay on the package-local Cache interface; the nil-detection logic lives in
-// the shared internal/cache helper (Audit-D §4 cluster 2).
-func resolveCache(c Cache) Cache {
-	return cache.ResolveCache[Cache](c, cache.NoOpCache{})
 }
 
 // SearchResult is the API/handler DTO for user search.
@@ -214,7 +187,7 @@ func (s *Service) ListFriendRequests(ctx context.Context, userID string) ([]Requ
 		return []RequestInfo{}, nil
 	}
 
-	// Collect sender IDs for batch query (P2-1: fix N+1)
+	// Collect sender IDs for batch query (avoids N+1)
 	senderIDs := make([]string, 0, len(requests))
 	for _, r := range requests {
 		senderIDs = append(senderIDs, r.UserID)
@@ -301,7 +274,7 @@ func (s *Service) ListContacts(ctx context.Context, userID string) ([]ContactInf
 		return []ContactInfo{}, nil
 	}
 
-	// Collect friend IDs for batch query (P2-2: fix N+1)
+	// Collect friend IDs for batch query (avoids N+1)
 	friendIDs := make([]string, 0, len(friends))
 	for _, f := range friends {
 		friendIDs = append(friendIDs, f.FriendID)
@@ -312,10 +285,9 @@ func (s *Service) ListContacts(ctx context.Context, userID string) ([]ContactInf
 		return nil, err
 	}
 
-	// Presence in one pipelined round trip instead of one per friend (#2154
-	// perf lane); errors degrade to all-offline, matching the previous
-	// per-item error swallowing.
-	onlineSet, _ := resolveCache(s.cacheClient).AreOnline(ctx, friendIDs)
+	// Presence in one pipelined round trip instead of one per friend (#2154);
+	// errors degrade to all-offline.
+	onlineSet, _ := s.cacheClient.AreOnline(ctx, friendIDs)
 
 	result := make([]ContactInfo, 0, len(friends))
 	for _, f := range friends {

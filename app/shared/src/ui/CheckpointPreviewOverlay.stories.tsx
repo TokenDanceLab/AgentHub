@@ -42,8 +42,8 @@ const labels = {
   selectFile: 'Select a file to view its pre-run content',
   emptyContent: 'No text preview for this file (binary or over the size cap).',
   absent: 'No snapshot found for this run (it may have been cleaned up); nothing to preview.',
-  restoreUnavailable: 'Restore is not wired: write-back requires the remote-evidence track and explicit approval. This surface offers read-only preview only.',
-  surfaceUnavailable: 'This surface cannot reach snapshot content (Hub-only boundary).',
+  restoreUnavailable: 'Restore is not available in this client; this is a read-only preview.',
+  surfaceUnavailable: 'This client cannot access snapshot content; snapshot preview is available in the Desktop app.',
   loadFailed: 'Failed to load the snapshot; try again later.',
 };
 

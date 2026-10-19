@@ -122,7 +122,7 @@ function createChromeFixture(overrides: Partial<TranscriptChromeControllerDeps> 
     },
     writers,
     getTranscript: () => [
-      // #2274 B-1: the agent block carries the hub-stamped task id so the
+      // #2274: the agent block carries the hub-stamped task id so the
       // regenerate entry/effect has an honest identity to send.
       textBlock({ id: 'a1', text: 'Alpha', agentTaskId: 'task-a1' }),
       textBlock({ id: 'u1', text: 'Mine', author: { id: 'u', role: 'human', name: 'You' } }),
@@ -640,7 +640,7 @@ describe('workbenchTranscriptChromeHelpers', () => {
     expect(handlers.exitSelection).toHaveBeenCalledOnce();
   });
 
-  it('builds residual selection snapshots without undefined optionals', () => {
+  it('builds selection snapshots without undefined optionals', () => {
     expect(createExitSelectionSnapshot()).toEqual({
       selectionMode: false,
       selectedBlockIds: [],
@@ -658,7 +658,7 @@ describe('workbenchTranscriptChromeHelpers', () => {
     });
   });
 
-  it('plans residual block select/hold/pointer-up flows', () => {
+  it('plans block select/hold/pointer-up flows', () => {
     const card = document.createElement('div');
     document.body.append(card);
     const transcript = [textBlock({ id: 'a' }), textBlock({ id: 'b' }), textBlock({ id: 'c' })];
@@ -848,7 +848,7 @@ describe('workbenchTranscriptChromeHelpers', () => {
     vi.useRealTimers();
   });
 
-  it('creates a residual transcript chrome controller for selection/toast flows', () => {
+  it('creates a transcript chrome controller for selection/toast flows', () => {
     const writers = {
       setContextMenu: vi.fn(),
       setSelectionMode: vi.fn(),
@@ -1078,7 +1078,7 @@ describe('workbenchTranscriptChromeHelpers', () => {
     expect(typeof forwardItem?.submenu).toBe('function');
   });
 
-  /* ── #2154 P1-A：controller 级 fail-closed 菜单 + 真实派发 ────────────── */
+  /* ── #2154 fail-closed 菜单 + 真实派发 ────────────── */
 
   it('omits handler-backed menu entries when no handler is wired, even with a session id (#2154)', () => {
     // The Desktop shell before #2154: `activeConversationId` doubles as the

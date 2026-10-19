@@ -1,5 +1,5 @@
 // Package adapters — SecurityHook implements AgentHook for the
-// Claude Code 23-check security pipeline (§2.2 of 00-synthesis.md).
+// Claude Code 23-check security pipeline.
 //
 // The hook operates in two phases:
 //  1. PreToolUse: classify tool risk + scan Bash/WebFetch input for

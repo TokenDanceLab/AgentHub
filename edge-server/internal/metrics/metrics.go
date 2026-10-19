@@ -94,17 +94,9 @@ type EdgeMetrics struct {
 // stays a read-only view of them. A nil field means the series is not
 // registered at all.
 //
-// This used to be a positional parameter list, and the only production
-// constructor (NewWithBusStats) took the two bus callbacks and hard-coded nil
-// for the three event-log ones. The consequence was that
-// edge_event_log_truncations_total, edge_event_log_truncate_failures_total and
-// edge_event_log_gaps_total existed as struct fields, registration blocks, Bus
-// accessors and code comments, and were never served: a live Edge's
-// GET /v1/metrics returned edge_event_bus_depth and edge_event_bus_dropped_total
-// and zero edge_event_log_* series (#2304). Named fields make an unfilled hook
-// visible at the call site instead of hiding it behind positional nils, and
+// Named fields keep an unfilled hook visible at the call site, and
 // TestBuildEventBusAndMetricsServesEventLogSeries asserts the production wiring
-// really serves them.
+// serves the event-log series (#2304).
 type BusHooks struct {
 	BusDepth                    func() float64
 	BusDropped                  func() float64
@@ -213,8 +205,6 @@ func NewWithBusHooks(hooks BusHooks) *EdgeMetrics {
 
 	// Go runtime + process collectors on the isolated registry so the Edge
 	// /metrics endpoint exposes go_* and process_* alongside edge_* metrics.
-	// Previously only the Hub registered these on the default registry; the
-	// Edge served its isolated registry without them (#9 P2).
 	reg.MustRegister(collectors.NewGoCollector())
 	reg.MustRegister(collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}))
 
@@ -273,11 +263,4 @@ func (m *EdgeMetrics) RecordWSConnect() {
 // RecordWSDisconnect decrements the WebSocket connections gauge.
 func (m *EdgeMetrics) RecordWSDisconnect() {
 	m.EdgeWSConnections.Dec()
-}
-
-// NewTestEdgeMetrics creates an EdgeMetrics with all counters initialized for
-// unit tests that need to exercise metric increment paths without wiring a
-// real event bus. The registry is isolated so parallel tests don't collide.
-func NewTestEdgeMetrics() *EdgeMetrics {
-	return NewWithBusHooks(BusHooks{})
 }

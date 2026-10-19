@@ -16,7 +16,7 @@ import styles from './AgentHubWorkbench.module.css';
 
 const SORT_STORAGE_KEY = 'agenthub.conversationSort';
 
-/** F1 live-status dot labels — sharedWorkbench ns keys (zh/en parity is
+/** Live-status dot labels — sharedWorkbench ns keys (zh/en parity is
  *  enforced by the shared i18n resources test). */
 const LIVE_STATUS_LABEL_KEY: Record<ConversationLiveStatus, string> = {
   running: 'sharedWorkbench:attention.stateRunning',
@@ -65,7 +65,7 @@ export interface ConversationSidebarProps {
    *  CTA; both absent when the prop is not wired (backward compatible). */
   onStartNewConversation?: (() => void) | undefined;
   /**
-   * F1 live status per conversation (running / awaiting-approval / done),
+   * Live status per conversation (running / awaiting-approval / done),
    * derived by the shell from the run/approval model via
    * `workbenchAttentionModel`. Rows without an entry render no dot.
    */
@@ -137,12 +137,12 @@ export function ConversationSidebar({
   const [renamingId, setRenamingId] = useState<string | null>(null);
   /** Conversation awaiting delete confirmation in the dialog. */
   const [deleteTarget, setDeleteTarget] = useState<WorkbenchConversation | null>(null);
-  /** Conversation awaiting archive confirmation in the dialog (#1821). */
+  /** Conversation awaiting archive confirmation in the dialog. */
   const [archiveTarget, setArchiveTarget] = useState<WorkbenchConversation | null>(null);
   /**
    * Set when Escape cancels an inline rename. Blur fires after the input is
    * removed in some browsers — the flag keeps that late blur from committing
-   * a cancelled rename (#1821).
+   * a cancelled rename.
    */
   const cancelRenameRef = useRef(false);
 

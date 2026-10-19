@@ -179,7 +179,7 @@ describe('ChatEngineeringColumn Preview (#1966)', () => {
 });
 
 
-describe('ChatEngineeringColumn artifact focus intent (#1992, F10)', () => {
+describe('ChatEngineeringColumn artifact focus intent (#1992)', () => {
   it('resolves the clicked artifact rather than the newest artifact', () => {
     const snapshot = evidenceWithArtifacts();
     const focused = resolveEngineeringPreview(tZh, snapshot, {

@@ -1,10 +1,10 @@
 # Hub→Edge 任务投递契约
 
-> 最后更新：2026-09-07。事件索引见 [events.md](events.md)，REST 字段见 [openapi.yaml](openapi.yaml)。
+> 最后更新：2026-10-18。事件索引见 [events.md](events.md)，REST 字段见 [openapi.yaml](openapi.yaml)。
 
-本页定义跨通道执行输入、admission 回执和结果回传方；它不代表真实登录、模型 E2E、部署或进程恢复已验证。
+本页定义跨通道执行输入、admission 回执和结果回传方。
 
-### Hub→Edge `delivery_id` admission 契约（#2101 G2 / #2347）
+### Hub→Edge `delivery_id` admission 契约
 
 Hub 的 WS `agent.dispatch` 与 outbox HTTP POST `/v1/runs` 共享同一 `delivery_id`。Desktop 将事件中的 `delivery_id` / `deliveryId` 转交为 Edge 请求的 `deliveryId`；空值保留既有无去重路径。
 
@@ -32,4 +32,4 @@ Hub 的 WS `agent.dispatch` 与 outbox HTTP POST `/v1/runs` 共享同一 `delive
 - **typed 输出与背压**：Edge 回传 thinking/tool/file/permission/route/result 的结构化事件，`payload` 是 JSON 对象、每条带稳定 `client_msg_id`。typed 边界前先排入待合并文本；typed 与终态共用同一 per-run FIFO，队列满时 typed 等待空位，不通过丢审批或新增无界 goroutine 释放压力。文本仍沿既有丢流策略并独立收集 final fallback。网络重试有预算，永久失败仍可导致未交付；这不是跨进程可靠消息日志或恢复保证。
 - **Team 控制边界**：typed route/result stream 是事件记录，不等同于调用 Team 的权威 route-decision 接口。带 Team 上下文的任务继续走 Desktop callback owner 与现有控制流程；Hub direct 在 POST 前退出，不把事件透传宣称为 Team 自动调度。
 - **direct 路由保留**：只有执行前能力检查失败、且尚未绑定设备的任务可以走普通 fallback。Hub 在 run POST 前持久化真实设备绑定；POST 超时、连接中断、错误或未知 owner 响应不证明未执行，现有 outbox 只能向原设备核对，不改投另一执行器。成功回执补记原 run ID；迟到回执不得回退已经 running/done/failed 的任务。
-- **旧回执与恢复**：现代请求碰到无法确定 owner 的旧 run，或收到缺失/非法 owner 的接收响应，按未决结果处理，不猜测、不自动重启。Desktop 的 run POST 网络失败、5xx 或缺失 run ID 也不能证明执行失败，因此保持待核对而不发 FAIL；明确的执行前客户端拒绝仍可失败收口。该契约不迁移正在执行的旧进程、不转交已接受任务的 owner，也不宣称跨重启恢复已完成。
+- **旧回执与恢复**：现代请求碰到无法确定 owner 的旧 run，或收到缺失/非法 owner 的接收响应时，按未决结果处理：不猜测、不自动重启。Desktop 的 run POST 网络失败、5xx 或缺失 run ID 同样只保持待核对、不发 FAIL；只有明确的执行前客户端拒绝才失败收口。恢复边界：本契约不迁移正在执行的旧进程、不转交已接受任务的 owner，也不宣称跨重启恢复已完成。

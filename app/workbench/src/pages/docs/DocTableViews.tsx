@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════════════════════════
-   Docs table / preview subviews — extracted for Phase 19 #582.
+   Docs table and preview subviews (#582).
    ═══════════════════════════════════════════════════════════════════════ */
 
 import React, { useCallback, useState } from 'react';
@@ -99,7 +99,7 @@ export function DocTable({
 }: {
   rows: DocRow[];
   documentsLoading?: boolean;
-  /** Hub documents request failure (#1821) — show an explicit error state
+  /** Hub documents request failure — show an explicit error state
    *  instead of collapsing into the empty list. */
   documentsError?: string | undefined;
   profiles?: WorkbenchProfileSource[] | undefined;

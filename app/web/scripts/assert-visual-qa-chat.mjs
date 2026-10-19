@@ -127,7 +127,7 @@ async function main() {
     }
   }
 
-  // UX F8 goal scene (#1998): every goal contract must prove the banner
+  // Goal scene (#1998): every goal contract must prove the banner
   // rendered with positive geometry in the active state.
   const goalContractNames = contractNames.filter(function (n) { return /^web-chat-goal-.*\.json$/.test(n); });
   if (goalContractNames.length === 0) {

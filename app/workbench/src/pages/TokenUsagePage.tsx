@@ -57,10 +57,8 @@ export function hasRecordedTokens(teams: TokenUsagePageTeam[]): boolean {
   return teams.some((team) => team.runs.some((run) => typeof run.tokenUsageTotal === 'number'));
 }
 
-// #2154 P3-3: formatTokenCount (12.3k / 2.50M) is gone. The board and the
-// bottom status strip both format through shared formatTokens (12.3K / 2.5M),
-// the same helper the inspector overview already used, so one screen can no
-// longer show two unit conventions for the same counters.
+// The board and bottom status strip both format through shared formatTokens
+// (12.3K / 2.5M), so one screen shows one unit convention for counters.
 
 /** Deterministic created-at label: locale string when parseable, raw otherwise. */
 export function formatUsageTimestamp(iso: string | undefined): string {

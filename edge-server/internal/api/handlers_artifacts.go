@@ -5,7 +5,6 @@ import (
 	"strings"
 
 	"github.com/agenthub/edge-server/internal/errcode"
-	"github.com/agenthub/edge-server/internal/lifecycle"
 	"github.com/agenthub/edge-server/internal/store"
 )
 
@@ -78,10 +77,11 @@ func (h *Handler) PostPreview(w http.ResponseWriter, r *http.Request) {
 		errcode.Write(w, errcode.ErrNotFound.WithMessage("run not found"))
 		return
 	}
-	preview, err := ensurePreviewRunner(h, repository).StartPreview(lifecycle.PreviewStartRequest{
-		PreviewID: req.PreviewID,
-		RunID:     req.RunID,
-		ThreadID:  req.ThreadID,
+	preview, err := repository.UpsertPreview(store.Preview{
+		ID:       strings.TrimSpace(req.PreviewID),
+		RunID:    strings.TrimSpace(req.RunID),
+		ThreadID: strings.TrimSpace(req.ThreadID),
+		Status:   "starting",
 	})
 	if err != nil {
 		errcode.Write(w, errcode.ErrNotFound.WithMessage("run not found"))
@@ -127,7 +127,9 @@ func (h *Handler) PostPreviewStop(w http.ResponseWriter, r *http.Request, previe
 		errcode.Write(w, errcode.ErrNotFound.WithMessage("preview not found"))
 		return
 	}
-	stopped, err := ensurePreviewRunner(h, repository).StopPreview(preview.ID)
+	preview.Status = "stopped"
+	preview.URL = ""
+	stopped, err := repository.UpsertPreview(preview)
 	if err != nil {
 		errcode.Write(w, errcode.ErrNotFound.WithMessage("preview not found"))
 		return

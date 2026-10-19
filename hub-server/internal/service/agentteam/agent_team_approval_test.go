@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/agenthub/hub-server/internal/cache"
 	"github.com/agenthub/hub-server/internal/errcode"
 	"github.com/agenthub/hub-server/internal/model"
 	"github.com/agenthub/hub-server/internal/repository"
@@ -15,7 +16,7 @@ import (
 
 func TestAgentTeamService_ResolveConflictAppendsEventAndUpdatesReplay(t *testing.T) {
 	db := setupAgentTeamStateSQLite(t)
-	svc := NewAgentTeamService(db, nil, nil)
+	svc := NewAgentTeamService(db, nil, cache.NoOpCache{})
 	team, _, executor, run := seedAgentTeamRun(t, db)
 	reviewerProfileID := "profile-reviewer"
 	reviewer := &model.AgentTeamMember{
@@ -92,7 +93,7 @@ func TestAgentTeamService_ResolveConflictAppendsEventAndUpdatesReplay(t *testing
 
 func TestAgentTeamService_ResolveConflictRejectsTaskOutsideConflict(t *testing.T) {
 	db := setupAgentTeamStateSQLite(t)
-	svc := NewAgentTeamService(db, nil, nil)
+	svc := NewAgentTeamService(db, nil, cache.NoOpCache{})
 	team, _, executor, run := seedAgentTeamRun(t, db)
 	reviewerProfileID := "profile-reviewer"
 	reviewer := &model.AgentTeamMember{
@@ -146,7 +147,7 @@ func TestAgentTeamService_ResolveConflictRejectsTaskOutsideConflict(t *testing.T
 
 func TestAgentTeamService_DecideApprovalAppendsEventAndUpdatesReplay(t *testing.T) {
 	db := setupAgentTeamStateSQLite(t)
-	svc := NewAgentTeamService(db, nil, nil)
+	svc := NewAgentTeamService(db, nil, cache.NoOpCache{})
 	team, _, executor, run := seedAgentTeamRun(t, db)
 	pending := &model.PendingAgentTask{
 		ID:                "agent-task-approval",
@@ -211,7 +212,7 @@ func TestAgentTeamService_DecideApprovalAppendsEventAndUpdatesReplay(t *testing.
 func TestAgentTeamService_DecideApprovalDeliversControlToExactEdgeDevice(t *testing.T) {
 	db := setupAgentTeamStateSQLite(t)
 	controlSvc := &mockAgentTeamControlSvc{}
-	svc := NewAgentTeamService(db, nil, nil)
+	svc := NewAgentTeamService(db, nil, cache.NoOpCache{})
 	svc.SetControlService(controlSvc)
 	team, _, executor, run := seedAgentTeamRun(t, db)
 	pending := &model.PendingAgentTask{
@@ -265,7 +266,7 @@ func TestAgentTeamService_DecideApprovalDeliversControlToExactEdgeDevice(t *test
 func TestAgentTeamService_DecideApprovalRedeliversSameDecisionWithoutDuplicateEvent(t *testing.T) {
 	db := setupAgentTeamStateSQLite(t)
 	controlSvc := &mockAgentTeamControlSvc{}
-	svc := NewAgentTeamService(db, nil, nil)
+	svc := NewAgentTeamService(db, nil, cache.NoOpCache{})
 	svc.SetControlService(controlSvc)
 	team, _, executor, run := seedAgentTeamRun(t, db)
 	pending := &model.PendingAgentTask{
@@ -350,7 +351,7 @@ func TestAgentTeamService_DecideApprovalRedeliversSameDecisionWithoutDuplicateEv
 func TestAgentTeamService_DecideApprovalRejectsMissingEdgeDeviceForControl(t *testing.T) {
 	db := setupAgentTeamStateSQLite(t)
 	controlSvc := &mockAgentTeamControlSvc{}
-	svc := NewAgentTeamService(db, nil, nil)
+	svc := NewAgentTeamService(db, nil, cache.NoOpCache{})
 	svc.SetControlService(controlSvc)
 	team, _, executor, run := seedAgentTeamRun(t, db)
 	pending := &model.PendingAgentTask{
@@ -390,7 +391,7 @@ func TestAgentTeamService_DecideApprovalRejectsMissingEdgeDeviceForControl(t *te
 
 func TestAgentTeamService_DecideApprovalRejectsAlreadyDecided(t *testing.T) {
 	db := setupAgentTeamStateSQLite(t)
-	svc := NewAgentTeamService(db, nil, nil)
+	svc := NewAgentTeamService(db, nil, cache.NoOpCache{})
 	team, _, executor, run := seedAgentTeamRun(t, db)
 	taskID := "agent-task-decided"
 	require.NoError(t, repository.CreateTeamTask(db, &model.AgentTeamTask{
@@ -431,7 +432,7 @@ func TestAgentTeamService_DecideApprovalRejectsAlreadyDecided(t *testing.T) {
 
 func TestAgentTeamService_MemberReadableTeamCannotMutateRunDecisions(t *testing.T) {
 	db := setupAgentTeamStateSQLite(t)
-	svc := NewAgentTeamService(db, nil, nil)
+	svc := NewAgentTeamService(db, nil, cache.NoOpCache{})
 	team, _, executor, run := seedAgentTeamRun(t, db)
 	addReadableTeamMemberForUser(t, db, team.ID, "member-user")
 

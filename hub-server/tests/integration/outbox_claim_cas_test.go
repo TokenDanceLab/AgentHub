@@ -21,7 +21,7 @@ import (
 	"github.com/agenthub/hub-server/internal/service/deliveryoutbox"
 )
 
-// ==================== #2071 S3 — outbox ClaimRetry CAS under real PG ====================
+// ==================== #2071 — outbox ClaimRetry CAS under real PG ====================
 //
 // These tests verify that Store.ClaimRetry's SQL CAS (WHERE attempt_count =
 // expectedAttempt) is atomic under true PostgreSQL concurrency. The unit tests

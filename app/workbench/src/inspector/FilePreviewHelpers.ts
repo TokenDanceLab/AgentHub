@@ -5,10 +5,10 @@ import type { DesignOpenWithIconName } from '../designIcons';
 import styles from './FilePreview.module.css';
 
 /* ═══════════════════════════════════════════════════════════════════════
-   FilePreviewHelpers — pure residual slices from FilePreview (#663).
+   FilePreviewHelpers — pure helpers for FilePreview (#663).
 
    Mime/type detectors, default mode planner, synthetic diff, and highlight
-   helpers. No React hooks / no intentional UX change.
+   helpers. No React hooks.
    ═══════════════════════════════════════════════════════════════════════ */
 
 export type FilePreviewMode = 'code' | 'markdown' | 'diff' | 'pdf' | 'html' | 'image' | 'text';

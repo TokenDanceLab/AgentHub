@@ -22,7 +22,6 @@ import styles from './AgentHubWorkbench.module.css';
    RightInspectorModePanel — mode tabpanel bodies for RightInspector (#661).
 
    Pure presentational host for overview / browser / files mode content.
-   No intentional UX change.
    ═══════════════════════════════════════════════════════════════════════ */
 
 export interface RightInspectorModePanelProps {

@@ -19,6 +19,18 @@ import (
 	"github.com/agenthub/hub-server/internal/ws"
 )
 
+// setAuthAndDrain authenticates the conn and consumes the auth.ok frame that
+// SetAuth queues first (seq_id 1), so tests observe only business frames.
+func setAuthAndDrain(t *testing.T, mgr *ws.Manager, conn *ws.Conn, userID, deviceType, deviceID string) {
+	t.Helper()
+	mgr.SetAuth(conn.ID, userID, deviceType, deviceID)
+	select {
+	case <-conn.Send:
+	default:
+		t.Fatal("SetAuth did not queue auth.ok")
+	}
+}
+
 func TestPromptFromMessage_TextPayload(t *testing.T) {
 	msg := &model.Message{
 		ContentType: model.ContentTypeText,
@@ -426,7 +438,7 @@ func TestDispatchTaskWithTargetIDButNoDeviceFailsClosed(t *testing.T) {
 	mgr := ws.NewManager()
 	connA := ws.NewConn(nil)
 	require.NoError(t, mgr.Register(connA))
-	mgr.SetAuth(connA.ID, "user-1", "desktop", "dev-a")
+	setAuthAndDrain(t, mgr, connA, "user-1", "desktop", "dev-a")
 
 	cache := &mockAgentCache{routeID: connA.ID}
 	svc := &Service{db: db, mgr: mgr, cacheClient: cache}
@@ -461,7 +473,7 @@ func TestDispatchTaskDoesNotPushWhenDispatchedStateMissing(t *testing.T) {
 	mgr := ws.NewManager()
 	conn := ws.NewConn(nil)
 	require.NoError(t, mgr.Register(conn))
-	mgr.SetAuth(conn.ID, "user-1", "desktop", "dev-a")
+	setAuthAndDrain(t, mgr, conn, "user-1", "desktop", "dev-a")
 
 	cache := &mockAgentCache{routeID: conn.ID}
 	svc := &Service{db: db, mgr: mgr, cacheClient: cache}
@@ -495,7 +507,7 @@ func TestDispatchTaskDoesNotPushTerminalTask(t *testing.T) {
 	mgr := ws.NewManager()
 	conn := ws.NewConn(nil)
 	require.NoError(t, mgr.Register(conn))
-	mgr.SetAuth(conn.ID, "user-1", "desktop", "dev-a")
+	setAuthAndDrain(t, mgr, conn, "user-1", "desktop", "dev-a")
 
 	cache := &mockAgentCache{routeID: conn.ID}
 	svc := &Service{db: db, mgr: mgr, cacheClient: cache}
@@ -532,7 +544,7 @@ func TestDispatchTaskPreservesNonTargetTaskWhenDeliveryBufferFull(t *testing.T) 
 	mgr := ws.NewManager()
 	conn := ws.NewConn(nil)
 	require.NoError(t, mgr.Register(conn))
-	mgr.SetAuth(conn.ID, "user-1", "desktop", "dev-a")
+	setAuthAndDrain(t, mgr, conn, "user-1", "desktop", "dev-a")
 	for i := 0; i < cap(conn.Send); i++ {
 		conn.Send <- []byte("already queued")
 	}
@@ -572,8 +584,8 @@ func TestDispatchTaskRoutesTargetBoundTaskToBoundDevice(t *testing.T) {
 	connB := ws.NewConn(nil)
 	require.NoError(t, mgr.Register(connA))
 	require.NoError(t, mgr.Register(connB))
-	mgr.SetAuth(connA.ID, "user-1", "desktop", "dev-a")
-	mgr.SetAuth(connB.ID, "user-1", "desktop", "dev-b")
+	setAuthAndDrain(t, mgr, connA, "user-1", "desktop", "dev-a")
+	setAuthAndDrain(t, mgr, connB, "user-1", "desktop", "dev-b")
 
 	cache := &mockAgentCache{
 		routeID: connA.ID,
@@ -633,7 +645,7 @@ func TestDispatchTaskQueuesTargetBoundTaskWhenDeliveryBufferFull(t *testing.T) {
 	mgr := ws.NewManager()
 	connB := ws.NewConn(nil)
 	require.NoError(t, mgr.Register(connB))
-	mgr.SetAuth(connB.ID, "user-1", "desktop", "dev-b")
+	setAuthAndDrain(t, mgr, connB, "user-1", "desktop", "dev-b")
 	for i := 0; i < cap(connB.Send); i++ {
 		connB.Send <- []byte("already queued")
 	}
@@ -672,7 +684,7 @@ func TestDispatchTaskDoesNotPushTargetWhenDispatchedStateMissing(t *testing.T) {
 	mgr := ws.NewManager()
 	connB := ws.NewConn(nil)
 	require.NoError(t, mgr.Register(connB))
-	mgr.SetAuth(connB.ID, "user-1", "desktop", "dev-b")
+	setAuthAndDrain(t, mgr, connB, "user-1", "desktop", "dev-b")
 
 	cache := &mockAgentCache{
 		deviceRoutes: map[string]string{
@@ -712,7 +724,7 @@ func TestDispatchTaskDoesNotPushTerminalTargetTask(t *testing.T) {
 	mgr := ws.NewManager()
 	connB := ws.NewConn(nil)
 	require.NoError(t, mgr.Register(connB))
-	mgr.SetAuth(connB.ID, "user-1", "desktop", "dev-b")
+	setAuthAndDrain(t, mgr, connB, "user-1", "desktop", "dev-b")
 
 	cache := &mockAgentCache{
 		deviceRoutes: map[string]string{
@@ -752,7 +764,7 @@ func TestDispatchTaskQueuesTargetBoundTaskWhenBoundDeviceOffline(t *testing.T) {
 	mgr := ws.NewManager()
 	connA := ws.NewConn(nil)
 	require.NoError(t, mgr.Register(connA))
-	mgr.SetAuth(connA.ID, "user-1", "desktop", "dev-a")
+	setAuthAndDrain(t, mgr, connA, "user-1", "desktop", "dev-a")
 
 	cache := &mockAgentCache{routeID: connA.ID}
 	svc := &Service{db: db, mgr: mgr, cacheClient: cache}

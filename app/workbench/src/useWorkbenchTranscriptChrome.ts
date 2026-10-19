@@ -33,7 +33,7 @@ export interface UseWorkbenchTranscriptChromeOptions {
   t: (key: string, options?: Record<string, unknown>) => string;
   onApprovalDecision?: ((action: ApprovalDecisionAction) => Promise<void> | void) | undefined;
   /**
-   * Regenerate port (#1821). May return a Promise: the chrome then awaits it
+   * Regenerate port. May return a Promise: the chrome then awaits it
    * so the success toast fires after resolution and a rejection surfaces a
    * failure toast instead of a fake optimistic success.
    */

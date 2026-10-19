@@ -1,14 +1,11 @@
 #!/usr/bin/env python3
-"""dev-up — 一键本地开发环境（ps1 迁移，契约见 server docs/design/ps1-to-python-migration.md）。
+"""dev-up — 一键本地开发环境。
 
 Docker Compose 启动 PostgreSQL 16 + Redis 7，等待健康后 go run 启动 Hub
-Server。默认行为/输出/退出码与 ps1 一致；--full 兼容原 dev-up.sh 语义
-（连带构建并启动 hub-server 镜像，等待 Hub health 后打印服务表，不 go run）。
+Server。--full 连带构建并启动 hub-server 镜像，等待 Hub health 后打印服务表，
+不 go run。
 
-契约：stdlib only；参数名/退出码与 ps1 一致（docker 失败即非零退出）；输出行
-（`=== Starting PostgreSQL + Redis ===` / `Waiting for PostgreSQL...` /
-`  PostgreSQL is ready.` / `  Redis is ready.` / `=== Starting Hub Server ===`）
-与原 ps1 一致。
+stdlib only；docker 失败即非零退出。
 """
 
 import argparse
@@ -119,6 +116,6 @@ def main() -> int:
 if __name__ == "__main__":
     try:
         sys.exit(main())
-    except Exception as exc:  # noqa: BLE001 —— 顶层兜底，对齐 ps1 $ErrorActionPreference='Stop'，禁止静默吞错
+    except Exception as exc:  # noqa: BLE001 —— fail closed：未捕获异常返回非零
         print(f"ERROR: {exc}", file=sys.stderr)
         sys.exit(1)

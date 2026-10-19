@@ -17,6 +17,7 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/agenthub/hub-server/internal/bus"
+	"github.com/agenthub/hub-server/internal/cache"
 	"github.com/agenthub/hub-server/internal/errcode"
 )
 
@@ -80,21 +81,6 @@ func TestService_NilBusPublishIsNoop(t *testing.T) {
 	svc.publish(context.Background(), bus.Event{Type: "message.new", Payload: "x"})
 }
 
-func TestService_SetBusAndSetCachePorts(t *testing.T) {
-	rec := &recordingMsgBus{}
-	cache := &mockMsgCache{seq: 9}
-	svc := NewService(nil, nil, nil)
-	require.NotNil(t, svc)
-
-	svc.SetBus(rec)
-	svc.SetCache(cache)
-	svc.publish(context.Background(), bus.Event{Type: "message.read", Payload: map[string]string{"k": "v"}})
-
-	require.Len(t, rec.events, 1)
-	assert.Equal(t, "message.read", rec.events[0].Type)
-	assert.Equal(t, int64(9), cache.seq)
-}
-
 // SQL substrings used for matching (QueryMatcherFunc with strings.Contains from newMockDB)
 const (
 	sqlmSessionMember = `FROM "session_members" WHERE`
@@ -106,7 +92,7 @@ const (
 	sqlmUpdateMsg     = `UPDATE "messages" SET`
 	sqlmUpdateSession = `UPDATE "sessions" SET`
 	// Column-specific variants so a test can tell the seqalloc next_seq mirror
-	// apart from the last_message_at activity touch (#2154 P2-8 asserts the
+	// apart from the last_message_at activity touch (#2154 asserts the
 	// latter happens exactly once per send, inside the persist transaction).
 	sqlmUpdateSessionNextSeq     = `UPDATE "sessions" SET "next_seq"`
 	sqlmUpdateSessionLastMessage = `UPDATE "sessions" SET "last_message_at"`
@@ -172,9 +158,8 @@ func TestSendMessage_InvalidContentJSON(t *testing.T) {
 	require.Error(t, err)
 	assert.ErrorIs(t, err, errcode.ErrBadRequest)
 
-	// deploy_card has no required fields — always passes
-	// (but it still gets validated by the caller... wait, we skip deploy_card in validation)
-	// Text content type goes through wrapping, not validation
+	// deploy_card has no required fields: any JSON object passes content
+	// validation, so the request proceeds to the member check and fails there.
 	_, err = svc.SendMessage(context.Background(), "sess-1", "user-1", SendMessageRequest{
 		ClientMsgID: "msg-5",
 		ContentType: "deploy_card",
@@ -307,7 +292,7 @@ func TestSendMessage_Success(t *testing.T) {
 
 	// seqalloc.Allocate mirrors the Redis seq into sessions.next_seq. This is
 	// the ONLY sessions UPDATE outside the persist transaction: allocateSeq no
-	// longer touches last_message_at (#2154 P2-8 removed the duplicate write).
+	// longer touches last_message_at (#2154 removed the duplicate write).
 	mock.ExpectExec(sqlmUpdateSessionNextSeq).
 		WithArgs(sqlmock.AnyArg(), "sess-1", sqlmock.AnyArg()).
 		WillReturnResult(sqlmock.NewResult(0, 1))
@@ -350,7 +335,7 @@ func TestSendMessage_SuccessNonText(t *testing.T) {
 		WithArgs("sess-1", "msg-c", 1).
 		WillReturnError(gorm.ErrRecordNotFound)
 
-	// seqalloc seq mirror only — see TestSendMessage_Success (#2154 P2-8).
+	// seqalloc seq mirror only — see TestSendMessage_Success (#2154).
 	mock.ExpectExec(sqlmUpdateSessionNextSeq).
 		WithArgs(sqlmock.AnyArg(), "sess-1", sqlmock.AnyArg()).
 		WillReturnResult(sqlmock.NewResult(0, 1))
@@ -543,7 +528,7 @@ func TestSendMessage_FileContentRejectsAttachmentOwnedByAnotherUser(t *testing.T
 	require.ErrorIs(t, err, errcode.AttachNotFound)
 }
 
-func TestSendMessage_NilCacheUsesDBSeqFallback(t *testing.T) {
+func TestSendMessage_NoOpCacheUsesDBSeqFallback(t *testing.T) {
 	db, mock, sqlDB := newMockDB(t)
 	defer sqlDB.Close()
 
@@ -574,7 +559,7 @@ func TestSendMessage_NilCacheUsesDBSeqFallback(t *testing.T) {
 		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectCommit()
 
-	svc := NewService(db, newTestBus(t), nil)
+	svc := NewService(db, newTestBus(t), cache.NoOpCache{})
 	resp, err := svc.SendMessage(context.Background(), "sess-1", "user-1", SendMessageRequest{
 		ClientMsgID: "msg-nil-cache",
 		ContentType: "text",

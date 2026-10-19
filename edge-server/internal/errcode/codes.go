@@ -41,9 +41,7 @@ var (
 var (
 	// Workspace security
 	ErrWorkspaceNotAllowed = New("workspace_not_allowed", "workDir is outside the workspace allowlist", http.StatusForbidden)
-	// ErrWorkDirRequired rejects adapter runs that omit workDir. Empty workDir
-	// previously fell through to DefaultWorkDir()/UserHomeDir and bypassed the
-	// workspace allowlist (AH-SR-006 / #854).
+	// ErrWorkDirRequired rejects adapter runs that omit workDir.
 	ErrWorkDirRequired = New("workdir_required", "workDir is required for adapter runs", http.StatusBadRequest)
 
 	// Permission mode / decision
@@ -83,7 +81,7 @@ var (
 	// Deploy
 	ErrDeployInvalidSlug    = New("deploy_invalid_slug", "slug must be lowercase alphanumeric with hyphens, 2-63 chars", http.StatusBadRequest)
 	ErrDeployNoArtifacts    = New("deploy_no_artifacts", "run has no deployable artifacts", http.StatusBadRequest)
-	ErrDeployRunNotFinished = New("deploy_run_not_finished", "run must be in a terminal state before deploying", http.StatusBadRequest)
+	ErrDeployRunNotFinished = New("deploy_run_not_finished", "run must be finished, failed, or cancelled before deploying", http.StatusBadRequest)
 
 	// Capability token (dual-token auth)
 	ErrCapabilityTokenInvalid = New("capability_token_invalid", "capability token is missing or invalid", http.StatusForbidden)
@@ -131,5 +129,10 @@ func ErrorBody(e *Error) map[string]any {
 // Wire behavior is byte-identical to writeJSON(w, e.HTTPStatus, ErrorBody(e)):
 // internal/api's writeJSON is itself a thin delegate to resputil.WriteJSON.
 func Write(w http.ResponseWriter, e *Error) {
+	// Every 429 must carry Retry-After (api/conventions.md). Call sites with a
+	// more precise value set the header before calling Write.
+	if e.HTTPStatus == http.StatusTooManyRequests && w.Header().Get("Retry-After") == "" {
+		w.Header().Set("Retry-After", "1")
+	}
 	resputil.WriteJSON(w, e.HTTPStatus, ErrorBody(e))
 }

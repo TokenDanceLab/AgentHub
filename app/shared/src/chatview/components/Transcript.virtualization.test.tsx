@@ -9,7 +9,7 @@ import type { VirtualizerHandle } from 'virtua';
 import type { TranscriptBlock } from '../adapter';
 
 /* ──────────────────────────────────────────────────────────────────────
-   Virtualization wiring tests (T15 / RFC §6.2–§6.3).
+   Virtualization wiring tests.
 
    jsdom has no layout engine, so the real virtua Virtualizer cannot measure
    the viewport/rows and mounts zero rows. These tests therefore use a
@@ -181,7 +181,7 @@ describe('Transcript virtualization wiring', () => {
   });
 });
 
-// ── ChatViewTranscript highlight migration (RFC §6.3) ──────────────────
+// ── ChatViewTranscript highlight migration ─────────────────────────────
 //
 // Under virtualization the target row may be off-screen; ChatViewTranscript
 // now calls Transcript.scrollToBlockId (→ virtualizer.scrollToIndex) before

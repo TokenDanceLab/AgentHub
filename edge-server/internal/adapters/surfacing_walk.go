@@ -10,8 +10,6 @@ import (
 	"strings"
 )
 
-// Residual pure-helper peel #1112: workdir walk / current-state snapshot scan.
-
 func walkCurrentState(dir string) map[string]fileRecord {
 	result := make(map[string]fileRecord)
 	count := 0

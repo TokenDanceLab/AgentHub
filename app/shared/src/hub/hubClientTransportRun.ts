@@ -1,6 +1,5 @@
 /**
  * Hub client transport fetch runners + createHubClient transport factory.
- * Peel companion of hubClientTransportUtils (#1102). Pure residual; zero behavior change.
  */
 
 import { reportApiError } from '../errors';
@@ -24,9 +23,9 @@ import {
   withHubAbortTimeout,
 } from './hubClientTransportCatch';
 
-// ── Residual pure peels (#1023) ───────────────────────────────────────────────
+// ── Pure helpers (#1023) ───────────────────────────────────────────────
 
-/** JSON/auth fetch under abort timeout (request primary + refresh retry residual). */
+/** JSON/auth fetch under abort timeout (request primary + refresh retry helper). */
 export async function fetchHubJsonWithTimeout(
   fetchImpl: typeof fetch,
   url: string,
@@ -39,7 +38,7 @@ export async function fetchHubJsonWithTimeout(
   );
 }
 
-/** Multipart POST fetch under abort timeout (uploadMultipart residual). */
+/** Multipart POST fetch under abort timeout (uploadMultipart helper). */
 export async function fetchHubMultipartWithTimeout(
   fetchImpl: typeof fetch,
   url: string,
@@ -53,7 +52,7 @@ export async function fetchHubMultipartWithTimeout(
 }
 
 /**
- * Residual 401 recovery peel: optionally refresh once, then retry via injected runner.
+ * 401 recovery helper: optionally refresh once, then retry via injected runner.
  * Side-effect sinks (onRefreshToken, retry, log/report) stay injected.
  */
 export type UnauthorizedRefreshResult<T> =
@@ -93,10 +92,10 @@ export async function runUnauthorizedTokenRefreshRecovery<T>(args: {
   return { action: 'continue' };
 }
 
-// ── Residual pure peels (#1044) ───────────────────────────────────────────────
+// ── Pure helpers (#1044) ───────────────────────────────────────────────
 
 /**
- * Residual JSON request peel for createHubClient.request (#1044).
+ * JSON request helper for createHubClient.request (#1044).
  * prepare → fetch → optional 401 refresh retry → parse; catch → default effects.
  * exactOptional-safe via prepareHubRequestContextFromClient.
  */
@@ -161,7 +160,7 @@ export async function runHubJsonRequest<T>(args: {
 }
 
 /**
- * Residual multipart upload peel for createHubClient.uploadMultipart (#1044).
+ * multipart upload helper for createHubClient.uploadMultipart (#1044).
  * prepare auth-only context → multipart fetch → parse success.
  */
 export async function runHubMultipartUploadRequest<T>(args: {
@@ -190,9 +189,9 @@ export async function runHubMultipartUploadRequest<T>(args: {
   );
 }
 
-// ── Residual pure peels (#1055) ───────────────────────────────────────────────
+// ── Pure helpers (#1055) ───────────────────────────────────────────────
 
-/** Residual createHubClient runtime peel: normalize baseUrl + resolve fetch impl. */
+/** createHubClient runtime helper: normalize baseUrl + resolve fetch impl. */
 export function resolveHubClientRuntime(opts: {
   baseUrl?: string;
   fetch?: typeof globalThis.fetch;
@@ -207,7 +206,7 @@ export function resolveHubClientRuntime(opts: {
 }
 
 /**
- * Residual JSON request peel with Hub envelope parseSuccess baked in (#1055).
+ * JSON request helper with Hub envelope parseSuccess baked in (#1055).
  * exactOptional-safe: only assign optional keys when defined (no `opt: undefined`).
  */
 export async function runHubClientJsonRequest<T>(args: {
@@ -250,7 +249,7 @@ export async function runHubClientJsonRequest<T>(args: {
 }
 
 /**
- * Residual multipart upload peel with Hub envelope parseSuccess baked in (#1055).
+ * multipart upload helper with Hub envelope parseSuccess baked in (#1055).
  * exactOptional-safe: only assign optional keys when defined.
  */
 export async function runHubClientMultipartUploadRequest<T>(args: {
@@ -304,7 +303,7 @@ export type HubClientTransportOptions = {
 };
 
 /**
- * exactOptional-safe residual: assemble transport options from createHubClient opts.
+ * exactOptional-safe helper: assemble transport options from createHubClient opts.
  * Omits optional keys when undefined (exactOptionalPropertyTypes).
  */
 export function resolveHubClientTransportOptions(
@@ -332,7 +331,7 @@ export function resolveHubClientTransportOptions(
 }
 
 /**
- * Residual createHubClient transport peel (#1055):
+ * createHubClient transport helper (#1055):
  * request / requestWithFallback / uploadMultipart with envelope parse baked in.
  */
 export function createHubClientTransport(

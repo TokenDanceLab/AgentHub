@@ -1,8 +1,8 @@
 # WebSocket Events
 
-最后更新：2026-09-07
+最后更新：2026-10-19
 
-WebSocket 事件合同入口：协议边界、源码 owner、**重复投递/幂等语义**、验收命令。旧长版见 [../docs/history.md](../docs/history.md)。
+WebSocket 事件合同入口：协议边界、源码 owner、**重复投递/幂等语义**、验收命令。
 
 ## Owner
 
@@ -10,7 +10,7 @@ WebSocket 事件合同入口：协议边界、源码 owner、**重复投递/幂�
 |---|---|---|
 | Edge envelope | `app/shared/src/events.ts` | 前端 `EventEnvelope` |
 | Edge event bus | `edge-server/internal/events/` | 发布、订阅、背压、gap |
-| Runtime event names | `edge-server/internal/orchestration/contracts.go` | `run.agent.*` 常量（adapters 包通过 `contract_aliases.go` 别名重导出） |
+| Runtime event names | `edge-server/internal/orchestration/contracts.go`、`edge-server/internal/adapters/surfacing.go` | `run.agent.*` 常量（adapters 包通过 `contract_aliases.go` 别名重导出） |
 | Hub WS frame | `hub-server/internal/ws/frame.go` | `{type, seq_id?, payload?}` + 31 常量 |
 | Hub client constants | `app/shared/src/hubEvents.ts` | 与 `frame.go` 1:1 |
 | Hub runtime replay | `hub-server/internal/service/agent/agent_edge_callback.go` | `agent.stream` / 聊天投影 |
@@ -24,19 +24,17 @@ Hub/Edge 实时面均为 **at-least-once**：重连、离线队列、outbox、�
 
 | 机制 | 含义 | 不是什么 |
 |---|---|---|
-| Hub `seq_id` | 单连接单调投递序号（`PushToConn` stamp）；同连 gap = 丢帧 | 非跨连接幂等键；重连从 1 计 |
+| Hub `seq_id` | 单连接单调投递序号（`enqueueLocked` stamp；`PushToConn` 与 `SetAuth` 的 `auth.ok`）；同连 gap = 丢帧 | 非跨连接幂等键；重连从 1 计 |
 | Edge `EventEnvelope.seq` / `id` | stream 单调 `seq` + 事件 `id`；断线用 cursor / 最后 id | 不能回放则 `system.gap`/`error`，客户端 REST snapshot |
 | 业务幂等键 | 下表「幂等键 / 重复投递语义」 | apply 必须按业务键，不能只靠 `seq_id` |
 
-> **`seq_id`（Hub WS per-conn）vs `seq`（Edge per-bus）**：Hub `seq_id` 是 `PushToConn` 在单连接上单调递增的投递序号，重连从 1 计、跨连接不可比；Edge `EventEnvelope.seq` 是事件总线上的 stream 单调序号，与持久化 `agent_run_events.event_seq` / `messages.seq_id` 对齐。REST 增量同步接口（`GET .../messages/sync?after_seq=`、`GET .../events?after_seq=`）的 `after_seq` 一律指**持久化表的内部 seq**（`messages.seq_id` 或 `agent_run_events.event_seq`），**不是** WS 帧的 `seq_id`。客户端不得用 WS `seq_id` 作为 REST 游标。
+> **seq 字段**：Hub `seq_id` 是单连接投递序号，Edge `seq` 是 per-bus stream 序号；REST `after_seq` 指持久化表内部 seq。完整对照见 [conventions.md](conventions.md)「seq 字段对照表」。
 
 ### Hub→Edge 任务投递
 
 同一任务共享 `delivery_id` / `hubTaskId`，消费端区分接收结果与执行状态，重放保留原 run 和 callback owner。执行输入、同步接收证据、能力预检与回调归属的完整合同见 [dispatch.md](dispatch.md)。
 
 标签：**UPSERT by id**（稳定 id 合并，禁止第二行）；**idempotent on apply**（再应用不变）；**水位 / watermark**（只前进 `max`）；**ephemeral**（可丢可重，不写持久态）；**非幂等**（须自备去重或 REST）。
-
-> ⚠️ **seq 字段契约**：Hub `seq_id`（per-conn 投递序号）与 Edge `seq`（per-bus stream 序号）语义完全不同，切勿混用，更不能互当 cursor / 幂等键。对照表、合法/禁止用法与源码锚点见 `api/conventions.md`「seq 字段对照表」。
 
 ## Edge EventEnvelope
 
@@ -62,12 +60,12 @@ Hub/Edge 实时面均为 **at-least-once**：重连、离线队列、outbox、�
 - `seq` 同 stream 单调；断线用 cursor / 最后事件 ID。`seq <= lastSeq` 丢弃（workbench 水位）；实体按 payload id **UPSERT**。
 - 不能回放 → `system.gap` / `error`，客户端 REST snapshot。stdout/stderr 合并为 `run.output.batch`。
 - Provider 字段停在 adapter 边界；进 transcript 前脱敏 token、authorization、绝对路径、provider trace body。
-- Run lifecycle（`run.started`/`run.finished` 等）payload 仅在 executor 真实解析出工作目录时携带 `workDir`；它是 run 级 diff 审查（#1967）唯一可信 workDir 证据——客户端禁止用当前 composer 目录等猜测值补全，缺失即只读。
+- Run lifecycle（`run.started`/`run.finished` 等）payload 仅在 executor 真实解析出工作目录时携带 `workDir`；它是 run 级 diff 审查唯一可信的 workDir 证据——客户端禁止用当前 composer 目录等猜测值补全，缺失即只读。
 
 ## Hub Frame
 
 ```json
-{"type":"message.new","seq_id":42,"payload":{"message_id":"msg_1"}}
+{"type":"message.new","seq_id":42,"payload":{"id":"<message-uuid>","session_id":"<session-uuid>","client_msg_id":"<client-uuid>","seq_id":7}}
 ```
 
 - `/client/ws` 仅 Hub-issued HS256 access token；TokenDance ID RS256 不能当 WS session。
@@ -76,12 +74,12 @@ Hub/Edge 实时面均为 **at-least-once**：重连、离线队列、outbox、�
 
 ## Hub WS 事件：重复投递 / 幂等语义
 
-SSOT：`frame.go` ↔ `hubEvents.ts` ↔ OpenAPI `HubWebSocketFrame.type`（31 个；#1362/#1422 死面禁止写回）。
+SSOT：`frame.go` ↔ `hubEvents.ts` ↔ OpenAPI `HubWebSocketFrame.type`（31 个）；未列出的 type 不得写回客户端常量表。
 
 | type | 方向 | 幂等键 | 重复投递语义 | 备注 |
 |---|---|---|---|---|
 | `typing` | C→S fanout | 无（ephemeral） | **ephemeral** | 唯一合法 C→S 业务帧；其余 type 丢弃 |
-| `auth.ok` | S→C | 连接生命周期 | **idempotent on apply** | upgrade 后 handler 发送；无 `auth`/`auth.fail` 首帧 |
+| `auth.ok` | S→C | 连接生命周期 | **idempotent on apply** | `Manager.SetAuth` 经 `enqueueLocked` 入队，是连接的 seq_id 1 首帧；无 `auth`/`auth.fail` 首帧 |
 | `message.new` | S→C | `payload.id`（另有 `client_msg_id`） | **UPSERT by id** | 库 `(session_id, client_msg_id)` 唯一 |
 | `message.recall` | S→C | `message_id` + `session_id` | **idempotent on apply** | `recalled=true` |
 | `message.pin` | S→C | `(session_id, message_id)` | **UPSERT by id** | |
@@ -104,15 +102,15 @@ SSOT：`frame.go` ↔ `hubEvents.ts` ↔ OpenAPI `HubWebSocketFrame.type`（31 �
 | `agent.cancel` | S→C | `task_id` | **idempotent on apply** | |
 | `agent.control` | S→C | `task_id` + 控制意图 | **UPSERT / idempotent** | 可离线重放；Edge 禁重复副作用 |
 | `team.run.started` | S→C | `run_id` | **UPSERT by id** | 无 session 时可 `PushToUser` |
-| `team.event` | S→C | payload 实体 id / invalidate | **UPSERT** 或 invalidate→REST | 多走 RQ invalidation |
-| `team.assignment.done` | S→C | assignment / task id | **UPSERT** / 终端 **idempotent** | bus `team.assignment.completed` → wire |
+| `team.event` | S→C | payload 实体 id / invalidate | **UPSERT** 或 invalidate→REST | 当前无生产者；team-run 事件持久化于 `agent_team_events`，经 REST 读取 |
+| `team.assignment.done` | S→C | assignment / task id | **UPSERT** / 终端 **idempotent** | bus type 与 wire 同为 `team.assignment.done`；`assignment.completed` 是 team-run 内部事件，持久化于 `agent_team_events`，经 REST 读取，不经 `team.event` WS 下发 |
 | `team.assignment.failed` | S→C | assignment / task id | **UPSERT** / 终端 **idempotent** | |
-| `team.subagent.stream` | S→C | `(agent_task_id, event_seq)` | **UPSERT** + **水位** | 与 `agent.stream` 同语义，team 域聚合；#1478 Phase A（edge 零改，前端不消费也能观测） |
+| `team.subagent.stream` | S→C | `(agent_task_id, event_seq)` | **UPSERT** + **水位** | 与 `agent.stream` 同语义，team 域聚合 |
 | `notification.new` | S→C | `notification.id` | **UPSERT by id** | `Notify()` 落库后推 |
 | `friend.request` | S→C（声明） | `request_id` / 双方 user | **UPSERT by id** | 常经 `notification.new`；常量保留对齐 OpenAPI |
 | `friend.accepted` | S→C | `request_id` / `user_id` | **UPSERT** 或 invalidate | 直接 `PushToUser` |
 
-**WS 增量同步 SPEC（#1412）先修**：replay/snapshot 合并必须按本表业务键 apply；禁止无幂等声明的 blind replay。
+**WS 增量同步**：replay/snapshot 合并必须按本表业务键 apply；禁止无幂等声明的 blind replay。
 
 ## Event Families
 
@@ -131,21 +129,10 @@ SSOT：`frame.go` ↔ `hubEvents.ts` ↔ OpenAPI `HubWebSocketFrame.type`（31 �
 - Output/session: `run.agent.text_delta`, `run.agent.text_block`, `run.agent.thinking`, `run.agent.session_init`, `run.agent.session_state_changed`, `run.agent.status_change`, `run.agent.result`.
 - Tool/file/permission: `run.agent.tool_call`, `run.agent.mcp_tool_call`, `run.agent.tool_result`, `run.agent.file_change`, `run.agent.tool_use_summary`, `run.agent.tool_rejected`, `run.agent.permission_requested`, `run.agent.permission_decided`.
 - Context/rate/runtime: `run.agent.route_decision`, `run.agent.compact_boundary`, `run.agent.api_retry`, `run.agent.auth_status`, `run.agent.rate_limit`, `run.agent.cli_invocation_plan`, `run.agent.session_metrics`, `run.agent.context_usage`, `run.agent.context_warning`, `run.agent.context_compaction`.
-- Task/subagent/hooks: `run.agent.task_started`, `run.agent.task_dispatched`, `run.agent.task_dispatch_failed`, `run.agent.task_progress`, `run.agent.task_notification`, `run.agent.sub_agent_status`, `run.agent.sub_agents_complete`, `run.agent.hook_started`, `run.agent.hook_progress`, `run.agent.hook_response`.
-- Approval/surfacing: `run.agent.plan_proposed`, `run.agent.plan_approved`, `run.agent.plan_rejected`, `run.agent.plan_expired`, `run.agent.surfaced_artifact`, `run.agent.surfaced_preview`, `run.agent.surfaced_diff`, `run.agent.surfaced_deploy`.
+- Task/subagent/hooks: `run.agent.task_started`, `run.agent.task_dispatched`, `run.agent.task_progress`, `run.agent.task_notification`, `run.agent.sub_agent_status`, `run.agent.sub_agents_complete`, `run.agent.hook_started`, `run.agent.hook_progress`, `run.agent.hook_response`.
+- Approval/surfacing: `run.agent.plan_proposed`, `run.agent.plan_approved`, `run.agent.plan_rejected`（审批超时以 `reason=timeout` 走此事件）, `run.agent.surfaced_artifact`, `run.agent.surfaced_preview`, `run.agent.surfaced_diff`, `run.agent.surfaced_deploy`.
 
 Edge workbench 默认：`*.created`/`*.updated`/run 态 **UPSERT** + `seq` **水位**；`message.delta`/`run.output(.batch)` 有 id 则 UPSERT，否则水位 + gap 后 REST；`system.gap`/`error` 触发 snapshot，不 UPSERT。
-
-## Removed Hub WS Dead Surface (#1362 / #1422)
-
-曾出现在客户端常量表、hub-server 从未 WS 实现（或仅内部 bus）的类型，**禁止**写回客户端 / `frame.go` / OpenAPI / 上表：
-
-- `sync.request` / `sync.events` — processIncoming 只处理 `typing`；断线补齐 REST `GET /web/agent-tasks/:id/events?after_seq=`。
-- `run.agent.plan_*` — 仅 Edge runtime 面（上节 Approval/surfacing），Hub WS 从未推。
-- `agent.regenerate` — 仅内部 bus，客户端走 REST regenerate。
-- `message.edited` — 内部 bus，无 bus→WS 订阅；编辑走 REST。
-- `agent.timeout` — 内部 bus，WS 映射为 `agent.failed`。
-- `auth` / `auth.fail` — upgrade 前 `WSAuthMiddleware`；缺认证 context 直接 401，无首帧 token / `auth.fail`。
 
 客户端 SSOT `hubEvents.ts` 必须与 `frame.go` + OpenAPI 1:1；契约测试防漂移。聊天可见新事件先补 shared transcript 测试；禁止 debug/mock/mode 元数据进主气泡。
 

@@ -149,7 +149,7 @@ export function WorkbenchFrame({
   } = session;
   const { selectionMode } = transcriptChrome;
 
-  /* ── Split view (#1997, UX F3): sidebar selection first routes through the
+  /* ── Split view (#1997): sidebar selection first routes through the
      split layout (≥2 panes → the conversation drops into an inactive pane),
      then performs the normal single-active selection. ── */
   const handleSidebarSelectConversation = useCallback((conversationId: string): void => {
@@ -162,7 +162,7 @@ export function WorkbenchFrame({
     openConversationAvatar,
   } = profile;
 
-  /* ── F1/F6 attention: one derivation feeds sidebar dots, rail badge and
+  /* ── Attention: one derivation feeds sidebar dots, rail badge and
      status-strip counts so the surfaces never disagree. Inventory mode uses
      the shell's run/approval/thread arrays; otherwise the active-conversation
      fallback observes what the workbench already holds client-side (pending
@@ -179,7 +179,7 @@ export function WorkbenchFrame({
     [attention, currentConversationId, transcript, isAgentRunning],
   );
   const openRunningQueue = useCallback(() => navigateRail('runs'), [navigateRail]);
-  // #1990 (UX F14): live usage chip — aggregate the usage board's recorded
+  // #1990: live usage chip — aggregate the usage board's recorded
   // token counters (same real data the Usage page renders); undefined keeps
   // the chip honestly hidden when the shell has no Hub usage data.
   const usageTokenTotal = useMemo(() => sumUsageTeamTokens(usageTeams), [usageTeams]);
@@ -193,7 +193,7 @@ export function WorkbenchFrame({
     if (target && target !== currentConversationId) selectConversation(target);
   }, [attentionSummary, conversations, currentConversationId, selectConversation]);
 
-  // #1994 (UX F5): the global status bar owns the awaiting-approval chip.
+  // #1994: the global status bar owns the awaiting-approval chip.
   // On the chat page a click asks the mounted ConversationHost to jump within
   // the active transcript (transient intent); elsewhere the bar first returns
   // to chat and selects the first awaiting conversation.
@@ -212,7 +212,7 @@ export function WorkbenchFrame({
     openApprovalQueueFallback();
   }, [isChatPage, firstPendingApprovalId, currentConversationId, setActivePage, openApprovalQueueFallback]);
 
-  /* ── Split view state + chrome (#1997, UX F3) ───────────────────────────
+  /* ── Split view state + chrome (#1997) ───────────────────────────
      Honesty gate: no split entry renders with fewer than two conversations.
      The active pane's header gets Split Right/Down + Move to Group +
      Unsplit; read-only panes get focus/move/close. ── */
@@ -484,7 +484,7 @@ export function WorkbenchFrame({
           <TerminalPanel {...buildTerminalPanelDockProps(platform)} />
         </div>
       )}
-      {/* #1994 (UX F5): global bottom status bar — visible on every rail
+      {/* #1994: global bottom status bar — visible on every rail
           page; conversation chain segments only on the chat page. */}
       <MainchainStatusStrip
         {...(connectionStatus ? { connectionStatus } : {})}

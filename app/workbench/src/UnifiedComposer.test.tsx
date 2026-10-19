@@ -377,7 +377,7 @@ describe('UnifiedComposer @mention popover', () => {
   });
 });
 
-/* ═══════════════════ Draft persistence (T10/UI6) ═══════════════════ */
+/* ═══════════════════ Draft persistence ═══════════════════ */
 
 const draftComposer: ComposerState = {
   conversationId: 'hub-session-draft',

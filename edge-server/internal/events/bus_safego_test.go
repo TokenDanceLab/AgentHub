@@ -1,6 +1,6 @@
 package events
 
-// #2246 slice 1: runWorker guarded each observer job with a private, bare
+// #2246: runWorker guarded each observer job with a private, bare
 // recover() that only wrote slog.Error("event bus observer panic", ...) — no
 // stack, no counter, no PanicObserver. That is exactly the failure mode the
 // pkg/safego package doc describes: a recovered panic that is invisible to
@@ -11,8 +11,7 @@ package events
 // goroutine survives it — with a single worker, a panic that killed the worker
 // would strand every later observer job forever.
 //
-// No time.Sleep in this file: the test-sleep ratchet budgets sleeps per file and
-// a newly added file has no baseline entry.
+// No time.Sleep in this file: the tests use bounded time.After waits.
 
 import (
 	"testing"

@@ -13,8 +13,7 @@ import (
 )
 
 // agent_dispatch_trigger_test.go covers the DB-backed success path and key
-// error paths for DispatchService.TriggerAgentTask (audit T-M1, the highest
-// remaining ROI coverage gap from the 2026-07-29 comprehensive audit).
+// error paths for DispatchService.TriggerAgentTask.
 //
 // The success path asserts the real TriggerAgentTask orchestration against an
 // in-memory SQLite DB: message lookup → session dissolved check → inviter
@@ -40,7 +39,7 @@ import (
 // returns ErrOutboxUnavailable (logged, continues with empty deliveryID), a
 // dead AGENTHUB_EDGE_URL routes the unbound task to the mock cache offline
 // queue (no status transition), and resolveDispatchTeamContext short-circuits
-// to EmptyTeamContext because the agent has no CustomAgentID. The task
+// because the agent has no CustomAgentID. The task
 // therefore stays queued, which is also what makes the second-call
 // TurnInProgress assertion deterministic.
 
@@ -187,7 +186,7 @@ func seedTriggerFixture(t *testing.T, db *gorm.DB) (userID, sessionID, agentInst
 	return userID, sessionID, agentInstanceID, triggerMessageID
 }
 
-// TestTriggerAgentTask_SuccessAndTurnInProgressGate is the T-M1 success path:
+// TestTriggerAgentTask_SuccessAndTurnInProgressGate is the success path:
 // empty targetID (skips validateDispatchTarget) returns a queued task whose
 // row is committed synchronously, and a second trigger for the same
 // agent_instance is rejected with errcode.TurnInProgress (HTTP 409) by the
@@ -285,8 +284,8 @@ func TestTriggerAgentTask_ErrorPaths(t *testing.T) {
 	t.Run("InactiveMember_returnsSessionNotMember", func(t *testing.T) {
 		// left_at set on the user member → IsMemberActive returns false →
 		// TriggerMemberActiveError surfaces errcode.SessionNotMember. A lookup
-		// failure must NOT be misread as inactive (audit T-M1 honest-error
-		// guarantee, pinned by TestTriggerAgentTask_MemberActiveLookupErrorSurfaces).
+		// failure must NOT be misread as inactive (honest-error guarantee,
+		// pinned by TestTriggerAgentTask_MemberActiveLookupErrorSurfaces).
 		db := newTriggerAgentTaskDB(t)
 		userID, sessionID, agentInstanceID, triggerMessageID := seedTriggerFixture(t, db)
 		require.NoError(t, db.Model(&model.SessionMember{}).
@@ -304,8 +303,7 @@ func TestTriggerAgentTask_ErrorPaths(t *testing.T) {
 	})
 
 	t.Run("MessageNotFound_returnsMsgNotFound", func(t *testing.T) {
-		// MapTriggerMessageLookupError collapses any GetMessageByID failure
-		// (including gorm.ErrRecordNotFound) into errcode.MsgNotFound.
+		// A missing trigger message maps gorm.ErrRecordNotFound to MsgNotFound.
 		db := newTriggerAgentTaskDB(t)
 		userID, _, agentInstanceID, _ := seedTriggerFixture(t, db)
 

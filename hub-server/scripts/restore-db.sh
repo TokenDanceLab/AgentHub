@@ -3,10 +3,10 @@
 # Restores a pg_dump -Fc custom-format backup created by backup-db.sh.
 set -euo pipefail
 
-DB_HOST="${DB_HOST:-localhost}"
-DB_PORT="${DB_PORT:-5432}"
-DB_USER="${DB_USER:-agenthub}"
-DB_NAME="${DB_NAME:-agenthub}"
+PG_HOST="${PG_HOST:-127.0.0.1}"
+PG_PORT="${PG_PORT:-5433}"
+PG_USER="${PG_USER:-agenthub}"
+PG_DB_NAME="${PG_DB_NAME:-agenthub}"
 
 if [ -z "$1" ]; then
     echo "Usage: $0 <backup-file.dump>"
@@ -24,12 +24,14 @@ if [ ! -f "$BACKUP_FILE" ]; then
     exit 1
 fi
 
+export PGPASSWORD="${PG_PASSWORD:?set PG_PASSWORD}"
+
 echo "[$(date)] Restoring from: $BACKUP_FILE"
-echo "  Target: $DB_HOST:$DB_PORT/$DB_NAME as $DB_USER"
+echo "  Target: $PG_HOST:$PG_PORT/$PG_DB_NAME as $PG_USER"
 
 # Restore custom-format dump (matches pg_dump -Fc from backup-db.sh)
-docker exec -i agenthub-postgres pg_restore \
-    -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" \
+pg_restore \
+    -h "$PG_HOST" -p "$PG_PORT" -U "$PG_USER" -d "$PG_DB_NAME" \
     --clean --if-exists --no-owner --no-acl \
     < "$BACKUP_FILE"
 

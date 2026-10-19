@@ -9,12 +9,8 @@ import { useHubStore } from '@/stores/hubStore';
 /**
  * These tests render the REAL shared v4 workbench (`@agenthub/workbench`).
  * Only the data/network layer below App is mocked — Hub queries, the web
- * workbench projection hook, web auth, and the auth modal.
- *
- * Previously this file replaced `@agenthub/workbench` with a ~50-line hand-written
- * stub and then asserted against the DOM that stub itself rendered, which made
- * every assertion vacuously true against the real shell. Keep the mock surface
- * at the data layer; do not stub the workbench.
+ * workbench projection hook, web auth, and the auth modal. Keep the mock
+ * surface at the data layer; do not stub the workbench.
  */
 
 const useAgentListMock = vi.hoisted(() => vi.fn());
@@ -47,6 +43,7 @@ const workspaceTabsLabel = /^(Workspace tabs|aria\.workspaceTabs)$/;
 const conversationSidebarLabel = /^(Conversation sidebar|aria\.conversationSidebar)$/;
 const composerInputLabel = /^(Composer input|aria\.composerInput)$/;
 const globalRailLabel = /^(Global rail|aria\.globalRail)$/;
+const mainChainStatusLabel = /^(Main chain status|aria\.mainChainStatus)$/;
 const sendMessageLabel = /^(发送消息|Send message|profile\.sendMessage)$/;
 const atAgentLabel = /^(@Agent|aria\.atAgent)$/;
 
@@ -155,15 +152,14 @@ describe('Web app root', () => {
     expect(screen.queryByRole('button', { name: '切换左侧栏' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '后退' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '前进' })).not.toBeInTheDocument();
-    // #1821: the legacy workspace tab row (消息/云文档/新建频道) was dead
-    // chrome (no onClick) and has been removed from WorkspaceHeader.
+    // #1821: WorkspaceHeader renders no workspace tab row.
     expect(screen.queryByRole('tablist', { name: workspaceTabsLabel })).not.toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Agent 协作群' })).toBeInTheDocument();
     expect(getComposerInput()).toBeInTheDocument();
     // showComposerAgentPicker / showMainchainStatus={false} prop gating, on the real shell.
-    // The real picker is a <select> (combobox), not the <button> the old stub invented.
+    // The real picker is a <select> (combobox).
     expect(screen.getByRole('combobox', { name: atAgentLabel })).toBeInTheDocument();
-    expect(screen.queryByRole('region', { name: 'Demo main chain status' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: mainChainStatusLabel })).not.toBeInTheDocument();
     expect(screen.queryByRole('toolbar', { name: 'Composer modes' })).not.toBeInTheDocument();
     expect(screen.queryByLabelText('Approval mode')).not.toBeInTheDocument();
     expect(screen.queryByLabelText('Work directory')).not.toBeInTheDocument();
@@ -248,7 +244,7 @@ describe('Web app root', () => {
           kind: 'text',
           author: { id: 'hub-agent', name: 'Builder', role: 'agent' },
           text: 'Agent 的回复内容',
-          // #2274 B-1: hub stamps the producing task id onto agent messages;
+          // #2274: hub stamps the producing task id onto agent messages;
           // the menu only offers regenerate when the block carries it.
           agentTaskId: 'task-42',
         },
@@ -265,7 +261,7 @@ describe('Web app root', () => {
     const regenerateItem = await screen.findByRole('menuitem', { name: 'context.regenerate' });
     fireEvent.click(regenerateItem);
 
-    // #2274 B-1: the port must send the TASK id — the only identity
+    // #2274: the port must send the TASK id — the only identity
     // POST /web/agent-tasks/:id/regenerate accepts (pre-fix web sent a message
     // identifier and every live click 404'd).
     expect(hubClientStub.regenerateAgentTask).toHaveBeenCalledWith('task-42');
@@ -276,7 +272,7 @@ describe('Web app root', () => {
     expect(screen.getByText('Agent 的回复内容')).toBeInTheDocument();
   });
 
-  // #2274 B-1 honesty gate, both halves: no stamped task id ⇒ nothing honest to
+  // #2274 honesty gate, both halves: no stamped task id ⇒ nothing honest to
   // send; no hub session (demo/unauthenticated) ⇒ the port must not exist at
   // all, so the shared menu hides the entry instead of offering a dead click.
   it('hides regenerate when the agent block carries no stamped task id', async () => {
@@ -304,7 +300,7 @@ describe('Web app root', () => {
     expect(hubClientStub.regenerateAgentTask).not.toHaveBeenCalled();
   });
 
-  it('hides regenerate outside hubReady even when a task id is stamped (#2274 B-1)', async () => {
+  it('hides regenerate outside hubReady even when a task id is stamped (#2274)', async () => {
     useWebWorkbenchModelMock.mockReturnValue({
       activeConversationId: 'hub-session-1',
       conversations: [

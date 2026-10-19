@@ -1,4 +1,4 @@
-// sumUsageTeamTokens (#1990, UX F14): the status-strip chip's data source.
+// sumUsageTeamTokens (#1990): the status-strip chip's data source.
 // Asserts the honesty contract — no recorded counters means `undefined`
 // (chip hidden), never a fake 0; pre-counter runs contribute nothing.
 import { describe, expect, it } from 'vitest';

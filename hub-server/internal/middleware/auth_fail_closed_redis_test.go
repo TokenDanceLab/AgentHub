@@ -1,9 +1,9 @@
 package middleware
 
-// AH-SR-052（SECURITY.md，High/Accepted）补偿控制行为级核验。
+// AGENTHUB_AUTH_FAIL_CLOSED 在 access-token 黑名单路径上的行为级核验。
 //
 // 风险：Redis 故障时 access-token jti 黑名单检查 fail-open，已登出的
-// access JWT 可能在故障窗口内复活。记录的补偿控制：生产显式设置
+// access JWT 可能在故障窗口内复活。补偿控制：生产显式设置
 // AGENTHUB_AUTH_FAIL_CLOSED=true，故障时改为拒绝请求（fail-closed）。
 //
 // 已有的 erroringAccessBlacklist 桩测试只覆盖「检查器返回 error」的
@@ -82,7 +82,7 @@ func runRealRedisAuthCase(t *testing.T, failClosedEnv string, blacklistJTIBefore
 	return !c.IsAborted(), w.Code
 }
 
-// TestAuthMiddlewareRealRedisFailClosedMatrix is the AH-SR-052 behavioral
+// TestAuthMiddlewareRealRedisFailClosedMatrix is the behavioral
 // gate: Redis reachability x AGENTHUB_AUTH_FAIL_CLOSED x expected behavior,
 // with the production-wired *cache.Client as blacklist checker.
 func TestAuthMiddlewareRealRedisFailClosedMatrix(t *testing.T) {
@@ -107,7 +107,7 @@ func TestAuthMiddlewareRealRedisFailClosedMatrix(t *testing.T) {
 		// Redis outage after the jti was blacklisted (logout happened before
 		// the outage): default policy is documented fail-open.
 		{name: "redis故障_故障前已拉黑_failclosed关_默认fail-open放行", failClosedEnv: "", blacklisted: true, outage: true, wantAllowed: true},
-		// AH-SR-052 compensating control: with AGENTHUB_AUTH_FAIL_CLOSED=true
+		// compensating control: with AGENTHUB_AUTH_FAIL_CLOSED=true
 		// the same outage must fail closed (401), otherwise the revoked
 		// (logged-out) access JWT gets back in during the Redis outage.
 		{name: "redis故障_故障前已拉黑_failclosed开_必须拒绝", failClosedEnv: "true", blacklisted: true, outage: true, wantAllowed: false},
@@ -133,7 +133,7 @@ func TestAuthMiddlewareRealRedisFailClosedMatrix(t *testing.T) {
 				t.Fatalf("status = %d, want 401", status)
 			}
 			if tc.outage {
-				// G9: a Redis outage on the blacklist path must be visible in
+				// A Redis outage on the blacklist path must be visible in
 				// Grafana regardless of the fail-open/fail-closed decision.
 				if delta := testutil.ToFloat64(metrics.JTIBlacklistCheckErrors) - errMetricBefore; delta != 1 {
 					t.Fatalf("JTIBlacklistCheckErrors delta = %v, want 1: Redis outage must be observable", delta)

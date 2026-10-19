@@ -2,6 +2,6 @@
 // (notificationBridge, deepLinking) keep a single import path while the
 // canonical schema + parser live in @agenthub/shared/notificationIntents.
 //
-// Metro note: requires `./notificationIntents` in app/shared/package.json
-// exports — tracked in BLOCKED (shared-lane follow-up).
+// Metro note: `./notificationIntents` must stay in app/shared/package.json
+// exports for this re-export to resolve.
 export * from '@agenthub/shared/notificationIntents';

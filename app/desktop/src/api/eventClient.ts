@@ -1,4 +1,4 @@
-// Thin shell over the shared event-stream client (#1682 P1 — shared is the
+// Thin shell over the shared event-stream client (#1682 — shared is the
 // single core implementation; desktop only injects platform defaults).
 //
 // Injected defaults:

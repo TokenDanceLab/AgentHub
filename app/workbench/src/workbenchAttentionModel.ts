@@ -3,12 +3,12 @@ import type { TranscriptBlock } from '@shared/transcript';
 import { countPendingApprovals } from './workbenchApprovalSummary';
 
 /**
- * F1/F6 attention model — pure derivation of live conversation status and
+ * Attention model — pure derivation of live conversation status and
  * global "running n / awaiting approval m" counts from the existing
  * run/approval/thread model shapes (see `workbenchStateTypes`). No new Hub
  * protocol: the shell hands over the run/approval inventory it already has;
  * this module is the single derivation source shared by the conversation
- * sidebar live dots (F1), the rail badge and the status-strip chips (F6).
+ * sidebar live dots, the rail badge and the status-strip chips.
  *
  * Honest boundary: shells without a run inventory fall back to
  * `buildActiveConversationAttention`, which only observes the ACTIVE
@@ -19,7 +19,7 @@ import { countPendingApprovals } from './workbenchApprovalSummary';
  * whatever the shell's client-side model contains.
  */
 
-/** Live status shown as a dot on a conversation row (F1). */
+/** Live status shown as a dot on a conversation row. */
 export type ConversationLiveStatus = 'running' | 'awaiting-approval' | 'done';
 
 /** Existing model arrays the shell already holds; no new wire shape. */
@@ -29,7 +29,7 @@ export interface WorkbenchAttentionInput {
   threads: Thread[];
 }
 
-/** Global attention counts shown in the rail badge and status strip (F6). */
+/** Global attention counts shown in the rail badge and status strip. */
 export interface WorkbenchAttentionCounts {
   /** undefined = not observable (active-conversation fallback without the
    *  runtime flag) — surfaces treat it as "no running chip", never zero. */

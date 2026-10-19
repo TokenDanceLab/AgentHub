@@ -1,6 +1,5 @@
 /**
  * Workbench demo public barrel.
- * Residual pure-helper peel of workbenchDemo (#1131). Pure only; zero behavior change.
  *
  * Implementations live in domain companions; this file re-exports so
  * consumers importing from `./workbenchDemo` / `@shared/demo` remain stable.

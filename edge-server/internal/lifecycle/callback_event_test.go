@@ -383,3 +383,7 @@ func TestHubCallbackQueueTypedApprovalBackpressuresThenDeliversBeforeDone(t *tes
 		return fmt.Sprintf("order=%v", cb.order)
 	})
 }
+
+func newHubCallbackEmitter(executor *ProcessExecutor, runID string, inner adapters.EventEmitter) adapters.EventEmitter {
+	return &hubCallbackEmitter{executor: executor, runID: runID, inner: inner}
+}

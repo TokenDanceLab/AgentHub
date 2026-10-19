@@ -17,7 +17,7 @@ var SessionMetricsTokensTotal *prometheus.CounterVec
 // events. Labels: model.
 var SessionMetricsCostUSDTotal *prometheus.CounterVec
 
-// RegisterSessionMetrics creates and registers the slice-A session metrics.
+// RegisterSessionMetrics creates and registers the Edge session metrics.
 // Safe to call multiple times; only the first call has effect.
 func RegisterSessionMetrics() {
 	sessionMetricsOnce.Do(func() {

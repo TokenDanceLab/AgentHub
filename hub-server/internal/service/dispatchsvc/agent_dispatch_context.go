@@ -7,42 +7,40 @@ import (
 )
 
 func (s *DispatchService) resolveDispatchTeamContext(ai *model.AgentInstance) dispatchTeamContext {
-	var rawCustomAgentID *string
+	var customAgentID *string
 	if ai != nil {
-		rawCustomAgentID = ai.CustomAgentID
+		customAgentID = ai.CustomAgentID
 	}
-	customAgentID := dispatch.CustomAgentIDFromAgentPresence(ai != nil, rawCustomAgentID)
-	if !dispatch.TeamContextResolutionReady(s != nil, s != nil && s.db != nil, ai != nil, customAgentID) {
-		return dispatch.EmptyTeamContext()
+	if s == nil || s.db == nil || ai == nil || dispatch.CustomAgentIDValue(customAgentID) == "" {
+		return dispatch.TeamContext{}
 	}
 	run, err := repository.GetTeamRunBySessionID(s.db, ai.SessionID)
-	var rawRunID string
+	var runID string
 	if run != nil {
-		rawRunID = run.ID
+		runID = run.ID
 	}
-	runID := dispatch.TeamRunIDValue(run != nil, rawRunID)
-	if !dispatch.TeamRunLoadable(err, run != nil, runID) {
-		return dispatch.EmptyTeamContext()
+	if err != nil || run == nil || runID == "" {
+		return dispatch.TeamContext{}
 	}
 	members, err := repository.ListTeamMembers(s.db, run.TeamID)
-	if !dispatch.TeamMembersPresent(err) {
-		return dispatch.EmptyTeamContext()
+	if err != nil {
+		return dispatch.TeamContext{}
 	}
-	return dispatch.MatchTeamContext(run.TeamID, runID, dispatch.TeamMatchCustomAgentID(customAgentID), dispatch.TeamMemberRefsFromMembers(members))
+	return dispatch.MatchTeamContext(run.TeamID, runID, dispatch.CustomAgentIDValue(customAgentID), dispatch.TeamMemberRefsFromMembers(members))
 }
 
 // loadThreadHistory loads recent thread messages (before the trigger message) for context continuity.
 // Limits to dispatch.MaxThreadHistory messages to avoid oversized dispatch payloads.
 func (s *DispatchService) loadThreadHistory(sessionID, triggerMessageID string) []dispatchMessage {
-	if !dispatch.HistoryLoadIDs(sessionID, triggerMessageID) {
+	if sessionID == "" || triggerMessageID == "" {
 		return nil
 	}
 	triggerMsg, err := repository.GetMessageByID(s.db, triggerMessageID)
-	if !dispatch.HistoryTriggerMessageLoadable(err, triggerMsg != nil) {
+	if err != nil || triggerMsg == nil {
 		return nil
 	}
 	msgs, err := repository.GetMessagesBySession(s.db, sessionID, triggerMsg.SeqID, dispatch.MaxThreadHistory)
-	if !dispatch.HistoryMessagesPresent(err, len(msgs)) {
+	if err != nil || len(msgs) == 0 {
 		return nil
 	}
 	// Reverse to chronological order (GetMessagesBySession returns DESC) via pure mapper (#756).
@@ -51,16 +49,16 @@ func (s *DispatchService) loadThreadHistory(sessionID, triggerMessageID string) 
 
 // loadPinnedMessages loads pinned messages for a session for context continuity.
 func (s *DispatchService) loadPinnedMessages(sessionID string) []dispatchMessage {
-	if !dispatch.ShouldLoadPinnedMessages(sessionID) {
+	if sessionID == "" {
 		return nil
 	}
 	pins, err := repository.ListPinsBySession(s.db, sessionID)
-	if !dispatch.PinnedRowsPresent(err, len(pins)) {
+	if err != nil || len(pins) == 0 {
 		return nil
 	}
 	messageIDs := dispatch.PinMessageIDsFromModels(pins)
 	msgs, err := repository.GetMessagesByIDs(s.db, messageIDs)
-	if !dispatch.PinMessagesLoadable(err) {
+	if err != nil {
 		return nil
 	}
 	return dispatch.MapPinnedMessages(msgs)

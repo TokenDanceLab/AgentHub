@@ -397,9 +397,9 @@ describe('WebSocketTransport protocol carriage', () => {
   });
 });
 
-// ── #2101 G1: seq_id gap detection + duplicate drop ───────────────
+// ── #2101: seq_id gap detection + duplicate drop ───────────────
 
-describe('hubWS seq_id gap detection (#2101 G1)', () => {
+describe('hubWS seq_id gap detection (#2101)', () => {
   let t: MockTransport;
   let h: HubWSHandle;
 
@@ -493,9 +493,9 @@ describe('hubWS seq_id gap detection (#2101 G1)', () => {
   });
 });
 
-// ── #2101 G4-②: onReconnected notification ────────────────────────
+// ── #2101: onReconnected notification ────────────────────────
 
-describe('hubWS onReconnected (#2101 G4-②)', () => {
+describe('hubWS onReconnected (#2101)', () => {
   let t: MockTransport;
   let h: HubWSHandle;
 

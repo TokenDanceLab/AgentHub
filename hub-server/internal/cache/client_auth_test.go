@@ -37,7 +37,7 @@ func TestIsRefreshTokenBlacklisted_Miss(t *testing.T) {
 }
 
 // TestIsRefreshTokenBlacklisted_RedisDownPropagatesError proves the #2053
-// contract (symmetric with the AH-SR-052 access contract, #2040): a Redis
+// contract (symmetric with the access contract, #2040): a Redis
 // outage is not swallowed here. The error is returned to the caller so the
 // refresh decision point (service/auth RefreshToken) can apply the configured
 // fail-open/fail-closed policy (AGENTHUB_AUTH_FAIL_CLOSED). Swallowing the
@@ -185,7 +185,7 @@ func TestIsAccessTokenBlacklisted_Miss(t *testing.T) {
 	assert.False(t, hit, "a never-blacklisted jti must not be reported as blacklisted")
 }
 
-// TestIsAccessTokenBlacklisted_RedisDownPropagatesError proves the AH-SR-052
+// TestIsAccessTokenBlacklisted_RedisDownPropagatesError proves the
 // contract (#2040): a Redis outage is not swallowed here. The error is
 // returned to the caller so the auth middleware can apply the configured
 // fail-open/fail-closed policy (AGENTHUB_AUTH_FAIL_CLOSED). Swallowing the

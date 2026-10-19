@@ -2,35 +2,32 @@
 
 > 子文档 | 主索引：[architecture.md](../architecture.md)
 >
-> 最后更新：2026-09-09
+> 最后更新：2026-10-19
 
 ## 概述
 
 Edge Server 的 adapter 层负责将不同 Agent Runtime 的协议统一为内部 `RunEvent` 流。所有 adapter 实现统一的 Go interface，Edge 不关心底层 Agent 的具体协议差异。
 
-`internal/adapters/` 已按 Agent 家族归组为叶子子包（[#1760]，见 [02-edge-server.md](02-edge-server.md) §Adapter 家族子包）：`claude/`、`codex/`、`opencode/`、`orchestrator/`、`sdk/`，另有 `acp/` 共享运行时子包（`acp.AcpAdapter`，claude/codex/opencode 嵌入复用）；NDJSON parser、registry 留在根包。下表文件列给出子包内路径（未标注的仍在根包平铺区）。
+`internal/adapters/` 已按 Agent 家族归组为叶子子包。包布局、依赖方向和共享 ACP 运行时见 [02-edge-server.md](02-edge-server.md) §Adapter 家族子包；本文件只列 CLI adapter 的注册契约与执行模式，下表文件列给出子包内路径（未标注的仍在根包平铺区）。
 
-[#1760]: https://github.com/TokenDanceLab/AgentHub/issues/1760
 
 ## CLI Adapters
 
 | Adapter | 注册 ID | 文件 | 功能 |
 |---------|---------|------|------|
-| Claude Code (ACP) | `claude-acp` | `claude/claude_acp.go` | 官方 `@agentclientprotocol/claude-agent-acp` 0.67.0 二进制 + `ANTHROPIC_API_KEY`，embed `AcpAdapter`（coder/acp-go-sdk） |
-| Codex (ACP) | `codex-acp` | `codex/codex_acp.go` | 官方 `codex-acp` 1.1.7 二进制 + `OPENAI_API_KEY`，embed `AcpAdapter` |
+| Claude Code (ACP) | `claude-acp` | `claude/claude_acp.go` | 官方 `@agentclientprotocol/claude-agent-acp` 二进制 + `ANTHROPIC_API_KEY`，embed `AcpAdapter`（coder/acp-go-sdk） |
+| Codex (ACP) | `codex-acp` | `codex/codex_acp.go` | 官方 `codex-acp` 二进制 + `OPENAI_API_KEY`，embed `AcpAdapter` |
 | OpenCode (ACP) | `opencode-acp` | `opencode/opencode_acp.go` | 原生 ACP 模式 `opencode acp` + 4 provider key passthrough，embed `AcpAdapter` |
-| Claude Code (legacy) | `claude-code` | `claude/claude_code.go` ⚠️ DEPRECATED | 旧手写 stream-json parser，仅保留作 orchestrator inner；Phase B 移除 |
+| Claude Code (legacy) | `claude-code` | `claude/claude_code.go`（deprecated） | 旧手写 stream-json parser；`--claude-code-path` 非空时注册为独立 adapter，也作为 orchestrator inner 使用 |
 
-> `codex.go` / `opencode.go`（旧手写批处理 parser）已在 ACP 收敛（阶段 A）中删除，运行时统一走 ACP 层。
+### ACP 协议层
 
-### ACP 迁移（2026-08，对标 codeg 官方 Wrapper）
+ACP 协议层**禁止手写 JSON-RPC loop**，必须用官方 Wrapper/适配层。三大家 CLI adapter 默认走 ACP：
 
-ACP 协议层**禁止手写 JSON-RPC loop**，必须用官方 Wrapper/适配层（对标 codeg）。三大家 CLI adapter 已接入官方 ACP 层，并成为**默认执行路径**（阶段 A 收敛完成）：
-
-- **协议边界**：100% 官方 adapter 二进制（claude-agent-acp / codex-acp / opencode 原生 ACP），Go runtime 用 `coder/acp-go-sdk` v0.13.5（Coder/Windsurf 厂维护，官方收录，从官方 schema 生成类型 + 自带 JSON-RPC 连接层）
+- **协议边界**：100% 官方 adapter 二进制（claude-agent-acp / codex-acp / opencode 原生 ACP），Go runtime 用 `coder/acp-go-sdk`（Coder/Windsurf 厂维护，官方收录，从官方 schema 生成类型 + 自带 JSON-RPC 连接层）
 - **runtime 共享层**：`acp/acp.go` `AcpAdapter`（SDK `acp.Client` 接口 9 方法自动分发）+ `acp/acp_events.go`（typed 映射 `acp.SessionUpdate` → `run.agent.*`）+ `acp/acp_client.go`（client skeleton）
 - **审批链**：`session/request_permission` → `PermissionDecisionBroker`（`RequestPermission` 桥接，复用既有 broker，零新协议）
-- **默认注册**：`claude-acp` / `codex-acp` / `opencode-acp` 默认注册（空 launcher 回退平台原生 `npx`/`opencode`）；`--agent-default` 与 `--runner-profile` 默认 cutover 到 `*-acp`。真跑验证需 `ANTHROPIC_API_KEY`/`OPENAI_API_KEY` + npx registry 网络。进度与剩余项见 GitHub issues（ACP migration 跟踪）。
+- **默认注册**：`claude-acp` / `codex-acp` / `opencode-acp` 默认注册（空 launcher 回退平台原生 `npx`/`opencode`）；`--runner-profile` 接受 `claude-code` / `codex` / `opencode`（以及测试用 `agenthub-runner-mock`），ACP adapter 由 `--agent-default` 或按 agent type 解析。真跑验证需 `ANTHROPIC_API_KEY`/`OPENAI_API_KEY` + npx registry 网络。
 
 ### CLI 执行模式
 
@@ -55,7 +52,7 @@ ACP 协议层**禁止手写 JSON-RPC loop**，必须用官方 Wrapper/适配层�
 - 无外部 SDK 依赖，纯 `net/http`
 - Key 缺失时 `Available=false`，不阻塞 Edge 启动
 - 注册 ID 为 `anthropic-sdk` / `openai-sdk`，由 `cmd/agenthub-edge` 的 `registerSDKAdapters` 按 `--anthropic-sdk-path` / `--openai-sdk-path` 注册
-- 重试机制：指数退避 + jitter（最大 3 次，1s/2s/4s (±25%)），匹配 `anthropic_sdk.go` 的 `doRequestWithRetry` 模式（v0.5.2+）
+- 重试机制：指数退避 + jitter（最大 3 次，1s/2s/4s (±25%)），匹配 `anthropic_sdk_request.go` 的 `doRequestWithRetry` 模式
 
 ## Orchestrator Adapter
 
@@ -74,15 +71,15 @@ Orchestrator 的 `ParseStream` 在 Claude Code 输出流上包装了 `dispatchIn
 
 | 子层 | 位置 | 职责 |
 |------|------|------|
-| **Rule Engine** (T2-A08) | `orchestrator/orchestrator_dispatch_interceptor.go` `applyRuleEngine` / `ruleEnginePreprocess` | 文本级和事件级的确定性预处理：完成信号检测（done/finish/completed 关键词匹配）、审批决策关键词短路（yes/no/approve/reject 跳过 JSON 解析）、单 finish dispatch 跳过优化、同 Agent 批量 dispatch 自动转顺序执行 |
-| **Plan Approval Gate** (P0 #3) | `orchestrator/plan_approval.go` `PlanApprovalBroker` | 在 dispatch 前暂停，发出 `plan.proposed` 事件并等待用户审批；支持超时自动批准（默认 60s） |
+| **Rule Engine** | `orchestrator/orchestrator_dispatch_interceptor.go` `applyRuleEngine` / `ruleEnginePreprocess` | 文本级和事件级的确定性预处理：完成信号检测（done/finish/completed 关键词匹配）、审批决策关键词短路（yes/no/approve/reject 跳过 JSON 解析）、单 finish dispatch 跳过优化、同 Agent 批量 dispatch 自动转顺序执行 |
+| **Plan Approval Gate** | `orchestrator/plan_approval.go` `PlanApprovalBroker` | 在 dispatch 前暂停，发出 `run.agent.plan_proposed` 事件并等待用户审批；超时默认拒绝（默认 60s） |
 | **Fan-Out Pool** | `orchestrator/orchestrator_dispatch_interceptor.go` `fanOutDispatches` / `fanOutSequential` | 信号量限制并发（默认 10），注入兄弟 Agent 上下文避免 workspace 文件冲突；同 Agent 批量自动降级为顺序执行 |
 | **Result Listener** | `orchestrator/orchestrator_dispatch_results.go` `runResultListener` / `handleSubAgentResult` | 通过消息队列接收子 Agent 结果/错误，注入回 orchestrator 文本流，触发进度汇总 |
-| **Failure Recovery** | lifecycle `FaultEscalation`（`internal/lifecycle/fault_escalation.go`） | 已收敛（#4ddde5b，2026-08-14）：删除 `orchestrator_failure.go`/`FailureRecoveryManager`/断路器三态/Reflexion，失败恢复改为纯自动重试（`MaxRetries` 默认 1，`AGENTHUB_MAX_RETRIES` 可调）+ 错误 review/replan 由 agent in-context 自纠错 |
+| **Failure Recovery** | lifecycle `FaultEscalation`（`internal/lifecycle/fault_escalation.go`） | 失败后按 `MaxRetries`（默认 1，`AGENTHUB_MAX_RETRIES` 可调）自动重试；错误 review/replan 由 agent in-context 自纠错 |
 
 **Rule Engine 规则说明**（按评估顺序）：
 
-1. **完成信号检测**：匹配独立完成信号（`done`、`finish`、`all tasks done` 等），短路跳过 JSON 解析并发出进度汇总。多词短语在任意长度文本匹配；单词信号仅在 80 字符内匹配以避免误触发。
+1. **完成信号检测**：匹配独立完成信号（`done`、`finish`、`all tasks done` 等），短路跳过 JSON 解析并发出进度汇总。多词短语在 ≤200 字符文本内匹配；单词信号在 ≤80 字符内匹配以避免误触发。
 2. **审批决策关键词**：当 `PlanApprovalBroker` 存在且文本 ≤40 字符时，匹配独立决策关键词（`yes`/`no`/`approve`/`reject`/`deny` 等），短路跳过 JSON 解析。
 3. **单 finish dispatch 跳过**：当 orchestrator 发出仅含完成语义描述的单个 dispatch 时，跳过 fanOut 直接发出进度汇总。
 4. **同 Agent 顺序执行**：当所有 dispatch 都指向同一 Agent 时，自动从并发 fanOut 降级为顺序执行，避免单个 adapter 的实例内竞争。
@@ -99,16 +96,16 @@ Orchestrator 的 `ParseStream` 在 Claude Code 输出流上包装了 `dispatchIn
 - 支持 `--agenthub-runtime-fixture-replay` 独立回放模式
 - `AgentSpec fixture` 使用此机制注册 demo runtime/profile
 
-## PreflightCheck 接口
+## PreflightAdapter 接口
 
 ```go
-// PreflightCheck 在真实执行前检查必要条件，快速失败
-type PreflightCheck interface {
+// PreflightAdapter 在真实执行前检查必要条件，快速失败
+type PreflightAdapter interface {
     PreflightCheck() error
 }
 ```
 
-`PreflightCheck` 接口定义在 `adapter.go`。所有 adapter 均实现：预检 launcher 二进制 / API key 是否存在，缺失时返回描述性错误而非进程启动后失败（例如 `codex-acp` 预检 `npx` launcher，`claude-code` 预检 `ANTHROPIC_API_KEY`）。
+`PreflightAdapter` 是可选接口，定义在 `adapter.go`；实现它的 adapter 在真实执行前预检 launcher 二进制 / API key 是否存在，缺失时返回描述性错误而非进程启动后失败（例如 `codex-acp` 预检 `npx` launcher，`claude-code` 预检 `ANTHROPIC_API_KEY`）。`orchestrator` 与 `RuntimeManifestAdapter` 不实现该接口。
 
 ## 事件映射合同
 
@@ -130,7 +127,7 @@ Agent 原生输出 -> Adapter normalize -> RunEvent -> EventStore -> WS -> Trans
 | approval_request | approval |
 | artifact | artifact |
 | deploy | deploy |
-| error | error |
+| error | failure |
 
 ## 动态模型路由（cc-switch 集成）
 

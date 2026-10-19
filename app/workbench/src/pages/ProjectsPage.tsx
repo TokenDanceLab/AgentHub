@@ -11,13 +11,11 @@ import type { ProjectsPageProps } from './projects';
 /* ═══════════════════════════════════════════════════════════════════════
    ProjectsPage — pure presentational workbench page
 
-   Detail/chrome subviews extracted under ./projects for Phase 17 #562.
-   Residual nav/main/editor shell extracted for Phase 20 #595.
+   Detail and chrome subviews live under ./projects (#562).
+   Nav, main, and editor shell (#595).
    ═══════════════════════════════════════════════════════════════════════ */
 
 /* ── Public re-exports (preserve external consumers) ── */
-
-export { DEFAULT_PROJECTS } from './projects';
 
 export type {
   ProjectRunStatus,

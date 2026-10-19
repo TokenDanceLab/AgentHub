@@ -1,6 +1,6 @@
 /* ==========================================================================
    WorkbenchSplitHost — absolutely-positioned pane shells over computeRects
-   (#1997, UX F3).
+   (#1997).
 
    Hard contract: layout changes never remount the active ConversationHost.
    The active pane is ALWAYS the first child of the workspace under the

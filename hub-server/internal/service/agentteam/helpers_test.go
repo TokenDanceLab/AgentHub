@@ -403,14 +403,6 @@ func seedTeamRunSession(t *testing.T, db *gorm.DB, sessionID, userID string, exe
 	).Error)
 }
 
-func entryMemberIDs(entries []model.CompeteSummaryEntry) []string {
-	ids := make([]string, len(entries))
-	for i, e := range entries {
-		ids[i] = e.MemberID
-	}
-	return ids
-}
-
 func strPtr(s string) *string {
 	return &s
 }

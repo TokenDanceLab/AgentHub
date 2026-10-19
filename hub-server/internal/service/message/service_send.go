@@ -19,8 +19,6 @@ import (
 	"github.com/agenthub/hub-server/internal/uuidv7"
 )
 
-// Residual pure-helper peel #1153: send/edit/recall/pin/forward write paths.
-
 func (s *Service) SendMessage(ctx context.Context, sessionID, senderUserID string, req SendMessageRequest) (*SendMessageResponse, error) {
 	content, attachmentIDs, err := normalizeSendMessage(req)
 	if err != nil {
@@ -91,7 +89,7 @@ func (s *Service) SendMessage(ctx context.Context, sessionID, senderUserID strin
 
 	err = s.persistSendMessageTx(msg, sessionID, attachmentIDs)
 	if err != nil {
-		// Single source of truth for the classification (#2244 slice 1). The
+		// Single source of truth for the classification (#2244). The
 		// package-private isDuplicateKeyError this used to call did NOT
 		// lower-case its input, so SQLite's upper-case "UNIQUE constraint
 		// failed: messages.client_msg_id" — the wording every unit test here
@@ -306,13 +304,13 @@ func (s *Service) PinMessage(ctx context.Context, userID, sessionID, msgID strin
 		// (internal/app/events.go -> ws.TypeMessagePin) re-render a pin list
 		// identical to the one it already holds.
 		//
-		// Residual gap, recorded rather than papered over: s.publish is
+		// Known gap: s.publish is
 		// best-effort (service_helpers.go logs and swallows a failed Publish),
 		// so "the row exists" does not strictly prove "a message.pin event was
 		// once delivered". A first attempt whose INSERT committed but whose
 		// Publish failed leaves that pin permanently un-broadcast, and this
 		// branch will never retry it. Closing that gap means changing publish
-		// semantics, which is out of scope for #2244 slice 1; the current
+		// semantics, which is out of scope for #2244; the current
 		// contract is pinned by TestPinMessage_DuplicatePublishesNothing and
 		// TestPinMessage_SuccessPublishesPinEventOnce.
 		//

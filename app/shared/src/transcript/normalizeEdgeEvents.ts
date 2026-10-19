@@ -138,19 +138,18 @@ function evidenceRunId(block: TranscriptBlock): string {
 // - run.agent.context_warning: auto-compaction budget alert (emitted at ~85%
 //   context budget by BudgetAwareEmitter); status indicator, not content.
 // - run.agent.api_retry: transient transport/retry signal (emitted ×N per retry
-//   attempt by the SDK request paths); observability noise, not content.
-//   Consuming it for retry counting is a larger follow-up, deferred for now.
+//   attempt by the SDK request paths); observability noise, not content. It is
+//   treated as an observable signal only and does not feed retry counting.
 // - run.agent.context_compaction: final auto-compaction marker emitted at
 //   compaction completion; status indicator, not content.
 //
-// TODO(Wave 3): The edge-server emits a long tail of structured events that the
-// transcript layer cannot yet project into dedicated block kinds. They are
-// listed here so the default-branch console.warn stays quiet until purpose-built
-// blocks are designed:
+// The edge-server also emits a long tail of structured events that the
+// transcript layer does not project into dedicated block kinds. They are
+// listed here so the default-branch console.warn stays quiet:
 //   - run.agent.sub_agents_complete: aggregated sub-agent results (no block kind)
 //   - run.agent.task_dispatched: orchestrator dispatch lifecycle (no block kind)
 //   - run.agent.hook_started / hook_progress / hook_response: hook chain telemetry
-//   - run.agent.plan_proposed / plan_approved / plan_rejected / plan_expired:
+//   - run.agent.plan_proposed / plan_approved / plan_rejected:
 //     plan approval gate signals (the Hub-level approval.* events are already
 //     projected via permissionRequestedBlock/permissionDecidedBlock)
 //   - run.agent.tool_rejected: allowlist enforcement signal
@@ -168,7 +167,7 @@ const SKIPPED_EVENT_TYPES = new Set<string>([
   'run.agent.context_warning',
   'run.agent.api_retry',
   'run.agent.context_compaction',
-  // TODO(Wave 3): no dedicated transcript block kind yet — silenced, not dropped silently.
+  // No dedicated transcript block kind yet — silenced, not dropped silently.
   'run.agent.sub_agents_complete',
   'run.agent.task_dispatched',
   'run.agent.hook_started',
@@ -177,7 +176,6 @@ const SKIPPED_EVENT_TYPES = new Set<string>([
   'run.agent.plan_proposed',
   'run.agent.plan_approved',
   'run.agent.plan_rejected',
-  'run.agent.plan_expired',
   'run.agent.tool_rejected',
   'run.agent.session_init',
   'run.agent.session_state_changed',

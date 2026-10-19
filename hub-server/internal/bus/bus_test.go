@@ -35,7 +35,7 @@ func newTestBus(t *testing.T) *Bus {
 // worker does not exit immediately after a handler returns, so gating on
 // Running()==0 would add a ~1-3s purge wait per publish with no correctness
 // benefit — Pending()==0 is the true "all dispatched handlers have finished"
-// signal (P1: bus drain 语义).
+// signal.
 func drainBus(t *testing.T, b *Bus) {
 	t.Helper()
 	deadline := time.Now().Add(3 * time.Second)
@@ -303,13 +303,15 @@ func TestClose_MarksClosed(t *testing.T) {
 	assert.True(t, b.IsClosed(), "bus must be closed after Close")
 }
 
-// TestPublish_AfterClose_SubmitFailurePath: publishing after Close drives the
-// submit-error branch (pool.Submit returns ErrPoolClosed). The handler must
-// NOT run, pending must not leak, and Publish must not panic.
+// TestPublish_AfterClose_SubmitFailurePath: publishing after Close hits the
+// closed guard and returns ErrBusClosed before submission, so the handler must
+// NOT run, pending must stay at 0, and Publish must not panic.
 //
-// This is the only reachable path that exercises bus.go:93-99 — the pool is
-// created with ants.WithNonblocking(false), so a saturated pool blocks rather
-// than returning an error; only a closed pool yields a Submit error.
+// This is not a submit-error case: the pool.Submit failure branch is skipped
+// because the closed guard short-circuits first. A saturated pool also cannot
+// produce one — the pool is created with ants.WithNonblocking(false), so it
+// blocks instead of returning a submit error; only a closed pool would, and
+// that state is caught earlier.
 func TestPublish_AfterClose_SubmitFailurePath(t *testing.T) {
 	b, err := New()
 	require.NoError(t, err)

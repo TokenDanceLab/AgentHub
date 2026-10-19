@@ -1,5 +1,5 @@
 -- 0065_redundant_index_cleanup.up.sql
--- P1 hygiene: drop three redundant secondary indexes whose lookup path is
+-- Drop three redundant secondary indexes whose lookup path is
 -- already satisfied by a unique constraint or a composite index whose left
 -- prefix is the same column. Each drop is safe because PostgreSQL can plan the
 -- same queries off the surviving index/constraint; keeping the duplicate only

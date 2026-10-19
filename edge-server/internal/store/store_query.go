@@ -4,10 +4,9 @@ import (
 	"sort"
 )
 
-// store_query.go holds pure query/filter builders extracted from store.go.
-// Companion pure peels: store_query_domain.go, store_query_maps.go,
-// store_query_resolve.go, store_query_plan.go, store_query_snapshot.go.
-// No *gorm.DB / IO / mutex ownership.
+// Pure query/filter builders. Companions: store_query_domain.go,
+// store_query_maps.go, store_query_resolve.go, store_query_plan.go,
+// store_query_snapshot.go. No *gorm.DB, IO, or mutex ownership.
 
 func defaultNonEmpty(value, fallback string) string {
 	if value == "" {

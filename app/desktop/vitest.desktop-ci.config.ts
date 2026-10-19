@@ -27,7 +27,7 @@ export default defineConfig({
     execArgv: ['--max-old-space-size=8192'],
     memoryLimit: '512MB',
     maxWorkers: 4,
-    // FLK-004：渲染重型 .tsx 用例在 512MB worker 负载下偶发超过默认 5s。
+    // 渲染重型 .tsx 用例在 512MB worker 负载下偶发超过默认 5s。
     testTimeout: 30_000,
     hookTimeout: 30_000,
     deps: {
@@ -38,9 +38,9 @@ export default defineConfig({
       },
     },
     coverage: createCoverage({
-      // 绝对 floors（2026-08-03 实测，含全部生产源码进分母后）：
-      // lines 49.29 / stmt 47.44 / fn 41.79 / br 40.96 — 每维 floor(实测)-1。
-      // 全部低于 60 是提升目标（见 coverage-baseline.json note），非永久豁免。
+      // 绝对 floors（含全部生产源码进分母）：lines 48 / branches 39 /
+      // functions 40 / statements 46。
+      // 全部低于 60 是提升目标（coverage thresholds 见本文件），非永久豁免。
       thresholds: { lines: 48, branches: 39, functions: 40, statements: 46 },
       // src/main.tsx — 纯入口（ReactDOM.createRoot 挂载），无业务逻辑（shared
       // 的 index.ts 同先例）

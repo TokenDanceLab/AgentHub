@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""backup-db — AgentHub PostgreSQL 备份（ps1 迁移，契约见 server docs/design/ps1-to-python-migration.md）。
+"""backup-db — AgentHub PostgreSQL 备份。
 
 pg_dump | gzip 备份到 BackupDir，并清理超过 RetentionDays 的旧 *.sql.gz。
-参数/环境变量与 ps1 一致（BACKUP_DIR/DB_NAME/DB_USER/DB_HOST 环境变量兜底）；
-输出行（`Backup: <file>` / `Cleaned backups older than N days`）与 ps1 一致。
+BACKUP_DIR/DB_NAME/DB_USER/DB_HOST 环境变量作为参数兜底；
+输出 `Backup: <file>` / `Cleaned backups older than N days`。
 
-契约差异（评审记录）：ps1 不检查 pg_dump 退出码，dump 失败仍静默 exit 0 并写
-空文件；py 按契约禁止静默吞错——dump 失败抛 ERROR 非零退出，不写空文件。
+失败语义：pg_dump 退出码非零时抛 RuntimeError 并以非零状态退出，
+不写出空备份文件。
 """
 
 import argparse
@@ -40,7 +40,7 @@ def main() -> int:
     if not gzip_exe:
         raise RuntimeError("gzip executable not found")
 
-    # PGPASSWORD 透传自环境（ps1 原样继承）；pg_dump 失败必须非零退出（ps1 静默吞错）
+    # PGPASSWORD 透传自环境；pg_dump 失败必须非零退出，不写空文件
     pg_dump_run = subprocess.run(
         [pg_dump_exe, "-h", args.DbHost, "-U", args.DbUser, "-d", args.DbName],
         stdout=subprocess.PIPE,
@@ -72,6 +72,6 @@ def main() -> int:
 if __name__ == "__main__":
     try:
         sys.exit(main())
-    except Exception as exc:  # noqa: BLE001 —— 顶层兜底，对齐 ps1 $ErrorActionPreference='Stop'，禁止静默吞错
+    except Exception as exc:  # noqa: BLE001 —— 顶层兜底：任何未处理异常以非零状态退出，禁止静默吞错
         print(f"ERROR: {exc}", file=sys.stderr)
         sys.exit(1)

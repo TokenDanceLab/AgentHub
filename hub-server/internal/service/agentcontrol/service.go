@@ -6,7 +6,6 @@ import (
 	"log/slog"
 	"strings"
 
-	"github.com/agenthub/hub-server/internal/cache"
 	"github.com/agenthub/hub-server/internal/errcode"
 	"github.com/agenthub/hub-server/internal/model"
 	"github.com/agenthub/hub-server/internal/ws"
@@ -28,13 +27,9 @@ type Service struct {
 
 func NewService(cacheClient CachePort, mgr *ws.Manager) *Service {
 	return &Service{
-		cacheClient: resolveAgentControlCache(cacheClient),
+		cacheClient: cacheClient,
 		mgr:         mgr,
 	}
-}
-
-func resolveAgentControlCache(c CachePort) CachePort {
-	return cache.ResolveCache[CachePort](c, cache.NoOpCache{})
 }
 
 func (s *Service) DeliverToDesktopDevice(ctx context.Context, userID, deviceID string, payload model.AgentControlPayload) error {

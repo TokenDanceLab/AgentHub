@@ -62,7 +62,7 @@ func (h *Handler) GetEvents(w http.ResponseWriter, r *http.Request) {
 	subID, ch, replay := h.Bus.Subscribe(cursor)
 	defer h.Bus.Unsubscribe(subID)
 
-	// Send replayed events, filtered by ownership under Hub JWT (AH-SR-045).
+	// Send replayed events, filtered by ownership under Hub JWT.
 	if err := replayEventsToClient(conn, repo, replay, userID); err != nil {
 		slog.Info("websocket write error during replay", "error", err)
 		return
@@ -87,7 +87,7 @@ func (h *Handler) GetEvents(w http.ResponseWriter, r *http.Request) {
 }
 
 // replayEventsToClient sends the replayed events, filtered by ownership under
-// Hub JWT (AH-SR-045).
+// Hub JWT.
 func replayEventsToClient(conn *websocket.Conn, repo store.Repository, replay []events.EventEnvelope, userID string) error {
 	for _, evt := range replay {
 		if !eventVisibleToUser(repo, evt, userID) {
@@ -256,14 +256,13 @@ func runToResponse(run store.Run) map[string]any {
 // activeRunExistsResponse builds the 409 body for "this thread already has an
 // active run".
 //
-// This is the only place in edge-server that still calls errcode.ErrorBody
-// directly instead of errcode.Write, and it is allow-listed by
-// scripts/verify/verify-edge-status-ssot.py: the response has to carry the
+// This is the only place in edge-server that calls errcode.ErrorBody
+// directly instead of errcode.Write: the response has to carry the
 // conflicting run's identifiers (runId/projectId/threadId/status) next to the
 // error envelope so the client can offer to cancel or attach to it, while
 // errcode.Write writes a fixed envelope. The status is NOT hand-copied either —
-// the caller passes errcode.ErrActiveRunExists.HTTPStatus — and the gate also
-// pins that, so the exemption cannot silently grow a second copy (#2245).
+// the caller passes errcode.ErrActiveRunExists.HTTPStatus, so the exemption
+// cannot silently grow a second copy (#2245).
 func activeRunExistsResponse(run store.Run) map[string]any {
 	body := errcode.ErrorBody(errcode.ErrActiveRunExists)
 	body["runId"] = run.ID

@@ -5,7 +5,7 @@ import (
 	"time"
 )
 
-// Bounded in-process state for the Edge stream callback hot path (#2154 P2-9).
+// Bounded in-process state for the Edge stream callback hot path (#2154).
 //
 // HandleTaskStream runs once per streamed chunk — in practice once per token.
 // Two of its maintenance writes are meaningful far less often than that:
@@ -104,23 +104,6 @@ func (b *ackedTaskSet) remove(id string) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	delete(b.seen, id)
-}
-
-// len reports the live entry count. Test/observability helper.
-func (b *ackedTaskSet) len() int {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-	return len(b.seen)
-}
-
-// retainedSlots reports how many key slots the structure holds, live or not.
-// The map being the only backing store is what makes this equal to len(); the
-// accessor exists so the invariant stays assertable (and stays broken loudly)
-// if an ordering structure is ever reintroduced here.
-func (b *ackedTaskSet) retainedSlots() int {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-	return len(b.seen)
 }
 
 // evictOldestLocked drops the entry with the smallest insertion sequence, i.e.
@@ -232,21 +215,6 @@ func (t *sessionTouchThrottle) reset(sessionID string) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	delete(t.last, sessionID)
-}
-
-// len reports the live entry count. Test/observability helper.
-func (t *sessionTouchThrottle) len() int {
-	t.mu.Lock()
-	defer t.mu.Unlock()
-	return len(t.last)
-}
-
-// retainedSlots reports how many key slots the structure holds, live or not.
-// See ackedTaskSet.retainedSlots.
-func (t *sessionTouchThrottle) retainedSlots() int {
-	t.mu.Lock()
-	defer t.mu.Unlock()
-	return len(t.last)
 }
 
 // evictOldestLocked drops the oldest-inserted live session. Caller holds mu.

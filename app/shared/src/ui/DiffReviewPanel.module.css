@@ -390,14 +390,14 @@
   background: transparent;
 }
 
-/* ── Word-diff highlights (P6 Step 5/6) ──────────────────────────
+/* ── Word-diff highlights ────────────────────────────────────────
    Per-word added/removed spans injected INSIDE Prism token spans by
-   highlightLineWithWordDiff() (HAST layer, P6 Step 3). They nest inside
+   highlightLineWithWordDiff() (HAST layer). They nest inside
    .token spans — they are NOT .token spans themselves, so the
    .lineContent span[class*="token"] { background: transparent } rule
    above does NOT clear their background.
 
-   Two-layer design (report §4.4): the row-level --diff-*-bg tint (alpha
+   Two-layer design: the row-level --diff-*-bg tint (alpha
    0.08-0.10) marks the whole modified/added/deleted line; the inline
    word-level highlight here derives from the saturated --diff-*-border
    at 28% so the per-word span reads ABOVE the row tint. color-mix()
@@ -414,14 +414,13 @@
   border-radius: var(--r-xs);
 }
 
-/* High Contrast (Windows HC) — report §4.5. Red/green are unreliable
+/* High Contrast (Windows HC). Red/green are unreliable
    under forced-colors; map word-diff to system semantic colors + add a
    text decoration so added/removed stay distinguishable without color.
      .wordAdded  -> Highlight bg + HighlightText (system "selection")
      .wordRemoved -> GrayText + line-through (deletion marker)
-   Inherits the jsdom css:false limitation (tokens-base.css:586 TODO):
-   forced-colors media cannot be exercised in-test; HC rendering needs
-   Windows HC实机 verification. */
+   Inherits the jsdom css:false limitation: forced-colors media cannot be
+   exercised in-test; HC rendering needs Windows实机 verification. */
 @media (forced-colors: active) {
   .wordAdded {
     background: Highlight;

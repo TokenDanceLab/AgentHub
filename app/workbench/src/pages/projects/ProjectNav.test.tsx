@@ -1,7 +1,6 @@
-// #2274 B-6 (Option A): the project lifecycle filter (Running/Completed/Archived
-// chips) is removed because Hub exposes no authoritative project lifecycle. Pin
-// the behavior: Hub-style status labels are never classified/filtered, and the
-// Projects nav renders no lifecycle filter controls.
+// Hub exposes no authoritative project lifecycle, so the Projects nav does not
+// classify or filter by lifecycle status: Hub-style status labels render as-is
+// and no Running/Completed/Archived filter controls are shown.
 import { render, screen } from "../../__tests__/setup";
 import { describe, expect, it } from "vitest";
 import type { ProjectInfo } from "./types";
@@ -22,7 +21,7 @@ function project(id: string, status: string): ProjectInfo {
   };
 }
 
-describe("ProjectNav lifecycle filter removal (#2274 B-6)", () => {
+describe("ProjectNav hub-style status without lifecycle filtering", () => {
   it("shows Hub-style projects as rows and renders no Running/Completed/Archived filter controls", () => {
     render(
       <ProjectNav

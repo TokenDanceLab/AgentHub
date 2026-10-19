@@ -15,10 +15,7 @@
 // Discover loads name + description + triggers from the frontmatter only
 // (lightweight); SystemPromptContext injects the "Available skills:" block
 // into the agent system prompt during run creation (handlers_runs.go).
-//
-// Historical trigger-word matching and fsnotify hot reload were removed:
-// they had zero production callers, and restoring them from git history is
-// straightforward if a future feature needs them (#2154).
+
 package skills
 
 import (

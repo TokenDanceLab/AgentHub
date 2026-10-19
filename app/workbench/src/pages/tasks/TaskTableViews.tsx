@@ -1,9 +1,9 @@
 /* ═══════════════════════════════════════════════════════════════════════
-   Tasks table / selection subviews — residual thin shell after extracting
+   Tasks table / selection subviews — helper module shell after extracting
    pure helpers to TaskTableHelpers and presentational parts to
    TaskTableParts (#745 / #571).
 
-   CSS stays on TasksPage.module.css. No intentional UX change.
+   CSS stays on TasksPage.module.css.
    Public API: TaskSelectionStrip, TaskTable.
    ═══════════════════════════════════════════════════════════════════════ */
 

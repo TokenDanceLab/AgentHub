@@ -1,6 +1,5 @@
 /**
  * Hub client transport primitives: timeouts, error constructors, URL/headers/fetch init.
- * Peel companion of hubClientTransportUtils (#1102). Pure only; zero behavior change.
  */
 
 import { AppError } from '../errors';

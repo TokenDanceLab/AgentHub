@@ -254,12 +254,9 @@ func (r *Reader) ResolveModelAlias(alias, appType string) (string, bool) {
 			return resolved, true
 		}
 		// Fall back to the display-name variant. The key is alias+"_name"
-		// because parseModelAliases's aliasMap is the only producer of
-		// ModelAliases and it emits lowercase keys ("opus_name" from
-		// ANTHROPIC_DEFAULT_OPUS_MODEL_NAME). This used to read "_NAME", which
-		// no producer ever emitted, so the fallback never fired; the sibling
-		// consumer in internal/api/model_catalog_ccswitch.go already used the
-		// lowercase form.
+		// because parseModelAliases's aliasMap emits lowercase keys
+		// ("opus_name" from ANTHROPIC_DEFAULT_OPUS_MODEL_NAME); the sibling
+		// consumer in internal/api/model_catalog_ccswitch.go uses the same form.
 		nameKey := alias + "_name"
 		if resolved, ok := p.ModelAliases[nameKey]; ok {
 			return resolved, true

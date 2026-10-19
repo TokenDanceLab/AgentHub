@@ -14,7 +14,7 @@ import (
 	"github.com/agenthub/pkg/testkit"
 )
 
-// Regression tests for #2154 (Wegener 并发探索): a repeat Cancel while the
+// Regression tests for #2154: a repeat Cancel while the
 // first grace path is armed must not re-arm. Re-arming overwrites
 // cancelDone[runID], so finish() closes only the newest channel and the
 // earlier cancelGrace goroutines are orphaned (they live out both timers,
@@ -163,8 +163,8 @@ func TestProcessExecutorConcurrentCancelArmsGraceOnce(t *testing.T) {
 	}
 
 	// Poll until the armed grace goroutine parks on its grace timer, then
-	// assert exactly one survived (#1550/#1948 sleep-ratchet: deadline polling
-	// instead of a fixed sleep).
+	// assert exactly one survived (#1550/#1948: deadline polling instead of a
+	// fixed sleep).
 	live := 0
 	testkit.Eventually(t, processTrackedWaitTimeout, func() bool {
 		live = countCancelGraceGoroutines(t)

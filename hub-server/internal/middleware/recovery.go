@@ -113,7 +113,7 @@ func RecoveryHTTPHandler(next http.Handler) http.Handler {
 //     anything else. A non-error payload is by definition not a broken pipe,
 //     must be reported false, and must never panic here — a panic inside the
 //     recovery middleware is unrecoverable and takes the process down.
-//   - Recognition is structural, not textual (#2244 slice 2). The kernel
+//   - Recognition is structural, not textual (#2244). The kernel
 //     already hands us the exact reason as a syscall.Errno; reading its
 //     English rendering back out of a formatted string throws that signal away
 //     and breaks on any wrapping, locale or Go version that renders it

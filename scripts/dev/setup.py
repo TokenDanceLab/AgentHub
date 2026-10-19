@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
-"""setup — AgentHub 本地环境配置（ps1 迁移，契约见 server docs/design/ps1-to-python-migration.md）。
+"""setup — AgentHub 本地环境配置。
 
 启用 git hooks（scripts/git-hooks）。
 
-契约：stdlib only；输出行（`Git hooks enabled: scripts/git-hooks` /
-`Setup complete.`）与 ps1 一致；退出码 0=通过。
+stdlib only；退出码 0=通过。
 """
 
 import argparse
@@ -35,6 +34,6 @@ def main() -> int:
 if __name__ == "__main__":
     try:
         sys.exit(main())
-    except Exception as exc:  # noqa: BLE001 —— 顶层兜底，对齐 ps1 $ErrorActionPreference='Stop'，禁止静默吞错
+    except Exception as exc:  # noqa: BLE001 —— fail closed：未捕获异常返回非零
         print(f"ERROR: {exc}", file=sys.stderr)
         sys.exit(1)

@@ -2,7 +2,7 @@
 # ─────────────────────────────────────────────────────────────
 # AgentHub WSL 全栈 E2E harness（WSL 侧执行体）
 #
-# 在 WSL (Ubuntu-24.04) 内以容器形态部署完整栈：
+# 在 WSL2 (Ubuntu) 内以容器形态部署完整栈：
 #   tokendance-id (OIDC 提供方, 容器) + hub-server (容器) + PG16 + Redis7,
 # 然后执行真实 OIDC Authorization Code + PKCE 登录流断言。
 #
@@ -16,8 +16,10 @@
 #   E2E-RESULT: PASS|FAIL   —— 末行总结
 #
 # 幂等：可重复运行；默认结束清理全部容器与网络（--keep=1 保留）。
-# 自动修复：docker daemon 死链镜像源移除、registry 不可达时配置 Clash 代理。
-# 无 secret、无生产资源：全部测试账号/密钥为运行期随机生成。
+# 可选：AGENTHUB_E2E_FIX_DOCKER_MIRRORS=1 时清理 daemon.json 中不可达镜像源。
+# 可选代理：export AGENTHUB_E2E_HTTP_PROXY=http://<host>:<port>（需从 WSL loopback 可达）。
+# 无 secret、无生产资源：全部测试账号/密钥为运行期随机生成，仅落在私有
+# workdir（chmod 600），不写入证据文件。
 # ─────────────────────────────────────────────────────────────
 set -euo pipefail
 
@@ -25,7 +27,9 @@ PROJECT_NAME="${1:-agenthub-e2e}"
 KEEP="${2:-0}"
 EVIDENCE_DIR="${3:-/tmp/agenthub-e2e-evidence}"
 
-REPO_HOST_ROOT="${AGENTHUB_E2E_SRC_ROOT:-/mnt/d/Code/TokenDance}"
+: "${AGENTHUB_E2E_SRC_ROOT:?set AGENTHUB_E2E_SRC_ROOT to the parent directory containing the AgentHub checkout}"
+: "${AGENTHUB_E2E_ID_SRC:?set AGENTHUB_E2E_ID_SRC to the TokenDance ID source checkout}"
+REPO_HOST_ROOT="$AGENTHUB_E2E_SRC_ROOT"
 WORK="/tmp/${PROJECT_NAME}-work"
 COMPOSE="$WORK/docker-compose.yml"
 EVIDENCE="$WORK/evidence.json"
@@ -84,8 +88,8 @@ ensure_docker_network() {
     fi
   fi
 
-  # 0a. daemon.json 中死链 registry-mirrors 移除（例如 mirror.baidubce.com）
-  if [ -f /etc/docker/daemon.json ]; then
+  # 0a. 可选：移除 daemon.json 中不可达的 registry-mirrors。默认不改宿主配置。
+  if [ "${AGENTHUB_E2E_FIX_DOCKER_MIRRORS:-0}" = "1" ] && [ -f /etc/docker/daemon.json ]; then
     local mirror_changed
     mirror_changed="$(python3 - <<'PYEOF' || true
 import json, sys
@@ -120,19 +124,16 @@ PYEOF
     fi
   fi
 
-  # 0b. registry 代理配置与探测（幂等）。
-  # 探测用 docker pull（走 daemon 代理，Go TLS 正常）；不用 curl 探测
-  # （OpenSSL 经 Clash CONNECT 隧道 TLS 失败，RC 35）。一旦本机配置过
-  # daemon 代理，说明 registry 依赖代理，直接启用 buildx 的 CLI 代理。
-  if [ -f /etc/systemd/system/docker.service.d/http-proxy.conf ]; then
-    info "docker daemon proxy already configured; buildx will use Clash"
-    export AGENTHUB_E2E_USE_PROXY=1
-  elif ! timeout 60 docker pull --quiet alpine:3.21 >/dev/null 2>&1; then
-    info "docker.io unreachable directly; configuring docker daemon proxy via Clash"
+  # 0b. 可选 registry 代理与探测（幂等）。
+  # 只有显式设置 AGENTHUB_E2E_HTTP_PROXY 才启用；探测用 docker pull，
+  # 因为部分 CONNECT 代理下 curl/OpenSSL 探测会失败。
+  E2E_PROXY="${AGENTHUB_E2E_HTTP_PROXY:-}"
+  if [ -n "$E2E_PROXY" ] && ! timeout 60 docker pull --quiet alpine:3.21 >/dev/null 2>&1; then
+    info "docker.io unreachable directly; configuring docker daemon proxy"
     sudo mkdir -p /etc/systemd/system/docker.service.d
-    sudo tee /etc/systemd/system/docker.service.d/http-proxy.conf >/dev/null <<'EOF'
+    sudo tee /etc/systemd/system/docker.service.d/http-proxy.conf >/dev/null <<EOF
 [Service]
-Environment="HTTP_PROXY=http://127.0.0.1:7897" "HTTPS_PROXY=http://127.0.0.1:7897" "NO_PROXY=localhost,127.0.0.1"
+Environment="HTTP_PROXY=$E2E_PROXY" "HTTPS_PROXY=$E2E_PROXY" "NO_PROXY=localhost,127.0.0.1"
 EOF
     sudo systemctl daemon-reload && sudo systemctl restart docker
     sleep 3
@@ -145,10 +146,9 @@ EOF
       sleep 2
     done
     if [ "$registry_ok" != "1" ]; then
-      fail "docker-network|registry-1.docker.io unreachable even via Clash proxy"
+      fail "docker-network|registry-1.docker.io unreachable through configured proxy"
       exit 1
     fi
-    export AGENTHUB_E2E_USE_PROXY=1
   fi
 
   docker info >/dev/null 2>&1 || { fail "docker-daemon|docker daemon not running"; exit 1; }
@@ -167,7 +167,7 @@ prepare_sources() {
   info "cloning AgentHub (committed state only)"
   git clone --quiet --depth 1 --no-tags "file://$REPO_HOST_ROOT/AgentHub" "$WORK/agenthub"
   info "cloning tokendance-id (committed state only)"
-  git clone --quiet --depth 1 --no-tags "file://$REPO_HOST_ROOT/tokendance-id" "$WORK/tokendance-id"
+  git clone --quiet --depth 1 --no-tags "file://$AGENTHUB_E2E_ID_SRC" "$WORK/tokendance-id"
   pass "sources ready (committed HEAD of both repos)"
 }
 
@@ -189,17 +189,16 @@ generate_compose_base() {
   ID_USER_EMAIL="e2e-user@test.local"
   ID_USER_PASSWORD="E2E-Passw0rd!$(python3 -c 'import secrets;print(secrets.token_hex(2))')"
 
-  # 构建期代理注入：容器内 go mod download 直连 proxy.golang.org 被墙。
-  # 构建用 host 网络（容器共享宿主网络栈，127.0.0.1 即 WSL loopback 上的
-  # Clash 7897）；bridge 网络的 host-gateway:7897 到不了只监听 loopback 的 Clash。
+  # 构建期代理注入：容器内 go mod download 可能需要代理。
+  # 构建用 host 网络，代理地址必须从 WSL loopback 可达。
   PROXY_BUILD_ARGS=""
-  if [ "${AGENTHUB_E2E_USE_PROXY:-0}" = "1" ]; then
-    PROXY_BUILD_ARGS='
+  if [ -n "${E2E_PROXY:-}" ]; then
+    PROXY_BUILD_ARGS="
       args:
-        HTTP_PROXY: http://127.0.0.1:7897
-        HTTPS_PROXY: http://127.0.0.1:7897
+        HTTP_PROXY: $E2E_PROXY
+        HTTPS_PROXY: $E2E_PROXY
         NO_PROXY: localhost,127.0.0.1
-      network: host'
+      network: host"
   fi
 
   cat > "$COMPOSE_BASE" <<EOF
@@ -296,7 +295,7 @@ services:
       AGENTHUB_JWT_SECRET: "${JWT_SECRET}"
       AGENTHUB_SERVER_PORT: "8080"
       AGENTHUB_SERVER_ADMIN_PORT: "6060"
-      AGENTHUB_SERVER_LOG_LEVEL: warn
+      AGENTHUB_LOG_LEVEL: warn
       AGENTHUB_UPLOAD_DIR: /app/uploads
       AGENTHUB_TOKENDANCE_ID_ISSUER_URL: "http://id:${PORT_ID}"
       AGENTHUB_TOKENDANCE_ID_CLIENT_ID: "${ID_CLIENT_ID}"
@@ -325,11 +324,11 @@ start_stack() {
   step "stack up (build may take several minutes)"
   # compose v5 的 build 走 buildx 客户端进程，代理需注入 CLI 环境
   # （daemon 层代理只覆盖 docker pull，不覆盖 buildkit 拉取）。
-  if [ "${AGENTHUB_E2E_USE_PROXY:-0}" = "1" ]; then
-    export HTTP_PROXY="http://127.0.0.1:7897"
-    export HTTPS_PROXY="http://127.0.0.1:7897"
+  if [ -n "${E2E_PROXY:-}" ]; then
+    export HTTP_PROXY="$E2E_PROXY"
+    export HTTPS_PROXY="$E2E_PROXY"
     export NO_PROXY="localhost,127.0.0.1"
-    info "buildkit uses Clash proxy for image pulls"
+    info "buildkit uses configured proxy for image pulls"
   fi
   (cd "$WORK" && docker compose -f compose.base.yml build --progress plain) || {
     fail "stack-up|docker compose build failed"
@@ -368,6 +367,7 @@ seed_identity() {
   step "seed identity (register + login + oauth client)"
   rm -f "$JAR"
   printf 'e2e_user_password=%s\n' "$ID_USER_PASSWORD" > "$WORK/id.pwd"
+  chmod 600 "$WORK/id.pwd"
 
   local register
   register="$(curl -sf -X POST "http://127.0.0.1:${PORT_ID}/api/auth/register" \
@@ -552,9 +552,11 @@ PYEOF
   local neg
   neg="$(curl -s -o /dev/null -w '%{http_code}' -X POST "http://127.0.0.1:${PORT_HUB}/client/auth/oidc/callback" \
     -H 'Content-Type: application/json' \
-    -d '{"code":"forged-code","state":"forged","code_verifier":"forged","device_type":"desktop","device_id":"e2e-device-0","redirect_uri":"http://127.0.0.1/callback"}')"
-  if [ "$neg" != "200" ] && [ "$neg" != "400" ] && [ "$neg" != "401" ]; then
-    fail "negative|forged code should be rejected, got $neg"
+    -d '{"code":"forged-code","state":"forged","code_verifier":"forged","device_type":"desktop","device_id":"00000000-0000-4000-8000-000000000000","redirect_uri":"http://127.0.0.1/callback"}')"
+  # A valid UUID device_id keeps the request past input normalization, so the
+  # rejection proves the code exchange failed rather than the payload shape.
+  if [ "$neg" != "400" ] && [ "$neg" != "401" ]; then
+    fail "negative|forged code must be rejected with 400/401, got $neg"
     return 1
   fi
   pass "negative test: forged code rejected (HTTP $neg)"
@@ -564,6 +566,7 @@ PYEOF
   echo "e2e_user_password=$ID_USER_PASSWORD" >> "$WORK/access.token"
   echo "e2e_client_id=$ID_CLIENT_ID" >> "$WORK/access.token"
   echo "e2e_client_secret=$ID_CLIENT_SECRET" >> "$WORK/access.token"
+  chmod 600 "$WORK/access.token"
 }
 
 # ── 阶段 6：证据 manifest ───────────────────────────────
@@ -573,18 +576,12 @@ write_evidence() {
 import json, os, sys, time
 path, out_dir = sys.argv[1], sys.argv[2]
 os.makedirs(out_dir, exist_ok=True)
-creds = {}
-if os.path.exists(os.path.join(os.path.dirname(path), "access.token")):
-    for line in open(os.path.join(os.path.dirname(path), "access.token"), encoding="utf-8"):
-        if "=" in line:
-            k, v = line.strip().split("=", 1)
-            creds[k] = v
 doc = {
     "kind": "wsl-full-stack-e2e",
     "generated_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
     "real_tokendance_id_login": True,
     "login_mode": "seeded-test-identity",
-    "evidence_level": "integration",
+    "evidence_level": "observed-local",
     "stack": ["tokendance-id", "hub-server", "postgres:16-alpine", "redis:7-alpine"],
     "checks": {
         "environment": "PASS",
@@ -598,7 +595,8 @@ doc = {
         "websocket_auth": "PASS",
         "forged_code_rejected": "PASS",
     },
-    "credentials": creds,
+    "credentials": "runtime-random; stored in private workdir (chmod 600), not included",
+    "credentials_recorded": True,
 }
 json.dump(doc, open(path, "w"), indent=2, ensure_ascii=False)
 json.dump(doc, open(os.path.join(out_dir, "evidence.json"), "w"), indent=2, ensure_ascii=False)

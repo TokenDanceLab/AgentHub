@@ -7,7 +7,7 @@ import type { SettingsPageProps } from './types';
 import { ShortcutsPane } from './SettingsPanes';
 
 /* ═══════════════════════════════════════════════════════════════════════
-   Shortcut conflict copy under the real zh bundle (#2154 P3-6).
+   Shortcut conflict copy under the real zh bundle (#2154).
 
    The pane used to print the colliding binding's internal id (`send`) and one
    of the two conflict sentences was hardcoded Chinese outside i18n. Both now
@@ -54,7 +54,7 @@ function remapButton(comboText: string): HTMLElement {
   return button;
 }
 
-describe('ShortcutsPane conflict copy (#2154 P3-6)', () => {
+describe('ShortcutsPane conflict copy (#2154)', () => {
   beforeEach(() => {
     resetKeybindings();
   });

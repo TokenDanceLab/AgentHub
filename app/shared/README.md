@@ -18,7 +18,7 @@
 | `@shared/ui` | `src/ui/` | Desktop/Web 共用 UI 组件、测试和 Storybook story |
 | `@shared/chatview` | `src/chatview/` | ChatView 消息卡片渲染系统：adapter、TranscriptItem、RowItem 状态机、i18n、CSS tokens |
 
-端级 workbench shell 已于 #1759 独立为第 6 个包 `@agenthub/workbench`（`app/workbench/`），依赖方向固定为 workbench → shared 单向；shared 不再包含也不再 re-export workbench。
+端级 workbench shell 位于 `app/workbench/`（`@agenthub/workbench`），依赖方向固定为 workbench → shared 单向。
 
 ## 使用
 
@@ -36,21 +36,12 @@ import { ChatViewTranscript } from '@shared/chatview';
 
 ## AgentHub 术语
 
-共享类型命名必须区分：
-
-| 概念 | 推荐字段 |
-|---|---|
-| Agent Runtime | `runtimeId`, `adapterId`, `capabilities` |
-| Agent Profile | `profileId`, `agentId`, `customAgentId` |
-| Agent Configuration | `model`, `reasoningEffort`, `permissionMode`, `skillIds`, `mcpServerIds` |
-| Execution Target | `targetId`, `edgeId`, `workspaceId`, `relayCommandId` |
-
-如果旧接口仍使用 `agentId` 表示 adapter ID，应在 shared 类型或 API client 边界处做清晰注释，避免 UI 把 Runtime 当作用户可管理 Profile 展示。
+共享类型命名必须区分 Agent Runtime / Agent Profile / Agent Configuration / Execution Target；定义见 `../../docs/architecture.md` §产品模型，API 字段映射见 `../../api/README.md`。如果旧接口仍使用 `agentId` 表示 adapter ID，应在 shared 类型或 API client 边界处做清晰注释，避免 UI 把 Runtime 当作用户可管理 Profile 展示。
 
 ## UI 规范
 
 - 通用组件放 `src/ui/`，并从 `src/ui/index.ts` barrel export。
-- 每个通用组件应有同目录 `*.test.tsx`；面向展示的组件补 `*.stories.tsx`。
+- 新组件放 `src/ui/`，必须同时提供同目录 `*.test.tsx`、`*.stories.tsx`，并按 [`../../docs/component-acceptance.md`](../../docs/component-acceptance.md) 验收。
 - 样式使用 CSS Modules 和项目 OKLCH token，避免硬编码颜色。
 - Desktop 的 Storybook 读取 shared UI story：`cd app/desktop && pnpm storybook`。
 
@@ -67,4 +58,4 @@ corepack pnpm --filter agenthub-web typecheck
 corepack pnpm --filter agenthub-web build
 ```
 
-已知限制：`app/shared/src/ui` 的 React 类型解析和 pnpm 跨包虚拟存储会影响部分 shared-ui 测试/typecheck。提交或交接时需要区分既有限制和本次新增错误。
+已知限制：`app/shared/src/ui` 的 React 类型解析和 pnpm 跨包虚拟存储会影响部分 shared-ui 测试/typecheck。

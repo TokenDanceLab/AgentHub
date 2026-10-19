@@ -56,7 +56,7 @@ describe('ContactsPage empty states', () => {
   });
 });
 
-describe('ContactsPage infinite scroll (T14 skeleton)', () => {
+describe('ContactsPage infinite scroll', () => {
   const BASE_PROPS = {
     activePane: 'internal' as const,
     onPaneChange: () => undefined,

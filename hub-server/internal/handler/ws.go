@@ -23,7 +23,7 @@ type WebSocketHandler struct {
 	// onTyping receives the typing fan-out callback. memberIDs is the session
 	// membership that canTypeInSession already resolved while admitting the
 	// frame, handed downstream so the fan-out does not resolve it a second
-	// time (#2154 P2-10: typing frames arrive continuously while a user types,
+	// time (#2154: typing frames arrive continuously while a user types,
 	// and each resolution is a cache.GetOrLoad round trip).
 	onTyping    func(userID, sessionID string, memberIDs []string)
 	userLimiter *middleware.WSUserConnLimiter
@@ -56,11 +56,11 @@ func (h *WebSocketHandler) SetOnTyping(fn func(userID, sessionID string, memberI
 
 func (h *WebSocketHandler) ServeWS(c *gin.Context) {
 	// Authentication is an HTTP-upgrade invariant. Fail closed here as
-	// defense-in-depth if a future route forgets WSAuthMiddleware; never fall
+	// defense-in-depth if a future route forgets AuthMiddleware.WSHandler(); never fall
 	// back to an in-band token frame that bypasses blacklist/session gates.
 	userID := c.GetString("user_id")
 	if userID == "" {
-		// Envelope + traceId like the rest of the API surface (#2123 P3-7):
+		// Envelope + traceId like the rest of the API surface (#2123):
 		// a bare AbortWithStatus left WS clients with an empty body.
 		Fail(c, errcode.ErrInvalidToken)
 		return
@@ -104,19 +104,23 @@ func (h *WebSocketHandler) ServeWS(c *gin.Context) {
 		return
 	}
 
-	h.manager.SetAuth(conn.ID, userID, c.GetString("device_type"), c.GetString("device_id"))
-	h.userLimiter.Acquire(userID, conn.ID)
-	// writeLoop must start before PushToConn so the stamped auth.ok frame has a
-	// draining goroutine ready to take it off conn.Send (writeLoop is launched
-	// below on its own goroutine). Routing auth.ok through PushToConn instead
-	// of the legacy sendFrame bypass unifies seq_id stamping so clients can
-	// detect loss via seq gaps (G12 fix); subsequent data frames start at
-	// seq_id=2 because auth.ok now consumes seq_id=1.
+	// writeLoop must start before SetAuth so the auth.ok frame it queues has a
+	// draining goroutine ready (writeLoop is launched below on its own
+	// goroutine). SetAuth queues auth.ok before the connection is published to
+	// byUser, so it is always the first frame (seq_id 1) and later data frames
+	// start at seq_id 2 — clients can detect loss via seq gaps.
 	// Track connection-scoped goroutines so Manager.Shutdown can wait for
 	// them to converge. Add(2) covers writeLoop + readLoop; each defers Done.
 	h.manager.GoroutineAdd(2)
 	h.startWriteLoop(conn)
-	h.manager.PushToConn(conn.ID, ws.NewFrame(ws.TypeAuthOK, nil))
+	if !h.manager.SetAuth(conn.ID, userID, c.GetString("device_type"), c.GetString("device_id")) {
+		// The manager already closed and unregistered the connection (cap or
+		// queue failure). Release the readLoop slot reserved by GoroutineAdd(2);
+		// writeLoop releases its own when the closed Send unblocks it.
+		h.manager.GoroutineDone()
+		return
+	}
+	h.userLimiter.Acquire(userID, conn.ID)
 	safego.SafeGo("ws.readLoop", func() {
 		defer h.manager.GoroutineDone()
 		h.authenticatedReadLoop(conn)
@@ -131,7 +135,7 @@ func (h *WebSocketHandler) ServeWS(c *gin.Context) {
 // first-registered `defer conn.W.Close(...)` runs *last* under LIFO, so a panic
 // raised by the close itself escapes writeLoop and only this launcher guard
 // stands between it and a process crash. Same shape as ws.readLoop above
-// (#2246 slice 1 follow-up); ws_write_loop_safego_test.go pins both guards.
+// (#2246); ws_write_loop_safego_test.go pins both guards.
 func (h *WebSocketHandler) startWriteLoop(conn *ws.Conn) {
 	safego.SafeGo("ws.writeLoop", func() {
 		defer h.manager.GoroutineDone()
@@ -241,7 +245,7 @@ func (h *WebSocketHandler) cleanupConn(conn *ws.Conn) {
 
 // handleTyping admits a typing frame and hands it to the fan-out callback.
 //
-// Admission is unchanged (#2154 P2-10 only removed the *second* member
+// Admission is unchanged (#2154 only removed the *second* member
 // resolution): an empty session id, a missing ResolveMembers hook, a panicking
 // hook and a non-member sender are all still dropped here, with the same warn
 // log, and the callback is never reached for them.
@@ -281,7 +285,7 @@ func typingSessionID(payload any) string {
 // when it is, returns the membership list it resolved to reach that verdict.
 //
 // Returning the list is what lets the typing path resolve session members
-// exactly once per frame instead of twice (#2154 P2-10) — the fan-out callback
+// exactly once per frame instead of twice (#2154) — the fan-out callback
 // used to re-resolve the same sessionID and re-run the same senderIsMember
 // scan. The admission verdict itself is byte-for-byte the old one: empty ids or
 // a missing ResolveMembers hook deny, a panicking hook denies (recovered and
@@ -306,43 +310,6 @@ func (h *WebSocketHandler) canTypeInSession(userID, sessionID string) (memberIDs
 		}
 	}
 	return nil, false
-}
-
-// sendFrame writes a frame directly to conn.Send, bypassing Manager.PushToConn
-// and therefore the per-connection seq_id stamping contract documented at
-// internal/ws/fanout.go (PushToConn: "every delivery attempt that reaches the
-// connection is stamped with the connection's monotonic seq_id"). Frames sent
-// here reach the
-// wire with SeqID=0, which frame.go's json "omitempty" tag drops entirely, so
-// clients cannot detect loss of these frames via seq_id gaps.
-//
-// G12 RESOLVED: the historical production caller (ServeWS auth.ok handshake)
-// now routes through Manager.PushToConn so auth.ok receives seq_id=1 and
-// subsequent data frames shift by 1 (wire-visible). sendFrame is retained for
-// the G12 characterization tests in ws_internal_test.go and any future
-// non-seq-critical control frames; production code MUST prefer PushToConn so
-// every wire frame carries a monotonic seq_id.
-//
-// ws_sendframe_bypass_total{frame_type} observes the bypass traffic rate so
-// operators can see the volume of frames escaping seq_id stamping. The counter
-// is nil-guarded to align with #1441 (builds that never call metrics.Register
-// must not panic).
-func (h *WebSocketHandler) sendFrame(conn *ws.Conn, frame ws.Frame) {
-	data, err := frame.Marshal()
-	if err != nil {
-		return
-	}
-	if metrics.WSSendFrameBypass != nil {
-		metrics.WSSendFrameBypass.WithLabelValues(frame.Type).Inc()
-	}
-	select {
-	case conn.Send <- data:
-	default:
-		if metrics.WSDroppedFrames != nil {
-			metrics.WSDroppedFrames.Inc()
-		}
-		slog.Warn("ws frame dropped: send buffer full", "conn_id", conn.ID, "user_id", conn.UserID)
-	}
 }
 
 // isProductionEnv returns true when running in production/release mode.

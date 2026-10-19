@@ -2,10 +2,10 @@ package dispatch
 
 import "encoding/json"
 
-// Payload is the pure agent.dispatch edge payload shape historically kept as
-// package-private dispatchPayload in service/agent_dispatch.go. JSON tags must
-// stay stable so redispatch unmarshaling of stored outbox rows continues to work.
-// Orchestration still owns ports/DB/WS; this type is free of service deps.
+// Payload is the pure agent.dispatch edge payload shape. Its JSON tags are part
+// of the stored delivery_outbox wire contract and must stay stable so redispatch
+// unmarshaling of stored rows continues to work. Orchestration still owns
+// ports/DB/WS; this type is free of service deps.
 type Payload struct {
 	TaskID           string `json:"task_id"`
 	DeliveryID       string `json:"delivery_id,omitempty"`

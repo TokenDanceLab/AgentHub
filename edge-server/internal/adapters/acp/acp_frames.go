@@ -1,5 +1,4 @@
-// Package adapters — ACP fs/terminal frame design + workspace allowlist
-// (#1743 item 1, follow-up of #1404).
+// Package adapters — ACP fs/terminal frame design + workspace allowlist.
 //
 // The seven fs/terminal endpoints of acp.Client (see the STUB INVENTORY in
 // acp_client.go) are still unwired: nothing in this package executes real
@@ -25,8 +24,8 @@
 //	    → gate accepts: JSON-RPC error wrapping errACPEndpointNotWired
 //	      until real execution is approved
 //
-// Real fs/terminal execution is deliberately NOT part of this file — it is
-// #1743 item 3 (real-run verification, requires approval). The future
+// Real fs/terminal execution is deliberately NOT part of this file — it
+// requires real-run verification (approval required). The future
 // executor must re-check resolved paths (e.g. after symlink resolution)
 // against the allowlist before any I/O; the pure containment check here is
 // the first, not the only, line of defense.

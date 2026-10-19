@@ -42,7 +42,6 @@ type openAPIPathItem struct {
 
 type openAPIOperation struct {
 	OperationID string                     `yaml:"operationId"`
-	Phase       string                     `yaml:"x-agenthub-phase"`
 	Status      string                     `yaml:"x-agenthub-status"`
 	Responses   map[string]openAPIResponse `yaml:"responses"`
 }
@@ -152,15 +151,12 @@ func TestOpenAPIModelCatalogDocumentsItemsAndSourcesContract(t *testing.T) {
 	}
 }
 
-func TestOpenAPIAgentInstanceCreateRemainsPlannedP1(t *testing.T) {
+func TestOpenAPIAgentInstanceCreateRemainsPlanned(t *testing.T) {
 	spec := loadEdgeOpenAPISpec(t)
 	operation := openAPIOperationFor(t, spec, "/v1/agent-instances", "post")
 
 	if operation.Status != "planned" {
 		t.Fatalf("post /v1/agent-instances status = %q, want planned", operation.Status)
-	}
-	if operation.Phase != "P1" {
-		t.Fatalf("post /v1/agent-instances phase = %q, want P1", operation.Phase)
 	}
 }
 
@@ -171,12 +167,11 @@ func TestOpenAPIBackendMigrationEdgeAuditCoverage(t *testing.T) {
 		path   string
 		method string
 		status string
-		phase  string
 	}{
 		{path: "/v1/model-catalog", method: "get", status: "implemented"},
 		{path: "/v1/agent-instances/{id}", method: "get", status: "implemented"},
 		{path: "/v1/threads/{threadId}:archive", method: "post", status: "implemented"},
-		{path: "/v1/agent-instances", method: "post", status: "planned", phase: "P1"},
+		{path: "/v1/agent-instances", method: "post", status: "planned"},
 	}
 
 	for _, tc := range cases {
@@ -184,9 +179,6 @@ func TestOpenAPIBackendMigrationEdgeAuditCoverage(t *testing.T) {
 			operation := openAPIOperationFor(t, spec, tc.path, tc.method)
 			if operation.Status != tc.status {
 				t.Fatalf("%s %s status = %q, want %q", tc.method, tc.path, operation.Status, tc.status)
-			}
-			if tc.phase != "" && operation.Phase != tc.phase {
-				t.Fatalf("%s %s phase = %q, want %q", tc.method, tc.path, operation.Phase, tc.phase)
 			}
 		})
 	}

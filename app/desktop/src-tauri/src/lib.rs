@@ -15,6 +15,35 @@ use tokio::sync::Mutex;
 pub struct CloseToTrayState(pub Arc<AtomicBool>);
 pub struct QuittingState(pub Arc<AtomicBool>);
 
+/// Returns the available updater version, or null when the app is current.
+#[tauri::command]
+async fn check_for_update(app: tauri::AppHandle) -> Result<Option<String>, String> {
+    use tauri_plugin_updater::UpdaterExt;
+    let updater = app.updater().map_err(|error| error.to_string())?;
+    updater
+        .check()
+        .await
+        .map(|update| update.map(|available| available.version.clone()))
+        .map_err(|error| error.to_string())
+}
+
+/// Downloads and installs the pending update, then restarts the app.
+#[tauri::command]
+async fn install_update(app: tauri::AppHandle) -> Result<(), String> {
+    use tauri_plugin_updater::UpdaterExt;
+    let updater = app.updater().map_err(|error| error.to_string())?;
+    match updater.check().await.map_err(|error| error.to_string())? {
+        Some(update) => {
+            update
+                .download_and_install(|_chunk_length, _content_length| {}, || {})
+                .await
+                .map_err(|error| error.to_string())?;
+            app.restart();
+        }
+        None => Ok(()),
+    }
+}
+
 pub fn run() {
     let edge_path = resolve_edge_path();
     let store_path = std::env::temp_dir().join("agenthub-edge.sqlite");
@@ -64,6 +93,8 @@ pub fn run() {
             // tray (direct — has #[tauri::command] proc-macro)
             tray::set_tray_labels,
             // updater (direct)
+            check_for_update,
+            install_update,
         ])
         .setup(move |app| {
             let handle = app.handle().clone();

@@ -6,7 +6,7 @@ import styles from './WorkbenchGoalBanner.module.css';
 import type { WorkbenchGoalStatus, WorkbenchGoalSummary } from './workbenchGoalSummary';
 
 /**
- * Conversation goal banner (#1998, UX F8). Projection of the transcript's
+ * Conversation goal banner (#1998). Projection of the transcript's
  * goal tool calls (see `workbenchGoalSummary`) shown between the workspace
  * header and the transcript of conversations that have a derivable goal.
  *

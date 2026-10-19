@@ -6,8 +6,6 @@ import (
 	"github.com/agenthub/edge-server/internal/adapters"
 )
 
-// Residual pure-helper peel #1122: payload/scope helpers for SDK fixture mapping.
-
 func commonSDKPayload(event SDKFixtureEvent, provider string, fields map[string]any) map[string]any {
 	payload := map[string]any{
 		"provider": provider,

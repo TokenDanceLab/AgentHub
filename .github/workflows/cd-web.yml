@@ -11,6 +11,8 @@ on:
       - "app/pnpm-lock.yaml"
       - "app/pnpm-workspace.yaml"
       - "app/Dockerfile"
+      - "app/.dockerignore"
+      - "app/.npmrc"
       - ".github/workflows/cd-web.yml"
   workflow_dispatch:
 

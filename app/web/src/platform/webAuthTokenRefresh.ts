@@ -1,11 +1,9 @@
 /**
- * Web Hub access-token refresh singleton (P0: wire onRefreshToken site-wide).
+ * Web Hub access-token refresh singleton.
  *
- * The shared auth state machine (authStateMachine.ts) refreshes inside
- * tryAutoLogin, but the transport's 401-recovery hook was never wired, so a
- * token-expired access token caused every authenticated request to 401 with no
- * recovery. This module provides the onRefreshToken callback the transport
- * layer already supports (hubClientTransportRun.runUnauthorizedTokenRefreshRecovery).
+ * The transport's 401-recovery hook calls `refreshWebHubAccessTokenOnce` via
+ * the onRefreshToken callback (hubClientTransportRun.runUnauthorizedTokenRefreshRecovery),
+ * so an expired access token recovers without a signed-out session.
  *
  * Strategy:
  * - single-flight: N concurrent 401s share one refresh promise.

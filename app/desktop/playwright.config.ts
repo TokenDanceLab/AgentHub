@@ -34,8 +34,8 @@ export default defineConfig({
   testDir: './src/__e2e__',
   timeout: 60_000,
   expect: { timeout: 10_000 },
-  // Flake retry policy SSOT: docs/governance/known-flaky.md. Budget stays 0
-  // (fail-closed); raising it needs a registry entry with a review deadline.
+  // Flake retry policy SSOT: docs/architecture/github-actions-ci-cd-policy.md. This lane
+  // declares no retries; retries may only absorb browser/network jitter, never mask defects.
   retries: 0,
   use: {
     baseURL: desktopE2EBaseURL,
@@ -76,14 +76,11 @@ export default defineConfig({
       VITE_HUB_WS_URL: 'wss://hub.test.invalid/client/ws',
     },
     url: desktopE2EBaseURL,
-    // (#2003) Never reuse an existing server, even locally. With
-    // `!process.env.CI` a leftover dev server on the port (manual `pnpm dev`
-    // or an interrupted Playwright child) was silently reused, so the `env`
-    // block above never applied and HUB_URL fell back to the production
-    // default. Combined with the port reap at the top of this file, an
-    // occupied port is cleared first and Playwright always launches a fresh
-    // server carrying the test env; if the port cannot be cleared this stays
-    // fail-closed and errors instead of silently reusing the wrong server.
+    // Never reuse an existing server. Combined with the port reap at the top
+    // of this file, an occupied port is cleared first and Playwright always
+    // launches a fresh server carrying the test env above; if the port cannot
+    // be cleared this stays fail-closed and errors instead of silently reusing
+    // the wrong server.
     reuseExistingServer: false,
     timeout: 45_000,
   },

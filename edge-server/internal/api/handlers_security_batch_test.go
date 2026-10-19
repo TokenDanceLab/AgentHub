@@ -10,7 +10,7 @@ import (
 )
 
 // TestPatchSettingsRejectsOversizedBody pins the shared 1MB body limit on
-// PATCH /v1/settings (#2154 security scan): a body beyond the limit is
+// PATCH /v1/settings (#2154): a body beyond the limit is
 // truncated and rejected instead of decoded into memory.
 func TestPatchSettingsRejectsOversizedBody(t *testing.T) {
 	h := newTestHandler()

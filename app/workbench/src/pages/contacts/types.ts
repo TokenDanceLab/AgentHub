@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════════════════════════
-   Contacts page public types — extracted for Phase 17 strangler slice #561.
+   Contacts page public types (#561).
    ═══════════════════════════════════════════════════════════════════════ */
 
 export interface FriendRequestRow {
@@ -99,7 +99,7 @@ export type ContactProfile =
     };
 
 export interface ContactsPageProps {
-  /** Hub contacts request failure (#1821) — when set, the page renders an
+  /** Hub contacts request failure — when set, the page renders an
    *  explicit error state instead of the empty/mock contact list. */
   error?: string | undefined;
   /** Currently active nav pane */
@@ -162,7 +162,7 @@ export interface ContactsPageProps {
   modalOpen?: boolean;
   /** Called to close the modal */
   onModalClose?: (() => void) | undefined;
-  /** Called when the invite invite link is copied */
+  /** Called when the invite link is copied */
   onCopyInvite?: (() => void) | undefined;
   /** Called when phone invite is submitted */
   onSendPhoneInvite?: ((countryCode: string, phone: string, note: string) => void) | undefined;
@@ -184,7 +184,7 @@ export interface ContactsPageProps {
   /** Called when user updates a contact remark */
   onUpdateRemark?: ((userId: string, remark: string) => Promise<unknown> | void) | undefined;
 
-  // ── Infinite scroll (T14 pattern; mock data-layer cursor pagination, #1510) ──
+  // ── Infinite scroll (mock data-layer cursor pagination, #1510) ──
   /** Whether more contacts are available via pagination (pageCursor). */
   hasMore?: boolean | undefined;
   /** Whether a load-more page fetch is in flight. */
