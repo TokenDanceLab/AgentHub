@@ -14,23 +14,6 @@ const runtimeStyleKeys = [
   'workspaceActions',
   'iconButton',
   'composer',
-  'composerRow',
-  'composerInput',
-  'composerMentions',
-  'composerMentionChip',
-  'composerMainchain',
-  'composerAgentPicker',
-  'composerAgentSelect',
-  'composerTargetPicker',
-  'composerTargetSelect',
-  'composerStatus',
-  'attachmentButton',
-  'composerAttachmentBar',
-  'attachmentChip',
-  'attachmentChipName',
-  'attachmentChipSize',
-  'attachmentChipRemove',
-  'sendButton',
 ] as const;
 
 describe('AgentHubWorkbench CSS module contract', () => {
@@ -51,6 +34,27 @@ describe('AgentHubWorkbench CSS module contract', () => {
     expect(css).not.toMatch(/\.blockText\b/);
     expect(css).not.toMatch(/\.agentBlockRow\b/);
     expect(css).not.toMatch(/\.workspaceDataMode\b/);
+  });
+
+  it('does not keep the retired CSS-Module composer chrome', () => {
+    for (const retired of [
+      'composerRow',
+      'composerInput',
+      'composerMentions',
+      'composerMentionChip',
+      'composerMainchain',
+      'composerAgentPicker',
+      'composerAgentSelect',
+      'composerTargetPicker',
+      'composerTargetSelect',
+      'composerStatus',
+      'attachmentButton',
+      'composerAttachmentBar',
+      'attachmentChip',
+      'sendButton',
+    ]) {
+      expect(css, retired).not.toMatch(new RegExp(`\\.${retired}\\b`));
+    }
   });
 
   it('keeps the terminal dock under workspace + inspector only (not rail/sidebar)', () => {

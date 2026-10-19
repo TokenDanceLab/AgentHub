@@ -1,6 +1,6 @@
 # AgentHub 组件验收标准（component-acceptance）
 
-最后更新：2026-10-18
+最后更新：2026-10-19
 
 本文是 AgentHub shared 组件的**验收标准 SSOT**：任何 `app/shared/src/ui/` 下的新组件（或对既有组件做可见行为改动）必须对照本文件的 5 维验收标准验收。Token 与主题规则见 `docs/architecture/07-design-system-ssot.md`；产品级截图证据按该文 §7 的 Visual QA gate 组织。
 
@@ -13,6 +13,8 @@
 | 验收表 | PR/issue 描述中附本文件的 5 维验收表 | 注明组件路径、token 使用（`--td-*` 优先）、截图/渲染证据路径、未覆盖项原因 |
 
 已有组件缺件时按同规则补件，不能以“旧组件”为由跳过。新增组件复制上述 5 个维度的表结构；修改组件后更新该表，不得保留过期勾选。
+
+**Vendored shadcn primitives are the exception.** Files under `app/shared/src/shadcn/ui/` are upstream registry source, not product-authored components. They keep a focused render/attribute test in the same directory and are customized only through caller classes and the token bridge in `app/shared/src/styles/shadcn.css`. Product wrappers around them (for example `UnifiedComposer` and `UserMessage`) still follow the full five-dimension acceptance bar.
 
 ## 5 维验收标准
 

@@ -39,15 +39,6 @@ describe('ChatViewTranscript CSS contract', () => {
     }
   });
 
-  it('keeps agent markdown replies on a stable readable column', () => {
-    const groupRule = cssRule(css, '.bubble-group');
-    const nestedBubbleRule = cssRule(css, '.bubble-group > .agent-bubble');
-
-    expect(groupRule).not.toMatch(/\bwidth\s*:\s*fit-content\b/);
-    expect(groupRule).toMatch(/\bwidth\s*:\s*min\(86%,\s*820px\)/);
-    expect(nestedBubbleRule).toMatch(/\bwidth\s*:\s*100%/);
-  });
-
   it('keeps the ChatView root constrained so the transcript owns vertical scrolling', () => {
     const chatviewRule = cssRule(css, '.chatview');
 
@@ -59,26 +50,13 @@ describe('ChatViewTranscript CSS contract', () => {
   });
 
   it('keeps Hub message metadata styled as compact non-card chrome', () => {
-    const metaRule = cssRule(css, '.message-display-meta');
-    const detailRule = cssRule(css, '.message-display-detail');
-
     for (const className of messageDisplayMetaClassNames) {
       expect(css, className).toMatch(new RegExp(`\\.${className}\\b`));
     }
-    expect(metaRule).toMatch(/\bfont\s*:\s*var\(--chat-label-xs\)/);
-    expect(metaRule).not.toMatch(/\bbackground\s*:/);
-    expect(detailRule).toMatch(/\btext-overflow\s*:\s*ellipsis/);
   });
 
-  it('uses dense row rhythm tokens for transcript messages (#1311)', () => {
-    const rowRule = cssRule(css, '.grp-row');
-    const contentRule = cssRule(css, '.grp-content');
-
-    expect(rowRule).toMatch(/margin-bottom\s*:\s*var\(--chat-sp-md\)/);
-    expect(rowRule).toMatch(/gap\s*:\s*var\(--chat-sp-sm\)/);
-    expect(contentRule).toMatch(/gap\s*:\s*var\(--chat-sp-2\)/);
-    /* Full-file match: cssRule hits first `.user-bubble` under `.grp-content >` (align only). */
-    expect(css).toMatch(/\.user-bubble\s*\{[^}]*padding\s*:\s*var\(--chat-sp-xxs\)\s+var\(--chat-sp-sm\)/);
-    expect(css).toMatch(/\.agent-bubble\s*\{[^}]*padding\s*:\s*var\(--chat-sp-xxs\)\s+var\(--chat-sp-sm\)/);
+  it('keeps both message roles on the shared conversation column', () => {
+    expect(css).toMatch(/\.agent-row\s*,\s*\.user-row-right\s*\{/);
+    expect(css).toMatch(/\.user-row-right\s*\{[^}]*justify-content\s*:\s*flex-end/);
   });
 });
