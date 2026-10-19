@@ -46,39 +46,38 @@ vi.mock('@lobehub/icons', () => {
 });
 
 function mkColorIcon(tag: string) {
-  const Icon = ({ size }: { size?: number }) => <span data-size={size} data-testid={`${tag}-color-icon`} />;
-  Icon.Color = Icon;
-  return { default: Icon };
+  return {
+    default: ({ size }: { size?: number }) => (
+      <span data-size={size} data-testid={`${tag}-color-icon`} />
+    ),
+  };
 }
 function mkRuntimeIcon(testid: string) {
   return { default: ({ size }: { size?: number }) => <span data-size={size} data-testid={testid} /> };
 }
 
-vi.mock('@lobehub/icons/es/Alibaba', () => mkColorIcon('alibaba'));
-vi.mock('@lobehub/icons/es/AlibabaCloud', () => mkColorIcon('alibabacloud'));
-vi.mock('@lobehub/icons/es/Anthropic', () => mkColorIcon('anthropic'));
-vi.mock('@lobehub/icons/es/Azure', () => mkColorIcon('azure'));
-vi.mock('@lobehub/icons/es/Aws', () => mkColorIcon('aws'));
-vi.mock('@lobehub/icons/es/Bedrock', () => mkColorIcon('bedrock'));
-vi.mock('@lobehub/icons/es/ByteDance', () => mkColorIcon('bytedance'));
-vi.mock('@lobehub/icons/es/Claude', () => mkColorIcon('claude'));
+vi.mock('@lobehub/icons/es/Alibaba/components/Color.js', () => mkColorIcon('alibaba'));
+vi.mock('@lobehub/icons/es/AlibabaCloud/components/Color.js', () => mkColorIcon('alibabacloud'));
+vi.mock('@lobehub/icons/es/Azure/components/Color.js', () => mkColorIcon('azure'));
+vi.mock('@lobehub/icons/es/Aws/components/Color.js', () => mkColorIcon('aws'));
+vi.mock('@lobehub/icons/es/Bedrock/components/Color.js', () => mkColorIcon('bedrock'));
+vi.mock('@lobehub/icons/es/ByteDance/components/Color.js', () => mkColorIcon('bytedance'));
+vi.mock('@lobehub/icons/es/Claude/components/Color.js', () => mkColorIcon('claude'));
 vi.mock('@lobehub/icons/es/ClaudeCode', () => mkRuntimeIcon('claude-code-icon'));
 vi.mock('@lobehub/icons/es/Codex', () => mkRuntimeIcon('codex-icon'));
-vi.mock('@lobehub/icons/es/Cohere', () => mkColorIcon('cohere'));
-vi.mock('@lobehub/icons/es/DeepSeek', () => mkColorIcon('deepseek'));
-vi.mock('@lobehub/icons/es/Doubao', () => mkColorIcon('doubao'));
-vi.mock('@lobehub/icons/es/Gemini', () => mkColorIcon('gemini'));
+vi.mock('@lobehub/icons/es/Cohere/components/Color.js', () => mkColorIcon('cohere'));
+vi.mock('@lobehub/icons/es/DeepSeek/components/Color.js', () => mkColorIcon('deepseek'));
+vi.mock('@lobehub/icons/es/Doubao/components/Color.js', () => mkColorIcon('doubao'));
+vi.mock('@lobehub/icons/es/Gemini/components/Color.js', () => mkColorIcon('gemini'));
 vi.mock('@lobehub/icons/es/GeminiCLI', () => mkRuntimeIcon('gemini-cli-icon'));
-vi.mock('@lobehub/icons/es/Google', () => mkColorIcon('google'));
-vi.mock('@lobehub/icons/es/Meta', () => mkColorIcon('meta'));
-vi.mock('@lobehub/icons/es/Mistral', () => mkColorIcon('mistral'));
-vi.mock('@lobehub/icons/es/Moonshot', () => mkColorIcon('moonshot'));
-vi.mock('@lobehub/icons/es/OpenAI', () => mkColorIcon('openai'));
+vi.mock('@lobehub/icons/es/Google/components/Color.js', () => mkColorIcon('google'));
+vi.mock('@lobehub/icons/es/Meta/components/Color.js', () => mkColorIcon('meta'));
+vi.mock('@lobehub/icons/es/Mistral/components/Color.js', () => mkColorIcon('mistral'));
 vi.mock('@lobehub/icons/es/OpenCode', () => mkRuntimeIcon('opencode-icon'));
-vi.mock('@lobehub/icons/es/Perplexity', () => mkColorIcon('perplexity'));
-vi.mock('@lobehub/icons/es/Qwen', () => mkColorIcon('qwen'));
-vi.mock('@lobehub/icons/es/Volcengine', () => mkColorIcon('volcengine'));
-vi.mock('@lobehub/icons/es/Zhipu', () => mkColorIcon('zhipu'));
+vi.mock('@lobehub/icons/es/Perplexity/components/Color.js', () => mkColorIcon('perplexity'));
+vi.mock('@lobehub/icons/es/Qwen/components/Color.js', () => mkColorIcon('qwen'));
+vi.mock('@lobehub/icons/es/Volcengine/components/Color.js', () => mkColorIcon('volcengine'));
+vi.mock('@lobehub/icons/es/Zhipu/components/Color.js', () => mkColorIcon('zhipu'));
 vi.mock('@lobehub/icons/es/Antigravity/components/Color.js', () => ({ default: () => null }));
 
 describe('RuntimeIcon', () => {
@@ -166,7 +165,9 @@ describe('RuntimeIcon', () => {
     expect(screen.getByTestId('codex-icon')).toBeInTheDocument();
     expect(screen.getByTestId('claude-code-icon')).toHaveAttribute('data-size', '24');
     expect(screen.getByTestId('opencode-icon')).toBeInTheDocument();
-    expect(screen.getByTestId('openai-color-icon')).toHaveAttribute('data-size', '16');
+    // OpenAI ships no colour mark, so it renders the deterministic fallback glyph.
+    expect(screen.queryByTestId('openai-color-icon')).toBeNull();
+    expect(screen.getByLabelText('OpenAI').querySelector('svg')).not.toBeNull();
     expect(screen.getByTestId('claude-color-icon')).toBeInTheDocument();
     expect(screen.getByLabelText('Claude')).toHaveAttribute('data-runtime-icon-value', 'claude');
   });
