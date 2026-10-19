@@ -1,5 +1,6 @@
 import { defineConfig, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
+import tailwindcss from '@tailwindcss/vite';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
@@ -75,7 +76,7 @@ export default defineConfig({
   define: {
     __APP_VERSION__: JSON.stringify(packageJson.version),
   },
-  plugins: [react(), edgeAuthTokenPlugin(), devCspPlugin()],
+  plugins: [react(), tailwindcss(), edgeAuthTokenPlugin(), devCspPlugin()],
   resolve: {
     dedupe: ['react', 'react-dom'],
     alias: {

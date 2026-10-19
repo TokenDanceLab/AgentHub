@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import '@/styles/tokens.css';
 import '@/styles/themes.css';
 import '@/styles/presets.css';
+import '@shared/styles/shadcn.css';
 import '@/i18n';
 import App from '@/App';
 import ErrorBoundary from '@/components/ErrorBoundary';

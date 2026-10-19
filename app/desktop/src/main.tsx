@@ -13,6 +13,7 @@ import { AppShell } from '@/AppShell';
 import '@/styles/tokens.css';
 import '@/styles/themes.css';
 import '@/styles/presets.css';
+import '@shared/styles/shadcn.css';
 
 const root = document.getElementById('root');
 if (!root) {
