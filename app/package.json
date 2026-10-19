@@ -12,7 +12,7 @@
     "dev:web": "pnpm --filter agenthub-web dev",
     "dev:mobile-rn": "pnpm --filter agenthub-mobile-rn dev",
     "build": "pnpm -r build",
-    "lint": "eslint .",
+    "lint": "pnpm -r lint",
     "lint:boundaries": "eslint --config eslint.boundaries.config.mjs shared/src/ui shared/src/chatview workbench/src web/src mobile-rn/src",
     "lint:fix": "eslint . --fix",
     "typecheck": "pnpm -r typecheck",
